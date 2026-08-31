@@ -396,5 +396,9 @@ export default {
     '委外发料单明细表': 'Outsource issue detail', '委外发料单统计表': 'Outsource issue stats',
     '委外入库单明细表': 'Outsource receipt detail', '委外入库单统计表': 'Outsource receipt stats',
     '发料单数': 'Issue docs', '入库单数': 'Receipt docs', '发料仓库': 'Issue warehouse', '材料仓库': 'Material warehouse',
+    '销售管理': 'Sales management', '销售订单': 'Sales order', '销售订单明细表': 'Sales order detail',
+    '销售订单统计表': 'Sales order statistics', '订单数': 'Order count', '含税金额': 'Tax-incl. amount', '销售单位': 'Sales UOM',
+    '联系人': 'Contact', '客户': 'Customer', '部门.负责人': 'Dept manager', '存货名称.品牌': 'Brand', '税率%': 'Tax rate %',
+    '含税单价': 'Tax-incl. price', '折扣金额': 'Discount amount', 'line_no': 'Line', '行备注': 'Line note',
   },
 }

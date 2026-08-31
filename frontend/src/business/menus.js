@@ -26,6 +26,28 @@ export const menuTree = [
     icon: 'Connection',
     children: [
       {
+        code: 'sales',
+        title: '销售管理',
+        icon: 'ShoppingCart',
+        children: [
+          {
+            code: 'doc', title: '单据', children: [
+              { code: 'soOrder', title: '销售订单', path: '/panelx/list/SO_ORDER', icon: 'Tickets', panelCode: 'SO_ORDER', operationName: '新增流程' },
+            ],
+          },
+          {
+            code: 'detail', title: '明细表', children: [
+              { code: 'soDetail', title: '销售订单明细表', path: '/panelx/list/SALES_ORDER_DETAIL', panelCode: 'SALES_ORDER_DETAIL', icon: 'List' },
+            ],
+          },
+          {
+            code: 'stats', title: '统计表', children: [
+              { code: 'soStats', title: '销售订单统计表', path: '/panelx/list/SALES_ORDER_STATS', panelCode: 'SALES_ORDER_STATS', icon: 'Histogram' },
+            ],
+          },
+        ],
+      },
+      {
         code: 'purchase',
         title: '采购管理',
         icon: 'ShoppingCart',

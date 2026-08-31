@@ -245,7 +245,8 @@ public class ButtonService {
         fillRequiredDefaults(table, cols);
         cols.put("asp_user1", user);
         cols.put("asp_time1", LocalDateTime.now());
-        String names = String.join(",", cols.keySet());
+        // 列名含特殊字符(%、.等)必须方括号包裹
+        String names = String.join(",", cols.keySet().stream().map(c -> "[" + c + "]").toList());
         String marks = String.join(",", cols.values().stream().map(x -> "?").toList());
         String sql = "INSERT INTO " + table + " (" + names + ") VALUES (" + marks + ")";
         Object[] args = cols.values().toArray();
@@ -304,15 +305,15 @@ public class ButtonService {
         List<Object> args = new ArrayList<>();
         for (Map.Entry<String, Object> e : cols.entrySet()) {
             if (set.length() > 0) set.append(", ");
-            set.append(e.getKey()).append(" = ?");
+            set.append("[").append(e.getKey()).append("] = ?");
             args.add(e.getValue());
         }
         StringBuilder where = new StringBuilder();
         if (id != null) {
-            where.append(pk).append(" = ?");
+            where.append("[").append(pk).append("] = ?");
             args.add(id);
         } else if (groupCol != null) {
-            where.append(groupCol).append(" = ?");
+            where.append("[").append(groupCol).append("] = ?");
             args.add(groupVal);
         }
         jdbc.update("UPDATE " + table + " SET " + set + " WHERE " + where, args.toArray());

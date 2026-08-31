@@ -114,16 +114,16 @@ public class QueryService {
         List<Object> args = new ArrayList<>();
         appendDocFilters(def, where, args, keyword, condition, l2c, split, docCols, docTable, g);
 
-        where.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.")
-                .append(g).append(" AND s.canceled = 'Y')");
+        where.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.[")
+                .append(g).append("] AND s.canceled = 'Y')");
         args.add(def.code());
 
         Integer total = jdbc.queryForObject(
-                "SELECT COUNT(DISTINCT t." + g + ") FROM " + docTable + " t " + where,
+                "SELECT COUNT(DISTINCT t.[" + g + "]) FROM " + docTable + " t " + where,
                 Integer.class, args.toArray());
 
-        String pageSql = "SELECT DISTINCT t." + g + " AS __no FROM " + docTable + " t " + where
-                + " ORDER BY t." + g + " DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+        String pageSql = "SELECT DISTINCT t.[" + g + "] AS __no FROM " + docTable + " t " + where
+                + " ORDER BY t.[" + g + "] DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add((pageNo - 1) * pageSize);
         pageArgs.add(pageSize);
@@ -144,9 +144,9 @@ public class QueryService {
 
         // 明细行(行表):单表式选全部字段列,头行式选明细列
         List<PanelRegistry.FieldDef> lineCols = split ? def.fieldsAt("detail") : def.fields();
-        String lineSql = "SELECT t.id AS __id, t." + g + " AS __no, " + selectCols(def, lineCols)
-                + " FROM " + def.lineTable() + " t WHERE t." + g + " IN (" + in + ")"
-                + " AND ISNULL(t.asp_cancel,'N')<>'Y' ORDER BY t." + g + ", t.id";
+        String lineSql = "SELECT t.id AS __id, t.[" + g + "] AS __no, " + selectCols(def, lineCols)
+                + " FROM " + def.lineTable() + " t WHERE t.[" + g + "] IN (" + in + ")"
+                + " AND ISNULL(t.asp_cancel,'N')<>'Y' ORDER BY t.[" + g + "], t.id";
         List<Map<String, Object>> lineRows = jdbc.queryForList(lineSql, docNos.toArray());
 
         Map<String, List<Map<String, Object>>> byDoc = new LinkedHashMap<>();
@@ -159,8 +159,8 @@ public class QueryService {
         // 头表(头行式)
         Map<String, Map<String, Object>> headRows = new HashMap<>();
         if (split) {
-            String headSql = "SELECT t.id AS __id, t." + g + " AS __no, " + selectCols(def, def.fieldsAt("header"))
-                    + " FROM " + def.headTable() + " t WHERE t." + g + " IN (" + in + ")";
+            String headSql = "SELECT t.id AS __id, t.[" + g + "] AS __no, " + selectCols(def, def.fieldsAt("header"))
+                    + " FROM " + def.headTable() + " t WHERE t.[" + g + "] IN (" + in + ")";
             for (Map<String, Object> r : jdbc.queryForList(headSql, docNos.toArray())) {
                 headRows.put(String.valueOf(r.get("__no")), r);
             }
@@ -237,12 +237,12 @@ public class QueryService {
 
     // ============ 公共 ============
 
-    /** 生成 SELECT 列(col AS 中文标签) */
+    /** 生成 SELECT 列(col AS 中文标签);列名含特殊字符(%、.、空格等)必须方括号包裹 */
     private String selectCols(PanelRegistry.PanelDef def, List<PanelRegistry.FieldDef> fields) {
         StringBuilder sb = new StringBuilder();
         for (PanelRegistry.FieldDef f : fields) {
             if (sb.length() > 0) sb.append(", ");
-            sb.append("t.").append(f.col()).append(" AS [").append(f.label()).append("]");
+            sb.append("t.[").append(f.col()).append("] AS [").append(f.label()).append("]");
         }
         return sb.length() == 0 ? "t.*" : sb.toString();
     }
@@ -317,7 +317,7 @@ public class QueryService {
             StringBuilder or = new StringBuilder();
             List<Object> kargs = new ArrayList<>();
             for (PanelRegistry.FieldDef f : docCols) {
-                or.append(or.length() > 0 ? " OR " : "").append("t.").append(f.col()).append(" LIKE ?");
+                or.append(or.length() > 0 ? " OR " : "").append("t.[").append(f.col()).append("] LIKE ?");
                 kargs.add("%" + keyword + "%");
             }
             StringBuilder lineOr = new StringBuilder();
