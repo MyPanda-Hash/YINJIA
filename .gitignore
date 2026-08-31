@@ -1,0 +1,15 @@
+# YINJIA-MES .gitignore
+node_modules/
+dist/
+target/
+*.jar
+*.rar
+*.tar.gz
+*.log
+.env
+.env.local
+*.local
+.vite/
+.vite-temp/
+.DS_Store
+Thumbs.db

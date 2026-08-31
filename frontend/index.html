@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YINJIA-MES · 生产制造执行系统</title>
+  <!-- 前端 /api 固定访问本地 Spring Boot + SQL Server HSDZ_MES 后端。 -->
+  <!-- 预置页面底色(登录页深色/主界面浅色):加载与语言切换刷新瞬间即正确底色,消除闪白 -->
+  <style>
+    html { background: #f0f2f3; }
+    html.login-bg { background: #15241f; }
+  </style>
+  <script>
+    ;(function () {
+      var h = (location.hash || '').toLowerCase()
+      if (h.indexOf('/login') >= 0 || (!h && sessionStorage.getItem('mes_at_login') === '1')) {
+        document.documentElement.classList.add('login-bg')
+      }
+    })()
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

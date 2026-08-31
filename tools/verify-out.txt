@@ -1,0 +1,18 @@
+﻿== 1. 登录 ==
+OK admin isAdmin=True
+== 2. 面板配置(KHDA/RKD)==
+KHDA: å®¢æ·æ¡£æ¡ cat=æ¡£æ¡ singleDoc=True query=3 detailCols=14 groups=4
+RKD: å¥åºå cat=åæ® singleDoc=False query=5 detailCols=10 groups=5
+KHDD: å®¢æ·è®¢å cat=åæ® singleDoc=False query=5 detailCols=9 groups=5
+WLBOM: ç©ææ¸å cat=åæ® singleDoc=False query=3 detailCols=10 groups=5
+== 3. 档案查询(KHDA 客户, 24 行)==
+total=24 编号= 状态= 首行=/
+== 4. 单据查询(RKD 入库单)==
+total=21 首单= 状态= 明细行=1
+== 5. 头行式查询(KHDD 客户订单)==
+total=13 订单= 客户PO= 明细行=15 首行产品= qty=
+== 6. 新增草稿(directAdd 语义: 空表单调保存)==
+新单号= 状态=
+== 7. 保存明细(给新单加两行)==
+保存后 状态=
+== 8. 审核 ==
