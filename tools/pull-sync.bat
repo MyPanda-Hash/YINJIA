@@ -27,7 +27,7 @@ if errorlevel 1 ( echo [错误] git pull 失败,先解决冲突再同步数据�
 
 echo.
 echo [2/2] 同步数据库 HSDZ_MES(仅执行新增/有变化的脚本)...
-"%JAVA_HOME%\bin\java.exe" -cp "%JDBC%" DbSync.java
+"%JAVA_HOME%\bin\java.exe" -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp "%JDBC%" DbSync.java
 if errorlevel 1 ( echo [错误] 数据库同步失败,查看上方输出 & goto :fail )
 
 echo.

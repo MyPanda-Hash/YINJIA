@@ -7,6 +7,7 @@ import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +26,9 @@ import java.util.List;
  * 注意:脚本按批(GO)自动提交,中途失败可能部分生效——此时不写记录,修复后重跑即可(脚本幂等)。
  */
 public class DbSync {
+    /** SQL Server 提示类消息码(0=PRINT,5701=库上下文,5703/5704=语言,15477=sp_rename 注意事项),不算错误 */
+    static final java.util.Set<Integer> INFO_CODES = java.util.Set.of(0, 5701, 5703, 5704, 15477);
+
     static final String URL = "jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false;loginTimeout=10";
     static final String USER = "yinjia";
     static final String PASS = System.getenv().getOrDefault("YINJIA_SQL_PASS", "Yinjia@2026");
@@ -151,6 +155,7 @@ public class DbSync {
             return false;
         }
         if (!raw.isEmpty() && raw.codePointAt(0) == 0xFEFF) raw = raw.substring(1);
+        boolean hadError = false;
         try (Statement st = c.createStatement()) {
             int batches = 0;
             for (String batch : splitGo(raw)) {
@@ -158,9 +163,21 @@ public class DbSync {
                 if (b.isEmpty()) continue;
                 st.execute(b);
                 batches++;
+                // 语句级错误(如建视图失败但批次继续)会以 SQLWarning 形式返回,必须检查,否则会静默漏建对象
+                for (SQLWarning w = st.getWarnings(); w != null; w = w.getNextWarning()) {
+                    if (!INFO_CODES.contains(w.getErrorCode())) {
+                        // 白名单外非 0 码为真实错误(如 4502 列重复、207 列名无效)
+                        System.err.println("  [语句错误] " + w.getMessage().trim() + " (code " + w.getErrorCode() + ")");
+                        hadError = true;
+                    } else if (w.getErrorCode() != 0) {
+                        System.out.println("  [print] " + w.getMessage().trim());
+                    }
+                }
+                st.clearWarnings();
                 int u = st.getUpdateCount();
                 if (u >= 0) System.out.println("  (" + u + " rows)");
             }
+            if (hadError) { System.err.println("  [FAIL] " + file.getFileName() + " 有 " + batches + " 批,但部分语句报错,视为失败"); return false; }
             System.out.println("  [OK] " + batches + " batches");
             return true;
         } catch (SQLException e) {
