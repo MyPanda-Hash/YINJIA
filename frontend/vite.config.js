@@ -15,6 +15,10 @@ export default defineConfig({
     // 局域网可访问（同事浏览器访问 http://<本机IP>:5173；Windows 防火墙需放行 5173）
     host: true,
     port: 5173,
+    // 忽略第三方程序(如 DSH Desktop)在源码目录创建的临时文件,避免 chokidar EBUSY 崩溃
+    watch: {
+      ignored: ['**/*.tmpdir/**', '**/*.tmp'],
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8090',
