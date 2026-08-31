@@ -18,3 +18,6 @@ Thumbs.db
 .m2-repo/
 .npm-cache/
 tools/apache-maven-3.9.9/
+
+# 例外:数据库同步工具需要的 JDBC 驱动
+!tools/lib/mssql-jdbc.jar

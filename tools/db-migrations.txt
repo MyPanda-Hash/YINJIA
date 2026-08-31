@@ -1,0 +1,38 @@
+# YINJIA-MES 数据库迁移清单(唯一权威顺序,按行序执行)
+# - DbSync.java 增量同步(pull-sync.bat 调用):只执行新脚本或内容有变化的脚本
+# - DbInit.java 全量初始化也按本清单执行
+# - 新增迁移脚本时:插入到合适位置(表结构 -> 元数据 -> 数据 -> 翻译 -> 视图 -> 修复类放最后)
+# - 脚本必须幂等(IF NOT EXISTS / DELETE+INSERT / 游标补列),因为内容变化会触发重跑
+
+setup-db.sql
+migrate-arch-single-doc.sql
+migrate-approval-flow.sql
+migrate-org-admin.sql
+fix-yj-user-id.sql
+migrate-role-perms.sql
+migrate-panel-modules.sql
+migrate-column-prefs.sql
+i18n-p3-labels.sql
+i18n-p3-updates.sql
+i18n-translation-table.sql
+i18n-fix-refkey.sql
+i18n-seed-languages.sql
+_bs_part1_tables.sql
+_bs_part2_meta.sql
+_bs_part3_data.sql
+_bs_part4_translations.sql
+cleanup-base-panels.sql
+_doc_part1_tables.sql
+_doc_part2_meta.sql
+_doc_part3_data.sql
+_doc_part4_translations.sql
+_so_part1.sql
+_so_data.sql
+dispatch-reports.sql
+outsource-reports.sql
+fix-views-ultimate.sql
+fix-views-cancel.sql
+fix-missing-columns.sql
+fix-all-report-fields.sql
+fix-zdgl-perf.sql
+fix-bsdict.sql

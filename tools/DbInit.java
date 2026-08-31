@@ -14,36 +14,26 @@ import java.util.List;
  */
 public class DbInit {
     static final String BASE = "D:\\YINJIA-main\\YINJIA-main\\tools\\";
+    /** 兜底清单(仅当 db-migrations.txt 不存在时使用;正常情况以清单文件为准) */
     static final String[] SCRIPTS = {
         "setup-db.sql",
-        "migrate-arch-single-doc.sql",
-        "migrate-approval-flow.sql",
-        "migrate-org-admin.sql",
-        "fix-yj-user-id.sql",
-        "migrate-role-perms.sql",
-        "migrate-panel-modules.sql",
-        "migrate-column-prefs.sql",
-        "i18n-p3-labels.sql",
-        "i18n-p3-updates.sql",
-        "i18n-translation-table.sql",
-        "i18n-fix-refkey.sql",
-        "i18n-seed-languages.sql",
-        "_bs_part1_tables.sql",
-        "_bs_part2_meta.sql",
-        "_bs_part3_data.sql",
-        "_bs_part4_translations.sql",
-        "cleanup-base-panels.sql",
-        "_doc_part1_tables.sql",
-        "_doc_part2_meta.sql",
-        "_doc_part3_data.sql",
-        "_doc_part4_translations.sql",
-        "dispatch-reports.sql",
-        "outsource-reports.sql",
-        "fix-views-ultimate.sql",
-        "fix-views-cancel.sql",
-        "fix-zdgl-perf.sql",
-        "fix-bsdict.sql",
     };
+
+    /** 优先读取 db-migrations.txt(DbSync 增量同步共用同一清单) */
+    static List<String> manifest() throws Exception {
+        Path mf = Path.of(BASE, "db-migrations.txt");
+        if (Files.exists(mf)) {
+            List<String> out = new ArrayList<>();
+            for (String line : Files.readAllLines(mf, StandardCharsets.UTF_8)) {
+                String t = line.trim();
+                if (!t.isEmpty() && !t.startsWith("#")) out.add(t);
+            }
+            System.out.println("[manifest] db-migrations.txt 共 " + out.size() + " 个脚本");
+            return out;
+        }
+        System.out.println("[manifest] 未找到 db-migrations.txt,使用内置兜底清单");
+        return List.of(SCRIPTS);
+    }
 
     public static void main(String[] args) throws Exception {
         String mode = args.length > 0 ? args[0] : "full";
@@ -52,11 +42,12 @@ public class DbInit {
                     "jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false;loginTimeout=10",
                     "yinjia", "Yinjia@2026")) {
                 System.out.println("[yinjia] connected: " + c.getMetaData().getUserName());
+                List<String> scripts = manifest();
                 boolean ok = true;
-                for (String s : SCRIPTS) {
+                for (String s : scripts) {
                     if (!runFile(c, Path.of(BASE, s))) { System.out.println("[ABORT] " + s); ok = false; break; }
                 }
-                if (ok) summary(c);
+                if (ok) { recordLog(c, scripts); summary(c); }
                 c.close();
                 System.exit(ok ? 0 : 1);
             }
@@ -89,12 +80,43 @@ public class DbInit {
         System.out.println("[admin] yinjia 登录/用户/角色就绪");
 
         boolean ok = true;
-        for (String s : SCRIPTS) {
+        List<String> scripts = manifest();
+        for (String s : scripts) {
             if (!runFile(c, Path.of(BASE, s))) { System.out.println("[ABORT] " + s); ok = false; break; }
         }
-        if (ok) { summary(c); System.out.println("\n=== 数据库初始化完成(服务即将恢复正常模式)==="); }
+        if (ok) { recordLog(c, scripts); summary(c); System.out.println("\n=== 数据库初始化完成(服务即将恢复正常模式)==="); }
         c.close();
         System.exit(ok ? 0 : 1);
+    }
+
+    /** 把已执行的脚本写入 yj_schema_log(与 DbSync 共用),避免初始化后 DbSync 重跑全部脚本 */
+    static void recordLog(Connection c, List<String> scripts) {
+        try (Statement st = c.createStatement()) {
+            st.execute("IF OBJECT_ID('yj_schema_log') IS NULL CREATE TABLE yj_schema_log ("
+                + "script_name nvarchar(300) PRIMARY KEY, content_hash char(64) NOT NULL, "
+                + "applied_at datetime2 DEFAULT SYSDATETIME())");
+        } catch (SQLException e) { System.out.println("[log] 建表失败(不影响初始化): " + e.getMessage()); return; }
+        int n = 0;
+        for (String s : scripts) {
+            try (java.sql.PreparedStatement ps = c.prepareStatement(
+                    "INSERT INTO yj_schema_log (script_name, content_hash) SELECT ?, ? "
+                  + "WHERE NOT EXISTS (SELECT 1 FROM yj_schema_log WHERE script_name = ?)")) {
+                String hash = "";
+                try { hash = sha256(Path.of(BASE, s)); } catch (Exception ignore) { }
+                ps.setString(1, s);
+                ps.setString(2, hash);
+                ps.setString(3, s);
+                n += ps.executeUpdate();
+            } catch (SQLException ignored) { }
+        }
+        System.out.println("[log] yj_schema_log 记录完成(新增 " + n + " 条)");
+    }
+
+    static String sha256(Path file) throws Exception {
+        byte[] d = java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(file));
+        StringBuilder sb = new StringBuilder();
+        for (byte b : d) sb.append(String.format("%02x", b));
+        return sb.toString();
     }
 
     static void restoreDb(Connection c, String bak) throws SQLException {
