@@ -11,10 +11,11 @@ IF OBJECT_ID('bs_dict') IS NULL CREATE TABLE bs_dict (
   [状态] nvarchar(10) NOT NULL DEFAULT N'启用',
   asp_user1 nvarchar(50) NULL, asp_time1 datetime2 NULL
 );
--- 2. 迁移数据(排除已作废)
+-- 2. 迁移数据(排除已作废;过滤 NULL,bs_dict 关键列 NOT NULL)
 INSERT INTO bs_dict ([字典类别], [代码], [名称], [备注], asp_user1, asp_time1)
 SELECT lb, dm, mc, bz, N'migration', SYSDATETIME()
-FROM dm_gx WHERE ISNULL(asp_cancel, 'N') <> 'Y';
+FROM dm_gx WHERE ISNULL(asp_cancel, 'N') <> 'Y'
+  AND lb IS NOT NULL AND dm IS NOT NULL AND mc IS NOT NULL;
 -- 3. 更新面板指向新表 + 限页
 UPDATE yj_panel SET line_table = 'bs_dict', page_size = 20 WHERE panel_code = 'ZDGL';
 -- 4. 更新字段:col_name 改中文键(与新表列名一致),dict_sql 改静态 VALUES

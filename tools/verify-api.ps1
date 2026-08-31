@@ -43,7 +43,7 @@ $token = $login.data.token
 Write-Output "OK admin isAdmin=$($login.data.user.isAdmin)"
 
 Write-Output '== 2. 面板配置 =='
-foreach ($p in @('KHDA','GFDA','YWYDA','CKDA','ZDGL','RKD','CKD','CGD','KHDD','WLBOM')) {
+foreach ($p in @('KHDA','ZDGL','RKD','CKD','CGD','KHDD','WLBOM')) {
   $cfg = Api 'GET' "/api/px/getPanelConfig?panelCode=$p" $null $token
   $m = $cfg.data.metadata
   Write-Output ("{0}: {1} | cat={2} singleDoc={3} query={4} cols={5} groups={6}" -f $p, $m.panelName, $m.panelCategory, $m.singleDoc, $m.panelPageDto.tablePages[0].queryFields.Count, $m.panelPageDto.tablePages[0].gridTabs[0].columns.Count, $m.buttonGroups.Count)

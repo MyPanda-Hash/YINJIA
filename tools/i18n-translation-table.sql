@@ -43,12 +43,17 @@ WHEN NOT MATCHED THEN INSERT (locale, name_zh, name_native, enabled, sort)
 VALUES (s.locale, s.name_zh, s.name_native, s.enabled, s.sort);
 GO
 -- 存量 label_en / panel_name_en 迁入翻译表(source=manual)
+-- 注意:yj_field 同一 (panel,col) 可能有多行且 label 不同(header/detail 双 place),
+-- 用 GROUP BY+MAX 聚成一行,否则撞 uq_translation;后续 i18n-fix-refkey 会统一重键为中文原文
 INSERT INTO yj_translation (scope, ref_key, locale, text, source)
-SELECT 'field', f.panel_code + ':' + f.col_name, 'en', f.label_en, 'manual'
-FROM yj_field f WHERE f.label_en IS NOT NULL
-AND NOT EXISTS (SELECT 1 FROM yj_translation t WHERE t.scope='field' AND t.ref_key = f.panel_code + ':' + f.col_name AND t.locale='en');
+SELECT 'field', x.ref_key, 'en', MAX(x.label_en), 'manual'
+FROM (SELECT f.panel_code + ':' + f.col_name AS ref_key, f.label_en
+      FROM yj_field f WHERE f.label_en IS NOT NULL) x
+LEFT JOIN yj_translation t ON t.scope='field' AND t.ref_key = x.ref_key AND t.locale='en'
+WHERE t.ref_key IS NULL
+GROUP BY x.ref_key;
 INSERT INTO yj_translation (scope, ref_key, locale, text, source)
-SELECT 'panel', p.panel_code, 'en', p.panel_name_en, 'manual'
+SELECT DISTINCT 'panel', p.panel_code, 'en', p.panel_name_en, 'manual'
 FROM yj_panel p WHERE p.panel_name_en IS NOT NULL
 AND NOT EXISTS (SELECT 1 FROM yj_translation t WHERE t.scope='panel' AND t.ref_key = p.panel_code AND t.locale='en');
 GO

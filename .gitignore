@@ -13,3 +13,8 @@ target/
 .vite-temp/
 .DS_Store
 Thumbs.db
+
+# 本地缓存与工具链(体积大,不入库)
+.m2-repo/
+.npm-cache/
+tools/apache-maven-3.9.9/

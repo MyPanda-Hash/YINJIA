@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- YINJIA-MES 本地构建用 Maven 配置:
+     本地仓库放工作区内(避免写 C:\Users\...\.m2),中央仓库走阿里云镜像(国内加速)。 -->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+  <localRepository>${env.YINJIA_M2_REPO}</localRepository>
+  <mirrors>
+    <mirror>
+      <id>aliyun-central</id>
+      <mirrorOf>central</mirrorOf>
+      <name>Aliyun Central Mirror</name>
+      <url>https://maven.aliyun.com/repository/public</url>
+    </mirror>
+  </mirrors>
+</settings>

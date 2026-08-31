@@ -3,11 +3,13 @@ chcp 65001 >nul
 rem YINJIA-MES 一键启动:后端(8090) + 前端 dev(5173)
 setlocal
 
-set "JAVA_HOME=D:\Program Files\Java\jdk-24"
-if not exist "%JAVA_HOME%\bin\java.exe" (
-  echo [错误] 未找到 JDK: %JAVA_HOME%
-  goto :fail
+rem ---- JDK 探测(与 build.bat 一致) ----
+if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" goto :jdk_ok
+for %%D in ("C:\Program Files\Java\jdk-26.0.2" "D:\Program Files\Java\jdk-26.0.2" "D:\Program Files\Java\jdk-24" "C:\Program Files\Java\jdk-17") do (
+  if exist "%%~D\bin\java.exe" ( set "JAVA_HOME=%%~D" & goto :jdk_ok )
 )
+where java >nul 2>nul || ( echo [错误] 未找到 JDK ^(17+^) & goto :fail )
+:jdk_ok
 
 if not exist "%~dp0backend\target\yinjia-mes-backend-0.1.0.jar" (
   echo [提示] 后端未构建,先执行 backend\build.bat
