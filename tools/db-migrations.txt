@@ -36,3 +36,14 @@ fix-missing-columns.sql
 fix-all-report-fields.sql
 fix-zdgl-perf.sql
 fix-bsdict.sql
+migrate-panda-parity.sql
+migrate-panda-replica.sql
+i18n-replica-labels.sql
+migrate-manu-contract-fix.sql
+migrate-ref-dialog.sql
+i18n-archive-panels.sql
+migrate-form-flow-link.sql
+migrate-report-column-settings.sql
+migrate-report-category.sql
+migrate-audit-cols.sql
+migrate-status-align.sql

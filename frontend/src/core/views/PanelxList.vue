@@ -2,7 +2,7 @@
   <div class="panelx-list" @click="closeCtx">
     <!-- ══════════ ① 顶部工具栏（T+ 灰条 + 单据翻页）══════════ -->
     <div class="tools">
-      <button type="button" class="toolbar-query-btn" title="按表头字段查询单据" @click.stop="openQueryDialog">
+      <button type="button" class="toolbar-query-btn" :title="tt('按表头字段查询单据')" @click.stop="openQueryDialog">
         <el-icon><Search /></el-icon>
         <span>{{ tt('查询') }}</span>
       </button>
@@ -19,23 +19,23 @@
       <div class="tools-right">
         <template v-if="reportMode">
           <span class="doc-chip">{{ panelName }}</span>
-          <span class="report-count">共 {{ total }} 条</span>
-          <span class="page-btn" title="首页" @click="reportPage(1)">◁</span>
-          <span class="page-btn" title="上一页" @click="reportPage(query.pageNo - 1)">◀</span>
-          <span class="page-no">第 {{ query.pageNo }}/{{ reportPageCount }} 页</span>
-          <span class="page-btn" title="下一页" @click="reportPage(query.pageNo + 1)">▶</span>
-          <span class="page-btn" title="末页" @click="reportPage(reportPageCount)">▷</span>
+          <span class="report-count">{{ tt('共') }} {{ total }} {{ tt('条') }}</span>
+          <span class="page-btn" :title="tt('首页')" @click="reportPage(1)">◁</span>
+          <span class="page-btn" :title="tt('上一页')" @click="reportPage(query.pageNo - 1)">◀</span>
+          <span class="page-no">{{ pageText(query.pageNo, reportPageCount, '页') }}</span>
+          <span class="page-btn" :title="tt('下一页')" @click="reportPage(query.pageNo + 1)">▶</span>
+          <span class="page-btn" :title="tt('末页')" @click="reportPage(reportPageCount)">▷</span>
         </template>
         <template v-else>
           <span class="doc-chip">{{ tt('单据：') }}{{ cur['编号'] || cur['单据编号'] || '-' }}</span>
           <span v-if="cur['类别']" class="doc-cat">{{ tt(cur['类别']) }}</span>
           <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
           <template v-if="!singleDocMode">
-            <span class="page-btn" title="首页" @click="pageFirst">◁</span>
-            <span class="page-btn" title="上一张" @click="page(-1)">◀</span>
-            <span class="page-no">第 {{ curNo }}/{{ total }} 张</span>
-            <span class="page-btn" title="下一张" @click="page(1)">▶</span>
-            <span class="page-btn" title="末页" @click="pageLast">▷</span>
+            <span class="page-btn" :title="tt('首页')" @click="pageFirst">◁</span>
+            <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
+            <span class="page-no">{{ pageText(curNo, total, '张') }}</span>
+            <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
+            <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
           </template>
         </template>
       </div>
@@ -44,14 +44,14 @@
     <!-- 报表沿用配置查询字段；单据页显示当前单据表头，草稿态原地编辑。 -->
     <div v-if="reportMode" class="fields udl-fields">
       <div class="field" v-for="qr in queryFields" :key="qr.dataName">
-        <label :class="{ req: qr.isRequired }">{{ qr.label || qr.dataName }}</label>
+        <label :class="{ req: qr.isRequired }">{{ qr.displayName || tt(qr.dataName) }}</label>
         <div v-if="qType(qr) === 'ref' && refModeMap[qr.dataName] === 'select'" class="query-ref-select">
           <el-select
             v-model="condition[qr.dataName]"
             clearable filterable remote allow-create default-first-option
             :remote-method="(kw) => loadRefSelectOptions(qr, qr.dataName, kw)"
             :loading="refSelectData[qr.dataName]?.loading"
-            :placeholder="qr.placeholder || '输入搜索'"
+            :placeholder="qr.placeholder || tt('输入搜索')"
             style="width: 100%"
             @change="search"
             @clear="search"
@@ -101,9 +101,10 @@
               v-model="cur[headerFieldKey(field)]"
               clearable filterable remote allow-create default-first-option
               :disabled="headerFieldLocked(field)"
+              @change="markInlineDirty"
               :remote-method="(kw) => loadRefSelectOptions(field, headerFieldKey(field), kw)"
               :loading="refSelectData[headerFieldKey(field)]?.loading"
-              placeholder="输入搜索"
+              :placeholder="tt('输入搜索')"
               style="width: 100%"
               @focus="checkRefMode(field, headerFieldKey(field))"
             >
@@ -132,6 +133,7 @@
             clearable
             filterable
             allow-create
+            @change="markInlineDirty"
           >
             <el-option v-for="option in fieldOptions(field)" :key="option.value" :label="option.label" :value="option.value" />
           </el-select>
@@ -141,22 +143,26 @@
             :disabled="headerFieldLocked(field)"
             type="date"
             value-format="YYYY-MM-DD"
+            @change="markInlineDirty"
           />
           <el-input-number
             v-else-if="isNumberField(field)"
             v-model="cur[headerFieldKey(field)]"
             :disabled="headerFieldLocked(field)"
             :controls="false"
+            @change="markInlineDirty"
           />
           <el-switch
             v-else-if="isBooleanField(field)"
             v-model="cur[headerFieldKey(field)]"
             :disabled="headerFieldLocked(field)"
+            @change="markInlineDirty"
           />
           <el-input
             v-else
             v-model="cur[headerFieldKey(field)]"
             :disabled="headerFieldLocked(field)"
+            @change="markInlineDirty"
           />
         </template>
         <div v-else class="field-readonly" :title="String(cur[headerFieldKey(field)] ?? '')">
@@ -172,7 +178,7 @@
       </div>
       <el-table
         class="report-table"
-        :data="list"
+        :data="reportList"
         border
         stripe
         size="small"
@@ -182,27 +188,65 @@
         empty-text="暂无符合条件的数据"
         @row-click="(row) => (current = row)"
       >
-        <el-table-column type="index" label="序号" width="58" fixed="left" :index="(i) => (query.pageNo - 1) * query.pageSize + i + 1" />
+        <el-table-column type="index" :label="tt('序号')" width="58" fixed="left" :index="(i) => (query.pageNo - 1) * query.pageSize + i + 1" />
         <template v-for="column in reportColumnTree" :key="column.label">
-          <el-table-column v-if="column.children" :label="column.label" align="center">
+          <el-table-column v-if="column.children" :label="tt(column.label)" align="center">
             <el-table-column
               v-for="child in column.children"
               :key="child.prop"
               :prop="child.prop"
-              :label="child.label"
               :min-width="child.width"
               :align="child.align"
               show-overflow-tooltip
-            />
+            >
+              <template #header>
+                <div class="report-col-container">
+                  <span class="report-col-title">{{ tt(child.label) }}</span>
+                  <span class="report-col-operator">
+                    <span class="report-col-sorter"
+                          :class="{on: reportCols.sort.prop===child.prop && reportCols.sort.order==='asc'}"
+                          @click.stop="reportCols.setSort(child.prop,'asc')">▲</span>
+                    <span class="report-col-sorter"
+                          :class="{on: reportCols.sort.prop===child.prop && reportCols.sort.order==='desc'}"
+                          @click.stop="reportCols.setSort(child.prop,'desc')">▼</span>
+                    <span v-if="hasDistinctValues(child.prop)"
+                          class="report-col-filter"
+                          :class="{on: reportCols.isFiltered(child.prop)}"
+                          @click.stop="openFilterAt(child.prop, $event)">
+                      <el-icon><Filter /></el-icon>
+                    </span>
+                  </span>
+                </div>
+              </template>
+            </el-table-column>
           </el-table-column>
           <el-table-column
             v-else
             :prop="column.prop"
-            :label="column.label"
             :min-width="column.width"
             :align="column.align"
             show-overflow-tooltip
-          />
+          >
+            <template #header>
+              <div class="report-col-container">
+                <span class="report-col-title">{{ tt(column.label) }}</span>
+                <span class="report-col-operator">
+                  <span class="report-col-sorter"
+                        :class="{on: reportCols.sort.prop===column.prop && reportCols.sort.order==='asc'}"
+                        @click.stop="reportCols.setSort(column.prop,'asc')">▲</span>
+                  <span class="report-col-sorter"
+                        :class="{on: reportCols.sort.prop===column.prop && reportCols.sort.order==='desc'}"
+                        @click.stop="reportCols.setSort(column.prop,'desc')">▼</span>
+                  <span v-if="hasDistinctValues(column.prop)"
+                        class="report-col-filter"
+                        :class="{on: reportCols.isFiltered(column.prop)}"
+                        @click.stop="openFilterAt(column.prop, $event)">
+                    <el-icon><Filter /></el-icon>
+                  </span>
+                </span>
+              </div>
+            </template>
+          </el-table-column>
         </template>
       </el-table>
     </div>
@@ -384,6 +428,16 @@
       <div class="ctx-item" v-for="it in ctxItems" :key="it" @click="onCtxItem(it)">{{ tt(it) }}</div>
     </div>
 
+    <!-- 未保存离开守卫(规范 §6.2):同步拦截路由,模板弹窗三态 -->
+    <el-dialog v-model="leaveVisible" :title="tt('未保存提示')" width="420px" append-to-body :close-on-click-modal="false">
+      <span>{{ tt('当前单据有未保存的修改，是否保存？') }}</span>
+      <template #footer>
+        <el-button @click="onLeaveChoice('stay')">{{ tt('取消') }}</el-button>
+        <el-button @click="onLeaveChoice('discard')">{{ tt('不保存') }}</el-button>
+        <el-button type="primary" @click="onLeaveChoice('save')">{{ tt('保存') }}</el-button>
+      </template>
+    </el-dialog>
+
     <RefPickDialog v-model="queryRefVisible" :field="queryRefField" mode="query" @confirm="onQueryRefConfirm" />
     <RefPickDialog v-model="headerRefVisible" :field="headerRefField" mode="header" @confirm="onHeaderRefConfirm" />
     <RefPickDialog v-model="detailRefVisible" :field="detailRefPick?.field" mode="detail" @confirm="onDetailRefConfirm" />
@@ -521,20 +575,47 @@
         <el-button type="primary" size="small" :loading="colPrefSaving" @click="saveColPrefs">保存</el-button>
       </template>
     </el-dialog>
+
+    <!-- ══════════ 报表表头筛选面板(teleport 到 body,按列头位置定位) ══════════ -->
+    <teleport to="body">
+      <div v-if="reportFilterVisible"
+           class="report-filter-panel"
+           :style="{ left: reportFilterX + 'px', top: reportFilterY + 'px' }"
+           @click.stop>
+        <div class="filter-panel-header">{{ tt('筛选') }}</div>
+        <div class="filter-panel-body">
+          <el-checkbox-group v-model="reportCols.headerFilters[reportFilterProp]">
+            <el-checkbox v-for="v in reportCols.distinctValues(reportFilterProp)"
+                         :key="String(v)" :value="v" class="filter-panel-item">
+              <span class="filter-panel-text">
+                {{ v === '' || v == null ? tt('（空）') : v }}
+              </span>
+            </el-checkbox>
+          </el-checkbox-group>
+        </div>
+        <div class="filter-panel-footer">
+          <el-button size="small"
+                     @click="reportCols.clearFilter(reportFilterProp)">{{ tt('清除') }}</el-button>
+          <el-button size="small" type="primary"
+                     @click="reportFilterVisible = false">{{ tt('确定') }}</el-button>
+        </div>
+      </div>
+    </teleport>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, nextTick } from 'vue'
+import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search } from '@element-plus/icons-vue'
+import { Filter, Plus, Search } from '@element-plus/icons-vue'
 import { useTabsStore } from '@/stores/tabs'
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
+import { useReportColumns } from '@core/report/useReportColumns'
 import RefPickDialog from './RefPickDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
@@ -770,7 +851,7 @@ async function checkRefMode(field, fieldKey) {
   refModeMap[fieldKey] = 'dialog' // 默认弹窗,异步判定后可能切下拉
   try {
     const count = await engine.refRowCount(field)
-    // 少量数据(≤20)用下拉轻快;大量数据(>20)用弹窗带搜索定位
+    // 少量数据(≤20)用下拉轻快;大量数据(>20)用弹窗带搜索定位(仅表头/查询区;明细单元格恒弹窗)
     refModeMap[fieldKey] = count > REF_DROPDOWN_THRESHOLD ? 'dialog' : 'select'
     if (refModeMap[fieldKey] === 'select') await loadRefSelectOptions(field, fieldKey, '')
   } catch (e) { /* 保持弹窗 */ }
@@ -815,23 +896,55 @@ const reportPeriod = computed(() => {
   if (start && end) return `${start} - ${end}`
   if (start) return `${start} 起`
   if (end) return `截至 ${end}`
-  return '当前业务数据'
+  return tt('当前业务数据')
 })
 const reportColumns = computed(() => gridTabs.value[0]?.columns || [])
+// ── 报表表头筛选与排序补丁:栏目显隐 / 表头筛选 / 升降序 / 后端持久化 ──
+const reportCols = useReportColumns(panelCode, reportColumns, list)
+const reportList = reportCols.sortedRows          // 排序+筛选后的报表数据(模板顶层引用以自动解包)
+const reportFilterVisible = ref(false)             // 筛选面板显示状态(本地驱动,配合 teleport 定位)
+const reportFilterProp = ref('')                   // 当前筛选的字段名
+const reportFilterX = ref(0)
+const reportFilterY = ref(0)
+
+function hasDistinctValues(prop) {
+  return reportCols.distinctValues(prop).length > 1
+}
+
+function openFilterAt(prop, event) {
+  const rect = event.currentTarget.getBoundingClientRect()
+  reportFilterX.value = rect.left
+  reportFilterY.value = rect.bottom + 4
+  if (!Array.isArray(reportCols.headerFilters[prop])) reportCols.headerFilters[prop] = []
+  reportFilterProp.value = prop
+  reportFilterVisible.value = true
+}
+
+function closeFilterPanel(e) {
+  if (!reportFilterVisible.value) return
+  if (e.target.closest('.report-filter-panel')) return
+  if (e.target.closest('.report-col-filter')) return
+  reportFilterVisible.value = false
+}
+
+onMounted(() => document.addEventListener('click', closeFilterPanel))
+onUnmounted(() => document.removeEventListener('click', closeFilterPanel))
+
 const reportColumnTree = computed(() => {
   const groups = gridTabs.value[0]?.columnGroups || []
   const owner = new Map()
   for (const group of groups) for (const column of group.columns || []) owner.set(column, group)
   const emitted = new Set()
   const out = []
-  for (const column of reportColumns.value) {
+  for (const column of reportColumns.value
+          .filter((name) => reportCols.visibleProps.value.includes(name))) {
     const group = owner.get(column)
     if (group) {
       if (emitted.has(group.label)) continue
       emitted.add(group.label)
       out.push({
         label: group.label,
-        children: (group.columns || []).filter((name) => reportColumns.value.includes(name)).map(reportLeaf),
+        children: (group.columns || []).filter((name) => reportCols.visibleProps.value.includes(name)).map(reportLeaf),
       })
     } else {
       out.push(reportLeaf(column))
@@ -926,44 +1039,51 @@ watch(cur, (v) => {
   }
 })
 
+/** 面板内切单守卫(翻页/点行):当前单有未保存修改时弹三态窗,干净则直切 */
+async function guardDocSwitch(nextIdx) {
+  if (nextIdx === curIdx.value) return
+  if (!hasUnsavedChanges() || guardAsking) { curIdx.value = nextIdx; return }
+  guardAsking = true
+  pendingLeave.value = null
+  pendingAction = async () => { curIdx.value = Math.min(nextIdx, Math.max(0, list.value.length - 1)) }
+  askUnsavedLeave()
+}
+
+/** 翻页动作守卫(含跨页):脏时弹三态窗,选择后执行原翻页逻辑 */
+async function guardPageAction(run) {
+  if (!hasUnsavedChanges() || guardAsking) { await run(); return }
+  guardAsking = true
+  pendingLeave.value = null
+  pendingAction = run
+  askUnsavedLeave()
+}
+
 async function page(delta) {
   const l = list.value
   if (!l.length) return
   const nxt = curIdx.value + delta
   if (nxt >= 0 && nxt < l.length) {
-    curIdx.value = nxt
+    await guardDocSwitch(nxt)
     return
   }
   if (delta > 0 && l.length < total.value) {
-    query.pageNo += 1
-    await load()
-    curIdx.value = 0
+    await guardPageAction(async () => { query.pageNo += 1; await load(); curIdx.value = 0 })
     return
   }
   if (delta < 0 && query.pageNo > 1) {
-    query.pageNo -= 1
-    await load()
-    curIdx.value = list.value.length - 1
+    await guardPageAction(async () => { query.pageNo -= 1; await load(); curIdx.value = list.value.length - 1 })
   }
 }
 
 async function pageFirst() {
   if (!list.value.length) return
-  if (query.pageNo > 1) {
-    query.pageNo = 1
-    await load()
-  }
-  curIdx.value = 0
+  await guardPageAction(async () => { if (query.pageNo > 1) { query.pageNo = 1; await load() } curIdx.value = 0 })
 }
 
 async function pageLast() {
   if (!list.value.length) return
   const lastPage = Math.max(1, Math.ceil(total.value / query.pageSize))
-  if (query.pageNo < lastPage) {
-    query.pageNo = lastPage
-    await load()
-  }
-  curIdx.value = list.value.length - 1
+  await guardPageAction(async () => { if (query.pageNo < lastPage) { query.pageNo = lastPage; await load() } curIdx.value = list.value.length - 1 })
 }
 
 // ══════════ 明细区块模型（配置驱动，见 docs/frontend/前端面板设计.md）══════════
@@ -986,9 +1106,9 @@ const mainRows = computed(() => {
   while (rows.length < 5) rows.push({ _placeholder: true })
   return rows
 })
-function onMainRowClick(row) {
+async function onMainRowClick(row) {
   const i = list.value.indexOf(row)
-  if (i >= 0) curIdx.value = i
+  if (i >= 0) await guardDocSwitch(i)
 }
 function mainRowCls({ row }) {
   if (row._placeholder) return 'ph-row'
@@ -1427,6 +1547,7 @@ function onHeaderRefConfirm(rows) {
   }
   headerRefVisible.value = false
   headerRefField.value = null
+  markInlineDirty() // 表头参照带回 = 未保存修改
 }
 
 function detailTabDefOf(key) {
@@ -1489,6 +1610,7 @@ function addInlineDetailRow(b) {
   if (!cur.value.detail) cur.value.detail = {}
   const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
   rows.push(newDetailRow(tabKey))
+  markInlineDirty() // 新增明细行 = 未保存修改
 }
 
 function primaryDetailRefField(b) {
@@ -1527,6 +1649,7 @@ function discardCreatedDetailRefRow(pick) {
 }
 
 async function onInlineDetailChange(tabKey, row, field) {
+  markInlineDirty() // 明细单元格任何值变更 → 未保存离开守卫置脏
   calculateDetailRow(tabKey, row)
   if (['存货编码', '存货名称', '产品编码', '产品名称', '材料编码', '材料名称', '仓库', '预出仓库', '出库仓库'].includes(field?.dataName)) {
     try { await engine.fillCurrentStock(row) } catch (error) { ElMessage.error(engine.errMsg(error) || '现存量刷新失败') }
@@ -1622,6 +1745,8 @@ async function saveInlineDraft(buttonName = '保存', { silent = false } = {}) {
     const index = list.value.findIndex((item) => item['编号'] === documentNo)
     if (index >= 0) curIdx.value = index
     if (!silent) ElMessage.success(`「${buttonName}」成功`)
+    inlineDirtyFlag.value = false
+    freshAdded.value = false
     return true
   } catch (error) {
     ElMessage.error(engine.errMsg(error) || '保存失败')
@@ -1735,6 +1860,12 @@ async function onDetailRefConfirm(selectedRows) {
     detailRefSaving.value = false
     detailRefPick.value = null
   }
+}
+
+/** 页码文案(语序适配:中文 第x/y张;英文 No. x of y) */
+function pageText(cur, total, unit) {
+  const zh = String(localStorage.getItem("mes_locale") || "zh-CN").startsWith("zh")
+  return zh ? `第 ${cur}/${total} ${unit}` : `${unit === "张" ? "No." : "Page"} ${cur} / ${total}`
 }
 
 function qType(qr) {
@@ -1931,6 +2062,30 @@ function exportReport() {
   ElMessage.success('已导出当前页 ' + list.value.length + ' 条数据')
 }
 
+/** 单据明细导出:当前 A 区活动页签(明细/汇总视图均可)导出 CSV(PANDA 打印组·导出) */
+function exportDetail() {
+  const blk = blocks.value.find((b) => b.id === 'A')
+  if (!blk) return ElMessage.warning('该面板无可导出的明细')
+  const tab = activeTab(blk)
+  const cols = blockCols(blk)
+  const rows = blockData(blk)
+  if (!rows.length) return ElMessage.warning('当前单据无明细可导出')
+  const esc = (value) => {
+    const text = String(value ?? '')
+    return /[",\n\t]/.test(text) ? '"' + text.replace(/"/g, '""') + '"' : text
+  }
+  const csv = '﻿' + cols.map(esc).join(',') + '\n'
+    + rows.map((row) => cols.map((col) => esc(row[col])).join(',')).join('\n')
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `${panelName.value}-${current.value?.['编号'] || current.value?.['单据编号'] || ''}-${tab.label || '明细'}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
+  ElMessage.success('已导出明细 ' + rows.length + ' 行')
+}
+
 // 底部备注（可编辑，绑定当前单据）
 const remarkText = computed({
   get: () => cur.value['备注'] ?? '',
@@ -1989,6 +2144,15 @@ function isDisabled(action) {
     保存为草稿: !draftEditable.value || inlineSaving.value,
     保存新增: !draftEditable.value || inlineSaving.value,
     扫描填单: reportMode.value,
+    // PANDA 工具栏动作(列表页语义)
+    复制: !current.value,            // 整单复制=另存为一张新草稿
+    放弃: false,                     // 丢弃内联草稿修改,恢复最近一次保存
+    打印: false, 预览: false, 导出: false,
+    发送邮件: false, 退出: false, 表格调整: false,
+  }
+  // 灰色占位动作(后端 metadata.disabledActions:选单无流转来源/生单无实现链路)恒置灰,点击忽略
+  if (map[action] === undefined && (cfgCache.value?.metadata?.disabledActions || []).includes(action)) {
+    return true
   }
   // 2026-08-25：所有「生成XX」生单按钮统一仅已审核/生产中可用（对齐 T+：已审核才能选择生单）
   if (map[action] === undefined && action.startsWith('生成')) {
@@ -2030,10 +2194,123 @@ async function directAdd() {
     if (!no) return ElMessage.error('新增失败：未返回单据编号')
     await load() // 刷新列表（新单按创建时间倒序置顶）
     curIdx.value = 0 // 定位到最新单据，草稿状态列表页可直接填写
+    freshAdded.value = true // 本次新增尚未成功保存过：离开守卫「不保存」时据此撤回整单
+    markSavedSnapshot()
     ElMessage.success(`已新增 ${panelName.value}-${no}，请在列表页填写并保存`)
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || '新增失败')
   }
+}
+
+// ============ 未保存离开守卫（开发规范 2026-09-01） ============
+// 草稿态内联编辑存在未保存修改时离开本页（菜单切换/页签关闭/后退）弹窗三态：
+// - 保存 → 走「保存」按钮路径(saveInlineDraft)落库后放行
+// - 不保存 → 新增未保存过的撤回整单（走「删除」按钮路径：软删作废，
+//   yj_doc_status.cancel_by/cancel_at 留痕 + form_flow_link 占用释放）；
+//   修改既有草稿的仅放弃修改（不删单）
+// - 取消(关闭弹窗) → 留在本页
+// 实现：路由守卫【同步】return false 拦截，弹窗在守卫之外(普通交互流程)弹出，
+// 选择完成后置 leaveConfirmed 再发起导航放行——避开在导航守卫内 await 弹窗的
+// 竞态(hash 已改/页签已关导致体验异常)。另挂 beforeunload 兜底刷新/关窗提醒。
+
+const savedSnapshot = ref('')
+const freshAdded = ref(false)
+/** 变更钩子置脏(表头/明细控件 @change;对真实交互可靠)——快照对比作兜底 */
+const inlineDirtyFlag = ref(false)
+function markInlineDirty() { if (draftEditable.value) inlineDirtyFlag.value = true }
+
+/** 记录"已保存"基线快照（load 完成/保存成功后调用） */
+function markSavedSnapshot() {
+  try {
+    savedSnapshot.value = cur.value ? JSON.stringify(currentFormData(cur.value.detail || {})) : ''
+  } catch { savedSnapshot.value = '' }
+}
+
+/** 当前是否存在未保存修改（草稿态且 变更钩子置脏 或 表头/明细相对基线有变化） */
+function hasUnsavedChanges() {
+  if (!draftEditable.value || !cur.value) return false
+  if (inlineDirtyFlag.value) return true
+  try {
+    return JSON.stringify(currentFormData(cur.value.detail || {})) !== savedSnapshot.value
+  } catch { return false }
+}
+
+/** 取消离开时页签可能已被 TabsBar 关闭，补回当前页签 */
+function restoreCurrentTab() {
+  try { tabs.open({ path: route.fullPath, title: panelName.value }) } catch { /* 页签兜底失败不阻断 */ }
+}
+
+// ---- 离开守卫：同步拦截 → 守卫外弹窗 → 选择后放行 ----
+const pendingLeave = ref(null)   // 被拦截的目标路由(选择后跳转)
+let pendingAction = null          // 被拦截的面板内动作(翻页/点行切单,选择后执行)
+const leaveConfirmed = ref(false) // 弹窗已决：放行下一次(由本组件发起的)导航
+let guardAsking = false          // 弹窗进行中防重入
+
+onBeforeRouteLeave((to) => {
+  if (leaveConfirmed.value) { leaveConfirmed.value = false; return true }
+  if (!hasUnsavedChanges() || guardAsking) { pendingLeave.value = null; return true }
+  pendingLeave.value = to
+  guardAsking = true
+  nextTick(() => askUnsavedLeave()) // 守卫拦截后弹模板确认框
+  return false
+})
+
+const leaveVisible = ref(false)
+
+/** 守卫拦截后弹出模板确认框(命令式 ElMessageBox 在导航守卫上下文中不渲染,改用模板弹窗) */
+function askUnsavedLeave() {
+  leaveVisible.value = true
+}
+
+/** 离开守卫三态选择:save=按保存按钮落库;discard=撤回新增/放弃修改;stay=留在本页 */
+async function onLeaveChoice(choice) {
+  leaveVisible.value = false
+  const to = pendingLeave.value
+  if (choice === 'stay') {
+    guardAsking = false
+    pendingLeave.value = null
+    restoreCurrentTab()
+    return
+  }
+  if (choice === 'save') {
+    const saved = await saveInlineDraft('保存', { silent: true })
+    if (!saved) { guardAsking = false; pendingLeave.value = null; restoreCurrentTab(); return }
+  } else if (freshAdded.value && cur.value?.['编号']) {
+    // 不保存 + 本次新增未保存过 → 撤回整单(走「删除」按钮路径:按开发规范留痕+释放占用)
+    try {
+      await engine.callButton({ panelCode: panelCode.value, buttonName: '删除', formData: { 编号: cur.value['编号'] }, buttonParam: {} })
+      ElMessage.success(`已撤回新增：${cur.value['编号']}`)
+      await load() // 撤回后重载列表(挂起的切单/翻页动作据此定位)
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || '撤回新增失败，请手动删除草稿')
+      guardAsking = false
+      pendingLeave.value = null
+      restoreCurrentTab()
+      return
+    }
+  }
+  freshAdded.value = false
+  inlineDirtyFlag.value = false
+  guardAsking = false
+  pendingLeave.value = null
+  const action = pendingAction
+  pendingAction = null
+  if (action) {
+    // 面板内动作(翻页/点行切单):load 时的快照对应切换前的单据,切换后必须重打
+    // 基线快照,否则快照错位导致恒脏(误弹守卫/beforeunload 卡死)
+    await action()
+    markSavedSnapshot()
+    return
+  }
+  leaveConfirmed.value = true
+  if (to) router.push(typeof to === 'string' ? to : (to.fullPath || to.path))
+}
+
+// 刷新/关闭浏览器兜底：未保存时浏览器原生确认
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', (e) => {
+    if (hasUnsavedChanges()) { e.preventDefault(); e.returnValue = '' }
+  })
 }
 
 async function onButton(action) {
@@ -2050,11 +2327,13 @@ async function onButton(action) {
     search()
     return
   }
-  if (reportMode.value && action === '导出') {
-    exportReport()
+  if (action === '导出') {
+    // 报表=整表 CSV;单据=当前明细页签 CSV(PANDA 打印组/委外更多 的导出)
+    if (reportMode.value) exportReport()
+    else exportDetail()
     return
   }
-  if (action === '预览' || (reportMode.value && action === '打印')) {
+  if (action === '打印' || action === '预览') {
     window.print()
     return
   }
@@ -2067,8 +2346,46 @@ async function onButton(action) {
     ElMessage.info('报表邮件发送需先配置企业邮箱服务')
     return
   }
-  if (reportMode.value && action === '退出') {
+  if (action === '退出') {
     router.push('/dashboard')
+    return
+  }
+  // 放弃(列表页):丢弃内联草稿修改,恢复最近一次保存的数据
+  if (action === '放弃') {
+    if (draftEditable.value) {
+      await load()
+      ElMessage.success('已放弃未保存的修改')
+    } else {
+      ElMessage.info('当前没有未保存的修改')
+    }
+    return
+  }
+  // 复制(列表页):整单复制为一张新草稿(表头+明细,去掉编号/状态/行 id)
+  if (action === '复制') {
+    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (cfgCache.value?.metadata?.singleDoc) return ElMessage.info('档案面板不支持整单复制')
+    const srcNo = current.value['编号'] || current.value['单据编号']
+    try {
+      const fd = await engine.getFormDescriptor({ panelCode: panelCode.value, code: srcNo })
+      const head = { ...(fd.data || {}) }
+      delete head['编号']; delete head['单据状态']
+      const detail = {}
+      for (const [key, rows] of Object.entries(fd.detailData || {})) {
+        if (!Array.isArray(rows)) continue
+        detail[key] = rows.map((row) => {
+          const copy = { ...row }
+          delete copy.id; delete copy.__id; delete copy.__no
+          return copy
+        })
+      }
+      const res = await engine.callButton({
+        panelCode: panelCode.value, buttonName: '保存', formData: { ...head, detail }, buttonParam: {},
+      })
+      ElMessage.success('已复制为新草稿：' + (res['编号'] || ''))
+      await load()
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || '复制失败')
+    }
     return
   }
   if (action === '导入') {
@@ -2351,6 +2668,8 @@ async function load() {
     }
     // 参照字段模式跟随最新数据量(增删档案跨越 20 条阈值时下拉↔弹窗自动切换)
     refreshRefModes()
+    markSavedSnapshot() // 未保存离开守卫的基线快照（载入即干净；保存成功也会经此刷新）
+    inlineDirtyFlag.value = false
   } catch (e) {
     const msg = engine.errMsg(e) || '加载失败'
     ElMessage.error(msg)
@@ -3492,4 +3811,107 @@ onUnmounted(() => {
 .cp-label { flex: 1; font-size: 13px; color: #333; min-width: 80px; }
 .cp-alias { width: 140px; }
 .cp-alias .el-input__inner { font-size: 12px; }
+
+/* ══════════ 报表表头筛选与排序补丁 ══════════ */
+/* ---- 表头排序和筛选图标 ---- */
+.report-col-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+  position: relative;
+}
+.report-col-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.report-col-operator {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  flex: none;
+  margin-left: 4px;
+  opacity: 0;
+  transition: opacity .15s;
+}
+.report-col-container:hover .report-col-operator {
+  opacity: 1;
+}
+.report-col-operator .on {
+  opacity: 1;
+}
+.report-col-sorter {
+  font-size: 9px;
+  color: #bfbfbf;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 1px;
+}
+.report-col-sorter:hover {
+  color: #1677ff;
+}
+.report-col-sorter.on {
+  color: #1677ff;
+}
+.report-col-filter {
+  font-size: 12px;
+  color: #bfbfbf;
+  cursor: pointer;
+  margin-left: 2px;
+  display: inline-flex;
+  align-items: center;
+}
+.report-col-filter .el-icon {
+  font-size: 12px;
+}
+.report-col-filter:hover {
+  color: #1677ff;
+}
+.report-col-filter.on {
+  color: #1677ff;
+}
+/* ---- 筛选面板 ---- */
+.report-filter-panel {
+  position: fixed;
+  z-index: 9999;
+  background: #fff;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  box-shadow: 0 6px 16px rgba(0,0,0,.08);
+  min-width: 160px;
+  max-width: 220px;
+}
+.filter-panel-header {
+  padding: 8px 12px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #606266;
+  border-bottom: 1px solid #f0f0f0;
+}
+.filter-panel-body {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px 12px;
+}
+.filter-panel-item {
+  display: flex !important;
+  margin-left: 0 !important;
+  height: 26px;
+}
+.filter-panel-text {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+.filter-panel-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 8px 12px;
+  border-top: 1px solid #f0f0f0;
+}
 </style>

@@ -30,7 +30,7 @@ IF OBJECT_ID('bd_so_order') IS NULL CREATE TABLE bd_so_order (
   [备注] nvarchar(500) NULL,
 
   [单据状态] nvarchar(10) NOT NULL DEFAULT N'草稿', [审核人] nvarchar(50) NULL, [审核时间] datetime2 NULL, [审批人] nvarchar(50) NULL, [审批时间] datetime2 NULL,
-  asp_user1 nvarchar(50) NULL, asp_time1 datetime2 NULL, asp_cancel char(1) NULL DEFAULT 'N'
+  asp_user1 nvarchar(50) NULL, asp_time1 datetime2 NULL, asp_user2 nvarchar(50) NULL, asp_time2 datetime2 NULL, asp_cancel char(1) NULL DEFAULT 'N'
 );
 
 IF OBJECT_ID('bl_so_order') IS NULL CREATE TABLE bl_so_order (
@@ -67,7 +67,7 @@ IF OBJECT_ID('bl_so_order') IS NULL CREATE TABLE bl_so_order (
 
   [备注] nvarchar(200) NULL,
 
-  asp_user1 nvarchar(50) NULL
+  asp_user1 nvarchar(50) NULL, asp_time1 datetime2 NULL, asp_user2 nvarchar(50) NULL, asp_time2 datetime2 NULL, asp_cancel char(1) NULL DEFAULT 'N'
 );
 
 -- 兼容旧库:早期版本列名带点(部门.负责人/存货名称.品牌),后端 SQL 构建器不支持,统一改为无点列名
@@ -111,15 +111,24 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SO_ORDER' AND col_name=N
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SO_ORDER' AND col_name=N'现存量') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('SO_ORDER', N'现存量', N'现存量', N'小数', NULL, NULL, NULL, NULL, N'detail', 140, 110, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SO_ORDER' AND col_name=N'备注') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('SO_ORDER', N'备注', N'备注', N'文本', NULL, NULL, NULL, NULL, N'detail', 150, 140, 1, 0, 0, 1);
 
--- 明细表视图(先删后建保证幂等;l 的预计交货日期/备注与 h.* 重复,已去掉)
+-- 明细表视图(先删后建保证幂等;l 的预计交货日期/备注与 h 重复,已去掉;
+-- 单据状态/审核人由 yj_doc_status 工作流注册表派生,与单据面板显示一致)
 IF OBJECT_ID('v_sales_order_detail') IS NOT NULL DROP VIEW v_sales_order_detail;
-EXEC('CREATE VIEW v_sales_order_detail AS SELECT h.*, l.[单据编号] AS line_no, l.[存货名称品牌], l.[存货名称], l.[存货编码], l.[规格型号], l.[数量], l.[销售单位], l.[单价], l.[税率%], l.[含税单价], l.[金额], l.[含税金额], l.[折扣金额], l.[现存量] FROM bd_so_order h LEFT JOIN bl_so_order l ON h.[单据编号]=l.[单据编号]');
-IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='SALES_ORDER_DETAIL') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('SALES_ORDER_DETAIL', N'销售订单明细表', N'智能供应链', 'flat', 'v_sales_order_detail', NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'智能供应链');
+EXEC(N'CREATE VIEW v_sales_order_detail AS SELECT h.[id], h.[单据编号], h.[单据日期], h.[客户], h.[客户编码], h.[结算客户], h.[部门], h.[部门负责人], h.[业务员], h.[项目], h.[预计交货日期], h.[联系人], h.[备注], h.[审核时间], h.[审批人], h.[审批时间], h.asp_user1, h.asp_time1, h.asp_cancel'
+  + N', l.[单据编号] AS line_no, l.[存货名称品牌], l.[存货名称], l.[存货编码], l.[规格型号], l.[数量], l.[销售单位], l.[单价], l.[税率%], l.[含税单价], l.[金额], l.[含税金额], l.[折扣金额], l.[现存量]'
+  + N', CASE WHEN ISNULL(s.canceled,N''N'')=N''Y'' THEN N''已作废'''
+  + N' WHEN ISNULL(s.pending,N''N'')=N''Y'' THEN N''审批中'''
+  + N' WHEN s.shr IS NOT NULL THEN N''已审核'''
+  + N' ELSE N''草稿'' END AS [单据状态]'
+  + N', s.shr AS [审核人]'
+  + N' FROM bd_so_order h LEFT JOIN bl_so_order l ON h.[单据编号]=l.[单据编号]'
+  + N' LEFT JOIN yj_doc_status s ON s.panel_code = ''SO_ORDER'' AND s.doc_no = h.[单据编号]');
+IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='SALES_ORDER_DETAIL') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('SALES_ORDER_DETAIL', N'销售订单明细表', N'报表', 'flat', 'v_sales_order_detail', NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'智能供应链');
 
 -- 统计表视图(bl_so_order 无[计量单位]列,取[销售单位]别名;先删后建保证幂等)
 IF OBJECT_ID('v_sales_order_stats') IS NOT NULL DROP VIEW v_sales_order_stats;
 EXEC('CREATE VIEW v_sales_order_stats AS SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.[单据日期], h.asp_cancel, l.[存货名称], l.[规格型号], l.[销售单位] AS [计量单位], COUNT(DISTINCT h.[单据编号]) AS [订单数], SUM(COALESCE(l.[数量],0)) AS [数量], SUM(COALESCE(l.[金额],0)) AS [金额] FROM bd_so_order h LEFT JOIN bl_so_order l ON h.[单据编号]=l.[单据编号] GROUP BY h.[单据日期], h.asp_cancel, l.[存货名称], l.[规格型号], l.[销售单位]');
-IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='SALES_ORDER_STATS') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('SALES_ORDER_STATS', N'销售订单统计表', N'智能供应链', 'flat', 'v_sales_order_stats', NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'智能供应链');
+IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='SALES_ORDER_STATS') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('SALES_ORDER_STATS', N'销售订单统计表', N'报表', 'flat', 'v_sales_order_stats', NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'智能供应链');
 
 DECLARE @n sysname, @i int;
 DECLARE cc CURSOR FOR SELECT c.name FROM sys.columns c WHERE c.object_id=OBJECT_ID('v_sales_order_detail') AND c.name NOT IN ('id','asp_cancel') ORDER BY c.column_id;

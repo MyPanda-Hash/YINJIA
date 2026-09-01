@@ -7,8 +7,8 @@
           <div class="wz-close" @click="skip">
             <el-icon><Close /></el-icon>
           </div>
-          <div class="wz-title">MES 初始化配置</div>
-          <div class="wz-subtitle">三步即可轻松完成行业功能初始化流程</div>
+          <div class="wz-title">{{ tt('MES 初始化配置') }}</div>
+          <div class="wz-subtitle">{{ tt('三步即可轻松完成行业功能初始化流程') }}</div>
         </div>
 
         <!-- 步骤指示 -->
@@ -17,7 +17,7 @@
             <span class="wz-step-no">1</span>
             <div class="wz-step-text">
               <div class="wz-step-name">第一步</div>
-              <div class="wz-step-desc">选择行业细分 & 经营业态</div>
+              <div class="wz-step-desc">{{ tt('选择行业细分 & 经营业态') }}</div>
             </div>
           </div>
           <div class="wz-step-arrow"><el-icon><ArrowRight /></el-icon></div>
@@ -40,7 +40,7 @@
 
         <!-- 第一步：行业 & 业态 -->
         <div v-if="step === 1" class="wz-body">
-          <div class="wz-body-title">选择行业细分</div>
+          <div class="wz-body-title">{{ tt('选择行业细分') }}</div>
           <div class="wz-cards">
             <div
               v-for="i in industries"
@@ -54,7 +54,7 @@
               <span class="wz-card-desc">{{ i.desc }}</span>
             </div>
           </div>
-          <div class="wz-body-title">选择经营业态</div>
+          <div class="wz-body-title">{{ tt('选择经营业态') }}</div>
           <div class="wz-cards">
             <div
               v-for="b in business"
@@ -71,7 +71,7 @@
 
         <!-- 第二步：特性选择 -->
         <div v-if="step === 2" class="wz-body">
-          <div class="wz-body-title">选择启用模块</div>
+          <div class="wz-body-title">{{ tt('选择启用模块') }}</div>
           <div class="wz-cards">
             <div
               v-for="m in modules"
@@ -85,7 +85,7 @@
               <span class="wz-card-desc">{{ m.desc }}</span>
             </div>
           </div>
-          <div class="wz-body-title">报工方式</div>
+          <div class="wz-body-title">{{ tt('报工方式') }}</div>
           <el-radio-group v-model="form.reportMode" class="wz-radio-group">
             <el-radio-button value="scan">扫码报工（推荐）</el-radio-button>
             <el-radio-button value="manual">手工报工</el-radio-button>
@@ -118,7 +118,7 @@
               <span>{{ moduleNames || '仅基础模块' }}</span>
             </div>
             <div class="wz-summary-row">
-              <span class="wz-summary-label">报工方式</span>
+              <span class="wz-summary-label">{{ tt('报工方式') }}</span>
               <span>{{ reportModeName }}</span>
             </div>
             <div class="wz-summary-row">
@@ -130,13 +130,13 @@
 
         <!-- 底部按钮 -->
         <div class="wz-footer">
-          <div v-if="step === 1" class="wz-start" @click="next">开始配置</div>
+          <div v-if="step === 1" class="wz-start" @click="next">{{ tt('开始配置') }}</div>
           <template v-else>
             <div class="wz-back" @click="prev">上一步</div>
             <div v-if="step === 2" class="wz-start" @click="next">下一步</div>
             <div v-else class="wz-start" @click="finish">完成设置</div>
           </template>
-          <div class="wz-skip" @click="skip">下次再说</div>
+          <div class="wz-skip" @click="skip">{{ tt('下次再说') }}</div>
         </div>
       </div>
     </div>
@@ -144,6 +144,7 @@
 </template>
 
 <script setup>
+import { tt } from '@/i18n'
 import { ref, reactive, computed } from 'vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'

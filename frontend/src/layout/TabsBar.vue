@@ -25,7 +25,7 @@
         <div class="find-box">
           <el-input
             v-model="findNo"
-            placeholder="单据编号（如 MO20260813-001）"
+            :placeholder="tt('单据编号（如 MO20260813-001）')"
             size="small"
             clearable
             @keyup.enter="quickFind"

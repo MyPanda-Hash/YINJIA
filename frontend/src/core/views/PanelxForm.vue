@@ -52,7 +52,7 @@
             :disabled="!editable || fieldLocked(r)"
             :remote-method="(kw) => loadRefOptions(r, kw)"
             :loading="refSelectData[r.code]?.loading"
-            placeholder="输入搜索"
+            :placeholder="tt('输入搜索')"
             style="width: 100%"
             @focus="checkRefMode(r)"
           >
@@ -63,7 +63,7 @@
               :model-value="refText(r, form[r.code])"
               readonly
               :disabled="!editable || fieldLocked(r)"
-              :placeholder="isEdit ? '' : '点击选择'"
+              :placeholder="isEdit ? '' : tt('点击选择')"
               @click="openRefPick(r)"
             />
             <el-button v-if="editable && !fieldLocked(r)" class="ref-btn" size="small" :icon="Search" @click="openRefPick(r)" />
@@ -100,18 +100,18 @@
               >{{ tab.label }}汇总</span>
             </div>
             <div class="dt-actions">
-              <el-button v-if="editable" type="primary" :icon="Plus" @click="addDetailRow(tab)" class="add-data-btn">新增数据</el-button>
-              <span class="dt-ic" v-if="ti === 0">Ctrl+V列粘贴</span>
-              <span class="dt-ic">定位</span>
-              <span class="dt-ic">复制到剪贴板</span>
-              <span class="dt-ic">从剪贴板粘贴</span>
-              <span class="dt-ic">另存为EXCEL模板</span>
-              <span class="dt-ic">批量修改</span>
-              <span class="dt-ic" v-if="ti === 0">销售订单查询</span>
-              <span class="dt-ic">存货中心</span>
-              <span class="dt-ic" v-if="visibleFields(tab).some((field) => field.dataName === '现存量')" @click="refreshTabCurrentStock(tab)">现存量提取</span>
-              <span class="dt-ic">更多</span>
-              <span v-if="tab.key === 'materials' && selectedProduct" class="filter-hint">当前产品：{{ selectedProduct }} 的 BOM 子件</span>
+              <el-button v-if="editable" type="primary" :icon="Plus" @click="addDetailRow(tab)" class="add-data-btn">{{ tt('新增数据') }}</el-button>
+              <span class="dt-ic" v-if="ti === 0">{{ tt('Ctrl+V列粘贴') }}</span>
+              <span class="dt-ic">{{ tt('定位') }}</span>
+              <span class="dt-ic">{{ tt('复制到剪贴板') }}</span>
+              <span class="dt-ic">{{ tt('从剪贴板粘贴') }}</span>
+              <span class="dt-ic">{{ tt('另存为EXCEL模板') }}</span>
+              <span class="dt-ic">{{ tt('批量修改') }}</span>
+              <span class="dt-ic" v-if="ti === 0">{{ tt('销售订单查询') }}</span>
+              <span class="dt-ic">{{ tt('存货中心') }}</span>
+              <span class="dt-ic" v-if="visibleFields(tab).some((field) => field.dataName === '现存量')" @click="refreshTabCurrentStock(tab)">{{ tt('现存量提取') }}</span>
+              <span class="dt-ic">{{ tt('更多') }}</span>
+              <span v-if="tab.key === 'materials' && selectedProduct" class="filter-hint">{{ tt('当前产品：') }}{{ selectedProduct }} {{ tt('的 BOM 子件') }}</span>
               <span class="tab-hint">{{ tabHint(tab) }}</span>
             </div>
           </div>
@@ -134,7 +134,7 @@
                   <div class="sub-wrap">
                     <div class="sub-head">
                       <span class="sub-title">{{ tab.subTable.label }}</span>
-                      <el-button v-if="editable" size="small" :icon="Plus" @click="addSubRow(row, tab)">增行</el-button>
+                      <el-button v-if="editable" size="small" :icon="Plus" @click="addSubRow(row, tab)">{{ tt('增行') }}</el-button>
                     </div>
                     <el-table :data="row['子表材料'] || []" size="small" border>
                       <el-table-column label="序号" width="50" align="center">
@@ -376,7 +376,7 @@ const subBomVisible = ref(false)
 const subBomMaterial = ref(null)
 const subBomBom = ref([])
 const groups = ref([])
-// ---- 参照字段双模(≤20 弹窗,>20 下拉):与 PanelxList 同一逻辑 ----
+// ---- 参照字段双模:仅表头(≤20 弹窗,>20 下拉);明细单元格恒为弹窗(参照字段在表格内不走此逻辑) ----
 const refModeMap = reactive({})
 const refSelectData = reactive({})
 const REF_DROPDOWN_THRESHOLD = 20

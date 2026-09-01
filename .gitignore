@@ -21,3 +21,15 @@ tools/apache-maven-3.9.9/
 
 # 例外:数据库同步工具需要的 JDBC 驱动
 !tools/lib/mssql-jdbc.jar
+
+# 误创建的 Maven 本地仓库(settings.xml 的 localRepository 未展开环境变量)
+backend/${env.YINJIA_M2_REPO}/
+
+# 会话诊断脚本与临时产物(不入库)
+tools/_*.cjs
+tools/_*.json
+tools/_*.md
+tools/_*.txt
+tools/vc-out.txt
+tools/vd-out.txt
+tools/_void-check.sql

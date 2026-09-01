@@ -22,10 +22,12 @@ public class QueryService {
 
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
+    private final TranslationService translations;
 
-    public QueryService(PanelRegistry registry, JdbcTemplate jdbc) {
+    public QueryService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations) {
         this.registry = registry;
         this.jdbc = jdbc;
+        this.translations = translations;
     }
 
     public Map<String, Object> queryFormDataList(String panelCode, String keyword,
@@ -89,7 +91,11 @@ public class QueryService {
 
         // 单单据契约:一张虚拟单承载整份档案,记录在 detail.<tabKey>(light-mes §八)
         Map<String, Object> doc = new LinkedHashMap<>();
-        doc.put("编号", def.name());
+        // 档案虚拟单据的"编号"=面板名:按请求 locale 下发译名(显示层,数据层仍中文面板名)
+        String localeKey = TranslationService.localeKey(org.springframework.context.i18n.LocaleContextHolder.getLocale());
+        String docName = "zh".equals(localeKey) ? def.name()
+                : translations.scope(localeKey, "panel").getOrDefault(def.name(), def.name());
+        doc.put("编号", docName);
         doc.put("状态", "启用");
         doc.put("单据状态", "启用");
         doc.put("detail", Map.of(def.tabKey(), items));
@@ -213,12 +219,13 @@ public class QueryService {
         List<Object> args = new ArrayList<>(List.of(panelCode));
         args.addAll(docNos);
         Map<String, Map<String, Object>> out = new HashMap<>();
-        jdbc.query("SELECT doc_no, shr, shsj, canceled, pending, pending_by, pending_at FROM yj_doc_status"
+        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at FROM yj_doc_status"
                 + " WHERE panel_code = ? AND doc_no IN (" + in + ")", rs -> {
             Map<String, Object> m = new HashMap<>();
             m.put("shr", rs.getString("shr"));
             m.put("shsj", rs.getTimestamp("shsj"));
             m.put("canceled", rs.getString("canceled"));
+            m.put("stopped", rs.getString("stopped"));
             m.put("pending", rs.getString("pending"));
             m.put("pending_by", rs.getString("pending_by"));
             m.put("pending_at", rs.getTimestamp("pending_at"));
@@ -227,9 +234,10 @@ public class QueryService {
         return out;
     }
 
-    /** 状态推导(照搬 light-mes 审批流):已作废 > 已审核 > 审批中 > 草稿 */
+    /** 状态推导(照搬 light-mes 审批流 + 中止档):已作废 > 已中止 > 已审核 > 审批中 > 草稿 */
     private String docStatus(Map<String, Object> st) {
         if (st != null && "Y".equals(st.get("canceled"))) return "已作废";
+        if (st != null && "Y".equals(st.get("stopped"))) return "已中止";
         if (st != null && st.get("shr") != null) return "已审核";
         if (st != null && "Y".equals(st.get("pending"))) return "审批中";
         return "草稿";

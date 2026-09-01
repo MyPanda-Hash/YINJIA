@@ -19,10 +19,60 @@ public class PxController {
 
     private final PanelRuntimeService service;
     private final com.yinjia.mes.service.PanelConfigService configService;
+    private final com.yinjia.mes.service.ReportColumnSettingsService reportColumnSettingsService;
+    private final com.yinjia.mes.service.VoucherFlowService voucherFlowService;
 
-    public PxController(PanelRuntimeService service, com.yinjia.mes.service.PanelConfigService configService) {
+    public PxController(PanelRuntimeService service, com.yinjia.mes.service.PanelConfigService configService,
+                        com.yinjia.mes.service.ReportColumnSettingsService reportColumnSettingsService,
+                        com.yinjia.mes.service.VoucherFlowService voucherFlowService) {
         this.service = service;
         this.configService = configService;
+        this.reportColumnSettingsService = reportColumnSettingsService;
+        this.voucherFlowService = voucherFlowService;
+    }
+
+    /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher) */
+    @PostMapping("/voucherFlow/sources")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> voucherFlowSources(@RequestBody Map<String, Object> body) {
+        String sourcePanel = String.valueOf(body.getOrDefault("sourcePanel", ""));
+        String targetPanel = String.valueOf(body.getOrDefault("targetPanel", ""));
+        Map<String, Object> condition = (Map<String, Object>) body.getOrDefault("condition", Map.of());
+        int pageNo = body.get("pageNo") == null ? 1 : Integer.parseInt(String.valueOf(body.get("pageNo")));
+        int pageSize = body.get("pageSize") == null ? 20 : Integer.parseInt(String.valueOf(body.get("pageSize")));
+        return ApiResult.ok(voucherFlowService.sources(sourcePanel, targetPanel, condition, pageNo, pageSize));
+    }
+
+    /** 选单生单后写占用(来源行不再出现在选单列表;删除下游草稿自动释放) */
+    @PostMapping("/voucherFlow/link")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Void> voucherFlowLink(@RequestBody Map<String, Object> body) {
+        voucherFlowService.link(
+                String.valueOf(body.getOrDefault("sourcePanel", "")),
+                String.valueOf(body.getOrDefault("sourceNo", "")),
+                String.valueOf(body.getOrDefault("sourceKey", "items")),
+                String.valueOf(body.getOrDefault("targetPanel", "")),
+                String.valueOf(body.getOrDefault("targetNo", "")),
+                String.valueOf(body.getOrDefault("targetKey", "items")),
+                body.get("targetOffset") == null ? 0 : Integer.parseInt(String.valueOf(body.get("targetOffset"))),
+                String.valueOf(body.getOrDefault("businessType", "")));
+        return ApiResult.ok(null);
+    }
+
+    /** 报表栏目设置读取(报表表头筛选与排序补丁) */
+    @GetMapping("/reportColumnSettings")
+    public ApiResult<Map<String, Object>> getReportColumnSettings(@RequestParam String panelCode) {
+        return ApiResult.ok(reportColumnSettingsService.load(panelCode));
+    }
+
+    /** 报表栏目设置保存(报表表头筛选与排序补丁) */
+    @PostMapping("/reportColumnSettings")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Void> saveReportColumnSettings(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        Map<String, Object> settings = (Map<String, Object>) body.getOrDefault("settings", Map.of());
+        reportColumnSettingsService.save(panelCode, settings);
+        return ApiResult.ok(null);
     }
 
     @GetMapping("/getPanelConfig")

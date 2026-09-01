@@ -37,7 +37,7 @@ OPEN c; FETCH NEXT FROM c INTO @code, @name, @view;
 WHILE @@FETCH_STATUS = 0 BEGIN
   IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code=@code)
     INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group)
-    VALUES (@code, @name, N'智能供应链', 'flat', @view, NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'智能供应链');
+    VALUES (@code, @name, N'报表', 'flat', @view, NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'智能供应链');
   DECLARE @cols TABLE (name sysname);
   INSERT INTO @cols SELECT c2.name FROM sys.columns c2 WHERE c2.object_id = OBJECT_ID(@view) AND c2.name <> 'id';
   DECLARE @n sysname, @i int = 0;

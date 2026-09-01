@@ -70,7 +70,7 @@
         <section v-if="desk.showProgress" class="card operation-core col-8 reveal-item">
           <div class="panel-heading">
             <div>
-              <div class="card-title">生产执行核心</div>
+              <div class="card-title">{{ tt('生产执行核心') }}</div>
               <p>工单生命周期与近 7 天执行脉冲</p>
             </div>
             <div class="live-chip"><i></i>LIVE · {{ lastUpdatedText }}</div>
@@ -505,25 +505,25 @@ const kpis = computed(() => {
   const amount = Number(sales.value.amount || 0)
   return [
     {
-      title: '生产任务负载', value: Number(stats.value.kpis.moActive || 0), unit: '单', icon: 'Odometer',
-      tone: 'primary', state: '实时', meta: `总计 ${productionTotal.value} 单`, signal: `${productionRunning.value} 单生产中`,
+      title: tt('生产任务负载'), value: Number(stats.value.kpis.moActive || 0), unit: tt('单'), icon: 'Odometer',
+      tone: 'primary', state: tt('实时'), meta: `${tt('总计')} ${productionTotal.value} ${tt('单')}`, signal: `${productionRunning.value} ${tt('单生产中')}`,
       bars: trend.map((item) => Number(item.added || 0)),
     },
     {
-      title: '工单闭环率', value: completionRate.value, unit: '%', icon: 'CircleCheck',
-      tone: 'steel', state: completionRate.value >= 80 ? '稳定' : '推进中',
-      meta: `${productionDone.value} / ${productionTotal.value} 已完工`, signal: '生命周期',
+      title: tt('工单闭环率'), value: completionRate.value, unit: '%', icon: 'CircleCheck',
+      tone: 'steel', state: completionRate.value >= 80 ? tt('稳定') : tt('推进中'),
+      meta: `${productionDone.value} / ${productionTotal.value} ${tt('已完工')}`, signal: tt('生命周期'),
       bars: trend.map((item) => Number(item.done || 0)),
     },
     {
-      title: '检验合格率', value: quality.value.total ? qualityRate.value : '--', unit: quality.value.total ? '%' : '', icon: 'Aim',
+      title: tt('检验合格率'), value: quality.value.total ? qualityRate.value : '--', unit: quality.value.total ? '%' : '', icon: 'Aim',
       tone: qualityRate.value < 80 && quality.value.total ? 'danger' : 'warning', state: qualityRisk.value.label,
-      meta: `${quality.value.pass || 0} / ${quality.value.total || 0} 合格`, signal: `${qualityExceptions.value} 项待处理`,
+      meta: `${quality.value.pass || 0} / ${quality.value.total || 0} ${tt('合格')}`, signal: `${qualityExceptions.value} ${tt('项待处理')}`,
       bars: (quality.value.byResult || []).map((item) => Number(item.value || 0)),
     },
     {
-      title: '销售订单金额', value: formatCompact(amount), unit: '元', icon: 'TrendCharts',
-      tone: 'neutral', state: `${sales.value.total || 0} 张订单`, meta: `${salesDone.value} 张已审核`, signal: '业务流入',
+      title: tt('销售订单金额'), value: formatCompact(amount), unit: tt('元'), icon: 'TrendCharts',
+      tone: 'neutral', state: `${sales.value.total || 0} ${tt('张订单')}`, meta: `${salesDone.value} ${tt('张已审核')}`, signal: tt('业务流入'),
       bars: (sales.value.byCustomer || []).map((item) => Number(item.value || 0)),
     },
   ]

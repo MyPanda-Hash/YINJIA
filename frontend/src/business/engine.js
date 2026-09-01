@@ -40,6 +40,8 @@ export function normalizeApprovalGroups(rawGroups, forceWorkflow = false) {
   const result = []
   let approvalGroup = null
   let insertAt = -1
+  // 审批组归一时保留附加动作(如后端生成的直接「审核」),排在工作流固定动作之后
+  const extras = []
   for (const group of groups) {
     const actions = group.actions || group.items || []
     const isWorkflowGroup = actions.includes('提交审批')
@@ -48,6 +50,10 @@ export function normalizeApprovalGroups(rawGroups, forceWorkflow = false) {
     if (isWorkflowGroup) {
       if (insertAt < 0) insertAt = result.length
       approvalGroup ||= group
+      for (const action of actions) {
+        const normalized = action === '驳回审批' ? '审批驳回' : action
+        if (!APPROVAL_WORKFLOW_ACTIONS.includes(normalized) && !extras.includes(normalized)) extras.push(normalized)
+      }
       continue
     }
     result.push({
@@ -58,7 +64,7 @@ export function normalizeApprovalGroups(rawGroups, forceWorkflow = false) {
   result.splice(insertAt < 0 ? result.length : insertAt, 0, {
     ...(approvalGroup || {}),
     name: '审批',
-    actions: [...APPROVAL_WORKFLOW_ACTIONS],
+    actions: [...APPROVAL_WORKFLOW_ACTIONS, ...extras],
   })
   return result
 }
@@ -294,6 +300,24 @@ export async function deleteForms({ panelCode, rowCodes }) {
 export async function saveColumnPrefs({ panelCode, columns }) {
   return unwrap(await request.post('/px/saveColumnPrefs', { panelCode, columns }))
 }
+
+// ==================== 选单流转(对齐 T+ SelectVoucher;占用跟踪 form_flow_link) ====================
+
+/** 选单来源查询:已审核 + 未被占用行(带 _lineKey/剩余数量) */
+export async function outsourceFlowSources({ sourcePanel, targetPanel, sourceKey, businessType = '', condition = {}, pageNo = 1, pageSize = 20 }) {
+  return unwrap(await request.post('/px/voucherFlow/sources', { sourcePanel, targetPanel, sourceKey, businessType, condition, pageNo, pageSize }))
+}
+
+/** 采购流选单来源(与选单来源同服务,统一占用语义) */
+export async function purchaseFlowSources(payload) {
+  return outsourceFlowSources(payload)
+}
+
+/** 选单生单后写占用(来源行不再出现在选单列表;删除下游草稿自动释放) */
+export async function linkOutsourceSelection(payload) {
+  return unwrap(await request.post('/px/voucherFlow/link', payload))
+}
+
 
 /**
  * Upload a voucher image to the MES backend. The backend owns the cloud OCR

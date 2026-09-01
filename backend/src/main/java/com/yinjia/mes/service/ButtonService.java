@@ -53,6 +53,9 @@ public class ButtonService {
             case "审批通过" -> approveApproval(def, formData);
             case "审批驳回" -> rejectApproval(def, formData);
             case "审批情况" -> approvalHistory(def, formData);
+            // 整单中止/中止执行(前端 engine.callButton 已归一为「中止」)、草稿(归一为「取消中止」)
+            case "中止" -> stop(def, formData);
+            case "取消中止" -> unstop(def, formData);
             case "删除", "删除单据" -> delete(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
         };
@@ -107,10 +110,11 @@ public class ButtonService {
             }
             no = formNoService.next(def.prefix(), user);
         }
-        // 已审核/审批中单据不允许保存(照搬 light-mes:仅草稿可改)
+        // 已审核/审批中/已中止单据不允许保存(照搬 light-mes:仅草稿可改)
         Map<String, Object> st = docStatusOf(def.code(), no);
         if ("已审核".equals(st.get("status"))) throw new IllegalStateException("已审核单据不可保存，请先弃审");
         if ("审批中".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可保存，请等待审批完成或驳回");
+        if ("已中止".equals(st.get("status"))) throw new IllegalStateException("已中止单据不可保存，请先恢复");
 
         Map<String, String> l2c = def.labelToCol();
         if (split) {
@@ -204,12 +208,17 @@ public class ButtonService {
         return result(def.name(), "启用");
     }
 
-    /** 标签键 -> 列名键(仅取字段定义内的列,忽略 id/__no 等保留键) */
+    /** 标签键 -> 列名键(仅取字段定义内的列,忽略 id/__no 等保留键)。
+     *  归一化后为 null(空串)的值同样跳过——否则 NOT NULL 列(如 币种)会被显式插 NULL 报错,
+     *  交由 fillRequiredDefaults 补默认值。 */
     private Map<String, Object> labelsToCols(List<PanelRegistry.FieldDef> fields, Map<String, Object> row) {
         Map<String, Object> out = new LinkedHashMap<>();
         for (PanelRegistry.FieldDef f : fields) {
             Object v = row.get(f.label());
-            if (v != null) out.put(f.col(), normalizeByType(f, v));
+            if (v != null) {
+                Object normalized = normalizeByType(f, v);
+                if (normalized != null) out.put(f.col(), normalized);
+            }
         }
         return out;
     }
@@ -299,6 +308,8 @@ public class ButtonService {
     private void updateRow(String table, String pk, Object id, Map<String, Object> cols, String user,
                            String groupCol, String groupVal) {
         if (cols.isEmpty()) return;
+        dropNullsOnNotNull(table, cols);
+        if (cols.isEmpty()) return;
         cols.put("asp_user2", user);
         cols.put("asp_time2", LocalDateTime.now());
         StringBuilder set = new StringBuilder();
@@ -319,6 +330,25 @@ public class ButtonService {
         jdbc.update("UPDATE " + table + " SET " + set + " WHERE " + where, args.toArray());
     }
 
+    private final Map<String, java.util.Set<String>> notNullColsCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** UPDATE 清洗:NOT NULL 列收到 null 值时剔除该列(保留库中原值),避免"列不允许有 Null 值"更新失败。
+     *  可空列的 null 是合法的"清空"语义,不受影响。对全部单据/档案面板的更新路径统一生效。 */
+    private void dropNullsOnNotNull(String table, Map<String, Object> cols) {
+        java.util.Set<String> notNull = notNullColsCache.computeIfAbsent(table, t -> {
+            try {
+                java.util.Set<String> s = new java.util.HashSet<>();
+                jdbc.query("SELECT name FROM sys.columns WHERE object_id = OBJECT_ID(?) AND is_nullable = 0",
+                        rs -> { s.add(rs.getString(1)); }, t);
+                return s;
+            } catch (Exception e) {
+                return java.util.Set.of();
+            }
+        });
+        if (notNull.isEmpty()) return;
+        cols.keySet().removeIf(k -> cols.get(k) == null && notNull.contains(k));
+    }
+
     // ============ 状态机(照搬 light-mes:草稿⇄已审核 + 审批流) ============
 
     private Map<String, Object> audit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -327,6 +357,7 @@ public class ButtonService {
         ensureDocExists(def, no);
         Map<String, Object> st = docStatusOf(def.code(), no);
         if ("已作废".equals(st.get("status"))) throw new IllegalStateException("已作废单据不可审核");
+        if ("已中止".equals(st.get("status"))) throw new IllegalStateException("已中止单据不可审核，请先恢复");
         if ("已审核".equals(st.get("status"))) throw new IllegalStateException("单据已是已审核状态");
         if ("审批中".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
@@ -346,6 +377,39 @@ public class ButtonService {
                 + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
         return result(no, "草稿");
+    }
+
+    // ---- 中止(对齐 PANDA/T+ 整单中止、生产加工单中止执行):仅已审核可中止,恢复保留原审核留痕 ----
+
+    /** 中止:已审核 → 已中止(留痕 stop_by/stop_at;shr 保留,取消中止后回到已审核) */
+    private Map<String, Object> stop(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        String status = String.valueOf(st.get("status"));
+        if ("已作废".equals(status)) throw new IllegalStateException("已作废单据不可中止");
+        if ("已中止".equals(status)) throw new IllegalStateException("单据已是已中止状态");
+        if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核状态可中止");
+        jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
+                        + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
+                        + "WHEN MATCHED THEN UPDATE SET stopped = 'Y', stop_by = ?, stop_at = GETDATE(), update_at = GETDATE() "
+                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, stopped, stop_by, stop_at, update_at) "
+                        + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), GETDATE());",
+                def.code(), no, currentUserName(), currentUserName());
+        recordApproval(def.code(), no, "STOP", "STOPPED", opinionOf(formData));
+        return result(no, "已中止");
+    }
+
+    /** 取消中止(生产加工单「草稿」按钮):已中止 → 恢复(shr 保留则已审核,否则草稿) */
+    private Map<String, Object> unstop(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String no = requireNo(formData);
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        if (!"已中止".equals(st.get("status"))) throw new IllegalStateException("仅已中止状态可恢复");
+        jdbc.update("UPDATE yj_doc_status SET stopped = 'N', stop_by = NULL, stop_at = NULL, update_at = GETDATE()"
+                + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
+        recordApproval(def.code(), no, "UNSTOP", "UNSTOPPED", opinionOf(formData));
+        Map<String, Object> after = docStatusOf(def.code(), no);
+        return result(no, String.valueOf(after.get("status")));
     }
 
     // ---- 审批流(照搬 light-mes PxService):提交/通过/驳回全留痕,防伪校验 ----
@@ -468,6 +532,9 @@ public class ButtonService {
                             + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, canceled, cancel_by, cancel_at, update_at) "
                             + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), GETDATE());",
                     def.code(), no, user, user);
+            // 选单流转占用释放:下游草稿作废,来源行重新可选(对齐 T+ 选单占用语义)
+            jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"
+                    + " WHERE target_panel_code = ? AND target_form_no = ? AND link_status = 'ACTIVE'", def.code(), no);
             return result(no, "已作废");
         }
         Object no = formData.get("编号");
@@ -503,10 +570,15 @@ public class ButtonService {
         if (c == null || c == 0) throw new IllegalArgumentException("表单数据不存在：" + no);
     }
 
-    /** 状态推导:已作废 > 已审核(shr) > 审批中(pending) > 草稿 */
+    /** 单据状态查询(供生单等领域动作校验来源单状态) */
+    public Map<String, Object> docStatus(String panelCode, String no) {
+        return docStatusOf(panelCode, no);
+    }
+
+    /** 状态推导:已作废 > 已中止(stopped) > 已审核(shr) > 审批中(pending) > 草稿 */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT shr, canceled, pending, pending_by, pending_at FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                "SELECT shr, canceled, stopped, pending, pending_by, pending_at FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
                 panelCode, no);
         Map<String, Object> out = new HashMap<>();
         Map<String, Object> r = rows.isEmpty() ? null : rows.get(0);
@@ -514,6 +586,8 @@ public class ButtonService {
             out.put("status", "草稿");
         } else if ("Y".equals(r.get("canceled"))) {
             out.put("status", "已作废");
+        } else if ("Y".equals(r.get("stopped"))) {
+            out.put("status", "已中止");
         } else if (r.get("shr") != null) {
             out.put("status", "已审核");
         } else if ("Y".equals(r.get("pending"))) {

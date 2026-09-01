@@ -22,8 +22,8 @@ FROM bd_dispatch h LEFT JOIN bl_dispatch l ON h.[单据编号] = l.[单据编号
 GROUP BY h.[单据日期], l.[生产车间], l.[工序编码], l.[工序名称], l.[计量单位];');
 GO
 -- 面板注册
-IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='DISPATCH_DETAIL') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('DISPATCH_DETAIL', N'工序派工单明细表', N'新生产', 'flat', 'v_dispatch_detail', NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'新生产');
-IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='DISPATCH_STATS') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('DISPATCH_STATS', N'工序派工单统计表', N'新生产', 'flat', 'v_dispatch_stats', NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'新生产');
+IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='DISPATCH_DETAIL') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('DISPATCH_DETAIL', N'工序派工单明细表', N'报表', 'flat', 'v_dispatch_detail', NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'新生产');
+IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='DISPATCH_STATS') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('DISPATCH_STATS', N'工序派工单统计表', N'报表', 'flat', 'v_dispatch_stats', NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'新生产');
 GO
 -- 字段注册(明细)
 DECLARE @cols TABLE (name sysname, pos int);
