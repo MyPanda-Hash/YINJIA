@@ -64,7 +64,7 @@ public class LocaleController {
                 ? l.stream().map(String::valueOf).toList() : List.of();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("locale", locale);
-        if (locale.isBlank() || locale.startsWith("zh") || keys.isEmpty()) {
+        if (locale.isBlank() || "zh".equalsIgnoreCase(locale) || "zh-CN".equalsIgnoreCase(locale) || keys.isEmpty()) {
             out.put("dict", Map.of());
             return ApiResult.ok(out);
         }

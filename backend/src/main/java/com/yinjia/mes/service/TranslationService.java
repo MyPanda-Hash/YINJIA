@@ -16,6 +16,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -39,7 +40,8 @@ public class TranslationService {
 
     /** 缓存:locale → scope → (中文原文 → 译名)。 */
     private volatile Map<String, Map<String, Map<String, String>>> cache = Map.of();
-    private volatile long loadedAt = 0;
+    /** 各语言缓存加载时间(per-locale;invalidate 时删除对应键,避免他语 reload 掩护本语过期数据)。 */
+    private final Map<String, Long> loadedAtByLocale = new ConcurrentHashMap<>();
     private volatile Client mtClient;
     /** 机翻并行执行器(10 并发:阿里云通用翻译 QPS 余量内,170 词条秒级完成)。 */
     private final ExecutorService mtPool = Executors.newFixedThreadPool(10, r -> {
@@ -64,7 +66,8 @@ public class TranslationService {
     public Map<String, Map<String, String>> byLocale(String locale) {
         String key = keyOf(locale);
         Map<String, Map<String, Map<String, String>>> snapshot = cache;
-        if (!snapshot.containsKey(key) || System.currentTimeMillis() - loadedAt > TTL_MS) {
+        Long ts = loadedAtByLocale.get(key);
+        if (!snapshot.containsKey(key) || ts == null || System.currentTimeMillis() - ts > TTL_MS) {
             reload(key);
             snapshot = cache;
         }
@@ -88,7 +91,7 @@ public class TranslationService {
         }
         next.put(key, loaded);
         this.cache = next;
-        this.loadedAt = System.currentTimeMillis();
+        this.loadedAtByLocale.put(key, System.currentTimeMillis());
     }
 
     /**
@@ -98,7 +101,7 @@ public class TranslationService {
     public Map<String, String> translate(String locale, List<String> sources) {
         String key = keyOf(locale);
         Map<String, String> out = new LinkedHashMap<>();
-        if (sources == null || sources.isEmpty() || key.startsWith("zh")) return out;
+        if (sources == null || sources.isEmpty() || "zh".equals(key) || "zh-CN".equalsIgnoreCase(key)) return out;
         Map<String, String> fieldDict = scope(key, "field");
         Map<String, String> uiDict = scope(key, "ui");
         Map<String, String> pending = new LinkedHashMap<>();
@@ -135,6 +138,7 @@ public class TranslationService {
         Map<String, Map<String, Map<String, String>>> next = new HashMap<>(cache);
         next.remove(locale);
         this.cache = next;
+        this.loadedAtByLocale.remove(locale);
     }
 
     private void upsert(String locale, String scope, String refKey, String text) {

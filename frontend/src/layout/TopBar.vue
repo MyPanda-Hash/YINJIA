@@ -158,6 +158,7 @@
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item v-if="user.isAdmin" command="org"><el-icon><OfficeBuilding /></el-icon>{{ tt('组织架构') }}</el-dropdown-item>
+            <el-dropdown-item v-if="user.isAdmin" command="usage"><el-icon><View /></el-icon>{{ tt('使用权限查看') }}</el-dropdown-item>
             <el-dropdown-item command="account"><el-icon><User /></el-icon>{{ tt('账号管理') }}</el-dropdown-item>
             <el-dropdown-item command="pwd"><el-icon><Key /></el-icon>{{ tt('修改密码') }}</el-dropdown-item>
             <el-dropdown-item command="ui"><el-icon><Setting /></el-icon>{{ tt('界面设置') }}</el-dropdown-item>
@@ -340,6 +341,7 @@ const pwdForm = ref({ old: '', next: '', confirm: '' })
 function onUserCommand(cmd) {
   if (cmd === 'account') accountVisible.value = true
   else if (cmd === 'org') router.push('/sys/org')
+  else if (cmd === 'usage') router.push('/sys/usage')
   else if (cmd === 'pwd') pwdVisible.value = true
   else if (cmd === 'ui') uiSettingVisible.value = true
   else if (cmd === 'dark') app.toggleDark()

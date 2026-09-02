@@ -1,4 +1,4 @@
--- 选单流转占用表(对齐 PANDA form_flow_link;SQL Server 版):
+﻿﻿-- 选单流转占用表(对齐 PANDA form_flow_link;SQL Server 版):
 -- 生单后写 ACTIVE 记录,来源明细行不再出现在选单列表;删除下游草稿改 RELEASED 释放。
 USE HSDZ_MES;
 SET NOCOUNT ON;

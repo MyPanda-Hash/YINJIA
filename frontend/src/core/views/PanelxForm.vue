@@ -68,6 +68,16 @@
             />
             <el-button v-if="editable && !fieldLocked(r)" class="ref-btn" size="small" :icon="Search" @click="openRefPick(r)" />
           </div>
+          <div v-else-if="isSelect(r) && dictModeOf(r) === 'dialog'" class="ref-ctl">
+            <el-input
+              :model-value="form[r.code]"
+              readonly
+              :disabled="!editable || fieldLocked(r)"
+              :placeholder="tt('请选择')"
+              @click="openDictPick(r)"
+            />
+            <el-button v-if="editable && !fieldLocked(r)" class="ref-btn" size="small" :icon="Search" @click="openDictPick(r)" />
+          </div>
           <el-select v-else-if="isSelect(r)" v-model="form[r.code]" :disabled="!editable || fieldLocked(r)" filterable clearable allow-create style="width: 100%">
             <el-option v-for="o in r.options || []" :key="o" :label="o.label ?? o" :value="o.value ?? o" />
           </el-select>
@@ -289,6 +299,21 @@
       </el-dialog>
     </div>
     <RefPickDialog v-model="refVisible" :field="refPick?.field" :mode="refPick?.mode" @confirm="onRefConfirm" />
+
+    <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
+    <el-dialog v-model="dictPickVisible" :title="tt('选择') + '：' + (dictPickField ? tt(dictPickField.name) : '')" width="440px" append-to-body :close-on-click-modal="false">
+      <el-input v-model="dictPickKeyword" :placeholder="tt('输入搜索')" clearable class="dict-pick-search" />
+      <div class="dict-pick-list">
+        <div v-for="(o, i) in dictPickOptions" :key="i" class="dict-pick-item" @click="onDictPick(o)">
+          {{ o.label }}
+        </div>
+        <el-empty v-if="!dictPickOptions.length" :description="tt('暂无数据')" :image-size="50" />
+      </div>
+      <template #footer>
+        <el-button @click="clearDictPick">{{ tt('清空') }}</el-button>
+        <el-button type="primary" @click="dictPickVisible = false">{{ tt('取消') }}</el-button>
+      </template>
+    </el-dialog>
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
@@ -402,6 +427,55 @@ async function loadRefOptions(r, keyword) {
   } finally {
     refSelectData[r.code].loading = false
   }
+}
+
+// ---- 下拉框字段双模(≤20 下拉 / >20 弹窗):options 内嵌于面板配置,按数量直接判定 ----
+const dictModeMap = reactive({}) // code -> 'dialog' | 'select'
+
+function dictModeOf(r) {
+  if (!dictModeMap[r.code]) {
+    dictModeMap[r.code] = (r.options || []).length > REF_DROPDOWN_THRESHOLD ? 'dialog' : 'select'
+  }
+  return dictModeMap[r.code]
+}
+
+function resetDictModes() {
+  Object.keys(dictModeMap).forEach((k) => delete dictModeMap[k])
+}
+
+// 字典弹窗选择(>20 条):搜索 + 列表点击回填
+const dictPickVisible = ref(false)
+const dictPickField = ref(null)
+const dictPickKeyword = ref('')
+const dictPickOptions = computed(() => {
+  const r = dictPickField.value
+  if (!r) return []
+  const kw = dictPickKeyword.value.trim().toLowerCase()
+  const opts = (r.options || []).map((o) => ({ value: o.value ?? o, label: o.label ?? o }))
+  if (!kw) return opts
+  return opts.filter((o) =>
+    String(o.label).toLowerCase().includes(kw) || String(o.value).toLowerCase().includes(kw))
+})
+
+function openDictPick(r) {
+  if (!editable.value || fieldLocked(r)) return
+  dictPickField.value = r
+  dictPickKeyword.value = ''
+  dictPickVisible.value = true
+}
+
+function onDictPick(option) {
+  const r = dictPickField.value
+  if (r) form[r.code] = option.value
+  dictPickVisible.value = false
+  dictPickField.value = null
+}
+
+function clearDictPick() {
+  const r = dictPickField.value
+  if (r) form[r.code] = ''
+  dictPickVisible.value = false
+  dictPickField.value = null
 }
 // 审批按钮权限（提交审批/审批情况公开；审批通过/驳回需角色审批权限）
 const APPROVE_ACTIONS = ['审批通过', '审批驳回']
@@ -1442,6 +1516,7 @@ watch(() => [panelCode.value, code.value], () => {
   selVisible.value = false
   refVisible.value = false
   impVisible.value = false
+  resetDictModes()
   load()
 })
 </script>
@@ -1666,6 +1741,28 @@ watch(() => [panelCode.value, code.value], () => {
 }
 .ref-btn {
   flex-shrink: 0;
+}
+.dict-pick-search {
+  margin-bottom: 8px;
+}
+.dict-pick-list {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--el-border-color-lighter, #e4e7ed);
+  border-radius: 4px;
+}
+.dict-pick-item {
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid var(--el-border-color-lighter, #f0f2f5);
+  transition: background 0.15s;
+}
+.dict-pick-item:last-child {
+  border-bottom: none;
+}
+.dict-pick-item:hover {
+  background: var(--el-color-primary-light-9, #ecf5ff);
 }
 .ref-cell {
   display: inline-flex;

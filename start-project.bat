@@ -16,6 +16,9 @@ if not exist "%~dp0backend\target\yinjia-mes-backend-0.1.0.jar" (
   goto :fail
 )
 
+rem ---- 阿里云密钥:backend\.env(本地,不入库);缺失时翻译/OCR 自动降级 ----
+if exist "%~dp0backend\.env" for /f "usebackq delims=" %%L in ("%~dp0backend\.env") do set "%%L"
+
 echo [1/2] 启动后端 http://localhost:8090 ...
 start "YINJIA-MES backend" cmd /c ""%JAVA_HOME%\bin\java.exe" -jar "%~dp0backend\target\yinjia-mes-backend-0.1.0.jar""
 

@@ -14,29 +14,8 @@
       </div>
     </div>
 
-    <!-- T+ tabs-right 按钮组：快速查找 / 最大化恢复 / 关闭全部 / 更多 -->
+    <!-- T+ tabs-right 按钮组：最大化恢复 / 关闭全部 -->
     <div class="tab-actions">
-      <el-popover v-model:visible="findPop" placement="bottom-end" :width="260" trigger="click">
-        <template #reference>
-          <el-tooltip content="快速查找单据" placement="bottom">
-            <el-icon class="action-icon"><Search /></el-icon>
-          </el-tooltip>
-        </template>
-        <div class="find-box">
-          <el-input
-            v-model="findNo"
-            :placeholder="tt('单据编号（如 MO20260813-001）')"
-            size="small"
-            clearable
-            @keyup.enter="quickFind"
-          >
-            <template #append>
-              <el-icon class="find-btn" @click="quickFind"><Search /></el-icon>
-            </template>
-          </el-input>
-        </div>
-      </el-popover>
-
       <el-tooltip :content="app.maxContent ? '恢复' : '最大化'" placement="bottom">
         <el-icon class="action-icon" @click="app.toggleMaxContent()">
           <FullScreen v-if="!app.maxContent" />
@@ -47,23 +26,6 @@
       <el-tooltip content="关闭全部页签" placement="bottom">
         <el-icon class="action-icon" @click="closeAll"><Close /></el-icon>
       </el-tooltip>
-
-      <el-dropdown @command="onMore">
-        <el-tooltip content="更多" placement="bottom">
-          <el-icon class="action-icon"><ArrowDown /></el-icon>
-        </el-tooltip>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item v-for="t in tabs.tabs.filter((x) => !x.affix)" :key="t.path" :command="`go:${t.path}`">
-              {{ tt(t.title) }}
-            </el-dropdown-item>
-            <el-dropdown-item v-if="tabs.tabs.every((x) => x.affix)" disabled>暂无其他页签</el-dropdown-item>
-            <el-dropdown-item divided command="others">关闭其他</el-dropdown-item>
-            <el-dropdown-item command="all">关闭全部</el-dropdown-item>
-            <el-dropdown-item divided command="refresh">刷新当前</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
     </div>
 
     <ul v-if="ctx.tab" class="ctx-menu" :style="{ left: ctx.x + 'px', top: ctx.y + 'px' }" @mouseleave="ctx.tab = null">

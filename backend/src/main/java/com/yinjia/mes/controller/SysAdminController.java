@@ -2,7 +2,10 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PanelRegistry;
+import com.yinjia.mes.service.UsageLogService;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -10,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
@@ -26,11 +30,50 @@ public class SysAdminController {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
     private final PanelRegistry registry;
+    private final UsageLogService usageLog;
 
-    public SysAdminController(JdbcTemplate jdbc, PasswordEncoder encoder, PanelRegistry registry) {
+    public SysAdminController(JdbcTemplate jdbc, PasswordEncoder encoder, PanelRegistry registry, UsageLogService usageLog) {
         this.jdbc = jdbc;
         this.encoder = encoder;
         this.registry = registry;
+        this.usageLog = usageLog;
+    }
+
+    // ============ 使用权限查看(仅管理员;CONTEXT.md「使用权限查看」) ============
+
+    /** 使用记录分页查询(登录 + 面板操作),admin-only。 */
+    @GetMapping("/usageLog")
+    public ApiResult<Map<String, Object>> usageLog(@RequestParam(required = false) String userName,
+                                                   @RequestParam(required = false) String panelName,
+                                                   @RequestParam(required = false) String actionName,
+                                                   @RequestParam(required = false) String start,
+                                                   @RequestParam(required = false) String end,
+                                                   @RequestParam(defaultValue = "1") int page,
+                                                   @RequestParam(defaultValue = "20") int size) {
+        requireAdmin();
+        return ApiResult.ok(usageLog.query(userName, panelName, actionName, start, end, page, size));
+    }
+
+    /** 使用记录按账号分组(admin-only;页面按账号分类展示)。 */
+    @GetMapping("/usageLog/grouped")
+    public ApiResult<Map<String, Object>> usageLogGrouped(@RequestParam(required = false) String userName,
+                                                          @RequestParam(required = false) String panelName,
+                                                          @RequestParam(required = false) String actionName,
+                                                          @RequestParam(required = false) String start,
+                                                          @RequestParam(required = false) String end) {
+        requireAdmin();
+        return ApiResult.ok(usageLog.queryGrouped(userName, panelName, actionName, start, end));
+    }
+
+    /** 当前登录用户须为系统管理员,否则 403。 */
+    private void requireAdmin() {
+        String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
+                : SecurityContextHolder.getContext().getAuthentication().getName();
+        if (username == null) throw new AccessDeniedException("未登录");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT is_admin FROM yj_user WHERE username = ?", username);
+        boolean admin = !rows.isEmpty() && "Y".equals(rows.get(0).get("is_admin"));
+        if (!admin) throw new AccessDeniedException("仅管理员可查看使用记录");
     }
 
     // ============ 部门 ============

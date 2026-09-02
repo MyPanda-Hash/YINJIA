@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT panel_code FROM yj_panel ORDER BY panel_code;

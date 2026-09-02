@@ -8,7 +8,7 @@ import router from './router'
 import './styles/index.css'
 import * as sqlPanelRuntime from './business/engine'
 import { installPanelRuntime } from './core/panel-runtime'
-import { i18n } from './i18n'
+import { i18n, registerDictFetcher } from './i18n'
 import { useLocaleStore } from './stores/locale'
 
 const app = createApp(App)
@@ -30,7 +30,8 @@ app.use(ElementPlus)
 // 拉取动态语言列表(yj_locale 注册表);外语缺失词典(翻译表/机翻)后台补齐
 // (静态包词条挂载即生效,机翻补缺的零星词条下次刷新生效——翻译表已缓存)。
 const localeStore = useLocaleStore()
+// tt() 渲染 miss 的键 → 批量调词器(翻译表命中或机翻)→ merge → 重渲(light-mes 同款自动机翻)
+registerDictFetcher((locale, keys) => localeStore.ensureDict(locale, keys))
 localeStore.apply()
 localeStore.loadAvailable()
-localeStore.ensureDict(localeStore.locale)
 app.mount('#app')

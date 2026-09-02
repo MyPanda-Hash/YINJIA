@@ -126,6 +126,21 @@
               @click="openHeaderRef(field)"
             />
           </div>
+          <div v-else-if="isSelectField(field) && dictModeOf(field, headerFieldKey(field)) === 'dialog'" class="query-ref">
+            <el-input
+              :model-value="cur[headerFieldKey(field)]"
+              readonly
+              :disabled="headerFieldLocked(field)"
+              :placeholder="tt('请选择')"
+              @click="openDictPick(field)"
+            />
+            <el-button
+              :icon="Search"
+              :title="tt('选择')"
+              :disabled="headerFieldLocked(field)"
+              @click="openDictPick(field)"
+            />
+          </div>
           <el-select
             v-else-if="isSelectField(field)"
             v-model="cur[headerFieldKey(field)]"
@@ -441,6 +456,21 @@
     <RefPickDialog v-model="queryRefVisible" :field="queryRefField" mode="query" @confirm="onQueryRefConfirm" />
     <RefPickDialog v-model="headerRefVisible" :field="headerRefField" mode="header" @confirm="onHeaderRefConfirm" />
     <RefPickDialog v-model="detailRefVisible" :field="detailRefPick?.field" mode="detail" @confirm="onDetailRefConfirm" />
+
+    <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
+    <el-dialog v-model="dictPickVisible" :title="tt('选择') + '：' + (dictPickField ? headerFieldLabel(dictPickField) : '')" width="440px" append-to-body :close-on-click-modal="false">
+      <el-input v-model="dictPickKeyword" :placeholder="tt('输入搜索')" clearable class="dict-pick-search" />
+      <div class="dict-pick-list">
+        <div v-for="(o, i) in dictPickOptions" :key="i" class="dict-pick-item" @click="onDictPick(o)">
+          {{ o.label }}
+        </div>
+        <el-empty v-if="!dictPickOptions.length" :description="tt('暂无数据')" :image-size="50" />
+      </div>
+      <template #footer>
+        <el-button @click="clearDictPick">{{ tt('清空') }}</el-button>
+        <el-button type="primary" @click="dictPickVisible = false">{{ tt('取消') }}</el-button>
+      </template>
+    </el-dialog>
     <el-dialog v-model="queryDialogVisible" :title="tt('查询')" width="760px" append-to-body destroy-on-close class="header-query-dialog" @open="loadPlans">
       <!-- 查询方案:下拉调用 + 保存 + 维护 -->
       <div class="query-plan-bar">
@@ -868,6 +898,62 @@ async function refreshRefModes() {
     delete refModeMap[key]
     return checkRefMode(f, key)
   }))
+}
+
+// ---- 下拉框字段双模(≤20 下拉 / >20 弹窗):options 内嵌于面板配置,按数量直接判定 ----
+const dictModeMap = reactive({}) // fieldKey -> 'dialog' | 'select'
+
+function dictModeOf(field, fieldKey) {
+  if (!dictModeMap[fieldKey]) {
+    dictModeMap[fieldKey] = fieldOptions(field).length > REF_DROPDOWN_THRESHOLD ? 'dialog' : 'select'
+  }
+  return dictModeMap[fieldKey]
+}
+
+/** 面板切换时清理上个面板的字典模式缓存(同名字段如「业务类型」在不同面板数量可能不同)。 */
+function resetDictModes() {
+  Object.keys(dictModeMap).forEach((k) => delete dictModeMap[k])
+}
+
+// 字典弹窗选择(>20 条):搜索 + 列表点击回填
+const dictPickVisible = ref(false)
+const dictPickField = ref(null)
+const dictPickKeyword = ref('')
+const dictPickOptions = computed(() => {
+  const field = dictPickField.value
+  if (!field) return []
+  const kw = dictPickKeyword.value.trim().toLowerCase()
+  const opts = fieldOptions(field)
+  if (!kw) return opts
+  return opts.filter((o) =>
+    String(o.label).toLowerCase().includes(kw) || String(o.value).toLowerCase().includes(kw))
+})
+
+function openDictPick(field) {
+  if (!draftEditable.value || headerFieldLocked(field)) return
+  dictPickField.value = field
+  dictPickKeyword.value = ''
+  dictPickVisible.value = true
+}
+
+function onDictPick(option) {
+  const field = dictPickField.value
+  if (field) {
+    cur.value[headerFieldKey(field)] = option.value
+    markInlineDirty()
+  }
+  dictPickVisible.value = false
+  dictPickField.value = null
+}
+
+function clearDictPick() {
+  const field = dictPickField.value
+  if (field) {
+    cur.value[headerFieldKey(field)] = ''
+    markInlineDirty()
+  }
+  dictPickVisible.value = false
+  dictPickField.value = null
 }
 
 async function loadRefSelectOptions(field, fieldKey, keyword) {
@@ -2864,6 +2950,7 @@ watch(
     // 2026-08-20：关闭页签/切走时 panelCode 变 undefined——不触发加载（避免「面板编号无效」误报）
     if (!panelCode.value || panelCode.value === 'undefined') return
     cfgCache.value = null
+    resetDictModes()
     qOptCache.clear()
     Object.keys(condition).forEach((key) => delete condition[key])
     Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
@@ -3173,6 +3260,28 @@ onUnmounted(() => {
   width: 28px;
   min-height: 26px;
   padding: 0;
+}
+.dict-pick-search {
+  margin-bottom: 8px;
+}
+.dict-pick-list {
+  max-height: 320px;
+  overflow: auto;
+  border: 1px solid var(--el-border-color-lighter, #e4e7ed);
+  border-radius: 4px;
+}
+.dict-pick-item {
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 1px solid var(--el-border-color-lighter, #f0f2f5);
+  transition: background 0.15s;
+}
+.dict-pick-item:last-child {
+  border-bottom: none;
+}
+.dict-pick-item:hover {
+  background: var(--el-color-primary-light-9, #ecf5ff);
 }
 .field-readonly {
   width: 160px;

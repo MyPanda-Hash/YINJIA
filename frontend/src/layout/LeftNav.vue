@@ -201,7 +201,7 @@ function clickGroup(g) {
 }
 
 async function openCard(m, e) {
-  if (!app.collapsed && !m.children) return
+  if (!m.children || !m.children.length) return
   cardModule.value = m
   if (e?.currentTarget) cardAnchorEl = e.currentTarget
   await nextTick()
@@ -312,11 +312,26 @@ function groupOrPath(path) {
 const cardColumns = computed(() => {
   const m = cardModule.value
   if (!m) return []
-  if (!m.children) return [{ title: m.title, items: [m] }]
+  if (!m.children || !m.children.length) return [{ title: m.title, items: [m] }]
+  if (m.code === 'mfg') {
+    // 生产制造(一级悬停):与生产管理一致的三列——单据 / 明细表 / 统计表
+    const prod = (m.children || []).find((c) => c.code === 'prod')
+    return (prod?.children || []).map((cat) => ({ title: cat.title, items: flattenCardItems(cat.children || [cat]) }))
+  }
+  if (m.code === 'rd') {
+    // 研发管理:叶子(立项申请/实施计划/进度查询)归「研发管理」列,三个子分类各一列 → 共 4 列
+    const leaves = m.children.filter((c) => !c.children || !c.children.length)
+    const cats = m.children.filter((c) => c.children && c.children.length)
+    const cols = cats.map((cat) => ({ title: cat.title, items: flattenCardItems(cat.children) }))
+    cols.unshift({ title: m.title, items: flattenCardItems(leaves) })
+    return cols
+  }
   if (m.children[0]?.children) {
+    // 子节点有子分类(如 单据/明细表/统计表)→ 按子分类分列
     return m.children.map((cat) => ({ title: cat.title, items: flattenCardItems(cat.children || [cat]) }))
   }
-  return m.children.map((mod) => ({ title: mod.title, items: flattenCardItems([mod]) }))
+  // 子节点全是叶子 → 合并为一列竖排
+  return [{ title: m.title, items: m.children.flatMap((mod) => flattenCardItems([mod])) }]
 })
 
 function flattenCardItems(nodes) {

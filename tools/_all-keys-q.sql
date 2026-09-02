@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT DISTINCT panel_name FROM yj_panel; SELECT DISTINCT label FROM yj_field;

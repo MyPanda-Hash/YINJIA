@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT scope, COUNT(*) AS n FROM yj_translation WHERE locale='en' GROUP BY scope ORDER BY scope; SELECT DISTINCT ref_key FROM yj_translation WHERE locale='en' AND scope IN ('field','panel') ORDER BY ref_key;
