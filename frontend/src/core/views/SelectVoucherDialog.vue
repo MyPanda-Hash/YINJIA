@@ -128,12 +128,14 @@ import { computed, nextTick, onBeforeUnmount, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { ArrowDown, ArrowUp, Search, Setting } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
-import * as engine from '@/business/engine'
+import { usePanelRuntime } from '../panel-runtime'
 import {
   setDocumentSelection,
   sourceDocumentNo,
   sourceWithSelectedDetails,
 } from '@/core/selection/masterDetailSelection'
+
+const engine = usePanelRuntime()
 
 const props = defineProps({ modelValue: Boolean, panelCode: String, config: Object })
 const emit = defineEmits(['update:modelValue', 'generated'])

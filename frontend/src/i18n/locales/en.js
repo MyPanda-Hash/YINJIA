@@ -3,7 +3,7 @@ export default {
   locale: {
     switch: 'Switch language',
     hint: 'Press Alt+L to switch quickly',
-    zh-CN: '简体中文',
+    'zh-CN': '简体中文',
     en: 'English',
   },
   common: {
