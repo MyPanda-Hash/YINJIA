@@ -45,6 +45,12 @@ vue-i18n 响应式热生效(不刷新页面),按用户记忆(`yj_user.locale`),
 | 2026-09-02 | 使用记录存储:新建 `yj_usage_log`(登录+操作统一一张表),不复用旧系统 `s_log`、不展示其历史 | grill 会话「使用权限查看」第 1 问 |
 | 2026-09-02 | 使用权限查看入口仅管理员可见(登录用户不可见);记录范围为业务动作+登录成功,不含查询/刷新类浏览动作 | grill 会话「使用权限查看」第 2、3 问 |
 
+### 已审批判据(Approved Status Criteria)
+
+单据"已审批"的统一判据(对应 light-mes `core/doc-status.js` 语义;YINJIA 由
+`yj_doc_status` 状态推导实现同一判定):状态 ∈ {已审核, 生产中, 已完工, 已关闭}
+或 审批状态 ∈ {已审批, 已通过}。列表/表单共用同一判据,禁止各处手写状态集合。
+
 ### 翻译表(Translation Table)
 
 `yj_translation(scope, ref_key, locale, text)`:任意对象(面板/字段/前端词条)的任意语言译名存行,
