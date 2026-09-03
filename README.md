@@ -11,6 +11,9 @@
 | 数据库 | SQL Server(HSDZ_MES) |
 | 外部服务 | 阿里云 OCR / 阿里云机器翻译 |
 
+> **系统通用设计资产库**(供其它项目 agent 参考实现面板引擎/多语言/权限/生命周期等):
+> https://github.com/MyPanda-Hash/CHENGXIAO(与 light-mes 双实现提炼)
+
 ## 系统结构
 
 ```text
