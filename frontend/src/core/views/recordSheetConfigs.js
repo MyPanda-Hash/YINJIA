@@ -487,7 +487,7 @@ export const recordSheetConfigs = {
     head: { title: 5, infoLabel: 1, infoValue: 2 },
     sections: [
       // 产品基本信息:标签行 + 值行(炭棒规格 3 值格)
-      { bar: '产品基本信息', cols: [130, 190, 55, 55, 55, 130, 90, 110], rows: [
+      { bar: '产品基本信息', cols: [140, 220, 70, 70, 70, 180, 110, 180], rows: [
         { grid: [
           { label: '产品编号' },
           { label: '产品名称' },
@@ -508,7 +508,7 @@ export const recordSheetConfigs = {
         ]},
       ]},
       // 工序:阶段列 + 参数键值对;冷却后插入 长度要求|重量要求 列标题行(脱模的列分组)
-      { bar: '工序', cols: [130, 150, 200, 150, 200], rows: [
+      { bar: '工序', cols: [160, 200, 260, 200, 220], rows: [
         { grid: [
           { label: '灌料', rowspan: 5 },
           { label: '理论最低灌料重量g', key: '理论最低灌料重量g' },
@@ -560,7 +560,7 @@ export const recordSheetConfigs = {
         ]},
       ]},
       // 检验要求:炭棒尺寸(捕获行+值行);密度/跌落/抗压/压降 各自三列键值对(管控要求文本在标签格内)
-      { bar: '检验要求', cols: [150, 105, 85, 105, 85, 145, 130], rows: [
+      { bar: '检验要求', cols: [170, 140, 110, 140, 110, 180, 190], rows: [
         { grid: [
           { label: '炭棒尺寸', rowspan: 2 },
           { label: '外径mm', cap: true, span: 2 },
