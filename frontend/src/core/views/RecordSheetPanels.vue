@@ -75,19 +75,22 @@
 
     <!-- ═══ 条件区(1.基本信息 / 2.测试条件 / 3.测试对象信息…) ═══ -->
     <table v-for="(sec, si) in cfg.sections" :key="'sec' + si" class="rs-t">
-      <colgroup><col style="width:170px" /><col style="width:auto" /><col style="width:auto" /></colgroup>
+      <colgroup>
+        <col style="width:170px" />
+        <col v-for="ci in secColCount(sec) - 1" :key="ci" style="width:auto" />
+      </colgroup>
       <tbody>
-        <tr><td colspan="3" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
+        <tr><td :colspan="secColCount(sec)" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
         <tr v-for="(row, ri) in sec.rows" :key="'r' + ri">
           <td class="rs-td rs-label">{{ tt(row.label) }}</td>
-          <!-- 多值单元格(如 阻垢 特殊配方 1#/2#/3#) -->
+          <!-- 多值单元格(如 阻垢 特殊配方 1#/2#/3#):末格吃掉剩余列 -->
           <template v-if="row.cells">
-            <td v-for="(c, ci) in row.cells" :key="c.key" class="rs-td" :colspan="ci === row.cells.length - 1 ? 4 - row.cells.length : 1">
+            <td v-for="(c, ci) in row.cells" :key="c.key" class="rs-td" :colspan="ci === row.cells.length - 1 ? Math.max(1, secColCount(sec) - row.cells.length) : 1">
               <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
               <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
             </td>
           </template>
-          <td v-else class="rs-td" colspan="2">
+          <td v-else class="rs-td" :colspan="secColCount(sec) - 1">
             <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
             <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.tall ? 3 : 1, maxRows: 12 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt" :class="{ 'rsp-pre': row.tall }">{{ head[row.key] || '' }}</span>
@@ -98,7 +101,7 @@
         <template v-if="sec.waterStrip">
           <tr>
             <td class="rs-td rs-label rsp-water-label" rowspan="2">{{ tt('原水水质条件') }}</td>
-            <td class="rs-td rsp-water-zone" colspan="2">
+            <td class="rs-td rsp-water-zone" :colspan="secColCount(sec) - 1">
               <table class="rs-inner">
                 <tbody>
                   <tr>
@@ -171,10 +174,10 @@
             </tr>
             <tr class="rs-grp">
               <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
-                <th v-if="g.kind === 'plain'" class="rs-th" rowspan="2">{{ tt(g.label) }}</th>
+                <th v-if="g.kind === 'plain'" class="rs-th" :rowspan="hasGroup(dt) ? 2 : 1">{{ tt(g.label) }}</th>
                 <th v-else-if="g.kind === 'group'" class="rs-th" :colspan="g.span">{{ tt(g.label) }}</th>
               </template>
-              <th v-if="editable" class="rs-th rs-th-op" rowspan="2"></th>
+              <th v-if="editable" class="rs-th rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
             </tr>
             <tr v-if="hasGroup(dt)" class="rs-grp2">
               <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th">{{ tt(c.label) }}</th>
@@ -272,6 +275,16 @@ function touch() {
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
   return d.items
+}
+
+// ── 条件区列数:默认 3(标签+2 值列);多值单元格行取 1+格数;浸泡安全特例块 5 列 ──
+function secColCount(sec) {
+  let n = 3
+  for (const r of sec.rows || []) {
+    if (r.cells) n = Math.max(n, 1 + r.cells.length)
+  }
+  if (sec.soakBlocks) n = Math.max(n, 5)
+  return n
 }
 
 // ── 数据记录表渲染 ──
