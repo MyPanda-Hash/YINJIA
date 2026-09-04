@@ -45,6 +45,11 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
+    '未保存提示': 'Unsaved Changes',
+    '当前单据有未保存的修改，是否保存？': 'Current document has unsaved changes. Save it?',
+    '当前草稿尚未保存，是否保存？（不保存将撤回该单）': 'The current draft has not been saved. Save it? (Choosing No will withdraw it)',
+    '不保存': "Don't Save",
     '我的桌面': 'My Dashboard',
     '基础资料': 'Master Data',
     '业务单据': 'Business Documents',

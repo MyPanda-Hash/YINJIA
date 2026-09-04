@@ -1,6 +1,11 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
+    '未保存提示': 'Cambios sin guardar',
+    '当前单据有未保存的修改，是否保存？': 'El documento actual tiene cambios sin guardar. ¿Desea guardarlo?',
+    '当前草稿尚未保存，是否保存？（不保存将撤回该单）': 'El borrador actual aún no se ha guardado. ¿Desea guardarlo? (Si elige No guardar, se retirará)',
+    '不保存': 'No guardar',
     '删除单据': 'Eliminar documento',
     '新增流程': 'Nuevo flujo',
     '我的桌面': 'Mi panel',

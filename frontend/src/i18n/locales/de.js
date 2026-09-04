@@ -1,6 +1,11 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
+    '未保存提示': 'Ungespeicherte Änderungen',
+    '当前单据有未保存的修改，是否保存？': 'Das aktuelle Dokument enthält ungespeicherte Änderungen. Speichern?',
+    '当前草稿尚未保存，是否保存？（不保存将撤回该单）': 'Der aktuelle Entwurf wurde noch nicht gespeichert. Speichern? (Bei „Nicht speichern“ wird er zurückgezogen)',
+    '不保存': 'Nicht speichern',
     '删除单据': 'Beleg löschen',
     '新增流程': 'Neuer Workflow',
     '操作员': 'Bediener',

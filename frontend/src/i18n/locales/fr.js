@@ -1,6 +1,11 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
+    '未保存提示': 'Modifications non enregistrées',
+    '当前单据有未保存的修改，是否保存？': 'Le document en cours comporte des modifications non enregistrées. Voulez-vous enregistrer ?',
+    '当前草稿尚未保存，是否保存？（不保存将撤回该单）': "Le brouillon actuel n'a pas encore été enregistré. Voulez-vous l'enregistrer ? (Choisir « Ne pas enregistrer » le retirera)",
+    '不保存': 'Ne pas enregistrer',
     '删除单据': 'Supprimer le document',
     '新增流程': 'Nouveau flux',
     '我的桌面': 'Mon tableau de bord',

@@ -1,6 +1,11 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
+    '未保存提示': 'Chưa lưu thay đổi',
+    '当前单据有未保存的修改，是否保存？': 'Chứng từ hiện tại có thay đổi chưa lưu. Có lưu không?',
+    '当前草稿尚未保存，是否保存？（不保存将撤回该单）': 'Bản nháp hiện tại chưa được lưu. Có lưu không? (Chọn Không lưu sẽ thu hồi bản nháp)',
+    '不保存': 'Không lưu',
     '删除单据': 'Xóa chứng từ',
     '新增流程': 'Luồng mới',
     '我的桌面': 'Bảng điều khiển',
