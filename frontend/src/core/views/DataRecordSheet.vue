@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        功能性滤效 数据记录表(RD_FILTER_EFF)——按《04数据记录表.xlsx》一比一复刻
        真实表格列对齐:报告头表(公司名|YJ-PD-01、主题+信息块4行) →
@@ -94,7 +94,10 @@
         </tr>
         <tr class="rs-row-mid">
           <td class="rs-td rs-label">{{ tt('样品配方') }}</td>
-          <td class="rs-td">&nbsp;</td>
+          <td class="rs-td">
+            <el-input v-if="editable" v-model="head['样品配方']" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" maxlength="300" class="rs-t-in" @input="emit('dirty')" />
+            <span v-else class="rs-txt">{{ head['样品配方'] || '' }}</span>
+          </td>
           <td class="rs-td">&nbsp;</td>
         </tr>
         <tr>
