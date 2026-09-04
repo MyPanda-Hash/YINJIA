@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
@@ -720,17 +720,32 @@ function removeItem(i) {
   body.approval-printing .ps-del {
     display: none !important;
   }
-  /* 打印按纸张自适应(取消固定宽表),字号压缩 */
+  /* 打印按纸张自适应:14 列均分页宽,小字号可断行,避免右侧字段被裁切 */
   body.approval-printing .ps-scroll {
     overflow: visible !important;
   }
   body.approval-printing .ps-table {
     min-width: 100% !important;
+    table-layout: fixed !important;
   }
   body.approval-printing .ps-table th,
   body.approval-printing .ps-table td {
-    font-size: 11px !important;
-    padding: 2px 4px !important;
+    width: auto !important;
+    font-size: 10px !important;
+    padding: 1px 2px !important;
+    word-break: break-all !important;
+    white-space: normal !important;
+    height: auto !important;
+    line-height: 1.3 !important;
+  }
+  body.approval-printing .ps-cell-text,
+  body.approval-printing .ps-table .el-input__inner,
+  body.approval-printing .ps-table .el-textarea__inner {
+    font-size: 10px !important;
+  }
+  body.approval-printing .ps-company,
+  body.approval-printing .ps-title {
+    font-size: 22px !important;
   }
   @page {
     margin: 8mm;
