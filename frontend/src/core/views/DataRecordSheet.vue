@@ -226,7 +226,7 @@
           <th class="rs-th" rowspan="2">{{ tt('冲水时间') }}</th>
           <th class="rs-th" rowspan="2">{{ tt('累计进水（L）') }}</th>
           <th class="rs-th" rowspan="2">{{ tt('水温（℃）') }}</th>
-          <th class="rs-th" colspan="4">{{ tt('取样前样品：压力（PSI)/流速（L/min）') }}</th>
+          <th class="rs-th" colspan="2">{{ tt('取样前样品：压力（PSI)/流速（L/min）') }}</th>
           <th class="rs-th" rowspan="2">{{ tt('原水含量（ug/L）') }}</th>
           <th class="rs-th" colspan="2">{{ tt('出水含量（ug/L）') }}</th>
           <th class="rs-th" colspan="2">{{ tt('去除率%') }}</th>
@@ -234,7 +234,6 @@
           <th v-if="editable" class="rs-th rs-th-op" rowspan="2"></th>
         </tr>
         <tr class="rs-grp2">
-          <th class="rs-th">样品1</th><th class="rs-th">样品2</th>
           <th class="rs-th">样品1</th><th class="rs-th">样品2</th>
           <th class="rs-th">样品1</th><th class="rs-th">样品2</th>
           <th class="rs-th">样品1</th><th class="rs-th">样品2</th>
