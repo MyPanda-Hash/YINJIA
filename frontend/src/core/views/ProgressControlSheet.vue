@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
@@ -176,6 +176,9 @@
       </table>
       <div v-if="editable" class="ps-addbar">
         <div class="ps-add" @click="openAddProject">＋ {{ tt('新增项目') }}</div>
+        <div class="ps-add" @click="pickImportFile">⬆ {{ tt('导入Excel') }}</div>
+        <span class="ps-addbar-tip">{{ tt('导入Excel列与面板一致（项目等级/项目名称/子项目尺寸/项目编号/内容/项目发起人/项目负责人/立项日期/预计完成日期/状态/测试情况/技术目标达成/是否市场转化/未转换原因），导入后自动追加子项目行，请保存入库。') }}</span>
+        <input ref="fileRef" type="file" accept=".xlsx,.xls" style="display: none" @change="importExcelFile" />
       </div>
     </div>
 
@@ -372,8 +375,59 @@ function removeItem(i) {
   emit('dirty')
 }
 
-/** 导出 Excel:面板块信息 + 全部字段列 + 全部数据行(内容完整,不受列宽/纸张限制) */
-function exportProgressExcel() {
+/** 导入 Excel(模板 14 列):解析后追加子项目行到当前控制列表 */
+const fileRef = ref(null)
+function pickImportFile() {
+  fileRef.value?.click()
+}
+function importExcelFile(e) {
+  const file = e.target.files && e.target.files[0]
+  e.target.value = ''
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    try {
+      const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' })
+      const ws = wb.Sheets[wb.SheetNames[0]]
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
+      const d = props.head.detail || (props.head.detail = {})
+      if (!Array.isArray(d.items)) d.items = []
+      let added = 0
+      for (const r of rows) {
+        const name = String(r['项目名称'] || '').trim()
+        if (!name) continue
+        d.items.push({
+          '项目等级': r['项目等级'] || '二级',
+          '项目名称': name,
+          '子项目/尺寸': String(r['子项目/尺寸'] ?? r['子项目尺寸'] ?? ''),
+          '项目编号': String(r['项目编号'] ?? ''),
+          '内容': String(r['内容'] ?? ''),
+          '项目发起人': String(r['项目发起人'] ?? ''),
+          '项目负责人': String(r['项目负责人'] ?? ''),
+          '立项日期': String(r['立项日期'] ?? ''),
+          '预计完成日期': String(r['预计完成日期'] ?? ''),
+          '状态': String(r['状态'] ?? ''),
+          '测试情况': String(r['测试情况'] ?? ''),
+          '技术目标达成': String(r['技术目标达成'] ?? ''),
+          '是否市场转化': String(r['是否市场转化'] ?? ''),
+          '未转换原因': String(r['未转换原因'] ?? ''),
+        })
+        added++
+      }
+      if (!added) {
+        ElMessage.warning(tt('未识别到有效数据（请确认首行为面板列头且含项目名称）'))
+        return
+      }
+      ElMessage.success(`${tt('已导入')} ${added} ${tt('行，请保存入库')}`)
+      emit('dirty')
+    } catch (err) {
+      ElMessage.error(tt('导入失败') + '：' + (err.message || ''))
+    }
+  }
+  reader.readAsArrayBuffer(file)
+}
+
+/** 导出 Excel:面板块信息 + 全部字段列 + 全部数据行(内容完整,不受列宽/纸张限制) */function exportProgressExcel() {
   const head = props.head || {}
   const rows = (head.detail && Array.isArray(head.detail.items) ? head.detail.items : [])
   const title = '产品开发二三四级项目控制列表'
@@ -636,7 +690,13 @@ defineExpose({ exportProgressExcel })
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
   margin: 6px 8px;
+}
+.ps-addbar-tip {
+  font-size: 11px;
+  color: #8a97a6;
+  line-height: 1.4;
 }
 /* 新增项目弹窗 */
 .ps-dlg-row {
