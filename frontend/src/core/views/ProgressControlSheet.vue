@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
@@ -721,10 +721,10 @@ defineExpose({ exportProgressExcel })
 .c-content { min-width: 300px; }
 .c-grade { min-width: 90px; }
 .c-owner { min-width: 110px; }
-.c-progress { min-width: 70px; }
-.c-mile { min-width: 90px; }
+.c-progress { min-width: 110px; }
+.c-mile { min-width: 120px; }
 .c-status { min-width: 300px; }
-.c-tester { min-width: 260px; }
+.c-tester { min-width: 200px; }
 .c-approve { min-width: 90px; }
 .c-inspect { min-width: 90px; }
 .c-reason { min-width: 120px; }
