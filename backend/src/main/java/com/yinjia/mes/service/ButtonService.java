@@ -56,7 +56,10 @@ public class ButtonService {
             // 整单中止/中止执行(前端 engine.callButton 已归一为「中止」)、草稿(归一为「取消中止」)
             case "中止" -> stop(def, formData);
             case "取消中止" -> unstop(def, formData);
-            case "删除", "删除单据" -> delete(def, formData);
+            case "删除", "删除单据" -> DOC_ARCHIVE_PANELS.contains(def.code()) ? deleteDocFile(def, formData) : delete(def, formData);
+            // 文件类面板:归档单据删除申请的管理员审批
+            case "删除审批通过" -> approveDelete(def, formData);
+            case "删除审批驳回" -> rejectDelete(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
         };
     }
@@ -537,16 +540,7 @@ public class ButtonService {
             String no = requireNo(formData);
             Map<String, Object> st = docStatusOf(def.code(), no);
             if (!"草稿".equals(st.get("status"))) throw new IllegalStateException("仅草稿状态可删除（已审核请先弃审）");
-            jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
-                            + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
-                            + "WHEN MATCHED THEN UPDATE SET canceled = 'Y', cancel_by = ?, cancel_at = GETDATE(), update_at = GETDATE() "
-                            + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, canceled, cancel_by, cancel_at, update_at) "
-                            + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), GETDATE());",
-                    def.code(), no, user, user);
-            // 选单流转占用释放:下游草稿作废,来源行重新可选(对齐 T+ 选单占用语义)
-            jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"
-                    + " WHERE target_panel_code = ? AND target_form_no = ? AND link_status = 'ACTIVE'", def.code(), no);
-            return result(no, "已作废");
+            return voidDoc(def, no, user);
         }
         Object no = formData.get("编号");
         if (no != null && !String.valueOf(no).isBlank()) {
@@ -556,6 +550,19 @@ public class ButtonService {
         return result(String.valueOf(no), "已作废");
     }
 
+    /** 单据作废(软删):yj_doc_status.canceled='Y' + 选单占用释放(文件类面板无流转,语义一致) */
+    private Map<String, Object> voidDoc(PanelRegistry.PanelDef def, String no, String user) {
+        jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
+                + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
+                + "WHEN MATCHED THEN UPDATE SET canceled = 'Y', cancel_by = ?, cancel_at = GETDATE(), update_at = GETDATE() "
+                + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, canceled, cancel_by, cancel_at, update_at) "
+                + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), GETDATE());",
+                def.code(), no, user, user);
+        jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"
+                + " WHERE target_panel_code = ? AND target_form_no = ? AND link_status = 'ACTIVE'", def.code(), no);
+        return result(no, "已作废");
+    }
+
     public void deleteForms(String panelCode, List<String> rowCodes) {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         for (String code : rowCodes) {
@@ -563,6 +570,48 @@ public class ButtonService {
             fd.put("编号", code);
             delete(def, fd);
         }
+    }
+
+    /** 文件类面板删除:草稿直接作废;已归档单据需删除申请(待管理员审批),管理员可直接作废 */
+    private Map<String, Object> deleteDocFile(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        if (!def.isDoc()) return delete(def, formData);
+        String no = requireNo(formData);
+        String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if ("删除申请中".equals(st)) throw new IllegalStateException("删除申请已提交，待管理员审核");
+        if ("草稿".equals(st)) return delete(def, formData);
+        if (isAdminUser(user)) return voidDoc(def, no, user);
+        int n = jdbc.update("UPDATE yj_doc_status SET deleting='Y', delete_req_by=?, delete_req_at=GETDATE(), update_at=GETDATE()"
+                + " WHERE panel_code=? AND doc_no=?", user, def.code(), no);
+        if (n == 0) throw new IllegalStateException("单据不存在或状态已变更");
+        return result(no, "删除申请中");
+    }
+
+    /** 删除申请审批通过(仅管理员):单据作废 */
+    private Map<String, Object> approveDelete(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        if (!isAdminUser(user)) throw new IllegalStateException("仅管理员可审批删除申请");
+        String no = requireNo(formData);
+        int n = jdbc.update("UPDATE yj_doc_status SET canceled='Y', cancel_by=?, cancel_at=GETDATE(), deleting='N', update_at=GETDATE()"
+                + " WHERE panel_code=? AND doc_no=? AND deleting='Y'", user, def.code(), no);
+        if (n == 0) throw new IllegalStateException("无待审批的删除申请");
+        return result(no, "已作废");
+    }
+
+    /** 删除申请驳回(仅管理员):恢复归档状态 */
+    private Map<String, Object> rejectDelete(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        if (!isAdminUser(user)) throw new IllegalStateException("仅管理员可审批删除申请");
+        String no = requireNo(formData);
+        int n = jdbc.update("UPDATE yj_doc_status SET deleting='N', update_at=GETDATE()"
+                + " WHERE panel_code=? AND doc_no=? AND deleting='Y'", def.code(), no);
+        if (n == 0) throw new IllegalStateException("无待审批的删除申请");
+        return result(no, "已归档");
+    }
+
+    private boolean isAdminUser(String user) {
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT is_admin FROM yj_user WHERE username=?", user);
+        return !rows.isEmpty() && "Y".equals(String.valueOf(rows.get(0).get("is_admin")));
     }
 
     // ============ 工具 ============
@@ -589,10 +638,10 @@ public class ButtonService {
         return docStatusOf(panelCode, no);
     }
 
-    /** 状态推导:已作废 > 已中止(stopped) > 已审核(shr) > 审批中(pending) > 已归档(archived) > 草稿 */
+    /** 状态推导:已作废 > 已中止(stopped) > 已审核(shr) > 审批中(pending) > 删除申请中(deleting) > 已归档(archived) > 草稿 */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
                 panelCode, no);
         Map<String, Object> out = new HashMap<>();
         Map<String, Object> r = rows.isEmpty() ? null : rows.get(0);
@@ -606,6 +655,8 @@ public class ButtonService {
             out.put("status", "已审核");
         } else if ("Y".equals(r.get("pending"))) {
             out.put("status", "审批中");
+        } else if ("Y".equals(r.get("deleting"))) {
+            out.put("status", "删除申请中");
         } else if ("Y".equals(r.get("archived"))) {
             out.put("status", "已归档");
         } else {

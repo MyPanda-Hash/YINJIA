@@ -48,6 +48,28 @@ BEGIN CATCH
   PRINT 'yj_doc_status.archived 列已存在或无 DDL 权限(管理员执行:ALTER TABLE yj_doc_status ADD archived char(1) NULL DEFAULT ''N'');';
 END CATCH
 GO
+-- 归档单据删除申请/审批:deleting=删除申请中(待管理员审批);delete_req_by/at=申请人与时间
+BEGIN TRY
+  IF COL_LENGTH('yj_doc_status','deleting') IS NULL ALTER TABLE yj_doc_status ADD deleting char(1) NULL DEFAULT 'N';
+END TRY
+BEGIN CATCH
+  PRINT 'yj_doc_status.deleting 列已存在或无 DDL 权限(管理员执行:ALTER TABLE yj_doc_status ADD deleting char(1) NULL DEFAULT ''N'');';
+END CATCH
+GO
+BEGIN TRY
+  IF COL_LENGTH('yj_doc_status','delete_req_by') IS NULL ALTER TABLE yj_doc_status ADD delete_req_by nvarchar(50) NULL;
+END TRY
+BEGIN CATCH
+  PRINT 'yj_doc_status.delete_req_by 列已存在或无 DDL 权限;';
+END CATCH
+GO
+BEGIN TRY
+  IF COL_LENGTH('yj_doc_status','delete_req_at') IS NULL ALTER TABLE yj_doc_status ADD delete_req_at datetime2 NULL;
+END TRY
+BEGIN CATCH
+  PRINT 'yj_doc_status.delete_req_at 列已存在或无 DDL 权限;';
+END CATCH
+GO
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'单据编号') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'单据编号', N'单据编号', N'文本', NULL, NULL, NULL, NULL, N'header', 10, 140, 0, 1, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'单据日期') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'单据日期', N'单据日期', N'日期', NULL, NULL, NULL, NULL, N'header', 20, 120, 1, 1, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'客户名') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'客户名', N'客户名', N'文本', NULL, NULL, NULL, NULL, N'header', 30, 160, 1, 0, 0, 1);

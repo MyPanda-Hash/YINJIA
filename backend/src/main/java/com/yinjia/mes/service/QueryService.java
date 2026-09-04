@@ -219,7 +219,7 @@ public class QueryService {
         List<Object> args = new ArrayList<>(List.of(panelCode));
         args.addAll(docNos);
         Map<String, Map<String, Object>> out = new HashMap<>();
-        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived FROM yj_doc_status"
+        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting FROM yj_doc_status"
                 + " WHERE panel_code = ? AND doc_no IN (" + in + ")", rs -> {
             Map<String, Object> m = new HashMap<>();
             m.put("shr", rs.getString("shr"));
@@ -230,17 +230,19 @@ public class QueryService {
             m.put("pending_by", rs.getString("pending_by"));
             m.put("pending_at", rs.getTimestamp("pending_at"));
             m.put("archived", rs.getString("archived"));
+            m.put("deleting", rs.getString("deleting"));
             out.put(rs.getString("doc_no"), m);
         }, args.toArray());
         return out;
     }
 
-    /** 状态推导(照搬 light-mes 审批流 + 中止档 + 文件类归档):已作废 > 已中止 > 已审核 > 审批中 > 已归档 > 草稿 */
+    /** 状态推导(照搬 light-mes 审批流 + 中止档 + 文件类归档/删除申请):已作废 > 已中止 > 已审核 > 审批中 > 删除申请中 > 已归档 > 草稿 */
     private String docStatus(Map<String, Object> st) {
         if (st != null && "Y".equals(st.get("canceled"))) return "已作废";
         if (st != null && "Y".equals(st.get("stopped"))) return "已中止";
         if (st != null && st.get("shr") != null) return "已审核";
         if (st != null && "Y".equals(st.get("pending"))) return "审批中";
+        if (st != null && "Y".equals(st.get("deleting"))) return "删除申请中";
         if (st != null && "Y".equals(st.get("archived"))) return "已归档";
         return "草稿";
     }

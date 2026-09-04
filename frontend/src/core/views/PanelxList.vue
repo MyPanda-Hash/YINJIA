@@ -123,6 +123,11 @@
                 @click="onSideAction(a)"
               >{{ tt(a) }}</div>
             </template>
+            <!-- 归档单据删除申请:仅管理员显示审批入口 -->
+            <template v-if="isApprovalDoc && user.isAdmin">
+              <div class="as-side-btn sub" @click="onSideAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
+              <div class="as-side-btn sub" @click="onSideAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
+            </template>
           </div>
         </div>
       </div>
@@ -3270,6 +3275,11 @@ onUnmounted(() => {
   color: #6b7280;
   border: 1px solid #d1d5db;
   background: #f3f4f6;
+}
+.doc-status.删除申请中 {
+  color: #b91c1c;
+  border: 1px solid #f3c1c1;
+  background: #fef2f2;
 }
 .page-btn {
   width: 24px;
