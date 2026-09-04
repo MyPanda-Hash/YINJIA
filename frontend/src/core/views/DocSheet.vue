@@ -1,12 +1,11 @@
 <template>
   <!-- ═══════════════════════════════════════════════════════════════════
-       立项申请表(二三级项目)——文书式面板特例(RD_APPROVAL)
-       版式严格对齐《立项申请表(二三级项目)》原图:
-       ① 顶部条:公司名(斜体)| YJ-XS002(右上,竖线分隔)
-       ② 标题行:蓝色大标题(左区居中)| 信息表(文件管理人/密级/文件使用范围)
-       ③ 内容区:序号列(蓝底)+ 项目名(蓝底)+ 填写区(左上角可写字数)+ 点状虚线装饰列
-       ④ 底部签名:申请立项人 / 申请立项日期(蓝底标签 + 值区)
-       单据编号/单据日期(引擎流水号,原图为空白模板无此行,打印必需)置于内容表首行。
+       文件类文书面板(DocSheet):按 config 渲染《立项申请表》/《项目实施计划》等纸面版式
+       config 见 docSheetConfigs.js:
+       ① 顶部条:公司名(斜体)| 文档编号(可编辑)
+       ② 标题行:大标题(左区居中)| 信息表(文件管理人/密级/文件使用范围)
+       ③ 内容区:序号列(蓝底)+ 项目名(蓝底)+ 填写区(可写字数标识)+ 可选点状虚线装饰列
+       ④ 底部签名:signCells(蓝格标签 + 值区)
        数据键全部为字段 label;保存/审批/导出复用引擎既有逻辑,本组件只负责呈现与置脏。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="approval-sheet">
@@ -28,7 +27,7 @@
 
     <!-- ② 标题行:大标题 + 右上信息表 -->
     <div class="as-title-row">
-      <div class="as-title">{{ tt('立项申请表') }}（{{ tt('二三级项目') }}）</div>
+      <div class="as-title">{{ tt(config.titlePart1) }}（{{ tt(config.titlePart2) }}）{{ tt(config.titlePart3) }}</div>
       <div class="as-info-table">
         <div class="as-info-row">
           <span class="as-info-label">{{ tt('文件管理人') }}</span>
@@ -81,56 +80,77 @@
 
     <!-- ③ 内容表 -->
     <div class="as-table">
-      <div class="as-row" v-for="sec in sections" :key="sec.key" :style="{ height: sec.h + 'px' }">
-        <div class="as-no">{{ sec.num }}</div>
-        <div class="as-name">{{ tt(sec.label) }}</div>
-        <div class="as-fill">
-          <el-input
-            v-if="editable && sec.kind === 'input'"
-            v-model="head[sec.key]"
-            type="text"
-            :maxlength="sec.max || 50"
-            :style="{ height: (sec.h - 14) + 'px' }"
-            class="as-fill-input"
-            @input="emit('dirty')"
-          />
-          <el-input
-            v-else-if="editable"
-            v-model="head[sec.key]"
-            type="textarea"
-            :rows="sec.h > 90 ? 4 : 2"
-            :maxlength="sec.max"
-            class="as-fill-input as-fill-area"
-            resize="none"
-            @input="emit('dirty')"
-          />
-          <div v-else class="as-ro-text">{{ head[sec.key] || '' }}</div>
+      <!-- 单字段行 / 多子区行 -->
+      <template v-for="(row, ri) in config.rows" :key="row.key || row.label">
+        <div v-if="!row.subs" class="as-row" :style="{ height: row.h + 'px' }">
+          <div class="as-no">{{ row.num }}</div>
+          <div class="as-name">{{ tt(row.label) }}</div>
+          <div class="as-fill">
+            <div v-if="row.hint" class="as-hint">{{ tt(row.hint) }}</div>
+            <el-input
+              v-if="editable && row.kind === 'input'"
+              v-model="head[row.key]"
+              type="text"
+              :maxlength="row.max || 50"
+              :style="{ height: (row.h - 14) + 'px' }"
+              class="as-fill-input"
+              @input="emit('dirty')"
+            />
+            <el-input
+              v-else-if="editable"
+              v-model="head[row.key]"
+              type="textarea"
+              :rows="row.h > 90 ? 4 : 2"
+              :maxlength="row.max || 2000"
+              class="as-fill-input as-fill-area"
+              resize="none"
+              @input="emit('dirty')"
+            />
+            <div v-else class="as-ro-text">{{ head[row.key] || '' }}</div>
+          </div>
+          <div v-if="config.deco" class="as-deco"></div>
         </div>
-        <div class="as-deco"></div>
-      </div>
 
-      <!-- ④ 底部签名(对齐原图:申请立项人 蓝格=序号列+项目名列 202px;两半按原图 53/47) -->
+        <!-- 多子区行:如 测试方案(条件/方法/标准) -->
+        <div v-else class="as-row" :style="{ height: row.h + 'px' }">
+          <div class="as-no">{{ row.num }}</div>
+          <div class="as-name">{{ tt(row.label) }}</div>
+          <div class="as-fill as-fill-multi">
+            <div v-for="(sub, si) in row.subs" :key="sub.key" class="as-sub" :class="{ first: si === 0 }">
+              <div class="as-sub-label">{{ tt(sub.label) }}：{{ sub.max }}{{ tt('字') }}</div>
+              <el-input
+                v-if="editable"
+                v-model="head[sub.key]"
+                type="textarea"
+                :maxlength="sub.max"
+                rows="2"
+                class="as-fill-input as-fill-area"
+                resize="none"
+                @input="emit('dirty')"
+              />
+              <div v-else class="as-ro-text">{{ head[sub.key] || '' }}</div>
+            </div>
+          </div>
+          <div v-if="config.deco" class="as-deco"></div>
+        </div>
+      </template>
+
+      <!-- ④ 底部签名(如 申请立项人/申请立项日期、负责人/编制日期) -->
       <div class="as-sign-row">
-        <div class="as-sign-half as-sign-h1">
-          <div class="as-sign-cell as-sign-c1">{{ tt('申请立项人') }}</div>
+        <div v-for="(c, ci) in config.signCells" :key="c.key" class="as-sign-pair" :style="{ flex: c.flex }">
+          <div class="as-sign-cell" :class="{ 'white-shell': c.white }" :style="{ width: c.w + 'px' }">{{ tt(c.label) }}</div>
           <div class="as-sign-val">
             <el-input
-              v-if="editable"
-              v-model="head['申请立项人']"
+              v-if="editable && c.type === 'text'"
+              v-model="head[c.key]"
               size="small"
               maxlength="50"
               class="as-cell-input"
               @input="emit('dirty')"
             />
-            <template v-else>{{ head['申请立项人'] || '' }}</template>
-          </div>
-        </div>
-        <div class="as-sign-half as-sign-h2">
-          <div class="as-sign-cell as-sign-c2">{{ tt('申请立项日期') }}</div>
-          <div class="as-sign-val">
             <el-date-picker
-              v-if="editable"
-              v-model="head['申请立项日期']"
+              v-else-if="editable"
+              v-model="head[c.key]"
               type="date"
               value-format="YYYY-MM-DD"
               size="small"
@@ -138,7 +158,7 @@
               :clearable="false"
               @change="emit('dirty')"
             />
-            <template v-else>{{ head['申请立项日期'] || '' }}</template>
+            <template v-else>{{ head[c.key] || '' }}</template>
           </div>
         </div>
       </div>
@@ -154,21 +174,9 @@ const props = defineProps({
   head: { type: Object, required: true },
   fields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
+  config: { type: Object, required: true },
 })
 const emit = defineEmits(['dirty'])
-
-/** 内容区行定义:num 序号 / label 字段标签(即数据键) / max 可写字数(仅用于 maxlength 截断,
- *  不显示任何提示字样) / h 行高(对齐原图模板) / kind 控件类型 */
-const sections = [
-  { num: '一', label: '客户名', key: '客户名', max: 0, h: 47, kind: 'input' },
-  { num: '二', label: '立项背景', key: '立项背景', max: 250, h: 96, kind: 'textarea' },
-  { num: '三', label: '机型及应用位置', key: '机型及应用位置', max: 50, h: 58, kind: 'textarea' },
-  { num: '四', label: '滤芯/炭棒规格或结构', key: '滤芯/炭棒规格或结构', max: 100, h: 71, kind: 'textarea' },
-  { num: '五', label: '项目开发目标', key: '项目开发目标', max: 250, h: 155, kind: 'textarea' },
-  { num: '六', label: '项目输出', key: '项目输出', max: 100, h: 97, kind: 'textarea' },
-  { num: '七', label: '开发周期要求', key: '开发周期要求', max: 50, h: 45, kind: 'textarea' },
-  { num: '八', label: '其它要求', key: '其它要求', max: 250, h: 132, kind: 'textarea' },
-]
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
 
@@ -214,7 +222,7 @@ function selectOptions(key) {
   padding: 0;
 }
 
-/* ═══ ① 顶部条:公司名 | YJ-XS002 ═══ */
+/* ═══ ① 顶部条:公司名 | 文档编号 ═══ */
 .as-topbar {
   display: flex;
   border-bottom: 1px solid #8a8a8a;
@@ -341,6 +349,12 @@ function selectOptions(key) {
   flex-direction: column;
   padding: 3px 6px;
 }
+.as-hint {
+  font-size: 14px;
+  color: #333;
+  line-height: 20px;
+  padding-left: 2px;
+}
 .as-fill-input {
   flex: 1;
 }
@@ -354,11 +368,29 @@ function selectOptions(key) {
   word-break: break-all;
   padding: 2px 4px;
 }
-/* 装饰列:250px 与上方信息表/文档编号竖线(690px 处)精确对齐 */
 .as-deco {
   width: 250px;
   flex: none;
   border-left: 3px dotted #9a9a9a;
+}
+/* 多子区行:如 测试方案(条件/方法/标准) */
+.as-fill-multi {
+  padding: 0 6px;
+}
+.as-sub {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 2px 4px;
+}
+.as-sub + .as-sub {
+  border-top: 1px solid #c9c9c9;
+}
+.as-sub-label {
+  font-size: 14px;
+  color: #333;
+  line-height: 20px;
 }
 
 /* ═══ ④ 底部签名 ═══ */
@@ -366,15 +398,8 @@ function selectOptions(key) {
   display: flex;
   min-height: 54px;
 }
-.as-sign-half {
+.as-sign-pair {
   display: flex;
-}
-.as-sign-h1 {
-  flex: 0 0 53%;
-}
-.as-sign-h2 {
-  flex: 1;
-  border-left: 1px solid #8a8a8a;
 }
 .as-sign-cell {
   flex: none;
@@ -387,13 +412,8 @@ function selectOptions(key) {
   padding: 0 8px;
   text-align: center;
 }
-/* 申请立项人 蓝格与上部 序号列(52) + 项目名列(150) 对齐 */
-.as-sign-c1 {
-  width: 202px;
-}
-/* 申请立项日期 白底蓝字(与上部信息表标签一致) */
-.as-sign-c2 {
-  width: 150px;
+/* 白底蓝字标签(如 申请立项日期 自定义) */
+.as-sign-cell.white-shell {
   background: #fff;
   color: #1f5fa8;
 }

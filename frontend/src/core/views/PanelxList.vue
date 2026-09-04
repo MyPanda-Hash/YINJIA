@@ -95,7 +95,7 @@
     <!-- 文书式面板:完整纸张居中 + 功能按钮右侧竖排(不按表头/表中/表尾三段式) -->
     <template v-else-if="isApprovalDoc">
       <div class="approval-layout">
-        <ApprovalDocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" @dirty="markInlineDirty" />
+        <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" @dirty="markInlineDirty" />
         <div class="approval-side">
           <div class="as-side-title">{{ tt(panelName) }}</div>
           <div class="as-side-status-row">
@@ -701,7 +701,8 @@ import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import SubBomDialog from './SubBomDialog.vue'
 import BomMasterDetail from './BomMasterDetail.vue'
-import ApprovalDocSheet from './ApprovalDocSheet.vue'
+import DocSheet from './DocSheet.vue'
+import { approvalSheetCfg, planSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import VoucherFormDialog from './VoucherFormDialog.vue'
@@ -730,8 +731,9 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 
 // 物料清单维护和正反向查询统一使用父件/子件主从视图；仅 BOM 草稿开放编辑。
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
-// 立项申请表(二三级项目):文书式特例面板,内容区按《立项申请表》模板排版(ApprovalDocSheet)
-const isApprovalDoc = computed(() => panelCode.value === 'RD_APPROVAL')
+// 立项申请表/项目实施计划等:文件类文书式特例面板,内容区按《申请表》模板排版(DocSheet 配置驱动)
+const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN'].includes(String(panelCode.value)))
+const docSheetConfig = computed(() => (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
 const bomMasterRows = computed(() => {
   if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
   return list.value || [] // BOM_FWD/BOM_REV：后端返回的展平行（父件-子件对）
@@ -1183,8 +1185,10 @@ watch(
   () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
   () => {
     if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
-    if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
-    if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
+    if (panelCode.value === 'RD_APPROVAL') {
+      if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
+      if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
+    }
     if (!cur.value['文件管理人']) cur.value['文件管理人'] = '陈秀丽'
   },
 )
