@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
@@ -176,7 +176,12 @@
           </tr>
         </tbody>
       </table>
-      <div v-if="editable" class="ps-add" @click="addProject">＋ {{ tt('新增项目') }}</div>
+      <div v-if="editable" class="ps-addbar">
+        <el-select v-model="newLevel" size="small" :clearable="false" class="ps-addbar-level">
+          <el-option v-for="o in selectOptions('项目等级')" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
+        <div class="ps-add" @click="addProject">＋ {{ tt('新增项目') }}</div>
+      </div>
     </div>
   </div>
 </template>
@@ -288,11 +293,19 @@ function changeGroupLevel(i, v) {
   }
   emit('dirty')
 }
-/** 新增项目(文件面板内多个项目,每组一行起) */
+/** 新增项目:先选等级,自动插入并归入对应等级块(同级末尾) */
+const newLevel = ref('二级')
 function addProject() {
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
-  d.items.push({ '项目名称': '', '项目等级': '一二级' })
+  const lv = newLevel.value || '二级'
+  const row = { '项目名称': '', '项目等级': lv }
+  let idx = -1
+  for (let i = d.items.length - 1; i >= 0; i--) {
+    if (d.items[i]['项目等级'] === lv) { idx = i; break }
+  }
+  if (idx >= 0) d.items.splice(idx + 1, 0, row)
+  else d.items.push(row)
   emit('dirty')
 }
 /** 在当前子项目后插入同组新子项目(复制所属项目名称/层级) */
@@ -474,7 +487,7 @@ function removeItem(i) {
 .ps-table tr:hover td {
   background: #f7fbff;
 }
-.c-level { width: 70px; }
+.c-level { width: 100px; }
 .c-name { width: 150px; }
 /* 项目名称合并块:铺满组内子项目行,浅蓝底,文字居中(对齐原图) */
 .ps-table td.c-name {
@@ -500,11 +513,12 @@ function removeItem(i) {
 .ps-level-block {
   display: inline-block;
   width: 100%;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
-  word-break: break-all;
+  white-space: nowrap;
+  word-break: keep-all;
 }
-/* 编辑态等级块内下拉底色透明(与块色调和) */
+/* 编辑态等级块内下拉底色透明(与块色调和),选中文字完整显示 */
 .ps-table td.c-level :deep(.el-select__wrapper) {
   background: transparent;
   box-shadow: none !important;
@@ -512,8 +526,20 @@ function removeItem(i) {
 }
 .ps-table td.c-level :deep(.el-select__selected-item) {
   color: #fff;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
+  white-space: nowrap;
+  overflow: visible;
+}
+/* 新增项目条:等级下拉 + 按钮 */
+.ps-addbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 8px;
+}
+.ps-addbar-level {
+  width: 110px;
 }
 .c-sub { width: 120px; }
 .c-remark { width: 130px; }
