@@ -793,9 +793,8 @@ export const recordSheetConfigs = {
   // 检验项目及标准页:从标准库(测试项目汇总 26 类)勾选组装
   RD_SPEC_DOC: {
     headMode: 'report',
-    titleFromKey: '名称',
-    titlePrefix: '产品规格书·',
-    titlePlaceholder: '矿化后置烧结矿化棒',
+    staticTitle: '产品规格书',
+
     specTypes: ['飞利浦沐浴阻垢滤芯', '矿化烧结炭棒', '迈博瑞复合滤芯', '除铅炭棒', '抑菌炭棒', 'X14折叠复合滤芯', '碱性炭棒', '矿化炭棒', '多功能炭棒'],
     pages: [
       { title: '产品信息' },
@@ -808,21 +807,30 @@ export const recordSheetConfigs = {
     sections: [
       { page: 0, rows: [
         { pairs: [
-          { label: '规格书种类', key: '规格书种类', type: 'select', vspan: 3 },
-          { label: '编号', key: '编号', type: 'text', vspan: 3 },
+          { label: '名称', key: '名称', type: 'text', vspan: 7 },
         ]},
         { pairs: [
-          { label: '客户名', key: '客户名', vspan: 1 },
-          { label: '客户料号', key: '客户料号', vspan: 5 },
+          { label: '编号', key: '编号', type: 'text', vspan: 7 },
         ]},
         { pairs: [
-          { label: '版本', key: '版本', vspan: 1 },
-          { label: '日期', key: '日期', vspan: 5 },
+          { label: '客户名', key: '客户名', vspan: 7 },
+        ]},
+        { pairs: [
+          { label: '客户料号', key: '客户料号', vspan: 7 },
+        ]},
+        { pairs: [
+          { label: '版本', key: '版本', vspan: 7 },
+        ]},
+        { pairs: [
+          { label: '日期', key: '日期', vspan: 7 },
+        ]},
+        { pairs: [
+          { label: '规格书种类', key: '规格书种类', type: 'select', vspan: 7 },
         ]},
         { pairs: [
           { label: '制订日期', key: '制订日期' },
           { label: '审核日期', key: '审核日期' },
-          { label: '批准日期', key: '批准日期', vspan: 2 },
+          { label: '批准日期', key: '批准日期', vspan: 4 },
         ]},
         { label: '1.适用范围', key: '适用范围', type: 'area', tall: true },
         { label: '2.整体规格参数', key: '整体规格参数', type: 'area', tall: true },
