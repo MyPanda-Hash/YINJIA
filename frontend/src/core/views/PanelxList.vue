@@ -679,7 +679,7 @@ import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
-import html2canvas from 'html2canvas'
+import { toBlob } from 'html-to-image'
 import { ensureScanFillAction } from '@core/button-groups'
 import { useReportColumns } from '@core/report/useReportColumns'
 import RefPickDialog from './RefPickDialog.vue'
@@ -1546,18 +1546,20 @@ async function exportApprovalSheet() {
   if (!el) return
   ElMessage.info('正在导出整张文书…')
   try {
-    // 跳过 iframe(布局外壳/第三方组件可能内嵌,克隆时无法解析);文书本身无 iframe,不影响导出
-    const canvas = await html2canvas(el, {
-      scale: 2,
+    // html-to-image:SVG foreignObject 序列化;显式过滤 iframe(布局外壳/组件内嵌,文书内无)
+    const blob = await toBlob(el, {
+      pixelRatio: 2,
       backgroundColor: '#ffffff',
-      useCORS: true,
-      logging: false,
-      ignoreElements: (node) => node.tagName === 'IFRAME',
+      cacheBust: true,
+      filter: (node) => node.tagName !== 'IFRAME',
     })
+    if (!blob) throw new Error('导出结果为空')
+    const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
-    link.href = canvas.toDataURL('image/png')
+    link.href = url
     link.download = `立项申请-${cur.value['单据编号'] || cur.value['文档编号'] || 'PIR'}.png`
     link.click()
+    setTimeout(() => URL.revokeObjectURL(url), 30000)
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || '导出失败')
   }
