@@ -796,23 +796,17 @@ export const recordSheetConfigs = {
     staticTitle: '产品规格书',
     cover: {
       fields: [
-        { label: '名称', key: '名称' },
-        { label: '编号', key: '编号' },
+        { label: '名 称', key: '名称' },
+        { label: '编  号', key: '编号' },
         { label: '客户名', key: '客户名' },
         { label: '客户料号', key: '客户料号' },
-        { label: '版本', key: '版本' },
-        { label: '日期', key: '日期' },
-        { label: '规格书种类', key: '规格书种类', type: 'select' },
+        { label: '版  本', key: '版本' },
+        { label: '日  期', key: '日期' },
       ],
       sign: [
         { label: '制订/日期', key: '制订日期' },
         { label: '审核/日期', key: '审核日期' },
         { label: '批准/日期', key: '批准日期' },
-      ],
-      chapters: [
-        { label: '1.适用范围', key: '适用范围' },
-        { label: '2.整体规格参数', key: '整体规格参数' },
-        { label: '3.产品主要性能', key: '产品主要性能' },
       ],
     },
 
@@ -826,6 +820,12 @@ export const recordSheetConfigs = {
     grid: [100, 300, 100, 240, 100, 100, 100, 110],
     head: { title: 5, infoLabel: 1, infoValue: 2 },
     sections: [
+      // 第 2 页(检验项目及标准):1.适用范围 / 2.整体规格参数 / 3.产品主要性能(源 docx 同页,先于 4.检验标准表)
+      { page: 2, doc: true, rows: [
+          { label: '1.适用范围', key: '适用范围' },
+          { label: '2.整体规格参数', key: '整体规格参数' },
+          { label: '3.产品主要性能', key: '产品主要性能' },
+        ]},
       { page: 3, doc: true, rows: [
         { label: '6.包装方式', key: '包装方式', area: true },
         { label: '7.运输要求', key: '运输要求', area: true },

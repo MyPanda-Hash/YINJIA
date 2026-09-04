@@ -22,36 +22,35 @@
     <table v-if="!isPlain && activePage === 0" class="rs-t rs-head-t" :style="{ width: gridW + 'px' }">
       <colgroup><col v-for="(w, i) in effGrid" :key="'hc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
-        <!-- 规格书文档式封面:公司名 → 大标题 → 逐行字段 → 章节 → 签名(按《规格书细分》设计图) -->
+        <!-- 规格书文档式封面:按《C-95-33 伊可普高品质功能炭棒规格书》设计图逐像素复刻
+             (设计画布 708×1173px,内层全部坐标=设计像素,由 --cok=gridW/708 等比缩放)
+             公司左上 | 大标题居中偏右(设计图标题中心 367.5/708)| 6 条字段线 | 窄居中签名表 -->
         <template v-if="cfg.cover">
-          <tr><td :colspan="nCols" class="rsp-cover-company">惠州市银嘉环保科技有限公司</td></tr>
-          <tr><td :colspan="nCols" class="rsp-cover-title">产品规格书</td></tr>
-          <tr v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi">
-            <td :colspan="nCols" class="rsp-cover-line">
-              <span class="rsp-cover-label">{{ tt(fd.label) }}：</span>
-              <el-select v-if="editable && fd.type === 'select'" v-model="head[fd.key]" size="small" class="rsp-cover-input" :clearable="false" @change="emit('dirty')">
-                <el-option v-for="o in selectOptions(fd.key)" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-              <el-input v-else-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :maxlength="fd.max || 200" @input="emit('dirty')" />
-              <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
-            </td>
-          </tr>
-          <tr v-for="(ch, ci) in cfg.cover.chapters" :key="'ch' + ci">
-            <td :colspan="nCols" class="rsp-cover-line">
-              <span class="rsp-cover-label">{{ tt(ch.label) }}：</span>
-              <el-input v-if="editable" v-model="head[ch.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 5 }" size="small" class="rsp-cover-input" :maxlength="ch.max || 2000" @input="emit('dirty')" />
-              <span v-else class="rsp-cover-val rsp-pre">{{ head[ch.key] || '' }}</span>
-            </td>
-          </tr>
-          <tr class="rsp-cover-sign">
-            <td v-for="(sg, si) in cfg.cover.sign" :key="'sg' + si" class="rsp-sign-cell" :colspan="si === cfg.cover.sign.length - 1 ? nCols - (cfg.cover.sign.length - 1) * 3 : 3">
-              <div class="rsp-sign-label">{{ tt(sg.label) }}</div>
-              <div class="rsp-sign-val">
-                <el-input v-if="editable" v-model="head[sg.key]" size="small" class="rs-c-in" maxlength="100" @input="emit('dirty')" />
-                <span v-else class="rsp-cover-val">{{ head[sg.key] || '' }}</span>
+          <tr><td :colspan="nCols" class="rsp-cover-td">
+            <div class="rsp-cover-page" :style="{ height: coverPageH + 'px', '--cok': coverK }">
+              <div class="rsp-cover-company">惠州市银嘉环保科技有限公司</div>
+              <div class="rsp-cover-title">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
+              <div v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi" class="rsp-cover-line" :style="{ top: coverLineTop(fi) }">
+                <span class="rsp-cover-label">{{ tt(fd.label) }}：</span>
+                <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :maxlength="fd.max || 200" @input="emit('dirty')" />
+                <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
               </div>
-            </td>
-          </tr>
+              <table class="rsp-sign-t">
+                <colgroup><col v-for="(w, i) in coverSignW" :key="'cw' + i" :style="{ width: w + 'px' }" /></colgroup>
+                <tbody>
+                  <tr>
+                    <th v-for="(sg, si) in cfg.cover.sign" :key="'sh' + si" class="rsp-sign-th">{{ tt(sg.label) }}</th>
+                  </tr>
+                  <tr>
+                    <td v-for="(sg, si) in cfg.cover.sign" :key="'sd' + si" class="rsp-sign-td">
+                      <el-input v-if="editable" v-model="head[sg.key]" size="small" class="rsp-sign-input" maxlength="100" @input="emit('dirty')" />
+                      <span v-else class="rsp-cover-val">{{ head[sg.key] || '' }}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </td></tr>
         </template>
         <!-- 标准报告头(其它文书面板) -->
         <template v-else>
@@ -461,6 +460,22 @@ const effHead = computed(() => activeVariant.value?.head || cfg.value?.head || {
 const nCols = computed(() => effGrid.value.length)
 /** 网格总宽:所有表格显式用这个宽度,列分界线全页严格一致(数据表编辑态另加 60px 操作列) */
 const gridW = computed(() => effGrid.value.reduce((s, w) => s + w, 0))
+
+/* ── 规格书文档式封面(设计图 708×1173 逐像素复刻):内层坐标=设计像素,由 --cok 等比缩放 ──
+   测量自《C-95-33 伊可普高品质功能炭棒规格书》(设计图): 公司 y19..38 / 标题 y191..239 /
+   6 字段行 x≈173..177,行距 67px / 签名表 x132..604,y990..1112,列宽 143/157/172 */
+const COVER_W = 708
+const COVER_H = 1173
+const coverK = computed(() => gridW.value / COVER_W)
+const coverPageH = computed(() => Math.round(COVER_H * coverK.value))
+/** 字段行顶部(设计 px,行高 46 → ink 中心 482.5/549.5/617/683/750/817.5 = 设计墨迹中心) */
+const COVER_LINE_TOPS = [460, 527, 594, 660, 727, 795]
+function coverLineTop(i) {
+  const y = COVER_LINE_TOPS[i] ?? (COVER_LINE_TOPS[0] + i * 67)
+  return (y * coverK.value).toFixed(1) + 'px'
+}
+const COVER_SIGN_W = [143, 157, 172] // x 132..275..432..604 (设计图实测)
+const coverSignW = COVER_SIGN_W
 
 /** 报告头右侧信息块(数据记录表=密级/适用范围/测试负责人/报告编号;委托单=文件管理人/密级/文件使用范围) */
 const DEFAULT_INFO = [
@@ -1007,68 +1022,110 @@ function chartOf(dt) {
   border-color: #8fb4e0;
 }
 
-/* ═══ 规格书文档式封面(按设计图:无表格线) ═══ */
+/* ═══ 规格书文档式封面:设计图 708×1173 逐像素复刻(内层全部 calc 设计px × var(--cok)) ═══ */
+.rsp-cover-td {
+  border: none !important;
+  padding: 0 !important;
+  vertical-align: top;
+}
+/* 页面画布:按网格宽等比缩放到设计图宽度(708) */
+.rsp-cover-page {
+  position: relative;
+  width: 100%;
+  background: #fff;
+  overflow: hidden;
+}
+/* 公司名:微软雅黑 15.5pt(设计图墨迹 y19..38,x15..295) */
 .rsp-cover-company {
-  border: none !important;
-  padding: 18px 0 0 8px !important;
-  font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
-  font-size: 15px;
-  color: #333;
+  position: absolute;
+  left: calc(15px * var(--cok));
+  top: calc(15px * var(--cok));
+  font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+  font-size: calc(20.7px * var(--cok));
+  line-height: 1;
+  color: #000;
+  white-space: nowrap;
 }
+/* 大标题:宋体 35.5pt + 字距-1pt,中心 x=367.5/708(设计图实测 51.9%,非画布正中) */
 .rsp-cover-title {
-  border: none !important;
-  text-align: center;
+  position: absolute;
+  left: calc(367.5px * var(--cok));
+  transform: translateX(-50%);
+  top: calc(191px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
-  font-size: 34px;
-  font-weight: 700;
-  letter-spacing: 6px;
-  padding: 40px 0 30px !important;
+  font-size: calc(47.3px * var(--cok));
+  font-weight: 400;
+  letter-spacing: calc(-1.33px * var(--cok));
+  color: #111;
+  line-height: 1;
+  white-space: nowrap;
+  text-align: center;
 }
+/* 字段行:宋体 23.5pt,行距 67px,标签起点 x=173;标签内嵌空格(名 称/编  号/版  本/日  期)自然流 → 冒号/值随行自动落位 */
 .rsp-cover-line {
-  border: none !important;
-  padding: 3px 0 3px 90px !important;
-  font-size: 16px;
-  color: #222;
+  position: absolute;
+  left: calc(173px * var(--cok));
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  height: calc(46px * var(--cok));
+  font-family: 'SimSun', 'Songti SC', serif;
+  font-size: calc(31.3px * var(--cok));
+  color: #1a1a1a;
+  white-space: nowrap;
 }
 .rsp-cover-label {
   flex: none;
-  min-width: 96px;
-  font-family: 'SimSun', 'Songti SC', serif;
-  color: #333;
+  white-space: pre;
+  line-height: 1;
 }
 .rsp-cover-input {
   flex: 1;
-  max-width: 480px;
+  height: calc(46px * var(--cok));
 }
-.rsp-cover-input :deep(.el-input__inner),
-.rsp-cover-input :deep(.el-textarea__inner) {
-  font-size: 16px;
+.rsp-cover-input :deep(.el-input__inner) {
+  font-size: calc(31.3px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
+  line-height: calc(46px * var(--cok));
   padding: 0;
 }
 .rsp-cover-val {
+  font-size: calc(31.3px * var(--cok));
+  line-height: 1;
+}/* 签名表:设计图 x132..604(宽 473),y990..1112(高 123);表头 59px,表体 63px;2px 黑边框 */
+.rsp-sign-t {
+  position: absolute;
+  left: calc(132px * var(--cok));
+  top: calc(990px * var(--cok));
+  width: calc(473px * var(--cok));
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.rsp-sign-t th,
+.rsp-sign-t td {
+  border: calc(1.5px * var(--cok)) solid #000;
+}
+.rsp-sign-th {
+  height: calc(59px * var(--cok));
+  font-size: calc(16px * var(--cok));
+  font-weight: 400;
+  font-family: 'SimSun', 'Songti SC', serif;
+  color: #111;
+  padding: 0 4px;
+  text-align: center;
+  vertical-align: middle;
+}
+.rsp-sign-td {
+  height: calc(62px * var(--cok));
+  padding: 0 8px;
+  text-align: center;
+  vertical-align: middle;
+  font-size: calc(16px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
 }
-.rsp-cover-sign {
-  margin-top: 10px;
-}
-.rsp-sign-cell {
-  border: 1px solid #7f7f7f !important;
-  padding: 6px 10px !important;
+.rsp-sign-input :deep(.el-input__inner) {
   text-align: center;
-}
-.rsp-sign-label {
-  font-size: 13px;
-  color: #333;
-  border-bottom: 1px solid #c9c9c9;
-  padding-bottom: 4px;
-  margin-bottom: 4px;
-}
-.rsp-sign-val :deep(.el-input__inner) {
-  text-align: center;
+  font-size: calc(16px * var(--cok));
+  line-height: 1.6;
 }
 
 /* ═══ 文档式章节行(规格书 P4) ═══ */
