@@ -112,7 +112,7 @@
                 :loading="refLoading"
                 @change="changeGroupName(i, $event)"
               >
-                <el-option v-for="o in refOptions" :key="o" :label="o" :value="o" />
+                <el-option v-for="o in refOptions" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
               <span v-else class="ps-cell-text ps-name-block">{{ row['项目名称'] || '' }}</span>
             </td>
@@ -177,17 +177,45 @@
         </tbody>
       </table>
       <div v-if="editable" class="ps-addbar">
-        <el-select v-model="newLevel" size="small" :clearable="false" class="ps-addbar-level">
-          <el-option v-for="o in selectOptions('项目等级')" :key="o.value" :label="o.label" :value="o.value" />
-        </el-select>
-        <div class="ps-add" @click="addProject">＋ {{ tt('新增项目') }}</div>
+        <div class="ps-add" @click="openAddProject">＋ {{ tt('新增项目') }}</div>
       </div>
     </div>
+
+    <!-- 新增项目弹窗:选等级 + 项目名称(手填/选项目实施计划项目,选项带实施计划单据号,选中导入相关信息) -->
+    <el-dialog v-model="dlgVisible" :title="tt('新增项目')" width="400px" append-to-body>
+      <div class="ps-dlg-row">
+        <span class="ps-dlg-label">{{ tt('项目等级') }}</span>
+        <el-select v-model="dlgLevel" size="default" :clearable="false" style="width: 220px">
+          <el-option v-for="o in selectOptions('项目等级')" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
+      </div>
+      <div class="ps-dlg-row">
+        <span class="ps-dlg-label">{{ tt('项目名称') }}</span>
+        <el-select
+          v-model="dlgName"
+          filterable
+          allow-create
+          default-first-option
+          clearable
+          size="default"
+          style="width: 220px"
+          :loading="refLoading"
+        >
+          <el-option v-for="o in refOptions" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
+      </div>
+      <div class="ps-dlg-tip">{{ tt('下拉可选择项目实施计划项目（含其实施计划单号），选中后自动导入实施计划相关信息；也可直接输入新项目名称。') }}</div>
+      <template #footer>
+        <el-button @click="dlgVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="confirmAddProject">{{ tt('确定') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 
@@ -224,7 +252,10 @@ async function loadRefOptions() {
     const res = await engine.queryFormDataList({ panelCode: 'RD_PLAN', condition: {}, pageNo: 1, pageSize: 200 })
     const rows = res.list || []
     refRows.value = rows
-    refOptions.value = rows.map((r) => r['项目名称']).filter(Boolean)
+    // 选项:项目名称（实施计划单号,如 LXB2609040001）
+    refOptions.value = rows
+      .filter((r) => r['项目名称'])
+      .map((r) => ({ value: r['项目名称'], label: `${r['项目名称']}（${r['单据编号'] || r['编号'] || ''}）` }))
   } catch (e) {
     /* 实施计划未就绪时静默 */
   } finally {
@@ -293,19 +324,40 @@ function changeGroupLevel(i, v) {
   }
   emit('dirty')
 }
-/** 新增项目:先选等级,自动插入并归入对应等级块(同级末尾) */
-const newLevel = ref('二级')
-function addProject() {
+/** 新增项目:点击按钮弹窗(选等级 + 项目名称 手填/选实施计划项目),自动归入对应等级块 */
+const dlgVisible = ref(false)
+const dlgName = ref('')
+const dlgLevel = ref('二级')
+function openAddProject() {
+  dlgName.value = ''
+  dlgLevel.value = '二级'
+  dlgVisible.value = true
+}
+function confirmAddProject() {
+  const name = String(dlgName.value || '').trim()
+  if (!name) {
+    ElMessage.warning(tt('请填写项目名称'))
+    return
+  }
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
-  const lv = newLevel.value || '二级'
-  const row = { '项目名称': '', '项目等级': lv }
+  const lv = dlgLevel.value || '二级'
+  const row = { '项目名称': name, '项目等级': lv }
   let idx = -1
   for (let i = d.items.length - 1; i >= 0; i--) {
     if (d.items[i]['项目等级'] === lv) { idx = i; break }
   }
   if (idx >= 0) d.items.splice(idx + 1, 0, row)
   else d.items.push(row)
+  // 选实施计划项目:自动导入实施计划相关信息(项目定级/测试内容/…)
+  const found = refRows.value.find((r) => r['项目名称'] === name)
+  if (found) {
+    const keys = ['项目定级', '测试内容', '测试产品打样要求', '测试目标', '测试条件', '测试方法', '测试标准']
+    for (const k of keys) {
+      if (found[k] != null && found[k] !== '') props.head[k] = found[k]
+    }
+  }
+  dlgVisible.value = false
   emit('dirty')
 }
 /** 在当前子项目后插入同组新子项目(复制所属项目名称/层级) */
@@ -531,15 +583,30 @@ function removeItem(i) {
   white-space: nowrap;
   overflow: visible;
 }
-/* 新增项目条:等级下拉 + 按钮 */
+/* 新增项目条(弹窗入口) */
 .ps-addbar {
   display: flex;
   gap: 8px;
   align-items: center;
   margin: 6px 8px;
 }
-.ps-addbar-level {
-  width: 110px;
+/* 新增项目弹窗 */
+.ps-dlg-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.ps-dlg-label {
+  width: 72px;
+  text-align: right;
+  color: #333;
+  font-weight: 600;
+}
+.ps-dlg-tip {
+  font-size: 12px;
+  color: #8a97a6;
+  line-height: 1.5;
 }
 .c-sub { width: 120px; }
 .c-remark { width: 130px; }
