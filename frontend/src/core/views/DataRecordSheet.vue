@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        功能性滤效 数据记录表(RD_FILTER_EFF)——按《04数据记录表.xlsx》一比一复刻
        真实表格列对齐:报告头表(公司名|YJ-PD-01、主题+信息块4行) →
@@ -13,7 +13,7 @@
           <td class="rs-td rs-company-cell">惠州市银嘉环保科技有限公司</td>
           <td class="rs-td rs-docno">
             <el-input v-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" @input="emit('dirty')" />
-            <template v-else>{{ head['文档编号'] || head['单据编号'] || 'YJ-PD-01' }}</template>
+            <span v-else class="rs-docno-text">{{ head['文档编号'] || head['单据编号'] || 'YJ-PD-01' }}</span>
           </td>
         </tr>
         <tr>
@@ -402,6 +402,12 @@ function removeRow(i) {
   font-size: 14px;
   padding: 6px 14px !important;
   vertical-align: middle;
+}
+.rs-docno-text {
+  display: inline-block;
+  min-width: 150px;
+  text-align: right;
+  letter-spacing: 1px;
 }
 .rs-docno-input {
   width: 160px;
