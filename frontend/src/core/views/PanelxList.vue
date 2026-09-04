@@ -95,7 +95,7 @@
     <!-- 文书式面板:完整纸张居中 + 功能按钮右侧竖排(不按表头/表中/表尾三段式) -->
     <template v-else-if="isApprovalDoc">
       <div class="approval-layout">
-        <ApprovalDocSheet :head="cur" :fields="headerFields" :editable="draftEditable" @dirty="markInlineDirty" />
+        <ApprovalDocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" @dirty="markInlineDirty" />
         <div class="approval-side">
           <div class="as-side-title">{{ tt(panelName) }}</div>
           <div class="as-side-status-row">
@@ -113,14 +113,14 @@
               <div
                 class="as-side-btn"
                 :class="{ disabled: isDisabled(btnName(g)) }"
-                @click="onButton(btnName(g))"
+                @click="onSideAction(btnName(g))"
               >{{ tt(btnName(g)) }}</div>
               <div
                 v-for="a in dropItems(g)"
                 :key="a"
                 class="as-side-btn sub"
                 :class="{ disabled: isDisabled(a) }"
-                @click="onGroupAction(a)"
+                @click="onSideAction(a)"
               >{{ tt(a) }}</div>
             </template>
           </div>
@@ -679,6 +679,7 @@ import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
+import html2canvas from 'html2canvas'
 import { ensureScanFillAction } from '@core/button-groups'
 import { useReportColumns } from '@core/report/useReportColumns'
 import RefPickDialog from './RefPickDialog.vue'
@@ -1527,6 +1528,32 @@ function onGroupAction(a) {
   // 2026-08-25：灰按钮（如草稿态「生成XX」）点击不执行、不弹提示
   if (isDisabled(a)) return
   onButton(a)
+}
+
+// ══════════ 文书式面板:导出 = 整张文书导出(PNG,含全部版式) ══════════
+const approvalSheetRef = ref(null)
+function onSideAction(a) {
+  // 文书面板「导出」不走通用 CSV,改为整张文书截图导出
+  if (isApprovalDoc.value && a === '导出') {
+    exportApprovalSheet()
+    return
+  }
+  if (isDisabled(a)) return
+  onButton(a)
+}
+async function exportApprovalSheet() {
+  const el = approvalSheetRef.value?.$el || approvalSheetRef.value
+  if (!el) return
+  ElMessage.info('正在导出整张文书…')
+  try {
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false })
+    const link = document.createElement('a')
+    link.href = canvas.toDataURL('image/png')
+    link.download = `立项申请-${cur.value['单据编号'] || cur.value['文档编号'] || 'PIR'}.png`
+    link.click()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '导出失败')
+  }
 }
 
 async function copyActive() {

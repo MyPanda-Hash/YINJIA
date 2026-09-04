@@ -15,6 +15,7 @@
     "@vue-flow/core": "^1.48.2",
     "axios": "^1.7.9",
     "element-plus": "^2.9.3",
+    "html2canvas": "^1.4.1",
     "pinia": "^2.3.0",
     "vue": "^3.5.13",
     "vue-i18n": "^9.14.4",
