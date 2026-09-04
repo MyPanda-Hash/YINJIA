@@ -109,6 +109,20 @@
             <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
           </div>
           <div class="as-side-btns">
+            <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回) -->
+            <div class="as-side-del" v-if="isApprovalDoc">
+              <div class="as-side-btn-row">
+                <div class="as-side-btn" style="flex: 1" @click="onSideAction('删除')">{{ tt('删除') }}</div>
+                <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openDelMenu = !openDelMenu">▼</div>
+              </div>
+              <div v-if="openDelMenu" class="as-side-menu" @click.stop>
+                <div class="as-side-menu-item" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
+                <template v-if="user.isAdmin">
+                  <div class="as-side-menu-item" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
+                  <div class="as-side-menu-item" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
+                </template>
+              </div>
+            </div>
             <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
               <div
                 class="as-side-btn"
@@ -122,11 +136,6 @@
                 :class="{ disabled: isDisabled(a) }"
                 @click="onSideAction(a)"
               >{{ tt(a) }}</div>
-            </template>
-            <!-- 归档单据删除申请:仅管理员显示审批入口 -->
-            <template v-if="isApprovalDoc && user.isAdmin">
-              <div class="as-side-btn sub" @click="onSideAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
-              <div class="as-side-btn sub" @click="onSideAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
             </template>
           </div>
         </div>
@@ -1088,9 +1097,11 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
 }).filter((group) => actsOf(group).length))
 // 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
 const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审']
+// 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
+const openDelMenu = ref(false)
 const approvalSideGroups = computed(() => toolbarGroups.value
   .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => !APPROVAL_SIDE_EXCLUDE.includes(a)) }))
-  .filter((g) => (g.actions || []).length))
+  .filter((g) => (g.actions || []).length && !(g.actions || []).includes('删除')))
 const headerFields = computed(() => {
   const fields = (cfgCache.value?.dataSchema?.fields || []).filter((field) => !field.hidden)
   const names = cfgCache.value?.metadata?.panelPageDto?.formPages?.[0]?.fieldNames
@@ -1500,6 +1511,7 @@ function onCtx(ev, row, b) {
 function closeCtx() {
   ctx.visible = false
   openGroup.value = -1
+  openDelMenu.value = false
 }
 
 // ---------- 审批按钮权限（提交审批/审批情况公开；审批通过/驳回需角色审批权限） ----------
@@ -1536,10 +1548,26 @@ function onGroupAction(a) {
 
 // ══════════ 文书式面板:导出 = 整张文书打印/存PDF(浏览器原生,所见即所得) ══════════
 const approvalSheetRef = ref(null)
+/** 删除组下拉动作:收起菜单后走统一入口(删除带整单确认) */
+function pickDelAction(a) {
+  openDelMenu.value = false
+  onSideAction(a)
+}
 function onSideAction(a) {
   // 文书面板「导出」不走通用 CSV,改为整张文书打印(可另存 PDF)
   if (isApprovalDoc.value && a === '导出') {
     printApprovalSheet()
+    return
+  }
+  // 文件类删除=整单删除:确认后按状态(草稿直接作废/已归档提交申请,管理员通过后删除)
+  if (isApprovalDoc.value && a === '删除') {
+    ElMessageBox.confirm(
+      `${tt('确定删除整张单据？')}（${tt('草稿')}${tt('直接作废')}；${tt('已归档')}${tt('需管理员审批通过后删除')}）`,
+      tt('删除确认'),
+      { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
+    ).then(() => {
+      onButton('删除')
+    }).catch(() => {})
     return
   }
   if (isDisabled(a)) return
@@ -3389,6 +3417,56 @@ onUnmounted(() => {
   color: #b9c2ce;
   border-color: #e2e7ef;
   background: #f4f6f9;
+}
+/* 删除组 + 下拉 */
+.as-side-del {
+  position: relative;
+}
+.as-side-btn-row {
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+}
+.as-side-caret {
+  width: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c9cfdb;
+  border-radius: 4px;
+  background: #f8fafc;
+  color: #1c4f8a;
+  cursor: pointer;
+  user-select: none;
+  font-size: 9px;
+}
+.as-side-caret:hover {
+  border-color: #0d5bd3;
+  color: #0d5bd3;
+  background: #f0f6ff;
+}
+.as-side-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 150px;
+  background: #fff;
+  border: 1px solid #d9e2ec;
+  border-radius: 6px;
+  box-shadow: 0 2px 10px rgba(13, 91, 211, 0.15);
+  z-index: 30;
+  padding: 4px;
+}
+.as-side-menu-item {
+  padding: 7px 10px;
+  font-size: 12px;
+  color: #1c4f8a;
+  cursor: pointer;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+.as-side-menu-item:hover {
+  background: #f0f6ff;
 }
 
 /* ═══════ ② 表头字段区（label 在上、输入在下）═══════ */
