@@ -440,7 +440,7 @@ function selectOptions(key) {
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
-    border: none !important;
+    border: 1px solid #8a8a8a !important;
     box-shadow: none !important;
   }
   /* 强制打印背景色(蓝底标签/序号列),否则浏览器打印默认丢弃背景 */
