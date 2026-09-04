@@ -17,6 +17,8 @@ IF OBJECT_ID('rd_plan') IS NULL CREATE TABLE rd_plan (
   [测试方法] nvarchar(500) NULL,
   [测试标准] nvarchar(500) NULL,
   [测试计划] nvarchar(1000) NULL,
+  [阶段1] nvarchar(500) NULL, [阶段2] nvarchar(500) NULL, [阶段3] nvarchar(500) NULL, [阶段4] nvarchar(500) NULL, [阶段5] nvarchar(500) NULL,
+  [阶段6] nvarchar(500) NULL, [阶段7] nvarchar(500) NULL, [阶段8] nvarchar(500) NULL, [阶段9] nvarchar(500) NULL, [阶段10] nvarchar(500) NULL,
   [负责人] nvarchar(50) NULL,
   [编制日期] nvarchar(20) NULL,
   [文件管理人] nvarchar(50) NULL,
@@ -66,7 +68,27 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'文件使用范围') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'文件使用范围', N'文件使用范围', N'下拉框', N'SELECT v FROM (VALUES (N''公司内''),(N''客户项目组''),(N''双方项目组'')) AS t(v)', NULL, NULL, NULL, N'header', 160, 100, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'文档编号') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'文档编号', N'文档编号', N'文本', NULL, NULL, NULL, NULL, N'header', 170, 120, 1, 0, 1, 1);
 GO
--- en 译名(其它语言由实时机翻自动补齐;项目名称/负责人 等已有全局译名自动共享)
+-- 测试计划:10 个阶段框(前端开关显示/隐藏,按实际显示导出);测试计划整列字段降为 hidden,阶段1..10 为隐藏字段
+BEGIN TRY
+  IF COL_LENGTH('rd_plan','阶段1') IS NULL
+    ALTER TABLE rd_plan ADD [阶段1] nvarchar(500) NULL, [阶段2] nvarchar(500) NULL, [阶段3] nvarchar(500) NULL, [阶段4] nvarchar(500) NULL, [阶段5] nvarchar(500) NULL, [阶段6] nvarchar(500) NULL, [阶段7] nvarchar(500) NULL, [阶段8] nvarchar(500) NULL, [阶段9] nvarchar(500) NULL, [阶段10] nvarchar(500) NULL;
+END TRY
+BEGIN CATCH
+  PRINT '阶段1..10 列已存在或无 DDL 权限(管理员执行 ALTER TABLE);';
+END CATCH
+GO
+IF EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'测试计划') UPDATE yj_field SET hidden=1 WHERE panel_code='RD_PLAN' AND col_name=N'测试计划';
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'阶段1') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'阶段1', N'阶段1', N'文本', NULL, NULL, NULL, NULL, N'header', 111, 200, 1, 0, 1, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'阶段2') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'阶段2', N'阶段2', N'文本', NULL, NULL, NULL, NULL, N'header', 112, 200, 1, 0, 1, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'阶段3') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'阶段3', N'阶段3', N'文本', NULL, NULL, NULL, NULL, N'header', 113, 200, 1, 0, 1, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'阶段4') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'阶段4', N'阶段4', N'文本', NULL, NULL, NULL, NULL, N'header', 114, 200, 1, 0, 1, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'阶段5') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'阶段5', N'阶段5', N'文本', NULL, NULL, NULL, NULL, N'header', 115, 200, 1, 0, 1, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'阶段6') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'阶段6', N'阶段6', N'文本', NULL, NULL, NULL, NULL, N'header', 116, 200, 1, 0, 1, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'阶段7') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'阶段7', N'阶段7', N'文本', NULL, NULL, NULL, NULL, N'header', 117, 200, 1, 0, 1, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'阶段8') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'阶段8', N'阶段8', N'文本', NULL, NULL, NULL, NULL, N'header', 118, 200, 1, 0, 1, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'阶段9') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'阶段9', N'阶段9', N'文本', NULL, NULL, NULL, NULL, N'header', 119, 200, 1, 0, 1, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PLAN' AND col_name=N'阶段10') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PLAN', N'阶段10', N'阶段10', N'文本', NULL, NULL, NULL, NULL, N'header', 120, 200, 1, 0, 1, 1);
+GO
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='panel' AND ref_key=N'项目实施计划' AND locale='en') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('panel', N'项目实施计划', 'en', N'Project Implementation Plan', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'项目定级' AND locale='en') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'项目定级', 'en', N'Project Level', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'测试内容' AND locale='en') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'测试内容', 'en', N'Test Content', 'manual');

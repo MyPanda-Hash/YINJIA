@@ -80,9 +80,9 @@
 
     <!-- ③ 内容表 -->
     <div class="as-table">
-      <!-- 单字段行 / 多子区行 -->
+      <!-- 单字段行 / 多子区行 / 阶段框行(测试计划) -->
       <template v-for="(row, ri) in config.rows" :key="row.key || row.label">
-        <div v-if="!row.subs" class="as-row" :style="{ height: row.h + 'px' }">
+        <div v-if="!row.subs && row.kind !== 'phases'" class="as-row" :style="{ height: row.h + 'px' }">
           <div class="as-no">{{ row.num }}</div>
           <div class="as-name">{{ tt(row.label) }}</div>
           <div class="as-fill">
@@ -112,7 +112,7 @@
         </div>
 
         <!-- 多子区行:如 测试方案(条件/方法/标准) -->
-        <div v-else class="as-row" :style="{ height: row.h + 'px' }">
+        <div v-else-if="row.subs" class="as-row" :style="{ height: row.h + 'px' }">
           <div class="as-no">{{ row.num }}</div>
           <div class="as-name">{{ tt(row.label) }}</div>
           <div class="as-fill as-fill-multi">
@@ -129,6 +129,35 @@
                 @input="emit('dirty')"
               />
               <div v-else class="as-ro-text">{{ head[sub.key] || '' }}</div>
+            </div>
+          </div>
+          <div v-if="config.deco" class="as-deco"></div>
+        </div>
+
+        <!-- 阶段框行:10 个阶段框,每框可隐藏/显示;隐藏后下方自动接上;导出按实际显示 -->
+        <div v-else class="as-row as-row-phases" :style="{ minHeight: (row.h || 200) + 'px' }">
+          <div class="as-no">{{ row.num }}</div>
+          <div class="as-name">{{ tt(row.label) }}</div>
+          <div class="as-fill">
+            <div v-for="(ph, pi) in row.phases" :key="ph.key" v-if="!phaseHidden[pi]" class="as-phase">
+              <div class="as-phase-head">
+                <span class="as-phase-title">{{ tt('阶段') }}{{ ph.num }}</span>
+                <span class="as-phase-toggle" @click.stop="phaseHidden[pi] = true">{{ tt('隐藏') }}</span>
+              </div>
+              <el-input
+                v-if="editable"
+                v-model="head[ph.key]"
+                type="textarea"
+                rows="2"
+                :maxlength="ph.max || 500"
+                class="as-fill-input as-fill-area"
+                resize="none"
+                @input="emit('dirty')"
+              />
+              <div v-else class="as-ro-text">{{ head[ph.key] || '' }}</div>
+            </div>
+            <div v-if="Object.values(phaseHidden).filter(Boolean).length" class="as-phase-restore" @click.stop="phaseHidden = {}">
+              {{ tt('显示全部') }}（{{ row.phases.length }}）
             </div>
           </div>
           <div v-if="config.deco" class="as-deco"></div>
@@ -167,7 +196,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, reactive } from 'vue'
 import { tt } from '@/i18n'
 
 const props = defineProps({
@@ -177,6 +206,9 @@ const props = defineProps({
   config: { type: Object, required: true },
 })
 const emit = defineEmits(['dirty'])
+
+// 阶段框显示状态(本地视图;导出/打印按当前实际显示渲染)
+const phaseHidden = reactive({})
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
 
@@ -391,6 +423,45 @@ function selectOptions(key) {
   font-size: 14px;
   color: #333;
   line-height: 20px;
+}
+/* 阶段框行(测试计划):每框独立边框,可隐藏/显示 */
+.as-phase {
+  border: 1px solid #c9c9c9;
+  margin: 3px 0;
+  padding: 2px 6px 4px;
+}
+.as-phase-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #333;
+  padding: 1px 0;
+}
+.as-phase-title {
+  font-weight: 600;
+}
+.as-phase-toggle {
+  color: #0d5bd3;
+  cursor: pointer;
+  font-size: 12px;
+  user-select: none;
+  padding: 0 2px;
+}
+.as-phase-toggle:hover {
+  text-decoration: underline;
+}
+.as-phase-restore {
+  margin: 3px 0;
+  padding: 3px 6px;
+  font-size: 12px;
+  color: #0d5bd3;
+  cursor: pointer;
+  user-select: none;
+  text-align: center;
+}
+.as-phase-restore:hover {
+  text-decoration: underline;
 }
 
 /* ═══ ④ 底部签名 ═══ */

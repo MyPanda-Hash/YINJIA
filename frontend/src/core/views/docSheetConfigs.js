@@ -48,10 +48,25 @@ export const planSheetCfg = {
         { label: '测试标准', key: '测试标准', max: 150 },
       ],
     },
-    { num: '7', label: '测试计划', key: '测试计划', max: 0, h: 96, kind: 'textarea', hint: '预设10个阶段' },
+    // 测试计划:10 个阶段框(默认全显示;每个框可隐藏/显示,隐藏后下方自动接上;导出按实际显示)
+    {
+      num: '7', label: '测试计划', kind: 'phases', h: 200,
+      phases: [
+        { num: 1, key: '阶段1', max: 500 },
+        { num: 2, key: '阶段2', max: 500 },
+        { num: 3, key: '阶段3', max: 500 },
+        { num: 4, key: '阶段4', max: 500 },
+        { num: 5, key: '阶段5', max: 500 },
+        { num: 6, key: '阶段6', max: 500 },
+        { num: 7, key: '阶段7', max: 500 },
+        { num: 8, key: '阶段8', max: 500 },
+        { num: 9, key: '阶段9', max: 500 },
+        { num: 10, key: '阶段10', max: 500 },
+      ],
+    },
   ],
   signCells: [
-    { label: '负责人', key: '负责人', w: 208, type: 'text', flex: 58 },
+    { label: '负责人', key: '负责人', w: 202, type: 'text', flex: 58 },
     { label: '编制日期', key: '编制日期', w: 180, type: 'date', flex: 42 },
   ],
 }
