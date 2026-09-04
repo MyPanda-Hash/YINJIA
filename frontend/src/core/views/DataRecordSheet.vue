@@ -556,6 +556,16 @@ function removeRow(i) {
 .rs-c-in.hl {
   width: 46%;
 }
+.rs-dt td {
+  height: 27px;
+  text-align: center;
+}
+.rs-dt td .rs-txt {
+  white-space: nowrap;
+  display: inline-block;
+  min-width: 40px;
+  text-align: center;
+}
 .rs-td-op {
   text-align: center;
   white-space: nowrap;
