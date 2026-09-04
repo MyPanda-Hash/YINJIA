@@ -1546,7 +1546,14 @@ async function exportApprovalSheet() {
   if (!el) return
   ElMessage.info('正在导出整张文书…')
   try {
-    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false })
+    // 跳过 iframe(布局外壳/第三方组件可能内嵌,克隆时无法解析);文书本身无 iframe,不影响导出
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+      ignoreElements: (node) => node.tagName === 'IFRAME',
+    })
     const link = document.createElement('a')
     link.href = canvas.toDataURL('image/png')
     link.download = `立项申请-${cur.value['单据编号'] || cur.value['文档编号'] || 'PIR'}.png`
