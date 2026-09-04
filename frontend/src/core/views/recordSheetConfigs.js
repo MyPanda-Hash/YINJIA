@@ -472,7 +472,8 @@ export const recordSheetConfigs = {
 
   // ═══════════ 产品文件 6 面板(《2.产品文件》) ═══════════
 
-  // 成型工艺清单(炭棒工艺管控清单):纯表单——产品基本信息 + 工序(灌料/烧结/热压/冷却/脱模) + 检验要求
+  // 成型工艺清单(炭棒工艺管控清单):纯表单——产品基本信息(标签行/值行两行式) +
+  // 工序(灌料/烧结/热压/冷却 → 长度要求|重量要求列标题 → 脱模) + 检验要求(三列块)
   RD_MOLD_PROC: {
     headMode: 'report',
     staticTitle: '炭棒工艺管控清单',
@@ -485,44 +486,120 @@ export const recordSheetConfigs = {
     grid: [130, 180, 130, 200, 130, 90, 90, 90],
     head: { title: 5, infoLabel: 1, infoValue: 2 },
     sections: [
-      { bar: '产品基本信息', rows: [
-        { pairs: [
-          { label: '产品编号', key: '产品编号', type: 'text' },
-          { label: '产品名称', key: '产品名称', type: 'text' },
-          { label: '炭棒规格', cells: [{ key: '炭棒规格1' }, { key: '炭棒规格2' }, { key: '炭棒规格3' }] },
+      // 产品基本信息:标签行 + 值行(炭棒规格 3 值格)
+      { bar: '产品基本信息', cols: [130, 190, 55, 55, 55, 130, 90, 110], rows: [
+        { grid: [
+          { label: '产品编号' },
+          { label: '产品名称' },
+          { label: '炭棒规格', span: 3 },
+          { label: '产品管控类型' },
+          { label: '外观要求' },
+          { label: '生产车间' },
         ]},
-        { pairs: [
-          { label: '产品管控类型', key: '产品管控类型', type: 'select' },
-          { label: '外观要求', key: '外观要求', type: 'select' },
-          { label: '生产车间', key: '生产车间', type: 'select', vspan: 3 },
+        { grid: [
+          { key: '产品编号' },
+          { key: '产品名称' },
+          { key: '炭棒规格1' },
+          { key: '炭棒规格2' },
+          { key: '炭棒规格3' },
+          { key: '产品管控类型', type: 'select' },
+          { key: '外观要求', type: 'select' },
+          { key: '生产车间', type: 'select' },
         ]},
       ]},
-      { bar: '工序', stage: true, rows: [
-        { stage: '灌料', label: '理论最低灌料重量g', key: '理论最低灌料重量g' },
-        { label: '理论灌料中间值g', key: '理论灌料中间值g' },
-        { label: '理论最高灌料重量g', key: '理论最高灌料重量g' },
-        { label: '理论水分', key: '理论水分' },
-        { label: '实际灌料重量计算公式', key: '实际灌料重量计算公式' },
-        { stage: '烧结', label: '烧结炉参数', key: '烧结炉参数', label2: '烧结时间/调速器参数', key2: '烧结时间调速器参数' },
-        { stage: '热压', label: '热压要求', key: '热压要求' },
-        { stage: '冷却', label: '冷却参数设置', key: '冷却参数设置', label2: '长度要求', key2: '长度要求' },
-        { label: '重量要求', key: '重量要求' },
-        { stage: '脱模', label: '最短长度mm', key: '最短长度mm', label2: '最低重量g', key2: '最低重量g' },
-        { label: '中间值mm', key: '中间值mm', label2: '中间值g', key2: '中间值g' },
-        { label: '最长长度mm', key: '最长长度mm', label2: '最高重量g', key2: '最高重量g' },
+      // 工序:阶段列 + 参数键值对;冷却后插入 长度要求|重量要求 列标题行(脱模的列分组)
+      { bar: '工序', cols: [130, 150, 200, 150, 200], rows: [
+        { grid: [
+          { label: '灌料', rowspan: 5 },
+          { label: '理论最低灌料重量g', key: '理论最低灌料重量g' },
+          { fixed: '0', span: 2, rowspan: 4 },
+        ]},
+        { grid: [
+          { label: '理论灌料中间值g', key: '理论灌料中间值g' },
+        ]},
+        { grid: [
+          { label: '理论最高灌料重量g', key: '理论最高灌料重量g' },
+        ]},
+        { grid: [
+          { label: '理论水分', key: '理论水分' },
+        ]},
+        { grid: [
+          { label: '实际灌料重量计算公式', key: '实际灌料重量计算公式', span: 3 },
+        ]},
+        { grid: [
+          { label: '烧结' },
+          { label: '烧结炉参数', key: '烧结炉参数' },
+          { label: '烧结时间/调速器参数', key: '烧结时间调速器参数' },
+        ]},
+        { grid: [
+          { label: '热压' },
+          { label: '热压要求', key: '热压要求', span: 3 },
+        ]},
+        { grid: [
+          { label: '冷却' },
+          { label: '冷却参数设置', key: '冷却参数设置', span: 3 },
+        ]},
+        // 长度要求|重量要求 列标题(脱模列分组)
+        { grid: [
+          { label: '', span: 1 },
+          { label: '长度要求', cap: true, span: 2 },
+          { label: '重量要求', cap: true, span: 2 },
+        ]},
+        { grid: [
+          { label: '脱模', rowspan: 3 },
+          { label: '最短长度mm', key: '最短长度mm' },
+          { label: '最低重量g', key: '最低重量g' },
+        ]},
+        { grid: [
+          { label: '中间值mm', key: '中间值mm' },
+          { label: '中间值g', key: '中间值g' },
+        ]},
+        { grid: [
+          { label: '最长长度mm', key: '最长长度mm' },
+          { label: '最高重量g', key: '最高重量g' },
+        ]},
       ]},
-      { bar: '检验要求', stage: true, rows: [
-        { stage: '炭棒尺寸', label: '外径mm', key: '外径mm', label2: '内径mm', key2: '内径mm' },
-        { label: '外径公差', key: '外径公差', label2: '内径公差', key2: '内径公差' },
-        { label: '内孔要求', key: '内孔要求' },
-        { stage: '密度管控', label: '管控要求', key: '密度管控要求', label2: '实际密度管控下限', key2: '实际密度管控下限' },
-        { label: '实际密度管控上限', key: '实际密度管控上限' },
-        { stage: '跌落强度', label: '高度cm', key: '跌落高度cm', label2: '跌落次数', key2: '跌落次数' },
-        { label: '要求', key: '跌落要求' },
-        { stage: '抗压强度', label: '测试间距mm', key: '测试间距mm', label2: '压头下降速度mm/min', key2: '压头下降速度' },
-        { label: '强度要求kgf', key: '强度要求kgf' },
-        { stage: '压降', label: '测试管路', key: '压降测试管路', label2: '测试流速L/min', key2: '压降测试流速' },
-        { label: '压降标准kpa', key: '压降标准kpa' },
+      // 检验要求:炭棒尺寸(捕获行+值行);密度/跌落/抗压/压降 各自三列键值对(管控要求文本在标签格内)
+      { bar: '检验要求', cols: [150, 105, 85, 105, 85, 145, 130], rows: [
+        { grid: [
+          { label: '炭棒尺寸', rowspan: 2 },
+          { label: '外径mm', cap: true, span: 2 },
+          { label: '内径mm', cap: true, span: 2 },
+          { label: '内孔要求', cap: true },
+          { label: '' },
+        ]},
+        { grid: [
+          { key: '外径mm' },
+          { key: '外径公差' },
+          { key: '内径mm' },
+          { key: '内径公差' },
+          { key: '内孔要求' },
+          { fixed: '' },
+        ]},
+        { grid: [
+          { label: '密度管控' },
+          { fixed: '·密度范围：0.575~0.595', span: 2 },
+          { label: '实际密度管控下限', key: '实际密度管控下限' },
+          { label: '实际密度管控上限', key: '实际密度管控上限' },
+        ]},
+        { grid: [
+          { label: '跌落强度' },
+          { label: '高度cm', key: '跌落高度cm' },
+          { label: '跌落次数', key: '跌落次数' },
+          { label: '要求', key: '跌落要求' },
+        ]},
+        { grid: [
+          { label: '抗压强度' },
+          { label: '测试间距mm', key: '测试间距mm' },
+          { label: '压头下降速度mm/min', key: '压头下降速度' },
+          { label: '强度要求kgf', key: '强度要求kgf' },
+        ]},
+        { grid: [
+          { label: '压降' },
+          { label: '测试管路', key: '压降测试管路' },
+          { label: '测试流速L/min', key: '压降测试流速' },
+          { label: '压降标准kpa', key: '压降标准kpa' },
+        ]},
       ]},
     ],
     dataTables: [],
@@ -601,55 +678,77 @@ export const recordSheetConfigs = {
     ],
   },
 
-  // 规格书:封面(名称/编号/客户/料号/版本/日期+制订审核批准) + 修订记录/检验要求/物料清单 3 表区
+  // 规格书:8 种类型(类型Tab 切换单据分类) + 5 页结构(页签翻页)——封面/修订与范围/检验/物料/包装运输
   RD_SPEC_DOC: {
     headMode: 'report',
-    staticTitle: '产品规格书',
-    titlePlaceholder: '产品规格书',
+    titleFromKey: '名称',
+    titlePrefix: '产品规格书·',
+    titlePlaceholder: '矿化后置烧结矿化棒',
+    specTypes: ['飞利浦沐浴阻垢滤芯', '矿化烧结炭棒', '除铅炭棒', '抑菌炭棒', 'X14折叠复合滤芯', '碱性炭棒', '矿化炭棒', '多功能炭棒'],
+    pages: [
+      { title: '封面' },
+      { title: '修订与范围' },
+      { title: '检验要求' },
+      { title: '关键物料' },
+      { title: '包装运输' },
+    ],
     grid: [100, 300, 100, 240, 100, 100, 100, 110],
     head: { title: 5, infoLabel: 1, infoValue: 2 },
     sections: [
-      { rows: [
+      // P1 封面:类型 + 编号/客户/料号/版本/日期 + 制订/审核/批准(名称在大标题)
+      { page: 0, rows: [
         { pairs: [
-          { label: '名称', key: '名称', vspan: 3 },
-          { label: '编号', key: '编号', type: 'text' },
+          { label: '规格书种类', key: '规格书种类', type: 'select', vspan: 3 },
+          { label: '编号', key: '编号', type: 'text', vspan: 3 },
         ]},
         { pairs: [
-          { label: '客户名', key: '客户名' },
-          { label: '客户料号', key: '客户料号' },
+          { label: '客户名', key: '客户名', vspan: 1 },
+          { label: '客户料号', key: '客户料号', vspan: 5 },
         ]},
         { pairs: [
-          { label: '版本', key: '版本' },
-          { label: '日期', key: '日期' },
+          { label: '版本', key: '版本', vspan: 1 },
+          { label: '日期', key: '日期', vspan: 5 },
         ]},
         { pairs: [
-          { label: '制订/日期', key: '制订日期' },
-          { label: '审核/日期', key: '审核日期' },
-          { label: '批准/日期', key: '批准日期', vspan: 2 },
+          { label: '制订日期', key: '制订日期' },
+          { label: '审核日期', key: '审核日期' },
+          { label: '批准日期', key: '批准日期', vspan: 2 },
         ]},
+      ]},
+      // P2 修订与范围:1.适用范围 / 2.整体规格参数 / 3.产品主要性能
+      { page: 1, rows: [
+        { label: '1.适用范围', key: '适用范围', type: 'area', tall: true },
+        { label: '2.整体规格参数', key: '整体规格参数', type: 'area', tall: true },
+        { label: '3.产品主要性能', key: '产品主要性能', type: 'area' },
+      ]},
+      // P5 包装运输:6.包装方式 / 7.运输要求 / 8.存储环境
+      { page: 4, rows: [
+        { label: '6.包装方式', key: '包装方式', type: 'area', tall: true },
+        { label: '7.运输要求', key: '运输要求', type: 'area', tall: true },
+        { label: '8.存储环境', key: '存储环境', type: 'area', tall: true },
       ]},
     ],
     dataTables: [
-      { bar: '修订记录', filterKey: '表区', filterVal: '修订记录', cols: [
+      { page: 1, bar: '修订记录', filterKey: '表区', filterVal: '修订记录', cols: [
           { key: '表区', label: '表区', hiddenCol: true },
-          { key: '序号', label: '序 号', w: 60 },
+          { key: '序号', label: '序号', w: 60 },
           { key: '更改内容', label: '更改内容', w: 320, area: true },
           { key: '更改原因', label: '更改原因', w: 220 },
           { key: '更改时间', label: '更改时间', w: 120 },
           { key: '责任人', label: '责任人', w: 100 },
           { key: '备注', label: '备注', w: 140 },
         ]},
-      { bar: '检验要求', filterKey: '表区', filterVal: '检验要求', cols: [
+      { page: 2, bar: '4.产品性能检验项目及检验标准', filterKey: '表区', filterVal: '检验要求', cols: [
           { key: '表区', label: '表区', hiddenCol: true },
-          { key: '序号', label: '序 号', w: 60 },
+          { key: '序号', label: '序号', w: 60 },
           { key: '检验项目', label: '检验项目', w: 120 },
           { key: '检验要求', label: '检验要求', w: 380, area: true },
           { key: '检验方法', label: '检验方法', w: 130 },
           { key: '检验依据', label: '检验依据', w: 140 },
         ]},
-      { bar: '物料清单', filterKey: '表区', filterVal: '物料清单', cols: [
+      { page: 3, bar: '5.关键物料列表', filterKey: '表区', filterVal: '物料清单', cols: [
           { key: '表区', label: '表区', hiddenCol: true },
-          { key: '序号', label: '序 号', w: 60 },
+          { key: '序号', label: '序号', w: 60 },
           { key: '物料编码', label: '物料编码', w: 130 },
           { key: '物料名称', label: '物料名称', w: 160 },
           { key: '规格参数', label: '规格参数', w: 320, area: true },

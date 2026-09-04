@@ -7,8 +7,19 @@
        特例块:碱性原水水质条 / 浸泡安全(浸泡液用量+仪器检出限) / 矿化(4 指标块+散点图)
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="record-sheet rsp-sheet">
-    <!-- ═══ 报告头(report 版式):公司名 | 文档编号 + 大标题 | 信息块 ═══ -->
-    <table v-if="!isPlain" class="rs-t rs-head-t" :style="{ width: gridW + 'px' }">
+    <!-- ═══ 页签(规格书多页结构:封面/修订与范围/检验要求/关键物料/包装运输) ═══ -->
+    <div v-if="pageList.length" class="rsp-pages">
+      <div
+        v-for="(pg, pi) in pageList"
+        :key="'pg' + pi"
+        class="rsp-page-tab"
+        :class="{ active: activePage === pi }"
+        @click="activePage = pi"
+      >{{ tt(pg.title) }}</div>
+    </div>
+
+    <!-- ═══ 报告头(report 版式,仅封面页):公司名 | 文档编号 + 大标题 | 信息块 ═══ -->
+    <table v-if="!isPlain && activePage === 0" class="rs-t rs-head-t" :style="{ width: gridW + 'px' }">
       <colgroup><col v-for="(w, i) in effGrid" :key="'hc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
         <tr>
@@ -45,11 +56,11 @@
       </tbody>
     </table>
 
-    <!-- ═══ 条件区(共享网格:标签=第1列,值跨其余列;与数据表竖线对齐) ═══ -->
-    <table v-for="(sec, si) in cfg.sections" :key="'sec' + si" class="rs-t" :style="{ width: gridW + 'px' }">
-      <colgroup><col v-for="(w, i) in effGrid" :key="'sc' + i" :style="{ width: w + 'px' }" /></colgroup>
+    <!-- ═══ 条件区(共享网格:标签=第1列,值跨其余列;与数据表竖线对齐;按页归属渲染) ═══ -->
+    <table v-for="(sec, si) in cfg.sections" v-show="pageOf(sec) === activePage" :key="'sec' + si" class="rs-t" :style="{ width: secW(sec) + 'px' }">
+      <colgroup><col v-for="(w, i) in secCols(sec)" :key="'sc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
-        <tr v-if="sec.bar"><td :colspan="nCols" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
+        <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
 
         <!-- 键值对行(产品基本信息/检验计划信息行):pairs=[{label,key,type,vspan,cells}] 逐格铺网格 -->
         <template v-for="(row, ri) in sec.rows" :key="'pr' + ri">
@@ -69,6 +80,22 @@
                 <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" @input="emit('dirty')" />
                 <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
                 <span v-else class="rs-txt">{{ head[pair.key] || '' }}</span>
+              </td>
+            </template>
+          </tr>
+
+          <!-- 单元格网格行(成型工艺:产品基本信息两行式/工序阶段块/列标题行)——
+               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化) } 逐格铺 sec.cols -->
+          <tr v-else-if="row.grid">
+            <template v-for="(c, ci) in row.grid" :key="'g' + ci">
+              <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
+                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(c.label) }}</td>
+              <td v-else class="rs-td" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
+                <el-select v-if="editable && c.type === 'select'" v-model="head[c.key]" size="small" :clearable="false" @change="emit('dirty')">
+                  <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+                <el-input v-else-if="editable && c.key" v-model="head[c.key]" size="small" :maxlength="c.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+                <span v-else class="rs-txt">{{ head[c.key] || c.fixed || '' }}</span>
               </td>
             </template>
           </tr>
@@ -171,8 +198,8 @@
       </tbody>
     </table>
 
-    <!-- ═══ 数据记录表(共享网格;支持子头行+两级表头;矿化 4 指标块各带散点图) ═══ -->
-    <div v-for="(dt, di) in cfg.dataTables" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
+    <!-- ═══ 数据记录表(共享网格;支持子头行+两级表头;矿化 4 指标块各带散点图;按页归属渲染) ═══ -->
+    <div v-for="(dt, di) in cfg.dataTables" v-show="pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
         <table class="rs-t rs-dt" :style="{ width: (dtOwnsWidth(dt) ? dtW(dt) + (editable ? 60 : 0) : isPlain ? plainW(dt) : gridW + (editable ? 60 : 0)) + 'px' }">
           <colgroup>
@@ -320,7 +347,7 @@
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import { recordSheetConfigs } from './recordSheetConfigs'
 
@@ -370,13 +397,23 @@ const DEFAULT_INFO = [
 const effInfo = computed(() => cfg.value?.info || DEFAULT_INFO)
 const infoSpan = computed(() => effInfo.value.length)
 
-/** 报告头大标题:静态标题(工艺/配方清单)或头字段派生(委托单),否则为 测试主题 输入 */
+/** 报告头大标题:静态/前缀+头字段派生(规格书=产品规格书·名称,委托单=类型+'-测试申请单'),否则为 测试主题 输入 */
 const derivedTitle = computed(() => {
   if (cfg.value?.staticTitle) return cfg.value.staticTitle
-  if (!cfg.value?.titleFromKey) return null
-  const v = props.head?.[cfg.value.titleFromKey] || Object.keys(cfg.value.variants || {})[0] || ''
-  return v + (cfg.value.titleSuffix || '')
+  if (cfg.value?.titleFromKey) {
+    const v = props.head?.[cfg.value.titleFromKey] || cfg.value.titlePlaceholder || ''
+    if (v || !cfg.value.titlePlaceholder) return (cfg.value.titlePrefix || '') + v + (cfg.value.titleSuffix || '')
+  }
+  return null
 })
+
+// ── 多页结构(规格书):页签切换,各区块按 page 归属渲染 ──
+const activePage = ref(0)
+const pageList = computed(() => cfg.value?.pages || [])
+function pageOf(block) {
+  return block.page ?? 0
+}
+watch(() => props.panelCode, () => { activePage.value = 0 })
 
 /** plain 版式表格列宽与总宽(无全页网格,列宽取 col.w) */
 function plainCols(dt) {
@@ -403,6 +440,14 @@ function pairCells(pair) {
   if (pair.cells) for (const c of pair.cells) out.push({ kind: 'value', key: c.key })
   else out.push({ kind: 'value', key: pair.key })
   return out
+}
+
+// ── 条件区列格式:sec.cols 自定义(工序/检验格数据),缺省沿用面板网格 ──
+function secCols(sec) {
+  return sec.cols || effGrid.value
+}
+function secW(sec) {
+  return secCols(sec).reduce((s, w) => s + w, 0)
 }
 
 // ── 工序阶段行:行左端 stage 单元格纵向合并(Excel A 列 灌料/烧结/脱模…) ──
@@ -834,6 +879,34 @@ function chartOf(dt) {
 .rsp-cell {
   display: block;
   min-height: 20px;
+}
+
+/* ═══ 页签(规格书多页) ═══ */
+.rsp-pages {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 8px;
+  justify-content: center;
+}
+.rsp-page-tab {
+  padding: 5px 18px;
+  border: 1px solid #b7c9dd;
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  background: #e8eef5;
+  color: #33517a;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+.rsp-page-tab:hover {
+  background: #dde8f2;
+}
+.rsp-page-tab.active {
+  background: #fff;
+  color: #1c4f8a;
+  font-weight: 700;
+  border-color: #8fb4e0;
 }
 
 /* ═══ plain 版式:标题条 + 副标题行 + 页脚须知 ═══ */
