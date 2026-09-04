@@ -85,8 +85,6 @@
         <div class="as-no">{{ sec.num }}</div>
         <div class="as-name">{{ tt(sec.label) }}</div>
         <div class="as-fill">
-          <!-- 可写字数仅编辑态右上角浅灰标识;只读/打印态不出现 -->
-          <div v-if="editable && sec.max" class="as-limit" :title="tt('可写') + sec.max + tt('字')">{{ sec.max }}{{ tt('字') }}</div>
           <el-input
             v-if="editable && sec.kind === 'input'"
             v-model="head[sec.key]"
@@ -159,8 +157,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['dirty'])
 
-/** 内容区行定义:num 序号 / label 字段标签(即数据键) / max 可写字数(0=不限,无标识;
- *  标识仅编辑态右上角浅灰小字,只读/打印不出现) / h 行高(对齐原图模板) / kind 控件类型 */
+/** 内容区行定义:num 序号 / label 字段标签(即数据键) / max 可写字数(仅用于 maxlength 截断,
+ *  不显示任何提示字样) / h 行高(对齐原图模板) / kind 控件类型 */
 const sections = [
   { num: '一', label: '客户名', key: '客户名', max: 0, h: 47, kind: 'input' },
   { num: '二', label: '立项背景', key: '立项背景', max: 250, h: 96, kind: 'textarea' },
@@ -343,14 +341,6 @@ function selectOptions(key) {
   flex-direction: column;
   padding: 3px 6px;
 }
-.as-limit {
-  position: absolute;
-  top: 4px;
-  right: 9px;
-  font-size: 11px;
-  line-height: 1;
-  color: #b7bfca;
-}
 .as-fill-input {
   flex: 1;
 }
@@ -452,6 +442,16 @@ function selectOptions(key) {
     margin: 0 !important;
     border: none !important;
     box-shadow: none !important;
+  }
+  /* 强制打印背景色(蓝底标签/序号列),否则浏览器打印默认丢弃背景 */
+  body.approval-printing .approval-sheet,
+  body.approval-printing .approval-sheet * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* 控件图标(下拉箭头/日历)不打印,输出与原版线条一致 */
+  body.approval-printing .approval-sheet svg {
+    display: none !important;
   }
   @page {
     margin: 8mm;
