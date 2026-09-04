@@ -47,24 +47,66 @@
 
     <!-- ═══ 条件区(共享网格:标签=第1列,值跨其余列;与数据表竖线对齐) ═══ -->
     <table v-for="(sec, si) in cfg.sections" :key="'sec' + si" class="rs-t" :style="{ width: gridW + 'px' }">
-      <colgroup><col v-for="(w, i) in cfg.grid" :key="'sc' + i" :style="{ width: w + 'px' }" /></colgroup>
+      <colgroup><col v-for="(w, i) in effGrid" :key="'sc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
-        <tr><td :colspan="nCols" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
-        <tr v-for="(row, ri) in sec.rows" :key="'r' + ri">
-          <td class="rs-td rs-label">{{ tt(row.label) }}</td>
-          <!-- 多值单元格(如 阻垢 特殊配方 1#/2#/3#,Excel B:D/E:G/H:K 合并) -->
-          <template v-if="row.cells">
-            <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
-              <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
-              <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
+        <tr v-if="sec.bar"><td :colspan="nCols" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
+
+        <!-- 键值对行(产品基本信息/检验计划信息行):pairs=[{label,key,type,vspan,cells}] 逐格铺网格 -->
+        <template v-for="(row, ri) in sec.rows" :key="'pr' + ri">
+          <tr v-if="row.pairs">
+            <template v-for="(pair, pi) in row.pairs" :key="'p' + pi">
+              <td class="rs-td rs-label">{{ tt(pair.label) }}</td>
+              <template v-if="pair.cells">
+                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1">
+                  <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" />
+                  <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
+                </td>
+              </template>
+              <td v-else class="rs-td" :colspan="pair.vspan || 1">
+                <el-select v-if="editable && pair.type === 'select'" v-model="head[pair.key]" size="small" :clearable="false" @change="emit('dirty')">
+                  <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+                <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" @input="emit('dirty')" />
+                <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+                <span v-else class="rs-txt">{{ head[pair.key] || '' }}</span>
+              </td>
+            </template>
+          </tr>
+
+          <!-- 工序阶段行(成型工艺):左端 stage 纵向合并 + 参数键值对(可两对) -->
+          <tr v-else-if="sec.stage">
+            <td v-if="row.stage" class="rs-td rs-label rsp-stage" :rowspan="stageSpan(sec, ri)" :colspan="2">{{ tt(row.stage) }}</td>
+            <td class="rs-td rs-label">{{ tt(row.label) }}</td>
+            <td class="rs-td" :colspan="row.label2 ? 2 : 5">
+              <el-input v-if="editable" v-model="head[row.key]" size="small" :maxlength="row.max || 500" class="rs-t-in" @input="emit('dirty')" />
+              <span v-else class="rs-txt">{{ head[row.key] || '' }}</span>
             </td>
-          </template>
-          <td v-else class="rs-td" :colspan="nCols - 1">
-            <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
-            <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.tall ? 3 : 1, maxRows: 12 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
-            <span v-else class="rs-txt" :class="{ 'rsp-pre': row.tall }">{{ head[row.key] || '' }}</span>
-          </td>
-        </tr>
+            <template v-if="row.label2">
+              <td class="rs-td rs-label">{{ tt(row.label2) }}</td>
+              <td class="rs-td" colspan="2">
+                <el-input v-if="editable" v-model="head[row.key2]" size="small" :maxlength="row.max2 || 500" class="rs-t-in" @input="emit('dirty')" />
+                <span v-else class="rs-txt">{{ head[row.key2] || '' }}</span>
+              </td>
+            </template>
+          </tr>
+
+          <!-- 常规单标签行 -->
+          <tr v-else>
+            <td class="rs-td rs-label">{{ tt(row.label) }}</td>
+            <!-- 多值单元格(如 阻垢 特殊配方 1#/2#/3#,Excel B:D/E:G/H:K 合并) -->
+            <template v-if="row.cells">
+              <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
+                <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
+                <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
+              </td>
+            </template>
+            <td v-else class="rs-td" :colspan="nCols - 1">
+              <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
+              <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.tall ? 3 : 1, maxRows: 12 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+              <span v-else class="rs-txt" :class="{ 'rsp-pre': row.tall }">{{ head[row.key] || '' }}</span>
+            </td>
+          </tr>
+        </template>
 
         <!-- 特例:碱性 原水水质条件(6 指标格按 Excel C:D/E/F:H/I:J/K:L/M:N 跨网格列) -->
         <template v-if="sec.waterStrip">
@@ -132,9 +174,9 @@
     <!-- ═══ 数据记录表(共享网格;支持子头行+两级表头;矿化 4 指标块各带散点图) ═══ -->
     <div v-for="(dt, di) in cfg.dataTables" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
-        <table class="rs-t rs-dt" :style="{ width: (isPlain ? plainW(dt) : gridW + (editable ? 60 : 0)) + 'px' }">
+        <table class="rs-t rs-dt" :style="{ width: (dtOwnsWidth(dt) ? dtW(dt) + (editable ? 60 : 0) : isPlain ? plainW(dt) : gridW + (editable ? 60 : 0)) + 'px' }">
           <colgroup>
-            <template v-if="isPlain">
+            <template v-if="isPlain || dtOwnsWidth(dt)">
               <col v-for="(c, i) in plainCols(dt)" :key="'dc' + i" :style="{ width: (c.w || 100) + 'px' }" />
             </template>
             <template v-else>
@@ -201,6 +243,14 @@
               <td :colspan="totalSpan(dt)" class="rs-empty">—</td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
+            <!-- 合计行(成型配方:比例/含量/设计添加量数值求和) -->
+            <tr v-if="dt.totalCols && rowsOf(dt).length">
+              <td class="rs-td rsp-total" colspan="2">{{ tt('合计') }}</td>
+              <td v-for="(c, ci) in visCols(dt).slice(2)" :key="'tt' + ci" class="rs-td rsp-total" :colspan="(c.span || 1) > 1 ? c.span : undefined">
+                {{ totalOf(dt, c.key) || '' }}
+              </td>
+              <td v-if="editable" class="rsp-op-pad"></td>
+            </tr>
             <!-- 页脚须知(仪器使用记录表) -->
             <tr v-if="dt.footerNote">
               <td :colspan="totalSpan(dt)" class="rsp-footnote">{{ tt(dt.footerNote) }}</td>
@@ -236,6 +286,22 @@
         </svg>
       </div>
     </div>
+
+    <!-- ═══ 表尾区(成型配方:配料要求——数据表之后) ═══ -->
+    <table v-for="(sec, si) in cfg.tailSections || []" :key="'ts' + si" class="rs-t" :style="{ width: gridW + 'px' }">
+      <colgroup><col v-for="(w, i) in effGrid" :key="'tc' + i" :style="{ width: w + 'px' }" /></colgroup>
+      <tbody>
+        <tr><td :colspan="nCols" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
+        <tr v-for="(row, ri) in sec.rows" :key="'tr' + ri">
+          <td class="rs-td rs-label">{{ tt(row.label) }}</td>
+          <td class="rs-td" :colspan="nCols - 1">
+            <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
+            <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+            <span v-else class="rs-txt">{{ head[row.key] || '' }}</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
 
     <!-- ═══ 结论区(共享网格;Excel 无结论区的表不渲染) ═══ -->
     <table v-if="cfg.conclusion" class="rs-t" :style="{ width: gridW + 'px' }">
@@ -304,8 +370,9 @@ const DEFAULT_INFO = [
 const effInfo = computed(() => cfg.value?.info || DEFAULT_INFO)
 const infoSpan = computed(() => effInfo.value.length)
 
-/** 报告头大标题:可由头字段派生(委托单=申请单类型+'-测试申请单'),否则为 测试主题 输入 */
+/** 报告头大标题:静态标题(工艺/配方清单)或头字段派生(委托单),否则为 测试主题 输入 */
 const derivedTitle = computed(() => {
+  if (cfg.value?.staticTitle) return cfg.value.staticTitle
   if (!cfg.value?.titleFromKey) return null
   const v = props.head?.[cfg.value.titleFromKey] || Object.keys(cfg.value.variants || {})[0] || ''
   return v + (cfg.value.titleSuffix || '')
@@ -320,6 +387,38 @@ function plainW(dt) {
 }
 function colsOf(dt) {
   return activeVariant.value?.cols || dt.cols || []
+}
+
+/** 数据表列宽是否自持(列带 w 时数据表用自己的 colgroup,与全页网格解耦——出货检验计划/规格书) */
+function dtOwnsWidth(dt) {
+  return visCols(dt).some((c) => c.w)
+}
+function dtW(dt) {
+  return visCols(dt).reduce((s, c) => s + (c.w || 100), 0)
+}
+
+// ── 键值对行(产品基本信息等):pair {label,key,type,vspan,cells:[{key}](多值格,如炭棒规格3格)} ──
+function pairCells(pair) {
+  const out = [{ kind: 'label', label: pair.label }]
+  if (pair.cells) for (const c of pair.cells) out.push({ kind: 'value', key: c.key })
+  else out.push({ kind: 'value', key: pair.key })
+  return out
+}
+
+// ── 工序阶段行:行左端 stage 单元格纵向合并(Excel A 列 灌料/烧结/脱模…) ──
+function stageSpan(sec, ri) {
+  let n = 1
+  for (let i = ri + 1; i < sec.rows.length && !sec.rows[i].stage; i++) n++
+  return n
+}
+
+// ── 合计行(成型配方):对指定列求数值和 ──
+function totalOf(dt, key) {
+  const sum = rowsOf(dt).reduce((s, r) => {
+    const v = parseFloat(r[key])
+    return Number.isFinite(v) ? s + v : s
+  }, 0)
+  return sum ? String(Math.round(sum * 10000) / 10000) : ''
 }
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
@@ -393,13 +492,15 @@ function spreadSubHeads(dt) {
   }
   return out
 }
-/** 行集:矿化按 指标 字段分块;其余全量 */
+/** 行集:矿化按 指标 / 规格书按 表区 分块(filterKey+filterVal);其余全量 */
 function rowsOf(dt) {
+  if (dt.filterKey) return items.value.filter((r) => (r[dt.filterKey] || '') === dt.filterVal)
   if (!dt.metric) return items.value
   return items.value.filter((r) => (r['指标'] || '') === dt.metric)
 }
 function addRow(dt) {
-  const row = dt.metric ? { 指标: dt.metric } : {}
+  const row = dt.filterKey ? { [dt.filterKey]: dt.filterVal } : {}
+  if (dt.metric) row['指标'] = dt.metric
   if (cfg.value?.autoSeq) row['序号'] = String(touch().length + 1)
   touch().push(row)
   emit('dirty')
@@ -641,6 +742,17 @@ function chartOf(dt) {
 .rsp-item-name {
   text-align: center;
   font-size: 13.5px;
+}
+.rsp-stage {
+  font-weight: 600;
+  font-size: 14px;
+  vertical-align: middle;
+}
+.rsp-total {
+  text-align: center;
+  font-weight: 600;
+  color: #333;
+  background: #f2f2f2;
 }
 
 /* ═══ 数据记录表 ═══ */

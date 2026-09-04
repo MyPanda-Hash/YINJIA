@@ -469,4 +469,238 @@ export const recordSheetConfigs = {
       },
     ],
   },
+
+  // ═══════════ 产品文件 6 面板(《2.产品文件》) ═══════════
+
+  // 成型工艺清单(炭棒工艺管控清单):纯表单——产品基本信息 + 工序(灌料/烧结/热压/冷却/脱模) + 检验要求
+  RD_MOLD_PROC: {
+    headMode: 'report',
+    staticTitle: '炭棒工艺管控清单',
+    info: [
+      { label: '表单管理人', key: '表单管理人', type: 'text' },
+      { label: '密级', key: '密级', type: 'select' },
+      { label: '使用范围', key: '使用范围', type: 'select' },
+      { label: '版本号', key: '版本号', type: 'text' },
+    ],
+    grid: [130, 180, 130, 200, 130, 90, 90, 90],
+    head: { title: 5, infoLabel: 1, infoValue: 2 },
+    sections: [
+      { bar: '产品基本信息', rows: [
+        { pairs: [
+          { label: '产品编号', key: '产品编号', type: 'text' },
+          { label: '产品名称', key: '产品名称', type: 'text' },
+          { label: '炭棒规格', cells: [{ key: '炭棒规格1' }, { key: '炭棒规格2' }, { key: '炭棒规格3' }] },
+        ]},
+        { pairs: [
+          { label: '产品管控类型', key: '产品管控类型', type: 'select' },
+          { label: '外观要求', key: '外观要求', type: 'select' },
+          { label: '生产车间', key: '生产车间', type: 'select', vspan: 3 },
+        ]},
+      ]},
+      { bar: '工序', stage: true, rows: [
+        { stage: '灌料', label: '理论最低灌料重量g', key: '理论最低灌料重量g' },
+        { label: '理论灌料中间值g', key: '理论灌料中间值g' },
+        { label: '理论最高灌料重量g', key: '理论最高灌料重量g' },
+        { label: '理论水分', key: '理论水分' },
+        { label: '实际灌料重量计算公式', key: '实际灌料重量计算公式' },
+        { stage: '烧结', label: '烧结炉参数', key: '烧结炉参数', label2: '烧结时间/调速器参数', key2: '烧结时间调速器参数' },
+        { stage: '热压', label: '热压要求', key: '热压要求' },
+        { stage: '冷却', label: '冷却参数设置', key: '冷却参数设置', label2: '长度要求', key2: '长度要求' },
+        { label: '重量要求', key: '重量要求' },
+        { stage: '脱模', label: '最短长度mm', key: '最短长度mm', label2: '最低重量g', key2: '最低重量g' },
+        { label: '中间值mm', key: '中间值mm', label2: '中间值g', key2: '中间值g' },
+        { label: '最长长度mm', key: '最长长度mm', label2: '最高重量g', key2: '最高重量g' },
+      ]},
+      { bar: '检验要求', stage: true, rows: [
+        { stage: '炭棒尺寸', label: '外径mm', key: '外径mm', label2: '内径mm', key2: '内径mm' },
+        { label: '外径公差', key: '外径公差', label2: '内径公差', key2: '内径公差' },
+        { label: '内孔要求', key: '内孔要求' },
+        { stage: '密度管控', label: '管控要求', key: '密度管控要求', label2: '实际密度管控下限', key2: '实际密度管控下限' },
+        { label: '实际密度管控上限', key: '实际密度管控上限' },
+        { stage: '跌落强度', label: '高度cm', key: '跌落高度cm', label2: '跌落次数', key2: '跌落次数' },
+        { label: '要求', key: '跌落要求' },
+        { stage: '抗压强度', label: '测试间距mm', key: '测试间距mm', label2: '压头下降速度mm/min', key2: '压头下降速度' },
+        { label: '强度要求kgf', key: '强度要求kgf' },
+        { stage: '压降', label: '测试管路', key: '压降测试管路', label2: '测试流速L/min', key2: '压降测试流速' },
+        { label: '压降标准kpa', key: '压降标准kpa' },
+      ]},
+    ],
+    dataTables: [],
+  },
+
+  // 成型配方(炭棒配方管控清单):产品基本信息 + 配方表(动态行+合计) + 配料要求
+  RD_MOLD_FORMULA: {
+    headMode: 'report',
+    staticTitle: '炭棒配方管控清单',
+    info: [
+      { label: '表单管理人', key: '表单管理人', type: 'text' },
+      { label: '密级', key: '密级', type: 'select' },
+      { label: '使用范围', key: '使用范围', type: 'select' },
+      { label: '版本号', key: '版本号', type: 'text' },
+    ],
+    grid: [130, 180, 130, 200, 130, 90, 90, 90],
+    head: { title: 5, infoLabel: 1, infoValue: 2 },
+    sections: [
+      { bar: '产品基本信息', rows: [
+        { pairs: [
+          { label: '产品编号', key: '产品编号', type: 'text' },
+          { label: '产品名称', key: '产品名称', type: 'text' },
+          { label: '炭棒规格', cells: [{ key: '炭棒规格1' }, { key: '炭棒规格2' }, { key: '炭棒规格3' }] },
+        ]},
+        { pairs: [
+          { label: '产品管控类型', key: '产品管控类型', type: 'select' },
+          { label: '外观要求', key: '外观要求', type: 'select' },
+          { label: '生产车间', key: '生产车间', type: 'select', vspan: 3 },
+        ]},
+      ]},
+    ],
+    dataTables: [
+      { bar: '配方表', autoSeqBar: true, totalCols: true, cols: [
+          { key: '序号', label: 'No.' },
+          { key: '物料种类', label: '物料种类' },
+          { key: '物料编号', label: '物料编号' },
+          { key: '物料名称', label: '物料名称', span: 2 },
+          { key: '实际添加比例', label: '实际添加\n比例%' },
+          { key: '单支物料含量', label: '单支\n物料含量g' },
+          { key: '设计添加量', label: '设计添加\n量' },
+        ]},
+    ],
+    tailSections: [
+      { bar: '配料要求', rows: [
+        { label: '配料要求', key: '配料要求', type: 'area' },
+      ]},
+    ],
+  },
+
+  // 组装BOM表:plain 清单(物料名/编号/规格/外观/用量)
+  RD_ASM_BOM: {
+    headMode: 'plain',
+    plainTitle: '炭棒滤芯组装/包装物料清单',
+    dataTables: [
+      { cols: [
+          { key: '物料名', label: '物料名', w: 150 },
+          { key: '物料编号', label: '物料编号', w: 130 },
+          { key: '物料规格', label: '物料规格', w: 330, area: true },
+          { key: '外观要求', label: '外观要求', w: 330, area: true },
+          { key: '用量', label: '用量', w: 80 },
+        ]},
+    ],
+  },
+
+  // 组装工艺清单:plain 清单(工序/控制内容/管控要求/检查比例)
+  RD_ASM_PROC: {
+    headMode: 'plain',
+    plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单',
+    dataTables: [
+      { cols: [
+          { key: '工序', label: '工序', w: 130 },
+          { key: '工序控制内容', label: '工序控制内容', w: 320, area: true },
+          { key: '管控要求', label: '管控要求', w: 430, area: true },
+          { key: '检查比例', label: '检查比例', w: 120 },
+        ]},
+    ],
+  },
+
+  // 规格书:封面(名称/编号/客户/料号/版本/日期+制订审核批准) + 修订记录/检验要求/物料清单 3 表区
+  RD_SPEC_DOC: {
+    headMode: 'report',
+    staticTitle: '产品规格书',
+    titlePlaceholder: '产品规格书',
+    grid: [100, 300, 100, 240, 100, 100, 100, 110],
+    head: { title: 5, infoLabel: 1, infoValue: 2 },
+    sections: [
+      { rows: [
+        { pairs: [
+          { label: '名称', key: '名称', vspan: 3 },
+          { label: '编号', key: '编号', type: 'text' },
+        ]},
+        { pairs: [
+          { label: '客户名', key: '客户名' },
+          { label: '客户料号', key: '客户料号' },
+        ]},
+        { pairs: [
+          { label: '版本', key: '版本' },
+          { label: '日期', key: '日期' },
+        ]},
+        { pairs: [
+          { label: '制订/日期', key: '制订日期' },
+          { label: '审核/日期', key: '审核日期' },
+          { label: '批准/日期', key: '批准日期', vspan: 2 },
+        ]},
+      ]},
+    ],
+    dataTables: [
+      { bar: '修订记录', filterKey: '表区', filterVal: '修订记录', cols: [
+          { key: '表区', label: '表区', hiddenCol: true },
+          { key: '序号', label: '序 号', w: 60 },
+          { key: '更改内容', label: '更改内容', w: 320, area: true },
+          { key: '更改原因', label: '更改原因', w: 220 },
+          { key: '更改时间', label: '更改时间', w: 120 },
+          { key: '责任人', label: '责任人', w: 100 },
+          { key: '备注', label: '备注', w: 140 },
+        ]},
+      { bar: '检验要求', filterKey: '表区', filterVal: '检验要求', cols: [
+          { key: '表区', label: '表区', hiddenCol: true },
+          { key: '序号', label: '序 号', w: 60 },
+          { key: '检验项目', label: '检验项目', w: 120 },
+          { key: '检验要求', label: '检验要求', w: 380, area: true },
+          { key: '检验方法', label: '检验方法', w: 130 },
+          { key: '检验依据', label: '检验依据', w: 140 },
+        ]},
+      { bar: '物料清单', filterKey: '表区', filterVal: '物料清单', cols: [
+          { key: '表区', label: '表区', hiddenCol: true },
+          { key: '序号', label: '序 号', w: 60 },
+          { key: '物料编码', label: '物料编码', w: 130 },
+          { key: '物料名称', label: '物料名称', w: 160 },
+          { key: '规格参数', label: '规格参数', w: 320, area: true },
+          { key: '数量', label: '数量', w: 80 },
+          { key: '备注', label: '备注', w: 140 },
+        ]},
+    ],
+  },
+
+  // 出货检验计划表(出货检验控制计划):标题+版本/密级 + 3 行信息对 + 10 列控制计划
+  RD_INSP_PLAN: {
+    headMode: 'report',
+    docNoDefault: 'YJ-RD001',
+    titlePlaceholder: '伊可普20寸折叠复合除铅大胖出货检验控制计划',
+    info: [
+      { label: '版本号', key: '版本号', type: 'text' },
+      { label: '密级', key: '密级', type: 'select' },
+    ],
+    grid: [110, 170, 110, 220, 110, 240],
+    head: { title: 3, infoLabel: 1, infoValue: 2 },
+    sections: [
+      { rows: [
+        { pairs: [
+          { label: '产品编号', key: '产品编号', type: 'text' },
+          { label: '客户名', key: '客户名', type: 'text' },
+          { label: '管理人', key: '管理人', type: 'text' },
+        ]},
+        { pairs: [
+          { label: '主要性能', key: '主要性能', type: 'text' },
+          { label: '滤芯尺寸', key: '滤芯尺寸', type: 'text' },
+          { label: '授权使用人', key: '授权使用人', type: 'text' },
+        ]},
+        { pairs: [
+          { label: '编写人', key: '编写人', type: 'text' },
+          { label: '审核人', key: '审核人', type: 'text' },
+        ]},
+      ]},
+    ],
+    dataTables: [
+      { cols: [
+          { key: '控制项目', label: '控制项目', w: 110 },
+          { key: '质量控制内容', label: '质量控制内容', w: 130 },
+          { key: '检测仪器', label: '检测仪器、工具', w: 120 },
+          { key: '控制标准及要求', label: '控制标准及要求', w: 320, area: true },
+          { key: '检验', label: '检验', w: 70 },
+          { key: '不合格应对措施', label: '不合格应对措施', w: 270, area: true },
+          { key: '检测频率', label: '检测频率', w: 120 },
+          { key: '取样方式', label: '取样方式', w: 110 },
+          { key: '检验内容', label: '检验内容', w: 170 },
+          { key: '控制方法', label: '控制方法', w: 110 },
+        ]},
+    ],
+  },
 }
