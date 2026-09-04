@@ -1559,17 +1559,7 @@ function onSideAction(a) {
     printApprovalSheet()
     return
   }
-  // 文件类删除=整单删除:确认后按状态(草稿直接作废/已归档提交申请,管理员通过后删除)
-  if (isApprovalDoc.value && a === '删除') {
-    ElMessageBox.confirm(
-      `${tt('确定删除整张单据？')}（${tt('草稿')}${tt('直接作废')}；${tt('已归档')}${tt('需管理员审批通过后删除')}）`,
-      tt('删除确认'),
-      { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
-    ).then(() => {
-      onButton('删除')
-    }).catch(() => {})
-    return
-  }
+  // 删除确认与整单语义统一在 onButton(isApprovalDoc 分支)处理
   if (isDisabled(a)) return
   onButton(a)
 }
@@ -2644,6 +2634,30 @@ async function onButton(action) {
   }
   if (action === '表格调整') {
     openColPrefs()
+    return
+  }
+  // 文件类面板(文书式):「删除」= 整单删除(草稿直接作废;已归档提交删除申请,管理员审批)
+  if (isApprovalDoc.value && (action === '删除' || action === '删除单据')) {
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+    const no = current.value['编号'] || current.value['单据编号'] || ''
+    try {
+      await ElMessageBox.confirm(
+        `${tt('确定删除整张单据？')}（${tt('草稿')}${tt('直接作废')}；${tt('已归档')}${tt('需管理员审批通过后删除')}）`,
+        tt('删除确认'),
+        { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
+      )
+    } catch (e) {
+      return
+    }
+    try {
+      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '删除', formData: { 编号: no }, buttonParam: {} })
+      ElMessage.success(res?.['单据状态'] === '删除申请中' ? `${no} 删除申请已提交，待管理员审核` : `${no} 已删除`)
+      delMode.value = false
+      delSel.value = []
+      load()
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || '删除失败')
+    }
     return
   }
   if (action === '删除单据') {
