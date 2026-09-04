@@ -686,19 +686,6 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
 // 立项申请表(二三级项目):文书式特例面板,内容区按《立项申请表》模板排版(ApprovalDocSheet)
 const isApprovalDoc = computed(() => panelCode.value === 'RD_APPROVAL')
-// 文书默认值:新建起草时 申请立项人=当前用户 / 申请立项日期=今天(用户可改,不置脏)
-function todayStr() {
-  const d = new Date()
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-}
-watch(
-  () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
-  () => {
-    if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
-    if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
-    if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
-  },
-)
 const bomMasterRows = computed(() => {
   if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
   return list.value || [] // BOM_FWD/BOM_REV：后端返回的展平行（父件-子件对）
@@ -1082,6 +1069,20 @@ const draftEditable = computed(() => {
   if ((cfgCache.value?.metadata?.singleDoc || cfgCache.value?.metadata?.panelCategory === '设置') && (st === '启用' || st === '停用')) return true
   return false
 })
+// 文书默认值:新建起草时 申请立项人=当前用户 / 申请立项日期=今天(用户可改,不置脏)
+// 注意:watch getter 在 setup 时立即求值,必须位于 draftEditable/cur 定义之后
+function todayStr() {
+  const d = new Date()
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+}
+watch(
+  () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
+  () => {
+    if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
+    if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
+    if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
+  },
+)
 const newVisible = ref(false)
 const approvalVisible = ref(false)
 const approvalNo = ref('')
