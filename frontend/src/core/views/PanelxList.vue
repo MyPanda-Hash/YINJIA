@@ -102,48 +102,53 @@
           @dirty="markInlineDirty"
         />
         <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" @dirty="markInlineDirty" />
-        <div class="approval-side">
-          <div class="as-side-title">{{ tt(panelName) }}</div>
-          <div class="as-side-status-row">
-            <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
+        <div class="approval-side" :class="{ collapsed: sideCollapsed }">
+          <div class="as-side-title" @click="sideCollapsed = !sideCollapsed">
+            <span v-if="!sideCollapsed">{{ tt(panelName) }}</span>
+            <span class="as-side-toggle">{{ sideCollapsed ? '◀' : '▶' }}</span>
           </div>
-          <div class="as-side-pager">
-            <span class="page-btn" :title="tt('首页')" @click="pageFirst">◁</span>
-            <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
-            <span class="page-no">{{ pageText(curNo, total, '张') }}</span>
-            <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
-            <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
-          </div>
-          <div class="as-side-btns">
-            <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回) -->
-            <div class="as-side-del" v-if="isApprovalDoc">
-              <div class="as-side-btn-row">
-                <div class="as-side-btn" style="flex: 1" @click="onSideAction('删除')">{{ tt('删除') }}</div>
-                <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openDelMenu = !openDelMenu">▼</div>
-              </div>
-              <div v-if="openDelMenu" class="as-side-menu" @click.stop>
-                <div class="as-side-menu-item" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
-                <template v-if="user.isAdmin">
-                  <div class="as-side-menu-item" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
-                  <div class="as-side-menu-item" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
-                </template>
-              </div>
+          <template v-if="!sideCollapsed">
+            <div class="as-side-status-row">
+              <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
             </div>
-            <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
-              <div
-                class="as-side-btn"
-                :class="{ disabled: isDisabled(btnName(g)) }"
-                @click="onSideAction(btnName(g))"
-              >{{ tt(btnName(g)) }}</div>
-              <div
-                v-for="a in dropItems(g)"
-                :key="a"
-                class="as-side-btn sub"
-                :class="{ disabled: isDisabled(a) }"
-                @click="onSideAction(a)"
-              >{{ tt(a) }}</div>
-            </template>
-          </div>
+            <div class="as-side-pager">
+              <span class="page-btn" :title="tt('首页')" @click="pageFirst">◁</span>
+              <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
+              <span class="page-no">{{ pageText(curNo, total, '张') }}</span>
+              <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
+              <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
+            </div>
+            <div class="as-side-btns">
+              <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回) -->
+              <div class="as-side-del" v-if="isApprovalDoc">
+                <div class="as-side-btn-row">
+                  <div class="as-side-btn" style="flex: 1" @click="onSideAction('删除')">{{ tt('删除') }}</div>
+                  <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openDelMenu = !openDelMenu">▼</div>
+                </div>
+                <div v-if="openDelMenu" class="as-side-menu" @click.stop>
+                  <div class="as-side-menu-item" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
+                  <template v-if="user.isAdmin">
+                    <div class="as-side-menu-item" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
+                    <div class="as-side-menu-item" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
+                  </template>
+                </div>
+              </div>
+              <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
+                <div
+                  class="as-side-btn"
+                  :class="{ disabled: isDisabled(btnName(g)) }"
+                  @click="onSideAction(btnName(g))"
+                >{{ tt(btnName(g)) }}</div>
+                <div
+                  v-for="a in dropItems(g)"
+                  :key="a"
+                  class="as-side-btn sub"
+                  :class="{ disabled: isDisabled(a) }"
+                  @click="onSideAction(a)"
+                >{{ tt(a) }}</div>
+              </template>
+            </div>
+          </template>
         </div>
       </div>
     </template>
@@ -1562,6 +1567,8 @@ function onGroupAction(a) {
   onButton(a)
 }
 
+// 文书面板右侧操作栏:默认展开,可收纳(收起为窄条,点击标题切换)
+const sideCollapsed = ref(false)
 // ══════════ 文书式面板:导出 = 整张文书打印/存PDF(浏览器原生,所见即所得) ══════════
 const approvalSheetRef = ref(null)
 /** 删除组下拉动作:收起菜单后走统一入口(删除带整单确认) */
@@ -3373,7 +3380,7 @@ onUnmounted(() => {
   padding-right: 6px;
 }
 
-/* ═══════ 文书式面板:纸张自适应 + 右侧固定侧边栏(布局流,不悬浮) ═══════ */
+/* ═══════ 文书式面板:纸张自适应 + 右侧收纳式操作栏(系统风格,与单据头对齐) ═══════ */
 .approval-layout {
   display: flex;
   align-items: flex-start;
@@ -3387,32 +3394,49 @@ onUnmounted(() => {
 }
 .approval-side {
   position: sticky;
-  top: 0;
+  top: 16px;
   flex: none;
   width: 176px;
-  max-height: 100vh;
+  max-height: calc(100vh - 32px);
   overflow-y: auto;
   overflow-x: hidden;
-  background: #fbfcfe;
-  border: none;
-  border-left: 1px solid #dfe7f0;
-  border-radius: 0;
+  background: #fff;
+  border: 1px solid #d9dee7;
+  border-radius: 4px;
   box-shadow: none;
   padding: 0;
   display: flex;
   flex-direction: column;
   z-index: 20;
+  transition: width 0.2s ease;
+}
+.approval-side.collapsed {
+  width: 34px;
 }
 .as-side-title {
-  padding: 11px 14px;
-  background: linear-gradient(90deg, #1c4f8a 0%, #2f6db8 100%);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  text-align: center;
-  border-radius: 0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  background: #f2f4f7;
+  color: #303133;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #d9dee7;
+  user-select: none;
+}
+.approval-side.collapsed .as-side-title {
+  padding: 9px 0;
+  justify-content: center;
+}
+.as-side-toggle {
+  font-size: 10px;
+  color: #7a869c;
+}
+.approval-side.collapsed .as-side-title .as-side-toggle {
+  font-size: 11px;
 }
 .as-side-status-row {
   display: flex;
@@ -3445,53 +3469,44 @@ onUnmounted(() => {
 .as-side-btn {
   display: block;
   width: 100%;
-  padding: 8px 10px;
-  border: 1px solid #cfe0f2;
-  border-radius: 9px;
+  padding: 7px 10px;
+  border: 1px solid #d9dee7;
+  border-radius: 4px;
   background: #fff;
   color: #1c4f8a;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 600;
   text-align: center;
   cursor: pointer;
   user-select: none;
-  box-shadow: 0 1px 3px rgba(28, 79, 138, 0.1);
   transition: all 0.15s ease;
 }
 .as-side-btn:hover {
-  background: #eaf3ff;
-  border-color: #2f6db8;
+  background: #eef4ff;
+  border-color: #8fb4e0;
   color: #0d5bd3;
-  transform: translateX(-3px);
-  box-shadow: 0 4px 10px rgba(28, 79, 138, 0.18);
 }
 .as-side-btn.sub {
   background: transparent;
   border: none;
-  box-shadow: none;
-  color: #5a7590;
+  color: #66788e;
   font-size: 12px;
   font-weight: 500;
   padding: 4px 10px;
 }
 .as-side-btn.sub:hover {
-  background: #eaf3ff;
-  transform: none;
-  box-shadow: none;
+  background: #eef4ff;
 }
 .as-side-btn.disabled {
   color: #b9c2ce;
   border-color: #e4ebf3;
   background: #f4f6f9;
-  box-shadow: none;
   cursor: not-allowed;
 }
 .as-side-btn.disabled:hover {
   color: #b9c2ce;
   border-color: #e4ebf3;
   background: #f4f6f9;
-  transform: none;
-  box-shadow: none;
 }
 /* 删除组 + 下拉 */
 .as-side-del {
