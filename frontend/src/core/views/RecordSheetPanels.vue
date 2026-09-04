@@ -488,6 +488,15 @@ function chartOf(dt) {
 .rs-topic-input {
   width: 90%;
 }
+.rs-topic-input :deep(.el-input__inner) {
+  font-family: 'SimSun', 'Songti SC', serif;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #333;
+  text-align: center;
+  height: 40px;
+}
 .rs-info-label {
   background: #d9d9d9;
   text-align: center;
