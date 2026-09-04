@@ -1069,20 +1069,6 @@ const draftEditable = computed(() => {
   if ((cfgCache.value?.metadata?.singleDoc || cfgCache.value?.metadata?.panelCategory === '设置') && (st === '启用' || st === '停用')) return true
   return false
 })
-// 文书默认值:新建起草时 申请立项人=当前用户 / 申请立项日期=今天(用户可改,不置脏)
-// 注意:watch getter 在 setup 时立即求值,必须位于 draftEditable/cur 定义之后
-function todayStr() {
-  const d = new Date()
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-}
-watch(
-  () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
-  () => {
-    if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
-    if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
-    if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
-  },
-)
 const newVisible = ref(false)
 const approvalVisible = ref(false)
 const approvalNo = ref('')
@@ -1133,6 +1119,21 @@ const cur = computed(() => {
   return l[Math.min(curIdx.value, l.length - 1)]
 })
 const curNo = computed(() => (list.value.length ? Math.min(curIdx.value, list.value.length - 1) + 1 : 0))
+
+// 文书默认值:新建起草时 申请立项人=当前用户 / 申请立项日期=今天(用户可改,不置脏)
+// 注意:watch getter 在 setup 时立即求值,必须位于 draftEditable/cur 定义之后
+function todayStr() {
+  const d = new Date()
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+}
+watch(
+  () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
+  () => {
+    if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
+    if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
+    if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
+  },
+)
 
 watch(cur, (v) => {
   current.value = v
