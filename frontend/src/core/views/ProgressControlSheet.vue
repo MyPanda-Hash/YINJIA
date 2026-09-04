@@ -117,15 +117,15 @@
               <span v-else class="ps-cell-text ps-name-block">{{ row['项目名称'] || '' }}</span>
             </td>
             <td class="c-sub">
-              <el-input v-if="editable" v-model="row['子项目/尺寸']" size="small" class="ps-cell-input" maxlength="100" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row['子项目/尺寸']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['子项目/尺寸'] || '' }}</span>
             </td>
             <td class="c-remark">
-              <el-input v-if="editable" v-model="row['项目编号']" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row['项目编号']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['项目编号'] || '' }}</span>
             </td>
             <td class="c-content">
-              <el-input v-if="editable" v-model="row['内容']" size="small" class="ps-cell-input" maxlength="500" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row['内容']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['内容'] || '' }}</span>
             </td>
             <td class="c-grade">
@@ -133,7 +133,7 @@
               <span v-else class="ps-cell-text">{{ row['项目发起人'] || '' }}</span>
             </td>
             <td class="c-owner">
-              <el-input v-if="editable" v-model="row['项目负责人']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row['项目负责人']" size="small" class="ps-cell-input" maxlength="100" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['项目负责人'] || '' }}</span>
             </td>
             <td class="c-progress">
@@ -145,11 +145,11 @@
               <span v-else class="ps-cell-text">{{ row['预计完成日期'] || '' }}</span>
             </td>
             <td class="c-status">
-              <el-input v-if="editable" v-model="row['状态']" size="small" class="ps-cell-input" maxlength="100" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row['状态']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['状态'] || '' }}</span>
             </td>
             <td class="c-tester">
-              <el-input v-if="editable" v-model="row['测试情况']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row['测试情况']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['测试情况'] || '' }}</span>
             </td>
             <td class="c-approve">
@@ -161,7 +161,7 @@
               <span v-else class="ps-cell-text">{{ row['是否市场转化'] || '' }}</span>
             </td>
             <td class="c-reason">
-              <el-input v-if="editable" v-model="row['未转换原因']" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row['未转换原因']" type="textarea" :autosize="{ minRows: 1, maxRows: 5 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['未转换原因'] || '' }}</span>
             </td>
             <td v-if="editable" class="c-op">
@@ -216,6 +216,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
+import * as XLSX from 'xlsx'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -263,8 +264,7 @@ async function loadRefOptions() {
 onMounted(loadRefOptions)
 watch(() => props.editable, (v) => { if (v) loadRefOptions() })
 
-// ---------- 项目(组)/子项目 行增删 ----------
-/** 组首行:与上一行项目名称不同(或首行) → 显示 项目名称/层级 输入,否则并入上一组 */
+// ---------- 项目(组)/子项目 行增删 ----------/** 组首行:与上一行项目名称不同(或首行) → 显示 项目名称/层级 输入,否则并入上一组 */
 function isGroupHead(i) {
   if (i <= 0) return true
   return items.value[i]?.['项目名称'] !== items.value[i - 1]?.['项目名称']
@@ -371,6 +371,48 @@ function removeItem(i) {
   if (d && Array.isArray(d.items)) d.items.splice(i, 1)
   emit('dirty')
 }
+
+/** 导出 Excel:面板块信息 + 全部字段列 + 全部数据行(内容完整,不受列宽/纸张限制) */
+function exportProgressExcel() {
+  const head = props.head || {}
+  const rows = (head.detail && Array.isArray(head.detail.items) ? head.detail.items : [])
+  const title = '产品开发二三四级项目控制列表'
+  const info = `惠州市银嘉环保科技有限公司　　文档编号：${head['文档编号'] || 'YJ-XS002'}　　密级：${head['密级'] || ''}　　使用范围：${head['文件使用范围'] || ''}　　单据编号：${head['单据编号'] || ''}`
+  const header = ['项目等级', '项目名称', '子项目/尺寸', '项目编号', '内容', '项目发起人', '项目负责人', '立项日期', '预计完成日期', '状态', '测试情况', '技术目标达成', '是否市场转化', '未转换原因']
+  const data = rows.map((r) => [
+    r['项目等级'], r['项目名称'], r['子项目/尺寸'], r['项目编号'], r['内容'], r['项目发起人'],
+    r['项目负责人'], r['立项日期'], r['预计完成日期'], r['状态'], r['测试情况'],
+    r['技术目标达成'], r['是否市场转化'], r['未转换原因'],
+  ])
+  const aoa = [[title], [info], [], header, ...data]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+  ws['!cols'] = [
+    { wch: 10 }, { wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 30 }, { wch: 10 },
+    { wch: 12 }, { wch: 11 }, { wch: 12 }, { wch: 20 }, { wch: 34 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
+  ]
+  ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 13 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 13 } }]
+  // 表头加粗 + 数据单元格自动换行
+  const cols = header.length
+  for (let c = 0; c < cols; c++) {
+    const cell = ws[{ r: 3, c }]
+    if (cell) cell.s = { font: { bold: true, sz: 11 }, alignment: { horizontal: 'center', wrapText: true }, fill: { fgColor: { rgb: 'D9ECFB' } } }
+  }
+  for (let r = 4; r < aoa.length; r++) {
+    for (let c = 0; c < cols; c++) {
+      const cell = ws[{ r, c }]
+      if (cell) cell.s = { alignment: { vertical: 'top', wrapText: true } }
+    }
+  }
+  const c0 = ws[{ r: 0, c: 0 }]
+  if (c0) c0.s = { font: { bold: true, sz: 16 }, alignment: { horizontal: 'center' } }
+  const c1 = ws[{ r: 1, c: 0 }]
+  if (c1) c1.s = { font: { sz: 10, color: { rgb: '666666' } }, alignment: { horizontal: 'left' } }
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, title.slice(0, 31))
+  XLSX.writeFile(wb, `${title}-${head['单据编号'] || head['文档编号'] || '导出'}.xlsx`)
+}
+
+defineExpose({ exportProgressExcel })
 </script>
 
 <style scoped>

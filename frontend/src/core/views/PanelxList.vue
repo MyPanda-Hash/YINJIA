@@ -1570,8 +1570,15 @@ function pickDelAction(a) {
   onSideAction(a)
 }
 function onSideAction(a) {
-  // 文书面板「导出」不走通用 CSV,改为整张文书打印(可另存 PDF)
+  // 导出:控制列表=完整 Excel(全字段+全数据);其它文书面板=整张打印(可存 PDF)
   if (isApprovalDoc.value && a === '导出') {
+    if (panelCode.value === 'RD_PROGRESS') {
+      const sheet = approvalSheetRef.value
+      if (sheet && typeof sheet.exportProgressExcel === 'function') {
+        sheet.exportProgressExcel()
+        return
+      }
+    }
     printApprovalSheet()
     return
   }
