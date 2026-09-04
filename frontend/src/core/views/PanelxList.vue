@@ -2287,8 +2287,11 @@ async function directAdd() {
     const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData: {}, buttonParam: {} })
     const no = res && (res['编号'] || res.formNo)
     if (!no) return ElMessage.error('新增失败：未返回单据编号')
-    await load() // 刷新列表（新单按创建时间倒序置顶）
-    curIdx.value = 0 // 定位到最新单据，草稿状态列表页可直接填写
+    await load() // 刷新列表
+    // 定位到新单:列表按单据号排序,新单号不一定排在首位(如存在 WW-/旧格式单号时 WO 新单不在第 1 位),
+    // 必须按编号精确定位,否则新增后仍显示旧单,看起来像"新增复制了当前页面的内容"
+    const idx = list.value.findIndex((item) => item['编号'] === no)
+    curIdx.value = idx >= 0 ? idx : 0
     freshAdded.value = true // 本次新增尚未成功保存过：离开守卫「不保存」时据此撤回整单
     freshAddedNo.value = no // 撤回只允许命中这张新建单
     markFreshDraft(no) // 持久化标记：刷新/重进后守卫仍能识别并撤回这张草稿
