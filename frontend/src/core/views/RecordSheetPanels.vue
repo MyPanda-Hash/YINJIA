@@ -349,21 +349,24 @@
       </tbody>
     </table>
 
-    <!-- ═══ 标准库勾选弹窗(规格书检验要求) ═══ -->
-    <el-dialog v-model="libVisible" :title="tt('检验项目标准库')" width="880px" append-to-body>
+    <!-- ═══ 标准库勾选弹窗(规格书检验要求/出货检验计划必测项+型式项) ═══ -->
+    <el-dialog v-model="libVisible" :title="tt('检验项目标准库')" width="920px" append-to-body>
       <el-table
-        ref="libTableRef"
-        :data="cfg.testLib || []"
+        :data="libRows"
         size="small"
         border
         max-height="480"
         @selection-change="(sel) => (libChecked = sel)"
       >
         <el-table-column type="selection" width="42" />
-        <el-table-column prop="检验项目" :label="tt('检验项目')" min-width="150" />
-        <el-table-column prop="检验要求" :label="tt('检验要求')" min-width="240" />
-        <el-table-column prop="检验方法" :label="tt('检验方法')" min-width="140" />
-        <el-table-column prop="检验依据" :label="tt('检验依据')" min-width="110" />
+        <el-table-column prop="控制项目" :label="tt('控制项目')" min-width="110" />
+        <el-table-column prop="质量控制内容" :label="tt('质量控制内容')" min-width="110" />
+        <el-table-column prop="检测仪器" :label="tt('检测仪器、工具')" min-width="100" />
+        <el-table-column prop="控制标准及要求" :label="tt('控制标准及要求')" min-width="220" />
+        <el-table-column prop="检验" :label="tt('检验')" width="60" />
+        <el-table-column prop="检测频率" :label="tt('检测频率')" min-width="90" />
+        <el-table-column prop="检验内容" :label="tt('检验内容')" min-width="140" />
+        <el-table-column prop="控制方法" :label="tt('控制方法')" min-width="90" />
       </el-table>
       <template #footer>
         <el-button @click="libVisible = false">{{ tt('取消') }}</el-button>
@@ -453,11 +456,13 @@ function colsOf(dt) {
   return activeVariant.value?.cols || dt.cols || []
 }
 
-// ── 标准库勾选(规格书检验要求:测试项目汇总 26 类) ──
+// ── 标准库勾选(规格书检验要求 26 类 / 出货检验计划 必测项+型式项) ──
 const libVisible = ref(false)
 const libChecked = ref([])
+const libRows = ref([])
 function openLib(dt) {
   libTargetDt.value = dt
+  libRows.value = dt.lib || cfg.value?.testLib || []
   libChecked.value = []
   libVisible.value = true
 }
@@ -467,7 +472,7 @@ function confirmLib() {
   if (!dt) return
   const arr = touch()
   for (const row of libChecked.value) {
-    arr.push({ 表区: dt.filterVal, ...row })
+    arr.push(dt.filterKey ? { [dt.filterKey]: dt.filterVal, ...row } : { ...row })
   }
   libChecked.value = []
   libVisible.value = false
