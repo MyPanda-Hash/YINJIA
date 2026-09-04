@@ -67,6 +67,6 @@ export const planSheetCfg = {
   ],
   signCells: [
     { label: '负责人', key: '负责人', w: 202, type: 'text', flex: 58 },
-    { label: '编制日期', key: '编制日期', w: 180, type: 'date', flex: 42 },
+    { label: '编制日期', key: '编制日期', w: 180, type: 'date', flex: 42, white: true },
   ],
 }
