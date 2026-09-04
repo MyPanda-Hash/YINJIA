@@ -1,262 +1,251 @@
-﻿<template>
+<template>
   <!-- ═══════════════════════════════════════════════════════════════════
-       功能性滤效 数据记录表(RD_FILTER_EFF)——按《04数据记录表.xlsx》一比一复刻
-       报告头(公司名+测试主题 | 右上文档编号+密级/适用范围/测试负责人/测试编号)
-       → 1.基本信息 → 2.测试条件(含原水水质勾选+水质指标行) → 3.数据记录表(分组表头动态行)
+       功能性滤效 数据记录表(RD_FILTER_EFF)——按《04数据记录表.xlsx》一比一复刻(网格表版式)
+       报告头(公司名|YJ-PD-01、主题+信息块4行)→ 1.基本信息 → 2.测试条件(原水水质双行)
+       → 3.数据记录表(分组表头) → 4.数据结论;粉条区块标题/灰底标签列
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="record-sheet">
     <!-- ═══ 报告头 ═══ -->
-    <div class="rs-head">
-      <div class="rs-left">
-        <div class="rs-company">惠州市银嘉环保科技有限公司</div>
-        <div class="rs-topic">
-          <el-input
-            v-if="editable"
-            v-model="head['测试主题']"
-            size="small"
-            class="rs-topic-input"
-            placeholder=""
-            @input="emit('dirty')"
-          />
-          <template v-else>{{ head['测试主题'] || '' }}</template>
-        </div>
+    <div class="rs-hrow">
+      <div class="rs-td rs-company-cell">惠州市银嘉环保科技有限公司</div>
+      <div class="rs-td rs-docno">
+        <el-input v-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" @input="emit('dirty')" />
+        <template v-else>{{ head['文档编号'] || head['单据编号'] || 'YJ-PD-01' }}</template>
       </div>
-      <div class="rs-right">
-        <div class="rs-docno">
-          <el-input
-            v-if="editable"
-            v-model="head['文档编号']"
-            size="small"
-            maxlength="30"
-            class="rs-docno-input"
-            @input="emit('dirty')"
-          />
-          <template v-else>{{ head['文档编号'] || head['单据编号'] || 'YJ-PD-01' }}</template>
-        </div>
-        <div class="rs-info">
-          <div class="rs-info-row">
-            <span class="rs-info-label">{{ tt('密级') }}</span>
-            <span class="rs-info-value">
-              <el-select v-if="editable" v-model="head['密级']" size="small" :clearable="false" @change="emit('dirty')">
-                <el-option v-for="o in selectOptions('密级')" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-              <template v-else>{{ head['密级'] || '' }}</template>
-            </span>
-          </div>
-          <div class="rs-info-row">
-            <span class="rs-info-label">{{ tt('适用范围') }}</span>
-            <span class="rs-info-value">
-              <el-select v-if="editable" v-model="head['适用范围']" size="small" :clearable="false" @change="emit('dirty')">
-                <el-option v-for="o in selectOptions('适用范围')" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-              <template v-else>{{ head['适用范围'] || '' }}</template>
-            </span>
-          </div>
-          <div class="rs-info-row">
-            <span class="rs-info-label">{{ tt('测试负责人') }}</span>
-            <span class="rs-info-value">
-              <el-input v-if="editable" v-model="head['测试负责人']" size="small" maxlength="50" @input="emit('dirty')" />
-              <template v-else>{{ head['测试负责人'] || '' }}</template>
-            </span>
-          </div>
-          <div class="rs-info-row">
-            <span class="rs-info-label">{{ tt('测试编号') }}</span>
-            <span class="rs-info-value">
-              <el-input v-if="editable" v-model="head['测试编号']" size="small" maxlength="60" @input="emit('dirty')" />
-              <template v-else>{{ head['测试编号'] || '' }}</template>
-            </span>
-          </div>
+    </div>
+    <div class="rs-hrow">
+      <div class="rs-td rs-topic-cell">
+        <el-input v-if="editable" v-model="head['测试主题']" size="small" class="rs-topic-input" @input="emit('dirty')" />
+        <span v-else class="rs-topic">{{ head['测试主题'] || '' }}</span>
+      </div>
+      <div class="rs-td rs-info">
+        <div v-for="row in infoRows" :key="row.key" class="rs-irow">
+          <span class="rs-ilabel">{{ tt(row.label) }}</span>
+          <span class="rs-ivalue">
+            <el-select v-if="editable && row.type === 'select'" v-model="head[row.key]" size="small" :clearable="false" @change="emit('dirty')">
+              <el-option v-for="o in selectOptions(row.key)" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <el-input v-else-if="editable" v-model="head[row.key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+            <template v-else>{{ head[row.key] || '' }}</template>
+          </span>
         </div>
       </div>
     </div>
 
     <!-- ═══ 1.基本信息 ═══ -->
-    <div class="rs-section">{{ tt('1.基本信息') }}</div>
-    <div class="rs-form">
-      <div class="rs-row">
-        <label>{{ tt('测试目的/背景') }}</label>
-        <div class="rs-val">
-          <el-input v-if="editable" v-model="head['测试目的/背景']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="rs-input" @input="emit('dirty')" />
-          <span v-else class="rs-text">{{ head['测试目的/背景'] || '' }}</span>
-        </div>
+    <div class="rs-sectionbar">{{ tt('1.基本信息') }}</div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('测试目的/背景') }}</div>
+      <div class="rs-td">
+        <el-input v-if="editable" v-model="head['测试目的/背景']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['测试目的/背景'] || '' }}</span>
       </div>
-      <div class="rs-row">
-        <label>{{ tt('规格') }}</label>
-        <div class="rs-val">
-          <el-input v-if="editable" v-model="head['规格']" size="small" class="rs-input" maxlength="200" @input="emit('dirty')" />
-          <span v-else class="rs-text">{{ head['规格'] || '' }}</span>
-        </div>
+      <div class="rs-td">&nbsp;</div>
+    </div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('规格') }}</div>
+      <div class="rs-td">
+        <el-input v-if="editable" v-model="head['规格']" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['规格'] || '' }}</span>
       </div>
-      <div class="rs-row">
-        <label>{{ tt('样品配方') }}</label>
-        <div class="rs-val">
-          <el-input v-if="editable" v-model="head['样品配方']" size="small" class="rs-input" maxlength="300" @input="emit('dirty')" />
-          <span v-else class="rs-text">{{ head['样品配方'] || '' }}</span>
-        </div>
+      <div class="rs-td">&nbsp;</div>
+    </div>
+    <div class="rs-trow rs-trow-mid">
+      <div class="rs-td rs-label">{{ tt('样品配方') }}</div>
+      <div class="rs-td">&nbsp;</div>
+      <div class="rs-td">&nbsp;</div>
+    </div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('样品信息') }}</div>
+      <div class="rs-td">
+        <el-input v-if="editable" v-model="head['样品信息1']" type="textarea" :autosize="{ minRows: 3, maxRows: 12 }" size="small" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['样品信息1'] || '' }}</span>
       </div>
-      <div class="rs-row">
-        <label>{{ tt('样品信息') }}</label>
-        <div class="rs-val rs-dual">
-          <div class="rs-cell">
-            <el-input v-if="editable" v-model="head['样品信息1']" type="textarea" :autosize="{ minRows: 3, maxRows: 10 }" size="small" class="rs-input" @input="emit('dirty')" />
-            <span v-else class="rs-text">{{ head['样品信息1'] || '' }}</span>
-          </div>
-          <div class="rs-cell">
-            <el-input v-if="editable" v-model="head['样品信息2']" type="textarea" :autosize="{ minRows: 3, maxRows: 10 }" size="small" class="rs-input" @input="emit('dirty')" />
-            <span v-else class="rs-text">{{ head['样品信息2'] || '' }}</span>
-          </div>
-        </div>
+      <div class="rs-td">
+        <el-input v-if="editable" v-model="head['样品信息2']" type="textarea" :autosize="{ minRows: 3, maxRows: 12 }" size="small" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['样品信息2'] || '' }}</span>
       </div>
-      <div class="rs-row">
-        <label>{{ tt('测试要求') }}</label>
-        <div class="rs-val">
-          <el-input v-if="editable" v-model="head['测试要求']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="rs-input" @input="emit('dirty')" />
-          <span v-else class="rs-text">{{ head['测试要求'] || '' }}</span>
-        </div>
+    </div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('测试要求') }}</div>
+      <div class="rs-td">
+        <el-input v-if="editable" v-model="head['测试要求']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['测试要求'] || '' }}</span>
       </div>
-      <div class="rs-row">
-        <label>{{ tt('测试标准') }}</label>
-        <div class="rs-val">
-          <el-input v-if="editable" v-model="head['测试标准']" size="small" class="rs-input" maxlength="300" @input="emit('dirty')" />
-          <span v-else class="rs-text">{{ head['测试标准'] || '' }}</span>
-        </div>
+      <div class="rs-td">&nbsp;</div>
+    </div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('测试标准') }}</div>
+      <div class="rs-td">
+        <el-input v-if="editable" v-model="head['测试标准']" size="small" maxlength="300" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['测试标准'] || '' }}</span>
       </div>
-      <div class="rs-row">
-        <label>{{ tt('测试时间') }}</label>
-        <div class="rs-val">
-          <el-input v-if="editable" v-model="head['测试时间']" size="small" class="rs-input" maxlength="200" @input="emit('dirty')" />
-          <span v-else class="rs-text">{{ head['测试时间'] || '' }}</span>
-        </div>
+      <div class="rs-td">&nbsp;</div>
+    </div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('测试时间') }}</div>
+      <div class="rs-td">
+        <el-input v-if="editable" v-model="head['测试时间']" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['测试时间'] || '' }}</span>
       </div>
-      <div class="rs-row">
-        <label>{{ tt('本次实验目的') }}</label>
-        <div class="rs-val">
-          <el-input v-if="editable" v-model="head['本次实验目的']" type="textarea" :autosize="{ minRows: 1, maxRows: 5 }" size="small" class="rs-input" @input="emit('dirty')" />
-          <span v-else class="rs-text">{{ head['本次实验目的'] || '' }}</span>
-        </div>
+      <div class="rs-td">&nbsp;</div>
+    </div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('本次实验目的') }}</div>
+      <div class="rs-td">
+        <el-input v-if="editable" v-model="head['本次实验目的']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['本次实验目的'] || '' }}</span>
       </div>
+      <div class="rs-td">&nbsp;</div>
     </div>
 
     <!-- ═══ 2.测试条件 ═══ -->
-    <div class="rs-section">{{ tt('2.测试条件') }}</div>
-    <div class="rs-form">
-      <div class="rs-row">
-        <label>{{ tt('测试装置及编号') }}</label>
-        <div class="rs-val rs-dual">
-          <div class="rs-cell">
-            <el-input v-if="editable" v-model="head['测试装置及编号1']" size="small" class="rs-input" maxlength="200" @input="emit('dirty')" />
-            <span v-else class="rs-text">{{ head['测试装置及编号1'] || '' }}</span>
-          </div>
-          <div class="rs-cell">
-            <el-input v-if="editable" v-model="head['测试装置及编号2']" size="small" class="rs-input" maxlength="200" @input="emit('dirty')" />
-            <span v-else class="rs-text">{{ head['测试装置及编号2'] || '' }}</span>
-          </div>
-        </div>
+    <div class="rs-sectionbar">{{ tt('2.测试条件') }}</div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('测试装置及编号') }}</div>
+      <div class="rs-td">
+        <el-input v-if="editable" v-model="head['测试装置及编号1']" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['测试装置及编号1'] || '' }}</span>
       </div>
-      <div class="rs-row">
-        <label>{{ tt('加标方式') }}</label>
-        <div class="rs-val">
-          <el-input v-if="editable" v-model="head['加标方式']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="rs-input" @input="emit('dirty')" />
-          <span v-else class="rs-text">{{ head['加标方式'] || '' }}</span>
-        </div>
+      <div class="rs-td">
+        <el-input v-if="editable" v-model="head['测试装置及编号2']" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['测试装置及编号2'] || '' }}</span>
       </div>
-      <div class="rs-row">
-        <label>{{ tt('冲水方式') }}</label>
-        <div class="rs-val">
-          <el-input v-if="editable" v-model="head['冲水方式']" type="textarea" :autosize="{ minRows: 3, maxRows: 10 }" size="small" class="rs-input" @input="emit('dirty')" />
-          <span v-else class="rs-text">{{ head['冲水方式'] || '' }}</span>
-        </div>
+    </div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('加标方式') }}</div>
+      <div class="rs-td" colspan="2">
+        <el-input v-if="editable" v-model="head['加标方式']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['加标方式'] || '' }}</span>
       </div>
-      <div class="rs-row">
-        <label>{{ tt('测试用仪器/检出限') }}</label>
-        <div class="rs-val">
-          <el-input v-if="editable" v-model="head['测试用仪器/检出限']" size="small" class="rs-input" maxlength="500" @input="emit('dirty')" />
-          <span v-else class="rs-text">{{ head['测试用仪器/检出限'] || '' }}</span>
-        </div>
+      <div class="rs-td" style="display: none"></div>
+    </div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('冲水方式') }}</div>
+      <div class="rs-td" colspan="2">
+        <el-input v-if="editable" v-model="head['冲水方式']" type="textarea" :autosize="{ minRows: 3, maxRows: 12 }" size="small" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['冲水方式'] || '' }}</span>
       </div>
-      <!-- 原水水质条件:水源勾选 + 水质指标格(复刻 Excel 两行网格) -->
-      <div class="rs-row rs-row-water">
-        <label>{{ tt('原水水质条件') }}</label>
-        <div class="rs-val rs-water">
-          <span v-for="src in waterSources" :key="src.key" class="rs-water-src">
-            <span class="rs-water-name">{{ tt(src.label) }}</span>
-            <el-select v-if="editable" v-model="head[src.key]" size="small" :clearable="false" @change="emit('dirty')">
-              <el-option v-for="o in selectOptions('原水自来水')" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <span v-else>{{ head[src.key] || '' }}</span>
-          </span>
-          <span class="rs-water-src">
-            <span class="rs-water-name">{{ tt('PH') }}</span>
-            <el-input v-if="editable" v-model="head['原水PH']" size="small" class="rs-cell-input s" @input="emit('dirty')" />
-            <span v-else class="rs-text">{{ head['原水PH'] || '' }}</span>
-          </span>
-          <span class="rs-water-src">
-            <span class="rs-water-name">{{ tt('TDS') }}</span>
-            <el-input v-if="editable" v-model="head['原水TDS']" size="small" class="rs-cell-input s" @input="emit('dirty')" />
-            <span v-else class="rs-text">{{ head['原水TDS'] || '' }}</span>
-          </span>
-          <span class="rs-water-src">
-            <span class="rs-water-name">{{ tt('缸内自来水VOC浓度') }}</span>
-            <el-input v-if="editable" v-model="head['缸内自来水VOC浓度']" size="small" class="rs-cell-input m" @input="emit('dirty')" />
-            <span v-else class="rs-text">{{ head['缸内自来水VOC浓度'] || '' }}</span>
-          </span>
-          <span class="rs-water-src">
-            <span class="rs-water-name">{{ tt('自来水加氯浓度') }}</span>
-            <el-input v-if="editable" v-model="head['自来水加氯浓度']" size="small" class="rs-cell-input m" @input="emit('dirty')" />
-            <span v-else class="rs-text">{{ head['自来水加氯浓度'] || '' }}</span>
-          </span>
-          <span class="rs-water-src">
-            <span class="rs-water-name">{{ tt('水温℃') }}</span>
-            <el-input v-if="editable" v-model="head['水温']" size="small" class="rs-cell-input s" @input="emit('dirty')" />
-            <span v-else class="rs-text">{{ head['水温'] || '' }}</span>
-          </span>
-        </div>
+      <div class="rs-td" style="display: none"></div>
+    </div>
+    <div class="rs-trow">
+      <div class="rs-td rs-label">{{ tt('测试用仪器/检出限') }}</div>
+      <div class="rs-td" colspan="2">
+        <el-input v-if="editable" v-model="head['测试用仪器/检出限']" size="small" maxlength="500" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['测试用仪器/检出限'] || '' }}</span>
       </div>
+      <div class="rs-td" style="display: none"></div>
+    </div>
+    <!-- 原水水质条件:指标名行 + 值行 -->
+    <div class="rs-trow">
+      <div class="rs-td rs-label rs-water-label">{{ tt('原水水质条件') }}</div>
+      <div class="rs-td rs-ind-name">{{ tt('自来水') }}</div>
+      <div class="rs-td rs-ind-name">{{ tt('纯水') }}</div>
+      <div class="rs-td rs-ind-name">{{ tt('超纯水') }}</div>
+      <div class="rs-td rs-ind-name">{{ tt('PH') }}</div>
+      <div class="rs-td rs-ind-name">{{ tt('TDS') }}</div>
+      <div class="rs-td rs-ind-name narrow">{{ tt('缸内自来水VOC浓度') }}</div>
+      <div class="rs-td rs-ind-name">{{ tt('自来水加氯浓度') }}</div>
+      <div class="rs-td rs-ind-name">{{ tt('水温℃') }}</div>
+    </div>
+    <div class="rs-trow">
+      <div class="rs-td rs-water-val">
+        <el-select v-if="editable" v-model="head['原水自来水']" size="small" :clearable="false" @change="emit('dirty')">
+          <el-option v-for="o in selectOptions('原水自来水')" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
+        <template v-else>{{ head['原水自来水'] || '' }}</template>
+      </div>
+      <div class="rs-td rs-water-val">
+        <el-select v-if="editable" v-model="head['原水纯水']" size="small" :clearable="false" @change="emit('dirty')">
+          <el-option v-for="o in selectOptions('原水纯水')" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
+        <template v-else>{{ head['原水纯水'] || '' }}</template>
+      </div>
+      <div class="rs-td rs-water-val">
+        <el-select v-if="editable" v-model="head['原水超纯水']" size="small" :clearable="false" @change="emit('dirty')">
+          <el-option v-for="o in selectOptions('原水超纯水')" :key="o.value" :label="o.label" :value="o.value" />
+        </el-select>
+        <template v-else>{{ head['原水超纯水'] || '' }}</template>
+      </div>
+      <div class="rs-td rs-water-val"><el-input v-if="editable" v-model="head['原水PH']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['原水PH'] || '' }}</span></div>
+      <div class="rs-td rs-water-val"><el-input v-if="editable" v-model="head['原水TDS']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['原水TDS'] || '' }}</span></div>
+      <div class="rs-td rs-water-val"><el-input v-if="editable" v-model="head['缸内自来水VOC浓度']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['缸内自来水VOC浓度'] || '' }}</span></div>
+      <div class="rs-td rs-water-val"><el-input v-if="editable" v-model="head['自来水加氯浓度']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['自来水加氯浓度'] || '' }}</span></div>
+      <div class="rs-td rs-water-val"><el-input v-if="editable" v-model="head['水温']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['水温'] || '' }}</span></div>
     </div>
 
     <!-- ═══ 3.数据记录表 ═══ -->
-    <div class="rs-section">{{ tt('3.数据记录表') }}</div>
-    <div class="rs-table-wrap">
-      <table class="rs-table">
-        <thead>
-          <tr>
-            <template v-for="(g, gi) in recordCols" :key="gi">
-              <th v-if="g.cols.length > 1" :colspan="g.cols.length" class="rs-th-g">{{ tt(g.label) }}</th>
-              <th v-else :rowspan="2" class="rs-th-g">{{ tt(g.label) }}</th>
-            </template>
-            <th v-if="editable" :rowspan="2" class="rs-th-g rs-th-op"></th>
-          </tr>
-          <tr>
-            <template v-for="(g, gi) in recordCols" :key="'s' + gi">
-              <th v-if="g.cols.length > 1" v-for="c in g.cols" :key="c.key">{{ tt(c.label) }}</th>
-            </template>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
-            <td v-for="(g, gi) in recordCols" :key="gi">
-              <template v-if="g.cols.length > 1">
-                <span v-for="c in g.cols" :key="c.key" class="rs-td-cell">
-                  <el-input v-if="editable" v-model="row[c.key]" size="small" class="rs-cell-input" @input="emit('dirty')" />
-                  <span v-else class="rs-text">{{ row[c.key] || '' }}</span>
-                </span>
-              </template>
-              <template v-else>
-                <el-input v-if="editable" v-model="row[g.cols[0].key]" size="small" class="rs-cell-input" @input="emit('dirty')" />
-                <span v-else class="rs-text">{{ row[g.cols[0].key] || '' }}</span>
-              </template>
-            </td>
-            <td v-if="editable" class="rs-td-op">
-              <span class="rs-addrow" :title="tt('新增一行')" @click="addRow(i)">＋</span>
-              <span class="rs-del" :title="tt('删除该行')" @click="removeRow(i)">×</span>
-            </td>
-          </tr>
-          <tr v-if="!items.length">
-            <td :colspan="editable ? recordCols.length + 1 : recordCols.length" class="rs-empty">{{ tt('暂无数据记录，点击下方按钮新增') }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <div v-if="editable" class="rs-add" @click="addRow(-1)">＋ {{ tt('新增数据记录行') }}</div>
+    <div class="rs-sectionbar">{{ tt('3.数据记录表') }}</div>
+    <div class="rs-throw">
+      <div class="rs-th">{{ tt('冲水时间') }}</div>
+      <div class="rs-th">{{ tt('累计进水（L）') }}</div>
+      <div class="rs-th">{{ tt('水温（℃）') }}</div>
+      <div class="rs-th rs-th-g">{{ tt('取样前样品：压力（PSI)/流速（L/min）') }}</div>
+      <div class="rs-th">{{ tt('原水含量（ug/L）') }}</div>
+      <div class="rs-th rs-th-g">{{ tt('出水含量（ug/L）') }}</div>
+      <div class="rs-th rs-th-g">{{ tt('去除率%') }}</div>
+      <div class="rs-th">{{ tt('测试时间') }}</div>
+      <div v-if="editable" class="rs-th rs-th-op"></div>
+    </div>
+    <div class="rs-throw">
+      <div class="rs-th rs-th-sub"></div>
+      <div class="rs-th rs-th-sub"></div>
+      <div class="rs-th rs-th-sub"></div>
+      <div class="rs-th-block">
+        <div class="rs-th-left">{{ tt('样品1') }}</div>
+        <div class="rs-th-right">{{ tt('样品2') }}</div>
+      </div>
+      <div class="rs-th rs-th-sub"></div>
+      <div class="rs-th-block">
+        <div class="rs-th-left">{{ tt('样品1') }}</div>
+        <div class="rs-th-right">{{ tt('样品2') }}</div>
+      </div>
+      <div class="rs-th-block">
+        <div class="rs-th-left">{{ tt('样品1') }}</div>
+        <div class="rs-th-right">{{ tt('样品2') }}</div>
+      </div>
+      <div class="rs-th rs-th-sub"></div>
+      <div v-if="editable" class="rs-th rs-th-sub rs-th-op"></div>
+    </div>
+    <div v-for="(row, i) in items" :key="row.id ?? ('new' + i)" class="rs-trow">
+      <div class="rs-td"><el-input v-if="editable" v-model="row['冲水时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['冲水时间'] || ' / ' }}</span></div>
+      <div class="rs-td"><el-input v-if="editable" v-model="row['累计进水（L）']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['累计进水（L）'] || ' / ' }}</span></div>
+      <div class="rs-td"><el-input v-if="editable" v-model="row['水温（℃）']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['水温（℃）'] || ' / ' }}</span></div>
+      <div class="rs-td">
+        <div class="rs-combo">
+          <el-input v-if="editable" v-model="row['压力（PSI)样品1']" size="small" class="rs-c-in q" placeholder="压力" @input="emit('dirty')" />
+          <span v-else class="rs-txt">{{ displayCombo(row, '压力（PSI)样品1', '流速（L/min)样品1') }}</span>
+        </div>
+      </div>
+      <div class="rs-td">
+        <div class="rs-combo">
+          <el-input v-if="editable" v-model="row['流速（L/min)样品1']" size="small" class="rs-c-in q" placeholder="流速" @input="emit('dirty')" />
+          <span v-else class="rs-txt">{{ displayCombo(row, '压力（PSI)样品2', '流速（L/min)样品2') }}</span>
+        </div>
+      </div>
+      <div class="rs-td"><el-input v-if="editable" v-model="row['原水含量（ug/L）5号缸']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['原水含量（ug/L）5号缸'] || ' / ' }}</span></div>
+      <div class="rs-td"><el-input v-if="editable" v-model="row['出水含量（ug/L）样品1']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['出水含量（ug/L）样品1'] || ' / ' }}</span></div>
+      <div class="rs-td"><el-input v-if="editable" v-model="row['出水含量（ug/L）样品2']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['出水含量（ug/L）样品2'] || ' / ' }}</span></div>
+      <div class="rs-td"><el-input v-if="editable" v-model="row['去除率%样品1']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['去除率%样品1'] || ' / ' }}</span></div>
+      <div class="rs-td"><el-input v-if="editable" v-model="row['去除率%样品2']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['去除率%样品2'] || ' / ' }}</span></div>
+      <div class="rs-td"><el-input v-if="editable" v-model="row['测试时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['测试时间'] || ' / ' }}</span></div>
+      <div v-if="editable" class="rs-td rs-td-op">
+        <span class="rs-op-add" :title="tt('新增一行')" @click="addRow(i)">＋</span>
+        <span class="rs-op-del" :title="tt('删除该行')" @click="removeRow(i)">×</span>
+      </div>
+    </div>
+    <div v-if="!items.length" class="rs-trow rs-trow-empty">
+      <div class="rs-td rs-empty rs-empty-span">{{ tt('—') }}</div>
+    </div>
+    <div v-if="editable" class="rs-add" @click="addRow(-1)">＋ {{ tt('新增数据记录行') }}</div>
+
+    <!-- ═══ 4.数据结论 ═══ -->
+    <div class="rs-sectionbar">{{ tt('4.数据结论') }}</div>
+    <div class="rs-trow">
+      <div class="rs-td rs-conclusion">
+        <el-input v-if="editable" v-model="head['数据结论']" type="textarea" :autosize="{ minRows: 2, maxRows: 12 }" size="small" class="rs-t-in" @input="emit('dirty')" />
+        <span v-else class="rs-txt">{{ head['数据结论'] || '' }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -279,41 +268,21 @@ function selectOptions(key) {
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
 }
 
-/** 原水水质水源勾选(复刻 Excel) */
-const waterSources = [
-  { label: '自来水', key: '原水自来水' },
-  { label: '纯水', key: '原水纯水' },
-  { label: '超纯水', key: '原水超纯水' },
+/** 报告头信息块 */
+const infoRows = [
+  { label: '密级', key: '密级', type: 'select' },
+  { label: '适用范围', key: '适用范围', type: 'select' },
+  { label: '测试负责人', key: '测试负责人', type: 'input' },
+  { label: '测试编号', key: '测试编号', type: 'input' },
 ]
 
-/** 数据记录表列(分组表头,复刻 Excel 表头结构) */
-const recordCols = [
-  { label: '冲水时间', cols: [{ key: '冲水时间' }] },
-  { label: '累计进水（L）', cols: [{ key: '累计进水（L）' }] },
-  { label: '水温（℃）', cols: [{ key: '水温（℃）' }] },
-  {
-    label: '取样前样品：压力（PSI)/流速（L/min）', cols: [
-      { key: '压力（PSI)样品1', label: '压力（PSI)样品1' },
-      { key: '压力（PSI)样品2', label: '压力（PSI)样品2' },
-      { key: '流速（L/min)样品1', label: '流速（L/min)样品1' },
-      { key: '流速（L/min)样品2', label: '流速（L/min)样品2' },
-    ],
-  },
-  { label: '原水含量（ug/L）', cols: [{ key: '原水含量（ug/L）5号缸', label: '5号缸' }] },
-  {
-    label: '出水含量（ug/L）', cols: [
-      { key: '出水含量（ug/L）样品1', label: '样品1' },
-      { key: '出水含量（ug/L）样品2', label: '样品2' },
-    ],
-  },
-  {
-    label: '去除率%', cols: [
-      { key: '去除率%样品1', label: '样品1' },
-      { key: '去除率%样品2', label: '样品2' },
-    ],
-  },
-  { label: '测试时间', cols: [{ key: '测试时间' }] },
-]
+/** 取样前组合显示:流速 / 压力(复刻 Excel "1.93/61.1") */
+function displayCombo(row, pKey, fKey) {
+  const p = row[pKey] || ''
+  const f = row[fKey] || ''
+  if (!p && !f) return ' / '
+  return `${f}/${p}`
+}
 
 const items = computed(() => {
   const d = props.head?.detail
@@ -340,11 +309,10 @@ function removeRow(i) {
 <style scoped>
 /* ═══ 纸张 ═══ */
 .record-sheet {
-  width: 980px;
+  width: 1180px;
   max-width: 100%;
   margin: 16px auto 26px;
   background: #fff;
-  border: 1px solid #8a8a8a;
   font-size: 14px;
   color: #222;
 }
@@ -360,246 +328,242 @@ function removeRow(i) {
 }
 .record-sheet :deep(.el-input__inner),
 .record-sheet :deep(.el-textarea__inner) {
-  font-size: 14px;
-  line-height: 1.7;
+  font-size: 13.5px;
+  line-height: 1.6;
   padding: 0;
 }
-.record-sheet :deep(.rs-info-value .el-select__wrapper) {
-  box-shadow: none !important;
-  border: 1px solid #c8d6e5;
-  border-radius: 2px;
+
+/* ═══ 网格骨架(display:table) ═══ */
+.record-sheet {
+  display: table;
+  border-collapse: collapse;
+}
+.rs-hrow,
+.rs-trow {
+  display: table-row;
+}
+.rs-throw {
+  display: table-row;
+}
+.rs-throw .rs-th,
+.rs-hrow .rs-td,
+.rs-trow .rs-td {
+  display: table-cell;
+}
+.rs-trow-mid {
+  height: 130px;
+}
+.rs-trow-empty {
+  height: 40px;
+}
+.rs-td {
+  border: 1px solid #7f7f7f;
+  padding: 4px 8px;
+  vertical-align: middle;
   background: #fff;
-  min-height: 24px;
+}
+.rs-label {
+  background: #d9d9d9;
+  color: #333;
+  text-align: center;
+  width: 170px;
+  min-width: 170px;
+  font-weight: 500;
+}
+.rs-txt {
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.7;
+}
+.rs-t-in {
+  width: 100%;
+}
+.rs-c-in {
+  width: 100%;
+}
+.rs-c-in.q {
+  width: 118px;
 }
 
 /* ═══ 报告头 ═══ */
-.rs-head {
-  display: flex;
-  border-bottom: 1px solid #8a8a8a;
-}
-.rs-left {
-  flex: 1;
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.rs-company {
+.rs-company-cell {
   font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
   font-style: italic;
-  font-size: 18px;
+  font-size: 17px;
   color: #333;
-}
-.rs-topic {
-  font-family: 'SimSun', 'Songti SC', serif;
-  font-size: 22px;
-  font-weight: 700;
-  color: #1f5fa8;
-}
-.rs-topic-input {
-  width: 420px;
-}
-.rs-right {
-  width: 320px;
-  flex: none;
-  border-left: 1px solid #8a8a8a;
-  display: flex;
-  flex-direction: column;
+  padding: 7px 14px !important;
 }
 .rs-docno {
+  width: 300px;
+  min-width: 300px;
   text-align: right;
-  padding: 8px 14px 2px;
   font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
+  font-weight: 600;
   font-style: italic;
   font-size: 14px;
-  height: 28px;
+  padding: 6px 14px !important;
 }
 .rs-docno-input {
-  width: 150px;
+  width: 160px;
 }
 .rs-docno-input :deep(.el-input__inner) {
   text-align: right;
   font-style: italic;
   font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
 }
-.rs-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
+.rs-topic-cell {
+  padding: 12px 14px 14px 30px !important;
+  vertical-align: middle;
 }
-.rs-info-row {
-  display: flex;
-  flex: 1;
-}
-.rs-info-row + .rs-info-row {
-  border-top: 1px solid #c9c9c9;
-}
-.rs-info-label {
-  width: 100px;
-  flex: none;
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  padding-right: 6px;
-  font-size: 13px;
-  color: #1f5fa8;
-}
-.rs-info-value {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  padding-left: 8px;
-  border-left: 1px solid #c9c9c9;
-  font-size: 13px;
-  min-height: 30px;
-}
-.rs-info-value :deep(.el-select) {
-  width: 100%;
-}
-
-/* ═══ 区块标题 ═══ */
-.rs-section {
-  padding: 7px 14px 3px;
-  font-size: 15px;
+.rs-topic {
+  font-family: 'SimSun', 'Songti SC', serif;
+  font-size: 26px;
   font-weight: 700;
-  color: #222;
+  letter-spacing: 2px;
+  color: #333;
 }
-
-/* ═══ 表单行 ═══ */
-.rs-form {
-  padding: 0 14px 8px;
+.rs-topic-input {
+  width: 520px;
 }
-.rs-row {
+.rs-info {
+  padding: 0 !important;
+  vertical-align: top !important;
+}
+.rs-irow {
   display: flex;
-  align-items: flex-start;
-  border-bottom: 1px solid #d5d5d5;
-  padding: 5px 0;
 }
-.rs-row > label {
-  width: 160px;
+.rs-irow + .rs-irow {
+  border-top: 1px solid #7f7f7f;
+}
+.rs-ilabel {
+  width: 90px;
   flex: none;
-  font-size: 13.5px;
-  font-weight: 600;
-  color: #1f5fa8;
-  padding-top: 2px;
+  background: #d9d9d9;
+  text-align: center;
+  font-size: 13px;
+  padding: 5px 4px;
+  border-right: 1px solid #7f7f7f;
 }
-.rs-val {
+.rs-ivalue {
   flex: 1;
-  min-width: 0;
-  padding-left: 8px;
-}
-.rs-text {
-  white-space: pre-wrap;
-  word-break: break-all;
-  line-height: 1.7;
-}
-.rs-dual {
+  padding: 5px 8px;
+  font-size: 13px;
   display: flex;
-  gap: 18px;
+  align-items: center;
 }
-.rs-cell {
-  flex: 1;
-  min-width: 0;
-}
-.rs-input {
+.rs-ivalue :deep(.el-select) {
   width: 100%;
 }
-/* 原水水质行 */
-.rs-row-water {
-  align-items: center;
+
+/* ═══ 区块粉条 ═══ */
+.rs-sectionbar {
+  background: #f9dfe2;
+  border: 1px solid #7f7f7f;
+  border-bottom: none;
+  color: #333;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 5px 10px;
+  text-align: center;
 }
-.rs-water {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 14px;
-  align-items: center;
+
+/* ═══ 测试条件 ═══ */
+.rs-water-label {
+  vertical-align: middle;
 }
-.rs-water-src {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
+.rs-ind-name {
+  text-align: center;
   font-size: 13px;
+  color: #333;
+  min-width: 86px;
 }
-.rs-water-name {
-  color: #444;
-  white-space: nowrap;
+.rs-ind-name.narrow {
+  min-width: 120px;
 }
-.rs-water-src :deep(.el-select) {
-  width: 62px;
+.rs-water-val {
+  text-align: center;
+  min-width: 86px;
 }
-.rs-cell-input {
-  width: 90px;
-}
-.rs-cell-input.s {
-  width: 60px;
-}
-.rs-cell-input.m {
-  width: 100px;
+.rs-water-val :deep(.el-select) {
+  width: 64px;
 }
 
 /* ═══ 数据记录表 ═══ */
-.rs-table-wrap {
-  padding: 0 14px 10px;
-  overflow-x: auto;
-}
-.rs-table {
-  width: 100%;
-  min-width: 1180px;
-  border-collapse: collapse;
-  table-layout: auto;
-}
-.rs-table th,
-.rs-table td {
-  border: 1px solid #9a9a9a;
-  padding: 2px 4px;
-  font-size: 12px;
-  vertical-align: middle;
-}
-.rs-table th {
-  background: #eef4fc;
-  color: #1f5fa8;
+.rs-th {
+  border: 1px solid #7f7f7f;
+  background: #9c9c9c;
+  color: #fff;
+  font-size: 12.5px;
   font-weight: 600;
   text-align: center;
+  padding: 6px 6px;
+  vertical-align: middle;
+  min-width: 100px;
 }
 .rs-th-g {
-  line-height: 1.4;
+  min-width: 210px;
+  font-size: 12px;
+  line-height: 1.35;
 }
 .rs-th-op {
-  width: 56px;
+  min-width: 60px;
 }
-.rs-td-cell {
+.rs-th-block {
+  display: table-cell;
+  border: 1px solid #7f7f7f;
+  background: #9c9c9c;
+  color: #fff;
+  padding: 0;
+}
+.rs-th-block .rs-th-left,
+.rs-th-block .rs-th-right {
   display: inline-block;
-  width: 49%;
-  min-width: 96px;
-  vertical-align: top;
-}
-.rs-td-cell + .rs-td-cell::before {
-  content: '|';
-  position: absolute;
-}
-.rs-td-cell {
-  position: relative;
-}
-.rs-td-cell + .rs-td-cell {
   width: 50%;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 4px;
+  box-sizing: border-box;
 }
-.rs-td-cell + .rs-td-cell > :deep(.el-input) {
-  padding-left: 6px;
+.rs-th-block .rs-th-right {
+  border-left: 1px solid #7f7f7f;
 }
-.rs-text {
-  word-break: break-all;
+.rs-th-sub {
+  border-top: none;
+}
+.rs-combo {
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 .rs-td-op {
   text-align: center;
   white-space: nowrap;
 }
+.rs-op-add,
+.rs-op-del {
+  display: inline-block;
+  cursor: pointer;
+  user-select: none;
+  font-size: 14px;
+  margin: 0 3px;
+}
+.rs-op-add {
+  color: #0d5bd3;
+}
+.rs-op-del {
+  color: #c0392b;
+}
 .rs-empty {
   text-align: center;
   color: #98a4b3;
-  padding: 14px 0 !important;
+}
+.rs-empty-span {
+  border-left: none;
+  border-right: none;
 }
 .rs-add {
-  margin: 6px 0 4px;
+  margin: 8px 0 2px;
   padding: 5px 10px;
   border: 1px dashed #8fb4e0;
   border-radius: 4px;
@@ -614,26 +578,7 @@ function removeRow(i) {
   background: #e8f2ff;
   border-style: solid;
 }
-.rs-addrow {
-  display: inline-block;
-  color: #0d5bd3;
-  font-size: 14px;
-  cursor: pointer;
-  user-select: none;
-  margin-right: 5px;
-}
-.rs-addrow:hover {
-  font-weight: 700;
-}
-.rs-del {
-  display: inline-block;
-  color: #c0392b;
-  font-size: 15px;
-  cursor: pointer;
-  user-select: none;
-}
-.rs-del:hover {
-  color: #e74c3c;
-  font-weight: 700;
+.rs-conclusion {
+  padding: 10px 14px !important;
 }
 </style>
