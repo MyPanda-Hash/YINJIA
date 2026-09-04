@@ -206,15 +206,25 @@ function selectOptions(key) {
 .approval-sheet :deep(.as-cell-input) {
   width: 100%;
 }
-.approval-sheet :deep(.as-cell-input .el-input__wrapper),
-.approval-sheet :deep(.as-cell-input .el-select__wrapper) {
-  border: 1px solid #c8d6e5;
-  border-radius: 2px;
-  background: #fff;
-  min-height: 24px;
-}
 .approval-sheet :deep(.as-date) {
   width: 132px;
+}
+/* 输入控件去边框:保持原版表格线条(编辑/聚焦均无提示线) */
+.approval-sheet :deep(.el-input__wrapper),
+.approval-sheet :deep(.el-select__wrapper),
+.approval-sheet :deep(.el-input__wrapper.is-focus),
+.approval-sheet :deep(.el-select__wrapper.is-focused),
+.approval-sheet :deep(.el-date-editor .el-input__wrapper),
+.approval-sheet :deep(.el-date-editor .el-input__wrapper.is-focus),
+.approval-sheet :deep(.el-textarea__inner) {
+  box-shadow: none !important;
+  border: none;
+  background: transparent;
+}
+.approval-sheet :deep(.el-input__inner),
+.approval-sheet :deep(.el-textarea__inner) {
+  font-size: 14px;
+  padding: 0;
 }
 
 /* ═══ ① 顶部条:公司名 | YJ-XS002 ═══ */
@@ -322,7 +332,9 @@ function selectOptions(key) {
   background: #29b8f0;
   color: #fff;
   font-size: 15px;
-  padding: 6px 0 0 10px;
+  display: flex;
+  align-items: center;
+  padding: 0 0 0 10px;
 }
 .as-name {
   width: 150px;
@@ -355,17 +367,7 @@ function selectOptions(key) {
 .as-fill-input {
   flex: 1;
 }
-.as-fill-input :deep(.el-input__wrapper) {
-  border: 1px solid #d5dde6;
-  border-radius: 2px;
-  box-shadow: none;
-}
 .as-fill-area :deep(.el-textarea__inner) {
-  border: 1px solid #d5dde6;
-  border-radius: 2px;
-  box-shadow: none;
-  padding: 3px 6px;
-  font-size: 14px;
   line-height: 1.7;
 }
 .as-ro-text {
@@ -411,8 +413,11 @@ function selectOptions(key) {
 .as-sign-c1 {
   width: 202px;
 }
+/* 申请立项日期 白底蓝字(与上部信息表标签一致) */
 .as-sign-c2 {
   width: 150px;
+  background: #fff;
+  color: #1f5fa8;
 }
 .as-sign-val {
   flex: 1;
