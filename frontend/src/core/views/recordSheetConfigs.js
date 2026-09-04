@@ -659,7 +659,8 @@ export const recordSheetConfigs = {
     ],
   },
 
-  // 出货检验计划表(出货检验控制计划):标题+版本/密级 + 3 行信息对 + 10 列控制计划
+  // 出货检验计划表(出货检验控制计划):全页共用 10 列网格(与数据表同列)——
+  // 产品编号↔控制项目、客户名↔控制标准及要求、版本号↔检测频率/取样方式,上下总宽一致
   RD_INSP_PLAN: {
     headMode: 'report',
     docNoDefault: 'YJ-RD001',
@@ -668,38 +669,38 @@ export const recordSheetConfigs = {
       { label: '版本号', key: '版本号', type: 'text' },
       { label: '密级', key: '密级', type: 'select' },
     ],
-    grid: [110, 170, 110, 220, 110, 240],
-    head: { title: 3, infoLabel: 1, infoValue: 2 },
+    grid: [110, 130, 120, 320, 70, 270, 120, 110, 170, 110],
+    head: { title: 6, infoLabel: 2, infoValue: 2 },
     sections: [
       { rows: [
         { pairs: [
-          { label: '产品编号', key: '产品编号', type: 'text' },
-          { label: '客户名', key: '客户名', type: 'text' },
-          { label: '管理人', key: '管理人', type: 'text' },
+          { label: '产品编号', key: '产品编号', type: 'text', vspan: 2 },
+          { label: '客户名', key: '客户名', type: 'text', vspan: 2 },
+          { label: '管理人', key: '管理人', type: 'text', lspan: 2, vspan: 2 },
         ]},
         { pairs: [
-          { label: '主要性能', key: '主要性能', type: 'text' },
-          { label: '滤芯尺寸', key: '滤芯尺寸', type: 'text' },
-          { label: '授权使用人', key: '授权使用人', type: 'text' },
+          { label: '主要性能', key: '主要性能', type: 'text', vspan: 2 },
+          { label: '滤芯尺寸', key: '滤芯尺寸', type: 'text', vspan: 2 },
+          { label: '授权使用人', key: '授权使用人', type: 'text', lspan: 2, vspan: 2 },
         ]},
         { pairs: [
-          { label: '编写人', key: '编写人', type: 'text' },
-          { label: '审核人', key: '审核人', type: 'text' },
+          { label: '编写人', key: '编写人', type: 'text', vspan: 2 },
+          { label: '审核人', key: '审核人', type: 'text', vspan: 6 },
         ]},
       ]},
     ],
     dataTables: [
       { cols: [
-          { key: '控制项目', label: '控制项目', w: 110 },
-          { key: '质量控制内容', label: '质量控制内容', w: 130 },
-          { key: '检测仪器', label: '检测仪器、工具', w: 120 },
-          { key: '控制标准及要求', label: '控制标准及要求', w: 320, area: true },
-          { key: '检验', label: '检验', w: 70 },
-          { key: '不合格应对措施', label: '不合格应对措施', w: 270, area: true },
-          { key: '检测频率', label: '检测频率', w: 120 },
-          { key: '取样方式', label: '取样方式', w: 110 },
-          { key: '检验内容', label: '检验内容', w: 170 },
-          { key: '控制方法', label: '控制方法', w: 110 },
+          { key: '控制项目', label: '控制项目' },
+          { key: '质量控制内容', label: '质量控制内容' },
+          { key: '检测仪器', label: '检测仪器、工具' },
+          { key: '控制标准及要求', label: '控制标准及要求' },
+          { key: '检验', label: '检验' },
+          { key: '不合格应对措施', label: '不合格应对措施' },
+          { key: '检测频率', label: '检测频率' },
+          { key: '取样方式', label: '取样方式' },
+          { key: '检验内容', label: '检验内容' },
+          { key: '控制方法', label: '控制方法' },
         ]},
     ],
   },
