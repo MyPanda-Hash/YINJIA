@@ -1,7 +1,7 @@
 <template>
   <div class="panelx-list" @click="closeCtx">
     <!-- ══════════ ① 顶部工具栏（T+ 灰条 + 单据翻页）══════════ -->
-    <div class="tools">
+    <div v-if="!isApprovalDoc" class="tools">
       <button type="button" class="toolbar-query-btn" :title="tt('按表头字段查询单据')" @click.stop="openQueryDialog">
         <el-icon><Search /></el-icon>
         <span>{{ tt('查询') }}</span>
@@ -92,8 +92,40 @@
         <el-input v-else v-model="condition[qr.dataName]" :placeholder="qr.placeholder || ''" @keyup.enter="search" clearable @clear="search" />
       </div>
     </div>
+    <!-- 文书式面板:完整纸张居中 + 功能按钮右侧竖排(不按表头/表中/表尾三段式) -->
     <template v-else-if="isApprovalDoc">
-      <ApprovalDocSheet :head="cur" :fields="headerFields" :editable="draftEditable" @dirty="markInlineDirty" />
+      <div class="approval-layout">
+        <ApprovalDocSheet :head="cur" :fields="headerFields" :editable="draftEditable" @dirty="markInlineDirty" />
+        <div class="approval-side">
+          <div class="as-side-title">{{ tt(panelName) }}</div>
+          <div class="as-side-status-row">
+            <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
+          </div>
+          <div class="as-side-pager">
+            <span class="page-btn" :title="tt('首页')" @click="pageFirst">◁</span>
+            <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
+            <span class="page-no">{{ pageText(curNo, total, '张') }}</span>
+            <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
+            <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
+          </div>
+          <div class="as-side-btns">
+            <template v-for="(g, gi) in toolbarGroups" :key="'sg' + gi">
+              <div
+                class="as-side-btn"
+                :class="{ disabled: isDisabled(btnName(g)) }"
+                @click="onButton(btnName(g))"
+              >{{ tt(btnName(g)) }}</div>
+              <div
+                v-for="a in dropItems(g)"
+                :key="a"
+                class="as-side-btn sub"
+                :class="{ disabled: isDisabled(a) }"
+                @click="onGroupAction(a)"
+              >{{ tt(a) }}</div>
+            </template>
+          </div>
+        </div>
+      </div>
     </template>
     <div v-else class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
       <div class="field" v-for="field in headerFields" :key="headerFieldKey(field)">
@@ -1383,6 +1415,8 @@ function blockCols(b) {
 }
 
 const showFooter = computed(() => {
+  // 文书式面板(立项申请):不按表头/表中/表尾三段式,页脚(备注+审核行)整体隐藏
+  if (isApprovalDoc.value) return false
   const cfg = cfgCache.value
   return cfg?.metadata?.panelCategory === '单据' || (cfg?.detail?.tabs || []).length > 0
 })
@@ -3227,6 +3261,89 @@ onUnmounted(() => {
   color: #64748b;
   font-size: 12px;
   padding-right: 6px;
+}
+
+/* ═══════ 文书式面板(立项申请):完整纸张居中 + 右侧竖排功能栏 ═══════ */
+.approval-layout {
+  position: relative;
+  min-height: 560px;
+  padding-right: 172px;
+}
+.approval-side {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  width: 150px;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #d9e2ec;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(13, 91, 211, 0.1);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 20;
+}
+.as-side-title {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  color: #1c3d6e;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e5ecf5;
+}
+.as-side-status-row {
+  display: flex;
+  justify-content: center;
+}
+.as-side-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.as-side-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid #e5ecf5;
+  padding-top: 8px;
+}
+.as-side-btn {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #c9cfdb;
+  border-radius: 4px;
+  background: #f8fafc;
+  color: #1c4f8a;
+  font-size: 13px;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+}
+.as-side-btn:hover {
+  border-color: #0d5bd3;
+  color: #0d5bd3;
+  background: #f0f6ff;
+}
+.as-side-btn.sub {
+  background: #fbfcfe;
+  color: #48617f;
+  font-size: 12px;
+  padding: 5px 10px;
+}
+.as-side-btn.disabled {
+  color: #b9c2ce;
+  border-color: #e2e7ef;
+  background: #f4f6f9;
+  cursor: not-allowed;
+}
+.as-side-btn.disabled:hover {
+  color: #b9c2ce;
+  border-color: #e2e7ef;
+  background: #f4f6f9;
 }
 
 /* ═══════ ② 表头字段区（label 在上、输入在下）═══════ */
