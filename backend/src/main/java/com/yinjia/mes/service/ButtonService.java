@@ -649,9 +649,9 @@ public class ButtonService {
     }
 
     /** 文件类面板(文书式):保存即归档,退出草稿状态机;后续新增文件类面板在此登记 */
-    private static final java.util.Set<String> DOC_ARCHIVE_PANELS = java.util.Set.of("RD_APPROVAL", "RD_PLAN");
+    private static final java.util.Set<String> DOC_ARCHIVE_PANELS = java.util.Set.of("RD_APPROVAL", "RD_PLAN", "RD_FILTER_EFF");
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复) */
-    private static final java.util.Set<String> DOC_NO_PANELS = java.util.Set.of("RD_APPROVAL", "RD_PLAN", "RD_PROGRESS");
+    private static final java.util.Set<String> DOC_NO_PANELS = java.util.Set.of("RD_APPROVAL", "RD_PLAN", "RD_PROGRESS", "RD_FILTER_EFF");
 
     /** 单据状态查询(供生单等领域动作校验来源单状态) */
     public Map<String, Object> docStatus(String panelCode, String no) {
