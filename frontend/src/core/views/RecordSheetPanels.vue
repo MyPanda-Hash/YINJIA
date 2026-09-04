@@ -605,15 +605,15 @@ function removeRow(row) {
   emit('dirty')
 }
 
-// 浸泡安全:进入草稿编辑且明细为空时,自动带出 GB/T17219 标准 17 项卫生项目(Excel 原表预填)
+// 明细预置(seedRows):进入草稿编辑且明细为空时自动带出标准行(浸泡安全 17 项卫生项目/组装工艺 20 道工序)
 // 监听含 head 对象本身:cur 整体替换(单据加载)时也会触发,避免预填丢失
 watch(() => [props.editable, props.head], ([v]) => {
   if (!v || !cfg.value?.seedRows) return
   if (!props.head || !props.head['单据编号']) return
   const arr = touch()
   if (arr.length) return
-  for (const [no, name, req] of cfg.value.seedRows) {
-    arr.push({ 序号: no, 项目: name, 卫生要求: req })
+  for (const row of cfg.value.seedRows) {
+    arr.push({ ...row })
   }
 })
 
