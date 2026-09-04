@@ -129,7 +129,18 @@ public class ButtonService {
             }
             upsertLineRows(def, items, no, l2c, user);
         }
+        // 文件类面板(文书式):保存即归档(空白新建草稿不归档,保留首次填写入口)
+        if (DOC_ARCHIVE_PANELS.contains(def.code())) markArchived(def.code(), no);
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
+    }
+
+    /** 归档标记:yj_doc_status.archived='Y'(已归档优先级:已作废>已中止>已审核>审批中>已归档>草稿) */
+    private void markArchived(String panelCode, String no) {
+        jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
+                + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
+                + "WHEN MATCHED THEN UPDATE SET archived = 'Y', pending = 'N', canceled = 'N', update_at = GETDATE() "
+                + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, archived, pending, canceled, update_at) "
+                + "VALUES (s.panel_code, s.doc_no, 'Y', 'N', 'N', GETDATE());", panelCode, no);
     }
 
     /** 行表 upsert:有 id 更新,无 id 插入(回填自增 id),缺席行软删(asp_cancel='Y') */
@@ -570,15 +581,18 @@ public class ButtonService {
         if (c == null || c == 0) throw new IllegalArgumentException("表单数据不存在：" + no);
     }
 
+    /** 文件类面板(文书式):保存即归档,退出草稿状态机;后续新增文件类面板在此登记 */
+    private static final java.util.Set<String> DOC_ARCHIVE_PANELS = java.util.Set.of("RD_APPROVAL");
+
     /** 单据状态查询(供生单等领域动作校验来源单状态) */
     public Map<String, Object> docStatus(String panelCode, String no) {
         return docStatusOf(panelCode, no);
     }
 
-    /** 状态推导:已作废 > 已中止(stopped) > 已审核(shr) > 审批中(pending) > 草稿 */
+    /** 状态推导:已作废 > 已中止(stopped) > 已审核(shr) > 审批中(pending) > 已归档(archived) > 草稿 */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT shr, canceled, stopped, pending, pending_by, pending_at FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
                 panelCode, no);
         Map<String, Object> out = new HashMap<>();
         Map<String, Object> r = rows.isEmpty() ? null : rows.get(0);
@@ -592,6 +606,8 @@ public class ButtonService {
             out.put("status", "已审核");
         } else if ("Y".equals(r.get("pending"))) {
             out.put("status", "审批中");
+        } else if ("Y".equals(r.get("archived"))) {
+            out.put("status", "已归档");
         } else {
             out.put("status", "草稿");
         }

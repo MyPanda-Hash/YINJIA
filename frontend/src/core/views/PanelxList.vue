@@ -3266,6 +3266,11 @@ onUnmounted(() => {
   border: 1px solid #f3d9a6;
   background: #fffaf0;
 }
+.doc-status.已归档 {
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+}
 .page-btn {
   width: 24px;
   height: 24px;

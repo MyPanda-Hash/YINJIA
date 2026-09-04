@@ -40,7 +40,14 @@ GO
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'RD_APPROVAL') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('RD_APPROVAL', N'立项申请', N'单据', 'doc', 'rd_approval_detail', 'rd_approval', N'单据编号', N'id', N'单据编号', N'LXA', N'单据日期', 20, 'items', N'研发管理');
 ELSE IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='RD_APPROVAL' AND line_table=N'rd_approval_detail') UPDATE yj_panel SET line_table=N'rd_approval_detail' WHERE panel_code='RD_APPROVAL';
 GO
--- 表头字段(全部 header 位;文书特例里按截图排版渲染)
+-- 文件类面板(文书式)保存即归档:yj_doc_status 增加 archived 标记(无权限环境跳过,由管理员执行)
+BEGIN TRY
+  IF COL_LENGTH('yj_doc_status','archived') IS NULL ALTER TABLE yj_doc_status ADD archived char(1) NULL DEFAULT 'N';
+END TRY
+BEGIN CATCH
+  PRINT 'yj_doc_status.archived 列已存在或无 DDL 权限(管理员执行:ALTER TABLE yj_doc_status ADD archived char(1) NULL DEFAULT ''N'');';
+END CATCH
+GO
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'单据编号') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'单据编号', N'单据编号', N'文本', NULL, NULL, NULL, NULL, N'header', 10, 140, 0, 1, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'单据日期') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'单据日期', N'单据日期', N'日期', NULL, NULL, NULL, NULL, N'header', 20, 120, 1, 1, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'客户名') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'客户名', N'客户名', N'文本', NULL, NULL, NULL, NULL, N'header', 30, 160, 1, 0, 0, 1);
