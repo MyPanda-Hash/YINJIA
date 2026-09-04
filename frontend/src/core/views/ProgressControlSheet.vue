@@ -513,7 +513,7 @@ function removeItem(i) {
   width: 100%;
   min-width: 1480px;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
 }
 .ps-table th,
 .ps-table td {
@@ -537,8 +537,8 @@ function removeItem(i) {
 .ps-table tr:hover td {
   background: #f7fbff;
 }
-.c-level { width: 100px; }
-.c-name { width: 150px; }
+.c-level { min-width: 100px; }
+.c-name { min-width: 150px; }
 /* 项目名称合并块:铺满组内子项目行,浅蓝底,文字居中(对齐原图) */
 .ps-table td.c-name {
   background: #d9ecfb;
@@ -606,19 +606,37 @@ function removeItem(i) {
   color: #8a97a6;
   line-height: 1.5;
 }
-.c-sub { width: 120px; }
-.c-remark { width: 130px; }
-.c-content { width: 150px; }
-.c-grade { width: 70px; }
-.c-owner { width: 78px; }
-.c-progress { width: 150px; }
-.c-mile { width: 110px; }
-.c-status { width: 96px; }
-.c-tester { width: 76px; }
-.c-approve { width: 76px; }
-.c-inspect { width: 76px; }
-.c-reason { width: 140px; }
-.c-op { width: 30px; text-align: center; }
+.c-sub { min-width: 120px; }
+.c-remark { min-width: 130px; }
+.c-content { min-width: 150px; }
+.c-grade { min-width: 70px; }
+.c-owner { min-width: 78px; }
+.c-progress { min-width: 150px; }
+.c-mile { min-width: 110px; }
+.c-status { min-width: 96px; }
+.c-tester { min-width: 76px; }
+.c-approve { min-width: 76px; }
+.c-inspect { min-width: 76px; }
+.c-reason { min-width: 140px; }
+.c-op { min-width: 30px; text-align: center; }
+/* 长文本列:按内容自适应但设上限,超出自动换行,不被列栏盖住 */
+.ps-table td.c-remark,
+.ps-table td.c-content,
+.ps-table td.c-status,
+.ps-table td.c-tester,
+.ps-table td.c-reason,
+.ps-table td.c-progress {
+  max-width: 240px;
+}
+.ps-table td.c-status {
+  max-width: 210px;
+}
+.ps-table td.c-reason {
+  max-width: 170px;
+}
+.ps-table td.c-remark {
+  max-width: 170px;
+}
 .ps-cell-text {
   display: inline-block;
   width: 100%;
