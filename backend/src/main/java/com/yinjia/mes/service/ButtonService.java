@@ -134,7 +134,25 @@ public class ButtonService {
         }
         // 文件类面板(文书式):保存即归档(空白新建草稿不归档,保留首次填写入口)
         if (DOC_ARCHIVE_PANELS.contains(def.code())) markArchived(def.code(), no);
+        // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
+        if (DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
+    }
+
+    /** 文档编号不允许重复:同面板其它单据占用即拒绝(空值跳过) */
+    private void ensureDocNoUnique(PanelRegistry.PanelDef def, Map<String, Object> head, String no) {
+        Object v = head.get("文档编号");
+        if (v == null || String.valueOf(v).isBlank()) return;
+        String docNo = String.valueOf(v);
+        Integer dup;
+        if (no == null || no.isBlank()) {
+            dup = jdbc.queryForObject("SELECT COUNT(*) FROM " + def.headTable() + " WHERE [文档编号] = ?",
+                    Integer.class, docNo);
+        } else {
+            dup = jdbc.queryForObject("SELECT COUNT(*) FROM " + def.headTable()
+                    + " WHERE [文档编号] = ? AND [" + def.groupCol() + "] <> ?", Integer.class, docNo, no);
+        }
+        if (dup != null && dup > 0) throw new IllegalArgumentException("文档编号不允许重复：" + docNo);
     }
 
     /** 归档标记:yj_doc_status.archived='Y'(已归档优先级:已作废>已中止>已审核>审批中>已归档>草稿) */
@@ -632,6 +650,8 @@ public class ButtonService {
 
     /** 文件类面板(文书式):保存即归档,退出草稿状态机;后续新增文件类面板在此登记 */
     private static final java.util.Set<String> DOC_ARCHIVE_PANELS = java.util.Set.of("RD_APPROVAL", "RD_PLAN");
+    /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复) */
+    private static final java.util.Set<String> DOC_NO_PANELS = java.util.Set.of("RD_APPROVAL", "RD_PLAN", "RD_PROGRESS");
 
     /** 单据状态查询(供生单等领域动作校验来源单状态) */
     public Map<String, Object> docStatus(String panelCode, String no) {

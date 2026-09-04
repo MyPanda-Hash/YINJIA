@@ -12,8 +12,18 @@
     <!-- ① 顶部条 -->
     <div class="as-topbar">
       <div class="as-company">惠州市银嘉环保科技有限公司</div>
-      <!-- 右上角显示单据编号(实施计划单号):引擎流水号唯一,只读不可改 -->
-      <div class="as-docno">{{ head['单据编号'] || head['文档编号'] || 'YJ-XS002' }}</div>
+      <!-- 右上角:实施计划单据号(可手填,保存唯一性校验),默认 YJ-XS002 模板号 -->
+      <div class="as-docno">
+        <el-input
+          v-if="editable"
+          v-model="head['文档编号']"
+          size="small"
+          maxlength="30"
+          class="as-docno-input"
+          @input="emit('dirty')"
+        />
+        <template v-else>{{ head['文档编号'] || head['单据编号'] || 'YJ-XS002' }}</template>
+      </div>
     </div>
 
     <!-- ② 标题行:大标题 + 右上信息表 -->
@@ -271,6 +281,19 @@ function selectOptions(key) {
   color: #333;
   text-align: right;
   padding: 8px 14px 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: flex-start;
+}
+.as-docno-input {
+  width: 130px;
+}
+.as-docno-input :deep(.el-input__inner) {
+  text-align: right;
+  font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
+  font-style: italic;
+  font-size: 14px;
+  padding: 0;
 }
 
 /* ═══ ② 标题行:大标题 + 信息表 ═══ */
