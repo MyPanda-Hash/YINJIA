@@ -95,7 +95,13 @@
     <!-- 文书式面板:完整纸张居中 + 功能按钮右侧竖排(不按表头/表中/表尾三段式) -->
     <template v-else-if="isApprovalDoc">
       <div class="approval-layout">
-        <DocSheet ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" @dirty="markInlineDirty" />
+        <ProgressControlSheet
+          v-if="panelCode === 'RD_PROGRESS'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="headerFields" :editable="draftEditable"
+          @dirty="markInlineDirty"
+        />
+        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" @dirty="markInlineDirty" />
         <div class="approval-side">
           <div class="as-side-title">{{ tt(panelName) }}</div>
           <div class="as-side-status-row">
@@ -702,6 +708,7 @@ import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import SubBomDialog from './SubBomDialog.vue'
 import BomMasterDetail from './BomMasterDetail.vue'
 import DocSheet from './DocSheet.vue'
+import ProgressControlSheet from './ProgressControlSheet.vue'
 import { approvalSheetCfg, planSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
@@ -731,8 +738,8 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 
 // 物料清单维护和正反向查询统一使用父件/子件主从视图；仅 BOM 草稿开放编辑。
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
-// 立项申请表/项目实施计划等:文件类文书式特例面板,内容区按《申请表》模板排版(DocSheet 配置驱动)
-const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN'].includes(String(panelCode.value)))
+// 立项申请表/项目实施计划/项目进度查询:文件类文书式特例面板(DocSheet/ProgressControlSheet 配置驱动)
+const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS'].includes(String(panelCode.value)))
 const docSheetConfig = computed(() => (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
 const bomMasterRows = computed(() => {
   if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
@@ -1188,8 +1195,14 @@ watch(
     if (panelCode.value === 'RD_APPROVAL') {
       if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
       if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
+      if (!cur.value['文件管理人']) cur.value['文件管理人'] = '陈秀丽'
+    } else if (panelCode.value === 'RD_PLAN') {
+      if (!cur.value['文件管理人']) cur.value['文件管理人'] = '陈秀丽'
+    } else if (panelCode.value === 'RD_PROGRESS') {
+      // 原图默认值:层级=一二级;使用范围=工程技术中心
+      if (!['一二级', '二级', '三级', '四级'].includes(cur.value['项目(一/二级)'])) cur.value['项目(一/二级)'] = '一二级'
+      if (!cur.value['文件使用范围']) cur.value['文件使用范围'] = '工程技术中心'
     }
-    if (!cur.value['文件管理人']) cur.value['文件管理人'] = '陈秀丽'
   },
 )
 
