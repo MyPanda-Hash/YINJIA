@@ -107,6 +107,13 @@
           :head="cur" :fields="headerFields" :editable="draftEditable"
           @dirty="markInlineDirty"
         />
+        <!-- 数据记录表其余 7 张(配置驱动:碱性/矿化/抑菌/阻垢性能/RO保护/浸泡安全/压降精度) -->
+        <RecordSheetPanels
+          v-else-if="isRecordSheetPanel"
+          ref="approvalSheetRef"
+          :head="cur" :fields="headerFields" :editable="draftEditable" :panel-code="panelCode"
+          @dirty="markInlineDirty"
+        />
         <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" @dirty="markInlineDirty" />
         <div class="approval-side" :class="{ collapsed: sideCollapsed }">
           <div class="as-side-title" @click="sideCollapsed = !sideCollapsed">
@@ -721,6 +728,7 @@ import BomMasterDetail from './BomMasterDetail.vue'
 import DocSheet from './DocSheet.vue'
 import ProgressControlSheet from './ProgressControlSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
+import RecordSheetPanels from './RecordSheetPanels.vue'
 import { approvalSheetCfg, planSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
@@ -750,8 +758,10 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 
 // 物料清单维护和正反向查询统一使用父件/子件主从视图；仅 BOM 草稿开放编辑。
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
-// 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效):文件类文书式特例面板
-const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF'].includes(String(panelCode.value)))
+// 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张):文件类文书式特例面板
+const RECORD_SHEET_PANELS = ['RD_ALKALINE', 'RD_MINERAL', 'RD_ANTIBACT', 'RD_SCALE', 'RD_RO_PROTECT', 'RD_SOAK', 'RD_DROP_PREC']
+const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', ...RECORD_SHEET_PANELS].includes(String(panelCode.value)))
+const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 const docSheetConfig = computed(() => (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
 const bomMasterRows = computed(() => {
   if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
@@ -1214,9 +1224,10 @@ watch(
       // 原图默认值:使用范围=工程技术中心(项目名称/层级在行级,新增项目时行内默认)
       if (!cur.value['文件使用范围']) cur.value['文件使用范围'] = '工程技术中心'
     } else if (panelCode.value === 'RD_FILTER_EFF') {
-      // 数据记录表默认:密级=保密,适用范围=银嘉内部
+      // 数据记录表默认:密级=保密,适用范围=银嘉内部,测试主题=样板标题(可改)
       if (!cur.value['密级']) cur.value['密级'] = '保密'
       if (!cur.value['适用范围']) cur.value['适用范围'] = '银嘉内部'
+      if (!cur.value['测试主题']) cur.value['测试主题'] = '伊可普需求2炭棒除VOC测试'
     }
   },
 )
