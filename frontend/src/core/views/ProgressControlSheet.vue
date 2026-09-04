@@ -145,9 +145,7 @@
               <span v-else class="ps-cell-text">{{ row['样件完成日期'] || '' }}</span>
             </td>
             <td class="c-status">
-              <el-select v-if="editable" v-model="row['状态']" size="small" :clearable="true" @change="emit('dirty')">
-                <el-option v-for="o in selectOptions('状态')" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
+              <el-input v-if="editable" v-model="row['状态']" size="small" class="ps-cell-input" maxlength="100" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['状态'] || '' }}</span>
             </td>
             <td class="c-tester">
