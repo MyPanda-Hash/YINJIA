@@ -25,13 +25,20 @@ IF OBJECT_ID('rd_approval') IS NULL CREATE TABLE rd_approval (
 );
 ELSE IF COL_LENGTH('rd_approval','文档编号') IS NULL ALTER TABLE rd_approval ADD [文档编号] nvarchar(30) NOT NULL CONSTRAINT DF_rd_approval_docno DEFAULT N'YJ-XS002';
 GO
--- 恒空明细视图(doc 模式要求 line_table;立项申请无明细,查询取空集)
--- 注:doc 明细通用 SQL 会引用 asp_cancel/asp_user1 等审计列,恒空视图须补齐同名列,否则报「列名无效」207。
--- 旧版视图(仅 单据编号/两列)已部署库:请以管理员(-E)执行 DROP VIEW + 下方 CREATE VIEW 重建;
--- yinjia 账号无 DROP/ALTER 视图权限,脚本内仅负责首次创建。
-IF OBJECT_ID('v_rd_approval_detail') IS NULL EXEC('CREATE VIEW v_rd_approval_detail AS SELECT CAST(NULL AS nvarchar(60)) AS 单据编号, CAST(NULL AS int) AS id, CAST(NULL AS char(1)) AS asp_cancel, CAST(NULL AS nvarchar(50)) AS asp_user1, CAST(NULL AS nvarchar(50)) AS asp_user2, CAST(NULL AS datetime2) AS asp_time1, CAST(NULL AS datetime2) AS asp_time2 WHERE 1=0');
+-- 恒空明细表(doc 模式要求 line_table;立项申请无明细,查询取空集)。
+-- 注意:必须用物理空表而非视图——doc 保存会执行缺席软删 UPDATE(asp_cancel),视图含派生/常量域不可更新(报 4406)。
+-- 早前版本使用 v_rd_approval_detail 视图,已部署库请以管理员(-E)执行:
+--   DROP VIEW v_rd_approval_detail; EXEC('CREATE TABLE rd_approval_detail (id int IDENTITY(1,1) PRIMARY KEY, [单据编号] nvarchar(60) NULL, asp_cancel char(1) NULL DEFAULT N''N'', asp_user1 nvarchar(50) NULL, asp_user2 nvarchar(50) NULL, asp_time1 datetime2 NULL, asp_time2 datetime2 NULL)');
+IF OBJECT_ID('rd_approval_detail') IS NULL CREATE TABLE rd_approval_detail (
+  id int IDENTITY(1,1) PRIMARY KEY,
+  [单据编号] nvarchar(60) NULL,
+  asp_cancel char(1) NULL DEFAULT 'N',
+  asp_user1 nvarchar(50) NULL, asp_user2 nvarchar(50) NULL,
+  asp_time1 datetime2 NULL, asp_time2 datetime2 NULL
+);
 GO
-IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'RD_APPROVAL') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('RD_APPROVAL', N'立项申请', N'单据', 'doc', 'v_rd_approval_detail', 'rd_approval', N'单据编号', N'id', N'单据编号', N'LXA', N'单据日期', 20, 'items', N'研发管理');
+IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'RD_APPROVAL') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('RD_APPROVAL', N'立项申请', N'单据', 'doc', 'rd_approval_detail', 'rd_approval', N'单据编号', N'id', N'单据编号', N'LXA', N'单据日期', 20, 'items', N'研发管理');
+ELSE IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='RD_APPROVAL' AND line_table=N'rd_approval_detail') UPDATE yj_panel SET line_table=N'rd_approval_detail' WHERE panel_code='RD_APPROVAL';
 GO
 -- 表头字段(全部 header 位;文书特例里按截图排版渲染)
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'单据编号') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'单据编号', N'单据编号', N'文本', NULL, NULL, NULL, NULL, N'header', 10, 140, 0, 1, 0, 1);
