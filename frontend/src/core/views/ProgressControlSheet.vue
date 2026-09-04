@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
@@ -76,8 +76,8 @@
             <th class="c-content">{{ tt('内容') }}</th>
             <th class="c-grade">{{ tt('项目级') }}</th>
             <th class="c-owner">{{ tt('项目负责') }}</th>
-            <th class="c-progress">{{ tt('实施进度') }}</th>
-            <th class="c-mile">{{ tt('里程完成') }}</th>
+            <th class="c-progress">{{ tt('立项日期') }}</th>
+            <th class="c-mile">{{ tt('样件完成日期') }}</th>
             <th class="c-status">{{ tt('状态') }}</th>
             <th class="c-tester">{{ tt('测试员') }}</th>
             <th class="c-approve">{{ tt('谁来批准') }}</th>
@@ -137,14 +137,12 @@
               <span v-else class="ps-cell-text">{{ row['项目负责'] || '' }}</span>
             </td>
             <td class="c-progress">
-              <el-input v-if="editable" v-model="row['实施进度']" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['实施进度'] || '' }}</span>
+              <el-input v-if="editable" v-model="row['立项日期']" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row['立项日期'] || '' }}</span>
             </td>
             <td class="c-mile">
-              <el-select v-if="editable" v-model="row['里程完成']" size="small" :clearable="true" @change="emit('dirty')">
-                <el-option v-for="o in selectOptions('里程完成')" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-              <span v-else class="ps-cell-text">{{ row['里程完成'] || '' }}</span>
+              <el-input v-if="editable" v-model="row['样件完成日期']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row['样件完成日期'] || '' }}</span>
             </td>
             <td class="c-status">
               <el-select v-if="editable" v-model="row['状态']" size="small" :clearable="true" @change="emit('dirty')">
@@ -523,7 +521,7 @@ function removeItem(i) {
 .c-grade { width: 70px; }
 .c-owner { width: 78px; }
 .c-progress { width: 150px; }
-.c-mile { width: 78px; }
+.c-mile { width: 110px; }
 .c-status { width: 96px; }
 .c-tester { width: 76px; }
 .c-approve { width: 76px; }
