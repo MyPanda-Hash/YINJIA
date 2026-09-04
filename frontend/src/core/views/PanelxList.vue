@@ -2462,7 +2462,10 @@ function onFormSaved() {
 // 刷新列表并定位到新单，在列表页直接内联填写（不跳转表单页/不弹新增弹窗）。
 async function directAdd() {
   try {
-    const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData: {}, buttonParam: {} })
+    // 规格书:新单一律带当前类型Tab的 规格书种类 —— 列表按类型过滤,缺分类会从当前页签消失
+    const formData = {}
+    if (panelCode.value === 'RD_SPEC_DOC' && specTypeTab.value) formData['规格书种类'] = specTypeTab.value
+    const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData, buttonParam: {} })
     const no = res && (res['编号'] || res.formNo)
     if (!no) return ElMessage.error('新增失败：未返回单据编号')
     await load() // 刷新列表（新单按创建时间倒序置顶）

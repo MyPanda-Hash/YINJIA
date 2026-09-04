@@ -108,6 +108,11 @@ public class ButtonService {
                 cols.put(def.groupCol(), no);
                 if (def.dateCol() != null) cols.put(def.dateCol(), LocalDate.now());
                 if (!split && def.codeCol() != null) cols.put(def.codeCol(), no);
+                // 空草稿也写入随表单提交的头字段(如 规格书种类):
+                // 规格书按类型页签过滤列表,不带分类的新单会从当前页签列表消失,导致"新增后无法填写"
+                for (Map.Entry<String, Object> e : labelsToCols(def.fieldsAt("header"), head).entrySet()) {
+                    if (!e.getKey().equals(def.groupCol())) cols.put(e.getKey(), e.getValue());
+                }
                 insertRow(table, cols, user);
                 return result(no, "草稿");
             }
