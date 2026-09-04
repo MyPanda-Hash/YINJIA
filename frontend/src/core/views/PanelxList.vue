@@ -92,6 +92,9 @@
         <el-input v-else v-model="condition[qr.dataName]" :placeholder="qr.placeholder || ''" @keyup.enter="search" clearable @clear="search" />
       </div>
     </div>
+    <template v-else-if="isApprovalDoc">
+      <ApprovalDocSheet :head="cur" :fields="headerFields" :editable="draftEditable" @dirty="markInlineDirty" />
+    </template>
     <div v-else class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
       <div class="field" v-for="field in headerFields" :key="headerFieldKey(field)">
         <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}</label>
@@ -266,7 +269,7 @@
       </el-table>
     </div>
 
-    <div v-else class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading && !isBomMasterPanel">
+    <div v-else-if="!isApprovalDoc" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading && !isBomMasterPanel">
       <!-- ══════════ 物料清单专用：父件表格 + 子件表格联动（BOM/BOM_FWD/BOM_REV） ══════════ -->
       <BomMasterDetail
         v-if="isBomMasterPanel"
@@ -652,6 +655,7 @@ import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import SubBomDialog from './SubBomDialog.vue'
 import BomMasterDetail from './BomMasterDetail.vue'
+import ApprovalDocSheet from './ApprovalDocSheet.vue'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import VoucherFormDialog from './VoucherFormDialog.vue'
@@ -680,6 +684,21 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 
 // 物料清单维护和正反向查询统一使用父件/子件主从视图；仅 BOM 草稿开放编辑。
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
+// 立项申请表(二三级项目):文书式特例面板,内容区按《立项申请表》模板排版(ApprovalDocSheet)
+const isApprovalDoc = computed(() => panelCode.value === 'RD_APPROVAL')
+// 文书默认值:新建起草时 申请立项人=当前用户 / 申请立项日期=今天(用户可改,不置脏)
+function todayStr() {
+  const d = new Date()
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+}
+watch(
+  () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
+  () => {
+    if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
+    if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
+    if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
+  },
+)
 const bomMasterRows = computed(() => {
   if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
   return list.value || [] // BOM_FWD/BOM_REV：后端返回的展平行（父件-子件对）
