@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
@@ -72,17 +72,17 @@
             <th class="c-level">{{ tt('项目等级') }}</th>
             <th class="c-name">{{ tt('项目名称') }}</th>
             <th class="c-sub">{{ tt('子项目/尺寸') }}</th>
-            <th class="c-remark">{{ tt('说明') }}</th>
+            <th class="c-remark">{{ tt('项目编号') }}</th>
             <th class="c-content">{{ tt('内容') }}</th>
-            <th class="c-grade">{{ tt('项目级') }}</th>
-            <th class="c-owner">{{ tt('项目负责') }}</th>
+            <th class="c-grade">{{ tt('项目发起人') }}</th>
+            <th class="c-owner">{{ tt('项目负责人') }}</th>
             <th class="c-progress">{{ tt('立项日期') }}</th>
-            <th class="c-mile">{{ tt('样件完成日期') }}</th>
+            <th class="c-mile">{{ tt('预计完成日期') }}</th>
             <th class="c-status">{{ tt('状态') }}</th>
-            <th class="c-tester">{{ tt('测试员') }}</th>
-            <th class="c-approve">{{ tt('谁来批准') }}</th>
-            <th class="c-inspect">{{ tt('谁来检验') }}</th>
-            <th class="c-reason">{{ tt('未批准原因') }}</th>
+            <th class="c-tester">{{ tt('测试情况') }}</th>
+            <th class="c-approve">{{ tt('技术目标达成') }}</th>
+            <th class="c-inspect">{{ tt('是否市场转化') }}</th>
+            <th class="c-reason">{{ tt('未转换原因') }}</th>
             <th v-if="editable" class="c-op"></th>
           </tr>
         </thead>
@@ -121,48 +121,48 @@
               <span v-else class="ps-cell-text">{{ row['子项目/尺寸'] || '' }}</span>
             </td>
             <td class="c-remark">
-              <el-input v-if="editable" v-model="row['说明']" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['说明'] || '' }}</span>
+              <el-input v-if="editable" v-model="row['项目编号']" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row['项目编号'] || '' }}</span>
             </td>
             <td class="c-content">
               <el-input v-if="editable" v-model="row['内容']" size="small" class="ps-cell-input" maxlength="500" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['内容'] || '' }}</span>
             </td>
             <td class="c-grade">
-              <el-input v-if="editable" v-model="row['项目级']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['项目级'] || '' }}</span>
+              <el-input v-if="editable" v-model="row['项目发起人']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row['项目发起人'] || '' }}</span>
             </td>
             <td class="c-owner">
-              <el-input v-if="editable" v-model="row['项目负责']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['项目负责'] || '' }}</span>
+              <el-input v-if="editable" v-model="row['项目负责人']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row['项目负责人'] || '' }}</span>
             </td>
             <td class="c-progress">
               <el-input v-if="editable" v-model="row['立项日期']" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['立项日期'] || '' }}</span>
             </td>
             <td class="c-mile">
-              <el-input v-if="editable" v-model="row['样件完成日期']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['样件完成日期'] || '' }}</span>
+              <el-input v-if="editable" v-model="row['预计完成日期']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row['预计完成日期'] || '' }}</span>
             </td>
             <td class="c-status">
               <el-input v-if="editable" v-model="row['状态']" size="small" class="ps-cell-input" maxlength="100" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row['状态'] || '' }}</span>
             </td>
             <td class="c-tester">
-              <el-input v-if="editable" v-model="row['测试员']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['测试员'] || '' }}</span>
+              <el-input v-if="editable" v-model="row['测试情况']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row['测试情况'] || '' }}</span>
             </td>
             <td class="c-approve">
-              <el-input v-if="editable" v-model="row['谁来批准']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['谁来批准'] || '' }}</span>
+              <el-input v-if="editable" v-model="row['技术目标达成']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row['技术目标达成'] || '' }}</span>
             </td>
             <td class="c-inspect">
-              <el-input v-if="editable" v-model="row['谁来检验']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['谁来检验'] || '' }}</span>
+              <el-input v-if="editable" v-model="row['是否市场转化']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row['是否市场转化'] || '' }}</span>
             </td>
             <td class="c-reason">
-              <el-input v-if="editable" v-model="row['未批准原因']" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['未批准原因'] || '' }}</span>
+              <el-input v-if="editable" v-model="row['未转换原因']" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row['未转换原因'] || '' }}</span>
             </td>
             <td v-if="editable" class="c-op">
               <span class="ps-addrow" :title="tt('在该项目后新增子项目')" @click="insertAfter(i)">＋</span>
