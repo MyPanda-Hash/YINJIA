@@ -552,12 +552,11 @@ export const recordSheetConfigs = {
           { key: '冷却参数设置', span: 8 },
         ]},
         { grid: [
-          { label: '' },
+          { label: '脱模', rowspan: 4 },
           { label: '长度要求', cap: true, span: 6 },
           { label: '重量要求', cap: true, span: 4 },
         ]},
         { grid: [
-          { label: '脱模', rowspan: 3 },
           { label: '最短长度mm', span: 2 },
           { key: '最短长度mm', span: 4 },
           { label: '最低重量g', span: 2 },
