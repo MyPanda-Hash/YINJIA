@@ -139,23 +139,25 @@
           <div class="as-no">{{ row.num }}</div>
           <div class="as-name">{{ tt(row.label) }}</div>
           <div class="as-fill">
-            <div v-for="(ph, pi) in row.phases" :key="ph.key" v-if="!phaseHidden[pi]" class="as-phase">
-              <div class="as-phase-head">
-                <span class="as-phase-title">{{ tt('阶段') }}{{ ph.num }}</span>
-                <span class="as-phase-toggle" @click.stop="phaseHidden[pi] = true">{{ tt('隐藏') }}</span>
+            <template v-for="(ph, pi) in row.phases" :key="ph.key">
+              <div v-if="!phaseHidden[pi]" class="as-phase">
+                <div class="as-phase-head">
+                  <span class="as-phase-title">{{ tt('阶段') }}{{ ph.num }}</span>
+                  <span class="as-phase-toggle" @click.stop="phaseHidden[pi] = true">{{ tt('隐藏') }}</span>
+                </div>
+                <el-input
+                  v-if="editable"
+                  v-model="head[ph.key]"
+                  type="textarea"
+                  rows="2"
+                  :maxlength="ph.max || 500"
+                  class="as-fill-input as-fill-area"
+                  resize="none"
+                  @input="emit('dirty')"
+                />
+                <div v-else class="as-ro-text">{{ head[ph.key] || '' }}</div>
               </div>
-              <el-input
-                v-if="editable"
-                v-model="head[ph.key]"
-                type="textarea"
-                rows="2"
-                :maxlength="ph.max || 500"
-                class="as-fill-input as-fill-area"
-                resize="none"
-                @input="emit('dirty')"
-              />
-              <div v-else class="as-ro-text">{{ head[ph.key] || '' }}</div>
-            </div>
+            </template>
             <div v-if="Object.values(phaseHidden).filter(Boolean).length" class="as-phase-restore" @click.stop="phaseHidden = {}">
               {{ tt('显示全部') }}（{{ row.phases.length }}）
             </div>
