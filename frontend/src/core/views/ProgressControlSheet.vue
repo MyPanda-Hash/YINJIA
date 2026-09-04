@@ -88,9 +88,9 @@
         </thead>
         <tbody>
           <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
-            <td v-if="editable || isLevelHead(i)" class="c-level" :rowspan="editable ? 1 : levelSpan(i)">
+            <td v-if="isLevelHead(i)" class="c-level" :rowspan="levelSpan(i)">
               <el-select
-                v-if="editable && isGroupHead(i)"
+                v-if="editable"
                 :model-value="row['项目等级']"
                 size="small"
                 :clearable="false"
@@ -98,7 +98,6 @@
               >
                 <el-option v-for="o in selectOptions('项目等级')" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <span v-else-if="editable" class="ps-cell-text">{{ row['项目等级'] || '' }}</span>
               <span v-else class="ps-level-block">{{ row['项目等级'] || '' }}</span>
             </td>
             <td v-if="isGroupHead(i)" class="c-name" :rowspan="groupSpan(i)">
@@ -493,10 +492,10 @@ function removeItem(i) {
   font-weight: 600;
   word-break: break-all;
 }
-/* 项目等级合并块:同级归类只显示一个名字,放大居中 */
+/* 项目等级合并块:同级归入同一等级目录只显示一次,深灰蓝底白字,放大居中 */
 .ps-table td.c-level {
-  background: #d9ecfb;
-  color: #1f5fa8;
+  background: #7890ab;
+  color: #fff;
   vertical-align: middle;
   text-align: center;
 }
@@ -506,6 +505,17 @@ function removeItem(i) {
   font-size: 18px;
   font-weight: 700;
   word-break: break-all;
+}
+/* 编辑态等级块内下拉底色透明(与块色调和) */
+.ps-table td.c-level :deep(.el-select__wrapper) {
+  background: transparent;
+  box-shadow: none !important;
+  border: none;
+}
+.ps-table td.c-level :deep(.el-select__selected-item) {
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
 }
 .c-sub { width: 120px; }
 .c-remark { width: 130px; }
