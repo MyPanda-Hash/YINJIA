@@ -681,11 +681,11 @@ export const recordSheetConfigs = {
         { pairs: [
           { label: '主要性能', key: '主要性能', type: 'text', vspan: 2 },
           { label: '滤芯尺寸', key: '滤芯尺寸', type: 'text', vspan: 2 },
-          { label: '授权使用人', key: '授权使用人', type: 'text', lspan: 2, vspan: 2 },
+          { label: '授权使用人', key: '授权使用人', type: 'text', lspan: 2, vspan: 2, rowspan: 2 },
         ]},
         { pairs: [
           { label: '编写人', key: '编写人', type: 'text', vspan: 2 },
-          { label: '审核人', key: '审核人', type: 'text', vspan: 6 },
+          { label: '审核人', key: '审核人', type: 'text', vspan: 2 },
         ]},
       ]},
     ],

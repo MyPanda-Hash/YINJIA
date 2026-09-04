@@ -55,14 +55,14 @@
         <template v-for="(row, ri) in sec.rows" :key="'pr' + ri">
           <tr v-if="row.pairs">
             <template v-for="(pair, pi) in row.pairs" :key="'p' + pi">
-              <td class="rs-td rs-label" :colspan="pair.lspan || 1">{{ tt(pair.label) }}</td>
+              <td class="rs-td rs-label" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
               <template v-if="pair.cells">
-                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1">
+                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" />
                   <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
                 </td>
               </template>
-              <td v-else class="rs-td" :colspan="pair.vspan || 1">
+              <td v-else class="rs-td" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
                 <el-select v-if="editable && pair.type === 'select'" v-model="head[pair.key]" size="small" :clearable="false" @change="emit('dirty')">
                   <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
