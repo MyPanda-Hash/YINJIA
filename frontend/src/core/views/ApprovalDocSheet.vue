@@ -96,7 +96,8 @@
         <div class="as-no">{{ sec.num }}</div>
         <div class="as-name">{{ tt(sec.label) }}</div>
         <div class="as-fill">
-          <div v-if="sec.max" class="as-limit" :title="tt('可写') + sec.max + tt('字')">{{ sec.max }}{{ tt(sec.suffix || '') }}</div>
+          <!-- 可写字数仅编辑态右上角浅灰标识;只读/打印态不出现 -->
+          <div v-if="editable && sec.max" class="as-limit" :title="tt('可写') + sec.max + tt('字')">{{ sec.max }}{{ tt('字') }}</div>
           <el-input
             v-if="editable && sec.kind === 'input'"
             v-model="head[sec.key]"
@@ -169,17 +170,17 @@ const props = defineProps({
 })
 const emit = defineEmits(['dirty'])
 
-/** 内容区行定义:num 序号 / label 字段标签(即数据键) / max 可写字数(0=不限,不显示提示) /
- *  suffix 上限后缀(仅立项背景为"汉字") / h 行高(对齐原图模板) / kind 控件类型 */
+/** 内容区行定义:num 序号 / label 字段标签(即数据键) / max 可写字数(0=不限,无标识;
+ *  标识仅编辑态右上角浅灰小字,只读/打印不出现) / h 行高(对齐原图模板) / kind 控件类型 */
 const sections = [
-  { num: '一', label: '客户名', key: '客户名', max: 0, suffix: '', h: 47, kind: 'input' },
-  { num: '二', label: '立项背景', key: '立项背景', max: 250, suffix: '汉字', h: 96, kind: 'textarea' },
-  { num: '三', label: '机型及应用位置', key: '机型及应用位置', max: 50, suffix: '', h: 58, kind: 'textarea' },
-  { num: '四', label: '滤芯/炭棒规格或结构', key: '滤芯/炭棒规格或结构', max: 100, suffix: '', h: 71, kind: 'textarea' },
-  { num: '五', label: '项目开发目标', key: '项目开发目标', max: 250, suffix: '', h: 155, kind: 'textarea' },
-  { num: '六', label: '项目输出', key: '项目输出', max: 100, suffix: '', h: 97, kind: 'textarea' },
-  { num: '七', label: '开发周期要求', key: '开发周期要求', max: 50, suffix: '', h: 45, kind: 'textarea' },
-  { num: '八', label: '其它要求', key: '其它要求', max: 250, suffix: '', h: 132, kind: 'textarea' },
+  { num: '一', label: '客户名', key: '客户名', max: 0, h: 47, kind: 'input' },
+  { num: '二', label: '立项背景', key: '立项背景', max: 250, h: 96, kind: 'textarea' },
+  { num: '三', label: '机型及应用位置', key: '机型及应用位置', max: 50, h: 58, kind: 'textarea' },
+  { num: '四', label: '滤芯/炭棒规格或结构', key: '滤芯/炭棒规格或结构', max: 100, h: 71, kind: 'textarea' },
+  { num: '五', label: '项目开发目标', key: '项目开发目标', max: 250, h: 155, kind: 'textarea' },
+  { num: '六', label: '项目输出', key: '项目输出', max: 100, h: 97, kind: 'textarea' },
+  { num: '七', label: '开发周期要求', key: '开发周期要求', max: 50, h: 45, kind: 'textarea' },
+  { num: '八', label: '其它要求', key: '其它要求', max: 250, h: 132, kind: 'textarea' },
 ]
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
@@ -338,15 +339,18 @@ function selectOptions(key) {
 .as-fill {
   flex: 1;
   min-width: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
   padding: 3px 6px;
 }
 .as-limit {
-  font-size: 13px;
-  color: #333;
-  line-height: 20px;
-  padding-left: 2px;
+  position: absolute;
+  top: 4px;
+  right: 9px;
+  font-size: 11px;
+  line-height: 1;
+  color: #b7bfca;
 }
 .as-fill-input {
   flex: 1;
