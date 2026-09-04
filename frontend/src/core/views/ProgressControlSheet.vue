@@ -61,41 +61,7 @@
       </div>
     </div>
 
-    <!-- ③ 项目选择条:项目名称(可填/可参照实施计划并带回内容)+ 项目(一/二级) -->
-    <div class="ps-select-row">
-      <span class="ps-select-label">{{ tt('项目名称') }}</span>
-      <el-select
-        v-if="editable"
-        v-model="head['项目名称']"
-        filterable
-        allow-create
-        default-first-option
-        clearable
-        size="small"
-        class="ps-select-name"
-        :loading="refLoading"
-        placeholder=""
-        @change="onPickProject"
-        @input="emit('dirty')"
-      >
-        <el-option v-for="o in refOptions" :key="o" :label="o" :value="o" />
-      </el-select>
-      <span v-else class="ps-select-text">{{ head['项目名称'] || '' }}</span>
-      <span class="ps-select-label">{{ tt('项目(一/二级)') }}</span>
-      <el-select
-        v-if="editable"
-        v-model="head['项目(一/二级)']"
-        size="small"
-        class="ps-select-level"
-        :clearable="false"
-        @change="emit('dirty')"
-      >
-        <el-option v-for="o in selectOptions('项目(一/二级)')" :key="o.value" :label="o.label" :value="o.value" />
-      </el-select>
-      <span v-else class="ps-select-text">{{ head['项目(一/二级)'] || '' }}</span>
-    </div>
-
-    <!-- ④ 项目定级原则说明段(打印/导出保留,原图固定文本) -->
+    <!-- ③ 项目定级原则说明段(打印/导出保留,原图固定文本) -->
     <div class="ps-principle">{{ tt('项目定级原则') }}：1. 二级项目=形成B级客户或该产品一年内有望给经济收益、对应技术产品有重大推广价值、部分对客户新品有重大影响的项目；2. 三级项目=针对小批量订单或客户有较大需求、能够为下一年下半年带来显著收益的项目；3. 四级项目=单机项目（型试验单）。</div>
 
     <!-- ⑤ 主从控制表 -->
@@ -136,7 +102,21 @@
               <span v-else class="ps-cell-text">{{ head['项目(一/二级)'] || '' }}</span>
             </td>
             <td class="c-name">
-              <span v-if="i === 0" class="ps-cell-text">{{ head['项目名称'] || '' }}</span>
+              <el-select
+                v-if="i === 0 && editable"
+                v-model="head['项目名称']"
+                filterable
+                allow-create
+                default-first-option
+                clearable
+                size="small"
+                :loading="refLoading"
+                @change="onPickProject"
+                @input="emit('dirty')"
+              >
+                <el-option v-for="o in refOptions" :key="o" :label="o" :value="o" />
+              </el-select>
+              <span v-else-if="i === 0" class="ps-cell-text">{{ head['项目名称'] || '' }}</span>
             </td>
             <td class="c-sub">
               <el-input v-if="editable" v-model="row['子项目/尺寸']" size="small" class="ps-cell-input" maxlength="100" @input="emit('dirty')" />
@@ -400,35 +380,6 @@ function removeItem(i) {
   font-size: 13px;
 }
 
-/* ═══ ③ 项目选择条 ═══ */
-.ps-select-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 14px;
-  border-bottom: 1px solid #8a8a8a;
-  background: #fbfcfe;
-}
-.ps-select-label {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1f5fa8;
-  white-space: nowrap;
-}
-.ps-select-label::after {
-  content: '：';
-}
-.ps-select-name {
-  width: 300px;
-}
-.ps-select-level {
-  width: 120px;
-}
-.ps-select-text {
-  font-size: 14px;
-  color: #222;
-}
-
 /* ═══ ④ 原则说明段(浅粉底) ═══ */
 .ps-principle {
   padding: 6px 14px;
@@ -457,23 +408,21 @@ function removeItem(i) {
   font-size: 12.5px;
 }
 .ps-table th {
-  background: #29b8f0;
-  color: #fff;
+  background: #b9dbf8;
+  color: #1f5fa8;
   font-weight: 600;
   text-align: center;
   line-height: 1.4;
+  text-decoration: underline;
 }
 .ps-table td {
   background: #fff;
-  height: 26px;
-}
-.ps-table tr.grp-first td {
-  background: #f2fafe;
+  height: 24px;
 }
 .ps-table tr:hover td {
   background: #f7fbff;
 }
-.c-level { width: 84px; }
+.c-level { width: 70px; }
 .c-name { width: 150px; }
 .c-sub { width: 120px; }
 .c-remark { width: 130px; }
@@ -576,6 +525,18 @@ function removeItem(i) {
   body.approval-printing .ps-add,
   body.approval-printing .ps-del {
     display: none !important;
+  }
+  /* 打印按纸张自适应(取消固定宽表),字号压缩 */
+  body.approval-printing .ps-scroll {
+    overflow: visible !important;
+  }
+  body.approval-printing .ps-table {
+    min-width: 100% !important;
+  }
+  body.approval-printing .ps-table th,
+  body.approval-printing .ps-table td {
+    font-size: 11px !important;
+    padding: 2px 4px !important;
   }
   @page {
     margin: 8mm;
