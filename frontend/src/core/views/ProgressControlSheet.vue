@@ -91,31 +91,30 @@
             <td class="c-level">
               <el-select
                 v-if="isGroupHead(i) && editable"
-                v-model="row['项目(一/二级)']"
+                :model-value="row['项目(一/二级)']"
                 size="small"
                 :clearable="false"
-                @change="emit('dirty')"
+                @change="changeGroupLevel(i, $event)"
               >
                 <el-option v-for="o in selectOptions('项目(一/二级)')" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
               <span v-else class="ps-cell-text">{{ row['项目(一/二级)'] || '' }}</span>
             </td>
-            <td class="c-name">
+            <td v-if="isGroupHead(i)" class="c-name" :rowspan="groupSpan(i)">
               <el-select
-                v-if="isGroupHead(i) && editable"
-                v-model="row['项目名称']"
+                v-if="editable"
+                :model-value="row['项目名称']"
                 filterable
                 allow-create
                 default-first-option
                 clearable
                 size="small"
                 :loading="refLoading"
-                @change="onPickProject(row)"
-                @input="emit('dirty')"
+                @change="changeGroupName(i, $event)"
               >
                 <el-option v-for="o in refOptions" :key="o" :label="o" :value="o" />
               </el-select>
-              <span v-else-if="isGroupHead(i)" class="ps-cell-text">{{ row['项目名称'] || '' }}</span>
+              <span v-else class="ps-cell-text ps-name-block">{{ row['项目名称'] || '' }}</span>
             </td>
             <td class="c-sub">
               <el-input v-if="editable" v-model="row['子项目/尺寸']" size="small" class="ps-cell-input" maxlength="100" @input="emit('dirty')" />
@@ -232,9 +231,31 @@ async function loadRefOptions() {
 onMounted(loadRefOptions)
 watch(() => props.editable, (v) => { if (v) loadRefOptions() })
 
-/** 选项目实施计划项目(组首行):带回实施计划同名字段到表头(隐藏保留),组名写回当前行 */
-function onPickProject(row) {
-  const v = row && row['项目名称']
+// ---------- 项目(组)/子项目 行增删 ----------
+/** 组首行:与上一行项目名称不同(或首行) → 显示 项目名称/层级 输入,否则并入上一组 */
+function isGroupHead(i) {
+  if (i <= 0) return true
+  return items.value[i]?.['项目名称'] !== items.value[i - 1]?.['项目名称']
+}
+/** 组内行数(名称列 rowspan 合并铺满整组;空名称新组不合并) */
+function groupSpan(i) {
+  if (!isGroupHead(i)) return 0
+  const name = items.value[i]?.['项目名称']
+  if (!name) return 1
+  let n = 1
+  while (i + n < items.value.length && items.value[i + n]?.['项目名称'] === name) n++
+  return n
+}
+/** 组首行名称变更:同步组内同名行 + 选实施计划项目带回同名字段 */
+function changeGroupName(i, v) {
+  const row = items.value[i]
+  const old = row['项目名称']
+  row['项目名称'] = v
+  let j = i + 1
+  while (j < items.value.length && items.value[j]['项目名称'] === old) {
+    items.value[j]['项目名称'] = v
+    j++
+  }
   const found = refRows.value.find((r) => r['项目名称'] === v)
   if (found) {
     const keys = ['项目定级', '测试内容', '测试产品打样要求', '测试目标', '测试条件', '测试方法', '测试标准']
@@ -244,12 +265,14 @@ function onPickProject(row) {
   }
   emit('dirty')
 }
-
-// ---------- 项目(组)/子项目 行增删 ----------
-/** 组首行:与上一行项目名称不同(或首行) → 显示 项目名称/层级 输入,否则并入上一组 */
-function isGroupHead(i) {
-  if (i <= 0) return true
-  return items.value[i]?.['项目名称'] !== items.value[i - 1]?.['项目名称']
+/** 同步组内层级(组首行层级变更时) */
+function changeGroupLevel(i, v) {
+  const row = items.value[i]
+  row['项目(一/二级)'] = v
+  for (let j = i + 1; j < items.value.length && items.value[j]?.['项目名称'] === row['项目名称']; j++) {
+    items.value[j]['项目(一/二级)'] = v
+  }
+  emit('dirty')
 }
 /** 新增项目(文件面板内多个项目,每组一行起) */
 function addProject() {
@@ -439,6 +462,19 @@ function removeItem(i) {
 }
 .c-level { width: 70px; }
 .c-name { width: 150px; }
+/* 项目名称合并块:铺满组内子项目行,浅蓝底,文字顶部(对齐原图) */
+.ps-table td.c-name {
+  background: #d9ecfb;
+  color: #1f5fa8;
+  font-weight: 600;
+  vertical-align: top;
+  padding-top: 6px;
+}
+.ps-name-block {
+  display: inline-block;
+  width: 100%;
+  word-break: break-all;
+}
 .c-sub { width: 120px; }
 .c-remark { width: 130px; }
 .c-content { width: 150px; }
