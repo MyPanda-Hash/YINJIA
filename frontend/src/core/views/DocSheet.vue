@@ -149,7 +149,7 @@
                   v-if="editable"
                   v-model="head[ph.key]"
                   type="textarea"
-                  rows="2"
+                  :autosize="{ minRows: 2, maxRows: 20 }"
                   :maxlength="ph.max || 500"
                   class="as-fill-input as-fill-area"
                   resize="none"
