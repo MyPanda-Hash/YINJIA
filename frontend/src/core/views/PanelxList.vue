@@ -1081,8 +1081,8 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
-// 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用)
-const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整']
+// 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
+const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审']
 const approvalSideGroups = computed(() => toolbarGroups.value
   .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => !APPROVAL_SIDE_EXCLUDE.includes(a)) }))
   .filter((g) => (g.actions || []).length))

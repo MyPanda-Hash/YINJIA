@@ -364,8 +364,9 @@ function selectOptions(key) {
   word-break: break-all;
   padding: 2px 4px;
 }
+/* 装饰列:250px 与上方信息表/文档编号竖线(690px 处)精确对齐 */
 .as-deco {
-  width: 245px;
+  width: 250px;
   flex: none;
   border-left: 3px dotted #9a9a9a;
 }
