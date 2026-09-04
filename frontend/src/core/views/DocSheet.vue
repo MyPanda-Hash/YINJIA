@@ -546,6 +546,13 @@ function selectOptions(key) {
   body.approval-printing .approval-sheet svg {
     display: none !important;
   }
+  /* 阶段框标识(阶段N/隐藏/显示全部)仅为编辑标识,导出/打印不出现 */
+  body.approval-printing .as-phase-title,
+  body.approval-printing .as-phase-toggle,
+  body.approval-printing .as-phase-restore,
+  body.approval-printing .as-hint {
+    display: none !important;
+  }
   @page {
     margin: 8mm;
   }
