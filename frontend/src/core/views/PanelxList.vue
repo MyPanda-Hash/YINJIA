@@ -3373,24 +3373,31 @@ onUnmounted(() => {
   padding-right: 6px;
 }
 
-/* ═══════ 文书式面板:完整纸张居中 + 右侧悬浮操作栏(卡片式) ═══════ */
+/* ═══════ 文书式面板:纸张自适应 + 右侧固定侧边栏(布局流,不悬浮) ═══════ */
 .approval-layout {
-  position: relative;
+  display: flex;
+  align-items: flex-start;
   min-height: 560px;
-  padding-right: 196px;
+  padding-right: 0;
+}
+.approval-layout :deep(.approval-sheet),
+.approval-layout :deep(.progress-sheet) {
+  flex: 1;
+  min-width: 0;
 }
 .approval-side {
-  position: fixed;
-  top: 14px;
-  right: 16px;
-  width: 172px;
-  max-height: calc(100vh - 28px);
+  position: sticky;
+  top: 0;
+  flex: none;
+  width: 176px;
+  max-height: 100vh;
   overflow-y: auto;
   overflow-x: hidden;
-  background: linear-gradient(180deg, #ffffff 0%, #f3f8fe 100%);
-  border: 1px solid #d9e6f5;
-  border-radius: 14px;
-  box-shadow: 0 8px 28px rgba(28, 79, 138, 0.18);
+  background: #fbfcfe;
+  border: none;
+  border-left: 1px solid #dfe7f0;
+  border-radius: 0;
+  box-shadow: none;
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -3404,7 +3411,7 @@ onUnmounted(() => {
   font-weight: 700;
   letter-spacing: 2px;
   text-align: center;
-  border-radius: 14px 14px 0 0;
+  border-radius: 0;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 .as-side-status-row {
