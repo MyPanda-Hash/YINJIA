@@ -2,123 +2,104 @@
   <!-- ═══════════════════════════════════════════════════════════════════
        数据记录表 7 张文书面板(RecordSheetPanels)——按《04数据记录表.xlsx》一比一复刻
        覆盖:碱性/矿化/抑菌/阻垢性能/RO保护/浸泡安全/压降、精度
-       配置驱动:recordSheetConfigs.js(sections 条件区 + dataTables 两级表头 + conclusion)
+       配置驱动:recordSheetConfigs.js;整页共用一套列网格(cfg.grid=Excel 原表列宽),
+       报告头/条件区/数据表竖线全页对齐;数据键=字段 label(中文)
        特例块:碱性原水水质条 / 浸泡安全(浸泡液用量+仪器检出限) / 矿化(4 指标块+散点图)
-       数据键全部为字段 label(中文);保存/审批/打印复用引擎既有逻辑
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="record-sheet rsp-sheet">
-    <!-- ═══ 报告头:公司名 | 文档编号 ═══ -->
-    <table class="rs-t rs-head-t">
-      <colgroup><col style="width:auto" /><col style="width:300px" /></colgroup>
+    <!-- ═══ 报告头:公司名 | 文档编号(共享网格:公司跨 n-1 列,编号=末列) ═══ -->
+    <table class="rs-t rs-head-t" :style="{ width: gridW + 'px' }">
+      <colgroup><col v-for="(w, i) in cfg.grid" :key="'hc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
         <tr>
-          <td class="rs-td rs-company-cell">惠州市银嘉环保科技有限公司</td>
+          <td class="rs-td rs-company-cell" :colspan="nCols - 1">惠州市银嘉环保科技有限公司</td>
           <td class="rs-td rs-docno">
             <el-input v-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" @input="emit('dirty')" />
             <template v-else>{{ head['文档编号'] || head['单据编号'] || 'YJ-PD-01' }}</template>
           </td>
         </tr>
         <tr>
-          <td class="rs-td rs-topic-cell" rowspan="4">
+          <td class="rs-td rs-topic-cell" :colspan="cfg.head.title" rowspan="4">
             <el-input v-if="editable" v-model="head['测试主题']" size="small" class="rs-topic-input" :placeholder="tt(cfg.titlePlaceholder)" @input="emit('dirty')" />
             <span v-else class="rs-topic">{{ head['测试主题'] || cfg.titlePlaceholder }}</span>
           </td>
-          <td class="rs-td rs-info-cell">
-            <div class="rs-irow">
-              <span class="rs-ilabel">{{ tt('密级') }}</span>
-              <span class="rs-ivalue">
-                <el-select v-if="editable" v-model="head['密级']" size="small" :clearable="false" @change="emit('dirty')">
-                  <el-option v-for="o in selectOptions('密级')" :key="o.value" :label="o.label" :value="o.value" />
-                </el-select>
-                <template v-else>{{ head['密级'] || '' }}</template>
-              </span>
-            </div>
+          <td class="rs-td rs-info-label" :colspan="cfg.head.infoLabel">{{ tt('密级') }}</td>
+          <td class="rs-td rs-info-value" :colspan="cfg.head.infoValue">
+            <el-select v-if="editable" v-model="head['密级']" size="small" :clearable="false" @change="emit('dirty')">
+              <el-option v-for="o in selectOptions('密级')" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <template v-else>{{ head['密级'] || '' }}</template>
           </td>
         </tr>
         <tr>
-          <td class="rs-td rs-info-cell">
-            <div class="rs-irow">
-              <span class="rs-ilabel">{{ tt('适用范围') }}</span>
-              <span class="rs-ivalue">
-                <el-select v-if="editable" v-model="head['适用范围']" size="small" :clearable="false" @change="emit('dirty')">
-                  <el-option v-for="o in selectOptions('适用范围')" :key="o.value" :label="o.label" :value="o.value" />
-                </el-select>
-                <template v-else>{{ head['适用范围'] || '' }}</template>
-              </span>
-            </div>
+          <td class="rs-td rs-info-label" :colspan="cfg.head.infoLabel">{{ tt('适用范围') }}</td>
+          <td class="rs-td rs-info-value" :colspan="cfg.head.infoValue">
+            <el-select v-if="editable" v-model="head['适用范围']" size="small" :clearable="false" @change="emit('dirty')">
+              <el-option v-for="o in selectOptions('适用范围')" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <template v-else>{{ head['适用范围'] || '' }}</template>
           </td>
         </tr>
         <tr>
-          <td class="rs-td rs-info-cell">
-            <div class="rs-irow">
-              <span class="rs-ilabel">{{ tt('测试负责人') }}</span>
-              <span class="rs-ivalue">
-                <el-input v-if="editable" v-model="head['测试负责人']" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
-                <template v-else>{{ head['测试负责人'] || '' }}</template>
-              </span>
-            </div>
+          <td class="rs-td rs-info-label" :colspan="cfg.head.infoLabel">{{ tt('测试负责人') }}</td>
+          <td class="rs-td rs-info-value" :colspan="cfg.head.infoValue">
+            <el-input v-if="editable" v-model="head['测试负责人']" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+            <template v-else>{{ head['测试负责人'] || '' }}</template>
           </td>
         </tr>
         <tr>
-          <td class="rs-td rs-info-cell">
-            <div class="rs-irow">
-              <span class="rs-ilabel">{{ tt('报告编号') }}</span>
-              <span class="rs-ivalue">
-                <el-input v-if="editable" v-model="head['报告编号']" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
-                <template v-else>{{ head['报告编号'] || '' }}</template>
-              </span>
-            </div>
+          <td class="rs-td rs-info-label" :colspan="cfg.head.infoLabel">{{ tt('报告编号') }}</td>
+          <td class="rs-td rs-info-value" :colspan="cfg.head.infoValue">
+            <el-input v-if="editable" v-model="head['报告编号']" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+            <template v-else>{{ head['报告编号'] || '' }}</template>
           </td>
         </tr>
       </tbody>
     </table>
 
-    <!-- ═══ 条件区(1.基本信息 / 2.测试条件 / 3.测试对象信息…) ═══ -->
-    <table v-for="(sec, si) in cfg.sections" :key="'sec' + si" class="rs-t">
-      <colgroup>
-        <col style="width:170px" />
-        <col v-for="ci in secColCount(sec) - 1" :key="ci" style="width:auto" />
-      </colgroup>
+    <!-- ═══ 条件区(共享网格:标签=第1列,值跨其余列;与数据表竖线对齐) ═══ -->
+    <table v-for="(sec, si) in cfg.sections" :key="'sec' + si" class="rs-t" :style="{ width: gridW + 'px' }">
+      <colgroup><col v-for="(w, i) in cfg.grid" :key="'sc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
-        <tr><td :colspan="secColCount(sec)" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
+        <tr><td :colspan="nCols" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
         <tr v-for="(row, ri) in sec.rows" :key="'r' + ri">
           <td class="rs-td rs-label">{{ tt(row.label) }}</td>
-          <!-- 多值单元格(如 阻垢 特殊配方 1#/2#/3#):末格吃掉剩余列 -->
+          <!-- 多值单元格(如 阻垢 特殊配方 1#/2#/3#,Excel B:D/E:G/H:K 合并) -->
           <template v-if="row.cells">
-            <td v-for="(c, ci) in row.cells" :key="c.key" class="rs-td" :colspan="ci === row.cells.length - 1 ? Math.max(1, secColCount(sec) - row.cells.length) : 1">
+            <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
               <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
               <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
             </td>
           </template>
-          <td v-else class="rs-td" :colspan="secColCount(sec) - 1">
+          <td v-else class="rs-td" :colspan="nCols - 1">
             <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
             <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.tall ? 3 : 1, maxRows: 12 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt" :class="{ 'rsp-pre': row.tall }">{{ head[row.key] || '' }}</span>
           </td>
         </tr>
 
-        <!-- 特例:碱性 原水水质条件(6 指标条) -->
+        <!-- 特例:碱性 原水水质条件(6 指标格按 Excel C:D/E/F:H/I:J/K:L/M:N 跨网格列) -->
         <template v-if="sec.waterStrip">
           <tr>
             <td class="rs-td rs-label rsp-water-label" rowspan="2">{{ tt('原水水质条件') }}</td>
-            <td class="rs-td rsp-water-zone" :colspan="secColCount(sec) - 1">
+            <td class="rs-td rsp-water-zone" :colspan="nCols - 1">
               <table class="rs-inner">
+                <colgroup><col v-for="(w, i) in cfg.grid.slice(1)" :key="'wc' + i" :style="{ width: w + 'px' }" /></colgroup>
                 <tbody>
                   <tr>
-                    <td class="rs-ind-name">{{ tt('自来水') }}</td>
-                    <td class="rs-ind-name">{{ tt('超纯水') }}</td>
-                    <td class="rs-ind-name">{{ tt('RO纯水（水效水+RO机）') }}</td>
-                    <td class="rs-ind-name">{{ tt('PH') }}</td>
-                    <td class="rs-ind-name">{{ tt('TDS') }}</td>
-                    <td class="rs-ind-name">{{ tt('水温') }}</td>
+                    <td v-for="(cs, i) in cfg.waterColspans" :key="'wn' + i" :colspan="cs" class="rs-ind-name">{{ tt(waterNames[i]) }}</td>
                   </tr>
                   <tr>
-                    <td class="rs-water-val"><el-select v-if="editable" v-model="head['原水自来水']" size="small" :clearable="false" @change="emit('dirty')"><el-option v-for="o in selectOptions('原水自来水')" :key="o.value" :label="o.label" :value="o.value" /></el-select><template v-else>{{ head['原水自来水'] || '' }}</template></td>
-                    <td class="rs-water-val"><el-select v-if="editable" v-model="head['原水超纯水']" size="small" :clearable="false" @change="emit('dirty')"><el-option v-for="o in selectOptions('原水超纯水')" :key="o.value" :label="o.label" :value="o.value" /></el-select><template v-else>{{ head['原水超纯水'] || '' }}</template></td>
-                    <td class="rs-water-val"><el-select v-if="editable" v-model="head['原水RO纯水']" size="small" :clearable="false" @change="emit('dirty')"><el-option v-for="o in selectOptions('原水RO纯水')" :key="o.value" :label="o.label" :value="o.value" /></el-select><template v-else>{{ head['原水RO纯水'] || '' }}</template></td>
-                    <td class="rs-water-val"><el-input v-if="editable" v-model="head['原水PH']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['原水PH'] || '' }}</span></td>
-                    <td class="rs-water-val"><el-input v-if="editable" v-model="head['原水TDS']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['原水TDS'] || '' }}</span></td>
-                    <td class="rs-water-val"><el-input v-if="editable" v-model="head['水温']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['水温'] || '' }}</span></td>
+                    <td v-for="(cs, i) in cfg.waterColspans" :key="'wv' + i" :colspan="cs" class="rs-water-val">
+                      <template v-if="i < 3">
+                        <el-select v-if="editable" v-model="head[waterKeys[i]]" size="small" :clearable="false" @change="emit('dirty')"><el-option v-for="o in selectOptions(waterKeys[i])" :key="o.value" :label="o.label" :value="o.value" /></el-select>
+                        <template v-else>{{ head[waterKeys[i]] || '' }}</template>
+                      </template>
+                      <template v-else>
+                        <el-input v-if="editable" v-model="head[waterKeys[i]]" size="small" class="rs-c-in" @input="emit('dirty')" />
+                        <span v-else class="rs-txt">{{ head[waterKeys[i]] || '' }}</span>
+                      </template>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -126,71 +107,73 @@
           </tr>
         </template>
 
-        <!-- 特例:浸泡安全 浸泡液用量 + 测试用仪器/检出限 -->
+        <!-- 特例:浸泡安全 浸泡液用量 + 测试用仪器/检出限(值3/检出限跨2列,Excel F:G) -->
         <template v-if="sec.soakBlocks">
           <tr>
             <td class="rs-td rs-label rsp-water-label" rowspan="2">{{ tt('浸泡液用量') }}</td>
-            <td class="rs-td rs-label rsp-thin">{{ tt('炭棒尺寸') }}</td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head['炭棒尺寸（1）']" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['炭棒尺寸（1）'] || '' }}</span></td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head['炭棒尺寸（2）']" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['炭棒尺寸（2）'] || '' }}</span></td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head['炭棒尺寸（3）']" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['炭棒尺寸（3）'] || '' }}</span></td>
+            <td class="rs-td rs-label">{{ tt('炭棒尺寸') }}</td>
+            <td v-for="(cs, i) in cfg.soakColspans" :key="'sv' + i" class="rs-td" :colspan="cs">
+              <el-input v-if="editable" v-model="head[soakSizeKeys[i]]" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" />
+              <span v-else class="rs-txt">{{ head[soakSizeKeys[i]] || '' }}</span>
+            </td>
           </tr>
           <tr>
-            <td class="rs-td rs-label rsp-thin">{{ tt('浸泡液用量（ml）') }}</td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head['浸泡液用量（1）ml']" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['浸泡液用量（1）ml'] || '' }}</span></td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head['浸泡液用量（2）ml']" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['浸泡液用量（2）ml'] || '' }}</span></td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head['浸泡液用量（3）ml']" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head['浸泡液用量（3）ml'] || '' }}</span></td>
+            <td class="rs-td rs-label">{{ tt('浸泡液用量（ml）') }}</td>
+            <td v-for="(cs, i) in cfg.soakColspans" :key="'sv2' + i" class="rs-td" :colspan="cs">
+              <el-input v-if="editable" v-model="head[soakVolKeys[i]]" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" />
+              <span v-else class="rs-txt">{{ head[soakVolKeys[i]] || '' }}</span>
+            </td>
           </tr>
           <tr>
             <td class="rs-td rs-label rsp-water-label" rowspan="5">{{ tt('测试用仪器/检出限') }}</td>
-            <td class="rs-th rsp-thin">{{ tt('测试项目') }}</td>
+            <td class="rs-th">{{ tt('测试项目') }}</td>
             <td class="rs-th">{{ tt('仪器名称') }}</td>
             <td class="rs-th">{{ tt('品牌型号') }}</td>
-            <td class="rs-th">{{ tt('检出限') }}</td>
+            <td class="rs-th" :colspan="cfg.soakColspans[2]">{{ tt('检出限') }}</td>
           </tr>
           <tr v-for="it in soakInstrumentRows" :key="it.name">
             <td class="rs-td rsp-item-name">{{ tt(it.name) }}</td>
             <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[0]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[0]] || '' }}</span></td>
             <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[1]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[1]] || '' }}</span></td>
-            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[2]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[2]] || '' }}</span></td>
+            <td class="rs-td" :colspan="cfg.soakColspans[2]"><el-input v-if="editable" v-model="head[it.keys[2]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[2]] || '' }}</span></td>
           </tr>
         </template>
       </tbody>
     </table>
 
-    <!-- ═══ 数据记录表(支持子头行 + 两级表头;矿化 4 指标块各带散点图) ═══ -->
+    <!-- ═══ 数据记录表(共享网格;支持子头行+两级表头;矿化 4 指标块各带散点图) ═══ -->
     <div v-for="(dt, di) in cfg.dataTables" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
-        <table class="rs-t rs-dt">
+        <table class="rs-t rs-dt" :style="{ width: (gridW + (editable ? 60 : 0)) + 'px' }">
           <colgroup>
-            <col v-for="c in visCols(dt)" :key="c.key" :style="{ width: c.w + 'px' }" />
+            <col v-for="(w, i) in cfg.grid" :key="'dc' + i" :style="{ width: w + 'px' }" />
             <col v-if="editable" style="width:60px" />
           </colgroup>
           <tbody>
-            <tr v-if="dt.bar"><td :colspan="visCols(dt).length + (editable ? 1 : 0)" class="rs-sectionbar">{{ tt(dt.bar) }}</td></tr>
+            <tr v-if="dt.bar"><td :colspan="totalSpan(dt) + (editable ? 1 : 0)" class="rs-sectionbar">{{ tt(dt.bar) }}</td></tr>
             <tr v-if="dt.subHeads">
               <td v-for="(sh, shi) in spreadSubHeads(dt)" :key="'sh' + shi" :colspan="sh.span" class="rs-subhead">{{ tt(sh.label) }}</td>
               <td v-if="editable" class="rs-subhead"></td>
             </tr>
             <tr class="rs-grp">
               <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
-                <th v-if="g.kind === 'plain'" class="rs-th" :rowspan="hasGroup(dt) ? 2 : 1">{{ tt(g.label) }}</th>
+                <th v-if="g.kind === 'plain'" class="rs-th" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(g.label) }}</th>
                 <th v-else-if="g.kind === 'group'" class="rs-th" :colspan="g.span">{{ tt(g.label) }}</th>
               </template>
               <th v-if="editable" class="rs-th rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
             </tr>
             <tr v-if="hasGroup(dt)" class="rs-grp2">
-              <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th">{{ tt(c.label) }}</th>
+              <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th" :colspan="(c.span || 1) > 1 ? c.span : undefined">{{ tt(c.label) }}</th>
             </tr>
             <tr v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)">
-              <td v-for="c in visCols(dt)" :key="c.key" class="rs-td">
+              <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :colspan="(c.span || 1) > 1 ? c.span : undefined">
                 <el-input v-if="editable && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" @input="emit('dirty')" />
                 <el-input v-else-if="editable" v-model="row[c.key]" size="small" class="rs-c-in" @input="emit('dirty')" />
                 <span v-else class="rs-txt rsp-cell">{{ row[c.key] || ' / ' }}</span>
               </td>
               <td v-if="editable" class="rs-td rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
             </tr>
-            <tr v-if="!rowsOf(dt).length"><td :colspan="visCols(dt).length + (editable ? 1 : 0)" class="rs-empty">—</td></tr>
+            <tr v-if="!rowsOf(dt).length"><td :colspan="totalSpan(dt) + (editable ? 1 : 0)" class="rs-empty">—</td></tr>
           </tbody>
         </table>
         <div v-if="editable" class="rs-add" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
@@ -222,12 +205,13 @@
       </div>
     </div>
 
-    <!-- ═══ 结论区(Excel 无结论区的表不渲染) ═══ -->
-    <table v-if="cfg.conclusion" class="rs-t">
+    <!-- ═══ 结论区(共享网格;Excel 无结论区的表不渲染) ═══ -->
+    <table v-if="cfg.conclusion" class="rs-t" :style="{ width: gridW + 'px' }">
+      <colgroup><col v-for="(w, i) in cfg.grid" :key="'cc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
-        <tr><td colspan="3" class="rs-sectionbar">{{ tt(cfg.conclusion.bar) }}</td></tr>
+        <tr><td :colspan="nCols" class="rs-sectionbar">{{ tt(cfg.conclusion.bar) }}</td></tr>
         <tr>
-          <td class="rs-td rs-conclusion" colspan="3">
+          <td class="rs-td rs-conclusion" :colspan="nCols">
             <el-input v-if="editable" v-model="head[cfg.conclusion.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 12 }" size="small" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head[cfg.conclusion.key] || '' }}</span>
           </td>
@@ -251,6 +235,9 @@ const props = defineProps({
 const emit = defineEmits(['dirty'])
 
 const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
+const nCols = computed(() => (cfg.value?.grid || []).length)
+/** 网格总宽:所有表格显式用这个宽度,列分界线全页严格一致(数据表编辑态另加 60px 操作列) */
+const gridW = computed(() => (cfg.value?.grid || []).reduce((s, w) => s + w, 0))
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
 function selectOptions(key) {
@@ -259,7 +246,13 @@ function selectOptions(key) {
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
 }
 
-// 浸泡安全:仪器/检出限 4 行(PH/TDS/浊度/重金属)固定检测项目名 + 3 个可编辑字段
+// 碱性原水水质条:6 指标名与字段键(前3个 √/× 下拉,后3个文本)
+const waterNames = ['自来水', '超纯水', 'RO纯水（水效水+RO机）', 'PH', 'TDS', '水温']
+const waterKeys = ['原水自来水', '原水超纯水', '原水RO纯水', '原水PH', '原水TDS', '水温']
+
+// 浸泡安全:浸泡液用量块 + 仪器/检出限 4 行(PH/TDS/浊度/重金属)
+const soakSizeKeys = ['炭棒尺寸（1）', '炭棒尺寸（2）', '炭棒尺寸（3）']
+const soakVolKeys = ['浸泡液用量（1）ml', '浸泡液用量（2）ml', '浸泡液用量（3）ml']
 const soakInstrumentRows = [
   { name: 'PH', keys: ['仪器名称（PH）', '品牌型号（PH）', '检出限（PH）'] },
   { name: 'TDS', keys: ['仪器名称（TDS）', '品牌型号（TDS）', '检出限（TDS）'] },
@@ -277,16 +270,6 @@ function touch() {
   return d.items
 }
 
-// ── 条件区列数:默认 3(标签+2 值列);多值单元格行取 1+格数;浸泡安全特例块 5 列 ──
-function secColCount(sec) {
-  let n = 3
-  for (const r of sec.rows || []) {
-    if (r.cells) n = Math.max(n, 1 + r.cells.length)
-  }
-  if (sec.soakBlocks) n = Math.max(n, 5)
-  return n
-}
-
 // ── 数据记录表渲染 ──
 function visCols(dt) {
   return dt.cols.filter((c) => !c.hiddenCol)
@@ -297,23 +280,27 @@ function groupCols(dt) {
 function hasGroup(dt) {
   return groupCols(dt).length > 0
 }
-/** 一级表头:非 group 列(rowspan=2);group 列合并为一条(colspan=n) */
+/** 可见列的总跨度(网格列数口径) */
+function totalSpan(dt) {
+  return visCols(dt).reduce((s, c) => s + (c.span || 1), 0)
+}
+/** 一级表头:非 group 列(rowspan=2 仅当有两级表头);group 列合并为一条(colspan=成员跨度之和) */
 function headerRow1(dt) {
   const out = []
   for (const c of visCols(dt)) {
     if (!c.group) {
-      out.push({ kind: 'plain', label: c.label, key: c.key })
+      out.push({ kind: 'plain', label: c.label, span: c.span || 1, rowspan: hasGroup(dt) ? 2 : 1 })
     } else if (!out.length || out[out.length - 1].kind !== 'group' || out[out.length - 1].label !== c.group) {
-      out.push({ kind: 'group', label: c.group, span: 1 })
+      out.push({ kind: 'group', label: c.group, span: c.span || 1 })
     } else {
-      out[out.length - 1].span += 1
+      out[out.length - 1].span += c.span || 1
     }
   }
   return out
 }
-/** 子头行(碱性:口感测试/离子分析):按 cols 顺序铺 colspan */
+/** 子头行(碱性:口感测试/离子分析):按网格列跨度铺 colspan */
 function spreadSubHeads(dt) {
-  const total = visCols(dt).length
+  const total = totalSpan(dt)
   const out = []
   let used = 0
   for (const sh of dt.subHeads || []) {
@@ -399,17 +386,15 @@ function chartOf(dt) {
 </script>
 
 <style scoped>
-/* ═══ 纸张/表基础(与功能性滤效同一视觉语言) ═══ */
+/* ═══ 纸张/表基础(与功能性滤效同一视觉语言;宽度=网格列宽总和,竖线全页对齐) ═══ */
 .record-sheet {
-  width: 1180px;
-  max-width: 100%;
+  width: fit-content;
   margin: 16px auto 26px;
   background: #fff;
   font-size: 14px;
   color: #222;
 }
 .rs-t {
-  width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
 }
@@ -472,7 +457,7 @@ function chartOf(dt) {
   vertical-align: middle;
 }
 .rs-docno-input {
-  width: 160px;
+  width: 90%;
 }
 .rs-docno-input :deep(.el-input__inner) {
   text-align: right;
@@ -495,35 +480,17 @@ function chartOf(dt) {
 .rs-topic-input {
   width: 90%;
 }
-.rs-info-cell {
-  padding: 0 !important;
-  vertical-align: top !important;
-}
-.rs-irow {
-  display: flex;
-  border-bottom: 1px solid #7f7f7f;
-  min-height: 34px;
-}
-.rs-irow:last-child {
-  border-bottom: none;
-}
-.rs-ilabel {
-  width: 90px;
-  flex: none;
+.rs-info-label {
   background: #d9d9d9;
   text-align: center;
   font-size: 13px;
-  padding: 5px 4px;
-  border-right: 1px solid #7f7f7f;
+  padding: 6px 4px;
 }
-.rs-ivalue {
-  flex: 1;
-  padding: 5px 8px;
+.rs-info-value {
   font-size: 13px;
-  display: flex;
-  align-items: center;
+  padding: 4px 8px;
 }
-.rs-ivalue :deep(.el-select) {
+.rs-info-value :deep(.el-select) {
   width: 100%;
 }
 
@@ -569,17 +536,12 @@ function chartOf(dt) {
   text-align: center;
   font-size: 13px;
   color: #333;
-  min-width: 86px;
 }
 .rs-water-val {
   text-align: center;
-  min-width: 86px;
 }
 .rs-water-val :deep(.el-select) {
   width: 64px;
-}
-.rsp-thin {
-  width: 150px;
 }
 .rsp-item-name {
   text-align: center;
@@ -669,12 +631,11 @@ function chartOf(dt) {
   align-items: flex-start;
 }
 .rsp-dt-wrap.with-chart .rsp-dt-table {
-  flex: 0 0 56%;
-  min-width: 0;
+  flex: none;
 }
 .rsp-chart {
-  flex: 1;
-  min-width: 0;
+  flex: none;
+  width: 520px;
   border: 1px solid #b7b7b7;
   background: #fff;
   padding: 6px 4px 2px;
