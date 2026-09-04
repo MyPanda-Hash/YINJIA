@@ -3373,87 +3373,118 @@ onUnmounted(() => {
   padding-right: 6px;
 }
 
-/* ═══════ 文书式面板(立项申请):完整纸张居中 + 右侧竖排功能栏 ═══════ */
+/* ═══════ 文书式面板:完整纸张居中 + 右侧悬浮操作栏(卡片式) ═══════ */
 .approval-layout {
   position: relative;
   min-height: 560px;
-  padding-right: 172px;
+  padding-right: 196px;
 }
 .approval-side {
   position: fixed;
-  top: 12px;
-  right: 12px;
-  width: 150px;
-  max-height: calc(100vh - 24px);
+  top: 14px;
+  right: 16px;
+  width: 172px;
+  max-height: calc(100vh - 28px);
   overflow-y: auto;
-  background: #fff;
-  border: 1px solid #d9e2ec;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(13, 91, 211, 0.1);
-  padding: 10px;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, #ffffff 0%, #f3f8fe 100%);
+  border: 1px solid #d9e6f5;
+  border-radius: 14px;
+  box-shadow: 0 8px 28px rgba(28, 79, 138, 0.18);
+  padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   z-index: 20;
 }
 .as-side-title {
+  padding: 11px 14px;
+  background: linear-gradient(90deg, #1c4f8a 0%, #2f6db8 100%);
+  color: #fff;
   font-size: 14px;
   font-weight: 700;
+  letter-spacing: 2px;
   text-align: center;
-  color: #1c3d6e;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #e5ecf5;
+  border-radius: 14px 14px 0 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
 }
 .as-side-status-row {
   display: flex;
   justify-content: center;
+  padding: 9px 12px 4px;
 }
 .as-side-pager {
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 4px 12px 11px;
+  border-bottom: 1px solid #e5ecf5;
+}
+.approval-side .page-btn {
+  border-radius: 6px;
+  border-color: #cfdced;
+  background: #fff;
+  color: #44608a;
+}
+.approval-side .page-btn:hover {
+  border-color: #2f6db8;
+  background: #eaf3ff;
 }
 .as-side-btns {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  border-top: 1px solid #e5ecf5;
-  padding-top: 8px;
+  gap: 7px;
+  padding: 12px;
 }
 .as-side-btn {
   display: block;
   width: 100%;
-  padding: 7px 10px;
-  border: 1px solid #c9cfdb;
-  border-radius: 4px;
-  background: #f8fafc;
+  padding: 8px 10px;
+  border: 1px solid #cfe0f2;
+  border-radius: 9px;
+  background: #fff;
   color: #1c4f8a;
   font-size: 13px;
+  font-weight: 600;
   text-align: center;
   cursor: pointer;
   user-select: none;
+  box-shadow: 0 1px 3px rgba(28, 79, 138, 0.1);
+  transition: all 0.15s ease;
 }
 .as-side-btn:hover {
-  border-color: #0d5bd3;
+  background: #eaf3ff;
+  border-color: #2f6db8;
   color: #0d5bd3;
-  background: #f0f6ff;
+  transform: translateX(-3px);
+  box-shadow: 0 4px 10px rgba(28, 79, 138, 0.18);
 }
 .as-side-btn.sub {
-  background: #fbfcfe;
-  color: #48617f;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  color: #5a7590;
   font-size: 12px;
-  padding: 5px 10px;
+  font-weight: 500;
+  padding: 4px 10px;
+}
+.as-side-btn.sub:hover {
+  background: #eaf3ff;
+  transform: none;
+  box-shadow: none;
 }
 .as-side-btn.disabled {
   color: #b9c2ce;
-  border-color: #e2e7ef;
+  border-color: #e4ebf3;
   background: #f4f6f9;
+  box-shadow: none;
   cursor: not-allowed;
 }
 .as-side-btn.disabled:hover {
   color: #b9c2ce;
-  border-color: #e2e7ef;
+  border-color: #e4ebf3;
   background: #f4f6f9;
+  transform: none;
+  box-shadow: none;
 }
 /* 删除组 + 下拉 */
 .as-side-del {
@@ -3461,49 +3492,52 @@ onUnmounted(() => {
 }
 .as-side-btn-row {
   display: flex;
-  gap: 4px;
+  gap: 5px;
   align-items: stretch;
 }
 .as-side-caret {
-  width: 22px;
+  width: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #c9cfdb;
-  border-radius: 4px;
-  background: #f8fafc;
+  border: 1px solid #cfe0f2;
+  border-radius: 9px;
+  background: #fff;
   color: #1c4f8a;
   cursor: pointer;
   user-select: none;
   font-size: 9px;
+  box-shadow: 0 1px 3px rgba(28, 79, 138, 0.1);
+  transition: all 0.15s ease;
 }
 .as-side-caret:hover {
-  border-color: #0d5bd3;
+  border-color: #2f6db8;
   color: #0d5bd3;
-  background: #f0f6ff;
+  background: #eaf3ff;
 }
 .as-side-menu {
   position: absolute;
-  top: calc(100% + 4px);
+  top: calc(100% + 5px);
   left: 0;
-  min-width: 150px;
+  min-width: 156px;
   background: #fff;
-  border: 1px solid #d9e2ec;
-  border-radius: 6px;
-  box-shadow: 0 2px 10px rgba(13, 91, 211, 0.15);
+  border: 1px solid #d9e6f5;
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(28, 79, 138, 0.18);
   z-index: 30;
-  padding: 4px;
+  padding: 5px;
 }
 .as-side-menu-item {
-  padding: 7px 10px;
-  font-size: 12px;
+  padding: 8px 12px;
+  font-size: 12.5px;
   color: #1c4f8a;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: 7px;
   white-space: nowrap;
+  transition: background 0.12s ease;
 }
 .as-side-menu-item:hover {
-  background: #f0f6ff;
+  background: #eaf3ff;
 }
 
 /* ═══════ ② 表头字段区（label 在上、输入在下）═══════ */
