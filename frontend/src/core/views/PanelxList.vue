@@ -109,7 +109,7 @@
             <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
           </div>
           <div class="as-side-btns">
-            <template v-for="(g, gi) in toolbarGroups" :key="'sg' + gi">
+            <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
               <div
                 class="as-side-btn"
                 :class="{ disabled: isDisabled(btnName(g)) }"
@@ -1081,6 +1081,11 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
+// 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用)
+const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整']
+const approvalSideGroups = computed(() => toolbarGroups.value
+  .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => !APPROVAL_SIDE_EXCLUDE.includes(a)) }))
+  .filter((g) => (g.actions || []).length))
 const headerFields = computed(() => {
   const fields = (cfgCache.value?.dataSchema?.fields || []).filter((field) => !field.hidden)
   const names = cfgCache.value?.metadata?.panelPageDto?.formPages?.[0]?.fieldNames

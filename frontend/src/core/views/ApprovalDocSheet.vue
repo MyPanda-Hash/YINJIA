@@ -121,10 +121,10 @@
         <div class="as-deco"></div>
       </div>
 
-      <!-- ④ 底部签名 -->
+      <!-- ④ 底部签名(对齐原图:申请立项人 蓝格=序号列+项目名列 202px;两半按原图 53/47) -->
       <div class="as-sign-row">
-        <div class="as-sign-half">
-          <div class="as-sign-cell">{{ tt('申请立项人') }}</div>
+        <div class="as-sign-half as-sign-h1">
+          <div class="as-sign-cell as-sign-c1">{{ tt('申请立项人') }}</div>
           <div class="as-sign-val">
             <el-input
               v-if="editable"
@@ -137,8 +137,8 @@
             <template v-else>{{ head['申请立项人'] || '' }}</template>
           </div>
         </div>
-        <div class="as-sign-half">
-          <div class="as-sign-cell">{{ tt('申请立项日期') }}</div>
+        <div class="as-sign-half as-sign-h2">
+          <div class="as-sign-cell as-sign-c2">{{ tt('申请立项日期') }}</div>
           <div class="as-sign-val">
             <el-date-picker
               v-if="editable"
@@ -380,16 +380,19 @@ function selectOptions(key) {
 /* ═══ ④ 底部签名 ═══ */
 .as-sign-row {
   display: flex;
+  min-height: 54px;
 }
 .as-sign-half {
-  flex: 1;
   display: flex;
 }
-.as-sign-half + .as-sign-half {
+.as-sign-h1 {
+  flex: 0 0 53%;
+}
+.as-sign-h2 {
+  flex: 1;
   border-left: 1px solid #8a8a8a;
 }
 .as-sign-cell {
-  width: 150px;
   flex: none;
   background: #29b8f0;
   color: #fff;
@@ -399,6 +402,13 @@ function selectOptions(key) {
   justify-content: center;
   padding: 0 8px;
   text-align: center;
+}
+/* 申请立项人 蓝格与上部 序号列(52) + 项目名列(150) 对齐 */
+.as-sign-c1 {
+  width: 202px;
+}
+.as-sign-c2 {
+  width: 150px;
 }
 .as-sign-val {
   flex: 1;
