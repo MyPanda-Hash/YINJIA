@@ -279,7 +279,7 @@ public class QueryService {
                 String col = l2c.get(e.getKey());
                 Object v = e.getValue();
                 if (col == null || v == null || String.valueOf(v).isBlank()) continue;
-                where.append(" AND ").append(alias).append(".").append(col).append(" LIKE ?");
+                where.append(" AND ").append(alias).append(".[").append(col).append("] LIKE ?");
                 args.add("%" + v + "%");
             }
         }
@@ -287,7 +287,7 @@ public class QueryService {
             StringBuilder or = new StringBuilder();
             List<Object> kargs = new ArrayList<>();
             for (PanelRegistry.FieldDef f : def.fields()) {
-                or.append(or.length() > 0 ? " OR " : "").append(alias).append(".").append(f.col()).append(" LIKE ?");
+                or.append(or.length() > 0 ? " OR " : "").append(alias).append(".[").append(f.col()).append("] LIKE ?");
                 kargs.add("%" + keyword + "%");
             }
             if (or.length() > 0) {
@@ -335,7 +335,7 @@ public class QueryService {
             StringBuilder lineOr = new StringBuilder();
             List<Object> largs = new ArrayList<>();
             for (PanelRegistry.FieldDef f : lineFields) {
-                lineOr.append(lineOr.length() > 0 ? " OR " : "").append("x.").append(f.col()).append(" LIKE ?");
+                lineOr.append(lineOr.length() > 0 ? " OR " : "").append("x.[").append(f.col()).append("] LIKE ?");
                 largs.add("%" + keyword + "%");
             }
             where.append(" AND (");
