@@ -2,7 +2,7 @@
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
-       项目定级原则说明段/主从控制大表(项目(一/二级)|项目名称 + 子项目行,可增删)
+       项目定级原则说明段/主从控制大表(项目等级|项目名称 + 子项目行,可增删)
        项目名称可手填或选择项目实施计划(选中自动带回实施计划同名字段)
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="progress-sheet">
@@ -69,7 +69,7 @@
       <table class="ps-table">
         <thead>
           <tr>
-            <th class="c-level">{{ tt('项目(一/二级)') }}</th>
+            <th class="c-level">{{ tt('项目等级') }}</th>
             <th class="c-name">{{ tt('项目名称') }}</th>
             <th class="c-sub">{{ tt('子项目/尺寸') }}</th>
             <th class="c-remark">{{ tt('说明') }}</th>
@@ -88,17 +88,18 @@
         </thead>
         <tbody>
           <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
-            <td class="c-level">
+            <td v-if="editable || isLevelHead(i)" class="c-level" :rowspan="editable ? 1 : levelSpan(i)">
               <el-select
-                v-if="isGroupHead(i) && editable"
-                :model-value="row['项目(一/二级)']"
+                v-if="editable && isGroupHead(i)"
+                :model-value="row['项目等级']"
                 size="small"
                 :clearable="false"
                 @change="changeGroupLevel(i, $event)"
               >
-                <el-option v-for="o in selectOptions('项目(一/二级)')" :key="o.value" :label="o.label" :value="o.value" />
+                <el-option v-for="o in selectOptions('项目等级')" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <span v-else class="ps-cell-text">{{ row['项目(一/二级)'] || '' }}</span>
+              <span v-else-if="editable" class="ps-cell-text">{{ row['项目等级'] || '' }}</span>
+              <span v-else class="ps-level-block">{{ row['项目等级'] || '' }}</span>
             </td>
             <td v-if="isGroupHead(i)" class="c-name" :rowspan="groupSpan(i)">
               <el-select
@@ -237,6 +238,22 @@ function isGroupHead(i) {
   if (i <= 0) return true
   return items.value[i]?.['项目名称'] !== items.value[i - 1]?.['项目名称']
 }
+/** 等级头行:只读态相邻同级合并为一个"项目等级"块 */
+function isLevelHead(i) {
+  if (i <= 0) return true
+  const lv = items.value[i]?.['项目等级']
+  if (!lv) return true
+  return items.value[i - 1]?.['项目等级'] !== lv
+}
+/** 相邻同级行数(等级合并块) */
+function levelSpan(i) {
+  if (!isLevelHead(i)) return 0
+  const lv = items.value[i]?.['项目等级']
+  if (!lv) return 1
+  let n = 1
+  while (i + n < items.value.length && items.value[i + n]?.['项目等级'] === lv) n++
+  return n
+}
 /** 组内行数(名称列 rowspan 合并铺满整组;空名称新组不合并) */
 function groupSpan(i) {
   if (!isGroupHead(i)) return 0
@@ -268,9 +285,9 @@ function changeGroupName(i, v) {
 /** 同步组内层级(组首行层级变更时) */
 function changeGroupLevel(i, v) {
   const row = items.value[i]
-  row['项目(一/二级)'] = v
+  row['项目等级'] = v
   for (let j = i + 1; j < items.value.length && items.value[j]?.['项目名称'] === row['项目名称']; j++) {
-    items.value[j]['项目(一/二级)'] = v
+    items.value[j]['项目等级'] = v
   }
   emit('dirty')
 }
@@ -278,7 +295,7 @@ function changeGroupLevel(i, v) {
 function addProject() {
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
-  d.items.push({ '项目名称': '', '项目(一/二级)': '一二级' })
+  d.items.push({ '项目名称': '', '项目等级': '一二级' })
   emit('dirty')
 }
 /** 在当前子项目后插入同组新子项目(复制所属项目名称/层级) */
@@ -286,7 +303,7 @@ function insertAfter(i) {
   const d = props.head.detail
   if (!Array.isArray(d.items)) return
   const src = d.items[i] || {}
-  d.items.splice(i + 1, 0, { '项目名称': src['项目名称'], '项目(一/二级)': src['项目(一/二级)'] })
+  d.items.splice(i + 1, 0, { '项目名称': src['项目名称'], '项目等级': src['项目等级'] })
   emit('dirty')
 }
 function removeItem(i) {
@@ -462,17 +479,32 @@ function removeItem(i) {
 }
 .c-level { width: 70px; }
 .c-name { width: 150px; }
-/* 项目名称合并块:铺满组内子项目行,浅蓝底,文字顶部(对齐原图) */
+/* 项目名称合并块:铺满组内子项目行,浅蓝底,文字居中(对齐原图) */
 .ps-table td.c-name {
   background: #d9ecfb;
   color: #1f5fa8;
-  font-weight: 600;
-  vertical-align: top;
-  padding-top: 6px;
+  vertical-align: middle;
+  text-align: center;
 }
 .ps-name-block {
   display: inline-block;
   width: 100%;
+  font-size: 16px;
+  font-weight: 600;
+  word-break: break-all;
+}
+/* 项目等级合并块:同级归类只显示一个名字,放大居中 */
+.ps-table td.c-level {
+  background: #d9ecfb;
+  color: #1f5fa8;
+  vertical-align: middle;
+  text-align: center;
+}
+.ps-level-block {
+  display: inline-block;
+  width: 100%;
+  font-size: 18px;
+  font-weight: 700;
   word-break: break-all;
 }
 .c-sub { width: 120px; }
