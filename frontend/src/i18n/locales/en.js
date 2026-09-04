@@ -1004,5 +1004,17 @@ export default {
     '设备使用登记表': 'Equipment Usage Log',
     '仪器使用记录表': 'Instrument Usage Log',
     '基础档案': 'Master Data',
+    /* ── 实验室使用记录表 4 面板(RecordSheetPanels plain 版式)静态词条 ── */
+    '测试设备使用登记表': 'Test Equipment Usage Log',
+    '实验室仪器使用记录表': 'Lab Instrument Usage Log',
+    '试剂用量（g）': 'Reagents (g)',
+    '试剂用量': 'Reagents',
+    '加标水水质指标': 'Spike Water Quality',
+    '测试（检测）样品信息': 'Sample Info',
+    '申请单类型：': 'Request Type: ',
+    '测试项目：': 'Test Item: ',
+    '设备名称：': 'Equipment: ',
+    '仪器名称/型号：': 'Instrument / Model: ',
+    '请各位实验人员知悉：\n1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。\n2.态度恶劣者，实验室负责人将拒接该人员进入实验室。': 'Notice: 1. Users who fail to register will lose instrument access. 2. Misconduct may result in lab access denial.',
   },
 }

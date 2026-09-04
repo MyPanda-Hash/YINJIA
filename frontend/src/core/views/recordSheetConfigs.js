@@ -1,13 +1,20 @@
 /**
- * recordSheetConfigs.js — 数据记录表 7 张文书面板配置(碱性/矿化/抑菌/阻垢性能/RO保护/浸泡安全/压降、精度)
- * 按《04数据记录表.xlsx》逐表复刻;key = yj_field 的 label(中文数据键),由 RecordSheetPanels.vue 统一渲染。
+ * recordSheetConfigs.js — 文书面板配置(数据记录表 7 张 + 实验室使用记录表 4 张)
+ * 按各 Excel 原表逐表复刻;key = yj_field 的 label(中文数据键),由 RecordSheetPanels.vue 统一渲染。
  * 结构:
+ *   headMode —— 'report'(默认:公司名+大标题+右侧信息块的报告头) | 'plain'(标题条+副标题行的登记表版式)
  *   grid —— 整页共用列网格(Excel 原表各列宽度 px):报告头/条件区/数据表全部用这套列宽,竖线全页对齐
- *   head {title, infoLabel, infoValue} —— 报告头三段列跨度(大标题|信息标签|信息值),合计 = grid 列数
+ *   head {title, infoLabel, infoValue} —— report 版式报告头三段列跨度(大标题|信息标签|信息值),合计 = grid 列数
+ *   info —— report 版式右侧信息块行(缺省=密级/适用范围/测试负责人/报告编号;委托单自定义 文件管理人/密级/文件使用范围)
+ *   docNoDefault —— 文档编号缺省(默认 YJ-PD-01;委托单 YJ-RIR001)
+ *   titleFromKey/titleSuffix —— 标题由头字段派生(如 申请单类型+'-测试申请单')
+ *   plainTitle/plainTitleW —— plain 版式标题条文字与表格总宽(列宽取 cols.w 之和)
+ *   subtitle {label,key,type,options} —— plain 版式副标题行(如 测试项目：/设备名称：/仪器名称/型号：)
+ *   variantKey/variants —— 动态列变体:按头字段值切换列集(加标水 3 种测试项目/委托单 2 种类型)
  *   sections[{bar, rows[]}] —— row: {label,key,type:'text|area'} 或 {label,cells:[{key,ph,span}](多值格)}
  *   waterColspans(碱性) —— 原水水质条 6 指标格各自跨的网格列数(Excel C:D/E/F:H/I:J/K:L/M:N)
  *   soakColspans(浸泡安全) —— 特例块值区跨度(Excel D/E/F:G)
- *   dataTables[{bar,subHeads[],cols[{key,label,span,group,area}],charts}] —— 数据记录表(两级表头:同 group 合并)
+ *   dataTables[{bar,subHeads[],cols[{key,label,span,group,area,w}],charts,footerNote}] —— 数据记录表(两级表头:同 group 合并)
  *   conclusion{bar,key} —— 结论区(Excel 无结论区的表不配置)
  *   seedRows(浸泡安全) —— 标准卫生项目 17 行(新增草稿自动预填)
  */
@@ -292,6 +299,174 @@ export const recordSheetConfigs = {
           { key: '0.5-1μm颗粒物去除率-2min（%）', label: '0.5-1μm颗粒物去除率-2min（%）' },
           { key: '备注', label: '备注' },
         ]},
+    ],
+  },
+
+  // ═══════════ 实验室使用记录表 4 面板(《3.实验室使用记录表》) ═══════════
+
+  // 加标水配置记录表:3 种测试项目(除铅/除汞/除VOC)动态切换列集,明细为全字段并集
+  RD_SPIKE_WATER: {
+    headMode: 'plain',
+    plainTitle: '加标水配置记录表',
+    variantKey: '测试项目',
+    variantOptions: [
+      { value: 'NSF 53-除铅（PH8.5）', variant: '除铅' },
+      { value: 'NSF 53-除汞（PH8.5）', variant: '除汞' },
+      { value: 'NSF 53-除VOC', variant: '除VOC' },
+    ],
+    subtitle: { label: '测试项目：', key: '测试项目', type: 'select' },
+    variants: {
+      除铅: { cols: [
+          { key: '测试日期', label: '测试日期', w: 90, rowspan: 2 },
+          { key: '项目名称', label: '项目名称', w: 110, rowspan: 2 },
+          { key: '测试装置', label: '测试装置', w: 100, rowspan: 2 },
+          { key: '测试工位', label: '测试工位', w: 90, rowspan: 2 },
+          { key: '配水量', label: '配水量\n（L）', w: 80, rowspan: 2 },
+          { key: '配置用水', label: '配置用水', w: 90, rowspan: 2 },
+          { key: '硫酸镁', label: '硫酸镁', w: 90, group: '试剂用量（g）' },
+          { key: '二水氯化钙', label: '二水氯化钙', w: 100, group: '试剂用量（g）' },
+          { key: '碳酸氢钠', label: '碳酸氢钠', w: 90, group: '试剂用量（g）' },
+          { key: '4%次氯酸钠', label: '4%次氯酸钠', w: 110, group: '试剂用量（g）' },
+          { key: '盐酸或氢氧化钠', label: '盐酸或氢氧化钠', w: 120, group: '试剂用量（g）' },
+          { key: '可溶性铅', label: '可溶性铅', w: 90, group: '试剂用量（g）' },
+          { key: '不可溶性铅', label: '不可溶性铅', w: 100, group: '试剂用量（g）' },
+          { key: 'PH', label: 'PH\n8.5±0.25', w: 90, group: '加标水水质指标' },
+          { key: 'TDS', label: 'TDS\n（mg/L）', w: 90, group: '加标水水质指标' },
+          { key: '水温', label: '水温（℃）\n20±2.5℃', w: 100, group: '加标水水质指标' },
+          { key: '负责人', label: '负责人', w: 70, rowspan: 2 },
+      ]},
+      除汞: { cols: [
+          { key: '测试日期', label: '测试日期', w: 90, rowspan: 2 },
+          { key: '项目名称', label: '项目名称', w: 120, rowspan: 2 },
+          { key: '测试装置', label: '测试装置', w: 110, rowspan: 2 },
+          { key: '测试工位', label: '测试工位', w: 100, rowspan: 2 },
+          { key: '配水量', label: '配水量\n（L）', w: 90, rowspan: 2 },
+          { key: '配置用水', label: '配置用水', w: 110, rowspan: 2 },
+          { key: '碳酸氢钠', label: '碳酸氢钠', w: 100, group: '试剂用量（g）' },
+          { key: '二水氯化钙', label: '二水氯化钙', w: 110, group: '试剂用量（g）' },
+          { key: '盐酸或氢氧化钠', label: '盐酸或氢氧化钠', w: 130, group: '试剂用量（g）' },
+          { key: '汞标准溶液', label: '汞标准溶液 \n1000mg/L', w: 130, group: '试剂用量（g）' },
+          { key: 'PH', label: 'PH\n8.5±0.25', w: 90, group: '加标水水质指标' },
+          { key: 'TDS', label: 'TDS（mg/L）\n200-500mg/L', w: 120, group: '加标水水质指标' },
+          { key: '水温', label: '水温（℃）\n20±2.5℃', w: 100, group: '加标水水质指标' },
+          { key: '浊度值', label: '浊度值（NTU）\n＜1NTU', w: 110, group: '加标水水质指标' },
+          { key: '负责人', label: '负责人', w: 80, rowspan: 2 },
+      ]},
+      除VOC: { cols: [
+          { key: '测试日期', label: '测试日期', w: 90, rowspan: 2 },
+          { key: '项目名称', label: '项目名称', w: 120, rowspan: 2 },
+          { key: '测试装置', label: '测试装置', w: 110, rowspan: 2 },
+          { key: '测试工位', label: '测试工位', w: 100, rowspan: 2 },
+          { key: '配水量', label: '配水量\n（L）', w: 90, rowspan: 2 },
+          { key: '配置用水', label: '配置用水', w: 110, rowspan: 2 },
+          { key: '氯化钠', label: '氯化钠（g）', w: 110, group: '试剂用量' },
+          { key: '三氯甲烷储备液', label: '三氯甲烷储备液\n（1000mg/L）', w: 150, group: '试剂用量' },
+          { key: 'PH', label: 'PH\n7.5±0.5', w: 90, group: '加标水水质指标' },
+          { key: 'TDS', label: 'TDS（mg/L)\n200-500mg/L', w: 120, group: '加标水水质指标' },
+          { key: '水温', label: '水温（℃）\n20.0±2.5℃', w: 100, group: '加标水水质指标' },
+          { key: '浊度值', label: '浊度值（NTU）\n＜1NTU', w: 110, group: '加标水水质指标' },
+          { key: '负责人', label: '负责人', w: 80, rowspan: 2 },
+      ]},
+    },
+    dataTables: [{}],
+  },
+
+  // 内部委托测试申请单:开发性/品质委托 2 变体;报告头信息块=文件管理人/密级/文件使用范围
+  RD_DOM_TEST: {
+    headMode: 'report',
+    docNoDefault: 'YJ-RIR001',
+    info: [
+      { label: '文件管理人', key: '文件管理人', type: 'text' },
+      { label: '密级', key: '密级', type: 'select' },
+      { label: '文件使用范围', key: '文件使用范围', type: 'select' },
+    ],
+    titleFromKey: '申请单类型',
+    titleSuffix: '-测试申请单',
+    variantKey: '申请单类型',
+    variants: {
+      '开发性': {
+        grid: [45, 90, 90, 70, 200, 90, 110, 60, 260, 120, 120, 140, 140, 130, 60],
+        head: { title: 12, infoLabel: 1, infoValue: 2 },
+        cols: [
+          { key: '序号', label: '序号', rowspan: 2 },
+          { key: '日期', label: '日期', rowspan: 2 },
+          { key: '申请人', label: '申请人', rowspan: 2 },
+          { key: '背景/目的', label: '测试（检测）背景/目的', rowspan: 2, area: true },
+          { key: '尺寸', label: '尺寸', group: '测试（检测）样品信息' },
+          { key: '配方', label: '配方', group: '测试（检测）样品信息' },
+          { key: '密度', label: '密度', group: '测试（检测）样品信息' },
+          { key: '方法', label: '测试（检测）方法', rowspan: 2, area: true },
+          { key: '标准', label: '测试（检测）标准', rowspan: 2 },
+          { key: '目标', label: '测试（检测）目标', rowspan: 2 },
+          { key: '组装方式', label: '组装方式', rowspan: 2 },
+          { key: '样品处理', label: '测完后样品样品处理', rowspan: 2 },
+          { key: '期望完成日期', label: '期望完成日期', rowspan: 2 },
+          { key: '备注', label: '备注', rowspan: 2 },
+        ],
+      },
+      '品质委托': {
+        grid: [45, 90, 90, 70, 200, 90, 110, 90, 260, 120, 120, 140, 140, 80, 100, 100, 60],
+        head: { title: 14, infoLabel: 1, infoValue: 2 },
+        cols: [
+          { key: '序号', label: '序号', rowspan: 2 },
+          { key: '日期', label: '日期', rowspan: 2 },
+          { key: '申请人', label: '申请人', rowspan: 2 },
+          { key: '背景/目的', label: '测试（检测）背景/目的', rowspan: 2, area: true },
+          { key: '产品编号', label: '产品编号', group: '测试（检测）样品信息' },
+          { key: '产品名称', label: '产品名称', group: '测试（检测）样品信息' },
+          { key: '生产批次', label: '生产批次', group: '测试（检测）样品信息' },
+          { key: '方法', label: '测试（检测）方法', rowspan: 2, area: true },
+          { key: '标准', label: '测试（检测）标准', rowspan: 2 },
+          { key: '目标', label: '测试（检测）目标', rowspan: 2 },
+          { key: '组装方式', label: '组装方式', rowspan: 2 },
+          { key: '样品处理', label: '测完后样品样品处理', rowspan: 2 },
+          { key: '紧急程度', label: '紧急程度', rowspan: 2 },
+          { key: '期望完成日期', label: '期望完成日期', rowspan: 2 },
+          { key: '预计完成日期', label: '预计完成日期', rowspan: 2 },
+          { key: '备注', label: '备注', rowspan: 2 },
+        ],
+      },
+    },
+    dataTables: [{}],
+  },
+
+  // 设备使用登记表:7 台加标测试系统共用一版式,设备名称下拉
+  RD_EQUIP_USE: {
+    headMode: 'plain',
+    plainTitle: '测试设备使用登记表',
+    subtitle: { label: '设备名称：', key: '设备名称', type: 'select' },
+    dataTables: [
+      { cols: [
+          { key: '使用日期', label: '使用日期', w: 100 },
+          { key: '测试项目', label: '测试项目', w: 150 },
+          { key: '测试标准', label: '测试标准', w: 130 },
+          { key: '使用工位', label: '使用工位', w: 110 },
+          { key: '设备状态', label: '设备状态\n（检查管路、阀门、启动是否正常）', w: 220 },
+          { key: '使用人', label: '使用人', w: 100 },
+          { key: '备注', label: '备注', w: 110 },
+        ]},
+    ],
+  },
+
+  // 仪器使用记录表:仪器名称/型号副标题 + 页脚须知
+  RD_INSTR_USE: {
+    headMode: 'plain',
+    plainTitle: '实验室仪器使用记录表',
+    subtitle: { label: '仪器名称/型号：', key: '仪器名称/型号', type: 'text' },
+    dataTables: [
+      { cols: [
+          { key: '使用日期', label: '使用日期', w: 110 },
+          { key: '起止时间', label: '起止时间', w: 120 },
+          { key: '仪器状态', label: '仪器状态\n√/×', w: 90 },
+          { key: '是否内校', label: '是否内校\n√/-', w: 90 },
+          { key: '项目名称/内容', label: '项目名称/内容', w: 300 },
+          { key: '用途', label: '用途', w: 120 },
+          { key: '样品数量', label: '样品数量', w: 90 },
+          { key: '使用人', label: '使用人', w: 100 },
+          { key: '备注', label: '备注', w: 120 },
+        ],
+        footerNote: '请各位实验人员知悉：\n1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。\n2.态度恶劣者，实验室负责人将拒接该人员进入实验室。',
+      },
     ],
   },
 }

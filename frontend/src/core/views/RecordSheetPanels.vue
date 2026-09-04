@@ -7,51 +7,39 @@
        特例块:碱性原水水质条 / 浸泡安全(浸泡液用量+仪器检出限) / 矿化(4 指标块+散点图)
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="record-sheet rsp-sheet">
-    <!-- ═══ 报告头:公司名 | 文档编号(共享网格:公司跨 n-1 列,编号=末列) ═══ -->
-    <table class="rs-t rs-head-t" :style="{ width: gridW + 'px' }">
-      <colgroup><col v-for="(w, i) in cfg.grid" :key="'hc' + i" :style="{ width: w + 'px' }" /></colgroup>
+    <!-- ═══ 报告头(report 版式):公司名 | 文档编号 + 大标题 | 信息块 ═══ -->
+    <table v-if="!isPlain" class="rs-t rs-head-t" :style="{ width: gridW + 'px' }">
+      <colgroup><col v-for="(w, i) in effGrid" :key="'hc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
         <tr>
           <td class="rs-td rs-company-cell" :colspan="nCols - 1">惠州市银嘉环保科技有限公司</td>
           <td class="rs-td rs-docno">
             <el-input v-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" @input="emit('dirty')" />
-            <template v-else>{{ head['文档编号'] || head['单据编号'] || 'YJ-PD-01' }}</template>
+            <template v-else>{{ head['文档编号'] || head['单据编号'] || cfg.docNoDefault || 'YJ-PD-01' }}</template>
           </td>
         </tr>
         <tr>
-          <td class="rs-td rs-topic-cell" :colspan="cfg.head.title" rowspan="4">
-            <el-input v-if="editable" v-model="head['测试主题']" size="small" class="rs-topic-input" :placeholder="tt(cfg.titlePlaceholder)" @input="emit('dirty')" />
-            <span v-else class="rs-topic">{{ head['测试主题'] || cfg.titlePlaceholder }}</span>
+          <td class="rs-td rs-topic-cell" :colspan="effHead.title" :rowspan="infoSpan">
+            <el-input v-if="editable && !derivedTitle" v-model="head['测试主题']" size="small" class="rs-topic-input" :placeholder="tt(cfg.titlePlaceholder)" @input="emit('dirty')" />
+            <span v-else class="rs-topic">{{ derivedTitle || head['测试主题'] || cfg.titlePlaceholder }}</span>
           </td>
-          <td class="rs-td rs-info-label" :colspan="cfg.head.infoLabel">{{ tt('密级') }}</td>
-          <td class="rs-td rs-info-value" :colspan="cfg.head.infoValue">
-            <el-select v-if="editable" v-model="head['密级']" size="small" :clearable="false" @change="emit('dirty')">
-              <el-option v-for="o in selectOptions('密级')" :key="o.value" :label="o.label" :value="o.value" />
+          <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>
+          <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
+            <el-select v-if="editable && effInfo[0].type === 'select'" v-model="head[effInfo[0].key]" size="small" :clearable="false" @change="emit('dirty')">
+              <el-option v-for="o in selectOptions(effInfo[0].key)" :key="o.value" :label="o.label" :value="o.value" />
             </el-select>
-            <template v-else>{{ head['密级'] || '' }}</template>
+            <el-input v-else-if="editable" v-model="head[effInfo[0].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+            <template v-else>{{ head[effInfo[0].key] || '' }}</template>
           </td>
         </tr>
-        <tr>
-          <td class="rs-td rs-info-label" :colspan="cfg.head.infoLabel">{{ tt('适用范围') }}</td>
-          <td class="rs-td rs-info-value" :colspan="cfg.head.infoValue">
-            <el-select v-if="editable" v-model="head['适用范围']" size="small" :clearable="false" @change="emit('dirty')">
-              <el-option v-for="o in selectOptions('适用范围')" :key="o.value" :label="o.label" :value="o.value" />
+        <tr v-for="ii in infoSpan - 1" :key="'hi' + ii">
+          <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[ii].label) }}</td>
+          <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
+            <el-select v-if="editable && effInfo[ii].type === 'select'" v-model="head[effInfo[ii].key]" size="small" :clearable="false" @change="emit('dirty')">
+              <el-option v-for="o in selectOptions(effInfo[ii].key)" :key="o.value" :label="o.label" :value="o.value" />
             </el-select>
-            <template v-else>{{ head['适用范围'] || '' }}</template>
-          </td>
-        </tr>
-        <tr>
-          <td class="rs-td rs-info-label" :colspan="cfg.head.infoLabel">{{ tt('测试负责人') }}</td>
-          <td class="rs-td rs-info-value" :colspan="cfg.head.infoValue">
-            <el-input v-if="editable" v-model="head['测试负责人']" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
-            <template v-else>{{ head['测试负责人'] || '' }}</template>
-          </td>
-        </tr>
-        <tr>
-          <td class="rs-td rs-info-label" :colspan="cfg.head.infoLabel">{{ tt('报告编号') }}</td>
-          <td class="rs-td rs-info-value" :colspan="cfg.head.infoValue">
-            <el-input v-if="editable" v-model="head['报告编号']" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
-            <template v-else>{{ head['报告编号'] || '' }}</template>
+            <el-input v-else-if="editable" v-model="head[effInfo[ii].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+            <template v-else>{{ head[effInfo[ii].key] || '' }}</template>
           </td>
         </tr>
       </tbody>
@@ -144,12 +132,45 @@
     <!-- ═══ 数据记录表(共享网格;支持子头行+两级表头;矿化 4 指标块各带散点图) ═══ -->
     <div v-for="(dt, di) in cfg.dataTables" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
-        <table class="rs-t rs-dt" :style="{ width: (gridW + (editable ? 60 : 0)) + 'px' }">
+        <table class="rs-t rs-dt" :style="{ width: (isPlain ? plainW(dt) : gridW + (editable ? 60 : 0)) + 'px' }">
           <colgroup>
-            <col v-for="(w, i) in cfg.grid" :key="'dc' + i" :style="{ width: w + 'px' }" />
+            <template v-if="isPlain">
+              <col v-for="(c, i) in plainCols(dt)" :key="'dc' + i" :style="{ width: (c.w || 100) + 'px' }" />
+            </template>
+            <template v-else>
+              <col v-for="(w, i) in effGrid" :key="'dc' + i" :style="{ width: w + 'px' }" />
+            </template>
             <col v-if="editable" style="width:60px" />
           </colgroup>
           <tbody>
+            <!-- plain 版式:标题条 + 副标题行(测试项目：/设备名称：/仪器名称/型号：) -->
+            <tr v-if="isPlain">
+              <td :colspan="totalSpan(dt)" class="rsp-plain-title">{{ tt(cfg.plainTitle) }}</td>
+              <td v-if="editable" class="rsp-op-pad"></td>
+            </tr>
+            <tr v-if="isPlain && cfg.subtitle">
+              <td :colspan="totalSpan(dt)" class="rsp-subtitle-row" :class="{ right: cfg.subtitle.align === 'right' }">
+                <span class="rsp-sub-label">{{ tt(cfg.subtitle.label) }}</span>
+                <el-select v-if="editable && cfg.subtitle.type === 'select'" v-model="head[cfg.subtitle.key]" size="small" class="rsp-sub-ctl" :clearable="false" @change="emit('dirty')">
+                  <el-option v-for="o in variantOptions" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+                <el-input v-else-if="editable" v-model="head[cfg.subtitle.key]" size="small" maxlength="100" class="rsp-sub-ctl" @input="emit('dirty')" />
+                <span v-else class="rsp-sub-value">{{ head[cfg.subtitle.key] || '' }}</span>
+              </td>
+              <td v-if="editable" class="rsp-op-pad"></td>
+            </tr>
+            <!-- report 版式带变体时:变体切换行(如 申请单类型) -->
+            <tr v-if="!isPlain && cfg.variantKey">
+              <td :colspan="2" class="rsp-subtitle-row rsp-left">
+                <span class="rsp-sub-label">{{ tt(variantLabel) }}</span>
+                <el-select v-if="editable" v-model="head[cfg.variantKey]" size="small" class="rsp-sub-ctl" :clearable="false" @change="emit('dirty')">
+                  <el-option v-for="o in variantOptions" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+                <span v-else class="rsp-sub-value">{{ head[cfg.variantKey] || '' }}</span>
+              </td>
+              <td :colspan="Math.max(1, totalSpan(dt) - 2)" class="rsp-subtitle-row rsp-quiet"></td>
+              <td v-if="editable" class="rsp-op-pad"></td>
+            </tr>
             <tr v-if="dt.bar">
               <td :colspan="totalSpan(dt)" class="rs-sectionbar">{{ tt(dt.bar) }}</td>
               <td v-if="editable" class="rsp-op-pad"></td>
@@ -180,9 +201,14 @@
               <td :colspan="totalSpan(dt)" class="rs-empty">—</td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
+            <!-- 页脚须知(仪器使用记录表) -->
+            <tr v-if="dt.footerNote">
+              <td :colspan="totalSpan(dt)" class="rsp-footnote">{{ tt(dt.footerNote) }}</td>
+              <td v-if="editable" class="rsp-op-pad"></td>
+            </tr>
           </tbody>
         </table>
-        <div v-if="editable" class="rs-add" :style="{ width: gridW + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
+        <div v-if="editable" class="rs-add" :style="{ width: (isPlain ? plainW(dt) : gridW) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
       </div>
       <!-- 矿化:Excel 原表右侧 4 张散点图(RO出水/浸泡30min/煮沸晾凉 × 累计流量) -->
       <div v-if="dt.charts" class="rsp-chart">
@@ -241,9 +267,60 @@ const props = defineProps({
 const emit = defineEmits(['dirty'])
 
 const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
-const nCols = computed(() => (cfg.value?.grid || []).length)
+const isPlain = computed(() => cfg.value?.headMode === 'plain')
+
+/** 动态列变体:按头字段值解析(加标水经 variantOptions 映射/委托单直取),缺省第一个变体 */
+const activeVariant = computed(() => {
+  const vs = cfg.value?.variants
+  if (!vs) return null
+  const val = props.head?.[cfg.value.variantKey]
+  if (val) {
+    if (vs[val]) return { name: val, ...vs[val] }
+    const opt = (cfg.value.variantOptions || []).find((o) => o.value === val)
+    if (opt && vs[opt.variant]) return { name: opt.variant, ...vs[opt.variant] }
+  }
+  const first = Object.keys(vs)[0]
+  return { name: first, ...vs[first] }
+})
+const variantOptions = computed(() => {
+  if (cfg.value?.variantOptions) return cfg.value.variantOptions.map((o) => ({ value: o.value, label: o.value }))
+  return selectOptions(cfg.value?.variantKey)
+})
+const variantLabel = computed(() => (cfg.value?.variantKey || '') + (cfg.value?.variantKey ? '：' : ''))
+
+const effGrid = computed(() => activeVariant.value?.grid || cfg.value?.grid || [])
+const effHead = computed(() => activeVariant.value?.head || cfg.value?.head || {})
+const nCols = computed(() => effGrid.value.length)
 /** 网格总宽:所有表格显式用这个宽度,列分界线全页严格一致(数据表编辑态另加 60px 操作列) */
-const gridW = computed(() => (cfg.value?.grid || []).reduce((s, w) => s + w, 0))
+const gridW = computed(() => effGrid.value.reduce((s, w) => s + w, 0))
+
+/** 报告头右侧信息块(数据记录表=密级/适用范围/测试负责人/报告编号;委托单=文件管理人/密级/文件使用范围) */
+const DEFAULT_INFO = [
+  { label: '密级', key: '密级', type: 'select' },
+  { label: '适用范围', key: '适用范围', type: 'select' },
+  { label: '测试负责人', key: '测试负责人', type: 'text' },
+  { label: '报告编号', key: '报告编号', type: 'text' },
+]
+const effInfo = computed(() => cfg.value?.info || DEFAULT_INFO)
+const infoSpan = computed(() => effInfo.value.length)
+
+/** 报告头大标题:可由头字段派生(委托单=申请单类型+'-测试申请单'),否则为 测试主题 输入 */
+const derivedTitle = computed(() => {
+  if (!cfg.value?.titleFromKey) return null
+  const v = props.head?.[cfg.value.titleFromKey] || Object.keys(cfg.value.variants || {})[0] || ''
+  return v + (cfg.value.titleSuffix || '')
+})
+
+/** plain 版式表格列宽与总宽(无全页网格,列宽取 col.w) */
+function plainCols(dt) {
+  return colsOf(dt)
+}
+function plainW(dt) {
+  return colsOf(dt).reduce((s, c) => s + (c.w || 100), 0)
+}
+function colsOf(dt) {
+  return activeVariant.value?.cols || dt.cols || []
+}
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
 function selectOptions(key) {
@@ -278,7 +355,7 @@ function touch() {
 
 // ── 数据记录表渲染 ──
 function visCols(dt) {
-  return dt.cols.filter((c) => !c.hiddenCol)
+  return colsOf(dt).filter((c) => !c.hiddenCol)
 }
 function groupCols(dt) {
   return visCols(dt).filter((c) => c.group)
@@ -323,6 +400,7 @@ function rowsOf(dt) {
 }
 function addRow(dt) {
   const row = dt.metric ? { 指标: dt.metric } : {}
+  if (cfg.value?.autoSeq) row['序号'] = String(touch().length + 1)
   touch().push(row)
   emit('dirty')
 }
@@ -644,6 +722,58 @@ function chartOf(dt) {
 .rsp-cell {
   display: block;
   min-height: 20px;
+}
+
+/* ═══ plain 版式:标题条 + 副标题行 + 页脚须知 ═══ */
+.rsp-plain-title {
+  border: 1px solid #7f7f7f;
+  font-family: 'SimSun', 'Songti SC', serif;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #333;
+  text-align: center;
+  padding: 8px 10px;
+  background: #fff;
+}
+.rsp-subtitle-row {
+  border: 1px solid #7f7f7f;
+  border-top: none;
+  padding: 4px 10px;
+  font-size: 14px;
+  text-align: left;
+}
+.rsp-subtitle-row.right {
+  text-align: right;
+}
+.rsp-sub-label {
+  font-weight: 600;
+  color: #333;
+  margin-right: 6px;
+}
+.rsp-sub-ctl {
+  width: 240px;
+  vertical-align: middle;
+}
+.rsp-sub-value {
+  color: #222;
+}
+.rsp-left {
+  text-align: left !important;
+}
+.rsp-quiet {
+  background: #fff;
+}
+.rsp-footnote {
+  border: 1px solid #7f7f7f;
+  border-top: none;
+  text-align: left;
+  font-size: 12px;
+  color: #444;
+  white-space: pre-line;
+  line-height: 1.8;
+  padding: 8px 12px;
+  background: #fff;
 }
 
 /* ═══ 矿化:表+图并排(复刻 Excel 表格在左、散点图在右) ═══ */

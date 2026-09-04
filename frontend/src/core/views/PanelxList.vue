@@ -729,6 +729,7 @@ import DocSheet from './DocSheet.vue'
 import ProgressControlSheet from './ProgressControlSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
+import { recordSheetConfigs } from './recordSheetConfigs'
 import { approvalSheetCfg, planSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
@@ -758,8 +759,8 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 
 // 物料清单维护和正反向查询统一使用父件/子件主从视图；仅 BOM 草稿开放编辑。
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
-// 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张):文件类文书式特例面板
-const RECORD_SHEET_PANELS = ['RD_ALKALINE', 'RD_MINERAL', 'RD_ANTIBACT', 'RD_SCALE', 'RD_RO_PROTECT', 'RD_SOAK', 'RD_DROP_PREC']
+// 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
+const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
 const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', ...RECORD_SHEET_PANELS].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 const docSheetConfig = computed(() => (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
