@@ -19,9 +19,11 @@ IF OBJECT_ID('rd_approval') IS NULL CREATE TABLE rd_approval (
   [文件管理人] nvarchar(50) NULL,
   [密级] nvarchar(20) NOT NULL DEFAULT N'保密',
   [文件使用范围] nvarchar(50) NOT NULL DEFAULT N'公司内',
+  [文档编号] nvarchar(30) NOT NULL CONSTRAINT DF_rd_approval_docno DEFAULT N'YJ-XS002',
   [备注] nvarchar(500) NULL,
   asp_user1 nvarchar(50) NULL, asp_time1 datetime2 NULL, asp_user2 nvarchar(50) NULL, asp_time2 datetime2 NULL, asp_cancel char(1) NULL DEFAULT 'N'
 );
+ELSE IF COL_LENGTH('rd_approval','文档编号') IS NULL ALTER TABLE rd_approval ADD [文档编号] nvarchar(30) NOT NULL CONSTRAINT DF_rd_approval_docno DEFAULT N'YJ-XS002';
 GO
 -- 恒空明细视图(doc 模式要求 line_table;立项申请无明细,查询取空集)
 -- 注:doc 明细通用 SQL 会引用 asp_cancel/asp_user1 等审计列,恒空视图须补齐同名列,否则报「列名无效」207。
@@ -47,6 +49,8 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_nam
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'文件管理人') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'文件管理人', N'文件管理人', N'文本', NULL, NULL, NULL, NULL, N'header', 130, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'密级') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'密级', N'密级', N'下拉框', N'SELECT v FROM (VALUES (N''保密''),(N''内部''),(N''公开'')) AS t(v)', NULL, NULL, NULL, N'header', 140, 80, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'文件使用范围') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'文件使用范围', N'文件使用范围', N'下拉框', N'SELECT v FROM (VALUES (N''公司内''),(N''客户项目组''),(N''双方项目组'')) AS t(v)', NULL, NULL, NULL, N'header', 150, 100, 1, 0, 0, 1);
+-- 文档编号(YJ-XS002):文书表头右上角可编辑;hidden=1 不出现在通用表单,仅供文书特例取键
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_APPROVAL' AND col_name=N'文档编号') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_APPROVAL', N'文档编号', N'文档编号', N'文本', NULL, NULL, NULL, NULL, N'header', 155, 120, 1, 0, 1, 1);
 GO
 -- en 译名(其它语言由实时机翻自动补齐)
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='panel' AND ref_key=N'立项申请' AND locale='en') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('panel', N'立项申请', 'en', N'Project Initiation Request', 'manual');
