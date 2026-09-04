@@ -415,3 +415,46 @@ function selectOptions(key) {
   min-height: 50px;
 }
 </style>
+
+<!-- 打印/导出整张文书:只保留文书纸张,隐藏布局菜单/侧栏/其它页面元素 -->
+<style>
+@media print {
+  body.approval-printing .portal {
+    visibility: hidden;
+  }
+  body.approval-printing .topbar,
+  body.approval-printing .func-zone,
+  body.approval-printing .tabsbar,
+  body.approval-printing .help-panel,
+  body.approval-printing .nav-mask,
+  body.approval-printing .approval-side,
+  body.approval-printing .tools {
+    display: none !important;
+  }
+  body.approval-printing .portal-body,
+  body.approval-printing .portal-main,
+  body.approval-printing .portal-content,
+  body.approval-printing .panelx-list,
+  body.approval-printing .approval-layout {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding-right: 0 !important;
+    margin: 0 !important;
+  }
+  body.approval-printing .approval-sheet {
+    visibility: visible !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  @page {
+    margin: 8mm;
+  }
+}
+</style>

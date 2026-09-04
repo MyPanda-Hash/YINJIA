@@ -679,7 +679,6 @@ import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
-import { toBlob } from 'html-to-image'
 import { ensureScanFillAction } from '@core/button-groups'
 import { useReportColumns } from '@core/report/useReportColumns'
 import RefPickDialog from './RefPickDialog.vue'
@@ -1530,39 +1529,28 @@ function onGroupAction(a) {
   onButton(a)
 }
 
-// ══════════ 文书式面板:导出 = 整张文书导出(PNG,含全部版式) ══════════
+// ══════════ 文书式面板:导出 = 整张文书打印/存PDF(浏览器原生,所见即所得) ══════════
 const approvalSheetRef = ref(null)
 function onSideAction(a) {
-  // 文书面板「导出」不走通用 CSV,改为整张文书截图导出
+  // 文书面板「导出」不走通用 CSV,改为整张文书打印(可另存 PDF)
   if (isApprovalDoc.value && a === '导出') {
-    exportApprovalSheet()
+    printApprovalSheet()
     return
   }
   if (isDisabled(a)) return
   onButton(a)
 }
-async function exportApprovalSheet() {
-  const el = approvalSheetRef.value?.$el || approvalSheetRef.value
-  if (!el) return
-  ElMessage.info('正在导出整张文书…')
-  try {
-    // html-to-image:SVG foreignObject 序列化;显式过滤 iframe(布局外壳/组件内嵌,文书内无)
-    const blob = await toBlob(el, {
-      pixelRatio: 2,
-      backgroundColor: '#ffffff',
-      cacheBust: true,
-      filter: (node) => node.tagName !== 'IFRAME',
-    })
-    if (!blob) throw new Error('导出结果为空')
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `立项申请-${cur.value['单据编号'] || cur.value['文档编号'] || 'PIR'}.png`
-    link.click()
-    setTimeout(() => URL.revokeObjectURL(url), 30000)
-  } catch (e) {
-    ElMessage.error(engine.errMsg(e) || '导出失败')
+async function printApprovalSheet() {
+  if (!approvalSheetRef.value) return
+  // 打印样式(approval-printing):只打印文书纸张,隐藏侧栏/其它页面元素
+  document.body.classList.add('approval-printing')
+  const restore = () => {
+    document.body.classList.remove('approval-printing')
+    window.removeEventListener('afterprint', restore)
   }
+  window.addEventListener('afterprint', restore)
+  // 等样式生效后调打印预览(用户可另存为 PDF 或打印)
+  setTimeout(() => window.print(), 150)
 }
 
 async function copyActive() {
