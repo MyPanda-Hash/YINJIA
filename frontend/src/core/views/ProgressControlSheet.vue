@@ -429,18 +429,20 @@ defineExpose({ exportProgressExcel })
 .progress-sheet :deep(.ps-cell-input) {
   width: 100%;
 }
-.progress-sheet :deep(.ps-cell-input .el-input__wrapper),
-.progress-sheet :deep(.ps-select-row .el-select__wrapper),
-.progress-sheet :deep(.ps-info-table .el-select__wrapper) {
+/* 填写控件去边框:白纸观感,内容直接写在格子内(聚焦亦无框) */
+.progress-sheet :deep(.el-input__wrapper),
+.progress-sheet :deep(.el-input__wrapper.is-focus),
+.progress-sheet :deep(.el-textarea__inner),
+.progress-sheet :deep(.el-textarea__inner:focus) {
   box-shadow: none !important;
   border: none;
   background: transparent;
-  min-height: 22px;
-  padding: 0 2px;
 }
-.progress-sheet :deep(.ps-cell-input .el-input__inner) {
+.progress-sheet :deep(.el-input__inner),
+.progress-sheet :deep(.el-textarea__inner) {
   font-size: 13px;
   padding: 0;
+  line-height: 1.6;
 }
 .progress-sheet :deep(.ps-info-table .el-select__wrapper),
 .progress-sheet :deep(.ps-select-row .el-select__wrapper) {
@@ -579,8 +581,8 @@ defineExpose({ exportProgressExcel })
 .ps-table tr:hover td {
   background: #f7fbff;
 }
-.c-level { min-width: 100px; }
-.c-name { min-width: 150px; }
+.c-level { min-width: 70px; }
+.c-name { min-width: 160px; }
 /* 项目名称合并块:铺满组内子项目行,浅蓝底,文字居中(对齐原图) */
 .ps-table td.c-name {
   background: #d9ecfb;
@@ -648,18 +650,18 @@ defineExpose({ exportProgressExcel })
   color: #8a97a6;
   line-height: 1.5;
 }
-.c-sub { min-width: 120px; }
-.c-remark { min-width: 130px; }
-.c-content { min-width: 150px; }
-.c-grade { min-width: 70px; }
-.c-owner { min-width: 78px; }
-.c-progress { min-width: 150px; }
-.c-mile { min-width: 110px; }
-.c-status { min-width: 96px; }
-.c-tester { min-width: 76px; }
-.c-approve { min-width: 76px; }
-.c-inspect { min-width: 76px; }
-.c-reason { min-width: 140px; }
+.c-sub { min-width: 140px; }
+.c-remark { min-width: 90px; }
+.c-content { min-width: 300px; }
+.c-grade { min-width: 90px; }
+.c-owner { min-width: 110px; }
+.c-progress { min-width: 70px; }
+.c-mile { min-width: 90px; }
+.c-status { min-width: 300px; }
+.c-tester { min-width: 260px; }
+.c-approve { min-width: 90px; }
+.c-inspect { min-width: 90px; }
+.c-reason { min-width: 120px; }
 .c-op { min-width: 30px; text-align: center; }
 /* 长文本列:按内容自适应但设上限,超出自动换行,不被列栏盖住 */
 .ps-table td.c-remark,
