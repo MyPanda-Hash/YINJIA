@@ -1000,7 +1000,7 @@ export default {
     '组装工艺清单': 'Assembly Process List',
     '出货检验计划表': 'Outgoing Inspection Plan',
     '加标水配置记录表': 'Spike Water Preparation',
-    '国内部委托测试申请单': 'Domestic Test Request',
+    '内部委托测试申请单': 'Internal Test Request',
     '设备使用登记表': 'Equipment Usage Log',
     '仪器使用记录表': 'Instrument Usage Log',
     '基础档案': 'Master Data',

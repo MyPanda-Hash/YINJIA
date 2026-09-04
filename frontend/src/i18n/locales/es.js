@@ -894,7 +894,7 @@ export default {
     '组装工艺清单': 'Lista de Procesos de Ensamblaje',
     '出货检验计划表': 'Plan de Inspección de Salida',
     '加标水配置记录表': 'Preparación de Agua Patrón',
-    '国内部委托测试申请单': 'Solicitud de Prueba Interna',
+    '内部委托测试申请单': 'Solicitud de Prueba Interna',
     '设备使用登记表': 'Registro de Uso de Equipo',
     '仪器使用记录表': 'Registro de Uso de Instrumento',
     '基础档案': 'Datos Maestros',
