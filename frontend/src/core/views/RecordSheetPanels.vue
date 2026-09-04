@@ -150,17 +150,20 @@
             <col v-if="editable" style="width:60px" />
           </colgroup>
           <tbody>
-            <tr v-if="dt.bar"><td :colspan="totalSpan(dt) + (editable ? 1 : 0)" class="rs-sectionbar">{{ tt(dt.bar) }}</td></tr>
+            <tr v-if="dt.bar">
+              <td :colspan="totalSpan(dt)" class="rs-sectionbar">{{ tt(dt.bar) }}</td>
+              <td v-if="editable" class="rsp-op-pad"></td>
+            </tr>
             <tr v-if="dt.subHeads">
               <td v-for="(sh, shi) in spreadSubHeads(dt)" :key="'sh' + shi" :colspan="sh.span" class="rs-subhead">{{ tt(sh.label) }}</td>
-              <td v-if="editable" class="rs-subhead"></td>
+              <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
             <tr class="rs-grp">
               <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
                 <th v-if="g.kind === 'plain'" class="rs-th" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(g.label) }}</th>
                 <th v-else-if="g.kind === 'group'" class="rs-th" :colspan="g.span">{{ tt(g.label) }}</th>
               </template>
-              <th v-if="editable" class="rs-th rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
+              <th v-if="editable" class="rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
             </tr>
             <tr v-if="hasGroup(dt)" class="rs-grp2">
               <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th" :colspan="(c.span || 1) > 1 ? c.span : undefined">{{ tt(c.label) }}</th>
@@ -171,12 +174,15 @@
                 <el-input v-else-if="editable" v-model="row[c.key]" size="small" class="rs-c-in" @input="emit('dirty')" />
                 <span v-else class="rs-txt rsp-cell">{{ row[c.key] || ' / ' }}</span>
               </td>
-              <td v-if="editable" class="rs-td rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
+              <td v-if="editable" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
             </tr>
-            <tr v-if="!rowsOf(dt).length"><td :colspan="totalSpan(dt) + (editable ? 1 : 0)" class="rs-empty">—</td></tr>
+            <tr v-if="!rowsOf(dt).length">
+              <td :colspan="totalSpan(dt)" class="rs-empty">—</td>
+              <td v-if="editable" class="rsp-op-pad"></td>
+            </tr>
           </tbody>
         </table>
-        <div v-if="editable" class="rs-add" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
+        <div v-if="editable" class="rs-add" :style="{ width: gridW + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
       </div>
       <!-- 矿化:Excel 原表右侧 4 张散点图(RO出水/浸泡30min/煮沸晾凉 × 累计流量) -->
       <div v-if="dt.charts" class="rsp-chart">
@@ -328,8 +334,10 @@ function removeRow(row) {
 }
 
 // 浸泡安全:进入草稿编辑且明细为空时,自动带出 GB/T17219 标准 17 项卫生项目(Excel 原表预填)
-watch(() => props.editable, (v) => {
+// 监听含 head 对象本身:cur 整体替换(单据加载)时也会触发,避免预填丢失
+watch(() => [props.editable, props.head], ([v]) => {
   if (!v || !cfg.value?.seedRows) return
+  if (!props.head || !props.head['单据编号']) return
   const arr = touch()
   if (arr.length) return
   for (const [no, name, req] of cfg.value.seedRows) {
@@ -573,6 +581,14 @@ function chartOf(dt) {
 }
 .rs-th-op {
   min-width: 60px;
+}
+/* 操作列无边框浮动:＋/× 按钮悬浮于网格右缘之外,不占表格边框——编辑态全页右边缘仍对齐网格 */
+.rs-th-op,
+.rs-td-op,
+.rsp-op-pad {
+  border: none !important;
+  background: transparent !important;
+  padding: 4px 2px;
 }
 .rs-td-op {
   text-align: center;
