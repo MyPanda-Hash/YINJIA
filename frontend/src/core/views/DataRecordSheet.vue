@@ -78,19 +78,17 @@
         <tr><td colspan="3" class="rs-sectionbar">{{ tt('1.基本信息') }}</td></tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('测试目的/背景') }}</td>
-          <td class="rs-td">
+          <td class="rs-td" colspan="2">
             <el-input v-if="editable" v-model="head['测试目的/背景']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['测试目的/背景'] || '' }}</span>
           </td>
-          <td class="rs-td">&nbsp;</td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('规格') }}</td>
-          <td class="rs-td">
+          <td class="rs-td" colspan="2">
             <el-input v-if="editable" v-model="head['规格']" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['规格'] || '' }}</span>
           </td>
-          <td class="rs-td">&nbsp;</td>
         </tr>
         <tr class="rs-row-mid">
           <td class="rs-td rs-label">{{ tt('样品配方') }}</td>
@@ -98,7 +96,6 @@
             <el-input v-if="editable" v-model="head['样品配方']" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" maxlength="300" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['样品配方'] || '' }}</span>
           </td>
-          <td class="rs-td">&nbsp;</td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('样品信息') }}</td>
@@ -113,27 +110,24 @@
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('测试要求') }}</td>
-          <td class="rs-td">
+          <td class="rs-td" colspan="2">
             <el-input v-if="editable" v-model="head['测试要求']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['测试要求'] || '' }}</span>
           </td>
-          <td class="rs-td">&nbsp;</td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('测试标准') }}</td>
-          <td class="rs-td">
+          <td class="rs-td" colspan="2">
             <el-input v-if="editable" v-model="head['测试标准']" size="small" maxlength="300" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['测试标准'] || '' }}</span>
           </td>
-          <td class="rs-td">&nbsp;</td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('测试时间') }}</td>
-          <td class="rs-td">
+          <td class="rs-td" colspan="2">
             <el-input v-if="editable" v-model="head['测试时间']" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['测试时间'] || '' }}</span>
           </td>
-          <td class="rs-td">&nbsp;</td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('本次实验目的') }}</td>
