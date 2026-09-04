@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        功能性滤效 数据记录表(RD_FILTER_EFF)——按《04数据记录表.xlsx》一比一复刻
        真实表格列对齐:报告头表(公司名|YJ-PD-01、主题+信息块4行) →
@@ -242,8 +242,20 @@
           <td class="rs-td"><el-input v-if="editable" v-model="row['冲水时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['冲水时间'] || ' / ' }}</span></td>
           <td class="rs-td"><el-input v-if="editable" v-model="row['累计进水（L）']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['累计进水（L）'] || ' / ' }}</span></td>
           <td class="rs-td"><el-input v-if="editable" v-model="row['水温（℃）']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['水温（℃）'] || ' / ' }}</span></td>
-          <td class="rs-td"><el-input v-if="editable" v-model="row['压力（PSI)样品1']" size="small" class="rs-c-in" placeholder="压力" @input="emit('dirty')" /><span v-else class="rs-txt">{{ combo(row, '压力（PSI)样品1', '流速（L/min)样品1') }}</span></td>
-          <td class="rs-td"><el-input v-if="editable" v-model="row['流速（L/min)样品1']" size="small" class="rs-c-in" placeholder="流速" @input="emit('dirty')" /><span v-else class="rs-txt">{{ combo(row, '压力（PSI)样品2', '流速（L/min)样品2') }}</span></td>
+          <td class="rs-td">
+            <div class="rs-combo">
+              <el-input v-if="editable" v-model="row['压力（PSI)样品1']" size="small" class="rs-c-in hl" placeholder="压力" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row['流速（L/min)样品1']" size="small" class="rs-c-in hl" placeholder="流速" @input="emit('dirty')" />
+              <span v-else class="rs-txt">{{ combo(row, '压力（PSI)样品1', '流速（L/min)样品1') }}</span>
+            </div>
+          </td>
+          <td class="rs-td">
+            <div class="rs-combo">
+              <el-input v-if="editable" v-model="row['压力（PSI)样品2']" size="small" class="rs-c-in hl" placeholder="压力" @input="emit('dirty')" />
+              <el-input v-if="editable" v-model="row['流速（L/min)样品2']" size="small" class="rs-c-in hl" placeholder="流速" @input="emit('dirty')" />
+              <span v-else class="rs-txt">{{ combo(row, '压力（PSI)样品2', '流速（L/min)样品2') }}</span>
+            </div>
+          </td>
           <td class="rs-td"><el-input v-if="editable" v-model="row['原水含量（ug/L）5号缸']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['原水含量（ug/L）5号缸'] || ' / ' }}</span></td>
           <td class="rs-td"><el-input v-if="editable" v-model="row['出水含量（ug/L）样品1']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['出水含量（ug/L）样品1'] || ' / ' }}</span></td>
           <td class="rs-td"><el-input v-if="editable" v-model="row['出水含量（ug/L）样品2']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['出水含量（ug/L）样品2'] || ' / ' }}</span></td>
@@ -529,6 +541,14 @@ function removeRow(i) {
 }
 .rs-th-op {
   min-width: 60px;
+}
+.rs-combo {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.rs-c-in.hl {
+  width: 46%;
 }
 .rs-td-op {
   text-align: center;
