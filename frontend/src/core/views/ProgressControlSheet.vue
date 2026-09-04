@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
@@ -418,8 +418,9 @@ defineExpose({ exportProgressExcel })
 <style scoped>
 /* ═══ 纸张主体(宽表格,原图纵横向扩展) ═══ */
 .progress-sheet {
-  width: 1240px;
-  max-width: 100%;
+  width: calc(100vw - 300px);
+  min-width: 900px;
+  max-width: 1760px;
   margin: 16px auto 26px;
   background: #fff;
   border: 1px solid #8a8a8a;
@@ -551,7 +552,9 @@ defineExpose({ exportProgressExcel })
 
 /* ═══ ⑤ 控制表 ═══ */
 .ps-scroll {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(100vh - 320px);
+  min-height: 220px;
 }
 .ps-table {
   width: 100%;
@@ -567,6 +570,9 @@ defineExpose({ exportProgressExcel })
   font-size: 12.5px;
 }
 .ps-table th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
   background: #b9dbf8;
   color: #1f5fa8;
   font-weight: 600;
@@ -785,6 +791,7 @@ defineExpose({ exportProgressExcel })
   /* 打印按纸张自适应:14 列均分页宽,小字号可断行,避免右侧字段被裁切 */
   body.approval-printing .ps-scroll {
     overflow: visible !important;
+    max-height: none !important;
   }
   body.approval-printing .ps-table {
     min-width: 100% !important;
