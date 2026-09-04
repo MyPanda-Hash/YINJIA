@@ -472,8 +472,8 @@ export const recordSheetConfigs = {
 
   // ═══════════ 产品文件 6 面板(《2.产品文件》) ═══════════
 
-  // 成型工艺清单(炭棒工艺管控清单):纯表单——产品基本信息(标签行/值行两行式) +
-  // 工序(灌料/烧结/热压/冷却 → 长度要求|重量要求列标题 → 脱模) + 检验要求(三列块)
+  // 成型工艺清单(炭棒工艺管控清单):纯表单——全页 11 列网格(A..K),所有行显式声明跨度
+  // 结构:标题+右侧信息块(4行) / 产品基本信息(标签行+值行) / ·备注条 / 工序(双列表头+灌料0合并+长度|重量列标题+脱模) / 检验要求
   RD_MOLD_PROC: {
     headMode: 'report',
     staticTitle: '炭棒工艺管控清单',
@@ -483,128 +483,158 @@ export const recordSheetConfigs = {
       { label: '使用范围', key: '使用范围', type: 'select' },
       { label: '版本号', key: '版本号', type: 'text' },
     ],
-    grid: [130, 180, 130, 200, 130, 90, 90, 90],
-    head: { title: 5, infoLabel: 1, infoValue: 2 },
+    grid: [150, 130, 80, 120, 90, 90, 60, 120, 80, 60, 60],
+    head: { title: 7, infoLabel: 2, infoValue: 2 },
     sections: [
-      // 产品基本信息:标签行 + 值行(炭棒规格 3 值格)
-      { bar: '产品基本信息', cols: [140, 220, 70, 70, 70, 180, 110, 180], rows: [
+      { bar: '产品基本信息', rows: [
         { grid: [
-          { label: '产品编号' },
-          { label: '产品名称' },
+          { label: '产品编号', span: 2 },
+          { label: '产品名称', span: 2 },
           { label: '炭棒规格', span: 3 },
-          { label: '产品管控类型' },
+          { label: '产品管控类型', span: 2 },
           { label: '外观要求' },
           { label: '生产车间' },
         ]},
         { grid: [
-          { key: '产品编号' },
-          { key: '产品名称' },
+          { key: '产品编号', span: 2 },
+          { key: '产品名称', span: 2 },
           { key: '炭棒规格1' },
           { key: '炭棒规格2' },
           { key: '炭棒规格3' },
-          { key: '产品管控类型', type: 'select' },
+          { key: '产品管控类型', type: 'select', span: 2 },
           { key: '外观要求', type: 'select' },
           { key: '生产车间', type: 'select' },
         ]},
+        { grid: [{ fixed: '·', span: 11 }] },
       ]},
-      // 工序:阶段列 + 参数键值对;冷却后插入 长度要求|重量要求 列标题行(脱模的列分组)
-      { bar: '工序', cols: [160, 200, 260, 200, 220], rows: [
+      { bar: '工序', rows: [
+        { grid: [
+          { label: '工序', cap: true },
+          { label: '工序管控要求', cap: true, span: 10 },
+        ]},
         { grid: [
           { label: '灌料', rowspan: 5 },
-          { label: '理论最低灌料重量g', key: '理论最低灌料重量g' },
-          { fixed: '0', span: 2, rowspan: 4 },
+          { label: '理论最低灌料重量g', span: 2 },
+          { key: '理论最低灌料重量g', span: 4 },
+          { fixed: '0', span: 4, rowspan: 4 },
         ]},
         { grid: [
-          { label: '理论灌料中间值g', key: '理论灌料中间值g' },
+          { label: '理论灌料中间值g', span: 2 },
+          { key: '理论灌料中间值g', span: 4 },
         ]},
         { grid: [
-          { label: '理论最高灌料重量g', key: '理论最高灌料重量g' },
+          { label: '理论最高灌料重量g', span: 2 },
+          { key: '理论最高灌料重量g', span: 4 },
         ]},
         { grid: [
-          { label: '理论水分', key: '理论水分' },
+          { label: '理论水分', span: 2 },
+          { key: '理论水分', span: 4 },
         ]},
         { grid: [
-          { label: '实际灌料重量计算公式', key: '实际灌料重量计算公式', span: 3 },
+          { label: '实际灌料重量计算公式', span: 2 },
+          { key: '实际灌料重量计算公式', span: 9 },
         ]},
         { grid: [
           { label: '烧结' },
-          { label: '烧结炉参数', key: '烧结炉参数' },
-          { label: '烧结时间/调速器参数', key: '烧结时间调速器参数' },
+          { label: '烧结炉参数', span: 2 },
+          { key: '烧结炉参数', span: 4 },
+          { label: '烧结时间/调速器参数' },
+          { key: '烧结时间调速器参数', span: 3 },
         ]},
         { grid: [
           { label: '热压' },
-          { label: '热压要求', key: '热压要求', span: 3 },
+          { label: '热压要求', span: 2 },
+          { key: '热压要求', span: 8 },
         ]},
         { grid: [
           { label: '冷却' },
-          { label: '冷却参数设置', key: '冷却参数设置', span: 3 },
+          { label: '冷却参数设置', span: 2 },
+          { key: '冷却参数设置', span: 8 },
         ]},
-        // 长度要求|重量要求 列标题(脱模列分组)
         { grid: [
-          { label: '', span: 1 },
-          { label: '长度要求', cap: true, span: 2 },
-          { label: '重量要求', cap: true, span: 2 },
+          { label: '' },
+          { label: '长度要求', cap: true, span: 6 },
+          { label: '重量要求', cap: true, span: 4 },
         ]},
         { grid: [
           { label: '脱模', rowspan: 3 },
-          { label: '最短长度mm', key: '最短长度mm' },
-          { label: '最低重量g', key: '最低重量g' },
+          { label: '最短长度mm', span: 2 },
+          { key: '最短长度mm', span: 4 },
+          { label: '最低重量g', span: 2 },
+          { key: '最低重量g', span: 2 },
         ]},
         { grid: [
-          { label: '中间值mm', key: '中间值mm' },
-          { label: '中间值g', key: '中间值g' },
+          { label: '中间值mm', span: 2 },
+          { key: '中间值mm', span: 4 },
+          { label: '中间值g', span: 2 },
+          { key: '中间值g', span: 2 },
         ]},
         { grid: [
-          { label: '最长长度mm', key: '最长长度mm' },
-          { label: '最高重量g', key: '最高重量g' },
+          { label: '最长长度mm', span: 2 },
+          { key: '最长长度mm', span: 4 },
+          { label: '最高重量g', span: 2 },
+          { key: '最高重量g', span: 2 },
         ]},
       ]},
-      // 检验要求:炭棒尺寸(捕获行+值行);密度/跌落/抗压/压降 各自三列键值对(管控要求文本在标签格内)
-      { bar: '检验要求', cols: [170, 140, 110, 140, 110, 180, 190], rows: [
+      { bar: '检验要求', rows: [
         { grid: [
           { label: '炭棒尺寸', rowspan: 2 },
-          { label: '外径mm', cap: true, span: 2 },
-          { label: '内径mm', cap: true, span: 2 },
-          { label: '内孔要求', cap: true },
-          { label: '' },
+          { label: '外径mm', span: 2 },
+          { label: '内径mm', span: 4 },
+          { label: '内孔要求', span: 4 },
         ]},
         { grid: [
           { key: '外径mm' },
           { key: '外径公差' },
           { key: '内径mm' },
-          { key: '内径公差' },
-          { key: '内孔要求' },
-          { fixed: '' },
+          { key: '内径公差', span: 3 },
+          { key: '内孔要求', span: 4 },
         ]},
         { grid: [
-          { label: '密度管控' },
-          { fixed: '·密度范围：0.575~0.595', span: 2 },
-          { label: '实际密度管控下限', key: '实际密度管控下限' },
-          { label: '实际密度管控上限', key: '实际密度管控上限' },
+          { label: '密度管控', rowspan: 2 },
+          { label: '管控要求', span: 2 },
+          { key: '实际密度管控下限', span: 4 },
+          { label: '实际密度管控上限', span: 4 },
         ]},
         { grid: [
-          { label: '跌落强度' },
-          { label: '高度cm', key: '跌落高度cm' },
-          { label: '跌落次数', key: '跌落次数' },
-          { label: '要求', key: '跌落要求' },
+          { label: '·密度范围：0.575~0.595', span: 2 },
+          { key: '密度管控要求', span: 4 },
+          { fixed: '', span: 4 },
         ]},
         { grid: [
-          { label: '抗压强度' },
-          { label: '测试间距mm', key: '测试间距mm' },
-          { label: '压头下降速度mm/min', key: '压头下降速度' },
-          { label: '强度要求kgf', key: '强度要求kgf' },
+          { label: '跌落强度', rowspan: 2 },
+          { label: '高度cm', span: 2 },
+          { key: '跌落次数', span: 4 },
+          { label: '要求', span: 4 },
         ]},
         { grid: [
-          { label: '压降' },
-          { label: '测试管路', key: '压降测试管路' },
-          { label: '测试流速L/min', key: '压降测试流速' },
-          { label: '压降标准kpa', key: '压降标准kpa' },
+          { key: '跌落高度cm', span: 2 },
+          { key: '跌落要求', span: 9 },
+        ]},
+        { grid: [
+          { label: '抗压强度', rowspan: 2 },
+          { label: '测试间距mm', span: 2 },
+          { key: '压头下降速度', span: 4 },
+          { label: '强度要求kgf', span: 4 },
+        ]},
+        { grid: [
+          { key: '测试间距mm', span: 2 },
+          { key: '强度要求kgf', span: 9 },
+        ]},
+        { grid: [
+          { label: '压降', rowspan: 2 },
+          { label: '测试管路', span: 2 },
+          { key: '压降测试流速', span: 4 },
+          { label: '压降标准kpa', span: 4 },
+        ]},
+        { grid: [
+          { key: '压降测试管路', span: 2 },
+          { key: '压降标准kpa', span: 9 },
         ]},
       ]},
     ],
     dataTables: [],
   },
-
   // 成型配方(炭棒配方管控清单):产品基本信息 + 配方表(动态行+合计) + 配料要求
   RD_MOLD_FORMULA: {
     headMode: 'report',
