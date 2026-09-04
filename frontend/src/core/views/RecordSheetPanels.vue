@@ -241,7 +241,12 @@
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
             <tr v-if="dt.bar">
-              <td :colspan="totalSpan(dt)" class="rs-sectionbar">{{ tt(dt.bar) }}</td>
+              <td :colspan="totalSpan(dt)" class="rs-sectionbar">
+                <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
+                  <span>{{ tt(dt.bar) }}</span>
+                  <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
+                </span>
+              </td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
             <tr v-if="dt.subHeads">
@@ -343,6 +348,28 @@
         </tr>
       </tbody>
     </table>
+
+    <!-- ═══ 标准库勾选弹窗(规格书检验要求) ═══ -->
+    <el-dialog v-model="libVisible" :title="tt('检验项目标准库')" width="880px" append-to-body>
+      <el-table
+        ref="libTableRef"
+        :data="cfg.testLib || []"
+        size="small"
+        border
+        max-height="480"
+        @selection-change="(sel) => (libChecked = sel)"
+      >
+        <el-table-column type="selection" width="42" />
+        <el-table-column prop="检验项目" :label="tt('检验项目')" min-width="150" />
+        <el-table-column prop="检验要求" :label="tt('检验要求')" min-width="240" />
+        <el-table-column prop="检验方法" :label="tt('检验方法')" min-width="140" />
+        <el-table-column prop="检验依据" :label="tt('检验依据')" min-width="110" />
+      </el-table>
+      <template #footer>
+        <el-button @click="libVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="confirmLib">{{ tt('追加选中项') }}({{ libChecked.length }})</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -424,6 +451,27 @@ function plainW(dt) {
 }
 function colsOf(dt) {
   return activeVariant.value?.cols || dt.cols || []
+}
+
+// ── 标准库勾选(规格书检验要求:测试项目汇总 26 类) ──
+const libVisible = ref(false)
+const libChecked = ref([])
+function openLib(dt) {
+  libTargetDt.value = dt
+  libChecked.value = []
+  libVisible.value = true
+}
+const libTargetDt = ref(null)
+function confirmLib() {
+  const dt = libTargetDt.value
+  if (!dt) return
+  const arr = touch()
+  for (const row of libChecked.value) {
+    arr.push({ 表区: dt.filterVal, ...row })
+  }
+  libChecked.value = []
+  libVisible.value = false
+  emit('dirty')
 }
 
 /** 数据表列宽是否自持(列带 w 时数据表用自己的 colgroup,与全页网格解耦——出货检验计划/规格书) */
@@ -907,6 +955,21 @@ function chartOf(dt) {
   color: #1c4f8a;
   font-weight: 700;
   border-color: #8fb4e0;
+}
+
+/* ═══ 标准库勾选按钮 ═══ */
+.rs-lib-btn {
+  font-size: 12px;
+  color: #0d5bd3;
+  border: 1px solid #8fb4e0;
+  border-radius: 3px;
+  padding: 1px 8px;
+  background: #f4f9ff;
+  cursor: pointer;
+  user-select: none;
+}
+.rs-lib-btn:hover {
+  background: #e8f2ff;
 }
 
 /* ═══ plain 版式:标题条 + 副标题行 + 页脚须知 ═══ */
