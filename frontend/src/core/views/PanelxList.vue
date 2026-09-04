@@ -1164,6 +1164,7 @@ watch(
     if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
     if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
     if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
+    if (!cur.value['文件管理人']) cur.value['文件管理人'] = '陈秀丽'
   },
 )
 
