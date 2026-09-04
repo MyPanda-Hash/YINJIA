@@ -87,36 +87,35 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)" :class="{ 'grp-first': i === 0 }">
+          <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
             <td class="c-level">
-              <span v-if="i > 0" class="ps-cell-text">{{ head['项目(一/二级)'] || '' }}</span>
               <el-select
-                v-else-if="editable"
-                v-model="head['项目(一/二级)']"
+                v-if="isGroupHead(i) && editable"
+                v-model="row['项目(一/二级)']"
                 size="small"
                 :clearable="false"
                 @change="emit('dirty')"
               >
                 <el-option v-for="o in selectOptions('项目(一/二级)')" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <span v-else class="ps-cell-text">{{ head['项目(一/二级)'] || '' }}</span>
+              <span v-else class="ps-cell-text">{{ row['项目(一/二级)'] || '' }}</span>
             </td>
             <td class="c-name">
               <el-select
-                v-if="i === 0 && editable"
-                v-model="head['项目名称']"
+                v-if="isGroupHead(i) && editable"
+                v-model="row['项目名称']"
                 filterable
                 allow-create
                 default-first-option
                 clearable
                 size="small"
                 :loading="refLoading"
-                @change="onPickProject"
+                @change="onPickProject(row)"
                 @input="emit('dirty')"
               >
                 <el-option v-for="o in refOptions" :key="o" :label="o" :value="o" />
               </el-select>
-              <span v-else-if="i === 0" class="ps-cell-text">{{ head['项目名称'] || '' }}</span>
+              <span v-else-if="isGroupHead(i)" class="ps-cell-text">{{ row['项目名称'] || '' }}</span>
             </td>
             <td class="c-sub">
               <el-input v-if="editable" v-model="row['子项目/尺寸']" size="small" class="ps-cell-input" maxlength="100" @input="emit('dirty')" />
@@ -171,6 +170,7 @@
               <span v-else class="ps-cell-text">{{ row['未批准原因'] || '' }}</span>
             </td>
             <td v-if="editable" class="c-op">
+              <span class="ps-addrow" :title="tt('在该项目后新增子项目')" @click="insertAfter(i)">＋</span>
               <span class="ps-del" :title="tt('删除该子项目')" @click="removeItem(i)">×</span>
             </td>
           </tr>
@@ -179,7 +179,7 @@
           </tr>
         </tbody>
       </table>
-      <div v-if="editable" class="ps-add" @click="addItem">＋ {{ tt('新增子项目') }}</div>
+      <div v-if="editable" class="ps-add" @click="addProject">＋ {{ tt('新增项目') }}</div>
     </div>
   </div>
 </template>
@@ -232,23 +232,38 @@ async function loadRefOptions() {
 onMounted(loadRefOptions)
 watch(() => props.editable, (v) => { if (v) loadRefOptions() })
 
-/** 选项目实施计划项目:带回同名字段(项目定级/测试内容/…),覆盖当前 head 对应键 */
-function onPickProject(v) {
-  const row = refRows.value.find((r) => r['项目名称'] === v)
-  if (row) {
+/** 选项目实施计划项目(组首行):带回实施计划同名字段到表头(隐藏保留),组名写回当前行 */
+function onPickProject(row) {
+  const v = row && row['项目名称']
+  const found = refRows.value.find((r) => r['项目名称'] === v)
+  if (found) {
     const keys = ['项目定级', '测试内容', '测试产品打样要求', '测试目标', '测试条件', '测试方法', '测试标准']
     for (const k of keys) {
-      if (row[k] != null && row[k] !== '') props.head[k] = row[k]
+      if (found[k] != null && found[k] !== '') props.head[k] = found[k]
     }
   }
   emit('dirty')
 }
 
-// ---------- 子项目行增删 ----------
-function addItem() {
+// ---------- 项目(组)/子项目 行增删 ----------
+/** 组首行:与上一行项目名称不同(或首行) → 显示 项目名称/层级 输入,否则并入上一组 */
+function isGroupHead(i) {
+  if (i <= 0) return true
+  return items.value[i]?.['项目名称'] !== items.value[i - 1]?.['项目名称']
+}
+/** 新增项目(文件面板内多个项目,每组一行起) */
+function addProject() {
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
-  d.items.push({})
+  d.items.push({ '项目名称': '', '项目(一/二级)': '一二级' })
+  emit('dirty')
+}
+/** 在当前子项目后插入同组新子项目(复制所属项目名称/层级) */
+function insertAfter(i) {
+  const d = props.head.detail
+  if (!Array.isArray(d.items)) return
+  const src = d.items[i] || {}
+  d.items.splice(i + 1, 0, { '项目名称': src['项目名称'], '项目(一/二级)': src['项目(一/二级)'] })
   emit('dirty')
 }
 function removeItem(i) {
@@ -441,6 +456,18 @@ function removeItem(i) {
   display: inline-block;
   width: 100%;
   word-break: break-all;
+}
+.ps-addrow {
+  display: inline-block;
+  color: #0d5bd3;
+  font-size: 14px;
+  cursor: pointer;
+  user-select: none;
+  line-height: 1;
+  margin-right: 4px;
+}
+.ps-addrow:hover {
+  font-weight: 700;
 }
 .ps-del {
   display: inline-block;

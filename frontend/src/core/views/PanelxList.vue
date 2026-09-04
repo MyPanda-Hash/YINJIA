@@ -1199,8 +1199,7 @@ watch(
     } else if (panelCode.value === 'RD_PLAN') {
       if (!cur.value['文件管理人']) cur.value['文件管理人'] = '陈秀丽'
     } else if (panelCode.value === 'RD_PROGRESS') {
-      // 原图默认值:层级=一二级;使用范围=工程技术中心
-      if (!['一二级', '二级', '三级', '四级'].includes(cur.value['项目(一/二级)'])) cur.value['项目(一/二级)'] = '一二级'
+      // 原图默认值:使用范围=工程技术中心(项目名称/层级在行级,新增项目时行内默认)
       if (!cur.value['文件使用范围']) cur.value['文件使用范围'] = '工程技术中心'
     }
   },
