@@ -18,10 +18,43 @@
       >{{ tt(pg.title) }}</div>
     </div>
 
-    <!-- ═══ 报告头(report 版式,仅封面页):公司名 | 文档编号 + 大标题 | 信息块 ═══ -->
+    <!-- ═══ 报告头(report 版式,仅封面页):公司名 | 文档编号 + 大标题 | 信息块;规格书=文档式封面 ═══ -->
     <table v-if="!isPlain && activePage === 0" class="rs-t rs-head-t" :style="{ width: gridW + 'px' }">
       <colgroup><col v-for="(w, i) in effGrid" :key="'hc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
+        <!-- 规格书文档式封面:公司名 → 大标题 → 逐行字段 → 章节 → 签名(按《规格书细分》设计图) -->
+        <template v-if="cfg.cover">
+          <tr><td :colspan="nCols" class="rsp-cover-company">惠州市银嘉环保科技有限公司</td></tr>
+          <tr><td :colspan="nCols" class="rsp-cover-title">产品规格书</td></tr>
+          <tr v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi">
+            <td :colspan="nCols" class="rsp-cover-line">
+              <span class="rsp-cover-label">{{ tt(fd.label) }}：</span>
+              <el-select v-if="editable && fd.type === 'select'" v-model="head[fd.key]" size="small" class="rsp-cover-input" :clearable="false" @change="emit('dirty')">
+                <el-option v-for="o in selectOptions(fd.key)" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+              <el-input v-else-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :maxlength="fd.max || 200" @input="emit('dirty')" />
+              <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
+            </td>
+          </tr>
+          <tr v-for="(ch, ci) in cfg.cover.chapters" :key="'ch' + ci">
+            <td :colspan="nCols" class="rsp-cover-line">
+              <span class="rsp-cover-label">{{ tt(ch.label) }}：</span>
+              <el-input v-if="editable" v-model="head[ch.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 5 }" size="small" class="rsp-cover-input" :maxlength="ch.max || 2000" @input="emit('dirty')" />
+              <span v-else class="rsp-cover-val rsp-pre">{{ head[ch.key] || '' }}</span>
+            </td>
+          </tr>
+          <tr class="rsp-cover-sign">
+            <td v-for="(sg, si) in cfg.cover.sign" :key="'sg' + si" class="rsp-sign-cell" :colspan="si === cfg.cover.sign.length - 1 ? nCols - (cfg.cover.sign.length - 1) * 3 : 3">
+              <div class="rsp-sign-label">{{ tt(sg.label) }}</div>
+              <div class="rsp-sign-val">
+                <el-input v-if="editable" v-model="head[sg.key]" size="small" class="rs-c-in" maxlength="100" @input="emit('dirty')" />
+                <span v-else class="rsp-cover-val">{{ head[sg.key] || '' }}</span>
+              </div>
+            </td>
+          </tr>
+        </template>
+        <!-- 标准报告头(其它文书面板) -->
+        <template v-else>
         <tr>
           <td class="rs-td rs-company-cell" :colspan="nCols - 1">惠州市银嘉环保科技有限公司</td>
           <td class="rs-td rs-docno">
@@ -53,6 +86,7 @@
             <template v-else>{{ head[effInfo[ii].key] || '' }}</template>
           </td>
         </tr>
+        </template>
       </tbody>
     </table>
 
@@ -62,8 +96,19 @@
       <tbody>
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
 
+        <!-- 文档式行(规格书 P4 章节:6.包装方式/7.运输要求/8.存储环境 无表格线) -->
+        <template v-if="sec.doc">
+          <tr v-for="(row, ri) in sec.rows" :key="'dl' + ri">
+            <td :colspan="secCols(sec).length" class="rsp-doccell">
+              <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
+              <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
+              <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
+            </td>
+          </tr>
+        </template>
+
         <!-- 键值对行(产品基本信息/检验计划信息行):pairs=[{label,key,type,vspan,cells}] 逐格铺网格 -->
-        <template v-for="(row, ri) in sec.rows" :key="'pr' + ri">
+        <template v-for="(row, ri) in sec.rows" v-if="!sec.doc" :key="'pr' + ri">
           <tr v-if="row.pairs">
             <template v-for="(pair, pi) in row.pairs" :key="'p' + pi">
               <td class="rs-td rs-label" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
@@ -960,6 +1005,92 @@ function chartOf(dt) {
   color: #1c4f8a;
   font-weight: 700;
   border-color: #8fb4e0;
+}
+
+/* ═══ 规格书文档式封面(按设计图:无表格线) ═══ */
+.rsp-cover-company {
+  border: none !important;
+  padding: 18px 0 0 8px !important;
+  font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
+  font-size: 15px;
+  color: #333;
+}
+.rsp-cover-title {
+  border: none !important;
+  text-align: center;
+  font-family: 'SimSun', 'Songti SC', serif;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: 6px;
+  padding: 40px 0 30px !important;
+}
+.rsp-cover-line {
+  border: none !important;
+  padding: 3px 0 3px 90px !important;
+  font-size: 16px;
+  color: #222;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.rsp-cover-label {
+  flex: none;
+  min-width: 96px;
+  font-family: 'SimSun', 'Songti SC', serif;
+  color: #333;
+}
+.rsp-cover-input {
+  flex: 1;
+  max-width: 480px;
+}
+.rsp-cover-input :deep(.el-input__inner),
+.rsp-cover-input :deep(.el-textarea__inner) {
+  font-size: 16px;
+  font-family: 'SimSun', 'Songti SC', serif;
+  padding: 0;
+}
+.rsp-cover-val {
+  font-family: 'SimSun', 'Songti SC', serif;
+}
+.rsp-cover-sign {
+  margin-top: 10px;
+}
+.rsp-sign-cell {
+  border: 1px solid #7f7f7f !important;
+  padding: 6px 10px !important;
+  text-align: center;
+}
+.rsp-sign-label {
+  font-size: 13px;
+  color: #333;
+  border-bottom: 1px solid #c9c9c9;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+.rsp-sign-val :deep(.el-input__inner) {
+  text-align: center;
+}
+
+/* ═══ 文档式章节行(规格书 P4) ═══ */
+.rsp-doccell {
+  border: none !important;
+  padding: 4px 0 4px 16px !important;
+  font-size: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.rsp-doclabel {
+  flex: none;
+  min-width: 130px;
+  font-family: 'SimSun', 'Songti SC', serif;
+  color: #333;
+}
+.rsp-docinput {
+  flex: 1;
+}
+.rsp-docval {
+  font-family: 'SimSun', 'Songti SC', serif;
 }
 
 /* ═══ 标准库勾选按钮 ═══ */

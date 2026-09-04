@@ -794,6 +794,27 @@ export const recordSheetConfigs = {
   RD_SPEC_DOC: {
     headMode: 'report',
     staticTitle: '产品规格书',
+    cover: {
+      fields: [
+        { label: '名称', key: '名称' },
+        { label: '编号', key: '编号' },
+        { label: '客户名', key: '客户名' },
+        { label: '客户料号', key: '客户料号' },
+        { label: '版本', key: '版本' },
+        { label: '日期', key: '日期' },
+        { label: '规格书种类', key: '规格书种类', type: 'select' },
+      ],
+      sign: [
+        { label: '制订/日期', key: '制订日期' },
+        { label: '审核/日期', key: '审核日期' },
+        { label: '批准/日期', key: '批准日期' },
+      ],
+      chapters: [
+        { label: '1.适用范围', key: '适用范围' },
+        { label: '2.整体规格参数', key: '整体规格参数' },
+        { label: '3.产品主要性能', key: '产品主要性能' },
+      ],
+    },
 
     specTypes: ['飞利浦沐浴阻垢滤芯', '矿化烧结炭棒', '迈博瑞复合滤芯', '除铅炭棒', '抑菌炭棒', 'X14折叠复合滤芯', '碱性炭棒', '矿化炭棒', '多功能炭棒'],
     pages: [
@@ -805,41 +826,10 @@ export const recordSheetConfigs = {
     grid: [100, 300, 100, 240, 100, 100, 100, 110],
     head: { title: 5, infoLabel: 1, infoValue: 2 },
     sections: [
-      { page: 0, rows: [
-        { pairs: [
-          { label: '名称', key: '名称', type: 'text', vspan: 7 },
-        ]},
-        { pairs: [
-          { label: '编号', key: '编号', type: 'text', vspan: 7 },
-        ]},
-        { pairs: [
-          { label: '客户名', key: '客户名', vspan: 7 },
-        ]},
-        { pairs: [
-          { label: '客户料号', key: '客户料号', vspan: 7 },
-        ]},
-        { pairs: [
-          { label: '版本', key: '版本', vspan: 7 },
-        ]},
-        { pairs: [
-          { label: '日期', key: '日期', vspan: 7 },
-        ]},
-        { pairs: [
-          { label: '规格书种类', key: '规格书种类', type: 'select', vspan: 7 },
-        ]},
-        { pairs: [
-          { label: '制订日期', key: '制订日期' },
-          { label: '审核日期', key: '审核日期' },
-          { label: '批准日期', key: '批准日期', vspan: 4 },
-        ]},
-        { label: '1.适用范围', key: '适用范围', type: 'area', tall: true },
-        { label: '2.整体规格参数', key: '整体规格参数', type: 'area', tall: true },
-        { label: '3.产品主要性能', key: '产品主要性能', type: 'area' },
-      ]},
-      { page: 3, rows: [
-        { label: '6.包装方式', key: '包装方式', type: 'area', tall: true },
-        { label: '7.运输要求', key: '运输要求', type: 'area', tall: true },
-        { label: '8.存储环境', key: '存储环境', type: 'area', tall: true },
+      { page: 3, doc: true, rows: [
+        { label: '6.包装方式', key: '包装方式', area: true },
+        { label: '7.运输要求', key: '运输要求', area: true },
+        { label: '8.存储环境', key: '存储环境', area: true },
       ]},
     ],
     dataTables: [
