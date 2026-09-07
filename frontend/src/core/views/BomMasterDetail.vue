@@ -117,6 +117,26 @@
               <span v-else>{{ row['规格型号'] || '' }}</span>
             </template>
           </el-table-column>
+          <el-table-column prop="物料种类" label="物料种类" width="110">
+            <template #default="{ row }">
+              <el-select v-if="editable" v-model="row['物料种类']" filterable allow-create clearable @change="emitRows">
+                <el-option v-for="o in materialTypes" :key="o" :label="o" :value="o" />
+              </el-select>
+              <span v-else>{{ row['物料种类'] || '' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="物料规格" label="物料规格(外径/内径/长度)" min-width="160" show-overflow-tooltip>
+            <template #default="{ row }">
+              <el-input v-if="editable" v-model="row['物料规格']" placeholder="外径： mm 内径： mm 长度： mm" @change="emitRows" />
+              <span v-else>{{ row['物料规格'] || '' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="外观要求" label="外观要求" min-width="180" show-overflow-tooltip>
+            <template #default="{ row }">
+              <el-input v-if="editable" v-model="row['外观要求']" placeholder="无脏污、破损等" @change="emitRows" />
+              <span v-else>{{ row['外观要求'] || '' }}</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="子件计量单位" label="单位" width="110">
             <template #default="{ row }">
               <el-select v-if="editable" v-model="row['子件计量单位']" filterable allow-create @change="emitRows">
@@ -188,6 +208,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:rows'])
 
+/** 物料种类(来自产品文件·成型配方/组装BOM) */
+const materialTypes = ['炭粉', '胶粉', '折算物料', '包装材料', '辅助材料']
 const PARENT_KEYS = [
   '物料清单编码', '父件编码', '父件名称', '版本号', '默认BOM',
   '计量单位', '生产数量', '生产车间', '虚拟件', '预入仓库',
