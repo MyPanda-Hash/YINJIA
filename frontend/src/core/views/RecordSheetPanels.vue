@@ -406,6 +406,22 @@
       </div>
     </div>
 
+    <!-- ═══ 表尾文档式章节行(规格书第4页:5.关键物料列表数据表之后跟 6-8 章节) ═══ -->
+    <table v-for="(sec, si) in cfg.tailDocSections || []" v-show="pageOf(sec) === activePage" :key="'tds' + si" class="rs-t" :style="{ width: gridW + 'px' }">
+      <colgroup><col v-for="(w, i) in secCols(sec)" :key="'tdc' + i" :style="{ width: w + 'px' }" /></colgroup>
+      <tbody>
+        <tr v-for="(row, ri) in sec.rows" :key="'tdr' + ri">
+          <td :colspan="secCols(sec).length" class="rsp-doccell">
+            <div class="rsp-docrow">
+              <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
+              <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
+              <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
     <!-- ═══ 表尾区(成型配方:配料要求——数据表之后) ═══ -->
     <table v-for="(sec, si) in cfg.tailSections || []" :key="'ts' + si" class="rs-t" :style="{ width: gridW + 'px' }">
       <colgroup><col v-for="(w, i) in effGrid" :key="'tc' + i" :style="{ width: w + 'px' }" /></colgroup>

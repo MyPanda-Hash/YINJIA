@@ -839,6 +839,9 @@ export const recordSheetConfigs = {
           { label: '2.整体规格参数', key: '整体规格参数' },
           { label: '3.产品主要性能', key: '产品主要性能' },
         ]},
+    ],
+    // 第 4 页(成品及包装运输):5.关键物料列表(数据表)在上,6-8 章节行在下(tailDoc=数据表之后渲染)
+    tailDocSections: [
       { page: 3, doc: true, rows: [
         { label: '6.包装方式', key: '包装方式', area: true },
         { label: '7.运输要求', key: '运输要求', area: true },
