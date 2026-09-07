@@ -1121,5 +1121,8 @@ export default {
     '责任人': 'Owner',
     '物料规格': 'Material Spec',
     '表区': 'Section',
+    /* ── 组装工艺清单 标签 ── */
+    '工序控制内容': 'Process Control Content',
+    '检查比例': 'Inspection Ratio',
   },
 }
