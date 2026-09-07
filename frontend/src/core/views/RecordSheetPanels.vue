@@ -533,22 +533,23 @@
       </template>
     </el-dialog>
 
-    <!-- ═══ 字段编辑(数据记录表):列名/显隐 可改,应对复杂测试环境 ═══ -->
+    <!-- ═══ 字段编辑(数据记录表/成型工艺):列名/显隐 可改,应对复杂测试环境 ═══ -->
     <el-dialog v-model="fieldEditVisible" :title="tt('字段编辑')" width="620px" append-to-body>
-      <el-table :data="fieldEditRows" size="small" border max-height="420">
-        <el-table-column prop="key" :label="tt('字段键')" width="150" show-overflow-tooltip />
-        <el-table-column prop="label" :label="tt('原名')" width="140" show-overflow-tooltip />
-        <el-table-column :label="tt('显示名称')" min-width="160">
-          <template #default="{ row }">
-            <el-input v-model="row.alias" size="small" :placeholder="row.label" clearable />
-          </template>
-        </el-table-column>
-        <el-table-column :label="tt('显示')" width="60" align="center">
-          <template #default="{ row }">
-            <el-checkbox v-model="row.visible" />
-          </template>
-        </el-table-column>
-      </el-table>
+      <div class="fe-list">
+        <div v-for="(row, idx) in fieldEditRows" :key="idx" class="fe-row">
+          <span class="fe-key" :title="row.key">{{ row.key }}</span>
+          <span class="fe-label">{{ row.label }}</span>
+          <el-input
+            :model-value="row.alias"
+            @update:model-value="(v) => { row.alias = v }"
+            size="small"
+            :placeholder="row.label"
+            clearable
+            class="fe-alias"
+          />
+          <el-checkbox :model-value="row.visible" @update:model-value="(v) => { row.visible = v }" class="fe-vis" />
+        </div>
+      </div>
       <div style="margin-top:8px;color:#909399;font-size:12px">{{ tt('留空=沿用原名;修改全局生效(所有用户共享)') }}</div>
       <template #footer>
         <el-button @click="fieldEditVisible = false">{{ tt('取消') }}</el-button>
@@ -1367,6 +1368,50 @@ function chartOf(dt) {
 }
 .rsp-lib-pick:hover {
   background: #ecf2fb;
+}
+
+/* 字段编辑弹窗列表(普通 v-for,不用 el-table 避免响应性问题) */
+.fe-list {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 4px 0;
+}
+.fe-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.fe-row:last-child {
+  border-bottom: none;
+}
+.fe-key {
+  flex: none;
+  width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #606266;
+}
+.fe-label {
+  flex: none;
+  width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #909399;
+}
+.fe-alias {
+  flex: 1;
+  min-width: 120px;
+}
+.fe-vis {
+  flex: none;
 }
 
 /* 字段编辑按钮(数据表区块条右侧,单据外围) */
