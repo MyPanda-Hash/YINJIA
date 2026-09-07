@@ -306,17 +306,49 @@
               <td v-for="(sh, shi) in spreadSubHeads(dt)" :key="'sh' + shi" :colspan="sh.span" class="rs-subhead">{{ tt(sh.label) }}</td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
-            <tr class="rs-grp" :class="{ 'rsp-design': dt.design }">
-              <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
-                <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(g.label) }}</th>
-                <th v-else-if="g.kind === 'group'" class="rs-th" :style="designThStyle(dt)" :colspan="g.span">{{ tt(g.label) }}</th>
-              </template>
-              <th v-if="editable" class="rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
+            <!-- 分组式设计表头(检验项目及标准:检验项目跨 组/子项目 两列,单行表头) -->
+            <tr v-if="dt.design?.groupCol" class="rs-grp rsp-design">
+              <th class="rs-th" :style="designThStyle(dt)">{{ tt('序号') }}</th>
+              <th class="rs-th" :style="designThStyle(dt)" colspan="2">{{ tt('检验项目') }}</th>
+              <th class="rs-th" :style="designThStyle(dt)">{{ tt('检验要求') }}</th>
+              <th class="rs-th" :style="designThStyle(dt)">{{ tt('检验方法') }}</th>
+              <th class="rs-th" :style="designThStyle(dt)">{{ tt('检验依据') }}</th>
+              <th v-if="editable" class="rs-th-op"></th>
             </tr>
-            <tr v-if="hasGroup(dt)" class="rs-grp2">
-              <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th" :colspan="(c.span || 1) > 1 ? c.span : undefined">{{ tt(c.label) }}</th>
-            </tr>
-            <tr v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }">
+            <template v-else>
+              <tr class="rs-grp" :class="{ 'rsp-design': dt.design }">
+                <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
+                  <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(g.label) }}</th>
+                  <th v-else-if="g.kind === 'group'" class="rs-th" :style="designThStyle(dt)" :colspan="g.span">{{ tt(g.label) }}</th>
+                </template>
+                <th v-if="editable" class="rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
+              </tr>
+              <tr v-if="hasGroup(dt)" class="rs-grp2">
+                <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th" :colspan="(c.span || 1) > 1 ? c.span : undefined">{{ tt(c.label) }}</th>
+              </tr>
+            </template>
+            <!-- 分组式数据行(检验项目及标准:序号/组跨行,子项目列,要求/方法/依据可编辑) -->
+            <template v-if="dt.design?.groupCol">
+              <tr v-for="r in designGroupRows(dt)" :key="r.key" class="rsp-design">
+                <td class="rs-td" :style="designTdStyle(dt, 'seq')" :rowspan="r.groupFirst ? r.group.count : undefined">{{ r.groupFirst ? r.seq : '' }}</td>
+                <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.groupFirst ? r.group.count : undefined" :colspan="r.standalone ? 2 : 1">{{ r.groupFirst ? tt(r.group.label) : '' }}</td>
+                <td v-if="!r.standalone" class="rs-td" :style="designTdStyle(dt, 'item')">{{ tt(r.sub || '') }}</td>
+                <td class="rs-td" :style="designTdStyle(dt, 'req')">
+                  <el-input v-if="editable" v-model="r.row['检验要求']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />
+                  <span v-else class="rs-txt rsp-cell rsp-pre">{{ r.row['检验要求'] || ' / ' }}</span>
+                </td>
+                <td class="rs-td" :style="designTdStyle(dt, 'method')">
+                  <el-input v-if="editable" v-model="r.row['检验方法']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />
+                  <span v-else class="rs-txt rsp-cell rsp-pre">{{ r.row['检验方法'] || ' / ' }}</span>
+                </td>
+                <td class="rs-td" :style="designTdStyle(dt, 'basis')">
+                  <el-input v-if="editable" v-model="r.row['检验依据']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />
+                  <span v-else class="rs-txt rsp-cell rsp-pre">{{ r.row['检验依据'] || ' / ' }}</span>
+                </td>
+                <td v-if="editable" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(r.row)">×</span></td>
+              </tr>
+            </template>
+            <tr v-else v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }">
               <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :style="designTdStyle(dt)" :colspan="(c.span || 1) > 1 ? c.span : undefined">
                 <el-input v-if="editable && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
                 <el-input v-else-if="editable" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
@@ -402,9 +434,28 @@
       </tbody>
     </table>
 
-    <!-- ═══ 标准库勾选弹窗(规格书检验要求/出货检验计划必测项+型式项) ═══ -->
-    <el-dialog v-model="libVisible" :title="tt('检验项目标准库')" width="920px" append-to-body>
+    <!-- ═══ 标准库勾选弹窗(规格书检验要求:分组标准库;出货检验计划必测项+型式项:扁平表格) ═══ -->
+    <el-dialog v-model="libVisible" :title="tt('检验项目标准库')" width="880px" append-to-body>
+      <template v-if="libRows.length && Array.isArray(libRows[0].subs)">
+        <el-scrollbar max-height="520">
+          <div v-for="(g, gi) in libRows" :key="'lg' + gi" class="lib-group">
+            <div class="lib-group-name">{{ tt(g.name) }}</div>
+            <div class="lib-group-subs">
+              <el-checkbox
+                v-for="(s, si) in g.subs"
+                :key="'ls' + gi + '-' + si"
+                :model-value="libChecked.includes(gi + ':' + si)"
+                @change="(v) => toggleLib(gi + ':' + si, !!v)"
+              >
+                <span class="lib-sub-name">{{ s.name ? tt(s.name) : tt('（项目）') }}</span>
+                <span class="lib-sub-req">{{ (s.req || '').split('\n')[0].slice(0, 26) }}</span>
+              </el-checkbox>
+            </div>
+          </div>
+        </el-scrollbar>
+      </template>
       <el-table
+        v-else
         :data="libRows"
         size="small"
         border
@@ -529,23 +580,47 @@ function colsOf(dt) {
   return activeVariant.value?.cols || dt.cols || []
 }
 
-// ── 标准库勾选(规格书检验要求 26 类 / 出货检验计划 必测项+型式项) ──
+// ── 标准库勾选(规格书检验要求 26 组分组标准库 / 出货检验计划 必测项+型式项) ──
 const libVisible = ref(false)
 const libChecked = ref([])
 const libRows = ref([])
 function openLib(dt) {
   libTargetDt.value = dt
-  libRows.value = dt.lib || cfg.value?.testLib || []
+  // dt.lib 为数组(出货检验计划两套标准库)或 true(规格书用面板级 testLib)
+  libRows.value = Array.isArray(dt.lib) ? dt.lib : (cfg.value?.testLib || [])
   libChecked.value = []
   libVisible.value = true
+}
+/** 分组标准库勾选(键=组下标:子项下标);扁平表格走 el-table selection-change */
+function toggleLib(key, on) {
+  const i = libChecked.value.indexOf(key)
+  if (on && i < 0) libChecked.value = [...libChecked.value, key]
+  else if (!on && i >= 0) libChecked.value = libChecked.value.filter((k) => k !== key)
 }
 const libTargetDt = ref(null)
 function confirmLib() {
   const dt = libTargetDt.value
   if (!dt) return
   const arr = touch()
-  for (const row of libChecked.value) {
-    arr.push(dt.filterKey ? { [dt.filterKey]: dt.filterVal, ...row } : { ...row })
+  const grouped = libRows.value.length && Array.isArray(libRows.value[0].subs)
+  if (grouped) {
+    for (const key of libChecked.value) {
+      const [gi, si] = key.split(':').map(Number)
+      const g = libRows.value[gi]
+      const s = g && g.subs[si]
+      if (!g || !s) continue
+      arr.push({
+        '表区': dt.filterVal,
+        '检验项目': s.name ? g.name + '·' + s.name : g.name,
+        '检验要求': s.req || '',
+        '检验方法': s.method || '',
+        '检验依据': s.basis || '',
+      })
+    }
+  } else {
+    for (const row of libChecked.value) {
+      arr.push(dt.filterKey ? { [dt.filterKey]: dt.filterVal, ...row } : { ...row })
+    }
   }
   libChecked.value = []
   libVisible.value = false
@@ -583,14 +658,35 @@ function designThStyle(dt) {
   const d = dt.design
   return { height: dpx(dt, d.headerH || 22) + 'px', fontSize: dpx(dt, d.fontSize || 11) + 'px', background: '#fff', color: '#333' }
 }
-function designTdStyle(dt) {
+function designTdStyle(dt, alignKey) {
   if (!dt.design) return null
   const d = dt.design
-  return { height: dpx(dt, d.rowH || 21) + 'px', fontSize: dpx(dt, d.fontSize || 11) + 'px', textAlign: 'center' }
+  const alignMap = { seq: 'center', item: 'center', sub: 'center', req: 'left', method: 'left', basis: 'left' }
+  const style = { fontSize: dpx(dt, d.fontSize || 11) + 'px', textAlign: alignMap[alignKey] || 'center' }
+  if (d.rowH) style.height = dpx(dt, d.rowH) + 'px'
+  return style
 }
 function designInputStyle(dt) {
   if (!dt.design) return null
   return { fontSize: dpx(dt, dt.design.fontSize || 11) + 'px', textAlign: 'center' }
+}
+
+// ── 分组式设计表(检验项目及标准):行按「组·子项」前缀分组,组跨行、序号按组编号 ──
+function designGroupRows(dt) {
+  const out = []
+  let g = null
+  for (const row of rowsOf(dt)) {
+    const label = row['检验项目'] || ''
+    const dot = label.indexOf('·')
+    const gLabel = dot >= 0 ? label.slice(0, dot) : label
+    const sub = dot >= 0 ? label.slice(dot + 1) : ''
+    if (!g || g.label !== gLabel) {
+      g = { label: gLabel, count: 0, seq: out.filter((x) => x.groupFirst).length + 1 }
+    }
+    g.count++
+    out.push({ key: 'gr' + out.length, row, group: g, groupFirst: g.count === 1, sub, standalone: dot < 0, seq: g.seq })
+  }
+  return out
 }
 
 // ── 键值对行(产品基本信息等):pair {label,key,type,vspan,cells:[{key}](多值格,如炭棒规格3格)} ──
@@ -934,6 +1030,36 @@ function chartOf(dt) {
 .rsp-design-t .el-textarea__inner {
   font-size: inherit !important;
   text-align: center;
+}
+
+/* 分组式设计单元格(检验项目及标准):要求/方法/依据 左对齐多行文本 */
+.rsp-area-left .el-textarea__inner {
+  text-align: left;
+}
+
+/* 标准库勾选(分组) */
+.lib-group {
+  margin-bottom: 6px;
+}
+.lib-group-name {
+  background: #f5f7fa;
+  border-left: 3px solid #d3a6a9;
+  font-weight: 600;
+  padding: 4px 8px;
+}
+.lib-group-subs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 18px;
+  padding: 6px 8px;
+}
+.lib-sub-name {
+  font-weight: 600;
+}
+.lib-sub-req {
+  color: #909399;
+  font-size: 12px;
+  margin-left: 4px;
 }
 
 /* ═══ 条件区特例 ═══ */
