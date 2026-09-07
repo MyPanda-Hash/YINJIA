@@ -100,7 +100,7 @@
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
           <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
             <span>{{ tt(sec.bar) }}</span>
-            <span v-if="editable && si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+            <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
 
@@ -306,7 +306,7 @@
                 <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
                   <span>{{ tt(dt.bar) }}</span>
                   <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
-                  <span v-if="editable && di === 0" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+                  <span v-if="di === 0" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
                 </span>
               </td>
               <td v-if="editable" class="rsp-op-pad"></td>
