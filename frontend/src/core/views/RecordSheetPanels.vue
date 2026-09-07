@@ -306,6 +306,7 @@
                 <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
                   <span>{{ tt(dt.bar) }}</span>
                   <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
+                  <span v-if="dt.materialPick && editable" class="rs-lib-btn" style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(dt)">📦 {{ tt('从物料清单引用') }}</span>
                   <span v-if="di === 0" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
                 </span>
               </td>
@@ -536,6 +537,24 @@
     </el-dialog>
 
     <!-- ═══ 章节标准库(yj_std_lib,lib=spec.section):点击填入 / 自行补充 / 删除 ═══ -->
+    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用')" width="860px" append-to-body>
+      <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索物料名/编号/规格')" clearable style="margin-bottom:8px;width:300px" @input="filterMatPick" />
+      <el-table :data="matPickFiltered" size="small" border max-height="420" @selection-change="(sel) => (matPickChecked = sel)">
+        <el-table-column type="selection" width="42" />
+        <el-table-column prop="子件编码" :label="tt('物料编号')" width="100" />
+        <el-table-column prop="子件名称" :label="tt('物料名')" width="120" />
+        <el-table-column prop="物料种类" :label="tt('物料种类')" width="90" />
+        <el-table-column prop="物料规格" :label="tt('物料规格')" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="外观要求" :label="tt('外观要求')" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="子件计量单位" :label="tt('单位')" width="60" />
+      </el-table>
+      <template #footer>
+        <el-button @click="matPickVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="confirmMaterialPick">{{ tt('追加选中项') }}({{ matPickChecked.length }})</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ═══ 章节标准库(yj_std_lib,lib=spec.section) ═══ -->
     <el-dialog v-model="secLibVisible" :title="tt('章节标准库') + ' · ' + tt(secLibLabel)" width="720px" append-to-body>
       <div class="sec-lib-list">
         <div v-for="e in secLibRows" :key="e.id" class="sec-lib-item" @click="applySectionLib(e.content)">
@@ -1142,6 +1161,56 @@ watch(() => [props.editable, props.head], ([v]) => {
     }
   }
 })
+
+// ── 从物料清单引用(基础档案 BOM 面板数据):勾选后回填 物料名/编号/规格/外观要求 ──
+const matPickVisible = ref(false)
+const matPickRows = ref([])
+const matPickFiltered = ref([])
+const matPickChecked = ref([])
+const matPickKeyword = ref('')
+const matPickTargetDt = ref(null)
+async function openMaterialPick(dt) {
+  matPickTargetDt.value = dt
+  matPickKeyword.value = ''
+  matPickChecked.value = []
+  matPickVisible.value = true
+  try {
+    const res = await request.post('/px/queryFormDataList', { panelCode: 'BOM', condition: {}, pageNo: 1, pageSize: 500 })
+    const rows = res?.data?.rows || res?.data || []
+    matPickRows.value = rows
+    matPickFiltered.value = rows
+  } catch (e) {
+    matPickRows.value = []
+    matPickFiltered.value = []
+  }
+}
+function filterMatPick() {
+  const kw = (matPickKeyword.value || '').trim().toLowerCase()
+  if (!kw) { matPickFiltered.value = matPickRows.value; return }
+  matPickFiltered.value = matPickRows.value.filter((r) =>
+    String(r['子件名称'] || '').toLowerCase().includes(kw) ||
+    String(r['子件编码'] || '').toLowerCase().includes(kw) ||
+    String(r['物料规格'] || '').toLowerCase().includes(kw)
+  )
+}
+function confirmMaterialPick() {
+  const dt = matPickTargetDt.value
+  if (!dt) return
+  const arr = touch()
+  for (const m of matPickChecked.value) {
+    arr.push({
+      '表区': dt.filterVal,
+      '物料名': m['子件名称'] || '',
+      '物料编号': m['子件编码'] || '',
+      '物料规格': m['物料规格'] || '',
+      '外观要求': m['外观要求'] || '',
+      '用量': '',
+    })
+  }
+  matPickChecked.value = []
+  matPickVisible.value = false
+  emit('dirty')
+}
 
 // ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──
 const secLibVisible = ref(false)
@@ -2038,7 +2107,8 @@ function chartOf(dt) {
   body.approval-printing .rs-op-del,
   body.approval-printing .rs-field-edit-btn,
   body.approval-printing .rsp-lib-pick,
-  body.approval-printing .rs-lib-btn {
+  body.approval-printing .rs-lib-btn,
+  body.approval-printing [style*="从物料清单引用"] {
     display: none !important;
   }
   /* 打印为纯文书:页签条不打印;格式区条(4.检验标准/5.关键物料列表等)去背景色 */

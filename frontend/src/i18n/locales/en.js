@@ -1250,5 +1250,10 @@ export default {
     '显示名称': 'Display Name',
     '显示': 'Show',
     '留空=沿用原名;修改全局生效(所有用户共享)': 'Empty = keep original; changes are global (shared by all users)',
+    /* ── 物料清单引用 ── */
+    '从物料清单引用': 'Pick from Materials',
+    '搜索物料名/编号/规格': 'Search name / code / spec',
+    '物料名': 'Material Name',
+    '物料编号': 'Material Code',
   },
 }
