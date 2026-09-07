@@ -301,6 +301,7 @@
                 <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
                   <span>{{ tt(dt.bar) }}</span>
                   <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
+                  <span v-if="editable && di === 0" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
                 </span>
               </td>
               <td v-if="editable" class="rsp-op-pad"></td>
@@ -321,13 +322,13 @@
             <template v-else>
               <tr class="rs-grp" :class="{ 'rsp-design': dt.design }">
                 <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
-                  <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(g.label) }}</th>
+                  <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(effColLabel(g.key || g.label, g.label)) }}</th>
                   <th v-else-if="g.kind === 'group'" class="rs-th" :style="designThStyle(dt)" :colspan="g.span">{{ tt(g.label) }}</th>
                 </template>
                 <th v-if="editable" class="rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
               </tr>
               <tr v-if="hasGroup(dt)" class="rs-grp2">
-                <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th" :colspan="(c.span || 1) > 1 ? c.span : undefined">{{ tt(c.label) }}</th>
+                <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th" :colspan="(c.span || 1) > 1 ? c.span : undefined">{{ tt(effColLabel(c.key, c.label)) }}</th>
               </tr>
             </template>
             <!-- 分组式数据行(检验项目及标准:序号/组跨行,子项目列,要求/方法/依据可编辑) -->
@@ -526,6 +527,29 @@
         <el-button @click="secLibVisible = false">{{ tt('关闭') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- ═══ 字段编辑(数据记录表):列名/显隐 可改,应对复杂测试环境 ═══ -->
+    <el-dialog v-model="fieldEditVisible" :title="tt('字段编辑')" width="620px" append-to-body>
+      <el-table :data="fieldEditRows" size="small" border max-height="420">
+        <el-table-column prop="key" :label="tt('字段键')" width="150" show-overflow-tooltip />
+        <el-table-column prop="label" :label="tt('原名')" width="140" show-overflow-tooltip />
+        <el-table-column :label="tt('显示名称')" min-width="160">
+          <template #default="{ row }">
+            <el-input v-model="row.alias" size="small" :placeholder="row.label" clearable />
+          </template>
+        </el-table-column>
+        <el-table-column :label="tt('显示')" width="60" align="center">
+          <template #default="{ row }">
+            <el-checkbox v-model="row.visible" />
+          </template>
+        </el-table-column>
+      </el-table>
+      <div style="margin-top:8px;color:#909399;font-size:12px">{{ tt('留空=沿用原名;修改全局生效(所有用户共享)') }}</div>
+      <template #footer>
+        <el-button @click="fieldEditVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="saveFieldEdit">{{ tt('保存') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -542,7 +566,7 @@ const props = defineProps({
   editable: { type: Boolean, default: false },
   panelCode: { type: String, required: true },
 })
-const emit = defineEmits(['dirty'])
+const emit = defineEmits(['dirty', 'refresh-config'])
 
 const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
 const isPlain = computed(() => cfg.value?.headMode === 'plain')
@@ -830,6 +854,52 @@ function selectOptions(key) {
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
 }
 
+// ── 字段编辑(数据记录表):列名可改,应对复杂测试环境 ──
+/** 动态列头标签:优先取后端 yj_field 的 alias/displayName,缺省回退配置硬编码 label */
+function effColLabel(key, fallback) {
+  const f = fieldMap.value.get(key)
+  return f?.displayName || f?.alias || fallback || key
+}
+
+const fieldEditVisible = ref(false)
+const fieldEditRows = ref([])
+function openFieldEdit() {
+  const rows = []
+  for (const dt of cfg.value?.dataTables || []) {
+    for (const c of dt.cols || []) {
+      if (c.hiddenCol) continue
+      const f = fieldMap.value.get(c.key)
+      rows.push({
+        key: c.key,
+        label: c.label,                  // 配置硬编码(原文)
+        alias: f?.displayName || '',     // 当前别名(yj_field)
+        visible: f ? !f.hidden : true,
+      })
+    }
+  }
+  fieldEditRows.value = rows
+  fieldEditVisible.value = true
+}
+async function saveFieldEdit() {
+  try {
+    // saveColumnProps 按 label(=col_name 中文键)定位字段
+    await request.post('/px/saveColumnPrefs', {
+      panelCode: props.panelCode,
+      columns: fieldEditRows.value.map((r) => ({
+        label: r.key,
+        alias: r.alias || '',
+        visible: !!r.visible,
+      })),
+    })
+    ElMessage.success(tt('字段编辑已保存'))
+    fieldEditVisible.value = false
+    // 通知父组件刷新配置(字段别名随配置接口重新下发)
+    emit('refresh-config')
+  } catch (e) {
+    ElMessage.error(tt('保存失败'))
+  }
+}
+
 // 碱性原水水质条:6 指标名与字段键(前3个 √/× 下拉,后3个文本)
 const waterNames = ['自来水', '超纯水', 'RO纯水（水效水+RO机）', 'PH', 'TDS', '水温']
 const waterKeys = ['原水自来水', '原水超纯水', '原水RO纯水', '原水PH', '原水TDS', '水温']
@@ -873,7 +943,7 @@ function headerRow1(dt) {
   const out = []
   for (const c of visCols(dt)) {
     if (!c.group) {
-      out.push({ kind: 'plain', label: c.label, span: c.span || 1, rowspan: hasGroup(dt) ? 2 : 1 })
+      out.push({ kind: 'plain', label: c.label, key: c.key, span: c.span || 1, rowspan: hasGroup(dt) ? 2 : 1 })
     } else if (!out.length || out[out.length - 1].kind !== 'group' || out[out.length - 1].label !== c.group) {
       out.push({ kind: 'group', label: c.group, span: c.span || 1 })
     } else {
@@ -1259,6 +1329,20 @@ function chartOf(dt) {
 }
 .rsp-lib-pick:hover {
   background: #ecf2fb;
+}
+
+/* 字段编辑按钮(数据表区块条右侧,单据外围) */
+.rs-field-edit-btn {
+  color: #e6a23c;
+  cursor: pointer;
+  font-size: 12px;
+  border: 1px solid #e6a23c;
+  border-radius: 3px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.rs-field-edit-btn:hover {
+  background: #fdf6ec;
 }
 .sec-lib-list {
   max-height: 320px;

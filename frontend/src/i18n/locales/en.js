@@ -1243,5 +1243,12 @@ export default {
     '检验项目(组名)': 'Test Item (group)',
     '子项目(可空)': 'Sub item (optional)',
     '请填写检验项目与检验要求': 'Item group and requirement are required',
+    /* ── 字段编辑(数据记录表) ── */
+    '字段编辑': 'Edit Fields',
+    '字段键': 'Field Key',
+    '原名': 'Original',
+    '显示名称': 'Display Name',
+    '显示': 'Show',
+    '留空=沿用原名;修改全局生效(所有用户共享)': 'Empty = keep original; changes are global (shared by all users)',
   },
 }

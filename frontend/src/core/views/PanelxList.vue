@@ -113,6 +113,7 @@
           ref="approvalSheetRef"
           :head="cur" :fields="headerFields" :editable="draftEditable" :panel-code="panelCode"
           @dirty="markInlineDirty"
+          @refresh-config="onFieldEditRefresh"
         />
         <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" @dirty="markInlineDirty" />
         <div class="approval-side" :class="{ collapsed: sideCollapsed }">
@@ -2466,6 +2467,11 @@ const freshAdded = ref(false)
 /** 变更钩子置脏(表头/明细控件 @change;对真实交互可靠)——快照对比作兜底 */
 const inlineDirtyFlag = ref(false)
 function markInlineDirty() { if (draftEditable.value) inlineDirtyFlag.value = true }
+/** 字段编辑保存后刷新面板配置(yj_field 别名随配置接口重新下发) */
+async function onFieldEditRefresh() {
+  cfgCache.value = null
+  await load()
+}
 
 /** 记录"已保存"基线快照（load 完成/保存成功后调用） */
 function markSavedSnapshot() {
