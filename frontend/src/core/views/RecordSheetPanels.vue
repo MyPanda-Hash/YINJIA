@@ -1176,9 +1176,17 @@ async function openMaterialPick(dt) {
   matPickVisible.value = true
   try {
     const res = await request.post('/px/queryFormDataList', { panelCode: 'BOM', condition: {}, pageNo: 1, pageSize: 500 })
-    const rows = res?.data?.rows || res?.data || []
-    matPickRows.value = rows
-    matPickFiltered.value = rows
+    // BOM 面板返回主从结构:list[0].detail.children = 子件物料数组
+    const masters = res?.data?.list || res?.data?.rows || res?.data || []
+    const children = []
+    if (Array.isArray(masters)) {
+      for (const m of masters) {
+        const kids = m?.detail?.children || m?.detail?.items || []
+        if (Array.isArray(kids)) children.push(...kids)
+      }
+    }
+    matPickRows.value = children
+    matPickFiltered.value = children
   } catch (e) {
     matPickRows.value = []
     matPickFiltered.value = []
