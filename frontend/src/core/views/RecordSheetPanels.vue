@@ -288,7 +288,12 @@
               <td :colspan="Math.max(1, totalSpan(dt) - 2)" class="rsp-subtitle-row rsp-quiet"></td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
-            <tr v-if="dt.bar">
+            <!-- 页面级标题(规格书修订记录:设计图为居中大标题,非格式区条) -->
+            <tr v-if="dt.pageTitle">
+              <td :colspan="totalSpan(dt)" class="rsp-page-title">{{ tt(dt.pageTitle) }}</td>
+              <td v-if="editable" class="rsp-op-pad"></td>
+            </tr>
+            <tr v-if="dt.bar && !dt.pageTitle">
               <td :colspan="totalSpan(dt)" class="rs-sectionbar">
                 <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
                   <span>{{ tt(dt.bar) }}</span>
@@ -869,6 +874,17 @@ function chartOf(dt) {
 }
 .rs-t > tbody > tr:first-child .rs-sectionbar {
   border-top: 1px solid #7f7f7f;
+}
+
+/* ═══ 页面级标题(规格书修订记录:设计图居中大标题) ═══ */
+.rsp-page-title {
+  border: 1px solid #7f7f7f;
+  color: #1f2d3d;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 6px;
+  padding: 16px 0 12px;
+  text-align: center;
 }
 
 /* ═══ 条件区特例 ═══ */

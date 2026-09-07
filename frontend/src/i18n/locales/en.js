@@ -1126,7 +1126,6 @@ export default {
     '检查比例': 'Inspection Ratio',
     /* ── 规格书 标签/类型/章节 ── */
     '产品信息': 'Product Info Page',
-    '修订记录（履历表）': 'Revision History',
     '检验项目及标准': 'Inspection Items & Standards',
     '成品及包装运输': 'Packaging & Transportation',
     '4.产品性能检验项目及检验标准': '4. Product Performance Inspection Items & Standards',
