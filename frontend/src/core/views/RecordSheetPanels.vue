@@ -1524,6 +1524,13 @@ function chartOf(dt) {
   body.approval-printing .rs-op-del {
     display: none !important;
   }
+  /* 打印为纯文书:页签条不打印;格式区条(4.检验标准/5.关键物料列表等)去背景色 */
+  body.approval-printing .rsp-pages {
+    display: none !important;
+  }
+  body.approval-printing .rs-sectionbar {
+    background: transparent !important;
+  }
   @page {
     margin: 8mm;
   }

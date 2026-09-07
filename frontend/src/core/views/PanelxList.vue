@@ -4159,7 +4159,8 @@ onUnmounted(() => {
   .tools,
   .fields,
   .footer,
-  .ctx-menu {
+  .ctx-menu,
+  .rsp-type-tabs {
     display: none !important;
   }
   .panelx-list,
