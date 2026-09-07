@@ -847,7 +847,7 @@ export const recordSheetConfigs = {
           { key: '检验方法', label: '检验方法', w: 241, align: 'left', area: true },
           { key: '检验依据', label: '检验依据', w: 83, align: 'left', area: true },
         ]},
-      { page: 3, bar: '5.关键物料列表', filterKey: '表区', filterVal: '物料清单', cols: [
+      { page: 3, bar: '5.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },
           { key: '物料编码', label: '物料编码' },

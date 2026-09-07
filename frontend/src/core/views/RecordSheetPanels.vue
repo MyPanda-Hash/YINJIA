@@ -1205,15 +1205,21 @@ function confirmMaterialPick() {
   const dt = matPickTargetDt.value
   if (!dt) return
   const arr = touch()
+  // 字段映射:按目标面板的列定义匹配(组装BOM=物料名/物料编号/物料规格;规格书=物料编码/物料名称/规格参数)
+  const colKeys = new Set((dt.cols || []).map((c) => c.key))
   for (const m of matPickChecked.value) {
-    arr.push({
-      '表区': dt.filterVal,
-      '物料名': m['子件名称'] || '',
-      '物料编号': m['子件编码'] || '',
-      '物料规格': m['物料规格'] || '',
-      '外观要求': m['外观要求'] || '',
-      '用量': '',
-    })
+    const row = { '表区': dt.filterVal }
+    if (colKeys.has('物料名')) row['物料名'] = m['子件名称'] || ''            // 组装BOM
+    if (colKeys.has('物料编号')) row['物料编号'] = m['子件编码'] || ''
+    if (colKeys.has('物料规格')) row['物料规格'] = m['物料规格'] || ''
+    if (colKeys.has('外观要求')) row['外观要求'] = m['外观要求'] || ''
+    if (colKeys.has('物料编码')) row['物料编码'] = m['子件编码'] || ''          // 规格书
+    if (colKeys.has('物料名称')) row['物料名称'] = m['子件名称'] || ''
+    if (colKeys.has('规格参数')) row['规格参数'] = m['物料规格'] || ''
+    if (colKeys.has('数量')) row['数量'] = ''
+    if (colKeys.has('备注')) row['备注'] = ''
+    if (colKeys.has('用量')) row['用量'] = ''
+    arr.push(row)
   }
   matPickChecked.value = []
   matPickVisible.value = false
