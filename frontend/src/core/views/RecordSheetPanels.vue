@@ -876,9 +876,9 @@ function chartOf(dt) {
   border-top: 1px solid #7f7f7f;
 }
 
-/* ═══ 页面级标题(规格书修订记录:设计图居中大标题) ═══ */
+/* ═══ 页面级标题(规格书修订记录:设计图居中大标题,无表格线) ═══ */
 .rsp-page-title {
-  border: 1px solid #7f7f7f;
+  border: none !important;
   color: #1f2d3d;
   font-size: 21px;
   font-weight: 600;
