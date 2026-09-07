@@ -107,6 +107,7 @@
                 <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
                 <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
                 <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
+                <span v-if="editable" class="rsp-lib-pick" @click.stop="openSectionLib(row)">⌄ {{ tt('标准库') }}</span>
               </div>
             </td>
           </tr>
@@ -416,6 +417,7 @@
               <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
               <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
               <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
+              <span v-if="editable" class="rsp-lib-pick" @click.stop="openSectionLib(row)">⌄ {{ tt('标准库') }}</span>
             </div>
           </td>
         </tr>
@@ -471,6 +473,17 @@
             </div>
           </div>
         </el-scrollbar>
+        <div class="lib-custom">
+          <div class="lib-custom-title">{{ tt('补充自定义检验项') }}({{ tt('存入后长期可用') }})</div>
+          <div class="lib-custom-form">
+            <el-input v-model="libCGroup" size="small" :placeholder="tt('检验项目(组名)')" />
+            <el-input v-model="libCSub" size="small" :placeholder="tt('子项目(可空)')" />
+            <el-input v-model="libCReq" size="small" type="textarea" :rows="2" :placeholder="tt('检验要求')" />
+            <el-input v-model="libCMethod" size="small" :placeholder="tt('检验方法')" />
+            <el-input v-model="libCBasis" size="small" :placeholder="tt('检验依据')" />
+            <el-button size="small" type="primary" @click="addCustomTestLib">{{ tt('存入标准库') }}</el-button>
+          </div>
+        </div>
       </template>
       <el-table
         v-else
@@ -495,12 +508,32 @@
         <el-button type="primary" @click="confirmLib">{{ tt('追加选中项') }}({{ libChecked.length }})</el-button>
       </template>
     </el-dialog>
+
+    <!-- ═══ 章节标准库(yj_std_lib,lib=spec.section):点击填入 / 自行补充 / 删除 ═══ -->
+    <el-dialog v-model="secLibVisible" :title="tt('章节标准库') + ' · ' + tt(secLibLabel)" width="720px" append-to-body>
+      <div class="sec-lib-list">
+        <div v-for="e in secLibRows" :key="e.id" class="sec-lib-item" @click="applySectionLib(e.content)">
+          <div class="sec-lib-text">{{ e.content }}</div>
+          <span class="sec-lib-del" @click.stop="removeSectionLib(e)">✕</span>
+        </div>
+        <div v-if="!secLibRows.length" class="sec-lib-empty">{{ tt('暂无条目，可在下方补充') }}</div>
+      </div>
+      <div class="sec-lib-add">
+        <el-input v-model="secLibDraft" type="textarea" :rows="3" :placeholder="tt('新条目(默认带入当前值，编辑后存入)')" />
+        <el-button type="primary" @click="addSectionLib">{{ tt('存入标准库') }}</el-button>
+      </div>
+      <template #footer>
+        <el-button @click="secLibVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { tt } from '@/i18n'
+import { ElMessage } from 'element-plus'
+import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 
 const props = defineProps({
@@ -605,10 +638,29 @@ function colsOf(dt) {
 const libVisible = ref(false)
 const libChecked = ref([])
 const libRows = ref([])
-function openLib(dt) {
+async function openLib(dt) {
   libTargetDt.value = dt
-  // dt.lib 为数组(出货检验计划两套标准库)或 true(规格书用面板级 testLib)
-  libRows.value = Array.isArray(dt.lib) ? dt.lib : (cfg.value?.testLib || [])
+  const lib = dt.lib
+  if (Array.isArray(lib)) {
+    // 出货检验计划:内置两套标准库
+    libRows.value = lib
+  } else if (cfg.value?.testLib) {
+    // 规格书检验项目:内置分组 + yj_std_lib 自定义项合并(可自行补充,不写死)
+    const base = JSON.parse(JSON.stringify(cfg.value.testLib))
+    try {
+      const res = await request.get('/stdlib/list', { params: { lib: 'spec.test' } })
+      for (const r of res?.data || []) {
+        let c = {}
+        try { c = JSON.parse(r.content) } catch { c = {} }
+        let g = base.find((x) => x.name === r.item)
+        if (!g) { g = { name: r.item, subs: [] }; base.push(g) }
+        g.subs.push({ name: c.sub || '', req: c.req || '', method: c.method || '', basis: c.basis || '' })
+      }
+    } catch { /* 标准库接口不可用则仅内置 */ }
+    libRows.value = base
+  } else {
+    libRows.value = []
+  }
   libChecked.value = []
   libVisible.value = true
 }
@@ -619,6 +671,35 @@ function toggleLib(key, on) {
   else if (!on && i >= 0) libChecked.value = libChecked.value.filter((k) => k !== key)
 }
 const libTargetDt = ref(null)
+// 自定义检验项补充(存 yj_std_lib,长期可用)
+const libCGroup = ref('')
+const libCSub = ref('')
+const libCReq = ref('')
+const libCMethod = ref('')
+const libCBasis = ref('')
+async function addCustomTestLib() {
+  const group = libCGroup.value.trim()
+  if (!group || !libCReq.value.trim()) {
+    ElMessage.warning(tt('请填写检验项目与检验要求'))
+    return
+  }
+  try {
+    await request.post('/stdlib/add', {
+      lib: 'spec.test',
+      item: group,
+      content: JSON.stringify({ sub: libCSub.value.trim(), req: libCReq.value.trim(), method: libCMethod.value.trim(), basis: libCBasis.value.trim() }),
+    })
+    ElMessage.success(tt('已存入标准库'))
+    libCGroup.value = ''
+    libCSub.value = ''
+    libCReq.value = ''
+    libCMethod.value = ''
+    libCBasis.value = ''
+    await openLib(libTargetDt.value)
+  } catch (e) {
+    ElMessage.error(tt('保存失败'))
+  }
+}
 function confirmLib() {
   const dt = libTargetDt.value
   if (!dt) return
@@ -844,6 +925,65 @@ watch(() => [props.editable, props.head], ([v]) => {
     arr.push({ ...row })
   }
 })
+
+// 章节默认值(规格书 7.运输要求/8.存储环境 通用文案):进入草稿编辑且字段为空时预填
+watch(() => [props.editable, props.head], ([v]) => {
+  if (!v || !cfg.value?.sectionDefaults) return
+  if (!props.head || !props.head['单据编号']) return
+  for (const [k, val] of Object.entries(cfg.value.sectionDefaults)) {
+    if (props.head[k] === undefined || props.head[k] === null || String(props.head[k]).trim() === '') {
+      props.head[k] = val
+    }
+  }
+})
+
+// ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──
+const secLibVisible = ref(false)
+const secLibRows = ref([])
+const secLibLabel = ref('')
+const secLibKey = ref('')
+const secLibDraft = ref('')
+async function openSectionLib(row) {
+  secLibKey.value = row.key
+  secLibLabel.value = row.label
+  secLibDraft.value = props.head?.[row.key] || ''
+  secLibVisible.value = true
+  await loadSectionLib()
+}
+async function loadSectionLib() {
+  try {
+    const res = await request.get('/stdlib/list', { params: { lib: 'spec.section', item: secLibLabel.value } })
+    secLibRows.value = res?.data || []
+  } catch (e) {
+    secLibRows.value = []
+  }
+}
+function applySectionLib(content) {
+  if (!props.head) return
+  props.head[secLibKey.value] = content
+  emit('dirty')
+  secLibVisible.value = false
+}
+async function addSectionLib() {
+  const text = (secLibDraft.value || '').trim()
+  if (!text) return
+  try {
+    await request.post('/stdlib/add', { lib: 'spec.section', item: secLibLabel.value, content: text })
+    ElMessage.success(tt('已存入标准库'))
+    secLibDraft.value = ''
+    await loadSectionLib()
+  } catch (e) {
+    ElMessage.error(tt('保存失败'))
+  }
+}
+async function removeSectionLib(entry) {
+  try {
+    await request.post('/stdlib/remove', { id: entry.id })
+    await loadSectionLib()
+  } catch (e) {
+    ElMessage.error(tt('删除失败'))
+  }
+}
 
 // ── 矿化散点图(Excel 原表 4 张 XY 散点图:3 系列 × 累计流量) ──
 const CW = 380
@@ -1081,6 +1221,84 @@ function chartOf(dt) {
   color: #909399;
   font-size: 12px;
   margin-left: 4px;
+}
+
+/* 自定义检验项补充表单 */
+.lib-custom {
+  border-top: 1px dashed #dcdfe6;
+  margin-top: 10px;
+  padding-top: 8px;
+}
+.lib-custom-title {
+  color: #606266;
+  font-size: 12.5px;
+  margin-bottom: 6px;
+}
+.lib-custom-form {
+  align-items: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lib-custom-form .el-input,
+.lib-custom-form .el-textarea {
+  width: 200px;
+}
+
+/* 章节标准库 */
+.rsp-lib-pick {
+  align-self: center;
+  border: 1px solid #8fb4e0;
+  border-radius: 3px;
+  color: #0d5bd3;
+  cursor: pointer;
+  flex: none;
+  font-size: 12px;
+  padding: 1px 6px;
+  white-space: nowrap;
+}
+.rsp-lib-pick:hover {
+  background: #ecf2fb;
+}
+.sec-lib-list {
+  max-height: 320px;
+  overflow: auto;
+}
+.sec-lib-item {
+  align-items: flex-start;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 6px 8px;
+}
+.sec-lib-item:hover {
+  background: #f5f7fa;
+  border-color: #c6e2ff;
+}
+.sec-lib-text {
+  flex: 1;
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+.sec-lib-del {
+  color: #f56c6c;
+  cursor: pointer;
+  flex: none;
+  font-size: 12px;
+}
+.sec-lib-empty {
+  color: #909399;
+  font-size: 13px;
+  padding: 8px;
+}
+.sec-lib-add {
+  align-items: flex-end;
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
 }
 
 /* ═══ 条件区特例 ═══ */

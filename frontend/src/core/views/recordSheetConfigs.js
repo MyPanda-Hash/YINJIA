@@ -885,8 +885,13 @@ export const recordSheetConfigs = {
           { key: '备注', label: '备注' },
         ]},
     ],
-    // 检验项目标准库(分组):SPEC_TEST_LIB 由 tools/_walk-gen-testlib.cjs 从《测试项目汇总.xlsx》生成
+    // 检验项目标准库(分组):SPEC_TEST_LIB 由 tools/gen-spec-testlib.cjs 从《测试项目汇总.xlsx》生成
     testLib: SPEC_TEST_LIB,
+    // 7./8. 通用文案默认预填(《规格书示例》通行文本;新单草稿进入编辑且字段为空时带入)
+    sectionDefaults: {
+      '运输要求': '产品在运输中应避免冲击、挤压、雨淋、受潮及化学品腐蚀。',
+      '存储环境': '产品应贮存在通风良好、干燥的室内，不得与酸、碱及有腐蚀性的物品放置一起。',
+    },
   },
 
   // 出货检验计划表(出货检验项目控制计划):全页共用 10 列网格(与数据表同列)——
