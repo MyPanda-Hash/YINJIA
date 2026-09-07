@@ -1336,13 +1336,20 @@ function chartOf(dt) {
   padding: 0 8px;
   text-align: center;
   vertical-align: middle;
-  font-size: calc(16px * var(--cok));
+  /* 填写值字号缩小(16→12 设计px):正常长度(如 陈秀丽/2026/06/24)不出框,超长自动换行 */
+  font-size: calc(12px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
+  word-break: break-all;
 }
 .rsp-sign-input :deep(.el-input__inner) {
   text-align: center;
-  font-size: calc(16px * var(--cok));
-  line-height: 1.6;
+  font-size: calc(12px * var(--cok));
+  line-height: 1.5;
+}
+/* 只读态值沿用 .rsp-cover-val(封面大字段 31.3px)会出框,签名格内覆盖为小字号 */
+.rsp-sign-td .rsp-cover-val {
+  font-size: calc(12px * var(--cok));
+  line-height: 1.4;
 }
 
 /* ═══ 文档式章节行(规格书 P4) ═══ */
