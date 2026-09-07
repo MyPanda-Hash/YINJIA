@@ -509,7 +509,26 @@
         <el-table-column prop="检测频率" :label="tt('检测频率')" min-width="90" />
         <el-table-column prop="检验内容" :label="tt('检验内容')" min-width="140" />
         <el-table-column prop="控制方法" :label="tt('控制方法')" min-width="90" />
+        <el-table-column v-if="hasCustomFlat" :label="tt('操作')" width="50" align="center">
+          <template #default="{ row }">
+            <span v-if="row.custom && row.dbId" class="lib-sub-del" @click.stop="removeCustomFlatLib(row.dbId)">✕</span>
+          </template>
+        </el-table-column>
       </el-table>
+      <!-- 出货检验计划:自定义补充表单(扁平结构) -->
+      <div v-if="!isGroupedLib" class="lib-custom">
+        <div class="lib-custom-title">{{ tt('补充自定义检验项') }}({{ tt('存入后长期可用') }})</div>
+        <div class="lib-custom-form">
+          <el-input v-model="libFControl" size="small" :placeholder="tt('控制项目')" />
+          <el-input v-model="libFQuality" size="small" :placeholder="tt('质量控制内容')" />
+          <el-input v-model="libFInstrument" size="small" :placeholder="tt('检测仪器、工具')" />
+          <el-input v-model="libFStandard" size="small" type="textarea" :rows="2" :placeholder="tt('控制标准及要求')" />
+          <el-input v-model="libFFrequency" size="small" :placeholder="tt('检测频率')" />
+          <el-input v-model="libFContent" size="small" :placeholder="tt('检验内容')" />
+          <el-input v-model="libFMethod" size="small" :placeholder="tt('控制方法')" />
+          <el-button size="small" type="primary" @click="addCustomFlatLib">{{ tt('存入标准库') }}</el-button>
+        </div>
+      </div>
       <template #footer>
         <el-button @click="libVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" @click="confirmLib">{{ tt('追加选中项') }}({{ libChecked.length }})</el-button>
@@ -673,8 +692,17 @@ async function openLib(dt) {
   libTargetDt.value = dt
   const lib = dt.lib
   if (Array.isArray(lib)) {
-    // 出货检验计划:内置两套标准库
-    libRows.value = lib
+    // 出货检验计划:内置两套标准库 + yj_std_lib 自定义项合并
+    const base = [...lib]
+    try {
+      const res = await request.get('/stdlib/list', { params: { lib: 'insp.plan', item: dt.filterVal || '' } })
+      for (const r of res?.data || []) {
+        let c = {}
+        try { c = JSON.parse(r.content) } catch { c = {} }
+        base.push({ ...c, custom: true, dbId: r.id })
+      }
+    } catch { /* 接口不可用则仅内置 */ }
+    libRows.value = base
   } else if (cfg.value?.testLib) {
     // 规格书检验项目:内置分组 + yj_std_lib 自定义项合并(可自行补充/删除,不写死)
     const base = JSON.parse(JSON.stringify(cfg.value.testLib))
@@ -733,6 +761,63 @@ async function addCustomTestLib() {
 }
 /** 删除自定义检验项(仅 DB 条目,内置不可删) */
 async function removeCustomTestLib(dbId) {
+  if (!dbId) return
+  try {
+    await request.post('/stdlib/remove', { id: dbId })
+    ElMessage.success(tt('已删除'))
+    await openLib(libTargetDt.value)
+  } catch (e) {
+    ElMessage.error(tt('删除失败'))
+  }
+}
+
+// ── 出货检验计划:自定义补充(扁平结构) ──
+const isGroupedLib = computed(() => libRows.value.length > 0 && Array.isArray(libRows.value[0]?.subs))
+const hasCustomFlat = computed(() => libRows.value.some((r) => r.custom))
+const libFControl = ref('')
+const libFQuality = ref('')
+const libFInstrument = ref('')
+const libFStandard = ref('')
+const libFFrequency = ref('')
+const libFContent = ref('')
+const libFMethod = ref('')
+async function addCustomFlatLib() {
+  const control = libFControl.value.trim()
+  if (!control || !libFStandard.value.trim()) {
+    ElMessage.warning(tt('请填写控制项目与控制标准'))
+    return
+  }
+  try {
+    await request.post('/stdlib/add', {
+      lib: 'insp.plan',
+      item: libTargetDt.value?.filterVal || '',
+      content: JSON.stringify({
+        控制项目: control,
+        质量控制内容: libFQuality.value.trim(),
+        检测仪器: libFInstrument.value.trim(),
+        控制标准及要求: libFStandard.value.trim(),
+        检验: 'IQC',
+        不合格应对措施: '',
+        检测频率: libFFrequency.value.trim(),
+        取样方式: '',
+        检验内容: libFContent.value.trim(),
+        控制方法: libFMethod.value.trim(),
+      }),
+    })
+    ElMessage.success(tt('已存入标准库'))
+    libFControl.value = ''
+    libFQuality.value = ''
+    libFInstrument.value = ''
+    libFStandard.value = ''
+    libFFrequency.value = ''
+    libFContent.value = ''
+    libFMethod.value = ''
+    await openLib(libTargetDt.value)
+  } catch (e) {
+    ElMessage.error(tt('保存失败'))
+  }
+}
+async function removeCustomFlatLib(dbId) {
   if (!dbId) return
   try {
     await request.post('/stdlib/remove', { id: dbId })
