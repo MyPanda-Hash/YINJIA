@@ -660,7 +660,7 @@ export const recordSheetConfigs = {
           { label: '炭棒规格', span: 3 },
           { label: '产品管控类型' },
           { label: '外观要求', span: 2 },
-          { label: '生产车间', span: 2 },
+          { label: '生产车间', span: 3 },
         ]},
         { grid: [
           { key: '产品编号', span: 2 },
@@ -670,7 +670,7 @@ export const recordSheetConfigs = {
           { key: '炭棒规格3' },
           { key: '产品管控类型', type: 'select' },
           { key: '外观要求', type: 'select', span: 2 },
-          { key: '生产车间', type: 'select', span: 2 },
+          { key: '生产车间', type: 'select', span: 3 },
         ]},
       ]},
     ],
