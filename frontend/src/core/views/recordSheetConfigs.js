@@ -925,12 +925,12 @@ export const recordSheetConfigs = {
     ],
   },
 
-  // 出货检验计划表(出货检验控制计划):全页共用 10 列网格(与数据表同列)——
+  // 出货检验计划表(出货检验项目控制计划):全页共用 10 列网格(与数据表同列)——
   // 产品编号↔控制项目、客户名↔控制标准及要求、版本号↔检测频率/取样方式,上下总宽一致
   RD_INSP_PLAN: {
     headMode: 'report',
     docNoDefault: 'YJ-RD001',
-    titlePlaceholder: '伊可普20寸折叠复合除铅大胖出货检验控制计划',
+    titlePlaceholder: '伊可普碱性炭棒出货检验项目控制计划',
     info: [
       { label: '版本号', key: '版本号', type: 'text' },
       { label: '密级', key: '密级', type: 'select' },
@@ -947,11 +947,7 @@ export const recordSheetConfigs = {
         { pairs: [
           { label: '主要性能', key: '主要性能', type: 'text', vspan: 2 },
           { label: '滤芯尺寸', key: '滤芯尺寸', type: 'text', vspan: 2 },
-          { label: '授权使用人', key: '授权使用人', type: 'text', lspan: 2, vspan: 2, rowspan: 2 },
-        ]},
-        { pairs: [
-          { label: '编写人', key: '编写人', type: 'text', vspan: 2 },
-          { label: '审核人', key: '审核人', type: 'text', vspan: 2 },
+          { label: '授权使用人', key: '授权使用人', type: 'text', lspan: 2, vspan: 2 },
         ]},
       ]},
     ],

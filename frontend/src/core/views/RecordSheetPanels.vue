@@ -64,7 +64,7 @@
         <tr>
           <td class="rs-td rs-topic-cell" :colspan="infoSpan ? effHead.title : nCols" :rowspan="infoSpan || 1">
             <el-input v-if="editable && !derivedTitle" v-model="head['测试主题']" size="small" class="rs-topic-input" :placeholder="tt(cfg.titlePlaceholder)" @input="emit('dirty')" />
-            <span v-else class="rs-topic">{{ derivedTitle || head['测试主题'] || cfg.titlePlaceholder }}</span>
+            <span v-else class="rs-topic">{{ derivedTitle || head['测试主题'] || tt(cfg.titlePlaceholder) }}</span>
           </td>
           <template v-if="infoSpan">
             <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>
