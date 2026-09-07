@@ -138,7 +138,7 @@
                 <el-select v-if="editable && c.type === 'select'" v-model="head[c.key]" size="small" :clearable="false" @change="emit('dirty')">
                   <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
-                <el-input v-else-if="editable && c.key" v-model="head[c.key]" size="small" :maxlength="c.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+                <el-input v-else-if="editable && c.key" v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                 <span v-else class="rs-txt">{{ head[c.key] || c.fixed || '' }}</span>
               </td>
             </template>
