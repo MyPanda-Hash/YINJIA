@@ -637,7 +637,7 @@ export const recordSheetConfigs = {
     ],
     dataTables: [],
   },
-  // 成型配方(炭棒配方管控清单):产品基本信息 + 配方表(动态行+合计) + 配料要求
+  // 成型配方(炭棒配方管控清单,源=产品工单-配方 12列+配方表13格):标签行/值行两行式
   RD_MOLD_FORMULA: {
     headMode: 'report',
     staticTitle: '炭棒配方管控清单',
@@ -647,28 +647,36 @@ export const recordSheetConfigs = {
       { label: '使用范围', key: '使用范围', type: 'select' },
       { label: '版本号', key: '版本号', type: 'text' },
     ],
-    grid: [130, 180, 130, 200, 130, 90, 90, 90],
-    head: { title: 5, infoLabel: 1, infoValue: 2 },
+    grid: [101, 60, 109, 85, 44, 44, 68, 146, 64, 64, 121, 77, 57],
+    head: { title: 7, infoLabel: 2, infoValue: 3 },
     sections: [
       { bar: '产品基本信息', rows: [
-        { pairs: [
-          { label: '产品编号', key: '产品编号', type: 'text' },
-          { label: '产品名称', key: '产品名称', type: 'text' },
-          { label: '炭棒规格', cells: [{ key: '炭棒规格1' }, { key: '炭棒规格2' }, { key: '炭棒规格3' }] },
+        { grid: [
+          { label: '产品编号', span: 2 },
+          { label: '产品名称', span: 2 },
+          { label: '炭棒规格', span: 3 },
+          { label: '产品管控类型' },
+          { label: '外观要求', span: 2 },
+          { label: '生产车间', span: 2 },
         ]},
-        { pairs: [
-          { label: '产品管控类型', key: '产品管控类型', type: 'select' },
-          { label: '外观要求', key: '外观要求', type: 'select' },
-          { label: '生产车间', key: '生产车间', type: 'select', vspan: 3 },
+        { grid: [
+          { key: '产品编号', span: 2 },
+          { key: '产品名称', span: 2 },
+          { key: '炭棒规格1' },
+          { key: '炭棒规格2' },
+          { key: '炭棒规格3' },
+          { key: '产品管控类型', type: 'select' },
+          { key: '外观要求', type: 'select', span: 2 },
+          { key: '生产车间', type: 'select', span: 2 },
         ]},
       ]},
     ],
     dataTables: [
       { bar: '配方表', autoSeqBar: true, totalCols: true, cols: [
           { key: '序号', label: 'No.' },
-          { key: '物料种类', label: '物料种类' },
-          { key: '物料编号', label: '物料编号' },
-          { key: '物料名称', label: '物料名称', span: 2 },
+          { key: '物料种类', label: '物料种类', span: 2 },
+          { key: '物料编号', label: '物料编号', span: 4 },
+          { key: '物料名称', label: '物料名称', span: 3 },
           { key: '实际添加比例', label: '实际添加\n比例%' },
           { key: '单支物料含量', label: '单支\n物料含量g' },
           { key: '设计添加量', label: '设计添加\n量' },

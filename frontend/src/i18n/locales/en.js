@@ -1103,5 +1103,12 @@ export default {
     '测试管路': 'Test Line',
     '测试流速L/min': 'Test Flow (L/min)',
     '压降标准kpa': 'Pressure Drop Std (kPa)',
+    /* ── 成型配方(炭棒配方管控清单)标签 ── */
+    '物料种类': 'Material Type',
+    '物料编号': 'Material No.',
+    '实际添加\n比例%': 'Actual Add\nRatio %',
+    '单支\n物料含量g': 'Per Unit\nContent (g)',
+    '设计添加\n量': 'Design\nAmount',
+    '配料要求': 'Batching Requirements',
   },
 }
