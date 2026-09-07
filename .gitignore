@@ -33,3 +33,4 @@ tools/_*.txt
 tools/vc-out.txt
 tools/vd-out.txt
 tools/_void-check.sql
+tools/_walk/_rsc*.cjs
