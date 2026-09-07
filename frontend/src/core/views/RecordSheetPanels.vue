@@ -1345,6 +1345,12 @@ function chartOf(dt) {
 .rsp-docinput {
   flex: 1;
 }
+/* 编辑态给可见填写线:全局无边框样式会吞掉可填感知(1-3/6-8 章节行) */
+.rsp-doccell :deep(.el-textarea__inner) {
+  border-bottom: 1px solid #9c9c9c;
+  min-height: 22px;
+  padding: 0 2px;
+}
 .rsp-docval {
   font-family: 'SimSun', 'Songti SC', serif;
 }
