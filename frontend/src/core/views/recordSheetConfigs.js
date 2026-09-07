@@ -650,7 +650,8 @@ export const recordSheetConfigs = {
       { label: '版本号', key: '版本号', type: 'text' },
     ],
     grid: [101, 60, 109, 85, 44, 44, 68, 146, 64, 64, 121, 77, 57],
-    head: { title: 7, infoLabel: 2, infoValue: 3 },
+    // 横向对齐:报告头三段跨度合计 = 网格列数(13),右缘与 产品基本信息/配方表/配料要求 平齐
+    head: { title: 7, infoLabel: 2, infoValue: 4 },
     sections: [
       { bar: '产品基本信息', rows: [
         { grid: [

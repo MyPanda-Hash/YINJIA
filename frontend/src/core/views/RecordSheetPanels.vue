@@ -252,7 +252,7 @@
     <!-- ═══ 数据记录表(共享网格;支持子头行+两级表头;矿化 4 指标块各带散点图;按页归属渲染) ═══ -->
     <div v-for="(dt, di) in cfg.dataTables" v-show="pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
-        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) + (editable ? 60 : 0) : isPlain ? plainW(dt) : gridW + (editable ? 60 : 0)) + 'px' }">
+        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : isPlain ? plainW(dt) : gridW) + 'px' }">
           <colgroup>
             <template v-if="isPlain || dtOwnsWidth(dt)">
               <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :style="{ width: ((c.w || 100) * (dt.design ? designK(dt) : 1)).toFixed(1) + 'px' }" />
@@ -260,7 +260,7 @@
             <template v-else>
               <col v-for="(w, i) in effGrid" :key="'dc' + i" :style="{ width: w + 'px' }" />
             </template>
-            <col v-if="editable" style="width:60px" />
+            <col v-if="editable" style="width:0" />
           </colgroup>
           <tbody>
             <!-- plain 版式:标题条 + 副标题行(测试项目：/设备名称：/仪器名称/型号：) -->
@@ -378,7 +378,7 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="editable" class="rs-add" :style="{ width: (isPlain ? plainW(dt) : gridW) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
+        <div v-if="editable" class="rs-add" :style="{ width: (isPlain ? plainW(dt) : (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : gridW)) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
       </div>
       <!-- 矿化:Excel 原表右侧 4 张散点图(RO出水/浸泡30min/煮沸晾凉 × 累计流量) -->
       <div v-if="dt.charts" class="rsp-chart">
@@ -1374,10 +1374,12 @@ function chartOf(dt) {
   text-align: center;
   padding: 5px 6px;
 }
-.rs-th-op {
-  min-width: 60px;
-}
 /* 操作列无边框浮动:＋/× 按钮悬浮于网格右缘之外,不占表格边框——编辑态全页右边缘仍对齐网格 */
+.rs-th-op {
+  width: 0;
+  min-width: 0;
+  overflow: visible;
+}
 .rs-th-op,
 .rs-td-op,
 .rsp-op-pad {
@@ -1388,6 +1390,7 @@ function chartOf(dt) {
 .rs-td-op {
   text-align: center;
   white-space: nowrap;
+  overflow: visible;
 }
 .rs-op-add,
 .rs-op-del {
