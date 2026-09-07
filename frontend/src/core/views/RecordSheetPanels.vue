@@ -467,15 +467,16 @@
           <div v-for="(g, gi) in libRows" :key="'lg' + gi" class="lib-group">
             <div class="lib-group-name">{{ tt(g.name) }}</div>
             <div class="lib-group-subs">
-              <el-checkbox
-                v-for="(s, si) in g.subs"
-                :key="'ls' + gi + '-' + si"
-                :model-value="libChecked.includes(gi + ':' + si)"
-                @change="(v) => toggleLib(gi + ':' + si, !!v)"
-              >
-                <span class="lib-sub-name">{{ s.name ? tt(s.name) : tt('（项目）') }}</span>
-                <span class="lib-sub-req">{{ (s.req || '').split('\n')[0].slice(0, 26) }}</span>
-              </el-checkbox>
+              <div v-for="(s, si) in g.subs" :key="'ls' + gi + '-' + si" class="lib-sub-item">
+                <el-checkbox
+                  :model-value="libChecked.includes(gi + ':' + si)"
+                  @change="(v) => toggleLib(gi + ':' + si, !!v)"
+                >
+                  <span class="lib-sub-name" :class="{ 'lib-sub-custom': s.custom }">{{ s.name ? tt(s.name) : tt('（项目）') }}</span>
+                  <span class="lib-sub-req">{{ (s.req || '').split('\n')[0].slice(0, 26) }}</span>
+                </el-checkbox>
+                <span v-if="s.custom && s.dbId" class="lib-sub-del" @click.stop="removeCustomTestLib(s.dbId)">✕</span>
+              </div>
             </div>
           </div>
         </el-scrollbar>
@@ -675,7 +676,7 @@ async function openLib(dt) {
     // 出货检验计划:内置两套标准库
     libRows.value = lib
   } else if (cfg.value?.testLib) {
-    // 规格书检验项目:内置分组 + yj_std_lib 自定义项合并(可自行补充,不写死)
+    // 规格书检验项目:内置分组 + yj_std_lib 自定义项合并(可自行补充/删除,不写死)
     const base = JSON.parse(JSON.stringify(cfg.value.testLib))
     try {
       const res = await request.get('/stdlib/list', { params: { lib: 'spec.test' } })
@@ -684,7 +685,7 @@ async function openLib(dt) {
         try { c = JSON.parse(r.content) } catch { c = {} }
         let g = base.find((x) => x.name === r.item)
         if (!g) { g = { name: r.item, subs: [] }; base.push(g) }
-        g.subs.push({ name: c.sub || '', req: c.req || '', method: c.method || '', basis: c.basis || '' })
+        g.subs.push({ name: c.sub || '', req: c.req || '', method: c.method || '', basis: c.basis || '', custom: true, dbId: r.id })
       }
     } catch { /* 标准库接口不可用则仅内置 */ }
     libRows.value = base
@@ -728,6 +729,17 @@ async function addCustomTestLib() {
     await openLib(libTargetDt.value)
   } catch (e) {
     ElMessage.error(tt('保存失败'))
+  }
+}
+/** 删除自定义检验项(仅 DB 条目,内置不可删) */
+async function removeCustomTestLib(dbId) {
+  if (!dbId) return
+  try {
+    await request.post('/stdlib/remove', { id: dbId })
+    ElMessage.success(tt('已删除'))
+    await openLib(libTargetDt.value)
+  } catch (e) {
+    ElMessage.error(tt('删除失败'))
   }
 }
 function confirmLib() {
@@ -1330,6 +1342,30 @@ function chartOf(dt) {
   color: #909399;
   font-size: 12px;
   margin-left: 4px;
+}
+/* 自定义条目标识与删除 */
+.lib-sub-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.lib-sub-custom {
+  color: #e6a23c;
+}
+.lib-sub-custom::after {
+  content: ' ✦';
+  font-size: 10px;
+}
+.lib-sub-del {
+  color: #f56c6c;
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: 2px;
+  padding: 0 2px;
+}
+.lib-sub-del:hover {
+  background: #fef0f0;
+  border-radius: 2px;
 }
 
 /* 自定义检验项补充表单 */
