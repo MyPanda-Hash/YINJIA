@@ -94,16 +94,6 @@
     </div>
     <!-- 文书式面板:完整纸张居中 + 功能按钮右侧竖排(不按表头/表中/表尾三段式) -->
     <template v-else-if="isApprovalDoc">
-      <!-- 规格书类型Tab:切换 规格书种类 过滤单据;新单据默认取当前Tab类型 -->
-      <div v-if="panelCode === 'RD_SPEC_DOC'" class="rsp-type-tabs">
-        <div
-          v-for="tp in recordSheetConfigs.RD_SPEC_DOC?.specTypes || []"
-          :key="tp"
-          class="rsp-type-tab"
-          :class="{ active: specTypeTab === tp }"
-          @click="switchSpecType(tp)"
-        >{{ tt(tp) }}</div>
-      </div>
       <div class="approval-layout">
         <ProgressControlSheet
           v-if="panelCode === 'RD_PROGRESS'"
@@ -791,16 +781,6 @@ function onBomRowsUpdate(rows) {
 
 const query = reactive({ keyword: '', pageNo: 1, pageSize: 20 })
 const condition = reactive({})
-// 规格书类型Tab(单面板 8 种规格书分类):切换=按 规格书种类 过滤;新单据默认当前Tab
-const specTypeTab = ref('')
-function switchSpecType(tp) {
-  specTypeTab.value = tp
-  if (condition['规格书种类'] !== tp) {
-    condition['规格书种类'] = tp
-    query.pageNo = 1
-    search()
-  }
-}
 const list = ref([])
 const total = ref(0)
 const loading = ref(false)
@@ -2387,12 +2367,6 @@ async function loadCrg() {
     cfg?.metadata?.buttonGroups,
     cfg?.metadata,
   ))
-  // 规格书类型Tab初始化:默认第一种并按其过滤(单据按规格书种类分类)
-  if (panelCode.value === 'RD_SPEC_DOC') {
-    const types = recordSheetConfigs.RD_SPEC_DOC?.specTypes || []
-    if (!specTypeTab.value || !types.includes(specTypeTab.value)) specTypeTab.value = types[0] || ''
-    if (specTypeTab.value && condition['规格书种类'] !== specTypeTab.value) condition['规格书种类'] = specTypeTab.value
-  }
   return cfg
 }
 
@@ -2462,9 +2436,7 @@ function onFormSaved() {
 // 刷新列表并定位到新单，在列表页直接内联填写（不跳转表单页/不弹新增弹窗）。
 async function directAdd() {
   try {
-    // 规格书:新单一律带当前类型Tab的 规格书种类 —— 列表按类型过滤,缺分类会从当前页签消失
     const formData = {}
-    if (panelCode.value === 'RD_SPEC_DOC' && specTypeTab.value) formData['规格书种类'] = specTypeTab.value
     const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData, buttonParam: {} })
     const no = res && (res['编号'] || res.formNo)
     if (!no) return ElMessage.error('新增失败：未返回单据编号')
@@ -4159,8 +4131,7 @@ onUnmounted(() => {
   .tools,
   .fields,
   .footer,
-  .ctx-menu,
-  .rsp-type-tabs {
+  .ctx-menu {
     display: none !important;
   }
   .panelx-list,
