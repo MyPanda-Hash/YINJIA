@@ -1110,5 +1110,16 @@ export default {
     '单支\n物料含量g': 'Per Unit\nContent (g)',
     '设计添加\n量': 'Design\nAmount',
     '配料要求': 'Batching Requirements',
+    /* ── 组装BOM表 标签 ── */
+    '产品种类': 'Product Kind',
+    '成品重量': 'Finished Weight',
+    '整体规格（外径）': 'Overall OD',
+    '整体规格（长度）': 'Overall Length',
+    '更改内容': 'Change Content',
+    '更改原因': 'Change Reason',
+    '更改时间': 'Change Time',
+    '责任人': 'Owner',
+    '物料规格': 'Material Spec',
+    '表区': 'Section',
   },
 }

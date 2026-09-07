@@ -62,29 +62,33 @@
           </td>
         </tr>
         <tr>
-          <td class="rs-td rs-topic-cell" :colspan="effHead.title" :rowspan="infoSpan">
+          <td class="rs-td rs-topic-cell" :colspan="infoSpan ? effHead.title : nCols" :rowspan="infoSpan || 1">
             <el-input v-if="editable && !derivedTitle" v-model="head['测试主题']" size="small" class="rs-topic-input" :placeholder="tt(cfg.titlePlaceholder)" @input="emit('dirty')" />
             <span v-else class="rs-topic">{{ derivedTitle || head['测试主题'] || cfg.titlePlaceholder }}</span>
           </td>
-          <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>
-          <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
-            <el-select v-if="editable && effInfo[0].type === 'select'" v-model="head[effInfo[0].key]" size="small" :clearable="false" @change="emit('dirty')">
-              <el-option v-for="o in selectOptions(effInfo[0].key)" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <el-input v-else-if="editable" v-model="head[effInfo[0].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
-            <template v-else>{{ head[effInfo[0].key] || '' }}</template>
-          </td>
+          <template v-if="infoSpan">
+            <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>
+            <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
+              <el-select v-if="editable && effInfo[0].type === 'select'" v-model="head[effInfo[0].key]" size="small" :clearable="false" @change="emit('dirty')">
+                <el-option v-for="o in selectOptions(effInfo[0].key)" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+              <el-input v-else-if="editable" v-model="head[effInfo[0].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+              <template v-else>{{ head[effInfo[0].key] || '' }}</template>
+            </td>
+          </template>
         </tr>
-        <tr v-for="ii in infoSpan - 1" :key="'hi' + ii">
-          <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[ii].label) }}</td>
-          <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
-            <el-select v-if="editable && effInfo[ii].type === 'select'" v-model="head[effInfo[ii].key]" size="small" :clearable="false" @change="emit('dirty')">
-              <el-option v-for="o in selectOptions(effInfo[ii].key)" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <el-input v-else-if="editable" v-model="head[effInfo[ii].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
-            <template v-else>{{ head[effInfo[ii].key] || '' }}</template>
-          </td>
-        </tr>
+        <template v-if="infoSpan > 1">
+          <tr v-for="ii in infoSpan - 1" :key="'hi' + ii">
+            <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[ii].label) }}</td>
+            <td class="rs-td rs-info-value" :colspan="effHead.infoValue">
+              <el-select v-if="editable && effInfo[ii].type === 'select'" v-model="head[effInfo[ii].key]" size="small" :clearable="false" @change="emit('dirty')">
+                <el-option v-for="o in selectOptions(effInfo[ii].key)" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+              <el-input v-else-if="editable" v-model="head[effInfo[ii].key]" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+              <template v-else>{{ head[effInfo[ii].key] || '' }}</template>
+            </td>
+          </tr>
+        </template>
         </template>
       </tbody>
     </table>
@@ -248,7 +252,7 @@
         <table class="rs-t rs-dt" :style="{ width: (dtOwnsWidth(dt) ? dtW(dt) + (editable ? 60 : 0) : isPlain ? plainW(dt) : gridW + (editable ? 60 : 0)) + 'px' }">
           <colgroup>
             <template v-if="isPlain || dtOwnsWidth(dt)">
-              <col v-for="(c, i) in plainCols(dt)" :key="'dc' + i" :style="{ width: (c.w || 100) + 'px' }" />
+              <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :style="{ width: (c.w || 100) + 'px' }" />
             </template>
             <template v-else>
               <col v-for="(w, i) in effGrid" :key="'dc' + i" :style="{ width: w + 'px' }" />
@@ -484,7 +488,11 @@ const DEFAULT_INFO = [
   { label: '测试负责人', key: '测试负责人', type: 'text' },
   { label: '报告编号', key: '报告编号', type: 'text' },
 ]
-const effInfo = computed(() => cfg.value?.info || DEFAULT_INFO)
+const effInfo = computed(() => {
+  const info = cfg.value?.info
+  if (info === undefined) return DEFAULT_INFO
+  return info
+})
 const infoSpan = computed(() => effInfo.value.length)
 
 /** 报告头大标题:静态/前缀+头字段派生(规格书=产品规格书·名称,委托单=类型+'-测试申请单'),否则为 测试主题 输入 */
