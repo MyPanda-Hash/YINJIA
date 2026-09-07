@@ -97,7 +97,12 @@
     <table v-for="(sec, si) in cfg.sections" v-show="pageOf(sec) === activePage" :key="'sec' + si" class="rs-t" :style="{ width: secW(sec) + 'px' }">
       <colgroup><col v-for="(w, i) in secCols(sec)" :key="'sc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
-        <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
+        <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
+          <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
+            <span>{{ tt(sec.bar) }}</span>
+            <span v-if="editable && si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+          </span>
+        </td></tr>
 
         <!-- 文档式行(规格书 P4 章节:6.包装方式/7.运输要求/8.存储环境 无表格线) -->
         <template v-if="sec.doc">
@@ -140,7 +145,7 @@
           <tr v-else-if="row.grid">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
-                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(c.label) }}</td>
+                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(effColLabel(c.label, c.label)) }}</td>
               <td v-else class="rs-td" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <el-select v-if="editable && c.type === 'select'" v-model="head[c.key]" size="small" :clearable="false" @change="emit('dirty')">
                   <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
@@ -865,18 +870,41 @@ const fieldEditVisible = ref(false)
 const fieldEditRows = ref([])
 function openFieldEdit() {
   const rows = []
+  const seen = new Set()
+  const push = (key, label) => {
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    const f = fieldMap.value.get(key)
+    rows.push({
+      key,
+      colName: f?.name || f?.code || key,
+      label,
+      alias: f?.displayName || '',
+      originalAlias: f?.displayName || '',
+      visible: f ? !f.hidden : true,
+    })
+  }
+  // 数据表列
   for (const dt of cfg.value?.dataTables || []) {
     for (const c of dt.cols || []) {
       if (c.hiddenCol) continue
-      const f = fieldMap.value.get(c.key)
-      rows.push({
-        key: c.key,
-        colName: f?.name || f?.code || c.key,  // 后端 yj_field.col_name(保存键)
-        label: c.label,                         // 配置硬编码(原文)
-        alias: f?.displayName || '',            // 当前别名(yj_field.alias)
-        originalAlias: f?.displayName || '',    // 保存时比对变更
-        visible: f ? !f.hidden : true,
-      })
+      push(c.key, c.label)
+    }
+  }
+  // section 网格字段(成型工艺清单等:标签行/值行的 key 与 label)
+  for (const sec of [...(cfg.value?.sections || []), ...(cfg.value?.tailSections || [])]) {
+    for (const row of sec.rows || []) {
+      if (row.grid) {
+        for (const c of row.grid) {
+          if (c.label) push(c.label, c.label)
+          if (c.key && c.key !== c.label) push(c.key, c.key)
+        }
+      } else if (row.label && row.key) {
+        push(row.key, row.label)
+      } else if (row.label) {
+        push(row.label, row.label)
+      }
+      if (row.label2) push(row.label2, row.label2)
     }
   }
   fieldEditRows.value = rows
