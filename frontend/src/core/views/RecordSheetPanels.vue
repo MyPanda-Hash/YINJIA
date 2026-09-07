@@ -1914,7 +1914,10 @@ function chartOf(dt) {
   }
   body.approval-printing .rs-add,
   body.approval-printing .rs-op-add,
-  body.approval-printing .rs-op-del {
+  body.approval-printing .rs-op-del,
+  body.approval-printing .rs-field-edit-btn,
+  body.approval-printing .rsp-lib-pick,
+  body.approval-printing .rs-lib-btn {
     display: none !important;
   }
   /* 打印为纯文书:页签条不打印;格式区条(4.检验标准/5.关键物料列表等)去背景色 */
