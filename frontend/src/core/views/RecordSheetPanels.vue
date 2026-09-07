@@ -871,8 +871,10 @@ function openFieldEdit() {
       const f = fieldMap.value.get(c.key)
       rows.push({
         key: c.key,
-        label: c.label,                  // 配置硬编码(原文)
-        alias: f?.displayName || '',     // 当前别名(yj_field)
+        colName: f?.name || f?.code || c.key,  // 后端 yj_field.col_name(保存键)
+        label: c.label,                         // 配置硬编码(原文)
+        alias: f?.displayName || '',            // 当前别名(yj_field.alias)
+        originalAlias: f?.displayName || '',    // 保存时比对变更
         visible: f ? !f.hidden : true,
       })
     }
@@ -881,19 +883,27 @@ function openFieldEdit() {
   fieldEditVisible.value = true
 }
 async function saveFieldEdit() {
+  // 只发送有变更的行(避免空 alias 批量覆盖已有别名 + seq 重排副作用)
+  const changed = fieldEditRows.value.filter((r) => r.alias !== (r.originalAlias || ''))
+  if (!changed.length) {
+    fieldEditVisible.value = false
+    return
+  }
   try {
-    // saveColumnProps 按 label(=col_name 中文键)定位字段
-    await request.post('/px/saveColumnPrefs', {
+    const res = await request.post('/px/saveColumnPrefs', {
       panelCode: props.panelCode,
-      columns: fieldEditRows.value.map((r) => ({
-        label: r.key,
+      columns: changed.map((r) => ({
+        label: r.colName,
         alias: r.alias || '',
         visible: !!r.visible,
       })),
     })
+    if (res && res.code && res.code !== 200) {
+      ElMessage.error(res.message || tt('保存失败'))
+      return
+    }
     ElMessage.success(tt('字段编辑已保存'))
     fieldEditVisible.value = false
-    // 通知父组件刷新配置(字段别名随配置接口重新下发)
     emit('refresh-config')
   } catch (e) {
     ElMessage.error(tt('保存失败'))

@@ -111,7 +111,7 @@
         <RecordSheetPanels
           v-else-if="isRecordSheetPanel"
           ref="approvalSheetRef"
-          :head="cur" :fields="headerFields" :editable="draftEditable" :panel-code="panelCode"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable" :panel-code="panelCode"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -1142,6 +1142,12 @@ const headerFields = computed(() => {
   const ordered = String(names).split(',').map((name) => name.trim()).filter(Boolean)
   const byName = new Map(fields.map((field) => [headerFieldKey(field), field]))
   return ordered.map((name) => byName.get(name)).filter(Boolean)
+})
+/** RecordSheetPanels 专用:表头字段 + 明细字段(数据表列的 alias 从明细字段元数据取) */
+const sheetAllFields = computed(() => {
+  const header = headerFields.value || []
+  const detail = cfgCache.value?.detail?.tabs?.[0]?.fields || []
+  return [...header, ...detail]
 })
 const queryDialogFields = computed(() => {
   const fields = reportMode.value ? queryFields.value : headerFields.value
