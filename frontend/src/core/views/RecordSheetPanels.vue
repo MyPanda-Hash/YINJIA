@@ -249,10 +249,10 @@
     <!-- ═══ 数据记录表(共享网格;支持子头行+两级表头;矿化 4 指标块各带散点图;按页归属渲染) ═══ -->
     <div v-for="(dt, di) in cfg.dataTables" v-show="pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
-        <table class="rs-t rs-dt" :style="{ width: (dtOwnsWidth(dt) ? dtW(dt) + (editable ? 60 : 0) : isPlain ? plainW(dt) : gridW + (editable ? 60 : 0)) + 'px' }">
+        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) + (editable ? 60 : 0) : isPlain ? plainW(dt) : gridW + (editable ? 60 : 0)) + 'px' }">
           <colgroup>
             <template v-if="isPlain || dtOwnsWidth(dt)">
-              <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :style="{ width: (c.w || 100) + 'px' }" />
+              <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :style="{ width: ((c.w || 100) * (dt.design ? designK(dt) : 1)).toFixed(1) + 'px' }" />
             </template>
             <template v-else>
               <col v-for="(w, i) in effGrid" :key="'dc' + i" :style="{ width: w + 'px' }" />
@@ -289,8 +289,8 @@
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
             <!-- 页面级标题(规格书修订记录:设计图为居中大标题,非格式区条) -->
-            <tr v-if="dt.pageTitle">
-              <td :colspan="totalSpan(dt)" class="rsp-page-title">{{ tt(dt.pageTitle) }}</td>
+            <tr v-if="dt.pageTitle" :class="{ 'rsp-design': dt.design }">
+              <td :colspan="totalSpan(dt)" class="rsp-page-title" :style="designTitleStyle(dt)">{{ tt(dt.pageTitle) }}</td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
             <tr v-if="dt.bar && !dt.pageTitle">
@@ -306,20 +306,20 @@
               <td v-for="(sh, shi) in spreadSubHeads(dt)" :key="'sh' + shi" :colspan="sh.span" class="rs-subhead">{{ tt(sh.label) }}</td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
-            <tr class="rs-grp">
+            <tr class="rs-grp" :class="{ 'rsp-design': dt.design }">
               <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
-                <th v-if="g.kind === 'plain'" class="rs-th" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(g.label) }}</th>
-                <th v-else-if="g.kind === 'group'" class="rs-th" :colspan="g.span">{{ tt(g.label) }}</th>
+                <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(g.label) }}</th>
+                <th v-else-if="g.kind === 'group'" class="rs-th" :style="designThStyle(dt)" :colspan="g.span">{{ tt(g.label) }}</th>
               </template>
               <th v-if="editable" class="rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
             </tr>
             <tr v-if="hasGroup(dt)" class="rs-grp2">
               <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th" :colspan="(c.span || 1) > 1 ? c.span : undefined">{{ tt(c.label) }}</th>
             </tr>
-            <tr v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)">
-              <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :colspan="(c.span || 1) > 1 ? c.span : undefined">
-                <el-input v-if="editable && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" @input="emit('dirty')" />
-                <el-input v-else-if="editable" v-model="row[c.key]" size="small" class="rs-c-in" @input="emit('dirty')" />
+            <tr v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }">
+              <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :style="designTdStyle(dt)" :colspan="(c.span || 1) > 1 ? c.span : undefined">
+                <el-input v-if="editable && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
+                <el-input v-else-if="editable" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
                 <span v-else class="rs-txt rsp-cell">{{ row[c.key] || ' / ' }}</span>
               </td>
               <td v-if="editable" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
@@ -558,6 +558,39 @@ function dtOwnsWidth(dt) {
 }
 function dtW(dt) {
   return visCols(dt).reduce((s, c) => s + (c.w || 100), 0)
+}
+
+// ── 像素级还原(dt.design):配置为设计图像素单位,按 k = 网格宽 / 可见列设计宽 等比缩放 ──
+function designK(dt) {
+  if (!dt.design) return 1
+  const w = visCols(dt).reduce((s, c) => s + (c.w || 100), 0)
+  return w ? gridW.value / w : 1
+}
+function dpx(dt, v) {
+  return Math.round(v * designK(dt))
+}
+function designTitleStyle(dt) {
+  if (!dt.design) return null
+  const d = dt.design
+  return {
+    fontSize: dpx(dt, d.titleSize || 21) + 'px',
+    letterSpacing: '0',
+    padding: `${dpx(dt, d.titleTop || 14)}px 0 ${dpx(dt, d.titleGap || 16)}px`,
+  }
+}
+function designThStyle(dt) {
+  if (!dt.design) return null
+  const d = dt.design
+  return { height: dpx(dt, d.headerH || 22) + 'px', fontSize: dpx(dt, d.fontSize || 11) + 'px', background: '#fff', color: '#333' }
+}
+function designTdStyle(dt) {
+  if (!dt.design) return null
+  const d = dt.design
+  return { height: dpx(dt, d.rowH || 21) + 'px', fontSize: dpx(dt, d.fontSize || 11) + 'px', textAlign: 'center' }
+}
+function designInputStyle(dt) {
+  if (!dt.design) return null
+  return { fontSize: dpx(dt, dt.design.fontSize || 11) + 'px', textAlign: 'center' }
 }
 
 // ── 键值对行(产品基本信息等):pair {label,key,type,vspan,cells:[{key}](多值格,如炭棒规格3格)} ──
@@ -884,6 +917,22 @@ function chartOf(dt) {
   font-weight: 600;
   letter-spacing: 6px;
   padding: 16px 0 12px;
+  text-align: center;
+}
+
+/* ═══ 像素级还原数据表(dt.design):单元格垂直居中,输入/文本随单元格字号 ═══ */
+.rsp-design-t .rs-td,
+.rsp-design-t .rs-th {
+  padding: 0 4px;
+  text-align: center;
+  vertical-align: middle;
+}
+.rsp-design-t .rs-th {
+  font-weight: 400;
+}
+.rsp-design-t .el-input__inner,
+.rsp-design-t .el-textarea__inner {
+  font-size: inherit !important;
   text-align: center;
 }
 

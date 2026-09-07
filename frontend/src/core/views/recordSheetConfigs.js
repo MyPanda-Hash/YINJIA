@@ -844,14 +844,16 @@ export const recordSheetConfigs = {
       ]},
     ],
     dataTables: [
-      { page: 1, pageTitle: '修订记录', filterKey: '表区', filterVal: '修订记录', cols: [
-          { key: '表区', label: '表区', hiddenCol: true, w: 90 },
-          { key: '序号', label: '序号', w: 100 },
-          { key: '更改内容', label: '更改内容', w: 300 },
-          { key: '更改原因', label: '更改原因', w: 190 },
-          { key: '更改时间', label: '更改时间', w: 140 },
-          { key: '责任人', label: '责任人', w: 120 },
-          { key: '备注', label: '备注', w: 100 },
+      { page: 1, pageTitle: '修订记录', filterKey: '表区', filterVal: '修订记录',
+        design: { titleSize: 21, titleTop: 24, titleGap: 61, headerH: 44, rowH: 43, fontSize: 16 },
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true, w: 46 },
+          { key: '序号', label: '序号', w: 46 },
+          { key: '更改内容', label: '更改内容', w: 140 },
+          { key: '更改原因', label: '更改原因', w: 108 },
+          { key: '更改时间', label: '更改时间', w: 97 },
+          { key: '责任人', label: '责任人', w: 72 },
+          { key: '备注', label: '备注', w: 161 },
         ]},
       { page: 2, bar: '4.产品性能检验项目及检验标准', filterKey: '表区', filterVal: '检验要求', lib: true, cols: [
           { key: '表区', label: '表区', hiddenCol: true },
