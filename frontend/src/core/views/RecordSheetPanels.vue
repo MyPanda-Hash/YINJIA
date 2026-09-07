@@ -103,9 +103,11 @@
         <template v-if="sec.doc">
           <tr v-for="(row, ri) in sec.rows" :key="'dl' + ri">
             <td :colspan="secCols(sec).length" class="rsp-doccell">
-              <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
-              <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
-              <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
+              <div class="rsp-docrow">
+                <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
+                <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
+                <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
+              </div>
             </td>
           </tr>
         </template>
@@ -1332,6 +1334,9 @@ function chartOf(dt) {
   border: none !important;
   padding: 4px 0 4px 16px !important;
   font-size: 14px;
+}
+/* flex 布局放内层容器:display:flex 直接挂 td 会破坏表格盒模型(fixed 布局下单元格塌缩,输入框只剩 4×1px 点不中) */
+.rsp-docrow {
   display: flex;
   align-items: baseline;
   gap: 8px;
