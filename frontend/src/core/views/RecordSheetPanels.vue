@@ -27,7 +27,7 @@
              公司左上 | 大标题居中偏右(设计图标题中心 367.5/708)| 6 条字段线 | 窄居中签名表 -->
         <template v-if="cfg.cover">
           <tr><td :colspan="nCols" class="rsp-cover-td">
-            <div class="rsp-cover-page" :style="{ height: coverPageH + 'px', '--cok': coverK }">
+            <div class="rsp-cover-page" :style="{ height: coverPageH + 'px', '--cok': coverK, '--cvy': coverVy }">
               <div class="rsp-cover-company">惠州市银嘉环保科技有限公司</div>
               <div class="rsp-cover-title">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
               <div v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi" class="rsp-cover-line" :style="{ top: coverLineTop(fi) }">
@@ -545,12 +545,15 @@ const gridW = computed(() => effGrid.value.reduce((s, w) => s + w, 0))
 const COVER_W = 708
 const COVER_H = 1173
 const coverK = computed(() => gridW.value / COVER_W)
-const coverPageH = computed(() => Math.round(COVER_H * coverK.value))
+/** 封面高度 = 真实 A4(210×297mm):设计画布 1173/708≈1.657 比 A4(1.414)长,按画布高等比
+ *  会在打印时溢出到第二页;纵向位置/行高用独立缩放 coverVy 压入 A4 高度,横向(字号/列宽)仍用 coverK */
+const coverPageH = computed(() => Math.round(gridW.value * (297 / 210)))
+const coverVy = computed(() => coverPageH.value / COVER_H)
 /** 字段行顶部(设计 px,行高 46 → ink 中心 482.5/549.5/617/683/750/817.5 = 设计墨迹中心) */
 const COVER_LINE_TOPS = [460, 527, 594, 660, 727, 795]
 function coverLineTop(i) {
   const y = COVER_LINE_TOPS[i] ?? (COVER_LINE_TOPS[0] + i * 67)
-  return (y * coverK.value).toFixed(1) + 'px'
+  return (y * coverVy.value).toFixed(1) + 'px'
 }
 const COVER_SIGN_W = [143, 157, 172] // x 132..275..432..604 (设计图实测)
 const coverSignW = COVER_SIGN_W
@@ -1256,7 +1259,7 @@ function chartOf(dt) {
 .rsp-cover-company {
   position: absolute;
   left: calc(15px * var(--cok));
-  top: calc(15px * var(--cok));
+  top: calc(15px * var(--cvy));
   font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
   font-size: calc(20.7px * var(--cok));
   line-height: 1;
@@ -1268,7 +1271,7 @@ function chartOf(dt) {
   position: absolute;
   left: calc(367.5px * var(--cok));
   transform: translateX(-50%);
-  top: calc(191px * var(--cok));
+  top: calc(191px * var(--cvy));
   font-family: 'SimSun', 'Songti SC', serif;
   font-size: calc(47.3px * var(--cok));
   font-weight: 400;
@@ -1284,7 +1287,7 @@ function chartOf(dt) {
   left: calc(173px * var(--cok));
   display: flex;
   align-items: center;
-  height: calc(46px * var(--cok));
+  height: calc(46px * var(--cvy));
   font-family: 'SimSun', 'Songti SC', serif;
   font-size: calc(31.3px * var(--cok));
   color: #1a1a1a;
@@ -1297,12 +1300,12 @@ function chartOf(dt) {
 }
 .rsp-cover-input {
   flex: 1;
-  height: calc(46px * var(--cok));
+  height: calc(46px * var(--cvy));
 }
 .rsp-cover-input :deep(.el-input__inner) {
   font-size: calc(31.3px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
-  line-height: calc(46px * var(--cok));
+  line-height: calc(46px * var(--cvy));
   padding: 0;
 }
 .rsp-cover-val {
@@ -1312,7 +1315,7 @@ function chartOf(dt) {
 .rsp-sign-t {
   position: absolute;
   left: calc(132px * var(--cok));
-  top: calc(990px * var(--cok));
+  top: calc(990px * var(--cvy));
   width: calc(473px * var(--cok));
   border-collapse: collapse;
   table-layout: fixed;
@@ -1322,7 +1325,7 @@ function chartOf(dt) {
   border: calc(1.5px * var(--cok)) solid #000;
 }
 .rsp-sign-th {
-  height: calc(59px * var(--cok));
+  height: calc(44px * var(--cvy));
   font-size: calc(16px * var(--cok));
   font-weight: 400;
   font-family: 'SimSun', 'Songti SC', serif;
@@ -1332,7 +1335,7 @@ function chartOf(dt) {
   vertical-align: middle;
 }
 .rsp-sign-td {
-  height: calc(62px * var(--cok));
+  height: calc(48px * var(--cvy));
   padding: 0 8px;
   text-align: center;
   vertical-align: middle;
@@ -1507,6 +1510,8 @@ function chartOf(dt) {
     width: 100% !important;
     max-width: none !important;
     margin: 0 !important;
+    /* 打印适配:宽度 100%(≈733px@8mm页边距)下固定高度封面(1123px)会溢出到第二页,整体 0.92 缩入一页 */
+    zoom: 0.92 !important;
   }
   body.approval-printing .rsp-sheet,
   body.approval-printing .rsp-sheet * {
