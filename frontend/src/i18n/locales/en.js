@@ -1067,6 +1067,11 @@ export default {
     '暂无修改记录': 'No modification records',
     '本次修改未变更头字段': 'No header fields changed in this modification',
     '修改进行中——内容随保存实时更新，再归档审批后定格': 'Modification in progress — content updates live on save and is finalized after re-archive approval',
+    /* ── 文件面板查询单据 ── */
+    '查询单据': 'Query Documents',
+    '单据编号/文档编号模糊匹配': 'Fuzzy match on form no. / document no.',
+    '归档时间': 'Archived At',
+    '按首次归档时间过滤；草稿未归档不计入区间': 'Filtered by first-archive time; drafts are not archived and excluded from range',
     '二、炭棒滤芯组装/包装物料清单': '2. Assembly / Packaging Material List',
     '必测项': 'Mandatory Tests',
     '型式检验或者必测项': 'Type Tests / Mandatory',

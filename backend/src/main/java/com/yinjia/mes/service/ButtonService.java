@@ -168,13 +168,15 @@ public class ButtonService {
         if (dup != null && dup > 0) throw new IllegalArgumentException("文档编号不允许重复：" + docNo);
     }
 
-    /** 归档标记:yj_doc_status.archived='Y'(已归档优先级:已作废>已中止>已审核>审批中>已归档>草稿) */
+    /** 归档标记:yj_doc_status.archived='Y'(已归档优先级:已作废>已中止>已审核>审批中>已归档>草稿);
+     *  archived_at 仅首次归档写入(CASE 保首次),修改后再归档不覆盖——查询单据的时间区间口径 */
     private void markArchived(String panelCode, String no) {
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                 + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
-                + "WHEN MATCHED THEN UPDATE SET archived = 'Y', pending = 'N', canceled = 'N', update_at = GETDATE() "
-                + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, archived, pending, canceled, update_at) "
-                + "VALUES (s.panel_code, s.doc_no, 'Y', 'N', 'N', GETDATE());", panelCode, no);
+                + "WHEN MATCHED THEN UPDATE SET archived = 'Y', pending = 'N', canceled = 'N', "
+                + "archived_at = CASE WHEN t.archived_at IS NULL THEN GETDATE() ELSE t.archived_at END, update_at = GETDATE() "
+                + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, archived, pending, canceled, archived_at, update_at) "
+                + "VALUES (s.panel_code, s.doc_no, 'Y', 'N', 'N', GETDATE(), GETDATE());", panelCode, no);
     }
 
     /** 行表 upsert:有 id 更新,无 id 插入(回填自增 id),缺席行软删(asp_cancel='Y') */

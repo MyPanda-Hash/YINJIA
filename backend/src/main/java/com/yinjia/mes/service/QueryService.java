@@ -118,7 +118,45 @@ public class QueryService {
 
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
-        appendDocFilters(def, where, args, keyword, condition, l2c, split, docCols, docTable, g);
+        // 文件面板「查询单据」自定义条件:_docNo=编号模糊(单据编号/文档编号),_archFrom/_archTo=首次归档时间区间(含端点)
+        Object qDocNo = condition == null ? null : condition.get("_docNo");
+        Object qFrom = condition == null ? null : condition.get("_archFrom");
+        Object qTo = condition == null ? null : condition.get("_archTo");
+        Map<String, Object> fieldCond = condition;
+        if (qDocNo != null || qFrom != null || qTo != null) {
+            fieldCond = new HashMap<>(condition);
+            fieldCond.remove("_docNo");
+            fieldCond.remove("_archFrom");
+            fieldCond.remove("_archTo");
+        }
+        appendDocFilters(def, where, args, keyword, fieldCond, l2c, split, docCols, docTable, g);
+        String noKw = qDocNo == null ? "" : String.valueOf(qDocNo).trim();
+        if (!noKw.isEmpty()) {
+            where.append(" AND (t.[").append(g).append("] LIKE ?");
+            args.add("%" + noKw + "%");
+            boolean hasDocNoCol = split && docCols.stream().anyMatch(f -> "文档编号".equals(f.label()));
+            if (hasDocNoCol) {
+                where.append(" OR t.[文档编号] LIKE ?");
+                args.add("%" + noKw + "%");
+            }
+            where.append(")");
+        }
+        String archFrom = qFrom == null ? "" : String.valueOf(qFrom).trim();
+        String archTo = qTo == null ? "" : String.valueOf(qTo).trim();
+        if (!archFrom.isEmpty() || !archTo.isEmpty()) {
+            where.append(" AND EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.[")
+                    .append(g).append("] AND s.archived_at IS NOT NULL");
+            args.add(def.code());
+            if (!archFrom.isEmpty()) {
+                where.append(" AND s.archived_at >= ?");
+                args.add(archFrom);
+            }
+            if (!archTo.isEmpty()) {
+                where.append(" AND s.archived_at < DATEADD(day, 1, ?)");
+                args.add(archTo);
+            }
+            where.append(")");
+        }
 
         where.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.[")
                 .append(g).append("] AND s.canceled = 'Y')");

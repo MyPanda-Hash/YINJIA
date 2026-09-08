@@ -133,6 +133,8 @@
               <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
             </div>
             <div class="as-side-btns">
+              <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板) -->
+              <div class="as-side-btn" @click="docQueryVisible = true">{{ tt('查询单据') }}</div>
               <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回) -->
               <div class="as-side-del" v-if="isApprovalDoc">
                 <div class="as-side-btn-row">
@@ -699,6 +701,24 @@
         </div>
       </div>
     </el-dialog>
+    <!-- 查询单据弹窗(文件面板):编号模糊(单据编号/文档编号) + 首次归档时间区间 -->
+    <el-dialog v-model="docQueryVisible" :title="tt('查询单据')" width="480px" append-to-body>
+      <div class="dq-form">
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('编号') }}</span>
+          <el-input v-model="docQueryNo" clearable :placeholder="tt('单据编号/文档编号模糊匹配')" @keyup.enter="applyDocQuery" />
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('归档时间') }}</span>
+          <el-date-picker v-model="docQueryRange" type="daterange" value-format="YYYY-MM-DD" :start-placeholder="tt('起')" :end-placeholder="tt('止')" style="width: 100%" />
+        </div>
+        <div class="dq-tip">{{ tt('按首次归档时间过滤；草稿未归档不计入区间') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="clearDocQuery">{{ tt('清空') }}</el-button>
+        <el-button type="primary" @click="applyDocQuery">{{ tt('查询') }}</el-button>
+      </template>
+    </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <VoucherFormDialog v-model="formVisible" :panel-code="formPanel || panelCode" :code="formCode" @saved="onFormSaved" />
@@ -1189,6 +1209,30 @@ const openDelMenu = ref(false)
 
 // ---------- 修改组(产品文件 7 面板):归档后申请修改(管理员审批进入修改态)+ 修改记录(滚动3条) ----------
 const PROD_FILE_PANELS = ['RD_PROD_INFO', 'RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_BOM', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+
+// ---------- 文件面板查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间 ----------
+const docQueryVisible = ref(false)
+const docQueryNo = ref('')
+const docQueryRange = ref(null)
+
+function applyDocQuery() {
+  condition['_docNo'] = docQueryNo.value || ''
+  const r = docQueryRange.value || []
+  condition['_archFrom'] = r[0] || ''
+  condition['_archTo'] = r[1] || ''
+  docQueryVisible.value = false
+  search()
+}
+
+function clearDocQuery() {
+  docQueryNo.value = ''
+  docQueryRange.value = null
+  delete condition['_docNo']
+  delete condition['_archFrom']
+  delete condition['_archTo']
+  docQueryVisible.value = false
+  search()
+}
 const isProdFilePanel = computed(() => PROD_FILE_PANELS.includes(String(panelCode.value)))
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
@@ -3584,6 +3628,29 @@ onUnmounted(() => {
   font-size: 12px;
   color: #1d4ed8;
   background: #eff6ff;
+}
+/* 查询单据弹窗 */
+.dq-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dq-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dq-label {
+  flex: none;
+  width: 64px;
+  font-size: 13px;
+  color: #374151;
+  text-align: right;
+}
+.dq-tip {
+  font-size: 12px;
+  color: #9ca3af;
+  padding-left: 74px;
 }
 .page-btn {
   width: 24px;
