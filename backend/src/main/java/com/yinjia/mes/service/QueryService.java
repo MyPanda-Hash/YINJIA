@@ -316,6 +316,12 @@ public class QueryService {
                                      List<Object> args, String keyword, Map<String, Object> condition,
                                      Map<String, String> l2c, String alias) {
         if (condition != null) {
+            // 仓库下拉(库存状况):按仓库编码(ckdm)精确过滤(_ckdm);绑定编码,仓库字典改名不影响
+            Object ck = condition.get("_ckdm");
+            if (ck != null && !String.valueOf(ck).isBlank()) {
+                where.append(" AND ").append(alias).append(".[ckdm] = ?");
+                args.add(String.valueOf(ck).trim());
+            }
             for (Map.Entry<String, Object> e : condition.entrySet()) {
                 String col = l2c.get(e.getKey());
                 Object v = e.getValue();

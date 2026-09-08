@@ -6,6 +6,19 @@
         <el-icon><Search /></el-icon>
         <span>{{ tt('查询') }}</span>
       </button>
+      <!-- 库存状况:仓库下拉(按仓库编码精确过滤,字典改名不影响绑定) -->
+      <el-select
+        v-if="panelCode === 'STOCK_STATUS'"
+        v-model="stockWh"
+        class="wh-filter"
+        size="small"
+        clearable
+        filterable
+        :placeholder="tt('全部仓库')"
+        @change="onStockWhChange"
+      >
+        <el-option v-for="w in warehouseOptions" :key="w.code" :label="`${w.name}（${w.code}）`" :value="w.code" />
+      </el-select>
       <div class="tb-group" v-for="(g, gi) in toolbarGroups" :key="'g' + gi">
         <span class="tb-main" :class="{ disabled: isDisabled(btnName(g)) }" @click="onButton(btnName(g))">
           <span class="act-name">{{ tt(g.name) }}</span>
@@ -793,6 +806,7 @@ import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
+import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
 import RefPickDialog from './RefPickDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
@@ -1220,6 +1234,25 @@ function canApproveHere() {
 const docQueryVisible = ref(false)
 const docQueryNo = ref('')
 const docQueryRange = ref(null)
+
+// ---------- 库存状况:仓库下拉(_ckdm 按仓库编码精确过滤;dm_ck 字典改名不影响绑定) ----------
+const stockWh = ref('')
+const warehouseOptions = ref([])
+const isStockStatus = computed(() => String(panelCode.value) === 'STOCK_STATUS')
+watch(isStockStatus, async (v) => {
+  if (!v || warehouseOptions.value.length) return
+  try {
+    const res = await request.get('/base/warehouse/list')
+    warehouseOptions.value = res?.data || []
+  } catch {
+    warehouseOptions.value = []
+  }
+}, { immediate: true })
+function onStockWhChange(v) {
+  if (v) condition['_ckdm'] = v
+  else delete condition['_ckdm']
+  search()
+}
 
 async function applyDocQuery() {
   condition['_docNo'] = docQueryNo.value || ''
@@ -3133,6 +3166,7 @@ function search() {
 function reset() {
   Object.keys(condition).forEach((k) => delete condition[k])
   query.keyword = ''
+  if (isStockStatus.value) stockWh.value = ''
   search()
 }
 
@@ -3438,6 +3472,12 @@ onUnmounted(() => {
   color: #263548;
   font: inherit;
   cursor: pointer;
+}
+/* 库存状况:仓库下拉(工具栏内嵌) */
+.wh-filter {
+  width: 190px;
+  align-self: stretch;
+  margin: 3px 8px;
 }
 .toolbar-query-btn:hover {
   background: #e7eef8;

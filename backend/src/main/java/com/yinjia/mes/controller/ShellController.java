@@ -33,6 +33,19 @@ public class ShellController {
         return ApiResult.ok(List.of(f));
     }
 
+    /** 仓库下拉(dm_ck 字典):code=仓库编码(dm),name=仓库名(mc);库存状况按编码绑定,改名不影响 */
+    @GetMapping("/base/warehouse/list")
+    public ApiResult<List<Map<String, Object>>> warehouses() {
+        return ApiResult.ok(jdbc.query(
+                "SELECT dm AS code, mc AS name FROM dm_ck WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY od_no, dm",
+                (rs, i) -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("code", rs.getString("code"));
+                    m.put("name", rs.getString("name"));
+                    return m;
+                }));
+    }
+
     @GetMapping("/sys/menu/tree")
     public ApiResult<List<Map<String, Object>>> menuTree() {
         return ApiResult.ok(List.of());

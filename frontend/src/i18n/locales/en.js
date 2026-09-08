@@ -1095,6 +1095,8 @@ export default {
     '保存后生效': 'Takes effect after saving',
     '已复制': 'Copied',
     '的权限，确认无误后请保存': "'s permissions; review and save",
+    /* ── 库存状况:仓库下拉 ── */
+    '全部仓库': 'All Warehouses',
     '二、炭棒滤芯组装/包装物料清单': '2. Assembly / Packaging Material List',
     '必测项': 'Mandatory Tests',
     '型式检验或者必测项': 'Type Tests / Mandatory',
