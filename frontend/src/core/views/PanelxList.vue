@@ -147,6 +147,20 @@
                   </template>
                 </div>
               </div>
+              <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改记录弹窗(滚动3条) -->
+              <div class="as-side-del" v-if="isProdFilePanel">
+                <div class="as-side-btn-row">
+                  <div class="as-side-btn" style="flex: 1" :class="{ disabled: !canModifyReq }" @click="pickModAction('申请修改')">{{ tt('申请修改') }}</div>
+                  <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openModMenu = !openModMenu">▼</div>
+                </div>
+                <div v-if="openModMenu" class="as-side-menu" @click.stop>
+                  <template v-if="user.isAdmin">
+                    <div class="as-side-menu-item" @click="pickModAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
+                    <div class="as-side-menu-item" @click="pickModAction('修改审批驳回')">{{ tt('修改审批驳回') }}</div>
+                  </template>
+                </div>
+              </div>
+              <div class="as-side-btn" v-if="isProdFilePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
               <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
                 <div
                   class="as-side-btn"
@@ -645,6 +659,37 @@
     <SubBomDialog v-model="subBomVisible" :material="subBomMaterial" :bom="subBomBom" />
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
+    <!-- 修改记录弹窗:滚动3条(字段变化/补充/清空 + 明细变化摘要) -->
+    <el-dialog v-model="modifyLogVisible" :title="tt('修改记录') + ' · ' + modifyLogNo" width="720px" append-to-body>
+      <div v-if="!modifyLogRecords.length" class="mod-log-empty">{{ tt('暂无修改记录') }}</div>
+      <div v-else class="mod-log-list">
+        <div v-for="(r, ri) in modifyLogRecords" :key="ri" class="mod-log-card">
+          <div class="mod-log-head">
+            <span class="mod-log-seq">{{ tt('第') }} {{ modifyLogRecords.length - ri }} {{ tt('次修改') }}</span>
+            <span>{{ tt('申请') }}：{{ r.applyBy || '-' }} {{ r.applyAt || '' }}</span>
+            <span>{{ tt('修改审批') }}：{{ r.approveBy || '-' }} {{ r.approveAt || '' }}</span>
+            <span>{{ tt('再归档') }}：{{ r.rearchiveBy || '-' }} {{ r.rearchiveAt || tt('未归档') }}</span>
+          </div>
+          <table v-if="(r.changes || []).length" class="mod-log-table">
+            <thead><tr><th style="width:70px">{{ tt('类型') }}</th><th style="width:140px">{{ tt('字段') }}</th><th>{{ tt('原内容') }}</th><th>{{ tt('新内容') }}</th></tr></thead>
+            <tbody>
+              <tr v-for="(c, ci) in r.changes" :key="ci">
+                <td><span class="mod-kind" :class="String(c.kind)">{{ tt(String(c.kind)) }}</span></td>
+                <td>{{ c.label }}</td>
+                <td class="mod-old">{{ c.old || '—' }}</td>
+                <td class="mod-new">{{ c.new || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="mod-log-nodata">{{ tt('本次修改未变更头字段') }}</div>
+          <div v-if="r.changeMeta && (r.changeMeta.addedRows || r.changeMeta.removedRows || r.changeMeta.changedRows)" class="mod-log-meta">
+            {{ tt('明细变化') }}：{{ tt('新增') }} {{ r.changeMeta.addedRows || 0 }} {{ tt('行') }} / {{ tt('删除') }} {{ r.changeMeta.removedRows || 0 }} {{ tt('行') }} / {{ tt('修改') }} {{ r.changeMeta.changedRows || 0 }} {{ tt('行') }}
+            <span v-if="(r.changeMeta.addedSamples || []).length">（{{ tt('新增') }}：{{ r.changeMeta.addedSamples.join('、') }}{{ (r.changeMeta.addedRows || 0) > (r.changeMeta.addedSamples || []).length ? ' …' : '' }}）</span>
+            <span v-if="(r.changeMeta.removedSamples || []).length">（{{ tt('删除') }}：{{ r.changeMeta.removedSamples.join('、') }}{{ (r.changeMeta.removedRows || 0) > (r.changeMeta.removedSamples || []).length ? ' …' : '' }}）</span>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <VoucherFormDialog v-model="formVisible" :panel-code="formPanel || panelCode" :code="formCode" @saved="onFormSaved" />
@@ -1132,6 +1177,42 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
 const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审']
 // 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
 const openDelMenu = ref(false)
+
+// ---------- 修改组(产品文件 7 面板):归档后申请修改(管理员审批进入修改态)+ 修改记录(滚动3条) ----------
+const PROD_FILE_PANELS = ['RD_PROD_INFO', 'RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_BOM', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+const isProdFilePanel = computed(() => PROD_FILE_PANELS.includes(String(panelCode.value)))
+const openModMenu = ref(false)
+const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
+const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocStatus.value))
+const modifyLogVisible = ref(false)
+const modifyLogRecords = ref([])
+const modifyLogNo = ref('')
+
+function pickModAction(action) {
+  openModMenu.value = false
+  onSideAction(action)
+}
+
+function safeParseJson(s) {
+  try { return JSON.parse(s) } catch { return null }
+}
+
+async function openModifyLog() {
+  if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+  const no = current.value['编号'] || current.value['单据编号'] || ''
+  try {
+    const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '修改记录', formData: { 编号: no }, buttonParam: {} })
+    modifyLogNo.value = no
+    modifyLogRecords.value = (res?.records || []).map((r) => ({
+      ...r,
+      changes: typeof r.changes === 'string' ? (safeParseJson(r.changes) || []) : (r.changes || []),
+      changeMeta: typeof r.changeMeta === 'string' ? (safeParseJson(r.changeMeta) || {}) : (r.changeMeta || {}),
+    }))
+    modifyLogVisible.value = true
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('查询失败'))
+  }
+}
 const approvalSideGroups = computed(() => toolbarGroups.value
   .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => !APPROVAL_SIDE_EXCLUDE.includes(a)) }))
   .filter((g) => (g.actions || []).length && !(g.actions || []).includes('删除')))
@@ -1157,6 +1238,8 @@ const draftEditable = computed(() => {
   if (reportMode.value || ['BOM_FWD', 'BOM_REV'].includes(String(panelCode.value))) return false
   const st = cur.value?.['单据状态']
   if (st === '草稿') return true
+  // 修改态(文件类:申请修改经管理员审批通过):可编辑,保存不再自动归档,走再审批
+  if (st === '修改中') return true
   // 档案/单单据面板（存货档案、员工、部门、工艺路线等）：启用/停用状态列表页同样内联可编辑（2026-08-24）
   if ((cfgCache.value?.metadata?.singleDoc || cfgCache.value?.metadata?.panelCategory === '设置') && (st === '启用' || st === '停用')) return true
   return false
@@ -3392,6 +3475,94 @@ onUnmounted(() => {
   color: #b91c1c;
   border: 1px solid #f3c1c1;
   background: #fef2f2;
+}
+.doc-status.修改申请中 {
+  color: #b45309;
+  border: 1px solid #f3d9a6;
+  background: #fffbeb;
+}
+.doc-status.修改中 {
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+}
+/* 修改记录弹窗 */
+.mod-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.mod-log-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.mod-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+.mod-log-seq {
+  font-weight: 600;
+  color: #374151;
+}
+.mod-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.mod-log-table th,
+.mod-log-table td {
+  border: 1px solid #e5e7eb;
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-all;
+}
+.mod-log-table th {
+  background: #f3f4f6;
+  font-weight: 500;
+}
+.mod-old {
+  color: #9ca3af;
+}
+.mod-new {
+  color: #111827;
+}
+.mod-kind {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 18px;
+}
+.mod-kind.变化 {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+.mod-kind.补充 {
+  color: #047857;
+  background: #ecfdf5;
+}
+.mod-kind.清空 {
+  color: #b45309;
+  background: #fffbeb;
+}
+.mod-log-empty,
+.mod-log-nodata {
+  color: #9ca3af;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.mod-log-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;
 }
 .page-btn {
   width: 24px;

@@ -1,5 +1,6 @@
 package com.yinjia.mes.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -60,6 +61,11 @@ public class ButtonService {
             // 文件类面板:归档单据删除申请的管理员审批
             case "删除审批通过" -> approveDelete(def, formData);
             case "删除审批驳回" -> rejectDelete(def, formData);
+            // 文件类面板:归档后申请修改(管理员审批进入修改态,再审批归档+修改记录滚动3条)
+            case "申请修改" -> modifyRequest(def, formData);
+            case "修改审批通过" -> modifyApprove(def, formData);
+            case "修改审批驳回" -> modifyReject(def, formData);
+            case "修改记录" -> modifyHistory(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
         };
     }
@@ -137,8 +143,8 @@ public class ButtonService {
             }
             upsertLineRows(def, items, no, l2c, user);
         }
-        // 文件类面板(文书式):保存即归档(空白新建草稿不归档,保留首次填写入口)
-        if (DOC_ARCHIVE_PANELS.contains(def.code())) markArchived(def.code(), no);
+        // 文件类面板(文书式):保存即归档(空白新建草稿不归档,保留首次填写入口);修改态保存不归档,走再审批
+        if (DOC_ARCHIVE_PANELS.contains(def.code()) && !"Y".equals(modifyStateOf(def.code(), no))) markArchived(def.code(), no);
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
         if (DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
@@ -403,6 +409,10 @@ public class ButtonService {
                         + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, shr, shsj, canceled, pending, update_at) "
                         + "VALUES (s.panel_code, s.doc_no, ?, GETDATE(), 'N', 'N', GETDATE());",
                 def.code(), no, currentUserName(), currentUserName());
+        // 文件类面板:修改态经审核收尾 → 计算修改记录并再归档
+        if (DOC_ARCHIVE_PANELS.contains(def.code()) && finalizeModify(def, no, currentUserName())) {
+            return result(no, "已归档");
+        }
         return result(no, "已审核");
     }
 
@@ -456,7 +466,9 @@ public class ButtonService {
         String no = requireNo(formData);
         ensureDocExists(def, no);
         Map<String, Object> st = docStatusOf(def.code(), no);
-        if (!"草稿".equals(st.get("status"))) throw new IllegalStateException("仅草稿状态可提交审批");
+        // 修改态(文件类:申请修改经管理员审批通过)同样可提交审批,通过后 finalizeModify 再归档
+        if (!"草稿".equals(st.get("status")) && !"修改中".equals(st.get("status")))
+            throw new IllegalStateException("仅草稿或修改中状态可提交审批");
         String operator = currentUserName();
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                         + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
@@ -480,6 +492,10 @@ public class ButtonService {
         jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", operator, def.code(), no);
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion);
+        // 文件类面板:修改态审批通过 → 计算修改记录并再归档
+        if (DOC_ARCHIVE_PANELS.contains(def.code()) && finalizeModify(def, no, operator)) {
+            return result(no, "已归档");
+        }
         return result(no, "已审核");
     }
 
@@ -632,6 +648,227 @@ public class ButtonService {
         return result(no, "已归档");
     }
 
+    // ============ 文件类面板:归档后申请修改 + 修改记录(滚动3条) ============
+
+    /** 申请修改:已归档/已审核 → 修改申请中(待管理员审批) */
+    private Map<String, Object> modifyRequest(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if (!"已归档".equals(st) && !"已审核".equals(st)) throw new IllegalStateException("仅已归档单据可申请修改");
+        jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
+                        + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
+                        + "WHEN MATCHED THEN UPDATE SET modify_state = 'R', modify_req_by = ?, modify_req_at = GETDATE(), update_at = GETDATE() "
+                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, modify_state, modify_req_by, modify_req_at, update_at) "
+                        + "VALUES (s.panel_code, s.doc_no, 'R', ?, GETDATE(), GETDATE());",
+                def.code(), no, user, user);
+        recordApproval(def.code(), no, "MODIFY_REQ", "PENDING", opinionOf(formData));
+        return result(no, "修改申请中");
+    }
+
+    /** 修改审批通过(仅管理员):快照入库 → 修改态(可编辑,保存不再自动归档) */
+    private Map<String, Object> modifyApprove(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        if (!isAdminUser(user)) throw new IllegalStateException("仅管理员可审批修改申请");
+        String no = requireNo(formData);
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        if (!"修改申请中".equals(st.get("status"))) throw new IllegalStateException("无待审批的修改申请");
+        Map<String, Object> row = st.get("row") instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
+        String applyBy = row == null || row.get("modify_req_by") == null ? user : String.valueOf(row.get("modify_req_by"));
+        Object applyAt = row == null ? null : row.get("modify_req_at");
+        jdbc.update("INSERT INTO yj_doc_modify_log (panel_code, doc_no, apply_by, apply_at, approve_by, approve_at, snapshot_head, snapshot_rows) "
+                        + "VALUES (?,?,?,?,?,?,?,?)",
+                def.code(), no, applyBy, applyAt, user, LocalDateTime.now(),
+                toJson(headLabelSnapshot(def, no)), toJson(rowSnapshots(def, no)));
+        int n = jdbc.update("UPDATE yj_doc_status SET modify_state='Y', modify_appr_by=?, modify_appr_at=GETDATE(), archived='N', update_at=GETDATE()"
+                + " WHERE panel_code=? AND doc_no=? AND modify_state='R'", user, def.code(), no);
+        if (n == 0) throw new IllegalStateException("无待审批的修改申请");
+        recordApproval(def.code(), no, "MODIFY_APPROVE", "MODIFYING", opinionOf(formData));
+        return result(no, "修改中");
+    }
+
+    /** 修改审批驳回(仅管理员):恢复已归档 */
+    private Map<String, Object> modifyReject(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        if (!isAdminUser(user)) throw new IllegalStateException("仅管理员可审批修改申请");
+        String no = requireNo(formData);
+        int n = jdbc.update("UPDATE yj_doc_status SET modify_state=NULL, update_at=GETDATE()"
+                + " WHERE panel_code=? AND doc_no=? AND modify_state='R'", def.code(), no);
+        if (n == 0) throw new IllegalStateException("无待审批的修改申请");
+        recordApproval(def.code(), no, "MODIFY_REJECT", "ARCHIVED", opinionOf(formData));
+        return result(no, "已归档");
+    }
+
+    /** 修改记录:最近3条(超出滚动覆盖最早的),供前端弹窗展示 */
+    private Map<String, Object> modifyHistory(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String no = requireNo(formData);
+        List<Map<String, Object>> records = jdbc.queryForList(
+                "SELECT TOP 3 apply_by, apply_at, approve_by, approve_at, rearchive_by, rearchive_at, changes, change_meta"
+                        + " FROM yj_doc_modify_log WHERE panel_code=? AND doc_no=? ORDER BY id DESC", def.code(), no);
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (Map<String, Object> r : records) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("applyBy", r.get("apply_by"));
+            m.put("applyAt", fmtTime(r.get("apply_at")));
+            m.put("approveBy", r.get("approve_by"));
+            m.put("approveAt", fmtTime(r.get("approve_at")));
+            m.put("rearchiveBy", r.get("rearchive_by"));
+            m.put("rearchiveAt", fmtTime(r.get("rearchive_at")));
+            m.put("changes", r.get("changes"));
+            m.put("changeMeta", r.get("change_meta"));
+            list.add(m);
+        }
+        Map<String, Object> out = new HashMap<>();
+        out.put("编号", no);
+        out.put("records", list);
+        return out;
+    }
+
+    /** 再归档收尾:计算头字段 diff(变化/补充/清空) + 明细摘要,回填修改记录并滚动保留3条;返回是否实际处于修改态并完成收尾 */
+    private boolean finalizeModify(PanelRegistry.PanelDef def, String no, String user) {
+        List<Map<String, Object>> stRows = jdbc.queryForList(
+                "SELECT modify_state FROM yj_doc_status WHERE panel_code=? AND doc_no=?", def.code(), no);
+        if (stRows.isEmpty() || !"Y".equals(stRows.get(0).get("modify_state"))) return false;
+        List<Map<String, Object>> open = jdbc.queryForList(
+                "SELECT TOP 1 id, snapshot_head, snapshot_rows FROM yj_doc_modify_log"
+                        + " WHERE panel_code=? AND doc_no=? AND rearchive_by IS NULL ORDER BY id DESC", def.code(), no);
+        if (!open.isEmpty()) {
+            Map<String, String> oldHead = fromJsonMap(open.get(0).get("snapshot_head"));
+            Map<String, String> curHead = headLabelSnapshot(def, no);
+            List<Map<String, Object>> changes = new ArrayList<>();
+            for (PanelRegistry.FieldDef f : def.fieldsAt("header")) {
+                String oldV = oldHead.getOrDefault(f.label(), "");
+                String newV = curHead.getOrDefault(f.label(), "");
+                if (oldV.equals(newV)) continue;
+                Map<String, Object> c = new LinkedHashMap<>();
+                c.put("label", f.label());
+                c.put("kind", oldV.isEmpty() ? "补充" : (newV.isEmpty() ? "清空" : "变化"));
+                c.put("old", oldV);
+                c.put("new", newV);
+                changes.add(c);
+            }
+            Map<String, Object> meta = rowDiffMeta(fromJsonList(open.get(0).get("snapshot_rows")), rowSnapshots(def, no));
+            jdbc.update("UPDATE yj_doc_modify_log SET changes=?, change_meta=?, rearchive_by=?, rearchive_at=GETDATE() WHERE id=?",
+                    toJson(changes), toJson(meta), user, open.get(0).get("id"));
+            // 滚动3条:删除最早的超出部分(后续修改覆盖最早记录)
+            jdbc.update("DELETE FROM yj_doc_modify_log WHERE panel_code=? AND doc_no=? AND id NOT IN"
+                            + " (SELECT TOP 3 id FROM yj_doc_modify_log WHERE panel_code=? AND doc_no=? ORDER BY id DESC)",
+                    def.code(), no, def.code(), no);
+        }
+        jdbc.update("UPDATE yj_doc_status SET modify_state=NULL, archived='Y', pending='N', update_at=GETDATE()"
+                + " WHERE panel_code=? AND doc_no=?", def.code(), no);
+        return true;
+    }
+
+    /** 明细行变化摘要:新增/删除/修改行数 + 各取至多5个行标签样例 */
+    private Map<String, Object> rowDiffMeta(List<Map<String, Object>> oldRows, List<Map<String, Object>> curRows) {
+        Map<String, Map<String, Object>> oldById = new LinkedHashMap<>();
+        for (Map<String, Object> r : oldRows) oldById.put(String.valueOf(r.get("id")), r);
+        Map<String, Map<String, Object>> curById = new LinkedHashMap<>();
+        for (Map<String, Object> r : curRows) curById.put(String.valueOf(r.get("id")), r);
+        List<String> added = new ArrayList<>();
+        List<String> removed = new ArrayList<>();
+        int changed = 0;
+        for (Map.Entry<String, Map<String, Object>> e : curById.entrySet()) {
+            Map<String, Object> old = oldById.get(e.getKey());
+            if (old == null) added.add(String.valueOf(e.getValue().getOrDefault("label", e.getKey())));
+            else if (!String.valueOf(old.get("hash")).equals(String.valueOf(e.getValue().get("hash")))) changed++;
+        }
+        for (Map.Entry<String, Map<String, Object>> e : oldById.entrySet()) {
+            if (!curById.containsKey(e.getKey())) removed.add(String.valueOf(e.getValue().getOrDefault("label", e.getKey())));
+        }
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("addedRows", added.size());
+        meta.put("removedRows", removed.size());
+        meta.put("changedRows", changed);
+        meta.put("addedSamples", added.subList(0, Math.min(5, added.size())));
+        meta.put("removedSamples", removed.subList(0, Math.min(5, removed.size())));
+        return meta;
+    }
+
+    private String modifyStateOf(String panelCode, String no) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT modify_state FROM yj_doc_status WHERE panel_code=? AND doc_no=?", panelCode, no);
+        return rows.isEmpty() || rows.get(0).get("modify_state") == null ? "" : String.valueOf(rows.get(0).get("modify_state"));
+    }
+
+    /** 头字段快照:头表当前行 → 标签→字符串值(去空白) */
+    private Map<String, String> headLabelSnapshot(PanelRegistry.PanelDef def, String no) {
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM " + table + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N')<>'Y'", no);
+        Map<String, String> out = new LinkedHashMap<>();
+        if (rows.isEmpty()) return out;
+        Map<String, Object> row = rows.get(0);
+        for (PanelRegistry.FieldDef f : def.fieldsAt("header")) {
+            Object v = row.get(f.col());
+            out.put(f.label(), v == null ? "" : String.valueOf(v).trim());
+        }
+        return out;
+    }
+
+    /** 明细行快照:行主键/指纹(全部字段值拼接)/业务标签(首个非空文本字段值) */
+    private List<Map<String, Object>> rowSnapshots(PanelRegistry.PanelDef def, String no) {
+        if (!def.hasHeadTable() || def.lineTable() == null || def.lineTable().equals(def.headTable())) return List.of();
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT * FROM " + def.lineTable() + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY " + def.pkCol(), no);
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> row : rows) {
+            StringBuilder hash = new StringBuilder();
+            String label = "";
+            for (PanelRegistry.FieldDef f : def.fields()) {
+                Object v = row.get(f.col());
+                String s = v == null ? "" : String.valueOf(v);
+                hash.append(f.col()).append('=').append(s).append(';');
+                String colName = String.valueOf(f.col()).toLowerCase();
+                if (label.isEmpty() && !s.isEmpty() && !colName.equals("id") && !colName.equals(String.valueOf(def.pkCol()).toLowerCase())) label = s;
+            }
+            Object id = row.get(def.pkCol()) != null ? row.get(def.pkCol()) : row.get("id");
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", id);
+            m.put("hash", hash.toString());
+            m.put("label", label);
+            out.add(m);
+        }
+        return out;
+    }
+
+    private static final ObjectMapper MODIFY_JSON = new ObjectMapper();
+
+    private String toJson(Object o) {
+        try {
+            return MODIFY_JSON.writeValueAsString(o);
+        } catch (Exception e) {
+            throw new IllegalStateException("修改记录序列化失败", e);
+        }
+    }
+
+    private Map<String, String> fromJsonMap(Object json) {
+        try {
+            return json == null ? Map.of() : MODIFY_JSON.readValue(String.valueOf(json),
+                    new com.fasterxml.jackson.core.type.TypeReference<Map<String, String>>() {});
+        } catch (Exception e) {
+            return Map.of();
+        }
+    }
+
+    private List<Map<String, Object>> fromJsonList(Object json) {
+        try {
+            return json == null ? List.of() : MODIFY_JSON.readValue(String.valueOf(json),
+                    new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    private String fmtTime(Object t) {
+        if (t == null) return "";
+        if (t instanceof java.sql.Timestamp ts) return ts.toLocalDateTime()
+                .format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        return String.valueOf(t);
+    }
+
     private boolean isAdminUser(String user) {
         List<Map<String, Object>> rows = jdbc.queryForList("SELECT is_admin FROM yj_user WHERE username=?", user);
         return !rows.isEmpty() && "Y".equals(String.valueOf(rows.get(0).get("is_admin")));
@@ -670,10 +907,10 @@ public class ButtonService {
         return docStatusOf(panelCode, no);
     }
 
-    /** 状态推导:已作废 > 已中止(stopped) > 已审核(shr) > 审批中(pending) > 删除申请中(deleting) > 已归档(archived) > 草稿 */
+    /** 状态推导:已作废 > 已中止 > 删除申请中 > 修改申请中 > 审批中 > 修改中 > 已归档 > 已审核 > 草稿 */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
                 panelCode, no);
         Map<String, Object> out = new HashMap<>();
         Map<String, Object> r = rows.isEmpty() ? null : rows.get(0);
@@ -683,14 +920,18 @@ public class ButtonService {
             out.put("status", "已作废");
         } else if ("Y".equals(r.get("stopped"))) {
             out.put("status", "已中止");
-        } else if (r.get("shr") != null) {
-            out.put("status", "已审核");
-        } else if ("Y".equals(r.get("pending"))) {
-            out.put("status", "审批中");
         } else if ("Y".equals(r.get("deleting"))) {
             out.put("status", "删除申请中");
+        } else if ("R".equals(r.get("modify_state"))) {
+            out.put("status", "修改申请中");
+        } else if ("Y".equals(r.get("pending"))) {
+            out.put("status", "审批中");
+        } else if ("Y".equals(r.get("modify_state"))) {
+            out.put("status", "修改中");
         } else if ("Y".equals(r.get("archived"))) {
             out.put("status", "已归档");
+        } else if (r.get("shr") != null) {
+            out.put("status", "已审核");
         } else {
             out.put("status", "草稿");
         }
