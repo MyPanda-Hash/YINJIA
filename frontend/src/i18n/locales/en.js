@@ -1075,6 +1075,11 @@ export default {
     '查询到': 'Found',
     '已跳转到': 'Jumped to',
     '未查询到匹配单据，已恢复全部单据': 'No matching documents; full list restored',
+    /* ── 文件面板权限动作集 ── */
+    '新增保存': 'Create & Save',
+    '删除申请': 'Delete Request',
+    '导出打印': 'Export & Print',
+    '审批': 'Approve',
     '二、炭棒滤芯组装/包装物料清单': '2. Assembly / Packaging Material List',
     '必测项': 'Mandatory Tests',
     '型式检验或者必测项': 'Type Tests / Mandatory',

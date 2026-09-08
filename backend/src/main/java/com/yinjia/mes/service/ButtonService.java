@@ -905,8 +905,8 @@ public class ButtonService {
         if (c == null || c == 0) throw new IllegalArgumentException("表单数据不存在：" + no);
     }
 
-    /** 文件类面板(文书式):保存即归档,退出草稿状态机;后续新增文件类面板在此登记 */
-    private static final java.util.Set<String> DOC_ARCHIVE_PANELS = java.util.Set.of(
+    /** 文件类面板(文书式):保存即归档,退出草稿状态机;后续新增文件类面板在此登记(SysAdminController 权限动作集引用) */
+    public static final java.util.Set<String> DOC_ARCHIVE_PANELS = java.util.Set.of(
             "RD_APPROVAL", "RD_PLAN", "RD_FILTER_EFF",
             "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC",
             "RD_SPIKE_WATER", "RD_DOM_TEST", "RD_EQUIP_USE", "RD_INSTR_USE",

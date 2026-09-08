@@ -103,19 +103,21 @@
                   <thead>
                     <tr>
                       <th class="pt-panel">{{ tt('面板') }}</th>
-                      <th v-for="act in permActions" :key="act[0]" class="pt-act" :title="tt(act[1])">{{ tt(act[1]) }}</th>
+                      <th v-for="act in groupActs(g)" :key="act[0]" class="pt-act" :title="tt(act[1])">{{ tt(act[1]) }}</th>
                       <th class="pt-all">{{ tt('全选') }}</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-for="r in g.panels" :key="r.panelCode">
                       <td class="pt-panel">{{ tt(r.panelName) }}</td>
-                      <td v-for="act in permActions" :key="act[0]" class="pt-act">
+                      <td v-for="act in groupActs(g)" :key="act[0]" class="pt-act">
                         <el-checkbox
+                          v-if="rowHasAct(r, act[0])"
                           :model-value="hasPerm(r, act[0])"
                           @update:model-value="togglePerm(r, act[0], $event)"
                           :disabled="act[0] !== 'view' && !hasPerm(r, 'view')"
                         />
+                        <span v-else class="pt-na">—</span>
                       </td>
                       <td class="pt-all">
                         <el-checkbox
@@ -239,7 +241,21 @@ const groupedPanels = computed(() => {
   return other.panels.length ? buckets.concat(other) : buckets
 })
 
-// ---- 操作权限工具(11 项,行对象 permsSet 为 Set) ----
+// ---- 操作权限工具(行对象 permsSet 为 Set;动作集按行,文件面板 8 项/通用面板 11 项) ----
+/** 组内动作列 = 成员行动作集的并集(保序去重);同组混合时不适用的格显示 — */
+function groupActs(g) {
+  const seen = new Set()
+  const out = []
+  for (const r of g.panels) {
+    for (const a of r.actions || []) {
+      if (!seen.has(a[0])) { seen.add(a[0]); out.push(a) }
+    }
+  }
+  return out
+}
+function rowHasAct(row, code) {
+  return (row.actions || []).some((a) => a[0] === code)
+}
 function hasPerm(row, code) {
   return row.permsSet ? row.permsSet.has(code) : false
 }
@@ -254,18 +270,18 @@ function togglePerm(row, code, val) {
   }
 }
 function isAllPerms(row) {
-  return permActions.value.length > 0 && permActions.value.every((a) => row.permsSet && row.permsSet.has(a[0]))
+  return (row.actions || []).length > 0 && row.actions.every((a) => row.permsSet && row.permsSet.has(a[0]))
 }
 function toggleAllPerms(row, val) {
   if (val) {
-    row.permsSet = new Set(permActions.value.map((a) => a[0]))
+    row.permsSet = new Set(row.actions.map((a) => a[0]))
   } else {
     row.permsSet = new Set()
   }
 }
 function setGroupPerms(g, mode) {
   for (const r of g.panels) {
-    if (mode === 'all') r.permsSet = new Set(permActions.value.map((a) => a[0]))
+    if (mode === 'all') r.permsSet = new Set(r.actions.map((a) => a[0]))
     else r.permsSet = new Set()
   }
 }
@@ -477,6 +493,8 @@ async function loadRolePanels(row) {
       panelCode: p.panelCode,
       panelName: p.panelName,
       hasApproval: !!p.hasApproval,
+      // 面板级动作集:文件类=专属 8 项(按真实操作行为),其余=通用 11 项
+      actions: (p.actions && p.actions.length ? p.actions : permActions.value),
       permsSet: new Set((grantedPerms[p.panelCode] || '').split(',').filter(Boolean)),
     }))
   } catch (e) {
@@ -602,6 +620,7 @@ onMounted(load)
   font-weight: 500;
 }
 .perm-table .pt-act { min-width: 36px; }
+.perm-table .pt-na { color: #d1d5db; }
 .perm-table .pt-all {
   min-width: 40px;
   background: #fafbfc;

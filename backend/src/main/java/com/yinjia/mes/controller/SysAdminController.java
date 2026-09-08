@@ -1,6 +1,7 @@
 package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
+import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.UsageLogService;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -214,7 +215,7 @@ public class SysAdminController {
 
     // ============ 角色面板操作权限(11 项) ============
 
-    /** 全部操作权限定义(顺序=前端列顺序) */
+    /** 全部操作权限定义(顺序=前端列顺序)——通用面板 11 项 */
     public static final String[][] PERMISSION_ACTIONS = {
             {"view",    "可见"},
             {"query",   "查询"},
@@ -229,6 +230,19 @@ public class SysAdminController {
             {"adjust",  "调价"},
     };
 
+    /** 文件类面板(研发管理·文书式)专属动作集:按真实操作行为设计(新增保存即归档/查询单据/
+     *  申请修改闭环/修改记录/删除申请管理员审批/导出打印/审批族),非通用 11 项 */
+    public static final String[][] FILE_PANEL_ACTIONS = {
+            {"view",    "可见"},
+            {"query",   "查询单据"},
+            {"add",     "新增保存"},
+            {"modify",  "申请修改"},
+            {"modlog",  "修改记录"},
+            {"del",     "删除申请"},
+            {"export",  "导出打印"},
+            {"audit",   "审批"},
+    };
+
     @GetMapping("/role/{id}/panels")
     public ApiResult<Map<String, Object>> rolePanels(@PathVariable int id) {
         // 面板按真实模块分组返回(对齐 HSDZ permission.GROP,数据源 yj_panel.module_group)
@@ -239,6 +253,9 @@ public class SysAdminController {
             p.put("panelName", def.name());
             p.put("module", def.moduleName());
             p.put("hasApproval", def.isDoc());
+            // 面板级动作集:文件类面板按真实操作行为下发专属 8 项,其余保持通用 11 项
+            p.put("actions", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code())
+                    ? FILE_PANEL_ACTIONS : PERMISSION_ACTIONS);
             byModule.computeIfAbsent(def.moduleName(), k -> new ArrayList<>()).add(p);
         }
         List<Map<String, Object>> modules = new ArrayList<>();
