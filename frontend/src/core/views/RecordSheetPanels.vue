@@ -1011,6 +1011,14 @@ function onProdRefConfirm(rows) {
   for (const m of f.refMap || []) {
     if (m && source[m.from] !== undefined) props.head[m.to || m.from] = source[m.from]
   }
+  // 炭棒尺寸整串 → 成型面板 炭棒规格1/2/3 三窄格拆分回填(源 Excel 即外径/内径/长度三个窄数字格)
+  const sizeStr = String(source['炭棒尺寸'] ?? '')
+  if (sizeStr && fieldMap.value.has('炭棒规格1')) {
+    const dim = (kw) => (sizeStr.match(new RegExp(kw + '\\s*([0-9.]+)\\s*mm')) || [])[1] ?? ''
+    props.head['炭棒规格1'] = dim('外径')
+    props.head['炭棒规格2'] = dim('内径')
+    props.head['炭棒规格3'] = dim('长度')
+  }
   prodRefVisible.value = false
   emit('dirty')
 }
