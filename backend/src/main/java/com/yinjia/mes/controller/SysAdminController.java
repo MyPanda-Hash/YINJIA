@@ -273,6 +273,14 @@ public class SysAdminController {
     public ApiResult<Map<String, Object>> rolePanels(@PathVariable int id) {
         // 面板按真实模块分组返回(对齐 HSDZ permission.GROP,数据源 yj_panel.module_group)
         Map<String, List<Map<String, Object>>> byModule = new LinkedHashMap<>();
+        // 通用虚拟面板:我的桌面权限化(勾可见才在导航显示;admin 恒可见)
+        Map<String, Object> dash = new LinkedHashMap<>();
+        dash.put("panelCode", "DASHBOARD");
+        dash.put("panelName", "我的桌面");
+        dash.put("module", "通用");
+        dash.put("hasApproval", false);
+        dash.put("actions", new String[][]{{"view", "可见"}});
+        byModule.computeIfAbsent("通用", k -> new ArrayList<>()).add(dash);
         for (PanelRegistry.PanelDef def : registry.all()) {
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("panelCode", def.code());

@@ -490,7 +490,7 @@ public class ButtonService {
         Map<String, Object> st = docStatusOf(def.code(), no);
         if (!"审批中".equals(st.get("status"))) throw new IllegalStateException("仅审批中状态可审批通过");
         requirePendingSubmission(def.code(), no);
-        requireApprover();
+        requireApprover(def.code());
         String operator = currentUserName();
         String opinion = opinionOf(formData);
         jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), update_at = GETDATE()"
@@ -509,7 +509,7 @@ public class ButtonService {
         Map<String, Object> st = docStatusOf(def.code(), no);
         if (!"审批中".equals(st.get("status"))) throw new IllegalStateException("仅审批中状态可审批驳回");
         requirePendingSubmission(def.code(), no);
-        requireApprover();
+        requireApprover(def.code());
         String opinion = opinionOf(formData);
         if (opinion.isEmpty()) throw new IllegalStateException("审批驳回必须填写审批意见");
         jdbc.update("UPDATE yj_doc_status SET pending = 'N', update_at = GETDATE()"
@@ -538,13 +538,20 @@ public class ButtonService {
         }
     }
 
-    /** 审批权限:YINJIA 以 yj_user.is_admin 承载(light-mes 为角色 can_approve) */
-    private void requireApprover() {
-        String user = currentUserName();
-        List<String> admins = jdbc.query(
-                "SELECT username FROM yj_user WHERE username = ? AND is_admin = 'Y'",
-                (rs, i) -> rs.getString(1), user);
-        if (admins.isEmpty()) throw new org.springframework.security.access.AccessDeniedException("当前用户无审批权限");
+    /** 审批权限:管理员,或角色对该面板勾了审批(yj_role_panel.can_approve='Y') */
+    private void requireApprover(String panelCode) {
+        if (!canApprove(currentUserName(), panelCode))
+            throw new org.springframework.security.access.AccessDeniedException("当前用户无审批权限");
+    }
+
+    /** 审批判定:管理员恒可;普通用户按角色面板审批权(can_approve) */
+    private boolean canApprove(String user, String panelCode) {
+        if (isAdminUser(user)) return true;
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM yj_user u JOIN yj_role_panel rp ON rp.role_id = u.role_id"
+                        + " WHERE u.username = ? AND rp.panel_code = ? AND rp.can_approve = 'Y'",
+                Integer.class, user, panelCode);
+        return n != null && n > 0;
     }
 
     private void recordApproval(String panelCode, String formNo, String action, String result, String opinion) {
@@ -633,7 +640,7 @@ public class ButtonService {
     /** 删除申请审批通过(仅管理员):单据作废 */
     private Map<String, Object> approveDelete(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String user = currentUserName();
-        if (!isAdminUser(user)) throw new IllegalStateException("仅管理员可审批删除申请");
+        if (!canApprove(user, def.code())) throw new IllegalStateException("当前角色无该面板的删除审批权限");
         String no = requireNo(formData);
         int n = jdbc.update("UPDATE yj_doc_status SET canceled='Y', cancel_by=?, cancel_at=GETDATE(), deleting='N', update_at=GETDATE()"
                 + " WHERE panel_code=? AND doc_no=? AND deleting='Y'", user, def.code(), no);
@@ -644,7 +651,7 @@ public class ButtonService {
     /** 删除申请驳回(仅管理员):恢复归档状态 */
     private Map<String, Object> rejectDelete(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String user = currentUserName();
-        if (!isAdminUser(user)) throw new IllegalStateException("仅管理员可审批删除申请");
+        if (!canApprove(user, def.code())) throw new IllegalStateException("当前角色无该面板的删除审批权限");
         String no = requireNo(formData);
         int n = jdbc.update("UPDATE yj_doc_status SET deleting='N', update_at=GETDATE()"
                 + " WHERE panel_code=? AND doc_no=? AND deleting='Y'", def.code(), no);
@@ -674,7 +681,7 @@ public class ButtonService {
     /** 修改审批通过(仅管理员):快照入库 → 修改态(可编辑,保存不再自动归档) */
     private Map<String, Object> modifyApprove(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String user = currentUserName();
-        if (!isAdminUser(user)) throw new IllegalStateException("仅管理员可审批修改申请");
+        if (!canApprove(user, def.code())) throw new IllegalStateException("当前角色无该面板的修改审批权限");
         String no = requireNo(formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
         if (!"修改申请中".equals(st.get("status"))) throw new IllegalStateException("无待审批的修改申请");
@@ -695,7 +702,7 @@ public class ButtonService {
     /** 修改审批驳回(仅管理员):恢复已归档 */
     private Map<String, Object> modifyReject(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String user = currentUserName();
-        if (!isAdminUser(user)) throw new IllegalStateException("仅管理员可审批修改申请");
+        if (!canApprove(user, def.code())) throw new IllegalStateException("当前角色无该面板的修改审批权限");
         String no = requireNo(formData);
         int n = jdbc.update("UPDATE yj_doc_status SET modify_state=NULL, update_at=GETDATE()"
                 + " WHERE panel_code=? AND doc_no=? AND modify_state='R'", def.code(), no);

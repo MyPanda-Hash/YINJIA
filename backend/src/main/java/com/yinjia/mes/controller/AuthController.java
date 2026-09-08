@@ -57,8 +57,8 @@ public class AuthController {
         user.put("roleCode", admin ? "admin" : "user");
         user.put("isAdmin", admin);
         user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
-        // 审批权限(照搬 light-mes can_approve 语义):仅管理员可审批通过/驳回
-        user.put("approvePanels", admin ? List.of("*") : List.of());
+        // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
+        user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         Map<String, Object> out = new HashMap<>();
         out.put("token", jwtUtil.generate(username));
         out.put("user", user);
@@ -96,7 +96,7 @@ public class AuthController {
         user.put("roleCode", admin ? "admin" : "user");
         user.put("isAdmin", admin);
         user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
-        user.put("approvePanels", admin ? List.of("*") : List.of());
+        user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         return user;
     }
 
@@ -107,6 +107,15 @@ public class AuthController {
         if (roleId == null) return List.of();
         return jdbc.query(
                 "SELECT panel_code FROM yj_role_panel WHERE role_id = ? AND perms LIKE '%view%'",
+                (rs, i) -> rs.getString(1), roleId);
+    }
+
+    /** 审批权限面板:管理员=全部;普通用户=角色勾了审批(面板权限含 audit → can_approve='Y')的面板码 */
+    private List<String> approvePanelsOf(boolean admin, Object roleId) {
+        if (admin) return List.of("*");
+        if (roleId == null) return List.of();
+        return jdbc.query(
+                "SELECT panel_code FROM yj_role_panel WHERE role_id = ? AND can_approve = 'Y'",
                 (rs, i) -> rs.getString(1), roleId);
     }
 

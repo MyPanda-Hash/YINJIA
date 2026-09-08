@@ -6,6 +6,7 @@ export const menuTree = [
     title: '我的桌面',
     path: '/dashboard',
     icon: 'HomeFilled',
+    panelCode: 'DASHBOARD', // 权限化:组织架构「通用·我的桌面」勾可见才显示(admin 恒可见)
   },
   {
     code: 'rd',

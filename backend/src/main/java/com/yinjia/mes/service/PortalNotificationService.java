@@ -35,7 +35,7 @@ public class PortalNotificationService {
 
     public Map<String, Integer> badge(String userName) {
         Map<String, Integer> result = new LinkedHashMap<>();
-        result.put("todo", todos().size());
+        result.put("todo", todos(userName).size());
         result.put("message", messages().size());
         result.put("alarm", alarms().size());
         return result;
@@ -43,35 +43,70 @@ public class PortalNotificationService {
 
     public List<Map<String, Object>> list(String userName, String type) {
         return switch (type == null ? "" : type) {
-            case "todo" -> todos();
+            case "todo" -> todos(userName);
             case "message" -> messages();
             case "alarm" -> alarms();
             default -> List.of();
         };
     }
 
-    /** 待办:审批中单据(照搬 light-mes 语义,数据源 yj_doc_status.pending) */
-    private List<Map<String, Object>> todos() {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT TOP " + LIST_LIMIT + " panel_code, doc_no, pending_by, pending_at, update_at"
-                        + " FROM yj_doc_status WHERE ISNULL(pending,'N') = 'Y' AND ISNULL(canceled,'N') <> 'Y'"
-                        + " ORDER BY update_at DESC");
+    /** 待办:当前账号有权审批的面板上的待审单据(审批中/修改申请中/删除申请中),按审批权限过滤 */
+    private List<Map<String, Object>> todos(String userName) {
+        List<String> panels = approverPanels(userName);
+        if (panels.isEmpty()) return List.of();
         List<Map<String, Object>> result = new ArrayList<>();
+        appendTodos(result, "pending", "待审批", "已提交", panels);
+        appendTodos(result, "modify", "待修改审批", "已申请修改", panels);
+        appendTodos(result, "delete", "待删除审批", "已申请删除", panels);
+        return result;
+    }
+
+    /** 按状态拼接待办(panels=["*"] 表示管理员不过滤) */
+    private void appendTodos(List<Map<String, Object>> out, String kind, String label, String verb, List<String> panels) {
+        String cond;
+        String by;
+        switch (kind) {
+            case "modify" -> { cond = "ISNULL(modify_state,'') = 'R'"; by = "modify_req_by"; }
+            case "delete" -> { cond = "ISNULL(deleting,'N') = 'Y'"; by = "delete_req_by"; }
+            default -> { cond = "ISNULL(pending,'N') = 'Y'"; by = "pending_by"; }
+        }
+        StringBuilder sql = new StringBuilder(
+                "SELECT TOP " + LIST_LIMIT + " panel_code, doc_no, " + by + " AS req_by, update_at"
+                        + " FROM yj_doc_status WHERE " + cond + " AND ISNULL(canceled,'N') <> 'Y'");
+        List<Object> args = new ArrayList<>();
+        if (!panels.contains("*")) {
+            sql.append(" AND panel_code IN (")
+                    .append(String.join(",", panels.stream().map(p -> "?").toList())).append(")");
+            args.addAll(panels);
+        }
+        sql.append(" ORDER BY update_at DESC");
+        List<Map<String, Object>> rows = jdbc.queryForList(sql.toString(), args.toArray());
         for (Map<String, Object> row : rows) {
             String panelCode = String.valueOf(row.get("panel_code"));
             String docNo = String.valueOf(row.get("doc_no"));
             String panelName = panelName(panelCode);
             Timestamp time = (Timestamp) row.get("update_at");
-            String submitter = row.get("pending_by") == null ? "未知账号" : String.valueOf(row.get("pending_by"));
-            Map<String, Object> item = base("todo:" + panelCode + ':' + docNo, "todo",
-                    panelName + " " + docNo + " 待审批", time,
-                    "提交人「" + submitter + "」已提交" + panelName + " " + docNo + ",等待当前账号审批。",
+            String submitter = row.get("req_by") == null ? "未知账号" : String.valueOf(row.get("req_by"));
+            Map<String, Object> item = base("todo:" + kind + ':' + panelCode + ':' + docNo, "todo",
+                    panelName + " " + docNo + " " + label, time,
+                    "提交人「" + submitter + "」" + verb + panelName + " " + docNo + ",等待当前账号审批。",
                     panelCode, docNo);
             item.put("submitter", submitter);
             item.put("actionLabel", "去审批");
-            result.add(item);
+            out.add(item);
         }
-        return result;
+    }
+
+    /** 审批权限面板:管理员=全部("*");普通用户=角色勾了审批的面板(can_approve='Y') */
+    private List<String> approverPanels(String userName) {
+        List<Integer> admin = jdbc.query(
+                "SELECT CASE WHEN is_admin = 'Y' THEN 1 ELSE 0 END FROM yj_user WHERE username = ?",
+                (rs, i) -> rs.getInt(1), userName);
+        if (!admin.isEmpty() && admin.get(0) == 1) return List.of("*");
+        return jdbc.query(
+                "SELECT rp.panel_code FROM yj_role_panel rp JOIN yj_user u ON u.role_id = rp.role_id"
+                        + " WHERE u.username = ? AND rp.can_approve = 'Y'",
+                (rs, i) -> rs.getString(1), userName);
     }
 
     /** 消息:HSDZ_MES 操作日志(s_log)最近记录 */

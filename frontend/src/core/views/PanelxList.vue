@@ -143,7 +143,7 @@
                 </div>
                 <div v-if="openDelMenu" class="as-side-menu" @click.stop>
                   <div class="as-side-menu-item" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
-                  <template v-if="user.isAdmin">
+                  <template v-if="canApproveHere()">
                     <div class="as-side-menu-item" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
                     <div class="as-side-menu-item" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
                   </template>
@@ -157,7 +157,7 @@
                 </div>
                 <div v-if="curDocStatus === '修改中'" class="as-side-btn" @click="pickModAction('提交审批')">{{ tt('提交审批') }}</div>
                 <div v-if="openModMenu" class="as-side-menu" @click.stop>
-                  <template v-if="user.isAdmin">
+                  <template v-if="canApproveHere()">
                     <template v-if="curDocStatus === '修改申请中'">
                       <div class="as-side-menu-item" @click="pickModAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
                       <div class="as-side-menu-item" @click="pickModAction('修改审批驳回')">{{ tt('修改审批驳回') }}</div>
@@ -1209,6 +1209,12 @@ const openDelMenu = ref(false)
 
 // ---------- 修改组(产品文件 7 面板):归档后申请修改(管理员审批进入修改态)+ 修改记录(滚动3条) ----------
 const PROD_FILE_PANELS = ['RD_PROD_INFO', 'RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_BOM', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+
+/** 审批权限:管理员,或角色对该面板勾了审批(approvePanels,后端 can_approve 口径) */
+function canApproveHere() {
+  const ap = user.approvePanels || []
+  return user.isAdmin || ap.includes('*') || ap.includes(String(panelCode.value))
+}
 
 // ---------- 文件面板查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间 ----------
 const docQueryVisible = ref(false)
