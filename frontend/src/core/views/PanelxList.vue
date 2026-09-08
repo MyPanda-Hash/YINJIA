@@ -2272,12 +2272,12 @@ function validateInlineDraft() {
   for (const field of headerFields.value) {
     const key = headerFieldKey(field)
     if (field.isRequired && emptyFieldValue(cur.value[key])) {
-      // 系统字段:单据日期默认今天、单据编号由后端自动生成(文书界面常不渲染,避免"幽灵必填"无解报错)
+      // 系统字段:单据日期默认今天、单据编号由后端自动生成、规格书种类为页签分类(旧草稿可能为空)
       if (key === '单据日期') {
         cur.value[key] = todayStr()
         continue
       }
-      if (key === '单据编号') continue
+      if (key === '单据编号' || key === '规格书种类') continue
       return `${headerFieldLabel(field)}不能为空`
     }
   }
