@@ -147,8 +147,21 @@ public class ButtonService {
             }
             upsertLineRows(def, items, no, l2c, user);
         }
-        // 文件类面板(文书式):保存即归档(空白新建草稿不归档,保留首次填写入口);修改态保存不归档,走再审批
-        if (DOC_ARCHIVE_PANELS.contains(def.code()) && !"Y".equals(modifyStateOf(def.code(), no))) markArchived(def.code(), no);
+        // 文件类面板:管理员保存即归档;普通用户保存即提交审批(管理员审批通过后归档);修改态保存不归档走再审批
+        if (DOC_ARCHIVE_PANELS.contains(def.code()) && !"Y".equals(modifyStateOf(def.code(), no))) {
+            if (isAdminUser(user)) {
+                markArchived(def.code(), no);
+            } else {
+                // 普通用户:保存→自动提交审批(pending='Y'),管理员审批通过后再归档
+                jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
+                                + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
+                                + "WHEN MATCHED THEN UPDATE SET pending = 'Y', pending_by = ?, pending_at = GETDATE(), update_at = GETDATE() "
+                                + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, pending, pending_by, pending_at, update_at) "
+                                + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), GETDATE());",
+                        def.code(), no, user, user);
+                recordApproval(def.code(), no, "SUBMIT", "PENDING", "");
+            }
+        }
         // 修改态保存:实时刷新修改记录 diff(快照 vs 当前),修改记录随时可见已改内容
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && "Y".equals(modifyStateOf(def.code(), no))) refreshModifyDiff(def, no);
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
@@ -500,8 +513,10 @@ public class ButtonService {
         jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", operator, def.code(), no);
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion);
-        // 文件类面板:修改态审批通过 → 计算修改记录并再归档
-        if (DOC_ARCHIVE_PANELS.contains(def.code()) && finalizeModify(def, no, operator)) {
+        // 文件类面板:审批通过后归档(修改态走 finalizeModify 含修改记录;普通用户保存提交的走 markArchived)
+        if (DOC_ARCHIVE_PANELS.contains(def.code())) {
+            finalizeModify(def, no, operator);
+            markArchived(def.code(), no);
             return result(no, "已归档");
         }
         return result(no, "已审核");
