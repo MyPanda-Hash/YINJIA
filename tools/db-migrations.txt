@@ -81,4 +81,5 @@ migrate-archived-at.sql
 migrate-stock-warn.sql
 migrate-rebuild-inventory.sql
 migrate-fix-ghost-required.sql
+migrate-fin-archive.sql
 migrate-base-fields.sql
