@@ -14,7 +14,7 @@ WHERE mode = 'archive';
 UPDATE yj_panel SET detail_key = 'items' WHERE mode <> 'archive';
 UPDATE yj_field SET place = 'detail' WHERE panel_code IN ('KHDA','GFDA','YWYDA','CKDA','ZDGL');
 GO
-GRANT SELECT, INSERT, UPDATE, DELETE ON yj_panel TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON yj_panel TO yinjia;
 DECLARE @c int = (SELECT COUNT(*) FROM yj_panel WHERE mode='archive');
 PRINT N'基础档案单单据迁移完成: ' + CAST(@c AS nvarchar(10)) + N' 个档案面板';
 GO

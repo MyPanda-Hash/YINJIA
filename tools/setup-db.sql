@@ -10,12 +10,17 @@ IF SUSER_ID('yinjia') IS NULL
 GO
 IF USER_ID('yinjia') IS NULL
     CREATE USER yinjia FOR LOGIN yinjia;
-ALTER ROLE db_datareader ADD MEMBER yinjia;
-ALTER ROLE db_datawriter ADD MEMBER yinjia;
+IF USER_ID('yinjia') IS NOT NULL AND IS_ROLEMEMBER('db_datareader', 'yinjia') = 0
+    ALTER ROLE db_datareader ADD MEMBER yinjia;
+IF USER_ID('yinjia') IS NOT NULL AND IS_ROLEMEMBER('db_datawriter', 'yinjia') = 0
+    ALTER ROLE db_datawriter ADD MEMBER yinjia;
+IF USER_ID('yinjia') IS NOT NULL AND IS_ROLEMEMBER('db_ddladmin', 'yinjia') = 0
+    ALTER ROLE db_ddladmin ADD MEMBER yinjia;
 GO
 IF OBJECT_ID('yj_field') IS NOT NULL DROP TABLE yj_field;
 IF OBJECT_ID('yj_panel') IS NOT NULL DROP TABLE yj_panel;
 IF OBJECT_ID('yj_doc_status') IS NOT NULL DROP TABLE yj_doc_status;
+IF OBJECT_ID('yj_form_approval') IS NOT NULL DROP TABLE yj_form_approval;
 IF OBJECT_ID('yj_user') IS NOT NULL DROP TABLE yj_user;
 GO
 CREATE TABLE yj_panel (
@@ -261,11 +266,12 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, requir
 ('STOCK_STATUS','yl2',N'辅助结余','小数','detail',9,0),
 ('STOCK_STATUS','in_date',N'入库日期','日期','detail',10,0);
 GO
-GRANT SELECT, INSERT, UPDATE, DELETE ON yj_panel TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON yj_field TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON yj_doc_status TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON yj_user TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON yj_form_approval TO yinjia;
+-- yinjia 自身执行时跳过(对自己 GRANT 报 4624;角色成员身份已覆盖以下权限)
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON yj_panel TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON yj_field TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON yj_doc_status TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON yj_user TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON yj_form_approval TO yinjia;
 GO
 DECLARE @fc int = (SELECT COUNT(*) FROM yj_field);
 PRINT N'YINJIA-MES 元数据初始化完成: 10 面板 / ' + CAST(@fc AS nvarchar(10)) + N' 字段定义';
