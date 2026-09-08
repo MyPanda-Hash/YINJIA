@@ -145,6 +145,8 @@ public class ButtonService {
         }
         // 文件类面板(文书式):保存即归档(空白新建草稿不归档,保留首次填写入口);修改态保存不归档,走再审批
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && !"Y".equals(modifyStateOf(def.code(), no))) markArchived(def.code(), no);
+        // 修改态保存:实时刷新修改记录 diff(快照 vs 当前),修改记录随时可见已改内容
+        if (DOC_ARCHIVE_PANELS.contains(def.code()) && "Y".equals(modifyStateOf(def.code(), no))) refreshModifyDiff(def, no);
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
         if (DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
@@ -700,9 +702,11 @@ public class ButtonService {
         return result(no, "已归档");
     }
 
-    /** 修改记录:最近3条(超出滚动覆盖最早的),供前端弹窗展示 */
+    /** 修改记录:最近3条(超出滚动覆盖最早的),供前端弹窗展示;打开即刷新未收尾记录的 diff */
     private Map<String, Object> modifyHistory(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
+        // 修改中/审批中随时打开可见当前已改内容(快照 vs 当前实时 diff)
+        refreshModifyDiff(def, no);
         List<Map<String, Object>> records = jdbc.queryForList(
                 "SELECT TOP 3 apply_by, apply_at, approve_by, approve_at, rearchive_by, rearchive_at, changes, change_meta"
                         + " FROM yj_doc_modify_log WHERE panel_code=? AND doc_no=? ORDER BY id DESC", def.code(), no);
@@ -725,32 +729,41 @@ public class ButtonService {
         return out;
     }
 
-    /** 再归档收尾:计算头字段 diff(变化/补充/清空) + 明细摘要,回填修改记录并滚动保留3条;返回是否实际处于修改态并完成收尾 */
+    /** 刷新修改记录 diff:未收尾记录的快照 vs 当前(头字段 变化/补充/清空 + 明细行摘要);返回是否存在未收尾记录 */
+    private boolean refreshModifyDiff(PanelRegistry.PanelDef def, String no) {
+        List<Map<String, Object>> open = jdbc.queryForList(
+                "SELECT TOP 1 id, snapshot_head, snapshot_rows FROM yj_doc_modify_log"
+                        + " WHERE panel_code=? AND doc_no=? AND rearchive_by IS NULL ORDER BY id DESC", def.code(), no);
+        if (open.isEmpty()) return false;
+        Map<String, String> oldHead = fromJsonMap(open.get(0).get("snapshot_head"));
+        Map<String, String> curHead = headLabelSnapshot(def, no);
+        List<Map<String, Object>> changes = new ArrayList<>();
+        for (PanelRegistry.FieldDef f : def.fieldsAt("header")) {
+            String oldV = oldHead.getOrDefault(f.label(), "");
+            String newV = curHead.getOrDefault(f.label(), "");
+            if (oldV.equals(newV)) continue;
+            Map<String, Object> c = new LinkedHashMap<>();
+            c.put("label", f.label());
+            c.put("kind", oldV.isEmpty() ? "补充" : (newV.isEmpty() ? "清空" : "变化"));
+            c.put("old", oldV);
+            c.put("new", newV);
+            changes.add(c);
+        }
+        Map<String, Object> meta = rowDiffMeta(fromJsonList(open.get(0).get("snapshot_rows")), rowSnapshots(def, no));
+        jdbc.update("UPDATE yj_doc_modify_log SET changes=?, change_meta=? WHERE id=?",
+                toJson(changes), toJson(meta), open.get(0).get("id"));
+        return true;
+    }
+
+    /** 再归档收尾:刷新 diff 后盖章再归档留痕,滚动保留3条;返回是否实际处于修改态并完成收尾 */
     private boolean finalizeModify(PanelRegistry.PanelDef def, String no, String user) {
         List<Map<String, Object>> stRows = jdbc.queryForList(
                 "SELECT modify_state FROM yj_doc_status WHERE panel_code=? AND doc_no=?", def.code(), no);
         if (stRows.isEmpty() || !"Y".equals(stRows.get(0).get("modify_state"))) return false;
-        List<Map<String, Object>> open = jdbc.queryForList(
-                "SELECT TOP 1 id, snapshot_head, snapshot_rows FROM yj_doc_modify_log"
-                        + " WHERE panel_code=? AND doc_no=? AND rearchive_by IS NULL ORDER BY id DESC", def.code(), no);
-        if (!open.isEmpty()) {
-            Map<String, String> oldHead = fromJsonMap(open.get(0).get("snapshot_head"));
-            Map<String, String> curHead = headLabelSnapshot(def, no);
-            List<Map<String, Object>> changes = new ArrayList<>();
-            for (PanelRegistry.FieldDef f : def.fieldsAt("header")) {
-                String oldV = oldHead.getOrDefault(f.label(), "");
-                String newV = curHead.getOrDefault(f.label(), "");
-                if (oldV.equals(newV)) continue;
-                Map<String, Object> c = new LinkedHashMap<>();
-                c.put("label", f.label());
-                c.put("kind", oldV.isEmpty() ? "补充" : (newV.isEmpty() ? "清空" : "变化"));
-                c.put("old", oldV);
-                c.put("new", newV);
-                changes.add(c);
-            }
-            Map<String, Object> meta = rowDiffMeta(fromJsonList(open.get(0).get("snapshot_rows")), rowSnapshots(def, no));
-            jdbc.update("UPDATE yj_doc_modify_log SET changes=?, change_meta=?, rearchive_by=?, rearchive_at=GETDATE() WHERE id=?",
-                    toJson(changes), toJson(meta), user, open.get(0).get("id"));
+        if (refreshModifyDiff(def, no)) {
+            jdbc.update("UPDATE yj_doc_modify_log SET rearchive_by=?, rearchive_at=GETDATE()"
+                            + " WHERE panel_code=? AND doc_no=? AND rearchive_by IS NULL",
+                    user, def.code(), no);
             // 滚动3条:删除最早的超出部分(后续修改覆盖最早记录)
             jdbc.update("DELETE FROM yj_doc_modify_log WHERE panel_code=? AND doc_no=? AND id NOT IN"
                             + " (SELECT TOP 3 id FROM yj_doc_modify_log WHERE panel_code=? AND doc_no=? ORDER BY id DESC)",

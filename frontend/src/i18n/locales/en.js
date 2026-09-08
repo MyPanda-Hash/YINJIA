@@ -1066,6 +1066,7 @@ export default {
     '明细变化': 'Detail Changes',
     '暂无修改记录': 'No modification records',
     '本次修改未变更头字段': 'No header fields changed in this modification',
+    '修改进行中——内容随保存实时更新，再归档审批后定格': 'Modification in progress — content updates live on save and is finalized after re-archive approval',
     '二、炭棒滤芯组装/包装物料清单': '2. Assembly / Packaging Material List',
     '必测项': 'Mandatory Tests',
     '型式检验或者必测项': 'Type Tests / Mandatory',

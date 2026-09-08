@@ -672,6 +672,7 @@
       <div v-if="!modifyLogRecords.length" class="mod-log-empty">{{ tt('暂无修改记录') }}</div>
       <div v-else class="mod-log-list">
         <div v-for="(r, ri) in modifyLogRecords" :key="ri" class="mod-log-card">
+          <div v-if="!r.rearchiveAt" class="mod-log-open">{{ tt('修改进行中——内容随保存实时更新，再归档审批后定格') }}</div>
           <div class="mod-log-head">
             <span class="mod-log-seq">{{ tt('第') }} {{ modifyLogRecords.length - ri }} {{ tt('次修改') }}</span>
             <span>{{ tt('申请') }}：{{ r.applyBy || '-' }} {{ r.applyAt || '' }}</span>
@@ -3575,6 +3576,14 @@ onUnmounted(() => {
   margin-top: 6px;
   font-size: 12px;
   color: #6b7280;
+}
+.mod-log-open {
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1d4ed8;
+  background: #eff6ff;
 }
 .page-btn {
   width: 24px;
