@@ -537,20 +537,19 @@
     </el-dialog>
 
     <!-- ═══ 章节标准库(yj_std_lib,lib=spec.section):点击填入 / 自行补充 / 删除 ═══ -->
-    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用')" width="860px" append-to-body>
-      <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索物料名/编号/规格')" clearable style="margin-bottom:8px;width:300px" @input="filterMatPick" />
+    <!-- ═══ 从物料清单引用(父件口径):勾选父件,一次导入其全部子件 ═══ -->
+    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用(选父件,导入其全部子件)')" width="760px" append-to-body>
+      <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索父件编码/名称')" clearable style="margin-bottom:8px;width:300px" @input="filterMatPick" />
       <el-table :data="matPickFiltered" size="small" border max-height="420" @selection-change="(sel) => (matPickChecked = sel)">
         <el-table-column type="selection" width="42" />
-        <el-table-column prop="子件编码" :label="tt('物料编号')" width="100" />
-        <el-table-column prop="子件名称" :label="tt('物料名')" width="120" />
-        <el-table-column prop="物料种类" :label="tt('物料种类')" width="90" />
-        <el-table-column prop="物料规格" :label="tt('物料规格')" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="外观要求" :label="tt('外观要求')" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="子件计量单位" :label="tt('单位')" width="60" />
+        <el-table-column prop="父件编码" :label="tt('父件编码')" width="120" />
+        <el-table-column prop="父件名称" :label="tt('父件名称')" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="版本号" :label="tt('版本号')" width="90" />
+        <el-table-column prop="childCount" :label="tt('子件数')" width="80" align="center" />
       </el-table>
       <template #footer>
         <el-button @click="matPickVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="confirmMaterialPick">{{ tt('追加选中项') }}({{ matPickChecked.length }})</el-button>
+        <el-button type="primary" @click="confirmMaterialPick">{{ tt('导入所选父件的全部子件') }}({{ matPickChecked.length }})</el-button>
       </template>
     </el-dialog>
 
@@ -1176,17 +1175,35 @@ async function openMaterialPick(dt) {
   matPickVisible.value = true
   try {
     const res = await request.post('/px/queryFormDataList', { panelCode: 'BOM', condition: {}, pageNo: 1, pageSize: 500 })
-    // BOM 面板返回主从结构:list[0].detail.children = 子件物料数组
+    // BOM 面板返回主从结构:list[0].detail.children = 子件行(锚点行已被上游过滤亦可再兜底)
     const masters = res?.data?.list || res?.data?.rows || res?.data || []
     const children = []
     if (Array.isArray(masters)) {
       for (const m of masters) {
         const kids = m?.detail?.children || m?.detail?.items || []
-        if (Array.isArray(kids)) children.push(...kids.filter((k) => String(k['子件编码'] || '').trim())) // 锚点行不参与
+        if (Array.isArray(kids)) children.push(...kids.filter((k) => String(k['子件编码'] || '').trim()))
       }
     }
-    matPickRows.value = children
-    matPickFiltered.value = children
+    // 父件口径:按 父件编码 分组,一行=一个父件,确认后导入其全部子件
+    const byParent = new Map()
+    for (const k of children) {
+      const code = String(k['父件编码'] || '').trim()
+      if (!code) continue
+      if (!byParent.has(code)) {
+        byParent.set(code, {
+          父件编码: code,
+          父件名称: k['父件名称'] || '',
+          版本号: k['版本号'] || '',
+          childCount: 0,
+          children: [],
+        })
+      }
+      const p = byParent.get(code)
+      p.childCount++
+      p.children.push(k)
+    }
+    matPickRows.value = [...byParent.values()]
+    matPickFiltered.value = matPickRows.value
   } catch (e) {
     matPickRows.value = []
     matPickFiltered.value = []
@@ -1196,9 +1213,8 @@ function filterMatPick() {
   const kw = (matPickKeyword.value || '').trim().toLowerCase()
   if (!kw) { matPickFiltered.value = matPickRows.value; return }
   matPickFiltered.value = matPickRows.value.filter((r) =>
-    String(r['子件名称'] || '').toLowerCase().includes(kw) ||
-    String(r['子件编码'] || '').toLowerCase().includes(kw) ||
-    String(r['物料规格'] || '').toLowerCase().includes(kw)
+    String(r['父件编码'] || '').toLowerCase().includes(kw) ||
+    String(r['父件名称'] || '').toLowerCase().includes(kw)
   )
 }
 function confirmMaterialPick() {
@@ -1207,23 +1223,34 @@ function confirmMaterialPick() {
   const arr = touch()
   // 字段映射:按目标面板的列定义匹配(组装BOM=物料名/物料编号/物料规格;规格书=物料编码/物料名称/规格参数)
   const colKeys = new Set((dt.cols || []).map((c) => c.key))
-  for (const m of matPickChecked.value) {
-    const row = { '表区': dt.filterVal }
-    if (colKeys.has('物料名')) row['物料名'] = m['子件名称'] || ''            // 组装BOM
-    if (colKeys.has('物料编号')) row['物料编号'] = m['子件编码'] || ''
-    if (colKeys.has('物料规格')) row['物料规格'] = m['物料规格'] || ''
-    if (colKeys.has('外观要求')) row['外观要求'] = m['外观要求'] || ''
-    if (colKeys.has('物料编码')) row['物料编码'] = m['子件编码'] || ''          // 规格书
-    if (colKeys.has('物料名称')) row['物料名称'] = m['子件名称'] || ''
-    if (colKeys.has('规格参数')) row['规格参数'] = m['物料规格'] || ''
-    if (colKeys.has('数量')) row['数量'] = ''
-    if (colKeys.has('备注')) row['备注'] = ''
-    if (colKeys.has('用量')) row['用量'] = ''
-    arr.push(row)
+  const codeKey = colKeys.has('物料编号') ? '物料编号' : (colKeys.has('物料编码') ? '物料编码' : null)
+  const existCodes = new Set(arr.map((r) => String(r[codeKey] || '').trim()).filter(Boolean))
+  let added = 0
+  let skipped = 0
+  for (const parent of matPickChecked.value) {
+    for (const m of parent.children || []) {
+      // 去重:目标表已有同编码物料则跳过
+      if (codeKey && existCodes.has(String(m['子件编码'] || '').trim())) { skipped++; continue }
+      const row = { '表区': dt.filterVal }
+      if (colKeys.has('物料名')) row['物料名'] = m['子件名称'] || ''            // 组装BOM
+      if (colKeys.has('物料编号')) row['物料编号'] = m['子件编码'] || ''
+      if (colKeys.has('物料规格')) row['物料规格'] = m['物料规格'] || ''
+      if (colKeys.has('外观要求')) row['外观要求'] = m['外观要求'] || ''
+      if (colKeys.has('物料编码')) row['物料编码'] = m['子件编码'] || ''          // 规格书
+      if (colKeys.has('物料名称')) row['物料名称'] = m['子件名称'] || ''
+      if (colKeys.has('规格参数')) row['规格参数'] = m['物料规格'] || ''
+      if (colKeys.has('数量')) row['数量'] = ''
+      if (colKeys.has('备注')) row['备注'] = ''
+      if (colKeys.has('用量')) row['用量'] = ''
+      arr.push(row)
+      if (codeKey) existCodes.add(String(m['子件编码'] || '').trim())
+      added++
+    }
   }
   matPickChecked.value = []
   matPickVisible.value = false
   emit('dirty')
+  ElMessage.success(tt('已导入 {n} 行子件') .replace('{n}', added) + (skipped ? tt('(跳过重复 {n} 行)').replace('{n}', skipped) : ''))
 }
 
 // ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──
