@@ -114,19 +114,22 @@
                   <thead>
                     <tr>
                       <th class="pt-panel">{{ tt('面板') }}</th>
-                      <th v-for="act in groupActs(g)" :key="act[0]" class="pt-act" :title="tt(act[1])">{{ tt(act[1]) }}</th>
+                      <th v-for="act in actsOf(g)" :key="act[0]" class="pt-act" :title="tt(act[1])">{{ tt(act[1]) }}</th>
                       <th class="pt-all">{{ tt('全选') }}</th>
                     </tr>
                   </thead>
                   <tbody>
                     <tr v-for="r in g.panels" :key="r.panelCode">
                       <td class="pt-panel">{{ tt(r.panelName) }}</td>
-                      <td v-for="act in groupActs(g)" :key="act[0]" class="pt-act">
-                        <el-checkbox
+                      <td v-for="act in actsOf(g)" :key="act[0]" class="pt-act pt-sweep"
+                          @mousedown.prevent="rowHasAct(r, act[0]) && canAct(r, act[0]) && startSweep(r, act[0])"
+                          @mouseenter="rowHasAct(r, act[0]) && sweepOver(r, act[0])">
+                        <input
                           v-if="rowHasAct(r, act[0])"
-                          :model-value="hasPerm(r, act[0])"
-                          @update:model-value="togglePerm(r, act[0], $event)"
-                          :disabled="act[0] !== 'view' && !hasPerm(r, 'view')"
+                          type="checkbox"
+                          class="pt-cb"
+                          :checked="hasPerm(r, act[0])"
+                          :disabled="!canAct(r, act[0])"
                         />
                         <span v-else class="pt-na">—</span>
                       </td>
@@ -230,7 +233,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { useUserStore } from '@/stores/user'
@@ -279,6 +282,36 @@ function groupActs(g) {
 function rowHasAct(row, code) {
   return (row.actions || []).some((a) => a[0] === code)
 }
+/** 组内动作列缓存(computed 一次),避免每格每轮渲染重算并集导致卡顿 */
+const groupActsMap = computed(() => {
+  const m = {}
+  for (const g of groupedPanels.value) m[g.code] = groupActs(g)
+  return m
+})
+function actsOf(g) {
+  return groupActsMap.value[g.code] || []
+}
+/** 该格可操作:可见列恒可操作,其余需先勾可见 */
+function canAct(row, code) {
+  return code === 'view' || hasPerm(row, 'view')
+}
+// ---------- 滑动勾选:按下即切换,按住拖过多格批量套用同一状态 ----------
+const sweeping = ref(false)
+const sweepMode = ref(true)
+function startSweep(row, code) {
+  sweeping.value = true
+  sweepMode.value = !hasPerm(row, code)
+  togglePerm(row, code, sweepMode.value)
+}
+function sweepOver(row, code) {
+  if (!sweeping.value || !canAct(row, code)) return
+  if (hasPerm(row, code) !== sweepMode.value) togglePerm(row, code, sweepMode.value)
+}
+function stopSweep() {
+  sweeping.value = false
+}
+onMounted(() => window.addEventListener('mouseup', stopSweep))
+onUnmounted(() => window.removeEventListener('mouseup', stopSweep))
 function hasPerm(row, code) {
   return row.permsSet ? row.permsSet.has(code) : false
 }
@@ -699,8 +732,20 @@ onMounted(load)
   min-width: 100px;
   font-weight: 500;
 }
-.perm-table .pt-act { min-width: 36px; }
+.perm-table .pt-act { min-width: 40px; text-align: center; }
 .perm-table .pt-na { color: #d1d5db; }
+/* 原生大号勾选框(18px)+滑动扫选:整格命中,按下即切换,拖动批量套用 */
+.perm-table .pt-cb {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #409eff;
+  vertical-align: middle;
+  pointer-events: none; /* 状态由格子 mousedown 统一驱动,勾选/滑动一致 */
+}
+.perm-table td.pt-sweep { cursor: pointer; user-select: none; padding: 6px 4px; }
+.perm-table td.pt-sweep:active { background: #f0f6ff; }
 .perm-table .pt-all {
   min-width: 40px;
   background: #fafbfc;
