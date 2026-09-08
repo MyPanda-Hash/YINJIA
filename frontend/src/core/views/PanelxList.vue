@@ -1815,12 +1815,15 @@ function validateInlineDraft() {
   return ''
 }
 
-async function saveInlineDraft(buttonName = '保存', { silent = false } = {}) {
+async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false } = {}) {
   if (!draftEditable.value || inlineSaving.value) return false
-  const validation = validateInlineDraft()
-  if (validation) {
-    ElMessage.warning(validation)
-    return false
+  // 「保存」执行校验;「保存为草稿」=暂存,不校验(未完成的数据也可落库)
+  if (!skipValidation) {
+    const validation = validateInlineDraft()
+    if (validation) {
+      ElMessage.warning(validation)
+      return false
+    }
   }
   for (const tab of cfgCache.value?.detail?.tabs || []) {
     for (const row of cur.value.detail?.[tab.key] || []) calculateDetailRow(tab.key, row)
@@ -2282,8 +2285,20 @@ function onFormSaved() {
 
 // 直接新增：调后端保存（空表头）创建最新草稿单（autoCode 编号 + 单据日期=当天自动填入），
 // 刷新列表并定位到新单，在列表页直接内联填写（不跳转表单页/不弹新增弹窗）。
+// 流程规范：新增时当前页面未保存的内容直接剔除,不弹确认——
+//   新增未保存过的占位单 → 撤回(防垃圾空单残留);已保存单据的未保存修改 → 随 load 放弃。
 async function directAdd() {
   try {
+    // 静默剔除当前未保存内容
+    if (isFreshAddedDoc() && cur.value?.['编号']) {
+      try {
+        await engine.callButton({ panelCode: panelCode.value, buttonName: '删除', formData: { 编号: cur.value['编号'] }, buttonParam: {} })
+        clearFreshDraft(cur.value['编号'])
+      } catch { /* 撤回失败不阻断新增 */ }
+    }
+    inlineDirtyFlag.value = false
+    freshAdded.value = false
+    freshAddedNo.value = ''
     const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData: {}, buttonParam: {} })
     const no = res && (res['编号'] || res.formNo)
     if (!no) return ElMessage.error('新增失败：未返回单据编号')
@@ -2589,8 +2604,8 @@ async function onButton(action) {
     }
     // 统一直接新增（2026-08-24 全量生效）：后端创建一张最新草稿单（autoCode 编号 + 单据日期=当天填入表头），
     // 刷新列表并定位到新单，在列表页内联填写（不再弹新增弹窗、不跳转表单页）。
-    // 经离开守卫拦截：当前已有未保存草稿/修改时先弹三态窗，避免静默丢弃上一张新增草稿。
-    await guardPageAction(() => directAdd())
+    // 流程规范：新增时当前未保存内容直接剔除,不弹确认(directAdd 内部静默撤回占位单)
+    await directAdd()
     return
   }
   if (action === '修改') {
@@ -2599,6 +2614,16 @@ async function onButton(action) {
     return
   }
   if (['保存', '保存为草稿', '保存新增'].includes(action) && draftEditable.value) {
+    if (action === '保存为草稿') {
+      // 暂存:不校验(未完成的数据也可落库)
+      await saveInlineDraft(action, { skipValidation: true })
+      return
+    }
+    if (action === '保存新增') {
+      // 保存当前单据(执行校验) → 成功后自动新增一页
+      if (await saveInlineDraft('保存')) await directAdd()
+      return
+    }
     await saveInlineDraft(action)
     return
   }
@@ -3081,8 +3106,7 @@ async function handleNewQuery() {
     return
   }
   newQueryHandled = true
-  // 与工具栏「新增」一致经离开守卫：当前已有未保存草稿时先弹三态窗，避免静默丢弃
-  await guardPageAction(() => directAdd())
+  await directAdd()
 }
 watch(
   () => route.query.new,

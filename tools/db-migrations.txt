@@ -5,6 +5,7 @@
 # - 脚本必须幂等(IF NOT EXISTS / DELETE+INSERT / 游标补列),因为内容变化会触发重跑
 
 setup-db.sql
+legacy-hsdz-compat.sql
 migrate-arch-single-doc.sql
 migrate-approval-flow.sql
 migrate-org-admin.sql
@@ -36,6 +37,7 @@ fix-missing-columns.sql
 fix-all-report-fields.sql
 fix-zdgl-perf.sql
 fix-bsdict.sql
+prune-orphan-fields.sql
 migrate-panda-parity.sql
 migrate-panda-replica.sql
 i18n-replica-labels.sql
@@ -47,3 +49,7 @@ migrate-report-column-settings.sql
 migrate-report-category.sql
 migrate-audit-cols.sql
 migrate-status-align.sql
+migrate-formno-style.sql
+migrate-manu-docdate.sql
+
+migrate-doc-saved.sql
