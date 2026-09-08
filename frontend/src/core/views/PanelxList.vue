@@ -1215,13 +1215,26 @@ const docQueryVisible = ref(false)
 const docQueryNo = ref('')
 const docQueryRange = ref(null)
 
-function applyDocQuery() {
+async function applyDocQuery() {
   condition['_docNo'] = docQueryNo.value || ''
   const r = docQueryRange.value || []
   condition['_archFrom'] = r[0] || ''
   condition['_archTo'] = r[1] || ''
   docQueryVisible.value = false
-  search()
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+  if (!list.value.length) {
+    // 零匹配:自动恢复全部单据,避免停留在空白视图
+    delete condition['_docNo']
+    delete condition['_archFrom']
+    delete condition['_archTo']
+    ElMessage.warning(tt('未查询到匹配单据，已恢复全部单据'))
+    await load()
+    return
+  }
+  const firstNo = list.value[0]?.['单据编号'] || list.value[0]?.['编号'] || ''
+  ElMessage.success(`${tt('查询到')} ${total.value} ${tt('张')}，${tt('已跳转到')}：${firstNo}`)
 }
 
 function clearDocQuery() {
