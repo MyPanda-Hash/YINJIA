@@ -146,8 +146,8 @@ UPDATE yj_field SET dict_sql=N'SELECT v FROM (VALUES (N''飞利浦沐浴阻垢�
 GO
 
 -- ═══ 权限 ═══
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_prod_info_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_prod_info_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_prod_info_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_prod_info_detail TO yinjia;
 GO
 
 -- ═══ 译名(en;已有跳过) ═══
