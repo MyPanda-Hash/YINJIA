@@ -47,6 +47,8 @@ public class AuthController {
         if (rows.isEmpty() || !encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
             throw new IllegalStateException("用户名或密码错误");
         }
+        Map<String, Object> u = rows.get(0);
+        boolean admin = "Y".equals(u.get("is_admin"));
         // 使用记录:登录成功事件(失败不记)
         usageLog.recordLogin(username, String.valueOf(u.get("real_name")), clientIp(request));
         Map<String, Object> user = new HashMap<>();
@@ -86,22 +88,12 @@ public class AuthController {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT username, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
         if (rows.isEmpty()) throw new IllegalStateException("用户不存在");
-        return buildUser(rows.get(0));
-    }
-
-    /**
-     * 组装用户信息(角色 + 面板权限)。
-     * 可见/审批面板来自角色配置表 yj_role_panel(组织架构「面板操作权限」保存的数据):
-     * - 管理员:visiblePanels/approvePanels = ["*"](前端按 isAdmin 放行,"*" 仅作标记);
-     * - 普通角色:visible = perms 含 view 的面板(勾任何权限都隐含可见);审批 = can_approve='Y'。
-     * 此前此处硬编码 visiblePanels=["*"]、roleCode 只有 admin/user,角色配置完全不生效,
-     * 导致配置过权限的用户登录后看不到任何功能面板(只显示默认菜单)。
-     */
-    private Map<String, Object> buildUser(Map<String, Object> u) {
+        Map<String, Object> u = rows.get(0);
         boolean admin = "Y".equals(u.get("is_admin"));
         Map<String, Object> user = new HashMap<>();
         user.put("userName", u.get("username"));
         user.put("realName", u.get("real_name"));
+        user.put("roleCode", admin ? "admin" : "user");
         user.put("isAdmin", admin);
         user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
         user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
