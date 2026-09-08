@@ -1,4 +1,4 @@
-import{h as sl,o as l,c as n,F as k,r as g,B as Y,t as y,n as d,p as r,q as V,v as z,a as u,d as T,e as A,w as O,m as nl,U as ol,y as X,b as x,s as Ll,C as na,f as N,i as H,g as G,j as Q,E as $}from"./index-BV5Q6O76.js";import{R as oa}from"./RefPickDialog-C6QTuCGw.js";import{_ as ia}from"./_plugin-vue_export-helper-DlAUqK2U.js";const ra=[{name:"外观",subs:[{name:"",req:`裸棒要求：
+import{h as sl,o as l,c as n,F as k,r as g,B as Y,t as y,n as d,p as r,q as V,v as z,a as u,d as T,e as A,w as O,m as nl,U as ol,y as X,b as x,s as Ll,C as na,f as N,i as H,g as G,j as Q,E as $}from"./index-C-ARws2I.js";import{R as oa}from"./RefPickDialog-C_LC9KvP.js";import{_ as ia}from"./_plugin-vue_export-helper-DlAUqK2U.js";const ra=[{name:"外观",subs:[{name:"",req:`裸棒要求：
 -清洁、无破损无压痕，无裂纹,无倾斜等缺陷
 -切面平整无锯齿纹路，无明显缺角
 -切面无残留炭渣
