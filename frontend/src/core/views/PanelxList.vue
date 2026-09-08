@@ -19,6 +19,10 @@
       >
         <el-option v-for="w in warehouseOptions" :key="w.code" :label="`${w.name}（${w.code}）`" :value="w.code" />
       </el-select>
+      <button v-if="panelCode === 'STOCK_STATUS'" type="button" class="toolbar-query-btn" @click.stop="openStockAdd">
+        <el-icon><Plus /></el-icon>
+        <span>{{ tt('新增库存') }}</span>
+      </button>
       <div class="tb-group" v-for="(g, gi) in toolbarGroups" :key="'g' + gi">
         <span class="tb-main" :class="{ disabled: isDisabled(btnName(g)) }" @click="onButton(btnName(g))">
           <span class="act-name">{{ tt(g.name) }}</span>
@@ -732,6 +736,41 @@
         <el-button type="primary" @click="applyDocQuery">{{ tt('查询') }}</el-button>
       </template>
     </el-dialog>
+    <!-- 新增库存弹窗(库存状况):存货/仓库按编码校验基础档案,期初现存量+预警数量 -->
+    <el-dialog v-model="stockAddVisible" :title="tt('新增库存')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('存货编码') }}</span>
+          <el-input v-model="stockAddForm['存货编码']" :placeholder="tt('基础档案·存货中的编码，如 CL001')" />
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('仓库') }}</span>
+          <el-select v-model="stockAddForm['仓库']" style="width: 100%" filterable :placeholder="tt('选择仓库（基础档案·仓库）')">
+            <el-option v-for="w in warehouseOptions" :key="w.code" :label="`${w.name}（${w.code}）`" :value="w.code" />
+          </el-select>
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('批号') }}</span>
+          <el-input v-model="stockAddForm['批号']" :placeholder="tt('可留空')" />
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('入库日期') }}</span>
+          <el-date-picker v-model="stockAddForm['入库日期']" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('现存量') }}</span>
+          <el-input-number v-model="stockAddForm['现存量']" :min="0" :precision="2" style="width: 100%" />
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('预警数量') }}</span>
+          <el-input-number v-model="stockAddForm['预警数量']" :min="0" :precision="2" style="width: 100%" :placeholder="tt('留空使用全局阈值')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="stockAddVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="stockAdding" @click="submitStockAdd">{{ tt('确定') }}</el-button>
+      </template>
+    </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <VoucherFormDialog v-model="formVisible" :panel-code="formPanel || panelCode" :code="formCode" @saved="onFormSaved" />
@@ -1252,6 +1291,38 @@ function onStockWhChange(v) {
   if (v) condition['_ckdm'] = v
   else delete condition['_ckdm']
   search()
+}
+
+// ---------- 新增库存(库存状况):存货/仓库按编码绑定基础档案,期初现存量+预警数量 ----------
+const stockAddVisible = ref(false)
+const stockAdding = ref(false)
+const stockAddForm = reactive({ 存货编码: '', 仓库: '', 批号: '', 入库日期: '', 现存量: 0, 预警数量: null })
+function openStockAdd() {
+  stockAddForm['存货编码'] = ''
+  stockAddForm['仓库'] = ''
+  stockAddForm['批号'] = ''
+  stockAddForm['入库日期'] = todayStr()
+  stockAddForm['现存量'] = 0
+  stockAddForm['预警数量'] = null
+  stockAddVisible.value = true
+}
+async function submitStockAdd() {
+  stockAdding.value = true
+  try {
+    await engine.callButton({
+      panelCode: 'STOCK_STATUS',
+      buttonName: '新增库存',
+      formData: { ...stockAddForm, 预警数量: stockAddForm['预警数量'] ?? '' },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('库存已新增'))
+    stockAddVisible.value = false
+    load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('新增失败'))
+  } finally {
+    stockAdding.value = false
+  }
 }
 
 async function applyDocQuery() {

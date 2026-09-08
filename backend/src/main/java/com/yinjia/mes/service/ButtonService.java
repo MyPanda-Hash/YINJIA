@@ -66,6 +66,8 @@ public class ButtonService {
             case "修改审批通过" -> modifyApprove(def, formData);
             case "修改审批驳回" -> modifyReject(def, formData);
             case "修改记录" -> modifyHistory(def, formData);
+            // 库存状况:新增库存(存货/仓库按编码校验基础档案,期初现存量+预警数量)
+            case "新增库存" -> addStock(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
         };
     }
@@ -660,6 +662,54 @@ public class ButtonService {
     }
 
     // ============ 文件类面板:归档后申请修改 + 修改记录(滚动3条) ============
+
+    /** 新增库存(库存状况):向 kucun 插一行记录;存货编码/仓库编码按基础档案校验(绑定编码,改名不影响) */
+    private Map<String, Object> addStock(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"STOCK_STATUS".equals(def.code())) throw new IllegalStateException("仅库存状况面板支持新增库存");
+        String user = currentUserName();
+        String wzdm = requiredText(formData, "存货编码");
+        String ckdm = requiredText(formData, "仓库");
+        String ylRaw = requiredText(formData, "现存量");
+        double yl;
+        try {
+            yl = Double.parseDouble(ylRaw);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("现存量必须是数字");
+        }
+        String lot = optionalText(formData, "批号");
+        String inDate = optionalText(formData, "入库日期");
+        String warnRaw = optionalText(formData, "预警数量");
+        Double warn = null;
+        if (!warnRaw.isBlank()) {
+            try {
+                warn = Double.parseDouble(warnRaw);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("预警数量必须是数字");
+            }
+        }
+        Integer inv = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM bs_inv WHERE [存货编码] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, wzdm);
+        if (inv == null || inv == 0) throw new IllegalArgumentException("存货档案中不存在：" + wzdm);
+        Integer wh = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM bs_wh WHERE [仓库编码] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, ckdm);
+        if (wh == null || wh == 0) throw new IllegalArgumentException("仓库档案中不存在：" + ckdm);
+        jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, yl, price, [预警数量], asp_user1, asp_time1, asp_cancel)"
+                        + " VALUES (?,?,?,?,?,?,0,?,?,GETDATE(),'N')",
+                wzdm, ckdm, lot.isBlank() ? null : lot, inDate.isBlank() ? LocalDate.now().toString() : inDate,
+                yl, yl, warn, user);
+        return result(wzdm + "@" + ckdm, "已新增");
+    }
+
+    private String requiredText(Map<String, Object> formData, String key) {
+        Object v = formData == null ? null : formData.get(key);
+        if (v == null || String.valueOf(v).isBlank()) throw new IllegalArgumentException("请填写" + key);
+        return String.valueOf(v).trim();
+    }
+
+    private String optionalText(Map<String, Object> formData, String key) {
+        Object v = formData == null ? null : formData.get(key);
+        return v == null ? "" : String.valueOf(v).trim();
+    }
 
     /** 申请修改:已归档/已审核 → 修改申请中(待管理员审批) */
     private Map<String, Object> modifyRequest(PanelRegistry.PanelDef def, Map<String, Object> formData) {

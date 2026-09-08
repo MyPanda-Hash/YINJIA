@@ -1097,6 +1097,17 @@ export default {
     '的权限，确认无误后请保存': "'s permissions; review and save",
     /* ── 库存状况:仓库下拉 ── */
     '全部仓库': 'All Warehouses',
+    /* ── 新增库存 ── */
+    '新增库存': 'Add Stock',
+    '存货编码': 'Inventory Code',
+    '基础档案·存货中的编码，如 CL001': 'Code from Archives · Inventory, e.g. CL001',
+    '选择仓库（基础档案·仓库）': 'Warehouse (Archives · Warehouse)',
+    '可留空': 'Optional',
+    '现存量': 'On-hand Qty',
+    '预警数量': 'Alarm Qty',
+    '留空使用全局阈值': 'Leave blank for global threshold',
+    '库存已新增': 'Stock added',
+    '新增失败': 'Failed to add',
     '二、炭棒滤芯组装/包装物料清单': '2. Assembly / Packaging Material List',
     '必测项': 'Mandatory Tests',
     '型式检验或者必测项': 'Type Tests / Mandatory',

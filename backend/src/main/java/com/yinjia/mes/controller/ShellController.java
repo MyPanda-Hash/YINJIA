@@ -33,11 +33,13 @@ public class ShellController {
         return ApiResult.ok(List.of(f));
     }
 
-    /** 仓库下拉(dm_ck 字典):code=仓库编码(dm),name=仓库名(mc);库存状况按编码绑定,改名不影响 */
+    /** 仓库下拉:引用基础档案·仓库面板明细(bs_wh,按仓库编码绑定,字典改名不影响);
+     *  仅列启用且未停用的仓库 */
     @GetMapping("/base/warehouse/list")
     public ApiResult<List<Map<String, Object>>> warehouses() {
         return ApiResult.ok(jdbc.query(
-                "SELECT dm AS code, mc AS name FROM dm_ck WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY od_no, dm",
+                "SELECT [仓库编码] AS code, [仓库名称] AS name FROM bs_wh"
+                        + " WHERE ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL([停用],0) <> 1 AND [状态] = N'启用' ORDER BY id",
                 (rs, i) -> {
                     Map<String, Object> m = new HashMap<>();
                     m.put("code", rs.getString("code"));

@@ -132,12 +132,13 @@ public class PortalNotificationService {
         return result;
     }
 
-    /** 预警:kucun 结余低于阈值的物料库存 */
+    /** 预警:kucun 结余低于预警阈值 —— 行级预警数量优先(ISNULL(NULLIF(预警数量,0),100)),未设回退全局阈值 */
     private List<Map<String, Object>> alarms() {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT TOP " + LIST_LIMIT + " wzdm, ckdm, lot_no, yl FROM kucun"
-                        + " WHERE ISNULL(asp_cancel,'N') <> 'Y' AND yl IS NOT NULL AND yl < ?"
-                        + " ORDER BY yl", LOW_STOCK_THRESHOLD);
+                "SELECT TOP " + LIST_LIMIT + " wzdm, ckdm, lot_no, yl, ISNULL(NULLIF([预警数量],0),100) AS thr FROM kucun"
+                        + " WHERE ISNULL(asp_cancel,'N') <> 'Y' AND yl IS NOT NULL"
+                        + " AND yl < ISNULL(NULLIF([预警数量],0),100)"
+                        + " ORDER BY yl");
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
             String code = text(row.get("wzdm"), "-");
@@ -145,7 +146,7 @@ public class PortalNotificationService {
             Map<String, Object> item = base("alarm:" + warehouse + ':' + code + ':' + text(row.get("lot_no"), ""),
                     "alarm", "低库存:" + code + "(" + warehouse + ")", null,
                     "库存台账显示「" + code + "」在「" + warehouse + "」的结余为 "
-                            + row.get("yl") + ",低于预警阈值 " + LOW_STOCK_THRESHOLD + "。",
+                            + row.get("yl") + ",低于预警阈值 " + row.get("thr") + "。",
                     "STOCK_STATUS", null);
             item.put("warehouse", warehouse);
             item.put("inventoryCode", code);
