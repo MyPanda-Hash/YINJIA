@@ -485,7 +485,7 @@ export const recordSheetConfigs = {
       { label: '使用范围', key: '使用范围', type: 'select' },
       { label: '版本号', key: '版本号', type: 'text' },
     ],
-    grid: [150, 130, 80, 120, 90, 90, 60, 120, 80, 60, 60],
+    grid: [150, 130, 80, 120, 80, 80, 80, 120, 80, 60, 60],
     head: { title: 7, infoLabel: 2, infoValue: 2 },
     sections: [
       { bar: '产品基本信息', rows: [
@@ -649,7 +649,7 @@ export const recordSheetConfigs = {
       { label: '使用范围', key: '使用范围', type: 'select' },
       { label: '版本号', key: '版本号', type: 'text' },
     ],
-    grid: [101, 60, 109, 85, 44, 44, 68, 146, 64, 64, 121, 77, 57],
+    grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57],
     // 横向对齐:报告头三段跨度合计 = 网格列数(13),右缘与 产品基本信息/配方表/配料要求 平齐
     head: { title: 7, infoLabel: 2, infoValue: 4 },
     sections: [
