@@ -502,44 +502,49 @@
                   />
                   <el-icon v-if="detailRefTrigger(c.field) === 'dblclick' && isActiveDetailRefRow(row, b, c.prop)" class="list-ref-icon"><Search /></el-icon>
                 </div>
-                <el-select
-                  v-else-if="isSelectField(c.field)"
-                  v-model="row[c.prop]"
-                  :disabled="c.field.computed"
-                  filterable
-                  clearable
-                  allow-create
-                  @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
-                >
-                  <el-option v-for="option in fieldOptions(c.field)" :key="option.value" :label="option.label" :value="option.value" />
-                </el-select>
-                <el-date-picker
-                  v-else-if="isDateField(c.field)"
-                  v-model="row[c.prop]"
-                  :disabled="c.field.computed"
-                  type="date"
-                  value-format="YYYY-MM-DD"
-                  @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
-                />
-                <el-input-number
-                  v-else-if="isNumberField(c.field)"
-                  v-model="row[c.prop]"
-                  :disabled="c.field.computed"
-                  :controls="false"
-                  @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
-                />
-                <el-switch
-                  v-else-if="isBooleanField(c.field)"
-                  v-model="row[c.prop]"
-                  :disabled="c.field.computed"
-                  @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
-                />
-                <el-input
-                  v-else
-                  v-model="row[c.prop]"
-                  :disabled="c.field.computed"
-                  @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
-                />
+                <!-- 编辑器懒渲染:仅激活单元格挂载编辑控件,其余单元格显示纯文本,
+                     避免大数据量面板(如数据字典 210 行)每格常驻编辑器导致 DOM 膨胀 -->
+                <template v-else-if="isActiveCell(row, b, c.prop)">
+                  <el-select
+                    v-if="isSelectField(c.field)"
+                    v-model="row[c.prop]"
+                    :disabled="c.field.computed"
+                    filterable
+                    clearable
+                    allow-create
+                    @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+                  >
+                    <el-option v-for="option in fieldOptions(c.field)" :key="option.value" :label="option.label" :value="option.value" />
+                  </el-select>
+                  <el-date-picker
+                    v-else-if="isDateField(c.field)"
+                    v-model="row[c.prop]"
+                    :disabled="c.field.computed"
+                    type="date"
+                    value-format="YYYY-MM-DD"
+                    @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+                  />
+                  <el-input-number
+                    v-else-if="isNumberField(c.field)"
+                    v-model="row[c.prop]"
+                    :disabled="c.field.computed"
+                    :controls="false"
+                    @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+                  />
+                  <el-switch
+                    v-else-if="isBooleanField(c.field)"
+                    v-model="row[c.prop]"
+                    :disabled="c.field.computed"
+                    @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+                  />
+                  <el-input
+                    v-else
+                    v-model="row[c.prop]"
+                    :disabled="c.field.computed"
+                    @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+                  />
+                </template>
+                <span v-else class="cell-lazy" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
               </template>
               <span v-else-if="c.prop === '材料编码' && activeTab(b).key === 'materials'" class="mat-cell">
                 <span>{{ tt(row[c.prop] ?? '') }}</span>
@@ -2138,6 +2143,25 @@ function detailRefTrigger(field) {
 function isActiveDetailRefRow(row, b, prop) {
   const pick = detailRefPick.value
   return detailRefVisible.value && !!pick && pick.row === row && pick.tabKey === activeTab(b).key && pick.field?.dataName === prop
+}
+
+// ---------- 明细单元格编辑器懒渲染(2026-09-08) ----------
+// 只给「当前激活的单元格」挂载编辑控件,其余单元格渲染纯文本。
+// 动因:数据字典 210 行 × 6 列 = 1260 个常驻编辑器(含 el-select 全部选项 3165 个 option 节点),
+// DOM 达 1.85 万节点、首屏 2.1s,表现为点击后面板长时间白屏。
+const activeCell = ref(null)
+function isActiveCell(row, b, prop) {
+  const a = activeCell.value
+  return !!a && a.row === row && a.tabKey === activeTab(b).key && a.prop === prop
+}
+function activateCell(row, b, prop) {
+  if (!detailEditable(b) || row?._placeholder) return
+  const a = activeCell.value
+  if (a && a.row === row && a.tabKey === activeTab(b).key && a.prop === prop) return
+  activeCell.value = { row, tabKey: activeTab(b).key, prop }
+}
+function deactivateCell() {
+  activeCell.value = null
 }
 
 function openDetailReference(field, row, b) {
@@ -4486,6 +4510,22 @@ onUnmounted(() => {
 .inline-ref-editor.active :deep(.el-input__wrapper) {
   padding-right: 24px;
   box-shadow: 0 0 0 1px #4b74a6 inset;
+}
+/* 懒渲染单元格:未激活时显示纯文本,点击后挂载编辑控件 */
+.detail :deep(.el-table td .cell-lazy) {
+  display: block;
+  min-height: 24px;
+  padding: 3px 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: text;
+}
+.detail :deep(.el-table td .cell-lazy:hover) {
+  background: #f2f6ff;
+  box-shadow: inset 0 0 0 1px #c7d8f5;
 }
 .list-ref-icon {
   position: absolute;
