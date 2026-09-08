@@ -34,9 +34,13 @@
     <div class="org-col users">
       <div class="col-head">
         <span class="col-title">{{ tt('用户（组织调整）') }}</span>
-        <el-button type="primary" size="small" @click="openUser()">{{ tt('新增用户') }}</el-button>
+        <span class="col-head-btns">
+          <el-button size="small" :disabled="!userSel.length" @click="batchRoleVisible = true">{{ tt('批量分配角色') }}({{ userSel.length }})</el-button>
+          <el-button type="primary" size="small" @click="openUser()">{{ tt('新增用户') }}</el-button>
+        </span>
       </div>
-      <el-table :data="users" size="small" border height="620" highlight-current-row @row-click="openUser">
+      <el-table :data="users" size="small" border height="620" highlight-current-row @row-click="openUser" @selection-change="onUserSel">
+        <el-table-column type="selection" width="38" :selectable="(row) => !row.isAdmin" />
         <el-table-column prop="userName" :label="tt('账号')" width="100" />
         <el-table-column prop="realName" :label="tt('姓名')" min-width="80" />
         <el-table-column :label="tt('部门')" min-width="110">
@@ -85,6 +89,13 @@
         <div class="perm-head">
           「{{ selRole.roleName }}」{{ tt('面板操作权限') }}
           <span class="perm-sub">{{ tt('（勾选对应操作权限;可见=能看到面板,其余为操作级别）') }}</span>
+          <span class="perm-copy">
+            {{ tt('复制自') }}
+            <el-select v-model="copyFromRoleId" size="small" style="width: 130px" clearable :placeholder="tt('选择角色')">
+              <el-option v-for="r in copyableRoles" :key="r.id" :label="r.roleName" :value="r.id" />
+            </el-select>
+            <el-button size="small" type="primary" plain :disabled="!copyFromRoleId" @click="copyRolePerms">{{ tt('复制权限') }}</el-button>
+          </span>
         </div>
         <div v-if="selRole.isAdmin" class="admin-tip">{{ tt('管理员为超级权限：默认拥有全部操作权限，无需配置。') }}</div>
         <template v-else>
@@ -138,6 +149,18 @@
         </template>
       </div>
     </div>
+
+    <!-- 批量分配角色 -->
+    <el-dialog v-model="batchRoleVisible" :title="tt('批量分配角色')" width="380px" append-to-body>
+      <div class="batch-tip">{{ tt('已选') }} {{ userSel.length }} {{ tt('个用户（管理员账号自动跳过）') }}</div>
+      <el-select v-model="batchRoleId" clearable style="width: 100%" :placeholder="tt('选择目标角色')">
+        <el-option v-for="r in roles.filter((x) => !x.isAdmin)" :key="r.id" :label="r.roleName" :value="r.id" />
+      </el-select>
+      <template #footer>
+        <el-button @click="batchRoleVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="applyBatchRole">{{ tt('确定') }}</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 新增/编辑部门 -->
     <el-dialog v-model="deptVisible" :title="editingDept ? tt('编辑部门') : tt('新增部门')" width="360px" append-to-body>
@@ -309,6 +332,54 @@ const deptForm = reactive({ id: null, parentId: 0, deptName: '' })
 
 const users = ref([])
 const roles = ref([])
+
+// ---------- 用户批量分配角色 ----------
+const userSel = ref([])
+function onUserSel(rows) {
+  userSel.value = rows || []
+}
+const batchRoleVisible = ref(false)
+const batchRoleId = ref(null)
+async function applyBatchRole() {
+  try {
+    await request.post('/sys/user/batch-role', { userIds: userSel.value.map((u) => u.id), roleId: batchRoleId.value })
+    ElMessage.success(`${tt('已为')} ${userSel.value.length} ${tt('个用户分配角色')}`)
+    batchRoleVisible.value = false
+    batchRoleId.value = null
+    await loadUsers()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '批量分配失败')
+  }
+}
+
+// ---------- 复制角色权限(把源角色勾选载入当前编辑,保存后生效) ----------
+const copyFromRoleId = ref(null)
+const copyableRoles = computed(() => roles.value.filter((r) => !r.isAdmin && selRole.value && r.id !== selRole.value.id))
+async function copyRolePerms() {
+  const src = roles.value.find((r) => r.id === copyFromRoleId.value)
+  if (!src) return
+  try {
+    await ElMessageBox.confirm(
+      `${tt('将用')}「${src.roleName}」${tt('的面板权限覆盖当前编辑内容？')}${tt('保存后生效')}`,
+      tt('复制权限'),
+      { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
+    )
+  } catch (e) {
+    return
+  }
+  try {
+    const r = await request.get('/sys/role/' + src.id + '/panels')
+    const granted = r?.data?.granted || []
+    const byCode = {}
+    for (const g of granted) byCode[g.panelCode] = g.perms || ''
+    for (const p of panelRows.value) {
+      p.permsSet = new Set((byCode[p.panelCode] || '').split(',').filter(Boolean))
+    }
+    ElMessage.success(`${tt('已复制')}「${src.roleName}」${tt('的权限，确认无误后请保存')}`)
+  } catch (e) {
+    ElMessage.error('复制权限失败')
+  }
+}
 const selRole = ref(null)
 const panelRows = ref([])
 const saving = ref(false)
@@ -559,7 +630,10 @@ onMounted(load)
 .dept-ops { display: none; }
 .dept-node:hover .dept-ops { display: inline-flex; gap: 2px; }
 .perm-box { margin-top: 12px; border-top: 1px dashed #d0d7e3; padding-top: 10px; }
-.perm-head { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
+.perm-head { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.perm-copy { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: 400; }
+.col-head-btns { display: inline-flex; gap: 8px; }
+.batch-tip { margin-bottom: 10px; font-size: 13px; color: #6b7280; }
 .perm-sub { font-weight: 400; color: #888; font-size: 12px; }
 .admin-tip { color: #c0392b; font-size: 12px; padding: 8px 0; }
 .perm-actions { margin-top: 10px; display: flex; gap: 8px; }
@@ -595,7 +669,13 @@ onMounted(load)
   align-items: center;
 }
 /* 操作权限矩阵表(11 项) */
-.perm-table-wrap { overflow-x: auto; }
+.perm-table-wrap { overflow: auto; max-height: 70vh; }
+.perm-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #eef1f6;
+}
 .perm-table {
   width: 100%;
   border-collapse: collapse;

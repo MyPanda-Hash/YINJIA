@@ -179,6 +179,32 @@ public class SysAdminController {
         return ApiResult.ok(null);
     }
 
+    /** 批量分配角色:给一组用户统一换角色;权限随角色,is_admin 同步角色口径,管理员账号自动跳过 */
+    @PostMapping("/user/batch-role")
+    public ApiResult<Void> userBatchRole(@RequestBody Map<String, Object> body) {
+        Object idsObj = body.get("userIds");
+        Object roleObj = body.get("roleId");
+        if (!(idsObj instanceof List<?> ids) || ids.isEmpty()) throw new IllegalArgumentException("请选择用户");
+        Integer roleId = roleObj == null || String.valueOf(roleObj).isBlank()
+                ? null : Integer.valueOf(String.valueOf(roleObj));
+        String isAdmin = "N";
+        if (roleId != null) {
+            List<String> r = jdbc.query("SELECT is_admin FROM yj_role WHERE id = ?", (rs, i) -> rs.getString(1), roleId);
+            if (r.isEmpty()) throw new IllegalArgumentException("角色不存在");
+            isAdmin = "Y".equals(r.get(0)) ? "Y" : "N";
+        }
+        int n = 0;
+        for (Object idObj : ids) {
+            int userId = Integer.parseInt(String.valueOf(idObj));
+            List<Map<String, Object>> rows = jdbc.queryForList("SELECT is_admin FROM yj_user WHERE id = ?", userId);
+            if (rows.isEmpty() || "Y".equals(String.valueOf(rows.get(0).get("is_admin")))) continue;
+            jdbc.update("UPDATE yj_user SET role_id = ?, is_admin = ? WHERE id = ?", roleId, isAdmin, userId);
+            n++;
+        }
+        if (n == 0) throw new IllegalStateException("没有可分配的用户（管理员账号不参与批量分配）");
+        return ApiResult.ok(null);
+    }
+
     // ============ 角色 ============
 
     @GetMapping("/role/list")
