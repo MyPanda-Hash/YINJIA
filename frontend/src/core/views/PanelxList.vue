@@ -2270,7 +2270,13 @@ function validateInlineDraft() {
     if (validation) return validation
   }
   for (const field of headerFields.value) {
-    if (field.isRequired && emptyFieldValue(cur.value[headerFieldKey(field)])) {
+    const key = headerFieldKey(field)
+    if (field.isRequired && emptyFieldValue(cur.value[key])) {
+      // 系统字段:单据日期默认今天(文书面板常不渲染该字段,避免"幽灵必填"无解报错)
+      if (key === '单据日期') {
+        cur.value[key] = todayStr()
+        continue
+      }
       return `${headerFieldLabel(field)}不能为空`
     }
   }
@@ -2295,6 +2301,11 @@ async function saveInlineDraft(buttonName = '保存', { silent = false } = {}) {
   const validation = validateInlineDraft()
   if (validation) {
     ElMessage.warning(validation)
+    // 文书面板:自动翻到缺失字段所在页并滚动+闪烁定位(规格书等多页结构)
+    if (isRecordSheetPanel.value && approvalSheetRef.value?.focusField) {
+      const label = validation.replace(/第\s*\d+\s*行/g, '').match(/^(.+?)不能为空/)?.[1] || ''
+      approvalSheetRef.value.focusField(String(label).trim())
+    }
     return false
   }
   for (const tab of cfgCache.value?.detail?.tabs || []) {

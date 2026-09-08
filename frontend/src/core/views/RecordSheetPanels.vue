@@ -609,7 +609,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, nextTick } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
@@ -703,6 +703,43 @@ function pageOf(block) {
   return block.page ?? 0
 }
 watch(() => props.panelCode, () => { activePage.value = 0 })
+
+// ── 校验定位(供 PanelxList 保存校验调用):翻到字段所在页 + 滚动 + 闪烁 ──
+/** 找到 label 所在页签(封面字段=0;sections 按 page 归属;找不到返回 null) */
+function pageOfLabel(label) {
+  const c = cfg.value || {}
+  if ((c.cover?.fields || []).some((f) => f.label === label)) return 0
+  for (const sec of c.sections || []) {
+    const hit = (sec.rows || []).some((row) =>
+      (row.pairs || []).some((p) => p.label === label)
+      || row.label === label
+      || (row.grid || []).some((g) => g.label === label))
+    if (hit) return pageOf(sec)
+  }
+  return null
+}
+/** 翻页 + 定位闪烁该字段(琥珀高亮约 3 秒);返回是否定位成功 */
+function focusField(label) {
+  if (!label) return false
+  const target = pageOfLabel(label)
+  if (target === null) return false
+  if (pageList.value.length) activePage.value = target
+  nextTick(() => {
+    const root = document.querySelector('.record-sheet')
+    if (!root) return
+    const el = [...root.querySelectorAll('td.rs-label, .rsp-cover-label, td.rs-td, th')]
+      .find((e) => (e.textContent || '').trim() === label)
+      || [...root.querySelectorAll('td.rs-label, .rsp-cover-label')]
+        .find((e) => (e.textContent || '').includes(label))
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('field-blink')
+      setTimeout(() => el.classList.remove('field-blink'), 3200)
+    }
+  })
+  return true
+}
+defineExpose({ focusField })
 
 /** plain 版式表格列宽与总宽(无全页网格,列宽取 col.w) */
 function plainCols(dt) {
@@ -1439,6 +1476,16 @@ function chartOf(dt) {
   color: #333;
   text-align: center;
   font-weight: 500;
+}
+/* 校验定位闪烁:琥珀高亮约3秒(保存必填缺失时跳转提示) */
+@keyframes rsFieldBlink {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 3px rgba(250, 173, 20, 0.55); background: #ffe58f; }
+}
+.field-blink {
+  animation: rsFieldBlink 0.65s ease-in-out 5;
+  outline: 2px solid #faad14;
+  outline-offset: -2px;
 }
 .rs-txt {
   white-space: pre-wrap;
