@@ -130,7 +130,11 @@
                 </td>
               </template>
               <td v-else class="rs-td" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
-                <el-select v-if="editable && pair.type === 'select'" v-model="head[pair.key]" size="small" :clearable="false" @change="emit('dirty')">
+                <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(pair.key)">
+                  <span class="rs-ref-text">{{ head[pair.key] || tt('点击选择') }}</span>
+                  <el-icon class="rs-ref-ico"><Search /></el-icon>
+                </div>
+                <el-select v-else-if="editable && pair.type === 'select'" v-model="head[pair.key]" size="small" :clearable="false" @change="emit('dirty')">
                   <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
                 <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" @input="emit('dirty')" />
@@ -147,7 +151,11 @@
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(effColLabel(c.label, c.label)) }}</td>
               <td v-else class="rs-td" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
-                <el-select v-if="editable && c.type === 'select'" v-model="head[c.key]" size="small" :clearable="false" @change="emit('dirty')">
+                <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
+                  <span class="rs-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
+                  <el-icon class="rs-ref-ico"><Search /></el-icon>
+                </div>
+                <el-select v-else-if="editable && c.type === 'select'" v-model="head[c.key]" size="small" :clearable="false" @change="emit('dirty')">
                   <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
                 <el-input v-else-if="editable && c.key" v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
@@ -594,6 +602,9 @@
         <el-button type="primary" @click="saveFieldEdit">{{ tt('保存') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- ═══ 参照选择(产品编号 -> 产品信息表):确认后按 refMap 带回 产品名称 等 ═══ -->
+    <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" @confirm="onProdRefConfirm" />
   </div>
 </template>
 
@@ -601,8 +612,10 @@
 import { computed, ref, watch } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
+import RefPickDialog from './RefPickDialog.vue'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -973,6 +986,33 @@ function selectOptions(key) {
   const f = fieldMap.value.get(key)
   const opts = f?.options || []
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
+}
+
+// ── 参照字段(产品编号等 -> 产品信息表):点击单元格弹参照,确认后按 refMap 带回(产品名称等) ──
+function isRefKey(key) {
+  if (!key) return false
+  const f = fieldMap.value.get(key)
+  return !!(f && f.refPanel)
+}
+const prodRefVisible = ref(false)
+const prodRefKey = ref('')
+const prodRefField = computed(() => fieldMap.value.get(prodRefKey.value) || null)
+function openProdRef(key) {
+  if (!props.editable || !isRefKey(key)) return
+  prodRefKey.value = key
+  prodRefVisible.value = true
+}
+function onProdRefConfirm(rows) {
+  const f = prodRefField.value
+  const source = rows?.[0]
+  if (!f || !source) return
+  const refField = f.refField || f.dataName
+  props.head[prodRefKey.value] = source[refField] ?? ''
+  for (const m of f.refMap || []) {
+    if (m && source[m.from] !== undefined) props.head[m.to || m.from] = source[m.from]
+  }
+  prodRefVisible.value = false
+  emit('dirty')
 }
 
 // ── 字段编辑(数据记录表):列名可改,应对复杂测试环境 ──
@@ -1401,6 +1441,36 @@ function chartOf(dt) {
 .rs-t-in,
 .rs-c-in {
   width: 100%;
+}
+/* 参照单元格(产品编号 -> 产品信息表):拟态输入框,点击弹参照 */
+.rs-ref-ctl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 4px;
+  border: 1px dashed #b9c0c8;
+  border-radius: 3px;
+  cursor: pointer;
+  background: #fafbfc;
+}
+.rs-ref-ctl:hover {
+  border-color: var(--el-color-primary, #409eff);
+  background: #f0f6ff;
+}
+.rs-ref-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #333;
+}
+.rs-ref-ico {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--el-color-primary, #409eff);
 }
 
 /* ═══ 报告头 ═══ */
