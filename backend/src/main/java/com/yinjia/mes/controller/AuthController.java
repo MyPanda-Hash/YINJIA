@@ -43,7 +43,7 @@ public class AuthController {
             throw new IllegalArgumentException("用户名和密码不能为空");
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT username, password_hash, real_name, is_admin FROM yj_user WHERE username = ?", username);
+                "SELECT username, password_hash, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
         if (rows.isEmpty() || !encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
             throw new IllegalStateException("用户名或密码错误");
         }
@@ -56,7 +56,7 @@ public class AuthController {
         user.put("realName", u.get("real_name"));
         user.put("roleCode", admin ? "admin" : "user");
         user.put("isAdmin", admin);
-        user.put("visiblePanels", List.of("*"));
+        user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
         // 审批权限(照搬 light-mes can_approve 语义):仅管理员可审批通过/驳回
         user.put("approvePanels", admin ? List.of("*") : List.of());
         Map<String, Object> out = new HashMap<>();
@@ -86,7 +86,7 @@ public class AuthController {
                 : SecurityContextHolder.getContext().getAuthentication().getName();
         if (username == null) throw new IllegalStateException("未登录");
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT username, real_name, is_admin FROM yj_user WHERE username = ?", username);
+                "SELECT username, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
         if (rows.isEmpty()) throw new IllegalStateException("用户不存在");
         Map<String, Object> u = rows.get(0);
         boolean admin = "Y".equals(u.get("is_admin"));
@@ -95,9 +95,19 @@ public class AuthController {
         user.put("realName", u.get("real_name"));
         user.put("roleCode", admin ? "admin" : "user");
         user.put("isAdmin", admin);
-        user.put("visiblePanels", List.of("*"));
+        user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
         user.put("approvePanels", admin ? List.of("*") : List.of());
         return user;
+    }
+
+    /** 可见面板(角色口径):管理员=全部("*");普通用户=yj_role_panel 中勾了可见(view)的面板码。
+     *  前端 filterMenuTree 据此保留面板叶子,分组节点在子项全不可见时隐藏(= 有可见面板才显示模块)。 */
+    private List<String> visiblePanelsOf(boolean admin, Object roleId) {
+        if (admin) return List.of("*");
+        if (roleId == null) return List.of();
+        return jdbc.query(
+                "SELECT panel_code FROM yj_role_panel WHERE role_id = ? AND perms LIKE '%view%'",
+                (rs, i) -> rs.getString(1), roleId);
     }
 
     /** 客户端 IP(直连内网部署,取 remoteAddr 即可;带代理时取 X-Forwarded-For 首段)。 */
