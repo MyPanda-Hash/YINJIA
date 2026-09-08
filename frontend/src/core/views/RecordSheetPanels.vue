@@ -1182,7 +1182,7 @@ async function openMaterialPick(dt) {
     if (Array.isArray(masters)) {
       for (const m of masters) {
         const kids = m?.detail?.children || m?.detail?.items || []
-        if (Array.isArray(kids)) children.push(...kids)
+        if (Array.isArray(kids)) children.push(...kids.filter((k) => String(k['子件编码'] || '').trim())) // 锚点行不参与
       }
     }
     matPickRows.value = children

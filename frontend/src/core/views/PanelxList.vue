@@ -1963,6 +1963,8 @@ function validateInlineDraft() {
     }
   }
   for (const tab of cfgCache.value?.detail?.tabs || []) {
+    // BOM 面板:子件关系由 BomMasterDetail.validate 校验(锚点行 子件编码='' 合法),跳过通用逐行校验
+    if (panelCode.value === 'BOM' && tab.key === 'children') continue
     const rows = cur.value.detail?.[tab.key] || []
     if (tab.isRequired && !rows.length) return `请至少添加一行${tab.label || '明细'}`
     for (let index = 0; index < rows.length; index++) {
@@ -2019,6 +2021,7 @@ async function expandBomMaterials(detail, productRows) {
     const bom = []
     for (const d of res.list || []) {
       for (const it of (d.detail && d.detail.children) || []) {
+        if (!String(it['子件编码'] || '').trim()) continue // 锚点行(暂无子件的父件占位)不参与展开
         const parent = String(it['父件编码'] || '')
         if (!parent || !productRows.some((r) => String(r['产品编码'] || '') === parent)) continue
         bom.push({
@@ -3093,6 +3096,7 @@ async function loadSubBomMap() {
     const map = {}
     for (const d of res.list || []) {
       for (const it of (d.detail && d.detail.children) || []) {
+        if (!String(it['子件编码'] || '').trim()) continue // 锚点行不参与
         const parent = it['父件编码']
         if (!parent) continue
         if (!map[parent]) map[parent] = []
