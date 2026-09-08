@@ -692,6 +692,59 @@ export const recordSheetConfigs = {
     ],
   },
 
+  // 产品信息表:14 字段纯表单升级为文书面板(纸张式,与产品文件家族同视觉语言);
+  // 网格 4 列(标签130/值260×2),报告头带单据日期信息块;下拉走 yj_field 字典,长文本不写 type 即多行域
+  RD_PROD_INFO: {
+    headMode: 'report',
+    staticTitle: '产品信息表',
+    info: [{ label: '单据日期', key: '单据日期', type: 'text' }],
+    grid: [130, 260, 130, 260],
+    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    sections: [
+      { bar: '一、产品基本信息', rows: [
+        { pairs: [
+          { label: '产品编号', key: '产品编号', type: 'text' },
+          { label: '产品名称', key: '产品名称', type: 'text' },
+        ]},
+        { pairs: [
+          { label: '产品类别', key: '产品类别', type: 'select' },
+          { label: '产品类型', key: '产品类型', type: 'select' },
+        ]},
+        { pairs: [
+          { label: '产品分类', key: '产品分类', type: 'select' },
+          { label: '产品形态', key: '产品形态', type: 'select' },
+        ]},
+      ]},
+      { bar: '二、规格与尺寸', rows: [
+        { pairs: [
+          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text' },
+          { label: '客户料号', key: '客户料号', type: 'text' },
+        ]},
+        { pairs: [
+          { label: '炭棒尺寸', key: '炭棒尺寸', type: 'text' },
+          { label: '下单数量', key: '下单数量', type: 'text' },
+        ]},
+      ]},
+      { bar: '三、特殊性能描述', rows: [
+        { pairs: [
+          { label: '特殊性能描述', key: '特殊性能描述', vspan: 3 },
+        ]},
+      ]},
+      { bar: '四、文件与签署', rows: [
+        { pairs: [
+          { label: '客户图纸或规格书', key: '客户图纸或规格书', vspan: 3 },
+        ]},
+        { pairs: [
+          { label: '责任人', key: '责任人', type: 'text' },
+          { label: '审核人', key: '审核人', type: 'text' },
+        ]},
+        { pairs: [
+          { label: '备注', key: '备注', vspan: 3 },
+        ]},
+      ]},
+    ],
+  },
+
   // 组装BOM表(源=组装段BOM和工艺控制.docx):产品基本信息 + 修订记录 + 物料清单(30 种预置);源文档无信息块
   RD_ASM_BOM: {
     headMode: 'report',
