@@ -53,3 +53,32 @@ migrate-formno-style.sql
 migrate-manu-docdate.sql
 
 migrate-doc-saved.sql
+
+# —— 2026-09-08 补登记:远程并行开发新增的 27 个脚本(按远程执行时序;seed-rd-progress.tsv 为配套数据不入清单)——
+migrate-rd-approval.sql
+migrate-rd-plan.sql
+migrate-rd-progress.sql
+seed-rd-progress.sql
+migrate-rd-filter-eff.sql
+migrate-rd-record-sheets.sql
+migrate-rename-dom-test.sql
+migrate-rd-lab-sheets.sql
+migrate-rd-prod-sheets.sql
+migrate-rd-prod2.sql
+migrate-rd-asm-bom-fix.sql
+migrate-rd-spec-multi.sql
+migrate-stdlib.sql
+migrate-stdlib-seed.sql
+migrate-mold-proc-cols.sql
+migrate-mold-proc-labels.sql
+migrate-bom-material-fields.sql
+migrate-bom-seed-materials.sql
+migrate-bom-parent-materials.sql
+migrate-prod-info-seed.sql
+migrate-prod-ref-fields.sql
+migrate-modify-request.sql
+migrate-archived-at.sql
+migrate-stock-warn.sql
+migrate-rebuild-inventory.sql
+migrate-fix-ghost-required.sql
+migrate-base-fields.sql
