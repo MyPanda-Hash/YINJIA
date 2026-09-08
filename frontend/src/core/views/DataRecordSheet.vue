@@ -285,7 +285,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick } from 'vue'
 import { tt } from '@/i18n'
 
 const props = defineProps({
@@ -301,6 +301,26 @@ function selectOptions(key) {
   const opts = f?.options || []
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
 }
+
+// ── 校验定位(供 PanelxList 保存校验调用):滚动到该字段并琥珀闪烁 ──
+function focusField(label) {
+  if (!label) return false
+  nextTick(() => {
+    const root = document.querySelector('.drc-sheet') || document.querySelector('.record-sheet')
+    if (!root) return
+    const el = [...root.querySelectorAll('td.rs-label, .rs-topic-cell, th')]
+      .find((e) => (e.textContent || '').trim() === label)
+      || [...root.querySelectorAll('td.rs-label, .rs-topic-cell, th')]
+        .find((e) => (e.textContent || '').includes(label))
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('field-blink')
+      setTimeout(() => el.classList.remove('field-blink'), 3200)
+    }
+  })
+  return true
+}
+defineExpose({ focusField })
 
 /** 取样前组合显示:流速 / 压力(复刻 Excel "1.93/61.1") */
 function combo(row, pKey, fKey) {
@@ -420,6 +440,16 @@ function removeRow(i) {
 .rs-topic-cell {
   padding: 12px 14px 14px 30px !important;
   vertical-align: middle;
+}
+/* 校验定位闪烁:琥珀高亮约3秒(保存必填缺失时) */
+@keyframes drcFieldBlink {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 3px rgba(250, 173, 20, 0.55); background: #ffe58f; }
+}
+.field-blink {
+  animation: drcFieldBlink 0.65s ease-in-out 5;
+  outline: 2px solid #faad14;
+  outline-offset: -2px;
 }
 .rs-topic {
   font-family: 'SimSun', 'Songti SC', serif;

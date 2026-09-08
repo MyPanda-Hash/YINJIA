@@ -926,6 +926,7 @@ export const recordSheetConfigs = {
     docNoDefault: 'YJ-RD001',
     titlePlaceholder: '伊可普碱性炭棒出货检验项目控制计划',
     info: [
+      { label: '标题', key: '标题', type: 'text' },
       { label: '版本号', key: '版本号', type: 'text' },
       { label: '密级', key: '密级', type: 'select' },
     ],

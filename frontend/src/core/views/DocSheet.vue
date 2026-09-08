@@ -199,7 +199,7 @@
 </template>
 
 <script setup>
-import { computed, reactive } from 'vue'
+import { computed, reactive, nextTick } from 'vue'
 import { tt } from '@/i18n'
 
 const props = defineProps({
@@ -220,6 +220,26 @@ function selectOptions(key) {
   const opts = f?.options || []
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
 }
+
+// ── 校验定位(供 PanelxList 保存校验调用):滚动到该字段行并琥珀闪烁 ──
+function focusField(label) {
+  if (!label) return false
+  nextTick(() => {
+    const root = document.querySelector('.approval-sheet')
+    if (!root) return
+    const el = [...root.querySelectorAll('.as-name, .as-info-label, .as-sub-label')]
+      .find((e) => (e.textContent || '').trim() === label)
+      || [...root.querySelectorAll('.as-name, .as-info-label, .as-sub-label')]
+        .find((e) => (e.textContent || '').includes(label))
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('field-blink')
+      setTimeout(() => el.classList.remove('field-blink'), 3200)
+    }
+  })
+  return true
+}
+defineExpose({ focusField })
 </script>
 
 <style scoped>
@@ -375,6 +395,16 @@ function selectOptions(key) {
   justify-content: center;
   padding: 0 8px;
   text-align: center;
+}
+/* 校验定位闪烁:琥珀高亮约3秒(保存必填缺失时) */
+@keyframes dsFieldBlink {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 0 0 0 3px rgba(250, 173, 20, 0.65); }
+}
+.field-blink {
+  animation: dsFieldBlink 0.65s ease-in-out 5;
+  outline: 2px solid #faad14;
+  outline-offset: -1px;
 }
 .as-fill {
   flex: 1;
