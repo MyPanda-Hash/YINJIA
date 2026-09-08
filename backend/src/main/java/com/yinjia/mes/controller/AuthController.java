@@ -43,14 +43,20 @@ public class AuthController {
             throw new IllegalArgumentException("用户名和密码不能为空");
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT username, password_hash, real_name, is_admin, role_id"
-                        + " FROM yj_user WHERE username = ?", username);
+                "SELECT username, password_hash, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
         if (rows.isEmpty() || !encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
             throw new IllegalStateException("用户名或密码错误");
         }
         // 使用记录:登录成功事件(失败不记)
-        usageLog.recordLogin(username, String.valueOf(rows.get(0).get("real_name")), clientIp(request));
-        Map<String, Object> user = buildUser(rows.get(0));
+        usageLog.recordLogin(username, String.valueOf(u.get("real_name")), clientIp(request));
+        Map<String, Object> user = new HashMap<>();
+        user.put("userName", u.get("username"));
+        user.put("realName", u.get("real_name"));
+        user.put("roleCode", admin ? "admin" : "user");
+        user.put("isAdmin", admin);
+        user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
+        // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
+        user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         Map<String, Object> out = new HashMap<>();
         out.put("token", jwtUtil.generate(username));
         out.put("user", user);
@@ -97,39 +103,28 @@ public class AuthController {
         user.put("userName", u.get("username"));
         user.put("realName", u.get("real_name"));
         user.put("isAdmin", admin);
-        Integer roleId = parseIntOrNull(u.get("role_id"));
-        String roleCode = admin ? "admin" : "user";
-        if (roleId != null) {
-            List<String> rc = jdbc.query(
-                    "SELECT role_code FROM yj_role WHERE id = ?", (rs, i) -> rs.getString(1), roleId);
-            if (!rc.isEmpty() && rc.get(0) != null && !rc.get(0).isBlank()) roleCode = rc.get(0);
-        }
-        user.put("roleCode", roleCode);
-        user.put("roleId", roleId);
-        if (admin) {
-            user.put("visiblePanels", List.of("*"));
-            user.put("approvePanels", List.of("*"));
-        } else if (roleId != null) {
-            user.put("visiblePanels", jdbc.query(
-                    "SELECT panel_code FROM yj_role_panel WHERE role_id = ? AND perms LIKE '%view%'",
-                    (rs, i) -> rs.getString(1), roleId));
-            user.put("approvePanels", jdbc.query(
-                    "SELECT panel_code FROM yj_role_panel WHERE role_id = ? AND can_approve = 'Y'",
-                    (rs, i) -> rs.getString(1), roleId));
-        } else {
-            user.put("visiblePanels", List.of());
-            user.put("approvePanels", List.of());
-        }
+        user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
+        user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         return user;
     }
 
-    private static Integer parseIntOrNull(Object v) {
-        if (v == null) return null;
-        try {
-            return Integer.parseInt(String.valueOf(v));
-        } catch (NumberFormatException e) {
-            return null;
-        }
+    /** 可见面板(角色口径):管理员=全部("*");普通用户=yj_role_panel 中勾了可见(view)的面板码。
+     *  前端 filterMenuTree 据此保留面板叶子,分组节点在子项全不可见时隐藏(= 有可见面板才显示模块)。 */
+    private List<String> visiblePanelsOf(boolean admin, Object roleId) {
+        if (admin) return List.of("*");
+        if (roleId == null) return List.of();
+        return jdbc.query(
+                "SELECT panel_code FROM yj_role_panel WHERE role_id = ? AND perms LIKE '%view%'",
+                (rs, i) -> rs.getString(1), roleId);
+    }
+
+    /** 审批权限面板:管理员=全部;普通用户=角色勾了审批(面板权限含 audit → can_approve='Y')的面板码 */
+    private List<String> approvePanelsOf(boolean admin, Object roleId) {
+        if (admin) return List.of("*");
+        if (roleId == null) return List.of();
+        return jdbc.query(
+                "SELECT panel_code FROM yj_role_panel WHERE role_id = ? AND can_approve = 'Y'",
+                (rs, i) -> rs.getString(1), roleId);
     }
 
     /** 客户端 IP(直连内网部署,取 remoteAddr 即可;带代理时取 X-Forwarded-For 首段)。 */

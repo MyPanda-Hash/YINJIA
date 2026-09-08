@@ -907,7 +907,7 @@ export default {
     '组装工艺清单': 'Montageprozessliste',
     '出货检验计划表': 'Warenprüfplan',
     '加标水配置记录表': 'Standardwasser-Herstellung',
-    '国内部委托测试申请单': 'Inländischer Prüfantrag',
+    '内部委托测试申请单': 'Inländischer Prüfantrag',
     '设备使用登记表': 'Gerätenutzung',
     '仪器使用记录表': 'Instrumentennutzung',
     '基础档案': 'Stammdaten',

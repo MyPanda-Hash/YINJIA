@@ -23,7 +23,7 @@ tools/apache-maven-3.9.9/
 !tools/lib/mssql-jdbc.jar
 
 # 误创建的 Maven 本地仓库(settings.xml 的 localRepository 未展开环境变量)
-backend/${env.YINJIA_M2_REPO}/
+*/${env.YINJIA_M2_REPO}/
 
 # 会话诊断脚本与临时产物(不入库)
 tools/_*.cjs
@@ -33,3 +33,10 @@ tools/_*.txt
 tools/vc-out.txt
 tools/vd-out.txt
 tools/_void-check.sql
+tools/_walk/_rsc*.cjs
+tools/_walk/*.generated.js
+
+deploy/*.bak
+deploy/*.jar
+*.deploy.zip
+yinjia-mes-deploy.zip

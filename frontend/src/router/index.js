@@ -49,6 +49,12 @@ router.beforeEach((to) => {
   if (to.path !== '/login' && !user.isLogin) return '/login'
   if (to.meta.requireAdmin && !user.isAdmin) return '/dashboard'
   if (to.path === '/login' && user.isLogin) return '/dashboard'
+  // 我的桌面权限化:无可见权限时落到第一个可见面板(直接敲 /dashboard 也跳走)
+  if (to.path === '/dashboard' && user.isLogin && !user.isAdmin
+      && !(user.visiblePanels || []).includes('DASHBOARD')) {
+    const first = flatMenus().find((m) => m.panelCode && m.path && (user.visiblePanels || []).includes(m.panelCode))
+    if (first) return first.path
+  }
   return true
 })
 

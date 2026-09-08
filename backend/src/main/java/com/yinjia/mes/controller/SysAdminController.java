@@ -1,6 +1,7 @@
 package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
+import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.UsageLogService;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -178,6 +179,32 @@ public class SysAdminController {
         return ApiResult.ok(null);
     }
 
+    /** 批量分配角色:给一组用户统一换角色;权限随角色,is_admin 同步角色口径,管理员账号自动跳过 */
+    @PostMapping("/user/batch-role")
+    public ApiResult<Void> userBatchRole(@RequestBody Map<String, Object> body) {
+        Object idsObj = body.get("userIds");
+        Object roleObj = body.get("roleId");
+        if (!(idsObj instanceof List<?> ids) || ids.isEmpty()) throw new IllegalArgumentException("请选择用户");
+        Integer roleId = roleObj == null || String.valueOf(roleObj).isBlank()
+                ? null : Integer.valueOf(String.valueOf(roleObj));
+        String isAdmin = "N";
+        if (roleId != null) {
+            List<String> r = jdbc.query("SELECT is_admin FROM yj_role WHERE id = ?", (rs, i) -> rs.getString(1), roleId);
+            if (r.isEmpty()) throw new IllegalArgumentException("角色不存在");
+            isAdmin = "Y".equals(r.get(0)) ? "Y" : "N";
+        }
+        int n = 0;
+        for (Object idObj : ids) {
+            int userId = Integer.parseInt(String.valueOf(idObj));
+            List<Map<String, Object>> rows = jdbc.queryForList("SELECT is_admin FROM yj_user WHERE id = ?", userId);
+            if (rows.isEmpty() || "Y".equals(String.valueOf(rows.get(0).get("is_admin")))) continue;
+            jdbc.update("UPDATE yj_user SET role_id = ?, is_admin = ? WHERE id = ?", roleId, isAdmin, userId);
+            n++;
+        }
+        if (n == 0) throw new IllegalStateException("没有可分配的用户（管理员账号不参与批量分配）");
+        return ApiResult.ok(null);
+    }
+
     // ============ 角色 ============
 
     @GetMapping("/role/list")
@@ -214,7 +241,7 @@ public class SysAdminController {
 
     // ============ 角色面板操作权限(11 项) ============
 
-    /** 全部操作权限定义(顺序=前端列顺序) */
+    /** 全部操作权限定义(顺序=前端列顺序)——通用面板 11 项 */
     public static final String[][] PERMISSION_ACTIONS = {
             {"view",    "可见"},
             {"query",   "查询"},
@@ -229,16 +256,40 @@ public class SysAdminController {
             {"adjust",  "调价"},
     };
 
+    /** 文件类面板(研发管理·文书式)专属动作集:按真实操作行为设计(新增保存即归档/查询单据/
+     *  申请修改闭环/修改记录/删除申请管理员审批/导出打印/审批族),非通用 11 项 */
+    public static final String[][] FILE_PANEL_ACTIONS = {
+            {"view",    "可见"},
+            {"query",   "查询单据"},
+            {"add",     "新增保存"},
+            {"modify",  "申请修改"},
+            {"modlog",  "修改记录"},
+            {"del",     "删除申请"},
+            {"export",  "导出打印"},
+            {"audit",   "审批"},
+    };
+
     @GetMapping("/role/{id}/panels")
     public ApiResult<Map<String, Object>> rolePanels(@PathVariable int id) {
         // 面板按真实模块分组返回(对齐 HSDZ permission.GROP,数据源 yj_panel.module_group)
         Map<String, List<Map<String, Object>>> byModule = new LinkedHashMap<>();
+        // 通用虚拟面板:我的桌面权限化(勾可见才在导航显示;admin 恒可见)
+        Map<String, Object> dash = new LinkedHashMap<>();
+        dash.put("panelCode", "DASHBOARD");
+        dash.put("panelName", "我的桌面");
+        dash.put("module", "通用");
+        dash.put("hasApproval", false);
+        dash.put("actions", new String[][]{{"view", "可见"}});
+        byModule.computeIfAbsent("通用", k -> new ArrayList<>()).add(dash);
         for (PanelRegistry.PanelDef def : registry.all()) {
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("panelCode", def.code());
             p.put("panelName", def.name());
             p.put("module", def.moduleName());
             p.put("hasApproval", def.isDoc());
+            // 面板级动作集:文件类面板按真实操作行为下发专属 8 项,其余保持通用 11 项
+            p.put("actions", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code())
+                    ? FILE_PANEL_ACTIONS : PERMISSION_ACTIONS);
             byModule.computeIfAbsent(def.moduleName(), k -> new ArrayList<>()).add(p);
         }
         List<Map<String, Object>> modules = new ArrayList<>();

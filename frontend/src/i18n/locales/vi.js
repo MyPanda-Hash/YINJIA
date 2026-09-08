@@ -907,7 +907,7 @@ export default {
     '组装工艺清单': 'Danh sách công nghệ lắp ráp',
     '出货检验计划表': 'Kế hoạch kiểm tra xuất hàng',
     '加标水配置记录表': 'Sổ pha nước chuẩn',
-    '国内部委托测试申请单': 'Đơn yêu cầu kiểm tra nội bộ',
+    '内部委托测试申请单': 'Đơn yêu cầu kiểm tra nội bộ',
     '设备使用登记表': 'Sổ đăng ký sử dụng thiết bị',
     '仪器使用记录表': 'Sổ sử dụng dụng cụ',
     '基础档案': 'Dữ liệu nền',

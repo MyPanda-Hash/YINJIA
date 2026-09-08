@@ -292,6 +292,41 @@
       </div>
     </template>
 
+    <!-- ===== 研发管理 ===== -->
+    <template v-else-if="mod === 'rd'">
+      <div class="rd-grid">
+        <section class="card rd-feed">
+          <div class="card-head"><h3>{{ tt('修改申请动态') }}</h3><span class="rd-sub">{{ tt('待管理员审批的文件') }}</span></div>
+          <div v-if="!rdData.modifyRequests.length" class="rd-empty">{{ tt('暂无修改申请') }}</div>
+          <div v-else class="rd-list">
+            <div v-for="m in rdData.modifyRequests" :key="m.panelCode + ':' + m.docNo" class="rd-item" @click="goPanel(m.panelCode, m.docNo)">
+              <span class="rd-badge mod">{{ tt('修改申请') }}</span>
+              <span class="rd-txt">{{ tt(m.panelName) }} {{ m.docNo }}</span>
+              <span class="rd-meta">{{ m.by || '-' }} · {{ fmtRdTime(m.at) }}</span>
+            </div>
+          </div>
+        </section>
+        <section class="card rd-feed">
+          <div class="card-head"><h3>{{ tt('最新单据') }}</h3><span class="rd-sub">{{ tt('各面板最近新增') }}</span></div>
+          <div v-if="!rdData.newDocs.length" class="rd-empty">{{ tt('暂无单据') }}</div>
+          <div v-else class="rd-list">
+            <div v-for="(d, i) in rdData.newDocs" :key="i" class="rd-item" @click="goPanel(d.panelCode, d.docNo)">
+              <span class="rd-badge new">{{ tt('新增') }}</span>
+              <span class="rd-txt">{{ tt(d.panelName) }} {{ d.docNo }}</span>
+              <span class="rd-meta">{{ d.creator || '-' }} · {{ fmtRdTime(d.at) }}</span>
+            </div>
+          </div>
+        </section>
+        <section class="card rd-archive">
+          <div class="card-head"><h3>{{ tt('面板档案本') }}</h3><span class="rd-sub">{{ tt('像翻档案一样查阅各面板文件') }}</span></div>
+          <div class="rd-chips">
+            <span v-for="p in rdData.panels" :key="p.code" class="rd-chip" @click="openArchive(p.code)">{{ tt(p.name) }}</span>
+          </div>
+          <div v-if="!rdData.panels.length" class="rd-empty">{{ tt('暂无面板') }}</div>
+        </section>
+      </div>
+    </template>
+
     <!-- ===== 质量 ===== -->
     <template v-else>
       <div class="dash-grid">
@@ -309,11 +344,38 @@
         </div>
       </div>
     </template>
+
+    <!-- 档案本弹窗:像翻档案一样查阅各文件面板的单据(文书面板纸张渲染 + 翻页) -->
+    <el-dialog v-model="archVisible" :title="tt('档案本') + ' · ' + archPanelName" width="920px" top="4vh" append-to-body class="arch-dialog">
+      <div class="arch-bar">
+        <span class="arch-btn" @click="archIdx = 0">◁</span>
+        <span class="arch-btn" @click="archIdx = Math.max(0, archIdx - 1)">◀</span>
+        <span class="arch-no">{{ archIdx + 1 }} / {{ archDocs.length }}</span>
+        <span class="arch-btn" @click="archIdx = Math.min(archDocs.length - 1, archIdx + 1)">▶</span>
+        <span class="arch-btn" @click="archIdx = archDocs.length - 1">▷</span>
+        <span v-if="archDoc && archDoc['单据状态']" class="arch-status" :class="archDoc['单据状态']">{{ tt(archDoc['单据状态']) }}</span>
+      </div>
+      <div v-loading="archLoading" class="arch-body">
+        <RecordSheetPanels
+          v-if="archDoc && archIsSheet"
+          :head="archDoc" :fields="archFields" :editable="false" :panel-code="archPanel"
+        />
+        <div v-else-if="archDoc" class="arch-fallback">
+          <div class="af-grid">
+            <div v-for="f in archHeaderFields" :key="f.dataName" class="af-cell">
+              <span class="af-label">{{ tt(f.displayName || f.dataName) }}</span>
+              <span class="af-value">{{ archDoc[f.dataName] ?? '' }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-else class="rd-empty">{{ tt('该面板暂无单据') }}</div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
@@ -324,6 +386,8 @@ import SBars from './SBars.vue'
 import SDonut from './SDonut.vue'
 import SLine from './SLine.vue'
 import STree from './STree.vue'
+import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
+import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
 import { tt } from '@/i18n'
 
 const user = useUserStore()
@@ -343,12 +407,72 @@ const quickEntries = computed(() => QUICK_DEFS.filter((q) => desk.value.quick.in
 // ---------- 看板模块 ----------
 const MODULES = [
   { key: 'overview', title: '概览', icon: 'DataBoard' },
+  { key: 'rd', title: '研发管理', icon: 'MagicStick' },
   { key: 'prod', title: '生产', icon: 'Odometer' },
   { key: 'stock', title: '库存', icon: 'Box' },
   { key: 'sales', title: '销售', icon: 'ShoppingCart' },
   { key: 'quality', title: '质量', icon: 'Aim' },
 ]
 const mod = ref('overview')
+
+// ---------- 研发管理模块:修改申请动态 + 最新单据 + 面板档案本 ----------
+const rdData = ref({ modifyRequests: [], newDocs: [], panels: [] })
+let rdLoaded = false
+async function loadRd() {
+  try {
+    const r = await request.get('/dashboard/rd')
+    if (r?.data) rdData.value = r.data
+    rdLoaded = true
+  } catch { /* 静默 */ }
+}
+watch(mod, (v) => {
+  if (v === 'rd' && !rdLoaded) loadRd()
+}, { immediate: true })
+function goPanel(panelCode, docNo) {
+  if (!panelCode) return
+  router.push({ path: `/panelx/list/${panelCode}`, query: docNo ? { focus: docNo } : {} })
+}
+function fmtRdTime(t) {
+  if (!t) return ''
+  const s = String(t).replace('T', ' ')
+  return s.length > 16 ? s.slice(0, 16) : s
+}
+
+// ---------- 档案本:像翻档案一样查阅各文件面板单据(纸张渲染 + 翻页) ----------
+const RECORD_SHEET_SET = new Set(Object.keys(recordSheetConfigs))
+const archVisible = ref(false)
+const archPanel = ref('')
+const archPanelName = ref('')
+const archDocs = ref([])
+const archFields = ref([])
+const archIdx = ref(0)
+const archLoading = ref(false)
+const archIsSheet = computed(() => RECORD_SHEET_SET.has(archPanel.value))
+const archDoc = computed(() => archDocs.value[archIdx.value] || null)
+const archHeaderFields = computed(() => archFields.value.filter((f) => !f.hidden))
+async function openArchive(code) {
+  archPanel.value = code
+  const p = rdData.value.panels.find((x) => x.code === code)
+  archPanelName.value = p ? p.name : code
+  archVisible.value = true
+  archLoading.value = true
+  archIdx.value = 0
+  try {
+    const [cfg, docs] = await Promise.all([
+      request.get('/px/getPanelConfig', { params: { panelCode: code } }),
+      request.post('/px/queryFormDataList', { panelCode: code, condition: {}, pageNo: 1, pageSize: 500 }),
+    ])
+    const header = (cfg?.data?.dataSchema?.fields || []).filter((f) => !f.hidden)
+    const detail = cfg?.data?.detail?.tabs?.[0]?.fields || []
+    archFields.value = [...header, ...detail]
+    archDocs.value = docs?.data?.list || []
+  } catch {
+    archDocs.value = []
+    archFields.value = []
+  } finally {
+    archLoading.value = false
+  }
+}
 
 // ---------- 班次：8:00-21:00 白班，其余夜班；每分钟自动检查，到点自动切换 ----------
 const now = ref(new Date())
@@ -1649,5 +1773,175 @@ function go(path, title) {
   .doc-row i {
     transition: none;
   }
+}
+
+/* ═══════════ 研发管理模块 ═══════════ */
+.rd-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+.card-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.card-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+.rd-sub {
+  font-size: 12px;
+  color: #9ca3af;
+}
+.rd-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 320px;
+  overflow: auto;
+}
+.rd-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.rd-item:hover {
+  background: #f0f6ff;
+}
+.rd-badge {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+}
+.rd-badge.mod {
+  color: #b45309;
+  background: #fffbeb;
+}
+.rd-badge.new {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+.rd-txt {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #263548;
+}
+.rd-meta {
+  flex: none;
+  font-size: 12px;
+  color: #9ca3af;
+}
+.rd-empty {
+  color: #9ca3af;
+  font-size: 13px;
+  padding: 24px 0;
+  text-align: center;
+}
+.rd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rd-chip {
+  padding: 5px 12px;
+  border: 1px solid #c8ced8;
+  border-radius: 14px;
+  font-size: 13px;
+  cursor: pointer;
+  color: #263548;
+}
+.rd-chip:hover {
+  border-color: #409eff;
+  color: #409eff;
+  background: #f0f6ff;
+}
+
+/* 档案本弹窗 */
+.arch-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.arch-btn {
+  min-width: 24px;
+  height: 24px;
+  line-height: 22px;
+  text-align: center;
+  border: 1px solid #c9cfdb;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  color: #263548;
+}
+.arch-btn:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
+.arch-no {
+  font-size: 13px;
+  color: #374151;
+  margin: 0 6px;
+}
+.arch-status {
+  margin-left: 8px;
+  padding: 1px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+}
+.arch-status.修改中,
+.arch-status.审批中 {
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+.arch-status.修改申请中 {
+  color: #b45309;
+  border-color: #f3d9a6;
+  background: #fffbeb;
+}
+.arch-body {
+  max-height: 74vh;
+  overflow: auto;
+}
+.af-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  background: #fff;
+  border: 1px solid #7f7f7f;
+}
+.af-cell {
+  display: flex;
+  border-bottom: 1px solid #e5e7eb;
+}
+.af-label {
+  flex: none;
+  width: 140px;
+  padding: 6px 10px;
+  background: #f3f4f6;
+  color: #374151;
+  font-size: 13px;
+  text-align: center;
+}
+.af-value {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 13px;
+  color: #222;
+  word-break: break-all;
 }
 </style>

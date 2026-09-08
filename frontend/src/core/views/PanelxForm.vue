@@ -848,6 +848,7 @@ async function loadSubBomMap() {
     const map = {}
     for (const d of res.list || []) {
       for (const it of (d.detail && d.detail.children) || []) {
+        if (!String(it['子件编码'] || '').trim()) continue // 锚点行不参与
         const parent = it['父件编码']
         if (!parent) continue
         if (!map[parent]) map[parent] = []
@@ -1069,6 +1070,7 @@ async function loadBomFor(code) {
     const bom = []
     for (const d of res.list || []) {
       for (const it of (d.detail && d.detail.children) || []) {
+        if (!String(it['子件编码'] || '').trim()) continue // 锚点行不参与
         if (String(it['父件编码']) !== code) continue
         bom.push({
           材料编码: it['子件编码'],

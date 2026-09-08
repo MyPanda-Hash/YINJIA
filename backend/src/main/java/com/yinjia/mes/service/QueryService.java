@@ -58,7 +58,7 @@ public class QueryService {
         args.add(pageSize);
         List<Map<String, Object>> rows = jdbc.queryForList(sql, args.toArray());
         List<Map<String, Object>> list = new ArrayList<>();
-        for (Map<String, Object> r : rows) list.add(rowToLabels(def, r, false));
+        for (Map<String, Object> r : rows) list.add(rowToLabels(def, r, true));
 
         Map<String, Object> out = new HashMap<>();
         out.put("totalSize", total == null ? 0 : total);
@@ -118,7 +118,45 @@ public class QueryService {
 
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
-        appendDocFilters(def, where, args, keyword, condition, l2c, split, docCols, docTable, g);
+        // 文件面板「查询单据」自定义条件:_docNo=编号模糊(单据编号/文档编号),_archFrom/_archTo=首次归档时间区间(含端点)
+        Object qDocNo = condition == null ? null : condition.get("_docNo");
+        Object qFrom = condition == null ? null : condition.get("_archFrom");
+        Object qTo = condition == null ? null : condition.get("_archTo");
+        Map<String, Object> fieldCond = condition;
+        if (qDocNo != null || qFrom != null || qTo != null) {
+            fieldCond = new HashMap<>(condition);
+            fieldCond.remove("_docNo");
+            fieldCond.remove("_archFrom");
+            fieldCond.remove("_archTo");
+        }
+        appendDocFilters(def, where, args, keyword, fieldCond, l2c, split, docCols, docTable, g);
+        String noKw = qDocNo == null ? "" : String.valueOf(qDocNo).trim();
+        if (!noKw.isEmpty()) {
+            where.append(" AND (t.[").append(g).append("] LIKE ?");
+            args.add("%" + noKw + "%");
+            boolean hasDocNoCol = split && docCols.stream().anyMatch(f -> "文档编号".equals(f.label()));
+            if (hasDocNoCol) {
+                where.append(" OR t.[文档编号] LIKE ?");
+                args.add("%" + noKw + "%");
+            }
+            where.append(")");
+        }
+        String archFrom = qFrom == null ? "" : String.valueOf(qFrom).trim();
+        String archTo = qTo == null ? "" : String.valueOf(qTo).trim();
+        if (!archFrom.isEmpty() || !archTo.isEmpty()) {
+            where.append(" AND EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.[")
+                    .append(g).append("] AND s.archived_at IS NOT NULL");
+            args.add(def.code());
+            if (!archFrom.isEmpty()) {
+                where.append(" AND s.archived_at >= ?");
+                args.add(archFrom);
+            }
+            if (!archTo.isEmpty()) {
+                where.append(" AND s.archived_at < DATEADD(day, 1, ?)");
+                args.add(archTo);
+            }
+            where.append(")");
+        }
 
         where.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.[")
                 .append(g).append("] AND s.canceled = 'Y')");
@@ -219,7 +257,7 @@ public class QueryService {
         List<Object> args = new ArrayList<>(List.of(panelCode));
         args.addAll(docNos);
         Map<String, Map<String, Object>> out = new HashMap<>();
-        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at FROM yj_doc_status"
+        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state FROM yj_doc_status"
                 + " WHERE panel_code = ? AND doc_no IN (" + in + ")", rs -> {
             Map<String, Object> m = new HashMap<>();
             m.put("shr", rs.getString("shr"));
@@ -229,17 +267,24 @@ public class QueryService {
             m.put("pending", rs.getString("pending"));
             m.put("pending_by", rs.getString("pending_by"));
             m.put("pending_at", rs.getTimestamp("pending_at"));
+            m.put("archived", rs.getString("archived"));
+            m.put("deleting", rs.getString("deleting"));
+            m.put("modify_state", rs.getString("modify_state"));
             out.put(rs.getString("doc_no"), m);
         }, args.toArray());
         return out;
     }
 
-    /** 状态推导(照搬 light-mes 审批流 + 中止档):已作废 > 已中止 > 已审核 > 审批中 > 草稿 */
+    /** 状态推导:已作废 > 已中止 > 删除申请中 > 修改申请中 > 审批中 > 修改中 > 已归档 > 已审核 > 草稿 */
     private String docStatus(Map<String, Object> st) {
         if (st != null && "Y".equals(st.get("canceled"))) return "已作废";
         if (st != null && "Y".equals(st.get("stopped"))) return "已中止";
-        if (st != null && st.get("shr") != null) return "已审核";
+        if (st != null && "Y".equals(st.get("deleting"))) return "删除申请中";
+        if (st != null && "R".equals(st.get("modify_state"))) return "修改申请中";
         if (st != null && "Y".equals(st.get("pending"))) return "审批中";
+        if (st != null && "Y".equals(st.get("modify_state"))) return "修改中";
+        if (st != null && "Y".equals(st.get("archived"))) return "已归档";
+        if (st != null && st.get("shr") != null) return "已审核";
         return "草稿";
     }
 
@@ -271,11 +316,17 @@ public class QueryService {
                                      List<Object> args, String keyword, Map<String, Object> condition,
                                      Map<String, String> l2c, String alias) {
         if (condition != null) {
+            // 仓库下拉(库存状况):按仓库编码(ckdm)精确过滤(_ckdm);绑定编码,仓库字典改名不影响
+            Object ck = condition.get("_ckdm");
+            if (ck != null && !String.valueOf(ck).isBlank()) {
+                where.append(" AND ").append(alias).append(".[ckdm] = ?");
+                args.add(String.valueOf(ck).trim());
+            }
             for (Map.Entry<String, Object> e : condition.entrySet()) {
                 String col = l2c.get(e.getKey());
                 Object v = e.getValue();
                 if (col == null || v == null || String.valueOf(v).isBlank()) continue;
-                where.append(" AND ").append(alias).append(".").append(col).append(" LIKE ?");
+                where.append(" AND ").append(alias).append(".[").append(col).append("] LIKE ?");
                 args.add("%" + v + "%");
             }
         }
@@ -283,7 +334,7 @@ public class QueryService {
             StringBuilder or = new StringBuilder();
             List<Object> kargs = new ArrayList<>();
             for (PanelRegistry.FieldDef f : def.fields()) {
-                or.append(or.length() > 0 ? " OR " : "").append(alias).append(".").append(f.col()).append(" LIKE ?");
+                or.append(or.length() > 0 ? " OR " : "").append(alias).append(".[").append(f.col()).append("] LIKE ?");
                 kargs.add("%" + keyword + "%");
             }
             if (or.length() > 0) {
@@ -331,7 +382,7 @@ public class QueryService {
             StringBuilder lineOr = new StringBuilder();
             List<Object> largs = new ArrayList<>();
             for (PanelRegistry.FieldDef f : lineFields) {
-                lineOr.append(lineOr.length() > 0 ? " OR " : "").append("x.").append(f.col()).append(" LIKE ?");
+                lineOr.append(lineOr.length() > 0 ? " OR " : "").append("x.[").append(f.col()).append("] LIKE ?");
                 largs.add("%" + keyword + "%");
             }
             where.append(" AND (");

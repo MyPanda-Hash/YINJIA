@@ -1,10 +1,27 @@
 <template>
   <div class="panelx-list" @click="closeCtx">
     <!-- ══════════ ① 顶部工具栏（T+ 灰条 + 单据翻页）══════════ -->
-    <div class="tools">
+    <div v-if="!isApprovalDoc" class="tools">
       <button type="button" class="toolbar-query-btn" :title="tt('按表头字段查询单据')" @click.stop="openQueryDialog">
         <el-icon><Search /></el-icon>
         <span>{{ tt('查询') }}</span>
+      </button>
+      <!-- 库存状况:仓库下拉(按仓库编码精确过滤,字典改名不影响绑定) -->
+      <el-select
+        v-if="panelCode === 'STOCK_STATUS'"
+        v-model="stockWh"
+        class="wh-filter"
+        size="small"
+        clearable
+        filterable
+        :placeholder="tt('全部仓库')"
+        @change="onStockWhChange"
+      >
+        <el-option v-for="w in warehouseOptions" :key="w.code" :label="`${w.name}（${w.code}）`" :value="w.code" />
+      </el-select>
+      <button v-if="panelCode === 'STOCK_STATUS'" type="button" class="toolbar-query-btn" @click.stop="openStockAdd">
+        <el-icon><Plus /></el-icon>
+        <span>{{ tt('新增库存') }}</span>
       </button>
       <div class="tb-group" v-for="(g, gi) in toolbarGroups" :key="'g' + gi">
         <span class="tb-main" :class="{ disabled: isDisabled(btnName(g)) }" @click="onButton(btnName(g))">
@@ -92,6 +109,104 @@
         <el-input v-else v-model="condition[qr.dataName]" :placeholder="qr.placeholder || ''" @keyup.enter="search" clearable @clear="search" />
       </div>
     </div>
+    <!-- 文书式面板:完整纸张居中 + 功能按钮右侧竖排(不按表头/表中/表尾三段式) -->
+    <template v-else-if="isApprovalDoc">
+      <div class="approval-layout">
+        <ProgressControlSheet
+          v-if="panelCode === 'RD_PROGRESS'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="headerFields" :editable="draftEditable"
+          @dirty="markInlineDirty"
+        />
+        <DataRecordSheet
+          v-else-if="panelCode === 'RD_FILTER_EFF'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="headerFields" :editable="draftEditable"
+          @dirty="markInlineDirty"
+        />
+        <!-- 数据记录表其余 7 张(配置驱动:碱性/矿化/抑菌/阻垢性能/RO保护/浸泡安全/压降精度) -->
+        <RecordSheetPanels
+          v-else-if="isRecordSheetPanel"
+          ref="approvalSheetRef"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable" :panel-code="panelCode"
+          @dirty="markInlineDirty"
+          @refresh-config="onFieldEditRefresh"
+        />
+        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" @dirty="markInlineDirty" />
+        <div class="approval-side" :class="{ collapsed: sideCollapsed }">
+          <div class="as-side-title" @click="sideCollapsed = !sideCollapsed">
+            <span v-if="!sideCollapsed">{{ tt(panelName) }}</span>
+            <span class="as-side-toggle">{{ sideCollapsed ? '◀' : '▶' }}</span>
+          </div>
+          <template v-if="!sideCollapsed">
+            <div class="as-side-status-row">
+              <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
+            </div>
+            <div class="as-side-pager">
+              <span class="page-btn" :title="tt('首页')" @click="pageFirst">◁</span>
+              <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
+              <span class="page-no">{{ pageText(curNo, total, '张') }}</span>
+              <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
+              <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
+            </div>
+            <div class="as-side-btns">
+              <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板) -->
+              <div class="as-side-btn" @click="docQueryVisible = true">{{ tt('查询单据') }}</div>
+              <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回) -->
+              <div class="as-side-del" v-if="isApprovalDoc">
+                <div class="as-side-btn-row">
+                  <div class="as-side-btn" style="flex: 1" @click="onSideAction('删除')">{{ tt('删除') }}</div>
+                  <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openDelMenu = !openDelMenu">▼</div>
+                </div>
+                <div v-if="openDelMenu" class="as-side-menu" @click.stop>
+                  <div class="as-side-menu-item" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
+                  <template v-if="canApproveHere()">
+                    <div class="as-side-menu-item" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
+                    <div class="as-side-menu-item" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
+                  </template>
+                </div>
+              </div>
+              <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改态出「提交审批」,审批中出管理员审批;修改记录弹窗(滚动3条) -->
+              <div class="as-side-del" v-if="isProdFilePanel">
+                <div class="as-side-btn-row">
+                  <div class="as-side-btn" style="flex: 1" :class="{ disabled: !canModifyReq }" @click="pickModAction('申请修改')">{{ tt('申请修改') }}</div>
+                  <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openModMenu = !openModMenu">▼</div>
+                </div>
+                <div v-if="curDocStatus === '修改中'" class="as-side-btn" @click="pickModAction('提交审批')">{{ tt('提交审批') }}</div>
+                <div v-if="openModMenu" class="as-side-menu" @click.stop>
+                  <template v-if="canApproveHere()">
+                    <template v-if="curDocStatus === '修改申请中'">
+                      <div class="as-side-menu-item" @click="pickModAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
+                      <div class="as-side-menu-item" @click="pickModAction('修改审批驳回')">{{ tt('修改审批驳回') }}</div>
+                    </template>
+                    <template v-else-if="curDocStatus === '审批中'">
+                      <div class="as-side-menu-item" @click="pickModAction('审批通过')">{{ tt('审批通过') }}</div>
+                      <div class="as-side-menu-item" @click="pickModAction('审批驳回')">{{ tt('审批驳回') }}</div>
+                    </template>
+                  </template>
+                  <div class="as-side-menu-item" @click="pickModAction('审批情况')">{{ tt('审批情况') }}</div>
+                </div>
+              </div>
+              <div class="as-side-btn" v-if="isProdFilePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
+              <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
+                <div
+                  class="as-side-btn"
+                  :class="{ disabled: isDisabled(btnName(g)) }"
+                  @click="onSideAction(btnName(g))"
+                >{{ tt(btnName(g)) }}</div>
+                <div
+                  v-for="a in dropItems(g)"
+                  :key="a"
+                  class="as-side-btn sub"
+                  :class="{ disabled: isDisabled(a) }"
+                  @click="onSideAction(a)"
+                >{{ tt(a) }}</div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </div>
+    </template>
     <div v-else class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
       <div class="field" v-for="field in headerFields" :key="headerFieldKey(field)">
         <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}</label>
@@ -242,6 +357,25 @@
             :align="column.align"
             show-overflow-tooltip
           >
+            <template #default="{ row }">
+              <template v-if="isStockStatus && column.prop === '预警数量'">
+                <el-input-number
+                  v-if="warnEdit.id === row.id"
+                  ref="warnEditRef"
+                  v-model="warnEdit.value"
+                  :controls="false"
+                  :min="0"
+                  :precision="0"
+                  size="small"
+                  class="warn-input"
+                  @keyup.enter="saveWarnEdit"
+                  @keyup.esc="warnEdit.id = null"
+                  @blur="saveWarnEdit"
+                />
+                <span v-else class="warn-editable" :title="tt('点击修改预警数量，留空使用默认阈值50')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
+              </template>
+              <span v-else>{{ row[column.prop] }}</span>
+            </template>
             <template #header>
               <div class="report-col-container">
                 <span class="report-col-title">{{ tt(column.label) }}</span>
@@ -266,7 +400,7 @@
       </el-table>
     </div>
 
-    <div v-else class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading && !isBomMasterPanel">
+    <div v-else-if="!isApprovalDoc" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading && !isBomMasterPanel">
       <!-- ══════════ 物料清单专用：父件表格 + 子件表格联动（BOM/BOM_FWD/BOM_REV） ══════════ -->
       <BomMasterDetail
         v-if="isBomMasterPanel"
@@ -571,6 +705,91 @@
     <SubBomDialog v-model="subBomVisible" :material="subBomMaterial" :bom="subBomBom" />
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
+    <!-- 修改记录弹窗:滚动3条(字段变化/补充/清空 + 明细变化摘要) -->
+    <el-dialog v-model="modifyLogVisible" :title="tt('修改记录') + ' · ' + modifyLogNo" width="720px" append-to-body>
+      <div v-if="!modifyLogRecords.length" class="mod-log-empty">{{ tt('暂无修改记录') }}</div>
+      <div v-else class="mod-log-list">
+        <div v-for="(r, ri) in modifyLogRecords" :key="ri" class="mod-log-card">
+          <div v-if="!r.rearchiveAt" class="mod-log-open">{{ tt('修改进行中——内容随保存实时更新，再归档审批后定格') }}</div>
+          <div class="mod-log-head">
+            <span class="mod-log-seq">{{ tt('第') }} {{ modifyLogRecords.length - ri }} {{ tt('次修改') }}</span>
+            <span>{{ tt('申请') }}：{{ r.applyBy || '-' }} {{ r.applyAt || '' }}</span>
+            <span>{{ tt('修改审批') }}：{{ r.approveBy || '-' }} {{ r.approveAt || '' }}</span>
+            <span>{{ tt('再归档') }}：{{ r.rearchiveBy || '-' }} {{ r.rearchiveAt || tt('未归档') }}</span>
+          </div>
+          <table v-if="(r.changes || []).length" class="mod-log-table">
+            <thead><tr><th style="width:70px">{{ tt('类型') }}</th><th style="width:140px">{{ tt('字段') }}</th><th>{{ tt('原内容') }}</th><th>{{ tt('新内容') }}</th></tr></thead>
+            <tbody>
+              <tr v-for="(c, ci) in r.changes" :key="ci">
+                <td><span class="mod-kind" :class="String(c.kind)">{{ tt(String(c.kind)) }}</span></td>
+                <td>{{ c.label }}</td>
+                <td class="mod-old">{{ c.old || '—' }}</td>
+                <td class="mod-new">{{ c.new || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="mod-log-nodata">{{ tt('本次修改未变更头字段') }}</div>
+          <div v-if="r.changeMeta && (r.changeMeta.addedRows || r.changeMeta.removedRows || r.changeMeta.changedRows)" class="mod-log-meta">
+            {{ tt('明细变化') }}：{{ tt('新增') }} {{ r.changeMeta.addedRows || 0 }} {{ tt('行') }} / {{ tt('删除') }} {{ r.changeMeta.removedRows || 0 }} {{ tt('行') }} / {{ tt('修改') }} {{ r.changeMeta.changedRows || 0 }} {{ tt('行') }}
+            <span v-if="(r.changeMeta.addedSamples || []).length">（{{ tt('新增') }}：{{ r.changeMeta.addedSamples.join('、') }}{{ (r.changeMeta.addedRows || 0) > (r.changeMeta.addedSamples || []).length ? ' …' : '' }}）</span>
+            <span v-if="(r.changeMeta.removedSamples || []).length">（{{ tt('删除') }}：{{ r.changeMeta.removedSamples.join('、') }}{{ (r.changeMeta.removedRows || 0) > (r.changeMeta.removedSamples || []).length ? ' …' : '' }}）</span>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
+    <!-- 查询单据弹窗(文件面板):编号模糊(单据编号/文档编号) + 首次归档时间区间 -->
+    <el-dialog v-model="docQueryVisible" :title="tt('查询单据')" width="480px" append-to-body>
+      <div class="dq-form">
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('编号') }}</span>
+          <el-input v-model="docQueryNo" clearable :placeholder="tt('单据编号/文档编号模糊匹配')" @keyup.enter="applyDocQuery" />
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('归档时间') }}</span>
+          <el-date-picker v-model="docQueryRange" type="daterange" value-format="YYYY-MM-DD" :start-placeholder="tt('起')" :end-placeholder="tt('止')" style="width: 100%" />
+        </div>
+        <div class="dq-tip">{{ tt('按首次归档时间过滤；草稿未归档不计入区间') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="clearDocQuery">{{ tt('清空') }}</el-button>
+        <el-button type="primary" @click="applyDocQuery">{{ tt('查询') }}</el-button>
+      </template>
+    </el-dialog>
+    <!-- 新增库存弹窗(库存状况):存货/仓库按编码校验基础档案,期初现存量+预警数量 -->
+    <el-dialog v-model="stockAddVisible" :title="tt('新增库存')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('存货编码') }}</span>
+          <el-input v-model="stockAddForm['存货编码']" :placeholder="tt('基础档案·存货中的编码，如 CL001')" />
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('仓库') }}</span>
+          <el-select v-model="stockAddForm['仓库']" style="width: 100%" filterable :placeholder="tt('选择仓库（基础档案·仓库）')">
+            <el-option v-for="w in warehouseOptions" :key="w.code" :label="`${w.name}（${w.code}）`" :value="w.code" />
+          </el-select>
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('批号') }}</span>
+          <el-input v-model="stockAddForm['批号']" :placeholder="tt('可留空')" />
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('入库日期') }}</span>
+          <el-date-picker v-model="stockAddForm['入库日期']" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('现存量') }}</span>
+          <el-input-number v-model="stockAddForm['现存量']" :min="0" :precision="2" style="width: 100%" />
+        </div>
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('预警数量') }}</span>
+          <el-input-number v-model="stockAddForm['预警数量']" :min="0" :precision="0" style="width: 100%" :placeholder="tt('留空使用默认阈值50')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="stockAddVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="stockAdding" @click="submitStockAdd">{{ tt('确定') }}</el-button>
+      </template>
+    </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <VoucherFormDialog v-model="formVisible" :panel-code="formPanel || panelCode" :code="formCode" @saved="onFormSaved" />
@@ -645,6 +864,7 @@ import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
+import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
 import RefPickDialog from './RefPickDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
@@ -652,6 +872,12 @@ import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import SubBomDialog from './SubBomDialog.vue'
 import BomMasterDetail from './BomMasterDetail.vue'
+import DocSheet from './DocSheet.vue'
+import ProgressControlSheet from './ProgressControlSheet.vue'
+import DataRecordSheet from './DataRecordSheet.vue'
+import RecordSheetPanels from './RecordSheetPanels.vue'
+import { recordSheetConfigs } from './recordSheetConfigs'
+import { approvalSheetCfg, planSheetCfg } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import VoucherFormDialog from './VoucherFormDialog.vue'
@@ -680,6 +906,11 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 
 // 物料清单维护和正反向查询统一使用父件/子件主从视图；仅 BOM 草稿开放编辑。
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
+// 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
+const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
+const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', ...RECORD_SHEET_PANELS].includes(String(panelCode.value)))
+const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
+const docSheetConfig = computed(() => (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
 const bomMasterRows = computed(() => {
   if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
   return list.value || [] // BOM_FWD/BOM_REV：后端返回的展平行（父件-子件对）
@@ -1043,6 +1274,177 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
+// 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
+const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审']
+// 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
+const openDelMenu = ref(false)
+
+// ---------- 修改组(产品文件 7 面板):归档后申请修改(管理员审批进入修改态)+ 修改记录(滚动3条) ----------
+const PROD_FILE_PANELS = ['RD_PROD_INFO', 'RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_BOM', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+
+/** 审批权限:管理员,或角色对该面板勾了审批(approvePanels,后端 can_approve 口径) */
+function canApproveHere() {
+  const ap = user.approvePanels || []
+  return user.isAdmin || ap.includes('*') || ap.includes(String(panelCode.value))
+}
+
+// ---------- 文件面板查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间 ----------
+const docQueryVisible = ref(false)
+const docQueryNo = ref('')
+const docQueryRange = ref(null)
+
+// ---------- 库存状况:仓库下拉(_ckdm 按仓库编码精确过滤;dm_ck 字典改名不影响绑定) ----------
+const stockWh = ref('')
+const warehouseOptions = ref([])
+const isStockStatus = computed(() => String(panelCode.value) === 'STOCK_STATUS')
+watch(isStockStatus, async (v) => {
+  if (!v || warehouseOptions.value.length) return
+  try {
+    const res = await request.get('/base/warehouse/list')
+    warehouseOptions.value = res?.data || []
+  } catch {
+    warehouseOptions.value = []
+  }
+}, { immediate: true })
+function onStockWhChange(v) {
+  if (v) condition['_ckdm'] = v
+  else delete condition['_ckdm']
+  search()
+}
+
+// ---------- 新增库存(库存状况):存货/仓库按编码绑定基础档案,期初现存量+预警数量 ----------
+const stockAddVisible = ref(false)
+const stockAdding = ref(false)
+const stockAddForm = reactive({ 存货编码: '', 仓库: '', 批号: '', 入库日期: '', 现存量: 0, 预警数量: null })
+function openStockAdd() {
+  stockAddForm['存货编码'] = ''
+  stockAddForm['仓库'] = ''
+  stockAddForm['批号'] = ''
+  stockAddForm['入库日期'] = todayStr()
+  stockAddForm['现存量'] = 0
+  stockAddForm['预警数量'] = 50
+  stockAddVisible.value = true
+}
+async function submitStockAdd() {
+  stockAdding.value = true
+  try {
+    await engine.callButton({
+      panelCode: 'STOCK_STATUS',
+      buttonName: '新增库存',
+      formData: { ...stockAddForm, 预警数量: stockAddForm['预警数量'] ?? '' },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('库存已新增'))
+    stockAddVisible.value = false
+    load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('新增失败'))
+  } finally {
+    stockAdding.value = false
+  }
+}
+
+// ---------- 预警数量行内编辑(库存状况):点击变输入框,回车/失焦保存,Esc 取消 ----------
+const warnEdit = reactive({ id: null, value: null })
+const warnEditRef = ref(null)
+watch(() => warnEdit.id, async (v) => {
+  if (v == null) return
+  await nextTick()
+  const el = warnEditRef.value
+  if (el && typeof el.focus === 'function') el.focus()
+})
+function startWarnEdit(row) {
+  warnEdit.id = row.id
+  warnEdit.value = row['预警数量'] == null || row['预警数量'] === '' ? null : Number(row['预警数量'])
+}
+async function saveWarnEdit() {
+  if (warnEdit.id == null) return
+  const id = warnEdit.id
+  const val = warnEdit.value
+  warnEdit.id = null
+  try {
+    await engine.callButton({
+      panelCode: 'STOCK_STATUS',
+      buttonName: '更新预警数量',
+      formData: { id, 预警数量: val == null ? '' : String(val) },
+      buttonParam: {},
+    })
+    const row = (reportList.value || list.value).find((r) => r.id === id)
+    if (row) row['预警数量'] = val == null ? null : val
+    ElMessage.success(tt('预警数量已更新'))
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('更新失败'))
+    load()
+  }
+}
+
+async function applyDocQuery() {
+  condition['_docNo'] = docQueryNo.value || ''
+  const r = docQueryRange.value || []
+  condition['_archFrom'] = r[0] || ''
+  condition['_archTo'] = r[1] || ''
+  docQueryVisible.value = false
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+  if (!list.value.length) {
+    // 零匹配:自动恢复全部单据,避免停留在空白视图
+    delete condition['_docNo']
+    delete condition['_archFrom']
+    delete condition['_archTo']
+    ElMessage.warning(tt('未查询到匹配单据，已恢复全部单据'))
+    await load()
+    return
+  }
+  const firstNo = list.value[0]?.['单据编号'] || list.value[0]?.['编号'] || ''
+  ElMessage.success(`${tt('查询到')} ${total.value} ${tt('张')}，${tt('已跳转到')}：${firstNo}`)
+}
+
+function clearDocQuery() {
+  docQueryNo.value = ''
+  docQueryRange.value = null
+  delete condition['_docNo']
+  delete condition['_archFrom']
+  delete condition['_archTo']
+  docQueryVisible.value = false
+  search()
+}
+const isProdFilePanel = computed(() => PROD_FILE_PANELS.includes(String(panelCode.value)))
+const openModMenu = ref(false)
+const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
+const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocStatus.value))
+const modifyLogVisible = ref(false)
+const modifyLogRecords = ref([])
+const modifyLogNo = ref('')
+
+function pickModAction(action) {
+  openModMenu.value = false
+  onSideAction(action)
+}
+
+function safeParseJson(s) {
+  try { return JSON.parse(s) } catch { return null }
+}
+
+async function openModifyLog() {
+  if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+  const no = current.value['编号'] || current.value['单据编号'] || ''
+  try {
+    const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '修改记录', formData: { 编号: no }, buttonParam: {} })
+    modifyLogNo.value = no
+    modifyLogRecords.value = (res?.records || []).map((r) => ({
+      ...r,
+      changes: typeof r.changes === 'string' ? (safeParseJson(r.changes) || []) : (r.changes || []),
+      changeMeta: typeof r.changeMeta === 'string' ? (safeParseJson(r.changeMeta) || {}) : (r.changeMeta || {}),
+    }))
+    modifyLogVisible.value = true
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('查询失败'))
+  }
+}
+const approvalSideGroups = computed(() => toolbarGroups.value
+  .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => !APPROVAL_SIDE_EXCLUDE.includes(a)) }))
+  .filter((g) => (g.actions || []).length && !(g.actions || []).includes('删除')))
 const headerFields = computed(() => {
   const fields = (cfgCache.value?.dataSchema?.fields || []).filter((field) => !field.hidden)
   const names = cfgCache.value?.metadata?.panelPageDto?.formPages?.[0]?.fieldNames
@@ -1050,6 +1452,12 @@ const headerFields = computed(() => {
   const ordered = String(names).split(',').map((name) => name.trim()).filter(Boolean)
   const byName = new Map(fields.map((field) => [headerFieldKey(field), field]))
   return ordered.map((name) => byName.get(name)).filter(Boolean)
+})
+/** RecordSheetPanels 专用:表头字段 + 明细字段(数据表列的 alias 从明细字段元数据取) */
+const sheetAllFields = computed(() => {
+  const header = headerFields.value || []
+  const detail = cfgCache.value?.detail?.tabs?.[0]?.fields || []
+  return [...header, ...detail]
 })
 const queryDialogFields = computed(() => {
   const fields = reportMode.value ? queryFields.value : headerFields.value
@@ -1059,6 +1467,8 @@ const draftEditable = computed(() => {
   if (reportMode.value || ['BOM_FWD', 'BOM_REV'].includes(String(panelCode.value))) return false
   const st = cur.value?.['单据状态']
   if (st === '草稿') return true
+  // 修改态(文件类:申请修改经管理员审批通过):可编辑,保存不再自动归档,走再审批
+  if (st === '修改中') return true
   // 档案/单单据面板（存货档案、员工、部门、工艺路线等）：启用/停用状态列表页同样内联可编辑（2026-08-24）
   if ((cfgCache.value?.metadata?.singleDoc || cfgCache.value?.metadata?.panelCategory === '设置') && (st === '启用' || st === '停用')) return true
   return false
@@ -1113,6 +1523,34 @@ const cur = computed(() => {
   return l[Math.min(curIdx.value, l.length - 1)]
 })
 const curNo = computed(() => (list.value.length ? Math.min(curIdx.value, list.value.length - 1) + 1 : 0))
+
+// 文书默认值:新建起草时 申请立项人=当前用户 / 申请立项日期=今天(用户可改,不置脏)
+// 注意:watch getter 在 setup 时立即求值,必须位于 draftEditable/cur 定义之后
+function todayStr() {
+  const d = new Date()
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+}
+watch(
+  () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
+  () => {
+    if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
+    if (panelCode.value === 'RD_APPROVAL') {
+      if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
+      if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
+      if (!cur.value['文件管理人']) cur.value['文件管理人'] = '陈秀丽'
+    } else if (panelCode.value === 'RD_PLAN') {
+      if (!cur.value['文件管理人']) cur.value['文件管理人'] = '陈秀丽'
+    } else if (panelCode.value === 'RD_PROGRESS') {
+      // 原图默认值:使用范围=工程技术中心(项目名称/层级在行级,新增项目时行内默认)
+      if (!cur.value['文件使用范围']) cur.value['文件使用范围'] = '工程技术中心'
+    } else if (panelCode.value === 'RD_FILTER_EFF') {
+      // 数据记录表默认:密级=保密,适用范围=银嘉内部,测试主题=样板标题(可改)
+      if (!cur.value['密级']) cur.value['密级'] = '保密'
+      if (!cur.value['适用范围']) cur.value['适用范围'] = '银嘉内部'
+      if (!cur.value['测试主题']) cur.value['测试主题'] = '伊可普需求2炭棒除VOC测试'
+    }
+  },
+)
 
 watch(cur, (v) => {
   current.value = v
@@ -1369,6 +1807,8 @@ function blockCols(b) {
 }
 
 const showFooter = computed(() => {
+  // 文书式面板(立项申请):不按表头/表中/表尾三段式,页脚(备注+审核行)整体隐藏
+  if (isApprovalDoc.value) return false
   const cfg = cfgCache.value
   return cfg?.metadata?.panelCategory === '单据' || (cfg?.detail?.tabs || []).length > 0
 })
@@ -1441,6 +1881,7 @@ function onCtx(ev, row, b) {
 function closeCtx() {
   ctx.visible = false
   openGroup.value = -1
+  openDelMenu.value = false
 }
 
 // ---------- 审批按钮权限（提交审批/审批情况公开；审批通过/驳回需角色审批权限） ----------
@@ -1473,6 +1914,45 @@ function onGroupAction(a) {
   // 2026-08-25：灰按钮（如草稿态「生成XX」）点击不执行、不弹提示
   if (isDisabled(a)) return
   onButton(a)
+}
+
+// 文书面板右侧操作栏:默认展开,可收纳(收起为窄条,点击标题切换)
+const sideCollapsed = ref(false)
+// ══════════ 文书式面板:导出 = 整张文书打印/存PDF(浏览器原生,所见即所得) ══════════
+const approvalSheetRef = ref(null)
+/** 删除组下拉动作:收起菜单后走统一入口(删除带整单确认) */
+function pickDelAction(a) {
+  openDelMenu.value = false
+  onSideAction(a)
+}
+function onSideAction(a) {
+  // 导出:控制列表=完整 Excel(全字段+全数据);其它文书面板=整张打印(可存 PDF)
+  if (isApprovalDoc.value && a === '导出') {
+    if (panelCode.value === 'RD_PROGRESS') {
+      const sheet = approvalSheetRef.value
+      if (sheet && typeof sheet.exportProgressExcel === 'function') {
+        sheet.exportProgressExcel()
+        return
+      }
+    }
+    printApprovalSheet()
+    return
+  }
+  // 删除确认与整单语义统一在 onButton(isApprovalDoc 分支)处理
+  if (isDisabled(a)) return
+  onButton(a)
+}
+async function printApprovalSheet() {
+  if (!approvalSheetRef.value) return
+  // 打印样式(approval-printing):只打印文书纸张,隐藏侧栏/其它页面元素
+  document.body.classList.add('approval-printing')
+  const restore = () => {
+    document.body.classList.remove('approval-printing')
+    window.removeEventListener('afterprint', restore)
+  }
+  window.addEventListener('afterprint', restore)
+  // 等样式生效后调打印预览(用户可另存为 PDF 或打印)
+  setTimeout(() => window.print(), 150)
 }
 
 async function copyActive() {
@@ -1797,11 +2277,20 @@ function validateInlineDraft() {
     if (validation) return validation
   }
   for (const field of headerFields.value) {
-    if (field.isRequired && emptyFieldValue(cur.value[headerFieldKey(field)])) {
+    const key = headerFieldKey(field)
+    if (field.isRequired && emptyFieldValue(cur.value[key])) {
+      // 系统字段:单据日期默认今天、单据编号由后端自动生成、规格书种类为页签分类(旧草稿可能为空)
+      if (key === '单据日期') {
+        cur.value[key] = todayStr()
+        continue
+      }
+      if (key === '单据编号' || key === '规格书种类') continue
       return `${headerFieldLabel(field)}不能为空`
     }
   }
   for (const tab of cfgCache.value?.detail?.tabs || []) {
+    // BOM 面板:子件关系由 BomMasterDetail.validate 校验(锚点行 子件编码='' 合法),跳过通用逐行校验
+    if (panelCode.value === 'BOM' && tab.key === 'children') continue
     const rows = cur.value.detail?.[tab.key] || []
     if (tab.isRequired && !rows.length) return `请至少添加一行${tab.label || '明细'}`
     for (let index = 0; index < rows.length; index++) {
@@ -1817,13 +2306,15 @@ function validateInlineDraft() {
 
 async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false } = {}) {
   if (!draftEditable.value || inlineSaving.value) return false
-  // 「保存」执行校验;「保存为草稿」=暂存,不校验(未完成的数据也可落库)
-  if (!skipValidation) {
-    const validation = validateInlineDraft()
-    if (validation) {
-      ElMessage.warning(validation)
-      return false
+  const validation = validateInlineDraft()
+  if (validation) {
+    ElMessage.warning(validation)
+    // 文书面板(RecordSheetPanels/DocSheet/DataRecordSheet):自动定位缺失字段(翻页/滚动/闪烁);仅必填触发
+    if (approvalSheetRef.value?.focusField) {
+      const label = validation.replace(/第\s*\d+\s*行/g, '').match(/^(.+?)不能为空/)?.[1] || ''
+      approvalSheetRef.value.focusField(String(label).trim())
     }
+    return false
   }
   for (const tab of cfgCache.value?.detail?.tabs || []) {
     for (const row of cur.value.detail?.[tab.key] || []) calculateDetailRow(tab.key, row)
@@ -1863,6 +2354,7 @@ async function expandBomMaterials(detail, productRows) {
     const bom = []
     for (const d of res.list || []) {
       for (const it of (d.detail && d.detail.children) || []) {
+        if (!String(it['子件编码'] || '').trim()) continue // 锚点行(暂无子件的父件占位)不参与展开
         const parent = String(it['父件编码'] || '')
         if (!parent || !productRows.some((r) => String(r['产品编码'] || '') === parent)) continue
         bom.push({
@@ -2234,7 +2726,7 @@ function isDisabled(action) {
     取消中止: !current.value || st !== '已中止',
     修改: !current.value || !['已审核', '生产中', '已完工'].includes(st),
     审批情况: false,
-    提交审批: !current.value || st !== '草稿',
+    提交审批: !current.value || (st !== '草稿' && st !== '修改中'),
     审批通过: !current.value || st !== '审批中',
     审批驳回: !current.value || st !== '审批中',
    驳回审批: !current.value || st !== '审批中',
@@ -2289,17 +2781,8 @@ function onFormSaved() {
 //   新增未保存过的占位单 → 撤回(防垃圾空单残留);已保存单据的未保存修改 → 随 load 放弃。
 async function directAdd() {
   try {
-    // 静默剔除当前未保存内容
-    if (isFreshAddedDoc() && cur.value?.['编号']) {
-      try {
-        await engine.callButton({ panelCode: panelCode.value, buttonName: '删除', formData: { 编号: cur.value['编号'] }, buttonParam: {} })
-        clearFreshDraft(cur.value['编号'])
-      } catch { /* 撤回失败不阻断新增 */ }
-    }
-    inlineDirtyFlag.value = false
-    freshAdded.value = false
-    freshAddedNo.value = ''
-    const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData: {}, buttonParam: {} })
+    const formData = {}
+    const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData, buttonParam: {} })
     const no = res && (res['编号'] || res.formNo)
     if (!no) return ElMessage.error('新增失败：未返回单据编号')
     await load() // 刷新列表
@@ -2334,39 +2817,10 @@ const freshAddedNo = ref('') // freshAdded 绑定的单据编号:撤回只允许
 /** 变更钩子置脏(表头/明细控件 @change;对真实交互可靠)——快照对比作兜底 */
 const inlineDirtyFlag = ref(false)
 function markInlineDirty() { if (draftEditable.value) inlineDirtyFlag.value = true }
-/** 「新增未保存」标记持久化(按面板+单号):页面刷新/重进后 directAdd 草稿仍可被守卫识别与撤回 */
-function freshDraftKey(no) {
-  return `mes_fresh_draft:${panelCode.value}:${no}`
-}
-function markFreshDraft(no) {
-  try { localStorage.setItem(freshDraftKey(no), '1') } catch { /* 存储不可用时仅会话内生效 */ }
-}
-function clearFreshDraft(no) {
-  try { localStorage.removeItem(freshDraftKey(no)) } catch { /* 同上 */ }
-}
-/** 当前是否为「directAdd 新建且尚未保存过」的那一张(会话内标记或持久化标记命中) */
-function isFreshAddedDoc() {
-  if (!draftEditable.value || !cur.value) return false
-  const no = cur.value['编号']
-  if (!no) return false
-  if (freshAdded.value && no === freshAddedNo.value) return true
-  try { return localStorage.getItem(freshDraftKey(no)) === '1' } catch { return false }
-}
-/** 当前单据的「已保存基线」是否为空白草稿(判定取基线而非工作区,临时改动不影响撤回判定) */
-const savedBlankDraft = ref(false)
-/** 「空白草稿」内容判定:明细所有数值列全为 0/空(典型=新增后未填写被遗留的单据,单表式面板
- * 后端写入的占位行也命中)。数值全 0 = 没有任何实质收发内容,「不保存」撤回整单不会丢失实质数据。
- * 单单据档案面板不适用(空档案是常态);明细无数值列的面板无法判定,不启用。 */
-function isBlankDraftContent(detail) {
-  if (cfgCache.value?.metadata?.singleDoc) return false
-  const tabs = cfgCache.value?.detail?.tabs || []
-  if (!tabs.length) return false
-  const numericCols = tabs.flatMap((t) => (t.fields || [])
-    .filter((f) => f.dataType === '小数' || f.dataType === '整数')
-    .map((f) => f.dataName))
-  if (!numericCols.length) return false
-  const blankVal = (v) => v === undefined || v === null || String(v).trim() === '' || Number(v) === 0
-  return tabs.every((t) => (detail?.[t.key] || []).every((row) => numericCols.every((n) => blankVal(row[n]))))
+/** 字段编辑保存后刷新面板配置(yj_field 别名随配置接口重新下发) */
+async function onFieldEditRefresh() {
+  cfgCache.value = null
+  await load()
 }
 
 /** 记录"已保存"基线快照（load 完成/保存成功后调用） */
@@ -2635,6 +3089,30 @@ async function onButton(action) {
     openColPrefs()
     return
   }
+  // 文件类面板(文书式):「删除」= 整单删除(草稿直接作废;已归档提交删除申请,管理员审批)
+  if (isApprovalDoc.value && (action === '删除' || action === '删除单据')) {
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+    const no = current.value['编号'] || current.value['单据编号'] || ''
+    try {
+      await ElMessageBox.confirm(
+        `${tt('确定删除整张单据？')}（${tt('草稿')}${tt('直接作废')}；${tt('已归档')}${tt('需管理员审批通过后删除')}）`,
+        tt('删除确认'),
+        { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
+      )
+    } catch (e) {
+      return
+    }
+    try {
+      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '删除', formData: { 编号: no }, buttonParam: {} })
+      ElMessage.success(res?.['单据状态'] === '删除申请中' ? `${no} 删除申请已提交，待管理员审核` : `${no} 已删除`)
+      delMode.value = false
+      delSel.value = []
+      load()
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || '删除失败')
+    }
+    return
+  }
   if (action === '删除单据') {
     if (!current.value) return ElMessage.warning('请先选择一行数据')
     const no = current.value['编号'] || current.value['单据编号'] || ''
@@ -2730,8 +3208,12 @@ async function onButton(action) {
     let approvalOpinion = ''
     if (action === '提交审批' || action === '审批通过') {
       if (!current.value) return ElMessage.warning('请先选择一行数据')
-      const need = action === '提交审批' ? '草稿' : '审批中'
-      if (current.value['单据状态'] !== need) return ElMessage.warning(action === '提交审批' ? '仅草稿状态可提交审批' : '仅审批中状态可审批通过')
+      // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过仅审批中
+      if (action === '提交审批') {
+        if (!['草稿', '修改中'].includes(current.value['单据状态'])) return ElMessage.warning('仅草稿或修改中状态可提交审批')
+      } else if (current.value['单据状态'] !== '审批中') {
+        return ElMessage.warning('仅审批中状态可审批通过')
+      }
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
         const { value } = await ElMessageBox.prompt(
@@ -2880,6 +3362,7 @@ function search() {
 function reset() {
   Object.keys(condition).forEach((k) => delete condition[k])
   query.keyword = ''
+  if (isStockStatus.value) stockWh.value = ''
   search()
 }
 
@@ -3002,6 +3485,7 @@ async function loadSubBomMap() {
     const map = {}
     for (const d of res.list || []) {
       for (const it of (d.detail && d.detail.children) || []) {
+        if (!String(it['子件编码'] || '').trim()) continue // 锚点行不参与
         const parent = it['父件编码']
         if (!parent) continue
         if (!map[parent]) map[parent] = []
@@ -3185,6 +3669,25 @@ onUnmounted(() => {
   font: inherit;
   cursor: pointer;
 }
+/* 库存状况:仓库下拉(工具栏内嵌) */
+.wh-filter {
+  width: 190px;
+  align-self: stretch;
+  margin: 3px 8px;
+}
+/* 预警数量行内编辑 */
+.warn-editable {
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+.warn-editable:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.warn-input {
+  width: 90px;
+}
 .toolbar-query-btn:hover {
   background: #e7eef8;
   color: #0d5bd3;
@@ -3288,6 +3791,135 @@ onUnmounted(() => {
   border: 1px solid #f3d9a6;
   background: #fffaf0;
 }
+.doc-status.已归档 {
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  background: #f3f4f6;
+}
+.doc-status.删除申请中 {
+  color: #b91c1c;
+  border: 1px solid #f3c1c1;
+  background: #fef2f2;
+}
+.doc-status.修改申请中 {
+  color: #b45309;
+  border: 1px solid #f3d9a6;
+  background: #fffbeb;
+}
+.doc-status.修改中 {
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+}
+/* 修改记录弹窗 */
+.mod-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.mod-log-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.mod-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+.mod-log-seq {
+  font-weight: 600;
+  color: #374151;
+}
+.mod-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.mod-log-table th,
+.mod-log-table td {
+  border: 1px solid #e5e7eb;
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-all;
+}
+.mod-log-table th {
+  background: #f3f4f6;
+  font-weight: 500;
+}
+.mod-old {
+  color: #9ca3af;
+}
+.mod-new {
+  color: #111827;
+}
+.mod-kind {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 18px;
+}
+.mod-kind.变化 {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+.mod-kind.补充 {
+  color: #047857;
+  background: #ecfdf5;
+}
+.mod-kind.清空 {
+  color: #b45309;
+  background: #fffbeb;
+}
+.mod-log-empty,
+.mod-log-nodata {
+  color: #9ca3af;
+  font-size: 13px;
+  padding: 8px 0;
+}
+.mod-log-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.mod-log-open {
+  margin-bottom: 8px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+/* 查询单据弹窗 */
+.dq-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.dq-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.dq-label {
+  flex: none;
+  width: 64px;
+  font-size: 13px;
+  color: #374151;
+  text-align: right;
+}
+.dq-tip {
+  font-size: 12px;
+  color: #9ca3af;
+  padding-left: 74px;
+}
 .page-btn {
   width: 24px;
   height: 24px;
@@ -3313,6 +3945,188 @@ onUnmounted(() => {
   color: #64748b;
   font-size: 12px;
   padding-right: 6px;
+}
+
+/* ═══════ 文书式面板:纸张自适应 + 右侧收纳式操作栏(系统风格,与单据头对齐) ═══════ */
+.approval-layout {
+  display: flex;
+  align-items: flex-start;
+  min-height: 560px;
+  padding-right: 0;
+}
+.approval-layout :deep(.approval-sheet),
+.approval-layout :deep(.progress-sheet) {
+  flex: 1;
+  min-width: 0;
+}
+.approval-side {
+  position: sticky;
+  top: 16px;
+  flex: none;
+  width: 176px;
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #fff;
+  border: 1px solid #d9dee7;
+  border-radius: 4px;
+  box-shadow: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+  transition: width 0.2s ease;
+}
+.approval-side.collapsed {
+  width: 34px;
+}
+.as-side-title {
+  background: #f2f4f7;
+  color: #303133;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid #d9dee7;
+  user-select: none;
+}
+.approval-side.collapsed .as-side-title {
+  padding: 9px 0;
+  justify-content: center;
+}
+.as-side-toggle {
+  font-size: 10px;
+  color: #7a869c;
+}
+.approval-side.collapsed .as-side-title .as-side-toggle {
+  font-size: 11px;
+}
+.as-side-status-row {
+  display: flex;
+  justify-content: center;
+  padding: 9px 12px 4px;
+}
+.as-side-pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px 11px;
+  border-bottom: 1px solid #e5ecf5;
+}
+.approval-side .page-btn {
+  border-radius: 6px;
+  border-color: #cfdced;
+  background: #fff;
+  color: #44608a;
+}
+.approval-side .page-btn:hover {
+  border-color: #2f6db8;
+  background: #eaf3ff;
+}
+.as-side-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 12px;
+}
+.as-side-btn {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid #d9dee7;
+  border-radius: 4px;
+  background: #fff;
+  color: #1c4f8a;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.15s ease;
+}
+.as-side-btn:hover {
+  background: #eef4ff;
+  border-color: #8fb4e0;
+  color: #0d5bd3;
+}
+.as-side-btn.sub {
+  background: transparent;
+  border: none;
+  color: #66788e;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+}
+.as-side-btn.sub:hover {
+  background: #eef4ff;
+}
+.as-side-btn.disabled {
+  color: #b9c2ce;
+  border-color: #e4ebf3;
+  background: #f4f6f9;
+  cursor: not-allowed;
+}
+.as-side-btn.disabled:hover {
+  color: #b9c2ce;
+  border-color: #e4ebf3;
+  background: #f4f6f9;
+}
+/* 删除组 + 下拉 */
+.as-side-del {
+  position: relative;
+}
+.as-side-btn-row {
+  display: flex;
+  gap: 5px;
+  align-items: stretch;
+}
+.as-side-caret {
+  width: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cfe0f2;
+  border-radius: 9px;
+  background: #fff;
+  color: #1c4f8a;
+  cursor: pointer;
+  user-select: none;
+  font-size: 9px;
+  box-shadow: 0 1px 3px rgba(28, 79, 138, 0.1);
+  transition: all 0.15s ease;
+}
+.as-side-caret:hover {
+  border-color: #2f6db8;
+  color: #0d5bd3;
+  background: #eaf3ff;
+}
+.as-side-menu {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  min-width: 156px;
+  background: #fff;
+  border: 1px solid #d9e6f5;
+  border-radius: 10px;
+  box-shadow: 0 8px 22px rgba(28, 79, 138, 0.18);
+  z-index: 30;
+  padding: 5px;
+}
+.as-side-menu-item {
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: #1c4f8a;
+  cursor: pointer;
+  border-radius: 7px;
+  white-space: nowrap;
+  transition: background 0.12s ease;
+}
+.as-side-menu-item:hover {
+  background: #eaf3ff;
 }
 
 /* ═══════ ② 表头字段区（label 在上、输入在下）═══════ */

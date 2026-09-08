@@ -34,9 +34,13 @@
     <div class="org-col users">
       <div class="col-head">
         <span class="col-title">{{ tt('用户（组织调整）') }}</span>
-        <el-button type="primary" size="small" @click="openUser()">{{ tt('新增用户') }}</el-button>
+        <span class="col-head-btns">
+          <el-button size="small" :disabled="!userSel.length" @click="batchRoleVisible = true">{{ tt('批量分配角色') }}({{ userSel.length }})</el-button>
+          <el-button type="primary" size="small" @click="openUser()">{{ tt('新增用户') }}</el-button>
+        </span>
       </div>
-      <el-table :data="users" size="small" border height="620" highlight-current-row @row-click="openUser">
+      <el-table :data="users" size="small" border height="620" highlight-current-row @row-click="openUser" @selection-change="onUserSel">
+        <el-table-column type="selection" width="38" :selectable="(row) => !row.isAdmin" />
         <el-table-column prop="userName" :label="tt('账号')" width="100" />
         <el-table-column prop="realName" :label="tt('姓名')" min-width="80" />
         <el-table-column :label="tt('部门')" min-width="110">
@@ -85,6 +89,13 @@
         <div class="perm-head">
           「{{ selRole.roleName }}」{{ tt('面板操作权限') }}
           <span class="perm-sub">{{ tt('（勾选对应操作权限;可见=能看到面板,其余为操作级别）') }}</span>
+          <span class="perm-copy">
+            {{ tt('复制自') }}
+            <el-select v-model="copyFromRoleId" size="small" style="width: 130px" clearable :placeholder="tt('选择角色')">
+              <el-option v-for="r in copyableRoles" :key="r.id" :label="r.roleName" :value="r.id" />
+            </el-select>
+            <el-button size="small" type="primary" plain :disabled="!copyFromRoleId" @click="copyRolePerms">{{ tt('复制权限') }}</el-button>
+          </span>
         </div>
         <div v-if="selRole.isAdmin" class="admin-tip">{{ tt('管理员为超级权限：默认拥有全部操作权限，无需配置。') }}</div>
         <template v-else>
@@ -106,60 +117,32 @@
                   <thead>
                     <tr>
                       <th class="pt-panel">{{ tt('面板') }}</th>
-                      <th v-for="act in permActions" :key="act[0]" class="pt-act" :data-col="act[0]" :title="tt(act[1])">
-                        <div class="pt-head">
-                          <span class="pt-head-txt">{{ tt(act[1]) }}</span>
-                          <el-dropdown trigger="click" placement="bottom-start" @command="(cmd) => onHeadCommand(cmd, act[0], g.panels)">
-                            <span class="pt-head-caret" :class="colStateClass(g.panels, act[0])" :title="tt('本列批量设置')" @click.stop>
-                              <span class="pt-head-mark">{{ colMark(g.panels, act[0]) }}</span>
-                              <el-icon class="pt-head-arrow"><ArrowDown /></el-icon>
-                            </span>
-                            <template #dropdown>
-                              <el-dropdown-menu>
-                                <el-dropdown-item command="all">
-                                  <span class="dd-mark">{{ colMark(g.panels, act[0]) === '✓' ? '✓' : '' }}</span>{{ tt('全选本列') }}
-                                </el-dropdown-item>
-                                <el-dropdown-item command="clear">
-                                  <span class="dd-mark">{{ colMark(g.panels, act[0]) === '−' ? '−' : '' }}</span>{{ tt('清空本列') }}
-                                </el-dropdown-item>
-                              </el-dropdown-menu>
-                              <div class="dd-count">{{ colCountText(g.panels, act[0]) }}</div>
-                            </template>
-                          </el-dropdown>
-                        </div>
-                      </th>
-                      <th class="pt-all" data-col="__all__" :title="tt('全选')">
-                        <div class="pt-head">
-                          <span class="pt-head-txt">{{ tt('全选') }}</span>
-                          <el-dropdown trigger="click" placement="bottom-start" @command="(cmd) => onHeadCommand(cmd, ALL_COL, g.panels)">
-                            <span class="pt-head-caret" :class="colStateClass(g.panels, ALL_COL)" :title="tt('本列批量设置')" @click.stop>
-                              <span class="pt-head-mark">{{ colMark(g.panels, ALL_COL) }}</span>
-                              <el-icon class="pt-head-arrow"><ArrowDown /></el-icon>
-                            </span>
-                            <template #dropdown>
-                              <el-dropdown-menu>
-                                <el-dropdown-item command="all">
-                                  <span class="dd-mark">{{ colMark(g.panels, ALL_COL) === '✓' ? '✓' : '' }}</span>{{ tt('全选本列') }}
-                                </el-dropdown-item>
-                                <el-dropdown-item command="clear">
-                                  <span class="dd-mark">{{ colMark(g.panels, ALL_COL) === '−' ? '−' : '' }}</span>{{ tt('清空本列') }}
-                                </el-dropdown-item>
-                              </el-dropdown-menu>
-                              <div class="dd-count">{{ colCountText(g.panels, ALL_COL) }}</div>
-                            </template>
-                          </el-dropdown>
-                        </div>
-                      </th>
+                      <th v-for="act in actsOf(g)" :key="act[0]" class="pt-act" :title="tt(act[1])">{{ tt(act[1]) }}</th>
+                      <th class="pt-all">{{ tt('全选') }}</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <PermRow
-                      v-for="r in g.panels"
-                      :key="r.panelCode"
-                      :row="r"
-                      :acts="permActions"
-                      @paint-down="onPaintDown"
-                    />
+                    <tr v-for="r in g.panels" :key="r.panelCode">
+                      <td class="pt-panel">{{ tt(r.panelName) }}</td>
+                      <td v-for="act in actsOf(g)" :key="act[0]" class="pt-act pt-sweep"
+                          @mousedown.prevent="rowHasAct(r, act[0]) && canAct(r, act[0]) && startSweep(r, act[0])"
+                          @mouseenter="rowHasAct(r, act[0]) && sweepOver(r, act[0])">
+                        <input
+                          v-if="rowHasAct(r, act[0])"
+                          type="checkbox"
+                          class="pt-cb"
+                          :checked="hasPerm(r, act[0])"
+                          :disabled="!canAct(r, act[0])"
+                        />
+                        <span v-else class="pt-na">—</span>
+                      </td>
+                      <td class="pt-all">
+                        <el-checkbox
+                          :model-value="isAllPerms(r)"
+                          @update:model-value="toggleAllPerms(r, $event)"
+                        />
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
@@ -173,6 +156,18 @@
         </template>
       </div>
     </div>
+
+    <!-- 批量分配角色 -->
+    <el-dialog v-model="batchRoleVisible" :title="tt('批量分配角色')" width="380px" append-to-body>
+      <div class="batch-tip">{{ tt('已选') }} {{ userSel.length }} {{ tt('个用户（管理员账号自动跳过）') }}</div>
+      <el-select v-model="batchRoleId" clearable style="width: 100%" :placeholder="tt('选择目标角色')">
+        <el-option v-for="r in roles.filter((x) => !x.isAdmin)" :key="r.id" :label="r.roleName" :value="r.id" />
+      </el-select>
+      <template #footer>
+        <el-button @click="batchRoleVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="applyBatchRole">{{ tt('确定') }}</el-button>
+      </template>
+    </el-dialog>
 
     <!-- 新增/编辑部门 -->
     <el-dialog v-model="deptVisible" :title="editingDept ? tt('编辑部门') : tt('新增部门')" width="360px" append-to-body>
@@ -245,7 +240,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { useUserStore } from '@/stores/user'
@@ -280,7 +275,51 @@ const groupedPanels = computed(() => {
   return other.panels.length ? buckets.concat(other) : buckets
 })
 
-// ---- 操作权限工具(11 项,行对象 permsSet 为 Set) ----
+// ---- 操作权限工具(行对象 permsSet 为 Set;动作集按行,文件面板 8 项/通用面板 11 项) ----
+/** 组内动作列 = 成员行动作集的并集(保序去重);同组混合时不适用的格显示 — */
+function groupActs(g) {
+  const seen = new Set()
+  const out = []
+  for (const r of g.panels) {
+    for (const a of r.actions || []) {
+      if (!seen.has(a[0])) { seen.add(a[0]); out.push(a) }
+    }
+  }
+  return out
+}
+function rowHasAct(row, code) {
+  return (row.actions || []).some((a) => a[0] === code)
+}
+/** 组内动作列缓存(computed 一次),避免每格每轮渲染重算并集导致卡顿 */
+const groupActsMap = computed(() => {
+  const m = {}
+  for (const g of groupedPanels.value) m[g.code] = groupActs(g)
+  return m
+})
+function actsOf(g) {
+  return groupActsMap.value[g.code] || []
+}
+/** 该格可操作:可见列恒可操作,其余需先勾可见 */
+function canAct(row, code) {
+  return code === 'view' || hasPerm(row, 'view')
+}
+// ---------- 滑动勾选:按下即切换,按住拖过多格批量套用同一状态 ----------
+const sweeping = ref(false)
+const sweepMode = ref(true)
+function startSweep(row, code) {
+  sweeping.value = true
+  sweepMode.value = !hasPerm(row, code)
+  togglePerm(row, code, sweepMode.value)
+}
+function sweepOver(row, code) {
+  if (!sweeping.value || !canAct(row, code)) return
+  if (hasPerm(row, code) !== sweepMode.value) togglePerm(row, code, sweepMode.value)
+}
+function stopSweep() {
+  sweeping.value = false
+}
+onMounted(() => window.addEventListener('mouseup', stopSweep))
+onUnmounted(() => window.removeEventListener('mouseup', stopSweep))
 function hasPerm(row, code) {
   return row.permsSet ? row.permsSet.has(code) : false
 }
@@ -295,18 +334,18 @@ function togglePerm(row, code, val) {
   }
 }
 function isAllPerms(row) {
-  return permActions.value.length > 0 && permActions.value.every((a) => row.permsSet && row.permsSet.has(a[0]))
+  return (row.actions || []).length > 0 && row.actions.every((a) => row.permsSet && row.permsSet.has(a[0]))
 }
 function toggleAllPerms(row, val) {
   if (val) {
-    row.permsSet = new Set(permActions.value.map((a) => a[0]))
+    row.permsSet = new Set(row.actions.map((a) => a[0]))
   } else {
     row.permsSet = new Set()
   }
 }
 function setGroupPerms(g, mode) {
   for (const r of g.panels) {
-    if (mode === 'all') r.permsSet = new Set(permActions.value.map((a) => a[0]))
+    if (mode === 'all') r.permsSet = new Set(r.actions.map((a) => a[0]))
     else r.permsSet = new Set()
   }
   refreshHeadMarks()
@@ -627,6 +666,54 @@ const deptForm = reactive({ id: null, parentId: 0, deptName: '' })
 
 const users = ref([])
 const roles = ref([])
+
+// ---------- 用户批量分配角色 ----------
+const userSel = ref([])
+function onUserSel(rows) {
+  userSel.value = rows || []
+}
+const batchRoleVisible = ref(false)
+const batchRoleId = ref(null)
+async function applyBatchRole() {
+  try {
+    await request.post('/sys/user/batch-role', { userIds: userSel.value.map((u) => u.id), roleId: batchRoleId.value })
+    ElMessage.success(`${tt('已为')} ${userSel.value.length} ${tt('个用户分配角色')}`)
+    batchRoleVisible.value = false
+    batchRoleId.value = null
+    await loadUsers()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || '批量分配失败')
+  }
+}
+
+// ---------- 复制角色权限(把源角色勾选载入当前编辑,保存后生效) ----------
+const copyFromRoleId = ref(null)
+const copyableRoles = computed(() => roles.value.filter((r) => !r.isAdmin && selRole.value && r.id !== selRole.value.id))
+async function copyRolePerms() {
+  const src = roles.value.find((r) => r.id === copyFromRoleId.value)
+  if (!src) return
+  try {
+    await ElMessageBox.confirm(
+      `${tt('将用')}「${src.roleName}」${tt('的面板权限覆盖当前编辑内容？')}${tt('保存后生效')}`,
+      tt('复制权限'),
+      { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
+    )
+  } catch (e) {
+    return
+  }
+  try {
+    const r = await request.get('/sys/role/' + src.id + '/panels')
+    const granted = r?.data?.granted || []
+    const byCode = {}
+    for (const g of granted) byCode[g.panelCode] = g.perms || ''
+    for (const p of panelRows.value) {
+      p.permsSet = new Set((byCode[p.panelCode] || '').split(',').filter(Boolean))
+    }
+    ElMessage.success(`${tt('已复制')}「${src.roleName}」${tt('的权限，确认无误后请保存')}`)
+  } catch (e) {
+    ElMessage.error('复制权限失败')
+  }
+}
 const selRole = ref(null)
 const panelRows = ref([])
 const saving = ref(false)
@@ -811,6 +898,8 @@ async function loadRolePanels(row) {
       panelCode: p.panelCode,
       panelName: p.panelName,
       hasApproval: !!p.hasApproval,
+      // 面板级动作集:文件类=专属 8 项(按真实操作行为),其余=通用 11 项
+      actions: (p.actions && p.actions.length ? p.actions : permActions.value),
       permsSet: new Set((grantedPerms[p.panelCode] || '').split(',').filter(Boolean)),
     }))
     buildHeadMarkCache() // 首次渲染前备好快照(thead 三态绑定读缓存)
@@ -886,7 +975,10 @@ onBeforeUnmount(() => {
 .dept-ops { display: none; }
 .dept-node:hover .dept-ops { display: inline-flex; gap: 2px; }
 .perm-box { margin-top: 12px; border-top: 1px dashed #d0d7e3; padding-top: 10px; }
-.perm-head { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; }
+.perm-head { font-size: 13px; font-weight: 600; color: #333; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.perm-copy { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-weight: 400; }
+.col-head-btns { display: inline-flex; gap: 8px; }
+.batch-tip { margin-bottom: 10px; font-size: 13px; color: #6b7280; }
 .perm-sub { font-weight: 400; color: #888; font-size: 12px; }
 .admin-tip { color: #c0392b; font-size: 12px; padding: 8px 0; }
 .perm-actions { margin-top: 10px; display: flex; gap: 8px; }
@@ -923,7 +1015,13 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 /* 操作权限矩阵表(11 项) */
-.perm-table-wrap { overflow-x: auto; }
+.perm-table-wrap { overflow: auto; max-height: 70vh; }
+.perm-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #eef1f6;
+}
 .perm-table {
   width: 100%;
   border-collapse: collapse;
@@ -949,17 +1047,24 @@ onBeforeUnmount(() => {
   gap: 2px;
   white-space: nowrap;
 }
-.pt-head-txt { font-size: 11px; font-weight: 600; color: #333; }
-.pt-head-caret {
-  display: inline-flex;
-  align-items: center;
-  gap: 1px;
+.perm-table .pt-act { min-width: 40px; text-align: center; }
+.perm-table .pt-na { color: #d1d5db; }
+/* 原生大号勾选框(18px)+滑动扫选:整格命中,按下即切换,拖动批量套用 */
+.perm-table .pt-cb {
+  width: 18px;
+  height: 18px;
+  margin: 0;
   cursor: pointer;
-  color: #a8abb2;
-  font-size: 11px;
-  line-height: 1;
-  padding: 1px 3px;
-  border-radius: 3px;
+  accent-color: #409eff;
+  vertical-align: middle;
+  pointer-events: none; /* 状态由格子 mousedown 统一驱动,勾选/滑动一致 */
+}
+.perm-table td.pt-sweep { cursor: pointer; user-select: none; padding: 6px 4px; }
+.perm-table td.pt-sweep:active { background: #f0f6ff; }
+.perm-table .pt-all {
+  min-width: 40px;
+  background: #fafbfc;
+  font-weight: 600;
 }
 .pt-head-caret:hover { color: #409eff; background: rgba(64, 158, 255, 0.12); }
 .pt-head-caret.is-all { color: #409eff; }
