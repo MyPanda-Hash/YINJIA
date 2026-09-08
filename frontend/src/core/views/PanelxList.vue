@@ -372,7 +372,7 @@
                   @keyup.esc="warnEdit.id = null"
                   @blur="saveWarnEdit"
                 />
-                <span v-else class="warn-editable" :title="tt('点击修改预警数量，留空使用全局阈值')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
+                <span v-else class="warn-editable" :title="tt('点击修改预警数量，留空使用默认阈值50')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
               </template>
               <span v-else>{{ row[column.prop] }}</span>
             </template>
@@ -782,7 +782,7 @@
         </div>
         <div class="dq-row">
           <span class="dq-label">{{ tt('预警数量') }}</span>
-          <el-input-number v-model="stockAddForm['预警数量']" :min="0" :precision="2" style="width: 100%" :placeholder="tt('留空使用全局阈值')" />
+          <el-input-number v-model="stockAddForm['预警数量']" :min="0" :precision="0" style="width: 100%" :placeholder="tt('留空使用默认阈值50')" />
         </div>
       </div>
       <template #footer>
@@ -1322,7 +1322,7 @@ function openStockAdd() {
   stockAddForm['批号'] = ''
   stockAddForm['入库日期'] = todayStr()
   stockAddForm['现存量'] = 0
-  stockAddForm['预警数量'] = null
+  stockAddForm['预警数量'] = 50
   stockAddVisible.value = true
 }
 async function submitStockAdd() {

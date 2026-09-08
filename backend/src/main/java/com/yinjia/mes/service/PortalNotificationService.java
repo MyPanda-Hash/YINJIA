@@ -132,12 +132,12 @@ public class PortalNotificationService {
         return result;
     }
 
-    /** 预警:kucun 结余低于预警阈值 —— 行级预警数量优先(ISNULL(NULLIF(预警数量,0),100)),未设回退全局阈值 */
+    /** 预警:kucun 结余低于预警阈值 —— 行级预警数量优先(ISNULL(NULLIF(预警数量,0),50)),未设回退默认 50 */
     private List<Map<String, Object>> alarms() {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT TOP " + LIST_LIMIT + " wzdm, ckdm, lot_no, yl, ISNULL(NULLIF([预警数量],0),100) AS thr FROM kucun"
+                "SELECT TOP " + LIST_LIMIT + " wzdm, ckdm, lot_no, yl, ISNULL(NULLIF([预警数量],0),50) AS thr FROM kucun"
                         + " WHERE ISNULL(asp_cancel,'N') <> 'Y' AND yl IS NOT NULL"
-                        + " AND yl < ISNULL(NULLIF([预警数量],0),100)"
+                        + " AND yl < ISNULL(NULLIF([预警数量],0),50)"
                         + " ORDER BY yl");
         List<Map<String, Object>> result = new ArrayList<>();
         for (Map<String, Object> row : rows) {
