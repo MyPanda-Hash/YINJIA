@@ -147,17 +147,25 @@
                   </template>
                 </div>
               </div>
-              <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改记录弹窗(滚动3条) -->
+              <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改态出「提交审批」,审批中出管理员审批;修改记录弹窗(滚动3条) -->
               <div class="as-side-del" v-if="isProdFilePanel">
                 <div class="as-side-btn-row">
                   <div class="as-side-btn" style="flex: 1" :class="{ disabled: !canModifyReq }" @click="pickModAction('申请修改')">{{ tt('申请修改') }}</div>
                   <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openModMenu = !openModMenu">▼</div>
                 </div>
+                <div v-if="curDocStatus === '修改中'" class="as-side-btn" @click="pickModAction('提交审批')">{{ tt('提交审批') }}</div>
                 <div v-if="openModMenu" class="as-side-menu" @click.stop>
                   <template v-if="user.isAdmin">
-                    <div class="as-side-menu-item" @click="pickModAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
-                    <div class="as-side-menu-item" @click="pickModAction('修改审批驳回')">{{ tt('修改审批驳回') }}</div>
+                    <template v-if="curDocStatus === '修改申请中'">
+                      <div class="as-side-menu-item" @click="pickModAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
+                      <div class="as-side-menu-item" @click="pickModAction('修改审批驳回')">{{ tt('修改审批驳回') }}</div>
+                    </template>
+                    <template v-else-if="curDocStatus === '审批中'">
+                      <div class="as-side-menu-item" @click="pickModAction('审批通过')">{{ tt('审批通过') }}</div>
+                      <div class="as-side-menu-item" @click="pickModAction('审批驳回')">{{ tt('审批驳回') }}</div>
+                    </template>
                   </template>
+                  <div class="as-side-menu-item" @click="pickModAction('审批情况')">{{ tt('审批情况') }}</div>
                 </div>
               </div>
               <div class="as-side-btn" v-if="isProdFilePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
@@ -2476,7 +2484,7 @@ function isDisabled(action) {
     取消中止: !current.value || st !== '已中止',
     修改: !current.value || !['已审核', '生产中', '已完工'].includes(st),
     审批情况: false,
-    提交审批: !current.value || st !== '草稿',
+    提交审批: !current.value || (st !== '草稿' && st !== '修改中'),
     审批通过: !current.value || st !== '审批中',
     审批驳回: !current.value || st !== '审批中',
    驳回审批: !current.value || st !== '审批中',
@@ -2907,8 +2915,12 @@ async function onButton(action) {
     let approvalOpinion = ''
     if (action === '提交审批' || action === '审批通过') {
       if (!current.value) return ElMessage.warning('请先选择一行数据')
-      const need = action === '提交审批' ? '草稿' : '审批中'
-      if (current.value['单据状态'] !== need) return ElMessage.warning(action === '提交审批' ? '仅草稿状态可提交审批' : '仅审批中状态可审批通过')
+      // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过仅审批中
+      if (action === '提交审批') {
+        if (!['草稿', '修改中'].includes(current.value['单据状态'])) return ElMessage.warning('仅草稿或修改中状态可提交审批')
+      } else if (current.value['单据状态'] !== '审批中') {
+        return ElMessage.warning('仅审批中状态可审批通过')
+      }
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
         const { value } = await ElMessageBox.prompt(
