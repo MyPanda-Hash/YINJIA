@@ -357,6 +357,25 @@
             :align="column.align"
             show-overflow-tooltip
           >
+            <template #default="{ row }">
+              <template v-if="isStockStatus && column.prop === '预警数量'">
+                <el-input-number
+                  v-if="warnEdit.id === row.id"
+                  ref="warnEditRef"
+                  v-model="warnEdit.value"
+                  :controls="false"
+                  :min="0"
+                  :precision="0"
+                  size="small"
+                  class="warn-input"
+                  @keyup.enter="saveWarnEdit"
+                  @keyup.esc="warnEdit.id = null"
+                  @blur="saveWarnEdit"
+                />
+                <span v-else class="warn-editable" :title="tt('点击修改预警数量，留空使用全局阈值')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
+              </template>
+              <span v-else>{{ row[column.prop] }}</span>
+            </template>
             <template #header>
               <div class="report-col-container">
                 <span class="report-col-title">{{ tt(column.label) }}</span>
@@ -1322,6 +1341,40 @@ async function submitStockAdd() {
     ElMessage.error(engine.errMsg(e) || tt('新增失败'))
   } finally {
     stockAdding.value = false
+  }
+}
+
+// ---------- 预警数量行内编辑(库存状况):点击变输入框,回车/失焦保存,Esc 取消 ----------
+const warnEdit = reactive({ id: null, value: null })
+const warnEditRef = ref(null)
+watch(() => warnEdit.id, async (v) => {
+  if (v == null) return
+  await nextTick()
+  const el = warnEditRef.value
+  if (el && typeof el.focus === 'function') el.focus()
+})
+function startWarnEdit(row) {
+  warnEdit.id = row.id
+  warnEdit.value = row['预警数量'] == null || row['预警数量'] === '' ? null : Number(row['预警数量'])
+}
+async function saveWarnEdit() {
+  if (warnEdit.id == null) return
+  const id = warnEdit.id
+  const val = warnEdit.value
+  warnEdit.id = null
+  try {
+    await engine.callButton({
+      panelCode: 'STOCK_STATUS',
+      buttonName: '更新预警数量',
+      formData: { id, 预警数量: val == null ? '' : String(val) },
+      buttonParam: {},
+    })
+    const row = (reportList.value || list.value).find((r) => r.id === id)
+    if (row) row['预警数量'] = val == null ? null : val
+    ElMessage.success(tt('预警数量已更新'))
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('更新失败'))
+    load()
   }
 }
 
@@ -3549,6 +3602,19 @@ onUnmounted(() => {
   width: 190px;
   align-self: stretch;
   margin: 3px 8px;
+}
+/* 预警数量行内编辑 */
+.warn-editable {
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 3px;
+}
+.warn-editable:hover {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+.warn-input {
+  width: 90px;
 }
 .toolbar-query-btn:hover {
   background: #e7eef8;

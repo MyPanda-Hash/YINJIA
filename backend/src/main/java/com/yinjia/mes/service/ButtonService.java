@@ -68,6 +68,8 @@ public class ButtonService {
             case "修改记录" -> modifyHistory(def, formData);
             // 库存状况:新增库存(存货/仓库按编码校验基础档案,期初现存量+预警数量)
             case "新增库存" -> addStock(def, formData);
+            // 库存状况:修改预警数量(行内编辑,空值回退全局阈值100)
+            case "更新预警数量" -> updateStockWarn(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
         };
     }
@@ -700,8 +702,32 @@ public class ButtonService {
         return result(wzdm + "@" + ckdm, "已新增");
     }
 
-    private String requiredText(Map<String, Object> formData, String key) {
-        Object v = formData == null ? null : formData.get(key);
+    /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */
+    private Map<String, Object> updateStockWarn(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"STOCK_STATUS".equals(def.code())) throw new IllegalStateException("仅库存状况面板支持修改预警数量");
+        String idRaw = requiredText(formData, "id");
+        int id;
+        try {
+            id = Integer.parseInt(idRaw);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("库存行标识无效");
+        }
+        String v = optionalText(formData, "预警数量");
+        Double warn = null;
+        if (!v.isBlank()) {
+            try {
+                warn = Double.parseDouble(v);
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("预警数量必须是数字");
+            }
+        }
+        int n = jdbc.update("UPDATE kucun SET [预警数量] = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
+                warn, currentUserName(), id);
+        if (n == 0) throw new IllegalStateException("库存行不存在");
+        return result(String.valueOf(id), "已更新");
+    }
+
+    private String requiredText(Map<String, Object> formData, String key) {        Object v = formData == null ? null : formData.get(key);
         if (v == null || String.valueOf(v).isBlank()) throw new IllegalArgumentException("请填写" + key);
         return String.valueOf(v).trim();
     }

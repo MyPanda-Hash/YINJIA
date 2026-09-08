@@ -58,7 +58,7 @@ public class QueryService {
         args.add(pageSize);
         List<Map<String, Object>> rows = jdbc.queryForList(sql, args.toArray());
         List<Map<String, Object>> list = new ArrayList<>();
-        for (Map<String, Object> r : rows) list.add(rowToLabels(def, r, false));
+        for (Map<String, Object> r : rows) list.add(rowToLabels(def, r, true));
 
         Map<String, Object> out = new HashMap<>();
         out.put("totalSize", total == null ? 0 : total);
