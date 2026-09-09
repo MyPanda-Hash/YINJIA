@@ -27,10 +27,12 @@ public class PortalNotificationService {
 
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;
+    private final DevTaskService devTaskService;
 
-    public PortalNotificationService(JdbcTemplate jdbc, PanelRegistry registry) {
+    public PortalNotificationService(JdbcTemplate jdbc, PanelRegistry registry, DevTaskService devTaskService) {
         this.jdbc = jdbc;
         this.registry = registry;
+        this.devTaskService = devTaskService;
     }
 
     public Map<String, Integer> badge(String userName) {
@@ -38,6 +40,7 @@ public class PortalNotificationService {
         result.put("todo", todos(userName).size());
         result.put("message", messages().size());
         result.put("alarm", alarms().size());
+        result.put("dev", devTasks(userName).size());
         return result;
     }
 
@@ -46,6 +49,7 @@ public class PortalNotificationService {
             case "todo" -> todos(userName);
             case "message" -> messages();
             case "alarm" -> alarms();
+            case "dev" -> devTasks(userName);
             default -> List.of();
         };
     }
@@ -156,6 +160,49 @@ public class PortalNotificationService {
             result.add(item);
         }
         return result;
+    }
+
+    /** 产品开发:已下发且本面板仍未开发的产品(按用户可见面板过滤) */
+    private List<Map<String, Object>> devTasks(String userName) {
+        List<String> panels = visiblePanels(userName);
+        if (panels.isEmpty()) return List.of();
+        List<Map<String, Object>> rows = devTaskService.pendingFor(panels, LIST_LIMIT);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            String code = text(r.get("产品编号"), "-");
+            String name = text(r.get("产品名称"), "");
+            String panel = String.valueOf(r.get("panelCode"));
+            String panelName = text(r.get("panelName"), panel);
+            Map<String, Object> item = base("dev:" + code + ':' + panel, "dev",
+                    "产品开发:" + code + (name.isBlank() ? "" : " " + name), toTimestamp(r.get("下发时间")),
+                    "产品「" + code + "」已下发到" + panelName + ",请开展研发设计(当前:未开发)。",
+                    panel, null);
+            item.put("productCode", code);
+            item.put("productName", name);
+            item.put("status", r.get("status"));
+            item.put("dispatcher", r.get("下发人"));
+            item.put("actionLabel", "去开发");
+            result.add(item);
+        }
+        return result;
+    }
+
+    /** 可见面板:管理员=全部("*");普通用户=角色勾了 view 的面板 */
+    private List<String> visiblePanels(String userName) {
+        List<Integer> admin = jdbc.query(
+                "SELECT CASE WHEN is_admin = 'Y' THEN 1 ELSE 0 END FROM yj_user WHERE username = ?",
+                (rs, i) -> rs.getInt(1), userName);
+        if (!admin.isEmpty() && admin.get(0) == 1) return List.of("*");
+        return jdbc.query(
+                "SELECT rp.panel_code FROM yj_role_panel rp JOIN yj_user u ON u.role_id = rp.role_id"
+                        + " WHERE u.username = ? AND rp.perms LIKE '%view%'",
+                (rs, i) -> rs.getString(1), userName);
+    }
+
+    private Timestamp toTimestamp(Object v) {
+        if (v instanceof Timestamp t) return t;
+        if (v instanceof java.time.LocalDateTime l) return Timestamp.valueOf(l);
+        return null;
     }
 
     private Map<String, Object> base(String id, String type, String title, Timestamp time,

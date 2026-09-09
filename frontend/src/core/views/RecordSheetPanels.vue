@@ -132,6 +132,7 @@
               <td v-else class="rs-td" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
                 <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(pair.key)">
                   <span class="rs-ref-text">{{ head[pair.key] || tt('点击选择') }}</span>
+                  <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                   <el-icon class="rs-ref-ico"><Search /></el-icon>
                 </div>
                 <el-select v-else-if="editable && pair.type === 'select'" v-model="head[pair.key]" size="small" :clearable="false" @change="emit('dirty')">
@@ -153,6 +154,7 @@
               <td v-else class="rs-td" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
                   <span class="rs-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
+                  <span v-if="devStatus && devKey === c.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                   <el-icon class="rs-ref-ico"><Search /></el-icon>
                 </div>
                 <el-select v-else-if="editable && c.type === 'select'" v-model="head[c.key]" size="small" :clearable="false" @change="emit('dirty')">
@@ -604,7 +606,7 @@
     </el-dialog>
 
     <!-- ═══ 参照选择(产品编号 -> 产品信息表):确认后按 refMap 带回 产品名称 等 ═══ -->
-    <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" @confirm="onProdRefConfirm" />
+    <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" :owner-panel="panelCode" @confirm="onProdRefConfirm" />
   </div>
 </template>
 
@@ -1034,6 +1036,34 @@ function isRefKey(key) {
 const prodRefVisible = ref(false)
 const prodRefKey = ref('')
 const prodRefField = computed(() => fieldMap.value.get(prodRefKey.value) || null)
+
+// ── 产品开发状态角标(2026-09-09):本面板的产品键已下发时,在单元格标注 未开发 / 已开发 ──
+const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_BOM', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+const devStatus = ref('')
+const devKey = computed(() => {
+  for (const k of ['产品编号', '编号']) {
+    if (fieldMap.value.has(k) && isRefKey(k)) return k
+  }
+  return ''
+})
+watch(
+  () => [props.panelCode, devKey.value ? props.head[devKey.value] : ''],
+  async () => {
+    const code = devKey.value ? props.head[devKey.value] : ''
+    if (!code || !DEV_PANEL_CODES.includes(props.panelCode)) {
+      devStatus.value = ''
+      return
+    }
+    try {
+      const res = await request.post('/px/rdDev/annotate', { panelCode: props.panelCode, productCodes: [code] })
+      const map = res?.data?.data || res?.data || {}
+      devStatus.value = map[code] || ''
+    } catch (e) {
+      devStatus.value = ''
+    }
+  },
+  { immediate: true }
+)
 function openProdRef(key) {
   if (!props.editable || !isRefKey(key)) return
   prodRefKey.value = key
@@ -1530,6 +1560,16 @@ function chartOf(dt) {
   font-size: 13px;
   color: var(--el-color-primary, #409eff);
 }
+/* 产品开发状态角标 */
+.rs-dev-badge {
+  flex-shrink: 0;
+  padding: 0 5px;
+  border-radius: 7px;
+  font-size: 11px;
+  line-height: 16px;
+}
+.rs-dev-badge.none { background: #fff2e0; color: #b26a00; }
+.rs-dev-badge.done { background: #e6f4ea; color: #1a7f37; }
 
 /* ═══ 报告头 ═══ */
 .rs-company-cell {

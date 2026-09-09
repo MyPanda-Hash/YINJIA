@@ -15,7 +15,7 @@
         <span class="rpd-tip">{{ tipText }} · 共 {{ total }} 条</span>
       </div>
       <el-table
-        :data="rows"
+        :data="displayRows"
         v-loading="loading"
         size="small"
         border
@@ -24,7 +24,11 @@
         @selection-change="(r) => (selected = r)"
       >
         <el-table-column type="selection" width="45" />
-        <el-table-column v-for="c in columns" :key="c" :prop="c" :label="c" min-width="110" show-overflow-tooltip />
+        <el-table-column v-for="c in displayColumns" :key="c" :prop="c" :label="c" min-width="110" show-overflow-tooltip>
+          <template v-if="c === '开发状态'" #default="{ row }">
+            <span class="rpd-dev" :class="devTone(row['开发状态'])">{{ tt(row['开发状态']) }}</span>
+          </template>
+        </el-table-column>
       </el-table>
     </div>
     <template #footer>
@@ -39,6 +43,7 @@ import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { usePanelRuntime } from '@core/panel-runtime'
+import { tt } from '@/i18n'
 
 const engine = usePanelRuntime()
 
@@ -49,6 +54,8 @@ const props = defineProps({
   field: { type: Object, default: null },
   // 'header' 表头单值字段（多选仅导入第一行）/ 'detail' 明细行（多选每行生成一条明细）
   mode: { type: String, default: 'header' },
+  // 调用方所属面板(用于「产品开发」状态标注:仅下游 5 个文件面板显示)
+  ownerPanel: { type: String, default: '' },
 })
 const emit = defineEmits(['update:modelValue', 'update:visible', 'confirm'])
 
@@ -58,6 +65,19 @@ const columns = ref([])
 const selected = ref([])
 const loading = ref(false)
 const total = ref(0)
+
+// ── 产品开发状态标注(2026-09-09):参照产品信息表时,按当前面板标注 未开发 / 已开发 ──
+const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_BOM', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+const devMap = ref({})
+const showDevStatus = computed(() => props.field?.refPanel === 'RD_PROD_INFO'
+  && DEV_PANEL_CODES.includes(String(props.ownerPanel || '')))
+const displayColumns = computed(() => (showDevStatus.value ? [...columns.value, '开发状态'] : columns.value))
+const displayRows = computed(() => (showDevStatus.value
+  ? rows.value.map((r) => ({ ...r, 开发状态: devMap.value[r['产品编号']] || '' }))
+  : rows.value))
+function devTone(status) {
+  return status === '已开发' ? 'done' : 'none'
+}
 
 const title = ref('参照选择')
 const multi = computed(() => !!props.field?.refMulti || !!props.field?.multi)
@@ -78,6 +98,16 @@ async function open() {
     const list = await engine.queryRefRows(props.field, { keyword: keyword.value })
     rows.value = list
     total.value = list.length
+    if (showDevStatus.value) {
+      const codes = list.map((r) => r['产品编号']).filter((v) => v !== undefined && v !== null && v !== '')
+      try {
+        devMap.value = (await engine.rdDevAnnotate(props.ownerPanel, codes)) || {}
+      } catch (e) {
+        devMap.value = {}
+      }
+    } else {
+      devMap.value = {}
+    }
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || '参照数据加载失败')
   } finally {
@@ -104,4 +134,14 @@ function confirm() {
   color: var(--t-text-3);
   margin-left: 4px;
 }
+/* 产品开发状态标注 */
+.rpd-dev {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.rpd-dev.none { background: #fff2e0; color: #b26a00; }
+.rpd-dev.done { background: #e6f4ea; color: #1a7f37; }
 </style>

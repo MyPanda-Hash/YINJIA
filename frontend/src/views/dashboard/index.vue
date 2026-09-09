@@ -181,9 +181,45 @@
               <div class="card-title">{{ tt('实时业务事件流') }}</div>
               <p>{{ tt('来自 SQL 业务单据的最新活动') }}</p>
             </div>
-            <span class="event-count">{{ latest.length }} {{ tt('条事件') }}</span>
+            <el-select v-model="flowPanel" size="small" class="flow-pick" @change="onFlowChange">
+              <el-option :label="tt('全部事件')" value="" />
+              <el-option :label="tt('产品开发业务流')" value="RD_PROD_INFO" />
+            </el-select>
+            <span v-if="flowPanel !== 'RD_PROD_INFO'" class="event-count">{{ latest.length }} {{ tt('条事件') }}</span>
+            <span v-else class="event-count">{{ devBoard.length }} {{ tt('已下发产品') }}</span>
           </div>
-          <div class="event-list">
+
+          <!-- 产品开发业务流:产品 × 下游 5 面板 矩阵(审核中可点跳转审批) -->
+          <div v-if="flowPanel === 'RD_PROD_INFO'" class="dev-board" v-loading="devLoading">
+            <table v-if="devBoard.length" class="dev-table">
+              <thead>
+                <tr>
+                  <th class="dev-th-prod">{{ tt('产品编号') }}</th>
+                  <th>{{ tt('产品名称') }}</th>
+                  <th v-for="m in devMeta" :key="m.panelCode">{{ tt(m.panelName) }}</th>
+                  <th>{{ tt('总进度') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="row in devBoard" :key="row['产品编号']">
+                  <td class="dev-td-prod">{{ row['产品编号'] }}</td>
+                  <td>{{ row['产品名称'] }}</td>
+                  <td v-for="m in devMeta" :key="m.panelCode">
+                    <span
+                      class="dev-cell"
+                      :class="[devTone(row.cells[m.panelCode]), { clickable: row.cells[m.panelCode] === '开发审核中' && canApprovePanel(m.panelCode) }]"
+                      :title="row.cells[m.panelCode] === '开发审核中' ? (canApprovePanel(m.panelCode) ? tt('点击去审批') : tt('无该面板审批权限')) : ''"
+                      @click="onDevCell(row, m)"
+                    >{{ tt(row.cells[m.panelCode]) }}</span>
+                  </td>
+                  <td>{{ row.doneCount }}/{{ row.totalCount }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-else class="empty">{{ tt('暂无已下发产品') }}</div>
+          </div>
+
+          <div v-else class="event-list">
             <div v-for="(event, index) in latest.slice(0, 6)" :key="`${event['编号']}-${index}`" class="event-row">
               <div class="event-axis"><i :class="{ pulse: index === 0 }"></i></div>
               <div class="event-icon"><el-icon><component :is="eventIcon(event.panel)" /></el-icon></div>
@@ -381,7 +417,7 @@ import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
 import { useAppStore } from '@/stores/app'
 import request from '@core/request'
-import { ElNotification } from 'element-plus'
+import { ElNotification, ElMessage } from 'element-plus'
 import SBars from './SBars.vue'
 import SDonut from './SDonut.vue'
 import SLine from './SLine.vue'
@@ -536,6 +572,63 @@ async function load() {
   }
 }
 let refreshTimer = null
+
+// ── 产品开发业务流(2026-09-09):实时业务事件流里可选「产品信息表」查看下发开发情况 ──
+const flowPanel = ref('')
+const devBoard = ref([])
+const devMeta = ref([])
+const devLoading = ref(false)
+async function loadDevBoard() {
+  devLoading.value = true
+  try {
+    const [metaRes, boardRes] = await Promise.all([
+      request.get('/px/rdDev/meta'),
+      request.get('/px/rdDev/board'),
+    ])
+    devMeta.value = Array.isArray(metaRes?.data) ? metaRes.data : []
+    devBoard.value = Array.isArray(boardRes?.data) ? boardRes.data : []
+  } catch (e) {
+    devMeta.value = []
+    devBoard.value = []
+  } finally {
+    devLoading.value = false
+  }
+}
+function onFlowChange(v) {
+  if (v === 'RD_PROD_INFO') loadDevBoard()
+}
+function devTone(status) {
+  if (status === '开发完毕') return 'done'
+  if (status === '开发审核中') return 'review'
+  if (status === '开发中') return 'doing'
+  return 'none'
+}
+function canApprovePanel(panelCode) {
+  const ap = user.approvePanels || []
+  return !!user.isAdmin || ap.includes('*') || ap.includes(String(panelCode))
+}
+async function onDevCell(row, m) {
+  const st = row.cells ? row.cells[m.panelCode] : ''
+  if (st !== '开发审核中') return
+  if (!canApprovePanel(m.panelCode)) {
+    ElMessage.warning(tt('无该面板审批权限'))
+    return
+  }
+  const target = `/panelx/list/${m.panelCode}`
+  try {
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: m.panelCode, condition: {}, pageNo: 1, pageSize: 300,
+    })
+    const list = res?.data?.list || []
+    const key = m.panelCode === 'RD_SPEC_DOC' ? '编号' : '产品编号'
+    const hit = list.find((r) => String(r[key] ?? '') === String(row['产品编号'] ?? '')
+      && String(r['单据状态'] ?? '').includes('审批'))
+    const docNo = hit ? (hit['单据编号'] || hit['编号'] || '') : ''
+    router.push(docNo ? { path: target, query: { docNo } } : target)
+  } catch (e) {
+    router.push(target)
+  }
+}
 let countdownTimer = null
 
 onMounted(() => {
@@ -1264,6 +1357,58 @@ function go(path, title) {
 .event-stream,
 .business-vitals {
   min-height: 294px;
+}
+
+/* 产品开发业务流:产品 × 下游面板 矩阵 */
+.flow-pick {
+  width: 150px;
+  margin-right: 8px;
+}
+.dev-board {
+  max-height: 240px;
+  overflow: auto;
+}
+.dev-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.dev-table th,
+.dev-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--t-border, #eef0f3);
+  text-align: left;
+  white-space: nowrap;
+}
+.dev-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #fff;
+  font-weight: 600;
+  color: #667085;
+}
+.dev-td-prod,
+.dev-th-prod {
+  font-weight: 600;
+}
+.dev-cell {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 8px;
+  font-size: 11.5px;
+  line-height: 17px;
+}
+.dev-cell.none { background: #f2f4f7; color: #98a2b3; }
+.dev-cell.doing { background: #e8f0fe; color: #1a56db; }
+.dev-cell.review { background: #fff2e0; color: #b26a00; }
+.dev-cell.done { background: #e6f4ea; color: #1a7f37; }
+.dev-cell.clickable {
+  cursor: pointer;
+  box-shadow: 0 0 0 1px #f0b429 inset;
+}
+.dev-cell.clickable:hover {
+  background: #ffe9bf;
 }
 
 .event-count {

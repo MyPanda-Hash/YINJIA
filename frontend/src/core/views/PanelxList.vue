@@ -188,6 +188,14 @@
                 </div>
               </div>
               <div class="as-side-btn" v-if="isProdFilePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
+              <!-- 产品开发下发:仅产品信息表;归档后可点;下发过则置灰显示「已下发」 -->
+              <div
+                class="as-side-btn"
+                v-if="panelCode === 'RD_PROD_INFO'"
+                :class="{ disabled: !canDevDispatch || devDispatch.dispatched }"
+                :title="devDispatch.dispatched ? tt('该产品已下发到下游面板') : (canDevDispatch ? tt('把该产品下发到下游 5 个文件面板') : tt('仅已归档的产品信息表可下发'))"
+                @click="onDevDispatch"
+              >{{ devDispatch.dispatched ? tt('已下发') : tt('产品开发') }}</div>
               <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
                 <div
                   class="as-side-btn"
@@ -1421,6 +1429,42 @@ const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocSt
 const modifyLogVisible = ref(false)
 const modifyLogRecords = ref([])
 const modifyLogNo = ref('')
+
+// ── 产品开发下发(2026-09-09):仅产品信息表;归档后可用;按产品编号下发过则置灰「已下发」 ──
+const devDispatch = reactive({ productCode: '', dispatched: false, busy: false })
+const canDevDispatch = computed(() => panelCode.value === 'RD_PROD_INFO' && curDocStatus.value === '已归档')
+async function loadDevDispatchState() {
+  if (panelCode.value !== 'RD_PROD_INFO') {
+    devDispatch.productCode = ''
+    devDispatch.dispatched = false
+    return
+  }
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) {
+    devDispatch.productCode = ''
+    devDispatch.dispatched = false
+    return
+  }
+  try {
+    const res = await engine.rdDevButtonState(no)
+    devDispatch.productCode = res?.productCode || ''
+    devDispatch.dispatched = !!res?.dispatched
+  } catch (e) {
+    devDispatch.productCode = ''
+    devDispatch.dispatched = false
+  }
+}
+async function onDevDispatch() {
+  if (!canDevDispatch.value || devDispatch.dispatched || devDispatch.busy) return
+  devDispatch.busy = true
+  try {
+    await onButton('产品开发')
+    await loadDevDispatchState()
+  } finally {
+    devDispatch.busy = false
+  }
+}
+watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState() }, { immediate: true })
 
 function pickModAction(action) {
   openModMenu.value = false
@@ -3574,6 +3618,13 @@ onMounted(() => {
   if (invalidPanel.value) {
     router.replace('/panelx/list/MANU_ORDER')
     return
+  }
+  // 从「我的桌面 · 产品开发」矩阵跳转:带 ?docNo= 直接定位到该单据
+  const jumpDocNo = route.query.docNo
+  if (jumpDocNo) {
+    docQueryNo.value = String(jumpDocNo)
+    condition['_docNo'] = String(jumpDocNo)
+    router.replace({ path: route.path, query: { ...route.query, docNo: undefined } })
   }
   load()
 })
