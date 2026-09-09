@@ -55,8 +55,8 @@
         <!-- 标准报告头(其它文书面板) -->
         <template v-else>
         <tr>
-          <td class="rs-td rs-company-cell" :colspan="nCols - 1">惠州市银嘉环保科技有限公司</td>
-          <td class="rs-td rs-docno">
+          <td class="rs-td rs-company-cell" :colspan="nCols - docnoSpan">惠州市银嘉环保科技有限公司</td>
+          <td class="rs-td rs-docno" :colspan="docnoSpan">
             <!-- 文档编号:配置为参照时(如数据记录表→立项申请)点击弹参照;否则保持纯输入 -->
             <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
               <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
@@ -659,6 +659,22 @@ const effHead = computed(() => activeVariant.value?.head || cfg.value?.head || {
 const nCols = computed(() => effGrid.value.length)
 /** 网格总宽:所有表格显式用这个宽度,列分界线全页严格一致(数据表编辑态另加 60px 操作列) */
 const gridW = computed(() => effGrid.value.reduce((s, w) => s + w, 0))
+/** 右上角编号格占末尾几列:末尾列宽不足时向左并列凑到 ≥160px——
+ *  现有最长编号 YJ-AB-SAMPLE-1 实测 98px,加参照图标/间距约 145px;
+ *  只并列不改列宽,全页竖线位置不变(并掉的列整列被编号格覆盖)。 */
+const DOCNO_MIN_W = 160
+const docnoSpan = computed(() => {
+  const g = effGrid.value || []
+  if (g.length < 2) return 1
+  let sum = 0
+  let k = 0
+  for (let i = g.length - 1; i >= 1; i--) {
+    sum += g[i]
+    k += 1
+    if (sum >= DOCNO_MIN_W) break
+  }
+  return Math.min(k, g.length - 1)
+})
 
 /* ── 规格书文档式封面(设计图 708×1173 逐像素复刻):内层坐标=设计像素,由 --cok 等比缩放 ──
    测量自《C-95-33 伊可普高品质功能炭棒规格书》(设计图): 公司 y19..38 / 标题 y191..239 /
