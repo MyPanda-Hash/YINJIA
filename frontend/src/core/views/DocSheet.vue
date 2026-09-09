@@ -12,10 +12,14 @@
     <!-- ① 顶部条 -->
     <div class="as-topbar">
       <div class="as-company">惠州市银嘉环保科技有限公司</div>
-      <!-- 右上角:实施计划单据号(可手填,保存唯一性校验),默认 YJ-XS002 模板号 -->
+      <!-- 右上角:配置为参照时(项目实施计划→立项申请右上角编号)点击弹参照;否则保持手填(默认 YJ-XS002 模板号) -->
       <div class="as-docno">
+        <div v-if="editable && isRefKey('文档编号')" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+          <span class="as-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
+          <el-icon class="as-ref-ico"><Search /></el-icon>
+        </div>
         <el-input
-          v-if="editable"
+          v-else-if="editable"
           v-model="head['文档编号']"
           size="small"
           maxlength="30"
@@ -195,12 +199,15 @@
         </div>
       </div>
     </div>
+    <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" @confirm="onProdRefConfirm" />
   </div>
 </template>
 
 <script setup>
-import { computed, reactive, nextTick } from 'vue'
+import { computed, reactive, nextTick, ref } from 'vue'
 import { tt } from '@/i18n'
+import { Search } from '@element-plus/icons-vue'
+import RefPickDialog from './RefPickDialog.vue'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -219,6 +226,33 @@ function selectOptions(key) {
   const f = fieldMap.value.get(key)
   const opts = f?.options || []
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
+}
+
+// ── 参照字段(文档编号 → 立项申请右上角编号):点击右上角弹参照,确认后按 refMap 带回(密级等) ──
+function isRefKey(key) {
+  if (!key) return false
+  const f = fieldMap.value.get(key)
+  return !!(f && f.refPanel)
+}
+const prodRefVisible = ref(false)
+const prodRefKey = ref('')
+const prodRefField = computed(() => fieldMap.value.get(prodRefKey.value) || null)
+function openProdRef(key) {
+  if (!props.editable || !isRefKey(key)) return
+  prodRefKey.value = key
+  prodRefVisible.value = true
+}
+function onProdRefConfirm(rows) {
+  const f = prodRefField.value
+  const source = rows?.[0]
+  if (!f || !source) return
+  const refField = f.refField || f.dataName
+  props.head[prodRefKey.value] = source[refField] ?? ''
+  for (const m of f.refMap || []) {
+    if (m && source[m.from] !== undefined) props.head[m.to || m.from] = source[m.from]
+  }
+  prodRefVisible.value = false
+  emit('dirty')
 }
 
 // ── 校验定位(供 PanelxList 保存校验调用):滚动到该字段行并琥珀闪烁 ──
@@ -307,6 +341,40 @@ defineExpose({ focusField })
 }
 .as-docno-input {
   width: 130px;
+}
+/* 参照单元格(文档编号 -> 立项申请右上角编号):拟态输入框,点击弹参照 */
+.as-ref-ctl {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  width: 200px;
+  min-height: 24px;
+  padding: 0 4px;
+  border: 1px dashed #b9c0c8;
+  border-radius: 3px;
+  cursor: pointer;
+  background: #fafbfc;
+  font-style: normal;
+  font-weight: 400;
+}
+.as-ref-ctl:hover {
+  border-color: var(--el-color-primary, #409eff);
+  background: #f0f6ff;
+}
+.as-ref-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #333;
+  text-align: right;
+}
+.as-ref-ico {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--el-color-primary, #409eff);
 }
 .as-docno-input :deep(.el-input__inner) {
   text-align: right;
