@@ -165,6 +165,8 @@ export const menuTree = [
             code: 'detail', title: '明细表', children: [
               { code: 'manuDetail', title: '生产加工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
               { code: 'dispatchDetail', title: '工序派工单明细表', path: '/panelx/list/DISPATCH_DETAIL', panelCode: 'DISPATCH_DETAIL', icon: 'List' },
+              { code: 'woSchedule', title: '排单计划', path: '/panelx/list/WO_SCHEDULE', panelCode: 'WO_SCHEDULE', icon: 'DataLine' },
+              { code: 'woKit', title: '工单齐套表', path: '/panelx/list/WO_KIT', panelCode: 'WO_KIT', icon: 'Box' },
             ],
           },
           {
