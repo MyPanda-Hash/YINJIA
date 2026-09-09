@@ -2945,41 +2945,6 @@ async function onFieldEditRefresh() {
   await load()
 }
 
-/** 「新增未保存」标记持久化(按面板+单号):页面刷新/重进后 directAdd 草稿仍可被守卫识别与撤回 */
-function freshDraftKey(no) {
-  return `mes_fresh_draft:${panelCode.value}:${no}`
-}
-function markFreshDraft(no) {
-  try { localStorage.setItem(freshDraftKey(no), '1') } catch { /* 存储不可用时仅会话内生效 */ }
-}
-function clearFreshDraft(no) {
-  try { localStorage.removeItem(freshDraftKey(no)) } catch { /* 同上 */ }
-}
-/** 当前是否为「directAdd 新建且尚未保存过」的那一张(会话内标记或持久化标记命中) */
-function isFreshAddedDoc() {
-  if (!draftEditable.value || !cur.value) return false
-  const no = cur.value['编号']
-  if (!no) return false
-  if (freshAdded.value && no === freshAddedNo.value) return true
-  try { return localStorage.getItem(freshDraftKey(no)) === '1' } catch { return false }
-}
-/** 当前单据的「已保存基线」是否为空白草稿(判定取基线而非工作区,临时改动不影响撤回判定) */
-const savedBlankDraft = ref(false)
-/** 「空白草稿」内容判定:明细所有数值列全为 0/空(典型=新增后未填写被遗留的单据,单表式面板
- * 后端写入的占位行也命中)。数值全 0 = 没有任何实质收发内容,「不保存」撤回整单不会丢失实质数据。
- * 单单据档案面板不适用(空档案是常态);明细无数值列的面板无法判定,不启用。 */
-function isBlankDraftContent(detail) {
-  if (cfgCache.value?.metadata?.singleDoc) return false
-  const tabs = cfgCache.value?.detail?.tabs || []
-  if (!tabs.length) return false
-  const numericCols = tabs.flatMap((t) => (t.fields || [])
-    .filter((f) => f.dataType === '小数' || f.dataType === '整数')
-    .map((f) => f.dataName))
-  if (!numericCols.length) return false
-  const blankVal = (v) => v === undefined || v === null || String(v).trim() === '' || Number(v) === 0
-  return tabs.every((t) => (detail?.[t.key] || []).every((row) => numericCols.every((n) => blankVal(row[n]))))
-}
-
 /** 记录"已保存"基线快照（load 完成/保存成功后调用） */
 function markSavedSnapshot() {
   try {
