@@ -455,15 +455,19 @@ public class PanelConfigService {
 
     /** 参照带回映射(对齐 light-mes ref.map 契约):
      *  1) 同名字段自动映射;2) 同义词映射(引用面板字段 → 本面板异名字段)。
-     *  参照弹窗选中后整串回填——如选存货同时带出 存货编码/规格型号/单位/单价 等。 */
+     *  参照弹窗选中后整串回填——如选存货同时带出 存货编码/规格型号/单位/单价 等。
+     *  2026-09-09:本单自身标识字段(分组列/单据号列/日期列/主键列)永不参与带回——
+     *  单据→单据参照(数据记录表→立项申请)同名标签会冲掉本单的单据编号/单据日期,
+     *  保存时唯一性校验把本单当成重复单据而拒绝。 */
     private List<Map<String, String>> buildRefMap(PanelRegistry.PanelDef def, PanelRegistry.FieldDef f) {
         List<Map<String, String>> out = new ArrayList<>();
         if (def == null || f.refPanel() == null) return out;
         try {
             PanelRegistry.PanelDef refDef = registry.panel(f.refPanel());
-            java.util.Set<String> mapped = new java.util.HashSet<>();
+            java.util.Set<String> mapped = new java.util.HashSet<>(selfIdentityLabels(def));
             for (PanelRegistry.FieldDef sibling : def.fields()) {
                 if (sibling.label().equals(f.label())) continue;
+                if (mapped.contains(sibling.label())) continue;
                 if (refDef.byLabel(sibling.label()) != null) {
                     out.add(Map.of("from", sibling.label(), "to", sibling.label()));
                     mapped.add(sibling.label());
@@ -479,6 +483,17 @@ public class PanelConfigService {
                 }
             }
         } catch (Exception ignore) { /* 引用面板不存在时静默跳过 */ }
+        return out;
+    }
+
+    /** 本单自身标识字段的标签集合(分组列=单据编号 / 单据号列 / 日期列 / 主键列):参照带回禁止覆盖 */
+    private java.util.Set<String> selfIdentityLabels(PanelRegistry.PanelDef def) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        for (String col : new String[]{def.groupCol(), def.codeCol(), def.dateCol(), def.pkCol()}) {
+            if (col == null || col.isBlank()) continue;
+            PanelRegistry.FieldDef fd = def.byCol(col);
+            if (fd != null) out.add(fd.label());
+        }
         return out;
     }
 

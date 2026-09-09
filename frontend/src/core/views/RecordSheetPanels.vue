@@ -57,7 +57,12 @@
         <tr>
           <td class="rs-td rs-company-cell" :colspan="nCols - 1">惠州市银嘉环保科技有限公司</td>
           <td class="rs-td rs-docno">
-            <el-input v-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" @input="emit('dirty')" />
+            <!-- 文档编号:配置为参照时(如数据记录表→立项申请)点击弹参照;否则保持纯输入 -->
+            <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+              <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
+              <el-icon class="rs-ref-ico"><Search /></el-icon>
+            </div>
+            <el-input v-else-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" @input="emit('dirty')" />
             <template v-else>{{ head['文档编号'] || head['单据编号'] || cfg.docNoDefault || 'YJ-PD-01' }}</template>
           </td>
         </tr>
