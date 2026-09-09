@@ -40,3 +40,5 @@ deploy/*.bak
 deploy/*.jar
 *.deploy.zip
 yinjia-mes-deploy.zip
+
+tools/_flow-v12/forms-images-full/
