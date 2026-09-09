@@ -2317,6 +2317,8 @@ function chartOf(dt) {
   body.approval-printing .rs-field-edit-btn,
   body.approval-printing .rsp-lib-pick,
   body.approval-printing .rs-lib-btn,
+  /* 产品开发状态角标(未开发/已开发)属界面辅助信息,打印/导出不出现 */
+  body.approval-printing .rs-dev-badge,
   body.approval-printing [style*="从物料清单引用"] {
     display: none !important;
   }
@@ -2329,6 +2331,10 @@ function chartOf(dt) {
   }
   @page {
     margin: 8mm;
+  }
+  /* 兜底:不经「打印」按钮直接 Ctrl+P 时,同样不打印产品开发状态角标 */
+  .rs-dev-badge {
+    display: none !important;
   }
 }
 </style>

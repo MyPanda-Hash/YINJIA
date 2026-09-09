@@ -144,10 +144,24 @@ public class DevTaskService {
         };
     }
 
-    /** 该产品在该面板是否「已开发」(有任意未删除单据)——参照标注用 */
+    /**
+     * 该产品在该面板的参照标注:未下发 → 空(不标注,不属于下发流程);
+     * 已下发 → 未开发 / 已开发。
+     */
     public String annotate(String productCode, String panelCode) {
+        if (productCode == null || productCode.isBlank()) return "";
+        if (!dispatchedTo(productCode, panelCode)) return "";
         String st = statusOf(productCode, panelCode);
         return STATUS_NONE.equals(st) ? STATUS_NONE : "已开发";
+    }
+
+    /** 该产品是否已下发到指定面板 */
+    public boolean dispatchedTo(String productCode, String panelCode) {
+        if (productCode == null || productCode.isBlank()) return false;
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM rd_dev_task WHERE 产品编号 = ? AND 目标面板 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                Integer.class, productCode, panelCode);
+        return n != null && n > 0;
     }
 
     /** 批量标注:产品编号列表 → { 未开发 | 已开发 } */
