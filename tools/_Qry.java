@@ -1,21 +1,15 @@
-// _Qry.java — 实例登录名与库所有者侦察
+// _Qry.java — 验证销售订单同步落库
 import java.sql.*;
 public class _Qry {
   public static void main(String[] a) throws Exception {
     try (Connection c = DriverManager.getConnection("jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false", "yinjia", "Yinjia@2026")) {
       Statement s = c.createStatement();
-      System.out.println("== server principals (SQL/Windows logins) ==");
-      try (ResultSet r = s.executeQuery("SELECT name, type_desc, is_disabled, CAST(is_sysadmin AS varchar) FROM (SELECT name, type_desc, is_disabled, CASE WHEN type='S' AND name='sa' THEN 1 ELSE 0 END AS is_sysadmin FROM sys.server_principals WHERE type IN ('S','U') AND name NOT LIKE '##%') t")) {
-        while (r.next()) System.out.println("  " + r.getString(1) + " | " + r.getString(2) + " | disabled=" + r.getString(3));
-      } catch (Exception e) { System.out.println("  ERR: " + e.getMessage().split("\n")[0]); }
-      System.out.println("== HSDZ_MES owner ==");
-      try (ResultSet r = s.executeQuery("SELECT d.name, SUSER_SNAME(d.owner_sid), d.owner_sid FROM sys.databases d WHERE d.name='HSDZ_MES'")) {
-        while (r.next()) System.out.println("  db=" + r.getString(1) + " owner=" + r.getString(2) + " sid=" + r.getString(3));
-      } catch (Exception e) { System.out.println("  ERR: " + e.getMessage().split("\n")[0]); }
-      System.out.println("== yinjia server perms ==");
-      try (ResultSet r = s.executeQuery("SELECT p.permission_name FROM sys.server_principals pr JOIN sys.server_permissions p ON p.grantee_principal_id = pr.principal_id WHERE pr.name='yinjia'")) {
-        while (r.next()) System.out.println("  " + r.getString(1));
-      } catch (Exception e) { System.out.println("  ERR: " + e.getMessage().split("\n")[0]); }
+      ResultSet r = s.executeQuery("SELECT 单据编号, 客户, 单据状态, 外部数据ID, asp_user1 FROM bd_so_order ORDER BY id");
+      while (r.next()) System.out.println("bd_so_order: " + r.getString(1) + " | " + r.getString(2) + " | " + r.getString(3) + " | ext=" + r.getString(4) + " | by=" + r.getString(5));
+      r = s.executeQuery("SELECT COUNT(1) FROM bl_so_order");
+      r.next(); System.out.println("bl_so_order lines: " + r.getInt(1));
+      r = s.executeQuery("SELECT doc_no, shr, shsj, stopped FROM yj_doc_status WHERE panel_code='SO_ORDER' ORDER BY doc_no");
+      while (r.next()) System.out.println("yj_doc_status: " + r.getString(1) + " | 审核人=" + r.getString(2) + " | " + r.getString(3) + " | stopped=" + r.getString(4));
     }
   }
 }

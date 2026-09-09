@@ -121,6 +121,9 @@ bd/bl 表,幂等锚点=`外部数据ID` 唯一索引(行表按单号先删后插
 `yj_doc_status`(shr/shsj/stopped),星辰为唯一事实源(MES 手动审核 5 分钟内被覆盖)。
 已落地:销售订单(/jdy/v2/scm/sal_order → bd_so_order/bl_so_order,2026-09-08 实跑验证)。
 踩坑:账套限流 500 次/分钟;路径含括号会致计划任务静默失败(部署到 D:\jdy-sync);bat 须 CRLF。
+**本机(PANDA/Win11 26340)部署**:计划任务 JdySalOrderSync 直接以 node.exe(C:\nvm4w\nodejs)为动作,
+每 5 分钟——**该构建拒绝 wscript.exe 作为任务动作(0x800710E0),README 的 vbs 隐藏方案不可用**;
+node 走 nvm4w,勿硬编码 Program Files 路径;任务设置须放开电池供电限制。
 erp_imp_log/erp_imp_row 通道表定位调整为**审计层**(同步器写批次摘要),不作为写入路径。
 
 ### 归档后申请修改(Archived Modification Request)
