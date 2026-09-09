@@ -30,13 +30,16 @@ public class ButtonService {
     private final QueryService queryService;
     private final FormNoService formNoService;
     private final JdbcTemplate jdbc;
+    private final DevTaskService devTaskService;
 
     public ButtonService(PanelRegistry registry, QueryService queryService,
-                         FormNoService formNoService, JdbcTemplate jdbc) {
+                         FormNoService formNoService, JdbcTemplate jdbc,
+                         DevTaskService devTaskService) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
         this.jdbc = jdbc;
+        this.devTaskService = devTaskService;
     }
 
     @Transactional
@@ -64,6 +67,8 @@ public class ButtonService {
             case "删除审批驳回" -> rejectDelete(def, formData);
             // 文件类面板:归档后申请修改(管理员审批进入修改态,再审批归档+修改记录滚动3条)
             case "申请修改" -> modifyRequest(def, formData);
+            // 产品信息表:归档后下发产品开发到 5 个下游文件面板(2026-09-09)
+            case "产品开发" -> dispatchDev(def, formData);
             case "修改审批通过" -> modifyApprove(def, formData);
             case "修改审批驳回" -> modifyReject(def, formData);
             case "修改记录" -> modifyHistory(def, formData);
@@ -778,6 +783,45 @@ public class ButtonService {
     private String optionalText(Map<String, Object> formData, String key) {
         Object v = formData == null ? null : formData.get(key);
         return v == null ? "" : String.valueOf(v).trim();
+    }
+
+    /** 产品开发下发(2026-09-09):仅产品信息表、仅已归档、按产品编号幂等 → 写 rd_dev_task 5 行 */
+    private Map<String, Object> dispatchDev(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_PROD_INFO".equals(def.code())) throw new IllegalStateException("仅产品信息表可下发产品开发");
+        String user = currentUserName();
+        if (!canEdit(user, def.code()))
+            throw new org.springframework.security.access.AccessDeniedException("当前角色无该面板编辑权限");
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if (!"已归档".equals(st)) throw new IllegalStateException("仅已归档的产品信息表可下发产品开发");
+        Map<String, Object> head = jdbc.queryForMap(
+                "SELECT TOP 1 产品编号, 产品名称 FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        String productCode = head.get("产品编号") == null ? "" : String.valueOf(head.get("产品编号")).trim();
+        String productName = head.get("产品名称") == null ? "" : String.valueOf(head.get("产品名称")).trim();
+        if (productCode.isEmpty()) throw new IllegalStateException("产品信息表的「产品编号」为空,无法下发");
+        Map<String, Object> out = devTaskService.dispatch(productCode, productName, no, user);
+        Map<String, Object> r = result(no, Boolean.TRUE.equals(out.get("already")) ? "已下发" : "已下发");
+        r.put("already", out.get("already"));
+        r.put("productCode", productCode);
+        r.put("panels", out.get("panels"));
+        return r;
+    }
+
+    /** 编辑权:管理员恒可;普通用户角色对该面板勾了 add 或 modify */
+    private boolean canEdit(String user, String panelCode) {
+        if (isAdminUser(user)) return true;
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT rp.perms FROM yj_user u JOIN yj_role_panel rp ON rp.role_id = u.role_id"
+                        + " WHERE u.username = ? AND rp.panel_code = ?", user, panelCode);
+        for (Map<String, Object> row : rows) {
+            String perms = row.get("perms") == null ? "" : String.valueOf(row.get("perms"));
+            for (String p : perms.split(",")) {
+                String t = p.trim();
+                if ("add".equals(t) || "modify".equals(t)) return true;
+            }
+        }
+        return false;
     }
 
     /** 申请修改:已归档/已审核 → 修改申请中(待管理员审批) */

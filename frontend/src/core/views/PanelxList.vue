@@ -188,6 +188,14 @@
                 </div>
               </div>
               <div class="as-side-btn" v-if="isProdFilePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
+              <!-- 产品开发下发:仅产品信息表;归档后可点;下发过则置灰显示「已下发」 -->
+              <div
+                class="as-side-btn"
+                v-if="panelCode === 'RD_PROD_INFO'"
+                :class="{ disabled: !canDevDispatch || devDispatch.dispatched }"
+                :title="devDispatch.dispatched ? tt('该产品已下发到下游面板') : (canDevDispatch ? tt('把该产品下发到下游 5 个文件面板') : tt('仅已归档的产品信息表可下发'))"
+                @click="onDevDispatch"
+              >{{ devDispatch.dispatched ? tt('已下发') : tt('产品开发') }}</div>
               <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
                 <div
                   class="as-side-btn"
@@ -1422,6 +1430,41 @@ const modifyLogVisible = ref(false)
 const modifyLogRecords = ref([])
 const modifyLogNo = ref('')
 
+// ── 产品开发下发(2026-09-09):仅产品信息表;归档后可用;按产品编号下发过则置灰「已下发」 ──
+const devDispatch = reactive({ productCode: '', dispatched: false, busy: false })
+const canDevDispatch = computed(() => panelCode.value === 'RD_PROD_INFO' && curDocStatus.value === '已归档')
+async function loadDevDispatchState() {
+  if (panelCode.value !== 'RD_PROD_INFO') {
+    devDispatch.productCode = ''
+    devDispatch.dispatched = false
+    return
+  }
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) {
+    devDispatch.productCode = ''
+    devDispatch.dispatched = false
+    return
+  }
+  try {
+    const res = await engine.rdDevButtonState(no)
+    devDispatch.productCode = res?.productCode || ''
+    devDispatch.dispatched = !!res?.dispatched
+  } catch (e) {
+    devDispatch.productCode = ''
+    devDispatch.dispatched = false
+  }
+}
+async function onDevDispatch() {
+  if (!canDevDispatch.value || devDispatch.dispatched || devDispatch.busy) return
+  devDispatch.busy = true
+  try {
+    await onButton('产品开发')
+    await loadDevDispatchState()
+  } finally {
+    devDispatch.busy = false
+  }
+}
+
 function pickModAction(action) {
   openModMenu.value = false
   onSideAction(action)
@@ -1528,6 +1571,9 @@ const cur = computed(() => {
   return l[Math.min(curIdx.value, l.length - 1)]
 })
 const curNo = computed(() => (list.value.length ? Math.min(curIdx.value, list.value.length - 1) + 1 : 0))
+
+// 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
+watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState() }, { immediate: true })
 
 // 文书默认值:新建起草时 申请立项人=当前用户 / 申请立项日期=今天(用户可改,不置脏)
 // 注意:watch getter 在 setup 时立即求值,必须位于 draftEditable/cur 定义之后
@@ -2838,6 +2884,58 @@ async function directAdd() {
 const savedSnapshot = ref('')
 const freshAdded = ref(false)
 const freshAddedNo = ref('') // freshAdded 绑定的单据编号:撤回只允许命中这张单,防止 cur 漂移后误撤既有单据
+/** 当前单据是否为「本次新增且尚未成功保存过」的草稿(freshAdded 且编号匹配,防 cur 漂移误判) */
+function isFreshAddedDoc() {
+  if (!freshAdded.value) return false
+  if (!freshAddedNo.value) return true
+  return cur.value?.['编号'] === freshAddedNo.value
+}
+// ---- 新增草稿标记的持久化(2026-09-09 补齐):刷新/重进后离开守卫仍能识别并撤回这张草稿 ----
+const FRESH_DRAFT_KEY = 'mes_fresh_draft'
+function markFreshDraft(documentNo) {
+  try {
+    sessionStorage.setItem(FRESH_DRAFT_KEY, JSON.stringify({ panel: panelCode.value, no: String(documentNo || '') }))
+  } catch { /* 存储不可用则退化为仅内存标记 */ }
+}
+function clearFreshDraft(documentNo) {
+  try {
+    const raw = sessionStorage.getItem(FRESH_DRAFT_KEY)
+    if (!raw) return
+    let saved = null
+    try { saved = JSON.parse(raw) } catch { saved = null }
+    if (!documentNo || !saved || String(saved.no || '') === String(documentNo)) {
+      sessionStorage.removeItem(FRESH_DRAFT_KEY)
+    }
+  } catch { /* ignore */ }
+}
+function restoreFreshDraft() {
+  try {
+    const raw = sessionStorage.getItem(FRESH_DRAFT_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    if (saved && saved.panel === panelCode.value && saved.no) {
+      freshAdded.value = true
+      freshAddedNo.value = String(saved.no)
+    }
+  } catch { /* ignore */ }
+}
+/** 保存基线是否为「空白草稿」(新增后保存为草稿且未填任何内容)——离开守卫据此仍判定未保存 */
+const savedBlankDraft = ref(false)
+/** 明细内容是否为空:所有页签下都没有任何带值的行 */
+function isBlankDraftContent(detail) {
+  if (!detail || typeof detail !== 'object') return true
+  for (const rows of Object.values(detail)) {
+    if (!Array.isArray(rows)) continue
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue
+      for (const [key, value] of Object.entries(row)) {
+        if (key === '_placeholder' || key === 'id' || key === '序号') continue
+        if (value !== undefined && value !== null && String(value).trim() !== '') return false
+      }
+    }
+  }
+  return true
+}
 /** 变更钩子置脏(表头/明细控件 @change;对真实交互可靠)——快照对比作兜底 */
 const inlineDirtyFlag = ref(false)
 function markInlineDirty() { if (draftEditable.value) inlineDirtyFlag.value = true }
@@ -3404,6 +3502,7 @@ async function load() {
     refreshRefModes()
     markSavedSnapshot() // 未保存离开守卫的基线快照（载入即干净；保存成功也会经此刷新）
     inlineDirtyFlag.value = false
+    restoreFreshDraft() // 刷新/重进后恢复「本次新增未保存草稿」标记,守卫仍可撤回
   } catch (e) {
     const msg = engine.errMsg(e) || '加载失败'
     ElMessage.error(msg)
@@ -3669,6 +3768,13 @@ onMounted(() => {
   if (invalidPanel.value) {
     router.replace('/panelx/list/MANU_ORDER')
     return
+  }
+  // 从「我的桌面 · 产品开发」矩阵跳转:带 ?docNo= 直接定位到该单据
+  const jumpDocNo = route.query.docNo
+  if (jumpDocNo) {
+    docQueryNo.value = String(jumpDocNo)
+    condition['_docNo'] = String(jumpDocNo)
+    router.replace({ path: route.path, query: { ...route.query, docNo: undefined } })
   }
   load()
 })

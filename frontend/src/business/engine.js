@@ -251,6 +251,28 @@ export async function queryFormDataList(params) {
   return unwrap(await request.post('/px/queryFormDataList', params))
 }
 
+// ==================== 产品开发下发(2026-09-09) ====================
+
+/** 下游面板元数据(矩阵列头):[{panelCode, panelName}] */
+export async function rdDevMeta() {
+  return unwrap(await request.get('/px/rdDev/meta'))
+}
+
+/** 产品信息表侧边栏按钮状态:{ productCode, dispatched } */
+export async function rdDevButtonState(docNo) {
+  return unwrap(await request.get('/px/rdDev/buttonState', { params: { docNo } }))
+}
+
+/** 已下发产品的开发矩阵 */
+export async function rdDevBoard() {
+  return unwrap(await request.get('/px/rdDev/board'))
+}
+
+/** 参照标注:某面板下这批产品是 未开发 / 已开发 */
+export async function rdDevAnnotate(panelCode, productCodes) {
+  return unwrap(await request.post('/px/rdDev/annotate', { panelCode, productCodes }))
+}
+
 /**
  * 按库存状况表口径回填明细现存量：有仓库取仓库库存，无仓库取全部仓库合计。
  * 选择存货后即时调用，避免引用存货档案中的静态值。

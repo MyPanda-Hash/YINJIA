@@ -106,16 +106,17 @@ const user = useUserStore()
 
 const types = [
   { type: 'todo', title: '待办', icon: 'Bell' },
+  { type: 'dev', title: '产品开发', icon: 'Promotion' },
   { type: 'message', title: '消息', icon: 'Message' },
   { type: 'alarm', title: '预警', icon: 'Warning' },
 ]
 
-const TAG_TYPE = { todo: 'warning', message: 'success', alarm: 'danger' }
+const TAG_TYPE = { todo: 'warning', dev: 'primary', message: 'success', alarm: 'danger' }
 
 const visible = ref(null)
-const badge = ref({ todo: 0, message: 0, alarm: 0 })
-const listMap = reactive({ todo: [], message: [], alarm: [] })
-const loadingMap = reactive({ todo: false, message: false, alarm: false })
+const badge = ref({ todo: 0, dev: 0, message: 0, alarm: 0 })
+const listMap = reactive({ todo: [], dev: [], message: [], alarm: [] })
+const loadingMap = reactive({ todo: false, dev: false, message: false, alarm: false })
 
 const detailVisible = ref(false)
 const historyVisible = ref(false)
@@ -263,6 +264,7 @@ onBeforeUnmount(() => {
 }
 
 .nc-ref.type-todo.active { color: #a56b14; background: #fff3dc; }
+.nc-ref.type-dev.active { color: #1a56db; background: #e8f0fe; }
 .nc-ref.type-message.active { color: #456f7e; background: #eaf0f2; }
 .nc-ref.type-alarm.active { color: #ad4438; background: #faece9; }
 

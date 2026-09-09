@@ -2,6 +2,7 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.panel.PanelRuntimeService;
+import com.yinjia.mes.service.DevTaskService;
 import com.yinjia.mes.service.PanelConfigService;
 import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.ReportColumnSettingsService;
@@ -33,11 +34,13 @@ public class PxController {
     private final PanelRegistry registry;
     private final UsageLogService usageLog;
     private final JdbcTemplate jdbc;
+    private final DevTaskService devTaskService;
 
     public PxController(PanelRuntimeService service, PanelConfigService configService,
                         ReportColumnSettingsService reportColumnSettingsService,
                         VoucherFlowService voucherFlowService,
-                        PanelRegistry registry, UsageLogService usageLog, JdbcTemplate jdbc) {
+                        PanelRegistry registry, UsageLogService usageLog, JdbcTemplate jdbc,
+                        DevTaskService devTaskService) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -45,6 +48,43 @@ public class PxController {
         this.registry = registry;
         this.usageLog = usageLog;
         this.jdbc = jdbc;
+        this.devTaskService = devTaskService;
+    }
+
+    /** 产品开发:下游面板元数据(矩阵列头) */
+    @GetMapping("/rdDev/meta")
+    public ApiResult<List<Map<String, String>>> rdDevMeta() {
+        return ApiResult.ok(DevTaskService.devPanelMeta());
+    }
+
+    /** 产品开发:产品信息表侧边栏按钮状态(是否已下发) */
+    @GetMapping("/rdDev/buttonState")
+    public ApiResult<Map<String, Object>> rdDevButtonState(@RequestParam String docNo) {
+        String productCode = null;
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT TOP 1 产品编号 FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
+        if (!rows.isEmpty() && rows.get(0).get("产品编号") != null) {
+            productCode = String.valueOf(rows.get(0).get("产品编号")).trim();
+        }
+        return ApiResult.ok(devTaskService.buttonState(productCode));
+    }
+
+    /** 产品开发:已下发产品的开发矩阵 */
+    @GetMapping("/rdDev/board")
+    public ApiResult<List<Map<String, Object>>> rdDevBoard() {
+        return ApiResult.ok(devTaskService.board());
+    }
+
+    /** 产品开发:参照标注(某面板下,这批产品是 未开发 / 已开发) */
+    @PostMapping("/rdDev/annotate")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, String>> rdDevAnnotate(@RequestBody Map<String, Object> body) {
+        String panelCode = body.get("panelCode") == null ? "" : String.valueOf(body.get("panelCode"));
+        Object codes = body.get("productCodes");
+        List<String> list = codes instanceof List<?> l
+                ? l.stream().map(v -> v == null ? "" : String.valueOf(v)).toList()
+                : List.of();
+        return ApiResult.ok(devTaskService.annotateBatch(panelCode, list));
     }
 
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher) */
