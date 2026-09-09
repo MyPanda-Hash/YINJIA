@@ -128,6 +128,25 @@ public class ButtonService {
                 if (lot == null || String.valueOf(lot).isBlank()) it.put("批号", lotSeqService.next());
             }
         }
+        // 计划层:生产工单无工序行时预填全部启用工序(bs_op 顺序),计划数量=订单数量
+        // (五道工序共用一张工单;成型计划数量可在头上按"1切几"折算另填)
+        if ("WO_ORDER".equals(def.code()) && !items.isEmpty()) {
+            boolean hasOp = items.stream().anyMatch(it -> it.get("工序") != null && !String.valueOf(it.get("工序")).isBlank());
+            if (!hasOp) {
+                Object orderQty = body.get("订单数量");
+                double plan = orderQty == null ? 0 : Double.parseDouble(String.valueOf(orderQty));
+                List<String> ops = jdbc.queryForList(
+                        "SELECT 工序名称 FROM bs_op WHERE ISNULL([状态], N'启用') = N'启用' AND ISNULL(是否停用, 0) = 0 ORDER BY id", String.class);
+                items.clear();
+                for (String op : ops) {
+                    Map<String, Object> row = new java.util.LinkedHashMap<>();
+                    row.put("工序", op);
+                    row.put("计划数量", plan);
+                    row.put("完成数量", 0);
+                    items.add(row);
+                }
+            }
+        }
 
         String no = noObj == null || String.valueOf(noObj).isBlank() ? null : String.valueOf(noObj);
         if (def.isDoc()) {

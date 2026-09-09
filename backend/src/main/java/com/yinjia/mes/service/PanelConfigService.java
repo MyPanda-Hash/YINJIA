@@ -640,6 +640,19 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
+            // 生产工单(计划层):选单=销售订单;五道工序共用工单;标签=工单二维码(扫码报工/领料入口)
+            java.util.Map.entry("WO_ORDER", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"选单", "选销售订单"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "审核", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"标签", "打印工单二维码"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
             // 产成品入库单:选单=生产加工单;生单灰(PANDA:生成产成品入库单（自制退库）)
             java.util.Map.entry("FINISH_IN", List.of(
                     new String[]{"新增", "新增"},
@@ -781,6 +794,7 @@ public class PanelConfigService {
             java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(品检分流链)
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(品检分流)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
+            java.util.Map.entry("WO_ORDER", "SO_ORDER"),             // 销售订单 → 生产工单(计划层:选单生单)
             java.util.Map.entry("RKD", "CGD"),                       // 采购单(旧) → 入库单(旧)
             java.util.Map.entry("CKD", "KHDD")                       // 客户订单(旧) → 出库单(旧)
     )));
@@ -805,6 +819,9 @@ public class PanelConfigService {
             {"暂收数量", "送检数量"},
             {"合格数量", "实收数量"},
             {"不合格数量", "退货数量"},
+            // 计划层(销售订单 → 生产工单)的产品口径换名
+            {"存货编码", "产品编码"}, {"存货名称", "产品名称"},
+            {"数量", "订单数量"},
     };
 
     /** 头字段同义词(按链路 source|target 键控;同名映射之外的补充)。 */
@@ -815,7 +832,8 @@ public class PanelConfigService {
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             "QC_RECV|QC_INSP", new String[][]{{"单据编号", "暂收单号"}},
             "QC_INSP|PURCHASE_IN", new String[][]{{"单据编号", "外部单据号"}},
-            "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}}
+            "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}},
+            "SO_ORDER|WO_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "交期"}}
     )));
 
     /** 生单/选单共用的头行映射(目标面板 → {source, headerMap, detailMap});供 PushGenerateHandler 复用。 */

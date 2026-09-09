@@ -10,7 +10,7 @@
         <div class="qr-label-info">
           <div class="qr-label-line strong">{{ lb.code }}</div>
           <div class="qr-label-line">{{ lb.name }}</div>
-          <div class="qr-label-line">LOT {{ lb.lot }}</div>
+          <div v-if="lb.lot" class="qr-label-line">LOT {{ lb.lot }}</div>
           <div class="qr-label-line dim">{{ lb.qty }} {{ lb.unit }} · {{ lb.doc }}</div>
         </div>
       </div>
@@ -41,8 +41,9 @@ const gridRef = ref(null)
 
 async function renderQr() {
   for (const lb of props.labels) {
-    if (!lb.qr && lb.code && lb.lot) {
-      try { lb.qr = await QRCode.toDataURL(`${lb.code}|${lb.lot}`, { width: 160, margin: 1, errorCorrectionLevel: 'M' }) }
+    if (!lb.qr && lb.code) {
+      const text = lb.lot ? `${lb.code}|${lb.lot}` : String(lb.code)
+      try { lb.qr = await QRCode.toDataURL(text, { width: 160, margin: 1, errorCorrectionLevel: 'M' }) }
       catch { /* 单张失败不影响其余 */ }
     }
   }

@@ -156,6 +156,7 @@ export const menuTree = [
           {
             code: 'doc', title: '单据', children: [
               { code: 'manufactureOrder', title: '生产加工单', path: '/panelx/list/MANU_ORDER', icon: 'Document', panelCode: 'MANU_ORDER', operationName: '新增流程' },
+              { code: 'woOrder', title: '生产工单', path: '/panelx/list/WO_ORDER', icon: 'Tickets', panelCode: 'WO_ORDER', operationName: '新增流程' },
               { code: 'dispatch', title: '工序派工单', path: '/panelx/list/DISPATCH', icon: 'AlarmClock', panelCode: 'DISPATCH', operationName: '新增流程' },
               { code: 'outsourceOrder', title: '委外加工单', path: '/panelx/list/OUTSOURCE_ORDER', icon: 'Tickets', panelCode: 'OUTSOURCE_ORDER', operationName: '新增流程' },
             ],

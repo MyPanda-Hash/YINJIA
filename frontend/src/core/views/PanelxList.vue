@@ -3103,6 +3103,18 @@ async function onButton(action) {
     openQrLabels()
     return
   }
+  // 工单二维码(计划层):单产品工单一张标签,二维码=工单号(扫码报工/领料入口)
+  if (action === '打印工单二维码') {
+    const cur = current.value || {}
+    const no = cur['单据编号'] || cur['编号'] || ''
+    if (!no) return ElMessage.warning('请先选择一张工单')
+    qrLabels.value = [{
+      code: no, name: cur['产品名称'] || '', lot: '', qty: cur['订单数量'], unit: cur['单位'] || '',
+      doc: `交期 ${cur['交期'] || '-'}`, qr: '',
+    }]
+    qrVisible.value = true
+    return
+  }
   if (action === '查询' || action === '查找') {
     search()
     return
