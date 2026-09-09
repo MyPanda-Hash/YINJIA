@@ -83,3 +83,4 @@ migrate-rebuild-inventory.sql
 migrate-fix-ghost-required.sql
 migrate-fin-archive.sql
 migrate-base-fields.sql
+migrate-rd-panel-register.sql
