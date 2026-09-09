@@ -113,15 +113,14 @@ const types = [
   { type: 'msg', title: '消息', icon: 'ChatDotRound' },
   { type: 'dev', title: '产品开发', icon: 'Promotion' },
   { type: 'alarm', title: '预警', icon: 'Warning' },
-  { type: 'message', title: '动态', icon: 'Message' },
 ]
 
-const TAG_TYPE = { todo: 'warning', msg: 'primary', dev: 'primary', message: 'success', alarm: 'danger' }
+const TAG_TYPE = { todo: 'warning', msg: 'primary', dev: 'primary', alarm: 'danger' }
 
 const visible = ref(null)
-const badge = ref({ todo: 0, msg: 0, dev: 0, message: 0, alarm: 0 })
-const listMap = reactive({ todo: [], msg: [], dev: [], message: [], alarm: [] })
-const loadingMap = reactive({ todo: false, msg: false, dev: false, message: false, alarm: false })
+const badge = ref({ todo: 0, msg: 0, dev: 0, alarm: 0 })
+const listMap = reactive({ todo: [], msg: [], dev: [], alarm: [] })
+const loadingMap = reactive({ todo: false, msg: false, dev: false, alarm: false })
 
 // ── 业务事件消息(2026-09-09):消息码 + 参数 → i18n 模板渲染(键即中文模板,切语言消息跟着变) ──
 const MSG_TPL = {
@@ -333,7 +332,6 @@ onBeforeUnmount(() => {
 .nc-ref.type-todo.active { color: #a56b14; background: #fff3dc; }
 .nc-ref.type-msg.active { color: #1a56db; background: #e8f0fe; }
 .nc-ref.type-dev.active { color: #1a56db; background: #e8f0fe; }
-.nc-ref.type-message.active { color: #456f7e; background: #eaf0f2; }
 .nc-ref.type-alarm.active { color: #ad4438; background: #faece9; }
 
 .nc-badge {
