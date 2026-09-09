@@ -36,6 +36,22 @@ export async function apiGetNotices(type) {
   return res?.data ?? res
 }
 
+// ---- 业务事件消息(2026-09-09) ----
+export async function apiGetMessages({ onlyUnread = false, limit = 100 } = {}) {
+  const res = await request.get('/portal/message/list', { params: { onlyUnread, limit } })
+  return res?.data ?? res
+}
+
+export async function apiReadMessage(id) {
+  const res = await request.post('/portal/message/read', { id })
+  return res?.data ?? res
+}
+
+export async function apiReadAllMessages() {
+  const res = await request.post('/portal/message/readAll', {})
+  return res?.data ?? res
+}
+
 export async function apiPageManuOrders(params) {
   const res = await request.get('/manu/order/page', { params })
   return res?.data ?? res

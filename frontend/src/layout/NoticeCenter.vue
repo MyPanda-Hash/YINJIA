@@ -30,7 +30,10 @@
           <span class="nc-title">{{ tt(cfg.title) }}</span>
           <span class="nc-scope">{{ user.account || user.realName }}</span>
         </div>
-        <span class="nc-more" @click="openHistory(cfg)">{{ tt('全部') }} {{ badge[cfg.type] || 0 }} {{ tt('项') }}</span>
+        <div class="nc-head-actions">
+          <span v-if="cfg.type === 'msg' && badge.msg" class="nc-more" @click.stop="readAllMsg">{{ tt('全部已读') }}</span>
+          <span class="nc-more" @click="openHistory(cfg)">{{ tt('全部') }} {{ badge[cfg.type] || 0 }} {{ tt('项') }}</span>
+        </div>
       </div>
       <div v-loading="loadingMap[cfg.type]" class="nc-list">
         <div
@@ -97,26 +100,94 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { apiGetBadge, apiGetNotices } from '@/business/api'
+import { apiGetBadge, apiGetNotices, apiGetMessages, apiReadMessage, apiReadAllMessages } from '@/business/api'
 import { useUserStore } from '@/stores/user'
 import { tt } from '@/i18n'
+import { ElMessage } from 'element-plus'
 
 const router = useRouter()
 const user = useUserStore()
 
 const types = [
   { type: 'todo', title: '待办', icon: 'Bell' },
+  { type: 'msg', title: '消息', icon: 'ChatDotRound' },
   { type: 'dev', title: '产品开发', icon: 'Promotion' },
-  { type: 'message', title: '消息', icon: 'Message' },
   { type: 'alarm', title: '预警', icon: 'Warning' },
+  { type: 'message', title: '动态', icon: 'Message' },
 ]
 
-const TAG_TYPE = { todo: 'warning', dev: 'primary', message: 'success', alarm: 'danger' }
+const TAG_TYPE = { todo: 'warning', msg: 'primary', dev: 'primary', message: 'success', alarm: 'danger' }
 
 const visible = ref(null)
-const badge = ref({ todo: 0, dev: 0, message: 0, alarm: 0 })
-const listMap = reactive({ todo: [], dev: [], message: [], alarm: [] })
-const loadingMap = reactive({ todo: false, dev: false, message: false, alarm: false })
+const badge = ref({ todo: 0, msg: 0, dev: 0, message: 0, alarm: 0 })
+const listMap = reactive({ todo: [], msg: [], dev: [], message: [], alarm: [] })
+const loadingMap = reactive({ todo: false, msg: false, dev: false, message: false, alarm: false })
+
+// ── 业务事件消息(2026-09-09):消息码 + 参数 → i18n 模板渲染(键即中文模板,切语言消息跟着变) ──
+const MSG_TPL = {
+  APPROVAL_SUBMITTED: { title: '新的待审批单据', body: '{actor} 提交了「{panelName} {docNo}」，等待您审批。' },
+  APPROVAL_APPROVED: { title: '审批通过', body: '您提交的「{panelName} {docNo}」已由 {actor} 审批通过。' },
+  APPROVAL_REJECTED: { title: '审批被驳回', body: '您提交的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}' },
+  MODIFY_REQUESTED: { title: '新的修改申请', body: '{actor} 申请修改「{panelName} {docNo}」，等待您审批。' },
+  DELETE_REQUESTED: { title: '新的删除申请', body: '{actor} 申请删除「{panelName} {docNo}」，等待您审批。' },
+}
+
+function fillTpl(text, params) {
+  let out = tt(text)
+  for (const [k, v] of Object.entries(params || {})) {
+    out = out.split(`{${k}}`).join(v === null || v === undefined ? '' : String(v))
+  }
+  return out.replace(/\{[a-zA-Z]+\}/g, '').trim()
+}
+
+function mapMsg(r) {
+  const tpl = MSG_TPL[r['消息码']] || { title: '业务消息', body: '{panelName} {docNo}' }
+  const params = r.params || {}
+  return {
+    id: `msg:${r.id}`,
+    rawId: r.id,
+    type: 'msg',
+    title: fillTpl(tpl.title, params),
+    content: fillTpl(tpl.body, { ...params, panelName: params.panelName ? tt(params.panelName) : '' }),
+    time: String(r['创建时间'] || '').replace('T', ' ').slice(0, 19),
+    read: r['已读'] === 'Y',
+    panelCode: r['面板编码'] || '',
+    formNo: params.docNo || r['单据编号'] || '',
+    targetPath: r['面板编码'] ? `/panelx/list/${r['面板编码']}` : '',
+    actionLabel: '去处理',
+  }
+}
+
+async function load(type) {
+  if (loadingMap[type]) return
+  loadingMap[type] = true
+  try {
+    if (type === 'msg') {
+      const rows = await apiGetMessages({ limit: 100 })
+      listMap.msg = (rows || []).map(mapMsg)
+      badge.value = { ...badge.value, msg: listMap.msg.filter((m) => !m.read).length }
+    } else {
+      listMap[type] = await apiGetNotices(type)
+      badge.value = { ...badge.value, [type]: listMap[type].length }
+    }
+  } catch (e) {
+    listMap[type] = []
+  } finally {
+    loadingMap[type] = false
+  }
+}
+
+/** 全部已读(仅「消息」页签) */
+async function readAllMsg() {
+  try {
+    const res = await apiReadAllMessages()
+    badge.value = { ...badge.value, msg: res?.unread ?? 0 }
+    listMap.msg = listMap.msg.map((m) => ({ ...m, read: true }))
+    ElMessage.success(tt('已全部标记为已读'))
+  } catch (e) {
+    ElMessage.error(tt('操作失败'))
+  }
+}
 
 const detailVisible = ref(false)
 const historyVisible = ref(false)
@@ -124,19 +195,6 @@ const current = ref(null)
 const currentCrg = ref(types[0])
 const historyCrg = ref(types[0])
 const historyList = ref([])
-
-async function load(type) {
-  if (loadingMap[type]) return
-  loadingMap[type] = true
-  try {
-    listMap[type] = await apiGetNotices(type)
-    badge.value = { ...badge.value, [type]: listMap[type].length }
-  } catch (e) {
-    listMap[type] = []
-  } finally {
-    loadingMap[type] = false
-  }
-}
 
 async function refreshBadge() {
   try {
@@ -153,6 +211,13 @@ function handleHide(type) {
 }
 
 function openDetail(n, cfg) {
+  // 业务消息:点开即已读(2026-09-09)
+  if (n.type === 'msg' && !n.read && n.rawId) {
+    n.read = true
+    apiReadMessage(n.rawId)
+      .then((res) => { badge.value = { ...badge.value, msg: res?.unread ?? 0 } })
+      .catch(() => {})
+  }
   current.value = decorate(n)
   currentCrg.value = cfg
   visible.value = null
@@ -294,6 +359,12 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--t-border-light);
   padding-bottom: 8px;
   margin-bottom: 6px;
+}
+/* 消息页签头部动作:全部已读 + 全部N项 */
+.nc-head-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
 .nc-title {
   font-weight: 600;
