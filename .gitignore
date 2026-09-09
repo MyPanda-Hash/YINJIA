@@ -42,3 +42,5 @@ deploy/*.jar
 yinjia-mes-deploy.zip
 
 tools/_flow-v12/forms-images-full/
+tools/_flow-v12/_runsql-out.txt
+tools/_flow-v12/_grant-out.txt
