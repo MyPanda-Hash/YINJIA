@@ -224,14 +224,20 @@
               v-model="cur[headerFieldKey(field)]"
               clearable filterable remote allow-create default-first-option
               :disabled="headerFieldLocked(field)"
-              @change="markInlineDirty"
+              @change="(v) => onHeaderRefSelectChange(field, v)"
               :remote-method="(kw) => loadRefSelectOptions(field, headerFieldKey(field), kw)"
               :loading="refSelectData[headerFieldKey(field)]?.loading"
               :placeholder="tt('输入搜索')"
               style="width: 100%"
               @focus="checkRefMode(field, headerFieldKey(field))"
             >
-              <el-option v-for="o in (refSelectData[headerFieldKey(field)]?.options || [])" :key="o.value" :label="o.label" :value="o.value" />
+              <!-- 编码型参照(refField≠displayField):候选列表与选中态都显示存值(编码),按名称挑选走 display 同名字段 -->
+              <el-option
+                v-for="o in (refSelectData[headerFieldKey(field)]?.options || [])"
+                :key="o.value"
+                :label="refShowsCode(field) ? o.value : o.label"
+                :value="o.value"
+              />
             </el-select>
           </div>
           <div v-else-if="isReferenceField(field)" class="query-ref">
@@ -879,6 +885,7 @@ import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
+import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
@@ -1214,6 +1221,17 @@ async function loadRefSelectOptions(field, fieldKey, keyword) {
 
 function isRefSelect(field) {
   return isReferenceField(field) && refModeMap[headerFieldKey(field)] === 'select'
+}
+
+/** 草稿表头下拉选中带回:与表头参照弹窗同口径,按 refMap 把选中项源数据行的其他字段整串回填。
+ *  allow-create 自由输入/清空时无源行,跳过映射只标记脏(不动已填字段,与弹窗取消一致)。 */
+function onHeaderRefSelectChange(field, v) {
+  const key = headerFieldKey(field)
+  const opt = (refSelectData[key]?.options || []).find((o) => o.value === v)
+  if (opt?.row) {
+    applyRefCarry(cur.value, opt.row, refConfigOf(field), key)
+  }
+  markInlineDirty()
 }
 
 const reportMode = computed(() => cfgCache.value?.metadata?.report === true || cfgCache.value?.metadata?.panelCategory === '报表')
@@ -2163,12 +2181,10 @@ function onHeaderRefConfirm(rows) {
   const source = rows?.[0]
   if (!field || !source || !draftEditable.value) return
   const key = headerFieldKey(field)
-  const ref = field.ref && typeof field.ref === 'object' ? field.ref : field
+  const ref = refConfigOf(field)
   const refField = ref.field || ref.refField || key
   cur.value[key] = source[refField] ?? ''
-  for (const map of ref.map || ref.refMap || []) {
-    if (map && source[map.from] !== undefined) cur.value[map.to || map.from] = source[map.from]
-  }
+  applyRefCarry(cur.value, source, ref, key)
   headerRefVisible.value = false
   headerRefField.value = null
   markInlineDirty() // 表头参照带回 = 未保存修改

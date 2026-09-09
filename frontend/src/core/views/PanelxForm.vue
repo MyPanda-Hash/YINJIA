@@ -55,8 +55,15 @@
             :placeholder="tt('输入搜索')"
             style="width: 100%"
             @focus="checkRefMode(r)"
+            @change="(v) => onRefSelectChange(r, v)"
           >
-            <el-option v-for="o in (refSelectData[r.code]?.options || [])" :key="o.value" :label="o.label" :value="o.value" />
+            <!-- 编码型参照(refField≠displayField):候选列表与选中态都显示存值(编码),按名称挑选走 display 同名字段 -->
+            <el-option
+              v-for="o in (refSelectData[r.code]?.options || [])"
+              :key="o.value"
+              :label="refShowsCode(r) ? o.value : o.label"
+              :value="o.value"
+            />
           </el-select>
           <div v-else-if="isRef(r)" class="ref-ctl">
             <el-input
@@ -348,6 +355,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Back, Plus, Delete, ArrowDown, Search } from '@element-plus/icons-vue'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
+import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
@@ -427,6 +435,15 @@ async function loadRefOptions(r, keyword) {
   } finally {
     refSelectData[r.code].loading = false
   }
+}
+
+/** 下拉选中带回:与弹窗确认同口径,按 refMap 把选中项源数据行的其他字段整串回填。
+ *  allow-create 自由输入/清空时无源行,静默跳过(不动已填字段,与弹窗取消一致)。 */
+function onRefSelectChange(r, v) {
+  const opt = (refSelectData[r.code]?.options || []).find((o) => o.value === v)
+  if (!opt?.row) return
+  applyRefCarry(form, opt.row, refConfigOf(r), r.code)
+  applyCalc()
 }
 
 // ---- 下拉框字段双模(≤20 下拉 / >20 弹窗):options 内嵌于面板配置,按数量直接判定 ----
@@ -744,30 +761,18 @@ async function onRefConfirm(rows) {
   const p = refPick.value
   if (!p || !rows.length) return
   const r = p.field
-  const rp = r.ref || r
+  const rp = refConfigOf(r)
   const refField = rp.field || rp.refField
   const multi = !!(rp.multi || rp.refMulti)
   const vals = rows.map((x) => x[refField])
   if (p.kind === 'header') {
     form[p.code] = multi ? vals.join('、') : vals[0]
-    const first = rows[0] || {}
-    for (const m of rp.map || rp.refMap || []) {
-      if (!m || first[m.from] === undefined) continue
-      const to = m.to || m.from
-      if (to !== p.code) form[to] = first[m.from]
-    }
+    applyRefCarry(form, rows[0] || {}, rp, p.code)
   } else {
     const row = p.row
     const tab = p.tab
     const changedRows = []
-    const maps = rp.map || rp.refMap || []
-    const applyMap = (target, srcRow) => {
-      for (const m of maps) {
-        if (!m || srcRow[m.from] === undefined) continue
-        const to = m.to || m.from
-        if (to !== r.dataName) target[to] = srcRow[m.from]
-      }
-    }
+    const applyMap = (target, srcRow) => applyRefCarry(target, srcRow, rp, r.dataName)
     const rillRow = (target, srcRow) => {
       target[r.dataName] = srcRow[refField]
       applyMap(target, srcRow)
