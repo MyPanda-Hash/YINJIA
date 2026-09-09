@@ -3098,6 +3098,11 @@ async function onButton(action) {
     scanVisible.value = true
     return
   }
+  // 材料二维码标签打印(品检分流链):本地拦截,数据源=当前暂收单明细行
+  if (action === '打印标签') {
+    openQrLabels()
+    return
+  }
   if (action === '查询' || action === '查找') {
     search()
     return
@@ -3386,11 +3391,6 @@ async function onButton(action) {
       return
     }
     const actionDocumentNo = current.value?.['编号'] || current.value?.['单据编号'] || ''
-    // 材料二维码标签打印(品检分流链):本地拦截,不走后端按钮;数据源=当前暂收单明细行
-    if (action === '打印标签') {
-      openQrLabels()
-      return
-    }
     // 列表页草稿是前端内联编辑态；审核/提交审批前必须先落库，否则状态刷新后会显示数据库中的旧空明细。
     if (['审核', '提交审批'].includes(action) && draftEditable.value) {
       const saved = await saveInlineDraft('保存', { silent: true })
