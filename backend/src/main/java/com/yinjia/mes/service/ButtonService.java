@@ -33,11 +33,12 @@ public class ButtonService {
     private final DevTaskService devTaskService;
     private final MessageService messageService;
     private final LotSeqService lotSeqService;
+    private final StockLedgerService stockLedger;
 
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
                          DevTaskService devTaskService, MessageService messageService,
-                         LotSeqService lotSeqService) {
+                         LotSeqService lotSeqService, StockLedgerService stockLedger) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -45,6 +46,7 @@ public class ButtonService {
         this.devTaskService = devTaskService;
         this.messageService = messageService;
         this.lotSeqService = lotSeqService;
+        this.stockLedger = stockLedger;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -486,6 +488,8 @@ public class ButtonService {
                         + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, shr, shsj, canceled, pending, saved, update_at) "
                         + "VALUES (s.panel_code, s.doc_no, ?, GETDATE(), 'N', 'N', 'Y', GETDATE());",
                 def.code(), no, currentUserName(), currentUserName());
+        // 库存记账(材料入库链):采购入库单审核 → kucun 入账(失败抛错整笔回滚)
+        stockLedger.postIn(def.code(), no, currentUserName());
         // 文件类面板:修改态经审核收尾 → 计算修改记录并再归档
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && finalizeModify(def, no, currentUserName())) {
             return result(no, "已归档");
@@ -497,6 +501,8 @@ public class ButtonService {
         String no = requireNo(formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
         if (!"已审核".equals(st.get("status"))) throw new IllegalStateException("仅已审核状态可弃审");
+        // 库存冲回(材料入库链):先冲账再弃审,余额不足或台账缺失则拒绝,整笔回滚
+        stockLedger.unpostIn(def.code(), no, currentUserName());
         jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
