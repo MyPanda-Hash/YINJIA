@@ -18,5 +18,5 @@ END CATCH
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ix_stdlib_lib_item') CREATE INDEX ix_stdlib_lib_item ON yj_std_lib (lib_code, item_code, enabled);
 GO
-GRANT SELECT, INSERT, UPDATE ON yj_std_lib TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE ON yj_std_lib TO yinjia;
 GO

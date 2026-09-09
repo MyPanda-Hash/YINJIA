@@ -10,7 +10,7 @@ IF COL_LENGTH('yj_field', 'visible') IS NULL
 GO
 UPDATE yj_field SET visible = 1 WHERE visible IS NULL;
 GO
-GRANT SELECT, INSERT, UPDATE, DELETE ON yj_field TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON yj_field TO yinjia;
 GO
 PRINT N'列自定义迁移完成(alias + visible)';
 GO

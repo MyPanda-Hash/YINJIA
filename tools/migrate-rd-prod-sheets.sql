@@ -75,7 +75,7 @@ BEGIN CATCH
   PRINT 'rd_mold_proc_detail 表创建跳过(无 DDL 权限,由管理员执行)';
 END CATCH
 GO
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_proc_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_proc_detail TO yinjia;
 GO
 UPDATE yj_panel SET mode=N'doc', line_table=N'rd_mold_proc_detail', head_table=N'rd_mold_proc_head', group_col=N'单据编号', pk_col=N'id', code_col=N'单据编号', prefix=N'MP', date_col=N'单据日期', page_size=20, detail_key=N'items', module_group=N'研发管理' WHERE panel_code='RD_MOLD_PROC';
 GO
@@ -480,17 +480,17 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_pane
 GO
 
 -- ═══════════════ 权限 ═══════════════
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_proc_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_formula_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_formula_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_bom_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_bom_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_proc_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_proc_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_spec_doc_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_spec_doc_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_insp_plan_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_insp_plan_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_proc_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_formula_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_formula_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_bom_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_bom_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_proc_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_proc_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_spec_doc_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_spec_doc_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_insp_plan_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_insp_plan_detail TO yinjia;
 GO
 
 -- ═══════════════ 字段译名(en;已有跳过) ═══════════════

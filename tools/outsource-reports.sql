@@ -4,26 +4,26 @@ SET NOCOUNT ON;
 GO
 -- ===== 委外发料单 =====
 EXEC('CREATE OR ALTER VIEW v_outsource_issue_detail AS
-SELECT h.[单据编号], h.[单据日期], h.[业务类型], h.[委外供应商], h.[委外加工单号], h.[仓库] AS [发料仓库], h.[部门], h.[经手人], h.[来源单据], h.[来源单号],
+SELECT h.id AS [id], h.asp_cancel, h.[单据编号], h.[单据日期], h.[业务类型], h.[委外供应商], h.[委外加工单号], h.[仓库] AS [发料仓库], h.[部门], h.[经手人], h.[来源单据], h.[来源单号],
        l.[材料编码], l.[材料名称], l.[规格型号], l.[计量单位], l.[数量], l.[单价], l.[金额], l.[仓库] AS [材料仓库], l.[行中止]
 FROM bd_outsource_issue h LEFT JOIN bl_outsource_issue l ON h.[单据编号] = l.[单据编号];');
 EXEC('CREATE OR ALTER VIEW v_outsource_issue_stats AS
-SELECT h.[单据日期], h.[委外供应商], l.[材料编码], l.[材料名称], l.[规格型号], l.[计量单位],
+SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.asp_cancel, h.[单据日期], h.[委外供应商], l.[材料编码], l.[材料名称], l.[规格型号], l.[计量单位],
        COUNT(DISTINCT h.[单据编号]) AS [发料单数],
        SUM(COALESCE(l.[数量], 0)) AS [数量], SUM(COALESCE(l.[金额], 0)) AS [金额]
 FROM bd_outsource_issue h LEFT JOIN bl_outsource_issue l ON h.[单据编号] = l.[单据编号]
-GROUP BY h.[单据日期], h.[委外供应商], l.[材料编码], l.[材料名称], l.[规格型号], l.[计量单位];');
+GROUP BY h.asp_cancel, h.[单据日期], h.[委外供应商], l.[材料编码], l.[材料名称], l.[规格型号], l.[计量单位];');
 -- ===== 委外入库单 =====
 EXEC('CREATE OR ALTER VIEW v_outsource_in_detail AS
-SELECT h.[单据编号], h.[单据日期], h.[业务类型], h.[委外供应商], h.[委外加工单号], h.[仓库], h.[经手人], h.[来源单据], h.[来源单号],
+SELECT h.id AS [id], h.asp_cancel, h.[单据编号], h.[单据日期], h.[业务类型], h.[委外供应商], h.[委外加工单号], h.[仓库], h.[经手人], h.[来源单据], h.[来源单号],
        l.[产品编码], l.[产品名称], l.[规格型号], l.[计量单位], l.[实收数量], l.[单价], l.[金额], l.[现存量], l.[行中止]
 FROM bd_outsource_in h LEFT JOIN bl_outsource_in l ON h.[单据编号] = l.[单据编号];');
 EXEC('CREATE OR ALTER VIEW v_outsource_in_stats AS
-SELECT h.[单据日期], h.[委外供应商], l.[产品编码], l.[产品名称], l.[规格型号], l.[计量单位],
+SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.asp_cancel, h.[单据日期], h.[委外供应商], l.[产品编码], l.[产品名称], l.[规格型号], l.[计量单位],
        COUNT(DISTINCT h.[单据编号]) AS [入库单数],
        SUM(COALESCE(l.[实收数量], 0)) AS [实收数量], SUM(COALESCE(l.[金额], 0)) AS [金额]
 FROM bd_outsource_in h LEFT JOIN bl_outsource_in l ON h.[单据编号] = l.[单据编号]
-GROUP BY h.[单据日期], h.[委外供应商], l.[产品编码], l.[产品名称], l.[规格型号], l.[计量单位];');
+GROUP BY h.asp_cancel, h.[单据日期], h.[委外供应商], l.[产品编码], l.[产品名称], l.[规格型号], l.[计量单位];');
 GO
 DECLARE @panels TABLE (code varchar(50), name nvarchar(100), vw sysname);
 INSERT INTO @panels VALUES

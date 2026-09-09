@@ -4,14 +4,14 @@ SET NOCOUNT ON;
 GO
 -- 明细视图:头行平铺
 EXEC('CREATE OR ALTER VIEW v_dispatch_detail AS
-SELECT h.[单据编号], h.[单据日期], h.[业务类型], h.[生产车间], h.[加工单号], h.[预开工日], h.[预完工日], h.[经手人], h.[项目], h.[部门],
+SELECT h.id AS [id], h.asp_cancel, h.[单据编号], h.[单据日期], h.[业务类型], h.[生产车间], h.[加工单号], h.[预开工日], h.[预完工日], h.[经手人], h.[项目], h.[部门],
        l.[工序编码], l.[工序名称], l.[产品名称], l.[工作中心], l.[设备], l.[班组], l.[工人], l.[加工类型],
        l.[计划数量], l.[已派工数量], l.[派工数量], l.[计量单位], l.[派工加工状态], l.[累计汇报数量], l.[规格型号], l.[备注] AS [行备注]
 FROM bd_dispatch h LEFT JOIN bl_dispatch l ON h.[单据编号] = l.[单据编号];');
 GO
 -- 统计视图:按 车间/工序/日期 分组汇总
 EXEC('CREATE OR ALTER VIEW v_dispatch_stats AS
-SELECT h.[单据日期], l.[生产车间], l.[工序编码], l.[工序名称], l.[计量单位],
+SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.asp_cancel, h.[单据日期], l.[生产车间], l.[工序编码], l.[工序名称], l.[计量单位],
        COUNT(DISTINCT h.[单据编号]) AS [派工单数],
        SUM(COALESCE(l.[计划数量], 0)) AS [计划数量],
        SUM(COALESCE(l.[派工数量], 0)) AS [派工数量],
@@ -19,7 +19,7 @@ SELECT h.[单据日期], l.[生产车间], l.[工序编码], l.[工序名称], l
        SUM(COALESCE(l.[累计汇报数量], 0)) AS [累计汇报数量],
        MAX(l.[派工加工状态]) AS [派工加工状态]
 FROM bd_dispatch h LEFT JOIN bl_dispatch l ON h.[单据编号] = l.[单据编号]
-GROUP BY h.[单据日期], l.[生产车间], l.[工序编码], l.[工序名称], l.[计量单位];');
+GROUP BY h.asp_cancel, h.[单据日期], l.[生产车间], l.[工序编码], l.[工序名称], l.[计量单位];');
 GO
 -- 面板注册
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='DISPATCH_DETAIL') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('DISPATCH_DETAIL', N'工序派工单明细表', N'报表', 'flat', 'v_dispatch_detail', NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'新生产');

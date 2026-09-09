@@ -30,6 +30,8 @@ BEGIN TRY
 IF OBJECT_ID('rd_progress_detail') IS NULL CREATE TABLE rd_progress_detail (
   id int IDENTITY(1,1) PRIMARY KEY,
   [单据编号] nvarchar(60) NOT NULL,
+  [项目名称] nvarchar(200) NULL,
+  [项目层级] nvarchar(20) NULL,
   [子项目/尺寸] nvarchar(100) NULL,
   [说明] nvarchar(200) NULL,
   [内容] nvarchar(500) NULL,
@@ -37,7 +39,7 @@ IF OBJECT_ID('rd_progress_detail') IS NULL CREATE TABLE rd_progress_detail (
   [项目负责] nvarchar(50) NULL,
   [实施进度] nvarchar(200) NULL,
   [里程完成] nvarchar(20) NULL,
-  [状态] nvarchar(20) NULL,
+  [状态] nvarchar(500) NULL,
   [测试员] nvarchar(50) NULL,
   [谁来批准] nvarchar(50) NULL,
   [谁来检验] nvarchar(50) NULL,
@@ -49,6 +51,12 @@ BEGIN CATCH
   PRINT 'rd_progress_detail 表创建跳过(无 DDL 权限,由管理员执行)';
 END CATCH
 GO
+-- 旧库已存在的明细表补列 + 主表放开可空(项目名称/项目层级 真实数据在明细行;种子脚本与明细网格依赖)
+IF OBJECT_ID('rd_progress_detail') IS NOT NULL AND COL_LENGTH('rd_progress_detail', '项目名称') IS NULL ALTER TABLE rd_progress_detail ADD [项目名称] nvarchar(200) NULL;
+IF OBJECT_ID('rd_progress_detail') IS NOT NULL AND COL_LENGTH('rd_progress_detail', '项目层级') IS NULL ALTER TABLE rd_progress_detail ADD [项目层级] nvarchar(20) NULL;
+IF OBJECT_ID('rd_progress_detail') IS NOT NULL AND COL_LENGTH('rd_progress_detail', '状态') IS NOT NULL AND EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('rd_progress_detail') AND name = N'状态' AND max_length < 1000) ALTER TABLE rd_progress_detail ALTER COLUMN [状态] nvarchar(500) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('rd_progress') AND name = N'项目名称' AND is_nullable = 0) ALTER TABLE rd_progress ALTER COLUMN [项目名称] nvarchar(200) NULL;
+GO
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'RD_PROGRESS') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('RD_PROGRESS', N'项目进度查询', N'单据', 'doc', 'rd_progress_detail', 'rd_progress', N'单据编号', N'id', N'单据编号', N'LXJ', N'单据日期', 20, 'items', N'研发管理');
 GO
 -- 查询字段(项目名称参照实施计划)
@@ -59,6 +67,9 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PROGRESS' AND col_nam
 -- 项目名称:可填写(≤20条参照下拉 allow-create)或选择项目实施计划(选取后自动带回同名字段)
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PROGRESS' AND col_name=N'项目名称' AND place=N'header') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PROGRESS', N'项目名称', N'项目名称', N'参照', NULL, 'RD_PLAN', N'项目名称', N'项目名称', N'header', 30, 240, 1, 1, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PROGRESS' AND col_name=N'项目层级') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PROGRESS', N'项目层级', N'项目(一/二级)', N'下拉框', N'SELECT v FROM (VALUES (N''一二级''),(N''二级''),(N''三级''),(N''四级'')) AS t(v)', NULL, NULL, NULL, N'header', 40, 100, 1, 0, 0, 1);
+-- 明细字段(与 seed-rd-progress 一致:项目名称/项目层级 真实数据在明细行)
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PROGRESS' AND col_name=N'项目名称' AND place=N'detail') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PROGRESS', N'项目名称', N'项目名称', N'文本', NULL, NULL, NULL, NULL, N'detail', 5, 240, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PROGRESS' AND col_name=N'项目层级' AND place=N'detail') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PROGRESS', N'项目层级', N'项目层级', N'下拉框', N'SELECT v FROM (VALUES (N''一二级''),(N''二级''),(N''三级''),(N''四级'')) AS t(v)', NULL, NULL, NULL, N'detail', 6, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PROGRESS' AND col_name=N'项目定级') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PROGRESS', N'项目定级', N'项目定级', N'文本', NULL, NULL, NULL, NULL, N'header', 50, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PROGRESS' AND col_name=N'测试内容') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PROGRESS', N'测试内容', N'测试内容', N'文本', NULL, NULL, NULL, NULL, N'header', 60, 180, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_PROGRESS' AND col_name=N'测试产品打样要求') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('RD_PROGRESS', N'测试产品打样要求', N'测试产品打样要求', N'文本', NULL, NULL, NULL, NULL, N'header', 70, 180, 1, 0, 0, 1);

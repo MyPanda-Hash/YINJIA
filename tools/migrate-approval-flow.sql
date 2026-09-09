@@ -26,7 +26,7 @@ IF COL_LENGTH('yj_doc_status', 'pending') IS NULL
 GO
 UPDATE yj_doc_status SET pending = 'N' WHERE pending IS NULL;
 GO
-GRANT SELECT, INSERT, UPDATE, DELETE ON yj_form_approval TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON yj_form_approval TO yinjia;
 GO
 DECLARE @c int = (SELECT COUNT(*) FROM yj_form_approval);
 PRINT N'审批流迁移完成: yj_form_approval 就绪(行数 ' + CAST(@c AS nvarchar(10)) + N'), yj_doc_status 已加审批中标记';

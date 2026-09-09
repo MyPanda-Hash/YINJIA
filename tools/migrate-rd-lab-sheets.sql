@@ -290,14 +290,14 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_pane
 GO
 
 -- ═══════════════ 权限 ═══════════════
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_spike_water_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_spike_water_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_dom_test_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_dom_test_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_equip_use_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_equip_use_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_instr_use_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_instr_use_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_spike_water_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_spike_water_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_dom_test_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_dom_test_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_equip_use_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_equip_use_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_instr_use_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_instr_use_detail TO yinjia;
 GO
 
 -- ═══════════════ 字段标签译名(en;已有跳过) ═══════════════

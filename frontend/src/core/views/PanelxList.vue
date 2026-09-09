@@ -591,8 +591,8 @@
     </div>
 
     <!-- 未保存离开守卫(规范 §6.2):同步拦截路由,模板弹窗三态 -->
-    <el-dialog v-model="leaveVisible" :title="tt('未保存提示')" width="420px" append-to-body :close-on-click-modal="false">
-      <span>{{ tt('当前单据有未保存的修改，是否保存？') }}</span>
+    <el-dialog v-model="leaveVisible" :title="tt('未保存提示')" width="420px" append-to-body :close-on-click-modal="false" @close="onLeaveDialogClose">
+      <span>{{ leaveQuestion }}</span>
       <template #footer>
         <el-button @click="onLeaveChoice('stay')">{{ tt('取消') }}</el-button>
         <el-button @click="onLeaveChoice('discard')">{{ tt('不保存') }}</el-button>
@@ -1603,6 +1603,7 @@ watch(
 
 watch(cur, (v) => {
   current.value = v
+  markSavedSnapshot() // 基线快照跟随当前单据:静默切单后不重打会快照错位,导致后续误判"有未保存修改"
   detailRefVisible.value = false
   detailRefPick.value = null
   // 产成品→材料联动：默认不选中（点击产成品明细行才过滤材料明细），切换单据时重置
@@ -1615,7 +1616,8 @@ watch(cur, (v) => {
 /** 面板内切单守卫(翻页/点行):当前单有未保存修改时弹三态窗,干净则直切 */
 async function guardDocSwitch(nextIdx) {
   if (nextIdx === curIdx.value) return
-  if (!hasUnsavedChanges() || guardAsking) { curIdx.value = nextIdx; return }
+  if (guardAsking) return // 弹窗进行中:忽略后续切单动作,防绕过弹窗
+  if (!hasUnsavedChanges()) { curIdx.value = nextIdx; return }
   guardAsking = true
   pendingLeave.value = null
   pendingAction = async () => { curIdx.value = Math.min(nextIdx, Math.max(0, list.value.length - 1)) }
@@ -1624,7 +1626,8 @@ async function guardDocSwitch(nextIdx) {
 
 /** 翻页动作守卫(含跨页):脏时弹三态窗,选择后执行原翻页逻辑 */
 async function guardPageAction(run) {
-  if (!hasUnsavedChanges() || guardAsking) { await run(); return }
+  if (guardAsking) return // 弹窗进行中:忽略后续动作,防绕过弹窗
+  if (!hasUnsavedChanges()) { await run(); return }
   guardAsking = true
   pendingLeave.value = null
   pendingAction = run
@@ -1645,7 +1648,11 @@ async function page(delta) {
   }
   if (delta < 0 && query.pageNo > 1) {
     await guardPageAction(async () => { query.pageNo -= 1; await load(); curIdx.value = list.value.length - 1 })
+    return
   }
+  // 边界翻页（第 1 张点上一张/末张点下一张/仅 1 张）:动作为空,但当前草稿未保存仍需弹守卫——
+  // 否则「新增后落在第 1 张点翻页」永远不触发提示(规范 §6.2);干净单据保持原样无感直过
+  await guardPageAction(async () => {})
 }
 
 async function pageFirst() {
@@ -2365,7 +2372,7 @@ function validateInlineDraft() {
   return ''
 }
 
-async function saveInlineDraft(buttonName = '保存', { silent = false } = {}) {
+async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false } = {}) {
   if (!draftEditable.value || inlineSaving.value) return false
   const validation = validateInlineDraft()
   if (validation) {
@@ -2395,6 +2402,8 @@ async function saveInlineDraft(buttonName = '保存', { silent = false } = {}) {
     if (!silent) ElMessage.success(`「${buttonName}」成功`)
     inlineDirtyFlag.value = false
     freshAdded.value = false
+    freshAddedNo.value = ''
+    clearFreshDraft(documentNo)
     return true
   } catch (error) {
     ElMessage.error(engine.errMsg(error) || '保存失败')
@@ -2836,15 +2845,22 @@ function onFormSaved() {
 
 // 直接新增：调后端保存（空表头）创建最新草稿单（autoCode 编号 + 单据日期=当天自动填入），
 // 刷新列表并定位到新单，在列表页直接内联填写（不跳转表单页/不弹新增弹窗）。
+// 流程规范：新增时当前页面未保存的内容直接剔除,不弹确认——
+//   新增未保存过的占位单 → 撤回(防垃圾空单残留);已保存单据的未保存修改 → 随 load 放弃。
 async function directAdd() {
   try {
     const formData = {}
     const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData, buttonParam: {} })
     const no = res && (res['编号'] || res.formNo)
     if (!no) return ElMessage.error('新增失败：未返回单据编号')
-    await load() // 刷新列表（新单按创建时间倒序置顶）
-    curIdx.value = 0 // 定位到最新单据，草稿状态列表页可直接填写
+    await load() // 刷新列表
+    // 定位到新单:列表按单据号排序,新单号不一定排在首位(如存在 WW-/旧格式单号时 WO 新单不在第 1 位),
+    // 必须按编号精确定位,否则新增后仍显示旧单,看起来像"新增复制了当前页面的内容"
+    const idx = list.value.findIndex((item) => item['编号'] === no)
+    curIdx.value = idx >= 0 ? idx : 0
     freshAdded.value = true // 本次新增尚未成功保存过：离开守卫「不保存」时据此撤回整单
+    freshAddedNo.value = no // 撤回只允许命中这张新建单
+    markFreshDraft(no) // 持久化标记：刷新/重进后守卫仍能识别并撤回这张草稿
     markSavedSnapshot()
     ElMessage.success(`已新增 ${panelName.value}-${no}，请在列表页填写并保存`)
   } catch (e) {
@@ -2865,6 +2881,7 @@ async function directAdd() {
 
 const savedSnapshot = ref('')
 const freshAdded = ref(false)
+const freshAddedNo = ref('') // freshAdded 绑定的单据编号:撤回只允许命中这张单,防止 cur 漂移后误撤既有单据
 /** 变更钩子置脏(表头/明细控件 @change;对真实交互可靠)——快照对比作兜底 */
 const inlineDirtyFlag = ref(false)
 function markInlineDirty() { if (draftEditable.value) inlineDirtyFlag.value = true }
@@ -2878,13 +2895,19 @@ async function onFieldEditRefresh() {
 function markSavedSnapshot() {
   try {
     savedSnapshot.value = cur.value ? JSON.stringify(currentFormData(cur.value.detail || {})) : ''
-  } catch { savedSnapshot.value = '' }
+    savedBlankDraft.value = cur.value ? isBlankDraftContent(cur.value.detail || {}) : false
+  } catch {
+    savedSnapshot.value = ''
+    savedBlankDraft.value = false
+  }
 }
 
-/** 当前是否存在未保存修改（草稿态且 变更钩子置脏 或 表头/明细相对基线有变化） */
+/** 当前是否存在未保存修改（草稿态且 变更钩子置脏/新增未保存/基线为空白草稿 或 相对基线有变化）。
+ * directAdd 新建且尚未保存过的草稿即使零修改也算未保存：否则「新增后未填写直接离开」
+ * 不触发守卫弹窗，空草稿永久残留（规范 §6.2「不保存→撤回整单」依赖本判定）。 */
 function hasUnsavedChanges() {
   if (!draftEditable.value || !cur.value) return false
-  if (inlineDirtyFlag.value) return true
+  if (inlineDirtyFlag.value || isFreshAddedDoc() || savedBlankDraft.value) return true
   try {
     return JSON.stringify(currentFormData(cur.value.detail || {})) !== savedSnapshot.value
   } catch { return false }
@@ -2903,7 +2926,8 @@ let guardAsking = false          // 弹窗进行中防重入
 
 onBeforeRouteLeave((to) => {
   if (leaveConfirmed.value) { leaveConfirmed.value = false; return true }
-  if (!hasUnsavedChanges() || guardAsking) { pendingLeave.value = null; return true }
+  if (guardAsking) return false // 弹窗进行中:拦截一切导航(三态选择后由 onLeaveChoice 放行)
+  if (!hasUnsavedChanges()) { pendingLeave.value = null; return true }
   pendingLeave.value = to
   guardAsking = true
   nextTick(() => askUnsavedLeave()) // 守卫拦截后弹模板确认框
@@ -2911,14 +2935,34 @@ onBeforeRouteLeave((to) => {
 })
 
 const leaveVisible = ref(false)
+let leaveChoiceHandled = false    // onLeaveChoice 已处理置 false 的弹窗,@close 兜底跳过
+
+/** 弹窗问句:新建未保存/基线为空白草稿走「尚未保存」文案(提示不保存将撤回),有修改的走「有修改」 */
+const leaveQuestion = computed(() => (
+  (isFreshAddedDoc() || savedBlankDraft.value) && !inlineDirtyFlag.value
+    ? tt('当前草稿尚未保存，是否保存？（不保存将撤回该单）')
+    : tt('当前单据有未保存的修改，是否保存？')
+))
 
 /** 守卫拦截后弹出模板确认框(命令式 ElMessageBox 在导航守卫上下文中不渲染,改用模板弹窗) */
 function askUnsavedLeave() {
+  leaveChoiceHandled = false
   leaveVisible.value = true
+}
+
+/** ESC/右上角 × 关闭弹窗(未做三态选择)= 留在本页:必须复位守卫状态,否则后续导航/切单被永久拦截 */
+function onLeaveDialogClose() {
+  if (leaveChoiceHandled) { leaveChoiceHandled = false; return }
+  if (!guardAsking) return
+  guardAsking = false
+  pendingLeave.value = null
+  pendingAction = null
+  restoreCurrentTab()
 }
 
 /** 离开守卫三态选择:save=按保存按钮落库;discard=撤回新增/放弃修改;stay=留在本页 */
 async function onLeaveChoice(choice) {
+  leaveChoiceHandled = true
   leaveVisible.value = false
   const to = pendingLeave.value
   if (choice === 'stay') {
@@ -2930,11 +2974,14 @@ async function onLeaveChoice(choice) {
   if (choice === 'save') {
     const saved = await saveInlineDraft('保存', { silent: true })
     if (!saved) { guardAsking = false; pendingLeave.value = null; restoreCurrentTab(); return }
-  } else if (freshAdded.value && cur.value?.['编号']) {
-    // 不保存 + 本次新增未保存过 → 撤回整单(走「删除」按钮路径:按开发规范留痕+释放占用)
+  } else if (isFreshAddedDoc() || savedBlankDraft.value) {
+    // 不保存 + 新建未保存过或基线为空白草稿 → 撤回整单(走「删除」按钮路径:按开发规范留痕+释放占用)。
+    // 有修改的既有草稿(基线含实质数据)不走此分支:仅放弃修改,保留单据(避免误删已填写内容)
+    const withdrawNo = cur.value['编号']
     try {
-      await engine.callButton({ panelCode: panelCode.value, buttonName: '删除', formData: { 编号: cur.value['编号'] }, buttonParam: {} })
-      ElMessage.success(`已撤回新增：${cur.value['编号']}`)
+      await engine.callButton({ panelCode: panelCode.value, buttonName: '删除', formData: { 编号: withdrawNo }, buttonParam: {} })
+      ElMessage.success(`已撤回新增：${withdrawNo}`)
+      clearFreshDraft(withdrawNo)
       await load() // 撤回后重载列表(挂起的切单/翻页动作据此定位)
     } catch (e) {
       ElMessage.error(engine.errMsg(e) || '撤回新增失败，请手动删除草稿')
@@ -2945,6 +2992,7 @@ async function onLeaveChoice(choice) {
     }
   }
   freshAdded.value = false
+  freshAddedNo.value = ''
   inlineDirtyFlag.value = false
   guardAsking = false
   pendingLeave.value = null
@@ -3077,8 +3125,10 @@ async function onButton(action) {
       return
     }
     // 统一直接新增（2026-08-24 全量生效）：后端创建一张最新草稿单（autoCode 编号 + 单据日期=当天填入表头），
-    // 刷新列表并定位到新单，在列表页内联填写（不再弹新增弹窗、不跳转表单页）
-    return await directAdd()
+    // 刷新列表并定位到新单，在列表页内联填写（不再弹新增弹窗、不跳转表单页）。
+    // 流程规范：新增时当前未保存内容直接剔除,不弹确认(directAdd 内部静默撤回占位单)
+    await directAdd()
+    return
   }
   if (action === '修改') {
     if (!current.value) return ElMessage.warning('请先选择一行数据')
@@ -3086,6 +3136,16 @@ async function onButton(action) {
     return
   }
   if (['保存', '保存为草稿', '保存新增'].includes(action) && draftEditable.value) {
+    if (action === '保存为草稿') {
+      // 暂存:不校验(未完成的数据也可落库)
+      await saveInlineDraft(action, { skipValidation: true })
+      return
+    }
+    if (action === '保存新增') {
+      // 保存当前单据(执行校验) → 成功后自动新增一页
+      if (await saveInlineDraft('保存')) await directAdd()
+      return
+    }
     await saveInlineDraft(action)
     return
   }

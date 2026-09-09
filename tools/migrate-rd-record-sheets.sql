@@ -651,20 +651,20 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_pane
 GO
 
 -- ═══════════════ 权限 ═══════════════
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_alkaline_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_alkaline_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mineral_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mineral_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_antibact_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_antibact_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_scale_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_scale_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_ro_protect_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_ro_protect_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_soak_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_soak_detail TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_drop_prec_head TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_drop_prec_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_alkaline_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_alkaline_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mineral_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mineral_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_antibact_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_antibact_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_scale_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_scale_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_ro_protect_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_ro_protect_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_soak_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_soak_detail TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_drop_prec_head TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_drop_prec_detail TO yinjia;
 GO
 
 -- ═══════════════ 面板名译名(en;其余语言由机翻兜底) ═══════════════

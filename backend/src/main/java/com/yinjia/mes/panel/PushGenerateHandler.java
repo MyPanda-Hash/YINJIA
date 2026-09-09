@@ -115,7 +115,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         // 5) 保存为目标草稿(复用通用保存语义:头行分表/默认值/号池取号)
         Map<String, Object> formData = new LinkedHashMap<>(targetHead);
         formData.put("detail", Map.of("items", targetItems));
-        Map<String, Object> saved = buttonService.save(registry.panel(target), formData);
+        Map<String, Object> saved = buttonService.save(registry.panel(target), formData, false);
         String newNo = String.valueOf(saved.get("编号"));
 
         // 6) 写占用:来源行不再出现在选单列表(与选单同一占用语义)

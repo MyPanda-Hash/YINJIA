@@ -48,8 +48,9 @@ public class ButtonService {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         return switch (buttonName == null ? "" : buttonName) {
             case "刷新" -> new HashMap<>();
-            case "新增流程", "新增" -> save(def, formData == null ? new HashMap<>() : formData);
-            case "保存", "提交", "保存新增", "保存为草稿" -> save(def, formData == null ? new HashMap<>() : formData);
+            case "保存", "提交", "保存新增" -> save(def, formData == null ? new HashMap<>() : formData, true);
+            case "保存为草稿" -> save(def, formData == null ? new HashMap<>() : formData, false);
+            case "新增流程", "新增" -> save(def, formData == null ? new HashMap<>() : formData, false);
             case "审核" -> audit(def, formData);
             case "弃审" -> unaudit(def, formData);
             // 审批流(照搬 light-mes:草稿→提交审批→审批中→通过/驳回;弃审全留痕)
@@ -83,7 +84,7 @@ public class ButtonService {
 
     @Transactional
     @SuppressWarnings("unchecked")
-    public Map<String, Object> save(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+    public Map<String, Object> save(PanelRegistry.PanelDef def, Map<String, Object> formData, boolean markSaved) {
         String user = currentUserName();
         Map<String, Object> body = new LinkedHashMap<>(formData == null ? Map.of() : formData);
         Object detailObj = body.remove("detail");
@@ -105,14 +106,14 @@ public class ButtonService {
 
         String no = noObj == null || String.valueOf(noObj).isBlank() ? null : String.valueOf(noObj);
         if (def.isDoc()) {
-            return saveDoc(def, body, items, no, user);
+            return saveDoc(def, body, items, no, user, markSaved);
         }
         return saveArchive(def, items, user);
     }
 
     /** 单据保存:头字段并入每行(单表式)或分别写头表/行表(头行式);无编号=新建 */
     private Map<String, Object> saveDoc(PanelRegistry.PanelDef def, Map<String, Object> head,
-                                        List<Map<String, Object>> items, String no, String user) {
+                                        List<Map<String, Object>> items, String no, String user, boolean markSaved) {
         boolean split = def.hasHeadTable();
         if (no == null) {
             if (items.isEmpty()) {
@@ -121,7 +122,7 @@ public class ButtonService {
                 String table = split ? def.headTable() : def.lineTable();
                 Map<String, Object> cols = new LinkedHashMap<>();
                 cols.put(def.groupCol(), no);
-                if (def.dateCol() != null) cols.put(def.dateCol(), LocalDate.now());
+                if (def.dateCol() != null && tableCols(table).contains(def.dateCol())) cols.put(def.dateCol(), LocalDate.now());
                 if (!split && def.codeCol() != null) cols.put(def.codeCol(), no);
                 // 空草稿也写入随表单提交的头字段(如 规格书种类):
                 // 规格书按类型页签过滤列表,不带分类的新单会从当前页签列表消失,导致"新增后无法填写"
@@ -129,6 +130,7 @@ public class ButtonService {
                     if (!e.getKey().equals(def.groupCol())) cols.put(e.getKey(), e.getValue());
                 }
                 insertRow(table, cols, user);
+                markDocSaved(def.code(), no, false);
                 return result(no, "草稿");
             }
             no = formNoService.next(def.prefix(), user);
@@ -344,6 +346,22 @@ public class ButtonService {
 
     private final Map<String, List<String[]>> requiredColsCache = new java.util.concurrent.ConcurrentHashMap<>();
 
+    private final Map<String, Set<String>> tableColsCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /** 表物理列集合(缺表/异常返回空集):元数据引用了物理表没有的列时跳过该列,避免 INSERT/UPDATE 报 207 */
+    private Set<String> tableCols(String table) {
+        return tableColsCache.computeIfAbsent(table, t -> {
+            try {
+                Set<String> s = new HashSet<>();
+                jdbc.query("SELECT name FROM sys.columns WHERE object_id = OBJECT_ID(?)",
+                        rs -> { s.add(rs.getString(1)); }, t);
+                return s;
+            } catch (Exception e) {
+                return Set.of();
+            }
+        });
+    }
+
     /** 补齐无默认值的 NOT NULL 列(排除 IDENTITY):comm->'0',字符->'',数值->0 —— 与旧系统写入习惯一致 */
     private void fillRequiredDefaults(String table, Map<String, Object> cols) {
         List<String[]> required = requiredColsCache.computeIfAbsent(table, t -> {
@@ -418,6 +436,16 @@ public class ButtonService {
         cols.keySet().removeIf(k -> cols.get(k) == null && notNull.contains(k));
     }
 
+    /** 标记草稿的保存阶段:saved='Y' 已保存(未审核) / 'N' 临时草稿(新增未保存/保存为草稿) */
+    private void markDocSaved(String panelCode, String no, boolean saved) {
+        jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
+                        + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
+                        + "WHEN MATCHED THEN UPDATE SET saved = ?, update_at = GETDATE() "
+                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, saved, update_at) "
+                        + "VALUES (s.panel_code, s.doc_no, ?, GETDATE());",
+                panelCode, no, saved ? "Y" : "N", saved ? "Y" : "N");
+    }
+
     // ============ 状态机(照搬 light-mes:草稿⇄已审核 + 审批流) ============
 
     private Map<String, Object> audit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -431,9 +459,9 @@ public class ButtonService {
         if ("审批中".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                         + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
-                        + "WHEN MATCHED THEN UPDATE SET shr = ?, shsj = GETDATE(), canceled = 'N', pending = 'N', update_at = GETDATE() "
-                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, shr, shsj, canceled, pending, update_at) "
-                        + "VALUES (s.panel_code, s.doc_no, ?, GETDATE(), 'N', 'N', GETDATE());",
+                        + "WHEN MATCHED THEN UPDATE SET shr = ?, shsj = GETDATE(), canceled = 'N', pending = 'N', saved = 'Y', update_at = GETDATE() "
+                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, shr, shsj, canceled, pending, saved, update_at) "
+                        + "VALUES (s.panel_code, s.doc_no, ?, GETDATE(), 'N', 'N', 'Y', GETDATE());",
                 def.code(), no, currentUserName(), currentUserName());
         // 文件类面板:修改态经审核收尾 → 计算修改记录并再归档
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && finalizeModify(def, no, currentUserName())) {

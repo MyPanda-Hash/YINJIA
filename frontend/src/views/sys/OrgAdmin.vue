@@ -99,7 +99,10 @@
         </div>
         <div v-if="selRole.isAdmin" class="admin-tip">{{ tt('管理员为超级权限：默认拥有全部操作权限，无需配置。') }}</div>
         <template v-else>
+          <div v-if="resultBanner" class="result-banner">{{ resultBanner }}</div>
           <el-collapse v-model="openGroups" class="perm-collapse">
+            <!-- 框选矩形:容器内绝对定位(内容坐标),直接 DOM 更新(不走 Vue 响应式,防拖动卡顿) -->
+            <div ref="rectRef" class="paint-rect" style="display: none"></div>
             <el-collapse-item v-for="g in groupedPanels" :key="g.code" :name="g.code">
               <template #title>
                 <span class="g-title">{{ tt(g.name) }}</span>
@@ -148,6 +151,7 @@
           <div class="perm-actions">
             <el-button type="primary" size="small" :loading="saving" @click="savePanels">{{ tt('保存面板权限') }}</el-button>
             <el-button size="small" @click="loadRolePanels(selRole)">{{ tt('刷新') }}</el-button>
+            <span class="paint-tip">{{ tt('提示：按住左键拖动框选，批量勾选/取消经过的权限') }}</span>
           </div>
         </template>
       </div>
@@ -229,6 +233,9 @@
         <el-button type="primary" :loading="savingRole" @click="saveRole">{{ tt('创建') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 拖动框选跟随提示(直接 DOM 更新;矩形本体在 .perm-collapse 内部,受容器裁剪) -->
+    <div ref="badgeRef" class="paint-badge" style="display: none"></div>
   </div>
 </template>
 
@@ -238,6 +245,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { useUserStore } from '@/stores/user'
 import { tt } from '@/i18n'
+import PermRow from './PermRow.vue'
 
 const user = useUserStore()
 
@@ -340,21 +348,314 @@ function setGroupPerms(g, mode) {
     if (mode === 'all') r.permsSet = new Set(r.actions.map((a) => a[0]))
     else r.permsSet = new Set()
   }
+  refreshHeadMarks()
 }
 
-function setGroupVisible(g, v) {
-  for (const r of g.panels) {
-    r.checked = v
-    if (!v) r.canApprove = false
+// ---- 拖动框选:按住左键拉出矩形,框内格子实时应用按下格的状态;框缩小则实时回退 ----
+// 语义:pointerdown 切换按下格并记下"涂选值"(单击=只切换该格,无反馈标识);
+// 移动超过阈值后出现框选矩形,矩形当前覆盖到的格子应用涂选值,退出覆盖的格恢复拖动前状态
+// —— 最终结果恒等于松手时框住的格子,与常规框选体验一致。
+// 滚动:拖动中指针到达滚动容器上下边缘自动滚动;滚轮滚动同样实时跟进(锚点按内容坐标存储)。
+// 性能:拖动周期内的一切 UI(显隐/矩形/徽标/面板 painting 类/列头三态)全部直接操作 DOM,
+// 不经 Vue 响应式——否则按下/松手/每次移动都会触发本组件(744 格+部门树+用户表+130 个
+// 下拉列头)全量重渲染,dev 模式单次 ~300ms,是拖动卡顿的根因。
+const ALL_COL = '__all__'
+const rectRef = ref(null)
+const badgeRef = ref(null)
+const paint = {
+  active: false, moved: false, col: '', value: false, count: 0,
+  x: 0, y: 0,   // 当前指针(视口坐标)
+  ax: 0, ay: 0, // 按下锚点(视口坐标,每帧由内容坐标换算——滚动时跟随内容)
+  rx: 0, ry: 0, // 矩形随指针移动的当前角(视口坐标)
+  acy: 0,       // 按下锚点的纵向内容坐标(相对滚动容器内容原点,滚动不变)
+}
+let paintCells = []       // 全部可涂格 {panel,col,x,y,w,h}(按下时收集)
+let panelRowMap = new Map() // panelCode -> 行对象(拖动期查表,避免逐格线性扫描)
+let dragOrig = new Map()  // 本次拖动改过状态的格 → 拖动前状态(框缩小时实时回退)
+let paintRaf = 0
+let paintScrollEl = null  // 拖动目标所在的纵向滚动容器(边缘自动滚动作用对象)
+let paintHostEl = null    // 矩形渲染宿主(.perm-collapse,容器内绝对定位 + 裁剪)
+let paintBoxEl = null     // .perm-box(painting 类的直接开关)
+let autoScrollRaf = 0
+const AUTOSCROLL_EDGE = 28  // 距容器边缘多少像素触发自动滚动
+const AUTOSCROLL_STEP = 9   // 每帧基础滚动量(px,按深入边缘比例加速)
+function trailKey(panelCode, col) {
+  return panelCode + ':' + col
+}
+function colLabel(col) {
+  if (col === ALL_COL) return tt('全选')
+  const act = permActions.value.find((a) => a[0] === col)
+  return act ? tt(act[1]) : col
+}
+/** 由内容坐标换算锚点的视口纵坐标(容器自身滚动/页面滚动均自动跟随) */
+function anchorViewportY() {
+  if (!paintHostEl) return paint.ay
+  const r = paintHostEl.getBoundingClientRect()
+  return r.top + (paint.acy - paintHostEl.scrollTop)
+}
+/** 找 td 的最近纵向可滚动祖先(如权限分组的 .perm-collapse) */
+function findScrollContainer(el) {
+  let p = el && el.parentElement
+  while (p) {
+    const s = getComputedStyle(p)
+    if (/(auto|scroll)/.test(s.overflowY) && p.scrollHeight > p.clientHeight + 1) return p
+    p = p.parentElement
+  }
+  return null
+}
+function cellState(row, col) {
+  return col === ALL_COL ? isAllPerms(row) : hasPerm(row, col)
+}
+function setCellState(row, col, val) {
+  if (col === ALL_COL) toggleAllPerms(row, val)
+  else togglePerm(row, col, val)
+}
+function collectPaintCells() {
+  paintCells = []
+  panelRowMap = new Map(panelRows.value.map((r) => [r.panelCode, r]))
+  document.querySelectorAll('.perm-box .perm-table tbody td[data-col]').forEach((td) => {
+    const r = td.getBoundingClientRect()
+    paintCells.push({ panel: td.dataset.panel, col: td.dataset.col, x: r.x, y: r.y, w: r.width, h: r.height })
+  })
+}
+/** 矩形/徽标的直接 DOM 同步(高频路径,不经 Vue 响应式) */
+function syncPaintUi() {
+  if (rectRef.value && paintHostEl) {
+    const r = paintHostEl.getBoundingClientRect()
+    // 渲染盒与容器可视区取交集:布局级钳制,不产生横向滚动条,绝不超出面板
+    const vx1 = Math.max(Math.min(paint.ax, paint.rx), r.left)
+    const vx2 = Math.min(Math.max(paint.ax, paint.rx), r.left + paintHostEl.clientWidth)
+    const vy1 = Math.max(Math.min(paint.ay, paint.ry), r.top)
+    const vy2 = Math.min(Math.max(paint.ay, paint.ry), r.top + paintHostEl.clientHeight)
+    const s = rectRef.value.style
+    s.left = (vx1 - r.left) + 'px'
+    s.width = Math.max(0, vx2 - vx1) + 'px'
+    s.top = (vy1 - r.top + paintHostEl.scrollTop) + 'px'
+    s.height = Math.max(0, vy2 - vy1) + 'px'
+  }
+  if (badgeRef.value) {
+    badgeRef.value.style.left = (paint.x + 14) + 'px'
+    badgeRef.value.style.top = (paint.y + 18) + 'px'
+    badgeRef.value.textContent = (paint.value ? tt('勾选') : tt('取消')) + ' ' + colLabel(paint.col) + ' · ' + paint.count
   }
 }
-function setGroupApprove(g) {
-  for (const r of g.panels) {
-    if (r.hasApproval) {
-      r.checked = true
-      r.canApprove = true
+function processPaintRect() {
+  paintRaf = 0
+  if (!paint.active || !paint.moved) return
+  paint.ay = anchorViewportY() // 滚动后锚点跟随内容(矩形不漂移)
+  const x1 = Math.min(paint.ax, paint.rx)
+  const x2 = Math.max(paint.ax, paint.rx)
+  const y1 = Math.min(paint.ay, paint.ry)
+  const y2 = Math.max(paint.ay, paint.ry)
+  const covered = new Set()
+  for (const c of paintCells) {
+    // 框选语义:格子盒子与框选矩形相交即命中(中心点判定会因亚像素取整漏掉边界格)
+    if (c.x + c.w < x1 || c.x > x2 || c.y + c.h < y1 || c.y > y2) continue
+    const key = trailKey(c.panel, c.col)
+    covered.add(key)
+    const row = panelRowMap.get(c.panel)
+    if (!row || cellState(row, c.col) === paint.value) continue
+    if (!dragOrig.has(key)) dragOrig.set(key, { panel: c.panel, col: c.col, val: cellState(row, c.col) })
+    setCellState(row, c.col, paint.value)
+  }
+  // 实时回退:本次拖动改过、现已退出框内的格恢复拖动前状态
+  for (const [key, o] of dragOrig) {
+    if (covered.has(key)) continue
+    const row = panelRowMap.get(o.panel)
+    if (row && cellState(row, o.col) !== o.val) setCellState(row, o.col, o.val)
+    dragOrig.delete(key)
+  }
+  paint.count = covered.size
+  syncPaintUi()
+}
+function scheduleProcess() {
+  // rAF 节流:每帧最多重算一次(高频鼠标/触控下避免重复全量遍历造成卡顿)
+  if (!paintRaf) paintRaf = requestAnimationFrame(processPaintRect)
+}
+/** 拖动期间持续运行:指针贴近/越过滚动容器上下边缘时按比例自动滚动 */
+function autoScrollTick() {
+  autoScrollRaf = 0
+  if (!paint.active) return
+  const el = paintScrollEl
+  if (el && paint.moved) {
+    const r = el.getBoundingClientRect()
+    let d = 0
+    if (paint.y < r.top + AUTOSCROLL_EDGE) {
+      d = -AUTOSCROLL_STEP * Math.min(1, (r.top + AUTOSCROLL_EDGE - paint.y) / AUTOSCROLL_EDGE)
+    } else if (paint.y > r.bottom - AUTOSCROLL_EDGE) {
+      d = AUTOSCROLL_STEP * Math.min(1, (paint.y - (r.bottom - AUTOSCROLL_EDGE)) / AUTOSCROLL_EDGE)
+    }
+    if (d) {
+      const before = el.scrollTop
+      el.scrollTop = before + d
+      if (el.scrollTop !== before) {
+        collectPaintCells() // 滚动改变格子视口坐标,刷新几何后立即重算
+        scheduleProcess()
+      }
     }
   }
+  autoScrollRaf = requestAnimationFrame(autoScrollTick)
+}
+function onPaintDown(row, col, e) {
+  if (e.button !== 0) return
+  e.preventDefault() // 禁止拖选时触发文本选择/原生点击
+  paint.active = true
+  paint.moved = false
+  paint.col = col
+  paint.value = col === ALL_COL ? !isAllPerms(row) : !hasPerm(row, col)
+  paint.count = 0
+  paint.ax = paint.rx = paint.x = e.clientX
+  paint.ay = paint.ry = paint.y = e.clientY
+  dragOrig.clear()
+  setCellState(row, col, paint.value) // 单击=只切换该格(此时 moved=false,无反馈标识)
+  collectPaintCells()
+  // 锚点内容坐标 + 滚动容器(边缘自动滚动);无滚动容器时自动滚动自然失效
+  paintScrollEl = findScrollContainer(e.currentTarget)
+  paintHostEl = e.currentTarget.closest('.perm-collapse') || null
+  paintBoxEl = e.currentTarget.closest('.perm-box') || null
+  if (paintHostEl) {
+    paint.acy = e.clientY - paintHostEl.getBoundingClientRect().top + paintHostEl.scrollTop
+  }
+  if (!autoScrollRaf) autoScrollRaf = requestAnimationFrame(autoScrollTick)
+}
+/** 框选 UI(矩形/徽标/painting 类)显隐:直接 DOM,不走 Vue 响应式 */
+function setPaintUiVisible(v) {
+  if (rectRef.value) rectRef.value.style.display = v ? 'block' : 'none'
+  if (badgeRef.value) badgeRef.value.style.display = v ? 'block' : 'none'
+  if (paintBoxEl) paintBoxEl.classList.toggle('painting', v)
+}
+function onPaintMove(e) {
+  if (!paint.active) return
+  paint.x = e.clientX
+  paint.y = e.clientY
+  if (!paint.moved) {
+    // 位移超过阈值才认定拖动:普通单击不出现框选矩形/徽标/轨迹
+    if (Math.hypot(e.clientX - paint.ax, e.clientY - paint.ay) < 4) return
+    paint.moved = true
+    setPaintUiVisible(true)
+    syncPaintUi() // 显示前先就位(零尺寸矩形+徽标),避免首帧闪跳
+  }
+  paint.rx = e.clientX
+  paint.ry = e.clientY
+  scheduleProcess()
+}
+function onPaintUp() {
+  if (!paint.active) return
+  if (autoScrollRaf) { cancelAnimationFrame(autoScrollRaf); autoScrollRaf = 0 }
+  if (paintRaf) { cancelAnimationFrame(paintRaf); paintRaf = 0 }
+  if (paint.moved) processPaintRect() // 松开前补算:最终状态=松手时矩形覆盖
+  paint.active = false
+  setPaintUiVisible(false)
+  dragOrig.clear()
+  paintCells = []
+  paintScrollEl = null
+  paintHostEl = null
+  paintBoxEl = null
+  refreshHeadMarks() // 列头三态取松手后的最新值(直接 DOM,不触发重渲染)
+}
+function onPaintScroll() {
+  // 拖动中滚动(滚轮/触摸板/程序滚动):格子视口坐标变化,刷新几何并重算覆盖
+  // (锚点存内容坐标,processPaintRect 内自动换算回视口——矩形跟随内容不漂移)
+  if (paint.active && paint.moved) {
+    collectPaintCells()
+    scheduleProcess()
+  }
+}
+
+// ---- 列头三态下拉:全勾✓/部分"−"/全空(无标) → 菜单批量设置仅作用于当前模块分组 ----
+// 性能:三态标记永远读"快照缓存"(普通 Map,非响应式)——thead 不实时依赖行 permsSet,
+// 否则任何一格变更都会把 OrgAdmin(整个页面,dev 模式单次渲染 ~300ms)拉进重渲染。
+// 缓存在权限变化点(拖动起止/菜单命令/分组按钮/载入)由 refreshHeadMarks() 重建,
+// 并直接同步到 DOM(130 个标记节点,<1ms);菜单打开时弹层按当前缓存惰性渲染,天然新鲜。
+let headMarkCache = new Map() // 分组 panels 数组 -> col -> {mark, cls, text}
+function buildHeadMarkCache() {
+  headMarkCache = new Map()
+  const cols = [ALL_COL, ...permActions.value.map((a) => a[0])]
+  for (const g of groupedPanels.value) {
+    const m = new Map()
+    for (const c of cols) {
+      const n = colCount(g.panels, c)
+      const total = g.panels.length
+      m.set(c, {
+        mark: n === 0 ? '' : n === total ? '✓' : '−',
+        cls: n === 0 ? '' : n === total ? 'is-all' : 'is-part',
+        text: n + '/' + total + ' ' + tt('已选'),
+      })
+    }
+    headMarkCache.set(g.panels, m)
+  }
+}
+/** 重建三态快照并直接同步到列头 DOM(不经 Vue 重渲染) */
+function refreshHeadMarks() {
+  buildHeadMarkCache()
+  const items = document.querySelectorAll('.perm-collapse .el-collapse-item')
+  groupedPanels.value.forEach((g, idx) => {
+    const table = items[idx] && items[idx].querySelector('.perm-table')
+    const m = headMarkCache.get(g.panels)
+    if (!table || !m) return
+    table.querySelectorAll('thead th[data-col]').forEach((th) => {
+      const info = m.get(th.dataset.col)
+      if (!info) return
+      const caret = th.querySelector('.pt-head-caret')
+      if (caret) {
+        caret.classList.toggle('is-all', info.cls === 'is-all')
+        caret.classList.toggle('is-part', info.cls === 'is-part')
+      }
+      const mark = th.querySelector('.pt-head-mark')
+      if (mark) mark.textContent = info.mark
+    })
+  })
+}
+function colCount(panels, col) {
+  if (col === ALL_COL) return panels.filter((r) => isAllPerms(r)).length
+  return panels.filter((r) => hasPerm(r, col)).length
+}
+function colMark(panels, col) {
+  const m = headMarkCache.get(panels)
+  return (m && m.get(col) && m.get(col).mark) || ''
+}
+function colStateClass(panels, col) {
+  const m = headMarkCache.get(panels)
+  return (m && m.get(col) && m.get(col).cls) || ''
+}
+function colCountText(panels, col) {
+  const m = headMarkCache.get(panels)
+  return (m && m.get(col) && m.get(col).text) || ''
+}
+function setCol(panels, col, val) {
+  let changed = 0
+  for (const r of panels) {
+    // 全选列:行有任意权限即视为"已选"(清空=清掉整行);普通列:按该列权限判断
+    const cur = col === ALL_COL ? (!!r.permsSet && r.permsSet.size > 0) : hasPerm(r, col)
+    if (cur === val) continue
+    if (col === ALL_COL) toggleAllPerms(r, val)
+    else togglePerm(r, col, val)
+    changed++
+  }
+  return changed
+}
+function colClearMsg(col) {
+  return tt('即将清空当前角色下所有面板的【{act}】权限').replace('{act}', colLabel(col))
+}
+function onHeadCommand(cmd, col, panels) {
+  if (cmd === 'all') {
+    const n = setCol(panels, col, true)
+    showBanner(tt('已为{n}个面板开启【{act}】权限').replace('{n}', String(n)).replace('{act}', colLabel(col)))
+  } else {
+    ElMessage.info(colClearMsg(col)) // 清空属破坏性操作:执行前轻提示
+    const n = setCol(panels, col, false)
+    showBanner(tt('已清空{n}个面板的【{act}】权限').replace('{n}', String(n)).replace('{act}', colLabel(col)))
+  }
+  refreshHeadMarks()
+}
+
+// ---- 批量操作结果反馈:浅绿色横幅(4 秒自动消退) ----
+const resultBanner = ref('')
+let bannerTimer = null
+function showBanner(text) {
+  resultBanner.value = text
+  if (bannerTimer) clearTimeout(bannerTimer)
+  bannerTimer = setTimeout(() => { resultBanner.value = '' }, 4000)
 }
 
 const deptTree = ref([])
@@ -601,6 +902,7 @@ async function loadRolePanels(row) {
       actions: (p.actions && p.actions.length ? p.actions : permActions.value),
       permsSet: new Set((grantedPerms[p.panelCode] || '').split(',').filter(Boolean)),
     }))
+    buildHeadMarkCache() // 首次渲染前备好快照(thead 三态绑定读缓存)
   } catch (e) {
     ElMessage.error('面板权限加载失败')
   }
@@ -622,7 +924,17 @@ async function savePanels() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('pointermove', onPaintMove)
+  window.addEventListener('pointerup', onPaintUp)
+  window.addEventListener('scroll', onPaintScroll, true)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('pointermove', onPaintMove)
+  window.removeEventListener('pointerup', onPaintUp)
+  window.removeEventListener('scroll', onPaintScroll, true)
+})
 </script>
 
 <style scoped>
@@ -672,6 +984,7 @@ onMounted(load)
 .perm-actions { margin-top: 10px; display: flex; gap: 8px; }
 /* 2026-08-25：按业务模块分组的权限配置 */
 .perm-collapse {
+  position: relative; /* 框选矩形的定位宿主:矩形在容器内绝对定位,越界被裁剪 */
   border: 1px solid #e3e8ef;
   border-radius: 6px;
   max-height: 340px;
@@ -714,8 +1027,7 @@ onMounted(load)
   border-collapse: collapse;
   font-size: 12px;
 }
-.perm-table th,
-.perm-table td {
+.perm-table th {
   border: 1px solid #e8ecf1;
   padding: 4px 6px;
   text-align: center;
@@ -727,10 +1039,13 @@ onMounted(load)
   color: #333;
   font-size: 11px;
 }
-.perm-table .pt-panel {
-  text-align: left;
-  min-width: 100px;
-  font-weight: 500;
+.perm-table th .pt-panel { text-align: left; }
+/* 列头:操作名 + 三态标记(✓/−)+ ▾ 下拉(批量设置收进菜单,表头保持素净) */
+.pt-head {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
 }
 .perm-table .pt-act { min-width: 40px; text-align: center; }
 .perm-table .pt-na { color: #d1d5db; }
@@ -751,5 +1066,56 @@ onMounted(load)
   background: #fafbfc;
   font-weight: 600;
 }
-.perm-table tbody tr:hover { background: #f8f9fb; }
+.pt-head-caret:hover { color: #409eff; background: rgba(64, 158, 255, 0.12); }
+.pt-head-caret.is-all { color: #409eff; }
+.pt-head-caret.is-part { color: #e6a23c; }
+.pt-head-mark { font-weight: 700; }
+.pt-head-arrow { font-size: 10px; }
+/* 下拉菜单内的三态标记与计数行 */
+.dd-mark { display: inline-block; width: 14px; color: #409eff; font-weight: 700; }
+.dd-count {
+  padding: 4px 16px 6px;
+  margin: 0;
+  font-size: 11px;
+  color: #909399;
+  cursor: default;
+  border-top: 1px solid #ebeef5;
+}
+/* 批量操作结果横幅(浅绿) */
+.result-banner {
+  margin: 6px 0 8px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  background: #f0f9eb;
+  border: 1px solid #e1f3d8;
+  color: #529b2e;
+  font-size: 12px;
+}
+/* ---- 拖动框选 ---- */
+/* 框选中:禁止文本选区干扰(轨迹/格子样式见 PermRow 子组件) */
+.perm-box.painting,
+.perm-box.painting * { user-select: none; -webkit-user-select: none; }
+/* 框选矩形(锚点到当前指针,主题蓝半透明+虚线边,不与勾选框蓝/表头灰冲突) */
+.paint-rect {
+  position: absolute; /* 容器内容坐标定位:随滚动移动,与容器可视区交集钳制 */
+  z-index: 5;
+  pointer-events: none;
+  background: rgba(64, 158, 255, 0.10);
+  border: 1px dashed rgba(64, 158, 255, 0.55);
+}
+/* 跟随光标的框选反馈徽标 */
+.paint-badge {
+  position: fixed;
+  z-index: 3000;
+  pointer-events: none;
+  background: #1c4f8a;
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(28, 79, 138, 0.35);
+  white-space: nowrap;
+}
+.paint-tip { margin-left: auto; font-size: 12px; color: #999; }
 </style>
