@@ -85,6 +85,9 @@ export const menuTree = [
             code: 'doc', title: '单据', children: [
               { code: 'puReq', title: '请购单', path: '/panelx/list/PU_REQ', icon: 'Tickets', panelCode: 'PU_REQ', operationName: '新增流程' },
               { code: 'puOrder', title: '采购订单', path: '/panelx/list/PU_ORDER', icon: 'Tickets', panelCode: 'PU_ORDER', operationName: '新增流程' },
+              { code: 'qcRecv', title: '送料暂收单', path: '/panelx/list/QC_RECV', icon: 'Box', panelCode: 'QC_RECV', operationName: '新增流程' },
+              { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
+              { code: 'qcReturn', title: '暂收退回单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
             ],
           },
         ],
