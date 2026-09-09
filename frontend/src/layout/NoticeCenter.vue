@@ -284,7 +284,9 @@ onBeforeUnmount(() => {
 .notice-center {
   height: 34px;
   display: inline-grid;
-  grid-template-columns: repeat(3, 34px);
+  /* 自适应列数(原来写死 repeat(3,34px),加到 5 个页签后会折行错位) */
+  grid-auto-flow: column;
+  grid-auto-columns: 34px;
   align-items: center;
   flex: 0 0 auto;
   overflow: visible;
@@ -329,6 +331,7 @@ onBeforeUnmount(() => {
 }
 
 .nc-ref.type-todo.active { color: #a56b14; background: #fff3dc; }
+.nc-ref.type-msg.active { color: #1a56db; background: #e8f0fe; }
 .nc-ref.type-dev.active { color: #1a56db; background: #e8f0fe; }
 .nc-ref.type-message.active { color: #456f7e; background: #eaf0f2; }
 .nc-ref.type-alarm.active { color: #ad4438; background: #faece9; }
