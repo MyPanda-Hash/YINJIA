@@ -31,15 +31,27 @@ public class ButtonService {
     private final FormNoService formNoService;
     private final JdbcTemplate jdbc;
     private final DevTaskService devTaskService;
+    private final MessageService messageService;
 
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
-                         DevTaskService devTaskService) {
+                         DevTaskService devTaskService, MessageService messageService) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
         this.jdbc = jdbc;
         this.devTaskService = devTaskService;
+        this.messageService = messageService;
+    }
+
+    /** 发送业务事件消息(失败不影响业务操作) */
+    private void notify(java.util.function.Supplier<Integer> action) {
+        try {
+            action.get();
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("business message send failed: {}", e.getMessage());
+        }
     }
 
     @Transactional
@@ -531,6 +543,9 @@ public class ButtonService {
                         + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), 'N', GETDATE());",
                 def.code(), no, operator, operator);
         recordApproval(def.code(), no, "SUBMIT", "PENDING", opinionOf(formData));
+        // 消息:提交审批 → 该面板审批人
+        notify(() -> messageService.sendToApprovers(def.code(), MessageService.APPROVAL_SUBMITTED, no,
+                Map.of("docNo", no, "actor", operator), operator));
         return result(no, "审批中");
     }
 
@@ -546,6 +561,10 @@ public class ButtonService {
         jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", operator, def.code(), no);
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion);
+        // 消息:审批通过 → 制单人
+        notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
+                def.code(), no, MessageService.APPROVAL_APPROVED,
+                Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion), operator));
         // 文件类面板:审批通过后归档(修改态走 finalizeModify 含修改记录;普通用户保存提交的走 markArchived)
         if (DOC_ARCHIVE_PANELS.contains(def.code())) {
             finalizeModify(def, no, operator);
@@ -567,6 +586,11 @@ public class ButtonService {
         jdbc.update("UPDATE yj_doc_status SET pending = 'N', update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
         recordApproval(def.code(), no, "REJECT", "REJECTED", opinion);
+        // 消息:审批驳回 → 制单人(驳回意见随消息带上)
+        String rejectBy = currentUserName();
+        notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
+                def.code(), no, MessageService.APPROVAL_REJECTED,
+                Map.of("docNo", no, "actor", rejectBy, "opinion", opinion), rejectBy));
         return result(no, "草稿");
     }
 
@@ -686,6 +710,9 @@ public class ButtonService {
         int n = jdbc.update("UPDATE yj_doc_status SET deleting='Y', delete_req_by=?, delete_req_at=GETDATE(), update_at=GETDATE()"
                 + " WHERE panel_code=? AND doc_no=?", user, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据不存在或状态已变更");
+        // 消息:申请删除 → 管理员
+        notify(() -> messageService.sendToAdmins(def.code(), no, MessageService.DELETE_REQUESTED,
+                Map.of("docNo", no, "actor", user), user));
         return result(no, "删除申请中");
     }
 
@@ -838,6 +865,9 @@ public class ButtonService {
                         + "VALUES (s.panel_code, s.doc_no, 'R', ?, GETDATE(), GETDATE());",
                 def.code(), no, user, user);
         recordApproval(def.code(), no, "MODIFY_REQ", "PENDING", opinionOf(formData));
+        // 消息:申请修改 → 管理员
+        notify(() -> messageService.sendToAdmins(def.code(), no, MessageService.MODIFY_REQUESTED,
+                Map.of("docNo", no, "actor", user, "opinion", opinionOf(formData)), user));
         return result(no, "修改申请中");
     }
 

@@ -36,6 +36,21 @@ async function translateBatch(locale, keys) {
   return (j && j.data && j.data.dict) || {}
 }
 
+/**
+ * 含占位符({xxx})的模板不能直接把 {actor} 交给机翻——会被译成 {Actor}/{アクタ}。
+ * 方案:把占位符换成哨兵 #0#/#1#(机翻会原样保留,可能加空格),整句翻译后还原。
+ * 整句翻译能保住语序与标点(分句翻译会把标点拆断)。
+ */
+function sentinelize(key) {
+  const names = []
+  const text = key.replace(/\{(\w+)\}/g, (m, n) => { names.push(n); return `#${names.length - 1}#` })
+  return { text, names }
+}
+
+function desentinelize(value, names) {
+  return String(value).replace(/#\s*(\d+)\s*#/g, (m, i) => (names[Number(i)] ? `{${names[Number(i)]}}` : m))
+}
+
 async function main() {
   const targets = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_LOCALES
   const enBiz = await loadBiz('en')
@@ -48,7 +63,9 @@ async function main() {
     if (!fs.existsSync(full)) { console.log(`${locale}: 语言包不存在,跳过`); continue }
     const biz = await loadBiz(locale)
     const have = new Set(Object.keys(biz))
-    const missing = enKeys.filter((k) => !have.has(k))
+    // 含占位符 {xxx} 的模板**不机翻**——机翻会把占位符译坏({actor}→{アクタ}/{Actor});
+    // 这类模板由人工维护(en 已手写,其余语种缺失时回退中文源文)
+    const missing = enKeys.filter((k) => !have.has(k) && !/\{\w+\}/.test(k))
     if (!missing.length) { console.log(`${locale}: 无缺口`); continue }
 
     let src = fs.readFileSync(full, 'utf8')
@@ -56,15 +73,25 @@ async function main() {
     let written = 0
     for (let i = 0; i < missing.length; i += CHUNK) {
       const chunk = missing.slice(i, i + CHUNK)
+      // 请求键:无占位符用原句;含占位符用哨兵版本(整句翻译)
+      const requestKeys = []
+      const tpl = new Map()
+      for (const k of chunk) {
+        const s = sentinelize(k)
+        tpl.set(k, s)
+        if (!requestKeys.includes(s.text)) requestKeys.push(s.text)
+      }
       let dict = {}
       try {
-        dict = await translateBatch(locale, chunk)
+        dict = await translateBatch(locale, requestKeys)
       } catch (e) {
         console.log(`\n  ${locale} 批次 ${Math.floor(i / CHUNK) + 1} 失败: ${e.message}`)
         continue
       }
       for (const k of chunk) {
-        const v = dict[k]
+        const s = tpl.get(k)
+        const raw = dict[s.text]
+        const v = raw === undefined ? '' : (s.names.length ? desentinelize(raw, s.names) : raw)
         if (!v || !String(v).trim()) continue
         if (src.includes(`'${escKey(k)}':`)) continue
         lines.push(`    '${escKey(k)}': '${escVal(v)}',`)

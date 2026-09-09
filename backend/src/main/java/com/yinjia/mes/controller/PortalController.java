@@ -1,10 +1,13 @@
 package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
+import com.yinjia.mes.service.MessageService;
 import com.yinjia.mes.service.PortalNotificationService;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,15 +22,50 @@ import java.util.Map;
 public class PortalController {
 
     private final PortalNotificationService notificationService;
+    private final MessageService messageService;
 
-    public PortalController(PortalNotificationService notificationService) {
+    public PortalController(PortalNotificationService notificationService, MessageService messageService) {
         this.notificationService = notificationService;
+        this.messageService = messageService;
     }
 
     @GetMapping("/badge")
     public ApiResult<Map<String, Integer>> badge(Authentication authentication) {
         String user = authentication == null ? "" : authentication.getName();
-        return ApiResult.ok(notificationService.badge(user));
+        Map<String, Integer> out = new LinkedHashMap<>(notificationService.badge(user));
+        out.put("msg", messageService.unreadCount(user)); // 业务事件消息未读数(2026-09-09)
+        return ApiResult.ok(out);
+    }
+
+    /** 业务事件消息列表(未读优先,时间倒序) */
+    @GetMapping("/message/list")
+    public ApiResult<List<Map<String, Object>>> messageList(
+            @RequestParam(defaultValue = "false") boolean onlyUnread,
+            @RequestParam(defaultValue = "100") int limit,
+            Authentication authentication) {
+        String user = authentication == null ? "" : authentication.getName();
+        return ApiResult.ok(messageService.list(user, onlyUnread, limit));
+    }
+
+    /** 标记单条已读(仅本人消息) */
+    @PostMapping("/message/read")
+    public ApiResult<Map<String, Object>> messageRead(@RequestBody Map<String, Object> body, Authentication authentication) {
+        String user = authentication == null ? "" : authentication.getName();
+        long id = body.get("id") == null ? 0L : Long.parseLong(String.valueOf(body.get("id")));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("updated", messageService.markRead(user, id));
+        out.put("unread", messageService.unreadCount(user));
+        return ApiResult.ok(out);
+    }
+
+    /** 全部已读 */
+    @PostMapping("/message/readAll")
+    public ApiResult<Map<String, Object>> messageReadAll(Authentication authentication) {
+        String user = authentication == null ? "" : authentication.getName();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("updated", messageService.markAllRead(user));
+        out.put("unread", messageService.unreadCount(user));
+        return ApiResult.ok(out);
     }
 
     private static final Map<String, List<Map<String, Object>>> NOTICES = buildNotices();
