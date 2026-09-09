@@ -86,8 +86,22 @@ public class PushGenerateHandler implements PanelActionHandler {
         }
         if (items.isEmpty()) throw new IllegalStateException("来源单据无明细行,不能生单");
 
+        // 3b) 行过滤(按生单动作拆行,如 检验单按处置方式拆 入库/退回);过滤后无行则拒绝生单
+        String[] filter = configService.detailFilter(sourcePanel, context.action());
+        if (filter != null) {
+            items = items.stream().filter(it -> {
+                Object v = it.get(filter[0]);
+                boolean eq = filter[2].equals(v == null ? "" : String.valueOf(v));
+                return "=".equals(filter[1]) ? eq : !eq;
+            }).collect(java.util.stream.Collectors.toList());
+            if (items.isEmpty()) {
+                throw new IllegalStateException("无符合生单条件的明细行(过滤:" + filter[0] + filter[1] + filter[2] + ")");
+            }
+        }
+
         // 4) 头/行映射:与选单共用 buildSelectConfig 生成的 headerMap/detailMap(from=源标签,to=目标标签)
-        Map<String, Object> maps = configService.flowMaps(target);
+        //    显式传来源(目标面板可有多来源,如 采购入库单 ← 采购订单/来料检验单)
+        Map<String, Object> maps = configService.flowMaps(sourcePanel, target);
         if (maps == null) throw new IllegalStateException("目标面板未配置流转来源:" + target);
         List<Map<String, String>> headerMap = (List<Map<String, String>>) maps.get("headerMap");
         List<Map<String, String>> detailMap = (List<Map<String, String>>) maps.get("detailMap");

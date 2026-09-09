@@ -601,6 +601,44 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
+            // 送料暂收单:选单=采购订单;生单=来料检验单(已实现,品检分流链)
+            java.util.Map.entry("QC_RECV", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"选单", "选采购订单"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "审核", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"生单", "生成检验单"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
+            // 来料检验单:选单=送料暂收单;生单=采购入库单(非退货行)/暂收退回单(退货行),按处置方式拆行
+            java.util.Map.entry("QC_INSP", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"选单", "选送料暂收单"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "审核", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"生单", "生成采购入库单", "生成暂收退回单"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
+            // 暂收退回单:选单=来料检验单;生单灰(无下游)
+            java.util.Map.entry("QC_RETURN", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"选单", "选来料检验单"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "审核", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
             // 产成品入库单:选单=生产加工单;生单灰(PANDA:生成产成品入库单（自制退库）)
             java.util.Map.entry("FINISH_IN", List.of(
                     new String[]{"新增", "新增"},
@@ -695,12 +733,29 @@ public class PanelConfigService {
             "PU_ORDER|生成采购入库单", "PURCHASE_IN",
             "SO_ORDER|生成生产加工单", "MANU_ORDER",
             "SO_ORDER|生成销售出库单", "SALE_OUT",
-            "MANU_ORDER|生成产成品入库单", "FINISH_IN"
+            "MANU_ORDER|生成产成品入库单", "FINISH_IN",
+            "QC_RECV|生成检验单", "QC_INSP",
+            "QC_INSP|生成采购入库单", "PURCHASE_IN",
+            "QC_INSP|生成暂收退回单", "QC_RETURN"
     )));
 
     /** 推式生单目标面板(无实现返回 null)。 */
     public String pushTarget(String panelCode, String action) {
         return PUSH_TARGETS.get(panelCode + "|" + action);
+    }
+
+    /**
+     * 推式生单行过滤((面板|动作) → {字段, =/!=, 值}):同一来源按行拆到不同目标单时使用。
+     * 例:来料检验单按 处置方式 拆行——非退货行生成采购入库单,退货行生成暂收退回单。
+     */
+    private static final Map<String, String[]> PUSH_DETAIL_FILTERS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
+            "QC_INSP|生成采购入库单", new String[]{"处置方式", "!=", "退货"},
+            "QC_INSP|生成暂收退回单", new String[]{"处置方式", "=", "退货"}
+    )));
+
+    /** 推式生单行过滤条件(无则 null)。 */
+    public String[] detailFilter(String panelCode, String action) {
+        return PUSH_DETAIL_FILTERS.get(panelCode + "|" + action);
     }
 
     /** 表单底部按钮(PANDA bottomOperationBarBtn:保存,删除,审核,弃审,+中止类,+放弃)。 */
@@ -722,6 +777,9 @@ public class PanelConfigService {
             java.util.Map.entry("SALE_OUT", "SO_ORDER"),             // 销售订单 → 销售出库单
             java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产加工单(销售-生产链)
             java.util.Map.entry("PU_ORDER", "PU_REQ"),               // 请购单 → 采购订单
+            java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(品检分流链)
+            java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(品检分流)
+            java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
             java.util.Map.entry("RKD", "CGD"),                       // 采购单(旧) → 入库单(旧)
             java.util.Map.entry("CKD", "KHDD")                       // 客户订单(旧) → 出库单(旧)
     )));
@@ -742,6 +800,10 @@ public class PanelConfigService {
             {"存货编码", "物料编码"}, {"存货名称", "物料名称"},
             {"单位", "计量单位"}, {"销售单位", "计量单位"}, {"生产单位", "计量单位"},
             {"采购单位", "单位"}, {"销售单位", "生产单位"},
+            // 品检分流三链(暂收→检验→入库/退回)的数量口径换名
+            {"暂收数量", "送检数量"},
+            {"合格数量", "实收数量"},
+            {"不合格数量", "退货数量"},
     };
 
     /** 头字段同义词(按链路 source|target 键控;同名映射之外的补充)。 */
@@ -749,12 +811,24 @@ public class PanelConfigService {
             "PU_REQ|PU_ORDER", new String[][]{{"建议供应商", "供应商"}},
             "PU_ORDER|PURCHASE_IN", new String[][]{{"单据编号", "采购订单号"}},
             "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}},
-            "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}}
+            "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
+            "QC_RECV|QC_INSP", new String[][]{{"单据编号", "暂收单号"}},
+            "QC_INSP|PURCHASE_IN", new String[][]{{"单据编号", "外部单据号"}},
+            "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}}
     )));
 
     /** 生单/选单共用的头行映射(目标面板 → {source, headerMap, detailMap});供 PushGenerateHandler 复用。 */
     public Map<String, Object> flowMaps(String targetPanel) {
-        Map<String, Object> cfg = buildSelectConfig(registry.panel(targetPanel));
+        return flowMaps(SELECT_FLOWS.get(targetPanel), targetPanel);
+    }
+
+    /**
+     * 指定来源的头行映射:推式生单用(目标面板可有多个来源,如 采购入库单 ← 采购订单(免检) / 来料检验单(检验合格));
+     * 选单 UI 仍用单来源 flowMaps(target)(SELECT_FLOWS 主来源)。
+     */
+    public Map<String, Object> flowMaps(String sourcePanel, String targetPanel) {
+        if (sourcePanel == null) return null;
+        Map<String, Object> cfg = buildSelectConfig(registry.panel(targetPanel), sourcePanel);
         if (cfg == null) return null;
         Map<String, Object> out = new java.util.LinkedHashMap<>();
         out.put("source", cfg.get("source"));
@@ -765,7 +839,11 @@ public class PanelConfigService {
 
     /** 生成 selectConfig(查询字段/表头表体列/头行映射全自动:同名优先 + 同义词补充)。 */
     private Map<String, Object> buildSelectConfig(PanelRegistry.PanelDef def) {
-        String sourceCode = SELECT_FLOWS.get(def.code());
+        return buildSelectConfig(def, SELECT_FLOWS.get(def.code()));
+    }
+
+    /** 指定来源版本(推式生单多来源链路)。 */
+    private Map<String, Object> buildSelectConfig(PanelRegistry.PanelDef def, String sourceCode) {
         if (sourceCode == null) return null;
         try {
             PanelRegistry.PanelDef src = registry.panel(sourceCode);
