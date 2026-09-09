@@ -2890,6 +2890,35 @@ function isFreshAddedDoc() {
   if (!freshAddedNo.value) return true
   return cur.value?.['编号'] === freshAddedNo.value
 }
+// ---- 新增草稿标记的持久化(2026-09-09 补齐):刷新/重进后离开守卫仍能识别并撤回这张草稿 ----
+const FRESH_DRAFT_KEY = 'mes_fresh_draft'
+function markFreshDraft(documentNo) {
+  try {
+    sessionStorage.setItem(FRESH_DRAFT_KEY, JSON.stringify({ panel: panelCode.value, no: String(documentNo || '') }))
+  } catch { /* 存储不可用则退化为仅内存标记 */ }
+}
+function clearFreshDraft(documentNo) {
+  try {
+    const raw = sessionStorage.getItem(FRESH_DRAFT_KEY)
+    if (!raw) return
+    let saved = null
+    try { saved = JSON.parse(raw) } catch { saved = null }
+    if (!documentNo || !saved || String(saved.no || '') === String(documentNo)) {
+      sessionStorage.removeItem(FRESH_DRAFT_KEY)
+    }
+  } catch { /* ignore */ }
+}
+function restoreFreshDraft() {
+  try {
+    const raw = sessionStorage.getItem(FRESH_DRAFT_KEY)
+    if (!raw) return
+    const saved = JSON.parse(raw)
+    if (saved && saved.panel === panelCode.value && saved.no) {
+      freshAdded.value = true
+      freshAddedNo.value = String(saved.no)
+    }
+  } catch { /* ignore */ }
+}
 /** 保存基线是否为「空白草稿」(新增后保存为草稿且未填任何内容)——离开守卫据此仍判定未保存 */
 const savedBlankDraft = ref(false)
 /** 明细内容是否为空:所有页签下都没有任何带值的行 */
@@ -3438,6 +3467,7 @@ async function load() {
     refreshRefModes()
     markSavedSnapshot() // 未保存离开守卫的基线快照（载入即干净；保存成功也会经此刷新）
     inlineDirtyFlag.value = false
+    restoreFreshDraft() // 刷新/重进后恢复「本次新增未保存草稿」标记,守卫仍可撤回
   } catch (e) {
     const msg = engine.errMsg(e) || '加载失败'
     ElMessage.error(msg)
