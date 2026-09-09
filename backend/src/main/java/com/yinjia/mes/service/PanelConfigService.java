@@ -601,7 +601,7 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 送料暂收单:选单=采购订单;生单=来料检验单(已实现,品检分流链)
+            // 送料暂收单:选单=采购订单;生单=来料检验单(已实现,品检分流链);标签=行级材料二维码(物料编码+批号)
             java.util.Map.entry("QC_RECV", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选采购订单"},
@@ -611,6 +611,7 @@ public class PanelConfigService {
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成检验单"},
+                    new String[]{"标签", "打印标签"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),

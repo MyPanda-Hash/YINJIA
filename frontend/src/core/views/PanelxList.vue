@@ -804,6 +804,7 @@
       </template>
     </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
+    <QrLabelDialog v-model="qrVisible" :labels="qrLabels" />
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <VoucherFormDialog v-model="formVisible" :panel-code="formPanel || panelCode" :code="formCode" @saved="onFormSaved" />
     <ScanFillDialog
@@ -877,6 +878,7 @@ import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
+import QrLabelDialog from '@/business/components/QrLabelDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
 import RefPickDialog from './RefPickDialog.vue'
@@ -1530,6 +1532,22 @@ const impFields = ref([])
 const impLabel = ref('明细')
 const scanVisible = ref(false)
 const selCfg = ref(null)
+// 材料二维码标签(品检分流链:暂收单行 打印标签)
+const qrVisible = ref(false)
+const qrLabels = ref([])
+
+function openQrLabels() {
+  const rows = current.value?.detail?.items || []
+  const doc = current.value?.['单据编号'] || current.value?.['编号'] || ''
+  qrLabels.value = rows
+    .filter((r) => r['批号'])
+    .map((r) => ({ code: r['物料编码'], name: r['物料名称'], lot: r['批号'], qty: r['暂收数量'], unit: r['单位'], doc, qr: '' }))
+  if (!qrLabels.value.length) {
+    ElMessage.warning(tt('当前单据明细行均无批号——请先保存(保存时自动取批号)后再打印'))
+    return
+  }
+  qrVisible.value = true
+}
 
 function selectConfigFor(action = '选单') {
   const cfg = cfgCache.value || {}
@@ -3368,6 +3386,11 @@ async function onButton(action) {
       return
     }
     const actionDocumentNo = current.value?.['编号'] || current.value?.['单据编号'] || ''
+    // 材料二维码标签打印(品检分流链):本地拦截,不走后端按钮;数据源=当前暂收单明细行
+    if (action === '打印标签') {
+      openQrLabels()
+      return
+    }
     // 列表页草稿是前端内联编辑态；审核/提交审批前必须先落库，否则状态刷新后会显示数据库中的旧空明细。
     if (['审核', '提交审批'].includes(action) && draftEditable.value) {
       const saved = await saveInlineDraft('保存', { silent: true })

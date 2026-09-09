@@ -32,16 +32,19 @@ public class ButtonService {
     private final JdbcTemplate jdbc;
     private final DevTaskService devTaskService;
     private final MessageService messageService;
+    private final LotSeqService lotSeqService;
 
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
-                         DevTaskService devTaskService, MessageService messageService) {
+                         DevTaskService devTaskService, MessageService messageService,
+                         LotSeqService lotSeqService) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
         this.jdbc = jdbc;
         this.devTaskService = devTaskService;
         this.messageService = messageService;
+        this.lotSeqService = lotSeqService;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -114,6 +117,14 @@ public class ButtonService {
                 ? new ArrayList<>((List<Map<String, Object>>) l) : new ArrayList<>();
         if (items.isEmpty() && detail.values().stream().findFirst().map(v -> v instanceof List).orElse(false)) {
             items = new ArrayList<>((List<Map<String, Object>>) detail.values().iterator().next());
+        }
+
+        // 品检分流链:暂收行缺批号时自动取号(批号=入库日期+3位流水;二维码=物料编码+批号)
+        if ("QC_RECV".equals(def.code())) {
+            for (Map<String, Object> it : items) {
+                Object lot = it.get("批号");
+                if (lot == null || String.valueOf(lot).isBlank()) it.put("批号", lotSeqService.next());
+            }
         }
 
         String no = noObj == null || String.valueOf(noObj).isBlank() ? null : String.valueOf(noObj);
