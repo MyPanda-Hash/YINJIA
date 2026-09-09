@@ -12,7 +12,12 @@
         <tr>
           <td class="rs-td rs-company-cell">惠州市银嘉环保科技有限公司</td>
           <td class="rs-td rs-docno">
-            <el-input v-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" @input="emit('dirty')" />
+            <!-- 文档编号:配置为参照时(数据记录表→立项申请右上角编号)点击弹参照;否则保持纯输入 -->
+            <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+              <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
+              <el-icon class="rs-ref-ico"><Search /></el-icon>
+            </div>
+            <el-input v-else-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" @input="emit('dirty')" />
             <span v-else class="rs-docno-text">{{ head['文档编号'] || head['单据编号'] || 'YJ-PD-01' }}</span>
           </td>
         </tr>
@@ -281,12 +286,15 @@
         </tr>
       </tbody>
     </table>
+    <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" @confirm="onProdRefConfirm" />
   </div>
 </template>
 
 <script setup>
-import { computed, nextTick } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { tt } from '@/i18n'
+import { Search } from '@element-plus/icons-vue'
+import RefPickDialog from './RefPickDialog.vue'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -300,6 +308,33 @@ function selectOptions(key) {
   const f = fieldMap.value.get(key)
   const opts = f?.options || []
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
+}
+
+// ── 参照字段(文档编号 → 立项申请右上角编号):点击单元格弹参照,确认后按 refMap 带回(密级等) ──
+function isRefKey(key) {
+  if (!key) return false
+  const f = fieldMap.value.get(key)
+  return !!(f && f.refPanel)
+}
+const prodRefVisible = ref(false)
+const prodRefKey = ref('')
+const prodRefField = computed(() => fieldMap.value.get(prodRefKey.value) || null)
+function openProdRef(key) {
+  if (!props.editable || !isRefKey(key)) return
+  prodRefKey.value = key
+  prodRefVisible.value = true
+}
+function onProdRefConfirm(rows) {
+  const f = prodRefField.value
+  const source = rows?.[0]
+  if (!f || !source) return
+  const refField = f.refField || f.dataName
+  props.head[prodRefKey.value] = source[refField] ?? ''
+  for (const m of f.refMap || []) {
+    if (m && source[m.from] !== undefined) props.head[m.to || m.from] = source[m.from]
+  }
+  prodRefVisible.value = false
+  emit('dirty')
 }
 
 // ── 校验定位(供 PanelxList 保存校验调用):滚动到该字段并琥珀闪烁 ──
@@ -436,6 +471,39 @@ function removeRow(i) {
   text-align: right;
   font-style: italic;
   font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
+}
+/* 参照单元格(文档编号 -> 立项申请右上角编号):拟态输入框,点击弹参照 */
+.rs-ref-ctl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0 4px;
+  border: 1px dashed #b9c0c8;
+  border-radius: 3px;
+  cursor: pointer;
+  background: #fafbfc;
+  font-style: normal;
+  font-weight: 400;
+}
+.rs-ref-ctl:hover {
+  border-color: var(--el-color-primary, #409eff);
+  background: #f0f6ff;
+}
+.rs-ref-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #333;
+  text-align: right;
+}
+.rs-ref-ico {
+  flex-shrink: 0;
+  font-size: 13px;
+  color: var(--el-color-primary, #409eff);
 }
 .rs-topic-cell {
   padding: 12px 14px 14px 30px !important;

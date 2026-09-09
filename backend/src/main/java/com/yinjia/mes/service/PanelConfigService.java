@@ -447,6 +447,9 @@ public class PanelConfigService {
             m.put("refPanel", f.refPanel());
             m.put("refField", refLabelOf(f.refPanel(), f.refField()));
             m.put("displayField", refLabelOf(f.refPanel(), f.displayField()));
+            // 立项申请参照:仅已归档单据可选——草稿/审批中项目的右上角编号尚未定稿,
+            // 被数据记录表引用会落空(或后续改号对不上),对齐「仅已归档可引用」口径。
+            if ("RD_APPROVAL".equals(f.refPanel())) m.put("filter", Map.of("单据状态", "已归档"));
             List<Map<String, String>> refMap = buildRefMap(def, f);
             if (!refMap.isEmpty()) m.put("refMap", refMap);
         }
