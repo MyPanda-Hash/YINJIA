@@ -464,22 +464,33 @@ public class PanelConfigService {
             java.util.Set<String> mapped = new java.util.HashSet<>();
             for (PanelRegistry.FieldDef sibling : def.fields()) {
                 if (sibling.label().equals(f.label())) continue;
-                if (refDef.byLabel(sibling.label()) != null) {
+                PanelRegistry.FieldDef refSide = refDef.byLabel(sibling.label());
+                if (refSide != null && carryTypeAllowed(sibling.dataType(), refSide.dataType())) {
                     out.add(Map.of("from", sibling.label(), "to", sibling.label()));
                     mapped.add(sibling.label());
                 }
             }
             // 同义词:引用面板字段名 → 本面板可能的异名字段名(如 存货的"计量单位"→单据的"销售单位/单位/采购单位")
             for (Map.Entry<String, List<String>> e : REF_SYNONYMS.entrySet()) {
-                if (refDef.byLabel(e.getKey()) == null) continue;
+                PanelRegistry.FieldDef fromSide = refDef.byLabel(e.getKey());
+                if (fromSide == null) continue;
                 for (String target : e.getValue()) {
-                    if (mapped.contains(target) || def.byLabel(target) == null) continue;
+                    if (target.equals(f.label()) || mapped.contains(target) || def.byLabel(target) == null) continue;
+                    if (!carryTypeAllowed(def.byLabel(target).dataType(), fromSide.dataType())) continue;
                     out.add(Map.of("from", e.getKey(), "to", target));
                     mapped.add(target);
                 }
             }
         } catch (Exception ignore) { /* 引用面板不存在时静默跳过 */ }
         return out;
+    }
+
+    /** 参照带回类型闸门:「是否」型不参与带回(任一侧是即禁止)。
+     *  同名≠同义——如 往来单位.结算客户(是否,0/1标志) 与 销售订单.结算客户(客户名下拉) 同名异义,
+     *  映射会把 0/1 写进名称字段;「停用」等档案标志同理不该串到单据上。
+     *  文本/下拉框/参照之间存值同构(中文字符串),互带合法。 */
+    private static boolean carryTypeAllowed(String a, String b) {
+        return !"是否".equals(a) && !"是否".equals(b);
     }
 
     /** 参照带回同义词词典(引用面板字段 → 本面板异名字段候选,命中即映射)。
@@ -489,6 +500,9 @@ public class PanelConfigService {
             "参考成本", List.of("单价"),
             "存货编码", List.of("材料编码", "产品编码", "物料编码"),
             "存货名称", List.of("材料名称", "产品名称", "物料名称"),
+            // 选客户/供应商整串带回:往来单位的编码/名称 → 单据的客户编码/供应商编码 与 客户/供应商(编码↔名称双向带动)
+            "往来单位编码", List.of("客户编码", "供应商编码"),
+            "往来单位名称", List.of("供应商", "客户"),
             // 产品信息表 炭棒尺寸(整串) → 产品文件面板异名规格字段;三窄格 炭棒规格1/2/3 由前端拆分回填
             "炭棒尺寸", List.of("炭棒规格", "滤芯尺寸")
     )));
