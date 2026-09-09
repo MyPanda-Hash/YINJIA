@@ -1464,7 +1464,6 @@ async function onDevDispatch() {
     devDispatch.busy = false
   }
 }
-watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState() }, { immediate: true })
 
 function pickModAction(action) {
   openModMenu.value = false
@@ -1572,6 +1571,9 @@ const cur = computed(() => {
   return l[Math.min(curIdx.value, l.length - 1)]
 })
 const curNo = computed(() => (list.value.length ? Math.min(curIdx.value, list.value.length - 1) + 1 : 0))
+
+// 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
+watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState() }, { immediate: true })
 
 // 文书默认值:新建起草时 申请立项人=当前用户 / 申请立项日期=今天(用户可改,不置脏)
 // 注意:watch getter 在 setup 时立即求值,必须位于 draftEditable/cur 定义之后
@@ -2882,6 +2884,29 @@ async function directAdd() {
 const savedSnapshot = ref('')
 const freshAdded = ref(false)
 const freshAddedNo = ref('') // freshAdded 绑定的单据编号:撤回只允许命中这张单,防止 cur 漂移后误撤既有单据
+/** 当前单据是否为「本次新增且尚未成功保存过」的草稿(freshAdded 且编号匹配,防 cur 漂移误判) */
+function isFreshAddedDoc() {
+  if (!freshAdded.value) return false
+  if (!freshAddedNo.value) return true
+  return cur.value?.['编号'] === freshAddedNo.value
+}
+/** 保存基线是否为「空白草稿」(新增后保存为草稿且未填任何内容)——离开守卫据此仍判定未保存 */
+const savedBlankDraft = ref(false)
+/** 明细内容是否为空:所有页签下都没有任何带值的行 */
+function isBlankDraftContent(detail) {
+  if (!detail || typeof detail !== 'object') return true
+  for (const rows of Object.values(detail)) {
+    if (!Array.isArray(rows)) continue
+    for (const row of rows) {
+      if (!row || typeof row !== 'object') continue
+      for (const [key, value] of Object.entries(row)) {
+        if (key === '_placeholder' || key === 'id' || key === '序号') continue
+        if (value !== undefined && value !== null && String(value).trim() !== '') return false
+      }
+    }
+  }
+  return true
+}
 /** 变更钩子置脏(表头/明细控件 @change;对真实交互可靠)——快照对比作兜底 */
 const inlineDirtyFlag = ref(false)
 function markInlineDirty() { if (draftEditable.value) inlineDirtyFlag.value = true }
