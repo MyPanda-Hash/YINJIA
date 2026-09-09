@@ -1,6 +1,7 @@
 ﻿/* ============================================================
    数据记录表「文档编号」改参照立项申请(2026-09-09)
-   业务:立项申请归档后,数据记录表的文档编号引用该立项申请的「单据编号」,
+   业务:立项申请归档后,数据记录表的文档编号引用该立项申请纸张「右上角」的编号
+        ——即 RD_APPROVAL.文档编号(YJ-XSxxx 口径),两张纸右上角编号一致,
         一张数据记录表对应一个已归档的立项项目。
    范围:8 个数据记录表面板
         RD_FILTER_EFF / RD_ALKALINE / RD_MINERAL / RD_ANTIBACT
@@ -12,11 +13,13 @@ SET NOCOUNT ON;
 GO
 
 UPDATE yj_field
-SET data_type = N'参照', ref_panel = N'RD_APPROVAL', ref_field = N'单据编号', display_field = N'单据编号', dict_sql = NULL
+SET data_type = N'参照', ref_panel = N'RD_APPROVAL', ref_field = N'文档编号', display_field = N'文档编号', dict_sql = NULL
 WHERE panel_code IN (N'RD_FILTER_EFF', N'RD_ALKALINE', N'RD_MINERAL', N'RD_ANTIBACT',
                      N'RD_SCALE', N'RD_RO_PROTECT', N'RD_SOAK', N'RD_DROP_PREC')
   AND col_name = N'文档编号'
-  AND ISNULL(ref_panel, N'') <> N'RD_APPROVAL';
+  AND (ISNULL(ref_panel, N'') <> N'RD_APPROVAL'
+       OR ISNULL(ref_field, N'') <> N'文档编号'
+       OR ISNULL(display_field, N'') <> N'文档编号');
 GO
 
 /* 取消隐藏:该字段原 hidden=1(纯文本时代为避免表头重复录入而隐藏),
