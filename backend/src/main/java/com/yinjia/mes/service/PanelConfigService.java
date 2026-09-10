@@ -308,7 +308,7 @@ public class PanelConfigService {
         metadata.put("panelCode", def.code());
         metadata.put("panelName", panelDisplay);
         metadata.put("panelCategory", def.category());
-        metadata.put("singleDoc", false);
+        metadata.put("singleDoc", panelSingleDoc(def.code()));   // 见 yj_panel.config 的 singleDoc
         metadata.put("autoCodeField", doc ? autoCodeLabel(def) : null);
         metadata.put("panelState", Map.of(
                 "dataName", "单据状态",
@@ -1167,5 +1167,24 @@ public class PanelConfigService {
             }
         }
         return actions;
+    }
+
+    /**
+     * 单单据面板判定:yj_panel.config 里写了 "singleDoc": true,即认为该面板只有一张单据 ——
+     * 前端会隐藏「新增单据」等入口(PanelxList 的 singleDocMode 分支),但**保留 doc 状态机**
+     * (草稿/已审核/归档流程不变)。项目进度查询(RD_PROGRESS)即用它:全部项目都放在同一张单据里。
+     * 读 config 用字符串匹配而不是 JSON_VALUE —— 库兼容级别 100,JSON 函数要 130+。
+     */
+    private boolean panelSingleDoc(String panelCode) {
+        try {
+            String cfg = jdbc.queryForObject(
+                    "SELECT ISNULL(CONVERT(nvarchar(max), config), '') FROM yj_panel WHERE panel_code = ?",
+                    String.class, panelCode);
+            if (cfg == null || cfg.isBlank()) return false;
+            String compact = cfg.replace(" ", "").replace("\r", "").replace("\n", "").replace("\t", "");
+            return compact.contains("\"singleDoc\":true");
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

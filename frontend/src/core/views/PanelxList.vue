@@ -1655,7 +1655,12 @@ async function openModifyLog() {
   }
 }
 const approvalSideGroups = computed(() => toolbarGroups.value
-  .map((g) => ({ ...g, actions: (g.actions || []).filter((a) => !APPROVAL_SIDE_EXCLUDE.includes(a)) }))
+  .map((g) => ({
+    ...g,
+    actions: (g.actions || []).filter((a) => !APPROVAL_SIDE_EXCLUDE.includes(a)
+      // 单单据面板(项目进度查询 RD_PROGRESS):全部数据都进同一张单据,不提供「新增」入口
+      && !(singleDocMode.value && (a === '新增' || a === '新增流程' || a === '新建'))),
+  }))
   .filter((g) => (g.actions || []).length && !(g.actions || []).includes('删除')))
 const headerFields = computed(() => {
   const fields = (cfgCache.value?.dataSchema?.fields || []).filter((field) => !field.hidden)
