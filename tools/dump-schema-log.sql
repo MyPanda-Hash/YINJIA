@@ -46,5 +46,26 @@ IF OBJECT_ID('wo_order')       IS NOT NULL SELECT N'wo_order'       AS tbl, COUN
 IF OBJECT_ID('yj_form_approval') IS NOT NULL SELECT N'yj_form_approval' AS tbl, COUNT(*) AS n FROM yj_form_approval;
 GO
 
+PRINT N'===== 5. TABLES (name + rowcount) =====';
+SELECT t.name AS obj, ISNULL(SUM(p.row_count), 0) AS rows_
+  FROM sys.tables t
+  LEFT JOIN sys.dm_db_partition_stats p ON p.object_id = t.object_id AND p.index_id IN (0, 1)
+ GROUP BY t.name ORDER BY t.name;
+GO
+
+PRINT N'===== 6. TABLE COLUMN COUNTS =====';
+SELECT t.name AS tbl, COUNT(c.column_id) AS cols
+  FROM sys.tables t JOIN sys.columns c ON c.object_id = t.object_id
+ GROUP BY t.name ORDER BY t.name;
+GO
+
+PRINT N'===== 7. VIEWS =====';
+SELECT name FROM sys.views ORDER BY name;
+GO
+
+PRINT N'===== 8. ROUTINES =====';
+SELECT name FROM sys.objects WHERE type IN ('P','FN','IF','TF') ORDER BY name;
+GO
+
 PRINT N'===== DUMP-END =====';
 GO

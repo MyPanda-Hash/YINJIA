@@ -100,6 +100,8 @@ echo [2/9] DB self check (read-only) ...
 call :SELFCHECK "%TOOLS%\check-migrations.sql" >>"%LOG%" 2>&1
 echo [2b/9] dumping migration ledger + scale (read-only) ...
 call :LEDGER >>"%LOG%" 2>&1
+echo [2c/9] dumping view definitions ...
+call :VIEWS >>"%LOG%" 2>&1
 echo [2/9] done - verdict below
 echo.
 call :SHOWTAIL
@@ -121,6 +123,12 @@ call :LEDGER       rem ???????/??,????????(??)
 echo == dump-schema-log.sql ==
 sqlcmd -S localhost -d HSDZ_MES -U yinjia -P "%YJ_PASS%" -f i:65001,o:65001 -W -i "%TOOLS%\dump-schema-log.sql" -o "%LOGDIR%\server-ledger.txt"
 type "%LOGDIR%\server-ledger.txt"
+exit /b 0
+
+:VIEWS        rem ????????(??)
+echo == dump-server-views.sql ==
+sqlcmd -S localhost -d HSDZ_MES -E -f i:65001,o:65001 -y 0 -i "%TOOLS%\dump-server-views.sql" -o "%LOGDIR%\server-views.sql"
+echo [views] exit=%errorlevel%   file: %LOGDIR%\server-views.sql
 exit /b 0
 
 :BACKUP >>"%LOG%" 2>&1
@@ -218,6 +226,12 @@ exit /b 0
 echo == dump-schema-log.sql ==
 sqlcmd -S localhost -d HSDZ_MES -U yinjia -P "%YJ_PASS%" -f i:65001,o:65001 -W -i "%TOOLS%\dump-schema-log.sql" -o "%LOGDIR%\server-ledger.txt"
 type "%LOGDIR%\server-ledger.txt"
+exit /b 0
+
+:VIEWS        rem ????????(??)
+echo == dump-server-views.sql ==
+sqlcmd -S localhost -d HSDZ_MES -E -f i:65001,o:65001 -y 0 -i "%TOOLS%\dump-server-views.sql" -o "%LOGDIR%\server-views.sql"
+echo [views] exit=%errorlevel%   file: %LOGDIR%\server-views.sql
 exit /b 0
 
 :BACKUP
