@@ -3131,6 +3131,28 @@ async function onButton(action) {
     qrVisible.value = true
     return
   }
+  // 产品二维码(成型后):二维码=产品编码|产品批号;批号由后端按需取号(一次生成终身复用)
+  if (action === '打印产品二维码') {
+    const cur = current.value || {}
+    const no = cur['单据编号'] || cur['编号'] || ''
+    if (!no) return ElMessage.warning('请先选择一张工单')
+    try {
+      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '生成产品批号', formData: { 编号: no }, buttonParam: {} })
+      const lot = res?.['产品批号']
+      if (!lot) throw new Error('未返回产品批号')
+      await load()
+      const fresh = list.value.find((r) => (r['单据编号'] || r['编号']) === no) || cur
+      qrLabels.value = [{
+        code: fresh['产品编码'] || cur['产品编码'] || '', name: fresh['产品名称'] || cur['产品名称'] || '',
+        lot, qty: fresh['订单数量'] ?? cur['订单数量'], unit: fresh['单位'] || cur['单位'] || '',
+        doc: `工单 ${no} · 交期 ${fresh['交期'] || cur['交期'] || '-'}`, qr: '',
+      }]
+      qrVisible.value = true
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || '生成产品批号失败')
+    }
+    return
+  }
   if (action === '查询' || action === '查找') {
     search()
     return

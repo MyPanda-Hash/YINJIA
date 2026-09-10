@@ -682,7 +682,7 @@ public class PanelConfigService {
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成领料单"},
-                    new String[]{"标签", "打印工单二维码"},
+                    new String[]{"标签", "打印工单二维码", "打印产品二维码"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),

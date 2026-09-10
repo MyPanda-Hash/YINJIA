@@ -98,6 +98,8 @@ public class ButtonService {
             case "新增库存" -> addStock(def, formData);
             // 库存状况:修改预警数量(行内编辑,空值回退全局阈值100)
             case "更新预警数量" -> updateStockWarn(def, formData);
+            // 生产工单:成型后生成产品批号(打印产品二维码的数据源,一次生成终身复用)
+            case "生成产品批号" -> genProductLot(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
         };
     }
@@ -517,6 +519,8 @@ public class ButtonService {
         stockLedger.postIn(def.code(), no, currentUserName());
         // 工序报工记账(生产过程层):报工单审核 → wo_progress.完成数量 累计
         woReport.post(def.code(), no, currentUserName());
+        // 切炭双出口(已确认):报工审核后,直销数量自动生成成品入库单并审核入账(成品仓)
+        dualOutFinishIn(def.code(), no, currentUserName());
         // 不良品处理记账(品质层):处理单审核 → 原仓扣减+目标仓(隔离/不良品)移仓或报废
         qcDisposal.post(def.code(), no, currentUserName());
         // 文件类面板:修改态经审核收尾 → 计算修改记录并再归档
@@ -829,8 +833,87 @@ public class ButtonService {
         return result(wzdm + "@" + ckdm, "已新增");
     }
 
-    /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */
-    private Map<String, Object> updateStockWarn(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+    /**
+     * 生成产品批号(生产工单):成型后打印产品二维码的数据源。
+     * 批号=入库日期+3位流水(与材料批号同一号池);一次生成终身复用,重复调用返回已有批号。
+     */
+    private Map<String, Object> genProductLot(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"WO_ORDER".equals(def.code())) throw new IllegalStateException("仅生产工单支持生成产品批号");
+        String no = requireNo(formData);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT [产品批号] FROM wo_order WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (rows.isEmpty()) throw new IllegalStateException("工单不存在:" + no);
+        Object cur = rows.get(0).get("产品批号");
+        String lot = cur == null || String.valueOf(cur).isBlank() ? null : String.valueOf(cur).trim();
+        if (lot == null) {
+            lot = lotSeqService.next();
+            jdbc.update("UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?", lot, no);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", no);
+        out.put("产品批号", lot);
+        return out;
+    }
+
+    /**
+     * 切炭双出口(流程图已确认:合格品一部分直销入成品仓,其余继续组装):
+     * 切炭报工单审核后,若[直销数量]>0 → 自动生成成品入库单(成品仓,带产品批号)并审核入账;
+     * 完成数量仍全额累计切炭进度(直销+组装都在切炭完成量内)。
+     * 幂等:经 form_flow_link 占用,同一报工单重审不重复生成;弃审报工不自动冲回入库单(需单独弃审入库单)。
+     */
+    private void dualOutFinishIn(String panelCode, String no, String user) {
+        if (!"WO_REPORT".equals(panelCode)) return;
+        List<Map<String, Object>> reps = jdbc.queryForList(
+                "SELECT [工单号], [工序], [报工数量], [直销数量] FROM wo_report WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (reps.isEmpty()) return;
+        Map<String, Object> rep = reps.get(0);
+        if (!"切炭".equals(String.valueOf(rep.get("工序")))) return;
+        double dual = numOr(rep.get("直销数量"));
+        if (dual <= 0) return;
+        double done = numOr(rep.get("报工数量"));
+        if (dual > done + 0.0001) throw new IllegalStateException("直销数量(" + dual + ")不能大于报工数量(" + done + ")");
+        Integer linked = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code = 'WO_REPORT' AND source_form_no = ?"
+                        + " AND target_panel_code = 'FINISH_IN' AND link_status = 'ACTIVE'", Integer.class, no);
+        if (linked != null && linked > 0) return; // 已生成过直销入库(重审幂等)
+        String wo = String.valueOf(rep.get("工单号"));
+        List<Map<String, Object>> ws = jdbc.queryForList(
+                "SELECT [产品编码], [产品名称], [单位], [产品批号] FROM wo_order WHERE [单据编号] = ?", wo);
+        if (ws.isEmpty()) throw new IllegalStateException("工单不存在:" + wo);
+        Map<String, Object> w = ws.get(0);
+        Object lotObj = w.get("产品批号");
+        String lot = lotObj == null || String.valueOf(lotObj).isBlank() ? null : String.valueOf(lotObj).trim();
+        if (lot == null) {
+            lot = lotSeqService.next();
+            jdbc.update("UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?", lot, wo);
+        }
+        Map<String, Object> line = new LinkedHashMap<>();
+        line.put("产品编码", w.get("产品编码"));
+        line.put("产品名称", w.get("产品名称"));
+        line.put("实收数量", dual);
+        line.put("计量单位", w.get("单位"));
+        line.put("批号", lot);
+        line.put("仓库", "成品仓");
+        Map<String, Object> head = new LinkedHashMap<>();
+        head.put("单据日期", LocalDate.now().toString());
+        head.put("仓库", "成品仓");
+        head.put("生产车间", "切炭车间");
+        head.put("加工单号", wo);
+        head.put("经手人", user);
+        head.put("detail", Map.of("items", List.of(line)));
+        Map<String, Object> saved = save(registry.panel("FINISH_IN"), head, false);
+        String fiNo = String.valueOf(saved.get("编号"));
+        audit(registry.panel("FINISH_IN"), Map.of("编号", (Object) fiNo));
+        jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key, target_panel_code, target_form_no, link_status, create_by, create_time)"
+                        + " VALUES ('WO_REPORT', ?, '', 'FINISH_IN', ?, 'ACTIVE', ?, GETDATE())", no, fiNo, user);
+    }
+
+    private static double numOr(Object o) {
+        if (o == null || String.valueOf(o).isBlank()) return 0;
+        try { return Double.parseDouble(String.valueOf(o)); } catch (NumberFormatException e) { return 0; }
+    }
+
+    /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */    private Map<String, Object> updateStockWarn(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         if (!"STOCK_STATUS".equals(def.code())) throw new IllegalStateException("仅库存状况面板支持修改预警数量");
         String idRaw = requiredText(formData, "id");
         int id;
