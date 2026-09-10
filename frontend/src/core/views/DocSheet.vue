@@ -188,14 +188,34 @@
                   <div class="as-phase-row">
                     <span class="as-phase-row-label">{{ tt('计划开始') }}</span>
                     <div class="as-phase-row-value">
-                      <el-input v-if="editable" v-model="head[ph.key + '_计划开始']" size="small" class="as-phase-input" maxlength="20" placeholder="YYYY-MM-DD" @input="emit('dirty')" />
+                      <el-date-picker
+                        v-if="editable"
+                        v-model="head[ph.key + '_计划开始']"
+                        type="date"
+                        value-format="YYYY-MM-DD"
+                        format="YYYY-MM-DD"
+                        size="small"
+                        class="as-phase-input as-phase-date"
+                        placeholder="YYYY-MM-DD"
+                        @change="onPhaseStart(ph.key, $event)"
+                      />
                       <span v-else class="as-phase-text">{{ head[ph.key + '_计划开始'] || '' }}</span>
                     </div>
                   </div>
                   <div class="as-phase-row">
                     <span class="as-phase-row-label">{{ tt('计划完成') }}</span>
                     <div class="as-phase-row-value">
-                      <el-input v-if="editable" v-model="head[ph.key + '_计划完成']" size="small" class="as-phase-input" maxlength="20" placeholder="YYYY-MM-DD" @input="emit('dirty')" />
+                      <el-date-picker
+                        v-if="editable"
+                        v-model="head[ph.key + '_计划完成']"
+                        type="date"
+                        value-format="YYYY-MM-DD"
+                        format="YYYY-MM-DD"
+                        size="small"
+                        class="as-phase-input as-phase-date"
+                        placeholder="YYYY-MM-DD"
+                        @change="onPhaseDone(ph.key, $event)"
+                      />
                       <span v-else class="as-phase-text">{{ head[ph.key + '_计划完成'] || '' }}</span>
                     </div>
                   </div>
@@ -268,7 +288,7 @@ import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
 import RefPickDialog from './RefPickDialog.vue'
 import { usePanelRuntime } from '@core/panel-runtime'
-import { hasPhaseContent } from '@core/progress/stageProgress'
+import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -288,6 +308,19 @@ const stageLoading = ref(0)
 /** 阶段完成按钮可用:非编辑态 + 已审核 */
 const canStageComplete = computed(() => !props.editable && props.audited && props.panelCode === 'RD_PLAN')
 
+/** 阶段计划开始:归一空值(清空时 el-date-picker 给 null),别把 null 存进库 */
+function onPhaseStart(phaseKey, v) {
+  props.head[phaseKey + '_计划开始'] = v || ''
+  emit('dirty')
+}
+
+/** 阶段计划完成:同上归一,并把下一阶段的「计划开始」接上次日(仅当其为空) */
+function onPhaseDone(phaseKey, v) {
+  props.head[phaseKey + '_计划完成'] = v || ''
+  const n = Number(String(phaseKey).replace(/[^0-9]/g, ''))
+  if (n) chainNextStageStart(props.head, n)
+  emit('dirty')
+}
 async function doStageComplete(stageNum) {
   stageLoading.value = stageNum
   try {
@@ -662,6 +695,7 @@ defineExpose({ focusField })
   flex: 1; min-width: 0;
   display: flex; align-items: center;
 }
+.as-phase-date { width: 100%; }
 .as-phase-input { max-width: 160px; }
 .as-phase-text {
   font-size: 12px; color: #444; line-height: 24px;

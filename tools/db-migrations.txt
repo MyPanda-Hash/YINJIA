@@ -159,3 +159,4 @@ migrate-prod-forms-fields4.sql
 migrate-prod-forms-fix.sql
 migrate-view-id.sql
 migrate-view-ascancel.sql
+migrate-clean-orphan-docstatus.sql

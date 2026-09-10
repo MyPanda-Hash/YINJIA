@@ -182,11 +182,13 @@ public class ButtonService {
                 for (Map.Entry<String, Object> e : labelsToCols(def.fieldsAt("header"), head).entrySet()) {
                     if (!e.getKey().equals(def.groupCol())) cols.put(e.getKey(), e.getValue());
                 }
+                clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
                 markDocSaved(def.code(), no, false);
                 return result(no, "草稿");
             }
             no = formNoService.next(def.prefix(), user);
+            clearStaleDocStatus(def, no);
         }
         // 已审核/审批中/已中止单据不允许保存(照搬 light-mes:仅草稿可改)
         Map<String, Object> st = docStatusOf(def.code(), no);
@@ -490,6 +492,27 @@ public class ButtonService {
         cols.keySet().removeIf(k -> cols.get(k) == null && notNull.contains(k));
     }
 
+    /**
+     * 单号是"释放后可重发"的(删除单据会释放单号)。
+     * 若该号在 yj_doc_status 里还留着上一轮的状态行,新单会 继承 它的 archived/canceled/pending
+     * —— 表现就是"新增一张单据,它一出生就是已归档/已作废",根本填不了数据。
+     * 新建时若单据表里查不到这个号,说明状态行是陈旧的,直接清掉。
+     * 2026-09-10 实测:RD_APPROVAL 10 条 + RD_PLAN 5 条孤儿状态行导致该故障。
+     */
+    private void clearStaleDocStatus(PanelRegistry.PanelDef def, String no) {
+        if (no == null || no.isBlank()) return;
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        String col = def.groupCol() != null ? def.groupCol() : def.codeCol();
+        if (table == null || col == null) return;
+        Integer live = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE [" + col + "] = ?", Integer.class, no);
+        if (live != null && live > 0) return;   // 在册单据,状态行有效,不动
+        int n = jdbc.update("DELETE FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?", def.code(), no);
+        if (n > 0) {
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("[新建] 单号 {} 存在陈旧状态行({} 条),已清除,避免新单继承旧的归档/作废标记", no, n);
+        }
+    }
     /** 标记草稿的保存阶段:saved='Y' 已保存(未审核) / 'N' 临时草稿(新增未保存/保存为草稿) */
     private void markDocSaved(String panelCode, String no, boolean saved) {
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "

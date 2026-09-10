@@ -13,6 +13,7 @@ setlocal enabledelayedexpansion
 set "SRC=%~dp0"
 if "%SRC:~-1%"=="\" set "SRC=%SRC:~0,-1%"
 set "DEST=C:\yinjia"
+set "TOOLS=%SRC%\db-tools"
 if defined YJ_DEST set "DEST=%YJ_DEST%"
 
 set "LOGDIR=%SRC%\logs"
@@ -49,6 +50,14 @@ copy /Y "%DEST%\app.jar" "%DEST%\app.jar.bak" >>"%LOG%" 2>&1
 copy /Y "%DEST%\update\app.jar" "%DEST%\app.jar" >>"%LOG%" 2>&1
 del /Q "%DEST%\update\app.jar" 2>nul
 >>"%LOG%" echo [ok] swapped
+
+echo [3b/5] cleaning stale doc-status rows (orphans make new docs look archived) ...
+if exist "%TOOLS%\migrate-clean-orphan-docstatus.sql" (
+  sqlcmd -S localhost -d HSDZ_MES -E -b -f i:65001,o:65001 -i "%TOOLS%\migrate-clean-orphan-docstatus.sql" >>"%LOG%" 2>&1
+  echo   orphan cleanup exit=!errorlevel!
+) else (
+  echo   [WARN] migrate-clean-orphan-docstatus.sql not found, skipped
+)
 
 echo [4/5] starting backend ...
 start "" cmd /c "%DEST%\start.bat"
