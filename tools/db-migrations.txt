@@ -87,3 +87,7 @@ migrate-rd-panel-register.sql
 migrate-rd-dev-task.sql
 migrate-rd-docno-ref.sql
 migrate-rd-plan-docno-ref.sql
+fix-proj-customer-ref.sql
+migrate-wo-order.sql
+migrate-wo-schedule.sql
+migrate-wo-schedule-fix.sql
