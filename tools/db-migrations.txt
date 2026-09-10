@@ -142,3 +142,20 @@ migrate-prod-forms-fields.sql
 
 # —— 2026-09-10 登记:项目档案客户参照改名称口径(dm→mc,存量按 dm_kh 翻译) ——
 fix-proj-customer-ref.sql
+
+# —— 2026-09-10 补登记:近期新增但漏登记的 11 个脚本(部署前补齐,否则 DbSync 整批跳过 → 新代码缺表缺列) ——
+# 排序:① 库存/台账表结构 → ② 行表补列 → ③ 阶段/批次字段 → ④ 面板字段与译名 → ⑤ 视图;
+# 已本地连跑两遍验证幂等(无报错、业务表行数不变)。
+# 🔴 禁止登记:migrate-rd-cleanup.sql —— 一次性测试数据清理脚本(删单据/状态/审批记录/使用日志),
+#    登记进清单 = 每次同步都删业务数据,只能在明确后果时人工手工执行,绝不入清单。
+migrate-aux-stock.sql
+migrate-aux-line-wh.sql
+migrate-product-lot-dualout.sql
+migrate-dualout-label.sql
+migrate-rd-plan-stages.sql
+migrate-prod-forms-fields2.sql
+migrate-prod-forms-fields3.sql
+migrate-prod-forms-fields4.sql
+migrate-prod-forms-fix.sql
+migrate-view-id.sql
+migrate-view-ascancel.sql
