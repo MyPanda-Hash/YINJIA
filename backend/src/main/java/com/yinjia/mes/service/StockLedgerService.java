@@ -52,7 +52,7 @@ public class StockLedgerService {
             String whName = str(r.get("行仓库")) != null ? str(r.get("行仓库")) : str(r.get("头仓库"));
             Double price = r.get("price") == null ? null : num(r.get("price"));
             if (code == null) throw new IllegalStateException("存在缺少[材料/存货编码]的明细行,不能记账");
-            if (qty <= 0) continue;
+            if (qty == 0) continue; // 零行跳过;负数=红字冲回,正常过账(applyIn 内含负库存守卫)
             String ckdm = resolveCkdm(whName);
             if (ckdm == null) throw new IllegalStateException("仓库档案不存在:[" + whName + "],请先在基础档案-仓库中建立");
             if (inbound) applyIn(code, ckdm, lot, qty, price, user, forward);
@@ -66,15 +66,15 @@ public class StockLedgerService {
                         + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ? AND lot_no = ?",
                 sign * qty, sign * qty, user, code, ckdm, lot);
         if (n == 0) {
-            if (!forward) throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + "),可能已被清理");
+            if (!forward || qty < 0) throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + "),红字冲回要求台账行已存在");
             jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, yl, price, asp_user1, asp_time1, asp_cancel)"
                             + " VALUES (?, ?, ?, GETDATE(), ?, ?, ?, ?, GETDATE(), 'N')",
                     code, ckdm, lot, qty, qty, price, "stock:" + user);
             return;
         }
-        if (!forward) {
+        if (!forward || qty < 0) {
             Double yl = bal(code, ckdm, lot);
-            if (yl != null && yl < -0.0001) throw new IllegalStateException("冲回将使现存量为负(物料 " + code + " 批 " + lot + " 余额 " + yl + "),库存已被消耗,不可弃审");
+            if (yl != null && yl < -0.0001) throw new IllegalStateException("冲回将使现存量为负(物料 " + code + " 批 " + lot + " 余额 " + yl + "),库存已被消耗,不可冲回");
         }
     }
 

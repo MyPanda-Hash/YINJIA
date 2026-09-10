@@ -539,6 +539,8 @@ public class ButtonService {
         stockLedger.unpostIn(def.code(), no, currentUserName());
         // 报工冲回(生产过程层):完成数量对称扣减,为负则拒绝
         woReport.unpost(def.code(), no, currentUserName());
+        // 切炭双出口冲回:弃审报工 → 自动生成红字(负数量)成品入库单冲回台账
+        dualOutRedReverse(def.code(), no, currentUserName());
         // 不良品处理冲回(品质层):移仓/报废对称冲回,目标仓被消耗则拒绝
         qcDisposal.unpost(def.code(), no, currentUserName());
         // 弃审同时清归档标记(文件面板审批后=已归档,弃审应回到草稿)
@@ -911,6 +913,59 @@ public class ButtonService {
     private static double numOr(Object o) {
         if (o == null || String.valueOf(o).isBlank()) return 0;
         try { return Double.parseDouble(String.valueOf(o)); } catch (NumberFormatException e) { return 0; }
+    }
+
+    /**
+     * 切炭双出口红字冲回:弃审切炭报工单时,若已自动生成直销入库单(ACTIVE link),
+     * 则自动生成一张红字(负数量)成品入库单并审核 → 台账 rkl/yl 对称扣减,库中留痕。
+     * 原入库单保留(审计线索),红字单独立存在;link 释放后重审可再生成新入库单。
+     * 幂等:无 ACTIVE link(未生成过或已冲回)则跳过。
+     */
+    private void dualOutRedReverse(String panelCode, String no, String user) {
+        if (!"WO_REPORT".equals(panelCode)) return;
+        // 查报工单是否为切炭且有直销
+        List<Map<String, Object>> reps = jdbc.queryForList(
+                "SELECT [工单号], [工序], [直销数量] FROM wo_report WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (reps.isEmpty() || !"切炭".equals(String.valueOf(reps.get(0).get("工序")))) return;
+        if (numOr(reps.get(0).get("直销数量")) <= 0) return;
+        // 查 ACTIVE link → 原入库单号
+        List<String> fiNos = jdbc.queryForList(
+                "SELECT target_form_no FROM form_flow_link WHERE source_panel_code='WO_REPORT' AND source_form_no=?"
+                        + " AND target_panel_code='FINISH_IN' AND link_status='ACTIVE'", String.class, no);
+        if (fiNos.isEmpty()) return; // 未生成过或已冲回
+        String srcFi = fiNos.get(0);
+        // 读原入库单明细行(取第一行——双出口只生成单行)
+        List<Map<String, Object>> lines = jdbc.queryForList(
+                "SELECT [产品编码], [产品名称], [实收数量], [计量单位], [批号], [仓库] FROM bl_finish_in"
+                        + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", srcFi);
+        if (lines.isEmpty()) throw new IllegalStateException("红字冲回失败:原入库单 " + srcFi + " 无有效行");
+        Map<String, Object> src = lines.get(0);
+        double srcQty = numOr(src.get("实收数量"));
+        if (srcQty <= 0) return; // 原行已非正数,无需冲回
+        String wo = String.valueOf(reps.get(0).get("工单号"));
+        // 生成红字入库单(负数量)
+        Map<String, Object> line = new LinkedHashMap<>();
+        line.put("产品编码", src.get("产品编码"));
+        line.put("产品名称", src.get("产品名称"));
+        line.put("实收数量", -srcQty);
+        line.put("计量单位", src.get("计量单位"));
+        line.put("批号", src.get("批号"));
+        line.put("仓库", src.get("仓库"));
+        Map<String, Object> head = new LinkedHashMap<>();
+        head.put("单据日期", LocalDate.now().toString());
+        head.put("仓库", src.get("仓库"));
+        head.put("生产车间", "切炭车间");
+        head.put("加工单号", wo);
+        head.put("经手人", user);
+        head.put("备注", "红字冲回:弃审报工 " + no + " 对应直销入库 " + srcFi);
+        head.put("detail", Map.of("items", List.of(line)));
+        Map<String, Object> saved = save(registry.panel("FINISH_IN"), head, false);
+        String redNo = String.valueOf(saved.get("编号"));
+        audit(registry.panel("FINISH_IN"), Map.of("编号", (Object) redNo));
+        // 释放原 link → 重审可再生成新入库单
+        jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=GETDATE()"
+                + " WHERE source_panel_code='WO_REPORT' AND source_form_no=? AND target_form_no=? AND link_status='ACTIVE'",
+                no, srcFi);
     }
 
     /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */    private Map<String, Object> updateStockWarn(PanelRegistry.PanelDef def, Map<String, Object> formData) {
