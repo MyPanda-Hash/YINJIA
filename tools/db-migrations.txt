@@ -87,3 +87,49 @@ migrate-rd-panel-register.sql
 migrate-rd-dev-task.sql
 migrate-rd-docno-ref.sql
 migrate-rd-plan-docno-ref.sql
+
+# —— 2026-09-10 补登记:此前"执行过但未登记"的 34 个脚本(按依赖顺序分区) ——
+# 背景:登记停在 migrate-rd-plan-docno-ref.sql(2026-09-09 16:28)。此后 9-09 下午起的
+#       基础数据层/工单/品质/Phase1-3 全部脚本都在开发库手工执行过(sqlcmd 直跑)但未登记,
+#       DbSync/DbInit 只认本清单 → 这些对象在"全量部署/新机器/重装"时会被整体跳过,必然缺表缺列。
+# 排序:① 表结构/补列 → ② 参照与视图 → ③ 流程单据与面板种子 → ④ 元数据与修复类;
+#       每区内按产出物依赖排(V 依赖的基表在前,加列先于引用该列的脚本)。
+# 幂等:以下脚本均幂等(IF NOT EXISTS / 条件 UPDATE / DELETE+INSERT),库内重跑安全。
+# 🔴 禁止登记:_doc_part3_cleanup.sql —— 一次性清库脚本,内容为 DELETE 掉 bl_/bd_ 的
+#    dispatch / manu_order / material_out / outsource_order / pu_order 中 asp_user1='migration'
+#    的全部行(业务单据数据)。登记进本清单 = 每次执行清单都删业务数据,DbInit 全量初始化同样命中。
+#    只能在明确知道后果时人工手工执行,绝不入清单。
+migrate-basedata.sql
+migrate-phase1-foundation.sql
+migrate-message.sql
+migrate-mold-workshop-ref.sql
+migrate-purchase-in-lot.sql
+migrate-purchase-in-inv-code.sql
+migrate-material-out-cols.sql
+migrate-finish-disposal.sql
+migrate-wo-order.sql
+migrate-wo-schedule.sql
+migrate-wo-schedule-fix.sql
+migrate-wo-report.sql
+migrate-lot-trace.sql
+migrate-qc-3docs.sql
+migrate-qc-op.sql
+migrate-phase23-production.sql
+migrate-phase23-forms.sql
+migrate-phase23-forms-batch2.sql
+i18n-rd-panels.sql
+migrate-rd-files.sql
+migrate-rd-panels.sql
+migrate-rd-lab.sql
+migrate-usage-log.sql
+migrate-dispatch.sql
+migrate-dispatch-fix.sql
+fix-views-def.sql
+fix-views-definitive.sql
+fix-views-final.sql
+fix-views-v2.sql
+fix-views-v3.sql
+fix-views-v4.sql
+fix-views-v5-gen.sql
+migrate-audit-cols-fix.sql
+setup-stock-status.sql
