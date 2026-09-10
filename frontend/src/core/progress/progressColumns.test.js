@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   PROGRESS_COLUMNS,
   RD_PROGRESS_DETAIL_COLUMNS,
@@ -58,3 +59,35 @@ test('readCell:兼容历史 Excel 表头别名', () => {
   assert.equal(readCell({ 项目负责人: '陈秀丽' }, '项目负责人'), '陈秀丽')
   assert.equal(columnByLabel('测试情况').key, '测试员')
 })
+
+/**
+ * 源码级回归:组件里**不允许**把"显示名"当作数据键写进对象字面量。
+ * 2026-09-10 踩过:批量把 row['X'] 改成 row[K['X']] 时漏了 { '项目等级': lv } 这种
+ * 对象字面量写法,结果"新增项目"建出来的行等级键仍是显示名 → 保存被丢弃 + 同等级块查找失效。
+ * 这条断言直接扫组件源码,把这一类"漏替换"钉死。
+ */
+test('组件源码里不得把显示名当对象字面量的数据键', () => {
+  const src = readFileSync(new URL('../views/ProgressControlSheet.vue', import.meta.url), 'utf8')
+  const bad = []
+  for (const col of PROGRESS_COLUMNS) {
+    // 显示名与数据键本来就相同的列(项目名称/内容/状态/子项目尺寸)不受此约束
+    if (col.pendingAlign || col.key === col.label) continue
+    if (new RegExp(`'${escapeRe(col.label)}'\\s*:`).test(src)) bad.push(`${col.label} (应为 ${col.key})`)
+  }
+  assert.deepEqual(bad, [], `组件里仍把显示名当数据键,保存会被丢弃:\n  ${bad.join('\n  ')}`)
+})
+
+test('组件源码里不得出现裸的显示名方括号取值(必须经 K 映射)', () => {
+  const src = readFileSync(new URL('../views/ProgressControlSheet.vue', import.meta.url), 'utf8')
+  const bad = []
+  for (const col of PROGRESS_COLUMNS) {
+    if (col.pendingAlign) continue
+    if (new RegExp(`(?<!K)\\['${escapeRe(col.label)}'\\]`).test(src)) bad.push(col.label)
+  }
+  assert.deepEqual(bad, [], `这些列仍用显示名直接取值: ${bad.join(', ')}`)
+})
+
+/** 正则转义(中文标签里含 / 等字符) */
+function escapeRe(s) {
+  return s.replace(/[.*+?^$${}()|[\]\\]/g, '\\$&')
+}
