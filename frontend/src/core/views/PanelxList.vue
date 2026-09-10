@@ -151,9 +151,51 @@
               <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
               <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
             </div>
-            <div class="as-side-btns">
+            <!-- ═══ 模糊搜索态:字段+内容条件行 → 查找 → 结果清单(点行即切换查看) ═══ -->
+            <div v-if="fuzzyMode" class="fuzzy-panel">
+              <div class="fuzzy-head">
+                <span>{{ tt('模糊搜索') }}</span>
+                <span class="fuzzy-back" :title="tt('返回')" @click="closeFuzzy">↩</span>
+              </div>
+              <div v-for="(row, fi) in fuzzyRows" :key="'fz' + fi" class="fuzzy-row">
+                <el-select v-model="row.field" size="small" filterable :placeholder="tt('字段')" class="fuzzy-field">
+                  <el-option-group v-for="g in fuzzyFieldGroups" :key="g.label" :label="g.label">
+                    <el-option v-for="o in g.options" :key="o.value" :label="o.label" :value="o.value" />
+                  </el-option-group>
+                </el-select>
+                <el-input
+                  v-model="row.value"
+                  size="small"
+                  class="fuzzy-value"
+                  :placeholder="tt('内容')"
+                  @keyup.enter="runFuzzySearch"
+                />
+                <span class="fuzzy-del" :title="tt('删除该条件')" @click="removeFuzzyRow(fi)">×</span>
+              </div>
+              <div class="fuzzy-btns">
+                <span class="as-side-btn" @click="addFuzzyRow">{{ tt('添加条件') }}</span>
+                <span class="as-side-btn primary" @click="runFuzzySearch">{{ tt('查找') }}</span>
+              </div>
+              <div v-if="fuzzySearched" class="fuzzy-result">
+                <div class="fuzzy-result-head">{{ tt('结果') }}：{{ total }} {{ tt('张') }}</div>
+                <div
+                  v-for="r in fuzzyResultRows"
+                  :key="r.no"
+                  class="fuzzy-result-row"
+                  :class="{ on: r.no === curDocNo }"
+                  @click="openFuzzyResult(r)"
+                >
+                  <span class="fz-no">{{ r.no }}</span>
+                  <span class="fz-meta">{{ r.date }} {{ tt(r.status) }}</span>
+                </div>
+                <div v-if="!fuzzyResultRows.length" class="fuzzy-empty">{{ tt('未找到匹配单据') }}</div>
+              </div>
+            </div>
+            <div v-else class="as-side-btns">
               <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板) -->
               <div class="as-side-btn" @click="docQueryVisible = true">{{ tt('查询单据') }}</div>
+              <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单 -->
+              <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
               <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回) -->
               <div class="as-side-del" v-if="isApprovalDoc">
                 <div class="as-side-btn-row">
@@ -898,6 +940,7 @@ import QrLabelDialog from '@/business/components/QrLabelDialog.vue'
 import StagePanel from '@/business/components/StagePanel.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
+import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import RefPickDialog from './RefPickDialog.vue'
@@ -1453,6 +1496,94 @@ function clearDocQuery() {
   delete condition['_archTo']
   docQueryVisible.value = false
   search()
+}
+
+// ---------- 文书侧栏「模糊搜索」:字段+内容(可加多条件 AND) → 查找 → 单条跳转/多条出清单 ----------
+// 复用现有查询:具体字段 → condition[字段](后端 LIKE '%值%';明细字段走 EXISTS 行匹配),
+// 「全部字段」→ keyword(后端在表头+明细全部字段 OR 模糊)。零后端改动。
+const fuzzyMode = ref(false)
+const fuzzyRows = ref([{ field: '', value: '' }])
+const fuzzySearched = ref(false)
+const fuzzyApplied = ref(null) // 生效中的条件 {condition, keyword, valid}
+let fuzzyPrevPageSize = null
+const curDocNo = computed(() => String(cur.value?.['单据编号'] || cur.value?.['编号'] || ''))
+
+/** 字段下拉:全部字段 / 表头字段 / 明细字段(值=字段中文标签,后端按标签映射列) */
+const fuzzyFieldGroups = computed(() => {
+  const cfg = cfgCache.value
+  const header = (headerFields.value || []).map((f) => headerFieldKey(f)).filter(Boolean)
+  const seen = new Set(header)
+  const detail = []
+  for (const tab of cfg?.detail?.tabs || []) {
+    for (const f of tab.fields || []) {
+      const key = f.dataName || f.code
+      if (!key || seen.has(key) || f.hidden) continue
+      seen.add(key)
+      detail.push(key)
+    }
+  }
+  const groups = [{ label: tt('全部字段'), options: [{ value: ALL_FIELDS, label: tt('任意字段') }] }]
+  if (header.length) groups.push({ label: tt('表头字段'), options: header.map((k) => ({ value: k, label: tt(k) })) })
+  if (detail.length) groups.push({ label: tt('明细字段'), options: detail.map((k) => ({ value: k, label: tt(k) })) })
+  return groups
+})
+
+/** 结果清单:直接取当前已加载列表(查找后列表本身就是命中集合) */
+const fuzzyResultRows = computed(() => (list.value || []).map((row) => ({
+  no: String(row['单据编号'] || row['编号'] || ''),
+  date: String(row['单据日期'] || ''),
+  status: String(row['单据状态'] || ''),
+  row,
+})))
+
+function openFuzzy() {
+  fuzzyMode.value = true
+  if (!fuzzyRows.value.length) fuzzyRows.value = [{ field: '', value: '' }]
+}
+function addFuzzyRow() {
+  fuzzyRows.value.push({ field: '', value: '' })
+}
+function removeFuzzyRow(index) {
+  fuzzyRows.value.splice(index, 1)
+  if (!fuzzyRows.value.length) addFuzzyRow()
+}
+async function closeFuzzy() {
+  fuzzyMode.value = false
+  fuzzyRows.value = [{ field: '', value: '' }]
+  fuzzySearched.value = false
+  fuzzyApplied.value = null
+  if (fuzzyPrevPageSize) { query.pageSize = fuzzyPrevPageSize; fuzzyPrevPageSize = null }
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+}
+async function runFuzzySearch() {
+  const built = buildFuzzyQuery(fuzzyRows.value)
+  if (!built.valid) {
+    ElMessage.warning(tt('请先填写字段和内容'))
+    return
+  }
+  if (fuzzyPrevPageSize === null) fuzzyPrevPageSize = query.pageSize
+  fuzzyApplied.value = built
+  query.pageSize = 200 // 模糊搜索一次取够,结果清单要能列全
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+  fuzzySearched.value = true
+  if (!total.value) {
+    ElMessage.warning(tt('未找到匹配单据'))
+    return
+  }
+  if (total.value === 1) {
+    ElMessage.success(`${tt('已跳转到')}：${fuzzyResultRows.value[0]?.no || ''}`)
+    return
+  }
+  ElMessage.success(`${tt('找到')} ${total.value} ${tt('张单据')}，${tt('点清单切换查看')}`)
+}
+/** 点结果行 = 切换当前单据(走既有离开守卫:草稿未保存会提示) */
+async function openFuzzyResult(r) {
+  const index = list.value.indexOf(r.row)
+  if (index >= 0) await guardDocSwitch(index)
 }
 const isProdFilePanel = computed(() => PROD_FILE_PANELS.includes(String(panelCode.value)))
 const openModMenu = ref(false)
@@ -3573,6 +3704,11 @@ async function load() {
   try {
     await loadCrg()
     const params = { panelCode: panelCode.value, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
+    // 模糊搜索生效中:叠加字段条件(后端 AND)与「全部字段」关键字
+    if (fuzzyApplied.value?.valid) {
+      Object.assign(params.condition, fuzzyApplied.value.condition || {})
+      if (!query.keyword && fuzzyApplied.value.keyword) params.keyword = fuzzyApplied.value.keyword
+    }
     if (query.keyword) params.keyword = query.keyword
     const res = await engine.queryFormDataList(params)
     list.value = res.list || []
@@ -3788,6 +3924,12 @@ watch(
     cfgCache.value = null
     resetDictModes()
     resetTableSorts() // 切面板清排序(同一面板内保留:切单据/翻页/查询都在)
+    // 切面板退出模糊搜索态并清条件(条件字段属于上一个面板)
+    fuzzyMode.value = false
+    fuzzyRows.value = [{ field: '', value: '' }]
+    fuzzySearched.value = false
+    fuzzyApplied.value = null
+    fuzzyPrevPageSize = null
     qOptCache.clear()
     Object.keys(condition).forEach((key) => delete condition[key])
     Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
@@ -5077,6 +5219,36 @@ onUnmounted(() => {
     white-space: nowrap;
   }
 }
+/* 模糊搜索态(文书侧栏) */
+.fuzzy-panel { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 4px 2px; }
+.fuzzy-head {
+  display: flex; align-items: center; justify-content: space-between;
+  font-size: 12px; font-weight: 600; color: #303133; padding: 0 2px 2px;
+}
+.fuzzy-back { cursor: pointer; color: #909399; font-size: 13px; }
+.fuzzy-back:hover { color: #409eff; }
+.fuzzy-row { display: flex; align-items: center; gap: 4px; }
+.fuzzy-field { width: 92px; flex: none; }
+.fuzzy-value { flex: 1; min-width: 0; }
+.fuzzy-del {
+  flex: none; width: 16px; text-align: center; cursor: pointer;
+  color: #c0c4cc; font-size: 14px; line-height: 1;
+}
+.fuzzy-del:hover { color: #f56c6c; }
+.fuzzy-btns { display: flex; gap: 6px; }
+.fuzzy-btns .as-side-btn { flex: 1; }
+.fuzzy-btns .as-side-btn.primary { background: #409eff; color: #fff; border-color: #409eff; }
+.fuzzy-result { margin-top: 4px; border-top: 1px dashed #e4e7ed; padding-top: 6px; }
+.fuzzy-result-head { font-size: 12px; color: #606266; margin-bottom: 4px; }
+.fuzzy-result-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 6px;
+  padding: 3px 4px; border-radius: 3px; cursor: pointer; font-size: 12px;
+}
+.fuzzy-result-row:hover { background: #f0f6ff; }
+.fuzzy-result-row.on { background: #eaf4fe; font-weight: 600; }
+.fz-no { color: #303133; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fz-meta { color: #909399; font-size: 11px; white-space: nowrap; }
+.fuzzy-empty { font-size: 12px; color: #909399; padding: 4px; }
 /* 列头点击筛选 */
 .col-hdr {
   display: inline-flex; align-items: center; gap: 3px;
