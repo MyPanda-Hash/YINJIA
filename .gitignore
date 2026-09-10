@@ -38,6 +38,8 @@ tools/_walk/*.generated.js
 
 deploy/*.bak
 deploy/*.jar
+# make-deploy-package.ps1 产出的部署包(含 app.jar 与 .bak,不入库)
+deploy/pkg-*/
 *.deploy.zip
 yinjia-mes-deploy.zip
 
