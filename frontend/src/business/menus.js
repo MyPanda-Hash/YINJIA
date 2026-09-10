@@ -171,6 +171,7 @@ export const menuTree = [
               { code: 'woSchedule', title: '排单计划', path: '/panelx/list/WO_SCHEDULE', panelCode: 'WO_SCHEDULE', icon: 'DataLine' },
               { code: 'woKit', title: '工单齐套表', path: '/panelx/list/WO_KIT', panelCode: 'WO_KIT', icon: 'Box' },
               { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
+              { code: 'lotTrace', title: '批号追溯', path: '/panelx/list/LOT_TRACE', panelCode: 'LOT_TRACE', icon: 'Search' },
             ],
           },
           {
