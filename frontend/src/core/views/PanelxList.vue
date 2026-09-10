@@ -2560,7 +2560,10 @@ async function expandBomMaterials(detail, productRows) {
 async function onDetailRefConfirm(selectedRows) {
   const pick = detailRefPick.value
   if (!pick || !selectedRows?.length || detailRefSaving.value) return
-  if (cur.value['编号'] !== pick.documentNo || cur.value['单据状态'] !== '草稿') {
+  // 草稿判定仅适用于单据式面板(有 单据状态=草稿 语义);
+  // singleDoc 档案长表格面板(如 项目/基础档案)状态为 启用/停用,行始终可编辑,不做该判定。
+  if (cfgCache.value?.metadata?.singleDoc !== true
+      && (cur.value['编号'] !== pick.documentNo || cur.value['单据状态'] !== '草稿')) {
     detailRefVisible.value = false
     ElMessage.warning('当前单据已切换或不再是草稿，请重新选择')
     return
@@ -2985,7 +2988,9 @@ const freshAddedNo = ref('') // freshAdded 绑定的单据编号:撤回只允许
 function isFreshAddedDoc() {
   if (!freshAdded.value) return false
   if (!freshAddedNo.value) return true
-  return cur.value?.['编号'] === freshAddedNo.value
+  if (cur.value?.['编号'] === freshAddedNo.value) return true
+  // 库端标记(directAdd 占位=库存 saved=N;保存/保存为草稿后=Y):跨刷新/跨会话/跨浏览器可靠
+  return cur.value?.['saved'] === 'N'
 }
 // ---- 新增草稿标记的持久化(2026-09-09 补齐):刷新/重进后离开守卫仍能识别并撤回这张草稿 ----
 const FRESH_DRAFT_KEY = 'mes_fresh_draft'
@@ -3016,23 +3021,6 @@ function restoreFreshDraft() {
     }
   } catch { /* ignore */ }
 }
-/** 保存基线是否为「空白草稿」(新增后保存为草稿且未填任何内容)——离开守卫据此仍判定未保存 */
-const savedBlankDraft = ref(false)
-/** 明细内容是否为空:所有页签下都没有任何带值的行 */
-function isBlankDraftContent(detail) {
-  if (!detail || typeof detail !== 'object') return true
-  for (const rows of Object.values(detail)) {
-    if (!Array.isArray(rows)) continue
-    for (const row of rows) {
-      if (!row || typeof row !== 'object') continue
-      for (const [key, value] of Object.entries(row)) {
-        if (key === '_placeholder' || key === 'id' || key === '序号') continue
-        if (value !== undefined && value !== null && String(value).trim() !== '') return false
-      }
-    }
-  }
-  return true
-}
 /** 变更钩子置脏(表头/明细控件 @change;对真实交互可靠)——快照对比作兜底 */
 const inlineDirtyFlag = ref(false)
 function markInlineDirty() { if (draftEditable.value) inlineDirtyFlag.value = true }
@@ -3046,10 +3034,8 @@ async function onFieldEditRefresh() {
 function markSavedSnapshot() {
   try {
     savedSnapshot.value = cur.value ? JSON.stringify(currentFormData(cur.value.detail || {})) : ''
-    savedBlankDraft.value = cur.value ? isBlankDraftContent(cur.value.detail || {}) : false
   } catch {
     savedSnapshot.value = ''
-    savedBlankDraft.value = false
   }
 }
 
@@ -3058,7 +3044,7 @@ function markSavedSnapshot() {
  * 不触发守卫弹窗，空草稿永久残留（规范 §6.2「不保存→撤回整单」依赖本判定）。 */
 function hasUnsavedChanges() {
   if (!draftEditable.value || !cur.value) return false
-  if (inlineDirtyFlag.value || isFreshAddedDoc() || savedBlankDraft.value) return true
+  if (inlineDirtyFlag.value || isFreshAddedDoc()) return true
   try {
     return JSON.stringify(currentFormData(cur.value.detail || {})) !== savedSnapshot.value
   } catch { return false }
@@ -3090,7 +3076,7 @@ let leaveChoiceHandled = false    // onLeaveChoice 已处理置 false 的弹窗,
 
 /** 弹窗问句:新建未保存/基线为空白草稿走「尚未保存」文案(提示不保存将撤回),有修改的走「有修改」 */
 const leaveQuestion = computed(() => (
-  (isFreshAddedDoc() || savedBlankDraft.value) && !inlineDirtyFlag.value
+  isFreshAddedDoc() && !inlineDirtyFlag.value
     ? tt('当前草稿尚未保存，是否保存？（不保存将撤回该单）')
     : tt('当前单据有未保存的修改，是否保存？')
 ))
@@ -3125,7 +3111,7 @@ async function onLeaveChoice(choice) {
   if (choice === 'save') {
     const saved = await saveInlineDraft('保存', { silent: true })
     if (!saved) { guardAsking = false; pendingLeave.value = null; restoreCurrentTab(); return }
-  } else if (isFreshAddedDoc() || savedBlankDraft.value) {
+  } else if (isFreshAddedDoc()) {
     // 不保存 + 新建未保存过或基线为空白草稿 → 撤回整单(走「删除」按钮路径:按开发规范留痕+释放占用)。
     // 有修改的既有草稿(基线含实质数据)不走此分支:仅放弃修改,保留单据(避免误删已填写内容)
     const withdrawNo = cur.value['编号']

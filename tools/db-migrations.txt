@@ -139,3 +139,6 @@ setup-stock-status.sql
 # 字段脚本可能分多份交付(如 …-fields.sql / …-fields2.sql),**新增一份就补登记一份**。
 migrate-prod-forms.sql
 migrate-prod-forms-fields.sql
+
+# —— 2026-09-10 登记:项目档案客户参照改名称口径(dm→mc,存量按 dm_kh 翻译) ——
+fix-proj-customer-ref.sql
