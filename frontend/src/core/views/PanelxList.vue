@@ -348,13 +348,11 @@
               <template #header>
                 <div class="report-col-container">
                   <span class="report-col-title">{{ tt(child.label) }}</span>
-                  <span class="report-col-operator">
+                  <span class="report-col-operator" :class="{ 'has-sort': reportSortOn(child.prop) }">
                     <span class="report-col-sorter"
-                          :class="{on: reportCols.sort.prop===child.prop && reportCols.sort.order==='asc'}"
-                          @click.stop="reportCols.setSort(child.prop,'asc')">▲</span>
-                    <span class="report-col-sorter"
-                          :class="{on: reportCols.sort.prop===child.prop && reportCols.sort.order==='desc'}"
-                          @click.stop="reportCols.setSort(child.prop,'desc')">▼</span>
+                          :class="{on: reportSortOn(child.prop)}"
+                          :title="tt('点击排序：升序 → 降序 → 取消')"
+                          @click.stop="cycleReportSort(child.prop)">{{ reportSortCaret(child.prop) }}</span>
                     <span v-if="hasDistinctValues(child.prop)"
                           class="report-col-filter"
                           :class="{on: reportCols.isFiltered(child.prop)}"
@@ -395,13 +393,11 @@
             <template #header>
               <div class="report-col-container">
                 <span class="report-col-title">{{ tt(column.label) }}</span>
-                <span class="report-col-operator">
+                <span class="report-col-operator" :class="{ 'has-sort': reportSortOn(column.prop) }">
                   <span class="report-col-sorter"
-                        :class="{on: reportCols.sort.prop===column.prop && reportCols.sort.order==='asc'}"
-                        @click.stop="reportCols.setSort(column.prop,'asc')">▲</span>
-                  <span class="report-col-sorter"
-                        :class="{on: reportCols.sort.prop===column.prop && reportCols.sort.order==='desc'}"
-                        @click.stop="reportCols.setSort(column.prop,'desc')">▼</span>
+                        :class="{on: reportSortOn(column.prop)}"
+                        :title="tt('点击排序：升序 → 降序 → 取消')"
+                        @click.stop="cycleReportSort(column.prop)">{{ reportSortCaret(column.prop) }}</span>
                   <span v-if="hasDistinctValues(column.prop)"
                         class="report-col-filter"
                         :class="{on: reportCols.isFiltered(column.prop)}"
@@ -1765,6 +1761,18 @@ function resetTableSorts() {
   mainSort.order = ''
   Object.keys(blockSorts).forEach((key) => delete blockSorts[key])
 }
+// 报表表头沿用同一循环口径(底层仍是 reportCols.sort,栏目设置的后端持久化不变)
+function cycleReportSort(prop) {
+  const next = nextSortState(reportCols.sort, prop)
+  reportCols.setSort(next.prop, next.order)
+}
+function reportSortCaret(prop) {
+  if (reportCols.sort.prop !== prop || !reportCols.sort.order) return '⇅'
+  return reportCols.sort.order === 'asc' ? '▲' : '▼'
+}
+function reportSortOn(prop) {
+  return reportCols.sort.prop === prop && !!reportCols.sort.order
+}
 // 主表固定 5 行（不足补占位，与明细区一致）
 const mainRows = computed(() => {
   const l = list.value
@@ -2338,6 +2346,9 @@ function addInlineDetailRow(b) {
   const tabKey = activeTab(b).key
   if (!cur.value.detail) cur.value.detail = {}
   const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
+  // 排序激活时先清排序:新行落在数据末尾,避免"插到已排好的中间"的错觉
+  const state = blockSortOf(b)
+  if (state.order) { state.prop = ''; state.order = '' }
   rows.push(newDetailRow(tabKey))
   markInlineDirty() // 新增明细行 = 未保存修改
 }
@@ -3790,6 +3801,7 @@ watch(
     if (!panelCode.value || panelCode.value === 'undefined') return
     cfgCache.value = null
     resetDictModes()
+    resetTableSorts() // 切面板清排序(同一面板内保留:切单据/翻页/查询都在)
     qOptCache.clear()
     Object.keys(condition).forEach((key) => delete condition[key])
     Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
@@ -5087,6 +5099,14 @@ onUnmounted(() => {
 .col-hdr:hover .col-hdr-ic { color: #409eff; }
 .col-hdr.filtering { color: #409eff; font-weight: 600; }
 .col-hdr-ic { font-size: 12px; color: #c0c4cc; transition: color 0.15s; }
+/* 列头点击排序角标:⇅ 未排序(淡) / ▲ 升序 / ▼ 降序 */
+.col-hdr-sort {
+  font-size: 10px; line-height: 1; color: #c8ccd4;
+  cursor: pointer; padding: 0 1px; transition: color 0.15s;
+}
+.col-hdr:hover .col-hdr-sort { color: #9aa3af; }
+.col-hdr-sort:hover { color: #409eff; }
+.col-hdr-sort.on { color: #409eff; font-weight: 700; }
 .col-hdr-tag {
   font-size: 10px; color: #fff; background: #409eff;
   border-radius: 8px; padding: 0 5px; line-height: 16px;
@@ -5138,6 +5158,10 @@ onUnmounted(() => {
   transition: opacity .15s;
 }
 .report-col-container:hover .report-col-operator {
+  opacity: 1;
+}
+/* 排序生效时角标常显(否则父级 opacity:0 会把已排序标记也一起藏掉) */
+.report-col-operator.has-sort {
   opacity: 1;
 }
 .report-col-operator .on {

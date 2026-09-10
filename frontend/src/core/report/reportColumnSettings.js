@@ -3,6 +3,8 @@
  * 无 Vue 依赖,可被 composable 与单元测试共用。
  */
 
+import { sortRows } from '../sort/rowSort.js'
+
 /**
  * 构建栏目设置数组。
  * @param {string[]} columns - 面板全部字段名列表
@@ -28,22 +30,13 @@ export function visibleReportColumns(settings = []) {
 }
 
 /**
- * 排序数据行。数字列按数值排序,其他按中文 localeCompare 排序。
+ * 排序数据行。2026-09-09 起与表格面板共用同一套类型化比较器
+ * (core/sort/rowSort:字段类型优先 → 数值/时间/拼音,空值恒最后)。
+ * 未传字段元数据时沿用旧口径(两侧都能当数字才按数字),历史调用与单测语义不变。
  * @param {Object[]} rows - 原始数据行
- * @param {{prop:string, order:string}} sort - 排序配置
+ * @param {{prop:string, order:string, field?:Object}} sort - 排序配置
  * @returns {Object[]}
  */
 export function sortReportRows(rows = [], sort = {}) {
-  if (!sort.prop || !sort.order) return [...rows]
-  return [...rows].sort((left, right) => {
-    const a = left[sort.prop] ?? ''
-    const b = right[sort.prop] ?? ''
-    const numberA = Number(a)
-    const numberB = Number(b)
-    const numeric = a !== '' && b !== '' && Number.isFinite(numberA) && Number.isFinite(numberB)
-    const result = numeric
-      ? numberA - numberB
-      : String(a).localeCompare(String(b), 'zh-CN')
-    return sort.order === 'asc' ? result : -result
-  })
+  return sortRows(rows, sort)
 }

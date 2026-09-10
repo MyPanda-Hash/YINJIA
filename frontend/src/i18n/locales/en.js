@@ -296,6 +296,7 @@ export default {
     '筛选...': 'Filter...',
     '清除': 'Clear',
     '清除筛选': 'Clear filter',
+    '点击排序：升序 → 降序 → 取消': 'Click to sort: ascending → descending → clear',
     '已审批': 'Approved',
     '当前产品：': 'Product: ',
     '的 BOM 子件': 'BOM components',
