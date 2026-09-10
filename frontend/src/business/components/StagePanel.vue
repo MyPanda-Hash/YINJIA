@@ -25,11 +25,31 @@
             <span v-else class="sp-text">{{ head['阶段'+n+'_计划内容'] || '' }}</span>
           </td>
           <td class="sp-td-date">
-            <el-input v-if="editable" v-model="head['阶段'+n+'_计划开始']" size="small" class="sp-input sp-date" maxlength="20" placeholder="YYYY-MM-DD" @input="emit('dirty')" />
+            <el-date-picker
+              v-if="editable"
+              v-model="head['阶段'+n+'_计划开始']"
+              type="date"
+              value-format="YYYY-MM-DD"
+              format="YYYY-MM-DD"
+              size="small"
+              class="sp-input sp-date"
+              placeholder="YYYY-MM-DD"
+              @change="onPlanStart(n, $event)"
+            />
             <span v-else class="sp-text">{{ head['阶段'+n+'_计划开始'] || '' }}</span>
           </td>
           <td class="sp-td-date">
-            <el-input v-if="editable" v-model="head['阶段'+n+'_计划完成']" size="small" class="sp-input sp-date" maxlength="20" placeholder="YYYY-MM-DD" @input="emit('dirty')" />
+            <el-date-picker
+              v-if="editable"
+              v-model="head['阶段'+n+'_计划完成']"
+              type="date"
+              value-format="YYYY-MM-DD"
+              format="YYYY-MM-DD"
+              size="small"
+              class="sp-input sp-date"
+              placeholder="YYYY-MM-DD"
+              @change="onPlanDone(n, $event)"
+            />
             <span v-else class="sp-text">{{ head['阶段'+n+'_计划完成'] || '' }}</span>
           </td>
           <td class="sp-td-date">
@@ -59,11 +79,18 @@
  * 与 DocSheet(纸面版式) 并列渲染:DocSheet 展示原有版式,本面板展示结构化阶段表格。
  * 数据直接读写 head 对象上的 阶段N_XXX 字段,与引擎保存机制天然对接。
  * 阶段完成按钮:调后端 callButton('RD_PLAN','阶段完成',{编号,阶段序号}) → 填写实际完成时间。
+ *
+ * 计划开始/计划完成用日期弹窗填写(2026-09-10 由纯文本输入框改为 el-date-picker):
+ * 值一律以 YYYY-MM-DD 字符串存回表头(库里这两列是文本),与存量数据格式一致。
+ * 填完某阶段「计划完成」后,若下一阶段「计划开始」为空则自动接上次日
+ * (见 core/progress/stageProgress.js 的 chainNextStageStart,已单测),
+ * 免得 10 个阶段的日期逐个手敲。
  */
 import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
+import { chainNextStageStart } from '@core/progress/stageProgress'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -77,6 +104,19 @@ const engine = usePanelRuntime()
 const loadingStage = ref(0)
 
 const canOperate = computed(() => props.audited && !props.editable)
+
+/** 计划开始变更:归一空值为 ''(清空时 el-date-picker 给的是 null,别把 null 存进库) */
+function onPlanStart(n, v) {
+  props.head[`阶段${n}_计划开始`] = v || ''
+  emit('dirty')
+}
+
+/** 计划完成变更:同上归一,并把下一阶段的「计划开始」接上次日(仅当其为空) */
+function onPlanDone(n, v) {
+  props.head[`阶段${n}_计划完成`] = v || ''
+  chainNextStageStart(props.head, n)
+  emit('dirty')
+}
 
 async function completeStage(n) {
   loadingStage.value = n
@@ -108,7 +148,7 @@ async function completeStage(n) {
 .sp-table { width: 100%; border-collapse: collapse; }
 .sp-th-num, .sp-td-num { width: 40px; text-align: center; }
 .sp-th-content, .sp-td-content { min-width: 200px; }
-.sp-th-date, .sp-td-date { width: 110px; text-align: center; }
+.sp-th-date, .sp-td-date { width: 132px; text-align: center; }
 .sp-th-person, .sp-td-person { width: 90px; }
 .sp-th-op, .sp-td-op { width: 80px; text-align: center; }
 .sp-table th { background: #e8f2fc; color: #3a6b95; font-size: 12px; font-weight: 600; padding: 6px 8px; border: 1px solid #d4e4f1; }

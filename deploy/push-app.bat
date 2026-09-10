@@ -36,7 +36,9 @@ mkdir "%DEST%\update" 2>nul
 copy /Y "%SRC%\app.jar" "%DEST%\update\app.jar" >>"%LOG%" 2>&1
 if errorlevel 1 goto :nocopy
 for %%f in ("%SRC%\app.jar") do echo      staged %%~zf bytes
-powershell -NoProfile -Command "(Get-FileHash '%SRC%\app.jar' -Algorithm SHA256).Hash" >>"%LOG%" 2>&1
+rem DO NOT hash %SRC% here: it lives on the RDP redirected drive, and a server-side
+rem process reading 50MB+ through that redirect is so slow it looks like a hang
+rem (measured twice on 2026-09-10). Verify the SHA256 on the DEVELOPER machine.
 
 echo [2/5] stopping backend ...
 taskkill /IM java.exe /F >>"%LOG%" 2>&1

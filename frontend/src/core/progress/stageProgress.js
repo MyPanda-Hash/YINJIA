@@ -127,3 +127,37 @@ export function statusTone(summary) {
   if (summary.state === 'doing') return summary.overdue > 0 ? 'overdue' : 'doing'
   return 'idle'
 }
+
+// ---------- 阶段计划日期:次日 + 相邻阶段自动衔接 ----------
+// 用途:项目实施计划的阶段框里,计划开始/计划完成改为日期弹窗后,
+// 填完某阶段的「计划完成」就把下一阶段的「计划开始」接上次日,避免 10 个阶段逐个手填。
+// 实测数据习惯即为如此:阶段1 09-01→09-10,阶段2 09-11→09-25。
+
+/** 次日(YYYY-MM-DD);解析不出返回空串(不写脏数据) */
+export function nextDay(value) {
+  const day = normDate(value)
+  if (!day) return ''
+  const [y, m, d] = day.split('-').map(Number)
+  const t = new Date(Date.UTC(y, m - 1, d))
+  t.setUTCDate(t.getUTCDate() + 1)
+  const p = (x) => String(x).padStart(2, '0')
+  return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())}`
+}
+
+/**
+ * 相邻阶段日期衔接:阶段 n「计划完成」确定后,若阶段 n+1「计划开始」为空则填次日。
+ * 规则:**只在下一阶段为空时写入**,不覆盖已填值;本阶段日期为空/非法、或 n 已是最后阶段时不写入。
+ * 就地修改 head(与面板其它字段读写方式一致)。
+ * @param {Object} head 实施计划单据表头
+ * @param {number} n 阶段号
+ * @returns {number} 被写入的阶段号;未写入返回 0
+ */
+export function chainNextStageStart(head, n, total = MAX_STAGE) {
+  if (!head || !n || n >= total) return 0
+  const start = nextDay(head[`阶段${n}_计划完成`])
+  if (!start) return 0
+  const nextKey = `阶段${n + 1}_计划开始`
+  if (text(head[nextKey])) return 0
+  head[nextKey] = start
+  return n + 1
+}
