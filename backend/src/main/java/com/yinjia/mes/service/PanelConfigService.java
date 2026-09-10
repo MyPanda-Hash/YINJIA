@@ -681,6 +681,7 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"生单", "生成领料单"},
                     new String[]{"标签", "打印工单二维码"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
@@ -782,7 +783,8 @@ public class PanelConfigService {
             "MANU_ORDER|生成产成品入库单", "FINISH_IN",
             "QC_RECV|生成检验单", "QC_INSP",
             "QC_INSP|生成采购入库单", "PURCHASE_IN",
-            "QC_INSP|生成暂收退回单", "QC_RETURN"
+            "QC_INSP|生成暂收退回单", "QC_RETURN",
+            "WO_ORDER|生成领料单", "MATERIAL_OUT"
     )));
 
     /** 推式生单目标面板(无实现返回 null)。 */
