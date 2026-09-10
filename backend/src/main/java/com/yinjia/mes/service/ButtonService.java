@@ -1044,9 +1044,9 @@ public class ButtonService {
         else if (doneStages == 0) status = "阶段已规划(" + totalStages + "个)";
         else if (doneStages >= totalStages) status = "全部完成(" + doneStages + "/" + totalStages + ")";
         else status = "进行中(完成" + doneStages + "/" + totalStages + ",至阶段" + lastDoneStage + ")";
-        // 更新 rd_progress_detail 中同名行
+        // 更新 rd_progress_detail 中同名行(列名为 状态/里程完成/项目负责,对应 label 状态/预计完成日期/项目负责人)
         int n = jdbc.update(
-                "UPDATE rd_progress_detail SET [状态] = ?, [预计完成日期] = COALESCE(?, [预计完成日期]), [项目负责人] = COALESCE(?, [项目负责人])"
+                "UPDATE rd_progress_detail SET [状态] = ?, [里程完成] = COALESCE(?, [里程完成]), [项目负责] = COALESCE(?, [项目负责])"
                         + " WHERE [项目名称] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                 status, latestDate, str(plans.get(0).get("负责人")), projectName);
         if (n > 0) {
