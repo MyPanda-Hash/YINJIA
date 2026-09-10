@@ -145,8 +145,15 @@
               <span v-else class="ps-cell-text">{{ row['预计完成日期'] || '' }}</span>
             </td>
             <td class="c-status">
-              <el-input v-if="editable" v-model="row['状态']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['状态'] || '' }}</span>
+              <!-- 状态=按实施计划阶段自动派生(只读):点它看阶段计划与完成情况 -->
+              <span
+                v-if="progressText(row)"
+                class="ps-status-tag"
+                :class="progressToneOf(row)"
+                :title="tt('点击查看阶段计划')"
+                @click="openStageDialog(row)"
+              >{{ progressText(row) }}</span>
+              <span v-else class="ps-cell-text">—</span>
             </td>
             <td class="c-tester">
               <el-input v-if="editable" v-model="row['测试情况']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
@@ -212,6 +219,49 @@
         <el-button type="primary" @click="confirmAddProject">{{ tt('确定') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- ═══ 阶段计划弹窗(点状态列打开,只读):实施计划的阶段 + 完成/未完成/逾期 ═══ -->
+    <el-dialog v-model="stageDlgVisible" :title="tt('项目阶段计划')" width="900px" append-to-body>
+      <div class="psd-head">
+        <span>{{ tt('项目名称') }}：<b>{{ stageDlgName }}</b></span>
+        <span v-if="stageDlgPlan">{{ tt('实施计划') }}：{{ stageDlgPlan.planNo }}</span>
+      </div>
+      <template v-if="stageDlgStages.length">
+        <div class="psd-sum">
+          <span class="ps-status-tag" :class="progressToneOf(stageDlgRow)">{{ statusText(stageDlgSummary) }}</span>
+          <span>{{ tt('已完成') }} {{ stageDlgSummary.done }} · {{ tt('未完成') }} {{ stageDlgSummary.total - stageDlgSummary.done }}<template v-if="stageDlgSummary.overdue"> · {{ tt('逾期') }} {{ stageDlgSummary.overdue }}</template></span>
+          <span v-if="stageDlgSummary.next" class="psd-next">
+            {{ tt('下一阶段') }}：{{ tt('阶段') }}{{ stageDlgSummary.next.no }} {{ stageDlgSummary.next.content }}<template v-if="stageDlgSummary.next.due">（{{ tt('计划完成') }} {{ stageDueText(stageDlgSummary.next.due) }}）</template>
+          </span>
+        </div>
+        <el-table :data="stageDlgStages" size="small" border max-height="420" class="psd-table">
+          <el-table-column type="index" :label="tt('序号')" width="52" align="center" />
+          <el-table-column prop="content" :label="tt('计划内容')" min-width="240" show-overflow-tooltip />
+          <el-table-column :label="tt('计划开始')" width="104" align="center">
+            <template #default="{ row }">{{ stageDueText(row.start) }}</template>
+          </el-table-column>
+          <el-table-column :label="tt('计划完成')" width="104" align="center">
+            <template #default="{ row }">{{ stageDueText(row.due) }}</template>
+          </el-table-column>
+          <el-table-column :label="tt('实际完成')" width="104" align="center">
+            <template #default="{ row }">{{ stageDueText(row.actual) }}</template>
+          </el-table-column>
+          <el-table-column prop="owner" :label="tt('责任人')" width="96" />
+          <el-table-column :label="tt('状态')" width="92" align="center">
+            <template #default="{ row }">
+              <span class="ps-status-tag" :class="stageBadgeTone(row)">{{ stageBadgeText(row) }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+      <div v-else class="psd-empty">
+        <template v-if="stageDlgPlan">{{ tt('该实施计划尚未录入阶段内容') }}</template>
+        <template v-else>{{ tt('未找到同名项目实施计划，请先在项目实施计划中录入阶段') }}</template>
+      </div>
+      <template #footer>
+        <el-button @click="stageDlgVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -220,6 +270,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
+import { pickStages, stageRowState, statusLabel, STATUS_TOKENS, statusTone, summarizeStages } from '@core/progress/stageProgress'
 import * as XLSX from 'xlsx'
 
 const props = defineProps({
@@ -248,7 +299,12 @@ function selectOptions(key) {
 const refOptions = ref([])
 const refRows = ref([])
 const refLoading = ref(false)
-const planStageMap = ref({}) // 项目名称 → {total, done, lastDoneStage, latestDate, 负责人}
+const planStageMap = ref({}) // 项目名称 → {planNo, head, stages, summary}
+/** 今天(YYYY-MM-DD):逾期判定基准 */
+function todayStr() {
+  const d = new Date()
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
+}
 async function loadRefOptions() {
   if (refOptions.value.length) return
   refLoading.value = true
@@ -256,29 +312,22 @@ async function loadRefOptions() {
     const res = await engine.queryFormDataList({ panelCode: 'RD_PLAN', condition: {}, pageNo: 1, pageSize: 200 })
     const rows = res.list || []
     refRows.value = rows
-    // 选项:项目名称（实施计划单号）;同时提取阶段进度
+    // 选项:项目名称（实施计划单号）;同时按阶段进度口径(共用 core/progress 纯函数)提取阶段与汇总
     const stageMap = {}
+    const today = todayStr()
     refOptions.value = rows
       .filter((r) => r['项目名称'])
       .map((r) => {
-        // 计算该项目的阶段进度
-        let total = 0, done = 0, lastDone = 0, latestDate = null
-        for (let i = 1; i <= 10; i++) {
-          const content = r[`阶段${i}_计划内容`]
-          const actual = r[`阶段${i}_实际完成`]
-          if (content && String(content).trim()) {
-            total++
-            if (actual && String(actual).trim()) {
-              done++
-              lastDone = i
-              if (!latestDate || String(actual) > latestDate) latestDate = String(actual)
-            }
-          }
-        }
-        stageMap[r['项目名称']] = { total, done, lastDoneStage: lastDone, latestDate, 负责人: r['负责人'] || '' }
-        return { value: r['项目名称'], label: `${r['项目名称']}（${r['单据编号'] || r['编号'] || ''}）` }
+        const stages = pickStages(r)
+        const summary = summarizeStages(stages, today)
+        const planNo = r['单据编号'] || r['编号'] || ''
+        const prev = stageMap[r['项目名称']]
+        // 同名多张实施计划:取最新一张(列表按单据编号倒序,先到的即最新)
+        if (!prev) stageMap[r['项目名称']] = { planNo, head: r, stages, summary, 负责人: r['负责人'] || '' }
+        return { value: r['项目名称'], label: `${r['项目名称']}（${planNo}）` }
       })
     planStageMap.value = stageMap
+    applyDerivedStatus()
   } catch (e) {
     /* 实施计划未就绪时静默 */
   } finally {
@@ -287,6 +336,88 @@ async function loadRefOptions() {
 }
 onMounted(loadRefOptions)
 watch(() => props.editable, (v) => { if (v) loadRefOptions() })
+
+// ---------- 状态列 = 阶段进度自动派生(只读) ----------
+/** 状态文案:逐词 tt() 组句,数字由界面拼(便于多语言) */
+function statusText(summary) {
+  if (!summary) return tt(STATUS_TOKENS.no_plan)
+  if (summary.state === 'none') return tt(STATUS_TOKENS.none)
+  if (summary.state === 'not_started') return `${tt(STATUS_TOKENS.not_started)} 0/${summary.total}`
+  if (summary.state === 'done') return `${tt(STATUS_TOKENS.done)} ${summary.done}/${summary.total}`
+  const base = `${tt(STATUS_TOKENS.doing)} ${summary.done}/${summary.total}`
+  return summary.overdue > 0 ? `${base} · ${tt(STATUS_TOKENS.overdue)} ${summary.overdue}` : base
+}
+/** 该行的实施计划(按项目名称关联;同名多张取最新) */
+function planOf(row) {
+  const name = String(row?.['项目名称'] || '').trim()
+  return name ? planStageMap.value[name] || null : null
+}
+function progressText(row) {
+  const name = String(row?.['项目名称'] || '').trim()
+  if (!name) return ''
+  const plan = planStageMap.value[name]
+  if (!plan) return Object.keys(planStageMap.value).length ? tt(STATUS_TOKENS.no_plan) : ''
+  return statusText(plan.summary)
+}
+function progressToneOf(row) {
+  const plan = planOf(row)
+  return plan ? statusTone(plan.summary) : 'idle'
+}
+/** 载入/刷新把派生状态写回行模型:列表、导出、保存入库口径一致 */
+function applyDerivedStatus() {
+  const rows = items.value || []
+  if (!rows.length || !Object.keys(planStageMap.value).length) return
+  for (const row of rows) {
+    const name = String(row?.['项目名称'] || '').trim()
+    if (!name) continue
+    const plan = planStageMap.value[name]
+    if (plan) row['状态'] = statusLabel(plan.summary)
+  }
+}
+watch(items, () => applyDerivedStatus(), { deep: false })
+
+// ---------- 点状态 → 阶段计划弹窗(只读) ----------
+const stageDlgVisible = ref(false)
+const stageDlgName = ref('')
+const stageDlgRow = ref(null)
+function openStageDialog(row) {
+  const name = String(row?.['项目名称'] || '').trim()
+  if (!name) {
+    ElMessage.warning(tt('请先填写项目名称'))
+    return
+  }
+  stageDlgName.value = name
+  stageDlgRow.value = row
+  stageDlgVisible.value = true
+}
+const stageDlgPlan = computed(() => planStageMap.value[stageDlgName.value] || null)
+const stageDlgStages = computed(() => (stageDlgPlan.value ? stageDlgPlan.value.stages : []))
+const stageDlgSummary = computed(() => (stageDlgPlan.value ? stageDlgPlan.value.summary : null))
+const stageDlgToday = computed(() => todayStr())
+function stageBadgeTone(stage) {
+  return stageRowState(stage, stageDlgToday.value)
+}
+function stageBadgeText(stage) {
+  const state = stageBadgeTone(stage)
+  if (state === 'done') return tt('已完成')
+  if (state === 'overdue') return tt('逾期')
+  return tt('进行中')
+}
+function stageDueText(due) {
+  return String(due || '').replace(/\//g, '-') || '—'
+}
+/** 项目预计完成日期 = 最后一个有内容的阶段的计划完成(缺则取实际完成最大值) */
+function planDueDate(plan) {
+  if (!plan) return ''
+  const pick = (key) => (plan.stages || [])
+    .map((s) => String(s[key] || '').replace(/\//g, '-'))
+    .filter(Boolean)
+    .sort()
+  const dues = pick('due')
+  if (dues.length) return dues[dues.length - 1]
+  const actuals = pick('actual')
+  return actuals.length ? actuals[actuals.length - 1] : ''
+}
 
 // ---------- 项目(组)/子项目 行增删 ----------/** 组首行:与上一行项目名称不同(或首行) → 显示 项目名称/层级 输入,否则并入上一组 */
 function isGroupHead(i) {
@@ -379,15 +510,13 @@ function confirmAddProject() {
       if (found[k] != null && found[k] !== '') props.head[k] = found[k]
     }
   }
-  // 自动导入阶段进度到「状态」列
-  const stage = planStageMap.value[name]
-  if (stage) {
-    row['状态'] = stage.total === 0 ? '已立项'
-      : stage.done >= stage.total ? `全部完成(${stage.done}/${stage.total})`
-      : stage.done === 0 ? `阶段已规划(${stage.total}个)`
-      : `进行中(完成${stage.done}/${stage.total},至阶段${stage.lastDoneStage})`
-    if (stage.latestDate) row['预计完成日期'] = stage.latestDate
-    if (stage.负责人) row['项目负责人'] = stage.负责人
+  // 自动导入阶段进度到「状态」列(与状态列同一口径:core/progress 纯函数)
+  const plan = planStageMap.value[name]
+  if (plan) {
+    row['状态'] = statusLabel(plan.summary)
+    const due = planDueDate(plan)
+    if (due) row['预计完成日期'] = due
+    if (plan.负责人) row['项目负责人'] = plan.负责人
   }
   dlgVisible.value = false
   emit('dirty')
@@ -407,11 +536,9 @@ function syncStageProgress() {
     if (!name) continue
     const stage = planStageMap.value[name]
     if (!stage) continue
-    row['状态'] = stage.total === 0 ? '已立项'
-      : stage.done >= stage.total ? `全部完成(${stage.done}/${stage.total})`
-      : stage.done === 0 ? `阶段已规划(${stage.total}个)`
-      : `进行中(完成${stage.done}/${stage.total},至阶段${stage.lastDoneStage})`
-    if (stage.latestDate) row['预计完成日期'] = stage.latestDate
+    row['状态'] = statusLabel(stage.summary)
+    const due = planDueDate(stage)
+    if (due) row['预计完成日期'] = due
     if (stage.负责人) row['项目负责人'] = stage.负责人
     updated++
   }
@@ -813,6 +940,28 @@ defineExpose({ exportProgressExcel })
   width: 100%;
   word-break: break-all;
 }
+/* 状态列:阶段进度标签(可点击查看阶段计划) */
+.ps-status-tag {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 9px;
+  font-size: 12px;
+  line-height: 18px;
+  white-space: nowrap;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.ps-status-tag.idle { background: #f2f3f5; color: #909399; border-color: #e4e7ed; }
+.ps-status-tag.doing { background: #eaf4fe; color: #1677ff; border-color: #b9dcff; }
+.ps-status-tag.overdue { background: #fff4e6; color: #b26a00; border-color: #ffd9a8; }
+.ps-status-tag.done { background: #e8f7ee; color: #1a7f37; border-color: #b7e3c6; }
+.ps-status-tag:hover { filter: brightness(0.96); }
+/* 阶段计划弹窗 */
+.psd-head { display: flex; gap: 18px; align-items: baseline; margin-bottom: 8px; font-size: 13px; color: #303133; }
+.psd-sum { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; font-size: 12px; color: #606266; }
+.psd-next { color: #1677ff; }
+.psd-table :deep(.el-table__cell) { font-size: 12px; }
+.psd-empty { padding: 18px 4px; color: #909399; font-size: 13px; }
 .ps-addrow {
   display: inline-block;
   color: #0d5bd3;
