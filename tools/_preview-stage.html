@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>阶段框版式预览(项目实施计划)</title>
+<style>
+  body { margin: 0; padding: 18px; background: #f5f7fa; font-family: "Microsoft YaHei", "PingFang SC", sans-serif; }
+  .sheet { background: #fff; border: 1px solid #ddd; padding: 14px; max-width: 1080px; }
+  .sheet-title { font-size: 17px; font-weight: 700; text-align: center; padding-bottom: 10px; border-bottom: 2px solid #333; margin-bottom: 12px; }
+  /* 纸面版式行:序号列 + 项目名 + 填写区 */
+  .as-row { display: flex; border: 1px solid #c9c9c9; border-right: none; }
+  .as-no { width: 34px; flex: none; display: flex; align-items: center; justify-content: center; background: #dce9f7; border-right: 1px solid #c9c9c9; font-size: 13px; color: #1e5a8a; }
+  .as-name { width: 110px; flex: none; display: flex; align-items: center; justify-content: center; background: #dce9f7; border-right: 1px solid #c9c9c9; font-size: 13px; color: #1e5a8a; }
+  .as-fill { flex: 1; padding: 5px 7px; }
+  /* ── 阶段框(与 DocSheet.vue 完全一致的样式) ── */
+  .as-phase { border: 1px solid #c9c9c9; margin: 3px 0; padding: 2px 6px 4px; }
+  .as-phase-done { border-color: #b7e4c7; background: #f0faf0; }
+  .as-phase-head { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #333; padding: 1px 0; border-bottom: 1px solid #e8e8e8; margin-bottom: 2px; }
+  .as-phase-title { font-weight: 600; }
+  .as-phase-badge { background: #52c41a; color: #fff; font-size: 11px; padding: 1px 6px; border-radius: 3px; margin-right: 4px; }
+  .as-phase-toggle { color: #0d5bd3; cursor: pointer; font-size: 12px; user-select: none; padding: 0 2px; }
+  .as-phase-grid { display: flex; flex-direction: column; gap: 2px; }
+  .as-phase-row { display: flex; align-items: flex-start; gap: 6px; min-height: 26px; }
+  .as-phase-row-label { width: 60px; flex-shrink: 0; font-size: 12px; color: #5a7a99; font-weight: 500; line-height: 24px; text-align: right; }
+  .as-phase-row-value { flex: 1; min-width: 0; display: flex; align-items: center; }
+  .as-phase-input { max-width: 160px; width: 100%; }
+  .as-phase-text { font-size: 12px; color: #444; line-height: 24px; word-break: break-all; white-space: pre-wrap; }
+  .as-phase-actual { color: #ccc; }
+  .as-phase-actual.done { color: #52c41a; font-weight: 600; }
+  .as-phase-footer { display: flex; justify-content: flex-end; padding-top: 3px; margin-top: 2px; border-top: 1px dashed #d9e6f2; }
+  /* Element Plus 风格控件近似 */
+  .ipt { height: 24px; border: 1px solid #dcdfe6; border-radius: 4px; padding: 0 8px; font-size: 12px; line-height: 22px; color: #333; box-sizing: border-box; background: #fff; }
+  .ipt.area { height: auto; line-height: 20px; padding: 3px 8px; }
+  .btn { height: 24px; padding: 0 12px; border-radius: 4px; border: none; font-size: 12px; cursor: pointer; }
+  .btn-success { background: #67c23a; color: #fff; }
+  .idx-label { font-size: 12px; color: #8ba6bd; margin: 10px 0 4px 4px; }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="sheet-title">项目（二三级项目）实施计划</div>
+
+  <div class="idx-label">项目 7「测试计划」区 —— 每阶段框内五个字段按五行排列，完成按钮在五行最下边</div>
+
+  <div class="as-row">
+    <div class="as-no">7</div>
+    <div class="as-name">测试计划</div>
+    <div class="as-fill">
+
+      <!-- 阶段1:已填写,未完成 → 底部显示「完成」按钮 -->
+      <div class="as-phase">
+        <div class="as-phase-head">
+          <span class="as-phase-title">阶段1</span>
+          <span class="as-phase-toggle">隐藏</span>
+        </div>
+        <div class="as-phase-grid">
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">计划内容</span>
+            <div class="as-phase-row-value"><div class="ipt area" style="width:100%">样品打样与小批量试制，验证过滤性能与结构强度</div></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">计划开始</span>
+            <div class="as-phase-row-value"><div class="ipt as-phase-input">2026-09-01</div></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">计划完成</span>
+            <div class="as-phase-row-value"><div class="ipt as-phase-input">2026-09-15</div></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">实际完成</span>
+            <div class="as-phase-row-value"><span class="as-phase-text as-phase-actual">—</span></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">责任人</span>
+            <div class="as-phase-row-value"><div class="ipt as-phase-input">张三</div></div>
+          </div>
+        </div>
+        <div class="as-phase-footer"><button class="btn btn-success">完成</button></div>
+      </div>
+
+      <!-- 阶段2:已完成 → 绿色框 + 徽章,按钮消失 -->
+      <div class="as-phase as-phase-done">
+        <div class="as-phase-head">
+          <span class="as-phase-title">阶段2</span>
+          <span><span class="as-phase-badge">已完成</span><span class="as-phase-toggle">隐藏</span></span>
+        </div>
+        <div class="as-phase-grid">
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">计划内容</span>
+            <div class="as-phase-row-value"><div class="ipt area" style="width:100%">首批产品客户端装机测试，收集反馈并确认技术目标</div></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">计划开始</span>
+            <div class="as-phase-row-value"><div class="ipt as-phase-input">2026-09-16</div></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">计划完成</span>
+            <div class="as-phase-row-value"><div class="ipt as-phase-input">2026-09-30</div></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">实际完成</span>
+            <div class="as-phase-row-value"><span class="as-phase-text as-phase-actual done">2026-09-28</span></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">责任人</span>
+            <div class="as-phase-row-value"><div class="ipt as-phase-input">李四</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 阶段3:只填了部分,未完成 -->
+      <div class="as-phase">
+        <div class="as-phase-head">
+          <span class="as-phase-title">阶段3</span>
+          <span class="as-phase-toggle">隐藏</span>
+        </div>
+        <div class="as-phase-grid">
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">计划内容</span>
+            <div class="as-phase-row-value"><div class="ipt area" style="width:100%">小批量产线导入与工艺固化</div></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">计划开始</span>
+            <div class="as-phase-row-value"><div class="ipt as-phase-input">2026-10-08</div></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">计划完成</span>
+            <div class="as-phase-row-value"><div class="ipt as-phase-input">2026-10-31</div></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">实际完成</span>
+            <div class="as-phase-row-value"><span class="as-phase-text as-phase-actual">—</span></div>
+          </div>
+          <div class="as-phase-row">
+            <span class="as-phase-row-label">责任人</span>
+            <div class="as-phase-row-value"><div class="ipt as-phase-input">王五</div></div>
+          </div>
+        </div>
+        <div class="as-phase-footer"><button class="btn btn-success">完成</button></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>
