@@ -1,4 +1,4 @@
-﻿/* ============================================================
+/* ============================================================
    YINJIA-MES 迁移到位自查(在目标库 HSDZ_MES 上执行,只读不写)
    用途:部署/换包后确认"代码依赖的对象"是否都已在库里 —— 逐项打印 期望/实际/状态。
    执行:sqlcmd -S localhost -d HSDZ_MES -E -f 65001 -i tools\check-migrations.sql
@@ -74,8 +74,14 @@ INSERT INTO @r (item, expect, actual, ok) VALUES (N'面板 yj_panel 行数', N'>
 SELECT @n = COUNT(*) FROM yj_field;
 INSERT INTO @r (item, expect, actual, ok) VALUES (N'字段 yj_field 行数', N'>=2000', CAST(@n AS nvarchar(10)), CASE WHEN @n >= 2000 THEN 1 ELSE 0 END);
 
-SELECT item AS 检查项, expect AS 期望, actual AS 实际, CASE WHEN ok = 1 THEN N'✓ 到位' ELSE N'✗ 缺失' END AS 状态 FROM @r ORDER BY seq;
+SELECT item AS 检查项, expect AS 期望, actual AS 实际,
+       CASE WHEN ok = 1 THEN N'✓ 到位' ELSE N'✗ 缺失' END AS 状态,
+       CASE WHEN ok = 1 THEN 'OK' ELSE 'MISSING' END AS result
+  FROM @r ORDER BY seq;
+-- result 列与下面 RESULT 行是纯 ASCII:部署脚本据此判定,不受控制台/日志编码影响
 
 DECLARE @bad int = (SELECT COUNT(*) FROM @r WHERE ok = 0);
-IF @bad > 0 PRINT N'=== 有 ' + CAST(@bad AS nvarchar(10)) + N' 项缺失:按上表逐项 DbSync run 对应脚本 ==='
-ELSE PRINT N'=== 全部到位:库与当前代码同版 ===';
+IF @bad > 0
+    PRINT N'RESULT: MISSING-' + CAST(@bad AS nvarchar(10)) + N' 有 ' + CAST(@bad AS nvarchar(10)) + N' 项缺失:按上表逐项 DbSync run 对应脚本';
+ELSE
+    PRINT N'RESULT: ALL-OK 全部到位:库与当前代码同版';

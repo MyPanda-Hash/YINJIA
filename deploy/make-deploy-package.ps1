@@ -40,6 +40,7 @@ New-Item -ItemType Directory "$pkg\server-scripts", "$pkg\db-tools\lib" -Force |
 
 Write-Host "[3/5] 复制 app.jar 与服务器脚本 ..." -ForegroundColor Cyan
 Copy-Item $jar "$pkg\app.jar" -Force
+if (Test-Path (Join-Path $deploy 'deploy-server.bat')) { Copy-Item (Join-Path $deploy 'deploy-server.bat') "$pkg\deploy.bat" -Force } else { Write-Warning '未找到 deploy\deploy-server.bat' }
 foreach ($f in 'update.bat', 'start.bat', 'start-service.bat', '部署说明.md') {
   $src = Join-Path $deploy $f
   if (Test-Path $src) { Copy-Item $src (Join-Path "$pkg\server-scripts" $f) -Force }
@@ -56,6 +57,13 @@ if (Test-Path $jdbc) { Copy-Item $jdbc "$pkg\db-tools\lib\mssql-jdbc.jar" -Force
 $sqlFiles = Get-ChildItem $tools -Filter '*.sql' -File
 foreach ($s in $sqlFiles) { Copy-Item $s.FullName "$pkg\db-tools\" -Force }
 Write-Host ("      SQL 脚本 {0} 个(含清单内历史脚本,勿手工逐个跑), 共 {1:N1} MB" -f $sqlFiles.Count, (($sqlFiles | Measure-Object Length -Sum).Sum / 1MB))
+# 预编译 DbSync:服务器只装 JRE 也能跑(迁移执行器)
+if (Get-Command javac -ErrorAction SilentlyContinue) {
+  & javac --release 11 -encoding UTF-8 -d "$pkg\db-tools\lib" "$tools\DbSync.java" 2>&1 | Out-Null
+  if ((Test-Path "$pkg\db-tools\lib\DbSync.class") -and $LASTEXITCODE -eq 0) {
+    Write-Host ("      DbSync.class {0:N0} B (Java 11 字节码:服务器无 JDK 时用这个)" -f (Get-Item "$pkg\db-tools\lib\DbSync.class").Length)
+  } else { Write-Warning 'DbSync 预编译失败,服务器将回退到 java DbSync.java(需要 JDK)' }
+} else { Write-Warning '本机没有 javac,跳过 DbSync 预编译' }
 
 # db-tools 里的显眼警示(防止有人见 sql 就跑)
 $warn = @"
@@ -108,6 +116,7 @@ $steps = @"
 
 ``````
 app.jar                            热更新包:前端 dist + 后端 jar 合并成单文件
+deploy.bat                         服务器上一键部署(不带参数=只读自查;deploy.bat GO=真跑)
 server-scripts\                    update.bat / start.bat / start-service.bat / 部署说明.md(服务器已装过就跳过)
 db-tools\                          迁移工具链:DbSync.java + db-migrations.txt + check-migrations.sql + 全部 *.sql + lib\mssql-jdbc.jar
 db-tools\restore-from-backup.sql   路线 A 的一键还原脚本(自动识别数据文件目录)
@@ -117,6 +126,18 @@ FILES.txt                          清单(相对路径 + 字节数 + SHA256)
 ``````
 
 ## 二、路线 B:保留服务器现有数据(默认走这条)
+
+> **最省事:直接跑包里的 `deploy.bat`**（在服务器上,在包目录里双击或在 cmd 里执行）
+>
+> | 命令 | 作用 |
+> |---|---|
+> | `deploy.bat` | **只读自查**：前置检查 + 库缺项自查。不写服务器任何文件,应用照常在跑 |
+> | `deploy.bat GO` | **真跑**：停应用 → 备份库 → baseline 登记 → 补跑 14 个脚本 → 复验 → 换 app.jar → 起应用 → 健康检查 |
+> | `deploy.bat GO DB` | 只做数据库部分,不动 app.jar / 不停服务 |
+>
+> 全程写 UTF-8 日志到 `logs\deploy-<时间>.log`；**备份失败会硬停**(不会在没有备份的情况下改库)；
+> 复验仍有缺项时**不会换 app.jar**(避免"库落后但代码已更新"的故障重演)。
+> 下面是它的手工等价流程,脚本跑不动时照着做。
 
 **第 0 步 — 先备份(必做;用 sa 或 sysadmin,yinjia 应用账号没有 BACKUP 权限)**
 ``````sql
