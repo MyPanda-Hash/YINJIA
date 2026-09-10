@@ -213,6 +213,18 @@
           <el-option v-for="o in refOptions" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
       </div>
+      <div class="ps-dlg-row ps-dlg-row-top">
+        <span class="ps-dlg-label">{{ tt('子项目/尺寸') }}</span>
+        <el-input
+          v-model="dlgSub"
+          type="textarea"
+          :autosize="{ minRows: 1, maxRows: 3 }"
+          size="default"
+          style="width: 220px"
+          maxlength="200"
+          :placeholder="tt('必填')"
+        />
+      </div>
       <div class="ps-dlg-tip">{{ tt('下拉可选择项目实施计划项目（含其实施计划单号），选中后自动导入实施计划相关信息；也可直接输入新项目名称。') }}</div>
       <template #footer>
         <el-button @click="dlgVisible = false">{{ tt('取消') }}</el-button>
@@ -491,9 +503,12 @@ function changeGroupLevel(i, v) {
 const dlgVisible = ref(false)
 const dlgName = ref('')
 const dlgLevel = ref('二级')
+/** 子项目/尺寸:明细必填项,新增时就一起填,否则整张单据保存会被校验拦下 */
+const dlgSub = ref('')
 function openAddProject() {
   dlgName.value = ''
   dlgLevel.value = '二级'
+  dlgSub.value = ''
   dlgVisible.value = true
 }
 function confirmAddProject() {
@@ -502,10 +517,16 @@ function confirmAddProject() {
     ElMessage.warning(tt('请填写项目名称'))
     return
   }
+  const sub = String(dlgSub.value || '').trim()
+  if (!sub) {
+    // 子项目/尺寸 是明细必填项:这里拦住并说清楚,免得点了保存才被后端拒绝
+    ElMessage.warning(tt('请填写子项目/尺寸'))
+    return
+  }
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
   const lv = dlgLevel.value || '二级'
-  const row = { '项目名称': name, '项目等级': lv }
+  const row = { [K['项目名称']]: name, [K['项目等级']]: lv, [K['子项目/尺寸']]: sub }
   let idx = -1
   for (let i = d.items.length - 1; i >= 0; i--) {
     if (d.items[i][K['项目等级']] === lv) { idx = i; break }
@@ -564,7 +585,7 @@ function insertAfter(i) {
   const d = props.head.detail
   if (!Array.isArray(d.items)) return
   const src = d.items[i] || {}
-  d.items.splice(i + 1, 0, { '项目名称': src[K['项目名称']], '项目等级': src[K['项目等级']] })
+  d.items.splice(i + 1, 0, { [K['项目名称']]: src[K['项目名称']], [K['项目等级']]: src[K['项目等级']] })
   emit('dirty')
 }
 function removeItem(i) {
@@ -891,6 +912,7 @@ defineExpose({ exportProgressExcel })
   gap: 10px;
   margin-bottom: 12px;
 }
+.ps-dlg-row-top { align-items: flex-start; }
 .ps-dlg-label {
   width: 72px;
   text-align: right;
