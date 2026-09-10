@@ -177,6 +177,41 @@ export const menuTree = [
             ],
           },
           {
+            code: 'mixForms', title: '混料工序单据', children: [
+              { code: 'prMixProcess', title: '阻垢工序控制', path: '/panelx/list/PR_MIX_PROCESS', icon: 'Document', panelCode: 'PR_MIX_PROCESS' },
+              { code: 'prMixFeed', title: '阻垢投料单', path: '/panelx/list/PR_MIX_FEED', icon: 'Document', panelCode: 'PR_MIX_FEED' },
+              { code: 'prMixGranule', title: '造粒过程控制', path: '/panelx/list/PR_MIX_GRANULE', icon: 'Document', panelCode: 'PR_MIX_GRANULE' },
+              { code: 'prMixBlend', title: '物料混合记录', path: '/panelx/list/PR_MIX_BLEND', icon: 'Document', panelCode: 'PR_MIX_BLEND' },
+              { code: 'prMixCheck', title: '设备点检表', path: '/panelx/list/PR_MIX_CHECK', icon: 'Document', panelCode: 'PR_MIX_CHECK' },
+              { code: 'prMixDaily', title: '混料日报表', path: '/panelx/list/PR_MIX_DAILY', icon: 'Document', panelCode: 'PR_MIX_DAILY' },
+            ],
+          },
+          {
+            code: 'formForms', title: '成型工序单据', children: [
+              { code: 'prSinterQc', title: '烧结制程检验', path: '/panelx/list/PR_SINTER_QC', icon: 'Document', panelCode: 'PR_SINTER_QC' },
+              { code: 'prFormDaily', title: '成型日报表', path: '/panelx/list/PR_FORM_DAILY', icon: 'Document', panelCode: 'PR_FORM_DAILY' },
+              { code: 'prDemoldQc', title: '脱模检验记录', path: '/panelx/list/PR_DEMOLD_QC', icon: 'Document', panelCode: 'PR_DEMOLD_QC' },
+              { code: 'prEfficiency', title: '人均效率表', path: '/panelx/list/PR_EFFICIENCY', icon: 'Document', panelCode: 'PR_EFFICIENCY' },
+            ],
+          },
+          {
+            code: 'asmForms', title: '组装工序单据', children: [
+              { code: 'prAsmReturn', title: '不良退货记录', path: '/panelx/list/PR_ASM_RETURN', icon: 'Document', panelCode: 'PR_ASM_RETURN' },
+              { code: 'prMatInspect', title: '材料进厂检查', path: '/panelx/list/PR_MAT_INSPECT', icon: 'Document', panelCode: 'PR_MAT_INSPECT' },
+              { code: 'prNoBlack', title: '无黑处理登记', path: '/panelx/list/PR_NO_BLACK', icon: 'Document', panelCode: 'PR_NO_BLACK' },
+              { code: 'prBlackTest', title: '黑水测试记录', path: '/panelx/list/PR_BLACK_TEST', icon: 'Document', panelCode: 'PR_BLACK_TEST' },
+              { code: 'prPatrolQc', title: '巡线抽检记录', path: '/panelx/list/PR_PATROL_QC', icon: 'Document', panelCode: 'PR_PATROL_QC' },
+              { code: 'prAsmDaily', title: '组装日报表', path: '/panelx/list/PR_ASM_DAILY', icon: 'Document', panelCode: 'PR_ASM_DAILY' },
+            ],
+          },
+          {
+            code: 'otherForms', title: '装箱与其他单据', children: [
+              { code: 'prMaintenance', title: '预防性保养计划', path: '/panelx/list/PR_MAINTENANCE', icon: 'Document', panelCode: 'PR_MAINTENANCE' },
+              { code: 'prFlowCard', title: '产品流动标识卡', path: '/panelx/list/PR_FLOW_CARD', icon: 'Document', panelCode: 'PR_FLOW_CARD' },
+              { code: 'prScrap', title: '物料产品报废单', path: '/panelx/list/PR_SCRAP', icon: 'Document', panelCode: 'PR_SCRAP' },
+            ],
+          },
+          {
             code: 'detail', title: '明细表', children: [
               { code: 'manuDetail', title: '生产加工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
               { code: 'dispatchDetail', title: '工序派工单明细表', path: '/panelx/list/DISPATCH_DETAIL', panelCode: 'DISPATCH_DETAIL', icon: 'List' },
