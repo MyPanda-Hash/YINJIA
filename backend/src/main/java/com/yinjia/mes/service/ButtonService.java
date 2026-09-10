@@ -34,11 +34,13 @@ public class ButtonService {
     private final MessageService messageService;
     private final LotSeqService lotSeqService;
     private final StockLedgerService stockLedger;
+    private final WoReportService woReport;
 
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
                          DevTaskService devTaskService, MessageService messageService,
-                         LotSeqService lotSeqService, StockLedgerService stockLedger) {
+                         LotSeqService lotSeqService, StockLedgerService stockLedger,
+                         WoReportService woReport) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -47,6 +49,7 @@ public class ButtonService {
         this.messageService = messageService;
         this.lotSeqService = lotSeqService;
         this.stockLedger = stockLedger;
+        this.woReport = woReport;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -509,6 +512,8 @@ public class ButtonService {
                 def.code(), no, currentUserName(), currentUserName());
         // 库存记账(材料入库链):采购入库单审核 → kucun 入账(失败抛错整笔回滚)
         stockLedger.postIn(def.code(), no, currentUserName());
+        // 工序报工记账(生产过程层):报工单审核 → wo_progress.完成数量 累计
+        woReport.post(def.code(), no, currentUserName());
         // 文件类面板:修改态经审核收尾 → 计算修改记录并再归档
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && finalizeModify(def, no, currentUserName())) {
             return result(no, "已归档");
@@ -522,6 +527,8 @@ public class ButtonService {
         if (!"已审核".equals(st.get("status"))) throw new IllegalStateException("仅已审核状态可弃审");
         // 库存冲回(材料入库链):先冲账再弃审,余额不足或台账缺失则拒绝,整笔回滚
         stockLedger.unpostIn(def.code(), no, currentUserName());
+        // 报工冲回(生产过程层):完成数量对称扣减,为负则拒绝
+        woReport.unpost(def.code(), no, currentUserName());
         jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
