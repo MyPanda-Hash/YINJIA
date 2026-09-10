@@ -156,7 +156,12 @@
           <div class="as-name">{{ tt(row.label) }}</div>
           <div class="as-fill">
             <template v-for="(ph, pi) in row.phases" :key="ph.key">
-              <div v-if="!phaseHidden[pi]" class="as-phase" :class="{ 'as-phase-done': head[ph.key + '_实际完成'] }">
+              <div
+                v-if="!phaseHidden[pi]"
+                class="as-phase"
+                :class="{ 'as-phase-done': head[ph.key + '_实际完成'] }"
+                :data-filled="hasPhaseContent(head, ph.num) ? '1' : '0'"
+              >
                 <div class="as-phase-head">
                   <span class="as-phase-title">{{ tt('阶段') }}{{ ph.num }}</span>
                   <span v-if="head[ph.key + '_实际完成']" class="as-phase-badge">{{ tt('已完成') }}</span>
@@ -263,6 +268,7 @@ import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
 import RefPickDialog from './RefPickDialog.vue'
 import { usePanelRuntime } from '@core/panel-runtime'
+import { hasPhaseContent } from '@core/progress/stageProgress'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -767,6 +773,14 @@ defineExpose({ focusField })
   body.approval-printing .as-phase-toggle,
   body.approval-printing .as-phase-restore,
   body.approval-printing .as-hint {
+    display: none !important;
+  }
+  /* 「已完成」角标属于办理状态,不进导出件 */
+  body.approval-printing .as-phase-badge {
+    display: none !important;
+  }
+  /* 没填过内容的阶段框不导出(整框 5 个字段全空) */
+  body.approval-printing .as-phase[data-filled="0"] {
     display: none !important;
   }
   @page {

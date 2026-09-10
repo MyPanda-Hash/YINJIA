@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { pickStages, stageRowState, statusLabel, summarizeStages } from './stageProgress.js'
+import { hasPhaseContent, pickStages, stageRowState, statusLabel, summarizeStages } from './stageProgress.js'
 
 const TODAY = '2026-09-15'
 
@@ -128,4 +128,20 @@ test('each stage row gets its own badge state', () => {
     { no: 3, content: 'C', due: '2026-09-30' },
   ])
   assert.deepEqual(pickStages(head).map((s) => stageRowState(s, TODAY)), ['done', 'overdue', 'doing'])
+})
+
+test('an untouched phase box counts as empty (print skips it)', () => {
+  assert.equal(hasPhaseContent({}, 1), false)
+  assert.equal(hasPhaseContent({ 阶段1_计划内容: '', 阶段1_计划开始: '  ', 阶段1_计划完成: '', 阶段1_实际完成: '', 阶段1_责任人: '' }, 1), false)
+})
+
+test('a phase box with any single filled field counts as filled', () => {
+  assert.equal(hasPhaseContent({ 阶段2_责任人: '陈研发' }, 2), true)
+  assert.equal(hasPhaseContent({ 阶段3_计划内容: '立项与方案评审' }, 3), true)
+  assert.equal(hasPhaseContent({ 阶段4_实际完成: '2026-09-10' }, 4), true)
+})
+
+test('phase content check ignores other phases and unrelated keys', () => {
+  assert.equal(hasPhaseContent({ 阶段1_计划内容: 'A', 备注: 'B' }, 2), false)
+  assert.equal(hasPhaseContent(null, 1), false)
 })

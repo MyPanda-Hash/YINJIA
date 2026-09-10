@@ -63,6 +63,15 @@ export function pickStages(planHead) {
   return out
 }
 
+/** 阶段框内 5 个字段(与实施计划纸面阶段框一一对应) */
+export const PHASE_FIELDS = ['计划内容', '计划开始', '计划完成', '实际完成', '责任人']
+
+/** 阶段框是否填过内容:5 个字段任一非空即为已填;全空则在导出/打印时跳过该框 */
+export function hasPhaseContent(head, no) {
+  if (!head) return false
+  return PHASE_FIELDS.some((field) => text(head[`阶段${no}_${field}`]) !== '')
+}
+
 /** 单个阶段的行内状态(弹窗徽标用) */
 export function stageRowState(stage, today = '') {
   if (stage && stage.actual) return 'done'
