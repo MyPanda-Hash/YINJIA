@@ -439,6 +439,8 @@ public class PanelConfigService {
         if (!display.equals(f.label())) m.put("displayName", display);
         if (f.width() != null) m.put("width", f.width());
         if (f.hidden()) m.put("hidden", true);
+        // 字段编辑的显隐开关(存 yj_field.visible):显式 false 才下发,前端据此隐藏该列
+        if (!f.visible()) m.put("visible", false);
         if (!f.editable()) m.put("readonly", true);
         if ("下拉框".equals(f.dataType()) && f.dictSql() != null) {
             m.put("options", dictOptions(f.dictSql()));

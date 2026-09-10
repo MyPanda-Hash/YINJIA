@@ -335,6 +335,11 @@ export default {
     '请先填写项目名称': 'Fill in the project name first',
     '该实施计划尚未录入阶段内容': 'This implementation plan has no stage content yet',
     '未找到同名项目实施计划，请先在项目实施计划中录入阶段': 'No implementation plan with the same project name was found; add its stages in 项目实施计划 first',
+    /* ── 功能性滤效:字段编辑 ── */
+    '可改列名(别名)与显隐,全用户共享': 'Rename columns (alias) and toggle visibility; shared by all users',
+    '不勾选=该列不显示/不导出': 'Unchecked = the column is hidden and not exported',
+    '留空=沿用原名;修改全局生效(所有用户共享)': 'Leave blank to keep the original name; changes apply globally (shared by all users)',
+    '字段编辑已保存': 'Column settings saved',
     '点击排序：升序 → 降序 → 取消': 'Click to sort: ascending → descending → clear',
     '已审批': 'Approved',
     '当前产品：': 'Product: ',

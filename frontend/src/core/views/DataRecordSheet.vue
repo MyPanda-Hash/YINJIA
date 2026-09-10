@@ -217,59 +217,70 @@
     <!-- ═══ 3.数据记录表 ═══ -->
     <table class="rs-t rs-dt">
       <colgroup>
-        <col style="width:130px" /><col style="width:96px" /><col style="width:80px" />
-        <col style="width:110px" /><col style="width:110px" />
-        <col style="width:96px" />
-        <col style="width:96px" /><col style="width:96px" />
-        <col style="width:96px" /><col style="width:96px" />
-        <col style="width:110px" />
+        <col v-if="!dtHidden('冲水时间')" style="width:130px" />
+        <col v-if="!dtHidden('累计进水（L）')" style="width:96px" />
+        <col v-if="!dtHidden('水温（℃）')" style="width:80px" />
+        <col v-if="!dtHidden('压力（PSI)样品1')" style="width:110px" />
+        <col v-if="!dtHidden('压力（PSI)样品2')" style="width:110px" />
+        <col v-if="!dtHidden('原水含量（ug/L）5号缸')" style="width:96px" />
+        <col v-if="!dtHidden('出水含量（ug/L）样品1')" style="width:96px" />
+        <col v-if="!dtHidden('出水含量（ug/L）样品2')" style="width:96px" />
+        <col v-if="!dtHidden('去除率%样品1')" style="width:96px" />
+        <col v-if="!dtHidden('去除率%样品2')" style="width:96px" />
+        <col v-if="!dtHidden('测试时间')" style="width:110px" />
         <col v-if="editable" style="width:60px" />
       </colgroup>
       <tbody>
-        <tr><td colspan="12" class="rs-sectionbar">{{ tt('3.数据记录表') }}</td></tr>
+        <tr><td :colspan="dtColSpan" class="rs-sectionbar">
+          {{ tt('3.数据记录表') }}
+          <span v-if="editable" class="rs-fieldedit" :title="tt('可改列名(别名)与显隐,全用户共享')" @click="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+        </td></tr>
         <tr class="rs-grp">
-          <th class="rs-th" rowspan="2">{{ tt('冲水时间') }}</th>
-          <th class="rs-th" rowspan="2">{{ tt('累计进水（L）') }}</th>
-          <th class="rs-th" rowspan="2">{{ tt('水温（℃）') }}</th>
-          <th class="rs-th" colspan="2">{{ tt('取样前样品：压力（PSI)/流速（L/min）') }}</th>
-          <th class="rs-th" rowspan="2">{{ tt('原水含量（ug/L）') }}</th>
-          <th class="rs-th" colspan="2">{{ tt('出水含量（ug/L）') }}</th>
-          <th class="rs-th" colspan="2">{{ tt('去除率%') }}</th>
-          <th class="rs-th" rowspan="2">{{ tt('测试时间') }}</th>
+          <th v-if="!dtHidden('冲水时间')" class="rs-th" rowspan="2">{{ dtLabel('冲水时间') }}</th>
+          <th v-if="!dtHidden('累计进水（L）')" class="rs-th" rowspan="2">{{ dtLabel('累计进水（L）') }}</th>
+          <th v-if="!dtHidden('水温（℃）')" class="rs-th" rowspan="2">{{ dtLabel('水温（℃）') }}</th>
+          <th v-if="dtGroupSpan('压力')" class="rs-th" :colspan="dtGroupSpan('压力')">{{ dtGroupLabel('压力') }}</th>
+          <th v-if="!dtHidden('原水含量（ug/L）5号缸')" class="rs-th" rowspan="2">{{ dtLabel('原水含量（ug/L）5号缸', '原水含量（ug/L）') }}</th>
+          <th v-if="dtGroupSpan('出水')" class="rs-th" :colspan="dtGroupSpan('出水')">{{ dtGroupLabel('出水') }}</th>
+          <th v-if="dtGroupSpan('去除率')" class="rs-th" :colspan="dtGroupSpan('去除率')">{{ dtGroupLabel('去除率') }}</th>
+          <th v-if="!dtHidden('测试时间')" class="rs-th" rowspan="2">{{ dtLabel('测试时间') }}</th>
           <th v-if="editable" class="rs-th rs-th-op" rowspan="2"></th>
         </tr>
         <tr class="rs-grp2">
-          <th class="rs-th">样品1</th><th class="rs-th">样品2</th>
-          <th class="rs-th">样品1</th><th class="rs-th">样品2</th>
-          <th class="rs-th">样品1</th><th class="rs-th">样品2</th>
+          <th v-if="!dtHidden('压力（PSI)样品1')" class="rs-th">{{ dtLabel('压力（PSI)样品1', '样品1') }}</th>
+          <th v-if="!dtHidden('压力（PSI)样品2')" class="rs-th">{{ dtLabel('压力（PSI)样品2', '样品2') }}</th>
+          <th v-if="!dtHidden('出水含量（ug/L）样品1')" class="rs-th">{{ dtLabel('出水含量（ug/L）样品1', '样品1') }}</th>
+          <th v-if="!dtHidden('出水含量（ug/L）样品2')" class="rs-th">{{ dtLabel('出水含量（ug/L）样品2', '样品2') }}</th>
+          <th v-if="!dtHidden('去除率%样品1')" class="rs-th">{{ dtLabel('去除率%样品1', '样品1') }}</th>
+          <th v-if="!dtHidden('去除率%样品2')" class="rs-th">{{ dtLabel('去除率%样品2', '样品2') }}</th>
         </tr>
         <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
-          <td class="rs-td"><el-input v-if="editable" v-model="row['冲水时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['冲水时间'] || ' / ' }}</span></td>
-          <td class="rs-td"><el-input v-if="editable" v-model="row['累计进水（L）']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['累计进水（L）'] || ' / ' }}</span></td>
-          <td class="rs-td"><el-input v-if="editable" v-model="row['水温（℃）']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['水温（℃）'] || ' / ' }}</span></td>
-          <td class="rs-td">
+          <td v-if="!dtHidden('冲水时间')" class="rs-td"><el-input v-if="editable" v-model="row['冲水时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['冲水时间'] || ' / ' }}</span></td>
+          <td v-if="!dtHidden('累计进水（L）')" class="rs-td"><el-input v-if="editable" v-model="row['累计进水（L）']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['累计进水（L）'] || ' / ' }}</span></td>
+          <td v-if="!dtHidden('水温（℃）')" class="rs-td"><el-input v-if="editable" v-model="row['水温（℃）']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['水温（℃）'] || ' / ' }}</span></td>
+          <td v-if="!dtHidden('压力（PSI)样品1')" class="rs-td">
             <div class="rs-combo">
               <el-input v-if="editable" v-model="row['压力（PSI)样品1']" size="small" class="rs-c-in hl" placeholder="压力" @input="emit('dirty')" />
               <el-input v-if="editable" v-model="row['流速（L/min)样品1']" size="small" class="rs-c-in hl" placeholder="流速" @input="emit('dirty')" />
               <span v-else class="rs-txt">{{ combo(row, '压力（PSI)样品1', '流速（L/min)样品1') }}</span>
             </div>
           </td>
-          <td class="rs-td">
+          <td v-if="!dtHidden('压力（PSI)样品2')" class="rs-td">
             <div class="rs-combo">
               <el-input v-if="editable" v-model="row['压力（PSI)样品2']" size="small" class="rs-c-in hl" placeholder="压力" @input="emit('dirty')" />
               <el-input v-if="editable" v-model="row['流速（L/min)样品2']" size="small" class="rs-c-in hl" placeholder="流速" @input="emit('dirty')" />
               <span v-else class="rs-txt">{{ combo(row, '压力（PSI)样品2', '流速（L/min)样品2') }}</span>
             </div>
           </td>
-          <td class="rs-td"><el-input v-if="editable" v-model="row['原水含量（ug/L）5号缸']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['原水含量（ug/L）5号缸'] || ' / ' }}</span></td>
-          <td class="rs-td"><el-input v-if="editable" v-model="row['出水含量（ug/L）样品1']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['出水含量（ug/L）样品1'] || ' / ' }}</span></td>
-          <td class="rs-td"><el-input v-if="editable" v-model="row['出水含量（ug/L）样品2']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['出水含量（ug/L）样品2'] || ' / ' }}</span></td>
-          <td class="rs-td"><el-input v-if="editable" v-model="row['去除率%样品1']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['去除率%样品1'] || ' / ' }}</span></td>
-          <td class="rs-td"><el-input v-if="editable" v-model="row['去除率%样品2']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['去除率%样品2'] || ' / ' }}</span></td>
-          <td class="rs-td"><el-input v-if="editable" v-model="row['测试时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['测试时间'] || ' / ' }}</span></td>
+          <td v-if="!dtHidden('原水含量（ug/L）5号缸')" class="rs-td"><el-input v-if="editable" v-model="row['原水含量（ug/L）5号缸']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['原水含量（ug/L）5号缸'] || ' / ' }}</span></td>
+          <td v-if="!dtHidden('出水含量（ug/L）样品1')" class="rs-td"><el-input v-if="editable" v-model="row['出水含量（ug/L）样品1']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['出水含量（ug/L）样品1'] || ' / ' }}</span></td>
+          <td v-if="!dtHidden('出水含量（ug/L）样品2')" class="rs-td"><el-input v-if="editable" v-model="row['出水含量（ug/L）样品2']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['出水含量（ug/L）样品2'] || ' / ' }}</span></td>
+          <td v-if="!dtHidden('去除率%样品1')" class="rs-td"><el-input v-if="editable" v-model="row['去除率%样品1']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['去除率%样品1'] || ' / ' }}</span></td>
+          <td v-if="!dtHidden('去除率%样品2')" class="rs-td"><el-input v-if="editable" v-model="row['去除率%样品2']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['去除率%样品2'] || ' / ' }}</span></td>
+          <td v-if="!dtHidden('测试时间')" class="rs-td"><el-input v-if="editable" v-model="row['测试时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['测试时间'] || ' / ' }}</span></td>
           <td v-if="editable" class="rs-td rs-td-op"><span class="rs-op-add" @click="addRow(i)">＋</span><span class="rs-op-del" @click="removeRow(i)">×</span></td>
         </tr>
-        <tr v-if="!items.length"><td colspan="12" class="rs-empty">—</td></tr>
+        <tr v-if="!items.length"><td :colspan="dtColSpan" class="rs-empty">—</td></tr>
       </tbody>
     </table>
     <div v-if="editable" class="rs-add" @click="addRow(-1)">＋ {{ tt('新增数据记录行') }}</div>
@@ -287,14 +298,41 @@
       </tbody>
     </table>
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" @confirm="onProdRefConfirm" />
+
+    <!-- ═══ 字段编辑(3.数据记录表):列别名/显隐可改,应对复杂测试环境 ═══ -->
+    <el-dialog v-model="fieldEditVisible" :title="tt('字段编辑')" width="620px" append-to-body>
+      <div class="fe-list">
+        <div v-for="(row, idx) in fieldEditRows" :key="idx" class="fe-row">
+          <span class="fe-key" :title="row.key">{{ row.key }}</span>
+          <span class="fe-label">{{ tt(row.label) }}</span>
+          <el-input
+            :model-value="row.alias"
+            @update:model-value="(v) => { row.alias = v }"
+            size="small"
+            :placeholder="tt(row.label)"
+            clearable
+            class="fe-alias"
+          />
+          <el-checkbox :model-value="row.visible" @update:model-value="(v) => { row.visible = v }" class="fe-vis" :title="tt('不勾选=该列不显示/不导出')" />
+        </div>
+      </div>
+      <div style="margin-top:8px;color:#909399;font-size:12px">{{ tt('留空=沿用原名;修改全局生效(所有用户共享)') }}</div>
+      <template #footer>
+        <el-button @click="fieldEditVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="saveFieldEdit">{{ tt('保存') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, ref } from 'vue'
 import { tt } from '@/i18n'
+import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
+import request from '@/core/request'
 import RefPickDialog from './RefPickDialog.vue'
+import { buildColumnPrefsPayload, isColumnHidden, resolveColumnLabel } from '@core/sheet/columnPrefs'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -335,6 +373,78 @@ function onProdRefConfirm(rows) {
   }
   prodRefVisible.value = false
   emit('dirty')
+}
+
+// ── 3.数据记录表:列名(别名)与显隐可配置,与其余 7 张同一接口(字段编辑) ──
+// 分组表头(取样前样品/出水含量/去除率)各管两列;隐藏一列时分组标题 colspan 自动收缩,两列都隐藏则整组不渲染。
+const DT_GROUPS = {
+  压力: { label: '取样前样品：压力（PSI)/流速（L/min）', keys: ['压力（PSI)样品1', '压力（PSI)样品2'] },
+  出水: { label: '出水含量（ug/L）', keys: ['出水含量（ug/L）样品1', '出水含量（ug/L）样品2'] },
+  去除率: { label: '去除率%', keys: ['去除率%样品1', '去除率%样品2'] },
+}
+/** 数据记录表 11 列(键=数据键,label=纸面默认表头) */
+const DT_COLUMNS = [
+  { key: '冲水时间', label: '冲水时间' },
+  { key: '累计进水（L）', label: '累计进水（L）' },
+  { key: '水温（℃）', label: '水温（℃）' },
+  { key: '压力（PSI)样品1', label: '样品1（压力/流速）' },
+  { key: '压力（PSI)样品2', label: '样品2（压力/流速）' },
+  { key: '原水含量（ug/L）5号缸', label: '原水含量（ug/L）' },
+  { key: '出水含量（ug/L）样品1', label: '样品1' },
+  { key: '出水含量（ug/L）样品2', label: '样品2' },
+  { key: '去除率%样品1', label: '样品1' },
+  { key: '去除率%样品2', label: '样品2' },
+  { key: '测试时间', label: '测试时间' },
+]
+function dtFieldOf(key) {
+  return fieldMap.value.get(key)
+}
+function dtHidden(key) {
+  return isColumnHidden(dtFieldOf(key))
+}
+function dtLabel(key, fallback) {
+  return resolveColumnLabel(dtFieldOf(key), fallback || key)
+}
+function dtGroupSpan(name) {
+  return (DT_GROUPS[name]?.keys || []).filter((k) => !dtHidden(k)).length
+}
+function dtGroupLabel(name) {
+  const g = DT_GROUPS[name]
+  return g ? tt(g.label) : ''
+}
+const dtColSpan = computed(() => DT_COLUMNS.filter((c) => !dtHidden(c.key)).length + (props.editable ? 1 : 0))
+
+/** 字段编辑弹窗:改列别名/显隐(存 yj_field.alias/visible,全用户共享) */
+const fieldEditVisible = ref(false)
+const fieldEditRows = ref([])
+function openFieldEdit() {
+  fieldEditRows.value = DT_COLUMNS.map((col) => {
+    const f = dtFieldOf(col.key)
+    const alias = f && f.displayName && f.displayName !== f.dataName ? String(f.displayName) : ''
+    const visible = !dtHidden(col.key)
+    return { key: col.key, label: col.label, alias, originalAlias: alias, visible, originalVisible: visible }
+  })
+  fieldEditVisible.value = true
+}
+async function saveFieldEdit() {
+  const changed = buildColumnPrefsPayload(fieldEditRows.value)
+  if (!changed.length) {
+    fieldEditVisible.value = false
+    return
+  }
+  try {
+    // 该组件只服务功能性滤效面板;接口与其余 7 张数据记录表一致
+    const res = await request.post('/px/saveColumnPrefs', { panelCode: 'RD_FILTER_EFF', columns: changed })
+    if (res && res.code && res.code !== 200) {
+      ElMessage.error(res.message || tt('保存失败'))
+      return
+    }
+    ElMessage.success(tt('字段编辑已保存'))
+    fieldEditVisible.value = false
+    emit('refresh-config')
+  } catch (e) {
+    ElMessage.error(tt('保存失败'))
+  }
 }
 
 // ── 校验定位(供 PanelxList 保存校验调用):滚动到该字段并琥珀闪烁 ──
@@ -472,6 +582,50 @@ function removeRow(i) {
   font-style: italic;
   font-family: 'KaiTi', 'STKaiti', 'SimSun', serif;
 }
+/* 字段编辑:区块条右侧入口 + 弹窗列表 */
+.rs-fieldedit {
+  float: right;
+  color: #e6a23c;
+  cursor: pointer;
+  font-size: 12px;
+}
+.rs-fieldedit:hover { text-decoration: underline; }
+.fe-list {
+  max-height: 420px;
+  overflow-y: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  padding: 4px 0;
+}
+.fe-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-bottom: 1px solid #f0f0f0;
+}
+.fe-row:last-child { border-bottom: none; }
+.fe-key {
+  flex: none;
+  width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #606266;
+}
+.fe-label {
+  flex: none;
+  width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #909399;
+}
+.fe-alias { flex: 1; min-width: 120px; }
+.fe-vis { flex: none; }
+
 /* 参照单元格(文档编号 -> 立项申请右上角编号):拟态输入框,点击弹参照 */
 .rs-ref-ctl {
   display: flex;

@@ -121,8 +121,9 @@
         <DataRecordSheet
           v-else-if="panelCode === 'RD_FILTER_EFF'"
           ref="approvalSheetRef"
-          :head="cur" :fields="headerFields" :editable="draftEditable"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
           @dirty="markInlineDirty"
+          @refresh-config="onFieldEditRefresh"
         />
         <!-- 数据记录表其余 7 张(配置驱动:碱性/矿化/抑菌/阻垢性能/RO保护/浸泡安全/压降精度) -->
         <RecordSheetPanels
