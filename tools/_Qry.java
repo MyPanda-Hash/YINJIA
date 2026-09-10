@@ -1,16 +1,12 @@
-// _Qry.java — 修复号池:登记 SQL 直插的 GD-0003,并预留余量
+// _Qry.java — 盘点生产/品质相关已注册面板(yj_panel)与菜单对应关系
 import java.sql.*;
 public class _Qry {
   public static void main(String[] a) throws Exception {
     try (Connection c = DriverManager.getConnection("jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false", "yinjia", "Yinjia@2026")) {
       Statement s = c.createStatement();
-      // 直插单登记进号池(取 MAX+1 语义,登记到 0009 留余量)
-      try {
-        s.executeUpdate("IF NOT EXISTS (SELECT 1 FROM s_allno WHERE lb='GD' AND ny='2026-09' AND dh='GD-2026-09-0009') INSERT INTO s_allno (comm, lb, ny, dh) VALUES (0, 'GD', '2026-09', 'GD-2026-09-0009')");
-        System.out.println("号池已登记 GD-2026-09-0009 (下一号 0010)");
-      } catch (SQLException e) { System.out.println("号池修复: " + e.getMessage()); }
-      ResultSet r = s.executeQuery("SELECT dh FROM s_allno WHERE lb='GD' AND ny='2026-09' ORDER BY dh");
-      while (r.next()) System.out.println("  allno: " + r.getString(1));
+      ResultSet r = s.executeQuery("SELECT panel_code, panel_name, category, module_group FROM yj_panel WHERE panel_code LIKE 'PR[_]%' OR panel_code LIKE 'WO[_]%' OR panel_code IN ('DAY_REPORT','FEED_CONFIRM','MIX_RECORD','GRAN_RECORD','QC_RECORD','WH_RECORD','PACK_CONFIRM','EQUIP_CHECK','MAINT_PLAN','SAMPLE_REQ','ROD_RETURN','QC_OP','QC_DISPOSAL','QC_RECV','QC_INSP','QC_RETURN','LOT_TRACE','WO_SCHEDULE','WO_KIT','WO_REPORT','WO_REPORT_LIST') ORDER BY module_group, panel_code");
+      System.out.println("code | name | category | module_group");
+      while (r.next()) System.out.println(r.getString(1) + " | " + r.getString(2) + " | " + r.getString(3) + " | " + r.getString(4));
     }
   }
 }
