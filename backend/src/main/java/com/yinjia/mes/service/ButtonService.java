@@ -1036,46 +1036,75 @@ public class ButtonService {
      */
     private void syncPlanToProgress(String planNo) {
         List<Map<String, Object>> plans = jdbc.queryForList(
-                "SELECT [项目名称], [项目定级], [负责人], [编制日期] FROM rd_plan WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", planNo);
+                "SELECT [项目名称], [项目定级], [负责人], [文档编号] FROM rd_plan WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", planNo);
         if (plans.isEmpty()) return;
         String projectName = str(plans.get(0).get("项目名称"));
         if (projectName == null || projectName.isBlank()) return;
-        // 统计阶段完成情况
-        int totalStages = 0, doneStages = 0;
-        int lastDoneStage = 0;
-        String latestDate = null;
+        // 统计阶段(计划内容非空才计入),同时取最后一个有内容的阶段的「计划完成」= 预计完成日期口径
+        int totalStages = 0, doneStages = 0, lastDoneStage = 0;
+        String latestDone = null, lastPlanDue = null;
         for (int i = 1; i <= 10; i++) {
-            String contentCol = "阶段" + i + "_计划内容";
-            String doneCol = "阶段" + i + "_实际完成";
             List<Map<String, Object>> cols = jdbc.queryForList(
-                    "SELECT [" + contentCol + "] AS c, [" + doneCol + "] AS d FROM rd_plan WHERE [单据编号] = ?", planNo);
+                    "SELECT [阶段" + i + "_计划内容] AS c, [阶段" + i + "_实际完成] AS d, [阶段" + i + "_计划完成] AS p"
+                            + " FROM rd_plan WHERE [单据编号] = ?", planNo);
             if (cols.isEmpty()) continue;
             String content = str(cols.get(0).get("c"));
             String done = str(cols.get(0).get("d"));
-            if (content != null && !content.isBlank()) {
-                totalStages++;
-                if (done != null && !done.isBlank()) {
-                    doneStages++;
-                    lastDoneStage = i;
-                    if (latestDate == null || done.compareTo(latestDate) > 0) latestDate = done;
-                }
+            String planDue = str(cols.get(0).get("p"));
+            if (content == null || content.isBlank()) continue;
+            totalStages++;
+            if (planDue != null) lastPlanDue = planDue;   // 阶段号递增:最后取到的即最晚计划完成
+            if (done != null) {
+                doneStages++;
+                lastDoneStage = i;
+                if (latestDone == null || done.compareTo(latestDone) > 0) latestDone = done;
             }
         }
-        // 构建进度摘要
         String status;
         if (totalStages == 0) status = "已立项";
         else if (doneStages == 0) status = "阶段已规划(" + totalStages + "个)";
         else if (doneStages >= totalStages) status = "全部完成(" + doneStages + "/" + totalStages + ")";
         else status = "进行中(完成" + doneStages + "/" + totalStages + ",至阶段" + lastDoneStage + ")";
-        // 更新 rd_progress_detail 中同名行(列名为 状态/里程完成/项目负责,对应 label 状态/预计完成日期/项目负责人)
-        int n = jdbc.update(
-                "UPDATE rd_progress_detail SET [状态] = ?, [里程完成] = COALESCE(?, [里程完成]), [项目负责] = COALESCE(?, [项目负责])"
-                        + " WHERE [项目名称] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                status, latestDate, str(plans.get(0).get("负责人")), projectName);
-        if (n > 0) {
+
+        // 项目进度查询按约定只有一张单据:取最近一张非作废的作为导入目标
+        List<Map<String, Object>> targets = jdbc.queryForList(
+                "SELECT TOP 1 [单据编号] FROM rd_progress WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY [单据编号] DESC");
+        if (targets.isEmpty()) {
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("[RD_PLAN→RD_PROGRESS] 没有可用的项目进度查询单据,跳过导入 项目={}", projectName);
+            return;
+        }
+        String progressNo = str(targets.get(0).get("单据编号"));
+        String owner = str(plans.get(0).get("负责人"));
+        String level = str(plans.get(0).get("项目定级"));
+        String due = latestDone != null ? latestDone : lastPlanDue;
+
+        int n = jdbc.update("UPDATE rd_progress_detail SET [状态] = ?, [里程完成] = COALESCE(?, [里程完成]),"
+                        + " [项目负责] = COALESCE(?, [项目负责]), [项目层级] = COALESCE(?, [项目层级])"
+                        + " WHERE [单据编号] = ? AND [项目名称] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                status, due, owner, level, progressNo, projectName);
+        if (n == 0) {
+            // 「子项目/尺寸」是明细必填项:从立项申请的规格结构带出,取不到就回退项目名称,
+            // 否则用户下次在界面上保存这张进度单时会被必填校验拦下
+            String spec = specFromApproval(str(plans.get(0).get("文档编号")));
+            jdbc.update("INSERT INTO rd_progress_detail ([单据编号], [项目名称], [项目层级], [子项目/尺寸],"
+                            + " [项目负责], [里程完成], [状态], asp_user1, asp_time1)"
+                            + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, GETDATE())",
+                    progressNo, projectName, level, spec == null ? projectName : spec, owner, due, status, currentUserName());
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .info("[RD_PLAN→RD_PROGRESS] 新增 1 行, 进度单={}, 项目={}, 状态={}", progressNo, projectName, status);
+        } else {
             org.slf4j.LoggerFactory.getLogger(ButtonService.class)
                     .info("[RD_PLAN→RD_PROGRESS] 同步 {} 行, 项目={}, 状态={}", n, projectName, status);
         }
+    }
+
+    /** 立项申请的「滤芯炭棒规格或结构」:作为进度查询明细「子项目/尺寸」的默认值 */
+    private String specFromApproval(String approvalDocNo) {
+        if (approvalDocNo == null || approvalDocNo.isBlank()) return null;
+        List<String> v = jdbc.queryForList(
+                "SELECT [滤芯炭棒规格或结构] FROM rd_approval WHERE [文档编号] = ?", String.class, approvalDocNo);
+        return v.isEmpty() ? null : str(v.get(0));
     }
 
     private static String str(Object o) {
