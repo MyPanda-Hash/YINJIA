@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
@@ -176,6 +176,7 @@
       </table>
       <div v-if="editable" class="ps-addbar">
         <div class="ps-add" @click="openAddProject">＋ {{ tt('新增项目') }}</div>
+        <div class="ps-add" @click="syncStageProgress">⟳ {{ tt('同步阶段进度') }}</div>
         <div class="ps-add" @click="pickImportFile">⬆ {{ tt('导入Excel') }}</div>
         <span class="ps-addbar-tip">{{ tt('导入Excel列与面板一致（项目等级/项目名称/子项目尺寸/项目编号/内容/项目发起人/项目负责人/立项日期/预计完成日期/状态/测试情况/技术目标达成/是否市场转化/未转换原因），导入后自动追加子项目行，请保存入库。') }}</span>
         <input ref="fileRef" type="file" accept=".xlsx,.xls" style="display: none" @change="importExcelFile" />
@@ -243,10 +244,11 @@ function selectOptions(key) {
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
 }
 
-// ---------- 项目名称:填选实施计划项目(≤200 条选项;选中带回实施计划同名字段) ----------
+// ---------- 项目名称:填选实施计划项目(≤200 条选项;选中带回实施计划同名字段+阶段进度) ----------
 const refOptions = ref([])
 const refRows = ref([])
 const refLoading = ref(false)
+const planStageMap = ref({}) // 项目名称 → {total, done, lastDoneStage, latestDate, 负责人}
 async function loadRefOptions() {
   if (refOptions.value.length) return
   refLoading.value = true
@@ -254,10 +256,29 @@ async function loadRefOptions() {
     const res = await engine.queryFormDataList({ panelCode: 'RD_PLAN', condition: {}, pageNo: 1, pageSize: 200 })
     const rows = res.list || []
     refRows.value = rows
-    // 选项:项目名称（实施计划单号,如 LXB2609040001）
+    // 选项:项目名称（实施计划单号）;同时提取阶段进度
+    const stageMap = {}
     refOptions.value = rows
       .filter((r) => r['项目名称'])
-      .map((r) => ({ value: r['项目名称'], label: `${r['项目名称']}（${r['单据编号'] || r['编号'] || ''}）` }))
+      .map((r) => {
+        // 计算该项目的阶段进度
+        let total = 0, done = 0, lastDone = 0, latestDate = null
+        for (let i = 1; i <= 10; i++) {
+          const content = r[`阶段${i}_计划内容`]
+          const actual = r[`阶段${i}_实际完成`]
+          if (content && String(content).trim()) {
+            total++
+            if (actual && String(actual).trim()) {
+              done++
+              lastDone = i
+              if (!latestDate || String(actual) > latestDate) latestDate = String(actual)
+            }
+          }
+        }
+        stageMap[r['项目名称']] = { total, done, lastDoneStage: lastDone, latestDate, 负责人: r['负责人'] || '' }
+        return { value: r['项目名称'], label: `${r['项目名称']}（${r['单据编号'] || r['编号'] || ''}）` }
+      })
+    planStageMap.value = stageMap
   } catch (e) {
     /* 实施计划未就绪时静默 */
   } finally {
@@ -358,10 +379,50 @@ function confirmAddProject() {
       if (found[k] != null && found[k] !== '') props.head[k] = found[k]
     }
   }
+  // 自动导入阶段进度到「状态」列
+  const stage = planStageMap.value[name]
+  if (stage) {
+    row['状态'] = stage.total === 0 ? '已立项'
+      : stage.done >= stage.total ? `全部完成(${stage.done}/${stage.total})`
+      : stage.done === 0 ? `阶段已规划(${stage.total}个)`
+      : `进行中(完成${stage.done}/${stage.total},至阶段${stage.lastDoneStage})`
+    if (stage.latestDate) row['预计完成日期'] = stage.latestDate
+    if (stage.负责人) row['项目负责人'] = stage.负责人
+  }
   dlgVisible.value = false
   emit('dirty')
 }
 /** 在当前子项目后插入同组新子项目(复制所属项目名称/层级) */
+
+/** 同步阶段进度:遍历所有子项目行,从实施计划阶段数据刷新「状态」「预计完成日期」「项目负责人」 */
+function syncStageProgress() {
+  const d = props.head.detail
+  if (!d || !Array.isArray(d.items) || !d.items.length) {
+    ElMessage.warning(tt('暂无子项目可同步'))
+    return
+  }
+  let updated = 0
+  for (const row of d.items) {
+    const name = row['项目名称']
+    if (!name) continue
+    const stage = planStageMap.value[name]
+    if (!stage) continue
+    row['状态'] = stage.total === 0 ? '已立项'
+      : stage.done >= stage.total ? `全部完成(${stage.done}/${stage.total})`
+      : stage.done === 0 ? `阶段已规划(${stage.total}个)`
+      : `进行中(完成${stage.done}/${stage.total},至阶段${stage.lastDoneStage})`
+    if (stage.latestDate) row['预计完成日期'] = stage.latestDate
+    if (stage.负责人) row['项目负责人'] = stage.负责人
+    updated++
+  }
+  if (updated > 0) {
+    ElMessage.success(tt('已同步') + ` ${updated} ` + tt('个子项目的阶段进度') + tt('，请保存入库'))
+    emit('dirty')
+  } else {
+    ElMessage.warning(tt('未找到与实施计划匹配的项目(请确认项目名称一致)'))
+  }
+}
+
 function insertAfter(i) {
   const d = props.head.detail
   if (!Array.isArray(d.items)) return

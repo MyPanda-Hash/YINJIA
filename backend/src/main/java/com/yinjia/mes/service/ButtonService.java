@@ -525,6 +525,8 @@ public class ButtonService {
         dualOutFinishIn(def.code(), no, currentUserName());
         // 不良品处理记账(品质层):处理单审核 → 原仓扣减+目标仓(隔离/不良品)移仓或报废
         qcDisposal.post(def.code(), no, currentUserName());
+        // 项目实施计划归档 → 自动同步项目进度查询(研发管理)
+        if ("RD_PLAN".equals(def.code())) syncPlanToProgress(no);
         // 文件类面板:修改态经审核收尾 → 计算修改记录并再归档
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && finalizeModify(def, no, currentUserName())) {
             return result(no, "已归档");
@@ -994,11 +996,67 @@ public class ButtonService {
         if (COL_LENGTH("rd_plan", col) == 0) throw new IllegalStateException("阶段列不存在:" + col);
         String today = LocalDate.now().toString();
         jdbc.update("UPDATE rd_plan SET [" + col + "] = ? WHERE [单据编号] = ?", today, no);
+        // 联动:阶段完成 → 刷新项目进度查询
+        syncPlanToProgress(no);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("编号", no);
         out.put("阶段", stage);
         out.put("实际完成", today);
         return out;
+    }
+
+    /**
+     * 项目实施计划 → 项目进度查询 自动同步:
+     * 读取 rd_plan 的阶段数据(计划内容/实际完成),计算进度摘要,
+     * 更新 rd_progress_detail 中同名项目的「状态」「预计完成日期」字段。
+     * 找不到同名行则静默跳过(需先在进度查询中添加该项目)。
+     */
+    private void syncPlanToProgress(String planNo) {
+        List<Map<String, Object>> plans = jdbc.queryForList(
+                "SELECT [项目名称], [项目定级], [负责人], [编制日期] FROM rd_plan WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", planNo);
+        if (plans.isEmpty()) return;
+        String projectName = str(plans.get(0).get("项目名称"));
+        if (projectName == null || projectName.isBlank()) return;
+        // 统计阶段完成情况
+        int totalStages = 0, doneStages = 0;
+        int lastDoneStage = 0;
+        String latestDate = null;
+        for (int i = 1; i <= 10; i++) {
+            String contentCol = "阶段" + i + "_计划内容";
+            String doneCol = "阶段" + i + "_实际完成";
+            List<Map<String, Object>> cols = jdbc.queryForList(
+                    "SELECT [" + contentCol + "] AS c, [" + doneCol + "] AS d FROM rd_plan WHERE [单据编号] = ?", planNo);
+            if (cols.isEmpty()) continue;
+            String content = str(cols.get(0).get("c"));
+            String done = str(cols.get(0).get("d"));
+            if (content != null && !content.isBlank()) {
+                totalStages++;
+                if (done != null && !done.isBlank()) {
+                    doneStages++;
+                    lastDoneStage = i;
+                    if (latestDate == null || done.compareTo(latestDate) > 0) latestDate = done;
+                }
+            }
+        }
+        // 构建进度摘要
+        String status;
+        if (totalStages == 0) status = "已立项";
+        else if (doneStages == 0) status = "阶段已规划(" + totalStages + "个)";
+        else if (doneStages >= totalStages) status = "全部完成(" + doneStages + "/" + totalStages + ")";
+        else status = "进行中(完成" + doneStages + "/" + totalStages + ",至阶段" + lastDoneStage + ")";
+        // 更新 rd_progress_detail 中同名行
+        int n = jdbc.update(
+                "UPDATE rd_progress_detail SET [状态] = ?, [预计完成日期] = COALESCE(?, [预计完成日期]), [项目负责人] = COALESCE(?, [项目负责人])"
+                        + " WHERE [项目名称] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                status, latestDate, str(plans.get(0).get("负责人")), projectName);
+        if (n > 0) {
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .info("[RD_PLAN→RD_PROGRESS] 同步 {} 行, 项目={}, 状态={}", n, projectName, status);
+        }
+    }
+
+    private static String str(Object o) {
+        return o == null || String.valueOf(o).isBlank() ? null : String.valueOf(o).trim();
     }
 
     private int COL_LENGTH(String table, String col) {
