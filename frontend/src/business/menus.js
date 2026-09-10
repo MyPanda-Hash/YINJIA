@@ -85,9 +85,6 @@ export const menuTree = [
             code: 'doc', title: '单据', children: [
               { code: 'puReq', title: '请购单', path: '/panelx/list/PU_REQ', icon: 'Tickets', panelCode: 'PU_REQ', operationName: '新增流程' },
               { code: 'puOrder', title: '采购订单', path: '/panelx/list/PU_ORDER', icon: 'Tickets', panelCode: 'PU_ORDER', operationName: '新增流程' },
-              { code: 'qcRecv', title: '送料暂收单', path: '/panelx/list/QC_RECV', icon: 'Box', panelCode: 'QC_RECV', operationName: '新增流程' },
-              { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
-              { code: 'qcReturn', title: '暂收退回单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
             ],
           },
         ],
@@ -154,86 +151,53 @@ export const menuTree = [
         icon: 'Cpu',
         children: [
           {
-            code: 'doc', title: '单据', children: [
-              { code: 'manufactureOrder', title: '生产加工单', path: '/panelx/list/MANU_ORDER', icon: 'Document', panelCode: 'MANU_ORDER', operationName: '新增流程' },
+            // 生产计划(流程图·生管泳道):销售订单→工单→排产→齐套
+            code: 'plan', title: '生产计划', children: [
               { code: 'woOrder', title: '生产工单', path: '/panelx/list/WO_ORDER', icon: 'Tickets', panelCode: 'WO_ORDER', operationName: '新增流程' },
+              { code: 'woSchedule', title: '排单计划', path: '/panelx/list/WO_SCHEDULE', panelCode: 'WO_SCHEDULE', icon: 'DataLine' },
+              { code: 'woKit', title: '工单齐套表', path: '/panelx/list/WO_KIT', panelCode: 'WO_KIT', icon: 'Box' },
+            ],
+          },
+          {
+            // 生产执行(五道工序:领料/报工)
+            code: 'exec', title: '生产执行', children: [
               { code: 'woReport', title: '工序报工单', path: '/panelx/list/WO_REPORT', icon: 'Promotion', panelCode: 'WO_REPORT', operationName: '新增流程' },
-              { code: 'qcOp', title: '工序质检单', path: '/panelx/list/QC_OP', icon: 'CircleCheck', panelCode: 'QC_OP', operationName: '新增流程' },
-              { code: 'qcDisposal', title: '不良品处理单', path: '/panelx/list/QC_DISPOSAL', icon: 'Warning', panelCode: 'QC_DISPOSAL', operationName: '新增流程' },
-              {
-                code: 'prodRecords', title: '生产记录', icon: 'Notebook', children: [
-                  { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
-                  { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
-                  { code: 'mixRecord', title: '物料混合记录', path: '/panelx/list/MIX_RECORD', panelCode: 'MIX_RECORD', operationName: '新增流程' },
-                  { code: 'granRecord', title: '造粒记录', path: '/panelx/list/GRAN_RECORD', panelCode: 'GRAN_RECORD', operationName: '新增流程' },
-                  { code: 'whRecord', title: '无黑处理登记', path: '/panelx/list/WH_RECORD', panelCode: 'WH_RECORD', operationName: '新增流程' },
-                  { code: 'packConfirm', title: '封箱确认', path: '/panelx/list/PACK_CONFIRM', panelCode: 'PACK_CONFIRM', operationName: '新增流程' },
-                  { code: 'qcRecord', title: '检验记录单', path: '/panelx/list/QC_RECORD', panelCode: 'QC_RECORD', operationName: '新增流程' },
-                  { code: 'rodReturn', title: '炭棒不良退货登记', path: '/panelx/list/ROD_RETURN', panelCode: 'ROD_RETURN', operationName: '新增流程' },
-                  { code: 'equipCheck', title: '设备点检记录', path: '/panelx/list/EQUIP_CHECK', panelCode: 'EQUIP_CHECK', operationName: '新增流程' },
-                  { code: 'maintPlan', title: '保养计划', path: '/panelx/list/MAINT_PLAN', panelCode: 'MAINT_PLAN', operationName: '新增流程' },
-                  { code: 'sampleReq', title: '样品申请单', path: '/panelx/list/SAMPLE_REQ', panelCode: 'SAMPLE_REQ', operationName: '新增流程' },
-                ],
-              },
+              { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
+            ],
+          },
+          {
+            // 生产记录(29份真实单据·家族面板)
+            code: 'records', title: '生产记录', icon: 'Notebook', children: [
+              { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
+              { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
+              { code: 'mixRecord', title: '物料混合记录', path: '/panelx/list/MIX_RECORD', panelCode: 'MIX_RECORD', operationName: '新增流程' },
+              { code: 'granRecord', title: '造粒记录', path: '/panelx/list/GRAN_RECORD', panelCode: 'GRAN_RECORD', operationName: '新增流程' },
+              { code: 'whRecord', title: '无黑处理登记', path: '/panelx/list/WH_RECORD', panelCode: 'WH_RECORD', operationName: '新增流程' },
+              { code: 'packConfirm', title: '封箱确认', path: '/panelx/list/PACK_CONFIRM', panelCode: 'PACK_CONFIRM', operationName: '新增流程' },
+            ],
+          },
+          {
+            code: 'device', title: '设备维护', children: [
+              { code: 'equipCheck', title: '设备点检记录', path: '/panelx/list/EQUIP_CHECK', panelCode: 'EQUIP_CHECK', operationName: '新增流程' },
+              { code: 'maintPlan', title: '保养计划', path: '/panelx/list/MAINT_PLAN', panelCode: 'MAINT_PLAN', operationName: '新增流程' },
+            ],
+          },
+          {
+            code: 'sample', title: '样品管理', children: [
+              { code: 'sampleReq', title: '样品申请单', path: '/panelx/list/SAMPLE_REQ', panelCode: 'SAMPLE_REQ', operationName: '新增流程' },
+            ],
+          },
+          {
+            code: 'legacy', title: '经典单据', children: [
+              { code: 'manufactureOrder', title: '生产加工单', path: '/panelx/list/MANU_ORDER', icon: 'Document', panelCode: 'MANU_ORDER', operationName: '新增流程' },
               { code: 'dispatch', title: '工序派工单', path: '/panelx/list/DISPATCH', icon: 'AlarmClock', panelCode: 'DISPATCH', operationName: '新增流程' },
               { code: 'outsourceOrder', title: '委外加工单', path: '/panelx/list/OUTSOURCE_ORDER', icon: 'Tickets', panelCode: 'OUTSOURCE_ORDER', operationName: '新增流程' },
-            ],
-          },
-          {
-            code: 'stage', title: '五道工序', children: [
-              { code: 'woStage', title: '工序报工', path: '/panelx/list/WO_STAGE', icon: 'Timer', panelCode: 'WO_STAGE' },
-              { code: 'woPick', title: '工序领料', path: '/panelx/list/WO_PICK', icon: 'Goods', panelCode: 'WO_PICK' },
-              { code: 'woLine', title: '线边库存', path: '/panelx/list/WO_LINE', icon: 'Box', panelCode: 'WO_LINE' },
-              { code: 'prMixConfirm', title: '投料确认表', path: '/panelx/list/PR_MIX_CONFIRM', icon: 'Document', panelCode: 'PR_MIX_CONFIRM' },
-              { code: 'prFormFirst', title: '成型首件记录', path: '/panelx/list/PR_FORM_FIRST', icon: 'Document', panelCode: 'PR_FORM_FIRST' },
-              { code: 'prCutDaily', title: '切炭日报表', path: '/panelx/list/PR_CUT_DAILY', icon: 'Document', panelCode: 'PR_CUT_DAILY' },
-              { code: 'prAsmIncoming', title: '组装来料检查', path: '/panelx/list/PR_ASM_INCOMING', icon: 'Document', panelCode: 'PR_ASM_INCOMING' },
-              { code: 'prPackConfirm', title: '封箱数量确认', path: '/panelx/list/PR_PACK_CONFIRM', icon: 'Document', panelCode: 'PR_PACK_CONFIRM' },
-            ],
-          },
-          {
-            code: 'mixForms', title: '混料工序单据', children: [
-              { code: 'prMixProcess', title: '阻垢工序控制', path: '/panelx/list/PR_MIX_PROCESS', icon: 'Document', panelCode: 'PR_MIX_PROCESS' },
-              { code: 'prMixFeed', title: '阻垢投料单', path: '/panelx/list/PR_MIX_FEED', icon: 'Document', panelCode: 'PR_MIX_FEED' },
-              { code: 'prMixGranule', title: '造粒过程控制', path: '/panelx/list/PR_MIX_GRANULE', icon: 'Document', panelCode: 'PR_MIX_GRANULE' },
-              { code: 'prMixBlend', title: '物料混合记录', path: '/panelx/list/PR_MIX_BLEND', icon: 'Document', panelCode: 'PR_MIX_BLEND' },
-              { code: 'prMixCheck', title: '设备点检表', path: '/panelx/list/PR_MIX_CHECK', icon: 'Document', panelCode: 'PR_MIX_CHECK' },
-              { code: 'prMixDaily', title: '混料日报表', path: '/panelx/list/PR_MIX_DAILY', icon: 'Document', panelCode: 'PR_MIX_DAILY' },
-            ],
-          },
-          {
-            code: 'formForms', title: '成型工序单据', children: [
-              { code: 'prSinterQc', title: '烧结制程检验', path: '/panelx/list/PR_SINTER_QC', icon: 'Document', panelCode: 'PR_SINTER_QC' },
-              { code: 'prFormDaily', title: '成型日报表', path: '/panelx/list/PR_FORM_DAILY', icon: 'Document', panelCode: 'PR_FORM_DAILY' },
-              { code: 'prDemoldQc', title: '脱模检验记录', path: '/panelx/list/PR_DEMOLD_QC', icon: 'Document', panelCode: 'PR_DEMOLD_QC' },
-              { code: 'prEfficiency', title: '人均效率表', path: '/panelx/list/PR_EFFICIENCY', icon: 'Document', panelCode: 'PR_EFFICIENCY' },
-            ],
-          },
-          {
-            code: 'asmForms', title: '组装工序单据', children: [
-              { code: 'prAsmReturn', title: '不良退货记录', path: '/panelx/list/PR_ASM_RETURN', icon: 'Document', panelCode: 'PR_ASM_RETURN' },
-              { code: 'prMatInspect', title: '材料进厂检查', path: '/panelx/list/PR_MAT_INSPECT', icon: 'Document', panelCode: 'PR_MAT_INSPECT' },
-              { code: 'prNoBlack', title: '无黑处理登记', path: '/panelx/list/PR_NO_BLACK', icon: 'Document', panelCode: 'PR_NO_BLACK' },
-              { code: 'prBlackTest', title: '黑水测试记录', path: '/panelx/list/PR_BLACK_TEST', icon: 'Document', panelCode: 'PR_BLACK_TEST' },
-              { code: 'prPatrolQc', title: '巡线抽检记录', path: '/panelx/list/PR_PATROL_QC', icon: 'Document', panelCode: 'PR_PATROL_QC' },
-              { code: 'prAsmDaily', title: '组装日报表', path: '/panelx/list/PR_ASM_DAILY', icon: 'Document', panelCode: 'PR_ASM_DAILY' },
-            ],
-          },
-          {
-            code: 'otherForms', title: '装箱与其他单据', children: [
-              { code: 'prMaintenance', title: '预防性保养计划', path: '/panelx/list/PR_MAINTENANCE', icon: 'Document', panelCode: 'PR_MAINTENANCE' },
-              { code: 'prFlowCard', title: '产品流动标识卡', path: '/panelx/list/PR_FLOW_CARD', icon: 'Document', panelCode: 'PR_FLOW_CARD' },
-              { code: 'prScrap', title: '物料产品报废单', path: '/panelx/list/PR_SCRAP', icon: 'Document', panelCode: 'PR_SCRAP' },
             ],
           },
           {
             code: 'detail', title: '明细表', children: [
               { code: 'manuDetail', title: '生产加工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
               { code: 'dispatchDetail', title: '工序派工单明细表', path: '/panelx/list/DISPATCH_DETAIL', panelCode: 'DISPATCH_DETAIL', icon: 'List' },
-              { code: 'woSchedule', title: '排单计划', path: '/panelx/list/WO_SCHEDULE', panelCode: 'WO_SCHEDULE', icon: 'DataLine' },
-              { code: 'woKit', title: '工单齐套表', path: '/panelx/list/WO_KIT', panelCode: 'WO_KIT', icon: 'Box' },
-              { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
-              { code: 'lotTrace', title: '批号追溯', path: '/panelx/list/LOT_TRACE', panelCode: 'LOT_TRACE', icon: 'Search' },
             ],
           },
           {
@@ -250,7 +214,35 @@ export const menuTree = [
     code: 'qc',
     title: '品质管理',
     icon: 'CircleCheck',
-    children: [],
+    children: [
+      {
+        // 来料品质(流程图·采购支线:暂收→检验→退回)
+        code: 'incoming', title: '来料品质', children: [
+          { code: 'qcRecv', title: '送料暂收单', path: '/panelx/list/QC_RECV', icon: 'Box', panelCode: 'QC_RECV', operationName: '新增流程' },
+          { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
+          { code: 'qcReturn', title: '暂收退回单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
+        ],
+      },
+      {
+        // 制程品质(流程图·品质泳道:工序质检数据)
+        code: 'process', title: '制程品质', children: [
+          { code: 'qcOp', title: '工序质检单', path: '/panelx/list/QC_OP', icon: 'CircleCheck', panelCode: 'QC_OP', operationName: '新增流程' },
+          { code: 'qcRecord', title: '检验记录单', path: '/panelx/list/QC_RECORD', icon: 'Document', panelCode: 'QC_RECORD', operationName: '新增流程' },
+        ],
+      },
+      {
+        // 不良处理(隔离仓/不良品仓/报废/退货)
+        code: 'defect', title: '不良处理', children: [
+          { code: 'qcDisposal', title: '不良品处理单', path: '/panelx/list/QC_DISPOSAL', icon: 'Warning', panelCode: 'QC_DISPOSAL', operationName: '新增流程' },
+          { code: 'rodReturn', title: '炭棒不良退货登记', path: '/panelx/list/ROD_RETURN', icon: 'RefreshLeft', panelCode: 'ROD_RETURN', operationName: '新增流程' },
+        ],
+      },
+      {
+        code: 'trace', title: '品质追溯', children: [
+          { code: 'lotTrace', title: '批号追溯', path: '/panelx/list/LOT_TRACE', panelCode: 'LOT_TRACE', icon: 'Search' },
+        ],
+      },
+    ],
   },
   {
     code: 'fin',
