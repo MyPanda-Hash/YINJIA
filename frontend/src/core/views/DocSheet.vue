@@ -150,7 +150,7 @@
           <div v-if="config.deco" class="as-deco"></div>
         </div>
 
-        <!-- 阶段框行:10 个阶段框,每框含5字段(计划内容/计划开始/计划完成/实际完成/责任人)+完成按钮;隐藏后下方自动接上 -->
+        <!-- 阶段框行:10个阶段框,每框5行(计划内容/计划开始/计划完成/实际完成/责任人),完成按钮在五行最下边 -->
         <div v-else class="as-row as-row-phases" :style="{ minHeight: (row.h || 200) + 'px' }">
           <div class="as-no">{{ row.num }}</div>
           <div class="as-name">{{ tt(row.label) }}</div>
@@ -162,47 +162,57 @@
                   <span v-if="head[ph.key + '_实际完成']" class="as-phase-badge">{{ tt('已完成') }}</span>
                   <span class="as-phase-toggle" @click.stop="phaseHidden[pi] = true">{{ tt('隐藏') }}</span>
                 </div>
-                <div class="as-phase-content">
-                  <div class="as-phase-label">{{ tt('计划内容') }}</div>
-                  <el-input
-                    v-if="editable"
-                    v-model="head[ph.key + '_计划内容']"
-                    type="textarea"
-                    :autosize="{ minRows: 1, maxRows: 4 }"
-                    :maxlength="ph.max || 500"
-                    class="as-fill-input as-fill-area"
-                    resize="none"
-                    @input="emit('dirty')"
-                  />
-                  <div v-else class="as-ro-text">{{ head[ph.key + '_计划内容'] || '' }}</div>
+                <!-- 五行:每行 label + input -->
+                <div class="as-phase-grid">
+                  <div class="as-phase-row">
+                    <span class="as-phase-row-label">{{ tt('计划内容') }}</span>
+                    <div class="as-phase-row-value">
+                      <el-input
+                        v-if="editable"
+                        v-model="head[ph.key + '_计划内容']"
+                        type="textarea"
+                        :autosize="{ minRows: 1, maxRows: 3 }"
+                        :maxlength="ph.max || 500"
+                        class="as-fill-input as-fill-area"
+                        resize="none"
+                        @input="emit('dirty')"
+                      />
+                      <span v-else class="as-phase-text">{{ head[ph.key + '_计划内容'] || '' }}</span>
+                    </div>
+                  </div>
+                  <div class="as-phase-row">
+                    <span class="as-phase-row-label">{{ tt('计划开始') }}</span>
+                    <div class="as-phase-row-value">
+                      <el-input v-if="editable" v-model="head[ph.key + '_计划开始']" size="small" class="as-phase-input" maxlength="20" placeholder="YYYY-MM-DD" @input="emit('dirty')" />
+                      <span v-else class="as-phase-text">{{ head[ph.key + '_计划开始'] || '' }}</span>
+                    </div>
+                  </div>
+                  <div class="as-phase-row">
+                    <span class="as-phase-row-label">{{ tt('计划完成') }}</span>
+                    <div class="as-phase-row-value">
+                      <el-input v-if="editable" v-model="head[ph.key + '_计划完成']" size="small" class="as-phase-input" maxlength="20" placeholder="YYYY-MM-DD" @input="emit('dirty')" />
+                      <span v-else class="as-phase-text">{{ head[ph.key + '_计划完成'] || '' }}</span>
+                    </div>
+                  </div>
+                  <div class="as-phase-row">
+                    <span class="as-phase-row-label">{{ tt('实际完成') }}</span>
+                    <div class="as-phase-row-value">
+                      <span class="as-phase-text as-phase-actual" :class="{ done: head[ph.key + '_实际完成'] }">{{ head[ph.key + '_实际完成'] || '—' }}</span>
+                    </div>
+                  </div>
+                  <div class="as-phase-row">
+                    <span class="as-phase-row-label">{{ tt('责任人') }}</span>
+                    <div class="as-phase-row-value">
+                      <el-input v-if="editable" v-model="head[ph.key + '_责任人']" size="small" class="as-phase-input" maxlength="50" @input="emit('dirty')" />
+                      <span v-else class="as-phase-text">{{ head[ph.key + '_责任人'] || '' }}</span>
+                    </div>
+                  </div>
                 </div>
-                <div class="as-phase-meta">
-                  <div class="as-phase-cell">
-                    <span class="as-phase-cell-label">{{ tt('计划开始') }}</span>
-                    <el-input v-if="editable" v-model="head[ph.key + '_计划开始']" size="small" class="as-phase-cell-input" maxlength="20" placeholder="YYYY-MM-DD" @input="emit('dirty')" />
-                    <span v-else class="as-phase-cell-text">{{ head[ph.key + '_计划开始'] || '' }}</span>
-                  </div>
-                  <div class="as-phase-cell">
-                    <span class="as-phase-cell-label">{{ tt('计划完成') }}</span>
-                    <el-input v-if="editable" v-model="head[ph.key + '_计划完成']" size="small" class="as-phase-cell-input" maxlength="20" placeholder="YYYY-MM-DD" @input="emit('dirty')" />
-                    <span v-else class="as-phase-cell-text">{{ head[ph.key + '_计划完成'] || '' }}</span>
-                  </div>
-                  <div class="as-phase-cell">
-                    <span class="as-phase-cell-label">{{ tt('实际完成') }}</span>
-                    <span class="as-phase-cell-text as-phase-actual" :class="{ done: head[ph.key + '_实际完成'] }">{{ head[ph.key + '_实际完成'] || '—' }}</span>
-                  </div>
-                  <div class="as-phase-cell">
-                    <span class="as-phase-cell-label">{{ tt('责任人') }}</span>
-                    <el-input v-if="editable" v-model="head[ph.key + '_责任人']" size="small" class="as-phase-cell-input" maxlength="50" @input="emit('dirty')" />
-                    <span v-else class="as-phase-cell-text">{{ head[ph.key + '_责任人'] || '' }}</span>
-                  </div>
-                  <div class="as-phase-cell as-phase-cell-op">
-                    <el-button
-                      v-if="canStageComplete && head[ph.key + '_计划内容'] && !head[ph.key + '_实际完成']"
-                      type="success" size="small" :loading="stageLoading === ph.num"
-                      @click.stop="doStageComplete(ph.num)"
-                    >{{ tt('完成') }}</el-button>
-                  </div>
+                <!-- 完成按钮:五行最下边 -->
+                <div v-if="canStageComplete && head[ph.key + '_计划内容'] && !head[ph.key + '_实际完成']" class="as-phase-footer">
+                  <el-button type="success" size="small" :loading="stageLoading === ph.num" @click.stop="doStageComplete(ph.num)">
+                    {{ tt('完成') }}
+                  </el-button>
                 </div>
               </div>
             </template>
@@ -601,7 +611,7 @@ defineExpose({ focusField })
   color: #333;
   line-height: 20px;
 }
-/* 阶段框行(测试计划):每框独立边框,可隐藏/显示;含结构化5字段+完成按钮 */
+/* 阶段框行(测试计划):每框独立边框;内部五行(标签+输入),完成按钮在五行最下边 */
 .as-phase {
   border: 1px solid #c9c9c9;
   margin: 3px 0;
@@ -618,6 +628,8 @@ defineExpose({ focusField })
   font-size: 13px;
   color: #333;
   padding: 1px 0;
+  border-bottom: 1px solid #e8e8e8;
+  margin-bottom: 2px;
 }
 .as-phase-title { font-weight: 600; }
 .as-phase-badge {
@@ -629,22 +641,34 @@ defineExpose({ focusField })
   user-select: none; padding: 0 2px;
 }
 .as-phase-toggle:hover { text-decoration: underline; }
-.as-phase-content { margin: 2px 0; }
-.as-phase-label { font-size: 11px; color: #8ba6bd; margin-bottom: 1px; }
-.as-phase-meta {
-  display: flex; gap: 6px; align-items: flex-end; flex-wrap: wrap;
-  padding: 2px 0;
+/* 五行网格 */
+.as-phase-grid { display: flex; flex-direction: column; gap: 2px; }
+.as-phase-row {
+  display: flex; align-items: flex-start; gap: 6px;
+  min-height: 26px;
 }
-.as-phase-cell { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.as-phase-cell-label { font-size: 11px; color: #8ba6bd; white-space: nowrap; }
-.as-phase-cell-input { width: 100px; }
-.as-phase-cell-text {
-  font-size: 12px; color: #555; min-height: 22px; line-height: 22px;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.as-phase-row-label {
+  width: 60px; flex-shrink: 0;
+  font-size: 12px; color: #5a7a99; font-weight: 500;
+  line-height: 24px; text-align: right;
 }
-.as-phase-actual { color: #ccc; text-align: center; }
+.as-phase-row-value {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center;
+}
+.as-phase-input { max-width: 160px; }
+.as-phase-text {
+  font-size: 12px; color: #444; line-height: 24px;
+  word-break: break-all; white-space: pre-wrap;
+}
+.as-phase-actual { color: #ccc; }
 .as-phase-actual.done { color: #52c41a; font-weight: 600; }
-.as-phase-cell-op { align-items: center; justify-content: center; }
+/* 完成按钮:五行最下边 */
+.as-phase-footer {
+  display: flex; justify-content: flex-end;
+  padding-top: 3px; margin-top: 2px;
+  border-top: 1px dashed #d9e6f2;
+}
 .as-phase-restore {
   margin: 3px 0;
   padding: 3px 6px;
