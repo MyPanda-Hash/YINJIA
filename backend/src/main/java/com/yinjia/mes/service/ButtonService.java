@@ -35,12 +35,13 @@ public class ButtonService {
     private final LotSeqService lotSeqService;
     private final StockLedgerService stockLedger;
     private final WoReportService woReport;
+    private final QcDisposalService qcDisposal;
 
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
                          DevTaskService devTaskService, MessageService messageService,
                          LotSeqService lotSeqService, StockLedgerService stockLedger,
-                         WoReportService woReport) {
+                         WoReportService woReport, QcDisposalService qcDisposal) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -50,6 +51,7 @@ public class ButtonService {
         this.lotSeqService = lotSeqService;
         this.stockLedger = stockLedger;
         this.woReport = woReport;
+        this.qcDisposal = qcDisposal;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -514,6 +516,8 @@ public class ButtonService {
         stockLedger.postIn(def.code(), no, currentUserName());
         // 工序报工记账(生产过程层):报工单审核 → wo_progress.完成数量 累计
         woReport.post(def.code(), no, currentUserName());
+        // 不良品处理记账(品质层):处理单审核 → 原仓扣减+目标仓(隔离/不良品)移仓或报废
+        qcDisposal.post(def.code(), no, currentUserName());
         // 文件类面板:修改态经审核收尾 → 计算修改记录并再归档
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && finalizeModify(def, no, currentUserName())) {
             return result(no, "已归档");
@@ -529,6 +533,8 @@ public class ButtonService {
         stockLedger.unpostIn(def.code(), no, currentUserName());
         // 报工冲回(生产过程层):完成数量对称扣减,为负则拒绝
         woReport.unpost(def.code(), no, currentUserName());
+        // 不良品处理冲回(品质层):移仓/报废对称冲回,目标仓被消耗则拒绝
+        qcDisposal.unpost(def.code(), no, currentUserName());
         jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));

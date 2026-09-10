@@ -159,6 +159,7 @@ export const menuTree = [
               { code: 'woOrder', title: '生产工单', path: '/panelx/list/WO_ORDER', icon: 'Tickets', panelCode: 'WO_ORDER', operationName: '新增流程' },
               { code: 'woReport', title: '工序报工单', path: '/panelx/list/WO_REPORT', icon: 'Promotion', panelCode: 'WO_REPORT', operationName: '新增流程' },
               { code: 'qcOp', title: '工序质检单', path: '/panelx/list/QC_OP', icon: 'CircleCheck', panelCode: 'QC_OP', operationName: '新增流程' },
+              { code: 'qcDisposal', title: '不良品处理单', path: '/panelx/list/QC_DISPOSAL', icon: 'Warning', panelCode: 'QC_DISPOSAL', operationName: '新增流程' },
               { code: 'dispatch', title: '工序派工单', path: '/panelx/list/DISPATCH', icon: 'AlarmClock', panelCode: 'DISPATCH', operationName: '新增流程' },
               { code: 'outsourceOrder', title: '委外加工单', path: '/panelx/list/OUTSOURCE_ORDER', icon: 'Tickets', panelCode: 'OUTSOURCE_ORDER', operationName: '新增流程' },
             ],

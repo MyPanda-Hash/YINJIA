@@ -25,7 +25,8 @@ public class StockLedgerService {
 
     /** 是否参与记账的面板。 */
     public static boolean postsStock(String panelCode) {
-        return "PURCHASE_IN".equals(panelCode) || "MATERIAL_OUT".equals(panelCode) || "SALE_OUT".equals(panelCode);
+        return "PURCHASE_IN".equals(panelCode) || "MATERIAL_OUT".equals(panelCode)
+                || "SALE_OUT".equals(panelCode) || "FINISH_IN".equals(panelCode);
     }
 
     /** 审核 → 过账(入库 + / 出库 −)。 */
@@ -41,7 +42,7 @@ public class StockLedgerService {
     }
 
     private void apply(String panelCode, String no, String user, boolean forward) {
-        boolean inbound = "PURCHASE_IN".equals(panelCode);
+        boolean inbound = "PURCHASE_IN".equals(panelCode) || "FINISH_IN".equals(panelCode);
         List<Map<String, Object>> rows = loadRows(panelCode, no);
         if (rows.isEmpty()) throw new IllegalStateException(panelCode + " " + no + " 无明细行,不能记账");
         for (Map<String, Object> r : rows) {
@@ -112,6 +113,13 @@ public class StockLedgerService {
             return jdbc.queryForList(
                     "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
                             + " FROM bl_sale_out l LEFT JOIN bd_sale_out h ON h.[单据编号] = l.[单据编号]"
+                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+        }
+        if ("FINISH_IN".equals(panelCode)) {
+            // 产成品入库(装箱后成品入仓):三键入库,批号来自产品二维码
+            return jdbc.queryForList(
+                    "SELECT l.[产品编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[实收数量] AS qty, l.[单价] AS price"
+                            + " FROM bl_finish_in l LEFT JOIN bd_finish_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
         }
         return jdbc.queryForList(
