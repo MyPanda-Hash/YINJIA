@@ -98,6 +98,8 @@ rem ==================================================================
 :PHASE_CHECK
 echo [2/9] DB self check (read-only) ...
 call :SELFCHECK "%TOOLS%\check-migrations.sql" >>"%LOG%" 2>&1
+echo [2b/9] dumping migration ledger + scale (read-only) ...
+call :LEDGER >>"%LOG%" 2>&1
 echo [2/9] done - verdict below
 echo.
 call :SHOWTAIL
@@ -115,7 +117,13 @@ taskkill /IM java.exe /F >>"%LOG%" 2>&1
 ping -n 4 127.0.0.1 >nul
 
 echo [3/9] backing up database ...
-call :BACKUP >>"%LOG%" 2>&1
+call :LEDGER       rem ???????/??,????????(??)
+echo == dump-schema-log.sql ==
+sqlcmd -S localhost -d HSDZ_MES -U yinjia -P "%YJ_PASS%" -f i:65001,o:65001 -W -i "%TOOLS%\dump-schema-log.sql" -o "%LOGDIR%\server-ledger.txt"
+type "%LOGDIR%\server-ledger.txt"
+exit /b 0
+
+:BACKUP >>"%LOG%" 2>&1
 if errorlevel 1 goto :FAIL_BACKUP
 
 echo [4/9] staging db-tools to %DTOOLS% ...
@@ -204,6 +212,12 @@ exit /b 0
 echo == %~nx1 ==
 sqlcmd -S localhost -d HSDZ_MES -U yinjia -P "%YJ_PASS%" -f i:65001,o:65001 -W -i "%~1" -o "%CHK%"
 type "%CHK%"
+exit /b 0
+
+:LEDGER       rem ???????/??,????????(??)
+echo == dump-schema-log.sql ==
+sqlcmd -S localhost -d HSDZ_MES -U yinjia -P "%YJ_PASS%" -f i:65001,o:65001 -W -i "%TOOLS%\dump-schema-log.sql" -o "%LOGDIR%\server-ledger.txt"
+type "%LOGDIR%\server-ledger.txt"
 exit /b 0
 
 :BACKUP
