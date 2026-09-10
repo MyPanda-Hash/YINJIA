@@ -98,6 +98,8 @@ public class ButtonService {
             case "新增库存" -> addStock(def, formData);
             // 库存状况:修改预警数量(行内编辑,空值回退全局阈值100)
             case "更新预警数量" -> updateStockWarn(def, formData);
+            // 工序报工:切炭双出口(合格品分直销入成品仓+继续组装)
+            case "切炭报工" -> cutCarbonReport(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
         };
     }
@@ -826,6 +828,40 @@ public class ButtonService {
                 wzdm, ckdm, lot.isBlank() ? null : lot, inDate.isBlank() ? LocalDate.now().toString() : inDate,
                 yl, yl, warn, user);
         return result(wzdm + "@" + ckdm, "已新增");
+    }
+
+    /** 切炭报工(双出口):合格品按 dual_out_qty 拆分——直销部分自动入成品仓,其余转线边库存(组装) */
+    private Map<String, Object> cutCarbonReport(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        String orderNo = requiredText(formData, "工单号");
+        double actualQty = Double.parseDouble(requiredText(formData, "完成数量"));
+        String dualOutRaw = optionalText(formData, "直销数量");
+        double dualOut = dualOutRaw.isBlank() ? 0 : Double.parseDouble(dualOutRaw);
+        String batchNo = optionalText(formData, "批号");
+        String productCode = optionalText(formData, "产品编码");
+        if (dualOut > actualQty) throw new IllegalArgumentException("直销数量不能大于完成数量");
+        double assemblyQty = actualQty - dualOut;
+
+        // 1. 记录报工
+        jdbc.update("INSERT INTO wo_stage_report (manu_order_no, stage, report_date, shift, worker, actual_qty, defect_qty, dual_out_qty, batch_no, asp_user1) VALUES (?,?,GETDATE(),?,?,?,?,?,?,?)",
+                orderNo, "切炭", optionalText(formData, "班次"), optionalText(formData, "操作工"),
+                actualQty, Double.parseDouble(optionalText(formData, "不良数量").isBlank() ? "0" : optionalText(formData, "不良数量")),
+                dualOut, batchNo.isBlank() ? null : batchNo, user);
+
+        // 2. 直销部分 → 自动入成品仓(FINISH_IN 骨架行)
+        if (dualOut > 0 && !productCode.isBlank()) {
+            jdbc.update("INSERT INTO wo_line_stock (manu_order_no, stage, item_code, batch_no, qty, warehouse, asp_user1) VALUES (?,?,?,?,?,?,?)",
+                    orderNo, "直销入库", productCode, batchNo, dualOut, "CK03", user);
+        }
+
+        // 3. 组装部分 → 线边库存(stage=组装)
+        if (assemblyQty > 0 && !productCode.isBlank()) {
+            jdbc.update("INSERT INTO wo_line_stock (manu_order_no, stage, item_code, batch_no, qty, warehouse, asp_user1) VALUES (?,?,?,?,?,?,?)",
+                    orderNo, "组装", productCode, batchNo, assemblyQty, "LINE", user);
+        }
+
+        String msg = "切炭报工:完成" + actualQty + ",直销" + dualOut + "(→成品仓),组装" + assemblyQty + "(→线边)";
+        return result(orderNo, msg);
     }
 
     /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */

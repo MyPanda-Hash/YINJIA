@@ -165,6 +165,13 @@ export const menuTree = [
             ],
           },
           {
+            code: 'stage', title: '五道工序', children: [
+              { code: 'woStage', title: '工序报工', path: '/panelx/list/WO_STAGE', icon: 'Timer', panelCode: 'WO_STAGE' },
+              { code: 'woPick', title: '工序领料', path: '/panelx/list/WO_PICK', icon: 'Goods', panelCode: 'WO_PICK' },
+              { code: 'woLine', title: '线边库存', path: '/panelx/list/WO_LINE', icon: 'Box', panelCode: 'WO_LINE' },
+            ],
+          },
+          {
             code: 'detail', title: '明细表', children: [
               { code: 'manuDetail', title: '生产加工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
               { code: 'dispatchDetail', title: '工序派工单明细表', path: '/panelx/list/DISPATCH_DETAIL', panelCode: 'DISPATCH_DETAIL', icon: 'List' },
