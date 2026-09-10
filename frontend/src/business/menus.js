@@ -169,6 +169,11 @@ export const menuTree = [
               { code: 'woStage', title: '工序报工', path: '/panelx/list/WO_STAGE', icon: 'Timer', panelCode: 'WO_STAGE' },
               { code: 'woPick', title: '工序领料', path: '/panelx/list/WO_PICK', icon: 'Goods', panelCode: 'WO_PICK' },
               { code: 'woLine', title: '线边库存', path: '/panelx/list/WO_LINE', icon: 'Box', panelCode: 'WO_LINE' },
+              { code: 'prMixConfirm', title: '投料确认表', path: '/panelx/list/PR_MIX_CONFIRM', icon: 'Document', panelCode: 'PR_MIX_CONFIRM' },
+              { code: 'prFormFirst', title: '成型首件记录', path: '/panelx/list/PR_FORM_FIRST', icon: 'Document', panelCode: 'PR_FORM_FIRST' },
+              { code: 'prCutDaily', title: '切炭日报表', path: '/panelx/list/PR_CUT_DAILY', icon: 'Document', panelCode: 'PR_CUT_DAILY' },
+              { code: 'prAsmIncoming', title: '组装来料检查', path: '/panelx/list/PR_ASM_INCOMING', icon: 'Document', panelCode: 'PR_ASM_INCOMING' },
+              { code: 'prPackConfirm', title: '封箱数量确认', path: '/panelx/list/PR_PACK_CONFIRM', icon: 'Document', panelCode: 'PR_PACK_CONFIRM' },
             ],
           },
           {
