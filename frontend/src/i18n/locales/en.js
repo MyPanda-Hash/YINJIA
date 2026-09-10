@@ -1025,6 +1025,8 @@ export default {
     '生产加工单明细表': 'Work Order Details',
     '生产加工单统计表': 'Work Order Statistics',
     '研发管理': 'R&D Management',
+    '项目管理': 'Project Management',
+    '测试记录': 'Test Records',
     '立项申请': 'Project Initiation',
     '立项申请表': 'Project Initiation Application',
     '二三级项目': 'Level 2/3 Project',

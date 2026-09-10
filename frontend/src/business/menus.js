@@ -12,22 +12,40 @@ export const menuTree = [
     code: 'rd',
     title: '研发管理',
     icon: 'MagicStick',
+    // 二级目录按研发流程分三组(2026-09-10 整理):项目管理 → 测试记录 → 产品文件;
+    // 叶子项与分组不再混排,面板/权限/数据键均不变,只调整导航层级。
     children: [
-      { code: 'rdApproval', title: '立项申请', path: '/panelx/list/RD_APPROVAL', icon: 'DocumentAdd', panelCode: 'RD_APPROVAL', operationName: '新增流程' },
-      { code: 'rdPlan', title: '项目实施计划', path: '/panelx/list/RD_PLAN', icon: 'Calendar', panelCode: 'RD_PLAN', operationName: '新增流程' },
       {
-        code: 'rdData', title: '数据记录表', icon: 'Notebook', children: [
-          { code: 'rdFilterEff', title: '功能性滤效', path: '/panelx/list/RD_FILTER_EFF', panelCode: 'RD_FILTER_EFF', icon: 'Histogram' },
-          { code: 'rdAlkaline', title: '碱性', path: '/panelx/list/RD_ALKALINE', panelCode: 'RD_ALKALINE', icon: 'Coin' },
-          { code: 'rdMineral', title: '矿化', path: '/panelx/list/RD_MINERAL', panelCode: 'RD_MINERAL', icon: 'Odometer' },
-          { code: 'rdAntibact', title: '抑菌', path: '/panelx/list/RD_ANTIBACT', panelCode: 'RD_ANTIBACT', icon: 'CircleCheck' },
-          { code: 'rdScale', title: '阻垢性能', path: '/panelx/list/RD_SCALE', panelCode: 'RD_SCALE', icon: 'Minus' },
-          { code: 'rdRoProtect', title: 'RO保护', path: '/panelx/list/RD_RO_PROTECT', panelCode: 'RD_RO_PROTECT', icon: 'Umbrella' },
-          { code: 'rdSoak', title: '浸泡安全', path: '/panelx/list/RD_SOAK', panelCode: 'RD_SOAK', icon: 'Coffee' },
-          { code: 'rdDropPrec', title: '压降、精度', path: '/panelx/list/RD_DROP_PREC', panelCode: 'RD_DROP_PREC', icon: 'Bottom' },
+        code: 'rdProject', title: '项目管理', icon: 'DocumentAdd', children: [
+          { code: 'rdApproval', title: '立项申请', path: '/panelx/list/RD_APPROVAL', icon: 'DocumentAdd', panelCode: 'RD_APPROVAL', operationName: '新增流程' },
+          { code: 'rdPlan', title: '项目实施计划', path: '/panelx/list/RD_PLAN', icon: 'Calendar', panelCode: 'RD_PLAN', operationName: '新增流程' },
+          { code: 'rdProgress', title: '项目进度查询', path: '/panelx/list/RD_PROGRESS', icon: 'DataLine', panelCode: 'RD_PROGRESS' },
         ],
       },
-      { code: 'rdProgress', title: '项目进度查询', path: '/panelx/list/RD_PROGRESS', icon: 'DataLine', panelCode: 'RD_PROGRESS' },
+      {
+        code: 'rdTest', title: '测试记录', icon: 'Notebook', children: [
+          {
+            code: 'rdData', title: '数据记录表', icon: 'Notebook', children: [
+              { code: 'rdFilterEff', title: '功能性滤效', path: '/panelx/list/RD_FILTER_EFF', panelCode: 'RD_FILTER_EFF', icon: 'Histogram' },
+              { code: 'rdAlkaline', title: '碱性', path: '/panelx/list/RD_ALKALINE', panelCode: 'RD_ALKALINE', icon: 'Coin' },
+              { code: 'rdMineral', title: '矿化', path: '/panelx/list/RD_MINERAL', panelCode: 'RD_MINERAL', icon: 'Odometer' },
+              { code: 'rdAntibact', title: '抑菌', path: '/panelx/list/RD_ANTIBACT', panelCode: 'RD_ANTIBACT', icon: 'CircleCheck' },
+              { code: 'rdScale', title: '阻垢性能', path: '/panelx/list/RD_SCALE', panelCode: 'RD_SCALE', icon: 'Minus' },
+              { code: 'rdRoProtect', title: 'RO保护', path: '/panelx/list/RD_RO_PROTECT', panelCode: 'RD_RO_PROTECT', icon: 'Umbrella' },
+              { code: 'rdSoak', title: '浸泡安全', path: '/panelx/list/RD_SOAK', panelCode: 'RD_SOAK', icon: 'Coffee' },
+              { code: 'rdDropPrec', title: '压降、精度', path: '/panelx/list/RD_DROP_PREC', panelCode: 'RD_DROP_PREC', icon: 'Bottom' },
+            ],
+          },
+          {
+            code: 'rdLab', title: '实验室使用记录表', icon: 'Flask', children: [
+              { code: 'rdSpikeWater', title: '加标水配置记录表', path: '/panelx/list/RD_SPIKE_WATER', panelCode: 'RD_SPIKE_WATER', icon: 'Coin' },
+              { code: 'rdDomTest', title: '内部委托测试申请单', path: '/panelx/list/RD_DOM_TEST', panelCode: 'RD_DOM_TEST', icon: 'DocumentAdd' },
+              { code: 'rdEquipUse', title: '设备使用登记表', path: '/panelx/list/RD_EQUIP_USE', panelCode: 'RD_EQUIP_USE', icon: 'Monitor' },
+              { code: 'rdInstrUse', title: '仪器使用记录表', path: '/panelx/list/RD_INSTR_USE', panelCode: 'RD_INSTR_USE', icon: 'Odometer' },
+            ],
+          },
+        ],
+      },
       {
         code: 'rdFiles', title: '产品文件', icon: 'FolderOpened', children: [
           { code: 'rdProdInfo', title: '产品信息表', path: '/panelx/list/RD_PROD_INFO', panelCode: 'RD_PROD_INFO', icon: 'Tickets' },
@@ -37,14 +55,6 @@ export const menuTree = [
           { code: 'rdAsmBom', title: '组装BOM表', path: '/panelx/list/RD_ASM_BOM', panelCode: 'RD_ASM_BOM', icon: 'Grid' },
           { code: 'rdAsmProc', title: '组装工艺清单', path: '/panelx/list/RD_ASM_PROC', panelCode: 'RD_ASM_PROC', icon: 'Operation' },
           { code: 'rdInspPlan', title: '出货检验计划表', path: '/panelx/list/RD_INSP_PLAN', panelCode: 'RD_INSP_PLAN', icon: 'CircleCheck' },
-        ],
-      },
-      {
-        code: 'rdLab', title: '实验室使用记录表', icon: 'Flask', children: [
-          { code: 'rdSpikeWater', title: '加标水配置记录表', path: '/panelx/list/RD_SPIKE_WATER', panelCode: 'RD_SPIKE_WATER', icon: 'Coin' },
-          { code: 'rdDomTest', title: '内部委托测试申请单', path: '/panelx/list/RD_DOM_TEST', panelCode: 'RD_DOM_TEST', icon: 'DocumentAdd' },
-          { code: 'rdEquipUse', title: '设备使用登记表', path: '/panelx/list/RD_EQUIP_USE', panelCode: 'RD_EQUIP_USE', icon: 'Monitor' },
-          { code: 'rdInstrUse', title: '仪器使用记录表', path: '/panelx/list/RD_INSTR_USE', panelCode: 'RD_INSTR_USE', icon: 'Odometer' },
         ],
       },
     ],
