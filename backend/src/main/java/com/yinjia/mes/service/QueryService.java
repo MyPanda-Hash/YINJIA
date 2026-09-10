@@ -158,8 +158,9 @@ public class QueryService {
             where.append(")");
         }
 
-        where.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.[")
-                .append(g).append("] AND s.canceled = 'Y')");
+        // CAST 统一为 nvarchar:date 类型的组列(如 bd_manu_order.合同号)与 doc_no 比较时不会隐式转换失败
+        where.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = CAST(t.[")
+                .append(g).append("] AS nvarchar(100)) AND s.canceled = 'Y')");
         args.add(def.code());
 
         Integer total = jdbc.queryForObject(

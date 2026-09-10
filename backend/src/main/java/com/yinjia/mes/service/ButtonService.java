@@ -528,14 +528,16 @@ public class ButtonService {
     private Map<String, Object> unaudit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
-        if (!"已审核".equals(st.get("status"))) throw new IllegalStateException("仅已审核状态可弃审");
+        String status = String.valueOf(st.get("status"));
+        if (!"已审核".equals(status) && !"已归档".equals(status)) throw new IllegalStateException("仅已审核或已归档状态可弃审");
         // 库存冲回(材料入库链):先冲账再弃审,余额不足或台账缺失则拒绝,整笔回滚
         stockLedger.unpostIn(def.code(), no, currentUserName());
         // 报工冲回(生产过程层):完成数量对称扣减,为负则拒绝
         woReport.unpost(def.code(), no, currentUserName());
         // 不良品处理冲回(品质层):移仓/报废对称冲回,目标仓被消耗则拒绝
         qcDisposal.unpost(def.code(), no, currentUserName());
-        jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, update_at = GETDATE()"
+        // 弃审同时清归档标记(文件面板审批后=已归档,弃审应回到草稿)
+        jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
         return result(no, "草稿");
