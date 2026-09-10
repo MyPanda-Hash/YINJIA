@@ -229,6 +229,7 @@ public class QueryService {
             Map<String, Object> st = status.get(no);
             String statusText = docStatus(st);
             doc.put("单据状态", statusText);
+            doc.put("saved", st != null ? st.get("saved") : null);
             doc.put("detail", Map.of("items", items));
             if (st != null && st.get("shr") != null) {
                 doc.put("审核人", st.get("shr"));
@@ -257,7 +258,7 @@ public class QueryService {
         List<Object> args = new ArrayList<>(List.of(panelCode));
         args.addAll(docNos);
         Map<String, Map<String, Object>> out = new HashMap<>();
-        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state FROM yj_doc_status"
+        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, saved FROM yj_doc_status"
                 + " WHERE panel_code = ? AND doc_no IN (" + in + ")", rs -> {
             Map<String, Object> m = new HashMap<>();
             m.put("shr", rs.getString("shr"));
@@ -270,6 +271,7 @@ public class QueryService {
             m.put("archived", rs.getString("archived"));
             m.put("deleting", rs.getString("deleting"));
             m.put("modify_state", rs.getString("modify_state"));
+                m.put("saved", rs.getString("saved"));
             out.put(rs.getString("doc_no"), m);
         }, args.toArray());
         return out;
