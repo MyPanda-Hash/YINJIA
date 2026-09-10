@@ -59,6 +59,13 @@ if exist "%TOOLS%\migrate-clean-orphan-docstatus.sql" (
   echo   [WARN] migrate-clean-orphan-docstatus.sql not found, skipped
 )
 
+echo [3c/5] applying data migrations ...
+if exist "%SRC%\push-migrations.bat" (
+  call "%SRC%\push-migrations.bat"
+) else (
+  echo   [WARN] push-migrations.bat not found, skipped
+)
+
 echo [4/5] starting backend ...
 start "" cmd /c "%DEST%\start.bat"
 
