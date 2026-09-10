@@ -98,8 +98,6 @@ public class ButtonService {
             case "新增库存" -> addStock(def, formData);
             // 库存状况:修改预警数量(行内编辑,空值回退全局阈值100)
             case "更新预警数量" -> updateStockWarn(def, formData);
-            // 工序报工:切炭双出口(合格品分直销入成品仓+继续组装)
-            case "切炭报工" -> cutCarbonReport(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
         };
     }
@@ -223,10 +221,6 @@ public class ButtonService {
         // 修改态保存:实时刷新修改记录 diff(快照 vs 当前),修改记录随时可见已改内容
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && "Y".equals(modifyStateOf(def.code(), no))) refreshModifyDiff(def, no);
 
-        // Phase 2 品检自动分流:采购入库保存后,按存货检验标志自动生成暂收单
-        if ("PURCHASE_IN".equals(def.code()) && markSaved) {
-            autoQcRouting(def, no, items, user);
-        }
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
         if (DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
@@ -833,66 +827,6 @@ public class ButtonService {
                 wzdm, ckdm, lot.isBlank() ? null : lot, inDate.isBlank() ? LocalDate.now().toString() : inDate,
                 yl, yl, warn, user);
         return result(wzdm + "@" + ckdm, "已新增");
-    }
-
-    /** 切炭报工(双出口):合格品按 dual_out_qty 拆分——直销部分自动入成品仓,其余转线边库存(组装) */
-    /** Phase 2 品检自动分流:采购入库保存后,按存货检验标志自动生成暂收单(QC_RECV) */
-    private void autoQcRouting(PanelRegistry.PanelDef def, String no, List<Map<String, Object>> items, String user) {
-        int routed = 0;
-        for (Map<String, Object> item : items) {
-            String itemCode = String.valueOf(item.get("存货编码") != null ? item.get("存货编码") : item.get("物料编码") != null ? item.get("物料编码") : "");
-            if (itemCode.isBlank()) continue;
-            // 查存货检验标志
-            List<Map<String, Object>> inv = jdbc.queryForList(
-                    "SELECT [是否检验], [检验方式], [存货名称] FROM bs_inv WHERE [存货编码] = ? AND ISNULL(asp_cancel,'N')<>'Y'", itemCode);
-            if (inv.isEmpty()) continue;
-            boolean needQc = inv.get(0).get("是否检验") != null && Boolean.parseBoolean(String.valueOf(inv.get(0).get("是否检验")));
-            if (!needQc) continue;
-            // 需要检验:自动生成暂收单行
-            String itemName = String.valueOf(inv.get(0).getOrDefault("存货名称", ""));
-            String qty = String.valueOf(item.get("数量") != null ? item.get("数量") : item.get("实收数量") != null ? item.get("实收数量") : "0");
-            jdbc.update("INSERT INTO bl_qc_recv ([单据编号],[物料编码],[物料名称],[数量],[暂收日期],[状态],[asp_user1],[asp_time1],[asp_cancel]) "
-                            + "VALUES (?,?,?,?,GETDATE(),N'待检验',?,GETDATE(),'N')",
-                    no + "-QC", itemCode, itemName, qty, user);
-            routed++;
-        }
-        if (routed > 0) {
-            // 更新采购入库单状态为"部分暂收"
-            jdbc.update("UPDATE yj_doc_status SET update_at = GETDATE() WHERE panel_code = ? AND doc_no = ?", def.code(), no);
-        }
-    }
-
-    private Map<String, Object> cutCarbonReport(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        String user = currentUserName();
-        String orderNo = requiredText(formData, "工单号");
-        double actualQty = Double.parseDouble(requiredText(formData, "完成数量"));
-        String dualOutRaw = optionalText(formData, "直销数量");
-        double dualOut = dualOutRaw.isBlank() ? 0 : Double.parseDouble(dualOutRaw);
-        String batchNo = optionalText(formData, "批号");
-        String productCode = optionalText(formData, "产品编码");
-        if (dualOut > actualQty) throw new IllegalArgumentException("直销数量不能大于完成数量");
-        double assemblyQty = actualQty - dualOut;
-
-        // 1. 记录报工
-        jdbc.update("INSERT INTO wo_stage_report (manu_order_no, stage, report_date, shift, worker, actual_qty, defect_qty, dual_out_qty, batch_no, asp_user1) VALUES (?,?,GETDATE(),?,?,?,?,?,?,?)",
-                orderNo, "切炭", optionalText(formData, "班次"), optionalText(formData, "操作工"),
-                actualQty, Double.parseDouble(optionalText(formData, "不良数量").isBlank() ? "0" : optionalText(formData, "不良数量")),
-                dualOut, batchNo.isBlank() ? null : batchNo, user);
-
-        // 2. 直销部分 → 自动入成品仓(FINISH_IN 骨架行)
-        if (dualOut > 0 && !productCode.isBlank()) {
-            jdbc.update("INSERT INTO wo_line_stock (manu_order_no, stage, item_code, batch_no, qty, warehouse, asp_user1) VALUES (?,?,?,?,?,?,?)",
-                    orderNo, "直销入库", productCode, batchNo, dualOut, "CK03", user);
-        }
-
-        // 3. 组装部分 → 线边库存(stage=组装)
-        if (assemblyQty > 0 && !productCode.isBlank()) {
-            jdbc.update("INSERT INTO wo_line_stock (manu_order_no, stage, item_code, batch_no, qty, warehouse, asp_user1) VALUES (?,?,?,?,?,?,?)",
-                    orderNo, "组装", productCode, batchNo, assemblyQty, "LINE", user);
-        }
-
-        String msg = "切炭报工:完成" + actualQty + ",直销" + dualOut + "(→成品仓),组装" + assemblyQty + "(→线边)";
-        return result(orderNo, msg);
     }
 
     /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */
