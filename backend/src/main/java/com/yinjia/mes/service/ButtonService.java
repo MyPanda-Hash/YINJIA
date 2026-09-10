@@ -100,6 +100,8 @@ public class ButtonService {
             case "更新预警数量" -> updateStockWarn(def, formData);
             // 生产工单:成型后生成产品批号(打印产品二维码的数据源,一次生成终身复用)
             case "生成产品批号" -> genProductLot(def, formData);
+            // 项目实施计划:阶段完成按钮(填写实际完成时间)
+            case "阶段完成" -> completeStage(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
         };
     }
@@ -966,6 +968,44 @@ public class ButtonService {
         jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=GETDATE()"
                 + " WHERE source_panel_code='WO_REPORT' AND source_form_no=? AND target_form_no=? AND link_status='ACTIVE'",
                 no, srcFi);
+    }
+
+    /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */
+
+    /**
+     * 阶段完成(项目实施计划):填写指定阶段的实际完成时间(默认当天),标记该阶段完成。
+     * formData: { 编号: 单据编号, 阶段序号: "1"~"10" }
+     * 仅已审核/已归档单据可操作;重复调用覆盖(允许补填/修改)。
+     */
+    private Map<String, Object> completeStage(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_PLAN".equals(def.code())) throw new IllegalStateException("仅项目实施计划支持阶段完成");
+        String no = requireNo(formData);
+        String stageStr = String.valueOf(formData.getOrDefault("阶段序号", ""));
+        int stage;
+        try { stage = Integer.parseInt(stageStr); } catch (NumberFormatException e) { throw new IllegalArgumentException("阶段序号无效:" + stageStr); }
+        if (stage < 1 || stage > 10) throw new IllegalArgumentException("阶段序号须在 1~10 之间");
+        String col = "阶段" + stage + "_实际完成";
+        // 单据必须已审核(有 shr)
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        String status = String.valueOf(st.get("status"));
+        if ("草稿".equals(status)) throw new IllegalStateException("草稿单据不能标记阶段完成,请先审核");
+        if ("已作废".equals(status)) throw new IllegalStateException("已作废单据不能操作");
+        // 检查列存在
+        if (COL_LENGTH("rd_plan", col) == 0) throw new IllegalStateException("阶段列不存在:" + col);
+        String today = LocalDate.now().toString();
+        jdbc.update("UPDATE rd_plan SET [" + col + "] = ? WHERE [单据编号] = ?", today, no);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", no);
+        out.put("阶段", stage);
+        out.put("实际完成", today);
+        return out;
+    }
+
+    private int COL_LENGTH(String table, String col) {
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(?) AND name = ?",
+                Integer.class, table, col);
+        return n == null ? 0 : n;
     }
 
     /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */    private Map<String, Object> updateStockWarn(PanelRegistry.PanelDef def, Map<String, Object> formData) {

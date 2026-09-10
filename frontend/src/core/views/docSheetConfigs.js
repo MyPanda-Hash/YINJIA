@@ -36,7 +36,13 @@ export const planSheetCfg = {
   deco: false,
   rows: [
     { num: '1', label: '项目名称', key: '项目名称', max: 50, h: 71, kind: 'input' },
-    { num: '2', label: '项目定级', key: '项目定级', max: 30, h: 53, kind: 'input' },
+    { num: '2', label: '项目定级', key: '项目定级', max: 0, h: 53, kind: 'select',
+      options: [
+        { value: '二级', label: '二级' },
+        { value: '三级', label: '三级' },
+        { value: '四级', label: '四级' },
+      ], required: true,
+      hint: '必填' },
     { num: '3', label: '测试内容', key: '测试内容', max: 100, h: 77, kind: 'textarea' },
     { num: '4', label: '测试产品打样要求', key: '测试产品打样要求', max: 100, h: 103, kind: 'textarea' },
     { num: '5', label: '测试目标', key: '测试目标', max: 50, h: 78, kind: 'textarea' },

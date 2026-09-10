@@ -101,6 +101,17 @@
               class="as-fill-input"
               @input="emit('dirty')"
             />
+            <el-select
+              v-else-if="editable && row.kind === 'select'"
+              v-model="head[row.key]"
+              :style="{ height: (row.h - 14) + 'px' }"
+              class="as-fill-input as-fill-select"
+              :clearable="false"
+              :placeholder="row.hint ? tt(row.hint) : tt('请选择')"
+              @change="emit('dirty')"
+            >
+              <el-option v-for="o in (row.options || [])" :key="o.value" :label="tt(o.label)" :value="o.value" />
+            </el-select>
             <el-input
               v-else-if="editable"
               v-model="head[row.key]"

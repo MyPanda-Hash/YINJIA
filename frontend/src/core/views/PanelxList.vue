@@ -133,6 +133,8 @@
           @refresh-config="onFieldEditRefresh"
         />
         <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" @dirty="markInlineDirty" />
+        <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
+        <StagePanel v-if="panelCode === 'RD_PLAN' && cur" :head="cur" :editable="draftEditable" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" panel-code="RD_PLAN" @dirty="markInlineDirty" />
         <div class="approval-side" :class="{ collapsed: sideCollapsed }">
           <div class="as-side-title" @click="sideCollapsed = !sideCollapsed">
             <span v-if="!sideCollapsed">{{ tt(panelName) }}</span>
@@ -885,6 +887,7 @@ import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import QrLabelDialog from '@/business/components/QrLabelDialog.vue'
+import StagePanel from '@/business/components/StagePanel.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
