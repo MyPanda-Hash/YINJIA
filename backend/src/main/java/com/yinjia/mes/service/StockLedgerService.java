@@ -25,8 +25,11 @@ public class StockLedgerService {
 
     /** 是否参与记账的面板。 */
     public static boolean postsStock(String panelCode) {
-        return "PURCHASE_IN".equals(panelCode) || "MATERIAL_OUT".equals(panelCode)
-                || "SALE_OUT".equals(panelCode) || "FINISH_IN".equals(panelCode);
+        return switch (panelCode) {
+            case "PURCHASE_IN", "FINISH_IN", "OTHER_IN", "OUTSOURCE_IN",
+                 "MATERIAL_OUT", "SALE_OUT", "OTHER_OUT", "OUTSOURCE_ISSUE" -> true;
+            default -> false;
+        };
     }
 
     /** 审核 → 过账(入库 + / 出库 −)。 */
@@ -42,7 +45,10 @@ public class StockLedgerService {
     }
 
     private void apply(String panelCode, String no, String user, boolean forward) {
-        boolean inbound = "PURCHASE_IN".equals(panelCode) || "FINISH_IN".equals(panelCode);
+        boolean inbound = switch (panelCode) {
+            case "PURCHASE_IN", "FINISH_IN", "OTHER_IN", "OUTSOURCE_IN" -> true;
+            default -> false; // MATERIAL_OUT, SALE_OUT, OTHER_OUT, OUTSOURCE_ISSUE
+        };
         List<Map<String, Object>> rows = loadRows(panelCode, no);
         if (rows.isEmpty()) throw new IllegalStateException(panelCode + " " + no + " 无明细行,不能记账");
         for (Map<String, Object> r : rows) {
@@ -102,30 +108,42 @@ public class StockLedgerService {
     }
 
     private List<Map<String, Object>> loadRows(String panelCode, String no) {
-        if ("PURCHASE_IN".equals(panelCode)) {
-            return jdbc.queryForList(
+        return switch (panelCode) {
+            case "PURCHASE_IN" -> jdbc.queryForList(
                     "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[实收数量] AS qty, l.[单价] AS price"
                             + " FROM bl_purchase_in l LEFT JOIN bd_purchase_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-        }
-        if ("SALE_OUT".equals(panelCode)) {
-            // 销售出库(出货链):成品三键出库,行批号来自产品二维码
-            return jdbc.queryForList(
-                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
-                            + " FROM bl_sale_out l LEFT JOIN bd_sale_out h ON h.[单据编号] = l.[单据编号]"
-                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-        }
-        if ("FINISH_IN".equals(panelCode)) {
-            // 产成品入库(装箱后成品入仓):三键入库,批号来自产品二维码
-            return jdbc.queryForList(
+            case "FINISH_IN" -> jdbc.queryForList(
                     "SELECT l.[产品编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[实收数量] AS qty, l.[单价] AS price"
                             + " FROM bl_finish_in l LEFT JOIN bd_finish_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-        }
-        return jdbc.queryForList(
-                "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
-                        + " FROM bl_material_out l LEFT JOIN bd_material_out h ON h.[单据编号] = l.[单据编号]"
-                        + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+            case "OTHER_IN" -> jdbc.queryForList(
+                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, l.[单价] AS price"
+                            + " FROM bl_other_in l LEFT JOIN bd_other_in h ON h.[单据编号] = l.[单据编号]"
+                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+            case "OUTSOURCE_IN" -> jdbc.queryForList(
+                    // 行仓库优先,缺失时回退头仓库
+                    "SELECT l.[产品编码] AS code, l.[仓库] AS [行仓库], ISNULL(l.[仓库], h.[仓库]) AS [头仓库], l.[批号] AS lot, l.[实收数量] AS qty, l.[单价] AS price"
+                            + " FROM bl_outsource_in l LEFT JOIN bd_outsource_in h ON h.[单据编号] = l.[单据编号]"
+                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+            case "SALE_OUT" -> jdbc.queryForList(
+                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
+                            + " FROM bl_sale_out l LEFT JOIN bd_sale_out h ON h.[单据编号] = l.[单据编号]"
+                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+            case "OTHER_OUT" -> jdbc.queryForList(
+                    // 头表无仓库列,仓库取行表
+                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], l.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
+                            + " FROM bl_other_out l"
+                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+            case "OUTSOURCE_ISSUE" -> jdbc.queryForList(
+                    "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
+                            + " FROM bl_outsource_issue l LEFT JOIN bd_outsource_issue h ON h.[单据编号] = l.[单据编号]"
+                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+            default -> jdbc.queryForList( // MATERIAL_OUT
+                    "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
+                            + " FROM bl_material_out l LEFT JOIN bd_material_out h ON h.[单据编号] = l.[单据编号]"
+                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+        };
     }
 
     /** 仓库名称 → 编码(bs_wh)。 */
