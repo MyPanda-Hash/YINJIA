@@ -319,12 +319,9 @@ const cardColumns = computed(() => {
     return (prod?.children || []).map((cat) => ({ title: cat.title, items: flattenCardItems(cat.children || [cat]) }))
   }
   if (m.code === 'rd') {
-    // 研发管理:叶子(立项申请/实施计划/进度查询)归「研发管理」列,三个子分类各一列 → 共 4 列
-    const leaves = m.children.filter((c) => !c.children || !c.children.length)
-    const cats = m.children.filter((c) => c.children && c.children.length)
-    const cols = cats.map((cat) => ({ title: cat.title, items: flattenCardItems(cat.children) }))
-    cols.unshift({ title: m.title, items: flattenCardItems(leaves) })
-    return cols
+    // 研发管理:二级目录全是分组 → 以「直接含面板的分组」为列(项目管理/数据记录表/实验室使用记录表/产品文件),
+    // 不再像旧结构那样额外拼一列「研发管理」直属叶子(改版后直属叶子为空,会多出一个空列)
+    return leafGroupColumns(m)
   }
   if (m.children[0]?.children) {
     // 子节点有子分类(如 单据/明细表/统计表)→ 按子分类分列
@@ -344,6 +341,20 @@ function flattenCardItems(nodes) {
   return out
 }
 
+/** 悬停浮层列:以「直接含面板(叶子)的分组」为列,递归穿过纯分组层——
+ *  既不产生空列,也不会把不同分组的叶子混进同一列(如 数据记录表 / 实验室使用记录表 各成一列)。 */
+function leafGroupColumns(node) {
+  const out = []
+  const walk = (parent) => {
+    const children = parent.children || []
+    const leaves = children.filter((c) => !c.children || !c.children.length)
+    const groups = children.filter((c) => c.children && c.children.length)
+    if (leaves.length) out.push({ title: parent.title, items: flattenCardItems(leaves) })
+    groups.forEach(walk)
+  }
+  walk(node)
+  return out
+}
 watch(
   () => route.path,
   (p) => {
