@@ -133,3 +133,9 @@ fix-views-v4.sql
 fix-views-v5-gen.sql
 migrate-audit-cols-fix.sql
 setup-stock-status.sql
+
+# —— 2026-09-10 登记:生产相关 11 面板(表格数字化)新增脚本,登记即完成第 2 步 ——
+# 顺序:先建表+面板注册,再逐份插 yj_field 字段与译名(后者依赖前者已注册的 panel_code)。
+# 字段脚本可能分多份交付(如 …-fields.sql / …-fields2.sql),**新增一份就补登记一份**。
+migrate-prod-forms.sql
+migrate-prod-forms-fields.sql
