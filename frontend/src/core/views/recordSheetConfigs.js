@@ -454,7 +454,7 @@ export const recordSheetConfigs = {
   RD_INSTR_USE: {
     headMode: 'plain',
     plainTitle: '实验室仪器使用记录表',
-    subtitle: { label: '仪器名称/型号：', key: '仪器名称/型号', type: 'text' },
+    subtitle: { label: '仪器名称/型号：', key: '仪器名称/型号', type: 'select' },   // 标准库(可维护)
     dataTables: [
       { cols: [
           { key: '使用日期', label: '使用日期', w: 110 },

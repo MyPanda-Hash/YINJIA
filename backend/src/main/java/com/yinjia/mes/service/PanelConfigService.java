@@ -444,6 +444,10 @@ public class PanelConfigService {
         if (!f.editable()) m.put("readonly", true);
         if ("下拉框".equals(f.dataType()) && f.dictSql() != null) {
             m.put("options", dictOptions(f.dictSql()));
+        } else if ("标准库".equals(f.dataType()) && f.dictSql() != null) {
+            // 标准库:dict_sql 存标准库编码(见 migrate-lab-stdlib.sql),选项来自 yj_std_lib,可维护
+            m.put("options", stdLibOptions(f.dictSql()));
+            m.put("stdLib", f.dictSql());
         }
         if (f.isRef()) {
             m.put("refPanel", f.refPanel());
@@ -1053,6 +1057,24 @@ public class PanelConfigService {
         }
     }
 
+    /**
+     * 标准库选项:字段 data_type=\u0027标准库\u0027 时,dict_sql 里存的是**标准库编码**(lib_code),
+     * 不再是可执行 SQL;条目取自 yj_std_lib,可在界面上增删维护(StdLibController /api/stdlib/add|remove)。
+     */
+    public List<String> stdLibOptions(String libCode) {
+        try {
+            List<String> out = new ArrayList<>();
+            jdbc.query("SELECT content FROM yj_std_lib WHERE lib_code = ? AND enabled = 1"
+                            + " AND ISNULL(asp_cancel, \u0027N\u0027) <> \u0027Y\u0027 ORDER BY seq, id",
+                    rs -> {
+                        Object v = rs.getObject(1);
+                        if (v != null && !out.contains(String.valueOf(v))) out.add(String.valueOf(v));
+                    }, libCode);
+            return out;
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
     // ---------- 表格列自定义 ----------
 
     /** 保存列排序/栏名/显隐(更新 yj_field 的 seq/alias/visible) */
@@ -1122,7 +1144,12 @@ public class PanelConfigService {
             m.put("dataType", f.dataType());
             m.put("isNotNull", f.required());
             m.put("defaultValue", "");
-            if ("下拉框".equals(f.dataType()) && f.dictSql() != null) m.put("options", dictOptions(f.dictSql()));
+            if ("下拉框".equals(f.dataType()) && f.dictSql() != null) {
+                m.put("options", dictOptions(f.dictSql()));
+            } else if ("标准库".equals(f.dataType()) && f.dictSql() != null) {
+                m.put("options", stdLibOptions(f.dictSql()));
+                m.put("stdLib", f.dictSql());
+            }
             if (f.isRef()) {
                 Map<String, Object> ref = new HashMap<>();
                 ref.put("panel", f.refPanel());

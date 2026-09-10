@@ -291,9 +291,11 @@
             <tr v-if="isPlain && cfg.subtitle">
               <td :colspan="totalSpan(dt)" class="rsp-subtitle-row" :class="{ right: cfg.subtitle.align === 'right' }">
                 <span class="rsp-sub-label">{{ tt(cfg.subtitle.label) }}</span>
-                <el-select v-if="editable && cfg.subtitle.type === 'select'" v-model="head[cfg.subtitle.key]" size="small" class="rsp-sub-ctl" :clearable="false" @change="emit('dirty')">
-                  <el-option v-for="o in variantOptions" :key="o.value" :label="o.label" :value="o.value" />
+                <el-select v-if="editable && cfg.subtitle.type === 'select'" v-model="head[cfg.subtitle.key]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="emit('dirty')">
+                  <el-option v-for="o in subtitleOptions" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
+                <!-- 标准库字段:条目可维护(打印时隐藏,纸张上不出现"标准库"字样) -->
+                <span v-if="editable && cfg.subtitle.type === 'select' && stdLibOf(cfg.subtitle.key)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(cfg.subtitle.key))">⧉ {{ tt('标准库维护') }}</span>
                 <el-input v-else-if="editable" v-model="head[cfg.subtitle.key]" size="small" maxlength="100" class="rsp-sub-ctl" @input="emit('dirty')" />
                 <span v-else class="rsp-sub-value">{{ head[cfg.subtitle.key] || '' }}</span>
               </td>
@@ -303,9 +305,10 @@
             <tr v-if="!isPlain && cfg.variantKey">
               <td :colspan="2" class="rsp-subtitle-row rsp-left">
                 <span class="rsp-sub-label">{{ tt(variantLabel) }}</span>
-                <el-select v-if="editable" v-model="head[cfg.variantKey]" size="small" class="rsp-sub-ctl" :clearable="false" @change="emit('dirty')">
+                <el-select v-if="editable" v-model="head[cfg.variantKey]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="emit('dirty')">
                   <el-option v-for="o in variantOptions" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
+                <span v-if="editable && stdLibOf(cfg.variantKey)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(cfg.variantKey))">⧉ {{ tt('标准库维护') }}</span>
                 <span v-else class="rsp-sub-value">{{ head[cfg.variantKey] || '' }}</span>
               </td>
               <td :colspan="Math.max(1, totalSpan(dt) - 2)" class="rsp-subtitle-row rsp-quiet"></td>
@@ -609,6 +612,25 @@
         <el-button type="primary" @click="saveFieldEdit">{{ tt('保存') }}</el-button>
       </template>
     </el-dialog>
+    <!-- 标准库维护(可增可停用;打印时隐藏) -->
+    <el-dialog v-model="stdLibVisible" :title="tt('标准库维护') + ' · ' + tt(stdLibName)" width="520px" append-to-body>
+      <div class="stdlib-tip">{{ tt('下拉即可从标准库选择；也可以在这里增删条目。填写时直接输入新值后点「加入标准库」也能入库。') }}</div>
+      <div class="stdlib-add">
+        <el-input v-model="stdLibNew" size="default" :placeholder="tt('新增条目')" @keyup.enter="addStdLibItem" />
+        <el-button type="primary" @click="addStdLibItem">{{ tt('加入标准库') }}</el-button>
+      </div>
+      <div class="stdlib-list" v-loading="stdLibBusy">
+        <div v-for="r in stdLibRows" :key="r.id" class="stdlib-item">
+          <span class="stdlib-item-text">{{ r.content }}</span>
+          <span class="stdlib-del" :title="tt('停用')" @click="removeStdLibItem(r)">×</span>
+        </div>
+        <div v-if="!stdLibBusy && !stdLibRows.length" class="stdlib-empty">{{ tt('暂无条目,请在上方新增') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="stdLibVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
+
 
     <!-- ═══ 参照选择(产品编号 -> 产品信息表):确认后按 refMap 带回 产品名称 等 ═══ -->
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" :owner-panel="panelCode" @confirm="onProdRefConfirm" />
@@ -653,6 +675,74 @@ const variantOptions = computed(() => {
   return selectOptions(cfg.value?.variantKey)
 })
 const variantLabel = computed(() => (cfg.value?.variantKey || '') + (cfg.value?.variantKey ? '：' : ''))
+/** 该字段是不是标准库字段:是则返回标准库编码(后端 fieldSpec 下发的 stdLib),否则空串 */
+function stdLibOf(key) {
+  const f = (props.fields || []).find((x) => (x.dataName || x.code) === key)
+  return f && f.dataType === '标准库' ? (f.stdLib || '') : ''
+}
+
+/** 副标题下拉的选项:优先取字段元数据的 options(标准库字段即标准库条目),退回变体选项 */
+const subtitleOptions = computed(() => {
+  const key = cfg.value?.subtitle?.key
+  if (!key) return []
+  const o = selectOptions(key)
+  return o.length ? o : variantOptions.value
+})
+
+// ---------- 标准库维护(实验室 4 张表的 测试项目/申请单类型/设备名称/仪器名称-型号) ----------
+const stdLibVisible = ref(false)
+const stdLibCode = ref('')
+const stdLibName = ref('')
+const stdLibNew = ref('')
+const stdLibRows = ref([])
+const stdLibBusy = ref(false)
+
+async function openStdLib(lib) {
+  if (!lib) return
+  stdLibCode.value = lib
+  stdLibName.value = cfg.value?.subtitle?.label ? String(cfg.value.subtitle.label).replace(/[：:]\s*$/, '') : lib
+  stdLibNew.value = ''
+  stdLibVisible.value = true
+  await loadStdLib()
+}
+
+async function loadStdLib() {
+  stdLibBusy.value = true
+  try {
+    const res = await request.get('/stdlib/list', { params: { lib: stdLibCode.value } })
+    stdLibRows.value = (res?.data || []).map((r) => ({ id: r.id, content: r.content }))
+  } catch {
+    stdLibRows.value = []
+  } finally {
+    stdLibBusy.value = false
+  }
+}
+
+async function addStdLibItem() {
+  const v = String(stdLibNew.value || '').trim()
+  if (!v) return
+  try {
+    await request.post('/stdlib/add', { lib: stdLibCode.value, item: '默认', content: v })
+    stdLibNew.value = ''
+    await loadStdLib()
+    // 同步刷新字段选项,新增的条目立刻可以在下拉里选
+    emit('refresh-config')
+    ElMessage.success(tt('已加入标准库'))
+  } catch (e) {
+    ElMessage.error(tt('加入标准库失败'))
+  }
+}
+
+async function removeStdLibItem(row) {
+  try {
+    await request.post('/stdlib/remove', { id: row.id })
+    await loadStdLib()
+    emit('refresh-config')
+    ElMessage.success(tt('已停用该条目'))
+  } catch (e) {
+    ElMessage.error(tt('停用失败'))
+  }
+}
 
 const effGrid = computed(() => activeVariant.value?.grid || cfg.value?.grid || [])
 const effHead = computed(() => activeVariant.value?.head || cfg.value?.head || {})
@@ -2309,6 +2399,17 @@ function chartOf(dt) {
 
 <!-- 打印/导出整张文书:只保留文书纸张,隐藏布局菜单/侧栏/其它页面元素 -->
 <style>
+/* 标准库维护入口:屏幕可见,打印不出现(纸张上不留"标准库"字样) */
+.no-print { }
+@media print { .no-print, .rs-lib-btn { display: none !important; } }
+.stdlib-tip { font-size: 12px; color: #8ba6bd; margin-bottom: 8px; line-height: 1.6; }
+.stdlib-add { display: flex; gap: 8px; margin-bottom: 10px; }
+.stdlib-list { max-height: 320px; overflow: auto; border: 1px solid #e4edf5; border-radius: 4px; }
+.stdlib-item { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-bottom: 1px solid #f0f4f8; font-size: 13px; }
+.stdlib-item:last-child { border-bottom: none; }
+.stdlib-item-text { flex: 1; word-break: break-all; }
+.stdlib-del { cursor: pointer; color: #c45656; padding: 0 4px; font-size: 16px; line-height: 1; }
+.stdlib-empty { padding: 18px; text-align: center; color: #a8b6c4; font-size: 13px; }
 @media print {
   body.approval-printing .rsp-sheet {
     visibility: visible !important;
