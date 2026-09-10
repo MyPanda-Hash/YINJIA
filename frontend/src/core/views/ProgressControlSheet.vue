@@ -91,19 +91,19 @@
             <td v-if="isLevelHead(i)" class="c-level" :rowspan="levelSpan(i)">
               <el-select
                 v-if="editable"
-                :model-value="row['项目等级']"
+                :model-value="row[K['项目等级']]"
                 size="small"
                 :clearable="false"
                 @change="changeGroupLevel(i, $event)"
               >
-                <el-option v-for="o in selectOptions('项目等级')" :key="o.value" :label="o.label" :value="o.value" />
+                <el-option v-for="o in selectOptions('项目层级')" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <span v-else class="ps-level-block">{{ row['项目等级'] || '' }}</span>
+              <span v-else class="ps-level-block">{{ row[K['项目等级']] || '' }}</span>
             </td>
             <td v-if="isGroupHead(i)" class="c-name" :rowspan="groupSpan(i)">
               <el-select
                 v-if="editable"
-                :model-value="row['项目名称']"
+                :model-value="row[K['项目名称']]"
                 filterable
                 allow-create
                 default-first-option
@@ -114,35 +114,35 @@
               >
                 <el-option v-for="o in refOptions" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <span v-else class="ps-cell-text ps-name-block">{{ row['项目名称'] || '' }}</span>
+              <span v-else class="ps-cell-text ps-name-block">{{ row[K['项目名称']] || '' }}</span>
             </td>
             <td class="c-sub">
-              <el-input v-if="editable" v-model="row['子项目/尺寸']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['子项目/尺寸'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['子项目/尺寸']]" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['子项目/尺寸']] || '' }}</span>
             </td>
             <td class="c-remark">
-              <el-input v-if="editable" v-model="row['项目编号']" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['项目编号'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['项目编号']]" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['项目编号']] || '' }}</span>
             </td>
             <td class="c-content">
-              <el-input v-if="editable" v-model="row['内容']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['内容'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['内容']]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['内容']] || '' }}</span>
             </td>
             <td class="c-grade">
-              <el-input v-if="editable" v-model="row['项目发起人']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['项目发起人'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['项目发起人']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['项目发起人']] || '' }}</span>
             </td>
             <td class="c-owner">
-              <el-input v-if="editable" v-model="row['项目负责人']" size="small" class="ps-cell-input" maxlength="100" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['项目负责人'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['项目负责人']]" size="small" class="ps-cell-input" maxlength="100" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['项目负责人']] || '' }}</span>
             </td>
             <td class="c-progress">
-              <el-input v-if="editable" v-model="row['立项日期']" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['立项日期'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['立项日期']]" size="small" class="ps-cell-input" maxlength="200" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['立项日期']] || '' }}</span>
             </td>
             <td class="c-mile">
-              <el-input v-if="editable" v-model="row['预计完成日期']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['预计完成日期'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['预计完成日期']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['预计完成日期']] || '' }}</span>
             </td>
             <td class="c-status">
               <!-- 状态=按实施计划阶段自动派生(只读):点它看阶段计划与完成情况 -->
@@ -156,20 +156,20 @@
               <span v-else class="ps-cell-text">—</span>
             </td>
             <td class="c-tester">
-              <el-input v-if="editable" v-model="row['测试情况']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['测试情况'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['测试情况']]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['测试情况']] || '' }}</span>
             </td>
             <td class="c-approve">
-              <el-input v-if="editable" v-model="row['技术目标达成']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['技术目标达成'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['技术目标达成']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['技术目标达成']] || '' }}</span>
             </td>
             <td class="c-inspect">
-              <el-input v-if="editable" v-model="row['是否市场转化']" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['是否市场转化'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['是否市场转化']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['是否市场转化']] || '' }}</span>
             </td>
             <td class="c-reason">
-              <el-input v-if="editable" v-model="row['未转换原因']" type="textarea" :autosize="{ minRows: 1, maxRows: 5 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row['未转换原因'] || '' }}</span>
+              <el-input v-if="editable" v-model="row[K['未转换原因']]" type="textarea" :autosize="{ minRows: 1, maxRows: 5 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['未转换原因']] || '' }}</span>
             </td>
             <td v-if="editable" class="c-op">
               <span class="ps-addrow" :title="tt('在该项目后新增子项目')" @click="insertAfter(i)">＋</span>
@@ -195,7 +195,7 @@
       <div class="ps-dlg-row">
         <span class="ps-dlg-label">{{ tt('项目等级') }}</span>
         <el-select v-model="dlgLevel" size="default" :clearable="false" style="width: 220px">
-          <el-option v-for="o in selectOptions('项目等级')" :key="o.value" :label="o.label" :value="o.value" />
+          <el-option v-for="o in selectOptions('项目层级')" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
       </div>
       <div class="ps-dlg-row">
@@ -272,6 +272,16 @@ import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { pickStages, stageRowState, statusLabel, STATUS_TOKENS, statusTone, summarizeStages } from '@core/progress/stageProgress'
 import * as XLSX from 'xlsx'
+import { PROGRESS_COLUMNS, readCell } from '@core/progress/progressColumns'
+
+/**
+ * 界面显示名 → 落库数据键 的映射(唯一真源见 progressColumns.js)。
+ *
+ * 表头仍显示业务名称,但写进 detail 行的 **键** 必须是 RD_PROGRESS 的元数据列名,
+ * 否则后端 ButtonService.labelsToCols(def.fields(), item) 会按元数据把它过滤掉,
+ * 值保存后就消失(自动导入写的「预计完成日期」「项目负责人」就是这么丢的)。
+ */
+const K = Object.fromEntries(PROGRESS_COLUMNS.map((c) => [c.label, c.key]))
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -316,15 +326,15 @@ async function loadRefOptions() {
     const stageMap = {}
     const today = todayStr()
     refOptions.value = rows
-      .filter((r) => r['项目名称'])
+      .filter((r) => r[K['项目名称']])
       .map((r) => {
         const stages = pickStages(r)
         const summary = summarizeStages(stages, today)
         const planNo = r['单据编号'] || r['编号'] || ''
-        const prev = stageMap[r['项目名称']]
+        const prev = stageMap[r[K['项目名称']]]
         // 同名多张实施计划:取最新一张(列表按单据编号倒序,先到的即最新)
-        if (!prev) stageMap[r['项目名称']] = { planNo, head: r, stages, summary, 负责人: r['负责人'] || '' }
-        return { value: r['项目名称'], label: `${r['项目名称']}（${planNo}）` }
+        if (!prev) stageMap[r[K['项目名称']]] = { planNo, head: r, stages, summary, 负责人: r['负责人'] || '' }
+        return { value: r[K['项目名称']], label: `${r[K['项目名称']]}（${planNo}）` }
       })
     planStageMap.value = stageMap
     applyDerivedStatus()
@@ -349,11 +359,11 @@ function statusText(summary) {
 }
 /** 该行的实施计划(按项目名称关联;同名多张取最新) */
 function planOf(row) {
-  const name = String(row?.['项目名称'] || '').trim()
+  const name = String(row?.[K['项目名称']] || '').trim()
   return name ? planStageMap.value[name] || null : null
 }
 function progressText(row) {
-  const name = String(row?.['项目名称'] || '').trim()
+  const name = String(row?.[K['项目名称']] || '').trim()
   if (!name) return ''
   const plan = planStageMap.value[name]
   if (!plan) return Object.keys(planStageMap.value).length ? tt(STATUS_TOKENS.no_plan) : ''
@@ -368,10 +378,10 @@ function applyDerivedStatus() {
   const rows = items.value || []
   if (!rows.length || !Object.keys(planStageMap.value).length) return
   for (const row of rows) {
-    const name = String(row?.['项目名称'] || '').trim()
+    const name = String(row?.[K['项目名称']] || '').trim()
     if (!name) continue
     const plan = planStageMap.value[name]
-    if (plan) row['状态'] = statusLabel(plan.summary)
+    if (plan) row[K['状态']] = statusLabel(plan.summary)
   }
 }
 watch(items, () => applyDerivedStatus(), { deep: false })
@@ -381,7 +391,7 @@ const stageDlgVisible = ref(false)
 const stageDlgName = ref('')
 const stageDlgRow = ref(null)
 function openStageDialog(row) {
-  const name = String(row?.['项目名称'] || '').trim()
+  const name = String(row?.[K['项目名称']] || '').trim()
   if (!name) {
     ElMessage.warning(tt('请先填写项目名称'))
     return
@@ -422,44 +432,44 @@ function planDueDate(plan) {
 // ---------- 项目(组)/子项目 行增删 ----------/** 组首行:与上一行项目名称不同(或首行) → 显示 项目名称/层级 输入,否则并入上一组 */
 function isGroupHead(i) {
   if (i <= 0) return true
-  return items.value[i]?.['项目名称'] !== items.value[i - 1]?.['项目名称']
+  return items.value[i]?.[K['项目名称']] !== items.value[i - 1]?.[K['项目名称']]
 }
 /** 等级头行:只读态相邻同级合并为一个"项目等级"块 */
 function isLevelHead(i) {
   if (i <= 0) return true
-  const lv = items.value[i]?.['项目等级']
+  const lv = items.value[i]?.[K['项目等级']]
   if (!lv) return true
-  return items.value[i - 1]?.['项目等级'] !== lv
+  return items.value[i - 1]?.[K['项目等级']] !== lv
 }
 /** 相邻同级行数(等级合并块) */
 function levelSpan(i) {
   if (!isLevelHead(i)) return 0
-  const lv = items.value[i]?.['项目等级']
+  const lv = items.value[i]?.[K['项目等级']]
   if (!lv) return 1
   let n = 1
-  while (i + n < items.value.length && items.value[i + n]?.['项目等级'] === lv) n++
+  while (i + n < items.value.length && items.value[i + n]?.[K['项目等级']] === lv) n++
   return n
 }
 /** 组内行数(名称列 rowspan 合并铺满整组;空名称新组不合并) */
 function groupSpan(i) {
   if (!isGroupHead(i)) return 0
-  const name = items.value[i]?.['项目名称']
+  const name = items.value[i]?.[K['项目名称']]
   if (!name) return 1
   let n = 1
-  while (i + n < items.value.length && items.value[i + n]?.['项目名称'] === name) n++
+  while (i + n < items.value.length && items.value[i + n]?.[K['项目名称']] === name) n++
   return n
 }
 /** 组首行名称变更:同步组内同名行 + 选实施计划项目带回同名字段 */
 function changeGroupName(i, v) {
   const row = items.value[i]
-  const old = row['项目名称']
-  row['项目名称'] = v
+  const old = row[K['项目名称']]
+  row[K['项目名称']] = v
   let j = i + 1
-  while (j < items.value.length && items.value[j]['项目名称'] === old) {
-    items.value[j]['项目名称'] = v
+  while (j < items.value.length && items.value[j][K['项目名称']] === old) {
+    items.value[j][K['项目名称']] = v
     j++
   }
-  const found = refRows.value.find((r) => r['项目名称'] === v)
+  const found = refRows.value.find((r) => r[K['项目名称']] === v)
   if (found) {
     const keys = ['项目定级', '测试内容', '测试产品打样要求', '测试目标', '测试条件', '测试方法', '测试标准']
     for (const k of keys) {
@@ -471,9 +481,9 @@ function changeGroupName(i, v) {
 /** 同步组内层级(组首行层级变更时) */
 function changeGroupLevel(i, v) {
   const row = items.value[i]
-  row['项目等级'] = v
-  for (let j = i + 1; j < items.value.length && items.value[j]?.['项目名称'] === row['项目名称']; j++) {
-    items.value[j]['项目等级'] = v
+  row[K['项目等级']] = v
+  for (let j = i + 1; j < items.value.length && items.value[j]?.[K['项目名称']] === row[K['项目名称']]; j++) {
+    items.value[j][K['项目等级']] = v
   }
   emit('dirty')
 }
@@ -498,12 +508,12 @@ function confirmAddProject() {
   const row = { '项目名称': name, '项目等级': lv }
   let idx = -1
   for (let i = d.items.length - 1; i >= 0; i--) {
-    if (d.items[i]['项目等级'] === lv) { idx = i; break }
+    if (d.items[i][K['项目等级']] === lv) { idx = i; break }
   }
   if (idx >= 0) d.items.splice(idx + 1, 0, row)
   else d.items.push(row)
   // 选实施计划项目:自动导入实施计划相关信息(项目定级/测试内容/…)
-  const found = refRows.value.find((r) => r['项目名称'] === name)
+  const found = refRows.value.find((r) => r[K['项目名称']] === name)
   if (found) {
     const keys = ['项目定级', '测试内容', '测试产品打样要求', '测试目标', '测试条件', '测试方法', '测试标准']
     for (const k of keys) {
@@ -513,10 +523,10 @@ function confirmAddProject() {
   // 自动导入阶段进度到「状态」列(与状态列同一口径:core/progress 纯函数)
   const plan = planStageMap.value[name]
   if (plan) {
-    row['状态'] = statusLabel(plan.summary)
+    row[K['状态']] = statusLabel(plan.summary)
     const due = planDueDate(plan)
-    if (due) row['预计完成日期'] = due
-    if (plan.负责人) row['项目负责人'] = plan.负责人
+    if (due) row[K['预计完成日期']] = due
+    if (plan.负责人) row[K['项目负责人']] = plan.负责人
   }
   dlgVisible.value = false
   emit('dirty')
@@ -532,14 +542,14 @@ function syncStageProgress() {
   }
   let updated = 0
   for (const row of d.items) {
-    const name = row['项目名称']
+    const name = row[K['项目名称']]
     if (!name) continue
     const stage = planStageMap.value[name]
     if (!stage) continue
-    row['状态'] = statusLabel(stage.summary)
+    row[K['状态']] = statusLabel(stage.summary)
     const due = planDueDate(stage)
-    if (due) row['预计完成日期'] = due
-    if (stage.负责人) row['项目负责人'] = stage.负责人
+    if (due) row[K['预计完成日期']] = due
+    if (stage.负责人) row[K['项目负责人']] = stage.负责人
     updated++
   }
   if (updated > 0) {
@@ -554,7 +564,7 @@ function insertAfter(i) {
   const d = props.head.detail
   if (!Array.isArray(d.items)) return
   const src = d.items[i] || {}
-  d.items.splice(i + 1, 0, { '项目名称': src['项目名称'], '项目等级': src['项目等级'] })
+  d.items.splice(i + 1, 0, { '项目名称': src[K['项目名称']], '项目等级': src[K['项目等级']] })
   emit('dirty')
 }
 function removeItem(i) {
@@ -582,24 +592,18 @@ function importExcelFile(e) {
       if (!Array.isArray(d.items)) d.items = []
       let added = 0
       for (const r of rows) {
-        const name = String(r['项目名称'] || '').trim()
+        const name = String(readCell(r, '项目名称') || '').trim()
         if (!name) continue
-        d.items.push({
-          '项目等级': r['项目等级'] || '二级',
-          '项目名称': name,
-          '子项目/尺寸': String(r['子项目/尺寸'] ?? r['子项目尺寸'] ?? ''),
-          '项目编号': String(r['项目编号'] ?? ''),
-          '内容': String(r['内容'] ?? ''),
-          '项目发起人': String(r['项目发起人'] ?? ''),
-          '项目负责人': String(r['项目负责人'] ?? ''),
-          '立项日期': String(r['立项日期'] ?? ''),
-          '预计完成日期': String(r['预计完成日期'] ?? ''),
-          '状态': String(r['状态'] ?? ''),
-          '测试情况': String(r['测试情况'] ?? ''),
-          '技术目标达成': String(r['技术目标达成'] ?? ''),
-          '是否市场转化': String(r['是否市场转化'] ?? ''),
-          '未转换原因': String(r['未转换原因'] ?? ''),
-        })
+        const item = {}
+        // Excel 表头是"显示名",落库键取 PROGRESS_COLUMNS 的 key(见 progressColumns.js)
+        for (const col of PROGRESS_COLUMNS) {
+          const v = readCell(r, col.label)
+          if (v === undefined || v === null || v === '') continue
+          item[col.key] = String(v)
+        }
+        item[K['项目名称']] = name
+        if (!item[K['项目等级']]) item[K['项目等级']] = '二级'
+        d.items.push(item)
         added++
       }
       if (!added) {
@@ -620,18 +624,12 @@ function importExcelFile(e) {
   const rows = (head.detail && Array.isArray(head.detail.items) ? head.detail.items : [])
   const title = '产品开发二三四级项目控制列表'
   const info = `惠州市银嘉环保科技有限公司　　文档编号：${head['文档编号'] || 'YJ-XS002'}　　密级：${head['密级'] || ''}　　使用范围：${head['文件使用范围'] || ''}　　单据编号：${head['单据编号'] || ''}`
-  const header = ['项目等级', '项目名称', '子项目/尺寸', '项目编号', '内容', '项目发起人', '项目负责人', '立项日期', '预计完成日期', '状态', '测试情况', '技术目标达成', '是否市场转化', '未转换原因']
-  const data = rows.map((r) => [
-    r['项目等级'], r['项目名称'], r['子项目/尺寸'], r['项目编号'], r['内容'], r['项目发起人'],
-    r['项目负责人'], r['立项日期'], r['预计完成日期'], r['状态'], r['测试情况'],
-    r['技术目标达成'], r['是否市场转化'], r['未转换原因'],
-  ])
+  // 表头=显示名(label);取数=落库键(key);列宽也用同一份定义(见 progressColumns.js)
+  const header = PROGRESS_COLUMNS.map((c) => c.label)
+  const data = rows.map((r) => PROGRESS_COLUMNS.map((c) => r[c.key]))
   const aoa = [[title], [info], [], header, ...data]
   const ws = XLSX.utils.aoa_to_sheet(aoa)
-  ws['!cols'] = [
-    { wch: 10 }, { wch: 20 }, { wch: 22 }, { wch: 12 }, { wch: 30 }, { wch: 10 },
-    { wch: 12 }, { wch: 11 }, { wch: 12 }, { wch: 20 }, { wch: 34 }, { wch: 12 }, { wch: 12 }, { wch: 16 },
-  ]
+  ws['!cols'] = PROGRESS_COLUMNS.map((c) => ({ wch: c.width }))
   ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 13 } }, { s: { r: 1, c: 0 }, e: { r: 1, c: 13 } }]
   // 表头加粗 + 数据单元格自动换行
   const cols = header.length
