@@ -150,28 +150,60 @@
           <div v-if="config.deco" class="as-deco"></div>
         </div>
 
-        <!-- 阶段框行:10 个阶段框,每框可隐藏/显示;隐藏后下方自动接上;导出按实际显示 -->
+        <!-- 阶段框行:10 个阶段框,每框含5字段(计划内容/计划开始/计划完成/实际完成/责任人)+完成按钮;隐藏后下方自动接上 -->
         <div v-else class="as-row as-row-phases" :style="{ minHeight: (row.h || 200) + 'px' }">
           <div class="as-no">{{ row.num }}</div>
           <div class="as-name">{{ tt(row.label) }}</div>
           <div class="as-fill">
             <template v-for="(ph, pi) in row.phases" :key="ph.key">
-              <div v-if="!phaseHidden[pi]" class="as-phase">
+              <div v-if="!phaseHidden[pi]" class="as-phase" :class="{ 'as-phase-done': head[ph.key + '_实际完成'] }">
                 <div class="as-phase-head">
                   <span class="as-phase-title">{{ tt('阶段') }}{{ ph.num }}</span>
+                  <span v-if="head[ph.key + '_实际完成']" class="as-phase-badge">{{ tt('已完成') }}</span>
                   <span class="as-phase-toggle" @click.stop="phaseHidden[pi] = true">{{ tt('隐藏') }}</span>
                 </div>
-                <el-input
-                  v-if="editable"
-                  v-model="head[ph.key]"
-                  type="textarea"
-                  :autosize="{ minRows: 2, maxRows: 20 }"
-                  :maxlength="ph.max || 500"
-                  class="as-fill-input as-fill-area"
-                  resize="none"
-                  @input="emit('dirty')"
-                />
-                <div v-else class="as-ro-text">{{ head[ph.key] || '' }}</div>
+                <div class="as-phase-content">
+                  <div class="as-phase-label">{{ tt('计划内容') }}</div>
+                  <el-input
+                    v-if="editable"
+                    v-model="head[ph.key + '_计划内容']"
+                    type="textarea"
+                    :autosize="{ minRows: 1, maxRows: 4 }"
+                    :maxlength="ph.max || 500"
+                    class="as-fill-input as-fill-area"
+                    resize="none"
+                    @input="emit('dirty')"
+                  />
+                  <div v-else class="as-ro-text">{{ head[ph.key + '_计划内容'] || '' }}</div>
+                </div>
+                <div class="as-phase-meta">
+                  <div class="as-phase-cell">
+                    <span class="as-phase-cell-label">{{ tt('计划开始') }}</span>
+                    <el-input v-if="editable" v-model="head[ph.key + '_计划开始']" size="small" class="as-phase-cell-input" maxlength="20" placeholder="YYYY-MM-DD" @input="emit('dirty')" />
+                    <span v-else class="as-phase-cell-text">{{ head[ph.key + '_计划开始'] || '' }}</span>
+                  </div>
+                  <div class="as-phase-cell">
+                    <span class="as-phase-cell-label">{{ tt('计划完成') }}</span>
+                    <el-input v-if="editable" v-model="head[ph.key + '_计划完成']" size="small" class="as-phase-cell-input" maxlength="20" placeholder="YYYY-MM-DD" @input="emit('dirty')" />
+                    <span v-else class="as-phase-cell-text">{{ head[ph.key + '_计划完成'] || '' }}</span>
+                  </div>
+                  <div class="as-phase-cell">
+                    <span class="as-phase-cell-label">{{ tt('实际完成') }}</span>
+                    <span class="as-phase-cell-text as-phase-actual" :class="{ done: head[ph.key + '_实际完成'] }">{{ head[ph.key + '_实际完成'] || '—' }}</span>
+                  </div>
+                  <div class="as-phase-cell">
+                    <span class="as-phase-cell-label">{{ tt('责任人') }}</span>
+                    <el-input v-if="editable" v-model="head[ph.key + '_责任人']" size="small" class="as-phase-cell-input" maxlength="50" @input="emit('dirty')" />
+                    <span v-else class="as-phase-cell-text">{{ head[ph.key + '_责任人'] || '' }}</span>
+                  </div>
+                  <div class="as-phase-cell as-phase-cell-op">
+                    <el-button
+                      v-if="canStageComplete && head[ph.key + '_计划内容'] && !head[ph.key + '_实际完成']"
+                      type="success" size="small" :loading="stageLoading === ph.num"
+                      @click.stop="doStageComplete(ph.num)"
+                    >{{ tt('完成') }}</el-button>
+                  </div>
+                </div>
               </div>
             </template>
             <div v-if="Object.values(phaseHidden).filter(Boolean).length" class="as-phase-restore" @click.stop="phaseHidden = {}">
@@ -216,17 +248,50 @@
 
 <script setup>
 import { computed, reactive, nextTick, ref } from 'vue'
+import { ElMessage, ElButton } from 'element-plus'
 import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
 import RefPickDialog from './RefPickDialog.vue'
+import { usePanelRuntime } from '@core/panel-runtime'
 
 const props = defineProps({
   head: { type: Object, required: true },
   fields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
   config: { type: Object, required: true },
+  /** 面板编码(阶段完成按钮的 API 目标) */
+  panelCode: { type: String, default: '' },
+  /** 单据是否已审核(阶段完成按钮仅在审核后可用) */
+  audited: { type: Boolean, default: false },
 })
 const emit = defineEmits(['dirty'])
+
+const engine = usePanelRuntime()
+const stageLoading = ref(0)
+
+/** 阶段完成按钮可用:非编辑态 + 已审核 */
+const canStageComplete = computed(() => !props.editable && props.audited && props.panelCode === 'RD_PLAN')
+
+async function doStageComplete(stageNum) {
+  stageLoading.value = stageNum
+  try {
+    const no = props.head['单据编号'] || props.head['编号'] || ''
+    const res = await engine.callButton({
+      panelCode: props.panelCode,
+      buttonName: '阶段完成',
+      formData: { 编号: no, 阶段序号: String(stageNum) },
+      buttonParam: {},
+    })
+    if (res?.['实际完成']) {
+      props.head[`阶段${stageNum}_实际完成`] = res['实际完成']
+      ElMessage.success(`阶段${stageNum} 已完成 (${res['实际完成']})`)
+    }
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || `阶段${stageNum} 完成失败`)
+  } finally {
+    stageLoading.value = 0
+  }
+}
 
 // 阶段框显示状态(本地视图;导出/打印按当前实际显示渲染)
 const phaseHidden = reactive({})
@@ -536,11 +601,15 @@ defineExpose({ focusField })
   color: #333;
   line-height: 20px;
 }
-/* 阶段框行(测试计划):每框独立边框,可隐藏/显示 */
+/* 阶段框行(测试计划):每框独立边框,可隐藏/显示;含结构化5字段+完成按钮 */
 .as-phase {
   border: 1px solid #c9c9c9;
   margin: 3px 0;
   padding: 2px 6px 4px;
+}
+.as-phase-done {
+  border-color: #b7e4c7;
+  background: #f0faf0;
 }
 .as-phase-head {
   display: flex;
@@ -550,19 +619,32 @@ defineExpose({ focusField })
   color: #333;
   padding: 1px 0;
 }
-.as-phase-title {
-  font-weight: 600;
+.as-phase-title { font-weight: 600; }
+.as-phase-badge {
+  background: #52c41a; color: #fff; font-size: 11px;
+  padding: 1px 6px; border-radius: 3px; margin-right: 4px;
 }
 .as-phase-toggle {
-  color: #0d5bd3;
-  cursor: pointer;
-  font-size: 12px;
-  user-select: none;
-  padding: 0 2px;
+  color: #0d5bd3; cursor: pointer; font-size: 12px;
+  user-select: none; padding: 0 2px;
 }
-.as-phase-toggle:hover {
-  text-decoration: underline;
+.as-phase-toggle:hover { text-decoration: underline; }
+.as-phase-content { margin: 2px 0; }
+.as-phase-label { font-size: 11px; color: #8ba6bd; margin-bottom: 1px; }
+.as-phase-meta {
+  display: flex; gap: 6px; align-items: flex-end; flex-wrap: wrap;
+  padding: 2px 0;
 }
+.as-phase-cell { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.as-phase-cell-label { font-size: 11px; color: #8ba6bd; white-space: nowrap; }
+.as-phase-cell-input { width: 100px; }
+.as-phase-cell-text {
+  font-size: 12px; color: #555; min-height: 22px; line-height: 22px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.as-phase-actual { color: #ccc; text-align: center; }
+.as-phase-actual.done { color: #52c41a; font-weight: 600; }
+.as-phase-cell-op { align-items: center; justify-content: center; }
 .as-phase-restore {
   margin: 3px 0;
   padding: 3px 6px;

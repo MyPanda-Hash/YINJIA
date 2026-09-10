@@ -132,9 +132,9 @@
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
-        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" @dirty="markInlineDirty" />
+        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" @dirty="markInlineDirty" />
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
-        <StagePanel v-if="panelCode === 'RD_PLAN' && cur" :head="cur" :editable="draftEditable" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" panel-code="RD_PLAN" @dirty="markInlineDirty" />
+
         <div class="approval-side" :class="{ collapsed: sideCollapsed }">
           <div class="as-side-title" @click="sideCollapsed = !sideCollapsed">
             <span v-if="!sideCollapsed">{{ tt(panelName) }}</span>
@@ -444,6 +444,12 @@
             <template #header>
               <div class="col-hdr" :class="{ filtering: hasColFilter(c) }" @click.stop="toggleColFilter(c)">
                 <span>{{ tt(c) }}</span>
+                <span
+                  class="col-hdr-sort"
+                  :class="{ on: isSortOn(mainSort, c) }"
+                  :title="tt('点击排序：升序 → 降序 → 取消')"
+                  @click.stop="cycleSort(mainSort, c)"
+                >{{ sortCaret(mainSort, c) }}</span>
                 <span v-if="hasColFilter(c)" class="col-hdr-tag" @click.stop="clearColFilter(c)" :title="tt('清除')">{{ colFilterText[c] }} ×</span>
                 <el-icon v-else class="col-hdr-ic"><Search /></el-icon>
               </div>
@@ -491,6 +497,12 @@
             <template #header>
               <div class="col-hdr" :class="{ filtering: hasColFilter(c.prop) }" @click.stop="toggleColFilter(c.prop)">
                 <span class="col-hdr-text">{{ c.label }}</span>
+                <span
+                  class="col-hdr-sort"
+                  :class="{ on: isSortOn(blockSortOf(b), c.prop) }"
+                  :title="tt('点击排序：升序 → 降序 → 取消')"
+                  @click.stop="cycleSort(blockSortOf(b), c.prop)"
+                >{{ sortCaret(blockSortOf(b), c.prop) }}</span>
                 <span v-if="hasColFilter(c.prop)" class="col-hdr-tag" @click.stop="clearColFilter(c.prop)" :title="tt('清除筛选')">{{ colFilterText[c.prop] }} ×</span>
                 <el-icon v-else class="col-hdr-ic"><Search /></el-icon>
               </div>
@@ -890,6 +902,7 @@ import QrLabelDialog from '@/business/components/QrLabelDialog.vue'
 import StagePanel from '@/business/components/StagePanel.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
+import { nextSortState, sortRows } from '@core/sort/rowSort'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
@@ -1718,12 +1731,47 @@ const mainGrid = computed(() => {
   return tp?.mainTable || null
 })
 const mainCols = computed(() => (mainGrid.value?.columns || []).filter((c) => c !== '序号'))
+// ── 表头点击排序(2026-09-09 通用规则):每张表格自己一个排序状态,单键排序(点别的列覆盖前一列),升→降→取消 ──
+// 明细块按 块id:页签 分别记状态;主表预览独立一份;报表沿用 reportCols.sort(后端持久化那套不动)。
+const mainSort = reactive({ prop: '', order: '' })
+const blockSorts = reactive({})
+function blockSortOf(b) {
+  const key = `${b.id}:${activeTab(b)?.key || ''}`
+  if (!blockSorts[key]) blockSorts[key] = { prop: '', order: '' }
+  return blockSorts[key]
+}
+/** 点击角标:升 → 降 → 取消(状态对象就地更新) */
+function cycleSort(state, prop) {
+  const next = nextSortState(state, prop)
+  state.prop = next.prop
+  state.order = next.order
+}
+/** 视图排序:占位行不参与;按字段类型选比较器;不改行数据、不改原数组 */
+function sortViewRows(rows, state) {
+  if (!state || !state.prop || !state.order) return rows
+  return sortRows(rows.filter((r) => !r._placeholder), {
+    prop: state.prop, order: state.order, field: fieldDefOf(state.prop),
+  })
+}
+function sortCaret(state, prop) {
+  if (!state || state.prop !== prop || !state.order) return '⇅'
+  return state.order === 'asc' ? '▲' : '▼'
+}
+function isSortOn(state, prop) {
+  return !!state && state.prop === prop && !!state.order
+}
+function resetTableSorts() {
+  mainSort.prop = ''
+  mainSort.order = ''
+  Object.keys(blockSorts).forEach((key) => delete blockSorts[key])
+}
 // 主表固定 5 行（不足补占位，与明细区一致）
 const mainRows = computed(() => {
   const l = list.value
   if (!l.length) return []
   const filtered = applyAdvFilters(applyColFilters(l.map((r) => r), mainCols.value.map((c) => ({ prop: c }))))
-  const rows = filtered.slice(0, 5)
+  // 排序在取前 5 行之前:排序后看到的是"本页该字段前 5 条",而不是"前 5 条里再排"
+  const rows = sortViewRows(filtered, mainSort).slice(0, 5)
   while (rows.length < 5) rows.push({ _placeholder: true })
   return rows
 })
@@ -1871,7 +1919,8 @@ function blockData(b) {
 
 function blockRows(b) {
   const filtered = applyAdvFilters(applyColFilters(blockData(b).map((r) => r), blockCols(b)))
-  const out = filtered
+  // 视图排序(不改行数据):占位行在排序之后补,不参与比较
+  const out = sortViewRows(filtered, blockSortOf(b))
   while (out.length < MIN_ROWS) out.push({ _placeholder: true })
   return out
 }
