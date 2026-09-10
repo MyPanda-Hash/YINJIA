@@ -3,9 +3,11 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PanelRegistry;
+import com.yinjia.mes.service.QrBatchService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
@@ -20,10 +22,12 @@ public class ShellController {
 
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
+    private final QrBatchService qrBatch;
 
-    public ShellController(PanelRegistry registry, JdbcTemplate jdbc) {
+    public ShellController(PanelRegistry registry, JdbcTemplate jdbc, QrBatchService qrBatch) {
         this.registry = registry;
         this.jdbc = jdbc;
+        this.qrBatch = qrBatch;
     }
 
     @GetMapping("/base/factory/list")
@@ -98,6 +102,27 @@ public class ShellController {
         } catch (Exception e) {
             return code;
         }
+    }
+
+    // ============ 二维码批号 ============
+
+    /** 生成新批号(yyyymmdd+3位流水) */
+    @GetMapping("/qr/next-batch")
+    public ApiResult<String> nextBatch(@RequestParam String itemType, @RequestParam String sourceNo,
+                                        @RequestParam(required = false, defaultValue = "MANUAL") String sourceType) {
+        return ApiResult.ok(qrBatch.nextBatchNo(itemType, sourceType, sourceNo, "system"));
+    }
+
+    /** 按来源查批号列表 */
+    @GetMapping("/qr/by-source")
+    public ApiResult<List<java.util.Map<String, Object>>> qrBySource(@RequestParam String sourceType, @RequestParam String sourceNo) {
+        return ApiResult.ok(qrBatch.findBySource(sourceType, sourceNo));
+    }
+
+    /** 按日期查批号(打印界面) */
+    @GetMapping("/qr/by-date")
+    public ApiResult<List<java.util.Map<String, Object>>> qrByDate(@RequestParam String from, @RequestParam String to) {
+        return ApiResult.ok(qrBatch.findByDateRange(from, to));
     }
 
     @GetMapping("/sys/menu/tree")
