@@ -950,6 +950,7 @@ export default {
     '立项申请表': 'Đơn đăng ký dự án',
     '二三级项目': 'Dự án cấp hai và cấp ba',
     '文档编号': 'Số tài liệu',
+    '文档编号：': 'Số tài liệu: ',
     '填写内容': 'Điền vào nội dung',
     '可写字数': 'Số từ có thể viết',
     '可写': 'Có thể viết',

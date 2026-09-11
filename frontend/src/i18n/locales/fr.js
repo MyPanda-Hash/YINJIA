@@ -950,6 +950,7 @@ export default {
     '立项申请表': 'Formulaire de demande de projet',
     '二三级项目': 'Projets de deuxième et troisième niveaux',
     '文档编号': 'Numéro de document',
+    '文档编号：': 'Numéro de document : ',
     '填写内容': 'Remplir le contenu',
     '可写字数': 'Nombre de mots pouvant être écrits',
     '可写': 'Peut être écrit',
