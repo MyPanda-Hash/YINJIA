@@ -212,7 +212,7 @@
                 </div>
               </div>
               <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改态出「提交审批」,审批中出管理员审批;修改记录弹窗(滚动3条) -->
-              <div class="as-side-del" v-if="isProdFilePanel">
+              <div class="as-side-del" v-if="isDocArchivePanel">
                 <div class="as-side-btn-row">
                   <div class="as-side-btn" style="flex: 1" :class="{ disabled: !canModifyReq }" @click="pickModAction('申请修改')">{{ tt('申请修改') }}</div>
                   <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openModMenu = !openModMenu">▼</div>
@@ -232,7 +232,7 @@
                   <div class="as-side-menu-item" @click="pickModAction('审批情况')">{{ tt('审批情况') }}</div>
                 </div>
               </div>
-              <div class="as-side-btn" v-if="isProdFilePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
+              <div class="as-side-btn" v-if="isDocArchivePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
               <!-- 产品开发下发:仅产品信息表;归档后可点;下发过则置灰显示「已下发」 -->
               <div
                 class="as-side-btn"
@@ -1369,8 +1369,10 @@ const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '�
 // 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
 const openDelMenu = ref(false)
 
-// ---------- 修改组(产品文件 7 面板):归档后申请修改(管理员审批进入修改态)+ 修改记录(滚动3条) ----------
-const PROD_FILE_PANELS = ['RD_PROD_INFO', 'RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_BOM', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+// ---------- 修改组(文书归档面板):归档后申请修改(管理员审批进入修改态)+ 修改记录(滚动3条) ----------
+// 面板集合真源 = 后端 ButtonService.DOC_ARCHIVE_PANELS,经面板配置 metadata.docArchive 下发;
+// 2026-09-11 从产品文件 7 面板放开到全部保存即归档面板(实验室 4/数据记录表 8/立项申请/实施计划等),
+// 前端不再维护清单——新文书面板在后端登记即自动获得修改闭环。
 
 /** 审批权限:管理员,或角色对该面板勾了审批(approvePanels,后端 can_approve 口径) */
 function canApproveHere() {
@@ -1587,7 +1589,8 @@ async function openFuzzyResult(r) {
   const index = list.value.indexOf(r.row)
   if (index >= 0) await guardDocSwitch(index)
 }
-const isProdFilePanel = computed(() => PROD_FILE_PANELS.includes(String(panelCode.value)))
+/** 文书归档面板(保存即归档):修改闭环按钮组的显隐开关,真源后端 metadata.docArchive */
+const isDocArchivePanel = computed(() => !!cfgCache.value?.metadata?.docArchive)
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
 const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocStatus.value))

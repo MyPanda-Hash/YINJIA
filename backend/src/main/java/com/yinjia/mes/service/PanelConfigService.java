@@ -310,6 +310,9 @@ public class PanelConfigService {
         metadata.put("panelCategory", def.category());
         metadata.put("singleDoc", panelSingleDoc(def.code()));   // 见 yj_panel.config 的 singleDoc
         metadata.put("autoCodeField", doc ? autoCodeLabel(def) : null);
+        // 保存即归档文书面板(真源 ButtonService.DOC_ARCHIVE_PANELS):前端据此放出
+        // 「申请修改/修改审批/修改记录」闭环按钮(2026-09-11 起从产品文件 7 面板放开到全部文书归档面板)
+        metadata.put("docArchive", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code()));
         metadata.put("panelState", Map.of(
                 "dataName", "单据状态",
                 "dataType", "STRING",
