@@ -1346,5 +1346,6 @@ export default {
     '彻底删除': 'Eliminar definitivamente',
     '彻底删除该条目？不可恢复，已录入单据不受影响。': '¿Eliminar esta entrada definitivamente? No se puede deshacer. Las hojas registradas no se ven afectadas.',
     '已彻底删除': 'Entrada eliminada definitivamente',
+    '已是最大列数': 'Número máximo de columnas',
   },
 }

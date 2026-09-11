@@ -1346,5 +1346,6 @@ export default {
     '彻底删除': 'Supprimer définitivement',
     '彻底删除该条目？不可恢复，已录入单据不受影响。': 'Supprimer définitivement cette entrée ? Action irréversible. Les fiches saisies ne sont pas affectées.',
     '已彻底删除': 'Entrée supprimée définitivement',
+    '已是最大列数': 'Nombre maximal de colonnes atteint',
   },
 }

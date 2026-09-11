@@ -1346,5 +1346,6 @@ export default {
     '彻底删除': 'Endgültig löschen',
     '彻底删除该条目？不可恢复，已录入单据不受影响。': 'Diesen Eintrag endgültig löschen? Nicht wiederherstellbar. Erfasste Bögen sind nicht betroffen.',
     '已彻底删除': 'Eintrag endgültig gelöscht',
+    '已是最大列数': 'Maximale Spaltenzahl erreicht',
   },
 }

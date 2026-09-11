@@ -1553,5 +1553,6 @@ export default {
     '彻底删除': 'Delete Permanently',
     '彻底删除该条目？不可恢复，已录入单据不受影响。': 'Delete this entry permanently? This cannot be undone. Recorded sheets are not affected.',
     '已彻底删除': 'Entry permanently deleted',
+    '已是最大列数': 'Maximum column count reached',
   },
 }

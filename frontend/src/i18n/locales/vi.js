@@ -1351,5 +1351,12 @@ export default {
     '彻底删除': 'Xóa vĩnh viễn',
     '彻底删除该条目？不可恢复，已录入单据不受影响。': 'Xóa vĩnh viễn mục này? Không thể khôi phục. Chứng từ đã nhập không bị ảnh hưởng.',
     '已彻底删除': 'Đã xóa vĩnh viễn',
+    '样品列': 'Cột mẫu',
+    '增加样品列': 'Thêm cột mẫu',
+    '减少样品列(清空该列数据)': 'Bớt cột mẫu (xóa dữ liệu cột đó)',
+    '减少样品列': 'Bớt cột mẫu',
+    '减少样品列将清空该列已填数据，确定减少吗？': 'Bớt cột mẫu sẽ xóa dữ liệu đã nhập trong cột đó. Tiếp tục?',
+    '已是最少列数': 'Đã đạt số cột tối thiểu',
+    '已是最大列数': 'Đã đạt số cột tối đa',
   },
 }

@@ -76,67 +76,71 @@
       </tbody>
     </table>
 
+    <!-- ═══ 样品列控制(表格外,紧邻 1.基本信息 的 样品信息 行;打印隐藏;减列清空该列数据) ═══ -->
+    <div v-if="editable" class="rs-sample-ctl">
+      <span class="rs-sample-label">{{ tt('样品列') }}</span>
+      <span class="rs-sample-btn" :class="{ dim: sampleCount <= MIN_SAMPLES }" :title="tt('减少样品列(清空该列数据)')" @click="setSampleCount(sampleCount - 1)">－</span>
+      <span class="rs-sample-num">{{ sampleCount }}</span>
+      <span class="rs-sample-btn" :class="{ dim: sampleCount >= MAX_SAMPLES }" :title="tt('增加样品列')" @click="setSampleCount(sampleCount + 1)">＋</span>
+    </div>
+
     <!-- ═══ 1.基本信息 ═══ -->
     <table class="rs-t">
-      <colgroup><col style="width:170px" /><col style="width:auto" /><col style="width:auto" /></colgroup>
+      <colgroup><col style="width:170px" /><col v-for="n in sampleCount" :key="'bc' + n" style="width:auto" /></colgroup>
       <tbody>
-        <tr><td colspan="3" class="rs-sectionbar">{{ tt('1.基本信息') }}</td></tr>
+        <tr><td :colspan="sampleCount + 1" class="rs-sectionbar">{{ tt('1.基本信息') }}</td></tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('测试目的/背景') }}</td>
-          <td class="rs-td" colspan="2">
+          <td class="rs-td" :colspan="sampleCount">
             <el-input v-if="editable" v-model="head['测试目的/背景']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['测试目的/背景'] || '' }}</span>
           </td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('规格') }}</td>
-          <td class="rs-td" colspan="2">
+          <td class="rs-td" :colspan="sampleCount">
             <el-input v-if="editable" v-model="head['规格']" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['规格'] || '' }}</span>
           </td>
         </tr>
         <tr class="rs-row-mid">
           <td class="rs-td rs-label">{{ tt('样品配方') }}</td>
-          <td class="rs-td">
+          <td class="rs-td" :colspan="sampleCount">
             <el-input v-if="editable" v-model="head['样品配方']" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" maxlength="300" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['样品配方'] || '' }}</span>
           </td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('样品信息') }}</td>
-          <td class="rs-td">
-            <el-input v-if="editable" v-model="head['样品信息1']" type="textarea" :autosize="{ minRows: 3, maxRows: 12 }" size="small" class="rs-t-in" @input="emit('dirty')" />
-            <span v-else class="rs-txt">{{ head['样品信息1'] || '' }}</span>
-          </td>
-          <td class="rs-td">
-            <el-input v-if="editable" v-model="head['样品信息2']" type="textarea" :autosize="{ minRows: 3, maxRows: 12 }" size="small" class="rs-t-in" @input="emit('dirty')" />
-            <span v-else class="rs-txt">{{ head['样品信息2'] || '' }}</span>
+          <td v-for="n in sampleCount" :key="'si' + n" class="rs-td">
+            <el-input v-if="editable" v-model="head['样品信息' + n]" type="textarea" :autosize="{ minRows: 3, maxRows: 12 }" size="small" class="rs-t-in" @input="emit('dirty')" />
+            <span v-else class="rs-txt">{{ head['样品信息' + n] || '' }}</span>
           </td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('测试要求') }}</td>
-          <td class="rs-td" colspan="2">
+          <td class="rs-td" :colspan="sampleCount">
             <el-input v-if="editable" v-model="head['测试要求']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['测试要求'] || '' }}</span>
           </td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('测试标准') }}</td>
-          <td class="rs-td" colspan="2">
+          <td class="rs-td" :colspan="sampleCount">
             <el-input v-if="editable" v-model="head['测试标准']" size="small" maxlength="300" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['测试标准'] || '' }}</span>
           </td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('测试时间') }}</td>
-          <td class="rs-td" colspan="2">
+          <td class="rs-td" :colspan="sampleCount">
             <el-input v-if="editable" v-model="head['测试时间']" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['测试时间'] || '' }}</span>
           </td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('本次实验目的') }}</td>
-          <td class="rs-td" colspan="2">
+          <td class="rs-td" :colspan="sampleCount">
             <el-input v-if="editable" v-model="head['本次实验目的']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['本次实验目的'] || '' }}</span>
           </td>
@@ -146,37 +150,33 @@
 
     <!-- ═══ 2.测试条件 ═══ -->
     <table class="rs-t">
-      <colgroup><col style="width:170px" /><col style="width:auto" /><col style="width:auto" /></colgroup>
+      <colgroup><col style="width:170px" /><col v-for="n in sampleCount" :key="'cc' + n" style="width:auto" /></colgroup>
       <tbody>
-        <tr><td colspan="3" class="rs-sectionbar">{{ tt('2.测试条件') }}</td></tr>
+        <tr><td :colspan="sampleCount + 1" class="rs-sectionbar">{{ tt('2.测试条件') }}</td></tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('测试装置及编号') }}</td>
-          <td class="rs-td">
-            <el-input v-if="editable" v-model="head['测试装置及编号1']" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
-            <span v-else class="rs-txt">{{ head['测试装置及编号1'] || '' }}</span>
-          </td>
-          <td class="rs-td">
-            <el-input v-if="editable" v-model="head['测试装置及编号2']" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
-            <span v-else class="rs-txt">{{ head['测试装置及编号2'] || '' }}</span>
+          <td v-for="n in sampleCount" :key="'td' + n" class="rs-td">
+            <el-input v-if="editable" v-model="head['测试装置及编号' + n]" size="small" maxlength="200" class="rs-t-in" @input="emit('dirty')" />
+            <span v-else class="rs-txt">{{ head['测试装置及编号' + n] || '' }}</span>
           </td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('加标方式') }}</td>
-          <td class="rs-td" colspan="2">
+          <td class="rs-td" :colspan="sampleCount">
             <el-input v-if="editable" v-model="head['加标方式']" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['加标方式'] || '' }}</span>
           </td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('冲水方式') }}</td>
-          <td class="rs-td" colspan="2">
+          <td class="rs-td" :colspan="sampleCount">
             <el-input v-if="editable" v-model="head['冲水方式']" type="textarea" :autosize="{ minRows: 3, maxRows: 12 }" size="small" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['冲水方式'] || '' }}</span>
           </td>
         </tr>
         <tr>
           <td class="rs-td rs-label">{{ tt('测试用仪器/检出限') }}</td>
-          <td class="rs-td" colspan="2">
+          <td class="rs-td" :colspan="sampleCount">
             <el-input v-if="editable" v-model="head['测试用仪器/检出限']" size="small" maxlength="500" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head['测试用仪器/检出限'] || '' }}</span>
           </td>
@@ -214,19 +214,22 @@
       </tbody>
     </table>
 
-    <!-- ═══ 3.数据记录表 ═══ -->
+    <!-- ═══ 3.数据记录表(样品组列随样品数,总宽恒定:组总宽÷列数) ═══ -->
     <table class="rs-t rs-dt">
       <colgroup>
         <col v-if="!dtHidden('冲水时间')" style="width:130px" />
         <col v-if="!dtHidden('累计进水（L）')" style="width:96px" />
         <col v-if="!dtHidden('水温（℃）')" style="width:80px" />
-        <col v-if="!dtHidden('压力（PSI)样品1')" style="width:110px" />
-        <col v-if="!dtHidden('压力（PSI)样品2')" style="width:110px" />
+        <template v-for="n in sampleCount" :key="'cp' + n">
+          <col v-if="!dtHidden(`压力（PSI)样品${n}`)" :style="{ width: pressColW + 'px' }" />
+        </template>
         <col v-if="!dtHidden('原水含量（ug/L）5号缸')" style="width:96px" />
-        <col v-if="!dtHidden('出水含量（ug/L）样品1')" style="width:96px" />
-        <col v-if="!dtHidden('出水含量（ug/L）样品2')" style="width:96px" />
-        <col v-if="!dtHidden('去除率%样品1')" style="width:96px" />
-        <col v-if="!dtHidden('去除率%样品2')" style="width:96px" />
+        <template v-for="n in sampleCount" :key="'co' + n">
+          <col v-if="!dtHidden(`出水含量（ug/L）样品${n}`)" :style="{ width: outColW + 'px' }" />
+        </template>
+        <template v-for="n in sampleCount" :key="'cr' + n">
+          <col v-if="!dtHidden(`去除率%样品${n}`)" :style="{ width: outColW + 'px' }" />
+        </template>
         <col v-if="!dtHidden('测试时间')" style="width:110px" />
         <col v-if="editable" style="width:60px" />
       </colgroup>
@@ -247,36 +250,36 @@
           <th v-if="editable" class="rs-th rs-th-op" rowspan="2"></th>
         </tr>
         <tr class="rs-grp2">
-          <th v-if="!dtHidden('压力（PSI)样品1')" class="rs-th">{{ dtLabel('压力（PSI)样品1', '样品1') }}</th>
-          <th v-if="!dtHidden('压力（PSI)样品2')" class="rs-th">{{ dtLabel('压力（PSI)样品2', '样品2') }}</th>
-          <th v-if="!dtHidden('出水含量（ug/L）样品1')" class="rs-th">{{ dtLabel('出水含量（ug/L）样品1', '样品1') }}</th>
-          <th v-if="!dtHidden('出水含量（ug/L）样品2')" class="rs-th">{{ dtLabel('出水含量（ug/L）样品2', '样品2') }}</th>
-          <th v-if="!dtHidden('去除率%样品1')" class="rs-th">{{ dtLabel('去除率%样品1', '样品1') }}</th>
-          <th v-if="!dtHidden('去除率%样品2')" class="rs-th">{{ dtLabel('去除率%样品2', '样品2') }}</th>
+          <template v-for="n in sampleCount" :key="'hp' + n">
+            <th v-if="!dtHidden(`压力（PSI)样品${n}`)" class="rs-th">{{ dtLabel(`压力（PSI)样品${n}`, `样品${n}`) }}</th>
+          </template>
+          <template v-for="n in sampleCount" :key="'ho' + n">
+            <th v-if="!dtHidden(`出水含量（ug/L）样品${n}`)" class="rs-th">{{ dtLabel(`出水含量（ug/L）样品${n}`, `样品${n}`) }}</th>
+          </template>
+          <template v-for="n in sampleCount" :key="'hr' + n">
+            <th v-if="!dtHidden(`去除率%样品${n}`)" class="rs-th">{{ dtLabel(`去除率%样品${n}`, `样品${n}`) }}</th>
+          </template>
         </tr>
         <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
           <td v-if="!dtHidden('冲水时间')" class="rs-td"><el-input v-if="editable" v-model="row['冲水时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['冲水时间'] || ' / ' }}</span></td>
           <td v-if="!dtHidden('累计进水（L）')" class="rs-td"><el-input v-if="editable" v-model="row['累计进水（L）']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['累计进水（L）'] || ' / ' }}</span></td>
           <td v-if="!dtHidden('水温（℃）')" class="rs-td"><el-input v-if="editable" v-model="row['水温（℃）']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['水温（℃）'] || ' / ' }}</span></td>
-          <td v-if="!dtHidden('压力（PSI)样品1')" class="rs-td">
-            <div class="rs-combo">
-              <el-input v-if="editable" v-model="row['压力（PSI)样品1']" size="small" class="rs-c-in hl" placeholder="压力" @input="emit('dirty')" />
-              <el-input v-if="editable" v-model="row['流速（L/min)样品1']" size="small" class="rs-c-in hl" placeholder="流速" @input="emit('dirty')" />
-              <span v-else class="rs-txt">{{ combo(row, '压力（PSI)样品1', '流速（L/min)样品1') }}</span>
-            </div>
-          </td>
-          <td v-if="!dtHidden('压力（PSI)样品2')" class="rs-td">
-            <div class="rs-combo">
-              <el-input v-if="editable" v-model="row['压力（PSI)样品2']" size="small" class="rs-c-in hl" placeholder="压力" @input="emit('dirty')" />
-              <el-input v-if="editable" v-model="row['流速（L/min)样品2']" size="small" class="rs-c-in hl" placeholder="流速" @input="emit('dirty')" />
-              <span v-else class="rs-txt">{{ combo(row, '压力（PSI)样品2', '流速（L/min)样品2') }}</span>
-            </div>
-          </td>
+          <template v-for="n in sampleCount" :key="'dp' + n">
+            <td v-if="!dtHidden(`压力（PSI)样品${n}`)" class="rs-td">
+              <div class="rs-combo">
+                <el-input v-if="editable" v-model="row[`压力（PSI)样品${n}`]" size="small" class="rs-c-in hl" placeholder="压力" @input="emit('dirty')" />
+                <el-input v-if="editable" v-model="row[`流速（L/min)样品${n}`]" size="small" class="rs-c-in hl" placeholder="流速" @input="emit('dirty')" />
+                <span v-else class="rs-txt">{{ combo(row, `压力（PSI)样品${n}`, `流速（L/min)样品${n}`) }}</span>
+              </div>
+            </td>
+          </template>
           <td v-if="!dtHidden('原水含量（ug/L）5号缸')" class="rs-td"><el-input v-if="editable" v-model="row['原水含量（ug/L）5号缸']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['原水含量（ug/L）5号缸'] || ' / ' }}</span></td>
-          <td v-if="!dtHidden('出水含量（ug/L）样品1')" class="rs-td"><el-input v-if="editable" v-model="row['出水含量（ug/L）样品1']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['出水含量（ug/L）样品1'] || ' / ' }}</span></td>
-          <td v-if="!dtHidden('出水含量（ug/L）样品2')" class="rs-td"><el-input v-if="editable" v-model="row['出水含量（ug/L）样品2']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['出水含量（ug/L）样品2'] || ' / ' }}</span></td>
-          <td v-if="!dtHidden('去除率%样品1')" class="rs-td"><el-input v-if="editable" v-model="row['去除率%样品1']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['去除率%样品1'] || ' / ' }}</span></td>
-          <td v-if="!dtHidden('去除率%样品2')" class="rs-td"><el-input v-if="editable" v-model="row['去除率%样品2']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['去除率%样品2'] || ' / ' }}</span></td>
+          <template v-for="n in sampleCount" :key="'do' + n">
+            <td v-if="!dtHidden(`出水含量（ug/L）样品${n}`)" class="rs-td"><el-input v-if="editable" v-model="row[`出水含量（ug/L）样品${n}`]" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row[`出水含量（ug/L）样品${n}`] || ' / ' }}</span></td>
+          </template>
+          <template v-for="n in sampleCount" :key="'dr' + n">
+            <td v-if="!dtHidden(`去除率%样品${n}`)" class="rs-td"><el-input v-if="editable" v-model="row[`去除率%样品${n}`]" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row[`去除率%样品${n}`] || ' / ' }}</span></td>
+          </template>
           <td v-if="!dtHidden('测试时间')" class="rs-td"><el-input v-if="editable" v-model="row['测试时间']" size="small" class="rs-c-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ row['测试时间'] || ' / ' }}</span></td>
           <td v-if="editable" class="rs-td rs-td-op"><span class="rs-op-add" @click="addRow(i)">＋</span><span class="rs-op-del" @click="removeRow(i)">×</span></td>
         </tr>
@@ -328,7 +331,7 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue'
 import { tt } from '@/i18n'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import RefPickDialog from './RefPickDialog.vue'
@@ -376,26 +379,77 @@ function onProdRefConfirm(rows) {
 }
 
 // ── 3.数据记录表:列名(别名)与显隐可配置,与其余 7 张同一接口(字段编辑) ──
-// 分组表头(取样前样品/出水含量/去除率)各管两列;隐藏一列时分组标题 colspan 自动收缩,两列都隐藏则整组不渲染。
-const DT_GROUPS = {
-  压力: { label: '取样前样品：压力（PSI)/流速（L/min）', keys: ['压力（PSI)样品1', '压力（PSI)样品2'] },
-  出水: { label: '出水含量（ug/L）', keys: ['出水含量（ug/L）样品1', '出水含量（ug/L）样品2'] },
-  去除率: { label: '去除率%', keys: ['去除率%样品1', '去除率%样品2'] },
+// 分组表头(取样前样品/出水含量/去除率)各管"样品数"列;隐藏一列时分组标题 colspan 自动收缩,全隐藏则整组不渲染。
+// ── 动态样品列(2026-09-11):默认 2 列,2~6 列可调 ──
+// 计数存头字段「样品数」(物理列 预置到 样品6,见 tools/migrate-filter-eff-samples.sql);
+// 加列即时生效;减列**清空被减列数据**(用户口径,确认弹窗);总表宽恒定——样品组总宽不变,列宽=组总宽÷列数。
+const MIN_SAMPLES = 2
+const MAX_SAMPLES = 6
+const sampleCount = computed(() => {
+  const n = parseInt(props.head?.['样品数'], 10)
+  return Math.min(MAX_SAMPLES, Math.max(MIN_SAMPLES, Number.isFinite(n) ? n : MIN_SAMPLES))
+})
+async function setSampleCount(n) {
+  if (!props.editable) return
+  const cur = sampleCount.value
+  if (n === cur) return
+  if (n < MIN_SAMPLES) return ElMessage.warning(tt('已是最少列数'))
+  if (n > MAX_SAMPLES) return ElMessage.warning(tt('已是最大列数'))
+  if (n < cur) {
+    try {
+      await ElMessageBox.confirm(tt('减少样品列将清空该列已填数据，确定减少吗？'), tt('减少样品列'),
+        { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') })
+    } catch { return /* 取消 */ }
+    const drop = cur
+    props.head[`样品信息${drop}`] = ''
+    props.head[`测试装置及编号${drop}`] = ''
+    for (const row of props.head?.detail?.items || []) {
+      row[`压力（PSI)样品${drop}`] = ''
+      row[`流速（L/min)样品${drop}`] = ''
+      row[`出水含量（ug/L）样品${drop}`] = ''
+      row[`去除率%样品${drop}`] = ''
+    }
+  }
+  props.head['样品数'] = String(n)
+  emit('dirty')
 }
-/** 数据记录表 11 列(键=数据键,label=纸面默认表头) */
-const DT_COLUMNS = [
-  { key: '冲水时间', label: '冲水时间' },
-  { key: '累计进水（L）', label: '累计进水（L）' },
-  { key: '水温（℃）', label: '水温（℃）' },
-  { key: '压力（PSI)样品1', label: '样品1（压力/流速）' },
-  { key: '压力（PSI)样品2', label: '样品2（压力/流速）' },
-  { key: '原水含量（ug/L）5号缸', label: '原水含量（ug/L）' },
-  { key: '出水含量（ug/L）样品1', label: '样品1' },
-  { key: '出水含量（ug/L）样品2', label: '样品2' },
-  { key: '去除率%样品1', label: '样品1' },
-  { key: '去除率%样品2', label: '样品2' },
-  { key: '测试时间', label: '测试时间' },
-]
+/** 样品组列宽:组总宽÷当前列数(总宽恒定,维持表格整齐;下限防过窄) */
+const pressColW = computed(() => Math.max(34, Math.floor(220 / sampleCount.value)))
+const outColW = computed(() => Math.max(30, Math.floor(192 / sampleCount.value)))
+/** 某样品组的物理列键(1..样品数) */
+function sampleKeys(prefix) {
+  return Array.from({ length: sampleCount.value }, (_, i) => `${prefix}${i + 1}`)
+}
+const DT_GROUPS = {
+  压力: { label: '取样前样品：压力（PSI)/流速（L/min）', prefix: '压力（PSI)样品' },
+  出水: { label: '出水含量（ug/L）', prefix: '出水含量（ug/L）样品' },
+  去除率: { label: '去除率%', prefix: '去除率%样品' },
+}
+/** 数据记录表全部物理列(键=数据键,label=纸面默认表头;样品列到 6,字段编辑可管全部) */
+const DT_COLUMNS = (() => {
+  const cols = [
+    { key: '冲水时间', label: '冲水时间' },
+    { key: '累计进水（L）', label: '累计进水（L）' },
+    { key: '水温（℃）', label: '水温（℃）' },
+  ]
+  for (let n = 1; n <= MAX_SAMPLES; n++) cols.push({ key: `压力（PSI)样品${n}`, label: `样品${n}（压力/流速）` })
+  cols.push({ key: '原水含量（ug/L）5号缸', label: '原水含量（ug/L）' })
+  for (let n = 1; n <= MAX_SAMPLES; n++) cols.push({ key: `出水含量（ug/L）样品${n}`, label: `样品${n}` })
+  for (let n = 1; n <= MAX_SAMPLES; n++) cols.push({ key: `去除率%样品${n}`, label: `样品${n}` })
+  cols.push({ key: '测试时间', label: '测试时间' })
+  return cols
+})()
+/** 当前渲染的列键序(固定列 + 各样品组 1..样品数 中未隐藏者) */
+const dtRenderedKeys = computed(() => {
+  const keys = []
+  for (const k of ['冲水时间', '累计进水（L）', '水温（℃）']) if (!dtHidden(k)) keys.push(k)
+  for (const k of sampleKeys(DT_GROUPS.压力.prefix)) if (!dtHidden(k)) keys.push(k)
+  if (!dtHidden('原水含量（ug/L）5号缸')) keys.push('原水含量（ug/L）5号缸')
+  for (const k of sampleKeys(DT_GROUPS.出水.prefix)) if (!dtHidden(k)) keys.push(k)
+  for (const k of sampleKeys(DT_GROUPS.去除率.prefix)) if (!dtHidden(k)) keys.push(k)
+  if (!dtHidden('测试时间')) keys.push('测试时间')
+  return keys
+})
 function dtFieldOf(key) {
   return fieldMap.value.get(key)
 }
@@ -406,13 +460,13 @@ function dtLabel(key, fallback) {
   return resolveColumnLabel(dtFieldOf(key), fallback || key)
 }
 function dtGroupSpan(name) {
-  return (DT_GROUPS[name]?.keys || []).filter((k) => !dtHidden(k)).length
+  return sampleKeys(DT_GROUPS[name]?.prefix || '').filter((k) => !dtHidden(k)).length
 }
 function dtGroupLabel(name) {
   const g = DT_GROUPS[name]
   return g ? tt(g.label) : ''
 }
-const dtColSpan = computed(() => DT_COLUMNS.filter((c) => !dtHidden(c.key)).length + (props.editable ? 1 : 0))
+const dtColSpan = computed(() => dtRenderedKeys.value.length + (props.editable ? 1 : 0))
 
 /** 字段编辑弹窗:改列别名/显隐(存 yj_field.alias/visible,全用户共享) */
 const fieldEditVisible = ref(false)
@@ -783,6 +837,33 @@ function removeRow(i) {
 .rs-water-val :deep(.el-select) {
   width: 64px;
 }
+
+/* ═══ 样品列控制(表格外,紧邻 样品信息 行;打印隐藏) ═══ */
+.rs-sample-ctl {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 0 0 6px;
+  user-select: none;
+}
+.rs-sample-label { font-size: 12.5px; color: #1c4f8a; }
+.rs-sample-btn {
+  width: 22px;
+  height: 22px;
+  line-height: 20px;
+  text-align: center;
+  border: 1px solid #8fb4e0;
+  border-radius: 3px;
+  color: #0d5bd3;
+  background: #f4f9ff;
+  cursor: pointer;
+  font-size: 14px;
+}
+.rs-sample-btn:hover { background: #e8f2ff; }
+.rs-sample-btn.dim { color: #b6c2d0; border-color: #d4dde6; background: #f7fafc; cursor: not-allowed; }
+.rs-sample-num { min-width: 18px; text-align: center; font-size: 13px; color: #333; font-weight: 600; }
+@media print { .rs-sample-ctl { display: none !important; } }
 
 /* ═══ 数据记录表 ═══ */
 .rs-th {
