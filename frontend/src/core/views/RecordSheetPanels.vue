@@ -516,9 +516,10 @@
           <div class="lib-custom-form">
             <el-input v-model="libCGroup" size="small" :readonly="!!libCEditId" :title="libCEditId ? tt('组名是条目的归属(item_code)，编辑接口不改它；要换组请新建条目') : ''" :placeholder="tt('检验项目(组名)')" />
             <el-input v-model="libCSub" size="small" :placeholder="tt('子项目(可空)')" />
-            <el-input v-model="libCReq" size="small" type="textarea" :rows="2" :placeholder="tt('检验要求')" />
-            <el-input v-model="libCMethod" size="small" :placeholder="tt('检验方法')" />
-            <el-input v-model="libCBasis" size="small" :placeholder="tt('检验依据')" />
+            <!-- 长文本字段自适应:autosize 随内容增高(编辑带入长值不再挤在 2 行小框里),宽度加宽 -->
+            <el-input v-model="libCReq" size="small" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" class="lib-wide" :placeholder="tt('检验要求')" />
+            <el-input v-model="libCMethod" size="small" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" class="lib-wide" :placeholder="tt('检验方法')" />
+            <el-input v-model="libCBasis" size="small" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" class="lib-wide" :placeholder="tt('检验依据')" />
             <el-button size="small" type="primary" @click="addCustomTestLib">{{ libCEditId ? tt('保存修改') : tt('存入标准库') }}</el-button>
             <el-button v-if="libCEditId" size="small" @click="cancelEditTestLib">{{ tt('取消编辑') }}</el-button>
           </div>
@@ -558,10 +559,11 @@
           <el-input v-model="libFControl" size="small" :placeholder="tt('控制项目')" />
           <el-input v-model="libFQuality" size="small" :placeholder="tt('质量控制内容')" />
           <el-input v-model="libFInstrument" size="small" :placeholder="tt('检测仪器、工具')" />
-          <el-input v-model="libFStandard" size="small" type="textarea" :rows="2" :placeholder="tt('控制标准及要求')" />
+          <!-- 长文本字段自适应:autosize 随内容增高,宽度加宽 -->
+          <el-input v-model="libFStandard" size="small" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" class="lib-wide" :placeholder="tt('控制标准及要求')" />
           <el-input v-model="libFFrequency" size="small" :placeholder="tt('检测频率')" />
-          <el-input v-model="libFContent" size="small" :placeholder="tt('检验内容')" />
-          <el-input v-model="libFMethod" size="small" :placeholder="tt('控制方法')" />
+          <el-input v-model="libFContent" size="small" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" class="lib-wide" :placeholder="tt('检验内容')" />
+          <el-input v-model="libFMethod" size="small" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" class="lib-wide" :placeholder="tt('控制方法')" />
           <el-button size="small" type="primary" @click="addCustomFlatLib">{{ libFEditId ? tt('保存修改') : tt('存入标准库') }}</el-button>
           <el-button v-if="libFEditId" size="small" @click="cancelEditFlatLib">{{ tt('取消编辑') }}</el-button>
         </div>
@@ -1944,6 +1946,15 @@ function chartOf(dt) {
 .lib-custom-form .el-input,
 .lib-custom-form .el-textarea {
   width: 200px;
+}
+/* 长文本编辑域:加宽 + 自适应高度(autosize);换行不断词 */
+.lib-custom-form .lib-wide {
+  width: 460px;
+}
+.lib-custom-form .lib-wide .el-textarea__inner {
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
 }
 
 /* 章节标准库 */
