@@ -15,7 +15,7 @@
       <!-- 右上角:配置为参照时(项目实施计划→立项申请右上角编号)点击弹参照;否则保持手填(默认 YJ-XS002 模板号) -->
       <div class="as-docno">
         <div v-if="editable && isRefKey('文档编号')" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
-          <span class="as-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
+          <span class="as-ref-text" :class="{ 'is-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('单据编号：') }}</span>
           <el-icon class="as-ref-ico"><Search /></el-icon>
         </div>
         <el-input
@@ -24,6 +24,7 @@
           size="small"
           maxlength="30"
           class="as-docno-input"
+          :placeholder="tt('单据编号：')"
           @input="emit('dirty')"
         />
         <template v-else>{{ head['文档编号'] || head['单据编号'] || 'YJ-XS002' }}</template>
@@ -496,6 +497,7 @@ defineExpose({ focusField })
   color: #333;
   text-align: right;
 }
+.as-ref-text.is-empty { color: #a8b6c4; }   /* 空值时的背景提示词,与 input placeholder 同观感 */
 .as-ref-ico {
   flex-shrink: 0;
   font-size: 13px;

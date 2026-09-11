@@ -1442,6 +1442,7 @@ export default {
     '保存失败': 'Save failed',
     '删除失败': 'Delete failed',
     '关闭': 'Close',
+    '单据编号：': 'Doc No.: ',
     '标准库维护': 'Standard Library',
     '新增条目': 'New entry',
     '加入标准库': 'Add to library',
