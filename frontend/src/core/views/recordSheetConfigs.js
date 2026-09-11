@@ -860,15 +860,18 @@ export const recordSheetConfigs = {
   RD_ASM_PROC: {
     headMode: 'plain',
     plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单',
-    // ── 页签:页 1 = plain 清单原版式;页 2 = 组装BOM表原版式(report 报告头 + 4 列网格)──
-    // 页 1 不声明 headMode/head ⇒ 用面板缺省 plain(标题条 + 本表自持列宽 130/320/430/120),无报告头;
-    // 页 2 声明 headMode:'report' 且 showHead:true ⇒ 原样渲染自己的报告头 + 4 列网格 + pairs 区块 + 两张原表。
+    // ── 页签:页 1 = 组装BOM表(report 报告头 + 4 列网格,info:[] 原版无信息块);页 2 = 组装工艺清单(plain 清单)──
+    // 2026-09-11 按用户要求调换顺序(BOM 在前);页归属翻转用 map 改写 page,RD_ASM_BOM 原配置保持不动(回滚参考)。
+    // BOM 页声明 info:[] = 原版无右侧信息块——修复误回退默认四件套导致大标题挤进第一列(130px)的错位。
     pages: [
+      { title: '组装BOM表', headMode: 'report', grid: [130, 390, 130, 390], showHead: true, staticTitle: '组装BOM表', info: [], head: { title: 2, infoLabel: 1, infoValue: 1 } },
       { title: '组装工艺清单' },
-      { title: '组装BOM表', headMode: 'report', grid: [130, 390, 130, 390], showHead: true, staticTitle: '组装BOM表' },
     ],
-    sections: [...RD_ASM_BOM.sections],
-    dataTables: [...RD_ASM_PROC_DT0, ...RD_ASM_BOM.dataTables],
+    sections: RD_ASM_BOM.sections.map((s) => ({ ...s, page: 0 })),
+    dataTables: [
+      ...RD_ASM_PROC_DT0.map((dt) => ({ ...dt, page: 1 })),
+      ...RD_ASM_BOM.dataTables.map((dt) => ({ ...dt, page: 0 })),
+    ],
   },
 
   // 规格书:通用模板(所有产品种类共用一套结构,规格书种类仅作单据分类)——

@@ -739,7 +739,8 @@ const activePageMeta = computed(() => cfg.value?.pages?.[activePage.value] || nu
  *  成型配方 13 列 / 组装BOM表 4 列 130·390·130·390),共用一个网格会把其中一页的列宽挤变形。
  *  退化顺序:本页 pages[i].grid → 变体 grid → 面板 grid。页面未声明 grid 时与改造前逐字等价。 */
 const effGrid = computed(() => activePageMeta.value?.grid || activeVariant.value?.grid || cfg.value?.grid || [])
-const effHead = computed(() => activeVariant.value?.head || cfg.value?.head || {})
+/** 报告头布局:页声明可覆盖(title 跨列数等),与 grid/headMode 同一套按页退化 */
+const effHead = computed(() => ({ ...(activeVariant.value?.head || cfg.value?.head || {}), ...(activePageMeta.value?.head || {}) }))
 /** 生效版式:'report'(报告头)| 'plain'(标题条登记表)——同样支持按页声明(页各按原貌渲染)。
  *  退化顺序:本页 pages[i].headMode / pages[i].plain → 变体 headMode → 面板 headMode。 */
 const effPlain = computed(() => {
@@ -807,6 +808,11 @@ const DEFAULT_INFO = [
   { label: '报告编号', key: '报告编号', type: 'text' },
 ]
 const effInfo = computed(() => {
+  // 多页签面板可按页声明 pages[i].info:被并入的页各有各的信息块(含**空数组=无信息块**,
+  // 如组装BOM表原版 info:[])——页声明优先,未声明才退面板级,再退默认四件套。
+  // 修复:BOM 页未声明时误回退默认信息块,大标题被挤进第一列(130px)错位。
+  const m = activePageMeta.value
+  if (m && m.info !== undefined) return m.info
   const info = cfg.value?.info
   if (info === undefined) return DEFAULT_INFO
   return info
