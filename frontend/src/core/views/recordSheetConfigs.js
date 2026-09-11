@@ -735,7 +735,8 @@ export const recordSheetConfigs = {
       ]},
       { bar: '四、文件与签署', rows: [
         { pairs: [
-          { label: '客户图纸或规格书', key: '客户图纸或规格书', vspan: 3 },
+          // 客户图纸或规格书:附件字段(源 Excel 该格提示即"上传图片")——上传保留原文件名,点击查看,打印/PDF 只见文件名
+          { label: '客户图纸或规格书', key: '客户图纸或规格书', type: 'file', vspan: 3 },
         ]},
         { pairs: [
           { label: '责任人', key: '责任人', type: 'text' },

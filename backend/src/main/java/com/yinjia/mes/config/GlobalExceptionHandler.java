@@ -27,7 +27,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ApiResult<Void> handleMaxUploadSize(MaxUploadSizeExceededException e) {
-        return ApiResult.fail(400, "图片不能超过10MB");
+        return ApiResult.fail(400, "上传文件不能超过20MB(OCR 扫描图片仍限 10MB)");
     }
 
     @ExceptionHandler(MissingServletRequestPartException.class)

@@ -3,6 +3,10 @@
 # Output: C:\INCER\YINJIA-MES\deploy\app.jar -> copy to server C:\yinjia\update\ then run update.bat
 
 $ErrorActionPreference = 'Stop'
+# PS7.4+: native stderr warnings (e.g. rollup) must not terminate under EAP=Stop
+if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -Scope Global -ErrorAction SilentlyContinue) {
+    $Global:PSNativeCommandUseErrorActionPreference = $false
+}
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $root     = 'C:\INCER\YINJIA-MES'
 $frontend = "$root\frontend"
@@ -15,8 +19,14 @@ $jarTool  = 'C:\Program Files\Java\jdk-24\bin\jar.exe'
 
 Write-Host '=== 1/5 Frontend build ===' -ForegroundColor Cyan
 Push-Location $frontend
-npm run build 2>&1 | Select-String 'built in|error' | ForEach-Object { $_.Line }
-if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }
+# native stderr (rollup warnings) becomes terminating ErrorRecords under EAP=Stop on PS5.1 -> lower it locally
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = 'Continue'
+$npmOut = @(npm run build 2>&1)
+$npmExit = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+$npmOut | ForEach-Object { "$_" } | Select-String 'built in|error' | ForEach-Object { $_.Line }
+if ($npmExit -ne 0) { throw "Frontend build failed" }
 Pop-Location
 
 Write-Host '=== 2/5 Compile backend (full service + controller) ===' -ForegroundColor Cyan
@@ -40,10 +50,11 @@ Copy-Item "$frontend\dist\*" $static -Recurse -Force
 Write-Host '=== 4/5 Assemble fat-jar ===' -ForegroundColor Cyan
 $stage = "$backend\target\jar-hotstage"
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
-New-Item -ItemType Directory "$stage\BOOT-INF\classes\com\yinjia\mes\service", "$stage\BOOT-INF\classes\com\yinjia\mes\controller" -Force | Out-Null
+New-Item -ItemType Directory "$stage\BOOT-INF\classes\com\yinjia\mes\service", "$stage\BOOT-INF\classes\com\yinjia\mes\controller", "$stage\BOOT-INF\classes\com\yinjia\mes\config" -Force | Out-Null
 Copy-Item $static "$stage\BOOT-INF\classes\static" -Recurse -Force
 Get-ChildItem "$inspect\BOOT-INF\classes\com\yinjia\mes\service" -Filter '*.class' | Copy-Item -Destination "$stage\BOOT-INF\classes\com\yinjia\mes\service" -Force
 Get-ChildItem "$inspect\BOOT-INF\classes\com\yinjia\mes\controller" -Filter '*.class' | Copy-Item -Destination "$stage\BOOT-INF\classes\com\yinjia\mes\controller" -Force
+Get-ChildItem "$inspect\BOOT-INF\classes\com\yinjia\mes\config" -Filter '*.class' | Copy-Item -Destination "$stage\BOOT-INF\classes\com\yinjia\mes\config" -Force
 
 # Stop local dev server (holds jar file lock)
 $c = Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
