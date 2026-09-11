@@ -1,6 +1,8 @@
 package com.yinjia.mes.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -25,6 +27,8 @@ import java.util.Set;
  */
 @Service
 public class ButtonService {
+
+    private static final Logger log = LoggerFactory.getLogger(ButtonService.class);
 
     private final PanelRegistry registry;
     private final QueryService queryService;
@@ -203,6 +207,10 @@ public class ButtonService {
         if ("已中止".equals(st.get("status"))) throw new IllegalStateException("已中止单据不可保存，请先恢复");
 
         Map<String, String> l2c = def.labelToCol();
+        // 规格书修改态:落库前留「4.产品性能检验项目及检验标准」页旧值快照(表区=检验要求),
+        // 保存后比对——变了就通知关联出货检验计划表核对(编号=产品编号,2026-09-11 用户口径)
+        List<String> specTestOld = "RD_SPEC_DOC".equals(def.code()) && no != null
+                && "Y".equals(modifyStateOf(def.code(), no)) ? specTestRowsSnapshot(no) : null;
         if (split) {
             upsertHeadRow(def, head, no, user);
             upsertLineRows(def, items, no, l2c, user);
@@ -237,6 +245,8 @@ public class ButtonService {
         }
         // 修改态保存:实时刷新修改记录 diff(快照 vs 当前),修改记录随时可见已改内容
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && "Y".equals(modifyStateOf(def.code(), no))) refreshModifyDiff(def, no);
+        // 规格书修改态保存且检验项目及标准页发生变化 → 通知关联出货检验计划表(仅变更提醒,不做内容比对)
+        if (specTestOld != null) notifyInspPlansOnSpecTestChange(no, specTestOld, user);
 
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
         if (DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
@@ -270,6 +280,55 @@ public class ButtonService {
         }
         Integer dup = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
         if (dup != null && dup > 0) throw new IllegalArgumentException("文档编号不允许重复：" + docNo);
+    }
+
+    // ==================== 规格书检验项目变更 → 出货检验计划表核对提醒(2026-09-11) ====================
+
+    /** 规格书「4.产品性能检验项目及检验标准」页明细快照(表区=检验要求;[检验项目] 内含 组·子项)。
+     *  行签名=检验项目◇要求◇方法◇依据,顺序按 id——增/删/改/调序任一变化都会使快照不同。 */
+    private List<String> specTestRowsSnapshot(String no) {
+        try {
+            return jdbc.queryForList("SELECT CONVERT(nvarchar(max), ISNULL([检验项目], N'')) + N'◇' + ISNULL([检验要求], N'') "
+                            + "+ N'◇' + ISNULL([检验方法], N'') + N'◇' + ISNULL([检验依据], N'') "
+                            + "FROM rd_spec_doc_detail WHERE [单据编号] = ? AND [表区] = N'检验要求' ORDER BY id",
+                    String.class, no);
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /** 规格书修改态保存后:检验项目及标准页发生变化(快照 vs 落库后)→ 按「规格书编号 = 计划表产品编号」
+     *  找关联出货检验计划表,向其经办人+管理员发核对提醒(仅变更提醒,不做两侧内容比对——名称体系不同,
+     *  机械比对易误报;差异由经办人按新规格书人工核对)。
+     *  注:规格书的「编号」在行模型里就是单据编号(查询服务注入,物理头表无独立编号列),故直接以 specNo 关联。 */
+    private void notifyInspPlansOnSpecTestChange(String specNo, List<String> oldRows, String actor) {
+        try {
+            List<String> newRows = specTestRowsSnapshot(specNo);
+            if (newRows.equals(oldRows)) return; // 该页没变,不打扰
+            final String name = specNameOf(specNo);
+            List<String> plans = jdbc.queryForList(
+                    "SELECT [单据编号] FROM rd_insp_plan_head WHERE [产品编号] = ? AND ISNULL(asp_cancel, 'N') <> 'Y'",
+                    String.class, specNo);
+            for (String planNo : plans) {
+                List<String> targets = new ArrayList<>(messageService.admins());
+                String author = messageService.authorOf("rd_insp_plan_head", planNo);
+                if (!author.isBlank()) targets.add(author);
+                notify(() -> messageService.send(targets, MessageService.SPEC_ITEMS_CHANGED, "RD_INSP_PLAN", planNo,
+                        Map.of("specNo", specNo, "specName", name, "specCode", specNo), actor));
+            }
+        } catch (Exception e) {
+            log.warn("spec-test-change notify failed: spec={} err={}", specNo, e.getMessage());
+        }
+    }
+
+    /** 规格书名称(通知文案用;取不到返回空串不影响发送) */
+    private String specNameOf(String specNo) {
+        try {
+            return String.valueOf(jdbc.queryForObject(
+                    "SELECT ISNULL(MAX([名称]), N'') FROM rd_spec_doc_head WHERE [单据编号] = ?", String.class, specNo));
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     /** 归档标记:yj_doc_status.archived='Y'(已归档优先级:已作废>已中止>已审核>审批中>已归档>草稿);

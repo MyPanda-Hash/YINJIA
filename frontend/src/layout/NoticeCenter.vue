@@ -129,6 +129,8 @@ const MSG_TPL = {
   APPROVAL_REJECTED: { title: '审批被驳回', body: '您提交的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}' },
   MODIFY_REQUESTED: { title: '新的修改申请', body: '{actor} 申请修改「{panelName} {docNo}」，等待您审批。' },
   DELETE_REQUESTED: { title: '新的删除申请', body: '{actor} 申请删除「{panelName} {docNo}」，等待您审批。' },
+  // 规格书检验项目及标准变更 → 关联出货检验计划表核对(2026-09-11;仅变更提醒,不比对内容)
+  SPEC_ITEMS_CHANGED: { title: '规格书检验项目已更新', body: '「规格书 {specNo}（{specName}）」的产品性能检验项目及检验标准已由 {actor} 修改，与本表（{panelName} {docNo}）可能不一致，请核对本表的必测项/型式检验。' },
 }
 
 function fillTpl(text, params) {

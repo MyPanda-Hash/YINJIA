@@ -1358,5 +1358,7 @@ export default {
     '减少样品列将清空该列已填数据，确定减少吗？': 'Bớt cột mẫu sẽ xóa dữ liệu đã nhập trong cột đó. Tiếp tục?',
     '已是最少列数': 'Đã đạt số cột tối thiểu',
     '已是最大列数': 'Đã đạt số cột tối đa',
+    '规格书检验项目已更新': 'Hạng mục kiểm tra của spec đã cập nhật',
+    '「规格书 {specNo}（{specName}）」的产品性能检验项目及检验标准已由 {actor} 修改，与本表（{panelName} {docNo}）可能不一致，请核对本表的必测项/型式检验。': 'Hạng mục và tiêu chuẩn kiểm tra của "Spec {specNo} ({specName})" đã được {actor} sửa đổi, có thể không nhất quán với biểu mẫu này ({panelName} {docNo}). Vui lòng đối chiếu hạng mục bắt buộc/kiểm tra định dạng.',
   },
 }

@@ -1347,5 +1347,7 @@ export default {
     '彻底删除该条目？不可恢复，已录入单据不受影响。': '¿Eliminar esta entrada definitivamente? No se puede deshacer. Las hojas registradas no se ven afectadas.',
     '已彻底删除': 'Entrada eliminada definitivamente',
     '已是最大列数': 'Número máximo de columnas',
+    '规格书检验项目已更新': 'Ítems de inspección de la especificación actualizados',
+    '「规格书 {specNo}（{specName}）」的产品性能检验项目及检验标准已由 {actor} 修改，与本表（{panelName} {docNo}）可能不一致，请核对本表的必测项/型式检验。': 'Los ítems y estándares de inspección de la "Especificación {specNo} ({specName})" fueron modificados por {actor} y pueden ser inconsistentes con esta hoja ({panelName} {docNo}). Revise los ítems obligatorios/de inspección de tipo.',
   },
 }

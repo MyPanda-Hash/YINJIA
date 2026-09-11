@@ -1554,5 +1554,7 @@ export default {
     '彻底删除该条目？不可恢复，已录入单据不受影响。': 'Delete this entry permanently? This cannot be undone. Recorded sheets are not affected.',
     '已彻底删除': 'Entry permanently deleted',
     '已是最大列数': 'Maximum column count reached',
+    '规格书检验项目已更新': 'Spec inspection items updated',
+    '「规格书 {specNo}（{specName}）」的产品性能检验项目及检验标准已由 {actor} 修改，与本表（{panelName} {docNo}）可能不一致，请核对本表的必测项/型式检验。': 'The inspection items and standards of "Spec {specNo} ({specName})" were modified by {actor} and may be inconsistent with this sheet ({panelName} {docNo}). Please review the mandatory/type-inspection items.',
   },
 }

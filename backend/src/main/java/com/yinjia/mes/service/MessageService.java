@@ -41,6 +41,8 @@ public class MessageService {
     public static final String MODIFY_REQUESTED = "MODIFY_REQUESTED";
     /** 消息码:申请删除 → 管理员 */
     public static final String DELETE_REQUESTED = "DELETE_REQUESTED";
+    /** 消息码:规格书检验项目及标准已改 → 关联出货检验计划表的经办人+管理员(核对一致性提醒) */
+    public static final String SPEC_ITEMS_CHANGED = "SPEC_ITEMS_CHANGED";
 
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;

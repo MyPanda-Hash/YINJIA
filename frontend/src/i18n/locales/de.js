@@ -1347,5 +1347,7 @@ export default {
     '彻底删除该条目？不可恢复，已录入单据不受影响。': 'Diesen Eintrag endgültig löschen? Nicht wiederherstellbar. Erfasste Bögen sind nicht betroffen.',
     '已彻底删除': 'Eintrag endgültig gelöscht',
     '已是最大列数': 'Maximale Spaltenzahl erreicht',
+    '规格书检验项目已更新': 'Spezifikations-Prüfpunkte aktualisiert',
+    '「规格书 {specNo}（{specName}）」的产品性能检验项目及检验标准已由 {actor} 修改，与本表（{panelName} {docNo}）可能不一致，请核对本表的必测项/型式检验。': 'Die Produktprüfpunkte und -normen der „Spezifikation {specNo} ({specName})“ wurden von {actor} geändert und können von diesem Blatt ({panelName} {docNo}) abweichen. Bitte Pflicht-/Typprüfpunkte abgleichen.',
   },
 }
