@@ -184,7 +184,7 @@
         <!-- 原水水质条件:左侧标签跨两行,右侧内嵌 指标名行 + 值行 -->
         <tr>
           <td class="rs-td rs-label rs-water-label" rowspan="2">{{ tt('原水水质条件') }}</td>
-          <td class="rs-td rs-water-zone" colspan="2">
+          <td class="rs-td rs-water-zone" :colspan="sampleCount">
             <table class="rs-inner">
               <tbody>
                 <tr>
