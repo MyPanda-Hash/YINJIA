@@ -10,12 +10,14 @@ import {
 } from './testItemLib.js'
 
 /**
- * 这组断言守的是 2026-09-11 的口径:**检验项目标准库在规格书(RD_SPEC_DOC)与
- * 出货检验计划表(RD_INSP_PLAN)之间互通**——两个面板共用同一批条目,一边新增/编辑,
- * 另一边立刻可选。难点是两边的 JSON 形状完全不同:
+ * 这组断言守的是**内容格式与投影**的正确性,不是"两面板共用库":
+ * 规格书(RD_SPEC_DOC)用 `spec.test`、出货检验计划表(RD_INSP_PLAN)用 `insp.plan`,
+ * 两个面板各管各的库、互不可见(2026-09-11 的共库决定已撤销);
+ * 规范结构(canonical v=2)是**两库共用的格式**,让历史旧格式条目也能编辑。
+ * 难点是两库的 JSON 形状本来就不同:
  *   · 规格书(旧 spec.test): item_code=组名, content={sub,req,method,basis}
  *   · 出货计划(旧 insp.plan): item_code=表区名, content=10 个中文键
- * 所以统一到一份规范结构(canonical),再各自投影回自己的形态;**空字段一律留空,不丢数据**。
+ * 所以统一到一份规范结构(canonical),再各自投影回自己那一侧的形态;**空字段一律留空,不丢数据**。
  */
 
 test('旧规格书条目 → 规范结构:item 当组名,sub 当 name', () => {
@@ -68,13 +70,13 @@ test('规范结构 → 出货计划行:10 个中文键齐全,规格书没有的�
   }
 })
 
-test('互通本意:一边存的条目落到另一边仍然成立(规格书↔出货计划双向)', () => {
-  // 规格书里录的,出货计划表里要能选中并显示在对应列
+test('投影互转:规格书形态与出货计划形态之间可无损转换(字段映射正确)', () => {
+  // 规格书形态的条目投影到出货计划行,应落到对应列
   const fromSpec = toCanonical({ sub: '整体尺寸', req: '长210±1', method: '卡尺', basis: '银嘉标准' }, '尺寸')
   const inspRow = toInspRow(fromSpec)
   assert.equal(inspRow['控制项目'], '整体尺寸')
   assert.equal(inspRow['控制标准及要求'], '长210±1')
-  // 出货计划里录的,规格书里要能作为子项勾选
+  // 出货计划形态的条目投影到规格书子项,应可作为子项勾选
   const fromInsp = toCanonical({ 控制项目: '外观', 控制标准及要求: '无破损', 控制方法: '目视' }, '必测项')
   const specSub = toSpecSub(fromInsp)
   assert.equal(specSub.name, '外观')

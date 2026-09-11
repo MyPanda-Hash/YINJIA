@@ -834,24 +834,30 @@ const libRows = ref([])
 async function openLib(dt) {
   libTargetDt.value = dt
   const lib = dt.lib
-  if (Array.isArray(lib) || cfg.value?.testLib) {
-    // 检验项目标准库 = 内置常量 + yj_std_lib 自定义项合并(可自行补充/删除,不写死)。
-    // **两种形态读同一批条目**(互通的核心):规格书与出货检验计划表都读 spec.test,
-    // 新增/编辑任一边,另一边立刻可选;字段差异由 testItemLib 的规范结构投影,不丢数据。
-    const base = Array.isArray(lib) ? [...lib] : JSON.parse(JSON.stringify(cfg.value.testLib))
+  const flat = Array.isArray(lib)
+  if (flat || cfg.value?.testLib) {
+    // 检验项目标准库 = 内置常量 + yj_std_lib 自定义项合并(可自行补充/编辑/删除,不写死)。
+    // **两个面板各用各的库,互不相通**(共库决定已于 2026-09-11 反转):规格书(分组形态)读写
+    // spec.test,出货检验计划表(扁平形态)读写 insp.plan 且只取本表区(item_code)的条目——
+    // 规格书里新增的条目不会出现在出货计划弹窗里,反之亦然。
+    // 条目正文统一用 testItemLib 的规范结构读写,所以两边的条目字段齐全,勾选后都能编辑。
+    const base = flat ? [...lib] : JSON.parse(JSON.stringify(cfg.value.testLib))
     try {
-      const res = await request.get('/stdlib/list', { params: { lib: 'spec.test' } })
+      const res = await request.get('/stdlib/list', {
+        // insp.plan 按表区过滤(必测项/型式检验各看各的);spec.test 整库取回,组名由正文 group 承载
+        params: flat ? { lib: 'insp.plan', item: dt.filterVal || '' } : { lib: 'spec.test' },
+      })
       for (const r of res?.data || []) {
         const e = toCanonical(r.content, r.item)
-        if (Array.isArray(lib)) {
+        if (flat) {
           // 出货检验计划表(扁平):规范结构 → 固定的 10 个中文键,一一对列名。
-          // 另把规范结构挂在 __entry 上:平表只有 10 列,规格书来的条目还有 basis 等列上没显示的字段,
-          // 编辑保存时要以 __entry 打底,否则那些字段会被空串覆盖(丢数据);
+          // 另把规范结构挂在 __entry 上:平表表单只有 7 个字段,条目里还有不合格应对措施/取样方式
+          // 等本表单没有的列,编辑保存时要以 __entry 打底,否则那些字段会被空串覆盖(丢数据);
           // confirmLib 落明细前会重新投影成 10 键,__entry 不会进单据。
           base.push({ ...toInspRow(e), __entry: e, custom: true, dbId: r.id })
         } else {
           // 规格书(分组):组名取自规范结构的 group(旧 item_code 兜底)。
-          // __entry 同扁平分支:子项表单只有 4 个字段,出货计划表来的条目还有 8 个列上没显示的字段,
+          // __entry 同扁平分支:子项表单只有 4 个字段,条目里还有另一套(出货计划)字段,
           // 编辑保存时用它打底,避免被空串覆盖;投影成明细(confirmLib)时不会带出去。
           const grp = e.group || r.item
           let g = base.find((x) => x.name === grp)
@@ -1032,14 +1038,14 @@ async function addCustomFlatLib() {
     ElMessage.warning(tt('请填写控制项目与控制标准'))
     return
   }
-  // 与规格书同一套规范结构、同一个库(spec.test)
+  // 与规格书同一套规范结构,但**各存各的库**:出货检验计划表写 insp.plan(item=本表区)
   const content = flatContent()
   try {
     if (libFEditId.value) {
       await request.post('/stdlib/update', { id: libFEditId.value, content })
       ElMessage.success(tt('已保存修改'))
     } else {
-      await request.post('/stdlib/add', { lib: 'spec.test', item: libTargetDt.value?.filterVal || '', content })
+      await request.post('/stdlib/add', { lib: 'insp.plan', item: libTargetDt.value?.filterVal || '', content })
       ElMessage.success(tt('已存入标准库'))
     }
     resetLibEdit()

@@ -163,4 +163,3 @@ migrate-clean-orphan-docstatus.sql
 migrate-progress-single-doc.sql
 migrate-lab-stdlib.sql
 migrate-applicant-lock.sql
-migrate-testlib-shared.sql

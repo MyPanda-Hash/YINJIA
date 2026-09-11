@@ -1473,7 +1473,7 @@ export default {
     '检验项目(组名)': 'Test Item (group)',
     '子项目(可空)': 'Sub item (optional)',
     '请填写检验项目与检验要求': 'Item group and requirement are required',
-    /* ── 检验项目标准库:编辑条目(规格书 ↔ 出货检验计划表共用同一批条目) ── */
+    /* ── 检验项目标准库:编辑条目(规格书 spec.test 与出货检验计划表 insp.plan 各用各的库) ── */
     '请先勾选一条自定义条目': 'Select one custom entry first',
     '已带入表单，改完点「保存修改」': 'Loaded into the form — click Save Changes when done',
     '保存修改': 'Save Changes',
