@@ -18,8 +18,12 @@
       >{{ tt(pg.title) }}</div>
     </div>
 
-    <!-- ═══ 报告头(report 版式,仅封面页):公司名 | 文档编号 + 大标题 | 信息块;规格书=文档式封面 ═══ -->
-    <table v-if="!isPlain && activePage === 0" class="rs-t rs-head-t" :style="{ width: gridW + 'px' }">
+    <!-- ═══ 报告头(report 版式):公司名 | 文档编号 + 大标题 | 信息块;规格书=文档式封面
+         渲染条件 = 「本页是 report 版式」且「本页要报告头」(见 showReportHead / effPlain):
+           · 单页面板 / 普通多页面板:报告头只在第 1 页(历史行为,如规格书的封面);
+           · 被并入同一张单后仍是独立一张单据的那页(成型配方页 / 组装BOM表页)声明
+             pages[i].showHead=true,于是第 2 页也能有自己的报告头 —— 它本来就是另一张单据的表头。 ═══ -->
+    <table v-if="!effPlain && showReportHead" class="rs-t rs-head-t" :style="{ width: gridW + 'px' }">
       <colgroup><col v-for="(w, i) in effGrid" :key="'hc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
         <!-- 规格书文档式封面:按《C-95-33 伊可普高品质功能炭棒规格书》设计图逐像素复刻
@@ -288,9 +292,9 @@
     <!-- ═══ 数据记录表(共享网格;支持子头行+两级表头;矿化 4 指标块各带散点图;按页归属渲染) ═══ -->
     <div v-for="(dt, di) in cfg.dataTables" v-show="pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
-        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : isPlain ? plainW(dt) : gridW) + 'px' }">
+        <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : effPlain ? plainW(dt) : gridW) + 'px' }">
           <colgroup>
-            <template v-if="isPlain || dtOwnsWidth(dt)">
+            <template v-if="effPlain || dtOwnsWidth(dt)">
               <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :style="{ width: ((c.w || 100) * (dt.design ? designK(dt) : 1)).toFixed(1) + 'px' }" />
             </template>
             <template v-else>
@@ -300,11 +304,11 @@
           </colgroup>
           <tbody>
             <!-- plain 版式:标题条 + 副标题行(测试项目：/设备名称：/仪器名称/型号：) -->
-            <tr v-if="isPlain">
+            <tr v-if="effPlain">
               <td :colspan="totalSpan(dt)" class="rsp-plain-title">{{ tt(plainTitleOf) }}</td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
-            <tr v-if="isPlain && cfg.subtitle">
+            <tr v-if="effPlain && cfg.subtitle">
               <td :colspan="totalSpan(dt)" class="rsp-subtitle-row" :class="{ right: cfg.subtitle.align === 'right' }">
                 <span class="rsp-sub-label">{{ tt(cfg.subtitle.label) }}</span>
                 <el-select v-if="editable && cfg.subtitle.type === 'select'" v-model="head[cfg.subtitle.key]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="emit('dirty')">
@@ -318,7 +322,7 @@
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
             <!-- report 版式带变体时:变体切换行(如 申请单类型) -->
-            <tr v-if="!isPlain && cfg.variantKey">
+            <tr v-if="!effPlain && cfg.variantKey">
               <td :colspan="2" class="rsp-subtitle-row rsp-left">
                 <span class="rsp-sub-label">{{ tt(variantLabel) }}</span>
                 <el-select v-if="editable" v-model="head[cfg.variantKey]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="emit('dirty')">
@@ -419,7 +423,7 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="editable" class="rs-add" :style="{ width: (isPlain ? plainW(dt) : (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : gridW)) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
+        <div v-if="editable" class="rs-add" :style="{ width: (effPlain ? plainW(dt) : (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : gridW)) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
       </div>
       <!-- 矿化:Excel 原表右侧 4 张散点图(RO出水/浸泡30min/煮沸晾凉 × 累计流量) -->
       <div v-if="dt.charts" class="rsp-chart">
@@ -671,7 +675,7 @@ const props = defineProps({
 const emit = defineEmits(['dirty', 'refresh-config'])
 
 const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
-const isPlain = computed(() => cfg.value?.headMode === 'plain')
+// 版式:'report' | 'plain'——面板级值是缺省,多页签面板可按页覆盖(见 effPlain)
 
 /** 动态列变体:按头字段值解析(加标水经 variantOptions 映射/委托单直取),缺省第一个变体 */
 const activeVariant = computed(() => {
@@ -724,8 +728,36 @@ function onStdLibChanged() {
   emit('refresh-config')
 }
 
-const effGrid = computed(() => activeVariant.value?.grid || cfg.value?.grid || [])
+// ── 多页结构(规格书 / 成型工艺清单+成型配方 / 组装工艺清单+组装BOM表):页签切换,各区块按 page 归属渲染 ──
+// activePage 必须先于 effGrid/effPlain 声明:它们按当前页解析 pages[i] 的 grid/headMode(见下)。
+const activePage = ref(0)
+
+/** 当前页签的配置块(pages 里的声明;单页面板为空) */
+const activePageMeta = computed(() => cfg.value?.pages?.[activePage.value] || null)
+/** 生效网格 —— 每页各自一套列宽(2026-09-11):
+ *  多页签面板允许按页声明 pages[i].grid,两张单据版式本就不同(成型工艺清单 11 列 A..K /
+ *  成型配方 13 列 / 组装BOM表 4 列 130·390·130·390),共用一个网格会把其中一页的列宽挤变形。
+ *  退化顺序:本页 pages[i].grid → 变体 grid → 面板 grid。页面未声明 grid 时与改造前逐字等价。 */
+const effGrid = computed(() => activePageMeta.value?.grid || activeVariant.value?.grid || cfg.value?.grid || [])
 const effHead = computed(() => activeVariant.value?.head || cfg.value?.head || {})
+/** 生效版式:'report'(报告头)| 'plain'(标题条登记表)——同样支持按页声明(页各按原貌渲染)。
+ *  退化顺序:本页 pages[i].headMode / pages[i].plain → 变体 headMode → 面板 headMode。 */
+const effPlain = computed(() => {
+  if (activePageMeta.value?.plain) return true
+  const m = activePageMeta.value?.headMode || activeVariant.value?.headMode || cfg.value?.headMode
+  return m === 'plain'
+})
+/** 本页是否渲染报告头。
+ *  · 本页声明 showHead:true → 渲染(被并入同一张单、但原本是独立单据的那页);
+ *  · 本页声明 showHead:false → 不渲染;
+ *  · 未声明 → 退回历史行为「只有第 1 页有报告头」(规格书封面、各单页面板都靠这条保持原样零影响)。
+ *  只有「成型配方 / 组装BOM表」两页需要「非首页也有自己的报告头」,按页声明即可,不必猜。 */
+const showReportHead = computed(() => {
+  const m = activePageMeta.value
+  if (m && m.showHead === true) return true
+  if (m && m.showHead === false) return false
+  return activePage.value === 0
+})
 const nCols = computed(() => effGrid.value.length)
 /** 网格总宽:所有表格显式用这个宽度,列分界线全页严格一致(数据表编辑态另加 60px 操作列) */
 const gridW = computed(() => effGrid.value.reduce((s, w) => s + w, 0))
@@ -781,9 +813,12 @@ const effInfo = computed(() => {
 })
 const infoSpan = computed(() => effInfo.value.length)
 
-/** 报告头大标题:静态/前缀+头字段派生(规格书=产品规格书·名称,委托单=类型+'-测试申请单'),否则为 测试主题 输入 */
+/** 报告头大标题:静态/前缀+头字段派生(规格书=产品规格书·名称,委托单=类型+'-测试申请单'),否则为 测试主题 输入。
+ *  多页签面板可按页声明 pages[i].staticTitle —— 被并入同一张单的两页本是**两张单据**,
+ *  各有各的标题(如 炭棒工艺管控清单 / 炭棒配方管控清单),不能共用一个 staticTitle。 */
+const effStaticTitle = computed(() => activePageMeta.value?.staticTitle || cfg.value?.staticTitle || null)
 const derivedTitle = computed(() => {
-  if (cfg.value?.staticTitle) return cfg.value.staticTitle
+  if (effStaticTitle.value) return effStaticTitle.value
   if (cfg.value?.titleFromKey) {
     const v = props.head?.[cfg.value.titleFromKey] || cfg.value.titlePlaceholder || ''
     if (v || !cfg.value.titlePlaceholder) return (cfg.value.titlePrefix || '') + v + (cfg.value.titleSuffix || '')
@@ -791,8 +826,8 @@ const derivedTitle = computed(() => {
   return null
 })
 
-// ── 多页结构(规格书):页签切换,各区块按 page 归属渲染 ──
-const activePage = ref(0)
+// ── 多页结构(规格书 / 成型工艺清单+成型配方 / 组装工艺清单+组装BOM表):页签切换,各区块按 page 归属渲染 ──
+// (activePage 本体在文件上方声明,effGrid/effPlain 依赖它)
 const pageList = computed(() => cfg.value?.pages || [])
 function pageOf(block) {
   return block.page ?? 0
@@ -856,6 +891,9 @@ const plainTitleOf = computed(() => {
   return t || ''
 })
 function plainW(dt) {
+  // 本页声明了自己的网格时以网格总宽为准(组装BOM表页:物料清单/修订记录按 130·390·130·390 铺满纸张);
+  // 未声明网格的 plain 面板(实验室各表、组装工艺清单页)仍按列宽之和,与改造前一致。
+  if (activePageMeta.value?.grid) return gridW.value
   return colsOf(dt).reduce((s, c) => s + (c.w || 100), 0)
 }
 function colsOf(dt) {
