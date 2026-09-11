@@ -163,3 +163,12 @@ migrate-clean-orphan-docstatus.sql
 migrate-progress-single-doc.sql
 migrate-lab-stdlib.sql
 migrate-applicant-lock.sql
+
+# —— 2026-09-11 登记:成型配方/组装BOM表 并入各自工艺清单面板(第 2 页签)——
+# 内容:主面板行表补配方表/BOM 列(rd_mold_proc_detail 原为空表只补列,不动数据)、
+#      主面板头表补 配料要求 / 产品种类·整体规格外径·整体规格长度·成品重量、
+#      RD_ASM_PROC 头表补 产品编号(参照 RD_PROD_INFO,产品开发下发矩阵的关联键)+ 所需 yj_field 行与 en/ja 译名。
+# 幂等:补列 IF COL_LENGTH IS NULL、元数据 IF NOT EXISTS,库内重跑安全(已本地连跑两遍验证)。
+# 🔴 禁止登记:_cleanup-merged-panels-20260911.sql —— 一次性清理脚本(备份并清空被并入面板的旧单据与状态行),
+#    登记进清单 = 每次同步都清业务数据,与 migrate-rd-cleanup.sql / _doc_part3_cleanup.sql 同款先例。
+migrate-merged-panels.sql

@@ -189,7 +189,8 @@
             <span v-else class="event-count">{{ devBoard.length }} {{ tt('已下发产品') }}</span>
           </div>
 
-          <!-- 产品开发业务流:产品 × 下游 5 面板 矩阵(审核中可点跳转审批) -->
+          <!-- 产品开发业务流:产品 × 下游面板 矩阵(列数 = 后端 DevTaskService.devPanelMeta;
+               2026-09-11 起 4 列:成型工艺清单/组装工艺清单/规格书/出货检验计划表;审核中可点跳转审批) -->
           <div v-if="flowPanel === 'RD_PROD_INFO'" class="dev-board" v-loading="devLoading">
             <table v-if="devBoard.length" class="dev-table">
               <thead>

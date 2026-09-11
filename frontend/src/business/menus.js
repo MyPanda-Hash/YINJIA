@@ -49,10 +49,15 @@ export const menuTree = [
       {
         code: 'rdFiles', title: '产品文件', icon: 'FolderOpened', children: [
           { code: 'rdProdInfo', title: '产品信息表', path: '/panelx/list/RD_PROD_INFO', panelCode: 'RD_PROD_INFO', icon: 'Tickets' },
+          // 成型工艺清单 = 页1 工艺清单 + 页2 成型配方(2026-09-11 起 RD_MOLD_FORMULA 并入其第 2 页签)
           { code: 'rdMoldProc', title: '成型工艺清单', path: '/panelx/list/RD_MOLD_PROC', panelCode: 'RD_MOLD_PROC', icon: 'SetUp' },
-          { code: 'rdMoldFormula', title: '成型配方', path: '/panelx/list/RD_MOLD_FORMULA', panelCode: 'RD_MOLD_FORMULA', icon: 'Coin' },
+          // 2026-09-11 下线(并入 RD_MOLD_PROC 第 2 页签):yj_panel/yj_field/yj_role_panel 行保留,
+          // 面板配置与保存链路都还在,需要恢复入口时放开本行即可。
+          // { code: 'rdMoldFormula', title: '成型配方', path: '/panelx/list/RD_MOLD_FORMULA', panelCode: 'RD_MOLD_FORMULA', icon: 'Coin' },
           { code: 'rdSpecDoc', title: '规格书', path: '/panelx/list/RD_SPEC_DOC', panelCode: 'RD_SPEC_DOC', icon: 'Document' },
-          { code: 'rdAsmBom', title: '组装BOM表', path: '/panelx/list/RD_ASM_BOM', panelCode: 'RD_ASM_BOM', icon: 'Grid' },
+          // 2026-09-11 下线(并入 RD_ASM_PROC 第 2 页签):同上,行保留、配置保留,放开本行即恢复。
+          // { code: 'rdAsmBom', title: '组装BOM表', path: '/panelx/list/RD_ASM_BOM', panelCode: 'RD_ASM_BOM', icon: 'Grid' },
+          // 组装工艺清单 = 页1 关键工序控制清单 + 页2 组装BOM表(物料清单 + 修订记录)
           { code: 'rdAsmProc', title: '组装工艺清单', path: '/panelx/list/RD_ASM_PROC', panelCode: 'RD_ASM_PROC', icon: 'Operation' },
           { code: 'rdInspPlan', title: '出货检验计划表', path: '/panelx/list/RD_INSP_PLAN', panelCode: 'RD_INSP_PLAN', icon: 'CircleCheck' },
         ],

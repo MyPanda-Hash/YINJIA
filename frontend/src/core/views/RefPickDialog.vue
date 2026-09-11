@@ -54,7 +54,7 @@ const props = defineProps({
   field: { type: Object, default: null },
   // 'header' 表头单值字段（多选仅导入第一行）/ 'detail' 明细行（多选每行生成一条明细）
   mode: { type: String, default: 'header' },
-  // 调用方所属面板(用于「产品开发」状态标注:仅下游 5 个文件面板显示)
+  // 调用方所属面板(用于「产品开发」状态标注:仅下游文件面板显示;2026-09-11 起 4 个)
   ownerPanel: { type: String, default: '' },
 })
 const emit = defineEmits(['update:modelValue', 'update:visible', 'confirm'])
@@ -67,7 +67,7 @@ const loading = ref(false)
 const total = ref(0)
 
 // ── 产品开发状态标注(2026-09-09):参照产品信息表时,按当前面板标注 未开发 / 已开发 ──
-const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_BOM', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
 const devMap = ref({})
 const showDevStatus = computed(() => props.field?.refPanel === 'RD_PROD_INFO'
   && DEV_PANEL_CODES.includes(String(props.ownerPanel || '')))

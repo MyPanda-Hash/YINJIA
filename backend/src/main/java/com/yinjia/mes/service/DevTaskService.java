@@ -23,7 +23,13 @@ import java.util.Set;
  * 状态口径(取最高进度,单调不回退):
  *   已归档 → 开发完毕 | 审批中 → 开发审核中 | 有草稿 → 开发中 | 无单据 → 未开发
  *
- * 产品键不统一:规格书用「编号」(语义即产品编号),其余 4 个用「产品编号」。
+ * 产品键不统一:规格书用「编号」(语义即产品编号),其余用「产品编号」。
+ *
+ * 2026-09-11:成型配方(RD_MOLD_FORMULA)并入成型工艺清单第 2 页签、组装BOM表(RD_ASM_BOM)并入
+ * 组装工艺清单第 2 页签,菜单下线 —— 下游面板矩阵从 5 列收敛为 **4 列**(成型工艺清单/组装工艺清单/
+ * 规格书/出货检验计划表)。组装工艺清单原先不在矩阵里(它没有「产品编号」列,推导不出状态),
+ * 当日随合并补齐 RD_ASM_PROC.产品编号(参照 RD_PROD_INFO)后正式入列。
+ * 历史 rd_dev_task 行仍指向 RD_MOLD_FORMULA/RD_ASM_BOM(不删,留审计),只是不再参与矩阵统计。
  */
 @Service
 public class DevTaskService {
@@ -35,8 +41,7 @@ public class DevTaskService {
 
     static {
         DEV_PANELS.put("RD_MOLD_PROC", new String[]{"rd_mold_proc_head", "产品编号", "成型工艺清单"});
-        DEV_PANELS.put("RD_MOLD_FORMULA", new String[]{"rd_mold_formula_head", "产品编号", "成型配方"});
-        DEV_PANELS.put("RD_ASM_BOM", new String[]{"rd_asm_bom_head", "产品编号", "组装BOM表"});
+        DEV_PANELS.put("RD_ASM_PROC", new String[]{"rd_asm_proc_head", "产品编号", "组装工艺清单"});
         DEV_PANELS.put("RD_SPEC_DOC", new String[]{"rd_spec_doc_head", "编号", "规格书"});
         DEV_PANELS.put("RD_INSP_PLAN", new String[]{"rd_insp_plan_head", "产品编号", "出货检验计划表"});
         DEV_PANELS.forEach((code, v) -> PRODUCT_KEY.put(code, v[1]));

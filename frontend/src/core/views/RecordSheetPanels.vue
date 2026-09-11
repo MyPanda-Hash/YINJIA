@@ -207,8 +207,15 @@
                 <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
               </td>
             </template>
-            <td v-else class="rs-td" :colspan="nCols - 1">
-              <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
+            <td v-else class="rs-td" :colspan="nCols > 1 ? nCols - 1 : 1">
+              <!-- 参照字段(plain 版式也支持:2026-09-11 组装工艺清单头补「产品编号」→ 参照产品信息表;
+                   此前这一支只渲染纯输入框,参照字段在 plain 版式里点不开弹窗) -->
+              <div v-if="editable && isRefKey(row.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(row.key)">
+                <span class="rs-ref-text">{{ head[row.key] || tt('点击选择') }}</span>
+                <span v-if="devStatus && devKey === row.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
+                <el-icon class="rs-ref-ico"><Search /></el-icon>
+              </div>
+              <el-input v-else-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
               <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.tall ? 3 : 1, maxRows: 12 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
               <span v-else class="rs-txt" :class="{ 'rsp-pre': row.tall }">{{ head[row.key] || '' }}</span>
             </td>
@@ -294,7 +301,7 @@
           <tbody>
             <!-- plain 版式:标题条 + 副标题行(测试项目：/设备名称：/仪器名称/型号：) -->
             <tr v-if="isPlain">
-              <td :colspan="totalSpan(dt)" class="rsp-plain-title">{{ tt(cfg.plainTitle) }}</td>
+              <td :colspan="totalSpan(dt)" class="rsp-plain-title">{{ tt(plainTitleOf) }}</td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
             <tr v-if="isPlain && cfg.subtitle">
@@ -397,10 +404,10 @@
               <td :colspan="totalSpan(dt)" class="rs-empty">—</td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
-            <!-- 合计行(成型配方:比例/含量/设计添加量数值求和) -->
+            <!-- 合计行(成型配方:比例/含量/设计添加量数值求和)——「合计」格跨度跟首列跨度走(13 格配方表首列 No. 占 1 格) -->
             <tr v-if="dt.totalCols && rowsOf(dt).length">
-              <td class="rs-td rsp-total" colspan="2">{{ tt('合计') }}</td>
-              <td v-for="(c, ci) in visCols(dt).slice(2)" :key="'tt' + ci" class="rs-td rsp-total" :colspan="(c.span || 1) > 1 ? c.span : undefined">
+              <td class="rs-td rsp-total" :colspan="visCols(dt)[0]?.span || 1">{{ tt('合计') }}</td>
+              <td v-for="(c, ci) in visCols(dt).slice(1)" :key="'tt' + ci" class="rs-td rsp-total" :colspan="(c.span || 1) > 1 ? c.span : undefined">
                 {{ totalOf(dt, c.key) || '' }}
               </td>
               <td v-if="editable" class="rsp-op-pad"></td>
@@ -458,8 +465,8 @@
       </tbody>
     </table>
 
-    <!-- ═══ 表尾区(成型配方:配料要求——数据表之后) ═══ -->
-    <table v-for="(sec, si) in cfg.tailSections || []" :key="'ts' + si" class="rs-t" :style="{ width: gridW + 'px' }">
+    <!-- ═══ 表尾区(成型配方:配料要求——数据表之后;多页签面板按 page 归属渲染) ═══ -->
+    <table v-for="(sec, si) in cfg.tailSections || []" v-show="pageOf(sec) === activePage" :key="'ts' + si" class="rs-t" :style="{ width: gridW + 'px' }">
       <colgroup><col v-for="(w, i) in effGrid" :key="'tc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
         <tr><td :colspan="nCols" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
@@ -793,16 +800,23 @@ function pageOf(block) {
 watch(() => props.panelCode, () => { activePage.value = 0 })
 
 // ── 校验定位(供 PanelxList 保存校验调用):翻到字段所在页 + 滚动 + 闪烁 ──
-/** 找到 label 所在页签(封面字段=0;sections 按 page 归属;找不到返回 null) */
+/** 找到 label 所在页签(封面字段=0;sections/tailSections 按 page 归属;找不到返回 null) */
 function pageOfLabel(label) {
   const c = cfg.value || {}
   if ((c.cover?.fields || []).some((f) => f.label === label)) return 0
-  for (const sec of c.sections || []) {
+  for (const sec of [...(c.sections || []), ...(c.tailSections || [])]) {
     const hit = (sec.rows || []).some((row) =>
       (row.pairs || []).some((p) => p.label === label)
       || row.label === label
       || (row.grid || []).some((g) => g.label === label))
     if (hit) return pageOf(sec)
+  }
+  // 数据表列头/格式区条(多页签面板的页 2 表格列,如成型配方「实际添加比例」)
+  for (const dt of c.dataTables || []) {
+    const hit = (dt.cols || []).some((col) => col.label === label)
+      || (dt.subHeads || []).some((sh) => sh.label === label)
+      || dt.bar === label
+    if (hit) return pageOf(dt)
   }
   return null
 }
@@ -815,9 +829,11 @@ function focusField(label) {
   nextTick(() => {
     const root = document.querySelector('.record-sheet')
     if (!root) return
-    const el = [...root.querySelectorAll('td.rs-label, .rsp-cover-label, td.rs-td, th')]
-      .find((e) => (e.textContent || '').trim() === label)
-      || [...root.querySelectorAll('td.rs-label, .rsp-cover-label')]
+    // v-show 隐藏的其它页签也会命中查询,故只在**可见**元素里找(否则会闪到看不见的格子上)
+    const visible = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length)
+    const els = [...root.querySelectorAll('td.rs-label, .rsp-cover-label, td.rs-td, th')].filter(visible)
+    const el = els.find((e) => (e.textContent || '').trim() === label)
+      || [...root.querySelectorAll('td.rs-label, .rsp-cover-label')].filter(visible)
         .find((e) => (e.textContent || '').includes(label))
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -833,6 +849,12 @@ defineExpose({ focusField })
 function plainCols(dt) {
   return colsOf(dt)
 }
+/** plain 版式标题条文字:多页签面板配数组(按 activePage 取,缺省回退第 0 个),单页面板配字符串 */
+const plainTitleOf = computed(() => {
+  const t = cfg.value?.plainTitle
+  if (Array.isArray(t)) return t[activePage.value] ?? t[0] ?? ''
+  return t || ''
+})
 function plainW(dt) {
   return colsOf(dt).reduce((s, c) => s + (c.w || 100), 0)
 }
@@ -1251,7 +1273,7 @@ const prodRefKey = ref('')
 const prodRefField = computed(() => fieldMap.value.get(prodRefKey.value) || null)
 
 // ── 产品开发状态角标(2026-09-09):本面板的产品键已下发时,在单元格标注 未开发 / 已开发 ──
-const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_BOM', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
 const devStatus = ref('')
 const devKey = computed(() => {
   for (const k of ['产品编号', '编号']) {
@@ -1458,7 +1480,10 @@ function rowsOf(dt) {
 function addRow(dt) {
   const row = dt.filterKey ? { [dt.filterKey]: dt.filterVal } : {}
   if (dt.metric) row['指标'] = dt.metric
-  if (cfg.value?.autoSeq) row['序号'] = String(touch().length + 1)
+  // 序号自动编:dataTables 里声明 autoSeqBar 的表(成型配方表)按**本表区**已有行数续编。
+  // 原来只认面板级 cfg.autoSeq 且用全表 touch().length 计数——多表区共用一张明细表时
+  // 会串号(配方行数被工序/BOM 行数带偏),故改为按表区过滤后计数。
+  if (dt.autoSeqBar || cfg.value?.autoSeq) row['序号'] = String(rowsOf(dt).length + 1)
   touch().push(row)
   emit('dirty')
 }
