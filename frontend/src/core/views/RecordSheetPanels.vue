@@ -501,7 +501,7 @@
                   @change="(v) => toggleLib(gi + ':' + si, !!v)"
                 >
                   <span class="lib-sub-name" :class="{ 'lib-sub-custom': s.custom }">{{ s.name ? tt(s.name) : tt('（项目）') }}</span>
-                  <span class="lib-sub-req">{{ (s.req || '').split('\n')[0].slice(0, 26) }}</span>
+                  <span class="lib-sub-req">{{ String(s.req || '').split('\n')[0].slice(0, 26) }}</span>
                 </el-checkbox>
                 <span v-if="s.custom && s.dbId" class="lib-sub-del" @click.stop="removeCustomTestLib(s.dbId)">✕</span>
               </div>
@@ -511,12 +511,13 @@
         <div class="lib-custom">
           <div class="lib-custom-title">{{ tt('补充自定义检验项') }}({{ tt('存入后长期可用') }})</div>
           <div class="lib-custom-form">
-            <el-input v-model="libCGroup" size="small" :placeholder="tt('检验项目(组名)')" />
+            <el-input v-model="libCGroup" size="small" :readonly="!!libCEditId" :title="libCEditId ? tt('组名是条目的归属(item_code)，编辑接口不改它；要换组请新建条目') : ''" :placeholder="tt('检验项目(组名)')" />
             <el-input v-model="libCSub" size="small" :placeholder="tt('子项目(可空)')" />
             <el-input v-model="libCReq" size="small" type="textarea" :rows="2" :placeholder="tt('检验要求')" />
             <el-input v-model="libCMethod" size="small" :placeholder="tt('检验方法')" />
             <el-input v-model="libCBasis" size="small" :placeholder="tt('检验依据')" />
-            <el-button size="small" type="primary" @click="addCustomTestLib">{{ tt('存入标准库') }}</el-button>
+            <el-button size="small" type="primary" @click="addCustomTestLib">{{ libCEditId ? tt('保存修改') : tt('存入标准库') }}</el-button>
+            <el-button v-if="libCEditId" size="small" @click="cancelEditTestLib">{{ tt('取消编辑') }}</el-button>
           </div>
         </div>
       </template>
@@ -554,10 +555,12 @@
           <el-input v-model="libFFrequency" size="small" :placeholder="tt('检测频率')" />
           <el-input v-model="libFContent" size="small" :placeholder="tt('检验内容')" />
           <el-input v-model="libFMethod" size="small" :placeholder="tt('控制方法')" />
-          <el-button size="small" type="primary" @click="addCustomFlatLib">{{ tt('存入标准库') }}</el-button>
+          <el-button size="small" type="primary" @click="addCustomFlatLib">{{ libFEditId ? tt('保存修改') : tt('存入标准库') }}</el-button>
+          <el-button v-if="libFEditId" size="small" @click="cancelEditFlatLib">{{ tt('取消编辑') }}</el-button>
         </div>
       </div>
       <template #footer>
+        <el-button :disabled="!canEditLibEntry" @click="editLibEntry">{{ tt('编辑') }}</el-button>
         <el-button @click="libVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" @click="confirmLib">{{ tt('追加选中项') }}({{ libChecked.length }})</el-button>
       </template>
@@ -636,6 +639,7 @@ import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
+import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -830,29 +834,30 @@ const libRows = ref([])
 async function openLib(dt) {
   libTargetDt.value = dt
   const lib = dt.lib
-  if (Array.isArray(lib)) {
-    // 出货检验计划:内置两套标准库 + yj_std_lib 自定义项合并
-    const base = [...lib]
-    try {
-      const res = await request.get('/stdlib/list', { params: { lib: 'insp.plan', item: dt.filterVal || '' } })
-      for (const r of res?.data || []) {
-        let c = {}
-        try { c = JSON.parse(r.content) } catch { c = {} }
-        base.push({ ...c, custom: true, dbId: r.id })
-      }
-    } catch { /* 接口不可用则仅内置 */ }
-    libRows.value = base
-  } else if (cfg.value?.testLib) {
-    // 规格书检验项目:内置分组 + yj_std_lib 自定义项合并(可自行补充/删除,不写死)
-    const base = JSON.parse(JSON.stringify(cfg.value.testLib))
+  if (Array.isArray(lib) || cfg.value?.testLib) {
+    // 检验项目标准库 = 内置常量 + yj_std_lib 自定义项合并(可自行补充/删除,不写死)。
+    // **两种形态读同一批条目**(互通的核心):规格书与出货检验计划表都读 spec.test,
+    // 新增/编辑任一边,另一边立刻可选;字段差异由 testItemLib 的规范结构投影,不丢数据。
+    const base = Array.isArray(lib) ? [...lib] : JSON.parse(JSON.stringify(cfg.value.testLib))
     try {
       const res = await request.get('/stdlib/list', { params: { lib: 'spec.test' } })
       for (const r of res?.data || []) {
-        let c = {}
-        try { c = JSON.parse(r.content) } catch { c = {} }
-        let g = base.find((x) => x.name === r.item)
-        if (!g) { g = { name: r.item, subs: [] }; base.push(g) }
-        g.subs.push({ name: c.sub || '', req: c.req || '', method: c.method || '', basis: c.basis || '', custom: true, dbId: r.id })
+        const e = toCanonical(r.content, r.item)
+        if (Array.isArray(lib)) {
+          // 出货检验计划表(扁平):规范结构 → 固定的 10 个中文键,一一对列名。
+          // 另把规范结构挂在 __entry 上:平表只有 10 列,规格书来的条目还有 basis 等列上没显示的字段,
+          // 编辑保存时要以 __entry 打底,否则那些字段会被空串覆盖(丢数据);
+          // confirmLib 落明细前会重新投影成 10 键,__entry 不会进单据。
+          base.push({ ...toInspRow(e), __entry: e, custom: true, dbId: r.id })
+        } else {
+          // 规格书(分组):组名取自规范结构的 group(旧 item_code 兜底)。
+          // __entry 同扁平分支:子项表单只有 4 个字段,出货计划表来的条目还有 8 个列上没显示的字段,
+          // 编辑保存时用它打底,避免被空串覆盖;投影成明细(confirmLib)时不会带出去。
+          const grp = e.group || r.item
+          let g = base.find((x) => x.name === grp)
+          if (!g) { g = { name: grp, subs: [] }; base.push(g) }
+          g.subs.push({ ...toSpecSub(e), __entry: e, custom: true, dbId: r.id })
+        }
       }
     } catch { /* 标准库接口不可用则仅内置 */ }
     libRows.value = base
@@ -860,6 +865,7 @@ async function openLib(dt) {
     libRows.value = []
   }
   libChecked.value = []
+  resetLibEdit()
   libVisible.value = true
 }
 /** 分组标准库勾选(键=组下标:子项下标);扁平表格走 el-table selection-change */
@@ -869,30 +875,121 @@ function toggleLib(key, on) {
   else if (!on && i >= 0) libChecked.value = libChecked.value.filter((k) => k !== key)
 }
 const libTargetDt = ref(null)
-// 自定义检验项补充(存 yj_std_lib,长期可用)
+// ── 勾选 → 编辑 → 表单带入 → 保存修改(POST /stdlib/update) ──
+// 两种形态各有一套表单,分别记一个"正在编辑的条目 id":非 null 即处于「保存修改」态。
+// 内置条目的正文在代码常量里(recordSheetConfigs),改不了 → 无 dbId 一律不可编辑。
+const libCEditId = ref(null) // 分组形态(规格书):子项表单
+const libCEditEntry = ref(null) // 正在编辑条目的规范结构(保存时打底,含表单没有的字段)
 const libCGroup = ref('')
 const libCSub = ref('')
 const libCReq = ref('')
 const libCMethod = ref('')
 const libCBasis = ref('')
+const libFEditId = ref(null) // 扁平形态(出货检验计划):平表表单
+const libFEditEntry = ref(null)
+const libFControl = ref('')
+const libFQuality = ref('')
+const libFInstrument = ref('')
+const libFStandard = ref('')
+const libFFrequency = ref('')
+const libFContent = ref('')
+const libFMethod = ref('')
+/** 恰好勾选 1 条,且该条目是 DB 里的自定义条目(custom && dbId)才可编辑 */
+function oneEditableChecked() {
+  if (libChecked.value.length !== 1) return null
+  const it = libChecked.value[0]
+  if (isGroupedLib.value) {
+    const key = String(it)
+    if (!/^\d+:\d+$/.test(key)) return null
+    const s = libRows.value[Number(key.split(':')[0])]?.subs?.[Number(key.split(':')[1])]
+    return s && s.custom && s.dbId ? s : null
+  }
+  return it && it.custom && it.dbId ? it : null
+}
+const canEditLibEntry = computed(() => !!oneEditableChecked())
+function editLibEntry() {
+  const e = oneEditableChecked()
+  if (!e) {
+    ElMessage.warning(tt('请先勾选一条自定义条目'))
+    return
+  }
+  // 打底用的规范结构:取行上挂的原规范结构(__entry),没有再从投影值反推(老数据兜底)。
+  // 注意不能写 toCanonical(JSON.stringify(row),''):它只挑规范键,custom/dbId/__entry 会被丢掉,
+  // 于是「表单没显示的字段」就没人保了。
+  const snap = { ...toCanonical(JSON.stringify(e), ''), ...(e.__entry || {}) }
+  const c = toCanonical(snap, '')
+  if (isGroupedLib.value) {
+    libCGroup.value = c.group || libTargetDt.value?.filterVal || ''
+    libCSub.value = c.name
+    libCReq.value = c.req
+    libCMethod.value = c.method
+    libCBasis.value = c.basis
+    libCEditId.value = e.dbId
+    libCEditEntry.value = snap
+  } else {
+    libFControl.value = c.name
+    libFQuality.value = c.quality
+    libFInstrument.value = c.instrument
+    libFStandard.value = c.req
+    libFFrequency.value = c.freq
+    libFContent.value = c.content
+    libFMethod.value = c.method
+    libFEditId.value = e.dbId
+    libFEditEntry.value = snap
+  }
+  ElMessage.info(tt('已带入表单，改完点「保存修改」'))
+}
+function resetLibEdit() {
+  libCEditId.value = null
+  libFEditId.value = null
+  libCEditEntry.value = null
+  libFEditEntry.value = null
+  libCGroup.value = ''
+  libCSub.value = ''
+  libCReq.value = ''
+  libCMethod.value = ''
+  libCBasis.value = ''
+  libFControl.value = ''
+  libFQuality.value = ''
+  libFInstrument.value = ''
+  libFStandard.value = ''
+  libFFrequency.value = ''
+  libFContent.value = ''
+  libFMethod.value = ''
+}
+function cancelEditTestLib() {
+  resetLibEdit()
+  ElMessage.info(tt('已取消编辑'))
+}
+function cancelEditFlatLib() {
+  resetLibEdit()
+  ElMessage.info(tt('已取消编辑'))
+}
+// 自定义检验项补充(存 yj_std_lib,长期可用);编辑态下改为保存修改
 async function addCustomTestLib() {
   const group = libCGroup.value.trim()
   if (!group || !libCReq.value.trim()) {
     ElMessage.warning(tt('请填写检验项目与检验要求'))
     return
   }
+  // 编辑时以条目原规范结构打底(子项表单没有的字段原样保留),新增时空字段留空
+  const content = toContentJson({
+    ...(libCEditId.value ? (libCEditEntry.value || emptyEntry()) : emptyEntry()),
+    group,
+    name: libCSub.value.trim(),
+    req: libCReq.value.trim(),
+    method: libCMethod.value.trim(),
+    basis: libCBasis.value.trim(),
+  })
   try {
-    await request.post('/stdlib/add', {
-      lib: 'spec.test',
-      item: group,
-      content: JSON.stringify({ sub: libCSub.value.trim(), req: libCReq.value.trim(), method: libCMethod.value.trim(), basis: libCBasis.value.trim() }),
-    })
-    ElMessage.success(tt('已存入标准库'))
-    libCGroup.value = ''
-    libCSub.value = ''
-    libCReq.value = ''
-    libCMethod.value = ''
-    libCBasis.value = ''
+    if (libCEditId.value) {
+      await request.post('/stdlib/update', { id: libCEditId.value, content })
+      ElMessage.success(tt('已保存修改'))
+    } else {
+      await request.post('/stdlib/add', { lib: 'spec.test', item: group, content })
+      ElMessage.success(tt('已存入标准库'))
+    }
+    resetLibEdit()
     await openLib(libTargetDt.value)
   } catch (e) {
     ElMessage.error(tt('保存失败'))
@@ -913,44 +1010,39 @@ async function removeCustomTestLib(dbId) {
 // ── 出货检验计划:自定义补充(扁平结构) ──
 const isGroupedLib = computed(() => libRows.value.length > 0 && Array.isArray(libRows.value[0]?.subs))
 const hasCustomFlat = computed(() => libRows.value.some((r) => r.custom))
-const libFControl = ref('')
-const libFQuality = ref('')
-const libFInstrument = ref('')
-const libFStandard = ref('')
-const libFFrequency = ref('')
-const libFContent = ref('')
-const libFMethod = ref('')
+/** 平表表单 → 规范结构:编辑时以条目原规范结构打底(保住列上没显示的字段),新增时空字段留空 */
+function flatContent() {
+  return toContentJson({
+    ...(libFEditId.value ? (libFEditEntry.value || emptyEntry()) : emptyEntry()),
+    // 组名沿用本表区(必测项/型式检验);检验固定 IQC
+    group: libTargetDt.value?.filterVal || '',
+    name: libFControl.value.trim(),
+    quality: libFQuality.value.trim(),
+    instrument: libFInstrument.value.trim(),
+    req: libFStandard.value.trim(),
+    inspect: 'IQC',
+    freq: libFFrequency.value.trim(),
+    content: libFContent.value.trim(),
+    method: libFMethod.value.trim(),
+  })
+}
 async function addCustomFlatLib() {
   const control = libFControl.value.trim()
   if (!control || !libFStandard.value.trim()) {
     ElMessage.warning(tt('请填写控制项目与控制标准'))
     return
   }
+  // 与规格书同一套规范结构、同一个库(spec.test)
+  const content = flatContent()
   try {
-    await request.post('/stdlib/add', {
-      lib: 'insp.plan',
-      item: libTargetDt.value?.filterVal || '',
-      content: JSON.stringify({
-        控制项目: control,
-        质量控制内容: libFQuality.value.trim(),
-        检测仪器: libFInstrument.value.trim(),
-        控制标准及要求: libFStandard.value.trim(),
-        检验: 'IQC',
-        不合格应对措施: '',
-        检测频率: libFFrequency.value.trim(),
-        取样方式: '',
-        检验内容: libFContent.value.trim(),
-        控制方法: libFMethod.value.trim(),
-      }),
-    })
-    ElMessage.success(tt('已存入标准库'))
-    libFControl.value = ''
-    libFQuality.value = ''
-    libFInstrument.value = ''
-    libFStandard.value = ''
-    libFFrequency.value = ''
-    libFContent.value = ''
-    libFMethod.value = ''
+    if (libFEditId.value) {
+      await request.post('/stdlib/update', { id: libFEditId.value, content })
+      ElMessage.success(tt('已保存修改'))
+    } else {
+      await request.post('/stdlib/add', { lib: 'spec.test', item: libTargetDt.value?.filterVal || '', content })
+      ElMessage.success(tt('已存入标准库'))
+    }
+    resetLibEdit()
     await openLib(libTargetDt.value)
   } catch (e) {
     ElMessage.error(tt('保存失败'))
@@ -987,7 +1079,10 @@ function confirmLib() {
     }
   } else {
     for (const row of libChecked.value) {
-      arr.push(dt.filterKey ? { [dt.filterKey]: dt.filterVal, ...row } : { ...row })
+      // 只把行投影成规范的 10 个中文键落进明细——否则 custom/dbId 会跟着 spread 存进单据
+      // (保存链路只剥 id/__id/__no,认不出这两个键,会当成业务字段留在库里)
+      const proj = toInspRow(toCanonical(row, ''))
+      arr.push(dt.filterKey ? { [dt.filterKey]: dt.filterVal, ...proj } : { ...proj })
     }
   }
   libChecked.value = []

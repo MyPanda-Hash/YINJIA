@@ -1473,6 +1473,14 @@ export default {
     '检验项目(组名)': 'Test Item (group)',
     '子项目(可空)': 'Sub item (optional)',
     '请填写检验项目与检验要求': 'Item group and requirement are required',
+    /* ── 检验项目标准库:编辑条目(规格书 ↔ 出货检验计划表共用同一批条目) ── */
+    '请先勾选一条自定义条目': 'Select one custom entry first',
+    '已带入表单，改完点「保存修改」': 'Loaded into the form — click Save Changes when done',
+    '保存修改': 'Save Changes',
+    '已保存修改': 'Changes saved',
+    '取消编辑': 'Cancel Editing',
+    '已取消编辑': 'Editing cancelled',
+    '组名是条目的归属(item_code)，编辑接口不改它；要换组请新建条目': 'The group is the entry\'s own key (item_code) and the edit API does not change it; create a new entry to use another group',
     /* ── 字段编辑(数据记录表) ── */
     '字段编辑': 'Edit Fields',
     '字段键': 'Field Key',
