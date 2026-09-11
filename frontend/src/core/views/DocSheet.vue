@@ -256,7 +256,7 @@
           <div class="as-sign-cell" :class="{ 'white-shell': c.white }" :style="{ width: c.w + 'px' }">{{ tt(c.label) }}</div>
           <div class="as-sign-val">
             <el-input
-              v-if="editable && c.type === 'text'"
+              v-if="editable && c.type === 'text' && !signLocked(c)"
               v-model="head[c.key]"
               size="small"
               maxlength="50"
@@ -264,7 +264,7 @@
               @input="emit('dirty')"
             />
             <el-date-picker
-              v-else-if="editable"
+              v-else-if="editable && !signLocked(c)"
               v-model="head[c.key]"
               type="date"
               value-format="YYYY-MM-DD"
@@ -347,6 +347,10 @@ async function doStageComplete(stageNum) {
 const phaseHidden = reactive({})
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
+/** 字段级只读(元数据 editable=0 → readonly):文书锁定字段(申请立项人/负责人)按纯文本显示,不可改 */
+function signLocked(c) {
+  return !!(fieldMap.value.get(c.key) || {}).readonly
+}
 
 function selectOptions(key) {
   const f = fieldMap.value.get(key)

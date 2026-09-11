@@ -937,6 +937,7 @@ import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
+import { applyDocDefaults, todayStr } from '@core/panel/docDefaults'
 import QrLabelDialog from '@/business/components/QrLabelDialog.vue'
 import StagePanel from '@/business/components/StagePanel.vue'
 import request from '@core/request'
@@ -1760,31 +1761,16 @@ const curNo = computed(() => (list.value.length ? Math.min(curIdx.value, list.va
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
 watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState() }, { immediate: true })
 
-// 文书默认值:新建起草时 申请立项人=当前用户 / 申请立项日期=今天(用户可改,不置脏)
+// 文书默认值:文书面板的「新增」= directAdd 建一张空白草稿(库端 saved='N'),此时 draftEditable 为真,
+// 本 watch 生效。锁定字段(申请立项人/负责人)只在「本次新增且尚未保存过」时带出——用 isFreshAddedDoc()
+// 判定(跨刷新可靠),绝不在打开既有单据时改它,否则弃审后再打开会把申请人改成操作人(冒名)。
+// 默认值真源见 core/panel/docDefaults.js
 // 注意:watch getter 在 setup 时立即求值,必须位于 draftEditable/cur 定义之后
-function todayStr() {
-  const d = new Date()
-  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10)
-}
 watch(
   () => [isApprovalDoc.value, draftEditable.value, cur.value?.['单据编号']],
   () => {
     if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
-    if (panelCode.value === 'RD_APPROVAL') {
-      if (!cur.value['申请立项人']) cur.value['申请立项人'] = user.realName || ''
-      if (!cur.value['申请立项日期']) cur.value['申请立项日期'] = todayStr()
-      if (!cur.value['文件管理人']) cur.value['文件管理人'] = '陈秀丽'
-    } else if (panelCode.value === 'RD_PLAN') {
-      if (!cur.value['文件管理人']) cur.value['文件管理人'] = '陈秀丽'
-    } else if (panelCode.value === 'RD_PROGRESS') {
-      // 原图默认值:使用范围=工程技术中心(项目名称/层级在行级,新增项目时行内默认)
-      if (!cur.value['文件使用范围']) cur.value['文件使用范围'] = '工程技术中心'
-    } else if (panelCode.value === 'RD_FILTER_EFF') {
-      // 数据记录表默认:密级=保密,适用范围=银嘉内部,测试主题=样板标题(可改)
-      if (!cur.value['密级']) cur.value['密级'] = '保密'
-      if (!cur.value['适用范围']) cur.value['适用范围'] = '银嘉内部'
-      if (!cur.value['测试主题']) cur.value['测试主题'] = '伊可普需求2炭棒除VOC测试'
-    }
+    applyDocDefaults(panelCode.value, cur.value, user, { isNew: isFreshAddedDoc(), today: todayStr() })
   },
 )
 
@@ -2378,7 +2364,9 @@ function formatFieldValue(field, value) {
 
 function headerFieldLocked(field) {
   const key = headerFieldKey(field)
-  return !!field.computed || !!field.autoCode || ['编号', '单据状态', '创建时间', '更新时间', '发起人编号'].includes(key)
+  // readonly:元数据 editable=0 → buildMeta 下发 readonly(文书锁定字段 申请立项人/负责人 在此列)
+  return !!field.computed || !!field.autoCode || !!field.readonly
+    || ['编号', '单据状态', '创建时间', '更新时间', '发起人编号'].includes(key)
 }
 
 function headerRefText(field) {
@@ -3092,14 +3080,16 @@ async function directAdd() {
     const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '保存', formData, buttonParam: {} })
     const no = res && (res['编号'] || res.formNo)
     if (!no) return ElMessage.error('新增失败：未返回单据编号')
+    // 标记必须先立:下面的 load() 刷新列表时 cur 就可能切到这张新草稿,文书默认值 watch 在
+    // await 期间就会跑;标记晚设会被 isFreshAddedDoc() 判成 false,锁定字段(申请立项人/负责人)就带不出来
+    freshAdded.value = true // 本次新增尚未成功保存过：离开守卫「不保存」时据此撤回整单
+    freshAddedNo.value = no // 撤回只允许命中这张新建单
+    markFreshDraft(no) // 持久化标记：刷新/重进后守卫仍能识别并撤回这张草稿
     await load() // 刷新列表
     // 定位到新单:列表按单据号排序,新单号不一定排在首位(如存在 WW-/旧格式单号时 WO 新单不在第 1 位),
     // 必须按编号精确定位,否则新增后仍显示旧单,看起来像"新增复制了当前页面的内容"
     const idx = list.value.findIndex((item) => item['编号'] === no)
     curIdx.value = idx >= 0 ? idx : 0
-    freshAdded.value = true // 本次新增尚未成功保存过：离开守卫「不保存」时据此撤回整单
-    freshAddedNo.value = no // 撤回只允许命中这张新建单
-    markFreshDraft(no) // 持久化标记：刷新/重进后守卫仍能识别并撤回这张草稿
     markSavedSnapshot()
     ElMessage.success(`已新增 ${panelName.value}-${no}，请在列表页填写并保存`)
   } catch (e) {

@@ -119,8 +119,11 @@ import { Plus, Delete, Search } from '@element-plus/icons-vue'
 import { usePanelRuntime } from '@core/panel-runtime'
 import RefPickDialog from './RefPickDialog.vue'
 import { tt } from '@/i18n'
+import { useUserStore } from '@/stores/user'
+import { applyDocDefaults } from '@core/panel/docDefaults'
 
 const engine = usePanelRuntime()
+const user = useUserStore()
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -162,7 +165,8 @@ function isRef(r) {
 }
 
 function fieldLocked(r) {
-  return !!(r.autoCode || r.computed)
+  // readonly:元数据 editable=0(yj_field)→ buildMeta 下发 readonly,文书锁定字段(申请立项人/负责人)靠它
+  return !!(r.autoCode || r.computed || r.readonly)
 }
 
 function refText(r, v) {
@@ -305,6 +309,9 @@ async function onOpen() {
     const p = await engine.getNewFormPermMatrix({ panelCode: props.panelCode, operationName: '新增流程' })
     Object.keys(form).forEach((k) => delete form[k])
     Object.assign(form, p.data || {})
+    // 文书默认值:必须在「新增」这一刻带出。文书面板(RD_APPROVAL/RD_PLAN 等)保存后
+    // 管理员=已归档、普通用户=审批中,都不经过草稿态,挂到列表页草稿 watch 上等于永不执行。
+    applyDocDefaults(props.panelCode, form, user, { isNew: true })
     meta.value = p.meta || []
     detailDef.value = p.detail || null
     Object.keys(detailData).forEach((k) => delete detailData[k])
