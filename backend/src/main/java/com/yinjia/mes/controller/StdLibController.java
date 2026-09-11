@@ -29,12 +29,21 @@ public class StdLibController {
         this.jdbc = jdbc;
     }
 
-    /** 条目列表:GET /api/stdlib/list?lib=spec.section&item=1.适用范围(item 缺省=整库)。 */
+    /**
+     * 条目列表:GET /api/stdlib/list?lib=spec.section&item=1.适用范围(item 缺省=整库)。
+     * all=1 时连**停用**条目一起返回并下发 enabled —— 维护界面要靠它显示灰显条目并恢复启用;
+     * 默认(不带 all)只给 enabled=1,即下拉候选,停用条目不得出现在业务选择里。
+     */
     @GetMapping("/list")
     public ApiResult<List<Map<String, Object>>> list(@RequestParam String lib,
-                                                     @RequestParam(required = false) String item) {
+                                                     @RequestParam(required = false) String item,
+                                                     @RequestParam(required = false) String all) {
+        boolean includeDisabled = all != null && !all.isBlank() && !"0".equals(all) && !"false".equalsIgnoreCase(all);
         StringBuilder sql = new StringBuilder(
-                "SELECT id, lib_code AS lib, item_code AS item, content FROM yj_std_lib WHERE enabled = 1 AND lib_code = ?");
+                "SELECT id, lib_code AS lib, item_code AS item, content, enabled FROM yj_std_lib WHERE lib_code = ?");
+        if (!includeDisabled) {
+            sql.append(" AND enabled = 1");
+        }
         Object[] args;
         if (item != null && !item.isBlank()) {
             sql.append(" AND item_code = ? ORDER BY seq, id");
@@ -69,14 +78,62 @@ public class StdLibController {
     /** 停用条目(软删):POST {id}。 */
     @PostMapping("/remove")
     public ApiResult<Map<String, Object>> remove(@RequestBody Map<String, Object> body) {
+        return setEnabled(body, 0);
+    }
+
+    /**
+     * 编辑条目正文:POST {id, content} —— 只改标准库条目本身。
+     * 面板勾选录入时存的是**文本内容**(单据列不存条目 id),所以改库条目**不会**改到历史单据,
+     * 这正是"不污染已录入数据"的口径;改完只影响以后的勾选候选。
+     * content 允许纯文本或 JSON(spec.test/insp.plan 存结构化 JSON,原样往返不解析)。
+     */
+    @PostMapping("/update")
+    public ApiResult<Map<String, Object>> update(@RequestBody Map<String, Object> body) {
         String username = currentUsername();
         Object id = body.get("id");
         if (!(id instanceof Number n)) {
             return ApiResult.error(400, "id 无效");
         }
-        jdbc.update("UPDATE yj_std_lib SET enabled = 0, asp_user2 = ?, asp_time2 = SYSDATETIME() WHERE id = ?", username, n.intValue());
+        String content = str(body.get("content"));
+        if (content.isBlank()) {
+            return ApiResult.error(400, "内容不能为空");
+        }
+        if (content.length() > 4000) {
+            return ApiResult.error(400, "内容过长(≤4000 字)");
+        }
+        int rows = jdbc.update("UPDATE yj_std_lib SET content = ?, asp_user2 = ?, asp_time2 = SYSDATETIME() WHERE id = ?",
+                content, username, n.intValue());
+        if (rows == 0) {
+            return ApiResult.error(404, "条目不存在");
+        }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("ok", true);
+        out.put("id", n.intValue());
+        out.put("content", content);
+        return ApiResult.ok(out);
+    }
+
+    /** 恢复启用:POST {id}(停用是软删,可救回)。 */
+    @PostMapping("/enable")
+    public ApiResult<Map<String, Object>> enable(@RequestBody Map<String, Object> body) {
+        return setEnabled(body, 1);
+    }
+
+    private ApiResult<Map<String, Object>> setEnabled(Map<String, Object> body, int enabled) {
+        String username = currentUsername();
+        Object id = body.get("id");
+        if (!(id instanceof Number n)) {
+            return ApiResult.error(400, "id 无效");
+        }
+        int rows = jdbc.update("UPDATE yj_std_lib SET enabled = ?, asp_user2 = ?, asp_time2 = SYSDATETIME() WHERE id = ?",
+                enabled, username, n.intValue());
+        if (rows == 0) {
+            return ApiResult.error(404, "条目不存在");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", true);
+        out.put("id", n.intValue());
+        out.put("enabled", enabled);
         return ApiResult.ok(out);
     }
 

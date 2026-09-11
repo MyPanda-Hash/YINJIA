@@ -143,6 +143,15 @@
                 <el-select v-else-if="editable && pair.type === 'select'" v-model="head[pair.key]" size="small" :clearable="false" @change="emit('dirty')">
                   <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
                 </el-select>
+                <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名 -->
+                <FileAttachCell
+                  v-else-if="editable && pair.type === 'file'"
+                  :panel-code="panelCode"
+                  :doc-no="head['单据编号'] || ''"
+                  :field-key="pair.key"
+                  :model-value="head[pair.key] || ''"
+                  @update:model-value="(v) => { head[pair.key] = v }"
+                />
                 <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" @input="emit('dirty')" />
                 <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
                 <span v-else class="rs-txt">{{ head[pair.key] || '' }}</span>
@@ -572,14 +581,8 @@
     </el-dialog>
 
     <!-- ═══ 章节标准库(yj_std_lib,lib=spec.section) ═══ -->
-    <el-dialog v-model="secLibVisible" :title="tt('章节标准库') + ' · ' + tt(secLibLabel)" width="720px" append-to-body>
-      <div class="sec-lib-list">
-        <div v-for="e in secLibRows" :key="e.id" class="sec-lib-item" @click="applySectionLib(e.content)">
-          <div class="sec-lib-text">{{ e.content }}</div>
-          <span class="sec-lib-del" @click.stop="removeSectionLib(e)">✕</span>
-        </div>
-        <div v-if="!secLibRows.length" class="sec-lib-empty">{{ tt('暂无条目，可在下方补充') }}</div>
-      </div>
+    <el-dialog v-model="secLibVisible" :title="tt('章节标准库') + ' · ' + tt(secLibLabel)" width="760px" append-to-body>
+      <StdLibManager ref="secLibRef" lib="spec.section" :item="secLibLabel" :add-item="secLibLabel" pickable :show-add="false" @pick="applySectionLib" />
       <div class="sec-lib-add">
         <el-input v-model="secLibDraft" type="textarea" :rows="3" :placeholder="tt('新条目(默认带入当前值，编辑后存入)')" />
         <el-button type="primary" @click="addSectionLib">{{ tt('存入标准库') }}</el-button>
@@ -612,20 +615,9 @@
         <el-button type="primary" @click="saveFieldEdit">{{ tt('保存') }}</el-button>
       </template>
     </el-dialog>
-    <!-- 标准库维护(可增可停用;打印时隐藏) -->
-    <el-dialog v-model="stdLibVisible" :title="tt('标准库维护') + ' · ' + tt(stdLibName)" width="520px" append-to-body>
-      <div class="stdlib-tip">{{ tt('下拉即可从标准库选择；也可以在这里增删条目。填写时直接输入新值后点「加入标准库」也能入库。') }}</div>
-      <div class="stdlib-add">
-        <el-input v-model="stdLibNew" size="default" :placeholder="tt('新增条目')" @keyup.enter="addStdLibItem" />
-        <el-button type="primary" @click="addStdLibItem">{{ tt('加入标准库') }}</el-button>
-      </div>
-      <div class="stdlib-list" v-loading="stdLibBusy">
-        <div v-for="r in stdLibRows" :key="r.id" class="stdlib-item">
-          <span class="stdlib-item-text">{{ r.content }}</span>
-          <span class="stdlib-del" :title="tt('停用')" @click="removeStdLibItem(r)">×</span>
-        </div>
-        <div v-if="!stdLibBusy && !stdLibRows.length" class="stdlib-empty">{{ tt('暂无条目,请在上方新增') }}</div>
-      </div>
+    <!-- 标准库维护(可增/可编辑/可停用/可恢复启用;打印时隐藏) -->
+    <el-dialog v-model="stdLibVisible" :title="tt('标准库维护') + ' · ' + tt(stdLibName)" width="680px" append-to-body>
+      <StdLibManager :lib="stdLibCode" @changed="onStdLibChanged" />
       <template #footer>
         <el-button @click="stdLibVisible = false">{{ tt('关闭') }}</el-button>
       </template>
@@ -645,6 +637,8 @@ import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import RefPickDialog from './RefPickDialog.vue'
+import FileAttachCell from './FileAttachCell.vue'
+import StdLibManager from './StdLibManager.vue'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -690,58 +684,22 @@ const subtitleOptions = computed(() => {
 })
 
 // ---------- 标准库维护(实验室 4 张表的 测试项目/申请单类型/设备名称/仪器名称-型号) ----------
+// 列表/新增/编辑/停用/恢复启用都在共用组件 StdLibManager 里(勾选→编辑按钮→行内改),
+// 这里只负责决定打开哪个库、以及改完刷新下拉选项。
 const stdLibVisible = ref(false)
 const stdLibCode = ref('')
 const stdLibName = ref('')
-const stdLibNew = ref('')
-const stdLibRows = ref([])
-const stdLibBusy = ref(false)
 
-async function openStdLib(lib) {
+function openStdLib(lib) {
   if (!lib) return
   stdLibCode.value = lib
   stdLibName.value = cfg.value?.subtitle?.label ? String(cfg.value.subtitle.label).replace(/[：:]\s*$/, '') : lib
-  stdLibNew.value = ''
   stdLibVisible.value = true
-  await loadStdLib()
 }
 
-async function loadStdLib() {
-  stdLibBusy.value = true
-  try {
-    const res = await request.get('/stdlib/list', { params: { lib: stdLibCode.value } })
-    stdLibRows.value = (res?.data || []).map((r) => ({ id: r.id, content: r.content }))
-  } catch {
-    stdLibRows.value = []
-  } finally {
-    stdLibBusy.value = false
-  }
-}
-
-async function addStdLibItem() {
-  const v = String(stdLibNew.value || '').trim()
-  if (!v) return
-  try {
-    await request.post('/stdlib/add', { lib: stdLibCode.value, item: '默认', content: v })
-    stdLibNew.value = ''
-    await loadStdLib()
-    // 同步刷新字段选项,新增的条目立刻可以在下拉里选
-    emit('refresh-config')
-    ElMessage.success(tt('已加入标准库'))
-  } catch (e) {
-    ElMessage.error(tt('加入标准库失败'))
-  }
-}
-
-async function removeStdLibItem(row) {
-  try {
-    await request.post('/stdlib/remove', { id: row.id })
-    await loadStdLib()
-    emit('refresh-config')
-    ElMessage.success(tt('已停用该条目'))
-  } catch (e) {
-    ElMessage.error(tt('停用失败'))
-  }
+/** 标准库条目变了:刷新字段选项,新增/改名立刻反映到下拉(不影响已录入单据的文本) */
+function onStdLibChanged() {
+  emit('refresh-config')
 }
 
 const effGrid = computed(() => activeVariant.value?.grid || cfg.value?.grid || [])
@@ -1483,8 +1441,9 @@ function confirmMaterialPick() {
 }
 
 // ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──
+// 列表维护(增/编/停用/恢复)交给 StdLibManager;本处保留「多行新增」框与「勾选→填入」到当前章节字段
 const secLibVisible = ref(false)
-const secLibRows = ref([])
+const secLibRef = ref(null)
 const secLibLabel = ref('')
 const secLibKey = ref('')
 const secLibDraft = ref('')
@@ -1493,15 +1452,6 @@ async function openSectionLib(row) {
   secLibLabel.value = row.label
   secLibDraft.value = props.head?.[row.key] || ''
   secLibVisible.value = true
-  await loadSectionLib()
-}
-async function loadSectionLib() {
-  try {
-    const res = await request.get('/stdlib/list', { params: { lib: 'spec.section', item: secLibLabel.value } })
-    secLibRows.value = res?.data || []
-  } catch (e) {
-    secLibRows.value = []
-  }
 }
 function applySectionLib(content) {
   if (!props.head) return
@@ -1516,17 +1466,9 @@ async function addSectionLib() {
     await request.post('/stdlib/add', { lib: 'spec.section', item: secLibLabel.value, content: text })
     ElMessage.success(tt('已存入标准库'))
     secLibDraft.value = ''
-    await loadSectionLib()
+    await secLibRef.value?.load()
   } catch (e) {
     ElMessage.error(tt('保存失败'))
-  }
-}
-async function removeSectionLib(entry) {
-  try {
-    await request.post('/stdlib/remove', { id: entry.id })
-    await loadSectionLib()
-  } catch (e) {
-    ElMessage.error(tt('删除失败'))
   }
 }
 
