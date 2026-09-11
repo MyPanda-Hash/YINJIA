@@ -275,14 +275,26 @@ public class QueryService {
                 m.put("saved", rs.getString("saved"));
             out.put(rs.getString("doc_no"), m);
         }, args.toArray());
+        // 项目实施计划:补终止审批状态(yj_plan_term,一单一行;RTRIM 防 char(2) 尾空格)
+        if ("RD_PLAN".equals(panelCode)) {
+            jdbc.query("SELECT doc_no, RTRIM(state) AS term_state FROM yj_plan_term WHERE panel_code='RD_PLAN' AND doc_no IN (" + in + ")",
+                    rs -> {
+                        Map<String, Object> m = out.get(rs.getString("doc_no"));
+                        if (m != null) m.put("term_state", rs.getString("term_state"));
+                    }, docNos.toArray());
+        }
         return out;
     }
 
-    /** 状态推导:已作废 > 已中止 > 删除申请中 > 修改申请中 > 审批中 > 修改中 > 已归档 > 已审核 > 草稿 */
+    /** 状态推导:已作废 > 已中止 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 审批中 > 修改中 > 已归档 > 已审核 > 草稿 */
     private String docStatus(Map<String, Object> st) {
         if (st != null && "Y".equals(st.get("canceled"))) return "已作废";
         if (st != null && "Y".equals(st.get("stopped"))) return "已中止";
         if (st != null && "Y".equals(st.get("deleting"))) return "删除申请中";
+        // 项目实施计划:终止二级审批(P1 待立项人/P2 待管理员/T 已终止)
+        if (st != null && "T".equals(st.get("term_state"))) return "已终止";
+        if (st != null && "P2".equals(st.get("term_state"))) return "终止审批中（管理员）";
+        if (st != null && "P1".equals(st.get("term_state"))) return "终止审批中（立项人）";
         if (st != null && "R".equals(st.get("modify_state"))) return "修改申请中";
         if (st != null && "Y".equals(st.get("pending"))) return "审批中";
         if (st != null && "Y".equals(st.get("modify_state"))) return "修改中";

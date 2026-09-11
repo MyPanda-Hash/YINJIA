@@ -9,6 +9,24 @@
        数据键全部为字段 label;保存/审批/导出复用引擎既有逻辑,本组件只负责呈现与置脏。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="approval-sheet">
+    <!-- ⛔ 终止审批横幅(项目实施计划:申请终止(阶段处)二级审批 立项人→管理员→落实;打印隐藏) -->
+    <div v-if="panelCode === 'RD_PLAN' && term" class="as-term-banner no-print-term" :class="'term-' + term.state">
+      <template v-if="term.state === 'T'">
+        <span class="atb-tag">{{ tt('已终止') }}</span>
+        <span class="atb-txt">{{ tt('终止于阶段') }} {{ term.stage }} · {{ tt('落实于') }} {{ term.p2_at || '' }}（{{ term.p2_by || '' }}）</span>
+      </template>
+      <template v-else>
+        <span class="atb-tag">{{ tt(term.state === 'P1' ? '终止审批中（立项人）' : '终止审批中（管理员）') }}</span>
+        <span class="atb-txt">{{ tt('终止于阶段') }} {{ term.stage }} · {{ tt('发起人') }} {{ term.req_by || '' }}<template v-if="term.reason"> · {{ tt('原因') }}：{{ term.reason }}</template></span>
+        <span v-if="canApproveTerm" class="atb-ops">
+          <el-button type="danger" size="small" @click="doTermAction('终止审批通过')">{{ tt('终止审批通过') }}</el-button>
+          <el-button size="small" @click="doTermAction('终止审批驳回')">{{ tt('终止审批驳回') }}</el-button>
+        </span>
+        <span v-else-if="canWithdrawTerm" class="atb-ops">
+          <el-button size="small" @click="doTermAction('撤回终止申请')">{{ tt('撤回终止申请') }}</el-button>
+        </span>
+      </template>
+    </div>
     <!-- ① 顶部条 -->
     <div class="as-topbar">
       <div class="as-company">惠州市银嘉环保科技有限公司</div>
@@ -234,10 +252,13 @@
                     </div>
                   </div>
                 </div>
-                <!-- 完成按钮:五行最下边 -->
-                <div v-if="canStageComplete && head[ph.key + '_计划内容'] && !head[ph.key + '_实际完成']" class="as-phase-footer">
-                  <el-button type="success" size="small" :loading="stageLoading === ph.num" @click.stop="doStageComplete(ph.num)">
+                <!-- 完成按钮:五行最下边;附「申请终止」(阶段处终止,二级审批;无在途/已落实终止时可用) -->
+                <div v-if="canStageComplete && head[ph.key + '_计划内容']" class="as-phase-footer">
+                  <el-button v-if="!head[ph.key + '_实际完成']" type="success" size="small" :loading="stageLoading === ph.num" @click.stop="doStageComplete(ph.num)">
                     {{ tt('完成') }}
+                  </el-button>
+                  <el-button v-if="!term" type="danger" plain size="small" @click.stop="doTermRequest(ph.num)">
+                    {{ tt('申请终止') }}
                   </el-button>
                 </div>
               </div>
@@ -283,11 +304,12 @@
 </template>
 
 <script setup>
-import { computed, reactive, nextTick, ref } from 'vue'
-import { ElMessage, ElButton } from 'element-plus'
+import { computed, reactive, nextTick, ref, watch } from 'vue'
+import { ElMessage, ElButton, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
 import RefPickDialog from './RefPickDialog.vue'
+import request from '@core/request'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
 
@@ -300,8 +322,10 @@ const props = defineProps({
   panelCode: { type: String, default: '' },
   /** 单据是否已审核(阶段完成按钮仅在审核后可用) */
   audited: { type: Boolean, default: false },
+  /** 当前用户(终止审批按钮显隐:一级=立项人姓名匹配,二级=管理员) */
+  user: { type: Object, default: () => ({}) },
 })
-const emit = defineEmits(['dirty'])
+const emit = defineEmits(['dirty', 'term-changed'])
 
 const engine = usePanelRuntime()
 const stageLoading = ref(0)
@@ -341,6 +365,76 @@ async function doStageComplete(stageNum) {
   } finally {
     stageLoading.value = 0
   }
+}
+
+// ── 申请终止(阶段处)二级审批:立项人 → 管理员 → 落实终止(2026-09-11) ──
+// 状态源 GET /px/planTerm(yj_plan_term 一单一行);动作走 callButton;动作后刷新状态并通知父级重载单据状态。
+const term = ref(null)
+const docNoOf = () => props.head['单据编号'] || props.head['编号'] || ''
+async function loadTerm() {
+  if (props.panelCode !== 'RD_PLAN') { term.value = null; return }
+  const no = docNoOf()
+  if (!no) { term.value = null; return }
+  try {
+    const res = await request.get('/px/planTerm', { params: { code: no } })
+    term.value = res?.data || null
+  } catch { term.value = null }
+}
+watch(() => [props.panelCode, docNoOf()], () => loadTerm(), { immediate: true })
+
+/** 一级审批权:当前用户姓名 = 立项人(严格口径,姓名匹配;管理员不代审);二级:管理员 */
+const canApproveTerm = computed(() => {
+  if (!term.value) return false
+  if (term.value.state === 'P1') return !!props.user?.realName && props.user.realName === term.value.initiator
+  if (term.value.state === 'P2') return !!props.user?.isAdmin
+  return false
+})
+/** 撤回权:发起人本人或管理员(仅 P1/P2) */
+const canWithdrawTerm = computed(() => {
+  if (!term.value || term.value.state === 'T') return false
+  return props.user?.isAdmin || (props.user?.userName && props.user.userName === term.value.req_by)
+})
+
+async function doTermRequest(stageNum) {
+  let reason = ''
+  try {
+    const { value } = await ElMessageBox.prompt(
+      `${tt('申请终止')}：${tt('终止于阶段')} ${stageNum}。${tt('终止原因（选填）')}：`,
+      tt('申请终止'), { confirmButtonText: tt('确定'), cancelButtonText: tt('取消'), inputPlaceholder: tt('终止原因（选填）') })
+    reason = value || ''
+  } catch { return /* 取消 */ }
+  try {
+    const res = await engine.callButton({ panelCode: props.panelCode, buttonName: '申请终止',
+      formData: { 编号: docNoOf(), 阶段序号: String(stageNum), 终止原因: reason }, buttonParam: {} })
+    ElMessage.success(`${tt('已提交终止申请')}（${tt('阶段')} ${res?.['阶段'] || stageNum}）→ ${tt('待立项人审批')}`)
+    await loadTerm()
+    emit('term-changed')
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('提交终止申请失败'))
+  }
+}
+
+async function doTermAction(buttonName) {
+  if (buttonName === '终止审批驳回' || (buttonName === '终止审批通过' && term.value?.state === 'P2')) {
+    try {
+      const { value } = await ElMessageBox.prompt(
+        buttonName === '终止审批通过' ? `${tt('审批意见（选填）')}：` : `${tt('驳回须填写意见')}：`,
+        tt(buttonName), { confirmButtonText: tt('确定'), cancelButtonText: tt('取消'),
+          inputValidator: buttonName === '终止审批通过' ? undefined : (v) => (v && v.trim() ? true : tt('意见必填')) })
+      var opinion = value || ''
+    } catch { return /* 取消 */ }
+    try {
+      await engine.callButton({ panelCode: props.panelCode, buttonName,
+        formData: { 编号: docNoOf(), 审批意见: opinion }, buttonParam: {} })
+    } catch (e) { ElMessage.error(engine.errMsg(e) || tt('操作失败')); return }
+  } else {
+    try {
+      await engine.callButton({ panelCode: props.panelCode, buttonName, formData: { 编号: docNoOf() }, buttonParam: {} })
+    } catch (e) { ElMessage.error(engine.errMsg(e) || tt('操作失败')); return }
+  }
+  ElMessage.success(tt('操作成功'))
+  await loadTerm()
+  emit('term-changed')
 }
 
 // 阶段框显示状态(本地视图;导出/打印按当前实际显示渲染)
@@ -440,6 +534,41 @@ defineExpose({ focusField })
   font-size: 14px;
   padding: 0;
 }
+
+/* ═══ 终止审批横幅(打印隐藏;红系=已终止,蓝系=审批中) ═══ */
+.as-term-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  border: 1px solid #f3c1c1;
+  background: #fef2f2;
+  border-radius: 4px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+.as-term-banner.term-P1,
+.as-term-banner.term-P2 {
+  border-color: #bcd2f5;
+  background: #f0f6ff;
+}
+.atb-tag {
+  font-weight: 600;
+  color: #b91c1c;
+  border: 1px solid #f3c1c1;
+  border-radius: 3px;
+  padding: 1px 8px;
+  background: #fff;
+}
+.term-P1 .atb-tag,
+.term-P2 .atb-tag {
+  color: #0d5bd3;
+  border-color: #bcd2f5;
+}
+.atb-txt { color: #555; }
+.atb-ops { margin-left: auto; display: inline-flex; gap: 6px; }
+@media print { .no-print-term { display: none !important; } }
 
 /* ═══ ① 顶部条:公司名 | 文档编号 ═══ */
 .as-topbar {

@@ -133,7 +133,7 @@
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
-        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" @dirty="markInlineDirty" />
+        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
         <div class="approval-side" :class="{ collapsed: sideCollapsed }">
@@ -3164,6 +3164,11 @@ function restoreFreshDraft() {
 /** 变更钩子置脏(表头/明细控件 @change;对真实交互可靠)——快照对比作兜底 */
 const inlineDirtyFlag = ref(false)
 function markInlineDirty() { if (draftEditable.value) inlineDirtyFlag.value = true }
+
+/** 终止审批动作后(申请终止/审批/撤回):重载列表刷新单据状态(终止审批中/已终止) */
+async function onTermChanged() {
+  await load()
+}
 /** 字段编辑保存后刷新面板配置(yj_field 别名随配置接口重新下发) */
 async function onFieldEditRefresh() {
   cfgCache.value = null
@@ -4204,6 +4209,18 @@ onUnmounted(() => {
   color: #b91c1c;
   border: 1px solid #f3c1c1;
   background: #fef2f2;
+}
+.doc-status.已终止 {
+  color: #b91c1c;
+  border: 1px solid #f3c1c1;
+  background: #fef2f2;
+  font-weight: 600;
+}
+.doc-status.终止审批中（立项人）,
+.doc-status.终止审批中（管理员） {
+  color: #0d5bd3;
+  border: 1px solid #bcd2f5;
+  background: #f0f6ff;
 }
 .doc-status.修改申请中 {
   color: #b45309;

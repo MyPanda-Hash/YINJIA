@@ -109,6 +109,11 @@ public class ButtonService {
             case "生成产品批号" -> genProductLot(def, formData);
             // 项目实施计划:阶段完成按钮(填写实际完成时间)
             case "阶段完成" -> completeStage(def, formData);
+            // 项目实施计划:申请终止(阶段处)二级审批——立项人 → 管理员 → 落实终止(2026-09-11)
+            case "申请终止" -> termRequest(def, formData);
+            case "终止审批通过" -> termApprove(def, formData);
+            case "终止审批驳回" -> termReject(def, formData);
+            case "撤回终止申请" -> termWithdraw(def, formData);
             // 项目进度查询:把全部实施计划实时导入唯一那张进度单(幂等,手动触发用)
             case "同步进度" -> syncAllPlansToProgress();
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
@@ -200,11 +205,14 @@ public class ButtonService {
             no = formNoService.next(def.prefix(), user);
             clearStaleDocStatus(def, no);
         }
-        // 已审核/审批中/已中止单据不允许保存(照搬 light-mes:仅草稿可改)
+        // 已审核/审批中/已中止单据不允许保存(照搬 light-mes:仅草稿可改);终止审批中/已终止同样锁定
         Map<String, Object> st = docStatusOf(def.code(), no);
-        if ("已审核".equals(st.get("status"))) throw new IllegalStateException("已审核单据不可保存，请先弃审");
-        if ("审批中".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可保存，请等待审批完成或驳回");
-        if ("已中止".equals(st.get("status"))) throw new IllegalStateException("已中止单据不可保存，请先恢复");
+        String stStatus = String.valueOf(st.get("status"));
+        if ("已审核".equals(stStatus)) throw new IllegalStateException("已审核单据不可保存，请先弃审");
+        if ("审批中".equals(stStatus)) throw new IllegalStateException("审批中单据不可保存，请等待审批完成或驳回");
+        if ("已中止".equals(stStatus)) throw new IllegalStateException("已中止单据不可保存，请先恢复");
+        if ("已终止".equals(stStatus)) throw new IllegalStateException("已终止单据不可保存");
+        if (stStatus.startsWith("终止审批中")) throw new IllegalStateException("终止审批中单据不可保存，请等待审批完成或撤回");
 
         Map<String, String> l2c = def.labelToCol();
         // 规格书修改态:落库前留「4.产品性能检验项目及检验标准」页旧值快照(表区=检验要求),
@@ -1151,6 +1159,8 @@ public class ButtonService {
         String status = String.valueOf(st.get("status"));
         if ("草稿".equals(status)) throw new IllegalStateException("草稿单据不能标记阶段完成,请先审核");
         if ("已作废".equals(status)) throw new IllegalStateException("已作废单据不能操作");
+        if ("已终止".equals(status)) throw new IllegalStateException("已终止单据不能标记阶段完成");
+        if (status.startsWith("终止审批中")) throw new IllegalStateException("终止审批中单据不能标记阶段完成,请等待审批完成或撤回");
         // 检查列存在
         if (COL_LENGTH("rd_plan", col) == 0) throw new IllegalStateException("阶段列不存在:" + col);
         String today = LocalDate.now().toString();
@@ -1162,6 +1172,147 @@ public class ButtonService {
         out.put("阶段", stage);
         out.put("实际完成", today);
         return out;
+    }
+
+    // ==================== 项目实施计划:申请终止(阶段处)二级审批(2026-09-11) ====================
+    // 流程:申请终止(阶段N) → P1 待立项人审批 →(立项人同意)→ P2 待管理员审批 →(管理员同意)→ T 已终止(锁定单据)。
+    // 驳回/撤回删行,可重新申请;留痕走 yj_form_approval(TERM_*)。状态表 yj_plan_term(一单一行)。
+    // 立项人 = 本计划「文档编号」所引立项申请(rd_approval)的「申请立项人」,按姓名匹配 yj_user.real_name;
+    // 严格口径:无账号则一级审批挂起(申请人可撤回重走),管理员不代审。
+
+    /** 申请终止:{编号, 阶段序号, 终止原因(选填)}——仅已审核/已归档且无在途/已落实终止的单据 */
+    private Map<String, Object> termRequest(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_PLAN".equals(def.code())) throw new IllegalStateException("仅项目实施计划支持申请终止");
+        String user = currentUserName();
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        int stage = parseStage(formData.get("阶段序号"));
+        String reason = String.valueOf(formData.getOrDefault("终止原因", "") == null ? "" : formData.get("终止原因"));
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        String status = String.valueOf(st.get("status"));
+        if (!"已审核".equals(status) && !"已归档".equals(status))
+            throw new IllegalStateException("仅已审核或已归档的实施计划可申请终止(当前:" + status + ")");
+        if (termStateOf(no) != null) throw new IllegalStateException("该计划已有终止申请或已终止,不可重复申请");
+        jdbc.update("DELETE FROM yj_plan_term WHERE panel_code='RD_PLAN' AND doc_no=?", no); // 清历史残留行(如驳回未净)
+        jdbc.update("INSERT INTO yj_plan_term (panel_code, doc_no, stage, reason, state, req_by, req_at, asp_user1, asp_time1) "
+                        + "VALUES ('RD_PLAN', ?, ?, ?, 'P1', ?, SYSDATETIME(), ?, SYSDATETIME())",
+                no, stage, reason, user, user);
+        recordApproval(def.code(), no, "TERM_REQUEST", "PENDING", reason);
+        List<String> initiators = initiatorUsersOf(no);
+        notify(() -> messageService.send(initiators, MessageService.TERM_REQUESTED, def.code(), no,
+                Map.of("stage", String.valueOf(stage), "reason", reason), user));
+        Map<String, Object> out = result(no, "终止审批中（立项人）");
+        out.put("阶段", stage);
+        return out;
+    }
+
+    /** 终止审批通过:P1(仅立项人)→ 递交管理员;P2(仅管理员)→ 落实终止(锁定单据) */
+    private Map<String, Object> termApprove(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        String no = requireNo(formData);
+        Map<String, Object> t = termRowOf(no);
+        String state = t == null ? null : String.valueOf(t.get("state")).trim();
+        if (!"P1".equals(state) && !"P2".equals(state)) throw new IllegalStateException("无待审批的终止申请");
+        String stage = String.valueOf(t.get("stage"));
+        if ("P1".equals(state)) {
+            requireInitiator(no, user);
+            jdbc.update("UPDATE yj_plan_term SET state='P2', p1_by=?, p1_at=SYSDATETIME(), asp_user2=?, asp_time2=SYSDATETIME() "
+                    + "WHERE panel_code='RD_PLAN' AND doc_no=? AND state='P1'", user, user, no);
+            recordApproval(def.code(), no, "TERM_L1_APPROVE", "APPROVED", opinionOf(formData));
+            notify(() -> messageService.sendToAdmins(def.code(), no, MessageService.TERM_TO_ADMIN,
+                    Map.of("stage", stage), user));
+            return result(no, "终止审批中（管理员）");
+        }
+        if (!isAdminUser(user)) throw new IllegalStateException("二级审批仅管理员可同意");
+        jdbc.update("UPDATE yj_plan_term SET state='T', p2_by=?, p2_at=SYSDATETIME(), asp_user2=?, asp_time2=SYSDATETIME() "
+                + "WHERE panel_code='RD_PLAN' AND doc_no=? AND state='P2'", user, user, no);
+        recordApproval(def.code(), no, "TERM_L2_APPROVE", "APPROVED", opinionOf(formData));
+        String reqBy = String.valueOf(t.get("req_by") == null ? "" : t.get("req_by"));
+        List<String> to = new ArrayList<>(initiatorUsersOf(no));
+        if (!reqBy.isBlank()) to.add(reqBy);
+        notify(() -> messageService.send(to, MessageService.TERM_APPROVED, def.code(), no,
+                Map.of("stage", stage), user));
+        return result(no, "已终止");
+    }
+
+    /** 终止审批驳回:P1=立项人驳回,P2=管理员驳回;驳回后删行可重新申请 */
+    private Map<String, Object> termReject(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        String no = requireNo(formData);
+        Map<String, Object> t = termRowOf(no);
+        String state = t == null ? null : String.valueOf(t.get("state")).trim();
+        if (!"P1".equals(state) && !"P2".equals(state)) throw new IllegalStateException("无待审批的终止申请");
+        if ("P1".equals(state)) requireInitiator(no, user);
+        else if (!isAdminUser(user)) throw new IllegalStateException("二级审批仅管理员可驳回");
+        String stage = String.valueOf(t.get("stage"));
+        String reqBy = String.valueOf(t.get("req_by") == null ? "" : t.get("req_by"));
+        jdbc.update("DELETE FROM yj_plan_term WHERE panel_code='RD_PLAN' AND doc_no=?", no);
+        recordApproval(def.code(), no, "P1".equals(state) ? "TERM_L1_REJECT" : "TERM_L2_REJECT", "REJECTED", opinionOf(formData));
+        if (!reqBy.isBlank()) notify(() -> messageService.send(List.of(reqBy), MessageService.TERM_REJECTED, def.code(), no,
+                Map.of("stage", stage, "opinion", opinionOf(formData)), user));
+        return result(no, "已归档");
+    }
+
+    /** 撤回终止申请:发起人本人或管理员,仅在途(P1/P2)可撤 */
+    private Map<String, Object> termWithdraw(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        String no = requireNo(formData);
+        Map<String, Object> t = termRowOf(no);
+        String state = t == null ? null : String.valueOf(t.get("state")).trim();
+        if (!"P1".equals(state) && !"P2".equals(state)) throw new IllegalStateException("无在途的终止申请");
+        String reqBy = String.valueOf(t.get("req_by") == null ? "" : t.get("req_by"));
+        if (!user.equals(reqBy) && !isAdminUser(user)) throw new IllegalStateException("仅发起人或管理员可撤回终止申请");
+        jdbc.update("DELETE FROM yj_plan_term WHERE panel_code='RD_PLAN' AND doc_no=?", no);
+        recordApproval(def.code(), no, "TERM_WITHDRAW", "WITHDRAWN", opinionOf(formData));
+        return result(no, "已归档");
+    }
+
+    /** 终止状态查询(P1/P2/T;无=null)——docStatusOf 与前端 /px/planTerm 共用。char(2) 右补空,一律 trim */
+    public String termStateOf(String no) {
+        List<String> rows = jdbc.queryForList(
+                "SELECT state FROM yj_plan_term WHERE panel_code='RD_PLAN' AND doc_no=?", String.class, no);
+        return rows.isEmpty() || rows.get(0) == null ? null : rows.get(0).trim();
+    }
+
+    /** 终止单完整行(前端展示用;无=null;含立项人姓名供一级审批按钮显隐判定) */
+    public Map<String, Object> termRowOf(String no) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT t.id, t.doc_no, t.stage, t.reason, RTRIM(t.state) AS state, t.req_by, CONVERT(varchar(19), t.req_at, 120) AS req_at, "
+                        + "t.p1_by, CONVERT(varchar(19), t.p1_at, 120) AS p1_at, t.p2_by, CONVERT(varchar(19), t.p2_at, 120) AS p2_at, "
+                        + "ISNULL(a.[申请立项人], N'') AS initiator "
+                        + "FROM yj_plan_term t LEFT JOIN rd_plan p ON p.[单据编号] = t.doc_no "
+                        + "LEFT JOIN rd_approval a ON a.[文档编号] = p.[文档编号] "
+                        + "WHERE t.panel_code='RD_PLAN' AND t.doc_no=?", no);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /** 立项人登录账号(姓名→yj_user.real_name;可能多个/零个——严格口径:零个则一级审批挂起) */
+    private List<String> initiatorUsersOf(String planNo) {
+        try {
+            List<String> names = jdbc.queryForList(
+                    "SELECT a.[申请立项人] FROM rd_plan p JOIN rd_approval a ON a.[文档编号] = p.[文档编号] "
+                            + "WHERE p.[单据编号] = ?", String.class, planNo);
+            if (names.isEmpty() || names.get(0) == null || names.get(0).isBlank()) return List.of();
+            return jdbc.queryForList(
+                    "SELECT username FROM yj_user WHERE real_name = ? AND ISNULL(enabled, '1') = '1'", String.class, names.get(0));
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /** 一级审批权限:当前用户必须是立项人账号(严格口径,管理员不代审) */
+    private void requireInitiator(String planNo, String user) {
+        if (!initiatorUsersOf(planNo).contains(user))
+            throw new IllegalStateException("一级审批仅立项人（申请立项人）本人可操作");
+    }
+
+    private int parseStage(Object raw) {
+        int stage;
+        try { stage = Integer.parseInt(String.valueOf(raw)); } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("阶段序号无效:" + raw);
+        }
+        if (stage < 1 || stage > 10) throw new IllegalArgumentException("阶段序号须在 1~10 之间");
+        return stage;
     }
 
     /**
@@ -1662,6 +1813,8 @@ public class ButtonService {
                 panelCode, no);
         Map<String, Object> out = new HashMap<>();
         Map<String, Object> r = rows.isEmpty() ? null : rows.get(0);
+        // 项目实施计划:终止二级审批状态(2026-09-11)——已终止 > 终止审批中,排在删除申请中之后
+        String ts = "RD_PLAN".equals(panelCode) && r != null ? termStateOf(no) : null;
         if (r == null) {
             out.put("status", "草稿");
         } else if ("Y".equals(r.get("canceled"))) {
@@ -1670,6 +1823,12 @@ public class ButtonService {
             out.put("status", "已中止");
         } else if ("Y".equals(r.get("deleting"))) {
             out.put("status", "删除申请中");
+        } else if ("T".equals(ts)) {
+            out.put("status", "已终止");
+        } else if ("P2".equals(ts)) {
+            out.put("status", "终止审批中（管理员）");
+        } else if ("P1".equals(ts)) {
+            out.put("status", "终止审批中（立项人）");
         } else if ("R".equals(r.get("modify_state"))) {
             out.put("status", "修改申请中");
         } else if ("Y".equals(r.get("pending"))) {

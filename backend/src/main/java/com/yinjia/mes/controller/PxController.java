@@ -2,6 +2,7 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.panel.PanelRuntimeService;
+import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.DevTaskService;
 import com.yinjia.mes.service.PanelConfigService;
 import com.yinjia.mes.service.PanelRegistry;
@@ -35,12 +36,13 @@ public class PxController {
     private final UsageLogService usageLog;
     private final JdbcTemplate jdbc;
     private final DevTaskService devTaskService;
+    private final ButtonService buttons;
 
     public PxController(PanelRuntimeService service, PanelConfigService configService,
                         ReportColumnSettingsService reportColumnSettingsService,
                         VoucherFlowService voucherFlowService,
                         PanelRegistry registry, UsageLogService usageLog, JdbcTemplate jdbc,
-                        DevTaskService devTaskService) {
+                        DevTaskService devTaskService, ButtonService buttons) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -49,6 +51,7 @@ public class PxController {
         this.usageLog = usageLog;
         this.jdbc = jdbc;
         this.devTaskService = devTaskService;
+        this.buttons = buttons;
     }
 
     /** 产品开发:下游面板元数据(矩阵列头) */
@@ -151,6 +154,12 @@ public class PxController {
     public ApiResult<Map<String, Object>> getFormDescriptor(@RequestParam String panelCode,
                                                             @RequestParam String code) {
         return ApiResult.ok(service.getFormDescriptor(panelCode, code));
+    }
+
+    /** 项目实施计划:终止审批状态查询(申请终止/审批按钮渲染依据;无终止单则 data=null) */
+    @GetMapping("/planTerm")
+    public ApiResult<Map<String, Object>> planTerm(@RequestParam String code) {
+        return ApiResult.ok(buttons.termRowOf(code));
     }
 
     @PostMapping("/queryFormDataList")
