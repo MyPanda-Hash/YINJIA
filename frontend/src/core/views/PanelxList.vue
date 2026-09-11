@@ -117,6 +117,7 @@
           ref="approvalSheetRef"
           :head="cur" :fields="headerFields" :editable="draftEditable"
           @dirty="markInlineDirty"
+          @open-sheets="openDataSheets"
         />
         <DataRecordSheet
           v-else-if="panelCode === 'RD_FILTER_EFF'"
@@ -782,6 +783,33 @@
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
     <!-- 修改记录弹窗:滚动3条(字段变化/补充/清空 + 明细变化摘要) -->
+    <!-- ═══ 项目进度查询:该项目的数据记录表单据(点项目编号弹出;行点击跳转对应面板并定位单据) ═══ -->
+    <el-dialog v-model="dataSheetsVisible" :title="tt('数据记录表单据') + ' · ' + dataSheetsCode" width="760px" append-to-body>
+      <div v-loading="dataSheetsLoading">
+        <div v-if="!dataSheetsLoading && !dataSheetsRows.length" class="mod-log-empty">
+          {{ tt('该项目暂无数据记录表单据（数据记录表按文档编号关联立项申请，请确认已按该项目编号填写）') }}
+        </div>
+        <el-table v-else :data="dataSheetsRows" size="small" border max-height="480" @row-click="jumpDataSheet">
+          <el-table-column prop="panelName" :label="tt('数据记录表')" min-width="150" />
+          <el-table-column prop="docNo" :label="tt('单据编号')" min-width="130" />
+          <el-table-column prop="docDate" :label="tt('单据日期')" width="110" align="center" />
+          <el-table-column :label="tt('单据状态')" width="120" align="center">
+            <template #default="{ row }">
+              <span class="doc-status" :class="row.status">{{ tt(row.status) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('操作')" width="90" align="center">
+            <template #default>
+              <span class="ds-jump">{{ tt('查看') }} →</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+      <template #footer>
+        <el-button @click="dataSheetsVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="modifyLogVisible" :title="tt('修改记录') + ' · ' + modifyLogNo" width="720px" append-to-body>
       <div v-if="!modifyLogRecords.length" class="mod-log-empty">{{ tt('暂无修改记录') }}</div>
       <div v-else class="mod-log-list">
@@ -941,6 +969,7 @@ import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
+import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr } from '@core/panel/docDefaults'
 import QrLabelDialog from '@/business/components/QrLabelDialog.vue'
 import StagePanel from '@/business/components/StagePanel.vue'
@@ -3169,6 +3198,36 @@ function markInlineDirty() { if (draftEditable.value) inlineDirtyFlag.value = tr
 async function onTermChanged() {
   await load()
 }
+
+// ── 项目进度查询:点项目编号 → 该项目的数据记录表单据(8 面板按文档编号关联;行点击跳转定位) ──
+const dataSheetsVisible = ref(false)
+const dataSheetsLoading = ref(false)
+const dataSheetsRows = ref([])
+const dataSheetsCode = ref('')
+async function openDataSheets(row) {
+  const K = Object.fromEntries(PROGRESS_COLUMNS.map((c) => [c.label, c.key]))
+  const code = String(row?.[K['项目编号']] || '').trim()
+  if (!code) return ElMessage.warning(tt('该行未填项目编号，无法关联数据记录表'))
+  dataSheetsCode.value = code
+  dataSheetsVisible.value = true
+  dataSheetsLoading.value = true
+  dataSheetsRows.value = []
+  try {
+    const res = await request.get('/px/progress/dataSheets', { params: { code } })
+    dataSheetsRows.value = res?.data || []
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('查询失败'))
+  } finally {
+    dataSheetsLoading.value = false
+  }
+}
+function jumpDataSheet(row) {
+  if (!row?.panelCode || !row?.docNo) return
+  dataSheetsVisible.value = false
+  const path = `/panelx/list/${row.panelCode}`
+  router.push({ path, query: { focus: row.docNo } })
+  tabs.open({ path, title: `${row.panelName}-${row.docNo}`, query: { focus: row.docNo } })
+}
 /** 字段编辑保存后刷新面板配置(yj_field 别名随配置接口重新下发) */
 async function onFieldEditRefresh() {
   cfgCache.value = null
@@ -4305,6 +4364,13 @@ onUnmounted(() => {
   font-size: 13px;
   padding: 8px 0;
 }
+/* 数据记录表单据清单:行可点跳转 */
+.ds-jump {
+  color: #0d5bd3;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+:deep(.el-table__row) { cursor: pointer; }
 .mod-log-meta {
   margin-top: 6px;
   font-size: 12px;

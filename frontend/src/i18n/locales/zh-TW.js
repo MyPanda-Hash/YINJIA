@@ -1453,5 +1453,6 @@ export default {
     '终止审批中（立项人）': '終止審批中（立項人）',
     '「{panelName} {docNo}」的终止申请（阶段 {stage}）被 {actor} 驳回。意见：{opinion}': '「{panelName} {docNo}」的終止申請（階段 {stage}）被 {actor} 駁回。意見：{opinion}',
     '终止审批通过': '終止審批通過',
+    '查询失败': '查詢失敗',
   },
 }

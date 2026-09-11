@@ -121,8 +121,16 @@
               <span v-else class="ps-cell-text">{{ row[K['子项目/尺寸']] || '' }}</span>
             </td>
             <td class="c-remark">
-              <el-input v-if="editable" v-model="row[K['项目编号']]" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row[K['项目编号']] || '' }}</span>
+              <!-- 项目编号(=立项申请文档编号):点击查该项目全部数据记录表单据(测试/功能性等可多张) -->
+              <div v-if="row[K['项目编号']]" class="ps-code-cell">
+                <el-input v-if="editable" v-model="row[K['项目编号']]" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
+                <span v-else class="ps-cell-text">{{ row[K['项目编号']] }}</span>
+                <span class="ps-code-link no-print" :title="tt('查看该项目的数据记录表单据')" @click.stop="emit('open-sheets', row)">📄</span>
+              </div>
+              <template v-else>
+                <el-input v-if="editable" v-model="row[K['项目编号']]" type="textarea" :autosize="{ minRows: 1, maxRows: 4 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
+                <span v-else class="ps-cell-text">{{ row[K['项目编号']] || '' }}</span>
+              </template>
             </td>
             <td class="c-content">
               <el-input v-if="editable" v-model="row[K['内容']]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
@@ -300,7 +308,7 @@ const props = defineProps({
   fields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
 })
-const emit = defineEmits(['dirty'])
+const emit = defineEmits(['dirty', 'open-sheets'])
 
 const engine = usePanelRuntime()
 
@@ -955,6 +963,22 @@ defineExpose({ exportProgressExcel })
 .ps-table td.c-remark {
   max-width: 170px;
 }
+/* 项目编号格:文本+查单图标(打印隐藏;点开该项目的数据记录表单据清单) */
+.ps-code-cell {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+.ps-code-cell .ps-cell-input { flex: 1; }
+.ps-code-link {
+  flex: none;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 18px;
+  opacity: 0.45;
+}
+.ps-code-link:hover { opacity: 1; }
+@media print { .ps-code-link { display: none !important; } }
 .ps-cell-text {
   display: inline-block;
   width: 100%;

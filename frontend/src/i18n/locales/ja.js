@@ -1395,5 +1395,6 @@ export default {
     '终止审批中（立项人）': '終了承認中（立項者）',
     '「{panelName} {docNo}」的终止申请（阶段 {stage}）被 {actor} 驳回。意见：{opinion}': '「{panelName} {docNo}」の終了申請（段階 {stage}）は {actor} に却下されました。意見：{opinion}',
     '终止审批通过': '終了承認承諾',
+    '查询失败': '照会失敗',
   },
 }

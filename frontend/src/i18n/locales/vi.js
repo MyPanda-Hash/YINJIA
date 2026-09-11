@@ -1406,5 +1406,10 @@ export default {
     '终止审批中（立项人）': 'Duyệt chấm dứt (người lập)',
     '「{panelName} {docNo}」的终止申请（阶段 {stage}）被 {actor} 驳回。意见：{opinion}': 'Đơn chấm dứt của "{panelName} {docNo}" (giai đoạn {stage}) bị {actor} từ chối. Ý kiến: {opinion}',
     '终止审批通过': 'Duyệt chấm dứt',
+    '数据记录表单据': 'Chứng từ ghi dữ liệu',
+    '该项目暂无数据记录表单据（数据记录表按文档编号关联立项申请，请确认已按该项目编号填写）': 'Chưa có biểu ghi dữ liệu cho dự án (liên kết theo số tài liệu; kiểm tra mã dự án).',
+    '该行未填项目编号，无法关联数据记录表': 'Dòng chưa có mã dự án, không thể liên kết',
+    '查看': 'Xem',
+    '查询失败': 'Truy vấn thất bại',
   },
 }

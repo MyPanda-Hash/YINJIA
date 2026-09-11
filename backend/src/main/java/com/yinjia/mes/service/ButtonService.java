@@ -1274,6 +1274,41 @@ public class ButtonService {
         return rows.isEmpty() || rows.get(0) == null ? null : rows.get(0).trim();
     }
 
+    // ==================== 项目进度查询 → 该项目的数据记录表单据(2026-09-11) ====================
+    // 项目编号(进度明细「说明」列)= 计划文档编号 = 立项申请文档编号;数据记录表 8 面板的单据
+    // 按同号「文档编号」关联 → 进度列表点项目编号即可查该项目全部数据记录表(测试/功能性等可多张)。
+    private static final List<String> DATARECORD_PANELS = List.of(
+            "RD_FILTER_EFF", "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT",
+            "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC");
+
+    /** 按项目编号(=立项申请文档编号)取该项目在 8 张数据记录表面板的全部单据(含状态;作废不计) */
+    public List<Map<String, Object>> progressDataSheets(String code) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        if (code == null || code.isBlank()) return out;
+        for (String pc : DATARECORD_PANELS) {
+            PanelRegistry.PanelDef def;
+            try { def = registry.panel(pc); } catch (Exception e) { continue; }
+            String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT t.[" + def.groupCol() + "] AS no, t.[" + (def.dateCol() == null ? def.groupCol() : def.dateCol()) + "] AS d "
+                            + "FROM " + table + " t WHERE t.[文档编号] = ? AND ISNULL(t.asp_cancel,'N') <> 'Y' "
+                            + "AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.["
+                            + def.groupCol() + "] AND ISNULL(s.canceled,'N') = 'Y') ORDER BY t.id",
+                    code, pc);
+            for (Map<String, Object> r : rows) {
+                String no = String.valueOf(r.get("no"));
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("panelCode", pc);
+                m.put("panelName", def.name());
+                m.put("docNo", no);
+                m.put("docDate", r.get("d") == null ? "" : String.valueOf(r.get("d")));
+                m.put("status", docStatusOf(pc, no).get("status"));
+                out.add(m);
+            }
+        }
+        return out;
+    }
+
     /** 终止单完整行(前端展示用;无=null;含立项人姓名供一级审批按钮显隐判定) */
     public Map<String, Object> termRowOf(String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(

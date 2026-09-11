@@ -1395,5 +1395,6 @@ export default {
     '终止审批中（立项人）': 'Aprobación de término (iniciador)',
     '「{panelName} {docNo}」的终止申请（阶段 {stage}）被 {actor} 驳回。意见：{opinion}': 'La solicitud de término de "{panelName} {docNo}" (etapa {stage}) fue rechazada por {actor}. Comentario: {opinion}',
     '终止审批通过': 'Aprobar término',
+    '查询失败': 'Error de consulta',
   },
 }

@@ -1602,5 +1602,6 @@ export default {
     '终止审批中（立项人）': 'Termination Approval (Initiator)',
     '「{panelName} {docNo}」的终止申请（阶段 {stage}）被 {actor} 驳回。意见：{opinion}': 'The termination request for "{panelName} {docNo}" (stage {stage}) was rejected by {actor}. Comment: {opinion}',
     '终止审批通过': 'Approve Termination',
+    '查询失败': 'Query failed',
   },
 }

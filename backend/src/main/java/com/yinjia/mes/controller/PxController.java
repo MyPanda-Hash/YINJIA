@@ -162,6 +162,12 @@ public class PxController {
         return ApiResult.ok(buttons.termRowOf(code));
     }
 
+    /** 项目进度查询:按项目编号(=立项申请文档编号)取该项目全部数据记录表单据(8 面板,含状态) */
+    @GetMapping("/progress/dataSheets")
+    public ApiResult<List<Map<String, Object>>> progressDataSheets(@RequestParam String code) {
+        return ApiResult.ok(buttons.progressDataSheets(code));
+    }
+
     @PostMapping("/queryFormDataList")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> queryFormDataList(@RequestBody Map<String, Object> body) {
