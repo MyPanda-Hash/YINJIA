@@ -1341,5 +1341,7 @@ export default {
     '附件已删除': 'Adjunto eliminado',
     '附件删除失败': 'Error al eliminar el adjunto',
     '附件下载失败': 'Error al descargar el adjunto',
+    '请先勾选一条要编辑的条目': 'Primero marque una entrada para editar',
+    '库条目均可维护：勾选一条可「编辑」，✕ 停用、↩ 恢复启用；改库只影响以后的勾选，已录入单据不变。': 'Todas las entradas de la biblioteca se pueden mantener: marque una para Editar; ✕ deshabilita, ↩ reactiva. Los cambios solo afectan a selecciones futuras; las hojas registradas no cambian.',
   },
 }

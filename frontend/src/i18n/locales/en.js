@@ -1545,5 +1545,7 @@ export default {
     '附件已删除': 'Attachment deleted',
     '附件删除失败': 'Failed to delete attachment',
     '附件下载失败': 'Attachment download failed',
+    '请先勾选一条要编辑的条目': 'Check one entry to edit first',
+    '库条目均可维护：勾选一条可「编辑」，✕ 停用、↩ 恢复启用；改库只影响以后的勾选，已录入单据不变。': 'All library entries are maintainable: check one to Edit; ✕ disables, ↩ re-enables. Library changes only affect future picks; recorded sheets stay unchanged.',
   },
 }

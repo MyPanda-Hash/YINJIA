@@ -1341,5 +1341,7 @@ export default {
     '附件已删除': 'Pièce jointe supprimée',
     '附件删除失败': 'Échec de la suppression de la pièce jointe',
     '附件下载失败': 'Échec du téléchargement de la pièce jointe',
+    '请先勾选一条要编辑的条目': 'Cochez d\'abord une entrée à modifier',
+    '库条目均可维护：勾选一条可「编辑」，✕ 停用、↩ 恢复启用；改库只影响以后的勾选，已录入单据不变。': 'Toutes les entrées de la bibliothèque sont maintenables : cochez-en une pour Modifier ; ✕ désactive, ↩ réactive. Les changements n\'affectent que les sélections futures ; les fiches saisies restent inchangées.',
   },
 }

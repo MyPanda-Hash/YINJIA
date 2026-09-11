@@ -490,20 +490,23 @@
 
     <!-- ═══ 标准库勾选弹窗(规格书检验要求:分组标准库;出货检验计划必测项+型式项:扁平表格) ═══ -->
     <el-dialog v-model="libVisible" :title="tt('检验项目标准库')" width="880px" append-to-body>
+      <div class="lib-tip">{{ tt('库条目均可维护：勾选一条可「编辑」，✕ 停用、↩ 恢复启用；改库只影响以后的勾选，已录入单据不变。') }}</div>
       <template v-if="libRows.length && Array.isArray(libRows[0].subs)">
         <el-scrollbar max-height="520">
           <div v-for="(g, gi) in libRows" :key="'lg' + gi" class="lib-group">
             <div class="lib-group-name">{{ tt(g.name) }}</div>
             <div class="lib-group-subs">
-              <div v-for="(s, si) in g.subs" :key="'ls' + gi + '-' + si" class="lib-sub-item">
+              <div v-for="(s, si) in g.subs" :key="'ls' + gi + '-' + si" class="lib-sub-item" :class="{ 'lib-sub-item-off': s.off }">
                 <el-checkbox
                   :model-value="libChecked.includes(gi + ':' + si)"
+                  :disabled="s.off"
                   @change="(v) => toggleLib(gi + ':' + si, !!v)"
                 >
-                  <span class="lib-sub-name" :class="{ 'lib-sub-custom': s.custom }">{{ s.name ? tt(s.name) : tt('（项目）') }}</span>
+                  <span class="lib-sub-name" :class="{ 'lib-sub-name-off': s.off }">{{ (s.name ? tt(s.name) : tt('（项目）')) + (s.off ? '（' + tt('已停用') + '）' : '') }}</span>
                   <span class="lib-sub-req">{{ String(s.req || '').split('\n')[0].slice(0, 26) }}</span>
                 </el-checkbox>
-                <span v-if="s.custom && s.dbId" class="lib-sub-del" @click.stop="removeCustomTestLib(s.dbId)">✕</span>
+                <span v-if="s.dbId && !s.off" class="lib-sub-del" :title="tt('停用')" @click.stop="stopLibRow(s.dbId)">✕</span>
+                <span v-if="s.off" class="lib-sub-undo" :title="tt('恢复启用')" @click.stop="enableLibRow(s.dbId)">↩</span>
               </div>
             </div>
           </div>
@@ -527,10 +530,13 @@
         size="small"
         border
         max-height="480"
-        @selection-change="(sel) => (libChecked = sel)"
+        :row-class-name="({ row }) => (row.off ? 'lib-row-off' : '')"
+        @selection-change="(sel) => (libChecked = sel.filter((r) => !r.off))"
       >
-        <el-table-column type="selection" width="42" />
-        <el-table-column prop="控制项目" :label="tt('控制项目')" min-width="110" />
+        <el-table-column type="selection" width="42" :selectable="(row) => !row.off" />
+        <el-table-column prop="控制项目" :label="tt('控制项目')" min-width="110">
+          <template #default="{ row }">{{ row['控制项目'] + (row.off ? '（' + tt('已停用') + '）' : '') }}</template>
+        </el-table-column>
         <el-table-column prop="质量控制内容" :label="tt('质量控制内容')" min-width="110" />
         <el-table-column prop="检测仪器" :label="tt('检测仪器、工具')" min-width="100" />
         <el-table-column prop="控制标准及要求" :label="tt('控制标准及要求')" min-width="220" />
@@ -538,9 +544,10 @@
         <el-table-column prop="检测频率" :label="tt('检测频率')" min-width="90" />
         <el-table-column prop="检验内容" :label="tt('检验内容')" min-width="140" />
         <el-table-column prop="控制方法" :label="tt('控制方法')" min-width="90" />
-        <el-table-column v-if="hasCustomFlat" :label="tt('操作')" width="50" align="center">
+        <el-table-column v-if="hasDbFlat" :label="tt('操作')" width="56" align="center">
           <template #default="{ row }">
-            <span v-if="row.custom && row.dbId" class="lib-sub-del" @click.stop="removeCustomFlatLib(row.dbId)">✕</span>
+            <span v-if="row.dbId && !row.off" class="lib-sub-del" :title="tt('停用')" @click.stop="stopLibRow(row.dbId)">✕</span>
+            <span v-else-if="row.off" class="lib-sub-undo" :title="tt('恢复启用')" @click.stop="enableLibRow(row.dbId)">↩</span>
           </template>
         </el-table-column>
       </el-table>
@@ -836,37 +843,50 @@ async function openLib(dt) {
   const lib = dt.lib
   const flat = Array.isArray(lib)
   if (flat || cfg.value?.testLib) {
-    // 检验项目标准库 = 内置常量 + yj_std_lib 自定义项合并(可自行补充/编辑/删除,不写死)。
-    // **两个面板各用各的库,互不相通**(共库决定已于 2026-09-11 反转):规格书(分组形态)读写
-    // spec.test,出货检验计划表(扁平形态)读写 insp.plan 且只取本表区(item_code)的条目——
-    // 规格书里新增的条目不会出现在出货计划弹窗里,反之亦然。
-    // 条目正文统一用 testItemLib 的规范结构读写,所以两边的条目字段齐全,勾选后都能编辑。
-    const base = flat ? [...lib] : JSON.parse(JSON.stringify(cfg.value.testLib))
-    try {
-      const res = await request.get('/stdlib/list', {
-        // insp.plan 按表区过滤(必测项/型式检验各看各的);spec.test 整库取回,组名由正文 group 承载
-        params: flat ? { lib: 'insp.plan', item: dt.filterVal || '' } : { lib: 'spec.test' },
-      })
-      for (const r of res?.data || []) {
-        const e = toCanonical(r.content, r.item)
-        if (flat) {
-          // 出货检验计划表(扁平):规范结构 → 固定的 10 个中文键,一一对列名。
-          // 另把规范结构挂在 __entry 上:平表表单只有 7 个字段,条目里还有不合格应对措施/取样方式
-          // 等本表单没有的列,编辑保存时要以 __entry 打底,否则那些字段会被空串覆盖(丢数据);
-          // confirmLib 落明细前会重新投影成 10 键,__entry 不会进单据。
-          base.push({ ...toInspRow(e), __entry: e, custom: true, dbId: r.id })
-        } else {
-          // 规格书(分组):组名取自规范结构的 group(旧 item_code 兜底)。
-          // __entry 同扁平分支:子项表单只有 4 个字段,条目里还有另一套(出货计划)字段,
-          // 编辑保存时用它打底,避免被空串覆盖;投影成明细(confirmLib)时不会带出去。
-          const grp = e.group || r.item
-          let g = base.find((x) => x.name === grp)
-          if (!g) { g = { name: grp, subs: [] }; base.push(g) }
-          g.subs.push({ ...toSpecSub(e), __entry: e, custom: true, dbId: r.id })
+    // 检验项目标准库 = yj_std_lib **唯一真源**(内置 26 组/48 子项+必测/型式种子见
+    // tools/gen-testlib-seed.cjs;**两个面板各用各的库,互不相通**:规格书(分组形态)读写
+    // spec.test,出货检验计划表(扁平形态)读写 insp.plan 且只取本表区(item_code)的条目)。
+    // all=1 连停用条目一起取回:停用条目灰显划线、不可勾选、可「恢复启用」——
+    // 与 StdLibManager 同款维护能力(编辑/停用/恢复启用),改库不污染已录入单据。
+    const res = await request.get('/stdlib/list', {
+      // insp.plan 按表区过滤(必测项/型式检验各看各的);spec.test 整库取回,组名由正文 group 承载
+      params: flat ? { lib: 'insp.plan', item: dt.filterVal || '', all: 1 } : { lib: 'spec.test', all: 1 },
+    }).catch(() => null)
+    const rows = res?.data || []
+    if (rows.length) {
+      if (flat) {
+        // 出货检验计划表(扁平):规范结构 → 固定的 10 个中文键,一一对列名。
+        // __entry 挂原规范结构:平表表单只有 7 个字段,编辑保存时以 __entry 打底,
+        // 否则条目里不合格应对措施/取样方式等本表单没有的列会被空串覆盖(丢数据);
+        // confirmLib 落明细前会重新投影成 10 键,__entry 不会进单据。
+        libRows.value = rows.map((r) => {
+          const e = toCanonical(r.content, r.item)
+          return { ...toInspRow(e), __entry: e, dbId: r.id, off: Number(r.enabled) === 0 }
+        })
+      } else {
+        // 规格书(分组):组名取自规范结构的 group(旧 item_code 兜底);组序沿用内置常量的
+        // 既有顺序(Excel 业务序),库里的新组缀后;停用条目同入组(off:checkbox 禁用+划线+可恢复)。
+        const order = (cfg.value.testLib || []).map((g) => g.name)
+        const groups = []
+        const grpOf = (name) => {
+          let g = groups.find((x) => x.name === name)
+          if (!g) { g = { name, subs: [] }; groups.push(g) }
+          return g
         }
+        for (const r of rows) {
+          const e = toCanonical(r.content, r.item)
+          grpOf(e.group || r.item).subs.push({ ...toSpecSub(e), __entry: e, dbId: r.id, off: Number(r.enabled) === 0 })
+        }
+        groups.sort((a, b) => {
+          const ia = order.indexOf(a.name); const ib = order.indexOf(b.name)
+          return (ia < 0 ? 9999 : ia) - (ib < 0 ? 9999 : ib)
+        })
+        libRows.value = groups
       }
-    } catch { /* 标准库接口不可用则仅内置 */ }
-    libRows.value = base
+    } else {
+      // 兜底:库里一条都没有(未跑种子的环境)才用内置常量展示(无 dbId → 不可编辑/停用,跑种子后即全量可维护)
+      libRows.value = flat ? [...lib] : JSON.parse(JSON.stringify(cfg.value.testLib))
+    }
   } else {
     libRows.value = []
   }
@@ -883,7 +903,8 @@ function toggleLib(key, on) {
 const libTargetDt = ref(null)
 // ── 勾选 → 编辑 → 表单带入 → 保存修改(POST /stdlib/update) ──
 // 两种形态各有一套表单,分别记一个"正在编辑的条目 id":非 null 即处于「保存修改」态。
-// 内置条目的正文在代码常量里(recordSheetConfigs),改不了 → 无 dbId 一律不可编辑。
+// 条目全部来自 yj_std_lib(内置已种子入库)→ 有 dbId 一律可编辑;
+// 仅"未跑种子环境的内置常量兜底"行没有 dbId,不可维护。
 const libCEditId = ref(null) // 分组形态(规格书):子项表单
 const libCEditEntry = ref(null) // 正在编辑条目的规范结构(保存时打底,含表单没有的字段)
 const libCGroup = ref('')
@@ -900,7 +921,7 @@ const libFStandard = ref('')
 const libFFrequency = ref('')
 const libFContent = ref('')
 const libFMethod = ref('')
-/** 恰好勾选 1 条,且该条目是 DB 里的自定义条目(custom && dbId)才可编辑 */
+/** 恰好勾选 1 条、且该条目是库里的条目(dbId;种子入库后含原内置 26 组/48 子项)才可编辑 */
 function oneEditableChecked() {
   if (libChecked.value.length !== 1) return null
   const it = libChecked.value[0]
@@ -908,15 +929,15 @@ function oneEditableChecked() {
     const key = String(it)
     if (!/^\d+:\d+$/.test(key)) return null
     const s = libRows.value[Number(key.split(':')[0])]?.subs?.[Number(key.split(':')[1])]
-    return s && s.custom && s.dbId ? s : null
+    return s && s.dbId ? s : null
   }
-  return it && it.custom && it.dbId ? it : null
+  return it && it.dbId ? it : null
 }
 const canEditLibEntry = computed(() => !!oneEditableChecked())
 function editLibEntry() {
   const e = oneEditableChecked()
   if (!e) {
-    ElMessage.warning(tt('请先勾选一条自定义条目'))
+    ElMessage.warning(tt('请先勾选一条要编辑的条目'))
     return
   }
   // 打底用的规范结构:取行上挂的原规范结构(__entry),没有再从投影值反推(老数据兜底)。
@@ -1001,21 +1022,32 @@ async function addCustomTestLib() {
     ElMessage.error(tt('保存失败'))
   }
 }
-/** 删除自定义检验项(仅 DB 条目,内置不可删) */
-async function removeCustomTestLib(dbId) {
+/** 停用条目(✕,软删可恢复):与 StdLibManager 同款;只影响以后的勾选候选,已录入单据不变 */
+async function stopLibRow(dbId) {
   if (!dbId) return
   try {
     await request.post('/stdlib/remove', { id: dbId })
-    ElMessage.success(tt('已删除'))
+    ElMessage.success(tt('已停用该条目'))
     await openLib(libTargetDt.value)
   } catch (e) {
-    ElMessage.error(tt('删除失败'))
+    ElMessage.error(tt('操作失败'))
+  }
+}
+/** 恢复启用停用条目(↩) */
+async function enableLibRow(dbId) {
+  if (!dbId) return
+  try {
+    await request.post('/stdlib/enable', { id: dbId })
+    ElMessage.success(tt('已恢复启用'))
+    await openLib(libTargetDt.value)
+  } catch (e) {
+    ElMessage.error(tt('操作失败'))
   }
 }
 
 // ── 出货检验计划:自定义补充(扁平结构) ──
 const isGroupedLib = computed(() => libRows.value.length > 0 && Array.isArray(libRows.value[0]?.subs))
-const hasCustomFlat = computed(() => libRows.value.some((r) => r.custom))
+const hasDbFlat = computed(() => libRows.value.some((r) => r.dbId))
 /** 平表表单 → 规范结构:编辑时以条目原规范结构打底(保住列上没显示的字段),新增时空字段留空 */
 function flatContent() {
   return toContentJson({
@@ -1052,16 +1084,6 @@ async function addCustomFlatLib() {
     await openLib(libTargetDt.value)
   } catch (e) {
     ElMessage.error(tt('保存失败'))
-  }
-}
-async function removeCustomFlatLib(dbId) {
-  if (!dbId) return
-  try {
-    await request.post('/stdlib/remove', { id: dbId })
-    ElMessage.success(tt('已删除'))
-    await openLib(libTargetDt.value)
-  } catch (e) {
-    ElMessage.error(tt('删除失败'))
   }
 }
 function confirmLib() {
@@ -1860,18 +1882,18 @@ function chartOf(dt) {
   font-size: 12px;
   margin-left: 4px;
 }
-/* 自定义条目标识与删除 */
+/* 条目维护标识:停用(✕,灰显划线可恢复)/恢复启用(↩)——与 StdLibManager 同款维护 */
 .lib-sub-item {
   display: inline-flex;
   align-items: center;
   gap: 2px;
 }
-.lib-sub-custom {
-  color: #e6a23c;
+.lib-sub-item-off .el-checkbox {
+  opacity: 0.55;
 }
-.lib-sub-custom::after {
-  content: ' ✦';
-  font-size: 10px;
+.lib-sub-name-off {
+  color: #a8b6c4;
+  text-decoration: line-through;
 }
 .lib-sub-del {
   color: #f56c6c;
@@ -1885,7 +1907,24 @@ function chartOf(dt) {
   border-radius: 2px;
 }
 
-/* 自定义检验项补充表单 */
+/* 检验项目库补充表单 + 停用行(扁平表格灰显划线) */
+.lib-tip { font-size: 12px; color: #8ba6bd; margin-bottom: 8px; line-height: 1.6; }
+.lib-sub-undo {
+  color: #67c23a;
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: 2px;
+}
+.lib-sub-undo:hover {
+  color: #529b2e;
+}
+:deep(.lib-row-off) {
+  color: #a8b6c4;
+  text-decoration: line-through;
+}
+:deep(.lib-row-off td) {
+  background: #fafbfc !important;
+}
 .lib-custom {
   border-top: 1px dashed #dcdfe6;
   margin-top: 10px;

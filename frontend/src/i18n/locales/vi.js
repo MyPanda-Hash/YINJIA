@@ -1346,5 +1346,7 @@ export default {
     '附件已删除': 'Đã xóa tệp đính kèm',
     '附件删除失败': 'Xóa tệp đính kèm thất bại',
     '附件下载失败': 'Tải xuống tệp đính kèm thất bại',
+    '请先勾选一条要编辑的条目': 'Hãy chọn một mục để sửa trước',
+    '库条目均可维护：勾选一条可「编辑」，✕ 停用、↩ 恢复启用；改库只影响以后的勾选，已录入单据不变。': 'Mọi mục trong thư viện đều có thể bảo trì: chọn một mục để «Sửa»; ✕ tạm dừng, ↩ kích hoạt lại. Thay đổi chỉ ảnh hưởng lần chọn sau; chứng từ đã nhập không đổi.',
   },
 }
