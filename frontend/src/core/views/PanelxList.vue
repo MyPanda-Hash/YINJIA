@@ -197,12 +197,14 @@
               <div class="as-side-btn" @click="docQueryVisible = true">{{ tt('查询单据') }}</div>
               <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单 -->
               <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
-              <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回) -->
+              <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回);删除申请中出「撤回删除申请」(卡死单据出口) -->
               <div class="as-side-del" v-if="isApprovalDoc">
                 <div class="as-side-btn-row">
                   <div class="as-side-btn" style="flex: 1" @click="onSideAction('删除')">{{ tt('删除') }}</div>
                   <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openDelMenu = !openDelMenu">▼</div>
                 </div>
+                <!-- 删除申请中:申请提交后无人审批会卡死(不可编辑也无审批入口)——发起人本人或审批人可撤回 -->
+                <div v-if="curDocStatus === '删除申请中'" class="as-side-btn" @click="pickDelAction('撤回删除申请')">{{ tt('撤回删除申请') }}</div>
                 <div v-if="openDelMenu" class="as-side-menu" @click.stop>
                   <div class="as-side-menu-item" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
                   <template v-if="canApproveHere()">
@@ -211,13 +213,15 @@
                   </template>
                 </div>
               </div>
-              <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改态出「提交审批」,审批中出管理员审批;修改记录弹窗(滚动3条) -->
+              <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改态出「提交审批」,审批中出管理员审批;修改申请中出「撤回修改申请」;修改记录弹窗(滚动3条) -->
               <div class="as-side-del" v-if="isDocArchivePanel">
                 <div class="as-side-btn-row">
                   <div class="as-side-btn" style="flex: 1" :class="{ disabled: !canModifyReq }" @click="pickModAction('申请修改')">{{ tt('申请修改') }}</div>
                   <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openModMenu = !openModMenu">▼</div>
                 </div>
                 <div v-if="curDocStatus === '修改中'" class="as-side-btn" @click="pickModAction('提交审批')">{{ tt('提交审批') }}</div>
+                <!-- 修改申请中:同删除申请,卡死时由发起人本人或审批人撤回 -->
+                <div v-if="curDocStatus === '修改申请中'" class="as-side-btn" @click="pickModAction('撤回修改申请')">{{ tt('撤回修改申请') }}</div>
                 <div v-if="openModMenu" class="as-side-menu" @click.stop>
                   <template v-if="canApproveHere()">
                     <template v-if="curDocStatus === '修改申请中'">
@@ -2110,12 +2114,15 @@ function sumMethod({ columns, data }) {
 }
 
 // 审批流：当前单据已审批 → 表格左上角「已审批」角标；已审批明细行浅绿底色
-const isApproved = computed(() => cur.value && cur.value['审批状态'] === '已审批')
+// 判据统一(2026-09-11):后端 QueryService 只产 '已通过'(shr 非空)/'审批中',历史数据里也有 '已审批',
+// 两值都认;禁止各处再手写单值比较(口径见 CONTEXT.md「已审批判据」)。
+const APPROVED_STATUS_VALUES = ['已审批', '已通过']
+const isApproved = computed(() => cur.value && APPROVED_STATUS_VALUES.includes(cur.value['审批状态']))
 
 function rowCls({ row }, b) {
   if (row._placeholder) return 'ph-row'
   if (b && b.id === 'A' && row['产品编码'] && row['产品编码'] === selectedProduct.value) return 'prod-selected'
-  if (row['审批状态'] === '已审批') return 'row-approved'
+  if (APPROVED_STATUS_VALUES.includes(row['审批状态'])) return 'row-approved'
   return ['产品编码', '材料编码', '存货编码', '存货名称', '产品名称', '材料名称'].some((k) => row[k] === '合计') ? 'sum-row' : ''
 }
 
@@ -3028,6 +3035,9 @@ function isDisabled(action) {
     审批通过: !current.value || st !== '审批中',
     审批驳回: !current.value || st !== '审批中',
    驳回审批: !current.value || st !== '审批中',
+    // 卡死单据出口(2026-09-11):撤回删除/修改申请仅在对应申请态可点
+    撤回删除申请: !current.value || st !== '删除申请中',
+    撤回修改申请: !current.value || st !== '修改申请中',
     保存: !draftEditable.value || inlineSaving.value,
     保存为草稿: !draftEditable.value || inlineSaving.value,
     保存新增: !draftEditable.value || inlineSaving.value,

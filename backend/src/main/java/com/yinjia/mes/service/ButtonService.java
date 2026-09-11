@@ -94,6 +94,9 @@ public class ButtonService {
             case "修改审批通过" -> modifyApprove(def, formData);
             case "修改审批驳回" -> modifyReject(def, formData);
             case "修改记录" -> modifyHistory(def, formData);
+            // 卡死单据出口(2026-09-11):删除/修改申请提交后无人审批,发起人或审批人可撤回
+            case "撤回删除申请" -> withdrawDeleteRequest(def, formData);
+            case "撤回修改申请" -> withdrawModifyRequest(def, formData);
             // 库存状况:新增库存(存货/仓库按编码校验基础档案,期初现存量+预警数量)
             case "新增库存" -> addStock(def, formData);
             // 库存状况:修改预警数量(行内编辑,空值回退全局阈值100)
@@ -186,7 +189,8 @@ public class ButtonService {
                 }
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
-                markDocSaved(def.code(), no, false);
+                // directAdd 占位草稿:未保存过 -> saved='N'(前端 isFreshAddedDoc 依赖本标记界定"本次新增"窗口)
+                markDocSaved(def.code(), no, markSaved);
                 return result(no, "草稿");
             }
             no = formNoService.next(def.prefix(), user);
@@ -211,6 +215,9 @@ public class ButtonService {
             }
             upsertLineRows(def, items, no, l2c, user);
         }
+        // 主保存路径落库成功才写 saved:markSaved=true「保存/提交/保存新增」,false「保存为草稿/新增」。
+        // saved='Y' 只表示"这张单存过一次"(不表示已审核),前端 isFreshAddedDoc() 用 'N' 界定"本次新增"窗口。
+        markDocSaved(def.code(), no, markSaved);
         // 文件类面板:管理员保存即归档;普通用户保存即提交审批(管理员审批通过后归档);修改态保存不归档走再审批
         if (DOC_ARCHIVE_PANELS.contains(def.code()) && !"Y".equals(modifyStateOf(def.code(), no))) {
             if (isAdminUser(user)) {
@@ -236,19 +243,32 @@ public class ButtonService {
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
     }
 
-    /** 文档编号不允许重复:同面板其它单据占用即拒绝(空值跳过) */
+    /** 文档编号不允许重复:同面板其它单据占用即拒绝(空值跳过)。
+     *  已作废单据不算占用(2026-09-11 口径):作废单仍留在业务表里(头行式单据作废只写
+     *  yj_doc_status.canceled='Y',不软删业务行),不排除的话"作废掉再新建同号"永远撞唯一性。
+     *  两侧都排:业务表软删标记 asp_cancel='Y'(表若无该列则跳过,故先查 sys.columns)+
+     *  状态表 yj_doc_status.canceled='Y'。 */
     private void ensureDocNoUnique(PanelRegistry.PanelDef def, Map<String, Object> head, String no) {
         Object v = head.get("文档编号");
         if (v == null || String.valueOf(v).isBlank()) return;
         String docNo = String.valueOf(v);
-        Integer dup;
-        if (no == null || no.isBlank()) {
-            dup = jdbc.queryForObject("SELECT COUNT(*) FROM " + def.headTable() + " WHERE [文档编号] = ?",
-                    Integer.class, docNo);
-        } else {
-            dup = jdbc.queryForObject("SELECT COUNT(*) FROM " + def.headTable()
-                    + " WHERE [文档编号] = ? AND [" + def.groupCol() + "] <> ?", Integer.class, docNo, no);
+        String table = def.headTable();
+        String groupCol = def.groupCol();
+        StringBuilder sql = new StringBuilder("SELECT COUNT(*) FROM " + table + " t WHERE t.[文档编号] = ?");
+        List<Object> args = new ArrayList<>(List.of(docNo));
+        // 业务表软删行不计占用(头表无 asp_cancel 列时不加该条件,避免"列名无效")
+        if (tableCols(table).contains("asp_cancel")) sql.append(" AND ISNULL(t.asp_cancel,'N') <> 'Y'");
+        // 已作废(状态表 canceled='Y')不计占用
+        if (groupCol != null && !groupCol.isBlank()) {
+            sql.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ? AND s.doc_no = t.[")
+                    .append(groupCol).append("] AND s.canceled = 'Y')");
+            args.add(def.code());
         }
+        if (no != null && !no.isBlank()) {
+            sql.append(" AND t.[").append(groupCol).append("] <> ?");
+            args.add(no);
+        }
+        Integer dup = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
         if (dup != null && dup > 0) throw new IllegalArgumentException("文档编号不允许重复：" + docNo);
     }
 
@@ -497,9 +517,12 @@ public class ButtonService {
     }
 
     /**
-     * 单号是"释放后可重发"的(删除单据会释放单号)。
-     * 若该号在 yj_doc_status 里还留着上一轮的状态行,新单会 继承 它的 archived/canceled/pending
-     * —— 表现就是"新增一张单据,它一出生就是已归档/已作废",根本填不了数据。
+     * 清理"孤儿状态行"。真实成因(2026-09-11 更正,原文写"单号释放后可重发"是错的):
+     * `FormNoService.next()` 按 s_allno 单调递增,`s_allno` 从不回收,单号**不会**被重发。
+     * 孤儿状态行的来源是**历史清理脚本把业务表头行物理删掉**(或单据从未真正落库),
+     * 而 `yj_doc_status` 里的状态行留了下来;此后若该号被复用(手工建号/直接改库/跨环境搬数据),
+     * 新单就会**继承**旧的 archived/canceled/pending —— 表现是"新增一张单据,它一出生就是
+     * 已归档/已作废",根本填不了数据。
      * 新建时若单据表里查不到这个号,说明状态行是陈旧的,直接清掉。
      * 2026-09-10 实测:RD_APPROVAL 10 条 + RD_PLAN 5 条孤儿状态行导致该故障。
      */
@@ -530,6 +553,8 @@ public class ButtonService {
     // ============ 状态机(照搬 light-mes:草稿⇄已审核 + 审批流) ============
 
     private Map<String, Object> audit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        // 审批权校验:审核与审批通过/驳回同口径(管理员 ∪ yj_role_panel.can_approve='Y')
+        requireApprover(def.code());
         if (!def.isDoc()) throw new IllegalStateException("档案面板无审核动作");
         String no = requireNo(formData);
         ensureDocExists(def, no);
@@ -562,6 +587,8 @@ public class ButtonService {
     }
 
     private Map<String, Object> unaudit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        // 审批权校验:与 审核 同口径,防"自审自弃"绕过审批权
+        requireApprover(def.code());
         String no = requireNo(formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
         String status = String.valueOf(st.get("status"));
@@ -813,10 +840,11 @@ public class ButtonService {
         int n = jdbc.update("UPDATE yj_doc_status SET canceled='Y', cancel_by=?, cancel_at=GETDATE(), deleting='N', update_at=GETDATE()"
                 + " WHERE panel_code=? AND doc_no=? AND deleting='Y'", user, def.code(), no);
         if (n == 0) throw new IllegalStateException("无待审批的删除申请");
+        recordApproval(def.code(), no, "DELETE_APPROVE", "APPROVED", "");
         return result(no, "已作废");
     }
 
-    /** 删除申请驳回(仅管理员):恢复归档状态 */
+    /** 删除申请驳回(仅管理员):恢复归档状态(返回回查的真实状态,不硬编码) */
     private Map<String, Object> rejectDelete(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String user = currentUserName();
         if (!canApprove(user, def.code())) throw new IllegalStateException("当前角色无该面板的删除审批权限");
@@ -824,7 +852,52 @@ public class ButtonService {
         int n = jdbc.update("UPDATE yj_doc_status SET deleting='N', update_at=GETDATE()"
                 + " WHERE panel_code=? AND doc_no=? AND deleting='Y'", def.code(), no);
         if (n == 0) throw new IllegalStateException("无待审批的删除申请");
-        return result(no, "已归档");
+        recordApproval(def.code(), no, "DELETE_REJECT", "REJECTED", "");
+        return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
+    }
+
+    // ---- 卡死单据出口(2026-09-11):删除/修改申请提交后无人审批时,发起人或审批人可撤回 ----
+
+    /** 撤回删除申请:删除申请中 → 回到真实状态(发起人本人或审批人;清 deleting 并留痕) */
+    private Map<String, Object> withdrawDeleteRequest(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        String no = requireNo(formData);
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        if (!"删除申请中".equals(st.get("status"))) throw new IllegalStateException("仅删除申请中状态可撤回删除申请");
+        requireRequesterOrApprover(def.code(), no, "delete_req_by", user);
+        int n = jdbc.update("UPDATE yj_doc_status SET deleting='N', update_at=GETDATE()"
+                + " WHERE panel_code=? AND doc_no=? AND deleting='Y'", def.code(), no);
+        if (n == 0) throw new IllegalStateException("无待撤回的删除申请");
+        recordApproval(def.code(), no, "DELETE_WITHDRAW", "WITHDRAWN", "撤回人：" + user);
+        return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
+    }
+
+    /** 撤回修改申请:修改申请中 → 回到真实状态(发起人本人或审批人;清 modify_state 并留痕) */
+    private Map<String, Object> withdrawModifyRequest(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String user = currentUserName();
+        String no = requireNo(formData);
+        Map<String, Object> st = docStatusOf(def.code(), no);
+        if (!"修改申请中".equals(st.get("status"))) throw new IllegalStateException("仅修改申请中状态可撤回修改申请");
+        requireRequesterOrApprover(def.code(), no, "modify_req_by", user);
+        int n = jdbc.update("UPDATE yj_doc_status SET modify_state=NULL, update_at=GETDATE()"
+                + " WHERE panel_code=? AND doc_no=? AND modify_state='R'", def.code(), no);
+        if (n == 0) throw new IllegalStateException("无待撤回的修改申请");
+        recordApproval(def.code(), no, "MODIFY_WITHDRAW", "WITHDRAWN", "撤回人：" + user);
+        return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
+    }
+
+    /** 撤回权限:该申请的发起人本人(reqByCol),或该面板审批人(管理员恒可) */
+    private void requireRequesterOrApprover(String panelCode, String no, String reqByCol, String user) {
+        if (user.equals(requestByOf(panelCode, no, reqByCol))) return;
+        if (!canApprove(user, panelCode))
+            throw new org.springframework.security.access.AccessDeniedException("仅申请人本人或审批人可撤回该申请");
+    }
+
+    /** 申请发起人(delete_req_by / modify_req_by):撤回权限判定用;列名由本类常量传入,非外部输入 */
+    private String requestByOf(String panelCode, String no, String col) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT " + col + " FROM yj_doc_status WHERE panel_code=? AND doc_no=?", panelCode, no);
+        return rows.isEmpty() || rows.get(0).get(col) == null ? "" : String.valueOf(rows.get(0).get(col));
     }
 
     // ============ 文件类面板:归档后申请修改 + 修改记录(滚动3条) ============
@@ -1302,7 +1375,7 @@ public class ButtonService {
                 + " WHERE panel_code=? AND doc_no=? AND modify_state='R'", def.code(), no);
         if (n == 0) throw new IllegalStateException("无待审批的修改申请");
         recordApproval(def.code(), no, "MODIFY_REJECT", "ARCHIVED", opinionOf(formData));
-        return result(no, "已归档");
+        return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
     }
 
     /** 修改记录:最近3条(超出滚动覆盖最早的),供前端弹窗展示;打开即刷新未收尾记录的 diff */

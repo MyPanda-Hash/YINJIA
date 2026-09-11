@@ -1135,6 +1135,9 @@ export default {
     '修改审批驳回': 'Reject Modification',
     '修改记录': 'Modification Log',
     '修改申请中': 'Modify Requested',
+    // 卡死单据出口(2026-09-11):删除/修改申请提交后无人审批,发起人或审批人可撤回
+    '撤回删除申请': 'Withdraw Delete Request',
+    '撤回修改申请': 'Withdraw Modify Request',
     '修改中': 'Modifying',
     '次修改': 'th Modification',
     '修改审批': 'Modify Approval',

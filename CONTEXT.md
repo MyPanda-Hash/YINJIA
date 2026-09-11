@@ -215,6 +215,29 @@ erp_imp_log/erp_imp_row 通道表定位调整为**审计层**(同步器写批次
 状态存储 `yj_doc_status.modify_state`('R'申请中/'Y'修改中),记录表 `yj_doc_modify_log`;
 角色授权动作集(FILE_PANEL_ACTIONS 含 申请修改/修改记录/删除申请)同按 DOC_ARCHIVE_PANELS 下发。
 
+### 文书归档面板(Archived Doc Panels)
+**保存即归档的一族文书面板**,真源 `ButtonService.DOC_ARCHIVE_PANELS`,**共 21 面**:立项申请 1 +
+项目实施计划 1 + 数据记录表 8 + 实验室使用记录表 4 + 产品文件 7(前端不维护清单,
+经面板配置 `metadata.docArchive` 下发,新面在 `DOC_ARCHIVE_PANELS` 登记即自动获得归档与修改闭环)。
+**研发管理 22 个面板里 `RD_PROGRESS`(项目进度查询)不在其中**:它是全部实施计划实时汇总进来的
+唯一一张单据,**无归档、无修改闭环、永远草稿**——不是漏登记,是刻意排除(它的数据由
+`syncAllPlansToProgress` 维护,归档语义无意义)。**本项目采用此含义。**
+
+归档触发与审核人(既定行为,2026-09-11 确认,不是 bug):
+
+- **管理员在草稿态点「保存」= 直接归档**(`markArchived`),不经审批;
+  **普通用户点「保存」= 自动进审批中**(`pending='Y'` + 留痕 SUBMIT),管理员审批通过后归档。
+- **归档时不写审核人 `shr`**——`markArchived` 只置 `archived='Y'`,所以归档单的纸面「审核人」栏
+  **本来就是空的**(只有走审核/审批通过路径才写 `shr`);因此归档单在列表里**没有「已审批」角标**
+  (角标判据看 `审批状态`,见「已审批判据」)。
+
+**撤回申请(卡死单据出口,2026-09-11)**:删除申请(`deleting='Y'` → 删除申请中)与修改申请
+(`modify_state='R'` → 修改申请中)提交后若不审批,单据既不可编辑也没有审批入口 = **卡死**。
+两个撤回动作给出口:**「撤回删除申请」**(→ `deleting='N'`)、**「撤回修改申请」**(→ `modify_state=NULL`),
+两者都回查真实状态(回到已归档),**允许申请发起人本人(`delete_req_by`/`modify_req_by`)或该面板
+审批人**(管理员 ∪ `can_approve='Y'`),并各写一条 `yj_form_approval` 留痕
+(action=`DELETE_WITHDRAW`/`MODIFY_WITHDRAW`,result=`WITHDRAWN`)。
+
 ### 标准库(Standard Library)
 
 `yj_std_lib(lib_code, item_code, content)` 承载的可维护候选条目库。**本项目采用此含义。**
@@ -260,12 +283,19 @@ erp_imp_log/erp_imp_row 通道表定位调整为**审计层**(同步器写批次
 | 2026-09-11 | **检验项目标准库维护补齐三件**:①编辑表单长文本字段(检验要求/方法/依据/控制标准及要求/检验内容/控制方法)改 textarea **autosize 随内容增高 + 加宽 200→460px**;②条目「**彻底删除**」(🗑 物理删,确认弹窗,`POST /stdlib/destroy`,与「停用」软删相对,已录入单据不受影响——用户自删重复条目的正式途径);③本地库核实:两库纯种子(48+13)无互通残留、实验停用行已恢复启用;生产去重脚本 `tools/migrate-testlib-dedup.sql`(库内完全重复保最小 id,幂等)。踩坑:RecordSheetPanels 漏 `import ElMessageBox` → 🗑 点击静默失败(async 内 ReferenceError 走 unhandled rejection,不进 console.error),CDP 逐步诊断才定位 | grill 会话 2026-09-11 |
 | 2026-09-11 | **【已反转,见下行】** **检验项目标准库两面板互通**:规格书与出货检验计划表**共用同一批条目**(统一挂 `spec.test`,旧 `insp.plan` 库由 `tools/migrate-testlib-shared.sql` 并入),字段不同之处**做一层映射合并成一套共用条目**(纯模块 `core/panel/testItemLib.js` 的规范结构 v2:`toCanonical/toSpecSub/toInspRow/toContentJson`),**空字段留空、不丢数据**;条目正文兼容旧 JSON 形状(只在用户「编辑→保存修改」时升级为 v2);两面板均支持「勾选一条自定义条目 → 编辑 → 表单带入 → 保存修改」(`POST /stdlib/update`),内置常量条目无 dbId 不可编辑;组名存 item_code,编辑不改组名 | grill 会话 2026-09-11 |
 | 2026-09-11 | **反转上一条:取消两面板共库,改为各自维护自己的库**(用户改口径)。规格书= `spec.test`、出货检验计划表= `insp.plan`(读取按表区 `item_code` 过滤,必测项/型式检验各看各的),一边新增的条目不会出现在另一边的弹窗里;写入路径 `addCustomTestLib`→`spec.test`、`addCustomFlatLib`→`insp.plan`(`POST /stdlib/update` 只认 id,与库无关,不变)。**编辑能力原样保留**:两弹窗照旧「勾选一条自定义条目 → 编辑按钮 → 表单带入 → 保存修改」,内容**继续走 `testItemLib.js` 规范结构 v2、不退回旧格式**;规范结构是**格式统一**而非数据共用,所以历史旧格式条目(规格书 `{sub,req,method,basis}` / 出货计划 10 中文键)读取兼容、编辑保存时升级为 v2 —— **旧数据不存在"不能编辑"一说**(这也是本轮反转的前提:编辑能力已经做出来了,再谈库分不分)。共库迁移 `tools/migrate-testlib-shared.sql` 从未在服务器执行过、本机执行搬运行数为 0,故**删除文件并从 `tools/db-migrations.txt` 撤登记,不写反向迁移**;SQL 复核 `yj_std_lib` 无因它错位的行(spec.test/insp.plan 现各 0 行)。验收探针 `tools/_probe-testlib-edit.cjs` 24 项断言通过(旧格式条目经界面编辑→保存后回读为 v2、表单上没有的 10 个字段一个不丢 + 两库互不相见 + 清理后行数复原),`npm test` 112 通过、`npm run build` 通过 | grill 会话 2026-09-11 |
+| 2026-09-11 | **文书面板审批与归档口径确认 + 一轮实现/验证修复**(详见「文书归档面板(Archived Doc Panels)」):①**审核/弃审补审批权校验**——`audit()`/`unaudit()` 起手 `requireApprover`(管理员 ∪ `yj_role_panel.can_approve='Y'`),与审批通过/驳回同口径;②删除审批(`approveDelete`/`rejectDelete`)补 `yj_form_approval` 留痕(新增 action `DELETE_APPROVE`/`DELETE_REJECT`);③`rejectDelete`/`modifyReject` 不再硬编码返回"已归档",改回查真实状态;④**文档编号查重排除已作废单据**(业务表 `asp_cancel='Y'` + 状态表 `canceled='Y'` 两侧都排),作废掉再新建同号不再撞唯一性;⑤`markSaved` 死参数落实生效(保存/提交写 `saved='Y'`,新增/保存为草稿写 `'N'`);⑥两份设计文档里"单号释放后可重发"的注释纠正为"历史清理脚本物理删头行导致孤儿状态行";⑦**新增两个卡死单据出口**(`撤回删除申请`/`撤回修改申请`,发起人或审批人可撤),并用它把库里两张实测卡死的删除申请单(`MP-2026-09-0005`/`MP-2026-09-0007`)救回已归档(`CP382S` 的修改申请按用户口径未动,新增的出口已可供人工撤回);⑧列表页「已审批」判据统一为 `['已审批','已通过']`(原单值 `=== '已审批'` 永不命中)。**口径确认(既定行为,不是 bug)**:管理员草稿态点「保存」= 直接归档不走审批,普通用户点「保存」= 自动进审批中;**归档不写审核人 `shr`**,故归档单纸面审核人栏为空、列表无「已审批」角标;**`RD_PROGRESS`(项目进度查询)刻意不在 `DOC_ARCHIVE_PANELS`(21 面)内**,无归档/无修改闭环/永远草稿 | grill 会话 2026-09-11 |
 
 ### 已审批判据(Approved Status Criteria)
 
 单据"已审批"的统一判据(对应 light-mes `core/doc-status.js` 语义;YINJIA 由
 `yj_doc_status` 状态推导实现同一判定):状态 ∈ {已审核, 生产中, 已完工, 已关闭}
 或 审批状态 ∈ {已审批, 已通过}。列表/表单共用同一判据,禁止各处手写状态集合。
+
+- 落地现状(2026-09-11 校正):列表页「已审批」角标与明细行浅绿底色**只按 `审批状态` ∈ {已审批, 已通过}**
+  判定(`PanelxList.vue` 的 `APPROVED_STATUS_VALUES`)。后端 `QueryService` 只产 `'已通过'`(shr 非空)
+  与 `'审批中'` 两值——**单值比较 `=== '已审批'` 是错的**(永不命中,角标曾经完全不显示)。
+  保存即归档的单据(无 `shr`)**按设计不带角标**,故**不**把"状态 ∈ {已审核, …}"那半句并进列表页判据;
+  需要"这张纸归档了没有"请看 `单据状态` ∈ {已归档, 已审核},不要用角标代替。
 
 ### 翻译表(Translation Table)
 
