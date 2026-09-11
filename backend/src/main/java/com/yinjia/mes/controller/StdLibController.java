@@ -119,6 +119,26 @@ public class StdLibController {
         return setEnabled(body, 1);
     }
 
+    /**
+     * 彻底删除:POST {id} —— 物理删除条目行(与「停用」相对:停用可恢复,彻底删除不可)。
+     * 已录入单据存的是内容文本(不存条目 id),删除条目不影响历史单据——与停用同一"不污染"口径。
+     */
+    @PostMapping("/destroy")
+    public ApiResult<Map<String, Object>> destroy(@RequestBody Map<String, Object> body) {
+        Object id = body.get("id");
+        if (!(id instanceof Number n)) {
+            return ApiResult.error(400, "id 无效");
+        }
+        int rows = jdbc.update("DELETE FROM yj_std_lib WHERE id = ?", n.intValue());
+        if (rows == 0) {
+            return ApiResult.error(404, "条目不存在");
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("ok", true);
+        out.put("id", n.intValue());
+        return ApiResult.ok(out);
+    }
+
     private ApiResult<Map<String, Object>> setEnabled(Map<String, Object> body, int enabled) {
         String username = currentUsername();
         Object id = body.get("id");

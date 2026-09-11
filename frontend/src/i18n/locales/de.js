@@ -1343,5 +1343,8 @@ export default {
     '附件下载失败': 'Download des Anhangs fehlgeschlagen',
     '请先勾选一条要编辑的条目': 'Zum Bearbeiten zuerst einen Eintrag auswählen',
     '库条目均可维护：勾选一条可「编辑」，✕ 停用、↩ 恢复启用；改库只影响以后的勾选，已录入单据不变。': 'Alle Bibliothekseinträge sind pflegbar: einen zum Bearbeiten markieren; ✕ deaktiviert, ↩ reaktiviert. Änderungen wirken nur auf künftige Auswahlen; erfasste Bögen bleiben unverändert.',
+    '彻底删除': 'Endgültig löschen',
+    '彻底删除该条目？不可恢复，已录入单据不受影响。': 'Diesen Eintrag endgültig löschen? Nicht wiederherstellbar. Erfasste Bögen sind nicht betroffen.',
+    '已彻底删除': 'Eintrag endgültig gelöscht',
   },
 }

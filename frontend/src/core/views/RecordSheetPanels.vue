@@ -507,6 +507,7 @@
                 </el-checkbox>
                 <span v-if="s.dbId && !s.off" class="lib-sub-del" :title="tt('停用')" @click.stop="stopLibRow(s.dbId)">✕</span>
                 <span v-if="s.off" class="lib-sub-undo" :title="tt('恢复启用')" @click.stop="enableLibRow(s.dbId)">↩</span>
+                <span v-if="s.dbId" class="lib-sub-destroy" :title="tt('彻底删除')" @click.stop="destroyLibRow(s.dbId)">🗑</span>
               </div>
             </div>
           </div>
@@ -545,10 +546,11 @@
         <el-table-column prop="检测频率" :label="tt('检测频率')" min-width="90" />
         <el-table-column prop="检验内容" :label="tt('检验内容')" min-width="140" />
         <el-table-column prop="控制方法" :label="tt('控制方法')" min-width="90" />
-        <el-table-column v-if="hasDbFlat" :label="tt('操作')" width="56" align="center">
+        <el-table-column v-if="hasDbFlat" :label="tt('操作')" width="80" align="center">
           <template #default="{ row }">
             <span v-if="row.dbId && !row.off" class="lib-sub-del" :title="tt('停用')" @click.stop="stopLibRow(row.dbId)">✕</span>
             <span v-else-if="row.off" class="lib-sub-undo" :title="tt('恢复启用')" @click.stop="enableLibRow(row.dbId)">↩</span>
+            <span v-if="row.dbId" class="lib-sub-destroy" :title="tt('彻底删除')" @click.stop="destroyLibRow(row.dbId)">🗑</span>
           </template>
         </el-table-column>
       </el-table>
@@ -644,7 +646,7 @@
 <script setup>
 import { computed, ref, watch, nextTick } from 'vue'
 import { tt } from '@/i18n'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
@@ -1046,6 +1048,21 @@ async function enableLibRow(dbId) {
     await openLib(libTargetDt.value)
   } catch (e) {
     ElMessage.error(tt('操作失败'))
+  }
+}
+/** 彻底删除条目(🗑 物理删,与「停用」相对):确认后不可恢复;已录入单据存的是内容文本,不受影响 */
+async function destroyLibRow(dbId) {
+  if (!dbId) return
+  try {
+    await ElMessageBox.confirm(tt('彻底删除该条目？不可恢复，已录入单据不受影响。'), tt('彻底删除'),
+      { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') })
+  } catch { return /* 取消 */ }
+  try {
+    await request.post('/stdlib/destroy', { id: dbId })
+    ElMessage.success(tt('已彻底删除'))
+    await openLib(libTargetDt.value)
+  } catch (e) {
+    ElMessage.error(tt('删除失败'))
   }
 }
 
@@ -1921,6 +1938,15 @@ function chartOf(dt) {
 }
 .lib-sub-undo:hover {
   color: #529b2e;
+}
+.lib-sub-destroy {
+  color: #c0c4cc;
+  cursor: pointer;
+  font-size: 11px;
+  margin-left: 2px;
+}
+.lib-sub-destroy:hover {
+  color: #f56c6c;
 }
 :deep(.lib-row-off) {
   color: #a8b6c4;
