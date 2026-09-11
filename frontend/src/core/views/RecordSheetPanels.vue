@@ -744,8 +744,10 @@ const COVER_W = 708
 const COVER_H = 1173
 const coverK = computed(() => gridW.value / COVER_W)
 /** 封面高度 = 真实 A4(210×297mm):设计画布 1173/708≈1.657 比 A4(1.414)长,按画布高等比
- *  会在打印时溢出到第二页;纵向位置/行高用独立缩放 coverVy 压入 A4 高度,横向(字号/列宽)仍用 coverK */
-const coverPageH = computed(() => Math.round(gridW.value * (297 / 210)))
+ *  会在打印时溢出到第二页;纵向位置/行高用独立缩放 coverVy 压入 A4 高度,横向(字号/列宽)仍用 coverK
+ *  −cfg.coverTailReserve:与封面同页、渲染在封面**之下**的章节块(规格书 1-3 章节)预留的高度——
+ *  不预扣则整页高度 = A4 + 章节块,打印时章节块被挤到第二个近乎空白的页(实测 794px 宽下 3 行=93px) */
+const coverPageH = computed(() => Math.round(gridW.value * (297 / 210)) - (cfg.value?.coverTailReserve || 0))
 const coverVy = computed(() => coverPageH.value / COVER_H)
 /** 字段行顶部(设计 px,行高 46 → ink 中心 482.5/549.5/617/683/750/817.5 = 设计墨迹中心) */
 const COVER_LINE_TOPS = [460, 527, 594, 660, 727, 795]
