@@ -1740,10 +1740,16 @@ public class ButtonService {
             String docNo = String.valueOf(a.get("编号")).trim();
             String owner = String.valueOf(a.get("责任人")).trim();
             List<Map<String, Object>> docs = jdbc.queryForList(
-                    "SELECT 编号, 规格书种类 FROM rd_spec_doc_head h WHERE h.单据编号 = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'"
-                            + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_SPEC_DOC'"
-                            + " AND s.doc_no = h.单据编号 AND ISNULL(s.canceled,'N') = 'Y')", docNo);
+                    "SELECT h.编号, h.规格书种类, ISNULL(s.deleting,'N') AS deleting, ISNULL(s.stopped,'N') AS stopped"
+                            + " FROM rd_spec_doc_head h LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC'"
+                            + " AND s.doc_no = h.单据编号"
+                            + " WHERE h.单据编号 = ? AND ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'", docNo);
             if (docs.isEmpty()) throw new IllegalArgumentException("规格书单据不存在或已作废：" + docNo);
+            // 删除申请中/已中止单据不可分发(2026-09-12「删除的就不再显示选择」:与候选列表排除口径一致)
+            if ("Y".equals(String.valueOf(docs.get(0).get("deleting"))))
+                throw new IllegalArgumentException("规格书单据正在删除审批中，不可分发：" + docNo);
+            if ("Y".equals(String.valueOf(docs.get(0).get("stopped"))))
+                throw new IllegalArgumentException("规格书单据已中止，不可分发：" + docNo);
             String docProduct = docs.get(0).get("编号") == null ? "" : String.valueOf(docs.get(0).get("编号")).trim();
             if (!docProduct.isEmpty() && !docProduct.equals(productCode))
                 throw new IllegalArgumentException("规格书单据「" + docNo + "」已属于其他产品（" + docProduct + "）");

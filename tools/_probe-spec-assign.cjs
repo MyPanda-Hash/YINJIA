@@ -12,7 +12,8 @@
 //   ⑦ 防绕过:以产品码为单号建规格书单 → 403;admin 同操作 → 200(后清理)
 //   ⑧ 不误伤:未下发产品的自由键建单 → 200;未分配单跨用户保存(glm53 存 SPECT2 建的单) → 200
 //   ⑨ specAssign/doc:有分配(hasAssign=true+owner/supervisor)/无分配(hasAssign=false)两态
-//   ⑩ 幂等:已分发单据重复分发被拒;他产品单不能跨产品分发;作废单不能再分发;未分发候选单放行
+//   ⑩ 幂等:已分发单据重复分发被拒;他产品单不能跨产品分发;作废单不能再分发;未分发候选单放行;
+//      删除申请中的归档单退出候选且分发被拒(「删除的就不再显示选择」)
 //   ⑪ 清理:作废全部探针单据(产品信息表/规格书)+ SQL 侧删分配行/还原账号(见 cleanup SQL)
 // 用法: node tools/_probe-spec-assign.cjs [BASE](默认 http://localhost:8091)
 // 前置: bash 已跑 _probe-spec-assign-prep.sql(tester01 临时启用+SPECT2);结束后跑 cleanup SQL。
@@ -143,7 +144,7 @@ async function main() {
   ok(q9b?.data?.hasAssign === false, `⑨-2 未分配单 hasAssign=false`)
 
   // ⑩ 幂等(2026-09-12 用户口径):分发过的单据不再重复分发;他产品单不能跨产品分发;
-  //     作废单不能再分发;未分发候选单照常放行
+  //     作废单不能再分发;未分发候选单照常放行;删除申请中的单据不再显示选择(⑩-5)
   const dup = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 编号: docNos.X1, 责任人: 'tester01' }] })
   ok(dup.code !== 200 && String(dup.message || '').includes('该规格书已分发'), `⑩-1 已分发单据重复分发被拒(${dup.message})`)
   const cross = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 编号: docNos.X2, 责任人: 'tester01' }] })
@@ -154,7 +155,20 @@ async function main() {
   const vd = await btn(sup, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P2, assigns: [{ 编号: docNos.X2, 责任人: 'tester01' }] })
   ok(vd.code !== 200 && String(vd.message || '').includes('不存在或已作废'), `⑩-4 作废单不能再分发(${vd.message})`)
 
-  // ⑪ 清理:作废探针单据(规格书草稿直删;产品信息表已归档 admin 直删)
+  // ⑩-5 删除申请中的归档单(用户眼里的"已删除")退出候选列表且分发被拒
+  docNos.X4 = await mkDoc(t2, '规格书分发探针单D')
+  await btn(t2, 'RD_SPEC_DOC', '保存', { 编号: docNos.X4, 名称: '规格书分发探针单D' }) // 非管理员保存 → 自动送审
+  const ap4 = await btn(api, 'RD_SPEC_DOC', '审批通过', { 编号: docNos.X4 })
+  ok(ap4?.data?.['单据状态'] === '已归档', `⑩-5a X4 审批归档(${ap4?.data?.['单据状态']})`)
+  const dr4 = await btn(t2, 'RD_SPEC_DOC', '删除', { 编号: docNos.X4 })
+  ok(dr4?.data?.['单据状态'] === '删除申请中', `⑩-5b X4 提交删除申请(${dr4?.data?.['单据状态']})`)
+  const st4 = await api(`/api/px/specAssign?code=${encodeURIComponent(MARK + '-A')}`)
+  ok(!(st4?.data?.docs || []).some((d) => d['单据编号'] === docNos.X4), `⑩-5c 删除申请中的单据退出候选列表`)
+  const dp4 = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 编号: docNos.X4, 责任人: 'tester01' }] })
+  ok(dp4.code !== 200 && String(dp4.message || '').includes('删除审批中'), `⑩-5d 删除申请中的单据分发被拒(${dp4.message})`)
+
+  // ⑪ 清理:作废探针单据(规格书草稿直删;产品信息表已归档 admin 直删;X4 删除申请走审批通过)
+  if (docNos.X4) await btn(api, 'RD_SPEC_DOC', '删除审批通过', { 编号: docNos.X4 })
   for (const n of [docNos.X1, docNos.X2, docNos.X3, docNos.BYPASS, docNos.FREE]) {
     if (n) await btn(api, 'RD_SPEC_DOC', '删除', { 编号: n })
   }

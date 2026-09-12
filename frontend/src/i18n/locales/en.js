@@ -1551,6 +1551,8 @@ export default {
     '分发条目缺少「规格书单据」': 'An assignment is missing the spec doc',
     '同一请求内规格书单据重复：': 'Duplicate spec doc in one request: ',
     '规格书单据不存在或已作废：': 'Spec doc not found or voided: ',
+    '规格书单据正在删除审批中，不可分发：': 'Spec doc is pending delete approval and cannot be dispatched: ',
+    '规格书单据已中止，不可分发：': 'Spec doc is stopped and cannot be dispatched: ',
     '该规格书已分发：': 'This spec doc is already dispatched: ',
     '请选择规格书单据': 'Select a spec doc',
     '分发成功，已分配 {n} 张规格书': 'Dispatched: {n} spec doc(s) assigned',

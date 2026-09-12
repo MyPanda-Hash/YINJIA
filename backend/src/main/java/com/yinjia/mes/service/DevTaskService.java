@@ -198,19 +198,25 @@ public class DevTaskService {
         out.put("productName", p.isEmpty() || p.get(0).get("产品名称") == null ? "" : String.valueOf(p.get(0).get("产品名称")));
         out.put("assigns", jdbc.queryForList(
                 "SELECT a.单据编号, a.规格书种类, a.责任人, a.负责人, ISNULL(u.real_name, N'') AS ownerName,"
-                        + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废' WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档'"
-                        + " WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' ELSE N'草稿' END AS status"
+                        + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废' WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
+                        + " WHEN ISNULL(s.deleting,'N')='Y' THEN N'删除申请中' WHEN ISNULL(s.modify_state,N'')='R' THEN N'修改申请中'"
+                        + " WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' WHEN ISNULL(s.modify_state,N'')='Y' THEN N'修改中'"
+                        + " WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档' ELSE N'草稿' END AS status"
                         + " FROM rd_spec_assign a LEFT JOIN yj_user u ON u.username = a.责任人"
                         + " LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = a.单据编号"
                         + " WHERE a.产品编号 = ? AND ISNULL(a.asp_cancel,'N') <> 'Y' ORDER BY a.id", productCode));
         // 可分配候选单(2026-09-12 用户口径:分发=把已有单据分给人,不再按种类建单):
-        // 存活、未分配、且 编号为空(普通保存从不写该列)或已等于本产品编号(分发/历史导入盖过章)
+        // 存活、未分配、且 编号为空(普通保存从不写该列)或已等于本产品编号(分发/历史导入盖过章)。
+        // 删除申请中/已中止单据不再出现(2026-09-12「删除的就不再显示选择」:归档单点删除待审批 = 用户眼里的"已删除")
         out.put("docs", jdbc.queryForList(
                 "SELECT h.单据编号, ISNULL(h.规格书种类, N'') AS 规格书种类,"
-                        + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废' WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档'"
-                        + " WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' ELSE N'草稿' END AS status"
+                        + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废' WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
+                        + " WHEN ISNULL(s.deleting,'N')='Y' THEN N'删除申请中' WHEN ISNULL(s.modify_state,N'')='R' THEN N'修改申请中'"
+                        + " WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' WHEN ISNULL(s.modify_state,N'')='Y' THEN N'修改中'"
+                        + " WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档' ELSE N'草稿' END AS status"
                         + " FROM rd_spec_doc_head h LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = h.单据编号"
-                        + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y' AND (h.编号 IS NULL OR h.编号 = ?)"
+                        + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'"
+                        + " AND ISNULL(s.deleting,'N') <> 'Y' AND ISNULL(s.stopped,'N') <> 'Y' AND (h.编号 IS NULL OR h.编号 = ?)"
                         + " AND NOT EXISTS (SELECT 1 FROM rd_spec_assign a WHERE a.单据编号 = h.单据编号 AND ISNULL(a.asp_cancel,'N') <> 'Y')"
                         + " ORDER BY h.id DESC", productCode));
         return out;
