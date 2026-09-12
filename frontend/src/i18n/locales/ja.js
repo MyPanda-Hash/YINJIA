@@ -1396,5 +1396,6 @@ export default {
     '「{panelName} {docNo}」的终止申请（阶段 {stage}）被 {actor} 驳回。意见：{opinion}': '「{panelName} {docNo}」の終了申請（段階 {stage}）は {actor} に却下されました。意見：{opinion}',
     '终止审批通过': '終了承認承諾',
     '查询失败': '照会失敗',
+    '返回列表': '一覧へ戻る',
   },
 }

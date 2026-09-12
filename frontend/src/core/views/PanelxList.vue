@@ -783,31 +783,53 @@
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
     <!-- 修改记录弹窗:滚动3条(字段变化/补充/清空 + 明细变化摘要) -->
-    <!-- ═══ 项目进度查询:该项目的数据记录表单据(点项目编号弹出;单据就地只读渲染,多张可切换,不跳转) ═══ -->
+    <!-- ═══ 项目进度查询:该项目的数据记录表单据(点项目编号弹出;多张先选取再查看,单张直接查看) ═══ -->
     <el-dialog v-model="dataSheetsVisible" :title="tt('数据记录表单据') + ' · ' + dataSheetsCode" width="1240px" top="4vh" append-to-body>
       <div v-loading="dataSheetsLoading">
         <div v-if="!dataSheetsLoading && !dataSheetsRows.length" class="mod-log-empty">
           {{ tt('该项目暂无数据记录表单据（数据记录表按文档编号关联立项申请，请确认已按该项目编号填写）') }}
         </div>
+        <!-- ① 选取列表(多张时先选后看) -->
+        <el-table
+          v-else-if="!dsActive"
+          :data="dataSheetsRows" size="small" border max-height="480"
+          row-class-name="ds-sel-row" @row-click="selectDataSheet"
+        >
+          <el-table-column prop="panelName" :label="tt('数据记录表')" min-width="150" />
+          <el-table-column prop="docNo" :label="tt('单据编号')" min-width="130" />
+          <el-table-column prop="docDate" :label="tt('单据日期')" width="110" align="center" />
+          <el-table-column :label="tt('单据状态')" width="120" align="center">
+            <template #default="{ row }">
+              <span class="doc-status" :class="row.status">{{ tt(row.status) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column :label="tt('操作')" width="90" align="center">
+            <template #default>
+              <span class="ds-jump">{{ tt('查看') }} →</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <!-- ② 查看视图(选取后渲染;返回列表可再选,多张时胶囊可快捷切换) -->
         <template v-else>
-          <!-- 多张单据切换条(单张时隐藏) -->
-          <div v-if="dataSheetsRows.length > 1" class="ds-switch">
-            <span
-              v-for="r in dataSheetsRows"
-              :key="r.panelCode + r.docNo"
-              class="ds-pill"
-              :class="{ on: dsActive && dsActive.panelCode === r.panelCode && dsActive.docNo === r.docNo }"
-              @click="selectDataSheet(r)"
-            >{{ tt(r.panelName) }} {{ r.docNo }}</span>
+          <div class="ds-viewbar">
+            <span class="ds-back" @click="dsActive = null">← {{ tt('返回列表') }}</span>
+            <span v-if="dataSheetsRows.length > 1" class="ds-switch">
+              <span
+                v-for="r in dataSheetsRows"
+                :key="r.panelCode + r.docNo"
+                class="ds-pill"
+                :class="{ on: dsActive.panelCode === r.panelCode && dsActive.docNo === r.docNo }"
+                @click="selectDataSheet(r)"
+              >{{ tt(r.panelName) }} {{ r.docNo }}</span>
+            </span>
           </div>
-          <!-- 单据只读渲染(功能性滤效=DataRecordSheet;其余 7 张=RecordSheetPanels;字段元数据按面板取) -->
-          <div class="ds-doc-wrap" v-loading="dsActive && dsActive.loading">
+          <div class="ds-doc-wrap" v-loading="dsActive.loading">
             <DataRecordSheet
-              v-if="dsActive && dsActive.doc && dsActive.panelCode === 'RD_FILTER_EFF'"
+              v-if="dsActive.doc && dsActive.panelCode === 'RD_FILTER_EFF'"
               :head="dsActive.doc" :fields="dsActive.headerFields" :editable="false"
             />
             <RecordSheetPanels
-              v-else-if="dsActive && dsActive.doc"
+              v-else-if="dsActive.doc"
               :head="dsActive.doc" :fields="dsActive.allFields" :editable="false" :panel-code="dsActive.panelCode"
             />
             <div v-else class="mod-log-empty">{{ tt('加载中…') }}</div>
@@ -3227,7 +3249,8 @@ async function openDataSheets(row) {
   try {
     const res = await request.get('/px/progress/dataSheets', { params: { code } })
     dataSheetsRows.value = res?.data || []
-    if (dataSheetsRows.value.length) await selectDataSheet(dataSheetsRows.value[0])
+    // 单张:直接进入查看;多张:先出选取列表,选中后再查看
+    if (dataSheetsRows.value.length === 1) await selectDataSheet(dataSheetsRows.value[0])
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('查询失败'))
   } finally {
@@ -4393,12 +4416,24 @@ onUnmounted(() => {
   font-size: 13px;
   padding: 8px 0;
 }
-/* 数据记录表单据弹窗:切换条 + 纸张滚动区(只读渲染,不跳转) */
+/* 数据记录表单据弹窗:选取列表(行可点) + 查看视图顶栏(返回列表/胶囊快捷切换) + 纸张滚动区 */
+.ds-back {
+  color: #0d5bd3;
+  cursor: pointer;
+  font-size: 13px;
+  flex: none;
+}
+.ds-back:hover { text-decoration: underline; }
+.ds-viewbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
 .ds-switch {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 10px;
 }
 .ds-pill {
   border: 1px solid #bcd2f5;
@@ -4416,6 +4451,12 @@ onUnmounted(() => {
   color: #fff;
   border-color: #1c4f8a;
 }
+.ds-jump {
+  color: #0d5bd3;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+:deep(.el-table .ds-sel-row) { cursor: pointer; }
 .ds-doc-wrap {
   max-height: 68vh;
   overflow: auto;

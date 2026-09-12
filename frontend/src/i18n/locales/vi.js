@@ -1411,5 +1411,6 @@ export default {
     '该行未填项目编号，无法关联数据记录表': 'Dòng chưa có mã dự án, không thể liên kết',
     '查看': 'Xem',
     '查询失败': 'Truy vấn thất bại',
+    '返回列表': 'Về danh sách',
   },
 }

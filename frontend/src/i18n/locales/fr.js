@@ -1396,5 +1396,6 @@ export default {
     '「{panelName} {docNo}」的终止申请（阶段 {stage}）被 {actor} 驳回。意见：{opinion}': 'La demande d\'arrêt de « {panelName} {docNo} » (étape {stage}) a été rejetée par {actor}. Commentaire : {opinion}',
     '终止审批通过': 'Approuver l\'arrêt',
     '查询失败': 'Échec de la requête',
+    '返回列表': 'Retour à la liste',
   },
 }

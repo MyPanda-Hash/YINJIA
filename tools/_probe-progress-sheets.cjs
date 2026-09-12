@@ -84,31 +84,45 @@ async function main() {
       for(var i=0;i<trs.length;i++){if((trs[i].textContent||'').indexOf(${JSON.stringify(MARK)})>=0){
         var lk=trs[i].querySelector('.ps-code-link');if(lk){lk.click();return 1}}}return 0})()`)
     ok(clicked === 1, '④-1 找到该行项目编号链接并点击')
-    await sleep(1800)
-    // 弹窗:切换条列出两单 + 首张(功能性)就地只读渲染(纸张+主题文本)
-    const dlgState = await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
+    await sleep(1600)
+    // 多张 → 先出选取列表(两行,未渲染纸张)
+    const listState = await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
       var d=dlgs[dlgs.length-1];if(!d)return JSON.stringify({dlg:0});
-      var pills=[].slice.call(d.querySelectorAll('.ds-pill')).map(function(p){return (p.textContent||'').trim()});
-      var paper=!!d.querySelector('.record-sheet');
-      var txt=(d.querySelector('.ds-doc-wrap')||{}).textContent||'';
-      return JSON.stringify({dlg:1,pills:pills,paper:paper,hasF:txt.indexOf('链接探针功能F')>=0,hasA:txt.indexOf('链接探针碱性A')>=0,docno:(d.querySelector('.rs-docno')||{textContent:''}).textContent.trim()})})()`)
-    const ds = JSON.parse(dlgState || '{}')
-    ok(ds.dlg === 1, '④-2 弹窗打开')
-    ok((ds.pills || []).length === 2 && (ds.pills || []).some((p) => p.includes(eff.no)) && (ds.pills || []).some((p) => p.includes(alk.no)), `④-3 切换条列两单(${JSON.stringify(ds.pills)})`)
-    ok(ds.paper === true && ds.hasF === true && String(ds.docno).includes(MARK), `④-4 首张(功能性)就地渲染(纸张=${ds.paper}, 主题F=${ds.hasF}, 编号=${String(ds.docno).slice(0, 20)})`)
-    // 切到第二张(碱性) → 内容变为碱性纸张
+      var trs=[].slice.call(d.querySelectorAll('.el-table__body-wrapper tbody tr')).map(function(tr){return (tr.textContent||'').trim().slice(0,36)});
+      return JSON.stringify({dlg:1,rows:trs,paper:!!d.querySelector('.record-sheet'),back:!!d.querySelector('.ds-back')})})()`)
+    const ls = JSON.parse(listState || '{}')
+    ok(ls.dlg === 1, '④-2 弹窗打开')
+    ok((ls.rows || []).length === 2 && ls.paper === false && ls.back === false, `④-3 多张先出选取列表且未渲染纸张(行=${ls.rows ? ls.rows.length : 0}, 纸张=${ls.paper})`)
+    // 选取第一张(功能性) → 就地渲染
     await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
-      var d=dlgs[dlgs.length-1];var pills=[].slice.call(d.querySelectorAll('.ds-pill'));
-      for(var i=0;i<pills.length;i++){if((pills[i].textContent||'').indexOf(${JSON.stringify(alk.no)})>=0){pills[i].click();return 1}}return 0})()`)
-    await sleep(1500)
-    const afterSwitch = await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
+      var d=dlgs[dlgs.length-1];var trs=[].slice.call(d.querySelectorAll('.el-table__body-wrapper tbody tr'));
+      for(var i=0;i<trs.length;i++){if((trs[i].textContent||'').indexOf(${JSON.stringify(eff.no)})>=0){trs[i].click();return 1}}return 0})()`)
+    await sleep(1600)
+    const view1 = await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
+      var d=dlgs[dlgs.length-1];var txt=(d.querySelector('.ds-doc-wrap')||{}).textContent||'';
+      return JSON.stringify({paper:!!d.querySelector('.record-sheet'),hasF:txt.indexOf('链接探针功能F')>=0,back:!!d.querySelector('.ds-back')})})()`)
+    const v1 = JSON.parse(view1 || '{}')
+    ok(v1.paper === true && v1.hasF === true && v1.back === true, `④-4 选取功能性 → 就地渲染(纸张=${v1.paper}, 主题F=${v1.hasF}, 返回=${v1.back})`)
+    // 返回列表 → 再选取碱性 → 渲染碱性
+    await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
+      var b=dlgs[dlgs.length-1].querySelector('.ds-back');if(b){b.click();return 1}return 0})()`)
+    await sleep(700)
+    const backList = await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
+      var d=dlgs[dlgs.length-1];return JSON.stringify({rows:d.querySelectorAll('.el-table__body-wrapper tbody tr').length,paper:!!d.querySelector('.record-sheet')})})()`)
+    const bl = JSON.parse(backList || '{}')
+    ok(bl.rows === 2 && bl.paper === false, `④-5 返回列表(行=${bl.rows}, 纸张=${bl.paper})`)
+    await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
+      var d=dlgs[dlgs.length-1];var trs=[].slice.call(d.querySelectorAll('.el-table__body-wrapper tbody tr'));
+      for(var i=0;i<trs.length;i++){if((trs[i].textContent||'').indexOf(${JSON.stringify(alk.no)})>=0){trs[i].click();return 1}}return 0})()`)
+    await sleep(1600)
+    const view2 = await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
       var d=dlgs[dlgs.length-1];var txt=(d.querySelector('.ds-doc-wrap')||{}).textContent||'';
       return JSON.stringify({hasA:txt.indexOf('链接探针碱性A')>=0,hasF:txt.indexOf('链接探针功能F')>=0})})()`)
-    const sw = JSON.parse(afterSwitch || '{}')
-    ok(sw.hasA === true && sw.hasF !== true, `④-5 切换后渲染碱性单(碱性=${sw.hasA}, 功能=${sw.hasF})`)
+    const v2 = JSON.parse(view2 || '{}')
+    ok(v2.hasA === true && v2.hasF !== true, `④-6 再选碱性 → 渲染碱性单(碱性=${v2.hasA})`)
     const hash = await ev('location.hash')
-    ok(String(hash).includes('RD_PROGRESS'), `④-6 未跳转离开进度页(hash=${hash})`)
-    ok(errs.length === 0, `④-7 无 console 错误(${errs.length ? errs[0] : ''})`)
+    ok(String(hash).includes('RD_PROGRESS'), `④-7 未跳转离开进度页(hash=${hash})`)
+    ok(errs.length === 0, `④-8 无 console 错误(${errs.length ? errs[0] : ''})`)
   } finally {
     try { edge.kill() } catch {}
     await sleep(1200); try { fs.rmSync(profile, { recursive: true, force: true }) } catch {}
