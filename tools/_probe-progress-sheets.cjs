@@ -36,15 +36,15 @@ async function main() {
   const planNo = planDraft?.data?.['编号']
   const planSave = await btn('RD_PLAN', '保存', { 编号: planNo, 文档编号: MARK, 项目名称: '进度链接探针' + MARK, 阶段1_计划内容: '阶段一' })
   ok(planSave?.data?.['单据状态'] === '已归档', `②-1 实施计划归档(${planSave?.data?.['单据状态']})`)
-  // 两张数据记录表(同文档编号)
-  const mkSheet = async (pc) => {
+  // 两张数据记录表(同文档编号,不同测试主题便于区分就地渲染内容)
+  const mkSheet = async (pc, topic) => {
     const d = await btn(pc, '保存', {})
     const no = d?.data?.['编号']
-    const s = await btn(pc, '保存', { 编号: no, 文档编号: MARK, 测试主题: '链接探针' })
+    const s = await btn(pc, '保存', { 编号: no, 文档编号: MARK, 测试主题: topic })
     return { no, st: s?.data?.['单据状态'] }
   }
-  const eff = await mkSheet('RD_FILTER_EFF')
-  const alk = await mkSheet('RD_ALKALINE')
+  const eff = await mkSheet('RD_FILTER_EFF', '链接探针功能F')
+  const alk = await mkSheet('RD_ALKALINE', '链接探针碱性A')
   ok(eff.st === '已归档' && alk.st === '已归档', `②-2 两张数据记录表归档(${eff.no}/${alk.no})`)
 
   // ③ API 聚合
@@ -84,21 +84,31 @@ async function main() {
       for(var i=0;i<trs.length;i++){if((trs[i].textContent||'').indexOf(${JSON.stringify(MARK)})>=0){
         var lk=trs[i].querySelector('.ps-code-link');if(lk){lk.click();return 1}}}return 0})()`)
     ok(clicked === 1, '④-1 找到该行项目编号链接并点击')
-    await sleep(1200)
-    const dlgRows = await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
-      var d=dlgs[dlgs.length-1];if(!d)return 'no-dlg';
-      var trs=[].slice.call(d.querySelectorAll('.el-table__body-wrapper tbody tr'));
-      return trs.map(function(tr){return (tr.textContent||'').trim().slice(0,40)}).join(' || ')})()`)
-    ok(String(dlgRows).includes(eff.no) && String(dlgRows).includes(alk.no), `④-2 弹窗列出两单(${dlgRows})`)
-    // 点第一行 → 跳转定位
+    await sleep(1800)
+    // 弹窗:切换条列出两单 + 首张(功能性)就地只读渲染(纸张+主题文本)
+    const dlgState = await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
+      var d=dlgs[dlgs.length-1];if(!d)return JSON.stringify({dlg:0});
+      var pills=[].slice.call(d.querySelectorAll('.ds-pill')).map(function(p){return (p.textContent||'').trim()});
+      var paper=!!d.querySelector('.record-sheet');
+      var txt=(d.querySelector('.ds-doc-wrap')||{}).textContent||'';
+      return JSON.stringify({dlg:1,pills:pills,paper:paper,hasF:txt.indexOf('链接探针功能F')>=0,hasA:txt.indexOf('链接探针碱性A')>=0,docno:(d.querySelector('.rs-docno')||{textContent:''}).textContent.trim()})})()`)
+    const ds = JSON.parse(dlgState || '{}')
+    ok(ds.dlg === 1, '④-2 弹窗打开')
+    ok((ds.pills || []).length === 2 && (ds.pills || []).some((p) => p.includes(eff.no)) && (ds.pills || []).some((p) => p.includes(alk.no)), `④-3 切换条列两单(${JSON.stringify(ds.pills)})`)
+    ok(ds.paper === true && ds.hasF === true && String(ds.docno).includes(MARK), `④-4 首张(功能性)就地渲染(纸张=${ds.paper}, 主题F=${ds.hasF}, 编号=${String(ds.docno).slice(0, 20)})`)
+    // 切到第二张(碱性) → 内容变为碱性纸张
     await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
-      var d=dlgs[dlgs.length-1];var tr=d.querySelector('.el-table__body-wrapper tbody tr');if(tr){tr.click();return 1}return 0})()`)
-    await sleep(3200)
-    const located = await ev(`(function(){var t=document.querySelector('.rs-docno')||document.querySelector('.as-docno');
-      var txt=t?(t.textContent||'').trim():'';return txt})()`)
-    // DataRecordSheet 只读态编号格显示 文档编号 优先(=MARK);显示 MARK 即证明 focus 定位到本项目的单据
-    ok(String(located).includes(MARK) || String(located).includes(eff.no) || String(located).includes(alk.no), `④-3 跳转并定位到目标单据(当前编号格=${String(located).slice(0, 30)}, 期望含 ${MARK})`)
-    ok(errs.length === 0, `④-4 无 console 错误(${errs.length ? errs[0] : ''})`)
+      var d=dlgs[dlgs.length-1];var pills=[].slice.call(d.querySelectorAll('.ds-pill'));
+      for(var i=0;i<pills.length;i++){if((pills[i].textContent||'').indexOf(${JSON.stringify(alk.no)})>=0){pills[i].click();return 1}}return 0})()`)
+    await sleep(1500)
+    const afterSwitch = await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
+      var d=dlgs[dlgs.length-1];var txt=(d.querySelector('.ds-doc-wrap')||{}).textContent||'';
+      return JSON.stringify({hasA:txt.indexOf('链接探针碱性A')>=0,hasF:txt.indexOf('链接探针功能F')>=0})})()`)
+    const sw = JSON.parse(afterSwitch || '{}')
+    ok(sw.hasA === true && sw.hasF !== true, `④-5 切换后渲染碱性单(碱性=${sw.hasA}, 功能=${sw.hasF})`)
+    const hash = await ev('location.hash')
+    ok(String(hash).includes('RD_PROGRESS'), `④-6 未跳转离开进度页(hash=${hash})`)
+    ok(errs.length === 0, `④-7 无 console 错误(${errs.length ? errs[0] : ''})`)
   } finally {
     try { edge.kill() } catch {}
     await sleep(1200); try { fs.rmSync(profile, { recursive: true, force: true }) } catch {}

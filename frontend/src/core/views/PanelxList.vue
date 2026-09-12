@@ -783,27 +783,36 @@
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
     <!-- 修改记录弹窗:滚动3条(字段变化/补充/清空 + 明细变化摘要) -->
-    <!-- ═══ 项目进度查询:该项目的数据记录表单据(点项目编号弹出;行点击跳转对应面板并定位单据) ═══ -->
-    <el-dialog v-model="dataSheetsVisible" :title="tt('数据记录表单据') + ' · ' + dataSheetsCode" width="760px" append-to-body>
+    <!-- ═══ 项目进度查询:该项目的数据记录表单据(点项目编号弹出;单据就地只读渲染,多张可切换,不跳转) ═══ -->
+    <el-dialog v-model="dataSheetsVisible" :title="tt('数据记录表单据') + ' · ' + dataSheetsCode" width="1240px" top="4vh" append-to-body>
       <div v-loading="dataSheetsLoading">
         <div v-if="!dataSheetsLoading && !dataSheetsRows.length" class="mod-log-empty">
           {{ tt('该项目暂无数据记录表单据（数据记录表按文档编号关联立项申请，请确认已按该项目编号填写）') }}
         </div>
-        <el-table v-else :data="dataSheetsRows" size="small" border max-height="480" @row-click="jumpDataSheet">
-          <el-table-column prop="panelName" :label="tt('数据记录表')" min-width="150" />
-          <el-table-column prop="docNo" :label="tt('单据编号')" min-width="130" />
-          <el-table-column prop="docDate" :label="tt('单据日期')" width="110" align="center" />
-          <el-table-column :label="tt('单据状态')" width="120" align="center">
-            <template #default="{ row }">
-              <span class="doc-status" :class="row.status">{{ tt(row.status) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column :label="tt('操作')" width="90" align="center">
-            <template #default>
-              <span class="ds-jump">{{ tt('查看') }} →</span>
-            </template>
-          </el-table-column>
-        </el-table>
+        <template v-else>
+          <!-- 多张单据切换条(单张时隐藏) -->
+          <div v-if="dataSheetsRows.length > 1" class="ds-switch">
+            <span
+              v-for="r in dataSheetsRows"
+              :key="r.panelCode + r.docNo"
+              class="ds-pill"
+              :class="{ on: dsActive && dsActive.panelCode === r.panelCode && dsActive.docNo === r.docNo }"
+              @click="selectDataSheet(r)"
+            >{{ tt(r.panelName) }} {{ r.docNo }}</span>
+          </div>
+          <!-- 单据只读渲染(功能性滤效=DataRecordSheet;其余 7 张=RecordSheetPanels;字段元数据按面板取) -->
+          <div class="ds-doc-wrap" v-loading="dsActive && dsActive.loading">
+            <DataRecordSheet
+              v-if="dsActive && dsActive.doc && dsActive.panelCode === 'RD_FILTER_EFF'"
+              :head="dsActive.doc" :fields="dsActive.headerFields" :editable="false"
+            />
+            <RecordSheetPanels
+              v-else-if="dsActive && dsActive.doc"
+              :head="dsActive.doc" :fields="dsActive.allFields" :editable="false" :panel-code="dsActive.panelCode"
+            />
+            <div v-else class="mod-log-empty">{{ tt('加载中…') }}</div>
+          </div>
+        </template>
       </div>
       <template #footer>
         <el-button @click="dataSheetsVisible = false">{{ tt('关闭') }}</el-button>
@@ -3199,11 +3208,13 @@ async function onTermChanged() {
   await load()
 }
 
-// ── 项目进度查询:点项目编号 → 该项目的数据记录表单据(8 面板按文档编号关联;行点击跳转定位) ──
+// ── 项目进度查询:点项目编号 → 该项目的数据记录表单据(8 面板按文档编号关联;弹窗内就地只读渲染,不跳转) ──
 const dataSheetsVisible = ref(false)
 const dataSheetsLoading = ref(false)
 const dataSheetsRows = ref([])
 const dataSheetsCode = ref('')
+const dsActive = ref(null) // 当前展示的单据 {panelCode,panelName,docNo,doc,headerFields,allFields,loading}
+const dsCfgCache = new Map() // panelCode → 面板配置(字段元数据;会话内缓存)
 async function openDataSheets(row) {
   const K = Object.fromEntries(PROGRESS_COLUMNS.map((c) => [c.label, c.key]))
   const code = String(row?.[K['项目编号']] || '').trim()
@@ -3212,21 +3223,39 @@ async function openDataSheets(row) {
   dataSheetsVisible.value = true
   dataSheetsLoading.value = true
   dataSheetsRows.value = []
+  dsActive.value = null
   try {
     const res = await request.get('/px/progress/dataSheets', { params: { code } })
     dataSheetsRows.value = res?.data || []
+    if (dataSheetsRows.value.length) await selectDataSheet(dataSheetsRows.value[0])
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('查询失败'))
   } finally {
     dataSheetsLoading.value = false
   }
 }
-function jumpDataSheet(row) {
-  if (!row?.panelCode || !row?.docNo) return
-  dataSheetsVisible.value = false
-  const path = `/panelx/list/${row.panelCode}`
-  router.push({ path, query: { focus: row.docNo } })
-  tabs.open({ path, title: `${row.panelName}-${row.docNo}`, query: { focus: row.docNo } })
+/** 载入一张单据到弹窗(面板配置缓存 + getFormDescriptor 头明细拼回行模型) */
+async function selectDataSheet(r) {
+  if (!r?.panelCode || !r?.docNo) return
+  dsActive.value = { ...r, loading: true, doc: null, headerFields: [], allFields: [] }
+  try {
+    let cfg = dsCfgCache.get(r.panelCode)
+    if (!cfg) {
+      const c = await request.get('/px/getPanelConfig', { params: { panelCode: r.panelCode } })
+      cfg = c?.data || {}
+      dsCfgCache.set(r.panelCode, cfg)
+    }
+    const d = await request.get('/px/getFormDescriptor', { params: { panelCode: r.panelCode, code: r.docNo } })
+    // 响应体 data → {data: 头字段labels, detailData: {items}, ...};拼回行模型(head + detail.items)
+    const payload = d?.data || {}
+    const doc = { ...(payload.data || {}), detail: payload.detailData || {} }
+    const headerFields = cfg?.dataSchema?.fields || []
+    const allFields = [...headerFields, ...((cfg?.detail?.tabs?.[0]?.fields) || [])]
+    dsActive.value = { ...r, loading: false, doc, headerFields, allFields }
+  } catch (e) {
+    dsActive.value = { ...r, loading: false, doc: null, headerFields: [], allFields: [] }
+    ElMessage.error(engine.errMsg(e) || tt('查询失败'))
+  }
 }
 /** 字段编辑保存后刷新面板配置(yj_field 别名随配置接口重新下发) */
 async function onFieldEditRefresh() {
@@ -4364,13 +4393,37 @@ onUnmounted(() => {
   font-size: 13px;
   padding: 8px 0;
 }
-/* 数据记录表单据清单:行可点跳转 */
-.ds-jump {
-  color: #0d5bd3;
+/* 数据记录表单据弹窗:切换条 + 纸张滚动区(只读渲染,不跳转) */
+.ds-switch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.ds-pill {
+  border: 1px solid #bcd2f5;
+  background: #f0f6ff;
+  color: #1c4f8a;
+  border-radius: 12px;
+  padding: 2px 12px;
   font-size: 12.5px;
   cursor: pointer;
+  user-select: none;
 }
-:deep(.el-table__row) { cursor: pointer; }
+.ds-pill:hover { background: #e2efff; }
+.ds-pill.on {
+  background: #1c4f8a;
+  color: #fff;
+  border-color: #1c4f8a;
+}
+.ds-doc-wrap {
+  max-height: 68vh;
+  overflow: auto;
+  border: 1px solid #e4edf5;
+  border-radius: 4px;
+  padding: 8px 8px 16px;
+  background: #f6f8fa;
+}
 .mod-log-meta {
   margin-top: 6px;
   font-size: 12px;
