@@ -45,6 +45,15 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    '导出报表': 'Export report',
+    '打印预览': 'Print preview',
+    '服务端正式报表：含公司抬头、页眉页脚与页码': 'Server-side formal report with letterhead, header/footer and page numbers',
+    '在浏览器新窗口内打开 PDF，可直接打印': 'Opens the PDF in a new browser tab, ready to print',
+    '报表数据行 + 页眉信息，可在 Excel 里直接编辑': 'Report rows plus header info, editable in Excel',
+    '正在生成报表…': 'Generating report...',
+    '报表生成失败': 'Report generation failed',
+    '浏览器拦截了新窗口，请允许弹出窗口': 'The browser blocked the new tab, please allow pop-ups',
+
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
     '未保存提示': 'Unsaved Changes',
     '当前单据有未保存的修改，是否保存？': 'Current document has unsaved changes. Save it?',

@@ -1,0 +1,436 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  销售订单报表模板(SO_ORDER / bd_so_order 头 + bl_so_order 行)
+  ============================================================================
+  ⚠ 本文件由 IT 维护,业务不直接改。
+    业务侧只做「在销售订单面板上选一张单 → 导出报表 / 打印预览」,
+    版式、栏目、公司抬头一律由本模板与后端 ReportService 决定。
+
+  改版式的工作流(IT):
+    1) 直接编辑本 .jrxml(Jaspersoft Studio 可打开,也可纯文本改);
+    2) 字段中文名必须与 yj_field.label 一致(取数走 QueryService 的行契约):
+       明细字段写在 <field>,头字段写在 <parameter>(头字段不在明细行里);
+    3) 改完重启后端生效(模板首次导出时编译并缓存)。
+
+  版式要点:
+    - A4 横向(842×595pt),四边 42/36pt 可打印边距,单栏宽 758pt;
+    - 页眉 = 公司抬头 + 单据编号/日期/状态(多页单据每页重复,便于散页装订);
+    - 头字段区 = 3×3 键值网格(客户/结算客户/联系人/部门/部门负责人/业务员/项目/客户编码/预计交货日期);
+    - 明细表 12 列:序号|存货编码|存货名称|规格型号|数量|销售单位|单价|含税单价|税率%|金额|含税金额|备注;
+    - 合计(数量/金额/含税金额)在 summary 带 = 数据尾的全单总计(单据只有一页时就在页脚正上方);
+    - 页脚 = 页码「第 X 页 / 共 Y 页」+ 打印时间 + 制单/审核/签收签名区。
+
+  排版约定(JR 6.x 的 XSD 很挑,改的时候别踩):
+    - 字体/字号/加粗/对齐一律写在 <style> 里,元素用 style="..." 引用;
+      <textElement> 只认 textAlignment/verticalAlignment/rotation + <font> 子元素,写 fontSize 会报 XSD 错;
+    - isStretchWithOverflow / isBlankWhenNull / pattern / evaluationTime 是 <textField> 的属性,
+      不是 <reportElement> 的;reportElement 只管 x/y/width/height/style/mode/forecolor/backcolor;
+    - <box> 里只能放 pen/topPen/leftPen/bottomPen/rightPen,padding 是 <box padding="2"> 属性;
+    - 分节元素(pageHeader/columnHeader/pageFooter/summary)必须包一层 <band height="...">。
+
+  字体:一律 fontName="NotoSansSC"(字体扩展注册,TTF 嵌入 PDF)。
+        不要改成 Serif/SansSerif 等逻辑字体 —— 那些不嵌入,中文会变方框。
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="so_order" language="java" columnCount="1"
+              pageWidth="842" pageHeight="595" orientation="Landscape"
+              columnWidth="758" leftMargin="42" rightMargin="42" topMargin="36" bottomMargin="36"
+              whenNoDataType="AllSectionsNoDetail"
+              uuid="b7c1e5a0-6f21-4c8e-9a70-4f1a2c3d5e60">
+
+  <property name="net.sf.jasperreports.awt.ignore.missing.font" value="false"/>
+  <property name="net.sf.jasperreports.default.font.name" value="NotoSansSC"/>
+  <!-- xlsx 导出:数字/日期按类型落单元格(在 Excel 里能直接参与计算) -->
+  <property name="net.sf.jasperreports.export.xlsx.detect.cell.type" value="true"/>
+
+  <!-- ======================= 样式(字体/字号/对齐的唯一出处) ======================= -->
+  <!-- base 是报表默认样式:所有未显式指定字体的元素都继承它 —— 保证没有元素漏掉中文字体。
+       PDF 的编码/嵌入由字体扩展(fonts/noto-sans-sc.xml 的 pdfEncoding/pdfEmbedded)决定,
+       这里不写已废弃的 pdfFontName/pdfEncoding。 -->
+  <style name="base" isDefault="true" fontName="NotoSansSC" fontSize="9"/>
+
+  <!-- 表体单元格:细灰框 + 垂直居中(相邻单元格共用同一条边,网格线不会加粗) -->
+  <style name="cell" style="base" hAlign="Left" vAlign="Middle">
+    <box padding="2">
+      <pen lineWidth="0.5" lineColor="#8A8A8A"/>
+    </box>
+  </style>
+  <style name="cellC" style="cell" hAlign="Center"/>
+  <style name="cellR" style="cell" hAlign="Right"/>
+  <!-- 表头单元格:加粗 + 浅灰底 -->
+  <style name="th" style="cell" isBold="true" hAlign="Center" mode="Opaque" backcolor="#EFEFEF"/>
+  <!-- 合计行 -->
+  <style name="sum" style="cellR" isBold="true" mode="Opaque" backcolor="#F7F7F7"/>
+
+  <!-- 页眉/页脚 -->
+  <style name="company" style="base" fontSize="18" isBold="true" hAlign="Center" vAlign="Bottom"/>
+  <style name="docTitle" style="base" fontSize="16" isBold="true" hAlign="Center" vAlign="Middle"/>
+  <style name="meta" style="base" fontSize="10" vAlign="Middle"/>
+  <style name="metaR" style="meta" hAlign="Right"/>
+  <style name="gridLabel" style="base" isBold="true" vAlign="Middle"/>
+  <style name="gridValue" style="base" vAlign="Middle"/>
+  <style name="pager" style="base" vAlign="Middle"/>
+  <style name="pagerR" style="pager" hAlign="Right"/>
+  <style name="footerNote" style="base" fontSize="8" forecolor="#666666" vAlign="Middle"/>
+  <style name="sign" style="base" fontSize="9" vAlign="Middle"/>
+
+  <!-- ======================= 参数(单据头字段;取数见 ReportService) ======================= -->
+  <parameter name="单据编号" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="单据日期" class="java.util.Date" isForPrompting="false"/>
+  <parameter name="单据状态" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="客户" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="客户编码" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="结算客户" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="联系人" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="部门" class="java.lang.String" isForPrompting="false"/>
+  <!-- ⚠ 参数名必须与 yj_field.label 逐字一致:「部门负责人」这一列在 yj_field 里的 label 是
+       「部门.负责人」(带点)。写成「部门负责人」取不到值 —— 报表上那一格会是空白(已踩过)。 -->
+  <parameter name="部门.负责人" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="业务员" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="项目" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="预计交货日期" class="java.util.Date" isForPrompting="false"/>
+  <parameter name="打印时间" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="公司名称" class="java.lang.String" isForPrompting="false">
+    <defaultValueExpression><![CDATA["惠州市银嘉环保科技有限公司"]]></defaultValueExpression>
+  </parameter>
+
+  <!-- ======================= 字段(明细行:中文名与 yj_field.label 一致) ======================= -->
+  <field name="存货编码" class="java.lang.String"/>
+  <field name="存货名称" class="java.lang.String"/>
+  <field name="规格型号" class="java.lang.String"/>
+  <field name="数量" class="java.math.BigDecimal"/>
+  <field name="销售单位" class="java.lang.String"/>
+  <field name="单价" class="java.math.BigDecimal"/>
+  <field name="含税单价" class="java.math.BigDecimal"/>
+  <field name="税率%" class="java.math.BigDecimal"/>
+  <field name="金额" class="java.math.BigDecimal"/>
+  <field name="含税金额" class="java.math.BigDecimal"/>
+  <field name="备注" class="java.lang.String"/>
+
+  <!-- ======================= 变量(合计;明细可能缺值,表达式按 0 兜底) ======================= -->
+  <variable name="数量合计" class="java.math.BigDecimal" resetType="Report" calculation="Sum">
+    <variableExpression><![CDATA[$F{数量} == null ? java.math.BigDecimal.ZERO : $F{数量}]]></variableExpression>
+    <initialValueExpression><![CDATA[java.math.BigDecimal.ZERO]]></initialValueExpression>
+  </variable>
+  <variable name="金额合计" class="java.math.BigDecimal" resetType="Report" calculation="Sum">
+    <variableExpression><![CDATA[$F{金额} == null ? java.math.BigDecimal.ZERO : $F{金额}]]></variableExpression>
+    <initialValueExpression><![CDATA[java.math.BigDecimal.ZERO]]></initialValueExpression>
+  </variable>
+  <variable name="含税金额合计" class="java.math.BigDecimal" resetType="Report" calculation="Sum">
+    <variableExpression><![CDATA[$F{含税金额} == null ? java.math.BigDecimal.ZERO : $F{含税金额}]]></variableExpression>
+    <initialValueExpression><![CDATA[java.math.BigDecimal.ZERO]]></initialValueExpression>
+  </variable>
+
+  <!-- ======================= 页眉:公司抬头 + 单据标识 + 头字段网格 ======================= -->
+  <pageHeader>
+    <band height="126">
+      <textField>
+        <reportElement style="company" x="0" y="0" width="758" height="32"/>
+        <textFieldExpression><![CDATA[$P{公司名称}]]></textFieldExpression>
+      </textField>
+
+      <textField>
+        <reportElement style="docTitle" x="0" y="32" width="758" height="26"/>
+        <textFieldExpression><![CDATA["销售订单"]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true">
+        <reportElement style="meta" x="0" y="60" width="400" height="16"/>
+        <textFieldExpression><![CDATA["单据编号：" + ($P{单据编号} == null ? "" : $P{单据编号})]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true">
+        <reportElement style="metaR" x="400" y="60" width="358" height="16"/>
+        <textFieldExpression><![CDATA["单据日期：" + ($P{单据日期} == null ? "" : new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.CHINA).format($P{单据日期})) + "　　单据状态：" + ($P{单据状态} == null ? "" : $P{单据状态})]]></textFieldExpression>
+      </textField>
+
+      <!-- 头字段区:3 列 × 3 行键值网格(标签加粗、值常规) -->
+      <frame>
+        <reportElement x="0" y="78" width="758" height="48"/>
+        <box>
+          <pen lineWidth="0.5" lineColor="#8A8A8A"/>
+        </box>
+
+        <!-- 第 1 行 -->
+        <staticText>
+          <reportElement style="gridLabel" x="4" y="0" width="64" height="16"/>
+          <text><![CDATA[客户：]]></text>
+        </staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="gridValue" x="68" y="0" width="180" height="16"/>
+          <textFieldExpression><![CDATA[$P{客户}]]></textFieldExpression>
+        </textField>
+
+        <staticText>
+          <reportElement style="gridLabel" x="256" y="0" width="64" height="16"/>
+          <text><![CDATA[联系人：]]></text>
+        </staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="gridValue" x="320" y="0" width="180" height="16"/>
+          <textFieldExpression><![CDATA[$P{联系人}]]></textFieldExpression>
+        </textField>
+
+        <staticText>
+          <reportElement style="gridLabel" x="508" y="0" width="64" height="16"/>
+          <text><![CDATA[业务员：]]></text>
+        </staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="gridValue" x="572" y="0" width="182" height="16"/>
+          <textFieldExpression><![CDATA[$P{业务员}]]></textFieldExpression>
+        </textField>
+
+        <!-- 第 2 行 -->
+        <staticText>
+          <reportElement style="gridLabel" x="4" y="16" width="64" height="16"/>
+          <text><![CDATA[结算客户：]]></text>
+        </staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="gridValue" x="68" y="16" width="180" height="16"/>
+          <textFieldExpression><![CDATA[$P{结算客户}]]></textFieldExpression>
+        </textField>
+
+        <staticText>
+          <reportElement style="gridLabel" x="256" y="16" width="64" height="16"/>
+          <text><![CDATA[部门：]]></text>
+        </staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="gridValue" x="320" y="16" width="180" height="16"/>
+          <textFieldExpression><![CDATA[$P{部门}]]></textFieldExpression>
+        </textField>
+
+        <staticText>
+          <reportElement style="gridLabel" x="508" y="16" width="64" height="16"/>
+          <text><![CDATA[部门负责人：]]></text>
+        </staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="gridValue" x="572" y="16" width="182" height="16"/>
+          <textFieldExpression><![CDATA[$P{部门.负责人}]]></textFieldExpression>
+        </textField>
+
+        <!-- 第 3 行 -->
+        <staticText>
+          <reportElement style="gridLabel" x="4" y="32" width="64" height="16"/>
+          <text><![CDATA[项目：]]></text>
+        </staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="gridValue" x="68" y="32" width="180" height="16"/>
+          <textFieldExpression><![CDATA[$P{项目}]]></textFieldExpression>
+        </textField>
+
+        <staticText>
+          <reportElement style="gridLabel" x="256" y="32" width="64" height="16"/>
+          <text><![CDATA[客户编码：]]></text>
+        </staticText>
+        <textField isBlankWhenNull="true">
+          <reportElement style="gridValue" x="320" y="32" width="180" height="16"/>
+          <textFieldExpression><![CDATA[$P{客户编码}]]></textFieldExpression>
+        </textField>
+
+        <staticText>
+          <reportElement style="gridLabel" x="508" y="32" width="64" height="16"/>
+          <text><![CDATA[预计交货日期：]]></text>
+        </staticText>
+        <textField isBlankWhenNull="true" pattern="yyyy-MM-dd">
+          <reportElement style="gridValue" x="572" y="32" width="182" height="16"/>
+          <textFieldExpression><![CDATA[$P{预计交货日期}]]></textFieldExpression>
+        </textField>
+      </frame>
+    </band>
+  </pageHeader>
+
+  <!-- ======================= 明细表表头(每页重复) ======================= -->
+  <columnHeader>
+    <band height="22">
+      <staticText>
+        <reportElement style="th" x="0" y="0" width="28" height="22"/>
+        <text><![CDATA[序号]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="28" y="0" width="70" height="22"/>
+        <text><![CDATA[存货编码]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="98" y="0" width="96" height="22"/>
+        <text><![CDATA[存货名称]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="194" y="0" width="96" height="22"/>
+        <text><![CDATA[规格型号]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="290" y="0" width="58" height="22"/>
+        <text><![CDATA[数量]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="348" y="0" width="38" height="22"/>
+        <text><![CDATA[单位]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="386" y="0" width="62" height="22"/>
+        <text><![CDATA[单价]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="448" y="0" width="62" height="22"/>
+        <text><![CDATA[含税单价]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="510" y="0" width="40" height="22"/>
+        <text><![CDATA[税率%]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="550" y="0" width="64" height="22"/>
+        <text><![CDATA[金额]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="614" y="0" width="64" height="22"/>
+        <text><![CDATA[含税金额]]></text>
+      </staticText>
+      <staticText>
+        <reportElement style="th" x="678" y="0" width="80" height="22"/>
+        <text><![CDATA[备注]]></text>
+      </staticText>
+    </band>
+  </columnHeader>
+
+  <!-- ======================= 明细行 ======================= -->
+  <detail>
+    <band height="18">
+      <textField>
+        <reportElement style="cellC" x="0" y="0" width="28" height="18"/>
+        <textFieldExpression><![CDATA[$V{REPORT_COUNT}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="cell" x="28" y="0" width="70" height="18"/>
+        <textFieldExpression><![CDATA[$F{存货编码}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="cell" x="98" y="0" width="96" height="18"/>
+        <textFieldExpression><![CDATA[$F{存货名称}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="cell" x="194" y="0" width="96" height="18"/>
+        <textFieldExpression><![CDATA[$F{规格型号}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" pattern="#,##0.00">
+        <reportElement style="cellR" x="290" y="0" width="58" height="18"/>
+        <textFieldExpression><![CDATA[$F{数量}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true">
+        <reportElement style="cellC" x="348" y="0" width="38" height="18"/>
+        <textFieldExpression><![CDATA[$F{销售单位}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" pattern="#,##0.00">
+        <reportElement style="cellR" x="386" y="0" width="62" height="18"/>
+        <textFieldExpression><![CDATA[$F{单价}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" pattern="#,##0.00">
+        <reportElement style="cellR" x="448" y="0" width="62" height="18"/>
+        <textFieldExpression><![CDATA[$F{含税单价}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" pattern="#,##0.00">
+        <reportElement style="cellR" x="510" y="0" width="40" height="18"/>
+        <textFieldExpression><![CDATA[$F{税率%}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" pattern="#,##0.00">
+        <reportElement style="cellR" x="550" y="0" width="64" height="18"/>
+        <textFieldExpression><![CDATA[$F{金额}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" pattern="#,##0.00">
+        <reportElement style="cellR" x="614" y="0" width="64" height="18"/>
+        <textFieldExpression><![CDATA[$F{含税金额}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="cell" x="678" y="0" width="80" height="18"/>
+        <textFieldExpression><![CDATA[$F{备注}]]></textFieldExpression>
+      </textField>
+    </band>
+  </detail>
+
+  <!--
+    ======================= 页脚:页码 + 打印时间 + 签名区 =======================
+    页码做法(「第 X 页 / 共 Y 页」):同一个 $V{PAGE_NUMBER} 用两个文本域,
+      当前页 → evaluationTime="Now"(填到哪页就是哪页);
+      总页数 → evaluationTime="Report"(整份填完才知道,末页回填)。
+    两个文本域紧邻拼接,视觉上就是一行「第 1 页 / 共 3 页」。
+  -->
+  <pageFooter>
+    <band height="48">
+      <line>
+        <reportElement x="0" y="0" width="758" height="1"/>
+        <graphicElement>
+          <pen lineWidth="0.5" lineColor="#8A8A8A"/>
+        </graphicElement>
+      </line>
+
+      <textField isBlankWhenNull="true">
+        <reportElement style="footerNote" x="0" y="6" width="300" height="14"/>
+        <textFieldExpression><![CDATA["打印时间：" + ($P{打印时间} == null ? "" : $P{打印时间})]]></textFieldExpression>
+      </textField>
+
+      <textField evaluationTime="Now">
+        <reportElement style="pagerR" x="320" y="6" width="52" height="14"/>
+        <textFieldExpression><![CDATA["第 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
+      </textField>
+      <textField evaluationTime="Report">
+        <reportElement style="pager" x="372" y="6" width="64" height="14"/>
+        <textFieldExpression><![CDATA[" / 共 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
+      </textField>
+
+      <textField>
+        <reportElement style="sign" x="40" y="26" width="230" height="18"/>
+        <textFieldExpression><![CDATA["制单人：____________________"]]></textFieldExpression>
+      </textField>
+      <textField>
+        <reportElement style="sign" x="290" y="26" width="230" height="18"/>
+        <textFieldExpression><![CDATA["审核人：____________________"]]></textFieldExpression>
+      </textField>
+      <textField>
+        <reportElement style="sign" x="540" y="26" width="218" height="18"/>
+        <textFieldExpression><![CDATA["签收人：____________________"]]></textFieldExpression>
+      </textField>
+    </band>
+  </pageFooter>
+  <!-- ======================= 合计(数据尾:全单总计) ======================= -->
+  <summary>
+    <band height="24">
+      <textField>
+        <reportElement style="sum" x="28" y="0" width="262" height="24"/>
+        <textFieldExpression><![CDATA["合计"]]></textFieldExpression>
+      </textField>
+      <textField pattern="#,##0.00">
+        <reportElement style="sum" x="290" y="0" width="58" height="24"/>
+        <textFieldExpression><![CDATA[$V{数量合计}]]></textFieldExpression>
+      </textField>
+      <staticText>
+        <reportElement style="sum" x="348" y="0" width="202" height="24"/>
+        <text><![CDATA[金额合计 / 含税金额合计：]]></text>
+      </staticText>
+      <textField pattern="#,##0.00">
+        <reportElement style="sum" x="550" y="0" width="64" height="24"/>
+        <textFieldExpression><![CDATA[$V{金额合计}]]></textFieldExpression>
+      </textField>
+      <textField pattern="#,##0.00">
+        <reportElement style="sum" x="614" y="0" width="64" height="24"/>
+        <textFieldExpression><![CDATA[$V{含税金额合计}]]></textFieldExpression>
+      </textField>
+      <staticText>
+        <reportElement style="sum" x="678" y="0" width="80" height="24"/>
+        <text><![CDATA[（元）]]></text>
+      </staticText>
+    </band>
+  </summary>
+
+</jasperReport>

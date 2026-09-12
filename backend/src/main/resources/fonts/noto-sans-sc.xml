@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  字体族定义:NotoSansSC(思源黑体的 Google 版 = Noto Sans SC)
+  由 IT 维护;业务不需要改动本文件。
+
+  字形来源(均为 TrueType 轮廓 TTF,非 OTF):
+    NotoSansSC-Regular.ttf / NotoSansSC-Bold.ttf
+    = notofonts/noto-cjk 的 NotoSansSC-VF.ttf(可变字体,wght 100~900,SIL OFL 1.1)
+      经 fontTools varLib.instancer 落地成静态字重 + pyftsubset 子集化
+      (保留 Latin/希腊/西里尔/常用符号 + CJK 符号标点 + 假名 + CJK 统一汉字 + 兼容汉字 + 全角半角)。
+      构建脚本见 tools/gen-report-font.py。
+
+  ⚠ 4 个字形必须全部注册:JasperReports 找不到某个字形时会回退到内置的 Helvetica,
+    中文立刻变方框/空白。本项目没有真斜体字,italic/boldItalic 退化用 Regular/Bold。
+-->
+<fontFamilies>
+  <fontFamily name="NotoSansSC">
+    <normal>fonts/NotoSansSC-Regular.ttf</normal>
+    <bold>fonts/NotoSansSC-Bold.ttf</bold>
+    <italic>fonts/NotoSansSC-Regular.ttf</italic>
+    <boldItalic>fonts/NotoSansSC-Bold.ttf</boldItalic>
+    <!-- Identity-H:PDF 里按字形 id 直排,中文必须用它(不能用 WinAnsi 之类的单字节编码) -->
+    <pdfEncoding>Identity-H</pdfEncoding>
+    <pdfEmbedded>true</pdfEmbedded>
+    <exportFonts>
+      <!-- HTML/其它导出器用的 CSS 字体名(PDF 不读这一项,给将来 HTML 导出留的) -->
+      <export key="net.sf.jasperreports.html">'Noto Sans SC','Microsoft YaHei',sans-serif</export>
+    </exportFonts>
+  </fontFamily>
+</fontFamilies>
