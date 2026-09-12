@@ -2343,7 +2343,16 @@ async function exportSheetExcel() {
   exportFmtVisible.value = false
   if (panelCode.value === 'RD_PROGRESS') {
     const sheet = approvalSheetRef.value
-    if (sheet && typeof sheet.exportProgressExcel === 'function') { sheet.exportProgressExcel(); return }
+    if (sheet && typeof sheet.exportProgressExcel === 'function') {
+      try {
+        sheet.exportProgressExcel()
+        ElMessage.success(tt('已导出') + ' Excel')
+      } catch (e) {
+        console.error('progress-excel-export failed', e)
+        ElMessage.error(tt('导出失败'))
+      }
+      return
+    }
   }
   try {
     const XLSX = await import('xlsx')
