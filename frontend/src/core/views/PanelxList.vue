@@ -33,6 +33,16 @@
           <div class="ctx-item" :class="{ disabled: isDisabled(a) }" v-for="a in dropItems(g)" :key="a" @click="onGroupAction(a)">{{ tt(a) }}</div>
         </div>
       </div>
+      <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
+           该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
+      <span
+        v-if="reportTemplates.length"
+        class="tb-main"
+        :title="tt('服务端正式报表：含公司抬头、页眉页脚与页码')"
+        @click.stop="reportVisible = true"
+      >
+        <span class="act-name">{{ tt('导出报表') }}</span>
+      </span>
       <div class="tools-right">
         <template v-if="reportMode">
           <span class="doc-chip">{{ panelName }}</span>
@@ -2338,8 +2348,10 @@ function onSideAction(a) {
 const exportFmtVisible = ref(false)
 /** 导出 PDF:浏览器内直接生成 .pdf 下载,不弹打印对话框/无需打印机。
  *  页面尺寸=纸张实际尺寸单页输出(不套 A4)。截图用 modern-screenshot(SVG foreignObject,
- *  无 iframe 克隆)——根治 html2canvas 在真实浏览器(缩放/样式时序)下的
- *  "Unable to find element in cloned iframe" 报错。 */
+ *  无 iframe 克隆)——根治 html2canvas 的 "Unable to find element in cloned iframe"。
+ *  宽表(压降/精度等 ~1300px)整张不截的关键:**离屏克隆 + 按纸宽强制布局**——
+ *  根节点 max-width:100% 在窄窗下 computed width 被压缩,直接截原元素时 foreignObject
+ *  里的克隆树仍按窄宽排版(画布再宽也只排半张);克隆体显式定宽+去 max-width 再截,一次到位。 */
 async function exportSheetPdf() {
   exportFmtVisible.value = false
   // $el 在 dev 下可能是 fragment 注释锚点(组件含多个 append-to-body 弹窗)——不是元素时按纸张根类名兜底
@@ -2348,15 +2360,25 @@ async function exportSheetPdf() {
     '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet')
   if (!el || !(el instanceof HTMLElement)) return ElMessage.warning(tt('未找到可导出的单据'))
   const loadingMsg = ElMessage({ message: tt('正在生成 PDF…'), duration: 0 })
+  let holder = null
   try {
     const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
     await nextTick()
-    const scale = 2
-    // 纸张实际内容尺寸:宽高都取 scroll 值(纸张根是 width:1180px;max-width:100%,窗口窄时
-    // offsetWidth 被压缩而内容横向溢出,只传 offsetWidth 会把右半张截掉)
+    // 纸宽=scrollWidth(max-width:100% 压缩 offsetWidth 时,内容横向溢出,scrollWidth 才是整张纸)
     const w0 = Math.max(el.scrollWidth, el.offsetWidth)
-    const h0 = Math.max(el.scrollHeight, el.offsetHeight)
-    const dataUrl = await domToPng(el, {
+    holder = document.createElement('div')
+    holder.style.cssText = `position:fixed;left:-10000px;top:0;width:${w0}px;background:#ffffff;`
+    const clone = el.cloneNode(true)
+    clone.style.width = w0 + 'px'
+    clone.style.maxWidth = 'none'
+    clone.style.overflow = 'visible'
+    holder.appendChild(clone)
+    document.body.appendChild(holder)
+    // 双 raf:等克隆体按全宽完成重排再量高(窄窗换行多,原元素高度偏大;全宽布局高度才是纸高)
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    const h0 = Math.max(clone.scrollHeight, clone.offsetHeight, el.scrollHeight)
+    const scale = 2
+    const dataUrl = await domToPng(clone, {
       scale,
       backgroundColor: '#ffffff',
       width: w0,
@@ -2375,6 +2397,7 @@ async function exportSheetPdf() {
     console.error('pdf-export failed', e)
     ElMessage.error(tt('导出失败'))
   } finally {
+    if (holder) holder.remove()
     loadingMsg.close()
   }
 }
