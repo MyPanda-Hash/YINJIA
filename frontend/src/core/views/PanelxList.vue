@@ -240,6 +240,9 @@
               <div class="as-side-btn" v-if="isDocArchivePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
               <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
               <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
+              <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
+                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
+              <div v-if="reportTemplates.length" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
               <!-- 产品开发下发:仅产品信息表;归档后可点;下发过则置灰显示「已下发」 -->
               <div
                 class="as-side-btn"
@@ -863,6 +866,36 @@
       </div>
       <template #footer>
         <el-button @click="exportFmtVisible = false">{{ tt('取消') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ═══ 对外正式报表(后端 JasperReports 模板):业务只选格式,版式由 IT 的 .jrxml 决定 ═══ -->
+    <el-dialog v-model="reportVisible" :title="tt('导出报表')" width="420px" append-to-body>
+      <div class="efmt-list">
+        <div class="efmt-item" @click="downloadReport('pdf')">
+          <span class="efmt-ico">📄</span>
+          <div class="efmt-txt">
+            <div class="efmt-name">{{ tt('导出 PDF') }}</div>
+            <div class="efmt-desc">{{ tt('服务端正式报表：含公司抬头、页眉页脚与页码') }}</div>
+          </div>
+        </div>
+        <div class="efmt-item" @click="previewServerReport">
+          <span class="efmt-ico">🖨</span>
+          <div class="efmt-txt">
+            <div class="efmt-name">{{ tt('打印预览') }}</div>
+            <div class="efmt-desc">{{ tt('在浏览器新窗口内打开 PDF，可直接打印') }}</div>
+          </div>
+        </div>
+        <div class="efmt-item" @click="downloadReport('xlsx')">
+          <span class="efmt-ico">📊</span>
+          <div class="efmt-txt">
+            <div class="efmt-name">{{ tt('导出 Excel（.xlsx）') }}</div>
+            <div class="efmt-desc">{{ tt('报表数据行 + 页眉信息，可在 Excel 里直接编辑') }}</div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="reportVisible = false">{{ tt('取消') }}</el-button>
       </template>
     </el-dialog>
 
@@ -2319,16 +2352,20 @@ async function exportSheetPdf() {
     const [{ domToPng }, { jsPDF }] = await Promise.all([import('modern-screenshot'), import('jspdf')])
     await nextTick()
     const scale = 2
+    // 纸张实际内容尺寸:宽高都取 scroll 值(纸张根是 width:1180px;max-width:100%,窗口窄时
+    // offsetWidth 被压缩而内容横向溢出,只传 offsetWidth 会把右半张截掉)
+    const w0 = Math.max(el.scrollWidth, el.offsetWidth)
+    const h0 = Math.max(el.scrollHeight, el.offsetHeight)
     const dataUrl = await domToPng(el, {
       scale,
       backgroundColor: '#ffffff',
-      width: el.offsetWidth,
-      height: el.scrollHeight,
+      width: w0,
+      height: h0,
       // 隐藏编辑态元素(字段编辑/标准库/终止横幅等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
-    const w = el.offsetWidth * scale
-    const h = el.scrollHeight * scale
+    const w = w0 * scale
+    const h = h0 * scale
     const pdf = new jsPDF({ orientation: 'p', unit: 'px', format: [w, h], compress: true })
     pdf.addImage(dataUrl, 'PNG', 0, 0, w, h)
     const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
@@ -2407,6 +2444,79 @@ async function printApprovalSheet() {
   window.addEventListener('afterprint', restore)
   // 等样式生效后调打印预览(用户可另存为 PDF 或打印)
   setTimeout(() => window.print(), 150)
+}
+
+// ══════════ 对外正式报表(后端 JasperReports 模板;IT 做版式,业务只选单据/格式) ══════════
+// 与上面的「导出」不是一回事:上面是浏览器内基于当前屏幕纸张生成(所见即所得),
+// 这里是后端按 IT 维护的 .jrxml 重新排版(A4 + 公司抬头 + 页眉页脚 + 页码),用于对外正式文件。
+const reportTemplates = ref([])
+const reportVisible = ref(false)
+
+/** 该面板有没有服务端报表模板(模板表 reports/report-templates.properties 决定)——有才显示入口 */
+async function loadReportTemplates() {
+  try {
+    const res = await request.get('/report/templates', { params: { panelCode: panelCode.value } })
+    reportTemplates.value = Array.isArray(res?.data) ? res.data : []
+  } catch (e) {
+    reportTemplates.value = [] // 报表是增量能力,取不到就当没有,不影响面板本身
+  }
+}
+
+/** 取报表字节(Blob);失败由调用方提示 */
+function fetchReportBlob(fmt) {
+  return request.get('/report/export', {
+    params: {
+      code: reportTemplates.value[0]?.code,
+      panelCode: panelCode.value,
+      docNo: curDocNo.value,
+      format: fmt,
+    },
+    responseType: 'blob',
+  })
+}
+
+/** 下载报表:PDF / Excel(.xlsx),文件名由后端 Content-Disposition 给,这里按同口径命名 */
+async function downloadReport(fmt) {
+  const no = curDocNo.value
+  if (!no) return ElMessage.warning(tt('未找到可导出的单据'))
+  reportVisible.value = false
+  const loading = ElMessage({ message: tt('正在生成报表…'), duration: 0 })
+  try {
+    const blob = await fetchReportBlob(fmt)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${reportTemplates.value[0]?.name || '报表'}-${no}.${fmt === 'xlsx' ? 'xlsx' : 'pdf'}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+    ElMessage.success(tt('已导出') + ' ' + (fmt === 'xlsx' ? 'Excel' : 'PDF'))
+  } catch (e) {
+    ElMessage.error(tt('报表生成失败'))
+  } finally {
+    loading.close()
+  }
+}
+
+/** 打印预览:先同步开窗口占位(否则 await 之后新窗口会被浏览器拦截),拿到 PDF 再指向它 */
+async function previewServerReport() {
+  const no = curDocNo.value
+  if (!no) return ElMessage.warning(tt('未找到可导出的单据'))
+  reportVisible.value = false
+  const win = window.open('', '_blank')
+  const loading = ElMessage({ message: tt('正在生成报表…'), duration: 0 })
+  try {
+    const blob = await fetchReportBlob('pdf')
+    const url = URL.createObjectURL(blob)
+    if (win) win.location.href = url
+    else ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
+  } catch (e) {
+    if (win) win.close()
+    ElMessage.error(tt('报表生成失败'))
+  } finally {
+    loading.close()
+  }
 }
 
 async function copyActive() {
@@ -3942,6 +4052,7 @@ async function load() {
   loading.value = true
   try {
     await loadCrg()
+    loadReportTemplates() // 服务端报表入口(该面板有模板才显示;不阻塞列表)
     const params = { panelCode: panelCode.value, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
     // 模糊搜索生效中:叠加字段条件(后端 AND)与「全部字段」关键字
     if (fuzzyApplied.value?.valid) {
