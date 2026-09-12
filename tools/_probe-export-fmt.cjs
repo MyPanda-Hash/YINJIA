@@ -28,9 +28,9 @@ async function main() {
     let seq = 0; const pending = new Map(); const errs = []
     ws.on('message', (d) => { let m; try { m = JSON.parse(d.toString()) } catch { return }
       if (m.method === 'Runtime.consoleAPICalled' && m.params && ['error', 'log'].includes(m.params.type))
-        errs.push(m.params.type + ': ' + (m.params.args || []).map((a) => String(a.value ?? a.description ?? '')).join(' ').slice(0, 200))
+        errs.push(m.params.type + ': ' + (m.params.args || []).map((a) => String(a.value ?? a.description ?? '')).join(' ').slice(0, 1500))
       if (m.method === 'Runtime.exceptionThrown')
-        errs.push('EXC: ' + String((m.params.exceptionDetails || {}).text || '').slice(0, 200))
+        errs.push('EXC: ' + String((m.params.exceptionDetails || {}).text || '') + ' | ' + String(((m.params.exceptionDetails || {}).exception || {}).description || '').slice(0, 1500))
       if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) } })
     const send = (method, params = {}) => new Promise((res) => { const id = ++seq; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })) })
     const ev = async (exp) => { const r = await send('Runtime.evaluate', { expression: exp, returnByValue: true, awaitPromise: true })
@@ -98,6 +98,7 @@ async function main() {
     ok(printedPdf === 0, `④-3 未调用打印对话框(printed=${printedPdf})`)
     console.log('pdf-export 日志:', errs.filter((x) => x.startsWith('log: [pdf')).join(' | ') || '(无)')
     const pdfErrs = errs.filter((x) => !x.startsWith('log: [pdf'))
+    console.log('错误全文:', JSON.stringify(pdfErrs, null, 1))
     // ⑤ 打印按钮直接 print(不经弹窗)
     await ev('window.__printed=0')
     await ev(`(function(){var b=[].slice.call(document.querySelectorAll('.as-side-btn'));for(var i=0;i<b.length;i++){if((b[i].textContent||'').trim()==='打印'){b[i].click();return 1}}return 0})()`)
