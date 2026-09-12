@@ -1691,12 +1691,12 @@ public class ButtonService {
     }
 
     /**
-     * 规格书分发(2026-09-12 两级分发第二级):总负责人按「规格书种类 + 责任人账号」批量创建
-     * 规格书草稿单并绑定分配。formData = {编号: 产品信息表单据编号, assigns: [{规格书种类, 责任人}]}。
-     * 产品编号/名称/负责人一律服务端自查(不信客户端);分配单仅 责任人∪总负责人∪管理员 可编辑
+     * 规格书分发(2026-09-12 两级分发第二级,当日改口径:不按种类建单,分发=把已有单据分给人)。
+     * formData = {编号: 产品信息表单据编号, assigns: [{编号: 规格书单据编号, 责任人: 账号}]}。
+     * 产品编号/名称/负责人一律服务端自查(不信客户端);分配后仅 责任人∪总负责人∪管理员 可编辑
      * (ensureSpecAssignEditable 在 保存/申请修改/删除 三个入口强制)。
-     * 建单:rd_spec_doc_head 写 编号=产品编号(运行时首个写入方,历史只有 Excel 导入写过)、
-     * 规格书种类、asp_user1=责任人(与制单/审批分离口径一致);多张在同一事务内全成或全无。
+     * 绑定:单据须存活、未分配过(一单一条活分配,分发过的不再重复分发)、编号为空或属本产品;
+     * 绑定时 rd_spec_doc_head.编号 盖产品编号章(正常运行时唯一写入方,进度匹配依据)。多张同一事务全成或全无。
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> specAssign(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -1713,77 +1713,66 @@ public class ButtonService {
             throw new IllegalStateException("该产品未下发产品开发，请先下发");
         if (!devTaskService.isSupervisorOrAdmin(productCode, user))
             throw new org.springframework.security.access.AccessDeniedException("该产品已下发，仅总负责人或管理员可执行规格书分发");
-        // 解析 assigns 并整体校验(全成或全无)
+        // 解析 assigns 并整体校验(全成或全无)。2026-09-12 用户口径:分发=把已有规格书单分给人,
+        // 不再按种类建单——条目 = {编号: 规格书单据编号, 责任人: 账号}
         Object raw = formData.get("assigns");
         List<Map<String, Object>> assigns = raw instanceof List<?> l
                 ? l.stream().filter(x -> x instanceof Map).map(x -> (Map<String, Object>) x).toList() : List.of();
-        if (assigns.isEmpty()) throw new IllegalArgumentException("请至少填写一条分发(规格书种类 + 责任人)");
-        Set<String> seenKind = new HashSet<>();
+        if (assigns.isEmpty()) throw new IllegalArgumentException("请至少填写一条分发(规格书单据 + 责任人)");
+        Set<String> seenDoc = new HashSet<>();
         for (Map<String, Object> a : assigns) {
-            String kind = a.get("规格书种类") == null ? "" : String.valueOf(a.get("规格书种类")).trim();
+            String docNo = a.get("编号") == null ? "" : String.valueOf(a.get("编号")).trim();
             String owner = a.get("责任人") == null ? "" : String.valueOf(a.get("责任人")).trim();
-            if (kind.isEmpty()) throw new IllegalArgumentException("分发条目缺少「规格书种类」");
-            if (owner.isEmpty()) throw new IllegalArgumentException("分发条目「" + kind + "」缺少责任人");
-            if (!seenKind.add(kind)) throw new IllegalArgumentException("同一请求内规格书种类重复：" + kind);
+            if (docNo.isEmpty()) throw new IllegalArgumentException("分发条目缺少「规格书单据」");
+            if (owner.isEmpty()) throw new IllegalArgumentException("分发条目「" + docNo + "」缺少责任人");
+            if (!seenDoc.add(docNo)) throw new IllegalArgumentException("同一请求内规格书单据重复：" + docNo);
             Integer enabled = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM yj_user WHERE username = ? AND ISNULL(enabled,'1') = '1'", Integer.class, owner);
             if (enabled == null || enabled == 0)
                 throw new IllegalArgumentException("责任人账号不存在或已停用：" + owner);
         }
-        // 幂等(2026-09-12 用户口径):分发过的种类不再重复分发——活分配且其单据未作废即视为已分发;
-        // 单据作废后同种类允许重新分发(旧分配行在重建时收口)
-        Map<String, String> dispatchedKinds = new LinkedHashMap<>();
-        for (Map<String, Object> row : jdbc.queryForList(
-                "SELECT a.规格书种类, a.单据编号 FROM rd_spec_assign a"
-                        + " LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = a.单据编号"
-                        + " WHERE a.产品编号 = ? AND ISNULL(a.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'",
-                        productCode)) {
-            dispatchedKinds.put(String.valueOf(row.get("规格书种类")), String.valueOf(row.get("单据编号")));
-        }
-        for (Map<String, Object> a : assigns) {
-            String kind = String.valueOf(a.get("规格书种类")).trim();
-            String prev = dispatchedKinds.get(kind);
-            if (prev != null)
-                throw new IllegalArgumentException("该规格书种类已分发，请勿重复分发：" + kind + "（单据 " + prev + "）");
-        }
-        // 建单 + 写分配(同一事务)
-        PanelRegistry.PanelDef specDef = registry.panel("RD_SPEC_DOC");
         String supervisor = devTaskService.supervisorOf(productCode);
         String supervisorSnapshot = supervisor == null ? user : supervisor; // 挂起产品快照操作人(admin)
-        List<Map<String, Object>> created = new ArrayList<>();
+        // 绑定 + 写分配(同一事务):单据须存活、未分配过(分发过的不再重复分发)、
+        // 且 编号为空(普通保存从不写该列)或已属于本产品;绑定时给单据盖上产品编号(进度匹配依据)
+        List<Map<String, Object>> assigned = new ArrayList<>();
         for (Map<String, Object> a : assigns) {
-            String kind = String.valueOf(a.get("规格书种类")).trim();
+            String docNo = String.valueOf(a.get("编号")).trim();
             String owner = String.valueOf(a.get("责任人")).trim();
-            // 能走到这里说明该种类无"活分配+活单据",残留的旧分配行(单据已作废)收口,保持一产品一种类一条活分配
-            jdbc.update("UPDATE rd_spec_assign SET asp_cancel = 'Y', asp_user2 = ?, asp_time2 = GETDATE()"
-                    + " WHERE 产品编号 = ? AND 规格书种类 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", user, productCode, kind);
-            String specNo = formNoService.next(specDef.prefix(), owner);
-            Map<String, Object> cols = new LinkedHashMap<>();
-            cols.put("单据编号", specNo);
-            cols.put("编号", productCode);
-            cols.put("规格书种类", kind);
-            if (specDef.dateCol() != null && tableCols(specDef.headTable()).contains(specDef.dateCol()))
-                cols.put(specDef.dateCol(), LocalDate.now());
-            insertRow(specDef.headTable(), cols, owner); // asp_user1=责任人(制单=责任人,审批分离)
-            markDocSaved("RD_SPEC_DOC", specNo, false);   // 新建的分配单是未保存草稿
+            List<Map<String, Object>> docs = jdbc.queryForList(
+                    "SELECT 编号, 规格书种类 FROM rd_spec_doc_head h WHERE h.单据编号 = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'"
+                            + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_SPEC_DOC'"
+                            + " AND s.doc_no = h.单据编号 AND ISNULL(s.canceled,'N') = 'Y')", docNo);
+            if (docs.isEmpty()) throw new IllegalArgumentException("规格书单据不存在或已作废：" + docNo);
+            String docProduct = docs.get(0).get("编号") == null ? "" : String.valueOf(docs.get(0).get("编号")).trim();
+            if (!docProduct.isEmpty() && !docProduct.equals(productCode))
+                throw new IllegalArgumentException("规格书单据「" + docNo + "」已属于其他产品（" + docProduct + "）");
+            List<Map<String, Object>> prev = jdbc.queryForList(
+                    "SELECT TOP 1 责任人 FROM rd_spec_assign WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
+            if (!prev.isEmpty())
+                throw new IllegalArgumentException("该规格书已分发：" + docNo + "（责任人 " + prev.get(0).get("责任人") + "），请勿重复分发");
+            String kind = docs.get(0).get("规格书种类") == null ? "" : String.valueOf(docs.get(0).get("规格书种类")).trim();
+            // 盖章:产品编号列(正常保存路径从不写,分发是运行时唯一写入方)+ 操作人留痕
+            jdbc.update("UPDATE rd_spec_doc_head SET 编号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE 单据编号 = ?",
+                    productCode, user, docNo);
             Map<String, Object> asg = new LinkedHashMap<>();
             asg.put("产品编号", productCode);
-            asg.put("单据编号", specNo);
-            asg.put("规格书种类", kind);
+            asg.put("单据编号", docNo);
+            asg.put("规格书种类", kind); // 单据自带种类的快照,仅展示用
             asg.put("负责人", supervisorSnapshot);
             asg.put("责任人", owner);
             insertRow("rd_spec_assign", asg, user);
             Map<String, Object> c = new LinkedHashMap<>();
-            c.put("单据编号", specNo);
+            c.put("单据编号", docNo);
             c.put("规格书种类", kind);
             c.put("责任人", owner);
-            created.add(c);
-            notify(() -> messageService.send(List.of(owner), MessageService.SPEC_ASSIGNED, "RD_SPEC_DOC", specNo,
+            assigned.add(c);
+            notify(() -> messageService.send(List.of(owner), MessageService.SPEC_ASSIGNED, "RD_SPEC_DOC", docNo,
                     Map.of("kind", kind, "productCode", productCode, "productName", productName), user));
         }
         Map<String, Object> r = result(no, "已分发");
         r.put("productCode", productCode);
-        r.put("created", created);
+        r.put("assigned", assigned);
         return r;
     }
 

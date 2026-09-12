@@ -3,15 +3,16 @@
 //   ② 挂起+懒重解:责任人='查无此人XYZ' → resolved=false 且无 SPEC_DISPATCHED;
 //      SQL 改好责任人后再查 buttonState → 懒重解补挂(见 bash 侧 SQL 断言 rd_dev_task.负责人)
 //   ③ 负责人(glm53)收到 SPEC_DISPATCHED
-//   ④ 规格书分发(admin):按 种类+责任人 建草稿单 → created 单号 SD- 开头;specAssign 列表含它且 kinds 非空
-//      (SQL 断言:head.编号=产品编号、asp_user1=责任人、saved='N')
+//   ④ 分发=绑定已有单据(不按种类建单):三人各建一张空白草稿 → 候选列表含未分配单;
+//      admin 给产品1分发 X1;负责人(glm53)给产品2分发 X2;无关人分发被拒
+//      (SQL 断言:绑定后 head.编号=产品编号(盖章)、分配行正确)
 //   ⑤ 责任人(tester01)收到 SPEC_ASSIGNED
 //   ⑥ 编辑封锁:无关人(SPECT2)保存/申请修改/删除分配单 → 三连 403;
 //      责任人/负责人/admin 保存均 200;无关人调 规格书分发 → 403
 //   ⑦ 防绕过:以产品码为单号建规格书单 → 403;admin 同操作 → 200(后清理)
 //   ⑧ 不误伤:未下发产品的自由键建单 → 200;未分配单跨用户保存(glm53 存 SPECT2 建的单) → 200
 //   ⑨ specAssign/doc:有分配(hasAssign=true+owner/supervisor)/无分配(hasAssign=false)两态
-//   ⑩ 幂等:同种类重复分发被拒;未分发种类放行;作废单后同种类可重分发(旧分配行收口,SQL 断言)
+//   ⑩ 幂等:已分发单据重复分发被拒;他产品单不能跨产品分发;作废单不能再分发;未分发候选单放行
 //   ⑪ 清理:作废全部探针单据(产品信息表/规格书)+ SQL 侧删分配行/还原账号(见 cleanup SQL)
 // 用法: node tools/_probe-spec-assign.cjs [BASE](默认 http://localhost:8091)
 // 前置: bash 已跑 _probe-spec-assign-prep.sql(tester01 临时启用+SPECT2);结束后跑 cleanup SQL。
@@ -80,38 +81,45 @@ async function main() {
   const glmMsg1 = ((await sup('/api/portal/message/list?limit=200'))?.data) || []
   ok(glmMsg1.some((m) => m['消息码'] === 'SPEC_DISPATCHED' && m['单据编号'] === docNos.P1), '③ glm53 收到 SPEC_DISPATCHED(产品1)')
 
-  // ④ admin 给产品1分发 [种类+tester01];负责人(glm53)给产品2分发(证明负责人可分发)
+  // ④ 分发=绑定已有单据:三人各建一张空白草稿(directAdd),候选列表须含未分配单
+  const mkDoc = async (call, name) => {
+    const r = await btn(call, 'RD_SPEC_DOC', '保存为草稿', { 名称: name })
+    return r?.data?.['编号']
+  }
+  docNos.X1 = await mkDoc(api, '规格书分发探针单A')
+  docNos.X2 = await mkDoc(sup, '规格书分发探针单B')
+  docNos.X3 = await mkDoc(t2, '规格书分发探针单C')
+  ok([docNos.X1, docNos.X2, docNos.X3].every((n) => /^SD-/.test(n || '')), `④-1 三人各建空白草稿(${docNos.X1}/${docNos.X2}/${docNos.X3})`)
   const st1 = await api(`/api/px/specAssign?code=${encodeURIComponent(MARK + '-A')}`)
-  const kind = (st1?.data?.kinds || [])[0]
-  ok(!!kind && (st1?.data?.kinds || []).length > 0, `④-1 specAssign 下发种类字典非空(${(st1?.data?.kinds || []).length} 种)`)
-  const a1 = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 规格书种类: kind, 责任人: 'tester01' }] })
-  docNos.D1 = a1?.data?.created?.[0]?.['单据编号']
-  ok(a1.code === 200 && /^SD-/.test(docNos.D1 || ''), `④-2 admin 分发建单 ${docNos.D1}(${a1?.data?.['单据状态']})`)
+  const docs1 = st1?.data?.docs || []
+  ok(docs1.some((d) => d['单据编号'] === docNos.X1) && docs1.some((d) => d['单据编号'] === docNos.X3), `④-2 候选列表含未分配单据(${docs1.length} 张)`)
+  const a1 = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 编号: docNos.X1, 责任人: 'tester01' }] })
+  ok(a1.code === 200 && (a1?.data?.assigned || [])[0]?.['单据编号'] === docNos.X1, `④-3 admin 分发绑定 ${docNos.X1}(${a1?.message})`)
   const st1b = await api(`/api/px/specAssign?code=${encodeURIComponent(MARK + '-A')}`)
-  ok((st1b?.data?.assigns || []).some((x) => x['单据编号'] === docNos.D1 && x['责任人'] === 'tester01'), '④-3 specAssign 列表含新分配')
-  const a2 = await btn(sup, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P2, assigns: [{ 规格书种类: kind, 责任人: 'tester01' }] })
-  docNos.D2 = a2?.data?.created?.[0]?.['单据编号']
-  ok(a2.code === 200 && /^SD-/.test(docNos.D2 || ''), `④-4 总负责人(glm53)分发产品2建单 ${docNos.D2}`)
-  const a3 = await btn(t2, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 规格书种类: kind, 责任人: 'tester01' }] })
-  ok(a3.code === 403, `④-5 无关人(SPECT2)调 规格书分发 被拒(code=${a3.code} ${a3.message})`)
+  ok((st1b?.data?.assigns || []).some((x) => x['单据编号'] === docNos.X1 && x['责任人'] === 'tester01'), '④-4 分配列表含 X1')
+  ok(!(st1b?.data?.docs || []).some((d) => d['单据编号'] === docNos.X1), '④-5 已分发单据退出候选列表')
+  const a2 = await btn(sup, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P2, assigns: [{ 编号: docNos.X2, 责任人: 'tester01' }] })
+  ok(a2.code === 200, `④-6 总负责人(glm53)分发产品2绑定 ${docNos.X2}`)
+  const a3 = await btn(t2, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 编号: docNos.X3, 责任人: 'tester01' }] })
+  ok(a3.code === 403, `④-7 无关人(SPECT2)调 规格书分发 被拒(code=${a3.code} ${a3.message})`)
 
   // ⑤ 责任人收到 SPEC_ASSIGNED
   const t1Msg = ((await t1('/api/portal/message/list?limit=200'))?.data) || []
-  ok(t1Msg.some((m) => m['消息码'] === 'SPEC_ASSIGNED' && m['单据编号'] === docNos.D1), '⑤-1 tester01 收到 SPEC_ASSIGNED(D1)')
-  ok(t1Msg.some((m) => m['消息码'] === 'SPEC_ASSIGNED' && m['单据编号'] === docNos.D2), '⑤-2 tester01 收到 SPEC_ASSIGNED(D2)')
+  ok(t1Msg.some((m) => m['消息码'] === 'SPEC_ASSIGNED' && m['单据编号'] === docNos.X1), '⑤-1 tester01 收到 SPEC_ASSIGNED(X1)')
+  ok(t1Msg.some((m) => m['消息码'] === 'SPEC_ASSIGNED' && m['单据编号'] === docNos.X2), '⑤-2 tester01 收到 SPEC_ASSIGNED(X2)')
 
   // ⑥ 编辑封锁:无关人三连 403;责任人/负责人/admin 可存
-  const s6a = await btn(t2, 'RD_SPEC_DOC', '保存为草稿', { 编号: docNos.D1, 名称: '越权改' })
+  const s6a = await btn(t2, 'RD_SPEC_DOC', '保存为草稿', { 编号: docNos.X1, 名称: '越权改' })
   ok(s6a.code === 403 && String(s6a.message || '').includes('该规格书已分发'), `⑥-1 SPECT2 保存被拒(${s6a.message})`)
-  const s6b = await btn(t2, 'RD_SPEC_DOC', '申请修改', { 编号: docNos.D1 })
+  const s6b = await btn(t2, 'RD_SPEC_DOC', '申请修改', { 编号: docNos.X1 })
   ok(s6b.code === 403 && String(s6b.message || '').includes('该规格书已分发'), `⑥-2 SPECT2 申请修改被拒(${s6b.message})`)
-  const s6c = await btn(t2, 'RD_SPEC_DOC', '删除', { 编号: docNos.D1 })
+  const s6c = await btn(t2, 'RD_SPEC_DOC', '删除', { 编号: docNos.X1 })
   ok(s6c.code === 403 && String(s6c.message || '').includes('该规格书已分发'), `⑥-3 SPECT2 删除被拒(${s6c.message})`)
-  const s6d = await btn(t1, 'RD_SPEC_DOC', '保存为草稿', { 编号: docNos.D1, 名称: '责任人填写' })
+  const s6d = await btn(t1, 'RD_SPEC_DOC', '保存为草稿', { 编号: docNos.X1, 名称: '责任人填写' })
   ok(s6d.code === 200 && s6d?.data?.['单据状态'] === '草稿', `⑥-4 责任人(tester01)保存 OK(${s6d?.data?.['单据状态']})`)
-  const s6e = await btn(sup, 'RD_SPEC_DOC', '保存为草稿', { 编号: docNos.D1, 名称: '负责人代填' })
+  const s6e = await btn(sup, 'RD_SPEC_DOC', '保存为草稿', { 编号: docNos.X1, 名称: '负责人代填' })
   ok(s6e.code === 200, `⑥-5 总负责人(glm53)保存 OK(${s6e?.data?.['单据状态']})`)
-  const s6f = await btn(api, 'RD_SPEC_DOC', '保存为草稿', { 编号: docNos.D1, 名称: '管理员代填' })
+  const s6f = await btn(api, 'RD_SPEC_DOC', '保存为草稿', { 编号: docNos.X1, 名称: '管理员代填' })
   ok(s6f.code === 200, `⑥-6 admin 保存 OK(${s6f?.data?.['单据状态']})`)
 
   // ⑦ 防绕过:以已下发产品的产品码为单号建规格书单
@@ -129,25 +137,25 @@ async function main() {
   ok(s8b.code === 200, `⑧-2 glm53 跨用户保存未分配单放行(${s8b?.data?.['单据状态']})`)
 
   // ⑨ specAssign/doc 两态
-  const q9a = await api(`/api/px/specAssign/doc?no=${encodeURIComponent(docNos.D1)}`)
-  ok(q9a?.data?.hasAssign === true && q9a?.data?.owner === 'tester01' && q9a?.data?.supervisor === 'glm53', `⑨-1 D1 hasAssign=true owner/supervisor 正确`)
+  const q9a = await api(`/api/px/specAssign/doc?no=${encodeURIComponent(docNos.X1)}`)
+  ok(q9a?.data?.hasAssign === true && q9a?.data?.owner === 'tester01' && q9a?.data?.supervisor === 'glm53', `⑨-1 X1 hasAssign=true owner/supervisor 正确`)
   const q9b = await api(`/api/px/specAssign/doc?no=${encodeURIComponent(MARK + '-FREE')}`)
   ok(q9b?.data?.hasAssign === false, `⑨-2 未分配单 hasAssign=false`)
 
-  // ⑩ 幂等(2026-09-12 用户口径):分发过的种类不再重复分发;作废单后同种类可重分发(旧分配行收口)
-  const dup = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 规格书种类: kind, 责任人: 'tester01' }] })
-  ok(dup.code !== 200 && String(dup.message || '').includes('请勿重复分发'), `⑩-1 已分发种类重复分发被拒(${dup.message})`)
-  const kind2 = ((st1?.data?.kinds) || []).find((k) => k !== kind)
-  const nd = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 规格书种类: kind2, 责任人: 'tester01' }] })
-  docNos.D3 = nd?.data?.created?.[0]?.['单据编号']
-  ok(nd.code === 200 && /^SD-/.test(docNos.D3 || ''), `⑩-2 未分发种类照常放行 ${docNos.D3}`)
-  await btn(api, 'RD_SPEC_DOC', '删除', { 编号: docNos.D2 }) // 草稿直删(作废)
-  const rd = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P2, assigns: [{ 规格书种类: kind, 责任人: 'tester01' }] })
-  docNos.D4 = rd?.data?.created?.[0]?.['单据编号']
-  ok(rd.code === 200 && /^SD-/.test(docNos.D4 || ''), `⑩-3 作废单后同种类重分发 ${docNos.D4}`)
+  // ⑩ 幂等(2026-09-12 用户口径):分发过的单据不再重复分发;他产品单不能跨产品分发;
+  //     作废单不能再分发;未分发候选单照常放行
+  const dup = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 编号: docNos.X1, 责任人: 'tester01' }] })
+  ok(dup.code !== 200 && String(dup.message || '').includes('该规格书已分发'), `⑩-1 已分发单据重复分发被拒(${dup.message})`)
+  const cross = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 编号: docNos.X2, 责任人: 'tester01' }] })
+  ok(cross.code !== 200 && String(cross.message || '').includes('已属于其他产品'), `⑩-2 已绑产品2的单不能分给产品1(${cross.message})`)
+  const nd = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 编号: docNos.X3, 责任人: 'tester01' }] })
+  ok(nd.code === 200, `⑩-3 未分发的候选单照常放行(${docNos.X3})`)
+  await btn(api, 'RD_SPEC_DOC', '删除', { 编号: docNos.X2 }) // 草稿直删(作废)
+  const vd = await btn(sup, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P2, assigns: [{ 编号: docNos.X2, 责任人: 'tester01' }] })
+  ok(vd.code !== 200 && String(vd.message || '').includes('不存在或已作废'), `⑩-4 作废单不能再分发(${vd.message})`)
 
   // ⑪ 清理:作废探针单据(规格书草稿直删;产品信息表已归档 admin 直删)
-  for (const n of [docNos.D1, docNos.D2, docNos.D3, docNos.D4, docNos.BYPASS, docNos.FREE]) {
+  for (const n of [docNos.X1, docNos.X2, docNos.X3, docNos.BYPASS, docNos.FREE]) {
     if (n) await btn(api, 'RD_SPEC_DOC', '删除', { 编号: n })
   }
   for (const n of [docNos.P1, docNos.P2]) {

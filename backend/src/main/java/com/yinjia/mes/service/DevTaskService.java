@@ -203,6 +203,16 @@ public class DevTaskService {
                         + " FROM rd_spec_assign a LEFT JOIN yj_user u ON u.username = a.责任人"
                         + " LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = a.单据编号"
                         + " WHERE a.产品编号 = ? AND ISNULL(a.asp_cancel,'N') <> 'Y' ORDER BY a.id", productCode));
+        // 可分配候选单(2026-09-12 用户口径:分发=把已有单据分给人,不再按种类建单):
+        // 存活、未分配、且 编号为空(普通保存从不写该列)或已等于本产品编号(分发/历史导入盖过章)
+        out.put("docs", jdbc.queryForList(
+                "SELECT h.单据编号, ISNULL(h.规格书种类, N'') AS 规格书种类,"
+                        + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废' WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档'"
+                        + " WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' ELSE N'草稿' END AS status"
+                        + " FROM rd_spec_doc_head h LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = h.单据编号"
+                        + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y' AND (h.编号 IS NULL OR h.编号 = ?)"
+                        + " AND NOT EXISTS (SELECT 1 FROM rd_spec_assign a WHERE a.单据编号 = h.单据编号 AND ISNULL(a.asp_cancel,'N') <> 'Y')"
+                        + " ORDER BY h.id DESC", productCode));
         return out;
     }
 

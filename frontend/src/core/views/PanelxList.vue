@@ -272,7 +272,7 @@
                 class="as-side-btn"
                 v-if="panelCode === 'RD_PROD_INFO' && devDispatch.dispatched"
                 :class="{ disabled: !canSpecDispatch }"
-                :title="canSpecDispatch ? tt('按规格书种类分发责任人并自动创建规格书草稿')
+                :title="canSpecDispatch ? tt('把该产品的规格书单据分发给责任人填写')
                   : (devDispatch.supervisorResolved ? tt('仅总负责人或管理员可分发规格书') : tt('产品信息表「责任人」未匹配到启用账号，任务挂起'))"
                 @click="openSpecAssign"
               >{{ tt('规格书分发') }}</div>
@@ -955,7 +955,7 @@
         </div>
       </div>
     </el-dialog>
-    <!-- 规格书分发弹窗(两级分发第二级):总负责人按 种类+责任人 批量建草稿单 -->
+    <!-- 规格书分发弹窗(两级分发第二级):总负责人把已有规格书单逐张绑定责任人(2026-09-12 改口径,不按种类建单) -->
     <el-dialog v-model="specAssignVisible" :title="tt('规格书分发') + (specAssignStateData?.productName ? ' · ' + specAssignStateData.productName : '')" width="640px" append-to-body>
       <div class="dq-form">
         <div class="dq-row" style="margin-bottom:6px">
@@ -978,17 +978,17 @@
         </table>
         <div v-for="(row, ri) in specAssignRows" :key="ri" class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('新增分发') }}</span>
-          <el-select v-model="row['规格书种类']" style="flex:1" :placeholder="tt('请选择规格书种类')">
-            <el-option v-for="k in specKindsAvail" :key="k" :label="k" :value="k" />
+          <el-select v-model="row['编号']" style="flex:1" filterable :placeholder="tt('请选择规格书单据')">
+            <el-option v-for="d in specDocsAvail" :key="d['单据编号']" :label="specDocLabel(d)" :value="d['单据编号']" />
           </el-select>
           <el-select v-model="row['责任人']" style="flex:1" filterable :placeholder="tt('请选择责任人')">
             <el-option v-for="u in specAssignUsers" :key="u.userName" :label="`${u.realName}（${u.userName}）`" :value="u.userName" />
           </el-select>
           <span style="cursor:pointer;color:#f56c6c;padding:0 4px" @click="specAssignRows.splice(ri, 1)">×</span>
         </div>
-        <!-- 分发过的种类不再重复分发:可选项=字典−活单据已分发−本弹窗已选;全部分发完只留提示 -->
-        <div v-if="specKindsAvail.length" class="as-side-btn" style="display:inline-block" @click="specAssignRows.push({ '规格书种类': '', '责任人': '' })">+ {{ tt('新增分发') }}</div>
-        <div v-else-if="(specAssignStateData?.kinds || []).length" class="mod-log-meta">{{ tt('全部规格书种类均已分发') }}</div>
+        <!-- 分发过的单据不再重复分发:候选=未分配单据(服务端过滤)−本弹窗已选;没有候选只留提示 -->
+        <div v-if="specDocsAvail.length" class="as-side-btn" style="display:inline-block" @click="specAssignRows.push({ '编号': '', '责任人': '' })">+ {{ tt('新增分发') }}</div>
+        <div v-else class="mod-log-meta">{{ tt('该产品暂无可分发的规格书单据') }}</div>
       </div>
       <template #footer>
         <el-button @click="specAssignVisible = false">{{ tt('取消') }}</el-button>
@@ -1846,17 +1846,16 @@ const specAssignStateData = ref(null)
 const specAssignRows = ref([])
 const specAssignUsers = ref([])
 const specAssignBusy = ref(false)
-/** 可分发种类 = 种类字典 − 已分发且单据存活的种类 − 本弹窗各行已选(分发过的不再重复分发) */
-const specKindsAvail = computed(() => {
-  const taken = new Set((specAssignStateData.value?.assigns || [])
-    .filter((a) => a.status !== '已作废')
-    .map((a) => a['规格书种类']))
-  for (const r of specAssignRows.value) {
-    const k = String(r['规格书种类'] || '').trim()
-    if (k) taken.add(k)
-  }
-  return (specAssignStateData.value?.kinds || []).filter((k) => !taken.has(k))
+/** 可分配候选单 = 服务端 docs(存活且未分配的单据) − 本弹窗各行已选(分发过的不再重复分发) */
+const specDocsAvail = computed(() => {
+  const picked = new Set(specAssignRows.value.map((r) => String(r['编号'] || '').trim()).filter(Boolean))
+  return (specAssignStateData.value?.docs || []).filter((d) => !picked.has(d['单据编号']))
 })
+/** 候选单下拉展示:单据编号 · 种类(有则附) · 状态 */
+const specDocLabel = (d) => {
+  const kind = d['规格书种类'] ? ` · ${d['规格书种类']}` : ''
+  return `${d['单据编号']}${kind} · ${tt(String(d.status))}`
+}
 /** 规格书单据编辑闸门:随面板/当前单据加载分配状态(无分配=历史单,不受封锁) */
 async function loadSpecDocAssign() {
   if (panelCode.value !== 'RD_SPEC_DOC') { specDocAssign.value = null; return }
@@ -1874,7 +1873,7 @@ async function openSpecAssign() {
     ])
     specAssignStateData.value = state
     specAssignUsers.value = (Array.isArray(users) ? users : []).filter((u) => String(u.enabled) !== '0' && u.userName)
-    specAssignRows.value = [{ '规格书种类': '', '责任人': '' }]
+    specAssignRows.value = [{ '编号': '', '责任人': '' }]
     specAssignVisible.value = true
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('查询失败'))
@@ -1882,10 +1881,10 @@ async function openSpecAssign() {
 }
 async function submitSpecAssign() {
   const assigns = specAssignRows.value
-    .map((r) => ({ '规格书种类': String(r['规格书种类'] || '').trim(), '责任人': String(r['责任人'] || '').trim() }))
-    .filter((r) => r['规格书种类'] || r['责任人'])
-  if (!assigns.length) return ElMessage.warning(tt('请选择规格书种类') + ' / ' + tt('请选择责任人'))
-  if (assigns.some((r) => !r['规格书种类'])) return ElMessage.warning(tt('请选择规格书种类'))
+    .map((r) => ({ '编号': String(r['编号'] || '').trim(), '责任人': String(r['责任人'] || '').trim() }))
+    .filter((r) => r['编号'] || r['责任人'])
+  if (!assigns.length) return ElMessage.warning(tt('请选择规格书单据') + ' / ' + tt('请选择责任人'))
+  if (assigns.some((r) => !r['编号'])) return ElMessage.warning(tt('请选择规格书单据'))
   if (assigns.some((r) => !r['责任人'])) return ElMessage.warning(tt('请选择责任人'))
   specAssignBusy.value = true
   try {
@@ -1895,8 +1894,8 @@ async function submitSpecAssign() {
       formData: { 编号: cur.value?.['单据编号'], assigns },
       buttonParam: {},
     })
-    const n = (res?.created || assigns).length
-    ElMessage.success(tt('分发成功，已创建 {n} 张规格书草稿').replace('{n}', String(n)))
+    const n = (res?.assigned || assigns).length
+    ElMessage.success(tt('分发成功，已分配 {n} 张规格书').replace('{n}', String(n)))
     specAssignVisible.value = false
     specAssignStateData.value = await engine.specAssignState(devDispatch.productCode)
     specAssignRows.value = []

@@ -98,18 +98,11 @@ public class PxController {
         return ApiResult.ok(devTaskService.annotateBatch(panelCode, list));
     }
 
-    /** 规格书两级分发:某产品的分配总览(总负责人弹窗用;含可用规格书种类,与头字段字典同源) */
+    /** 规格书两级分发:某产品的分配总览(总负责人弹窗用;docs=可分配候选单,2026-09-12 改为绑定已有单据) */
     @GetMapping("/specAssign")
     public ApiResult<Map<String, Object>> specAssignState(@RequestParam String code) {
         perm.requirePanelView("RD_PROD_INFO");
-        Map<String, Object> out = devTaskService.specAssignState(code);
-        List<String> kinds = List.of();
-        try {
-            PanelRegistry.FieldDef f = registry.panel("RD_SPEC_DOC").byLabel("规格书种类");
-            if (f != null && f.dictSql() != null) kinds = configService.dictOptions(f.dictSql());
-        } catch (Exception ignored) { /* 字典取不到时弹窗仅无候选 */ }
-        out.put("kinds", kinds);
-        return ApiResult.ok(out);
+        return ApiResult.ok(devTaskService.specAssignState(code));
     }
 
     /** 规格书两级分发:单张规格书单的分配(编辑闸门/侧栏展示用;hasAssign=false 不受封锁约束) */
