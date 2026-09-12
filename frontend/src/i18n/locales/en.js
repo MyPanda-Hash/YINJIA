@@ -1615,5 +1615,6 @@ export default {
     '直接生成 PDF 文件下载，无需打印机': 'Directly generates a PDF file download - no printer needed',
     '正在生成 PDF…': 'Generating PDF...',
     '未找到可导出的单据': 'No exportable document found',
+    '按纸张实际尺寸单页生成，直接下载，无需打印机': 'Single page at actual sheet size, direct download, no printer needed',
   },
 }

@@ -106,6 +106,24 @@ async function main() {
     const fmtStill = await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent&&d.textContent.indexOf('选择导出格式')>=0});return dlgs.length})()`)
     ok(printed2 === 1 && fmtStill === 0, `⑤ 打印按钮直接打印且不开格式弹窗(printed=${printed2}, 格式弹窗=${fmtStill})`)
     ok(pdfErrs.length === 0, `⑥ 无 console 错误(${pdfErrs.length ? pdfErrs[0] : ''})`)
+    // ⑦ 规格书(复杂纸张:封面/缩放/多页签——曾报 "Unable to find element in cloned iframe" 的场景)
+    await nav(`${BASE}/#/panelx/list/RD_SPEC_DOC`)
+    await sleep(2800)
+    await ev(`(function(){window.__pdf2=null;var oco=URL.createObjectURL;URL.createObjectURL=function(b){try{if(b&&b.size>1000)window.__blob2=b}catch(e){}return oco.apply(this,arguments)};return 1})()`)
+    await ev(`(function(){var b=[].slice.call(document.querySelectorAll('.as-side-btn'));for(var i=0;i<b.length;i++){if((b[i].textContent||'').trim()==='导出'){b[i].click();return 1}}return 0})()`)
+    await sleep(900)
+    await ev(`(function(){var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent});
+      var d=dlgs[dlgs.length-1];var its=[].slice.call(d.querySelectorAll('.efmt-item'));
+      for(var i=0;i<its.length;i++){if((its[i].textContent||'').indexOf('PDF')>=0){its[i].click();return 1}}return 0})()`)
+    let pdf2 = null
+    for (let w = 0; w < 15; w++) {
+      pdf2 = await ev(`(async function(){if(!window.__blob2)return null;
+        var buf=await window.__blob2.arrayBuffer();var u=new Uint8Array(buf);
+        return {name:'spec.pdf',size:buf.byteLength,magic:String.fromCharCode.apply(null,u.slice(0,5))}})()`)
+      if (pdf2) break
+      await sleep(1000)
+    }
+    ok(!!pdf2 && pdf2.magic === '%PDF-' && (pdf2.size || 0) > 20000, `⑦ 规格书导出 PDF 成功(魔数=${pdf2 && pdf2.magic}, ${(((pdf2 && pdf2.size) || 0) / 1024).toFixed(0)}KB, 无 cloned-iframe 报错)`)
   } catch (e) {
     console.error('PROBE ERROR', e); fails.push('probe error: ' + (e && e.message))
   } finally {

@@ -1423,5 +1423,6 @@ export default {
     '直接生成 PDF 文件下载，无需打印机': 'Tạo trực tiếp tệp PDF - không cần máy in',
     '正在生成 PDF…': 'Đang tạo PDF…',
     '未找到可导出的单据': 'Không tìm thấy chứng từ để xuất',
+    '按纸张实际尺寸单页生成，直接下载，无需打印机': 'Một trang theo kích thước thật của tờ, tải trực tiếp, không cần máy in',
   },
 }

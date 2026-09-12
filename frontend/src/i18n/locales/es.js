@@ -1408,5 +1408,6 @@ export default {
     '直接生成 PDF 文件下载，无需打印机': 'Genera directamente un archivo PDF - sin impresora',
     '正在生成 PDF…': 'Generando PDF...',
     '未找到可导出的单据': 'No hay documento para exportar',
+    '按纸张实际尺寸单页生成，直接下载，无需打印机': 'Una página al tamaño real de la hoja, descarga directa, sin impresora',
   },
 }
