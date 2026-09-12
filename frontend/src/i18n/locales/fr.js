@@ -1405,5 +1405,8 @@ export default {
     '头字段键值 + 各明细页签全字段全数据，不受纸张限制': 'Valeurs d\'enete + tous les onglets de detail, champs et donnees complets',
     '已导出': 'Exporté',
     '导出失败': 'Échec de l\'export',
+    '直接生成 PDF 文件下载，无需打印机': 'Genere directement un fichier PDF - sans imprimante',
+    '正在生成 PDF…': 'Generation du PDF...',
+    '未找到可导出的单据': 'Aucun document a exporter',
   },
 }

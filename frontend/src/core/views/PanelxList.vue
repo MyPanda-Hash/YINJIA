@@ -850,7 +850,7 @@
           <span class="efmt-ico">📄</span>
           <div class="efmt-txt">
             <div class="efmt-name">{{ tt('导出 PDF') }}</div>
-            <div class="efmt-desc">{{ tt('打开打印对话框，在“目标打印机”处选择“另存为 PDF”') }}</div>
+            <div class="efmt-desc">{{ tt('直接生成 PDF 文件下载，无需打印机') }}</div>
           </div>
         </div>
         <div class="efmt-item" @click="exportSheetExcel">
@@ -2303,11 +2303,43 @@ function onSideAction(a) {
 
 // ── 文书面板导出:格式选择(PDF / Excel);打印为独立按钮不经过这里 ──
 const exportFmtVisible = ref(false)
-/** 导出 PDF:走浏览器打印对话框(目标选「另存为 PDF」),提示引导 */
-function exportSheetPdf() {
+/** 导出 PDF:浏览器内直接生成 .pdf 下载(html2canvas 截纸张 → jsPDF 按 A4 分页),不弹打印对话框/无需打印机 */
+async function exportSheetPdf() {
   exportFmtVisible.value = false
-  ElMessage.info(tt('PDF 导出将打开打印对话框，请在“目标打印机”处选择“另存为 PDF”'))
-  setTimeout(() => printApprovalSheet(), 350)
+  const el = approvalSheetRef.value?.$el
+  if (!el) return ElMessage.warning(tt('未找到可导出的单据'))
+  const loadingMsg = ElMessage({ message: tt('正在生成 PDF…'), duration: 0 })
+  // 借用打印样式:隐藏 ✎ 字段编辑 / 标准库 / 终止横幅等编辑态元素(no-print)
+  document.body.classList.add('approval-printing')
+  try {
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas'), import('jspdf')])
+    await nextTick()
+    const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true })
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const PW = 210, PH = 297
+    const pageHpx = Math.floor(canvas.width * PH / PW) // 每页对应画布高(px)
+    let y = 0, page = 0
+    while (y < canvas.height) {
+      const h = Math.min(pageHpx, canvas.height - y)
+      const slice = document.createElement('canvas')
+      slice.width = canvas.width
+      slice.height = h
+      slice.getContext('2d').drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h)
+      if (page) pdf.addPage()
+      pdf.addImage(slice.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, PW, h * PW / canvas.width)
+      y += pageHpx
+      page++
+    }
+    const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
+    pdf.save(`${panelName.value}-${no || '导出'}.pdf`)
+    ElMessage.success(tt('已导出') + ' PDF')
+  } catch (e) {
+    console.error('pdf-export failed', e)
+    ElMessage.error(tt('导出失败'))
+  } finally {
+    loadingMsg.close()
+    document.body.classList.remove('approval-printing')
+  }
 }
 /** 导出 Excel(.xlsx):当前单据 头字段键值 + 各明细页签(全字段全数据,不受纸张限制);控制列表走专属导出 */
 async function exportSheetExcel() {

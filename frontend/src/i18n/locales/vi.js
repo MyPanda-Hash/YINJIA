@@ -1420,5 +1420,8 @@ export default {
     '头字段键值 + 各明细页签全字段全数据，不受纸张限制': 'Trường đầu + các tab chi tiết đầy đủ trường và dữ liệu',
     '已导出': 'Đã xuất',
     '导出失败': 'Xuất thất bại',
+    '直接生成 PDF 文件下载，无需打印机': 'Tạo trực tiếp tệp PDF - không cần máy in',
+    '正在生成 PDF…': 'Đang tạo PDF…',
+    '未找到可导出的单据': 'Không tìm thấy chứng từ để xuất',
   },
 }

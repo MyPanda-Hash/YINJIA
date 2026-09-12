@@ -1612,5 +1612,8 @@ export default {
     '头字段键值 + 各明细页签全字段全数据，不受纸张限制': 'Header key-values + all detail tabs with full fields and data, not limited by paper layout',
     '已导出': 'Exported',
     '导出失败': 'Export failed',
+    '直接生成 PDF 文件下载，无需打印机': 'Directly generates a PDF file download - no printer needed',
+    '正在生成 PDF…': 'Generating PDF...',
+    '未找到可导出的单据': 'No exportable document found',
   },
 }

@@ -1405,5 +1405,8 @@ export default {
     '头字段键值 + 各明细页签全字段全数据，不受纸张限制': 'Campos de cabecera + todas las pestanas de detalle con todos los campos y datos',
     '已导出': 'Exportado',
     '导出失败': 'Error al exportar',
+    '直接生成 PDF 文件下载，无需打印机': 'Genera directamente un archivo PDF - sin impresora',
+    '正在生成 PDF…': 'Generando PDF...',
+    '未找到可导出的单据': 'No hay documento para exportar',
   },
 }
