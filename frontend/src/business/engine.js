@@ -273,6 +273,16 @@ export async function rdDevAnnotate(panelCode, productCodes) {
   return unwrap(await request.post('/px/rdDev/annotate', { panelCode, productCodes }))
 }
 
+/** 规格书两级分发:某产品的分配总览(总负责人弹窗;supervisor/assigns/kinds) */
+export async function specAssignState(code) {
+  return unwrap(await request.get('/px/specAssign', { params: { code } }))
+}
+
+/** 规格书两级分发:单张规格书单的分配(编辑闸门;hasAssign=false 不受封锁) */
+export async function specAssignDoc(no) {
+  return unwrap(await request.get('/px/specAssign/doc', { params: { no } }))
+}
+
 /**
  * 按库存状况表口径回填明细现存量：有仓库取仓库库存，无仓库取全部仓库合计。
  * 选择存货后即时调用，避免引用存货档案中的静态值。

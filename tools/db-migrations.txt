@@ -172,3 +172,8 @@ migrate-applicant-lock.sql
 # 🔴 禁止登记:_cleanup-merged-panels-20260911.sql —— 一次性清理脚本(备份并清空被并入面板的旧单据与状态行),
 #    登记进清单 = 每次同步都清业务数据,与 migrate-rd-cleanup.sql / _doc_part3_cleanup.sql 同款先例。
 migrate-merged-panels.sql
+
+# —— 2026-09-12 登记:规格书两级分发(总负责人→责任人) ——
+# 内容:rd_spec_assign 分配表(一单一条有效分配,筛选唯一索引 ux_rd_spec_assign_doc)、
+#      rd_dev_task 补「负责人」列(下发时快照总负责人账号,NULL=挂起待懒重解)。幂等可重跑。
+migrate-rd-spec-assign.sql

@@ -51,6 +51,18 @@ public class MessageService {
     public static final String TERM_APPROVED = "TERM_APPROVED";
     /** 消息码:终止被驳回(任一级) → 申请人 */
     public static final String TERM_REJECTED = "TERM_REJECTED";
+    /** 消息码:删除申请已同意(单据作废) → 删除申请人(2026-09-12 补齐,审批结果此前无通知) */
+    public static final String DELETE_APPROVED = "DELETE_APPROVED";
+    /** 消息码:删除申请被驳回 → 删除申请人(2026-09-12 补齐) */
+    public static final String DELETE_REJECTED = "DELETE_REJECTED";
+    /** 消息码:修改申请已同意(进入修改中) → 修改申请人(2026-09-12 补齐) */
+    public static final String MODIFY_APPROVED = "MODIFY_APPROVED";
+    /** 消息码:修改申请被驳回 → 修改申请人(2026-09-12 补齐) */
+    public static final String MODIFY_REJECTED = "MODIFY_REJECTED";
+    /** 消息码:产品开发已下发 → 总负责人(请用「规格书分发」安排规格书编写) */
+    public static final String SPEC_DISPATCHED = "SPEC_DISPATCHED";
+    /** 消息码:规格书已分发 → 责任人(填写并保存) */
+    public static final String SPEC_ASSIGNED = "SPEC_ASSIGNED";
 
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;
