@@ -1,0 +1,336 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  通用单据报表模板(元数据驱动)  —— 铺开到「除研发管理外」的全部单据面板
+  ============================================================================
+  ⚠ 本文件是**基础版式**,不是某一张单据的版式。绝大多数单据不需要单独做模板。
+
+  为什么需要它:目标面板有 38 张,明细列从 0 列到 22 列不等(采购入库单 22 列、检验记录单
+  3 列、日记录类 0 列),一单一 .jrxml 不现实。做法 = 固定骨架 + 动态明细表:
+
+    ┌ 固定部分(本文件,IT 可直接改) ─────────────────────────────────────────┐
+    │ pageHeader : 公司抬头 / 报表名 / 单据编号·日期·状态·制单人 / 头字段键值网格 │
+    │ pageFooter : 打印时间 + 「第 X 页 / 共 Y 页」                             │
+    │ <style>    : 字体/字号/边框/对齐的**唯一出处**(见下「样式单一出处」)        │
+    └───────────────────────────────────────────────────────────────────────┘
+    ┌ 动态部分(GenericReportSupport 生成) ────────────────────────────────────┐
+    │ detail 带   : 每个「列块」一条带,带里一个 <subreport>(明细子报表)          │
+    │ 明细子报表  : 表头行 + 明细行 + 「明细共 N 行 · M 列」,列名/列宽/对齐由      │
+    │               yj_field(place='detail')的 label/data_type 决定            │
+    └───────────────────────────────────────────────────────────────────────┘
+
+  ⚠ 本文件里没有 detail 带:主报表的 detail 带由 GenericReportSupport.buildMaster()
+    在运行时**拼进来**(列块数决定带数:22 列单据分 2 块 → 2 条带,每块单独成页)。
+    buildMaster() 会从本文件正文里**抽取 <style> 段落**用进生成的报表 —— 所以
+    改样式(字体/字号/边框/表头底色)改这里就够,不用碰 Java。改完重启后端生效。
+
+  参数与字段(name 是契约,由 ReportService/GenericReportSupport 下发):
+    公司名称      公司抬头(默认值见下,改抬头改这里)
+    报表名称      单据名(面板名 / 注册表里的模板名)
+    单据编号/单据日期/单据状态/制单人/打印时间   固定表头信息(已格式化成字符串)
+    头字段标签[]/头字段值[]  java.util.List<String>,固定 15 项(不足补空串),一一对应
+    子报表        GenericReportSupport 生成的明细子报表(JasperReport)
+    $F{块数据}/$F{块标识}/$F{行高}  主数据源每行 = 一个列块的数据源 / 标题 / 行高
+
+  排版约定(JR 6.x 的 XSD 很挑,同类注释见 so_order.jrxml):
+    - reportElement 的 x/y/width/height **只能是整数常量**(实测:写表达式会被 XSD 拒),
+      所以列宽/列位置在生成期算好 —— 见 GenericReportSupport 的版式算法;
+    - 字体/字号/加粗/对齐写在 <style>;textField 的 isBlankWhenNull/pattern/textAdjust
+      是 <textField> 的属性,不是 <reportElement> 的;
+    - 头字段网格固定 3 列 × 5 行 = 15 格:用 printWhenExpression 控制第 N 格是否打印
+      (比动态增删元素稳,且 JR 6 不允许表达式里访问自定义 helper 类);
+    - subreport 的子元素顺序(XSD 强制):reportElement → subreportParameter* →
+      connectionExpression **或** dataSourceExpression → returnValue* → subreportExpression;
+    - 字体一律 NotoSansSC(字体扩展注册、TTF 嵌入 PDF),不要用 Serif/SansSerif 逻辑字体。
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="report_generic" language="java" columnCount="1"
+              pageWidth="842" pageHeight="595" orientation="Landscape"
+              columnWidth="768" leftMargin="37" rightMargin="37" topMargin="24" bottomMargin="22"
+              whenNoDataType="AllSectionsNoDetail"
+              uuid="3f7a91c4-8e5b-4f2a-9d31-7c0b6e2a4d18">
+
+  <property name="net.sf.jasperreports.awt.ignore.missing.font" value="false"/>
+  <property name="net.sf.jasperreports.default.font.name" value="NotoSansSC"/>
+  <property name="net.sf.jasperreports.export.xlsx.detect.cell.type" value="true"/>
+
+  <!-- ======================= 样式(单一出处:Java 会抽取本段复用到生成的报表) ======================= -->
+  <style name="base" isDefault="true" fontName="NotoSansSC" fontSize="9"/>
+  <style name="company" style="base" fontSize="17" isBold="true" hAlign="Center" vAlign="Middle"/>
+  <style name="title" style="base" fontSize="14" isBold="true" hAlign="Center" vAlign="Middle"/>
+  <style name="meta" style="base" fontSize="9" vAlign="Middle"/>
+  <style name="gridLabel" style="base" isBold="true" vAlign="Top"/>
+  <style name="gridValue" style="base" vAlign="Top"/>
+  <style name="pager" style="base" vAlign="Middle"/>
+  <style name="pagerR" style="pager" hAlign="Right"/>
+
+  <!-- ======================= 参数(契约见文件头注释) ======================= -->
+  <parameter name="公司名称" class="java.lang.String" isForPrompting="false">
+    <defaultValueExpression><![CDATA["惠州市银嘉环保科技有限公司"]]></defaultValueExpression>
+  </parameter>
+  <parameter name="报表名称" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="单据编号" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="单据日期" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="单据状态" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="制单人" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="打印时间" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="头字段标签" class="java.util.List" isForPrompting="false"/>
+  <parameter name="头字段值" class="java.util.List" isForPrompting="false"/>
+  <parameter name="子报表" class="java.lang.Object" isForPrompting="false"/>
+  <field name="块数据" class="java.lang.Object"/>
+  <field name="块标识" class="java.lang.String"/>
+  <field name="行高" class="java.lang.Integer"/>
+
+  <!-- ======================= 页眉:抬头 + 报表名 + 单据标识 + 头字段网格 ======================= -->
+  <pageHeader>
+    <band height="112">
+      <textField>
+        <reportElement style="company" x="0" y="0" width="768" height="26"/>
+        <textFieldExpression><![CDATA[$P{公司名称}]]></textFieldExpression>
+      </textField>
+
+      <textField>
+        <reportElement style="title" x="0" y="26" width="768" height="22"/>
+        <textFieldExpression><![CDATA[$P{报表名称}]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true" isStretchWithOverflow="true">
+        <reportElement style="meta" x="0" y="48" width="768" height="15"/>
+        <textFieldExpression><![CDATA["单据编号：" + $P{单据编号}
+          + ($P{单据日期}.isEmpty() ? "" : "　　单据日期：" + $P{单据日期})
+          + ($P{单据状态}.isEmpty() ? "" : "　　单据状态：" + $P{单据状态})
+          + ($P{制单人}.isEmpty() ? "" : "　　制单人：" + $P{制单人})]]></textFieldExpression>
+      </textField>
+
+      <!-- 头字段键值网格(3 列 × 5 行 = 15 格):标签加粗、值自动换行把整行撑高 -->
+      <frame>
+        <reportElement x="0" y="66" width="768" height="46"/>
+        <box>
+          <pen lineWidth="0.5" lineColor="#8A8A8A"/>
+        </box>
+
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="2" y="2" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(0).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(0) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="68" y="2" width="188" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(0).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(0)]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="258" y="2" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(1).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(1) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="324" y="2" width="188" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(1).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(1)]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="514" y="2" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(2).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(2) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="580" y="2" width="186" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(2).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(2)]]></textFieldExpression>
+        </textField>
+
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="2" y="18" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(3).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(3) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="68" y="18" width="188" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(3).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(3)]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="258" y="18" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(4).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(4) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="324" y="18" width="188" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(4).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(4)]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="514" y="18" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(5).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(5) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="580" y="18" width="186" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(5).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(5)]]></textFieldExpression>
+        </textField>
+
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="2" y="34" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(6).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(6) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="68" y="34" width="188" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(6).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(6)]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="258" y="34" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(7).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(7) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="324" y="34" width="188" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(7).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(7)]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="514" y="34" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(8).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(8) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="580" y="34" width="186" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(8).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(8)]]></textFieldExpression>
+        </textField>
+
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="2" y="50" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(9).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(9) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="68" y="50" width="188" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(9).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(9)]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="258" y="50" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(10).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(10) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="324" y="50" width="188" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(10).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(10)]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="514" y="50" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(11).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(11) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="580" y="50" width="186" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(11).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(11)]]></textFieldExpression>
+        </textField>
+
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="2" y="66" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(12).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(12) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="68" y="66" width="188" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(12).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(12)]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="258" y="66" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(13).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(13) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="324" y="66" width="188" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(13).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(13)]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridLabel" x="514" y="66" width="66" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(14).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段标签}.get(14) + "："]]></textFieldExpression>
+        </textField>
+        <textField isStretchWithOverflow="true" isBlankWhenNull="true">
+          <reportElement style="gridValue" x="580" y="66" width="186" height="14">
+            <printWhenExpression><![CDATA[!$P{头字段标签}.get(14).toString().isEmpty()]]></printWhenExpression>
+          </reportElement>
+          <textFieldExpression><![CDATA[$P{头字段值}.get(14)]]></textFieldExpression>
+        </textField>
+      </frame>
+    </band>
+  </pageHeader>
+
+  <!--
+    ======================= 明细表 =======================
+    运行时这里不是空的:GenericReportSupport.buildMaster() 把本文件的 <style> 段复制过来,
+    并为每个「列块」拼一条 detail 带(带里一个 <subreport>,数据源 = $F{块数据})。
+    明细 0 行时子报表不产出内容,detail 带整条不出现 —— 只有头字段的单据照样出图。
+    单块示例(生成结果):
+      <detail>
+        <band height="60">
+          <subreport>
+            <reportElement x="0" y="20" width="768" height="20"/>
+            <subreportParameter name="列标签">…</subreportParameter>
+            <dataSourceExpression><![CDATA[$F{块数据}]]></dataSourceExpression>
+            <subreportExpression class="…JasperReport"><![CDATA[(…JasperReport) $P{子报表}]]></subreportExpression>
+          </subreport>
+        </band>
+      </detail>
+  -->
+
+  <!-- ======================= 页脚:打印时间 + 页码 ======================= -->
+  <pageFooter>
+    <band height="22">
+      <textField isBlankWhenNull="true">
+        <reportElement style="pager" x="0" y="4" width="420" height="14"/>
+        <textFieldExpression><![CDATA["打印时间：" + $P{打印时间}]]></textFieldExpression>
+      </textField>
+      <textField evaluationTime="Now">
+        <reportElement style="pagerR" x="568" y="4" width="52" height="14"/>
+        <textFieldExpression><![CDATA["第 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
+      </textField>
+      <textField evaluationTime="Report">
+        <reportElement style="pager" x="620" y="4" width="148" height="14"/>
+        <textFieldExpression><![CDATA[" / 共 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
+      </textField>
+    </band>
+  </pageFooter>
+</jasperReport>

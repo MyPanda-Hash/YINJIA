@@ -29,20 +29,13 @@
         </span>
         <span v-if="actsOf(g).length > 1" class="tb-caret" @click.stop="toggleGroup(gi)">▼</span>
         <div v-if="openGroup === gi" class="tb-menu">
-          <!-- 下拉排除主按钮（组按钮=第一个 action，下拉只列其余动作，避免「审核」重复） -->
-          <div class="ctx-item" :class="{ disabled: isDisabled(a) }" v-for="a in dropItems(g)" :key="a" @click="onGroupAction(a)">{{ tt(a) }}</div>
+          <!-- 下拉排除主按钮（组按钮=第一个 action，下拉只列其余动作，避免「审核」重复）；
+               「更多」组追加「导出报表」（2026-09-12 从独立工具栏按钮收进下拉：面板有服务端报表
+               模板才出现 —— 登记过精细模板的优先、未登记的单据面板回退通用模板，研发管理与
+               档案/报表面板没有模板，自然不追加） -->
+          <div class="ctx-item" :class="{ disabled: isDisabled(a) }" v-for="a in menuItems(g)" :key="a" @click="onGroupAction(a)">{{ tt(a) }}</div>
         </div>
       </div>
-      <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
-           该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
-      <span
-        v-if="reportTemplates.length"
-        class="tb-main"
-        :title="tt('服务端正式报表：含公司抬头、页眉页脚与页码')"
-        @click.stop="reportVisible = true"
-      >
-        <span class="act-name">{{ tt('导出报表') }}</span>
-      </span>
       <div class="tools-right">
         <template v-if="reportMode">
           <span class="doc-chip">{{ panelName }}</span>
@@ -250,9 +243,7 @@
               <div class="as-side-btn" v-if="isDocArchivePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
               <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
               <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
-              <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
-                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
-              <div v-if="reportTemplates.length" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
+              <!-- 对外正式报表入口 2026-09-12 收进表格上方「更多」下拉(工具栏 menuItems),侧栏不再重复 -->
               <!-- 产品开发下发:仅产品信息表;归档后可点;下发过则置灰显示「已下发」 -->
               <div
                 class="as-side-btn"
@@ -2311,6 +2302,17 @@ function actsOf(g) {
 function dropItems(g) {
   return actsOf(g).slice(1)
 }
+// 工具栏「更多」组下拉 = 组动作 + 「导出报表」（插在「退出」前，仅工具栏注入，右侧栏不受影响）。
+// 显隐口径 = 该面板有服务端报表模板（reportTemplates 非空）——登记过精细模板的优先，
+// 未登记的单据面板由后端回退通用模板；研发管理面板与档案/报表面板没有模板，不追加。
+function menuItems(g) {
+  const items = dropItems(g)
+  if (g.name !== '更多' || !reportTemplates.value.length) return items
+  const out = items.slice()
+  const at = out.indexOf('退出')
+  out.splice(at < 0 ? out.length : at, 0, '导出报表')
+  return out
+}
 function btnName(g) {
   return actsOf(g)[0] || g.name
 }
@@ -2319,6 +2321,11 @@ function toggleGroup(gi) {
 }
 function onGroupAction(a) {
   openGroup.value = -1
+  // 对外正式报表（「更多」下拉项）：打开格式选择弹窗（PDF / 打印预览 / xlsx），不走 onButton 按钮总线
+  if (a === '导出报表') {
+    reportVisible.value = true
+    return
+  }
   // 2026-08-25：灰按钮（如草稿态「生成XX」）点击不执行、不弹提示
   if (isDisabled(a)) return
   onButton(a)

@@ -339,6 +339,44 @@ erp_imp_log/erp_imp_row 通道表定位调整为**审计层**(同步器写批次
 替代按语言加列(label_en/label_ja...)的不可扩展模式。`yj_locale` 为语言注册表(可启用语言列表)。
 机翻兜底:翻译表 miss 时调阿里云翻译(与 OCR 同厂同凭证),结果写回翻译表成为缓存。
 
+### 对外正式报表(Formal Report Export)
+
+**面向公司外部**的正式单据报表:IT 用 JasperReports 写死版式(`.jrxml`),业务在面板上
+只做「选一张单 → 选格式(pdf/xlsx)→ 下载或打印预览」。**本项目采用此含义。**
+
+与既有的「文书面板导出」**不是一回事**,别混:
+
+| | 文书面板导出(既有) | 对外正式报表(本次新增) |
+|---|---|---|
+| 版式来源 | 屏幕上的纸面(所见即所得) | IT 的 `.jrxml` A4 版式(公司抬头/页眉页脚/页码) |
+| 渲染位置 | 浏览器(jsPDF / SheetJS) | 后端(JasperReports) |
+| 适用 | 文书面板(立项申请/数据记录表/产品文件…) | 任意 doc 面板(本期只登记了销售订单) |
+
+关键术语与口径:
+
+- **模板注册表**:`backend/src/main/resources/reports/report-templates.properties`。
+  一行三键 `<code>.panelCode / .name / .file`;**面板没登记就一个模板都没有**,
+  前端「导出报表」入口按「该面板有没有模板」自动显隐(接口 `/api/report/templates?panelCode=`)。
+  加单据 = 放一份 jrxml + 加三行 + 重启后端,前端不用改。
+- **取数同源**:头/明细一律走 `QueryService.loadOneDoc`(不是另写 SQL),
+  所以中文数据键、作废过滤、状态推导与面板列表完全一致。**头字段进报表参数(parameter),
+  明细行进数据源(field)**,两者名字都必须是 `yj_field.label`。
+  ⚠ **label 不等于列名**:`SO_ORDER.部门负责人` 这一列的 label 是「**部门.负责人**」(带点),
+  报表里写成「部门负责人」取不到值、只会打出一片空白(已踩)。
+- **中文字体(TTF 字体扩展)**:PDF 要显示中文必须**嵌入字体**,靠 classpath 下的
+  `jasperreports_extension.properties` + `fonts/noto-sans-sc.xml` + 两份 **TTF**
+  (`NotoSansSC-Regular/Bold`,由 `tools/gen-report-font.py` 从 Noto Sans SC 可变字体
+  instance + 子集化生成,SIL OFL 1.1)。**必须是 TTF(TrueType/glyf 轮廓)**:
+  JasperReports 的 PDF 走 OpenPDF,对 `.otf`/`.ttc`(CFF 轮廓)支持极差,会出方框。
+  字形族名 `NotoSansSC`,报表里 `<style fontName="NotoSansSC">` 引用;4 个字形(normal/bold/
+  italic/boldItalic)必须全注册,缺一个就会回退 Helvetica、中文立刻变方框。
+- **页码「第 X 页 / 共 Y 页」**:同一个 `$V{PAGE_NUMBER}` 两个文本域 ——
+  `evaluationTime="Now"` 打当前页、`="Report"` 打总页数(末页回填,所以每页都对)。
+- **合计位置**:数量/金额/含税金额合计落在 `summary` 带(= 数据尾的全单总计),
+  不是每页小计;单据只有一页时它就在页脚正上方,视觉上与「页脚合计」一致。
+- **单元格会截断**:JR 按 AWT 字宽把超出单元格的文字截断(不换行)。列宽要按
+  "最宽会出现的数字"留量(如数量列 58pt 才容得下 `999,999.99`),否则合计会被吃掉最后一位。
+
 ## 遗留问题(记录在案,未决)
 
 - Element Plus 组件内置文案(日期选择器、分页等)需配 `zhCn`/`en` locale 同步切换

@@ -57,7 +57,7 @@ public class ReportController {
                 : MediaType.APPLICATION_PDF);
         headers.setContentDisposition(ContentDisposition
                 .builder("inline".equalsIgnoreCase(disposition) ? "inline" : "attachment")
-                .filename(service.fileName(code, docNo, format), StandardCharsets.UTF_8).build());
+                .filename(service.fileName(code, panelCode, docNo, format), StandardCharsets.UTF_8).build());
         headers.setContentLength(body.length);
         return ResponseEntity.ok().headers(headers).body(body);
     }
