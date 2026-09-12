@@ -1730,6 +1730,22 @@ public class ButtonService {
             if (enabled == null || enabled == 0)
                 throw new IllegalArgumentException("责任人账号不存在或已停用：" + owner);
         }
+        // 幂等(2026-09-12 用户口径):分发过的种类不再重复分发——活分配且其单据未作废即视为已分发;
+        // 单据作废后同种类允许重新分发(旧分配行在重建时收口)
+        Map<String, String> dispatchedKinds = new LinkedHashMap<>();
+        for (Map<String, Object> row : jdbc.queryForList(
+                "SELECT a.规格书种类, a.单据编号 FROM rd_spec_assign a"
+                        + " LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = a.单据编号"
+                        + " WHERE a.产品编号 = ? AND ISNULL(a.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'",
+                        productCode)) {
+            dispatchedKinds.put(String.valueOf(row.get("规格书种类")), String.valueOf(row.get("单据编号")));
+        }
+        for (Map<String, Object> a : assigns) {
+            String kind = String.valueOf(a.get("规格书种类")).trim();
+            String prev = dispatchedKinds.get(kind);
+            if (prev != null)
+                throw new IllegalArgumentException("该规格书种类已分发，请勿重复分发：" + kind + "（单据 " + prev + "）");
+        }
         // 建单 + 写分配(同一事务)
         PanelRegistry.PanelDef specDef = registry.panel("RD_SPEC_DOC");
         String supervisor = devTaskService.supervisorOf(productCode);
@@ -1738,6 +1754,9 @@ public class ButtonService {
         for (Map<String, Object> a : assigns) {
             String kind = String.valueOf(a.get("规格书种类")).trim();
             String owner = String.valueOf(a.get("责任人")).trim();
+            // 能走到这里说明该种类无"活分配+活单据",残留的旧分配行(单据已作废)收口,保持一产品一种类一条活分配
+            jdbc.update("UPDATE rd_spec_assign SET asp_cancel = 'Y', asp_user2 = ?, asp_time2 = GETDATE()"
+                    + " WHERE 产品编号 = ? AND 规格书种类 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", user, productCode, kind);
             String specNo = formNoService.next(specDef.prefix(), owner);
             Map<String, Object> cols = new LinkedHashMap<>();
             cols.put("单据编号", specNo);

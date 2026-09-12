@@ -979,14 +979,16 @@
         <div v-for="(row, ri) in specAssignRows" :key="ri" class="dq-row" style="align-items:center">
           <span class="dq-label">{{ tt('新增分发') }}</span>
           <el-select v-model="row['规格书种类']" style="flex:1" :placeholder="tt('请选择规格书种类')">
-            <el-option v-for="k in (specAssignStateData?.kinds || [])" :key="k" :label="k" :value="k" />
+            <el-option v-for="k in specKindsAvail" :key="k" :label="k" :value="k" />
           </el-select>
           <el-select v-model="row['责任人']" style="flex:1" filterable :placeholder="tt('请选择责任人')">
             <el-option v-for="u in specAssignUsers" :key="u.userName" :label="`${u.realName}（${u.userName}）`" :value="u.userName" />
           </el-select>
           <span style="cursor:pointer;color:#f56c6c;padding:0 4px" @click="specAssignRows.splice(ri, 1)">×</span>
         </div>
-        <div class="as-side-btn" style="display:inline-block" @click="specAssignRows.push({ '规格书种类': '', '责任人': '' })">+ {{ tt('新增分发') }}</div>
+        <!-- 分发过的种类不再重复分发:可选项=字典−活单据已分发−本弹窗已选;全部分发完只留提示 -->
+        <div v-if="specKindsAvail.length" class="as-side-btn" style="display:inline-block" @click="specAssignRows.push({ '规格书种类': '', '责任人': '' })">+ {{ tt('新增分发') }}</div>
+        <div v-else-if="(specAssignStateData?.kinds || []).length" class="mod-log-meta">{{ tt('全部规格书种类均已分发') }}</div>
       </div>
       <template #footer>
         <el-button @click="specAssignVisible = false">{{ tt('取消') }}</el-button>
@@ -1844,6 +1846,17 @@ const specAssignStateData = ref(null)
 const specAssignRows = ref([])
 const specAssignUsers = ref([])
 const specAssignBusy = ref(false)
+/** 可分发种类 = 种类字典 − 已分发且单据存活的种类 − 本弹窗各行已选(分发过的不再重复分发) */
+const specKindsAvail = computed(() => {
+  const taken = new Set((specAssignStateData.value?.assigns || [])
+    .filter((a) => a.status !== '已作废')
+    .map((a) => a['规格书种类']))
+  for (const r of specAssignRows.value) {
+    const k = String(r['规格书种类'] || '').trim()
+    if (k) taken.add(k)
+  }
+  return (specAssignStateData.value?.kinds || []).filter((k) => !taken.has(k))
+})
 /** 规格书单据编辑闸门:随面板/当前单据加载分配状态(无分配=历史单,不受封锁) */
 async function loadSpecDocAssign() {
   if (panelCode.value !== 'RD_SPEC_DOC') { specDocAssign.value = null; return }

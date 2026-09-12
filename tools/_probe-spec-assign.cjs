@@ -11,7 +11,8 @@
 //   ⑦ 防绕过:以产品码为单号建规格书单 → 403;admin 同操作 → 200(后清理)
 //   ⑧ 不误伤:未下发产品的自由键建单 → 200;未分配单跨用户保存(glm53 存 SPECT2 建的单) → 200
 //   ⑨ specAssign/doc:有分配(hasAssign=true+owner/supervisor)/无分配(hasAssign=false)两态
-//   ⑩ 清理:作废全部探针单据(产品信息表/规格书)+ SQL 侧删分配行/还原账号(见 cleanup SQL)
+//   ⑩ 幂等:同种类重复分发被拒;未分发种类放行;作废单后同种类可重分发(旧分配行收口,SQL 断言)
+//   ⑪ 清理:作废全部探针单据(产品信息表/规格书)+ SQL 侧删分配行/还原账号(见 cleanup SQL)
 // 用法: node tools/_probe-spec-assign.cjs [BASE](默认 http://localhost:8091)
 // 前置: bash 已跑 _probe-spec-assign-prep.sql(tester01 临时启用+SPECT2);结束后跑 cleanup SQL。
 // 单据号落盘 tools/_probe-spec-docs.json 供 bash 侧 sqlcmd 断言。
@@ -133,8 +134,20 @@ async function main() {
   const q9b = await api(`/api/px/specAssign/doc?no=${encodeURIComponent(MARK + '-FREE')}`)
   ok(q9b?.data?.hasAssign === false, `⑨-2 未分配单 hasAssign=false`)
 
-  // ⑩ 清理:作废探针单据(规格书草稿直删;产品信息表已归档 admin 直删)
-  for (const n of [docNos.D1, docNos.D2, docNos.BYPASS, docNos.FREE]) {
+  // ⑩ 幂等(2026-09-12 用户口径):分发过的种类不再重复分发;作废单后同种类可重分发(旧分配行收口)
+  const dup = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 规格书种类: kind, 责任人: 'tester01' }] })
+  ok(dup.code !== 200 && String(dup.message || '').includes('请勿重复分发'), `⑩-1 已分发种类重复分发被拒(${dup.message})`)
+  const kind2 = ((st1?.data?.kinds) || []).find((k) => k !== kind)
+  const nd = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P1, assigns: [{ 规格书种类: kind2, 责任人: 'tester01' }] })
+  docNos.D3 = nd?.data?.created?.[0]?.['单据编号']
+  ok(nd.code === 200 && /^SD-/.test(docNos.D3 || ''), `⑩-2 未分发种类照常放行 ${docNos.D3}`)
+  await btn(api, 'RD_SPEC_DOC', '删除', { 编号: docNos.D2 }) // 草稿直删(作废)
+  const rd = await btn(api, 'RD_PROD_INFO', '规格书分发', { 编号: docNos.P2, assigns: [{ 规格书种类: kind, 责任人: 'tester01' }] })
+  docNos.D4 = rd?.data?.created?.[0]?.['单据编号']
+  ok(rd.code === 200 && /^SD-/.test(docNos.D4 || ''), `⑩-3 作废单后同种类重分发 ${docNos.D4}`)
+
+  // ⑪ 清理:作废探针单据(规格书草稿直删;产品信息表已归档 admin 直删)
+  for (const n of [docNos.D1, docNos.D2, docNos.D3, docNos.D4, docNos.BYPASS, docNos.FREE]) {
     if (n) await btn(api, 'RD_SPEC_DOC', '删除', { 编号: n })
   }
   for (const n of [docNos.P1, docNos.P2]) {

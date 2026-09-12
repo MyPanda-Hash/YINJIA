@@ -1552,6 +1552,8 @@ export default {
     '请至少填写一条分发(规格书种类 + 责任人)': 'Add at least one assignment (spec-doc type + owner)',
     '分发条目缺少「规格书种类」': 'An assignment is missing the spec-doc type',
     '同一请求内规格书种类重复：': 'Duplicate spec-doc type in one request: ',
+    '该规格书种类已分发，请勿重复分发：': 'This spec-doc type has already been dispatched: ',
+    '全部规格书种类均已分发': 'All spec-doc types have been dispatched',
     '责任人账号不存在或已停用：': 'Owner account not found or disabled: ',
     '新的规格书任务': 'New spec-doc task',
     '产品「{productName}（{productCode}）」已下发产品开发，请使用「规格书分发」安排规格书编写。': 'Product development for "{productName} ({productCode})" has been dispatched; use "Dispatch Spec Docs" to arrange spec-doc writing.',
