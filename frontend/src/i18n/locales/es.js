@@ -1397,5 +1397,13 @@ export default {
     '终止审批通过': 'Aprobar término',
     '查询失败': 'Error de consulta',
     '返回列表': 'Volver a la lista',
+    '选择导出格式': 'Elegir formato de exportación',
+    '导出 PDF': 'Exportar PDF',
+    '打开打印对话框，在“目标打印机”处选择“另存为 PDF”': 'Abre el dialogo de impresion: elija "Guardar como PDF" como destino',
+    'PDF 导出将打开打印对话框，请在“目标打印机”处选择“另存为 PDF”': 'La exportacion PDF abre el dialogo de impresion. Elija "Guardar como PDF".',
+    '导出 Excel（.xlsx）': 'Exportar Excel (.xlsx)',
+    '头字段键值 + 各明细页签全字段全数据，不受纸张限制': 'Campos de cabecera + todas las pestanas de detalle con todos los campos y datos',
+    '已导出': 'Exportado',
+    '导出失败': 'Error al exportar',
   },
 }

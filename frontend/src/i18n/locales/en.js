@@ -1604,5 +1604,13 @@ export default {
     '终止审批通过': 'Approve Termination',
     '查询失败': 'Query failed',
     '返回列表': 'Back to list',
+    '选择导出格式': 'Choose Export Format',
+    '导出 PDF': 'Export PDF',
+    '打开打印对话框，在“目标打印机”处选择“另存为 PDF”': 'Opens the print dialog - choose "Save as PDF" as the destination',
+    'PDF 导出将打开打印对话框，请在“目标打印机”处选择“另存为 PDF”': 'PDF export opens the print dialog. Choose "Save as PDF" as the printer destination.',
+    '导出 Excel（.xlsx）': 'Export Excel (.xlsx)',
+    '头字段键值 + 各明细页签全字段全数据，不受纸张限制': 'Header key-values + all detail tabs with full fields and data, not limited by paper layout',
+    '已导出': 'Exported',
+    '导出失败': 'Export failed',
   },
 }

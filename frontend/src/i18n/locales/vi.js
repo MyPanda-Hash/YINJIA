@@ -1412,5 +1412,13 @@ export default {
     '查看': 'Xem',
     '查询失败': 'Truy vấn thất bại',
     '返回列表': 'Về danh sách',
+    '选择导出格式': 'Chọn định dạng xuất',
+    '导出 PDF': 'Xuất PDF',
+    '打开打印对话框，在“目标打印机”处选择“另存为 PDF”': 'Mở hộp thoại in — chọn «Lưu dưới dạng PDF»',
+    'PDF 导出将打开打印对话框，请在“目标打印机”处选择“另存为 PDF”': 'Xuất PDF sẽ mở hộp thoại in. Hãy chọn «Lưu dưới dạng PDF».',
+    '导出 Excel（.xlsx）': 'Xuất Excel (.xlsx)',
+    '头字段键值 + 各明细页签全字段全数据，不受纸张限制': 'Trường đầu + các tab chi tiết đầy đủ trường và dữ liệu',
+    '已导出': 'Đã xuất',
+    '导出失败': 'Xuất thất bại',
   },
 }

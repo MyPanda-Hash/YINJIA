@@ -238,6 +238,8 @@
                 </div>
               </div>
               <div class="as-side-btn" v-if="isDocArchivePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
+              <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
+              <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
               <!-- 产品开发下发:仅产品信息表;归档后可点;下发过则置灰显示「已下发」 -->
               <div
                 class="as-side-btn"
@@ -838,6 +840,29 @@
       </div>
       <template #footer>
         <el-button @click="dataSheetsVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ═══ 文书面板导出:格式选择(打印按钮独立,导出走这里:PDF/Excel) ═══ -->
+    <el-dialog v-model="exportFmtVisible" :title="tt('选择导出格式')" width="380px" append-to-body>
+      <div class="efmt-list">
+        <div class="efmt-item" @click="exportSheetPdf">
+          <span class="efmt-ico">📄</span>
+          <div class="efmt-txt">
+            <div class="efmt-name">{{ tt('导出 PDF') }}</div>
+            <div class="efmt-desc">{{ tt('打开打印对话框，在“目标打印机”处选择“另存为 PDF”') }}</div>
+          </div>
+        </div>
+        <div class="efmt-item" @click="exportSheetExcel">
+          <span class="efmt-ico">📊</span>
+          <div class="efmt-txt">
+            <div class="efmt-name">{{ tt('导出 Excel（.xlsx）') }}</div>
+            <div class="efmt-desc">{{ tt('头字段键值 + 各明细页签全字段全数据，不受纸张限制') }}</div>
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="exportFmtVisible = false">{{ tt('取消') }}</el-button>
       </template>
     </el-dialog>
 
@@ -2266,21 +2291,69 @@ function pickDelAction(a) {
   onSideAction(a)
 }
 function onSideAction(a) {
-  // 导出:控制列表=完整 Excel(全字段+全数据);其它文书面板=整张打印(可存 PDF)
+  // 导出:文书面板=选择格式导出(PDF/Excel 分离,打印按钮独立);控制列表=完整 Excel(全字段+全数据)
   if (isApprovalDoc.value && a === '导出') {
-    if (panelCode.value === 'RD_PROGRESS') {
-      const sheet = approvalSheetRef.value
-      if (sheet && typeof sheet.exportProgressExcel === 'function') {
-        sheet.exportProgressExcel()
-        return
-      }
-    }
-    printApprovalSheet()
+    exportFmtVisible.value = true
     return
   }
   // 删除确认与整单语义统一在 onButton(isApprovalDoc 分支)处理
   if (isDisabled(a)) return
   onButton(a)
+}
+
+// ── 文书面板导出:格式选择(PDF / Excel);打印为独立按钮不经过这里 ──
+const exportFmtVisible = ref(false)
+/** 导出 PDF:走浏览器打印对话框(目标选「另存为 PDF」),提示引导 */
+function exportSheetPdf() {
+  exportFmtVisible.value = false
+  ElMessage.info(tt('PDF 导出将打开打印对话框，请在“目标打印机”处选择“另存为 PDF”'))
+  setTimeout(() => printApprovalSheet(), 350)
+}
+/** 导出 Excel(.xlsx):当前单据 头字段键值 + 各明细页签(全字段全数据,不受纸张限制);控制列表走专属导出 */
+async function exportSheetExcel() {
+  exportFmtVisible.value = false
+  if (panelCode.value === 'RD_PROGRESS') {
+    const sheet = approvalSheetRef.value
+    if (sheet && typeof sheet.exportProgressExcel === 'function') { sheet.exportProgressExcel(); return }
+  }
+  try {
+    const XLSX = await import('xlsx')
+    const head = cur.value || {}
+    const no = head['单据编号'] || head['编号'] || ''
+    const name = String(panelName.value || panelCode.value)
+    const aoa = [
+      [`${name}${no ? '　' + no : ''}`],
+      [`惠州市银嘉环保科技有限公司　　单据编号：${no || ''}　　单据状态：${tt(String(head['单据状态'] || ''))}`],
+      [],
+    ]
+    // 头字段键值(显示名=别名优先)
+    const sysKeys = new Set(['编号', '单据状态', 'saved', 'detail', '审核人', '审核时间', '审批状态', '提交人', '提交时间'])
+    for (const f of headerFields.value || []) {
+      const k = headerFieldKey(f)
+      if (sysKeys.has(k)) continue
+      aoa.push([headerFieldLabel(f) || k, String(head[k] ?? '')])
+    }
+    aoa.push([])
+    // 各明细页签(全字段全数据;隐藏列略)
+    const tabs = cfgCache.value?.detail?.tabs || []
+    for (const t of tabs) {
+      const rows = (head?.detail?.[t.key]) || []
+      if (!Array.isArray(rows) || !rows.length) continue
+      const cols = (t.fields || []).filter((f) => !f.hidden && (f.dataName || f.code))
+      aoa.push([`${t.label || t.key}（${rows.length} ${tt('行')}）`])
+      aoa.push(cols.map((f) => f.displayName || f.dataName || f.code))
+      for (const r of rows) aoa.push(cols.map((f) => String(r[f.dataName || f.code] ?? '')))
+      aoa.push([])
+    }
+    const ws = XLSX.utils.aoa_to_sheet(aoa)
+    ws['!cols'] = [{ wch: 24 }, { wch: 36 }, { wch: 18 }, { wch: 18 }]
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, (name || '单据').slice(0, 28))
+    XLSX.writeFile(wb, `${name}-${no || '导出'}.xlsx`)
+    ElMessage.success(tt('已导出') + ' Excel')
+  } catch (e) {
+    ElMessage.error(tt('导出失败'))
+  }
 }
 async function printApprovalSheet() {
   if (!approvalSheetRef.value) return
@@ -4417,6 +4490,17 @@ onUnmounted(() => {
   padding: 8px 0;
 }
 /* 数据记录表单据弹窗:选取列表(行可点) + 查看视图顶栏(返回列表/胶囊快捷切换) + 纸张滚动区 */
+/* 导出格式选择弹窗 */
+.efmt-list { display: flex; flex-direction: column; gap: 8px; }
+.efmt-item {
+  display: flex; align-items: center; gap: 12px;
+  border: 1px solid #d4e4f1; border-radius: 6px; padding: 10px 14px;
+  cursor: pointer; background: #fff;
+}
+.efmt-item:hover { background: #f0f7ff; border-color: #8fb4e0; }
+.efmt-ico { font-size: 22px; }
+.efmt-name { font-size: 14px; font-weight: 600; color: #1e5a8a; }
+.efmt-desc { font-size: 12px; color: #8ba6bd; margin-top: 2px; }
 .ds-back {
   color: #0d5bd3;
   cursor: pointer;

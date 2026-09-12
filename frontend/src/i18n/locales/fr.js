@@ -1397,5 +1397,13 @@ export default {
     '终止审批通过': 'Approuver l\'arrêt',
     '查询失败': 'Échec de la requête',
     '返回列表': 'Retour à la liste',
+    '选择导出格式': 'Choisir le format d\'export',
+    '导出 PDF': 'Exporter en PDF',
+    '打开打印对话框，在“目标打印机”处选择“另存为 PDF”': 'Ouvre la boite d\'impression - choisissez « Enregistrer au format PDF »',
+    'PDF 导出将打开打印对话框，请在“目标打印机”处选择“另存为 PDF”': 'L\'export PDF ouvre la boite d\'impression. Choisissez « Enregistrer au format PDF ».',
+    '导出 Excel（.xlsx）': 'Exporter Excel (.xlsx)',
+    '头字段键值 + 各明细页签全字段全数据，不受纸张限制': 'Valeurs d\'enete + tous les onglets de detail, champs et donnees complets',
+    '已导出': 'Exporté',
+    '导出失败': 'Échec de l\'export',
   },
 }
