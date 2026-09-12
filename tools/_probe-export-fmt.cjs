@@ -68,9 +68,10 @@ async function main() {
     ok(typeof dl === 'string' && dl.endsWith('.xlsx') && dl.includes('产品信息表'), `③ 导出 Excel 生成下载(${dl})`)
     // ④ PDF:直接生成 .pdf 下载(无打印对话框):拦截锚点下载,取 blob 验 %PDF 魔数;window.print 不被调
     await ev(`(function(){window.__printed=0;window.print=function(){window.__printed=1};
-      window.__pdf=null;window.__blob=null;
+      window.__pdf=null;window.__blob=null;window.__head='';
       // jsPDF 4.x:URL.createObjectURL(blob)+anchor.dispatchEvent,revoke 极快 → 在 createObjectURL 截 Blob 本体
-      var oco=URL.createObjectURL;URL.createObjectURL=function(b){try{if(b&&b.size>1000)window.__blob=b}catch(e){}return oco.apply(this,arguments)};
+      var oco=URL.createObjectURL;URL.createObjectURL=function(b){try{if(b&&b.size>1000){window.__blob=b;
+        b.slice(0,4000).text().then(function(t){window.__head=t})}}catch(e){}return oco.apply(this,arguments)};
       var od=EventTarget.prototype.dispatchEvent;EventTarget.prototype.dispatchEvent=function(e){
         if(this&&this.download&&/\\.pdf$/.test(this.download||'')&&window.__blob){
           var nm=this.download;window.__blob.arrayBuffer().then(function(buf){
@@ -95,6 +96,13 @@ async function main() {
     const printedPdf = await ev('window.__printed')
     ok(!!pdf && /\.pdf$/.test(pdf.name || ''), `④-1 直接下载 PDF 文件(${pdf && pdf.name})`)
     ok(!!pdf && pdf.magic === '%PDF-' && (pdf.size || 0) > 20000, `④-2 内容为有效 PDF(魔数=${pdf && pdf.magic}, ${(pdf && pdf.size / 1024 || 0).toFixed(0)}KB)`)
+    // 页面尺寸校验:MediaBox(pt)应≈纸px×0.75(jsPDF px 巨页 bug 的回归断言)
+    let mbox = null
+    for (let w2 = 0; w2 < 8; w2++) { mbox = await ev('(window.__head||"").match(/MediaBox\\[?\\s*\\[?\\s*0\\s+0\\s+([\\d.]+)\\s+([\\d.]+)/)&&[Number(RegExp.$1),Number(RegExp.$2)]'); if (mbox) break; await sleep(500) }
+    const paper = await ev(`(function(){var el=document.querySelector('.approval-layout .record-sheet')||document.querySelector('.approval-layout .approval-sheet');
+      return el?Math.max(el.scrollWidth,el.offsetWidth):0})()`)
+    const expectPt = Math.round(Number(paper || 0) * 0.75)
+    ok(!!mbox && Math.abs(mbox[0] - expectPt) <= 3, `④-4 页宽=纸张物理尺寸(MediaBox=${mbox && mbox[0]}pt ≈ ${expectPt}pt, ${mbox ? (mbox[0] / 72 * 25.4).toFixed(0) : '?'}mm)`)
     ok(printedPdf === 0, `④-3 未调用打印对话框(printed=${printedPdf})`)
     console.log('pdf-export 日志:', errs.filter((x) => x.startsWith('log: [pdf')).join(' | ') || '(无)')
     const pdfErrs = errs.filter((x) => !x.startsWith('log: [pdf'))

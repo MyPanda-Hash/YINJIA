@@ -2386,10 +2386,13 @@ async function exportSheetPdf() {
       // 隐藏编辑态元素(字段编辑/标准库/终止横幅等),与打印口径一致
       filter: (node) => !(node instanceof HTMLElement && node.classList?.contains?.('no-print')),
     })
-    const w = w0 * scale
-    const h = h0 * scale
-    const pdf = new jsPDF({ orientation: 'p', unit: 'px', format: [w, h], compress: true })
-    pdf.addImage(dataUrl, 'PNG', 0, 0, w, h)
+    // 页面尺寸用 mm + 自算 96dpi 换算(1px=25.4/96mm):jsPDF 的 px 单位换算因子与 CSS 不一致,
+    // 会标出 598×980mm 巨页、内容只占一部分(边框缩成发丝看不见)——mm 直算保证页面=纸张真实物理尺寸
+    const MM = 25.4 / 96
+    const pw = w0 * MM
+    const ph = h0 * MM
+    const pdf = new jsPDF({ orientation: pw > ph ? 'l' : 'p', unit: 'mm', format: [pw, ph], compress: true })
+    pdf.addImage(dataUrl, 'PNG', 0, 0, pw, ph)
     const no = cur.value?.['单据编号'] || cur.value?.['编号'] || ''
     pdf.save(`${panelName.value}-${no || '导出'}.pdf`)
     ElMessage.success(tt('已导出') + ' PDF')
