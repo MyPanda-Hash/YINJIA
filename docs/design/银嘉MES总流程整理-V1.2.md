@@ -118,7 +118,7 @@ ERP资料导入 → 基础资料/BOM → 采购单(ERP里输入,自动导入MES)
 
 来源:微信目录 `生产相关表格和生产排单表/` 下两份 Excel(公司真实单据,开发 1:1 依据):
 `排单计划表格.xlsx`(成型排单计划 sheet)与 `生产相关表格文件.xlsx`(29 份单据照片,
-图片提取至 `tools/_flow-v12/forms-images/`(压缩入库),原图 `forms-images-full/`(本地保留,git 不跟踪))。
+图片提取至 `tools/archive/_flow-v12/forms-images/`(压缩入库),原图 `tools/archive/_flow-v12/forms-images-full/`(本地保留,git 不跟踪))。
 
 ### 8.1 排单计划表格(工单排产 #7 的真实字段)
 

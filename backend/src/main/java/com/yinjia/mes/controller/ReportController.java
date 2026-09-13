@@ -1,6 +1,7 @@
 package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
+import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.ReportService;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -28,14 +29,17 @@ import java.util.Map;
 public class ReportController {
 
     private final ReportService service;
+    private final PanelPermissionService perm;
 
-    public ReportController(ReportService service) {
+    public ReportController(ReportService service, PanelPermissionService perm) {
         this.service = service;
+        this.perm = perm;
     }
 
     /** 可用报表模板;不给 panelCode 返回全部(便于排查"为什么面板上没有入口") */
     @GetMapping("/templates")
     public ApiResult<List<Map<String, Object>>> templates(@RequestParam(required = false) String panelCode) {
+        if (panelCode != null && !panelCode.isBlank()) perm.requirePanelView(panelCode);
         return ApiResult.ok(service.templateList(panelCode));
     }
 
@@ -49,6 +53,8 @@ public class ReportController {
                                          @RequestParam String docNo,
                                          @RequestParam(defaultValue = "pdf") String format,
                                          @RequestParam(defaultValue = "attachment") String disposition) {
+        // 对外正式文件按面板查看权限校验(2026-09-12):无该面板 view 的角色不可导出单据内容
+        if (panelCode != null && !panelCode.isBlank()) perm.requirePanelView(panelCode);
         byte[] body = service.export(code, panelCode, docNo, format);
         boolean xlsx = "xlsx".equalsIgnoreCase(format);
         HttpHeaders headers = new HttpHeaders();

@@ -8,11 +8,11 @@ rem ---- JDK 探测: JAVA_HOME -> 常见安装目录 -> PATH ----
 if not defined JAVA_HOME goto :jdk_scan
 if exist "%JAVA_HOME%\bin\java.exe" goto :jdk_ok
 :jdk_scan
-for %%D in ("C:\Program Files\Java\jdk-26.0.2" "D:\Program Files\Java\jdk-26.0.2" "D:\Program Files\Java\jdk-24" "C:\Program Files\Java\jdk-17") do (
+for %%D in ("C:\Program Files\Java\jdk-25" "D:\Program Files\Java\jdk-25" "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2") do (
   if exist "%%~D\bin\java.exe" ( set "JAVA_HOME=%%~D" & goto :jdk_ok )
 )
 where java >nul 2>nul && goto :jdk_ok
-echo [错误] 未找到 JDK(需要 17+)
+echo [错误] 未找到 JDK 25
 exit /b 1
 :jdk_ok
 

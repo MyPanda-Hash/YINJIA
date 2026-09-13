@@ -22,7 +22,7 @@ net start MSSQLSERVER /m
 echo [3/5] Granting db_ddladmin to yinjia (JDBC NTLM)...
 set ADMINPW=Yin#Admin#2026xQ
 if not "%~1"=="" set ADMINPW=%~1
-java -cp ".m2-repo\com\microsoft\sqlserver\mssql-jdbc\12.8.1.jre11\mssql-jdbc-12.8.1.jre11.jar" tools\_RunSql.java - --grant-only --adminpw "%ADMINPW%"
+java -cp ".m2-repo\com\microsoft\sqlserver\mssql-jdbc\12.8.2.jre11\mssql-jdbc-12.8.2.jre11.jar" tools\_RunSql.java - --grant-only --adminpw "%ADMINPW%"
 if not errorlevel 2 goto :granted
 
 echo JDBC NTLM failed - trying .NET SqlClient fallback (non-ODBC, still single-user)...

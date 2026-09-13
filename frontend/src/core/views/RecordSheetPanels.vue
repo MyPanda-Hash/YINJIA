@@ -916,7 +916,7 @@ async function openLib(dt) {
   const flat = Array.isArray(lib)
   if (flat || cfg.value?.testLib) {
     // 检验项目标准库 = yj_std_lib **唯一真源**(内置 26 组/48 子项+必测/型式种子见
-    // tools/gen-testlib-seed.cjs;**两个面板各用各的库,互不相通**:规格书(分组形态)读写
+    // tools/gen/gen-testlib-seed.cjs;**两个面板各用各的库,互不相通**:规格书(分组形态)读写
     // spec.test,出货检验计划表(扁平形态)读写 insp.plan 且只取本表区(item_code)的条目)。
     // all=1 连停用条目一起取回:停用条目灰显划线、不可勾选、可「恢复启用」——
     // 与 StdLibManager 同款维护能力(编辑/停用/恢复启用),改库不污染已录入单据。

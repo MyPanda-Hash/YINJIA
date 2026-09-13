@@ -1,4 +1,4 @@
-// 规格书检验标准库(分组)——由 tools/gen-spec-testlib.cjs 从《测试项目汇总.xlsx》生成(勿手改)
+// 规格书检验标准库(分组)——由 tools/gen/gen-spec-testlib.cjs 从《测试项目汇总.xlsx》生成(勿手改)
 // {name: 组名, subs: [{name: 子项目(单子项组为空), req: 检验要求(可多行), method: 检验方法, basis: 检验依据}]}
 export const SPEC_TEST_LIB = [
   {

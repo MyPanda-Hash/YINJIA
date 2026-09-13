@@ -42,7 +42,7 @@ Write-Host '[2/4] static 同步 OK'
 # ---------- 3/4 Maven 打包 ----------
 $env:YINJIA_M2_REPO = "$root\.m2-repo"
 if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME\bin\java.exe")) {
-  foreach ($cand in @('D:\Program Files\Java\jdk-24', 'C:\Program Files\Java\jdk-17')) {
+  foreach ($cand in @('C:\Program Files\Java\jdk-25', 'D:\Program Files\Java\jdk-25', "$env:USERPROFILE\.jdk\jdk-25\jdk-25.0.2")) {
     if (Test-Path "$cand\bin\java.exe") { $env:JAVA_HOME = $cand; break }
   }
 }
