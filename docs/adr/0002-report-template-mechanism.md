@@ -16,3 +16,6 @@
   - jrxml 内字段名/参数名必须等于 yj_field.label 中文——取数契约与 ADR-0001 同源，永不翻译。
   - 导出权限=面板 view（不变）；模板管理权限=仅 admin。
   - 代价：jrxml 为文本存储，模板质量依赖 Jaspersoft Studio 编写规范；无网页拖拽设计体验（明确放弃）。
+- 复审（2026-09-12）：曾评估「内嵌 Jaspersoft Studio 设计」——其本体为 Eclipse 桌面程序（SWT），
+  技术上无法嵌入浏览器；官方 Web 设计器仅存在于商业版 JasperReports Server。确认维持
+  「桌面 Studio 设计 → 模板管理弹窗上传」通道，不引入 Web 设计器、不引入第三方报表组件。
