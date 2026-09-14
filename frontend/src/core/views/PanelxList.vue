@@ -1543,7 +1543,7 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
 // 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
-const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审']
+const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出'] // 刷新=整页重载/退出=关页签,文书侧栏无意义(2026-09-12,2026-09-14 复确认)
 // 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
 const openDelMenu = ref(false)
 
