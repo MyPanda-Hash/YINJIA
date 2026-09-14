@@ -153,15 +153,14 @@
             <span class="as-side-toggle">{{ sideCollapsed ? '◀' : '▶' }}</span>
           </div>
           <template v-if="!sideCollapsed">
-            <div class="as-side-status-row">
+            <div class="as-side-nav">
               <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
-            </div>
-            <div class="as-side-pager">
-              <span class="page-btn" :title="tt('首页')" @click="pageFirst">◁</span>
-              <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
-              <span class="page-no">{{ pageText(curNo, total, '张') }}</span>
-              <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
-              <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
+              <span v-else class="doc-status none">—</span>
+              <span class="as-side-pager">
+                <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
+                <span class="page-no" :title="tt('回第一张')" @click="pageFirst">{{ pageText(curNo, total, '') }}</span>
+                <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
+              </span>
             </div>
             <!-- ═══ 模糊搜索态:字段+内容条件行 → 查找 → 结果清单(点行即切换查看) ═══ -->
             <div v-if="fuzzyMode" class="fuzzy-panel">
@@ -239,14 +238,16 @@
               </div>
             </div>
             <div v-else class="as-side-btns">
+              <div class="as-side-section">{{ tt('查找') }}</div>
               <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板) -->
               <div class="as-side-btn" @click="docQueryVisible = true">{{ tt('查询单据') }}</div>
               <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单 -->
               <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
               <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果 -->
               <div class="as-side-btn" @click="openDocPreview">{{ tt('单据预览') }}</div>
+              <div class="as-side-section">{{ tt('单据操作') }}</div>
               <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回);删除申请中出「撤回删除申请」(卡死单据出口) -->
-              <div class="as-side-del" v-if="isApprovalDoc">
+              <div class="as-side-del danger" v-if="isApprovalDoc">
                 <div class="as-side-btn-row">
                   <div class="as-side-btn" style="flex: 1" @click="onSideAction('删除')">{{ tt('删除') }}</div>
                   <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openDelMenu = !openDelMenu">▼</div>
@@ -254,10 +255,10 @@
                 <!-- 删除申请中:申请提交后无人审批会卡死(不可编辑也无审批入口)——发起人本人或审批人可撤回 -->
                 <div v-if="curDocStatus === '删除申请中'" class="as-side-btn" @click="pickDelAction('撤回删除申请')">{{ tt('撤回删除申请') }}</div>
                 <div v-if="openDelMenu" class="as-side-menu" @click.stop>
-                  <div class="as-side-menu-item" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
+                  <div class="as-side-menu-item danger" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
                   <template v-if="canApproveHere()">
-                    <div class="as-side-menu-item" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
-                    <div class="as-side-menu-item" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
+                    <div class="as-side-menu-item danger" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
+                    <div class="as-side-menu-item danger" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
                   </template>
                 </div>
               </div>
@@ -276,7 +277,7 @@
                 <div v-if="curDocStatus === '修改中'" class="as-side-btn" @click="pickModAction('提交审批')">{{ tt('提交审批') }}</div>
                 <!-- 修改申请中:同删除申请,卡死时由发起人本人或审批人撤回 -->
                 <div v-if="curDocStatus === '修改申请中'" class="as-side-btn" @click="pickModAction('撤回修改申请')">{{ tt('撤回修改申请') }}</div>
-                <div v-if="openModMenu" class="as-side-menu" @click.stop>
+                <div v-if="openModMenu" class="as-side-menu flip-up" @click.stop>
                   <template v-if="canApproveHere()">
                     <template v-if="curDocStatus === '修改申请中'">
                       <div class="as-side-menu-item" @click="pickModAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
@@ -291,6 +292,7 @@
                 </div>
               </div>
               <div class="as-side-btn" v-if="isDocArchivePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
+              <div class="as-side-section">{{ tt('文档输出') }}</div>
               <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
               <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
               <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
@@ -4845,7 +4847,7 @@ onUnmounted(() => {
 }
 .toolbar-query-btn:hover {
   background: #e7eef8;
-  color: #0d5bd3;
+  color: #2f4d75;
 }
 .tb-group {
   display: inline-flex;
@@ -4881,7 +4883,7 @@ onUnmounted(() => {
   user-select: none;
 }
 .tb-main:hover {
-  color: #0d5bd3;
+  color: #2f4d75;
   background: #f0f5ff;
 }
 .tb-main.disabled {
@@ -4910,20 +4912,20 @@ onUnmounted(() => {
 }
 .doc-chip {
   font-size: 12px;
-  color: #1c4f8a;
+  color: #46586e;
   font-weight: 600;
   margin-right: 6px;
 }
 .doc-status {
   font-size: 12px;
   padding: 1px 8px;
-  border-radius: 10px;
+  border-radius: 8px;
   margin-right: 6px;
 }
 .doc-cat {
   font-size: 12px;
   padding: 1px 8px;
-  border-radius: 10px;
+  border-radius: 8px;
   margin-right: 6px;
   color: #7c3aed;
   border: 1px solid #ddd6fe;
@@ -4937,7 +4939,7 @@ onUnmounted(() => {
 }
 .doc-status.生产中,
 .doc-status.审批中 {
-  color: #0d5bd3;
+  color: #2f4d75;
   border: 1px solid #bcd2f5;
   background: #f0f6ff;
 }
@@ -4964,7 +4966,7 @@ onUnmounted(() => {
 }
 .doc-status.终止审批中（立项人）,
 .doc-status.终止审批中（管理员） {
-  color: #0d5bd3;
+  color: #2f4d75;
   border: 1px solid #bcd2f5;
   background: #f0f6ff;
 }
@@ -5064,7 +5066,7 @@ onUnmounted(() => {
 .efmt-name { font-size: 14px; font-weight: 600; color: #1e5a8a; }
 .efmt-desc { font-size: 12px; color: #8ba6bd; margin-top: 2px; }
 .ds-back {
-  color: #0d5bd3;
+  color: #2f4d75;
   cursor: pointer;
   font-size: 13px;
   flex: none;
@@ -5084,7 +5086,7 @@ onUnmounted(() => {
 .ds-pill {
   border: 1px solid #bcd2f5;
   background: #f0f6ff;
-  color: #1c4f8a;
+  color: #46586e;
   border-radius: 12px;
   padding: 2px 12px;
   font-size: 12.5px;
@@ -5098,7 +5100,7 @@ onUnmounted(() => {
   border-color: #1c4f8a;
 }
 .ds-jump {
-  color: #0d5bd3;
+  color: #2f4d75;
   font-size: 12.5px;
   cursor: pointer;
 }
@@ -5161,7 +5163,7 @@ onUnmounted(() => {
 }
 .page-btn:hover {
   border-color: #0d5bd3;
-  color: #0d5bd3;
+  color: #2f4d75;
 }
 .page-no {
   padding: 0 6px;
@@ -5195,9 +5197,9 @@ onUnmounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   background: #fff;
-  border: 1px solid #d9dee7;
+  border: 1px solid #e2e6ec;
   border-radius: 4px;
-  box-shadow: none;
+  box-shadow: 0 1px 2px rgba(52, 64, 84, 0.04), 0 4px 14px rgba(52, 64, 84, 0.06);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -5208,8 +5210,8 @@ onUnmounted(() => {
   width: 34px;
 }
 .as-side-title {
-  background: #f2f4f7;
-  color: #303133;
+  background: #f5f6f8;
+  color: #3d4756;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 1px;
@@ -5218,7 +5220,7 @@ onUnmounted(() => {
   justify-content: space-between;
   padding: 8px 10px;
   cursor: pointer;
-  border-bottom: 1px solid #d9dee7;
+  border-bottom: 1px solid #e2e6ec;
   user-select: none;
 }
 .approval-side.collapsed .as-side-title {
@@ -5251,8 +5253,8 @@ onUnmounted(() => {
   color: #44608a;
 }
 .approval-side .page-btn:hover {
-  border-color: #2f6db8;
-  background: #eaf3ff;
+  border-color: #b9c9dc;
+  background: #f2f6fa;
 }
 .as-side-btns {
   display: flex;
@@ -5264,10 +5266,10 @@ onUnmounted(() => {
   display: block;
   width: 100%;
   padding: 7px 10px;
-  border: 1px solid #d9dee7;
+  border: 1px solid #e2e6ec;
   border-radius: 4px;
   background: #fff;
-  color: #1c4f8a;
+  color: #46586e;
   font-size: 12.5px;
   font-weight: 600;
   text-align: center;
@@ -5276,20 +5278,20 @@ onUnmounted(() => {
   transition: all 0.15s ease;
 }
 .as-side-btn:hover {
-  background: #eef4ff;
-  border-color: #8fb4e0;
-  color: #0d5bd3;
+  background: #f2f6fa;
+  border-color: #b9c9dc;
+  color: #2f4d75;
 }
 .as-side-btn.sub {
   background: transparent;
   border: none;
-  color: #66788e;
+  color: #6b7a8d;
   font-size: 12px;
   font-weight: 500;
   padding: 4px 10px;
 }
 .as-side-btn.sub:hover {
-  background: #eef4ff;
+  background: #f2f6fa;
 }
 .as-side-btn.disabled {
   color: #b9c2ce;
@@ -5316,10 +5318,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #cfe0f2;
-  border-radius: 9px;
+  border: 1px solid #dfe3ea;
+  border-radius: 6px;
   background: #fff;
-  color: #1c4f8a;
+  color: #46586e;
   cursor: pointer;
   user-select: none;
   font-size: 9px;
@@ -5327,9 +5329,9 @@ onUnmounted(() => {
   transition: all 0.15s ease;
 }
 .as-side-caret:hover {
-  border-color: #2f6db8;
-  color: #0d5bd3;
-  background: #eaf3ff;
+  border-color: #b9c9dc;
+  color: #2f4d75;
+  background: #f2f6fa;
 }
 .as-side-menu {
   position: absolute;
@@ -5337,23 +5339,23 @@ onUnmounted(() => {
   left: 0;
   min-width: 156px;
   background: #fff;
-  border: 1px solid #d9e6f5;
-  border-radius: 10px;
-  box-shadow: 0 8px 22px rgba(28, 79, 138, 0.18);
+  border: 1px solid #e2e6ec;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(52, 64, 84, 0.12);
   z-index: 30;
   padding: 5px;
 }
 .as-side-menu-item {
   padding: 8px 12px;
   font-size: 12.5px;
-  color: #1c4f8a;
+  color: #46586e;
   cursor: pointer;
-  border-radius: 7px;
+  border-radius: 6px;
   white-space: nowrap;
   transition: background 0.12s ease;
 }
 .as-side-menu-item:hover {
-  background: #eaf3ff;
+  background: #f2f6fa;
 }
 
 /* ═══════ ② 表头字段区（label 在上、输入在下）═══════ */
@@ -5462,7 +5464,7 @@ onUnmounted(() => {
   gap: 8px;
   margin-bottom: 12px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(17, 106, 91, 0.06);
 }
 .plan-label {
@@ -5659,11 +5661,11 @@ onUnmounted(() => {
   position: relative;
 }
 .dt-tab:hover {
-  color: #0d5bd3;
+  color: #2f4d75;
 }
 .dt-tab.on {
   background: #fff;
-  color: #0d5bd3;
+  color: #2f4d75;
   font-weight: 700;
   border: 1px solid #ccc;
   border-bottom-color: #fff;
@@ -5684,7 +5686,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .dt-ic:hover {
-  color: #0d5bd3;
+  color: #2f4d75;
 }
 .mat-cell {
   position: relative;
@@ -5752,7 +5754,7 @@ onUnmounted(() => {
 .detail :deep(.el-table td .el-select__wrapper) {
   min-height: 30px;
   border-radius: 0;
-  box-shadow: none;
+  box-shadow: 0 1px 2px rgba(52, 64, 84, 0.04), 0 4px 14px rgba(52, 64, 84, 0.06);
   background: transparent;
 }
 .detail :deep(.el-table td .el-input.is-disabled .el-input__wrapper),
@@ -5801,7 +5803,7 @@ onUnmounted(() => {
 }
 .filter-hint {
   font-size: 12px;
-  color: #0d5bd3;
+  color: #2f4d75;
   margin-right: 8px;
 }
 :deep(.prod-selected > td.el-table__cell) {
@@ -5895,7 +5897,7 @@ onUnmounted(() => {
 }
 .ctx-item:hover {
   background: #f0f5ff;
-  color: #0d5bd3;
+  color: #2f4d75;
 }
 /* 2026-08-25：灰按钮下拉项（如草稿态「生成XX」）视觉置灰 */
 .ctx-item.disabled {
@@ -6228,6 +6230,57 @@ onUnmounted(() => {
   gap: 6px;
   padding: 8px 12px;
   border-top: 1px solid #f0f0f0;
+}
+/* ── 侧栏高级灰调新增块(导航合并/分组标题/危险警示/菜单防溢出) ── */
+.as-side-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px 6px;
+}
+.as-side-nav .doc-status.none { color: #c2cad3; }
+.as-side-section {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #9aa5b3;
+  padding: 8px 2px 1px;
+  border-bottom: 1px dashed #e6eaef;
+  margin-bottom: 5px;
+  user-select: none;
+}
+.as-side-btn.primary {
+  background: #3d5a80;
+  border-color: #3d5a80;
+  color: #fff;
+}
+.as-side-btn.primary:hover {
+  background: #46688f;
+  border-color: #46688f;
+  color: #fff;
+}
+.as-side-del.danger .as-side-btn {
+  color: #a85c5c;
+  border-color: #e2cdcd;
+}
+.as-side-del.danger .as-side-btn:hover {
+  background: #faf3f3;
+  border-color: #cf9f9f;
+  color: #934b4b;
+}
+.as-side-del.danger .as-side-caret {
+  color: #a85c5c;
+  border-color: #e2cdcd;
+}
+.as-side-menu-item.danger {
+  color: #934b4b;
+}
+.as-side-menu-item.danger:hover {
+  background: #faf3f3;
+}
+.as-side-del .as-side-menu.flip-up {
+  top: auto;
+  bottom: calc(100% + 5px);
 }
 
 /* ── 导出报表:模板选择 + 模板管理(ADR-0002) ── */
