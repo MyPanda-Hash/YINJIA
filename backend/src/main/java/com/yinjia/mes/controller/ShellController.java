@@ -4,6 +4,7 @@ import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.QrBatchService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,6 +25,10 @@ public class ShellController {
     private final JdbcTemplate jdbc;
     private final QrBatchService qrBatch;
 
+    /** 登录页/顶栏工厂名(测试实例经 application-test.yml 或启动参数覆盖为「YINJIA-MES·测试库」) */
+    @Value("${yinjia.factory-name:YINJIA-MES}")
+    private String factoryName;
+
     public ShellController(PanelRegistry registry, JdbcTemplate jdbc, QrBatchService qrBatch) {
         this.registry = registry;
         this.jdbc = jdbc;
@@ -34,7 +39,7 @@ public class ShellController {
     public ApiResult<List<Map<String, Object>>> factories() {
         Map<String, Object> f = new HashMap<>();
         f.put("code", "YJ");
-        f.put("name", "YINJIA-MES");
+        f.put("name", factoryName);
         return ApiResult.ok(List.of(f));
     }
 
