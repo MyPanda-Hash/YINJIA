@@ -29,13 +29,20 @@
         </span>
         <span v-if="actsOf(g).length > 1" class="tb-caret" @click.stop="toggleGroup(gi)">▼</span>
         <div v-if="openGroup === gi" class="tb-menu">
-          <!-- 下拉排除主按钮（组按钮=第一个 action，下拉只列其余动作，避免「审核」重复）；
-               「更多」组追加「导出报表」（2026-09-12 从独立工具栏按钮收进下拉：面板有服务端报表
-               模板才出现 —— 登记过精细模板的优先、未登记的单据面板回退通用模板，研发管理与
-               档案/报表面板没有模板，自然不追加） -->
-          <div class="ctx-item" :class="{ disabled: isDisabled(a) }" v-for="a in menuItems(g)" :key="a" @click="onGroupAction(a)">{{ tt(a) }}</div>
+          <!-- 下拉排除主按钮（组按钮=第一个 action，下拉只列其余动作，避免「审核」重复） -->
+          <div class="ctx-item" :class="{ disabled: isDisabled(a) }" v-for="a in dropItems(g)" :key="a" @click="onGroupAction(a)">{{ tt(a) }}</div>
         </div>
       </div>
+      <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
+           该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
+      <span
+        v-if="reportTemplates.length || user.isAdmin"
+        class="tb-main"
+        :title="tt('服务端正式报表：含公司抬头、页眉页脚与页码')"
+        @click.stop="reportVisible = true"
+      >
+        <span class="act-name">{{ tt('导出报表') }}</span>
+      </span>
       <div class="tools-right">
         <template v-if="reportMode">
           <span class="doc-chip">{{ panelName }}</span>
@@ -147,14 +154,15 @@
           </div>
           <template v-if="!sideCollapsed">
             <div class="as-side-status-row">
-              <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
+              <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']" :title="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
+              <span v-else class="doc-status none">—</span>
             </div>
             <div class="as-side-pager">
-              <span class="page-btn" :title="tt('首页')" @click="pageFirst">◁</span>
+              <span class="page-btn" :title="tt('最前一张')" @click="pageFirst">◁</span>
               <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
-              <span class="page-no">{{ pageText(curNo, total, '张') }}</span>
+              <span class="page-no">{{ pageText(curNo, total, '') }}</span>
               <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
-              <span class="page-btn" :title="tt('末页')" @click="pageLast">▷</span>
+              <span class="page-btn" :title="tt('最后一张')" @click="pageLast">▷</span>
             </div>
             <!-- ═══ 模糊搜索态:字段+内容条件行 → 查找 → 结果清单(点行即切换查看) ═══ -->
             <div v-if="fuzzyMode" class="fuzzy-panel">
@@ -196,13 +204,52 @@
                 <div v-if="!fuzzyResultRows.length" class="fuzzy-empty">{{ tt('未找到匹配单据') }}</div>
               </div>
             </div>
+            <!-- ═══ 单据预览查找态:全量单据卡片(编号/状态/日期+关键摘要字段),点击即跳转,档案查看效果 ═══ -->
+            <div v-else-if="previewMode" class="fuzzy-panel">
+              <div class="fuzzy-head">
+                <span>{{ tt('单据预览查找') }}</span>
+                <span class="fuzzy-back" :title="tt('返回')" @click="closeDocPreview">↩</span>
+              </div>
+              <el-input
+                v-model="previewKw"
+                size="small"
+                clearable
+                :placeholder="tt('输入编号或任意内容快速筛选')"
+                class="preview-kw"
+              />
+              <div class="preview-cards">
+                <div
+                  v-for="c in previewCards"
+                  :key="c.no"
+                  class="preview-card"
+                  :class="{ on: c.no === curDocNo }"
+                  @click="openPreviewCard(c)"
+                >
+                  <div class="pc-head">
+                    <span class="pc-no">{{ c.no }}</span>
+                    <span v-if="c.status" class="doc-status" :class="c.status">{{ tt(c.status) }}</span>
+                  </div>
+                  <div class="pc-date">{{ c.date }}</div>
+                  <div v-for="(f, i) in c.fields" :key="i" class="pc-field">
+                    <span class="pc-label">{{ tt(f.label) }}</span>
+                    <span class="pc-value">{{ f.value }}</span>
+                  </div>
+                  <div v-if="!c.fields.length" class="pc-none">{{ tt('（无摘要字段）') }}</div>
+                </div>
+                <div v-if="!previewCards.length" class="fuzzy-empty">{{ tt('未找到匹配单据') }}</div>
+              </div>
+            </div>
             <div v-else class="as-side-btns">
+              <div class="as-side-section">{{ tt('查找') }}</div>
               <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板) -->
               <div class="as-side-btn" @click="docQueryVisible = true">{{ tt('查询单据') }}</div>
               <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单 -->
               <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
+              <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果 -->
+              <div class="as-side-btn" @click="openDocPreview">{{ tt('单据预览') }}</div>
+              <div class="as-side-section">{{ tt('单据操作') }}</div>
               <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回);删除申请中出「撤回删除申请」(卡死单据出口) -->
-              <div class="as-side-del" v-if="isApprovalDoc">
+              <div class="as-side-del danger" v-if="isApprovalDoc">
                 <div class="as-side-btn-row">
                   <div class="as-side-btn" style="flex: 1" @click="onSideAction('删除')">{{ tt('删除') }}</div>
                   <div class="as-side-caret" :title="tt('更多操作')" @click.stop="openDelMenu = !openDelMenu">▼</div>
@@ -210,10 +257,10 @@
                 <!-- 删除申请中:申请提交后无人审批会卡死(不可编辑也无审批入口)——发起人本人或审批人可撤回 -->
                 <div v-if="curDocStatus === '删除申请中'" class="as-side-btn" @click="pickDelAction('撤回删除申请')">{{ tt('撤回删除申请') }}</div>
                 <div v-if="openDelMenu" class="as-side-menu" @click.stop>
-                  <div class="as-side-menu-item" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
+                  <div class="as-side-menu-item danger" @click="pickDelAction('删除')">{{ tt('删除') }}（{{ tt('整单删除') }}）</div>
                   <template v-if="canApproveHere()">
-                    <div class="as-side-menu-item" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
-                    <div class="as-side-menu-item" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
+                    <div class="as-side-menu-item danger" @click="pickDelAction('删除审批通过')">{{ tt('删除审批通过') }}</div>
+                    <div class="as-side-menu-item danger" @click="pickDelAction('删除审批驳回')">{{ tt('删除审批驳回') }}</div>
                   </template>
                 </div>
               </div>
@@ -232,7 +279,7 @@
                 <div v-if="curDocStatus === '修改中'" class="as-side-btn" @click="pickModAction('提交审批')">{{ tt('提交审批') }}</div>
                 <!-- 修改申请中:同删除申请,卡死时由发起人本人或审批人撤回 -->
                 <div v-if="curDocStatus === '修改申请中'" class="as-side-btn" @click="pickModAction('撤回修改申请')">{{ tt('撤回修改申请') }}</div>
-                <div v-if="openModMenu" class="as-side-menu" @click.stop>
+                <div v-if="openModMenu" class="as-side-menu flip-up" @click.stop>
                   <template v-if="canApproveHere()">
                     <template v-if="curDocStatus === '修改申请中'">
                       <div class="as-side-menu-item" @click="pickModAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
@@ -247,9 +294,12 @@
                 </div>
               </div>
               <div class="as-side-btn" v-if="isDocArchivePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
+              <div class="as-side-section">{{ tt('文档输出') }}</div>
               <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
               <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
-              <!-- 对外正式报表入口 2026-09-12 收进表格上方「更多」下拉(工具栏 menuItems),侧栏不再重复 -->
+              <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
+                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
+              <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
               <!-- 产品开发下发:仅产品信息表;归档后可点;下发过则置灰显示「已下发」 -->
               <div
                 class="as-side-btn"
@@ -886,7 +936,14 @@
     </el-dialog>
 
     <!-- ═══ 对外正式报表(后端 JasperReports 模板):业务只选格式,版式由 IT 的 .jrxml 决定 ═══ -->
-    <el-dialog v-model="reportVisible" :title="tt('导出报表')" width="420px" append-to-body>
+    <el-dialog v-model="reportVisible" :title="tt('导出报表')" width="460px" append-to-body>
+      <div v-if="reportTemplates.length" class="rpt-tpl-row">
+        <span class="rpt-tpl-label">{{ tt('报表模板') }}</span>
+        <el-select v-model="selectedReportCode" size="default" style="flex:1" :placeholder="tt('选择报表模板')">
+          <el-option v-for="t in reportTemplates" :key="t.code" :label="t.name" :value="t.code" />
+        </el-select>
+      </div>
+      <div v-else class="rpt-tpl-empty">{{ tt('该面板暂无报表模板，可点下方「模板管理」上传') }}</div>
       <div class="efmt-list">
         <div class="efmt-item" @click="downloadReport('pdf')">
           <span class="efmt-ico">📄</span>
@@ -911,7 +968,54 @@
         </div>
       </div>
       <template #footer>
+        <el-button v-if="user.isAdmin" type="primary" link @click="openManage">{{ tt('模板管理') }}</el-button>
         <el-button @click="reportVisible = false">{{ tt('取消') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ═══ 报表模板管理(仅管理员;ADR-0002) ═══ -->
+    <el-dialog v-model="manageVisible" :title="tt('报表模板管理')" width="780px" append-to-body>
+      <div class="rpt-mg-toolbar">
+        <el-button type="primary" size="small" @click="uploadFormVisible = true">{{ tt('上传模板') }}</el-button>
+        <span class="rpt-mg-tip">{{ tt('模板为 .jrxml（Jaspersoft Studio 制作）；字段中文名须与面板字段标签一致；上传即生效') }}</span>
+      </div>
+      <el-table :data="manageList" size="small" border height="320">
+        <el-table-column prop="code" :label="tt('编码')" width="140" />
+        <el-table-column prop="name" :label="tt('名称')" width="140" />
+        <el-table-column prop="panelCode" :label="tt('绑定面板')" width="150" />
+        <el-table-column :label="tt('状态')" width="70" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? tt('启用') : tt('停用') }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="updateBy" :label="tt('更新')" width="130" />
+        <el-table-column :label="tt('操作')" min-width="150">
+          <template #default="{ row }">
+            <el-button size="small" link type="primary" @click="previewTpl(row)">{{ tt('预览') }}</el-button>
+            <el-button size="small" link :type="row.enabled ? 'warning' : 'success'" @click="toggleTpl(row)">{{ row.enabled ? tt('停用') : tt('启用') }}</el-button>
+            <el-button size="small" link type="danger" @click="removeTpl(row)">{{ tt('删除') }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="manageVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="uploadFormVisible" :title="tt('上传模板')" width="520px" append-to-body>
+      <div class="rpt-up-row"><span class="rpt-up-label">{{ tt('模板文件') }}</span>
+        <input ref="rptFileRef" type="file" accept=".jrxml,.xml" @change="onRptFile" /></div>
+      <div class="rpt-up-row"><span class="rpt-up-label">{{ tt('模板编码') }}</span>
+        <el-input v-model="uploadForm.templateCode" size="small" style="width:260px" placeholder="小写字母/数字/下划线,如 so_order" /></div>
+      <div class="rpt-up-row"><span class="rpt-up-label">{{ tt('报表名称') }}</span>
+        <el-input v-model="uploadForm.name" size="small" style="width:260px" /></div>
+      <div class="rpt-up-row"><span class="rpt-up-label">{{ tt('绑定面板') }}</span>
+        <el-input v-model="uploadForm.panelCode" size="small" style="width:260px" /></div>
+      <div class="rpt-up-row"><span class="rpt-up-label">{{ tt('备注') }}</span>
+        <el-input v-model="uploadForm.remark" size="small" style="width:260px" /></div>
+      <template #footer>
+        <el-button @click="uploadFormVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="uploading" @click="submitUpload">{{ tt('上传并启用') }}</el-button>
       </template>
     </el-dialog>
 
@@ -1543,7 +1647,7 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
 // 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
-const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出'] // 刷新=整页重载/退出=关页签,文书侧栏无意义(2026-09-12,2026-09-14 复确认)
+const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出'] // 刷新/退出在文书侧栏体验差(刷新整页重载/退出关闭页签),2026-09-14 移除
 // 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
 const openDelMenu = ref(false)
 
@@ -1765,6 +1869,61 @@ async function runFuzzySearch() {
 /** 点结果行 = 切换当前单据(走既有离开守卫:草稿未保存会提示) */
 async function openFuzzyResult(r) {
   const index = list.value.indexOf(r.row)
+  if (index >= 0) await guardDocSwitch(index)
+}
+// ---------- 文书侧栏「单据预览查找」:全量单据卡片(编号/状态/日期+前4个非空业务字段摘要) ----------
+// 与模糊搜索同源取数(pageSize 拉到 200 一次取全),关键字客户端筛选;点卡片即跳转,文件档案查看效果。零后端改动。
+const previewMode = ref(false)
+const previewKw = ref('')
+let previewPrevPageSize = null
+/** 摘要字段剔除清单:系统列与阶段明细列不进卡片 */
+const PREVIEW_SKIP = new Set(['单据编号', '编号', '单据日期', '单据状态', '文档编号', '文件管理人', '密级', '文件使用范围', '备注', '打印时间', '公司名称'])
+function previewFieldsOf(row) {
+  const out = []
+  for (const f of headerFields.value || []) {
+    if (out.length >= 4) break
+    const key = headerFieldKey(f)
+    if (!key || PREVIEW_SKIP.has(key) || /^阶段\d+/.test(key)) continue
+    const v = row[key]
+    if (v == null || String(v).trim() === '') continue
+    const s = String(v).replace(/\s+/g, ' ').trim()
+    if (!s) continue
+    out.push({ label: key, value: s.length > 42 ? s.slice(0, 42) + '…' : s })
+  }
+  return out
+}
+const previewCards = computed(() => (list.value || []).map((row) => {
+  const no = String(row['单据编号'] || row['编号'] || '')
+  const fields = previewFieldsOf(row)
+  const kw = previewKw.value.trim().toLowerCase()
+  const hit = !kw || no.toLowerCase().includes(kw) || fields.some((x) => x.value.toLowerCase().includes(kw))
+  return { no, date: String(row['单据日期'] || ''), status: String(row['单据状态'] || ''), fields, hit, row }
+}).filter((c) => c.hit))
+async function openDocPreview() {
+  if (fuzzyMode.value) { // 与模糊搜索互斥:模糊条件失效,pageSize 直接接管
+    fuzzyMode.value = false
+    fuzzySearched.value = false
+    fuzzyApplied.value = null
+    fuzzyPrevPageSize = null
+  }
+  previewMode.value = true
+  previewKw.value = ''
+  if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize
+  query.pageSize = 200
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+}
+async function closeDocPreview() {
+  previewMode.value = false
+  previewKw.value = ''
+  if (previewPrevPageSize !== null) { query.pageSize = previewPrevPageSize; previewPrevPageSize = null }
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+}
+async function openPreviewCard(c) {
+  const index = list.value.indexOf(c.row)
   if (index >= 0) await guardDocSwitch(index)
 }
 /** 文书归档面板(保存即归档):修改闭环按钮组的显隐开关,真源后端 metadata.docArchive */
@@ -2447,17 +2606,6 @@ function actsOf(g) {
 function dropItems(g) {
   return actsOf(g).slice(1)
 }
-// 工具栏「更多」组下拉 = 组动作 + 「导出报表」（插在「退出」前，仅工具栏注入，右侧栏不受影响）。
-// 显隐口径 = 该面板有服务端报表模板（reportTemplates 非空）——登记过精细模板的优先，
-// 未登记的单据面板由后端回退通用模板；研发管理面板与档案/报表面板没有模板，不追加。
-function menuItems(g) {
-  const items = dropItems(g)
-  if (g.name !== '更多' || !reportTemplates.value.length) return items
-  const out = items.slice()
-  const at = out.indexOf('退出')
-  out.splice(at < 0 ? out.length : at, 0, '导出报表')
-  return out
-}
 function btnName(g) {
   return actsOf(g)[0] || g.name
 }
@@ -2466,11 +2614,6 @@ function toggleGroup(gi) {
 }
 function onGroupAction(a) {
   openGroup.value = -1
-  // 对外正式报表（「更多」下拉项）：打开格式选择弹窗（PDF / 打印预览 / xlsx），不走 onButton 按钮总线
-  if (a === '导出报表') {
-    reportVisible.value = true
-    return
-  }
   // 2026-08-25：灰按钮（如草稿态「生成XX」）点击不执行、不弹提示
   if (isDisabled(a)) return
   onButton(a)
@@ -2640,11 +2783,104 @@ async function loadReportTemplates() {
   }
 }
 
+// ══════════ 模板选择 + 报表模板管理(仅管理员;ADR-0002) ══════════
+const selectedReportCode = ref('')
+watch(reportTemplates, (list) => {
+  if (!list?.length) { selectedReportCode.value = ''; return }
+  if (!list.some((t) => t.code === selectedReportCode.value)) selectedReportCode.value = list[0].code
+}, { immediate: true })
+
+const manageVisible = ref(false)
+const manageList = ref([])
+const uploadFormVisible = ref(false)
+const uploading = ref(false)
+const uploadForm = ref({ templateCode: '', name: '', panelCode: '', remark: '' })
+let uploadJrxml = ''
+
+function openManage() {
+  manageVisible.value = true
+  loadManageList()
+}
+async function loadManageList() {
+  try {
+    const res = await request.get('/report/templates', { params: { all: true } })
+    manageList.value = Array.isArray(res?.data) ? res.data : []
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('加载模板列表失败'))
+  }
+}
+function onRptFile(e) {
+  const file = e.target.files && e.target.files[0]
+  e.target.value = ''
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    uploadJrxml = String(ev.target.result || '')
+    const base = file.name.replace(/\.(jrxml|xml)$/i, '')
+    if (!uploadForm.value.templateCode) {
+      uploadForm.value.templateCode = base.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '')
+    }
+    if (!uploadForm.value.name) uploadForm.value.name = base
+  }
+  reader.readAsText(file, 'utf-8')
+}
+async function submitUpload() {
+  const f = uploadForm.value
+  if (!uploadJrxml) return ElMessage.warning(tt('请先选择 .jrxml 模板文件'))
+  if (!f.templateCode || !f.name || !f.panelCode) return ElMessage.warning(tt('编码/名称/绑定面板不能为空'))
+  uploading.value = true
+  try {
+    await request.post('/report/templates', { templateCode: f.templateCode, panelCode: f.panelCode, name: f.name, remark: f.remark, jrxml: uploadJrxml })
+    ElMessage.success(tt('模板已上传并启用'))
+    uploadFormVisible.value = false
+    uploadForm.value = { templateCode: '', name: '', panelCode: panelCode.value, remark: '' }
+    uploadJrxml = ''
+    await loadManageList()
+    await loadReportTemplates()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('上传失败'))
+  } finally {
+    uploading.value = false
+  }
+}
+async function toggleTpl(row) {
+  try {
+    await request.put(`/report/templates/${row.id}/enabled`, null, { params: { enabled: row.enabled ? 'N' : 'Y' } })
+    await loadManageList()
+    await loadReportTemplates()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('操作失败'))
+  }
+}
+async function removeTpl(row) {
+  try {
+    await ElMessageBox.confirm(`确认删除模板「${row.name}」？删除后不可恢复。`, tt('删除确认'), { type: 'warning' })
+  } catch { return }
+  try {
+    await request.delete(`/report/templates/${row.id}`)
+    ElMessage.success(tt('已删除'))
+    await loadManageList()
+    await loadReportTemplates()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('删除失败'))
+  }
+}
+function previewTpl(row) {
+  const no = curDocNo.value
+  if (!no) return ElMessage.warning(tt('请先在列表勾选一张单据（预览用其数据渲染）'))
+  request.get('/report/export', {
+    params: { code: row.code, panelCode: row.panelCode, docNo: no, format: 'pdf', disposition: 'inline' },
+    responseType: 'blob',
+  }).then((blob) => {
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  }).catch((e) => ElMessage.error(engine.errMsg(e) || tt('预览失败')))
+}
 /** 取报表字节(Blob);失败由调用方提示 */
 function fetchReportBlob(fmt) {
   return request.get('/report/export', {
     params: {
-      code: reportTemplates.value[0]?.code,
+      code: selectedReportCode.value || reportTemplates.value[0]?.code,
       panelCode: panelCode.value,
       docNo: curDocNo.value,
       format: fmt,
@@ -2664,7 +2900,7 @@ async function downloadReport(fmt) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${reportTemplates.value[0]?.name || '报表'}-${no}.${fmt === 'xlsx' ? 'xlsx' : 'pdf'}`
+    a.download = `${reportTemplates.value.find((t) => t.code === selectedReportCode.value)?.name || '报表'}-${no}.${fmt === 'xlsx' ? 'xlsx' : 'pdf'}`
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -4613,7 +4849,7 @@ onUnmounted(() => {
 }
 .toolbar-query-btn:hover {
   background: #e7eef8;
-  color: #0d5bd3;
+  color: #2f4d75;
 }
 .tb-group {
   display: inline-flex;
@@ -4649,7 +4885,7 @@ onUnmounted(() => {
   user-select: none;
 }
 .tb-main:hover {
-  color: #0d5bd3;
+  color: #2f4d75;
   background: #f0f5ff;
 }
 .tb-main.disabled {
@@ -4678,20 +4914,20 @@ onUnmounted(() => {
 }
 .doc-chip {
   font-size: 12px;
-  color: #1c4f8a;
+  color: #46586e;
   font-weight: 600;
   margin-right: 6px;
 }
 .doc-status {
   font-size: 12px;
   padding: 1px 8px;
-  border-radius: 10px;
+  border-radius: 8px;
   margin-right: 6px;
 }
 .doc-cat {
   font-size: 12px;
   padding: 1px 8px;
-  border-radius: 10px;
+  border-radius: 8px;
   margin-right: 6px;
   color: #7c3aed;
   border: 1px solid #ddd6fe;
@@ -4705,7 +4941,7 @@ onUnmounted(() => {
 }
 .doc-status.生产中,
 .doc-status.审批中 {
-  color: #0d5bd3;
+  color: #2f4d75;
   border: 1px solid #bcd2f5;
   background: #f0f6ff;
 }
@@ -4732,7 +4968,7 @@ onUnmounted(() => {
 }
 .doc-status.终止审批中（立项人）,
 .doc-status.终止审批中（管理员） {
-  color: #0d5bd3;
+  color: #2f4d75;
   border: 1px solid #bcd2f5;
   background: #f0f6ff;
 }
@@ -4832,7 +5068,7 @@ onUnmounted(() => {
 .efmt-name { font-size: 14px; font-weight: 600; color: #1e5a8a; }
 .efmt-desc { font-size: 12px; color: #8ba6bd; margin-top: 2px; }
 .ds-back {
-  color: #0d5bd3;
+  color: #2f4d75;
   cursor: pointer;
   font-size: 13px;
   flex: none;
@@ -4852,7 +5088,7 @@ onUnmounted(() => {
 .ds-pill {
   border: 1px solid #bcd2f5;
   background: #f0f6ff;
-  color: #1c4f8a;
+  color: #46586e;
   border-radius: 12px;
   padding: 2px 12px;
   font-size: 12.5px;
@@ -4866,7 +5102,7 @@ onUnmounted(() => {
   border-color: #1c4f8a;
 }
 .ds-jump {
-  color: #0d5bd3;
+  color: #2f4d75;
   font-size: 12.5px;
   cursor: pointer;
 }
@@ -4929,7 +5165,7 @@ onUnmounted(() => {
 }
 .page-btn:hover {
   border-color: #0d5bd3;
-  color: #0d5bd3;
+  color: #2f4d75;
 }
 .page-no {
   padding: 0 6px;
@@ -4963,9 +5199,9 @@ onUnmounted(() => {
   overflow-y: auto;
   overflow-x: hidden;
   background: #fff;
-  border: 1px solid #d9dee7;
+  border: 1px solid #e2e6ec;
   border-radius: 4px;
-  box-shadow: none;
+  box-shadow: 0 1px 2px rgba(52, 64, 84, 0.04), 0 4px 14px rgba(52, 64, 84, 0.06);
   padding: 0;
   display: flex;
   flex-direction: column;
@@ -4976,8 +5212,8 @@ onUnmounted(() => {
   width: 34px;
 }
 .as-side-title {
-  background: #f2f4f7;
-  color: #303133;
+  background: #f5f6f8;
+  color: #3d4756;
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 1px;
@@ -4986,7 +5222,7 @@ onUnmounted(() => {
   justify-content: space-between;
   padding: 8px 10px;
   cursor: pointer;
-  border-bottom: 1px solid #d9dee7;
+  border-bottom: 1px solid #e2e6ec;
   user-select: none;
 }
 .approval-side.collapsed .as-side-title {
@@ -5019,8 +5255,8 @@ onUnmounted(() => {
   color: #44608a;
 }
 .approval-side .page-btn:hover {
-  border-color: #2f6db8;
-  background: #eaf3ff;
+  border-color: #b9c9dc;
+  background: #f2f6fa;
 }
 .as-side-btns {
   display: flex;
@@ -5032,10 +5268,10 @@ onUnmounted(() => {
   display: block;
   width: 100%;
   padding: 7px 10px;
-  border: 1px solid #d9dee7;
+  border: 1px solid #e2e6ec;
   border-radius: 4px;
   background: #fff;
-  color: #1c4f8a;
+  color: #46586e;
   font-size: 12.5px;
   font-weight: 600;
   text-align: center;
@@ -5044,20 +5280,20 @@ onUnmounted(() => {
   transition: all 0.15s ease;
 }
 .as-side-btn:hover {
-  background: #eef4ff;
-  border-color: #8fb4e0;
-  color: #0d5bd3;
+  background: #f2f6fa;
+  border-color: #b9c9dc;
+  color: #2f4d75;
 }
 .as-side-btn.sub {
   background: transparent;
   border: none;
-  color: #66788e;
+  color: #6b7a8d;
   font-size: 12px;
   font-weight: 500;
   padding: 4px 10px;
 }
 .as-side-btn.sub:hover {
-  background: #eef4ff;
+  background: #f2f6fa;
 }
 .as-side-btn.disabled {
   color: #b9c2ce;
@@ -5084,10 +5320,10 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid #cfe0f2;
-  border-radius: 9px;
+  border: 1px solid #dfe3ea;
+  border-radius: 6px;
   background: #fff;
-  color: #1c4f8a;
+  color: #46586e;
   cursor: pointer;
   user-select: none;
   font-size: 9px;
@@ -5095,9 +5331,9 @@ onUnmounted(() => {
   transition: all 0.15s ease;
 }
 .as-side-caret:hover {
-  border-color: #2f6db8;
-  color: #0d5bd3;
-  background: #eaf3ff;
+  border-color: #b9c9dc;
+  color: #2f4d75;
+  background: #f2f6fa;
 }
 .as-side-menu {
   position: absolute;
@@ -5105,23 +5341,23 @@ onUnmounted(() => {
   left: 0;
   min-width: 156px;
   background: #fff;
-  border: 1px solid #d9e6f5;
-  border-radius: 10px;
-  box-shadow: 0 8px 22px rgba(28, 79, 138, 0.18);
+  border: 1px solid #e2e6ec;
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(52, 64, 84, 0.12);
   z-index: 30;
   padding: 5px;
 }
 .as-side-menu-item {
   padding: 8px 12px;
   font-size: 12.5px;
-  color: #1c4f8a;
+  color: #46586e;
   cursor: pointer;
-  border-radius: 7px;
+  border-radius: 6px;
   white-space: nowrap;
   transition: background 0.12s ease;
 }
 .as-side-menu-item:hover {
-  background: #eaf3ff;
+  background: #f2f6fa;
 }
 
 /* ═══════ ② 表头字段区（label 在上、输入在下）═══════ */
@@ -5230,7 +5466,7 @@ onUnmounted(() => {
   gap: 8px;
   margin-bottom: 12px;
   padding: 8px 10px;
-  border-radius: 10px;
+  border-radius: 8px;
   background: rgba(17, 106, 91, 0.06);
 }
 .plan-label {
@@ -5427,11 +5663,11 @@ onUnmounted(() => {
   position: relative;
 }
 .dt-tab:hover {
-  color: #0d5bd3;
+  color: #2f4d75;
 }
 .dt-tab.on {
   background: #fff;
-  color: #0d5bd3;
+  color: #2f4d75;
   font-weight: 700;
   border: 1px solid #ccc;
   border-bottom-color: #fff;
@@ -5452,7 +5688,7 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .dt-ic:hover {
-  color: #0d5bd3;
+  color: #2f4d75;
 }
 .mat-cell {
   position: relative;
@@ -5520,7 +5756,7 @@ onUnmounted(() => {
 .detail :deep(.el-table td .el-select__wrapper) {
   min-height: 30px;
   border-radius: 0;
-  box-shadow: none;
+  box-shadow: 0 1px 2px rgba(52, 64, 84, 0.04), 0 4px 14px rgba(52, 64, 84, 0.06);
   background: transparent;
 }
 .detail :deep(.el-table td .el-input.is-disabled .el-input__wrapper),
@@ -5569,7 +5805,7 @@ onUnmounted(() => {
 }
 .filter-hint {
   font-size: 12px;
-  color: #0d5bd3;
+  color: #2f4d75;
   margin-right: 8px;
 }
 :deep(.prod-selected > td.el-table__cell) {
@@ -5663,7 +5899,7 @@ onUnmounted(() => {
 }
 .ctx-item:hover {
   background: #f0f5ff;
-  color: #0d5bd3;
+  color: #2f4d75;
 }
 /* 2026-08-25：灰按钮下拉项（如草稿态「生成XX」）视觉置灰 */
 .ctx-item.disabled {
@@ -5997,4 +6233,112 @@ onUnmounted(() => {
   padding: 8px 12px;
   border-top: 1px solid #f0f0f0;
 }
-</style>
+/* ── 侧栏高级灰调新增块(导航合并/分组标题/危险警示/菜单防溢出) ── */
+.as-side-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 8px 10px 6px;
+}
+.as-side-nav .doc-status.none { color: #c2cad3; }
+.as-side-section {
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: #9aa5b3;
+  padding: 8px 2px 1px;
+  border-bottom: 1px dashed #e6eaef;
+  margin-bottom: 5px;
+  user-select: none;
+}
+.as-side-btn.primary {
+  background: #3d5a80;
+  border-color: #3d5a80;
+  color: #fff;
+}
+.as-side-btn.primary:hover {
+  background: #46688f;
+  border-color: #46688f;
+  color: #fff;
+}
+.as-side-del.danger .as-side-btn {
+  color: #a85c5c;
+  border-color: #e2cdcd;
+}
+.as-side-del.danger .as-side-btn:hover {
+  background: #faf3f3;
+  border-color: #cf9f9f;
+  color: #934b4b;
+}
+.as-side-del.danger .as-side-caret {
+  color: #a85c5c;
+  border-color: #e2cdcd;
+}
+.as-side-menu-item.danger {
+  color: #934b4b;
+}
+.as-side-menu-item.danger:hover {
+  background: #faf3f3;
+}
+.as-side-del .as-side-menu.flip-up {
+  top: auto;
+  bottom: calc(100% + 5px);
+}
+/* 侧栏导航一行五键:紧凑尺寸 */
+.as-side-nav { padding: 8px 8px 6px; gap: 3px; }
+.as-side-nav .doc-status { flex: 1; min-width: 0; max-width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; justify-content: center; }
+.as-side-nav .as-side-pager { display: flex; align-items: center; gap: 2px; flex: none; }
+.as-side-nav .page-btn { width: 17px; min-width: 17px; height: 20px; line-height: 18px; padding: 0; font-size: 9px; border-radius: 4px; }
+.as-side-nav .page-no { min-width: 26px; text-align: center; font-size: 11px; color: #46586e; }
+/* 侧栏状态栏独立居中 + 翻页器居中(2026-09-14) */
+.as-side-status-row { display: flex; justify-content: center; padding: 9px 12px 2px; }
+.as-side-status-row .doc-status.none { color: #c2cad3; }
+.as-side-pager { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 10px 10px; border-bottom: none; }
+/* 暗色主题跟随 */
+.dark .approval-side { background: #26282e; border-color: #3a3b42; box-shadow: none; }
+.dark .as-side-title { background: #2c2e34; color: #d6d9de; border-bottom-color: #3a3b42; }
+.dark .as-side-btn { background: transparent; border-color: #4a4c55; color: #c8cdd6; }
+.dark .as-side-btn:hover { background: #33363e; border-color: #6b7280; color: #e6e9ee; }
+.dark .as-side-btn.primary { background: #3d5a80; border-color: #3d5a80; color: #fff; }
+.dark .as-side-btn.primary:hover { background: #46688f; }
+.dark .as-side-btn.sub { color: #9aa3af; }
+.dark .as-side-section { color: #77808c; border-bottom-color: #3a3b42; }
+.dark .as-side-caret { background: transparent; border-color: #4a4c55; color: #c8cdd6; }
+.dark .as-side-menu { background: #2c2e34; border-color: #3a3b42; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
+.dark .as-side-menu-item { color: #c8cdd6; }
+.dark .as-side-menu-item:hover { background: #33363e; }
+.dark .preview-card { background: #26282e; border-color: #3a3b42; }
+.dark .preview-card.on { background: #2c3440; border-color: #5b8bc4; }
+.dark .pc-no { color: #9ec3e8; }
+.dark .pc-date { color: #6f7a86; }
+.dark .pc-value { color: #c8cdd6; }
+.dark .pc-label { color: #77808c; }
+.dark .fuzzy-panel { background: #26282e; border-color: #3a3b42; }
+.dark .fuzzy-head { color: #c8cdd6; }
+.dark .fuzzy-result-row .fz-no { color: #9ec3e8; }
+
+/* ── 导出报表:模板选择 + 模板管理(ADR-0002) ── */
+.rpt-tpl-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.rpt-tpl-label { flex: none; font-size: 13px; color: #5a7a99; }
+.rpt-tpl-empty { font-size: 12px; color: #b0b8c1; background: #f7f9fb; border: 1px dashed #d9e2ea; border-radius: 4px; padding: 8px 12px; margin-bottom: 10px; }
+.rpt-mg-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.rpt-mg-tip { font-size: 12px; color: #9aa8b5; }
+.rpt-up-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.rpt-up-label { flex: none; width: 70px; text-align: right; font-size: 13px; color: #5a7a99; }
+/* ── 单据预览查找(文书侧栏,文件档案查看效果) ── */
+.preview-kw { margin: 4px 0 6px; }
+.preview-cards { max-height: 520px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+.preview-card {
+  border: 1px solid #d9e2ea; border-radius: 6px; background: #fff;
+  padding: 6px 8px; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+}
+.preview-card:hover { border-color: #7fb0dd; box-shadow: 0 1px 4px rgba(30, 90, 138, .12); }
+.preview-card.on { border-color: #1e5a8a; background: #f0f7ff; }
+.pc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+.pc-no { font-weight: 600; font-size: 13px; color: #1e5a8a; word-break: break-all; }
+.pc-date { font-size: 11px; color: #9aa8b5; margin-bottom: 3px; }
+.pc-field { display: flex; gap: 6px; font-size: 12px; line-height: 18px; min-width: 0; }
+.pc-label { flex: none; color: #8ba6bd; }
+.pc-label::after { content: '：'; }
+.pc-value { color: #444; word-break: break-all; min-width: 0; }
+.pc-none { font-size: 11px; color: #c2ccd4; font-style: italic; }</style>
