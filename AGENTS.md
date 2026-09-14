@@ -50,6 +50,21 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 ```
 插行即可,切换器自动出现,词条由机翻初始化、可人工校对升级。
 
+## 🔴 数据库注明与全量部署规范(2026-09-14 起生效,不可豁免)
+
+1. **新增表必须带中文注明**:凡是 CREATE TABLE 的迁移脚本,必须同脚本内为
+   新表及关键列写入 `MS_Description` 中文扩展属性(幂等写法参照
+   `tools/migrate-table-comments.sql` 与 `tools/migrate-report-template-comments.sql`)。
+   只建表不注明 = 任务未完成。改动已有表结构时鼓励补注。
+2. **部署默认全量**:下次服务器部署走「全量恢复备份」路线(deploy/部署说明.md 二、A)——
+   用本地库整体覆盖服务器。因此:
+   - 打部署备份**之前**,必须先清掉本地库里的测试数据
+     (按 `migrate-golive-cleanup.sql` 模式,待产出),保证全量推上去的是干净账;
+   - 备份必须在部署当时新打(`BACKUP DATABASE ... WITH FORMAT, INIT`),
+     禁止拿 `deploy/` 里的历史 .bak 直接用;
+   - `tools/db-migrations.txt` 与 `deploy/push-migrations.bat` 清单仍需同步更新,
+     供测试库(HSDZ_MES_TEST)与增量场景使用。
+
 ## 架构速查
 
 - 术语表:`CONTEXT.md`(翻译表/翻译分层/字典翻事实不翻)
