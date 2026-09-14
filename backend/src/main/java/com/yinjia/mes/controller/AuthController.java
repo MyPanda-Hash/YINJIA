@@ -1,5 +1,6 @@
 package com.yinjia.mes.controller;
 
+import com.yinjia.mes.config.DataSourceRouter;
 import com.yinjia.mes.config.JwtUtil;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.UsageLogService;
@@ -39,30 +40,38 @@ public class AuthController {
     public ApiResult<Map<String, Object>> login(@RequestBody Map<String, String> body, HttpServletRequest request) {
         String username = body.getOrDefault("userName", "");
         String password = body.getOrDefault("password", "");
+        String factory = body.getOrDefault("factory", DataSourceRouter.PROD);
         if (username.isBlank() || password.isBlank()) {
             throw new IllegalArgumentException("用户名和密码不能为空");
         }
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT username, password_hash, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
-        if (rows.isEmpty() || !encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
-            throw new IllegalStateException("用户名或密码错误");
+        // 按登录工厂路由账套查询用户(ADR-0003);结束后恢复默认,防容器线程串库
+        DataSourceRouter.use(factory);
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT username, password_hash, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
+            if (rows.isEmpty() || !encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
+                throw new IllegalStateException("用户名或密码错误");
+            }
+            Map<String, Object> u = rows.get(0);
+            boolean admin = "Y".equals(u.get("is_admin"));
+            // 使用记录:登录成功事件(失败不记)
+            usageLog.recordLogin(username, String.valueOf(u.get("real_name")), clientIp(request));
+            Map<String, Object> user = new HashMap<>();
+            user.put("userName", u.get("username"));
+            user.put("realName", u.get("real_name"));
+            user.put("roleCode", admin ? "admin" : "user");
+            user.put("isAdmin", admin);
+            user.put("factory", DataSourceRouter.current());
+            user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
+            // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
+            user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
+            Map<String, Object> out = new HashMap<>();
+            out.put("token", jwtUtil.generate(username, DataSourceRouter.current()));
+            out.put("user", user);
+            return ApiResult.ok(out);
+        } finally {
+            DataSourceRouter.clear();
         }
-        Map<String, Object> u = rows.get(0);
-        boolean admin = "Y".equals(u.get("is_admin"));
-        // 使用记录:登录成功事件(失败不记)
-        usageLog.recordLogin(username, String.valueOf(u.get("real_name")), clientIp(request));
-        Map<String, Object> user = new HashMap<>();
-        user.put("userName", u.get("username"));
-        user.put("realName", u.get("real_name"));
-        user.put("roleCode", admin ? "admin" : "user");
-        user.put("isAdmin", admin);
-        user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
-        // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
-        user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
-        Map<String, Object> out = new HashMap<>();
-        out.put("token", jwtUtil.generate(username));
-        out.put("user", user);
-        return ApiResult.ok(out);
     }
 
     @GetMapping("/perms")
@@ -95,6 +104,7 @@ public class AuthController {
         user.put("realName", u.get("real_name"));
         user.put("roleCode", admin ? "admin" : "user");
         user.put("isAdmin", admin);
+        user.put("factory", DataSourceRouter.current());
         user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
         user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         return user;

@@ -25,9 +25,12 @@ public class ShellController {
     private final JdbcTemplate jdbc;
     private final QrBatchService qrBatch;
 
-    /** 登录页/顶栏工厂名(测试实例经 application-test.yml 或启动参数覆盖为「YINJIA-MES·测试库」) */
+    /** 登录工厂清单(ADR-0003 一系统两账套):YJ=正式库 / YJ_TEST=测试库,登录选择即切换 */
     @Value("${yinjia.factory-name:YINJIA-MES}")
     private String factoryName;
+
+    @Value("${yinjia.test-factory-name:YINJIA-MES·测试库}")
+    private String testFactoryName;
 
     public ShellController(PanelRegistry registry, JdbcTemplate jdbc, QrBatchService qrBatch) {
         this.registry = registry;
@@ -37,10 +40,13 @@ public class ShellController {
 
     @GetMapping("/base/factory/list")
     public ApiResult<List<Map<String, Object>>> factories() {
-        Map<String, Object> f = new HashMap<>();
-        f.put("code", "YJ");
-        f.put("name", factoryName);
-        return ApiResult.ok(List.of(f));
+        Map<String, Object> prod = new HashMap<>();
+        prod.put("code", "YJ");
+        prod.put("name", factoryName);
+        Map<String, Object> test = new HashMap<>();
+        test.put("code", "YJ_TEST");
+        test.put("name", testFactoryName);
+        return ApiResult.ok(List.of(prod, test));
     }
 
     /** 仓库下拉:引用基础档案·仓库面板明细(bs_wh,按仓库编码绑定,字典改名不影响);

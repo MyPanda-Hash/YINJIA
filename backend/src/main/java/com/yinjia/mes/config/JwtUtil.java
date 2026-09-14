@@ -31,9 +31,15 @@ public class JwtUtil {
     }
 
     public String generate(String username) {
+        return generate(username, DataSourceRouter.PROD);
+    }
+
+    /** 令牌携带登录工厂(ADR-0003):JwtAuthFilter 按它路由数据源 */
+    public String generate(String username, String factory) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(username)
+                .claim("factory", DataSourceRouter.PROD.equals(factory) || DataSourceRouter.TEST.equals(factory) ? factory : DataSourceRouter.PROD)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expireHours * 3600_000L))
                 .signWith(key)
@@ -46,6 +52,18 @@ public class JwtUtil {
             Claims claims = Jwts.parser().verifyWith(key).build()
                     .parseSignedClaims(token).getPayload();
             return claims.getSubject();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /** 校验并取出工厂声明;无令牌/解析失败返回 null(调用方按正式库兜底) */
+    public String factoryOf(String token) {
+        try {
+            Claims claims = Jwts.parser().verifyWith(key).build()
+                    .parseSignedClaims(token).getPayload();
+            Object f = claims.get("factory");
+            return f == null ? null : String.valueOf(f);
         } catch (Exception e) {
             return null;
         }

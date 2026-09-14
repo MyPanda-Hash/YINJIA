@@ -79,5 +79,5 @@ Invoke-Exec $conn "USE [$Target]; ALTER ROLE db_owner ADD MEMBER [yinjia];"
 # ⑤ 汇总
 $rowCount = Invoke-Scalar $conn "USE [$Target]; SELECT SUM(1) FROM sys.tables"
 Write-Host "完成: 测试库 $Target 已建立(表 $rowCount 张),yinjia 为 db_owner。"
-Write-Host "启动测试实例: java -jar yinjia-mes-backend-0.1.0.jar --spring.profiles.active=test  (端口 8091)"
+Write-Host "登录时选择工厂「YINJIA-MES·测试库」即切入本库(单实例账套路由,ADR-0003)"
 $conn.Close()

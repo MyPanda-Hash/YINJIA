@@ -21,6 +21,13 @@ spring:
       connection-timeout: 15000
 
 yinjia:
+  # 登录工厂清单显示名(ADR-0003:YJ=正式 HSDZ_MES / YJ_TEST=测试 HSDZ_MES_TEST)
+  factory-name: "YINJIA-MES"
+  test-factory-name: "YINJIA-MES·测试库"
+  test-datasource:
+    url: jdbc:sqlserver://localhost:1433;databaseName=HSDZ_MES_TEST;encrypt=false;trustServerCertificate=true;loginTimeout=10
+    username: yinjia
+    password: Yinjia@2026
   jwt:
     # 生产环境必须通过环境变量 YINJIA_JWT_SECRET 注入随机值
     secret: ${YINJIA_JWT_SECRET:CHANGE_ME_YINJIA_RANDOM_HEX_64_A1B2C3D4E5F60718293A4B5C6D7E8F90}

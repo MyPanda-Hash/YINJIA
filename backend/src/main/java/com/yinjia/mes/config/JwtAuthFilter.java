@@ -28,13 +28,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain chain) throws ServletException, IOException {
         String header = request.getHeader("Authorization");
         if (header != null && header.startsWith("Bearer ")) {
-            String username = jwtUtil.validate(header.substring(7));
+            String token = header.substring(7);
+            String username = jwtUtil.validate(token);
+            // 按令牌里的登录工厂切换账套(ADR-0003);无声明落正式库
+            DataSourceRouter.use(jwtUtil.factoryOf(token));
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                 UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                         username, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
                 SecurityContextHolder.getContext().setAuthentication(auth);
             }
         }
-        chain.doFilter(request, response);
+        try {
+            chain.doFilter(request, response);
+        } finally {
+            DataSourceRouter.clear(); // 容器线程复用,必须清理防串库
+        }
     }
 }

@@ -199,7 +199,7 @@ async function doLogin() {
   loading.value = true
   errorMessage.value = ''
   try {
-    await user.login({ userName: form.userName, password: form.password })
+    await user.login({ userName: form.userName, password: form.password, factory: form.factory })
     const selectedFactory = user.factories.find((item) => item.code === form.factory)
     if (selectedFactory) user.switchFactory(selectedFactory)
     if (rememberAccount.value) localStorage.setItem(REMEMBERED_ACCOUNT_KEY, form.userName)
