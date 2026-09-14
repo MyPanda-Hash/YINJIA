@@ -2390,7 +2390,16 @@ function chartOf(dt) {
   flex: 1;
   height: calc(46px * var(--cvy));
 }
+/* 编辑态封面输入框:覆盖 size=small 的 24px 内高(35px 字在 24px 盒里会被削成半截字),
+   并去掉 wrapper 默认左右 11px 内边距与灰边(只读态是纯 span 无边框,编辑态同口径) */
+.rsp-cover-input :deep(.el-input__wrapper) {
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+  border-radius: 0;
+}
 .rsp-cover-input :deep(.el-input__inner) {
+  height: calc(46px * var(--cvy));
   font-size: calc(31.3px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
   line-height: calc(46px * var(--cvy));
@@ -2431,6 +2440,11 @@ function chartOf(dt) {
   font-size: calc(12px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
   word-break: break-all;
+}
+.rsp-sign-input :deep(.el-input__wrapper) {
+  padding: 0 2px;
+  box-shadow: none;
+  background: transparent;
 }
 .rsp-sign-input :deep(.el-input__inner) {
   text-align: center;
