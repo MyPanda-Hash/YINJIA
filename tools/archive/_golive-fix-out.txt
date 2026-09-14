@@ -1,0 +1,25 @@
+OK   yj_doc_status deleted=256
+OK   yj_doc_modify_log deleted=17
+OK   yj_form_approval deleted=172
+OK   yj_usage_log deleted=3123
+OK   yj_message deleted=63
+OK   yj_attachment deleted=0
+OK   form_flow_link deleted=110
+OK   report_column_settings deleted=0
+OK   s_allno deleted=3342
+OK   yj_lot_seq deleted=2
+OK   qr_batch_registry deleted=1
+OK   yj_plan_term deleted=3
+== 复核 ==
+  yj_doc_status = 0
+  yj_doc_modify_log = 0
+  yj_form_approval = 0
+  yj_usage_log = 0
+  yj_message = 0
+  yj_attachment = 0
+  form_flow_link = 0
+  report_column_settings = 0
+  s_allno = 0
+  yj_lot_seq = 0
+  qr_batch_registry = 0
+  yj_plan_term = 0
