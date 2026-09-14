@@ -36,7 +36,7 @@
       <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
            该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
       <span
-        v-if="reportTemplates.length"
+        v-if="reportTemplates.length || user.isAdmin"
         class="tb-main"
         :title="tt('服务端正式报表：含公司抬头、页眉页脚与页码')"
         @click.stop="reportVisible = true"
@@ -258,7 +258,7 @@
               <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
               <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
                    该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
-              <div v-if="reportTemplates.length" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
+              <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
               <!-- 产品开发下发:仅产品信息表;归档后可点;下发过则置灰显示「已下发」 -->
               <div
                 class="as-side-btn"
@@ -895,7 +895,14 @@
     </el-dialog>
 
     <!-- ═══ 对外正式报表(后端 JasperReports 模板):业务只选格式,版式由 IT 的 .jrxml 决定 ═══ -->
-    <el-dialog v-model="reportVisible" :title="tt('导出报表')" width="420px" append-to-body>
+    <el-dialog v-model="reportVisible" :title="tt('导出报表')" width="460px" append-to-body>
+      <div v-if="reportTemplates.length" class="rpt-tpl-row">
+        <span class="rpt-tpl-label">{{ tt('报表模板') }}</span>
+        <el-select v-model="selectedReportCode" size="default" style="flex:1" :placeholder="tt('选择报表模板')">
+          <el-option v-for="t in reportTemplates" :key="t.code" :label="t.name" :value="t.code" />
+        </el-select>
+      </div>
+      <div v-else class="rpt-tpl-empty">{{ tt('该面板暂无报表模板，可点下方「模板管理」上传') }}</div>
       <div class="efmt-list">
         <div class="efmt-item" @click="downloadReport('pdf')">
           <span class="efmt-ico">📄</span>
@@ -920,7 +927,54 @@
         </div>
       </div>
       <template #footer>
+        <el-button v-if="user.isAdmin" type="primary" link @click="openManage">{{ tt('模板管理') }}</el-button>
         <el-button @click="reportVisible = false">{{ tt('取消') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- ═══ 报表模板管理(仅管理员;ADR-0002) ═══ -->
+    <el-dialog v-model="manageVisible" :title="tt('报表模板管理')" width="780px" append-to-body>
+      <div class="rpt-mg-toolbar">
+        <el-button type="primary" size="small" @click="uploadFormVisible = true">{{ tt('上传模板') }}</el-button>
+        <span class="rpt-mg-tip">{{ tt('模板为 .jrxml（Jaspersoft Studio 制作）；字段中文名须与面板字段标签一致；上传即生效') }}</span>
+      </div>
+      <el-table :data="manageList" size="small" border height="320">
+        <el-table-column prop="code" :label="tt('编码')" width="140" />
+        <el-table-column prop="name" :label="tt('名称')" width="140" />
+        <el-table-column prop="panelCode" :label="tt('绑定面板')" width="150" />
+        <el-table-column :label="tt('状态')" width="70" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? tt('启用') : tt('停用') }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="updateBy" :label="tt('更新')" width="130" />
+        <el-table-column :label="tt('操作')" min-width="150">
+          <template #default="{ row }">
+            <el-button size="small" link type="primary" @click="previewTpl(row)">{{ tt('预览') }}</el-button>
+            <el-button size="small" link :type="row.enabled ? 'warning' : 'success'" @click="toggleTpl(row)">{{ row.enabled ? tt('停用') : tt('启用') }}</el-button>
+            <el-button size="small" link type="danger" @click="removeTpl(row)">{{ tt('删除') }}</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="manageVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="uploadFormVisible" :title="tt('上传模板')" width="520px" append-to-body>
+      <div class="rpt-up-row"><span class="rpt-up-label">{{ tt('模板文件') }}</span>
+        <input ref="rptFileRef" type="file" accept=".jrxml,.xml" @change="onRptFile" /></div>
+      <div class="rpt-up-row"><span class="rpt-up-label">{{ tt('模板编码') }}</span>
+        <el-input v-model="uploadForm.templateCode" size="small" style="width:260px" placeholder="小写字母/数字/下划线,如 so_order" /></div>
+      <div class="rpt-up-row"><span class="rpt-up-label">{{ tt('报表名称') }}</span>
+        <el-input v-model="uploadForm.name" size="small" style="width:260px" /></div>
+      <div class="rpt-up-row"><span class="rpt-up-label">{{ tt('绑定面板') }}</span>
+        <el-input v-model="uploadForm.panelCode" size="small" style="width:260px" /></div>
+      <div class="rpt-up-row"><span class="rpt-up-label">{{ tt('备注') }}</span>
+        <el-input v-model="uploadForm.remark" size="small" style="width:260px" /></div>
+      <template #footer>
+        <el-button @click="uploadFormVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="uploading" @click="submitUpload">{{ tt('上传并启用') }}</el-button>
       </template>
     </el-dialog>
 
@@ -2633,11 +2687,104 @@ async function loadReportTemplates() {
   }
 }
 
+// ══════════ 模板选择 + 报表模板管理(仅管理员;ADR-0002) ══════════
+const selectedReportCode = ref('')
+watch(reportTemplates, (list) => {
+  if (!list?.length) { selectedReportCode.value = ''; return }
+  if (!list.some((t) => t.code === selectedReportCode.value)) selectedReportCode.value = list[0].code
+}, { immediate: true })
+
+const manageVisible = ref(false)
+const manageList = ref([])
+const uploadFormVisible = ref(false)
+const uploading = ref(false)
+const uploadForm = ref({ templateCode: '', name: '', panelCode: '', remark: '' })
+let uploadJrxml = ''
+
+function openManage() {
+  manageVisible.value = true
+  loadManageList()
+}
+async function loadManageList() {
+  try {
+    const res = await request.get('/report/templates', { params: { all: true } })
+    manageList.value = Array.isArray(res?.data) ? res.data : []
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('加载模板列表失败'))
+  }
+}
+function onRptFile(e) {
+  const file = e.target.files && e.target.files[0]
+  e.target.value = ''
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (ev) => {
+    uploadJrxml = String(ev.target.result || '')
+    const base = file.name.replace(/\.(jrxml|xml)$/i, '')
+    if (!uploadForm.value.templateCode) {
+      uploadForm.value.templateCode = base.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '')
+    }
+    if (!uploadForm.value.name) uploadForm.value.name = base
+  }
+  reader.readAsText(file, 'utf-8')
+}
+async function submitUpload() {
+  const f = uploadForm.value
+  if (!uploadJrxml) return ElMessage.warning(tt('请先选择 .jrxml 模板文件'))
+  if (!f.templateCode || !f.name || !f.panelCode) return ElMessage.warning(tt('编码/名称/绑定面板不能为空'))
+  uploading.value = true
+  try {
+    await request.post('/report/templates', { templateCode: f.templateCode, panelCode: f.panelCode, name: f.name, remark: f.remark, jrxml: uploadJrxml })
+    ElMessage.success(tt('模板已上传并启用'))
+    uploadFormVisible.value = false
+    uploadForm.value = { templateCode: '', name: '', panelCode: panelCode.value, remark: '' }
+    uploadJrxml = ''
+    await loadManageList()
+    await loadReportTemplates()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('上传失败'))
+  } finally {
+    uploading.value = false
+  }
+}
+async function toggleTpl(row) {
+  try {
+    await request.put(`/report/templates/${row.id}/enabled`, null, { params: { enabled: row.enabled ? 'N' : 'Y' } })
+    await loadManageList()
+    await loadReportTemplates()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('操作失败'))
+  }
+}
+async function removeTpl(row) {
+  try {
+    await ElMessageBox.confirm(`确认删除模板「${row.name}」？删除后不可恢复。`, tt('删除确认'), { type: 'warning' })
+  } catch { return }
+  try {
+    await request.delete(`/report/templates/${row.id}`)
+    ElMessage.success(tt('已删除'))
+    await loadManageList()
+    await loadReportTemplates()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('删除失败'))
+  }
+}
+function previewTpl(row) {
+  const no = curDocNo.value
+  if (!no) return ElMessage.warning(tt('请先在列表勾选一张单据（预览用其数据渲染）'))
+  request.get('/report/export', {
+    params: { code: row.code, panelCode: row.panelCode, docNo: no, format: 'pdf', disposition: 'inline' },
+    responseType: 'blob',
+  }).then((blob) => {
+    const url = URL.createObjectURL(blob)
+    window.open(url, '_blank')
+  }).catch((e) => ElMessage.error(engine.errMsg(e) || tt('预览失败')))
+}
 /** 取报表字节(Blob);失败由调用方提示 */
 function fetchReportBlob(fmt) {
   return request.get('/report/export', {
     params: {
-      code: reportTemplates.value[0]?.code,
+      code: selectedReportCode.value || reportTemplates.value[0]?.code,
       panelCode: panelCode.value,
       docNo: curDocNo.value,
       format: fmt,
@@ -2657,7 +2804,7 @@ async function downloadReport(fmt) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${reportTemplates.value[0]?.name || '报表'}-${no}.${fmt === 'xlsx' ? 'xlsx' : 'pdf'}`
+    a.download = `${reportTemplates.value.find((t) => t.code === selectedReportCode.value)?.name || '报表'}-${no}.${fmt === 'xlsx' ? 'xlsx' : 'pdf'}`
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -5990,4 +6137,12 @@ onUnmounted(() => {
   padding: 8px 12px;
   border-top: 1px solid #f0f0f0;
 }
-</style>
+
+/* ── 导出报表:模板选择 + 模板管理(ADR-0002) ── */
+.rpt-tpl-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.rpt-tpl-label { flex: none; font-size: 13px; color: #5a7a99; }
+.rpt-tpl-empty { font-size: 12px; color: #b0b8c1; background: #f7f9fb; border: 1px dashed #d9e2ea; border-radius: 4px; padding: 8px 12px; margin-bottom: 10px; }
+.rpt-mg-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.rpt-mg-tip { font-size: 12px; color: #9aa8b5; }
+.rpt-up-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.rpt-up-label { flex: none; width: 70px; text-align: right; font-size: 13px; color: #5a7a99; }</style>
