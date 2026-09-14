@@ -203,11 +203,48 @@
                 <div v-if="!fuzzyResultRows.length" class="fuzzy-empty">{{ tt('未找到匹配单据') }}</div>
               </div>
             </div>
+            <!-- ═══ 单据预览查找态:全量单据卡片(编号/状态/日期+关键摘要字段),点击即跳转,档案查看效果 ═══ -->
+            <div v-else-if="previewMode" class="fuzzy-panel">
+              <div class="fuzzy-head">
+                <span>{{ tt('单据预览查找') }}</span>
+                <span class="fuzzy-back" :title="tt('返回')" @click="closeDocPreview">↩</span>
+              </div>
+              <el-input
+                v-model="previewKw"
+                size="small"
+                clearable
+                :placeholder="tt('输入编号或任意内容快速筛选')"
+                class="preview-kw"
+              />
+              <div class="preview-cards">
+                <div
+                  v-for="c in previewCards"
+                  :key="c.no"
+                  class="preview-card"
+                  :class="{ on: c.no === curDocNo }"
+                  @click="openPreviewCard(c)"
+                >
+                  <div class="pc-head">
+                    <span class="pc-no">{{ c.no }}</span>
+                    <span v-if="c.status" class="doc-status" :class="c.status">{{ tt(c.status) }}</span>
+                  </div>
+                  <div class="pc-date">{{ c.date }}</div>
+                  <div v-for="(f, i) in c.fields" :key="i" class="pc-field">
+                    <span class="pc-label">{{ tt(f.label) }}</span>
+                    <span class="pc-value">{{ f.value }}</span>
+                  </div>
+                  <div v-if="!c.fields.length" class="pc-none">{{ tt('（无摘要字段）') }}</div>
+                </div>
+                <div v-if="!previewCards.length" class="fuzzy-empty">{{ tt('未找到匹配单据') }}</div>
+              </div>
+            </div>
             <div v-else class="as-side-btns">
               <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板) -->
               <div class="as-side-btn" @click="docQueryVisible = true">{{ tt('查询单据') }}</div>
               <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单 -->
               <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
+              <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果 -->
+              <div class="as-side-btn" @click="openDocPreview">{{ tt('单据预览') }}</div>
               <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回);删除申请中出「撤回删除申请」(卡死单据出口) -->
               <div class="as-side-del" v-if="isApprovalDoc">
                 <div class="as-side-btn-row">
@@ -1828,6 +1865,61 @@ async function runFuzzySearch() {
 /** 点结果行 = 切换当前单据(走既有离开守卫:草稿未保存会提示) */
 async function openFuzzyResult(r) {
   const index = list.value.indexOf(r.row)
+  if (index >= 0) await guardDocSwitch(index)
+}
+// ---------- 文书侧栏「单据预览查找」:全量单据卡片(编号/状态/日期+前4个非空业务字段摘要) ----------
+// 与模糊搜索同源取数(pageSize 拉到 200 一次取全),关键字客户端筛选;点卡片即跳转,文件档案查看效果。零后端改动。
+const previewMode = ref(false)
+const previewKw = ref('')
+let previewPrevPageSize = null
+/** 摘要字段剔除清单:系统列与阶段明细列不进卡片 */
+const PREVIEW_SKIP = new Set(['单据编号', '编号', '单据日期', '单据状态', '文档编号', '文件管理人', '密级', '文件使用范围', '备注', '打印时间', '公司名称'])
+function previewFieldsOf(row) {
+  const out = []
+  for (const f of headerFields.value || []) {
+    if (out.length >= 4) break
+    const key = headerFieldKey(f)
+    if (!key || PREVIEW_SKIP.has(key) || /^阶段\d+/.test(key)) continue
+    const v = row[key]
+    if (v == null || String(v).trim() === '') continue
+    const s = String(v).replace(/\s+/g, ' ').trim()
+    if (!s) continue
+    out.push({ label: key, value: s.length > 42 ? s.slice(0, 42) + '…' : s })
+  }
+  return out
+}
+const previewCards = computed(() => (list.value || []).map((row) => {
+  const no = String(row['单据编号'] || row['编号'] || '')
+  const fields = previewFieldsOf(row)
+  const kw = previewKw.value.trim().toLowerCase()
+  const hit = !kw || no.toLowerCase().includes(kw) || fields.some((x) => x.value.toLowerCase().includes(kw))
+  return { no, date: String(row['单据日期'] || ''), status: String(row['单据状态'] || ''), fields, hit, row }
+}).filter((c) => c.hit))
+async function openDocPreview() {
+  if (fuzzyMode.value) { // 与模糊搜索互斥:模糊条件失效,pageSize 直接接管
+    fuzzyMode.value = false
+    fuzzySearched.value = false
+    fuzzyApplied.value = null
+    fuzzyPrevPageSize = null
+  }
+  previewMode.value = true
+  previewKw.value = ''
+  if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize
+  query.pageSize = 200
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+}
+async function closeDocPreview() {
+  previewMode.value = false
+  previewKw.value = ''
+  if (previewPrevPageSize !== null) { query.pageSize = previewPrevPageSize; previewPrevPageSize = null }
+  query.pageNo = 1
+  curIdx.value = 0
+  await load()
+}
+async function openPreviewCard(c) {
+  const index = list.value.indexOf(c.row)
   if (index >= 0) await guardDocSwitch(index)
 }
 /** 文书归档面板(保存即归档):修改闭环按钮组的显隐开关,真源后端 metadata.docArchive */
@@ -6145,4 +6237,21 @@ onUnmounted(() => {
 .rpt-mg-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
 .rpt-mg-tip { font-size: 12px; color: #9aa8b5; }
 .rpt-up-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
-.rpt-up-label { flex: none; width: 70px; text-align: right; font-size: 13px; color: #5a7a99; }</style>
+.rpt-up-label { flex: none; width: 70px; text-align: right; font-size: 13px; color: #5a7a99; }
+/* ── 单据预览查找(文书侧栏,文件档案查看效果) ── */
+.preview-kw { margin: 4px 0 6px; }
+.preview-cards { max-height: 520px; overflow: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 2px; }
+.preview-card {
+  border: 1px solid #d9e2ea; border-radius: 6px; background: #fff;
+  padding: 6px 8px; cursor: pointer; transition: border-color .15s, box-shadow .15s;
+}
+.preview-card:hover { border-color: #7fb0dd; box-shadow: 0 1px 4px rgba(30, 90, 138, .12); }
+.preview-card.on { border-color: #1e5a8a; background: #f0f7ff; }
+.pc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
+.pc-no { font-weight: 600; font-size: 13px; color: #1e5a8a; word-break: break-all; }
+.pc-date { font-size: 11px; color: #9aa8b5; margin-bottom: 3px; }
+.pc-field { display: flex; gap: 6px; font-size: 12px; line-height: 18px; min-width: 0; }
+.pc-label { flex: none; color: #8ba6bd; }
+.pc-label::after { content: '：'; }
+.pc-value { color: #444; word-break: break-all; min-width: 0; }
+.pc-none { font-size: 11px; color: #c2ccd4; font-style: italic; }</style>
