@@ -131,6 +131,19 @@ const MSG_TPL = {
   DELETE_REQUESTED: { title: '新的删除申请', body: '{actor} 申请删除「{panelName} {docNo}」，等待您审批。' },
   // 规格书检验项目及标准变更 → 关联出货检验计划表核对(2026-09-11;仅变更提醒,不比对内容)
   SPEC_ITEMS_CHANGED: { title: '规格书检验项目已更新', body: '「规格书 {specNo}（{specName}）」的产品性能检验项目及检验标准已由 {actor} 修改，与本表（{panelName} {docNo}）可能不一致，请核对本表的必测项/型式检验。' },
+  // 审批结果通知(2026-09-12 补齐):删除/修改申请的审批结果此前不通知,申请人全靠自查
+  DELETE_APPROVED: { title: '删除申请已通过', body: '您申请删除的「{panelName} {docNo}」已由 {actor} 同意，单据已作废。意见：{opinion}' },
+  DELETE_REJECTED: { title: '删除申请被驳回', body: '您申请删除的「{panelName} {docNo}」被 {actor} 驳回，单据保持原状态。意见：{opinion}' },
+  MODIFY_APPROVED: { title: '修改申请已同意', body: '您申请修改的「{panelName} {docNo}」已由 {actor} 同意，现在可以编辑，保存后将重新归档。' },
+  MODIFY_REJECTED: { title: '修改申请被驳回', body: '您申请修改的「{panelName} {docNo}」被 {actor} 驳回。意见：{opinion}' },
+  // 终止二级审批四码(模板词条 en.js 已预置;此前缺模板渲染成通用「业务消息」)
+  TERM_REQUESTED: { title: '新的终止申请（待立项人审批）', body: '{actor} 申请终止「{panelName} {docNo}」（终止于阶段 {stage}），等待您（立项人）审批。' },
+  TERM_TO_ADMIN: { title: '终止申请待管理员审批', body: '「{panelName} {docNo}」的终止申请（阶段 {stage}）已经立项人同意，等待管理员审批落实。' },
+  TERM_APPROVED: { title: '终止已落实', body: '「{panelName} {docNo}」的终止申请（阶段 {stage}）已经管理员同意，终止已落实，单据已锁定。' },
+  TERM_REJECTED: { title: '终止申请被驳回', body: '「{panelName} {docNo}」的终止申请（阶段 {stage}）被 {actor} 驳回。意见：{opinion}' },
+  // 规格书两级分发(2026-09-12):下发→总负责人,分发→责任人
+  SPEC_DISPATCHED: { title: '产品开发已下发', body: '产品「{productName}（{productCode}）」已下发产品开发，请使用「规格书分发」安排规格书编写。' },
+  SPEC_ASSIGNED: { title: '新的规格书任务', body: '「{productName}（{productCode}）」的{kind}规格书已分发给您，请填写并保存（单据 {docNo}）。' },
 }
 
 function fillTpl(text, params) {

@@ -6,18 +6,18 @@ cd /d "%~dp0"
 
 rem ---- JDK 探测(与 build.bat 一致) ----
 if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" goto :jdk_ok
-for %%D in ("C:\Program Files\Java\jdk-26.0.2" "D:\Program Files\Java\jdk-26.0.2" "D:\Program Files\Java\jdk-24" "C:\Program Files\Java\jdk-17") do (
+for %%D in ("C:\Program Files\Java\jdk-25" "D:\Program Files\Java\jdk-25" "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2") do (
   if exist "%%~D\bin\java.exe" ( set "JAVA_HOME=%%~D" & goto :jdk_ok )
 )
-where java >nul 2>nul || ( echo [错误] 未找到 JDK ^(17+^) & goto :fail )
+where java >nul 2>nul || ( echo [错误] 未找到 JDK 25 & goto :fail )
 :jdk_ok
 
 rem ---- JDBC 驱动:优先 tools\lib,其次本地 .m2-repo ----
 set "JDBC=%~dp0lib\mssql-jdbc.jar"
-if not exist "%JDBC%" set "JDBC=%~dp0..\.m2-repo\com\microsoft\sqlserver\mssql-jdbc\12.8.1.jre11\mssql-jdbc-12.8.1.jre11.jar"
+if not exist "%JDBC%" set "JDBC=%~dp0..\.m2-repo\com\microsoft\sqlserver\mssql-jdbc\12.8.2.jre11\mssql-jdbc-12.8.2.jre11.jar"
 if not exist "%JDBC%" (
   echo [错误] 未找到 mssql-jdbc 驱动: tools\lib\mssql-jdbc.jar
-  echo        也没有 %~dp0..\.m2-repo\...\mssql-jdbc-12.8.1.jre11.jar ^(构建一次后端即可生成^)
+  echo        也没有 %~dp0..\.m2-repo\...\mssql-jdbc-12.8.2.jre11.jar ^(构建一次后端即可生成^)
   goto :fail
 )
 

@@ -50,7 +50,7 @@ import { tt } from '@/i18n'
  * 存结构化 JSON)——本组件只把它当字符串原样编辑/往返,不解析,避免改坏结构化条目。
  *
  * 不污染已录入数据:面板勾选录入时存的是**文本内容**,单据列不存条目 id,所以这里改条目
- * 只影响以后的勾选候选,历史单据原样不动(探针 tools/_probe-stdlib-edit.cjs 钉这条)。
+ * 只影响以后的勾选候选,历史单据原样不动(探针 tools/archive/_probe-stdlib-edit.cjs 钉这条)。
  */
 const props = defineProps({
   lib: { type: String, required: true },

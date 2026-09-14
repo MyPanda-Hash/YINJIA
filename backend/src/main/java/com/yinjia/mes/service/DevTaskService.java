@@ -101,9 +101,12 @@ public class DevTaskService {
     /**
      * 下发:把产品写到 5 个下游面板。已下发过的产品直接返回 already=true(幂等)。
      * 仅允许对「已归档」的产品信息表单据下发,由调用方(ButtonService)校验。
+     * 2026-09-12:下发同时快照总负责人账号(rd_dev_task.负责人,=产品信息表「责任人」姓名匹配的
+     * 启用账号);查无账号传 null(列可空 = 任务挂起,产品信息改好后经 supervisorOf 懒重解补挂)。
      */
     @Transactional
-    public Map<String, Object> dispatch(String productCode, String productName, String sourceDocNo, String user) {
+    public Map<String, Object> dispatch(String productCode, String productName, String sourceDocNo, String user,
+                                        String supervisor) {
         Map<String, Object> out = new LinkedHashMap<>();
         if (productCode == null || productCode.isBlank()) {
             throw new IllegalArgumentException("产品编号为空,无法下发");
@@ -112,18 +115,151 @@ public class DevTaskService {
             out.put("already", true);
             out.put("productCode", productCode);
             out.put("panels", dispatchedPanels(productCode));
+            fillSupervisor(out, productCode);
             return out;
         }
         LocalDateTime now = LocalDateTime.now();
         for (Map.Entry<String, String[]> e : DEV_PANELS.entrySet()) {
-            jdbc.update("INSERT INTO rd_dev_task (产品编号,产品名称,源单据号,目标面板,下发人,下发时间,asp_user1,asp_time1) "
-                            + "VALUES (?,?,?,?,?,?,?,?)",
-                    productCode, productName, sourceDocNo, e.getKey(), user, now, user, now);
+            jdbc.update("INSERT INTO rd_dev_task (产品编号,产品名称,源单据号,目标面板,负责人,下发人,下发时间,asp_user1,asp_time1) "
+                            + "VALUES (?,?,?,?,?,?,?,?,?)",
+                    productCode, productName, sourceDocNo, e.getKey(), supervisor, user, now, user, now);
         }
         out.put("already", false);
         out.put("productCode", productCode);
         out.put("panels", DEV_PANELS.keySet());
+        fillSupervisor(out, productCode);
         return out;
+    }
+
+    /** 输出补总负责人字段(supervisor/supervisorName/supervisorResolved) */
+    private void fillSupervisor(Map<String, Object> out, String productCode) {
+        String supervisor = supervisorOf(productCode);
+        out.put("supervisor", supervisor == null ? "" : supervisor);
+        out.put("supervisorName", supervisor == null ? "" : realNameOf(supervisor));
+        out.put("supervisorResolved", supervisor != null);
+    }
+
+    /** 姓名 → 启用账号(产品信息表「责任人」是姓名,rd_spec_assign/rd_dev_task 存账号);
+     *  同名取最小 id(确定性);查无返回 null。 */
+    public String resolveUsername(String realName) {
+        if (realName == null || realName.isBlank()) return null;
+        List<String> rows = jdbc.queryForList(
+                "SELECT TOP 1 username FROM yj_user WHERE real_name = ? AND ISNULL(enabled,'1') = '1' ORDER BY id",
+                String.class, realName.trim());
+        return rows.isEmpty() || rows.get(0) == null ? null : String.valueOf(rows.get(0));
+    }
+
+    /**
+     * 该产品的总负责人账号(活值):rd_dev_task.负责人 快照优先;历史行/挂起(NULL)时
+     * 懒重解——按产品信息表「责任人」姓名匹配启用账号并回填快照。查无返回 null(任务挂起)。
+     * 产品信息改负责人后,这里返回的是新负责人(权限判定用它,不用 rd_spec_assign 里的旧快照)。
+     */
+    public String supervisorOf(String productCode) {
+        if (productCode == null || productCode.isBlank()) return null;
+        List<String> cur = jdbc.queryForList(
+                "SELECT TOP 1 负责人 FROM rd_dev_task WHERE 产品编号 = ? AND 负责人 IS NOT NULL"
+                        + " AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
+                String.class, productCode);
+        if (!cur.isEmpty()) return String.valueOf(cur.get(0)).trim();
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT TOP 1 责任人 FROM rd_prod_info_head WHERE 产品编号 = ? AND 责任人 IS NOT NULL"
+                        + " AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC", productCode);
+        if (rows.isEmpty()) return null;
+        Object nm = rows.get(0).get("责任人");
+        if (nm == null || String.valueOf(nm).isBlank()) return null;
+        String account = resolveUsername(String.valueOf(nm));
+        if (account != null) {
+            jdbc.update("UPDATE rd_dev_task SET 负责人 = ? WHERE 产品编号 = ? AND 负责人 IS NULL", account, productCode);
+        }
+        return account;
+    }
+
+    /** 总负责人或管理员判定(活值,经 supervisorOf 懒重解;挂起产品仅管理员) */
+    public boolean isSupervisorOrAdmin(String productCode, String user) {
+        if (user == null || user.isBlank()) return false;
+        if (isAdmin(user)) return true;
+        String supervisor = supervisorOf(productCode);
+        return supervisor != null && supervisor.equals(user);
+    }
+
+    /** 规格书分配总览:某产品已分发的全部规格书单(负责人弹窗用;assigns 含单据状态) */
+    public Map<String, Object> specAssignState(String productCode) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (productCode == null || productCode.isBlank()) {
+            out.put("assigns", List.of());
+            return out;
+        }
+        out.put("productCode", productCode);
+        out.put("dispatched", dispatched(productCode));
+        fillSupervisor(out, productCode);
+        List<Map<String, Object>> p = jdbc.queryForList(
+                "SELECT TOP 1 产品名称 FROM rd_prod_info_head WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY id DESC", productCode);
+        out.put("productName", p.isEmpty() || p.get(0).get("产品名称") == null ? "" : String.valueOf(p.get(0).get("产品名称")));
+        out.put("assigns", jdbc.queryForList(
+                "SELECT a.单据编号, a.规格书种类, a.责任人, a.负责人, ISNULL(u.real_name, N'') AS ownerName,"
+                        + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废' WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
+                        + " WHEN ISNULL(s.deleting,'N')='Y' THEN N'删除申请中' WHEN ISNULL(s.modify_state,N'')='R' THEN N'修改申请中'"
+                        + " WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' WHEN ISNULL(s.modify_state,N'')='Y' THEN N'修改中'"
+                        + " WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档' ELSE N'草稿' END AS status"
+                        + " FROM rd_spec_assign a LEFT JOIN yj_user u ON u.username = a.责任人"
+                        + " LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = a.单据编号"
+                        + " WHERE a.产品编号 = ? AND ISNULL(a.asp_cancel,'N') <> 'Y' ORDER BY a.id", productCode));
+        // 可分配候选单(2026-09-12 用户口径:分发=把已有单据分给人,不再按种类建单):
+        // 存活、未分配、且 编号为空(普通保存从不写该列)或已等于本产品编号(分发/历史导入盖过章)。
+        // 删除申请中/已中止单据不再出现(2026-09-12「删除的就不再显示选择」:归档单点删除待审批 = 用户眼里的"已删除")
+        out.put("docs", jdbc.queryForList(
+                "SELECT h.单据编号, ISNULL(h.规格书种类, N'') AS 规格书种类,"
+                        + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废' WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
+                        + " WHEN ISNULL(s.deleting,'N')='Y' THEN N'删除申请中' WHEN ISNULL(s.modify_state,N'')='R' THEN N'修改申请中'"
+                        + " WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' WHEN ISNULL(s.modify_state,N'')='Y' THEN N'修改中'"
+                        + " WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档' ELSE N'草稿' END AS status"
+                        + " FROM rd_spec_doc_head h LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = h.单据编号"
+                        + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'"
+                        + " AND ISNULL(s.deleting,'N') <> 'Y' AND ISNULL(s.stopped,'N') <> 'Y' AND (h.编号 IS NULL OR h.编号 = ?)"
+                        + " AND NOT EXISTS (SELECT 1 FROM rd_spec_assign a WHERE a.单据编号 = h.单据编号 AND ISNULL(a.asp_cancel,'N') <> 'Y')"
+                        + " ORDER BY h.id DESC", productCode));
+        return out;
+    }
+
+    /** 单张规格书单的分配(hasAssign=false 表示未分配,不受编辑封锁约束) */
+    public Map<String, Object> specAssignOfDoc(String docNo) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (docNo == null || docNo.isBlank()) {
+            out.put("hasAssign", false);
+            return out;
+        }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT a.产品编号, a.规格书种类, a.责任人, a.负责人, ISNULL(u.real_name, N'') AS ownerName"
+                        + " FROM rd_spec_assign a LEFT JOIN yj_user u ON u.username = a.责任人"
+                        + " WHERE a.单据编号 = ? AND ISNULL(a.asp_cancel,'N') <> 'Y'", docNo);
+        if (rows.isEmpty()) {
+            out.put("hasAssign", false);
+            return out;
+        }
+        Map<String, Object> a = rows.get(0);
+        String productCode = String.valueOf(a.get("产品编号"));
+        String supervisor = supervisorOf(productCode);
+        out.put("hasAssign", true);
+        out.put("owner", String.valueOf(a.get("责任人")));
+        out.put("ownerName", String.valueOf(a.get("ownerName")));
+        out.put("kind", String.valueOf(a.get("规格书种类")));
+        out.put("productCode", productCode);
+        out.put("supervisor", supervisor == null ? "" : supervisor);
+        out.put("supervisorName", supervisor == null ? "" : realNameOf(supervisor));
+        return out;
+    }
+
+    private String realNameOf(String username) {
+        if (username == null || username.isBlank()) return "";
+        List<String> rows = jdbc.queryForList(
+                "SELECT real_name FROM yj_user WHERE username = ?", String.class, username);
+        return rows.isEmpty() || rows.get(0) == null ? "" : String.valueOf(rows.get(0));
+    }
+
+    private boolean isAdmin(String user) {
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT is_admin FROM yj_user WHERE username=?", user);
+        return !rows.isEmpty() && "Y".equals(String.valueOf(rows.get(0).get("is_admin")));
     }
 
     /** 单产品 × 单面板的开发状态(实时推导) */
@@ -210,11 +346,14 @@ public class DevTaskService {
         return out;
     }
 
-    /** 产品信息表侧边栏「产品开发」按钮状态:disabled / dispatched / ready */
+    /** 产品信息表侧边栏「产品开发」按钮状态:disabled / dispatched / ready;
+     *  已下发时附带总负责人字段(「规格书分发」按钮显隐依据,顺带承担懒重解) */
     public Map<String, Object> buttonState(String productCode) {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("productCode", productCode == null ? "" : productCode);
-        out.put("dispatched", dispatched(productCode));
+        boolean disp = dispatched(productCode);
+        out.put("dispatched", disp);
+        if (disp) fillSupervisor(out, productCode);
         return out;
     }
 

@@ -965,7 +965,7 @@ export const recordSheetConfigs = {
           { key: '备注', label: '备注' },
         ]},
     ],
-    // 检验项目标准库(分组):SPEC_TEST_LIB 由 tools/gen-spec-testlib.cjs 从《测试项目汇总.xlsx》生成
+    // 检验项目标准库(分组):SPEC_TEST_LIB 由 tools/gen/gen-spec-testlib.cjs 从《测试项目汇总.xlsx》生成
     testLib: SPEC_TEST_LIB,
     // 7./8. 通用文案默认预填(《规格书示例》通行文本;新单草稿进入编辑且字段为空时带入)
     sectionDefaults: {

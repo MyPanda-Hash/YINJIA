@@ -1,0 +1,160 @@
+package com.yinjia.mes.service;
+
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * 面板权限服务(2026-09-12 服务端强制执行):
+ * 此前权限只作用于前端(菜单显隐 + 审批按钮显隐),后端 /api/px/* 对任何登录用户开放——
+ * 拿 token 直接调 API 可越权读任意面板数据、改删他人草稿、把他人单据提进审批。
+ * 本服务在 PxController/ReportController 入口做服务端校验,与角色面板权限(yj_role_panel.perms)同源。
+ *
+ * 词表对齐 SysAdminController.PERMISSION_ACTIONS:
+ * view 可见 / query 查询单据 / add 新增保存 / modify 申请修改 / modlog 修改记录 /
+ * del 删除申请 / export 导出打印 / audit 审批(can_approve = perms 含 audit)。
+ *
+ * 读权限放行集合 = 可见面板 ∪ 可见面板字段的参照目标(yj_field.ref_panel) ∪ 同模块(module_group)面板。
+ * 参照/选单/BOM 勾选/进度表等跨面板读取大量存在(SelectVoucherDialog/RecordSheetPanels/ProgressControlSheet),
+ * 只按 view 硬拦会打断合法参照链,故按三层推导放行;跨模块的越权读仍被拦。
+ * 因缺失放行而被拦的合法场景,解法是给角色补一个该模块任意面板的「可见」(管理员界面一个勾)。
+ */
+@Service
+public class PanelPermissionService {
+
+    private final JdbcTemplate jdbc;
+    private final PanelRegistry registry;
+
+    public PanelPermissionService(JdbcTemplate jdbc, PanelRegistry registry) {
+        this.jdbc = jdbc;
+        this.registry = registry;
+    }
+
+    /** 按钮名 → 所需权限(词内任一命中即放行;管理员恒过)。语义对齐权限配置界面的词表注释。 */
+    private static final Map<String, String[]> BUTTON_PERMS;
+    /** 权限词 → 配置界面标签(错误提示用) */
+    private static final Map<String, String> PERM_LABEL = Map.of(
+            "view", "可见", "query", "查询单据", "add", "新增保存", "modify", "申请修改",
+            "modlog", "修改记录", "del", "删除申请", "export", "导出打印", "audit", "审批");
+
+    static {
+        Map<String, String[]> m = new HashMap<>();
+        // 只读/查询类(view 即可;方法内自有状态与身份校验)
+        for (String b : new String[]{"刷新", "查找", "审批情况", "同步进度", "终止审批通过", "终止审批驳回"})
+            m.put(b, new String[]{"view"});
+        m.put("修改记录", new String[]{"view", "modlog"});
+        // 编辑类(新增保存/申请修改 词表语义)
+        String[] edit = {"add", "modify"};
+        for (String b : new String[]{"保存", "提交", "保存新增", "保存为草稿", "新增流程", "新增", "复制",
+                "阶段完成", "生成产品批号", "新增库存", "更新预警数量", "产品开发", "申请终止"})
+            m.put(b, edit);
+        m.put("申请修改", new String[]{"modify"});                       // 词表:modify=申请修改
+        // 删除类(草稿直删需编辑权;归档单删除申请=del)
+        m.put("删除", new String[]{"add", "modify", "del"});
+        m.put("删除单据", new String[]{"add", "modify", "del"});
+        // 撤回类:发起人(对应申请权限)或审批人(audit);方法内另有发起人/审批人身份校验
+        m.put("撤回删除申请", new String[]{"del", "audit"});
+        m.put("撤回修改申请", new String[]{"modify", "audit"});
+        m.put("撤回终止申请", new String[]{"modify", "audit"});
+        // 审批类(audit → can_approve,与 ButtonService.requireApprover 同口径)
+        for (String b : new String[]{"审核", "弃审", "提交审批", "审批通过", "审批驳回", "中止", "取消中止",
+                "删除审批通过", "删除审批驳回", "修改审批通过", "修改审批驳回"})
+            m.put(b, new String[]{"audit"});
+        BUTTON_PERMS = Map.copyOf(m);
+    }
+
+    /** 按钮权限校验:未映射的按钮放行(由 ButtonService「未定义按钮规则」兜底拦截) */
+    public void requireButton(String panelCode, String buttonName) {
+        String user = currentUserName();
+        if (isAdmin(user)) return;
+        String[] need = BUTTON_PERMS.get(buttonName == null ? "" : buttonName);
+        if (need == null) return;
+        Set<String> perms = permsOf(user).getOrDefault(panelCode, Set.of());
+        for (String n : need) if (perms.contains(n)) return;
+        StringBuilder labels = new StringBuilder();
+        for (String n : need) {
+            if (labels.length() > 0) labels.append("/");
+            labels.append(PERM_LABEL.getOrDefault(n, n));
+        }
+        throw new AccessDeniedException("当前角色无该面板「" + labels + "」权限，无法执行「" + buttonName + "」");
+    }
+
+    /** 面板查看权限校验(数据读取类接口:列表/单据/审批历史/报表导出) */
+    public void requirePanelView(String panelCode) {
+        String user = currentUserName();
+        if (isAdmin(user)) return;
+        if (readablePanels(user).contains(panelCode)) return;
+        throw new AccessDeniedException("当前角色无该面板的查看权限：" + panelCode);
+    }
+
+    /** 用户面板权限:panelCode → perms 词集(单角色,但按多行合并兜底) */
+    public Map<String, Set<String>> permsOf(String user) {
+        Map<String, Set<String>> out = new HashMap<>();
+        jdbc.query("SELECT rp.panel_code, rp.perms FROM yj_user u JOIN yj_role_panel rp ON rp.role_id = u.role_id"
+                        + " WHERE u.username = ?",
+                rs -> {
+                    Set<String> s = out.computeIfAbsent(rs.getString(1), k -> new HashSet<>());
+                    String perms = rs.getString(2);
+                    if (perms != null) for (String p : perms.split(",")) {
+                        String t = p.trim();
+                        if (!t.isEmpty()) s.add(t);
+                    }
+                }, user);
+        return out;
+    }
+
+    /** 可见面板(perms 含 view) */
+    public Set<String> visiblePanels(String user) {
+        return new HashSet<>(jdbc.queryForList(
+                "SELECT rp.panel_code FROM yj_user u JOIN yj_role_panel rp ON rp.role_id = u.role_id"
+                        + " WHERE u.username = ? AND rp.perms LIKE '%view%'",
+                String.class, user));
+    }
+
+    /** 读放行集合:可见 ∪ 参照目标(yj_field.ref_panel) ∪ 同模块面板(module_group) */
+    public Set<String> readablePanels(String user) {
+        Set<String> visible = visiblePanels(user);
+        Set<String> out = new HashSet<>(visible);
+        for (String p : visible) {
+            PanelRegistry.PanelDef def = panelOf(p);
+            if (def == null) continue;
+            for (PanelRegistry.FieldDef f : def.fields()) {
+                if (f.refPanel() != null && !f.refPanel().isBlank()) out.add(f.refPanel().trim());
+            }
+        }
+        Set<String> modules = new HashSet<>();
+        for (String p : visible) {
+            PanelRegistry.PanelDef def = panelOf(p);
+            if (def != null) modules.add(def.moduleName());
+        }
+        for (PanelRegistry.PanelDef def : registry.all()) {
+            if (modules.contains(def.moduleName())) out.add(def.code());
+        }
+        return out;
+    }
+
+    private PanelRegistry.PanelDef panelOf(String code) {
+        try {
+            return registry.panel(code);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private boolean isAdmin(String user) {
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT is_admin FROM yj_user WHERE username=?", user);
+        return !rows.isEmpty() && "Y".equals(String.valueOf(rows.get(0).get("is_admin")));
+    }
+
+    private String currentUserName() {
+        var auth = SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : "system";
+    }
+}

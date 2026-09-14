@@ -25,7 +25,8 @@ tools/apache-maven-3.9.9/
 # 误创建的 Maven 本地仓库(settings.xml 的 localRepository 未展开环境变量)
 */${env.YINJIA_M2_REPO}/
 
-# 会话诊断脚本与临时产物(不入库)
+# 会话诊断脚本与临时产物:tools 根层不再堆放(历史产物已归档 tools/archive/ 并入库);
+# 根层规则保留作防线,防止再往根层丢。新的一次性探针/任务产物直接写 tools/archive/ 并入库。
 tools/_*.cjs
 tools/_*.json
 tools/_*.md
@@ -33,8 +34,8 @@ tools/_*.txt
 tools/vc-out.txt
 tools/vd-out.txt
 tools/_void-check.sql
-tools/_walk/_rsc*.cjs
-tools/_walk/*.generated.js
+tools/archive/_walk/_rsc*.cjs
+tools/archive/_walk/*.generated.js
 
 deploy/*.bak
 deploy/*.jar
@@ -43,6 +44,9 @@ deploy/pkg-*/
 *.deploy.zip
 yinjia-mes-deploy.zip
 
-tools/_flow-v12/forms-images-full/
-tools/_flow-v12/_runsql-out.txt
-tools/_flow-v12/_grant-out.txt
+tools/archive/_flow-v12/forms-images-full/
+tools/archive/_flow-v12/_runsql-out.txt
+tools/archive/_flow-v12/_grant-out.txt
+
+# 本地 IDE 配置(不入库)
+.vscode/

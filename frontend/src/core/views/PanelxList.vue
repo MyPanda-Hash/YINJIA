@@ -217,6 +217,12 @@
                   </template>
                 </div>
               </div>
+              <!-- 规格书两级分发:已分配单展示归属;非 责任人∪总负责人∪管理员 只读 -->
+              <div v-if="panelCode === 'RD_SPEC_DOC' && specDocAssign?.hasAssign"
+                   style="font-size:12px;color:#606266;line-height:1.7;padding:2px 0 6px;border-bottom:1px dashed #dcdfe6;margin-bottom:4px">
+                <div>{{ tt('责任人') }}：{{ specDocAssign.ownerName || specDocAssign.owner }}<span v-if="specAssignBlocked">（{{ tt('只读') }}）</span></div>
+                <div>{{ tt('总负责人') }}：{{ specDocAssign.supervisorName || specDocAssign.supervisor || tt('未落实') }}</div>
+              </div>
               <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改态出「提交审批」,审批中出管理员审批;修改申请中出「撤回修改申请」;修改记录弹窗(滚动3条) -->
               <div class="as-side-del" v-if="isDocArchivePanel">
                 <div class="as-side-btn-row">
@@ -252,6 +258,15 @@
                 :title="devDispatch.dispatched ? tt('该产品已下发到下游面板') : (canDevDispatch ? tt('把该产品下发到下游 5 个文件面板') : tt('仅已归档的产品信息表可下发'))"
                 @click="onDevDispatch"
               >{{ devDispatch.dispatched ? tt('已下发') : tt('产品开发') }}</div>
+              <!-- 规格书两级分发(第二级):已下发产品出现;仅总负责人/管理员可用,负责人未落实(挂起)时置灰 -->
+              <div
+                class="as-side-btn"
+                v-if="panelCode === 'RD_PROD_INFO' && devDispatch.dispatched"
+                :class="{ disabled: !canSpecDispatch }"
+                :title="canSpecDispatch ? tt('把该产品的规格书单据分发给责任人填写')
+                  : (devDispatch.supervisorResolved ? tt('仅总负责人或管理员可分发规格书') : tt('产品信息表「责任人」未匹配到启用账号，任务挂起'))"
+                @click="openSpecAssign"
+              >{{ tt('规格书分发') }}</div>
               <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
                 <div
                   class="as-side-btn"
@@ -930,6 +945,46 @@
           </div>
         </div>
       </div>
+    </el-dialog>
+    <!-- 规格书分发弹窗(两级分发第二级):总负责人把已有规格书单逐张绑定责任人(2026-09-12 改口径,不按种类建单) -->
+    <el-dialog v-model="specAssignVisible" :title="tt('规格书分发') + (specAssignStateData?.productName ? ' · ' + specAssignStateData.productName : '')" width="640px" append-to-body>
+      <div class="dq-form">
+        <div class="dq-row" style="margin-bottom:6px">
+          <span class="dq-label">{{ tt('总负责人') }}</span>
+          <span>{{ specAssignStateData?.supervisorName || specAssignStateData?.supervisor || tt('产品信息表「责任人」未匹配到启用账号，任务挂起') }}</span>
+        </div>
+        <div v-if="(specAssignStateData?.assigns || []).length" class="mod-log-meta" style="margin-bottom:8px">
+          {{ tt('已分发规格书') }}：{{ specAssignStateData.assigns.length }} {{ tt('张') }}
+        </div>
+        <table v-if="(specAssignStateData?.assigns || []).length" class="mod-log-table" style="margin-bottom:10px">
+          <thead><tr><th>{{ tt('单据编号') }}</th><th>{{ tt('规格书种类') }}</th><th>{{ tt('责任人') }}</th><th style="width:70px">{{ tt('单据状态') }}</th></tr></thead>
+          <tbody>
+            <tr v-for="a in specAssignStateData.assigns" :key="a['单据编号']">
+              <td>{{ a['单据编号'] }}</td>
+              <td>{{ a['规格书种类'] }}</td>
+              <td>{{ a.ownerName || a['责任人'] }}</td>
+              <td>{{ tt(String(a.status)) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div v-for="(row, ri) in specAssignRows" :key="ri" class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('新增分发') }}</span>
+          <el-select v-model="row['编号']" style="flex:1" filterable :placeholder="tt('请选择规格书单据')">
+            <el-option v-for="d in specDocsAvail" :key="d['单据编号']" :label="specDocLabel(d)" :value="d['单据编号']" />
+          </el-select>
+          <el-select v-model="row['责任人']" style="flex:1" filterable :placeholder="tt('请选择责任人')">
+            <el-option v-for="u in specAssignUsers" :key="u.userName" :label="`${u.realName}（${u.userName}）`" :value="u.userName" />
+          </el-select>
+          <span style="cursor:pointer;color:#f56c6c;padding:0 4px" @click="specAssignRows.splice(ri, 1)">×</span>
+        </div>
+        <!-- 分发过的单据不再重复分发:候选=未分配单据(服务端过滤)−本弹窗已选;没有候选只留提示 -->
+        <div v-if="specDocsAvail.length" class="as-side-btn" style="display:inline-block" @click="specAssignRows.push({ '编号': '', '责任人': '' })">+ {{ tt('新增分发') }}</div>
+        <div v-else class="mod-log-meta">{{ tt('该产品暂无可分发的规格书单据') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="specAssignVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="specAssignBusy" @click="submitSpecAssign">{{ tt('分发') }}</el-button>
+      </template>
     </el-dialog>
     <!-- 查询单据弹窗(文件面板):编号模糊(单据编号/文档编号) + 首次归档时间区间 -->
     <el-dialog v-model="docQueryVisible" :title="tt('查询单据')" width="480px" append-to-body>
@@ -1716,33 +1771,52 @@ async function openFuzzyResult(r) {
 const isDocArchivePanel = computed(() => !!cfgCache.value?.metadata?.docArchive)
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
-const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocStatus.value))
+// 规格书两级分发(2026-09-12):已分配单仅 责任人∪总负责人∪管理员 可编辑,其他人可见只读
+const specDocAssign = ref(null)
+const specAssignBlocked = computed(() => !!(specDocAssign.value?.hasAssign)
+  && !user.isAdmin
+  && user.account !== specDocAssign.value?.owner
+  && user.account !== specDocAssign.value?.supervisor)
+const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocStatus.value) && !specAssignBlocked.value)
 const modifyLogVisible = ref(false)
 const modifyLogRecords = ref([])
 const modifyLogNo = ref('')
 
 // ── 产品开发下发(2026-09-09):仅产品信息表;归档后可用;按产品编号下发过则置灰「已下发」 ──
-const devDispatch = reactive({ productCode: '', dispatched: false, busy: false })
+const devDispatch = reactive({ productCode: '', dispatched: false, busy: false, supervisor: '', supervisorName: '', supervisorResolved: false })
 const canDevDispatch = computed(() => panelCode.value === 'RD_PROD_INFO' && curDocStatus.value === '已归档')
 async function loadDevDispatchState() {
   if (panelCode.value !== 'RD_PROD_INFO') {
     devDispatch.productCode = ''
     devDispatch.dispatched = false
+    devDispatch.supervisor = ''
+    devDispatch.supervisorName = ''
+    devDispatch.supervisorResolved = false
     return
   }
   const no = cur.value?.['单据编号'] || ''
   if (!no) {
     devDispatch.productCode = ''
     devDispatch.dispatched = false
+    devDispatch.supervisor = ''
+    devDispatch.supervisorName = ''
+    devDispatch.supervisorResolved = false
     return
   }
   try {
     const res = await engine.rdDevButtonState(no)
     devDispatch.productCode = res?.productCode || ''
     devDispatch.dispatched = !!res?.dispatched
+    // 总负责人(=产品信息表「责任人」→账号;后端懒重解:产品信息改好人后这里即补挂)
+    devDispatch.supervisor = res?.supervisor || ''
+    devDispatch.supervisorName = res?.supervisorName || ''
+    devDispatch.supervisorResolved = !!res?.supervisorResolved
   } catch (e) {
     devDispatch.productCode = ''
     devDispatch.dispatched = false
+    devDispatch.supervisor = ''
+    devDispatch.supervisorName = ''
+    devDispatch.supervisorResolved = false
   }
 }
 async function onDevDispatch() {
@@ -1753,6 +1827,74 @@ async function onDevDispatch() {
     await loadDevDispatchState()
   } finally {
     devDispatch.busy = false
+  }
+}
+
+// ── 规格书两级分发(2026-09-12):总负责人按 种类+责任人 批量建规格书草稿单 ──
+const canSpecDispatch = computed(() => user.isAdmin || (!!devDispatch.supervisor && user.account === devDispatch.supervisor))
+const specAssignVisible = ref(false)
+const specAssignStateData = ref(null)
+const specAssignRows = ref([])
+const specAssignUsers = ref([])
+const specAssignBusy = ref(false)
+/** 可分配候选单 = 服务端 docs(存活且未分配的单据) − 本弹窗各行已选(分发过的不再重复分发) */
+const specDocsAvail = computed(() => {
+  const picked = new Set(specAssignRows.value.map((r) => String(r['编号'] || '').trim()).filter(Boolean))
+  return (specAssignStateData.value?.docs || []).filter((d) => !picked.has(d['单据编号']))
+})
+/** 候选单下拉展示:单据编号 · 种类(有则附) · 状态 */
+const specDocLabel = (d) => {
+  const kind = d['规格书种类'] ? ` · ${d['规格书种类']}` : ''
+  return `${d['单据编号']}${kind} · ${tt(String(d.status))}`
+}
+/** 规格书单据编辑闸门:随面板/当前单据加载分配状态(无分配=历史单,不受封锁) */
+async function loadSpecDocAssign() {
+  if (panelCode.value !== 'RD_SPEC_DOC') { specDocAssign.value = null; return }
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) { specDocAssign.value = null; return }
+  try { specDocAssign.value = await engine.specAssignDoc(no) } catch { specDocAssign.value = null }
+}
+async function openSpecAssign() {
+  if (!canSpecDispatch.value) return
+  if (!devDispatch.productCode) await loadDevDispatchState()
+  try {
+    const [state, users] = await Promise.all([
+      engine.specAssignState(devDispatch.productCode),
+      request.get('/sys/user/list').then((r) => r?.data || []),
+    ])
+    specAssignStateData.value = state
+    specAssignUsers.value = (Array.isArray(users) ? users : []).filter((u) => String(u.enabled) !== '0' && u.userName)
+    specAssignRows.value = [{ '编号': '', '责任人': '' }]
+    specAssignVisible.value = true
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('查询失败'))
+  }
+}
+async function submitSpecAssign() {
+  const assigns = specAssignRows.value
+    .map((r) => ({ '编号': String(r['编号'] || '').trim(), '责任人': String(r['责任人'] || '').trim() }))
+    .filter((r) => r['编号'] || r['责任人'])
+  if (!assigns.length) return ElMessage.warning(tt('请选择规格书单据') + ' / ' + tt('请选择责任人'))
+  if (assigns.some((r) => !r['编号'])) return ElMessage.warning(tt('请选择规格书单据'))
+  if (assigns.some((r) => !r['责任人'])) return ElMessage.warning(tt('请选择责任人'))
+  specAssignBusy.value = true
+  try {
+    const res = await engine.callButton({
+      panelCode: 'RD_PROD_INFO',
+      buttonName: '规格书分发',
+      formData: { 编号: cur.value?.['单据编号'], assigns },
+      buttonParam: {},
+    })
+    const n = (res?.assigned || assigns).length
+    ElMessage.success(tt('分发成功，已分配 {n} 张规格书').replace('{n}', String(n)))
+    specAssignVisible.value = false
+    specAssignStateData.value = await engine.specAssignState(devDispatch.productCode)
+    specAssignRows.value = []
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('操作失败'))
+  } finally {
+    specAssignBusy.value = false
   }
 }
 
@@ -1809,6 +1951,8 @@ const queryDialogFields = computed(() => {
 })
 const draftEditable = computed(() => {
   if (reportMode.value || ['BOM_FWD', 'BOM_REV'].includes(String(panelCode.value))) return false
+  // 规格书已分配:非 责任人∪总负责人∪管理员 只读(服务端三个入口同口径强制,这里提前置灰)
+  if (specAssignBlocked.value) return false
   const st = cur.value?.['单据状态']
   if (st === '草稿') return true
   // 修改态(文件类:申请修改经管理员审批通过):可编辑,保存不再自动归档,走再审批
@@ -1885,7 +2029,8 @@ const cur = computed(() => {
 const curNo = computed(() => (list.value.length ? Math.min(curIdx.value, list.value.length - 1) + 1 : 0))
 
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
-watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState() }, { immediate: true })
+// 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
+watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign() }, { immediate: true })
 
 // 文书默认值:文书面板的「新增」= directAdd 建一张空白草稿(库端 saved='N'),此时 draftEditable 为真,
 // 本 watch 生效。锁定字段(申请立项人/负责人)只在「本次新增且尚未保存过」时带出——用 isFreshAddedDoc()

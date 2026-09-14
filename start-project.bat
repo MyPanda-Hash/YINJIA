@@ -5,10 +5,10 @@ setlocal
 
 rem ---- JDK 探测(与 build.bat 一致) ----
 if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" goto :jdk_ok
-for %%D in ("C:\Program Files\Java\jdk-26.0.2" "D:\Program Files\Java\jdk-26.0.2" "D:\Program Files\Java\jdk-24" "C:\Program Files\Java\jdk-17") do (
+for %%D in ("C:\Program Files\Java\jdk-25" "D:\Program Files\Java\jdk-25" "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2") do (
   if exist "%%~D\bin\java.exe" ( set "JAVA_HOME=%%~D" & goto :jdk_ok )
 )
-where java >nul 2>nul || ( echo [错误] 未找到 JDK ^(17+^) & goto :fail )
+where java >nul 2>nul || ( echo [错误] 未找到 JDK 25 & goto :fail )
 :jdk_ok
 
 if not exist "%~dp0backend\target\yinjia-mes-backend-0.1.0.jar" (

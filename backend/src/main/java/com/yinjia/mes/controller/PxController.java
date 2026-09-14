@@ -5,6 +5,7 @@ import com.yinjia.mes.panel.PanelRuntimeService;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.DevTaskService;
 import com.yinjia.mes.service.PanelConfigService;
+import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.ReportColumnSettingsService;
 import com.yinjia.mes.service.UsageLogService;
@@ -37,12 +38,14 @@ public class PxController {
     private final JdbcTemplate jdbc;
     private final DevTaskService devTaskService;
     private final ButtonService buttons;
+    private final PanelPermissionService perm;
 
     public PxController(PanelRuntimeService service, PanelConfigService configService,
                         ReportColumnSettingsService reportColumnSettingsService,
                         VoucherFlowService voucherFlowService,
                         PanelRegistry registry, UsageLogService usageLog, JdbcTemplate jdbc,
-                        DevTaskService devTaskService, ButtonService buttons) {
+                        DevTaskService devTaskService, ButtonService buttons,
+                        PanelPermissionService perm) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -52,17 +55,20 @@ public class PxController {
         this.jdbc = jdbc;
         this.devTaskService = devTaskService;
         this.buttons = buttons;
+        this.perm = perm;
     }
 
     /** 产品开发:下游面板元数据(矩阵列头) */
     @GetMapping("/rdDev/meta")
     public ApiResult<List<Map<String, String>>> rdDevMeta() {
+        perm.requirePanelView("RD_PROD_INFO");
         return ApiResult.ok(DevTaskService.devPanelMeta());
     }
 
     /** 产品开发:产品信息表侧边栏按钮状态(是否已下发) */
     @GetMapping("/rdDev/buttonState")
     public ApiResult<Map<String, Object>> rdDevButtonState(@RequestParam String docNo) {
+        perm.requirePanelView("RD_PROD_INFO");
         String productCode = null;
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT TOP 1 产品编号 FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
@@ -75,6 +81,7 @@ public class PxController {
     /** 产品开发:已下发产品的开发矩阵 */
     @GetMapping("/rdDev/board")
     public ApiResult<List<Map<String, Object>>> rdDevBoard() {
+        perm.requirePanelView("RD_PROD_INFO");
         return ApiResult.ok(devTaskService.board());
     }
 
@@ -82,6 +89,7 @@ public class PxController {
     @PostMapping("/rdDev/annotate")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, String>> rdDevAnnotate(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("RD_PROD_INFO");
         String panelCode = body.get("panelCode") == null ? "" : String.valueOf(body.get("panelCode"));
         Object codes = body.get("productCodes");
         List<String> list = codes instanceof List<?> l
@@ -90,12 +98,28 @@ public class PxController {
         return ApiResult.ok(devTaskService.annotateBatch(panelCode, list));
     }
 
-    /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher) */
+    /** 规格书两级分发:某产品的分配总览(总负责人弹窗用;docs=可分配候选单,2026-09-12 改为绑定已有单据) */
+    @GetMapping("/specAssign")
+    public ApiResult<Map<String, Object>> specAssignState(@RequestParam String code) {
+        perm.requirePanelView("RD_PROD_INFO");
+        return ApiResult.ok(devTaskService.specAssignState(code));
+    }
+
+    /** 规格书两级分发:单张规格书单的分配(编辑闸门/侧栏展示用;hasAssign=false 不受封锁约束) */
+    @GetMapping("/specAssign/doc")
+    public ApiResult<Map<String, Object>> specAssignDoc(@RequestParam String no) {
+        perm.requirePanelView("RD_SPEC_DOC");
+        return ApiResult.ok(devTaskService.specAssignOfDoc(no));
+    }
+
+    /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。
+     *  权限按目标面板校验(选单是为了在目标面板生单,来源数据是选单必需的参照)。 */
     @PostMapping("/voucherFlow/sources")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> voucherFlowSources(@RequestBody Map<String, Object> body) {
         String sourcePanel = String.valueOf(body.getOrDefault("sourcePanel", ""));
         String targetPanel = String.valueOf(body.getOrDefault("targetPanel", ""));
+        if (!targetPanel.isBlank()) perm.requirePanelView(targetPanel);
         Map<String, Object> condition = (Map<String, Object>) body.getOrDefault("condition", Map.of());
         int pageNo = body.get("pageNo") == null ? 1 : Integer.parseInt(String.valueOf(body.get("pageNo")));
         int pageSize = body.get("pageSize") == null ? 20 : Integer.parseInt(String.valueOf(body.get("pageSize")));
@@ -106,6 +130,8 @@ public class PxController {
     @PostMapping("/voucherFlow/link")
     @SuppressWarnings("unchecked")
     public ApiResult<Void> voucherFlowLink(@RequestBody Map<String, Object> body) {
+        String targetPanel = String.valueOf(body.getOrDefault("targetPanel", ""));
+        if (!targetPanel.isBlank()) perm.requireButton(targetPanel, "保存");
         voucherFlowService.link(
                 String.valueOf(body.getOrDefault("sourcePanel", "")),
                 String.valueOf(body.getOrDefault("sourceNo", "")),
@@ -121,6 +147,7 @@ public class PxController {
     /** 报表栏目设置读取(报表表头筛选与排序补丁) */
     @GetMapping("/reportColumnSettings")
     public ApiResult<Map<String, Object>> getReportColumnSettings(@RequestParam String panelCode) {
+        perm.requirePanelView(panelCode);
         return ApiResult.ok(reportColumnSettingsService.load(panelCode));
     }
 
@@ -129,6 +156,7 @@ public class PxController {
     @SuppressWarnings("unchecked")
     public ApiResult<Void> saveReportColumnSettings(@RequestBody Map<String, Object> body) {
         String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelView(panelCode);
         Map<String, Object> settings = (Map<String, Object>) body.getOrDefault("settings", Map.of());
         reportColumnSettingsService.save(panelCode, settings);
         return ApiResult.ok(null);
@@ -153,18 +181,21 @@ public class PxController {
     @GetMapping("/getFormDescriptor")
     public ApiResult<Map<String, Object>> getFormDescriptor(@RequestParam String panelCode,
                                                             @RequestParam String code) {
+        perm.requirePanelView(panelCode);
         return ApiResult.ok(service.getFormDescriptor(panelCode, code));
     }
 
     /** 项目实施计划:终止审批状态查询(申请终止/审批按钮渲染依据;无终止单则 data=null) */
     @GetMapping("/planTerm")
     public ApiResult<Map<String, Object>> planTerm(@RequestParam String code) {
+        perm.requirePanelView("RD_PLAN");
         return ApiResult.ok(buttons.termRowOf(code));
     }
 
     /** 项目进度查询:按项目编号(=立项申请文档编号)取该项目全部数据记录表单据(8 面板,含状态) */
     @GetMapping("/progress/dataSheets")
     public ApiResult<List<Map<String, Object>>> progressDataSheets(@RequestParam String code) {
+        perm.requirePanelView("RD_PROGRESS");
         return ApiResult.ok(buttons.progressDataSheets(code));
     }
 
@@ -172,6 +203,7 @@ public class PxController {
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> queryFormDataList(@RequestBody Map<String, Object> body) {
         String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelView(panelCode);
         String keyword = body.get("keyword") == null ? null : String.valueOf(body.get("keyword"));
         int pageNo = body.get("pageNo") == null ? 1 : Integer.parseInt(String.valueOf(body.get("pageNo")));
         int pageSize = body.get("pageSize") == null ? 20 : Integer.parseInt(String.valueOf(body.get("pageSize")));
@@ -182,6 +214,7 @@ public class PxController {
     @GetMapping("/getApprovalHistory")
     public ApiResult<List<Map<String, Object>>> getApprovalHistory(@RequestParam String panelCode,
                                                                    @RequestParam String code) {
+        perm.requirePanelView(panelCode);
         return ApiResult.ok(service.getApprovalHistory(panelCode, code));
     }
 
@@ -190,6 +223,9 @@ public class PxController {
     public ApiResult<Map<String, Object>> callButton(@RequestBody Map<String, Object> body, HttpServletRequest request) {
         String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
         String buttonName = String.valueOf(body.getOrDefault("buttonName", ""));
+        // 服务端按钮权限(2026-09-12):按 yj_role_panel.perms 词表映射校验,管理员恒过;
+        // 此前仅审批类动作在 ButtonService 内校验,保存/删除/提交等对任何登录用户开放
+        perm.requireButton(panelCode, buttonName);
         Map<String, Object> formData = (Map<String, Object>) body.getOrDefault("formData", Map.of());
         Map<String, Object> buttonParam = (Map<String, Object>) body.getOrDefault("buttonParam", Map.of());
         ApiResult<Map<String, Object>> result = ApiResult.ok(service.callButton(panelCode, buttonName, formData, buttonParam));
@@ -202,6 +238,7 @@ public class PxController {
     @SuppressWarnings("unchecked")
     public ApiResult<Void> deleteForms(@RequestBody Map<String, Object> body, HttpServletRequest request) {
         String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requireButton(panelCode, "删除");
         List<String> rowCodes = (List<String>) body.getOrDefault("rowCodes", List.of());
         service.deleteForms(panelCode, rowCodes);
         // 使用记录:删除动作(单据号为删除清单)
