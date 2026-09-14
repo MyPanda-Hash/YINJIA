@@ -12,12 +12,16 @@ import net.sf.jasperreports.export.SimpleExporterInput;
 import net.sf.jasperreports.export.SimpleOutputStreamExporterOutput;
 import net.sf.jasperreports.export.SimpleXlsxReportConfiguration;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.sql.Timestamp;
+import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -56,28 +60,80 @@ public class ReportService {
     private static final String RD_MODULE = "研发管理";
     private static final String RD_PREFIX = "RD_";
 
-    /** 注册表一行 */
-    public record ReportTemplate(String code, String panelCode, String name, String file) {}
+    /** 模板一行(DB 行含 id/jrxml_text/enabled/update_at;classpath 注册表行仅四键) */
+    public record ReportTemplate(Long id, String code, String panelCode, String name,
+                                 String file, String jrxmlText, boolean enabled, Timestamp updatedAt) {}
 
     private static final String REGISTRY = "reports/report-templates.properties";
+    private static final String SEED_FILE = "reports/so_order.jrxml";
 
     private final PanelRegistry registry;
     private final QueryService queryService;
-    private final List<ReportTemplate> templates;
-    private final Map<String, JasperReport> compiled = new ConcurrentHashMap<>();
+    private final JdbcTemplate jdbc;
+    private final Map<String, CompiledTemplate> compiled = new ConcurrentHashMap<>();
 
-    public ReportService(PanelRegistry registry, QueryService queryService) {
+    /** 编译缓存条目:DB 模板 update_at 变了即自动重编译(上传即生效免重启) */
+    private record CompiledTemplate(Timestamp updatedAt, JasperReport report) {}
+
+    public ReportService(PanelRegistry registry, QueryService queryService, JdbcTemplate jdbc) {
         this.registry = registry;
         this.queryService = queryService;
-        this.templates = loadRegistry();
+        this.jdbc = jdbc;
+        seedFromClasspath();
     }
 
-    /** 某面板可用的报表模板(前端入口按它显隐;不给 panelCode 就返回全部) */
+    // ============ 模板解析:DB(yj_report_template)优先 → classpath 注册表兜底(ADR-0002) ============
+
+    /** DB 内模板(includeDisabled=false 仅启用);表未建/查询失败返回空列表(不阻断) */
+    private List<ReportTemplate> dbTemplates(boolean includeDisabled) {
+        try {
+            String sql = includeDisabled
+                    ? "SELECT id, template_code, panel_code, name, jrxml_text, enabled, update_at FROM yj_report_template ORDER BY id"
+                    : "SELECT id, template_code, panel_code, name, jrxml_text, enabled, update_at FROM yj_report_template WHERE enabled = 'Y' ORDER BY id";
+            return jdbc.query(sql, (rs, i) -> new ReportTemplate(rs.getLong("id"), rs.getString("template_code"),
+                    rs.getString("panel_code"), rs.getString("name"), null, rs.getString("jrxml_text"),
+                    "Y".equals(rs.getString("enabled")), rs.getTimestamp("update_at")));
+        } catch (Exception e) {
+            return List.of();
+        }
+    }
+
+    /** 统一视图:DB 启用模板优先,注册表条目(库中无同 code)兜底 */
+    private List<ReportTemplate> resolveTemplates() {
+        List<ReportTemplate> out = new ArrayList<>(dbTemplates(false));
+        var inDb = out.stream().map(ReportTemplate::code).collect(java.util.stream.Collectors.toSet());
+        for (ReportTemplate t : loadRegistry()) {
+            if (!inDb.contains(t.code())) out.add(t);
+        }
+        return List.copyOf(out);
+    }
+
+    /** 启动播种:表里没有 so_order 且 classpath 有模板文件时导入一次 */
+    private void seedFromClasspath() {
+        try {
+            Integer cnt = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_report_template WHERE template_code = N'so_order'", Integer.class);
+            if (cnt != null && cnt > 0) return;
+            ClassPathResource res = new ClassPathResource(SEED_FILE);
+            if (!res.exists()) return;
+            String text = new String(res.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+            jdbc.update("INSERT INTO yj_report_template (template_code, panel_code, name, jrxml_text, enabled, remark, create_by) "
+                            + "VALUES (N'so_order', N'SO_ORDER', N'销售订单', ?, 'Y', N'自 classpath 注册表迁入(ADR-0002)', N'seed')", text);
+        } catch (Exception e) {
+            // 表还没建:忽略,迁移脚本建表后下次启动再播种
+        }
+    }
+
+    /** 某面板可用的报表模板(前端入口按它显隐;不给 panelCode 就返回全部启用+注册表) */
     public List<ReportTemplate> templatesOf(String panelCode) {
-        if (panelCode == null || panelCode.isBlank()) return templates;
-        List<ReportTemplate> explicit = templates.stream().filter(t -> t.panelCode().equals(panelCode)).toList();
-        if (!explicit.isEmpty()) return explicit;                    // 登记过精细模板 → 优先
-        return hasReport(panelCode) ? List.of(genericTemplate(panelCode)) : List.of();
+        if (panelCode == null || panelCode.isBlank()) return resolveTemplates();
+        List<ReportTemplate> db = dbTemplates(false).stream()
+                .filter(t -> t.panelCode().equals(panelCode)).toList();
+        if (!db.isEmpty()) return db;                                // DB 登记过 → 优先(上传即生效)
+        List<ReportTemplate> explicit = loadRegistry().stream()
+                .filter(t -> t.panelCode().equals(panelCode)).toList();
+        if (!explicit.isEmpty()) return explicit;                    // 注册表登记过精细模板 → 次之
+        return reportablePanels().contains(panelCode) ? List.of(genericTemplate(panelCode)) : List.of();
     }
 
     /**
@@ -86,7 +142,8 @@ public class ReportService {
      */
     public boolean hasReport(String panelCode) {
         if (panelCode == null || panelCode.isBlank()) return false;
-        if (templates.stream().anyMatch(t -> t.panelCode().equals(panelCode))) return true;
+        if (dbTemplates(false).stream().anyMatch(t -> t.panelCode().equals(panelCode))) return true;
+        if (loadRegistry().stream().anyMatch(t -> t.panelCode().equals(panelCode))) return true;
         return reportablePanels().contains(panelCode);
     }
 
@@ -114,7 +171,7 @@ public class ReportService {
     private ReportTemplate genericTemplate(String panelCode) {
         PanelRegistry.PanelDef def = panelDefOrNull(panelCode);
         String name = def == null || def.name() == null || def.name().isBlank() ? GENERIC_TEMPLATE_NAME : def.name();
-        return new ReportTemplate(GENERIC_CODE, panelCode, name, GENERIC_FILE);
+        return new ReportTemplate(null, GENERIC_CODE, panelCode, name, GENERIC_FILE, null, true, null);
     }
 
     /** 面板定义(不抛异常版:未知面板按「不可报」处理,避免把 500 抛给前端) */
@@ -174,8 +231,9 @@ public class ReportService {
             tpl = null;
             panel = panelCode;
         } else {
-            tpl = templates.stream().filter(t -> t.code().equals(code)).findFirst()
-                    .orElseThrow(() -> new IllegalArgumentException("报表模板不存在：" + code));
+            tpl = dbTemplates(false).stream().filter(t -> t.code().equals(code)).findFirst().orElse(null);
+            if (tpl == null) tpl = loadRegistry().stream().filter(t -> t.code().equals(code)).findFirst().orElse(null);
+            if (tpl == null) throw new IllegalArgumentException("报表模板不存在：" + code);
             panel = (panelCode == null || panelCode.isBlank()) ? tpl.panelCode() : panelCode;
             if (!tpl.panelCode().equals(panel)) {
                 throw new IllegalArgumentException("报表模板 " + code + " 不属于面板 " + panel);
@@ -300,7 +358,7 @@ public class ReportService {
 
     /** 通用模板的编译缓存键(与精细模板共用 compile() 的缓存,键 = 模板编码) */
     private static final ReportTemplate GENERIC_TPL =
-            new ReportTemplate(GENERIC_CODE, "", GENERIC_TEMPLATE_NAME, GENERIC_FILE);
+            new ReportTemplate(null, GENERIC_CODE, "", GENERIC_TEMPLATE_NAME, GENERIC_FILE, null, true, null);
 
     private JasperReport compileGeneric() {
         return compile(GENERIC_TPL);
@@ -341,8 +399,10 @@ public class ReportService {
             PanelRegistry.PanelDef def = panelDefOrNull(panelCode);
             name = def == null || def.name() == null || def.name().isBlank() ? GENERIC_TEMPLATE_NAME : def.name();
         } else {
-            name = templates.stream().filter(t -> t.code().equals(code)).map(ReportTemplate::name)
-                    .findFirst().orElse(code);
+            name = dbTemplates(true).stream().filter(t -> t.code().equals(code)).map(ReportTemplate::name)
+                    .findFirst()
+                    .orElseGet(() -> loadRegistry().stream().filter(t -> t.code().equals(code))
+                            .map(ReportTemplate::name).findFirst().orElse(code));
         }
         return name + "-" + docNo + (FORMAT_XLSX.equalsIgnoreCase(format) ? ".xlsx" : ".pdf");
     }
@@ -371,14 +431,27 @@ public class ReportService {
         return false;
     }
 
+    /** 编译(带缓存):DB 模板按 update_at 失效重编(上传即生效);classpath 模板进程内一次 */
     private JasperReport compile(ReportTemplate tpl) {
-        return compiled.computeIfAbsent(tpl.code(), k -> {
-            try (InputStream in = new ClassPathResource(tpl.file()).getInputStream()) {
-                return JasperCompileManager.compileReport(in);
-            } catch (IOException | JRException e) {
-                throw new IllegalStateException("报表模板编译失败(" + tpl.file() + ")：" + rootMessage(e));
-            }
-        });
+        CompiledTemplate c = compiled.get(tpl.code());
+        if (c != null && (tpl.updatedAt() == null || tpl.updatedAt().equals(c.updatedAt()))) return c.report();
+        try {
+            JasperReport report = tpl.jrxmlText() != null
+                    ? JasperCompileManager.compileReport(new ByteArrayInputStream(tpl.jrxmlText().getBytes(StandardCharsets.UTF_8)))
+                    : compileClasspath(tpl.file());
+            compiled.put(tpl.code(), new CompiledTemplate(tpl.updatedAt(), report));
+            return report;
+        } catch (JRException e) {
+            throw new IllegalArgumentException("报表模板编译失败(" + tpl.code() + ")：" + rootMessage(e));
+        }
+    }
+
+    private JasperReport compileClasspath(String file) {
+        try (InputStream in = new ClassPathResource(file).getInputStream()) {
+            return JasperCompileManager.compileReport(in);
+        } catch (IOException | JRException e) {
+            throw new IllegalStateException("报表模板编译失败(" + file + ")：" + rootMessage(e));
+        }
     }
 
     private static byte[] toXlsx(JasperPrint print) throws JRException {
@@ -403,6 +476,68 @@ public class ReportService {
         while (t.getCause() != null && t.getCause() != t) t = t.getCause();
         String m = t.getMessage();
         return m == null || m.isBlank() ? t.getClass().getSimpleName() : m;
+    }
+
+    // ============ 模板管理(上传/启停/删除;调用方先 requireAdmin,ADR-0002) ============
+
+    /** 管理清单:DB 全部行(含停用);classpath 注册表条目无 id 不入列 */
+    public List<Map<String, Object>> templateManageList() {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (ReportTemplate t : dbTemplates(true)) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", t.id());
+            m.put("code", t.code());
+            m.put("panelCode", t.panelCode());
+            m.put("name", t.name());
+            m.put("enabled", t.enabled());
+            m.put("updateBy", t.updatedAt() == null ? null : t.updatedAt().toLocalDateTime()
+                    .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+            out.add(m);
+        }
+        return out;
+    }
+
+    /** 上传/覆盖模板:编译校验失败抛 400;同 code 覆盖并启用 */
+    public Map<String, Object> upload(String code, String panelCode, String name, String jrxmlText, String remark, String user) {
+        if (code == null || !code.matches("[a-z][a-z0-9_]{1,58}")) {
+            throw new IllegalArgumentException("模板编码须为小写字母开头的小写字母/数字/下划线(2~59 位)：" + code);
+        }
+        if (name == null || name.isBlank()) throw new IllegalArgumentException("报表名称不能为空");
+        if (jrxmlText == null || jrxmlText.isBlank()) throw new IllegalArgumentException("模板内容(.jrxml)不能为空");
+        if (!jrxmlText.contains("<jasperReport")) throw new IllegalArgumentException("这不是 JasperReports 模板文件(缺 <jasperReport> 根元素)");
+        try {
+            JasperCompileManager.compileReport(new ByteArrayInputStream(jrxmlText.getBytes(StandardCharsets.UTF_8)));
+        } catch (JRException e) {
+            throw new IllegalArgumentException("模板编译失败,请检查 .jrxml：" + rootMessage(e));
+        }
+        if (panelDefOrNull(panelCode) == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
+        jdbc.update(
+                "MERGE yj_report_template AS t USING (VALUES (?, ?, ?, ?, ?, ?)) AS s(template_code, panel_code, name, jrxml_text, remark, update_by) "
+                        + "ON t.template_code = s.template_code "
+                        + "WHEN MATCHED THEN UPDATE SET panel_code = s.panel_code, name = s.name, jrxml_text = s.jrxml_text, "
+                        + "enabled = 'Y', remark = s.remark, update_by = s.update_by, update_at = SYSDATETIME() "
+                        + "WHEN NOT MATCHED THEN INSERT (template_code, panel_code, name, jrxml_text, enabled, remark, create_by, update_by) "
+                        + "VALUES (s.template_code, s.panel_code, s.name, s.jrxml_text, 'Y', s.remark, s.update_by, s.update_by);",
+                code, panelCode, name.trim(), jrxmlText, remark, user);
+        compiled.remove(code);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("code", code);
+        return out;
+    }
+
+    /** 启用/停用 */
+    public void setEnabled(Long id, boolean enabled, String user) {
+        int n = jdbc.update("UPDATE yj_report_template SET enabled = ?, update_by = ?, update_at = SYSDATETIME() WHERE id = ?",
+                enabled ? "Y" : "N", user, id);
+        if (n == 0) throw new IllegalArgumentException("模板不存在：id=" + id);
+    }
+
+    /** 删除(仅库内模板;classpath 注册表条目无 id 不可删) */
+    public void delete(Long id) {
+        List<String> codes = jdbc.queryForList("SELECT template_code FROM yj_report_template WHERE id = ?", String.class, id);
+        if (codes.isEmpty()) throw new IllegalArgumentException("模板不存在：id=" + id);
+        jdbc.update("DELETE FROM yj_report_template WHERE id = ?", id);
+        compiled.remove(codes.get(0));
     }
 
     /**
@@ -439,7 +574,7 @@ public class ReportService {
         for (Map.Entry<String, String[]> e : byCode.entrySet()) {
             String[] r = e.getValue();
             if (r[0] == null || r[1] == null || r[2] == null) continue; // 三键不全的行丢掉
-            out.add(new ReportTemplate(e.getKey(), r[0], r[1], r[2]));
+            out.add(new ReportTemplate(null, e.getKey(), r[0], r[1], r[2], null, true, null));
         }
         return List.copyOf(out);
     }

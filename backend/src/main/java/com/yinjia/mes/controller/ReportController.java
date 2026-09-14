@@ -7,19 +7,28 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
+import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
 /**
  * 对外正式报表接口(JasperReports,/api/report):
- *   GET /templates → 某面板可用的报表模板(前端入口显隐 + 下拉)
- *   GET /export    → 生成报表文件(code/panelCode/docNo/format/disposition)
+ *   GET    /templates              → 某面板可用的报表模板(前端入口显隐 + 弹窗下拉;all=true 为管理视角)
+ *   GET    /export                 → 生成报表文件(code/panelCode/docNo/format/disposition)
+ *   POST   /templates              → 上传/覆盖模板(管理员;服务端编译校验,ADR-0002)
+ *   PUT    /templates/{id}/enabled → 启用/停用(管理员)
+ *   DELETE /templates/{id}         → 删除(管理员)
  * 鉴权:沿用项目既有做法 —— SecurityConfig 里除白名单外 anyRequest().authenticated(),
  * 本控制器不加注解即要求登录;未带 token 由 AuthenticationEntryPoint 返回 403(前端按登录失效处理)。
  * 错误走既有约定:IllegalArgumentException→HTTP 400(ApiResult 体),前端 errMsg 展示、不触发登出。
@@ -36,11 +45,16 @@ public class ReportController {
         this.perm = perm;
     }
 
-    /** 可用报表模板;不给 panelCode 返回全部(便于排查"为什么面板上没有入口") */
+    /**
+     * 可用报表模板;不给 panelCode 返回全部(便于排查"为什么面板上没有入口")。
+     * all=true 返回含停用的全部模板 —— 仅管理员(报表模板管理弹窗用,ADR-0002)。
+     */
     @GetMapping("/templates")
-    public ApiResult<List<Map<String, Object>>> templates(@RequestParam(required = false) String panelCode) {
-        if (panelCode != null && !panelCode.isBlank()) perm.requirePanelView(panelCode);
-        return ApiResult.ok(service.templateList(panelCode));
+    public ApiResult<List<Map<String, Object>>> templates(@RequestParam(required = false) String panelCode,
+                                                          @RequestParam(defaultValue = "false") boolean all) {
+        if (all) perm.requireAdmin();
+        else if (panelCode != null && !panelCode.isBlank()) perm.requirePanelView(panelCode);
+        return ApiResult.ok(all ? service.templateManageList() : service.templateList(panelCode));
     }
 
     /**
@@ -66,5 +80,31 @@ public class ReportController {
                 .filename(service.fileName(code, panelCode, docNo, format), StandardCharsets.UTF_8).build());
         headers.setContentLength(body.length);
         return ResponseEntity.ok().headers(headers).body(body);
+    }
+
+    /** 上传/覆盖模板(管理员):服务端 Jasper 编译校验,编译不过 400 退回 */
+    public record UploadBody(String templateCode, String panelCode, String name, String jrxml, String remark) {}
+
+    @PostMapping("/templates")
+    public ApiResult<Map<String, Object>> upload(@RequestBody UploadBody body, Principal principal) {
+        perm.requireAdmin();
+        return ApiResult.ok(service.upload(body.templateCode(), body.panelCode(), body.name(),
+                body.jrxml(), body.remark(), principal == null ? "system" : principal.getName()));
+    }
+
+    /** 启用/停用(管理员) */
+    @PutMapping("/templates/{id}/enabled")
+    public ApiResult<Void> setEnabled(@PathVariable Long id, @RequestParam String enabled, Principal principal) {
+        perm.requireAdmin();
+        service.setEnabled(id, "Y".equalsIgnoreCase(enabled), principal == null ? "system" : principal.getName());
+        return ApiResult.ok(null);
+    }
+
+    /** 删除(管理员) */
+    @DeleteMapping("/templates/{id}")
+    public ApiResult<Void> delete(@PathVariable Long id) {
+        perm.requireAdmin();
+        service.delete(id);
+        return ApiResult.ok(null);
     }
 }

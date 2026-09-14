@@ -157,4 +157,10 @@ public class PanelPermissionService {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         return auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : "system";
     }
+
+    /** 当前登录用户必须是管理员,否则 403(报表模板管理等管理动作用) */
+    public void requireAdmin() {
+        String user = currentUserName();
+        if (!isAdmin(user)) throw new org.springframework.security.access.AccessDeniedException("仅管理员可操作");
+    }
 }
