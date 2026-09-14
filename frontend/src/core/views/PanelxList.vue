@@ -154,12 +154,14 @@
           </div>
           <template v-if="!sideCollapsed">
             <div class="as-side-nav">
-              <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
+              <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']" :title="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
               <span v-else class="doc-status none">—</span>
               <span class="as-side-pager">
+                <span class="page-btn" :title="tt('最前一张')" @click="pageFirst">◁</span>
                 <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
-                <span class="page-no" :title="tt('回第一张')" @click="pageFirst">{{ pageText(curNo, total, '') }}</span>
+                <span class="page-no">{{ pageText(curNo, total, '') }}</span>
                 <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
+                <span class="page-btn" :title="tt('最后一张')" @click="pageLast">▷</span>
               </span>
             </div>
             <!-- ═══ 模糊搜索态:字段+内容条件行 → 查找 → 结果清单(点行即切换查看) ═══ -->
@@ -6282,6 +6284,12 @@ onUnmounted(() => {
   top: auto;
   bottom: calc(100% + 5px);
 }
+/* 侧栏导航一行五键:紧凑尺寸 */
+.as-side-nav { padding: 8px 8px 6px; gap: 3px; }
+.as-side-nav .doc-status { flex: 1; min-width: 0; max-width: 52px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; justify-content: center; }
+.as-side-nav .as-side-pager { display: flex; align-items: center; gap: 2px; flex: none; }
+.as-side-nav .page-btn { width: 17px; min-width: 17px; height: 20px; line-height: 18px; padding: 0; font-size: 9px; border-radius: 4px; }
+.as-side-nav .page-no { min-width: 26px; text-align: center; font-size: 11px; color: #46586e; }
 
 /* ── 导出报表:模板选择 + 模板管理(ADR-0002) ── */
 .rpt-tpl-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
