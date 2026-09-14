@@ -153,16 +153,16 @@
             <span class="as-side-toggle">{{ sideCollapsed ? '◀' : '▶' }}</span>
           </div>
           <template v-if="!sideCollapsed">
-            <div class="as-side-nav">
+            <div class="as-side-status-row">
               <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']" :title="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
               <span v-else class="doc-status none">—</span>
-              <span class="as-side-pager">
-                <span class="page-btn" :title="tt('最前一张')" @click="pageFirst">◁</span>
-                <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
-                <span class="page-no">{{ pageText(curNo, total, '') }}</span>
-                <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
-                <span class="page-btn" :title="tt('最后一张')" @click="pageLast">▷</span>
-              </span>
+            </div>
+            <div class="as-side-pager">
+              <span class="page-btn" :title="tt('最前一张')" @click="pageFirst">◁</span>
+              <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
+              <span class="page-no">{{ pageText(curNo, total, '') }}</span>
+              <span class="page-btn" :title="tt('下一张')" @click="page(1)">▶</span>
+              <span class="page-btn" :title="tt('最后一张')" @click="pageLast">▷</span>
             </div>
             <!-- ═══ 模糊搜索态:字段+内容条件行 → 查找 → 结果清单(点行即切换查看) ═══ -->
             <div v-if="fuzzyMode" class="fuzzy-panel">
@@ -6290,6 +6290,32 @@ onUnmounted(() => {
 .as-side-nav .as-side-pager { display: flex; align-items: center; gap: 2px; flex: none; }
 .as-side-nav .page-btn { width: 17px; min-width: 17px; height: 20px; line-height: 18px; padding: 0; font-size: 9px; border-radius: 4px; }
 .as-side-nav .page-no { min-width: 26px; text-align: center; font-size: 11px; color: #46586e; }
+/* 侧栏状态栏独立居中 + 翻页器居中(2026-09-14) */
+.as-side-status-row { display: flex; justify-content: center; padding: 9px 12px 2px; }
+.as-side-status-row .doc-status.none { color: #c2cad3; }
+.as-side-pager { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 4px 10px 10px; border-bottom: none; }
+/* 暗色主题跟随 */
+.dark .approval-side { background: #26282e; border-color: #3a3b42; box-shadow: none; }
+.dark .as-side-title { background: #2c2e34; color: #d6d9de; border-bottom-color: #3a3b42; }
+.dark .as-side-btn { background: transparent; border-color: #4a4c55; color: #c8cdd6; }
+.dark .as-side-btn:hover { background: #33363e; border-color: #6b7280; color: #e6e9ee; }
+.dark .as-side-btn.primary { background: #3d5a80; border-color: #3d5a80; color: #fff; }
+.dark .as-side-btn.primary:hover { background: #46688f; }
+.dark .as-side-btn.sub { color: #9aa3af; }
+.dark .as-side-section { color: #77808c; border-bottom-color: #3a3b42; }
+.dark .as-side-caret { background: transparent; border-color: #4a4c55; color: #c8cdd6; }
+.dark .as-side-menu { background: #2c2e34; border-color: #3a3b42; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); }
+.dark .as-side-menu-item { color: #c8cdd6; }
+.dark .as-side-menu-item:hover { background: #33363e; }
+.dark .preview-card { background: #26282e; border-color: #3a3b42; }
+.dark .preview-card.on { background: #2c3440; border-color: #5b8bc4; }
+.dark .pc-no { color: #9ec3e8; }
+.dark .pc-date { color: #6f7a86; }
+.dark .pc-value { color: #c8cdd6; }
+.dark .pc-label { color: #77808c; }
+.dark .fuzzy-panel { background: #26282e; border-color: #3a3b42; }
+.dark .fuzzy-head { color: #c8cdd6; }
+.dark .fuzzy-result-row .fz-no { color: #9ec3e8; }
 
 /* ── 导出报表:模板选择 + 模板管理(ADR-0002) ── */
 .rpt-tpl-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
