@@ -233,3 +233,11 @@ fix-db-restore-20260915.sql
 
 # —— 2026-09-15 登记(修复):终态收尾——SO_ORDER 品牌(列更名遗留)、DISPATCH_STATS 过期字段清理 ——
 fix-db-restore-tail.sql
+
+# —— 2026-09-15 登记:销售/采购订单字段对齐金蝶ERP(sync-core.mjs 映射 + 面板字段对照 §二/§三) ——
+# 内容:bd_so_order 补 币种/汇率/结算期限 列+字段,SO 头补注册 备注;bd_pu_order 补 结算期限 列+字段,
+#      PU 头补注册 供应商编码;PU 行补注册 数量2/计量单位2/折扣%/折扣金额/备注(列在——同步一直写但界面看不见);
+#      SO「部门.负责人」label→「部门负责人」;同步锚点列(外部数据ID等)收编进链;新标签9语言译名。
+#      配套 deploy/sync-core.mjs mapHead 增写 汇率/结算期限。
+# 幂等:COL_LENGTH/IF NOT EXISTS/MERGE NOT MATCHED。
+migrate-kingdee-order-align.sql
