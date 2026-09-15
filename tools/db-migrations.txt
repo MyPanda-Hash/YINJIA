@@ -186,3 +186,15 @@ migrate-rd-spec-assign.sql
 #      配套 yj_translation 9 语言译名(供应商档案/供应商名称/供应商级别/业务员编码/业务员名称/联系人补齐)。
 # 幂等:UPDATE 直写同值/INSERT IF NOT EXISTS/翻译 MERGE NOT MATCHED,已本地连跑两遍验证。
 migrate-kingdee-archive-align.sql
+
+# —— 2026-09-15 登记(第二期):基础档案全面对齐金蝶ERP(deploy/基础资料同步实现指引 §二映射) ——
+# 内容:①有则改(KHDA 详细地址/价格等级/开票税号/开户银行、GFDA 开票税号/开户银行/采购员、UOM 数量小数位,
+#      仅改 label,col_name 与参照 refField 不动);②无则加(KHDA 客户分类 khlb、GFDA 供应商分类 gysfl 补列、
+#      INV 条形码补列+数据来源字典加「金蝶同步」);③5 个新档案面板(金蝶缺的 5/12):
+#      结算方式 SETTLE/bs_settle_type、客户分类 CUSGRP/bs_customer_group、供应商分类 SUPGRP/bs_supplier_group、
+#      商品分类 MATGRP/bs_material_group、币别 CUR/bs_currency(表+面板+字段+9语言译名+中文表注明);
+#      ④7 张在用档案表(dm_kh/dm_gf/bs_inv/bs_emp/bs_dept/bs_wh/bs_uom)补 外部数据ID/外部单据号/外部指纹
+#      同步锚点列 + 唯一过滤索引(jdy-sync 档案同步幂等锚点,不注册面板字段)。
+#      配套前端 menus.js 补 5 个菜单入口(基础数据/物料及价格/财务 三组)。
+# 幂等:UPDATE 直写同值/IF NOT EXISTS/MERGE NOT MATCHED,已在 HSDZ_MES 连跑两遍验证。
+migrate-kingdee-archive-align2.sql

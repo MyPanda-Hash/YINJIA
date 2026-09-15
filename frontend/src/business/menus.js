@@ -288,6 +288,8 @@ export const menuTree = [
           { code: 'warehouse', title: '仓库', path: '/panelx/list/WH', icon: 'House', panelCode: 'WH', operationName: '新增流程' },
           { code: 'stockStatus', title: '库存状况', path: '/panelx/list/STOCK_STATUS', icon: 'Histogram', panelCode: 'STOCK_STATUS' },
           { code: 'khda', title: '客户档案', path: '/panelx/list/KHDA', icon: 'User', panelCode: 'KHDA', operationName: '新增流程' },
+          { code: 'cusgrp', title: '客户分类', path: '/panelx/list/CUSGRP', icon: 'FolderOpened', panelCode: 'CUSGRP', operationName: '新增流程' },
+          { code: 'supgrp', title: '供应商分类', path: '/panelx/list/SUPGRP', icon: 'FolderOpened', panelCode: 'SUPGRP', operationName: '新增流程' },
           { code: 'partner', title: '往来单位', path: '/panelx/list/PARTNER', icon: 'OfficeBuilding', panelCode: 'PARTNER', operationName: '新增流程' },
           { code: 'region', title: '地区', path: '/panelx/list/REGION', icon: 'Location', panelCode: 'REGION', operationName: '新增流程' },
           { code: 'proj', title: '项目', path: '/panelx/list/PROJ', icon: 'Flag', panelCode: 'PROJ', operationName: '新增流程' },
@@ -299,6 +301,7 @@ export const menuTree = [
         icon: 'Box',
         children: [
           { code: 'uom', title: '计量单位', path: '/panelx/list/UOM', icon: 'ScaleToOriginal', panelCode: 'UOM', operationName: '新增流程' },
+          { code: 'matgrp', title: '商品分类', path: '/panelx/list/MATGRP', icon: 'Files', panelCode: 'MATGRP', operationName: '新增流程' },
           { code: 'inventory', title: '存货', path: '/panelx/list/INV', icon: 'Grid', panelCode: 'INV', operationName: '新增流程' },
           { code: 'bom', title: '物料清单', path: '/panelx/list/BOM', icon: 'Files', panelCode: 'BOM', operationName: '新增流程' },
           { code: 'invPrice', title: '存货价格本', path: '/panelx/list/INV_PRICE', icon: 'PriceTag', panelCode: 'INV_PRICE', operationName: '新增流程' },
@@ -325,6 +328,8 @@ export const menuTree = [
         icon: 'Money',
         children: [
           { code: 'finTax', title: '税别资料', path: '/panelx/list/FIN_TAX', icon: 'Ticket', panelCode: 'FIN_TAX', operationName: '新增流程' },
+          { code: 'settle', title: '结算方式', path: '/panelx/list/SETTLE', icon: 'Tickets', panelCode: 'SETTLE', operationName: '新增流程' },
+          { code: 'cur', title: '币别', path: '/panelx/list/CUR', icon: 'Money', panelCode: 'CUR', operationName: '新增流程' },
           { code: 'finExp', title: '费用类别', path: '/panelx/list/FIN_EXP', icon: 'Wallet', panelCode: 'FIN_EXP', operationName: '新增流程' },
           { code: 'finAcc', title: '会计科目', path: '/panelx/list/FIN_ACC', icon: 'Notebook', panelCode: 'FIN_ACC', operationName: '新增流程' },
         ],
