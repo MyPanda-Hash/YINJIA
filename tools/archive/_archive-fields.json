@@ -21,7 +21,13 @@
         "enable": 1,
         "is_default": false
       }
-    ]
+    ],
+    "listFull": {
+      "id": "2203855203650780160",
+      "name": "其他应收款",
+      "enable": 1,
+      "is_default": false
+    }
   },
   "BD_CUSGRP": {
     "label": "客户分类",
@@ -54,7 +60,16 @@
         "level": "1",
         "remark": ""
       }
-    ]
+    ],
+    "listFull": {
+      "id": "2157412254105063424",
+      "name": "跟单客户",
+      "number": "KHFL00003",
+      "parent_id": "",
+      "is_leaf": true,
+      "level": "1",
+      "remark": ""
+    }
   },
   "BD_SUPGRP": {
     "label": "供应商分类",
@@ -84,7 +99,15 @@
         "is_leaf": true,
         "level": "1"
       }
-    ]
+    ],
+    "listFull": {
+      "id": "2195073908770621441",
+      "name": "供应商",
+      "number": "GYSFL00002",
+      "parent_id": "",
+      "is_leaf": true,
+      "level": "1"
+    }
   },
   "BD_MATGRP": {
     "label": "商品分类",
@@ -117,7 +140,16 @@
         "create_time": "2025-03-10 21:50:23",
         "modify_time": "2025-03-10 21:50:23"
       }
-    ]
+    ],
+    "listFull": {
+      "level": "2",
+      "number": "001",
+      "name": "炭粉",
+      "id": "2167738972682336256",
+      "is_leaf": true,
+      "create_time": "2025-03-10 21:50:23",
+      "modify_time": "2025-03-10 21:50:23"
+    }
   },
   "BD_CUR": {
     "label": "币别",
@@ -171,6 +203,23 @@
       "modifier_id",
       "modifier_name"
     ],
+    "detailFull": {
+      "id": "2274134194269571072",
+      "number": "薪酬核算合计专用",
+      "name": "薪酬核算",
+      "enable": 1,
+      "rate": "1",
+      "price_precision": "2",
+      "amt_precision": "2",
+      "exc_type": "2",
+      "sign": "",
+      "creator_id": "",
+      "creator_name": "",
+      "create_time": "2025-08-04 16:58:04",
+      "modify_time": "2025-08-04 16:58:42",
+      "modifier_id": "",
+      "modifier_name": ""
+    },
     "detailSample": {
       "id": "2274134194269571072",
       "number": "薪酬核算合计专用",
@@ -182,6 +231,16 @@
       "exc_type": "2",
       "create_time": "2025-08-04 16:58:04",
       "modify_time": "2025-08-04 16:58:42"
+    },
+    "listFull": {
+      "id": "2274134194269571072",
+      "number": "薪酬核算合计专用",
+      "name": "薪酬核算",
+      "enable": 1,
+      "rate": "1",
+      "price_precision": "2",
+      "amt_precision": "2",
+      "exc_type": "2"
     }
   },
   "BD_UOM": {
@@ -223,6 +282,22 @@
       "precision_account",
       "conversion_type"
     ],
+    "detailFull": {
+      "id": "9",
+      "name": "cm",
+      "number": "cm",
+      "long_number": "",
+      "enable": "1",
+      "create_time": "2025-02-21 14:57:09",
+      "creator_id": "",
+      "modify_time": "2025-02-21 14:57:09",
+      "modifier_id": "",
+      "is_leaf": true,
+      "level": 0,
+      "precision": 0,
+      "precision_account": 0,
+      "conversion_type": 1
+    },
     "detailSample": {
       "id": "9",
       "name": "cm",
@@ -235,6 +310,12 @@
       "precision": "0",
       "precision_account": "0",
       "conversion_type": "1"
+    },
+    "listFull": {
+      "id": "9",
+      "number": "cm",
+      "name": "cm",
+      "precision": "0"
     }
   },
   "BD_DEPT": {
@@ -294,12 +375,38 @@
       "parent_name",
       "parent_number"
     ],
+    "detailFull": {
+      "id": "2219578381425563648",
+      "number": "BM00016",
+      "name": "1号车间 ",
+      "enable": "1",
+      "level": "1",
+      "long_number": "",
+      "full_name": "",
+      "comment": "",
+      "parent_id": "100000",
+      "parent_name": "惠州市银嘉环保科技有限公司",
+      "parent_number": "100000"
+    },
     "detailSample": {
       "id": "2219578381425563648",
       "number": "BM00016",
       "name": "1号车间 ",
       "enable": "1",
       "level": "1",
+      "parent_id": "100000",
+      "parent_name": "惠州市银嘉环保科技有限公司",
+      "parent_number": "100000"
+    },
+    "listFull": {
+      "id": "2219578381425563648",
+      "number": "BM00016",
+      "name": "1号车间 ",
+      "long_number": "100000!BM00016",
+      "full_name": "惠州市银嘉环保科技有限公司_1号车间 ",
+      "enable": "1",
+      "level": "1",
+      "is_leaf": true,
       "parent_id": "100000",
       "parent_name": "惠州市银嘉环保科技有限公司",
       "parent_number": "100000"
@@ -353,6 +460,25 @@
       "leave_date",
       "birthday"
     ],
+    "detailFull": {
+      "id": "2178314889490196480",
+      "name": "LGH",
+      "enable": "1",
+      "gender": 1,
+      "department_id": "",
+      "department_name": "",
+      "department_number": "",
+      "mobile": "AYJxA+7VGUjwPZWcsbH3BA==",
+      "number": "ZY00099",
+      "settle_bank_id": "",
+      "settle_type_id": "",
+      "wechat": "",
+      "id_number": "",
+      "email": "",
+      "hire_date": "",
+      "leave_date": "",
+      "birthday": ""
+    },
     "detailSample": {
       "id": "2178314889490196480",
       "name": "LGH",
@@ -360,6 +486,14 @@
       "gender": "1",
       "mobile": "AYJxA+7VGUjwPZWcsbH3BA==",
       "number": "ZY00099"
+    },
+    "listFull": {
+      "id": "2178314889490196480",
+      "number": "ZY00099",
+      "name": "LGH",
+      "mobile": "AYJxA+7VGUjwPZWcsbH3BA==",
+      "id_number": "",
+      "enable": "1"
     }
   },
   "BD_STORE": {
@@ -418,6 +552,24 @@
       "storekeeper_name",
       "allow_negative"
     ],
+    "detailFull": {
+      "id": "2174067714627325952",
+      "number": "YJ-08",
+      "name": "车间仓",
+      "group_id": "",
+      "is_allow_freight": false,
+      "enable": "1",
+      "mobile": "",
+      "country_name": "中国",
+      "province_name": "",
+      "city_name": "",
+      "district_name": "",
+      "address": "",
+      "storekeeper_id": "",
+      "storekeeper_number": "",
+      "storekeeper_name": "",
+      "allow_negative": "false"
+    },
     "detailSample": {
       "id": "2174067714627325952",
       "number": "YJ-08",
@@ -426,6 +578,17 @@
       "enable": "1",
       "country_name": "中国",
       "allow_negative": "false"
+    },
+    "listFull": {
+      "id": "2174067714627325952",
+      "number": "YJ-08",
+      "name": "车间仓",
+      "group_name": "",
+      "group_id": "",
+      "group_number": "",
+      "is_allow_freight": false,
+      "is_allow_neg": "false",
+      "enable": "1"
     }
   },
   "BD_MATERIAL": {
@@ -634,6 +797,152 @@
       "backflushed_space_name",
       "backflushed_space_number"
     ],
+    "detailFull": {
+      "id": "2350998447882071040",
+      "number": "C-95-13",
+      "name": "006项目/功能炭棒滤芯",
+      "enable": "1",
+      "base_unit_id": "3",
+      "base_unit_name": "支",
+      "aux_unit_name": "支",
+      "mul_label": [
+        {
+          "id": "2479206810112873472",
+          "number": "2479206810112873472",
+          "name": "3-01-01-0234"
+        }
+      ],
+      "barcode": "",
+      "model": "57*21*66.5",
+      "brand_id": "",
+      "producing_pace": "",
+      "help_code": "3-01-01-0234",
+      "is_multi_unit": false,
+      "fix_unit_id1": "",
+      "coefficient1": 0,
+      "conversion_unit_id1": "",
+      "fix_unit_id2": "",
+      "coefficient2": 0,
+      "conversion_unit_id2": "",
+      "fix_unit_id3": "",
+      "coefficient3": 0,
+      "conversion_unit_id3": "",
+      "purchase_unit_id": "3",
+      "sale_unit_id": "3",
+      "store_unit_id": "3",
+      "aux_unit_id": "3",
+      "aux_unit_number": "支",
+      "is_weight": false,
+      "is_serial": false,
+      "is_batch": false,
+      "is_sale": true,
+      "is_purchase": true,
+      "is_subpart": true,
+      "is_assembly": true,
+      "is_kf_period": false,
+      "kf_period_type": "",
+      "kf_period": "0",
+      "alarm_day": "0",
+      "is_asst_attr": false,
+      "aux_entity": [],
+      "barcode_entity": [],
+      "price_entity": [
+        {
+          "id": "2350998447882071041",
+          "price_barcode": "",
+          "price_unit_id": "3",
+          "price_unit_name": "支",
+          "price_unit_number": "支",
+          "price_purchase_price": "0",
+          "price_max_purchase_price": "0",
+          "price_cost_price": "0",
+          "price_distribution_price": "0",
+          "price_trade_price": "0",
+          "price_retail_price": "0",
+          "price_min_sales_price": "0",
+          "price_near_pur_price": "0",
+          "price_near_pur_tax_price": "0",
+          "price_near_sal_price": "9.6",
+          "price_near_sal_tax_price": "9.6",
+          "price_sale_price1": "0",
+          "price_sale_price2": "0",
+          "price_sale_price3": "0",
+          "price_sale_price4": "0",
+          "price_sale_price5": "0",
+          "price_sale_price6": "0",
+          "price_sale_price7": "0",
+          "price_sale_price8": "0",
+          "price_sale_price9": "0",
+          "price_sale_price10": "0",
+          "price_aux_id": "",
+          "price_aux_id1": "",
+          "price_aux_number1": "",
+          "price_aux_name1": "",
+          "price_aux_id2": "",
+          "price_aux_number2": "",
+          "price_aux_name2": "",
+          "price_aux_id3": "",
+          "price_aux_name3": "",
+          "price_aux_number3": "",
+          "price_aux_id4": "",
+          "price_aux_number4": "",
+          "price_aux_name4": "",
+          "price_aux_id5": "",
+          "price_aux_number5": "",
+          "price_aux_name5": "",
+          "price_min_pur_tax_price": "0",
+          "price_near_pur_unit_cost": "0",
+          "price_near_supplier": "",
+          "price_outsourceprice": "0"
+        }
+      ],
+      "inv_mgr_type": "0",
+      "min_inventory_qty": "0",
+      "max_inventory_qty": "0",
+      "sec_inventory_qty": "0",
+      "cost_method": "1",
+      "fetch_category_id": "",
+      "tax_rate": "0",
+      "in_tax_rate": "0",
+      "stock_id": "",
+      "space_id": "",
+      "vender_id": "",
+      "purchase_id": "",
+      "refistration_number": "",
+      "pro_license": "",
+      "gross_weight": "0",
+      "net_weight": "0",
+      "weight_unit_id": "",
+      "length": "0",
+      "wide": "0",
+      "high": "0",
+      "volume": "0",
+      "images": [],
+      "check_type": "1",
+      "remark": "寿命:300 gallons\n流速:0.5 GPM\n过滤精度:0.5-1微米(不能超过1)\n去除物质:余氧、cyst、lead(要求满足NSF 42\\53性能)",
+      "custom_field": {
+        "custom_field__1__4swgci5cr1vb": "57*21*66.5",
+        "custom_field__1__4swgegvojiasxiej": "57*21*66.5",
+        "custom_field__1__6jiafyhnnjic0w": "108支/箱"
+      },
+      "parent_number": "SPFL00013",
+      "parent_id": "2236463020798653440",
+      "bom_entity": [],
+      "valid_qty": "0",
+      "qty_inv": "0",
+      "attachments_url": [],
+      "product_department_id": "",
+      "product_department_number": "",
+      "min_package_qty": 0,
+      "modify_time": "2026-08-22 16:19:59",
+      "is_backflushed": false,
+      "backflushed_stock_id": "",
+      "backflushed_stock_name": "",
+      "backflushed_stock_number": "",
+      "backflushed_space_id": "",
+      "backflushed_space_name": "",
+      "backflushed_space_number": ""
+    },
     "detailSample": {
       "id": "2350998447882071040",
       "number": "C-95-13",
@@ -747,7 +1056,49 @@
       "price_near_pur_unit_cost",
       "price_near_supplier",
       "price_outsourceprice"
-    ]
+    ],
+    "listFull": {
+      "parent_name": "冰箱炭棒",
+      "number": "C-95-13",
+      "parent_number": "SPFL00013",
+      "parent_id": "2236463020798653440",
+      "name": "006项目/功能炭棒滤芯",
+      "id": "2350998447882071040",
+      "is_multi_unit": false,
+      "is_serial": false,
+      "is_asst_attr": false,
+      "is_weight": false,
+      "is_kf_period": false,
+      "is_batch": false,
+      "url": "",
+      "model": "57*21*66.5",
+      "barcode": "",
+      "is_show_aux_barcode": false,
+      "mul_label": [
+        {
+          "id": "2479206810112873472",
+          "number": "2479206810112873472",
+          "name": "3-01-01-0234"
+        }
+      ],
+      "check_type": "1",
+      "brand_id": "",
+      "brand_name": "",
+      "brand_number": "",
+      "producing_pace": "",
+      "help_code": "3-01-01-0234",
+      "base_unit_id": "3",
+      "base_unit_number": "支",
+      "base_unit_name": "支",
+      "remark": "寿命:300 gallons\n流速:0.5 GPM\n过滤精度:0.5-1微米(不能超过1)\n去除物质:余氧、cyst、lead(要求满足NSF 42\\53性能)",
+      "units": [],
+      "stock_id": "",
+      "stock_name": "",
+      "stock_number": "",
+      "pro_license": "",
+      "purchase_unit_id": "3",
+      "is_self_restraint": "false"
+    }
   },
   "BD_CUSTOMER": {
     "label": "客户",
@@ -835,6 +1186,88 @@
       "invoice_email",
       "invoice_phone"
     ],
+    "detailFull": {
+      "modify_time": "2025-04-01 11:34:06",
+      "invoice_name": "",
+      "taxpayer_no": "",
+      "bank_account": "ddINT+oe8aYECJeyTlqw8w==",
+      "bank": "",
+      "account_open_addr": "",
+      "invoice_type": "0",
+      "remark": "",
+      "country_id": "1000001",
+      "country_number": "001",
+      "country_name": "中国",
+      "province_id": "382",
+      "province_name": "广东省",
+      "province_number": "00382",
+      "city_id": "383",
+      "city_number": "00383",
+      "city_name": "广州市",
+      "district_id": "389",
+      "district_number": "00389",
+      "district_name": "黄埔区",
+      "sale_dept_id": "2157415425770612736",
+      "sale_dept_number": "BM00001",
+      "sale_dept_name": "销售部",
+      "c_level_id": "",
+      "c_level_name": "",
+      "c_level_number": "",
+      "number": "A-26",
+      "rate": "0",
+      "enable": "1",
+      "bomentity": [
+        {
+          "birthday": "",
+          "qq": "",
+          "contact_person": "黄先生",
+          "create_time_contact": "2025-02-25 10:01:15",
+          "contact_country_id": "1000001",
+          "contact_country_name": "中国",
+          "contact_country_number": "001",
+          "contact_province_id": "",
+          "contact_province_name": "",
+          "contact_province_number": "",
+          "contact_city_id": "",
+          "contact_city_name": "",
+          "contact_city_number": "",
+          "contact_district_id": "",
+          "contact_district_name": "",
+          "contact_district_number": "",
+          "gender": "1",
+          "mobile": "CD4JnWOXutOD95n95VjvIw==",
+          "wechat": "",
+          "phone": "",
+          "is_default_linkman": true,
+          "id": "2157960035911692325",
+          "contact_address": "",
+          "seq": "1",
+          "email": ""
+        }
+      ],
+      "id": "2157960004865371136",
+      "addr": "sZybqVVfQiibdQIClDP4nKMCgOYz5370uo5RfVcJ9AuAIX5JkrLqlOyL36gOw4UI",
+      "group_id": "2157412121363730432",
+      "group_name": "直管客户",
+      "group_number": "KHFL00002",
+      "create_time": "2025-02-25 10:01:15",
+      "creater_field_name": "",
+      "saler_id": "2157416748628955136",
+      "saler_name": "孙淼淼",
+      "saler_number": "GD",
+      "name": "广州市鑫万电子商务有限公司",
+      "custom_field": {},
+      "setting_term_id": "",
+      "setting_term_number": "",
+      "setting_term_name": "",
+      "credit_limit": 0,
+      "deduct": false,
+      "settle_customer_id": "2157960004865371136",
+      "settle_customer_number": "A-26",
+      "settle_customer_name": "广州市鑫万电子商务有限公司",
+      "invoice_email": "",
+      "invoice_phone": ""
+    },
     "detailSample": {
       "modify_time": "2025-04-01 11:34:06",
       "bank_account": "ddINT+oe8aYECJeyTlqw8w==",
@@ -901,7 +1334,16 @@
       "contact_address",
       "seq",
       "email"
-    ]
+    ],
+    "listFull": {
+      "id": "2157960004865371136",
+      "name": "广州市鑫万电子商务有限公司",
+      "number": "A-26",
+      "group_name": "直管客户",
+      "c_level_id": "",
+      "remark": "",
+      "enable": "1"
+    }
   },
   "BD_SUPPLIER": {
     "label": "供应商",
@@ -971,6 +1413,21 @@
       "account_entity",
       "deduct"
     ],
+    "detailFull": {
+      "id": "2241285519952694272",
+      "number": "GYS00014",
+      "name": "KG",
+      "enable": "1",
+      "group_name": "",
+      "saler_name": "",
+      "sale_dept_name": "",
+      "bom_entity": [],
+      "custom_field": {},
+      "taxpayer_no": "",
+      "remark": "",
+      "account_entity": [],
+      "deduct": false
+    },
     "detailSample": {
       "id": "2241285519952694272",
       "number": "GYS00014",
@@ -980,6 +1437,22 @@
       "custom_field": "{}",
       "account_entity": "[ARRAY 0]",
       "deduct": "false"
+    },
+    "listFull": {
+      "id": "2241285519952694272",
+      "number": "GYS00014",
+      "name": "KG",
+      "group_id": "",
+      "group_name": "",
+      "group_number": "",
+      "rate": "0",
+      "bank": "",
+      "bank_account": "",
+      "account_open_addr": "",
+      "invoice_name": "",
+      "taxpayer_no": "",
+      "bom_entity": [],
+      "remark": ""
     }
   }
 }

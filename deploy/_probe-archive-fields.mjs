@@ -27,8 +27,8 @@ for (const [code, label, listPath, detailPath] of TARGETS) {
   const rows = list.rows || [];
   const rec = { label, count: Number(list.count), listKeys: rows[0] ? Object.keys(rows[0]) : [], listSample: rows.slice(0, 2) };
   if (detailPath && rows[0]) {
-    const d = await kingdeeGet(cfg.kingdee, token, detailPath, { id: rows[0].id });
-    rec.detailKeys = Object.keys(d);
+    const d = await kingdeeGet(cfg.kingdee, token, detailPath, { id: rows[0].id });    rec.detailKeys = Object.keys(d);
+    rec.detailFull = d;                                  // 完整详情(供对照脚本跑真实映射)
     rec.detailSample = {};
     for (const [k, v] of Object.entries(d)) {
       if (v === null || v === '' || v === undefined) continue;
@@ -37,6 +37,7 @@ for (const [code, label, listPath, detailPath] of TARGETS) {
       else rec.detailSample[k] = String(v).slice(0, 80);
     }
   }
+  rec.listFull = rows[0] || null;                        // 完整列表行(仅列表接口的档案用)
   res[code] = rec;
   console.log('[%s] %s 列表 %d 条 | 列表键 %d | 详情键 %d', code, label, rec.count, rec.listKeys.length, (rec.detailKeys || []).length);
 }
