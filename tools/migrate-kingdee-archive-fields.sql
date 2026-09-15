@@ -139,214 +139,214 @@ IF COL_LENGTH('dbo.dm_kh', N'首要联系人') IS NULL ALTER TABLE dbo.dm_kh ADD
 GO
 
 -- ══ yj_field 注册(面板可见;seq 900 段)══
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATGRP' AND col_name=N'创建时间')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATGRP', N'创建时间', N'创建时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATGRP' AND col_name=N'修改时间')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATGRP', N'修改时间', N'修改时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUR' AND col_name=N'创建人')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUR', N'创建人', N'创建人', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUR' AND col_name=N'创建时间')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUR', N'创建时间', N'创建时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUR' AND col_name=N'修改人')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUR', N'修改人', N'修改人', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUR' AND col_name=N'修改时间')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUR', N'修改时间', N'修改时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_UOM' AND col_name=N'长编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_UOM', N'长编码', N'长编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_UOM' AND col_name=N'精度处理')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_UOM', N'精度处理', N'精度处理', N'整数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_UOM' AND col_name=N'是否叶子节点')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_UOM', N'是否叶子节点', N'是否叶子节点', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_UOM' AND col_name=N'级次')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_UOM', N'级次', N'级次', N'整数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_UOM' AND col_name=N'创建时间')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_UOM', N'创建时间', N'创建时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_UOM' AND col_name=N'修改时间')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_UOM', N'修改时间', N'修改时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_DEPT' AND col_name=N'级次')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_DEPT', N'级次', N'级次', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_DEPT' AND col_name=N'长编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_DEPT', N'长编码', N'长编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_DEPT' AND col_name=N'部门全称')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_DEPT', N'部门全称', N'部门全称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_DEPT' AND col_name=N'上级编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_DEPT', N'上级编码', N'上级编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_EMP' AND col_name=N'性别')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_EMP', N'性别', N'性别', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_EMP' AND col_name=N'部门编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_EMP', N'部门编码', N'部门编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_EMP' AND col_name=N'入职日期')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_EMP', N'入职日期', N'入职日期', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_EMP' AND col_name=N'离职日期')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_EMP', N'离职日期', N'离职日期', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_STORE' AND col_name=N'国家')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_STORE', N'国家', N'国家', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_STORE' AND col_name=N'省')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_STORE', N'省', N'省', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_STORE' AND col_name=N'市')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_STORE', N'市', N'市', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_STORE' AND col_name=N'区')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_STORE', N'区', N'区', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_STORE' AND col_name=N'启用仓位管理')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_STORE', N'启用仓位管理', N'启用仓位管理', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_STORE' AND col_name=N'仓库管理员编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_STORE', N'仓库管理员编码', N'仓库管理员编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_SUPPLIER' AND col_name=N'采购员部门')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_SUPPLIER', N'采购员部门', N'采购员部门', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_SUPPLIER' AND col_name=N'自动抵扣预收款')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_SUPPLIER', N'自动抵扣预收款', N'自动抵扣预收款', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'备注')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'备注', N'备注', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'助记码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'助记码', N'助记码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'产地')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'产地', N'产地', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'商品类型')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'商品类型', N'商品类型', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'是否可销售')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'是否可销售', N'是否可销售', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'是否可采购')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'是否可采购', N'是否可采购', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'是否为子件')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'是否为子件', N'是否为子件', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'是否为组件')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'是否为组件', N'是否为组件', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'是否多单位')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'是否多单位', N'是否多单位', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'辅助单位')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'辅助单位', N'辅助单位', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'辅助单位编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'辅助单位编码', N'辅助单位编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'是否启用保质期')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'是否启用保质期', N'是否启用保质期', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'保质期')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'保质期', N'保质期', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'保质期单位')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'保质期单位', N'保质期单位', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'预警天数')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'预警天数', N'预警天数', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'是否启用辅助属性')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'是否启用辅助属性', N'是否启用辅助属性', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'库存管理方式')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'库存管理方式', N'库存管理方式', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最低库存')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最低库存', N'最低库存', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最高库存')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最高库存', N'最高库存', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'预警库存')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'预警库存', N'预警库存', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'销项税率')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'销项税率', N'销项税率', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'进项税率')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'进项税率', N'进项税率', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'生产许可证')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'生产许可证', N'生产许可证', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'注册证号')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'注册证号', N'注册证号', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'毛重')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'毛重', N'毛重', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'净重')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'净重', N'净重', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'长')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'长', N'长', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'宽')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'宽', N'宽', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'高')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'高', N'高', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'体积')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'体积', N'体积', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'可用库存')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'可用库存', N'可用库存', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'即时库存')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'即时库存', N'即时库存', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最小包装量')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最小包装量', N'最小包装量', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'默认生产车间编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'默认生产车间编码', N'默认生产车间编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'是否倒冲领料')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'是否倒冲领料', N'是否倒冲领料', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'倒冲仓库名称')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'倒冲仓库名称', N'倒冲仓库名称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'倒冲仓库编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'倒冲仓库编码', N'倒冲仓库编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'倒冲仓位名称')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'倒冲仓位名称', N'倒冲仓位名称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'商品标签')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'商品标签', N'商品标签', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'采购价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'采购价', N'采购价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'零售价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'零售价', N'零售价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'批发价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'批发价', N'批发价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'配送价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'配送价', N'配送价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最低销售价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最低销售价', N'最低销售价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最高采购价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最高采购价', N'最高采购价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最近采购价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最近采购价', N'最近采购价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最近销售价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最近销售价', N'最近销售价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最近含税采购价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最近含税采购价', N'最近含税采购价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最近含税销售价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最近含税销售价', N'最近含税销售价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最近采购入库成本')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最近采购入库成本', N'最近采购入库成本', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'最近成交供应商')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'最近成交供应商', N'最近成交供应商', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'委外价')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'委外价', N'委外价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_MATERIAL' AND col_name=N'价格单位')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_MATERIAL', N'价格单位', N'价格单位', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'客户分类编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'客户分类编码', N'客户分类编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'价格等级编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'价格等级编码', N'价格等级编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'业务员编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'业务员编码', N'业务员编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'结算客户')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'结算客户', N'结算客户', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'结算客户编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'结算客户编码', N'结算客户编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'部门')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'部门', N'部门', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'部门编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'部门编码', N'部门编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'增值税税率')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'增值税税率', N'增值税税率', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'开票名称')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'开票名称', N'开票名称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'发票类型')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'发票类型', N'发票类型', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'国家编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'国家编码', N'国家编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'省份编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'省份编码', N'省份编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'城市编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'城市编码', N'城市编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'区县编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'区县编码', N'区县编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'结算期限')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'结算期限', N'结算期限', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'结算期限编码')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'结算期限编码', N'结算期限编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'自动抵扣预收款')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'自动抵扣预收款', N'自动抵扣预收款', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'信用额度')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'信用额度', N'信用额度', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'创建人')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'创建人', N'创建人', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'创建时间')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'创建时间', N'创建时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'修改时间')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'修改时间', N'修改时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'联系人性别')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'联系人性别', N'联系人性别', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='BD_CUSTOMER' AND col_name=N'首要联系人')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('BD_CUSTOMER', N'首要联系人', N'首要联系人', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATGRP' AND col_name=N'创建时间')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATGRP', N'创建时间', N'创建时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATGRP' AND col_name=N'修改时间')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATGRP', N'修改时间', N'修改时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='CUR' AND col_name=N'创建人')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('CUR', N'创建人', N'创建人', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='CUR' AND col_name=N'创建时间')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('CUR', N'创建时间', N'创建时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='CUR' AND col_name=N'修改人')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('CUR', N'修改人', N'修改人', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='CUR' AND col_name=N'修改时间')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('CUR', N'修改时间', N'修改时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='UOM' AND col_name=N'长编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('UOM', N'长编码', N'长编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='UOM' AND col_name=N'精度处理')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('UOM', N'精度处理', N'精度处理', N'整数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='UOM' AND col_name=N'是否叶子节点')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('UOM', N'是否叶子节点', N'是否叶子节点', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='UOM' AND col_name=N'级次')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('UOM', N'级次', N'级次', N'整数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='UOM' AND col_name=N'创建时间')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('UOM', N'创建时间', N'创建时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='UOM' AND col_name=N'修改时间')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('UOM', N'修改时间', N'修改时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='DEPT' AND col_name=N'级次')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('DEPT', N'级次', N'级次', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='DEPT' AND col_name=N'长编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('DEPT', N'长编码', N'长编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='DEPT' AND col_name=N'部门全称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('DEPT', N'部门全称', N'部门全称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='DEPT' AND col_name=N'上级编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('DEPT', N'上级编码', N'上级编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'性别')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('EMP', N'性别', N'性别', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'部门编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('EMP', N'部门编码', N'部门编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'入职日期')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('EMP', N'入职日期', N'入职日期', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'离职日期')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('EMP', N'离职日期', N'离职日期', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'国家')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'国家', N'国家', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'省')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'省', N'省', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'市')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'市', N'市', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'区')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'区', N'区', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'启用仓位管理')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'启用仓位管理', N'启用仓位管理', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'仓库管理员编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'仓库管理员编码', N'仓库管理员编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'采购员部门')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'采购员部门', N'采购员部门', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'自动抵扣预收款')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'自动抵扣预收款', N'自动抵扣预收款', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'备注')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'备注', N'备注', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'助记码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'助记码', N'助记码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'产地')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'产地', N'产地', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'商品类型')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'商品类型', N'商品类型', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否可销售')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否可销售', N'是否可销售', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否可采购')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否可采购', N'是否可采购', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否为子件')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否为子件', N'是否为子件', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否为组件')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否为组件', N'是否为组件', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否多单位')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否多单位', N'是否多单位', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'辅助单位')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'辅助单位', N'辅助单位', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'辅助单位编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'辅助单位编码', N'辅助单位编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否启用保质期')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否启用保质期', N'是否启用保质期', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'保质期')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'保质期', N'保质期', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'保质期单位')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'保质期单位', N'保质期单位', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'预警天数')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'预警天数', N'预警天数', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否启用辅助属性')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否启用辅助属性', N'是否启用辅助属性', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'库存管理方式')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'库存管理方式', N'库存管理方式', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最低库存')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最低库存', N'最低库存', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最高库存')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最高库存', N'最高库存', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'预警库存')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'预警库存', N'预警库存', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'销项税率')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'销项税率', N'销项税率', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'进项税率')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'进项税率', N'进项税率', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'生产许可证')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'生产许可证', N'生产许可证', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'注册证号')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'注册证号', N'注册证号', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'毛重')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'毛重', N'毛重', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'净重')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'净重', N'净重', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'长')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'长', N'长', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'宽')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'宽', N'宽', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'高')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'高', N'高', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'体积')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'体积', N'体积', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'可用库存')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'可用库存', N'可用库存', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'即时库存')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'即时库存', N'即时库存', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最小包装量')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最小包装量', N'最小包装量', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'默认生产车间编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'默认生产车间编码', N'默认生产车间编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否倒冲领料')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否倒冲领料', N'是否倒冲领料', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'倒冲仓库名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'倒冲仓库名称', N'倒冲仓库名称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'倒冲仓库编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'倒冲仓库编码', N'倒冲仓库编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'倒冲仓位名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'倒冲仓位名称', N'倒冲仓位名称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'商品标签')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'商品标签', N'商品标签', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'采购价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'采购价', N'采购价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'零售价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'零售价', N'零售价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'批发价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'批发价', N'批发价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'配送价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'配送价', N'配送价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最低销售价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最低销售价', N'最低销售价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最高采购价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最高采购价', N'最高采购价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最近采购价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最近采购价', N'最近采购价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最近销售价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最近销售价', N'最近销售价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最近含税采购价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最近含税采购价', N'最近含税采购价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最近含税销售价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最近含税销售价', N'最近含税销售价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最近采购入库成本')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最近采购入库成本', N'最近采购入库成本', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最近成交供应商')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'最近成交供应商', N'最近成交供应商', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'委外价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'委外价', N'委外价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'价格单位')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'价格单位', N'价格单位', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'客户分类编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'客户分类编码', N'客户分类编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'价格等级编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'价格等级编码', N'价格等级编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'业务员编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'业务员编码', N'业务员编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'结算客户')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'结算客户', N'结算客户', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'结算客户编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'结算客户编码', N'结算客户编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'部门')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'部门', N'部门', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'部门编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'部门编码', N'部门编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'增值税税率')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'增值税税率', N'增值税税率', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'开票名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'开票名称', N'开票名称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'发票类型')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'发票类型', N'发票类型', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'国家编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'国家编码', N'国家编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'省份编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'省份编码', N'省份编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'城市编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'城市编码', N'城市编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'区县编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'区县编码', N'区县编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'结算期限')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'结算期限', N'结算期限', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'结算期限编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'结算期限编码', N'结算期限编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'自动抵扣预收款')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'自动抵扣预收款', N'自动抵扣预收款', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'信用额度')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'信用额度', N'信用额度', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'创建人')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'创建人', N'创建人', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'创建时间')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'创建时间', N'创建时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'修改时间')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'修改时间', N'修改时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'联系人性别')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'联系人性别', N'联系人性别', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'首要联系人')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'首要联系人', N'首要联系人', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
 GO
 
 -- ══ 新增标签英文译名(其余语言由机翻兜底)══

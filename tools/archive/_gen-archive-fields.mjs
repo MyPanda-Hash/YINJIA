@@ -129,6 +129,11 @@ const SPEC = [
 ];
 
 const esc = (s) => String(s).replace(/'/g, "''");
+// 同步注册码 → MES 面板码(两者不同:BD_MATERIAL 是同步条目码,面板是 INV)
+const PANEL = {
+  BD_SETTLE: 'SETTLE', BD_CUSGRP: 'CUSGRP', BD_SUPGRP: 'SUPGRP', BD_MATGRP: 'MATGRP', BD_CUR: 'CUR',
+  BD_UOM: 'UOM', BD_DEPT: 'DEPT', BD_EMP: 'EMP', BD_STORE: 'WH', BD_MATERIAL: 'INV', BD_CUSTOMER: 'KHDA', BD_SUPPLIER: 'GFDA',
+};
 // 物理类型 → yj_field.data_type
 const dataTypeOf = (t) => (t.startsWith('decimal') || t === 'float' ? '小数' : t === 'bit' ? '是否' : t === 'int' ? '整数' : t === 'datetime2' ? '日期' : '文本');
 // 新增标签的英文译名(缺则合并进迁移;已有译名的 IF NOT EXISTS 自动跳过)
@@ -185,8 +190,9 @@ for (const [table, items] of byTable) {
 // yj_field 注册(place 默认 detail;序号接 900 段避免与既有冲突)
 out.push('-- ══ yj_field 注册(面板可见;seq 900 段)══');
 for (const [code, , col, label, type, , place] of SPEC) {
-  out.push(`IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='${code}' AND col_name=N'${col}')`);
-  out.push(`    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('${code}', N'${col}', N'${label}', N'${dataTypeOf(type)}', N'${place}', 900, 130, 1, 0, 0, 1);`);
+  const pc = PANEL[code] || code;
+  out.push(`IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='${pc}' AND col_name=N'${col}')`);
+  out.push(`    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('${pc}', N'${col}', N'${label}', N'${dataTypeOf(type)}', N'${place}', 900, 130, 1, 0, 0, 1);`);
 }
 out.push('GO');
 out.push('');
