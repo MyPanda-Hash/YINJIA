@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fetchAppToken, kingdeeGet } from './kingdee-client.mjs';
 import { makeLogger, confirmBatch, backupBeforeWrite } from './safety.mjs';
+import { setSecret, dec, cryptoStats, resetCryptoStats } from './kingdee-crypto.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const N_SYNC_USER = '金蝶同步'; // 星辰审核人缺失时 yj_doc_status.shr 的兜底留痕
@@ -120,12 +121,13 @@ export const DOCS = [
     table: 'bs_emp', codeCol: '员工编码',
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.department_name].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d) {
-      // 敏感字段(手机/证件号/邮箱/生日/微信,指引 §四.6)跳过置空,联系方式在金蝶界面维护
+      // 敏感字段(手机/证件号/邮箱/生日/微信)解密落库
       const g = String(d.gender);
       return { 员工编码: str(d.number), 员工名称: str(d.name), 所属部门: str(d.department_name),
         部门编码: str(d.department_number), 性别: g === '1' ? '男' : g === '0' ? '女' : null,
         入职日期: str(d.hire_date), 离职日期: str(d.leave_date),
-        手机: null, 办公电话: null, 证件号码: null,
+        手机: dec(d.mobile), 证件号码: dec(d.id_number),
+        邮箱: dec(d.email), 生日: dec(d.birthday), 微信: dec(d.wechat),
         停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用', __cancel: 'N' };
     },
   },
@@ -141,7 +143,7 @@ export const DOCS = [
         国家: str(d.country_name), 省: str(d.province_name), 市: str(d.city_name), 区: str(d.district_name),
         启用仓位管理: d.is_allow_freight === true,
         允许零库存出库: d.allow_negative === true || d.is_allow_neg === true || String(d.allow_negative) === 'true' || String(d.is_allow_neg) === 'true',
-        联系电话: null,
+        联系电话: dec(d.mobile),
         停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用', __cancel: 'N' };
     },
   },
@@ -196,13 +198,15 @@ export const DOCS = [
     table: 'dm_kh', codeCol: 'dm',
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.group_name, r.c_level_name, r.saler_name, r.remark].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d) {
-      // 敏感字段(详细地址/电话/邮箱/银行账号/收票邮箱手机)AES密文,起步策略跳过(指引 §四.6)
-      const ct = (d.bomentity || [])[0] || {};   // 联系人取首行(仅非敏感字段)
+      // 敏感字段解密落库(官方《隐私数据解密》:AES-256-CBC,密钥=clientSecret,IV 固定)
+      const ct = (d.bomentity || [])[0] || {};
       const g = String(ct.gender);
       return { dm: str(d.number), mc: str(d.name), khlb: str(d.group_name), khjb: str(d.c_level_name),
-        addr: null, tel: null, email: null, lxr: str(ct.contact_person), ywman: str(d.saler_name),
-        sui_no: str(d.taxpayer_no), bank: str(d.bank), bank_no: null, bz: str(d.remark), comm: '',
-        // 按接口实测补齐(①档)
+        addr: dec(d.addr), tel: dec(ct.phone) || dec(ct.mobile), email: dec(ct.email), lxr: str(ct.contact_person), ywman: str(d.saler_name),
+        sui_no: str(d.taxpayer_no), bank: str(d.bank), bank_no: dec(d.bank_account), bz: str(d.remark), comm: '',
+        联系人手机: dec(ct.mobile), 联系人座机: dec(ct.phone), 联系人邮箱: dec(ct.email),
+        联系人生日: dec(ct.birthday), 联系人QQ: dec(ct.qq), 联系人微信: dec(ct.wechat), 联系人地址: dec(ct.contact_address),
+        收票邮箱: dec(d.invoice_email), 收票手机号: dec(d.invoice_phone), 开户地址: dec(d.account_open_addr),
         客户分类编码: str(d.group_number), 价格等级编码: str(d.c_level_number), 业务员编码: str(d.saler_number),
         结算客户: str(d.settle_customer_name), 结算客户编码: str(d.settle_customer_number),
         部门: str(d.sale_dept_name), 部门编码: str(d.sale_dept_number),
@@ -223,10 +227,13 @@ export const DOCS = [
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.group_name, r.saler_name, r.remark].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d) {
       const acc = (d.account_entity || [])[0] || {};
+      const ct = (d.bom_entity || [])[0] || {};
       return { dm: str(d.number), mc: str(d.name), gysfl: str(d.group_name), 供应商分类编码: str(d.group_number),
-        addr: null, tel: null, ywman: str(d.saler_name), sui_no: str(d.taxpayer_no),
-        bank: str(d.bank) || str(acc.income_bank_name), bank_no: null, bz: str(d.remark),
-        增值税税率: num(d.rate), 开票名称: str(d.invoice_name), 开户地址: str(d.account_open_addr),
+        addr: dec(ct.contact_address), tel: dec(ct.phone) || dec(ct.mobile), 联系人: str(ct.contact_person),
+        ywman: str(d.saler_name), sui_no: str(d.taxpayer_no),
+        bank: str(d.bank) || str(acc.income_bank_name), bank_no: dec(d.bank_account) || dec(acc.income_acc_no), bz: str(d.remark),
+        供应商联系人手机: dec(ct.mobile), 供应商联系人座机: dec(ct.phone), 供应商联系人邮箱: dec(ct.email), 供应商联系人地址: dec(ct.contact_address),
+        增值税税率: num(d.rate), 开票名称: str(d.invoice_name), 开户地址: dec(d.account_open_addr),
         采购员部门: str(d.sale_dept_name), 自动抵扣预收款: d.deduct === true,
         __cancel: d.enable === '1' ? 'N' : 'Y' };
     },
@@ -482,6 +489,8 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
     process.exit(1);
   }
   const cfg = JSON.parse(readText(configPath));
+  setSecret(cfg.kingdee && cfg.kingdee.clientSecret); // 敏感字段解密密钥(官方:密钥=clientSecret,IV 固定)
+  resetCryptoStats();
   const s = cfg.sync || {};
   const opt = {
     billStatus: (mode === 'incremental' ? s.billStatus : s.initBillStatus) ?? 'C',
@@ -709,5 +718,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
     saveState();
   }
   log(`全部完成:新增 ${totalIn},更新 ${totalUp},失败 ${totalFail}${dryRun ? '(dry-run 未写库)' : ''}`);
+  const cs = cryptoStats();
+  if (cs.ok || cs.fail) log(`敏感字段解密:成功 ${cs.ok} 个,失败 ${cs.fail} 个${cs.fail ? `(最后原因: ${cs.lastErr})` : ''}`);
   if (totalFail > 0) process.exitCode = 2;
 }

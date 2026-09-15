@@ -261,3 +261,8 @@ migrate-kingdee-trim-unused.sql
 # 幂等:COL_LENGTH 守卫 / IF NOT EXISTS / DELETE 直写,已连跑两遍验证。
 migrate-kingdee-archive-fields.sql
 migrate-kingdee-archive-prune.sql
+
+# —— 2026-09-15 登记:档案字段"只保留可同步"裁剪(口径见 deploy/金蝶档案字段同步对照.md) ——
+# 生成器 tools/archive/_gen-keep-syncable.mjs:保留集 = mapArchive 实际写出且接口真有该键的列;
+# 敏感密文字段改为解密导入(不再算"不可同步");其余(无接口来源/已被MES常量替代)从面板删除。
+migrate-kingdee-archive-keep-syncable.sql

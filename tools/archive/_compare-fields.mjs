@@ -33,8 +33,8 @@ const SPEC = {
   BD_CUR: { panel: 'CUR', map: { number: ['编码'], name: ['名称'], sign: ['币别符号'], rate: ['汇率'], exc_type: ['汇率类型'], amt_precision: ['金额小数位'], price_precision: ['单价小数位'], creator_name: ['创建人'], create_time: ['创建时间'], modifier_name: ['修改人'], modify_time: ['修改时间'], enable: ['停用'] } },
   BD_UOM: { panel: 'UOM', map: { number: ['计量单位编码'], name: ['计量单位名称'], conversion_type: ['单位类型'], precision: ['小数位数'], precision_account: ['精度处理'], long_number: ['长编码'], is_leaf: ['是否叶子节点'], level: ['级次'], create_time: ['创建时间'], modify_time: ['修改时间'], enable: ['停用'] } },
   BD_DEPT: { panel: 'DEPT', map: { number: ['部门编码'], name: ['部门名称'], parent_name: ['上级部门'], parent_number: ['上级编码'], level: ['级次'], long_number: ['长编码'], full_name: ['部门全称'], is_leaf: ['是否叶子节点'], comment: ['备注'], enable: ['停用'] } },
-  BD_EMP: { panel: 'EMP', map: { number: ['员工编码'], name: ['员工名称'], department_name: ['所属部门'], department_number: ['部门编码'], gender: ['性别'], hire_date: ['入职日期'], leave_date: ['离职日期'], enable: ['停用'], SKIP_mobile: ['手机'], SKIP_id_number: ['证件号码'] } },
-  BD_STORE: { panel: 'WH', map: { number: ['仓库编码'], name: ['仓库名称'], address: ['仓库地址'], storekeeper_name: ['负责人'], storekeeper_number: ['仓库管理员编码'], group_name: ['仓库分类'], group_number: ['仓库分类编码'], country_name: ['国家'], province_name: ['省'], city_name: ['市'], district_name: ['区'], allow_negative: ['允许零库存出库'], is_allow_neg: ['允许零库存出库'], is_allow_freight: ['启用仓位管理'], enable: ['停用'], SKIP_mobile: ['联系电话'] } },
+  BD_EMP: { panel: 'EMP', map: { number: ['员工编码'], name: ['员工名称'], department_name: ['所属部门'], department_number: ['部门编码'], gender: ['性别'], hire_date: ['入职日期'], leave_date: ['离职日期'], enable: ['停用'], mobile: ['手机'], id_number: ['证件号码'], email: ['邮箱'], birthday: ['生日'], wechat: ['微信'] } },
+  BD_STORE: { panel: 'WH', map: { number: ['仓库编码'], name: ['仓库名称'], address: ['仓库地址'], storekeeper_name: ['负责人'], storekeeper_number: ['仓库管理员编码'], group_name: ['仓库分类'], group_number: ['仓库分类编码'], country_name: ['国家'], province_name: ['省'], city_name: ['市'], district_name: ['区'], allow_negative: ['允许零库存出库'], is_allow_neg: ['允许零库存出库'], is_allow_freight: ['启用仓位管理'], enable: ['停用'], mobile: ['联系电话'] } },
   BD_MATERIAL: { panel: 'INV', map: {
     number: ['存货编码'], name: ['存货名称'], model: ['规格型号'], 'parent_id→分类名': ['所属类别'], base_unit_name: ['计量单位'], barcode: ['条形码'],
     help_code: ['助记码'], producing_pace: ['产地'], check_type: ['商品类型'], remark: ['备注'], cost_method: ['计价方式'],
@@ -67,10 +67,13 @@ const SPEC = {
     setting_term_name: ['结算期限'], setting_term_number: ['结算期限编码'], deduct: ['自动抵扣预收款'], credit_limit: ['信用额度'],
     creater_field_name: ['创建人'], create_time: ['创建时间'], modify_time: ['修改时间'], remark: ['bz'],
     'bomentity.contact_person': ['lxr'], 'bomentity.gender': ['联系人性别'], 'bomentity.is_default_linkman': ['首要联系人'],
+    'bomentity.mobile': ['联系人手机', 'tel'], 'bomentity.phone': ['联系人座机', 'tel'], 'bomentity.email': ['联系人邮箱', 'email'],
+    'bomentity.birthday': ['联系人生日'], 'bomentity.qq': ['联系人QQ'], 'bomentity.wechat': ['联系人微信'],
+    'bomentity.contact_address': ['联系人地址'], invoice_email: ['收票邮箱'], invoice_phone: ['收票手机号'],
     enable: ['停用(asp_cancel)'],
-    SKIP_addr: ['addr'], SKIP_tel: ['tel'], SKIP_email: ['email'], SKIP_bank_account: ['bank_no'], 'SKIP_bomentity.email': ['email'],
+    addr: ['addr'], bank_account: ['bank_no'], account_open_addr: ['开户地址'],
   } },
-  BD_SUPPLIER: { panel: 'GFDA', map: { number: ['dm'], name: ['mc'], group_name: ['gysfl'], group_number: ['供应商分类编码'], saler_name: ['ywman'], sale_dept_name: ['采购员部门'], taxpayer_no: ['sui_no'], rate: ['增值税税率'], invoice_name: ['开票名称'], account_open_addr: ['开户地址'], deduct: ['自动抵扣预收款'], remark: ['bz'], enable: ['停用(asp_cancel)'], bank: ['bank'], 'account_entity.income_bank_name': ['bank'], 'SKIP_bank_account': ['bank_no'], 'SKIP_account_entity.income_acc_no': ['bank_no'], SKIP_tel: ['tel'] } },
+  BD_SUPPLIER: { panel: 'GFDA', map: { number: ['dm'], name: ['mc'], group_name: ['gysfl'], group_number: ['供应商分类编码'], saler_name: ['ywman'], sale_dept_name: ['采购员部门'], taxpayer_no: ['sui_no'], rate: ['增值税税率'], invoice_name: ['开票名称'], account_open_addr: ['开户地址'], deduct: ['自动抵扣预收款'], remark: ['bz'], enable: ['停用(asp_cancel)'], bank: ['bank'], 'account_entity.income_bank_name': ['bank'], bank_account: ['bank_no'], 'account_entity.income_acc_no': ['bank_no'], 'bom_entity.contact_person': ['联系人'], 'bom_entity.mobile': ['供应商联系人手机'], 'bom_entity.phone': ['供应商联系人座机'], 'bom_entity.email': ['供应商联系人邮箱'], 'bom_entity.contact_address': ['供应商联系人地址', 'addr'], 'bom_entity.phone': ['tel', '供应商联系人座机'], 'bom_entity.mobile': ['供应商联系人手机'] } },
 };
 
 let fail = 0;

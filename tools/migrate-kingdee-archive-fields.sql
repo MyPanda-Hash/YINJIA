@@ -36,11 +36,14 @@ IF COL_LENGTH('dbo.bs_dept', N'上级编码') IS NULL ALTER TABLE dbo.bs_dept AD
 IF COL_LENGTH('dbo.bs_dept', N'是否叶子节点') IS NULL ALTER TABLE dbo.bs_dept ADD [是否叶子节点] bit NULL;
 GO
 
--- ══ bs_emp(4 列)══
+-- ══ bs_emp(7 列)══
 IF COL_LENGTH('dbo.bs_emp', N'性别') IS NULL ALTER TABLE dbo.bs_emp ADD [性别] nvarchar(10) NULL;
 IF COL_LENGTH('dbo.bs_emp', N'部门编码') IS NULL ALTER TABLE dbo.bs_emp ADD [部门编码] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.bs_emp', N'入职日期') IS NULL ALTER TABLE dbo.bs_emp ADD [入职日期] nvarchar(30) NULL;
 IF COL_LENGTH('dbo.bs_emp', N'离职日期') IS NULL ALTER TABLE dbo.bs_emp ADD [离职日期] nvarchar(30) NULL;
+IF COL_LENGTH('dbo.bs_emp', N'邮箱') IS NULL ALTER TABLE dbo.bs_emp ADD [邮箱] nvarchar(200) NULL;
+IF COL_LENGTH('dbo.bs_emp', N'生日') IS NULL ALTER TABLE dbo.bs_emp ADD [生日] nvarchar(50) NULL;
+IF COL_LENGTH('dbo.bs_emp', N'微信') IS NULL ALTER TABLE dbo.bs_emp ADD [微信] nvarchar(100) NULL;
 GO
 
 -- ══ bs_wh(8 列)══
@@ -54,13 +57,18 @@ IF COL_LENGTH('dbo.bs_wh', N'启用仓位管理') IS NULL ALTER TABLE dbo.bs_wh 
 IF COL_LENGTH('dbo.bs_wh', N'仓库管理员编码') IS NULL ALTER TABLE dbo.bs_wh ADD [仓库管理员编码] nvarchar(100) NULL;
 GO
 
--- ══ dm_gf(6 列)══
+-- ══ dm_gf(11 列)══
 IF COL_LENGTH('dbo.dm_gf', N'供应商分类编码') IS NULL ALTER TABLE dbo.dm_gf ADD [供应商分类编码] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.dm_gf', N'增值税税率') IS NULL ALTER TABLE dbo.dm_gf ADD [增值税税率] decimal(18,4) NULL;
 IF COL_LENGTH('dbo.dm_gf', N'开票名称') IS NULL ALTER TABLE dbo.dm_gf ADD [开票名称] nvarchar(200) NULL;
 IF COL_LENGTH('dbo.dm_gf', N'开户地址') IS NULL ALTER TABLE dbo.dm_gf ADD [开户地址] nvarchar(200) NULL;
 IF COL_LENGTH('dbo.dm_gf', N'采购员部门') IS NULL ALTER TABLE dbo.dm_gf ADD [采购员部门] nvarchar(200) NULL;
 IF COL_LENGTH('dbo.dm_gf', N'自动抵扣预收款') IS NULL ALTER TABLE dbo.dm_gf ADD [自动抵扣预收款] bit NULL;
+IF COL_LENGTH('dbo.dm_gf', N'联系人') IS NULL ALTER TABLE dbo.dm_gf ADD [联系人] nvarchar(200) NULL;
+IF COL_LENGTH('dbo.dm_gf', N'供应商联系人手机') IS NULL ALTER TABLE dbo.dm_gf ADD [供应商联系人手机] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.dm_gf', N'供应商联系人座机') IS NULL ALTER TABLE dbo.dm_gf ADD [供应商联系人座机] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.dm_gf', N'供应商联系人邮箱') IS NULL ALTER TABLE dbo.dm_gf ADD [供应商联系人邮箱] nvarchar(200) NULL;
+IF COL_LENGTH('dbo.dm_gf', N'供应商联系人地址') IS NULL ALTER TABLE dbo.dm_gf ADD [供应商联系人地址] nvarchar(500) NULL;
 GO
 
 -- ══ bs_inv(63 列)══
@@ -129,7 +137,7 @@ IF COL_LENGTH('dbo.bs_inv', N'委外价') IS NULL ALTER TABLE dbo.bs_inv ADD [�
 IF COL_LENGTH('dbo.bs_inv', N'价格单位') IS NULL ALTER TABLE dbo.bs_inv ADD [价格单位] nvarchar(100) NULL;
 GO
 
--- ══ dm_kh(23 列)══
+-- ══ dm_kh(33 列)══
 IF COL_LENGTH('dbo.dm_kh', N'客户分类编码') IS NULL ALTER TABLE dbo.dm_kh ADD [客户分类编码] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.dm_kh', N'价格等级编码') IS NULL ALTER TABLE dbo.dm_kh ADD [价格等级编码] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.dm_kh', N'业务员编码') IS NULL ALTER TABLE dbo.dm_kh ADD [业务员编码] nvarchar(100) NULL;
@@ -151,8 +159,18 @@ IF COL_LENGTH('dbo.dm_kh', N'信用额度') IS NULL ALTER TABLE dbo.dm_kh ADD [�
 IF COL_LENGTH('dbo.dm_kh', N'创建人') IS NULL ALTER TABLE dbo.dm_kh ADD [创建人] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.dm_kh', N'创建时间') IS NULL ALTER TABLE dbo.dm_kh ADD [创建时间] datetime2 NULL;
 IF COL_LENGTH('dbo.dm_kh', N'修改时间') IS NULL ALTER TABLE dbo.dm_kh ADD [修改时间] datetime2 NULL;
+IF COL_LENGTH('dbo.dm_kh', N'收票邮箱') IS NULL ALTER TABLE dbo.dm_kh ADD [收票邮箱] nvarchar(200) NULL;
+IF COL_LENGTH('dbo.dm_kh', N'收票手机号') IS NULL ALTER TABLE dbo.dm_kh ADD [收票手机号] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.dm_kh', N'开户地址') IS NULL ALTER TABLE dbo.dm_kh ADD [开户地址] nvarchar(200) NULL;
 IF COL_LENGTH('dbo.dm_kh', N'联系人性别') IS NULL ALTER TABLE dbo.dm_kh ADD [联系人性别] nvarchar(10) NULL;
 IF COL_LENGTH('dbo.dm_kh', N'首要联系人') IS NULL ALTER TABLE dbo.dm_kh ADD [首要联系人] bit NULL;
+IF COL_LENGTH('dbo.dm_kh', N'联系人手机') IS NULL ALTER TABLE dbo.dm_kh ADD [联系人手机] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.dm_kh', N'联系人座机') IS NULL ALTER TABLE dbo.dm_kh ADD [联系人座机] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.dm_kh', N'联系人邮箱') IS NULL ALTER TABLE dbo.dm_kh ADD [联系人邮箱] nvarchar(200) NULL;
+IF COL_LENGTH('dbo.dm_kh', N'联系人生日') IS NULL ALTER TABLE dbo.dm_kh ADD [联系人生日] nvarchar(50) NULL;
+IF COL_LENGTH('dbo.dm_kh', N'联系人QQ') IS NULL ALTER TABLE dbo.dm_kh ADD [联系人QQ] nvarchar(50) NULL;
+IF COL_LENGTH('dbo.dm_kh', N'联系人微信') IS NULL ALTER TABLE dbo.dm_kh ADD [联系人微信] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.dm_kh', N'联系人地址') IS NULL ALTER TABLE dbo.dm_kh ADD [联系人地址] nvarchar(500) NULL;
 GO
 
 -- ══ yj_field 注册(面板可见;seq 900 段)══
@@ -394,10 +412,46 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'创
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'创建时间', N'创建时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'修改时间')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'修改时间', N'修改时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'收票邮箱')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'收票邮箱', N'收票邮箱', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'收票手机号')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'收票手机号', N'收票手机号', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'开户地址')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'开户地址', N'开户地址', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'联系人性别')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'联系人性别', N'联系人性别', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'首要联系人')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'首要联系人', N'首要联系人', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'联系人手机')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'联系人手机', N'联系人手机', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'联系人座机')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'联系人座机', N'联系人座机', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'联系人邮箱')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'联系人邮箱', N'联系人邮箱', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'联系人生日')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'联系人生日', N'联系人生日', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'联系人QQ')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'联系人QQ', N'联系人QQ', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'联系人微信')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'联系人微信', N'联系人微信', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='KHDA' AND col_name=N'联系人地址')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('KHDA', N'联系人地址', N'联系人地址', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'联系人')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'联系人', N'联系人', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'供应商联系人手机')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'供应商联系人手机', N'供应商联系人手机', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'供应商联系人座机')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'供应商联系人座机', N'供应商联系人座机', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'供应商联系人邮箱')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'供应商联系人邮箱', N'供应商联系人邮箱', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'供应商联系人地址')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'供应商联系人地址', N'供应商联系人地址', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'邮箱')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('EMP', N'邮箱', N'邮箱', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'生日')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('EMP', N'生日', N'生日', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'微信')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('EMP', N'微信', N'微信', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 GO
 
 -- ══ 新增标签英文译名(其余语言由机翻兜底)══
@@ -607,10 +661,44 @@ IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'�
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'结算期限编码', 'en', N'Settlement Term Code', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'信用额度' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'信用额度', 'en', N'Credit Limit', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'收票邮箱' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'收票邮箱', 'en', N'Invoice Email', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'收票手机号' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'收票手机号', 'en', N'Invoice Mobile', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人性别' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人性别', 'en', N'Contact Gender', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'首要联系人' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'首要联系人', 'en', N'Primary Contact', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人手机' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人手机', 'en', N'Contact Mobile', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人座机' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人座机', 'en', N'Contact Phone', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人邮箱' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人邮箱', 'en', N'Contact Email', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人生日' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人生日', 'en', N'Contact Birthday', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人QQ' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人QQ', 'en', N'Contact QQ', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人微信' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人微信', 'en', N'Contact WeChat', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人地址' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人地址', 'en', N'Contact Address', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人', 'en', N'Contact', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'供应商联系人手机' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'供应商联系人手机', 'en', N'Supplier Contact Mobile', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'供应商联系人座机' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'供应商联系人座机', 'en', N'Supplier Contact Phone', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'供应商联系人邮箱' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'供应商联系人邮箱', 'en', N'Supplier Contact Email', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'供应商联系人地址' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'供应商联系人地址', 'en', N'Supplier Contact Address', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'邮箱' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'邮箱', 'en', N'Email', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'生日' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'生日', 'en', N'Birthday', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'微信' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'微信', 'en', N'WeChat', 'manual');
 GO
 
 PRINT N'migrate-kingdee-archive-fields 完成(档案字段按接口补齐)';

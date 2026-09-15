@@ -141,9 +141,30 @@ const SPEC = [
   ['BD_CUSTOMER', 'dm_kh', '创建人', '创建人', 'nvarchar(100)', 'creater_field_name', 'detail'],
   ['BD_CUSTOMER', 'dm_kh', '创建时间', '创建时间', 'datetime2', 'create_time', 'detail'],
   ['BD_CUSTOMER', 'dm_kh', '修改时间', '修改时间', 'datetime2', 'modify_time', 'detail'],
-  // 客户联系人(bomentity 首行;非敏感字段)
+  // 客户:敏感字段(解密落库)
+  ['BD_CUSTOMER', 'dm_kh', '收票邮箱', '收票邮箱', 'nvarchar(200)', 'invoice_email', 'detail'],
+  ['BD_CUSTOMER', 'dm_kh', '收票手机号', '收票手机号', 'nvarchar(100)', 'invoice_phone', 'detail'],
+  ['BD_CUSTOMER', 'dm_kh', '开户地址', '开户地址', 'nvarchar(200)', 'account_open_addr', 'detail'],
+  // 客户联系人(bomentity 首行)
   ['BD_CUSTOMER', 'dm_kh', '联系人性别', '联系人性别', 'nvarchar(10)', 'bomentity.gender', 'detail'],
   ['BD_CUSTOMER', 'dm_kh', '首要联系人', '首要联系人', 'bit', 'bomentity.is_default_linkman', 'detail'],
+  ['BD_CUSTOMER', 'dm_kh', '联系人手机', '联系人手机', 'nvarchar(100)', 'bomentity.mobile', 'detail'],
+  ['BD_CUSTOMER', 'dm_kh', '联系人座机', '联系人座机', 'nvarchar(100)', 'bomentity.phone', 'detail'],
+  ['BD_CUSTOMER', 'dm_kh', '联系人邮箱', '联系人邮箱', 'nvarchar(200)', 'bomentity.email', 'detail'],
+  ['BD_CUSTOMER', 'dm_kh', '联系人生日', '联系人生日', 'nvarchar(50)', 'bomentity.birthday', 'detail'],
+  ['BD_CUSTOMER', 'dm_kh', '联系人QQ', '联系人QQ', 'nvarchar(50)', 'bomentity.qq', 'detail'],
+  ['BD_CUSTOMER', 'dm_kh', '联系人微信', '联系人微信', 'nvarchar(100)', 'bomentity.wechat', 'detail'],
+  ['BD_CUSTOMER', 'dm_kh', '联系人地址', '联系人地址', 'nvarchar(500)', 'bomentity.contact_address', 'detail'],
+  // 供应商联系人(bom_entity 首行)
+  ['BD_SUPPLIER', 'dm_gf', '联系人', '联系人', 'nvarchar(200)', 'bom_entity.contact_person', 'detail'],
+  ['BD_SUPPLIER', 'dm_gf', '供应商联系人手机', '供应商联系人手机', 'nvarchar(100)', 'bom_entity.mobile', 'detail'],
+  ['BD_SUPPLIER', 'dm_gf', '供应商联系人座机', '供应商联系人座机', 'nvarchar(100)', 'bom_entity.phone', 'detail'],
+  ['BD_SUPPLIER', 'dm_gf', '供应商联系人邮箱', '供应商联系人邮箱', 'nvarchar(200)', 'bom_entity.email', 'detail'],
+  ['BD_SUPPLIER', 'dm_gf', '供应商联系人地址', '供应商联系人地址', 'nvarchar(500)', 'bom_entity.contact_address', 'detail'],
+  // 职员:敏感字段(解密落库)
+  ['BD_EMP', 'bs_emp', '邮箱', '邮箱', 'nvarchar(200)', 'email', 'detail'],
+  ['BD_EMP', 'bs_emp', '生日', '生日', 'nvarchar(50)', 'birthday', 'detail'],
+  ['BD_EMP', 'bs_emp', '微信', '微信', 'nvarchar(100)', 'wechat', 'detail'],
 ];
 
 const esc = (s) => String(s).replace(/'/g, "''");
@@ -181,6 +202,12 @@ const EN = {
   国家编码: 'Country Code', 省份编码: 'Province Code', 城市编码: 'City Code', 区县编码: 'District Code',
   结算期限: 'Settlement Term', 结算期限编码: 'Settlement Term Code', 信用额度: 'Credit Limit',
   联系人性别: 'Contact Gender', 首要联系人: 'Primary Contact',
+  联系人: 'Contact', 联系人手机: 'Contact Mobile', 联系人座机: 'Contact Phone', 联系人邮箱: 'Contact Email',
+  联系人生日: 'Contact Birthday', 联系人QQ: 'Contact QQ', 联系人微信: 'Contact WeChat', 联系人地址: 'Contact Address',
+  收票邮箱: 'Invoice Email', 收票手机号: 'Invoice Mobile', 开户地址: 'Bank Address',
+  供应商联系人手机: 'Supplier Contact Mobile', 供应商联系人座机: 'Supplier Contact Phone',
+  供应商联系人邮箱: 'Supplier Contact Email', 供应商联系人地址: 'Supplier Contact Address',
+  邮箱: 'Email', 生日: 'Birthday', 微信: 'WeChat',
   供应商分类编码: 'Supplier Group Code', 开户地址: 'Bank Address',
   品牌编码: 'Brand Code', 默认仓库: 'Default Warehouse', 默认仓库编码: 'Default Warehouse Code',
   基本单位编码: 'Base UOM Code', 是否自制: 'Self-made', 多单位: 'Multi-UOM List', 图片链接: 'Image URL',
