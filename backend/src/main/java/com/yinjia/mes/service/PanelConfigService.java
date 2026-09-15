@@ -92,9 +92,9 @@ public class PanelConfigService {
         buttonGroups.add(group("打印", List.of("打印", "预览")));
         buttonGroups.add(group("导入", List.of("下载模板", "导入")));
         buttonGroups.add(group("更多", List.of("复制", "表格调整", "导出", "退出")));
-        // 分类管理入口(金蝶同款交互):客户/供应商档案从工具栏进分类维护,分类面板不占左侧导航
+        // 分类管理入口(金蝶同款交互):客户/供应商/商品 档案从工具栏进分类维护,分类面板不占左侧导航
         String classifyPanel = switch (def.code()) {
-            case "KHDA" -> "CUSGRP"; case "GFDA" -> "SUPGRP"; default -> null;
+            case "KHDA" -> "CUSGRP"; case "GFDA" -> "SUPGRP"; case "INV" -> "MATGRP"; default -> null;
         };
         String classifyTitle = null;
         if (classifyPanel != null) {

@@ -301,7 +301,7 @@ export const menuTree = [
         icon: 'Box',
         children: [
           { code: 'uom', title: '计量单位', path: '/panelx/list/UOM', icon: 'ScaleToOriginal', panelCode: 'UOM', operationName: '新增流程' },
-          { code: 'matgrp', title: '商品分类', path: '/panelx/list/MATGRP', icon: 'Files', panelCode: 'MATGRP', operationName: '新增流程' },
+          // 商品分类不占导航:从 商品 面板工具栏「分类管理」进入(与 客户/供应商 同款交互)
           { code: 'inventory', title: '商品', path: '/panelx/list/INV', icon: 'Grid', panelCode: 'INV', operationName: '新增流程' },
           { code: 'bom', title: '物料清单', path: '/panelx/list/BOM', icon: 'Files', panelCode: 'BOM', operationName: '新增流程' },
           { code: 'invPrice', title: '存货价格本', path: '/panelx/list/INV_PRICE', icon: 'PriceTag', panelCode: 'INV_PRICE', operationName: '新增流程' },
