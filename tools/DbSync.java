@@ -157,6 +157,8 @@ public class DbSync {
         if (!raw.isEmpty() && raw.codePointAt(0) == 0xFEFF) raw = raw.substring(1);
         boolean hadError = false;
         try (Statement st = c.createStatement()) {
+            // 防御:重置会话级执行开关(脚本内 SET NOEXEC ON 未复位会毒化整个连接,2026-09-15 实发)
+            st.execute("SET NOEXEC OFF");
             int batches = 0;
             for (String batch : splitGo(raw)) {
                 String b = batch.trim();

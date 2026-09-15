@@ -1,2 +1,3 @@
 SET NOCOUNT ON;
-SELECT name FROM sys.tables WHERE name IN ('yj_std_lib','yj_message','yj_attachment','yj_plan_term','yj_form_flow_link','qr_batch_registry');
+SELECT h.id, h.[单据编号], h.[仓库] AS 头表仓库, l.[仓库] AS 行表仓库
+FROM bd_material_out h LEFT JOIN bl_material_out l ON l.[单据编号]=h.[单据编号] ORDER BY h.id;

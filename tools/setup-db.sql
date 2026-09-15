@@ -24,7 +24,7 @@ GO
 --    防止"内容哈希变化 → DbSync 重跑 → 清库"事故(2026-09-15 实发:RD 表/标准库/消息/附件全丢)。
 IF OBJECT_ID('dbo.yj_panel') IS NOT NULL
 BEGIN
-    RAISERROR(N'setup-db: 检测到 yj_panel 已存在,按防误伤守卫跳过初始化(重置库请先手工 DROP yj_panel)', 0, 1) WITH NOWAIT;
+    PRINT N'setup-db: 检测到 yj_panel 已存在,按防误伤守卫跳过初始化(重置库请先手工 DROP yj_panel)';
     SET NOEXEC ON;
 END
 GO
@@ -287,3 +287,8 @@ IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON yj_form_appro
 GO
 DECLARE @fc int = (SELECT COUNT(*) FROM yj_field);
 PRINT N'YINJIA-MES 元数据初始化完成: 10 面板 / ' + CAST(@fc AS nvarchar(10)) + N' 字段定义';
+
+-- 🔴 守卫收尾:恢复执行模式。SET NOEXEC OFF 在 NOEXEC ON 下依然会被执行(唯一出口),
+--    不加这句会把 NOEXEC 泄漏到整个连接,毒化 DbSync 后续所有脚本(只编译不执行)。
+SET NOEXEC OFF;
+GO
