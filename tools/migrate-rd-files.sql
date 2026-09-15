@@ -90,20 +90,24 @@ IF OBJECT_ID('rd_insp_plan') IS NULL CREATE TABLE rd_insp_plan (
     asp_cancel nvarchar(2) NULL, asp_print int DEFAULT 0);
 GO
 
--- ============ 面板注册 ============
-INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES
+-- ============ 面板注册(幂等:已注册的面板跳过) ============
+INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group)
+SELECT v.panel_code, v.panel_name, v.category, v.mode, v.line_table, v.head_table, v.group_col, v.pk_col, v.code_col, v.prefix, v.date_col, v.page_size, v.detail_key, v.module_group FROM (VALUES
 ('RD_PROD_INFO',    N'产品信息表',   N'单据', 'doc', 'rd_product_info', NULL, 'product_code', 'id', NULL, 'PI', NULL, 20, 'items', N'研发管理'),
 ('RD_MOLD_PROC',    N'成型工艺清单', N'单据', 'doc', 'rd_mold_proc',    NULL, 'process_no',   'id', NULL, 'MP', NULL, 20, 'items', N'研发管理'),
 ('RD_MOLD_FORMULA', N'成型配方',     N'单据', 'doc', 'rd_mold_formula', NULL, 'formula_no',   'id', NULL, 'MF', NULL, 20, 'items', N'研发管理'),
 ('RD_SPEC_DOC',     N'规格书',       N'单据', 'doc', 'rd_spec_doc',     NULL, 'product_code', 'id', NULL, 'SD', 'upload_date', 20, 'items', N'研发管理'),
 ('RD_ASM_BOM',      N'组装BOM表',    N'单据', 'doc', 'rd_asm_bom',      NULL, 'bom_no',       'id', NULL, 'AB', NULL, 20, 'items', N'研发管理'),
 ('RD_ASM_PROC',     N'组装工艺清单', N'单据', 'doc', 'rd_asm_proc',     NULL, 'process_no',   'id', NULL, 'AP', NULL, 20, 'items', N'研发管理'),
-('RD_INSP_PLAN',    N'出货检验计划表', N'单据', 'doc', 'rd_insp_plan',  NULL, 'product_code', 'id', NULL, 'IP', 'upload_date', 20, 'items', N'研发管理');
+('RD_INSP_PLAN',    N'出货检验计划表', N'单据', 'doc', 'rd_insp_plan',  NULL, 'product_code', 'id', NULL, 'IP', 'upload_date', 20, 'items', N'研发管理')
+) AS v(panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group)
+WHERE NOT EXISTS (SELECT 1 FROM yj_panel p WHERE p.panel_code = v.panel_code);
 GO
 
 -- ============ 字段定义 ============
 -- 1. 产品信息表
-INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
+INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq)
+SELECT v.panel_code, v.col_name, v.label, v.data_type, v.place, v.seq FROM (VALUES
 ('RD_PROD_INFO','product_code',N'产品编码','文本','query,header',1),
 ('RD_PROD_INFO','product_name',N'产品名称','文本','query,header,detail',2),
 ('RD_PROD_INFO','category',N'产品类别','文本','query,header,detail',3),
@@ -112,12 +116,15 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
 ('RD_PROD_INFO','unit',N'计量单位','文本','header,detail',6),
 ('RD_PROD_INFO','status',N'状态','下拉框','query,header,detail',7),
 ('RD_PROD_INFO','description',N'描述','文本','header,detail',8),
-('RD_PROD_INFO','remark',N'备注','文本','detail',99);
+('RD_PROD_INFO','remark',N'备注','文本','detail',99)
+) AS v(panel_code, col_name, label, data_type, place, seq)
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name);
 -- 状态选项
 UPDATE yj_field SET dict_sql = N'SELECT mc FROM dm_gx WHERE lb=''CPZT'' AND ISNULL(asp_cancel,''N'')<>''Y''' WHERE panel_code='RD_PROD_INFO' AND col_name='status';
 
 -- 2. 成型工艺清单
-INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
+INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq)
+SELECT v.panel_code, v.col_name, v.label, v.data_type, v.place, v.seq FROM (VALUES
 ('RD_MOLD_PROC','process_no',N'工艺编号','文本','query,header',1),
 ('RD_MOLD_PROC','product_code',N'产品编码','文本','query,header,detail',2),
 ('RD_MOLD_PROC','process_name',N'工序名称','文本','query,header,detail',3),
@@ -128,10 +135,13 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
 ('RD_MOLD_PROC','pressure',N'压力(MPa)','小数','detail',8),
 ('RD_MOLD_PROC','cycle_time',N'周期时间(s)','小数','detail',9),
 ('RD_MOLD_PROC','material_type',N'材料类型','文本','detail',10),
-('RD_MOLD_PROC','remark',N'备注','文本','detail',99);
+('RD_MOLD_PROC','remark',N'备注','文本','detail',99)
+) AS v(panel_code, col_name, label, data_type, place, seq)
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name);
 
 -- 3. 成型配方
-INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
+INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq)
+SELECT v.panel_code, v.col_name, v.label, v.data_type, v.place, v.seq FROM (VALUES
 ('RD_MOLD_FORMULA','formula_no',N'配方编号','文本','query,header',1),
 ('RD_MOLD_FORMULA','product_code',N'产品编码','文本','query,header,detail',2),
 ('RD_MOLD_FORMULA','material_name',N'材料名称','文本','query,header,detail',3),
@@ -139,10 +149,13 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
 ('RD_MOLD_FORMULA','ratio',N'配比(%)','小数','detail',5),
 ('RD_MOLD_FORMULA','weight',N'重量(g)','小数','detail',6),
 ('RD_MOLD_FORMULA','unit',N'单位','文本','detail',7),
-('RD_MOLD_FORMULA','remark',N'备注','文本','detail',99);
+('RD_MOLD_FORMULA','remark',N'备注','文本','detail',99)
+) AS v(panel_code, col_name, label, data_type, place, seq)
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name);
 
 -- 4. 规格书(文件上传)
-INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
+INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq)
+SELECT v.panel_code, v.col_name, v.label, v.data_type, v.place, v.seq FROM (VALUES
 ('RD_SPEC_DOC','product_code',N'产品编码','文本','query,header,detail',1),
 ('RD_SPEC_DOC','doc_name',N'文档名称','文本','query,header,detail',2),
 ('RD_SPEC_DOC','version',N'版本号','文本','header,detail',3),
@@ -151,11 +164,14 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
 ('RD_SPEC_DOC','upload_by',N'上传人','文本','header,detail',6),
 ('RD_SPEC_DOC','upload_date',N'上传日期','日期','query,header,detail',7),
 ('RD_SPEC_DOC','status',N'状态','下拉框','query,header,detail',8),
-('RD_SPEC_DOC','remark',N'备注','文本','detail',99);
+('RD_SPEC_DOC','remark',N'备注','文本','detail',99)
+) AS v(panel_code, col_name, label, data_type, place, seq)
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name);
 UPDATE yj_field SET dict_sql = N'SELECT mc FROM dm_gx WHERE lb=''WDZT'' AND ISNULL(asp_cancel,''N'')<>''Y''' WHERE panel_code='RD_SPEC_DOC' AND col_name='status';
 
 -- 5. 组装BOM表
-INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
+INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq)
+SELECT v.panel_code, v.col_name, v.label, v.data_type, v.place, v.seq FROM (VALUES
 ('RD_ASM_BOM','bom_no',N'BOM编号','文本','query,header',1),
 ('RD_ASM_BOM','product_code',N'产品编码','文本','query,header,detail',2),
 ('RD_ASM_BOM','parent_part',N'父件编码','文本','detail',3),
@@ -165,10 +181,13 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
 ('RD_ASM_BOM','quantity',N'数量','小数','detail',7),
 ('RD_ASM_BOM','unit',N'单位','文本','detail',8),
 ('RD_ASM_BOM','position',N'位置','文本','detail',9),
-('RD_ASM_BOM','remark',N'备注','文本','detail',99);
+('RD_ASM_BOM','remark',N'备注','文本','detail',99)
+) AS v(panel_code, col_name, label, data_type, place, seq)
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name);
 
 -- 6. 组装工艺清单
-INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
+INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq)
+SELECT v.panel_code, v.col_name, v.label, v.data_type, v.place, v.seq FROM (VALUES
 ('RD_ASM_PROC','process_no',N'工艺编号','文本','query,header',1),
 ('RD_ASM_PROC','product_code',N'产品编码','文本','query,header,detail',2),
 ('RD_ASM_PROC','process_name',N'工序名称','文本','query,header,detail',3),
@@ -176,10 +195,13 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
 ('RD_ASM_PROC','workstation',N'工位','文本','detail',5),
 ('RD_ASM_PROC','tool',N'工具/治具','文本','detail',6),
 ('RD_ASM_PROC','time_standard',N'标准时间(s)','小数','detail',7),
-('RD_ASM_PROC','remark',N'备注','文本','detail',99);
+('RD_ASM_PROC','remark',N'备注','文本','detail',99)
+) AS v(panel_code, col_name, label, data_type, place, seq)
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name);
 
 -- 7. 出货检验计划表(文件上传)
-INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
+INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq)
+SELECT v.panel_code, v.col_name, v.label, v.data_type, v.place, v.seq FROM (VALUES
 ('RD_INSP_PLAN','product_code',N'产品编码','文本','query,header,detail',1),
 ('RD_INSP_PLAN','doc_name',N'文档名称','文本','query,header,detail',2),
 ('RD_INSP_PLAN','version',N'版本号','文本','header,detail',3),
@@ -188,17 +210,20 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
 ('RD_INSP_PLAN','upload_by',N'上传人','文本','header,detail',6),
 ('RD_INSP_PLAN','upload_date',N'上传日期','日期','query,header,detail',7),
 ('RD_INSP_PLAN','status',N'状态','下拉框','query,header,detail',8),
-('RD_INSP_PLAN','remark',N'备注','文本','detail',99);
+('RD_INSP_PLAN','remark',N'备注','文本','detail',99)
+) AS v(panel_code, col_name, label, data_type, place, seq)
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name);
 UPDATE yj_field SET dict_sql = N'SELECT mc FROM dm_gx WHERE lb=''WDZT'' AND ISNULL(asp_cancel,''N'')<>''Y''' WHERE panel_code='RD_INSP_PLAN' AND col_name='status';
 GO
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_product_info TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_proc TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_formula TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_spec_doc TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_bom TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_proc TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_insp_plan TO yinjia;
+-- yinjia 自身执行时跳过(对自己 GRANT 报 4624;角色成员身份已覆盖以下权限)
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_product_info TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_proc TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mold_formula TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_spec_doc TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_bom TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_asm_proc TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_insp_plan TO yinjia;
 GO
 
 -- 补充字典:产品状态/文档状态

@@ -1,7 +1,10 @@
 <template>
-  <!-- ═══ 单据头字段附件格(yj_attachment):上传(原文件名保留)/点击查看/删除 ═══
-       通用组件:锚点=panelCode+docNo+fieldKey,由 recordSheetConfigs 的 type:'file' 字段启用;
-       打印(.no-print)只留文件名——纸张/导出 PDF 仅显示原文件名,与需求一致 -->
+  <!-- ═══ 单据附件格(yj_attachment):上传(原文件名保留)/点击查看/删除 ═══
+       通用组件,两种模式:
+       ① 单列位:锚点=panelCode+docNo+fieldKey(recordSheetConfigs type:'file' 字段);
+       ② 多列位(slots,如附件表 附件1..附件6):页面单格聚合展示,上传按序占用第一个
+          空余列位(每列位 1 个文件),删除按行删——表设计 6 个字段占位,页面只有 1 个附件位。
+       打印(.no-print)只留文件名——纸张/导出 PDF 仅显示原文件名 -->
   <div class="fac-cell">
     <div v-if="!files.length && legacyText" class="fac-legacy">{{ legacyText }}</div>
     <div class="fac-list">
@@ -13,11 +16,11 @@
         @click="openFile(a)"
       >
         <span class="fac-name">{{ a.fileName }}</span>
-        <span v-if="!busy" class="fac-del no-print" :title="tt('删除')" @click.stop="removeFile(a)">✕</span>
+        <span v-if="!busy && canEdit" class="fac-del no-print" :title="tt('删除')" @click.stop="removeFile(a)">✕</span>
       </span>
       <span v-if="!files.length && !legacyText" class="fac-empty">{{ tt('暂无附件') }}</span>
     </div>
-    <div class="fac-actions no-print">
+    <div v-if="canEdit" class="fac-actions no-print">
       <span class="fac-upload-btn" @click="pickFile">⬆ {{ tt('上传附件') }}</span>
       <input ref="fileInput" type="file" multiple hidden @change="onFiles" />
     </div>
@@ -34,17 +37,32 @@ const props = defineProps({
   panelCode: { type: String, required: true },
   /** 单据编号=附件锚点;新建未保存(无编号)不可上传,点上传时提示先保存 */
   docNo: { type: String, default: '' },
-  fieldKey: { type: String, required: true },
+  /** 单列位模式:字段中文键(=头表列名) */
+  fieldKey: { type: String, default: '' },
   /** 头字段当前值(文件名串;无附件时可能为历史遗留文本,只读展示) */
   modelValue: { type: String, default: '' },
+  /** 多列位模式:头表附件列位数组(如 ['附件1','附件2',...]),与 fieldKey 二选一 */
+  slots: { type: Array, default: null },
+  /** 多列位模式:各列位当前头值(遗留文本只读展示用) */
+  values: { type: Object, default: null },
+  /** 可编辑=允许上传/删除;已审核锁定单据只保留查看/下载 */
+  canEdit: { type: Boolean, default: true },
 })
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'change'])
 
 const files = ref([])
 const busy = ref(false)
 const fileInput = ref(null)
 
-const legacyText = computed(() => (files.value.length ? '' : String(props.modelValue || '').trim()))
+const isMulti = computed(() => Array.isArray(props.slots) && props.slots.length > 0)
+const slotsKey = computed(() => (isMulti.value ? props.slots.join(',') : ''))
+const legacyText = computed(() => {
+  if (files.value.length) return ''
+  if (isMulti.value) {
+    return props.slots.map((s) => String(props.values?.[s] || '').trim()).filter(Boolean).join('、')
+  }
+  return String(props.modelValue || '').trim()
+})
 
 function fmtSize(n) {
   if (!n && n !== 0) return ''
@@ -57,6 +75,25 @@ function chipTitle(a) {
     tt('上传时间') + ' ' + (a.uploadTime || '')].join('\n')
 }
 
+async function loadField(field) {
+  const res = await request.get('/attachment/list', { params: { panelCode: props.panelCode, docNo: props.docNo, field } })
+  return (res?.data || []).map((x) => ({ ...x, _field: field }))
+}
+
+/** 多列位:聚合全部列位附件;emitNames=true 时把各列位文件名串回抛父级(同步头列模型,不触发 dirty) */
+async function loadAll(emitNames) {
+  if (!props.docNo) {
+    files.value = []
+    return
+  }
+  try {
+    const lists = await Promise.all(props.slots.map((f) => loadField(f).catch(() => [])))
+    files.value = lists.flat()
+    if (emitNames) emitChange()
+  } catch { /* 列表加载失败不阻塞表单 */ }
+}
+
+/** 单列位:原逻辑 */
 async function load(emitNames) {
   if (!props.docNo) {
     files.value = []
@@ -70,7 +107,20 @@ async function load(emitNames) {
       emit('update:modelValue', files.value.map((f) => f.fileName).join('、'))
   } catch { /* 列表加载失败不阻塞表单 */ }
 }
-watch(() => [props.panelCode, props.docNo, props.fieldKey], () => load(true), { immediate: true })
+
+/** 多列位:把各列位文件名串抛给父级 {附件1:'a.pdf',附件2:'b.pdf',...} */
+function emitChange() {
+  if (!isMulti.value) return
+  const map = {}
+  for (const f of props.slots) {
+    map[f] = files.value.filter((x) => x._field === f).map((x) => x.fileName).join('、')
+  }
+  emit('change', map)
+}
+
+watch(() => [props.panelCode, props.docNo, props.fieldKey, slotsKey.value], () => {
+  isMulti.value ? loadAll(true) : load(true)
+}, { immediate: true })
 
 function pickFile() {
   if (!props.docNo) {
@@ -80,6 +130,11 @@ function pickFile() {
   fileInput.value?.click()
 }
 
+/** 多列位:第一个空余列位(每列位 1 个文件,6 个占位=最多 6 个附件) */
+function pickSlot() {
+  return props.slots.find((f) => !files.value.some((x) => x._field === f))
+}
+
 async function onFiles(e) {
   const list = [...(e.target.files || [])]
   e.target.value = ''
@@ -87,15 +142,27 @@ async function onFiles(e) {
   busy.value = true
   try {
     for (const f of list) {
+      const field = isMulti.value ? pickSlot() : props.fieldKey
+      if (field == null) {
+        ElMessage.warning(tt('附件占位已满') + '（' + props.slots.length + '）')
+        break
+      }
       const fd = new FormData()
       fd.append('file', f)
       fd.append('panelCode', props.panelCode)
       fd.append('docNo', props.docNo)
-      fd.append('field', props.fieldKey)
+      fd.append('field', field)
       try {
         const res = await request.post('/attachment/upload', fd, { timeout: 120000 })
-        files.value = res?.data?.files || files.value
-        if (res?.data?.names !== undefined) emit('update:modelValue', res.data.names)
+        if (isMulti.value) {
+          // 服务端返回该列位全部附件;替换本地对应分组后再为下一个文件选位
+          const group = (res?.data?.files || []).map((x) => ({ ...x, _field: field }))
+          files.value = files.value.filter((x) => x._field !== field).concat(group)
+          emitChange()
+        } else {
+          files.value = res?.data?.files || files.value
+          if (res?.data?.names !== undefined) emit('update:modelValue', res.data.names)
+        }
       } catch (err) {
         ElMessage.error(tt('附件上传失败') + (err?.response?.data?.message ? '：' + err.response.data.message : ''))
       }
@@ -110,9 +177,9 @@ async function removeFile(a) {
     await ElMessageBox.confirm(tt('确认删除该附件？'), tt('删除确认'), { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') })
   } catch { return /* 取消 */ }
   try {
-    const res = await request.post('/attachment/delete', { id: a.id })
-    files.value = res?.data?.files || []
-    if (res?.data?.names !== undefined) emit('update:modelValue', res.data.names)
+    await request.post('/attachment/delete', { id: a.id })
+    if (isMulti.value) await loadAll(true)
+    else await load(true)
     ElMessage.success(tt('附件已删除'))
   } catch (err) {
     ElMessage.error(tt('附件删除失败') + (err?.response?.data?.message ? '：' + err.response.data.message : ''))

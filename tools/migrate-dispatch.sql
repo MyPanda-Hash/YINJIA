@@ -2,9 +2,8 @@
 USE HSDZ_MES;
 SET NOCOUNT ON;
 GO
-IF OBJECT_ID('bl_dispatch') IS NOT NULL DROP TABLE bl_dispatch;
-GO
-CREATE TABLE bl_dispatch (
+-- 原版此处 DROP TABLE 会删业务数据(本地实测 8 行),改为已存在则跳过建表
+IF OBJECT_ID('bl_dispatch') IS NULL CREATE TABLE bl_dispatch (
     id int IDENTITY(1,1) PRIMARY KEY,
     dispatch_no nvarchar(60) NULL,
     dispatch_date date NULL,
@@ -37,10 +36,15 @@ CREATE TABLE bl_dispatch (
     asp_cancel nvarchar(2) NULL, asp_print int DEFAULT 0
 );
 GO
-INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES
-('DISPATCH', N'工序派工单', N'单据', 'doc', 'bl_dispatch', NULL, 'dispatch_no', 'id', NULL, 'DP', 'dispatch_date', 20, 'items', N'生产制造');
+-- 面板注册(幂等:已注册跳过;注意:英文列口径已被 migrate-dispatch-fix.sql 的中文列口径取代)
+INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group)
+SELECT v.panel_code, v.panel_name, v.category, v.mode, v.line_table, v.head_table, v.group_col, v.pk_col, v.code_col, v.prefix, v.date_col, v.page_size, v.detail_key, v.module_group FROM (VALUES
+('DISPATCH', N'工序派工单', N'单据', 'doc', 'bl_dispatch', NULL, 'dispatch_no', 'id', NULL, 'DP', 'dispatch_date', 20, 'items', N'生产制造')
+) AS v(panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group)
+WHERE NOT EXISTS (SELECT 1 FROM yj_panel p WHERE p.panel_code = v.panel_code);
 GO
-INSERT INTO yj_field (panel_code, col_name, label, data_type, ref_panel, ref_field, display_field, place, seq) VALUES
+INSERT INTO yj_field (panel_code, col_name, label, data_type, ref_panel, ref_field, display_field, place, seq)
+SELECT v.panel_code, v.col_name, v.label, v.data_type, v.ref_panel, v.ref_field, v.display_field, v.place, v.seq FROM (VALUES
 ('DISPATCH','dispatch_no',N'单据编号','文本',NULL,NULL,NULL,'query,header',1),
 ('DISPATCH','dispatch_date',N'单据日期','日期',NULL,NULL,NULL,'query,header',2),
 ('DISPATCH','biz_type',N'业务类型','下拉框',NULL,NULL,NULL,'query,header',3),
@@ -65,7 +69,9 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, ref_panel, ref_fie
 ('DISPATCH','handler',N'经手人','文本',NULL,NULL,NULL,'header',22),
 ('DISPATCH','project',N'项目','文本',NULL,NULL,NULL,'header',23),
 ('DISPATCH','dept',N'部门','文本',NULL,NULL,NULL,'header',24),
-('DISPATCH','remark',N'备注','文本',NULL,NULL,NULL,'header,detail',99);
+('DISPATCH','remark',N'备注','文本',NULL,NULL,NULL,'header,detail',99)
+) AS v(panel_code, col_name, label, data_type, ref_panel, ref_field, display_field, place, seq)
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name);
 GO
 UPDATE yj_field SET dict_sql = N'SELECT mc FROM dm_gx WHERE lb=''GXLX'' AND ISNULL(asp_cancel,''N'')<>''Y''' WHERE panel_code='DISPATCH' AND col_name='biz_type';
 IF NOT EXISTS (SELECT 1 FROM dm_gx WHERE lb='GXLX' AND dm='GXLX01')
@@ -73,7 +79,8 @@ INSERT INTO dm_gx (comm, dm, mc, lb, asp_cancel) VALUES
 ('0','GXLX01',N'工序派工','GXLX','N'),
 ('0','GXLX02',N'委外派工','GXLX','N');
 GO
-GRANT SELECT, INSERT, UPDATE, DELETE ON bl_dispatch TO yinjia;
+-- yinjia 自身执行时跳过(对自己 GRANT 报 4624)
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON bl_dispatch TO yinjia;
 GO
 DECLARE @c int = (SELECT COUNT(*) FROM yj_field WHERE panel_code='DISPATCH');
 PRINT N'工序派工单注册完成: ' + CAST(@c AS nvarchar(10)) + N' 个字段';

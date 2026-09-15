@@ -2,7 +2,8 @@
 USE HSDZ_MES;
 SET NOCOUNT ON;
 GO
-CREATE TABLE bl_dispatch (
+-- 幂等:已存在(含业务数据)则跳过建表
+IF OBJECT_ID('bl_dispatch') IS NULL CREATE TABLE bl_dispatch (
     id int IDENTITY(1,1) PRIMARY KEY,
     单据编号 nvarchar(60) NULL,
     工序编码 nvarchar(60) NULL,
@@ -29,10 +30,12 @@ CREATE TABLE bl_dispatch (
     asp_cancel nvarchar(2) NULL, asp_print int DEFAULT 0
 );
 GO
-GRANT SELECT, INSERT, UPDATE, DELETE ON bl_dispatch TO yinjia;
+-- yinjia 自身执行时跳过(对自己 GRANT 报 4624)
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON bl_dispatch TO yinjia;
 GO
--- DISPATCH 面板字段(detail 用中文列名,与 bd_dispatch 表头分离)
-INSERT INTO yj_field (panel_code, col_name, label, data_type, ref_panel, ref_field, display_field, place, seq) VALUES
+-- DISPATCH 面板字段(detail 用中文列名,与 bd_dispatch 表头分离;幂等:已有同名字段跳过)
+INSERT INTO yj_field (panel_code, col_name, label, data_type, ref_panel, ref_field, display_field, place, seq)
+SELECT v.panel_code, v.col_name, v.label, v.data_type, v.ref_panel, v.ref_field, v.display_field, v.place, v.seq FROM (VALUES
 ('DISPATCH','单据编号',N'单据编号','文本',NULL,NULL,NULL,'query,header',1),
 ('DISPATCH','工序编码',N'工序编码','文本',NULL,NULL,NULL,'detail',10),
 ('DISPATCH','工序名称',N'工序名称','文本',NULL,NULL,NULL,'query,detail',11),
@@ -51,7 +54,9 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, ref_panel, ref_fie
 ('DISPATCH','规格型号',N'规格型号','文本',NULL,NULL,NULL,'detail',24),
 ('DISPATCH','预开工日',N'预开工日','日期',NULL,NULL,NULL,'detail',25),
 ('DISPATCH','预完工日',N'预完工日','日期',NULL,NULL,NULL,'detail',26),
-('DISPATCH','备注',N'备注','文本',NULL,NULL,NULL,'detail',99);
+('DISPATCH','备注',N'备注','文本',NULL,NULL,NULL,'detail',99)
+) AS v(panel_code, col_name, label, data_type, ref_panel, ref_field, display_field, place, seq)
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name);
 GO
 -- DISPATCH 面板改为头行分表(bd_dispatch 头 / bl_dispatch 行)
 UPDATE yj_panel SET head_table = 'bd_dispatch' WHERE panel_code = 'DISPATCH';

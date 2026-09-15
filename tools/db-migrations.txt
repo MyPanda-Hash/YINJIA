@@ -61,14 +61,20 @@ migrate-rd-progress.sql
 seed-rd-progress.sql
 migrate-rd-filter-eff.sql
 migrate-rd-record-sheets.sql
+# —— 补登记:功能性滤效动态样品列地基(头表「样品数」计数+样品信息/装置 3~6、明细 压力/流速/出水/去除率×样品3~6;此前漏登记漏执行)——
+migrate-filter-eff-samples.sql
 migrate-rename-dom-test.sql
 migrate-rd-lab-sheets.sql
 migrate-rd-prod-sheets.sql
 migrate-rd-prod2.sql
+# —— 补登记:附件基础设施 yj_attachment 表(锚点=面板+单据编号+字段,文件存磁盘;首个使用方 RD_PROD_INFO·客户图纸或规格书;此前漏登记漏执行)——
+migrate-attachment.sql
 migrate-rd-asm-bom-fix.sql
 migrate-rd-spec-multi.sql
 migrate-stdlib.sql
 migrate-stdlib-seed.sql
+# —— 补登记:检验项目标准库种子(spec.test 26组/48子项 + insp.plan 必测7+型式6;生成物由 gen-testlib-seed.cjs 再生成;此前漏登记漏执行)——
+migrate-testlib-seed.sql
 migrate-mold-proc-cols.sql
 migrate-mold-proc-labels.sql
 migrate-bom-material-fields.sql
@@ -111,9 +117,9 @@ migrate-wo-order.sql
 migrate-wo-schedule.sql
 migrate-wo-schedule-fix.sql
 migrate-wo-report.sql
-migrate-lot-trace.sql
 migrate-qc-3docs.sql
 migrate-qc-op.sql
+migrate-lot-trace.sql
 migrate-phase23-production.sql
 migrate-phase23-forms.sql
 migrate-phase23-forms-batch2.sql
@@ -177,3 +183,26 @@ migrate-merged-panels.sql
 # 内容:rd_spec_assign 分配表(一单一条有效分配,筛选唯一索引 ux_rd_spec_assign_doc)、
 #      rd_dev_task 补「负责人」列(下发时快照总负责人账号,NULL=挂起待懒重解)。幂等可重跑。
 migrate-rd-spec-assign.sql
+
+# —— 补登记:项目实施计划「申请终止(阶段处)」二级审批状态表(远程 b154fe7 漏登记导致 yj_plan_term 缺表)——
+migrate-plan-term.sql
+
+# —— 2026-09-10 品质管理八单据(YJ-QR-11/59/60/64/92/118/119/120,doc 面板+头部表+空明细表)——
+# (本地 WIP 与远程合并时并入;migrate-qc-3docs.sql 上游已登记不重复;三脚本均幂等可重跑)
+migrate-qc-8sheets.sql
+
+# —— 2026-09-14 来料三单按 legacy 真实字段重建(暂收入库单/暂收退料单/检验单;检验单头部 6 附件走 yj_attachment+PanelxForm FileAttachCell)——
+# 面板编码/菜单位置不变,六表 0 行故空表重建,非空只补列;migrate-qc-3docs.sql 上游保持不动。幂等可重跑。
+migrate-qc-3docs-rebuild.sql
+
+# —— 2026-09-15 送料暂收单 SL_RECV(库存核算:采购订单选单/生单+保存同步修改来料检验单+头部附件1..6)——
+# 选单/生单链路与同步修改在 PanelConfigService/ButtonService 代码注册;幂等可重跑。
+migrate-sl-recv.sql
+
+# —— 2026-09-15 报表双机制:yj_report_template 模板入库(ADR-0002;DB 优先 → classpath 注册表兜底)——
+# 表注释配套 migrate-report-template-comments.sql;远程已执行,本地 2026-09-15 DbSync run 补齐。幂等可重跑。
+migrate-report-template.sql
+migrate-report-template-comments.sql
+
+# —— 2026-09-15 检验单改名来料检验单(QC_INSP;字段零变化;审核自动生成采购入库单在 ButtonService 代码注册)——
+migrate-insp-rename.sql

@@ -45,58 +45,51 @@
           :placeholder="tt('文档编号：')"
           @input="emit('dirty')"
         />
-        <template v-else>{{ head['文档编号'] || head['单据编号'] || 'YJ-XS002' }}</template>
+        <template v-else>{{ head['文档编号'] || head['单据编号'] || config.docno || 'YJ-XS002' }}</template>
       </div>
     </div>
 
-    <!-- ② 标题行:大标题 + 右上信息表 -->
+    <!-- ② 标题行:大标题 + 右上信息表(config.info 未配置时保持 文件管理人/密级/文件使用范围 原样) -->
     <div class="as-title-row">
-      <div class="as-title">{{ tt(config.titlePart1) }}（{{ tt(config.titlePart2) }}）{{ tt(config.titlePart3) }}</div>
+      <div class="as-title">{{ tt(config.titlePart1) }}<template v-if="config.titlePart2">（{{ tt(config.titlePart2) }}）</template><template v-if="config.titlePart3">{{ tt(config.titlePart3) }}</template></div>
       <div class="as-info-table">
-        <div class="as-info-row">
-          <span class="as-info-label">{{ tt('文件管理人') }}</span>
+        <div v-for="info in infoRows" :key="info.key || info.label" class="as-info-row">
+          <span class="as-info-label">{{ tt(info.label) }}</span>
           <span class="as-info-value">
+            <template v-if="info.kind === 'static'">{{ tt(info.text || '') }}</template>
+            <div v-else-if="editable && isRefKey(info.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(info.key)">
+              <span class="as-ref-text">{{ head[info.key] || tt('点击选择') }}</span>
+              <el-icon class="as-ref-ico"><Search /></el-icon>
+            </div>
+            <el-date-picker
+              v-else-if="editable && info.kind === 'date'"
+              v-model="head[info.key]"
+              type="date"
+              value-format="YYYY-MM-DD"
+              size="small"
+              class="as-date"
+              :clearable="false"
+              @change="emit('dirty')"
+            />
+            <el-select
+              v-else-if="editable && (info.kind === 'select' || selectOptions(info.key).length)"
+              v-model="head[info.key]"
+              size="small"
+              class="as-cell-input"
+              :clearable="false"
+              @change="emit('dirty')"
+            >
+              <el-option v-for="o in selectOptions(info.key)" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
             <el-input
-              v-if="editable"
-              v-model="head['文件管理人']"
+              v-else-if="editable"
+              v-model="head[info.key]"
               size="small"
               maxlength="50"
               class="as-cell-input"
               @input="emit('dirty')"
             />
-            <template v-else>{{ head['文件管理人'] || '' }}</template>
-          </span>
-        </div>
-        <div class="as-info-row">
-          <span class="as-info-label">{{ tt('密级') }}</span>
-          <span class="as-info-value">
-            <el-select
-              v-if="editable"
-              v-model="head['密级']"
-              size="small"
-              class="as-cell-input"
-              :clearable="false"
-              @change="emit('dirty')"
-            >
-              <el-option v-for="o in selectOptions('密级')" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <template v-else>{{ head['密级'] || '' }}</template>
-          </span>
-        </div>
-        <div class="as-info-row">
-          <span class="as-info-label">{{ tt('文件使用范围') }}</span>
-          <span class="as-info-value">
-            <el-select
-              v-if="editable"
-              v-model="head['文件使用范围']"
-              size="small"
-              class="as-cell-input"
-              :clearable="false"
-              @change="emit('dirty')"
-            >
-              <el-option v-for="o in selectOptions('文件使用范围')" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <template v-else>{{ head['文件使用范围'] || '' }}</template>
+            <template v-else>{{ head[info.key] || '' }}</template>
           </span>
         </div>
       </div>
@@ -104,9 +97,109 @@
 
     <!-- ③ 内容表 -->
     <div class="as-table">
-      <!-- 单字段行 / 多子区行 / 阶段框行(测试计划) -->
+      <!-- 行型:网格(pairs)/章节(section)/部门会签(dept)/单字段/多子区/阶段框 -->
       <template v-for="(row, ri) in config.rows" :key="row.key || row.label">
-        <div v-if="!row.subs && row.kind !== 'phases'" class="as-row" :style="{ height: row.h + 'px' }">
+        <!-- 网格行:一行多组 标签|值(品质单据表头区);cell.kind: input/date/select/ref/checks(单选,存选项值) -->
+        <div v-if="row.kind === 'pairs'" class="as-row q-pairs" :style="{ minHeight: (row.h || 40) + 'px' }">
+          <div v-for="(c, ci) in row.cells" :key="(c.key || c.label) + ci" class="q-pair" :style="{ flex: c.flex || 1 }">
+            <div class="q-label" :style="{ width: (c.labelW || row.labelW || 110) + 'px' }">{{ tt(c.label) }}</div>
+            <div class="q-value">
+              <div v-if="c.kind === 'checks'" class="q-checks">
+                <span
+                  v-for="o in c.options" :key="o" class="q-check" :class="{ on: head[c.key] === o }"
+                  @click="setCheck(c.key, o)"
+                >{{ head[c.key] === o ? '☑' : '□' }} {{ tt(o) }}</span>
+              </div>
+              <div v-else-if="editable && isRefKey(c.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
+                <span class="as-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
+                <el-icon class="as-ref-ico"><Search /></el-icon>
+              </div>
+              <el-date-picker
+                v-else-if="editable && c.kind === 'date'"
+                v-model="head[c.key]" type="date" value-format="YYYY-MM-DD"
+                size="small" class="as-date" :clearable="false" @change="emit('dirty')"
+              />
+              <el-select
+                v-else-if="editable && c.kind === 'select'"
+                v-model="head[c.key]" size="small" class="as-cell-input" :clearable="false" @change="emit('dirty')"
+              >
+                <el-option v-for="o in cellOptions(c)" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+              <el-input
+                v-else-if="editable"
+                v-model="head[c.key]" size="small" :maxlength="c.max || 200"
+                class="as-cell-input" @input="emit('dirty')"
+              />
+              <div v-else class="q-ro">{{ head[c.key] || '' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 章节行:标题 + 大填写区 / 勾选行 / 多子区 + 签名行(品质单据「一.问题描述」等) -->
+        <div v-else-if="row.kind === 'section'" class="as-row q-section" :style="{ minHeight: (row.h || 120) + 'px' }">
+          <div class="q-section-title">{{ tt(row.label) }}</div>
+          <div class="q-section-body">
+            <template v-if="row.subs">
+              <div v-for="sub in row.subs" :key="sub.key" class="q-sub">
+                <div class="q-sub-label">{{ tt(sub.label) }}<span v-if="sub.max" class="q-sub-max">（{{ sub.max }}{{ tt('字') }}）</span></div>
+                <el-input
+                  v-if="editable" v-model="head[sub.key]" type="textarea"
+                  :rows="sub.rows || 2" :maxlength="sub.max || 1000"
+                  class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
+                />
+                <div v-else class="as-ro-text">{{ head[sub.key] || '' }}</div>
+              </div>
+            </template>
+            <el-input
+              v-else-if="editable && row.key && !row.checks" v-model="head[row.key]" type="textarea"
+              :rows="row.rows || 3" :maxlength="row.max || 2000"
+              class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
+            />
+            <div v-else-if="row.key && !row.checks" class="as-ro-text">{{ head[row.key] || '' }}</div>
+            <div v-if="row.checks" class="q-checks">
+              <span
+                v-for="o in row.checks" :key="o" class="q-check" :class="{ on: head[row.key] === o }"
+                @click="setCheck(row.key, o)"
+              >{{ head[row.key] === o ? '☑' : '□' }} {{ tt(o) }}</span>
+            </div>
+            <div v-if="row.sign" class="q-signline">
+              <span class="q-sign-label">{{ tt(row.sign) }}：</span>
+              <span class="q-sign-val">
+                <el-input
+                  v-if="editable" v-model="head[row.signKey || '填写人']" size="small"
+                  maxlength="50" class="as-cell-input q-sign-input" @input="emit('dirty')"
+                />
+                <span v-else>{{ head[row.signKey || '填写人'] || '' }}</span>
+              </span>
+              <span class="q-sign-date">{{ tt('日期') }}：　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 部门会签行:左部门名格 + 右意见区(子区可带 纸面勾选样式;同意/不同意由审批流留痕,勾选为装饰) -->
+        <div v-else-if="row.kind === 'dept'" class="as-row q-dept" :style="{ minHeight: (row.h || 90) + 'px' }">
+          <div class="q-dept-name">{{ tt(row.label) }}</div>
+          <div class="q-dept-body">
+            <div v-for="(sub, si) in row.subs" :key="sub.key" class="q-dept-sub" :class="{ first: si === 0 }">
+              <div class="q-dept-sub-head">
+                <span v-if="sub.label" class="q-dept-sub-label">{{ tt(sub.label) }}</span>
+                <span v-if="sub.checks" class="q-checks deco">
+                  <span v-for="o in sub.checks" :key="o" class="q-check">□ {{ tt(o) }}</span>
+                </span>
+                <span class="q-dept-sign">{{ tt('签名') }}：　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
+              </div>
+              <el-input
+                v-if="editable" v-model="head[sub.key]" type="textarea"
+                :rows="sub.rows || 2" :maxlength="sub.max || 500"
+                class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
+              />
+              <div v-else class="as-ro-text">{{ head[sub.key] || '' }}</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 单字段行 / 多子区行 / 阶段框行(测试计划) -->
+        <div v-else-if="!row.subs && row.kind !== 'phases'" class="as-row" :style="{ height: row.h + 'px' }">
           <div class="as-no">{{ row.num }}</div>
           <div class="as-name">{{ tt(row.label) }}</div>
           <div class="as-fill">
@@ -271,8 +364,18 @@
         </div>
       </template>
 
-      <!-- ④ 底部签名(如 申请立项人/申请立项日期、负责人/编制日期) -->
-      <div class="as-sign-row">
+      <!-- ④ 底部签名:signKind='plain'=纸面简单行(编制/审核/批准);默认=蓝格签名区 -->
+      <div v-if="config.signKind === 'plain'" class="q-signrow">
+        <div v-for="c in config.signCells" :key="c.key" class="q-signitem" :style="{ flex: c.flex || 1 }">
+          <span class="q-signitem-label">{{ tt(c.label) }}：</span>
+          <el-input
+            v-if="editable" v-model="head[c.key]" size="small"
+            maxlength="50" class="as-cell-input q-signitem-input" @input="emit('dirty')"
+          />
+          <span v-else class="q-signitem-val">{{ head[c.key] || '' }}</span>
+        </div>
+      </div>
+      <div v-else class="as-sign-row">
         <div v-for="(c, ci) in config.signCells" :key="c.key" class="as-sign-pair" :style="{ flex: c.flex }">
           <div class="as-sign-cell" :class="{ 'white-shell': c.white }" :style="{ width: c.w + 'px' }">{{ tt(c.label) }}</div>
           <div class="as-sign-val">
@@ -446,10 +549,35 @@ function signLocked(c) {
   return !!(fieldMap.value.get(c.key) || {}).readonly
 }
 
+// 右上信息表:未配置 config.info 时保持 文件管理人/密级/文件使用范围 三行(立项申请/实施计划原样)
+const DEFAULT_INFO = [
+  { label: '文件管理人', key: '文件管理人' },
+  { label: '密级', key: '密级' },
+  { label: '文件使用范围', key: '文件使用范围' },
+]
+const infoRows = computed(() => props.config.info || DEFAULT_INFO)
+
 function selectOptions(key) {
   const f = fieldMap.value.get(key)
   const opts = f?.options || []
   return opts.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
+}
+
+// 网格行单元格下拉:配置 options 优先,其次字段字典
+function cellOptions(c) {
+  if (c.options && c.options.length) {
+    return c.options.map((o) => (typeof o === 'object' ? { value: o.value ?? o.label, label: o.label ?? o.value } : { value: o, label: o }))
+  }
+  return selectOptions(c.key)
+}
+
+// 勾选(单选语义,存选项值);只读态仅展示,点击无效
+function setCheck(key, o) {
+  if (!props.editable || !key) return
+  if (props.head[key] !== o) {
+    props.head[key] = o
+    emit('dirty')
+  }
 }
 
 // ── 参照字段(文档编号 → 立项申请右上角编号):点击右上角弹参照,确认后按 refMap 带回(密级等) ──
@@ -485,9 +613,9 @@ function focusField(label) {
   nextTick(() => {
     const root = document.querySelector('.approval-sheet')
     if (!root) return
-    const el = [...root.querySelectorAll('.as-name, .as-info-label, .as-sub-label')]
+    const el = [...root.querySelectorAll('.as-name, .as-info-label, .as-sub-label, .q-label, .q-section-title, .q-dept-name, .q-dept-sub-label')]
       .find((e) => (e.textContent || '').trim() === label)
-      || [...root.querySelectorAll('.as-name, .as-info-label, .as-sub-label')]
+    || [...root.querySelectorAll('.as-name, .as-info-label, .as-sub-label, .q-label, .q-section-title, .q-dept-name, .q-dept-sub-label')]
         .find((e) => (e.textContent || '').includes(label))
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -855,6 +983,192 @@ defineExpose({ focusField })
 }
 .as-phase-restore:hover {
   text-decoration: underline;
+}
+
+/* ═══ 品质单据行型:网格/章节/部门会签/简洁签名 ═══ */
+.q-pairs {
+  display: flex;
+}
+.q-pair {
+  display: flex;
+  min-width: 0;
+}
+.q-pair + .q-pair {
+  border-left: 1px solid #8a8a8a;
+}
+.q-label {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 4px 8px;
+  background: #eef7fd;
+  color: #1f5fa8;
+  font-size: 13px;
+  border-right: 1px solid #c9c9c9;
+  text-align: right;
+  line-height: 1.4;
+}
+.q-value {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 3px 6px;
+  min-height: 32px;
+}
+.q-value .as-ref-ctl {
+  width: 100%;
+}
+.q-ro {
+  flex: 1;
+  line-height: 1.6;
+  word-break: break-all;
+  padding: 2px;
+  font-size: 13px;
+}
+.q-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 13.5px;
+}
+.q-check {
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  color: #333;
+}
+.q-check.on {
+  color: #1f5fa8;
+  font-weight: 600;
+}
+.q-checks.deco .q-check {
+  cursor: default;
+}
+
+.q-section {
+  display: block;
+}
+.q-section-title {
+  padding: 6px 10px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #222;
+  border-bottom: 1px solid #c9c9c9;
+  background: #f7fbfe;
+}
+.q-section-body {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 8px 6px;
+}
+.q-sub {
+  display: flex;
+  flex-direction: column;
+  padding: 2px;
+}
+.q-sub + .q-sub {
+  border-top: 1px dashed #d5dde5;
+}
+.q-sub-label {
+  font-size: 13.5px;
+  color: #333;
+  line-height: 22px;
+}
+.q-sub-max {
+  color: #999;
+  font-size: 12px;
+}
+.q-signline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 2px 0;
+  font-size: 13.5px;
+}
+.q-sign-label {
+  color: #333;
+}
+.q-sign-val {
+  width: 130px;
+}
+.q-sign-date {
+  color: #333;
+}
+
+.q-dept {
+  display: flex;
+}
+.q-dept-name {
+  width: 130px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 8px;
+  background: #eef7fd;
+  color: #1f5fa8;
+  font-size: 14px;
+  border-right: 1px solid #c9c9c9;
+  text-align: center;
+  line-height: 1.5;
+}
+.q-dept-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.q-dept-sub {
+  display: flex;
+  flex-direction: column;
+  padding: 3px 8px 4px;
+}
+.q-dept-sub + .q-dept-sub {
+  border-top: 1px solid #c9c9c9;
+}
+.q-dept-sub-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 1px 0 2px;
+  font-size: 13.5px;
+}
+.q-dept-sub-label {
+  color: #333;
+  font-weight: 600;
+}
+.q-dept-sign {
+  margin-left: auto;
+  color: #333;
+}
+
+.q-signrow {
+  display: flex;
+  min-height: 44px;
+  padding: 8px 10px;
+  gap: 8px;
+}
+.q-signitem {
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  min-width: 0;
+}
+.q-signitem-label {
+  color: #333;
+  white-space: nowrap;
+}
+.q-signitem-input {
+  width: 120px;
+}
+.q-signitem-val {
+  flex: 1;
+  min-height: 20px;
+  border-bottom: 1px solid #333;
+  margin: 0 6px;
+  padding: 0 4px;
 }
 
 /* ═══ ④ 底部签名 ═══ */

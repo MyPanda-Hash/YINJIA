@@ -13,11 +13,16 @@ target/
 .vite-temp/
 .DS_Store
 Thumbs.db
+收集客户资料/
 
 # 本地缓存与工具链(体积大,不入库)
 .m2-repo/
 .npm-cache/
 tools/apache-maven-3.9.9/
+tools/jdk-17/
+
+# 本地 e2e 测试工作区(选型未定,不入库)
+tests/
 
 # 例外:数据库同步工具需要的 JDBC 驱动
 !tools/lib/mssql-jdbc.jar

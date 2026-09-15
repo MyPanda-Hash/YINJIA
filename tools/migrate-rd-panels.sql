@@ -76,8 +76,9 @@ IF OBJECT_ID('rd_drop_prec') IS NULL CREATE TABLE rd_drop_prec (
     asp_time2 datetime NULL, asp_cancel nvarchar(2) NULL, asp_print int DEFAULT 0);
 GO
 
--- ============ 面板注册 ============
-INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES
+-- ============ 面板注册(幂等:已注册的面板跳过) ============
+INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group)
+SELECT v.panel_code, v.panel_name, v.category, v.mode, v.line_table, v.head_table, v.group_col, v.pk_col, v.code_col, v.prefix, v.date_col, v.page_size, v.detail_key, v.module_group FROM (VALUES
 ('RD_FILTER_EFF', N'功能性滤效', N'单据', 'doc', 'rd_filter_eff',  NULL, 'record_no', 'id', NULL, 'FE', 'test_date', 20, 'items', N'研发管理'),
 ('RD_ALKALINE',   N'碱性',       N'单据', 'doc', 'rd_alkaline',    NULL, 'record_no', 'id', NULL, 'PH', 'test_date', 20, 'items', N'研发管理'),
 ('RD_MINERAL',    N'矿化',       N'单据', 'doc', 'rd_mineral',     NULL, 'record_no', 'id', NULL, 'MI', 'test_date', 20, 'items', N'研发管理'),
@@ -85,20 +86,29 @@ INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_t
 ('RD_SCALE',      N'阻垢性能',   N'单据', 'doc', 'rd_scale',       NULL, 'record_no', 'id', NULL, 'SC', 'test_date', 20, 'items', N'研发管理'),
 ('RD_RO_PROTECT', N'RO保护',     N'单据', 'doc', 'rd_ro_protect',  NULL, 'record_no', 'id', NULL, 'RO', 'test_date', 20, 'items', N'研发管理'),
 ('RD_SOAK',       N'浸泡安全',   N'单据', 'doc', 'rd_soak',        NULL, 'record_no', 'id', NULL, 'SK', 'test_date', 20, 'items', N'研发管理'),
-('RD_DROP_PREC',  N'压降精度',   N'单据', 'doc', 'rd_drop_prec',   NULL, 'record_no', 'id', NULL, 'DP', 'test_date', 20, 'items', N'研发管理');
+('RD_DROP_PREC',  N'压降精度',   N'单据', 'doc', 'rd_drop_prec',   NULL, 'record_no', 'id', NULL, 'DP', 'test_date', 20, 'items', N'研发管理')
+) AS v(panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group)
+WHERE NOT EXISTS (SELECT 1 FROM yj_panel p WHERE p.panel_code = v.panel_code);
 GO
 
--- ============ 通用字段 ============
+-- ============ 通用字段(幂等:已有同名字段的面板跳过) ============
 INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq)
-SELECT p.panel_code, 'record_no', N'记录编号', '文本', 'query,header', 1 FROM yj_panel p WHERE p.module_group = N'研发管理' AND p.mode = 'doc'
-UNION ALL SELECT p.panel_code, 'test_date', N'测试日期', '日期', 'query,header', 2 FROM yj_panel p WHERE p.module_group = N'研发管理' AND p.mode = 'doc'
-UNION ALL SELECT p.panel_code, 'sample_name', N'样品名称', '文本', 'query,header,detail', 3 FROM yj_panel p WHERE p.module_group = N'研发管理' AND p.mode = 'doc'
-UNION ALL SELECT p.panel_code, 'sample_no', N'样品编号', '文本', 'header,detail', 4 FROM yj_panel p WHERE p.module_group = N'研发管理' AND p.mode = 'doc'
-UNION ALL SELECT p.panel_code, 'tester', N'测试人员', '文本', 'header,detail', 5 FROM yj_panel p WHERE p.module_group = N'研发管理' AND p.mode = 'doc';
+SELECT p.panel_code, v.col_name, v.label, v.data_type, v.place, v.seq
+FROM yj_panel p CROSS JOIN (VALUES
+('record_no', N'记录编号', '文本', 'query,header', 1),
+('test_date', N'测试日期', '日期', 'query,header', 2),
+('sample_name', N'样品名称', '文本', 'query,header,detail', 3),
+('sample_no', N'样品编号', '文本', 'header,detail', 4),
+('tester', N'测试人员', '文本', 'header,detail', 5)
+) AS v(col_name, label, data_type, place, seq)
+WHERE p.module_group = N'研发管理' AND p.mode = 'doc'
+  AND p.panel_code IN ('RD_FILTER_EFF','RD_ALKALINE','RD_MINERAL','RD_ANTIBACT','RD_SCALE','RD_RO_PROTECT','RD_SOAK','RD_DROP_PREC')
+  AND NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = p.panel_code AND f.col_name = v.col_name);
 GO
 
--- ============ 专有字段 ============
-INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
+-- ============ 专有字段(幂等:已有同名字段跳过) ============
+INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq)
+SELECT v.panel_code, v.col_name, v.label, v.data_type, v.place, v.seq FROM (VALUES
 ('RD_FILTER_EFF','turbidity_in',N'滤前浊度(NTU)','小数','detail',10),
 ('RD_FILTER_EFF','turbidity_out',N'滤后浊度(NTU)','小数','detail',11),
 ('RD_FILTER_EFF','efficiency',N'滤效率(%)','小数','detail',12),
@@ -145,17 +155,20 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq) VALUES
 ('RD_DROP_PREC','precision_um',N'过滤精度(μm)','小数','detail',11),
 ('RD_DROP_PREC','flow_rate',N'流量(L/min)','小数','detail',12),
 ('RD_DROP_PREC','bubble_point',N'气泡点(MPa)','小数','detail',13),
-('RD_DROP_PREC','remark',N'备注','文本','detail',99);
+('RD_DROP_PREC','remark',N'备注','文本','detail',99)
+) AS v(panel_code, col_name, label, data_type, place, seq)
+WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name);
 GO
 
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_filter_eff TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_alkaline TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mineral TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_antibact TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_scale TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_ro_protect TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_soak TO yinjia;
-GRANT SELECT, INSERT, UPDATE, DELETE ON rd_drop_prec TO yinjia;
+-- yinjia 自身执行时跳过(对自己 GRANT 报 4624;角色成员身份已覆盖以下权限)
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_filter_eff TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_alkaline TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_mineral TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_antibact TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_scale TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_ro_protect TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_soak TO yinjia;
+IF USER_NAME() <> 'yinjia' GRANT SELECT, INSERT, UPDATE, DELETE ON rd_drop_prec TO yinjia;
 GO
 
 DECLARE @c int = (SELECT COUNT(*) FROM yj_field WHERE panel_code LIKE 'RD_%');

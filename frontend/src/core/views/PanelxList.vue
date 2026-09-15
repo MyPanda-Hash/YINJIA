@@ -270,6 +270,16 @@
                 <div>{{ tt('责任人') }}：{{ specDocAssign.ownerName || specDocAssign.owner }}<span v-if="specAssignBlocked">（{{ tt('只读') }}）</span></div>
                 <div>{{ tt('总负责人') }}：{{ specDocAssign.supervisorName || specDocAssign.supervisor || tt('未落实') }}</div>
               </div>
+              <!-- 审批组:品质单据等标准流文书面板(草稿需显式提交审批;审批通过/驳回需审批权限;审批情况公开) -->
+              <template v-if="isStandardFlowSheet">
+                <div class="as-side-btn" :class="{ disabled: isDisabled('提交审批') }" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
+                <template v-if="canApproveHere()">
+                  <div class="as-side-btn" :class="{ disabled: isDisabled('审批通过') }" @click="onSideAction('审批通过')">{{ tt('审批通过') }}</div>
+                  <div class="as-side-btn" :class="{ disabled: isDisabled('审批驳回') }" @click="onSideAction('审批驳回')">{{ tt('审批驳回') }}</div>
+                  <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
+                </template>
+                <div class="as-side-btn" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
+              </template>
               <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改态出「提交审批」,审批中出管理员审批;修改申请中出「撤回修改申请」;修改记录弹窗(滚动3条) -->
               <div class="as-side-del" v-if="isDocArchivePanel">
                 <div class="as-side-btn-row">
@@ -336,8 +346,117 @@
         </div>
       </div>
     </template>
-    <div v-else class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
-      <div class="field" v-for="field in headerFields" :key="headerFieldKey(field)">
+    <div v-if="reportMode" class="report-body" v-loading="loading">
+      <div class="report-heading">
+        <strong>{{ panelName }}</strong>
+        <span>{{ reportPeriod }}</span>
+      </div>
+      <el-table
+        class="report-table"
+        :data="reportList"
+        border
+        stripe
+        size="small"
+        height="100%"
+        show-summary
+        :summary-method="sumMethod"
+        empty-text="暂无符合条件的数据"
+        @row-click="(row) => (current = row)"
+      >
+        <el-table-column type="index" :label="tt('序号')" width="58" fixed="left" :index="(i) => (query.pageNo - 1) * query.pageSize + i + 1" />
+        <template v-for="column in reportColumnTree" :key="column.label">
+          <el-table-column v-if="column.children" :label="tt(column.label)" align="center">
+            <el-table-column
+              v-for="child in column.children"
+              :key="child.prop"
+              :prop="child.prop"
+              :min-width="child.width"
+              :align="child.align"
+              show-overflow-tooltip
+            >
+              <template #header>
+                <div class="report-col-container">
+                  <span class="report-col-title">{{ tt(child.label) }}</span>
+                  <span class="report-col-operator" :class="{ 'has-sort': reportSortOn(child.prop) }">
+                    <span class="report-col-sorter"
+                          :class="{on: reportSortOn(child.prop)}"
+                          :title="tt('点击排序：升序 → 降序 → 取消')"
+                          @click.stop="cycleReportSort(child.prop)">{{ reportSortCaret(child.prop) }}</span>
+                    <span v-if="hasDistinctValues(child.prop)"
+                          class="report-col-filter"
+                          :class="{on: reportCols.isFiltered(child.prop)}"
+                          @click.stop="openFilterAt(child.prop, $event)">
+                      <el-icon><Filter /></el-icon>
+                    </span>
+                  </span>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table-column>
+          <el-table-column
+            v-else
+            :prop="column.prop"
+            :min-width="column.width"
+            :align="column.align"
+            show-overflow-tooltip
+          >
+            <template #default="{ row }">
+              <template v-if="isStockStatus && column.prop === '预警数量'">
+                <el-input-number
+                  v-if="warnEdit.id === row.id"
+                  ref="warnEditRef"
+                  v-model="warnEdit.value"
+                  :controls="false"
+                  :min="0"
+                  :precision="0"
+                  size="small"
+                  class="warn-input"
+                  @keyup.enter="saveWarnEdit"
+                  @keyup.esc="warnEdit.id = null"
+                  @blur="saveWarnEdit"
+                />
+                <span v-else class="warn-editable" :title="tt('点击修改预警数量，留空使用默认阈值50')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
+              </template>
+              <span v-else>{{ row[column.prop] }}</span>
+            </template>
+            <template #header>
+              <div class="report-col-container">
+                <span class="report-col-title">{{ tt(column.label) }}</span>
+                <span class="report-col-operator" :class="{ 'has-sort': reportSortOn(column.prop) }">
+                  <span class="report-col-sorter"
+                        :class="{on: reportSortOn(column.prop)}"
+                        :title="tt('点击排序：升序 → 降序 → 取消')"
+                        @click.stop="cycleReportSort(column.prop)">{{ reportSortCaret(column.prop) }}</span>
+                  <span v-if="hasDistinctValues(column.prop)"
+                        class="report-col-filter"
+                        :class="{on: reportCols.isFiltered(column.prop)}"
+                        @click.stop="openFilterAt(column.prop, $event)">
+                    <el-icon><Filter /></el-icon>
+                  </span>
+                </span>
+              </div>
+            </template>
+          </el-table-column>
+        </template>
+      </el-table>
+    </div>
+
+
+    <template v-else>
+      <!-- 单据卡片:左「单据选择」栏(送料暂收单等启用,对齐 PANDA 左停靠选择列表) + 右侧表头/明细 -->
+      <div class="doc-rail-layout" :class="{ 'rail-on': !!docRailCfg && !railCollapsed }">
+        <DocSelectRail
+          v-if="docRailCfg"
+          :title="docRailCfg.title"
+          :rows="list"
+          :current-no="railCurNo"
+          :collapsed="railCollapsed"
+          @select="onRailSelect"
+          @toggle="railCollapsed = !railCollapsed"
+        />
+        <div class="doc-rail-main">
+          <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
+      <div class="field" v-for="field in headerEditFields" :key="headerFieldKey(field)">
         <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}</label>
         <template v-if="draftEditable">
           <div v-if="isRefSelect(field)" class="query-ref-select">
@@ -436,102 +555,49 @@
       </div>
     </div>
 
-    <div v-if="reportMode" class="report-body" v-loading="loading">
-      <div class="report-heading">
-        <strong>{{ panelName }}</strong>
-        <span>{{ reportPeriod }}</span>
+    <!-- 附件区:头表保留附件1..附件6 列位,页面单格聚合呈现,上传按序占第一个空余列位
+         (单号键兜底:label=单号 的面板如来料三单/送料暂收单,数据键只有 编号/单号) -->
+    <div v-if="attachFields.length && curDocNo" class="attach-strip">
+      <span class="attach-strip-label">{{ tt('附件') }}</span>
+      <div class="attach-slot">
+        <FileAttachCell
+          :panel-code="panelCode"
+          :doc-no="curDocNo"
+          :slots="attachKeys"
+          :values="attachValues"
+          :can-edit="draftEditable"
+          @change="applyAttachSlots"
+        />
       </div>
-      <el-table
-        class="report-table"
-        :data="reportList"
-        border
-        stripe
-        size="small"
-        height="100%"
-        show-summary
-        :summary-method="sumMethod"
-        empty-text="暂无符合条件的数据"
-        @row-click="(row) => (current = row)"
-      >
-        <el-table-column type="index" :label="tt('序号')" width="58" fixed="left" :index="(i) => (query.pageNo - 1) * query.pageSize + i + 1" />
-        <template v-for="column in reportColumnTree" :key="column.label">
-          <el-table-column v-if="column.children" :label="tt(column.label)" align="center">
-            <el-table-column
-              v-for="child in column.children"
-              :key="child.prop"
-              :prop="child.prop"
-              :min-width="child.width"
-              :align="child.align"
-              show-overflow-tooltip
-            >
-              <template #header>
-                <div class="report-col-container">
-                  <span class="report-col-title">{{ tt(child.label) }}</span>
-                  <span class="report-col-operator" :class="{ 'has-sort': reportSortOn(child.prop) }">
-                    <span class="report-col-sorter"
-                          :class="{on: reportSortOn(child.prop)}"
-                          :title="tt('点击排序：升序 → 降序 → 取消')"
-                          @click.stop="cycleReportSort(child.prop)">{{ reportSortCaret(child.prop) }}</span>
-                    <span v-if="hasDistinctValues(child.prop)"
-                          class="report-col-filter"
-                          :class="{on: reportCols.isFiltered(child.prop)}"
-                          @click.stop="openFilterAt(child.prop, $event)">
-                      <el-icon><Filter /></el-icon>
-                    </span>
-                  </span>
-                </div>
-              </template>
-            </el-table-column>
-          </el-table-column>
-          <el-table-column
-            v-else
-            :prop="column.prop"
-            :min-width="column.width"
-            :align="column.align"
-            show-overflow-tooltip
-          >
-            <template #default="{ row }">
-              <template v-if="isStockStatus && column.prop === '预警数量'">
-                <el-input-number
-                  v-if="warnEdit.id === row.id"
-                  ref="warnEditRef"
-                  v-model="warnEdit.value"
-                  :controls="false"
-                  :min="0"
-                  :precision="0"
-                  size="small"
-                  class="warn-input"
-                  @keyup.enter="saveWarnEdit"
-                  @keyup.esc="warnEdit.id = null"
-                  @blur="saveWarnEdit"
-                />
-                <span v-else class="warn-editable" :title="tt('点击修改预警数量，留空使用默认阈值50')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
-              </template>
-              <span v-else>{{ row[column.prop] }}</span>
-            </template>
-            <template #header>
-              <div class="report-col-container">
-                <span class="report-col-title">{{ tt(column.label) }}</span>
-                <span class="report-col-operator" :class="{ 'has-sort': reportSortOn(column.prop) }">
-                  <span class="report-col-sorter"
-                        :class="{on: reportSortOn(column.prop)}"
-                        :title="tt('点击排序：升序 → 降序 → 取消')"
-                        @click.stop="cycleReportSort(column.prop)">{{ reportSortCaret(column.prop) }}</span>
-                  <span v-if="hasDistinctValues(column.prop)"
-                        class="report-col-filter"
-                        :class="{on: reportCols.isFiltered(column.prop)}"
-                        @click.stop="openFilterAt(column.prop, $event)">
-                    <el-icon><Filter /></el-icon>
-                  </span>
-                </span>
-              </div>
-            </template>
-          </el-table-column>
-        </template>
-      </el-table>
     </div>
 
-    <div v-else-if="!isApprovalDoc" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading && !isBomMasterPanel">
+    <!-- ═══ 打印专用版式(屏幕隐藏,打印时经 body.doc-printing 激活):宽明细单据 A4 纸面优化层——
+         表头紧凑四列网格 + table-layout:fixed 百分比列宽 + 宽表列合并(名称/型号、合格/不良)
+         + thead 跨页自动重复;@page 横向/纵向由 prepareDocPrint 动态注入 ═══ -->
+    <div v-if="docPrintEnabled" class="doc-print" aria-hidden="true">
+      <div class="dp-title">{{ tt(panelName) }}</div>
+      <div class="dp-head">
+        <div v-for="f in docPrintHead" :key="headerFieldKey(f)" class="dp-pair">
+          <span class="dp-label">{{ tt(headerFieldLabel(f)) }}：</span>
+          <span class="dp-value">{{ formatFieldValue(f, cur[headerFieldKey(f)]) }}</span>
+        </div>
+      </div>
+      <table class="dp-table">
+        <colgroup>
+          <col v-for="(c, i) in docPrintCols" :key="i" :style="{ width: c.pct + '%' }" />
+        </colgroup>
+        <thead>
+          <tr><th v-for="(c, i) in docPrintCols" :key="i">{{ c.title }}</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="(r, ri) in docPrintRows" :key="ri">
+            <td v-for="(c, ci) in docPrintCols" :key="ci">{{ c.text(r, ri) }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div v-if="!isApprovalDoc" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading && !isBomMasterPanel">
       <!-- ══════════ 物料清单专用：父件表格 + 子件表格联动（BOM/BOM_FWD/BOM_REV） ══════════ -->
       <BomMasterDetail
         v-if="isBomMasterPanel"
@@ -719,6 +785,10 @@
         <span>{{ tt('审核意见：') }}{{ cur['审核意见'] || '-' }}</span>
       </div>
     </div>
+        </div>
+      </div>
+    </template>
+
 
     <!-- ══════════ 表格右键菜单（对齐真实 T+ 明细右键）══════════ -->
     <div v-if="ctx.visible" class="ctx-menu" :style="{ left: ctx.x + 'px', top: ctx.y + 'px' }">
@@ -1231,14 +1301,16 @@ import RefPickDialog from './RefPickDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
+import DocSelectRail from './DocSelectRail.vue'
 import SubBomDialog from './SubBomDialog.vue'
 import BomMasterDetail from './BomMasterDetail.vue'
 import DocSheet from './DocSheet.vue'
+import FileAttachCell from './FileAttachCell.vue'
 import ProgressControlSheet from './ProgressControlSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
-import { approvalSheetCfg, planSheetCfg } from './docSheetConfigs'
+import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import VoucherFormDialog from './VoucherFormDialog.vue'
@@ -1269,9 +1341,9 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
-const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', ...RECORD_SHEET_PANELS].includes(String(panelCode.value)))
+const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
-const docSheetConfig = computed(() => (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
+const docSheetConfig = computed(() => qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
 const bomMasterRows = computed(() => {
   if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
   return list.value || [] // BOM_FWD/BOM_REV：后端返回的展平行（父件-子件对）
@@ -1364,7 +1436,7 @@ const advFilterFields = computed(() => {
   const out = []
   const push = (label) => { if (label && !seen.has(label)) { seen.add(label); out.push(label) } }
   queryFields.value.forEach((f) => push(headerFieldKey(f)))
-  headerFields.value.forEach((f) => push(headerFieldKey(f)))
+  headerEditFields.value.forEach((f) => push(headerFieldKey(f)))
   ;(cfgCache.value?.detail?.tabs || []).forEach((t) => (t.fields || []).forEach((f) => push(f.dataName)))
   return out
 })
@@ -1928,6 +2000,8 @@ async function openPreviewCard(c) {
 }
 /** 文书归档面板(保存即归档):修改闭环按钮组的显隐开关,真源后端 metadata.docArchive */
 const isDocArchivePanel = computed(() => !!cfgCache.value?.metadata?.docArchive)
+/** 品质单据等标准流文书面板:非文件类(保存不自动提交审批),侧栏需显式审批动作组 */
+const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(qcSheetCfgs, String(panelCode.value)))
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
 // 规格书两级分发(2026-09-12):已分配单仅 责任人∪总负责人∪管理员 可编辑,其他人可见只读
@@ -2098,6 +2172,15 @@ const headerFields = computed(() => {
   const byName = new Map(fields.map((field) => [headerFieldKey(field), field]))
   return ordered.map((name) => byName.get(name)).filter(Boolean)
 })
+/** 附件类表头字段不进表头网格:单独「附件」区渲染,载入单据后常驻上传/查看 */
+const attachFields = computed(() => (headerFields.value || []).filter((f) => f.dataType === '附件'))
+const headerEditFields = computed(() => (headerFields.value || []).filter((f) => f.dataType !== '附件'))
+/** 头表附件列位键(附件1..附件6):页面单格聚合,上传按序占第一个空余列位 */
+const attachKeys = computed(() => attachFields.value.map((f) => headerFieldKey(f)))
+const attachValues = computed(() => Object.fromEntries(attachKeys.value.map((k) => [k, cur.value[k] || ''])))
+function applyAttachSlots(map) {
+  Object.entries(map || {}).forEach(([k, v]) => { cur.value[k] = v })
+}
 /** RecordSheetPanels 专用:表头字段 + 明细字段(数据表列的 alias 从明细字段元数据取) */
 const sheetAllFields = computed(() => {
   const header = headerFields.value || []
@@ -2105,7 +2188,7 @@ const sheetAllFields = computed(() => {
   return [...header, ...detail]
 })
 const queryDialogFields = computed(() => {
-  const fields = reportMode.value ? queryFields.value : headerFields.value
+  const fields = reportMode.value ? queryFields.value : headerEditFields.value
   return fields.filter((field) => headerFieldKey(field) !== '备注')
 })
 const draftEditable = computed(() => {
@@ -2235,6 +2318,18 @@ async function guardPageAction(run) {
   pendingLeave.value = null
   pendingAction = run
   askUnsavedLeave()
+}
+
+// ═══ 左侧「单据选择」栏(对齐 PANDA 暂收入库单选择):按面板启用,点行切换右侧当前单据 ═══
+const DOC_RAIL_PANELS = { SL_RECV: true, QC_INSP: true }
+const docRailCfg = computed(() => (DOC_RAIL_PANELS[panelCode.value] ? { title: (panelName.value || '') + tt('选择') } : null))
+const railCollapsed = ref(false)
+const railCurNo = computed(() => {
+  const c = cur.value || {}
+  return String(c['编号'] || c['单据编号'] || c['单号'] || '')
+})
+function onRailSelect(idx) {
+  guardPageAction(async () => { curIdx.value = idx })
 }
 
 async function page(delta) {
@@ -2765,6 +2860,86 @@ async function printApprovalSheet() {
   window.addEventListener('afterprint', restore)
   // 等样式生效后调打印预览(用户可另存为 PDF 或打印)
   setTimeout(() => window.print(), 150)
+}
+
+// ══════════ 单据打印版式(2026-09-15):宽明细表 A4 纸面优化 ══════════
+// 标准单据面板打印不再直出屏幕 DOM(el-table 固定列宽,字段一多打印必然横向截断),
+// 改走 .doc-print 纯表格打印层:数据与 A 区同源(同 tab/同过滤排序),仅版式为打印优化。
+const docPrintEnabled = computed(() => {
+  if (isApprovalDoc.value || reportMode.value || isBomMasterPanel.value) return false
+  return (cfgCache.value?.detail?.tabs || []).length > 0
+})
+const docPrintBlock = computed(() => blocks.value.find((b) => b.isMain) || blocks.value[0] || null)
+const docPrintHead = computed(() => (headerEditFields.value || []).filter((f) => !f.hidden))
+const docPrintRows = computed(() => {
+  const b = docPrintBlock.value
+  if (!b) return []
+  return blockRows(b).filter((r) => !r._placeholder)
+})
+// 宽表列合并对(两列同时存在才合并;如 来料检验单 物料名称/型号、合格数量/不良数量)
+const DOC_PRINT_MERGE_PAIRS = [['物料名称', '型号'], ['合格数量', '不良数量']]
+/** 列宽基准(按中文列名关键词,与界面语言无关);打印前归一化为百分比 */
+function dpBaseW(prop) {
+  if (/序号/.test(prop)) return 4
+  if (/描述|备注/.test(prop)) return 12
+  if (/编码|代码|单号/.test(prop)) return 8
+  if (/名称/.test(prop)) return 10
+  if (/型号|规格/.test(prop)) return 7
+  if (/日期/.test(prop)) return 7
+  if (/金额|税额|总额/.test(prop)) return 6
+  if (/数量|箱数|合格|不良/.test(prop)) return 5.5
+  if (/单价|折扣|税率/.test(prop)) return 5
+  return 6
+}
+const docPrintCols = computed(() => {
+  const b = docPrintBlock.value
+  if (!b) return []
+  const cols = blockCols(b)
+  const props = cols.map((c) => c.prop)
+  const consumed = new Set()
+  const out = [{ title: tt('序号'), base: 4, text: (_r, i) => String(i + 1) }]
+  for (const c of cols) {
+    if (consumed.has(c.prop)) continue
+    const pair = DOC_PRINT_MERGE_PAIRS.find(([x, y]) => x === c.prop && props.includes(y))
+    if (pair) {
+      const cy = cols.find((z) => z.prop === pair[1])
+      consumed.add(pair[1])
+      out.push({
+        title: c.label + ' / ' + cy.label,
+        base: dpBaseW(c.prop) + dpBaseW(cy.prop),
+        text: (r) => [r[c.prop], r[cy.prop]]
+          .map((v) => (v ?? '') === '' ? '' : String(v))
+          .filter((s) => s !== '')
+          .join(' / '),
+      })
+      continue
+    }
+    out.push({ title: c.label, base: dpBaseW(c.prop), text: (r) => formatFieldValue(c.field, r[c.prop]) })
+  }
+  const total = out.reduce((s, c) => s + c.base, 0) || 1
+  for (const c of out) c.pct = Math.round((c.base / total) * 1000) / 10
+  return out
+})
+/** 打印前置:挂 body 样式 + 注入 @page 规则(列数≥8 横向,否则纵向;@page 不响应类选择器,只能动态注入) */
+function prepareDocPrint() {
+  document.body.classList.add('doc-printing')
+  const wide = docPrintCols.value.length >= 8
+  let st = document.getElementById('doc-print-page')
+  if (!st) {
+    st = document.createElement('style')
+    st.id = 'doc-print-page'
+    document.head.appendChild(st)
+  }
+  st.textContent = wide
+    ? '@page { size: A4 landscape; margin: 9mm 8mm; }'
+    : '@page { size: A4 portrait; margin: 12mm 10mm; }'
+}
+function onBeforePrintDoc() {
+  // Ctrl+P 直打印也要走打印版式(beforeprint 在快照前同步触发)
+  if (docPrintEnabled.value) prepareDocPrint()
+}
+function onAfterPrintDoc() {
+  document.body.classList.remove('doc-printing')
 }
 
 // ══════════ 对外正式报表(后端 JasperReports 模板;IT 做版式,业务只选单据/格式) ══════════
@@ -3927,10 +4102,19 @@ async function onFieldEditRefresh() {
 /** 记录"已保存"基线快照（load 完成/保存成功后调用） */
 function markSavedSnapshot() {
   try {
-    savedSnapshot.value = cur.value ? JSON.stringify(currentFormData(cur.value.detail || {})) : ''
+    savedSnapshot.value = cur.value ? JSON.stringify(guardFormData()) : ''
   } catch {
     savedSnapshot.value = ''
   }
+}
+
+/** 守卫对比数据:在表单数据上剔除附件列位键——附件格挂载后异步回写头列位
+ *  (AttachmentService 聚合值落表单,晚于载入快照),属服务端值同步而非用户编辑,
+ *  不剔除会把带附件面板(QC_INSP/SL_RECV 等)的载入误判成未保存,守卫永远误弹。 */
+function guardFormData() {
+  const data = currentFormData(cur.value.detail || {})
+  for (const k of attachKeys.value) delete data[k]
+  return data
 }
 
 /** 当前是否存在未保存修改（草稿态且 变更钩子置脏/新增未保存/基线为空白草稿 或 相对基线有变化）。
@@ -3940,7 +4124,7 @@ function hasUnsavedChanges() {
   if (!draftEditable.value || !cur.value) return false
   if (inlineDirtyFlag.value || isFreshAddedDoc()) return true
   try {
-    return JSON.stringify(currentFormData(cur.value.detail || {})) !== savedSnapshot.value
+    return JSON.stringify(guardFormData()) !== savedSnapshot.value
   } catch { return false }
 }
 
@@ -4107,6 +4291,7 @@ async function onButton(action) {
     return
   }
   if (action === '打印' || action === '预览') {
+    if (docPrintEnabled.value) prepareDocPrint()
     window.print()
     return
   }
@@ -4758,6 +4943,9 @@ watch(cfgCache, (cfg) => {
 onMounted(() => {
   document.addEventListener('click', closeCtx)
   document.addEventListener('contextmenu', closeCtx)
+  // 单据打印版式:Ctrl+P 直打印同样走 .doc-print 层;打印结束还原屏幕
+  window.addEventListener('beforeprint', onBeforePrintDoc)
+  window.addEventListener('afterprint', onAfterPrintDoc)
   loadSubBomMap() // 材料下级 BOM 映射（红 * 标记 + 点击行弹窗）
   if (invalidPanel.value) {
     router.replace('/panelx/list/MANU_ORDER')
@@ -4792,6 +4980,9 @@ onDeactivated(() => {
 onUnmounted(() => {
   document.removeEventListener('click', closeCtx)
   document.removeEventListener('contextmenu', closeCtx)
+  window.removeEventListener('beforeprint', onBeforePrintDoc)
+  window.removeEventListener('afterprint', onAfterPrintDoc)
+  document.body.classList.remove('doc-printing')
 })
 </script>
 
@@ -5451,6 +5642,26 @@ onUnmounted(() => {
 .header-fields.is-draft {
   background: #fbfdff;
 }
+/* 附件区:表头下方独立一行,附件格常驻上传/查看(锁定单据只读) */
+.attach-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  padding: 6px 14px 4px;
+  border-top: 1px dashed #e4e7ed;
+  background: #fbfdff;
+}
+.attach-strip-label {
+  flex: 0 0 auto;
+  padding-top: 8px;
+  font-size: 13px;
+  color: #606266;
+}
+.attach-slot {
+  flex: 1 1 auto;
+  min-width: 240px;
+}
 .query-dialog-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -5580,6 +5791,24 @@ onUnmounted(() => {
   padding: 8px 10px 0;
   min-height: 0;
 }
+/* ═══ 左侧「单据选择」栏布局(送料暂收单等;rail 未启用时为透明直通容器) ═══
+   2:8 严格分栏:grid 定列,minmax 保极窄屏下左栏最低 200px 仍可见 */
+.doc-rail-layout {
+  flex: 1;
+  min-height: 0;
+  /* flex 行:左栏按自身宽度(可拖拽,flex-shrink:0)占位,右栏 flex:1 自适应 ——
+     不能用 grid 百分比列:左栏元素宽度与列宽不一致时右栏内容会压进左栏(交叉),且百分比列违背"不按比例缩放" */
+  display: flex;
+  align-items: stretch;
+}
+.doc-rail-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .report-body {
   flex: 1;
   min-height: 420px;
@@ -5934,6 +6163,87 @@ onUnmounted(() => {
   .report-table {
     height: auto !important;
   }
+}
+
+/* ═══════ 单据打印版式(2026-09-15):宽明细表 A4 纸面优化 ═══════
+   屏幕上 .doc-print 恒隐藏;打印时 body.doc-printing 激活并隐藏 A 区表单。
+   策略:表头四列网格(替代一列多行) / table-layout:fixed + colgroup 百分比列宽 /
+   长文本 word-break 换行 / thead table-header-group 跨页重复 / tr break-inside 禁拆。 */
+.doc-print {
+  display: none;
+}
+@media print {
+  body.doc-printing .doc-print {
+    display: block !important;
+  }
+  body.doc-printing .body,
+  body.doc-printing .attach-strip,
+  body.doc-printing .approval-side {
+    display: none !important;
+  }
+  body.doc-printing .panelx-list {
+    display: block;
+    min-height: 0;
+    padding: 0;
+    background: #fff;
+  }
+}
+.doc-print .dp-title {
+  text-align: center;
+  font: bold 17px/1.5 'SimHei', 'Microsoft YaHei', sans-serif;
+  letter-spacing: 2px;
+  margin: 1mm 0 2.5mm;
+}
+/* 表头:紧凑四列网格(标签:值 成对),替代屏幕上一字段一行 */
+.doc-print .dp-head {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.8mm 5mm;
+  border: 1.2px solid #000;
+  padding: 1.6mm 2.5mm;
+  margin-bottom: 2.5mm;
+}
+.doc-print .dp-pair {
+  display: flex;
+  min-width: 0;
+  font: 11px/1.6 'SimSun', 'NSimSun', serif;
+}
+.doc-print .dp-label {
+  flex: none;
+}
+.doc-print .dp-value {
+  font-weight: 600;
+  word-break: break-all;
+}
+/* 明细表:固定布局+百分比列宽(colgroup);长文本自动换行 */
+.doc-print .dp-table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font: 10.5px/1.45 'SimSun', 'NSimSun', serif;
+}
+.doc-print .dp-table th,
+.doc-print .dp-table td {
+  border: 1px solid #333;
+  padding: 1mm 1.4mm;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.doc-print .dp-table th {
+  background: #eee;
+  text-align: center;
+  font-weight: bold;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* 分页:表头每页重复;行不跨页截断 */
+.doc-print .dp-table thead {
+  display: table-header-group;
+}
+.doc-print .dp-table tbody tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 @media (max-width: 780px) {

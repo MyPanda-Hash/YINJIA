@@ -20,7 +20,7 @@ INSERT INTO @pairs VALUES
 ('dispatch','bd_dispatch','bl_dispatch','单据编号'),
 ('outsource_issue','bd_outsource_issue','bl_outsource_issue','单据编号'),
 ('outsource_in','bd_outsource_in','bl_outsource_in','单据编号');
-DECLARE @code varchar(50), @h sysname, @l sysname, @nc sysname, @lineCols nvarchar(max), @sql nvarchar(max);
+DECLARE @code varchar(50), @h sysname, @l sysname, @nc sysname, @lineCols nvarchar(max), @headCols nvarchar(max), @sql nvarchar(max);
 DECLARE p CURSOR FOR SELECT code, head, line, noCol FROM @pairs;
 OPEN p; FETCH NEXT FROM p INTO @code, @h, @l, @nc;
 WHILE @@FETCH_STATUS = 0 BEGIN
@@ -31,8 +31,14 @@ WHILE @@FETCH_STATUS = 0 BEGIN
     AND c.name NOT IN ('id','asp_user1','asp_time1','asp_cancel','asp_user2','asp_time2', @nc)
     AND c.name NOT IN (SELECT c2.name FROM sys.columns c2 WHERE c2.object_id = OBJECT_ID(@h))
   ORDER BY c.column_id;
+  -- 头表列也显式列出(排除 asp_cancel:外层包装会补 NULL asp_cancel,头表自带则视图列名重复)
+  SET @headCols = '';
+  SELECT @headCols = @headCols + CASE WHEN @headCols = N'' THEN N'' ELSE N',' END + N'h.[' + c.name + N']' FROM sys.columns c
+  WHERE c.object_id = OBJECT_ID(@h)
+    AND c.name <> 'asp_cancel'
+  ORDER BY c.column_id;
   -- DETAIL
-  SET @sql = N'CREATE VIEW v_' + @code + '_detail AS SELECT t.*, CAST(NULL AS char(1)) AS asp_cancel FROM (SELECT h.*' + @lineCols + N' FROM ' + @h + N' h LEFT JOIN ' + @l + N' l ON h.[' + @nc + N']=l.[' + @nc + N']) t';
+  SET @sql = N'CREATE VIEW v_' + @code + '_detail AS SELECT t.*, CAST(NULL AS char(1)) AS asp_cancel FROM (SELECT ' + @headCols + @lineCols + N' FROM ' + @h + N' h LEFT JOIN ' + @l + N' l ON h.[' + @nc + N']=l.[' + @nc + N']) t';
   EXEC(@sql);
   PRINT @code + ': detail OK';
   FETCH NEXT FROM p INTO @code, @h, @l, @nc;

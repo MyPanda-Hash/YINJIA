@@ -276,6 +276,8 @@ public class ButtonService {
         if (DOC_ARCHIVE_PANELS.contains(def.code())) refreshModifyDiff(def, no);
         // 规格书修改态保存且检验项目及标准页发生变化 → 通知关联出货检验计划表(仅变更提醒,不做内容比对)
         if (specTestOld != null) notifyInspPlansOnSpecTestChange(no, specTestOld, user);
+        // 送料暂收单:保存(含修改)后同步修改由它生成的来料检验单(共享字段镜像,见 syncInspFromSlRecv)
+        if ("SL_RECV".equals(def.code())) syncInspFromSlRecv(no, user);
 
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
         if (DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
@@ -360,6 +362,74 @@ public class ButtonService {
         }
     }
 
+    // ==================== 送料暂收单 → 来料检验单 同步修改(2026-09-15) ====================
+
+    /**
+     * 送料暂收单(SL_RECV)保存后,同步修改由它生成的来料检验单(QC_INSP):
+     * - 关联 = form_flow_link(SL_RECV→QC_INSP,ACTIVE,生单时写入;行键=单号#行表id,行 id 跨保存稳定);
+     * - 仅当检验单仍可编辑(草稿/修改中)时同步——已审核/审批中/已作废等不越权改动;
+     * - 表头镜像 单据日期/业务员/供应商代码/供应商/部门/部门名称/数量;
+     * - 明细按行键对行镜像共享列;暂收行已删(软删)时对应检验行一并软删
+     *   (检验单为草稿才同步,未生过下游单,删除安全);
+     * - 检验单自有字段(合格数量/不良数量/抽样方案等)与附件不动:附件实体锚定
+     *   panelCode+单号+field,镜像文件名会造成检验单侧下载失锚。
+     */
+    private void syncInspFromSlRecv(String no, String user) {
+        List<String> targets = jdbc.queryForList(
+                "SELECT DISTINCT target_form_no FROM form_flow_link"
+                        + " WHERE source_panel_code = 'SL_RECV' AND source_form_no = ?"
+                        + " AND target_panel_code = 'QC_INSP' AND link_status = 'ACTIVE'", String.class, no);
+        for (String tno : targets) {
+            String st = String.valueOf(docStatusOf("QC_INSP", tno).get("status"));
+            if (!"草稿".equals(st) && !"修改中".equals(st)) continue;
+            jdbc.update("UPDATE t SET t.单据日期 = s.单据日期, t.业务员 = s.业务员, t.供应商代码 = s.供应商代码,"
+                            + " t.供应商 = s.供应商, t.部门 = s.部门, t.部门名称 = s.部门名称, t.数量 = s.数量,"
+                            + " t.asp_user2 = ?, t.asp_time2 = GETDATE()"
+                            + " FROM qc_insp t JOIN sl_recv s ON s.单据编号 = t.单据编号"
+                            + " WHERE t.单据编号 = ? AND ISNULL(t.asp_cancel, 'N') <> 'Y' AND ISNULL(s.asp_cancel, 'N') <> 'Y'",
+                    user, tno);
+            List<Map<String, Object>> links = jdbc.queryForList(
+                    "SELECT source_line_key, target_line_key FROM form_flow_link"
+                            + " WHERE source_panel_code = 'SL_RECV' AND source_form_no = ?"
+                            + " AND target_panel_code = 'QC_INSP' AND target_form_no = ? AND link_status = 'ACTIVE'",
+                    no, tno);
+            for (Map<String, Object> lk : links) {
+                Integer srcId = lineKeyIdOf(lk.get("source_line_key"));
+                Integer tgtId = lineKeyIdOf(lk.get("target_line_key"));
+                if (srcId == null || tgtId == null) continue;
+                Boolean srcAlive = jdbc.queryForObject(
+                        "SELECT CASE WHEN ISNULL(asp_cancel, 'N') <> 'Y' THEN 1 ELSE 0 END"
+                                + " FROM sl_recv_detail WHERE id = ?", Boolean.class, srcId);
+                if (srcAlive == null) continue;
+                if (srcAlive) {
+                    jdbc.update("UPDATE d SET d.物料编码 = s.物料编码, d.物料名称 = s.物料名称, d.型号 = s.型号,"
+                                    + " d.物料描述 = s.物料描述, d.数量 = s.数量, d.箱数 = s.箱数, d.日期 = s.日期,"
+                                    + " d.备注 = s.备注, d.结案 = s.结案, d.部门 = s.部门, d.部门名称 = s.部门名称,"
+                                    + " d.asp_user2 = ?, d.asp_time2 = GETDATE()"
+                                    + " FROM qc_insp_detail d JOIN sl_recv_detail s ON s.id = ?"
+                                    + " WHERE d.id = ? AND d.单据编号 = ? AND ISNULL(d.asp_cancel, 'N') <> 'Y'",
+                            user, srcId, tgtId, tno);
+                } else {
+                    jdbc.update("UPDATE qc_insp_detail SET asp_cancel = 'Y', asp_user2 = ?, asp_time2 = GETDATE()"
+                            + " WHERE id = ? AND 单据编号 = ? AND ISNULL(asp_cancel, 'N') <> 'Y'", user, tgtId, tno);
+                }
+            }
+        }
+    }
+
+    /** form_flow_link 行键(单号#行表id)解析行表 id;格式不符返回 null */
+    private Integer lineKeyIdOf(Object lineKey) {
+        if (lineKey == null) return null;
+        String s = String.valueOf(lineKey);
+        int at = s.indexOf('#');
+        if (at < 0 || at == s.length() - 1) return null;
+        try {
+            return Integer.valueOf(s.substring(at + 1));
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     /** 归档标记:yj_doc_status.archived='Y'(已归档优先级:已作废>已中止>已审核>审批中>已归档>草稿);
      *  archived_at 仅首次归档写入(CASE 保首次),修改后再归档不覆盖——查询单据的时间区间口径。
      *  2026-09-12 口径反转:归档同时写审核人 shr(首次,CASE 保首审)——此前归档不写 shr,
@@ -384,6 +454,9 @@ public class ButtonService {
         for (Map<String, Object> item : items) {
             Object id = item.get("id");
             Map<String, Object> cols = labelsToCols(def.fields(), item);
+            // 行表没有的列不参与行 upsert:参照带回按同名标签回填(如表头 place 的 数据来源 被
+            // INV 存货行带入明细),拼进 INSERT/UPDATE 即 207;单表式列全在行表,此处为空操作
+            cols.keySet().retainAll(tableCols(def.lineTable()));
             cols.put(def.groupCol(), no);
             if (id != null && !String.valueOf(id).isBlank()) {
                 liveIds.add(id);
@@ -682,6 +755,8 @@ public class ButtonService {
         dualOutFinishIn(def.code(), no, currentUserName());
         // 不良品处理记账(品质层):处理单审核 → 原仓扣减+目标仓(隔离/不良品)移仓或报废
         qcDisposal.post(def.code(), no, currentUserName());
+        // 来料检验单审核 → 合格数量>0 的行自动生成采购入库单草稿(2026-09-15;暂收退回单暂不创建)
+        inspAutoPurchaseIn(def.code(), no, currentUserName());
         // 项目实施计划归档 → 自动同步项目进度查询(研发管理)
         if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
         // 文件类面板:经审核收尾(修改闭环/弃审留痕) → 计算修改记录并再归档
@@ -706,6 +781,9 @@ public class ButtonService {
         dualOutRedReverse(def.code(), no, currentUserName());
         // 不良品处理冲回(品质层):移仓/报废对称冲回,目标仓被消耗则拒绝
         qcDisposal.unpost(def.code(), no, currentUserName());
+        // 来料检验单弃审联动:自动生成的采购入库单为草稿则作废+释放占用+清入库单号回填;
+        // 已审核(可能已记台账)则拒绝,提示先弃审入库单——防止"检验弃审了、库存已入账"的错位
+        inspUnauditCascade(def.code(), no, currentUserName());
         // 弃审留痕(2026-09-12 修复):文件类面板弃审回到草稿后可直接改,此前的改动不走申请修改闭环,
         // 修改记录完全丢失。弃审时先落一份快照(弃审前的数据),此后再编辑保存/审核/审批通过时
         // 由 finalizeOpenModify 收尾 diff 并盖章再归档——弃审路径与申请修改路径留痕同构。
@@ -1192,6 +1270,93 @@ public class ButtonService {
     private static double numOr(Object o) {
         if (o == null || String.valueOf(o).isBlank()) return 0;
         try { return Double.parseDouble(String.valueOf(o)); } catch (NumberFormatException e) { return 0; }
+    }
+
+    // ==================== 来料检验单审核 → 自动生成采购入库单(2026-09-15) ====================
+
+    /**
+     * 来料检验单(QC_INSP)审核后,把 合格数量>0 的明细行自动生成采购入库单(PURCHASE_IN)草稿:
+     * 实收数量=合格数量;存货编码/存货名称/规格型号 ← 物料编码/物料名称/型号;行仓库 ← 仓库代码;
+     * 头带入 单据日期/供应商/供应商编码(供应商代码),外部单据号与来源单号=检验单号。
+     * 行级占用写 form_flow_link(source_quantity=数量,linked_quantity=合格数量,余量=不良部分,
+     * 供后续暂收退回链使用)并回填检验行 入库单号。幂等:已有 ACTIVE 占用(重审)跳过;
+     * 无合格数量的行不生成(全不良/未检完的检验单审核不产生空入库单)。
+     * 暂收退回单暂不自动创建(用户口径 2026-09-15;手工「生成暂收退回单」按钮保留)。
+     * 生成的入库单留草稿由仓库确认审核(不自动记账,对齐 编制/审核分离)。
+     */
+    private void inspAutoPurchaseIn(String panelCode, String no, String user) {
+        if (!"QC_INSP".equals(panelCode)) return;
+        Integer linked = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code='QC_INSP' AND source_form_no=?"
+                        + " AND target_panel_code='PURCHASE_IN' AND link_status='ACTIVE'", Integer.class, no);
+        if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, 物料编码, 物料名称, 型号, 数量, 合格数量, 仓库代码 FROM qc_insp_detail"
+                        + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
+        List<Map<String, Object>> pass = rows.stream()
+                .filter(r -> numOr(r.get("合格数量")) > 0).toList();
+        if (pass.isEmpty()) return;
+        List<Map<String, Object>> heads = jdbc.queryForList(
+                "SELECT 单据日期, 供应商代码, 供应商 FROM qc_insp"
+                        + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + no);
+        Map<String, Object> h = heads.get(0);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Map<String, Object> r : pass) {
+            Map<String, Object> line = new LinkedHashMap<>();
+            line.put("存货编码", r.get("物料编码"));
+            line.put("存货名称", r.get("物料名称"));
+            line.put("规格型号", r.get("型号"));
+            line.put("实收数量", r.get("合格数量"));
+            Object wh = r.get("仓库代码");
+            if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
+            items.add(line);
+        }
+        Map<String, Object> head = new LinkedHashMap<>();
+        Object date = h.get("单据日期");
+        head.put("单据日期", date == null || String.valueOf(date).isBlank() ? LocalDate.now().toString() : String.valueOf(date));
+        head.put("供应商", h.get("供应商"));
+        head.put("供应商编码", h.get("供应商代码"));
+        head.put("外部单据号", no);
+        head.put("来源单据", "来料检验单");
+        head.put("来源单号", no);
+        head.put("detail", Map.of("items", items));
+        Map<String, Object> saved = save(registry.panel("PURCHASE_IN"), head, false);
+        String piNo = String.valueOf(saved.get("编号"));
+        // 行级占用 + 入库单号回填(目标行按保存顺序取 id,与 pass 一一对应)
+        List<Integer> tgtIds = jdbc.queryForList(
+                "SELECT id FROM bl_purchase_in WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
+                Integer.class, piNo);
+        for (int i = 0; i < pass.size() && i < tgtIds.size(); i++) {
+            Map<String, Object> r = pass.get(i);
+            jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
+                            + " target_panel_code, target_form_no, target_line_key, inventory_code,"
+                            + " source_quantity, linked_quantity, link_status, create_by)"
+                            + " VALUES ('QC_INSP', ?, ?, 'PURCHASE_IN', ?, ?, ?, ?, ?, 'ACTIVE', ?)",
+                    no, no + "#" + r.get("id"), piNo, piNo + "#" + tgtIds.get(i), r.get("物料编码"),
+                    r.get("数量"), r.get("合格数量"), user);
+            jdbc.update("UPDATE qc_insp_detail SET 入库单号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
+                    piNo, user, r.get("id"));
+        }
+    }
+
+    /** 来料检验单弃审联动:自动生成的采购入库单草稿 → 作废留痕+释放占用+清 入库单号 回填;
+     *  已审核则拒绝弃审(先弃审该入库单),防止库存已入账而检验单被弃审的错位。 */
+    private void inspUnauditCascade(String panelCode, String no, String user) {
+        if (!"QC_INSP".equals(panelCode)) return;
+        List<String> piNos = jdbc.queryForList(
+                "SELECT DISTINCT target_form_no FROM form_flow_link WHERE source_panel_code='QC_INSP' AND source_form_no=?"
+                        + " AND target_panel_code='PURCHASE_IN' AND link_status='ACTIVE'", String.class, no);
+        for (String piNo : piNos) {
+            String st = String.valueOf(docStatusOf("PURCHASE_IN", piNo).get("status"));
+            if ("草稿".equals(st) || "修改中".equals(st)) {
+                voidDoc(registry.panel("PURCHASE_IN"), piNo, user);
+            } else {
+                throw new IllegalStateException("自动生成的采购入库单 " + piNo + " 已审核,请先弃审该入库单再弃审检验单");
+            }
+            jdbc.update("UPDATE qc_insp_detail SET 入库单号 = NULL, asp_user2 = ?, asp_time2 = GETDATE()"
+                    + " WHERE 单据编号 = ? AND 入库单号 = ?", user, no, piNo);
+        }
     }
 
     /**

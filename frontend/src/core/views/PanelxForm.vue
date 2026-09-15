@@ -34,7 +34,7 @@
 
       <!-- 表头（3 列） -->
       <div v-loading="loading" class="fields udl-fields">
-        <div v-for="r in visibleMeta" :key="r.code" class="field">
+        <div v-for="r in visibleFormMeta" :key="r.code" class="field">
           <label :title="tt(r.name)">{{ tt(r.name) }}<span v-if="r.isNotNull" class="req">*</span></label>
           <el-input v-if="isText(r)" v-model="form[r.code]" :disabled="!editable || fieldLocked(r)" :placeholder="tt(r.name)" />
           <el-input-number
@@ -98,6 +98,22 @@
           />
           <el-switch v-else-if="isBool(r)" v-model="form[r.code]" :disabled="!editable || fieldLocked(r)" />
           <el-input v-else v-model="form[r.code]" :disabled="!editable || fieldLocked(r)" :placeholder="r.name" />
+        </div>
+      </div>
+
+      <!-- 附件区:头表保留附件1..附件6 列位,页面单格聚合呈现,上传按序占第一个空余列位
+           (单号键兜底:label=单号 的面板如来料三单/送料暂收单,数据键只有 编号/单号) -->
+      <div v-if="visibleAttachMeta.length && (form['单据编号'] || form['编号'])" class="attach-strip">
+        <span class="attach-strip-label">{{ tt('附件') }}</span>
+        <div class="attach-slot">
+          <FileAttachCell
+            :panel-code="panelCode"
+            :doc-no="form['单据编号'] || form['编号'] || ''"
+            :slots="attachKeys"
+            :values="attachValues"
+            :can-edit="editable"
+            @change="applyAttachSlots"
+          />
         </div>
       </div>
 
@@ -329,7 +345,7 @@
       v-model="scanVisible"
       :panel-code="panelCode"
       :panel-name="payloadCache?.panelName || panelCode"
-      :header-fields="visibleMeta"
+      :header-fields="visibleFormMeta"
       :detail-tabs="tabs"
       @apply="onScanApply"
     />
@@ -357,6 +373,7 @@ import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import RefPickDialog from './RefPickDialog.vue'
+import FileAttachCell from './FileAttachCell.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import ImportDialog from './ImportDialog.vue'
@@ -659,6 +676,15 @@ function visibleFields(tab) {
 }
 
 const visibleMeta = computed(() => (meta.value || []).filter((r) => !r.hidden))
+/** 附件字段不进表头网格:单独「附件」区渲染,单据存在时常驻上传/查看(同 PanelxList 附件区) */
+const visibleAttachMeta = computed(() => visibleMeta.value.filter((r) => isAttach(r)))
+const visibleFormMeta = computed(() => visibleMeta.value.filter((r) => !isAttach(r)))
+/** 头表附件列位键(附件1..附件6):页面单格聚合,上传按序占第一个空余列位 */
+const attachKeys = computed(() => visibleAttachMeta.value.map((r) => r.code))
+const attachValues = computed(() => Object.fromEntries(attachKeys.value.map((k) => [k, form[k] || ''])))
+function applyAttachSlots(map) {
+  Object.entries(map || {}).forEach(([k, v]) => { form[k] = v })
+}
 
 function fieldLocked(r) {
   // 锭号：自动编码；仅勾选「是否手工修改单据编码」时草稿可改
@@ -697,6 +723,9 @@ function isDisabled(action) {
 
 function isText(r) {
   return !r.dataType || r.dataType === '文本' || r.dataType === 'STRING'
+}
+function isAttach(r) {
+  return r.dataType === '附件'
 }
 function isNumber(r) {
   return ['小数', '整数', 'Decimal', 'Long', 'Integer', 'Double'].includes(r.dataType)
@@ -1621,6 +1650,27 @@ watch(() => [panelCode.value, code.value], () => {
   padding: 12px;
   background: #fff;
   min-height: 0;
+}
+/* 附件区:表头网格下方独立一行,附件格常驻上传/查看(锁定单据只读) */
+.attach-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  margin-top: 6px;
+  border-top: 1px dashed #e4e7ed;
+  background: #fbfdff;
+}
+.attach-strip-label {
+  flex: 0 0 auto;
+  padding-top: 8px;
+  font-size: 13px;
+  color: #606266;
+}
+.attach-slot {
+  flex: 1 1 auto;
+  min-width: 240px;
 }
 .field {
   display: inline-block;
