@@ -92,6 +92,15 @@ public class PanelConfigService {
         buttonGroups.add(group("打印", List.of("打印", "预览")));
         buttonGroups.add(group("导入", List.of("下载模板", "导入")));
         buttonGroups.add(group("更多", List.of("复制", "表格调整", "导出", "退出")));
+        // 分类管理入口(金蝶同款交互):客户/供应商档案从工具栏进分类维护,分类面板不占左侧导航
+        String classifyPanel = switch (def.code()) {
+            case "KHDA" -> "CUSGRP"; case "GFDA" -> "SUPGRP"; default -> null;
+        };
+        String classifyTitle = null;
+        if (classifyPanel != null) {
+            try { classifyTitle = registry.panel(classifyPanel).name(); } catch (Exception ignored) { }
+            if (classifyTitle != null) buttonGroups.add(group("分类管理", List.of("分类管理")));
+        }
 
         List<Map<String, Object>> panelButtons = new ArrayList<>();
         for (String b : List.of("新增流程", "删除", "刷新", "保存", "放弃")) {
@@ -138,6 +147,10 @@ public class PanelConfigService {
                 "defaultOptions", List.of("启用", "已作废")));
         metadata.put("panelButtons", panelButtons);
         metadata.put("buttonGroups", buttonGroups);
+        if (classifyPanel != null && classifyTitle != null) {
+            metadata.put("classifyPanel", classifyPanel);   // 前端「分类管理」跳转目标面板码
+            metadata.put("classifyTitle", classifyTitle);   // 页签标题
+        }
         metadata.put("panelPageDto", pageDto);
 
         Map<String, Object> out = new LinkedHashMap<>();

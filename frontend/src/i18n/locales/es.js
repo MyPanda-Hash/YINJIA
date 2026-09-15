@@ -28,6 +28,8 @@ export default {
     '结算方式': 'Forma de liquidación',
     '币别': 'Moneda',
     '商品': 'Artículo',
+    '分类管理': 'Gestión de categorías',
+    '该面板没有可管理的分类': 'Este panel no tiene categorías que gestionar',
     '职员': 'Empleado',
     '业务员档案': 'Vendedores',
     '仓库档案': 'Almacenes',

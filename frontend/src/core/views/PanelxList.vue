@@ -3744,7 +3744,7 @@ function isDisabled(action) {
     复制: !current.value,            // 整单复制=另存为一张新草稿
     放弃: false,                     // 丢弃内联草稿修改,恢复最近一次保存
     打印: false, 预览: false, 导出: false,
-    发送邮件: false, 退出: false, 表格调整: false,
+    发送邮件: false, 退出: false, 表格调整: false, 分类管理: false,
   }
   // 灰色占位动作(后端 metadata.disabledActions:选单无流转来源/生单无实现链路)恒置灰,点击忽略
   if (map[action] === undefined && (cfgCache.value?.metadata?.disabledActions || []).includes(action)) {
@@ -4225,6 +4225,16 @@ async function onButton(action) {
   }
   if (action === '表格调整') {
     openColPrefs()
+    return
+  }
+  if (action === '分类管理') {
+    // 客户/供应商档案 → 对应分类面板(金蝶同款:分类不占导航,从档案工具栏进)
+    const target = cfgCache.value?.metadata?.classifyPanel
+    const title = cfgCache.value?.metadata?.classifyTitle || target
+    if (!target) return ElMessage.warning(tt('该面板没有可管理的分类'))
+    const targetPath = `/panelx/list/${target}`
+    router.push(targetPath)
+    tabs.open({ path: targetPath, title: tt(title) })
     return
   }
   // 文件类面板(文书式):「删除」= 整单删除(草稿直接作废;已归档提交删除申请,管理员审批)

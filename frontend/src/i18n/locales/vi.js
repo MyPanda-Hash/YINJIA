@@ -28,6 +28,8 @@ export default {
     '结算方式': 'Cách thanh toán',
     '币别': 'Tiền tệ',
     '商品': 'Hàng hóa',
+    '分类管理': 'Quản lý phân loại',
+    '该面板没有可管理的分类': 'Bảng này không có phân loại để quản lý',
     '职员': 'Nhân viên',
     '业务员档案': 'NV kinh doanh',
     '仓库档案': 'Kho',

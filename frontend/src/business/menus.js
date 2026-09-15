@@ -288,8 +288,8 @@ export const menuTree = [
           { code: 'warehouse', title: '仓库', path: '/panelx/list/WH', icon: 'House', panelCode: 'WH', operationName: '新增流程' },
           { code: 'stockStatus', title: '库存状况', path: '/panelx/list/STOCK_STATUS', icon: 'Histogram', panelCode: 'STOCK_STATUS' },
           { code: 'khda', title: '客户', path: '/panelx/list/KHDA', icon: 'User', panelCode: 'KHDA', operationName: '新增流程' },
-          { code: 'cusgrp', title: '客户分类', path: '/panelx/list/CUSGRP', icon: 'FolderOpened', panelCode: 'CUSGRP', operationName: '新增流程' },
-          { code: 'supgrp', title: '供应商分类', path: '/panelx/list/SUPGRP', icon: 'FolderOpened', panelCode: 'SUPGRP', operationName: '新增流程' },
+          { code: 'gfda', title: '供应商', path: '/panelx/list/GFDA', icon: 'OfficeBuilding', panelCode: 'GFDA', operationName: '新增流程' },
+          // 客户/供应商分类不占导航:从 客户/供应商 面板工具栏「分类管理」进入(金蝶同款交互)
           { code: 'partner', title: '往来单位', path: '/panelx/list/PARTNER', icon: 'OfficeBuilding', panelCode: 'PARTNER', operationName: '新增流程' },
           { code: 'region', title: '地区', path: '/panelx/list/REGION', icon: 'Location', panelCode: 'REGION', operationName: '新增流程' },
           { code: 'proj', title: '项目', path: '/panelx/list/PROJ', icon: 'Flag', panelCode: 'PROJ', operationName: '新增流程' },

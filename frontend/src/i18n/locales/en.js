@@ -79,6 +79,8 @@ export default {
     '结算方式': 'Settlement Method',
     '币别': 'Currency',
     '商品': 'Material',
+    '分类管理': 'Category Management',
+    '该面板没有可管理的分类': 'No category to manage for this panel',
     '职员': 'Employee',
     '业务员档案': 'Salesperson Archive',
     '仓库档案': 'Warehouse Archive',

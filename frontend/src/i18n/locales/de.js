@@ -31,6 +31,8 @@ export default {
     '结算方式': 'Zahlungsart',
     '币别': 'Währung',
     '商品': 'Ware',
+    '分类管理': 'Kategorienverwaltung',
+    '该面板没有可管理的分类': 'Keine Kategorie für dieses Panel verwaltbar',
     '职员': 'Mitarbeiter',
     '业务员档案': 'Vertriebsmitarbeiter',
     '仓库档案': 'Lager',

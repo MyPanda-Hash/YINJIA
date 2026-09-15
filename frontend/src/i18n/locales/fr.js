@@ -28,6 +28,8 @@ export default {
     '结算方式': 'Mode de règlement',
     '币别': 'Devise',
     '商品': 'Article',
+    '分类管理': 'Gestion des catégories',
+    '该面板没有可管理的分类': 'Aucune catégorie à gérer pour ce panneau',
     '职员': 'Employé',
     '业务员档案': 'Commerciaux',
     '仓库档案': 'Entrepôts',
