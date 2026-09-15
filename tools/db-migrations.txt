@@ -241,3 +241,10 @@ fix-db-restore-tail.sql
 #      配套 deploy/sync-core.mjs mapHead 增写 汇率/结算期限。
 # 幂等:COL_LENGTH/IF NOT EXISTS/MERGE NOT MATCHED。
 migrate-kingdee-order-align.sql
+
+# —— 2026-09-15 登记:面板字段按金蝶实际使用口径裁剪(隐藏不删,可恢复) ——
+# 口径:sync-core.mjs 实际映射有值写入的字段集。订单 9 个(部门负责人/项目/品牌/到货地址/发货状态/
+# 合同号/订金金额/付款方式/现存量说明)+档案 15 个(法人代表/注册资本/成立日期/供应商级别/到货地址/
+# 参考成本/最新成本/业务员/证件类型/职务/职称/部门类型/电话/允许零库存出库/仓库类型/所属车间/单位类型/
+# 主单位/换算率)=24 个字段 hidden=1+visible=0,PU项目剥 query 位。列与数据全保留。
+migrate-kingdee-trim-unused.sql
