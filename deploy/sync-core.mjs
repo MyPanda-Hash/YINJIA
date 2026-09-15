@@ -500,6 +500,27 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
       if (!rows.length) { log(`【${doc.label}】无符合条件${doc.archive ? '档案' : '单据'}`); continue; }
       if (doc.afterList) doc.afterList(rows, ctx); // 登记分类映射(供后续条目解析 id→名称/编码)
 
+      // 初始化清污(仅档案+init+真实写库):确认→全量前像备份→删除本同步器先前写入/收编的行→全量重建。
+      // 手录行(无外部数据ID且非 jdy-sync 所写)保留,后续按编码列收编接管。
+      let archiveInitHandled = false;
+      if (doc.archive && mode === 'init' && !dryRun && !probe) {
+        const ok = await confirmBatch({
+          log, label: `【${doc.label}】`, planned: rows.length,
+          threshold: opt.confirmThreshold, assumeYes,
+          timeoutMs: (opt.confirmTimeoutSeconds === undefined ? 5 : opt.confirmTimeoutSeconds) * 1000,
+        });
+        if (!ok) { log(`【${doc.label}】未确认,整类跳过`); continue; }
+        await backupBeforeWrite({
+          mssql, pool, baseDir: HERE, panel: doc.code,
+          headTable: doc.table, lineTable: null, docNos: null, // 全量前像(清污前)
+          retentionDays: opt.backupRetentionDays, log,
+        });
+        const del = await new mssql.Request(pool).query(
+          `DELETE FROM ${doc.table} WHERE 外部数据ID IS NOT NULL OR asp_user1 = N'jdy-sync'; SELECT @@ROWCOUNT AS n;`);
+        log(`【${doc.label}】初始化清污:删除同步器旧数据 ${del.recordset[0].n} 行(手录行保留),开始全量重建`);
+        archiveInitHandled = true; // 后续指纹为空=全量插入;确认与备份不再重复执行
+      }
+
       // 指纹比对先行:算出真正要写的单(新增/有变化)——提示、备份、写入都只针对它们
       let knownFps = new Map();
       if (!dryRun) {
@@ -518,7 +539,8 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
 
       // 规范:批量写入前按"实际写入量"提示(超阈值),并只备份将被影响的单据前像;未确认则整类跳过。
       // 注:备份范围=待写单(增量)或全量前像(初始化);无变化时不产生备份文件。
-      if (!dryRun) {
+      //     档案+init 已在"初始化清污"处完成确认与全量前像备份(archiveInitHandled),此处跳过。
+      if (!dryRun && !archiveInitHandled) {
         const ok = await confirmBatch({
           log, label: `【${doc.label}】`, planned: changedRows.length,
           threshold: opt.confirmThreshold, assumeYes,
@@ -535,7 +557,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
         });
       }
 
-      let inserted = 0, updated = 0, failed = 0, dup = 0, done = 0;
+      let inserted = 0, updated = 0, failed = 0, dup = 0, done = 0, noCode = 0;
       for (const row of changedRows) {
         done++;
         if (changedRows.length > 200 && done % 500 === 0) log(`【${doc.label}】进度 ${done}/${changedRows.length}(新增${inserted} 更新${updated})`);
@@ -549,6 +571,13 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
               外部数据ID: str(d.id), 外部单据号: str(d.number),
               __创建时间: str(d.create_time),
             };
+            // 编码列为空的行无法在 MES 建档(该列 NOT NULL,如金蝶里没有员工编码的职员):跳过并计数,不臆造编码
+            const code = mapped[doc.codeCol];
+            if (code === null || code === undefined || String(code).trim() === '') {
+              noCode++;
+              log(`⚠ 【${doc.label}】${d.name || d.id} 缺编码列「${doc.codeCol}」,跳过(MES 该列必填)`);
+              continue;
+            }
             if (dryRun) {
               console.log(`—— 【${doc.label}】${d.number || ''} ${d.name || ''}${mapped.__cancel === 'Y' ? '(停用)' : ''}`);
               continue;
@@ -588,7 +617,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
           log(`✗ 【${doc.label}】单据 ${row.bill_no || row.id} 处理失败: ${e.message}`);
         }
       }
-      log(`【${doc.label}】完成:新增 ${inserted},更新 ${updated},失败 ${failed}${dup ? `,并发让行 ${dup}` : ''}`);
+      log(`【${doc.label}】完成:新增 ${inserted},更新 ${updated},失败 ${failed}${noCode ? `,缺编码跳过 ${noCode}` : ''}${dup ? `,并发让行 ${dup}` : ''}`);
       totalIn += inserted; totalUp += updated; totalFail += failed;
     }
   } finally {
