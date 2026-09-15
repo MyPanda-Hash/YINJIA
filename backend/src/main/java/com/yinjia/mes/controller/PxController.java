@@ -306,4 +306,14 @@ public class PxController {
         configService.saveColumnPrefs(panelCode, columns);
         return ApiResult.ok(null);
     }
+
+    /** 表头调整:保存表头字段的排序/栏名/显隐(hidden+visible 同开同关) */
+    @PostMapping("/saveHeaderPrefs")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Void> saveHeaderPrefs(@RequestBody Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
+        configService.saveHeaderPrefs(panelCode, columns);
+        return ApiResult.ok(null);
+    }
 }

@@ -1179,6 +1179,29 @@
       </template>
     </el-dialog>
 
+    <!-- 表头字段自定义(表头调整:排序/栏名/显隐,与表格调整同款交互) -->
+    <el-dialog v-model="headPrefVisible" :title="tt('表头调整')" width="520px" append-to-body :close-on-click-modal="false">
+      <div class="col-pref-tip">{{ tt('拖动或用箭头调整字段顺序;勾选=显示;栏名可改。') }}</div>
+      <div class="col-pref-list">
+        <div v-for="(item, idx) in headPrefRows" :key="item.label" class="col-pref-row" draggable="true"
+             @dragstart="headDragIdx = idx" @dragover.prevent @drop="onHeadDrop(idx)">
+          <div class="cp-drag" :title="tt('拖动排序')">⋮⋮</div>
+          <div class="cp-order">
+            <el-button link size="small" :disabled="idx === 0" @click="moveHead(idx, -1)">▲</el-button>
+            <el-button link size="small" :disabled="idx === headPrefRows.length - 1" @click="moveHead(idx, 1)">▼</el-button>
+          </div>
+          <el-checkbox v-model="item.visible" class="cp-vis" />
+          <div class="cp-label">{{ item.label }}</div>
+          <el-input v-model="item.alias" class="cp-alias" size="small" :placeholder="item.label" clearable />
+        </div>
+      </div>
+      <template #footer>
+        <el-button size="small" @click="headPrefVisible = false">{{ tt('取消') }}</el-button>
+        <el-button size="small" @click="resetHeadPrefs">{{ tt('恢复默认') }}</el-button>
+        <el-button type="primary" size="small" :loading="headPrefSaving" @click="saveHeadPrefs">{{ tt('保存') }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- ══════════ 报表表头筛选面板(teleport 到 body,按列头位置定位) ══════════ -->
     <teleport to="body">
       <div v-if="reportFilterVisible"
@@ -1462,6 +1485,64 @@ function resetColPrefs() {
   colPrefRows.value.forEach((r) => { r.alias = ''; r.visible = true })
   ElMessage.info('已恢复默认(需保存生效)')
 }
+
+// ---- 表头字段自定义(表头调整:排序/栏名/显隐,与表格调整同款交互;显隐 hidden+visible 同开同关) ----
+const headPrefVisible = ref(false)
+const headPrefSaving = ref(false)
+const headPrefRows = ref([])
+const headDragIdx = ref(-1)
+
+function openHeadPrefs() {
+  const fields = cfgCache.value?.dataSchema?.fields || []
+  if (!fields.length) return ElMessage.warning(tt('该面板没有可调整的表头字段'))
+  headPrefRows.value = fields.map((f) => ({
+    label: f.dataName || f.name || f.code,
+    alias: f.displayName || '',
+    visible: f.hidden !== true && f.visible !== false,
+  }))
+  headPrefVisible.value = true
+}
+
+function moveHead(idx, dir) {
+  const rows = headPrefRows.value
+  const target = idx + dir
+  if (target < 0 || target >= rows.length) return
+  const tmp = rows[idx]
+  rows[idx] = rows[target]
+  rows[target] = tmp
+}
+
+function onHeadDrop(idx) {
+  const from = headDragIdx.value
+  if (from < 0 || from === idx) return
+  const rows = headPrefRows.value
+  const item = rows.splice(from, 1)[0]
+  rows.splice(idx, 0, item)
+  headDragIdx.value = -1
+}
+
+async function saveHeadPrefs() {
+  headPrefSaving.value = true
+  try {
+    await engine.saveHeaderPrefs({
+      panelCode: panelCode.value,
+      columns: headPrefRows.value.map((r) => ({ label: r.label, alias: r.alias || '', visible: !!r.visible })),
+    })
+    ElMessage.success(tt('表头调整已保存'))
+    headPrefVisible.value = false
+    cfgCache.value = null
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('保存失败'))
+  } finally {
+    headPrefSaving.value = false
+  }
+}
+
+function resetHeadPrefs() {
+  headPrefRows.value.forEach((r) => { r.alias = ''; r.visible = true })
+  ElMessage.info(tt('已恢复默认(需保存生效)'))
+}
 // ---- 参照字段动态模式(≤20 下拉 / >20 弹窗):缓存计数 + 下拉选项 ----
 // 数据量跨越阈值时(增删档案后)由 refreshRefModes 重新判定,模式随之切换。
 const refModeMap = reactive({})      // fieldKey -> 'dialog' | 'select'
@@ -1647,7 +1728,7 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
 // 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
-const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出'] // 刷新/退出在文书侧栏体验差(刷新整页重载/退出关闭页签),2026-09-14 移除
+const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '表头调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出'] // 刷新/退出在文书侧栏体验差(刷新整页重载/退出关闭页签),2026-09-14 移除
 // 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
 const openDelMenu = ref(false)
 
@@ -3744,7 +3825,7 @@ function isDisabled(action) {
     复制: !current.value,            // 整单复制=另存为一张新草稿
     放弃: false,                     // 丢弃内联草稿修改,恢复最近一次保存
     打印: false, 预览: false, 导出: false,
-    发送邮件: false, 退出: false, 表格调整: false, 分类管理: false,
+    发送邮件: false, 退出: false, 表格调整: false, 分类管理: false, 表头调整: false,
   }
   // 灰色占位动作(后端 metadata.disabledActions:选单无流转来源/生单无实现链路)恒置灰,点击忽略
   if (map[action] === undefined && (cfgCache.value?.metadata?.disabledActions || []).includes(action)) {
@@ -4225,6 +4306,10 @@ async function onButton(action) {
   }
   if (action === '表格调整') {
     openColPrefs()
+    return
+  }
+  if (action === '表头调整') {
+    openHeadPrefs()
     return
   }
   if (action === '分类管理') {

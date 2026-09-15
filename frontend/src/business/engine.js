@@ -333,6 +333,11 @@ export async function saveColumnPrefs({ panelCode, columns }) {
   return unwrap(await request.post('/px/saveColumnPrefs', { panelCode, columns }))
 }
 
+/** 表头调整:保存表头字段的排序/栏名/显隐(hidden+visible 同开同关) */
+export async function saveHeaderPrefs({ panelCode, columns }) {
+  return unwrap(await request.post('/px/saveHeaderPrefs', { panelCode, columns }))
+}
+
 // ==================== 选单流转(对齐 T+ SelectVoucher;占用跟踪 form_flow_link) ====================
 
 /** 选单来源查询:已审核 + 未被占用行(带 _lineKey/剩余数量) */

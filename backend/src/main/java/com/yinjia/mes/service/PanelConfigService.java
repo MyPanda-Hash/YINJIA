@@ -331,8 +331,18 @@ public class PanelConfigService {
                 "dataType", "STRING",
                 "defaultOptions", List.of("草稿", "已审核", "审批中", "已中止", "已作废")));
         metadata.put("panelButtons", panelButtons);
+        // 表头调整(与「表格调整」成对,管理表头字段的排序/栏名/显隐):紧跟表格调整之后插入
+        for (Map<String, Object> g : buttonGroups) {
+            @SuppressWarnings("unchecked")
+            List<String> gActions = (List<String>) g.get("actions");
+            int at = gActions.indexOf("表格调整");
+            if (at >= 0 && !gActions.contains("表头调整")) {
+                List<String> merged = new ArrayList<>(gActions);
+                merged.add(at + 1, "表头调整");
+                g.put("actions", merged);
+            }
+        }
         metadata.put("buttonGroups", buttonGroups);
-        // 灰色占位动作(选单无来源/生单无实现链路):前端恒置灰,布局与 T+ 一致
         if (!disabledActions.isEmpty()) metadata.put("disabledActions", disabledActions);
         metadata.put("panelPageDto", pageDto);
         metadata.put("formPages", List.of(formPage));
@@ -1110,6 +1120,25 @@ public class PanelConfigService {
         registry.reload();
     }
 
+    /** 保存表头字段排序/栏名/显隐(表头调整;更新 yj_field 的 seq/alias,显隐 hidden+visible 同开同关) */
+    public void saveHeaderPrefs(String panelCode, List<Map<String, Object>> columns) {
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        List<PanelRegistry.FieldDef> headers = def.fieldsAt("header");
+        for (int i = 0; i < columns.size(); i++) {
+            Map<String, Object> col = columns.get(i);
+            String label = String.valueOf(col.getOrDefault("label", ""));
+            String alias = String.valueOf(col.getOrDefault("alias", ""));
+            boolean visible = !Boolean.FALSE.equals(col.get("visible")) && !"false".equals(String.valueOf(col.get("visible")));
+            // 同名标签可能头/行并存(如 SO_ORDER 备注):只在表头字段集合内匹配,避免误改行字段
+            PanelRegistry.FieldDef fd = headers.stream().filter(f -> f.label().equals(label)).findFirst().orElse(null);
+            if (fd == null) continue;
+            jdbc.update("UPDATE yj_field SET seq = ?, alias = ?, hidden = ?, visible = ? "
+                            + "WHERE panel_code = ? AND col_name = ? AND place LIKE '%header%'",
+                    (i + 1) * 10, alias.isBlank() ? null : alias, !visible, visible, panelCode, fd.col());
+        }
+        registry.reload();
+    }
+
     // ---------- 权限矩阵(对齐 light-mes 契约) ----------
 
     public Map<String, Object> getPermMatrix(String panelCode) {
@@ -1160,6 +1189,7 @@ public class PanelConfigService {
             m.put("dataType", f.dataType());
             m.put("isNotNull", f.required());
             m.put("defaultValue", "");
+            if (f.hidden()) m.put("hidden", true);   // 表头调整隐藏的字段:表单渲染侧过滤(PanelxForm visibleMeta)
             if ("下拉框".equals(f.dataType()) && f.dictSql() != null) {
                 m.put("options", dictOptions(f.dictSql()));
             } else if ("标准库".equals(f.dataType()) && f.dictSql() != null) {
