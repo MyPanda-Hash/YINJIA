@@ -70,6 +70,7 @@ export const DOCS = [
     mapArchive(d, ctx) {
       return { 编码: str(d.number), 名称: str(d.name), 级次: str(d.level), 是否叶子节点: d.is_leaf === true,
         上级编码: (ctx.matgrpById && ctx.matgrpById.get(String(d.parent_id))) || null,
+        创建时间: str(d.create_time), 修改时间: str(d.modify_time),
         停用: 0, 状态: '启用', __cancel: 'N' };
     },
   },
@@ -83,6 +84,7 @@ export const DOCS = [
       return { 编码: str(d.number), 名称: str(d.name), 币别符号: str(d.sign), 汇率: num(d.rate),
         汇率类型: d.exc_type === '1' ? '固定汇率' : d.exc_type === '2' ? '浮动汇率' : null,
         金额小数位: d.amt_precision == null ? null : Number(d.amt_precision), 单价小数位: d.price_precision == null ? null : Number(d.price_precision),
+        创建人: str(d.creator_name), 创建时间: str(d.create_time), 修改人: str(d.modifier_name), 修改时间: str(d.modify_time),
         停用: en === 0, 状态: en === 0 ? '停用' : '启用', __cancel: 'N' };
     },
   },
@@ -94,6 +96,9 @@ export const DOCS = [
     mapArchive(d) {
       return { 计量单位编码: str(d.number), 计量单位名称: str(d.name),
         小数位数: d.precision == null ? null : Number(d.precision), // 物理列=小数位数(标签展示为数量小数位)
+        长编码: str(d.long_number), 单位类型: num(d.conversion_type), 精度处理: num(d.precision_account),
+        是否叶子节点: d.is_leaf === true, 级次: num(d.level),
+        创建时间: str(d.create_time), 修改时间: str(d.modify_time),
         停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用', __cancel: 'N' };
     },
   },
@@ -104,6 +109,7 @@ export const DOCS = [
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.parent_name, r.comment].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d) {
       return { 部门编码: str(d.number), 部门名称: str(d.name), 负责人: null, 上级部门: str(d.parent_name),
+        级次: str(d.level), 长编码: str(d.long_number), 部门全称: str(d.full_name), 上级编码: str(d.parent_number),
         备注: str(d.comment), 停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用', __cancel: 'N' };
     },
   },
@@ -113,8 +119,11 @@ export const DOCS = [
     table: 'bs_emp', codeCol: '员工编码',
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.department_name].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d) {
-      // 敏感字段(手机/证件号,指引 §四.6)跳过置空,联系方式在金蝶界面维护
+      // 敏感字段(手机/证件号/邮箱/生日/微信,指引 §四.6)跳过置空,联系方式在金蝶界面维护
+      const g = String(d.gender);
       return { 员工编码: str(d.number), 员工名称: str(d.name), 所属部门: str(d.department_name),
+        部门编码: str(d.department_number), 性别: g === '1' ? '男' : g === '0' ? '女' : null,
+        入职日期: str(d.hire_date), 离职日期: str(d.leave_date),
         手机: null, 办公电话: null, 证件号码: null,
         停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用', __cancel: 'N' };
     },
@@ -126,7 +135,11 @@ export const DOCS = [
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.address, r.storekeeper_name].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d) {
       return { 仓库编码: str(d.number), 仓库名称: str(d.name), 仓库地址: str(d.address),
-        负责人: str(d.storekeeper_name), 联系电话: null,
+        负责人: str(d.storekeeper_name), 仓库管理员编码: str(d.storekeeper_number),
+        国家: str(d.country_name), 省: str(d.province_name), 市: str(d.city_name), 区: str(d.district_name),
+        启用仓位管理: d.is_allow_freight === true,
+        允许零库存出库: d.allow_negative === true || String(d.allow_negative) === 'true',
+        联系电话: null,
         停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用', __cancel: 'N' };
     },
   },
@@ -138,12 +151,36 @@ export const DOCS = [
     mapArchive(d, ctx) {
       const costWay = { 1: '移动平均', 2: '加权平均', 3: '先进先出' }[String(d.cost_method || '')] || '移动平均';
       const attr = [d.is_batch === true && '批次管理', d.is_serial === true && '序列号管理'].filter(Boolean).join('/') || null;
+      const pe = (d.price_entity || [])[0] || {};                       // 商品价格(取首行)
+      const labels = (d.mul_label || []).map((x) => x && x.name).filter(Boolean).join('/') || null; // 商品标签
       return { 存货编码: str(d.number), 存货名称: str(d.name), 规格型号: str(d.model),
         所属类别: (ctx.matgrpNameById && ctx.matgrpNameById.get(String(d.parent_id))) || str(d.parent_number) || '',
         计价方式: costWay, 品牌: null, 计量单位: str(d.base_unit_name), 属性: attr, 条形码: str(d.barcode),
         建档日期: (str(d.create_time) || '').slice(0, 10) || null,
         停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用',
-        是否检验: 0, 数据来源: '金蝶同步', ERP更新时间: str(d.modify_time) || nowLocal(), __cancel: 'N' };
+        是否检验: 0, 数据来源: '金蝶同步', ERP更新时间: str(d.modify_time) || nowLocal(),
+        // 按接口实测补齐(①档)
+        备注: str(d.remark), 助记码: str(d.help_code), 产地: str(d.producing_pace), 商品类型: str(d.check_type),
+        是否可销售: d.is_sale === true, 是否可采购: d.is_purchase === true,
+        是否为子件: d.is_subpart === true, 是否为组件: d.is_assembly === true,
+        是否多单位: d.is_multi_unit === true, 辅助单位: str(d.aux_unit_name), 辅助单位编码: str(d.aux_unit_number),
+        是否启用保质期: d.is_kf_period === true, 保质期: num(d.kf_period), 保质期单位: str(d.kf_period_type),
+        预警天数: num(d.alarm_day), 是否启用辅助属性: d.is_asst_attr === true, 库存管理方式: str(d.inv_mgr_type),
+        最低库存: num(d.min_inventory_qty), 最高库存: num(d.max_inventory_qty), 预警库存: num(d.sec_inventory_qty),
+        销项税率: num(d.tax_rate), 进项税率: num(d.in_tax_rate),
+        生产许可证: str(d.pro_license), 注册证号: str(d.refistration_number),
+        毛重: num(d.gross_weight), 净重: num(d.net_weight), 长: num(d.length), 宽: num(d.wide), 高: num(d.high), 体积: num(d.volume),
+        可用库存: num(d.qty_inv), 即时库存: num(d.valid_qty), 最小包装量: num(d.min_package_qty),
+        默认生产车间编码: str(d.product_department_number), 是否倒冲领料: d.is_backflushed === true,
+        倒冲仓库名称: str(d.backflushed_stock_name), 倒冲仓库编码: str(d.backflushed_stock_number), 倒冲仓位名称: str(d.backflushed_space_name),
+        商品标签: labels, 参考成本: num(pe.price_cost_price),
+        采购价: num(pe.price_purchase_price), 零售价: num(pe.price_retail_price), 批发价: num(pe.price_trade_price),
+        配送价: num(pe.price_distribution_price), 最低销售价: num(pe.price_min_sales_price), 最高采购价: num(pe.price_max_purchase_price),
+        最近采购价: num(pe.price_near_pur_price), 最近销售价: num(pe.price_near_sal_price),
+        最近含税采购价: num(pe.price_near_pur_tax_price), 最近含税销售价: num(pe.price_near_sal_tax_price),
+        最近采购入库成本: num(pe.price_near_pur_unit_cost), 最近成交供应商: str(pe.price_near_supplier),
+        委外价: num(pe.price_outsourceprice), 价格单位: str(pe.price_unit_name),
+        __cancel: 'N' };
     },
   },
   {
@@ -152,10 +189,23 @@ export const DOCS = [
     table: 'dm_kh', codeCol: 'dm',
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.group_name, r.c_level_name, r.saler_name, r.remark].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d) {
-      // 敏感字段(详细地址/电话/邮箱/银行账号)AES密文,起步策略跳过(指引 §四.6)
+      // 敏感字段(详细地址/电话/邮箱/银行账号/收票邮箱手机)AES密文,起步策略跳过(指引 §四.6)
+      const ct = (d.bomentity || [])[0] || {};   // 联系人取首行(仅非敏感字段)
+      const g = String(ct.gender);
       return { dm: str(d.number), mc: str(d.name), khlb: str(d.group_name), khjb: str(d.c_level_name),
-        addr: null, tel: null, email: null, lxr: null, ywman: str(d.saler_name),
+        addr: null, tel: null, email: null, lxr: str(ct.contact_person), ywman: str(d.saler_name),
         sui_no: str(d.taxpayer_no), bank: str(d.bank), bank_no: null, bz: str(d.remark), comm: '',
+        // 按接口实测补齐(①档)
+        客户分类编码: str(d.group_number), 价格等级编码: str(d.c_level_number), 业务员编码: str(d.saler_number),
+        结算客户: str(d.settle_customer_name), 结算客户编码: str(d.settle_customer_number),
+        部门: str(d.sale_dept_name), 部门编码: str(d.sale_dept_number),
+        增值税税率: num(d.rate), 开票名称: str(d.invoice_name), 发票类型: str(d.invoice_type),
+        国家编码: str(d.country_number), 省份编码: str(d.province_number), 城市编码: str(d.city_number), 区县编码: str(d.district_number),
+        gj: str(d.country_name), sheng: str(d.province_name), shi: str(d.city_name), qu: str(d.district_name), // 旧列(拼音)承载国家/省/市/区
+        结算期限: str(d.setting_term_name), 结算期限编码: str(d.setting_term_number),
+        自动抵扣预收款: d.deduct === true, 信用额度: num(d.credit_limit),
+        创建人: str(d.creater_field_name), 创建时间: str(d.create_time), 修改时间: str(d.modify_time),
+        联系人性别: g === '1' ? '男' : g === '0' ? '女' : null, 首要联系人: ct.is_default_linkman === true,
         __cancel: d.enable === '1' ? 'N' : 'Y' }; // dm_kh 无停用列,停用走 asp_cancel(指引 §四.5)
     },
   },
@@ -169,6 +219,7 @@ export const DOCS = [
       return { dm: str(d.number), mc: str(d.name), gysfl: str(d.group_name),
         addr: null, tel: null, ywman: str(d.saler_name), sui_no: str(d.taxpayer_no),
         bank: str(acc.income_bank_name), bank_no: null, bz: str(d.remark),
+        采购员部门: str(d.sale_dept_name), 自动抵扣预收款: d.deduct === true,
         __cancel: d.enable === '1' ? 'N' : 'Y' };
     },
   },
@@ -417,6 +468,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
     endBiasMinutes: s.endBiasMinutes === undefined ? 180 : s.endBiasMinutes,
     pageSize: s.pageSize || 100,
     maxPages: s.maxPages || 60,
+    maxRecords: s.maxRecordsPerType || 0, // >0=每类最多处理 N 条(测试用;0=不限)
     types: Array.isArray(s.types) && s.types.length ? s.types : DOCS.map((d) => d.code),
     confirmThreshold: s.confirmThreshold === undefined ? 200 : s.confirmThreshold,
     confirmTimeoutSeconds: s.confirmTimeoutSeconds === undefined ? 5 : s.confirmTimeoutSeconds,
@@ -495,9 +547,14 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
         for (const r of data.rows || []) rows.push(r);
         const totalPage = Number(data.total_page || 1);
         if (page === 1) log(`【${doc.label}】列表第 1/${totalPage} 页,共 ${data.count} 条${doc.archive ? '(档案全量)' : mode === 'incremental' ? `(近${opt.windowDays}天修改/新增)` : '(全量)'}`);
+        if (opt.maxRecords > 0 && rows.length >= opt.maxRecords) break; // 测试上限:够数即停,不再翻页
         if (page >= totalPage) break;
       }
       if (!rows.length) { log(`【${doc.label}】无符合条件${doc.archive ? '档案' : '单据'}`); continue; }
+      // 测试上限:每类最多取 N 条(配置 maxRecordsPerType;0=不限)
+      const limited = opt.maxRecords > 0 ? rows.slice(0, opt.maxRecords) : rows;
+      if (opt.maxRecords > 0) log(`【${doc.label}】测试上限生效:共 ${rows.length} 条 → 只处理前 ${limited.length} 条`);
+      rows.length = 0; rows.push(...limited);
       if (doc.afterList) doc.afterList(rows, ctx); // 登记分类映射(供后续条目解析 id→名称/编码)
 
       // 初始化清污(仅档案+init+真实写库):确认→全量前像备份→删除本同步器先前写入/收编的行→全量重建。
