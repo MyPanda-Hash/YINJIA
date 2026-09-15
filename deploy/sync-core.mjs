@@ -141,7 +141,7 @@ export const DOCS = [
       return { 存货编码: str(d.number), 存货名称: str(d.name), 规格型号: str(d.model),
         所属类别: (ctx.matgrpNameById && ctx.matgrpNameById.get(String(d.parent_id))) || str(d.parent_number) || '',
         计价方式: costWay, 品牌: null, 计量单位: str(d.base_unit_name), 属性: attr, 条形码: str(d.barcode),
-        建档日期: str(d.create_time).slice(0, 10) || null,
+        建档日期: (str(d.create_time) || '').slice(0, 10) || null,
         停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用',
         是否检验: 0, 数据来源: '金蝶同步', ERP更新时间: str(d.modify_time) || nowLocal(), __cancel: 'N' };
     },

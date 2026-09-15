@@ -39,6 +39,12 @@ tools/archive/_walk/*.generated.js
 
 deploy/*.bak
 deploy/*.jar
+# 凭证配置(金蝶 clientId/Secret + 数据库口令,绝不入库;模板见 config.example.json)
+deploy/config.json
+deploy/state.json
+deploy/logs/
+deploy/backup/
+deploy/sync.lock
 # make-deploy-package.ps1 产出的部署包(含 app.jar 与 .bak,不入库)
 deploy/pkg-*/
 *.deploy.zip
