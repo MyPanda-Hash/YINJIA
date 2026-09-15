@@ -80,6 +80,7 @@ export const DOCS = [
     listPath: '/jdy/v2/bd/currency', detailPath: '/jdy/v2/bd/currency_detail',
     table: 'bs_currency', codeCol: '编码',
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.rate, r.sign, r.exc_type].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
+    afterList(rows, ctx) { ctx.currencyNameById = new Map(rows.map((r) => [String(r.id), r.name])); },
     mapArchive(d) {
       const en = Number(d.enable);
       return { 编码: str(d.number), 名称: str(d.name), 币别符号: str(d.sign), 汇率: num(d.rate),
@@ -248,13 +249,14 @@ export const DOCS = [
     fingerprintOf: (r) => [r.bill_status, r.bill_close_state, r.bill_date, r.customer_name,
       r.customer_number, r.dept_name, r.emp_name, r.total_amount, r.io_status, r.real_io_status]
       .map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
-    mapHead(d) {
+    mapHead(d, ctx) {
       const dates = (d.material_entity || []).map((m) => m.delivery_date).filter(Boolean).sort();
       return {
         单据编号: str(d.bill_no), 单据日期: str(d.bill_date),
         客户: str(d.customer_name), 客户编码: str(d.customer_number), 结算客户: str(d.settle_customer_number),
         部门: str(d.dept_name), 部门负责人: null, 业务员: str(d.emp_name), 项目: null,
-        汇率: num(d.exchange_rate), 结算期限: str(d.setting_term_name), // 币种待「币别」档案同步后经 currency_id→名称对照回填
+        币种: (ctx && ctx.currencyNameById && ctx.currencyNameById.get(String(d.currency_id))) || null, // 币别档案 id→名称解析
+        汇率: num(d.exchange_rate), 结算期限: str(d.setting_term_name),
         预计交货日期: dates[0] || null, 联系人: str(d.contact_linkman), 备注: str(d.remark),
         单据状态: d.bill_status === 'C' ? '已审核' : '草稿',
         审核人: str(d.auditor_name), 审核时间: str(d.audit_time),
@@ -280,13 +282,14 @@ export const DOCS = [
     fingerprintOf: (r) => [r.bill_status, r.bill_close_state, r.bill_date, r.supplier_name,
       r.supplier_number, r.emp_name, r.io_status, r.real_io_status, r.remark]
       .map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
-    mapHead(d) {
+    mapHead(d, ctx) {
       const dates = (d.material_entity || []).map((m) => m.delivery_date).filter(Boolean).sort();
       return {
         单据编号: str(d.bill_no), 单据日期: str(d.bill_date),
         供应商: str(d.supplier_name), 供应商编码: str(d.supplier_number),
-        // 本地列 NOT NULL:星辰只给 currency_id(无名称),默认人民币/汇率1
-        币种: '人民币', 汇率: num(d.exchange_rate) ?? 1, 到货地址: null, 结算期限: str(d.setting_term_name),
+        // 币种:优先按币别档案 id→名称解析,解析不到退回人民币(本地列 NOT NULL)
+        币种: (ctx && ctx.currencyNameById && ctx.currencyNameById.get(String(d.currency_id))) || '人民币',
+        汇率: num(d.exchange_rate) ?? 1, 到货地址: null, 结算期限: str(d.setting_term_name),
         交货日期: dates[0] || null, 发货状态: null, 合同号: null, 订金金额: null, 付款方式: null,
         数据来源: '金蝶同步', 备注: str(d.remark),
         单据状态: d.bill_status === 'C' ? '已审核' : '草稿',
@@ -541,7 +544,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
         if (doc.afterList) doc.afterList(data.rows, ctx);
         const d = doc.detailPath ? await kingdeeGet(cfg.kingdee, token, doc.detailPath, { id: data.rows[0].id }) : data.rows[0];
         if (doc.archive) console.log(JSON.stringify({ [doc.label]: doc.mapArchive(d, ctx) }, null, 2));
-        else console.log(JSON.stringify({ [doc.label]: { 头: doc.mapHead(d), 行: doc.mapLines(d).slice(0, 2) } }, null, 2));
+        else console.log(JSON.stringify({ [doc.label]: { 头: doc.mapHead(d, ctx), 行: doc.mapLines(d).slice(0, 2) } }, null, 2));
       }
     }
     log('probe 完成:认证、列表、详情、字段映射全链路正常');
@@ -678,7 +681,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
             }
           } else {
             const head = {
-              ...doc.mapHead(d),
+              ...doc.mapHead(d, ctx),
               外部数据ID: str(d.id),
               __创建时间: str(d.create_time),
               __已关闭: d.bill_close_state === 'S' || d.bill_close_state === 'H',

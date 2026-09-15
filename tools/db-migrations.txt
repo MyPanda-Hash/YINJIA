@@ -266,3 +266,9 @@ migrate-kingdee-archive-prune.sql
 # 生成器 tools/archive/_gen-keep-syncable.mjs:保留集 = mapArchive 实际写出且接口真有该键的列;
 # 敏感密文字段改为解密导入(不再算"不可同步");其余(无接口来源/已被MES常量替代)从面板删除。
 migrate-kingdee-archive-keep-syncable.sql
+
+# —— 2026-09-15 登记:销售/采购订单面板"只保留可同步字段"——
+# 生成器 tools/archive/_gen-order-keep-syncable.mjs(哨兵代理跑 mapHead/mapLines:硬编码 null 的键=不可同步)。
+# 删除:SO 品牌/部门负责人/项目;PU 项目/到货地址/发货状态/合同号/订金金额/付款方式/现存量说明(物理列保留)。
+# 同时 SO/PU 币种改为「币别档案 id→名称」解析(可同步),不再硬编码。
+migrate-kingdee-order-keep-syncable.sql
