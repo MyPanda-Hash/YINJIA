@@ -112,6 +112,7 @@ export const menuTree = [
           {
             code: 'doc', title: '单据', children: [
               { code: 'slRecv', title: '送料暂收单', path: '/panelx/list/SL_RECV', icon: 'Download', panelCode: 'SL_RECV', operationName: '新增流程' },
+              { code: 'qcReturn', title: '暂收退料单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
               { code: 'purchaseIn', title: '采购入库单', path: '/panelx/list/PURCHASE_IN', icon: 'Download', panelCode: 'PURCHASE_IN', operationName: '新增流程' },
               { code: 'finishIn', title: '产成品入库单', path: '/panelx/list/FINISH_IN', icon: 'Download', panelCode: 'FINISH_IN', operationName: '新增流程' },
               { code: 'otherIn', title: '其他入库单', path: '/panelx/list/OTHER_IN', icon: 'Download', panelCode: 'OTHER_IN', operationName: '新增流程' },
@@ -232,11 +233,10 @@ export const menuTree = [
     icon: 'CircleCheck',
     children: [
       {
-        // 来料品质(流程图·采购支线:暂收→检验→退料;2026-09-14 按 legacy 真实字段重建三单)
+        // 来料品质(流程图·采购支线:暂收→检验;暂收退料单已按用户口径移入「库存核算·单据」)
         code: 'incoming', title: '来料品质', children: [
           { code: 'qcRecv', title: '暂收入库单', path: '/panelx/list/QC_RECV', icon: 'Box', panelCode: 'QC_RECV', operationName: '新增流程' },
           { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
-          { code: 'qcReturn', title: '暂收退料单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
         ],
       },
       {

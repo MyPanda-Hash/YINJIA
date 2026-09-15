@@ -206,3 +206,10 @@ migrate-report-template-comments.sql
 
 # —— 2026-09-15 检验单改名来料检验单(QC_INSP;字段零变化;审核自动生成采购入库单在 ButtonService 代码注册)——
 migrate-insp-rename.sql
+
+# —— 2026-09-15 暂收退料单补 6 附件列位(头表 6 列 + yj_field dataType=附件,页面单附件格聚合;同 QC_INSP/SL_RECV)——
+# 前端零改动(附件区由 data_type 驱动 + curDocNo 兜底);译名附件1..6 为全局共享词条已有。幂等可重跑。
+migrate-qc-return-attach.sql
+
+# —— 2026-09-15 暂收退料单归入库存核算(yj_panel.module_group 同步菜单,权限分组/同模块读放行口径一致)——
+migrate-qc-return-module.sql
