@@ -27,6 +27,8 @@ export default {
     '商品分类': 'Nhóm hàng hóa',
     '结算方式': 'Cách thanh toán',
     '币别': 'Tiền tệ',
+    '商品': 'Hàng hóa',
+    '职员': 'Nhân viên',
     '业务员档案': 'NV kinh doanh',
     '仓库档案': 'Kho',
     '数据字典': 'Từ điển dữ liệu',

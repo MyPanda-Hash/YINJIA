@@ -135,8 +135,8 @@ const modules = [
       { code: 'PU_REQ', label: '请购单' }, { code: 'PU_ORDER', label: '采购订单' },
     ],
     archives: [
-      { code: 'INV', label: '存货' }, { code: 'UOM', label: '计量单位' }, { code: 'DEPT', label: '部门' },
-      { code: 'EMP', label: '员工' }, { code: 'WH', label: '仓库' }, { code: 'PROJ', label: '项目' },
+      { code: 'INV', label: '商品' }, { code: 'UOM', label: '计量单位' }, { code: 'DEPT', label: '部门' },
+      { code: 'EMP', label: '职员' }, { code: 'WH', label: '仓库' }, { code: 'PROJ', label: '项目' },
       { code: 'TEAM', label: '班组' }, { code: 'OP', label: '工序' }, { code: 'ROUTE', label: '工艺路线' },
       { code: 'BOM', label: '物料清单' },
     ],
@@ -175,8 +175,8 @@ const modules = [
       { code: 'SO_ORDER', label: '销售订单' }, { code: 'PU_REQ', label: '请购单' }, { code: 'PU_ORDER', label: '采购订单' },
     ],
     archives: [
-      { code: 'INV', label: '存货' }, { code: 'UOM', label: '计量单位' }, { code: 'PARTNER', label: '往来单位' },
-      { code: 'DEPT', label: '部门' }, { code: 'EMP', label: '员工' }, { code: 'WH', label: '仓库' },
+      { code: 'INV', label: '商品' }, { code: 'UOM', label: '计量单位' }, { code: 'PARTNER', label: '往来单位' },
+      { code: 'DEPT', label: '部门' }, { code: 'EMP', label: '职员' }, { code: 'WH', label: '仓库' },
       { code: 'PROJ', label: '项目' }, { code: 'TEAM', label: '班组' }, { code: 'OP', label: '工序' },
       { code: 'ROUTE', label: '工艺路线' },
     ],
@@ -221,7 +221,7 @@ const modules = [
       { code: 'SALE_INVOICE', label: '销售发票' }, { code: 'EXPENSE', label: '费用单' },
       { code: 'SALE_COST_ALLOC', label: '销售费用分摊单' },
     ],
-    archives: [{ code: 'PARTNER', label: '往来单位(客户)' }, { code: 'INV', label: '存货' }, { code: 'DEPT', label: '部门' }, { code: 'EMP', label: '员工' }, { code: 'UOM', label: '计量单位' }, { code: 'WH', label: '仓库' }, { code: 'SETTLE', label: '结算方式' }],
+    archives: [{ code: 'PARTNER', label: '往来单位(客户)' }, { code: 'INV', label: '商品' }, { code: 'DEPT', label: '部门' }, { code: 'EMP', label: '职员' }, { code: 'UOM', label: '计量单位' }, { code: 'WH', label: '仓库' }, { code: 'SETTLE', label: '结算方式' }],
     reports: [
       { code: 'SALES_ORDER_DETAIL', label: '销售订单明细表' }, { code: 'SALES_ORDER_STATS', label: '销售订单统计表' },
       { code: 'SALES_ORDER_EXEC', label: '销售订单执行表' }, { code: 'SALES_ORDER_PROGRESS', label: '销售订单生产进度表' },
@@ -261,7 +261,7 @@ const modules = [
       { code: 'PU_INVOICE', label: '采购发票' }, { code: 'EXPENSE', label: '费用单' },
       { code: 'PU_COST_ALLOC', label: '采购费用分摊单' },
     ],
-    archives: [{ code: 'PARTNER', label: '往来单位(供应商)' }, { code: 'INV', label: '存货' }, { code: 'WH', label: '仓库' }],
+    archives: [{ code: 'PARTNER', label: '往来单位(供应商)' }, { code: 'INV', label: '商品' }, { code: 'WH', label: '仓库' }],
     reports: [
       { code: 'PURCHASE_IN_DETAIL', label: '采购入库明细表' }, { code: 'PURCHASE_IN_STATS', label: '采购入库统计表' },
     ],
@@ -283,7 +283,7 @@ const modules = [
       { code: 'OTHER_IN', label: '其他入库单' }, { code: 'SO_ORDER', label: '销售订单' },
       { code: 'SALE_OUT', label: '销售出库单' }, { code: 'SALE_INV', label: '销货单' },
     ],
-    archives: [{ code: 'INV', label: '存货' }, { code: 'WH', label: '仓库' }],
+    archives: [{ code: 'INV', label: '商品' }, { code: 'WH', label: '仓库' }],
     reports: [
       { code: 'PICK_ORDER_DETAIL', label: '配货单明细表' }, { code: 'PICK_ORDER_STATS', label: '配货单统计表' },
       { code: 'PICK_ORDER_SUMMARY', label: '配货综合统计表' },
@@ -311,7 +311,7 @@ const modules = [
       { code: 'OTHER_OUT', label: '其他出库单' }, { code: 'PU_COST_ALLOC', label: '采购费用分摊单' },
       { code: 'MATERIAL_REQ', label: '领料申请单' }, { code: 'TRANSFER', label: '调拨单' },
     ],
-    archives: [{ code: 'INV', label: '存货' }, { code: 'WH', label: '仓库' }, { code: 'REGION', label: '地区' }],
+    archives: [{ code: 'INV', label: '商品' }, { code: 'WH', label: '仓库' }, { code: 'REGION', label: '地区' }],
     reports: [
       { code: 'STOCK_STATUS', label: '库存状况表' }, { code: 'STOCK_SUMMARY', label: '收发存汇总表' },
       { code: 'STOCK_LEDGER', label: '库存台账' },
@@ -345,7 +345,7 @@ const modules = [
       { code: 'TRANSFER', label: '调拨单' }, { code: 'STOCK_CHECK', label: '库存盘点单' },
       { code: 'LOCATION_ADJUST', label: '货位调整单' },
     ],
-    archives: [{ code: 'INV', label: '存货' }, { code: 'UOM', label: '计量单位' }, { code: 'DEPT', label: '部门' }, { code: 'EMP', label: '员工' }, { code: 'WH', label: '仓库' }],
+    archives: [{ code: 'INV', label: '商品' }, { code: 'UOM', label: '计量单位' }, { code: 'DEPT', label: '部门' }, { code: 'EMP', label: '职员' }, { code: 'WH', label: '仓库' }],
     reports: [
       { code: 'STOCK_STATUS', label: '库存状况表' }, { code: 'STOCK_SUMMARY', label: '收发存汇总表' },
       { code: 'STOCK_LEDGER', label: '库存台账' },
@@ -372,7 +372,7 @@ const modules = [
       { code: 'SERIAL_NO', label: '序列号登记单' }, { code: 'SERIAL_STATUS', label: '序列号状况表' },
       { code: 'SERIAL_TRACE', label: '序列号跟踪表' },
     ],
-    archives: [{ code: 'INV', label: '存货' }, { code: 'WH', label: '仓库' }],
+    archives: [{ code: 'INV', label: '商品' }, { code: 'WH', label: '仓库' }],
     reports: [],
   },
   {
@@ -414,7 +414,7 @@ const modules = [
     ],
     archives: [
       { code: 'QC_ITEM', label: '检验项目' }, { code: 'QC_PLAN', label: '检验方案' },
-      { code: 'REJECT', label: '不合格原因' }, { code: 'INV', label: '存货' },
+      { code: 'REJECT', label: '不合格原因' }, { code: 'INV', label: '商品' },
     ],
     reports: [
       { code: 'ARRIVAL_IN_EXEC', label: '到货单执行表' }, { code: 'FINISH_INSPECT_EXEC', label: '成品报检单执行表' },

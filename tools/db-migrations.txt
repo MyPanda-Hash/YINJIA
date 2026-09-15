@@ -198,3 +198,12 @@ migrate-kingdee-archive-align.sql
 #      配套前端 menus.js 补 5 个菜单入口(基础数据/物料及价格/财务 三组)。
 # 幂等:UPDATE 直写同值/IF NOT EXISTS/MERGE NOT MATCHED,已在 HSDZ_MES 连跑两遍验证。
 migrate-kingdee-archive-align2.sql
+
+# —— 2026-09-15 登记(第三期):基础档案面板中文名对齐金蝶面板命名 ——
+# 内容:KHDA 客户档案→客户、GFDA 供应商档案→供应商、INV 存货→商品、EMP 员工→职员
+#      (金蝶 12 面板名:客户/供应商/商品(存货)/职员/部门/仓库/计量单位/结算方式/客户分类/供应商分类/商品分类/币别,
+#       其余 8 个已一致)。仅改 panel_name/panel_name_en + panel 域 9 语言译名;panel_code/表/字段键全不动。
+#      配套前端 menus.js 菜单标题 + BusinessOverview/MobileWarehouse 快捷标签 + 10 语言包 商品/职员 词条。
+#      顺带补齐 DEPT/WH/UOM 的 panel_name_en 与 panel 域 9 语言译名(en 下发不再回退中文)。
+# 幂等:UPDATE 直写同值/MERGE NOT MATCHED,已本地连跑两遍验证。
+migrate-kingdee-archive-align3.sql

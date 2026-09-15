@@ -30,6 +30,8 @@ export default {
     '商品分类': 'Warengruppe',
     '结算方式': 'Zahlungsart',
     '币别': 'Währung',
+    '商品': 'Ware',
+    '职员': 'Mitarbeiter',
     '业务员档案': 'Vertriebsmitarbeiter',
     '仓库档案': 'Lager',
     '数据字典': 'Datenwörterbuch',

@@ -27,6 +27,8 @@ export default {
     '商品分类': 'Groupe d\'articles',
     '结算方式': 'Mode de règlement',
     '币别': 'Devise',
+    '商品': 'Article',
+    '职员': 'Employé',
     '业务员档案': 'Commerciaux',
     '仓库档案': 'Entrepôts',
     '数据字典': 'Dictionnaire',

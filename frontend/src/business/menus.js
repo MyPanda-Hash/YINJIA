@@ -282,12 +282,12 @@ export const menuTree = [
         icon: 'Collection',
         children: [
           { code: 'dept', title: '部门', path: '/panelx/list/DEPT', icon: 'OfficeBuilding', panelCode: 'DEPT', operationName: '新增流程' },
-          { code: 'employee', title: '员工', path: '/panelx/list/EMP', icon: 'User', panelCode: 'EMP', operationName: '新增流程' },
+          { code: 'employee', title: '职员', path: '/panelx/list/EMP', icon: 'User', panelCode: 'EMP', operationName: '新增流程' },
           { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
           { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
           { code: 'warehouse', title: '仓库', path: '/panelx/list/WH', icon: 'House', panelCode: 'WH', operationName: '新增流程' },
           { code: 'stockStatus', title: '库存状况', path: '/panelx/list/STOCK_STATUS', icon: 'Histogram', panelCode: 'STOCK_STATUS' },
-          { code: 'khda', title: '客户档案', path: '/panelx/list/KHDA', icon: 'User', panelCode: 'KHDA', operationName: '新增流程' },
+          { code: 'khda', title: '客户', path: '/panelx/list/KHDA', icon: 'User', panelCode: 'KHDA', operationName: '新增流程' },
           { code: 'cusgrp', title: '客户分类', path: '/panelx/list/CUSGRP', icon: 'FolderOpened', panelCode: 'CUSGRP', operationName: '新增流程' },
           { code: 'supgrp', title: '供应商分类', path: '/panelx/list/SUPGRP', icon: 'FolderOpened', panelCode: 'SUPGRP', operationName: '新增流程' },
           { code: 'partner', title: '往来单位', path: '/panelx/list/PARTNER', icon: 'OfficeBuilding', panelCode: 'PARTNER', operationName: '新增流程' },
@@ -302,7 +302,7 @@ export const menuTree = [
         children: [
           { code: 'uom', title: '计量单位', path: '/panelx/list/UOM', icon: 'ScaleToOriginal', panelCode: 'UOM', operationName: '新增流程' },
           { code: 'matgrp', title: '商品分类', path: '/panelx/list/MATGRP', icon: 'Files', panelCode: 'MATGRP', operationName: '新增流程' },
-          { code: 'inventory', title: '存货', path: '/panelx/list/INV', icon: 'Grid', panelCode: 'INV', operationName: '新增流程' },
+          { code: 'inventory', title: '商品', path: '/panelx/list/INV', icon: 'Grid', panelCode: 'INV', operationName: '新增流程' },
           { code: 'bom', title: '物料清单', path: '/panelx/list/BOM', icon: 'Files', panelCode: 'BOM', operationName: '新增流程' },
           { code: 'invPrice', title: '存货价格本', path: '/panelx/list/INV_PRICE', icon: 'PriceTag', panelCode: 'INV_PRICE', operationName: '新增流程' },
         ],

@@ -27,6 +27,8 @@ export default {
     '商品分类': 'Grupo de artículos',
     '结算方式': 'Forma de liquidación',
     '币别': 'Moneda',
+    '商品': 'Artículo',
+    '职员': 'Empleado',
     '业务员档案': 'Vendedores',
     '仓库档案': 'Almacenes',
     '数据字典': 'Diccionario',

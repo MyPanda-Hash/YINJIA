@@ -62,10 +62,10 @@ const reports = [
 ]
 
 const archives = [
-  { code: 'INV', label: '存货' },
+  { code: 'INV', label: '商品' },
   { code: 'UOM', label: '计量单位' },
   { code: 'DEPT', label: '部门' },
-  { code: 'EMP', label: '员工' },
+  { code: 'EMP', label: '职员' },
   { code: 'WH', label: '仓库' },
 ]
 

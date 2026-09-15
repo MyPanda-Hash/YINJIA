@@ -78,6 +78,8 @@ export default {
     '商品分类': 'Material Group',
     '结算方式': 'Settlement Method',
     '币别': 'Currency',
+    '商品': 'Material',
+    '职员': 'Employee',
     '业务员档案': 'Salesperson Archive',
     '仓库档案': 'Warehouse Archive',
     '数据字典': 'Data Dictionary',
