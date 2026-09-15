@@ -110,6 +110,7 @@ export const DOCS = [
     mapArchive(d) {
       return { 部门编码: str(d.number), 部门名称: str(d.name), 负责人: null, 上级部门: str(d.parent_name),
         级次: str(d.level), 长编码: str(d.long_number), 部门全称: str(d.full_name), 上级编码: str(d.parent_number),
+        是否叶子节点: d.is_leaf === true,
         备注: str(d.comment), 停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用', __cancel: 'N' };
     },
   },
@@ -136,9 +137,10 @@ export const DOCS = [
     mapArchive(d) {
       return { 仓库编码: str(d.number), 仓库名称: str(d.name), 仓库地址: str(d.address),
         负责人: str(d.storekeeper_name), 仓库管理员编码: str(d.storekeeper_number),
+        仓库分类: str(d.group_name), 仓库分类编码: str(d.group_number),
         国家: str(d.country_name), 省: str(d.province_name), 市: str(d.city_name), 区: str(d.district_name),
         启用仓位管理: d.is_allow_freight === true,
-        允许零库存出库: d.allow_negative === true || String(d.allow_negative) === 'true',
+        允许零库存出库: d.allow_negative === true || d.is_allow_neg === true || String(d.allow_negative) === 'true' || String(d.is_allow_neg) === 'true',
         联系电话: null,
         停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用', __cancel: 'N' };
     },
@@ -154,7 +156,7 @@ export const DOCS = [
       const pe = (d.price_entity || [])[0] || {};                       // 商品价格(取首行)
       const labels = (d.mul_label || []).map((x) => x && x.name).filter(Boolean).join('/') || null; // 商品标签
       return { 存货编码: str(d.number), 存货名称: str(d.name), 规格型号: str(d.model),
-        所属类别: (ctx.matgrpNameById && ctx.matgrpNameById.get(String(d.parent_id))) || str(d.parent_number) || '',
+        所属类别: (ctx.matgrpNameById && ctx.matgrpNameById.get(String(d.parent_id))) || str(d.parent_name) || str(d.parent_number) || '',
         计价方式: costWay, 品牌: null, 计量单位: str(d.base_unit_name), 属性: attr, 条形码: str(d.barcode),
         建档日期: (str(d.create_time) || '').slice(0, 10) || null,
         停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用',
@@ -162,6 +164,7 @@ export const DOCS = [
         // 按接口实测补齐(①档)
         备注: str(d.remark), 助记码: str(d.help_code), 产地: str(d.producing_pace), 商品类型: str(d.check_type),
         是否可销售: d.is_sale === true, 是否可采购: d.is_purchase === true,
+        是否启用称重: d.is_weight === true, 是否序列号管理: d.is_serial === true, 是否批次管理: d.is_batch === true,
         是否为子件: d.is_subpart === true, 是否为组件: d.is_assembly === true,
         是否多单位: d.is_multi_unit === true, 辅助单位: str(d.aux_unit_name), 辅助单位编码: str(d.aux_unit_number),
         是否启用保质期: d.is_kf_period === true, 保质期: num(d.kf_period), 保质期单位: str(d.kf_period_type),
@@ -174,6 +177,10 @@ export const DOCS = [
         默认生产车间编码: str(d.product_department_number), 是否倒冲领料: d.is_backflushed === true,
         倒冲仓库名称: str(d.backflushed_stock_name), 倒冲仓库编码: str(d.backflushed_stock_number), 倒冲仓位名称: str(d.backflushed_space_name),
         商品标签: labels, 参考成本: num(pe.price_cost_price),
+        品牌: str(d.brand_name), 品牌编码: str(d.brand_number), 默认仓库: str(d.stock_name), 默认仓库编码: str(d.stock_number),
+        基本单位编码: str(d.base_unit_number), 是否自制: d.is_self_restraint === true,
+        多单位: (d.units || []).map((x) => (x && (x.unit_name || x.name)) || '').filter(Boolean).join('/') || null,
+        图片链接: str(d.url),
         采购价: num(pe.price_purchase_price), 零售价: num(pe.price_retail_price), 批发价: num(pe.price_trade_price),
         配送价: num(pe.price_distribution_price), 最低销售价: num(pe.price_min_sales_price), 最高采购价: num(pe.price_max_purchase_price),
         最近采购价: num(pe.price_near_pur_price), 最近销售价: num(pe.price_near_sal_price),
@@ -216,9 +223,10 @@ export const DOCS = [
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.group_name, r.saler_name, r.remark].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d) {
       const acc = (d.account_entity || [])[0] || {};
-      return { dm: str(d.number), mc: str(d.name), gysfl: str(d.group_name),
+      return { dm: str(d.number), mc: str(d.name), gysfl: str(d.group_name), 供应商分类编码: str(d.group_number),
         addr: null, tel: null, ywman: str(d.saler_name), sui_no: str(d.taxpayer_no),
-        bank: str(acc.income_bank_name), bank_no: null, bz: str(d.remark),
+        bank: str(d.bank) || str(acc.income_bank_name), bank_no: null, bz: str(d.remark),
+        增值税税率: num(d.rate), 开票名称: str(d.invoice_name), 开户地址: str(d.account_open_addr),
         采购员部门: str(d.sale_dept_name), 自动抵扣预收款: d.deduct === true,
         __cancel: d.enable === '1' ? 'N' : 'Y' };
     },
@@ -298,6 +306,20 @@ export const DOCS = [
 const readText = (p) => readFileSync(p, 'utf8').replace(/^\uFEFF/, '');
 const str = (v) => (v === undefined || v === null || v === '' ? null : String(v));
 const num = (v) => (v === undefined || v === null || v === '' ? null : Number(v));
+/**
+ * 列表行 + 详情合并:两者字段集不同(实测供应商列表有 bank/rate/invoice_name 而详情没有,
+ * 商品列表有 brand_name/stock_name 而详情没有)。规则:列表打底,详情非空值覆盖;
+ * 详情为空/null 的键保留列表值(避免详情把列表已有值清空)。
+ */
+const mergeListDetail = (listRow, detail) => {
+  const out = { ...(listRow || {}) };
+  for (const [k, v] of Object.entries(detail || {})) {
+    const empty = v === null || v === undefined || v === '' || (Array.isArray(v) && v.length === 0);
+    if (empty && k in out) continue;
+    out[k] = v;
+  }
+  return out;
+};
 const nowLocal = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -348,8 +370,7 @@ function releaseLock() {
   } catch { /* 忽略 */ }
 }
 
-/** 通用参数类型推断:null→nvarchar,布尔→bit(档案 是否默认/是否叶子节点/停用),数字→decimal(18,4),其余→nvarchar */
-function inferType(value) {
+/** 通用参数类型推断:null→nvarchar,布尔→bit(档案 是否默认/是否叶子节点/停用),数字→decimal(18,4),其余→nvarchar */function inferType(value) {
   if (typeof value === 'boolean') return { type: 'bit' };
   if (typeof value === 'number') return { type: 'decimal', precision: 18, scale: 4 };
   return { type: 'nvarchar', length: 500 };
@@ -621,7 +642,8 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
         const fp = doc.fingerprintOf(row);
         const known = knownFps.has(String(row.id).trim());
         try {
-          const d = doc.detailPath ? await kingdeeGet(cfg.kingdee, token, doc.detailPath, { id: row.id }) : row; // 仅列表接口的档案直接用列表行
+          const raw = doc.detailPath ? await kingdeeGet(cfg.kingdee, token, doc.detailPath, { id: row.id }) : row;
+          const d = doc.archive ? mergeListDetail(row, doc.detailPath ? raw : null) : raw; // 档案:列表∪详情(仅列表接口时直接用列表行)
           if (doc.archive) {
             const mapped = {
               ...doc.mapArchive(d, ctx),

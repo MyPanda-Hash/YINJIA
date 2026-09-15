@@ -31,19 +31,26 @@ const SPEC = [
   ['BD_DEPT', 'bs_dept', '长编码', '长编码', 'nvarchar(100)', 'long_number', 'detail'],
   ['BD_DEPT', 'bs_dept', '部门全称', '部门全称', 'nvarchar(200)', 'full_name', 'detail'],
   ['BD_DEPT', 'bs_dept', '上级编码', '上级编码', 'nvarchar(100)', 'parent_number', 'detail'],
+  ['BD_DEPT', 'bs_dept', '是否叶子节点', '是否叶子节点', 'bit', 'is_leaf', 'detail'],
   // ── 职员 ──
   ['BD_EMP', 'bs_emp', '性别', '性别', 'nvarchar(10)', 'gender', 'detail'],
   ['BD_EMP', 'bs_emp', '部门编码', '部门编码', 'nvarchar(100)', 'department_number', 'detail'],
   ['BD_EMP', 'bs_emp', '入职日期', '入职日期', 'nvarchar(30)', 'hire_date', 'detail'],
   ['BD_EMP', 'bs_emp', '离职日期', '离职日期', 'nvarchar(30)', 'leave_date', 'detail'],
   // ── 仓库 ──
+  ['BD_STORE', 'bs_wh', '仓库分类', '仓库分类', 'nvarchar(200)', 'group_name', 'detail'],
+  ['BD_STORE', 'bs_wh', '仓库分类编码', '仓库分类编码', 'nvarchar(100)', 'group_number', 'detail'],
   ['BD_STORE', 'bs_wh', '国家', '国家', 'nvarchar(100)', 'country_name', 'detail'],
   ['BD_STORE', 'bs_wh', '省', '省', 'nvarchar(100)', 'province_name', 'detail'],
   ['BD_STORE', 'bs_wh', '市', '市', 'nvarchar(100)', 'city_name', 'detail'],
   ['BD_STORE', 'bs_wh', '区', '区', 'nvarchar(100)', 'district_name', 'detail'],
   ['BD_STORE', 'bs_wh', '启用仓位管理', '启用仓位管理', 'bit', 'is_allow_freight', 'detail'],
   ['BD_STORE', 'bs_wh', '仓库管理员编码', '仓库管理员编码', 'nvarchar(100)', 'storekeeper_number', 'detail'],
-  // ── 供应商 ──
+  // ── 供应商(列表独有字段)──
+  ['BD_SUPPLIER', 'dm_gf', '供应商分类编码', '供应商分类编码', 'nvarchar(100)', 'group_number', 'detail'],
+  ['BD_SUPPLIER', 'dm_gf', '增值税税率', '增值税税率', 'decimal(18,4)', 'rate', 'detail'],
+  ['BD_SUPPLIER', 'dm_gf', '开票名称', '开票名称', 'nvarchar(200)', 'invoice_name', 'detail'],
+  ['BD_SUPPLIER', 'dm_gf', '开户地址', '开户地址', 'nvarchar(200)', 'account_open_addr', 'detail'],
   ['BD_SUPPLIER', 'dm_gf', '采购员部门', '采购员部门', 'nvarchar(200)', 'sale_dept_name', 'detail'],
   ['BD_SUPPLIER', 'dm_gf', '自动抵扣预收款', '自动抵扣预收款', 'bit', 'deduct', 'detail'],
   // ── 商品(主体)──
@@ -86,6 +93,17 @@ const SPEC = [
   ['BD_MATERIAL', 'bs_inv', '倒冲仓库编码', '倒冲仓库编码', 'nvarchar(100)', 'backflushed_stock_number', 'detail'],
   ['BD_MATERIAL', 'bs_inv', '倒冲仓位名称', '倒冲仓位名称', 'nvarchar(200)', 'backflushed_space_name', 'detail'],
   ['BD_MATERIAL', 'bs_inv', '商品标签', '商品标签', 'nvarchar(500)', 'mul_label', 'detail'],
+  // 商品:列表独有字段
+  ['BD_MATERIAL', 'bs_inv', '品牌编码', '品牌编码', 'nvarchar(100)', 'brand_number', 'detail'],
+  ['BD_MATERIAL', 'bs_inv', '默认仓库', '默认仓库', 'nvarchar(200)', 'stock_name', 'detail'],
+  ['BD_MATERIAL', 'bs_inv', '默认仓库编码', '默认仓库编码', 'nvarchar(100)', 'stock_number', 'detail'],
+  ['BD_MATERIAL', 'bs_inv', '基本单位编码', '基本单位编码', 'nvarchar(100)', 'base_unit_number', 'detail'],
+  ['BD_MATERIAL', 'bs_inv', '是否自制', '是否自制', 'bit', 'is_self_restraint', 'detail'],
+  ['BD_MATERIAL', 'bs_inv', '是否启用称重', '是否启用称重', 'bit', 'is_weight', 'detail'],
+  ['BD_MATERIAL', 'bs_inv', '是否序列号管理', '是否序列号管理', 'bit', 'is_serial', 'detail'],
+  ['BD_MATERIAL', 'bs_inv', '是否批次管理', '是否批次管理', 'bit', 'is_batch', 'detail'],
+  ['BD_MATERIAL', 'bs_inv', '多单位', '多单位', 'nvarchar(500)', 'units', 'detail'],
+  ['BD_MATERIAL', 'bs_inv', '图片链接', '图片链接', 'nvarchar(500)', 'url', 'detail'],
   // 商品价格(price_entity 首行)
   ['BD_MATERIAL', 'bs_inv', '采购价', '采购价', 'decimal(18,4)', 'price_entity.price_purchase_price', 'detail'],
   ['BD_MATERIAL', 'bs_inv', '零售价', '零售价', 'decimal(18,4)', 'price_entity.price_retail_price', 'detail'],
@@ -163,6 +181,11 @@ const EN = {
   国家编码: 'Country Code', 省份编码: 'Province Code', 城市编码: 'City Code', 区县编码: 'District Code',
   结算期限: 'Settlement Term', 结算期限编码: 'Settlement Term Code', 信用额度: 'Credit Limit',
   联系人性别: 'Contact Gender', 首要联系人: 'Primary Contact',
+  供应商分类编码: 'Supplier Group Code', 开户地址: 'Bank Address',
+  品牌编码: 'Brand Code', 默认仓库: 'Default Warehouse', 默认仓库编码: 'Default Warehouse Code',
+  基本单位编码: 'Base UOM Code', 是否自制: 'Self-made', 多单位: 'Multi-UOM List', 图片链接: 'Image URL',
+  仓库分类: 'Warehouse Group', 仓库分类编码: 'Warehouse Group Code',
+  是否叶子节点_: 'Leaf Node',
 };
 const byTable = new Map();
 for (const s of SPEC) {

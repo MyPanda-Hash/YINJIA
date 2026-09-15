@@ -28,11 +28,12 @@ IF COL_LENGTH('dbo.bs_uom', N'创建时间') IS NULL ALTER TABLE dbo.bs_uom ADD 
 IF COL_LENGTH('dbo.bs_uom', N'修改时间') IS NULL ALTER TABLE dbo.bs_uom ADD [修改时间] datetime2 NULL;
 GO
 
--- ══ bs_dept(4 列)══
+-- ══ bs_dept(5 列)══
 IF COL_LENGTH('dbo.bs_dept', N'级次') IS NULL ALTER TABLE dbo.bs_dept ADD [级次] nvarchar(20) NULL;
 IF COL_LENGTH('dbo.bs_dept', N'长编码') IS NULL ALTER TABLE dbo.bs_dept ADD [长编码] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.bs_dept', N'部门全称') IS NULL ALTER TABLE dbo.bs_dept ADD [部门全称] nvarchar(200) NULL;
 IF COL_LENGTH('dbo.bs_dept', N'上级编码') IS NULL ALTER TABLE dbo.bs_dept ADD [上级编码] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.bs_dept', N'是否叶子节点') IS NULL ALTER TABLE dbo.bs_dept ADD [是否叶子节点] bit NULL;
 GO
 
 -- ══ bs_emp(4 列)══
@@ -42,7 +43,9 @@ IF COL_LENGTH('dbo.bs_emp', N'入职日期') IS NULL ALTER TABLE dbo.bs_emp ADD 
 IF COL_LENGTH('dbo.bs_emp', N'离职日期') IS NULL ALTER TABLE dbo.bs_emp ADD [离职日期] nvarchar(30) NULL;
 GO
 
--- ══ bs_wh(6 列)══
+-- ══ bs_wh(8 列)══
+IF COL_LENGTH('dbo.bs_wh', N'仓库分类') IS NULL ALTER TABLE dbo.bs_wh ADD [仓库分类] nvarchar(200) NULL;
+IF COL_LENGTH('dbo.bs_wh', N'仓库分类编码') IS NULL ALTER TABLE dbo.bs_wh ADD [仓库分类编码] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.bs_wh', N'国家') IS NULL ALTER TABLE dbo.bs_wh ADD [国家] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.bs_wh', N'省') IS NULL ALTER TABLE dbo.bs_wh ADD [省] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.bs_wh', N'市') IS NULL ALTER TABLE dbo.bs_wh ADD [市] nvarchar(100) NULL;
@@ -51,12 +54,16 @@ IF COL_LENGTH('dbo.bs_wh', N'启用仓位管理') IS NULL ALTER TABLE dbo.bs_wh 
 IF COL_LENGTH('dbo.bs_wh', N'仓库管理员编码') IS NULL ALTER TABLE dbo.bs_wh ADD [仓库管理员编码] nvarchar(100) NULL;
 GO
 
--- ══ dm_gf(2 列)══
+-- ══ dm_gf(6 列)══
+IF COL_LENGTH('dbo.dm_gf', N'供应商分类编码') IS NULL ALTER TABLE dbo.dm_gf ADD [供应商分类编码] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.dm_gf', N'增值税税率') IS NULL ALTER TABLE dbo.dm_gf ADD [增值税税率] decimal(18,4) NULL;
+IF COL_LENGTH('dbo.dm_gf', N'开票名称') IS NULL ALTER TABLE dbo.dm_gf ADD [开票名称] nvarchar(200) NULL;
+IF COL_LENGTH('dbo.dm_gf', N'开户地址') IS NULL ALTER TABLE dbo.dm_gf ADD [开户地址] nvarchar(200) NULL;
 IF COL_LENGTH('dbo.dm_gf', N'采购员部门') IS NULL ALTER TABLE dbo.dm_gf ADD [采购员部门] nvarchar(200) NULL;
 IF COL_LENGTH('dbo.dm_gf', N'自动抵扣预收款') IS NULL ALTER TABLE dbo.dm_gf ADD [自动抵扣预收款] bit NULL;
 GO
 
--- ══ bs_inv(53 列)══
+-- ══ bs_inv(63 列)══
 IF COL_LENGTH('dbo.bs_inv', N'备注') IS NULL ALTER TABLE dbo.bs_inv ADD [备注] nvarchar(500) NULL;
 IF COL_LENGTH('dbo.bs_inv', N'助记码') IS NULL ALTER TABLE dbo.bs_inv ADD [助记码] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.bs_inv', N'产地') IS NULL ALTER TABLE dbo.bs_inv ADD [产地] nvarchar(200) NULL;
@@ -96,6 +103,16 @@ IF COL_LENGTH('dbo.bs_inv', N'倒冲仓库名称') IS NULL ALTER TABLE dbo.bs_in
 IF COL_LENGTH('dbo.bs_inv', N'倒冲仓库编码') IS NULL ALTER TABLE dbo.bs_inv ADD [倒冲仓库编码] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.bs_inv', N'倒冲仓位名称') IS NULL ALTER TABLE dbo.bs_inv ADD [倒冲仓位名称] nvarchar(200) NULL;
 IF COL_LENGTH('dbo.bs_inv', N'商品标签') IS NULL ALTER TABLE dbo.bs_inv ADD [商品标签] nvarchar(500) NULL;
+IF COL_LENGTH('dbo.bs_inv', N'品牌编码') IS NULL ALTER TABLE dbo.bs_inv ADD [品牌编码] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.bs_inv', N'默认仓库') IS NULL ALTER TABLE dbo.bs_inv ADD [默认仓库] nvarchar(200) NULL;
+IF COL_LENGTH('dbo.bs_inv', N'默认仓库编码') IS NULL ALTER TABLE dbo.bs_inv ADD [默认仓库编码] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.bs_inv', N'基本单位编码') IS NULL ALTER TABLE dbo.bs_inv ADD [基本单位编码] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.bs_inv', N'是否自制') IS NULL ALTER TABLE dbo.bs_inv ADD [是否自制] bit NULL;
+IF COL_LENGTH('dbo.bs_inv', N'是否启用称重') IS NULL ALTER TABLE dbo.bs_inv ADD [是否启用称重] bit NULL;
+IF COL_LENGTH('dbo.bs_inv', N'是否序列号管理') IS NULL ALTER TABLE dbo.bs_inv ADD [是否序列号管理] bit NULL;
+IF COL_LENGTH('dbo.bs_inv', N'是否批次管理') IS NULL ALTER TABLE dbo.bs_inv ADD [是否批次管理] bit NULL;
+IF COL_LENGTH('dbo.bs_inv', N'多单位') IS NULL ALTER TABLE dbo.bs_inv ADD [多单位] nvarchar(500) NULL;
+IF COL_LENGTH('dbo.bs_inv', N'图片链接') IS NULL ALTER TABLE dbo.bs_inv ADD [图片链接] nvarchar(500) NULL;
 IF COL_LENGTH('dbo.bs_inv', N'采购价') IS NULL ALTER TABLE dbo.bs_inv ADD [采购价] decimal(18,4) NULL;
 IF COL_LENGTH('dbo.bs_inv', N'零售价') IS NULL ALTER TABLE dbo.bs_inv ADD [零售价] decimal(18,4) NULL;
 IF COL_LENGTH('dbo.bs_inv', N'批发价') IS NULL ALTER TABLE dbo.bs_inv ADD [批发价] decimal(18,4) NULL;
@@ -171,6 +188,8 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='DEPT' AND col_name=N'部
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('DEPT', N'部门全称', N'部门全称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='DEPT' AND col_name=N'上级编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('DEPT', N'上级编码', N'上级编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='DEPT' AND col_name=N'是否叶子节点')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('DEPT', N'是否叶子节点', N'是否叶子节点', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'性别')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('EMP', N'性别', N'性别', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'部门编码')
@@ -179,6 +198,10 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'入�
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('EMP', N'入职日期', N'入职日期', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='EMP' AND col_name=N'离职日期')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('EMP', N'离职日期', N'离职日期', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'仓库分类')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'仓库分类', N'仓库分类', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'仓库分类编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'仓库分类编码', N'仓库分类编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'国家')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'国家', N'国家', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'省')
@@ -191,6 +214,14 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'启�
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'启用仓位管理', N'启用仓位管理', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WH' AND col_name=N'仓库管理员编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('WH', N'仓库管理员编码', N'仓库管理员编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'供应商分类编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'供应商分类编码', N'供应商分类编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'增值税税率')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'增值税税率', N'增值税税率', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'开票名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'开票名称', N'开票名称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'开户地址')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'开户地址', N'开户地址', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'采购员部门')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('GFDA', N'采购员部门', N'采购员部门', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='GFDA' AND col_name=N'自动抵扣预收款')
@@ -273,6 +304,26 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'倒�
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'倒冲仓位名称', N'倒冲仓位名称', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'商品标签')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'商品标签', N'商品标签', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'品牌编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'品牌编码', N'品牌编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'默认仓库')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'默认仓库', N'默认仓库', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'默认仓库编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'默认仓库编码', N'默认仓库编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'基本单位编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'基本单位编码', N'基本单位编码', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否自制')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否自制', N'是否自制', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否启用称重')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否启用称重', N'是否启用称重', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否序列号管理')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否序列号管理', N'是否序列号管理', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'是否批次管理')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'是否批次管理', N'是否批次管理', N'是否', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'多单位')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'多单位', N'多单位', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'图片链接')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'图片链接', N'图片链接', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'采购价')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('INV', N'采购价', N'采购价', N'小数', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'零售价')
@@ -378,6 +429,10 @@ IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'�
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'入职日期', 'en', N'Hire Date', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'离职日期' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'离职日期', 'en', N'Leave Date', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'仓库分类' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'仓库分类', 'en', N'Warehouse Group', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'仓库分类编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'仓库分类编码', 'en', N'Warehouse Group Code', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'国家' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'国家', 'en', N'Country', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'省' AND locale='en')
@@ -390,6 +445,14 @@ IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'�
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'启用仓位管理', 'en', N'Bin Management', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'仓库管理员编码' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'仓库管理员编码', 'en', N'Keeper Code', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'供应商分类编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'供应商分类编码', 'en', N'Supplier Group Code', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'增值税税率' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'增值税税率', 'en', N'VAT Rate (%)', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'开票名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'开票名称', 'en', N'Invoice Name', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'开户地址' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'开户地址', 'en', N'Bank Address', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'采购员部门' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'采购员部门', 'en', N'Purchaser Dept.', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'自动抵扣预收款' AND locale='en')
@@ -471,6 +534,23 @@ IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'�
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'倒冲仓位名称', 'en', N'Backflush Bin', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'商品标签' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'商品标签', 'en', N'Item Labels', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'品牌编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'品牌编码', 'en', N'Brand Code', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'默认仓库' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'默认仓库', 'en', N'Default Warehouse', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'默认仓库编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'默认仓库编码', 'en', N'Default Warehouse Code', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'基本单位编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'基本单位编码', 'en', N'Base UOM Code', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'是否自制' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'是否自制', 'en', N'Self-made', 'manual');
+-- ⚠ 待补英译:是否启用称重
+-- ⚠ 待补英译:是否序列号管理
+-- ⚠ 待补英译:是否批次管理
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'多单位' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'多单位', 'en', N'Multi-UOM List', 'manual');
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'图片链接' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'图片链接', 'en', N'Image URL', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'采购价' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'采购价', 'en', N'Purchase Price', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'零售价' AND locale='en')
@@ -511,10 +591,6 @@ IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'�
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'结算客户编码', 'en', N'Settle Customer Code', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'部门' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'部门', 'en', N'Department', 'manual');
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'增值税税率' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'增值税税率', 'en', N'VAT Rate (%)', 'manual');
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'开票名称' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'开票名称', 'en', N'Invoice Name', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发票类型' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发票类型', 'en', N'Invoice Type', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'国家编码' AND locale='en')
