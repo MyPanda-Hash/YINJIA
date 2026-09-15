@@ -1,0 +1,14 @@
+{
+  "name": "jdy-sync",
+  "private": true,
+  "type": "module",
+  "description": "金蝶云·星辰销售订单 → YINJIA-MES(SQL Server) 定时同步",
+  "scripts": {
+    "probe": "node sync.mjs --probe",
+    "dry": "node sync.mjs --dry-run",
+    "sync": "node sync.mjs"
+  },
+  "dependencies": {
+    "mssql": "^10.0.2"
+  }
+}
