@@ -9,9 +9,9 @@ IF OBJECT_ID('dbo.s_allno') IS NULL
 CREATE TABLE dbo.s_allno (
     id         int IDENTITY(1,1) NOT NULL PRIMARY KEY,
     comm       varchar(10)  NOT NULL CONSTRAINT df_sallno_comm DEFAULT ('0'),
-    dh         varchar(20)  NOT NULL,                -- 单号(前缀+yyMMdd+4位序号)
+    dh         varchar(20)  NOT NULL,                -- 单号:新格式 前缀+yyyy-MM+4位序号 / 旧紧凑 前缀+yyMMdd+4位序号
     lb         varchar(10)  NOT NULL,                -- 单号前缀类别
-    ny         varchar(6)   NOT NULL,                -- 年月(yyMMdd)
+    ny         varchar(10)  NOT NULL,                -- 年月段:新横杠格式 yyyy-MM(7位);旧紧凑格式历史行 yyMMdd(6位)
     asp_user1  varchar(30)  NULL,
     asp_time1  datetime     NULL CONSTRAINT df_sallno_time DEFAULT (GETDATE()),
     asp_cancel char(1)      NOT NULL CONSTRAINT df_sallno_cancel DEFAULT ('N')

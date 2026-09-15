@@ -4,8 +4,8 @@
 USE HSDZ_MES;
 GO
 
-ALTER TABLE yj_field ADD label_en nvarchar(200) NULL;
-ALTER TABLE yj_panel ADD panel_name_en nvarchar(200) NULL;
+IF COL_LENGTH('dbo.yj_field', 'label_en') IS NULL ALTER TABLE yj_field ADD label_en nvarchar(200) NULL;
+IF COL_LENGTH('dbo.yj_panel', 'panel_name_en') IS NULL ALTER TABLE yj_panel ADD panel_name_en nvarchar(200) NULL;
 GO
 
 -- ---------- 字段标签翻译(按唯一中文词批量覆盖,含多面板重复标签) ----------

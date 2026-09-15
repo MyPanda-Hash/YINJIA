@@ -159,6 +159,12 @@ migrate-prod-forms-fields4.sql
 migrate-prod-forms-fix.sql
 migrate-view-id.sql
 migrate-view-ascancel.sql
+
+# —— 2026-09-15 补登记:附件表(此前只在 tools/ 未入清单,yj_attachment 一直缺) ——
+migrate-attachment.sql
+
+# —— 2026-09-15 补登记:阶段终止审批表(2026-09-11 功能,脚本漏登记) ——
+migrate-plan-term.sql
 migrate-clean-orphan-docstatus.sql
 migrate-progress-single-doc.sql
 migrate-lab-stdlib.sql
@@ -207,3 +213,23 @@ migrate-kingdee-archive-align2.sql
 #      顺带补齐 DEPT/WH/UOM 的 panel_name_en 与 panel 域 9 语言译名(en 下发不再回退中文)。
 # 幂等:UPDATE 直写同值/MERGE NOT MATCHED,已本地连跑两遍验证。
 migrate-kingdee-archive-align3.sql
+
+# —— 2026-09-15 登记(修复):单号池 s_allno.ny 列宽不足,所有单据面板新增保存报「将截断字符串或二进制数据」 ——
+# 根因:legacy-hsdz-compat.sql 建表 ny varchar(6)(旧 yyMMdd),而 migrate-formno-style.sql(2026-09-07)起
+#      FormNoService 写 ny="yyyy-MM"(7字符)必截断。修法:ny 加宽 varchar(10)(索引先删后建),
+#      legacy-hsdz-compat.sql 建表定义同步修正(全新建库不再回归)。幂等已连跑两遍验证。
+fix-s-allno-ny.sql
+
+# —— 2026-09-15 登记(修复):数据库终态修复——setup-db 破坏性重跑事故收口 ——
+# 背景:setup-db.sql 内容哈希变化被 DbSync 重跑,DROP 重建 yj_* 核心表,后续哈希未变脚本被跳过,
+#      造成 yj_doc_status(saved/modify 系列列)、RD 表、标准库、消息、附件、21 个报表视图零散缺失。
+# 本轮:①全链强制重跑(跳过 setup-db 与演示种子)恢复绝大部分;②14 个历史/危险脚本中性化
+#      (fix-views-def/definitive/final/v2/v3/v4/v5-gen、migrate-rebuild-inventory、migrate-dispatch(-fix)、
+#       migrate-rd-panels/rd-lab/rd-files、cleanup-base-panels——均为被后续实现取代或含破坏性语句);
+#      ③setup-db.sql 加"已初始化库跳过"守卫防复发;④本脚本收口:bl_dispatch 重建为服务器中文口径、
+#      DISPATCH 面板元数据对齐、22 个报表面板视图按服务器快照重建、报表面板字段按终版视图重注册。
+# 幂等:视图 CREATE OR ALTER / 字段先删后注册 / 表按列形态守卫,已连跑验证。
+fix-db-restore-20260915.sql
+
+# —— 2026-09-15 登记(修复):终态收尾——SO_ORDER 品牌(列更名遗留)、DISPATCH_STATS 过期字段清理 ——
+fix-db-restore-tail.sql

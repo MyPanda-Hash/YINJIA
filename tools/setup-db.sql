@@ -1,7 +1,10 @@
-﻿/* YINJIA-MES 元数据初始化
+/* YINJIA-MES 元数据初始化
    面板注册(yj_panel) + 字段定义(yj_field) + 单据状态(yj_doc_status) + 登录用户(yj_user)
    运行方式: sqlcmd -S localhost -E -i setup-db.sql
-   注意: yj_* 表为 YINJIA-MES 专用,HSDZ_MES 原有表不做任何修改 */
+   注意: yj_* 表为 YINJIA-MES 专用,HSDZ_MES 原有表不做任何修改
+   🔴 防误伤(2026-09-15):本脚本是「全新建库初始化」语义(DROP 重建 yj_* 并种基线);
+      已初始化的库因内容哈希变化被 DbSync 重跑时,只执行上方登录/授权幂等段,
+      检测到 yj_panel 已存在即 SET NOEXEC 跳过其余全部批次(重置库请先手工 DROP yj_panel)。 */
 USE HSDZ_MES;
 SET NOCOUNT ON;
 GO
@@ -16,6 +19,14 @@ IF USER_ID('yinjia') IS NOT NULL AND IS_ROLEMEMBER('db_datawriter', 'yinjia') = 
     ALTER ROLE db_datawriter ADD MEMBER yinjia;
 IF USER_ID('yinjia') IS NOT NULL AND IS_ROLEMEMBER('db_ddladmin', 'yinjia') = 0
     ALTER ROLE db_ddladmin ADD MEMBER yinjia;
+GO
+-- 🔴 初始化守卫:已有 yj_panel 的库(已初始化)重跑本脚本时跳过下方 DROP/CREATE/种子,
+--    防止"内容哈希变化 → DbSync 重跑 → 清库"事故(2026-09-15 实发:RD 表/标准库/消息/附件全丢)。
+IF OBJECT_ID('dbo.yj_panel') IS NOT NULL
+BEGIN
+    RAISERROR(N'setup-db: 检测到 yj_panel 已存在,按防误伤守卫跳过初始化(重置库请先手工 DROP yj_panel)', 0, 1) WITH NOWAIT;
+    SET NOEXEC ON;
+END
 GO
 IF OBJECT_ID('yj_field') IS NOT NULL DROP TABLE yj_field;
 IF OBJECT_ID('yj_panel') IS NOT NULL DROP TABLE yj_panel;

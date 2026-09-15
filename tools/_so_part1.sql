@@ -115,7 +115,7 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SO_ORDER' AND col_name=N
 -- 单据状态/审核人由 yj_doc_status 工作流注册表派生,与单据面板显示一致)
 IF OBJECT_ID('v_sales_order_detail') IS NOT NULL DROP VIEW v_sales_order_detail;
 EXEC(N'CREATE VIEW v_sales_order_detail AS SELECT h.[id], h.[单据编号], h.[单据日期], h.[客户], h.[客户编码], h.[结算客户], h.[部门], h.[部门负责人], h.[业务员], h.[项目], h.[预计交货日期], h.[联系人], h.[备注], h.[审核时间], h.[审批人], h.[审批时间], h.asp_user1, h.asp_time1, h.asp_cancel'
-  + N', l.[单据编号] AS line_no, l.[存货名称品牌], l.[存货名称], l.[存货编码], l.[规格型号], l.[数量], l.[销售单位], l.[单价], l.[税率%], l.[含税单价], l.[金额], l.[含税金额], l.[折扣金额], l.[现存量]'
+  + N', l.[单据编号] AS line_no, l.[品牌], l.[存货名称], l.[存货编码], l.[规格型号], l.[数量], l.[销售单位], l.[单价], l.[税率%], l.[含税单价], l.[金额], l.[含税金额], l.[折扣金额], l.[现存量]'
   + N', CASE WHEN ISNULL(s.canceled,N''N'')=N''Y'' THEN N''已作废'''
   + N' WHEN ISNULL(s.pending,N''N'')=N''Y'' THEN N''审批中'''
   + N' WHEN s.shr IS NOT NULL THEN N''已审核'''

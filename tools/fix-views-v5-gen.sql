@@ -1,6 +1,5 @@
--- 修复 v5:DETAIL 用 h.* + l.* 但排除重复 id/asp 列;逐个 EXEC
-USE HSDZ_MES;
+-- 【已中性化 2026-09-15】v5 生成器残篇(仅 v_purchase_in_detail 一个视图,且 SELECT 未排除 join 键导致重复列),
+-- 视图终态由 fix-db-restore-20260915.sql(服务器快照口径)维护。原文见 git 历史。
 SET NOCOUNT ON;
-EXEC('CREATE VIEW v_purchase_in_detail AS SELECT h.*, l.id AS line_id, ' +
-    (SELECT STRING_AGG('l.' + QUOTENAME(c.name), ', ') FROM sys.columns c WHERE c.object_id=OBJECT_ID('bl_purchase_in') AND c.name NOT IN ('id','asp_user1','asp_time1','asp_cancel')) +
-    ', h.asp_cancel AS v_cancel FROM bd_purchase_in h LEFT JOIN bl_purchase_in l ON h.[单据编号] = l.[单据编号]');
+PRINT N'fix-views-v5-gen: 已中性化(被 fix-db-restore-20260915.sql 取代),本次跳过';
+GO
