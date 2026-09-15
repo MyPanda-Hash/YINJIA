@@ -100,7 +100,7 @@ GO
 -- ============ 面板注册 ============
 INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES
 ('KHDA',  N'客户档案',   N'基础档案', 'archive', 'dm_kh',    NULL,       NULL,     'id',  'dm', NULL, NULL,      100, 'khda', N'基础资料'),
-('GFDA',  N'厂商档案',   N'基础档案', 'archive', 'dm_gf',    NULL,       NULL,     'id',  'dm', NULL, NULL,      100, 'gfda', N'基础资料'),
+('GFDA',  N'供应商档案', N'基础档案', 'archive', 'dm_gf',    NULL,       NULL,     'id',  'dm', NULL, NULL,      100, 'gfda', N'基础资料'),
 ('YWYDA', N'业务员档案', N'基础档案', 'archive', 'dm_ywy',   NULL,       NULL,     'id',  'dm', NULL, NULL,      100, 'ywyda', N'基础资料'),
 ('CKDA',  N'仓库档案',   N'基础档案', 'archive', 'dm_ck',    NULL,       NULL,     'id',  'dm', NULL, NULL,      100, 'ckda', N'基础资料'),
 ('ZDGL',  N'数据字典',   N'基础档案', 'archive', 'dm_gx',    NULL,       NULL,     'id',  'dm', NULL, NULL,      100, 'zdgl', N'基础资料'),
@@ -112,39 +112,40 @@ INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_t
 ('STOCK_STATUS', N'库存状况', N'报表', 'flat', 'kucun', NULL, NULL, 'id', NULL, NULL, NULL, 100, 'items', N'仓库管理');
 GO
 -- ============ 字段定义 ============
--- KHDA 客户档案
+-- KHDA 客户档案(金蝶口径:客户编码 customer_number;联系人 contact_linkman)
 INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, required) VALUES
-('KHDA','dm',N'客户代码','文本','detail',1,1),
+('KHDA','dm',N'客户编码','文本','detail',1,1),
 ('KHDA','mc',N'客户名称','文本','detail',2,1),
 ('KHDA','khjb',N'客户级别','文本','detail',3,0),
 ('KHDA','addr',N'地址','文本','detail',4,0),
 ('KHDA','tel',N'电话','文本','detail',5,0),
-('KHDA','ywman',N'业务员','文本','detail',6,0),
-('KHDA','sui_no',N'税号','文本','detail',7,0),
-('KHDA','bank',N'开户行','文本','detail',8,0),
-('KHDA','bank_no',N'银行账号','文本','detail',9,0),
-('KHDA','email',N'邮箱','文本','detail',10,0),
-('KHDA','frdb',N'法人代表','文本','detail',11,0),
-('KHDA','zczb',N'注册资本','小数','detail',12,0),
-('KHDA','clrq',N'成立日期','日期','detail',13,0),
-('KHDA','bz',N'备注','文本','detail',14,0);
--- GFDA 厂商档案
+('KHDA','lxr',N'联系人','文本','detail',6,0),
+('KHDA','ywman',N'业务员','文本','detail',7,0),
+('KHDA','sui_no',N'税号','文本','detail',8,0),
+('KHDA','bank',N'开户行','文本','detail',9,0),
+('KHDA','bank_no',N'银行账号','文本','detail',10,0),
+('KHDA','email',N'邮箱','文本','detail',11,0),
+('KHDA','frdb',N'法人代表','文本','detail',12,0),
+('KHDA','zczb',N'注册资本','小数','detail',13,0),
+('KHDA','clrq',N'成立日期','日期','detail',14,0),
+('KHDA','bz',N'备注','文本','detail',15,0);
+-- GFDA 供应商档案(金蝶口径:供应商编码 supplier_number / 到货地址 delivery_address)
 INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, required) VALUES
-('GFDA','dm',N'厂商代码','文本','detail',1,1),
-('GFDA','mc',N'厂商名称','文本','detail',2,1),
-('GFDA','csjb',N'厂商级别','文本','detail',3,0),
+('GFDA','dm',N'供应商编码','文本','detail',1,1),
+('GFDA','mc',N'供应商名称','文本','detail',2,1),
+('GFDA','csjb',N'供应商级别','文本','detail',3,0),
 ('GFDA','addr',N'地址','文本','detail',4,0),
 ('GFDA','tel',N'电话','文本','detail',5,0),
 ('GFDA','ywman',N'业务员','文本','detail',6,0),
 ('GFDA','sui_no',N'税号','文本','detail',7,0),
 ('GFDA','bank',N'开户行','文本','detail',8,0),
 ('GFDA','bank_no',N'银行账号','文本','detail',9,0),
-('GFDA','ckadd',N'收货地址','文本','detail',10,0),
+('GFDA','ckadd',N'到货地址','文本','detail',10,0),
 ('GFDA','bz',N'备注','文本','detail',11,0);
--- YWYDA 业务员档案
+-- YWYDA 业务员档案(金蝶口径:业务员编码/名称 emp 编码名称对)
 INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, required) VALUES
-('YWYDA','dm',N'业务员代码','文本','detail',1,1),
-('YWYDA','mc',N'姓名','文本','detail',2,1),
+('YWYDA','dm',N'业务员编码','文本','detail',1,1),
+('YWYDA','mc',N'业务员名称','文本','detail',2,1),
 ('YWYDA','lb',N'类别','文本','detail',3,0),
 ('YWYDA','zw',N'职务','文本','detail',4,0),
 ('YWYDA','bmmc',N'部门','文本','detail',5,0),
@@ -154,7 +155,7 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, requir
 ('YWYDA','bz',N'备注','文本','detail',9,0);
 -- CKDA 仓库档案
 INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, required) VALUES
-('CKDA','dm',N'仓库代码','文本','detail',1,1),
+('CKDA','dm',N'仓库编码','文本','detail',1,1),
 ('CKDA','mc',N'仓库名称','文本','detail',2,1),
 ('CKDA','bz',N'备注','文本','detail',3,0);
 -- ZDGL 数据字典

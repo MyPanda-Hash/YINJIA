@@ -177,3 +177,12 @@ migrate-merged-panels.sql
 # 内容:rd_spec_assign 分配表(一单一条有效分配,筛选唯一索引 ux_rd_spec_assign_doc)、
 #      rd_dev_task 补「负责人」列(下发时快照总负责人账号,NULL=挂起待懒重解)。幂等可重跑。
 migrate-rd-spec-assign.sql
+
+# —— 2026-09-15 登记:基础档案面板/字段对齐金蝶ERP命名(jdy-sync 字段映射口径) ——
+# 内容:GFDA 厂商档案→供应商档案(厂商代码/名称/级别/收货地址→供应商编码/名称/级别/到货地址)、
+#      KHDA 客户代码→客户编码 + dm_kh 补 lxr 联系人列(contact_linkman 口径)、
+#      YWYDA 业务员代码/姓名→业务员编码/名称、CKDA 仓库代码→仓库编码;
+#      仅改 label/panel_name(col_name 与参照 refField 不动,refLabelOf 运行时转标签,引用安全),
+#      配套 yj_translation 9 语言译名(供应商档案/供应商名称/供应商级别/业务员编码/业务员名称/联系人补齐)。
+# 幂等:UPDATE 直写同值/INSERT IF NOT EXISTS/翻译 MERGE NOT MATCHED,已本地连跑两遍验证。
+migrate-kingdee-archive-align.sql
