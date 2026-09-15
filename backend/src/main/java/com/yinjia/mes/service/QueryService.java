@@ -167,8 +167,19 @@ public class QueryService {
                 "SELECT COUNT(DISTINCT t.[" + g + "]) FROM " + docTable + " t " + where,
                 Integer.class, args.toArray());
 
-        String pageSql = "SELECT DISTINCT t.[" + g + "] AS __no FROM " + docTable + " t " + where
-                + " ORDER BY t.[" + g + "] DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+        // 默认排序:按组列(单据编号)字符串降序——依赖单号零填充才等价于"最新在上"。
+        // 金蝶同步单(SO_ORDER/PU_ORDER)单号由星辰生成、格式不统一(如 ZXL25041701 与 ZXL-20260914-02 混排),
+        // 字符串序会把 2025 年的老单排到 2026 年新单之前 → 这两个面板改按创建时间 asp_time1 DESC。
+        // 说明:GROUP BY 后 ORDER BY 只能引用分组列或聚合;
+        //   非时间面板 → ORDER BY 单据编号 DESC(与改动前的 ORDER BY t.[g] DESC 完全等价,行为不变);
+        //   时间面板   → ORDER BY MAX(asp_time1) DESC,单据编号 DESC(同秒并列时用单号兜底,保证分页稳定)。
+        String orderBy = sortByTime(def)
+                ? "MAX(t.asp_time1) DESC, t.[" + g + "] DESC"
+                : "t.[" + g + "] DESC";
+        String pageSql = "SELECT t.[" + g + "] AS __no FROM " + docTable + " t " + where
+                + " GROUP BY t.[" + g + "]"
+                + " ORDER BY " + orderBy
+                + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add((pageNo - 1) * pageSize);
         pageArgs.add(pageSize);
@@ -252,6 +263,16 @@ public class QueryService {
         List<Map<String, Object>> docs = loadDocs(def, List.of(docNo));
         if (docs.isEmpty()) throw new IllegalArgumentException("表单数据不存在：" + docNo);
         return docs.get(0);
+    }
+
+    /**
+     * 列表默认排序是否按创建时间(asp_time1 DESC)。
+     * 仅限单号由外部系统生成、格式不可控的面板(金蝶同步的销售订单/采购订单)——
+     * 这类面板按单号字符串排序无法表达"最新在上";其余面板单号由 s_allno 零填充生成,
+     * 保持原有 ORDER BY 单据编号 DESC 不变。
+     */
+    private static boolean sortByTime(PanelRegistry.PanelDef def) {
+        return "SO_ORDER".equals(def.code()) || "PU_ORDER".equals(def.code());
     }
 
     private Map<String, Map<String, Object>> loadStatus(String panelCode, List<String> docNos) {
