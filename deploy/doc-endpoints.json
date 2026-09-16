@@ -1,0 +1,242 @@
+[
+  {
+    "label": "客户列表",
+    "id": "9c3d3950712511eda0b3f9343e4297f7",
+    "path": "/jdy/v2/bd/customer",
+    "method": "GET"
+  },
+  {
+    "label": "供应商列表",
+    "id": "9ce7f88f712511eda0b313592b350ebd",
+    "path": "/jdy/v2/bd/supplier",
+    "method": "GET"
+  },
+  {
+    "label": "商品列表",
+    "id": "9c77d16b712511eda0b3b7b3cc033db5",
+    "path": "/jdy/v2/bd/material",
+    "method": "GET"
+  },
+  {
+    "label": "职员列表",
+    "id": "9c583b6c712511eda0b3cdfb303d26af",
+    "path": "/jdy/v2/bd/emp",
+    "method": "GET"
+  },
+  {
+    "label": "部门列表",
+    "id": "9c4cf0c8712511eda0b3ddc61ac19fc6",
+    "path": "/jdy/v2/bd/department",
+    "method": "GET"
+  },
+  {
+    "label": "仓库列表",
+    "id": "9cd7a4d7712511eda0b30feda7b225ca",
+    "path": "/jdy/v2/bd/store",
+    "method": "GET"
+  },
+  {
+    "label": "计量单位列表",
+    "id": "9c97b58a712511eda0b301369440b540",
+    "path": "/jdy/v2/bd/measure_unit",
+    "method": "GET"
+  },
+  {
+    "label": "结算方式列表",
+    "id": "9cb8f93b712511eda0b33dd9bb88427f",
+    "path": "/jdy/v2/bd/settlement_type",
+    "method": "GET"
+  },
+  {
+    "label": "客户分类列表",
+    "id": "9c48ab04712511eda0b39f6adb9b9dc0",
+    "path": "/jdy/v2/bd/customer_group",
+    "method": "GET"
+  },
+  {
+    "label": "供应商分类列表",
+    "id": "9cf1bc92712511eda0b35f062038767f",
+    "path": "/jdy/v2/bd/supplier_group",
+    "method": "GET"
+  },
+  {
+    "label": "商品分类列表",
+    "id": "9c8ae444712511eda0b37d0f701993b9",
+    "path": "/jdy/v2/bd/material_group",
+    "method": "GET"
+  },
+  {
+    "label": "商品品牌列表",
+    "id": "9c85b420712511eda0b33125447185ac",
+    "path": "/jdy/v2/bd/material_brand",
+    "method": "GET"
+  },
+  {
+    "label": "币别列表",
+    "id": "9c3040fc712511eda0b335487d560a84",
+    "path": "/jdy/v2/bd/currency",
+    "method": "GET"
+  },
+  {
+    "label": "BOM单列表",
+    "id": "9c2c4958712511eda0b361e90d734914",
+    "path": "/jdy/v2/bd/bom",
+    "method": "GET"
+  },
+  {
+    "label": "销售出库单列表",
+    "id": "4e2dbd5b3ccc11efb3f6d1f84d68e584",
+    "path": "/jdy/v2/scm/sal_out_bound",
+    "method": "GET"
+  },
+  {
+    "label": "销售退货单列表",
+    "id": "9e64d43d712511eda0b3bfe46d9efdb5",
+    "path": "/jdy/v2/scm/sal_in_bound",
+    "method": "GET"
+  },
+  {
+    "label": "销售报价单列表",
+    "id": "55980b1fb96011ed83eae38342a7c777",
+    "path": "/jdy/v2/scm/sal_quota",
+    "method": "GET"
+  },
+  {
+    "label": "采购申请单列表",
+    "id": "9e5543d4712511eda0b31ba0b7ff6e5a",
+    "path": "/jdy/v2/scm/pur_request",
+    "method": "GET"
+  },
+  {
+    "label": "采购入库单列表",
+    "id": "9e458c5b712511eda0b33bed5fd7d9af",
+    "path": "/jdy/v2/scm/pur_inbound",
+    "method": "GET"
+  },
+  {
+    "label": "采购退货单列表",
+    "id": "9e612ab9712511eda0b39dd8c0fddb5c",
+    "path": "/jdy/v2/scm/pur_ret",
+    "method": "GET"
+  },
+  {
+    "label": "其他入库单列表",
+    "id": "9df3e9c1712511eda0b32d6db90e2e0f",
+    "path": "/jdy/v2/scm/inv_other_in",
+    "method": "GET"
+  },
+  {
+    "label": "其他出库单列表",
+    "id": "9df82f85712511eda0b315880345f274",
+    "path": "/jdy/v2/scm/inv_other_out",
+    "method": "GET"
+  },
+  {
+    "label": "调拨出库单列表",
+    "id": "9e15a2a2712511eda0b3f782b7b5d1ba",
+    "path": "/jdy/v2/scm/inv_tfout",
+    "method": "GET"
+  },
+  {
+    "label": "盘点单列表",
+    "id": "9dcc647e712511eda0b33145260330da",
+    "path": "/jdy/v2/scm/inv_check_bill",
+    "method": "GET"
+  },
+  {
+    "label": "组装单列表",
+    "id": "9dbdbe78712511eda0b3ad52e4f31a54",
+    "path": "/jdy/v2/scm/inv_assemble",
+    "method": "GET"
+  },
+  {
+    "label": "生产领料单列表",
+    "id": "9e288e6e712511eda0b3774c6414bee9",
+    "path": "/jdy/v2/scm/inv_pick",
+    "method": "GET"
+  },
+  {
+    "label": "产品入库单列表",
+    "id": "9e351193712511eda0b33980965927a0",
+    "path": "/jdy/v2/scm/inv_product",
+    "method": "GET"
+  },
+  {
+    "label": "收款单列表",
+    "id": "9bc3753c712511eda0b345501aaf1f26",
+    "path": "/jdy/v2/arap/ar_credit",
+    "method": "GET"
+  },
+  {
+    "label": "付款单列表",
+    "id": "9b81ff56712511eda0b3431334c8b0ae",
+    "path": "/jdy/v2/arap/ap_credit",
+    "method": "GET"
+  },
+  {
+    "label": "凭证列表",
+    "id": "9d1d8798712511eda0b3cd6fb29bfcf5",
+    "path": "/jdy/v2/fi/voucher",
+    "method": "GET"
+  },
+  {
+    "label": "库存查询表",
+    "id": "67b338214a8c11efa60d9bb6fa9f8020",
+    "path": "/jdy/v2/inv/inv_inventory_ims",
+    "method": "GET"
+  },
+  {
+    "label": "商品库存列表",
+    "id": "9e20c637712511eda0b3697347bf3888",
+    "path": "/jdy/v2/scm/inventory",
+    "method": "GET"
+  },
+  {
+    "label": "生产任务单列表",
+    "id": "9d9acd15712511eda0b34534b54d70cb",
+    "path": "/jdy/v2/pm/mo_taskbill",
+    "method": "GET"
+  },
+  {
+    "label": "委外加工单列表",
+    "id": "9db7a3f2712511eda0b37520a0aa1010",
+    "path": "/jdy/v2/pm/subm_workorder",
+    "method": "GET"
+  },
+  {
+    "label": "门店列表",
+    "id": "9d8b64bf712511eda0b325cdb2d4f1b5",
+    "path": "/jdy/v2/ls/store",
+    "method": "GET"
+  },
+  {
+    "label": "会员列表",
+    "id": "9d6b3287712511eda0b301636ee85287",
+    "path": "/jdy/v2/ls/member",
+    "method": "GET"
+  },
+  {
+    "label": "工资单列表",
+    "id": "7428c174e4cd11ed8408114f30bf03cd",
+    "path": "/jdy/v2/fi/sa_bill",
+    "method": "GET"
+  },
+  {
+    "label": "资产列表",
+    "id": "f819650847f411ee8c8bf9570a2af3d1",
+    "path": "/jdy/v2/fi/fa_card",
+    "method": "GET"
+  },
+  {
+    "label": "用户信息列表",
+    "id": "9e8db910712511eda0b3fdf2a45da973",
+    "path": "/jdy/v2/sys/user_list",
+    "method": "GET"
+  },
+  {
+    "label": "科目列表",
+    "id": "9d0396ed712511eda0b399cf12aa235c",
+    "path": "/jdy/v2/fi/account",
+    "method": "GET"
+  }
+]

@@ -1,0 +1,31 @@
+{
+  "kingdee": {
+    "clientId": "在这里填应用ID(纯数字,开发者后台-创建应用后获得)",
+    "clientSecret": "在这里填应用密钥clientSecret(与clientId成对)",
+    "outerInstanceId": "正式环境必填:授权记录表格里的第三方实例ID(16~20位纯数字);填了则自动获取轮换的appKey/appSecret,下方两项可留空",
+    "appKey": "(可选)静态app_key,仅特殊静态密钥联调场景使用,正式环境留空",
+    "appSecret": "(可选)静态appSecret,同上",
+    "domain": "https://tf.jdy.com"
+  },
+  "database": {
+    "server": "127.0.0.1",
+    "port": 1433,
+    "database": "HSDZ_MES",
+    "user": "在这里填SQL Server账号",
+    "password": "在这里填SQL Server密码",
+    "encrypt": false
+  },
+  "sync": {
+    "billStatus": "C",
+    "initBillStatus": "C",
+    "windowDays": 31,
+    "endBiasMinutes": 180,
+    "pageSize": 100,
+    "maxPages": 60,
+    "types": ["SO_ORDER", "PU_ORDER"],
+    "confirmThreshold": 200,
+    "confirmTimeoutSeconds": 5,
+    "logRetentionDays": 365,
+    "backupRetentionDays": 365
+  }
+}
