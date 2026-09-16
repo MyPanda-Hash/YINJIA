@@ -448,6 +448,7 @@
         <DocSelectRail
           v-if="docRailCfg"
           :title="docRailCfg.title"
+          :columns="docRailCfg.columns"
           :rows="list"
           :current-no="railCurNo"
           :collapsed="railCollapsed"
@@ -2429,8 +2430,25 @@ async function guardPageAction(run) {
 }
 
 // ═══ 左侧「单据选择」栏(对齐 PANDA 暂收入库单选择):按面板启用,点行切换右侧当前单据 ═══
-const DOC_RAIL_PANELS = { SL_RECV: true, QC_INSP: true }
-const docRailCfg = computed(() => (DOC_RAIL_PANELS[panelCode.value] ? { title: (panelName.value || '') + tt('选择') } : null))
+// 值=该单据左栏的中间列(重要字段);首列单号/次列日期/末列审核状态由下方组装兜底(键含各单据别名)
+const DOC_RAIL_PANELS = {
+  SL_RECV: ['供应商', '部门'],        // 送料暂收单
+  QC_INSP: ['供应商', '部门'],        // 来料检验单
+  QC_RETURN: ['供应商', '部门'],      // 暂收退料单
+  PU_ORDER: ['供应商'],          // 采购订单(币种列 2026-09-16 按用户口径删)
+  PURCHASE_IN: ['供应商', '入库类别'], // 采购入库单
+}
+const docRailCfg = computed(() => {
+  const middles = DOC_RAIL_PANELS[panelCode.value]
+  if (!middles) return null
+  const columns = [
+    { label: '单号', keys: ['编号', '单据编号', '单号'], align: 'left', no: true },
+    { label: '日期', keys: ['日期', '单据日期'], align: 'left' },
+    ...middles.map((m) => ({ label: m, keys: [m], align: 'left' })),
+    { label: '审核状态', keys: ['单据状态'], align: 'center', tag: true },
+  ]
+  return { title: (panelName.value || '') + tt('选择'), columns }
+})
 const railCollapsed = ref(false)
 const railCurNo = computed(() => {
   const c = cur.value || {}

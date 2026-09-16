@@ -1,8 +1,8 @@
 <template>
-  <!-- 左侧「单据选择」栏(对齐 PANDA 暂收入库单选择):部门下拉+关键字查找+五列小表格,
+  <!-- 左侧「单据选择」栏(对齐 PANDA 暂收入库单选择):部门下拉+关键字查找+小表格(列按单据配置:
+       首列单号/次列日期/末列审核状态标签,中间列由挂载方挑重要字段),
        点行切换右侧当前单据(数据=当前页单据列表镜像,过滤纯前端)。
-       表格 width:max-content 自然紧凑宽 + 全格 nowrap 强制单行(无折行/竖排/交叉),
-       侧栏窄于表格自然宽时容器出横向滚动条;右缘拖拽只改栏宽。 -->
+       表格 width:100% + min-width:max-content(拖宽跟随/拖窄出横向滚动条),全格 nowrap 无交叉。 -->
   <div v-if="!collapsed" ref="railEl" class="doc-select-rail" :style="{ width: width + 'px' }">
     <div class="dsr-head">
       <span class="dsr-title" :title="title">{{ title }}</span>
@@ -22,11 +22,7 @@
       <table ref="tableEl">
         <thead>
           <tr>
-            <th class="a-left">{{ tt('单号') }}</th>
-            <th class="a-left">{{ tt('日期') }}</th>
-            <th class="a-left">{{ tt('供应商') }}</th>
-            <th class="a-center">{{ tt('部门') }}</th>
-            <th class="a-center">{{ tt('审核状态') }}</th>
+            <th v-for="c in cols" :key="c.label" :class="c.align === 'center' ? 'a-center' : 'a-left'">{{ tt(c.label) }}</th>
           </tr>
         </thead>
         <tbody>
@@ -36,16 +32,18 @@
             :class="{ active: r.no === currentNo }"
             @click="$emit('select', r.idx)"
           >
-            <td class="a-left dsr-no" :title="r.no">{{ r.no }}</td>
-            <td class="a-left" :title="r.date">{{ r.date }}</td>
-            <td class="a-left" :title="r.supplier">{{ r.supplier }}</td>
-            <td class="a-center" :title="r.dept">{{ r.dept }}</td>
-            <td class="a-center">
-              <span v-if="r.status" class="dsr-tag" :class="tagClass(r.status)">{{ r.status }}</span>
+            <td
+              v-for="(c, ci) in cols"
+              :key="c.label"
+              :class="[c.align === 'center' ? 'a-center' : 'a-left', { 'dsr-no': c.no }]"
+              :title="r.cells[ci]"
+            >
+              <span v-if="c.tag && r.cells[ci]" class="dsr-tag" :class="tagClass(r.cells[ci])">{{ r.cells[ci] }}</span>
+              <template v-else>{{ r.cells[ci] }}</template>
             </td>
           </tr>
           <tr v-if="!filtered.length">
-            <td colspan="5" class="dsr-empty">{{ tt('暂无数据') }}</td>
+            <td :colspan="cols.length" class="dsr-empty">{{ tt('暂无数据') }}</td>
           </tr>
         </tbody>
       </table>
@@ -66,11 +64,30 @@ const props = defineProps({
   /** 当前单据编号(高亮) */
   currentNo: { type: String, default: '' },
   collapsed: { type: Boolean, default: false },
+  /** 列配置(按单据定制):[{label, keys(候选行键,取首个非空), align, tag(状态标签), no(单号样式)}];
+   *  约定首列=单号、次列=日期、末列=审核状态(tag),中间列由挂载方按单据挑重要字段 */
+  columns: { type: Array, default: null },
 })
 defineEmits(['select', 'toggle'])
 
 const noOf = (row) => String(row['编号'] || row['单据编号'] || row['单号'] || '')
-const dateOf = (row) => row['日期'] ?? row['单据日期'] ?? ''
+
+/** 兜底列(未传 columns 时):与送料暂收单原五列一致 */
+const DEFAULT_COLUMNS = [
+  { label: '单号', keys: ['编号', '单据编号', '单号'], align: 'left', no: true },
+  { label: '日期', keys: ['日期', '单据日期'], align: 'left' },
+  { label: '供应商', keys: ['供应商'], align: 'left' },
+  { label: '部门', keys: ['部门'], align: 'center' },
+  { label: '审核状态', keys: ['单据状态'], align: 'center', tag: true },
+]
+const cols = computed(() => (props.columns && props.columns.length ? props.columns : DEFAULT_COLUMNS))
+const colValue = (row, c) => {
+  for (const k of c.keys || [c.label]) {
+    const v = row[k]
+    if (v !== undefined && v !== null && String(v).trim() !== '') return v
+  }
+  return ''
+}
 
 const dept = ref('')
 const kw = ref('')
@@ -84,11 +101,9 @@ const filtered = computed(() => {
   props.rows.forEach((row, idx) => {
     const no = noOf(row)
     if (appliedDept.value && String(row['部门'] ?? '') !== appliedDept.value) return
-    if (appliedKw) {
-      const hay = [no, row['供应商'], row['部门']].map((v) => String(v ?? '').toLowerCase())
-      if (!hay.some((v) => v.includes(appliedKw.value))) return
-    }
-    out.push({ key: no + '#' + idx, idx, no, date: dateOf(row), supplier: row['供应商'] ?? '', dept: row['部门'] ?? '', status: row['单据状态'] ?? '' })
+    const cells = cols.value.map((c) => colValue(row, c))
+    if (appliedKw.value && !cells.some((v) => String(v ?? '').toLowerCase().includes(appliedKw.value))) return
+    out.push({ key: no + '#' + idx, idx, no, cells })
   })
   return out
 })
@@ -208,23 +223,27 @@ onBeforeUnmount(detachDrag)
 .dsr-kw { display: flex; gap: 6px; margin-top: 8px; }
 .dsr-count { margin-top: 8px; font-size: 12px; color: var(--t-text-2, #5d6c67); }
 
-/* 表格外层:宽度跟随侧栏(100%);表格超宽即出横向滚动条(常显),绝不溢出侧栏 */
+/* 表格外层:宽度跟随侧栏(100%);表格超宽即出横向滚动条(常显),绝不溢出侧栏。
+   max-height 钉在视口内(约减去 工具栏+单号行+栏头/筛选 的高度):行数多时列表在侧栏内部
+   纵向滚动(独立的滚动条),不再把整个布局撑高、逼整页滚动;行数少时不生效,行为不变 */
 .dsr-grid {
   flex: 1;
   width: 100%;
   min-height: 0;
+  max-height: calc(100vh - 230px);
   overflow-x: auto;
   overflow-y: auto;
 }
-/* 滚动条常显(Chromium 下自定义 ::-webkit-scrollbar 即不再是自动隐藏式),
-   拖窄时用户能直接看到底部横向滚动条 */
-.dsr-grid::-webkit-scrollbar { height: 10px; width: 10px; }
-.dsr-grid::-webkit-scrollbar-track { background: var(--t-content-bg, #f2f5f4); }
+/* 滚动条极窄(4px)+平时隐藏:滑块与轨道默认全透明,悬停侧栏时滑块才显色
+   (悬停=将要使用;离开即隐)。轨道不画底色,4px 占位视觉上无感 */
+.dsr-grid::-webkit-scrollbar { width: 4px; height: 4px; }
+.dsr-grid::-webkit-scrollbar-track { background: transparent; }
 .dsr-grid::-webkit-scrollbar-thumb {
-  background: var(--el-color-primary-light-7, #b8d3ce);
-  border-radius: 5px;
+  background: transparent;
+  border-radius: 2px;
 }
-.dsr-grid::-webkit-scrollbar-thumb:hover { background: var(--el-color-primary-light-5, #88b4ac); }
+.dsr-grid:hover::-webkit-scrollbar-thumb { background: var(--el-color-primary-light-7, #b8d3ce); }
+.dsr-grid:hover::-webkit-scrollbar-thumb:hover { background: var(--el-color-primary-light-5, #88b4ac); }
 /* 表格:width:100% 跟随侧栏(拖宽即同步变宽,列一起伸展);
    min-width:max-content 保证不被压缩到内容自然宽以下(拖窄时由外层出横向滚动条) */
 .dsr-grid table {
