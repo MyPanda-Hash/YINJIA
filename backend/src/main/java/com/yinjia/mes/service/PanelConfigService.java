@@ -419,18 +419,25 @@ public class PanelConfigService {
         return new ArrayList<>(out);
     }
 
-    /** 明细自动计算规则:按字段组合推导常见公式(字段名=行键,引擎按中文名取值求值)。 */
+    /** 明细自动计算规则:按字段组合推导常见公式(字段名=行键,引擎按中文名取值求值)。
+     *  兼容两套命名:标准(单价/金额/含税单价/含税金额)与销售(售价/销售金额/含税售价/含税销售金额)。 */
     private List<Map<String, Object>> buildCalcRules(List<PanelRegistry.FieldDef> detailFields) {
         java.util.Set<String> labels = new java.util.HashSet<>();
         for (PanelRegistry.FieldDef f : detailFields) labels.add(f.label());
         List<Map<String, Object>> out = new ArrayList<>();
+        // 数量列:优先"数量",退而"实收数量"
         String qty = labels.contains("数量") ? "数量" : labels.contains("实收数量") ? "实收数量" : null;
-        boolean hasPrice = labels.contains("单价");
-        if (qty != null && hasPrice && labels.contains("金额")) calcRule(out, "金额", qty + "*单价", 2);
-        if (hasPrice && labels.contains("税率%") && labels.contains("含税单价")) calcRule(out, "含税单价", "单价*(1+税率%/100)", 4);
-        if (qty != null && labels.contains("含税单价") && labels.contains("含税金额")) calcRule(out, "含税金额", qty + "*含税单价", 2);
-        if (labels.contains("金额") && labels.contains("税率%") && labels.contains("税额")) calcRule(out, "税额", "金额*税率%/100", 2);
-        if (qty != null && hasPrice && labels.contains("折扣%") && labels.contains("折扣金额")) calcRule(out, "折扣金额", qty + "*单价*折扣%/100", 2);
+        // 单价/金额列:标准 或 销售命名(SALE_OUT 用 售价/销售金额/含税售价/含税销售金额)
+        String price = labels.contains("单价") ? "单价" : labels.contains("售价") ? "售价" : null;
+        String amount = labels.contains("金额") ? "金额" : labels.contains("销售金额") ? "销售金额" : null;
+        String taxPrice = labels.contains("含税单价") ? "含税单价" : labels.contains("含税售价") ? "含税售价" : null;
+        String taxAmount = labels.contains("含税金额") ? "含税金额" : labels.contains("含税销售金额") ? "含税销售金额" : null;
+        boolean hasPrice = price != null;
+        if (qty != null && hasPrice && amount != null) calcRule(out, amount, qty + "*" + price, 2);
+        if (hasPrice && labels.contains("税率%") && taxPrice != null) calcRule(out, taxPrice, price + "*(1+税率%/100)", 4);
+        if (qty != null && taxPrice != null && taxAmount != null) calcRule(out, taxAmount, qty + "*" + taxPrice, 2);
+        if (amount != null && labels.contains("税率%") && labels.contains("税额")) calcRule(out, "税额", amount + "*税率%/100", 2);
+        if (qty != null && hasPrice && labels.contains("折扣%") && labels.contains("折扣金额")) calcRule(out, "折扣金额", qty + "*" + price + "*折扣%/100", 2);
         if (qty != null && labels.contains("单重") && labels.contains("总重")) calcRule(out, "总重", "单重*" + qty, 4);
         return out;
     }
