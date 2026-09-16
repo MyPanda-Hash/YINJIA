@@ -305,3 +305,9 @@ migrate-hide-junk-fields.sql
 # 生成器 _gen-inbound-outbound.mjs:头补86/87列、行补66/89列(标签=订单已验证覆盖表);
 # id/创建修改/附件/费用分录默认隐藏;EXTRA/EXTRA_LINES 已备好但 sync-core 未接(待同步脚本特殊要求)。
 migrate-inbound-outbound-fields.sql
+
+# —— 2026-09-16 登记:全面板英文标签/id字段统一处理+显隐重设计 ——
+# 40+英文列名 sp_rename 中文化(customer_id→客户id/contact_country_id→联系人国家id/dispatcher系列/bill_stock_id 等);
+# 所有 id 类字段(*id/*ID/*-id/*_id/图片url/kf_period/QQ 等)统一隐藏(用户看名称不看内部ID);
+# 长标签清理(入库状态Z部分入库,C全部入库,A未入库→入库状态);可见字段英文标签清零。
+migrate-fix-all-english-and-visibility.sql
