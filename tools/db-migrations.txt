@@ -285,3 +285,9 @@ migrate-kingdee-full-union.sql
 # EXTRA_LINES(行级)+EXTRA dotted 路径(bomentity.xx);runCore autoExtraLines 按行合并(autoExtra 支持子实体首行取值);
 # 敏感行字段(条形码sn_list等)走解密。验证:50条回填失败0解密292。
 migrate-kingdee-subentity-union.sql
+
+# —— 2026-09-16 登记:14 面板默认显隐按业务常用度设置 ——
+# 全并集补齐的字段(seq>=950/960)中:常用业务字段(金额/日期/状态/地址/联系人/仓库/批次/条形码/源单等)保留显示,
+# 其余(id/编码/创建修改人/长编码/辅助属性组合等)隐藏。原有手工字段不动(已按金蝶实际使用口径裁剪过)。
+# 显示/隐藏:SO 118/80、PU 36/140、KHDA 60/14、GFDA 22/20、INV 75/33。
+migrate-panel-default-visibility.sql
