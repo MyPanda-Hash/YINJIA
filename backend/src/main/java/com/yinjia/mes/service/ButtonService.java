@@ -501,6 +501,14 @@ public class ButtonService {
 
     /** 档案保存:整份明细 upsert(插入回填自增 id),缺席行软删 */
     private Map<String, Object> saveArchive(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String user) {
+        // 数据量护栏(2026-09-16):档案保存=全量 upsert(缺席行=已删除);库里存活行数一旦超出
+        // 全量加载上限,前端看到的就是截断数据,此时放行保存会把未加载的行全部误删——直接拒绝
+        Integer live = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + def.lineTable() + " WHERE ISNULL(asp_cancel,'N')<>'Y'", Integer.class);
+        if (live != null && live > QueryService.ARCH_LOAD_CAP) {
+            throw new IllegalStateException("该档案存活行数 " + live + " 已超出全量加载上限 " + QueryService.ARCH_LOAD_CAP
+                    + ",保存已阻止:未加载的行会被当作删除处理,请联系开发提高上限或先清理/归档数据");
+        }
         Set<Object> liveIds = new HashSet<>();
         for (Map<String, Object> item : items) {
             Object id = item.get("id");
@@ -755,8 +763,10 @@ public class ButtonService {
         dualOutFinishIn(def.code(), no, currentUserName());
         // 不良品处理记账(品质层):处理单审核 → 原仓扣减+目标仓(隔离/不良品)移仓或报废
         qcDisposal.post(def.code(), no, currentUserName());
-        // 来料检验单审核 → 合格数量>0 的行自动生成采购入库单草稿(2026-09-15;暂收退回单暂不创建)
+        // 来料检验单审核 → 自动生单(2026-09-16 双出口口径):合格数量>0 的行生成采购入库单草稿,
+        // 不良数量>0 的行生成暂收退回单草稿(此前暂收退回单为手工按钮,现改为审核自动创建)
         inspAutoPurchaseIn(def.code(), no, currentUserName());
+        inspAutoReturn(def.code(), no, currentUserName());
         // 项目实施计划归档 → 自动同步项目进度查询(研发管理)
         if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
         // 文件类面板:经审核收尾(修改闭环/弃审留痕) → 计算修改记录并再归档
@@ -872,6 +882,11 @@ public class ButtonService {
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion);
+        // 来料检验单审批通过(与「审核」同效为已审核) → 同样触发自动生单(2026-09-16 修复:
+        // 此前钩子只挂在审核路径,走 提交审批→审批通过 的检验单不生成采购入库单/暂收退回单,
+        // 用户只好点手工生单按钮,而手工路径实收数量映射错误且退回单被死过滤器挡住)
+        inspAutoPurchaseIn(def.code(), no, operator);
+        inspAutoReturn(def.code(), no, operator);
         // 消息:审批通过 → 制单人
         notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
                 def.code(), no, MessageService.APPROVAL_APPROVED,
@@ -1281,7 +1296,6 @@ public class ButtonService {
      * 行级占用写 form_flow_link(source_quantity=数量,linked_quantity=合格数量,余量=不良部分,
      * 供后续暂收退回链使用)并回填检验行 入库单号。幂等:已有 ACTIVE 占用(重审)跳过;
      * 无合格数量的行不生成(全不良/未检完的检验单审核不产生空入库单)。
-     * 暂收退回单暂不自动创建(用户口径 2026-09-15;手工「生成暂收退回单」按钮保留)。
      * 生成的入库单留草稿由仓库确认审核(不自动记账,对齐 编制/审核分离)。
      */
     private void inspAutoPurchaseIn(String panelCode, String no, String user) {
@@ -1340,8 +1354,74 @@ public class ButtonService {
         }
     }
 
-    /** 来料检验单弃审联动:自动生成的采购入库单草稿 → 作废留痕+释放占用+清 入库单号 回填;
-     *  已审核则拒绝弃审(先弃审该入库单),防止库存已入账而检验单被弃审的错位。 */
+    /**
+     * 来料检验单(QC_INSP)审核后,把 不良数量>0 的明细行自动生成暂收退回单(QC_RETURN)草稿(2026-09-16):
+     * 退回数量=不良数量;物料编码/物料名称/型号/物料描述/备注 ← 检验行;头带入 单据日期/业务员/
+     * 供应商代码/供应商/部门/部门名称。行级占用写 form_flow_link(QC_INSP→QC_RETURN,
+     * source_quantity=数量,linked_quantity=不良数量,与采购入库单的 合格 占用并行,余量=待检部分)。
+     * 幂等:已有 ACTIVE 占用(重审)跳过;无不不良数量的行不生成(不产生空退回单)。
+     * 检验明细无「退回单号」列,不做回填(入库侧回填见 inspAutoPurchaseIn)。
+     * 生成的退回单留草稿由业务确认审核。
+     */
+    private void inspAutoReturn(String panelCode, String no, String user) {
+        if (!"QC_INSP".equals(panelCode)) return;
+        Integer linked = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code='QC_INSP' AND source_form_no=?"
+                        + " AND target_panel_code='QC_RETURN' AND link_status='ACTIVE'", Integer.class, no);
+        if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, 物料编码, 物料名称, 型号, 物料描述, 数量, 不良数量, 备注, 日期 FROM qc_insp_detail"
+                        + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
+        List<Map<String, Object>> defect = rows.stream()
+                .filter(r -> numOr(r.get("不良数量")) > 0).toList();
+        if (defect.isEmpty()) return;
+        List<Map<String, Object>> heads = jdbc.queryForList(
+                "SELECT 单据日期, 业务员, 供应商代码, 供应商, 部门, 部门名称 FROM qc_insp"
+                        + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + no);
+        Map<String, Object> h = heads.get(0);
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Map<String, Object> r : defect) {
+            Map<String, Object> line = new LinkedHashMap<>();
+            line.put("物料编码", r.get("物料编码"));
+            line.put("物料名称", r.get("物料名称"));
+            line.put("型号", r.get("型号"));
+            line.put("物料描述", r.get("物料描述"));
+            line.put("数量", r.get("不良数量"));
+            Object d = r.get("日期");
+            if (d != null && !String.valueOf(d).isBlank()) line.put("日期", String.valueOf(d));
+            Object m = r.get("备注");
+            if (m != null && !String.valueOf(m).isBlank()) line.put("备注", String.valueOf(m));
+            items.add(line);
+        }
+        Map<String, Object> head = new LinkedHashMap<>();
+        Object date = h.get("单据日期");
+        head.put("日期", date == null || String.valueOf(date).isBlank() ? LocalDate.now().toString() : String.valueOf(date));
+        head.put("业务员", h.get("业务员"));
+        head.put("供应商代码", h.get("供应商代码"));
+        head.put("供应商", h.get("供应商"));
+        head.put("部门", h.get("部门"));
+        head.put("部门名称", h.get("部门名称"));
+        head.put("detail", Map.of("items", items));
+        Map<String, Object> saved = save(registry.panel("QC_RETURN"), head, false);
+        String thNo = String.valueOf(saved.get("编号"));
+        // 行级占用(目标行按保存顺序取 id,与 defect 一一对应)
+        List<Integer> tgtIds = jdbc.queryForList(
+                "SELECT id FROM qc_return_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
+                Integer.class, thNo);
+        for (int i = 0; i < defect.size() && i < tgtIds.size(); i++) {
+            Map<String, Object> r = defect.get(i);
+            jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
+                            + " target_panel_code, target_form_no, target_line_key, inventory_code,"
+                            + " source_quantity, linked_quantity, link_status, create_by)"
+                            + " VALUES ('QC_INSP', ?, ?, 'QC_RETURN', ?, ?, ?, ?, ?, 'ACTIVE', ?)",
+                    no, no + "#" + r.get("id"), thNo, thNo + "#" + tgtIds.get(i), r.get("物料编码"),
+                    r.get("数量"), r.get("不良数量"), user);
+        }
+    }
+
+    /** 来料检验单弃审联动:自动生成的采购入库单/暂收退回单草稿 → 作废留痕+释放占用+清 入库单号 回填;
+     *  已审核则拒绝弃审(先弃审该下游单),防止库存已入账/退货已确认而检验单被弃审的错位。 */
     private void inspUnauditCascade(String panelCode, String no, String user) {
         if (!"QC_INSP".equals(panelCode)) return;
         List<String> piNos = jdbc.queryForList(
@@ -1356,6 +1436,19 @@ public class ButtonService {
             }
             jdbc.update("UPDATE qc_insp_detail SET 入库单号 = NULL, asp_user2 = ?, asp_time2 = GETDATE()"
                     + " WHERE 单据编号 = ? AND 入库单号 = ?", user, no, piNo);
+        }
+        // 暂收退回单(2026-09-16 自动生单):同口径联动——草稿作废释放,已审核则挡弃审;
+        // 检验明细无「退回单号」列,无回填可清
+        List<String> thNos = jdbc.queryForList(
+                "SELECT DISTINCT target_form_no FROM form_flow_link WHERE source_panel_code='QC_INSP' AND source_form_no=?"
+                        + " AND target_panel_code='QC_RETURN' AND link_status='ACTIVE'", String.class, no);
+        for (String thNo : thNos) {
+            String st = String.valueOf(docStatusOf("QC_RETURN", thNo).get("status"));
+            if ("草稿".equals(st) || "修改中".equals(st)) {
+                voidDoc(registry.panel("QC_RETURN"), thNo, user);
+            } else {
+                throw new IllegalStateException("自动生成的暂收退回单 " + thNo + " 已审核,请先弃审该退回单再弃审检验单");
+            }
         }
     }
 

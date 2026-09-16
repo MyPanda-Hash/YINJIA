@@ -807,6 +807,7 @@ export default {
     '生成委外发料单': 'Generar emisión subcontrato',
     '已中止': 'Detenido',
     '输入搜索': 'Escribir para buscar',
+    '点击编辑': 'Clic para editar',
     '共有数据': 'Total de registros',
     '审核状态': 'Estado de auditoría',
     '选择': 'Seleccionar',

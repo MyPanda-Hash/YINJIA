@@ -253,6 +253,7 @@ export default {
     '单据编号': 'Document No.',
     '备注': 'Remark',
     '输入搜索': 'Type to search',
+    '点击编辑': 'Click to edit',
     '共有数据': 'Total records',
     '审核状态': 'Audit Status',
     '选择': 'Select',

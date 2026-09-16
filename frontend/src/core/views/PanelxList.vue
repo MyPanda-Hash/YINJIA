@@ -650,13 +650,27 @@
             <span class="dt-ic" v-for="ic in b.isMain ? iconA : iconB" :key="ic" @click="onIcon(ic, b)">{{ tt(ic) }}</span>
           </span>
         </div>
+        <!-- 档案大表分页器:数据全量在内存(保存语义不变),DOM 只渲染当前页;
+             形态=总数+每页条数(默认100)+左右箭头+输入跳页,不带数字页码按钮 -->
+        <div v-if="singleDocMode && archTotal(b) > ARCH_SIZE_OPTS[0]" class="arch-pager">
+          <el-pagination
+            small background
+            v-model:page-size="archPageSize"
+            layout="total, sizes, prev, next, jumper"
+            :page-sizes="ARCH_SIZE_OPTS"
+            :total="archTotal(b)"
+            :current-page="archCurPage(b)"
+            @size-change="onArchSizeChange"
+            @current-change="(p) => (archPage = p)"
+          />
+        </div>
         <el-table
-          :data="blockRows(b)"
+          :data="pagedBlockRows(b)"
           :height="tableH(b)"
           border
           size="small"
           :show-summary="tabView(b, activeTab(b)) !== 'summary'"
-          :summary-method="sumMethod"
+          :summary-method="(p) => sumMethodFor(b, p)"
           :sum-text="tt('合计')"
           :row-class-name="(o) => rowCls(o, b)"
           @selection-change="(r) => (delSel = r)"
@@ -664,14 +678,16 @@
           @cell-dblclick="(row, col, cell, ev) => onDetailCellDblclick(row, col, ev, b)"
           @row-click="(row) => onRowClick(row, b)"
           @click.capture="(e) => onTableClick(b, e)"
+          @scroll.capture="(e) => onArchScroll(e, b)"
         >
           <el-table-column v-if="delMode && b.isMain" type="selection" width="45" fixed="left" />
           <el-table-column
-            v-for="c in blockCols(b)"
+            v-for="c in archCols(b)"
             :key="c.prop"
             :prop="c.prop"
             :label="c.label"
-            :min-width="c.width"
+            :width="archColW(b, c)"
+            :min-width="archColW(b, c) ? undefined : c.width"
             :align="c.align"
             :show-overflow-tooltip="!detailEditable(b)"
           >
@@ -700,9 +716,14 @@
               />
             </template>
             <template #default="{ row }">
-              <template v-if="detailEditable(b) && !row._placeholder">
+              <!-- 列懒渲染:视口外列只出空占位(表头保留撑宽),滚动进入视口再产出内容 -->
+              <span v-if="!archColVisible(b, c)" class="col-lazy-empty"></span>
+              <template v-else>
+              <template v-if="archEditable(b) && !row._placeholder">
                 <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
-                <div v-else-if="isReferenceField(c.field)" class="inline-ref-editor" :class="{ active: isActiveDetailRefRow(row, b, c.prop) }">
+                <!-- 档案页参照列同样懒挂载(2026-09-16):大数据档案每行常驻参照编辑器是 DOM 膨胀主源之一;
+                     单据页行数少,保持常驻(点即选)不变 -->
+                <div v-else-if="isReferenceField(c.field) && (!singleDocMode.value || isActiveCell(row, b, c.prop))" class="inline-ref-editor" :class="{ active: isActiveDetailRefRow(row, b, c.prop) }">
                   <el-input
                     :model-value="formatFieldValue(c.field, row[c.prop])"
                     readonly
@@ -711,6 +732,7 @@
                   />
                   <el-icon v-if="detailRefTrigger(c.field) === 'dblclick' && isActiveDetailRefRow(row, b, c.prop)" class="list-ref-icon"><Search /></el-icon>
                 </div>
+                <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
                 <!-- 编辑器懒渲染:仅激活单元格挂载编辑控件,其余单元格显示纯文本,
                      避免大数据量面板(如数据字典 210 行)每格常驻编辑器导致 DOM 膨胀 -->
                 <template v-else-if="isActiveCell(row, b, c.prop)">
@@ -760,6 +782,7 @@
                 <span v-if="hasSubBom(row[c.prop])" class="mat-star" :title="tt('该材料有下级子件 BOM，点击行查看')">*</span>
               </span>
               <span v-else>{{ tt(row[c.prop] ?? '') }}</span>
+              </template>
             </template>
           </el-table-column>
         </el-table>
@@ -1305,7 +1328,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, nextTick, markRaw, toRaw } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search } from '@element-plus/icons-vue'
@@ -2666,8 +2689,220 @@ function blockRows(b) {
   return out
 }
 
+// ═══ 档案大表分页渲染(2026-09-16):数据全量驻留内存(保存语义"缺席行=已删除"不变),
+// DOM 只渲染当前页 —— 商品等几千行×几十列的档案页全量渲染会把 DOM 撑到十几万格导致整页卡死;
+// 全部 singleDoc 档案面板(INV/KHDA/GFDA/EMP/WH/PARTNER/DEPT/UOM/REGION/ZDGL…)走同一通道自动生效。
+// 分页器形态(用户口径):总数 + 每页条数下拉(默认100) + 左右箭头 + 输入跳页(不要数字页码按钮) ═══
+const archPageSize = ref(50)
+const ARCH_SIZE_OPTS = [50, 100, 200, 500]
+const archPage = ref(1)
+function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首页
+/** 档案行非响应化(2026-09-16 四期,入口卡顿主因):几千行×几十列被 Vue 深度代理
+ *  (首次全量过滤/排序/快照访问 ≈29 万属性走 proxy get)是"点进页面转圈"的最大开销源(实测单一 4.4s 长任务)。
+ *  将档案明细数组与行 markRaw 后,读取零代理;写入(编辑/带回/新增)经 markInlineDirty
+ *  统一 bump archVersion 驱动视图与计算刷新——所有写路径本就必须置脏(守卫语义),天然闭环。
+ *  ⚠ markRaw 必须打在原始对象上:打在 reactive 代理上无效(标记不落 target)。
+ *  load 侧在赋给 list.value 之前处理(对象必然是原始的);本函数兜底带 ref 替换/追加的场景,经 toRaw 取原件。 */
+const archVersion = ref(0)
+function normalizeArchRaw() {
+  if (!singleDocMode.value) return
+  const doc = toRaw(cur.value || {})
+  const detail = doc?.detail
+  if (!detail) return
+  let touched = false
+  for (const rows of Object.values(detail)) {
+    if (!Array.isArray(rows)) continue
+    if (!rows.__v_skip) { markRaw(rows); touched = true }
+    for (const r of rows) if (r && typeof r === 'object' && !r.__v_skip) { markRaw(r); touched = true }
+  }
+  if (touched) archVersion.value++
+}
+/** 载入的档案文档在进入响应式系统前预打 raw 标记(load 赋值 list.value 之前调用) */
+function markArchListRaw(docs) {
+  if (!singleDocMode.value || !Array.isArray(docs)) return
+  const doc = docs[0]
+  const detail = doc?.detail
+  if (!detail) return
+  for (const rows of Object.values(detail)) {
+    if (!Array.isArray(rows)) continue
+    markRaw(rows)
+    for (const r of rows) if (r && typeof r === 'object') markRaw(r)
+  }
+}
+/** 档案行计算缓存:一次响应式变更只过滤+排序一遍 —— 此前 archTotal/pagedBlockRows/sumMethodFor/
+ *  分页器/表格高度各自调 blockRows,每次渲染对几千行重复跑 4~5 遍过滤+排序,交互卡顿主因之一 */
+const archRowsMap = computed(() => {
+  const m = {}
+  if (!singleDocMode.value) return m
+  void archVersion.value // 档案行 markRaw 后值变化无响应依赖,以版本号驱动重算(markInlineDirty/load 时 bump)
+  const detail = cur.value?.detail
+  if (detail) void Object.keys(detail).length
+  for (const b of blocks.value) m[b.id] = blockRows(b)
+  return m
+})
+function archRows(b) { return singleDocMode.value ? (archRowsMap.value[b.id] ?? blockRows(b)) : blockRows(b) }
+function archTotal(b) { return archRows(b).filter((r) => !r._placeholder).length }
+/** 档案列/列宽计算缓存(2026-09-16 三期):blockCols 内含 fieldDefOf 线性扫描,此前每次渲染
+ *  被调 1(v-for)+N(archColW 逐列)次,商品 75 列 ≈ 5800 次字段扫描;缓存后一次变更只构建一遍 */
+const archColsMap = computed(() => {
+  const m = {}
+  if (!singleDocMode.value) return m
+  for (const b of blocks.value) {
+    const cols = blockCols(b)
+    const widths = new Map()
+    if (cols.length <= ARCH_FIT_MAX_COLS && detailW.value) {
+      const avail = detailW.value - (delMode.value ? 47 : 0)
+      const sum = cols.reduce((a, x) => a + (Number(x.width) || 100), 0)
+      const raw = cols.map((x) => Math.max(48, Math.round(((Number(x.width) || 100) / sum) * avail)))
+      // 最小列宽钳制可能让合计偏离容器宽:差额多退少补全落到最宽列,保证恰好铺满
+      const diff = avail - raw.reduce((a, v) => a + v, 0)
+      if (diff !== 0) {
+        const idx = raw.indexOf(Math.max(...raw))
+        raw[idx] = Math.max(48, raw[idx] + diff)
+      }
+      cols.forEach((x, i) => widths.set(x.prop, raw[i]))
+    }
+    m[b.id] = { cols, widths }
+  }
+  return m
+})
+function archCols(b) { return singleDocMode.value ? (archColsMap.value[b.id]?.cols ?? blockCols(b)) : blockCols(b) }
+/** 档案块可编辑性缓存:模板每格 v-if 原先调 detailEditable(b)(多层 computed 链)×3750 格;
+ *  缓存后每块一次,状态变化经 computed 依赖自动刷新 */
+const archEditableMap = computed(() => {
+  const m = {}
+  if (!singleDocMode.value) return m
+  for (const b of blocks.value) m[b.id] = detailEditable(b)
+  return m
+})
+function archEditable(b) { return singleDocMode.value ? (archEditableMap.value[b.id] ?? detailEditable(b)) : detailEditable(b) }
+/** 列懒渲染(2026-09-16 五期):超宽档案(列>16 走横向滚动,如商品 75 列/表宽 7532px vs 视口 1042px)
+ *  只渲染视口±半屏内的列内容,视口外列渲染空占位(表头保留撑住列宽与滚动条)——
+ *  首渲染从 3750 格降到 ~1000 格,翻页同理;横向滚动时按需补渲染。
+ *  响应式行/列缓存已在位,这里只控制 default 插槽是否产出内容。 */
+const archViewport = reactive({ left: -1, w: 1042, expand: false })
+const COL_LAZY_MIN = ARCH_FIT_MAX_COLS + 1
+// 两段渲染:首帧只出窄窗口(视口+0.3屏)快速见内容,120ms 后扩到常规窗口(±半屏)补齐,
+// 把 75 列首渲染的长任务拆成两段短任务,页面更早可交互
+let colExpandTimer = 0
+function scheduleColExpand() {
+  archViewport.expand = false
+  clearTimeout(colExpandTimer)
+  colExpandTimer = setTimeout(() => { archViewport.expand = true }, 120)
+}
+watch(panelCode, scheduleColExpand)
+onMounted(scheduleColExpand)
+function archLazyOn(b) { return singleDocMode.value && archCols(b).length >= COL_LAZY_MIN }
+let colLazyRaf = 0
+function onArchScroll(e, b) {
+  if (!archLazyOn(b)) return
+  const el = e.target
+  if (!el || el.scrollWidth <= el.clientWidth) return
+  if (colLazyRaf) return
+  colLazyRaf = requestAnimationFrame(() => {
+    colLazyRaf = 0
+    archViewport.left = el.scrollLeft
+    archViewport.w = el.clientWidth || 1042
+  })
+}
+function archColVisible(b, c) {
+  if (!archLazyOn(b)) return true
+  const cols = archCols(b)
+  const widths = archColsMap.value[b.id]?.widths
+  let x = 0
+  for (const k of cols) {
+    const w = widths?.get(k.prop) ?? Number(k.width) ?? 100
+    if (k.prop === c.prop) {
+      const base = Math.max(0, archViewport.left)
+      const head = archViewport.left < 0 ? 0.3 : 0.5
+      const tail = archViewport.left < 0 ? 0.3 : 1
+      const win = archViewport.expand ? { head: 0.5, tail: 1.5 } : { head, tail }
+      return x + w >= base - archViewport.w * win.head && x <= base + archViewport.w * win.tail
+    }
+    x += w
+  }
+  return true
+}
+function archCurPage(b) { return Math.min(archPage.value, Math.max(1, Math.ceil(archTotal(b) / archPageSize.value))) }
+function pagedBlockRows(b) {
+  const rows = archRows(b)
+  if (!singleDocMode.value) return rows
+  const real = rows.filter((r) => !r._placeholder)
+  if (real.length <= archPageSize.value) return rows
+  const start = (archCurPage(b) - 1) * archPageSize.value
+  return real.slice(start, start + archPageSize.value)
+}
+/** 档案分页时合计行仍按全量行计算,不随当前页截断;
+ *  合计值走 archSums 缓存(全量行×数值列只算一遍)——此前每次翻页 el-table 重算合计,
+ *  对 3850行×75列 做 ~28 万次 Number(),是翻页卡顿主因 */
+const archSumsMap = computed(() => {
+  const m = {}
+  if (!singleDocMode.value) return m
+  for (const b of blocks.value) {
+    const sums = {}
+    for (const c of archCols(b)) {
+      const f = c.field
+      if (f && (f.dataType === '小数' || f.dataType === '整数')) {
+        let acc = 0
+        let has = false
+        for (const r of archRows(b)) {
+          if (r._placeholder) continue
+          const v = Number(r[c.prop])
+          if (Number.isFinite(v)) { acc += v; has = true }
+        }
+        sums[c.prop] = has ? Math.round(acc * 100) / 100 : ''
+      }
+    }
+    m[b.id] = sums
+  }
+  return m
+})
+function sumMethodFor(b, p) {
+  const sums = singleDocMode.value ? archSumsMap.value[b.id] : null
+  if (!sums) return sumMethod(p)
+  const { columns } = p
+  const out = []
+  columns.forEach((col, i) => { out[i] = i === 0 ? tt('合计') : (sums[col.property] ?? '') })
+  return out
+}
+/** 档案列铺满边框(2026-09-16):列数可容纳(≤ARCH_FIT_MAX_COLS)时按原列宽比例把容器宽度
+ *  分配为像素列宽(EP 列宽不支持百分比,parseWidth 会吞掉 %),表格恒等于容器宽、无横向滚动;
+ *  列过多(如商品 75 列)返回 undefined,保持像素宽+横向滚动。宽度随窗口缩放自动重算。 */
+const ARCH_FIT_MAX_COLS = 16
+const detailW = ref(0)
+const bodyH = ref(0)
+function measureDetailW() {
+  const el = document.querySelector('.panelx-list .detail')
+  detailW.value = el ? el.clientWidth - 2 /*左右边框*/ : 0
+  const body = document.querySelector('.panelx-list .body')
+  bodyH.value = body ? body.clientHeight : 0
+}
+let detailRO = null
+onMounted(() => {
+  nextTick(measureDetailW)
+  // ResizeObserver 监听根容器:窗口缩放/侧栏拖拽等一切布局变化都触发重测(比 window.resize 可靠)
+  const root = document.querySelector('.panelx-list')
+  if (root && window.ResizeObserver) {
+    detailRO = new ResizeObserver(() => measureDetailW())
+    detailRO.observe(root)
+  }
+  window.addEventListener('resize', measureDetailW)
+})
+onUnmounted(() => { detailRO?.disconnect(); window.removeEventListener('resize', measureDetailW) })
+watch(loading, () => !loading.value && nextTick(measureDetailW))
+function archColW(b, c) {
+  if (!singleDocMode.value) return undefined
+  return archColsMap.value[b.id]?.widths.get(c.prop) // 列宽缓存一次构建(含铺满/多退少补),逐列读取 O(1)
+}
+
 function tableH(b) {
   const hasFooter = tabView(b, activeTab(b)) !== 'summary'
+  // 档案页(2026-09-16):表格高度填充 .body 可用高度(到表尾备注区为止,不越过)——
+  // 固定 5 行高在小数据时下方大片空白,大数据时又只有 5 行视口
+  if (singleDocMode.value && bodyH.value) {
+    const pagerH = archTotal(b) > ARCH_SIZE_OPTS[0] ? 40 : 0
+    return Math.max(HEAD_H + MIN_ROWS * ROW_H + (hasFooter ? FOOT_H : 0), bodyH.value - 8 - 2 - 33 - pagerH - 10)
+  }
   return HEAD_H + MIN_ROWS * ROW_H + (hasFooter ? FOOT_H : 0)
 }
 
@@ -3443,6 +3678,7 @@ function addInlineDetailRow(b) {
   const state = blockSortOf(b)
   if (state.order) { state.prop = ''; state.order = '' }
   rows.push(newDetailRow(tabKey))
+  archPage.value = Math.ceil(rows.length / archPageSize.value) // 档案分页:新行在末尾,跳到末页立即可见
   markInlineDirty() // 新增明细行 = 未保存修改
 }
 
@@ -4121,7 +4357,10 @@ function restoreFreshDraft() {
 }
 /** 变更钩子置脏(表头/明细控件 @change;对真实交互可靠)——快照对比作兜底 */
 const inlineDirtyFlag = ref(false)
-function markInlineDirty() { if (draftEditable.value) inlineDirtyFlag.value = true }
+function markInlineDirty() {
+  if (draftEditable.value) inlineDirtyFlag.value = true
+  normalizeArchRaw() // 档案行 raw 写入不触发响应式:统一在此 markRaw 新行/新数组并 bump 版本驱动视图刷新
+}
 
 /** 终止审批动作后(申请终止/审批/撤回):重载列表刷新单据状态(终止审批中/已终止) */
 async function onTermChanged() {
@@ -4743,6 +4982,7 @@ async function onScanApply(payload) {
 async function load() {
   delMode.value = false
   delSel.value = []
+  archPage.value = 1 // 档案分页随每次载入回到首页
   if (invalidPanel.value) {
     ElMessage.error('面板编号无效，请从菜单重新进入')
     return
@@ -4759,6 +4999,7 @@ async function load() {
     }
     if (query.keyword) params.keyword = query.keyword
     const res = await engine.queryFormDataList(params)
+    markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
     list.value = res.list || []
     total.value = res.totalSize || 0
     if (curIdx.value >= list.value.length) curIdx.value = 0
@@ -5955,6 +6196,13 @@ onUnmounted(() => {
   margin-bottom: 8px;
   background: #fff;
   position: relative;
+}
+/* 档案大表分页器:右对齐贴在明细表头上沿 */
+.arch-pager {
+  display: flex;
+  justify-content: flex-end;
+  padding: 3px 8px 5px;
+  border-bottom: 1px solid var(--t-border-light, #edf1ef);
 }
 .approved-stamp {
   position: absolute;

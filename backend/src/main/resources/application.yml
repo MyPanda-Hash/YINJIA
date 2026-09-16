@@ -1,5 +1,11 @@
 server:
   port: 8090
+  compression:
+    # 响应 gzip:档案全量接口(商品 3850行×75列 ≈2.4MB JSON)压到 ~300KB,
+    # 生产跨机部署时显著缩短"点进页面转圈"的网络段
+    enabled: true
+    mime-types: application/json,text/javascript,text/css
+    min-response-size: 2KB
 
 spring:
   application:

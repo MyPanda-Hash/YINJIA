@@ -679,8 +679,10 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 来料检验单(原检验单,2026-09-15 改名):选单=暂收入库单;审核时自动生成采购入库单
-            // (合格行,ButtonService.inspAutoPurchaseIn);暂收退回单暂不自动创建,手工按钮保留
+            // 来料检验单(原检验单,2026-09-15 改名):选单=暂收入库单;审核/审批通过时自动生成
+            // 采购入库单(合格行,实收数量=合格数量)+暂收退回单(不良行,数量=不良数量)
+            // (ButtonService.inspAutoPurchaseIn/inspAutoReturn)。工具栏生单组保留占位(对齐 T+ 灰按钮):
+            // 无 pushTarget 实现时由 metadata.disabledActions 输出恒灰占位,不参与实际生单
             java.util.Map.entry("QC_INSP", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选暂收入库单"},
@@ -831,8 +833,6 @@ public class PanelConfigService {
             java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
             java.util.Map.entry("QC_RECV|生成检验单", "QC_INSP"),
             java.util.Map.entry("SL_RECV|生成来料检验单", "QC_INSP"),
-            java.util.Map.entry("QC_INSP|生成采购入库单", "PURCHASE_IN"),
-            java.util.Map.entry("QC_INSP|生成暂收退回单", "QC_RETURN"),
             java.util.Map.entry("WO_ORDER|生成领料单", "MATERIAL_OUT")
     )));
 
@@ -843,12 +843,10 @@ public class PanelConfigService {
 
     /**
      * 推式生单行过滤((面板|动作) → {字段, =/!=, 值}):同一来源按行拆到不同目标单时使用。
-     * 例:来料检验单按 处置方式 拆行——非退货行生成采购入库单,退货行生成暂收退回单。
+     * 现无在用条目(2026-09-16:检验单→入库/退回两条已随手工生单组移除——该过滤仅支持等值
+     * 匹配且引用的 处置方式 列在检验明细并不存在,行级 合格/不良 拆分改由审核自动生单实现)。
      */
-    private static final Map<String, String[]> PUSH_DETAIL_FILTERS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
-            "QC_INSP|生成采购入库单", new String[]{"处置方式", "!=", "退货"},
-            "QC_INSP|生成暂收退回单", new String[]{"处置方式", "=", "退货"}
-    )));
+    private static final Map<String, String[]> PUSH_DETAIL_FILTERS = Map.of();
 
     /** 推式生单行过滤条件(无则 null)。 */
     public String[] detailFilter(String panelCode, String action) {
