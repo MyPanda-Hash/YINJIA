@@ -18,6 +18,7 @@ const args = new Set(process.argv.slice(2));
 const DRY_RUN = args.has('--dry-run');
 const PROBE = args.has('--probe');
 const SKIP_CONFIRM = args.has('--yes');
+const INCLUDE_SYNCED = args.has('--include-synced'); // 推含金蝶同步来的单(推到不同沙箱时用)
 
 const cfgPath = join(HERE, 'config.json');
 if (!existsSync(cfgPath)) { console.error('缺少 push/config.json'); process.exit(1); }
@@ -86,8 +87,28 @@ async function ensureBasic(token, type, number, name, extra = {}) {
   const r = await kingdeePost(cfg.kingdee, token, paths[type], {}, body);
   if (r.ok) {
     sandboxCache[type].add(String(number));
-    log(`    + 沙箱创建${type}: ${number}(${name})`);
+    log(`    + 沙箱创建${type}: ${number}(${body.name})`);
     return true;
+  }
+  // 商品名称冲突 → 名称加编码后缀重试(金蝶不允许同名商品)
+  if (type === 'material' && /已存在/.test(String(r.error || ''))) {
+    const retryBody = { ...body, name: `${name}(${number})` };
+    const r2 = await kingdeePost(cfg.kingdee, token, paths[type], {}, retryBody);
+    if (r2.ok) {
+      sandboxCache[type].add(String(number));
+      log(`    + 沙箱创建${type}: ${number}(${retryBody.name}) [名称加编码消歧]`);
+      return true;
+    }
+  }
+  // 仓库/客户名称冲突 → 同样加编码后缀
+  if ((type === 'store' || type === 'customer') && /已存在/.test(String(r.error || ''))) {
+    const retryBody = { ...body, name: `${name}(${number})` };
+    const r2 = await kingdeePost(cfg.kingdee, token, paths[type], {}, retryBody);
+    if (r2.ok) {
+      sandboxCache[type].add(String(number));
+      log(`    + 沙箱创建${type}: ${number}(${retryBody.name}) [名称加编码消歧]`);
+      return true;
+    }
   }
   log(`    ✗ 沙箱创建${type}失败: ${number} → ${r.error?.slice(0, 80)}`);
   return false;
@@ -103,6 +124,51 @@ async function getDefaultUnitId(token) {
     if (unit) { cachedUnitId = unit.id; return cachedUnitId; }
   } catch { /* 忽略 */ }
   return null;
+}
+
+// ══ MES 基础资料 → 沙箱全量同步 ══
+async function pushAllBasics(token) {
+  log('── 同步基础资料到沙箱 ──');
+  let created = 0, skipped = 0, failed = 0;
+
+  // 供应商(dm_gf)
+  const suppliers = (await pool.request().query(`
+    SELECT dm AS 编码, mc AS 名称 FROM dm_gf WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(dm,'')<>''`)).recordset;
+  for (const s of suppliers) {
+    const ok = await ensureBasic(token, 'supplier', s.编码, s.名称);
+    ok ? (sandboxCache.supplier.has(String(s.编码)) ? skipped++ : created++) : failed++;
+  }
+  log(`  供应商: ${suppliers.length} 个(新建 ${created},已有 ${skipped},失败 ${failed})`);
+
+  // 客户(dm_kh)
+  created = 0; skipped = 0; failed = 0;
+  const customers = (await pool.request().query(`
+    SELECT dm AS 编码, mc AS 名称 FROM dm_kh WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(dm,'')<>''`)).recordset;
+  for (const c of customers) {
+    const ok = await ensureBasic(token, 'customer', c.编码, c.名称);
+    ok ? (sandboxCache.customer.has(String(c.编码)) ? skipped++ : created++) : failed++;
+  }
+  log(`  客户: ${customers.length} 个(新建 ${created},已有 ${skipped},失败 ${failed})`);
+
+  // 商品(bs_inv)
+  created = 0; skipped = 0; failed = 0;
+  const materials = (await pool.request().query(`
+    SELECT 存货编码 AS 编码, 存货名称 AS 名称 FROM bs_inv WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(存货编码,'')<>''`)).recordset;
+  for (const m of materials) {
+    const ok = await ensureBasic(token, 'material', m.编码, m.名称);
+    ok ? (sandboxCache.material.has(String(m.编码)) ? skipped++ : created++) : failed++;
+  }
+  log(`  商品: ${materials.length} 个(新建 ${created},已有 ${skipped},失败 ${failed})`);
+
+  // 仓库(bs_wh)
+  created = 0; skipped = 0; failed = 0;
+  const stores = (await pool.request().query(`
+    SELECT 仓库编码 AS 编码, 仓库名称 AS 名称 FROM bs_wh WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(仓库编码,'')<>''`)).recordset;
+  for (const s of stores) {
+    const ok = await ensureBasic(token, 'store', s.编码, s.名称);
+    ok ? (sandboxCache.store.has(String(s.编码)) ? skipped++ : created++) : failed++;
+  }
+  log(`  仓库: ${stores.length} 个(新建 ${created},已有 ${skipped},失败 ${failed})`);
 }
 
 // ══ MES → 金蝶 字段映射 ══
@@ -147,10 +213,11 @@ function mapSaleLines(lines) {
 
 // ══ 拉取 MES 待推送数据 ══
 async function fetchPending(headTable, lineTable) {
+  const excludeSynced = INCLUDE_SYNCED ? '' : `AND t.单据编号 NOT LIKE 'CGRK-%' AND t.单据编号 NOT LIKE 'XSCK-%'`;
   const heads = (await pool.request().query(`
     SELECT * FROM dbo.[${headTable}] t
     WHERE ISNULL(t.asp_cancel,'N') <> 'Y' AND ISNULL(t.asp_user1,'') <> '${N_PUSH_USER}'
-      AND t.单据编号 NOT LIKE 'PI-%' AND t.单据编号 NOT LIKE 'CGRK-%' AND t.单据编号 NOT LIKE 'XSCK-%'
+      AND t.单据编号 NOT LIKE 'PI-%' ${excludeSynced}
     ORDER BY t.asp_time1 DESC`)).recordset;
   // ↑ 排除已从金蝶同步过来的单(CGRK/XSCK 前缀)和手工测试单(PI 前缀)
   if (!heads.length) return [];
@@ -201,9 +268,12 @@ async function main() {
 
   if (PROBE) { log('探测模式,退出'); await pool.close(); return; }
 
-  // 加载沙箱基础资料缓存
+  // 加载沙箱基础资料缓存 + 同步 MES 全部基础资料到沙箱
   log('── 加载沙箱基础资料 ──');
   await loadSandboxBasics(token);
+  if (!PROBE) {
+    await pushAllBasics(token);
+  }
 
   // 拉取待推送(只推 MES 手工建的,排除金蝶同步来的)
   const purDocs = await fetchPending('bd_purchase_in', 'bl_purchase_in');
