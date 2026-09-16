@@ -112,7 +112,6 @@ export default {
     '紧急放行申请单': 'Emergency Release Application',
     '试产材料使用申请单': 'Trial Material Usage Application',
     '来料异常分析报告': 'Incoming Abnormality Analysis Report',
-    '暂收入库单': 'Temporary Receipt Inbound',
     '送料暂收单': 'Temporary Material Receipt',
     '生成送料暂收单': 'Generate Temporary Material Receipt',
     '生成来料检验单': 'Generate Incoming Inspection Sheet',
@@ -121,7 +120,6 @@ export default {
     '制程品质': 'Process Quality',
     '来料品质': 'Incoming Quality',
     '来料检验单': 'Incoming Inspection Sheet',
-    '选暂收入库单': 'Select temporary receipt inbound',
     '暂收退料单': 'Temporary Receipt Return',
     '生产异常分析报告': 'Production Abnormality Analysis Report',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

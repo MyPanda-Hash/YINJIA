@@ -59,7 +59,6 @@ export default {
     '紧急放行申请单': 'Demande de Libération d\'Urgence',
     '试产材料使用申请单': 'Demande d\'Utilisation de Matériau d\'Essai',
     '来料异常分析报告': 'Rapport d\'Analyse d\'Anomalie à Réception',
-    '暂收入库单': 'Réception provisoire',
     '送料暂收单': 'Réception temporaire de matière',
     '生成送料暂收单': 'Générer réception temporaire de matière',
     '生成来料检验单': 'Générer fiche d\'inspection à réception',
@@ -68,7 +67,6 @@ export default {
     '制程品质': 'Qualité processus',
     '来料品质': 'Qualité réception',
     '来料检验单': 'Fiche d\'inspection à réception',
-    '选暂收入库单': 'Sélectionner réception provisoire',
     '暂收退料单': 'Retour de réception provisoire',
     '生产异常分析报告': 'Rapport d\'Analyse d\'Anomalie de Production',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

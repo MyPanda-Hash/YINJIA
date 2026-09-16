@@ -59,7 +59,6 @@ export default {
     '紧急放行申请单': 'Đơn đề nghị xuất kho khẩn cấp',
     '试产材料使用申请单': 'Đơn đề nghị sử dụng vật liệu thử nghiệm',
     '来料异常分析报告': 'Báo cáo phân tích bất thường nguyên liệu đầu vào',
-    '暂收入库单': 'Phiếu nhập kho tạm nhận',
     '送料暂收单': 'Phiếu tạm nhận vật tư',
     '生成送料暂收单': 'Tạo phiếu tạm nhận vật tư',
     '生成来料检验单': 'Tạo phiếu kiểm nghiệm đầu vào',
@@ -68,7 +67,6 @@ export default {
     '制程品质': 'Chất lượng quá trình',
     '来料品质': 'Chất lượng nguyên liệu đầu vào',
     '来料检验单': 'Phiếu kiểm nghiệm đầu vào',
-    '选暂收入库单': 'Chọn phiếu nhập kho tạm nhận',
     '暂收退料单': 'Phiếu trả hàng tạm nhận',
     '生产异常分析报告': 'Báo cáo phân tích bất thường sản xuất',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

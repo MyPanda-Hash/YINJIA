@@ -672,27 +672,14 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 送料暂收单:选单=采购订单;生单=来料检验单(已实现,品检分流链);标签=行级材料二维码(物料编码+批号)
-            java.util.Map.entry("QC_RECV", List.of(
-                    new String[]{"新增", "新增"},
-                    new String[]{"选单", "选采购订单"},
-                    new String[]{"修改", "修改"},
-                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
-                    new String[]{"删除", "删除", "删除单据"},
-                    new String[]{"审核", "审核", "弃审"},
-                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生成检验单"},
-                    new String[]{"标签", "打印标签"},
-                    new String[]{"查找", "查找", "刷新"},
-                    new String[]{"打印", "打印", "预览", "导出"},
-                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 来料检验单(原检验单,2026-09-15 改名):选单=暂收入库单;审核/审批通过时自动生成
+            // 来料检验单(原检验单,2026-09-15 改名):选单=送料暂收单(QC_RECV 暂收入库单已下线,
+            // 其表头角色由 SL_RECV 承接);审核/审批通过时自动生成
             // 采购入库单(合格行,实收数量=合格数量)+暂收退回单(不良行,数量=不良数量)
             // (ButtonService.inspAutoPurchaseIn/inspAutoReturn)。工具栏生单组保留占位(对齐 T+ 灰按钮):
             // 无 pushTarget 实现时由 metadata.disabledActions 输出恒灰占位,不参与实际生单
             java.util.Map.entry("QC_INSP", List.of(
                     new String[]{"新增", "新增"},
-                    new String[]{"选单", "选暂收入库单"},
+                    new String[]{"选单", "选送料暂收单"},
                     new String[]{"修改", "修改"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
@@ -838,7 +825,6 @@ public class PanelConfigService {
             java.util.Map.entry("SO_ORDER|生成生产加工单", "MANU_ORDER"),
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
             java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
-            java.util.Map.entry("QC_RECV|生成检验单", "QC_INSP"),
             java.util.Map.entry("SL_RECV|生成来料检验单", "QC_INSP"),
             java.util.Map.entry("WO_ORDER|生成领料单", "MATERIAL_OUT")
     )));
@@ -879,9 +865,8 @@ public class PanelConfigService {
             java.util.Map.entry("SALE_OUT", "SO_ORDER"),             // 销售订单 → 销售出库单
             java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产加工单(销售-生产链)
             java.util.Map.entry("PU_ORDER", "PU_REQ"),               // 请购单 → 采购订单
-            java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(品检分流链)
             java.util.Map.entry("SL_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15)
-            java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(品检分流)
+            java.util.Map.entry("QC_INSP", "SL_RECV"),               // 送料暂收单 → 来料检验单(QC_RECV 暂收入库单已下线,来源切至 SL_RECV)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
             java.util.Map.entry("WO_ORDER", "SO_ORDER"),             // 销售订单 → 生产工单(计划层:选单生单)
             java.util.Map.entry("RKD", "CGD"),                       // 采购单(旧) → 入库单(旧)
@@ -920,7 +905,6 @@ public class PanelConfigService {
             "PU_ORDER|PURCHASE_IN", new String[][]{{"单据编号", "采购订单号"}},
             "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}},
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
-            "QC_RECV|QC_INSP", new String[][]{{"单据编号", "暂收单号"}},
             "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}},
             "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}},
             "SO_ORDER|WO_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "交期"}},

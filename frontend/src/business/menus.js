@@ -235,9 +235,8 @@ export const menuTree = [
     icon: 'CircleCheck',
     children: [
       {
-        // 来料品质(流程图·采购支线:暂收→检验;暂收退料单已按用户口径移入「库存核算·单据」)
+        // 来料品质(流程图·采购支线:检验;暂收入库单已下线,暂收角色由「库存核算·送料暂收单」承接)
         code: 'incoming', title: '来料品质', children: [
-          { code: 'qcRecv', title: '暂收入库单', path: '/panelx/list/QC_RECV', icon: 'Box', panelCode: 'QC_RECV', operationName: '新增流程' },
           { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
         ],
       },

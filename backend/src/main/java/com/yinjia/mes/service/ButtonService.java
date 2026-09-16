@@ -146,13 +146,6 @@ public class ButtonService {
             items = new ArrayList<>((List<Map<String, Object>>) detail.values().iterator().next());
         }
 
-        // 品检分流链:暂收行缺批号时自动取号(批号=入库日期+3位流水;二维码=物料编码+批号)
-        if ("QC_RECV".equals(def.code())) {
-            for (Map<String, Object> it : items) {
-                Object lot = it.get("批号");
-                if (lot == null || String.valueOf(lot).isBlank()) it.put("批号", lotSeqService.next());
-            }
-        }
         // 计划层:生产工单无工序行时预填全部启用工序(bs_op 顺序),计划数量=订单数量
         // (五道工序共用一张工单;成型计划数量可在头上按"1切几"折算另填)
         if ("WO_ORDER".equals(def.code()) && !items.isEmpty()) {

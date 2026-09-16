@@ -59,7 +59,6 @@ export default {
     '紧急放行申请单': 'Solicitud de Liberación de Emergencia',
     '试产材料使用申请单': 'Solicitud de Uso de Material de Prueba',
     '来料异常分析报告': 'Informe de Análisis de Anomalías de Recepción',
-    '暂收入库单': 'Entrada temporal de mercancía',
     '送料暂收单': 'Recepción temporal de material',
     '生成送料暂收单': 'Generar recepción temporal de material',
     '生成来料检验单': 'Generar hoja de inspección de entrada',
@@ -68,7 +67,6 @@ export default {
     '制程品质': 'Calidad de proceso',
     '来料品质': 'Calidad de entrada',
     '来料检验单': 'Hoja de inspección de entrada',
-    '选暂收入库单': 'Seleccionar entrada temporal',
     '暂收退料单': 'Devolución de mercancía temporal',
     '生产异常分析报告': 'Informe de Análisis de Anomalías de Producción',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

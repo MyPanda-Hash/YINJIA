@@ -59,7 +59,6 @@ export default {
     '紧急放行申请单': 'Notfreigabeantrag',
     '试产材料使用申请单': 'Antrag zur Verwendung von Versuchsmaterial',
     '来料异常分析报告': 'Eingangsabweichungsanalysebericht',
-    '暂收入库单': 'Vorläufiger Wareneingang',
     '送料暂收单': 'Vorübergehender Materialeingang',
     '生成送料暂收单': 'Vorübergehenden Materialeingang erzeugen',
     '生成来料检验单': 'Wareneingangsprüfung erzeugen',
@@ -68,7 +67,6 @@ export default {
     '制程品质': 'Prozessqualität',
     '来料品质': 'Eingangsqualität',
     '来料检验单': 'Wareneingangsprüfung',
-    '选暂收入库单': 'Vorläufigen Wareneingang wählen',
     '暂收退料单': 'Wareneingangs-Rückgabe',
     '生产异常分析报告': 'Produktionsabweichungsanalysebericht',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
