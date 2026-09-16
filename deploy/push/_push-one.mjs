@@ -115,7 +115,7 @@ try {
   if (r.ok) {
     const erpBillNo = String(Object.values(r.data?.id_number_map || {})[0] || h['单据编号']);
     console.log(JSON.stringify({ ok: true, erpBillNo }));
-  } else if (/组合值重复|已存在/.test(String(r.error || ''))) {
+  } else if (/组合值.*重复|重复.*组合|已存在/.test(String(r.error || ''))) {
     // 金蝶已有同号单据(可能之前转过,弃审后重转)——明确提示用户去金蝶处理旧单
     console.log(JSON.stringify({ ok: false, error: 'DUPLICATE', erpBillNo: h['单据编号'],
       hint: '该单号在金蝶已存在。请先在金蝶界面删除(或弃审作废)旧单,再重新转ERP' }));
