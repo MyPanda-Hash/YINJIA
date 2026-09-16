@@ -64,13 +64,14 @@ export const DOCS = [
   },
   {
     code: 'BD_MATGRP', label: '商品分类', archive: true,
-    listPath: '/jdy/v2/bd/material_group', detailPath: null, // 列表已含全部字段,detail 免调省额度
+    listPath: '/jdy/v2/bd/material_group', detailPath: '/jdy/v2/bd/material_group_detail', // 详情是超集:parent_id/description/creator/modifier 仅详情有(仅61条,成本可忽略)
     table: 'bs_material_group', codeCol: '编码',
-    fingerprintOf: (r) => [r.number, r.name, r.level, r.is_leaf, r.parent_id].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
+    fingerprintOf: (r) => [r.number, r.name, r.level, r.is_leaf, r.parent_id, r.modify_time].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     afterList(rows, ctx) { ctx.matgrpById = new Map(rows.map((r) => [String(r.id), r.number])); ctx.matgrpNameById = new Map(rows.map((r) => [String(r.id), r.name])); },
     mapArchive(d, ctx) {
       return { 编码: str(d.number), 名称: str(d.name), 级次: str(d.level), 是否叶子节点: d.is_leaf === true,
         上级编码: (ctx.matgrpById && ctx.matgrpById.get(String(d.parent_id))) || null,
+        备注: str(d.description), 创建人: str(d.creator_name), 修改人: str(d.modifier_name),
         创建时间: str(d.create_time), 修改时间: str(d.modify_time),
         停用: 0, 状态: '启用', __cancel: 'N' };
     },

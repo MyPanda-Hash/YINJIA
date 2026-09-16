@@ -7,9 +7,12 @@ USE HSDZ_MES;
 SET NOCOUNT ON;
 GO
 
--- ══ bs_material_group(2 列)══
+-- ══ bs_material_group(5 列)══
 IF COL_LENGTH('dbo.bs_material_group', N'创建时间') IS NULL ALTER TABLE dbo.bs_material_group ADD [创建时间] datetime2 NULL;
 IF COL_LENGTH('dbo.bs_material_group', N'修改时间') IS NULL ALTER TABLE dbo.bs_material_group ADD [修改时间] datetime2 NULL;
+IF COL_LENGTH('dbo.bs_material_group', N'备注') IS NULL ALTER TABLE dbo.bs_material_group ADD [备注] nvarchar(500) NULL;
+IF COL_LENGTH('dbo.bs_material_group', N'创建人') IS NULL ALTER TABLE dbo.bs_material_group ADD [创建人] nvarchar(100) NULL;
+IF COL_LENGTH('dbo.bs_material_group', N'修改人') IS NULL ALTER TABLE dbo.bs_material_group ADD [修改人] nvarchar(100) NULL;
 GO
 
 -- ══ bs_currency(4 列)══
@@ -178,6 +181,12 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATGRP' AND col_name=N'�
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATGRP', N'创建时间', N'创建时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATGRP' AND col_name=N'修改时间')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATGRP', N'修改时间', N'修改时间', N'日期', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATGRP' AND col_name=N'备注')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATGRP', N'备注', N'备注', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATGRP' AND col_name=N'创建人')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATGRP', N'创建人', N'创建人', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATGRP' AND col_name=N'修改人')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATGRP', N'修改人', N'修改人', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='CUR' AND col_name=N'创建人')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('CUR', N'创建人', N'创建人', N'文本', N'detail', 900, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='CUR' AND col_name=N'创建时间')
@@ -459,6 +468,7 @@ IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'�
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'创建时间', 'en', N'Created At', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'修改时间' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'修改时间', 'en', N'Modified At', 'manual');
+-- ⚠ 待补英译:备注
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'创建人' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'创建人', 'en', N'Created By', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'修改人' AND locale='en')
@@ -511,7 +521,6 @@ IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'�
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'采购员部门', 'en', N'Purchaser Dept.', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'自动抵扣预收款' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'自动抵扣预收款', 'en', N'Auto Offset Advance', 'manual');
--- ⚠ 待补英译:备注
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'助记码' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'助记码', 'en', N'Mnemonic Code', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'产地' AND locale='en')
