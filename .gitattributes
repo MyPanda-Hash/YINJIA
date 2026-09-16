@@ -1,0 +1,3 @@
+# Windows 批处理必须 CRLF,否则 cmd 解析会错行(仓库内仍存 LF,检出时转换)
+*.bat text eol=crlf
+*.cmd text eol=crlf

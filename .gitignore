@@ -56,3 +56,6 @@ tools/archive/_flow-v12/_grant-out.txt
 
 # 本地 IDE 配置(不入库)
 .vscode/
+
+# 本地整机备份目录(不入库)
+_local-backup-*/
