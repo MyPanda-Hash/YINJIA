@@ -341,3 +341,4 @@ migrate-stock-balance.sql
 
 # —— 2026-09-16 恢复被误删的供应商面板 GFDA(旧版cleanup-base-panels重跑所致;面板行重建+RKD/CKD仓库悬空参照改指WH)——
 migrate-restore-gfda.sql
+
