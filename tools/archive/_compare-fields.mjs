@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { DOCS } from '../../deploy/sync-core.mjs';
+import { EXTRA } from '../../deploy/kingdee-extra-fields.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const verbose = process.argv.includes('--verbose');
@@ -29,7 +30,7 @@ const SPEC = {
   BD_SETTLE: { panel: 'SETTLE', map: { name: ['名称'], enable: ['停用'], is_default: ['是否默认'] } },
   BD_CUSGRP: { panel: 'CUSGRP', map: { number: ['编码'], name: ['名称'], level: ['级次'], is_leaf: ['是否叶子节点'], 'parent_id→编码': ['上级编码'], remark: ['备注'] } },
   BD_SUPGRP: { panel: 'SUPGRP', map: { number: ['编码'], name: ['名称'], level: ['级次'], is_leaf: ['是否叶子节点'], 'parent_id→编码': ['上级编码'] } },
-  BD_MATGRP: { panel: 'MATGRP', map: { number: ['编码'], name: ['名称'], level: ['级次'], is_leaf: ['是否叶子节点'], 'parent_id→编码': ['上级编码'], create_time: ['创建时间'], modify_time: ['修改时间'] } },
+  BD_MATGRP: { panel: 'MATGRP', map: { number: ['编码'], name: ['名称'], level: ['级次'], is_leaf: ['是否叶子节点'], 'parent_id→编码': ['上级编码'], create_time: ['创建时间'], modify_time: ['修改时间'], description: ['备注'], creator_name: ['创建人'], modifier_name: ['修改人'] } },
   BD_CUR: { panel: 'CUR', map: { number: ['编码'], name: ['名称'], sign: ['币别符号'], rate: ['汇率'], exc_type: ['汇率类型'], amt_precision: ['金额小数位'], price_precision: ['单价小数位'], creator_name: ['创建人'], create_time: ['创建时间'], modifier_name: ['修改人'], modify_time: ['修改时间'], enable: ['停用'] } },
   BD_UOM: { panel: 'UOM', map: { number: ['计量单位编码'], name: ['计量单位名称'], conversion_type: ['单位类型'], precision: ['小数位数'], precision_account: ['精度处理'], long_number: ['长编码'], is_leaf: ['是否叶子节点'], level: ['级次'], create_time: ['创建时间'], modify_time: ['修改时间'], enable: ['停用'] } },
   BD_DEPT: { panel: 'DEPT', map: { number: ['部门编码'], name: ['部门名称'], parent_name: ['上级部门'], parent_number: ['上级编码'], level: ['级次'], long_number: ['长编码'], full_name: ['部门全称'], is_leaf: ['是否叶子节点'], comment: ['备注'], enable: ['停用'] } },
@@ -56,6 +57,8 @@ const SPEC = {
     'price_entity.price_outsourceprice': ['委外价'], 'price_entity.price_unit_name': ['价格单位'],
     brand_name: ['品牌'], brand_number: ['品牌编码'], stock_name: ['默认仓库'], stock_number: ['默认仓库编码'],
     base_unit_number: ['基本单位编码'], is_self_restraint: ['是否自制'], units: ['多单位'], url: ['图片链接'],
+    is_weight: ['是否启用称重'], is_serial: ['是否序列号管理'], is_batch: ['是否批次管理'],
+    parent_name: ['所属类别'], parent_number: ['所属类别'],
     '派生(is_batch/is_serial)': ['属性'], '派生(create_time)': ['建档日期'],
   } },
   BD_CUSTOMER: { panel: 'KHDA', map: {
@@ -105,6 +108,8 @@ for (const [code, spec] of Object.entries(SPEC)) {
     const apiOk = isSkip || apiKeys.has(realKey) || apiKeys.has(base) || subKeys.has(realKey) || realKey.includes('→') || realKey.startsWith('派生');
     if (!apiOk) { console.log(`[${code}] ①接口键不存在于真实响应: ${realKey}`); fail++; }
     if (!isSkip) coveredApi.add(base);
+    // 全并集自动映射(EXTRA)的键视为已覆盖、列视为已写出
+    for (const e of EXTRA[code] || []) { coveredApi.add(e.a); mappedKeys.add(e.c); }
     for (const mes of mesCols) {
       if (mes.includes('(')) { rows.push([code, realKey, mes, isSkip ? '锚点' : '派生']); continue; }
       const inPanel = panel.has(mes);

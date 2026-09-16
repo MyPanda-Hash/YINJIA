@@ -16,6 +16,22 @@ import { dirname, join } from 'node:path';
 import { fetchAppToken, kingdeeGet } from './kingdee-client.mjs';
 import { makeLogger, confirmBatch, backupBeforeWrite } from './safety.mjs';
 import { setSecret, dec, cryptoStats, resetCryptoStats } from './kingdee-crypto.mjs';
+import { EXTRA } from './kingdee-extra-fields.mjs';
+
+/** 全并集自动映射(生成器产出):dec=解密 / join=数组拼接 / str=文本;键缺省置 null */
+function autoExtra(code, d) {
+  const list = EXTRA[code];
+  if (!list || !list.length) return {};
+  const out = {};
+  for (const e of list) {
+    const v = d ? d[e.a] : undefined;
+    if (v === undefined || v === null || v === '') { out[e.c] = null; continue; }
+    if (e.t === 'dec') out[e.c] = dec(v);
+    else if (e.t === 'join') out[e.c] = Array.isArray(v) ? JSON.stringify(v).slice(0, 450) : str(v);
+    else out[e.c] = str(v);
+  }
+  return out;
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const N_SYNC_USER = '金蝶同步'; // 星辰审核人缺失时 yj_doc_status.shr 的兜底留痕
@@ -64,13 +80,14 @@ export const DOCS = [
   },
   {
     code: 'BD_MATGRP', label: '商品分类', archive: true,
-    listPath: '/jdy/v2/bd/material_group', detailPath: null, // 列表已含全部字段,detail 免调省额度
+    listPath: '/jdy/v2/bd/material_group', detailPath: '/jdy/v2/bd/material_group_detail', // 详情是超集:parent_id/description/creator/modifier 仅详情有(仅61条,成本可忽略)
     table: 'bs_material_group', codeCol: '编码',
-    fingerprintOf: (r) => [r.number, r.name, r.level, r.is_leaf, r.parent_id].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
+    fingerprintOf: (r) => [r.number, r.name, r.level, r.is_leaf, r.parent_id, r.modify_time].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     afterList(rows, ctx) { ctx.matgrpById = new Map(rows.map((r) => [String(r.id), r.number])); ctx.matgrpNameById = new Map(rows.map((r) => [String(r.id), r.name])); },
     mapArchive(d, ctx) {
       return { 编码: str(d.number), 名称: str(d.name), 级次: str(d.level), 是否叶子节点: d.is_leaf === true,
         上级编码: (ctx.matgrpById && ctx.matgrpById.get(String(d.parent_id))) || null,
+        备注: str(d.description), 创建人: str(d.creator_name), 修改人: str(d.modifier_name),
         创建时间: str(d.create_time), 修改时间: str(d.modify_time),
         停用: 0, 状态: '启用', __cancel: 'N' };
     },
@@ -659,6 +676,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
           if (doc.archive) {
             const mapped = {
               ...doc.mapArchive(d, ctx),
+              ...autoExtra(doc.code, d),
               外部数据ID: str(d.id), 外部单据号: str(d.number),
               __创建时间: str(d.create_time),
             };
@@ -682,6 +700,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
           } else {
             const head = {
               ...doc.mapHead(d, ctx),
+              ...autoExtra(doc.code, d),
               外部数据ID: str(d.id),
               __创建时间: str(d.create_time),
               __已关闭: d.bill_close_state === 'S' || d.bill_close_state === 'H',

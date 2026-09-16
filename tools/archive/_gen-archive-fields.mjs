@@ -11,9 +11,12 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 
 // spec: [档案码, 表, 列名, 中文标签, 类型, 接口键(支持 a.b 取子对象/数组首元素), 面板 place]
 const SPEC = [
-  // ── 商品分类 ──
+  // ── 商品分类(详情独有:description/creator/modifier;parent_id 用于上级编码映射) ──
   ['BD_MATGRP', 'bs_material_group', '创建时间', '创建时间', 'datetime2', 'create_time', 'detail'],
   ['BD_MATGRP', 'bs_material_group', '修改时间', '修改时间', 'datetime2', 'modify_time', 'detail'],
+  ['BD_MATGRP', 'bs_material_group', '备注', '备注', 'nvarchar(500)', 'description', 'detail'],
+  ['BD_MATGRP', 'bs_material_group', '创建人', '创建人', 'nvarchar(100)', 'creator_name', 'detail'],
+  ['BD_MATGRP', 'bs_material_group', '修改人', '修改人', 'nvarchar(100)', 'modifier_name', 'detail'],
   // ── 币别 ──
   ['BD_CUR', 'bs_currency', '创建人', '创建人', 'nvarchar(100)', 'creator_name', 'detail'],
   ['BD_CUR', 'bs_currency', '创建时间', '创建时间', 'datetime2', 'create_time', 'detail'],
