@@ -1,6 +1,14 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '二维码标签': 'QR-Etiketten',
+    '请先勾选要导出的商品': 'Bitte zuerst die zu exportierenden Artikel auswählen',
+    '已选 {n} 个商品，导出二维码标签 PDF？': 'QR-Etiketten-PDF für {n} ausgewählte(n) Artikel exportieren?',
+    '正在生成标签…': 'Etiketten werden erstellt...',
+    '已导出 {n} 张二维码标签': '{n} QR-Etiketten exportiert',
+    '标签生成失败': 'Etikettenerstellung fehlgeschlagen',
+    '物料二维码标签': 'Material-QR-Etiketten',
+    '本页全选': 'Alles auf dieser Seite auswählen',
     '一．问题描述（可附图片，必要时另附问题品）': 'I. Problem Description (photos/defective samples may be attached if necessary)',
     '二．原因分析': 'II. Root Cause Analysis',
     '三．性能验证': 'III. Performance Verification',

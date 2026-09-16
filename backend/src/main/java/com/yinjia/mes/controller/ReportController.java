@@ -26,6 +26,7 @@ import java.util.Map;
  * 对外正式报表接口(JasperReports,/api/report):
  *   GET    /templates              → 某面板可用的报表模板(前端入口显隐 + 弹窗下拉;all=true 为管理视角)
  *   GET    /export                 → 生成报表文件(code/panelCode/docNo/format/disposition)
+ *   POST   /qr-label               → 物料二维码标签(存货档案勾选即打,80×80mm 一码一页,内容=存货编码)
  *   POST   /templates              → 上传/覆盖模板(管理员;服务端编译校验,ADR-0002)
  *   PUT    /templates/{id}/enabled → 启用/停用(管理员)
  *   DELETE /templates/{id}         → 删除(管理员)
@@ -80,6 +81,25 @@ public class ReportController {
                 .filename(service.fileName(code, panelCode, docNo, format), StandardCharsets.UTF_8).build());
         headers.setContentLength(body.length);
         return ResponseEntity.ok().headers(headers).body(body);
+    }
+
+    /** 物料二维码标签请求体:勾选的存货编码(前端按行勾选收集;后端查重守卫见 ReportService) */
+    public record QrLabelBody(List<String> codes) {}
+
+    /**
+     * 物料二维码标签(存货档案勾选即打):按勾选的存货编码批量生成 80×80mm 标签 PDF,
+     * 一码一页,二维码内容=存货编码。权限按存货档案查看权(INV)。
+     */
+    @PostMapping("/qr-label")
+    public ResponseEntity<byte[]> qrLabel(@RequestBody QrLabelBody body) {
+        perm.requirePanelView("INV");
+        byte[] pdf = service.qrLabelPdf(body == null ? null : body.codes());
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename(service.qrLabelFileName(), StandardCharsets.UTF_8).build());
+        headers.setContentLength(pdf.length);
+        return ResponseEntity.ok().headers(headers).body(pdf);
     }
 
     /** 上传/覆盖模板(管理员):服务端 Jasper 编译校验,编译不过 400 退回 */

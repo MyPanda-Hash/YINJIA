@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  物料二维码标签模板(INV / bs_inv,2026-09-16)
+  ============================================================================
+  用途:存货档案勾选行 → 80×80mm 标签纸(一码一页),打印时缩放选 100%。
+  版式:左侧三行文字(物料编码/物料名称/规格),右侧二维码(内容 = 物料编码)。
+  字段名 = bs_inv 中文列名(ReportService.qrLabelPdf 直查下发的键):
+    存货编码 / 存货名称 / 规格型号。
+  页寸:80mm = 226.77pt ≈ 227pt;边距 8pt(≈2.8mm);模板不走 /export 单据链路,无参数。
+  ⚠ 字体沿用字体扩展族名 NotoSansSC(PDF 嵌入 TrueType),XSD 排版坑见 so_order.jrxml 头注释。
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="inv_qr_label" language="java" columnCount="1"
+              pageWidth="227" pageHeight="227"
+              columnWidth="211" leftMargin="8" rightMargin="8" topMargin="8" bottomMargin="8"
+              uuid="8e2f5a7c-3d64-4b1a-9f8e-6c0d2a9b5e13">
+
+  <property name="net.sf.jasperreports.awt.ignore.missing.font" value="false"/>
+  <property name="net.sf.jasperreports.default.font.name" value="NotoSansSC"/>
+
+  <style name="base" isDefault="true" fontName="NotoSansSC" fontSize="9"/>
+  <!-- 标签文字:编码行加粗放大(人眼核对关键),名称/规格小号可换行 -->
+  <style name="codeLine" style="base" fontSize="10.5" isBold="true" vAlign="Middle"/>
+  <style name="textLine" style="base" fontSize="8" vAlign="Top" forecolor="#333333"/>
+  <style name="frame" style="base">
+    <box padding="0">
+      <pen lineWidth="0.5" lineColor="#C8C8C8"/>
+    </box>
+  </style>
+
+  <!-- ======================= 字段(bs_inv 中文列名) ======================= -->
+  <field name="存货编码" class="java.lang.String"/>
+  <field name="存货名称" class="java.lang.String"/>
+  <field name="规格型号" class="java.lang.String"/>
+
+  <!-- ======================= 标签页(一行 = 一张 80×80 标签) ======================= -->
+  <detail>
+    <band height="211">
+      <!-- 细框:裁切/对位参考线(80×80 纸上贴边近似隐形) -->
+      <rectangle>
+        <reportElement style="frame" x="0" y="0" width="211" height="211"/>
+      </rectangle>
+
+      <!-- 左列文字:物料编码(加粗)/物料名称/规格;长值 StretchHeight 换行,后续行 Float 跟排 -->
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="codeLine" x="6" y="20" width="118" height="18"/>
+        <textFieldExpression><![CDATA["物料编码：" + ($F{存货编码} == null ? "" : $F{存货编码})]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="textLine" positionType="Float" x="6" y="46" width="118" height="14"/>
+        <textFieldExpression><![CDATA["物料名称：" + ($F{存货名称} == null ? "" : $F{存货名称})]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
+        <reportElement style="textLine" positionType="Float" x="6" y="66" width="118" height="14"/>
+        <textFieldExpression><![CDATA["规格：" + ($F{规格型号} == null ? "" : $F{规格型号})]]></textFieldExpression>
+      </textField>
+
+      <!-- 右侧二维码:内容 = 物料编码(扫码即得编码,与左列文字互为核对) -->
+      <componentElement>
+        <reportElement x="127" y="62" width="84" height="84"/>
+        <c:QRCode xmlns:c="http://jasperreports.sourceforge.net/jasperreports/components" margin="0">
+          <c:codeExpression><![CDATA[$F{存货编码} == null ? "" : $F{存货编码}]]></c:codeExpression>
+        </c:QRCode>
+      </componentElement>
+    </band>
+  </detail>
+
+</jasperReport>
