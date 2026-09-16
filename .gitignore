@@ -67,3 +67,5 @@ _local-backup-*/
 
 # 本地测试脚本目录(不入库、不上传)
 tests/
+deploy/config-push.json
+deploy/push/push-state.json

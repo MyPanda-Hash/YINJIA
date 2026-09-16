@@ -40,12 +40,14 @@ public class ButtonService {
     private final StockLedgerService stockLedger;
     private final WoReportService woReport;
     private final QcDisposalService qcDisposal;
+    private final KingdeePushService kingdeePush;
 
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
                          DevTaskService devTaskService, MessageService messageService,
                          LotSeqService lotSeqService, StockLedgerService stockLedger,
-                         WoReportService woReport, QcDisposalService qcDisposal) {
+                         WoReportService woReport, QcDisposalService qcDisposal,
+                         KingdeePushService kingdeePush) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -56,6 +58,7 @@ public class ButtonService {
         this.stockLedger = stockLedger;
         this.woReport = woReport;
         this.qcDisposal = qcDisposal;
+        this.kingdeePush = kingdeePush;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -107,6 +110,10 @@ public class ButtonService {
             case "新增库存" -> addStock(def, formData);
             // 库存状况:修改预警数量(行内编辑,空值回退全局阈值100)
             case "更新预警数量" -> updateStockWarn(def, formData);
+            // 转ERP:已审核+未转过的采购入库/销售出库 → 推送到金蝶沙箱,回写ERP单号
+            case "转ERP" -> pushToErp(def, formData);
+            // 批量转ERP:查询所有已审核+未转的单据列表(前端弹窗勾选后逐张调 转ERP)
+            case "查询可转ERP" -> listPushableErp(def);
             // 生产工单:成型后生成产品批号(打印产品二维码的数据源,一次生成终身复用)
             case "生成产品批号" -> genProductLot(def, formData);
             // 项目实施计划:阶段完成按钮(填写实际完成时间)
@@ -794,6 +801,11 @@ public class ButtonService {
         // 弃审同时清归档标记(文件面板审批后=已归档,弃审应回到草稿)
         jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
+        // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
+        if (List.of("PURCHASE_IN", "SALE_OUT").contains(def.code())) {
+            String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in" : "bd_sale_out";
+            jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
+        }
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
         return result(no, "草稿");
     }
@@ -1871,7 +1883,43 @@ public class ButtonService {
         return n == null ? 0 : n;
     }
 
-    /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */    private Map<String, Object> updateStockWarn(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+    // ══════════ 转ERP(金蝶沙箱) ══════════
+
+    /** 批量转ERP:查询所有已审核+未转ERP的单据(前端弹窗列表勾选) */
+    private Map<String, Object> listPushableErp(PanelRegistry.PanelDef def) {
+        if (!List.of("PURCHASE_IN", "SALE_OUT").contains(def.code()))
+            throw new IllegalStateException("仅采购入库/销售出库支持转ERP");
+        String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in" : "bd_sale_out";
+        String partnerCol = "PURCHASE_IN".equals(def.code()) ? "供应商" : "客户";
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT h.单据编号, h.单据日期, h." + partnerCol + " AS 往来单位, h." + partnerCol + " AS partner" +
+                " FROM " + tbl + " h" +
+                " INNER JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = h.单据编号 AND s.shr IS NOT NULL" +
+                " WHERE ISNULL(h.asp_cancel,'N') <> 'Y'" +
+                " AND ISNULL(h.是否已转ERP, N'否') <> N'是'" +
+                " ORDER BY h.单据编号 DESC", def.code());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("list", rows);
+        out.put("count", rows.size());
+        return out;
+    }
+
+    /** 转ERP:已审核+未转过的采购入库/销售出库 → 推金蝶,回写ERP单号 */
+    private Map<String, Object> pushToErp(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!List.of("PURCHASE_IN", "SALE_OUT").contains(def.code()))
+            throw new IllegalStateException("仅采购入库/销售出库支持转ERP");
+        String docNo = String.valueOf(formData.getOrDefault("编号", formData.getOrDefault("单据编号", "")));
+        if (docNo.isBlank()) throw new IllegalArgumentException("缺少单据编号");
+        String operator = currentUserName();
+        try {
+            return kingdeePush.pushDocument(def.code(), docNo, operator);
+        } catch (Exception e) {
+            throw new RuntimeException("转ERP失败: " + e.getMessage(), e);
+        }
+    }
+
+    /** 修改预警数量(库存状况行内编辑):空值=清空行级阈值,回退全局阈值100 */
+    private Map<String, Object> updateStockWarn(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         if (!"STOCK_STATUS".equals(def.code())) throw new IllegalStateException("仅库存状况面板支持修改预警数量");
         String idRaw = requiredText(formData, "id");
         int id;

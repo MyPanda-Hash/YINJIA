@@ -90,7 +90,8 @@ public class PanelConfigService {
         buttonGroups.add(group("删除", List.of("删除", "删除单据")));
         buttonGroups.add(group("查找", List.of("查找", "刷新")));
         buttonGroups.add(group("打印", List.of("打印", "预览")));
-        buttonGroups.add(group("导入", List.of("下载模板", "导入")));
+        // 导入仅限单据面板(档案面板不提供导入)
+        // buttonGroups.add(group("导入", List.of("下载模板", "导入")));
         buttonGroups.add(group("更多", List.of("复制", "表格调整", "导出", "退出")));
         // 分类管理入口(金蝶同款交互):客户/供应商/商品 档案从工具栏进分类维护,分类面板不占左侧导航
         String classifyPanel = switch (def.code()) {
@@ -249,7 +250,7 @@ public class PanelConfigService {
             }
             buttonGroups.add(group("保存", List.of("保存")));
             buttonGroups.add(group("删除", List.of("删除")));
-            if (doc) buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
+            buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
             buttonGroups.add(group("刷新", List.of("刷新")));
@@ -358,6 +359,8 @@ public class PanelConfigService {
         tab.put("key", "items");
         tab.put("label", detailLabel);
         tab.put("fields", detailFields);
+        // 有明细字段的单据面板:至少需要一行明细才可保存(前端 validateInlineDraft 消费)
+        tab.put("isRequired", !detailFields.isEmpty());
         // 自动计算规则(引擎 calculateDetailRow 消费:参照带回与保存时重算)
         List<Map<String, Object>> calcRules = buildCalcRules(def.fieldsAt("detail"));
         if (!calcRules.isEmpty()) tab.put("calc", calcRules);
@@ -667,6 +670,7 @@ public class PanelConfigService {
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成进货单"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},
@@ -764,6 +768,7 @@ public class PanelConfigService {
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成销货单"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},

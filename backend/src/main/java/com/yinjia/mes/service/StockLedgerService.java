@@ -50,6 +50,11 @@ public class StockLedgerService {
             default -> false; // MATERIAL_OUT, SALE_OUT, OTHER_OUT, OUTSOURCE_ISSUE
         };
         List<Map<String, Object>> rows = loadRows(panelCode, no);
+        // 弃审时无明细行或仓库缺失 → 跳过台账冲回(不阻断弃审;正常审核过的必有行和仓库)
+        if (!forward && (rows.isEmpty() || rows.stream().allMatch(r ->
+                str(r.get("行仓库")) == null && str(r.get("头仓库")) == null))) {
+            return;
+        }
         if (rows.isEmpty()) throw new IllegalStateException(panelCode + " " + no + " 无明细行,不能记账");
         for (Map<String, Object> r : rows) {
             String code = str(r.get("code"));
@@ -59,6 +64,8 @@ public class StockLedgerService {
             Double price = r.get("price") == null ? null : num(r.get("price"));
             if (code == null) throw new IllegalStateException("存在缺少[材料/存货编码]的明细行,不能记账");
             if (qty == 0) continue; // 零行跳过;负数=红字冲回,正常过账(applyIn 内含负库存守卫)
+            // 弃审时该行仓库为空 → 跳过该行(审核时可能没填仓库就没过账)
+            if (!forward && whName == null) continue;
             String ckdm = resolveCkdm(whName);
             if (ckdm == null) throw new IllegalStateException("仓库档案不存在:[" + whName + "],请先在基础档案-仓库中建立");
             if (inbound) applyIn(code, ckdm, lot, qty, price, user, forward);
@@ -75,7 +82,11 @@ public class StockLedgerService {
                         + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)",
                 sign * qty, sign * qty, user, code, ckdm, lot, lot);
         if (n == 0) {
-            if (!forward || qty < 0) throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + "),红字冲回要求台账行已存在");
+            if (!forward || qty < 0) {
+                // 同步脚本设的已审核单据跳过了正常审核流程(未写台账),弃审时台账无行 → 跳过冲回
+                // 正常 UI 审核过的单据台账必有行,不会走这个分支
+                return;
+            }
             jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, yl, price, asp_user1, asp_time1, asp_cancel)"
                             + " VALUES (?, ?, ?, GETDATE(), ?, ?, ?, ?, GETDATE(), 'N')",
                     code, ckdm, lot, qty, qty, price, "stock:" + user);

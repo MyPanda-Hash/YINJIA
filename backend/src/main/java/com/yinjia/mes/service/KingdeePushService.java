@@ -1,0 +1,137 @@
+package com.yinjia.mes.service;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+
+import java.io.File;
+import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+
+/**
+ * 金蝶云·星辰沙箱推送服务(转ERP按钮)。
+ * 所有金蝶 API 调用通过 Node.js 子进程(deploy/push/_push-one.mjs)执行——
+ * 签名/编码已验证一致但 Java HttpClient URI 规范化与网关有差异,Node 客户端实测可靠。
+ */
+@Service
+public class KingdeePushService {
+    private static final Logger log = LoggerFactory.getLogger(KingdeePushService.class);
+    private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    private final ObjectMapper json = new ObjectMapper();
+    private final JdbcTemplate jdbc;
+
+    public KingdeePushService(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    /**
+     * 推送采购入库/销售出库到金蝶沙箱。
+     * @param panelCode PURCHASE_IN 或 SALE_OUT
+     * @param docNo 单据编号
+     * @param operator 操作人(当前登录用户)
+     * @return { ERP单号, 转ERP操作人, 转ERP时间, message }
+     */
+    public Map<String, Object> pushDocument(String panelCode, String docNo, String operator) throws Exception {
+        boolean isPur = "PURCHASE_IN".equals(panelCode);
+        String headTable = isPur ? "bd_purchase_in" : "bd_sale_out";
+        String lineTable = isPur ? "bl_purchase_in" : "bl_sale_out";
+
+        Map<String, Object> head = jdbc.queryForMap(
+                "SELECT * FROM " + headTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
+
+        // ① 是否已转ERP = 是 → 直接提示(防多次点击)
+        String pushed = String.valueOf(head.getOrDefault("是否已转ERP", ""));
+        if ("是".equals(pushed)) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("是否已转ERP", "是");
+            out.put("ERP单号", String.valueOf(head.getOrDefault("ERP单号", "")));
+            out.put("message", "该单据已转入ERP，不可重复转入");
+            return out;
+        }
+
+        // ② 状态校验(从 yj_doc_status 状态机取)
+        String auditUser = null;
+        try {
+            auditUser = jdbc.queryForObject(
+                    "SELECT shr FROM yj_doc_status WHERE panel_code = ? AND doc_no = ? AND shr IS NOT NULL",
+                    String.class, panelCode, docNo);
+        } catch (Exception ignored) {}
+        if (auditUser == null) throw new RuntimeException("仅已审核(审批通过)单据可转ERP");
+
+        List<Map<String, Object>> lines = jdbc.queryForList(
+                "SELECT * FROM " + lineTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
+        if (lines.isEmpty()) throw new RuntimeException("单据无明细行，不可转ERP");
+
+        // 2. 行仓库编码:空的从 bs_wh 查
+        for (Map<String, Object> line : lines) {
+            Object stockCode = line.get("仓库编码");
+            if (stockCode == null || String.valueOf(stockCode).isBlank()) {
+                Object stockName = line.get("仓库");
+                if (stockName != null && !String.valueOf(stockName).isBlank()) {
+                    try {
+                        String code = jdbc.queryForObject(
+                                "SELECT 仓库编码 FROM bs_wh WHERE 仓库名称 = ?", String.class, String.valueOf(stockName).trim());
+                        if (code != null) line.put("仓库编码", code);
+                    } catch (Exception ignored) {}
+                }
+            }
+        }
+
+        // 3. 构建 stdin JSON 传给 Node 脚本
+        ObjectNode input = json.createObjectNode();
+        input.put("panelCode", panelCode);
+        input.put("docNo", docNo);
+        input.put("operator", operator);
+        input.set("head", json.valueToTree(head));
+        input.set("lines", json.valueToTree(lines));
+        String stdinJson = json.writeValueAsString(input);
+
+        // 4. 调 Node 子进程推送
+        String workDir = System.getProperty("user.dir") + File.separator + "deploy" + File.separator + "push";
+        Process p = new ProcessBuilder("node", "_push-one.mjs")
+                .directory(new File(workDir))
+                .redirectErrorStream(false).start();
+        p.getOutputStream().write(stdinJson.getBytes(StandardCharsets.UTF_8));
+        p.getOutputStream().close();
+
+        StringBuilder stdout = new StringBuilder();
+        try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = reader.readLine()) != null) stdout.append(line);
+        }
+        if (!p.waitFor(60, java.util.concurrent.TimeUnit.SECONDS)) {
+            p.destroyForcibly();
+            throw new RuntimeException("转ERP超时(60秒)");
+        }
+
+        JsonNode result = json.readTree(stdout.toString());
+        if (!result.path("ok").asBoolean(false)) {
+            throw new RuntimeException("金蝶接口失败: " + result.path("error").asText("未知错误"));
+        }
+
+        // 5. 回写 MES(ERP单号 = 金蝶自动生成的编号,不是 MES 编号)
+        String erpBillNo = result.path("erpBillNo").asText("");
+        if (erpBillNo.isBlank()) throw new RuntimeException("金蝶未返回单号");
+        String now = LocalDateTime.now().format(FMT);
+        jdbc.update("UPDATE " + headTable + " SET 是否已转ERP = N'是', ERP单号 = ?, 转ERP操作人 = ?, 转ERP时间 = ? WHERE 单据编号 = ?",
+                erpBillNo, operator, now, docNo);
+
+        // 6. 返回
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("是否已转ERP", "是");
+        out.put("ERP单号", erpBillNo);
+        out.put("转ERP操作人", operator);
+        out.put("转ERP时间", now);
+        out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）");
+        return out;
+    }
+}
