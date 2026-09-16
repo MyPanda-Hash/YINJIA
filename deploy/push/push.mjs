@@ -2,6 +2,11 @@
 // deploy/push/push.mjs — MES → 金蝶沙箱 增量推送(采购入库 + 销售出库)
 // 与 deploy/sync-core.mjs 同架构、同 EXTRA 映射,方向反转(读 MES → 写金蝶)
 //
+// ⚠ 金蝶星辰 OpenAPI 平台限制:
+//   save API 只能创建 Z(暂存)状态的单据,bill_status='C' 被忽略
+//   不开放 audit/submit/approve 接口(全部 API not found)
+//   推上去的单需要在金蝶界面手动点"审核"
+//
 // 增量规则(与同步脚本对称):
 //   ① 变更检测:asp_time2(MES 引擎每次修改自动写) > lastPushTime → 有变化才推
 //   ② 新增:    金蝶无该 bill_no → POST 创建
@@ -101,6 +106,7 @@ const PUSH_DOCS = [
       bill_date: String(h.单据日期 || '').slice(0, 10),
       trans_type: '2',
       supplier_number: String(h.供应商编码 || ''),
+      bill_stock_number: '', // 头仓库从行级取(金蝶头级允许空)
       remark: String(h.备注 || ''),
     }),
     lineBase: (l) => ({
@@ -123,6 +129,7 @@ const PUSH_DOCS = [
       bill_date: String(h.单据日期 || '').slice(0, 10),
       trans_type: '2',
       customer_number: String(h.客户编码 || ''),
+      bill_stock_number: '',
       remark: String(h.备注 || ''),
     }),
     lineBase: (l) => ({
