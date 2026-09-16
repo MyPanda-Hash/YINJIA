@@ -343,7 +343,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "单据整单折前价税合计",
+      "c": "折前价税合计",
       "a": "bill_dis_before_amount",
       "t": "str"
     },
@@ -633,7 +633,7 @@ export const EXTRA = {
       "t": "join"
     },
     {
-      "c": "业务模式0:普通销售，1:直运销售",
+      "c": "业务模式",
       "a": "biz_mode",
       "t": "str"
     },
@@ -653,7 +653,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "交货方式id,6-物流发货，8-车辆配送，9-客户自提",
+      "c": "交货方式id",
       "a": "delivery_type_id",
       "t": "str"
     },
@@ -668,7 +668,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "发票类型：1：普票，2:专票",
+      "c": "发票类型",
       "a": "ivc_type",
       "t": "str"
     },
