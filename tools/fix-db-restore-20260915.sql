@@ -4,6 +4,7 @@
 -- 本脚本以「服务器部署快照(tools/deploy-all.sql,2026-09-02)+ 后续契约脚本」为口径,统一收口:
 --   §1 bl_dispatch 重建为服务器口径(中文列 + 生产车间;当前为英文列空表,重建无损)
 --   §2 DISPATCH 面板元数据对齐服务器口径(头行分表 + 中文字段,清掉英文残留)
+--   §2.5 SO_ORDER 品牌列名归一为服务器口径「品牌」(服务器手工更名未脚本化,从零跑链的库只有「存货名称品牌」)
 --   §3 重建 22 个报表面板视图(11 DETAIL + 11 STATS;v_sales_order_detail 用 status-align 的状态派生版)
 --   §4 DISPATCH_DETAIL/DISPATCH_STATS 面板注册 + 全部 22 个报表面板字段按终版视图列重注册
 --   §5 自检
@@ -49,6 +50,16 @@ IF COL_LENGTH('dbo.bl_dispatch', N'生产车间') IS NULL ALTER TABLE dbo.bl_dis
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id = OBJECT_ID('dbo.bl_dispatch') AND minor_id = 0 AND name = N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'工序派工单行表(中文列,服务器口径;含生产车间列供统计视图分组)', N'SCHEMA', N'dbo', N'TABLE', N'bl_dispatch';
+GO
+
+-- ════════ §2.5 SO_ORDER 品牌列名归一 → 服务器口径 ════════
+-- 服务器已把 bl_so_order.[存货名称品牌] 更名为 [品牌](fix-db-restore-tail.sql 按此口径重注册字段);
+-- 从零跑链的库(测试库/全量部署)只会得到 _so_part1.sql 的 [存货名称品牌],此处统一归一,§3 视图才建得起来。
+IF COL_LENGTH('dbo.bl_so_order', N'存货名称品牌') IS NOT NULL AND COL_LENGTH('dbo.bl_so_order', N'品牌') IS NULL
+BEGIN
+  EXEC sp_rename N'bl_so_order.[存货名称品牌]', N'品牌', N'COLUMN';
+  UPDATE yj_field SET col_name = N'品牌' WHERE panel_code = 'SO_ORDER' AND col_name = N'存货名称品牌';
+END
 GO
 
 -- ════════ §2 DISPATCH 面板元数据 → 服务器口径 ════════
