@@ -116,19 +116,6 @@ public class KingdeePushService {
         JsonNode result = json.readTree(stdout.toString());
         if (!result.path("ok").asBoolean(false)) {
             String errText = result.path("error").asText("未知错误");
-            // 金蝶返回"组合值重复" = 该单号已存在于金蝶(可能被同步脚本或其他途径推过)
-            // → 识别为已转过,回填 ERP单号 并返回友好提示(不报错)
-            if (errText.contains("组合值重复") || errText.contains("已存在")) {
-                String now = LocalDateTime.now().format(FMT);
-                jdbc.update("UPDATE " + headTable + " SET ERP单号 = ?, 转ERP操作人 = ?, 转ERP时间 = ? WHERE 单据编号 = ?",
-                        docNo, operator, now, docNo);
-                Map<String, Object> out = new LinkedHashMap<>();
-                out.put("ERP单号", docNo);
-                out.put("转ERP操作人", operator);
-                out.put("转ERP时间", now);
-                out.put("message", "该单号在金蝶已存在(可能被同步脚本推过)，已标记为已转ERP");
-                return out;
-            }
             throw new RuntimeException("金蝶接口失败: " + errText);
         }
 

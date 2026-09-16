@@ -110,9 +110,22 @@ try {
     return e;
   });
 
-  const r = await kingdeePost(cfg.kingdee, token, apiPath, {}, body);
+  // 推送;如果"组合值重复"(金蝶不能覆盖已有数据),自动加修订后缀 -R1/-R2 重推
+  let billNo = String(h['单据编号'] || '');
+  let r = null;
+  for (let retry = 0; retry <= 5; retry++) {
+    body.bill_no = billNo;
+    r = await kingdeePost(cfg.kingdee, token, apiPath, {}, body);
+    if (r.ok) break;
+    if (/组合值重复|已存在/.test(String(r.error || '')) && retry < 5) {
+      billNo = String(h['单据编号']) + '-R' + (retry + 1); // 弃审修改后重推:加修订号
+      continue; // 换号重试
+    }
+    break; // 其他错误不重试
+  }
+
   if (r.ok) {
-    const erpBillNo = String(Object.values(r.data?.id_number_map || {})[0] || h['单据编号']);
+    const erpBillNo = String(Object.values(r.data?.id_number_map || {})[0] || billNo);
     console.log(JSON.stringify({ ok: true, erpBillNo }));
   } else {
     console.log(JSON.stringify({ ok: false, error: r.error || 'unknown' }));
