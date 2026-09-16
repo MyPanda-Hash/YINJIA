@@ -38,7 +38,7 @@
               :class="[c.align === 'center' ? 'a-center' : 'a-left', { 'dsr-no': c.no }]"
               :title="r.cells[ci]"
             >
-              <span v-if="c.tag && r.cells[ci]" class="dsr-tag" :class="tagClass(r.cells[ci])">{{ r.cells[ci] }}</span>
+              <span v-if="c.tag && r.cells[ci]" class="dsr-tag" :class="tagClass(r.cells[ci])">{{ tt(r.cells[ci]) }}</span>
               <template v-else>{{ r.cells[ci] }}</template>
             </td>
           </tr>
@@ -82,6 +82,8 @@ const DEFAULT_COLUMNS = [
 ]
 const cols = computed(() => (props.columns && props.columns.length ? props.columns : DEFAULT_COLUMNS))
 const colValue = (row, c) => {
+  // derive 列:值由挂载方函数从行派生(如转ERP状态:行上无现成字段,由 ERP单号/是否已转ERP 推出)
+  if (typeof c.derive === 'function') return c.derive(row) ?? ''
   for (const k of c.keys || [c.label]) {
     const v = row[k]
     if (v !== undefined && v !== null && String(v).trim() !== '') return v
@@ -109,7 +111,7 @@ const filtered = computed(() => {
 })
 
 /** 状态标签色彩(沿用系统制造绿体系:主色=已审核,中性灰=草稿,琥珀=流转中,红=作废/驳回) */
-const TAG_OK = ['已审核', '已归档', '生产中', '已完工', '已关闭', '已审批', '已通过']
+const TAG_OK = ['已审核', '已归档', '生产中', '已完工', '已关闭', '已审批', '已通过', '已转']
 const TAG_PENDING = ['审批中', '修改中', '删除申请中', '修改申请中', '提交审批']
 const TAG_DANGER = ['已作废', '已中止', '已终止', '审批驳回', '驳回']
 function tagClass(status) {

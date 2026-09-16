@@ -1,6 +1,9 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    'ERP单': 'ERP',
+    '已转': 'Đã chuyển',
+    '未转': 'Chưa chuyển',
     '二维码标签': 'Nhãn QR',
     '请先勾选要导出的商品': 'Hãy chọn trước các hàng hóa cần xuất',
     '已选 {n} 个商品，导出二维码标签 PDF？': 'Xuất PDF nhãn QR cho {n} hàng hóa đã chọn?',

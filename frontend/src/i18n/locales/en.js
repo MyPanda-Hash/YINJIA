@@ -45,6 +45,9 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    'ERP单': 'ERP',
+    '已转': 'Pushed',
+    '未转': 'Not pushed',
     '二维码标签': 'QR code labels',
     '请先勾选要导出的商品': 'Select the items to export first',
     '已选 {n} 个商品，导出二维码标签 PDF？': 'Export QR code label PDF for {n} selected item(s)?',

@@ -1,6 +1,9 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    'ERP单': 'ERP',
+    '已转': 'Transféré',
+    '未转': 'Non transféré',
     '二维码标签': 'Étiquettes QR',
     '请先勾选要导出的商品': "Cochez d'abord les articles à exporter",
     '已选 {n} 个商品，导出二维码标签 PDF？': 'Exporter les étiquettes QR en PDF des {n} article(s) sélectionné(s) ?',

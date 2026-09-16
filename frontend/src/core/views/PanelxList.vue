@@ -2507,13 +2507,18 @@ async function guardPageAction(run) {
 }
 
 // ═══ 左侧「单据选择」栏(对齐 PANDA 暂收入库单选择):按面板启用,点行切换右侧当前单据 ═══
-// 值=该单据左栏的中间列(重要字段);首列单号/次列日期/末列审核状态由下方组装兜底(键含各单据别名)
+// 值=该单据左栏的中间列(重要字段);首列单号/次列日期/末列审核状态由下方组装兜底(键含各单据别名);
+// 中间列支持字符串(行键)或列对象(derive 派生列,如采购入库的 ERP 状态)
 const DOC_RAIL_PANELS = {
   SL_RECV: ['供应商', '部门'],        // 送料暂收单
   QC_INSP: ['供应商', '部门'],        // 来料检验单
   QC_RETURN: ['供应商', '部门'],      // 暂收退料单
   PU_ORDER: ['供应商'],          // 采购订单(币种列 2026-09-16 按用户口径删)
-  PURCHASE_IN: ['供应商', '入库类别'], // 采购入库单
+  PURCHASE_IN: ['供应商', {        // 采购入库单(入库类别列 2026-09-16 按用户口径换成 ERP 转入状态)
+    label: 'ERP单', align: 'center', tag: true,
+    // 已转=转ERP成功才有(ERP单号成功回填/弃审清空;是否已转ERP 未入 yj_field 不随行下发,作首选信号)
+    derive: (row) => (String(row?.['是否已转ERP'] ?? '') === '是' || String(row?.['ERP单号'] ?? '').trim() !== '' ? '已转' : '未转'),
+  }],
 }
 const docRailCfg = computed(() => {
   const middles = DOC_RAIL_PANELS[panelCode.value]
@@ -2521,7 +2526,7 @@ const docRailCfg = computed(() => {
   const columns = [
     { label: '单号', keys: ['编号', '单据编号', '单号'], align: 'left', no: true },
     { label: '日期', keys: ['日期', '单据日期'], align: 'left' },
-    ...middles.map((m) => ({ label: m, keys: [m], align: 'left' })),
+    ...middles.map((m) => (typeof m === 'string' ? { label: m, keys: [m], align: 'left' } : m)),
     { label: '审核状态', keys: ['单据状态'], align: 'center', tag: true },
   ]
   return { title: (panelName.value || '') + tt('选择'), columns }
