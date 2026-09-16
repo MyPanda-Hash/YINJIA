@@ -291,3 +291,7 @@ migrate-kingdee-subentity-union.sql
 # 其余(id/编码/创建修改人/长编码/辅助属性组合等)隐藏。原有手工字段不动(已按金蝶实际使用口径裁剪过)。
 # 显示/隐藏:SO 118/80、PU 36/140、KHDA 60/14、GFDA 22/20、INV 75/33。
 migrate-panel-default-visibility.sql
+
+# —— 2026-09-16 登记:隐藏当前数据全空的已显示字段(50条沙箱口径) ——
+# 逐列检查非空行数=0 的已显示字段 → hidden+visible 双隐藏;正式环境有数据后可勾选恢复。
+migrate-hide-empty-fields.sql
