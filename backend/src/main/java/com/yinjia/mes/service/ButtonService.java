@@ -501,6 +501,14 @@ public class ButtonService {
 
     /** 档案保存:整份明细 upsert(插入回填自增 id),缺席行软删 */
     private Map<String, Object> saveArchive(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String user) {
+        // 数据量护栏(2026-09-16):档案保存=全量 upsert(缺席行=已删除);库里存活行数一旦超出
+        // 全量加载上限,前端看到的就是截断数据,此时放行保存会把未加载的行全部误删——直接拒绝
+        Integer live = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + def.lineTable() + " WHERE ISNULL(asp_cancel,'N')<>'Y'", Integer.class);
+        if (live != null && live > QueryService.ARCH_LOAD_CAP) {
+            throw new IllegalStateException("该档案存活行数 " + live + " 已超出全量加载上限 " + QueryService.ARCH_LOAD_CAP
+                    + ",保存已阻止:未加载的行会被当作删除处理,请联系开发提高上限或先清理/归档数据");
+        }
         Set<Object> liveIds = new HashSet<>();
         for (Map<String, Object> item : items) {
             Object id = item.get("id");

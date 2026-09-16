@@ -803,6 +803,7 @@ export default {
     '生成委外发料单': 'Générer sortie sous-traitance',
     '已中止': 'Arrêté',
     '输入搜索': 'Tapez pour chercher',
+    '点击编辑': 'Cliquer pour modifier',
     '共有数据': 'Total des données',
     '审核状态': 'Statut de validation',
     '选择': 'Sélectionner',

@@ -803,6 +803,7 @@ export default {
     '生成委外发料单': 'Sinh cấp gia công',
     '已中止': 'Đã dừng',
     '输入搜索': 'Gõ để tìm',
+    '点击编辑': 'Bấm để sửa',
     '共有数据': 'Tổng số dữ liệu',
     '审核状态': 'Trạng thái duyệt',
     '选择': 'Chọn',

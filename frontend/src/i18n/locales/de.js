@@ -803,6 +803,7 @@ export default {
     '生成委外发料单': 'Fremdvergabe-Ausgabe erzeugen',
     '已中止': 'Gestoppt',
     '输入搜索': 'Zum Suchen tippen',
+    '点击编辑': 'Klicken zum Bearbeiten',
     '共有数据': 'Gesamtdatensätze',
     '审核状态': 'Prüfstatus',
     '选择': 'Auswählen',

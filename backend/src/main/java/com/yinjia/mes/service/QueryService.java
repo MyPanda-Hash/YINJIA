@@ -67,8 +67,12 @@ public class QueryService {
     }
 
     // ============ 档案模式(单单据) ============
-    // 档案保存语义 = 全量明细 upsert(缺席行=已删除),因此查询必须返回全量行(上限 2000),
-    // 否则分页截断会造成"未加载的行被误删"。
+    // 档案保存语义 = 全量明细 upsert(缺席行=已删除),因此查询必须返回全量行,
+    // 否则截断会造成"未加载的行被误删"。上限内全量返回;超出上限时 ButtonService.saveArchive
+    // 的同值护栏会拒绝保存(2026-09-16:商品 bs_inv 已 3850 行,旧上限 2000 已被击穿)。
+
+    /** 档案全量加载/保存护栏共用上限(行) */
+    public static final int ARCH_LOAD_CAP = 50_000;
 
     private Map<String, Object> queryArchive(PanelRegistry.PanelDef def, String keyword,
                                              Map<String, Object> condition, Map<String, String> l2c,
@@ -81,9 +85,9 @@ public class QueryService {
         Integer total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + def.lineTable() + " t " + where, Integer.class, args.toArray());
 
-        // 全量返回(上限 2000):保存语义为"缺席行=已删除",必须保证明细完整
+        // 全量返回(上限 ARCH_LOAD_CAP):保存语义为"缺席行=已删除",必须保证明细完整
         String sql = "SELECT t.id AS __id, " + cols + " FROM " + def.lineTable() + " t " + where
-                + " ORDER BY t.id DESC OFFSET 0 ROWS FETCH NEXT 2000 ROWS ONLY";
+                + " ORDER BY t.id DESC OFFSET 0 ROWS FETCH NEXT " + ARCH_LOAD_CAP + " ROWS ONLY";
         List<Map<String, Object>> rows = jdbc.queryForList(sql, args.toArray());
 
         List<Map<String, Object>> items = new ArrayList<>();
