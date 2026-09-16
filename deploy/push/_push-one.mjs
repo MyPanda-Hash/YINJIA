@@ -105,7 +105,9 @@ try {
     };
     if (l['规格型号']) e.material_model = String(l['规格型号']);
     if (l['税率%']) e.cess = Number(l['税率%']) || 0;
-    if (l['仓库编码']) e.stock_number = String(l['仓库编码']);
+    // 仓库编码:行级 > 头级 > 默认正品仓(金蝶要求非服务商品必须录入仓库)
+    const stockCode = l['仓库编码'] || h['仓库编码'] || 'CK00001';
+    e.stock_number = String(stockCode);
     if (l['批号']) e.batch_no = String(l['批号']);
     return e;
   });
