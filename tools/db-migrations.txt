@@ -364,3 +364,6 @@ migrate-qc-recv-pool-clean.sql
 # —— 2026-09-16 采购订单/采购入库单补 6 附件列位(头表 6 列 + yj_field dataType=附件;同 QC_INSP/SL_RECV/QC_RETURN)——
 # 前端零改动(附件区由 data_type 驱动);译名附件1..6 全局共享已有。幂等可重跑。
 migrate-po-pi-attach.sql
+
+# —— 2026-09-16 转ERP按钮(采购入库/销售出库):ERP单号/转ERP操作人/转ERP时间 3列+是否已转ERP闸门列(合并补遗,原稿漏建)+yj_field注册+en译名;幂等可重跑 ——
+migrate-erp-push-button.sql

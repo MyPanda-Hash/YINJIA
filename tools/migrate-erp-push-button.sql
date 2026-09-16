@@ -4,6 +4,13 @@
 SET NOCOUNT ON;
 
 -- ══ 1) 物理列 ══
+-- 是否已转ERP:推送状态闸门(ButtonService 过滤 ISNULL(是否已转ERP,'否')<>'是',弃审回置'否');
+-- 2026-09-16 合并补遗:原稿漏建此列(开发库手工建过),正式迁移补齐;存量行 NULL=未转,无需回填
+IF COL_LENGTH('dbo.bd_purchase_in', N'是否已转ERP') IS NULL
+  ALTER TABLE dbo.bd_purchase_in ADD [是否已转ERP] nvarchar(10) NULL;
+IF COL_LENGTH('dbo.bd_sale_out', N'是否已转ERP') IS NULL
+  ALTER TABLE dbo.bd_sale_out ADD [是否已转ERP] nvarchar(10) NULL;
+
 IF COL_LENGTH('dbo.bd_purchase_in', N'ERP单号') IS NULL
   ALTER TABLE dbo.bd_purchase_in ADD [ERP单号] nvarchar(100) NULL;
 IF COL_LENGTH('dbo.bd_purchase_in', N'转ERP操作人') IS NULL
