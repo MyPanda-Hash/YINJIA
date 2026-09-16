@@ -358,6 +358,8 @@ public class PanelConfigService {
         tab.put("key", "items");
         tab.put("label", detailLabel);
         tab.put("fields", detailFields);
+        // 有明细字段的单据面板:至少需要一行明细才可保存(前端 validateInlineDraft 消费)
+        tab.put("isRequired", !detailFields.isEmpty());
         // 自动计算规则(引擎 calculateDetailRow 消费:参照带回与保存时重算)
         List<Map<String, Object>> calcRules = buildCalcRules(def.fieldsAt("detail"));
         if (!calcRules.isEmpty()) tab.put("calc", calcRules);
