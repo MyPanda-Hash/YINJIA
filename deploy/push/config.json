@@ -1,0 +1,17 @@
+{
+  "kingdee": {
+    "clientId": "359220",
+    "clientSecret": "c50fd697a5ff4e20b804325c9c342a74",
+    "appKey": "Wyaf4sPe",
+    "appSecret": "53846133d3aca9cecb3a630966c0053c1a438784",
+    "domain": "https://tf.jdy.com"
+  },
+  "database": {
+    "server": "127.0.0.1",
+    "port": 1433,
+    "database": "HSDZ_MES",
+    "user": "yinjia",
+    "password": "Yinjia@2026",
+    "encrypt": false
+  }
+}

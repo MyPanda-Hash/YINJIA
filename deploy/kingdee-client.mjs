@@ -160,3 +160,43 @@ export async function kingdeeTryGet(cfg, token, path, params) {
     return { ok: false, error: e.message };
   }
 }
+
+/**
+ * 调用业务 POST 接口(写入金蝶),返回 { ok, data?, error? }。
+ * body 为 JS 对象(自动 JSON 序列化);签名仅对 URL 参数(不含 body)。
+ * 自动重试(共3次,递增退避)。
+ */
+export async function kingdeePost(cfg, token, path, params, body) {
+  let lastErr;
+  for (let i = 0; i < 3; i++) {
+    try {
+      const timestamp = String(Date.now());
+      const nonce = String(Math.floor(Math.random() * 2147483646) + 1);
+      const url = buildUrl(path, params || {});
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Api-ClientID': cfg.clientId,
+          'X-Api-Auth-Version': '2.0',
+          'X-Api-TimeStamp': timestamp,
+          'X-Api-Nonce': nonce,
+          'X-Api-SignHeaders': 'X-Api-TimeStamp,X-Api-Nonce',
+          'X-Api-Signature': makeApiSignature(cfg.clientSecret, 'POST', path, params || {}, nonce, timestamp),
+          'app-token': token,
+          'X-GW-Router-Addr': cfg.domain,
+        },
+        body: JSON.stringify(body || {}),
+      });
+      if (res.status === 429) throw new Error('HTTP 429 已被限流(账套级 500次/分钟)');
+      if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
+      const json = await res.json();
+      if (json.errcode !== 0) return { ok: false, error: `errcode=${json.errcode} ${json.description || ''} [POST ${path}]`, raw: json };
+      return { ok: true, data: json.data, raw: json };
+    } catch (e) {
+      lastErr = e;
+      if (i < 2) await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+    }
+  }
+  return { ok: false, error: lastErr.message };
+}
