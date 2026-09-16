@@ -15,7 +15,9 @@
         <span class="rpd-tip">{{ tipText }} · 共 {{ total }} 条</span>
       </div>
       <el-table
-        :data="displayRows"
+        ref="tableRef"
+        :data="pagedRows"
+        :row-key="rowKeyOf"
         v-loading="loading"
         size="small"
         border
@@ -23,13 +25,28 @@
         highlight-current-row
         @selection-change="(r) => (selected = r)"
       >
-        <el-table-column type="selection" width="45" />
+        <!-- reserve-selection:跨页保留勾选(多选导入语义),row-key 用载入时分配的稳定 __rk -->
+        <el-table-column type="selection" width="45" reserve-selection />
         <el-table-column v-for="c in displayColumns" :key="c" :prop="c" :label="c" min-width="110" show-overflow-tooltip>
           <template v-if="c === '开发状态'" #default="{ row }">
             <span class="rpd-dev" :class="devTone(row['开发状态'])">{{ tt(row['开发状态']) }}</span>
           </template>
         </el-table-column>
       </el-table>
+      <!-- 大数据参照分页(2026-09-16):数据全量驻内存(keyword 过滤后),DOM 只渲染当前页 ——
+           商品 3850 行×75 列全量渲染曾把弹窗冻住数十秒;形态对齐档案页(总数+每页条数+箭头+跳页) -->
+      <div v-if="total > PAGE_SIZES[0]" class="rpd-pager">
+        <el-pagination
+          small background
+          v-model:page-size="pageSize"
+          layout="total, sizes, prev, next, jumper"
+          :page-sizes="PAGE_SIZES"
+          :total="total"
+          :current-page="page"
+          @size-change="onSizeChange"
+          @current-change="(p) => (page = p)"
+        />
+      </div>
     </div>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">取消</el-button>
@@ -39,7 +56,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, markRaw } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import { usePanelRuntime } from '@core/panel-runtime'
@@ -66,15 +83,26 @@ const selected = ref([])
 const loading = ref(false)
 const total = ref(0)
 
+// ── 大数据参照分页(2026-09-16):档案参照(商品 3850 行×75 列)此前全量渲染把弹窗冻住。
+// 数据全量驻内存(同档案页口径),DOM 只渲染当前页;行对象 markRaw 避免 ~29 万属性深度代理。
+const PAGE_SIZES = [50, 100, 200, 500]
+const pageSize = ref(PAGE_SIZES[0])
+const page = ref(1)
+const tableRef = ref(null)
+const pagedRows = computed(() => {
+  const s = (page.value - 1) * pageSize.value
+  return rows.value.slice(s, s + pageSize.value)
+})
+function onSizeChange() { page.value = 1 }
+/** reserve-selection 的稳定行键:载入时按序分配(过滤/翻页后仍指向同一行对象) */
+function rowKeyOf(r) { return r.__rk }
+
 // ── 产品开发状态标注(2026-09-09):参照产品信息表时,按当前面板标注 未开发 / 已开发 ──
 const DEV_PANEL_CODES = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
 const devMap = ref({})
 const showDevStatus = computed(() => props.field?.refPanel === 'RD_PROD_INFO'
   && DEV_PANEL_CODES.includes(String(props.ownerPanel || '')))
 const displayColumns = computed(() => (showDevStatus.value ? [...columns.value, '开发状态'] : columns.value))
-const displayRows = computed(() => (showDevStatus.value
-  ? rows.value.map((r) => ({ ...r, 开发状态: devMap.value[r['产品编号']] || '' }))
-  : rows.value))
 function devTone(status) {
   return status === '已开发' ? 'done' : 'none'
 }
@@ -91,13 +119,12 @@ async function open() {
   if (!props.field) return
   title.value = (await engine.refPanelName(props.field)) + ' · 参照选择'
   loading.value = true
+  tableRef.value?.clearSelection() // 重新查询后旧勾选(含跨页保留)整体作废
   selected.value = []
   rows.value = []
   try {
     columns.value = await engine.refColumns(props.field)
     const list = await engine.queryRefRows(props.field, { keyword: keyword.value })
-    rows.value = list
-    total.value = list.length
     if (showDevStatus.value) {
       const codes = list.map((r) => r['产品编号']).filter((v) => v !== undefined && v !== null && v !== '')
       try {
@@ -105,9 +132,16 @@ async function open() {
       } catch (e) {
         devMap.value = {}
       }
+      // 标注写进行对象,须在 rows.value 赋值(raw 进响应式)之前完成,渲染时即带值
+      for (const r of list) r['开发状态'] = devMap.value[r['产品编号']] || ''
     } else {
       devMap.value = {}
     }
+    // markRaw 必须在进入响应式系统(rows.value 赋值)之前打在原始行对象上
+    for (let i = 0; i < list.length; i++) { list[i].__rk = String(i); markRaw(list[i]) }
+    rows.value = list
+    total.value = list.length
+    page.value = 1
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || '参照数据加载失败')
   } finally {
@@ -133,6 +167,12 @@ function confirm() {
   font-size: 12px;
   color: var(--t-text-3);
   margin-left: 4px;
+}
+/* 大数据参照分页器:贴在表格下沿右对齐(形态对齐档案页 arch-pager) */
+.rpd-pager {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
 }
 /* 产品开发状态标注 */
 .rpd-dev {
