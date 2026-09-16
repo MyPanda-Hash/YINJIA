@@ -295,3 +295,7 @@ migrate-panel-default-visibility.sql
 # —— 2026-09-16 登记:隐藏当前数据全空的已显示字段(50条沙箱口径) ——
 # 逐列检查非空行数=0 的已显示字段 → hidden+visible 双隐藏;正式环境有数据后可勾选恢复。
 migrate-hide-empty-fields.sql
+
+# —— 2026-09-16 登记:隐藏英文标签字段 + 全 false/0 布尔字段 ——
+# 英文标签 18 个(group_id/价格等级-id/国家-id/商品id/源单id 等)+ 布尔全零 8 个(是否启用保质期/称重/序列号管理/自制/倒冲领料/辅助属性 + 自动抵扣预收款×2)。
+migrate-hide-junk-fields.sql
