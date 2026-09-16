@@ -323,3 +323,8 @@ migrate-redesign-inbound-outbound-header.sql
 # 出库:存货编码/名称/规格/数量/计量单位/售价/含税售价/销售金额/含税销售金额+批号/仓库名称/现存量/备注/退货数量/基本单位名称(17列)
 # SO 精简到13列、PU 17列(核心+仓库/预计到货/折扣系列)
 migrate-redesign-inbound-outbound-detail.sql
+
+# —— 2026-09-16 登记:四单据对基础资料的参照设计 ——
+# 设计:存货/物料→INV(编码匹配/名称显示)、供应商→GFDA(dm/mc)、客户→KHDA(dm/mc)、仓库→WH(编码/名称)、经手人/业务员→EMP;
+# KHDA/GFDA/WH 补 query 位(参照弹窗搜索列);遗留 PARTNER 参照全部改为 KHDA/GFDA(3处)。
+migrate-doc-panel-references.sql
