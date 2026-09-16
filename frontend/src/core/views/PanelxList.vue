@@ -682,6 +682,25 @@
           @scroll.capture="(e) => onArchScroll(e, b)"
         >
           <el-table-column v-if="delMode && b.isMain" type="selection" width="45" fixed="left" />
+          <!-- 物料二维码标签(勾选即打):自管勾选集(跨页保留),与删除模式的 selection 列互不相干;
+               表头复选框=本页全选。行键=qrLabelKey 列(存货编码),空编码行禁勾 -->
+          <el-table-column v-if="qrKey && b.isMain" width="40" fixed="left" align="center">
+            <template #header>
+              <el-checkbox
+                :model-value="qrPageAllChecked(b)"
+                :indeterminate="qrPageSomeChecked(b)"
+                :title="tt('本页全选')"
+                @change="(v) => qrTogglePage(b, v)"
+              />
+            </template>
+            <template #default="{ row }">
+              <el-checkbox
+                :model-value="qrSel.has(qrRowKey(row))"
+                :disabled="!qrRowKey(row)"
+                @change="() => qrToggleRow(row)"
+              />
+            </template>
+          </el-table-column>
           <el-table-column
             v-for="c in archCols(b)"
             :key="c.prop"
@@ -2773,6 +2792,77 @@ const archPageSize = ref(50)
 const ARCH_SIZE_OPTS = [50, 100, 200, 500]
 const archPage = ref(1)
 function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首页
+
+// ═══ 物料二维码标签(勾选即打,2026-09-16):存货档案工具栏「二维码标签」按行勾选 → 80×80mm 标签 PDF。
+// 勾选集自管(Set 换新触发响应式),跨页/跨筛选保留;行键 = 后端 metadata.qrLabelKey(存货编码),
+// 同码行勾一个即代表该码(二维码内容相同;库里同码多行由后端查重守卫报错拦截) ═══
+const qrSel = ref(new Set())
+const qrKey = computed(() => cfgCache.value?.metadata?.qrLabelKey || '')
+function qrRowKey(row) { return String(row?.[qrKey.value] ?? '').trim() }
+function qrToggleRow(row) {
+  const k = qrRowKey(row)
+  if (!k) return
+  const s = new Set(qrSel.value)
+  if (s.has(k)) s.delete(k)
+  else s.add(k)
+  qrSel.value = s
+}
+function qrVisibleRows(b) { return pagedBlockRows(b).filter((r) => !r._placeholder) }
+function qrPageAllChecked(b) {
+  const rows = qrVisibleRows(b)
+  return rows.length > 0 && rows.every((r) => qrSel.value.has(qrRowKey(r)))
+}
+function qrPageSomeChecked(b) {
+  const rows = qrVisibleRows(b)
+  return !qrPageAllChecked(b) && rows.some((r) => qrSel.value.has(qrRowKey(r)))
+}
+function qrTogglePage(b, on) {
+  const s = new Set(qrSel.value)
+  for (const r of qrVisibleRows(b)) {
+    const k = qrRowKey(r)
+    if (!k) continue
+    if (on) s.add(k)
+    else s.delete(k)
+  }
+  qrSel.value = s
+}
+/** 导出二维码标签 PDF:确认 → POST /report/qr-label(blob)→ 另存;失败体是 JSON,须按文本解析 message(如重复编码明细) */
+async function exportQrLabels() {
+  const codes = [...qrSel.value]
+  if (!codes.length) return ElMessage.warning(tt('请先勾选要导出的商品'))
+  try {
+    await ElMessageBox.confirm(
+      tt('已选 {n} 个商品，导出二维码标签 PDF？').replace('{n}', codes.length),
+      tt('二维码标签'),
+      { type: 'info', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
+    )
+  } catch { return }
+  const loading = ElMessage({ message: tt('正在生成标签…'), duration: 0 })
+  try {
+    const blob = await request.post('/report/qr-label', { codes }, { responseType: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${tt('物料二维码标签')}-${new Date().toISOString().slice(0, 10)}.pdf`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 60000)
+    ElMessage.success(tt('已导出 {n} 张二维码标签').replace('{n}', codes.length))
+  } catch (e) {
+    ElMessage.error(await qrBlobErrMsg(e) || tt('标签生成失败'))
+  } finally {
+    loading.close()
+  }
+}
+/** blob 响应的错误体解析:失败时响应是 JSON(ApiResult),按 Blob.text() 读出 message 后展示 */
+async function qrBlobErrMsg(e) {
+  const data = e?.response?.data
+  if (data instanceof Blob) {
+    try { return JSON.parse(await data.text())?.message || '' } catch { /* 非 JSON 走兜底 */ }
+  }
+  return e?.response?.data?.message || e?.message || ''
+}
 /** 档案行非响应化(2026-09-16 四期,入口卡顿主因):几千行×几十列被 Vue 深度代理
  *  (首次全量过滤/排序/快照访问 ≈29 万属性走 proxy get)是"点进页面转圈"的最大开销源(实测单一 4.4s 长任务)。
  *  将档案明细数组与行 markRaw 后,读取零代理;写入(编辑/带回/新增)经 markInlineDirty
@@ -4317,6 +4407,7 @@ function isDisabled(action) {
     放弃: false,                     // 丢弃内联草稿修改,恢复最近一次保存
     打印: false, 预览: false, 导出: false,
     发送邮件: false, 退出: false, 表格调整: false, 分类管理: false, 表头调整: false,
+    二维码标签: false, // 档案工具栏动作:是否可点由前端勾选数提示兜底,不按单据状态置灰
   }
   // 灰色占位动作(后端 metadata.disabledActions:选单无流转来源/生单无实现链路)恒置灰,点击忽略
   if (map[action] === undefined && (cfgCache.value?.metadata?.disabledActions || []).includes(action)) {
@@ -4831,6 +4922,11 @@ async function onButton(action) {
     tabs.open({ path: targetPath, title: tt(title) })
     return
   }
+  if (action === '二维码标签') {
+    // 存货档案勾选即打:勾行→80×80mm 标签 PDF(二维码=存货编码);未勾选只提示,不生成
+    exportQrLabels()
+    return
+  }
   // 文件类面板(文书式):「删除」= 整单删除(草稿直接作废;已归档提交删除申请,管理员审批)
   if (isApprovalDoc.value && (action === '删除' || action === '删除单据')) {
     if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
@@ -5292,6 +5388,7 @@ watch(
     // 2026-08-20：关闭页签/切走时 panelCode 变 undefined——不触发加载（避免「面板编号无效」误报）
     if (!panelCode.value || panelCode.value === 'undefined') return
     cfgCache.value = null
+    qrSel.value = new Set() // 二维码标签勾选集随面板清空(行键属于上一个档案)
     resetDictModes()
     resetTableSorts() // 切面板清排序(同一面板内保留:切单据/翻页/查询都在)
     // 切面板退出模糊搜索态并清条件(条件字段属于上一个面板)

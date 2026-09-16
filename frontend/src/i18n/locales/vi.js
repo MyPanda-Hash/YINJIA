@@ -1,6 +1,14 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '二维码标签': 'Nhãn QR',
+    '请先勾选要导出的商品': 'Hãy chọn trước các hàng hóa cần xuất',
+    '已选 {n} 个商品，导出二维码标签 PDF？': 'Xuất PDF nhãn QR cho {n} hàng hóa đã chọn?',
+    '正在生成标签…': 'Đang tạo nhãn…',
+    '已导出 {n} 张二维码标签': 'Đã xuất {n} nhãn QR',
+    '标签生成失败': 'Tạo nhãn thất bại',
+    '物料二维码标签': 'Nhãn QR vật liệu',
+    '本页全选': 'Chọn tất cả trang này',
     '一．问题描述（可附图片，必要时另附问题品）': 'I. Problem Description (photos/defective samples may be attached if necessary)',
     '二．原因分析': 'II. Root Cause Analysis',
     '三．性能验证': 'III. Performance Verification',

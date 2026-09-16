@@ -90,6 +90,11 @@ public class PanelConfigService {
         buttonGroups.add(group("删除", List.of("删除", "删除单据")));
         buttonGroups.add(group("查找", List.of("查找", "刷新")));
         buttonGroups.add(group("打印", List.of("打印", "预览")));
+        // 物料二维码标签入口(勾选即打):存货档案工具栏「打印」之后
+        // (原定打印与导入之间;远端已决策档案面板不提供导入,导入组移除后即紧跟打印),
+        // 前端按 qrLabelKey 列勾行(跨页保留)→ POST /report/qr-label 出 80×80mm 标签 PDF(二维码=存货编码)
+        boolean qrLabel = "INV".equals(def.code());
+        if (qrLabel) buttonGroups.add(group("二维码标签", List.of("二维码标签")));
         // 导入仅限单据面板(档案面板不提供导入)
         // buttonGroups.add(group("导入", List.of("下载模板", "导入")));
         buttonGroups.add(group("更多", List.of("复制", "表格调整", "导出", "退出")));
@@ -152,6 +157,7 @@ public class PanelConfigService {
             metadata.put("classifyPanel", classifyPanel);   // 前端「分类管理」跳转目标面板码
             metadata.put("classifyTitle", classifyTitle);   // 页签标题
         }
+        if (qrLabel) metadata.put("qrLabelKey", "存货编码"); // 前端二维码标签勾选列的行键(编码列)
         metadata.put("panelPageDto", pageDto);
 
         Map<String, Object> out = new LinkedHashMap<>();

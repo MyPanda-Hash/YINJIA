@@ -92,6 +92,25 @@
       <artifactId>poi-ooxml</artifactId>
       <version>${poi.version}</version>
     </dependency>
+    <!-- JR 条码组件(含 QRCode)所需的 barcode4j;上游为可选依赖,必须显式声明,
+         缺它会在渲染 QRCode 时抛 NoClassDefFoundError(2026-09-16 sl_recv 报表实证) -->
+    <dependency>
+      <groupId>net.sf.barcode4j</groupId>
+      <artifactId>barcode4j</artifactId>
+      <version>2.1</version>
+    </dependency>
+    <!-- JR QRCode 组件编码实际用 ZXing(同为可选依赖):缺 WriterException/QRCodeWriter 同样运行时炸 -->
+    <dependency>
+      <groupId>com.google.zxing</groupId>
+      <artifactId>core</artifactId>
+      <version>3.4.0</version>
+    </dependency>
+    <!-- QRCode 默认 SVG 渲染器要 Batik(bridge 及其传递件,本地 1.19 对齐) -->
+    <dependency>
+      <groupId>org.apache.xmlgraphics</groupId>
+      <artifactId>batik-bridge</artifactId>
+      <version>1.19</version>
+    </dependency>
   </dependencies>
 
   <build>

@@ -60,6 +60,17 @@ public class ReportService {
     private static final String RD_MODULE = "研发管理";
     private static final String RD_PREFIX = "RD_";
 
+    /**
+     * 物料二维码标签(存货档案勾选即打,2026-09-16):80×80mm 一码一页,二维码内容=存货编码。
+     * 不走 /export 的单据链路(无 docNo/头参数),由 qrLabelPdf 直查 bs_inv 明细喂模板。
+     */
+    private static final String QR_LABEL_CODE = "inv_qr_label";
+    private static final String QR_LABEL_FILE = "reports/inv-qr-label.jrxml";
+    private static final ReportTemplate QR_LABEL_TPL =
+            new ReportTemplate(null, QR_LABEL_CODE, "INV", "物料二维码标签", QR_LABEL_FILE, null, true, null);
+    /** 一次最多打多少张:IN 占位符防打爆(SQL Server 单语句参数上限 2100) */
+    private static final int QR_LABEL_MAX = 1000;
+
     /** 模板一行(DB 行含 id/jrxml_text/enabled/update_at;classpath 注册表行仅四键) */
     public record ReportTemplate(Long id, String code, String panelCode, String name,
                                  String file, String jrxmlText, boolean enabled, Timestamp updatedAt) {}
@@ -275,6 +286,48 @@ public class ReportService {
         } catch (JRException e) {
             throw new IllegalArgumentException("报表导出失败：" + rootMessage(e));
         }
+    }
+
+    /**
+     * 物料二维码标签 PDF:勾选的存货编码 → 80×80mm 标签(物料编码/物料名称/规格 + 二维码=存货编码)。
+     * 一码一页,按编码排序输出;取数与面板同源(bs_inv 现存行,作废过滤口径一致)。
+     */
+    public byte[] qrLabelPdf(List<String> codes) {
+        List<String> clean = codes == null ? List.of() : codes.stream()
+                .filter(c -> c != null && !c.isBlank()).map(String::trim).distinct().toList();
+        if (clean.isEmpty()) throw new IllegalArgumentException("请先勾选要导出的商品");
+        if (clean.size() > QR_LABEL_MAX) {
+            throw new IllegalArgumentException(
+                    "一次最多导出 " + QR_LABEL_MAX + " 个商品的二维码标签(当前 " + clean.size() + " 个),请分批勾选");
+        }
+        String in = String.join(",", java.util.Collections.nCopies(clean.size(), "?"));
+        // 重复编码守卫:bs_inv.存货编码无唯一约束,同码多行=同一二维码可能贴出两种货 → 报错列出,先清数据再打标
+        List<String> dup = jdbc.queryForList(
+                "SELECT a.[存货编码] FROM bs_inv a WHERE a.[存货编码] IN (" + in + ") "
+                        + "AND ISNULL(a.asp_cancel,'N')<>'Y' GROUP BY a.[存货编码] HAVING COUNT(*) > 1",
+                clean.toArray()).stream().map(String::valueOf).sorted().toList();
+        if (!dup.isEmpty()) {
+            throw new IllegalArgumentException("存货编码在档案中重复,无法生成二维码标签(请先清理重复数据)：" + String.join("、", dup));
+        }
+        // List 泛型不变:queryForList 的 List<Map<String,Object>> 不能直填 Collection<Map<String,?>>,拷贝定型
+        List<Map<String, ?>> rows = new ArrayList<>(jdbc.queryForList(
+                "SELECT t.[存货编码], t.[存货名称], t.[规格型号] FROM bs_inv t "
+                        + "WHERE t.[存货编码] IN (" + in + ") AND ISNULL(t.asp_cancel,'N')<>'Y' ORDER BY t.[存货编码]",
+                clean.toArray()));
+        // 勾选后行被他人删除/作废:选不中的自然少一张;全部失效时不出空 PDF
+        if (rows.isEmpty()) throw new IllegalArgumentException("勾选的存货在档案中均不存在(可能已被删除)");
+        try {
+            JasperPrint print = JasperFillManager.fillReport(
+                    compile(QR_LABEL_TPL), new LinkedHashMap<>(), new JRMapCollectionDataSource(rows));
+            return JasperExportManager.exportReportToPdf(print);
+        } catch (JRException e) {
+            throw new IllegalArgumentException("二维码标签生成失败：" + rootMessage(e));
+        }
+    }
+
+    /** 标签文件名(浏览器另存用):物料二维码标签-yyyyMMdd-HHmm.pdf */
+    public String qrLabelFileName() {
+        return "物料二维码标签-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd-HHmm")) + ".pdf";
     }
 
     /**
