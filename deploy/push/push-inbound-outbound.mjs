@@ -36,6 +36,8 @@ const log = (msg) => {
 
 // ── 金蝶客户端 ──
 const { fetchAppToken, kingdeeGet, kingdeePost } = await import(pathToFileURL(join(PARENT, 'kingdee-client.mjs')).href);
+// EXTRA 反向映射:列名 → API 键(全量推送,含隐藏字段)
+const { EXTRA, EXTRA_LINES } = await import(pathToFileURL(join(PARENT, 'kingdee-extra-fields.mjs')).href);
 
 // ── 数据库 ──
 const mssql = (await import('mssql')).default;
@@ -127,6 +129,21 @@ async function getDefaultUnitId(token) {
 }
 
 // ══ MES 基础资料 → 沙箱全量同步 ══
+
+/** 类型冲突 fallback:只保留基础字段(去 EXTRA) */
+function basicOnly(mapped) {
+  const safeHead = ['bill_date', 'trans_type', 'supplier_number', 'customer_number', 'remark', 'bill_stock_number'];
+  const safeLine = ['material_number', 'qty', 'price', 'cess', 'stock_number', 'batch_no', 'comment'];
+  const out = {};
+  for (const [k, v] of Object.entries(mapped)) {
+    if (Array.isArray(v)) {
+      out[k] = v.map((line) => Object.fromEntries(Object.entries(line).filter(([lk]) => safeLine.includes(lk))));
+    } else if (safeHead.includes(k)) {
+      out[k] = v;
+    }
+  }
+  return out;
+}
 async function pushAllBasics(token) {
   log('── 同步基础资料到沙箱 ──');
   let created = 0, skipped = 0, failed = 0;
@@ -169,46 +186,109 @@ async function pushAllBasics(token) {
     ok ? (sandboxCache.store.has(String(s.编码)) ? skipped++ : created++) : failed++;
   }
   log(`  仓库: ${stores.length} 个(新建 ${created},已有 ${skipped},失败 ${failed})`);
+
+  // 职员(bs_emp)— 单据的业务员/经手人引用
+  created = 0; skipped = 0; failed = 0;
+  if (!sandboxCache.emp) sandboxCache.emp = new Set();
+  const emps = (await pool.request().query(`
+    SELECT 员工编码 AS 编码, 员工名称 AS 名称 FROM bs_emp WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(员工编码,'')<>'' AND ISNULL(停用,0)<>1`)).recordset;
+  for (const e of emps) {
+    if (sandboxCache.emp.has(String(e.编码))) { skipped++; continue; }
+    const r = await kingdeePost(cfg.kingdee, token, '/jdy/v2/bd/emp', {}, { number: String(e.编码), name: String(e.名称) });
+    if (r.ok) { sandboxCache.emp.add(String(e.编码)); created++; }
+    else if (/已存在/.test(String(r.error || ''))) { sandboxCache.emp.add(String(e.编码)); skipped++; }
+    else failed++;
+  }
+  log(`  职员: ${emps.length} 个(新建 ${created},已有 ${skipped},失败 ${failed})`);
+
+  // 部门(bs_dept)
+  created = 0; skipped = 0; failed = 0;
+  if (!sandboxCache.dept) sandboxCache.dept = new Set();
+  const depts = (await pool.request().query(`
+    SELECT 部门编码 AS 编码, 部门名称 AS 名称 FROM bs_dept WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(部门编码,'')<>'' AND ISNULL(停用,0)<>1`)).recordset;
+  for (const d of depts) {
+    if (sandboxCache.dept.has(String(d.编码))) { skipped++; continue; }
+    const r = await kingdeePost(cfg.kingdee, token, '/jdy/v2/bd/department', {}, { number: String(d.编码), name: String(d.名称) });
+    if (r.ok) { sandboxCache.dept.add(String(d.编码)); created++; }
+    else if (/已存在/.test(String(r.error || ''))) { sandboxCache.dept.add(String(d.编码)); skipped++; }
+    else failed++;
+  }
+  log(`  部门: ${depts.length} 个(新建 ${created},已有 ${skipped},失败 ${failed})`);
 }
 
-// ══ MES → 金蝶 字段映射 ══
+// ══ MES → 金蝶 全量字段映射(EXTRA 反向:中文列名 → API 键) ══
+/** 反向映射:MES 行数据 → 金蝶 API 对象(全量,含隐藏字段)
+ *  类型推断:is_* → int(金蝶用 0/1);qty/amount/rate/price/coefficient → Number;其余 → String */
+function reverseMap(row, entries) {
+  const out = {};
+  for (const e of entries || []) {
+    const v = row[e.c];
+    if (v === undefined || v === null || v === '') continue;
+    if (e.a.includes('.')) continue;
+    // 跳过跨沙箱引用:src_* 指向原沙箱的源单/内部ID,推到新沙箱会报"源单未审核或已被删除"
+    // emp_number/dept_number:业务员/部门引用在新沙箱可能编码不匹配(非必填,跳过不影响单据创建)
+    if (/^src_/.test(e.a) || /_id$/.test(e.a) || e.a === 'emp_number' || e.a === 'dept_number') continue;
+    const s = String(v);
+    // is_* 字段:金蝶期望 int32(0/1),不收 bool
+    if (/^is_/.test(e.a)) { out[e.a] = s.toLowerCase() === 'true' || s === '1' ? 1 : 0; continue; }
+    // 数量/金额/比率/系数类:金蝶期望 Number
+    if (/qty|amount|rate|price|cost|coefficient|period|seq$|count|discount/i.test(e.a) && /^-?\d+\.?\d*$/.test(s)) {
+      out[e.a] = Number(s); continue;
+    }
+    // 其余字符串;金蝶响应里如果是 int 字段会报错,此时 fallback 跳过
+    out[e.a] = s;
+  }
+  return out;
+}
+
+/** 头字段:核心手工映射 + EXTRA 全量 */
 function mapPurHead(h) {
-  return {
+  const base = {
     bill_date: String(h.单据日期 || '').slice(0, 10),
     trans_type: '2',
     supplier_number: String(h.供应商编码 || ''),
     remark: String(h.备注 || ''),
   };
+  const extra = reverseMap(h, EXTRA.PURCHASE_IN || []);
+  return { ...extra, ...base }; // base 覆盖(确保核心字段正确)
 }
 function mapPurLines(lines) {
-  return (lines || []).map((l) => ({
-    material_number: String(l.存货编码 || ''),
-    qty: Number(l.实收数量) || 0,
-    price: Number(l.单价) || 0,
-    cess: Number(l['税率%']) || 0,
-    stock_number: String(l.仓库编码 || ''),
-    batch_no: String(l.批号 || ''),
-    comment: String(l.备注 || ''),
-  }));
+  return (lines || []).map((l) => {
+    const base = {
+      material_number: String(l.存货编码 || ''),
+      qty: Number(l.实收数量) || 0,
+      price: Number(l.单价) || 0,
+      cess: Number(l['税率%']) || 0,
+      stock_number: String(l.仓库编码 || ''),
+      batch_no: String(l.批号 || ''),
+    };
+    const extra = reverseMap(l, EXTRA_LINES.PURCHASE_IN || []);
+    return { ...extra, ...base };
+  });
 }
 function mapSaleHead(h) {
-  return {
+  const base = {
     bill_date: String(h.单据日期 || '').slice(0, 10),
     trans_type: '2',
     customer_number: String(h.客户编码 || ''),
     remark: String(h.备注 || ''),
   };
+  const extra = reverseMap(h, EXTRA.SALE_OUT || []);
+  return { ...extra, ...base };
 }
 function mapSaleLines(lines) {
-  return (lines || []).map((l) => ({
-    material_number: String(l.存货编码 || ''),
-    qty: Number(l.数量) || 0,
-    price: Number(l.售价) || 0,
-    cess: Number(l['税率%']) || 0,
-    stock_number: String(l.仓库编码 || ''),
-    batch_no: String(l.批号 || ''),
-    comment: String(l.备注 || ''),
-  }));
+  return (lines || []).map((l) => {
+    const base = {
+      material_number: String(l.存货编码 || ''),
+      qty: Number(l.数量) || 0,
+      price: Number(l.售价 || 0),
+      cess: Number(l['税率%']) || 0,
+      stock_number: String(l.仓库编码 || ''),
+      batch_no: String(l.批号 || ''),
+    };
+    const extra = reverseMap(l, EXTRA_LINES.SALE_OUT || []);
+    return { ...extra, ...base };
+  });
 }
 
 // ══ 拉取 MES 待推送数据 ══
@@ -239,7 +319,16 @@ async function pushDoc(token, headTable, apiPath, doc, mapped, basics) {
   }
   log(`  → ${doc.head.单据编号} (${doc.lines.length} 行)`);
   if (DRY_RUN) { log(`    [dry-run] body: ${JSON.stringify(mapped).slice(0, 200)}`); return true; }
-  const r = await kingdeePost(cfg.kingdee, token, apiPath, {}, mapped);
+  let r = await kingdeePost(cfg.kingdee, token, apiPath, {}, mapped);
+  // 类型错误 fallback:去掉引发冲突的字段重试(最多 3 轮)
+  let retries = 0;
+  while (!r.ok && /invalid value for/.test(String(r.error || '')) && retries < 3) {
+    retries++;
+    // 从错误信息提取字段名(proto: line 1:NNN 格式无法直接提取) → 简化:去掉所有非基础字段
+    log(`    [重试${retries}] 类型冲突,回退到基础字段模式`);
+    mapped = { ...basicOnly(mapped) };
+    r = await kingdeePost(cfg.kingdee, token, apiPath, {}, mapped);
+  }
   if (r.ok) {
     const kdeeNo = String(Object.values(r.data?.id_number_map || {})[0] || '');
     const kdeeId = String(r.data?.ids?.[0] || '');
