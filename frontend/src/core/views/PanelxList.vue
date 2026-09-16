@@ -693,7 +693,7 @@
           >
             <template #header>
               <div class="col-hdr" :class="{ filtering: hasColFilter(c.prop) }" @click.stop="toggleColFilter(c.prop)">
-                <span class="col-hdr-text">{{ c.label }}</span>
+                <span class="col-hdr-text" :class="{ req: c.field?.isRequired }">{{ c.label }}</span>
                 <span
                   class="col-hdr-sort"
                   :class="{ on: isSortOn(blockSortOf(b), c.prop) }"
@@ -5914,6 +5914,12 @@ onUnmounted(() => {
   content: '*';
   color: #ff0033;
   margin-right: 2px;
+}
+.col-hdr-text.req::before {
+  content: '*';
+  color: #ff0033;
+  margin-right: 2px;
+  font-weight: bold;
 }
 .field :deep(.el-input),
 .field :deep(.el-select),
