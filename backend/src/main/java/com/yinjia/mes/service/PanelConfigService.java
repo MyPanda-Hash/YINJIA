@@ -90,7 +90,8 @@ public class PanelConfigService {
         buttonGroups.add(group("删除", List.of("删除", "删除单据")));
         buttonGroups.add(group("查找", List.of("查找", "刷新")));
         buttonGroups.add(group("打印", List.of("打印", "预览")));
-        buttonGroups.add(group("导入", List.of("下载模板", "导入")));
+        // 导入仅限单据面板(档案面板不提供导入)
+        // buttonGroups.add(group("导入", List.of("下载模板", "导入")));
         buttonGroups.add(group("更多", List.of("复制", "表格调整", "导出", "退出")));
         // 分类管理入口(金蝶同款交互):客户/供应商/商品 档案从工具栏进分类维护,分类面板不占左侧导航
         String classifyPanel = switch (def.code()) {
