@@ -16,15 +16,36 @@ import { dirname, join } from 'node:path';
 import { fetchAppToken, kingdeeGet } from './kingdee-client.mjs';
 import { makeLogger, confirmBatch, backupBeforeWrite } from './safety.mjs';
 import { setSecret, dec, cryptoStats, resetCryptoStats } from './kingdee-crypto.mjs';
-import { EXTRA } from './kingdee-extra-fields.mjs';
+import { EXTRA, EXTRA_LINES } from './kingdee-extra-fields.mjs';
 
-/** 全并集自动映射(生成器产出):dec=解密 / join=数组拼接 / str=文本;键缺省置 null */
+/** 全并集自动映射(生成器产出):dec=解密 / join=数组拼接 / str=文本;键缺省置 null;
+ *  a 支持 dotted 路径(如 bomentity.contact_country_name = 子实体首行取值) */
 function autoExtra(code, d) {
   const list = EXTRA[code];
   if (!list || !list.length) return {};
   const out = {};
   for (const e of list) {
-    const v = d ? d[e.a] : undefined;
+    let v;
+    if (e.a.includes('.')) {
+      const [arr, key] = e.a.split('.');
+      const elem = (d && (d[arr] || []))[0];
+      v = elem ? elem[key] : undefined;
+    } else v = d ? d[e.a] : undefined;
+    if (v === undefined || v === null || v === '') { out[e.c] = null; continue; }
+    if (e.t === 'dec') out[e.c] = dec(v);
+    else if (e.t === 'join') out[e.c] = Array.isArray(v) ? JSON.stringify(v).slice(0, 450) : str(v);
+    else out[e.c] = str(v);
+  }
+  return out;
+}
+
+/** 订单行级自动映射(键取自 material_entity 元素) */
+function autoExtraLines(code, lineElem) {
+  const list = EXTRA_LINES[code];
+  if (!list || !list.length || !lineElem) return {};
+  const out = {};
+  for (const e of list) {
+    const v = lineElem[e.a];
     if (v === undefined || v === null || v === '') { out[e.c] = null; continue; }
     if (e.t === 'dec') out[e.c] = dec(v);
     else if (e.t === 'join') out[e.c] = Array.isArray(v) ? JSON.stringify(v).slice(0, 450) : str(v);
@@ -705,7 +726,8 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
               __创建时间: str(d.create_time),
               __已关闭: d.bill_close_state === 'S' || d.bill_close_state === 'H',
             };
-            const lines = doc.mapLines(d);
+            const lines = doc.mapLines(d)
+              .map((l, i) => ({ ...l, ...autoExtraLines(doc.code, (d.material_entity || [])[i]) })); // 行级全并集合并
             if (dryRun) {
               console.log(`—— 【${doc.label}】${head.单据编号}(${head[doc.code === 'PU_ORDER' ? '供应商' : '客户']}) 状态=${head.单据状态} 行数=${lines.length}`);
               continue;

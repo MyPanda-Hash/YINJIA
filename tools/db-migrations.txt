@@ -278,3 +278,10 @@ migrate-kingdee-order-keep-syncable.sql
 # 补 213 列(档案 54 + 订单 148)+面板字段+英译(取 api 键人性化);配套 deploy/kingdee-extra-fields.mjs 自动映射表
 # (runCore autoExtra 合并:敏感 dec/数组 join/其余 str)。面板总数 490。订单回填前需清 外部指纹(存量单重写)。
 migrate-kingdee-full-union.sql
+
+# —— 2026-09-16 登记:子实体(订单行+联系人)字段与文档并集完全对应 ——
+# 生成器 tools/archive/_gen-subentity-union.mjs(哨兵求差集);
+# SO行补89列(bl_so_order 22→111)、PU行补83列(bl_pu_order 26→109)、客户联系人补14列、供应商联系人补20列;
+# EXTRA_LINES(行级)+EXTRA dotted 路径(bomentity.xx);runCore autoExtraLines 按行合并(autoExtra 支持子实体首行取值);
+# 敏感行字段(条形码sn_list等)走解密。验证:50条回填失败0解密292。
+migrate-kingdee-subentity-union.sql
