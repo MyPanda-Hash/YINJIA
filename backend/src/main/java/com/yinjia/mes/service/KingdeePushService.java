@@ -45,27 +45,27 @@ public class KingdeePushService {
         String headTable = isPur ? "bd_purchase_in" : "bd_sale_out";
         String lineTable = isPur ? "bl_purchase_in" : "bl_sale_out";
 
-        // 1a. 已转过检查(优先:有ERP单号直接提示)
         Map<String, Object> head = jdbc.queryForMap(
                 "SELECT * FROM " + headTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
-        Object existingErpNo = head.get("ERP单号");
-        if (existingErpNo != null && !String.valueOf(existingErpNo).isBlank()) {
-            // 已转过:返回提示而不是报错(前端友好展示)
+
+        // ① 是否已转ERP = 是 → 直接提示(防多次点击)
+        String pushed = String.valueOf(head.getOrDefault("是否已转ERP", ""));
+        if ("是".equals(pushed)) {
             Map<String, Object> out = new LinkedHashMap<>();
-            out.put("ERP单号", String.valueOf(existingErpNo));
-            out.put("message", "该单据已转入ERP(ERP单号: " + existingErpNo + ")，不可重复转入");
+            out.put("是否已转ERP", "是");
+            out.put("ERP单号", String.valueOf(head.getOrDefault("ERP单号", "")));
+            out.put("message", "该单据已转入ERP，不可重复转入");
             return out;
         }
 
-        // 1b. 状态校验:从 yj_doc_status 状态机取(与 UI 显示一致;表列可能在审批流后未同步)
+        // ② 状态校验(从 yj_doc_status 状态机取)
         String auditUser = null;
         try {
             auditUser = jdbc.queryForObject(
                     "SELECT shr FROM yj_doc_status WHERE panel_code = ? AND doc_no = ? AND shr IS NOT NULL",
                     String.class, panelCode, docNo);
         } catch (Exception ignored) {}
-        boolean isAudited = auditUser != null;
-        if (!isAudited) throw new RuntimeException("仅已审核(审批通过)单据可转ERP");
+        if (auditUser == null) throw new RuntimeException("仅已审核(审批通过)单据可转ERP");
 
         List<Map<String, Object>> lines = jdbc.queryForList(
                 "SELECT * FROM " + lineTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
@@ -123,14 +123,15 @@ public class KingdeePushService {
             throw new RuntimeException("金蝶接口失败: " + errText);
         }
 
-        // 5. 回写 MES
+        // 5. 回写 MES(是否已转ERP=是 + ERP单号 + 操作人 + 时间)
         String erpBillNo = result.path("erpBillNo").asText(docNo);
         String now = LocalDateTime.now().format(FMT);
-        jdbc.update("UPDATE " + headTable + " SET ERP单号 = ?, 转ERP操作人 = ?, 转ERP时间 = ? WHERE 单据编号 = ?",
+        jdbc.update("UPDATE " + headTable + " SET 是否已转ERP = N'是', ERP单号 = ?, 转ERP操作人 = ?, 转ERP时间 = ? WHERE 单据编号 = ?",
                 erpBillNo, operator, now, docNo);
 
         // 6. 返回
         Map<String, Object> out = new LinkedHashMap<>();
+        out.put("是否已转ERP", "是");
         out.put("ERP单号", erpBillNo);
         out.put("转ERP操作人", operator);
         out.put("转ERP时间", now);

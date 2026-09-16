@@ -806,10 +806,10 @@ public class ButtonService {
         // 弃审同时清归档标记(文件面板审批后=已归档,弃审应回到草稿)
         jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
-        // 转ERP联动:弃审清 ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
+        // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
         if (List.of("PURCHASE_IN", "SALE_OUT").contains(def.code())) {
             String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in" : "bd_sale_out";
-            jdbc.update("UPDATE " + tbl + " SET ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
+            jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
         }
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
         return result(no, "草稿");
