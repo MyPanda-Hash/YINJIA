@@ -585,7 +585,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
       }
       if (!rows.length) { log(`【${doc.label}】无符合条件${doc.archive ? '档案' : '单据'}`); continue; }
       // 测试上限:每类最多取 N 条(配置 maxRecordsPerType;0=不限)
-      const limited = opt.maxRecords > 0 ? rows.slice(0, opt.maxRecords) : rows;
+      const limited = opt.maxRecords > 0 ? rows.slice(0, opt.maxRecords) : rows.slice(); // 复制数组:不定上限时不能与 rows 同引用,下方清空会连它一起清掉
       if (opt.maxRecords > 0) log(`【${doc.label}】测试上限生效:共 ${rows.length} 条 → 只处理前 ${limited.length} 条`);
       rows.length = 0; rows.push(...limited);
       if (doc.afterList) doc.afterList(rows, ctx); // 登记分类映射(供后续条目解析 id→名称/编码)

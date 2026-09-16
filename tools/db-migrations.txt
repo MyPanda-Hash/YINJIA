@@ -309,3 +309,7 @@ migrate-qc-return-attach.sql
 
 # —— 2026-09-15 暂收退料单归入库存核算(yj_panel.module_group 同步菜单,权限分组/同模块读放行口径一致)——
 migrate-qc-return-module.sql
+
+# —— 2026-09-15 登记:金蝶同步供应商编码超宽 ——
+# dm_gf.dm legacy nvarchar(16)(8字符)装不下 YJ-KG-JBE 等金蝶编码,同步报截断失败2条;dm_kh.dm 同款防御加宽。
+migrate-widen-dm-cols.sql
