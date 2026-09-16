@@ -34,6 +34,7 @@ export default {
     '总': 'Gesamt',
     '个': 'Felder',
     '列': 'Spalten',
+    '库存状况表': 'Lagerbestand',
     '分类管理': 'Kategorienverwaltung',
     '该面板没有可管理的分类': 'Keine Kategorie für dieses Panel verwaltbar',
     '表头调整': 'Kopfanpassung',

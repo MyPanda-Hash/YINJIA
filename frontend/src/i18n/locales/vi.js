@@ -31,6 +31,7 @@ export default {
     '总': 'Tổng',
     '个': 'trường',
     '列': 'cột',
+    '库存状况表': 'Tình trạng kho',
     '分类管理': 'Quản lý phân loại',
     '该面板没有可管理的分类': 'Bảng này không có phân loại để quản lý',
     '表头调整': 'Điều chỉnh đầu biểu',

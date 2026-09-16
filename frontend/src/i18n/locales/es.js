@@ -31,6 +31,7 @@ export default {
     '总': 'Total',
     '个': 'campos',
     '列': 'cols.',
+    '库存状况表': 'Estado de Stock',
     '分类管理': 'Gestión de categorías',
     '该面板没有可管理的分类': 'Este panel no tiene categorías que gestionar',
     '表头调整': 'Ajuste de encabezado',

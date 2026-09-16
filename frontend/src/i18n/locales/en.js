@@ -82,6 +82,7 @@ export default {
     '总': 'Total',
     '个': 'fields',
     '列': 'cols',
+    '库存状况表': 'Stock Balance',
     '分类管理': 'Category Management',
     '该面板没有可管理的分类': 'No category to manage for this panel',
     '表头调整': 'Header Adjustment',

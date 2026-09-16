@@ -332,3 +332,9 @@ migrate-doc-panel-references.sql
 # —— 2026-09-16 登记:时间/日期字段 data_type 改为「日期」,前端自动渲染日期选择器 ——
 # 所有面板字段名含 时间/日期/到期日 的(data_type 当前为「文本」)→ 改「日期」;isDateField() 识别后渲染 el-date-picker(与单据日期同款)。
 migrate-date-field-types.sql
+
+# —— 2026-09-16 登记:库存状况表(STOCK_BALANCE)——参照 PANDA 实时聚合实现 ——
+# 视图 v_stock_balance:8 类出入库单据行 UNION 后按 仓库+存货 聚合现存量/结存单价/结存金额;
+# 列名兼容(产成品用产品编码/材料出库用材料编码);ROW_NUMBER() AS id + asp_cancel 常量列;
+# 平表面板 mode=flat + 9 字段(仓库/存货参照 WH/INV)+10 语言译名;菜单在 库存统计 组末尾。
+migrate-stock-balance.sql
