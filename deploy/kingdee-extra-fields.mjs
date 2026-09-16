@@ -1384,7 +1384,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "单据状态_bill_status",
+      "c": "单据状态2",
       "a": "bill_status",
       "t": "str"
     },
@@ -1439,7 +1439,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "审核时间_audit_time",
+      "c": "审核时间2",
       "a": "audit_time",
       "t": "str"
     },
@@ -1454,7 +1454,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "creator_number",
+      "c": "创建人编码",
       "a": "creator_number",
       "t": "str"
     },
@@ -1469,7 +1469,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "modifier_number",
+      "c": "修改人编码",
       "a": "modifier_number",
       "t": "str"
     },
@@ -1479,12 +1479,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "审核人_auditor_name",
+      "c": "审核人2",
       "a": "auditor_name",
       "t": "str"
     },
     {
-      "c": "auditor_number",
+      "c": "审核人编码",
       "a": "auditor_number",
       "t": "str"
     },
@@ -1599,7 +1599,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "total_unsettle_amount_for",
+      "c": "未结算金额本位币",
       "a": "total_unsettle_amount_for",
       "t": "str"
     },
@@ -1624,7 +1624,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "edit_pay_type_number",
+      "c": "付款方式编码",
       "a": "edit_pay_type_number",
       "t": "str"
     },
@@ -1649,7 +1649,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "edit_pay_account_number",
+      "c": "付款账户编码",
       "a": "edit_pay_account_number",
       "t": "str"
     },
@@ -1816,7 +1816,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "单据状态_bill_status",
+      "c": "单据状态2",
       "a": "bill_status",
       "t": "str"
     },
@@ -2031,7 +2031,7 @@ export const EXTRA = {
       "t": "dec"
     },
     {
-      "c": "发货人_dispatcher_linkman",
+      "c": "发货人2",
       "a": "dispatcher_linkman",
       "t": "str"
     },
@@ -2061,7 +2061,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "attachments",
+      "c": "附件",
       "a": "attachments",
       "t": "str"
     },
@@ -2076,17 +2076,17 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "审核人_auditor_name",
+      "c": "审核人2",
       "a": "auditor_name",
       "t": "str"
     },
     {
-      "c": "auditor_number",
+      "c": "审核人编码",
       "a": "auditor_number",
       "t": "str"
     },
     {
-      "c": "审核时间_audit_time",
+      "c": "审核时间2",
       "a": "audit_time",
       "t": "str"
     },
@@ -2126,7 +2126,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "部门_dept_name",
+      "c": "部门2",
       "a": "dept_name",
       "t": "str"
     },
@@ -2161,7 +2161,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "creator_number",
+      "c": "创建人编码",
       "a": "creator_number",
       "t": "str"
     },
@@ -2176,7 +2176,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "modifier_number",
+      "c": "修改人编码",
       "a": "modifier_number",
       "t": "str"
     },
@@ -3330,7 +3330,7 @@ export const EXTRA_LINES = {
       "t": "str"
     },
     {
-      "c": "换算率_conversion_rate",
+      "c": "换算率2",
       "a": "conversion_rate",
       "t": "num"
     },
@@ -3410,7 +3410,7 @@ export const EXTRA_LINES = {
       "t": "str"
     },
     {
-      "c": "cur_settle_amount_for",
+      "c": "本次结算金额本位币",
       "a": "cur_settle_amount_for",
       "t": "num"
     },
@@ -3662,7 +3662,7 @@ export const EXTRA_LINES = {
       "t": "num"
     },
     {
-      "c": "税额_tax_amount",
+      "c": "税额",
       "a": "tax_amount",
       "t": "num"
     },
@@ -3717,7 +3717,7 @@ export const EXTRA_LINES = {
       "t": "num"
     },
     {
-      "c": "折扣金额_dis_amount",
+      "c": "折扣金额2",
       "a": "dis_amount",
       "t": "num"
     },
