@@ -116,6 +116,10 @@ public class KingdeePushService {
         JsonNode result = json.readTree(stdout.toString());
         if (!result.path("ok").asBoolean(false)) {
             String errText = result.path("error").asText("未知错误");
+            // DUPLICATE = 金蝶已有同号单据(弃审后重推)→ 明确提示用户在金蝶处理旧单
+            if ("DUPLICATE".equals(errText)) {
+                throw new RuntimeException(result.path("hint").asText("该单号在金蝶已存在，请先在金蝶删除旧单后重转"));
+            }
             throw new RuntimeException("金蝶接口失败: " + errText);
         }
 

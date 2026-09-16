@@ -110,23 +110,15 @@ try {
     return e;
   });
 
-  // 推送;如果"组合值重复"(金蝶不能覆盖已有数据),自动加修订后缀 -R1/-R2 重推
-  let billNo = String(h['单据编号'] || '');
-  let r = null;
-  for (let retry = 0; retry <= 5; retry++) {
-    body.bill_no = billNo;
-    r = await kingdeePost(cfg.kingdee, token, apiPath, {}, body);
-    if (r.ok) break;
-    if (/组合值重复|已存在/.test(String(r.error || '')) && retry < 5) {
-      billNo = String(h['单据编号']) + '-R' + (retry + 1); // 弃审修改后重推:加修订号
-      continue; // 换号重试
-    }
-    break; // 其他错误不重试
-  }
-
+  // 推送(不自动换号——多次点击会产生多条金蝶记录)
+  const r = await kingdeePost(cfg.kingdee, token, apiPath, {}, body);
   if (r.ok) {
-    const erpBillNo = String(Object.values(r.data?.id_number_map || {})[0] || billNo);
+    const erpBillNo = String(Object.values(r.data?.id_number_map || {})[0] || h['单据编号']);
     console.log(JSON.stringify({ ok: true, erpBillNo }));
+  } else if (/组合值重复|已存在/.test(String(r.error || ''))) {
+    // 金蝶已有同号单据(可能之前转过,弃审后重转)——明确提示用户去金蝶处理旧单
+    console.log(JSON.stringify({ ok: false, error: 'DUPLICATE', erpBillNo: h['单据编号'],
+      hint: '该单号在金蝶已存在。请先在金蝶界面删除(或弃审作废)旧单,再重新转ERP' }));
   } else {
     console.log(JSON.stringify({ ok: false, error: r.error || 'unknown' }));
   }
