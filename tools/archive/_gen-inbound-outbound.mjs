@@ -75,6 +75,25 @@ const LABEL = {
   // 出库物流子表
   express_entity: '物流信息分录',
   match_source_no: '匹配来源单号', supp_material_number: '供应商商品编码', supp_material_name: '供应商商品名称',
+  // 补全(第一轮英文标签修正)
+  emp_number: '经手人编码', delivery_type_number: '交货方式编码', contact_country_name: '联系人国家名称',
+  contact_country_number: '联系人国家编码', contact_province_name: '联系人省份名称', contact_province_number: '联系人省份编码',
+  contact_city_name: '联系人市区名称', contact_city_number: '联系人市区编码', contact_district_name: '联系人区县名称',
+  contact_district_number: '联系人区县编码', contact_linkman: '联系人', contact_info: '联系信息',
+  dispatcher_country_name: '发货国家名称', dispatcher_country_number: '发货国家编码',
+  dispatcher_province_name: '发货省份名称', dispatcher_province_number: '发货省份编码',
+  dispatcher_city_name: '发货市区名称', dispatcher_city_number: '发货市区编码',
+  dispatcher_district_name: '发货区县名称', dispatcher_district_number: '发货区县编码',
+  stock_is_allow_freight: '仓库启用仓位管理', def_float_qty: '默认浮动数量',
+  cost_view: '成本视图', unit_cost_view: '单位成本视图', material_entity: '商品分录',
+  delivery_status: '发货状态', material_group: '商品组合', material_qty: '商品数量',
+  bill_dis_before_amount: '折前价税合计', ivc_status: '开票状态', recevice_delivery: '发货方式',
+  deduction_balance: '抵扣余额', total_un_settle_amount: '未结算金额', cost_fee: '采购费用',
+  subsist_info: '费用分摊信息', io_status: '出入库状态', mulbill_label: '单据标签',
+  cus_bear_fee_entry: '客户承担费用分录', vrp_entity: '配送路线分录', currency_name: '币别名称',
+  aux_id4: '辅助属性4id', aux_name4: '辅助属性4名称', aux_number4: '辅助属性4编码',
+  aux_id5: '辅助属性5id', aux_name5: '辅助属性5名称', aux_number5: '辅助属性5编码',
+  act_tax_price: '实际含税单价', bill_stock_number: '仓库编码', total_amount_for: '金额本位币',
 };
 const SENS = /phone|mobile|email|bank_account|birthday|qq|wechat|id_number|address|contact_info|contact_phone/;
 const NUM = /qty|amount|price|rate|cost|coefficient|fee|seq|discount|period|count/i;

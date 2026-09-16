@@ -1404,7 +1404,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "emp_number",
+      "c": "经手人编码",
       "a": "emp_number",
       "t": "str"
     },
@@ -1424,7 +1424,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "delivery_type_number",
+      "c": "交货方式编码",
       "a": "delivery_type_number",
       "t": "str"
     },
@@ -1534,12 +1534,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "contact_country_name",
+      "c": "联系人国家名称",
       "a": "contact_country_name",
       "t": "str"
     },
     {
-      "c": "contact_country_number",
+      "c": "联系人国家编码",
       "a": "contact_country_number",
       "t": "str"
     },
@@ -1549,12 +1549,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "contact_province_name",
+      "c": "联系人省份名称",
       "a": "contact_province_name",
       "t": "str"
     },
     {
-      "c": "contact_province_number",
+      "c": "联系人省份编码",
       "a": "contact_province_number",
       "t": "str"
     },
@@ -1564,12 +1564,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "contact_city_name",
+      "c": "联系人市区名称",
       "a": "contact_city_name",
       "t": "str"
     },
     {
-      "c": "contact_city_number",
+      "c": "联系人市区编码",
       "a": "contact_city_number",
       "t": "str"
     },
@@ -1579,12 +1579,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "contact_district_name",
+      "c": "联系人区县名称",
       "a": "contact_district_name",
       "t": "str"
     },
     {
-      "c": "contact_district_number",
+      "c": "联系人区县编码",
       "a": "contact_district_number",
       "t": "str"
     },
@@ -1664,7 +1664,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "material_entity",
+      "c": "商品分录",
       "a": "material_entity",
       "t": "str"
     },
@@ -1714,12 +1714,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "dispatcher_country_name",
+      "c": "发货国家名称",
       "a": "dispatcher_country_name",
       "t": "str"
     },
     {
-      "c": "dispatcher_country_number",
+      "c": "发货国家编码",
       "a": "dispatcher_country_number",
       "t": "str"
     },
@@ -1729,12 +1729,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "dispatcher_province_name",
+      "c": "发货省份名称",
       "a": "dispatcher_province_name",
       "t": "str"
     },
     {
-      "c": "dispatcher_province_number",
+      "c": "发货省份编码",
       "a": "dispatcher_province_number",
       "t": "str"
     },
@@ -1744,12 +1744,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "dispatcher_city_name",
+      "c": "发货市区名称",
       "a": "dispatcher_city_name",
       "t": "str"
     },
     {
-      "c": "dispatcher_city_number",
+      "c": "发货市区编码",
       "a": "dispatcher_city_number",
       "t": "str"
     },
@@ -1759,12 +1759,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "dispatcher_district_name",
+      "c": "发货区县名称",
       "a": "dispatcher_district_name",
       "t": "str"
     },
     {
-      "c": "dispatcher_district_number",
+      "c": "发货区县编码",
       "a": "dispatcher_district_number",
       "t": "str"
     },
@@ -1826,7 +1826,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "delivery_status",
+      "c": "发货状态",
       "a": "delivery_status",
       "t": "str"
     },
@@ -1841,7 +1841,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "emp_number",
+      "c": "经手人编码",
       "a": "emp_number",
       "t": "str"
     },
@@ -1851,17 +1851,17 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "material_group",
+      "c": "商品组合",
       "a": "material_group",
       "t": "str"
     },
     {
-      "c": "material_qty",
+      "c": "商品数量",
       "a": "material_qty",
       "t": "str"
     },
     {
-      "c": "bill_dis_before_amount",
+      "c": "折前价税合计",
       "a": "bill_dis_before_amount",
       "t": "str"
     },
@@ -1871,7 +1871,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "material_entity",
+      "c": "商品分录",
       "a": "material_entity",
       "t": "str"
     },
@@ -1896,12 +1896,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "contact_country_name",
+      "c": "联系人国家名称",
       "a": "contact_country_name",
       "t": "str"
     },
     {
-      "c": "contact_country_number",
+      "c": "联系人国家编码",
       "a": "contact_country_number",
       "t": "str"
     },
@@ -1911,12 +1911,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "contact_province_name",
+      "c": "联系人省份名称",
       "a": "contact_province_name",
       "t": "str"
     },
     {
-      "c": "contact_province_number",
+      "c": "联系人省份编码",
       "a": "contact_province_number",
       "t": "str"
     },
@@ -1926,12 +1926,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "contact_city_name",
+      "c": "联系人市区名称",
       "a": "contact_city_name",
       "t": "str"
     },
     {
-      "c": "contact_city_number",
+      "c": "联系人市区编码",
       "a": "contact_city_number",
       "t": "str"
     },
@@ -1941,22 +1941,22 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "contact_district_name",
+      "c": "联系人区县名称",
       "a": "contact_district_name",
       "t": "str"
     },
     {
-      "c": "contact_district_number",
+      "c": "联系人区县编码",
       "a": "contact_district_number",
       "t": "str"
     },
     {
-      "c": "contact_linkman",
+      "c": "联系人",
       "a": "contact_linkman",
       "t": "str"
     },
     {
-      "c": "contact_info",
+      "c": "联系信息",
       "a": "contact_info",
       "t": "dec"
     },
@@ -1971,12 +1971,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "dispatcher_country_name",
+      "c": "发货国家名称",
       "a": "dispatcher_country_name",
       "t": "str"
     },
     {
-      "c": "dispatcher_country_number",
+      "c": "发货国家编码",
       "a": "dispatcher_country_number",
       "t": "str"
     },
@@ -1986,12 +1986,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "dispatcher_province_name",
+      "c": "发货省份名称",
       "a": "dispatcher_province_name",
       "t": "str"
     },
     {
-      "c": "dispatcher_province_number",
+      "c": "发货省份编码",
       "a": "dispatcher_province_number",
       "t": "str"
     },
@@ -2001,12 +2001,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "dispatcher_city_name",
+      "c": "发货市区名称",
       "a": "dispatcher_city_name",
       "t": "str"
     },
     {
-      "c": "dispatcher_city_number",
+      "c": "发货市区编码",
       "a": "dispatcher_city_number",
       "t": "str"
     },
@@ -2016,12 +2016,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "dispatcher_district_name",
+      "c": "发货区县名称",
       "a": "dispatcher_district_name",
       "t": "str"
     },
     {
-      "c": "dispatcher_district_number",
+      "c": "发货区县编码",
       "a": "dispatcher_district_number",
       "t": "str"
     },
@@ -2041,7 +2041,7 @@ export const EXTRA = {
       "t": "dec"
     },
     {
-      "c": "recevice_delivery",
+      "c": "发货方式",
       "a": "recevice_delivery",
       "t": "str"
     },
@@ -2051,12 +2051,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "deduction_balance",
+      "c": "抵扣余额",
       "a": "deduction_balance",
       "t": "str"
     },
     {
-      "c": "total_un_settle_amount",
+      "c": "未结算金额",
       "a": "total_un_settle_amount",
       "t": "str"
     },
@@ -2101,12 +2101,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "cost_fee",
+      "c": "采购费用",
       "a": "cost_fee",
       "t": "str"
     },
     {
-      "c": "subsist_info",
+      "c": "费用分摊信息",
       "a": "subsist_info",
       "t": "str"
     },
@@ -2146,7 +2146,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "io_status",
+      "c": "出入库状态",
       "a": "io_status",
       "t": "str"
     },
@@ -2181,12 +2181,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "mulbill_label",
+      "c": "单据标签",
       "a": "mulbill_label",
       "t": "str"
     },
     {
-      "c": "cus_bear_fee_entry",
+      "c": "客户承担费用分录",
       "a": "cus_bear_fee_entry",
       "t": "str"
     },
@@ -2201,7 +2201,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "delivery_type_number",
+      "c": "交货方式编码",
       "a": "delivery_type_number",
       "t": "str"
     },
@@ -2231,7 +2231,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "vrp_entity",
+      "c": "配送路线分录",
       "a": "vrp_entity",
       "t": "str"
     },
@@ -2241,7 +2241,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "currency_name",
+      "c": "币别名称",
       "a": "currency_name",
       "t": "str"
     }
@@ -3165,7 +3165,7 @@ export const EXTRA_LINES = {
       "t": "str"
     },
     {
-      "c": "stock_is_allow_freight",
+      "c": "仓库启用仓位管理",
       "a": "stock_is_allow_freight",
       "t": "str"
     },
@@ -3345,7 +3345,7 @@ export const EXTRA_LINES = {
       "t": "num"
     },
     {
-      "c": "def_float_qty",
+      "c": "默认浮动数量",
       "a": "def_float_qty",
       "t": "num"
     },
@@ -3420,12 +3420,12 @@ export const EXTRA_LINES = {
       "t": "num"
     },
     {
-      "c": "cost_view",
+      "c": "成本视图",
       "a": "cost_view",
       "t": "num"
     },
     {
-      "c": "unit_cost_view",
+      "c": "单位成本视图",
       "a": "unit_cost_view",
       "t": "num"
     },
@@ -3497,7 +3497,7 @@ export const EXTRA_LINES = {
       "t": "str"
     },
     {
-      "c": "stock_is_allow_freight",
+      "c": "仓库启用仓位管理",
       "a": "stock_is_allow_freight",
       "t": "str"
     },
@@ -3577,32 +3577,32 @@ export const EXTRA_LINES = {
       "t": "str"
     },
     {
-      "c": "aux_id4",
+      "c": "辅助属性4id",
       "a": "aux_id4",
       "t": "str"
     },
     {
-      "c": "aux_name4",
+      "c": "辅助属性4名称",
       "a": "aux_name4",
       "t": "str"
     },
     {
-      "c": "aux_number4",
+      "c": "辅助属性4编码",
       "a": "aux_number4",
       "t": "str"
     },
     {
-      "c": "aux_id5",
+      "c": "辅助属性5id",
       "a": "aux_id5",
       "t": "str"
     },
     {
-      "c": "aux_name5",
+      "c": "辅助属性5名称",
       "a": "aux_name5",
       "t": "str"
     },
     {
-      "c": "aux_number5",
+      "c": "辅助属性5编码",
       "a": "aux_number5",
       "t": "str"
     },
@@ -3612,7 +3612,7 @@ export const EXTRA_LINES = {
       "t": "str"
     },
     {
-      "c": "act_tax_price",
+      "c": "实际含税单价",
       "a": "act_tax_price",
       "t": "num"
     },

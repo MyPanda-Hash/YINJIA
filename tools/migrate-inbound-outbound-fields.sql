@@ -30,11 +30,11 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_nam
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'emp_id', N'emp_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'emp_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'emp_id', 'en', N'Emp Id', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'emp_number') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [emp_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'emp_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'emp_number', N'emp_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'emp_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'emp_number', 'en', N'Emp Number', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'经手人编码') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [经手人编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'经手人编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'经手人编码', N'经手人编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'经手人编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'经手人编码', 'en', N'Emp Number', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'金额') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [金额] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'金额')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'金额', N'金额', N'文本', N'header', 970, 130, 1, 0, 0, 1);
@@ -50,11 +50,11 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_nam
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'交货方式', N'交货方式', N'文本', N'header', 970, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'交货方式' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'交货方式', 'en', N'Delivery Type Name', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'delivery_type_number') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [delivery_type_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'delivery_type_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'delivery_type_number', N'delivery_type_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'delivery_type_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'delivery_type_number', 'en', N'Delivery Type Number', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'交货方式编码') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [交货方式编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'交货方式编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'交货方式编码', N'交货方式编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'交货方式编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'交货方式编码', 'en', N'Delivery Type Number', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'结算状态') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [结算状态] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'结算状态')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'结算状态', N'结算状态', N'文本', N'header', 970, 130, 1, 0, 0, 1);
@@ -160,61 +160,61 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_nam
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_country_id', N'contact_country_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_country_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_country_id', 'en', N'Contact Country Id', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'contact_country_name') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_country_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_country_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_country_name', N'contact_country_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_country_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_country_name', 'en', N'Contact Country Name', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'contact_country_number') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_country_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_country_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_country_number', N'contact_country_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_country_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_country_number', 'en', N'Contact Country Number', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'联系人国家名称') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [联系人国家名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'联系人国家名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'联系人国家名称', N'联系人国家名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人国家名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人国家名称', 'en', N'Contact Country Name', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'联系人国家编码') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [联系人国家编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'联系人国家编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'联系人国家编码', N'联系人国家编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人国家编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人国家编码', 'en', N'Contact Country Number', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'contact_province_id') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_province_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_province_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_province_id', N'contact_province_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_province_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_province_id', 'en', N'Contact Province Id', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'contact_province_name') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_province_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_province_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_province_name', N'contact_province_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_province_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_province_name', 'en', N'Contact Province Name', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'contact_province_number') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_province_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_province_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_province_number', N'contact_province_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_province_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_province_number', 'en', N'Contact Province Number', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'联系人省份名称') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [联系人省份名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'联系人省份名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'联系人省份名称', N'联系人省份名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人省份名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人省份名称', 'en', N'Contact Province Name', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'联系人省份编码') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [联系人省份编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'联系人省份编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'联系人省份编码', N'联系人省份编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人省份编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人省份编码', 'en', N'Contact Province Number', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'contact_city_id') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_city_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_city_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_city_id', N'contact_city_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_city_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_city_id', 'en', N'Contact City Id', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'contact_city_name') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_city_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_city_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_city_name', N'contact_city_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_city_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_city_name', 'en', N'Contact City Name', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'contact_city_number') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_city_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_city_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_city_number', N'contact_city_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_city_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_city_number', 'en', N'Contact City Number', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'联系人市区名称') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [联系人市区名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'联系人市区名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'联系人市区名称', N'联系人市区名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人市区名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人市区名称', 'en', N'Contact City Name', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'联系人市区编码') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [联系人市区编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'联系人市区编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'联系人市区编码', N'联系人市区编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人市区编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人市区编码', 'en', N'Contact City Number', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'contact_district_id') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_district_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_district_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_district_id', N'contact_district_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_district_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_district_id', 'en', N'Contact District Id', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'contact_district_name') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_district_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_district_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_district_name', N'contact_district_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_district_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_district_name', 'en', N'Contact District Name', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'contact_district_number') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [contact_district_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'contact_district_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'contact_district_number', N'contact_district_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_district_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_district_number', 'en', N'Contact District Number', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'联系人区县名称') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [联系人区县名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'联系人区县名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'联系人区县名称', N'联系人区县名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人区县名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人区县名称', 'en', N'Contact District Name', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'联系人区县编码') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [联系人区县编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'联系人区县编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'联系人区县编码', N'联系人区县编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人区县编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人区县编码', 'en', N'Contact District Number', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'联系地址') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [联系地址] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'联系地址')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'联系地址', N'联系地址', N'文本', N'header', 970, 130, 1, 0, 0, 1);
@@ -290,11 +290,11 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_nam
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'保险金额', N'保险金额', N'文本', N'header', 970, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'保险金额' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'保险金额', 'en', N'Total Ins Amount', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'material_entity') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [material_entity] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'material_entity')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'material_entity', N'material_entity', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'material_entity' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'material_entity', 'en', N'Material Entity', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'商品分录') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [商品分录] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'商品分录')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'商品分录', N'商品分录', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'商品分录' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'商品分录', 'en', N'Material Entity', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'币种id') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [币种id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'币种id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'币种id', N'币种id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
@@ -340,61 +340,61 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_nam
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_country_id', N'dispatcher_country_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_country_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_country_id', 'en', N'Dispatcher Country Id', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_country_name') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_country_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_country_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_country_name', N'dispatcher_country_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_country_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_country_name', 'en', N'Dispatcher Country Name', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_country_number') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_country_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_country_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_country_number', N'dispatcher_country_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_country_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_country_number', 'en', N'Dispatcher Country Number', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'发货国家名称') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [发货国家名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'发货国家名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'发货国家名称', N'发货国家名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货国家名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货国家名称', 'en', N'Dispatcher Country Name', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'发货国家编码') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [发货国家编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'发货国家编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'发货国家编码', N'发货国家编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货国家编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货国家编码', 'en', N'Dispatcher Country Number', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_province_id') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_province_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_province_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_province_id', N'dispatcher_province_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_province_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_province_id', 'en', N'Dispatcher Province Id', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_province_name') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_province_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_province_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_province_name', N'dispatcher_province_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_province_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_province_name', 'en', N'Dispatcher Province Name', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_province_number') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_province_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_province_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_province_number', N'dispatcher_province_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_province_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_province_number', 'en', N'Dispatcher Province Number', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'发货省份名称') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [发货省份名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'发货省份名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'发货省份名称', N'发货省份名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货省份名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货省份名称', 'en', N'Dispatcher Province Name', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'发货省份编码') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [发货省份编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'发货省份编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'发货省份编码', N'发货省份编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货省份编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货省份编码', 'en', N'Dispatcher Province Number', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_city_id') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_city_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_city_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_city_id', N'dispatcher_city_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_city_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_city_id', 'en', N'Dispatcher City Id', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_city_name') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_city_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_city_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_city_name', N'dispatcher_city_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_city_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_city_name', 'en', N'Dispatcher City Name', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_city_number') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_city_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_city_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_city_number', N'dispatcher_city_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_city_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_city_number', 'en', N'Dispatcher City Number', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'发货市区名称') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [发货市区名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'发货市区名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'发货市区名称', N'发货市区名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货市区名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货市区名称', 'en', N'Dispatcher City Name', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'发货市区编码') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [发货市区编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'发货市区编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'发货市区编码', N'发货市区编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货市区编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货市区编码', 'en', N'Dispatcher City Number', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_district_id') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_district_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_district_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_district_id', N'dispatcher_district_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_district_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_district_id', 'en', N'Dispatcher District Id', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_district_name') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_district_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_district_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_district_name', N'dispatcher_district_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_district_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_district_name', 'en', N'Dispatcher District Name', 'manual');
-IF COL_LENGTH('dbo.bd_purchase_in', N'dispatcher_district_number') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [dispatcher_district_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'dispatcher_district_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'dispatcher_district_number', N'dispatcher_district_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_district_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_district_number', 'en', N'Dispatcher District Number', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'发货区县名称') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [发货区县名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'发货区县名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'发货区县名称', N'发货区县名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货区县名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货区县名称', 'en', N'Dispatcher District Name', 'manual');
+IF COL_LENGTH('dbo.bd_purchase_in', N'发货区县编码') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [发货区县编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'发货区县编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'发货区县编码', N'发货区县编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货区县编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货区县编码', 'en', N'Dispatcher District Number', 'manual');
 IF COL_LENGTH('dbo.bd_purchase_in', N'采购费用分录') IS NULL ALTER TABLE dbo.bd_purchase_in ADD [采购费用分录] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'采购费用分录')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'采购费用分录', N'采购费用分录', N'文本', N'header', 970, 130, 1, 0, 1, 0);
@@ -485,11 +485,11 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_nam
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'仓库编码', N'仓库编码', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'仓库编码' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'仓库编码', 'en', N'Stock Number', 'manual');
-IF COL_LENGTH('dbo.bl_purchase_in', N'stock_is_allow_freight') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [stock_is_allow_freight] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'stock_is_allow_freight')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'stock_is_allow_freight', N'stock_is_allow_freight', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'stock_is_allow_freight' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'stock_is_allow_freight', 'en', N'Stock Is Allow Freight', 'manual');
+IF COL_LENGTH('dbo.bl_purchase_in', N'仓库启用仓位管理') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [仓库启用仓位管理] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'仓库启用仓位管理')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'仓库启用仓位管理', N'仓库启用仓位管理', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'仓库启用仓位管理' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'仓库启用仓位管理', 'en', N'Stock Is Allow Freight', 'manual');
 IF COL_LENGTH('dbo.bl_purchase_in', N'仓位id') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [仓位id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'仓位id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'仓位id', N'仓位id', N'文本', N'detail', 970, 120, 1, 0, 1, 0);
@@ -665,11 +665,11 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_nam
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'库存基本数量', N'库存基本数量', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'库存基本数量' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'库存基本数量', 'en', N'Inv Base Qty', 'manual');
-IF COL_LENGTH('dbo.bl_purchase_in', N'def_float_qty') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [def_float_qty] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'def_float_qty')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'def_float_qty', N'def_float_qty', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'def_float_qty' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'def_float_qty', 'en', N'Def Float Qty', 'manual');
+IF COL_LENGTH('dbo.bl_purchase_in', N'默认浮动数量') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [默认浮动数量] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'默认浮动数量')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'默认浮动数量', N'默认浮动数量', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'默认浮动数量' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'默认浮动数量', 'en', N'Def Float Qty', 'manual');
 IF COL_LENGTH('dbo.bl_purchase_in', N'辅助换算系数') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [辅助换算系数] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'辅助换算系数')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'辅助换算系数', N'辅助换算系数', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
@@ -740,16 +740,16 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_nam
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'折扣率%', N'折扣率%', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'折扣率%' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'折扣率%', 'en', N'Dis Rate', 'manual');
-IF COL_LENGTH('dbo.bl_purchase_in', N'cost_view') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [cost_view] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'cost_view')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'cost_view', N'cost_view', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'cost_view' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'cost_view', 'en', N'Cost View', 'manual');
-IF COL_LENGTH('dbo.bl_purchase_in', N'unit_cost_view') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [unit_cost_view] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'unit_cost_view')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'unit_cost_view', N'unit_cost_view', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'unit_cost_view' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'unit_cost_view', 'en', N'Unit Cost View', 'manual');
+IF COL_LENGTH('dbo.bl_purchase_in', N'成本视图') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [成本视图] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'成本视图')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'成本视图', N'成本视图', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'成本视图' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'成本视图', 'en', N'Cost View', 'manual');
+IF COL_LENGTH('dbo.bl_purchase_in', N'单位成本视图') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [单位成本视图] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'单位成本视图')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'单位成本视图', N'单位成本视图', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'单位成本视图' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'单位成本视图', 'en', N'Unit Cost View', 'manual');
 IF COL_LENGTH('dbo.bl_purchase_in', N'退货数量') IS NULL ALTER TABLE dbo.bl_purchase_in ADD [退货数量] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'退货数量')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('PURCHASE_IN', N'退货数量', N'退货数量', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
@@ -783,11 +783,11 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'结算状态', N'结算状态', N'文本', N'header', 970, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'结算状态' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'结算状态', 'en', N'Settle Status', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'delivery_status') IS NULL ALTER TABLE dbo.bd_sale_out ADD [delivery_status] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'delivery_status')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'delivery_status', N'delivery_status', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'delivery_status' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'delivery_status', 'en', N'Delivery Status', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'发货状态') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货状态] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货状态')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货状态', N'发货状态', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货状态' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货状态', 'en', N'Delivery Status', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'customer_id') IS NULL ALTER TABLE dbo.bd_sale_out ADD [customer_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'customer_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'customer_id', N'customer_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
@@ -798,41 +798,41 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'emp_id', N'emp_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'emp_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'emp_id', 'en', N'Emp Id', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'emp_number') IS NULL ALTER TABLE dbo.bd_sale_out ADD [emp_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'emp_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'emp_number', N'emp_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'emp_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'emp_number', 'en', N'Emp Number', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'经手人编码') IS NULL ALTER TABLE dbo.bd_sale_out ADD [经手人编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'经手人编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'经手人编码', N'经手人编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'经手人编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'经手人编码', 'en', N'Emp Number', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'金额') IS NULL ALTER TABLE dbo.bd_sale_out ADD [金额] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'金额')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'金额', N'金额', N'文本', N'header', 970, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'金额' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'金额', 'en', N'Total Amount', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'material_group') IS NULL ALTER TABLE dbo.bd_sale_out ADD [material_group] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'material_group')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'material_group', N'material_group', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'material_group' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'material_group', 'en', N'Material Group', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'material_qty') IS NULL ALTER TABLE dbo.bd_sale_out ADD [material_qty] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'material_qty')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'material_qty', N'material_qty', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'material_qty' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'material_qty', 'en', N'Material Qty', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'bill_dis_before_amount') IS NULL ALTER TABLE dbo.bd_sale_out ADD [bill_dis_before_amount] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'bill_dis_before_amount')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'bill_dis_before_amount', N'bill_dis_before_amount', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'bill_dis_before_amount' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'bill_dis_before_amount', 'en', N'Bill Dis Before Amount', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'商品组合') IS NULL ALTER TABLE dbo.bd_sale_out ADD [商品组合] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'商品组合')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'商品组合', N'商品组合', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'商品组合' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'商品组合', 'en', N'Material Group', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'商品数量') IS NULL ALTER TABLE dbo.bd_sale_out ADD [商品数量] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'商品数量')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'商品数量', N'商品数量', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'商品数量' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'商品数量', 'en', N'Material Qty', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'折前价税合计') IS NULL ALTER TABLE dbo.bd_sale_out ADD [折前价税合计] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'折前价税合计')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'折前价税合计', N'折前价税合计', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'折前价税合计' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'折前价税合计', 'en', N'Bill Dis Before Amount', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'整单折扣额') IS NULL ALTER TABLE dbo.bd_sale_out ADD [整单折扣额] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'整单折扣额')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'整单折扣额', N'整单折扣额', N'文本', N'header', 970, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'整单折扣额' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'整单折扣额', 'en', N'Bill Dis Amount', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'material_entity') IS NULL ALTER TABLE dbo.bd_sale_out ADD [material_entity] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'material_entity')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'material_entity', N'material_entity', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'material_entity' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'material_entity', 'en', N'Material Entity', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'商品分录') IS NULL ALTER TABLE dbo.bd_sale_out ADD [商品分录] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'商品分录')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'商品分录', N'商品分录', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'商品分录' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'商品分录', 'en', N'Material Entity', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'物流信息分录') IS NULL ALTER TABLE dbo.bd_sale_out ADD [物流信息分录] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'物流信息分录')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'物流信息分录', N'物流信息分录', N'文本', N'header', 970, 130, 1, 0, 1, 0);
@@ -853,71 +853,71 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_country_id', N'contact_country_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_country_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_country_id', 'en', N'Contact Country Id', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'contact_country_name') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_country_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_country_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_country_name', N'contact_country_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_country_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_country_name', 'en', N'Contact Country Name', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'contact_country_number') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_country_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_country_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_country_number', N'contact_country_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_country_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_country_number', 'en', N'Contact Country Number', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'联系人国家名称') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系人国家名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系人国家名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系人国家名称', N'联系人国家名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人国家名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人国家名称', 'en', N'Contact Country Name', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'联系人国家编码') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系人国家编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系人国家编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系人国家编码', N'联系人国家编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人国家编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人国家编码', 'en', N'Contact Country Number', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'contact_province_id') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_province_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_province_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_province_id', N'contact_province_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_province_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_province_id', 'en', N'Contact Province Id', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'contact_province_name') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_province_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_province_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_province_name', N'contact_province_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_province_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_province_name', 'en', N'Contact Province Name', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'contact_province_number') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_province_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_province_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_province_number', N'contact_province_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_province_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_province_number', 'en', N'Contact Province Number', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'联系人省份名称') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系人省份名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系人省份名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系人省份名称', N'联系人省份名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人省份名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人省份名称', 'en', N'Contact Province Name', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'联系人省份编码') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系人省份编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系人省份编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系人省份编码', N'联系人省份编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人省份编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人省份编码', 'en', N'Contact Province Number', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'contact_city_id') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_city_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_city_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_city_id', N'contact_city_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_city_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_city_id', 'en', N'Contact City Id', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'contact_city_name') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_city_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_city_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_city_name', N'contact_city_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_city_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_city_name', 'en', N'Contact City Name', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'contact_city_number') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_city_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_city_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_city_number', N'contact_city_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_city_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_city_number', 'en', N'Contact City Number', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'联系人市区名称') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系人市区名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系人市区名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系人市区名称', N'联系人市区名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人市区名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人市区名称', 'en', N'Contact City Name', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'联系人市区编码') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系人市区编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系人市区编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系人市区编码', N'联系人市区编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人市区编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人市区编码', 'en', N'Contact City Number', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'contact_district_id') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_district_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_district_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_district_id', N'contact_district_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_district_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_district_id', 'en', N'Contact District Id', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'contact_district_name') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_district_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_district_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_district_name', N'contact_district_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_district_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_district_name', 'en', N'Contact District Name', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'contact_district_number') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_district_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_district_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_district_number', N'contact_district_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_district_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_district_number', 'en', N'Contact District Number', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'contact_linkman') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_linkman] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_linkman')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_linkman', N'contact_linkman', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_linkman' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_linkman', 'en', N'Contact Linkman', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'contact_info') IS NULL ALTER TABLE dbo.bd_sale_out ADD [contact_info] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'contact_info')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'contact_info', N'contact_info', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'contact_info' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'contact_info', 'en', N'Contact Info', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'联系人区县名称') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系人区县名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系人区县名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系人区县名称', N'联系人区县名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人区县名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人区县名称', 'en', N'Contact District Name', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'联系人区县编码') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系人区县编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系人区县编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系人区县编码', N'联系人区县编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人区县编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人区县编码', 'en', N'Contact District Number', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'联系人') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系人] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系人')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系人', N'联系人', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系人' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系人', 'en', N'Contact Linkman', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'联系信息') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系信息] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系信息')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系信息', N'联系信息', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'联系信息' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'联系信息', 'en', N'Contact Info', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'联系地址') IS NULL ALTER TABLE dbo.bd_sale_out ADD [联系地址] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'联系地址')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'联系地址', N'联系地址', N'文本', N'header', 970, 130, 1, 0, 0, 1);
@@ -928,61 +928,61 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_country_id', N'dispatcher_country_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_country_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_country_id', 'en', N'Dispatcher Country Id', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_country_name') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_country_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_country_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_country_name', N'dispatcher_country_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_country_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_country_name', 'en', N'Dispatcher Country Name', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_country_number') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_country_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_country_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_country_number', N'dispatcher_country_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_country_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_country_number', 'en', N'Dispatcher Country Number', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'发货国家名称') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货国家名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货国家名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货国家名称', N'发货国家名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货国家名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货国家名称', 'en', N'Dispatcher Country Name', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'发货国家编码') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货国家编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货国家编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货国家编码', N'发货国家编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货国家编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货国家编码', 'en', N'Dispatcher Country Number', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_province_id') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_province_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_province_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_province_id', N'dispatcher_province_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_province_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_province_id', 'en', N'Dispatcher Province Id', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_province_name') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_province_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_province_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_province_name', N'dispatcher_province_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_province_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_province_name', 'en', N'Dispatcher Province Name', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_province_number') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_province_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_province_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_province_number', N'dispatcher_province_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_province_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_province_number', 'en', N'Dispatcher Province Number', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'发货省份名称') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货省份名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货省份名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货省份名称', N'发货省份名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货省份名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货省份名称', 'en', N'Dispatcher Province Name', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'发货省份编码') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货省份编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货省份编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货省份编码', N'发货省份编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货省份编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货省份编码', 'en', N'Dispatcher Province Number', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_city_id') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_city_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_city_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_city_id', N'dispatcher_city_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_city_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_city_id', 'en', N'Dispatcher City Id', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_city_name') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_city_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_city_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_city_name', N'dispatcher_city_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_city_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_city_name', 'en', N'Dispatcher City Name', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_city_number') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_city_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_city_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_city_number', N'dispatcher_city_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_city_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_city_number', 'en', N'Dispatcher City Number', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'发货市区名称') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货市区名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货市区名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货市区名称', N'发货市区名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货市区名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货市区名称', 'en', N'Dispatcher City Name', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'发货市区编码') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货市区编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货市区编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货市区编码', N'发货市区编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货市区编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货市区编码', 'en', N'Dispatcher City Number', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_district_id') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_district_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_district_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_district_id', N'dispatcher_district_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_district_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_district_id', 'en', N'Dispatcher District Id', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_district_name') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_district_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_district_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_district_name', N'dispatcher_district_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_district_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_district_name', 'en', N'Dispatcher District Name', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'dispatcher_district_number') IS NULL ALTER TABLE dbo.bd_sale_out ADD [dispatcher_district_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'dispatcher_district_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'dispatcher_district_number', N'dispatcher_district_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dispatcher_district_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dispatcher_district_number', 'en', N'Dispatcher District Number', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'发货区县名称') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货区县名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货区县名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货区县名称', N'发货区县名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货区县名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货区县名称', 'en', N'Dispatcher District Name', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'发货区县编码') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货区县编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货区县编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货区县编码', N'发货区县编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货区县编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货区县编码', 'en', N'Dispatcher District Number', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'发货地址') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货地址] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货地址')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货地址', N'发货地址', N'文本', N'header', 970, 130, 1, 0, 0, 1);
@@ -998,26 +998,26 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货电话', N'发货电话', N'文本', N'header', 970, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货电话' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货电话', 'en', N'Dispatcher Phone', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'recevice_delivery') IS NULL ALTER TABLE dbo.bd_sale_out ADD [recevice_delivery] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'recevice_delivery')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'recevice_delivery', N'recevice_delivery', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'recevice_delivery' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'recevice_delivery', 'en', N'Recevice Delivery', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'发货方式') IS NULL ALTER TABLE dbo.bd_sale_out ADD [发货方式] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'发货方式')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'发货方式', N'发货方式', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'发货方式' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'发货方式', 'en', N'Recevice Delivery', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'付款信息分录') IS NULL ALTER TABLE dbo.bd_sale_out ADD [付款信息分录] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'付款信息分录')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'付款信息分录', N'付款信息分录', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'付款信息分录' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'付款信息分录', 'en', N'Payment Entry', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'deduction_balance') IS NULL ALTER TABLE dbo.bd_sale_out ADD [deduction_balance] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'deduction_balance')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'deduction_balance', N'deduction_balance', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'deduction_balance' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'deduction_balance', 'en', N'Deduction Balance', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'total_un_settle_amount') IS NULL ALTER TABLE dbo.bd_sale_out ADD [total_un_settle_amount] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'total_un_settle_amount')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'total_un_settle_amount', N'total_un_settle_amount', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'total_un_settle_amount' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'total_un_settle_amount', 'en', N'Total Un Settle Amount', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'抵扣余额') IS NULL ALTER TABLE dbo.bd_sale_out ADD [抵扣余额] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'抵扣余额')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'抵扣余额', N'抵扣余额', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'抵扣余额' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'抵扣余额', 'en', N'Deduction Balance', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'未结算金额') IS NULL ALTER TABLE dbo.bd_sale_out ADD [未结算金额] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'未结算金额')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'未结算金额', N'未结算金额', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'未结算金额' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'未结算金额', 'en', N'Total Un Settle Amount', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'attachments') IS NULL ALTER TABLE dbo.bd_sale_out ADD [attachments] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'attachments')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'attachments', N'attachments', N'文本', N'header', 970, 130, 1, 0, 1, 0);
@@ -1058,16 +1058,16 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'f_logistics_id', N'f_logistics_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'f_logistics_id' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'f_logistics_id', 'en', N'F Logistics Id', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'cost_fee') IS NULL ALTER TABLE dbo.bd_sale_out ADD [cost_fee] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'cost_fee')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'cost_fee', N'cost_fee', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'cost_fee' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'cost_fee', 'en', N'Cost Fee', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'subsist_info') IS NULL ALTER TABLE dbo.bd_sale_out ADD [subsist_info] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'subsist_info')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'subsist_info', N'subsist_info', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'subsist_info' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'subsist_info', 'en', N'Subsist Info', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'采购费用') IS NULL ALTER TABLE dbo.bd_sale_out ADD [采购费用] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'采购费用')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'采购费用', N'采购费用', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'采购费用' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'采购费用', 'en', N'Cost Fee', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'费用分摊信息') IS NULL ALTER TABLE dbo.bd_sale_out ADD [费用分摊信息] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'费用分摊信息')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'费用分摊信息', N'费用分摊信息', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'费用分摊信息' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'费用分摊信息', 'en', N'Subsist Info', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'上次欠款') IS NULL ALTER TABLE dbo.bd_sale_out ADD [上次欠款] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'上次欠款')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'上次欠款', N'上次欠款', N'文本', N'header', 970, 130, 1, 0, 0, 1);
@@ -1103,11 +1103,11 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'修改时间', N'修改时间', N'文本', N'header', 970, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'修改时间' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'修改时间', 'en', N'Modify Time', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'io_status') IS NULL ALTER TABLE dbo.bd_sale_out ADD [io_status] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'io_status')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'io_status', N'io_status', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'io_status' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'io_status', 'en', N'Io Status', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'出入库状态') IS NULL ALTER TABLE dbo.bd_sale_out ADD [出入库状态] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'出入库状态')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'出入库状态', N'出入库状态', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'出入库状态' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'出入库状态', 'en', N'Io Status', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'creator_id') IS NULL ALTER TABLE dbo.bd_sale_out ADD [creator_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'creator_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'creator_id', N'creator_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
@@ -1138,16 +1138,16 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'modifier_number', N'modifier_number', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'modifier_number' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'modifier_number', 'en', N'Modifier Number', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'mulbill_label') IS NULL ALTER TABLE dbo.bd_sale_out ADD [mulbill_label] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'mulbill_label')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'mulbill_label', N'mulbill_label', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'mulbill_label' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'mulbill_label', 'en', N'Mulbill Label', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'cus_bear_fee_entry') IS NULL ALTER TABLE dbo.bd_sale_out ADD [cus_bear_fee_entry] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'cus_bear_fee_entry')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'cus_bear_fee_entry', N'cus_bear_fee_entry', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'cus_bear_fee_entry' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'cus_bear_fee_entry', 'en', N'Cus Bear Fee Entry', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'单据标签') IS NULL ALTER TABLE dbo.bd_sale_out ADD [单据标签] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'单据标签')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'单据标签', N'单据标签', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'单据标签' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'单据标签', 'en', N'Mulbill Label', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'客户承担费用分录') IS NULL ALTER TABLE dbo.bd_sale_out ADD [客户承担费用分录] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'客户承担费用分录')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'客户承担费用分录', N'客户承担费用分录', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'客户承担费用分录' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'客户承担费用分录', 'en', N'Cus Bear Fee Entry', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'delivery_type_id') IS NULL ALTER TABLE dbo.bd_sale_out ADD [delivery_type_id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'delivery_type_id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'delivery_type_id', N'delivery_type_id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
@@ -1158,11 +1158,11 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'交货方式', N'交货方式', N'文本', N'header', 970, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'交货方式' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'交货方式', 'en', N'Delivery Type Name', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'delivery_type_number') IS NULL ALTER TABLE dbo.bd_sale_out ADD [delivery_type_number] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'delivery_type_number')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'delivery_type_number', N'delivery_type_number', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'delivery_type_number' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'delivery_type_number', 'en', N'Delivery Type Number', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'交货方式编码') IS NULL ALTER TABLE dbo.bd_sale_out ADD [交货方式编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'交货方式编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'交货方式编码', N'交货方式编码', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'交货方式编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'交货方式编码', 'en', N'Delivery Type Number', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'币种id') IS NULL ALTER TABLE dbo.bd_sale_out ADD [币种id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'币种id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'币种id', N'币种id', N'文本', N'header', 970, 130, 1, 0, 1, 0);
@@ -1188,21 +1188,21 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'结算期限', N'结算期限', N'文本', N'header', 970, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'结算期限' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'结算期限', 'en', N'Setting Term Name', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'vrp_entity') IS NULL ALTER TABLE dbo.bd_sale_out ADD [vrp_entity] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'vrp_entity')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'vrp_entity', N'vrp_entity', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'vrp_entity' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'vrp_entity', 'en', N'Vrp Entity', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'配送路线分录') IS NULL ALTER TABLE dbo.bd_sale_out ADD [配送路线分录] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'配送路线分录')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'配送路线分录', N'配送路线分录', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'配送路线分录' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'配送路线分录', 'en', N'Vrp Entity', 'manual');
 IF COL_LENGTH('dbo.bd_sale_out', N'采购费用分录') IS NULL ALTER TABLE dbo.bd_sale_out ADD [采购费用分录] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'采购费用分录')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'采购费用分录', N'采购费用分录', N'文本', N'header', 970, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'采购费用分录' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'采购费用分录', 'en', N'Cost Fee Entity', 'manual');
-IF COL_LENGTH('dbo.bd_sale_out', N'currency_name') IS NULL ALTER TABLE dbo.bd_sale_out ADD [currency_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'currency_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'currency_name', N'currency_name', N'文本', N'header', 970, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'currency_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'currency_name', 'en', N'Currency Name', 'manual');
+IF COL_LENGTH('dbo.bd_sale_out', N'币别名称') IS NULL ALTER TABLE dbo.bd_sale_out ADD [币别名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'币别名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'币别名称', N'币别名称', N'文本', N'header', 970, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'币别名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'币别名称', 'en', N'Currency Name', 'manual');
 IF COL_LENGTH('dbo.bl_sale_out', N'商品id') IS NULL ALTER TABLE dbo.bl_sale_out ADD [商品id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'商品id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'商品id', N'商品id', N'文本', N'detail', 970, 120, 1, 0, 1, 0);
@@ -1253,11 +1253,11 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'仓库编码', N'仓库编码', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'仓库编码' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'仓库编码', 'en', N'Stock Number', 'manual');
-IF COL_LENGTH('dbo.bl_sale_out', N'stock_is_allow_freight') IS NULL ALTER TABLE dbo.bl_sale_out ADD [stock_is_allow_freight] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'stock_is_allow_freight')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'stock_is_allow_freight', N'stock_is_allow_freight', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'stock_is_allow_freight' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'stock_is_allow_freight', 'en', N'Stock Is Allow Freight', 'manual');
+IF COL_LENGTH('dbo.bl_sale_out', N'仓库启用仓位管理') IS NULL ALTER TABLE dbo.bl_sale_out ADD [仓库启用仓位管理] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'仓库启用仓位管理')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'仓库启用仓位管理', N'仓库启用仓位管理', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'仓库启用仓位管理' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'仓库启用仓位管理', 'en', N'Stock Is Allow Freight', 'manual');
 IF COL_LENGTH('dbo.bl_sale_out', N'仓位id') IS NULL ALTER TABLE dbo.bl_sale_out ADD [仓位id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'仓位id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'仓位id', N'仓位id', N'文本', N'detail', 970, 120, 1, 0, 1, 0);
@@ -1333,46 +1333,46 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'辅助属性3编码', N'辅助属性3编码', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'辅助属性3编码' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'辅助属性3编码', 'en', N'Aux Number3', 'manual');
-IF COL_LENGTH('dbo.bl_sale_out', N'aux_id4') IS NULL ALTER TABLE dbo.bl_sale_out ADD [aux_id4] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'aux_id4')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'aux_id4', N'aux_id4', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'aux_id4' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'aux_id4', 'en', N'Aux Id4', 'manual');
-IF COL_LENGTH('dbo.bl_sale_out', N'aux_name4') IS NULL ALTER TABLE dbo.bl_sale_out ADD [aux_name4] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'aux_name4')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'aux_name4', N'aux_name4', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'aux_name4' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'aux_name4', 'en', N'Aux Name4', 'manual');
-IF COL_LENGTH('dbo.bl_sale_out', N'aux_number4') IS NULL ALTER TABLE dbo.bl_sale_out ADD [aux_number4] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'aux_number4')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'aux_number4', N'aux_number4', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'aux_number4' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'aux_number4', 'en', N'Aux Number4', 'manual');
-IF COL_LENGTH('dbo.bl_sale_out', N'aux_id5') IS NULL ALTER TABLE dbo.bl_sale_out ADD [aux_id5] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'aux_id5')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'aux_id5', N'aux_id5', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'aux_id5' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'aux_id5', 'en', N'Aux Id5', 'manual');
-IF COL_LENGTH('dbo.bl_sale_out', N'aux_name5') IS NULL ALTER TABLE dbo.bl_sale_out ADD [aux_name5] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'aux_name5')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'aux_name5', N'aux_name5', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'aux_name5' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'aux_name5', 'en', N'Aux Name5', 'manual');
-IF COL_LENGTH('dbo.bl_sale_out', N'aux_number5') IS NULL ALTER TABLE dbo.bl_sale_out ADD [aux_number5] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'aux_number5')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'aux_number5', N'aux_number5', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'aux_number5' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'aux_number5', 'en', N'Aux Number5', 'manual');
+IF COL_LENGTH('dbo.bl_sale_out', N'辅助属性4id') IS NULL ALTER TABLE dbo.bl_sale_out ADD [辅助属性4id] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'辅助属性4id')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'辅助属性4id', N'辅助属性4id', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'辅助属性4id' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'辅助属性4id', 'en', N'Aux Id4', 'manual');
+IF COL_LENGTH('dbo.bl_sale_out', N'辅助属性4名称') IS NULL ALTER TABLE dbo.bl_sale_out ADD [辅助属性4名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'辅助属性4名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'辅助属性4名称', N'辅助属性4名称', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'辅助属性4名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'辅助属性4名称', 'en', N'Aux Name4', 'manual');
+IF COL_LENGTH('dbo.bl_sale_out', N'辅助属性4编码') IS NULL ALTER TABLE dbo.bl_sale_out ADD [辅助属性4编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'辅助属性4编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'辅助属性4编码', N'辅助属性4编码', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'辅助属性4编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'辅助属性4编码', 'en', N'Aux Number4', 'manual');
+IF COL_LENGTH('dbo.bl_sale_out', N'辅助属性5id') IS NULL ALTER TABLE dbo.bl_sale_out ADD [辅助属性5id] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'辅助属性5id')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'辅助属性5id', N'辅助属性5id', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'辅助属性5id' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'辅助属性5id', 'en', N'Aux Id5', 'manual');
+IF COL_LENGTH('dbo.bl_sale_out', N'辅助属性5名称') IS NULL ALTER TABLE dbo.bl_sale_out ADD [辅助属性5名称] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'辅助属性5名称')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'辅助属性5名称', N'辅助属性5名称', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'辅助属性5名称' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'辅助属性5名称', 'en', N'Aux Name5', 'manual');
+IF COL_LENGTH('dbo.bl_sale_out', N'辅助属性5编码') IS NULL ALTER TABLE dbo.bl_sale_out ADD [辅助属性5编码] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'辅助属性5编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'辅助属性5编码', N'辅助属性5编码', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'辅助属性5编码' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'辅助属性5编码', 'en', N'Aux Number5', 'manual');
 IF COL_LENGTH('dbo.bl_sale_out', N'条形码') IS NULL ALTER TABLE dbo.bl_sale_out ADD [条形码] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'条形码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'条形码', N'条形码', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'条形码' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'条形码', 'en', N'Barcode', 'manual');
-IF COL_LENGTH('dbo.bl_sale_out', N'act_tax_price') IS NULL ALTER TABLE dbo.bl_sale_out ADD [act_tax_price] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'act_tax_price')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'act_tax_price', N'act_tax_price', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'act_tax_price' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'act_tax_price', 'en', N'Act Tax Price', 'manual');
+IF COL_LENGTH('dbo.bl_sale_out', N'实际含税单价') IS NULL ALTER TABLE dbo.bl_sale_out ADD [实际含税单价] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'实际含税单价')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'实际含税单价', N'实际含税单价', N'文本', N'detail', 970, 120, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'实际含税单价' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'实际含税单价', 'en', N'Act Tax Price', 'manual');
 IF COL_LENGTH('dbo.bl_sale_out', N'基本单位id') IS NULL ALTER TABLE dbo.bl_sale_out ADD [基本单位id] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='SALE_OUT' AND col_name=N'基本单位id')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('SALE_OUT', N'基本单位id', N'基本单位id', N'文本', N'detail', 970, 120, 1, 0, 1, 0);
