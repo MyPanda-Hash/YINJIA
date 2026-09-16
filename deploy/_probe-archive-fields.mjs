@@ -9,7 +9,7 @@ const TARGETS = [
   ['BD_SETTLE', '结算方式', '/jdy/v2/bd/settlement_type', null],
   ['BD_CUSGRP', '客户分类', '/jdy/v2/bd/customer_group', null],
   ['BD_SUPGRP', '供应商分类', '/jdy/v2/bd/supplier_group', null],
-  ['BD_MATGRP', '商品分类', '/jdy/v2/bd/material_group', null],
+  ['BD_MATGRP', '商品分类', '/jdy/v2/bd/material_group', '/jdy/v2/bd/material_group_detail'],
   ['BD_CUR', '币别', '/jdy/v2/bd/currency', '/jdy/v2/bd/currency_detail'],
   ['BD_UOM', '计量单位', '/jdy/v2/bd/measure_unit', '/jdy/v2/bd/measure_unit_detail'],
   ['BD_DEPT', '部门', '/jdy/v2/bd/department', '/jdy/v2/bd/department_detail'],
@@ -18,6 +18,8 @@ const TARGETS = [
   ['BD_MATERIAL', '商品', '/jdy/v2/bd/material', '/jdy/v2/bd/material_detail'],
   ['BD_CUSTOMER', '客户', '/jdy/v2/bd/customer', '/jdy/v2/bd/customer_detail'],
   ['BD_SUPPLIER', '供应商', '/jdy/v2/bd/supplier', '/jdy/v2/bd/supplier_detail'],
+  ['SO_ORDER', '销售订单', '/jdy/v2/scm/sal_order', '/jdy/v2/scm/sal_order_detail'],
+  ['PU_ORDER', '采购订单', '/jdy/v2/scm/pur_order', '/jdy/v2/scm/pur_order_detail'],
 ];
 
 const { token } = await fetchAppToken(cfg.kingdee);
