@@ -1,0 +1,2 @@
+SELECT COUNT(*) AS dm_gf_n, SUM(CASE WHEN 外部数据ID IS NOT NULL THEN 1 ELSE 0 END) AS synced FROM dm_gf;
+SELECT dm, mc FROM dm_gf WHERE dm IN ('YJ-KG-JBE','YJ-XMHYX-001');
