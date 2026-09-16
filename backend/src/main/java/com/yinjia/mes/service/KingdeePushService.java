@@ -115,16 +115,12 @@ public class KingdeePushService {
 
         JsonNode result = json.readTree(stdout.toString());
         if (!result.path("ok").asBoolean(false)) {
-            String errText = result.path("error").asText("未知错误");
-            // DUPLICATE = 金蝶已有同号单据(弃审后重推)→ 明确提示用户在金蝶处理旧单
-            if ("DUPLICATE".equals(errText)) {
-                throw new RuntimeException(result.path("hint").asText("该单号在金蝶已存在，请先在金蝶删除旧单后重转"));
-            }
-            throw new RuntimeException("金蝶接口失败: " + errText);
+            throw new RuntimeException("金蝶接口失败: " + result.path("error").asText("未知错误"));
         }
 
-        // 5. 回写 MES(是否已转ERP=是 + ERP单号 + 操作人 + 时间)
-        String erpBillNo = result.path("erpBillNo").asText(docNo);
+        // 5. 回写 MES(ERP单号 = 金蝶自动生成的编号,不是 MES 编号)
+        String erpBillNo = result.path("erpBillNo").asText("");
+        if (erpBillNo.isBlank()) throw new RuntimeException("金蝶未返回单号");
         String now = LocalDateTime.now().format(FMT);
         jdbc.update("UPDATE " + headTable + " SET 是否已转ERP = N'是', ERP单号 = ?, 转ERP操作人 = ?, 转ERP时间 = ? WHERE 单据编号 = ?",
                 erpBillNo, operator, now, docNo);
