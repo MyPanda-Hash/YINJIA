@@ -68,9 +68,12 @@ public class StockLedgerService {
 
     private void applyIn(String code, String ckdm, String lot, double qty, Double price, String user, boolean forward) {
         double sign = forward ? 1 : -1;
+        // lot 为 NULL 时 =(null) 永不匹配:无批号入库行(如来料检验单生成的采购入库单)会插入
+        // lot_no=NULL 台账行,弃审却永远匹配不到 → "台账无该行"死锁;改为 NULL 安全匹配
         int n = jdbc.update("UPDATE kucun SET rkl = rkl + ?, yl = yl + ?, update_date = GETDATE(),"
-                        + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ? AND lot_no = ?",
-                sign * qty, sign * qty, user, code, ckdm, lot);
+                        + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ?"
+                        + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)",
+                sign * qty, sign * qty, user, code, ckdm, lot, lot);
         if (n == 0) {
             if (!forward || qty < 0) throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + "),红字冲回要求台账行已存在");
             jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, yl, price, asp_user1, asp_time1, asp_cancel)"
@@ -88,8 +91,9 @@ public class StockLedgerService {
         if (lot == null && forward) throw new IllegalStateException("出库行缺少[批号]——请扫材料二维码补批号后再审核(物料 " + code + ")");
         double sign = forward ? 1 : -1;
         int n = jdbc.update("UPDATE kucun SET ckl = ckl + ?, yl = yl - ?, update_date = GETDATE(),"
-                        + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ? AND lot_no = ?",
-                sign * qty, sign * qty, user, code, ckdm, lot);
+                        + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ?"
+                        + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)",
+                sign * qty, sign * qty, user, code, ckdm, lot, lot);
         if (n == 0) {
             if (forward) throw new IllegalStateException("台账无该批库存(物料 " + code + " 批 " + lot + " 仓 " + ckdm + "),不能出库");
             throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + ")");
@@ -103,7 +107,8 @@ public class StockLedgerService {
     }
 
     private Double bal(String code, String ckdm, String lot) {
-        List<Double> l = jdbc.queryForList("SELECT yl FROM kucun WHERE wzdm = ? AND ckdm = ? AND lot_no = ?", Double.class, code, ckdm, lot);
+        List<Double> l = jdbc.queryForList("SELECT yl FROM kucun WHERE wzdm = ? AND ckdm = ?"
+                + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)", Double.class, code, ckdm, lot, lot);
         return l.isEmpty() ? null : l.get(0);
     }
 

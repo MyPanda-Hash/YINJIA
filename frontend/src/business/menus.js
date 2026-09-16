@@ -111,6 +111,8 @@ export const menuTree = [
         children: [
           {
             code: 'doc', title: '单据', children: [
+              { code: 'slRecv', title: '送料暂收单', path: '/panelx/list/SL_RECV', icon: 'Download', panelCode: 'SL_RECV', operationName: '新增流程' },
+              { code: 'qcReturn', title: '暂收退料单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
               { code: 'purchaseIn', title: '采购入库单', path: '/panelx/list/PURCHASE_IN', icon: 'Download', panelCode: 'PURCHASE_IN', operationName: '新增流程' },
               { code: 'finishIn', title: '产成品入库单', path: '/panelx/list/FINISH_IN', icon: 'Download', panelCode: 'FINISH_IN', operationName: '新增流程' },
               { code: 'otherIn', title: '其他入库单', path: '/panelx/list/OTHER_IN', icon: 'Download', panelCode: 'OTHER_IN', operationName: '新增流程' },
@@ -231,11 +233,10 @@ export const menuTree = [
     icon: 'CircleCheck',
     children: [
       {
-        // 来料品质(流程图·采购支线:暂收→检验→退回)
+        // 来料品质(流程图·采购支线:暂收→检验;暂收退料单已按用户口径移入「库存核算·单据」)
         code: 'incoming', title: '来料品质', children: [
-          { code: 'qcRecv', title: '送料暂收单', path: '/panelx/list/QC_RECV', icon: 'Box', panelCode: 'QC_RECV', operationName: '新增流程' },
+          { code: 'qcRecv', title: '暂收入库单', path: '/panelx/list/QC_RECV', icon: 'Box', panelCode: 'QC_RECV', operationName: '新增流程' },
           { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
-          { code: 'qcReturn', title: '暂收退回单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
         ],
       },
       {
@@ -255,6 +256,19 @@ export const menuTree = [
       {
         code: 'trace', title: '品质追溯', children: [
           { code: 'lotTrace', title: '批号追溯', path: '/panelx/list/LOT_TRACE', panelCode: 'LOT_TRACE', icon: 'Search' },
+        ],
+      },
+      {
+        // 质量单据(YJ-QR 体系八表)
+        code: 'qcDoc', title: '质量单据', icon: 'DocumentChecked', children: [
+          { code: 'qcNcrp', title: '不合格报告(制程)', path: '/panelx/list/QC_BHG', icon: 'CircleClose', panelCode: 'QC_BHG', operationName: '新增流程' },
+          { code: 'qcNcdp', title: '不合格品处理单(制程)', path: '/panelx/list/QC_BHC', icon: 'Box', panelCode: 'QC_BHC', operationName: '新增流程' },
+          { code: 'qcTc', title: '特采申请单', path: '/panelx/list/QC_TC', icon: 'DocumentAdd', panelCode: 'QC_TC', operationName: '新增流程' },
+          { code: 'qcNcdz', title: '不合格品处理单(自制物料)', path: '/panelx/list/QC_BHZ', icon: 'Files', panelCode: 'QC_BHZ', operationName: '新增流程' },
+          { code: 'qcJjf', title: '紧急放行申请单', path: '/panelx/list/QC_JJF', icon: 'AlarmClock', panelCode: 'QC_JJF', operationName: '新增流程' },
+          { code: 'qcScp', title: '试产材料使用申请单', path: '/panelx/list/QC_SCP', icon: 'DocumentChecked', panelCode: 'QC_SCP', operationName: '新增流程' },
+          { code: 'qcLyb', title: '来料异常分析报告', path: '/panelx/list/QC_LYB', icon: 'DataAnalysis', panelCode: 'QC_LYB', operationName: '新增流程' },
+          { code: 'qcScy', title: '生产异常分析报告', path: '/panelx/list/QC_SCY', icon: 'TrendCharts', panelCode: 'QC_SCY', operationName: '新增流程' },
         ],
       },
     ],

@@ -1,0 +1,1 @@
+﻿SET NOCOUNT ON; SELECT TOP 1 单据编号 FROM bd_so_order ORDER BY 单据编号 DESC;

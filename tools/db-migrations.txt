@@ -272,3 +272,40 @@ migrate-kingdee-archive-keep-syncable.sql
 # 删除:SO 品牌/部门负责人/项目;PU 项目/到货地址/发货状态/合同号/订金金额/付款方式/现存量说明(物理列保留)。
 # 同时 SO/PU 币种改为「币别档案 id→名称」解析(可同步),不再硬编码。
 migrate-kingdee-order-keep-syncable.sql
+# —— 补登记:功能性滤效动态样品列地基(头表「样品数」计数+样品信息/装置 3~6、明细 压力/流速/出水/去除率×样品3~6;此前漏登记漏执行)——
+migrate-filter-eff-samples.sql
+# —— 补登记:附件基础设施 yj_attachment 表(锚点=面板+单据编号+字段,文件存磁盘;首个使用方 RD_PROD_INFO·客户图纸或规格书;此前漏登记漏执行)——
+migrate-attachment.sql
+# —— 补登记:检验项目标准库种子(spec.test 26组/48子项 + insp.plan 必测7+型式6;生成物由 gen-testlib-seed.cjs 再生成;此前漏登记漏执行)——
+migrate-testlib-seed.sql
+migrate-lot-trace.sql
+
+# —— 补登记:项目实施计划「申请终止(阶段处)」二级审批状态表(远程 b154fe7 漏登记导致 yj_plan_term 缺表)——
+migrate-plan-term.sql
+
+# —— 2026-09-10 品质管理八单据(YJ-QR-11/59/60/64/92/118/119/120,doc 面板+头部表+空明细表)——
+# (本地 WIP 与远程合并时并入;migrate-qc-3docs.sql 上游已登记不重复;三脚本均幂等可重跑)
+migrate-qc-8sheets.sql
+
+# —— 2026-09-14 来料三单按 legacy 真实字段重建(暂收入库单/暂收退料单/检验单;检验单头部 6 附件走 yj_attachment+PanelxForm FileAttachCell)——
+# 面板编码/菜单位置不变,六表 0 行故空表重建,非空只补列;migrate-qc-3docs.sql 上游保持不动。幂等可重跑。
+migrate-qc-3docs-rebuild.sql
+
+# —— 2026-09-15 送料暂收单 SL_RECV(库存核算:采购订单选单/生单+保存同步修改来料检验单+头部附件1..6)——
+# 选单/生单链路与同步修改在 PanelConfigService/ButtonService 代码注册;幂等可重跑。
+migrate-sl-recv.sql
+
+# —— 2026-09-15 报表双机制:yj_report_template 模板入库(ADR-0002;DB 优先 → classpath 注册表兜底)——
+# 表注释配套 migrate-report-template-comments.sql;远程已执行,本地 2026-09-15 DbSync run 补齐。幂等可重跑。
+migrate-report-template.sql
+migrate-report-template-comments.sql
+
+# —— 2026-09-15 检验单改名来料检验单(QC_INSP;字段零变化;审核自动生成采购入库单在 ButtonService 代码注册)——
+migrate-insp-rename.sql
+
+# —— 2026-09-15 暂收退料单补 6 附件列位(头表 6 列 + yj_field dataType=附件,页面单附件格聚合;同 QC_INSP/SL_RECV)——
+# 前端零改动(附件区由 data_type 驱动 + curDocNo 兜底);译名附件1..6 为全局共享词条已有。幂等可重跑。
+migrate-qc-return-attach.sql
+
+# —— 2026-09-15 暂收退料单归入库存核算(yj_panel.module_group 同步菜单,权限分组/同模块读放行口径一致)——
+migrate-qc-return-module.sql

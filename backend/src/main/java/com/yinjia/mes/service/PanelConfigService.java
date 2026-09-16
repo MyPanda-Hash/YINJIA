@@ -637,7 +637,7 @@ public class PanelConfigService {
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"导入", "导入"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 采购订单:选单=请购单;生单=采购入库单(已实现)
+            // 采购订单:选单=请购单;生单=采购入库单/送料暂收单(已实现)
             java.util.Map.entry("PU_ORDER", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选请购单"},
@@ -646,7 +646,7 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生成采购入库单"},
+                    new String[]{"生单", "生成采购入库单", "生成送料暂收单"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"导入", "导入"},
@@ -679,10 +679,11 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 来料检验单:选单=送料暂收单;生单=采购入库单(非退货行)/暂收退回单(退货行),按处置方式拆行
+            // 来料检验单(原检验单,2026-09-15 改名):选单=暂收入库单;审核时自动生成采购入库单
+            // (合格行,ButtonService.inspAutoPurchaseIn);暂收退回单暂不自动创建,手工按钮保留
             java.util.Map.entry("QC_INSP", List.of(
                     new String[]{"新增", "新增"},
-                    new String[]{"选单", "选送料暂收单"},
+                    new String[]{"选单", "选暂收入库单"},
                     new String[]{"修改", "修改"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
@@ -701,6 +702,20 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
+            // 送料暂收单(库存核算):选单=采购订单;生单=来料检验单;修改保存后由
+            // ButtonService.syncInspFromSlRecv 同步修改已生成的来料检验单
+            java.util.Map.entry("SL_RECV", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"选单", "选采购订单"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "审核", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"生单", "生成来料检验单"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
@@ -807,16 +822,18 @@ public class PanelConfigService {
      * 推式生单已实现链路((面板|动作) → 目标面板)。与 PushGenerateHandler 共用——
      * Handler 经 {@link #pushTarget} 查询;按钮生成据此区分可执行动作与灰色占位。
      */
-    private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
-            "PU_REQ|生成采购订单", "PU_ORDER",
-            "PU_ORDER|生成采购入库单", "PURCHASE_IN",
-            "SO_ORDER|生成生产加工单", "MANU_ORDER",
-            "SO_ORDER|生成销售出库单", "SALE_OUT",
-            "MANU_ORDER|生成产成品入库单", "FINISH_IN",
-            "QC_RECV|生成检验单", "QC_INSP",
-            "QC_INSP|生成采购入库单", "PURCHASE_IN",
-            "QC_INSP|生成暂收退回单", "QC_RETURN",
-            "WO_ORDER|生成领料单", "MATERIAL_OUT"
+    private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
+            java.util.Map.entry("PU_REQ|生成采购订单", "PU_ORDER"),
+            java.util.Map.entry("PU_ORDER|生成采购入库单", "PURCHASE_IN"),
+            java.util.Map.entry("PU_ORDER|生成送料暂收单", "SL_RECV"),
+            java.util.Map.entry("SO_ORDER|生成生产加工单", "MANU_ORDER"),
+            java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
+            java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
+            java.util.Map.entry("QC_RECV|生成检验单", "QC_INSP"),
+            java.util.Map.entry("SL_RECV|生成来料检验单", "QC_INSP"),
+            java.util.Map.entry("QC_INSP|生成采购入库单", "PURCHASE_IN"),
+            java.util.Map.entry("QC_INSP|生成暂收退回单", "QC_RETURN"),
+            java.util.Map.entry("WO_ORDER|生成领料单", "MATERIAL_OUT")
     )));
 
     /** 推式生单目标面板(无实现返回 null)。 */
@@ -858,6 +875,7 @@ public class PanelConfigService {
             java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产加工单(销售-生产链)
             java.util.Map.entry("PU_ORDER", "PU_REQ"),               // 请购单 → 采购订单
             java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(品检分流链)
+            java.util.Map.entry("SL_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15)
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(品检分流)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
             java.util.Map.entry("WO_ORDER", "SO_ORDER"),             // 销售订单 → 生产工单(计划层:选单生单)
@@ -879,6 +897,7 @@ public class PanelConfigService {
             // 两条链路补齐(采购链 PU_ORDER 物料口径 ↔ PU_REQ/PURCHASE_IN 存货口径;销售链单位换名)
             {"物料编码", "存货编码"}, {"物料名称", "存货名称"},
             {"存货编码", "物料编码"}, {"存货名称", "物料名称"},
+            {"规格型号", "型号"},
             {"单位", "计量单位"}, {"销售单位", "计量单位"}, {"生产单位", "计量单位"},
             {"采购单位", "单位"}, {"销售单位", "生产单位"},
             // 品检分流三链(暂收→检验→入库/退回)的数量口径换名
@@ -897,9 +916,11 @@ public class PanelConfigService {
             "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}},
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             "QC_RECV|QC_INSP", new String[][]{{"单据编号", "暂收单号"}},
-            "QC_INSP|PURCHASE_IN", new String[][]{{"单据编号", "外部单据号"}},
+            "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}},
             "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}},
-            "SO_ORDER|WO_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "交期"}}
+            "SO_ORDER|WO_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "交期"}},
+            // 采购订单 → 送料暂收单:表头日期标签不同(单据日期→日期),其余同名自动映射
+            "PU_ORDER|SL_RECV", new String[][]{{"单据日期", "日期"}}
     )));
 
     /** 生单/选单共用的头行映射(目标面板 → {source, headerMap, detailMap});供 PushGenerateHandler 复用。 */
