@@ -112,6 +112,8 @@ public class ButtonService {
             case "更新预警数量" -> updateStockWarn(def, formData);
             // 转ERP:已审核+未转过的采购入库/销售出库 → 推送到金蝶沙箱,回写ERP单号
             case "转ERP" -> pushToErp(def, formData);
+            // 批量转ERP:查询所有已审核+未转的单据列表(前端弹窗勾选后逐张调 转ERP)
+            case "查询可转ERP" -> listPushableErp(def);
             // 生产工单:成型后生成产品批号(打印产品二维码的数据源,一次生成终身复用)
             case "生成产品批号" -> genProductLot(def, formData);
             // 项目实施计划:阶段完成按钮(填写实际完成时间)
@@ -1889,6 +1891,25 @@ public class ButtonService {
     }
 
     // ══════════ 转ERP(金蝶沙箱) ══════════
+
+    /** 批量转ERP:查询所有已审核+未转ERP的单据(前端弹窗列表勾选) */
+    private Map<String, Object> listPushableErp(PanelRegistry.PanelDef def) {
+        if (!List.of("PURCHASE_IN", "SALE_OUT").contains(def.code()))
+            throw new IllegalStateException("仅采购入库/销售出库支持转ERP");
+        String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in" : "bd_sale_out";
+        String partnerCol = "PURCHASE_IN".equals(def.code()) ? "供应商" : "客户";
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT h.单据编号, h.单据日期, h." + partnerCol + " AS 往来单位, h." + partnerCol + " AS partner" +
+                " FROM " + tbl + " h" +
+                " INNER JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = h.单据编号 AND s.shr IS NOT NULL" +
+                " WHERE ISNULL(h.asp_cancel,'N') <> 'Y'" +
+                " AND ISNULL(h.是否已转ERP, N'否') <> N'是'" +
+                " ORDER BY h.单据编号 DESC", def.code());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("list", rows);
+        out.put("count", rows.size());
+        return out;
+    }
 
     /** 转ERP:已审核+未转过的采购入库/销售出库 → 推金蝶,回写ERP单号 */
     private Map<String, Object> pushToErp(PanelRegistry.PanelDef def, Map<String, Object> formData) {

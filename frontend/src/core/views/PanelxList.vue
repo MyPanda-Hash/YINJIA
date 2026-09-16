@@ -1274,6 +1274,30 @@
       </template>
     </el-dialog>
 
+    <!-- 批量转ERP:显示已审核+未转ERP的单据,勾选后批量推送 -->
+    <el-dialog v-model="batchErpVisible" :title="tt('批量转ERP')" width="600px" append-to-body :close-on-click-modal="false">
+      <div class="col-pref-tip">{{ tt('以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"') }}</div>
+      <el-table :data="batchErpList" size="small" border max-height="400" @selection-change="(val) => (batchErpSel = val)">
+        <el-table-column type="selection" width="45" />
+        <el-table-column prop="单据编号" :label="tt('单据编号')" width="160" />
+        <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
+        <el-table-column prop="partner" :label="tt('供应商/客户')" />
+        <el-table-column :label="tt('状态')" width="80">
+          <template #default="{ row }">
+            <el-tag v-if="row.result === 'ok'" type="success" size="small">{{ row.erpBillNo || '成功' }}</el-tag>
+            <el-tag v-else-if="row.result === 'skip'" type="info" size="small">已转</el-tag>
+            <el-tag v-else-if="row.result === 'fail'" type="danger" size="small">{{ tt('失败') }}</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button size="small" @click="batchErpVisible = false">{{ tt('关闭') }}</el-button>
+        <el-button type="primary" size="small" :loading="batchErpLoading" :disabled="!batchErpSel.length" @click="doBatchErp">
+          {{ tt('开始转ERP') }} ({{ batchErpSel.length }})
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- 表头字段自定义(表头调整:排序/栏名/显隐,与表格调整同款交互) -->
     <el-dialog v-model="headPrefVisible" :title="tt('表头调整')" width="520px" append-to-body :close-on-click-modal="false">
       <div class="col-pref-tip">{{ tt('拖动或用箭头调整字段顺序;勾选=显示;栏名可改。') }}
@@ -1530,6 +1554,40 @@ function applyAdvFilters(rows) {
 const colPrefVisible = ref(false)
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
+
+// ── 批量转ERP ──
+const batchErpVisible = ref(false)
+const batchErpList = ref([])
+const batchErpSel = ref([])
+const batchErpLoading = ref(false)
+
+async function openBatchErp() {
+  try {
+    const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '查询可转ERP', formData: {}, buttonParam: {} })
+    batchErpList.value = (res?.list || []).map((r) => ({ ...r, result: '' }))
+    batchErpSel.value = []
+    batchErpVisible.value = true
+    if (!batchErpList.value.length) ElMessage.info('暂无已审核且未转ERP的单据')
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('查询失败'))
+  }
+}
+
+async function doBatchErp() {
+  if (!batchErpSel.value.length) return
+  batchErpLoading.value = true
+  let ok = 0, skip = 0, fail = 0
+  for (const row of batchErpSel.value) {
+    try {
+      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '转ERP', formData: { 编号: row.单据编号, 单据编号: row.单据编号 }, buttonParam: {} })
+      if (res?.message?.includes('已转入ERP')) { row.result = 'skip'; skip++ }
+      else { row.result = 'ok'; row.erpBillNo = res?.ERP单号 || ''; ok++ }
+    } catch { row.result = 'fail'; fail++ }
+  }
+  batchErpLoading.value = false
+  ElMessage.success(`批量转ERP完成: 成功${ok} 跳过${skip} 失败${fail}`)
+  await load()
+}
 const colDragIdx = ref(-1)
 
 function openColPrefs() {
@@ -4563,6 +4621,11 @@ async function onButton(action) {
   }
   if (action === '扫描填单') {
     scanVisible.value = true
+    return
+  }
+  // 批量转ERP:弹窗显示已审核+未转的单据,勾选后批量推送
+  if (action === '批量转ERP') {
+    openBatchErp()
     return
   }
   // 材料二维码标签打印(品检分流链):本地拦截,数据源=当前暂收单明细行
