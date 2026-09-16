@@ -249,7 +249,7 @@ public class PanelConfigService {
             }
             buttonGroups.add(group("保存", List.of("保存")));
             buttonGroups.add(group("删除", List.of("删除")));
-            if (doc) buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
+            buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
             buttonGroups.add(group("刷新", List.of("刷新")));
@@ -667,6 +667,7 @@ public class PanelConfigService {
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成进货单"},
+                    new String[]{"转ERP", "转ERP"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},
@@ -777,6 +778,7 @@ public class PanelConfigService {
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成销货单"},
+                    new String[]{"转ERP", "转ERP"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},
