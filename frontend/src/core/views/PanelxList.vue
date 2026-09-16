@@ -1158,7 +1158,9 @@
 
     <!-- 表格列自定义(排序/栏名/显隐) -->
     <el-dialog v-model="colPrefVisible" title="表格调整" width="520px" append-to-body :close-on-click-modal="false">
-      <div class="col-pref-tip">拖动或用箭头调整列顺序;勾选=显示;栏名可改。</div>
+      <div class="col-pref-tip">拖动或用箭头调整列顺序;勾选=显示;栏名可改。
+        <span class="col-pref-count">总 {{ colPrefRows.length }} 列 / 显示 {{ colPrefRows.filter(r => r.visible).length }}</span>
+      </div>
       <div class="col-pref-list">
         <div v-for="(item, idx) in colPrefRows" :key="item.label" class="col-pref-row" draggable="true"
              @dragstart="colDragIdx = idx" @dragover.prevent @drop="onColDrop(idx)">
@@ -1181,7 +1183,9 @@
 
     <!-- 表头字段自定义(表头调整:排序/栏名/显隐,与表格调整同款交互) -->
     <el-dialog v-model="headPrefVisible" :title="tt('表头调整')" width="520px" append-to-body :close-on-click-modal="false">
-      <div class="col-pref-tip">{{ tt('拖动或用箭头调整字段顺序;勾选=显示;栏名可改。') }}</div>
+      <div class="col-pref-tip">{{ tt('拖动或用箭头调整字段顺序;勾选=显示;栏名可改。') }}
+        <span class="col-pref-count">{{ tt('总') }} {{ headPrefRows.length }} {{ tt('个') }} / {{ tt('显示') }} {{ headPrefRows.filter(r => r.visible).length }}</span>
+      </div>
       <div class="col-pref-list">
         <div v-for="(item, idx) in headPrefRows" :key="item.label" class="col-pref-row" draggable="true"
              @dragstart="headDragIdx = idx" @dragover.prevent @drop="onHeadDrop(idx)">
@@ -6206,6 +6210,7 @@ onUnmounted(() => {
 
 /* 表格列自定义对话框 */
 .col-pref-tip { font-size: 12px; color: #888; margin-bottom: 10px; }
+.col-pref-count { margin-left: 8px; padding: 1px 8px; border-radius: 8px; background: #e8f4ff; color: #409eff; font-weight: 500; }
 .col-pref-list { max-height: 400px; overflow-y: auto; border: 1px solid #e8ecf1; border-radius: 4px; }
 .col-pref-row {
   display: flex; align-items: center; gap: 6px;
