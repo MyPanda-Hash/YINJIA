@@ -75,7 +75,11 @@ public class StockLedgerService {
                         + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)",
                 sign * qty, sign * qty, user, code, ckdm, lot, lot);
         if (n == 0) {
-            if (!forward || qty < 0) throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + "),红字冲回要求台账行已存在");
+            if (!forward || qty < 0) {
+                // 同步脚本设的已审核单据跳过了正常审核流程(未写台账),弃审时台账无行 → 跳过冲回
+                // 正常 UI 审核过的单据台账必有行,不会走这个分支
+                return;
+            }
             jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, yl, price, asp_user1, asp_time1, asp_cancel)"
                             + " VALUES (?, ?, ?, GETDATE(), ?, ?, ?, ?, GETDATE(), 'N')",
                     code, ckdm, lot, qty, qty, price, "stock:" + user);
