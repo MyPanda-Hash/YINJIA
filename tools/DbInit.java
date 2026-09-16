@@ -13,7 +13,8 @@ import java.util.List;
  * 用法: java -cp <mssql-jdbc.jar> DbInit.java [bak路径]
  */
 public class DbInit {
-    static final String BASE = "D:\\YINJIA-main\\YINJIA-main\\tools\\";
+    /** 脚本基目录:以运行时工作目录为准(应在 tools/ 下运行),不再硬编码机器特定路径 */
+    static final String BASE = System.getProperty("user.dir") + System.getProperty("file.separator");
     /** 兜底清单(仅当 db-migrations.txt 不存在时使用;正常情况以清单文件为准) */
     static final String[] SCRIPTS = {
         "setup-db.sql",

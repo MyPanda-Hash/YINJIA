@@ -1,0 +1,22 @@
+﻿import mssql from 'mssql';
+import { writeFileSync, mkdirSync } from 'node:fs';
+const DIR = 'D:\\jdy-sync\\backup';
+mkdirSync(DIR, { recursive: true });
+const pool = await new mssql.ConnectionPool({server:'127.0.0.1',port:1433,database:'HSDZ_MES',user:'yinjia',password:'Yinjia@2026',options:{encrypt:false,trustServerCertificate:true}}).connect();
+const stamp = new Date().toISOString().replace(/[:T]/g,'-').slice(0,19);
+let body = '';
+const collect = async (sql) => {
+  const rs = await new mssql.Request(pool).query(sql);
+  for (const row of rs.recordset) body += JSON.stringify(row) + '\n';
+  return rs.recordset.length;
+};
+let n = 0;
+n += await collect('SELECT * FROM bd_so_order');   console.log('bd_so_order 头:', n);
+let a = await collect('SELECT * FROM bl_so_order'); console.log('bl_so_order 行:', a); n += a;
+let b = await collect(`SELECT * FROM yj_doc_status WHERE panel_code IN (N'SO_ORDER',N'PU_ORDER')`); console.log('yj_doc_status:', b); n += b;
+let c = await collect('SELECT * FROM bd_pu_order'); console.log('bd_pu_order 头:', c); n += c;
+let d = await collect('SELECT * FROM bl_pu_order'); console.log('bl_pu_order 行:', d); n += d;
+const path = `${DIR}\\PRECLEAR-SOPU-${stamp}.jsonl`;
+writeFileSync(path, body, 'utf8');
+console.log(`备份完成: ${path} (${n} 行, ${(Buffer.byteLength(body,'utf8')/1024).toFixed(1)} KB)`);
+await pool.close();
