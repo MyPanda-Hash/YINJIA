@@ -1,15 +1,9 @@
 SET NOCOUNT ON;
--- 4 个标签修正:列改名 + yj_field + 译名同步
-EXEC sp_rename N'bd_so_order.[单据整单折前价税合计]', N'折前价税合计', N'COLUMN';
-EXEC sp_rename N'bd_so_order.[业务模式0:普通销售，1:直运销售]', N'业务模式', N'COLUMN';
-EXEC sp_rename N'bd_so_order.[交货方式id,6-物流发货，8-车辆配送，9-客户自提]', N'交货方式id', N'COLUMN';
-EXEC sp_rename N'bd_so_order.[发票类型：1：普票，2:专票]', N'发票类型', N'COLUMN';
-UPDATE yj_field SET col_name=N'折前价税合计', label=N'折前价税合计' WHERE panel_code='SO_ORDER' AND col_name=N'单据整单折前价税合计';
-UPDATE yj_field SET col_name=N'业务模式',    label=N'业务模式'    WHERE panel_code='SO_ORDER' AND col_name=N'业务模式0:普通销售，1:直运销售';
-UPDATE yj_field SET col_name=N'交货方式id',  label=N'交货方式id'  WHERE panel_code='SO_ORDER' AND col_name LIKE N'交货方式id%';
-UPDATE yj_field SET col_name=N'发票类型',    label=N'发票类型'    WHERE panel_code='SO_ORDER' AND col_name LIKE N'发票类型%';
-UPDATE yj_translation SET ref_key=N'折前价税合计' WHERE scope='field' AND ref_key=N'单据整单折前价税合计';
-UPDATE yj_translation SET ref_key=N'业务模式' WHERE scope='field' AND ref_key=N'业务模式0:普通销售，1:直运销售';
-UPDATE yj_translation SET ref_key=N'交货方式id' WHERE scope='field' AND ref_key LIKE N'交货方式id%';
-UPDATE yj_translation SET ref_key=N'发票类型' WHERE scope='field' AND ref_key LIKE N'发票类型%';
-SELECT COUNT(*) AS SO面板字段数 FROM yj_field WHERE panel_code='SO_ORDER';
+SELECT (SELECT COUNT(*) FROM yj_field WHERE panel_code='SO_ORDER') AS SO面板
+, (SELECT COUNT(*) FROM yj_field WHERE panel_code='PU_ORDER') AS PU面板
+, (SELECT COUNT(*) FROM yj_field WHERE panel_code='KHDA') AS KHDA面板
+, (SELECT COUNT(*) FROM yj_field WHERE panel_code='GFDA') AS GFDA面板
+, (SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.bl_so_order')) AS SO行表列
+, (SELECT COUNT(*) FROM sys.columns WHERE object_id=OBJECT_ID('dbo.bl_pu_order')) AS PU行表列;
+SELECT name FROM sys.columns WHERE object_id=OBJECT_ID('dbo.dm_kh') AND name LIKE N'%联系人%' ORDER BY column_id;
+SELECT TOP 2 单据编号, 存货编码, ISNULL(图片url,'') AS 图片, ISNULL(仓库编码,'') AS 仓库 FROM bl_so_order WHERE ISNULL(图片url,'')<>'' ORDER BY id DESC;

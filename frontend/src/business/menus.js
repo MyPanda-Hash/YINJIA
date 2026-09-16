@@ -153,6 +153,8 @@ export const menuTree = [
           { code: 'materialOutStats', title: '材料出库单统计表', path: '/panelx/list/MATERIAL_OUT_STATS', panelCode: 'MATERIAL_OUT_STATS', icon: 'Histogram' },
           { code: 'otherOutStats', title: '其他出库单统计表', path: '/panelx/list/OTHER_OUT_STATS', panelCode: 'OTHER_OUT_STATS', icon: 'Histogram' },
           { code: 'outsourceIssueStats', title: '委外发料单统计表', path: '/panelx/list/OUTSOURCE_ISSUE_STATS', panelCode: 'OUTSOURCE_ISSUE_STATS', icon: 'Histogram' },
+          // 库存状况表:实时聚合 8 类出入库单据行的现存量/结存金额(参照 PANDA 实现)
+          { code: 'stockBalance', title: '库存状况表', path: '/panelx/list/STOCK_BALANCE', panelCode: 'STOCK_BALANCE', icon: 'DataAnalysis' },
         ],
       },
     ],
