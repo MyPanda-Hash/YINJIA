@@ -45,14 +45,27 @@ public class KingdeePushService {
         String headTable = isPur ? "bd_purchase_in" : "bd_sale_out";
         String lineTable = isPur ? "bl_purchase_in" : "bl_sale_out";
 
-        // 1. 校验
+        // 1a. 已转过检查(优先:有ERP单号直接提示)
         Map<String, Object> head = jdbc.queryForMap(
                 "SELECT * FROM " + headTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
-        String status = String.valueOf(head.get("单据状态"));
-        if (!"已审核".equals(status)) throw new RuntimeException("仅已审核单据可转ERP，当前状态: " + status);
         Object existingErpNo = head.get("ERP单号");
-        if (existingErpNo != null && !String.valueOf(existingErpNo).isBlank())
-            throw new RuntimeException("该单据已转ERP(ERP单号: " + existingErpNo + ")，不可重复转入");
+        if (existingErpNo != null && !String.valueOf(existingErpNo).isBlank()) {
+            // 已转过:返回提示而不是报错(前端友好展示)
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("ERP单号", String.valueOf(existingErpNo));
+            out.put("message", "该单据已转入ERP(ERP单号: " + existingErpNo + ")，不可重复转入");
+            return out;
+        }
+
+        // 1b. 状态校验:从 yj_doc_status 状态机取(与 UI 显示一致;表列可能在审批流后未同步)
+        String auditUser = null;
+        try {
+            auditUser = jdbc.queryForObject(
+                    "SELECT shr FROM yj_doc_status WHERE panel_code = ? AND doc_no = ? AND shr IS NOT NULL",
+                    String.class, panelCode, docNo);
+        } catch (Exception ignored) {}
+        boolean isAudited = auditUser != null;
+        if (!isAudited) throw new RuntimeException("仅已审核(审批通过)单据可转ERP");
 
         List<Map<String, Object>> lines = jdbc.queryForList(
                 "SELECT * FROM " + lineTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
@@ -102,7 +115,21 @@ public class KingdeePushService {
 
         JsonNode result = json.readTree(stdout.toString());
         if (!result.path("ok").asBoolean(false)) {
-            throw new RuntimeException("金蝶接口失败: " + result.path("error").asText("未知错误"));
+            String errText = result.path("error").asText("未知错误");
+            // 金蝶返回"组合值重复" = 该单号已存在于金蝶(可能被同步脚本或其他途径推过)
+            // → 识别为已转过,回填 ERP单号 并返回友好提示(不报错)
+            if (errText.contains("组合值重复") || errText.contains("已存在")) {
+                String now = LocalDateTime.now().format(FMT);
+                jdbc.update("UPDATE " + headTable + " SET ERP单号 = ?, 转ERP操作人 = ?, 转ERP时间 = ? WHERE 单据编号 = ?",
+                        docNo, operator, now, docNo);
+                Map<String, Object> out = new LinkedHashMap<>();
+                out.put("ERP单号", docNo);
+                out.put("转ERP操作人", operator);
+                out.put("转ERP时间", now);
+                out.put("message", "该单号在金蝶已存在(可能被同步脚本推过)，已标记为已转ERP");
+                return out;
+            }
+            throw new RuntimeException("金蝶接口失败: " + errText);
         }
 
         // 5. 回写 MES
