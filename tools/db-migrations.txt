@@ -311,3 +311,9 @@ migrate-inbound-outbound-fields.sql
 # 所有 id 类字段(*id/*ID/*-id/*_id/图片url/kf_period/QQ 等)统一隐藏(用户看名称不看内部ID);
 # 长标签清理(入库状态Z部分入库,C全部入库,A未入库→入库状态);可见字段英文标签清零。
 migrate-fix-all-english-and-visibility.sql
+
+# —— 2026-09-16 登记:采购入库/销售出库表头重设计(对齐 SO/PU 风格) ——
+# 先全隐藏再精选:核心(编号/日期/往来/仓库/经手人)+金额/备注/创建时间+状态(结算/出入库)+到期日/联系人电话/交货方式;
+# 编码仅留 供应商编码/客户编码;技术字段(创建修改审核人系列/交易类型/分录/欠款/国家编码)全隐藏。
+# 采购入库 14 个表头字段、销售出库 15 个。
+migrate-redesign-inbound-outbound-header.sql
