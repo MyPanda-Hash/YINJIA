@@ -19,6 +19,8 @@ const DRY_RUN = args.has('--dry-run');
 const PROBE = args.has('--probe');
 const SKIP_CONFIRM = args.has('--yes');
 const INCLUDE_SYNCED = args.has('--include-synced'); // 推含金蝶同步来的单(推到不同沙箱时用)
+const WATCH = args.has('--watch'); // 定时增量推送(默认 5 分钟)
+const WATCH_INTERVAL = 5 * 60 * 1000; // 5 分钟
 
 const cfgPath = join(HERE, 'config.json');
 if (!existsSync(cfgPath)) { console.error('缺少 push/config.json'); process.exit(1); }
@@ -80,11 +82,12 @@ async function ensureBasic(token, type, number, name, extra = {}) {
   if (sandboxCache[type].has(String(number))) return true;
   const paths = { supplier: '/jdy/v2/bd/supplier', customer: '/jdy/v2/bd/customer', material: '/jdy/v2/bd/material', store: '/jdy/v2/bd/store' };
   let body = { number: String(number), name: String(name || number) };
-  // 商品创建必须带单位 ID(实测 base_unit_number 无效,须用 base_unit_id)
+  // 商品创建必须带单位 ID + 规格型号(实测 base_unit_number 无效,须用 base_unit_id)
   if (type === 'material') {
     const unitId = await getDefaultUnitId(token);
     if (!unitId) { log(`    ✗ 无可用计量单位,无法创建商品 ${number}`); return false; }
     body = { ...body, base_unit_id: unitId, purchase_unit_id: unitId, sale_unit_id: unitId, store_unit_id: unitId };
+    if (extra.model) body.model = String(extra.model); // 规格型号
   }
   const r = await kingdeePost(cfg.kingdee, token, paths[type], {}, body);
   if (r.ok) {
@@ -167,12 +170,16 @@ async function pushAllBasics(token) {
   }
   log(`  客户: ${customers.length} 个(新建 ${created},已有 ${skipped},失败 ${failed})`);
 
-  // 商品(bs_inv)
+  // 商品(bs_inv)— 带规格型号;补从单据行来的商品(bs_inv 可能不全)
   created = 0; skipped = 0; failed = 0;
   const materials = (await pool.request().query(`
-    SELECT 存货编码 AS 编码, 存货名称 AS 名称 FROM bs_inv WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(存货编码,'')<>''`)).recordset;
+    SELECT 存货编码 AS 编码, 存货名称 AS 名称, 规格型号 AS 型号 FROM bs_inv WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(存货编码,'')<>''
+    UNION
+    SELECT l.存货编码, MAX(l.存货名称), MAX(l.规格型号) FROM bl_purchase_in l WHERE ISNULL(l.存货编码,'')<>'' GROUP BY l.存货编码
+    UNION
+    SELECT l.存货编码, MAX(l.存货名称), MAX(l.规格型号) FROM bl_sale_out l WHERE ISNULL(l.存货编码,'')<>'' GROUP BY l.存货编码`)).recordset;
   for (const m of materials) {
-    const ok = await ensureBasic(token, 'material', m.编码, m.名称);
+    const ok = await ensureBasic(token, 'material', m.编码, m.名称, { model: m.型号 || '' });
     ok ? (sandboxCache.material.has(String(m.编码)) ? skipped++ : created++) : failed++;
   }
   log(`  商品: ${materials.length} 个(新建 ${created},已有 ${skipped},失败 ${failed})`);
@@ -256,6 +263,7 @@ function mapPurLines(lines) {
   return (lines || []).map((l) => {
     const base = {
       material_number: String(l.存货编码 || ''),
+      material_model: String(l.规格型号 || ''), // 规格型号
       qty: Number(l.实收数量) || 0,
       price: Number(l.单价) || 0,
       cess: Number(l['税率%']) || 0,
@@ -280,6 +288,7 @@ function mapSaleLines(lines) {
   return (lines || []).map((l) => {
     const base = {
       material_number: String(l.存货编码 || ''),
+      material_model: String(l.规格型号 || ''), // 规格型号
       qty: Number(l.数量) || 0,
       price: Number(l.售价 || 0),
       cess: Number(l['税率%']) || 0,
@@ -355,7 +364,7 @@ async function main() {
     log(`✓ 沙箱连通`);
   } catch (e) { log(`✗ 连接失败: ${e.message}`); process.exit(1); }
 
-  if (PROBE) { log('探测模式,退出'); await pool.close(); return; }
+  if (PROBE) { log('探测模式,退出'); if (!WATCH) await pool.close(); return; }
 
   // 加载沙箱基础资料缓存 + 同步 MES 全部基础资料到沙箱
   log('── 加载沙箱基础资料 ──');
@@ -368,7 +377,7 @@ async function main() {
   const purDocs = await fetchPending('bd_purchase_in', 'bl_purchase_in');
   const saleDocs = await fetchPending('bd_sale_out', 'bl_sale_out');
   log(`\n待推送(仅MES手工单): 采购入库 ${purDocs.length} 单, 销售出库 ${saleDocs.length} 单`);
-  if (!purDocs.length && !saleDocs.length) { log('无待推送数据'); await pool.close(); return; }
+  if (!purDocs.length && !saleDocs.length) { log('无待推送数据'); if (!WATCH) await pool.close(); return; }
 
   if (!SKIP_CONFIRM && !DRY_RUN) {
     log(`⚠ 即将推送 ${purDocs.length + saleDocs.length} 张单据, 3 秒后开始...`);
@@ -379,10 +388,10 @@ async function main() {
 
   for (const doc of purDocs) {
     const mapped = { ...mapPurHead(doc.head), material_entity: mapPurLines(doc.lines) };
-    // 供应商 + 每行的商品/仓库
+    // 供应商 + 每行的商品(带规格型号)/仓库
     const basics = [{ type: 'supplier', number: doc.head.供应商编码, name: doc.head.供应商 }];
     for (const l of doc.lines) {
-      if (l.存货编码) basics.push({ type: 'material', number: l.存货编码, name: l.存货名称 });
+      if (l.存货编码) basics.push({ type: 'material', number: l.存货编码, name: l.存货名称, model: l.规格型号 || '' });
       if (l.仓库编码) basics.push({ type: 'store', number: l.仓库编码, name: l.仓库 });
     }
     const r = await pushDoc(token, 'bd_purchase_in', '/jdy/v2/scm/pur_inbound', doc, mapped, basics);
@@ -393,7 +402,7 @@ async function main() {
     const mapped = { ...mapSaleHead(doc.head), material_entity: mapSaleLines(doc.lines) };
     const basics = [{ type: 'customer', number: doc.head.客户编码, name: doc.head.客户 }];
     for (const l of doc.lines) {
-      if (l.存货编码) basics.push({ type: 'material', number: l.存货编码, name: l.存货名称 });
+      if (l.存货编码) basics.push({ type: 'material', number: l.存货编码, name: l.存货名称, model: l.规格型号 || '' });
       if (l.仓库编码) basics.push({ type: 'store', number: l.仓库编码, name: l.仓库 });
     }
     const r = await pushDoc(token, 'bd_sale_out', '/jdy/v2/scm/sal_out_bound', doc, mapped, basics);
@@ -401,8 +410,22 @@ async function main() {
   }
 
   log(`\n=== 完成: 成功 ${ok}, 失败 ${fail} ===`);
-  await pool.close();
-  if (fail > 0) process.exitCode = 2;
+  if (!WATCH) await pool.close(); // watch 模式保持连接
+  if (fail > 0 && !WATCH) process.exitCode = 2;
 }
 
 main().catch(async (e) => { log(`FATAL: ${e.message}`); try { await pool.close(); } catch {} process.exit(1); });
+
+// ── 定时增量推送(watch 模式):每 5 分钟跑一轮 ──
+if (WATCH) {
+  log(`[watch] 定时推送已启动,间隔 ${WATCH_INTERVAL / 60000} 分钟`);
+  setInterval(async () => {
+    try {
+      // 重置基础资料缓存(每轮重新加载,检测新建的基础资料)
+      sandboxCache.supplier.clear(); sandboxCache.customer.clear();
+      sandboxCache.material.clear(); sandboxCache.store.clear();
+      cachedUnitId = null;
+      await main();
+    } catch (e) { log(`[watch] 轮次异常: ${e.message}`); }
+  }, WATCH_INTERVAL);
+}
