@@ -5,6 +5,10 @@ SET NOCOUNT ON;
 -- ══ 1) 视图:v_stock_balance ══
 SET NOCOUNT ON;
 IF OBJECT_ID('dbo.v_stock_balance') IS NOT NULL DROP VIEW dbo.v_stock_balance;
+-- 单据状态2(金蝶同步列)由已删除的数据装载脚本创建,DDL 未入链——此处幂等补列,保证链可重放
+IF COL_LENGTH('dbo.bd_purchase_in', N'单据状态2') IS NULL ALTER TABLE bd_purchase_in ADD [单据状态2] nvarchar(20) NULL;
+IF COL_LENGTH('dbo.bd_sale_out', N'单据状态2') IS NULL ALTER TABLE bd_sale_out ADD [单据状态2] nvarchar(20) NULL;
+GO
 EXEC(N'
 CREATE VIEW dbo.v_stock_balance AS
 WITH movements AS (

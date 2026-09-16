@@ -32,7 +32,9 @@ WHILE @@FETCH_STATUS = 0 BEGIN
   DECLARE @sql nvarchar(max) = N'IF COL_LENGTH(''dbo.' + @t + ''', ''' + @o + ''') IS NOT NULL EXEC sp_rename ''dbo.' + @t + '.' + @o + ''', N''' + @n + ''', ''COLUMN'';';
   EXEC(@sql);
   UPDATE yj_field SET col_name = @n, label = @n WHERE panel_code IN ('PURCHASE_IN','SALE_OUT') AND col_name = @o;
-  UPDATE yj_translation SET ref_key = @n WHERE scope = 'field' AND ref_key = @o;
+  -- 幂等守卫:目标词条已存在(先前链上已建同中文键)时跳过改名,防 UPDATE 撞 uq_translation
+  UPDATE yj_translation SET ref_key = @n WHERE scope = 'field' AND ref_key = @o
+    AND NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope = 'field' AND ref_key = @n);
   FETCH NEXT FROM rc INTO @o, @n, @t;
 END
 CLOSE rc; DEALLOCATE rc;
