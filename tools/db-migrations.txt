@@ -299,3 +299,9 @@ migrate-hide-empty-fields.sql
 # —— 2026-09-16 登记:隐藏英文标签字段 + 全 false/0 布尔字段 ——
 # 英文标签 18 个(group_id/价格等级-id/国家-id/商品id/源单id 等)+ 布尔全零 8 个(是否启用保质期/称重/序列号管理/自制/倒冲领料/辅助属性 + 自动抵扣预收款×2)。
 migrate-hide-junk-fields.sql
+
+# —— 2026-09-16 登记:采购入库/销售出库面板字段与接口并集对应(不含同步) ——
+# 探针实测:pur_inbound 头92+行83键、sal_out_bound 头90+行107键+物流子表7键;
+# 生成器 _gen-inbound-outbound.mjs:头补86/87列、行补66/89列(标签=订单已验证覆盖表);
+# id/创建修改/附件/费用分录默认隐藏;EXTRA/EXTRA_LINES 已备好但 sync-core 未接(待同步脚本特殊要求)。
+migrate-inbound-outbound-fields.sql
