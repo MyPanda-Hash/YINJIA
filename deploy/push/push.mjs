@@ -191,14 +191,31 @@ async function runOnce() {
     if (PROBE) { log('探测模式'); return; }
 
     await loadCache(token);
-    let totalOk = 0, totalFail = 0;
+
+    // ── 防重复:拉取金蝶已有的单号集合 ──
+    const existingNos = new Set();
+    for (const doc of PUSH_DOCS) {
+      try {
+        let page = 1;
+        for (;;) {
+          const r = await kingdeeGet(cfg.kingdee, token, doc.apiPath, { page: String(page), page_size: '200' });
+          for (const row of (r.rows || [])) existingNos.add(doc.code + '|' + String(row.bill_no || ''));
+          if (!r.rows || r.rows.length < 200 || page > 20) break;
+          page++;
+        }
+      } catch { /* 忽略 */ }
+    }
+    log(`金蝶已有单号: ${existingNos.size} 个(防重复)`);
+
+    let totalOk = 0, totalFail = 0, totalSkip = 0;
 
     for (const doc of PUSH_DOCS) {
-      // 增量:asp_user1 ≠ 'mes-push'
+      // 增量:asp_user1 ≠ 'mes-push' 且 单据状态 = 已审核(草稿不上传)
       const exclude = INCLUDE_SYNCED ? '' : `AND t.单据编号 NOT LIKE '${doc.code === 'PUR_IN' ? 'CGRK' : 'XSCK'}-%'`;
       const heads = (await pool.request().query(`
         SELECT * FROM dbo.[${doc.headTable}] t
         WHERE ISNULL(t.asp_cancel,'N')<>'Y' AND ISNULL(t.asp_user1,'')<>'${N_PUSH}'
+          AND t.单据状态 = N'已审核'
           AND t.单据编号 NOT LIKE 'PI-%' AND t.单据编号 NOT LIKE 'TEST-%' ${exclude}
         ORDER BY t.asp_time1 DESC`)).recordset;
       if (!heads.length) { log(`【${doc.label}】无待推送`); continue; }
@@ -206,8 +223,23 @@ async function runOnce() {
 
       for (const h of heads) {
         const no = String(h.单据编号).replace(/'/g, "''");
+
+        // 防重复:金蝶已有该单号 → 跳过并标记
+        if (existingNos.has(doc.code + '|' + String(h.单据编号))) {
+          log(`  ⏭ ${h.单据编号}: 金蝶已存在,跳过`);
+          await pool.request().query(`UPDATE dbo.[${doc.headTable}] SET asp_user1='${N_PUSH}' WHERE 单据编号='${no}'`);
+          totalSkip++; continue;
+        }
+        // MES 备注里已有金蝶单号标记 → 跳过
+        if (/\[金蝶:[^\]]+\]/.test(String(h.备注 || ''))) {
+          log(`  ⏭ ${h.单据编号}: 已推送过(备注有标记),跳过`);
+          await pool.request().query(`UPDATE dbo.[${doc.headTable}] SET asp_user1='${N_PUSH}' WHERE 单据编号='${no}'`);
+          totalSkip++; continue;
+        }
+
         const lines = (await pool.request().query(`
           SELECT * FROM dbo.[${doc.lineTable}] WHERE 单据编号='${no}' AND ISNULL(asp_cancel,'N')<>'Y'`)).recordset;
+        if (!lines.length) { log(`  ⏭ ${h.单据编号}: 无明细行,跳过`); totalSkip++; continue; }
 
         // 确保基础资料
         let allOk = true;
@@ -216,35 +248,35 @@ async function runOnce() {
         }
         if (!allOk) { log(`  ✗ ${h.单据编号}: 基础资料无法创建`); totalFail++; continue; }
 
-        // 全量映射:头(核心 + EXTRA 全量) + 行(核心 + EXTRA_LINES 全量)
-        const head = { ...revMap(h, EXTRA[doc.extraKey]), ...doc.headBase(h) };
+        // 全量映射:头(bill_no 确保在) + EXTRA 全量 + 行
+        const head = { bill_no: String(h.单据编号 || ''), ...revMap(h, EXTRA[doc.extraKey]), ...doc.headBase(h) };
+        head.bill_no = String(h.单据编号 || ''); // 再次确保降级不丢
         head.material_entity = lines.map((l) => ({ ...revMap(l, EXTRA_LINES[doc.extraKey]), ...doc.lineBase(l) }));
 
-        log(`  → ${h.单据编号} (${lines.length} 行, 头${Object.keys(head).length - 1}键 行${Object.keys(head.material_entity[0] || {}).length}键)`);
+        log(`  → ${h.单据编号} (${lines.length} 行, 头${Object.keys(head).length - 1}键)`);
 
-        if (DRY_RUN) { log(`    [dry-run] ${JSON.stringify(head).slice(0, 300)}...`); totalOk++; continue; }
+        if (DRY_RUN) { log(`    [dry-run] bill_no=${head.bill_no}`); totalOk++; continue; }
 
         let r = await kingdeePost(cfg.kingdee, token, doc.apiPath, {}, head);
-        // 渐进降级:全量 → 去引用 → 核心
+        // 渐进降级
         if (!r.ok && /源单未审核|源单.*删除/.test(String(r.error || ''))) {
-          // 第1降:去掉 src_* 引用(跨沙箱源单不存在),保留其余全量字段
-          log(`    [降1] 源单引用跨沙箱,去 src_* 字段重试`);
+          log(`    [降1] 去 src_* 引用`);
           const noSrc = { ...head };
           for (const k of Object.keys(noSrc)) if (/^src_/.test(k)) delete noSrc[k];
           for (const ln of (noSrc.material_entity || [])) for (const k of Object.keys(ln)) if (/^src_/.test(k)) delete ln[k];
           r = await kingdeePost(cfg.kingdee, token, doc.apiPath, {}, noSrc);
         }
         if (!r.ok && /invalid value|proto/.test(String(r.error || ''))) {
-          // 第2降:类型冲突,退到核心字段
-          log(`    [降2] 类型冲突,退到核心字段`);
-          const basicHead = doc.headBase(h);
+          log(`    [降2] 类型冲突,退核心(保留 bill_no)`);
+          const basicHead = { bill_no: String(h.单据编号 || ''), ...doc.headBase(h) };
+          basicHead.bill_no = String(h.单据编号 || '');
           basicHead.material_entity = lines.map((l) => doc.lineBase(l));
           r = await kingdeePost(cfg.kingdee, token, doc.apiPath, {}, basicHead);
         }
         if (!r.ok && /数据不存在/.test(String(r.error || ''))) {
-          // 第3降:基础资料引用不存在(业务员/部门等),退到核心字段
-          log(`    [降3] 基础资料引用不存在,退到核心字段`);
-          const basicHead = doc.headBase(h);
+          log(`    [降3] 基础资料不存在,退核心(保留 bill_no)`);
+          const basicHead = { bill_no: String(h.单据编号 || ''), ...doc.headBase(h) };
+          basicHead.bill_no = String(h.单据编号 || '');
           basicHead.material_entity = lines.map((l) => doc.lineBase(l));
           r = await kingdeePost(cfg.kingdee, token, doc.apiPath, {}, basicHead);
         }
@@ -254,7 +286,8 @@ async function runOnce() {
           await pool.request().query(`
             UPDATE dbo.[${doc.headTable}] SET asp_user1='${N_PUSH}' ${kn ? `, 备注=ISNULL(备注,'')+N' [金蝶:${kn}]'` : ''}
             WHERE 单据编号='${no}'`);
-          log(`    ✓ → ${kn || '(无单号返回)'}`);
+          existingNos.add(doc.code + '|' + String(kn || h.单据编号));
+          log(`    ✓ → ${kn || '(金蝶自动编号)'}`);
           totalOk++;
         } else {
           log(`    ✗ ${String(r.error || '').slice(0, 120)}`);
@@ -262,7 +295,7 @@ async function runOnce() {
         }
       }
     }
-    log(`\n=== 推送完成: 成功 ${totalOk}, 失败 ${totalFail} ===`);
+    log(`\n=== 完成: 成功 ${totalOk}, 失败 ${totalFail}, 跳过 ${totalSkip} ===`);
   } catch (e) { log(`FATAL: ${e.message}`); }
   running = false;
 }
