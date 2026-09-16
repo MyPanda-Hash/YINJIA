@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // push-inbound-outbound.mjs — MES → 金蝶 增量推送(采购入库 + 销售出库)
-// 方向:MES 本地新建/修改的单据 → 推送到金蝶云·星辰(写入沙箱测试)
+// 方向:MES 本地新建的单据 → 推送到金蝶云·星辰沙箱
 // 增量口径:asp_user1 = 'mes-push' 标记已推送;未标记的 = 待推送
+// 推送前自动同步缺失的基础资料(供应商/客户/商品/仓库)到沙箱
 // 用法:
 //   node push-inbound-outbound.mjs              # 推送(交互确认)
 //   node push-inbound-outbound.mjs --yes        # 推送(跳过确认)
@@ -12,14 +13,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PARENT = join(HERE, '..'); // deploy/ 根(共用 kingdee-client,不改原脚本)
+const PARENT = join(HERE, '..');
 const args = new Set(process.argv.slice(2));
 const DRY_RUN = args.has('--dry-run');
 const PROBE = args.has('--probe');
 const SKIP_CONFIRM = args.has('--yes');
 
 const cfgPath = join(HERE, 'config.json');
-if (!existsSync(cfgPath)) { console.error('缺少 push/config.json(推送专用沙箱配置)'); process.exit(1); }
+if (!existsSync(cfgPath)) { console.error('缺少 push/config.json'); process.exit(1); }
 const cfg = JSON.parse(readFileSync(cfgPath, 'utf8'));
 
 // ── 日志 ──
@@ -32,7 +33,7 @@ const log = (msg) => {
   appendFileSync(LOG_FILE, line + '\n', 'utf8');
 };
 
-// ── 金蝶客户端(复用 deploy/ 根的 kingdee-client.mjs,不改动原文件) ──
+// ── 金蝶客户端 ──
 const { fetchAppToken, kingdeeGet, kingdeePost } = await import(pathToFileURL(join(PARENT, 'kingdee-client.mjs')).href);
 
 // ── 数据库 ──
@@ -46,60 +47,112 @@ await pool.connect();
 
 const N_PUSH_USER = 'mes-push';
 
-// ══ MES → 金蝶 字段映射(反向:中文列 → API 键) ══
-function mapPurInboundHead(h) {
+// ══ 基础资料缓存(沙箱已有的编码集合) ══
+const sandboxCache = { supplier: new Set(), customer: new Set(), material: new Set(), store: new Set() };
+
+async function loadSandboxBasics(token) {
+  const tasks = [
+    ['supplier', '/jdy/v2/bd/supplier', 200],
+    ['customer', '/jdy/v2/bd/customer', 200],
+    ['material', '/jdy/v2/bd/material', 200],
+    ['store', '/jdy/v2/bd/store', 50],
+  ];
+  for (const [key, path, pageSize] of tasks) {
+    try {
+      let page = 1;
+      for (;;) {
+        const r = await kingdeeGet(cfg.kingdee, token, path, { page: String(page), page_size: String(pageSize) });
+        for (const row of (r.rows || [])) sandboxCache[key].add(String(row.number));
+        if (!r.rows || r.rows.length < pageSize || page > 50) break;
+        page++;
+      }
+      log(`  沙箱${key}缓存: ${sandboxCache[key].size} 个编码`);
+    } catch (e) { log(`  沙箱${key}缓存失败: ${e.message.slice(0, 60)}`); }
+  }
+}
+
+/** 确保基础资料存在(不存在则创建),返回 true=可用 */
+async function ensureBasic(token, type, number, name, extra = {}) {
+  if (!number) return false;
+  if (sandboxCache[type].has(String(number))) return true;
+  const paths = { supplier: '/jdy/v2/bd/supplier', customer: '/jdy/v2/bd/customer', material: '/jdy/v2/bd/material', store: '/jdy/v2/bd/store' };
+  let body = { number: String(number), name: String(name || number) };
+  // 商品创建必须带单位 ID(实测 base_unit_number 无效,须用 base_unit_id)
+  if (type === 'material') {
+    const unitId = await getDefaultUnitId(token);
+    if (!unitId) { log(`    ✗ 无可用计量单位,无法创建商品 ${number}`); return false; }
+    body = { ...body, base_unit_id: unitId, purchase_unit_id: unitId, sale_unit_id: unitId, store_unit_id: unitId };
+  }
+  const r = await kingdeePost(cfg.kingdee, token, paths[type], {}, body);
+  if (r.ok) {
+    sandboxCache[type].add(String(number));
+    log(`    + 沙箱创建${type}: ${number}(${name})`);
+    return true;
+  }
+  log(`    ✗ 沙箱创建${type}失败: ${number} → ${r.error?.slice(0, 80)}`);
+  return false;
+}
+
+/** 取沙箱默认计量单位 ID(取第一个;可按 MES 单位名匹配优化) */
+let cachedUnitId = null;
+async function getDefaultUnitId(token) {
+  if (cachedUnitId) return cachedUnitId;
+  try {
+    const r = await kingdeeGet(cfg.kingdee, token, '/jdy/v2/bd/measure_unit', { page: '1', page_size: '5' });
+    const unit = (r.rows || []).find((u) => u.number === '个') || (r.rows || [])[0];
+    if (unit) { cachedUnitId = unit.id; return cachedUnitId; }
+  } catch { /* 忽略 */ }
+  return null;
+}
+
+// ══ MES → 金蝶 字段映射 ══
+function mapPurHead(h) {
   return {
-    bill_date: h.单据日期 || '',
-    trans_type: '2', // 采购入库
-    supplier_number: h.供应商编码 || '',
-    emp_number: h.经手人编码 || '',
-    remark: h.备注 || '',
-    bill_status: h.单据状态 === '已审核' ? 'C' : 'A',
+    bill_date: String(h.单据日期 || '').slice(0, 10),
+    trans_type: '2',
+    supplier_number: String(h.供应商编码 || ''),
+    remark: String(h.备注 || ''),
   };
 }
-function mapPurInboundLines(lines) {
+function mapPurLines(lines) {
   return (lines || []).map((l) => ({
-    material_number: l.存货编码 || '',
+    material_number: String(l.存货编码 || ''),
     qty: Number(l.实收数量) || 0,
-    unit_number: '',
     price: Number(l.单价) || 0,
     cess: Number(l['税率%']) || 0,
-    stock_number: l.仓库编码 || '',
-    batch_no: l.批号 || '',
-    comment: l.备注 || '',
+    stock_number: String(l.仓库编码 || ''),
+    batch_no: String(l.批号 || ''),
+    comment: String(l.备注 || ''),
   }));
 }
-function mapSaleOutHead(h) {
+function mapSaleHead(h) {
   return {
-    bill_date: h.单据日期 || '',
-    trans_type: '2', // 销售出库
-    customer_number: h.客户编码 || '',
-    emp_number: h.经手人编码 || '',
-    remark: h.备注 || '',
-    bill_status: h.单据状态 === '已审核' ? 'C' : 'A',
+    bill_date: String(h.单据日期 || '').slice(0, 10),
+    trans_type: '2',
+    customer_number: String(h.客户编码 || ''),
+    remark: String(h.备注 || ''),
   };
 }
-function mapSaleOutLines(lines) {
+function mapSaleLines(lines) {
   return (lines || []).map((l) => ({
-    material_number: l.存货编码 || '',
+    material_number: String(l.存货编码 || ''),
     qty: Number(l.数量) || 0,
-    unit_number: '',
     price: Number(l.售价) || 0,
     cess: Number(l['税率%']) || 0,
-    stock_number: l.仓库编码 || '',
-    batch_no: l.批号 || '',
-    comment: l.备注 || '',
+    stock_number: String(l.仓库编码 || ''),
+    batch_no: String(l.批号 || ''),
+    comment: String(l.备注 || ''),
   }));
 }
 
 // ══ 拉取 MES 待推送数据 ══
-async function fetchPending(panelCode, headTable, lineTable) {
-  // 增量:asp_user1 不是 'mes-push' 且未作废的单据
+async function fetchPending(headTable, lineTable) {
   const heads = (await pool.request().query(`
     SELECT * FROM dbo.[${headTable}] t
-    WHERE ISNULL(t.asp_cancel,'N') <> 'Y'
-      AND ISNULL(t.asp_user1,'') <> '${N_PUSH_USER}'
+    WHERE ISNULL(t.asp_cancel,'N') <> 'Y' AND ISNULL(t.asp_user1,'') <> '${N_PUSH_USER}'
+      AND t.单据编号 NOT LIKE 'PI-%' AND t.单据编号 NOT LIKE 'CGRK-%' AND t.单据编号 NOT LIKE 'XSCK-%'
     ORDER BY t.asp_time1 DESC`)).recordset;
+  // ↑ 排除已从金蝶同步过来的单(CGRK/XSCK 前缀)和手工测试单(PI 前缀)
   if (!heads.length) return [];
   const out = [];
   for (const h of heads) {
@@ -110,30 +163,28 @@ async function fetchPending(panelCode, headTable, lineTable) {
   return out;
 }
 
-// ══ 推送到金蝶 ══
-async function pushToKingdee(token, panelCode, apiPath, docs) {
-  let ok = 0, fail = 0;
-  for (const doc of docs) {
-    const body = doc.mapped; // 无包装:直接平铺(实测 data 包装会导致 material_entity 解析不到)
-    log(`  → 推送 ${doc.head.单据编号} ...`);
-    if (DRY_RUN) { log(`    [dry-run] 跳过`); ok++; continue; }
-    const r = await kingdeePost(cfg.kingdee, token, apiPath, {}, body);
-    if (r.ok) {
-      ok++;
-      // 标记已推送 + 回写金蝶单号
-      const kdeeId = String(r.data?.ids?.[0] || '');
-      const kdeeNo = String(Object.values(r.data?.id_number_map || {})[0] || '');
-      await pool.request().query(`
-        UPDATE dbo.[${doc.headTable}] SET asp_user1 = '${N_PUSH_USER}'
-          ${kdeeNo ? `, 备注 = ISNULL(备注,'') + N' [金蝶:${kdeeNo}]'` : ''}
-        WHERE 单据编号 = '${String(doc.head.单据编号).replace(/'/g, "''")}'`);
-      log(`    ✓ 成功 → 金蝶单号: ${kdeeNo || kdeeId || '(未返回)'}`);
-    } else {
-      fail++;
-      log(`    ✗ 失败: ${r.error}`);
-    }
+// ══ 推送单据 ══
+async function pushDoc(token, headTable, apiPath, doc, mapped, basics) {
+  // 确保基础资料存在
+  for (const b of basics) {
+    const ok = await ensureBasic(token, b.type, b.number, b.name);
+    if (!ok) { log(`  ✗ ${doc.head.单据编号}: 基础资料 ${b.type}:${b.number} 无法创建,跳过`); return false; }
   }
-  return { ok, fail };
+  log(`  → ${doc.head.单据编号} (${doc.lines.length} 行)`);
+  if (DRY_RUN) { log(`    [dry-run] body: ${JSON.stringify(mapped).slice(0, 200)}`); return true; }
+  const r = await kingdeePost(cfg.kingdee, token, apiPath, {}, mapped);
+  if (r.ok) {
+    const kdeeNo = String(Object.values(r.data?.id_number_map || {})[0] || '');
+    const kdeeId = String(r.data?.ids?.[0] || '');
+    await pool.request().query(`
+      UPDATE dbo.[${headTable}] SET asp_user1 = '${N_PUSH_USER}'
+        ${kdeeNo ? `, 备注 = ISNULL(备注,'') + N' [金蝶:${kdeeNo}]'` : ''}
+      WHERE 单据编号 = '${String(doc.head.单据编号).replace(/'/g, "''")}'`);
+    log(`    ✓ → 金蝶单号: ${kdeeNo || kdeeId}`);
+    return true;
+  }
+  log(`    ✗ ${r.error?.slice(0, 120)}`);
+  return false;
 }
 
 // ══ 主流程 ══
@@ -141,70 +192,58 @@ async function main() {
   log(`=== MES → 金蝶 推送${DRY_RUN ? '(dry-run)' : ''} ===`);
   log(`沙箱: clientId=${cfg.kingdee.clientId} domain=${cfg.kingdee.domain}`);
 
-  // 1. 探测连通
   let token;
   try {
     const { token: t } = await fetchAppToken(cfg.kingdee);
     token = t;
-    log(`✓ 沙箱连通 (app-token 获取成功)`);
-  } catch (e) {
-    log(`✗ 沙箱连接失败: ${e.message}`);
-    process.exit(1);
-  }
+    log(`✓ 沙箱连通`);
+  } catch (e) { log(`✗ 连接失败: ${e.message}`); process.exit(1); }
 
   if (PROBE) { log('探测模式,退出'); await pool.close(); return; }
 
-  // 2. 探测写入接口是否存在
-  for (const [path, label] of [
-    ['/jdy/v2/scm/pur_inbound', '采购入库保存(POST)'],
-    ['/jdy/v2/scm/sal_out_bound', '销售出库保存(POST)'],
-  ]) {
-    const test = await kingdeePost(cfg.kingdee, token, path, {}, { data: {} });
-    const err = String(test.error || '');
-    const canUse = test.ok || /参数|字段|必填|不能为空|data/i.test(err);
-    log(`  ${label} [POST ${path}]: ${canUse ? '✓ 接口可达' : `不可达 (${err.slice(0, 80)})`}`);
-  }
+  // 加载沙箱基础资料缓存
+  log('── 加载沙箱基础资料 ──');
+  await loadSandboxBasics(token);
 
-  // 3. 拉取待推送数据
-  const purDocs = await fetchPending('PURCHASE_IN', 'bd_purchase_in', 'bl_purchase_in');
-  const saleDocs = await fetchPending('SALE_OUT', 'bd_sale_out', 'bl_sale_out');
-  log(`待推送: 采购入库 ${purDocs.length} 单, 销售出库 ${saleDocs.length} 单`);
-
+  // 拉取待推送(只推 MES 手工建的,排除金蝶同步来的)
+  const purDocs = await fetchPending('bd_purchase_in', 'bl_purchase_in');
+  const saleDocs = await fetchPending('bd_sale_out', 'bl_sale_out');
+  log(`\n待推送(仅MES手工单): 采购入库 ${purDocs.length} 单, 销售出库 ${saleDocs.length} 单`);
   if (!purDocs.length && !saleDocs.length) { log('无待推送数据'); await pool.close(); return; }
 
-  // 4. 确认
   if (!SKIP_CONFIRM && !DRY_RUN) {
-    const total = purDocs.length + saleDocs.length;
-    log(`⚠ 即将向沙箱推送 ${total} 张单据, 3 秒后开始...`);
+    log(`⚠ 即将推送 ${purDocs.length + saleDocs.length} 张单据, 3 秒后开始...`);
     await new Promise((r) => setTimeout(r, 3000));
   }
 
-  // 5. 推送
-  let totalOk = 0, totalFail = 0;
+  let ok = 0, fail = 0;
 
-  if (purDocs.length) {
-    log(`\n══ 采购入库 ══`);
-    const mapped = purDocs.map((d) => ({
-      head: d.head, headTable: 'bd_purchase_in',
-      mapped: { ...mapPurInboundHead(d.head), material_entity: mapPurInboundLines(d.lines) },
-    }));
-    const r = await pushToKingdee(token, 'PURCHASE_IN', '/jdy/v2/scm/pur_inbound', mapped);
-    totalOk += r.ok; totalFail += r.fail;
+  for (const doc of purDocs) {
+    const mapped = { ...mapPurHead(doc.head), material_entity: mapPurLines(doc.lines) };
+    // 供应商 + 每行的商品/仓库
+    const basics = [{ type: 'supplier', number: doc.head.供应商编码, name: doc.head.供应商 }];
+    for (const l of doc.lines) {
+      if (l.存货编码) basics.push({ type: 'material', number: l.存货编码, name: l.存货名称 });
+      if (l.仓库编码) basics.push({ type: 'store', number: l.仓库编码, name: l.仓库 });
+    }
+    const r = await pushDoc(token, 'bd_purchase_in', '/jdy/v2/scm/pur_inbound', doc, mapped, basics);
+    r ? ok++ : fail++;
   }
 
-  if (saleDocs.length) {
-    log(`\n══ 销售出库 ══`);
-    const mapped = saleDocs.map((d) => ({
-      head: d.head, headTable: 'bd_sale_out',
-      mapped: { ...mapSaleOutHead(d.head), material_entity: mapSaleOutLines(d.lines) },
-    }));
-    const r = await pushToKingdee(token, 'SALE_OUT', '/jdy/v2/scm/sal_out_bound', mapped);
-    totalOk += r.ok; totalFail += r.fail;
+  for (const doc of saleDocs) {
+    const mapped = { ...mapSaleHead(doc.head), material_entity: mapSaleLines(doc.lines) };
+    const basics = [{ type: 'customer', number: doc.head.客户编码, name: doc.head.客户 }];
+    for (const l of doc.lines) {
+      if (l.存货编码) basics.push({ type: 'material', number: l.存货编码, name: l.存货名称 });
+      if (l.仓库编码) basics.push({ type: 'store', number: l.仓库编码, name: l.仓库 });
+    }
+    const r = await pushDoc(token, 'bd_sale_out', '/jdy/v2/scm/sal_out_bound', doc, mapped, basics);
+    r ? ok++ : fail++;
   }
 
-  log(`\n=== 推送完成: 成功 ${totalOk}, 失败 ${totalFail} ===`);
+  log(`\n=== 完成: 成功 ${ok}, 失败 ${fail} ===`);
   await pool.close();
-  if (totalFail > 0) process.exitCode = 2;
+  if (fail > 0) process.exitCode = 2;
 }
 
 main().catch(async (e) => { log(`FATAL: ${e.message}`); try { await pool.close(); } catch {} process.exit(1); });

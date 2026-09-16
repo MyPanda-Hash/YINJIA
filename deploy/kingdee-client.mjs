@@ -189,8 +189,11 @@ export async function kingdeePost(cfg, token, path, params, body) {
         body: JSON.stringify(body || {}),
       });
       if (res.status === 429) throw new Error('HTTP 429 已被限流(账套级 500次/分钟)');
+      const json = await res.json().catch(() => ({})); // 即使非200也尝试读响应体(金蝶错误详情在body里)
+      if (json.errcode !== undefined && json.errcode !== 0) {
+        return { ok: false, error: `errcode=${json.errcode} ${json.description || json.description_cn || ''} [POST ${path}]`, raw: json };
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText}`);
-      const json = await res.json();
       if (json.errcode !== 0) return { ok: false, error: `errcode=${json.errcode} ${json.description || ''} [POST ${path}]`, raw: json };
       return { ok: true, data: json.data, raw: json };
     } catch (e) {
