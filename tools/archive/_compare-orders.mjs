@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { DOCS } from '../../deploy/sync-core.mjs';
+import { EXTRA } from '../../deploy/kingdee-extra-fields.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const api = JSON.parse(readFileSync(join(HERE, '_archive-fields.json'), 'utf8'));
@@ -44,6 +45,8 @@ for (const code of ['SO_ORDER', 'PU_ORDER']) {
   const mapped = new Set([...Object.entries(head), ...Object.entries(line0)]
     .filter(([k, v]) => !k.startsWith('__') && v !== null && v !== undefined && !ALLOW.has(k))
     .map(([k]) => k));
+  // 全并集自动映射(EXTRA)的列与键计入
+  for (const e of EXTRA[code] || []) { mapped.add(e.c); }
   const panel = panelCols.get(code) || new Set();
   console.log(`\n══ ${doc.label} ${code} ══`);
   console.log(`  文档并集(列表∪详情): ${apiKeys.size} 键 | 映射实际写入(非空): ${mapped.size} 键 | 面板注册: ${panel.size} 字段`);
@@ -52,8 +55,8 @@ for (const code of ['SO_ORDER', 'PU_ORDER']) {
   if (notInPanel.length) { console.log(`  ✗ 映射写入但面板未注册(${notInPanel.length}): ${notInPanel.join(', ')}`); fail += notInPanel.length; }
   if (notFed.length) { console.log(`  ✗ 面板有但映射不写(${notFed.length}): ${notFed.join(', ')}`); fail += notFed.length; }
   if (!notInPanel.length && !notFed.length) console.log('  ✓ 映射写入与面板字段完全一致');
-  // 未覆盖的接口键分类(按 api→已映射 清单)
-  const covered = new Set(API_MAPPED[code] || []);
+  // 未覆盖的接口键分类(按 api→已映射 清单 + EXTRA)
+  const covered = new Set([...(API_MAPPED[code] || []), ...(EXTRA[code] || []).map((e) => e.a)]);
   const un = [...apiKeys].filter((k) => !covered.has(k));
   const ids = un.filter((k) => /(_id|_number)$/.test(k) && !/name$/.test(k));
   const arrs = un.filter((k) => Array.isArray((rec?.detailFull || {})[k]));

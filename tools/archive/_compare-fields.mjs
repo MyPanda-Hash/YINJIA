@@ -9,6 +9,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { DOCS } from '../../deploy/sync-core.mjs';
+import { EXTRA } from '../../deploy/kingdee-extra-fields.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const verbose = process.argv.includes('--verbose');
@@ -107,6 +108,8 @@ for (const [code, spec] of Object.entries(SPEC)) {
     const apiOk = isSkip || apiKeys.has(realKey) || apiKeys.has(base) || subKeys.has(realKey) || realKey.includes('→') || realKey.startsWith('派生');
     if (!apiOk) { console.log(`[${code}] ①接口键不存在于真实响应: ${realKey}`); fail++; }
     if (!isSkip) coveredApi.add(base);
+    // 全并集自动映射(EXTRA)的键视为已覆盖、列视为已写出
+    for (const e of EXTRA[code] || []) { coveredApi.add(e.a); mappedKeys.add(e.c); }
     for (const mes of mesCols) {
       if (mes.includes('(')) { rows.push([code, realKey, mes, isSkip ? '锚点' : '派生']); continue; }
       const inPanel = panel.has(mes);

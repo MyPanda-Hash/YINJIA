@@ -16,6 +16,22 @@ import { dirname, join } from 'node:path';
 import { fetchAppToken, kingdeeGet } from './kingdee-client.mjs';
 import { makeLogger, confirmBatch, backupBeforeWrite } from './safety.mjs';
 import { setSecret, dec, cryptoStats, resetCryptoStats } from './kingdee-crypto.mjs';
+import { EXTRA } from './kingdee-extra-fields.mjs';
+
+/** 全并集自动映射(生成器产出):dec=解密 / join=数组拼接 / str=文本;键缺省置 null */
+function autoExtra(code, d) {
+  const list = EXTRA[code];
+  if (!list || !list.length) return {};
+  const out = {};
+  for (const e of list) {
+    const v = d ? d[e.a] : undefined;
+    if (v === undefined || v === null || v === '') { out[e.c] = null; continue; }
+    if (e.t === 'dec') out[e.c] = dec(v);
+    else if (e.t === 'join') out[e.c] = Array.isArray(v) ? JSON.stringify(v).slice(0, 450) : str(v);
+    else out[e.c] = str(v);
+  }
+  return out;
+}
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const N_SYNC_USER = '金蝶同步'; // 星辰审核人缺失时 yj_doc_status.shr 的兜底留痕
@@ -660,6 +676,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
           if (doc.archive) {
             const mapped = {
               ...doc.mapArchive(d, ctx),
+              ...autoExtra(doc.code, d),
               外部数据ID: str(d.id), 外部单据号: str(d.number),
               __创建时间: str(d.create_time),
             };
@@ -683,6 +700,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
           } else {
             const head = {
               ...doc.mapHead(d, ctx),
+              ...autoExtra(doc.code, d),
               外部数据ID: str(d.id),
               __创建时间: str(d.create_time),
               __已关闭: d.bill_close_state === 'S' || d.bill_close_state === 'H',
