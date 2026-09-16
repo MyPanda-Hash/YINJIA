@@ -328,3 +328,7 @@ migrate-redesign-inbound-outbound-detail.sql
 # 设计:存货/物料→INV(编码匹配/名称显示)、供应商→GFDA(dm/mc)、客户→KHDA(dm/mc)、仓库→WH(编码/名称)、经手人/业务员→EMP;
 # KHDA/GFDA/WH 补 query 位(参照弹窗搜索列);遗留 PARTNER 参照全部改为 KHDA/GFDA(3处)。
 migrate-doc-panel-references.sql
+
+# —— 2026-09-16 登记:时间/日期字段 data_type 改为「日期」,前端自动渲染日期选择器 ——
+# 所有面板字段名含 时间/日期/到期日 的(data_type 当前为「文本」)→ 改「日期」;isDateField() 识别后渲染 el-date-picker(与单据日期同款)。
+migrate-date-field-types.sql
