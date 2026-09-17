@@ -331,7 +331,7 @@ public class PanelConfigService {
         metadata.put("panelName", panelDisplay);
         metadata.put("panelCategory", def.category());
         // 报表查询弹窗入口(T+ 同款):进入面板先弹查询条件(日期段必填),关闭弹窗即退出页面;前端 PanelxList 消费
-        if ("STOCK_SUMMARY".equals(def.code())) metadata.put("reportQueryDialog", true);
+        if (List.of("STOCK_SUMMARY", "STOCK_LEDGER").contains(def.code())) metadata.put("reportQueryDialog", true);
         metadata.put("singleDoc", panelSingleDoc(def.code()));   // 见 yj_panel.config 的 singleDoc
         metadata.put("autoCodeField", doc ? autoCodeLabel(def) : null);
         // 保存即归档文书面板(真源 ButtonService.DOC_ARCHIVE_PANELS):前端据此放出
