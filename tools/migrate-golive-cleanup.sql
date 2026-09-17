@@ -1,12 +1,16 @@
 -- migrate-golive-cleanup.sql — 全量部署前清理(2026-09-14 定:下次部署=全量恢复备份,本地库必须为干净账)
--- 保留:基础档案(bs_*)、yj_* 元数据/用户/角色、ERP 同步销售订单(bd/bl_so_order)、期初库存(kucun 中 migration 建的行)
--- 清除:全部业务测试单据 + 单据状态 + 日志 + 号池(归零) + 批号流水 + 二维码登记
+-- 2026-09-16 适配当前库况:①qc_recv/qc_recv_detail 已随暂收入库单下线删除(移除清列);②补 sl_recv/sl_recv_detail(9-15 新表);
+-- ③补 erp_imp_log/erp_imp_row(转ERP审计,测试推送清);④bd/bl_pu_order 与 bd/bl_so_order 改按标记清理——
+--   金蝶同步真实单(asp_user1='jdy-sync')保留,admin 测试单与 migration 演示单清除(金蝶 PU 同步 9-15 起在跑,全删会误杀真实订单);
+-- ⑤yj_report_template(1行种子注册)与 bs_* 新档案表(bs_currency/bs_*_group 等)按政策保留不动。
+-- 保留:基础档案(bs_*)、yj_* 元数据/用户/角色、金蝶同步单据(pu/so 的 jdy-sync 行)、期初库存(kucun 中 migration 建的行)
+-- 清除:业务测试单据 + 单据状态 + 日志 + 号池(归零) + 批号流水 + 二维码登记
 -- ⚠ 破坏性脚本:执行前必须已做保险备份(HSDZ_MES_pre_golive_*.bak);服务器库勿直接执行本脚本
 SET NOCOUNT ON;
 
 -- ── 1. 行表先清(细节) ──
 DELETE FROM bl_pu_req;            DELETE FROM bd_pu_req;
-DELETE FROM bl_pu_order;          DELETE FROM bd_pu_order;
+DELETE FROM bl_pu_order WHERE asp_user1 <> N'jdy-sync';  DELETE FROM bd_pu_order WHERE asp_user1 <> N'jdy-sync';
 DELETE FROM bl_purchase_in;       DELETE FROM bd_purchase_in;
 DELETE FROM bl_sale_out;          DELETE FROM bd_sale_out;
 DELETE FROM bl_material_out;      DELETE FROM bd_material_out;
@@ -18,10 +22,13 @@ DELETE FROM bl_outsource_issue;   DELETE FROM bd_outsource_issue;
 DELETE FROM bl_outsource_order;   DELETE FROM bd_outsource_order;
 DELETE FROM bl_manu_order;        DELETE FROM bd_manu_order;
 DELETE FROM bl_dispatch;          DELETE FROM bd_dispatch;
--- 注意:bd_so_order/bl_so_order(星辰同步的真实销售订单)保留不清
+-- 金蝶星辰同步的真实订单(pu/so)按标记保留:jdy-sync 行留存,admin 测试/migration 演示行清除
+DELETE FROM bl_so_order WHERE asp_user1 <> N'jdy-sync';  DELETE FROM bd_so_order WHERE asp_user1 <> N'jdy-sync';
+-- 转ERP 推送审计(测试推送清)
+DELETE FROM erp_imp_row;          DELETE FROM erp_imp_log;
 
--- 品质
-DELETE FROM qc_recv_detail;  DELETE FROM qc_recv;
+-- 品质(qc_recv/qc_recv_detail 已于 2026-09-15 随暂收入库单下线删除,不再清列)
+DELETE FROM sl_recv_detail;       DELETE FROM sl_recv;      -- 送料暂收单(9-15 新表)
 DELETE FROM qc_insp_detail;  DELETE FROM qc_insp;
 DELETE FROM qc_return_detail; DELETE FROM qc_return;
 DELETE FROM qc_op_detail;    DELETE FROM qc_op;
