@@ -155,16 +155,9 @@ export const menuTree = [
           { code: 'outsourceIssueStats', title: '委外发料单统计表', path: '/panelx/list/OUTSOURCE_ISSUE_STATS', panelCode: 'OUTSOURCE_ISSUE_STATS', icon: 'Histogram' },
         ],
       },
-    ],
-  },
-  {
-    // 库存核算(参照 PANDA invAcct):三张核心库存报表集中入口
-    code: 'invAcct',
-    title: '库存核算',
-    icon: 'Box',
-    children: [
       {
-        code: 'invAcctReports',
+        // 库存报表(三张核心库存报表集中入口)
+        code: 'invReports',
         title: '库存报表',
         icon: 'DataAnalysis',
         children: [
