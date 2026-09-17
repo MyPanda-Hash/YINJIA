@@ -56,6 +56,12 @@ IF NOT EXISTS(SELECT 1 FROM yj_field WHERE panel_code='STOCK_SUMMARY' AND col_na
 -- 编码列/期次退出查询区(保留明细列;仓库/存货参照仍在查询区)
 UPDATE yj_field SET place = N'detail' WHERE panel_code='STOCK_SUMMARY' AND col_name IN (N'仓库编码', N'存货编码', N'期次');
 
+-- 仓库/存货 关联基础档案(data_type 必须=参照 才会下发 refPanel;此前是文本导致参照失效)
+UPDATE yj_field SET data_type = N'参照', ref_panel = N'WH', ref_field = N'仓库名称', display_field = N'仓库名称'
+WHERE panel_code='STOCK_SUMMARY' AND col_name = N'仓库';
+UPDATE yj_field SET data_type = N'参照', ref_panel = N'INV', ref_field = N'存货名称', display_field = N'存货名称'
+WHERE panel_code='STOCK_SUMMARY' AND col_name = N'存货';
+
 -- 译名(全局共享,缺则补)
 IF NOT EXISTS(SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'结束日期' AND locale='en')
   INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'结束日期', 'en', N'End date', 'manual');
