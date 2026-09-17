@@ -1,0 +1,23 @@
+单据编号|单据状态|是否已转ERP|ERP单号|转ERP操作人|转ERP时间
+FLOW-TEST-001|草稿|否|null|null|null
+PI-2026-09-0005|草稿|null|null|null|null
+PI-2026-09-0004|草稿|否|null|null|null
+PI-2026-09-0003|草稿|否|null|null|null
+BTN-TEST-001|已审核|是|BTN-TEST-001|admin|2026-09-16 18:26:14
+PI-2026-09-0002|草稿|否|null|null|null
+TEST-PUR-001|已审核|否|null|null|null
+CGRK-20260915-03213|已审核|是|CGRK-20260915-03213|admin|2026-09-16 20:47:57
+CGRK-20260915-03214|已审核|是|CGRK-20260915-03214|admin|2026-09-16 19:51:57
+CGRK-20260916-03215|已审核|否|null|null|null
+PI-2026-09-0001|草稿|否|null|null|null
+doc_no|shr|shsj
+BTN-TEST-001|管理员|2026-09-16 00:00:00.0
+CGRK-20260915-03213|蒋小刚|2026-09-16 09:12:56.0
+CGRK-20260915-03214|蒋小刚|2026-09-16 13:56:28.0
+CGRK-20260916-03215|null|null
+PI-2026-09-0001|null|null
+PI-2026-09-0002|null|null
+PI-2026-09-0003|null|null
+PI-2026-09-0004|null|null
+PI-2026-09-0005|null|null
+TEST-PUR-001|null|null

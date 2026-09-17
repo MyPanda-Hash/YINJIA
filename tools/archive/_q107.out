@@ -1,0 +1,12 @@
+src|单据编号|单据状态|是否已转ERP|ERP单号
+src|panel_code|doc_no|shr|shsj
+yj_doc_status|PURCHASE_IN|PI-2026-09-0001|null|null
+yj_doc_status|PURCHASE_IN|PI-2026-09-0002|null|null
+yj_doc_status|PURCHASE_IN|PI-2026-09-0003|null|null
+yj_doc_status|PURCHASE_IN|PI-2026-09-0004|null|null
+src|单据编号|是否已转ERP|ERP单号
+已审核|CGRK-20260916-03215|是|CGRK-20260916-03215
+已审核|CGRK-20260915-03214|是|CGRK-20260915-03214
+已审核|TEST-PUR-001|否|null
+已审核|CGRK-20260915-03213|是|CGRK-20260915-03213
+已审核|BTN-TEST-001|是|BTN-TEST-001

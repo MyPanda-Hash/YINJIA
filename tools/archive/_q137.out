@@ -1,0 +1,6 @@
+r
+qc_insp 头表列完整 ✓ (1 行)
+r
+qc_insp_detail 明细列完整 ✓ (0 行有型号/数量)
+r
+syncInspFromSlRecv UPDATE 语法 ✓

@@ -1,0 +1,11 @@
+panel_code|place|总|显示
+PURCHASE_IN|detail|77|15
+PURCHASE_IN|header|54|8
+PURCHASE_IN|query,detail|1|1
+PURCHASE_IN|query,header|5|5
+PURCHASE_IN|query,header,detail|1|1
+SALE_OUT|detail|105|14
+SALE_OUT|header|56|12
+SALE_OUT|query,detail|2|2
+SALE_OUT|query,header|5|4
+SALE_OUT|query,header,detail|1|1

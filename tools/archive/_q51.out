@@ -1,0 +1,4 @@
+field_count
+9
+panel_code|panel_name|mode|line_table|pk_col
+STOCK_BALANCE|库存状况表|flat|v_stock_balance|id

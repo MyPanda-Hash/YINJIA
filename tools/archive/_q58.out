@@ -1,0 +1,6 @@
+t|单据状态|
+bd_purchase_in|草稿|2
+bd_purchase_in.单据状态2|null|1
+bd_purchase_in.单据状态2|C|1
+bd_sale_out.单据状态|草稿|1
+bd_sale_out.单据状态2|C|1

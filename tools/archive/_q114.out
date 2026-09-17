@@ -1,0 +1,15 @@
+name|type|max_length
+comm|nvarchar|40
+kucun_no|nvarchar|28
+khdm|nvarchar|16
+wzdm|nvarchar|60
+ckdm|nvarchar|12
+lot_no|nvarchar|60
+color|nvarchar|60
+siz|nvarchar|60
+bz|nvarchar|200
+asp_user1|nvarchar|40
+asp_user2|nvarchar|40
+asp_user3|nvarchar|40
+asp_cancel|nvarchar|2
+asp_user4|nvarchar|40

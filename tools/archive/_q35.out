@@ -1,0 +1,17 @@
+panel_code|col_name|place
+PURCHASE_IN|单价|detail
+PURCHASE_IN|含税单价|detail
+PURCHASE_IN|金额|detail
+PURCHASE_IN|含税金额|detail
+PURCHASE_IN|批号|detail
+PURCHASE_IN|金额|header
+PURCHASE_IN|备注|header
+PURCHASE_IN|存货编码|query,detail
+SALE_OUT|存货编码|detail
+SALE_OUT|售价|detail
+SALE_OUT|含税售价|detail
+SALE_OUT|销售金额|detail
+SALE_OUT|含税销售金额|detail
+SALE_OUT|备注|header
+SALE_OUT|金额|header
+SALE_OUT|批号|query,detail

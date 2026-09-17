@@ -1,0 +1,8 @@
+name|col|tp
+bd_finish_in|单据日期|date
+bd_purchase_in|单据日期|date
+bd_sale_out|单据日期|date
+compatibility_level
+100
+ledger_ok
+24

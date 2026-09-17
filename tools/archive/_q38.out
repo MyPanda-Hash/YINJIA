@@ -1,0 +1,7 @@
+panel_code|col_name|label|place
+INV|存货编码|存货编码|query,detail
+INV|存货名称|存货名称|query,detail
+panel_code|panel_name
+GFDA|供应商
+KHDA|客户
+PARTNER|往来单位

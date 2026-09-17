@@ -1,0 +1,6 @@
+col_name|data_type|ref_panel|place
+仓库编码|文本|null|query,detail
+仓库|文本|WH|query,detail
+存货编码|文本|null|query,detail
+存货|文本|INV|query,detail
+单据类型|文本|null|query,detail

@@ -1,0 +1,11 @@
+单据编号|单据状态|push_flag|asp_time1|asp_time2
+CGRK-20260916-03215|已审核|mes-push|null|null
+PI-2026-09-0001|草稿|admin|2026-09-16 13:07:08.8777287|null
+CGRK-20260915-03214|已审核|mes-push|null|null
+TEST-PUR-001|已审核|mes-push|null|null
+CGRK-20260915-03213|已审核|mes-push|null|null
+单据编号|单据状态|push_flag|asp_time1|asp_time2
+XSCK-20270901-00001|已审核||null|null
+XSCK-20260917-00001|已审核||null|null
+XSCK-20260916-00003|已审核||null|null
+TEST-SALE-001|已审核|mes-push|null|null

@@ -1,0 +1,7 @@
+panel_code|panel_name|category|mode|line_table
+PURCHASE_IN_DETAIL|采购入库单明细表|报表|flat|v_purchase_in_detail
+SALE_OUT_STATS|销售出库单统计表|报表|flat|v_sale_out_stats
+STOCK_BALANCE|库存状况表|报表|flat|v_stock_balance
+STOCK_STATUS|库存状况|报表|flat|kucun
+WH_RECORD|无黑处理登记|生产管理|doc|wh_record_detail
+panel_code|col_name|place

@@ -1,0 +1,8 @@
+panel_code|col_name|label|ref_panel|ref_field|display_field
+PU_ORDER|物料编码|物料编码|INV|存货编码|存货名称
+PU_ORDER|物料名称|物料名称|INV|存货名称|存货名称
+PU_ORDER|供应商|供应商|PARTNER|往来单位名称|往来单位名称
+PU_ORDER|仓库|仓库|WH|仓库名称|仓库名称
+SO_ORDER|存货名称|存货名称|INV|存货名称|存货名称
+SO_ORDER|存货编码|存货编码|INV|存货编码|存货名称
+SO_ORDER|客户|客户|PARTNER|往来单位名称|往来单位名称

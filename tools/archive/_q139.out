@@ -1,0 +1,34 @@
+col_name|place|seq|data_type
+单据编号|query,header|10|文本
+单据日期|query,header|20|日期
+暂收单号|query,header|30|参照
+供应商|query,header|40|文本
+检验员|header|50|文本
+检验日期|header|60|日期
+检验方案|header|70|参照
+总结论|query,header|80|下拉框
+备注|header,detail|90|文本
+单据状态|query,header|100|文本
+审核人|header|110|文本
+审核时间|header|120|文本
+物料编码|query,detail|200|参照
+物料名称|detail|210|文本
+规格型号|detail|220|文本
+单位|detail|230|文本
+送检数量|detail|240|小数
+合格数量|detail|250|小数
+不合格数量|detail|260|小数
+处置方式|detail|270|下拉框
+批号|query,detail|280|文本
+name|tp|max_length
+物料描述|nvarchar|1000
+日期|nvarchar|40
+结案|nvarchar|20
+箱数|decimal|9
+部门|nvarchar|200
+部门名称|nvarchar|200
+ref_key|locale|text
+部门名称|en|Dept Name
+部门|en|Dept Name
+日期|en|Date
+入库单号|en|Receipt No.

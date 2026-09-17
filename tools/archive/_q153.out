@@ -1,0 +1,10 @@
+col_name|place|data_type|ref_panel|visible
+仓库编码|detail|文本|null|1
+仓库|detail|文本|WH|1
+存货编码|detail|文本|null|1
+存货|detail|文本|INV|1
+规格型号|detail|文本|null|1
+主计量|detail|文本|null|1
+现存量|detail|小数|null|1
+结存单价|detail|小数|null|1
+结存金额|detail|小数|null|1

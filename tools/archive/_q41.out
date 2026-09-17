@@ -1,0 +1,4 @@
+panel_code|col_name|ref_panel
+PURCHASE_IN|供应商编码|PARTNER
+SALE_OUT|客户编码|PARTNER
+SALE_OUT|结算客户|PARTNER

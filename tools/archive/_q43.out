@@ -1,0 +1,14 @@
+panel_code|place|col_name|data_type
+PURCHASE_IN|header|创建时间|日期
+PURCHASE_IN|header|修改时间|日期
+PURCHASE_IN|header|审核时间2|日期
+PURCHASE_IN|header|到期日|日期
+PURCHASE_IN|query,header|单据日期|日期
+SALE_OUT|query,header|单据日期|日期
+SALE_OUT|header|发货日期|日期
+SALE_OUT|header|验货日期|日期
+SALE_OUT|header|创建时间|日期
+SALE_OUT|header|审核时间2|日期
+SALE_OUT|header|修改时间|日期
+SALE_OUT|header|到期日|日期
+panel_code|place|col_name

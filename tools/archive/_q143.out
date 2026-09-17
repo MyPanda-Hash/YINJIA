@@ -1,0 +1,3 @@
+panel_code|col_name|label|data_type|place
+definition
+CREATE   VIEW v_purchase_in_detail AS SELECT h.*, l.[存货名称], l.[存货图片], l.[规格型号], l.[实收数量], l.[计量单位], l.[实收数量2], l.[计量单位2], l.[计量单位组合], l.[换算率], l.[单价], l.[税率%], l.[单价2], l.[含税单价2], l.[含税单价], l.[金额], l.[含税金额], l.[费用调整], l.[费用金额], l.[现存量], l.[现存量说明], l.[产成品图片] FROM bd_purchase_in h LEFT JOIN bl_purchase_in l ON h.[单据编号]=l.[单据编号]

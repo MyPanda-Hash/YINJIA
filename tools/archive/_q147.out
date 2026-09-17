@@ -1,0 +1,3 @@
+panel_code|col_name|data_type|ref_panel|ref_field|display_field|place
+STOCK_SUMMARY|仓库|文本|WH|仓库名称|仓库名称|query,detail
+STOCK_SUMMARY|存货|文本|INV|存货名称|存货名称|query,detail
