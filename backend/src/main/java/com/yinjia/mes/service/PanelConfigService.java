@@ -1131,19 +1131,23 @@ public class PanelConfigService {
     }
     // ---------- 表格列自定义 ----------
 
-    /** 保存列排序/栏名/显隐(更新 yj_field 的 seq/alias/visible) */
+    /** 保存列排序/栏名/显隐(更新 yj_field 的 seq/alias;显隐 hidden+visible 同开同关——
+     *  编辑表格按 hidden 过滤,只写 visible 会出现"取消勾选后字段仍在表格末尾显示"的不一致,
+     *  2026-09-17 对齐表头调整口径修复) */
     @SuppressWarnings("unchecked")
     public void saveColumnPrefs(String panelCode, List<Map<String, Object>> columns) {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
+        // 只在明细字段集合内匹配,防同名头/行字段(如 SO_ORDER 备注)误改头字段
+        List<PanelRegistry.FieldDef> details = def.fieldsAt("detail");
         for (int i = 0; i < columns.size(); i++) {
             Map<String, Object> col = columns.get(i);
             String label = String.valueOf(col.getOrDefault("label", ""));
             String alias = String.valueOf(col.getOrDefault("alias", ""));
             boolean visible = !Boolean.FALSE.equals(col.get("visible")) && !"false".equals(String.valueOf(col.get("visible")));
-            PanelRegistry.FieldDef fd = def.byLabel(label);
+            PanelRegistry.FieldDef fd = details.stream().filter(f -> f.label().equals(label)).findFirst().orElse(null);
             if (fd == null) continue;
-            jdbc.update("UPDATE yj_field SET seq = ?, alias = ?, visible = ? WHERE panel_code = ? AND col_name = ?",
-                    (i + 1) * 10, alias.isBlank() ? null : alias, visible, panelCode, fd.col());
+            jdbc.update("UPDATE yj_field SET seq = ?, alias = ?, hidden = ?, visible = ? WHERE panel_code = ? AND col_name = ?",
+                    (i + 1) * 10, alias.isBlank() ? null : alias, !visible, visible, panelCode, fd.col());
         }
         registry.reload();
     }
