@@ -370,3 +370,6 @@ migrate-erp-push-button.sql
 
 # —— 2026-09-16 来料检验单明细补齐SL_RECV联动列(物料描述/箱数/日期/结案/部门/部门名称/入库单号 7物理列 + 不良数量计算列=不合格数量;ButtonService同步/生入库/生退料三链路SQL需)+yj_field注册+en译名+列注明。幂等可重跑——
 migrate-qc-insp-sync-cols.sql
+
+# —— 2026-09-17 库存核算导航两报表——v_stock_ledger台账(8类出入库行级流水+窗口滚动结存)+v_stock_summary收发存汇总(仓库+存货+期次聚合,期初=期末-(收-发)真实口径);两面板注册+字段+en译名25条+视图注明;库存状况表仅菜单迁入不动库。幂等可重跑(视图先删后建)——
+migrate-inv-accounting.sql
