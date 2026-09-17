@@ -117,8 +117,16 @@ public class PushGenerateHandler implements PanelActionHandler {
         }
         targetHead.put("来源单据", srcDef.name());
         targetHead.put("来源单号", sourceNo);
-        // 新建兜底(对齐 PANDA insertGenerated):单据日期缺省当天(来源无该字段时,如 加工单→产成品入库)
-        targetHead.putIfAbsent("单据日期", java.time.LocalDate.now().toString());
+        // 单据日期=创建当日,不继承来源单日期(2026-09-17 用户口径)。注意:head 键=目标字段标签
+        // (save 按标签映射列),而 yj_panel.date_col 是列名(如 SL_RECV 列=单据日期/标签=日期),
+        // 故先按列名反查目标字段再用其标签写入;查不到时兜底「单据日期」标签。
+        PanelRegistry.PanelDef tgtDef = registry.panel(target);
+        String dateLabel = "单据日期";
+        if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
+            PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
+            if (df != null) dateLabel = df.label();
+        }
+        targetHead.put(dateLabel, java.time.LocalDate.now().toString());
 
         List<Map<String, Object>> targetItems = new ArrayList<>();
         for (Map<String, Object> item : items) {

@@ -431,7 +431,8 @@ public class ButtonService {
      * 送料暂收单(SL_RECV)保存后,同步修改由它生成的来料检验单(QC_INSP):
      * - 关联 = form_flow_link(SL_RECV→QC_INSP,ACTIVE,生单时写入;行键=单号#行表id,行 id 跨保存稳定);
      * - 仅当检验单仍可编辑(草稿/修改中)时同步——已审核/审批中/已作废等不越权改动;
-     * - 表头镜像 单据日期/业务员/供应商代码/供应商/部门/部门名称/数量;
+     * - 表头镜像 业务员/供应商代码/供应商/部门/部门名称/数量(单据日期不镜像——
+     *   检验单保持自己的创建日期,2026-09-17 口径:被生单据日期=创建当日);
      * - 明细按行键对行镜像共享列;暂收行已删(软删)时对应检验行一并软删
      *   (检验单为草稿才同步,未生过下游单,删除安全);
      * - 检验单自有字段(合格数量/不良数量/抽样方案等)与附件不动:附件实体锚定
@@ -447,7 +448,7 @@ public class ButtonService {
             if (!"草稿".equals(st) && !"修改中".equals(st)) continue;
             // JOIN 锚定源暂收单号(单号两式 SL-xxx/IJ-xxx 不同,2026-09-17 修复:
             // 原写 s.单据编号 = t.单据编号 恒不匹配,表头镜像从未生效)
-            jdbc.update("UPDATE t SET t.单据日期 = s.单据日期, t.业务员 = s.业务员, t.供应商代码 = s.供应商代码,"
+            jdbc.update("UPDATE t SET t.业务员 = s.业务员, t.供应商代码 = s.供应商代码,"
                             + " t.供应商 = s.供应商, t.部门 = s.部门, t.部门名称 = s.部门名称, t.数量 = s.数量,"
                             + " t.asp_user2 = ?, t.asp_time2 = GETDATE()"
                             + " FROM qc_insp t JOIN sl_recv s ON s.单据编号 = ?"
@@ -469,7 +470,7 @@ public class ButtonService {
                 if (srcAlive) {
                     jdbc.update("UPDATE d SET d.物料编码 = s.物料编码, d.物料名称 = s.物料名称, d.型号 = s.型号,"
                                     + " d.物料描述 = s.物料描述, d.数量 = s.数量, d.箱数 = s.箱数, d.日期 = s.日期,"
-                                    + " d.计量单位 = s.计量单位,"
+                                    + " d.计量单位 = s.计量单位, d.单价 = s.单价,"
                                     + " d.备注 = s.备注, d.结案 = s.结案, d.部门 = s.部门, d.部门名称 = s.部门名称,"
                                     + " d.asp_user2 = ?, d.asp_time2 = GETDATE()"
                                     + " FROM qc_insp_detail d JOIN sl_recv_detail s ON s.id = ?"
@@ -1367,7 +1368,8 @@ public class ButtonService {
     /**
      * 来料检验单(QC_INSP)审核后,把 合格数量>0 的明细行自动生成采购入库单(PURCHASE_IN)草稿:
      * 实收数量=合格数量;存货编码/存货名称/规格型号 ← 物料编码/物料名称/型号;行仓库 ← 仓库代码;
-     * 头带入 单据日期/供应商/供应商编码(供应商代码),外部单据号与来源单号=检验单号。
+     * 计量单位/单价随行带入(2026-09-17 补单价——此前清单漏列致入库单单价断流);
+     * 头带入 供应商/供应商编码(供应商代码),外部单据号与来源单号=检验单号;单据日期=创建当日不继承。
      * 行级占用写 form_flow_link(source_quantity=数量,linked_quantity=合格数量,余量=不良部分,
      * 供后续暂收退回链使用)并回填检验行 入库单号。幂等:已有 ACTIVE 占用(重审)跳过;
      * 无合格数量的行不生成(全不良/未检完的检验单审核不产生空入库单)。
@@ -1380,13 +1382,13 @@ public class ButtonService {
                         + " AND target_panel_code='PURCHASE_IN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, 型号, 数量, 合格数量, 仓库代码, 计量单位 FROM qc_insp_detail"
+                "SELECT id, 物料编码, 物料名称, 型号, 数量, 合格数量, 仓库代码, 计量单位, 单价 FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> pass = rows.stream()
                 .filter(r -> numOr(r.get("合格数量")) > 0).toList();
         if (pass.isEmpty()) return;
         List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT 单据日期, 供应商代码, 供应商 FROM qc_insp"
+                "SELECT 供应商代码, 供应商 FROM qc_insp"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + no);
         Map<String, Object> h = heads.get(0);
@@ -1398,13 +1400,13 @@ public class ButtonService {
             line.put("规格型号", r.get("型号"));
             line.put("实收数量", r.get("合格数量"));
             line.put("计量单位", r.get("计量单位"));
+            line.put("单价", r.get("单价"));
             Object wh = r.get("仓库代码");
             if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
             items.add(line);
         }
         Map<String, Object> head = new LinkedHashMap<>();
-        Object date = h.get("单据日期");
-        head.put("单据日期", date == null || String.valueOf(date).isBlank() ? LocalDate.now().toString() : String.valueOf(date));
+        head.put("单据日期", LocalDate.now().toString()); // 创建当日,不继承检验单日期(2026-09-17 口径)
         head.put("供应商", h.get("供应商"));
         head.put("供应商编码", h.get("供应商代码"));
         head.put("外部单据号", no);
@@ -1432,8 +1434,8 @@ public class ButtonService {
 
     /**
      * 来料检验单(QC_INSP)审核后,把 不良数量>0 的明细行自动生成暂收退回单(QC_RETURN)草稿(2026-09-16):
-     * 退回数量=不良数量;物料编码/物料名称/型号/物料描述/备注 ← 检验行;头带入 单据日期/业务员/
-     * 供应商代码/供应商/部门/部门名称。行级占用写 form_flow_link(QC_INSP→QC_RETURN,
+     * 退回数量=不良数量;物料编码/物料名称/型号/物料描述/单价/备注 ← 检验行;头带入 业务员/
+     * 供应商代码/供应商/部门/部门名称;单据日期=创建当日不继承(2026-09-17 口径)。行级占用写 form_flow_link(QC_INSP→QC_RETURN,
      * source_quantity=数量,linked_quantity=不良数量,与采购入库单的 合格 占用并行,余量=待检部分)。
      * 幂等:已有 ACTIVE 占用(重审)跳过;无不不良数量的行不生成(不产生空退回单)。
      * 检验明细无「退回单号」列,不做回填(入库侧回填见 inspAutoPurchaseIn)。
@@ -1446,13 +1448,13 @@ public class ButtonService {
                         + " AND target_panel_code='QC_RETURN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, 型号, 物料描述, 数量, 不良数量, 备注, 日期, 计量单位 FROM qc_insp_detail"
+                "SELECT id, 物料编码, 物料名称, 型号, 物料描述, 数量, 不良数量, 备注, 日期, 计量单位, 单价 FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> defect = rows.stream()
                 .filter(r -> numOr(r.get("不良数量")) > 0).toList();
         if (defect.isEmpty()) return;
         List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT 单据日期, 业务员, 供应商代码, 供应商, 部门, 部门名称 FROM qc_insp"
+                "SELECT 业务员, 供应商代码, 供应商, 部门, 部门名称 FROM qc_insp"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + no);
         Map<String, Object> h = heads.get(0);
@@ -1465,6 +1467,7 @@ public class ButtonService {
             line.put("物料描述", r.get("物料描述"));
             line.put("数量", r.get("不良数量"));
             line.put("计量单位", r.get("计量单位"));
+            line.put("单价", r.get("单价"));
             Object d = r.get("日期");
             if (d != null && !String.valueOf(d).isBlank()) line.put("日期", String.valueOf(d));
             Object m = r.get("备注");
@@ -1472,8 +1475,7 @@ public class ButtonService {
             items.add(line);
         }
         Map<String, Object> head = new LinkedHashMap<>();
-        Object date = h.get("单据日期");
-        head.put("日期", date == null || String.valueOf(date).isBlank() ? LocalDate.now().toString() : String.valueOf(date));
+        head.put("日期", LocalDate.now().toString()); // 创建当日,不继承检验单日期(2026-09-17 口径)
         head.put("业务员", h.get("业务员"));
         head.put("供应商代码", h.get("供应商代码"));
         head.put("供应商", h.get("供应商"));

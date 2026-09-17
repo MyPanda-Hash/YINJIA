@@ -385,6 +385,7 @@ migrate-purchase-in-wh-ref.sql
 # —— 2026-09-17 计量单位存量回填两批——v1按商品档案(bs_inv)填空;v2沿form_flow_link占用链从采购订单行逐级下带+孤儿行同物料借值+错位行以检验行为准纠正+TEST-1测试残留清理;幂等只填空/只纠链路行 ——
 migrate-uom-backfill.sql
 migrate-uom-backfill-v2.sql
+migrate-qc-insp-price.sql
 migrate-share-file.sql
 
 # ���� 2026-09-16 ���ϼ��鵥��ϸ����SL_RECV������(��������/����/����/�᰸/����/��������/��ⵥ�� 7������ + ��������������=���ϸ�����;ButtonServiceͬ��/�����/����������·SQL��)+yj_fieldע��+en����+��ע�����ݵȿ����ܡ���
