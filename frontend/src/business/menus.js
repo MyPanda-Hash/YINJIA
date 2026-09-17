@@ -62,6 +62,13 @@ export const menuTree = [
           { code: 'rdInspPlan', title: '出货检验计划表', path: '/panelx/list/RD_INSP_PLAN', panelCode: 'RD_INSP_PLAN', icon: 'CircleCheck' },
         ],
       },
+      {
+        // 共享文件(2026-09-17):全公司共享资料库(标准/测试报告/认证报告),专用视图非面板引擎;
+        // 权限走 yj_role_panel(全员默认 view 查阅,上传/改/删=组织架构按角色勾 add/edit/delete)
+        code: 'rdShare', title: '共享文件', icon: 'Folder', children: [
+          { code: 'rdShareFile', title: '共享文件库', path: '/rd/shareFile', panelCode: 'RD_SHARE_FILE', icon: 'Collection' },
+        ],
+      },
     ],
   },
   {
