@@ -68,8 +68,9 @@
       </div>
     </div>
 
-    <!-- 报表沿用配置查询字段；单据页显示当前单据表头，草稿态原地编辑。 -->
-    <div v-if="reportMode" class="fields udl-fields">
+    <!-- 报表沿用配置查询字段；单据页显示当前单据表头，草稿态原地编辑。
+         查询弹窗面板(收发存):查询条件只在弹窗(按钮同款格式),不显示内联区 -->
+    <div v-if="reportMode && !reportQueryDialog" class="fields udl-fields">
       <div class="field" v-for="qr in queryFields" :key="qr.dataName">
         <label :class="{ req: qr.isRequired }">{{ qr.displayName || tt(qr.dataName) }}</label>
         <div v-if="qType(qr) === 'ref' && refModeMap[qr.dataName] === 'select'" class="query-ref-select">
@@ -866,7 +867,7 @@
         <el-button type="primary" @click="dictPickVisible = false">{{ tt('取消') }}</el-button>
       </template>
     </el-dialog>
-    <el-dialog v-model="queryDialogVisible" :title="tt('查询')" width="760px" append-to-body destroy-on-close class="header-query-dialog" @open="loadPlans">
+    <el-dialog v-model="queryDialogVisible" :title="tt('查询')" width="760px" append-to-body destroy-on-close class="header-query-dialog" @open="loadPlans" @close="onQueryDialogClose">
       <!-- 查询方案:下拉调用 + 保存 + 维护 -->
       <div class="query-plan-bar">
         <span class="plan-label">{{ tt('查询方案') }}</span>
@@ -1291,28 +1292,6 @@
         <el-button size="small" @click="colPrefVisible = false">取消</el-button>
         <el-button size="small" @click="resetColPrefs">恢复默认</el-button>
         <el-button type="primary" size="small" :loading="colPrefSaving" @click="saveColPrefs">保存</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 报表查询弹窗(T+ 同款):日期段必填,关闭即退出页面 -->
-    <el-dialog v-model="rqdVisible" :title="tt('查询条件')" width="420px" append-to-body :close-on-click-modal="false" @close="closeRqd">
-      <el-form label-width="90px">
-        <el-form-item :label="tt('开始日期')" required>
-          <el-date-picker v-model="rqdForm.开始日期" type="date" value-format="YYYY-MM-DD" style="width:100%" />
-        </el-form-item>
-        <el-form-item :label="tt('结束日期')" required>
-          <el-date-picker v-model="rqdForm.结束日期" type="date" value-format="YYYY-MM-DD" style="width:100%" />
-        </el-form-item>
-        <el-form-item :label="tt('仓库')">
-          <el-input v-model="rqdForm.仓库" clearable />
-        </el-form-item>
-        <el-form-item :label="tt('存货')">
-          <el-input v-model="rqdForm.存货" clearable />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button size="small" @click="closeRqd">{{ tt('取消') }}</el-button>
-        <el-button type="primary" size="small" @click="submitRqd">{{ tt('查询') }}</el-button>
       </template>
     </el-dialog>
 
@@ -1856,29 +1835,14 @@ function onHeaderRefSelectChange(field, v) {
 }
 
 const reportMode = computed(() => cfgCache.value?.metadata?.report === true || cfgCache.value?.metadata?.panelCategory === '报表')
-// ── 报表查询弹窗(T+ 同款,收发存汇总):进入先弹条件,日期段必填,关闭弹窗即退出页面 ──
+// ── 报表查询弹窗(T+ 同款,收发存汇总):进入与「查询」按钮共用同一个弹窗(方案栏+字段
+// 网格+高级筛选格式);进入态差异仅两点——①未完成过查询就关闭(✕/取消)=退出页面,
+// ②开始/结束日期必填(applyHeaderQuery 校验)。
 const reportQueryDialog = computed(() => cfgCache.value?.metadata?.reportQueryDialog === true)
-const rqdVisible = ref(false)
 const rqdDone = ref(false) // 本面板本轮是否已通过弹窗查询(未过弹窗前拦截一切列表加载)
-const rqdForm = reactive({ 开始日期: '', 结束日期: '', 仓库: '', 存货: '' })
-function openRqd() { rqdVisible.value = true }
-function closeRqd() {
-  rqdVisible.value = false
-  if (!rqdDone.value) router.push('/dashboard') // 未查询就关闭 = 退出页面(对齐 T+ 报表交互)
-}
-function submitRqd() {
-  if (!rqdForm.开始日期 || !rqdForm.结束日期) {
-    ElMessage.warning(tt('请填写开始日期与结束日期'))
-    return
-  }
-  condition['开始日期'] = rqdForm.开始日期
-  condition['结束日期'] = rqdForm.结束日期
-  if (rqdForm.仓库) condition['仓库'] = rqdForm.仓库; else delete condition['仓库']
-  if (rqdForm.存货) condition['存货'] = rqdForm.存货; else delete condition['存货']
-  rqdDone.value = true
-  rqdVisible.value = false
-  query.pageNo = 1
-  load()
+/** 弹窗关闭:查询弹窗面板在未完成过一次查询时,关闭(✕/取消)即退出页面(对齐 T+ 报表交互) */
+function onQueryDialogClose() {
+  if (reportQueryDialog.value && !rqdDone.value) router.push('/dashboard')
 }
 // YINJIA 适配:单单据面板(基础档案)只有一张虚拟单,隐藏单据切换按钮(◁◀ 第X/Y张 ▶▷)
 const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === true)
@@ -3008,14 +2972,9 @@ function scheduleColExpand() {
   colExpandTimer = setTimeout(() => { archViewport.expand = true }, 120)
 }
 watch(panelCode, scheduleColExpand)
-// 查询弹窗面板(收发存):切换面板重置弹窗状态(重新进入需再过条件弹窗)
+// 查询弹窗面板(收发存):切换面板重置(重新进入需再过条件弹窗)
 watch(panelCode, () => {
   rqdDone.value = false
-  rqdVisible.value = false
-  rqdForm.开始日期 = ''
-  rqdForm.结束日期 = ''
-  rqdForm.仓库 = ''
-  rqdForm.存货 = ''
 })
 onMounted(scheduleColExpand)
 function archLazyOn(b) { return singleDocMode.value && archCols(b).length >= COL_LAZY_MIN }
@@ -4227,10 +4186,16 @@ function onQueryRefConfirm(rows) {
 }
 
 function applyHeaderQuery() {
+  // 查询弹窗面板(收发存):开始/结束日期必填,未填不查询(弹窗保持打开)
+  if (reportQueryDialog.value && (!queryDraft['开始日期'] || !queryDraft['结束日期'])) {
+    ElMessage.warning(tt('请填写开始日期与结束日期'))
+    return
+  }
   Object.keys(condition).forEach((key) => delete condition[key])
   for (const [key, value] of Object.entries(queryDraft)) {
     if (value !== undefined && value !== null && String(value) !== '') condition[key] = value
   }
+  rqdDone.value = true // 已通过弹窗查询(此后关闭弹窗不再退页)
   queryDialogVisible.value = false
   search()
 }
@@ -4838,7 +4803,7 @@ async function onButton(action) {
   }
   if (action === '查询' || action === '查找') {
     // 查询弹窗面板(T+ 收发存):查询按钮重开条件弹窗,而非直接刷新
-    if (reportQueryDialog.value) { openRqd(); return }
+  if (reportQueryDialog.value) { openQueryDialog(); return }
     search()
     return
   }
@@ -5231,7 +5196,7 @@ async function load() {
     loading.value = false
     list.value = []
     total.value = 0
-    openRqd()
+    openQueryDialog() // 与「查询」按钮同一个弹窗(格式一致)
     return
   }
   loading.value = true
@@ -5551,7 +5516,6 @@ onMounted(() => {
 onDeactivated(() => {
   // keep-alive 切离时关闭弹窗（防止 append-to-body 弹窗残留）
   newVisible.value = false
-  rqdVisible.value = false
   queryDialogVisible.value = false
   queryRefVisible.value = false
   queryRefField.value = null
