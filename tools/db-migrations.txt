@@ -385,3 +385,6 @@ migrate-stock-ledger-query.sql
 
 # —— 2026-09-17 报表弹窗字段终版——删 开始/结束日期 查询字段(改为弹窗内置单个「单据日期」区间控件);台账 仓库/存货 required=1(单一仓库的一种存货),汇总 required=0;库存状况表(STOCK_BALANCE)零改动 ——
 migrate-report-dialog-fields.sql
+
+# —— 2026-09-17 库存台账期初/期末结存(T+同款语义)——参照PANDA真源(movements首源=INIT_BALANCE期初建账单);我们无建账单→期初=本行发生前累计(LAG窗口),期末=本行累计;日期段过滤时窗口先于WHERE→首行期初=期前累计(该时段期初结存),末行期末=期末结存;列组扩为 期初结存|收入|发出|期末结存(与收发存汇总同构);691行逐行勾稽通过。幂等可重跑 ——
+migrate-stock-ledger-open-close.sql
