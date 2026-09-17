@@ -163,6 +163,8 @@ export default {
     '列': 'cols',
     '库存状况表': 'Stock Balance',
     '批量转ERP': 'Batch Push to ERP',
+    '查询条件': 'Query Criteria',
+    '请填写开始日期与结束日期': 'Start date and end date are required',
     '以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"': 'Approved but not pushed documents. Check items then click Start Push.',
     '开始转ERP': 'Start Push',
     '供应商/客户': 'Supplier/Customer',

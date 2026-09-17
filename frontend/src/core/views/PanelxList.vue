@@ -1294,6 +1294,28 @@
       </template>
     </el-dialog>
 
+    <!-- 报表查询弹窗(T+ 同款):日期段必填,关闭即退出页面 -->
+    <el-dialog v-model="rqdVisible" :title="tt('查询条件')" width="420px" append-to-body :close-on-click-modal="false" @close="closeRqd">
+      <el-form label-width="90px">
+        <el-form-item :label="tt('开始日期')" required>
+          <el-date-picker v-model="rqdForm.开始日期" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+        <el-form-item :label="tt('结束日期')" required>
+          <el-date-picker v-model="rqdForm.结束日期" type="date" value-format="YYYY-MM-DD" style="width:100%" />
+        </el-form-item>
+        <el-form-item :label="tt('仓库')">
+          <el-input v-model="rqdForm.仓库" clearable />
+        </el-form-item>
+        <el-form-item :label="tt('存货')">
+          <el-input v-model="rqdForm.存货" clearable />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button size="small" @click="closeRqd">{{ tt('取消') }}</el-button>
+        <el-button type="primary" size="small" @click="submitRqd">{{ tt('查询') }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 批量转ERP:显示已审核+未转ERP的单据,勾选后批量推送 -->
     <el-dialog v-model="batchErpVisible" :title="tt('批量转ERP')" width="600px" append-to-body :close-on-click-modal="false">
       <div class="col-pref-tip">{{ tt('以下为已审核且未转入ERP的单据，勾选后点击"开始转ERP"') }}</div>
@@ -1834,6 +1856,30 @@ function onHeaderRefSelectChange(field, v) {
 }
 
 const reportMode = computed(() => cfgCache.value?.metadata?.report === true || cfgCache.value?.metadata?.panelCategory === '报表')
+// ── 报表查询弹窗(T+ 同款,收发存汇总):进入先弹条件,日期段必填,关闭弹窗即退出页面 ──
+const reportQueryDialog = computed(() => cfgCache.value?.metadata?.reportQueryDialog === true)
+const rqdVisible = ref(false)
+const rqdDone = ref(false) // 本面板本轮是否已通过弹窗查询(未过弹窗前拦截一切列表加载)
+const rqdForm = reactive({ 开始日期: '', 结束日期: '', 仓库: '', 存货: '' })
+function openRqd() { rqdVisible.value = true }
+function closeRqd() {
+  rqdVisible.value = false
+  if (!rqdDone.value) router.push('/dashboard') // 未查询就关闭 = 退出页面(对齐 T+ 报表交互)
+}
+function submitRqd() {
+  if (!rqdForm.开始日期 || !rqdForm.结束日期) {
+    ElMessage.warning(tt('请填写开始日期与结束日期'))
+    return
+  }
+  condition['开始日期'] = rqdForm.开始日期
+  condition['结束日期'] = rqdForm.结束日期
+  if (rqdForm.仓库) condition['仓库'] = rqdForm.仓库; else delete condition['仓库']
+  if (rqdForm.存货) condition['存货'] = rqdForm.存货; else delete condition['存货']
+  rqdDone.value = true
+  rqdVisible.value = false
+  query.pageNo = 1
+  load()
+}
 // YINJIA 适配:单单据面板(基础档案)只有一张虚拟单,隐藏单据切换按钮(◁◀ 第X/Y张 ▶▷)
 const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === true)
 const reportPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
@@ -2962,6 +3008,15 @@ function scheduleColExpand() {
   colExpandTimer = setTimeout(() => { archViewport.expand = true }, 120)
 }
 watch(panelCode, scheduleColExpand)
+// 查询弹窗面板(收发存):切换面板重置弹窗状态(重新进入需再过条件弹窗)
+watch(panelCode, () => {
+  rqdDone.value = false
+  rqdVisible.value = false
+  rqdForm.开始日期 = ''
+  rqdForm.结束日期 = ''
+  rqdForm.仓库 = ''
+  rqdForm.存货 = ''
+})
 onMounted(scheduleColExpand)
 function archLazyOn(b) { return singleDocMode.value && archCols(b).length >= COL_LAZY_MIN }
 let colLazyRaf = 0
@@ -4782,6 +4837,8 @@ async function onButton(action) {
     return
   }
   if (action === '查询' || action === '查找') {
+    // 查询弹窗面板(T+ 收发存):查询按钮重开条件弹窗,而非直接刷新
+    if (reportQueryDialog.value) { openRqd(); return }
     search()
     return
   }
@@ -5169,9 +5226,16 @@ async function load() {
     ElMessage.error('面板编号无效，请从菜单重新进入')
     return
   }
+  await loadCrg() // 配置先行(弹窗门依赖 metadata.reportQueryDialog)
+  if (reportQueryDialog.value && !rqdDone.value) {
+    loading.value = false
+    list.value = []
+    total.value = 0
+    openRqd()
+    return
+  }
   loading.value = true
   try {
-    await loadCrg()
     loadReportTemplates() // 服务端报表入口(该面板有模板才显示;不阻塞列表)
     const params = { panelCode: panelCode.value, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
     // 模糊搜索生效中:叠加字段条件(后端 AND)与「全部字段」关键字
@@ -5487,6 +5551,7 @@ onMounted(() => {
 onDeactivated(() => {
   // keep-alive 切离时关闭弹窗（防止 append-to-body 弹窗残留）
   newVisible.value = false
+  rqdVisible.value = false
   queryDialogVisible.value = false
   queryRefVisible.value = false
   queryRefField.value = null

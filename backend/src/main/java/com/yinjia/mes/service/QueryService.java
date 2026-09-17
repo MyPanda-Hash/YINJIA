@@ -362,10 +362,27 @@ public class QueryService {
                 where.append(" AND ").append(alias).append(".[ckdm] = ?");
                 args.add(String.valueOf(ck).trim());
             }
+            // 报表日期段(收发存汇总查询弹窗):开始/结束日期 → 期次(yyyy-MM)闭区间;
+            // 值截到月(2026-09-01 → 2026-09),与 v_stock_summary 的期次列直接比较。
+            // 这两个键不进通用 LIKE(视图无同名列),下方的 l2c 兜底也会因无列名而跳过。
+            boolean hasPeriod = l2c.containsKey("期次");
+            Object qs = condition.get("开始日期");
+            if (hasPeriod && qs != null && !String.valueOf(qs).isBlank()) {
+                String m = String.valueOf(qs).trim();
+                where.append(" AND ").append(alias).append(".[期次] >= ?");
+                args.add(m.length() > 7 ? m.substring(0, 7) : m);
+            }
+            Object qe = condition.get("结束日期");
+            if (hasPeriod && qe != null && !String.valueOf(qe).isBlank()) {
+                String m = String.valueOf(qe).trim();
+                where.append(" AND ").append(alias).append(".[期次] <= ?");
+                args.add(m.length() > 7 ? m.substring(0, 7) : m);
+            }
             for (Map.Entry<String, Object> e : condition.entrySet()) {
                 String col = l2c.get(e.getKey());
                 Object v = e.getValue();
                 if (col == null || v == null || String.valueOf(v).isBlank()) continue;
+                if ("开始日期".equals(e.getKey()) || "结束日期".equals(e.getKey())) continue; // 已按期次区间处理
                 where.append(" AND ").append(alias).append(".[").append(col).append("] LIKE ?");
                 args.add("%" + v + "%");
             }
