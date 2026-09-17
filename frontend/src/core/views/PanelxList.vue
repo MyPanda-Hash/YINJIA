@@ -902,6 +902,21 @@
             style="width: 100%"
           />
         </div>
+        <!-- 台账:仓库/存货联动下拉(选项=真实流水组合,互相约束) -->
+        <template v-if="reportQueryDialog && panelCode === 'STOCK_LEDGER'">
+          <div class="query-dialog-field">
+            <label class="req-label">{{ tt('仓库') }}<span class="req-star">*</span></label>
+            <el-select v-model="queryDraft['仓库']" filterable clearable :loading="ledgerOptsLoading" style="width:100%" @change="onLedgerWhChange">
+              <el-option v-for="w in ledgerWhOptions" :key="w" :label="w" :value="w" />
+            </el-select>
+          </div>
+          <div class="query-dialog-field">
+            <label class="req-label">{{ tt('存货') }}<span class="req-star">*</span></label>
+            <el-select v-model="queryDraft['存货']" filterable clearable :loading="ledgerOptsLoading" style="width:100%" @change="onLedgerItemChange">
+              <el-option v-for="i in ledgerItemOptions" :key="i" :label="i" :value="i" />
+            </el-select>
+          </div>
+        </template>
         <div v-for="field in queryDialogFields" :key="headerFieldKey(field)" class="query-dialog-field">
           <label :class="{ 'req-label': rqdFieldRequired(field) }">
             {{ headerFieldLabel(field) }}<span v-if="rqdFieldRequired(field)" class="req-star">*</span>
@@ -1862,6 +1877,30 @@ function rqdFieldRequired(field) {
   if (panelCode.value === 'STOCK_LEDGER' && ['仓库', '存货'].includes(headerFieldKey(field))) return true
   return false
 }
+// 台账联动选项:仓库/存货下拉互相约束(选项=后端 v_stock_ledger 真实组合)
+const ledgerWhOptions = ref([])
+const ledgerItemOptions = ref([])
+const ledgerOptsLoading = ref(false)
+async function loadLedgerRefOptions({ keepWh = true, keepItem = true } = {}) {
+  ledgerOptsLoading.value = true
+  try {
+    const res = await engine.callButton({
+      panelCode: panelCode.value, buttonName: '台账联动选项',
+      formData: { 仓库: queryDraft['仓库'] || '', 存货: queryDraft['存货'] || '' }, buttonParam: {},
+    })
+    ledgerWhOptions.value = res?.仓库列表 || []
+    ledgerItemOptions.value = res?.存货列表 || []
+    // 约束收紧后当前值可能不再合法:清掉无效侧(保持用户已选且仍合法的那侧)
+    if (!keepWh && queryDraft['仓库'] && !ledgerWhOptions.value.includes(queryDraft['仓库'])) delete queryDraft['仓库']
+    if (!keepItem && queryDraft['存货'] && !ledgerItemOptions.value.includes(queryDraft['存货'])) delete queryDraft['存货']
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('查询失败'))
+  } finally {
+    ledgerOptsLoading.value = false
+  }
+}
+function onLedgerWhChange() { loadLedgerRefOptions({ keepWh: true, keepItem: false }) } // 换仓→存货按新仓收敛
+function onLedgerItemChange() { loadLedgerRefOptions({ keepWh: false, keepItem: true }) } // 换存货→仓库按新存货收敛
 /** 弹窗关闭:查询弹窗面板在未完成过一次查询时,关闭(✕/取消)即退出页面(对齐 T+ 报表交互) */
 function onQueryDialogClose() {
   if (reportQueryDialog.value && !rqdDone.value) router.push('/dashboard')
@@ -2408,6 +2447,8 @@ const sheetAllFields = computed(() => {
 const queryDialogFields = computed(() => {
   const fields = reportMode.value ? queryFields.value : headerEditFields.value
   return fields.filter((field) => headerFieldKey(field) !== '备注')
+    // 台账弹窗:仓库/存货改用联动下拉(互相约束),不走通用参照控件
+    .filter((field) => !(reportQueryDialog.value && panelCode.value === 'STOCK_LEDGER' && ['仓库', '存货'].includes(headerFieldKey(field))))
 })
 const draftEditable = computed(() => {
   if (reportMode.value || ['BOM_FWD', 'BOM_REV'].includes(String(panelCode.value))) return false
@@ -2998,6 +3039,8 @@ watch(panelCode, scheduleColExpand)
 watch(panelCode, () => {
   rqdDone.value = false
   rqdRange.value = []
+  ledgerWhOptions.value = []
+  ledgerItemOptions.value = []
 })
 onMounted(scheduleColExpand)
 function archLazyOn(b) { return singleDocMode.value && archCols(b).length >= COL_LAZY_MIN }
@@ -4179,6 +4222,8 @@ function openQueryDialog() {
   // 弹窗面板:单据日期区间从当前条件回填(重开弹窗保留上次区间)
   if (reportQueryDialog.value) {
     rqdRange.value = condition['开始日期'] && condition['结束日期'] ? [condition['开始日期'], condition['结束日期']] : []
+    // 台账:加载联动选项(带上已选仓库/存货,选项即互相约束后的集合)
+    if (panelCode.value === 'STOCK_LEDGER') loadLedgerRefOptions()
   }
   queryDialogVisible.value = true
 }
