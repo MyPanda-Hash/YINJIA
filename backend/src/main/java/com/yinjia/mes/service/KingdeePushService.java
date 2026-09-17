@@ -96,9 +96,8 @@ public class KingdeePushService {
         String stdinJson = json.writeValueAsString(input);
 
         // 4. 调 Node 子进程推送
-        String workDir = System.getProperty("user.dir") + File.separator + "deploy" + File.separator + "push";
         Process p = new ProcessBuilder("node", "_push-one.mjs")
-                .directory(new File(workDir))
+                .directory(pushWorkDir())
                 .redirectErrorStream(false).start();
         p.getOutputStream().write(stdinJson.getBytes(StandardCharsets.UTF_8));
         p.getOutputStream().close();
@@ -133,5 +132,22 @@ public class KingdeePushService {
         out.put("转ERP时间", now);
         out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）");
         return out;
+    }
+
+    /**
+     * deploy/push 工作目录解析:后端从仓库根或 backend/ 启动都要命中——
+     * 依次探测 工作目录 及其上一级 下的 deploy/push(以 _push-one.mjs 存在为准),
+     * 都不存在时回退工作目录拼装(保持原报错口径,便于定位)。
+     * 2026-09-17:此前仅按 user.dir 拼装,后端以 backend/ 为工作目录启动时
+     * 解析到 backend\deploy\push(不存在)报 CreateProcess error=267。
+     */
+    private File pushWorkDir() {
+        File wd = new File(System.getProperty("user.dir"));
+        for (File base : new File[]{wd, wd.getParentFile()}) {
+            if (base == null) continue;
+            File dir = new File(base, "deploy" + File.separator + "push");
+            if (new File(dir, "_push-one.mjs").isFile()) return dir;
+        }
+        return new File(wd, "deploy" + File.separator + "push");
     }
 }
