@@ -1,0 +1,12 @@
+panel_code|col_name|label
+PURCHASE_IN|creator_number|creator_number
+PURCHASE_IN|modifier_number|modifier_number
+PURCHASE_IN|auditor_number|auditor_number
+PURCHASE_IN|total_unsettle_amount_for|total_unsettle_amount_for
+PURCHASE_IN|edit_pay_type_number|edit_pay_type_number
+PURCHASE_IN|edit_pay_account_number|edit_pay_account_number
+PURCHASE_IN|cur_settle_amount_for|cur_settle_amount_for
+SALE_OUT|attachments|attachments
+SALE_OUT|auditor_number|auditor_number
+SALE_OUT|creator_number|creator_number
+SALE_OUT|modifier_number|modifier_number

@@ -1,0 +1,48 @@
+panel_code|col_name|label|place
+PU_ORDER|单据日期|单据日期|query,header
+PU_ORDER|物料编码|物料编码|detail
+PU_ORDER|物料名称|物料名称|detail
+PU_ORDER|单据编号|单据编号|query,header
+PU_ORDER|供应商|供应商|query,header
+PU_ORDER|单位|单位|detail
+PU_ORDER|数量|数量|detail
+PU_ORDER|币种|币种|query,header
+PU_ORDER|汇率|汇率|header
+PU_ORDER|单价|单价|detail
+PURCHASE_IN|存货编码|存货编码|query,detail
+PURCHASE_IN|单据日期|单据日期|query,header
+PURCHASE_IN|存货名称|存货名称|detail
+PURCHASE_IN|单据编号|单据编号|query,header
+PURCHASE_IN|汇率|汇率|header
+PURCHASE_IN|实收数量|实收数量|detail
+PURCHASE_IN|计量单位|计量单位|detail
+PURCHASE_IN|供应商|供应商|query,header
+SALE_OUT|单据日期|单据日期|query,header
+SALE_OUT|单据编号|单据编号|query,header
+SALE_OUT|存货名称|存货名称|detail
+SALE_OUT|存货编码|存货编码|detail
+SALE_OUT|计量单位|计量单位|detail
+SALE_OUT|客户|客户|query,header
+SALE_OUT|数量|数量|detail
+SALE_OUT|结算客户|结算客户|query,header
+SO_ORDER|单据编号|单据编号|query,header
+SO_ORDER|单据日期|单据日期|query,header
+SO_ORDER|客户|客户|query,header
+SO_ORDER|结算客户|结算客户|header
+panel_code|col_name|label|dict_sql
+PU_ORDER|单位|单位|SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)
+PU_ORDER|币种|币种|SELECT v FROM (VALUES (N'人民币')) AS t(v)
+PU_ORDER|税率%|税率%|SELECT v FROM (VALUES (N'0'),(N'3'),(N'6'),(N'9'),(N'13')) AS t(v)
+PURCHASE_IN|计量单位|计量单位|SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)
+PURCHASE_IN|计量单位2|计量单位2|SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)
+PURCHASE_IN|税率%|税率%|SELECT v FROM (VALUES (N'0'),(N'3'),(N'6'),(N'9'),(N'13')) AS t(v)
+SALE_OUT|出库类别|出库类别|SELECT v FROM (VALUES (N'普通销售'),(N'销售退货')) AS t(v)
+SALE_OUT|计量单位|计量单位|SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)
+SALE_OUT|税率%|税率%|SELECT v FROM (VALUES (N'0'),(N'3'),(N'6'),(N'9'),(N'13')) AS t(v)
+SALE_OUT|退货原因|退货原因|SELECT v FROM (VALUES (N'客户退货'),(N'质量原因'),(N'其他')) AS t(v)
+SO_ORDER|客户编码|客户编码|SELECT v FROM (VALUES (N'KH001'),(N'KH002'),(N'KH003'),(N'KH004'),(N'KH005')) AS t(v)
+SO_ORDER|结算客户|结算客户|SELECT v FROM (VALUES (N'华东铝业'),(N'中天精工'),(N'西部材料'),(N'南方重工'),(N'北方机械')) AS t(v)
+SO_ORDER|销售单位|销售单位|SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套')) AS t(v)
+SO_ORDER|币种|币种|SELECT 名称 FROM bs_currency WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(停用,0)<>1
+SO_ORDER|部门|部门|SELECT v FROM (VALUES (N'销售一部'),(N'销售二部'),(N'国际部')) AS t(v)
+SO_ORDER|业务员|业务员|SELECT v FROM (VALUES (N'张伟'),(N'李娜'),(N'王芳'),(N'陈强')) AS t(v)

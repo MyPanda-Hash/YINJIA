@@ -1,0 +1,8 @@
+panel_code|col_group|n
+STOCK_LEDGER|发出|3
+STOCK_LEDGER|结存|3
+STOCK_LEDGER|收入|3
+STOCK_SUMMARY|本期出库|3
+STOCK_SUMMARY|本期入库|3
+STOCK_SUMMARY|期初结存|3
+STOCK_SUMMARY|期末结存|3

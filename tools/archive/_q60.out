@@ -1,0 +1,12 @@
+存货|单据编号|单据状态|单据状态2|数量|金额|来源
+端盖|CGRK-20260915-03213|草稿|C|2000.0000|null|采购入库
+A级烧结炭棒/滤芯|XSCK-20270901-00001|草稿|C|null|null|销售出库
+A级烧结炭棒/滤芯|XSCK-20270901-00001|草稿|C|null|null|销售出库
+X烧结炭棒/滤芯|XSCK-20270901-00001|草稿|C|null|null|销售出库
+t|n
+bd_finish_in|0
+bd_other_in|0
+bd_outsource_in|0
+bd_material_out|2
+bd_other_out|0
+bd_outsource_issue|0

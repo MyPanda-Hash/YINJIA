@@ -1,0 +1,10 @@
+col_name|label|place|seq
+金额|金额|detail|160
+含税金额|含税金额|detail|170
+未结算金额|未结算金额|header|970
+未结算金额本位币|未结算金额本位币|header|970
+预付金额|预付金额|header|970
+保险金额|保险金额|header|970
+本次结算金额本位币|本次结算金额本位币|detail|970
+col_name|label|place
+出库类别|出库类别|header

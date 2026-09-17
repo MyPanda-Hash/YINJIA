@@ -44,6 +44,7 @@ public class QueryService {
     private Map<String, Object> queryFlat(PanelRegistry.PanelDef def, String keyword,
                                           Map<String, Object> condition, Map<String, String> l2c,
                                           int pageNo, int pageSize) {
+        boolean ledger = "STOCK_LEDGER".equals(def.code()); // 台账:正序 + 首期初行/末期末行(T+ 三段式)
         String cols = selectCols(def, def.fields());
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
@@ -53,18 +54,72 @@ public class QueryService {
                 "SELECT COUNT(*) FROM " + def.lineTable() + " t " + where, Integer.class, args.toArray());
 
         String sql = "SELECT t.id AS __id, " + cols + " FROM " + def.lineTable() + " t " + where
-                + " ORDER BY t.id DESC OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                + " ORDER BY t.id " + (ledger ? "ASC" : "DESC") + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
         args.add((pageNo - 1) * pageSize);
         args.add(pageSize);
         List<Map<String, Object>> rows = jdbc.queryForList(sql, args.toArray());
         List<Map<String, Object>> list = new ArrayList<>();
-        for (Map<String, Object> r : rows) list.add(rowToLabels(def, r, true));
+        for (Map<String, Object> r : rows) {
+            Map<String, Object> m = rowToLabels(def, r, true);
+            if (ledger) { // 明细行不重复显示期初列(期初只在首行汇总呈现,T+ 同款)
+                m.put("期初数量", null); m.put("期初平均单价", null); m.put("期初金额", null);
+            }
+            list.add(m);
+        }
+
+        // 台账三段式:首行=期初结存(仅期初组有值),末行=期末结存(仅期末组有值)。
+        // 期初=查询段起点前的累计;期末=期初+段内净额。依赖弹窗必填的 仓库/存货/日期段。
+        int totalOut = total == null ? 0 : total;
+        if (ledger && condition != null) {
+            String wh = strOf(condition.get("仓库"));
+            String item = strOf(condition.get("存货"));
+            String ds = strOf(condition.get("开始日期"));
+            String de = strOf(condition.get("结束日期"));
+            if (!wh.isBlank() && !item.isBlank() && !ds.isBlank() && !de.isBlank()) {
+                // 期初 = 段起点前累计(视图中限 单据日期<=de 的行,取 <ds 部分;用视图暴露的收入/发出列)
+                Map<String, Object> opening = jdbc.queryForMap(
+                        "SELECT ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入数量 - 发出数量 ELSE 0 END),0) AS q,"
+                                + " ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入金额 - 发出金额 ELSE 0 END),0) AS a"
+                                + " FROM v_stock_ledger WHERE RTRIM(仓库)=? AND RTRIM(存货)=? AND 单据日期 <= ?",
+                        ds, ds, wh, item, de);
+                double oq = numD(opening.get("q")), oa = numD(opening.get("a"));
+                Map<String, Object> netm = jdbc.queryForMap(
+                        "SELECT ISNULL(SUM(收入数量 - 发出数量),0) AS q, ISNULL(SUM(收入金额 - 发出金额),0) AS a"
+                                + " FROM v_stock_ledger WHERE RTRIM(仓库)=? AND RTRIM(存货)=? AND 单据日期 >= ? AND 单据日期 <= ?",
+                        wh, item, ds, de);
+                double cq = oq + numD(netm.get("q")), ca = oa + numD(netm.get("a"));
+                totalOut += 2;
+                int lastPage = (int) Math.ceil(totalOut / (double) pageSize);
+                if (pageNo == 1) list.add(0, ledgerRow("期初结存", oq, oa, null, null));
+                if (pageNo == lastPage) list.add(ledgerRow("期末结存", null, null, cq, ca));
+            }
+        }
 
         Map<String, Object> out = new HashMap<>();
-        out.put("totalSize", total == null ? 0 : total);
+        out.put("totalSize", totalOut);
         out.put("list", list);
         return out;
     }
+
+    /** 台账合成行:期初行只填期初组,期末行只填期末组;单价=金额/数量(数量0→0) */
+    private Map<String, Object> ledgerRow(String type, Double oq, Double oa, Double cq, Double ca) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("单据类型", type);
+        if (oq != null) {
+            m.put("期初数量", oq);
+            m.put("期初平均单价", oq != 0 && oa != null ? oa / oq : 0);
+            m.put("期初金额", oa);
+        }
+        if (cq != null) {
+            m.put("期末数量", cq);
+            m.put("期末平均单价", cq != 0 && ca != null ? ca / cq : 0);
+            m.put("期末金额", ca);
+        }
+        return m;
+    }
+
+    private double numD(Object v) { return v == null ? 0 : ((Number) v).doubleValue(); }
+    private String strOf(Object v) { return v == null ? "" : String.valueOf(v).trim(); }
 
     // ============ 档案模式(单单据) ============
     // 档案保存语义 = 全量明细 upsert(缺席行=已删除),因此查询必须返回全量行,

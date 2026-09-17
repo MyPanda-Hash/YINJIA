@@ -1,0 +1,12 @@
+name
+采购订单号
+匹配来源单号
+来源单据
+来源单号
+销售订单号
+source_panel_code|target_panel_code|n
+PU_ORDER|PURCHASE_IN|1
+SL_RECV|QC_INSP|5
+PU_ORDER|SL_RECV|6
+archived_use
+6054

@@ -1,0 +1,10 @@
+panel_code|panel_name
+QC_BHC|不合格品处理单(制程)
+QC_BHG|不合格报告(制程)
+QC_BHZ|不合格品处理单(自制物料)
+QC_JJF|紧急放行申请单
+QC_LYB|来料异常分析报告
+QC_SCP|试产材料使用申请单
+QC_SCY|生产异常分析报告
+QC_TC|特采申请单
+SL_RECV|送料暂收单

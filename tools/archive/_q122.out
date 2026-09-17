@@ -1,0 +1,5 @@
+panel_code|col_name|label|ref_panel|ref_field|display_field|required
+PU_ORDER|仓库|仓库|WH|仓库名称|仓库名称|1
+PURCHASE_IN|仓库名称|仓库名称|WH|仓库名称|仓库名称|1
+SALE_OUT|仓库名称|仓库名称|WH|仓库名称|仓库名称|1
+SO_ORDER|仓库名称|仓库名称|null|null|null|1

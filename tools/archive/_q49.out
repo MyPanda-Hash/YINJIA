@@ -1,0 +1,9 @@
+name|name
+bl_finish_in|产品名称
+bl_finish_in|产品编码
+bl_material_out|材料名称
+bl_material_out|材料编码
+bl_outsource_in|产品编码
+bl_outsource_in|产品名称
+bl_outsource_issue|材料编码
+bl_outsource_issue|材料名称

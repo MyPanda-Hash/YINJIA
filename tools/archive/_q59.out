@@ -1,0 +1,9 @@
+name|has_st2
+bd_finish_in|0
+bd_material_out|0
+bd_other_in|0
+bd_other_out|0
+bd_outsource_in|0
+bd_outsource_issue|0
+bd_purchase_in|1
+bd_sale_out|1

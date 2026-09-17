@@ -1,0 +1,3 @@
+﻿SET NOCOUNT ON;
+UPDATE bd_so_order SET 外部指纹 = NULL WHERE 外部数据ID IS NOT NULL;
+UPDATE bd_pu_order SET 外部指纹 = NULL WHERE 外部数据ID IS NOT NULL;
