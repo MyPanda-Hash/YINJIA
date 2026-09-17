@@ -367,3 +367,6 @@ migrate-po-pi-attach.sql
 
 # —— 2026-09-16 转ERP按钮(采购入库/销售出库):ERP单号/转ERP操作人/转ERP时间 3列+是否已转ERP闸门列(合并补遗,原稿漏建)+yj_field注册+en译名;幂等可重跑 ——
 migrate-erp-push-button.sql
+
+# —— 2026-09-17 bd_so_order补建金蝶同步扩展4列(折前价税合计/业务模式/交货方式id/发票类型,9452c01漏建致SO同步10/10失败)+yj_field注册+en译名+中文注明;幂等可重跑 ——
+migrate-so-extra-cols.sql
