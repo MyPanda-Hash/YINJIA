@@ -69,3 +69,7 @@ _local-backup-*/
 tests/
 deploy/config-push.json
 deploy/push/push-state.json
+
+# 转ERP真实账套凭证(push/config.json)+测试沙箱打包目录(含凭证,绝不入库)
+deploy/push/config.json
+temp-push-sandbox/

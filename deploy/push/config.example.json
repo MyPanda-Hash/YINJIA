@@ -1,0 +1,19 @@
+{
+  "_说明": "转ERP按钮(采购入库/销售出库→金蝶)连接配置模板。复制为 config.json 并填入真实凭证;config.json 已 gitignore 绝不入库。outerInstanceId 选填,填了可自动应对 appSecret 24h 轮换(fetchAuthorization 自愈)。",
+  "kingdee": {
+    "clientId": "<金蝶开放平台 clientId>",
+    "clientSecret": "<金蝶开放平台 clientSecret>",
+    "appKey": "<应用 appKey>",
+    "appSecret": "<应用 appSecret(24h轮换,建议配 outerInstanceId 自愈)>",
+    "outerInstanceId": "<可选:授权实例ID,密钥轮换自愈>",
+    "domain": "https://api.kingdee.com"
+  },
+  "database": {
+    "server": "127.0.0.1",
+    "port": 1433,
+    "database": "HSDZ_MES",
+    "user": "<数据库用户>",
+    "password": "<数据库密码>",
+    "encrypt": false
+  }
+}
