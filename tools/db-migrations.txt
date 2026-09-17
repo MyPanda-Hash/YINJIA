@@ -370,3 +370,5 @@ migrate-erp-push-button.sql
 
 # —— 2026-09-17 bd_so_order补建金蝶同步扩展4列(折前价税合计/业务模式/交货方式id/发票类型,9452c01漏建致SO同步10/10失败)+yj_field注册+en译名+中文注明;幂等可重跑 ——
 migrate-so-extra-cols.sql
+# —— 2026-09-17 GFDA补注册9个原始档案字段(dm/mc/addr/tel/ywman/sui_no/bank/bank_no/bz;cleanup事故删后链上只自愈金蝶口径致33≠链重放42;税号空数据按治理口径默认隐藏;9标签译名全局共享已有)——
+migrate-gfda-restore-fields.sql
