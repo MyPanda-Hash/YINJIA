@@ -3196,8 +3196,20 @@ function sumMethod({ columns, data }) {
     // 只对「小数/整数」类型的字段求和：纯数字文本（身份证号/手机号/编码）不参与合计
     const f = fieldDefOf(col.property)
     const isNumeric = f && (f.dataType === '小数' || f.dataType === '整数')
-    const vals = real.map((r) => Number(r[col.property]))
-    sums[i] = isNumeric && vals.length && vals.every((v) => Number.isFinite(v)) ? Math.round(vals.reduce((a, b) => a + b, 0) * 100) / 100 : ''
+    // NaN 过滤:三段式台账的期初/期末合成行大量缺键(Number(undefined)=NaN),
+    // 旧行为 every(isFinite) 会因一行的缺失清空整列合计(合计消失的根因)
+    const vals = real.map((r) => Number(r[col.property])).filter((v) => Number.isFinite(v))
+    if (!isNumeric || !vals.length) { sums[i] = ''; return }
+    // 台账三段式:期初列合计=首值(期初),期末列合计=末值(期末结存);累计值求和无意义
+    if (panelCode.value === 'STOCK_LEDGER' && String(col.property || '').startsWith('期初')) {
+      sums[i] = vals[0]
+      return
+    }
+    if (panelCode.value === 'STOCK_LEDGER' && String(col.property || '').startsWith('期末')) {
+      sums[i] = vals[vals.length - 1]
+      return
+    }
+    sums[i] = Math.round(vals.reduce((a, b) => a + b, 0) * 100) / 100
   })
   return sums
 }
