@@ -68,8 +68,9 @@
       </div>
     </div>
 
-    <!-- 报表沿用配置查询字段；单据页显示当前单据表头，草稿态原地编辑。 -->
-    <div v-if="reportMode" class="fields udl-fields">
+    <!-- 报表沿用配置查询字段；单据页显示当前单据表头，草稿态原地编辑。
+         查询弹窗面板(收发存):查询条件只在弹窗(按钮同款格式),不显示内联区 -->
+    <div v-if="reportMode && !reportQueryDialog" class="fields udl-fields">
       <div class="field" v-for="qr in queryFields" :key="qr.dataName">
         <label :class="{ req: qr.isRequired }">{{ qr.displayName || tt(qr.dataName) }}</label>
         <div v-if="qType(qr) === 'ref' && refModeMap[qr.dataName] === 'select'" class="query-ref-select">
@@ -868,7 +869,7 @@
         <el-button type="primary" @click="dictPickVisible = false">{{ tt('取消') }}</el-button>
       </template>
     </el-dialog>
-    <el-dialog v-model="queryDialogVisible" :title="tt('查询')" width="760px" append-to-body destroy-on-close class="header-query-dialog" @open="loadPlans">
+    <el-dialog v-model="queryDialogVisible" :title="tt('查询')" width="760px" append-to-body destroy-on-close class="header-query-dialog" @open="loadPlans" @close="onQueryDialogClose">
       <!-- 查询方案:下拉调用 + 保存 + 维护 -->
       <div class="query-plan-bar">
         <span class="plan-label">{{ tt('查询方案') }}</span>
@@ -890,8 +891,38 @@
         <el-button size="small" @click="planManageVisible = true">{{ tt('方案维护') }}</el-button>
       </div>
       <div class="query-dialog-fields">
+        <!-- 查询弹窗面板(T+):单个「单据日期」区间控件(日期段必填的统一入口) -->
+        <div v-if="reportQueryDialog" class="query-dialog-field">
+          <label class="req-label">{{ tt('单据日期') }}<span class="req-star">*</span></label>
+          <el-date-picker
+            v-model="rqdRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            :range-separator="tt('至')"
+            :start-placeholder="tt('开始日期')"
+            :end-placeholder="tt('结束日期')"
+            style="width: 100%"
+          />
+        </div>
+        <!-- 台账:仓库/存货联动下拉(选项=真实流水组合,互相约束) -->
+        <template v-if="reportQueryDialog && panelCode === 'STOCK_LEDGER'">
+          <div class="query-dialog-field">
+            <label class="req-label">{{ tt('仓库') }}<span class="req-star">*</span></label>
+            <el-select v-model="queryDraft['仓库']" filterable clearable :loading="ledgerOptsLoading" style="width:100%" @change="onLedgerWhChange">
+              <el-option v-for="w in ledgerWhOptions" :key="w" :label="w" :value="w" />
+            </el-select>
+          </div>
+          <div class="query-dialog-field">
+            <label class="req-label">{{ tt('存货') }}<span class="req-star">*</span></label>
+            <el-select v-model="queryDraft['存货']" filterable clearable :loading="ledgerOptsLoading" style="width:100%" @change="onLedgerItemChange">
+              <el-option v-for="i in ledgerItemOptions" :key="i" :label="i" :value="i" />
+            </el-select>
+          </div>
+        </template>
         <div v-for="field in queryDialogFields" :key="headerFieldKey(field)" class="query-dialog-field">
-          <label>{{ headerFieldLabel(field) }}</label>
+          <label :class="{ 'req-label': rqdFieldRequired(field) }">
+            {{ headerFieldLabel(field) }}<span v-if="rqdFieldRequired(field)" class="req-star">*</span>
+          </label>
           <div v-if="isReferenceField(field)" class="query-ref">
             <el-input
               :model-value="queryDraft[headerFieldKey(field)] ?? ''"
@@ -1836,6 +1867,46 @@ function onHeaderRefSelectChange(field, v) {
 }
 
 const reportMode = computed(() => cfgCache.value?.metadata?.report === true || cfgCache.value?.metadata?.panelCategory === '报表')
+// ── 报表查询弹窗(T+ 同款,收发存汇总/库存台账):与「查询」按钮共用同一个弹窗 ──
+// 字段:单据日期(区间控件,必填) + 仓库/存货(参照;台账必填单一仓库+单一存货,汇总选填)
+// 进入态差异:①未完成过查询就关闭(✕/取消)=退出页面 ②必填项校验(applyHeaderQuery)。
+const reportQueryDialog = computed(() => cfgCache.value?.metadata?.reportQueryDialog === true)
+const rqdDone = ref(false) // 本面板本轮是否已通过弹窗查询(未过弹窗前拦截一切列表加载)
+const rqdRange = ref([])   // 单据日期区间 [开始, 结束](YYYY-MM-DD)
+/** 台账:仓库/存货必填(单选一个仓库的一种存货);汇总:仅单据日期必填 */
+function rqdFieldRequired(field) {
+  if (!reportQueryDialog.value) return false
+  if (panelCode.value === 'STOCK_LEDGER' && ['仓库', '存货'].includes(headerFieldKey(field))) return true
+  return false
+}
+// 台账联动选项:仓库/存货下拉互相约束(选项=后端 v_stock_ledger 真实组合)
+const ledgerWhOptions = ref([])
+const ledgerItemOptions = ref([])
+const ledgerOptsLoading = ref(false)
+async function loadLedgerRefOptions({ keepWh = true, keepItem = true } = {}) {
+  ledgerOptsLoading.value = true
+  try {
+    const res = await engine.callButton({
+      panelCode: panelCode.value, buttonName: '台账联动选项',
+      formData: { 仓库: queryDraft['仓库'] || '', 存货: queryDraft['存货'] || '' }, buttonParam: {},
+    })
+    ledgerWhOptions.value = res?.仓库列表 || []
+    ledgerItemOptions.value = res?.存货列表 || []
+    // 约束收紧后当前值可能不再合法:清掉无效侧(保持用户已选且仍合法的那侧)
+    if (!keepWh && queryDraft['仓库'] && !ledgerWhOptions.value.includes(queryDraft['仓库'])) delete queryDraft['仓库']
+    if (!keepItem && queryDraft['存货'] && !ledgerItemOptions.value.includes(queryDraft['存货'])) delete queryDraft['存货']
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('查询失败'))
+  } finally {
+    ledgerOptsLoading.value = false
+  }
+}
+function onLedgerWhChange() { loadLedgerRefOptions({ keepWh: true, keepItem: false }) } // 换仓→存货按新仓收敛
+function onLedgerItemChange() { loadLedgerRefOptions({ keepWh: false, keepItem: true }) } // 换存货→仓库按新存货收敛
+/** 弹窗关闭:查询弹窗面板在未完成过一次查询时,关闭(✕/取消)即退出页面(对齐 T+ 报表交互) */
+function onQueryDialogClose() {
+  if (reportQueryDialog.value && !rqdDone.value) router.push('/dashboard')
+}
 // YINJIA 适配:单单据面板(基础档案)只有一张虚拟单,隐藏单据切换按钮(◁◀ 第X/Y张 ▶▷)
 const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === true)
 const reportPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
@@ -2378,6 +2449,8 @@ const sheetAllFields = computed(() => {
 const queryDialogFields = computed(() => {
   const fields = reportMode.value ? queryFields.value : headerEditFields.value
   return fields.filter((field) => headerFieldKey(field) !== '备注')
+    // 台账弹窗:仓库/存货改用联动下拉(互相约束),不走通用参照控件
+    .filter((field) => !(reportQueryDialog.value && panelCode.value === 'STOCK_LEDGER' && ['仓库', '存货'].includes(headerFieldKey(field))))
 })
 const draftEditable = computed(() => {
   if (reportMode.value || ['BOM_FWD', 'BOM_REV'].includes(String(panelCode.value))) return false
@@ -2964,6 +3037,13 @@ function scheduleColExpand() {
   colExpandTimer = setTimeout(() => { archViewport.expand = true }, 120)
 }
 watch(panelCode, scheduleColExpand)
+// 查询弹窗面板(收发存/台账):切换面板重置(重新进入需再过条件弹窗)
+watch(panelCode, () => {
+  rqdDone.value = false
+  rqdRange.value = []
+  ledgerWhOptions.value = []
+  ledgerItemOptions.value = []
+})
 onMounted(scheduleColExpand)
 function archLazyOn(b) { return singleDocMode.value && archCols(b).length >= COL_LAZY_MIN }
 let colLazyRaf = 0
@@ -4141,6 +4221,12 @@ function qType(qr) {
 function openQueryDialog() {
   Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
   Object.assign(queryDraft, condition)
+  // 弹窗面板:单据日期区间从当前条件回填(重开弹窗保留上次区间)
+  if (reportQueryDialog.value) {
+    rqdRange.value = condition['开始日期'] && condition['结束日期'] ? [condition['开始日期'], condition['结束日期']] : []
+    // 台账:加载联动选项(带上已选仓库/存货,选项即互相约束后的集合)
+    if (panelCode.value === 'STOCK_LEDGER') loadLedgerRefOptions()
+  }
   queryDialogVisible.value = true
 }
 
@@ -4174,10 +4260,25 @@ function onQueryRefConfirm(rows) {
 }
 
 function applyHeaderQuery() {
+  // 查询弹窗面板:单据日期(区间)必填;台账加验 仓库/存货 必填(单一仓库的一种存货)
+  if (reportQueryDialog.value) {
+    const [ds, de] = rqdRange.value || []
+    if (!ds || !de) {
+      ElMessage.warning(tt('请填写单据日期'))
+      return
+    }
+    if (panelCode.value === 'STOCK_LEDGER' && (!queryDraft['仓库'] || !queryDraft['存货'])) {
+      ElMessage.warning(tt('库存台账需选择一个仓库和一种存货'))
+      return
+    }
+    queryDraft['开始日期'] = ds
+    queryDraft['结束日期'] = de
+  }
   Object.keys(condition).forEach((key) => delete condition[key])
   for (const [key, value] of Object.entries(queryDraft)) {
     if (value !== undefined && value !== null && String(value) !== '') condition[key] = value
   }
+  rqdDone.value = true // 已通过弹窗查询(此后关闭弹窗不再退页)
   queryDialogVisible.value = false
   search()
 }
@@ -4281,6 +4382,7 @@ function planSummary(plan) {
 function resetHeaderQuery() {
   Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
   Object.keys(condition).forEach((key) => delete condition[key])
+  rqdRange.value = [] // 弹窗面板:单据日期区间一并重置
   advFilters.value = []
   query.keyword = ''
   queryDialogVisible.value = false
@@ -4784,6 +4886,8 @@ async function onButton(action) {
     return
   }
   if (action === '查询' || action === '查找') {
+    // 查询弹窗面板(T+ 收发存):查询按钮重开条件弹窗,而非直接刷新
+  if (reportQueryDialog.value) { openQueryDialog(); return }
     search()
     return
   }
@@ -5171,9 +5275,16 @@ async function load() {
     ElMessage.error('面板编号无效，请从菜单重新进入')
     return
   }
+  await loadCrg() // 配置先行(弹窗门依赖 metadata.reportQueryDialog)
+  if (reportQueryDialog.value && !rqdDone.value) {
+    loading.value = false
+    list.value = []
+    total.value = 0
+    openQueryDialog() // 与「查询」按钮同一个弹窗(格式一致)
+    return
+  }
   loading.value = true
   try {
-    await loadCrg()
     loadReportTemplates() // 服务端报表入口(该面板有模板才显示;不阻塞列表)
     const params = { panelCode: panelCode.value, condition: { ...condition }, pageNo: query.pageNo, pageSize: query.pageSize }
     // 模糊搜索生效中:叠加字段条件(后端 AND)与「全部字段」关键字
@@ -6303,6 +6414,12 @@ onUnmounted(() => {
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 查询弹窗必填标记(单据日期/台账仓库存货) */
+.query-dialog-field > label .req-star {
+  color: #ff0033;
+  margin-left: 2px;
+  font-weight: bold;
 }
 .query-dialog-field :deep(.el-input),
 .query-dialog-field :deep(.el-select),

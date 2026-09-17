@@ -160,8 +160,20 @@ export const menuTree = [
           { code: 'materialOutStats', title: '材料出库单统计表', path: '/panelx/list/MATERIAL_OUT_STATS', panelCode: 'MATERIAL_OUT_STATS', icon: 'Histogram' },
           { code: 'otherOutStats', title: '其他出库单统计表', path: '/panelx/list/OTHER_OUT_STATS', panelCode: 'OTHER_OUT_STATS', icon: 'Histogram' },
           { code: 'outsourceIssueStats', title: '委外发料单统计表', path: '/panelx/list/OUTSOURCE_ISSUE_STATS', panelCode: 'OUTSOURCE_ISSUE_STATS', icon: 'Histogram' },
-          // 库存状况表:实时聚合 8 类出入库单据行的现存量/结存金额(参照 PANDA 实现)
+        ],
+      },
+      {
+        // 库存报表(三张核心库存报表集中入口)
+        code: 'invReports',
+        title: '库存报表',
+        icon: 'DataAnalysis',
+        children: [
+          // 库存状况表:实时聚合 8 类出入库单据行的现存量/结存金额(自库存统计组迁入)
           { code: 'stockBalance', title: '库存状况表', path: '/panelx/list/STOCK_BALANCE', panelCode: 'STOCK_BALANCE', icon: 'DataAnalysis' },
+          // 库存台账:8类出入库行级流水+按仓库+存货滚动结存(v_stock_ledger)
+          { code: 'stockLedger', title: '库存台账', path: '/panelx/list/STOCK_LEDGER', panelCode: 'STOCK_LEDGER', icon: 'Notebook' },
+          // 收发存汇总表:按仓库+存货+期次聚合的期初/本期收入发出/期末(v_stock_summary)
+          { code: 'stockSummary', title: '收发存汇总表', path: '/panelx/list/STOCK_SUMMARY', panelCode: 'STOCK_SUMMARY', icon: 'DataAnalysis' },
         ],
       },
     ],

@@ -121,6 +121,7 @@ public class PanelConfigService {
             gridTab.put("columnAliases", gridInfo.get("columnAliases"));
             gridTab.put("displayToKey", gridInfo.get("displayToKey"));
         }
+        if (gridInfo.get("columnGroups") != null) gridTab.put("columnGroups", gridInfo.get("columnGroups"));
 
         Map<String, Object> tablePage = new LinkedHashMap<>();
         tablePage.put("tableName", panelDisplay + (foreign ? " List" : "列表"));
@@ -278,6 +279,7 @@ public class PanelConfigService {
             main.put("columnAliases", gridInfo.get("columnAliases"));
             main.put("displayToKey", gridInfo.get("displayToKey"));
         }
+        if (gridInfo.get("columnGroups") != null) main.put("columnGroups", gridInfo.get("columnGroups"));
         gridTabs.add(main);
 
         // 汇总页签(对齐 PANDA 双层契约之一:gridTabs 第二项 summary=true)。
@@ -328,6 +330,8 @@ public class PanelConfigService {
         metadata.put("panelCode", def.code());
         metadata.put("panelName", panelDisplay);
         metadata.put("panelCategory", def.category());
+        // 报表查询弹窗入口(T+ 同款):进入面板先弹查询条件(日期段必填),关闭弹窗即退出页面;前端 PanelxList 消费
+        if (List.of("STOCK_SUMMARY", "STOCK_LEDGER").contains(def.code())) metadata.put("reportQueryDialog", true);
         metadata.put("singleDoc", panelSingleDoc(def.code()));   // 见 yj_panel.config 的 singleDoc
         metadata.put("autoCodeField", doc ? autoCodeLabel(def) : null);
         // 保存即归档文书面板(真源 ButtonService.DOC_ARCHIVE_PANELS):前端据此放出
@@ -1067,9 +1071,13 @@ public class PanelConfigService {
         List<String> columns = new ArrayList<>();
         Map<String, Object> aliases = new LinkedHashMap<>();
         Map<String, Object> displayToKey = new LinkedHashMap<>();
+        Map<String, List<String>> groupOrder = new LinkedHashMap<>(); // 父表头分组:col_group → 数据键列表(首现顺序)
         for (PanelRegistry.FieldDef f : fields) {
             if (!f.visible()) continue;
             columns.add(f.label()); // data key = 原标签
+            if (f.colGroup() != null && !f.colGroup().isBlank()) {
+                groupOrder.computeIfAbsent(f.colGroup(), k -> new ArrayList<>()).add(f.label());
+            }
             String display = foreign
                     ? (f.alias() != null && !f.alias().isBlank() ? f.alias() : dict.getOrDefault(f.label(), f.label()))
                     : f.displayName();
@@ -1082,6 +1090,11 @@ public class PanelConfigService {
         out.put("columns", columns);
         out.put("columnAliases", aliases);
         out.put("displayToKey", displayToKey);
+        if (!groupOrder.isEmpty()) {
+            List<Map<String, Object>> groups = new ArrayList<>();
+            groupOrder.forEach((g, cols) -> groups.add(Map.of("label", g, "columns", cols)));
+            out.put("columnGroups", groups); // 报表两级表头(前端 reportColumnTree 消费:组列+无组散列)
+        }
         return out;
     }
 
