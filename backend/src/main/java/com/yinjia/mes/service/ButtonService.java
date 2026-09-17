@@ -114,7 +114,7 @@ public class ButtonService {
             case "转ERP" -> pushToErp(def, formData);
             // 批量转ERP:查询所有已审核+未转的单据列表(前端弹窗勾选后逐张调 转ERP)
             case "查询可转ERP" -> listPushableErp(def);
-            // 库存台账弹窗联动选项:仓库/存货互相约束(选项=v_stock_ledger 真实流水组合)
+            // 报表弹窗联动选项(台账/库存状况):仓库/存货互相约束(选项=对应视图真实组合)
             case "台账联动选项" -> ledgerRefOptions(def, formData);
             // 生产工单:成型后生成产品批号(打印产品二维码的数据源,一次生成终身复用)
             case "生成产品批号" -> genProductLot(def, formData);
@@ -1888,21 +1888,26 @@ public class ButtonService {
     // ══════════ 转ERP(金蝶沙箱) ══════════
 
     /** 批量转ERP:查询所有已审核+未转ERP的单据(前端弹窗列表勾选) */
-    /** 库存台账弹窗联动选项:仓库/存货互相约束——选项=v_stock_ledger 真实存在过的组合,
+    /** 报表弹窗联动选项(台账/库存状况):仓库/存货互相约束——选项=对应视图真实存在的组合,
      *  选了存货→仓库只列该存货有流水的仓;选了仓库→存货只列该仓有流水的存货 */
     private Map<String, Object> ledgerRefOptions(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!"STOCK_LEDGER".equals(def.code())) throw new IllegalStateException("仅库存台账支持联动选项");
+        String view = switch (def.code()) {
+            case "STOCK_LEDGER" -> "v_stock_ledger";
+            case "STOCK_BALANCE" -> "v_stock_balance";
+            default -> null;
+        };
+        if (view == null) throw new IllegalStateException("仅库存台账/库存状况表支持联动选项");
         String wh = optionalText(formData, "仓库");
         String item = optionalText(formData, "存货");
         // RTRIM:源列可能带尾随空格(nchar/手工导入),选项须干净值回传才能精确匹配。
-        // 口径:台账查询=仓库+存货组合(两者必填),选项只来自 仓库非空 的行——
-        // 无仓库的行(如早期同步销售出库未带仓库)不在任何可查组合内,不进选项。
+        // 口径:选项只来自 仓库非空 的行——无仓库的行不在任何可查组合内,不进选项
+        // (台账必填仓库+存货;状况表快照本就按仓库聚合,天然非空)。
         List<String> whs = jdbc.queryForList(
-                "SELECT DISTINCT RTRIM(仓库) AS 仓库 FROM v_stock_ledger WHERE 仓库 IS NOT NULL AND RTRIM(仓库) <> ''"
+                "SELECT DISTINCT RTRIM(仓库) AS 仓库 FROM " + view + " WHERE 仓库 IS NOT NULL AND RTRIM(仓库) <> ''"
                 + (item.isBlank() ? "" : " AND RTRIM(存货) = N'" + item.replace("'", "''") + "'")
                 + " ORDER BY 1", String.class);
         List<String> items = jdbc.queryForList(
-                "SELECT DISTINCT RTRIM(存货) AS 存货 FROM v_stock_ledger WHERE 存货 IS NOT NULL AND RTRIM(存货) <> ''"
+                "SELECT DISTINCT RTRIM(存货) AS 存货 FROM " + view + " WHERE 存货 IS NOT NULL AND RTRIM(存货) <> ''"
                 + " AND 仓库 IS NOT NULL AND RTRIM(仓库) <> ''"
                 + (wh.isBlank() ? "" : " AND RTRIM(仓库) = N'" + wh.replace("'", "''") + "'")
                 + " ORDER BY 1", String.class);

@@ -69,8 +69,8 @@
     </div>
 
     <!-- 报表沿用配置查询字段；单据页显示当前单据表头，草稿态原地编辑。
-         查询弹窗面板(收发存):查询条件只在弹窗(按钮同款格式),不显示内联区 -->
-    <div v-if="reportMode && !reportQueryDialog" class="fields udl-fields">
+         查询弹窗/级联面板(收发存/台账/库存状况):查询条件只在弹窗(级联下拉),不显示内联区 -->
+    <div v-if="reportMode && !reportQueryDialog && !isCascadePanel" class="fields udl-fields">
       <div class="field" v-for="qr in queryFields" :key="qr.dataName">
         <label :class="{ req: qr.isRequired }">{{ qr.displayName || tt(qr.dataName) }}</label>
         <div v-if="qType(qr) === 'ref' && refModeMap[qr.dataName] === 'select'" class="query-ref-select">
@@ -902,16 +902,16 @@
             style="width: 100%"
           />
         </div>
-        <!-- 台账:仓库/存货联动下拉(选项=真实流水组合,互相约束) -->
-        <template v-if="reportQueryDialog && panelCode === 'STOCK_LEDGER'">
+        <!-- 级联面板:仓库/存货联动下拉(选项=对应视图真实组合,互相约束);台账必填,状况表选填 -->
+        <template v-if="isCascadePanel">
           <div class="query-dialog-field">
-            <label class="req-label">{{ tt('仓库') }}<span class="req-star">*</span></label>
+            <label :class="{ 'req-label': rqdFieldRequired({ dataName: '仓库' }) }">{{ tt('仓库') }}<span v-if="rqdFieldRequired({ dataName: '仓库' })" class="req-star">*</span></label>
             <el-select v-model="queryDraft['仓库']" filterable clearable :loading="ledgerOptsLoading" style="width:100%" @change="onLedgerWhChange">
               <el-option v-for="w in ledgerWhOptions" :key="w" :label="w" :value="w" />
             </el-select>
           </div>
           <div class="query-dialog-field">
-            <label class="req-label">{{ tt('存货') }}<span class="req-star">*</span></label>
+            <label :class="{ 'req-label': rqdFieldRequired({ dataName: '存货' }) }">{{ tt('存货') }}<span v-if="rqdFieldRequired({ dataName: '存货' })" class="req-star">*</span></label>
             <el-select v-model="queryDraft['存货']" filterable clearable :loading="ledgerOptsLoading" style="width:100%" @change="onLedgerItemChange">
               <el-option v-for="i in ledgerItemOptions" :key="i" :label="i" :value="i" />
             </el-select>
@@ -1869,6 +1869,8 @@ const reportMode = computed(() => cfgCache.value?.metadata?.report === true || c
 // 字段:单据日期(区间控件,必填) + 仓库/存货(参照;台账必填单一仓库+单一存货,汇总选填)
 // 进入态差异:①未完成过查询就关闭(✕/取消)=退出页面 ②必填项校验(applyHeaderQuery)。
 const reportQueryDialog = computed(() => cfgCache.value?.metadata?.reportQueryDialog === true)
+// 级联查询面板:仓库/存货下拉互相约束(台账=联动+必填;库存状况表=联动+选填,快照无日期)
+const isCascadePanel = computed(() => ['STOCK_LEDGER', 'STOCK_BALANCE'].includes(panelCode.value))
 const rqdDone = ref(false) // 本面板本轮是否已通过弹窗查询(未过弹窗前拦截一切列表加载)
 const rqdRange = ref([])   // 单据日期区间 [开始, 结束](YYYY-MM-DD)
 /** 台账:仓库/存货必填(单选一个仓库的一种存货);汇总:仅单据日期必填 */
@@ -2447,8 +2449,8 @@ const sheetAllFields = computed(() => {
 const queryDialogFields = computed(() => {
   const fields = reportMode.value ? queryFields.value : headerEditFields.value
   return fields.filter((field) => headerFieldKey(field) !== '备注')
-    // 台账弹窗:仓库/存货改用联动下拉(互相约束),不走通用参照控件
-    .filter((field) => !(reportQueryDialog.value && panelCode.value === 'STOCK_LEDGER' && ['仓库', '存货'].includes(headerFieldKey(field))))
+    // 级联面板(台账/库存状况):仓库/存货改用联动下拉(互相约束),不走通用参照控件
+    .filter((field) => !(isCascadePanel.value && ['仓库', '存货'].includes(headerFieldKey(field))))
 })
 const draftEditable = computed(() => {
   if (reportMode.value || ['BOM_FWD', 'BOM_REV'].includes(String(panelCode.value))) return false
@@ -4231,12 +4233,11 @@ function qType(qr) {
 function openQueryDialog() {
   Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
   Object.assign(queryDraft, condition)
-  // 弹窗面板:单据日期区间从当前条件回填(重开弹窗保留上次区间)
+  // 弹窗面板:单据日期区间从当前条件回填(重开弹窗保留上次区间);级联面板加载联动选项
   if (reportQueryDialog.value) {
     rqdRange.value = condition['开始日期'] && condition['结束日期'] ? [condition['开始日期'], condition['结束日期']] : []
-    // 台账:加载联动选项(带上已选仓库/存货,选项即互相约束后的集合)
-    if (panelCode.value === 'STOCK_LEDGER') loadLedgerRefOptions()
   }
+  if (isCascadePanel.value) loadLedgerRefOptions()
   queryDialogVisible.value = true
 }
 
