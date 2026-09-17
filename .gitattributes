@@ -1,3 +1,6 @@
 # Windows 批处理必须 CRLF,否则 cmd 解析会错行(仓库内仍存 LF,检出时转换)
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# 迁移清单为混合行尾的历史文件,禁用行尾转换避免整文件假重写(autocrlf坑)
+tools/db-migrations.txt -text

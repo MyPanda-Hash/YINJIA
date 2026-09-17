@@ -28,7 +28,8 @@ tests/
 !tools/lib/mssql-jdbc.jar
 
 # 误创建的 Maven 本地仓库(settings.xml 的 localRepository 未展开环境变量)
-*/${env.YINJIA_M2_REPO}/
+# 无前导斜杠=任意层级匹配(含仓库根);原 */ 前缀只匹配子目录,根级漏网
+${env.YINJIA_M2_REPO}/
 
 # 会话诊断脚本与临时产物:tools 根层不再堆放(历史产物已归档 tools/archive/ 并入库);
 # 根层规则保留作防线,防止再往根层丢。新的一次性探针/任务产物直接写 tools/archive/ 并入库。
