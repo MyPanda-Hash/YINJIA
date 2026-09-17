@@ -373,3 +373,6 @@ migrate-qc-insp-sync-cols.sql
 
 # —— 2026-09-17 库存核算导航两报表——v_stock_ledger台账(8类出入库行级流水+窗口滚动结存)+v_stock_summary收发存汇总(仓库+存货+期次聚合,期初=期末-(收-发)真实口径);两面板注册+字段+en译名25条+视图注明;库存状况表仅菜单迁入不动库。幂等可重跑(视图先删后建)——
 migrate-inv-accounting.sql
+
+# —— 2026-09-17 报表两级表头——yj_field 加 col_group 列(父组元数据);库存台账分组 收入/发出/结存,收发存汇总分组 期初结存/本期入库/本期出库/期末结存(PANDA 同款);父组 en 译名7条。幂等可重跑 ——
+migrate-col-group.sql

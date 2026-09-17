@@ -121,6 +121,7 @@ public class PanelConfigService {
             gridTab.put("columnAliases", gridInfo.get("columnAliases"));
             gridTab.put("displayToKey", gridInfo.get("displayToKey"));
         }
+        if (gridInfo.get("columnGroups") != null) gridTab.put("columnGroups", gridInfo.get("columnGroups"));
 
         Map<String, Object> tablePage = new LinkedHashMap<>();
         tablePage.put("tableName", panelDisplay + (foreign ? " List" : "列表"));
@@ -278,6 +279,7 @@ public class PanelConfigService {
             main.put("columnAliases", gridInfo.get("columnAliases"));
             main.put("displayToKey", gridInfo.get("displayToKey"));
         }
+        if (gridInfo.get("columnGroups") != null) main.put("columnGroups", gridInfo.get("columnGroups"));
         gridTabs.add(main);
 
         // 汇总页签(对齐 PANDA 双层契约之一:gridTabs 第二项 summary=true)。
@@ -1060,9 +1062,13 @@ public class PanelConfigService {
         List<String> columns = new ArrayList<>();
         Map<String, Object> aliases = new LinkedHashMap<>();
         Map<String, Object> displayToKey = new LinkedHashMap<>();
+        Map<String, List<String>> groupOrder = new LinkedHashMap<>(); // 父表头分组:col_group → 数据键列表(首现顺序)
         for (PanelRegistry.FieldDef f : fields) {
             if (!f.visible()) continue;
             columns.add(f.label()); // data key = 原标签
+            if (f.colGroup() != null && !f.colGroup().isBlank()) {
+                groupOrder.computeIfAbsent(f.colGroup(), k -> new ArrayList<>()).add(f.label());
+            }
             String display = foreign
                     ? (f.alias() != null && !f.alias().isBlank() ? f.alias() : dict.getOrDefault(f.label(), f.label()))
                     : f.displayName();
@@ -1075,6 +1081,11 @@ public class PanelConfigService {
         out.put("columns", columns);
         out.put("columnAliases", aliases);
         out.put("displayToKey", displayToKey);
+        if (!groupOrder.isEmpty()) {
+            List<Map<String, Object>> groups = new ArrayList<>();
+            groupOrder.forEach((g, cols) -> groups.add(Map.of("label", g, "columns", cols)));
+            out.put("columnGroups", groups); // 报表两级表头(前端 reportColumnTree 消费:组列+无组散列)
+        }
         return out;
     }
 
