@@ -371,4 +371,13 @@ migrate-erp-push-button.sql
 # —— 2026-09-17 bd_so_order补建金蝶同步扩展4列(折前价税合计/业务模式/交货方式id/发票类型,9452c01漏建致SO同步10/10失败)+yj_field注册+en译名+中文注明;幂等可重跑 ——
 migrate-so-extra-cols.sql
 # —— 2026-09-17 GFDA补注册9个原始档案字段(dm/mc/addr/tel/ywman/sui_no/bank/bank_no/bz;cleanup事故删后链上只自愈金蝶口径致33≠链重放42;税号空数据按治理口径默认隐藏;9标签译名全局共享已有)——
-migrate-gfda-restore-fields.sql
+migrate-gfda-restore-fields.sql
+# —— 2026-09-17 采购→暂收→检验→入库链路修复——PURCHASE_IN仓库名称必填;SL_RECV/QC_INSP明细补计量单位列+字段(随物料参照同名带回);PU_ORDER/PURCHASE_IN供应商参照改存名称(mc,与列内数据/金蝶同步口径一致);幂等可重跑 ——
+migrate-sl-chain-fixes.sql
+# —— 2026-09-17 暂收退料单明细补计量单位列+字段——采购链单位流转补全(采购订单单位→暂收/检验/退料/入库计量单位),链路映射走既有同名词典+同名自动映射零代码;幂等可重跑 ——
+migrate-qc-return-uom.sql
+# —— 2026-09-17 采购入库单仓库名称启用仓库参照(WH)点选——data_type文本改参照(ref配置本就有,序列化只认参照型故此前不弹);同名映射连带带出隐藏仓库编码列;幂等可重跑 ——
+migrate-purchase-in-wh-ref.sql
+# —— 2026-09-17 计量单位存量回填两批——v1按商品档案(bs_inv)填空;v2沿form_flow_link占用链从采购订单行逐级下带+孤儿行同物料借值+错位行以检验行为准纠正+TEST-1测试残留清理;幂等只填空/只纠链路行 ——
+migrate-uom-backfill.sql
+migrate-uom-backfill-v2.sql

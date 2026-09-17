@@ -198,6 +198,8 @@ public class ButtonService {
                 for (Map.Entry<String, Object> e : labelsToCols(def.fieldsAt("header"), head).entrySet()) {
                     if (!e.getKey().equals(def.groupCol())) cols.put(e.getKey(), e.getValue());
                 }
+                // 空白草稿同口径:存在"创建时间"列即填入(新建时刻)
+                if (tableCols(table).contains("创建时间")) cols.put("创建时间", LocalDateTime.now().format(TS_FMT));
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
                 // directAdd 占位草稿:未保存过 -> saved='N'(前端 isFreshAddedDoc 依赖本标记界定"本次新增"窗口)
@@ -206,6 +208,11 @@ public class ButtonService {
             }
             no = formNoService.next(def.prefix(), user);
             clearStaleDocStatus(def, no);
+            // 存在"创建时间"字段的单据新建时自动填入当前时间(金蝶同步单据字段,nvarchar 字符串口径;
+            // save() 已剥离前端传入值,此处是唯一填入点;修改已有单不覆盖)
+            if (def.byLabel("创建时间") != null && head.get("创建时间") == null) {
+                head.put("创建时间", LocalDateTime.now().format(TS_FMT));
+            }
         }
         // 规格书两级分发封锁(2026-09-12):①防绕过——载荷编号命中的是已下发产品(而非已有单据)
         // 时要求总负责人/admin(手动以产品码建单的唯一向量);②分配单仅 责任人∪总负责人∪管理员 可保存。
@@ -228,6 +235,8 @@ public class ButtonService {
         //  提交审批/审批通过双双被拒,撤回/弃审也够不着)
         if ("删除申请中".equals(stStatus)) throw new IllegalStateException("删除申请审批期间不可保存，请等待审批完成或撤回申请");
         if ("修改申请中".equals(stStatus)) throw new IllegalStateException("修改申请审批期间不可保存，请等待审批完成或撤回申请");
+        // 来料检验单数量守恒:每行 合格数量+不良数量 ≤ 数量(送检数量),超限拒绝保存
+        if ("QC_INSP".equals(def.code())) validateInspQty(items);
 
         Map<String, String> l2c = def.labelToCol();
         // 规格书修改态:落库前留「4.产品性能检验项目及检验标准」页旧值快照(表区=检验要求),
@@ -365,6 +374,58 @@ public class ButtonService {
     // ==================== 送料暂收单 → 来料检验单 同步修改(2026-09-15) ====================
 
     /**
+     * 送料暂收单(SL_RECV)弃审联动(2026-09-17):由它生成的来料检验单若已审核则一并弃审——
+     * 递归复用 unaudit(QC_INSP) 的全部联动(其下游入库/退料草稿作废释放,已审核则拒绝并提示先弃审)。
+     * 检验单为草稿则不动(暂收保存时 syncInspFromSlRecv 会镜像同步)。
+     * 链路口径:SL→IJ 占用在检验单作废时才 RELEASED,审核不变更,联动弃审后链保持 ACTIVE,同步可寻址。
+     */
+    private void slUnauditCascade(String panelCode, String no, String user) {
+        if (!"SL_RECV".equals(panelCode)) return;
+        List<String> targets = jdbc.queryForList(
+                "SELECT DISTINCT target_form_no FROM form_flow_link"
+                        + " WHERE source_panel_code = 'SL_RECV' AND source_form_no = ?"
+                        + " AND target_panel_code = 'QC_INSP'", String.class, no);
+        for (String tno : targets) {
+            String st = String.valueOf(docStatusOf("QC_INSP", tno).get("status"));
+            if (!"已审核".equals(st)) continue;
+            Map<String, Object> fd = new HashMap<>();
+            fd.put("编号", tno);
+            unaudit(registry.panel("QC_INSP"), fd);
+        }
+    }
+
+    /**
+     * 来料检验单行数量校验(2026-09-17):合格数量+不良数量不得超过数量(送检数量),空值按 0。
+     * 超限抛错并定位到行,前端以服务异常消息提示。
+     */
+    private void validateInspQty(List<Map<String, Object>> items) {
+        for (int i = 0; i < items.size(); i++) {
+            Map<String, Object> it = items.get(i);
+            double qty = numOf(it.get("数量")), ok = numOf(it.get("合格数量")), bad = numOf(it.get("不良数量"));
+            if (ok + bad > qty + 1e-9) {
+                throw new IllegalStateException("第" + (i + 1) + "行 合格数量(" + trimZero(ok) + ")+不良数量("
+                        + trimZero(bad) + ") 超过数量(" + trimZero(qty) + ")，请核对");
+            }
+        }
+    }
+
+    /** 行值转数值(空/非数值按 0) */
+    private double numOf(Object v) {
+        if (v == null || String.valueOf(v).isBlank()) return 0;
+        try {
+            return Double.parseDouble(String.valueOf(v));
+        } catch (NumberFormatException e) {
+            return 0;
+        }
+    }
+
+    /** 数值显示去尾零(50.0 -> 50) */
+    private static String trimZero(double d) {
+        return d == Math.floor(d) ? String.valueOf((long) d) : String.valueOf(d);
+    }
+
+
+    /**
      * 送料暂收单(SL_RECV)保存后,同步修改由它生成的来料检验单(QC_INSP):
      * - 关联 = form_flow_link(SL_RECV→QC_INSP,ACTIVE,生单时写入;行键=单号#行表id,行 id 跨保存稳定);
      * - 仅当检验单仍可编辑(草稿/修改中)时同步——已审核/审批中/已作废等不越权改动;
@@ -382,12 +443,14 @@ public class ButtonService {
         for (String tno : targets) {
             String st = String.valueOf(docStatusOf("QC_INSP", tno).get("status"));
             if (!"草稿".equals(st) && !"修改中".equals(st)) continue;
+            // JOIN 锚定源暂收单号(单号两式 SL-xxx/IJ-xxx 不同,2026-09-17 修复:
+            // 原写 s.单据编号 = t.单据编号 恒不匹配,表头镜像从未生效)
             jdbc.update("UPDATE t SET t.单据日期 = s.单据日期, t.业务员 = s.业务员, t.供应商代码 = s.供应商代码,"
                             + " t.供应商 = s.供应商, t.部门 = s.部门, t.部门名称 = s.部门名称, t.数量 = s.数量,"
                             + " t.asp_user2 = ?, t.asp_time2 = GETDATE()"
-                            + " FROM qc_insp t JOIN sl_recv s ON s.单据编号 = t.单据编号"
+                            + " FROM qc_insp t JOIN sl_recv s ON s.单据编号 = ?"
                             + " WHERE t.单据编号 = ? AND ISNULL(t.asp_cancel, 'N') <> 'Y' AND ISNULL(s.asp_cancel, 'N') <> 'Y'",
-                    user, tno);
+                    user, no, tno);
             List<Map<String, Object>> links = jdbc.queryForList(
                     "SELECT source_line_key, target_line_key FROM form_flow_link"
                             + " WHERE source_panel_code = 'SL_RECV' AND source_form_no = ?"
@@ -404,6 +467,7 @@ public class ButtonService {
                 if (srcAlive) {
                     jdbc.update("UPDATE d SET d.物料编码 = s.物料编码, d.物料名称 = s.物料名称, d.型号 = s.型号,"
                                     + " d.物料描述 = s.物料描述, d.数量 = s.数量, d.箱数 = s.箱数, d.日期 = s.日期,"
+                                    + " d.计量单位 = s.计量单位,"
                                     + " d.备注 = s.备注, d.结案 = s.结案, d.部门 = s.部门, d.部门名称 = s.部门名称,"
                                     + " d.asp_user2 = ?, d.asp_time2 = GETDATE()"
                                     + " FROM qc_insp_detail d JOIN sl_recv_detail s ON s.id = ?"
@@ -794,6 +858,10 @@ public class ButtonService {
         // 来料检验单弃审联动:自动生成的采购入库单为草稿则作废+释放占用+清入库单号回填;
         // 已审核(可能已记台账)则拒绝,提示先弃审入库单——防止"检验弃审了、库存已入账"的错位
         inspUnauditCascade(def.code(), no, currentUserName());
+        // 送料暂收单弃审联动:由它生成且已审核的来料检验单一并弃审(递归走检验单自身联动,
+        // 其下游入库/退料已审核会被拒绝并提示)——否则暂收改完保存时检验单仍"已审核"
+        // 被镜像同步跳过,出现"暂收改了检验没改"的错位(2026-09-17 用户报同步失效的根因)
+        slUnauditCascade(def.code(), no, currentUserName());
         // 弃审留痕(2026-09-12 修复):文件类面板弃审回到草稿后可直接改,此前的改动不走申请修改闭环,
         // 修改记录完全丢失。弃审时先落一份快照(弃审前的数据),此后再编辑保存/审核/审批通过时
         // 由 finalizeOpenModify 收尾 diff 并盖章再归档——弃审路径与申请修改路径留痕同构。
@@ -1310,7 +1378,7 @@ public class ButtonService {
                         + " AND target_panel_code='PURCHASE_IN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, 型号, 数量, 合格数量, 仓库代码 FROM qc_insp_detail"
+                "SELECT id, 物料编码, 物料名称, 型号, 数量, 合格数量, 仓库代码, 计量单位 FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> pass = rows.stream()
                 .filter(r -> numOr(r.get("合格数量")) > 0).toList();
@@ -1327,6 +1395,7 @@ public class ButtonService {
             line.put("存货名称", r.get("物料名称"));
             line.put("规格型号", r.get("型号"));
             line.put("实收数量", r.get("合格数量"));
+            line.put("计量单位", r.get("计量单位"));
             Object wh = r.get("仓库代码");
             if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
             items.add(line);
@@ -1375,7 +1444,7 @@ public class ButtonService {
                         + " AND target_panel_code='QC_RETURN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, 型号, 物料描述, 数量, 不良数量, 备注, 日期 FROM qc_insp_detail"
+                "SELECT id, 物料编码, 物料名称, 型号, 物料描述, 数量, 不良数量, 备注, 日期, 计量单位 FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> defect = rows.stream()
                 .filter(r -> numOr(r.get("不良数量")) > 0).toList();
@@ -1393,6 +1462,7 @@ public class ButtonService {
             line.put("型号", r.get("型号"));
             line.put("物料描述", r.get("物料描述"));
             line.put("数量", r.get("不良数量"));
+            line.put("计量单位", r.get("计量单位"));
             Object d = r.get("日期");
             if (d != null && !String.valueOf(d).isBlank()) line.put("日期", String.valueOf(d));
             Object m = r.get("备注");
@@ -2411,6 +2481,10 @@ public class ButtonService {
                 Integer.class, no);
         if (c == null || c == 0) throw new IllegalArgumentException("表单数据不存在：" + no);
     }
+
+    /** 单据时间戳统一格式(创建时间列 nvarchar,与金蝶同步口径一致) */
+    private static final java.time.format.DateTimeFormatter TS_FMT =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /** 文件类面板(文书式):保存即归档,退出草稿状态机;后续新增文件类面板在此登记(SysAdminController 权限动作集引用) */
     public static final java.util.Set<String> DOC_ARCHIVE_PANELS = java.util.Set.of(

@@ -884,9 +884,11 @@ public class PanelConfigService {
             java.util.Map.entry("CKD", "KHDD")                       // 客户订单(旧) → 出库单(旧)
     )));
 
-    /** 头字段映射排除项(状态/审批类不参与选单带入)。 */
+    /** 头字段映射排除项(状态/审批类不参与选单带入;附件1-6是按单号锚定的文件实体,
+     *  靠字段值映射带入既无意义又占 7 条映射上限的坑——曾把 SL_RECV→QC_INSP 的日期挤丢)。 */
     private static final java.util.Set<String> FLOW_HEAD_EXCLUDE = java.util.Set.of(
-            "编号", "单据状态", "审核人", "审核时间", "审批人", "审批时间", "创建时间", "更新时间");
+            "编号", "单据状态", "审核人", "审核时间", "审批人", "审批时间", "创建时间", "更新时间",
+            "附件1", "附件2", "附件3", "附件4", "附件5", "附件6");
 
     /** 明细字段同义词(来源字段 → 目标字段;同名映射之外的补充)。 */
     private static final String[][] FLOW_DETAIL_SYNONYMS = {
@@ -919,8 +921,10 @@ public class PanelConfigService {
             "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}},
             "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}},
             "SO_ORDER|WO_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "交期"}},
-            // 采购订单 → 送料暂收单:表头日期标签不同(单据日期→日期),其余同名自动映射
-            "PU_ORDER|SL_RECV", new String[][]{{"单据日期", "日期"}}
+            // 采购订单 → 送料暂收单:表头日期标签不同(单据日期→日期);供应商编码→供应商代码(异名,不带则生单丢失编码)
+            "PU_ORDER|SL_RECV", new String[][]{{"单据日期", "日期"}, {"供应商编码", "供应商代码"}},
+            // 送料暂收单 → 来料检验单:日期同名,但头映射 7 条上限曾被附件占坑挤丢,同义词追加无上限兜底
+            "SL_RECV|QC_INSP", new String[][]{{"日期", "日期"}}
     )));
 
     /** 生单/选单共用的头行映射(目标面板 → {source, headerMap, detailMap});供 PushGenerateHandler 复用。 */
