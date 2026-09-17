@@ -382,3 +382,6 @@ migrate-stock-summary-query.sql
 
 # —— 2026-09-17 库存台账查询弹窗(与收发存汇总同款)——弹窗字段 开始/结束日期(必填)+仓库/存货(参照WH/INV);过滤走 单据日期 闭区间(有期次列则按月,QueryService自动识别);v_stock_ledger 补开始/结束日期回显列;编码列/单据类型退为明细列;修正:重建ledger不需要DROP依赖视图(普通视图无SCHEMABINDING)。幂等可重跑 ——
 migrate-stock-ledger-query.sql
+
+# —— 2026-09-17 报表弹窗字段终版——删 开始/结束日期 查询字段(改为弹窗内置单个「单据日期」区间控件);台账 仓库/存货 required=1(单一仓库的一种存货),汇总 required=0;库存状况表(STOCK_BALANCE)零改动 ——
+migrate-report-dialog-fields.sql

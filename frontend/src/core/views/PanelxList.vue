@@ -889,8 +889,23 @@
         <el-button size="small" @click="planManageVisible = true">{{ tt('方案维护') }}</el-button>
       </div>
       <div class="query-dialog-fields">
+        <!-- 查询弹窗面板(T+):单个「单据日期」区间控件(日期段必填的统一入口) -->
+        <div v-if="reportQueryDialog" class="query-dialog-field">
+          <label class="req-label">{{ tt('单据日期') }}<span class="req-star">*</span></label>
+          <el-date-picker
+            v-model="rqdRange"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            :range-separator="tt('至')"
+            :start-placeholder="tt('开始日期')"
+            :end-placeholder="tt('结束日期')"
+            style="width: 100%"
+          />
+        </div>
         <div v-for="field in queryDialogFields" :key="headerFieldKey(field)" class="query-dialog-field">
-          <label>{{ headerFieldLabel(field) }}</label>
+          <label :class="{ 'req-label': rqdFieldRequired(field) }">
+            {{ headerFieldLabel(field) }}<span v-if="rqdFieldRequired(field)" class="req-star">*</span>
+          </label>
           <div v-if="isReferenceField(field)" class="query-ref">
             <el-input
               :model-value="queryDraft[headerFieldKey(field)] ?? ''"
@@ -1835,11 +1850,18 @@ function onHeaderRefSelectChange(field, v) {
 }
 
 const reportMode = computed(() => cfgCache.value?.metadata?.report === true || cfgCache.value?.metadata?.panelCategory === '报表')
-// ── 报表查询弹窗(T+ 同款,收发存汇总):进入与「查询」按钮共用同一个弹窗(方案栏+字段
-// 网格+高级筛选格式);进入态差异仅两点——①未完成过查询就关闭(✕/取消)=退出页面,
-// ②开始/结束日期必填(applyHeaderQuery 校验)。
+// ── 报表查询弹窗(T+ 同款,收发存汇总/库存台账):与「查询」按钮共用同一个弹窗 ──
+// 字段:单据日期(区间控件,必填) + 仓库/存货(参照;台账必填单一仓库+单一存货,汇总选填)
+// 进入态差异:①未完成过查询就关闭(✕/取消)=退出页面 ②必填项校验(applyHeaderQuery)。
 const reportQueryDialog = computed(() => cfgCache.value?.metadata?.reportQueryDialog === true)
 const rqdDone = ref(false) // 本面板本轮是否已通过弹窗查询(未过弹窗前拦截一切列表加载)
+const rqdRange = ref([])   // 单据日期区间 [开始, 结束](YYYY-MM-DD)
+/** 台账:仓库/存货必填(单选一个仓库的一种存货);汇总:仅单据日期必填 */
+function rqdFieldRequired(field) {
+  if (!reportQueryDialog.value) return false
+  if (panelCode.value === 'STOCK_LEDGER' && ['仓库', '存货'].includes(headerFieldKey(field))) return true
+  return false
+}
 /** 弹窗关闭:查询弹窗面板在未完成过一次查询时,关闭(✕/取消)即退出页面(对齐 T+ 报表交互) */
 function onQueryDialogClose() {
   if (reportQueryDialog.value && !rqdDone.value) router.push('/dashboard')
@@ -2972,9 +2994,10 @@ function scheduleColExpand() {
   colExpandTimer = setTimeout(() => { archViewport.expand = true }, 120)
 }
 watch(panelCode, scheduleColExpand)
-// 查询弹窗面板(收发存):切换面板重置(重新进入需再过条件弹窗)
+// 查询弹窗面板(收发存/台账):切换面板重置(重新进入需再过条件弹窗)
 watch(panelCode, () => {
   rqdDone.value = false
+  rqdRange.value = []
 })
 onMounted(scheduleColExpand)
 function archLazyOn(b) { return singleDocMode.value && archCols(b).length >= COL_LAZY_MIN }
@@ -4153,6 +4176,10 @@ function qType(qr) {
 function openQueryDialog() {
   Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
   Object.assign(queryDraft, condition)
+  // 弹窗面板:单据日期区间从当前条件回填(重开弹窗保留上次区间)
+  if (reportQueryDialog.value) {
+    rqdRange.value = condition['开始日期'] && condition['结束日期'] ? [condition['开始日期'], condition['结束日期']] : []
+  }
   queryDialogVisible.value = true
 }
 
@@ -4186,10 +4213,19 @@ function onQueryRefConfirm(rows) {
 }
 
 function applyHeaderQuery() {
-  // 查询弹窗面板(收发存):开始/结束日期必填,未填不查询(弹窗保持打开)
-  if (reportQueryDialog.value && (!queryDraft['开始日期'] || !queryDraft['结束日期'])) {
-    ElMessage.warning(tt('请填写开始日期与结束日期'))
-    return
+  // 查询弹窗面板:单据日期(区间)必填;台账加验 仓库/存货 必填(单一仓库的一种存货)
+  if (reportQueryDialog.value) {
+    const [ds, de] = rqdRange.value || []
+    if (!ds || !de) {
+      ElMessage.warning(tt('请填写单据日期'))
+      return
+    }
+    if (panelCode.value === 'STOCK_LEDGER' && (!queryDraft['仓库'] || !queryDraft['存货'])) {
+      ElMessage.warning(tt('库存台账需选择一个仓库和一种存货'))
+      return
+    }
+    queryDraft['开始日期'] = ds
+    queryDraft['结束日期'] = de
   }
   Object.keys(condition).forEach((key) => delete condition[key])
   for (const [key, value] of Object.entries(queryDraft)) {
@@ -4299,6 +4335,7 @@ function planSummary(plan) {
 function resetHeaderQuery() {
   Object.keys(queryDraft).forEach((key) => delete queryDraft[key])
   Object.keys(condition).forEach((key) => delete condition[key])
+  rqdRange.value = [] // 弹窗面板:单据日期区间一并重置
   advFilters.value = []
   query.keyword = ''
   queryDialogVisible.value = false
@@ -6330,6 +6367,12 @@ onUnmounted(() => {
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 查询弹窗必填标记(单据日期/台账仓库存货) */
+.query-dialog-field > label .req-star {
+  color: #ff0033;
+  margin-left: 2px;
+  font-weight: bold;
 }
 .query-dialog-field :deep(.el-input),
 .query-dialog-field :deep(.el-select),
