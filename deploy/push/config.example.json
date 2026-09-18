@@ -1,12 +1,12 @@
 {
-  "_说明": "转ERP按钮(采购入库/销售出库→金蝶)连接配置模板。复制为 config.json 并填入真实凭证;config.json 已 gitignore 绝不入库。outerInstanceId 选填,填了可自动应对 appSecret 24h 轮换(fetchAuthorization 自愈)。",
+  "_说明": "转ERP按钮(采购入库/销售出库→金蝶)连接配置模板。复制为 config.json 并填入真实凭证;config.json 已 gitignore 绝不入库。真实账套必须配 outerInstanceId(appSecret 24h轮换,fetchAuthorization 动态获取自愈);仅沙箱等静态密钥场景才手填 appKey/appSecret。",
   "kingdee": {
     "clientId": "<金蝶开放平台 clientId>",
     "clientSecret": "<金蝶开放平台 clientSecret>",
-    "appKey": "<应用 appKey>",
-    "appSecret": "<应用 appSecret(24h轮换,建议配 outerInstanceId 自愈)>",
-    "outerInstanceId": "<可选:授权实例ID,密钥轮换自愈>",
-    "domain": "https://api.kingdee.com"
+    "appKey": "<仅静态密钥场景填,真实账套留空>",
+    "appSecret": "<仅静态密钥场景填,真实账套留空>",
+    "outerInstanceId": "<真实账套必填:第三方实例ID,动态授权换当前 appKey/appSecret>",
+    "domain": "https://tf.jdy.com"
   },
   "database": {
     "server": "127.0.0.1",

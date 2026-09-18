@@ -110,7 +110,7 @@ public class ButtonService {
             case "新增库存" -> addStock(def, formData);
             // 库存状况:修改预警数量(行内编辑,空值回退全局阈值100)
             case "更新预警数量" -> updateStockWarn(def, formData);
-            // 转ERP:已审核+未转过的采购入库/销售出库 → 推送到金蝶沙箱,回写ERP单号
+            // 转ERP:已审核+未转过的采购入库/销售出库 → 推送金蝶星辰(账套由 kingdee.push.* 凭证决定),回写ERP单号
             case "转ERP" -> pushToErp(def, formData);
             // 批量转ERP:查询所有已审核+未转的单据列表(前端弹窗勾选后逐张调 转ERP)
             case "查询可转ERP" -> listPushableErp(def);
@@ -1957,7 +1957,7 @@ public class ButtonService {
         return n == null ? 0 : n;
     }
 
-    // ══════════ 转ERP(金蝶沙箱) ══════════
+    // ══════════ 转ERP(金蝶星辰) ══════════
 
     /** 批量转ERP:查询所有已审核+未转ERP的单据(前端弹窗列表勾选) */
     /** 报表弹窗联动选项(台账/库存状况):仓库/存货互相约束——选项=对应视图真实存在的组合,
