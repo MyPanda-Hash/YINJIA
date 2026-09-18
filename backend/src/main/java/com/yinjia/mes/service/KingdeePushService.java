@@ -220,6 +220,7 @@ public class KingdeePushService {
      * 切换测试/真实账套后自动按新凭证重拉,无需改代码或本地档案。
      */
     private synchronized Map<String, String> unitMap() throws Exception {
+        ensureCreds(); // 凭证先行:本方法可能先于 getToken() 被调用(推送流程④),Spring 未配时须先装 config.json,否则 clientSecret 为空 → SecretKeySpec "Empty key"
         if (unitIdByName != null && System.currentTimeMillis() - unitCacheAt < 22 * 3600_000L) return unitIdByName;
         Map<String, String> m = new HashMap<>();
         for (int page = 1; page <= 10; page++) {
