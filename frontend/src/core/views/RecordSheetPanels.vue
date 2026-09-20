@@ -136,12 +136,10 @@
     </table>
 
     <!-- ═══ 条件区(共享网格:标签=第1列,值跨其余列;与数据表竖线对齐;按页归属渲染) ═══
-         ⚠ 数据记录表在**模板里另起一段**(见下方 cfg.dataTables),故默认渲染次序是
-           「本页所有 sections → 本页所有 dataTables」—— 表格会落在同页**最后一个章节之后**。
-           (曾误以为表格紧跟 sections 的第一块,用户报「表格在最底下」才纠正过来。)
-           需要「标题 → 表格 → 后续章节」的交叉顺序时:给那条**表**标 `tablesAfterBar: '<节的 bar 文本>'`,
-           本循环渲染到该节之后就地渲染这条表,下方那段则跳过它(见两处 v-if)。 -->
-    <table v-for="(sec, si) in cfg.sections" v-show="pageOf(sec) === activePage" :key="'sec' + si" class="rs-t" :style="{ width: secW(sec) + 'px' }">
+         ⚠ 本循环只渲染**数据表锚点之前(含锚点)**的章节;锚点之后的章节由下面第二段循环渲染,
+           目的是让数据表能夹在两者之间(设计第 4 页:物料表紧跟「1.关键物料列表」)。
+           没有锚点的面板 ⇒ isAtOrBeforeTableAnchor 恒 true ⇒ 第二段为空、行为与以前完全一致。 -->
+    <table v-for="(sec, si) in cfg.sections" v-show="isAtOrBeforeTableAnchor(sec) && pageOf(sec) === activePage" :key="'sec' + si" class="rs-t" :style="{ width: secW(sec) + 'px' }">
       <colgroup><col v-for="(w, i) in secCols(sec)" :key="'sc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
@@ -328,190 +326,13 @@
       </tbody>
     </table>
 
-      <!-- 就地渲染「紧跟本标题」的数据表(仅当该节标了 tablesSlot、且这条表的
-           tablesAfterBar 等于本节的 bar 文本)。与下方那份是同一份实现的**原样副本**,
-           两处都有 v-if 守着 ⇒ 同一张表只渲染一处,不受影响的面板行为不变。
-           ⚠⚠ 三个条件**必须全写在 v-show 里**,不能写成 `v-if="…dt.…" v-for="(dt,…)"`:
-             Vue 的 v-if 优先级高于 v-for,同元素上 v-if 在**外层作用域**求值、取不到迭代变量,
-             编译出来是 `_ctx.dt.tablesAfterBar`(见 tools/archive/_chk-sfc-compile.mjs),
-             `_ctx.dt` 恒为 undefined ⇒ **每次渲染都抛 TypeError,整个面板一片空白**。
-             v-show 则编译进 v-for 的回调体内,dt 一定可取(下方 pageOf(dt) 用的就是这个)。 -->
-      <template v-for="(sec, si) in cfg.sections" :key="'slot' + si">
-      <div v-for="(dt, di) in cfg.dataTables" v-show="sec.tablesSlot && dt.tablesAfterBar === sec.bar && pageOf(dt) === activePage" :key="'sdt' + si + '-' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
-        <div class="rsp-dt-table">
-          <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : effPlain ? plainW(dt) : gridW) + 'px' }">
-            <colgroup>
-              <template v-if="effPlain || dtOwnsWidth(dt)">
-                <col v-for="(c, i) in visCols(dt)" :key="'dc' + i" :style="{ width: ((c.w || 100) * (dt.design ? designK(dt) : 1)).toFixed(1) + 'px' }" />
-              </template>
-              <template v-else>
-                <col v-for="(w, i) in effGrid" :key="'dc' + i" :style="{ width: w + 'px' }" />
-              </template>
-              <col v-if="editable" style="width:0" />
-            </colgroup>
-            <tbody>
-              <!-- plain 版式:标题条 + 副标题行(测试项目：/设备名称：/仪器名称/型号：) -->
-              <tr v-if="effPlain">
-                <td :colspan="totalSpan(dt)" class="rsp-plain-title">{{ tt(plainTitleOf) }}</td>
-                <td v-if="editable" class="rsp-op-pad"></td>
-              </tr>
-              <tr v-if="effPlain && cfg.subtitle">
-                <td :colspan="totalSpan(dt)" class="rsp-subtitle-row" :class="{ right: cfg.subtitle.align === 'right' }">
-                  <span class="rsp-sub-label">{{ tt(cfg.subtitle.label) }}</span>
-                  <el-select v-if="editable && cfg.subtitle.type === 'select'" v-model="head[cfg.subtitle.key]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="emit('dirty')">
-                    <el-option v-for="o in subtitleOptions" :key="o.value" :label="o.label" :value="o.value" />
-                  </el-select>
-                  <!-- 标准库字段:条目可维护(打印时隐藏,纸张上不出现"标准库"字样) -->
-                  <span v-if="editable && cfg.subtitle.type === 'select' && stdLibOf(cfg.subtitle.key)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(cfg.subtitle.key))">⧉ {{ tt('标准库维护') }}</span>
-                  <el-input v-else-if="editable" v-model="head[cfg.subtitle.key]" size="small" maxlength="100" class="rsp-sub-ctl" @input="emit('dirty')" />
-                  <span v-else class="rsp-sub-value">{{ head[cfg.subtitle.key] || '' }}</span>
-                </td>
-                <td v-if="editable" class="rsp-op-pad"></td>
-              </tr>
-              <!-- report 版式带变体时:变体切换行(如 申请单类型)。
-                   dt.noVariant 用于「变体字段已在条件区有一格」的表(组装工艺清单:工艺形态 在产品基本信息区),
-                   否则同一字段会在一页里出现两次。 -->
-              <tr v-if="!effPlain && cfg.variantKey && !dt.noVariant">
-                <td :colspan="2" class="rsp-subtitle-row rsp-left">
-                  <span class="rsp-sub-label">{{ tt(variantLabel) }}</span>
-                  <el-select v-if="editable" v-model="head[cfg.variantKey]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="emit('dirty')">
-                    <el-option v-for="o in variantOptions" :key="o.value" :label="o.label" :value="o.value" />
-                  </el-select>
-                  <span v-if="editable && stdLibOf(cfg.variantKey)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(cfg.variantKey))">⧉ {{ tt('标准库维护') }}</span>
-                  <span v-else class="rsp-sub-value">{{ head[cfg.variantKey] || '' }}</span>
-                </td>
-                <td :colspan="Math.max(1, totalSpan(dt) - 2)" class="rsp-subtitle-row rsp-quiet"></td>
-                <td v-if="editable" class="rsp-op-pad"></td>
-              </tr>
-              <!-- 页面级标题(规格书修订记录:设计图为居中大标题,非格式区条) -->
-              <tr v-if="dt.pageTitle" :class="{ 'rsp-design': dt.design }">
-                <td :colspan="totalSpan(dt)" class="rsp-page-title" :style="designTitleStyle(dt)">{{ tt(dt.pageTitle) }}</td>
-                <td v-if="editable" class="rsp-op-pad"></td>
-              </tr>
-              <tr v-if="dt.bar && !dt.pageTitle">
-                <td :colspan="totalSpan(dt)" class="rs-sectionbar">
-                  <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
-                    <span>{{ tt(dt.bar) }}</span>
-                    <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
-                    <span v-if="dt.materialPick && editable" class="rs-lib-btn" style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(dt)">📦 {{ tt('从物料清单引用') }}</span>
-                    <span v-if="di === fieldEditAt" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
-                  </span>
-                </td>
-                <td v-if="editable" class="rsp-op-pad"></td>
-              </tr>
-              <tr v-if="dt.subHeads">
-                <td v-for="(sh, shi) in spreadSubHeads(dt)" :key="'sh' + shi" :colspan="sh.span" class="rs-subhead">{{ tt(sh.label) }}</td>
-                <td v-if="editable" class="rsp-op-pad"></td>
-              </tr>
-              <!-- 分组式设计表头(检验项目及标准:检验项目跨 组/子项目 两列,单行表头) -->
-              <tr v-if="dt.design?.groupCol" class="rs-grp rsp-design">
-                <th class="rs-th" :style="designThStyle(dt)">{{ tt('序号') }}</th>
-                <th class="rs-th" :style="designThStyle(dt)" colspan="2">{{ tt('检验项目') }}</th>
-                <th class="rs-th" :style="designThStyle(dt)">{{ tt('检验要求') }}</th>
-                <th class="rs-th" :style="designThStyle(dt)">{{ tt('检验方法') }}</th>
-                <th class="rs-th" :style="designThStyle(dt)">{{ tt('检验依据') }}</th>
-                <th v-if="editable" class="rs-th-op"></th>
-              </tr>
-              <template v-else>
-                <tr class="rs-grp" :class="{ 'rsp-design': dt.design }">
-                  <template v-for="(g, gi) in headerRow1(dt)" :key="'h1' + gi">
-                    <th v-if="g.kind === 'plain'" class="rs-th" :style="designThStyle(dt)" :rowspan="g.rowspan" :colspan="g.span > 1 ? g.span : undefined">{{ tt(effColLabel(g.key || g.label, g.label)) }}</th>
-                    <th v-else-if="g.kind === 'group'" class="rs-th" :style="designThStyle(dt)" :colspan="g.span">{{ tt(g.label) }}</th>
-                  </template>
-                  <th v-if="editable" class="rs-th-op" :rowspan="hasGroup(dt) ? 2 : 1"></th>
-                </tr>
-                <tr v-if="hasGroup(dt)" class="rs-grp2">
-                  <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th" :colspan="(c.span || 1) > 1 ? c.span : undefined">{{ tt(effColLabel(c.key, c.label)) }}</th>
-                </tr>
-              </template>
-              <!-- 分组式数据行(检验项目及标准:序号/组跨行,子项目列,要求/方法/依据可编辑) -->
-              <template v-if="dt.design?.groupCol">
-                <tr v-for="r in designGroupRows(dt)" :key="r.key" class="rsp-design">
-                  <td class="rs-td" :style="designTdStyle(dt, 'seq')" :rowspan="r.groupFirst ? r.group.count : undefined">{{ r.groupFirst ? r.seq : '' }}</td>
-                  <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.groupFirst ? r.group.count : undefined" :colspan="r.standalone ? 2 : 1">{{ r.groupFirst ? tt(r.group.label) : '' }}</td>
-                  <td v-if="!r.standalone" class="rs-td" :style="designTdStyle(dt, 'item')">{{ tt(r.sub || '') }}</td>
-                  <td class="rs-td" :style="designTdStyle(dt, 'req')">
-                    <el-input v-if="editable" v-model="r.row['检验要求']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />
-                    <span v-else class="rs-txt rsp-cell rsp-pre">{{ r.row['检验要求'] || ' / ' }}</span>
-                  </td>
-                  <td class="rs-td" :style="designTdStyle(dt, 'method')">
-                    <el-input v-if="editable" v-model="r.row['检验方法']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />
-                    <span v-else class="rs-txt rsp-cell rsp-pre">{{ r.row['检验方法'] || ' / ' }}</span>
-                  </td>
-                  <td class="rs-td" :style="designTdStyle(dt, 'basis')">
-                    <el-input v-if="editable" v-model="r.row['检验依据']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />
-                    <span v-else class="rs-txt rsp-cell rsp-pre">{{ r.row['检验依据'] || ' / ' }}</span>
-                  </td>
-                  <td v-if="editable" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(r.row)">×</span></td>
-                </tr>
-              </template>
-              <tr v-else v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }">
-                <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :style="designTdStyle(dt)" :colspan="(c.span || 1) > 1 ? c.span : undefined">
-                  <el-input v-if="editable && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
-                  <el-input v-else-if="editable" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
-                  <span v-else class="rs-txt rsp-cell">{{ row[c.key] || ' / ' }}</span>
-                </td>
-                <td v-if="editable" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
-              </tr>
-              <tr v-if="!rowsOf(dt).length">
-                <td :colspan="totalSpan(dt)" class="rs-empty">—</td>
-                <td v-if="editable" class="rsp-op-pad"></td>
-              </tr>
-              <!-- 合计行(成型配方:比例/含量/设计添加量数值求和)——「合计」格跨度跟首列跨度走(13 格配方表首列 No. 占 1 格) -->
-              <tr v-if="dt.totalCols && rowsOf(dt).length">
-                <td class="rs-td rsp-total" :colspan="visCols(dt)[0]?.span || 1">{{ tt('合计') }}</td>
-                <td v-for="(c, ci) in visCols(dt).slice(1)" :key="'tt' + ci" class="rs-td rsp-total" :colspan="(c.span || 1) > 1 ? c.span : undefined">
-                  {{ totalOf(dt, c.key) || '' }}
-                </td>
-                <td v-if="editable" class="rsp-op-pad"></td>
-              </tr>
-              <!-- 页脚须知(仪器使用记录表) -->
-              <tr v-if="dt.footerNote">
-                <td :colspan="totalSpan(dt)" class="rsp-footnote">{{ tt(dt.footerNote) }}</td>
-                <td v-if="editable" class="rsp-op-pad"></td>
-              </tr>
-            </tbody>
-          </table>
-          <div v-if="editable" class="rs-add" :style="{ width: (effPlain ? plainW(dt) : (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : gridW)) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
-        </div>
-        <!-- 矿化:Excel 原表右侧 4 张散点图(RO出水/浸泡30min/煮沸晾凉 × 累计流量) -->
-        <div v-if="dt.charts" class="rsp-chart">
-          <svg :viewBox="`0 0 ${CW} ${CH}`" class="rsp-chart-svg" preserveAspectRatio="xMidYMid meet">
-            <text :x="CW / 2" y="16" text-anchor="middle" class="rsp-chart-title">{{ tt(dt.metric) }}-{{ tt('累计流量曲线') }}</text>
-            <g v-for="(gl, gi) in chartOf(dt).gridH" :key="'gh' + gi">
-              <line :x1="chartOf(dt).ml" :y1="gl.y" :x2="CW - chartOf(dt).mr" :y2="gl.y" class="rsp-gridline" />
-              <text :x="chartOf(dt).ml - 6" :y="gl.y + 4" text-anchor="end" class="rsp-tick">{{ gl.label }}</text>
-            </g>
-            <g v-for="(gv, gi) in chartOf(dt).gridV" :key="'gv' + gi">
-              <line :x1="gv.x" :y1="chartOf(dt).mt" :x2="gv.x" :y2="CH - chartOf(dt).mb" class="rsp-gridline" />
-              <text :x="gv.x" :y="CH - chartOf(dt).mb + 16" text-anchor="middle" class="rsp-tick">{{ gv.label }}</text>
-            </g>
-            <polyline v-for="(s, si) in chartOf(dt).series" :key="'s' + si" :points="s.pts.map((p) => p.join(',')).join(' ')" fill="none" :stroke="s.color" stroke-width="1.6" />
-            <g v-for="(s, si) in chartOf(dt).series" :key="'m' + si">
-              <circle v-for="(p, pi) in s.pts" :key="pi" :cx="p[0]" :cy="p[1]" r="2.6" :fill="s.color" />
-            </g>
-            <g :transform="`translate(${chartOf(dt).ml}, ${CH - 12})`">
-              <g v-for="(s, si) in chartOf(dt).series" :key="'lg' + si" :transform="`translate(${si * 118}, 0)`">
-                <rect width="14" height="3" y="-4" :fill="s.color" />
-                <text x="19" y="0" class="rsp-legend">{{ tt(s.name) }}</text>
-              </g>
-            </g>
-            <text v-if="!chartOf(dt).hasData" :x="CW / 2" :y="CH / 2" text-anchor="middle" class="rsp-nodata">{{ tt('暂无数据') }}</text>
-          </svg>
-        </div>
-      </div>
-      </template>
-
-    <!-- ═══ 数据记录表(共享网格;支持子头行+两级表头;矿化 4 指标块各带散点图;按页归属渲染)═══
-         ⚠ 位置:本段在模板里排在 **cfg.sections 之后** ⇒ 默认渲染次序是
-           「本页所有 sections → 本页所有 dataTables」,即**表格会落在同页最后一个章节之后**。
-           (曾误以为它紧跟 sections 的第一块,用户报「表格在最底下」才纠正过来。)
-           若某条表标了 `tablesAfterBar`,它改由上面 sections 循环在该节之后就地渲染(见那里的 v-for),
-           本段跳过它 —— 否则会渲染两遍。
-           ⚠ 跳过条件同样只能写在 v-show 里(理由见上方那段的 ⚠⚠:v-if 取不到 dt,整面板白屏)。
-           ⚠ 兜底:锚点写了却**没有任何节认领**它(节没标 tablesSlot / bar 文本对不上)时,本段照旧渲染 ——
-             否则上段跳过、本段也跳过,那张表会**无声消失**(这类"静默少一块"是本文件反复踩的坑)。 -->
-    <div v-for="(dt, di) in cfg.dataTables" v-show="!anchoredElsewhere(dt) && pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
+    <!-- ═══ 数据记录表(共享网格;按页归属渲染)═══
+         ⚠ 本段**只此一份**,夹在循环 A 与循环 B 之间 ⇒ 表格紧贴其锚点章节之后。
+           两次踩坑记在这,别退回:
+             · v-if 与 v-for 同元素引用 dt ⇒ 编译成 _ctx.dt ⇒ 每次渲染抛 TypeError ⇒ 整面板白屏;
+             · 把表块克隆进 sections 循环 ⇒ 每章节克隆一份(实测 8 份、7 份 display:none),
+               且克隆块仍排在所有 sections 之后 ⇒ 表格照样落在末尾。 -->
+    <div v-for="(dt, di) in cfg.dataTables" v-show="pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
         <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : effPlain ? plainW(dt) : gridW) + 'px' }">
           <colgroup>
@@ -674,6 +495,193 @@
         </svg>
       </div>
     </div>
+
+    <table v-for="(sec, si) in cfg.sections" v-show="!isAtOrBeforeTableAnchor(sec) && pageOf(sec) === activePage" :key="'secB' + si" class="rs-t" :style="{ width: secW(sec) + 'px' }">
+      <colgroup><col v-for="(w, i) in secCols(sec)" :key="'sc' + i" :style="{ width: w + 'px' }" /></colgroup>
+      <tbody>
+        <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
+          <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
+            <span>{{ tt(sec.bar) }}</span>
+            <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
+          </span>
+        </td></tr>
+
+        <!-- 文档式行(规格书 P4 章节:2.炭棒处理要求/3.包装方式/4.出货检验报告/5.运输要求/6.存储环境 无表格线;
+             1.关键物料列表 只有 bar、rows 为空 —— 表体由 dataTables 渲染在 sections 之后) -->
+        <template v-if="sec.doc">
+          <tr v-for="(row, ri) in sec.rows" :key="'dl' + ri">
+            <td :colspan="secCols(sec).length" class="rsp-doccell">
+              <div class="rsp-docrow">
+                <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
+                <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
+                <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
+                <span v-if="editable" class="rsp-lib-pick" @click.stop="openSectionLib(row)">⌄ {{ tt('标准库') }}</span>
+              </div>
+            </td>
+          </tr>
+        </template>
+
+        <!-- 键值对行(产品基本信息/检验计划信息行):pairs=[{label,key,type,vspan,cells}] 逐格铺网格 -->
+        <template v-for="(row, ri) in sec.rows" v-if="!sec.doc" :key="'pr' + ri">
+          <tr v-if="row.pairs">
+            <template v-for="(pair, pi) in row.pairs" :key="'p' + pi">
+              <td class="rs-td rs-label" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
+              <template v-if="pair.cells">
+                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
+                  <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
+                  <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
+                </td>
+              </template>
+              <td v-else class="rs-td" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
+                <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(pair.key)">
+                  <span class="rs-ref-text">{{ head[pair.key] || tt('点击选择') }}</span>
+                  <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
+                  <el-icon class="rs-ref-ico"><Search /></el-icon>
+                </div>
+                <el-select v-else-if="editable && pair.type === 'select'" v-model="head[pair.key]" size="small" :clearable="false" @change="emit('dirty')">
+                  <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+                <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名 -->
+                <FileAttachCell
+                  v-else-if="editable && pair.type === 'file'"
+                  :panel-code="panelCode"
+                  :doc-no="head['单据编号'] || ''"
+                  :field-key="pair.key"
+                  :model-value="head[pair.key] || ''"
+                  @update:model-value="(v) => { head[pair.key] = v }"
+                />
+                <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
+                <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+                <span v-else class="rs-txt">{{ head[pair.key] || '' }}</span>
+              </td>
+            </template>
+          </tr>
+
+          <!-- 单元格网格行(成型工艺:产品基本信息两行式/工序阶段块/列标题行)——
+               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化) } 逐格铺 sec.cols -->
+          <tr v-else-if="row.grid">
+            <template v-for="(c, ci) in row.grid" :key="'g' + ci">
+              <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
+                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(effColLabel(c.label, c.label)) }}</td>
+              <td v-else class="rs-td" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
+                <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
+                  <span class="rs-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
+                  <span v-if="devStatus && devKey === c.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
+                  <el-icon class="rs-ref-ico"><Search /></el-icon>
+                </div>
+                <el-select v-else-if="editable && c.type === 'select'" v-model="head[c.key]" size="small" :clearable="false" @change="emit('dirty')">
+                  <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
+                </el-select>
+                <el-input v-else-if="editable && c.key" v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                <span v-else class="rs-txt">{{ head[c.key] || c.fixed || '' }}</span>
+              </td>
+            </template>
+          </tr>
+
+          <!-- 工序阶段行(成型工艺):左端 stage 纵向合并 + 参数键值对(可两对) -->
+          <tr v-else-if="sec.stage">
+            <td v-if="row.stage" class="rs-td rs-label rsp-stage" :rowspan="stageSpan(sec, ri)" :colspan="2">{{ tt(row.stage) }}</td>
+            <td class="rs-td rs-label">{{ tt(row.label) }}</td>
+            <td class="rs-td" :colspan="row.label2 ? 2 : 5">
+              <el-input v-if="editable" v-model="head[row.key]" size="small" :maxlength="row.max || 500" class="rs-t-in" @input="emit('dirty')" />
+              <span v-else class="rs-txt">{{ head[row.key] || '' }}</span>
+            </td>
+            <template v-if="row.label2">
+              <td class="rs-td rs-label">{{ tt(row.label2) }}</td>
+              <td class="rs-td" colspan="2">
+                <el-input v-if="editable" v-model="head[row.key2]" size="small" :maxlength="row.max2 || 500" class="rs-t-in" @input="emit('dirty')" />
+                <span v-else class="rs-txt">{{ head[row.key2] || '' }}</span>
+              </td>
+            </template>
+          </tr>
+
+          <!-- 常规单标签行 -->
+          <tr v-else>
+            <td class="rs-td rs-label">{{ tt(row.label) }}</td>
+            <!-- 多值单元格(如 阻垢 特殊配方 1#/2#/3#,Excel B:D/E:G/H:K 合并) -->
+            <template v-if="row.cells">
+              <td v-for="c in row.cells" :key="c.key" class="rs-td" :colspan="c.span || 1">
+                <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="100" class="rs-t-in" :placeholder="c.ph || ''" @input="emit('dirty')" />
+                <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
+              </td>
+            </template>
+            <td v-else class="rs-td" :colspan="nCols > 1 ? nCols - 1 : 1">
+              <!-- 参照字段(plain 版式也支持:2026-09-11 组装工艺清单头补「产品编号」→ 参照产品信息表;
+                   此前这一支只渲染纯输入框,参照字段在 plain 版式里点不开弹窗) -->
+              <div v-if="editable && isRefKey(row.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(row.key)">
+                <span class="rs-ref-text">{{ head[row.key] || tt('点击选择') }}</span>
+                <span v-if="devStatus && devKey === row.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
+                <el-icon class="rs-ref-ico"><Search /></el-icon>
+              </div>
+              <el-input v-else-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
+              <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.tall ? 3 : 1, maxRows: 12 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
+              <span v-else class="rs-txt" :class="{ 'rsp-pre': row.tall }">{{ head[row.key] || '' }}</span>
+            </td>
+          </tr>
+        </template>
+
+        <!-- 特例:碱性 原水水质条件(6 指标格按 Excel C:D/E/F:H/I:J/K:L/M:N 跨网格列) -->
+        <template v-if="sec.waterStrip">
+          <tr>
+            <td class="rs-td rs-label rsp-water-label" rowspan="2">{{ tt('原水水质条件') }}</td>
+            <td class="rs-td rsp-water-zone" :colspan="nCols - 1">
+              <table class="rs-inner">
+                <colgroup><col v-for="(w, i) in cfg.grid.slice(1)" :key="'wc' + i" :style="{ width: w + 'px' }" /></colgroup>
+                <tbody>
+                  <tr>
+                    <td v-for="(cs, i) in cfg.waterColspans" :key="'wn' + i" :colspan="cs" class="rs-ind-name">{{ tt(waterNames[i]) }}</td>
+                  </tr>
+                  <tr>
+                    <td v-for="(cs, i) in cfg.waterColspans" :key="'wv' + i" :colspan="cs" class="rs-water-val">
+                      <template v-if="i < 3">
+                        <el-select v-if="editable" v-model="head[waterKeys[i]]" size="small" :clearable="false" @change="emit('dirty')"><el-option v-for="o in selectOptions(waterKeys[i])" :key="o.value" :label="o.label" :value="o.value" /></el-select>
+                        <template v-else>{{ head[waterKeys[i]] || '' }}</template>
+                      </template>
+                      <template v-else>
+                        <el-input v-if="editable" v-model="head[waterKeys[i]]" size="small" class="rs-c-in" @input="emit('dirty')" />
+                        <span v-else class="rs-txt">{{ head[waterKeys[i]] || '' }}</span>
+                      </template>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </td>
+          </tr>
+        </template>
+
+        <!-- 特例:浸泡安全 浸泡液用量 + 测试用仪器/检出限(值3/检出限跨2列,Excel F:G) -->
+        <template v-if="sec.soakBlocks">
+          <tr>
+            <td class="rs-td rs-label rsp-water-label" rowspan="2">{{ tt('浸泡液用量') }}</td>
+            <td class="rs-td rs-label">{{ tt('炭棒尺寸') }}</td>
+            <td v-for="(cs, i) in cfg.soakColspans" :key="'sv' + i" class="rs-td" :colspan="cs">
+              <el-input v-if="editable" v-model="head[soakSizeKeys[i]]" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" />
+              <span v-else class="rs-txt">{{ head[soakSizeKeys[i]] || '' }}</span>
+            </td>
+          </tr>
+          <tr>
+            <td class="rs-td rs-label">{{ tt('浸泡液用量（ml）') }}</td>
+            <td v-for="(cs, i) in cfg.soakColspans" :key="'sv2' + i" class="rs-td" :colspan="cs">
+              <el-input v-if="editable" v-model="head[soakVolKeys[i]]" size="small" maxlength="60" class="rs-t-in" @input="emit('dirty')" />
+              <span v-else class="rs-txt">{{ head[soakVolKeys[i]] || '' }}</span>
+            </td>
+          </tr>
+          <tr>
+            <td class="rs-td rs-label rsp-water-label" rowspan="5">{{ tt('测试用仪器/检出限') }}</td>
+            <td class="rs-th">{{ tt('测试项目') }}</td>
+            <td class="rs-th">{{ tt('仪器名称') }}</td>
+            <td class="rs-th">{{ tt('品牌型号') }}</td>
+            <td class="rs-th" :colspan="cfg.soakColspans[2]">{{ tt('检出限') }}</td>
+          </tr>
+          <tr v-for="it in soakInstrumentRows" :key="it.name">
+            <td class="rs-td rsp-item-name">{{ tt(it.name) }}</td>
+            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[0]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[0]] || '' }}</span></td>
+            <td class="rs-td"><el-input v-if="editable" v-model="head[it.keys[1]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[1]] || '' }}</span></td>
+            <td class="rs-td" :colspan="cfg.soakColspans[2]"><el-input v-if="editable" v-model="head[it.keys[2]]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" /><span v-else class="rs-txt">{{ head[it.keys[2]] || '' }}</span></td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
 
     <!-- ═══ 表尾文档式章节行(规格书第4页:5.关键物料列表数据表之后跟 6-8 章节) ═══ -->
     <table v-for="(sec, si) in cfg.tailDocSections || []" v-show="pageOf(sec) === activePage" :key="'tds' + si" class="rs-t" :style="{ width: gridW + 'px' }">
@@ -1154,22 +1162,29 @@ const fieldEditAt = computed(() => {
   const i = dts.findIndex((d) => d.bar && !d.pageTitle)
   return i < 0 ? 0 : i
 })
+
 /**
- * 这条表是否已被某个「标题槽」认领(= 会在 sections 循环里就地渲染)。
+ * 本节是否属于「数据表锚点之前(含锚点)」那一段 —— 用于把章节拆成表前/表后两段渲染。
  *
- * 模板里同一张表的渲染分两段(段内槽位 / 末尾兜底),两段的守卫必须**互斥且互补**:
- * 认领了 ⇒ 段内渲染、末尾跳过;没认领 ⇒ 段内跳过、末尾渲染。
- * 若末尾直接写 `!dt.tablesAfterBar`,锚点写错(或该节没标 tablesSlot)时两段都不渲染,
- * 表就无声消失了 —— 所以这里以「真的有一节认得它」为准,而不是「有没有写锚点」。
- * (dt.tablesSlot 那一侧把条件写进 v-show,是因为 v-if 与 v-for 同元素时取不到 dt,见模板注释。)
+ * 为什么需要:模板里数据表是**另起一段**渲染在 sections 之后的,单靠顺序挪不动它,
+ * 而设计第 4 页要求物料表夹在「1.关键物料列表」与「2.炭棒处理要求」之间。
+ * 于是把章节拆两段:循环 A(true)+ 数据表 + 循环 B(false),表自然落在锚点节之后。
+ * 锚点 = 某张表的 tablesAfterBar 等于某节的 bar(同页)。
+ * 无任何锚点的面板 ⇒ 恒 true ⇒ 循环 B 为空、表仍排在所有章节之后 = 原行为不变。
  */
-function anchoredElsewhere(dt) {
-  if (!dt?.tablesAfterBar) return false
-  // 锚点节还必须与表**同页**:段内那段自带 `pageOf(dt) === activePage`,跨页锚点等于没人认领。
-  return (cfg.value?.sections || []).some(
-    (s) => s.tablesSlot && s.bar === dt.tablesAfterBar && pageOf(s) === pageOf(dt),
-  )
+function isAtOrBeforeTableAnchor(sec) {
+  const c = cfg.value || {}
+  const anchored = (c.dataTables || []).filter((d) => d.tablesAfterBar)
+  if (!anchored.length) return true
+  const samePage = (c.sections || []).filter((s) => pageOf(s) === pageOf(sec))
+  let lastAnchor = -1
+  samePage.forEach((s, i) => {
+    if (anchored.some((d) => d.tablesAfterBar === s.bar && pageOf(d) === pageOf(s))) lastAnchor = i
+  })
+  if (lastAnchor < 0) return true
+  return samePage.indexOf(sec) <= lastAnchor
 }
+
 watch(() => props.panelCode, () => { activePage.value = 0 })
 
 // ── 校验定位(供 PanelxList 保存校验调用):翻到字段所在页 + 滚动 + 闪烁 ──

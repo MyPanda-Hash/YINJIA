@@ -1062,7 +1062,9 @@ export const recordSheetConfigs = {
       //   它的表体由 dataTables 那条表渲染,紧随其下 ⇒ 呈现为「标题 → 表头 → 行」。
       //   ⚠ 而**标题只能有一个来源**:曾让第 1 节的 bar 与表的 bar 同时存在 ⇒ 同一标题
       //     渲染两遍(用户报「空余行重复了」)。故那条**表不带 bar**。
-      { page: 3, bar: '1.关键物料列表', doc: true, tablesSlot: true, rows: [] },
+      // ⚠ 表格为何能紧跟本标题:靠前端 isAtOrBeforeTableAnchor() 把章节拆成"表前/表后"两段渲染,
+      //   本节点**不需要**任何标记。曾在这里加过 tablesSlot,那是"克隆式"实现的遗迹,已废弃删除。
+      { page: 3, bar: '1.关键物料列表', doc: true, rows: [] },
       { page: 3, bar: '2.炭棒处理要求', doc: true, rows: [
           { label: '炭棒处理要求', key: '炭棒处理要求', area: true, max: 2000 },
         ]},
