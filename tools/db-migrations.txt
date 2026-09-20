@@ -414,3 +414,6 @@ migrate-stock-balance-cascade.sql
 
 # —— 2026-09-17 采购入库三字段+商品检验方式——头·采购订单号面板注册(列已有,选单回填);商品 商品类型→检验方式正名(存金蝶check_type)+计算列 是否来料检验(1→是);行·是否来料检验(本地维护,下拉,存量按商品档案回填);转ERP行级带 src_bill_no+src_bill_type_name(接口写入成功,回显待金蝶界面确认)。幂等可重跑 ——
 migrate-po-inbound-fields.sql
+
+# —— 2026-09-18 商品·来料检验(金蝶自定义字段)接线——金蝶界面定义自定义字段后 API 可读(沙箱键 custom_field__1__62jiaob3z7yj97 实证:CL004=是 全链路通);bs_inv 建真实列 来料检验(是/否,金蝶维护MES只读);check_type 语义纠正回 商品类型(1普通/2套装/3服务,此前误更名检验方式);sync-core CF_INSPECTION_KEYS 登记表(真实账套键待其定义后登记);INV面板 detail列只读。幂等可重跑 ——
+migrate-material-inspection-field.sql
