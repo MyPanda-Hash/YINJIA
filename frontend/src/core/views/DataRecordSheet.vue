@@ -780,9 +780,11 @@ function removeRow(i) {
   width: 100%;
 }
 
-/* ═══ 区块粉条 ═══ */
+/* ═══ 区块条(cream gray)══════════════════════════════════════════
+   原为粉色 #f9dfe2。2026-09-18 改为奶油灰 #ECEAE3(暖调低饱和),
+   ⚠ 与 RecordSheetPanels.vue 的同名类**必须同色**(两张纸是一族,色值漂移一眼可见)。 */
 .rs-sectionbar {
-  background: #f9dfe2;
+  background: #ECEAE3;
   border: 1px solid #7f7f7f;
   border-top: none;
   color: #333;

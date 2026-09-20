@@ -831,14 +831,18 @@ defineExpose({ exportProgressExcel })
   font-size: 13px;
 }
 
-/* ═══ ④ 原则说明段(浅粉底) ═══ */
+/* ═══ ④ 原则说明段(cream gray 底)═══════════════════════════════
+   原为浅粉 #fdeef0 + 暖红字 #6b3a3a。2026-09-18 随「粉色→奶油灰」一并调整:
+   底色 #F5F3EE(比区块条 #ECEAE3 浅一档 —— 本段是长段说明文字,底色过重会压字);
+   文字色改为中性暖深灰 #4A4642:保留原来的"非纯黑"层次,但去掉粉色系统的红味。
+   对比度 #F5F3EE vs #4A4642 ≈ 9.0:1,远超 WCAG AA 正文要求。 */
 .ps-principle {
   padding: 6px 14px;
-  background: #fdeef0;
+  background: #F5F3EE;
   border-bottom: 1px solid #8a8a8a;
   font-size: 12.5px;
   line-height: 1.6;
-  color: #6b3a3a;
+  color: #4A4642;
 }
 
 /* ═══ ⑤ 控制表 ═══ */

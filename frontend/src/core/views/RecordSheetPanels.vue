@@ -2012,9 +2012,13 @@ function chartOf(dt) {
   width: 100%;
 }
 
-/* ═══ 区块粉条 ═══ */
+/* ═══ 区块条(cream gray)══════════════════════════════════════════
+   原为粉色 #f9dfe2(偏暖红)。2026-09-18 用户口径改为「奶油灰类似的高级色」:
+   取 #ECEAE3 —— 暖调(红>绿>蓝的温和梯度)、低饱和、高明度,与纸张白 #fff
+   只拉开一档明度差(不做成明显色块),与区块条既有边框 #7f7f7f/正文 #333 对比度充足。
+   同一色值必须与 DataRecordSheet.vue 的 .rs-sectionbar 保持一致(两张纸是一族)。 */
 .rs-sectionbar {
-  background: #f9dfe2;
+  background: #ECEAE3;
   border: 1px solid #7f7f7f;
   border-top: none;
   color: #333;
