@@ -1,0 +1,17 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q_probe_status.sql ==
+  | PI-2026-09-0007 | PURCHASE_IN | Y | (null) | 
+  | PI-2026-09-0008 | PURCHASE_IN | Y | (null) | 
+  | IJ-2026-09-0005 | QC_INSP | Y | (null) | 
+  | IJ-2026-09-0006 | QC_INSP | Y | (null) | 
+  | IJ-2026-09-0007 | QC_INSP | Y | (null) | 
+  | IJ-2026-09-0008 | QC_INSP | Y | (null) | 
+  | SL-2026-09-0006 | SL_RECV | Y | (null) | 
+  | SL-2026-09-0007 | SL_RECV | Y | (null) | 
+  | SL-2026-09-0008 | SL_RECV | Y | (null) | 
+  | SL-2026-09-0009 | SL_RECV | Y | (null) | 
+  | sl_recv | 3 | 
+  | qc_insp | 3 | 
+  | bd_purchase_in | 57 | 
+  | 7 | 
+[OK] _q_probe_status.sql (4 batches)

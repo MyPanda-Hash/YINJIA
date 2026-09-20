@@ -1,0 +1,59 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q_refs.sql ==
+  | PURCHASE_IN | detail | 20 | 存货名称 | 存货名称 | 参照 | INV | 存货名称 | 存货名称 | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 40 | 规格型号 | 规格型号 | 文本 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 50 | 实收数量 | 实收数量 | 小数 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 60 | 计量单位 | 计量单位 | 下拉框 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 70 | 实收数量2 | 实收数量2 | 小数 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 80 | 计量单位2 | 计量单位2 | 下拉框 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 110 | 单价 | 单价 | 小数 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 120 | 税率% | 税率% | 小数 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 150 | 含税单价 | 含税单价 | 小数 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 160 | 金额 | 金额 | 小数 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 170 | 含税金额 | 含税金额 | 小数 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 200 | 现存量 | 现存量 | 小数 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 225 | 批号 | 批号 | 文本 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 300 | 是否来料检验 | 是否来料检验 | 下拉框 | null | null | null | 0 | 0 | 1 | 
+  | PURCHASE_IN | detail | 970 | 保质期 | 保质期 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 保质期到期日 | 保质期到期日 | 日期 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 保质期类型 | 保质期类型 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 本次结算金额本位币 | 本次结算金额本位币 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 仓库id | 仓库id | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 仓库名称 | 仓库名称 | 参照 | WH | 仓库名称 | 仓库名称 | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 970 | 仓库启用仓位管理 | 仓库启用仓位管理 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 仓位id | 仓位id | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 仓位名称 | 仓位名称 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 产地 | 产地 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 成本视图 | 成本视图 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 单位id | 单位id | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 单位编码 | 单位编码 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 单位成本视图 | 单位成本视图 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 分录结算状态 | 分录结算状态 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助单位id | 辅助单位id | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助单位编码 | 辅助单位编码 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助换算系数 | 辅助换算系数 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性1id | 辅助属性1id | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性1编码 | 辅助属性1编码 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性1名称 | 辅助属性1名称 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性2id | 辅助属性2id | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性2编码 | 辅助属性2编码 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性2名称 | 辅助属性2名称 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性3id | 辅助属性3id | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性3编码 | 辅助属性3编码 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性3名称 | 辅助属性3名称 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性id | 辅助属性id | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性编码 | 辅助属性编码 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 辅助属性名称 | 辅助属性名称 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 换算率2 | 换算率2 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 换算系数 | 换算系数 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 基本单位id | 基本单位id | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 基本单位编码 | 基本单位编码 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | PURCHASE_IN | detail | 970 | 基本单位名称 | 基本单位名称 | 文本 | null | null | null | 1 | 0 | 1 | 
+  | PURCHASE_IN | detail | 970 | 基本数量 | 基本数量 | 文本 | null | null | null | 1 | 1 | 0 | 
+  | SL-2026-09-0005 | YJ-TS-032 | null | null | 500.0000 | 
+  | SL-2026-09-0004 | YJ-JPL-68 | null | null | 4.0000 | 
+  | SL-2026-09-0004 | YJ-JPL-56 | null | null | 20.0000 | 
+  | SL-2026-09-0004 | YJ-JPL-19 | null | null | 10.0000 | 
+  | SL-2026-09-0004 | YJ-JPL-066 | null | null | 8500.0000 | 
+  | 7 | 0 | 0 | 
+[OK] _q_refs.sql (4 batches)

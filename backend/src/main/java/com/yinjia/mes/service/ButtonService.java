@@ -397,18 +397,33 @@ public class ButtonService {
     }
 
     /**
-     * 来料检验单行数量校验(2026-09-17):合格数量+不良数量不得超过数量(送检数量),空值按 0。
+     * 来料检验单行数量校验(2026-09-17):合格数量+不合格数量不得超过送检数量,空值按 0。
      * 超限抛错并定位到行,前端以服务异常消息提示。
+     * 2026-09-20 修正取值口径:检验行数量字段在面板上叫「送检数量」(旧名 数量),不良侧叫「不合格数量」
+     * (库列另有遗留 不良数量)。原实现只读「数量」「不良数量」两个非面板键 → 数量恒 0,
+     * 一旦 送检数量 由链路带入,合格数量>0 即被判超限而存不下来(检验→入库链断在这里)。
+     * 取值改为按别名优先级兼容:数量口径 送检数量→数量→暂收数量;不良口径 不合格数量→不良数量。
      */
     private void validateInspQty(List<Map<String, Object>> items) {
         for (int i = 0; i < items.size(); i++) {
             Map<String, Object> it = items.get(i);
-            double qty = numOf(it.get("数量")), ok = numOf(it.get("合格数量")), bad = numOf(it.get("不良数量"));
+            double qty = firstNum(it, "送检数量", "数量", "暂收数量");
+            double ok = numOf(it.get("合格数量"));
+            double bad = firstNum(it, "不合格数量", "不良数量");
             if (ok + bad > qty + 1e-9) {
-                throw new IllegalStateException("第" + (i + 1) + "行 合格数量(" + trimZero(ok) + ")+不良数量("
-                        + trimZero(bad) + ") 超过数量(" + trimZero(qty) + ")，请核对");
+                throw new IllegalStateException("第" + (i + 1) + "行 合格数量(" + trimZero(ok) + ")+不合格数量("
+                        + trimZero(bad) + ") 超过送检数量(" + trimZero(qty) + ")，请核对");
             }
         }
+    }
+
+    /** 按别名优先级取行内数值(首个非空键;全空按 0)——面板字段改名后防取值断流 */
+    private double firstNum(Map<String, Object> row, String... labels) {
+        for (String l : labels) {
+            Object v = row.get(l);
+            if (v != null && !String.valueOf(v).isBlank()) return numOf(v);
+        }
+        return 0;
     }
 
     /** 行值转数值(空/非数值按 0) */
@@ -1370,6 +1385,8 @@ public class ButtonService {
      * 实收数量=合格数量;存货编码/存货名称/规格型号 ← 物料编码/物料名称/型号;行仓库 ← 仓库代码;
      * 计量单位/单价随行带入(2026-09-17 补单价——此前清单漏列致入库单单价断流);
      * 头带入 供应商/供应商编码(供应商代码),外部单据号与来源单号=检验单号;单据日期=创建当日不继承。
+     * 2026-09-20:随链带入 头 采购订单号 + 行 采购订单行号(检验单上由送料暂收单带下来的同一对字段),
+     * 使采购入库单具备金蝶源单关联(转ERP 时 src_bill_no/src_seq)——此前该对字段只走选单路径会丢。
      * 行级占用写 form_flow_link(source_quantity=数量,linked_quantity=合格数量,余量=不良部分,
      * 供后续暂收退回链使用)并回填检验行 入库单号。幂等:已有 ACTIVE 占用(重审)跳过;
      * 无合格数量的行不生成(全不良/未检完的检验单审核不产生空入库单)。
@@ -1382,13 +1399,15 @@ public class ButtonService {
                         + " AND target_panel_code='PURCHASE_IN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, 型号, 数量, 合格数量, 仓库代码, 计量单位, 单价 FROM qc_insp_detail"
+                "SELECT id, 物料编码, 物料名称, 型号, 数量, 合格数量, 仓库代码, 计量单位, 单价, 采购订单行号"
+                        + " FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> pass = rows.stream()
                 .filter(r -> numOr(r.get("合格数量")) > 0).toList();
         if (pass.isEmpty()) return;
         List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT 供应商代码, 供应商 FROM qc_insp"
+                "SELECT 供应商代码, 供应商, 采购订单号"
+                        + " FROM qc_insp"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + no);
         Map<String, Object> h = heads.get(0);
@@ -1401,6 +1420,8 @@ public class ButtonService {
             line.put("实收数量", r.get("合格数量"));
             line.put("计量单位", r.get("计量单位"));
             line.put("单价", r.get("单价"));
+            // 采购订单行号 → 采购入库行(列 源单行号,标签 采购订单行号):转ERP 时推 src_seq
+            if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
             Object wh = r.get("仓库代码");
             if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
             items.add(line);
@@ -1409,6 +1430,10 @@ public class ButtonService {
         head.put("单据日期", LocalDate.now().toString()); // 创建当日,不继承检验单日期(2026-09-17 口径)
         head.put("供应商", h.get("供应商"));
         head.put("供应商编码", h.get("供应商代码"));
+        // 采购订单号随链带入(送料暂收 → 来料检验 → 采购入库),空则不带(选单免检路径由映射带入)
+        if (h.get("采购订单号") != null && !String.valueOf(h.get("采购订单号")).isBlank()) {
+            head.put("采购订单号", h.get("采购订单号"));
+        }
         head.put("外部单据号", no);
         head.put("来源单据", "来料检验单");
         head.put("来源单号", no);

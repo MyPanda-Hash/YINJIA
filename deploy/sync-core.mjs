@@ -351,6 +351,9 @@ export const DOCS = [
     mapLines(d) {
       return (d.material_entity || []).map((m) => ({
         单据编号: str(d.bill_no),
+        // 采购订单行号(2026-09-20):金蝶分录 seq —— 采购链(暂收→检验→入库)逐站下传,
+        // 采购入库 转ERP 时作为金蝶源单关联 src_seq 推回;列 bl_pu_order.行号 非空约束无
+        行号: num(m.seq),
         // 本地列 NOT NULL:物料/单位/数量/单价 缺失时兜底空串/0
         物料编码: str(m.material_number) || '', 物料名称: str(m.material_name) || '', 规格型号: str(m.material_model),
         单位: str(m.unit_name) || str(m.unit_number) || '', 数量: num(m.qty) ?? 0,

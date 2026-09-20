@@ -1,0 +1,63 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q_slrecv_cols.sql ==
+  | sl_recv | id | int | 
+  | sl_recv | 单据编号 | nvarchar | 
+  | sl_recv | 单据日期 | nvarchar | 
+  | sl_recv | 业务员 | nvarchar | 
+  | sl_recv | 供应商代码 | nvarchar | 
+  | sl_recv | 供应商 | nvarchar | 
+  | sl_recv | 部门 | nvarchar | 
+  | sl_recv | 部门名称 | nvarchar | 
+  | sl_recv | 数量 | decimal | 
+  | sl_recv | 附件1 | nvarchar | 
+  | sl_recv | 附件2 | nvarchar | 
+  | sl_recv | 附件3 | nvarchar | 
+  | sl_recv | 附件4 | nvarchar | 
+  | sl_recv | 附件5 | nvarchar | 
+  | sl_recv | 附件6 | nvarchar | 
+  | sl_recv | 备注 | nvarchar | 
+  | sl_recv | 单据状态 | nvarchar | 
+  | sl_recv | 审核人 | nvarchar | 
+  | sl_recv | 审核时间 | nvarchar | 
+  | sl_recv | 审批人 | nvarchar | 
+  | sl_recv | 审批时间 | nvarchar | 
+  | sl_recv | asp_user1 | nvarchar | 
+  | sl_recv | asp_time1 | datetime2 | 
+  | sl_recv | asp_user2 | nvarchar | 
+  | sl_recv | asp_time2 | datetime2 | 
+  | sl_recv | asp_cancel | char | 
+  | sl_recv_detail | id | int | 
+  | sl_recv_detail | 单据编号 | nvarchar | 
+  | sl_recv_detail | 物料编码 | nvarchar | 
+  | sl_recv_detail | 物料名称 | nvarchar | 
+  | sl_recv_detail | 型号 | nvarchar | 
+  | sl_recv_detail | 物料描述 | nvarchar | 
+  | sl_recv_detail | 数量 | decimal | 
+  | sl_recv_detail | 日期 | nvarchar | 
+  | sl_recv_detail | 供应商 | nvarchar | 
+  | sl_recv_detail | 单价 | decimal | 
+  | sl_recv_detail | 折扣 | decimal | 
+  | sl_recv_detail | 金额 | decimal | 
+  | sl_recv_detail | 备注 | nvarchar | 
+  | sl_recv_detail | 采购单号 | nvarchar | 
+  | sl_recv_detail | 入库数量 | decimal | 
+  | sl_recv_detail | 入库单号 | nvarchar | 
+  | sl_recv_detail | 领料单号 | nvarchar | 
+  | sl_recv_detail | 结案 | nvarchar | 
+  | sl_recv_detail | 税别代码 | nvarchar | 
+  | sl_recv_detail | 税别说明 | nvarchar | 
+  | sl_recv_detail | 税额 | decimal | 
+  | sl_recv_detail | 总金额 | decimal | 
+  | sl_recv_detail | 订单号 | nvarchar | 
+  | sl_recv_detail | 箱数 | decimal | 
+  | sl_recv_detail | 部门 | nvarchar | 
+  | sl_recv_detail | 部门名称 | nvarchar | 
+  | sl_recv_detail | asp_user1 | nvarchar | 
+  | sl_recv_detail | asp_time1 | datetime2 | 
+  | sl_recv_detail | asp_user2 | nvarchar | 
+  | sl_recv_detail | asp_time2 | datetime2 | 
+  | sl_recv_detail | asp_cancel | char | 
+  | bl_purchase_in | 基本数量 | 
+  | bl_purchase_in | 行号 | 
+  | bl_purchase_in | 源单行号 | 
+[OK] _q_slrecv_cols.sql (4 batches)

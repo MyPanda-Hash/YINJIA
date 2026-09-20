@@ -154,7 +154,16 @@ public class KingdeePushService {
 
         ArrayNode entities = body.putArray("material_entity");
         // 来源单引用(金蝶行级 src_* 族):采购入库单带 采购订单号 → 金蝶按来源订单挂联
+        // 2026-09-20 补全为金蝶自身的完整关联写法(真实账套实测:带源单的行 6 个键齐全):
+        //   src_bill_no(订单号)+ src_bill_type_id/number(常量 pur_bill_order)+ src_bill_type_name(采购订单)
+        //   + src_seq(采购订单行号=订单分录序号)+ src_inter_id/src_entry_id(订单单据id/分录id,按单号向金蝶解析)。
+        //   后两项解析不到时只推前四项(不阻塞转ERP);订单号为空则整组不推(金蝶侧为普通入库单)。
         String poNo = str(head.get("采购订单号"));
+        if (isPur && poNo.isEmpty()) {
+            log.warn("采购入库单[{}]头上无采购订单号:本次转ERP 不带金蝶源单关联(src_bill_no/src_seq),"
+                    + "金蝶侧显示为无来源单的普通入库单", docNo);
+        }
+        PoRefs poRefs = isPur && !poNo.isEmpty() ? resolvePoRefs(poNo) : null;
         int rowNo = 0;
         for (Map<String, Object> line : lines) {
             rowNo++;
@@ -179,10 +188,24 @@ public class KingdeePushService {
             if (stock.isEmpty()) stock = "CK00001";
             e.put("stock_number", stock);
             String batch = str(line.get("批号")); if (!batch.isEmpty()) e.put("batch_no", batch);
-            // 来源单:行级src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
+            // 来源单:行级 src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
+            // src_seq=该行对应的采购订单行号(采购订单行 行号,沿 订单→暂收→检验→入库 逐站带下来)
             if (isPur && !poNo.isEmpty()) {
                 e.put("src_bill_no", poNo);
+                e.put("src_bill_type_id", "pur_bill_order");
+                e.put("src_bill_type_number", "pur_bill_order");
                 e.put("src_bill_type_name", "采购订单");
+                Integer srcSeq = intOf(line.get("采购订单行号"));
+                if (srcSeq != null) {
+                    e.put("src_seq", srcSeq);
+                    if (poRefs != null) {
+                        String entryId = poRefs.entryIdBySeq().get(srcSeq);
+                        if (entryId != null) e.put("src_entry_id", entryId);
+                    }
+                } else {
+                    log.warn("采购入库单[{}]第{}行无采购订单行号:该行不带 src_seq(金蝶侧按订单号挂单,不定位到具体行)", docNo, rowNo);
+                }
+                if (poRefs != null) e.put("src_inter_id", poRefs.billId());
             }
         }
 
@@ -218,6 +241,90 @@ public class KingdeePushService {
     // ══════════ 计量单位解析(按当前账套动态拉取) ══════════
 
     private static final String UNIT_LIST_PATH = "/jdy/v2/bd/measure_unit";
+    private static final String PO_LIST_PATH = "/jdy/v2/scm/pur_order";
+    private static final String PO_DETAIL_PATH = "/jdy/v2/scm/pur_order_detail";
+
+    /** 采购订单金蝶内部引用(src_inter_id=单据id;src_entry_id=按分录 seq 查分录id) */
+    private record PoRefs(String billId, Map<Integer, String> entryIdBySeq) {}
+
+    /** 采购订单引用缓存(单号→引用;转ERP 为低频操作,进程内缓存即可;失败不缓存以便重试) */
+    private final Map<String, PoRefs> poRefsCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * 按采购订单号向金蝶解析 订单单据id + 各分录id(推送 src_inter_id/src_entry_id 用)。
+     * 列表接口支持 bill_no 精确过滤(实测:pur_order?bill_no=YJ-20260916-02 返回单条),
+     * 详情接口 material_entity[].{seq,id} 即 分录序号→分录id。
+     * 解析不到(如订单在金蝶不存在/网络异常)返回 null:调用方只推 src_bill_no/type/seq,不阻塞转ERP。
+     */
+    private PoRefs resolvePoRefs(String poNo) {
+        if (poNo == null || poNo.isBlank()) return null;
+        PoRefs cached = poRefsCache.get(poNo);
+        if (cached != null) return cached;
+        try {
+            Map<String, String> lp = new TreeMap<>();
+            lp.put("page", "1"); lp.put("page_size", "10"); lp.put("bill_no", poNo);
+            JsonNode rows = kingdeeGet(PO_LIST_PATH, lp).path("rows");
+            String billId = "";
+            if (rows.isArray()) {
+                for (JsonNode r : rows) {
+                    if (poNo.equals(r.path("bill_no").asText(""))) { billId = r.path("id").asText(""); break; }
+                }
+            }
+            if (billId.isEmpty()) {
+                log.warn("金蝶账套内未找到采购订单[{}]:本次转ERP 只推 src_bill_no/src_bill_type_*/src_seq,不带 src_inter_id/src_entry_id", poNo);
+                return null;
+            }
+            Map<String, String> dp = new TreeMap<>();
+            dp.put("id", billId);
+            JsonNode entries = kingdeeGet(PO_DETAIL_PATH, dp).path("material_entity");
+            Map<Integer, String> bySeq = new HashMap<>();
+            if (entries.isArray()) {
+                for (JsonNode e : entries) {
+                    int seq = e.path("seq").asInt(-1);
+                    String eid = e.path("id").asText("");
+                    if (seq > 0 && !eid.isEmpty()) bySeq.put(seq, eid);
+                }
+            }
+            PoRefs out = new PoRefs(billId, bySeq);
+            poRefsCache.put(poNo, out);
+            log.info("金蝶采购订单[{}] 源单引用已解析:单据id={} 分录 {} 条", poNo, billId, bySeq.size());
+            return out;
+        } catch (Exception e) {
+            log.warn("解析金蝶采购订单[{}]内部id 失败({}):本次转ERP 不带 src_inter_id/src_entry_id,其余字段照推",
+                    poNo, e.getMessage());
+            return null;
+        }
+    }
+
+    /** 金蝶 GET(签名 + app-token,与计量单位拉取同款);返回 data 节点,errcode!=0 抛业务异常 */
+    private JsonNode kingdeeGet(String path, Map<String, String> params) throws Exception {
+        ensureCreds();
+        String[] tn = timestampNonce();
+        String url = API_BASE + path + "?" + qs(params, false);
+        Map<String, String> headers = baseHeaders(tn);
+        headers.put("X-Api-Signature", apiSignature("GET", path, params, tn[1], tn[0]));
+        headers.put("app-token", getToken());
+        headers.put("X-GW-Router-Addr", domain);
+        JsonNode res = http("GET", url, headers, null);
+        long code = res.path("errcode").asLong(-1);
+        if (code != 0) {
+            throw new RuntimeException("金蝶接口失败(" + code + "): " + res.path("description").asText(res.toString()));
+        }
+        return res.path("data");
+    }
+
+    /** 宽松取整(采购订单行号列是文本:"3"/"3.0" 都能取;非数字返回 null) */
+    private static Integer intOf(Object v) {
+        if (v == null) return null;
+        String s = String.valueOf(v).trim();
+        if (s.isEmpty()) return null;
+        try {
+            return (int) Double.parseDouble(s);
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
     private Map<String, String> unitIdByName;
     private long unitCacheAt;
 

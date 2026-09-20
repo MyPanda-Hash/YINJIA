@@ -1,0 +1,12 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== migrate-po-chain-link.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  | bl_pu_order.行号 | 4453 | 4453 | 
+  | yj_field 采购订单行号 | 3 | 3 | 
+  | yj_field 采购订单号(链上三站) | 3 | null | 
+  | yj_translation 采购订单行号 | 9 | null | 
+[OK] migrate-po-chain-link.sql (6 batches)

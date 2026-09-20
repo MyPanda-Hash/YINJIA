@@ -439,3 +439,13 @@ migrate-po-inbound-fields.sql
 
 # ���� 2026-09-18 ��Ʒ�����ϼ���(����Զ����ֶ�)���ߡ���������涨���Զ����ֶκ� API �ɶ�(ɳ��� custom_field__1__62jiaob3z7yj97 ʵ֤:CL004=�� ȫ��·ͨ);bs_inv ����ʵ�� ���ϼ���(��/��,���ά��MESֻ��);check_type ��������� ��Ʒ����(1��ͨ/2��װ/3����,��ǰ��������鷽ʽ);sync-core CF_INSPECTION_KEYS �ǼǱ�(��ʵ���׼����䶨���Ǽ�);INV��� detail��ֻ�����ݵȿ����� ����
 migrate-material-inspection-field.sql
+
+# —— 2026-09-20 采购链 采购订单号 / 采购订单行号 贯通(采购订单→送料暂收→来料检验→采购入库) ——
+#   bl_pu_order 补 行号(=金蝶 pur_order 分录 seq,sync-core.mapLines 写入 + 存量回填);
+#   sl_recv/qc_insp 各补 头 采购订单号 + 行 采购订单行号;采购入库行沿用既有列 源单行号,仅改标签
+#   「采购订单行号」并放开显示(同一语义不造双列,同步与链路共用一个落点);
+#   译名:采购订单行号 ×9 语言、行号补 8 语言;新增/改动列写 MS_Description 中文注明。
+#   配套代码:PanelConfigService 链路同义词(PU_ORDER|SL_RECV、SL_RECV|QC_INSP、QC_INSP|PURCHASE_IN
+#   及行级 行号→采购订单行号)、ButtonService.inspAutoPurchaseIn 自动生单带列、
+#   KingdeePushService 推送补 src_bill_type_id/number + src_seq + src_inter_id/src_entry_id。
+migrate-po-chain-link.sql

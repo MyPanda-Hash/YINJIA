@@ -1,0 +1,67 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q_label_i18n.sql ==
+  | 采购订单号 | field | de | Bestellnummer kaufen | 
+  | 采购订单号 | field | en | Purchase Order Number | 
+  | 采购订单号 | field | es | Número de pedido de compra | 
+  | 采购订单号 | field | fr | Numéro de commande d'achat | 
+  | 采购订单号 | field | ja | 調達注文番号 | 
+  | 采购订单号 | field | ko | 구매 주문 번호 | 
+  | 采购订单号 | field | ru | Номер заказа на закупку | 
+  | 采购订单号 | field | th | เลขที่ใบสั่งซื้อ | 
+  | 采购订单号 | field | vi | Số đơn mua hàng | 
+  | 行号 | field | en | Seq | 
+  | ERPLG_ROW | 行号 | 行号 | detail | 
+  | KHDD | od_xc | 行号 | detail | 
+  | PURCHASE_IN | 行号 | 行号 | detail | 
+  | SALE_OUT | 行号 | 行号 | detail | 
+  | qc_insp | id | int | 
+  | qc_insp | 单据编号 | nvarchar | 
+  | qc_insp | 单据日期 | nvarchar | 
+  | qc_insp | 暂收单号 | nvarchar | 
+  | qc_insp | 供应商 | nvarchar | 
+  | qc_insp | 检验员 | nvarchar | 
+  | qc_insp | 检验日期 | nvarchar | 
+  | qc_insp | 检验方案 | nvarchar | 
+  | qc_insp | 总结论 | nvarchar | 
+  | qc_insp | 备注 | nvarchar | 
+  | qc_insp | 单据状态 | nvarchar | 
+  | qc_insp | 审核人 | nvarchar | 
+  | qc_insp | 审核时间 | nvarchar | 
+  | qc_insp | 审批人 | nvarchar | 
+  | qc_insp | 审批时间 | nvarchar | 
+  | qc_insp | asp_user1 | nvarchar | 
+  | qc_insp | asp_time1 | datetime2 | 
+  | qc_insp | asp_user2 | nvarchar | 
+  | qc_insp | asp_time2 | datetime2 | 
+  | qc_insp | asp_cancel | char | 
+  | qc_insp | 业务员 | nvarchar | 
+  | qc_insp | 供应商代码 | nvarchar | 
+  | qc_insp | 部门 | nvarchar | 
+  | qc_insp | 部门名称 | nvarchar | 
+  | qc_insp | 数量 | float | 
+  | qc_insp_detail | id | int | 
+  | qc_insp_detail | 单据编号 | nvarchar | 
+  | qc_insp_detail | 物料编码 | nvarchar | 
+  | qc_insp_detail | 物料名称 | nvarchar | 
+  | qc_insp_detail | 规格型号 | nvarchar | 
+  | qc_insp_detail | 单位 | nvarchar | 
+  | qc_insp_detail | 送检数量 | decimal | 
+  | qc_insp_detail | 合格数量 | decimal | 
+  | qc_insp_detail | 不合格数量 | decimal | 
+  | qc_insp_detail | 处置方式 | nvarchar | 
+  | qc_insp_detail | 批号 | nvarchar | 
+  | qc_insp_detail | 备注 | nvarchar | 
+  | qc_insp_detail | asp_user1 | nvarchar | 
+  | qc_insp_detail | asp_time1 | datetime2 | 
+  | qc_insp_detail | asp_user2 | nvarchar | 
+  | qc_insp_detail | asp_time2 | datetime2 | 
+  | qc_insp_detail | asp_cancel | char | 
+  | qc_insp_detail | 型号 | nvarchar | 
+  | qc_insp_detail | 数量 | float | 
+  | qc_insp_detail | 仓库代码 | nvarchar | 
+  | qc_insp_detail | 物料描述 | nvarchar | 
+  | qc_insp_detail | 箱数 | float | 
+  | qc_insp_detail | 日期 | nvarchar | 
+  | qc_insp_detail | 结案 | nvarchar | 
+  | qc_insp_detail | 部门 | nvarchar | 
+[OK] _q_label_i18n.sql (4 batches)

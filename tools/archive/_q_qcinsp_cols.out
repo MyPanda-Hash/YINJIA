@@ -1,0 +1,74 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q_qcinsp_cols.sql ==
+  | id | int | 
+  | 单据编号 | nvarchar | 
+  | 物料编码 | nvarchar | 
+  | 物料名称 | nvarchar | 
+  | 规格型号 | nvarchar | 
+  | 单位 | nvarchar | 
+  | 送检数量 | decimal | 
+  | 合格数量 | decimal | 
+  | 不合格数量 | decimal | 
+  | 处置方式 | nvarchar | 
+  | 批号 | nvarchar | 
+  | 备注 | nvarchar | 
+  | asp_user1 | nvarchar | 
+  | asp_time1 | datetime2 | 
+  | asp_user2 | nvarchar | 
+  | asp_time2 | datetime2 | 
+  | asp_cancel | char | 
+  | 型号 | nvarchar | 
+  | 数量 | float | 
+  | 仓库代码 | nvarchar | 
+  | 物料描述 | nvarchar | 
+  | 箱数 | float | 
+  | 日期 | nvarchar | 
+  | 结案 | nvarchar | 
+  | 部门 | nvarchar | 
+  | 部门名称 | nvarchar | 
+  | 入库单号 | nvarchar | 
+  | 不良数量 | decimal | 
+  | 采购订单行号 | nvarchar | 
+  | id | int | 
+  | 单据编号 | nvarchar | 
+  | 单据日期 | nvarchar | 
+  | 暂收单号 | nvarchar | 
+  | 供应商 | nvarchar | 
+  | 检验员 | nvarchar | 
+  | 检验日期 | nvarchar | 
+  | 检验方案 | nvarchar | 
+  | 总结论 | nvarchar | 
+  | 备注 | nvarchar | 
+  | 单据状态 | nvarchar | 
+  | 审核人 | nvarchar | 
+  | 审核时间 | nvarchar | 
+  | 审批人 | nvarchar | 
+  | 审批时间 | nvarchar | 
+  | asp_user1 | nvarchar | 
+  | asp_time1 | datetime2 | 
+  | asp_user2 | nvarchar | 
+  | asp_time2 | datetime2 | 
+  | asp_cancel | char | 
+  | 业务员 | nvarchar | 
+  | 供应商代码 | nvarchar | 
+  | 部门 | nvarchar | 
+  | 部门名称 | nvarchar | 
+  | 数量 | float | 
+  | 采购订单号 | nvarchar | 
+  | IJ-2026-09-0005 | YJ-AJ-017 | null | 0.0000 | null | 3 | 
+  | IJ-2026-09-0005 | YJ-AJ-016-2 | null | 0.0000 | null | 2 | 
+  | IJ-2026-09-0005 | YJ-AJ-016-1 | null | 0.0000 | null | 1 | 
+  | IJ-2026-09-0004 | YJ-TS-032 | null | null | null | null | 
+  | IJ-2026-09-0002 | YJ-JPL-68 | null | null | null | null | 
+  | IJ-2026-09-0002 | YJ-JPL-56 | null | null | null | null | 
+  | IJ-2026-09-0002 | YJ-JPL-19 | null | null | null | null | 
+  | IJ-2026-09-0002 | YJ-JPL-066 | null | null | null | null | 
+  | IJ-2026-09-0001 | YJ-AJ-022 | null | null | null | null | 
+  | 9 | 0 | 0 | 
+  | (空) | 63 | 
+  | IJ-2026-09-0005 | null | YJ-20260915-06 | 草稿 | 
+  | IJ-2026-09-0004 | null | null | 草稿 | 
+  | IJ-2026-09-0003 | null | null | 草稿 | 
+  | IJ-2026-09-0002 | null | null | 草稿 | 
+  | IJ-2026-09-0001 | null | null | 草稿 | 
+[OK] _q_qcinsp_cols.sql (7 batches)
