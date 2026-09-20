@@ -1,0 +1,36 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q_qcret2.sql ==
+  | id | int | 
+  | 单据编号 | nvarchar | 
+  | 单据日期 | nvarchar | 
+  | 检验单号 | nvarchar | 
+  | 供应商 | nvarchar | 
+  | 退货原因 | nvarchar | 
+  | 经手人 | nvarchar | 
+  | 备注 | nvarchar | 
+  | 单据状态 | nvarchar | 
+  | 审核人 | nvarchar | 
+  | 审核时间 | nvarchar | 
+  | 审批人 | nvarchar | 
+  | 审批时间 | nvarchar | 
+  | asp_user1 | nvarchar | 
+  | asp_time1 | datetime2 | 
+  | asp_user2 | nvarchar | 
+  | asp_time2 | datetime2 | 
+  | asp_cancel | char | 
+  | id | int | 
+  | 单据编号 | nvarchar | 
+  | 物料编码 | nvarchar | 
+  | 物料名称 | nvarchar | 
+  | 规格型号 | nvarchar | 
+  | 单位 | nvarchar | 
+  | 退货数量 | decimal | 
+  | 批号 | nvarchar | 
+  | 备注 | nvarchar | 
+  | asp_user1 | nvarchar | 
+  | asp_time1 | datetime2 | 
+  | asp_user2 | nvarchar | 
+  | asp_time2 | datetime2 | 
+  | asp_cancel | char | 
+  | qc_return_detail.计量单位 | 0 | 
+[OK] _q_qcret2.sql (4 batches)

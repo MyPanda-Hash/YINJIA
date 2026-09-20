@@ -456,3 +456,9 @@ migrate-po-chain-link.sql
 #   之后由同步按原值精确化;同步改为只写 erp_close_state,**不再写 stopped**(MES 用户的中止不再被覆盖)。
 #   配套代码:sync-core.mjs(MERGE + __关闭状态)、QueryService/ButtonService 状态推导、前端状态色/词条。
 migrate-erp-close-state.sql
+
+# —— 2026-09-20 暂收退回单(QC_RETURN)链路字段补齐 ——
+#   头 qc_return.采购订单号 + 行 qc_return_detail.采购订单行号/计量单位/单价(幂等);
+#   同时修正 inspAutoReturn 三处「写了落不了」:数量→退货数量、型号→规格型号、计量单位/单价补列,
+#   并补 头「检验单号」=来源检验单(原先也没带);选单路径同义词 QC_INSP|QC_RETURN 增 采购订单号。
+migrate-qc-return-chain-link.sql

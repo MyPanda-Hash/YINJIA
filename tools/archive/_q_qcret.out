@@ -1,0 +1,52 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q_qcret.sql ==
+  | qc_return | id | int | 
+  | qc_return | 单据编号 | nvarchar | 
+  | qc_return | 单据日期 | nvarchar | 
+  | qc_return | 检验单号 | nvarchar | 
+  | qc_return | 供应商 | nvarchar | 
+  | qc_return | 退货原因 | nvarchar | 
+  | qc_return | 经手人 | nvarchar | 
+  | qc_return | 备注 | nvarchar | 
+  | qc_return | 单据状态 | nvarchar | 
+  | qc_return | 审核人 | nvarchar | 
+  | qc_return | 审核时间 | nvarchar | 
+  | qc_return | 审批人 | nvarchar | 
+  | qc_return | 审批时间 | nvarchar | 
+  | qc_return | asp_user1 | nvarchar | 
+  | qc_return | asp_time1 | datetime2 | 
+  | qc_return | asp_user2 | nvarchar | 
+  | qc_return | asp_time2 | datetime2 | 
+  | qc_return | asp_cancel | char | 
+  | qc_return_detail | id | int | 
+  | qc_return_detail | 单据编号 | nvarchar | 
+  | qc_return_detail | 物料编码 | nvarchar | 
+  | qc_return_detail | 物料名称 | nvarchar | 
+  | qc_return_detail | 规格型号 | nvarchar | 
+  | qc_return_detail | 单位 | nvarchar | 
+  | qc_return_detail | 退货数量 | decimal | 
+  | qc_return_detail | 批号 | nvarchar | 
+  | qc_return_detail | 备注 | nvarchar | 
+  | qc_return_detail | asp_user1 | nvarchar | 
+  | qc_return_detail | asp_time1 | datetime2 | 
+  | qc_return_detail | asp_user2 | nvarchar | 
+  | qc_return_detail | asp_time2 | datetime2 | 
+  | qc_return_detail | asp_cancel | char | 
+  | detail | 210 | 物料名称 | 物料名称 | 文本 | 0 | 1 | 
+  | detail | 220 | 规格型号 | 规格型号 | 文本 | 0 | 1 | 
+  | detail | 230 | 单位 | 单位 | 文本 | 0 | 1 | 
+  | detail | 240 | 退货数量 | 退货数量 | 小数 | 0 | 1 | 
+  | header | 50 | 退货原因 | 退货原因 | 文本 | 0 | 1 | 
+  | header | 60 | 经手人 | 经手人 | 文本 | 0 | 1 | 
+  | header | 90 | 审核人 | 审核人 | 文本 | 0 | 1 | 
+  | header | 100 | 审核时间 | 审核时间 | 文本 | 0 | 1 | 
+  | header,detail | 70 | 备注 | 备注 | 文本 | 0 | 1 | 
+  | query,detail | 200 | 物料编码 | 物料编码 | 参照 | 0 | 1 | 
+  | query,detail | 250 | 批号 | 批号 | 文本 | 0 | 1 | 
+  | query,header | 10 | 单据编号 | 单据编号 | 文本 | 0 | 1 | 
+  | query,header | 20 | 单据日期 | 单据日期 | 日期 | 0 | 1 | 
+  | query,header | 30 | 检验单号 | 检验单号 | 参照 | 0 | 1 | 
+  | query,header | 40 | 供应商 | 供应商 | 文本 | 0 | 1 | 
+  | query,header | 80 | 单据状态 | 单据状态 | 文本 | 0 | 1 | 
+  | 0 | 0 | 
+[OK] _q_qcret.sql (4 batches)

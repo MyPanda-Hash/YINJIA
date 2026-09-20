@@ -485,7 +485,7 @@ public class ButtonService {
                 if (srcAlive) {
                     jdbc.update("UPDATE d SET d.物料编码 = s.物料编码, d.物料名称 = s.物料名称, d.型号 = s.型号,"
                                     + " d.物料描述 = s.物料描述, d.数量 = s.数量, d.箱数 = s.箱数, d.日期 = s.日期,"
-                                    + " d.计量单位 = s.计量单位, d.单价 = s.单价,"
+                                    + " d.计量单位 = s.计量单位, d.单价 = s.单价, d.采购订单行号 = s.采购订单行号,"
                                     + " d.备注 = s.备注, d.结案 = s.结案, d.部门 = s.部门, d.部门名称 = s.部门名称,"
                                     + " d.asp_user2 = ?, d.asp_time2 = GETDATE()"
                                     + " FROM qc_insp_detail d JOIN sl_recv_detail s ON s.id = ?"
@@ -1459,12 +1459,18 @@ public class ButtonService {
 
     /**
      * 来料检验单(QC_INSP)审核后,把 不良数量>0 的明细行自动生成暂收退回单(QC_RETURN)草稿(2026-09-16):
-     * 退回数量=不良数量;物料编码/物料名称/型号/物料描述/单价/备注 ← 检验行;头带入 业务员/
-     * 供应商代码/供应商/部门/部门名称;单据日期=创建当日不继承(2026-09-17 口径)。行级占用写 form_flow_link(QC_INSP→QC_RETURN,
-     * source_quantity=数量,linked_quantity=不良数量,与采购入库单的 合格 占用并行,余量=待检部分)。
-     * 幂等:已有 ACTIVE 占用(重审)跳过;无不不良数量的行不生成(不产生空退回单)。
-     * 检验明细无「退回单号」列,不做回填(入库侧回填见 inspAutoPurchaseIn)。
+     * 退货数量=不良数量;物料编码/物料名称/规格型号/计量单位/单价/备注 ← 检验行;
+     * 头带入 业务员/供应商代码/供应商/部门/部门名称 + **采购订单号**(2026-09-20 随链下传,便于退回单追溯到原订单);
+     * 行带入 **采购订单行号**;单据日期=创建当日不继承(2026-09-17 口径)。
+     * 行级占用写 form_flow_link(QC_INSP→QC_RETURN,source_quantity=数量,linked_quantity=不良数量,
+     * 与采购入库单的 合格 占用并行,余量=待检部分)。幂等:已有 ACTIVE 占用(重审)跳过;
+     * 无不良数量的行不生成(不产生空退回单)。检验明细无「退回单号」列,不做回填(入库侧回填见 inspAutoPurchaseIn)。
      * 生成的退回单留草稿由业务确认审核。
+     *
+     * 2026-09-20 修正三处「写了但落不了」的字段(标签与目标面板不一致/目标列缺失,保存时被静默忽略):
+     *   ① 数量 → **退货数量**(QC_RETURN 行的数量字段叫退货数量,原先写「数量」→ 退货数量恒空);
+     *   ② 型号 → **规格型号**(退回行字段叫规格型号);
+     *   ③ 计量单位/单价:退回行原先**没有这两列**(本迁移已补),否则与 ② 同样丢弃。
      */
     private void inspAutoReturn(String panelCode, String no, String user) {
         if (!"QC_INSP".equals(panelCode)) return;
@@ -1473,13 +1479,14 @@ public class ButtonService {
                         + " AND target_panel_code='QC_RETURN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, 型号, 物料描述, 数量, 不良数量, 备注, 日期, 计量单位, 单价 FROM qc_insp_detail"
+                "SELECT id, 物料编码, 物料名称, 型号, 数量, 不良数量, 备注, 计量单位, 单价, 采购订单行号"
+                        + " FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> defect = rows.stream()
                 .filter(r -> numOr(r.get("不良数量")) > 0).toList();
         if (defect.isEmpty()) return;
         List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT 业务员, 供应商代码, 供应商, 部门, 部门名称 FROM qc_insp"
+                "SELECT 业务员, 供应商代码, 供应商, 部门, 部门名称, 采购订单号 FROM qc_insp"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + no);
         Map<String, Object> h = heads.get(0);
@@ -1488,13 +1495,11 @@ public class ButtonService {
             Map<String, Object> line = new LinkedHashMap<>();
             line.put("物料编码", r.get("物料编码"));
             line.put("物料名称", r.get("物料名称"));
-            line.put("型号", r.get("型号"));
-            line.put("物料描述", r.get("物料描述"));
-            line.put("数量", r.get("不良数量"));
+            line.put("规格型号", r.get("型号"));   // 退回行字段=规格型号(原写「型号」落不下)
+            line.put("退货数量", r.get("不良数量")); // 退回行数量字段=退货数量(原写「数量」落不下)
             line.put("计量单位", r.get("计量单位"));
             line.put("单价", r.get("单价"));
-            Object d = r.get("日期");
-            if (d != null && !String.valueOf(d).isBlank()) line.put("日期", String.valueOf(d));
+            if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
             Object m = r.get("备注");
             if (m != null && !String.valueOf(m).isBlank()) line.put("备注", String.valueOf(m));
             items.add(line);
@@ -1506,6 +1511,11 @@ public class ButtonService {
         head.put("供应商", h.get("供应商"));
         head.put("部门", h.get("部门"));
         head.put("部门名称", h.get("部门名称"));
+        // 采购订单号随链带入(采购订单→送料暂收→来料检验→暂收退回),空则不带
+        if (h.get("采购订单号") != null && !String.valueOf(h.get("采购订单号")).isBlank()) {
+            head.put("采购订单号", h.get("采购订单号"));
+        }
+        head.put("检验单号", no); // 头「检验单号」=来源检验单(参照字段存单号)
         head.put("detail", Map.of("items", items));
         Map<String, Object> saved = save(registry.panel("QC_RETURN"), head, false);
         String thNo = String.valueOf(saved.get("编号"));

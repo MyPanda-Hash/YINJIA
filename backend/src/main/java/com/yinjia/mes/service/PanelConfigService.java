@@ -935,7 +935,9 @@ public class PanelConfigService {
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
             // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoPurchaseIn 同步补列)
             "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}, {"采购订单号", "采购订单号"}},
-            "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}},
+            // 来料检验单 → 暂收退回单:检验单号落「检验单号」;采购订单号随链带入(2026-09-20,
+            // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoReturn)
+            "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}, {"采购订单号", "采购订单号"}},
             "SO_ORDER|WO_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "交期"}},
             // 采购订单 → 送料暂收单:表头日期标签不同(单据日期→日期);供应商编码→供应商代码(异名,不带则生单丢失编码)
             // + 采购订单号(2026-09-20:订单号/订单行号须沿链下传,转ERP 时作金蝶源单关联 src_bill_no/src_seq)

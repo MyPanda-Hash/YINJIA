@@ -4,7 +4,8 @@
  * 流程:采购订单(已审核) → 生成送料暂收单 → 审核 → 生成来料检验单 → 填合格数量保存 → 审核(自动生采购入库单)
  *      逐站断言 头 采购订单号 + 行 采购订单行号 是否带得下去;最后清理探针单据。
  */
-const API = 'http://127.0.0.1:8091/api';
+// 目标后端可用环境变量覆盖(默认本地正式实例 8090;验证实例可设 YJ_API=http://127.0.0.1:8091/api)
+const API = process.env.YJ_API || 'http://127.0.0.1:8090/api';
 const ORDER = process.argv[2] || 'YJ-20260915-06';
 const fails = [];
 const ok = (c, m, extra = '') => { console.log(`${c ? '  [PASS]' : '  [FAIL]'} ${m}${extra ? ' :: ' + extra : ''}`); if (!c) fails.push(m); };
@@ -117,13 +118,14 @@ const created = [];   // 探针建的单据(清理用)
   ok(JSON.stringify(linesOf(qc).map((l) => l.行)) === JSON.stringify(orderLines.map((l) => l.行)),
     'QC_INSP 行 采购订单行号 带下来了', JSON.stringify(linesOf(qc).map((l) => l.行)));
 
-  // ── 4) 填合格数量并保存 ──
-  console.log('\n=== 4) 填合格数量保存(合格=送检数量) ===');
-  const items = (qc.detail?.items || []).map((it) => ({
-    ...it,
-    合格数量: n(it['送检数量']) || n(it['数量']),
-    不合格数量: 0,
-  }));
+  // ── 4) 填合格数量并保存(第 1 行留不良,用于验证退回支路)──
+  console.log('\n=== 4) 填 合格/不合格 数量并保存(第1行留不良 → 触发暂收退回单) ===');
+  const items = (qc.detail?.items || []).map((it, i) => {
+    const q = n(it['送检数量']) || n(it['数量']);
+    // 第 1 行:留一半不良(不良>0 才会自动生成暂收退回单);其余行全合格
+    const bad = i === 0 ? Math.floor(q / 2) : 0;
+    return { ...it, 合格数量: q - bad, 不合格数量: bad };
+  });
   const saveBody = { ...qc, 编号: qcNo, detail: { ...(qc.detail || {}), items } };
   delete saveBody['detail'].items?.__proto__;
   await btn('QC_INSP', '保存', saveBody);
@@ -131,11 +133,12 @@ const created = [];   // 探针建的单据(清理用)
   console.log(`   保存后行: ${JSON.stringify(linesOf(qc).map((l) => ({ 行: l.行, 送检: l.送检数量, 合格: (qc.detail?.items || []).find((x) => x['采购订单行号'] === l.行)?.['合格数量'] })))}`);
   ok((qc.detail?.items || []).every((x) => n(x['合格数量']) > 0), '合格数量已写入');
 
-  // ── 5) 审核来料检验单 → 自动生采购入库单 ──
-  console.log('\n=== 5) 审核来料检验单(自动生采购入库单) ===');
+  // ── 5) 审核来料检验单 → 自动生采购入库单 + 暂收退回单(不良支路)──
+  console.log('\n=== 5) 审核来料检验单(自动生采购入库单 + 暂收退回单) ===');
   const piBefore = new Set((await list('PURCHASE_IN')).map((r) => String(r['编号'] || r['单据编号'])));
+  const rtBefore = new Set((await list('QC_RETURN')).map((r) => String(r['编号'] || r['单据编号'])));
   await btn('QC_INSP', '审核', { 编号: qcNo });
-  await new Promise((r) => setTimeout(r, 1500));
+  await new Promise((r) => setTimeout(r, 1800));
   const piNew = (await list('PURCHASE_IN')).filter((r) => !piBefore.has(String(r['编号'] || r['单据编号'])));
   ok(piNew.length === 1, '审核后自动生成 1 张采购入库单草稿', piNew.map((r) => r['编号'] || r['单据编号']).join(','));
   if (piNew.length) {
@@ -143,14 +146,37 @@ const created = [];   // 探针建的单据(清理用)
     const piNo = pi['编号'] || pi['单据编号'];
     created.push(['PURCHASE_IN', piNo]);
     const piHead = headOf(pi), piLines = linesOf(pi);
-    console.log(`   头: ${JSON.stringify(piHead)}`);
-    console.log(`   行: ${JSON.stringify(piLines)}`);
+    console.log(`   [入库] 头: ${JSON.stringify(piHead)}`);
+    console.log(`   [入库] 行: ${JSON.stringify(piLines)}`);
     ok(piHead['采购订单号'] === ORDER, 'PURCHASE_IN 头 采购订单号 带下来了', piHead['采购订单号']);
     ok(JSON.stringify(piLines.map((l) => l.行)) === JSON.stringify(orderLines.map((l) => l.行)),
       'PURCHASE_IN 行 采购订单行号 带下来了(=转ERP src_seq)', JSON.stringify(piLines.map((l) => l.行)));
     ok(piLines.every((l) => String(l.计量单位 || '').trim() !== ''), 'PURCHASE_IN 行 计量单位 带下来了(转ERP 换 unit_id 必需)',
       JSON.stringify(piLines.map((l) => l.计量单位)));
     ok(piLines.every((l) => n(l.单价) > 0), 'PURCHASE_IN 行 单价 带下来了', JSON.stringify(piLines.map((l) => l.单价)));
+  }
+
+  // ── 5b) 不良支路:暂收退回单也要带齐 采购订单号/行号/退货数量/计量单位/单价 ──
+  const rtNew = (await list('QC_RETURN')).filter((r) => !rtBefore.has(String(r['编号'] || r['单据编号'])));
+  ok(rtNew.length === 1, '审核后自动生成 1 张暂收退回单草稿(不良支路)', rtNew.map((r) => r['编号'] || r['单据编号']).join(','));
+  if (rtNew.length) {
+    const rt = rtNew[0];
+    const rtNo = rt['编号'] || rt['单据编号'];
+    created.push(['QC_RETURN', rtNo]);
+    const rtHead = headOf(rt);
+    const rtLines = (rt.detail?.items || []).map((x) => ({
+      行: x['采购订单行号'] ?? '', 物料: x['物料编码'] || '', 退货数量: x['退货数量'] ?? '',
+      计量单位: x['计量单位'] ?? '', 单价: x['单价'] ?? '',
+    }));
+    console.log(`   [退回] 头: ${JSON.stringify(rtHead)} 检验单号=${rt['检验单号'] ?? ''}`);
+    console.log(`   [退回] 行: ${JSON.stringify(rtLines)}`);
+    ok(rtHead['采购订单号'] === ORDER, 'QC_RETURN 头 采购订单号 带下来了', rtHead['采购订单号']);
+    ok(String(rt['检验单号'] || '') === qcNo, 'QC_RETURN 头 检验单号 带下来了(=来源检验单)', String(rt['检验单号'] || ''));
+    ok(rtLines.length === 1 && rtLines[0].行 === '1', 'QC_RETURN 行 采购订单行号 带下来了(不良行=第1行)',
+      JSON.stringify(rtLines.map((l) => l.行)));
+    ok(rtLines.every((l) => n(l.退货数量) > 0), 'QC_RETURN 行 退货数量 落库(原写「数量」落不下)', JSON.stringify(rtLines.map((l) => l.退货数量)));
+    ok(rtLines.every((l) => String(l.计量单位 || '').trim() !== ''), 'QC_RETURN 行 计量单位 落库', JSON.stringify(rtLines.map((l) => l.计量单位)));
+    ok(rtLines.every((l) => n(l.单价) > 0), 'QC_RETURN 行 单价 落库', JSON.stringify(rtLines.map((l) => l.单价)));
   }
 
   // ── 6) 清理探针单据(反序:下游先删)──
