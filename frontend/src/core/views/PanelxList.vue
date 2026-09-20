@@ -458,9 +458,11 @@
           :total="total"
           :page-no="query.pageNo"
           :page-size="query.pageSize"
+          :keyword="query.keyword"
           @select="onRailSelect"
           @toggle="railCollapsed = !railCollapsed"
           @page="onRailPage"
+          @search="onRailSearch"
         />
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
@@ -2642,6 +2644,14 @@ function onRailPage(target) {
   const t = Math.min(Math.max(1, Math.round(target) || 1), lastPage.value)
   if (t === query.pageNo) return
   guardPageAction(async () => { query.pageNo = t; await load(); curIdx.value = 0 })
+}
+
+/** 左栏「单据选择」模糊搜索:**全库跨页**(把关键字交给后端 keyword,对各字段列 LIKE),
+ *  「共有数据」与总页数随之变成命中结果;清空关键字即回到全量。 */
+function onRailSearch(kw) {
+  const k = String(kw || '').trim()
+  if (k === (query.keyword || '')) return
+  guardPageAction(async () => { query.keyword = k; query.pageNo = 1; await load(); curIdx.value = 0 })
 }
 
 async function page(delta) {

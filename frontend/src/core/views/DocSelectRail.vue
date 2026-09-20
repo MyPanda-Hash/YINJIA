@@ -9,12 +9,16 @@
       <span class="dsr-coll" :title="tt('收起')" @click="$emit('toggle')">«</span>
     </div>
     <div class="dsr-filters">
-      <!-- 查找 = 模糊搜索(单框,对本页各列做包含匹配);2026-09-20 按用户口径去掉「部门」下拉 -->
+      <!-- 模糊搜索(2026-09-20):**全库**搜——关键字上抛 PanelxList 走后端 keyword LIKE,跨页命中;
+           不在本组件内过滤,故「共有数据」显示的就是命中张数(原部门下拉已按用户口径删除) -->
       <div class="dsr-kw">
         <el-input v-model="kw" size="small" clearable :placeholder="tt('模糊搜索')" @keyup.enter="apply" @clear="apply" />
         <el-button size="small" type="primary" plain @click="apply">{{ tt('查找') }}</el-button>
       </div>
-      <div class="dsr-count">{{ tt('共有数据') }}: {{ total }} {{ tt('条') }}<span v-if="filtered.length !== rows.length" class="dsr-count-sub">（{{ tt('本页筛出') }} {{ filtered.length }}）</span></div>
+      <div class="dsr-count">
+        {{ tt('共有数据') }}: {{ total }} {{ tt('条') }}
+        <span v-if="keyword" class="dsr-count-sub">（{{ tt('模糊搜索') }}: {{ keyword }}）</span>
+      </div>
     </div>
     <!-- 顶层翻页条:整页翻(50 条/页),与左栏内容同一数据源(后端分页页号) -->
     <DocRailPager
@@ -30,7 +34,7 @@
         </thead>
         <tbody>
           <tr
-            v-for="r in filtered"
+            v-for="r in viewRows"
             :key="r.key"
             :class="{ active: r.no === currentNo }"
             @click="$emit('select', r.idx)"
@@ -45,7 +49,7 @@
               <template v-else>{{ r.cells[ci] }}</template>
             </td>
           </tr>
-          <tr v-if="!filtered.length">
+          <tr v-if="!viewRows.length">
             <td :colspan="cols.length" class="dsr-empty">{{ tt('暂无数据') }}</td>
           </tr>
         </tbody>
@@ -79,11 +83,13 @@ const props = defineProps({
   pageNo: { type: Number, default: 1 },
   /** 每页条数(整页翻的步长,当前 50) */
   pageSize: { type: Number, default: 50 },
+  /** 生效中的模糊搜索关键字(后端 keyword;显示用,父组件是唯一真源) */
+  keyword: { type: String, default: '' },
   /** 列配置(按单据定制):[{label, keys(候选行键,取首个非空), align, tag(状态标签), no(单号样式)}];
    *  约定首列=单号、次列=日期、末列=审核状态(tag),中间列由挂载方按单据挑重要字段 */
   columns: { type: Array, default: null },
 })
-defineEmits(['select', 'toggle', 'page'])
+const emit = defineEmits(['select', 'toggle', 'page', 'search'])
 
 /** 总页数:按总张数与每页条数算,至少 1 页 */
 const pageCount = computed(() => Math.max(1, Math.ceil((props.total || 0) / Math.max(1, props.pageSize))))
@@ -112,21 +118,16 @@ const colValue = (row, c) => {
   return ''
 }
 
-const kw = ref('')
-const appliedKw = ref('')
-const apply = () => { appliedKw.value = (kw.value || '').trim().toLowerCase() }
+const kw = ref(props.keyword || '')
+/** 外部(父组件)改动关键字时同步输入框:切面板/清空/查询弹窗重置都要跟随 */
+watch(() => props.keyword, (v) => { if (String(v || '') !== (kw.value || '').trim()) kw.value = String(v || '') })
+/** 点「查找」/回车:关键字上抛,由父组件走后端全库模糊搜索(本组件不再本地过滤) */
+function apply() { emit('search', (kw.value || '').trim()) }
 
-/** 模糊搜索:对本页各列做包含匹配(空条件=不过滤) */
-const filtered = computed(() => {
-  const out = []
-  props.rows.forEach((row, idx) => {
-    const no = noOf(row)
-    const cells = cols.value.map((c) => colValue(row, c))
-    if (appliedKw.value && !cells.some((v) => String(v ?? '').toLowerCase().includes(appliedKw.value))) return
-    out.push({ key: no + '#' + idx, idx, no, cells })
-  })
-  return out
-})
+/** 行视图:仅做"行契约→单元格"映射(idx 保持指向 props.rows,点行回传原始下标) */
+const viewRows = computed(() => props.rows.map((row, idx) => ({
+  key: noOf(row) + '#' + idx, idx, no: noOf(row), cells: cols.value.map((c) => colValue(row, c)),
+})))
 
 /** 状态标签色彩(沿用系统制造绿体系:主色=已审核,青蓝=已完成(与已审核区分),
  *  中性灰=草稿,琥珀=流转中,红=作废/驳回) */
