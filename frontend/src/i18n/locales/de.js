@@ -1010,6 +1010,8 @@ export default {
     '未生成任何单据': 'Keine Belege erzeugt',
     '已生成': 'Erzeugt',
     '张单据': 'Belege',
+    '找到 {n} 张单据，清单仅列出前 {m} 张': '{n} Belege gefunden; die Liste zeigt nur die ersten {m}',
+    '（清单仅显示前 {m} 张）': '（Liste zeigt nur die ersten {m}）',
     '生单失败': 'Erzeugung fehlgeschlagen',
     '制单人：': 'Erstellt von: ',
     '审核人：': 'Genehmigt von: ',

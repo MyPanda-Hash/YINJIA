@@ -1010,6 +1010,8 @@ export default {
     '未生成任何单据': 'Aucun document',
     '已生成': 'Généré',
     '张单据': 'documents',
+    '找到 {n} 张单据，清单仅列出前 {m} 张': '{n} documents trouvés ; la liste affiche seulement les {m} premiers',
+    '（清单仅显示前 {m} 张）': '（la liste affiche seulement les {m} premiers）',
     '生单失败': 'Échec génération',
     '制单人：': 'Établi par : ',
     '审核人：': 'Approuvé par : ',

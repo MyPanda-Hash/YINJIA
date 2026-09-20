@@ -191,7 +191,7 @@
                 <span class="as-side-btn primary" @click="runFuzzySearch">{{ tt('查找') }}</span>
               </div>
               <div v-if="fuzzySearched" class="fuzzy-result">
-                <div class="fuzzy-result-head">{{ tt('结果') }}：{{ total }} {{ tt('张') }}</div>
+                <div class="fuzzy-result-head">{{ tt('结果') }}：{{ total }} {{ tt('张') }}<span v-if="total > (list.length || 0)">{{ tt('（清单仅显示前 {m} 张）').replace('{m}', String(list.length)) }}</span></div>
                 <div
                   v-for="r in fuzzyResultRows"
                   :key="r.no"
@@ -2196,7 +2196,11 @@ async function runFuzzySearch() {
     ElMessage.success(`${tt('已跳转到')}：${fuzzyResultRows.value[0]?.no || ''}`)
     return
   }
-  ElMessage.success(`${tt('找到')} ${total.value} ${tt('张单据')}，${tt('点清单切换查看')}`)
+  // 结果清单一次最多取 200 张(pageSize=200):命中更多时必须讲清"共命中 N 张、仅列前 M 张",
+  // 否则「共 N 张」与清单实际条数不符(2026-09-20 修)
+  const shown = list.value.length
+  if (total.value > shown) ElMessage.warning(tt('找到 {n} 张单据，清单仅列出前 {m} 张').replace('{n}', total.value).replace('{m}', shown))
+  else ElMessage.success(`${tt('找到')} ${total.value} ${tt('张单据')}，${tt('点清单切换查看')}`)
 }
 /** 点结果行 = 切换当前单据(走既有离开守卫:草稿未保存会提示) */
 async function openFuzzyResult(r) {
@@ -2530,7 +2534,15 @@ const cur = computed(() => {
   if (!l.length) return {}
   return l[Math.min(curIdx.value, l.length - 1)]
 })
-const curNo = computed(() => (list.value.length ? Math.min(curIdx.value, list.value.length - 1) + 1 : 0))
+// 当前单据在全量中的序号(不是页内序号!)——页脚「第 X/N 张」必须用全局序号,
+// 否则数据量超过一页后永远显示 1..pageSize(2026-09-20 修:分页显示与实际不符)
+const curNo = computed(() => {
+  if (!list.value.length) return 0
+  const i = Math.min(curIdx.value, list.value.length - 1)
+  return (query.pageNo - 1) * query.pageSize + i + 1
+})
+/** 总页数(单据面板分页用;与后端 OFFSET/FETCH 口径一致) */
+const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize))))
 
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
@@ -2625,7 +2637,10 @@ async function page(delta) {
     await guardDocSwitch(nxt)
     return
   }
-  if (delta > 0 && l.length < total.value) {
+  // 翻页判据必须用「全局位置」:l.length 只在末页才小于 total,
+  // 旧写法 l.length < total 在任意非末页都成立 → 末页点「下一张」会翻出空白页(2026-09-20 修)
+  const globalIdx = (query.pageNo - 1) * query.pageSize + Math.min(curIdx.value, l.length - 1)
+  if (delta > 0 && globalIdx + 1 < total.value && query.pageNo < lastPage.value) {
     await guardPageAction(async () => { query.pageNo += 1; await load(); curIdx.value = 0 })
     return
   }
@@ -2645,8 +2660,7 @@ async function pageFirst() {
 
 async function pageLast() {
   if (!list.value.length) return
-  const lastPage = Math.max(1, Math.ceil(total.value / query.pageSize))
-  await guardPageAction(async () => { if (query.pageNo < lastPage) { query.pageNo = lastPage; await load() } curIdx.value = list.value.length - 1 })
+  await guardPageAction(async () => { if (query.pageNo < lastPage.value) { query.pageNo = lastPage.value; await load() } curIdx.value = list.value.length - 1 })
 }
 
 // ══════════ 明细区块模型（配置驱动，见 docs/frontend/前端面板设计.md）══════════
@@ -5280,7 +5294,7 @@ async function onScanApply(payload) {
   ElMessage.success('识别数据已填入草稿，请核对后保存')
 }
 
-async function load() {
+async function load(clamping = false) {
   delMode.value = false
   delSel.value = []
   archPage.value = 1 // 档案分页随每次载入回到首页
@@ -5310,6 +5324,13 @@ async function load() {
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
     list.value = res.list || []
     total.value = res.totalSize || 0
+    // 页码越界自愈(末页删单/换每页条数/筛选后页码残留):回落到最后一页重取,避免空白页与页码错乱
+    const lp = Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize)))
+    if (!clamping && query.pageNo > lp) {
+      query.pageNo = lp
+      await load(true)
+      return
+    }
     if (curIdx.value >= list.value.length) curIdx.value = 0
     // 2026-08-25：?focus=单号 定位（选单/生单从表单页跳转过来时直接显示目标单据）
     const focus = route.query.focus

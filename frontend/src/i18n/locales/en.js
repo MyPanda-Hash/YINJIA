@@ -478,6 +478,8 @@ export default {
     '找到': 'Found',
     '张单据': 'document(s)',
     '点清单切换查看': 'click a row to view',
+    '找到 {n} 张单据，清单仅列出前 {m} 张': 'Found {n} document(s); the list shows only the first {m}',
+    '（清单仅显示前 {m} 张）': ' (list shows only the first {m})',
     /* ── 项目进度查询:状态列(阶段进度)+ 阶段计划弹窗 ── */
     '点击查看阶段计划': 'Click to view the stage plan',
     '项目阶段计划': 'Project stage plan',

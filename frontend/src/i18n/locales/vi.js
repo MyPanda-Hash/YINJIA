@@ -1010,6 +1010,8 @@ export default {
     '未生成任何单据': 'Chưa sinh chứng từ',
     '已生成': 'Đã sinh',
     '张单据': 'chứng từ',
+    '找到 {n} 张单据，清单仅列出前 {m} 张': 'Tìm thấy {n} chứng từ; danh sách chỉ hiển thị {m} đầu tiên',
+    '（清单仅显示前 {m} 张）': '（danh sách chỉ hiển thị {m} đầu tiên）',
     '生单失败': 'Sinh thất bại',
     '制单人：': 'Người lập: ',
     '审核人：': 'Người duyệt: ',
