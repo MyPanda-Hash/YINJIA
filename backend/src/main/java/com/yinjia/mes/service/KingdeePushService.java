@@ -38,12 +38,17 @@ import java.util.*;
  *
  * 凭证来源(优先级): ① Spring 配置 kingdee.push.*(服务器: jar旁 config/application-*.properties
  * 或环境变量) → ② 兜底 deploy/push/config.json(本地联调,gitignored)。
+ *
+ * 授权模式:配置了 outerInstanceId 时走动态授权(真实账套,appSecret 24h 官方轮换,
+ * 每次取新 token 前自动刷新 appKey/appSecret/domain,与 deploy/kingdee-client.mjs 同算法);
+ * 未配置时用静态 appKey/appSecret(仅沙箱等特殊联调场景)。
  */
 @Service
 public class KingdeePushService {
     private static final Logger log = LoggerFactory.getLogger(KingdeePushService.class);
     private static final String API_BASE = "https://api.kingdee.com";
     private static final String TOKEN_PATH = "/jdyconnector/app_management/kingdee_auth_token";
+    private static final String AUTH_PATH = "/jdyconnector/app_management/push_app_authorize";
     private static final DateTimeFormatter FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     private final ObjectMapper json = new ObjectMapper();
@@ -53,6 +58,8 @@ public class KingdeePushService {
     private String clientId;
     @Value("${kingdee.push.clientSecret:}")
     private String clientSecret;
+    @Value("${kingdee.push.outerInstanceId:}")
+    private String outerInstanceId;
     @Value("${kingdee.push.appKey:}")
     private String appKey;
     @Value("${kingdee.push.appSecret:}")
@@ -78,6 +85,7 @@ public class KingdeePushService {
             JsonNode k = json.readTree(Files.readString(f.toPath(), StandardCharsets.UTF_8)).path("kingdee");
             clientId = k.path("clientId").asText("");
             clientSecret = k.path("clientSecret").asText("");
+            outerInstanceId = k.path("outerInstanceId").asText("");
             appKey = k.path("appKey").asText("");
             appSecret = k.path("appSecret").asText("");
             if (k.hasNonNull("domain") && !k.path("domain").asText("").isBlank()) domain = k.path("domain").asText();
@@ -145,18 +153,37 @@ public class KingdeePushService {
         else body.put("customer_number", str(head.get("客户编码")));
 
         ArrayNode entities = body.putArray("material_entity");
+        // 来源单引用(金蝶行级 src_* 族):采购入库单带 采购订单号 → 金蝶按来源订单挂联
+        String poNo = str(head.get("采购订单号"));
+        int rowNo = 0;
         for (Map<String, Object> line : lines) {
+            rowNo++;
             ObjectNode e = entities.addObject();
             e.put("material_number", str(line.get("存货编码")));
             e.put("qty", num(line, isPur ? "实收数量" : "数量"));
             e.put("price", num(line, isPur ? "单价" : "售价"));
             String model = str(line.get("规格型号")); if (!model.isEmpty()) e.put("material_model", model);
             double cess = num(line, "税率%"); if (cess != 0) e.put("cess", cess);
+            // 计量单位(保存接口要 unit_id=金蝶单位ID,报错文案里的"unit"即此):行上"单位id"列
+            // → 当前账套单位主数据(measure_unit)按名称换ID。单位ID按账套各不同(bs_uom 存的是
+            // 读入账套的ID,跨账套复用会静默错单位),按当前凭证实时拉取 → 测试/真实套切换零改动
+            String unit = str(line.get("计量单位"));
+            String unitId = str(line.get("单位id"));
+            if (unitId.isEmpty() && !unit.isEmpty()) unitId = str(unitMap().get(unit));
+            if (unitId.isEmpty()) throw new RuntimeException(
+                    "第" + rowNo + "行计量单位[" + unit + "]在当前账套金蝶单位档案中无对应ID,无法转ERP"
+                            + (unit.isEmpty() ? "(行上未填计量单位)" : ""));
+            e.put("unit_id", unitId);
             // 仓库编码:行级 > 头级 > 默认正品仓(金蝶要求非服务商品必须录入仓库)
             String stock = str(line.get("仓库编码")); if (stock.isEmpty()) stock = str(head.get("仓库编码"));
             if (stock.isEmpty()) stock = "CK00001";
             e.put("stock_number", stock);
             String batch = str(line.get("批号")); if (!batch.isEmpty()) e.put("batch_no", batch);
+            // 来源单:行级src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
+            if (isPur && !poNo.isEmpty()) {
+                e.put("src_bill_no", poNo);
+                e.put("src_bill_type_name", "采购订单");
+            }
         }
 
         // ⑤ 推送(纯 Java HTTP)
@@ -188,11 +215,80 @@ public class KingdeePushService {
         return out;
     }
 
+    // ══════════ 计量单位解析(按当前账套动态拉取) ══════════
+
+    private static final String UNIT_LIST_PATH = "/jdy/v2/bd/measure_unit";
+    private Map<String, String> unitIdByName;
+    private long unitCacheAt;
+
+    /**
+     * 当前账套的 计量单位名称→金蝶单位ID 缓存(22h,随 token 生命周期量级)。
+     * 单位ID按账套各不同(米=8 是读入账套的ID,测试套里 id=8 可能是别的单位),
+     * 切换测试/真实账套后自动按新凭证重拉,无需改代码或本地档案。
+     */
+    private synchronized Map<String, String> unitMap() throws Exception {
+        ensureCreds(); // 凭证先行:本方法可能先于 getToken() 被调用(推送流程④),Spring 未配时须先装 config.json,否则 clientSecret 为空 → SecretKeySpec "Empty key"
+        if (unitIdByName != null && System.currentTimeMillis() - unitCacheAt < 22 * 3600_000L) return unitIdByName;
+        Map<String, String> m = new HashMap<>();
+        for (int page = 1; page <= 10; page++) {
+            Map<String, String> params = new TreeMap<>();
+            params.put("page", String.valueOf(page));
+            params.put("page_size", "200");
+            String[] tn = timestampNonce();
+            String url = API_BASE + UNIT_LIST_PATH + "?" + qs(params, false);
+            Map<String, String> headers = baseHeaders(tn);
+            headers.put("X-Api-Signature", apiSignature("GET", UNIT_LIST_PATH, params, tn[1], tn[0]));
+            headers.put("app-token", getToken());
+            headers.put("X-GW-Router-Addr", domain);
+            JsonNode res = http("GET", url, headers, null);
+            if (res.path("errcode").asLong(-1) != 0) {
+                throw new RuntimeException("获取金蝶计量单位列表失败: "
+                        + res.path("description").asText(res.toString()));
+            }
+            JsonNode rows = res.path("data").path("rows");
+            int n = 0;
+            if (rows.isArray()) {
+                for (JsonNode r : rows) {
+                    String nm = r.path("name").asText("");
+                    if (!nm.isBlank()) m.put(nm, r.path("id").asText(""));
+                    n++;
+                }
+            }
+            if (n < 200) break;
+        }
+        if (m.isEmpty()) throw new RuntimeException("金蝶计量单位列表为空(账套无单位档案?)");
+        unitIdByName = m;
+        unitCacheAt = System.currentTimeMillis();
+        log.info("金蝶计量单位档案已加载({}个,按当前账套,缓存22h)", m.size());
+        return m;
+    }
+
     // ══════════ HTTP(原始字节控制) ══════════
 
     private synchronized String getToken() throws Exception {
         ensureCreds();
         if (cachedToken != null && System.currentTimeMillis() < tokenExpiresAt) return cachedToken;
+        boolean dyn = outerInstanceId != null && !outerInstanceId.isBlank();
+        if (dyn) fetchAuthorization();
+        JsonNode body = requestToken();
+        if (body.path("errcode").asLong(-1) != 0) {
+            // 1030002006: 授权密钥校验失败(appSecret 已 24h 轮换)→ 动态授权下重取授权信息再试一次
+            if (dyn && body.path("errcode").asLong(-1) == 1030002006L) {
+                fetchAuthorization();
+                body = requestToken();
+            }
+            if (body.path("errcode").asLong(-1) != 0) {
+                throw new RuntimeException("获取app-token失败: " + body.path("description").asText(body.toString()));
+            }
+        }
+        cachedToken = body.path("data").path("app-token").asText("");
+        if (cachedToken.isBlank()) throw new RuntimeException("app-token响应缺少字段");
+        tokenExpiresAt = System.currentTimeMillis() + 22 * 3600_000L;
+        log.info("金蝶 app-token 已获取(缓存22h)");
+        return cachedToken;
+    }
+
+    private JsonNode requestToken() throws Exception {
         String appSignature = Base64.getEncoder().encodeToString(
                 hex(hmacSha256(appSecret, appKey)).getBytes(StandardCharsets.UTF_8));
         Map<String, String> params = new TreeMap<>();
@@ -204,15 +300,44 @@ public class KingdeePushService {
         Map<String, String> headers = baseHeaders(tn);
         headers.put("X-Api-Signature", apiSignature("GET", TOKEN_PATH, params, tn[1], tn[0]));
         headers.put("X-GW-Router-Addr", domain);
-        JsonNode body = http("GET", url, headers, null);
-        if (body.path("errcode").asInt(-1) != 0) {
-            throw new RuntimeException("获取app-token失败: " + body.path("description").asText(body.toString()));
+        return http("GET", url, headers, null);
+    }
+
+    /**
+     * 动态授权(与 deploy/kingdee-client.mjs fetchAuthorization 同算法):
+     * 凭 outerInstanceId 调 push_app_authorize 取当前 appKey/appSecret/domain。
+     * 真实账套 appSecret 官方 24h 轮换,不能写死,须每次取新 token 前刷新;
+     * 响应 data 为数组,取 status=1 的授权记录(无则首条),兼容 errcode/code 两种格式。
+     */
+    private void fetchAuthorization() throws Exception {
+        Map<String, String> params = new TreeMap<>();
+        params.put("outerInstanceId", outerInstanceId);
+        String[] tn = timestampNonce();
+        String url = API_BASE + AUTH_PATH + "?" + qs(params, false);
+        Map<String, String> headers = baseHeaders(tn);
+        headers.put("X-Api-Signature", apiSignature("POST", AUTH_PATH, params, tn[1], tn[0]));
+        headers.put("X-GW-Router-Addr", domain);
+        JsonNode res = http("POST", url, headers, "{}".getBytes(StandardCharsets.UTF_8));
+        boolean ok = res.path("errcode").asLong(-1) == 0 || res.path("code").asLong(-1) == 200;
+        if (!ok) {
+            String err = res.toString();
+            throw new RuntimeException("主动获取授权失败: " + (err.length() > 300 ? err.substring(0, 300) : err));
         }
-        cachedToken = body.path("data").path("app-token").asText("");
-        if (cachedToken.isBlank()) throw new RuntimeException("app-token响应缺少字段");
-        tokenExpiresAt = System.currentTimeMillis() + 22 * 3600_000L;
-        log.info("金蝶 app-token 已获取(缓存22h)");
-        return cachedToken;
+        JsonNode data = res.path("data");
+        JsonNode hit = null;
+        if (data.isArray()) {
+            for (JsonNode x : data) {
+                if ("1".equals(x.path("status").asText(""))) { hit = x; break; }
+            }
+            if (hit == null && !data.isEmpty()) hit = data.get(0);
+        }
+        if (hit == null || hit.path("appKey").asText("").isBlank() || hit.path("appSecret").asText("").isBlank())
+            throw new RuntimeException("授权信息响应中缺少 appKey/appSecret");
+        appKey = hit.path("appKey").asText();
+        appSecret = hit.path("appSecret").asText();
+        String d = hit.path("domain").asText("");
+        if (!d.isBlank()) domain = d;
+        log.info("金蝶动态授权已刷新(appKey={}, 24h轮换自动适配)", appKey);
     }
 
     private JsonNode postJson(String path, ObjectNode bodyObj) throws Exception {

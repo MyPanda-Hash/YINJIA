@@ -443,7 +443,9 @@
     </div>
 
 
-    <template v-else>
+    <!-- !isApprovalDoc:文书式面板(RD 全系)只走上方纸张分支,单据卡片(含表头字段条)整体不渲染——
+         9357460 拆分报表链时此排除丢失,曾致 RD 每个面板纸张下方多出一条全空表头 -->
+    <template v-else-if="!isApprovalDoc">
       <!-- 单据卡片:左「单据选择」栏(送料暂收单等启用,对齐 PANDA 左停靠选择列表) + 右侧表头/明细 -->
       <div class="doc-rail-layout" :class="{ 'rail-on': !!docRailCfg && !railCollapsed }">
         <DocSelectRail
@@ -2905,30 +2907,28 @@ function qrTogglePage(b, on) {
   }
   qrSel.value = s
 }
-/** 导出二维码标签 PDF:确认 → POST /report/qr-label(blob)→ 另存;失败体是 JSON,须按文本解析 message(如重复编码明细) */
+/** 预览二维码标签:确认 → POST /report/qr-label(blob)→ 新窗口内打开 PDF(浏览器查看器可直接打印/另存)。
+ *  2026-09-17 由直接下载改为预览优先,对齐「导出报表→打印预览」形态;失败体是 JSON,须按文本解析 message(如重复编码明细) */
 async function exportQrLabels() {
   const codes = [...qrSel.value]
   if (!codes.length) return ElMessage.warning(tt('请先勾选要导出的商品'))
   try {
     await ElMessageBox.confirm(
-      tt('已选 {n} 个商品，导出二维码标签 PDF？').replace('{n}', codes.length),
+      tt('已选 {n} 个商品，预览二维码标签？').replace('{n}', codes.length),
       tt('二维码标签'),
       { type: 'info', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
     )
   } catch { return }
+  const win = window.open('', '_blank') // 先开窗口:await 之后再开会被浏览器判弹窗拦截
   const loading = ElMessage({ message: tt('正在生成标签…'), duration: 0 })
   try {
     const blob = await request.post('/report/qr-label', { codes }, { responseType: 'blob' })
     const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${tt('物料二维码标签')}-${new Date().toISOString().slice(0, 10)}.pdf`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 60000)
-    ElMessage.success(tt('已导出 {n} 张二维码标签').replace('{n}', codes.length))
+    if (win) win.location.href = url
+    else ElMessage.warning(tt('浏览器拦截了新窗口，请允许弹出窗口'))
+    ElMessage.success(tt('已打开标签预览，可直接打印或另存为 PDF'))
   } catch (e) {
+    if (win) win.close()
     ElMessage.error(await qrBlobErrMsg(e) || tt('标签生成失败'))
   } finally {
     loading.close()

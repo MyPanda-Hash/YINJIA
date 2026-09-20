@@ -390,6 +390,26 @@ migrate-stock-summary-query.sql
 migrate-stock-ledger-query.sql
 
 # —— 2026-09-17 报表弹窗字段终版——删 开始/结束日期 查询字段(改为弹窗内置单个「单据日期」区间控件);台账 仓库/存货 required=1(单一仓库的一种存货),汇总 required=0;库存状况表(STOCK_BALANCE)零改动 ——
+# —— 2026-09-17 bd_so_order补建金蝶同步扩展4列(折前价税合计/业务模式/交货方式id/发票类型,9452c01漏建致SO同步10/10失败)+yj_field注册+en译名+中文注明;幂等可重跑 ——
+migrate-so-extra-cols.sql
+# —— 2026-09-17 GFDA补注册9个原始档案字段(dm/mc/addr/tel/ywman/sui_no/bank/bank_no/bz;cleanup事故删后链上只自愈金蝶口径致33≠链重放42;税号空数据按治理口径默认隐藏;9标签译名全局共享已有)——
+migrate-gfda-restore-fields.sql
+# —— 2026-09-17 采购→暂收→检验→入库链路修复——PURCHASE_IN仓库名称必填;SL_RECV/QC_INSP明细补计量单位列+字段(随物料参照同名带回);PU_ORDER/PURCHASE_IN供应商参照改存名称(mc,与列内数据/金蝶同步口径一致);幂等可重跑 ——
+migrate-sl-chain-fixes.sql
+# —— 2026-09-17 暂收单/检验单供应商参照源改指供应商档案——SL_RECV头供应商(名称mc)/供应商代码(编码dm)+明细供应商、QC_INSP头两字段,由往来单位PARTNER改为GFDA;编码名称双向联动由REF_SYNONYMS新词条支持;幂等可重跑 ——
+migrate-sl-supplier-ref.sql
+# —— 2026-09-17 供应商参照源改指供应商档案第二批——QC_RETURN头供应商/供应商代码+明细供应商、PURCHASE_IN头供应商编码,由PARTNER改GFDA;至此四单据(暂收/检验/退料/采购入库)供应商系列10处参照全统一;幂等可重跑 ——
+migrate-supplier-ref-v2.sql
+# —— 2026-09-17 暂收退料单明细补计量单位列+字段——采购链单位流转补全(采购订单单位→暂收/检验/退料/入库计量单位),链路映射走既有同名词典+同名自动映射零代码;幂等可重跑 ——
+migrate-qc-return-uom.sql
+# —— 2026-09-17 采购入库单仓库名称启用仓库参照(WH)点选——data_type文本改参照(ref配置本就有,序列化只认参照型故此前不弹);同名映射连带带出隐藏仓库编码列;幂等可重跑 ——
+migrate-purchase-in-wh-ref.sql
+# —— 2026-09-17 计量单位存量回填两批——v1按商品档案(bs_inv)填空;v2沿form_flow_link占用链从采购订单行逐级下带+孤儿行同物料借值+错位行以检验行为准纠正+TEST-1测试残留清理;幂等只填空/只纠链路行 ——
+migrate-uom-backfill.sql
+migrate-uom-backfill-v2.sql
+migrate-qc-insp-price.sql
+migrate-share-file.sql
+
 migrate-report-dialog-fields.sql
 
 # —— 2026-09-17 库存台账期初/期末结存(T+同款语义)——参照PANDA真源(movements首源=INIT_BALANCE期初建账单);我们无建账单→期初=本行发生前累计(LAG窗口),期末=本行累计;日期段过滤时窗口先于WHERE→首行期初=期前累计(该时段期初结存),末行期末=期末结存;列组扩为 期初结存|收入|发出|期末结存(与收发存汇总同构);691行逐行勾稽通过。幂等可重跑 ——
@@ -415,3 +435,5 @@ migrate-testlib-dedup.sql
 migrate-doc-required-v2.sql
 migrate-report-template.sql
 migrate-report-template-comments.sql
+migrate-po-inbound-fields.sql
+

@@ -163,4 +163,19 @@ public class PanelPermissionService {
         String user = currentUserName();
         if (!isAdmin(user)) throw new org.springframework.security.access.AccessDeniedException("仅管理员可操作");
     }
+
+    /** 当前登录用户在指定面板是否持有任一权限词(管理员恒真;共享文件等自定义模块复用同一词表) */
+    public boolean hasAnyPerm(String panelCode, String... words) {
+        String user = currentUserName();
+        if (isAdmin(user)) return true;
+        Set<String> perms = permsOf(user).getOrDefault(panelCode, Set.of());
+        for (String w : words) if (perms.contains(w)) return true;
+        return false;
+    }
+
+    /** 当前登录用户必须是该面板的指定维护人(权限词任一命中,管理员恒过),否则 403 */
+    public void requireAnyPerm(String panelCode, String actionLabel, String... words) {
+        if (!hasAnyPerm(panelCode, words))
+            throw new org.springframework.security.access.AccessDeniedException("仅该面板「" + actionLabel + "」权限的指定人员可操作");
+    }
 }

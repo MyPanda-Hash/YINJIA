@@ -573,6 +573,9 @@ public class PanelConfigService {
             // 选客户/供应商整串带回:往来单位的编码/名称 → 单据的客户编码/供应商编码 与 客户/供应商(编码↔名称双向带动)
             "往来单位编码", List.of("客户编码", "供应商编码"),
             "往来单位名称", List.of("供应商", "客户"),
+            // 供应商档案(GFDA)整串带回:编码/名称 ↔ 单据的 供应商代码/供应商 异名字段(编码↔名称双向带动)
+            "供应商编码", List.of("供应商代码"),
+            "供应商名称", List.of("供应商"),
             // 产品信息表 炭棒尺寸(整串) → 产品文件面板异名规格字段;三窄格 炭棒规格1/2/3 由前端拆分回填
             "炭棒尺寸", List.of("炭棒规格", "滤芯尺寸")
     )));
@@ -888,9 +891,11 @@ public class PanelConfigService {
             java.util.Map.entry("CKD", "KHDD")                       // 客户订单(旧) → 出库单(旧)
     )));
 
-    /** 头字段映射排除项(状态/审批类不参与选单带入)。 */
+    /** 头字段映射排除项(状态/审批类不参与选单带入;附件1-6是按单号锚定的文件实体,
+     *  靠字段值映射带入既无意义又占 7 条映射上限的坑——曾把 SL_RECV→QC_INSP 的日期挤丢)。 */
     private static final java.util.Set<String> FLOW_HEAD_EXCLUDE = java.util.Set.of(
-            "编号", "单据状态", "审核人", "审核时间", "审批人", "审批时间", "创建时间", "更新时间");
+            "编号", "单据状态", "审核人", "审核时间", "审批人", "审批时间", "创建时间", "更新时间",
+            "附件1", "附件2", "附件3", "附件4", "附件5", "附件6");
 
     /** 明细字段同义词(来源字段 → 目标字段;同名映射之外的补充)。 */
     private static final String[][] FLOW_DETAIL_SYNONYMS = {
@@ -923,8 +928,10 @@ public class PanelConfigService {
             "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}},
             "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}},
             "SO_ORDER|WO_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "交期"}},
-            // 采购订单 → 送料暂收单:表头日期标签不同(单据日期→日期),其余同名自动映射
-            "PU_ORDER|SL_RECV", new String[][]{{"单据日期", "日期"}}
+            // 采购订单 → 送料暂收单:表头日期标签不同(单据日期→日期);供应商编码→供应商代码(异名,不带则生单丢失编码)
+            "PU_ORDER|SL_RECV", new String[][]{{"单据日期", "日期"}, {"供应商编码", "供应商代码"}},
+            // 送料暂收单 → 来料检验单:日期同名,但头映射 7 条上限曾被附件占坑挤丢,同义词追加无上限兜底
+            "SL_RECV|QC_INSP", new String[][]{{"日期", "日期"}}
     )));
 
     /** 生单/选单共用的头行映射(目标面板 → {source, headerMap, detailMap});供 PushGenerateHandler 复用。 */
@@ -1137,19 +1144,23 @@ public class PanelConfigService {
     }
     // ---------- 表格列自定义 ----------
 
-    /** 保存列排序/栏名/显隐(更新 yj_field 的 seq/alias/visible) */
+    /** 保存列排序/栏名/显隐(更新 yj_field 的 seq/alias;显隐 hidden+visible 同开同关——
+     *  编辑表格按 hidden 过滤,只写 visible 会出现"取消勾选后字段仍在表格末尾显示"的不一致,
+     *  2026-09-17 对齐表头调整口径修复) */
     @SuppressWarnings("unchecked")
     public void saveColumnPrefs(String panelCode, List<Map<String, Object>> columns) {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
+        // 只在明细字段集合内匹配,防同名头/行字段(如 SO_ORDER 备注)误改头字段
+        List<PanelRegistry.FieldDef> details = def.fieldsAt("detail");
         for (int i = 0; i < columns.size(); i++) {
             Map<String, Object> col = columns.get(i);
             String label = String.valueOf(col.getOrDefault("label", ""));
             String alias = String.valueOf(col.getOrDefault("alias", ""));
             boolean visible = !Boolean.FALSE.equals(col.get("visible")) && !"false".equals(String.valueOf(col.get("visible")));
-            PanelRegistry.FieldDef fd = def.byLabel(label);
+            PanelRegistry.FieldDef fd = details.stream().filter(f -> f.label().equals(label)).findFirst().orElse(null);
             if (fd == null) continue;
-            jdbc.update("UPDATE yj_field SET seq = ?, alias = ?, visible = ? WHERE panel_code = ? AND col_name = ?",
-                    (i + 1) * 10, alias.isBlank() ? null : alias, visible, panelCode, fd.col());
+            jdbc.update("UPDATE yj_field SET seq = ?, alias = ?, hidden = ?, visible = ? WHERE panel_code = ? AND col_name = ?",
+                    (i + 1) * 10, alias.isBlank() ? null : alias, !visible, visible, panelCode, fd.col());
         }
         registry.reload();
     }
