@@ -23,8 +23,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let fails = 0;
 const ok = (c, msg) => { console.log(`  ${c ? '[PASS]' : '[FAIL]'} ${msg}`); if (!c) fails++; };
 
-// 每面板取一张单据(优先非草稿,用于证明"已审核也能传")
-const PANELS = ['PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD'];
+// 每面板取一张单据(优先非草稿,用于证明"已审核也能传");可命令行传面板号覆盖
+const PANELS = process.argv.slice(2).length ? process.argv.slice(2)
+  : ['PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD'];
 
 const pool = await new mssql.ConnectionPool({ server: '127.0.0.1', port: 1433, database: 'HSDZ_MES', user: 'yinjia', password: 'Yinjia@2026', options: { encrypt: false, trustServerCertificate: true } }).connect();
 const q = async (sql) => (await new mssql.Request(pool).query(sql)).recordset;

@@ -2476,13 +2476,18 @@ const draftEditable = computed(() => {
   return false
 })
 
-/** 附件上传闸门(2026-09-20):草稿/修改中照旧可传;订单类面板(与迁移 migrate-order-attach 同名单)
- *  **已审核/已完成也允许补附件**(合同/扫描件等)——金蝶同步进来的订单本来就是已审核,
- *  若沿用"审核即锁定"这些单永远传不了附件。仅「已作废」单据禁止。 */
-const ATTACH_ANY_STATUS_PANELS = new Set(['PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD'])
+/** 附件上传闸门(2026-09-20):草稿/修改中照旧可传;**凡配了附件列位的单据,已审核/已完成也允许补附件**
+ *  (合同/送货单/检验报告等佐证材料,只写附件列与 yj_attachment,不动业务字段;金蝶同步进来的订单
+ *  本来就是已审核,沿用"审核即锁定"这些单永远传不了附件)。仅「已作废」单据禁止。
+ *  名单 = 已配 6 列位的单据:SALE/采购订单、生产加工单、委外加工单、生产工单、客户订单
+ *  + 采购链的送料暂收/来料检验/暂收退回/采购入库(见 migrate-order-attach / migrate-attach-restore)。 */
+const ATTACH_EDIT_PANELS = new Set([
+  'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
+  'SL_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN',
+])
 const attachEditable = computed(() => {
   if (draftEditable.value) return true
-  if (!ATTACH_ANY_STATUS_PANELS.has(panelCode.value)) return false
+  if (!ATTACH_EDIT_PANELS.has(panelCode.value)) return false
   if (!curDocNo.value) return false
   return String(cur.value?.['单据状态'] || '') !== '已作废'
 })

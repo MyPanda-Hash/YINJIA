@@ -659,12 +659,15 @@ const status = computed(() => form['单据状态'] || '草稿')
 // 单据=草稿可编辑；基础档案（存货/部门等）状态为 启用/停用 同样可编辑（增行/改字段/保存）
 const editable = computed(() => !isEdit.value || status.value === '草稿' || status.value === '启用' || status.value === '停用')
 
-/** 附件上传闸门(与 PanelxList 同口径 2026-09-20):订单类面板(迁移 migrate-order-attach 同名单)
- *  即使已审核/已完成也允许补附件——金蝶同步进来的订单本来就是已审核;仅「已作废」禁止 */
-const ATTACH_ANY_STATUS_PANELS = new Set(['PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD'])
+/** 附件上传闸门(与 PanelxList 同口径 2026-09-20):**凡配了附件列位的单据,已审核/已完成也允许补附件**
+ *  (佐证材料,只写附件列与 yj_attachment,不动业务字段;金蝶同步进来的订单本来就是已审核);仅「已作废」禁止 */
+const ATTACH_EDIT_PANELS = new Set([
+  'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
+  'SL_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN',
+])
 const attachEditable = computed(() => {
   if (editable.value) return true
-  if (!ATTACH_ANY_STATUS_PANELS.has(panelCode.value)) return false
+  if (!ATTACH_EDIT_PANELS.has(panelCode.value)) return false
   if (!(form['单据编号'] || form['编号'])) return false
   return status.value !== '已作废'
 })

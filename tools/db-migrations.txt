@@ -491,3 +491,11 @@ migrate-auditor-ref.sql
 #   (金蝶同步进来的订单本来就是已审核,沿用"审核即锁定"则永远传不了);仅已作废禁止。
 #   不在范围:CGD 采购单(遗留 Porder,无头表 → 文件名无法镜像回头列)。幂等可重跑。
 migrate-order-attach.sql
+
+# —— 2026-09-20 恢复采购链三单据附件列位(现网库缺失) ——
+#   盘点发现库里只有 送料暂收单 SL_RECV 有附件能力;而登记在册的迁移早该给
+#   来料检验单 QC_INSP(qc-3docs-rebuild 建表即含 附件1..6)、暂收退回单 QC_RETURN(qc-return-attach)、
+#   采购入库单 PURCHASE_IN(po-pi-attach)各补过 —— 当前库这三张单「表无列、字段无行」(本机库历史回档所致)。
+#   本脚本按同口径补齐;**不重跑**那两个会重建/清字段的旧迁移(其 DELETE yj_field 会清掉后续脚本加的字段)。
+#   同时把前端附件闸门从"仅订单"放宽到"凡配了附件列位的单据"(已审核也可补附件,仅已作废禁止)。
+migrate-attach-restore.sql
