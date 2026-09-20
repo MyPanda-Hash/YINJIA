@@ -9,6 +9,15 @@ import {
   readCell,
 } from './progressColumns.js'
 
+/** 设计原表(B5:S5)的 18 个表头,顺序即列序 —— 回归基线 */
+const DESIGN_LABELS = [
+  '项目定级', '项目名称', '子项目/尺寸', '项目编号',
+  '开发复杂度', '重要程度', '紧急程度', '内容',
+  '项目发起人', '项目负责人', '立项日期', '预计完成日期',
+  '项目定及变更', '状态', '测试情况',
+  '技术目标达成', '是否市场转化', '未转换原因',
+]
+
 /**
  * 这条断言守的是 2026-09-10 那个 bug:
  * 前端拿"显示名"当数据键 → 后端按元数据过滤 → 值保存时被静默丢弃。
@@ -16,48 +25,99 @@ import {
  */
 test('每个可落库列的 key 必须存在于 RD_PROGRESS 明细元数据列里', () => {
   const bad = PROGRESS_COLUMNS
-    .filter((c) => !c.pendingAlign)
     .filter((c) => !RD_PROGRESS_DETAIL_COLUMNS.includes(c.key))
     .map((c) => `${c.label}(key=${c.key})`)
   assert.deepEqual(bad, [], `以下列的落库键不在 rd_progress_detail / yj_field 里,保存会被丢弃:\n  ${bad.join('\n  ')}`)
 })
 
-test('列数固定为 14,且显示名不重复', () => {
-  assert.equal(PROGRESS_COLUMNS.length, 14)
-  assert.equal(new Set(PROGRESS_COLUMNS.map((c) => c.label)).size, 14)
+test('列数固定为 18(设计原表 18 个表头),显示名与设计逐字一致且顺序相同', () => {
+  assert.equal(PROGRESS_COLUMNS.length, 18)
+  assert.deepEqual(PROGRESS_COLUMNS.map((c) => c.label), DESIGN_LABELS)
+  assert.equal(new Set(PROGRESS_COLUMNS.map((c) => c.label)).size, 18)
 })
 
 /**
- * 尚未与元数据对齐的列必须**显式标记** pendingAlign,
- * 这样它们不会被误当成"能落库",将来对齐时也必须来改这个数字。
+ * 2026-09-18 二次重构后**不再有 pendingAlign** ——
+ * 上一轮为不改库结构而让 3 列只显示不落库,本轮已补齐物理列。
+ * 这条断言防止将来有人又用 pendingAlign 做临时妥协而不留痕。
  */
-test('暂未对齐的列必须显式标记,且数量被钉住(当前 3 列)', () => {
+test('不再有 pendingAlign 列(3 列已全部真落库)', () => {
   const pending = PROGRESS_COLUMNS.filter((c) => c.pendingAlign).map((c) => c.label)
-  assert.deepEqual(pending, ['技术目标达成', '是否市场转化', '未转换原因'])
+  assert.deepEqual(pending, [], `这些列又被标成"只显示不落库": ${pending.join(', ')}`)
 })
 
-test('已对齐列的 key 不应等于显示名(否则说明还没改名)', () => {
-  // 允许真正同名的那几列:项目名称 / 子项目/尺寸 / 内容 / 状态
-  const sameName = ['项目名称', '子项目/尺寸', '内容', '状态']
-  const suspicious = PROGRESS_COLUMNS
-    .filter((c) => !c.pendingAlign && !sameName.includes(c.label))
-    .filter((c) => c.key === c.label)
-    .map((c) => c.label)
-  assert.deepEqual(suspicious, [], `这些列仍在用显示名当数据键: ${suspicious.join(', ')}`)
+test('明细元数据列包含设计 18 列 + 3 个内部列', () => {
+  for (const label of DESIGN_LABELS) {
+    // 每列都必须能经 K 映射找到落库键(即 key 在元数据列里)
+    assert.ok(columnByLabel(label), `缺列定义: ${label}`)
+  }
+  for (const internal of ['说明', '谁来批准', '谁来检验', '未批准原因']) {
+    assert.ok(RD_PROGRESS_DETAIL_COLUMNS.includes(internal), `缺内部列: ${internal}`)
+  }
 })
 
-test('dataKeyOf:未对齐列返回 null(只显示不落库)', () => {
+/**
+ * 6 处 label≠key 是**刻意的**(数据库列名历史遗留;2026-09-18 决策 col_name 一律不改),
+ * 其余 13 列显示名应与数据键同名 —— 逐列钉死,防止将来误改一侧造成静默丢值。
+ */
+test('label≠key 的列恰好是那 6 处历史遗留,其余同名列不得漂移', () => {
+  const legacy = {
+    项目定级: '项目层级',
+    项目发起人: '项目级',
+    项目负责人: '项目负责',
+    立项日期: '实施进度',
+    预计完成日期: '里程完成',
+    测试情况: '测试员',
+  }
+  const actual = Object.fromEntries(
+    PROGRESS_COLUMNS.filter((c) => c.key !== c.label).map((c) => [c.label, c.key]),
+  )
+  assert.deepEqual(actual, legacy, 'label≠key 的列集合与预期不符')
+})
+
+/**
+ * label≠key 的 6 列必须带 alias,使**旧模板导出的 Excel 仍能落库**;
+ * 其余列显示名与数据键同名,不需要 alias。逐列钉死。
+ */
+test('6 处历史遗留列的 alias 恰好是"旧模板表头"集合', () => {
+  const expected = {
+    项目定级: ['项目等级'],                    // 旧版界面/导入表头叫「项目等级」
+    项目发起人: ['项目发起人'],                 // 旧物理列名 项目级,旧表头即显示名
+    项目负责人: ['项目负责人'],
+    立项日期: ['立项日期'],
+    预计完成日期: ['预计完成日期'],
+    测试情况: ['测试情况'],
+  }
+  const actual = Object.fromEntries(
+    PROGRESS_COLUMNS.filter((c) => c.key !== c.label && c.alias)
+      .map((c) => [c.label, c.alias]),
+  )
+  assert.deepEqual(actual, expected, 'label≠key 列的 alias 集合与预期不符')
+})
+
+test('readCell:显示名优先,旧模板表头(alias)兜底', () => {
+  // 显示名 = 设计表头,优先
+  assert.equal(readCell({ '子项目/尺寸': 'L2' }, '子项目/尺寸'), 'L2')
+  assert.equal(readCell({ 项目编号: 'YJ-XS002' }, '项目编号'), 'YJ-XS002')
+  assert.equal(readCell({ 项目定级: '二级' }, '项目定级'), '二级')
+  // 旧模板表头兜底(alias)
+  assert.equal(readCell({ 项目等级: '三级' }, '项目定级'), '三级')
+  assert.equal(readCell({ 子项目尺寸: 'L3' }, '子项目/尺寸'), 'L3')
+  assert.equal(readCell({ 说明: 'YJ-XS001' }, '项目编号'), 'YJ-XS001')
+  // 键不存在 → undefined(不抛)
+  assert.equal(readCell({}, '项目编号'), undefined)
+  assert.equal(readCell(null, '项目编号'), undefined)
+  assert.equal(readCell({ x: 1 }, '不存在的列'), undefined)
+})
+
+test('dataKeyOf:每列都返回真实落库键(不再有 null)', () => {
+  assert.equal(dataKeyOf('项目定级'), '项目层级')
   assert.equal(dataKeyOf('项目负责人'), '项目负责')
   assert.equal(dataKeyOf('预计完成日期'), '里程完成')
-  assert.equal(dataKeyOf('技术目标达成'), null)
+  assert.equal(dataKeyOf('技术目标达成'), '技术目标达成')   // 本轮起真落库
+  assert.equal(dataKeyOf('是否市场转化'), '是否市场转化')
+  assert.equal(dataKeyOf('未转换原因'), '未转换原因')
   assert.equal(dataKeyOf('不存在的列'), null)
-})
-
-test('readCell:兼容历史 Excel 表头别名', () => {
-  assert.equal(readCell({ 子项目尺寸: 'L3' }, '子项目/尺寸'), 'L3')
-  assert.equal(readCell({ '子项目/尺寸': 'L2' }, '子项目/尺寸'), 'L2')
-  assert.equal(readCell({ 项目负责人: '陈秀丽' }, '项目负责人'), '陈秀丽')
-  assert.equal(columnByLabel('测试情况').key, '测试员')
 })
 
 /**
@@ -70,8 +130,8 @@ test('组件源码里不得把显示名当对象字面量的数据键', () => {
   const src = readFileSync(new URL('../views/ProgressControlSheet.vue', import.meta.url), 'utf8')
   const bad = []
   for (const col of PROGRESS_COLUMNS) {
-    // 显示名与数据键本来就相同的列(项目名称/内容/状态/子项目尺寸)不受此约束
-    if (col.pendingAlign || col.key === col.label) continue
+    // 显示名与数据键本来就相同的列不受此约束
+    if (col.key === col.label) continue
     if (new RegExp(`'${escapeRe(col.label)}'\\s*:`).test(src)) bad.push(`${col.label} (应为 ${col.key})`)
   }
   assert.deepEqual(bad, [], `组件里仍把显示名当数据键,保存会被丢弃:\n  ${bad.join('\n  ')}`)
@@ -81,7 +141,6 @@ test('组件源码里不得出现裸的显示名方括号取值(必须经 K 映�
   const src = readFileSync(new URL('../views/ProgressControlSheet.vue', import.meta.url), 'utf8')
   const bad = []
   for (const col of PROGRESS_COLUMNS) {
-    if (col.pendingAlign) continue
     if (new RegExp(`(?<!K)\\['${escapeRe(col.label)}'\\]`).test(src)) bad.push(col.label)
   }
   assert.deepEqual(bad, [], `这些列仍用显示名直接取值: ${bad.join(', ')}`)

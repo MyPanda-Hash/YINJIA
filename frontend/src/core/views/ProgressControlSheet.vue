@@ -2,7 +2,7 @@
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
-       项目定级原则说明段/主从控制大表(项目等级|项目名称 + 子项目行,可增删)
+       项目定级原则说明段/主从控制大表(项目定级|项目名称 + 子项目行,可增删)
        项目名称可手填或选择项目实施计划(选中自动带回实施计划同名字段)
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="progress-sheet">
@@ -69,15 +69,19 @@
       <table class="ps-table">
         <thead>
           <tr>
-            <th class="c-level">{{ tt('项目等级') }}</th>
+            <th class="c-level">{{ tt('项目定级') }}</th>
             <th class="c-name">{{ tt('项目名称') }}</th>
             <th class="c-sub">{{ tt('子项目/尺寸') }}</th>
             <th class="c-remark">{{ tt('项目编号') }}</th>
+            <th class="c-complex">{{ tt('开发复杂度') }}</th>
+            <th class="c-degree">{{ tt('重要程度') }}</th>
+            <th class="c-urgency">{{ tt('紧急程度') }}</th>
             <th class="c-content">{{ tt('内容') }}</th>
             <th class="c-grade">{{ tt('项目发起人') }}</th>
             <th class="c-owner">{{ tt('项目负责人') }}</th>
             <th class="c-progress">{{ tt('立项日期') }}</th>
             <th class="c-mile">{{ tt('预计完成日期') }}</th>
+            <th class="c-change">{{ tt('项目定及变更') }}</th>
             <th class="c-status">{{ tt('状态') }}</th>
             <th class="c-tester">{{ tt('测试情况') }}</th>
             <th class="c-approve">{{ tt('技术目标达成') }}</th>
@@ -91,14 +95,14 @@
             <td v-if="isLevelHead(i)" class="c-level" :rowspan="levelSpan(i)">
               <el-select
                 v-if="editable"
-                :model-value="row[K['项目等级']]"
+                :model-value="row[K['项目定级']]"
                 size="small"
                 :clearable="false"
                 @change="changeGroupLevel(i, $event)"
               >
                 <el-option v-for="o in selectOptions('项目层级')" :key="o.value" :label="o.label" :value="o.value" />
               </el-select>
-              <span v-else class="ps-level-block">{{ row[K['项目等级']] || '' }}</span>
+              <span v-else class="ps-level-block">{{ row[K['项目定级']] || '' }}</span>
             </td>
             <td v-if="isGroupHead(i)" class="c-name" :rowspan="groupSpan(i)">
               <el-select
@@ -132,6 +136,19 @@
                 <span v-else class="ps-cell-text">{{ row[K['项目编号']] || '' }}</span>
               </template>
             </td>
+            <!-- 2026-09-18 设计新增 4 列(开发复杂度/重要程度/紧急程度/项目定及变更)-->
+            <td class="c-complex">
+              <el-input v-if="editable" v-model="row[K['开发复杂度']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['开发复杂度']] || '' }}</span>
+            </td>
+            <td class="c-degree">
+              <el-input v-if="editable" v-model="row[K['重要程度']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['重要程度']] || '' }}</span>
+            </td>
+            <td class="c-urgency">
+              <el-input v-if="editable" v-model="row[K['紧急程度']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['紧急程度']] || '' }}</span>
+            </td>
             <td class="c-content">
               <el-input v-if="editable" v-model="row[K['内容']]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row[K['内容']] || '' }}</span>
@@ -151,6 +168,11 @@
             <td class="c-mile">
               <el-input v-if="editable" v-model="row[K['预计完成日期']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row[K['预计完成日期']] || '' }}</span>
+            </td>
+            <!-- 项目定及变更(设计 O 列原始语义:手填的状态/变更说明,与派生只读的「状态」列不同)-->
+            <td class="c-change">
+              <el-input v-if="editable" v-model="row[K['项目定及变更']]" type="textarea" :autosize="{ minRows: 1, maxRows: 5 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
+              <span v-else class="ps-cell-text">{{ row[K['项目定及变更']] || '' }}</span>
             </td>
             <td class="c-status">
               <!-- 状态=按实施计划阶段自动派生(只读):点它看阶段计划与完成情况 -->
@@ -185,7 +207,7 @@
             </td>
           </tr>
           <tr v-if="!items.length">
-            <td :colspan="editable ? 15 : 14" class="ps-empty">{{ tt('暂无子项目，点击下方按钮新增') }}</td>
+            <td :colspan="editable ? 19 : 18" class="ps-empty">{{ tt('暂无子项目，点击下方按钮新增') }}</td>
           </tr>
         </tbody>
       </table>
@@ -193,7 +215,7 @@
         <div class="ps-add" @click="openAddProject">＋ {{ tt('新增项目') }}</div>
         <div class="ps-add" @click="syncStageProgress">⟳ {{ tt('同步阶段进度') }}</div>
         <div class="ps-add" @click="pickImportFile">⬆ {{ tt('导入Excel') }}</div>
-        <span class="ps-addbar-tip">{{ tt('导入Excel列与面板一致（项目等级/项目名称/子项目尺寸/项目编号/内容/项目发起人/项目负责人/立项日期/预计完成日期/状态/测试情况/技术目标达成/是否市场转化/未转换原因），导入后自动追加子项目行，请保存入库。') }}</span>
+        <span class="ps-addbar-tip">{{ tt('导入Excel列与面板一致（项目定级/项目名称/子项目尺寸/项目编号/开发复杂度/重要程度/紧急程度/内容/项目发起人/项目负责人/立项日期/预计完成日期/项目定及变更/状态/测试情况/技术目标达成/是否市场转化/未转换原因），导入后自动追加子项目行，请保存入库。') }}</span>
         <input ref="fileRef" type="file" accept=".xlsx,.xls" style="display: none" @change="importExcelFile" />
       </div>
     </div>
@@ -201,7 +223,7 @@
     <!-- 新增项目弹窗:选等级 + 项目名称(手填/选项目实施计划项目,选项带实施计划单据号,选中导入相关信息) -->
     <el-dialog v-model="dlgVisible" :title="tt('新增项目')" width="400px" append-to-body>
       <div class="ps-dlg-row">
-        <span class="ps-dlg-label">{{ tt('项目等级') }}</span>
+        <span class="ps-dlg-label">{{ tt('项目定级') }}</span>
         <el-select v-model="dlgLevel" size="default" :clearable="false" style="width: 220px">
           <el-option v-for="o in selectOptions('项目层级')" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
@@ -457,17 +479,17 @@ function isGroupHead(i) {
 /** 等级头行:只读态相邻同级合并为一个"项目等级"块 */
 function isLevelHead(i) {
   if (i <= 0) return true
-  const lv = items.value[i]?.[K['项目等级']]
+  const lv = items.value[i]?.[K['项目定级']]
   if (!lv) return true
-  return items.value[i - 1]?.[K['项目等级']] !== lv
+  return items.value[i - 1]?.[K['项目定级']] !== lv
 }
 /** 相邻同级行数(等级合并块) */
 function levelSpan(i) {
   if (!isLevelHead(i)) return 0
-  const lv = items.value[i]?.[K['项目等级']]
+  const lv = items.value[i]?.[K['项目定级']]
   if (!lv) return 1
   let n = 1
-  while (i + n < items.value.length && items.value[i + n]?.[K['项目等级']] === lv) n++
+  while (i + n < items.value.length && items.value[i + n]?.[K['项目定级']] === lv) n++
   return n
 }
 /** 组内行数(名称列 rowspan 合并铺满整组;空名称新组不合并) */
@@ -501,9 +523,9 @@ function changeGroupName(i, v) {
 /** 同步组内层级(组首行层级变更时) */
 function changeGroupLevel(i, v) {
   const row = items.value[i]
-  row[K['项目等级']] = v
+  row[K['项目定级']] = v
   for (let j = i + 1; j < items.value.length && items.value[j]?.[K['项目名称']] === row[K['项目名称']]; j++) {
-    items.value[j][K['项目等级']] = v
+    items.value[j][K['项目定级']] = v
   }
   emit('dirty')
 }
@@ -534,10 +556,10 @@ function confirmAddProject() {
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
   const lv = dlgLevel.value || '二级'
-  const row = { [K['项目名称']]: name, [K['项目等级']]: lv, [K['子项目/尺寸']]: sub }
+  const row = { [K['项目名称']]: name, [K['项目定级']]: lv, [K['子项目/尺寸']]: sub }
   let idx = -1
   for (let i = d.items.length - 1; i >= 0; i--) {
-    if (d.items[i][K['项目等级']] === lv) { idx = i; break }
+    if (d.items[i][K['项目定级']] === lv) { idx = i; break }
   }
   if (idx >= 0) d.items.splice(idx + 1, 0, row)
   else d.items.push(row)
@@ -593,7 +615,7 @@ function insertAfter(i) {
   const d = props.head.detail
   if (!Array.isArray(d.items)) return
   const src = d.items[i] || {}
-  d.items.splice(i + 1, 0, { [K['项目名称']]: src[K['项目名称']], [K['项目等级']]: src[K['项目等级']] })
+  d.items.splice(i + 1, 0, { [K['项目名称']]: src[K['项目名称']], [K['项目定级']]: src[K['项目定级']] })
   emit('dirty')
 }
 function removeItem(i) {
@@ -631,7 +653,7 @@ function importExcelFile(e) {
           item[col.key] = String(v)
         }
         item[K['项目名称']] = name
-        if (!item[K['项目等级']]) item[K['项目等级']] = '二级'
+        if (!item[K['项目定级']]) item[K['项目定级']] = '二级'
         d.items.push(item)
         added++
       }
