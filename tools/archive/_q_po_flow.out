@@ -1,0 +1,14 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q_po_flow.sql ==
+  | TCGRK-PO-001 | 2026-09-17 | 惠州市双喜科技有限公司 | YJ-20260916-01 | null | null | null | CGRK-20260917-00033 | 
+  | SL_RECV.头 | 0 | 
+  | QC_INSP.头 | 0 | 
+  | bd_purchase_in.头 | 1 | 
+  | bl_purchase_in.行_源单编号 | 1 | 
+java : [SQL FAIL] ���� '�ɹ�������' ��Ч��
+所在位置 行:1 字符: 210
++ ... ing]::UTF8; java "-Dstdout.encoding=UTF-8" -cp lib\mssql-jdbc.jar Sql ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([SQL FAIL] ���� '�ɹ�������' ��Ч��:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

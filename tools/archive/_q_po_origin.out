@@ -1,0 +1,10 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q_po_origin.sql ==
+  | YJ-(金蝶样式) | 2137 | YJ-20250402-01 | YJ-20260916-04 | 
+java : [SQL FAIL] ���� 'doc_status' ��Ч��
+所在位置 行:1 字符: 210
++ ... ing]::UTF8; java "-Dstdout.encoding=UTF-8" -cp lib\mssql-jdbc.jar Sql ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([SQL FAIL] ���� 'doc_status' ��Ч��:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
