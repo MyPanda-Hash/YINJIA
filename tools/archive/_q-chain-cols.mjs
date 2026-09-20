@@ -1,0 +1,11 @@
+﻿import { createRequire } from 'node:module';
+const mssql = createRequire('D:/jdy-sync/package.json')('mssql');
+const pool = await new mssql.ConnectionPool({ server:'127.0.0.1', port:1433, database:'HSDZ_MES', user:'yinjia', password:'Yinjia@2026', options:{encrypt:false,trustServerCertificate:true} }).connect();
+const q = async (s) => (await new mssql.Request(pool).query(s)).recordset;
+console.log('  sl_recv 列:', JSON.stringify((await q("SELECT COLUMN_NAME c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='sl_recv'")).map(r=>r.c)));
+console.log('  sl_recv_detail 列:', JSON.stringify((await q("SELECT COLUMN_NAME c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='sl_recv_detail'")).map(r=>r.c)));
+console.log('  qc_insp 列:', JSON.stringify((await q("SELECT COLUMN_NAME c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='qc_insp'")).map(r=>r.c)));
+console.log('  qc_insp_detail 列:', JSON.stringify((await q("SELECT COLUMN_NAME c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='qc_insp_detail'")).map(r=>r.c)));
+console.log('  bd_purchase_in 列(部分):', JSON.stringify((await q("SELECT COLUMN_NAME c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='bd_purchase_in'")).map(r=>r.c).slice(0,30)));
+console.log('  qc_return 列:', JSON.stringify((await q("SELECT COLUMN_NAME c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='qc_return'")).map(r=>r.c)));
+await pool.close();
