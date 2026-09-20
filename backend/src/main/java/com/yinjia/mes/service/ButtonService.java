@@ -241,6 +241,16 @@ public class ButtonService {
         if ("QC_INSP".equals(def.code())) validateInspQty(items);
         // 样品编号表:样品编号 = 客户项目代号 + 项目编号(确定性拼接),同面板内不允许重复
         if ("RD_SAMPLE_NO".equals(def.code())) ensureSampleNoUnique(no, items);
+        // 必填校验(2026-09-20):仅「保存/提交」路径(markSaved=true)执行;
+        // 「保存为草稿」「新增」放行 —— 用户口径:草稿不做必填限制,提交审批才做。
+        // 补这层的理由:此前必填**只在前端校验**,直连 /px/callButton 就能把缺必填的单提交/归档
+        // (实测:文档编号/测试主题为空仍可保存并归档)。前端仍保留校验(即时提示+定位字段),两层各司其职。
+        if (markSaved) {
+            ensureRequiredFilled(def, head, no);
+            // 明细行必填(2026-09-20):表头之外还有明细级必填(如 RD_SAMPLE_NO 的
+            // 客户项目代号/样品编号/项目编号全在明细),只查表头等于这些面板没校验。
+            ensureDetailRequiredFilled(def, items);
+        }
 
         Map<String, String> l2c = def.labelToCol();
         // 规格书修改态:落库前留「4.产品性能检验项目及检验标准」页旧值快照(表区=检验要求),
@@ -302,6 +312,117 @@ public class ButtonService {
      *  yj_doc_status.canceled='Y',不软删业务行),不排除的话"作废掉再新建同号"永远撞唯一性。
      *  两侧都排:业务表软删标记 asp_cancel='Y'(表若无该列则跳过,故先查 sys.columns)+
      *  状态表 yj_doc_status.canceled='Y'。 */
+    /**
+     * 必填校验(2026-09-20):仅「保存/提交」路径调用;「保存为草稿」「新增」不调用。
+     *
+     * 用户口径:保存为草稿不做必填限制(允许存一半);保存/提交审批才做。
+     * 为什么要在后端也做:此前必填**只在前端**(PanelxList.validateInlineDraft),
+     * 直连 /px/controller callButton 就能把缺必填的单保存并归档(实测:文档编号/测试主题为空仍归档成功)。
+     * 前端校验仍保留(即时提示 + 自动翻页定位字段),两层各司其职;此处是"绕过界面也拦得住"的兜底。
+     *
+     * 口径与前端保持一致:
+     *   · 只看 place=header 的必填字段;
+     *   · 跳过系统自动填写的字段(单据编号=autoCode、单据日期=当天默认、创建时间/编辑人/编辑日期);
+     *   · 表单里**没带**该字段(前端局部提交)时回退查-库存值,避免误报"未填";
+     *   · 字段有值但为空串也算未填。
+     */
+    private void ensureRequiredFilled(PanelRegistry.PanelDef def, Map<String, Object> head, String no) {
+        List<PanelRegistry.FieldDef> required = def.fieldsAt("header").stream()
+                .filter(PanelRegistry.FieldDef::required)
+                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.col()))
+                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.label()))
+                // 隐藏字段不校验:前端 headerFields = dataSchema.fields.filter(f => !f.hidden)
+                // (PanelxList.vue:2436 起,validateInlineDraft 只遍历它) —— 后端若强校验,
+                // 会出现"要求的字段界面上根本没渲染",用户无路可走。现存:RDDOM_TEST.文档编号、
+                // RD_PROD_INFO.产品类型(hidden=1/visible=1)。
+                .filter(f -> !f.hidden())
+                .toList();
+        if (required.isEmpty()) return;
+        // ⚠ labelsToCols 会把**空串归一化成 null 并跳过**,所以这里取不到"提交了空值"这件事;
+        //   取不到时回退查库中已存值(见下),两者都空才算未填。
+        Map<String, Object> submitted = labelsToCols(def.fieldsAt("header"), head);
+        List<String> missing = new ArrayList<>();
+        for (PanelRegistry.FieldDef f : required) {
+            Object v = submitted.get(f.col());
+            boolean blank = (v == null || String.valueOf(v).isBlank());
+            if (blank && no != null && def.hasHeadTable()) {
+                // 表单没带该字段(空串被丢弃,或本就未提交)⇒ 用库中已存值判定,避免把"没改"误判成"没填"
+                blank = isStoredBlank(def.headTable(), f.col(), def.groupCol(), no);
+            }
+            if (blank) missing.add(f.displayName());
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException(String.join("、", missing) + "不能为空");
+        }
+    }
+
+    /**
+     * 不参与用户必填校验的字段(与前端 validateInlineDraft 的跳过口径逐条对齐):
+     *   · 系统自动填写:单据日期=当天默认、单据编号=后端发号、创建时间/编辑人/编辑日期;
+     *   · 规格书种类:页签分类,新单与旧草稿都可能是空的(PanelxList.vue:4055 显式跳过);
+     *   · 编号:save() 把载荷里的「编号」当**单据标识**取走(body.remove("编号")),
+     *     同名列的字段永远无法随保存落库(实测 rd_spec_doc_head.编号 3 张单全为 NULL)
+     *     ⇒ 拿它做必填 = 永远填不进去的死结。
+     * 命中 col_name 或 label 任一即跳过。
+     */
+    private static final java.util.Set<String> REQUIRED_SYS_FIELDS =
+            java.util.Set.of("单据编号", "单据日期", "创建时间", "更新时间", "编辑人", "编辑日期", "规格书种类", "编号");
+
+    /**
+     * 明细行必填校验(2026-09-20 补):与前端 validateInlineDraft 的**逐行**口径一致
+     * (PanelxList.vue「明细第 N 行X不能为空」),只取第一条违规,便于前端定位。
+     *
+     * 只校验**载荷里明确带了该键**的字段:
+     *   · 前端 newDetailRow() 会把每个字段都物化成 ''(空串),所以"用户清空了必填项"
+     *     必然是"键在、值为空"——这一档拦得住;
+     *   · 键缺失则视为"局部提交/选单生成"(SelectVoucherDialog/NewVoucherDialog 按来源单据
+     *     逐字段映射,目标面板多出的必填列本来就不在载荷里),不误报;
+     *   · items 为空(未带明细页签)时整体跳过——与表头"取不到就回退查库、不误报"同口径。
+     * 刻意**不做**页签级"至少添加一行"(前端 tab.isRequired 那条):后端拿不到"明细页签是空的"
+     * 与"这次根本没提交明细"的区别(singleDoc/局部提交路径都只发页签子集),由前端把关。
+     * 内部调用方(送料暂收单同步来料检验单、WoPickingHandler、PushGenerateHandler)走的都是
+     * markSaved=false,不经此处。
+     */
+    private void ensureDetailRequiredFilled(PanelRegistry.PanelDef def, List<Map<String, Object>> items) {
+        if (items == null || items.isEmpty()) return;
+        List<PanelRegistry.FieldDef> required = def.fieldsAt("detail").stream()
+                .filter(PanelRegistry.FieldDef::required)
+                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.col()))
+                .toList();
+        if (required.isEmpty()) return;
+        for (int i = 0; i < items.size(); i++) {
+            Map<String, Object> row = items.get(i);
+            if (row == null) continue;
+            for (PanelRegistry.FieldDef f : required) {
+                if (!row.containsKey(f.label())) continue; // 未提交该键 ⇒ 不误报(见方法注释)
+                Object v = row.get(f.label());
+                if (v != null && !String.valueOf(v).isBlank()) continue;
+                throw new IllegalArgumentException("明细第 " + (i + 1) + " 行" + f.displayName() + "不能为空");
+            }
+        }
+    }
+
+    /** 库中该列是否为空(列不存在 / 取不到时按"空"处理,不因缺列或异常而报错) */
+    private boolean isStoredBlank(String table, String col, String groupCol, String no) {
+        if (table == null || table.isBlank() || groupCol == null || groupCol.isBlank()) return true;
+        if (!tableCols(table).contains(col)) return true;
+        // ⚠ 三个坑(都踩过,靠跨面板探针才发现):
+        //   ① 用 queryForList(...).stream().findFirst() 取到的是 **Map** 而不是值,空值被误判为"已填";
+        //   ② queryForObject(String.class) 在该单**有多行**时抛
+        //      "Incorrect result size: expected 1, actual 2"(RD_FILTER_EFF/RD_MOLD_PROC 都命中);
+        //   ③ 头表可能根本没有该列(如单据编号列在头行错位),直接查会报"列名无效"。
+        //   ⇒ 取 TOP 1 + 捕获一切异常并回退为"空"(宁可误报必填,也不要 500)。
+        try {
+            String v = jdbc.queryForObject(
+                    "SELECT TOP 1 t.[" + col + "] FROM " + table + " t WHERE t.[" + groupCol + "] = ?",
+                    String.class, no);
+            return v == null || v.isBlank();
+        } catch (Exception e) {
+            log.debug("必填校验回退:取库中值失败(视为空) table={} col={} no={} : {}", table, col, no, e.getMessage());
+            return true;
+        }
+    }
+
     private void ensureDocNoUnique(PanelRegistry.PanelDef def, Map<String, Object> head, String no) {
         Object v = head.get("文档编号");
         if (v == null || String.valueOf(v).isBlank()) return;

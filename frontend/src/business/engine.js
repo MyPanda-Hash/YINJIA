@@ -320,7 +320,14 @@ export async function fillCurrentStock(rows) {
 
 export async function callButton({ panelCode, buttonName, formData, buttonParam }) {
   // 按钮名对齐 SQL 后端（中止执行/整单中止→中止、草稿→取消中止、保存类→提交）
-  const apiName = buttonName === '中止执行' || buttonName === '整单中止' ? '中止' : buttonName === '草稿' ? '取消中止' : buttonName === '保存' || buttonName === '保存为草稿' || buttonName === '保存新增' ? '提交' : buttonName
+  // ⚠ 「保存为草稿」**不在**此列(2026-09-20 修):它必须原样透传给后端,后端 case "保存为草稿"
+  //   走 save(markSaved=false) —— 只落库、不归档/不送审、不做必填校验。
+  //   此前它和「保存」一起被改写成「提交」⇒ 点「保存为草稿」实际发的是提交请求:
+  //   草稿被直接归档/送审,而且缺必填还会被后端挡下(实测:界面点草稿→后端收到 buttonName="提交"→400)。
+  const apiName = buttonName === '中止执行' || buttonName === '整单中止' ? '中止'
+    : buttonName === '草稿' ? '取消中止'
+      : buttonName === '保存' || buttonName === '保存新增' ? '提交'
+        : buttonName
   return unwrap(await request.post('/px/callButton', { panelCode, buttonName: apiName, formData, buttonParam }))
 }
 

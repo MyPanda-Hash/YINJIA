@@ -2,10 +2,16 @@
  * _chk-save-behavior.cjs — 验证「保存为草稿」与「保存」的真实差异(后端行为,不经界面)
  *
  * 用户要的两条路必须**真的不一样**,否则加了按钮也没意义:
- *   · 保存为草稿 → markSaved=false → 不归档、不送审,单据仍为「草稿」
- *   · 保存       → markSaved=true  → 归档面板上:管理员即归档 / 普通用户自动提交审批
+ *   · 保存为草稿 → markSaved=false → 不归档、不送审,且**不做必填校验**(存一半)
+ *   · 保存       → markSaved=true  → 必填校验 + 归档面板上:管理员即归档 / 普通用户自动提交审批
  *
  * 做法:对同一张新建单分别走两条路径,读回 单据状态 与 archived_at / pending 比对。
+ *
+ * ⚠ 2026-09-20 补必填校验后本探针需同步:原来「保存」只传备注,现在会被必填校验挡在
+ *   400(不是"没归档"的 bug)。改为从 yj_field 读出必填字段填进去,让**归档路径真的跑到**;
+ *   另加第 ④ 段断言"缺必填的保存必须被拒",把新增的限制也钉住。
+ *   ⚠ 必填字段的 place 是逗号复合值('query,header' 等),筛选必须 LIKE '%header%',
+ *     后端 inPlace() 用的是 contains —— 用等号会漏字段,填了也白填。
  *
  * 用法:node tools/archive/_chk-save-behavior.cjs
  */
@@ -18,6 +24,12 @@ const PANEL = 'RD_SOAK'   // 归档面板,且字段少、易建单
 const sql = (q) => execFileSync('sqlcmd', ['-S', 'localhost', '-d', 'HSDZ_MES', '-U', 'yinjia', '-P', 'Yinjia@2026',
   '-W', '-s', '\t', '-h', '-1', '-Q', 'SET NOCOUNT ON; SET QUOTED_IDENTIFIER ON; ' + q],
 { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 }).trim()
+const lines = (q) => sql(q).split(/\r?\n/).map((x) => x.trim()).filter(Boolean)
+
+const SYS = `N'单据编号',N'单据日期',N'创建时间',N'更新时间',N'编辑人',N'编辑日期'`
+/** 必填字段标签(表头 / 明细),口径与后端一致:place 复合值用 LIKE */
+const reqLabels = (place) => lines(`SELECT label FROM yj_field WHERE panel_code='${PANEL}'
+  AND place LIKE '%${place}%' AND required=1 AND col_name NOT IN (${SYS}) ORDER BY seq`)
 
 ;(async () => {
   const lg = await (await fetch(BASE + '/api/auth/login', {
@@ -45,11 +57,25 @@ const sql = (q) => execFileSync('sqlcmd', ['-S', 'localhost', '-d', 'HSDZ_MES', 
   const draft = await call('保存为草稿', { 编号: no1, 备注: 'probe-draft' })
   console.log('② 保存为草稿 →', draft.status, JSON.stringify(draft.data))
 
-  // ── 3. 另建一张,走「保存」 ──
+  // ── 3. 另建一张,走「保存」(必填字段填齐,否则会被必填校验挡在保存之前) ──
+  const hReq = reqLabels('header')
+  const dReq = reqLabels('detail')
+  console.log('     本面板必填: 表头=', JSON.stringify(hReq), ' 明细=', JSON.stringify(dReq))
+  const validPayload = (no) => ({
+    编号: no,
+    ...Object.fromEntries(hReq.map((k) => [k, 'probe'])),
+    ...(dReq.length ? { detail: { items: [Object.fromEntries(dReq.map((k) => [k, 'probe']))] } } : {}),
+  })
   const created2 = await call('新增', {})
   const no2 = created2.data && created2.data['编号']
-  const save = await call('保存', { 编号: no2, 备注: 'probe-save' })
-  console.log('③ 新建草稿 =', no2, ' → 保存 →', save.status, JSON.stringify(save.data))
+  const save = await call('保存', { ...validPayload(no2), 备注: 'probe-save' })
+  console.log('③ 新建草稿 =', no2, ' → 保存(必填填齐) →', save.status, JSON.stringify(save.data))
+
+  // ── 3b. 第三张:必填留空走「保存」→ 必须被拒(草稿/提交分工的另一半) ──
+  const created3 = await call('新增', {})
+  const no3 = created3.data && created3.data['编号']
+  const rejected = await call('保存', { 编号: no3, 备注: 'probe-missing' })
+  console.log('③b 新建草稿 =', no3, ' → 保存(缺必填) →', rejected.status, JSON.stringify(rejected.msg))
 
   // ── 4. 读库比对 ──
   // ⚠ yj_doc_status **没有 status 列**:单据状态是后端按
@@ -78,6 +104,10 @@ const sql = (q) => execFileSync('sqlcmd', ['-S', 'localhost', '-d', 'HSDZ_MES', 
   chk('「保存为草稿」未送审(pending ≠ Y)', f1.pending !== 'Y', f1.pending)
   chk('「保存」(管理员)已归档(archived=Y)', f2.archived === 'Y', f2.archived)
   chk('「保存」写入归档时间戳', f2.archivedAt !== '-', f2.archivedAt)
+  // 必填分工(2026-09-20):同样"保存"按钮,缺必填必须被拒 —— 这是草稿按钮存在的意义
+  const expectLabel = hReq[0] || dReq[0] || ''
+  chk('「保存」缺必填被拒(非 200)', rejected.status !== 200, 'HTTP ' + rejected.status)
+  if (expectLabel) chk(`「保存」拦截信息含必填字段名(${expectLabel})`, String(rejected.msg || '').includes(expectLabel), rejected.msg)
 
   // 「保存为草稿」是否**真的落库**:去业务表读回备注。
   // ⚠ 不要用 saved 标记判断落库 —— saved='Y' 只表示"走过 保存/提交"路径,
@@ -95,17 +125,17 @@ const sql = (q) => execFileSync('sqlcmd', ['-S', 'localhost', '-d', 'HSDZ_MES', 
   //    否则残留单会污染列表(第一版就是这样留下 2 条残留)。
   console.log('')
   console.log('=== 清理(硬删探针单,不走删除审批流)==='    )
-  for (const no of [no1, no2]) {
+  for (const no of [no1, no2, no3]) {
     sql(`DELETE FROM yj_doc_status WHERE panel_code='${PANEL}' AND doc_no='${no}'`)
   }
   // 业务行:RD_SOAK 是头行式(head + detail);两张表都按单据编号清
   const headTbl = sql(`SELECT name FROM sys.tables WHERE name='rd_soak_head'`)
-  if (headTbl) sql(`DELETE FROM rd_soak_head WHERE 单据编号 IN ('${no1}','${no2}')`)
+  if (headTbl) sql(`DELETE FROM rd_soak_head WHERE 单据编号 IN ('${no1}','${no2}','${no3}')`)
   const detTbl = sql(`SELECT name FROM sys.tables WHERE name='rd_soak_detail'`)
-  if (detTbl) sql(`DELETE FROM rd_soak_detail WHERE 单据编号 IN ('${no1}','${no2}')`)
-  const left = sql(`SELECT COUNT(*) FROM yj_doc_status WHERE panel_code='${PANEL}' AND doc_no IN ('${no1}','${no2}')`)
+  if (detTbl) sql(`DELETE FROM rd_soak_detail WHERE 单据编号 IN ('${no1}','${no2}','${no3}')`)
+  const left = sql(`SELECT COUNT(*) FROM yj_doc_status WHERE panel_code='${PANEL}' AND doc_no IN ('${no1}','${no2}','${no3}')`)
   console.log('  清理后 yj_doc_status 残留 =', left)
-  console.log('  head 残留 =', headTbl ? sql(`SELECT COUNT(*) FROM rd_soak_head WHERE 单据编号 IN ('${no1}','${no2}')`) : '(无该表)')
+  console.log('  head 残留 =', headTbl ? sql(`SELECT COUNT(*) FROM rd_soak_head WHERE 单据编号 IN ('${no1}','${no2}','${no3}')`) : '(无该表)')
   if (left !== '0') bad++
 
   console.log('')

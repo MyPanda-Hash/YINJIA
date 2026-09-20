@@ -4074,7 +4074,11 @@ function validateInlineDraft() {
 
 async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false } = {}) {
   if (!draftEditable.value || inlineSaving.value) return false
-  const validation = validateInlineDraft()
+  // ⚠ skipValidation 必须在这里真正生效(2026-09-20 修):
+  //   参数早就声明了、调用方也传了(「保存为草稿」传 true),但函数体里**从来没读过它** ——
+  //   于是草稿路径照样跑全量必填校验 ⇒ "保存为草稿"做不到"存一半"。
+  //   用户口径:保存为草稿不做必填限制;保存/提交才做。
+  const validation = skipValidation ? '' : validateInlineDraft()
   if (validation) {
     ElMessage.warning(validation)
     // 文书面板(RecordSheetPanels/DocSheet/DataRecordSheet):自动定位缺失字段(翻页/滚动/闪烁);仅必填触发
