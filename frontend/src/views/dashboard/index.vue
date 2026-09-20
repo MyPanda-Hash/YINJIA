@@ -2055,6 +2055,12 @@ function go(path, title) {
   border-color: #bfdbfe;
   background: #eff6ff;
 }
+/* 已完成(金蝶自动关单):靛蓝 —— 与「已审核」的绿区分 */
+.arch-status.已完成 {
+  color: #4338ca;
+  border-color: #c7d2fe;
+  background: #eef2ff;
+}
 .arch-status.修改申请中 {
   color: #b45309;
   border-color: #f3d9a6;

@@ -238,6 +238,7 @@ function close() {
 }
 .mm-status.草稿 { background: #fff3e0; color: #e65100; }
 .mm-status.已审核 { background: #e8f5e9; color: #2e7d32; }
+.mm-status.已完成 { background: #eef2ff; color: #4338ca; } /* 靛蓝:与「已审核」的绿区分 */
 .mm-status.启用 { background: #e8f5e9; color: #2e7d32; }
 .mm-status.生效 { background: #e8f5e9; color: #2e7d32; }
 .mm-status.已中止 { background: #ffebee; color: #c62828; }

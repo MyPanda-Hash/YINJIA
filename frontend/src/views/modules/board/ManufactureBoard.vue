@@ -30,7 +30,7 @@
             <el-table-column prop="产品名称" label="产品" width="130" show-overflow-tooltip />
             <el-table-column prop="单据状态" label="状态" width="90" align="center">
               <template #default="{ row }">
-                <el-tag :type="statusTag(row.单据状态)" size="small">{{ row.单据状态 }}</el-tag>
+                <el-tag :type="statusTag(row.单据状态)" size="small" :class="{ 'st-done': row.单据状态 === '已完成' }">{{ row.单据状态 }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="生产车间" label="车间" width="100" />
@@ -72,6 +72,12 @@ const kpis = computed(() => {
 </script>
 
 <style scoped>
+/* 已完成(金蝶自动关单):靛蓝,与「已审核」区分 */
+.st-done {
+  --el-tag-bg-color: #eef2ff;
+  --el-tag-border-color: #c7d2fe;
+  --el-tag-text-color: #4338ca;
+}
 .board-view { background: #fff; border-radius: 10px; padding: 18px; min-height: 100%; }
 .dark .board-view { background: #26272e; }
 .head { display: flex; align-items: baseline; gap: 10px; border-bottom: 1px solid #r0r1r3; padding-bottom: 10px; margin-bottom: 14px; }

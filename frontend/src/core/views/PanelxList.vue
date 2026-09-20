@@ -5779,6 +5779,12 @@ onUnmounted(() => {
   border: 1px solid #bbe6c4;
   background: #f0fdf4;
 }
+/* 已完成(金蝶自动关单):靛蓝 —— 与「已审核」的绿明确区分 */
+.doc-status.已完成 {
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+  background: #eef2ff;
+}
 .doc-status.生产中,
 .doc-status.审批中 {
   color: #2f4d75;

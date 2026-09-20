@@ -28,7 +28,7 @@
       <div class="head">
         <div class="title">
           <span class="no">{{ isEdit ? (form['单据编号'] || form['锭号'] || form['编号'] || '') : tt('（新增）') }}</span>
-          <el-tag v-if="form['单据状态']" size="small" :type="statusTag(form['单据状态'])">{{ tt(form['单据状态']) }}</el-tag>
+          <el-tag v-if="form['单据状态']" size="small" :type="statusTag(form['单据状态'])" :class="{ 'st-done': form['单据状态'] === '已完成' }">{{ tt(form['单据状态']) }}</el-tag>
         </div>
       </div>
 
@@ -1559,6 +1559,13 @@ watch(() => [panelCode.value, code.value], () => {
 </script>
 
 <style scoped>
+/* 已完成(金蝶自动关单):靛蓝,与「已审核」的品牌绿明确区分 ——
+   覆盖 el-tag 的三个 CSS 变量(元素级变量优先级高于 .el-tag--xxx 的单类规则) */
+.st-done {
+  --el-tag-bg-color: #eef2ff;
+  --el-tag-border-color: #c7d2fe;
+  --el-tag-text-color: #4338ca;
+}
 .card {
   background: var(--t-card-bg);
   border-radius: 6px;

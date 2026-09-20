@@ -110,12 +110,16 @@ const filtered = computed(() => {
   return out
 })
 
-/** 状态标签色彩(沿用系统制造绿体系:主色=已审核/已完成,中性灰=草稿,琥珀=流转中,红=作废/驳回) */
-const TAG_OK = ['已审核', '已归档', '已完成', '生产中', '已完工', '已关闭', '已审批', '已通过', '已转']
+/** 状态标签色彩(沿用系统制造绿体系:主色=已审核,青蓝=已完成(与已审核区分),
+ *  中性灰=草稿,琥珀=流转中,红=作废/驳回) */
+const TAG_OK = ['已审核', '已归档', '生产中', '已完工', '已关闭', '已审批', '已通过', '已转']
+/** 已完成(金蝶自动关单):与「已审核」同为正常终态,但语义是"做完了",用青蓝一眼区分 */
+const TAG_DONE = ['已完成']
 const TAG_PENDING = ['审批中', '修改中', '删除申请中', '修改申请中', '提交审批']
 const TAG_DANGER = ['已作废', '已中止', '已终止', '审批驳回', '驳回']
 function tagClass(status) {
   const s = String(status || '')
+  if (TAG_DONE.includes(s)) return 'done'
   if (TAG_OK.includes(s)) return 'ok'
   if (TAG_DANGER.includes(s)) return 'danger'
   if (TAG_PENDING.includes(s)) return 'pending'
@@ -295,6 +299,12 @@ onBeforeUnmount(detachDrag)
   color: var(--t-primary-dark, #0d584c);
   border-color: var(--el-color-primary-light-5, #88b4ac);
   background: var(--el-color-primary-light-9, #e8f1ef);
+}
+/* 已完成:青蓝(与「已审核」的绿明确区分——语义是"下游全部执行完、系统自动关单") */
+.dsr-tag.done {
+  color: #4338ca;
+  border-color: #c7d2fe;
+  background: #eef2ff;
 }
 .dsr-tag.draft {
   color: var(--t-text-2, #5d6c67);
