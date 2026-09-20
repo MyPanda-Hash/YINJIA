@@ -157,13 +157,26 @@ public class KingdeePushService {
         // 2026-09-20 补全为金蝶自身的完整关联写法(真实账套实测:带源单的行 6 个键齐全):
         //   src_bill_no(订单号)+ src_bill_type_id/number(常量 pur_bill_order)+ src_bill_type_name(采购订单)
         //   + src_seq(采购订单行号=订单分录序号)+ src_inter_id/src_entry_id(订单单据id/分录id,按单号向金蝶解析)。
-        //   后两项解析不到时只推前四项(不阻塞转ERP);订单号为空则整组不推(金蝶侧为普通入库单)。
+        // 沙箱实测(359220)补充的关键事实:**带上 src_bill_type_id 后金蝶会真的校验来源单** ——
+        //   订单号在目标账套不存在时整单被拒("单据X的源单''已被删除"),而旧代码只发 src_bill_no+type_name
+        //   时金蝶静默忽略该引用(落库后 src_bill_no 为空)。
+        // 因此口径:**解析到订单才推源单组**;解析不到(订单不在该账套/号写错/账套配错)则整组不推、
+        //   按无来源单的普通入库单推送,并在返回消息里明确提示,避免"账套里没有该订单 → 转ERP 直接失败"。
         String poNo = str(head.get("采购订单号"));
+        String linkWarning = "";
+        PoRefs poRefs = null;
         if (isPur && poNo.isEmpty()) {
             log.warn("采购入库单[{}]头上无采购订单号:本次转ERP 不带金蝶源单关联(src_bill_no/src_seq),"
                     + "金蝶侧显示为无来源单的普通入库单", docNo);
+        } else if (isPur) {
+            poRefs = resolvePoRefs(poNo);
+            if (poRefs == null) {
+                linkWarning = "；注意:金蝶账套内未找到采购订单[" + poNo + "],本次未挂来源单(请核对账套/订单号,"
+                        + "或先在金蝶补建该订单后重审再转)";
+                log.warn("采购入库单[{}] 未挂来源单:金蝶账套内无采购订单[{}]", docNo, poNo);
+            }
         }
-        PoRefs poRefs = isPur && !poNo.isEmpty() ? resolvePoRefs(poNo) : null;
+        boolean linkSrc = isPur && poRefs != null;
         int rowNo = 0;
         for (Map<String, Object> line : lines) {
             rowNo++;
@@ -190,22 +203,27 @@ public class KingdeePushService {
             String batch = str(line.get("批号")); if (!batch.isEmpty()) e.put("batch_no", batch);
             // 来源单:行级 src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
             // src_seq=该行对应的采购订单行号(采购订单行 行号,沿 订单→暂收→检验→入库 逐站带下来)
-            if (isPur && !poNo.isEmpty()) {
+            // 仅当订单在金蝶解析到(linkSrc)才推整组;src_seq 必须在订单确有该分录时才推,
+            // 否则金蝶会因"源单分录不存在"整单被拒(用分录映射当白名单)。
+            if (linkSrc) {
                 e.put("src_bill_no", poNo);
                 e.put("src_bill_type_id", "pur_bill_order");
                 e.put("src_bill_type_number", "pur_bill_order");
                 e.put("src_bill_type_name", "采购订单");
-                Integer srcSeq = intOf(line.get("采购订单行号"));
-                if (srcSeq != null) {
-                    e.put("src_seq", srcSeq);
-                    if (poRefs != null) {
-                        String entryId = poRefs.entryIdBySeq().get(srcSeq);
-                        if (entryId != null) e.put("src_entry_id", entryId);
-                    }
-                } else {
+                e.put("src_inter_id", poRefs.billId());
+                Integer srcSeq = intOf(lineColumn(line, "源单行号", "采购订单行号"));
+                if (srcSeq == null) {
                     log.warn("采购入库单[{}]第{}行无采购订单行号:该行不带 src_seq(金蝶侧按订单号挂单,不定位到具体行)", docNo, rowNo);
+                } else {
+                    String entryId = poRefs.entryIdBySeq().get(srcSeq);
+                    if (entryId == null) {
+                        log.warn("采购入库单[{}]第{}行 采购订单行号[{}] 在采购订单[{}]分录中不存在:该行不带 src_seq/src_entry_id",
+                                docNo, rowNo, srcSeq, poNo);
+                    } else {
+                        e.put("src_seq", srcSeq);
+                        e.put("src_entry_id", entryId);
+                    }
                 }
-                if (poRefs != null) e.put("src_inter_id", poRefs.billId());
             }
         }
 
@@ -234,7 +252,7 @@ public class KingdeePushService {
         out.put("ERP单号", erpBillNo);
         out.put("转ERP操作人", operator);
         out.put("转ERP时间", now);
-        out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）");
+        out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）" + linkWarning);
         return out;
     }
 
@@ -323,6 +341,20 @@ public class KingdeePushService {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /**
+     * 行取值:本服务的行来自 `SELECT * FROM bl_xxx`,键是**物理列名**(不是面板标签)。
+     * 采购订单行号在库里的列名是 源单行号(面板标签为「采购订单行号」,见 migrate-po-chain-link.sql),
+     * 故按列名优先、标签兜底取值 —— 2026-09-20 沙箱实测踩坑:只按标签取会恒 null,
+     * src_seq 静默丢失(日志出现"该行不带 src_seq")。
+     */
+    private static Object lineColumn(Map<String, Object> line, String... names) {
+        for (String n : names) {
+            Object v = line.get(n);
+            if (v != null && !String.valueOf(v).isBlank()) return v;
+        }
+        return null;
     }
 
     private Map<String, String> unitIdByName;
