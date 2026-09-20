@@ -575,7 +575,7 @@
           :doc-no="curDocNo"
           :slots="attachKeys"
           :values="attachValues"
-          :can-edit="draftEditable"
+          :can-edit="attachEditable"
           @change="applyAttachSlots"
         />
       </div>
@@ -2474,6 +2474,17 @@ const draftEditable = computed(() => {
   // 档案/单单据面板（存货档案、员工、部门、工艺路线等）：启用/停用状态列表页同样内联可编辑（2026-08-24）
   if ((cfgCache.value?.metadata?.singleDoc || cfgCache.value?.metadata?.panelCategory === '设置') && (st === '启用' || st === '停用')) return true
   return false
+})
+
+/** 附件上传闸门(2026-09-20):草稿/修改中照旧可传;订单类面板(与迁移 migrate-order-attach 同名单)
+ *  **已审核/已完成也允许补附件**(合同/扫描件等)——金蝶同步进来的订单本来就是已审核,
+ *  若沿用"审核即锁定"这些单永远传不了附件。仅「已作废」单据禁止。 */
+const ATTACH_ANY_STATUS_PANELS = new Set(['PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD'])
+const attachEditable = computed(() => {
+  if (draftEditable.value) return true
+  if (!ATTACH_ANY_STATUS_PANELS.has(panelCode.value)) return false
+  if (!curDocNo.value) return false
+  return String(cur.value?.['单据状态'] || '') !== '已作废'
 })
 const newVisible = ref(false)
 const approvalVisible = ref(false)

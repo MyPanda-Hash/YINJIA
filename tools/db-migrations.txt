@@ -480,3 +480,14 @@ migrate-query-ref-links.sql
 #   数据现状:王光珍/冯加劲/孙淼淼/叶健乐/蒋小刚 在 bs_emp(可选),admin/管理员/测试导入/廖小姐 不在档案。
 #   脚本末尾断言「未绑定行数」必须为 0;幂等可重跑。
 migrate-auditor-ref.sql
+
+# —— 2026-09-20 订单类单据补附件(与送料暂收单 SL_RECV 同款) ——
+#   六张订单:采购订单 bd_pu_order / 销售订单 bd_so_order / 生产加工单 bd_manu_order /
+#   委外加工单 bd_outsource_order / 生产工单 wo_order / 客户订单 order_bt —— 各补 6 个 nvarchar(500) 附件列位
+#   (附件1..附件6)+ yj_field 6 行(data_type=附件,place=header,seq 91..96)+ 列 MS_Description 中文注明;
+#   文件实体仍存 yj_attachment(锚点=panelCode+单据编号+列位名),上传/删除后服务端把文件名串镜像回头列。
+#   译名:附件 + 附件1..6 × 10 语言(原先只有 SL_RECV 有字段行、词条却缺)。
+#   配套前端:PanelxList/PanelxForm 附件区闸门加「订单类面板已审核也允许补附件」
+#   (金蝶同步进来的订单本来就是已审核,沿用"审核即锁定"则永远传不了);仅已作废禁止。
+#   不在范围:CGD 采购单(遗留 Porder,无头表 → 文件名无法镜像回头列)。幂等可重跑。
+migrate-order-attach.sql
