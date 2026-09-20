@@ -86,7 +86,13 @@ public class PanelConfigService {
         List<Map<String, Object>> buttonGroups = new ArrayList<>();
         buttonGroups.add(group("新增", List.of("新增")));
         buttonGroups.add(group("修改", List.of("修改")));
-        buttonGroups.add(group("保存", List.of("保存", "保存新增")));
+        // 保存组:「保存」= 落库并按面板语义流转(归档面板:管理员保存即归档 / 普通用户自动提交审批);
+        // 「保存为草稿」= 只落库不流转(markSaved=false,见 ButtonService)。
+        // 用户口径(2026-09-20):侧边栏要同时给「保存(草稿)」与「保存(提交)」两条路,
+        // 否则文书面板存一半就必须送审(DOC_ARCHIVE_PANELS 上「保存」会自动归档/送审)。
+        // 动作在组里的位置决定侧边栏主按钮与下拉:第一个 = 主按钮,其余进 ▼ 菜单
+        // ⇒ 主按钮保持「保存」(即提交),草稿落在下拉,不改变既有主路径的点击习惯。
+        buttonGroups.add(group("保存", List.of("保存", "保存新增", "保存为草稿")));
         buttonGroups.add(group("删除", List.of("删除", "删除单据")));
         buttonGroups.add(group("查找", List.of("查找", "刷新")));
         buttonGroups.add(group("打印", List.of("打印", "预览")));
@@ -255,7 +261,13 @@ public class PanelConfigService {
                 buttonGroups.add(group("选单", List.of("选单")));
                 disabledActions.add("选单");
             }
-            buttonGroups.add(group("保存", List.of("保存")));
+            // 保存组:「保存」= 落库并按面板语义流转(归档面板:管理员保存即归档 / 普通用户自动提交审批);
+            // 「保存为草稿」= 只落库不流转(markSaved=false,见 ButtonService)。
+            // 用户口径(2026-09-20):侧边栏要同时给「保存(草稿)」与「保存(提交)」两条路 ——
+            //   没这条动作时,文书面板存一半就必须送审(DOC_ARCHIVE_PANELS 上「保存」会自动归档/送审)。
+            // 位置:第一个动作 = 侧边栏主按钮,其余进 ▼ 下拉 ⇒ 主按钮仍是「保存」(即提交),
+            //   草稿落在下拉,不改变既有主路径的点击习惯(与 PANDA_BUTTONS 各单据的写法一致)。
+            buttonGroups.add(group("保存", List.of("保存", "保存为草稿")));
             buttonGroups.add(group("删除", List.of("删除")));
             buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
             buttonGroups.add(group("生单", List.of("生单")));
