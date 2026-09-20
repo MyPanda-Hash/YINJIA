@@ -499,3 +499,8 @@ migrate-order-attach.sql
 #   本脚本按同口径补齐;**不重跑**那两个会重建/清字段的旧迁移(其 DELETE yj_field 会清掉后续脚本加的字段)。
 #   同时把前端附件闸门从"仅订单"放宽到"凡配了附件列位的单据"(已审核也可补附件,仅已作废禁止)。
 migrate-attach-restore.sql
+
+# —— 2026-09-20 销售出库单 SALE_OUT 补 6 附件列位 ——
+#   用户口径:需要;采购单 CGD 不做 —— 经核对 CGD 是旧版「采购单」遗留面板(Porder 表/0 行/模块"订单管理·单据"),
+#   并非「采购订单」(采购订单是 PU_ORDER,已有附件)。幂等:逐列判存 + 清旧插新。
+migrate-sale-out-attach.sql

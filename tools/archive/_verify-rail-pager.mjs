@@ -1,4 +1,4 @@
-/**
+﻿/**
  * _verify-rail-pager.mjs — 左栏「单据选择」顶/底翻页条实测(50 条/页整页翻)
  * 用法: node tools/archive/_verify-rail-pager.mjs
  */
@@ -72,7 +72,7 @@ localStorage.setItem('mes_login_date','2026-09-20'); localStorage.setItem('mes_l
         pagers, chip: document.querySelector('.doc-chip')?.textContent.trim() || '',
       };
     })()`;
-    // 点第 n 条(0=顶层,1=底层)翻页条上的按钮(title 定位;顶层/底层按 DOM 顺序)
+    // 点翻页条上的按钮(title 定位;2026-09-20 起左栏只有选择栏上方那一条)
     const clickBtn = (strip, title) => ev(`(() => {
       const rail = document.querySelector('.doc-select-rail'); if (!rail) return 'no-rail';
       const p = [...rail.querySelectorAll('.drp')][${strip}]; if (!p) return 'no-strip';
@@ -88,9 +88,8 @@ localStorage.setItem('mes_login_date','2026-09-20'); localStorage.setItem('mes_l
       console.log(`\n=== ${c.panel} ===`);
       let st = await ev(readRail);
       console.log('  初始:', JSON.stringify({ count: st.count, rows: st.rows, first: st.first, last: st.last, pagers: st.pagers }));
-      ok(st.pagers.length === 2, `左栏顶/底各一条翻页条(实得 ${st.pagers.length} 条)`);
+      ok(st.pagers.length === 1, `左栏只有一条翻页条(在选择栏上方;实得 ${st.pagers.length} 条)`);
       ok((st.count || '').includes(String(c.expectTotal)), `「共有数据」= 全量 ${c.expectTotal} 条(实得 ${JSON.stringify(st.count)})`);
-      ok(st.pagers[0]?.text === st.pagers[1]?.text, '顶/底两条页码一致');
       ok((st.pagers[0]?.text || '').includes(`1/${c.expectPages}`), `初始页码 1/${c.expectPages}(实得 ${JSON.stringify(st.pagers[0]?.text)})`);
       ok(st.rows === (c.expectPages > 1 ? 50 : c.expectTotal), `每页条数 = ${c.expectPages > 1 ? 50 : c.expectTotal}(实得 ${st.rows})`);
       if (c.expectPages === 1) {
@@ -104,17 +103,17 @@ localStorage.setItem('mes_login_date','2026-09-20'); localStorage.setItem('mes_l
       ok((st.pagers[0]?.text || '').includes(`2/${c.expectPages}`), `翻到第 2 页(期望 2/${c.expectPages},实得 ${st.pagers[0]?.text})`);
       if (c.expectLastRows) {
         ok(st.rows === c.expectLastRows, `末页条数 ${c.expectLastRows}(实得 ${st.rows})`);
-        ok(st.pagers[1]?.off?.[2] === true && st.pagers[1]?.off?.[3] === true, '末页时「下一页/末页」置灰');
+        ok(st.pagers[0]?.off?.[2] === true && st.pagers[0]?.off?.[3] === true, '末页时「下一页/末页」置灰');
       } else {
         ok(st.rows === 50, `非末页仍 50 条(实得 ${st.rows})`);
-        ok(st.pagers[1]?.off?.[2] === false && st.pagers[1]?.off?.[3] === false, '非末页时「下一页/末页」可用');
+        ok(st.pagers[0]?.off?.[2] === false && st.pagers[0]?.off?.[3] === false, '非末页时「下一页/末页」可用');
       }
       ok(st.active === st.first, '当前单据 = 新页首张(高亮同步)');
-      // 底层 ◀ 上一页 → 回首页
-      await clickBtn(1, '上一页'); await sleep(1600);
+      // 同一条翻页条 ◀ 上一页 → 回首页
+      await clickBtn(0, '上一页'); await sleep(1600);
       st = await ev(readRail);
-      console.log('  底层「上一页」→', JSON.stringify({ pagers: st.pagers[0]?.text, rows: st.rows, first: st.first }));
-      ok((st.pagers[0]?.text || '').includes('1/'), '底层按钮同样生效,回到第 1 页');
+      console.log('  「上一页」→', JSON.stringify({ pagers: st.pagers[0]?.text, rows: st.rows, first: st.first }));
+      ok((st.pagers[0]?.text || '').includes('1/'), '「上一页」回第 1 页');
       ok(st.rows === 50, `回到第 1 页 50 条(实得 ${st.rows})`);
       ok(st.pagers[0]?.off?.[0] === true && st.pagers[0]?.off?.[1] === true, '首页时「首页/上一页」置灰');
       // 顶层 ▷ 末页 / ◁ 首页

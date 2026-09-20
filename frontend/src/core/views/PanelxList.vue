@@ -2483,7 +2483,7 @@ const draftEditable = computed(() => {
  *  + 采购链的送料暂收/来料检验/暂收退回/采购入库(见 migrate-order-attach / migrate-attach-restore)。 */
 const ATTACH_EDIT_PANELS = new Set([
   'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
-  'SL_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN',
+  'SL_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT',
 ])
 const attachEditable = computed(() => {
   if (draftEditable.value) return true

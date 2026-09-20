@@ -20,7 +20,7 @@
         <span v-if="keyword" class="dsr-count-sub">（{{ tt('模糊搜索') }}: {{ keyword }}）</span>
       </div>
     </div>
-    <!-- 顶层翻页条:整页翻(50 条/页),与左栏内容同一数据源(后端分页页号) -->
+    <!-- 翻页条(选择栏**上方**唯一一条,2026-09-20):整页翻 50 条/页,与左栏内容同一数据源(后端分页页号) -->
     <DocRailPager
       :page-no="pageNo" :page-count="pageCount" :from="rangeFrom" :to="rangeTo" :total="total"
       @go="(p) => $emit('page', p)"
@@ -55,11 +55,7 @@
         </tbody>
       </table>
     </div>
-    <!-- 底层翻页条(与顶层同源同款):长列表滚到底部也能直接翻页 -->
-    <DocRailPager
-      :page-no="pageNo" :page-count="pageCount" :from="rangeFrom" :to="rangeTo" :total="total"
-      @go="(p) => $emit('page', p)"
-    />
+    <!-- 2026-09-20 用户口径:翻页条只留选择栏**上方**那一条,底部这条删除(不再需要) -->
     <div class="dsr-resizer" :title="tt('拖动调整宽度')" @mousedown.prevent="startDrag"></div>
   </div>
   <div v-else class="doc-select-rail coll" :title="title" @click="$emit('toggle')">»</div>
