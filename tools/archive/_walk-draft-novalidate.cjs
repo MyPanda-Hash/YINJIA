@@ -134,15 +134,6 @@ if (!HEAD || HEAD === '-' || !GROUP_COL || GROUP_COL === '-') {
       console.log(`④ 库中:头表行=${headRows} 明细行=${detRows}(提交 ${sentObj ? sentObj.rows : '?'} 行) archived=${arch}  请求 HTTP=${sentObj ? sentObj.status : '?'}`)
       if (sentObj && sentObj.status !== 200) console.log(`   草稿请求响应=${JSON.stringify(sentObj.resp)}`)
       chk('草稿已落库(头表 1 行)', headRows === '1', headRows)
-      // 已知未决(2026-09-20):RD_INSP_PLAN 的 文档编号 由前端 docNoDefault 与 DB 默认约束双双
-      // 定成固定值 YJ-RD001,而该面板又在 DOC_NO_PANELS 里 ⇒ 第二张单必被
-      // "文档编号不允许重复" 挡下(草稿路径也拦,因为 ensureDocNoUnique 不看 markSaved)。
-      // 这是既有的口径冲突(不是本任务的必填分层),待用户定夺,这里按 SKIP 报,不当成回归。
-      if (sentObj && /不允许重复/.test(String(sentObj.resp))) {
-        console.log(`  ⊘ ${PANEL} 已知未决:草稿被「${JSON.parse(sentObj.resp).message}」挡下(文档编号唯一性 vs 固定默认值)`)
-        cleanupOnly(docNo); docNo = ''
-        s.close(); process.exit(2)
-      }
       chk('草稿请求返回 200(非提交路径)', !!sentObj && sentObj.status === 200, sent)
       if (sentObj && sentObj.rows > 0) chk(`提交的明细行全部落库(${sentObj.rows} 行)`, Number(detRows) === sentObj.rows, detRows)
       chk('草稿未归档(archived≠Y)', arch !== 'Y', arch)

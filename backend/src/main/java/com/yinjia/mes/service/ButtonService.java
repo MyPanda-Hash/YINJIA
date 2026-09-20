@@ -303,7 +303,10 @@ public class ButtonService {
         if ("SL_RECV".equals(def.code())) syncInspFromSlRecv(no, user);
 
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
-        if (DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
+        // 文档编号唯一性(实施计划单号等):不允许与其他单据重复。
+        // 「保存为草稿」不校验(2026-09-20 用户口径):草稿=允许存一半,唯一性属于提交口径;
+        // 两条草稿可以先占用同一个文档编号,谁先提交谁占住,后提交的那张在提交时被拒。
+        if (markSaved && DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
     }
 
@@ -2690,11 +2693,17 @@ public class ButtonService {
             //   没有「新增」入口、永远没有单据可归档;登记进来只会让归档/修改闭环指向空集合。
             //   与 RD_PROGRESS(单单据、永远草稿、刻意排除)同一类处置 —— 见 CONTEXT「文书归档面板」。
             "RD_SAMPLE_NO");
-    /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复) */
+    /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复)。
+     *  ⚠ RD_INSP_PLAN(出货检验计划表)**刻意不入本集合**(2026-09-20 用户口径):
+     *   它的文档编号不是"单据号"而是**表单固定值** —— 前端 recordSheetConfigs.js 的
+     *   docNoDefault='YJ-RD001' 与 DB 默认约束 DF_insp_docno DEFAULT N'YJ-RD001'
+     *   (tools/migrate-rd-prod-sheets.sql)双双把它钉死;留在集合里 ⇒ 第二张计划一保存就被
+     *   "文档编号不允许重复：YJ-RD001" 挡下,面板实际只能存在一张单(已稳定复现)。
+     *   一个产品一份检验计划应能共存 ⇒ 移出集合。 */
     private static final java.util.Set<String> DOC_NO_PANELS = java.util.Set.of(
             "RD_APPROVAL", "RD_PLAN", "RD_PROGRESS", "RD_FILTER_EFF",
             "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC",
-            "RD_DOM_TEST", "RD_INSP_PLAN");
+            "RD_DOM_TEST");
 
     /** 单据状态查询(供生单等领域动作校验来源单状态) */
     public Map<String, Object> docStatus(String panelCode, String no) {
