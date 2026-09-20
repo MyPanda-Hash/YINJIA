@@ -36,6 +36,18 @@
 >   (以星辰为准;需要清理用第 8 节 SQL)。档案同理:金蝶删档后列表不再返回,本地行保留。
 > - 两脚本共享 `sync-core.mjs`、`config.json`、`state.json`、日志(按日 `logs/sync-*.log`)。
 
+### 0.1 读入与推送的分工(2026-09-20 定口径,不可混淆)
+
+| 方向 | 唯一入口 | 说明 |
+|---|---|---|
+| **读入**(金蝶 → MES) | **只有 `sync.mjs`(增量,每 5 分钟)与 `init-sync.mjs`(初始化/全量复核)** | 二者依赖 5 个模块:`sync-core.mjs`、`kingdee-client.mjs`、`kingdee-crypto.mjs`、`kingdee-extra-fields.mjs`、`safety.mjs` —— 部署目录**只放这 7 个 .mjs**,不再放一次性/探针脚本(2026-09-20 已清理 8 个探针 + 1 个一次性迁移) |
+| **推送**(MES → 金蝶) | **只有系统里的「转ERP」按钮**(后端 `KingdeePushService`,纯 Java;推送前过账套守卫,默认只允许测试沙箱) | 本工具目录与仓库**不放任何推送脚本**;历史遗留的 Node 推送原型(`temp-push-sandbox/_push-one.mjs`)已于 2026-09-20 删除 |
+
+> **前置(推送口径变更后必须满足)**:目标库需已应用 `tools/migrate-erp-close-state.sql`
+> (`yj_doc_status.erp_close_state`)。同步核心会写该列(金蝶 `bill_close_state`:`S` 已关闭 → MES「已完成」、
+> `H` 手动关闭 → MES「已中止」),且**不再写 `stopped`**(那是 MES 自己的中止动作,被同步覆盖会洗掉用户操作)。
+> 库缺该列时 MERGE 会报错 —— 这是新核心相对旧部署版的唯一 schema 前提。
+
 > 为什么要有 init:增量依赖时间窗,极小概率漏窗(接口窗口过滤实测有边界毛刺,
 > 已用"端点前移 `endBiasMinutes`,默认180分钟"规避);每月跑一次 init 做全量指纹比对即可兜底。
 
