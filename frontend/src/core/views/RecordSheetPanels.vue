@@ -61,13 +61,21 @@
         <tr>
           <td class="rs-td rs-company-cell" :colspan="nCols - docnoSpan">惠州市银嘉环保科技有限公司</td>
           <td class="rs-td rs-docno" :colspan="docnoSpan">
-            <!-- 文档编号:配置为参照时(如数据记录表→立项申请)点击弹参照;否则保持纯输入 -->
+            <!-- 文档编号(纸张右上角那一格):前置固定标识「编号：」——23 个面板统一。
+                 三种形态都要带上标识:
+                   · 参照控件(如数据记录表→立项申请):空时提示语也带标识
+                   · 可编辑纯输入:用 placeholder(用户选定的形式,不动版式)
+                   · 只读:标识 + 值(原来是裸值,纸面上分不清这格是什么) -->
             <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
-              <span class="rs-ref-text">{{ head['文档编号'] || tt('点击选择') }}</span>
+              <span class="rs-docno-prefix">{{ tt('编号：') }}</span>
+              <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
               <el-icon class="rs-ref-ico"><Search /></el-icon>
             </div>
-            <el-input v-else-if="editable" v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" @input="emit('dirty')" />
-            <template v-else>{{ head['文档编号'] || head['单据编号'] || cfg.docNoDefault || 'YJ-PD-01' }}</template>
+            <div v-else-if="editable" class="rs-docno-wrap">
+              <span class="rs-docno-prefix">{{ tt('编号：') }}</span>
+              <el-input v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt('编号：')" @input="emit('dirty')" />
+            </div>
+            <template v-else><span class="rs-docno-prefix">{{ tt('编号：') }}</span>{{ head['文档编号'] || head['单据编号'] || cfg.docNoDefault || 'YJ-PD-01' }}</template>
           </td>
         </tr>
         <tr>
@@ -134,7 +142,7 @@
               <td class="rs-td rs-label" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
               <template v-if="pair.cells">
                 <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
-                  <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" @input="emit('dirty')" />
+                  <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
                   <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
                 </td>
               </template>
@@ -156,7 +164,7 @@
                   :model-value="head[pair.key] || ''"
                   @update:model-value="(v) => { head[pair.key] = v }"
                 />
-                <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" @input="emit('dirty')" />
+                <el-input v-else-if="editable && pair.type === 'text'" v-model="head[pair.key]" size="small" :maxlength="pair.max || 300" class="rs-t-in" :placeholder="pair.ph ? tt(pair.ph) : ''" @input="emit('dirty')" />
                 <el-input v-else-if="editable" v-model="head[pair.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="pair.max || 2000" class="rs-t-in" @input="emit('dirty')" />
                 <span v-else class="rs-txt">{{ head[pair.key] || '' }}</span>
               </td>
@@ -1942,6 +1950,23 @@ function chartOf(dt) {
 }
 .rs-docno-input {
   width: 90%;
+}
+/* 「编号：」前置标识:23 个面板共用的纸张右上角逐格标签。
+   用 flex 让标识与输入框/参照控件同排,标识不缩、值区自适应。 */
+.rs-docno-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
+}
+.rs-docno-prefix {
+  white-space: nowrap;
+  font-style: normal;
+  font-weight: 600;
+}
+.rs-docno-empty {
+  color: #b6bcc6;
+  font-style: normal;
 }
 .rs-docno-input :deep(.el-input__inner) {
   text-align: right;

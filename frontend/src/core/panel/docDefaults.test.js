@@ -113,6 +113,23 @@ test('未知面板:不做任何写入', () => {
   assert.deepEqual(form, {})
 })
 
+/**
+ * 2026-09-18 第二轮:产品信息表两级审批人固定填写 冯总 / 秀丽。
+ * 口径:走"默认值"(仅空时填、可人工改),不是"锁定只读" —— 与 文件管理人=陈秀丽 同款。
+ * 若将来要收紧成不可改,改 yj_field.editable=0 即可(那时这条测试要改成断言 lockedPersonLabel)。
+ */
+test('产品信息表:两级审批人默认带出 冯总 / 秀丽', () => {
+  const form = {}
+  applyDocDefaults('RD_PROD_INFO', form, USER, { isNew: true, today: T })
+  assert.equal(form['审核人一级'], '冯总')
+  assert.equal(form['审核人二级'], '秀丽')
+  // 不是锁定字段(不在 LOCKED_PERSON 里):用户可改 ⇒ 已填值时不再覆盖
+  const filled = { 审核人一级: '张三' }
+  applyDocDefaults('RD_PROD_INFO', filled, USER, { isNew: true, today: T })
+  assert.equal(filled['审核人一级'], '张三', '已有值不应被默认值覆盖')
+  assert.equal(filled['审核人二级'], '秀丽', '空值仍应带出默认')
+})
+
 test('todayStr:按本地时区给 YYYY-MM-DD(不能因 UTC 偏移差一天)', () => {
   assert.match(todayStr(new Date(2026, 8, 11, 0, 30, 0)), /^2026-09-11$/)
   assert.match(todayStr(new Date(2026, 8, 11, 23, 30, 0)), /^2026-09-11$/)

@@ -822,15 +822,19 @@ export const recordSheetConfigs = {
   RD_PROD_INFO: {
     headMode: 'report',
     staticTitle: '产品信息表',
-    // 报告头右侧信息块:单据日期 + 编辑人(设计 D22「编辑人」签名格,2026-09-18 新增字段)
+    // 报告头右侧信息块:**编辑人在上、单据日期在下**(用户口径:原来上下颠倒了)。
+    // 设计纸面 B21:E23 右侧就是「编号：/ 编辑人 / 日期」竖排,编号即报告头右上角那一格。
     info: [
-      { label: '单据日期', key: '单据日期', type: 'text' },
       { label: '编辑人', key: '编辑人', type: 'text' },
+      { label: '单据日期', key: '单据日期', type: 'text' },
     ],
     grid: [130, 260, 130, 260],
     head: { title: 2, infoLabel: 1, infoValue: 1 },
     sections: [
       // 一、产品基本信息 = 设计 B25:E27 三行(产品编号|客户项目名称、客户料号|产品管控等级、产品功能类别|产品形态)
+      // ⚠ 行宽对齐:双列行的占法是「左标签1 + 左值1 + 右标签1 + 右值1 = 4」——
+      //   右值**不能再写 vspan:3**(那会变 6 列超宽,纸面直接串行;本次自检工具抓到的就是这个)。
+      //   只有"整行一个值"的行才用 标签1 + vspan3。
       { bar: '一、产品基本信息', rows: [
         { pairs: [
           { label: '产品编号', key: '产品编号', type: 'text' },
@@ -841,16 +845,25 @@ export const recordSheetConfigs = {
           { label: '产品管控等级', key: '产品管控等级', type: 'select' },
         ]},
         { pairs: [
-          { label: '产品功能类别', key: '产品功能类别', type: 'text' },
+          { label: '产品功能类别', key: '产品功能类别', type: 'select' },
           { label: '产品形态', key: '产品形态', type: 'select' },
         ]},
       ]},
-      // 二、规格与尺寸 = 设计 B29:E29 单行(产品整体尺寸|炭棒尺寸)
+      // 二、规格与尺寸:产品整体尺寸一行 + 炭棒尺寸一行(各整行,值区 vspan 3)
+      // 炭棒尺寸按用户口径**默认分三内格**:内径 * 外径 * 长度
+      // (顺照设计《产品信息表内容.xlsx》B13 填写说明原文「内径*外径*长度(模具尺寸)」),
+      // 三格用 pair.cells 铺开、各带 placeholder 提示词;旧的整串 [炭棒尺寸] 退化为历史列(不进纸面)
       // 注:产品名称/产品类别/产品类型/产品分类/下单数量 保留在元数据但不进纸面(兼容历史单据)
       { bar: '二、规格与尺寸', rows: [
         { pairs: [
-          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text' },
-          { label: '炭棒尺寸', key: '炭棒尺寸', type: 'text' },
+          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text', vspan: 3 },
+        ]},
+        { pairs: [
+          { label: '炭棒尺寸', cells: [
+            { key: '炭棒内径', ph: '内径(mm)' },
+            { key: '炭棒外径', ph: '外径(mm)' },
+            { key: '炭棒长度', ph: '长度(mm)' },
+          ], vspan: 3 },
         ]},
       ]},
       // 三、特殊性能描述 = 设计 B31「主要性能描述」;数据键仍是 特殊性能描述(col_name 一律不改)
@@ -865,14 +878,17 @@ export const recordSheetConfigs = {
           // 客户图纸或规格书:附件字段(源 Excel 该格提示即"上传图片")——上传保留原文件名,点击查看,打印/PDF 只见文件名
           { label: '客户图纸或规格书', key: '客户图纸或规格书', type: 'file', vspan: 3 },
         ]},
-        // 设计把单格「审核人」拆成两级(2026-09-18 新增字段);原「审核人」列保留为历史列
-        // (元数据 hidden=1 + visible=1 ⇒ 列表隐藏、表单仍可见,旧值不丢),故纸面只画设计的两级
+        // 两级审批人**各占一行**(用户口径:原来挤在同一行);固定值 冯总 / 秀丽 由
+        // docDefaults.js 在新建时带出(与 申请立项人/负责人 同机制,仍可人工改)。
+        // 原「审核人」列保留为历史列(hidden=1 + visible=1 ⇒ 列表隐藏、表单仍可见,旧值不丢)。
         { pairs: [
-          { label: '审核人（一级审核）', key: '审核人一级', type: 'text' },
-          { label: '审核人（二级审核）', key: '审核人二级', type: 'text' },
+          { label: '审核人（一级审批人）', key: '审核人一级', type: 'text', vspan: 3 },
         ]},
         { pairs: [
-          { label: '产品负责人', key: '责任人', type: 'text' },
+          { label: '审核人（二级审批人）', key: '审核人二级', type: 'text', vspan: 3 },
+        ]},
+        { pairs: [
+          { label: '产品负责人', key: '责任人', type: 'text', vspan: 3 },
         ]},
         { pairs: [
           { label: '备注', key: '备注', vspan: 3 },

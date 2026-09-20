@@ -527,3 +527,16 @@ migrate-rd-sample-no.sql
 #   RD_PROD_DOCLIST 只给 view,query,export,print(只读派生矩阵,给 add/modify/del 是无意义权限位);
 #   RD_SAMPLE_NO 照普通文书面板 view,query,add,modify,modlog,del,export。幂等键 role_id+panel_code。
 migrate-rd-2026-newpanels-perm.sql
+
+# —— 2026-09-18 产品信息表界面调整(用户口径 5 项)——
+# migrate-rd-prodinfo-ui.sql —— ③两级审批人 label 改「审核人（一级/二级审批人）」;
+#   ④产品功能类别 改下拉框(除余氯/VOC/重金属);⑤炭棒尺寸拆三格:新增 炭棒内径/炭棒外径/炭棒长度
+#   三列(照设计《产品信息表内容.xlsx》B13「内径*外径*长度(模具尺寸)」原文),
+#   旧整串 [炭棒尺寸] 退化为历史列(hidden=1+visible=1,不进纸面但不丢值)。
+#   ⚠ 不把旧列当"外径":旧列存整串(如 35*13*107),当外径用会把整串写进去。
+# i18n-rd-prodinfo-ui.sql —— 「编号：」+ 炭棒三格 label 与提示词 + 两级审批人新标签
+#   + 产品功能类别字典值(除余氯/重金属),各 10 语言。
+#   ⚠ 踩坑:字段 label 与提示词是**两套译名键**(译名以 label 为键)——
+#     第一版只加了提示词(内径(mm))那套,字段 label(炭棒内径)那套漏了,en 下字段名仍显中文。
+migrate-rd-prodinfo-ui.sql
+i18n-rd-prodinfo-ui.sql
