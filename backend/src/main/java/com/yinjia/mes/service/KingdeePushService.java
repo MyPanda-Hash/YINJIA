@@ -66,6 +66,14 @@ public class KingdeePushService {
     private String appSecret;
     @Value("${kingdee.push.domain:https://tf.jdy.com}")
     private String domain;
+    /**
+     * 是否允许把单据推进**真实账套**。默认 false = 只允许推测试沙箱。
+     * 判定依据沿用本项目凭证约定(见类注释):outerInstanceId 非空 ⇒ 动态授权 ⇒ **真实账套**;
+     * 留空 ⇒ 静态 appKey/appSecret ⇒ 测试沙箱。真实账套需显式开启本开关才放行,
+     * 防"配置误指向正式账套 + 随手点转ERP"把测试/演示单据写进正式账(2026-09-20 用户口径)。
+     */
+    @Value("${kingdee.push.allowProd:false}")
+    private boolean allowProd;
 
     private String cachedToken;
     private long tokenExpiresAt;
@@ -94,9 +102,35 @@ public class KingdeePushService {
         }
     }
 
+    /**
+     * 推送前**账套守卫**(在发任何 HTTP 之前执行,失败即拒,不会写任何单据):
+     * 本项目凭证约定 outerInstanceId 非空 = 真实账套;默认只允许测试沙箱(静态 appKey/appSecret)。
+     * 命中真实账套且未显式开启 {@code kingdee.push.allowProd=true} → 直接拒绝并给出可操作提示。
+     */
+    private void assertPushTargetAllowed() {
+        ensureCreds(); // 只读本地配置,不联网
+        boolean realAccount = outerInstanceId != null && !outerInstanceId.isBlank();
+        // 每次转ERP 都留一条目标账套日志(可审计:哪次推送打到了哪个账套)
+        log.info("转ERP 目标账套 = {}(clientId={}, domain={})",
+                realAccount ? "真实账套" : "测试沙箱", maskId(clientId), domain);
+        if (realAccount && !allowProd) {
+            throw new IllegalStateException("已拒绝转ERP:当前金蝶凭证指向**真实账套**(outerInstanceId="
+                    + maskId(outerInstanceId) + "),本功能默认只允许推测试沙箱,以免测试单据写进正式账。"
+                    + "确认要推真实账套时,请显式配置 kingdee.push.allowProd=true 后重试");
+        }
+    }
+
+    /** 只留前缀的脱敏(用于日志/报错文案,避免把账套标识打全) */
+    private static String maskId(String s) {
+        if (s == null || s.isBlank()) return "(空)";
+        String t = s.trim();
+        return t.length() <= 6 ? t.charAt(0) + "***" : t.substring(0, 6) + "…";
+    }
+
     // ══════════ 业务入口 ══════════
 
     public Map<String, Object> pushDocument(String panelCode, String docNo, String operator) throws Exception {
+        assertPushTargetAllowed(); // 守卫先行:真实账套未开启 allowProd 时,连 token 都不取
         boolean isPur = "PURCHASE_IN".equals(panelCode);
         String headTable = isPur ? "bd_purchase_in" : "bd_sale_out";
         String lineTable = isPur ? "bl_purchase_in" : "bl_sale_out";
@@ -181,7 +215,17 @@ public class KingdeePushService {
         for (Map<String, Object> line : lines) {
             rowNo++;
             ObjectNode e = entities.addObject();
-            e.put("material_number", str(line.get("存货编码")));
+            String materialNo = str(line.get("存货编码"));
+            e.put("material_number", materialNo);
+            // 商品ID:挂来源单时必须与源单分录一致(金蝶按 material_id 比对),故按存货编码解析后一并传;
+            // 解析不到不阻断(无来源单的普通入库单靠 material_number 即可),仅在挂联场景下报错提示
+            String materialId = materialNo.isEmpty() ? "" : str(materialMap().get(materialNo));
+            if (materialId.isEmpty()) {
+                log.warn("采购入库单[{}]第{}行存货编码[{}]在当前账套金蝶商品档案中无对应ID:不传 material_id",
+                        docNo, rowNo, materialNo);
+            } else {
+                e.put("material_id", materialId);
+            }
             e.put("qty", num(line, isPur ? "实收数量" : "数量"));
             e.put("price", num(line, isPur ? "单价" : "售价"));
             String model = str(line.get("规格型号")); if (!model.isEmpty()) e.put("material_model", model);
@@ -206,6 +250,10 @@ public class KingdeePushService {
             // 仅当订单在金蝶解析到(linkSrc)才推整组;src_seq 必须在订单确有该分录时才推,
             // 否则金蝶会因"源单分录不存在"整单被拒(用分录映射当白名单)。
             if (linkSrc) {
+                if (materialId.isEmpty()) {
+                    throw new RuntimeException("第" + rowNo + "行存货编码[" + materialNo + "]在当前账套金蝶商品档案中无对应ID,"
+                            + "无法挂来源单(采购订单[" + poNo + "]):请核对商品档案或账套后重试");
+                }
                 e.put("src_bill_no", poNo);
                 e.put("src_bill_type_id", "pur_bill_order");
                 e.put("src_bill_type_number", "pur_bill_order");
@@ -399,6 +447,44 @@ public class KingdeePushService {
         unitIdByName = m;
         unitCacheAt = System.currentTimeMillis();
         log.info("金蝶计量单位档案已加载({}个,按当前账套,缓存22h)", m.size());
+        return m;
+    }
+
+    private static final String MATERIAL_LIST_PATH = "/jdy/v2/bd/material";
+    /** 商品档案分页上限(真实账套约数千商品,200/页 → 30 页足够;超出仅告警不阻塞) */
+    private static final int MATERIAL_MAX_PAGES = 30;
+    private Map<String, String> materialIdByNumber;
+    private long materialCacheAt;
+
+    /**
+     * 当前账套的 存货编码→金蝶商品ID 缓存(22h)。
+     * 为什么必须传 material_id:采购入库**挂来源单**时金蝶按 material_id 与源单分录比对,
+     * 只传 material_number 会被判 `materialid_id：null 跟源单的数据不一致`(2026-09-20 沙箱实测);
+     * 商品ID同样按账套各不同(与单位ID 同理),故按当前凭证实时拉取,测试/真实套切换零改动。
+     * 列表接口不支持 number 精确过滤(实测传 number 返回的仍是首页),故整册分页拉取后建索引。
+     */
+    private synchronized Map<String, String> materialMap() throws Exception {
+        ensureCreds();
+        if (materialIdByNumber != null && System.currentTimeMillis() - materialCacheAt < 22 * 3600_000L) return materialIdByNumber;
+        Map<String, String> m = new HashMap<>();
+        int page = 0;
+        for (; page < MATERIAL_MAX_PAGES; page++) {
+            JsonNode rows = kingdeeGet(MATERIAL_LIST_PATH,
+                    Map.of("page", String.valueOf(page + 1), "page_size", "200")).path("rows");
+            int n = 0;
+            if (rows.isArray()) {
+                for (JsonNode r : rows) {
+                    String no = r.path("number").asText("");
+                    if (!no.isBlank()) m.put(no, r.path("id").asText(""));
+                    n++;
+                }
+            }
+            if (n < 200) break;
+        }
+        if (m.isEmpty()) throw new RuntimeException("金蝶商品档案为空(账套无商品?)");
+        materialIdByNumber = m;
+        materialCacheAt = System.currentTimeMillis();
+        log.info("金蝶商品档案已加载({}个,{}页,按当前账套,缓存22h)", m.size(), page + 1);
         return m;
     }
 

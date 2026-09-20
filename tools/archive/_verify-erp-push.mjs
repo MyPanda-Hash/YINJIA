@@ -43,6 +43,21 @@ const btn = (panelCode, buttonName, formData) => call('/px/callButton', { panelC
   }
   let newNo = '';
   try {
+  // 1.5) 若源采购订单在金蝶存在,按它的分录对齐测试行(数量不得超过订单 → 否则金蝶判"不允许超额入库")
+  let orderLine = null;
+  try {
+    const kk = JSON.parse(readFileSync(new URL('../../deploy/push/config.json', import.meta.url), 'utf8'));
+    const cf = kk.kingdee || kk;
+    const { token: t2 } = await fetchAppToken(cf);
+    const r2 = await kingdeeGet(cf, t2, '/jdy/v2/scm/pur_order', { page: '1', page_size: '5', bill_no: PO_NO });
+    const h2 = (r2.rows || []).find((x) => x.bill_no === PO_NO);
+    if (h2) {
+      const d2 = await kingdeeGet(cf, t2, '/jdy/v2/scm/pur_order_detail', { id: h2.id });
+      orderLine = (d2.material_entity || [])[0] || null;
+      console.log(`[源单核对] 金蝶采购订单 ${PO_NO} 状态=${d2.bill_status} 分录1: 商品=${orderLine?.material_number} 数量=${orderLine?.qty}`);
+    }
+  } catch (e) { console.log('[源单核对] 跳过:' + e.message.slice(0, 80)); }
+
   // 1) 复制源单(去掉单号/ERP痕迹)→ 新草稿,补 采购订单号 + 行 采购订单行号
   const list = (await call('/px/queryFormDataList', { panelCode: 'PURCHASE_IN', condition: {}, pageNo: 1, pageSize: 200 })).data?.list || [];
   const src = list.find((r) => String(r['编号'] || r['单据编号']) === SOURCE_DOC);
@@ -50,7 +65,18 @@ const btn = (panelCode, buttonName, formData) => call('/px/callButton', { panelC
   // 坑:保存接口把带 id 的行当"已有行"处理(按 id 更新 单据编号)→ 会把源单的行挪走,
   // 因此复制时必须剔除 id/__id(以及服务端痕迹字段),保证插入的是全新行。
   const stripIds = (o) => { const c = { ...o }; for (const k of ['id', '__id', '编号', '单据编号', 'ERP单号', 'asp_user1', 'asp_time1', 'asp_user2', 'asp_time2', 'asp_cancel']) delete c[k]; return c; };
-  const items = (src.detail?.items || []).map((it, i) => ({ ...stripIds(it), 采购订单行号: String(i + 1) }));
+  const items = (src.detail?.items || []).map((it, i) => {
+    const row = { ...stripIds(it), 采购订单行号: String(i + 1) };
+    // 有源单时:数量/单价/商品按订单分录对齐(数量超订单会被金蝶判"不允许超额入库")
+    if (orderLine && i === 0) {
+      row['存货编码'] = orderLine.material_number ?? row['存货编码'];
+      row['存货名称'] = orderLine.material_name ?? row['存货名称'];
+      row['实收数量'] = orderLine.qty ?? row['实收数量'];
+      row['计量单位'] = orderLine.unit_name ?? row['计量单位'];
+      if (orderLine.price != null) row['单价'] = orderLine.price;
+    }
+    return row;
+  });
   console.log(`[源单] ${SOURCE_DOC} 行数=${items.length} 供应商=${src['供应商']} 物料=${items.map((x) => x['存货编码']).join(',')}`);
   const head = { ...stripIds(src), 是否已转ERP: '否', 采购订单号: PO_NO, detail: { ...(src.detail || {}), items } };
   const saved = (await btn('PURCHASE_IN', '保存', head)).data || {};

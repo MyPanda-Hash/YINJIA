@@ -17,10 +17,9 @@ console.log(`[订单] ${hit.bill_no} id=${hit.id} 状态=${hit.bill_status}(Z=�
 if (hit.bill_status === 'C') { console.log('已审核,无需处理'); process.exit(0); }
 
 const tries = [
-  ['/jdy/v2/scm/pur_order_audit', { ids: [hit.id] }],
-  ['/jdy/v2/scm/pur_order_examine', { ids: [hit.id] }],
-  ['/jdy/v2/scm/pur_order_audit_bill', { ids: [hit.id] }],
-  ['/jdy/v2/sys/batch_operation', { bill_type: 'pur_order', ids: [hit.id], operation: 'audit' }],
+  // 正式路径(轻易云收录的金蝶星辰通用批量操作接口):operate_type + entity_number(pur_bill_order,与 src_bill_type_id 同值)
+  ['/jdy/v2/sys/common_operate', { operate_type: 'audit', entity_number: 'pur_bill_order', ids: [hit.id] }],
+  ['/jdy/v2/sys/common_operate', { operate_type: 'audit', entity_number: 'pur_bill_order', numbers: [billNo] }],
 ];
 for (const [path, body] of tries) {
   try {
