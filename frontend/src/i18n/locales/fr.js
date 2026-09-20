@@ -866,6 +866,8 @@ export default {
     '末页': 'Dernière',
     '上一页': 'Page précédente',
     '下一页': 'Page suivante',
+    '第 {p}/{n} 页': 'Page {p} / {n}',
+    '本页筛出': 'filtré sur cette page',
     '上一张': 'Précédent',
     '下一张': 'Suivant',
     '按表头字段查询单据': 'Rechercher par en-tête',

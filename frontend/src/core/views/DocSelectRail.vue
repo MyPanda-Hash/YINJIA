@@ -16,8 +16,13 @@
         <el-input v-model="kw" size="small" clearable :placeholder="tt('输入搜索')" @keyup.enter="apply" @clear="apply" />
         <el-button size="small" type="primary" plain @click="apply">{{ tt('查找') }}</el-button>
       </div>
-      <div class="dsr-count">{{ tt('共有数据') }}: {{ filtered.length }} {{ tt('条') }}</div>
+      <div class="dsr-count">{{ tt('共有数据') }}: {{ total }} {{ tt('条') }}<span v-if="filtered.length !== rows.length" class="dsr-count-sub">（{{ tt('本页筛出') }} {{ filtered.length }}）</span></div>
     </div>
+    <!-- 顶层翻页条:整页翻(50 条/页),与左栏内容同一数据源(后端分页页号) -->
+    <DocRailPager
+      :page-no="pageNo" :page-count="pageCount" :from="rangeFrom" :to="rangeTo" :total="total"
+      @go="(p) => $emit('page', p)"
+    />
     <div class="dsr-grid">
       <table ref="tableEl">
         <thead>
@@ -48,6 +53,11 @@
         </tbody>
       </table>
     </div>
+    <!-- 底层翻页条(与顶层同源同款):长列表滚到底部也能直接翻页 -->
+    <DocRailPager
+      :page-no="pageNo" :page-count="pageCount" :from="rangeFrom" :to="rangeTo" :total="total"
+      @go="(p) => $emit('page', p)"
+    />
     <div class="dsr-resizer" :title="tt('拖动调整宽度')" @mousedown.prevent="startDrag"></div>
   </div>
   <div v-else class="doc-select-rail coll" :title="title" @click="$emit('toggle')">»</div>
@@ -56,6 +66,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { tt } from '@/i18n'
+import DocRailPager from './DocRailPager.vue'
 
 const props = defineProps({
   title: { type: String, default: '' },
@@ -64,11 +75,23 @@ const props = defineProps({
   /** 当前单据编号(高亮) */
   currentNo: { type: String, default: '' },
   collapsed: { type: Boolean, default: false },
+  /** 单据总张数(后端 totalSize,全量而非本页)——「共有数据」与页码都按它算 */
+  total: { type: Number, default: 0 },
+  /** 当前页号(1 基,= 后端 pageNo) */
+  pageNo: { type: Number, default: 1 },
+  /** 每页条数(整页翻的步长,当前 50) */
+  pageSize: { type: Number, default: 50 },
   /** 列配置(按单据定制):[{label, keys(候选行键,取首个非空), align, tag(状态标签), no(单号样式)}];
    *  约定首列=单号、次列=日期、末列=审核状态(tag),中间列由挂载方按单据挑重要字段 */
   columns: { type: Array, default: null },
 })
-defineEmits(['select', 'toggle'])
+defineEmits(['select', 'toggle', 'page'])
+
+/** 总页数:按总张数与每页条数算,至少 1 页 */
+const pageCount = computed(() => Math.max(1, Math.ceil((props.total || 0) / Math.max(1, props.pageSize))))
+/** 本页首/末条的全局序号(展示「1-50 / 59」) */
+const rangeFrom = computed(() => (props.rows.length ? (props.pageNo - 1) * props.pageSize + 1 : 0))
+const rangeTo = computed(() => (props.rows.length ? rangeFrom.value + props.rows.length - 1 : 0))
 
 const noOf = (row) => String(row['编号'] || row['单据编号'] || row['单号'] || '')
 
@@ -228,6 +251,7 @@ onBeforeUnmount(detachDrag)
 .dsr-dept { width: 100%; }
 .dsr-kw { display: flex; gap: 6px; margin-top: 8px; }
 .dsr-count { margin-top: 8px; font-size: 12px; color: var(--t-text-2, #5d6c67); }
+.dsr-count-sub { margin-left: 6px; color: var(--t-text-3, #8b9893); }
 
 /* 表格外层:宽度跟随侧栏(100%);表格超宽即出横向滚动条(常显),绝不溢出侧栏。
    max-height 钉在视口内(约减去 工具栏+单号行+栏头/筛选 的高度):行数多时列表在侧栏内部

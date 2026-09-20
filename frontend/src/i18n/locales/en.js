@@ -323,6 +323,8 @@ export default {
     '末页': 'Last',
     '上一页': 'Prev page',
     '下一页': 'Next page',
+    '第 {p}/{n} 页': 'Page {p} / {n}',
+    '本页筛出': 'filtered on this page',
     '上一张': 'Previous',
     '下一张': 'Next',
     '按表头字段查询单据': 'Query documents by header fields',

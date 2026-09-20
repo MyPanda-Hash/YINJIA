@@ -866,6 +866,8 @@ export default {
     '末页': 'Cuối',
     '上一页': 'Trang trước',
     '下一页': 'Trang sau',
+    '第 {p}/{n} 页': 'Trang {p} / {n}',
+    '本页筛出': 'lọc trên trang này',
     '上一张': 'Trước',
     '下一张': 'Sau',
     '按表头字段查询单据': 'Tra chứng từ theo trường đầu',

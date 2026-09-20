@@ -455,8 +455,12 @@
           :rows="list"
           :current-no="railCurNo"
           :collapsed="railCollapsed"
+          :total="total"
+          :page-no="query.pageNo"
+          :page-size="query.pageSize"
           @select="onRailSelect"
           @toggle="railCollapsed = !railCollapsed"
+          @page="onRailPage"
         />
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
@@ -2597,6 +2601,9 @@ async function guardPageAction(run) {
 // ═══ 左侧「单据选择」栏(对齐 PANDA 暂收入库单选择):按面板启用,点行切换右侧当前单据 ═══
 // 值=该单据左栏的中间列(重要字段);首列单号/次列日期/末列审核状态由下方组装兜底(键含各单据别名);
 // 中间列支持字符串(行键)或列对象(derive 派生列,如采购入库的 ERP 状态)
+/** 左栏「单据选择」每页条数(整页翻的步长;2026-09-20 按用户口径统一 50 条,
+ *  原 SL_RECV/QC_INSP/QC_RETURN 面板配置是 20 条 → 带左栏的面板一律按此值分页) */
+const RAIL_PAGE_SIZE = 50
 const DOC_RAIL_PANELS = {
   SL_RECV: ['供应商', '采购订单号'],   // 送料暂收单(原「部门」实测 12 单仅 1 单有值,按链路可见性换成采购订单号)
   QC_INSP: ['供应商', '采购订单号'],   // 来料检验单(「部门」11 单全空,换采购订单号)
@@ -2627,6 +2634,14 @@ const railCurNo = computed(() => {
 })
 function onRailSelect(idx) {
   guardPageAction(async () => { curIdx.value = idx })
+}
+
+/** 左栏「单据选择」翻页条:整页翻(每页 RAIL_PAGE_SIZE 条),页号即后端分页页号。
+ *  翻页后当前单据落到新页首张(与顶部「下一张」跨页行为一致),未保存草稿走同一离开守卫。 */
+function onRailPage(target) {
+  const t = Math.min(Math.max(1, Math.round(target) || 1), lastPage.value)
+  if (t === query.pageNo) return
+  guardPageAction(async () => { query.pageNo = t; await load(); curIdx.value = 0 })
 }
 
 async function page(delta) {
@@ -4499,9 +4514,11 @@ async function loadCrg() {
   // 参照字段动态模式检查(≤20 弹窗,>20 下拉):并行判定全部参照字段
   const allRefFields = [...(queryFields.value || []), ...(headerFields.value || [])].filter(isReferenceField)
   for (const rf of allRefFields) checkRefMode(rf, headerFieldKey(rf))
-  // 面板可配置每页条数（如档案类大列表 pageSize=100），未配置时保持默认 20
-  if (tp?.pageSize && query.pageSize !== tp.pageSize) {
-    query.pageSize = tp.pageSize
+  // 面板可配置每页条数（如档案类大列表 pageSize=100），未配置时保持默认 20；
+  // 带左栏「单据选择」的面板一律 RAIL_PAGE_SIZE(50):左栏翻页条按"整页 50 条"翻
+  const wantSize = DOC_RAIL_PANELS[panelCode.value] ? RAIL_PAGE_SIZE : (tp?.pageSize || 0)
+  if (wantSize && query.pageSize !== wantSize) {
+    query.pageSize = wantSize
     query.pageNo = 1
   }
   gridTabs.value = tp?.gridTabs || []
