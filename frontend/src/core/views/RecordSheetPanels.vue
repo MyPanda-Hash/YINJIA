@@ -331,10 +331,13 @@
       <!-- 就地渲染「紧跟本标题」的数据表(仅当该节标了 tablesSlot、且这条表的
            tablesAfterBar 等于本节的 bar 文本)。与下方那份是同一份实现的**原样副本**,
            两处都有 v-if 守着 ⇒ 同一张表只渲染一处,不受影响的面板行为不变。
-           ⚠ 外层 template 提供 sec、内层 div 提供 dt —— Vue 的 v-if 优先级高于 v-for,
-             同元素上 v-if 取不到 v-for 的迭代变量,故必须分两层写。 -->
+           ⚠⚠ 三个条件**必须全写在 v-show 里**,不能写成 `v-if="…dt.…" v-for="(dt,…)"`:
+             Vue 的 v-if 优先级高于 v-for,同元素上 v-if 在**外层作用域**求值、取不到迭代变量,
+             编译出来是 `_ctx.dt.tablesAfterBar`(见 tools/archive/_chk-sfc-compile.mjs),
+             `_ctx.dt` 恒为 undefined ⇒ **每次渲染都抛 TypeError,整个面板一片空白**。
+             v-show 则编译进 v-for 的回调体内,dt 一定可取(下方 pageOf(dt) 用的就是这个)。 -->
       <template v-for="(sec, si) in cfg.sections" :key="'slot' + si">
-      <div v-if="sec.tablesSlot && dt.tablesAfterBar === sec.bar" v-for="(dt, di) in cfg.dataTables" v-show="pageOf(dt) === activePage" :key="'sdt' + si + '-' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
+      <div v-for="(dt, di) in cfg.dataTables" v-show="sec.tablesSlot && dt.tablesAfterBar === sec.bar && pageOf(dt) === activePage" :key="'sdt' + si + '-' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
         <div class="rsp-dt-table">
           <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : effPlain ? plainW(dt) : gridW) + 'px' }">
             <colgroup>
@@ -504,8 +507,11 @@
            「本页所有 sections → 本页所有 dataTables」,即**表格会落在同页最后一个章节之后**。
            (曾误以为它紧跟 sections 的第一块,用户报「表格在最底下」才纠正过来。)
            若某条表标了 `tablesAfterBar`,它改由上面 sections 循环在该节之后就地渲染(见那里的 v-for),
-           本段用 v-if 跳过它 —— 否则会渲染两遍。 -->
-    <div v-if="!dt.tablesAfterBar" v-for="(dt, di) in cfg.dataTables" v-show="pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
+           本段跳过它 —— 否则会渲染两遍。
+           ⚠ 跳过条件同样只能写在 v-show 里(理由见上方那段的 ⚠⚠:v-if 取不到 dt,整面板白屏)。
+           ⚠ 兜底:锚点写了却**没有任何节认领**它(节没标 tablesSlot / bar 文本对不上)时,本段照旧渲染 ——
+             否则上段跳过、本段也跳过,那张表会**无声消失**(这类"静默少一块"是本文件反复踩的坑)。 -->
+    <div v-for="(dt, di) in cfg.dataTables" v-show="!anchoredElsewhere(dt) && pageOf(dt) === activePage" :key="'dt' + di" class="rsp-dt-wrap" :class="{ 'with-chart': dt.charts }">
       <div class="rsp-dt-table">
         <table class="rs-t rs-dt" :class="{ 'rsp-design-t': dt.design }" :style="{ width: (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : effPlain ? plainW(dt) : gridW) + 'px' }">
           <colgroup>
@@ -1144,6 +1150,22 @@ const fieldEditAt = computed(() => {
   const i = dts.findIndex((d) => d.bar && !d.pageTitle)
   return i < 0 ? 0 : i
 })
+/**
+ * 这条表是否已被某个「标题槽」认领(= 会在 sections 循环里就地渲染)。
+ *
+ * 模板里同一张表的渲染分两段(段内槽位 / 末尾兜底),两段的守卫必须**互斥且互补**:
+ * 认领了 ⇒ 段内渲染、末尾跳过;没认领 ⇒ 段内跳过、末尾渲染。
+ * 若末尾直接写 `!dt.tablesAfterBar`,锚点写错(或该节没标 tablesSlot)时两段都不渲染,
+ * 表就无声消失了 —— 所以这里以「真的有一节认得它」为准,而不是「有没有写锚点」。
+ * (dt.tablesSlot 那一侧把条件写进 v-show,是因为 v-if 与 v-for 同元素时取不到 dt,见模板注释。)
+ */
+function anchoredElsewhere(dt) {
+  if (!dt?.tablesAfterBar) return false
+  // 锚点节还必须与表**同页**:段内那段自带 `pageOf(dt) === activePage`,跨页锚点等于没人认领。
+  return (cfg.value?.sections || []).some(
+    (s) => s.tablesSlot && s.bar === dt.tablesAfterBar && pageOf(s) === pageOf(dt),
+  )
+}
 watch(() => props.panelCode, () => { activePage.value = 0 })
 
 // ── 校验定位(供 PanelxList 保存校验调用):翻到字段所在页 + 滚动 + 闪烁 ──

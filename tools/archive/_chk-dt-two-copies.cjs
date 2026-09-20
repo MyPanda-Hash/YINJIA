@@ -36,9 +36,12 @@ const A = grab(starts[0])
 const B = grab(starts[1])
 console.log(`副本 A = ${A.length} 行 / 副本 B = ${B.length} 行`)
 
-// 归一化:去首尾空白、去掉守卫差异与 key 前缀差异
+// 归一化:去首尾空白、去掉两处**本就该不同**的守卫与 key 差异
+// ⚠ 守卫改成 v-show 而不是 v-if:同元素上 v-if 优先级高于 v-for,取不到 dt
+//   ⇒ 编译成 _ctx.dt.tablesAfterBar ⇒ 每次渲染抛 TypeError、整个面板白屏(2026-09-20 踩过)。
 const norm = (s) => s.trim()
-  .replace(/v-if="[^"]*"\s*/, '')
+  .replace(/v-show="[^"]*"\s*/g, '')
+  .replace(/v-if="[^"]*"\s*/g, '')
   .replace(/:key="'sdt'[^"]*"/, ":key=\"'dt' + di\"")
 const na = A.map(norm)
 const nb = B.map(norm)
@@ -57,11 +60,14 @@ diffs.slice(0, 8).forEach((d) => {
 
 console.log('')
 const src = L.join('\n')
-const hasGuardClone = /v-if="sec\.tablesSlot && dt\.tablesAfterBar === sec\.bar"/.test(src)
-const hasGuardOrig = /<div v-if="!dt\.tablesAfterBar" v-for="\(dt, di\) in cfg\.dataTables"/.test(src)
-console.log(`副本带「按节+按表」守卫 = ${hasGuardClone}`)
-console.log(`原块带「跳过托管表」守卫 = ${hasGuardOrig}`)
+const hasGuardClone = /v-show="sec\.tablesSlot && dt\.tablesAfterBar === sec\.bar/.test(src)
+const hasGuardOrig = /v-show="!anchoredElsewhere\(dt\)/.test(src)
+// ⚠ 守卫一律用 v-show(见文件头注释):若有人在任一表块写回 v-if+dt,就是白屏 bug
+const badVIf = /<div[^>]*v-if="[^"]*dt\.[^"]*v-for="\(dt/.test(src) || /<div[^>]*v-for="\(dt[^>]*v-if="[^"]*dt\./.test(src)
+console.log(`就地渲染守卫(v-show + 节槽 + 锚点匹配) = ${hasGuardClone}`)
+console.log(`末尾兜底守卫(v-show + anchoredElsewhere) = ${hasGuardOrig}`)
+console.log(`未出现「v-if 与 v-for 同元素且引用 dt」的白屏写法 = ${!badVIf}`)
 console.log('')
-const ok = diff === 0 && hasGuardClone && hasGuardOrig
+const ok = diff === 0 && hasGuardClone && hasGuardOrig && !badVIf
 console.log(ok ? '✓ 两份一致且守卫成对(同一张表只会渲染一处)' : '✗ 有问题,见上')
 process.exit(ok ? 0 : 1)
