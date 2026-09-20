@@ -183,7 +183,9 @@ public class PxController {
         Map<String, Object> res = pushGenerateHandler.generateBatch(sourcePanel, targetPanel, sourceNo,
                 SecurityContextHolder.getContext().getAuthentication() == null ? "system"
                         : SecurityContextHolder.getContext().getAuthentication().getName(),
-                qtyByLine);
+                qtyByLine,
+                body.get("overRatio") == null || String.valueOf(body.get("overRatio")).isBlank() ? null
+                        : Double.parseDouble(String.valueOf(body.get("overRatio"))));
         return ApiResult.ok(res);
     }
 

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="panelx-list" @click="closeCtx">
     <!-- ══════════ ① 顶部工具栏（T+ 灰条 + 单据翻页）══════════ -->
     <div v-if="!isApprovalDoc" class="tools">
@@ -55,6 +55,7 @@
         </template>
         <template v-else>
           <span class="doc-chip">{{ tt('单据：') }}{{ cur['编号'] || cur['单据编号'] || '-' }}</span>
+          <span v-if="cur['批次号']" class="doc-batch" :title="tt('批次号')">{{ tt('批次号') }}: {{ cur['批次号'] }}</span>
           <span v-if="cur['类别']" class="doc-cat">{{ tt(cur['类别']) }}</span>
           <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
           <template v-if="!singleDocMode">
@@ -2659,12 +2660,12 @@ async function guardPageAction(run) {
  *  原 SL_RECV/QC_INSP/QC_RETURN 面板配置是 20 条 → 带左栏的面板一律按此值分页) */
 const RAIL_PAGE_SIZE = 50
 const DOC_RAIL_PANELS = {
-  SL_RECV: ['供应商', '采购订单号'],   // 送料暂收单(原「部门」实测 12 单仅 1 单有值,按链路可见性换成采购订单号)
-  QC_INSP: ['供应商', '采购订单号'],   // 来料检验单(「部门」11 单全空,换采购订单号)
-  QC_RETURN: ['供应商', '检验单号'],   // 暂收退料单(qc_return 无「部门」列,恒空;换检验单号,可直接追到检验单)
+  SL_RECV: ['供应商', '采购订单号', '批次号'],   // 送料暂收单(原「部门」实测 12 单仅 1 单有值,按链路可见性换成采购订单号;2026-09-20 加批次号)
+  QC_INSP: ['供应商', '采购订单号', '批次号'],   // 来料检验单(「部门」11 单全空,换采购订单号;批次号随链带入)
+  QC_RETURN: ['供应商', '检验单号', '批次号'],   // 暂收退料单(qc_return 无「部门」列,恒空;检验单号可直接追到检验单)
   PU_ORDER: ['供应商'],          // 采购订单(币种列 2026-09-16 按用户口径删)
   SO_ORDER: ['客户'],            // 销售订单(对齐采购订单:中间列只留往来单位,采购=供应商/销售=客户)
-  PURCHASE_IN: ['供应商', {        // 采购入库单(入库类别列 2026-09-16 按用户口径换成 ERP 转入状态)
+  PURCHASE_IN: ['供应商', '批次号', {   // 采购入库单(入库类别列 2026-09-16 按用户口径换成 ERP 转入状态;2026-09-20 加批次号)
     label: 'ERP单', align: 'center', tag: true,
     // 已转=转ERP成功才有(ERP单号成功回填/弃审清空;是否已转ERP 未入 yj_field 不随行下发,作首选信号)
     derive: (row) => (String(row?.['是否已转ERP'] ?? '') === '是' || String(row?.['ERP单号'] ?? '').trim() !== '' ? '已转' : '未转'),
@@ -5861,6 +5862,15 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+.doc-batch {
+  font-size: 12px;
+  padding: 1px 8px;
+  border-radius: 8px;
+  margin-right: 6px;
+  color: #4338ca;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
 }
 .doc-chip {
   font-size: 12px;

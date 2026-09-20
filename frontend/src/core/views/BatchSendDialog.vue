@@ -15,7 +15,12 @@
       <div class="bsd-bar">
         <span class="bsd-chip">{{ tt('采购订单') }}: {{ sourceNo }}</span>
         <span class="bsd-chip">{{ tt('批次号') }}: <b>{{ nextBatchNo || '-' }}</b></span>
-        <span class="bsd-chip">{{ tt('超送比例') }}: {{ Math.round((overRatio || 0) * 100) }}%</span>
+        <span class="bsd-chip bsd-ratio">
+          {{ tt('超送比例') }}:
+          <el-input-number v-model="overRatioPct" :min="0" :max="100" :step="1" :precision="0" size="small"
+            :controls="false" style="width: 62px" @change="recompute" />
+          %<span class="bsd-ratio-tip">{{ tt('（0 = 不允许超送；本次生效）') }}</span>
+        </span>
         <span v-if="(batches || []).length" class="bsd-chip">{{
           tt('已有批次') }}: {{ batches.map((b) => b.batchNo).join('、') }}</span>
       </div>
@@ -29,10 +34,12 @@
         <el-table-column prop="已送数量" :label="tt('已送')" width="90" align="right" />
         <el-table-column prop="已退回数量" :label="tt('已退回')" width="90" align="right" />
         <el-table-column prop="剩余数量" :label="tt('剩余')" width="90" align="right" />
-        <el-table-column prop="可送上限" :label="tt('可送上限')" width="100" align="right" />
+        <el-table-column :label="tt('可送上限')" width="100" align="right">
+          <template #default="{ row }">{{ capOf(row) }}</template>
+        </el-table-column>
         <el-table-column :label="tt('本次送料数量')" width="150">
           <template #default="{ row }">
-            <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="row.可送上限" :controls="false"
+            <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row)" :controls="false"
               :disabled="!row.剩余数量" :precision="2" style="width: 130px" />
           </template>
         </el-table-column>
@@ -72,11 +79,25 @@ const saving = ref(false)
 const rows = ref([])
 const picked = ref([])
 const nextBatchNo = ref('')
-const overRatio = ref(0)
+const overRatio = ref(0)       // 系统默认比例(0~1)
+const overRatioPct = ref(5)    // 本次生效比例(%):可调,生单时随请求带给后端
 const batches = ref([])
 const qtyOf = reactive({})
 
 const totalQty = computed(() => rows.value.reduce((s, r) => s + Number(qtyOf[r.lineKey] || 0), 0))
+/** 本次生效超送比例(0~1) */
+const ratio = computed(() => Math.max(0, Math.min(100, Number(overRatioPct.value) || 0)) / 100)
+/** 行的可送上限 = 剩余 ×(1+本次比例);比例一改即时重算(后端同口径再校验一次) */
+function capOf(row) {
+  return Math.round(Number(row.剩余数量 || 0) * (1 + ratio.value) * 100) / 100
+}
+function recompute() {
+  // 比例调小后可能低于已填数量 → 收敛到新上限,避免提交时被后端拒
+  for (const r of rows.value) {
+    const cap = capOf(r)
+    if (Number(qtyOf[r.lineKey] || 0) > cap) qtyOf[r.lineKey] = cap
+  }
+}
 
 async function load() {
   if (!props.sourceNo) return
@@ -87,7 +108,8 @@ async function load() {
     })
     rows.value = res?.lines || []
     nextBatchNo.value = res?.nextBatchNo || ''
-    overRatio.value = res?.overRatio || 0
+    overRatio.value = Number(res?.overRatio || 0)
+    overRatioPct.value = Math.round(overRatio.value * 100)
     batches.value = res?.batches || []
     Object.keys(qtyOf).forEach((k) => delete qtyOf[k])
     for (const r of rows.value) qtyOf[r.lineKey] = Number(r.剩余数量) > 0 ? Number(r.剩余数量) : 0
@@ -114,6 +136,7 @@ async function confirm() {
   try {
     const res = await engine.batchFlowGenerate({
       sourcePanel: props.sourcePanel, targetPanel: props.targetPanel, sourceNo: props.sourceNo, lines,
+      overRatio: ratio.value,
     })
     ElMessage.success(`${tt('已生成')} ${res['编号']}（${tt('批次号')} ${res['批次号']}）`)
     emit('generated', { panel: res.gotoPanel || props.targetPanel, no: res['编号'], batchNo: res['批次号'] })
@@ -130,6 +153,8 @@ async function confirm() {
 .bsd { display: flex; flex-direction: column; gap: 8px; }
 .bsd-bar { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: #46586e; }
 .bsd-chip { background: #f2f6fa; border: 1px solid #e1e8f0; border-radius: 4px; padding: 2px 8px; }
+.bsd-ratio { display: inline-flex; align-items: center; gap: 4px; }
+.bsd-ratio-tip { color: #8b9893; }
 .bsd-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #46586e; }
 .bsd-tip { color: #8b9893; }
 </style>

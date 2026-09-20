@@ -269,6 +269,16 @@ public class PushGenerateHandler implements PanelActionHandler {
     @Transactional
     public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
                                              String user, Map<String, Double> qtyByLineKey) {
+        return generateBatch(sourcePanel, targetPanel, sourceNo, user, qtyByLineKey, null);
+    }
+
+    /**
+     * 分批生单(带超送比例覆盖):overRatioOverride 非空时按本次指定比例校验上限(界面弹窗可调),
+     * 为空则用系统参数 `receive_over_ratio`。比例夹在 0~1(0=不允许超送,1=允许 100% 超送)。
+     */
+    @Transactional
+    public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
+                                             String user, Map<String, Double> qtyByLineKey, Double overRatioOverride) {
         PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
         PanelRegistry.PanelDef tgtDef = registry.panel(targetPanel);
         if (!isBatchTarget(targetPanel)) throw new IllegalStateException("目标面板未启用分批送料:" + targetPanel);
@@ -288,7 +298,9 @@ public class PushGenerateHandler implements PanelActionHandler {
         // 3) 行级剩余量核算(含退货回冲) + 本次送料量校验
         Map<String, Double> sent = batchService.sentByLineKey(sourcePanel, sourceNo);
         Map<String, Double> returned = batchService.returnedByOrderLine(sourceNo);
-        double ratio = batchService.overRatio();
+        // 超送比例:弹窗可临时覆盖(夹 0~1),未给则用系统参数 receive_over_ratio
+        double ratio = overRatioOverride == null ? batchService.overRatio()
+                : Math.max(0d, Math.min(1d, overRatioOverride));
         List<Map<String, Object>> picked = new ArrayList<>();   // {item, qty}
         for (Map<String, Object> it : srcItems) {
             String lineKey = sourceNo + "#" + it.get("id");
