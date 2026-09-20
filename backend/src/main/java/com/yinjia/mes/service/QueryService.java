@@ -339,7 +339,7 @@ public class QueryService {
         List<Object> args = new ArrayList<>(List.of(panelCode));
         args.addAll(docNos);
         Map<String, Map<String, Object>> out = new HashMap<>();
-        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, saved FROM yj_doc_status"
+        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, saved, approve_node, l2_approver FROM yj_doc_status"
                 + " WHERE panel_code = ? AND doc_no IN (" + in + ")", rs -> {
             Map<String, Object> m = new HashMap<>();
             m.put("shr", rs.getString("shr"));
@@ -353,6 +353,8 @@ public class QueryService {
             m.put("deleting", rs.getString("deleting"));
             m.put("modify_state", rs.getString("modify_state"));
                 m.put("saved", rs.getString("saved"));
+            m.put("approve_node", rs.getObject("approve_node"));
+            m.put("l2_approver", rs.getString("l2_approver"));
             out.put(rs.getString("doc_no"), m);
         }, args.toArray());
         // 项目实施计划:补终止审批状态(yj_plan_term,一单一行;RTRIM 防 char(2) 尾空格)
@@ -366,7 +368,9 @@ public class QueryService {
         return out;
     }
 
-    /** 状态推导:已作废 > 已中止 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 审批中 > 修改中 > 已归档 > 已审核 > 草稿 */
+    /** 状态推导:已作废 > 已中止 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 待二级审批/审批中 > 修改中 > 已归档 > 已审核 > 草稿
+     *  ⚠ 与 ButtonService.docStatusOf **必须同改**(两处推导,一处管列表行、一处管按钮/保存门禁;
+     *    2026-09-20 两级审批新增「待二级审批」时同改两处)。 */
     private String docStatus(Map<String, Object> st) {
         if (st != null && "Y".equals(st.get("canceled"))) return "已作废";
         if (st != null && "Y".equals(st.get("stopped"))) return "已中止";
@@ -376,11 +380,19 @@ public class QueryService {
         if (st != null && "P2".equals(st.get("term_state"))) return "终止审批中（管理员）";
         if (st != null && "P1".equals(st.get("term_state"))) return "终止审批中（立项人）";
         if (st != null && "R".equals(st.get("modify_state"))) return "修改申请中";
-        if (st != null && "Y".equals(st.get("pending"))) return "审批中";
+        if (st != null && "Y".equals(st.get("pending"))) {
+            return l2Node(st) ? "待二级审批" : "审批中";
+        }
         if (st != null && "Y".equals(st.get("modify_state"))) return "修改中";
         if (st != null && "Y".equals(st.get("archived"))) return "已归档";
         if (st != null && st.get("shr") != null) return "已审核";
         return "草稿";
+    }
+
+    /** approve_node=2 ⇒ 二级节点(空/1 都是一级) */
+    private static boolean l2Node(Map<String, Object> st) {
+        Object v = st.get("approve_node");
+        return v != null && "2".equals(String.valueOf(v).trim().replace(".0", ""));
     }
 
     // ============ 公共 ============

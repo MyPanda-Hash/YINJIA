@@ -63,6 +63,10 @@ public class MessageService {
     public static final String SPEC_DISPATCHED = "SPEC_DISPATCHED";
     /** 消息码:规格书已分发 → 责任人(填写并保存) */
     public static final String SPEC_ASSIGNED = "SPEC_ASSIGNED";
+    /** 消息码:一级通过并选定二级审核人 → 被选人(2026-09-20 两级审批) */
+    public static final String APPROVAL_L2_ASSIGNED = "APPROVAL_L2_ASSIGNED";
+    /** 消息码:产品开发已分发责任人 → 四个下游文件的责任人(2026-09-20 分发责任人) */
+    public static final String TASK_ASSIGNED = "TASK_ASSIGNED";
 
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;

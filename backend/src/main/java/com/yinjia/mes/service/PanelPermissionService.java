@@ -86,8 +86,25 @@ public class PanelPermissionService {
         throw new AccessDeniedException("当前角色无该面板「" + labels + "」权限，无法执行「" + buttonName + "」");
     }
 
-    /** 面板查看权限校验(数据读取类接口:列表/单据/审批历史/报表导出) */
-    public void requirePanelView(String panelCode) {
+    /**
+     * 二级审批例外(2026-09-20 两级审批):产品信息表的「审批通过/审批驳回」在**二级节点**上
+     * 由一级审核人选定的审核人执行 —— 选取本身就是授权,不要求其角色有 audit 词
+     * (否则 cp 这类普通账号点不动第二级,而给它 audit 又会让它越权批一级)。
+     * 判据完全落库:yj_doc_status.pending='Y' + approve_node=2 + l2_approver=当前用户。
+     */
+    public boolean isL2ApproverOf(String panelCode, String targetPanel, String buttonName, Map<String, Object> formData) {
+        if (!panelCode.equals(targetPanel)) return false;
+        if (!"审批通过".equals(buttonName) && !"审批驳回".equals(buttonName)) return false;
+        String no = formData == null || formData.get("编号") == null ? "" : String.valueOf(formData.get("编号")).trim();
+        if (no.isEmpty()) return false;
+        String user = currentUserName();
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM yj_doc_status WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'"
+                        + " AND approve_node = 2 AND l2_approver = ?", Integer.class, panelCode, no, user);
+        return n != null && n > 0;
+    }
+
+    /** 面板查看权限校验(数据读取类接口:列表/单据/审批历史/报表导出) */    public void requirePanelView(String panelCode) {
         String user = currentUserName();
         if (isAdmin(user)) return;
         if (readablePanels(user).contains(panelCode)) return;

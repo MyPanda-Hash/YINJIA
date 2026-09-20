@@ -607,3 +607,51 @@ i18n-asm-proc-redesign.sql
 # ⚠ 页序/列序/列宽/设计像素在**前端配置** recordSheetConfigs.js(RD_MOLD_PROC_DT_REVISION);
 #   断言⑦(recordSheetConfigs.keys.test.js)钉住"每页有 grid/showHead + 表区值唯一 + 与组装逐字一致"。
 migrate-mold-proc-revision.sql
+
+# —— 2026-09-20 出货检验项目控制计划按《出货检验项目控制计划.xlsx》重排为「一张表 7 列」——
+# 设计源单 sheet,无页签:报告头 + 三行三格表头 + 单张 7 列表 + 跨 7 列表尾注。
+#
+# migrate-insp-plan-redesign-2026-09-20.sql —— 表结构 + 字段:
+#   §1 rd_insp_plan_head 增 3 列(客户项目名称 / 产品整体尺寸 / 使用范围);
+#   §2 新增 3 个 header 字段;
+#   §3 两处 **alias**(不是 label):[控制方法] 显示成「检验方法」、[检测频率] 显示成「检查频率」
+#      —— label 就是前端数据键,改 label 会让数据静默丢失(QueryService 的 AS [label] 口径)。
+#   ⚠ 宽度对齐**取值源**而非观感(客户项目名称 ← 规格书同名 200;产品整体尺寸 ← 规格书
+#     整体规格参数 1000),窄了保存时静默截断。
+# i18n-insp-plan-redesign.sql —— 大标题 / 表尾注 / 检查频率 / 检验项目 / 检验要求 /
+#   不合格应对措施 / 编写人 / 产品编号 各补齐到 10 语言。
+#   ⚠ 去重键取 (ref_key, locale) **不带 scope**:tt() 查的是 field+ui 合并词典,
+#     「检验方法」「检测频率」在 ui 侧已有 9 条,按 scope 去重再补 field 行会在合并词典里
+#     同键同语言撞车。该脚本对这两个键**一行不写**。
+# ⚠ 版式三条硬约束(改前端 recordSheetConfigs.js 的 grid/head/sections 时逐条核对):
+#   ① grid 7 格 = 设计 B..H 列宽,总宽 1187;
+#   ② head {title:5, infoLabel:1, infoValue:1} 合计 7 = grid 格数;
+#   ③ sections 每行靠 lspan/vspan 拼满 7 格,表体因列带 w 而 dtOwnsWidth ⇒ dtW 同 1187。
+# ⚠ 本面板**没有 filterKey/filterVal**:rd_insp_plan_detail 连 [表区] 物理列都没有,
+#   照抄组装工艺那边的 filterKey:'表区' 只会得到一张空表。检验类别改由 libGroupKey 承载。
+# 「自动填充规格书」走后端 GET /px/specByProduct(新增,见 PxController)——规格书的 编号
+#   (=产品键)在通用查询链路里被 QueryService.loadDocs 用单据编号覆盖,取不到真值。
+migrate-insp-plan-redesign-2026-09-20.sql
+i18n-insp-plan-redesign.sql
+
+# —— 2026-09-20 产品信息表两级审批 + 分发责任人(用户口径:一级=admin、一级通过选二级审核人、二级通过即归档)——
+# 口径(grill 六问全定,详见 CONTEXT.md「两级审批(产品信息表)」术语与同轮决策行):
+#   ① 两级审批:一级=admin(现有审批权口径);一级通过时**选取**二级审核人(候选=全部启用账号),
+#      写入纸面「审核人(二级审批人)」并转「待二级审批」;**二级通过即归档**(不新增中间态);
+#   ② 归档后二级审核人做「分发责任人」:四个下游文件**各自**一个责任人(默认带出产品负责人,
+#      可逐个改),落 rd_dev_task.负责人(该表本就是「产品×面板」一行),分发后可随时改人;
+#   ③ 四文件服务端硬门禁:未分发禁编,分发后只放该文件责任人 ∪ 管理员,四文件并行无串行依赖
+#      (产品编号为空的历史单豁免,否则既有单据被锁死;规格书另放已分配责任人/总负责人以兼容旧两级分发);
+#   ④ 二级驳回一律回草稿并通知制单人;非二级审核人代批被拒(管理员恒可);
+#   ⑤ 新增账号 cp(陈秀丽):普通用户角色,二级审批权靠"被一级选中即授权",不依赖 can_approve。
+# migrate-prodinfo-twolevel.sql —— 数据层:cp 账号 + yj_doc_status 两列
+#   (approve_node=当前待审批节点 1/2、l2_approver=选定的二级审核人账号;默认 NULL ⇒ 其余面板行为不变)。
+# 后端:ButtonService(两级状态机 approveApproval/approveSecond、rejectApproval、dispatchDev 改造、
+#   ensureDevFileEditable 门禁)、DevTaskService(dispatch 带分工 + assignsOf/assignState/enabledUsers)、
+#   QueryService.docStatus 与 ButtonService.docStatusOf **两处同改**加「待二级审批」、
+#   PanelPermissionService.isL2ApproverOf(二级审批绕过 audit 词表校验,否则 cp 点不动第二级)。
+# 前端:PanelxList(「选取二级审核人」弹窗 + 侧栏「分发责任人/改责任人」+ 四行分工弹窗 +
+#   审批组下拉在 待二级审批 态对被选人开放)、engine.js 两个新接口、en.js 词条。
+# ⚠ 按钮词表:分发动作沿用「产品开发」这个已授权动作词(前端显示改叫「分发责任人」),
+#   避免为一个动作改全体角色的权限行。
+migrate-prodinfo-twolevel.sql

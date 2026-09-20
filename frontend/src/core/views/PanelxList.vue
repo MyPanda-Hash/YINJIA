@@ -298,12 +298,14 @@
                 <!-- 修改申请中:同删除申请,卡死时由发起人本人或审批人撤回 -->
                 <div v-if="curDocStatus === '修改申请中'" class="as-side-btn" @click="pickModAction('撤回修改申请')">{{ tt('撤回修改申请') }}</div>
                 <div v-if="openModMenu" class="as-side-menu flip-up" @click.stop>
-                  <template v-if="canApproveHere()">
+                  <template v-if="canApproveHere() || l2ApproverNow">
                     <template v-if="curDocStatus === '修改申请中'">
                       <div class="as-side-menu-item" @click="pickModAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
                       <div class="as-side-menu-item" @click="pickModAction('修改审批驳回')">{{ tt('修改审批驳回') }}</div>
                     </template>
-                    <template v-else-if="curDocStatus === '审批中'">
+                    <!-- 两级审批(2026-09-20):一级节点(审批中)由审批人处理;二级节点(待二级审批)
+                         由一级选定的二级审核人处理 —— 被选中即授权,不依赖角色 can_approve -->
+                    <template v-else-if="IN_APPROVAL.includes(curDocStatus) && (curDocStatus === '待二级审批' ? l2ApproverNow : canApproveHere())">
                       <div class="as-side-menu-item" @click="pickModAction('审批通过')">{{ tt('审批通过') }}</div>
                       <div class="as-side-menu-item" @click="pickModAction('审批驳回')">{{ tt('审批驳回') }}</div>
                     </template>
@@ -318,14 +320,17 @@
               <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
                    该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
               <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
-              <!-- 产品开发下发:仅产品信息表;归档后可点;下发过则置灰显示「已下发」 -->
+              <!-- 分发责任人(2026-09-20;原名「产品开发下发」):仅产品信息表;
+                   已归档 **且 二级审核人 ∪ 管理员** 才可点;已分发后按钮变「改责任人」(分发后随时可改) -->
               <div
                 class="as-side-btn"
                 v-if="panelCode === 'RD_PROD_INFO'"
-                :class="{ disabled: !canDevDispatch || devDispatch.dispatched }"
-                :title="devDispatch.dispatched ? tt('该产品已下发到下游面板') : (canDevDispatch ? tt('把该产品下发到下游 5 个文件面板') : tt('仅已归档的产品信息表可下发'))"
+                :class="{ disabled: !canDevDispatch || devDispatch.busy }"
+                :title="devDispatch.dispatched ? tt('重新分发/调整四个文件的责任人')
+                  : (canDevDispatch ? tt('把四个下游文件各自分给责任人')
+                    : (curDocStatus === '已归档' ? tt('仅二级审核人或管理员可分发责任人') : tt('仅已归档的产品信息表可分发责任人')))"
                 @click="onDevDispatch"
-              >{{ devDispatch.dispatched ? tt('已下发') : tt('产品开发') }}</div>
+              >{{ devDispatch.dispatched ? tt('改责任人') : tt('分发责任人') }}</div>
               <!-- 规格书两级分发(第二级):已下发产品出现;仅总负责人/管理员可用,负责人未落实(挂起)时置灰 -->
               <div
                 class="as-side-btn"
@@ -1243,6 +1248,46 @@
         <el-button type="primary" :loading="specAssignBusy" @click="submitSpecAssign">{{ tt('分发') }}</el-button>
       </template>
     </el-dialog>
+    <!-- 分发责任人弹窗(2026-09-20):四个下游文件各选一个责任人(默认为产品负责人,可逐个改)。
+         二级审核人把开发任务落到人头上以后,四个文件才对该责任人开放编辑 —— 四文件并行,无串行依赖。 -->
+    <el-dialog v-model="devAssignVisible" :title="tt('分发责任人') + (devDispatch.productCode ? ' · ' + devDispatch.productCode : '')" width="620px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('为四个下游文件各指定一个责任人；分发后这四个文件同时对该责任人开放编辑（互不依赖）。') }}</div>
+        <div v-for="row in devAssignRows" :key="row.panel" class="dq-row" style="align-items:center">
+          <span class="dq-label" style="width:130px">{{ tt(row.label) }}</span>
+          <el-select v-model="row.owner" style="flex:1" filterable clearable :placeholder="tt('请选择责任人（留空=挂起）')">
+            <el-option v-for="u in devAssignUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+          </el-select>
+        </div>
+        <div class="mod-log-meta">{{ tt('二级审核人') }}：{{ devDispatch.l2Approver || tt('（未选，历史单由有编辑权的人分发）') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="devAssignVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="devAssignBusy" @click="confirmDevAssign">{{ tt('分发') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 一级通过时选取二级审核人(2026-09-20 两级审批):被选人收到消息并完成二级签核 -->
+    <el-dialog v-model="l2PickVisible" :title="tt('选取二级审核人')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('一级审批通过后，由该审核人完成二级签核；二级通过即归档，随后由其分发责任人。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('二级审核人') }}</span>
+          <el-select v-model="l2PickUser" style="flex:1" filterable :placeholder="tt('请选择二级审核人')">
+            <el-option v-for="u in l2PickUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+          </el-select>
+        </div>
+        <div class="dq-row" style="align-items:flex-start">
+          <span class="dq-label">{{ tt('审批意见') }}</span>
+          <el-input v-model="l2PickOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="l2PickVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="l2PickBusy" @click="confirmL2Pick">{{ tt('确认审批通过') }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 查询单据弹窗(文件面板):编号模糊(单据编号/文档编号) + 首次归档时间区间 -->
     <el-dialog v-model="docQueryVisible" :title="tt('查询单据')" width="480px" append-to-body>
       <div class="dq-form">
@@ -2283,25 +2328,18 @@ const modifyLogVisible = ref(false)
 const modifyLogRecords = ref([])
 const modifyLogNo = ref('')
 
-// ── 产品开发下发(2026-09-09):仅产品信息表;归档后可用;按产品编号下发过则置灰「已下发」 ──
-const devDispatch = reactive({ productCode: '', dispatched: false, busy: false, supervisor: '', supervisorName: '', supervisorResolved: false })
-const canDevDispatch = computed(() => panelCode.value === 'RD_PROD_INFO' && curDocStatus.value === '已归档')
+// ── 分发责任人(2026-09-20;原名「产品开发下发」2026-09-09)──
+// 口径:已归档 + (二级审核人 ∪ 管理员)可分发;四个下游文件**各自**一个责任人,分发后随时可改。
+const devDispatch = reactive({ productCode: '', dispatched: false, busy: false, supervisor: '', supervisorName: '', supervisorResolved: false, canAssign: false, l2Approver: '', isL2: false, assigns: {} })
+const canDevDispatch = computed(() => panelCode.value === 'RD_PROD_INFO' && curDocStatus.value === '已归档' && devDispatch.canAssign)
 async function loadDevDispatchState() {
   if (panelCode.value !== 'RD_PROD_INFO') {
-    devDispatch.productCode = ''
-    devDispatch.dispatched = false
-    devDispatch.supervisor = ''
-    devDispatch.supervisorName = ''
-    devDispatch.supervisorResolved = false
+    Object.assign(devDispatch, { productCode: '', dispatched: false, supervisor: '', supervisorName: '', supervisorResolved: false, canAssign: false, l2Approver: '', assigns: {} })
     return
   }
   const no = cur.value?.['单据编号'] || ''
   if (!no) {
-    devDispatch.productCode = ''
-    devDispatch.dispatched = false
-    devDispatch.supervisor = ''
-    devDispatch.supervisorName = ''
-    devDispatch.supervisorResolved = false
+    Object.assign(devDispatch, { productCode: '', dispatched: false, supervisor: '', supervisorName: '', supervisorResolved: false, canAssign: false, l2Approver: '', assigns: {} })
     return
   }
   try {
@@ -2312,22 +2350,72 @@ async function loadDevDispatchState() {
     devDispatch.supervisor = res?.supervisor || ''
     devDispatch.supervisorName = res?.supervisorName || ''
     devDispatch.supervisorResolved = !!res?.supervisorResolved
+    devDispatch.canAssign = !!res?.canAssign
+    devDispatch.l2Approver = res?.l2Approver || ''
+    devDispatch.isL2 = !!res?.isL2Approver
+    devDispatch.assigns = res?.assigns || {}
   } catch (e) {
-    devDispatch.productCode = ''
-    devDispatch.dispatched = false
-    devDispatch.supervisor = ''
-    devDispatch.supervisorName = ''
-    devDispatch.supervisorResolved = false
+    Object.assign(devDispatch, { productCode: '', dispatched: false, supervisor: '', supervisorName: '', supervisorResolved: false, canAssign: false, l2Approver: '', assigns: {} })
   }
 }
 async function onDevDispatch() {
-  if (!canDevDispatch.value || devDispatch.dispatched || devDispatch.busy) return
-  devDispatch.busy = true
+  if (!canDevDispatch.value || devDispatch.busy) return
+  await openDevAssign()
+}
+
+/** 本单据一级选定的二级审核人 = 当前登录人(二级节点才由他审批;被选中即授权) */
+const l2ApproverNow = computed(() => panelCode.value === 'RD_PROD_INFO' && !!devDispatch.isL2)
+
+// ── 分发责任人弹窗(2026-09-20):四个下游文件各选一个责任人 ──
+const devAssignVisible = ref(false)
+const devAssignBusy = ref(false)
+const devAssignUsers = ref([])
+const DEV_PANELS = [
+  { code: 'RD_MOLD_PROC', label: '成型工艺清单' },
+  { code: 'RD_ASM_PROC', label: '组装工艺清单' },
+  { code: 'RD_SPEC_DOC', label: '规格书' },
+  { code: 'RD_INSP_PLAN', label: '出货检验计划表' },
+]
+const devAssignRows = ref(DEV_PANELS.map((p) => ({ panel: p.code, label: p.label, owner: '' })))
+const devAssignDocNo = ref('')
+async function openDevAssign() {
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) return ElMessage.warning('请先保存单据')
+  devAssignBusy.value = true
   try {
-    await onButton('产品开发')
-    await loadDevDispatchState()
+    if (!devAssignUsers.value.length) devAssignUsers.value = (await engine.rdDevUsers()) || []
+    const st = await engine.rdDevAssignState(no)
+    const assigns = st?.assigns || {}
+    // 默认带出产品负责人(后端 buttonState.supervisor),四个文件各自可改
+    const fallback = devDispatch.supervisor || ''
+    devAssignRows.value = DEV_PANELS.map((p) => ({ panel: p.code, label: p.label, owner: assigns[p.code] || fallback }))
+    devAssignDocNo.value = no
+    devAssignVisible.value = true
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '读取分发状态失败')
   } finally {
-    devDispatch.busy = false
+    devAssignBusy.value = false
+  }
+}
+async function confirmDevAssign() {
+  if (devAssignBusy.value) return
+  devAssignBusy.value = true
+  try {
+    const 分发责任人 = {}
+    for (const r of devAssignRows.value) if (r.owner) 分发责任人[r.panel] = r.owner
+    const res = await engine.callButton({
+      panelCode: 'RD_PROD_INFO', buttonName: '分发责任人',
+      formData: { 编号: devAssignDocNo.value, 分发责任人 }, buttonParam: {},
+    })
+    const n = Object.keys(res?.assigns || {}).length
+    ElMessage.success(`已分发 ${n} 个文件的责任人`)
+    devAssignVisible.value = false
+    await loadDevDispatchState()
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '分发失败')
+  } finally {
+    devAssignBusy.value = false
   }
 }
 
@@ -3276,6 +3364,52 @@ function closeCtx() {
 
 // ---------- 审批按钮权限（提交审批/审批情况公开；审批通过/驳回需角色审批权限） ----------
 const APPROVE_ACTIONS = ['审批通过', '审批驳回']
+
+/** 处于审批流程中的状态(2026-09-20 两级审批:一级「审批中」/二级「待二级审批」) */
+const IN_APPROVAL = ['审批中', '待二级审批']
+
+// ---------- 二级审核人选取(2026-09-20 两级审批:一级通过时必须选人) ----------
+const l2PickVisible = ref(false)
+const l2PickBusy = ref(false)
+const l2PickUser = ref('')
+const l2PickOpinion = ref('')
+const l2PickUsers = ref([])
+const l2PickDocNo = ref('')
+/** 一级审批通过入口:产品信息表的一级节点必须先选二级审核人,其余面板/二级节点走原确认框 */
+async function openL2Pick(no) {
+  l2PickDocNo.value = no
+  l2PickUser.value = ''
+  l2PickOpinion.value = ''
+  if (!l2PickUsers.value.length) {
+    try {
+      l2PickUsers.value = (await engine.rdDevUsers()) || []
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || '读取账号列表失败')
+      return
+    }
+  }
+  l2PickVisible.value = true
+}
+async function confirmL2Pick() {
+  if (!l2PickUser.value) return ElMessage.warning(tt('请选取二级审核人'))
+  if (l2PickBusy.value) return
+  l2PickBusy.value = true
+  try {
+    await engine.callButton({
+      panelCode: 'RD_PROD_INFO', buttonName: '审批通过',
+      formData: { 编号: l2PickDocNo.value, 二级审批人: l2PickUser.value, ...(l2PickOpinion.value ? { 审批意见: l2PickOpinion.value } : {}) },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('已转交二级审核人'))
+    l2PickVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '审批失败')
+  } finally {
+    l2PickBusy.value = false
+  }
+}
+
 function filterGroups(raw) {
   const canApprove = user.isAdmin || user.approvePanels.includes(panelCode.value)
   if (canApprove) return raw
@@ -4523,9 +4657,9 @@ function isDisabled(action) {
     修改: !current.value || !['已审核', '生产中', '已完工'].includes(st),
     审批情况: false,
     提交审批: !current.value || (st !== '草稿' && st !== '修改中'),
-    审批通过: !current.value || st !== '审批中',
-    审批驳回: !current.value || st !== '审批中',
-   驳回审批: !current.value || st !== '审批中',
+    审批通过: !current.value || !IN_APPROVAL.includes(st),
+    审批驳回: !current.value || !IN_APPROVAL.includes(st),
+   驳回审批: !current.value || !IN_APPROVAL.includes(st),
     // 卡死单据出口(2026-09-11):撤回删除/修改申请仅在对应申请态可点
     撤回删除申请: !current.value || st !== '删除申请中',
     撤回修改申请: !current.value || st !== '修改申请中',
@@ -5179,11 +5313,19 @@ async function onButton(action) {
     let approvalOpinion = ''
     if (action === '提交审批' || action === '审批通过') {
       if (!current.value) return ElMessage.warning('请先选择一行数据')
-      // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过仅审批中
+      // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过:审批中(一级)/待二级审批(二级)
       if (action === '提交审批') {
         if (!['草稿', '修改中'].includes(current.value['单据状态'])) return ElMessage.warning('仅草稿或修改中状态可提交审批')
-      } else if (current.value['单据状态'] !== '审批中') {
-        return ElMessage.warning('仅审批中状态可审批通过')
+      } else if (!IN_APPROVAL.includes(current.value['单据状态'])) {
+        return ElMessage.warning('仅审批中或待二级审批状态可审批通过')
+      }
+      // 产品信息表一级节点(状态=审批中):走「选取二级审核人」弹窗(二级签核人由一级指定)
+      if (action === '审批通过' && panelCode.value === 'RD_PROD_INFO' && current.value['单据状态'] === '审批中') {
+        if (draftEditable.value) {
+          const saved = await saveInlineDraft('保存', { silent: true })
+          if (!saved) return
+        }
+        return openL2Pick(current.value['编号'] || current.value['单据编号'] || '')
       }
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
@@ -5198,7 +5340,7 @@ async function onButton(action) {
       }
     } else if (action === '审批驳回') {
       if (!current.value) return ElMessage.warning('请先选择一行数据')
-      if (current.value['单据状态'] !== '审批中') return ElMessage.warning('仅审批中状态可审批驳回')
+      if (!IN_APPROVAL.includes(current.value['单据状态'])) return ElMessage.warning('仅审批中或待二级审批状态可审批驳回')
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
         const { value } = await ElMessageBox.prompt(

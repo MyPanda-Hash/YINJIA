@@ -710,8 +710,8 @@ function isDisabled(action) {
     修改: !['已审核', '生产中', '已完工'].includes(s) || !isEdit.value,
     审批情况: false,
     提交审批: s !== '草稿' || !isEdit.value,
-    审批通过: s !== '审批中' || !isEdit.value,
-    审批驳回: s !== '审批中' || !isEdit.value,
+    审批通过: !['审批中', '待二级审批'].includes(s) || !isEdit.value,
+    审批驳回: !['审批中', '待二级审批'].includes(s) || !isEdit.value,
     扫描填单: false,
   }
   // 2026-08-25：所有「生成XX」生单按钮统一仅已审核/生产中可用（对齐 T+：已审核才能选择生单）

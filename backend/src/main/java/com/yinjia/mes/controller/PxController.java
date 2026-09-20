@@ -68,17 +68,44 @@ public class PxController {
         return ApiResult.ok(DevTaskService.devPanelMeta());
     }
 
-    /** 产品开发:产品信息表侧边栏按钮状态(是否已下发) */
+    /** 产品开发:产品信息表侧边栏按钮状态(是否已下发 / 能否分发责任人 / 二级审核人) */
     @GetMapping("/rdDev/buttonState")
     public ApiResult<Map<String, Object>> rdDevButtonState(@RequestParam String docNo) {
         perm.requirePanelView("RD_PROD_INFO");
-        String productCode = null;
+        String productCode = productCodeOf(docNo);
+        Map<String, Object> out = new LinkedHashMap<>(devTaskService.buttonState(productCode));
+        // 2026-09-20 两级审批:分发责任人是**二级审核人的动作**,前端据此置灰/显示
+        out.put("canAssign", buttons.canAssignDev(docNo));
+        out.put("l2Approver", buttons.l2ApproverName(docNo));
+        out.put("isL2Approver", buttons.isL2Approver(docNo));
+        out.put("assigns", devTaskService.assignsOf(productCode));
+        return ApiResult.ok(out);
+    }
+
+    /** 产品开发:四文件分工状态(分发责任人弹窗回显) */
+    @GetMapping("/rdDev/assignState")
+    public ApiResult<Map<String, Object>> rdDevAssignState(@RequestParam String docNo) {
+        perm.requirePanelView("RD_PROD_INFO");
+        Map<String, Object> out = new LinkedHashMap<>(devTaskService.assignState(productCodeOf(docNo)));
+        out.put("docNo", docNo);
+        out.put("canAssign", buttons.canAssignDev(docNo));
+        out.put("l2Approver", buttons.l2ApproverName(docNo));
+        return ApiResult.ok(out);
+    }
+
+    /** 产品开发:启用账号清单(一级通过选二级审核人 / 分发责任人选人;非管理员也可读 ⇒ 不能复用管理端接口) */
+    @GetMapping("/rdDev/users")
+    public ApiResult<List<Map<String, Object>>> rdDevUsers() {
+        perm.requirePanelView("RD_PROD_INFO");
+        return ApiResult.ok(devTaskService.enabledUsers());
+    }
+
+    /** 单据编号 → 产品编号(产品信息表侧边栏用;查不到返回空串) */
+    private String productCodeOf(String docNo) {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT TOP 1 产品编号 FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
-        if (!rows.isEmpty() && rows.get(0).get("产品编号") != null) {
-            productCode = String.valueOf(rows.get(0).get("产品编号")).trim();
-        }
-        return ApiResult.ok(devTaskService.buttonState(productCode));
+        if (rows.isEmpty() || rows.get(0).get("产品编号") == null) return "";
+        return String.valueOf(rows.get(0).get("产品编号")).trim();
     }
 
     /** 产品开发:已下发产品的开发矩阵 */
@@ -191,6 +218,88 @@ public class PxController {
     public ApiResult<Map<String, Object>> specAssignDoc(@RequestParam String no) {
         perm.requirePanelView("RD_SPEC_DOC");
         return ApiResult.ok(devTaskService.specAssignOfDoc(no));
+    }
+
+    /**
+     * 「自动填充规格书」数据源:按产品编号取对应规格书的表头 + 检验要求明细行。
+     *
+     * <p>【为什么要专门开一个端点】规格书的 编号(=产品键)在通用查询链路里**看不见**——
+     * QueryService.loadDocs 对每个 doc 面板都会执行 doc.put("编号", 单据编号),把真 编号 覆盖成单据号
+     * (那个键在纸张右上角被「编号：」占用)。所以 getFormDescriptor / queryFormDataList 都取不到真值,
+     * 只能像 prodDocList 一样直接读 head 表。
+     *
+     * <p>【产品编号 → 规格书单 的解析顺序】
+     * <ol>
+     *   <li>rd_spec_assign(产品编号=?)—— 分发写下的正式映射,带 责任人/负责人,是权威源;</li>
+     *   <li>rd_spec_doc_head.编号 = ? —— 分发时盖在产品键列上的章(ButtonService 分发路径写)。</li>
+     * </ol>
+     * 两条都按 id 倒序取最新。同一产品可能分发了多张规格书(不同规格书种类),
+     * 故用 matched 回报命中数,前端提示「按哪一张填的」,不让用户猜。
+     *
+     * <p>明细只取 [表区]='检验要求' 的行 —— 与 ButtonService.specTestRowsSnapshot 同款口径,
+     * 那是规格书「检验项目及检验标准」页的行;其余表区(修订记录/物料清单…)不参与出货检验。
+     */
+    @GetMapping("/specByProduct")
+    public ApiResult<Map<String, Object>> specByProduct(@RequestParam String code) {
+        perm.requirePanelView("RD_INSP_PLAN");
+        String productCode = code == null ? "" : code.trim();
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("found", false);
+        out.put("matched", 0);
+        out.put("单据编号", "");
+        out.put("编号", "");
+        out.put("客户项目名称", "");
+        out.put("产品类别", "");
+        out.put("整体规格参数", "");
+        out.put("items", List.of());
+        if (productCode.isEmpty()) return ApiResult.ok(out);
+
+        List<String> nos = specDocNosOfProduct(productCode);
+        out.put("matched", nos.size());
+        if (nos.isEmpty()) return ApiResult.ok(out);
+
+        String no = nos.get(0);
+        List<Map<String, Object>> heads = jdbc.queryForList(
+                "SELECT 单据编号, ISNULL(编号, N'') AS 编号, ISNULL(客户项目名称, N'') AS 客户项目名称,"
+                        + " ISNULL(产品类别, N'') AS 产品类别, ISNULL(整体规格参数, N'') AS 整体规格参数"
+                        + " FROM rd_spec_doc_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (heads.isEmpty()) return ApiResult.ok(out);
+
+        Map<String, Object> h = heads.get(0);
+        out.put("found", true);
+        for (String k : List.of("单据编号", "编号", "客户项目名称", "产品类别", "整体规格参数")) {
+            Object v = h.get(k);
+            out.put(k, v == null ? "" : String.valueOf(v));
+        }
+        out.put("items", jdbc.queryForList(
+                "SELECT ISNULL(序号, N'') AS 序号, ISNULL(检验项目, N'') AS 检验项目,"
+                        + " ISNULL(检验要求, N'') AS 检验要求, ISNULL(检验方法, N'') AS 检验方法,"
+                        + " ISNULL(检验依据, N'') AS 检验依据"
+                        + " FROM rd_spec_doc_detail WHERE 单据编号 = ? AND 表区 = N'检验要求' ORDER BY id", no));
+        return ApiResult.ok(out);
+    }
+
+    /** 产品编号 → 该产品已分发的规格书单号(最新在前,去重);rd_spec_assign 优先,退回 head.编号 盖章 */
+    private List<String> specDocNosOfProduct(String productCode) {
+        List<String> nos = new java.util.ArrayList<>();
+        String[] sqls = {
+                "SELECT 单据编号 FROM rd_spec_assign WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
+                "SELECT 单据编号 FROM rd_spec_doc_head WHERE 编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
+        };
+        for (String sql : sqls) {
+            try {
+                for (Map<String, Object> r : jdbc.queryForList(sql, productCode)) {
+                    Object v = r.get("单据编号");
+                    String s = v == null ? "" : String.valueOf(v);
+                    if (!s.isBlank() && !nos.contains(s)) nos.add(s);
+                }
+            } catch (Exception e) {
+                // 表缺失时降级:另一条路径仍可用(与 prodDocList 的受控推导同款处理)
+                log.warn("[specByProduct] 规格书单解析跳过 product={}: {}", productCode, e.getMessage());
+            }
+        }
+        return nos;
     }
 
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。
@@ -306,8 +415,13 @@ public class PxController {
         String buttonName = String.valueOf(body.getOrDefault("buttonName", ""));
         // 服务端按钮权限(2026-09-12):按 yj_role_panel.perms 词表映射校验,管理员恒过;
         // 此前仅审批类动作在 ButtonService 内校验,保存/删除/提交等对任何登录用户开放
-        perm.requireButton(panelCode, buttonName);
-        Map<String, Object> formData = (Map<String, Object>) body.getOrDefault("formData", Map.of());
+        // 2026-09-20 例外:产品信息表的二级节点——被一级选定的二级审核人即使没有 audit 词
+        //   (如 cp 这类普通账号)也可「审批通过/审批驳回」,否则两级审批第二级无人能点。
+        Map<String, Object> formData0 = (Map<String, Object>) body.getOrDefault("formData", Map.of());
+        if (!perm.isL2ApproverOf("RD_PROD_INFO", panelCode, buttonName, formData0)) {
+            perm.requireButton(panelCode, buttonName);
+        }
+        Map<String, Object> formData = formData0;
         Map<String, Object> buttonParam = (Map<String, Object>) body.getOrDefault("buttonParam", Map.of());
         ApiResult<Map<String, Object>> result = ApiResult.ok(service.callButton(panelCode, buttonName, formData, buttonParam));
         // 使用记录:业务按钮动作(成功后才记;表单类动作附单据号)

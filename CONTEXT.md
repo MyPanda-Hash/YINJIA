@@ -271,6 +271,38 @@ erp_imp_log/erp_imp_row 通道表定位调整为**审计层**(同步器写批次
 审批人**(管理员 ∪ `can_approve='Y'`),并各写一条 `yj_form_approval` 留痕
 (action=`DELETE_WITHDRAW`/`MODIFY_WITHDRAW`,result=`WITHDRAWN`)。
 
+### 两级审批(产品信息表)(Two-level Approval)
+
+**只有产品信息表(RD_PROD_INFO)走两级**(`ButtonService.TWO_LEVEL_PANELS`;其余面板单节点路径逐字不变):
+
+- **一级** = 现有审批权口径(管理员 ∪ 角色 `yj_role_panel.can_approve`;产品信息表当前实际只有 admin=冯总)。
+  一级「审批通过」**必须选取二级审核人**(载荷「二级审批人」= 账号,**候选 = 全部启用账号**),
+  定下的人写回纸面「审核人(二级审批人)」,单据转 **「待二级审批」**(`yj_doc_status.approve_node=2`
+  + `l2_approver`),**不归档**;被选人收 `APPROVAL_L2_ASSIGNED` 消息。
+- **二级** = **被选定的二级审核人本人 ∪ 管理员**(选取本身即授权,不要求其角色有 `audit` 词 ——
+  `PanelPermissionService.isL2ApproverOf` 就是为此开的例外,否则 cp 这类普通账号点不动第二级)。
+  二级通过 **即归档**;任一级驳回都**一律回草稿**并通知制单人(不退回上一级)。
+- 审批中 / 待二级审批期间单据不可保存、不可直接审核;两处状态推导
+  (`ButtonService.docStatusOf` 与 `QueryService.docStatus`)**必须同改**加「待二级审批」
+  (一处管按钮与保存门禁、一处管列表行状态)。
+
+### 分发责任人(Development Task Assignment)
+
+产品信息表**归档后**的独立动作(动作词沿用已授权的「产品开发」,界面显示「分发责任人」):
+
+- 执行人 = **二级审核人 ∪ 管理员**(历史单没选过二级审核人的退回旧口径:有本面板编辑权即可);
+- 四个下游文件**各自**一个责任人(弹窗默认带出「产品负责人」解析出的账号,可逐个改),
+  落 `rd_dev_task.负责人`(该表本就是「产品 × 面板」一行),**分发后可随时改人**;
+- 各责任人收 `TASK_ASSIGNED` 消息;责任人是**四文件编辑门禁**的唯一判据。
+
+**四文件编辑门禁**:成型工艺清单 / 组装工艺清单 / 规格书 / 出货检验计划表 ——
+**未分发禁编;分发后只放该文件责任人 ∪ 管理员;四文件并行、无串行依赖**。服务端在
+保存 / 申请修改 / 删除三个入口强制(`ButtonService.ensureDevFileEditable`),三条豁免:
+单据**产品编号为空**(历史单)不拦(否则既有单据被锁死);规格书另放「该单已分配的责任人 /
+产品总负责人」(兼容 2026-09-12 的两级分发);管理员恒可。
+**与「规格书分发」的区别**:**分发责任人**是「产品 × 文件」级别的责任人;2026-09-12 的
+**规格书分发**(`rd_spec_assign`)是**单张规格书**级别的分配 —— 两件事,别混。
+
 ### 标准库(Standard Library)
 
 `yj_std_lib(lib_code, item_code, content)` 承载的可维护候选条目库。**本项目采用此含义。**
@@ -329,6 +361,7 @@ erp_imp_log/erp_imp_row 通道表定位调整为**审计层**(同步器写批次
 | 2026-09-12 | **权限与审批缺陷全量加固(P1~P10 十项)**。①**服务端权限强制执行**——新增 `PanelPermissionService`,`/api/px/callButton`+`deleteForms` 按钮词表校验(词内任一命中放行,管理员恒过),`queryFormDataList`/`getFormDescriptor`/`getApprovalHistory`/报表模板与导出/报表栏目设置 等读接口按面板 view 校验;**读放行三层规则=可见面板 ∪ 字段参照目标(yj_field.ref_panel) ∪ 同模块(module_group)面板**——参照/选单/BOM 勾选/进度表跨面板读大量存在,只按 view 硬拦会打断合法参照链,跨模块越权读仍被拦;缺失放行的解法=给角色补该模块任意面板「可见」。权限错误用 `AccessDeniedException`→HTTP 200+code 403(避开前端 401/403 强制登出)。②**编制审批分离**——`approveApproval` 拒「审批人=提交人」、`audit` 拒「审核人=制单人」(asp_user1),**管理员豁免**(保存即归档本就是等价权力,堵死会造死路)。③**在途申请锁定**——删除申请中/修改申请中不可保存(此前申请期间仍可改数据,diff 失真甚至造出无人能解的死状态);审批通过/驳回 UPDATE 带 `pending='Y'` 行数守卫,并发只有一次生效。④**保存为草稿不再自动送审/归档**(markSaved 门控;旧代码草稿路径同样被自动归档,文书面板没有"存一半不送审"的能力)。⑤**弃审留痕**——文书面板弃审时落 modify_log 快照(`snapshotOnUnaudit`),再编辑保存由 `finalizeOpenModify`(泛化的 finalizeModify,不再只认修改态)收尾盖章,弃审路径与申请修改路径留痕同构。⑥**通知补齐**——删除/修改申请的审批结果通知申请人(DELETE_APPROVED/REJECTED、MODIFY_APPROVED/REJECTED 四码+消息中心模板;TERM_* 四码模板此前一直缺失,渲染成通用「业务消息」,一并挂上——词条 en.js 早已预置)。⑦**修改记录全量保留**——删掉滚动 3 条的物理 DELETE(审计要求;展示仍 TOP 3)。⑧**立项人账号锚定**——`initiatorUsersOf` 优先取立项申请制单人 `asp_user1` 直连 yj_user(启用校验),历史空值回退姓名匹配 real_name(立项人改名/同名他人时姓名匹配判错人)。⑨**删除审批通过释放 form_flow_link**(与草稿作废同口径)+意见随留痕与通知带上。⑩**立项作废参照守卫**——RD_APPROVAL 仍被实施计划/8 数据记录表(文档编号关联,作废不计)引用时拒绝作废,先作废引用单据才可。**口径反转两条**:归档现在**写审核人 shr**(CASE 保首审,再归档留痕看 modify_log.rearchive_by)——推翻 2026-09-11「归档不写 shr」条;管理员保存即归档显式留痕 SUBMIT+APPROVE「保存即归档(管理员保存)」。验收探针 `tools/_probe-perm-hardening.cjs` 32 项全绿(越权读拦/按钮词表拦/草稿不送审/自审拦截/在途锁定/驳回通知/弃审留痕/账号锚定/参照守卫)+SQL 断言(shr 落库、modify_log rearchive_by 盖章、作废标记),`mvn package`+`npm test` 112+`npm run build` 通过。**踩坑:本机 shell 残留全局 `SPRING_DATASOURCE_PASSWORD=000518`(他项目),Spring 环境变量优先级高于 yml,导致后端起不来报「用户 'yinjia' 登录失败」——启动须 `env -u SPRING_DATASOURCE_PASSWORD`;且打包必须走 `build.bat` 同款参数(`-s tools/settings.xml` + `YINJIA_M2_REPO=../.m2-repo`),用默认 ~/.m2 会解析出错版 jackson(NoClassDefFoundError: InternalJacksonUtil)** | 缺陷修复会话 2026-09-12 |
 | 2026-09-14 | **「点浏览器最小化按钮窗口收不起来/卡住」排查结论:应用代码无责,系 Edge Beta 154 窗口管理竞态(间歇性),仅登录页可复现**。方法:PowerShell ShowWindow/SC_MINIMIZE/真实鼠标点击三种方式 + CDP 页面侧插桩 + 纯 PS 翻转计数(探针集 `tools/_min-flip.cjs`/`_restore-stack.cjs`/`_final-matrix.cjs`/`_real-login-flip.cjs`/`_real-click-min.ps1` 等 22 个)。事实:①登录页最小化约 2/3 概率被自动弹回(间歇性);②**真实登录后的业务页面、静态 404 页、百度/淘宝均正常保持最小化**;③应用 JS 无嫌疑——focus/open/alert/print 全量插桩零调用、页面不重载(marker 存活)、主线程零阻塞(CPU≈0%);④与 CSS 动画/backdrop-filter/occlusion 特性/GPU 开关/翻译与自动填充等浏览器功能开关均无关。处置:用户侧升级或换 Edge 稳定版/Chrome;业务侧无需改代码。**用户实测确认(2026-09-14):改用 `http://127.0.0.1:8090` 访问后问题消失**(此前用 localhost)——localhost 与 127.0.0.1 在浏览器是不同站点(站点级状态/提示策略独立),换访问地址即绕开。**探针坑**:经 hash 变更导航到"面板页"会被路由守卫重定向回 #/login(登录态在内存),测登录后页面必须先在同源页种 token 再冷启动目标路由(见 `_final-matrix.cjs` C/D 案例);`Get-Process msedge` 的 MainWindowHandle 可能是已退出 launcher 的死句柄,须 EnumWindows 按可见+标题过滤 | 排查会话 2026-09-14 |
 | 2026-09-20 | **成型工艺清单加「修订记录」页签,口径 = 与组装工艺清单那一页逐字一致**(用户口径「和组装工艺清单的一样」,三选一里明确选了"完全照组装",未采用成型源文件《20267月22日-最新烧结配方模板-1.xlsx》sheet「变更履历」的 序号/日期/版本号/原因/内容 那一套):页签 0 = 修订记录(原「成型工艺清单/成型配方」顺延为页 1/页 2),列 = 表区(隐藏)/序号/更改内容/更改原因/更改时间/责任人/备注,不出报告头、由 `dt.pageTitle` 出居中大标题。**同时修掉成型侧一处既有缺陷**:[表区] 原登记 `place='header'`,而明细查询只 SELECT `fieldsAt("detail")` ⇒ 行落库了但重开单据读不回来,前端 `rowsOf()` 按它过滤会让**修订记录与配方表两页都变空**(组装侧 2026-09-20 同坑),本轮按同样口径改挂 `place='detail'`,并把 5 列(与 rd_asm_proc_detail 同名同型)补到 rd_mold_proc_detail;不新建物理表、页 2 语义不变。断言⑦(recordSheetConfigs.keys.test.js)钉页签/页归属/表区唯一 + **与组装那份逐字一致**;探针 `tools/archive/_probe-mold-rev-tab.cjs` 15 项(落库/读回/表区往返)+ `tools/archive/_probe-mold-rev-ui.cjs` 17 项(三页签渲染/大标题/无报告头/重开后两页各显各的行/与组装列宽逐格一致)全绿 | grill 会话 2026-09-20 |
+| 2026-09-20 | **产品信息表两级审批 + 分发责任人**(用户口径,grill 六问全定):①**一级**=admin(现有审批权口径),一级「审批通过」**必须选取二级审核人**(候选=全部启用账号),写回纸面「审核人(二级审批人)」、单据转**「待二级审批」**、**不归档**;②**二级**=被选定本人 ∪ 管理员(选取即授权,`PanelPermissionService.isL2ApproverOf` 破例绕过 `audit` 词表 —— 否则 cp 这类普通账号点不动第二级),**二级通过即归档**、任一级驳回**一律回草稿**;③归档后二级审核人做**「分发责任人」**:四个下游文件**各自**一个责任人(默认带出产品负责人,可逐个改),落 `rd_dev_task.负责人`,**分发后可随时改人**(不再"发一次就锁死");④**四文件服务端硬门禁**:未分发禁编、分发后只放该文件责任人 ∪ 管理员、四文件并行无串行依赖(历史单产品编号为空豁免;规格书另放已分配责任人/总负责人以兼容旧两级分发);⑤新增账号 **cp(陈秀丽)**=普通用户,初始口令同现有演示账号;⑥状态推导两处同改(`ButtonService.docStatusOf` + `QueryService.docStatus`)加「待二级审批」;数据层 `migrate-prodinfo-twolevel.sql`(cp 账号 + `yj_doc_status.approve_node`/`l2_approver` 两列)。**分发动作词沿用「产品开发」**(前端显示改「分发责任人」),不为一个动作改全体角色权限行。验收探针 `tools/archive/_probe-prodinfo-l2.cjs` 28 项全绿(含界面两弹窗截图 `_shots/l2-*.png`),`npm test` 141 通过、`npm run build` + `mvn package` 通过 | grill 会话 2026-09-20 |
 
 ### 已审批判据(Approved Status Criteria)
 
@@ -360,6 +393,7 @@ erp_imp_log/erp_imp_row 通道表定位调整为**审计层**(同步器写批次
 | 版式来源 | 屏幕上的纸面(所见即所得) | IT 的 `.jrxml` A4 版式(公司抬头/页眉页脚/页码) |
 | 渲染位置 | 浏览器(jsPDF / SheetJS) | 后端(JasperReports) |
 | 适用 | 文书面板(立项申请/数据记录表/产品文件…) | 任意 doc 面板(本期只登记了销售订单) |
+
 
 关键术语与口径:
 

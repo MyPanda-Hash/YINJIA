@@ -99,37 +99,91 @@ public class DevTaskService {
     }
 
     /**
-     * 下发:把产品写到 5 个下游面板。已下发过的产品直接返回 already=true(幂等)。
-     * 仅允许对「已归档」的产品信息表单据下发,由调用方(ButtonService)校验。
-     * 2026-09-12:下发同时快照总负责人账号(rd_dev_task.负责人,=产品信息表「责任人」姓名匹配的
-     * 启用账号);查无账号传 null(列可空 = 任务挂起,产品信息改好后经 supervisorOf 懒重解补挂)。
+     * 分发责任人(2026-09-20 口径):把产品写到 4 个下游面板,**每个面板一个责任人**。
+     *
+     * 与原「产品开发下发」的差别:
+     *   · 不再是"发过一次即 already 短路" —— 已分发的产品**可以改人**(UPDATE 而非跳过),
+     *     否则"分发后随时改责任人"这条口径落不了地;
+     *   · 载荷 picks = { 面板: 账号 } 决定每行负责人;未给某面板时退回 defaultOwner(产品负责人解析值,可空=挂起)。
+     * 返回 already = 本次调用前是否已完整分发过(4 行齐全),供调用方决定发消息/回显。
      */
     @Transactional
     public Map<String, Object> dispatch(String productCode, String productName, String sourceDocNo, String user,
-                                        String supervisor) {
+                                        String defaultOwner, Map<String, String> picks) {
         Map<String, Object> out = new LinkedHashMap<>();
         if (productCode == null || productCode.isBlank()) {
             throw new IllegalArgumentException("产品编号为空,无法下发");
         }
-        if (dispatched(productCode)) {
-            out.put("already", true);
-            out.put("productCode", productCode);
-            out.put("panels", dispatchedPanels(productCode));
-            fillSupervisor(out, productCode);
-            return out;
-        }
+        Map<String, String> existing = assignsOf(productCode);
+        boolean already = existing.size() >= DEV_PANELS.size() && !existing.containsValue(null);
         LocalDateTime now = LocalDateTime.now();
+        Map<String, String> assigns = new LinkedHashMap<>();
         for (Map.Entry<String, String[]> e : DEV_PANELS.entrySet()) {
-            jdbc.update("INSERT INTO rd_dev_task (产品编号,产品名称,源单据号,目标面板,负责人,下发人,下发时间,asp_user1,asp_time1) "
-                            + "VALUES (?,?,?,?,?,?,?,?,?)",
-                    productCode, productName, sourceDocNo, e.getKey(), supervisor, user, now, user, now);
+            String panel = e.getKey();
+            String owner = picks != null && picks.containsKey(panel) ? picks.get(panel) : defaultOwner;
+            assigns.put(panel, owner);
+            int rowId = rowIdOf(productCode, panel);
+            if (rowId > 0) {
+                jdbc.update("UPDATE rd_dev_task SET 负责人 = ?, 产品名称 = ?, 源单据号 = ?, 下发人 = ?, 下发时间 = ?,"
+                                + " asp_user2 = ?, asp_time2 = ?, asp_cancel = 'N' WHERE id = ?",
+                        owner, productName, sourceDocNo, user, now, user, now, rowId);
+            } else {
+                jdbc.update("INSERT INTO rd_dev_task (产品编号,产品名称,源单据号,目标面板,负责人,下发人,下发时间,asp_user1,asp_time1) "
+                                + "VALUES (?,?,?,?,?,?,?,?,?)",
+                        productCode, productName, sourceDocNo, panel, owner, user, now, user, now);
+            }
         }
-        out.put("already", false);
+        out.put("already", already);
         out.put("productCode", productCode);
         out.put("panels", DEV_PANELS.keySet());
+        out.put("assigns", assigns);
         fillSupervisor(out, productCode);
         return out;
     }
+
+    /** 该产品×面板的活任务行 id(无则 0) */
+    private int rowIdOf(String productCode, String panel) {
+        List<Integer> ids = jdbc.queryForList(
+                "SELECT TOP 1 id FROM rd_dev_task WHERE 产品编号 = ? AND 目标面板 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
+                Integer.class, productCode, panel);
+        return ids.isEmpty() || ids.get(0) == null ? 0 : ids.get(0);
+    }
+
+    /** 该产品的四文件分工:{ 面板编码: 责任人账号 }(未分发/挂起时该面板不在表里或值为 null) */
+    public Map<String, String> assignsOf(String productCode) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (productCode == null || productCode.isBlank()) return out;
+        jdbc.query("SELECT 目标面板, 负责人 FROM rd_dev_task WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
+                rs -> {
+                    out.put(rs.getString("目标面板"), rs.getString("负责人"));
+                }, productCode);
+        return out;
+    }
+
+    /** 分发状态(前端弹窗/按钮用):是否已分发、四文件分工(账号 + 姓名)、总负责人 */
+    public Map<String, Object> assignState(String productCode) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        Map<String, String> assigns = assignsOf(productCode);
+        Map<String, String> names = new LinkedHashMap<>();
+        for (Map.Entry<String, String> e : assigns.entrySet()) {
+            names.put(e.getKey(), e.getValue() == null ? "" : realNameOf(e.getValue()));
+        }
+        out.put("productCode", productCode == null ? "" : productCode);
+        out.put("dispatched", dispatched(productCode));
+        out.put("assigns", assigns);
+        out.put("assignNames", names);
+        fillSupervisor(out, productCode);
+        return out;
+    }
+
+    /** 启用账号清单(两级审批选人 / 分发选人;按姓名排序,前端下拉直接用) */
+    public List<Map<String, Object>> enabledUsers() {
+        return jdbc.queryForList(
+                "SELECT username, ISNULL(real_name, username) AS realName FROM yj_user"
+                        + " WHERE ISNULL(enabled,'1') = '1' ORDER BY ISNULL(real_name, username)");
+    }
+
+
 
     /** 输出补总负责人字段(supervisor/supervisorName/supervisorResolved) */
     private void fillSupervisor(Map<String, Object> out, String productCode) {

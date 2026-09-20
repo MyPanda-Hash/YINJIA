@@ -258,9 +258,19 @@ export async function rdDevMeta() {
   return unwrap(await request.get('/px/rdDev/meta'))
 }
 
-/** 产品信息表侧边栏按钮状态:{ productCode, dispatched } */
+/** 产品信息表侧边栏按钮状态:{ productCode, dispatched, canAssign, l2Approver, assigns } */
 export async function rdDevButtonState(docNo) {
   return unwrap(await request.get('/px/rdDev/buttonState', { params: { docNo } }))
+}
+
+/** 四文件分工状态(分发责任人弹窗回显):{ productCode, dispatched, assigns, assignNames, canAssign } */
+export async function rdDevAssignState(docNo) {
+  return unwrap(await request.get('/px/rdDev/assignState', { params: { docNo } }))
+}
+
+/** 启用账号清单(一级通过选二级审核人 / 分发责任人选人):[{username, realName}] */
+export async function rdDevUsers() {
+  return unwrap(await request.get('/px/rdDev/users'))
 }
 
 /** 已下发产品的开发矩阵 */
