@@ -521,3 +521,9 @@ migrate-rd-sample-no.sql
 # —— 2026-09-18 Phase 5 前端:ProdDocListSheet.vue(产品文件列表只读矩阵)+ PanelxList 接入 + menus 新增 2 面板 ——
 # 后端:/px/prodDocList 端点(复用 DevTaskService.board(),只补 是否受控/受控日期 派生);
 #       StdLibController.list 的 SELECT 补 seq(前端据 seq 恢复 asm.proc 的设计序,原先 ORDER BY 字母序)
+
+# —— 2026-09-18 Phase 6 收尾:新面板角色授权行 + 前端静态产物重建 ——
+# migrate-rd-2026-newpanels-perm.sql —— 两张新面板的 yj_role_panel 授权行(非管理员可见性真源):
+#   RD_PROD_DOCLIST 只给 view,query,export,print(只读派生矩阵,给 add/modify/del 是无意义权限位);
+#   RD_SAMPLE_NO 照普通文书面板 view,query,add,modify,modlog,del,export。幂等键 role_id+panel_code。
+migrate-rd-2026-newpanels-perm.sql

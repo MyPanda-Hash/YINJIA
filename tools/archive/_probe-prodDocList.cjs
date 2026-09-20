@@ -43,8 +43,13 @@ async function main() {
 
   const r1 = rows.find((x) => x['产品编号'] === 'ZZTEST-1')
   const r2 = rows.find((x) => x['产品编号'] === 'ZZTEST-2')
-  check('含探针产品 ZZTEST-1/ZZTEST-2(产品编号透传正常)', !!r1 && !!r2)
-  if (!r1 || !r2) { console.log('\n!! 探针数据缺失,请先跑 _seed-prodDocList-test.sql'); process.exit(1) }
+  if (!r1 || !r2) {
+    console.log('\n⚠  SKIP:未找到探针产品 ZZTEST-1/ZZTEST-2。')
+    console.log('   本探针依赖数据:先跑 tools/archive/_seed-prodDocList-test.sql,跑完用 _seed-prodDocList-test-cleanup.sql 清理。')
+    console.log(`   (当前矩阵行数 ${rows.length},可先确认端点本身可用 = ${r.status === 200 && j.code === 200})`)
+    process.exit(2)   // 2 = 跳过(非失败),便于批量脚本区分"没数据"与"断言失败"
+  }
+  check('含探针产品 ZZTEST-1/ZZTEST-2(产品编号透传正常)', true)
 
   console.log('\n-- ZZTEST-1(4 面板各一张已归档单)--')
   console.log('   cells =', JSON.stringify(r1.cells))
