@@ -239,6 +239,8 @@ public class ButtonService {
         if ("修改申请中".equals(stStatus)) throw new IllegalStateException("修改申请审批期间不可保存，请等待审批完成或撤回申请");
         // 来料检验单数量守恒:每行 合格数量+不良数量 ≤ 数量(送检数量),超限拒绝保存
         if ("QC_INSP".equals(def.code())) validateInspQty(items);
+        // 样品编号表:样品编号 = 客户项目代号 + 项目编号(确定性拼接),同面板内不允许重复
+        if ("RD_SAMPLE_NO".equals(def.code())) ensureSampleNoUnique(no, items);
 
         Map<String, String> l2c = def.labelToCol();
         // 规格书修改态:落库前留「4.产品性能检验项目及检验标准」页旧值快照(表区=检验要求),
@@ -322,6 +324,33 @@ public class ButtonService {
         }
         Integer dup = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
         if (dup != null && dup > 0) throw new IllegalArgumentException("文档编号不允许重复：" + docNo);
+    }
+
+    /** 样品编号不允许重复(RD_SAMPLE_NO,2026-09-18)。
+     *  口径:样品编号 = 客户项目代号 + 项目编号(确定性拼接,无计数器 —— 见
+     *  docs/design/研发管理-新面板设计与改动方案.md §14),所以重复必然意味着
+     *  同一 (代号, 项目编号) 被录了两次。此处按明细列查重(与 ensureDocNoUnique 判头表不同,
+     *  它是**明细行**唯一),作废单据不计占用(两侧都排,口径同 ensureDocNoUnique)。 */
+    private void ensureSampleNoUnique(String docNo, List<Map<String, Object>> items) {
+        if (items == null || items.isEmpty()) return;
+        java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> it : items) {
+            Object v = it.get("样品编号");
+            if (v == null) continue;
+            String sampleNo = String.valueOf(v).trim();
+            if (sampleNo.isEmpty()) continue;
+            // 同一次提交内部先查重(数据库里还没有这些行)
+            if (!seen.add(sampleNo)) throw new IllegalArgumentException("样品编号不允许重复：" + sampleNo);
+            Integer dup = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM rd_sample_no_detail d "
+                            + "JOIN rd_sample_no_head h ON h.[单据编号] = d.[单据编号] "
+                            + "WHERE d.[样品编号] = ? AND d.[单据编号] <> ? "
+                            + "AND ISNULL(h.asp_cancel,'N') <> 'Y' "
+                            + "AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_SAMPLE_NO' "
+                            + "                AND s.doc_no = h.[单据编号] AND s.canceled = 'Y')",
+                    Integer.class, sampleNo, docNo == null ? "" : docNo);
+            if (dup != null && dup > 0) throw new IllegalArgumentException("样品编号不允许重复：" + sampleNo);
+        }
     }
 
     // ==================== 规格书检验项目变更 → 出货检验计划表核对提醒(2026-09-11) ====================
@@ -2524,7 +2553,11 @@ public class ButtonService {
             "RD_APPROVAL", "RD_PLAN", "RD_FILTER_EFF",
             "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC",
             "RD_SPIKE_WATER", "RD_DOM_TEST", "RD_EQUIP_USE", "RD_INSTR_USE",
-            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO");
+            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
+            // 2026-09-18 新增 2 面(研发管理 × 产品开发最新设计):
+            //   RD_PROD_DOCLIST 产品文件列表 —— 是台账(有 是否受控/受控日期 自己数据),需要留痕与修改闭环
+            //   RD_SAMPLE_NO 样品编号表 —— 发号台账,改样品编号=改追溯锚点,必须防篡改
+            "RD_PROD_DOCLIST", "RD_SAMPLE_NO");
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复) */
     private static final java.util.Set<String> DOC_NO_PANELS = java.util.Set.of(
             "RD_APPROVAL", "RD_PLAN", "RD_PROGRESS", "RD_FILTER_EFF",

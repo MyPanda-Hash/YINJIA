@@ -437,3 +437,29 @@ migrate-report-template.sql
 migrate-report-template-comments.sql
 migrate-po-inbound-fields.sql
 
+
+# —— 2026-09-18 研发管理 × 产品开发最新设计(Phase 1 字段能力层)——
+# 对照源:C:\Users\x1787\OneDrive\Desktop\产品开发\产品开发(25 份设计文件);差异分析见
+# docs/design/研发管理-面板与设计对照.md,实施设计见 docs/design/研发管理-新面板设计与改动方案.md。
+# 口径:① col_name 一律不改(只 UPDATE label)② 改 label 必须同步 i18n ③ 新列一律 required=0(避幽灵必填)。
+# migrate-rd-2026-design.sql —— RD_PROD_INFO 三分类收口(产品类别换20项字典/新增产品管控等级·产品功能类别·
+#   客户项目名称·编辑人·两级审核人,历史值从 产品类别/产品分类 搬迁)、RD_ASM_PROC 2引用字段+变更履历日期·版本号、
+#   RD_INSP_PLAN 产品功能类别·序号·检验备注(⚠不叫[备注]——共表会被他行吞值)·检测频率改下拉·编写人锁定、
+#   RD_SPEC_DOC 客户项目名称·应用场景、11 处 label 对齐
+# migrate-ref-filter.sql —— 参照过滤数据驱动化(yj_field.ref_filter 新列 + 中文列注明):替代硬编码
+#   if(refPanel==RD_APPROVAL);⚠白名单式只改本次新增 4 字段 —— 用 ref_panel IN(...) 会误改既有
+#   RD_*_PROC/RD_INSP_PLAN.产品编号 与 RD_SPEC_DOC.编号,导致规格书选不到在研产品(流程堵死);
+#   3 个例外显式不过滤(产品文件列表.产品编号 / 规格书.编号 / 样品编号表.项目名称)
+# migrate-rd-sample-no.sql —— 样品编号表 RD_SAMPLE_NO 新面板(头+明细,7 明细列)+ 中文表注明
+# migrate-rd-prod-doclist.sql —— 产品文件列表 RD_PROD_DOCLIST 新面板(只建面板壳,业务数据由
+#   DevTaskService.DEV_PANELS 实时推导,不双写)+ 中文表注明
+# migrate-customer-code-seed.sql —— 客户项目代号标准库 rd.customer_code 34 条(由 tools/gen-customer-code.cjs
+#   从设计 38 样例反推;幂等键 lib_code+item_code)
+migrate-rd-2026-design.sql
+migrate-ref-filter.sql
+migrate-rd-sample-no.sql
+migrate-rd-prod-doclist.sql
+migrate-customer-code-seed.sql
+
+# —— 2026-09-18 研发管理最新设计 多语言(10 语言 × 新面板/新字段/改 label 字段)——
+i18n-rd-2026-design.sql

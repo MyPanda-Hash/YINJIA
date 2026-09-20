@@ -499,13 +499,37 @@ public class PanelConfigService {
             m.put("refPanel", f.refPanel());
             m.put("refField", refLabelOf(f.refPanel(), f.refField()));
             m.put("displayField", refLabelOf(f.refPanel(), f.displayField()));
-            // 立项申请参照:仅已归档单据可选——草稿/审批中项目的右上角编号尚未定稿,
-            // 被数据记录表引用会落空(或后续改号对不上),对齐「仅已归档可引用」口径。
-            if ("RD_APPROVAL".equals(f.refPanel())) m.put("filter", Map.of("单据状态", "已归档"));
+            // 参照过滤(数据驱动,存 yj_field.ref_filter;见 tools/migrate-ref-filter.sql):
+            //   原先硬编码 if ("RD_APPROVAL".equals(refPanel)) —— 新增参照(RD_PROD_INFO/RD_PROGRESS)
+            //   同样要"只列已归档"口径,继续堆 if 就是又一份清单,与新面板/新字段脱节。
+            //   ref_filter 为 NULL ⇒ 不下发 filter ⇒ 行为与改造前**逐字等价**(纯增量)。
+            Map<String, Object> refFilter = parseRefFilter(f.refFilter());
+            if (!refFilter.isEmpty()) m.put("filter", refFilter);
             List<Map<String, String>> refMap = buildRefMap(def, f);
             if (!refMap.isEmpty()) m.put("refMap", refMap);
         }
         return m;
+    }
+
+    /**
+     * 解析参照过滤条件文本 → Map。
+     * 格式:<b>k=v</b> 单条件,或 <b>k=v,k2=v2</b> 多条件(逗号分隔,值可含 =)。
+     * 空白/非法项直接跳过 —— 解析不出任何条件时返回空 Map(等价"不过滤"),
+     * 保证老数据(ref_filter 为 NULL)行为不变。
+     */
+    private Map<String, Object> parseRefFilter(String raw) {
+        if (raw == null || raw.isBlank()) return Map.of();
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (String part : raw.split(",")) {
+            String seg = part.trim();
+            if (seg.isEmpty()) continue;
+            int i = seg.indexOf('=');
+            if (i <= 0 || i == seg.length() - 1) continue;       // 缺键或缺值:跳过
+            String k = seg.substring(0, i).trim();
+            String v = seg.substring(i + 1).trim();
+            if (!k.isEmpty() && !v.isEmpty()) out.put(k, v);
+        }
+        return out;
     }
 
     /** 参照带回映射(对齐 light-mes ref.map 契约):
@@ -1246,7 +1270,10 @@ public class PanelConfigService {
                 ref.put("panel", f.refPanel());
                 ref.put("field", refLabelOf(f.refPanel(), f.refField()));
                 ref.put("display", refLabelOf(f.refPanel(), f.displayField()));
-                ref.put("filter", null);
+                // 参照过滤:此前**硬编码 null** ⇒ 表单侧参照弹窗拿不到"只列已归档"限制,
+                // 与列表侧 fieldSpec 下发的不一致(同一字段两处口径不同)。改为同源解析。
+                Map<String, Object> refFilter = parseRefFilter(f.refFilter());
+                ref.put("filter", refFilter.isEmpty() ? null : refFilter);
                 ref.put("map", buildRefMap(def, f));
                 ref.put("multi", false);
                 ref.put("columns", null);

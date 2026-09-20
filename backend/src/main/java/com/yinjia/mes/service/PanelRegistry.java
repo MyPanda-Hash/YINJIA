@@ -18,6 +18,7 @@ public class PanelRegistry {
     /** 字段定义(以 yj_field 为准;label 为数据键保持中文,label_en 仅显示层译名) */
     public record FieldDef(String col, String label, String labelEn, String dataType, String dictSql,
                            String refPanel, String refField, String displayField,
+                           String refFilter,
                            String place, int seq, boolean editable, boolean required,
                            boolean hidden, Integer width, String alias, boolean visible, String colGroup) {
         /** 显示名:别名优先,缺省用原标签 */
@@ -80,13 +81,13 @@ public class PanelRegistry {
 
     public synchronized void reload() {
         Map<String, List<FieldDef>> byPanel = new HashMap<>();
-        jdbc.query("SELECT panel_code, col_name, label, label_en, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible, col_group FROM yj_field ORDER BY panel_code, seq, id",
+        jdbc.query("SELECT panel_code, col_name, label, label_en, data_type, dict_sql, ref_panel, ref_field, display_field, ref_filter, place, seq, width, editable, required, hidden, alias, visible, col_group FROM yj_field ORDER BY panel_code, seq, id",
                 rs -> {
                     String pc = rs.getString("panel_code");
                     byPanel.computeIfAbsent(pc, k -> new ArrayList<>()).add(new FieldDef(
                             rs.getString("col_name"), rs.getString("label"), rs.getString("label_en"), rs.getString("data_type"),
                             rs.getString("dict_sql"), rs.getString("ref_panel"), rs.getString("ref_field"),
-                            rs.getString("display_field"), rs.getString("place"), rs.getInt("seq"),
+                            rs.getString("display_field"), rs.getString("ref_filter"), rs.getString("place"), rs.getInt("seq"),
                             rs.getBoolean("editable"), rs.getBoolean("required"),
                             rs.getBoolean("hidden"), (Integer) rs.getObject("width"),
                             rs.getString("alias"), rs.getBoolean("visible"), rs.getString("col_group")));
