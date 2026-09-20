@@ -22,7 +22,7 @@ const LOCKED_PERSON = {
   RD_INSP_PLAN: '编写人',
 }
 
-/** 非锁定默认值:'@today' 占位表示当天日期 */
+/** 非锁定默认值:'@today' 占位表示当天日期(可内嵌,如「V@today」⇒ V2026-09-20) */
 const DOC_DEFAULTS = {
   RD_APPROVAL: [['申请立项日期', '@today'], ['文件管理人', '陈秀丽']],
   RD_PLAN: [['文件管理人', '陈秀丽']],
@@ -40,6 +40,19 @@ const DOC_DEFAULTS = {
     ['审核人一级', '冯总'],
     ['审核人二级', '秀丽'],
   ],
+  // 2026-09-20 出货检验项目控制计划按《出货检验项目控制计划.xlsx》重排为「一张表 7 列」。
+  //   设计纸张上写死的那几格(表单管理人=冯敏 / 密级=保密 / 使用范围=全公司 / 审核人=冯加劲)
+  //   照录为默认值 —— 走"默认值"而非"锁定只读",因为这几格是业务常值不是身份,
+  //   与 RD_PROD_INFO 的两级审批人同款口径。
+  //   版本号设计原文是「V + 按照日期来」⇒ 'V@today' 展开成「V2026-09-20」(当天)。
+  //   ⚠ 编写人不在这里:它由登录人决定,在 LOCKED_PERSON 里(editable=0,UI 三处按只读渲染)。
+  RD_INSP_PLAN: [
+    ['表单管理人', '冯敏'],
+    ['密级', '保密'],
+    ['使用范围', '全公司'],
+    ['审核人', '冯加劲'],
+    ['版本号', 'V@today'],
+  ],
 }
 
 /** 该面板由当前用户锁定的字段标签;没有则 null */
@@ -55,6 +68,11 @@ export function todayStr(d = new Date()) {
 
 function isEmpty(v) {
   return v === undefined || v === null || String(v).trim() === ''
+}
+
+/** 展开值里的 '@today'(整串或内嵌:「V@today」⇒ V2026-09-20);没有占位就原样返回 */
+function expandToday(value, today) {
+  return typeof value === 'string' && value.includes('@today') ? value.split('@today').join(today) : value
 }
 
 /** 当前用户显示名(user store 的 realName getter 同口径:姓名优先,退回账号) */
@@ -81,7 +99,7 @@ export function applyDocDefaults(panelCode, form, user, opts = {}) {
   }
 
   for (const [key, value] of DOC_DEFAULTS[code] || []) {
-    if (isEmpty(form[key])) form[key] = value === '@today' ? today : value
+    if (isEmpty(form[key])) form[key] = expandToday(value, today)
   }
   return form
 }

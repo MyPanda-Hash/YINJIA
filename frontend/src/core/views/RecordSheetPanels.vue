@@ -809,6 +809,11 @@
         @selection-change="(sel) => (libChecked = sel.filter((r) => !r.off))"
       >
         <el-table-column type="selection" width="42" :selectable="(row) => !row.off" />
+        <!-- 分组列(必测项/型式检验):单表形态下两类条目同库,没有这一列就分不清谁是谁。
+             值来自条目正文的 group(yj_std_lib.item_code),不是明细字段 ⇒ 不参与落库投影 -->
+        <el-table-column v-if="libTargetDt?.libGroupKey" :label="tt('分组')" width="90" align="center">
+          <template #default="{ row }">{{ tt(flatGroupOf(row)) }}</template>
+        </el-table-column>
         <el-table-column prop="控制项目" :label="tt('控制项目')" min-width="110">
           <template #default="{ row }">{{ row['控制项目'] + (row.off ? '（' + tt('已停用') + '）' : '') }}</template>
         </el-table-column>
@@ -831,6 +836,21 @@
       <div v-if="!isGroupedLib && !isAsmProcLib" class="lib-custom">
         <div class="lib-custom-title">{{ tt('补充自定义检验项') }}({{ tt('存入后长期可用') }})</div>
         <div class="lib-custom-form">
+          <!-- 分组(必测项/型式检验):这一格就是条目在库里的 item_code,不是明细字段。
+               单表形态没有表区可推 ⇒ 必须让用户选/填一个(空值后端直接 400)。
+               allow-create:选项随 yj_field.options 走,新分组名不必先去维护字段选项 -->
+          <el-select
+            v-if="libTargetDt?.libGroupKey"
+            v-model="libFGroup"
+            size="small"
+            filterable
+            allow-create
+            default-first-option
+            :placeholder="tt('分组')"
+            style="width:120px"
+          >
+            <el-option v-for="o in selectOptions(libTargetDt.libGroupKey)" :key="o.value" :label="tt(o.label)" :value="o.value" />
+          </el-select>
           <el-input v-model="libFControl" size="small" :placeholder="tt('控制项目')" />
           <el-input v-model="libFQuality" size="small" :placeholder="tt('质量控制内容')" />
           <el-input v-model="libFInstrument" size="small" :placeholder="tt('检测仪器、工具')" />
@@ -1296,13 +1316,19 @@ async function openLib(dt) {
     // all=1 连停用条目一起取回:停用条目灰显划线、不可勾选、可「恢复启用」——
     // 与 StdLibManager 同款维护能力(编辑/停用/恢复启用),改库不污染已录入单据。
     const res = await request.get('/stdlib/list', {
-      // insp.plan 按表区过滤(必测项/型式检验各看各的);spec.test 整库取回,组名由正文 group 承载
-      params: flat ? { lib: 'insp.plan', item: dt.filterVal || '', all: 1 } : { lib: 'spec.test', all: 1 },
+      // insp.plan **整库取回**(不传 item):单表形态下必测项/型式检验同表,两边都能挑;
+      //   分组名由条目正文的 group 承载,落明细时写回 libGroupKey 那一列(见 flatGroupOf/confirmLib)。
+      //   旧版这里传 dt.filterVal 按表区过滤 —— 现行设计没有表区,传空串会退化成"整库"但也可能被
+      //   将来加回的过滤语义误伤,索性不传。
+      // spec.test 同样整库取回,组名由正文 group 承载。
+      params: flat ? { lib: 'insp.plan', all: 1 } : { lib: 'spec.test', all: 1 },
     }).catch(() => null)
     const rows = res?.data || []
     if (rows.length) {
       if (flat) {
         // 出货检验计划表(扁平):规范结构 → 固定的 10 个中文键,一一对列名。
+        // 分组名(必测项/型式检验)**不在**这 10 个键里(它是 item_code,不是明细字段),
+        // 由 __entry.group 承载 ⇒ 勾选落明细时靠 flatGroupOf() 取回,写进 libGroupKey 那列。
         // __entry 挂原规范结构:平表表单只有 7 个字段,编辑保存时以 __entry 打底,
         // 否则条目里不合格应对措施/取样方式等本表单没有的列会被空串覆盖(丢数据);
         // confirmLib 落明细前会重新投影成 10 键,__entry 不会进单据。
@@ -1368,6 +1394,30 @@ const libCMethod = ref('')
 const libCBasis = ref('')
 const libFEditId = ref(null) // 扁平形态(出货检验计划):平表表单
 const libFEditEntry = ref(null)
+// 扁平形态的分组名 = 本条目在 yj_std_lib 里的 item_code(必测项/型式检验)。
+// 【为什么要单独一格】设计重排后本表是**一张表**(没有 filterKey/filterVal),
+//   分组名没了现成的来源:条目列表要按它过滤、新增条目要按它落 item_code
+//   (StdLibController.add 对空 item 直接 400)。条目行自己带着这个值(见 libGroupKey),
+//   表单一格跟着走,编辑时从条目回填、新增时手选/手输。
+const libFGroup = ref('')
+/** 扁平库的分组名(item_code):表单值优先,其次回落到表区(仍用 filterVal 的旧面板) */
+function flatItem() {
+  return (libFGroup.value || libTargetDt.value?.filterVal || '').trim()
+}
+/** 「补充自定义检验项」表单里分组格的初始值:libGroupKey 的选项取第一个,取不到退回表区 */
+function flatDefaultGroup() {
+  const key = libTargetDt.value?.libGroupKey
+  if (key) {
+    const o = selectOptions(key)[0]
+    if (o) return o.value
+  }
+  return libTargetDt.value?.filterVal || ''
+}
+/** 扁平库某条目的分组名(必测项/型式检验):条目正文的 group 优先(库条目挂在 __entry 上),
+ *  退回行上的 libGroupKey 列(未跑种子时的内置兜底常量就是这么写的)。 */
+function flatGroupOf(row) {
+  return String(row?.__entry?.group || row?.[libTargetDt.value?.libGroupKey] || row?.group || '').trim()
+}
 const libFControl = ref('')
 const libFQuality = ref('')
 const libFInstrument = ref('')
@@ -1417,6 +1467,9 @@ function editLibEntry() {
     libFFrequency.value = c.freq
     libFContent.value = c.content
     libFMethod.value = c.method
+    // 分组名回填:条目正文的 group(规范结构),退回表区 —— 保存时 item_code 就用它,
+    // 不给则条目会被 /stdlib/update 之外的路径改名(新增才是改名点,这里是保原值)
+    libFGroup.value = c.group || libTargetDt.value?.filterVal || ''
     libFEditId.value = e.dbId
     libFEditEntry.value = snap
   }
@@ -1439,6 +1492,7 @@ function resetLibEdit() {
   libFFrequency.value = ''
   libFContent.value = ''
   libFMethod.value = ''
+  libFGroup.value = flatDefaultGroup()
 }
 function cancelEditTestLib() {
   resetLibEdit()
@@ -1537,8 +1591,8 @@ const isAsmProcLib = computed(() => libTargetDt.value?.lib === 'asm.proc')
 function flatContent() {
   return toContentJson({
     ...(libFEditId.value ? (libFEditEntry.value || emptyEntry()) : emptyEntry()),
-    // 组名沿用本表区(必测项/型式检验);检验固定 IQC
-    group: libTargetDt.value?.filterVal || '',
+    // 组名 = 该条目在库里的 item_code(必测项/型式检验);检验固定 IQC
+    group: flatItem(),
     name: libFControl.value.trim(),
     quality: libFQuality.value.trim(),
     instrument: libFInstrument.value.trim(),
@@ -1555,14 +1609,21 @@ async function addCustomFlatLib() {
     ElMessage.warning(tt('请填写控制项目与控制标准'))
     return
   }
-  // 与规格书同一套规范结构,但**各存各的库**:出货检验计划表写 insp.plan(item=本表区)
+  // item 为空后端直接 400(StdLibController.add 校验 lib/item/content 三者非空)——
+  // 旧版靠 filterVal 兜着,本面板没有表区了 ⇒ 分组格必须选/填一个
+  const item = flatItem()
+  if (!item) {
+    ElMessage.warning(tt('请先选择分组'))
+    return
+  }
+  // 与规格书同一套规范结构,但**各存各的库**:出货检验计划表写 insp.plan(item=分组名)
   const content = flatContent()
   try {
     if (libFEditId.value) {
       await request.post('/stdlib/update', { id: libFEditId.value, content })
       ElMessage.success(tt('已保存修改'))
     } else {
-      await request.post('/stdlib/add', { lib: 'insp.plan', item: libTargetDt.value?.filterVal || '', content })
+      await request.post('/stdlib/add', { lib: 'insp.plan', item, content })
       ElMessage.success(tt('已存入标准库'))
     }
     resetLibEdit()
@@ -1617,7 +1678,13 @@ function confirmLib() {
       // 只把行投影成规范的 10 个中文键落进明细——否则 custom/dbId 会跟着 spread 存进单据
       // (保存链路只剥 id/__id/__no,认不出这两个键,会当成业务字段留在库里)
       const proj = toInspRow(toCanonical(row, ''))
-      arr.push(dt.filterKey ? { [dt.filterKey]: dt.filterVal, ...proj } : { ...proj })
+      const out = dt.filterKey ? { [dt.filterKey]: dt.filterVal, ...proj } : { ...proj }
+      // 分组名(必测项/型式检验)随勾选带回明细:toInspRow 的 10 个键里没有它 ⇒ 不会被 proj 盖掉;
+      // 但配置若把 libGroupKey 指到一个 proj **已有**的键上,就是配置错了 —— 那种情况下宁可保留
+      // proj 的值(条目正文的真实内容)也不让分组名去覆盖,故先判 undefined 再写。
+      const grp = flatGroupOf(row)
+      if (dt.libGroupKey && grp && out[dt.libGroupKey] === undefined) out[dt.libGroupKey] = grp
+      arr.push(out)
     }
   }
   libChecked.value = []
@@ -1790,6 +1857,97 @@ function onProdRefConfirm(rows) {
   }
   prodRefVisible.value = false
   emit('dirty')
+  // 「自动填充规格书」:面板块若配了 autoFillSpec 且本次选中的就是它的 fromKey(产品编号),
+  // 紧接着按该编号拉规格书内容回填 —— 用户点「确定」后不用再点第二下按钮。
+  const afs = cfg.value?.autoFillSpec
+  if (afs && prodRefKey.value === afs.fromKey) autoFillFromSpec(props.head[afs.fromKey], afs)
+}
+
+/** 该面板承载 autoFillSpec.detail 落点的明细表:按第一个 to 键在哪张表的列里找,找不到用第一张 */
+function autoFillTargetDt(afs) {
+  const want = (afs.detail || []).map((m) => m.to)
+  const tables = cfg.value?.dataTables || []
+  return tables.find((dt) => (dt.cols || []).some((c) => want.includes(c.key))) || tables[0] || null
+}
+
+/**
+ * 自动填充规格书 —— 「自动填充规格书」就是这条路径:
+ *   选定产品编号 → 取该产品对应**规格书**(RD_SPEC_DOC)的表头 + 「检验要求」表区明细 → 回填。
+ *
+ * 【为什么走后端 /px/specByProduct 而不是通用查询】规格书的 编号(=产品键)在通用链路里被
+ *   QueryService.loadDocs 用单据编号覆盖掉了(详见该处注释),getFormDescriptor /
+ *   queryFormDataList 都取不到真值。该端点另开一条直读 head/detail 的路。
+ *
+ * 【填充口径】
+ *   表头:按 head[] 逐格写(客户项目名称/产品功能类别/产品整体尺寸 ← 规格书等价列);
+ *   明细:整表替换 —— 本表的检验项就是规格书的检验项,逐条追加会越填越长;
+ *   兜底:defaults 里的固定值(如不合格应对措施三段式)**只填空格**,不覆盖已录内容。
+ *   命中多张规格书时(matched>1)只取最新一张,末尾提示按哪一张填的,不让用户猜。
+ */
+async function autoFillFromSpec(code, afs) {
+  const key = afs?.fromKey
+  const val = String(code ?? '').trim()
+  if (!key || !val || !props.editable) return
+  const dt = autoFillTargetDt(afs)
+  let payload = null
+  try {
+    const res = await request.get('/px/specByProduct', { params: { code: val } })
+    // request.js 的响应拦截器已 (res) => res.data ⇒ 这里拿到的是 ApiResult {code,message,data}
+    payload = res?.data ?? res ?? null
+  } catch (e) {
+    ElMessage.warning(tt('取规格书失败，请手工填写'))
+    return
+  }
+  if (!payload || !payload.found) {
+    ElMessage.info(tt('该产品编号还没有对应的规格书，请先分发规格书后再来引用'))
+    return
+  }
+  const rows = Array.isArray(payload.items) ? payload.items : []
+  const filled = rows.map((r) => {
+    const row = {}
+    for (const m of afs.detail || []) row[m.to] = r[m.from] === undefined || r[m.from] === null ? '' : String(r[m.from])
+    if (dt?.filterKey) row[dt.filterKey] = dt.filterVal
+    return row
+  })
+
+  const cur = dt ? rowsOf(dt) : []
+  if (cur.length) {
+    try {
+      await ElMessageBox.confirm(
+        tt('本表已有 {n} 行，改用规格书 {no} 的 {m} 行内容替换？').replace('{n}', String(cur.length)).replace('{no}', payload.单据编号 || '').replace('{m}', String(filled.length)),
+        tt('自动填充规格书'),
+        { type: 'warning', confirmButtonText: tt('替换'), cancelButtonText: tt('取消') },
+      )
+    } catch (e) {
+      return // 用户选了「取消」:保留原行
+    }
+  }
+
+  // 表头逐格回填(空值不回填,免得把已录内容清成空白)
+  for (const m of afs.head || []) {
+    const v = payload[m.from]
+    if (v !== undefined && v !== null && String(v).trim() !== '') props.head[m.to] = String(v)
+  }
+  if (dt && filled.length) {
+    // 兜底固定值(设计 F9 模板行的三段应对措施)逐行填空格 —— 是**明细**字段,不动表头
+    for (const row of filled) {
+      for (const [k, v] of Object.entries(afs.defaults || {})) {
+        if (!String(row[k] ?? '').trim()) row[k] = v
+      }
+    }
+    const arr = touch()
+    if (dt.filterKey) {
+      // 多表区共用一张行表:只换本表区的行,别的表区原样留着
+      const kept = arr.filter((r) => String(r[dt.filterKey] || '') !== String(dt.filterVal || ''))
+      arr.splice(0, arr.length, ...kept, ...filled)
+    } else {
+      arr.splice(0, arr.length, ...filled)
+    }
+  }
+  prodRefVisible.value = false
+  emit('dirty')
+  const more = Number(payload.matched) > 1 ? tt('（该产品有多张规格书，按最新的填）') : ''
+  ElMessage.success(tt('已按规格书 {no} 自动填充').replace('{no}', payload.单据编号 || '') + more)
 }
 
 // ── 字段编辑(数据记录表):列名可改,应对复杂测试环境 ──

@@ -1,0 +1,103 @@
+===== RD_INSP_PLAN 字段全景 =====
+place	seq	col_name	label	alias	data_type	ref_panel	ref_field	display_field	editable	hidden	visible
+detail	2	序号	序号	序 号	文本				True	False	True
+detail	5	检验类别	检验类别		下拉框				True	False	True
+detail	10	控制项目	控制项目	检验项目	文本				True	False	True
+detail	20	质量控制内容	质量控制内容		文本				True	False	True
+detail	30	检测仪器	检测仪器		文本				True	False	True
+detail	40	控制标准及要求	控制标准及要求	检验要求	文本				True	False	True
+detail	50	检验	检验		文本				True	False	True
+detail	60	不合格应对措施	不合格应对措施		文本				True	False	True
+detail	70	检测频率	检测频率		下拉框				True	False	True
+detail	80	取样方式	取样方式		文本				True	False	True
+detail	90	检验内容	检验内容		文本				True	False	True
+detail	100	控制方法	控制方法		文本				True	False	True
+detail	120	备注	备注		文本				True	False	True
+header	10	单据编号	单据编号		文本				False	False	True
+header	20	单据日期	单据日期		日期				True	False	True
+header	30	文档编号	文档编号		文本				True	True	True
+header	40	标题	标题		文本				True	False	True
+header	50	版本号	版本号		文本				True	False	True
+header	60	密级	密级		下拉框				True	False	True
+header	70	产品编号	产品编号		参照	RD_PROD_INFO	产品编号	产品名称	True	False	True
+header	80	客户名	客户名		文本				True	False	True
+header	90	管理人	表单管理人		文本				True	False	True
+header	100	主要性能	主要性能		文本				True	False	True
+header	105	产品功能类别	产品功能类别		参照	RD_PROD_INFO	产品功能类别	产品功能类别	True	False	True
+header	110	滤芯尺寸	滤芯尺寸		文本				True	False	True
+header	120	授权使用人	授权使用人		文本				True	False	True
+header	130	编写人	编写人		文本				False	False	True
+header	140	审核人	审核人		文本				True	False	True
+header	150	备注	备注		文本				True	False	True
+query	10	标题	标题		文本				False	False	True
+query	20	产品编号	产品编号		文本				False	False	True
+
+===== docDefaults/表头 目标键是否落地 =====
+col_name	label	place	data_type
+版本号	版本号	header	文本
+编写人	编写人	header	文本
+产品功能类别	产品功能类别	header	参照
+管理人	表单管理人	header	文本
+密级	密级	header	下拉框
+审核人	审核人	header	文本
+
+===== rd_insp_plan_detail 物理列 =====
+col_name	type	chars
+id	int	2
+单据编号	nvarchar	60
+控制项目	nvarchar	100
+质量控制内容	nvarchar	200
+检测仪器	nvarchar	100
+控制标准及要求	nvarchar	2000
+检验	nvarchar	30
+不合格应对措施	nvarchar	1000
+检测频率	nvarchar	100
+取样方式	nvarchar	100
+检验内容	nvarchar	200
+控制方法	nvarchar	100
+asp_user1	nvarchar	50
+asp_time1	datetime2	4
+asp_user2	nvarchar	50
+asp_time2	datetime2	4
+asp_cancel	char	0
+检验类别	nvarchar	30
+序号	nvarchar	20
+备注	nvarchar	500
+
+===== 分组/频率/密级 字段的字典 SQL =====
+col_name	label	data_type	dict_sql
+检验类别	检验类别	下拉框	SELECT v FROM (VALUES (N'必测项'),(N'型式检验')) AS t(v)
+密级	密级	下拉框	SELECT v FROM (VALUES (N'保密'),(N'内部'),(N'公开')) AS t(v)
+检测频率	检测频率	下拉框	SELECT v FROM (VALUES (N'1PCS/一个生产批次'),(N'生产量*1%'),(N'型式检验')) AS t(v)
+
+===== rd_spec_doc_head 最近 10 条 =====
+单据编号	编号	客户项目名称	产品类别	整体规格参数
+probe				
+probe				
+SD-2026-09-0003				
+SD-2026-09-0002				
+SD-2026-09-0001				
+
+===== rd_spec_doc_detail 各表区行数 =====
+表区	行数
+
+===== rd_spec_assign 行数 =====
+行数
+0
+
+===== insp.plan 标准库条目 =====
+id	item_code	seq	enabled	content_head
+101	必测项	10	1	{"v":2,"group":"必测项","name":"*外观","req":"清洁、无破损无压痕，无裂纹,无倾斜等缺
+102	必测项	20	1	{"v":2,"group":"必测项","name":"*整体尺寸(外包无纺布)","req":"外径：46±0.5m
+103	必测项	30	1	{"v":2,"group":"必测项","name":"*出货重量","req":">22g","method":"常
+104	必测项	40	1	{"v":2,"group":"必测项","name":"*抗压强度（裸棒）","req":"将炭棒水平放置在水平面板上
+105	必测项	50	1	{"v":2,"group":"必测项","name":"*压降测试","req":"将炭棒组装好装入滤瓶（可旋盖大T）
+106	必测项	60	1	{"v":2,"group":"必测项","name":"*黑水及颗粒物测试（无黑后）","req":"将炭棒组装好装入
+158	必测项	70	1	{"v":2,"group":"必测项","name":"*黑水及颗粒物测试（无黑后）","req":"将炭棒组装好装入
+107	型式检验	80	1	{"v":2,"group":"型式检验","name":"*碱性性能测试","req":"将炭棒组装好装入伊可普工装，
+159	型式检验	90	1	{"v":2,"group":"型式检验","name":"*碱性性能测试","req":"将炭棒组装好装入伊可普工装，
+160	型式检验	100	1	{"v":2,"group":"型式检验","name":"*碱性性能测试","req":"将炭棒组装好装入伊可普工装，
+108	型式检验	110	1	{"v":2,"group":"型式检验","name":"余氯性能测试","req":"将炭棒组装好装入单筒，滤瓶进出
+161	型式检验	120	1	{"v":2,"group":"型式检验","name":"余氯性能测试","req":"将炭棒组装好装入单筒，滤瓶进出
+109	型式检验	130	1	{"v":2,"group":"型式检验","name":"卫生浸泡","req":"符合《生活饮用水输配水设备及防护材
+

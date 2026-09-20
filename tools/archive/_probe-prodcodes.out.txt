@@ -1,0 +1,56 @@
+===== rd_prod_info 最近 8 条(挑编号) =====
+[查询失败] 使用“0”个参数调用“ExecuteReader”时发生异常:“对象名 'rd_prod_info' 无效。”
+
+===== rd_spec_doc_detail 列型 =====
+name	type	chars	is_nullable
+id	int	2	False
+单据编号	nvarchar	60	False
+表区	nvarchar	20	True
+序号	nvarchar	20	True
+更改内容	nvarchar	500	True
+更改原因	nvarchar	200	True
+更改时间	nvarchar	50	True
+责任人	nvarchar	50	True
+备注	nvarchar	200	True
+检验项目	nvarchar	100	True
+检验要求	nvarchar	1000	True
+检验方法	nvarchar	200	True
+检验依据	nvarchar	200	True
+物料编码	nvarchar	60	True
+物料名称	nvarchar	100	True
+规格参数	nvarchar	500	True
+数量	nvarchar	30	True
+asp_user1	nvarchar	50	True
+asp_time1	datetime2	4	True
+asp_user2	nvarchar	50	True
+asp_time2	datetime2	4	True
+asp_cancel	char	0	True
+
+===== rd_spec_doc_head 相关列型 =====
+name	type	chars	is_nullable
+单据编号	nvarchar	60	False
+单据日期	nvarchar	20	True
+名称	nvarchar	200	True
+编号	nvarchar	50	True
+整体规格参数	nvarchar	1000	True
+客户项目名称	nvarchar	200	True
+产品类别	nvarchar	120	True
+
+===== rd_spec_assign 列型 =====
+name	type	chars	is_nullable
+id	int	2	False
+产品编号	nvarchar	200	False
+单据编号	nvarchar	50	False
+规格书种类	nvarchar	60	False
+负责人	nvarchar	50	False
+责任人	nvarchar	50	False
+asp_user1	nvarchar	100	True
+asp_time1	datetime2	4	True
+asp_user2	nvarchar	100	True
+asp_time2	datetime2	4	True
+asp_cancel	char	0	False
+
+===== 自增标记 =====
+head_单据编号_自增	detail_id_自增
+0	1
+

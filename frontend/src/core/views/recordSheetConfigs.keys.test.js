@@ -114,6 +114,38 @@ test('cover 的 field/sign 键必须是该面板当前的 label', () => {
 })
 
 /**
+ * 核心断言 ②·补2:报告头(info / subtitle / conclusion / titleFromKey)的键也必须是当前 label。
+ *
+ * 【为什么要补这条】2026-09-20 出货检验计划表重排时踩到,与封面那次是**同一个坑**:
+ *   列 `管理人` 的 label 是「表单管理人」(yj_field.alias 分流),配置却写
+ *   `info: [{ label:'表单管理人', key:'管理人' }]`。
+ *   而模板渲染的是 `head[effInfo[ii].key]` 与 `selectOptions(effInfo[ii].key)`,
+ *   链路后端 `PanelConfigService.fieldSpec()` 定死了 `dataName = f.label()`(≠col_name),
+ *   ⇒ `head['管理人']` 恒为 undefined:那一格**永远空白**,保存时也丢值。
+ *   断言 ①/②/②·补 覆盖了 dataTables / sections / cover,**报告头是第三个盲区**。
+ * 注:`info[].label` 才是「显示文案」(label 与 key 分写),不要拿它当数据键。
+ */
+test('报告头(info/subtitle/conclusion/titleFromKey)的键必须是该面板当前的 label', () => {
+  const problems = []
+  const push = (panel, where, key, labels, cols) => {
+    if (!key || NON_FIELD_KEYS.has(key) || labels.has(key)) return
+    if (KNOWN_PREEXISTING.has(`${panel}|${key}`)) return
+    problems.push(cols[key]
+      ? `${panel} · ${where} · key='${key}' 是 col_name,但该字段 label 是 '${cols[key]}' ⇒ key 应写 '${cols[key]}'`
+      : `${panel} · ${where} · key='${key}' 既不是 label 也不是 col_name`)
+  }
+  for (const [panel, cfg] of Object.entries(recordSheetConfigs)) {
+    if (!FIXTURE[panel]) continue
+    const { labels, cols } = fxOf(panel)
+    ;(cfg.info || []).forEach((e, i) => push(panel, `info[${i}]`, e.key, labels, cols))
+    if (cfg.subtitle) push(panel, 'subtitle', cfg.subtitle.key, labels, cols)
+    if (cfg.conclusion) push(panel, 'conclusion', cfg.conclusion.key, labels, cols)
+    if (cfg.titleFromKey) push(panel, 'titleFromKey', cfg.titleFromKey, labels, cols)
+  }
+  assert.deepEqual(problems, [], `报告头数据键与 yj_field.label 不一致(该格空白且保存丢值):\n  ${problems.join('\n  ')}`)
+})
+
+/**
  * 核心断言 ②:sections 网格字段的 key 同样必须是当前 label
  */
 test('sections / tailSections 的字段 key 必须是该面板当前的 label', () => {
@@ -338,4 +370,135 @@ test('成型工艺清单 3 页签:每页有 grid/showHead,且修订记录页与�
   assert.deepEqual(rev.cols, asmRev.cols, '成型修订记录页的列必须与组装逐字一致(用户口径:一样)')
   assert.deepEqual(rev.design, asmRev.design, '设计像素规范必须与组装一致')
   assert.equal(rev.pageTitle, asmRev.pageTitle)
+})
+
+/**
+ * 断言 ⑧(2026-09-20):出货检验项目控制计划「一张表 7 列」的版式与自动填充不变量。
+ *
+ * 设计源《出货检验项目控制计划.xlsx》单 sheet:报告头 + 三行三格表头 + 单张 7 列表 + 跨 7 列表尾注。
+ * 这里钉的是**三条同宽约束**(错一条整页竖线不齐、打印左右缘不齐平,且肉眼要拿尺子才看得出来):
+ *   ① grid 7 格 = 设计 B..H 列宽,总宽 1187;
+ *   ② head {title, infoLabel, infoValue} 合计 = grid 格数(报告头三段跨度),
+ *      大标题跨 5 格 = 设计 B3:F4 的合并区,信息栏落 G/H;
+ *   ③ sections 每行靠 lspan/vspan 拼满 7 格,且表体 cols 的可见列宽之和 = grid 之和。
+ *      ⇒ 报告头 / 表头块 / 表体三处同宽,竖线才对得齐。
+ *
+ * 另钉两条**会静默出错**的配置事实:
+ *   ④ 本面板的数据表**不得**有 filterKey —— rd_insp_plan_detail 连 [表区] 物理列都没有
+ *      (yj_field 里那条是 header 遗留),按它过滤只会得到一张**空表**;
+ *      检验类别改由 libGroupKey 承载,且内置兜底库的每一行都要带分组值(否则勾选落明细时分组丢失)。
+ *   ⑤ autoFillSpec 的 from/to 必须都是真实存在的字段名 —— 它跨面板取 RD_SPEC_DOC 的列,
+ *      那边改个 label,这边就静默填空白(与文件头讲的数据键漂移同一个坑)。
+ */
+test('出货检验计划表:一张表 7 列的三处同宽 + 自动填充规格书的字段名溯源', () => {
+  const cfg = recordSheetConfigs.RD_INSP_PLAN
+  assert.ok(cfg, 'RD_INSP_PLAN 配置缺失')
+
+  // ── 单 sheet = 单页,不应有页签 ──
+  assert.ok(!cfg.pages, '设计是单 sheet,不应配 pages(配了会出页签)')
+  assert.equal(cfg.headMode, 'report', '报告头版式')
+
+  // ── ①grid 7 格,总宽 1187(设计 B..H) ──
+  const grid = cfg.grid
+  assert.ok(Array.isArray(grid) && grid.length === 7, 'grid 应为 7 格(设计 B..H)')
+  assert.ok(grid.every((w) => w > 0), 'grid 含非正列宽 ⇒ 条件区/表体会塌')
+  const gridSum = grid.reduce((a, b) => a + b, 0)
+  assert.equal(gridSum, 1187, `grid 总宽应为 1187,实际 ${gridSum}`)
+
+  // ── ②报告头三段跨度合计 = grid 格数 ──
+  const h = cfg.head
+  assert.ok(h, '缺 head{title,infoLabel,infoValue} ⇒ 报告头对齐不上网格')
+  assert.equal(h.title + h.infoLabel + h.infoValue, grid.length,
+    'title + infoLabel + infoValue 必须等于 grid 格数(不等则报告头错位)')
+  assert.equal(h.title, 5, '大标题跨 5 格 = 设计 B3:F4 的合并区')
+  assert.equal(h.infoLabel, 1)
+  assert.equal(h.infoValue, 1)
+
+  // ── ③表头块每行拼满 7 格(照 HTML 表格算法模拟 colspan/rowspan 占位) ──
+  // 算法与浏览器一致:从左往右找本行第一个空位放格子;rowspan:r 把**该格占的列**继续占住下面 r-1 行。
+  // 判定:全部行处理完后,每个 (行, 列) 都必须被占住 —— 有空位就是缺格(竖线断)、
+  // 越界就是超出(末列被挤出去)。
+  const rows = (cfg.sections || []).flatMap((sec) => sec.rows || [])
+  assert.ok(rows.length >= 3, '表头块应有设计 r5/r6/r7 三行')
+  const n = grid.length
+  const occ = rows.map(() => new Array(n).fill(false))
+  const detail = []
+  for (const [ri, row] of rows.entries()) {
+    let col = 0
+    for (const p of row.pairs || []) {
+      const lspan = p.lspan || 1
+      const vspan = p.vspan || 1
+      const rowspan = p.rowspan || 1
+      const need = lspan + vspan
+      while (col < n && occ[ri][col]) col++
+      assert.ok(col + need <= n, `第 ${ri + 1} 行「${p.label}」放不下(第 ${col} 列起需 ${need} 格,共 ${n} 格)`)
+      const from = col
+      for (let c = col; c < col + need; c++) occ[ri][c] = true
+      col += need
+      for (let rr = ri + 1; rr < Math.min(ri + rowspan, rows.length); rr++) {
+        for (let c = from; c < from + need; c++) occ[rr][c] = true
+      }
+      detail.push(`r${ri + 1}「${p.label}」列${from + 1}-${from + need}`)
+    }
+  }
+  for (const [ri, row] of occ.entries()) {
+    const hole = row.indexOf(false)
+    assert.equal(hole, -1, `第 ${ri + 1} 行第 ${hole + 1} 格空着 ⇒ 整页缺格、竖线断(${detail.join(' / ')})`)
+  }
+
+  // ── ④表体:一张表、无 filterKey/表区、可见列宽之和 = grid 之和 ──
+  const dts = cfg.dataTables || []
+  assert.equal(dts.length, 1, '设计只有一张表')
+  const dt = dts[0]
+  assert.ok(!dt.filterKey, '⚠ 不得有 filterKey:rd_insp_plan_detail 没有 [表区] 物理列,按它过滤会得到空表')
+  assert.ok(!dt.filterVal, '不得有 filterVal(同上)')
+  const vis = (dt.cols || []).filter((c) => !c.hiddenCol)
+  assert.equal(vis.length, 7, '可见列应恰好 7 列(设计 B..H)')
+  const visSum = vis.reduce((a, c) => a + (c.w || 100), 0)
+  assert.equal(visSum, gridSum, `表体可见列宽之和 ${visSum} 应等于 grid 之和 ${gridSum}(否则表体与表头同宽不成立)`)
+
+  // ── ⑤libGroupKey:单表形态的分组通道,列要藏起来,内置兜底库每行都要带分组值 ──
+  assert.ok(dt.libGroupKey, '单表形态必须用 libGroupKey 承载 必测项/型式检验(否则勾选落明细时分组丢失)')
+  assert.ok((dt.cols || []).some((c) => c.key === dt.libGroupKey && c.hiddenCol),
+    'libGroupKey 那一列必须 hiddenCol(只参与写库,不上纸)')
+  const fx = FIXTURE.RD_INSP_PLAN
+  assert.ok(fx?.labels?.includes(dt.libGroupKey), `libGroupKey '${dt.libGroupKey}' 不是本面板的真实字段`)
+  const libRows = Array.isArray(dt.lib) ? dt.lib : null
+  assert.ok(libRows, 'lib 必须是**数组**:openLib 用 Array.isArray 判是否走扁平 insp.plan 库')
+  assert.ok(libRows.length > 0, '内置兜底库不应为空')
+  for (const [i, r] of libRows.entries()) {
+    assert.ok(String(r[dt.libGroupKey] || '').trim(), `兜底库第 ${i + 1} 行缺 ${dt.libGroupKey} 值(分组会丢)`)
+  }
+  assert.deepEqual([...new Set(libRows.map((r) => r[dt.libGroupKey]))].sort(), ['型式检验', '必测项'],
+    '分组值应与 yj_std_lib 的 item_code 同源(必测项/型式检验)')
+
+  // ── ⑥自动填充规格书:字段名必须两边都真实存在 ──
+  const afs = cfg.autoFillSpec
+  assert.ok(afs, '设计标了「自动填充规格书」的格子需要 autoFillSpec 配置')
+  assert.equal(afs.fromKey, '产品编号', '触发键应为 产品编号(设计里那一格的参照)')
+  assert.ok(fx.labels.includes(afs.fromKey))
+  assert.ok(afs.head?.length, 'autoFillSpec.head 为空 ⇒ 表头三格不会回填')
+  const specFx = FIXTURE.RD_SPEC_DOC
+  assert.ok(specFx?.labels?.length, 'fixture 缺 RD_SPEC_DOC(取值源面板)')
+  for (const m of afs.head) {
+    assert.ok(fx.labels.includes(m.to), `表头落点 '${m.to}' 不是本面板字段(会静默丢值)`)
+    assert.ok(specFx.labels.includes(m.from), `取数源 '${m.from}' 不是规格书字段(那边改 label 这里就填空白)`)
+  }
+  assert.ok(afs.detail?.length, 'autoFillSpec.detail 为空 ⇒ 明细不会回填')
+  for (const m of afs.detail) {
+    assert.ok(fx.labels.includes(m.to), `明细落点 '${m.to}' 不是本面板字段`)
+    assert.ok(specFx.labels.includes(m.from), `取数源 '${m.from}' 不是规格书字段`)
+  }
+  // 三段式应对措施是设计 F9 模板行的原文,必须挂在**明细**字段上(它在明细行上,不在表头)
+  assert.ok(afs.defaults && Object.keys(afs.defaults).length, '缺 autoFillSpec.defaults')
+  for (const k of Object.keys(afs.defaults)) {
+    assert.ok(fx.labels.includes(k), `兜底值落点 '${k}' 不是本面板字段`)
+    assert.ok(!(afs.head || []).some((m) => m.to === k), `'${k}' 是明细字段,不该同时出现在 head 映射里`)
+  }
+
+  // ── ⑦autoFillSpec 的明细落点必须正好是表体的列(否则填进去的行不上纸) ──
+  const dtKeys = new Set((dt.cols || []).map((c) => c.key))
+  for (const m of afs.detail) {
+    assert.ok(dtKeys.has(m.to), `明细落点 '${m.to}' 不在表体列里(填了也看不见)`)
+  }
 })
