@@ -1,0 +1,81 @@
+﻿== _q_rail_so_probe.sql ==
+  | 单据编号 | 文本 | query,header | 10 | 0 | 1 | 
+  | 单据日期 | 日期 | query,header | 20 | 0 | 1 | 
+  | 客户 | 参照 | query,header | 30 | 0 | 1 | 
+  | 客户编码 | 下拉框 | header | 40 | 0 | 1 | 
+  | 结算客户 | 下拉框 | header | 50 | 0 | 1 | 
+  | 币种 | 下拉框 | header | 60 | 1 | 0 | 
+  | 汇率 | 小数 | header | 70 | 0 | 1 | 
+  | 部门 | 下拉框 | query,header | 80 | 0 | 1 | 
+  | 业务员 | 下拉框 | query,header | 100 | 0 | 1 | 
+  | 结算期限 | 文本 | header | 110 | 0 | 1 | 
+  | 预计交货日期 | 日期 | query,header,detail | 120 | 0 | 1 | 
+  | 联系人 | 文本 | header | 130 | 0 | 1 | 
+  | 备注 | 文本 | header | 140 | 0 | 1 | 
+  | 整单折扣额 | 文本 | header | 950 | 1 | 0 | 
+  | 创建时间 | 日期 | header | 950 | 0 | 1 | 
+  | 结算状态 | 文本 | header | 950 | 1 | 0 | 
+  | 交货方式 | 文本 | header | 950 | 1 | 0 | 
+  | 客户id | 文本 | header | 950 | 1 | 0 | 
+  | 业务员id | 文本 | header | 950 | 1 | 0 | 
+  | 业务员编码 | 文本 | header | 950 | 1 | 0 | 
+  | 应收金额 | 文本 | header | 950 | 0 | 1 | 
+  | 商品组合 | 文本 | header | 950 | 1 | 0 | 
+  | 商品数量 | 文本 | header | 950 | 1 | 0 | 
+  | 折前价税合计 | 文本 | header | 950 | 1 | 0 | 
+  | 实际出入库状态 | 文本 | header | 950 | 1 | 0 | 
+  | 出入库状态 | 文本 | header | 950 | 0 | 1 | 
+  | 单据关闭状态 | 文本 | header | 950 | 1 | 0 | 
+  | 部门id | 文本 | header | 950 | 1 | 0 | 
+  | 部门编码 | 文本 | header | 950 | 1 | 0 | 
+  | 审核日期 | 日期 | header | 950 | 1 | 0 | 
+  | 客户联系电话 | 文本 | header | 950 | 0 | 1 | 
+  | 客户国家id | 文本 | header | 950 | 1 | 0 | 
+  | 客户国家名称 | 文本 | header | 950 | 1 | 0 | 
+  | 客户国家编码 | 文本 | header | 950 | 1 | 0 | 
+  | 客户省份id | 文本 | header | 950 | 1 | 0 | 
+  | 客户省份名称 | 文本 | header | 950 | 1 | 0 | 
+  | 客户省份编码 | 文本 | header | 950 | 1 | 0 | 
+  | 客户市区id | 文本 | header | 950 | 1 | 0 | 
+  | 客户市区名称 | 文本 | header | 950 | 1 | 0 | 
+  | 客户市区编码 | 文本 | header | 950 | 1 | 0 | 
+  | 客户区县id | 文本 | header | 950 | 1 | 0 | 
+  | 客户区县名称 | 文本 | header | 950 | 1 | 0 | 
+  | 客户区县编码 | 文本 | header | 950 | 1 | 0 | 
+  | 联系信息 | 文本 | header | 950 | 1 | 0 | 
+  | 联系地址 | 文本 | header | 950 | 0 | 1 | 
+  | 发货国家id | 文本 | header | 950 | 1 | 0 | 
+  | 发货国家名称 | 文本 | header | 950 | 1 | 0 | 
+  | 发货国家编码 | 文本 | header | 950 | 1 | 0 | 
+  | 发货省份id | 文本 | header | 950 | 1 | 0 | 
+  | 发货省份名称 | 文本 | header | 950 | 1 | 0 | 
+  | de | Kundenauftrag | manual | 
+  | en | Sales Order | manual | 
+  | es | Pedido de venta | manual | 
+  | fr | Commande de vente | manual | 
+  | ja | 受注伝票 | manual | 
+  | ko | 수주 오더 | manual | 
+  | ru | Заказ клиента | manual | 
+  | th | ใบสั่งขาย | manual | 
+  | vi | Đơn hàng bán | manual | 
+  | 部门 | en | Dept Name | manual | 
+  | 客户 | en | Customer Name | manual | 
+  | 部门 | 
+  | 单据编号 | 
+  | 单据日期 | 
+  | 单据状态 | 
+  | 客户 | 
+  | 业务员 | 
+  | ZXL-20260916-01 | 2026-09-16 | 深圳市龙达净水设备有限公司 | 销售部 | 邹新龙 | N | 
+  | ZL-20260916-06 | 2026-09-16 | 张莉 | 销售部 | 张莉 | N | 
+  | ZL-20260916-04 | 2026-09-16 | 张莉 | 销售部 | 张莉 | N | 
+  | ZL-20260916-01 | 2026-09-16 | 宁波市碧纯科技有限公司 | 销售部 | 张莉 | N | 
+  | LZW-20260915-04 | 2026-09-15 | 澳兰斯健康产业有限公司 | 销售部 | 李梓维 | N | 
+  | PU_ORDER | 采购订单 | doc | bd_pu_order | bl_pu_order | 
+  | PURCHASE_IN | 采购入库单 | doc | bd_purchase_in | bl_purchase_in | 
+  | QC_INSP | 来料检验单 | doc | qc_insp | qc_insp_detail | 
+  | QC_RETURN | 暂收退回单 | doc | qc_return | qc_return_detail | 
+  | SALE_OUT | 销售出库单 | doc | bd_sale_out | bl_sale_out | 
+  | SL_RECV | 送料暂收单 | doc | sl_recv | sl_recv_detail | 
+  | SO_ORDER | 销售订单 | doc | bd_so_order | bl_so_order | 
+[OK] _q_rail_so_probe.sql (7 batches)

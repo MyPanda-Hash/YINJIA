@@ -857,6 +857,8 @@ export default {
     '输入搜索': 'Gõ để tìm',
     '点击编辑': 'Bấm để sửa',
     '共有数据': 'Tổng số dữ liệu',
+    '单号': 'Số',
+    '拖动调整宽度': 'Kéo để điều chỉnh chiều rộng',
     '审核状态': 'Trạng thái duyệt',
     '选择': 'Chọn',
     '首页': 'Đầu',

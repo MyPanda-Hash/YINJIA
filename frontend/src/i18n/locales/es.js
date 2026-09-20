@@ -857,6 +857,8 @@ export default {
     '输入搜索': 'Escribir para buscar',
     '点击编辑': 'Clic para editar',
     '共有数据': 'Total de registros',
+    '单号': 'N.º',
+    '拖动调整宽度': 'Arrastrar para ajustar el ancho',
     '审核状态': 'Estado de auditoría',
     '选择': 'Seleccionar',
     '首页': 'Primera',

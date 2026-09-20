@@ -857,6 +857,8 @@ export default {
     '输入搜索': 'Zum Suchen tippen',
     '点击编辑': 'Klicken zum Bearbeiten',
     '共有数据': 'Gesamtdatensätze',
+    '单号': 'Nr.',
+    '拖动调整宽度': 'Ziehen zum Anpassen der Breite',
     '审核状态': 'Prüfstatus',
     '选择': 'Auswählen',
     '首页': 'Erste',

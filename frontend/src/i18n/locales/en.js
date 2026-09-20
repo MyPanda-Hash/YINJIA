@@ -315,6 +315,8 @@ export default {
     '输入搜索': 'Type to search',
     '点击编辑': 'Click to edit',
     '共有数据': 'Total records',
+    '单号': 'No.',
+    '拖动调整宽度': 'Drag to resize',
     '审核状态': 'Audit Status',
     '选择': 'Select',
     '首页': 'First',

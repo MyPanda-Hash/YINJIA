@@ -1,0 +1,18 @@
+﻿== _q_rail_i18n.sql ==
+  | 部门 | Dept Name | 部門 | 3 | 
+  | 查找 | null | null | 0 | 
+  | 单号 | null | null | 0 | 
+  | 供应商 | Vendor Archive | 仕入先 | 4 | 
+  | 共有数据 | null | null | 0 | 
+  | 客户 | Customer Name | 顧客 | 3 | 
+  | 日期 | Date | 日付 | 2 | 
+  | 审核状态 | null | null | 0 | 
+  | 收起 | null | null | 0 | 
+  | 输入搜索 | null | null | 0 | 
+  | 条 | null | null | 0 | 
+  | 拖动调整宽度 | null | null | 0 | 
+  | 选择 | null | null | 0 | 
+  | 暂无数据 | null | null | 0 | 
+  | 采购订单 | Purchase Order | 購入注文 | 
+  | 销售订单 | Sales Order | 受注伝票 | 
+[OK] _q_rail_i18n.sql (3 batches)
