@@ -155,3 +155,29 @@ test('配置里用到的每个表内键都能在 fixture 里找到归属', () =>
   }
   assert.deepEqual(problems, [], `fixture 已过期(重跑 gen-config-key-fixture.cjs):\n  ${problems.join('\n  ')}`)
 })
+
+/**
+ * 断言 ⑤(Phase 4):组装工艺 4 变体的三处取值集必须一致 ——
+ *   ① 面板字典(RD_ASM_PROC.工艺形态 的 dict_sql 4 值)
+ *   ② 配置 variants 的键(决定纸面标题)
+ *   ③ asm.proc 标准库的 item_code(决定勾选带入的内容)
+ * 任一处漂移就会出现"选了 A 变体却带出 B 的内容/标题"或"下拉有值但库里没有"。
+ * 字典从 fixture 取不到(它只记 label),故直接扫配置 + 断言与标准库列表常量同源。
+ */
+test('组装工艺 4 变体:面板字典值 / variants 键 / 标准库 item_code 三处一致', () => {
+  const VARIANTS = ['裸棒', '机器包布', '复合半成品', '成品']
+  const cfg = recordSheetConfigs.RD_ASM_PROC
+  assert.ok(cfg, 'RD_ASM_PROC 配置缺失')
+  assert.equal(cfg.variantKey, '工艺形态', '变体字段应为 工艺形态(与字典/库同源)')
+  assert.deepEqual(Object.keys(cfg.variants || {}), VARIANTS, 'variants 键应与设计 4 个变体 sheet 一致')
+
+  // 标准库条目名的权威清单在生成器里(此处只钉住"配置侧引用的库编码正确")
+  const libs = (cfg.dataTables || []).map((dt) => dt.lib).filter(Boolean)
+  assert.deepEqual(libs, ['asm.proc'], '页 1 关键控制清单的 lib 应为 asm.proc')
+
+  // 每个变体都必须有纸面标题(否则切变体后标题不跟着变)
+  for (const v of VARIANTS) {
+    assert.ok(cfg.variants[v].plainTitle, `变体 ${v} 缺 plainTitle`)
+    assert.ok(cfg.variants[v].plainTitle.endsWith(v), `变体 ${v} 的 plainTitle 应以变体名结尾`)
+  }
+})

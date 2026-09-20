@@ -493,3 +493,16 @@ migrate-rd-2026-design.sql
 migrate-rd-progress-18cols.sql
 
 # —— 2026-09-18 Phase 3 多语言补充:序号/检验项目/检验要求(alias 显示名)不含新 label,无需新增词条 ——
+
+# —— 2026-09-18 研发管理最新设计 Phase 4(组装工艺 4 变体标准库化)——
+# migrate-asm-proc-lib.sql —— 组装工艺 4 变体标准库种子(lib_code=asm.proc;裸棒/机器包布/复合半成品/成品,
+#   合计 39 道工序,管控要求 0 条为空)。**生成物**,由 tools/gen/gen-asm-proc-lib.cjs 从设计
+#   《关键控制清单--标准库.xlsx》4 个 sheet 生成 —— 生成器已展开设计的合并单元格(工序/检查比例纵向合并、
+#   工序控制内容横向多行);⚠ 旧 RD_ASM_PROC_DT0.seedRows 只有 21 条(= 首次复刻把合并单元格塌缩的产物)
+#   且多条管控要求为空,本种子以设计为准重建。幂等键 lib_code+item_code。
+# migrate-rd-2026-design.sql(重跑) —— §F 新增 RD_ASM_PROC.工艺形态(4 变体承载字段,字典=4 个 sheet 名):
+#   4 个关键控制清单变体原先没有任何字段能表达"本单用哪一套工序",默认只画首次复刻的那一套。
+# i18n-rd-2026-design.sql(重跑) —— 补 工艺形态 + 4 变体名 + 关键控制清单标准库 + 变体/工序数,各 10 语言
+migrate-asm-proc-lib.sql
+migrate-rd-2026-design.sql
+i18n-rd-2026-design.sql

@@ -499,10 +499,39 @@
       </tbody>
     </table>
 
-    <!-- ═══ 标准库勾选弹窗(规格书检验要求:分组标准库;出货检验计划必测项+型式项:扁平表格) ═══ -->
-    <el-dialog v-model="libVisible" :title="tt('检验项目标准库')" width="880px" append-to-body>
+    <!-- ═══ 标准库勾选弹窗(规格书检验项目:分组库;出货检验计划:必测项+型式项扁平表;
+             组装工艺:4 变体整表替换) ═══ -->
+    <el-dialog v-model="libVisible" :title="tt(libDialogTitle)" width="880px" append-to-body>
       <div class="lib-tip">{{ tt('库条目均可维护：勾选一条可「编辑」，✕ 停用、↩ 恢复启用；改库只影响以后的勾选，已录入单据不变。') }}</div>
-      <template v-if="libRows.length && Array.isArray(libRows[0].subs)">
+      <!-- 组装工艺 4 变体:一变体一条目,勾选即整表替换 -->
+      <template v-if="libTargetDt && libTargetDt.lib === 'asm.proc'">
+        <div class="lib-tip">{{ tt('选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在列表里「编辑」或「停用」。') }}</div>
+        <el-table
+          :data="libRows"
+          size="small"
+          border
+          max-height="480"
+          highlight-current-row
+          :row-class-name="({ row }) => (row.off ? 'lib-row-off' : '')"
+          @current-change="(row) => (libChecked = row && !row.off ? [row] : [])"
+        >
+          <el-table-column width="42">
+            <template #default="{ row }">
+              <el-radio :model-value="libChecked[0] && libChecked[0].item" :value="row.item" :disabled="row.off" @change="() => (libChecked = row.off ? [] : [row])"><span /></el-radio>
+            </template>
+          </el-table-column>
+          <el-table-column prop="item" :label="tt('变体')" width="160">
+            <template #default="{ row }">{{ row.name + (row.off ? '（' + tt('已停用') + '）' : '') }}</template>
+          </el-table-column>
+          <el-table-column :label="tt('工序数')" width="90" align="right">
+            <template #default="{ row }">{{ row.n }}</template>
+          </el-table-column>
+          <el-table-column :label="tt('工序一览')" min-width="360">
+            <template #default="{ row }">{{ (row.rows || []).map((r) => r['工序']).join(' / ') }}</template>
+          </el-table-column>
+        </el-table>
+      </template>
+      <template v-else-if="libRows.length && Array.isArray(libRows[0].subs)">
         <el-scrollbar max-height="520">
           <div v-for="(g, gi) in libRows" :key="'lg' + gi" class="lib-group">
             <div class="lib-group-name">{{ tt(g.name) }}</div>
@@ -890,8 +919,12 @@ defineExpose({ focusField })
 function plainCols(dt) {
   return colsOf(dt)
 }
-/** plain 版式标题条文字:多页签面板配数组(按 activePage 取,缺省回退第 0 个),单页面板配字符串 */
+/** plain 版式标题条文字:多页签面板配数组(按 activePage 取,缺省回退第 0 个),单页面板配字符串。
+ *  变体可各自声明 plainTitle(组装工艺清单 4 个变体:裸棒/机器包布/复合半成品/成品 各有各的设计标题),
+ *  优先级:变体 > 面板(数组/pages 归一后仍是面板级)。 */
 const plainTitleOf = computed(() => {
+  const v = activeVariant.value?.plainTitle
+  if (v) return v
   const t = cfg.value?.plainTitle
   if (Array.isArray(t)) return t[activePage.value] ?? t[0] ?? ''
   return t || ''
@@ -914,6 +947,27 @@ async function openLib(dt) {
   libTargetDt.value = dt
   const lib = dt.lib
   const flat = Array.isArray(lib)
+  // ── 第三态:组装工艺 4 变体库(lib='asm.proc')──────────────────────────────
+  // 一变体一条目(item_code=变体名),content={v:1,rows:[{工序,工序控制内容,管控要求,检查比例}]}。
+  // 与另两态的区别:**勾选即"整表替换"**(选中一个变体,把该表区的行换成它的 rows),
+  // 而不是"逐条追加到已有行"。种子见 tools/gen/gen-asm-proc-lib.cjs。
+  if (lib === 'asm.proc') {
+    const res = await request.get('/stdlib/list', { params: { lib: 'asm.proc', all: 1 } }).catch(() => null)
+    const rows = (res?.data || []).map((r) => {
+      let parsed = null
+      try { parsed = JSON.parse(r.content) } catch { parsed = null }
+      const list = Array.isArray(parsed?.rows) ? parsed.rows : []
+      return { item: r.item, name: r.item, rows: list, n: list.length, dbId: r.id, off: Number(r.enabled) === 0 }
+    })
+    // 兜底:库里一条都没有(未跑种子的环境)⇒ 用内置常量(无 dbId ⇒ 不可维护,跑种子后即全量可维护)
+    libRows.value = rows.length
+      ? rows.filter((r) => r.rows.length)
+      : [{ item: '(内置)', name: '(内置)', rows: JSON.parse(JSON.stringify(dt.seedRows || [])), n: (dt.seedRows || []).length, dbId: null, off: false }]
+    libChecked.value = []
+    resetLibEdit()
+    libVisible.value = true
+    return
+  }
   if (flat || cfg.value?.testLib) {
     // 检验项目标准库 = yj_std_lib **唯一真源**(内置 26 组/48 子项+必测/型式种子见
     // tools/gen/gen-testlib-seed.cjs;**两个面板各用各的库,互不相通**:规格书(分组形态)读写
@@ -972,6 +1026,13 @@ function toggleLib(key, on) {
   if (on && i < 0) libChecked.value = [...libChecked.value, key]
   else if (!on && i >= 0) libChecked.value = libChecked.value.filter((k) => k !== key)
 }
+/** 标准库弹窗标题:三种库各自说明用途(原来固定写「检验项目标准库」,对组装工艺变体库是误导) */
+const libDialogTitle = computed(() => {
+  const lib = libTargetDt.value?.lib
+  if (lib === 'asm.proc') return '关键控制清单标准库'
+  if (Array.isArray(lib)) return '检验项目标准库'
+  return '检验项目标准库'
+})
 const libTargetDt = ref(null)
 // ── 勾选 → 编辑 → 表单带入 → 保存修改(POST /stdlib/update) ──
 // 两种形态各有一套表单,分别记一个"正在编辑的条目 id":非 null 即处于「保存修改」态。
@@ -1177,6 +1238,28 @@ function confirmLib() {
   const dt = libTargetDt.value
   if (!dt) return
   const arr = touch()
+  // ── 组装工艺 4 变体:勾选一个变体 ⇒ 把本表区的行**整表替换**成该变体的 rows ──
+  // 语义与另两态不同(那两态是"逐条追加"):变体是一整套工序,混着用没有意义。
+  if (dt.lib === 'asm.proc') {
+    const picked = libChecked.value[0]
+    if (picked && picked.rows && picked.rows.length) {
+      const key = dt.filterKey || '表区'
+      const val = dt.filterVal
+      // 只替换本表区的行(同面板多表区共表时不能动别的表区)
+      for (let i = arr.length - 1; i >= 0; i--) {
+        if (String(arr[i][key] || '') === String(val || '')) arr.splice(i, 1)
+      }
+      for (const r of picked.rows) arr.push({ ...r, [key]: val })
+      // 同时把变体名写进头皮字段(产品形态),使 variantKey/variants 也跟着切
+      if (cfg.value?.variantKey && cfg.value.variants?.[picked.item]) {
+        props.head[cfg.value.variantKey] = picked.item
+      }
+    }
+    libChecked.value = []
+    libVisible.value = false
+    emit('dirty')
+    return
+  }
   const grouped = libRows.value.length && Array.isArray(libRows.value[0].subs)
   if (grouped) {
     for (const key of libChecked.value) {

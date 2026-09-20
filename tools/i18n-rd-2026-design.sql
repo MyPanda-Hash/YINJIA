@@ -167,7 +167,46 @@ FROM (VALUES
   (N'检验要求', 'es', N'Requisito de inspección'), (N'检验要求', 'fr', N'Exigence d''inspection'),
   (N'检验要求', 'de', N'Prüfanforderung'), (N'检验要求', 'ru', N'Требование контроля'),
   (N'检验要求', 'vi', N'Yêu cầu kiểm tra'), (N'检验要求', 'th', N'ข้อกำหนดการตรวจสอบ'),
-  (N'检验要求', 'zh-TW', N'檢驗要求')
+  (N'检验要求', 'zh-TW', N'檢驗要求'),
+
+  -- Phase 4:组装工艺 4 变体的承载字段
+  (N'工艺形态', 'en', N'Process Form'), (N'工艺形态', 'ja', N'工程形態'), (N'工艺形态', 'ko', N'공정 형태'),
+  (N'工艺形态', 'es', N'Forma de proceso'), (N'工艺形态', 'fr', N'Forme de process'), (N'工艺形态', 'de', N'Prozessform'),
+  (N'工艺形态', 'ru', N'Форма процесса'), (N'工艺形态', 'vi', N'Dạng quy trình'), (N'工艺形态', 'th', N'รูปแบบกระบวนการ'),
+  (N'工艺形态', 'zh-TW', N'製程形態'),
+
+  -- Phase 4:变体名(标准库 item_code,同时是纸面标题后缀,需译名)
+  (N'裸棒', 'en', N'Bare Rod'), (N'裸棒', 'ja', N'裸棒'), (N'裸棒', 'ko', N'생탄소봉'),
+  (N'裸棒', 'es', N'Varilla desnuda'), (N'裸棒', 'fr', N'Bâton nu'), (N'裸棒', 'de', N'Nacktstab'),
+  (N'裸棒', 'ru', N'Голый стержень'), (N'裸棒', 'vi', N'Thanh trần'), (N'裸棒', 'th', N'แท่งเปล่า'),
+  (N'裸棒', 'zh-TW', N'裸棒'),
+  (N'机器包布', 'en', N'Machine Wrapping'), (N'机器包布', 'ja', N'機械巻布'), (N'机器包布', 'ko', N'기계 포장'),
+  (N'机器包布', 'es', N'Envoltura a máquina'), (N'机器包布', 'fr', N'Enrobage machine'), (N'机器包布', 'de', N'Maschinenumwicklung'),
+  (N'机器包布', 'ru', N'Машинная обмотка'), (N'机器包布', 'vi', N'Bọc máy'), (N'机器包布', 'th', N'พันผ้าด้วยเครื่อง'),
+  (N'机器包布', 'zh-TW', N'機器包布'),
+  (N'复合半成品', 'en', N'Composite Semi-finished'), (N'复合半成品', 'ja', N'複合半製品'), (N'复合半成品', 'ko', N'복합 반제품'),
+  (N'复合半成品', 'es', N'Semielaborado compuesto'), (N'复合半成品', 'fr', N'Semi-fini composite'), (N'复合半成品', 'de', N'Verbund-Halbfertig'),
+  (N'复合半成品', 'ru', N'Композитный полуфабрикат'), (N'复合半成品', 'vi', N'Bán thành phẩm tổng hợp'), (N'复合半成品', 'th', N'กึ่งสำเร็จรูปคอมโพสิต'),
+  (N'复合半成品', 'zh-TW', N'複合半成品'),
+  (N'成品', 'en', N'Finished Product'), (N'成品', 'ja', N'完成品'), (N'成品', 'ko', N'완제품'),
+  (N'成品', 'es', N'Producto terminado'), (N'成品', 'fr', N'Produit fini'), (N'成品', 'de', N'Fertigprodukt'),
+  (N'成品', 'ru', N'Готовая продукция'), (N'成品', 'vi', N'Thành phẩm'), (N'成品', 'th', N'ผลิตภัณฑ์สำเร็จรูป'),
+  (N'成品', 'zh-TW', N'成品'),
+
+  -- Phase 4:标准库弹窗标题
+  (N'关键控制清单标准库', 'en', N'Key Control Checklist Library'), (N'关键控制清单标准库', 'ja', N'重要管理項目リスト標準ライブラリ'),
+  (N'关键控制清单标准库', 'ko', N'핵심 관리 항목 표준 라이브러리'), (N'关键控制清单标准库', 'es', N'Biblioteca de lista de control clave'),
+  (N'关键控制清单标准库', 'fr', N'Bibliothèque de liste de contrôle clé'), (N'关键控制清单标准库', 'de', N'Schlüsselkontrolllisten-Bibliothek'),
+  (N'关键控制清单标准库', 'ru', N'Библиотека ключевого контрольного перечня'), (N'关键控制清单标准库', 'vi', N'Thư viện danh mục kiểm soát chính'),
+  (N'关键控制清单标准库', 'th', N'ไลบรารีรายการควบคุมหลัก'), (N'关键控制清单标准库', 'zh-TW', N'關鍵控制清單標準庫'),
+  (N'变体', 'en', N'Variant'), (N'变体', 'ja', N'バリアント'), (N'变体', 'ko', N'변형'),
+  (N'变体', 'es', N'Variante'), (N'变体', 'fr', N'Variante'), (N'变体', 'de', N'Variante'),
+  (N'变体', 'ru', N'Вариант'), (N'变体', 'vi', N'Biến thể'), (N'变体', 'th', N'รูปแบบ'),
+  (N'变体', 'zh-TW', N'變體'),
+  (N'工序数', 'en', N'Step Count'), (N'工序数', 'ja', N'工程数'), (N'工序数', 'ko', N'공정 수'),
+  (N'工序数', 'es', N'N.º de pasos'), (N'工序数', 'fr', N'Nombre d''étapes'), (N'工序数', 'de', N'Anzahl Schritte'),
+  (N'工序数', 'ru', N'Кол-во операций'), (N'工序数', 'vi', N'Số công đoạn'), (N'工序数', 'th', N'จำนวนขั้นตอน'),
+  (N'工序数', 'zh-TW', N'工序數')
 ) AS v(ref_key, locale, text)
 WHERE NOT EXISTS (SELECT 1 FROM yj_translation t
                   WHERE t.scope = 'field' AND t.ref_key = v.ref_key AND t.locale = v.locale);

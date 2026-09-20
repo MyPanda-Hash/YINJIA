@@ -212,5 +212,26 @@ IF COL_LENGTH('rd_insp_plan_detail', '检验备注') IS NOT NULL
   ALTER TABLE rd_insp_plan_detail DROP COLUMN [检验备注];
 GO
 
+-- ═══════════════════════════════════════════════════════════════════
+-- F. RD_ASM_PROC 工艺形态 —— 4 个关键控制清单变体的承载字段(Phase 4)
+--    设计《关键控制清单--标准库》有 4 个独立 sheet(裸棒/机器包布/复合半成品/成品),
+--    而 RD_ASM_PROC 原先没有任何字段能表达"本单用的是哪一套工序",默认只画首次复刻的那一套。
+--    取值即 4 个 sheet 名,驱动前端 variantKey(表标题)与标准库勾选(asm.proc,整表替换)。
+--    ⚠ 字典是**固定 4 值**(与 asm.proc 库的 item_code 一一对应),故用 下拉框 而非 标准库 类型:
+--      标准库保持单一真源(内容),取值集不另开一个库,避免两处漂移。
+-- ═══════════════════════════════════════════════════════════════════
+IF COL_LENGTH('rd_asm_proc_head', '工艺形态') IS NULL
+  ALTER TABLE rd_asm_proc_head ADD [工艺形态] nvarchar(30) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_ASM_PROC' AND col_name=N'工艺形态')
+  INSERT INTO yj_field (panel_code,col_name,label,data_type,dict_sql,place,seq,width,editable,required,hidden,visible)
+  VALUES ('RD_ASM_PROC',N'工艺形态',N'工艺形态',N'下拉框',
+          N'SELECT v FROM (VALUES (N''裸棒''),(N''机器包布''),(N''复合半成品''),(N''成品'')) AS t(v)',
+          N'header',36,140,1,0,0,1);
+ELSE
+  UPDATE yj_field SET data_type=N'下拉框',
+         dict_sql=N'SELECT v FROM (VALUES (N''裸棒''),(N''机器包布''),(N''复合半成品''),(N''成品'')) AS t(v)'
+  WHERE panel_code='RD_ASM_PROC' AND col_name=N'工艺形态';
+GO
+
 PRINT N'migrate-rd-2026-design.sql 完成(字段能力层 Phase 1)';
 GO
