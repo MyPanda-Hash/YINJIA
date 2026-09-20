@@ -110,9 +110,11 @@ GO
 BEGIN TRY
 IF COL_LENGTH('rd_insp_plan_head', '产品功能类别') IS NULL ALTER TABLE rd_insp_plan_head ADD [产品功能类别] nvarchar(200) NULL;
 IF COL_LENGTH('rd_insp_plan_detail', '序号')     IS NULL ALTER TABLE rd_insp_plan_detail ADD [序号]     nvarchar(20)  NULL;
--- 注意:不能用 [备注] —— DetailMaintainDialog 保存整表覆盖,行类型不同会互相吞掉值。
--- 用独立列名 检验备注,与修订记录/必测项行互不干扰。
-IF COL_LENGTH('rd_insp_plan_detail', '检验备注') IS NULL ALTER TABLE rd_insp_plan_detail ADD [检验备注] nvarchar(500) NULL;
+-- 备注:RD_INSP_PLAN 明细**没有**「修订记录」行类型(本面板不存在修订记录),
+-- 故直接复用既有 [备注] 列,不另建 ——
+-- ⚠ 第一版多建了 [检验备注](label 也叫「备注」),造成**同面板 label 重复**:
+--   保存链 labelsToCols 按 label 匹配,一个 备注 键会同时写两列(行为不确定)。
+IF COL_LENGTH('rd_insp_plan_detail', '备注') IS NULL ALTER TABLE rd_insp_plan_detail ADD [备注] nvarchar(500) NULL;
 END TRY BEGIN CATCH PRINT N'RD_INSP_PLAN 加列跳过'; END CATCH;
 GO
 
@@ -120,8 +122,8 @@ INSERT INTO yj_field (panel_code, col_name, label, data_type, ref_panel, ref_fie
 SELECT v.panel_code, v.col_name, v.label, v.data_type, v.ref_panel, v.ref_field, v.display_field, v.place, v.seq, v.width, v.editable, v.required, v.hidden, v.visible
 FROM (VALUES
   ('RD_INSP_PLAN', N'产品功能类别', N'产品功能类别', N'参照', N'RD_PROD_INFO', N'产品功能类别', N'产品功能类别', N'header', 105, 180, 1, 0, 0, 1),
-  ('RD_INSP_PLAN', N'序号',         N'序 号',       N'文本', NULL, NULL, NULL, N'detail',   2,  60, 1, 0, 0, 1),
-  ('RD_INSP_PLAN', N'检验备注',     N'备注',        N'文本', NULL, NULL, NULL, N'detail', 120, 140, 1, 0, 0, 1)
+  ('RD_INSP_PLAN', N'序号',         N'序号',        N'文本', NULL, NULL, NULL, N'detail',   2,  60, 1, 0, 0, 1),
+  ('RD_INSP_PLAN', N'备注',         N'备注',        N'文本', NULL, NULL, NULL, N'detail', 120, 140, 1, 0, 0, 1)
 ) AS v(panel_code, col_name, label, data_type, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible)
 WHERE NOT EXISTS (SELECT 1 FROM yj_field f
                   WHERE f.panel_code = v.panel_code AND f.col_name = v.col_name AND f.place = v.place);
@@ -158,17 +160,56 @@ GO
 -- ═══════════════════════════════════════════════════════════════════
 -- E. label 对齐(只改 label;同步译名见 i18n-rd-2026-design.sql)
 -- ⚠ col_name 一律不动 —— 数据键永久不变
+--
+-- ⚠⚠ 关键约束(2026-09-18 实测,第一版漏了):
+--   后端 QueryService.selectCols 用 `t.[col_name] AS [label]` 出列、rowToLabels 按 **label**
+--   建行模型 ⇒ **配置里的数据键必须等于该字段当前的 label**。
+--   所以 **改 label == 改数据键**,必须同步改 recordSheetConfigs.js 里的 key;
+--   漏改的后果是**静默**的(该列取不到值 → 整列空白,且保存时 labelsToCols 找不到该 label → 丢值)。
+--   因此本轮**只对"配置里确实按 label 取值的地方"改 label**,其余保持 col_name==label
+--   以维持既有不变量(界面文案差异交给 yj_field.alias / effColLabel 解决,不动数据键)。
+--   守这条不变量的自动化防线:frontend/src/core/views/recordSheetConfigs.keys.test.js
 -- ═══════════════════════════════════════════════════════════════════
+
+-- ── ① 保留的 label 对齐(已同步改配置 key)──
 UPDATE yj_field SET label = N'主要性能描述' WHERE panel_code = 'RD_PROD_INFO' AND col_name = N'特殊性能描述';
 UPDATE yj_field SET label = N'产品负责人'   WHERE panel_code = 'RD_PROD_INFO' AND col_name = N'责任人';
 UPDATE yj_field SET label = N'客户名称'     WHERE panel_code = 'RD_SPEC_DOC'  AND col_name = N'客户名';
-UPDATE yj_field SET label = N'炭棒内孔要求' WHERE panel_code = 'RD_MOLD_PROC' AND col_name = N'内孔要求';
-UPDATE yj_field SET label = N'物料名称'     WHERE panel_code IN ('RD_ASM_PROC', 'RD_ASM_BOM') AND col_name = N'物料名';
 UPDATE yj_field SET label = N'表单管理人'   WHERE panel_code = 'RD_INSP_PLAN' AND col_name = N'管理人';
-UPDATE yj_field SET label = N'检验项目'     WHERE panel_code = 'RD_INSP_PLAN' AND col_name = N'控制项目';
-UPDATE yj_field SET label = N'检验要求'     WHERE panel_code = 'RD_INSP_PLAN' AND col_name = N'控制标准及要求';
-UPDATE yj_field SET label = N'原因'         WHERE panel_code = 'RD_ASM_PROC'  AND col_name = N'更改原因';
-UPDATE yj_field SET label = N'内容'         WHERE panel_code = 'RD_ASM_PROC'  AND col_name = N'更改内容';
+
+-- ── ② 明确**不改** label 的 3 处(设计文档写法与既有数据键冲突,以数据键稳定为先)──
+--    · RD_ASM_PROC/RD_ASM_BOM.物料名  —— 设计写「物料名称」,但改 label 会让
+--      组装BOM表物料清单 / 规格书物料清单(RD_SPEC_DOC 侧另有「物料名称」列,已 SAME)两处配置 key 过期
+--    · RD_ASM_PROC/RD_ASM_BOM.更改原因 —— 设计修订记录写「原因」
+--    · RD_ASM_PROC/RD_ASM_BOM.更改内容 —— 设计修订记录写「内容」
+--    · RD_MOLD_PROC.内孔要求           —— 设计需求正文写「炭棒内孔要求」,属 sections 网格字段
+--       (sections 的 key 是 yj_field.label),改名需同步改配置,本轮不纳入以缩小爆炸半径
+UPDATE yj_field SET label = N'物料名'   WHERE panel_code IN ('RD_ASM_PROC','RD_ASM_BOM') AND col_name = N'物料名';
+UPDATE yj_field SET label = N'更改原因' WHERE panel_code IN ('RD_ASM_PROC','RD_ASM_BOM') AND col_name = N'更改原因';
+UPDATE yj_field SET label = N'更改内容' WHERE panel_code IN ('RD_ASM_PROC','RD_ASM_BOM') AND col_name = N'更改内容';
+UPDATE yj_field SET label = N'内孔要求' WHERE panel_code = 'RD_MOLD_PROC' AND col_name = N'内孔要求';
+
+-- ── ③ 出货检验计划表:设计列名「序 号 / 检验项目 / 检验要求」写在**表头显示**上,
+--      数据键保持 序号 / 控制项目 / 控制标准及要求(控制项目一族与检验项目标准库
+--      specTestLib 的规范键一致,不宜漂移)
+--      ⇒ 用 alias 承载显示名(effColLabel 优先取 alias/displayName),不动 label/数据键
+--    ⚠ 序号 是新列:label 必须是 序号(纯,与 key 一致),显示名'序 号'(设计写法)放 alias
+UPDATE yj_field SET label = N'序号', alias = N'序 号'
+WHERE panel_code = 'RD_INSP_PLAN' AND col_name = N'序号';
+--    ⚠ 控制项目/控制标准及要求:第一版曾把 label 直接改成 检验项目/检验要求(已回退),
+--      这里显式归一 —— 保证无论库处于哪个中间态,跑完本脚本都回到 label==col_name
+UPDATE yj_field SET label = N'控制项目', alias = N'检验项目'
+WHERE panel_code = 'RD_INSP_PLAN' AND col_name = N'控制项目';
+UPDATE yj_field SET label = N'控制标准及要求', alias = N'检验要求'
+WHERE panel_code = 'RD_INSP_PLAN' AND col_name = N'控制标准及要求';
+GO
+
+-- ── 清理第一版误建的 [检验备注](label 也叫「备注」⇒ 同面板 label 重复)──
+--    改为复用既有 [备注] 列;此处清理 yj_field 登记行与物理列(空列,无数据可丢)
+IF EXISTS (SELECT 1 FROM yj_field WHERE panel_code='RD_INSP_PLAN' AND col_name=N'检验备注')
+  DELETE FROM yj_field WHERE panel_code='RD_INSP_PLAN' AND col_name=N'检验备注';
+IF COL_LENGTH('rd_insp_plan_detail', '检验备注') IS NOT NULL
+  ALTER TABLE rd_insp_plan_detail DROP COLUMN [检验备注];
 GO
 
 PRINT N'migrate-rd-2026-design.sql 完成(字段能力层 Phase 1)';

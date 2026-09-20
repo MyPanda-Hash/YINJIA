@@ -28,7 +28,9 @@
  *   conclusion{bar,key} —— 结论区(Excel 无结论区的表不配置)
  *   seedRows(浸泡安全) —— 标准卫生项目 17 行(新增草稿自动预填)
  */
-import { SPEC_TEST_LIB } from './specTestLib'
+// ⚠ 必须带 .js 扩展名:Node 的 ESM 解析不做扩展名补全(node --test 直接跑源码时
+//   无扩展名会 ERR_MODULE_NOT_FOUND);Vite 两种写法都接受,故带扩展名对两端都安全。
+import { SPEC_TEST_LIB } from './specTestLib.js'
 
 // ═══════════ 被并入面板的原始配置(2026-09-11 并入工艺清单面板第 2 页签,菜单已下线)═══════════
 // 这两份是**页 2 的唯一真源**:主面板按页引用它们的 sections/dataTables/tailSections,
@@ -281,6 +283,11 @@ const RD_ASM_BOM = {
           { label: '产品编号', key: '产品编号', type: 'text' },
           { label: '产品名称', key: '产品名称', type: 'text' },
         ]},
+        // 2026-09-18 设计《组装工艺控制-BOM表》明确这两格标「自动填充规格书」⇒ 参照字段(带回)
+        { pairs: [
+          { label: '客户项目名称', key: '客户项目名称', type: 'text' },
+          { label: '产品功能类别', key: '产品功能类别', type: 'text' },
+        ]},
         { pairs: [
           { label: '产品种类', key: '产品种类', type: 'text' },
           { label: '成品重量', key: '成品重量', type: 'text' },
@@ -294,6 +301,10 @@ const RD_ASM_BOM = {
     dataTables: [
       { page: 1, bar: '二、炭棒滤芯组装/包装物料清单', filterKey: '表区', filterVal: '物料清单',
         materialPick: true,  // 从基础档案 BOM 面板引用物料
+        // ⚠ key = 数据键 = yj_field.label(QueryService 用 `AS [label]` 出列,行模型按 label 取值)。
+        //   物料名/物料名称 这一列**刻意为 物料名**:设计文档写「物料名称」,但改 label 会让
+        //   本表与规格书物料清单(RD_SPEC_DOC 侧另有「物料名称」列)两处数据键同时漂移,
+        //   风险大于文案收益 ⇒ 维持 col_name==label(见 migrate-rd-2026-design.sql §E②)。
         cols: [
           { key: '表区', label: '表区', hiddenCol: true, w: 90 },
           { key: '物料名', label: '物料名', w: 140 },
@@ -804,47 +815,57 @@ export const recordSheetConfigs = {
   RD_PROD_INFO: {
     headMode: 'report',
     staticTitle: '产品信息表',
-    info: [{ label: '单据日期', key: '单据日期', type: 'text' }],
+    // 报告头右侧信息块:单据日期 + 编辑人(设计 D22「编辑人」签名格,2026-09-18 新增字段)
+    info: [
+      { label: '单据日期', key: '单据日期', type: 'text' },
+      { label: '编辑人', key: '编辑人', type: 'text' },
+    ],
     grid: [130, 260, 130, 260],
     head: { title: 2, infoLabel: 1, infoValue: 1 },
     sections: [
+      // 一、产品基本信息 = 设计 B25:E27 三行(产品编号|客户项目名称、客户料号|产品管控等级、产品功能类别|产品形态)
       { bar: '一、产品基本信息', rows: [
         { pairs: [
           { label: '产品编号', key: '产品编号', type: 'text' },
-          { label: '产品名称', key: '产品名称', type: 'text' },
+          { label: '客户项目名称', key: '客户项目名称', type: 'text' },
         ]},
         { pairs: [
-          { label: '产品类别', key: '产品类别', type: 'select' },
-          { label: '产品类型', key: '产品类型', type: 'select' },
+          { label: '客户料号', key: '客户料号', type: 'text' },
+          { label: '产品管控等级', key: '产品管控等级', type: 'select' },
         ]},
         { pairs: [
-          { label: '产品分类', key: '产品分类', type: 'select' },
+          { label: '产品功能类别', key: '产品功能类别', type: 'text' },
           { label: '产品形态', key: '产品形态', type: 'select' },
         ]},
       ]},
+      // 二、规格与尺寸 = 设计 B29:E29 单行(产品整体尺寸|炭棒尺寸)
+      // 注:产品名称/产品类别/产品类型/产品分类/下单数量 保留在元数据但不进纸面(兼容历史单据)
       { bar: '二、规格与尺寸', rows: [
         { pairs: [
           { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text' },
-          { label: '客户料号', key: '客户料号', type: 'text' },
-        ]},
-        { pairs: [
           { label: '炭棒尺寸', key: '炭棒尺寸', type: 'text' },
-          { label: '下单数量', key: '下单数量', type: 'text' },
         ]},
       ]},
+      // 三、特殊性能描述 = 设计 B31「主要性能描述」;数据键仍是 特殊性能描述(col_name 一律不改)
       { bar: '三、特殊性能描述', rows: [
         { pairs: [
-          { label: '特殊性能描述', key: '特殊性能描述', vspan: 3 },
+          { label: '主要性能描述', key: '特殊性能描述', vspan: 3 },
         ]},
       ]},
+      // 四、文件与签署 = 设计 B33 客户图纸或规格书 / B34-B35 两级审核 / B36 产品负责人 / B37 备注
       { bar: '四、文件与签署', rows: [
         { pairs: [
           // 客户图纸或规格书:附件字段(源 Excel 该格提示即"上传图片")——上传保留原文件名,点击查看,打印/PDF 只见文件名
           { label: '客户图纸或规格书', key: '客户图纸或规格书', type: 'file', vspan: 3 },
         ]},
+        // 设计把单格「审核人」拆成两级(2026-09-18 新增字段);原「审核人」列保留为历史列
+        // (元数据 hidden=1 + visible=1 ⇒ 列表隐藏、表单仍可见,旧值不丢),故纸面只画设计的两级
         { pairs: [
-          { label: '责任人', key: '责任人', type: 'text' },
-          { label: '审核人', key: '审核人', type: 'text' },
+          { label: '审核人（一级审核）', key: '审核人一级', type: 'text' },
+          { label: '审核人（二级审核）', key: '审核人二级', type: 'text' },
+        ]},
+        { pairs: [
+          { label: '产品负责人', key: '责任人', type: 'text' },
         ]},
         { pairs: [
           { label: '备注', key: '备注', vspan: 3 },
@@ -868,6 +889,9 @@ export const recordSheetConfigs = {
       { title: '组装工艺清单' },
     ],
     sections: RD_ASM_BOM.sections.map((s) => ({ ...s, page: 0 })),
+    // 页 1(RD_ASM_PROC_DT0)与页 2(RD_ASM_BOM.dataTables)的 key 都是 yj_field.label,
+    // 且 RD_ASM_BOM/RD_ASM_PROC 的 label 已保持一致(2026-09-18 决定不改 物料名/更改原因/更改内容)
+    // ⇒ 两面板可安全共用同一份配置,无需换键。
     dataTables: [
       ...RD_ASM_PROC_DT0.map((dt) => ({ ...dt, page: 1 })),
       ...RD_ASM_BOM.dataTables.map((dt) => ({ ...dt, page: 0 })),
@@ -1013,6 +1037,7 @@ export const recordSheetConfigs = {
       ], cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '检验类别', label: '检验类别', hiddenCol: true },
+          { key: '序号', label: '序号', w: 56 },
           { key: '控制项目', label: '控制项目' },
           { key: '质量控制内容', label: '质量控制内容' },
           { key: '检测仪器', label: '检测仪器、工具' },
@@ -1023,6 +1048,7 @@ export const recordSheetConfigs = {
           { key: '取样方式', label: '取样方式' },
           { key: '检验内容', label: '检验内容' },
           { key: '控制方法', label: '控制方法' },
+          { key: '备注', label: '备注' },
         ]},
       { bar: '型式检验或者必测项', filterKey: '检验类别', filterVal: '型式检验', lib: [
         { 控制项目: '*碱性性能测试', 质量控制内容: '*初始PH增加值测试', 检测仪器: 'PH计', 控制标准及要求: '将炭棒组装好装入伊可普工装，按进水方向通RO纯水（水效水500+RO机），测试流速0.24L/min,冲水5min后，浸泡30min后，测试出水PH，接水量为500ml。\n控制标准：初始PH增加值＞3.0', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒初始PH增加值测试是否符合要求', 控制方法: '常规抽检' },
@@ -1034,6 +1060,7 @@ export const recordSheetConfigs = {
       ], cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '检验类别', label: '检验类别', hiddenCol: true },
+          { key: '序号', label: '序号', w: 56 },
           { key: '控制项目', label: '控制项目' },
           { key: '质量控制内容', label: '质量控制内容' },
           { key: '检测仪器', label: '检测仪器、工具' },
@@ -1044,6 +1071,7 @@ export const recordSheetConfigs = {
           { key: '取样方式', label: '取样方式' },
           { key: '检验内容', label: '检验内容' },
           { key: '控制方法', label: '控制方法' },
+          { key: '备注', label: '备注' },
         ]},
     ],
   },

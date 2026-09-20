@@ -127,7 +127,19 @@ WHERE panel_code = 'RD_PROGRESS' AND place = N'detail'
   AND col_name IN (N'谁来批准', N'谁来检验', N'未批准原因');
 GO
 
--- ═══ 9. 核对 ═══
+-- ═══ 9. 表注明更新(2026-09-18 重构后原注明已误导:它列的是已退隐的旧列)═══
+IF EXISTS (SELECT 1 FROM sys.extended_properties
+           WHERE major_id = OBJECT_ID('rd_progress_detail') AND minor_id = 0 AND name = 'MS_Description')
+  EXEC sp_updateextendedproperty N'MS_Description',
+       N'项目进度查询行表(产品开发二三四级项目控制列表 18 列:项目定级=col 项目层级/项目编号/开发复杂度/重要程度/紧急程度/项目发起人=col 项目级/项目负责人=col 项目负责/立项日期=col 实施进度/预计完成日期=col 里程完成/项目定及变更/状态派生/测试情况=col 测试员/技术目标达成/是否市场转化/未转换原因;旧列 说明/项目负责/里程完成 保留兼容)',
+       N'SCHEMA', N'dbo', N'TABLE', N'rd_progress_detail';
+ELSE
+  EXEC sp_addextendedproperty N'MS_Description',
+       N'项目进度查询行表(产品开发二三四级项目控制列表 18 列;详见表结构)',
+       N'SCHEMA', N'dbo', N'TABLE', N'rd_progress_detail';
+GO
+
+-- ═══ 10. 核对 ═══
 PRINT N'--- RD_PROGRESS 明细列最终状态 ---';
 SELECT place, seq, col_name, label, data_type, editable, hidden, visible
 FROM yj_field WHERE panel_code = 'RD_PROGRESS' AND place = N'detail'

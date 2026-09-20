@@ -476,3 +476,20 @@ migrate-rd-progress-18cols.sql
 
 # —— 2026-09-18 Phase 2 多语言:RD_PROGRESS 界面 18 个表头 × 10 语言 ——
 i18n-rd-progress-18cols.sql
+
+# —— 2026-09-18 研发管理最新设计 Phase 3(产品文件 6 面板配置对齐 + 数据键不变量防线)——
+# ⚠⚠ 铁律(2026-09-18 实测确立,违反即静默丢值):
+#   后端 QueryService.selectCols 用 	.[col_name] AS [label] 出列、rowToLabels 按 **label** 建行模型,
+#   保存链 labelsToCols 再用 label 反查 col_name 落库 ⇒ **配置里的数据键必须等于该字段当前的 label**。
+#   等价地:**改 label 就是改数据键**,必须同步改 recordSheetConfigs.js 的 key,否则该列取不到值(整列空白)
+#   且保存时被静默丢弃。本轮据此回退了 3 处 label 改名(物料名/更改原因/更改内容)与 1 处(内孔要求),
+#   并把「出货检验计划表」设计列名(序 号/检验项目/检验要求)改由 yj_field.alias 承载(effColLabel 优先取 alias)。
+#   自动化防线:frontend/src/core/views/recordSheetConfigs.keys.test.js + rdPanelLabels.fixture.json
+#   (基线由 node tools/gen-config-key-fixture.cjs 从活库导出;改过 label/字段后必须重跑)。
+# migrate-rd-2026-design.sql(重跑) —— §E 收敛为:仅保留 4 处 label 对齐(主要性能描述/产品负责人/
+#   客户名称/表单管理人)+ 显式归一 3 处(序号/控制项目/控制标准及要求 的 label==col_name,显示名进 alias);
+#   清理第一版误建的 [检验备注](label 也叫「备注」⇒ 同面板 label 重复,保存链按 label 匹配会写错列)
+migrate-rd-2026-design.sql
+migrate-rd-progress-18cols.sql
+
+# —— 2026-09-18 Phase 3 多语言补充:序号/检验项目/检验要求(alias 显示名)不含新 label,无需新增词条 ——
