@@ -26,9 +26,16 @@ const skipAll = (m) => { console.log(`  ⊘ SKIP ${m}`); process.exit(2) }
  *    故这里不再有 labelFont/gridLeft/宽度的断言 —— 保留画布与竖向几何。 */
 const DESIGN = {
   canvasW: 767, canvasH: 794,
+  // 4 个竖向分区(与 RecordSheetPanels.vue 的常量一一对应)
+  companyTop: 25, companyH: 33,
+  titleTop: 58, titleH: 48,
   gridTop: 106, rowH: 46,
   signTop: 605, signRowH: 33,
   tailReserve: 220,
+  // 横向:公司名(左起)与居中大标题的实测用字宽(用于越界与相撞判定)
+  // 「惠州市银嘉环保科技有限公司」= 13 字(别数成 17);「产品规格书」= 5 字
+  companyLeft: 44, companyFont: 20.7, companyChars: 13,
+  titleFont: 47.3, titleChars: 5, titleLetterSpacing: -1.33,
 }
 const A4_RATIO = 297 / 210
 
@@ -154,15 +161,41 @@ function sql(query) {
   check('签字表 width:100% 跟随定宽层 ⇒ 与字段表同宽',
     /\.rsp-sign-t\s*\{[^}]*width:\s*100%/.test(vueSrc))
 
-  // 竖向:标题行(60) + 9 行字段 + 签字栏,不得互相压盖
-  const titleBottom = 25 + 60
-  check(`标题行底 ${titleBottom} ≤ 字段表顶 ${DESIGN.gridTop}(不压首行边框)`, titleBottom <= DESIGN.gridTop,
-    `标题压表格 ${(titleBottom - DESIGN.gridTop).toFixed(0)}px`)
-  const fieldsBottom = DESIGN.gridTop + 9 * DESIGN.rowH
-  check(`字段表底 ${fieldsBottom} ≤ 签字栏顶 ${DESIGN.signTop}`, fieldsBottom <= DESIGN.signTop,
-    `重叠 ${(fieldsBottom - DESIGN.signTop).toFixed(0)}px`)
-  const signBottom = DESIGN.signTop + 2 * DESIGN.signRowH
-  check(`签字栏底 ${signBottom} ≤ 画布高 ${DESIGN.canvasH}`, signBottom <= DESIGN.canvasH)
+  // 竖向:封面 4 个分区必须**首尾相接、两两不重叠、也不留空档**
+  // (连踩两次:先是公司名与标题同带 ⇒ 标题压住公司名;再是标题带凭感觉给 60px ⇒ 两端各溢 6px)
+  const bands = [
+    { name: '① 公司名', top: DESIGN.companyTop, h: DESIGN.companyH },
+    { name: '② 大标题', top: DESIGN.titleTop, h: DESIGN.titleH },
+    { name: '③ 字段表', top: DESIGN.gridTop, h: 9 * DESIGN.rowH },
+    { name: '④ 签字栏', top: DESIGN.signTop, h: 2 * DESIGN.signRowH },
+  ]
+  for (let i = 1; i < bands.length; i++) {
+    const prev = bands[i - 1], cur = bands[i]
+    const prevBottom = prev.top + prev.h
+    check(`${prev.name}(${prev.top}..${prevBottom}) 不与 ${cur.name}(${cur.top}..) 重叠`,
+      prevBottom <= cur.top, `重叠 ${(prevBottom - cur.top).toFixed(0)}px`)
+  }
+  check('①→② 相接不留空档(标题带高由分区反推,不是手填)',
+    DESIGN.titleTop === DESIGN.companyTop + DESIGN.companyH,
+    `titleTop=${DESIGN.titleTop} vs companyBottom=${DESIGN.companyTop + DESIGN.companyH}`)
+  check('②→③ 相接不留空档(标题带高 = 字段表顶 − 标题带起点)',
+    DESIGN.titleTop + DESIGN.titleH === DESIGN.gridTop,
+    `标题带 ${DESIGN.titleTop}..${DESIGN.titleTop + DESIGN.titleH} vs 表顶 ${DESIGN.gridTop}`)
+  check('标题带高装得下标题字号(47.3 设计px)',
+    DESIGN.titleH >= DESIGN.titleFont, `带高 ${DESIGN.titleH} < 字号 ${DESIGN.titleFont}`)
+  check(`签字栏底 ${bands[3].top + bands[3].h} ≤ 画布高 ${DESIGN.canvasH}`,
+    bands[3].top + bands[3].h <= DESIGN.canvasH)
+  // 水平:公司名与居中标题不得在**同一带**里水平相撞(即使不同带也要确认宽度不越界)
+  const companyRight = DESIGN.companyLeft + DESIGN.companyChars * DESIGN.companyFont
+  const titleW = DESIGN.titleChars * DESIGN.titleFont + (DESIGN.titleChars - 1) * DESIGN.titleLetterSpacing
+  const titleLeftEdge = DESIGN.canvasW / 2 - titleW / 2
+  const titleRightEdge = DESIGN.canvasW / 2 + titleW / 2
+  check(`公司名(${DESIGN.companyLeft}..${companyRight.toFixed(0)}) 不越出画布宽 ${DESIGN.canvasW}`,
+    companyRight <= DESIGN.canvasW)
+  check(`居中标题(${titleLeftEdge.toFixed(0)}..${titleRightEdge.toFixed(0)}) 不越出画布宽`,
+    titleLeftEdge >= 0 && titleRightEdge <= DESIGN.canvasW)
+  console.log(`  (公司名/标题虽水平重叠 ${Math.max(0, Math.min(companyRight, titleRightEdge) - titleLeftEdge).toFixed(0)}px,` +
+    `但已分属 ①② 两带 ⇒ 不再压字 —— 这正是本轮修复点)`)
 
   // 整页装得进 A4:画布高 × 网格宽 / 画布宽 + 尾部预留 ≤ A4 高
   const gridW = 794 // 规格书网格宽 = A4 210mm @96dpi

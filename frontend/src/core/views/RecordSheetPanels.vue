@@ -32,8 +32,11 @@
         <template v-if="cfg.cover">
           <tr><td :colspan="nCols" class="rsp-cover-td">
             <div class="rsp-cover-page" :style="{ height: coverPageH + 'px', '--cok': coverK, '--cvy': coverVy }">
-              <div class="rsp-cover-company">惠州市银嘉环保科技有限公司</div>
-              <div class="rsp-cover-title">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
+              <!-- 公司名与标题**分带**渲染(top 由常量给出):同带会因水平重叠而互相压字 -->
+              <div class="rsp-cover-company"
+                   :style="{ top: (COVER_COMPANY_TOP * coverVy) + 'px', height: (COVER_COMPANY_H * coverVy) + 'px' }">惠州市银嘉环保科技有限公司</div>
+              <div class="rsp-cover-title"
+                   :style="{ top: (COVER_TITLE_TOP * coverVy) + 'px', height: (COVER_TITLE_H * coverVy) + 'px' }">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
               <!-- 字段表 + 签字栏:外层负责**水平居中**,内层 inline-block 负责**按内容定宽**。
                    ⚠ 不要让外层用 width:max-content:它里面还有 width:100% 的签字表,
                      两者构成**循环依赖**(父宽取自子宽、子宽又取自父宽),
@@ -54,8 +57,10 @@
                       </tr>
                     </tbody>
                   </table>
-                  <!-- 签字栏:width:100% 跟随 .rsp-cover-blockin ⇒ 与字段表同宽 -->
-                  <table class="rsp-sign-t">
+                  <!-- 签字栏:width:100% 跟随 .rsp-cover-blockin ⇒ 与字段表同宽。
+                       margin-top = 签字栏顶 − 字段表底(由常量算出,不写死 85px) -->
+                  <table class="rsp-sign-t"
+                         :style="{ marginTop: ((COVER_SIGN_TOP - COVER_GRID_TOP - 9 * COVER_ROW_H) * coverVy) + 'px' }">
                     <colgroup>
                       <col v-for="(w, i) in coverSignW" :key="'cw' + i" :style="{ width: w }" />
                     </colgroup>
@@ -861,12 +866,32 @@ const COVER_CELL_PAD = 6
  *   同一份 cover.fields,所有行的标签列自然等宽 ⇒ 值列左边界仍然逐行对齐。
  * 仅保留内边距作为"最小留白"。
  */
-/** 字段表整体定位(设计像素)。left 由 CSS 的 50% + translateX(-50%) 居中,故不在此声明。
- *  top=106:标题行(25..85)之下;9 行 × 46 = 到 520,离签字栏(605)仍有 85px 间隔。 */
+/** ── 封面竖向分段(设计像素)──
+ *  四段**必须首尾相接、互不重叠**,不能共带:
+ *    ① 公司名行   y 25..58   (设计 B5,33px)
+ *    ② 大标题行   y 58..106  (设计 B6 带;高 48 由 ①③ 反推 —— 见下)
+ *    ③ 字段表     y 106 起   (设计 B7..B15,9 行 × 46 = 到 520)
+ *    ④ 签字栏     y 605 起   (设计 B17/B18,2 行 × 33 = 到 671)
+ *
+ *  ⚠ 2026-09-18 连踩两次,记下来别再犯:
+ *    · 第一次:公司名与标题**都放 top:25 / 高 33** ⇒ 同一带。公司名占 x44..313、
+ *      居中标题(3 字 × 47.3 = 186px)占 x268..499,**水平重叠 45px** ⇒
+ *      标题压住公司名末尾的「司」(用户报「产品规格书压到公司名」)。
+ *    · 第二次:把标题下移后**凭感觉**给了 60px 高 ⇒ 标题带 52..112 又同时压住
+ *      公司名(底 58)与字段表(顶 106),各溢出 6px。
+ *    ⇒ 正解是**把 4 段当分区算,首尾相接**:标题带高 = 106 − 58 = 48,不手填。
+ *      断言见 tools/archive/_probe-spec-cover.cjs(四段两两不重叠、且不留空档)。 */
+const COVER_COMPANY_TOP = 25
+const COVER_COMPANY_H = 33
+/** 标题带起点 = 公司带终点(相接,不留缝不重叠) */
+const COVER_TITLE_TOP = COVER_COMPANY_TOP + COVER_COMPANY_H
+/** 字段表顶(设计 B7 起点),也是标题带终点 */
 const COVER_GRID_TOP = 106
+/** 标题带高 = 字段表顶 − 标题带起点(由分区反推,不凭感觉填) */
+const COVER_TITLE_H = COVER_GRID_TOP - COVER_TITLE_TOP
 /** 9 行行高:编号/产品类别/客户名称/客户料号/客户项目名称/应用场景/整体规格参数/产品主要性能/版本 */
 const COVER_ROW_H = 46
-/** 签字栏(制订/审核/批准 三栏,列宽按设计 B17..D17 比例 92.7:97.3:97.3) */
+/** 签字栏顶(设计 B17);三栏列宽按设计 B17..D17 比例 92.7:97.3:97.3 */
 const COVER_SIGN_TOP = 605
 const coverK = computed(() => gridW.value / COVER_W)
 /** 封面高度 = 真实 A4(210×297mm):设计画布 1173/708≈1.657 比 A4(1.414)长,按画布高等比
@@ -2508,12 +2533,10 @@ function chartOf(dt) {
   background: #fff;
   overflow: hidden;
 }
-/* 公司名 与 编号:同属设计第 1 行(B5 = 25磅 = 33 设计px,y25..58),垂直居中对齐 */
+/* 公司名(第 ① 带):位置/高度由模板绑定 COVER_COMPANY_TOP/H 给出,此处只放外观 */
 .rsp-cover-company {
   position: absolute;
   left: calc(44px * var(--cok));
-  top: calc(25px * var(--cvy));
-  height: calc(33px * var(--cvy));
   display: flex;
   align-items: center;
   font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
@@ -2522,15 +2545,14 @@ function chartOf(dt) {
   color: #000;
   white-space: nowrap;
 }
-/* 大标题:设计是**独立一行**(B6 = 45磅 = 60 设计px),夹在「公司/编号」行(y25..58)
-   与字段表(y106 起)之间。故标题的线盒就取这一行的高度(60px)、靠下居中 ——
-   旧版把 top 设到 191px 是按另一张 PNG 画布量的,在新画布上会**压住字段表首行边框**。 */
+/* 大标题(第 ② 带):位置/高度由模板绑定 COVER_TITLE_TOP/H 给出。
+   设计里公司名与标题是**上下两行**(B5 / B6);早期误把两者放同一条带
+   ⇒ 居中标题(3 字 × 47.3 = 186px,占 x268..499)压住公司名(x44..313)末尾 45px。
+   标题水平居中于画布中线。 */
 .rsp-cover-title {
   position: absolute;
-  left: calc(383px * var(--cok));
+  left: 50%;
   transform: translateX(-50%);
-  top: calc(25px * var(--cvy));
-  height: calc(60px * var(--cvy));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2620,11 +2642,11 @@ function chartOf(dt) {
   font-family: 'SimSun', 'Songti SC', serif;
   color: #1a1a1a;
 }
-/* 签名表:width:100% 跟随 .rsp-cover-block ⇒ 与字段表同宽、左右边界对齐;
-   与字段表之间的垂直间隔在容器几何里预留(字段表底 → 签字栏顶,见 COVER_GRID_TOP/ROW_H) */
+/* 签名表:width:100% 跟随 .rsp-cover-blockin ⇒ 与字段表同宽、左右边界对齐;
+   与字段表之间的垂直间隔 = margin-top,由模板按 COVER_SIGN_TOP/ROW_H 算出(设计 y520→y605 = 85px),
+   不要在这里写死 85px —— 与常量分开两处会漂移。 */
 .rsp-sign-t {
   width: 100%;
-  margin-top: calc(85px * var(--cvy));
   border-collapse: collapse;
   table-layout: fixed;
   position: relative;

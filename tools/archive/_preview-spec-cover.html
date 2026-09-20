@@ -14,10 +14,11 @@
   .cap { font-size: 12px; color: #555; margin-bottom: 6px; }
   /* 纸张:设计画布 767×794(设计像素)按 1:1 展示 */
   .paper { position: relative; width: 767px; height: 794px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.18); overflow: hidden; }
-  /* 设计第 1 行:B5 = 33 设计px */
+  /* ── 竖向 4 分区(首尾相接,互不重叠)──
+     ① 公司名 y25..58  ② 大标题 y58..106(高=106−58,由分区反推)  ③ 字段表 y106  ④ 签字栏 y605
+     ⚠ 曾把公司名与标题都放 top:25 ⇒ 同带水平相撞,标题压住公司名末尾(用户报过) */
   .company { position: absolute; left: 44px; top: 25px; height: 33px; display: flex; align-items: center; font-size: 20.7px; line-height: 1; }
-  /* 设计第 2 行:B6 = 60 设计px 的独立标题行。水平居中:设计画布 767 的中线 */
-  .title { position: absolute; left: 50%; transform: translateX(-50%); top: 25px; height: 60px;
+  .title { position: absolute; left: 50%; transform: translateX(-50%); top: 58px; height: 48px;
     display: flex; align-items: center; justify-content: center;
     font-family: SimSun, serif; font-size: 47.3px; letter-spacing: -1.33px; line-height: 1; }
   /* 居中定位层:只管居中 */
