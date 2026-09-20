@@ -1,5 +1,5 @@
 <template>
-  <!-- 左侧「单据选择」栏(对齐 PANDA 暂收入库单选择):部门下拉+关键字查找+小表格(列按单据配置:
+  <!-- 左侧「单据选择」栏(对齐 PANDA 暂收入库单选择):模糊搜索框 + 顶/底翻页条 + 小表格(列按单据配置:
        首列单号/次列日期/末列审核状态标签,中间列由挂载方挑重要字段),
        点行切换右侧当前单据(数据=当前页单据列表镜像,过滤纯前端)。
        表格 width:100% + min-width:max-content(拖宽跟随/拖窄出横向滚动条),全格 nowrap 无交叉。 -->
@@ -9,11 +9,9 @@
       <span class="dsr-coll" :title="tt('收起')" @click="$emit('toggle')">«</span>
     </div>
     <div class="dsr-filters">
-      <el-select v-model="dept" clearable filterable size="small" :placeholder="tt('部门')" class="dsr-dept" @change="apply">
-        <el-option v-for="d in depts" :key="d" :label="d" :value="d" />
-      </el-select>
+      <!-- 查找 = 模糊搜索(单框,对本页各列做包含匹配);2026-09-20 按用户口径去掉「部门」下拉 -->
       <div class="dsr-kw">
-        <el-input v-model="kw" size="small" clearable :placeholder="tt('输入搜索')" @keyup.enter="apply" @clear="apply" />
+        <el-input v-model="kw" size="small" clearable :placeholder="tt('模糊搜索')" @keyup.enter="apply" @clear="apply" />
         <el-button size="small" type="primary" plain @click="apply">{{ tt('查找') }}</el-button>
       </div>
       <div class="dsr-count">{{ tt('共有数据') }}: {{ total }} {{ tt('条') }}<span v-if="filtered.length !== rows.length" class="dsr-count-sub">（{{ tt('本页筛出') }} {{ filtered.length }}）</span></div>
@@ -95,12 +93,12 @@ const rangeTo = computed(() => (props.rows.length ? rangeFrom.value + props.rows
 
 const noOf = (row) => String(row['编号'] || row['单据编号'] || row['单号'] || '')
 
-/** 兜底列(未传 columns 时):与送料暂收单原五列一致 */
+/** 兜底列(未传 columns 时):单号/日期/往来单位/审核状态(「部门」列 2026-09-20 去掉:
+ *  实测多数面板该列恒空,带左栏的面板已各自指定中间列) */
 const DEFAULT_COLUMNS = [
   { label: '单号', keys: ['编号', '单据编号', '单号'], align: 'left', no: true },
   { label: '日期', keys: ['日期', '单据日期'], align: 'left' },
-  { label: '供应商', keys: ['供应商'], align: 'left' },
-  { label: '部门', keys: ['部门'], align: 'center' },
+  { label: '供应商', keys: ['供应商', '客户'], align: 'left' },
   { label: '审核状态', keys: ['单据状态'], align: 'center', tag: true },
 ]
 const cols = computed(() => (props.columns && props.columns.length ? props.columns : DEFAULT_COLUMNS))
@@ -114,18 +112,15 @@ const colValue = (row, c) => {
   return ''
 }
 
-const dept = ref('')
 const kw = ref('')
-const appliedDept = ref('')
 const appliedKw = ref('')
-const apply = () => { appliedDept.value = dept.value || ''; appliedKw.value = (kw.value || '').trim().toLowerCase() }
+const apply = () => { appliedKw.value = (kw.value || '').trim().toLowerCase() }
 
-const depts = computed(() => [...new Set(props.rows.map((r) => r['部门']).filter(Boolean))])
+/** 模糊搜索:对本页各列做包含匹配(空条件=不过滤) */
 const filtered = computed(() => {
   const out = []
   props.rows.forEach((row, idx) => {
     const no = noOf(row)
-    if (appliedDept.value && String(row['部门'] ?? '') !== appliedDept.value) return
     const cells = cols.value.map((c) => colValue(row, c))
     if (appliedKw.value && !cells.some((v) => String(v ?? '').toLowerCase().includes(appliedKw.value))) return
     out.push({ key: no + '#' + idx, idx, no, cells })
@@ -248,7 +243,6 @@ onBeforeUnmount(detachDrag)
 }
 .dsr-coll:hover { color: var(--t-primary, #116a5b); }
 .dsr-filters { padding: 8px 10px; border-bottom: 1px solid var(--t-border-light, #edf1ef); }
-.dsr-dept { width: 100%; }
 .dsr-kw { display: flex; gap: 6px; margin-top: 8px; }
 .dsr-count { margin-top: 8px; font-size: 12px; color: var(--t-text-2, #5d6c67); }
 .dsr-count-sub { margin-left: 6px; color: var(--t-text-3, #8b9893); }
