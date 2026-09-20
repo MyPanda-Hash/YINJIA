@@ -22,6 +22,16 @@ const OUT = path.join(__dirname, '..', 'frontend', 'src', 'core', 'views', 'rdPa
 const SQL = `SET NOCOUNT ON;
 SELECT panel_code, place, col_name, label FROM yj_field WHERE panel_code LIKE 'RD[_]%' ORDER BY panel_code, place, seq;`
 
+/**
+ * 跑 sqlcmd 并**按实际字节编码**解码。
+ *
+ * ⚠ 这里踩过坑:sqlcmd 的输出编码跟的是**控制台代码页**(本机 GBK),`-f 65001` 只管
+ *   `-i` 输入文件的编码、`-u` 在新版 sqlcmd 里已被忽略 —— 两者都改不了输出。
+ *   先前按 'utf8' 硬解 ⇒ 中文 label 全长成乱码写回 fixture,
+ *   而 fixture 是测试基线,污染后**不会报错**,只会让断言在乱码上"通过"。
+ *   改成:先按严格 UTF-8 试解(控制台已是 65001 的机器走这条),失败再回落 GBK。
+ *   两者都不成立时抛错,绝不静默写坏基线。
+ */
 function runSqlcmd() {
   const args = [
     '-S', process.env.YINJIA_SQL_HOST || 'localhost',
@@ -30,7 +40,21 @@ function runSqlcmd() {
     '-P', process.env.YINJIA_SQL_PASSWORD || 'Yinjia@2026',
     '-W', '-s', '\t', '-h', '-1', '-Q', SQL,
   ]
-  return execFileSync('sqlcmd', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 })
+  const buf = execFileSync('sqlcmd', args, { maxBuffer: 64 * 1024 * 1024 })
+  return decodeOutput(buf)
+}
+
+function decodeOutput(buf) {
+  try {
+    const s = new TextDecoder('utf-8', { fatal: true }).decode(buf)
+    // 带 BOM 的 UTF-8 会残留 ﻿,按首字符剥掉
+    return s.charCodeAt(0) === 0xfeff ? s.slice(1) : s
+  } catch { /* 不是合法 UTF-8,继续试 GBK */ }
+  try {
+    return new TextDecoder('gbk').decode(buf)
+  } catch (e) {
+    throw new Error(`sqlcmd 输出既不是 UTF-8 也不是 GBK,无法安全解码:${e.message}`)
+  }
 }
 
 const raw = runSqlcmd()

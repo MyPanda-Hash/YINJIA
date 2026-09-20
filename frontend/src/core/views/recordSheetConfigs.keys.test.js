@@ -141,12 +141,19 @@ test('sections / tailSections 的字段 key 必须是该面板当前的 label', 
 })
 
 /**
- * 跨面板复用配置(sections/dataTables 共享)只有在**两面板 label 完全一致**时才安全。
- * RD_ASM_PROC 复用 RD_ASM_BOM 的表:R1 曾把 RD_ASM_PROC 的 label 改成 物料名称/原因/内容
- * 而 RD_ASM_BOM 仍是旧值,同一份配置无法同时满足两个面板 ⇒ 该复用随即失效。
- * 这条断言把"复用前先确认 label 一致"钉死。
+ * 同一份语义跨面板共享时,两面板的 label 必须完全一致 —— 而 label 就是数据键。
+ *
+ * 【历史】RD_ASM_PROC 早先直接复用 RD_ASM_BOM 的 sections/dataTables,同一份配置要同时满足
+ *   两个面板,label 一分叉复用即刻失效(R1 把 RD_ASM_PROC 改成 物料名称/原因/内容 就是这次事故)。
+ *
+ * 【2026-09-20 起】组装工艺清单按《组装工艺控制.xlsx》重排为 3 个页签,组装BOM表那页
+ *   **不再复用** RD_ASM_BOM 的配置(列序本就不同:设计是 物料编号|物料名称|… ,旧常量是 物料名|物料编号|…)。
+ *   这条断言因此不再是"共享配置"的前提,但**仍然有意义**:两张表读写的是同一批业务字段,
+ *   label 一旦分叉,「物料名」在一边是显示名、另一边是数据键,两边导出的单据对不上。
+ *   保留它当"两张表的字段字典不得分叉"的守卫。
+ *   ⚠ 注意 2026-09-20 的「物料名称」改的是 **yj_field.alias(显示层)**,不是 label ⇒ 本断言不受影响。
  */
-test('复用同一份数据表配置的面板,其 label 必须完全一致', () => {
+test('语义共享的面板,其 label 不得分叉(RD_ASM_PROC / RD_ASM_BOM 的物料与修订字段)', () => {
   const REUSE_PAIRS = [['RD_ASM_PROC', 'RD_ASM_BOM']]
   const problems = []
   for (const [a, b] of REUSE_PAIRS) {
@@ -212,5 +219,62 @@ test('组装工艺 4 变体:面板字典值 / variants 键 / 标准库 item_code
   for (const v of VARIANTS) {
     assert.ok(cfg.variants[v].plainTitle, `变体 ${v} 缺 plainTitle`)
     assert.ok(cfg.variants[v].plainTitle.endsWith(v), `变体 ${v} 的 plainTitle 应以变体名结尾`)
+  }
+})
+
+/**
+ * 断言 ⑥(2026-09-20):组装工艺清单的 3 页签结构不变量 —— 设计《组装工艺控制.xlsx》3 个 sheet。
+ *
+ * 守的是四条**改配置时不会报错、但页面上会静默出错**的坑(全部在 RecordSheetPanels.vue 里实测过):
+ *   ① 页缺 grid ⇒ effGrid 回落不到面板 grid 时 secW() 算出 width:0px,
+ *      而 .rs-t 是 table-layout:fixed ⇒ 整块条件区塌成一条竖线。
+ *   ② showHead 不写 ⇒ 兜底是 `activePage === 0`,页 1/页 2 会莫名没有报告头。
+ *   ③ dataTable 缺 filterKey/filterVal ⇒ rowsOf() 返回**整份明细**(三张表互相串行),
+ *      且 confirmLib() 的整表替换会删掉所有"表区为空"的行(不可撤销的数据丢失)。
+ *   ④ 两张表用同一个 filterVal ⇒ 同一批行在两张表里各显示一次,还都往同一批行上写。
+ */
+test('组装工艺清单 3 页签:每页有 grid/showHead,每条表有唯一的表区分块键', () => {
+  const cfg = recordSheetConfigs.RD_ASM_PROC
+  assert.ok(cfg, 'RD_ASM_PROC 配置缺失')
+
+  // ── ①页签数与页题(设计 3 个 sheet 一对一) ──
+  const titles = (cfg.pages || []).map((p) => p.title)
+  assert.deepEqual(titles, ['修订记录', '组装BOM表', '组装工艺清单'], '页签应为设计 3 个 sheet')
+
+  // ── ②每页都要能算出非 0 的网格宽 ──
+  for (const [i, pg] of (cfg.pages || []).entries()) {
+    const grid = pg.grid || cfg.grid
+    assert.ok(Array.isArray(grid) && grid.length > 0, `第 ${i} 页没有 grid(条件区会塌成 0 宽)`)
+    assert.ok(grid.every((w) => w > 0), `第 ${i} 页 grid 含非正列宽`)
+  }
+
+  // ── ③showHead 必须逐页显式写(不写会退到「只有第 0 页有报告头」) ──
+  for (const [i, pg] of (cfg.pages || []).entries()) {
+    assert.equal(typeof pg.showHead, 'boolean', `第 ${i} 页必须显式写 showHead`)
+  }
+
+  // ── ④每条数据表都要有 filterKey/filterVal,且表区值互不重复 ──
+  const dts = cfg.dataTables || []
+  assert.equal(dts.length, 3, '三页各一张数据表')
+  const seen = new Map()
+  for (const dt of dts) {
+    assert.equal(dt.filterKey, '表区', `表「${dt.bar || dt.pageTitle}」的物理分块键应为 表区`)
+    assert.ok(dt.filterVal, `表「${dt.bar || dt.pageTitle}」缺 filterVal(会串表并误删行)`)
+    assert.ok(!seen.has(dt.filterVal), `表区值 '${dt.filterVal}' 被两张表共用`)
+    seen.set(dt.filterVal, dt)
+  }
+  assert.deepEqual([...seen.keys()].sort(), ['修订记录', '关键控制清单', '物料清单'])
+
+  // ── ⑤每张表归属的页签要存在,且三张表落在三个不同页 ──
+  const pagesOf = dts.map((dt) => dt.page ?? 0)
+  assert.deepEqual([...pagesOf].sort(), [0, 1, 2], '三张表应各占一个页签')
+  for (const p of pagesOf) assert.ok(p < (cfg.pages || []).length, `表归属的页 ${p} 不存在`)
+
+  // ── ⑥三张表都不渲染变体切换行 ──
+  // 页 1/2 的「产品基本信息」区已各有一格 工艺形态,表头再来一条就是**同页两个下拉**
+  // (实测过:页 1 同时出现「工艺形态 | 请选择」与「工艺形态：| 请选择」);
+  // 页 0 没有该区,那条切换行既不驱动标题(本页出 pageTitle)也无处可写。
+  for (const dt of dts) {
+    assert.equal(dt.noVariant, true, `表「${dt.bar || dt.pageTitle}」应标 noVariant(否则同页重复一个 工艺形态 下拉)`)
   }
 })

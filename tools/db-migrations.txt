@@ -566,3 +566,30 @@ i18n-spec-doc-cover.sql
 # ⚠ 节的顺序/编号/归属在前端 recordSheetConfigs.js;
 #   物料表的 filterKey/filterVal([表区]='物料清单')必须保留,否则整张明细被当物料显示。
 migrate-spec-doc-p4.sql
+
+# —— 2026-09-20 组装工艺清单按设计重排为 3 页签(用户口径:照《组装工艺控制.xlsx》)——
+# 设计源:《产品开发\2.产品文件\2.组装\组装工艺控制.xlsx》(3 个 sheet:修订记录 / BOM表 / 关键控制清单)
+#         + 《关键控制清单--标准库.xlsx》(同一目录,4 类标准库内容)。
+# gen/gen-asm-proc-lib.cjs —— 生成标准库种子 SQL。本轮修了两处:
+#   ① 裸棒 sheet 的管控要求跨 C:D 合并,原生成器写死取第 4 列 ⇒ 4 条工序的「检查比例」全空。
+#      改为**按表头定位列号**(headerIndex),不再依赖固定列偏移。
+#   ② 成品 sheet 第 36-40 行把「套折叠棉/扎橡皮筋 + 套PP棉」原样重复了一遍(设计缺陷),
+#      生成器对四元组做精确去重(20→18 条工序)。
+# migrate-asm-proc-lib.sql —— 4 个变体的标准库内容改为 **upsert**(原为 INSERT-only,
+#   重复执行会撞主键);内容键 = 四列表头原文 = yj_field.label。
+# migrate-asm-proc-redesign-2026-09-20.sql —— 表结构 + 字段:
+#   §1 rd_asm_proc_head 增 5 列(产品整体尺寸 / 表单管理人 / 密级 / 使用范围 / 版本号);
+#   §2 把 [表区] 从 place='header' 移到 'detail'(三张逻辑表共表,靠它分块 —— 留在 header 会
+#      导致明细永远查不到分块列,三张表互相串行);
+#   §3 新增 4 个 header 字段(产品整体尺寸 参照 RD_PROD_INFO,不另存第二份);
+#   §4 [物料名] 显示名改 **alias** 而非 label —— 改 label 就是改数据键,会波及
+#      RD_ASM_BOM / RD_SPEC_DOC 的同名字段;[产品名称/产品种类/整体规格外径/整体规格长度/成品重量]
+#      在本面板置 visible=0(设计里没有,字段保留给别的面板用)。
+# i18n-asm-proc-redesign.sql —— [关键控制清单] 10 语言 + [修订记录/产品整体尺寸/密级/使用范围]
+#   各 9 语言(en 已在)。zh-CN 是源语言不建行。
+# ⚠ 3 页签的页序/表归属/条件区 grid/变体标题在**前端配置** recordSheetConfigs.js:
+#   每条 dataTable 必须带 filterKey+filterVal 且值互不重复,否则三张表互相串行、
+#   且「从标准库勾选」的整表替换会删掉表区为空的全部行。
+migrate-asm-proc-lib.sql
+migrate-asm-proc-redesign-2026-09-20.sql
+i18n-asm-proc-redesign.sql

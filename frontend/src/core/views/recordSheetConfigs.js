@@ -7,13 +7,14 @@
  *   pages —— 多页签面板(pages 缺省 = 单页面板)。每页可**各自**声明:
  *              pages[i].grid     本页专用列网格(不写则用面板 grid;两页版式不同时必须各写一套,
  *                                否则其中一页会被另一页的网格挤变形 —— 成型/组装两对面板即如此)
- *              pages[i].headMode 本页专用版式 'report'|'plain'(不写则用面板 headMode;
- *                                如 组装工艺清单页 plain / 组装BOM表页 report)
+ *              pages[i].headMode 本页专用版式 'report'|'plain'(不写则用面板 headMode)
  *              pages[i].head     本页专用报告头跨度(网格列数不同的页要各自给 title/infoLabel/infoValue)
- *              pages[i].showHead true=本页也渲染报告头(被并入同一张单、但原本是独立单据的那页);
- *                                缺省=沿用历史行为「只有第 1 页有报告头」
+ *              pages[i].showHead true=本页渲染报告头 / false=本页不渲染;
+ *                                **不写**=沿用历史行为「只有第 0 页有报告头」⇒ 多页面板请逐页显式写
  *              pages[i].staticTitle 本页报告头大标题(两页本是两张单据,各有各的标题,不能共用面板 staticTitle)
- *            区块用对象上的 page:i 归属到第 i 个页签(缺省 0)
+ *            区块用对象上的 page:i 归属到第 i 个页签(缺省 0;漏写会挤到第 0 页)
+ *            ⚠ 每页都必须有自己的 grid(或回落到面板 grid):report 页的 section 宽度取自 effGrid,
+ *              取不到就写 width:0px,而 .rs-t 是 table-layout:fixed ⇒ 整块塌掉。
  *   head {title, infoLabel, infoValue} —— report 版式报告头三段列跨度(大标题|信息标签|信息值),合计 = grid 列数
  *   info —— report 版式右侧信息块行(缺省=密级/适用范围/测试负责人/报告编号;委托单自定义 文件管理人/密级/文件使用范围)
  *   docNoDefault —— 文档编号缺省(默认 YJ-PD-01;委托单 YJ-RIR001)
@@ -25,6 +26,11 @@
  *   waterColspans(碱性) —— 原水水质条 6 指标格各自跨的网格列数(Excel C:D/E/F:H/I:J/K:L/M:N)
  *   soakColspans(浸泡安全) —— 特例块值区跨度(Excel D/E/F:G)
  *   dataTables[{bar,subHeads[],cols[{key,label,span,group,area,w}],charts,footerNote}] —— 数据记录表(两级表头:同 group 合并)
+ *              cols[].key   = **数据键,必须是该字段当前的 yj_field.label**
+ *              cols[].label = 显示文案(缺省同 key);与 key 不同即为「显示改名」,不改数据键
+ *              dt.noVariant = true ⇒ 本表不渲染表头的变体切换行(工艺形态已在条件区有一格时用;
+ *                                    组装工艺清单三张表全标 —— 页 1/2 的「产品基本信息」已有该格,页 0 无格可改)
+ *              dt.filterKey/filterVal ⇒ 多张逻辑表共用一张行表时的物理分块(见 CONTEXT「表区是物理列」)
  *   conclusion{bar,key} —— 结论区(Excel 无结论区的表不配置)
  *   seedRows(浸泡安全) —— 标准卫生项目 17 行(新增草稿自动预填)
  */
@@ -33,19 +39,30 @@
 import { SPEC_TEST_LIB } from './specTestLib.js'
 
 // ═══════════ 被并入面板的原始配置(2026-09-11 并入工艺清单面板第 2 页签,菜单已下线)═══════════
-// 这两份是**页 2 的唯一真源**:主面板按页引用它们的 sections/dataTables/tailSections,
-// 区块上的 page:1 标明归属第 2 页签;面板级 headMode 挪到主面板 pages[1] 声明(页 2 版式)。
-// 与合并前(e20bd9a~1)的原文逐字一致,可直接作为回滚参考。
+// RD_MOLD_FORMULA 仍按页引用到成型工艺面板(sections/dataTables/tailSections 上的 page:1 标明归属)。
+//
+// ⚠ 2026-09-20 起,**组装侧不再是"并入"关系**:组装工艺清单按《组装工艺控制.xlsx》重排为 3 个页签,
+//   第 2 个页签(组装BOM表)照设计 sheet 独立复刻,不再复用原来的 RD_ASM_BOM 常量 ——
+//   两者的列序本就不同(设计是 物料编号|物料名称|… ,RD_ASM_BOM 常量是 物料名|物料编号|… ),
+//   继续复用会按错误列序渲染。该常量已随本次重排删除(需要时见 e20bd9a~1 之前的 git 历史);
+//   组装BOM表**面板**(RD_ASM_BOM)菜单早已下线(menus.test.js 钉着),实体表与 yj_field 保留不动。
 
-/** 组装工艺清单(页 1)的原始数据表:21 道工序预置;逐字取自 e20bd9a~1,提成常量以便与页 2 的两张表并存
+/** 组装工艺清单 · 页签 2「关键控制清单」= 设计《组装工艺控制.xlsx》sheet「组装工艺控制-关键控制清单」
  *  2026-09-18(Phase 4):改为**标准库驱动**(lib:'asm.proc',一变体一条目,勾选即整表替换),
  *  seedRows 降级为"未跑种子的环境"兜底 —— 沿用检验项目标准库重构的同一降级模式。
- *  ⚠ 与设计的已知差距:本 seedRows 是首次复刻时**合并单元格被塌缩**的产物,且多条 管控要求 为空串;
- *    设计的权威内容以 asm.proc 库为准(4 变体共 39 道工序、管控要求 0 条为空,
+ *  2026-09-20:设计改为 3 页签后,本表归属第 3 页(page:2),并补 filterKey/filterVal —
+ *    rd_asm_proc_detail 现由三张逻辑表共用(修订记录/物料清单/关键控制清单),
+ *    没有表区过滤时 rowsOf() 会把整份明细当本表显示、confirmLib() 会删掉"表区为空"的行。
+ *  ⚠ seedRows 是首次复刻时**合并单元格被塌缩**的产物,且多条 管控要求 为空串;
+ *    权威内容以 asm.proc 库为准(4 变体 37 道工序、检查比例 0 条为空,
  *    见 tools/gen/gen-asm-proc-lib.cjs 的实测输出)。 */
 const RD_ASM_PROC_DT0 = [
       { lib: 'asm.proc',   // 标准库:组装工艺 4 变体(裸棒/机器包布/复合半成品/成品)
+        page: 2,
         bar: '关键控制清单',
+        filterKey: '表区', filterVal: '关键控制清单',
+        // 工艺形态 已在「产品基本信息」区有一格(见 sections),表头不再重复一条变体切换行
+        noVariant: true,
         seedRows: [
           { 工序: '无黑处理', 工序控制内容: '无黑时间', 管控要求: '将炭棒单层摆车无黑处理，破损、裂纹等不良挑出无黑处理时间：12-24小时', 检查比例: '随机取2支测试黑水' },
           { 工序: '机器除尘', 工序控制内容: '1.机器毛刷松紧度2.除尘后清洁效果', 管控要求: '', 检查比例: '3%' },
@@ -69,12 +86,81 @@ const RD_ASM_PROC_DT0 = [
           { 工序: '扣盒盖/封胶纸', 工序控制内容: '1.配件数量2.封胶方式', 管控要求: '1.检查产品无漏装堵头、说明书、反冲洗垫片，然后将盒盖扣好2.用透明胶纸：十字交叉方式：盒宽面连接盒底封一圈+盒盖窄面封一条', 检查比例: '全检' },
           { 工序: '封箱', 工序控制内容: '1.装箱方式2.数量', 管控要求: '准备好纸箱，折好刀卡，将外观合格的产品端盖朝上竖放在纸箱内，具体方法：每排装6盒，装4排，每盒2支，每箱装48支，封箱方式为“工”字形', 检查比例: '全检' },
         ], cols: [
+          { key: '表区', label: '表区', hiddenCol: true, w: 90 },
           { key: '工序', label: '工序', w: 130 },
           { key: '工序控制内容', label: '工序控制内容', w: 320, area: true },
           { key: '管控要求', label: '管控要求', w: 430, area: true },
-          { key: '检查比例', label: '检查比例', w: 120 },
+          { key: '检查比例', label: '检查比例', w: 160 },
         ]},
     ]
+
+/** 组装工艺清单 · 页签 0「修订记录」= 设计《组装工艺控制.xlsx》sheet「修订记录」(B6:G16)
+ *  该 sheet 只有一行居中大标题 + 一行表头,没有公司抬头/编号/信息栏 ⇒ 本页 showHead:false,
+ *  由 dt.pageTitle 出居中标题(与 RD_SPEC_DOC 的「修订记录」页同一做法)。
+ *  列宽按 1040 总宽配平(与另两页的报告头/表格同宽,打印时三页左右缘对齐)。 */
+const RD_ASM_PROC_DT_REVISION = {
+  page: 0,
+  pageTitle: '修订记录',
+  filterKey: '表区', filterVal: '修订记录',
+  // 本页无「产品基本信息」区,变体切换行在这里既不驱动本页标题(本页出 pageTitle 居中大标题)
+  // 也没有可改的工艺形态格 —— 留着只会在表头上多一条无作用的「工艺形态：请选择」。
+  noVariant: true,
+  design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+  cols: [
+    { key: '表区', label: '表区', hiddenCol: true, w: 46 },
+    { key: '序号', label: '序号', w: 60, align: 'center' },
+    { key: '更改内容', label: '更改内容', w: 300, area: true },
+    { key: '更改原因', label: '更改原因', w: 200 },
+    { key: '更改时间', label: '更改时间', w: 130 },
+    { key: '责任人', label: '责任人', w: 120 },
+    { key: '备注', label: '备注', w: 184, area: true },
+  ],
+}
+
+/** 组装工艺清单 · 页签 1「组装BOM表」= 设计《组装工艺控制.xlsx》sheet「组装工艺控制-BOM表」
+ *  ⚠ 列序照设计第 13 行(物料编号 | 物料名称 | 物料规格 | 外观要求 | 用量)——
+ *    与组装BOM表面板(RD_ASM_BOM)的列序**不同**,故这里独立声明、不复用它的 dataTables。
+ *  ⚠ 「物料名称」是**显示文案**,数据键仍是 yj_field.label `物料名`
+ *    (改 label 会同时漂移 RD_ASM_BOM/RD_SPEC_DOC 两处数据键,2026-09-18 已定不改;
+ *     这里靠 yj_field.alias 在显示层改名,见 migrate-asm-proc-redesign-2026-09-20.sql §4)。 */
+const RD_ASM_PROC_DT_BOM = {
+  page: 1,
+  bar: 'BOM表',
+  filterKey: '表区', filterVal: '物料清单',
+  materialPick: true,   // 从基础档案 BOM 面板引用物料
+  // 本页有「产品基本信息」区且其中已有 工艺形态 一格 ⇒ 表头不再重复一条变体切换行
+  // (实测:不写这行时同页会出现两个「工艺形态」下拉,一个在信息区、一个在表格表头上)
+  noVariant: true,
+  cols: [
+    { key: '表区', label: '表区', hiddenCol: true, w: 90 },
+    { key: '物料编号', label: '物料编号', w: 130 },
+    { key: '物料名', label: '物料名称', w: 140 },
+    { key: '物料规格', label: '物料规格', w: 300, area: true },
+    { key: '外观要求', label: '外观要求', w: 340 },
+    { key: '用量', label: '用量', w: 130 },
+  ],
+}
+
+/** 三个页签的「产品基本信息」区(设计两张表都有 B9:G9 这一块,格子相同)
+ *  按用户口径只保留设计的四格 + 工艺形态(驱动 4 个关键控制清单变体的字段)——
+ *  产品名称/产品种类/成品重量/整体规格(外径)/整体规格(长度) 已置 visible=0 退出编辑面板。 */
+const RD_ASM_PROC_INFO_SEC = (page) => ({
+  page,
+  bar: '产品基本信息',
+  rows: [
+    { pairs: [
+      { label: '产品编号', key: '产品编号', type: 'text' },
+      { label: '客户项目名称', key: '客户项目名称', type: 'text' },
+    ]},
+    { pairs: [
+      { label: '产品功能类别', key: '产品功能类别', type: 'text' },
+      { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text' },
+    ]},
+    { pairs: [
+      { label: '工艺形态', key: '工艺形态', type: 'select' },
+    ]},
+  ],
+})
 
 /** 成型工艺清单(页 1)的原始区块:产品基本信息 / 工序 / 检验要求;逐字取自 e20bd9a~1 */
 const RD_MOLD_PROC_SEC0 = [
@@ -276,59 +362,6 @@ const RD_MOLD_FORMULA = {
       { page: 1, bar: '配料要求', rows: [
         { label: '配料要求', key: '配料要求', type: 'area' },
       ]},
-    ],
-  }
-
-const RD_ASM_BOM = {
-    staticTitle: '组装BOM表',
-    info: [],
-    grid: [130, 390, 130, 390],
-    head: { title: 2, infoLabel: 1, infoValue: 1 },
-    sections: [
-      { page: 1, bar: '一、产品基本信息', rows: [
-        { pairs: [
-          { label: '产品编号', key: '产品编号', type: 'text' },
-          { label: '产品名称', key: '产品名称', type: 'text' },
-        ]},
-        // 2026-09-18 设计《组装工艺控制-BOM表》明确这两格标「自动填充规格书」⇒ 参照字段(带回)
-        { pairs: [
-          { label: '客户项目名称', key: '客户项目名称', type: 'text' },
-          { label: '产品功能类别', key: '产品功能类别', type: 'text' },
-        ]},
-        { pairs: [
-          { label: '产品种类', key: '产品种类', type: 'text' },
-          { label: '成品重量', key: '成品重量', type: 'text' },
-        ]},
-        { pairs: [
-          { label: '整体规格（外径）', key: '整体规格外径', type: 'text' },
-          { label: '整体规格（长度）', key: '整体规格长度', type: 'text' },
-        ]},
-      ]},
-    ],
-    dataTables: [
-      { page: 1, bar: '二、炭棒滤芯组装/包装物料清单', filterKey: '表区', filterVal: '物料清单',
-        materialPick: true,  // 从基础档案 BOM 面板引用物料
-        // ⚠ key = 数据键 = yj_field.label(QueryService 用 `AS [label]` 出列,行模型按 label 取值)。
-        //   物料名/物料名称 这一列**刻意为 物料名**:设计文档写「物料名称」,但改 label 会让
-        //   本表与规格书物料清单(RD_SPEC_DOC 侧另有「物料名称」列)两处数据键同时漂移,
-        //   风险大于文案收益 ⇒ 维持 col_name==label(见 migrate-rd-2026-design.sql §E②)。
-        cols: [
-          { key: '表区', label: '表区', hiddenCol: true, w: 90 },
-          { key: '物料名', label: '物料名', w: 140 },
-          { key: '物料编号', label: '物料编号', w: 130 },
-          { key: '物料规格', label: '物料规格', w: 300, area: true },
-          { key: '外观要求', label: '外观要求', w: 340 },
-          { key: '用量', label: '用量', w: 130 },
-        ]},
-      { page: 1, bar: '修订记录', filterKey: '表区', filterVal: '修订记录', cols: [
-          { key: '表区', label: '表区', hiddenCol: true, w: 90 },
-          { key: '序号', label: '序号', w: 60 },
-          { key: '更改内容', label: '更改内容', w: 300, area: true },
-          { key: '更改原因', label: '更改原因', w: 200 },
-          { key: '更改时间', label: '更改时间', w: 130 },
-          { key: '责任人', label: '责任人', w: 120 },
-          { key: '备注', label: '备注', w: 230 },
-        ]},
     ],
   }
 
@@ -897,60 +930,68 @@ export const recordSheetConfigs = {
     ],
   },
 
-// 组装工艺清单 + 组装BOM表 —— **一张单两个页签**(2026-09-11)
-  // 页 1 = 组装工艺清单(原样:plain 清单式,工序/控制内容/管控要求/检查比例,21 道工序预置)+ 产品基本信息
-  // 页 2 = 组装BOM表(原 RD_ASM_BOM 的内容:产品基本信息 + 物料清单 + 修订记录)
-  // plain 版式没有全页网格:每张数据表按自己的 cols.w 铺宽,两张表都按 1040 总宽排(与纸张可印宽度一致)。
+// 组装工艺清单 —— **一张单 3 个页签**(2026-09-20 按《组装工艺控制.xlsx》重排)
+  // 设计源 3 个 sheet 与 3 个页签一一对应:
+  //   页 0 修订记录         ← sheet「修订记录」
+  //   页 1 组装BOM表        ← sheet「组装工艺控制-BOM表」
+  //   页 2 组装工艺清单     ← sheet「组装工艺控制-组装/包装关键控制清单」
+  // 三张表共用 rd_asm_proc_detail,靠 [表区] 物理分列区分 ⇒ 每条 dataTable 都必须带
+  // filterKey:'表区' + filterVal(修订记录/物料清单/关键控制清单),少一条就会串表。
+  //
+  // ⚠ 版式要点(踩过的坑,改 pages 时逐条核对):
+  //   · **每页都要写 grid**:effGrid 退不到面板级 grid 时 secW() 会写 width:0px,
+  //     而 .rs-t 是 table-layout:fixed ⇒ 整块 section 塌掉。
+  //   · **showHead 必须每页显式写**:未声明时的兜底是 `activePage === 0`,
+  //     页 0 恰好不需要报告头(设计与修订记录 sheet 一致),但页 1/页 2 必须 showHead:true。
+  //   · headMode 每页显式写 report:面板级是 report,页 0 也用 report(靠 showHead:false 关掉
+  //     报告头)而不是 plain —— plain 会走 plainTitleOf,那是**面板级、按变体**的标题,
+  //     会把「…---裸棒」印到修订记录页上。
   RD_ASM_PROC: {
-    headMode: 'plain',
+    headMode: 'report',
     plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单',
-    // ── 页签:页 1 = 组装BOM表(report 报告头 + 4 列网格,info:[] 原版无信息块);页 2 = 组装工艺清单(plain 清单)──
-    // 2026-09-11 按用户要求调换顺序(BOM 在前);页归属翻转用 map 改写 page,RD_ASM_BOM 原配置保持不动(回滚参考)。
-    // BOM 页声明 info:[] = 原版无右侧信息块——修复误回退默认四件套导致大标题挤进第一列(130px)的错位。
+    // 报告头(页 1/页 2 共用):公司名 + 编号 + 居中大标题 + 右侧信息栏四格。
+    // 信息栏照设计 F5:G8(D5:E5..D8:E8)= 表单管理人/密级/使用范围/版本号,
+    // 与成型工艺管控清单(RD_MOLD_PROC)同一套;字段见 migrate-asm-proc-redesign-2026-09-20.sql §3。
+    grid: [130, 390, 130, 390],
+    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    info: [
+      { label: '表单管理人', key: '表单管理人', type: 'text' },
+      { label: '密级', key: '密级', type: 'text' },
+      { label: '使用范围', key: '使用范围', type: 'text' },
+      { label: '版本号', key: '版本号', type: 'text' },
+    ],
     pages: [
-      { title: '组装BOM表', headMode: 'report', grid: [130, 390, 130, 390], showHead: true, staticTitle: '组装BOM表', info: [], head: { title: 2, infoLabel: 1, infoValue: 1 } },
-      { title: '组装工艺清单' },
+      // 页 0:设计 sheet「修订记录」只有 B6:G6 一行居中大标题 + B7 表头 ⇒ 不出报告头,
+      // 由 dt.pageTitle 出标题(RD_SPEC_DOC 的修订记录页即此做法)。
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 390, 130, 390] },
+      { title: '组装BOM表', headMode: 'report', showHead: true, grid: [130, 390, 130, 390],
+        staticTitle: '组装工艺控制-BOM表' },
+      { title: '组装工艺清单', headMode: 'report', showHead: true, grid: [130, 390, 130, 390],
+        staticTitle: '组装工艺控制-组装/包装关键控制清单' },
     ],
-    // 页 1(RD_ASM_PROC)的「产品基本信息」**独立声明**、不复用页 2 那张:
-    //   · 页 1 要 工艺形态(驱动 4 个关键控制清单变体)
-    //   · 页 2(组装BOM表)要 客户项目名称/产品功能类别(设计标"自动填充规格书")
-    //   · 页 2 的 产品种类/成品重量 对页 1 的关键控制清单无意义
-    //   同一份配置套两页会让每页都多出无意义的格子,故各声明各的(与「每页版式」同一思路)。
-    sections: [
-      { page: 1, bar: '产品基本信息', rows: [
-        { pairs: [
-          { label: '产品编号', key: '产品编号', type: 'text' },
-          { label: '产品名称', key: '产品名称', type: 'text' },
-        ]},
-        { pairs: [
-          { label: '工艺形态', key: '工艺形态', type: 'select' },
-          { label: '整体规格（外径）', key: '整体规格外径', type: 'text' },
-        ]},
-        { pairs: [
-          { label: '整体规格（长度）', key: '整体规格长度', type: 'text' },
-        ]},
-      ]},
-    ],
+    // 设计两张表的 B9:G9 都是「产品基本信息」,格子相同 ⇒ 同一份声明给两页(各声明 page)。
+    sections: [RD_ASM_PROC_INFO_SEC(1), RD_ASM_PROC_INFO_SEC(2)],
     // 4 个关键控制清单变体(设计《关键控制清单--标准库》4 个 sheet)各有各的纸面标题。
     // 变体内容**不在配置里** —— 内容源是 asm.proc 标准库(勾选即整表替换),
     // 这里只为"按头字段切标题"声明骨架;variants 的键必须与 工艺形态 字典 / asm.proc 的 item_code 一致。
+    // ⚠ 2026-09-20 起三页都是 report,plainTitle 不再上纸(staticTitle 才是页标题);
+    //   保留它是因为 confirmLib() 勾选时仍会把变体名写回 head['工艺形态'],
+    //   且 variants/variantKey 的键集是测试断言⑤的三处同源之一(组5 字典 / variants / 库 item_code)。
     variants: {
       裸棒: { plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单---裸棒' },
       机器包布: { plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单---机器包布' },
       复合半成品: { plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单---复合半成品' },
       成品: { plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单---成品' },
     },
-    /** 关键控制清单变体 = 表头「工艺形态」的值(设计《关键控制清单--标准库》4 个 sheet 名)。
-     *  ⚠ 设计原版的 4 个 sheet 是**四个独立变体**,没有"默认那个"之说 ⇒ 新单 工艺形态 为空时
-     *    不假装是某一个变体:此时 plainTitleOf 回落面板标题(通用式),
-     *    内容仍由用户从标准库勾选某个变体带入(勾选时一并写回 工艺形态)。 */
+    /** 关键控制清单变体 = 产品基本信息区「工艺形态」的值(设计《关键控制清单--标准库》4 个 sheet 名)。
+     *  ⚠ 4 个 sheet 是**四个独立变体**,没有"默认那个"之说 ⇒ 新单 工艺形态 为空时
+     *    不假装是某一个变体:内容由用户从标准库勾选某个变体带入(勾选时一并写回 工艺形态)。 */
     variantKey: '工艺形态',
-    // 页 1(RD_ASM_PROC_DT0)与页 2(RD_ASM_BOM.dataTables)的 key 都是 yj_field.label,
-    // 且 RD_ASM_BOM/RD_ASM_PROC 的 label 已保持一致(2026-09-18 决定不改 物料名/更改原因/更改内容)
-    // ⇒ 两面板可安全共用同一份配置,无需换键。
+    // 列序/表区值见各常量;三页的列宽都配平到 1040(与 grid 总宽一致,打印左右缘对齐)。
     dataTables: [
-      ...RD_ASM_PROC_DT0.map((dt) => ({ ...dt, page: 1 })),
-      ...RD_ASM_BOM.dataTables.map((dt) => ({ ...dt, page: 0 })),
+      RD_ASM_PROC_DT_REVISION,
+      RD_ASM_PROC_DT_BOM,
+      ...RD_ASM_PROC_DT0,
     ],
   },
 

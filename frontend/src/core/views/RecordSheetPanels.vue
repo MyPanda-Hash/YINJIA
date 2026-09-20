@@ -725,10 +725,12 @@
     <!-- ═══ 标准库勾选弹窗(规格书检验项目:分组库;出货检验计划:必测项+型式项扁平表;
              组装工艺:4 变体整表替换) ═══ -->
     <el-dialog v-model="libVisible" :title="tt(libDialogTitle)" width="880px" append-to-body>
-      <div class="lib-tip">{{ tt('库条目均可维护：勾选一条可「编辑」，✕ 停用、↩ 恢复启用；改库只影响以后的勾选，已录入单据不变。') }}</div>
+      <!-- 变体库:本弹窗只提供「选一条→替换」,条目正文的编辑在「标准库维护」——
+           这句通用提示里的「勾选一条可编辑」对它不成立,故不显示(见 isAsmProcLib) -->
+      <div v-if="!isAsmProcLib" class="lib-tip">{{ tt('库条目均可维护：勾选一条可「编辑」，✕ 停用、↩ 恢复启用；改库只影响以后的勾选，已录入单据不变。') }}</div>
       <!-- 组装工艺 4 变体:一变体一条目,勾选即整表替换 -->
       <template v-if="libTargetDt && libTargetDt.lib === 'asm.proc'">
-        <div class="lib-tip">{{ tt('选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在列表里「编辑」或「停用」。') }}</div>
+        <div class="lib-tip">{{ tt('选一个变体：该变体的一整套工序会替换本表当前内容（不是追加）。可在此「停用」整条；要改工序内容请到「标准库维护」。') }}</div>
         <el-table
           :data="libRows"
           size="small"
@@ -817,8 +819,8 @@
           </template>
         </el-table-column>
       </el-table>
-      <!-- 出货检验计划:自定义补充表单(扁平结构) -->
-      <div v-if="!isGroupedLib" class="lib-custom">
+      <!-- 出货检验计划:自定义补充表单(扁平结构)。变体库没有这 7 个字段,排除(见 isAsmProcLib) -->
+      <div v-if="!isGroupedLib && !isAsmProcLib" class="lib-custom">
         <div class="lib-custom-title">{{ tt('补充自定义检验项') }}({{ tt('存入后长期可用') }})</div>
         <div class="lib-custom-form">
           <el-input v-model="libFControl" size="small" :placeholder="tt('控制项目')" />
@@ -836,7 +838,9 @@
       <template #footer>
         <el-button :disabled="!canEditLibEntry" @click="editLibEntry">{{ tt('编辑') }}</el-button>
         <el-button @click="libVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="confirmLib">{{ tt('追加选中项') }}({{ libChecked.length }})</el-button>
+        <!-- 变体库是**整表替换**而非逐条追加(confirmLib),按钮文案要跟着语义走,
+             否则写着「追加」实为「清空本表区再灌入」,用户按下去才发现原来的行没了 -->
+        <el-button type="primary" @click="confirmLib">{{ isAsmProcLib ? tt('替换本表内容') : tt('追加选中项') }}({{ libChecked.length }})</el-button>
       </template>
     </el-dialog>
 
@@ -1360,6 +1364,8 @@ const libFMethod = ref('')
 function oneEditableChecked() {
   if (libChecked.value.length !== 1) return null
   const it = libChecked.value[0]
+  // 变体库:弹窗里的编辑器只有"分组/扁平"两种形态,都不认 rows 结构 ⇒ 不给编辑(见 isAsmProcLib)
+  if (isAsmProcLib.value) return null
   if (isGroupedLib.value) {
     const key = String(it)
     if (!/^\d+:\d+$/.test(key)) return null
@@ -1498,6 +1504,20 @@ async function destroyLibRow(dbId) {
 // ── 出货检验计划:自定义补充(扁平结构) ──
 const isGroupedLib = computed(() => libRows.value.length > 0 && Array.isArray(libRows.value[0]?.subs))
 const hasDbFlat = computed(() => libRows.value.some((r) => r.dbId))
+/**
+ * 组装工艺 4 变体库(第三态)。
+ *
+ * ⚠ 这一态**既不是**分组库(spec.test,行上有 subs)**也不是**扁平库(insp.plan)——
+ *   它的条目正文是 `{v:1,rows:[{工序,工序控制内容,管控要求,检查比例}]}`。
+ *   两处必须按它排除,否则会套用扁平库那套 7 个字段(控制项目/质量控制内容/…):
+ *     ① 弹窗里会多出一整块「补充自定义检验项」表单 —— 字段名与本库毫不相干,
+ *        点「存入标准库」还会把条目写进 **insp.plan**;
+ *     ② 「编辑」会把该行喂给扁平编辑器(扁平键在变体条目上全取不到 ⇒ 显示空表单),
+ *        再点「保存修改」就 POST /stdlib/update **用扁平 content 覆盖掉变体的 rows** ——
+ *        整套工序没了。所以下面 oneEditableChecked() 对该库直接返回 null(编辑按钮置灰),
+ *        条目的增删改走「标准库维护」(StdLibManager,它把正文当字符串原样往返)。
+ */
+const isAsmProcLib = computed(() => libTargetDt.value?.lib === 'asm.proc')
 /** 平表表单 → 规范结构:编辑时以条目原规范结构打底(保住列上没显示的字段),新增时空字段留空 */
 function flatContent() {
   return toContentJson({
