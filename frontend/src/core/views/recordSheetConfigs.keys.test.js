@@ -278,3 +278,64 @@ test('组装工艺清单 3 页签:每页有 grid/showHead,每条表有唯一的�
     assert.equal(dt.noVariant, true, `表「${dt.bar || dt.pageTitle}」应标 noVariant(否则同页重复一个 工艺形态 下拉)`)
   }
 })
+
+/**
+ * 断言 ⑦(2026-09-20):成型工艺清单的 3 页签结构不变量 —— 用户口径「和组装工艺清单的一样」。
+ *   页 0 修订记录(新增)/ 页 1 成型工艺清单(原页 0)/ 页 2 成型配方(原页 1)。
+ * 守的坑与断言 ⑥ 同源:页缺 grid ⇒ 条件区塌成 0 宽;showHead 不写 ⇒ 页 1/页 2 没有报告头;
+ * 数据表缺 filterKey/filterVal ⇒ rowsOf() 返回整份明细(两张逻辑表互相串行)。
+ * 另钉一条**跨面板口径**:成型修订记录页与组装修订记录页的列必须逐字一致(用户明确要求"一样"),
+ * 任一侧改了列名/列宽/设计像素而另一侧没跟,这里就红。
+ */
+test('成型工艺清单 3 页签:每页有 grid/showHead,且修订记录页与组装逐字一致', () => {
+  const cfg = recordSheetConfigs.RD_MOLD_PROC
+  assert.ok(cfg, 'RD_MOLD_PROC 配置缺失')
+
+  // ── ①页签数与页题(新增修订记录在最前,原两页顺延) ──
+  const titles = (cfg.pages || []).map((p) => p.title)
+  assert.deepEqual(titles, ['修订记录', '成型工艺清单', '成型配方'], '页签应为 修订记录/成型工艺清单/成型配方')
+
+  // ── ②每页都要能算出非 0 的网格宽 ──
+  for (const [i, pg] of (cfg.pages || []).entries()) {
+    const grid = pg.grid || cfg.grid
+    assert.ok(Array.isArray(grid) && grid.length > 0, `第 ${i} 页没有 grid(条件区会塌成 0 宽)`)
+    assert.ok(grid.every((w) => w > 0), `第 ${i} 页 grid 含非正列宽`)
+  }
+
+  // ── ③showHead 必须逐页显式写(不写会退到「只有第 0 页有报告头」,而第 0 页正是不要报告头的那页) ──
+  for (const [i, pg] of (cfg.pages || []).entries()) {
+    assert.equal(typeof pg.showHead, 'boolean', `第 ${i} 页必须显式写 showHead`)
+  }
+  assert.equal(cfg.pages[0].showHead, false, '修订记录页不出报告头(设计只有一行居中大标题)')
+
+  // ── ④两张逻辑表共用 rd_mold_proc_detail,表区值必须互不重复 ──
+  const dts = cfg.dataTables || []
+  assert.equal(dts.length, 2, '两张数据表:修订记录 + 配方表')
+  for (const dt of dts) {
+    assert.equal(dt.filterKey, '表区', `表「${dt.bar || dt.pageTitle}」的物理分块键应为 表区`)
+    assert.ok(dt.filterVal, `表「${dt.bar || dt.pageTitle}」缺 filterVal(会串表并误删行)`)
+  }
+  assert.deepEqual(dts.map((d) => d.filterVal).sort(), ['修订记录', '配方表'], '表区值应为 修订记录/配方表')
+
+  // ── ⑤每张表归属的页签要存在,且落在不同页 ──
+  const rev = dts.find((d) => d.filterVal === '修订记录')
+  const formula = dts.find((d) => d.filterVal === '配方表')
+  assert.equal(rev.page ?? 0, 0, '修订记录表应挂第 0 页')
+  assert.equal(formula.page, 2, '配方表应挂第 2 页(成型配方)')
+  assert.equal(rev.pageTitle, '修订记录', '修订记录页用居中大标题(pageTitle),不画 bar 行')
+  assert.equal(rev.noVariant, true, '修订记录页无 产品基本信息 区,变体切换行无作用')
+  for (const dt of dts) assert.ok((dt.page ?? 0) < (cfg.pages || []).length, '表归属的页不存在')
+
+  // ── ⑥区块页归属:页 1 = 成型工艺清单(表单式,无数据表),页 2 = 成型配方 ──
+  const secPages = [...(cfg.sections || []), ...(cfg.tailSections || [])].map((s) => s.page ?? 0)
+  assert.ok(!secPages.includes(0), '第 0 页(修订记录)不应有区块 —— 它只有一张表')
+  assert.ok(secPages.includes(1) && secPages.includes(2), '页 1/页 2 都要有自己的区块')
+  assert.ok(!(cfg.sections || []).some((s) => s.bar === '配方表'), '配方表是数据表,不是区块')
+
+  // ── ⑦跨面板口径:与组装工艺清单的修订记录页逐字一致(列序/列宽/设计像素/页题) ──
+  const asmRev = (recordSheetConfigs.RD_ASM_PROC.dataTables || []).find((d) => d.filterVal === '修订记录')
+  assert.ok(asmRev, '组装工艺清单的修订记录表缺失')
+  assert.deepEqual(rev.cols, asmRev.cols, '成型修订记录页的列必须与组装逐字一致(用户口径:一样)')
+  assert.deepEqual(rev.design, asmRev.design, '设计像素规范必须与组装一致')
+  assert.equal(rev.pageTitle, asmRev.pageTitle)
+})

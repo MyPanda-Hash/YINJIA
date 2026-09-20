@@ -593,3 +593,17 @@ migrate-spec-doc-p4.sql
 migrate-asm-proc-lib.sql
 migrate-asm-proc-redesign-2026-09-20.sql
 i18n-asm-proc-redesign.sql
+
+# —— 2026-09-20 成型工艺清单补「修订记录」页签(用户口径:和组装工艺清单的一样)—— 
+# 页签 0 = 修订记录(新增),原「成型工艺清单 / 成型配方」顺延为页 1 / 页 2;
+# 列与组装工艺清单的修订记录页**逐字一致**:表区(隐藏)/序号/更改内容/更改原因/更改时间/责任人/备注。
+# migrate-mold-proc-revision.sql —— 只解决"能不能落库/能不能读回",两处改动:
+#   §1 rd_mold_proc_detail 补 5 列(与 rd_asm_proc_detail 同名同型);
+#   §2 [表区] 由 place='header' 改挂 'detail' —— 明细查询只取 place='detail' 的列,
+#      留在 header 时明细行上的 [表区] 永远查不回来,而 rowsOf() 按它过滤 ⇒
+#      修订记录与配方表**重开单据都会一行都看不见**(组装侧 2026-09-20 同坑)。
+# 落点:修订记录行与配方行共用 rd_mold_proc_detail,靠 [表区]='修订记录'/'配方表' 分块;
+# 不新建物理表、不动已有 22 张头表的语义。
+# ⚠ 页序/列序/列宽/设计像素在**前端配置** recordSheetConfigs.js(RD_MOLD_PROC_DT_REVISION);
+#   断言⑦(recordSheetConfigs.keys.test.js)钉住"每页有 grid/showHead + 表区值唯一 + 与组装逐字一致"。
+migrate-mold-proc-revision.sql

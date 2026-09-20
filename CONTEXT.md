@@ -82,12 +82,15 @@ RecordSheetPanels 渲染器(配置驱动,key=yj_field label 中文数据键):
   产品基本信息 + 工序(灌料/烧结/热压/冷却/脱模)+ 检验要求;工序与检验要求的键值对块统一
   「标签行 + 值行」两行式(源 Excel 网格:标签占外列,值占内列)。密度管控要求输入框提示语
   「密度范围:~」。
-  **2026-09-11 起与「成型配方」并为一张单两个页签**:页 1 = 成型工艺清单,页 2 = 成型配方
-  (原 RD_MOLD_FORMULA 的产品基本信息 + 配方表 + 配料要求)。**两页各用各的原始版式**(页 1 = 11 列
-  网格 [130,110,70,100,70,70,70,100,70,125,125],页 2 = 13 列
-  [101,60,109,85,52,52,52,146,64,64,121,77,57];报告头跨度与标题也各按各的)——见「每页版式」术语。
-  页 2 的配方行落在**同一张行表** rd_mold_proc_detail,用「表区=配方表」分块(filterKey 模式);
-  配料要求是头字段(rd_mold_proc_head.配料要求)。
+  **2026-09-11 起与「成型配方」并为一张单;2026-09-20 起为三个页签**:页 0 = 修订记录(新增)、
+  页 1 = 成型工艺清单、页 2 = 成型配方(原 RD_MOLD_FORMULA 的产品基本信息 + 配方表 + 配料要求)。
+  **每页各用各的原始版式**(页 1 = 11 列网格 [130,110,70,100,70,70,70,100,70,125,125],
+  页 2 = 13 列 [101,60,109,85,52,52,52,146,64,64,121,77,57],页 0 表格自持列宽、合计 1040;
+  报告头跨度与标题也各按各的)——见「每页版式」术语。
+  **页 0「修订记录」与组装工艺清单那一页逐字一致**(用户口径「和组装工艺清单的一样」):列 =
+  表区(隐藏)/序号/更改内容/更改原因/更改时间/责任人/备注,**不出报告头**(设计只有一行居中大标题,
+  由 `dt.pageTitle` 出),行落**同一张行表** rd_mold_proc_detail,用「表区=修订记录」分块(filterKey 模式);
+  页 2 的配方行同样在这张行表里,用「表区=配方表」分块;配料要求是头字段(rd_mold_proc_head.配料要求)。
 - **成型配方**(RD_MOLD_FORMULA):炭棒配方管控清单——产品基本信息(标签行/值行两行式)+
   配方表(No./物料种类2/物料编号4/物料名称3/实际添加比例/单支物料含量/设计添加量,13 格,
   合计行)+ 配料要求。**2026-09-11 起本面板已并入 RD_MOLD_PROC 第 2 页签并从菜单下线**,
@@ -114,9 +117,12 @@ RecordSheetPanels 渲染器(配置驱动,key=yj_field label 中文数据键):
 - **页签归页与共表口径(2026-09-11)**:`cfg.pages` 数组长度=页签数,区块用 `page` 索引归页
   (sections / tailSections / tailDocSections / dataTables 四类都支持,**tailSections 原先不按页过滤,
   已补齐**);一次只打印当前页签。
-  **「表区」是物理列而非内存标记**:多张逻辑表共用一张行表时,表区必须既在 yj_field 登记
-  (place='header',否则保存链 labelsToCols 把未声明的键丢掉、行下次打开就消失),又在头表有同名物理列
-  (否则 QueryService.selectCols 生成 t.[表区] 报"列名无效",整面板查询 500)。
+  **「表区」是物理列而非内存标记,且必须挂在 place='detail'**:多张逻辑表共用一张行表时,表区
+  ① 必须在 yj_field 登记(否则保存链 labelsToCols 把未声明的键丢掉,行下次打开就消失);
+  ② 必须登记成 **place='detail'** —— 明细查询只 SELECT `fieldsAt("detail")` 的列
+  (`QueryService.loadDocs`),挂成 'header' 时**行上的表区永远查不回来**,而前端 `rowsOf()` 正按它过滤
+  ⇒ 两张表重开单据都变成空表(新增行当场看得见、重开就没有 —— 组装 2026-09-20、成型 2026-09-20 各踩一次);
+  ③ 头表/行表要有同名物理列(`QueryService.selectCols` 生成 `t.[表区]`,缺列报"列名无效"、整面板查询 500)。
 - **规格书**(RD_SPEC_DOC):**单面板、9 种规格书类型仅作单据分类**(页签 Tab 过滤,新单默认当前类型),
   4 页结构(产品信息封面/修订记录/检验项目及标准/成品及包装运输);检验项目及标准页从标准库
   (测试项目汇总 26 类 48 子项)勾选组装;规格书种类属配置类数据,译名人工维护不机翻。
@@ -322,6 +328,7 @@ erp_imp_log/erp_imp_row 通道表定位调整为**审计层**(同步器写批次
 | 2026-09-12 | **对外正式报表第一期竖切:销售订单(JasperReports)**。口径:①报表是**对外正式文件**,要页眉(公司抬头+单据编号/日期/状态)/页脚(页码+打印时间+签名区);②**IT 做模板、业务只选单据导出**,不做网页拖拽设计器;③版式**由 IT 重新设计**(覆盖单据实际数据,不逐像素复刻屏幕纸面);④技术选型 **JasperReports 6.21.3**(6.x 末版:导出器/字体扩展同在一个 jar;7.x 已按导出器拆模块,坐标与 API 都不同)+ POI 5.4.1(xlsx 导出器依赖);⑤中文字体走**字体扩展 + 自建 TTF**(Noto Sans SC 可变字体 instance 成静态 Regular/Bold 再子集化,`tools/gen-report-font.py`)——**必须 TTF**,OpenPDF 对 OTF/CFF 支持差,PDF 会出方框;⑥模板注册表放 classpath 属性文件(不用 DB 表,避免为竖切加迁移),加单据=加 jrxml+三行+重启;⑦取数**沿用 QueryService.loadOneDoc**(头字段→报表参数、明细行→数据源,中文键=`yj_field.label`);⑧导出 PDF/Excel/打印预览(inline disposition),鉴权沿用项目 anyRequest().authenticated()(未登录 403);⑨单号不存在**不出空壳单**(按面板元数据判空后 400)。验收:三张真实销售订单 curl 导出 PDF(76–78KB,1 页,`/BaseFont` 命中 `NotoSansSC-Regular/Bold`、`/FontFile2` 嵌入式 TrueType、`/Identity-H`)+ XLSX(7.8–8.1KB),PDF 文本层能解出中文并与 SQL 值逐项一致;60 行临时单导出 4 页、每页页脚「第 N 页 / 共 4 页」正确(临时单按**精确单号**清理,真实 18 张未动);探针 `tools/_probe-report-export.cjs` 27 项全绿(含界面点 PDF/Excel 拿到非空文件字节),`npm test` 112 通过、`npm run build` 通过 | grill 会话 2026-09-12 |
 | 2026-09-12 | **权限与审批缺陷全量加固(P1~P10 十项)**。①**服务端权限强制执行**——新增 `PanelPermissionService`,`/api/px/callButton`+`deleteForms` 按钮词表校验(词内任一命中放行,管理员恒过),`queryFormDataList`/`getFormDescriptor`/`getApprovalHistory`/报表模板与导出/报表栏目设置 等读接口按面板 view 校验;**读放行三层规则=可见面板 ∪ 字段参照目标(yj_field.ref_panel) ∪ 同模块(module_group)面板**——参照/选单/BOM 勾选/进度表跨面板读大量存在,只按 view 硬拦会打断合法参照链,跨模块越权读仍被拦;缺失放行的解法=给角色补该模块任意面板「可见」。权限错误用 `AccessDeniedException`→HTTP 200+code 403(避开前端 401/403 强制登出)。②**编制审批分离**——`approveApproval` 拒「审批人=提交人」、`audit` 拒「审核人=制单人」(asp_user1),**管理员豁免**(保存即归档本就是等价权力,堵死会造死路)。③**在途申请锁定**——删除申请中/修改申请中不可保存(此前申请期间仍可改数据,diff 失真甚至造出无人能解的死状态);审批通过/驳回 UPDATE 带 `pending='Y'` 行数守卫,并发只有一次生效。④**保存为草稿不再自动送审/归档**(markSaved 门控;旧代码草稿路径同样被自动归档,文书面板没有"存一半不送审"的能力)。⑤**弃审留痕**——文书面板弃审时落 modify_log 快照(`snapshotOnUnaudit`),再编辑保存由 `finalizeOpenModify`(泛化的 finalizeModify,不再只认修改态)收尾盖章,弃审路径与申请修改路径留痕同构。⑥**通知补齐**——删除/修改申请的审批结果通知申请人(DELETE_APPROVED/REJECTED、MODIFY_APPROVED/REJECTED 四码+消息中心模板;TERM_* 四码模板此前一直缺失,渲染成通用「业务消息」,一并挂上——词条 en.js 早已预置)。⑦**修改记录全量保留**——删掉滚动 3 条的物理 DELETE(审计要求;展示仍 TOP 3)。⑧**立项人账号锚定**——`initiatorUsersOf` 优先取立项申请制单人 `asp_user1` 直连 yj_user(启用校验),历史空值回退姓名匹配 real_name(立项人改名/同名他人时姓名匹配判错人)。⑨**删除审批通过释放 form_flow_link**(与草稿作废同口径)+意见随留痕与通知带上。⑩**立项作废参照守卫**——RD_APPROVAL 仍被实施计划/8 数据记录表(文档编号关联,作废不计)引用时拒绝作废,先作废引用单据才可。**口径反转两条**:归档现在**写审核人 shr**(CASE 保首审,再归档留痕看 modify_log.rearchive_by)——推翻 2026-09-11「归档不写 shr」条;管理员保存即归档显式留痕 SUBMIT+APPROVE「保存即归档(管理员保存)」。验收探针 `tools/_probe-perm-hardening.cjs` 32 项全绿(越权读拦/按钮词表拦/草稿不送审/自审拦截/在途锁定/驳回通知/弃审留痕/账号锚定/参照守卫)+SQL 断言(shr 落库、modify_log rearchive_by 盖章、作废标记),`mvn package`+`npm test` 112+`npm run build` 通过。**踩坑:本机 shell 残留全局 `SPRING_DATASOURCE_PASSWORD=000518`(他项目),Spring 环境变量优先级高于 yml,导致后端起不来报「用户 'yinjia' 登录失败」——启动须 `env -u SPRING_DATASOURCE_PASSWORD`;且打包必须走 `build.bat` 同款参数(`-s tools/settings.xml` + `YINJIA_M2_REPO=../.m2-repo`),用默认 ~/.m2 会解析出错版 jackson(NoClassDefFoundError: InternalJacksonUtil)** | 缺陷修复会话 2026-09-12 |
 | 2026-09-14 | **「点浏览器最小化按钮窗口收不起来/卡住」排查结论:应用代码无责,系 Edge Beta 154 窗口管理竞态(间歇性),仅登录页可复现**。方法:PowerShell ShowWindow/SC_MINIMIZE/真实鼠标点击三种方式 + CDP 页面侧插桩 + 纯 PS 翻转计数(探针集 `tools/_min-flip.cjs`/`_restore-stack.cjs`/`_final-matrix.cjs`/`_real-login-flip.cjs`/`_real-click-min.ps1` 等 22 个)。事实:①登录页最小化约 2/3 概率被自动弹回(间歇性);②**真实登录后的业务页面、静态 404 页、百度/淘宝均正常保持最小化**;③应用 JS 无嫌疑——focus/open/alert/print 全量插桩零调用、页面不重载(marker 存活)、主线程零阻塞(CPU≈0%);④与 CSS 动画/backdrop-filter/occlusion 特性/GPU 开关/翻译与自动填充等浏览器功能开关均无关。处置:用户侧升级或换 Edge 稳定版/Chrome;业务侧无需改代码。**用户实测确认(2026-09-14):改用 `http://127.0.0.1:8090` 访问后问题消失**(此前用 localhost)——localhost 与 127.0.0.1 在浏览器是不同站点(站点级状态/提示策略独立),换访问地址即绕开。**探针坑**:经 hash 变更导航到"面板页"会被路由守卫重定向回 #/login(登录态在内存),测登录后页面必须先在同源页种 token 再冷启动目标路由(见 `_final-matrix.cjs` C/D 案例);`Get-Process msedge` 的 MainWindowHandle 可能是已退出 launcher 的死句柄,须 EnumWindows 按可见+标题过滤 | 排查会话 2026-09-14 |
+| 2026-09-20 | **成型工艺清单加「修订记录」页签,口径 = 与组装工艺清单那一页逐字一致**(用户口径「和组装工艺清单的一样」,三选一里明确选了"完全照组装",未采用成型源文件《20267月22日-最新烧结配方模板-1.xlsx》sheet「变更履历」的 序号/日期/版本号/原因/内容 那一套):页签 0 = 修订记录(原「成型工艺清单/成型配方」顺延为页 1/页 2),列 = 表区(隐藏)/序号/更改内容/更改原因/更改时间/责任人/备注,不出报告头、由 `dt.pageTitle` 出居中大标题。**同时修掉成型侧一处既有缺陷**:[表区] 原登记 `place='header'`,而明细查询只 SELECT `fieldsAt("detail")` ⇒ 行落库了但重开单据读不回来,前端 `rowsOf()` 按它过滤会让**修订记录与配方表两页都变空**(组装侧 2026-09-20 同坑),本轮按同样口径改挂 `place='detail'`,并把 5 列(与 rd_asm_proc_detail 同名同型)补到 rd_mold_proc_detail;不新建物理表、页 2 语义不变。断言⑦(recordSheetConfigs.keys.test.js)钉页签/页归属/表区唯一 + **与组装那份逐字一致**;探针 `tools/archive/_probe-mold-rev-tab.cjs` 15 项(落库/读回/表区往返)+ `tools/archive/_probe-mold-rev-ui.cjs` 17 项(三页签渲染/大标题/无报告头/重开后两页各显各的行/与组装列宽逐格一致)全绿 | grill 会话 2026-09-20 |
 
 ### 已审批判据(Approved Status Criteria)
 
