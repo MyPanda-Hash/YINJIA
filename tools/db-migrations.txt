@@ -504,3 +504,20 @@ migrate-attach-restore.sql
 #   用户口径:需要;采购单 CGD 不做 —— 经核对 CGD 是旧版「采购单」遗留面板(Porder 表/0 行/模块"订单管理·单据"),
 #   并非「采购订单」(采购订单是 PU_ORDER,已有附件)。幂等:逐列判存 + 清旧插新。
 migrate-sale-out-attach.sql
+
+# —— 2026-09-20 采购订单分批送料:批次台账 + 批次号字段(P0,方案 docs/方案-采购订单分批送料与批次号.md)——
+#   ① 系统参数表 yj_app_setting(键值对;默认 receive_over_ratio=0.05 = 允许超送 5%,0=不允许)
+#   ② 批次台账 yj_doc_batch:每张暂收单一个批次,batch_no=采购订单号+3位序号;
+#      **序号可回收**(用户口径):筛选唯一索引 UX_yj_doc_batch_active 只对 ACTIVE 唯一,
+#      释放的批次行状态置 RELEASED 留痕、序号回到可用池可复用。
+#   ③ form_flow_link 加 batch_no:分批占用按批次记录,linked_quantity = 本次实际送料量(原为整行量)。
+#   ④ 暂收/检验/入库/退回 四张单(头+行)加 批次号 列,批次号沿链路贯通(可反查四单)。
+#   ⑤ yj_field 注册 8 处 + yj_translation 批次号 ×10 语言。幂等可重跑。
+migrate-batch-link.sql
+
+# —— 2026-09-20 分批送料 P0 存量回填 ——
+#   存量 PU_ORDER→SL_RECV 占用无批次标识 → 按「一张暂收单 = 一个批次」回填:
+#   序号按该订单下暂收单创建时间排序,批次号=订单号+3位序号;写 yj_doc_batch,并把批次号沿链路
+#   下传 检验单/采购入库单/暂收退回单(头+行+form_flow_link.batch_no);存量 linked_quantity 保持原值。
+#   收尾自检:①回填覆盖计数 ②每张订单 Σ批次量 ≤ 订单数量(超出者列清单人工核对)。
+migrate-batch-backfill.sql

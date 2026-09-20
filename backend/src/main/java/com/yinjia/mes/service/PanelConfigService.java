@@ -355,6 +355,18 @@ public class PanelConfigService {
         }
         metadata.put("buttonGroups", buttonGroups);
         if (!disabledActions.isEmpty()) metadata.put("disabledActions", disabledActions);
+        // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
+        Map<String, Object> pushTargets = new LinkedHashMap<>();
+        for (Map<String, Object> g : buttonGroups) {
+            Object acts = g.get("actions");
+            if (!(acts instanceof List<?> list)) continue;
+            for (Object a : list) {
+                String action = String.valueOf(a);
+                String t = pushTarget(def.code(), action);
+                if (t != null && !disabledActions.contains(action)) pushTargets.put(action, t);
+            }
+        }
+        if (!pushTargets.isEmpty()) metadata.put("pushTargets", pushTargets);
         metadata.put("panelPageDto", pageDto);
         metadata.put("formPages", List.of(formPage));
 
@@ -921,6 +933,8 @@ public class PanelConfigService {
             // 采购链订单行号(2026-09-20):采购订单行 行号(金蝶 seq)→ 下游各站 采购订单行号,
             // 逐站下传后在 采购入库行 落 源单行号,转ERP 推给金蝶作 src_seq
             {"行号", "采购订单行号"},
+            // 送料批次号(2026-09-20 分批送料 P0):同名直通,逐站下传(暂收→检验→入库/退回)
+            {"批次号", "批次号"},
             // 计划层(销售订单 → 生产工单)的产品口径换名
             {"存货编码", "产品编码"}, {"存货名称", "产品名称"},
             {"数量", "订单数量"},
@@ -934,17 +948,19 @@ public class PanelConfigService {
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
             // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoPurchaseIn 同步补列)
-            "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}, {"采购订单号", "采购订单号"}},
+            // + 批次号(2026-09-20 分批送料 P0:批次号沿 暂收→检验→入库 贯通,同一批次可反查四单)
+            "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}, {"采购订单号", "采购订单号"}, {"批次号", "批次号"}},
             // 来料检验单 → 暂收退回单:检验单号落「检验单号」;采购订单号随链带入(2026-09-20,
-            // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoReturn)
-            "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}, {"采购订单号", "采购订单号"}},
+            // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoReturn)+ 批次号
+            "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}, {"采购订单号", "采购订单号"}, {"批次号", "批次号"}},
             "SO_ORDER|WO_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "交期"}},
             // 采购订单 → 送料暂收单:表头日期标签不同(单据日期→日期);供应商编码→供应商代码(异名,不带则生单丢失编码)
             // + 采购订单号(2026-09-20:订单号/订单行号须沿链下传,转ERP 时作金蝶源单关联 src_bill_no/src_seq)
+            // 注:批次号由分批生单自动取号写入(PushGenerateHandler.generateBatch),不走映射
             "PU_ORDER|SL_RECV", new String[][]{{"单据日期", "日期"}, {"供应商编码", "供应商代码"}, {"单据编号", "采购订单号"}},
             // 送料暂收单 → 来料检验单:日期同名,但头映射 7 条上限曾被附件占坑挤丢,同义词追加无上限兜底
-            // (采购订单号同理显式登记,不受同名 7 条上限影响)
-            "SL_RECV|QC_INSP", new String[][]{{"日期", "日期"}, {"采购订单号", "采购订单号"}}
+            // (采购订单号同理显式登记,不受同名 7 条上限影响;批次号同批补,保证检验单继承暂收单批次)
+            "SL_RECV|QC_INSP", new String[][]{{"日期", "日期"}, {"采购订单号", "采购订单号"}, {"批次号", "批次号"}}
     )));
 
     /** 生单/选单共用的头行映射(目标面板 → {source, headerMap, detailMap});供 PushGenerateHandler 复用。 */
@@ -988,6 +1004,9 @@ public class PanelConfigService {
             cfg.put("headerTitle", srcName + "表头");
             cfg.put("detailTitle", srcName + "表体");
             cfg.put("outsourceFlow", true);
+            // 分批送料(2026-09-20 P0):目标面板配了「批次号」表头字段 → 选单走分批生单接口
+            // (按量占用 + 自动批次号 + 台账),不再走"整行照搬 + link"通用路径
+            cfg.put("batchFlow", def.fieldsAt("header").stream().anyMatch(f -> "批次号".equals(f.label())));
             cfg.put("detailKey", "items");
             cfg.put("targetDetailKey", def.tabKey());
             cfg.put("targetBusinessType", "");

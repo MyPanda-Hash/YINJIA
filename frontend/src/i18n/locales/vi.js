@@ -1578,5 +1578,20 @@ export default {
     '未找到可导出的单据': 'Không tìm thấy chứng từ để xuất',
     '按纸张实际尺寸单页生成，直接下载，无需打印机': 'Một trang theo kích thước thật của tờ, tải trực tiếp, không cần máy in',
   },
+  biz: {
+    '分批送料': 'Giao theo lô',
+    '本次送料数量': 'Số lượng giao lần này',
+    '已送': 'Đã giao',
+    '已退回': 'Đã trả lại',
+    '可送上限': 'Tối đa giao',
+    '超送比例': 'Tỷ lệ giao vượt',
+    '已有批次': 'Lô hiện có',
+    '本次合计': 'Tổng lần này',
+    '按剩余量填充': 'Điền phần còn lại',
+    '确定生单': 'Tạo',
+    '每行留空或 0 = 本次不送;不超过「可送上限」(剩余 ×（1+超送比例）)': 'Để trống hoặc 0 = không giao lần này; không vượt mức tối đa (còn lại × (1 + tỷ lệ))',
+    '请至少填写一行的本次送料数量': 'Nhập số lượng cho ít nhất một dòng',
+    '分批送料数据加载失败': 'Không tải được dữ liệu giao theo lô',
+    '所选来源行已无剩余可送': 'Các dòng đã chọn không còn phần còn lại',
+  },
 }
-

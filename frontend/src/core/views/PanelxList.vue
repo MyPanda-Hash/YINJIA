@@ -860,6 +860,14 @@
     <RefPickDialog v-model="queryRefVisible" :field="queryRefField" mode="query" @confirm="onQueryRefConfirm" />
     <RefPickDialog v-model="headerRefVisible" :field="headerRefField" mode="header" @confirm="onHeaderRefConfirm" />
     <RefPickDialog v-model="detailRefVisible" :field="detailRefPick?.field" mode="detail" @confirm="onDetailRefConfirm" />
+    <!-- 分批送料对话框(2026-09-20 P0):采购订单「生成送料暂收单」逐行填本次送料数量 -->
+    <BatchSendDialog
+      v-model="batchSendVisible"
+      :source-panel="batchSend?.sourcePanel || ''"
+      :target-panel="batchSend?.targetPanel || ''"
+      :source-no="batchSend?.sourceNo || ''"
+      @generated="onBatchGenerated"
+    />
 
     <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
     <el-dialog v-model="dictPickVisible" :title="tt('选择') + '：' + (dictPickField ? headerFieldLabel(dictPickField) : '')" width="440px" append-to-body :close-on-click-modal="false">
@@ -1430,6 +1438,7 @@ import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import RefPickDialog from './RefPickDialog.vue'
+import BatchSendDialog from './BatchSendDialog.vue'
 import NewVoucherDialog from './NewVoucherDialog.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
@@ -2491,6 +2500,33 @@ const attachEditable = computed(() => {
   if (!curDocNo.value) return false
   return String(cur.value?.['单据状态'] || '') !== '已作废'
 })
+
+// ══════════ 分批送料(2026-09-20 P0)══════════
+// 目标面板配了「批次号」表头字段 = 分批链路;生单走分批对话框(逐行填本次数量),而不是整单一次性生成
+const batchSendVisible = ref(false)
+const batchSend = ref(null) // {sourcePanel, targetPanel, sourceNo}
+const batchTargetCache = new Map()
+async function isBatchTargetPanel(target) {
+  if (!target) return false
+  if (batchTargetCache.has(target)) return batchTargetCache.get(target)
+  let yes = false
+  try {
+    const cfg = await engine.getPanelConfig(target)
+    yes = (cfg?.dataSchema?.fields || []).some((f) => (f.dataName || f.label) === '批次号')
+  } catch { yes = false }
+  batchTargetCache.set(target, yes)
+  return yes
+}
+/** 分批生单完成:跳到目标面板继续填写(与推式生单同款:关源页签、开目标页签、新单按创建时间倒序在第一张) */
+function onBatchGenerated({ panel, no, batchNo }) {
+  const targetPanel = panel || batchSend.value?.targetPanel || ''
+  if (!targetPanel) return
+  ElMessage.success(`已生成 ${targetPanel} ${no}（批次号 ${batchNo}），请在列表页继续填写`)
+  const targetPath = `/panelx/list/${targetPanel}`
+  tabs.close(route.path)
+  router.push(targetPath)
+  tabs.open({ path: targetPath, title: targetPanel })
+}
 const newVisible = ref(false)
 const approvalVisible = ref(false)
 const approvalNo = ref('')
@@ -4921,6 +4957,16 @@ async function onButton(action) {
     openQrLabels()
     return
   }
+      // ═══ 分批送料(2026-09-20 P0):目标面板配了批次号 = 分批链路(如 采购订单→送料暂收单)═══
+      // 点「生成送料暂收单」不再整单一次性生成,改弹分批对话框逐行填本次送料数量(可多次分批)
+      const pushTarget = cfgCache.value?.metadata?.pushTargets?.[action]
+      if (pushTarget && await isBatchTargetPanel(pushTarget)) {
+        const no = current.value?.['单据编号'] || current.value?.['编号'] || ''
+        if (!no) return ElMessage.warning('请先选择一张单据')
+        batchSend.value = { sourcePanel: panelCode.value, targetPanel: pushTarget, sourceNo: no }
+        batchSendVisible.value = true
+        return
+      }
   // 工单二维码(计划层):单产品工单一张标签,二维码=工单号(扫码报工/领料入口)
   if (action === '打印工单二维码') {
     const cur = current.value || {}

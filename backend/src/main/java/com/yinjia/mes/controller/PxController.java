@@ -39,13 +39,17 @@ public class PxController {
     private final DevTaskService devTaskService;
     private final ButtonService buttons;
     private final PanelPermissionService perm;
+    private final com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler;
+    private final com.yinjia.mes.service.BatchService batchService;
 
     public PxController(PanelRuntimeService service, PanelConfigService configService,
                         ReportColumnSettingsService reportColumnSettingsService,
                         VoucherFlowService voucherFlowService,
                         PanelRegistry registry, UsageLogService usageLog, JdbcTemplate jdbc,
                         DevTaskService devTaskService, ButtonService buttons,
-                        PanelPermissionService perm) {
+                        PanelPermissionService perm,
+                        com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler,
+                        com.yinjia.mes.service.BatchService batchService) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -56,6 +60,8 @@ public class PxController {
         this.devTaskService = devTaskService;
         this.buttons = buttons;
         this.perm = perm;
+        this.pushGenerateHandler = pushGenerateHandler;
+        this.batchService = batchService;
     }
 
     /** 产品开发:下游面板元数据(矩阵列头) */
@@ -144,8 +150,53 @@ public class PxController {
         return ApiResult.ok(null);
     }
 
-    /** 报表栏目设置读取(报表表头筛选与排序补丁) */
-    @GetMapping("/reportColumnSettings")
+    /** 分批送料:行状态(订单量/已送/已退回/剩余/可送上限)+ 下一批次号 + 已有批次清单(采购订单→送料暂收单) */
+    @PostMapping("/batchFlow/lines")
+    public ApiResult<Map<String, Object>> batchFlowLines(@RequestBody Map<String, Object> body) {
+        String sourcePanel = String.valueOf(body.getOrDefault("sourcePanel", ""));
+        String targetPanel = String.valueOf(body.getOrDefault("targetPanel", ""));
+        String sourceNo = String.valueOf(body.getOrDefault("sourceNo", ""));
+        perm.requirePanelView(sourcePanel);
+        return ApiResult.ok(pushGenerateHandler.batchLines(sourcePanel, targetPanel, sourceNo));
+    }
+
+    /** 分批送料:按行「本次送料数量」生成一张下游草稿(自动取批次号 + 按量占用 + 写批次台账) */
+    @PostMapping("/batchFlow/generate")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> batchFlowGenerate(@RequestBody Map<String, Object> body) {
+        String sourcePanel = String.valueOf(body.getOrDefault("sourcePanel", ""));
+        String targetPanel = String.valueOf(body.getOrDefault("targetPanel", ""));
+        String sourceNo = String.valueOf(body.getOrDefault("sourceNo", ""));
+        if (!targetPanel.isBlank()) perm.requireButton(targetPanel, "保存");
+        Map<String, Double> qtyByLine = null;
+        Object raw = body.get("lines");
+        if (raw instanceof List<?> list && !list.isEmpty()) {
+            qtyByLine = new java.util.LinkedHashMap<>();
+            for (Object o : list) {
+                if (!(o instanceof Map<?, ?> m)) continue;
+                Object key = m.get("lineKey");
+                Object qty = m.get("qty");
+                if (key == null) continue;
+                qtyByLine.put(String.valueOf(key), qty == null ? 0d : Double.parseDouble(String.valueOf(qty)));
+            }
+        }
+        Map<String, Object> res = pushGenerateHandler.generateBatch(sourcePanel, targetPanel, sourceNo,
+                SecurityContextHolder.getContext().getAuthentication() == null ? "system"
+                        : SecurityContextHolder.getContext().getAuthentication().getName(),
+                qtyByLine);
+        return ApiResult.ok(res);
+    }
+
+    /** 某批次号的台账与下游单据(按批次反查:暂收/检验/入库/退回) */
+    @GetMapping("/batchFlow/batch")
+    public ApiResult<Map<String, Object>> batchFlowBatch(@RequestParam String batchNo) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("batch", batchService.batchOf(batchNo));
+        out.put("links", batchService.linksOfBatch(batchNo));
+        return ApiResult.ok(out);
+    }
+
+    /** 报表栏目设置读取(报表表头筛选与排序补丁) */    @GetMapping("/reportColumnSettings")
     public ApiResult<Map<String, Object>> getReportColumnSettings(@RequestParam String panelCode) {
         perm.requirePanelView(panelCode);
         return ApiResult.ok(reportColumnSettingsService.load(panelCode));

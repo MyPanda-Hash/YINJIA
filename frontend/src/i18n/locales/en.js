@@ -1829,5 +1829,20 @@ export default {
     '未找到可导出的单据': 'No exportable document found',
     '按纸张实际尺寸单页生成，直接下载，无需打印机': 'Single page at actual sheet size, direct download, no printer needed',
   },
+  biz: {
+    '分批送料': 'Batch delivery',
+    '本次送料数量': 'Delivery qty (this time)',
+    '已送': 'Delivered',
+    '已退回': 'Returned',
+    '可送上限': 'Max deliverable',
+    '超送比例': 'Over-delivery ratio',
+    '已有批次': 'Existing batches',
+    '本次合计': 'Total this time',
+    '按剩余量填充': 'Fill remaining',
+    '确定生单': 'Create',
+    '每行留空或 0 = 本次不送;不超过「可送上限」(剩余 ×（1+超送比例）)': 'Blank or 0 = not delivered this time; must not exceed "Max deliverable" (remaining × (1 + over-delivery ratio))',
+    '请至少填写一行的本次送料数量': 'Fill the delivery qty of at least one line',
+    '分批送料数据加载失败': 'Failed to load batch delivery data',
+    '所选来源行已无剩余可送': 'Selected source lines have no remaining qty',
+  },
 }
-

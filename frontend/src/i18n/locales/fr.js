@@ -1563,5 +1563,20 @@ export default {
     '未找到可导出的单据': 'Aucun document a exporter',
     '按纸张实际尺寸单页生成，直接下载，无需打印机': 'Une page a la taille reelle de la feuille, telechargement direct, sans imprimante',
   },
+  biz: {
+    '分批送料': 'Livraison partielle',
+    '本次送料数量': 'Qté livrée (cette fois)',
+    '已送': 'Livré',
+    '已退回': 'Retourné',
+    '可送上限': 'Max livrable',
+    '超送比例': 'Taux de sur-livraison',
+    '已有批次': 'Lots existants',
+    '本次合计': 'Total cette fois',
+    '按剩余量填充': 'Remplir le reste',
+    '确定生单': 'Créer',
+    '每行留空或 0 = 本次不送;不超过「可送上限」(剩余 ×（1+超送比例）)': 'Vide ou 0 = non livré cette fois ; ne pas dépasser le max livrable (reste × (1 + taux))',
+    '请至少填写一行的本次送料数量': 'Saisissez la quantité d\'au moins une ligne',
+    '分批送料数据加载失败': 'Échec du chargement des données de livraison partielle',
+    '所选来源行已无剩余可送': 'Les lignes sélectionnées n\'ont plus de reste',
+  },
 }
-

@@ -355,6 +355,21 @@ export async function linkOutsourceSelection(payload) {
   return unwrap(await request.post('/px/voucherFlow/link', payload))
 }
 
+/** 分批送料:行状态(订单量/已送/已退回/剩余/可送上限 + 下一批次号 + 已有批次清单) */
+export async function batchFlowLines(payload) {
+  return unwrap(await request.post('/px/batchFlow/lines', payload))
+}
+
+/** 分批送料:按行本次数量生成一张下游草稿(自动取批次号 + 按量占用 + 批次台账) */
+export async function batchFlowGenerate(payload) {
+  return unwrap(await request.post('/px/batchFlow/generate', payload))
+}
+
+/** 分批送料:按批次号反查(台账 + 上下游 link) */
+export async function batchFlowBatch(batchNo) {
+  return unwrap(await request.get('/px/batchFlow/batch', { params: { batchNo } }))
+}
+
 
 /**
  * Upload a voucher image to the MES backend. The backend owns the cloud OCR

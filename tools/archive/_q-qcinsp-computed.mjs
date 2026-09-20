@@ -1,0 +1,11 @@
+﻿import { createRequire } from 'node:module';
+const mssql = createRequire('D:/jdy-sync/package.json')('mssql');
+const pool = await new mssql.ConnectionPool({ server:'127.0.0.1', port:1433, database:'HSDZ_MES', user:'yinjia', password:'Yinjia@2026', options:{encrypt:false,trustServerCertificate:true} }).connect();
+const q = async (s) => (await new mssql.Request(pool).query(s)).recordset;
+console.log('qc_insp_detail 计算列/定义:');
+for (const r of await q(`SELECT c.name, c.is_computed, cc.definition FROM sys.columns c LEFT JOIN sys.computed_columns cc ON cc.object_id=c.object_id AND cc.column_id=c.column_id WHERE c.object_id=OBJECT_ID('qc_insp_detail') AND c.name IN (N'数量',N'合格数量',N'不合格数量',N'不良数量',N'送检数量')`)) console.log('  ', JSON.stringify(r));
+console.log('\n残留测试单:');
+console.log('  sl_recv:', JSON.stringify(await q("SELECT 单据编号, 批次号, 单据状态 FROM sl_recv WHERE 单据编号='SL-2026-09-0015'")));
+console.log('  qc_insp:', JSON.stringify(await q("SELECT 单据编号, 批次号, 单据状态 FROM qc_insp WHERE 单据编号='IJ-2026-09-0012'")));
+console.log('  yj_doc_status:', JSON.stringify(await q("SELECT panel_code, doc_no, canceled, shr FROM yj_doc_status WHERE doc_no IN ('SL-2026-09-0015','IJ-2026-09-0012')")));
+await pool.close();

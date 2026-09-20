@@ -1,5 +1,6 @@
 package com.yinjia.mes.panel;
 
+import com.yinjia.mes.service.BatchService;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PanelConfigService;
 import com.yinjia.mes.service.PanelRegistry;
@@ -34,16 +35,29 @@ public class PushGenerateHandler implements PanelActionHandler {
     private final ButtonService buttonService;
     private final VoucherFlowService voucherFlow;
     private final PanelConfigService configService;
+    private final BatchService batchService;
     private final JdbcTemplate jdbc;
 
     public PushGenerateHandler(PanelRegistry registry, QueryService queryService, ButtonService buttonService,
-                               VoucherFlowService voucherFlow, PanelConfigService configService, JdbcTemplate jdbc) {
+                               VoucherFlowService voucherFlow, PanelConfigService configService,
+                               BatchService batchService, JdbcTemplate jdbc) {
         this.registry = registry;
         this.queryService = queryService;
         this.buttonService = buttonService;
         this.voucherFlow = voucherFlow;
         this.configService = configService;
+        this.batchService = batchService;
         this.jdbc = jdbc;
+    }
+
+    /** 可分批生单的目标面板:配了「批次号」表头字段(暂收/检验/入库/退回 四张单) */
+    private boolean isBatchTarget(String targetPanel) {
+        try {
+            return registry.panel(targetPanel).fieldsAt("header").stream()
+                    .anyMatch(f -> "批次号".equals(f.label()));
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     /** 已由专用处理器接管的生单动作(仍登记 PUSH_TARGETS 供前端亮钮,但通用映射不认领)。 */
@@ -65,18 +79,26 @@ public class PushGenerateHandler implements PanelActionHandler {
         if (noObj == null || String.valueOf(noObj).isBlank()) throw new IllegalArgumentException("缺少表单编号");
         String sourceNo = String.valueOf(noObj);
 
+        // 分批链路(送料暂收单等):直接生成一批 —— 未指定数量时按"剩余量全部送出",批次号自动取号
+        if (isBatchTarget(target)) {
+            return generateBatch(sourcePanel, target, sourceNo, context.userName(), null);
+        }
+
         // 1) 来源必须已审核(已中止/作废/审批中均不可生单,对齐 T+)
         Map<String, Object> st = buttonService.docStatus(sourcePanel, sourceNo);
         String status = String.valueOf(st.get("status"));
         if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核单据可生单,当前状态:" + status);
 
         // 2) 该来源→该目标已有占用(选单或生单)时拒绝整单重复生单;删除下游草稿自动释放后可重生
-        Integer linked = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code=? AND source_form_no=?"
-                        + " AND target_panel_code=? AND link_status='ACTIVE'",
-                Integer.class, sourcePanel, sourceNo, target);
-        if (linked != null && linked > 0) {
-            throw new IllegalStateException("该单已向目标面板生单(或已选单占用),请先删除下游草稿后重试");
+        //    —— 分批链路(目标面板有 批次号)不走这条:采购订单可以分多批送料,改由行级剩余量把关(见 generateBatch)
+        if (!isBatchTarget(target)) {
+            Integer linked = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code=? AND source_form_no=?"
+                            + " AND target_panel_code=? AND link_status='ACTIVE'",
+                    Integer.class, sourcePanel, sourceNo, target);
+            if (linked != null && linked > 0) {
+                throw new IllegalStateException("该单已向目标面板生单(或已选单占用),请先删除下游草稿后重试");
+            }
         }
 
         // 3) 载入来源单(head + 明细,中文标签键)
@@ -152,5 +174,220 @@ public class PushGenerateHandler implements PanelActionHandler {
         out.put("单据状态", "草稿");
         out.put("gotoPanel", target);
         return out;
+    }
+
+    // ==================== 分批送料(P0,2026-09-20) ====================
+
+    /** 数量字段候选(按面板习惯命名,命中即用) */
+    private static final List<String> QTY_LABELS = List.of("数量", "实收数量", "送检数量", "计划数量");
+
+    /** 目标面板的"数量"字段标签(无则取第一个候选,兜底「数量」) */
+    private String qtyLabelOf(PanelRegistry.PanelDef def, String place) {
+        List<String> labels = def.fieldsAt(place).stream().map(PanelRegistry.FieldDef::label).toList();
+        for (String c : QTY_LABELS) if (labels.contains(c)) return c;
+        return "数量";
+    }
+
+    /** 来源行的行号(退货回冲按「采购订单行号」匹配;无则空串) */
+    private String lineNoOf(Map<String, Object> item) {
+        for (String f : List.of("行号", "采购订单行号", "源单行号")) {
+            Object v = item.get(f);
+            if (v != null && !String.valueOf(v).isBlank()) return String.valueOf(v).trim();
+        }
+        return "";
+    }
+
+    private double numOf(Object v) {
+        if (v instanceof Number n) return n.doubleValue();
+        if (v == null) return 0;
+        try { return Double.parseDouble(String.valueOf(v).trim()); } catch (Exception e) { return 0; }
+    }
+
+    private double round2(double v) { return Math.round(v * 100.0) / 100.0; }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> itemsOf(Map<String, Object> doc) {
+        Object d = doc == null ? null : doc.get("detail");
+        if (d instanceof Map<?, ?> dm && dm.get("items") instanceof List<?> l) {
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Object o : l) if (o instanceof Map<?, ?> m) out.add((Map<String, Object>) m);
+            return out;
+        }
+        return List.of();
+    }
+
+    /**
+     * 分批送料对话框的行状态:每行 订单量 / 已送 / 已退回(回冲) / 剩余 / 可送上限,
+     * 并附 下一批次号预览 + 该订单已有批次清单。前端「生成送料暂收单」据此弹出分批对话框。
+     */
+    public Map<String, Object> batchLines(String sourcePanel, String targetPanel, String sourceNo) {
+        PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
+        Map<String, Object> src = queryService.loadOneDoc(srcDef, sourceNo);
+        Map<String, Double> sent = batchService.sentByLineKey(sourcePanel, sourceNo);
+        Map<String, Double> returned = batchService.returnedByOrderLine(sourceNo);
+        double ratio = batchService.overRatio();
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (Map<String, Object> it : itemsOf(src)) {
+            Object id = it.get("id");
+            String lineKey = sourceNo + "#" + (id == null ? "" : String.valueOf(id));
+            double qty = numOf(it.get("数量"));
+            double used = sent.getOrDefault(lineKey, 0d);
+            double ret = returned.getOrDefault(lineNoOf(it), 0d);
+            double left = Math.max(0, qty - used + ret);
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("lineKey", lineKey);
+            row.put("id", id);
+            row.put("行号", it.get("行号"));
+            row.put("物料编码", it.get("物料编码"));
+            row.put("物料名称", it.get("物料名称"));
+            row.put("规格型号", it.get("规格型号"));
+            row.put("计量单位", it.get("计量单位") != null ? it.get("计量单位") : it.get("单位"));
+            row.put("数量", round2(qty));
+            row.put("已送数量", round2(used));
+            row.put("已退回数量", round2(ret));
+            row.put("剩余数量", round2(left));
+            row.put("可送上限", round2(left * (1 + ratio)));
+            rows.add(row);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("sourcePanel", sourcePanel);
+        out.put("sourceNo", sourceNo);
+        out.put("targetPanel", targetPanel);
+        out.put("overRatio", ratio);
+        out.put("nextBatchNo", batchService.peekNextNo(sourcePanel, sourceNo));
+        out.put("batches", batchService.batches(sourcePanel, sourceNo)); // 只列有效批次(历史释放行见 /batchFlow/batch 反查)
+        out.put("lines", rows);
+        return out;
+    }
+
+    /**
+     * 分批生单:按行指定「本次送料数量」生成一张目标草稿(送料暂收单),自动取批次号并写批次台账 + 按量占用。
+     * - qtyByLineKey 为空 = 所有"还有剩余"的行按剩余量全部送出(推式按钮直接点、或选单一次性送完);
+     * - 校验:来源已审核 / 目标为分批面板 / 每行 0 < 本次 ≤ 剩余×(1+超送比例) / 至少一行;
+     * - 失败回滚:批次号占位行删除(序号回收),不产生脏数据(@Transactional)。
+     */
+    @Transactional
+    public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
+                                             String user, Map<String, Double> qtyByLineKey) {
+        PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
+        PanelRegistry.PanelDef tgtDef = registry.panel(targetPanel);
+        if (!isBatchTarget(targetPanel)) throw new IllegalStateException("目标面板未启用分批送料:" + targetPanel);
+
+        // 1) 来源必须已审核
+        Map<String, Object> st = buttonService.docStatus(sourcePanel, sourceNo);
+        String status = String.valueOf(st.get("status"));
+        if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核单据可生单,当前状态:" + status);
+
+        // 2) 载入来源单(头 + 行)
+        Map<String, Object> src = queryService.loadOneDoc(srcDef, sourceNo);
+        Map<String, Object> head = new LinkedHashMap<>(src);
+        head.remove("detail");
+        List<Map<String, Object>> srcItems = new ArrayList<>(itemsOf(src));
+        if (srcItems.isEmpty()) throw new IllegalStateException("来源单据无明细行,不能生单");
+
+        // 3) 行级剩余量核算(含退货回冲) + 本次送料量校验
+        Map<String, Double> sent = batchService.sentByLineKey(sourcePanel, sourceNo);
+        Map<String, Double> returned = batchService.returnedByOrderLine(sourceNo);
+        double ratio = batchService.overRatio();
+        List<Map<String, Object>> picked = new ArrayList<>();   // {item, qty}
+        for (Map<String, Object> it : srcItems) {
+            String lineKey = sourceNo + "#" + it.get("id");
+            double left = Math.max(0, numOf(it.get("数量")) - sent.getOrDefault(lineKey, 0d)
+                    + returned.getOrDefault(lineNoOf(it), 0d));
+            if (left <= 0.000001) continue;                      // 该行已送满(且无退回额度)
+            double qty = qtyByLineKey == null ? left : qtyByLineKey.getOrDefault(lineKey, 0d);
+            if (qty <= 0.000001) continue;                       // 本次不送
+            double cap = left * (1 + ratio);
+            if (qty > cap + 0.000001) {
+                throw new IllegalStateException("第 " + it.get("行号") + " 行本次送料量 " + round2(qty)
+                        + " 超出允许上限 " + round2(cap) + "(剩余 " + round2(left) + " + 超送比例 "
+                        + Math.round(ratio * 100) + "%)");
+            }
+            Map<String, Object> p = new LinkedHashMap<>();
+            p.put("item", it);
+            p.put("qty", qty);
+            picked.add(p);
+        }
+        if (picked.isEmpty()) throw new IllegalStateException("该采购订单已无剩余可送(各明细行均已送满)");
+
+        // 4) 头/行映射(与选单共用 buildSelectConfig),再覆盖 本次数量 + 批次号
+        Map<String, Object> maps = configService.flowMaps(sourcePanel, targetPanel);
+        if (maps == null) throw new IllegalStateException("目标面板未配置流转来源:" + targetPanel);
+        List<Map<String, String>> headerMap = (List<Map<String, String>>) maps.get("headerMap");
+        List<Map<String, String>> detailMap = (List<Map<String, String>>) maps.get("detailMap");
+        String tgtQtyLabel = qtyLabelOf(tgtDef, "detail");
+
+        // 批次号来源(2026-09-20):**来源单自带批次号时继承,不再新取号** ——
+        // 批次号在「采购订单→送料暂收单」这一跳产生,下游(暂收→检验→入库/退回)一律继承同一批次,
+        // 否则每跳都会给上游单再发一个批次号(如 SL-xxx-001),批次追溯直接断链。
+        Object srcBatchObj = head.get("批次号");
+        String srcBatchNo = srcBatchObj == null ? "" : String.valueOf(srcBatchObj).trim();
+        boolean inheritBatch = !srcBatchNo.isBlank();
+        // 订单来源(无批次)→ 取新号并写台账;下游继承 → 不占新号、不动台账(该批次台账属订单那一跳)
+        String batchNo = inheritBatch ? srcBatchNo : batchService.reserve(sourcePanel, sourceNo, targetPanel, user);
+        try {
+            Map<String, Object> targetHead = new LinkedHashMap<>();
+            for (Map<String, String> m : headerMap) {
+                Object v = head.get(m.get("from"));
+                if (v != null) targetHead.put(m.get("to"), v);
+            }
+            targetHead.put("来源单据", srcDef.name());
+            targetHead.put("来源单号", sourceNo);
+            targetHead.put("批次号", batchNo);
+            String dateLabel = "单据日期";
+            if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
+                PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
+                if (df != null) dateLabel = df.label();
+            }
+            targetHead.put(dateLabel, java.time.LocalDate.now().toString());
+
+            List<Map<String, Object>> targetItems = new ArrayList<>();
+            for (Map<String, Object> p : picked) {
+                Map<String, Object> item = (Map<String, Object>) p.get("item");
+                Map<String, Object> row = new LinkedHashMap<>();
+                for (Map<String, String> m : detailMap) {
+                    Object v = item.get(m.get("from"));
+                    if (v != null) row.put(m.get("to"), v);
+                }
+                row.put(tgtQtyLabel, p.get("qty"));   // 本次送料数量
+                row.put("批次号", batchNo);
+                targetItems.add(row);
+            }
+
+            Map<String, Object> formData = new LinkedHashMap<>(targetHead);
+            formData.put("detail", Map.of("items", targetItems));
+            Map<String, Object> saved = buttonService.save(tgtDef, formData, false);
+            String newNo = String.valueOf(saved.get("编号"));
+
+            // 5) 按量占用(带批次号):目标行按保存顺序取行表 id
+            List<Integer> tgtIds = jdbc.queryForList("SELECT id FROM " + tgtDef.lineTable()
+                            + " WHERE [" + tgtDef.groupCol() + "] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
+                    Integer.class, newNo);
+            List<VoucherFlowService.BatchLine> links = new ArrayList<>();
+            double sum = 0;
+            for (int i = 0; i < picked.size(); i++) {
+                Map<String, Object> item = (Map<String, Object>) picked.get(i).get("item");
+                double qty = (double) picked.get(i).get("qty");
+                sum += qty;
+                links.add(new VoucherFlowService.BatchLine(
+                        sourceNo + "#" + item.get("id"),
+                        i < tgtIds.size() ? newNo + "#" + tgtIds.get(i) : null,
+                        item.get("物料编码") == null ? null : String.valueOf(item.get("物料编码")),
+                        numOf(item.get("数量")), qty));
+            }
+            voucherFlow.linkBatch(sourcePanel, sourceNo, targetPanel, newNo, batchNo, links);
+            if (!inheritBatch) batchService.bind(batchNo, targetPanel, newNo, round2(sum)); // 继承批次不改台账(归订单那一跳)
+
+            Map<String, Object> out = new LinkedHashMap<>();
+            out.put("编号", newNo);
+            out.put("批次号", batchNo);
+            out.put("单据状态", "草稿");
+            out.put("gotoPanel", targetPanel);
+            out.put("本次送料合计", round2(sum));
+            return out;
+        } catch (RuntimeException e) {
+            if (!inheritBatch) batchService.drop(batchNo);   // 生成失败:回收批次号占位(继承时不占号,无需回收)
+            throw e;
+        }
     }
 }

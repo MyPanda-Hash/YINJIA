@@ -419,6 +419,19 @@ async function generate() {
     } else for (const source of sources) {
       const no = source['编号'] || source['单据编号'] || ''
       if (!no) continue
+      // 分批送料(2026-09-20 P0):目标面板配了批次号 → 走分批生单接口(自动取批次号 + 按量占用 + 台账),
+      // 本次数量 = 各来源行的「剩余数量」(选单界面不做逐行填量;要按量分批用来源单据上的「生成XX」对话框)
+      if (config.batchFlow) {
+        const lines = sourceItems(source)
+          .map((it) => ({ lineKey: it._lineKey || `${no}#${it.id}`, qty: Number(it['剩余数量'] ?? it['数量'] ?? 0) }))
+          .filter((l) => l.qty > 0)
+        if (!lines.length) { ElMessage.warning(tt('所选来源行已无剩余可送')); continue }
+        const res = await engine.batchFlowGenerate({
+          sourcePanel: config.source, targetPanel: props.panelCode, sourceNo: no, lines,
+        })
+        if (res?.['编号']) generated.push({ panel: res.gotoPanel || props.panelCode, no: res['编号'], sourceNo: no, batchNo: res['批次号'] })
+        continue
+      }
       if (config.generateButton) {
         const result = await engine.callButton({ panelCode: config.source, buttonName: config.generateButton, formData: { 编号: no }, buttonParam: {} })
         if (result?.gotoPanel) generated.push({ panel: result.gotoPanel, no: result['编号'], sourceNo: no })
