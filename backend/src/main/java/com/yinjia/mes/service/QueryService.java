@@ -468,7 +468,17 @@ public class QueryService {
                 Object v = e.getValue();
                 if (col == null || v == null || String.valueOf(v).isBlank()) continue;
                 boolean onDoc = split && docCols.stream().anyMatch(f -> f.col().equals(col));
-                if (onDoc) {
+                // 「审核人」是**虚拟字段**:显示值取自 yj_doc_status.shr(见 loadStatus),表内同名列对 MES 单据为空
+                // (只有金蝶同步单才写列)。若只按列过滤,后端选了审核人也永远筛不出 MES 单据
+                // → 过滤取两处并集(2026-09-20 配合「审核人绑职员」一起修)
+                if (onDoc && "审核人".equals(e.getKey())) {
+                    where.append(" AND (t.[").append(col).append("] LIKE ? OR EXISTS (SELECT 1 FROM yj_doc_status s")
+                            .append(" WHERE s.panel_code = ? AND s.doc_no = CAST(t.[").append(g)
+                            .append("] AS nvarchar(100)) AND s.shr LIKE ?))");
+                    args.add("%" + v + "%");
+                    args.add(def.code());
+                    args.add("%" + v + "%");
+                } else if (onDoc) {
                     where.append(" AND t.").append(col).append(" LIKE ?");
                     args.add("%" + v + "%");
                 } else if (lineFields.stream().anyMatch(f -> f.col().equals(col)) || !split) {

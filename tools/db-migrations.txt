@@ -472,3 +472,11 @@ migrate-qc-return-chain-link.sql
 #   SO_ORDER 客户 ref dm→mc(库内存客户名称,32/32 命中),硬编码下拉(部门/业务员/客户编码/结算客户/币种)改档案参照。
 #   脚本末尾自检断言「仍非参照行数」必须为 0;幂等可重跑。
 migrate-query-ref-links.sql
+
+# —— 2026-09-20 「审核人」绑定职员档案 ——
+#   所有面板**表头位**的「审核人」(24 处)改「参照」→ EMP.员工名称(与业务员/经手人/检验员同口径);
+#   明细位/报表明细列不动。配套后端 QueryService.appendDocFilters:「审核人」是真源 yj_doc_status.shr 的
+#   虚拟字段(表内列对 MES 单据为空),过滤改为「表内列 OR shr」并集,否则选了审核人筛不出 MES 单据。
+#   数据现状:王光珍/冯加劲/孙淼淼/叶健乐/蒋小刚 在 bs_emp(可选),admin/管理员/测试导入/廖小姐 不在档案。
+#   脚本末尾断言「未绑定行数」必须为 0;幂等可重跑。
+migrate-auditor-ref.sql
