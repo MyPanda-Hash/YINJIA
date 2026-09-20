@@ -1016,8 +1016,11 @@ export const recordSheetConfigs = {
       // ── 第 4 页《规格书细分.xlsx》「成品及包装运输」6 节(2026-09-18 照设计补全)──
       // ⚠ **节的编号按设计原文**为 1..6(现实现原为 1 + 5/6/7/8,与设计不符,本轮改为照设计):
       //   1.关键物料列表 / 2.炭棒处理要求 / 3.包装方式 / 4.出货检验报告 / 5.运输要求 / 6.存储环境。
-      // 第 1 节只出标题(表由 dataTables 的 bar 提供,渲染顺序 sections → dataTables,与设计 B4→B6 一致);
-      // 第 2 节本轮新增(设计 B13/B15);第 4 节本轮新增(设计 B22/B23)。
+      // ⚠ 顺序:模板渲染次序是 **sections → dataTables**,而设计里 1.关键物料列表在最前
+      //   ⇒ 第 1 节必须留在 sections 里(靠 sections 先渲染把「1.」顶到表格之前);
+      //   它的表体由 dataTables 那条表渲染,紧随其下 ⇒ 呈现为「标题 → 表头 → 行」。
+      //   ⚠ 而**标题只能有一个来源**:曾让第 1 节的 bar 与表的 bar 同时存在 ⇒ 同一标题
+      //     渲染两遍(用户报「空余行重复了」)。故那条**表不带 bar**。
       { page: 3, bar: '1.关键物料列表', doc: true, rows: [] },
       { page: 3, bar: '2.炭棒处理要求', doc: true, rows: [
           { label: '炭棒处理要求', key: '炭棒处理要求', area: true, max: 2000 },
@@ -1061,11 +1064,13 @@ export const recordSheetConfigs = {
           { key: '检验方法', label: '检验方法', w: 241, align: 'left', area: true },
           { key: '检验依据', label: '检验依据', w: 83, align: 'left', area: true },
         ]},
-      // 第 4 页 1.关键物料列表:表头照设计 B6 = 序号|物料编码|物料名称|规格参数|数量|备注;
+      // 第 4 页 1.关键物料列表:表头照设计 B6 = 序号|物料编码|物料名称|规格参数|数量|备注。
+      // ⚠ **不要给这张表加 bar**:它的标题已由上面 page:3 那个 sections 块出(为了排在表格之前),
+      //    两者都有 = 同一标题渲染两遍(用户报「空余行重复了」)。
       // materialPick = 设计 [E4]「由材料库引用：输入物料编号自动引入」的落地(编辑态出「从物料清单引用」按钮)。
       // ⚠ filterKey/filterVal 保留:规格书全部明细共用一张 rd_spec_doc_detail,靠 [表区]='物料清单'
       //    把物料行与修订记录/检验项目行分开;删掉会把整张明细当物料显示(踩过)。
-      { page: 3, bar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
+      { page: 3, filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },
           { key: '物料编码', label: '物料编码' },

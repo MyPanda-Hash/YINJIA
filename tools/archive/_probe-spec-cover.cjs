@@ -206,7 +206,10 @@ function sql(query) {
 
   // ═══ ③ 第 4 页「成品及包装运输」6 节(设计 sheet 逐节对照)═══
   console.log('\n③ 第 4 页(成品及包装运输)6 节')
-  // 设计 B4/B13/B17/B22/B25/B30 六节,编号即设计原文
+  // 设计 B4/B13/B17/B22/B25/B30 六节,编号即设计原文。
+  // ⚠ 第 1 节「1.关键物料列表」在 sections 里(靠 sections 先于 dataTables 渲染,
+  //   才能把这个标题排在物料表**之前**);那条物料表**不带 bar** —— 两处都带 = 标题渲染两遍
+  //   (用户报「空余行重复了」)。下面同时断言"标题全局只出现一次"。
   const P4 = [
     { bar: '1.关键物料列表', key: null },
     { bar: '2.炭棒处理要求', key: '炭棒处理要求' },
@@ -216,28 +219,50 @@ function sql(query) {
     { bar: '6.存储环境', key: '存储环境' },
   ]
   const p4secs = (cfg.sections || []).filter((s) => s.page === 3)
-  check(`第 4 页恰有 6 节(设计 B4/B13/B17/B22/B25/B30)`, p4secs.length === 6, `实际 ${p4secs.length} 节`)
-  check('6 节标题与编号 = 设计原文',
+  check('第 4 页 sections 恰有 6 节(1..6,照设计)', p4secs.length === 6, `实际 ${p4secs.length} 节`)
+  check('sections 的标题与编号 = 设计 1..6',
     JSON.stringify(p4secs.map((s) => s.bar)) === JSON.stringify(P4.map((s) => s.bar)),
     JSON.stringify(p4secs.map((s) => s.bar)))
   for (const [i, want] of P4.entries()) {
     const sec = p4secs[i]
     if (!sec) continue
     if (!want.key) {
-      check(`  「${want.bar}」只出标题、表体交给 dataTables`, (sec.rows || []).length === 0)
+      check(`  「${want.bar}」只出标题(表体交给 dataTables 那张表)`, (sec.rows || []).length === 0)
       continue
     }
     const row = (sec.rows || [])[0]
-    check(`  「${want.bar}」→ 字段 ${want.key}`, !!row && row.key === want.key && liveLabels.has(want.key),
-      row ? `key=${row.key}` : '无行')
+    check(`  「${want.bar}」→ 字段 ${want.key}`,
+      !!row && row.key === want.key && liveLabels.has(want.key), row ? `key=${row.key}` : '无行')
   }
+  check('「1.关键物料列表」是第 4 页**第一节**(设计里它在最前)',
+    p4secs[0]?.bar === '1.关键物料列表',
+    `首节实为 ${JSON.stringify(p4secs[0]?.bar)}`)
+  // 渲染次序 = sections → dataTables ⇒ 物料表必然排在第 1 节标题**之后**、2..6 各节**之前**。
+  // 一旦把第 1 节挪出 sections(让表格自己带 bar),物料表就会掉到 2..6 后面,与设计不符
+  // —— 本轮改错方向时正是这个症状,故把"顺序"也钉住。
+  const matTbl = (cfg.dataTables || []).find((d) => d.page === 3)
+  const matIsInSections = (cfg.dataTables || []).some((d) => d.page === 3 && d.bar)
+  check('第 1 节留在 sections 里(表格自带 bar 会让物料表排到 2..6 之后)',
+    !matIsInSections,
+    '物料表带了 bar ⇒ 第 1 节被挪出 sections ⇒ 顺序会反')
+
+  // ⚠ 关键:章节标题**全局只能出现一次** —— 重复声明会渲染两遍(本轮踩过)
+  const allBars = [
+    ...(cfg.sections || []).map((s) => s.bar),
+    ...(cfg.dataTables || []).map((d) => d.bar || d.pageTitle),
+  ].filter(Boolean)
+  const dupBars = [...new Set(allBars.filter((b, i) => allBars.indexOf(b) !== i))]
+  check('章节标题全局不重复(重复声明会渲染两遍)', dupBars.length === 0, dupBars.join(', '))
+
   // 节的字段必须在活库 label 里(铁律),否则该节空白+丢值
   const p4Keys = p4secs.flatMap((s) => (s.rows || []).map((r) => r.key)).filter(Boolean)
   const p4Bad = p4Keys.filter((k) => !liveLabels.has(k))
   check('第 4 页各节字段都命中活库 label', p4Bad.length === 0, p4Bad.join(', '))
-  // 关键物料列表:表头照设计 B6;且必须保留 filterKey/filterVal(否则整张明细被当物料显示)
-  const matTbl = (cfg.dataTables || []).find((d) => d.page === 3)
-  check('物料表标题 = 1.关键物料列表', !!matTbl && matTbl.bar === '1.关键物料列表', matTbl && matTbl.bar)
+  // 关键物料列表:表头照设计 B6;标题由 sections 出,**表本身不得再带 bar**;
+  // 且必须保留 filterKey/filterVal(否则整张明细被当物料显示)
+  check('物料表**不带 bar**(标题由 sections 的「1.关键物料列表」出,两处都带会渲染两遍)',
+    !!matTbl && !matTbl.bar && !matTbl.pageTitle,
+    matTbl ? `bar=${JSON.stringify(matTbl.bar)} pageTitle=${JSON.stringify(matTbl.pageTitle)}` : '无表')
   check('物料表表头 = 设计 B6(序号|物料编码|物料名称|规格参数|数量|备注)',
     !!matTbl && JSON.stringify((matTbl.cols || []).filter((c) => !c.hiddenCol).map((c) => c.key)) ===
       JSON.stringify(['序号', '物料编码', '物料名称', '规格参数', '数量', '备注']),
