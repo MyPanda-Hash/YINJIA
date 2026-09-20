@@ -1021,7 +1021,7 @@ export const recordSheetConfigs = {
       //   它的表体由 dataTables 那条表渲染,紧随其下 ⇒ 呈现为「标题 → 表头 → 行」。
       //   ⚠ 而**标题只能有一个来源**:曾让第 1 节的 bar 与表的 bar 同时存在 ⇒ 同一标题
       //     渲染两遍(用户报「空余行重复了」)。故那条**表不带 bar**。
-      { page: 3, bar: '1.关键物料列表', doc: true, rows: [] },
+      { page: 3, bar: '1.关键物料列表', doc: true, tablesSlot: true, rows: [] },
       { page: 3, bar: '2.炭棒处理要求', doc: true, rows: [
           { label: '炭棒处理要求', key: '炭棒处理要求', area: true, max: 2000 },
         ]},
@@ -1070,7 +1070,7 @@ export const recordSheetConfigs = {
       // materialPick = 设计 [E4]「由材料库引用：输入物料编号自动引入」的落地(编辑态出「从物料清单引用」按钮)。
       // ⚠ filterKey/filterVal 保留:规格书全部明细共用一张 rd_spec_doc_detail,靠 [表区]='物料清单'
       //    把物料行与修订记录/检验项目行分开;删掉会把整张明细当物料显示(踩过)。
-      { page: 3, filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
+      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },
           { key: '物料编码', label: '物料编码' },
