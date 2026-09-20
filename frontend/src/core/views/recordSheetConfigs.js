@@ -1012,15 +1012,30 @@ export const recordSheetConfigs = {
           { label: '2.整体规格参数', key: '整体规格参数' },
           { label: '3.产品主要性能', key: '产品主要性能' },
         ]},
+
+      // ── 第 4 页《规格书细分.xlsx》「成品及包装运输」6 节(2026-09-18 照设计补全)──
+      // ⚠ **节的编号按设计原文**为 1..6(现实现原为 1 + 5/6/7/8,与设计不符,本轮改为照设计):
+      //   1.关键物料列表 / 2.炭棒处理要求 / 3.包装方式 / 4.出货检验报告 / 5.运输要求 / 6.存储环境。
+      // 第 1 节只出标题(表由 dataTables 的 bar 提供,渲染顺序 sections → dataTables,与设计 B4→B6 一致);
+      // 第 2 节本轮新增(设计 B13/B15);第 4 节本轮新增(设计 B22/B23)。
+      { page: 3, bar: '1.关键物料列表', doc: true, rows: [] },
+      { page: 3, bar: '2.炭棒处理要求', doc: true, rows: [
+          { label: '炭棒处理要求', key: '炭棒处理要求', area: true, max: 2000 },
+        ]},
+      { page: 3, bar: '3.包装方式', doc: true, rows: [
+          { label: '包装方式', key: '包装方式', area: true, max: 2000 },
+        ]},
+      { page: 3, bar: '4.出货检验报告', doc: true, rows: [
+          { label: '出货检验报告', key: '出货检验报告', area: true, max: 2000 },
+        ]},
+      { page: 3, bar: '5.运输要求', doc: true, rows: [
+          { label: '运输要求', key: '运输要求', area: true, max: 2000 },
+        ]},
+      { page: 3, bar: '6.存储环境', doc: true, rows: [
+          { label: '存储环境', key: '存储环境', area: true, max: 2000 },
+        ]},
     ],
-    // 第 4 页(成品及包装运输):5.关键物料列表(数据表)在上,6-8 章节行在下(tailDoc=数据表之后渲染)
-    tailDocSections: [
-      { page: 3, doc: true, rows: [
-        { label: '6.包装方式', key: '包装方式', area: true },
-        { label: '7.运输要求', key: '运输要求', area: true },
-        { label: '8.存储环境', key: '存储环境', area: true },
-      ]},
-    ],
+    // 第 4 页的章节已并入上面的 sections(page:3);原 tailDocSections 的 6/7/8 编号与设计不符,已移除
     dataTables: [
       { page: 1, pageTitle: '修订记录', filterKey: '表区', filterVal: '修订记录',
         design: { titleSize: 21, titleTop: 24, titleGap: 61, headerH: 44, rowH: 43, fontSize: 16 },
@@ -1046,7 +1061,11 @@ export const recordSheetConfigs = {
           { key: '检验方法', label: '检验方法', w: 241, align: 'left', area: true },
           { key: '检验依据', label: '检验依据', w: 83, align: 'left', area: true },
         ]},
-      { page: 3, bar: '5.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
+      // 第 4 页 1.关键物料列表:表头照设计 B6 = 序号|物料编码|物料名称|规格参数|数量|备注;
+      // materialPick = 设计 [E4]「由材料库引用：输入物料编号自动引入」的落地(编辑态出「从物料清单引用」按钮)。
+      // ⚠ filterKey/filterVal 保留:规格书全部明细共用一张 rd_spec_doc_detail,靠 [表区]='物料清单'
+      //    把物料行与修订记录/检验项目行分开;删掉会把整张明细当物料显示(踩过)。
+      { page: 3, bar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },
           { key: '物料编码', label: '物料编码' },
@@ -1058,8 +1077,12 @@ export const recordSheetConfigs = {
     ],
     // 检验项目标准库(分组):SPEC_TEST_LIB 由 tools/gen/gen-spec-testlib.cjs 从《测试项目汇总.xlsx》生成
     testLib: SPEC_TEST_LIB,
-    // 7./8. 通用文案默认预填(《规格书示例》通行文本;新单草稿进入编辑且字段为空时带入)
+    // 第 4 页各节默认文案(照《规格书细分.xlsx》「成品及包装运输」原文;
+    // 新单草稿进入编辑且字段为空时带入,人工可改)
     sectionDefaults: {
+      '炭棒处理要求': '炭棒有无黑要求、有颗粒物处理要求；',
+      '包装方式': '（1）按照包装规范进行包装作业；\n（2）纸箱外层左上角黏贴白色标签，标签内容包括：采购单号、物料编号、生产批号、包装箱号等信息；',
+      '出货检验报告': '出货时附上产品出货检验报告',
       '运输要求': '产品在运输中应避免冲击、挤压、雨淋、受潮及化学品腐蚀。',
       '存储环境': '产品应贮存在通风良好、干燥的室内，不得与酸、碱及有腐蚀性的物品放置一起。',
     },

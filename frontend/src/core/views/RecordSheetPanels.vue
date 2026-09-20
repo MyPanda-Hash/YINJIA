@@ -33,43 +33,46 @@
           <tr><td :colspan="nCols" class="rsp-cover-td">
             <div class="rsp-cover-page" :style="{ height: coverPageH + 'px', '--cok': coverK, '--cvy': coverVy }">
               <div class="rsp-cover-company">惠州市银嘉环保科技有限公司</div>
-              <!-- 设计 [D5] 编号:与公司名同一行,靠右 —— 值是单据编号(自动编号,只读) -->
-              <div class="rsp-cover-docno">
-                <span class="rsp-cover-docno-lb">{{ tt('编号') }}</span>
-                <span class="rsp-cover-docno-val">{{ head['单据编号'] || '' }}</span>
-              </div>
               <div class="rsp-cover-title">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
-              <!-- 9 行字段表:标签列定宽(冒号对齐)+ 值列定宽(值左边界对齐)= 设计「所有行对齐长度」 -->
-              <table class="rsp-cover-fields" :style="{ top: coverLineTop(0) }">
-                <colgroup>
-                  <col :style="{ width: (coverLabelW * coverK) + 'px' }" />
-                  <col :style="{ width: (coverValueW * coverK) + 'px' }" />
-                </colgroup>
-                <tbody>
-                  <tr v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi"
-                      :style="{ height: (COVER_ROW_H * coverVy) + 'px' }">
-                    <td class="rsp-cover-lb">{{ tt(fd.label) }}</td>
-                    <td class="rsp-cover-vl">
-                      <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :maxlength="fd.max || 200" @input="emit('dirty')" />
-                      <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-              <table class="rsp-sign-t">
-                <colgroup><col v-for="(w, i) in coverSignW" :key="'cw' + i" :style="{ width: w + 'px' }" /></colgroup>
-                <tbody>
-                  <tr>
-                    <th v-for="(sg, si) in cfg.cover.sign" :key="'sh' + si" class="rsp-sign-th">{{ tt(sg.label) }}</th>
-                  </tr>
-                  <tr>
-                    <td v-for="(sg, si) in cfg.cover.sign" :key="'sd' + si" class="rsp-sign-td">
-                      <el-input v-if="editable" v-model="head[sg.key]" size="small" class="rsp-sign-input" maxlength="100" @input="emit('dirty')" />
-                      <span v-else class="rsp-cover-val">{{ head[sg.key] || '' }}</span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              <!-- 字段表 + 签字栏:外层负责**水平居中**,内层 inline-block 负责**按内容定宽**。
+                   ⚠ 不要让外层用 width:max-content:它里面还有 width:100% 的签字表,
+                     两者构成**循环依赖**(父宽取自子宽、子宽又取自父宽),
+                     实测会把整块布局塌成空 —— 表格边框在、文字全部不渲染。
+                     正解:外层只管居中;内层 display:inline-block 由内容撑开(表内单元格 nowrap),
+                     签字表 width:100% 跟随内层 ⇒ 两表同宽、左右边界对齐。 -->
+              <div class="rsp-cover-block" :style="{ top: coverLineTop(0) }">
+                <div class="rsp-cover-blockin">
+                  <!-- 9 行字段表:两列由浏览器按内容定宽(auto + nowrap),故不会"字比列宽、压到值格上" -->
+                  <table class="rsp-cover-fields">
+                    <tbody>
+                      <tr v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi">
+                        <td class="rsp-cover-lb">{{ tt(fd.label) }}</td>
+                        <td class="rsp-cover-vl">
+                          <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :maxlength="fd.max || 200" @input="emit('dirty')" />
+                          <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  <!-- 签字栏:width:100% 跟随 .rsp-cover-blockin ⇒ 与字段表同宽 -->
+                  <table class="rsp-sign-t">
+                    <colgroup>
+                      <col v-for="(w, i) in coverSignW" :key="'cw' + i" :style="{ width: w }" />
+                    </colgroup>
+                    <tbody>
+                      <tr>
+                        <th v-for="(sg, si) in cfg.cover.sign" :key="'sh' + si" class="rsp-sign-th">{{ tt(sg.label) }}</th>
+                      </tr>
+                      <tr>
+                        <td v-for="(sg, si) in cfg.cover.sign" :key="'sd' + si" class="rsp-sign-td">
+                          <el-input v-if="editable" v-model="head[sg.key]" size="small" class="rsp-sign-input" maxlength="100" @input="emit('dirty')" />
+                          <span v-else class="rsp-cover-val">{{ head[sg.key] || '' }}</span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </td></tr>
         </template>
@@ -138,7 +141,8 @@
           </span>
         </td></tr>
 
-        <!-- 文档式行(规格书 P4 章节:6.包装方式/7.运输要求/8.存储环境 无表格线) -->
+        <!-- 文档式行(规格书 P4 章节:2.炭棒处理要求/3.包装方式/4.出货检验报告/5.运输要求/6.存储环境 无表格线;
+             1.关键物料列表 只有 bar、rows 为空 —— 表体由 dataTables 渲染在 sections 之后) -->
         <template v-if="sec.doc">
           <tr v-for="(row, ri) in sec.rows" :key="'dl' + ri">
             <td :colspan="secCols(sec).length" class="rsp-doccell">
@@ -843,36 +847,22 @@ const docnoSpan = computed(() => {
    与设计的「标签列定宽 + 值列定宽」表格不是一回事(用户 2026-09-18 明确要求按本设计重排)。 */
 const COVER_W = 767
 const COVER_H = 794
-/** 字体(设计像素) */
-const COVER_LABEL_FONT = 27.3 // 标签列与值列同号(设计正文 20.5pt)
-const COVER_CELL_PAD = 6 // 单元格左右内边距
+/** 字体(设计像素):标签列与值列同号(设计正文 20.5pt) */
+const COVER_LABEL_FONT = 27.3
+const COVER_CELL_PAD = 6
 /**
- * 标签列宽**按当前封面的最长标签算,不照抄设计的磅值**。
+ * 列宽**交给浏览器按内容算**(标签/值都 nowrap + table-layout:auto)。
  *
- * 为什么:设计 sheet 里标签列 = B 列 = 53.3磅 = 71 设计px,但它自己的标签
- * 「客户项目名称」6 字 @27.3px 需 163.8px ⇒ **设计本身这一列是放不下的**
- * (xlsx 里靠"缩小字体填充"或溢出到相邻空格,不是排版意图)。照抄磅值必截字 ——
- * 实测 9 个标签有 6 个溢出(客户项目名称/整体规格参数/产品主要性能 …)。
- * ⇒ 取「最长标签所需宽」为下限。**从 cfg 实取**而非另立一份标签名单:
- *   标签名单只此一处(recordSheetConfigs),改了自动跟上,不会漂移。
- *
- * ⚠ 宽度按**当前语言**的 label 文本算(tt 后的结果),字宽近似取"字符数 × 字号"。
- *   中文/日文/韩文等全角字与宋体实际字宽基本相等,故近似成立;
- *   若某语言的译名明显长于中文(如 ru/de 的长词),该语言下标签可能换行 ——
- *   断言见 tools/archive/_probe-spec-cover.cjs(它按中文标签校验宽度下限)。
+ * 为什么不再手算像素:第一版按「最长标签字数 × 字号 + 内边距」算标签列,给到 178px,
+ * 而「客户项目名称」6 字 @27.3px 理论需 175.8px —— **只有 2px 余量**。
+ * 真实字体渲染宽度略大于 1em(宋体常见 ~1.05em),且 `table-layout:fixed` 下单元格
+ * **不会因内容变宽**,于是 nowrap 的文字直接溢出压到右侧值格上 = 用户看到的**字段重叠**。
+ * ⇒ 正解是让浏览器测量(nowrap 撑开单元格),不再猜像素;
+ *   同一份 cover.fields,所有行的标签列自然等宽 ⇒ 值列左边界仍然逐行对齐。
+ * 仅保留内边距作为"最小留白"。
  */
-const coverTextW = (s) => s.length * COVER_LABEL_FONT
-const coverLabelW = computed(() => {
-  const labels = (cfg.value?.cover?.fields || []).map((f) => tt(f.label))
-  const longest = labels.reduce((a, b) => (a.length >= b.length ? a : b), '')
-  return coverTextW(longest) + COVER_CELL_PAD * 2 + 2
-})
-/** 值列宽:按最长值(产品类别「伊可普高品质功能炭棒」10 字)定,多余宽度留给右侧空白 */
-const COVER_VALUE_MAX_CHARS = 10
-const coverValueW = computed(() => coverTextW('x'.repeat(COVER_VALUE_MAX_CHARS)) + COVER_CELL_PAD * 2 + 2)
-/** 字段表整体定位(设计像素)。left=79:表宽≈471 ⇒ 左 79 / 右 794-79-471≈244,
- *  右侧那块正好留给右上角「编号」(设计 [D5] 就在标签列右侧的那一列)。 */
-const COVER_GRID_LEFT = 79
+/** 字段表整体定位(设计像素)。left 由 CSS 的 50% + translateX(-50%) 居中,故不在此声明。
+ *  top=106:标题行(25..85)之下;9 行 × 46 = 到 520,离签字栏(605)仍有 85px 间隔。 */
 const COVER_GRID_TOP = 106
 /** 9 行行高:编号/产品类别/客户名称/客户料号/客户项目名称/应用场景/整体规格参数/产品主要性能/版本 */
 const COVER_ROW_H = 46
@@ -889,14 +879,12 @@ const coverVy = computed(() => coverPageH.value / COVER_H)
 function coverLineTop(i) {
   return ((COVER_GRID_TOP + i * COVER_ROW_H) * coverVy.value).toFixed(1) + 'px'
 }
-/** 签字栏三栏列宽:与字段表**同左边界、同总宽**对齐(设计 B17:D17 也起于标签列);
- *  列宽按设计 B17..D17 的比例 92.7:97.3:97.3 分配 —— 三段等分会让 制订/日期 与
- *  设计里「三栏偏左窄右宽」的观感不符,故保留比例。 */
+/** 签字栏三栏:与字段表**同宽同居中**(两表共用 CSS 的居中规则 + var(--coverw) 宽度),
+ *  故左/右边界天然对齐。三栏之间按设计 B17..D17 的比例 92.7:97.3:97.3 分配(百分比)。 */
 const COVER_SIGN_COLS = [92.7, 97.3, 97.3]
-const coverSignW = computed(() => {
-  const span = coverLabelW.value + coverValueW.value
-  const sum = COVER_SIGN_COLS.reduce((a, b) => a + b, 0)
-  return COVER_SIGN_COLS.map((w) => ((w / sum) * span).toFixed(1))
+const coverSignW = COVER_SIGN_COLS.map((w, _i, arr) => {
+  const sum = arr.reduce((a, b) => a + b, 0)
+  return ((w / sum) * 100).toFixed(2) + '%'
 })
 
 /** 报告头右侧信息块(数据记录表=密级/适用范围/测试负责人/报告编号;委托单=文件管理人/密级/文件使用范围) */
@@ -2554,48 +2542,54 @@ function chartOf(dt) {
   line-height: 1;
   white-space: nowrap;
 }
-/* 编号(设计 [D5]):与公司名同行、靠右。值 = 单据编号(自动编号,只读) */
-.rsp-cover-docno {
+/* 字段表 + 签字栏的**居中定位层**:只负责水平居中,不管宽度 */
+.rsp-cover-block {
   position: absolute;
-  right: calc(51px * var(--cok));
-  top: calc(25px * var(--cvy));
-  height: calc(33px * var(--cvy));
-  display: flex;
-  align-items: center;
-  gap: calc(4px * var(--cok));
-  font-family: 'SimSun', 'Songti SC', serif;
-  font-size: calc(20.7px * var(--cok));
-  line-height: 1;
-  color: #000;
-  white-space: nowrap;
+  left: 50%;
+  transform: translateX(-50%);
 }
-.rsp-cover-docno-lb {
-  color: #333;
+/* **按内容定宽层**:inline-block 由内容撑开(表内单元格 nowrap),
+   签字表 width:100% 跟随它 ⇒ 两表同宽。
+   ⚠ 这里(以及 .rsp-cover-block)都**不要**用 width:max-content:
+     与子元素的 width:100% 构成循环依赖,会把整块塌成空(边框在、文字不渲染)。 */
+.rsp-cover-blockin {
+  display: inline-block;
 }
-.rsp-cover-docno-val {
-  font-style: italic;
-  letter-spacing: calc(0.5px * var(--cok));
-}
-/* 字段表:标签列定宽 + 值列定宽 ⇒ 冒号与值左边界逐行对齐(设计「所有行对齐长度」)。
-   ⚠ 不要退回 flex「标签：值」流式布局 —— 标签宽度会随文字长短变,冒号就参差不齐了。 */
+/* 字段表:两列**由内容定宽**(table-layout:auto + 标签 nowrap)。
+   ⚠ 三条纪律,别退回:
+   ① 不要再给固定列宽 —— 手算像素总有余量不足的风险(曾给标签列 178px,而「客户项目名称」
+      实际渲染约 176px+,仅 2px 余量 ⇒ 字压到值格上 = 用户看到的**字段重叠**);
+   ② 标签必须 nowrap,否则浏览器为省宽度把标签折行,行高变化破坏"9 行等高"的版式;
+   ③ 整表的居中由外层 .rsp-cover-block 负责,本表不要自己再定位/居中。 */
 .rsp-cover-fields {
-  position: absolute;
-  left: calc(79px * var(--cok));
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: auto;
+  width: 100%;
+}
+/* 行高 = 设计 B7..B15 的 46 设计px(9 行等高)。table 上设 height 对行不生效,必须设在 tr 上。
+   ⚠ 别把行高改成 auto:固定等高的 9 行是设计版式的骨架,行高随内容浮动会让整块错位。 */
+.rsp-cover-fields tr {
+  height: calc(46px * var(--cvy));
 }
 .rsp-cover-lb,
 .rsp-cover-vl {
   border: calc(1.4px * var(--cok)) solid #000;
   vertical-align: middle;
-  padding: 0 calc(6px * var(--cok));
+  padding: 0 calc(8px * var(--cok));
 }
+/* 标签列:居中(设计 B 列即居中),宽度由最长的标签决定(所有行自然同宽) */
 .rsp-cover-lb {
   text-align: center;
   font-family: 'SimSun', 'Songti SC', serif;
   font-size: calc(27.3px * var(--cok));
   color: #111;
   white-space: nowrap;
+}
+/* 值列:整列一个宽度,值左对齐;nowrap 由浏览器撑开 */
+.rsp-cover-vl {
+  text-align: left;
+  white-space: nowrap;
+  min-width: calc(280px * var(--cok));
 }
 .rsp-cover-vl {
   text-align: left;
@@ -2626,13 +2620,14 @@ function chartOf(dt) {
   font-family: 'SimSun', 'Songti SC', serif;
   color: #1a1a1a;
 }
-/* 签名表:与字段表**同左边界同总宽**对齐(设计 B17:D17 亦起于标签列);表头/表体各 33 设计px */
+/* 签名表:width:100% 跟随 .rsp-cover-block ⇒ 与字段表同宽、左右边界对齐;
+   与字段表之间的垂直间隔在容器几何里预留(字段表底 → 签字栏顶,见 COVER_GRID_TOP/ROW_H) */
 .rsp-sign-t {
-  position: absolute;
-  left: calc(79px * var(--cok));
-  top: calc(605px * var(--cvy));
+  width: 100%;
+  margin-top: calc(85px * var(--cvy));
   border-collapse: collapse;
   table-layout: fixed;
+  position: relative;
 }
 .rsp-sign-t th,
 .rsp-sign-t td {

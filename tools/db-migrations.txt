@@ -555,3 +555,14 @@ i18n-rd-prodinfo-ui.sql
 #     显示文案照设计原文,数据键必须是 yj_field.label —— 两者不同就分开写(label/key)。
 migrate-spec-doc-cover.sql
 i18n-spec-doc-cover.sql
+
+# —— 2026-09-18 规格书第 4 页(成品及包装运输)按设计补全 6 节 ——
+# 设计源同《规格书细分.xlsx》sheet「成品及包装运输」(B4:G34,0 合并区)。
+# 设计是 6 节,原实现只有 3 节且编号不符(1 + 5/6/7/8),本轮照设计改成 1..6:
+#   1.关键物料列表 / 2.炭棒处理要求(新) / 3.包装方式 / 4.出货检验报告(新) / 5.运输要求 / 6.存储环境
+# migrate-spec-doc-p4.sql —— 新增 [炭棒处理要求] / [出货检验报告] 两列 + 字段(label 即数据键),
+#   并把设计原文写入 alias 作字段级默认文案。
+# i18n-spec-doc-cover.sql 已含这两字段的 10 语言译名(同一轮)。
+# ⚠ 节的顺序/编号/归属在前端 recordSheetConfigs.js;
+#   物料表的 filterKey/filterVal([表区]='物料清单')必须保留,否则整张明细被当物料显示。
+migrate-spec-doc-p4.sql

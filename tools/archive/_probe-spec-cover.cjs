@@ -21,11 +21,12 @@ let pass = 0, fail = 0, skip = 0
 const check = (n, c, e) => { c ? (pass++, console.log(`  ✓ ${n}`)) : (fail++, console.log(`  ✗ ${n}${e ? '  → ' + e : ''}`)) }
 const skipAll = (m) => { console.log(`  ⊘ SKIP ${m}`); process.exit(2) }
 
-/** 设计画布与几何(必须与 RecordSheetPanels.vue 的常量一致) */
+/** 设计画布与几何(必须与 RecordSheetPanels.vue 的常量一致)
+ *  ⚠ 列宽**已不再手算**:改为浏览器按内容测量(auto + nowrap),
+ *    故这里不再有 labelFont/gridLeft/宽度的断言 —— 保留画布与竖向几何。 */
 const DESIGN = {
   canvasW: 767, canvasH: 794,
-  gridLeft: 79, gridTop: 106, rowH: 46,
-  labelFont: 27.3, cellPad: 6,
+  gridTop: 106, rowH: 46,
   signTop: 605, signRowH: 33,
   tailReserve: 220,
 }
@@ -41,12 +42,13 @@ function sql(query) {
 ;(async () => {
   // ═══ ① 活库字段层 ═══
   console.log('\n① 字段层(活库 yj_field + rd_spec_doc_head)')
+  // 封面 9 行 + 第 4 页各节字段,必须全部是活库里的 label(铁律)
+  // ⚠ 早先这里只查了封面 9 个字段,导致 liveLabels 缺第 4 页的字段,
+  //    第 4 页断言集体误报 —— 数据键校验必须覆盖**本探针会断言的全部字段**。
   let rows
   try {
     rows = sql(`SELECT label, col_name, data_type, ISNULL(ref_panel,''), ISNULL(ref_field,''), CAST(seq AS varchar)
-                FROM yj_field WHERE panel_code='RD_SPEC_DOC' AND place='header'
-                AND col_name IN (N'编号',N'产品类别',N'客户名',N'客户料号',N'客户项目名称',
-                                 N'应用场景',N'整体规格参数',N'产品主要性能',N'版本') ORDER BY seq`)
+                FROM yj_field WHERE panel_code='RD_SPEC_DOC' AND place='header' ORDER BY seq`)
   } catch (e) { skipAll('连不上 HSDZ_MES: ' + e.message.split('\n')[0]) }
 
   const byLabel = new Map()
@@ -122,20 +124,35 @@ function sql(query) {
   check('签字栏 3 栏 = 制订/审核/批准日期',
     JSON.stringify((cfg.cover.sign || []).map((s) => s.key)) === JSON.stringify(['制订日期', '审核日期', '批准日期']))
 
-  // 几何:标签列必须装得下最长的标签(设计磅值装不下 —— 这是本探针的核心断言)
+  // 几何:封面"不重叠"现在**由浏览器测量保证**(不写固定列宽),
+  // 故这里不再断言像素宽度(那正是旧版重叠的根源),改为断言"有没有退回手算/固定列宽"。
   const dispLabels = (cfg.cover.fields || []).map((f) => f.label)
   const longest = dispLabels.reduce((a, b) => (a.length >= b.length ? a : b), '')
-  const needLabelW = longest.length * DESIGN.labelFont + DESIGN.cellPad * 2 + 2
-  check(`标签列宽 ${needLabelW.toFixed(0)}px ≤ 画布可用宽(右留 51px 编号位)`,
-    DESIGN.gridLeft + needLabelW + 51 <= DESIGN.canvasW + 1,
-    `${DESIGN.gridLeft}+${needLabelW.toFixed(0)}+51 = ${(DESIGN.gridLeft + needLabelW + 51).toFixed(0)} > ${DESIGN.canvasW}`)
+  console.log(`  (最长标签「${longest}」${longest.length} 字;列宽交由浏览器测量,不再手算)`)
 
-  // 值列:最长值(产品类别 10 字)必须装得下
-  const VALUE_MAX_CHARS = 10
-  const needValueW = VALUE_MAX_CHARS * DESIGN.labelFont + DESIGN.cellPad * 2 + 2
-  const tableRight = DESIGN.gridLeft + needLabelW + needValueW
-  check(`值列宽 ${needValueW.toFixed(0)}px 且整表右边界 ${tableRight.toFixed(0)} ≤ 画布 ${DESIGN.canvasW}`,
-    tableRight <= DESIGN.canvasW, `右边界 ${tableRight.toFixed(0)} 越界`)
+  const vueSrc = require('node:fs').readFileSync(
+    'C:/INCER/YINJIA-MES/frontend/src/core/views/RecordSheetPanels.vue', 'utf8')
+  // ① 不得再出现固定列宽(colgroup 里写死 px 的列):退回即会重现"字比列宽"的重叠
+  const coverTableBlock = (vueSrc.match(/<table class="rsp-cover-fields">[\s\S]*?<\/table>/) || [''])[0]
+  check('字段表不再写死列宽(无 colgroup/固定宽度)',
+    coverTableBlock.length > 0 && !/colgroup/.test(coverTableBlock),
+    '字段表里又出现了 colgroup ⇒ 手算列宽会重现重叠')
+  check('标签列声明了 nowrap(否则标签折行破坏 9 行等高)',
+    /\.rsp-cover-lb[\s\S]{0,300}?white-space:\s*nowrap/.test(vueSrc))
+  check('值列声明了 nowrap(让浏览器按内容撑宽,而非折行)',
+    /\.rsp-cover-vl[\s\S]{0,300}?white-space:\s*nowrap/.test(vueSrc))
+  // ② 关键回归:居中容器**不得**用 width:max-content —— 它内含 width:100% 的签字表,
+  //    构成循环依赖,实测会把整块布局塌成空(边框在、文字全部不渲染)。
+  //    ⚠ 取 CSS 规则时用 [^}<]* 限定在单条规则内:早先用 [\s\S]*? 会**越过 CSS 抓进模板**,
+  //      导致断言读到的是别处的内容(假绿/假红)。
+  const blockCss = (vueSrc.match(/\.rsp-cover-block(?![a-z-])[^}<]*\}/) || [''])[0]
+  const blockinCss = (vueSrc.match(/\.rsp-cover-blockin[^}<]*\}/) || [''])[0]
+  check('居中容器 .rsp-cover-block 未用 width:max-content(会与子表 width:100% 循环依赖)',
+    !!blockCss && !/max-content/.test(blockCss), blockCss.trim().slice(0, 90))
+  check('定宽层 .rsp-cover-blockin 用 inline-block 由内容撑开',
+    !!blockinCss && /inline-block/.test(blockinCss), blockinCss.trim().slice(0, 90))
+  check('签字表 width:100% 跟随定宽层 ⇒ 与字段表同宽',
+    /\.rsp-sign-t\s*\{[^}]*width:\s*100%/.test(vueSrc))
 
   // 竖向:标题行(60) + 9 行字段 + 签字栏,不得互相压盖
   const titleBottom = 25 + 60
@@ -154,8 +171,56 @@ function sql(query) {
   check(`封面内容 ${scaled.toFixed(0)}px(缩放到网格宽) ≤ 可用页高 ${pageH}px`,
     scaled <= pageH, `溢出 ${(scaled - pageH).toFixed(0)}px ⇒ 打印会多出空白页`)
 
-  // ═══ ③ 服务端产物流通 ═══
-  console.log('\n③ 服务端(8090 供应的是这次构建)')
+  // ═══ ③ 第 4 页「成品及包装运输」6 节(设计 sheet 逐节对照)═══
+  console.log('\n③ 第 4 页(成品及包装运输)6 节')
+  // 设计 B4/B13/B17/B22/B25/B30 六节,编号即设计原文
+  const P4 = [
+    { bar: '1.关键物料列表', key: null },
+    { bar: '2.炭棒处理要求', key: '炭棒处理要求' },
+    { bar: '3.包装方式', key: '包装方式' },
+    { bar: '4.出货检验报告', key: '出货检验报告' },
+    { bar: '5.运输要求', key: '运输要求' },
+    { bar: '6.存储环境', key: '存储环境' },
+  ]
+  const p4secs = (cfg.sections || []).filter((s) => s.page === 3)
+  check(`第 4 页恰有 6 节(设计 B4/B13/B17/B22/B25/B30)`, p4secs.length === 6, `实际 ${p4secs.length} 节`)
+  check('6 节标题与编号 = 设计原文',
+    JSON.stringify(p4secs.map((s) => s.bar)) === JSON.stringify(P4.map((s) => s.bar)),
+    JSON.stringify(p4secs.map((s) => s.bar)))
+  for (const [i, want] of P4.entries()) {
+    const sec = p4secs[i]
+    if (!sec) continue
+    if (!want.key) {
+      check(`  「${want.bar}」只出标题、表体交给 dataTables`, (sec.rows || []).length === 0)
+      continue
+    }
+    const row = (sec.rows || [])[0]
+    check(`  「${want.bar}」→ 字段 ${want.key}`, !!row && row.key === want.key && liveLabels.has(want.key),
+      row ? `key=${row.key}` : '无行')
+  }
+  // 节的字段必须在活库 label 里(铁律),否则该节空白+丢值
+  const p4Keys = p4secs.flatMap((s) => (s.rows || []).map((r) => r.key)).filter(Boolean)
+  const p4Bad = p4Keys.filter((k) => !liveLabels.has(k))
+  check('第 4 页各节字段都命中活库 label', p4Bad.length === 0, p4Bad.join(', '))
+  // 关键物料列表:表头照设计 B6;且必须保留 filterKey/filterVal(否则整张明细被当物料显示)
+  const matTbl = (cfg.dataTables || []).find((d) => d.page === 3)
+  check('物料表标题 = 1.关键物料列表', !!matTbl && matTbl.bar === '1.关键物料列表', matTbl && matTbl.bar)
+  check('物料表表头 = 设计 B6(序号|物料编码|物料名称|规格参数|数量|备注)',
+    !!matTbl && JSON.stringify((matTbl.cols || []).filter((c) => !c.hiddenCol).map((c) => c.key)) ===
+      JSON.stringify(['序号', '物料编码', '物料名称', '规格参数', '数量', '备注']),
+    matTbl ? JSON.stringify((matTbl.cols || []).filter((c) => !c.hiddenCol).map((c) => c.key)) : '无表')
+  check('物料表保留 filterKey/filterVal(靠 [表区] 把物料行与其它明细行分开)',
+    !!matTbl && !!matTbl.filterKey && !!matTbl.filterVal,
+    '删掉会把修订记录/检验项目行也当物料显示')
+  check('物料表开启 materialPick(设计 [E4] 由材料库引用)',
+    !!matTbl && matTbl.materialPick === true)
+  // 默认文案:设计原文
+  const sd = cfg.sectionDefaults || {}
+  check('2/3/4/5/6 节都有默认文案(照设计原文)',
+    ['炭棒处理要求', '包装方式', '出货检验报告', '运输要求', '存储环境'].every((k) => !!sd[k]),
+    JSON.stringify(Object.keys(sd)))
+
+  console.log('\n④ 服务端(8090 供应的是这次构建)')
   let entry, rsName, rjs
   try {
     const html = await (await fetch(BASE + '/')).text()
@@ -166,14 +231,16 @@ function sql(query) {
   } catch (e) { skipAll('8090 不可达: ' + e.message) }
   check('拿到 RecordSheetPanels 分包', !!rsName, String(rsName))
   check('服务的分包含新封面结构(.rsp-cover-fields)', rjs.includes('rsp-cover-fields'))
-  check('服务的分包含右上角编号(.rsp-cover-docno)', rjs.includes('rsp-cover-docno'))
+  check('服务的分包含定宽层(.rsp-cover-blockin)', rjs.includes('rsp-cover-blockin'))
+  check('服务的分包已无右上角编号(.rsp-cover-docno)', !rjs.includes('rsp-cover-docno'),
+    '右上角编号已按用户要求去掉,若又出现说明回归了')
   check('服务的分包已无旧流式标签(.rsp-cover-line)', !rjs.includes('rsp-cover-line'))
 
-  // ═══ ④ 模板与样式的一致性(改结构后最容易漏的一类)═══
+  // ═══ ⑤ 模板与样式的一致性(改结构后最容易漏的一类)═══
   // 本轮真实踩到:.rsp-cover-label 的 <span> 被换成 <td class="rsp-cover-lb"> 后,
   // CSS 规则删了,但 focusField() 的 querySelector 里还留着 '.rsp-cover-label' 选择器
   // ⇒ **字段跳转(点关联字段跳到封面那一格)会静默失效**。样式类不见了不会报错,只能靠比对发现。
-  console.log('\n④ 模板 ⟷ 样式 类名一致性')
+  console.log('\n⑤ 模板 ⟷ 样式 类名一致性')
   const fs = require('node:fs')
   const vue = fs.readFileSync('C:/INCER/YINJIA-MES/frontend/src/core/views/RecordSheetPanels.vue', 'utf8')
   // 封面专属类(CSS 里定义的)
