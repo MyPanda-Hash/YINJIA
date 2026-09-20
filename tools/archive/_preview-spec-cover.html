@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<!--
+  _preview-spec-cover.html — 规格书封面静态样张(供截图目视核对,不依赖浏览器自动化)
+
+  用途:本机没有 Playwright/Puppeteer,改完封面版式无法跑端到端截图。此页把
+  RecordSheetPanels.vue 封面那一段的**同一套几何**用纯 HTML 复刻,再出图目视比对
+  《规格书细分.xlsx》「封面（产品信息）」sheet 的版式。
+
+  ⚠ 这是**样张**不是实现:值取设计 xlsx 原样(C-95-33 / 伊可普高品质功能炭棒 …),只用于看版式。
+    真正的渲染源是 RecordSheetPanels.vue + recordSheetConfigs.js。
+  ⚠ 列宽**按内容算**(与实现同口径):设计 B 列 71px 装不下它自己的「客户项目名称」6 字,
+    照抄必截字 —— 见实现里 coverLabelW 的注释。这里的 184/292 即该公式的结果。
+-->
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #e9e9ea; padding: 24px; font-family: 'Microsoft YaHei', sans-serif; }
+  .cap { font-size: 12px; color: #555; margin-bottom: 6px; }
+  /* 纸张:设计画布 767×794(设计像素)按 1:1 展示 */
+  .paper {
+    position: relative; width: 767px; height: 794px; background: #fff;
+    box-shadow: 0 2px 10px rgba(0,0,0,.18); overflow: hidden; flex: none;
+  }
+  /* 设计第 1 行:B5 = 33 设计px */
+  .company {
+    position: absolute; left: 44px; top: 25px; height: 33px; display: flex; align-items: center;
+    font-size: 20.7px; line-height: 1;
+  }
+  .docno {
+    position: absolute; right: 51px; top: 25px; height: 33px; display: flex;
+    align-items: center; gap: 4px; font-size: 20.7px; line-height: 1;
+    font-family: SimSun, serif;
+  }
+  .docno .lb { color: #333; }
+  .docno .vl { font-style: italic; }
+  /* 设计第 2 行:B6 = 60 设计px 的独立标题行(-1px 修边框折叠造成的实际起点 107) */
+  .title {
+    position: absolute; left: 383px; transform: translateX(-50%); top: 24px; height: 60px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: SimSun, serif; font-size: 47.3px; letter-spacing: -1.33px; line-height: 1;
+  }
+  /* 设计 B7:B15 共 9 行,行高 46 设计px */
+  table.fields { position: absolute; left: 79px; top: 106px; border-collapse: collapse; table-layout: fixed; }
+  table.fields td { border: 1.4px solid #000; padding: 0 6px; vertical-align: middle; }
+  table.fields tr { height: 46px; }
+  /* 178 = 最长标签「客户项目名称」6字×27.3 + 内边距12 + 边框2(与实现 coverLabelW 同式)
+     287 = 最长值 10字×27.3 + 12 + 2 */
+  td.lb { width: 178px; text-align: center; font-family: SimSun, serif; font-size: 27.3px; white-space: nowrap; }
+  td.vl { width: 287px; text-align: left; font-family: SimSun, serif; font-size: 27.3px; }
+  /* 签字栏:与字段表同左边界、同总宽(178+287=465) */
+  table.sign { position: absolute; left: 79px; top: 605px; width: 465px; border-collapse: collapse; table-layout: fixed; }
+  table.sign th, table.sign td { border: 1.5px solid #000; }
+  table.sign th { height: 33px; font-family: SimSun, serif; font-size: 16px; font-weight: 400; }
+  table.sign td { height: 33px; font-family: SimSun, serif; font-size: 12px; text-align: center; word-break: break-all; }
+</style>
+<div class="cap">规格书封面 · 按《规格书细分.xlsx》「封面（产品信息）」重排</div>
+<div class="paper">
+  <div class="company">惠州市银嘉环保科技有限公司</div>
+  <div class="docno"><span class="lb">编号</span><span class="vl">C-95-33</span></div>
+  <div class="title">产品规格书</div>
+  <table class="fields">
+    <colgroup><col style="width:178px"><col style="width:287px"></colgroup>
+    <tr><td class="lb">编　号</td><td class="vl">C-95-33</td></tr>
+    <tr><td class="lb">产品类别</td><td class="vl">伊可普高品质功能炭棒</td></tr>
+    <tr><td class="lb">客户名称</td><td class="vl">青岛伊可普</td></tr>
+    <tr><td class="lb">客户料号</td><td class="vl">3-01-01-0014</td></tr>
+    <tr><td class="lb">客户项目名称</td><td class="vl">伊可普需求3</td></tr>
+    <tr><td class="lb">应用场景</td><td class="vl">抽水壶</td></tr>
+    <tr><td class="lb">整体规格参数</td><td class="vl">35*13*99</td></tr>
+    <tr><td class="lb">产品主要性能</td><td class="vl"></td></tr>
+    <tr><td class="lb">版　本</td><td class="vl">V20260624</td></tr>
+  </table>
+  <table class="sign">
+    <colgroup><col style="width:150px"><col style="width:157px"><col style="width:158px"></colgroup>
+    <tr><th>制订/日期</th><th>审核/日期</th><th>批准/日期</th></tr>
+    <tr><td>陈秀丽/2026/06/24</td><td></td><td></td></tr>
+  </table>
+</div>

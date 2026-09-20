@@ -540,3 +540,18 @@ migrate-rd-2026-newpanels-perm.sql
 #     第一版只加了提示词(内径(mm))那套,字段 label(炭棒内径)那套漏了,en 下字段名仍显中文。
 migrate-rd-prodinfo-ui.sql
 i18n-rd-prodinfo-ui.sql
+
+# —— 2026-09-18 规格书封面按设计重排(用户口径:照《规格书细分.xlsx》封面 sheet)——
+# 设计源:《产品开发\2.产品文件\2.1规格书\规格书细分.xlsx》sheet「封面（产品信息）」
+#        = 封面(首页)版式:范围 B5:E18、11 个合并区、标签1列+值3列。
+# migrate-spec-doc-cover.sql —— 新增 [产品类别] 字段(参照 RD_PROD_INFO.产品类别,不另存字典:
+#   产品信息表已有该字段 20 个选项,规格书新建时经参照带出,避免同一事实两处维护)
+#   + 建 rd_spec_doc_head.[产品类别] 列(产品主要性能/三签字列**早已存在**,本轮不动)。
+#   签字栏沿用既有三列 制订/审核/批准日期 存「姓名/日期」合写串(均 nvarchar(200),历史即此形态)。
+# i18n-spec-doc-cover.sql —— 产品类别(实测 field scope 已有 9 语言,兜底补)+ 产品主要性能
+#   + 封面既有标签(编号/客户料号/整体规格参数/版本/三签字栏)原先**只有 en 一条**,
+#     本轮补齐到 9 语言(否则切日语/韩语封面会露中文)。zh-CN 是源语言不建行。
+#   ⚠ 封面 9 行顺序与「编 号/版 本」这类两端对齐空格在**前端配置**(recordSheetConfigs.js):
+#     显示文案照设计原文,数据键必须是 yj_field.label —— 两者不同就分开写(label/key)。
+migrate-spec-doc-cover.sql
+i18n-spec-doc-cover.sql

@@ -82,7 +82,40 @@ test('dataTables 每个列的 key 必须是该面板当前的 label', () => {
   assert.deepEqual(problems, [], `配置数据键与 yj_field.label 不一致(该列取不到值且保存丢值):\n  ${problems.join('\n  ')}`)
 })
 
-/** 核心断言 ②:sections 网格字段的 key 同样必须是当前 label */
+/**
+ * 核心断言 ②·补:cover(文档式封面)的 field/sign 键同样必须是当前 label。
+ *
+ * 【为什么要补这条】规格书封面在 2026-09-18 重排时踩到:
+ *   数据库列名 `客户名` 永久不变,但该字段的 **label** 早在 migrate-rd-2026-design.sql
+ *   就对齐设计改成了「客户名称」;而封面配置仍写 `key:'客户名'`(col_name)。
+ *   ⇒ 封面「客户名称」那一格**取不到值(空白)**,且保存时 labelsToCols 找不到该 label ⇒ 静默丢值。
+ *   断言 ①/② 只覆盖 dataTables 与 sections,**封面是盲区**,所以这个 bug 一直没被拦住。
+ * 同一条铁律、同一套修法:key 必须写 label;显示文案与数据键不同就分开写(label / key)。
+ */
+test('cover 的 field/sign 键必须是该面板当前的 label', () => {
+  const problems = []
+  for (const [panel, cfg] of Object.entries(recordSheetConfigs)) {
+    if (!cfg.cover || !FIXTURE[panel]) continue
+    const { labels, cols } = fxOf(panel)
+    const entries = [
+      ...(cfg.cover.fields || []).map((f) => ['fields', f]),
+      ...(cfg.cover.sign || []).map((s) => ['sign', s]),
+    ]
+    for (const [where, e] of entries) {
+      const key = e.key
+      if (!key || NON_FIELD_KEYS.has(key) || labels.has(key)) continue
+      if (KNOWN_PREEXISTING.has(`${panel}|${key}`)) continue
+      problems.push(cols[key]
+        ? `${panel} · cover.${where} · key='${key}' 是 col_name,但该字段 label 已改为 '${cols[key]}' ⇒ key 应写 '${cols[key]}'`
+        : `${panel} · cover.${where} · key='${key}' 既不是 label 也不是 col_name`)
+    }
+  }
+  assert.deepEqual(problems, [], `封面数据键与 yj_field.label 不一致(该格空白且保存丢值):\n  ${problems.join('\n  ')}`)
+})
+
+/**
+ * 核心断言 ②:sections 网格字段的 key 同样必须是当前 label
+ */
 test('sections / tailSections 的字段 key 必须是该面板当前的 label', () => {
   const problems = []
   for (const [panel, cfg] of Object.entries(recordSheetConfigs)) {

@@ -26,19 +26,36 @@
     <table v-if="!effPlain && showReportHead" class="rs-t rs-head-t" :style="{ width: gridW + 'px' }">
       <colgroup><col v-for="(w, i) in effGrid" :key="'hc' + i" :style="{ width: w + 'px' }" /></colgroup>
       <tbody>
-        <!-- 规格书文档式封面:按《C-95-33 伊可普高品质功能炭棒规格书》设计图逐像素复刻
-             (设计画布 708×1173px,内层全部坐标=设计像素,由 --cok=gridW/708 等比缩放)
-             公司左上 | 大标题居中偏右(设计图标题中心 367.5/708)| 6 条字段线 | 窄居中签名表 -->
+        <!-- 规格书文档式封面:按《规格书细分.xlsx》「封面（产品信息）」sheet 逐行复刻
+             (设计画布 767×794px = 该 sheet 列宽/行高折算,内层坐标=设计像素,由 --cok 等比缩放)
+             公司左上 + 编号右上 | 大标题居中 | 9 行「标签列|值列」定宽表格 | 底部三栏签字 -->
         <template v-if="cfg.cover">
           <tr><td :colspan="nCols" class="rsp-cover-td">
             <div class="rsp-cover-page" :style="{ height: coverPageH + 'px', '--cok': coverK, '--cvy': coverVy }">
               <div class="rsp-cover-company">惠州市银嘉环保科技有限公司</div>
-              <div class="rsp-cover-title">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
-              <div v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi" class="rsp-cover-line" :style="{ top: coverLineTop(fi) }">
-                <span class="rsp-cover-label">{{ tt(fd.label) }}：</span>
-                <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :maxlength="fd.max || 200" @input="emit('dirty')" />
-                <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
+              <!-- 设计 [D5] 编号:与公司名同一行,靠右 —— 值是单据编号(自动编号,只读) -->
+              <div class="rsp-cover-docno">
+                <span class="rsp-cover-docno-lb">{{ tt('编号') }}</span>
+                <span class="rsp-cover-docno-val">{{ head['单据编号'] || '' }}</span>
               </div>
+              <div class="rsp-cover-title">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
+              <!-- 9 行字段表:标签列定宽(冒号对齐)+ 值列定宽(值左边界对齐)= 设计「所有行对齐长度」 -->
+              <table class="rsp-cover-fields" :style="{ top: coverLineTop(0) }">
+                <colgroup>
+                  <col :style="{ width: (coverLabelW * coverK) + 'px' }" />
+                  <col :style="{ width: (coverValueW * coverK) + 'px' }" />
+                </colgroup>
+                <tbody>
+                  <tr v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi"
+                      :style="{ height: (COVER_ROW_H * coverVy) + 'px' }">
+                    <td class="rsp-cover-lb">{{ tt(fd.label) }}</td>
+                    <td class="rsp-cover-vl">
+                      <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :maxlength="fd.max || 200" @input="emit('dirty')" />
+                      <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
               <table class="rsp-sign-t">
                 <colgroup><col v-for="(w, i) in coverSignW" :key="'cw' + i" :style="{ width: w + 'px' }" /></colgroup>
                 <tbody>
@@ -816,11 +833,51 @@ const docnoSpan = computed(() => {
   return Math.min(k, g.length - 1)
 })
 
-/* ── 规格书文档式封面(设计图 708×1173 逐像素复刻):内层坐标=设计像素,由 --cok 等比缩放 ──
-   测量自《C-95-33 伊可普高品质功能炭棒规格书》(设计图): 公司 y19..38 / 标题 y191..239 /
-   6 字段行 x≈173..177,行距 67px / 签名表 x132..604,y990..1112,列宽 143/157/172 */
-const COVER_W = 708
-const COVER_H = 1173
+/* ── 规格书文档式封面(设计画布 767×794,内层坐标=设计像素,由 --cok 等比缩放) ──
+   几何改为按《规格书细分.xlsx》「封面（产品信息）」sheet 的**行高/列宽**折算 —— 设计像素 = 磅 × 4/3:
+     列  B=71 C=92.7 D=97.3 E=97.3   ⇒ 标签列 71、值区 287.3(设计 C7:D7 合并)
+     行  B5=33 B6=60 B7..B15=46 B16=40 B17=33 B18=33
+   公司/编号 与标题各有自己的行高(33 / 60),字段 7 行等宽等高(46),版本 1 行,签字 2 行 —— 
+   与设计逐行对应。⚠ 旧版取自设计图 PNG 的 708×1173 画布:那版封面把标签做成**流式**
+   「标签：值」两端撑开(flex),标签宽度随文字长短变 ⇒ **冒号与值列参差不齐**,
+   与设计的「标签列定宽 + 值列定宽」表格不是一回事(用户 2026-09-18 明确要求按本设计重排)。 */
+const COVER_W = 767
+const COVER_H = 794
+/** 字体(设计像素) */
+const COVER_LABEL_FONT = 27.3 // 标签列与值列同号(设计正文 20.5pt)
+const COVER_CELL_PAD = 6 // 单元格左右内边距
+/**
+ * 标签列宽**按当前封面的最长标签算,不照抄设计的磅值**。
+ *
+ * 为什么:设计 sheet 里标签列 = B 列 = 53.3磅 = 71 设计px,但它自己的标签
+ * 「客户项目名称」6 字 @27.3px 需 163.8px ⇒ **设计本身这一列是放不下的**
+ * (xlsx 里靠"缩小字体填充"或溢出到相邻空格,不是排版意图)。照抄磅值必截字 ——
+ * 实测 9 个标签有 6 个溢出(客户项目名称/整体规格参数/产品主要性能 …)。
+ * ⇒ 取「最长标签所需宽」为下限。**从 cfg 实取**而非另立一份标签名单:
+ *   标签名单只此一处(recordSheetConfigs),改了自动跟上,不会漂移。
+ *
+ * ⚠ 宽度按**当前语言**的 label 文本算(tt 后的结果),字宽近似取"字符数 × 字号"。
+ *   中文/日文/韩文等全角字与宋体实际字宽基本相等,故近似成立;
+ *   若某语言的译名明显长于中文(如 ru/de 的长词),该语言下标签可能换行 ——
+ *   断言见 tools/archive/_probe-spec-cover.cjs(它按中文标签校验宽度下限)。
+ */
+const coverTextW = (s) => s.length * COVER_LABEL_FONT
+const coverLabelW = computed(() => {
+  const labels = (cfg.value?.cover?.fields || []).map((f) => tt(f.label))
+  const longest = labels.reduce((a, b) => (a.length >= b.length ? a : b), '')
+  return coverTextW(longest) + COVER_CELL_PAD * 2 + 2
+})
+/** 值列宽:按最长值(产品类别「伊可普高品质功能炭棒」10 字)定,多余宽度留给右侧空白 */
+const COVER_VALUE_MAX_CHARS = 10
+const coverValueW = computed(() => coverTextW('x'.repeat(COVER_VALUE_MAX_CHARS)) + COVER_CELL_PAD * 2 + 2)
+/** 字段表整体定位(设计像素)。left=79:表宽≈471 ⇒ 左 79 / 右 794-79-471≈244,
+ *  右侧那块正好留给右上角「编号」(设计 [D5] 就在标签列右侧的那一列)。 */
+const COVER_GRID_LEFT = 79
+const COVER_GRID_TOP = 106
+/** 9 行行高:编号/产品类别/客户名称/客户料号/客户项目名称/应用场景/整体规格参数/产品主要性能/版本 */
+const COVER_ROW_H = 46
+/** 签字栏(制订/审核/批准 三栏,列宽按设计 B17..D17 比例 92.7:97.3:97.3) */
+const COVER_SIGN_TOP = 605
 const coverK = computed(() => gridW.value / COVER_W)
 /** 封面高度 = 真实 A4(210×297mm):设计画布 1173/708≈1.657 比 A4(1.414)长,按画布高等比
  *  会在打印时溢出到第二页;纵向位置/行高用独立缩放 coverVy 压入 A4 高度,横向(字号/列宽)仍用 coverK
@@ -828,14 +885,19 @@ const coverK = computed(() => gridW.value / COVER_W)
  *  不预扣则整页高度 = A4 + 章节块,打印时章节块被挤到第二个近乎空白的页(实测 794px 宽下 3 行=93px) */
 const coverPageH = computed(() => Math.round(gridW.value * (297 / 210)) - (cfg.value?.coverTailReserve || 0))
 const coverVy = computed(() => coverPageH.value / COVER_H)
-/** 字段行顶部(设计 px,行高 46 → ink 中心 482.5/549.5/617/683/750/817.5 = 设计墨迹中心) */
-const COVER_LINE_TOPS = [460, 527, 594, 660, 727, 795]
+/** 字段行顶部(设计 px):9 行等宽等高,由行号推出(不再手写坐标表 —— 加行不用改这里) */
 function coverLineTop(i) {
-  const y = COVER_LINE_TOPS[i] ?? (COVER_LINE_TOPS[0] + i * 67)
-  return (y * coverVy.value).toFixed(1) + 'px'
+  return ((COVER_GRID_TOP + i * COVER_ROW_H) * coverVy.value).toFixed(1) + 'px'
 }
-const COVER_SIGN_W = [143, 157, 172] // x 132..275..432..604 (设计图实测)
-const coverSignW = COVER_SIGN_W
+/** 签字栏三栏列宽:与字段表**同左边界、同总宽**对齐(设计 B17:D17 也起于标签列);
+ *  列宽按设计 B17..D17 的比例 92.7:97.3:97.3 分配 —— 三段等分会让 制订/日期 与
+ *  设计里「三栏偏左窄右宽」的观感不符,故保留比例。 */
+const COVER_SIGN_COLS = [92.7, 97.3, 97.3]
+const coverSignW = computed(() => {
+  const span = coverLabelW.value + coverValueW.value
+  const sum = COVER_SIGN_COLS.reduce((a, b) => a + b, 0)
+  return COVER_SIGN_COLS.map((w) => ((w / sum) * span).toFixed(1))
+})
 
 /** 报告头右侧信息块(数据记录表=密级/适用范围/测试负责人/报告编号;委托单=文件管理人/密级/文件使用范围) */
 const DEFAULT_INFO = [
@@ -909,9 +971,9 @@ function focusField(label) {
     if (!root) return
     // v-show 隐藏的其它页签也会命中查询,故只在**可见**元素里找(否则会闪到看不见的格子上)
     const visible = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length)
-    const els = [...root.querySelectorAll('td.rs-label, .rsp-cover-label, td.rs-td, th')].filter(visible)
+    const els = [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb, td.rs-td, th')].filter(visible)
     const el = els.find((e) => (e.textContent || '').trim() === label)
-      || [...root.querySelectorAll('td.rs-label, .rsp-cover-label')].filter(visible)
+      || [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb')].filter(visible)
         .find((e) => (e.textContent || '').includes(label))
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
@@ -2458,23 +2520,32 @@ function chartOf(dt) {
   background: #fff;
   overflow: hidden;
 }
-/* 公司名:微软雅黑 15.5pt(设计图墨迹 y19..38,x15..295) */
+/* 公司名 与 编号:同属设计第 1 行(B5 = 25磅 = 33 设计px,y25..58),垂直居中对齐 */
 .rsp-cover-company {
   position: absolute;
-  left: calc(15px * var(--cok));
-  top: calc(15px * var(--cvy));
+  left: calc(44px * var(--cok));
+  top: calc(25px * var(--cvy));
+  height: calc(33px * var(--cvy));
+  display: flex;
+  align-items: center;
   font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
   font-size: calc(20.7px * var(--cok));
   line-height: 1;
   color: #000;
   white-space: nowrap;
 }
-/* 大标题:宋体 35.5pt + 字距-1pt,中心 x=367.5/708(设计图实测 51.9%,非画布正中) */
+/* 大标题:设计是**独立一行**(B6 = 45磅 = 60 设计px),夹在「公司/编号」行(y25..58)
+   与字段表(y106 起)之间。故标题的线盒就取这一行的高度(60px)、靠下居中 ——
+   旧版把 top 设到 191px 是按另一张 PNG 画布量的,在新画布上会**压住字段表首行边框**。 */
 .rsp-cover-title {
   position: absolute;
-  left: calc(367.5px * var(--cok));
+  left: calc(383px * var(--cok));
   transform: translateX(-50%);
-  top: calc(191px * var(--cvy));
+  top: calc(25px * var(--cvy));
+  height: calc(60px * var(--cvy));
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-family: 'SimSun', 'Songti SC', serif;
   font-size: calc(47.3px * var(--cok));
   font-weight: 400;
@@ -2482,28 +2553,56 @@ function chartOf(dt) {
   color: #111;
   line-height: 1;
   white-space: nowrap;
-  text-align: center;
 }
-/* 字段行:宋体 23.5pt,行距 67px,标签起点 x=173;标签内嵌空格(名 称/编  号/版  本/日  期)自然流 → 冒号/值随行自动落位 */
-.rsp-cover-line {
+/* 编号(设计 [D5]):与公司名同行、靠右。值 = 单据编号(自动编号,只读) */
+.rsp-cover-docno {
   position: absolute;
-  left: calc(173px * var(--cok));
+  right: calc(51px * var(--cok));
+  top: calc(25px * var(--cvy));
+  height: calc(33px * var(--cvy));
   display: flex;
   align-items: center;
-  height: calc(46px * var(--cvy));
+  gap: calc(4px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
-  font-size: calc(31.3px * var(--cok));
-  color: #1a1a1a;
+  font-size: calc(20.7px * var(--cok));
+  line-height: 1;
+  color: #000;
   white-space: nowrap;
 }
-.rsp-cover-label {
-  flex: none;
-  white-space: pre;
-  line-height: 1;
+.rsp-cover-docno-lb {
+  color: #333;
+}
+.rsp-cover-docno-val {
+  font-style: italic;
+  letter-spacing: calc(0.5px * var(--cok));
+}
+/* 字段表:标签列定宽 + 值列定宽 ⇒ 冒号与值左边界逐行对齐(设计「所有行对齐长度」)。
+   ⚠ 不要退回 flex「标签：值」流式布局 —— 标签宽度会随文字长短变,冒号就参差不齐了。 */
+.rsp-cover-fields {
+  position: absolute;
+  left: calc(79px * var(--cok));
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.rsp-cover-lb,
+.rsp-cover-vl {
+  border: calc(1.4px * var(--cok)) solid #000;
+  vertical-align: middle;
+  padding: 0 calc(6px * var(--cok));
+}
+.rsp-cover-lb {
+  text-align: center;
+  font-family: 'SimSun', 'Songti SC', serif;
+  font-size: calc(27.3px * var(--cok));
+  color: #111;
+  white-space: nowrap;
+}
+.rsp-cover-vl {
+  text-align: left;
 }
 .rsp-cover-input {
-  flex: 1;
-  height: calc(46px * var(--cvy));
+  width: 100%;
+  height: calc(38px * var(--cvy));
 }
 /* 编辑态封面输入框:覆盖 size=small 的 24px 内高(35px 字在 24px 盒里会被削成半截字),
    并去掉 wrapper 默认左右 11px 内边距与灰边(只读态是纯 span 无边框,编辑态同口径) */
@@ -2514,21 +2613,24 @@ function chartOf(dt) {
   border-radius: 0;
 }
 .rsp-cover-input :deep(.el-input__inner) {
-  height: calc(46px * var(--cvy));
-  font-size: calc(31.3px * var(--cok));
+  height: calc(38px * var(--cvy));
+  font-size: calc(27.3px * var(--cok));
   font-family: 'SimSun', 'Songti SC', serif;
-  line-height: calc(46px * var(--cvy));
+  line-height: calc(38px * var(--cvy));
   padding: 0;
 }
+/* 只读值:设计正文 宋体 20.5pt ≈ 27.3 设计px(与标签列同号) */
 .rsp-cover-val {
-  font-size: calc(31.3px * var(--cok));
-  line-height: 1;
-}/* 签名表:设计图 x132..604(宽 473),y990..1112(高 123);表头 59px,表体 63px;2px 黑边框 */
+  font-size: calc(27.3px * var(--cok));
+  line-height: 1.15;
+  font-family: 'SimSun', 'Songti SC', serif;
+  color: #1a1a1a;
+}
+/* 签名表:与字段表**同左边界同总宽**对齐(设计 B17:D17 亦起于标签列);表头/表体各 33 设计px */
 .rsp-sign-t {
   position: absolute;
-  left: calc(132px * var(--cok));
-  top: calc(990px * var(--cvy));
-  width: calc(473px * var(--cok));
+  left: calc(79px * var(--cok));
+  top: calc(605px * var(--cvy));
   border-collapse: collapse;
   table-layout: fixed;
 }
