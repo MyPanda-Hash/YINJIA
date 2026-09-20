@@ -339,13 +339,14 @@ public class QueryService {
         List<Object> args = new ArrayList<>(List.of(panelCode));
         args.addAll(docNos);
         Map<String, Map<String, Object>> out = new HashMap<>();
-        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, saved FROM yj_doc_status"
+        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, saved, erp_close_state FROM yj_doc_status"
                 + " WHERE panel_code = ? AND doc_no IN (" + in + ")", rs -> {
             Map<String, Object> m = new HashMap<>();
             m.put("shr", rs.getString("shr"));
             m.put("shsj", rs.getTimestamp("shsj"));
             m.put("canceled", rs.getString("canceled"));
             m.put("stopped", rs.getString("stopped"));
+            m.put("erp_close_state", rs.getString("erp_close_state"));
             m.put("pending", rs.getString("pending"));
             m.put("pending_by", rs.getString("pending_by"));
             m.put("pending_at", rs.getTimestamp("pending_at"));
@@ -366,10 +367,12 @@ public class QueryService {
         return out;
     }
 
-    /** 状态推导:已作废 > 已中止 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 审批中 > 修改中 > 已归档 > 已审核 > 草稿 */
+    /** 状态推导:已作废 > 已中止 > 删除申请中 > 已终止/终止审批中(项目实施计划) > 修改申请中 > 审批中 > 修改中 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿 */
     private String docStatus(Map<String, Object> st) {
         if (st != null && "Y".equals(st.get("canceled"))) return "已作废";
         if (st != null && "Y".equals(st.get("stopped"))) return "已中止";
+        // 金蝶「手动关闭」(erp_close_state='H')= 人工终止,与 MES 中止同义(方案 A,2026-09-20)
+        if (st != null && "H".equals(st.get("erp_close_state"))) return "已中止";
         if (st != null && "Y".equals(st.get("deleting"))) return "删除申请中";
         // 项目实施计划:终止二级审批(P1 待立项人/P2 待管理员/T 已终止)
         if (st != null && "T".equals(st.get("term_state"))) return "已终止";
@@ -379,6 +382,8 @@ public class QueryService {
         if (st != null && "Y".equals(st.get("pending"))) return "审批中";
         if (st != null && "Y".equals(st.get("modify_state"))) return "修改中";
         if (st != null && "Y".equals(st.get("archived"))) return "已归档";
+        // 金蝶「已关闭」(erp_close_state='S')= 下游单据全部执行完系统自动关单,业务上是"做完了"
+        if (st != null && "S".equals(st.get("erp_close_state"))) return "已完成";
         if (st != null && st.get("shr") != null) return "已审核";
         return "草稿";
     }

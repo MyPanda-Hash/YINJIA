@@ -2561,10 +2561,10 @@ public class ButtonService {
         return docStatusOf(panelCode, no);
     }
 
-    /** 状态推导:已作废 > 已中止 > 删除申请中 > 修改申请中 > 审批中 > 修改中 > 已归档 > 已审核 > 草稿 */
+    /** 状态推导:已作废 > 已中止(含金蝶手动关闭) > 删除申请中 > 修改申请中 > 审批中 > 修改中 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿 */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at, erp_close_state FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
                 panelCode, no);
         Map<String, Object> out = new HashMap<>();
         Map<String, Object> r = rows.isEmpty() ? null : rows.get(0);
@@ -2575,6 +2575,9 @@ public class ButtonService {
         } else if ("Y".equals(r.get("canceled"))) {
             out.put("status", "已作废");
         } else if ("Y".equals(r.get("stopped"))) {
+            out.put("status", "已中止");
+        } else if ("H".equals(r.get("erp_close_state"))) {
+            // 金蝶「手动关闭」= 人工终止(方案 A,2026-09-20):与 MES 中止同义
             out.put("status", "已中止");
         } else if ("Y".equals(r.get("deleting"))) {
             out.put("status", "删除申请中");
@@ -2592,6 +2595,9 @@ public class ButtonService {
             out.put("status", "修改中");
         } else if ("Y".equals(r.get("archived"))) {
             out.put("status", "已归档");
+        } else if ("S".equals(r.get("erp_close_state"))) {
+            // 金蝶「已关闭」= 下游全执行完系统自动关单 → 业务语义"做完了"(方案 A,2026-09-20)
+            out.put("status", "已完成");
         } else if (r.get("shr") != null) {
             out.put("status", "已审核");
         } else {

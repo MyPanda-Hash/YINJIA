@@ -484,14 +484,17 @@ async function upsertDoc(doc, mssql, pool, head, lines, fp) {
     // 审核状态镜像(工作流注册表)
     r.input('m_shr', mssql.NVarChar(50), head.单据状态 === '已审核' ? (head.审核人 || N_SYNC_USER) : null);
     r.input('m_shsj', mssql.NVarChar(30), head.单据状态 === '已审核' ? head.审核时间 : null);
-    r.input('m_stopped', mssql.NVarChar(1), head.__已关闭 ? 'Y' : 'N');
+    // 金蝶关闭状态原值(方案 A,2026-09-20):S→MES 已完成,H→MES 已中止;未关闭为 NULL。
+    // 注意**不再写 stopped**:stopped 是 MES 自己的「中止」动作(带 stop_by 留痕),
+    // 由同步覆盖会导致"用户点的中止被下次同步洗掉"(改造前实测 1755 张已中止单 stop_by 全空)。
+    r.input('m_close', mssql.NVarChar(1), head.__关闭状态 ?? null);
     await r.query(`
       MERGE yj_doc_status AS t USING (VALUES (N'${doc.code}', @p0)) AS s(panel_code, doc_no)
       ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no
       WHEN MATCHED THEN UPDATE SET
-        shr = @m_shr, shsj = @m_shsj, canceled = N'N', stopped = @m_stopped, pending = N'N', update_at = GETDATE()
-      WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, shr, shsj, canceled, stopped, pending, update_at)
-        VALUES (s.panel_code, s.doc_no, @m_shr, @m_shsj, N'N', @m_stopped, N'N', GETDATE());`);
+        shr = @m_shr, shsj = @m_shsj, canceled = N'N', erp_close_state = @m_close, pending = N'N', update_at = GETDATE()
+      WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, shr, shsj, canceled, stopped, erp_close_state, pending, update_at)
+        VALUES (s.panel_code, s.doc_no, @m_shr, @m_shsj, N'N', N'N', @m_close, N'N', GETDATE());`);
     // 行表(列名直接用本地中文列;asp_time1 作为普通参数)
     for (const l of lines) {
       const lr = new mssql.Request(tx);
@@ -742,6 +745,10 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
               外部数据ID: str(d.id),
               __创建时间: str(d.create_time),
               __已关闭: d.bill_close_state === 'S' || d.bill_close_state === 'H',
+              // 金蝶关闭状态原值(2026-09-20 方案 A):S=已关闭(下游全执行完,系统自动)→ MES「已完成」;
+              // H=手动关闭(人工终止)→ MES「已中止」;'' / 'C' / 其它 = 未关闭。
+              // 只落这个原值,MES 侧状态由它推导;同步不再直接写 stopped(那会覆盖 MES 用户点的中止)。
+              __关闭状态: d.bill_close_state === 'S' || d.bill_close_state === 'H' ? d.bill_close_state : null,
             };
             const lines = doc.mapLines(d)
               .map((l, i) => ({ ...l, ...autoExtraLines(doc.code, (d.material_entity || [])[i]) })); // 行级全并集合并

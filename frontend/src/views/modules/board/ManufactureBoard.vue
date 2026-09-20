@@ -55,7 +55,7 @@ import { getProdBoard } from '@/business/engine'
 const data = getProdBoard()
 
 function statusTag(st) {
-  return { 草稿: 'info', 已审核: 'warning', 生产中: 'primary', 已完工: 'success', 已中止: 'danger', 已关闭: 'info' }[st] || 'info'
+  return { 草稿: 'info', 已审核: 'warning', 已完成: 'success', 生产中: 'primary', 已完工: 'success', 已中止: 'danger', 已关闭: 'info' }[st] || 'info'
 }
 
 const kpis = computed(() => {

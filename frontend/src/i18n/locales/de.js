@@ -854,6 +854,7 @@ export default {
     '生成产成品入库单（自制退库）': 'Fertigwareneingang (Eigenretoure)',
     '生成委外发料单': 'Fremdvergabe-Ausgabe erzeugen',
     '已中止': 'Gestoppt',
+    '已完成': 'Abgeschlossen',
     '输入搜索': 'Zum Suchen tippen',
     '点击编辑': 'Klicken zum Bearbeiten',
     '共有数据': 'Gesamtdatensätze',

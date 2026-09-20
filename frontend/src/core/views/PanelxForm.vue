@@ -659,7 +659,7 @@ const status = computed(() => form['单据状态'] || '草稿')
 // 单据=草稿可编辑；基础档案（存货/部门等）状态为 启用/停用 同样可编辑（增行/改字段/保存）
 const editable = computed(() => !isEdit.value || status.value === '草稿' || status.value === '启用' || status.value === '停用')
 
-const STATUS_TAG = { 草稿: 'info', 已审核: 'primary', 生产中: 'warning', 已完工: 'success', 已中止: 'danger', 已关闭: 'info' }
+const STATUS_TAG = { 草稿: 'info', 已审核: 'primary', 已完成: 'success', 生产中: 'warning', 已完工: 'success', 已中止: 'danger', 已关闭: 'info' }
 function statusTag(s) {
   return STATUS_TAG[s] || 'info'
 }

@@ -449,3 +449,10 @@ migrate-material-inspection-field.sql
 #   及行级 行号→采购订单行号)、ButtonService.inspAutoPurchaseIn 自动生单带列、
 #   KingdeePushService 推送补 src_bill_type_id/number + src_seq + src_inter_id/src_entry_id。
 migrate-po-chain-link.sql
+
+# —— 2026-09-20 金蝶关闭状态口径(方案 A):yj_doc_status 补 erp_close_state ——
+#   金蝶 bill_close_state:S=已关闭(下游全执行完自动关单)→ MES「已完成」;H=手动关闭 → MES「已中止」。
+#   存量纠正:同步曾把 S/H 都写成 stopped='Y'(不留 stop_by),迁移还原 stopped 并按已关闭预置 erp_close_state,
+#   之后由同步按原值精确化;同步改为只写 erp_close_state,**不再写 stopped**(MES 用户的中止不再被覆盖)。
+#   配套代码:sync-core.mjs(MERGE + __关闭状态)、QueryService/ButtonService 状态推导、前端状态色/词条。
+migrate-erp-close-state.sql

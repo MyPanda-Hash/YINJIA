@@ -1,0 +1,9 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== migrate-erp-close-state.sql ==
+  (0 rows)
+  | 0 | 
+  | PU_ORDER | ( | 382 | 0 | 
+  | PU_ORDER | S | 1755 | 0 | 
+  | SO_ORDER | ( | 823 | 0 | 
+  | SO_ORDER | S | 2976 | 0 | 
+[OK] migrate-erp-close-state.sql (8 batches)

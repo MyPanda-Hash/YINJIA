@@ -750,13 +750,13 @@ const kpis = computed(() => {
 // ---------- 工具 ----------
 function statusTone(status) {
   return {
-    已完工: 'stable', 已审核: 'stable', 启用: 'stable', 生产中: 'running',
+    已完工: 'stable', 已审核: 'stable', 已完成: 'stable', 启用: 'stable', 生产中: 'running',
     审批中: 'attention', 待审批: 'attention', 草稿: 'neutral', 不合格: 'risk',
     已中止: 'risk', 已关闭: 'risk',
   }[status] || 'neutral'
 }
 function orderStage(status) {
-  return { 草稿: 1, 已审核: 2, 生产中: 3, 已完工: 4, 已关闭: 4 }[status] || 1
+  return { 草稿: 1, 已审核: 2, 已完成: 4, 生产中: 3, 已完工: 4, 已关闭: 4 }[status] || 1
 }
 function eventIcon(panel) {
   const name = String(panel || '')

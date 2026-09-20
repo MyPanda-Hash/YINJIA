@@ -340,7 +340,7 @@ public class PanelConfigService {
         metadata.put("panelState", Map.of(
                 "dataName", "单据状态",
                 "dataType", "STRING",
-                "defaultOptions", List.of("草稿", "已审核", "审批中", "已中止", "已作废")));
+                "defaultOptions", List.of("草稿", "已审核", "已完成", "审批中", "已中止", "已作废")));
         metadata.put("panelButtons", panelButtons);
         // 表头调整(与「表格调整」成对,管理表头字段的排序/栏名/显隐):紧跟表格调整之后插入
         for (Map<String, Object> g : buttonGroups) {
