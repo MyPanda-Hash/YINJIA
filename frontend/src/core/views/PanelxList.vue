@@ -4533,9 +4533,11 @@ function isDisabled(action) {
   if (map[action] === undefined && (cfgCache.value?.metadata?.disabledActions || []).includes(action)) {
     return true
   }
-  // 2026-08-25：所有「生成XX」生单按钮统一仅已审核/生产中可用（对齐 T+：已审核才能选择生单）
+  // 2026-08-25：所有「生成XX」生单按钮统一仅已审核可用（对齐 T+：已审核才能选择生单）
+  // 2026-09-20：去掉残留的「生产中」档 —— 状态推导里不存在该档(全库无此值),
+  // 而后端 PushGenerateHandler 只认「已审核」,留着会让 UI 亮着却被后端拒(口径:选单/生单只能已审核)
   if (map[action] === undefined && action.startsWith('生成')) {
-    return !current.value || !['已审核', '生产中'].includes(st)
+    return !current.value || st !== '已审核'
   }
   return map[action] === true
 }

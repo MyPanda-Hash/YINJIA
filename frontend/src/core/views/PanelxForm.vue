@@ -714,9 +714,10 @@ function isDisabled(action) {
     审批驳回: s !== '审批中' || !isEdit.value,
     扫描填单: false,
   }
-  // 2026-08-25：所有「生成XX」生单按钮统一仅已审核/生产中可用（对齐 T+：已审核才能选择生单）
+  // 2026-08-25：所有「生成XX」生单按钮统一仅已审核可用（对齐 T+：已审核才能选择生单）
+  // 2026-09-20：去掉残留的「生产中」档(状态推导无此档,全库无此值),与后端 PushGenerateHandler 的「仅已审核」一致
   if (map[action] === undefined && action.startsWith('生成')) {
-    return !['已审核', '生产中'].includes(s) || !isEdit.value
+    return s !== '已审核' || !isEdit.value
   }
   return map[action] === true
 }
