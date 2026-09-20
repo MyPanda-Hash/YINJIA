@@ -12,6 +12,7 @@ import com.yinjia.mes.service.UsageLogService;
 import com.yinjia.mes.service.VoucherFlowService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
+import java.util.LinkedHashMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -39,6 +40,8 @@ public class PxController {
     private final DevTaskService devTaskService;
     private final ButtonService buttons;
     private final PanelPermissionService perm;
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
     public PxController(PanelRuntimeService service, PanelConfigService configService,
                         ReportColumnSettingsService reportColumnSettingsService,
@@ -83,6 +86,84 @@ public class PxController {
     public ApiResult<List<Map<String, Object>>> rdDevBoard() {
         perm.requirePanelView("RD_PROD_INFO");
         return ApiResult.ok(devTaskService.board());
+    }
+
+    /**
+     * 产品文件列表(RD_PROD_DOCLIST)—— 设计《产品开发系统需求汇总》sheet「文件汇总表」那张表。
+     *
+     * 【不新建业务逻辑】列头与状态推导**直接复用** DevTaskService:
+     *   · 4 个文件列 = DEV_PANELS 的 4 个下游面板(成型工艺清单/组装工艺清单/规格书/出货检验计划表)
+     *   · 每格状态 = statusOf(产品编号, 面板) ⇒ 未开发/开发中/开发审核中/开发完毕
+     * 本端点只做**只读拼装**:为每行补上「是否受控 / 受控日期」
+     *   —— 设计流程图 5.1/5.2/5.3/5.4 尾部都是「保存/提交 → 提交后审批 → **审批后自动受控**」,
+     *      故受控是**派生值**:该产品的 4 张文件**全部已归档**即为受控,受控日期取最后一份的归档时点。
+     *
+     * 状态存储查询:4 个面板的产品键字段不同(规格书是「编号」,其余是「产品编号」),
+     * 用 DevTaskService.productKeyOf(panel) 取,避免写死。
+     */
+    @GetMapping("/prodDocList")
+    public ApiResult<Map<String, Object>> prodDocList() {
+        perm.requirePanelView("RD_PROD_DOCLIST");
+
+        // 列头(顺序即矩阵列顺序):面板编码 + 显示名
+        List<Map<String, String>> columns = DevTaskService.devPanelMeta();
+
+        List<Map<String, Object>> rows = devTaskService.board();
+
+        // 各面板"已归档单据的产品键 → 归档时点"。产品键字段各面板不同(规格书是「编号」,其余是「产品编号」),
+        // 用 DevTaskService.productKeyOf(panel) 取;单据号列用面板自己的 groupCol。
+        Map<String, Map<String, String>> archivedAt = new LinkedHashMap<>();  // 面板 → (产品键 → 归档时点)
+        for (String panel : DevTaskService.devPanelCodes()) {
+            Map<String, String> m = new LinkedHashMap<>();
+            try {
+                String table = registry.panel(panel).headTable();
+                String keyCol = DevTaskService.productKeyOf(panel);
+                String docCol = pickGroupCol(panel);
+                jdbc.query("SELECT t.[" + keyCol + "] AS k, MAX(s.archived_at) AS at "
+                                + "FROM " + table + " t "
+                                + "JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = t.[" + docCol + "] "
+                                + "WHERE ISNULL(s.archived,'N') = 'Y' AND ISNULL(t.asp_cancel,'N') <> 'Y' "
+                                + "GROUP BY t.[" + keyCol + "]",
+                        rs -> {
+                            String k = rs.getString("k");
+                            if (k != null && !k.isBlank()) {
+                                Object at = rs.getObject("at");
+                                m.put(k, at == null ? "" : String.valueOf(at));
+                            }
+                        }, panel);
+            } catch (Exception e) {
+                // 某面板表/列缺失时降级:该面板不参与受控推导,矩阵主体仍可用
+                log.warn("[RD_PROD_DOCLIST] 受控推导跳过 panel={}: {}", panel, e.getMessage());
+            }
+            archivedAt.put(panel, m);
+        }
+
+        for (Map<String, Object> row : rows) {
+            String productCode = String.valueOf(row.get("产品编号"));
+            @SuppressWarnings("unchecked")
+            Map<String, String> cells = (Map<String, String>) row.get("cells");
+            boolean allDone = cells != null && !cells.isEmpty()
+                    && cells.values().stream().allMatch(DevTaskService.STATUS_DONE::equals);
+            String lastAt = "";
+            for (String panel : DevTaskService.devPanelCodes()) {
+                String at = archivedAt.getOrDefault(panel, Map.of()).get(productCode);
+                if (at != null && at.compareTo(lastAt) > 0) lastAt = at;
+            }
+            row.put("是否受控", allDone ? "是" : "否");
+            row.put("受控日期", allDone ? lastAt : "");
+            row.put("产品负责人", row.get("产品负责人") == null ? "" : row.get("产品负责人"));
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("columns", columns);
+        out.put("rows", rows);
+        return ApiResult.ok(out);
+    }
+
+    /** 该面板的单据号列(状态表 doc_no 的对应列):优先 group_col,缺省「单据编号」 */
+    private String pickGroupCol(String panelCode) {
+        String g = registry.panel(panelCode).groupCol();
+        return g == null || g.isBlank() ? "单据编号" : g;
     }
 
     /** 产品开发:参照标注(某面板下,这批产品是 未开发 / 已开发) */

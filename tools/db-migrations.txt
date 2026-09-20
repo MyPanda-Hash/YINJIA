@@ -506,3 +506,18 @@ migrate-rd-progress-18cols.sql
 migrate-asm-proc-lib.sql
 migrate-rd-2026-design.sql
 i18n-rd-2026-design.sql
+
+# —— 2026-09-18 Phase 5/重启测试修正(2 新面板前端 + 行表硬约定补齐)——
+# migrate-rd-prod-doclist.sql(重跑) —— ⚠ 补齐行表硬约定列:rd_prod_doclist_detail 缺 asp_cancel
+#   导致 QueryService.loadDetail 的 ISNULL(t.asp_cancel,'N')<>'Y' 直接 500、面板列表打不开(实测踩到);
+#   同族 rd_*_detail 表都带 asp_cancel + asp_user1/2 + asp_time1/2,两张新行表一并补齐(幂等 ALTER)。
+#   另:面板配 singleDoc=true(矩阵只有一张单,隐藏「新增」)+ 补承载单据 PDL-0001
+#   —— singleDoc 只隐藏新增入口,单据本身不存在则 queryDocs 返回空列表、矩阵无处挂载。
+#   清理第一版误建的死列(产品负责人/是否受控/受控日期/备注 均为派生值,永不写入)。
+# migrate-rd-sample-no.sql(重跑) —— rd_sample_no_detail 同样补齐 asp_cancel + asp_user1/2 + asp_time1/2。
+migrate-rd-prod-doclist.sql
+migrate-rd-sample-no.sql
+
+# —— 2026-09-18 Phase 5 前端:ProdDocListSheet.vue(产品文件列表只读矩阵)+ PanelxList 接入 + menus 新增 2 面板 ——
+# 后端:/px/prodDocList 端点(复用 DevTaskService.board(),只补 是否受控/受控日期 派生);
+#       StdLibController.list 的 SELECT 补 seq(前端据 seq 恢复 asm.proc 的设计序,原先 ORDER BY 字母序)

@@ -39,8 +39,11 @@ public class StdLibController {
                                                      @RequestParam(required = false) String item,
                                                      @RequestParam(required = false) String all) {
         boolean includeDisabled = all != null && !all.isBlank() && !"0".equals(all) && !"false".equalsIgnoreCase(all);
+        // ⚠ seq 必须在 SELECT 里:下面 ORDER BY 用它,而**调用方也要用**它自行重排 ——
+        //   `ORDER BY item_code, seq` 在"单条 item_code"的库里会退化成字母序(如 asm.proc 的
+        //   裸棒/机器包布/复合半成品/成品 会按拼音倒过来),设计序只能由前端按 seq 恢复。
         StringBuilder sql = new StringBuilder(
-                "SELECT id, lib_code AS lib, item_code AS item, content, enabled FROM yj_std_lib WHERE lib_code = ?");
+                "SELECT id, lib_code AS lib, item_code AS item, content, enabled, seq FROM yj_std_lib WHERE lib_code = ?");
         if (!includeDisabled) {
             sql.append(" AND enabled = 1");
         }

@@ -2563,10 +2563,12 @@ public class ButtonService {
             "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC",
             "RD_SPIKE_WATER", "RD_DOM_TEST", "RD_EQUIP_USE", "RD_INSTR_USE",
             "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
-            // 2026-09-18 新增 2 面(研发管理 × 产品开发最新设计):
-            //   RD_PROD_DOCLIST 产品文件列表 —— 是台账(有 是否受控/受控日期 自己数据),需要留痕与修改闭环
-            //   RD_SAMPLE_NO 样品编号表 —— 发号台账,改样品编号=改追溯锚点,必须防篡改
-            "RD_PROD_DOCLIST", "RD_SAMPLE_NO");
+            // 2026-09-18 新增:样品编号表 —— 发号台账,改样品编号=改追溯锚点,必须防篡改,故入归档闭环。
+            // ⚠ RD_PROD_DOCLIST(产品文件列表)**刻意不入本集合**:它是**只读派生视图**
+            //   (4 文件×状态矩阵由 DevTaskService 实时推导,面板本身没有可归档的"纸"),
+            //   没有「新增」入口、永远没有单据可归档;登记进来只会让归档/修改闭环指向空集合。
+            //   与 RD_PROGRESS(单单据、永远草稿、刻意排除)同一类处置 —— 见 CONTEXT「文书归档面板」。
+            "RD_SAMPLE_NO");
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复) */
     private static final java.util.Set<String> DOC_NO_PANELS = java.util.Set.of(
             "RD_APPROVAL", "RD_PLAN", "RD_PROGRESS", "RD_FILTER_EFF",

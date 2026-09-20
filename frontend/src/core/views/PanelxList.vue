@@ -130,6 +130,13 @@
           @dirty="markInlineDirty"
           @open-sheets="openDataSheets"
         />
+        <!-- 产品文件列表:4 文件×状态矩阵(设计《文件汇总表》)。只读视图 ——
+             数据源与产品信息表侧栏「产品开发」按钮同一份(DevTaskService),不另存状态 -->
+        <ProdDocListSheet
+          v-else-if="panelCode === 'RD_PROD_DOCLIST'"
+          ref="approvalSheetRef"
+          :head="cur" :panel-code="panelCode"
+        />
         <DataRecordSheet
           v-else-if="panelCode === 'RD_FILTER_EFF'"
           ref="approvalSheetRef"
@@ -1433,6 +1440,7 @@ import BomMasterDetail from './BomMasterDetail.vue'
 import DocSheet from './DocSheet.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import ProgressControlSheet from './ProgressControlSheet.vue'
+import ProdDocListSheet from './ProdDocListSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
@@ -1467,7 +1475,7 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
-const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
+const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 const docSheetConfig = computed(() => qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
 const bomMasterRows = computed(() => {

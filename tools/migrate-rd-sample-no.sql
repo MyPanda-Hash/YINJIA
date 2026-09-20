@@ -53,8 +53,21 @@ CREATE TABLE rd_sample_no_detail (
   项目编号     nvarchar(50)  NULL,   -- 必须以 -<数字> 结尾(如 201-1)
   炭棒尺寸     nvarchar(200) NULL,
   备注         nvarchar(500) NULL,
-  表区         nvarchar(40)  NULL
+  表区         nvarchar(40)  NULL,
+  -- ⚠ asp_cancel + asp_user1/2 + asp_time1/2 是**行表的硬约定**(见 migrate-rd-prod-doclist.sql 同款说明):
+  --   QueryService.loadDetail 的 SQL 一律带 `ISNULL(t.asp_cancel,'N') <> 'Y'`,缺列直接 500。
+  asp_user1 nvarchar(50) NULL, asp_time1 datetime NULL,
+  asp_user2 nvarchar(50) NULL, asp_time2 datetime NULL,
+  asp_cancel char(1) NULL DEFAULT 'N'
 );
+GO
+
+-- 幂等补齐(已建过缺列版本的环境)
+IF COL_LENGTH('rd_sample_no_detail','asp_cancel') IS NULL ALTER TABLE rd_sample_no_detail ADD asp_cancel char(1) NULL DEFAULT 'N';
+IF COL_LENGTH('rd_sample_no_detail','asp_user1')  IS NULL ALTER TABLE rd_sample_no_detail ADD asp_user1 nvarchar(50) NULL;
+IF COL_LENGTH('rd_sample_no_detail','asp_time1')  IS NULL ALTER TABLE rd_sample_no_detail ADD asp_time1 datetime NULL;
+IF COL_LENGTH('rd_sample_no_detail','asp_user2')  IS NULL ALTER TABLE rd_sample_no_detail ADD asp_user2 nvarchar(50) NULL;
+IF COL_LENGTH('rd_sample_no_detail','asp_time2')  IS NULL ALTER TABLE rd_sample_no_detail ADD asp_time2 datetime NULL;
 GO
 
 -- ═══ 4. 字段登记 ═══

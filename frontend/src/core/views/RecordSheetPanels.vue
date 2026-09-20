@@ -957,8 +957,11 @@ async function openLib(dt) {
       let parsed = null
       try { parsed = JSON.parse(r.content) } catch { parsed = null }
       const list = Array.isArray(parsed?.rows) ? parsed.rows : []
-      return { item: r.item, name: r.item, rows: list, n: list.length, dbId: r.id, off: Number(r.enabled) === 0 }
+      return { item: r.item, name: r.item, rows: list, n: list.length, seq: r.seq, dbId: r.id, off: Number(r.enabled) === 0 }
     })
+    // ⚠ StdLibController.list 的 SQL 是 `ORDER BY item_code, seq, id` ⇒ 单条 item_code 时退回**字母序**,
+    //   设计 sheet 的业务序(裸棒→机器包布→复合半成品→成品)会丢。按 seq 在前端重排(seq 已随响应下发)。
+    rows.sort((a, b) => (Number(a.seq ?? 9999) - Number(b.seq ?? 9999)) || String(a.item).localeCompare(String(b.item)))
     // 兜底:库里一条都没有(未跑种子的环境)⇒ 用内置常量(无 dbId ⇒ 不可维护,跑种子后即全量可维护)
     libRows.value = rows.length
       ? rows.filter((r) => r.rows.length)
