@@ -56,6 +56,14 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
    新表及关键列写入 `MS_Description` 中文扩展属性(幂等写法参照
    `tools/migrate-table-comments.sql` 与 `tools/migrate-report-template-comments.sql`)。
    只建表不注明 = 任务未完成。改动已有表结构时鼓励补注。
+
+   **全库表清单 = `docs/development/数据库表清单.md`**(437 表 + 101 视图逐张登记:
+   表名/中文名/列数/关联面板,按 yj_/bs_/bd_bl_/rd_/qc_/wo_/已下架/ERP/遗留/备份 十组)。
+   建表或改表前**先查这份清单**确认前缀归属与「这张表能不能动」:
+   - 第 9 组 `legacy`(dm_/s_/拼音缩写)仍被面板引用的(`dm_ck`/`kucun`/`mate`/`inh`/`outh`/`Porder`/`order_bs`)——改动前须评估面板影响;
+   - 第 7 组(已下架 `pr_*`/部分 `wo_*`)与第 10 组(`RENAME_*`/`*_bak_*`/`tmp_*`/`t1`/`t2`)——**禁止新代码引用**;
+   - 新增表前缀按清单 §0 选,单据必须 `bd_` 头 + `bl_` 行(或 `*_head`/`*_detail`)成对且带 `asp_user1/2`+`asp_time1/2`。
+   表结构变更后重跑清单末尾两条命令刷新并随任务提交。
 2. **部署默认全量**:下次服务器部署走「全量恢复备份」路线(deploy/部署说明.md 二、A)——
    用本地库整体覆盖服务器。因此:
    - 打部署备份**之前**,必须先清掉本地库里的测试数据
@@ -90,5 +98,6 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 ## 架构速查(补充)
 
 - 通用设计资产库(供其它项目 agent 参考实现):`https://github.com/MyPanda-Hash/CHENGXIAO`(9 专题+代码片段+表结构)
+- **数据库表清单**:**`docs/development/数据库表清单.md`**(全库 437 表 + 101 视图逐张登记 + §0 命名与归属规范;建表/改表/查表先看它,刷新命令见文档末尾)
 - **代码规范与防臃肿**:**`docs/development/代码规范与防臃肿.md`**(A 分层边界/B 契约数据驱动/C 文件红线/D 反复制粘贴/E 清理与技术债台账/F 自动化防线);新代码必须满足该规范,违背即视为任务未完成
 - **踩坑台账**:`docs/development/开发与质量.md` §5.5(2026-09-11 前端导出/探针专项:jsPDF px 单位、html2canvas、$el fragment 锚点、离屏克隆全宽截图、PS 命令通道 CJK 键、char(2) 尾空格等);**涉 PDF 生成/截图导出/CDP 探针/PS 工具脚本/定长列比较,先读该节再动手,违者即重复事故**
