@@ -1590,5 +1590,13 @@ export default {
     '送料时间': 'Lieferzeitpunkt',
     '释放时间': 'Freigabezeitpunkt',
     '暂收退回单': 'Rückgabe vorläufige Annahme',
+    '送料': 'Lieferung',
+    '批': 'Charge(n)',
+    '可补': 'Nachlieferbar',
+    '暂收单': 'Vorläufige Annahme',
+    '送料批次': 'Lieferchargen',
+    '该订单暂无送料批次': 'Keine Liefercharge für diesen Auftrag',
+    '点击查看送料批次': 'Klicken für Lieferchargen',
+    '已送合计': 'Geliefert gesamt',
   },
 }

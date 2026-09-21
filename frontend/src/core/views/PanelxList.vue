@@ -467,7 +467,7 @@
         />
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
-      <div class="field" v-for="field in headerEditFields" :key="headerFieldKey(field)">
+      <div class="field" v-for="(field, idx) in headerEditFields" :key="headerFieldKey(field)" :style="{ order: batchFieldOrder(idx) }">
         <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}</label>
         <template v-if="draftEditable">
           <div v-if="isRefSelect(field)" class="query-ref-select">
@@ -564,6 +564,45 @@
           {{ formatFieldValue(field, cur[headerFieldKey(field)]) }}
         </div>
       </div>
+      <!-- 采购订单:表头「送料」只读摘要(方案 A 轻量版)——一行文字,点击弹浮层看批次窄表 -->
+      <el-popover
+        v-if="showBatchSummary"
+        v-model:visible="batchPopover"
+        placement="bottom-start"
+        :width="760"
+        trigger="click"
+        popper-class="batch-pop"
+      >
+        <template #reference>
+          <button type="button" class="batch-sum-line" :title="tt('点击查看送料批次')">
+            <span class="bsl-tag">{{ tt('送料') }}</span>
+            <span>{{ tt('已送') }} {{ batchTab.sum.batches }} {{ tt('批') }}</span>
+            <span class="bsl-sep">/</span>
+            <span>{{ tt('剩余') }} {{ batchTab.sum.left }}</span>
+            <span class="bsl-sep">/</span>
+            <span>{{ tt('可补') }} {{ batchTab.sum.ret }}</span>
+            <span class="bsl-caret">▸</span>
+          </button>
+        </template>
+        <div class="batch-pop-body" v-loading="batchTab.loading">
+          <div class="bpb-head">{{ tt('送料批次') }} · {{ curDocNo }}{{ batchTab.sum.sent ? ` · ${tt('已送合计')} ${batchTab.sum.sent}` : '' }}</div>
+          <el-table :data="batchTab.rows" border size="small" max-height="330">
+            <el-table-column prop="batchNo" :label="tt('批次号')" min-width="180" />
+            <el-table-column prop="createTime" :label="tt('日期')" width="150" />
+            <el-table-column prop="batchQty" :label="tt('数量')" width="90" align="right" />
+            <el-table-column :label="tt('状态')" width="90" align="center">
+              <template #default="{ row }">{{ tt(row.status === 'ACTIVE' ? '有效' : '已释放') }}</template>
+            </el-table-column>
+            <el-table-column prop="targetFormNo" :label="tt('暂收单')" min-width="150" />
+            <el-table-column :label="tt('操作')" width="80" align="center">
+              <template #default="{ row }">
+                <el-button link type="primary" :disabled="!row.targetFormNo" @click="onBatchTabRow(row)">{{ tt('查看') }}</el-button>
+              </template>
+            </el-table-column>
+            <template #empty>{{ tt('该订单暂无送料批次') }}</template>
+          </el-table>
+        </div>
+      </el-popover>
     </div>
 
     <!-- 附件区:头表保留附件1..附件6 列位,页面单格聚合呈现,上传按序占第一个空余列位
@@ -2829,6 +2868,58 @@ function mainRowCls({ row }) {
   return row === cur.value ? 'row-cur' : ''
 }
 
+// ═══ 采购订单表头「送料」只读摘要(方案 A 轻量版,2026-09-21)═══════════════════
+// 页面结构一点不动:只在表头字段区末尾多**一行只读文字**,点它弹一个小浮层(批次窄表)。
+// 性能:仅「采购订单 + 已审批」的单据在**切换单据时**请求一次批次数据(按单号缓存);
+//       点开浮层时强制刷新一次(保证看的时候是最新);不点不看 = 不产生额外请求。
+const APPROVED_STATUS_VALUES = ['已审批', '已通过'] // 审批判据统一:后端只产 '已通过',历史数据有 '已审批'
+const BATCH_SUMMARY_TARGET = 'QC_RECV'
+const batchTab = reactive({ doc: '', loading: false, rows: [], sum: { batches: 0, sent: 0, left: 0, ret: 0 } })
+const batchPopover = ref(false)
+const showBatchSummary = computed(() => panelCode.value === 'PU_ORDER' && !!curDocNo.value
+  && APPROVED_STATUS_VALUES.includes(String(cur.value?.['审批状态'] || ''))
+  && String(cur.value?.['单据状态'] || '') !== '已中止')
+async function loadBatchTab(docNo, force = false) {
+  if (!docNo || (batchTab.doc === docNo && !force)) return
+  batchTab.doc = docNo
+  batchTab.loading = true
+  try {
+    const res = await engine.batchFlowLines({ sourcePanel: panelCode.value, targetPanel: BATCH_SUMMARY_TARGET, sourceNo: docNo })
+    batchTab.rows = res?.batches || []
+    const lines = res?.lines || []
+    batchTab.sum = {
+      batches: batchTab.rows.length,
+      sent: lines.reduce((a, l) => a + Number(l.已送数量 || 0), 0),
+      left: lines.reduce((a, l) => a + Number(l.剩余数量 || 0), 0),
+      ret: lines.reduce((a, l) => a + Number(l.已退回数量 || 0), 0),
+    }
+  } catch { batchTab.rows = []; batchTab.sum = { batches: 0, sent: 0, left: 0, ret: 0 } } finally { batchTab.loading = false }
+}
+/** 浮层里点批次行 = 跳到该批次生成的送料暂收单 */
+function onBatchTabRow(row) {
+  const no = row?.targetFormNo
+  if (!no) return
+  const panel = row.targetPanel || BATCH_SUMMARY_TARGET
+  const base = `/panelx/list/${panel}`
+  batchPopover.value = false
+  tabs.open({ path: base, title: panel })
+  router.push({ path: base, query: { docNo: no } })
+}
+watch(
+  () => [panelCode.value, curDocNo.value, String(cur.value?.['审批状态'] || '')],
+  ([pc, no, st]) => {
+    if (pc === 'PU_ORDER' && no && APPROVED_STATUS_VALUES.includes(st)) loadBatchTab(no)
+  },
+  { immediate: true }
+)
+watch(batchPopover, (open) => { if (open && curDocNo.value) loadBatchTab(curDocNo.value, true) })
+// 摘要行的落位:摘要按 DOM 顺序紧跟「单据编号(=采购订单号)」,其后的表头字段用 flex order 排到它后面
+const batchDocNoIdx = computed(() => (headerEditFields.value || []).findIndex((f) => headerFieldKey(f) === '单据编号'))
+function batchFieldOrder(idx) {
+  const d = batchDocNoIdx.value
+  if (d < 0) return 0
+  return idx > d ? 2 : 0
+}
 function buildBlocks(cfg) {
   if (!cfg) return []
   const tp = cfg.metadata?.panelPageDto?.tablePages?.[0]
@@ -3322,8 +3413,7 @@ function sumMethod({ columns, data }) {
 
 // 审批流：当前单据已审批 → 表格左上角「已审批」角标；已审批明细行浅绿底色
 // 判据统一(2026-09-11):后端 QueryService 只产 '已通过'(shr 非空)/'审批中',历史数据里也有 '已审批',
-// 两值都认;禁止各处再手写单值比较(口径见 CONTEXT.md「已审批判据」)。
-const APPROVED_STATUS_VALUES = ['已审批', '已通过']
+// 两值都认;禁止各处再手写单值比较(口径见 CONTEXT.md「已审批判据」;常量见上方表头送料摘要块)。
 const isApproved = computed(() => cur.value && APPROVED_STATUS_VALUES.includes(cur.value['审批状态']))
 
 function rowCls({ row }, b) {
@@ -5893,7 +5983,45 @@ onUnmounted(() => {
   align-items: center;
   gap: 4px;
 }
-.doc-batch {
+/* 采购订单表头「送料」只读摘要(方案 A 轻量版):一行 chip,点击弹批次浮层 */
+.batch-sum-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  margin: 0 0 6px 0;
+  border: 1px dashed #c7d2fe;
+  border-radius: 13px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  align-self: flex-end;
+}
+.batch-sum-line:hover {
+  background: #e0e7ff;
+  border-color: #818cf8;
+}
+.batch-sum-line .bsl-tag {
+  font-weight: 600;
+}
+.batch-sum-line .bsl-sep {
+  color: #a5b4fc;
+}
+.batch-sum-line .bsl-caret {
+  font-size: 10px;
+  color: #6366f1;
+}
+.batch-pop-body {
+  min-width: 700px;
+}
+.batch-pop-body .bpb-head {
+  font-size: 12px;
+  color: #475569;
+  margin-bottom: 6px;
+}.doc-batch {
   font-size: 12px;
   padding: 1px 8px;
   border-radius: 8px;

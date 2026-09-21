@@ -1856,5 +1856,13 @@ export default {
     '送料时间': 'Delivery Time',
     '释放时间': 'Release Time',
     '暂收退回单': 'Temp. Receipt Return',
+    '送料': 'Delivery',
+    '批': 'batch(es)',
+    '可补': 'Re-deliverable',
+    '暂收单': 'Temp. Receipt',
+    '送料批次': 'Delivery Batches',
+    '该订单暂无送料批次': 'No delivery batch for this order',
+    '点击查看送料批次': 'Click to view delivery batches',
+    '已送合计': 'Delivered total',
   },
 }

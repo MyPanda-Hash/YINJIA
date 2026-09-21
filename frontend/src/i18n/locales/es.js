@@ -1590,5 +1590,13 @@ export default {
     '送料时间': 'Fecha de entrega',
     '释放时间': 'Fecha de liberación',
     '暂收退回单': 'Devolución de recepción temporal',
+    '送料': 'Entrega',
+    '批': 'lote(s)',
+    '可补': 'Re-entregable',
+    '暂收单': 'Recepción provisional',
+    '送料批次': 'Lotes de entrega',
+    '该订单暂无送料批次': 'Este pedido no tiene lotes de entrega',
+    '点击查看送料批次': 'Clic para ver los lotes de entrega',
+    '已送合计': 'Total entregado',
   },
 }

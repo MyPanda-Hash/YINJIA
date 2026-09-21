@@ -1605,5 +1605,13 @@ export default {
     '送料时间': 'Thời gian giao',
     '释放时间': 'Thời gian giải phóng',
     '暂收退回单': 'Trả lại nhận tạm',
+    '送料': 'Giao hàng',
+    '批': 'lô',
+    '可补': 'Có thể giao bù',
+    '暂收单': 'Phiếu nhận tạm',
+    '送料批次': 'Lô giao hàng',
+    '该订单暂无送料批次': 'Đơn này chưa có lô giao hàng',
+    '点击查看送料批次': 'Nhấn để xem lô giao hàng',
+    '已送合计': 'Tổng đã giao',
   },
 }
