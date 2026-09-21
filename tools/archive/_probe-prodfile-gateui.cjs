@@ -275,6 +275,8 @@ DELETE FROM rd_spec_doc_head  WHERE 单据编号 IN (SELECT no FROM @files);
 DELETE FROM rd_prod_info_detail WHERE 单据编号 IN (SELECT no FROM @pi);
 DELETE FROM rd_prod_info_head   WHERE 单据编号 IN (SELECT no FROM @pi);
 DELETE FROM rd_dev_task WHERE 产品编号 LIKE N'T-PFG%';
+-- 本探针按需创建的品质部测试账号(要留用做演示就注释掉这行;探针重跑会自动再建)
+DELETE FROM yj_user WHERE username = N'probe_qc';
 SELECT N'本次残留' AS 检查, CAST(COUNT(*) AS nvarchar) AS n FROM rd_mold_proc_head WHERE 产品编号 LIKE N'T-PFG%' OR (产品编号 IS NULL AND 产品名称 LIKE N'历史单%');
 `, 'utf8')
     console.log(`\n  --   清理 SQL:${CLEANUP}(已分发单 ${mpNo} / 未分发 ${ndNo} / 历史单 ${hisNo})`)
