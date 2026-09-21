@@ -29,7 +29,10 @@ const SHOTS = path.join(__dirname, '_shots')
 const MOLD = 'RD_MOLD_PROC'
 const ASM = 'RD_ASM_PROC'
 const REV_COLS = [60, 300, 200, 130, 120, 184]        // 修订记录页可见列宽(合计 994,k≈1.046 ⇒ 渲染 1040)
-const MOLD_P1 = [130, 110, 70, 100, 70, 70, 70, 100, 70, 125, 125]
+// 成型工艺清单页(页 1)11 列网格 —— 2026-09-20 起「炭棒尺寸」的外径/内径两块各自对半平分:
+// B=C=90(外径 90|90)、D+E=F+G=155(内径 155|155);只挪块**内**列宽,
+// 块宽 B:C=180 / D:G=310 / H:K=420 与行总宽 1040 一分未动(见 recordSheetConfigs.js 注释)。
+const MOLD_P1 = [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125]
 const MOLD_P2 = [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57]
 
 let failed = 0
@@ -90,6 +93,17 @@ async function main() {
     }
     const shot = async (tag) => {
       const r = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+      if (!r.result?.data) return null
+      const f = path.join(SHOTS, `mold-rev-${tag}.png`)
+      fs.writeFileSync(f, Buffer.from(r.result.data, 'base64'))
+      return f
+    }
+    /** 按页面坐标裁一块截图(用于只看某一行的像素:整页截图是视口高,行常在折叠下看不见) */
+    const shotClip = async (tag, x, y, width, height) => {
+      const r = await send('Page.captureScreenshot', {
+        format: 'png', captureBeyondViewport: true,
+        clip: { x: Math.max(0, x), y: Math.max(0, y), width, height, scale: 1 },
+      })
       if (!r.result?.data) return null
       const f = path.join(SHOTS, `mold-rev-${tag}.png`)
       fs.writeFileSync(f, Buffer.from(r.result.data, 'base64'))
@@ -207,12 +221,48 @@ async function main() {
     else bad(`③-3 成型配方页没显示配方行,实际:${JSON.stringify(fTable?.rows)}`)
     const shot2 = await shot('mold-tab2')
 
-    // 切到「成型工艺清单」:原两页版式未被改号改坏
+    // 切到「成型工艺清单」:原两页版式未被改号改坏 + 炭棒尺寸外径/内径两块对半平分
     await clickTab('成型工艺清单'); await sleep(1200)
     const s1 = await snap()
     const grid11 = (s1?.allCols || []).find((c) => eqArr(c, MOLD_P1))
-    if (grid11) ok(`③-4 成型工艺清单页仍是原 11 列网格 ${JSON.stringify(MOLD_P1)}`)
+    if (grid11) ok(`③-4 成型工艺清单页 11 列网格 = ${JSON.stringify(MOLD_P1)}(外径/内径对半改版后)`)
     else bad(`③-4 成型工艺清单页列宽异常:${JSON.stringify(s1?.allCols)}`)
+    // 逐格量「炭棒尺寸」这一行:外径 90|90、内径 155|155、内孔要求 420(行总长 1040 不变)
+    // ⚠ 不能按单元格文字找值格:编辑态里值格是 el-input(textContent 为空),按文字只会命中**表头格**
+    //   (表头 外径mm 跨 2 列=180、内径mm 跨 4 列=310)—— 实测踩过,故改为「表头行 → 下一行」定位值行。
+    const widths = await ev(`(function(){
+      var root=document.querySelector('.record-sheet'); if(!root) return null
+      var anchor=null
+      ;[].slice.call(root.querySelectorAll('td,th')).forEach(function(td){
+        if(!anchor && (td.textContent||'').replace(/\\s+/g,'')==='炭棒尺寸') anchor=td })
+      if(!anchor) return { err:'找不到「炭棒尺寸」锚点格' }
+      var headRow=anchor.parentElement
+      var header=[].slice.call(headRow.children).map(function(td){ return { t:(td.textContent||'').replace(/\\s+/g,''), span:td.colSpan||1, w:Math.round(td.getBoundingClientRect().width) } })
+      var valueRow=headRow.nextElementSibling, value=[]
+      while(valueRow && value.length<5){ value=[].slice.call(valueRow.children).map(function(td){ return { span:td.colSpan||1, w:Math.round(td.getBoundingClientRect().width) } }); if(value.length>=5) break; valueRow=valueRow.nextElementSibling }
+      return { header:header, value:value, rowW:Math.round(headRow.getBoundingClientRect().width) } })()`)
+    console.log('     炭棒尺寸行实测:' + JSON.stringify(widths))
+    const v = widths?.value || []
+    if (v.length >= 5 && v[0].w === v[1].w) ok(`③-7 外径块对半平分:外径mm ${v[0].w}px | 外径公差 ${v[1].w}px`)
+    else bad(`③-7 外径块未对半:${JSON.stringify(v.slice(0, 2))}`)
+    if (v.length >= 5 && v[2].w === v[3].w) ok(`③-8 内径块对半平分:内径mm ${v[2].w}px | 内径公差 ${v[3].w}px`)
+    else bad(`③-8 内径块未对半:${JSON.stringify(v.slice(2, 4))}`)
+    if (v.length >= 5 && v[4].w === 420) ok('③-9 内孔要求仍是 420px 整块(未被挤动)')
+    else bad(`③-9 内孔要求宽度异常:${JSON.stringify(v[4])}`)
+    if (widths?.rowW === 1040) ok('③-10 炭棒尺寸行总长仍是 1040px(整体行长度不变)')
+    else bad(`③-10 炭棒尺寸行总长 = ${widths?.rowW},期望 1040`)
+    // 这一行的**像素证据**:整页截图只有视口高,该行在折叠之下 ⇒ 按页面坐标单独裁一块(留 8px 余量)
+    const rect = await ev(`(function(){
+      var td=null
+      ;[].slice.call(document.querySelectorAll('td,th')).forEach(function(c){ if(!td && (c.textContent||'').replace(/\\s+/g,'')==='炭棒尺寸') td=c })
+      if(!td) return null
+      var head=td.parentElement, val=head.nextElementSibling
+      var r1=head.getBoundingClientRect(), r2=val?val.getBoundingClientRect():r1
+      var x=Math.min(r1.left,r2.left)+window.scrollX, y=Math.min(r1.top,r2.top)+window.scrollY
+      return { x:x-8, y:y-8, w:(Math.max(r1.right,r2.right)-Math.min(r1.left,r2.left))+16,
+               h:(Math.max(r1.bottom,r2.bottom)-Math.min(r1.top,r2.top))+16 } })()`)
+    const shotRow = rect ? await shotClip('size-row', rect.x, rect.y, rect.w, rect.h) : null
+    console.log(`     炭棒尺寸行像素截图:${shotRow}`)
     if (s1?.headVisible) ok('③-5 成型工艺清单页仍渲染自己的报告头')
     else bad('③-5 成型工艺清单页报告头丢了')
     if ((s2?.allCols || []).some((c) => eqArr(c, MOLD_P2))) ok(`③-6 成型配方页仍是原 13 列网格`)
