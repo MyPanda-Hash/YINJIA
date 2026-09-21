@@ -47,8 +47,11 @@ if defined YJ_TASK set "TASK=%YJ_TASK%"
 set "BAK=%SRC%\HSDZ_MES.bak"
 set "NEWJAR=%SRC%\app.jar"
 
-set "STAMP=%DATE:~0,4%%DATE:~5,2%%DATE:~8,2%-%TIME:~0,2%%TIME:~3,2%%TIME:~6,2%"
-set "STAMP=%STAMP: =0%"
+rem Timestamp for file names: %DATE% is locale dependent (a zh-CN box yields
+rem a string like "<weekday> 2026/09/21", which would put Chinese into every
+rem archive/log file name). Ask PowerShell for an ASCII stamp instead.
+for /f "usebackq delims=" %%I in (`powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"`) do set "STAMP=%%I"
+if not defined STAMP set "STAMP=unknownstamp"
 set "LOGDIR=%SRC%\logs"
 set "CAMEHOME=1"
 mkdir "%LOGDIR%" 2>nul
@@ -105,6 +108,38 @@ echo [2/8] server state (check-db.sql)
 sqlcmd -S localhost -E -h -1 -W -f i:65001,o:65001 -i "%SRC%\check-db.sql"
 if errorlevel 1 ( echo RESULT: FAIL-CHECKSQL & exit /b 1 )
 
+rem ---- 2b. environment forensics (read-only) ----------------------
+rem WHY: the server layout is NOT the same as the dev machine's. Dump what
+rem actually exists so the deploy can be verified from the log alone:
+rem which jar the scheduled task really starts, where the old DB backups
+rem live, and what this package brought.
+echo.
+echo [2b/8] environment forensics
+echo --- scheduled task ---
+schtasks /query /tn "%TASK%" /fo list /v 2>nul | findstr /i "TaskName Task-To-Run Task To Run Start In Status"
+schtasks /query /tn "%TASK%" /xml 2>nul | findstr /i "<Command> <Arguments> <WorkingDirectory>"
+echo --- start-service.bat (first 25 lines, if present) ---
+if exist "%DEST%\start-service.bat" (
+  set "N=0"
+  for /f "usebackq delims=" %%L in ("%DEST%\start-service.bat") do (
+    set /a N+=1
+    if !N! leq 25 echo   %%L
+  )
+) else (
+  echo   (no start-service.bat in %DEST%)
+)
+echo --- %DEST% listing ---
+dir /b "%DEST%" 2>nul
+echo --- existing .bak in %DEST% ---
+dir /b /o-d "%DEST%\*.bak" 2>nul
+if exist "%DEST%\backup" (
+  echo --- %DEST%\backup (newest 5) ---
+  dir /b /o-d "%DEST%\backup" 2>nul | findstr /b /r "[1-5]:"
+  dir /b /o-d "%DEST%\backup\*.bak" 2>nul | findstr /b /r "[1-5]:"
+)
+echo --- this package ---
+dir /b "%SRC%" 2>nul
+
 if /i not "%MODE%"=="GO" (
   echo.
   echo CHECK done - nothing was changed.
@@ -137,6 +172,26 @@ if errorlevel 1 (
 echo RESULT: BACKUP-GATE-PASSED
 
 rem ---- 5. restore our DB ------------------------------------------
+rem (see deploy steps: staging our DB backup over the same-named old one / syncing update\app.jar)
+rem (see deploy steps: staging our DB backup over the same-named old one / syncing update\app.jar)
+rem (see deploy steps: staging our DB backup over the same-named old one / syncing update\app.jar)
+rem (see deploy steps: staging our DB backup over the same-named old one / syncing update\app.jar)
+echo.
+echo [4b/8] stage our DB backup into %DEST%\HSDZ_MES.bak
+echo RESULT: SRC-BAK-SIZE
+for %%F in ("%BAK%") do echo   %%~zF bytes  %%~tF  %%~nxF
+if exist "%DEST%\HSDZ_MES.bak" (
+  if not exist "%DEST%\backup" mkdir "%DEST%\backup"
+  move /y "%DEST%\HSDZ_MES.bak" "%DEST%\backup\HSDZ_MES.bak.old-%STAMP%" >nul
+  if errorlevel 1 ( echo RESULT: FAIL-ARCHIVE-OLD-BAK & exit /b 1 )
+  echo RESULT: OLD-BAK-ARCHIVED %DEST%\backup\HSDZ_MES.bak.old-%STAMP%
+) else (
+  echo RESULT: NO-PREVIOUS-BAK
+)
+copy /y "%BAK%" "%DEST%\HSDZ_MES.bak" >nul
+if errorlevel 1 ( echo RESULT: FAIL-STAGE-BAK & exit /b 1 )
+for %%F in ("%DEST%\HSDZ_MES.bak") do echo RESULT: STAGED-BAK-IN-PLACE %%~zF bytes  %%~tF
+
 echo.
 echo [5/8] restore our DB (restore-db.sql)
 sqlcmd -S localhost -E -h -1 -W -f i:65001,o:65001 -i "%SRC%\restore-db.sql" > "%LOGDIR%\step-restore.txt" 2>&1
@@ -193,6 +248,14 @@ if exist "%DEST%\app.jar" (
 copy /y "%NEWJAR%" "%DEST%\app.jar" >nul
 if errorlevel 1 ( echo RESULT: FAIL-COPY-NEW-JAR & exit /b 1 )
 for %%F in ("%DEST%\app.jar") do echo RESULT: NEW-JAR-IN-PLACE %%~zF bytes  %%~tF
+rem (see deploy steps: staging our DB backup over the same-named old one / syncing update\app.jar)
+rem (see deploy steps: staging our DB backup over the same-named old one / syncing update\app.jar)
+if exist "%DEST%\update" (
+  copy /y "%NEWJAR%" "%DEST%\update\app.jar" >nul
+  if errorlevel 1 ( echo RESULT: WARN-UPDATE-JAR-COPY-FAILED ) else ( echo RESULT: UPDATE-JAR-SYNCED )
+) else (
+  echo RESULT: NO-UPDATE-DIR
+)
 
 rem ---- 8. start + verify -----------------------------------------
 echo.
