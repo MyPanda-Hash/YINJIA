@@ -1407,7 +1407,8 @@ public class ButtonService {
                         + " AND target_panel_code='PURCHASE_IN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量, 仓库代码, 计量单位, 单价, 采购订单行号"
+                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量, 仓库代码, 计量单位, 单价, 采购订单行号,"
+                        + " 送检数量, 部门名称, 生产日期, 备注"
                         + " FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> pass = rows.stream()
@@ -1431,6 +1432,11 @@ public class ButtonService {
             // 是否来料检验:本单由**来料检验单**审核自动生成 → 该批物料走过检验 = 是
             // (免检直达的入库单由采购订单生单,写「否」,见 PushGenerateHandler.applyInspectionFlag)
             line.put("是否来料检验", "是");
+            // 采购入库单补齐(2026-09-21 用户口径「保证采购入库单完整」):送检数量/部门名称/生产日期/行备注随链带入
+            line.put("送检数量", r.get("送检数量"));
+            if (r.get("部门名称") != null) line.put("部门名称", r.get("部门名称"));
+            if (r.get("生产日期") != null) line.put("生产日期", r.get("生产日期"));
+            if (r.get("备注") != null) line.put("备注", r.get("备注"));
             // 采购订单行号 → 采购入库行(列 源单行号,标签 采购订单行号):转ERP 时推 src_seq
             if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
             // 批次号随链带入采购入库行(2026-09-20 分批送料:同一批次可反查四单)
@@ -1493,7 +1499,7 @@ public class ButtonService {
                         + " AND target_panel_code='QC_RETURN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 不良数量, 备注, 计量单位, 单价, 采购订单行号"
+                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 不良数量, 备注, 单位, 计量单位, 单价, 采购订单行号"
                         + " FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> defect = rows.stream()
@@ -1512,6 +1518,7 @@ public class ButtonService {
             line.put("规格型号", r.get("规格型号"));   // 退回行字段=规格型号(原写「型号」落不下)
             line.put("退货数量", r.get("不良数量")); // 退回行数量字段=退货数量(原写「数量」落不下)
             line.put("计量单位", r.get("计量单位"));
+            if (r.get("单位") != null) line.put("单位", r.get("单位")); // 退回行另有「单位」列(2026-09-21 补齐,原先只写计量单位 → 单位全空)
             line.put("单价", r.get("单价"));
             if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
             // 批次号随链带入退回行(2026-09-20 分批送料:退回不回冲送货量,但批次号要能追到同一批)
@@ -1521,7 +1528,7 @@ public class ButtonService {
             items.add(line);
         }
         Map<String, Object> head = new LinkedHashMap<>();
-        head.put("日期", LocalDate.now().toString()); // 创建当日,不继承检验单日期(2026-09-17 口径)
+        head.put("单据日期", LocalDate.now().toString()); // 创建当日,不继承检验单日期(2026-09-17 口径);2026-09-21 标签由「日期」改为「单据日期」(原写「日期」对不上目标字段 → 退回头日期全空)
         head.put("业务员", h.get("业务员"));
         head.put("供应商代码", h.get("供应商代码"));
         head.put("供应商", h.get("供应商"));
