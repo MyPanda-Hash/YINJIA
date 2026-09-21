@@ -109,6 +109,11 @@ export const menuTree = [
               { code: 'puOrder', title: '采购订单', path: '/panelx/list/PU_ORDER', icon: 'Tickets', panelCode: 'PU_ORDER', operationName: '新增流程' },
             ],
           },
+          {
+            code: 'ledger', title: '台账', children: [
+              { code: 'batchLedger', title: '送料批次台账', path: '/panelx/list/BATCH_LEDGER', icon: 'Files', panelCode: 'BATCH_LEDGER' },
+            ],
+          },
         ],
       },
       {
