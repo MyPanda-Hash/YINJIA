@@ -704,3 +704,21 @@ migrate-recipe-materials.sql
 # 前端:recipeSheet.js 的 parseLengthRange/sinterRowsFromQuery/sinterRowsForWorkshop/sinterParams/
 #   sinterPatch/sinterLengthWarning(均有单测)+ RecipeCalcDialog 的「①b 烧结尺寸(模具)」块。
 migrate-sinter-tolerance.sql
+
+# ── 2026-09-21 成型工艺清单(页1)按设计图重排字段与来源 ───────────────────────────────
+# 口径:用户给的版面照片 + 《炭棒BOM及工艺信息表单需求设计内容》第三/四页。
+# migrate-mold-proc-p1-redesign.sql —— ① 新字段 2 个(灌料要求 / 压降是否测试)+ 物理列 + 中文注明;
+#   ② 显示改名 7 处走 **yj_field.alias**(产品编号→炭棒编号、外观要求→产品形态、外径mm/外径公差/内径mm/
+#   内径公差→炭棒外径mm/炭棒外径公差mm/炭棒内径mm/炭棒内径公差mm、烧结时间调速器参数→烧结时间/调速器参数)
+#   —— **数据键一律不动**:参照(产品编号→产品信息表)、四文件编辑门禁、配方计算回填全按数据键走;
+#   ③ 五个工序字段(配料要求/烧结炉参数/烧结时间调速器参数/热压要求/冷却参数设置)改挂**标准库**
+#   (mold.batching / mold.sinter / mold.sintertime / mold.hotpress / mold.cooling),原来写死在
+#   yj_field.dict_sql 里的候选值搬进库(16 条,值不丢);配料要求/热压要求 两个库先空着,模板由工艺科录。
+#   ⚠ 标准库型字段的 dict_sql 必须是**库编码不是 SQL**(写 SQL ⇒ 下拉空白且不报错)。
+# 前端:recordSheetConfigs 的 RD_MOLD_PROC_SEC0 整段重排(配料要求行 / 灌料三值并排+空白行+灌料要求行 /
+#   炭棒尺寸四格、撤掉内孔要求 / 压降块补第三行「压降是否测试」);RecordSheetPanels 的 grid 分支支持
+#   area 文本域、标准库下拉(filterable+allow-create+⧉维护)、文本域旁的「⌄标准库」选择(库按字段声明走);
+#   rdPanelLabels.fixture.json 已按活库重生成;en.js 补纸面新标签词条。
+# 验收:界面探针 ⑧ 段 11 项(标签齐、旧标签撤、三值并排、⌄/⧉入口、压降是否测试格、选项确实来自库)
+#   + 原有 ①~⑦ 段全部照旧通过(配方计算回填四格未受影响)。
+migrate-mold-proc-p1-redesign.sql

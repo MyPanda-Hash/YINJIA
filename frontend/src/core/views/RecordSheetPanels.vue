@@ -212,10 +212,24 @@
                   <span v-if="devStatus && devKey === c.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                   <el-icon class="rs-ref-ico"><Search /></el-icon>
                 </div>
-                <el-select v-else-if="editable && c.type === 'select'" v-model="head[c.key]" size="small" :clearable="false" @change="emit('dirty')">
-                  <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
-                </el-select>
-                <el-input v-else-if="editable && c.key" v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                <template v-else-if="editable && c.type === 'select'">
+                  <!-- 标准库型字段(成型工艺的 烧结炉参数/烧结时间调速器参数/冷却参数设置):
+                       选项来自可维护库,故 filterable+allow-create —— 能选预设也能直接敲新值
+                       (设计口径「下拉选择项 + 选择后同时支持再次修改」);旁挂标准库维护入口。 -->
+                  <el-select v-model="head[c.key]" size="small" :clearable="false"
+                             :placeholder="c.ph ? tt(c.ph) : ''"
+                             :filterable="!!stdLibOf(c.key)" :allow-create="!!stdLibOf(c.key)" default-first-option
+                             @change="emit('dirty')">
+                    <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
+                  </el-select>
+                  <span v-if="stdLibOf(c.key)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(c.key))">⧉ {{ tt('标准库维护') }}</span>
+                </template>
+                <template v-else-if="editable && c.key">
+                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
+                  <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
+                </template>
                 <span v-else class="rs-txt">{{ head[c.key] || c.fixed || '' }}</span>
               </td>
             </template>
@@ -570,10 +584,24 @@
                   <span v-if="devStatus && devKey === c.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                   <el-icon class="rs-ref-ico"><Search /></el-icon>
                 </div>
-                <el-select v-else-if="editable && c.type === 'select'" v-model="head[c.key]" size="small" :clearable="false" @change="emit('dirty')">
-                  <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
-                </el-select>
-                <el-input v-else-if="editable && c.key" v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                <template v-else-if="editable && c.type === 'select'">
+                  <!-- 标准库型字段(成型工艺的 烧结炉参数/烧结时间调速器参数/冷却参数设置):
+                       选项来自可维护库,故 filterable+allow-create —— 能选预设也能直接敲新值
+                       (设计口径「下拉选择项 + 选择后同时支持再次修改」);旁挂标准库维护入口。 -->
+                  <el-select v-model="head[c.key]" size="small" :clearable="false"
+                             :placeholder="c.ph ? tt(c.ph) : ''"
+                             :filterable="!!stdLibOf(c.key)" :allow-create="!!stdLibOf(c.key)" default-first-option
+                             @change="emit('dirty')">
+                    <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
+                  </el-select>
+                  <span v-if="stdLibOf(c.key)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(c.key))">⧉ {{ tt('标准库维护') }}</span>
+                </template>
+                <template v-else-if="editable && c.key">
+                  <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
+                  <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
+                  <span v-if="stdLibOf(c.key)" class="rsp-lib-pick" @click.stop="openSectionLib(c)">⌄ {{ tt('标准库') }}</span>
+                </template>
                 <span v-else class="rs-txt">{{ head[c.key] || c.fixed || '' }}</span>
               </td>
             </template>
@@ -892,7 +920,7 @@
 
     <!-- ═══ 章节标准库(yj_std_lib,lib=spec.section) ═══ -->
     <el-dialog v-model="secLibVisible" :title="tt('章节标准库') + ' · ' + tt(secLibLabel)" width="760px" append-to-body>
-      <StdLibManager ref="secLibRef" lib="spec.section" :item="secLibLabel" :add-item="secLibLabel" pickable :show-add="false" @pick="applySectionLib" />
+      <StdLibManager ref="secLibRef" :lib="secLibLib" :item="secLibItem" :add-item="secLibItem" pickable :show-add="false" @pick="applySectionLib" />
       <div class="sec-lib-add">
         <el-input v-model="secLibDraft" type="textarea" :rows="3" :placeholder="tt('新条目(默认带入当前值，编辑后存入)')" />
         <el-button type="primary" @click="addSectionLib">{{ tt('存入标准库') }}</el-button>
@@ -2253,9 +2281,18 @@ const secLibRef = ref(null)
 const secLibLabel = ref('')
 const secLibKey = ref('')
 const secLibDraft = ref('')
+// 章节/模板标准库弹窗的库与条目:由 openSectionLib 按字段声明决定(见该函数注释)
+const secLibLib = ref('spec.section')
+const secLibItem = ref('')
 async function openSectionLib(row) {
   secLibKey.value = row.key
-  secLibLabel.value = row.label
+  // grid 单元格没有 label(那是标签格才有),退回 key,免得弹窗标题空着
+  secLibLabel.value = row.label || row.key || ''
+  // 库与条目按**字段自己声明的标准库**走(成型工艺的 配料要求/热压要求);
+  // 没声明库的老调用方(规格书章节)保持原样:spec.section + 条目名=章节名。
+  const lib = stdLibOf(row.key)
+  secLibLib.value = lib || 'spec.section'
+  secLibItem.value = lib ? '默认' : (row.label || row.key || '')
   secLibDraft.value = props.head?.[row.key] || ''
   secLibVisible.value = true
 }

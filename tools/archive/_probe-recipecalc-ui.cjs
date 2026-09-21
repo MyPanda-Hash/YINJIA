@@ -409,6 +409,58 @@ async function main() {
     else bad(`⑦-5 页 1 没看到烧结尺寸:${JSON.stringify(p1s.slice(0, 300))}`)
     const shot7 = await shot('07-page1-sinter')
     console.log('  --   截图(⑦):' + [shot6, shot7].filter(Boolean).join(' , '))
+
+    // ════ ⑧ 页 1 新版面(2026-09-21 按设计图重排):标签/并排/新行/标准库挂载 ════
+    await clickTab('成型工艺清单'); await sleep(1200)
+    const p1 = await ev(`(function(){ var rs=document.querySelector('.record-sheet'); if(!rs) return null
+      var labels=[].slice.call(rs.querySelectorAll('td.rs-label')).map(function(td){return (td.textContent||'').trim()})
+      var rows=[].slice.call(rs.querySelectorAll('tr')).map(function(tr){
+        return [].slice.call(tr.querySelectorAll('td,th')).map(function(td){ var i=td.querySelector('input,textarea'); return i? i.value : (td.textContent||'').trim() }).join('|') }).filter(function(s){return s.replace(/\\|/g,'').trim()})
+      return { labels: labels, rows: rows, text: rs.innerText || '',
+               libPicks: rs.querySelectorAll('.rsp-lib-pick').length,
+               libMaint: rs.querySelectorAll('.rs-lib-btn').length,
+               testPh: (rs.innerText || '').indexOf('是否测试丨 √ × 丨') >= 0 } })()`)
+    if (!p1) bad('⑧-0 页 1 没渲染出来')
+    const need = ['炭棒编号', '产品形态', '配料要求', '理论水分', '灌料要求', '炭棒外径mm', '炭棒外径公差mm', '炭棒内径mm', '炭棒内径公差mm']
+    const missLb = need.filter((k) => !p1.labels.includes(k))
+    if (!missLb.length) ok(`⑧-1 纸面新标签齐了(${need.join(' / ')})`)
+    else bad(`⑧-1 缺这些标签:${JSON.stringify(missLb)}`)
+    const gone = ['外观要求', '内孔要求'].filter((k) => p1.labels.includes(k) || p1.text.includes(k))
+    if (!gone.length) ok('⑧-2 新版面已撤掉「外观要求」「内孔要求」(数据键与历史值仍在库里)')
+    else bad(`⑧-2 旧标签还在:${JSON.stringify(gone)}`)
+    const trio = p1.rows.find((r) => r.includes('理论最低灌料重量g')) || ''
+    if (trio.includes('理论灌料中间值g') && trio.includes('理论最高灌料重量g')) ok('⑧-3 灌料三值同一行并排(理论最低/中间/最高)')
+    else bad(`⑧-3 三值没并排,该行 = ${JSON.stringify(trio)}`)
+    if (p1.libPicks >= 2) ok(`⑧-4 文本框版式的标准库字段带「⌄标准库」(实际 ${p1.libPicks} 处:配料要求/热压要求)`)
+    else bad(`⑧-4 期望 ≥2 处 ⌄标准库,实际 ${p1.libPicks}`)
+    if (p1.libMaint >= 3) ok(`⑧-5 下拉版式的标准库字段带「⧉标准库维护」(实际 ${p1.libMaint} 处)`)
+    else bad(`⑧-5 期望 ≥3 处 ⧉标准库维护,实际 ${p1.libMaint}`)
+    if (p1.testPh) ok('⑧-6 压降块第三行有「是否测试丨 √ × 丨」格(压降是否测试)')
+    else bad('⑧-6 没找到压降是否测试格')
+
+    // 标准库是否真的接到了字段上:直接问面板描述接口(GET + 单据号),选项在 data.meta[].options
+    // —— 不是在库里查一遍就算。踩过三次:POST→500、漏 code→400、找 headerFields→空(实际在 meta)。
+    const desc = await (await fetch(`${BASE}/api/px/getFormDescriptor?panelCode=${MOLD}&code=${encodeURIComponent(no)}`, { headers: H })).json()
+    const meta = desc?.data?.meta || []
+    if (!meta.length) bad(`⑧-7~10 面板描述没取到(HTTP ${desc?.code}:${desc?.message || ''})—— 后面的选项断言不可信`)
+    const metaOf = (k) => meta.find((f) => (f.code || f.name) === k) || {}
+    const optOf = (k) => (metaOf(k).options || []).map((o) => (typeof o === 'object' ? (o.label ?? o.value) : o))
+    const sinter = optOf('烧结炉参数')
+    const cool = optOf('冷却参数设置')
+    const drop = optOf('压降是否测试')
+    if (sinter.includes('170度') && sinter.length >= 5) ok(`⑧-7 烧结炉参数选项来自标准库 mold.sinter:${JSON.stringify(sinter)}`)
+    else bad(`⑧-7 烧结炉参数选项不对(库没接上?):${JSON.stringify(sinter)}`)
+    if (cool.length >= 5) ok(`⑧-8 冷却参数设置选项来自标准库 mold.cooling(${cool.length} 条)`)
+    else bad(`⑧-8 冷却参数设置选项不对:${JSON.stringify(cool)}`)
+    if (JSON.stringify(drop.slice().sort()) === JSON.stringify(['×', '√'].sort())) ok('⑧-9 压降是否测试选项 = √ / ×')
+    else bad(`⑧-9 压降是否测试选项应为 √/×,实际 ${JSON.stringify(drop)}`)
+    const pourReq = metaOf('灌料要求')
+    if (pourReq.code && pourReq.dataType === '文本') ok(`⑧-10 新字段「灌料要求」随面板描述下发(dataType=${pourReq.dataType})`)
+    else bad(`⑧-10 新字段「灌料要求」没随面板描述下发:${JSON.stringify(pourReq)}`)
+    if ((metaOf('配料要求').stdLib || '') === 'mold.batching') ok('⑧-11 配料要求已挂标准库 mold.batching(库先空着,由工艺科录模板)')
+    else bad(`⑧-11 配料要求的 stdLib 应为 mold.batching,实际 ${JSON.stringify(metaOf('配料要求').stdLib)}`)
+    const shot8 = await shot('08-page1-relayout')
+    console.log('  --   截图(⑧):' + shot8)
   } finally {
     if (ws) { try { ws.close() } catch { /* ignore */ } }
     try { edge.kill() } catch { /* ignore */ }

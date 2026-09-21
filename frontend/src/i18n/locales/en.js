@@ -1926,6 +1926,16 @@ export default {
     '读不到烧结尺寸表（可能没有该面板权限），尺寸按单据上手填': 'Cannot read the sintering size table (panel permission missing?) — enter sizes on the document instead',
     /* 从标准库勾选/标准库维护 的措辞与既有页面一致(此前只有机翻兜底) */
     '从标准库勾选': 'Pick from Library',
+    /* ── 成型工艺清单(页1)按设计图重排:纸面新标签(数据键不变,改名走 yj_field.alias) ── */
+    '炭棒编号': 'Rod No.',
+    '炭棒外径mm': 'Rod OD (mm)',
+    '炭棒外径公差mm': 'Rod OD Tol. (mm)',
+    '炭棒内径mm': 'Rod ID (mm)',
+    '炭棒内径公差mm': 'Rod ID Tol. (mm)',
+    '灌料要求': 'Filling Requirements',
+    '压降是否测试': 'Pressure Drop Tested',
+    '是否测试丨 √ × 丨': 'Tested? √ / X',
+    '用户输入': 'Enter manually',
   },
 }
 
