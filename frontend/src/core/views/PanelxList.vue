@@ -564,25 +564,35 @@
           {{ formatFieldValue(field, cur[headerFieldKey(field)]) }}
         </div>
       </div>
-      <!-- 采购订单:表头「送料」只读摘要(方案 A 轻量版)——一行文字,点击弹浮层看批次窄表 -->
+      <!-- 采购订单:表头「送料」只读摘要(方案 A 轻量版)——一行文字;浮层挂在字段区**末尾**(见下方锚点) -->
+      <button
+        v-if="showBatchSummary"
+        type="button"
+        class="batch-sum-line"
+        :title="tt('点击查看送料批次')"
+        @click="batchPopover = !batchPopover"
+      >
+        <span class="bsl-tag">{{ tt('送料') }}</span>
+        <span>{{ tt('已送') }} {{ batchTab.sum.batches }} {{ tt('批') }}</span>
+        <span class="bsl-sep">/</span>
+        <span>{{ tt('剩余') }} {{ batchTab.sum.left }}</span>
+        <span class="bsl-sep">/</span>
+        <span>{{ tt('可补') }} {{ batchTab.sum.ret }}</span>
+        <span class="bsl-caret">▸</span>
+      </button>
+      <!-- 浮层(v-loading 的批次窄表):锚点置于表头字段区**最后**,浮层因此落在字段区下方末尾,
+           不遮挡任何表头字段;摘要行点击用 v-model:visible 控制显隐 -->
       <el-popover
         v-if="showBatchSummary"
         v-model:visible="batchPopover"
-        placement="bottom-start"
+        placement="bottom-end"
         :width="760"
+        :show-arrow="false"
         trigger="click"
         popper-class="batch-pop"
       >
         <template #reference>
-          <button type="button" class="batch-sum-line" :title="tt('点击查看送料批次')">
-            <span class="bsl-tag">{{ tt('送料') }}</span>
-            <span>{{ tt('已送') }} {{ batchTab.sum.batches }} {{ tt('批') }}</span>
-            <span class="bsl-sep">/</span>
-            <span>{{ tt('剩余') }} {{ batchTab.sum.left }}</span>
-            <span class="bsl-sep">/</span>
-            <span>{{ tt('可补') }} {{ batchTab.sum.ret }}</span>
-            <span class="bsl-caret">▸</span>
-          </button>
+          <span class="batch-anchor" aria-hidden="true"></span>
         </template>
         <div class="batch-pop-body" v-loading="batchTab.loading">
           <div class="bpb-head">{{ tt('送料批次') }} · {{ curDocNo }}{{ batchTab.sum.sent ? ` · ${tt('已送合计')} ${batchTab.sum.sent}` : '' }}</div>
@@ -6013,6 +6023,15 @@ onUnmounted(() => {
 .batch-sum-line .bsl-caret {
   font-size: 10px;
   color: #6366f1;
+}
+/* 浮层锚点:占位 0 宽 + 自动推到字段区右侧末尾(order 3 = 所有字段之后),
+   浮层(placement=bottom-end)因此出现在表头字段区下方末尾,不遮挡字段 */
+.batch-anchor {
+  order: 3;
+  flex-basis: 100%;
+  width: 1px;
+  height: 0;
+  margin-left: auto;
 }
 .batch-pop-body {
   min-width: 700px;

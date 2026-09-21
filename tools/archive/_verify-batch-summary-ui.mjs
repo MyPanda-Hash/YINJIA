@@ -67,6 +67,14 @@ const READ = `(() => {
   const pop = document.querySelector('.batch-pop-body');
   const tb = pop ? pop.querySelector('.el-table__body-wrapper table') : null;
   const hd = pop ? pop.querySelector('.el-table__header-wrapper table') : null;
+  const R = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return { x: Math.round(b.x), y: Math.round(b.y), right: Math.round(b.right), bottom: Math.round(b.bottom) }; };
+  const wrap = document.querySelector('.header-fields');
+  const popper = pop ? (pop.closest('.el-popper') || pop) : null;
+  const wr = R(wrap), pr = R(popper);
+  const fields = wrap ? [...wrap.querySelectorAll('.field')].map((f) => ({ label: (f.querySelector('label')?.textContent || '').trim(), rect: R(f) })) : [];
+  const overlap = (a, b) => !(a.right <= b.x || b.right <= a.x || a.bottom <= b.y || b.bottom <= a.y);
+  const docNo = fields.find((f) => f.label === '单据编号');
+  const cr = R(line);
   return {
     summary: line ? line.textContent.replace(/\\s+/g, ' ').trim() : null,
     summaryTag: line ? line.tagName : null,
@@ -76,6 +84,14 @@ const READ = `(() => {
     popRows: tb ? [...tb.querySelectorAll('tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent.trim())) : [],
     empty: pop ? (pop.querySelector('.el-table__empty-text')?.textContent.trim() || '') : '',
     calls: performance.getEntriesByType('resource').filter((r) => r.name.includes('batchFlow/lines')).length,
+    /* 布局断言用:浮层是否落在表头字段区下方末尾、是否遮挡字段;摘要行是否紧贴「单据编号」 */
+    layout: (wr && pr) ? {
+      fieldsRect: wr, popRect: pr,
+      belowFields: pr.y >= wr.bottom - 2,
+      rightAligned: Math.abs(pr.right - wr.right) <= 12,
+      coveredFields: fields.filter((f) => overlap(pr, f.rect)).map((f) => f.label),
+      chipNextToDocNo: docNo && cr ? (cr.x >= docNo.rect.right - 2 && Math.abs(cr.y - docNo.rect.y) < 14) : null,
+    } : null,
   };
 })()`;
 async function openPanel(panel, docNo) {
@@ -118,6 +134,11 @@ ok(st.popRows.length === expBatches, `窄表行数 = 台账有效批次数(${st.
 ok(st.popRows.every((r) => r[3] === '有效'), '台账 ACTIVE → 状态列显示「有效」');
 ok((st.popHead || '').includes(withBatch), `浮层标题带单据号(${st.popHead})`);
 ok(st.calls >= 2, `点开浮层强制刷新一次(请求数 ${st.calls})`);
+console.log('   浮层位置:', JSON.stringify(st.layout));
+ok(st.layout?.belowFields, '浮层落在表头字段区**下方**(不压字段)');
+ok(st.layout?.rightAligned, '浮层右缘对齐表头字段区右缘(字段区末尾)');
+ok((st.layout?.coveredFields || []).length === 0, `浮层未遮挡任何表头字段(${JSON.stringify(st.layout?.coveredFields)})`);
+ok(st.layout?.chipNextToDocNo === true, '摘要行仍紧贴「单据编号」右侧同一行');
 
 // ── ④ 查看 → 跳暂收单 ──
 const targetNo = (api.data?.batches || [])[0]?.targetFormNo;
