@@ -1,4 +1,4 @@
-﻿/* ═══════════════════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════════════════════════════════════════
    seed-demo-prodfile.sql — 「产品文件」演示数据(2026-09-21)
 
    用途:部署到服务器后让工作人员**一登录就有单可跑** —— 不用先手工建 2 个产品 × 4 个受控文件
@@ -48,9 +48,11 @@ DELETE FROM rd_dev_task WHERE 产品编号 LIKE N'DEMO-%';
 GO
 
 -- ═══════════════ 1. 六个部门演示账号(口令同现有演示账号:123456) ═══════════════
+-- ⚠ 角色按 role_code 查(不硬编码 id):本机 user 角色的 id 是 2,换台机器/别的库不一定
 DECLARE @hash nvarchar(400) = (SELECT TOP 1 password_hash FROM yj_user WHERE username = N'cp');
+DECLARE @roleId int = (SELECT TOP 1 id FROM yj_role WHERE role_code = N'user');
 INSERT INTO yj_user (username, password_hash, real_name, is_admin, dept_id, role_id, enabled)
-SELECT v.username, @hash, v.real_name, 'N', d.id, 2, '1'
+SELECT v.username, @hash, v.real_name, 'N', d.id, @roleId, '1'
 FROM (VALUES
   (N'demo_gongyi',    N'演示-工艺科',   N'工艺科'),
   (N'demo_shengchan', N'演示-生产部',   N'生产部'),

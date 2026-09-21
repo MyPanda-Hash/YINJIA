@@ -152,6 +152,75 @@ SELECT CAST(COUNT(*) AS nvarchar(10)) FROM yj_form_approval WHERE panel_code=N'R
   if (vGz?.canEdit === false && vGz?.ownerName) ok(`非责任人只读,且能看到责任人是谁(${vGz.ownerName})`)
   else bad('非责任人口径不对:' + JSON.stringify(vGz))
 
+  // ════ ⑦ 界面看一眼(留截图:变更单纸张 + 产品文件列表)════
+  step('⑦ 界面:变更单纸张与产品文件列表各留一张截图')
+  {
+    const os = require('node:os')
+    const fsx = require('node:fs')
+    const { spawn } = require('node:child_process')
+    const WebSocket = require('C:/INCER/YINJIA-MES/tools/node_modules/ws')
+    const EDGE = process.env.EDGE_BIN || 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
+    const PORT = 9347
+    const SHOTS = path.join(__dirname, '_shots')
+    const profile = fsx.mkdtempSync(path.join(os.tmpdir(), 'yj-demo-'))
+    const edge = spawn(EDGE, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+      '--window-size=1760,1400', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' })
+    let ws = null
+    try {
+      await new Promise((r) => setTimeout(r, 3200))
+      const tab = await (await fetch(`http://127.0.0.1:${PORT}/json/new?about:blank`, { method: 'PUT' })).json()
+      ws = new WebSocket(tab.webSocketDebuggerUrl)
+      await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej })
+      let seq = 0
+      const pending = new Map()
+      ws.on('message', (d) => { let m; try { m = JSON.parse(d.toString()) } catch { return } if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) } })
+      const send = (method, params = {}) => new Promise((res) => { const id = ++seq; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })) })
+      const ev = async (exp) => {
+        const r = await send('Runtime.evaluate', { expression: exp, returnByValue: true, awaitPromise: true })
+        return r.result && r.result.result ? r.result.result.value : undefined
+      }
+      const nav = async (url) => {
+        await send('Page.navigate', { url })
+        for (let i = 0; i < 90; i++) { await new Promise((r) => setTimeout(r, 200)); if (await ev('document.readyState') === 'complete') { await new Promise((r) => setTimeout(r, 3000)); return } }
+      }
+      const shot = async (tag) => {
+        const r = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true })
+        if (!r.result?.data) return null
+        const f = path.join(SHOTS, `demo-${tag}.png`)
+        fsx.writeFileSync(f, Buffer.from(r.result.data, 'base64'))
+        return f
+      }
+      await send('Page.enable'); await send('Runtime.enable')
+      await send('Emulation.setDeviceMetricsOverride', { width: 1760, height: 1400, deviceScaleFactor: 1, mobile: false })
+      await nav(`${BASE}/#/login`)
+      await ev(`localStorage.setItem('mes_init_done','1'); localStorage.setItem('mes_token', ${JSON.stringify(cp.token)}); localStorage.setItem('mes_user', ${JSON.stringify(JSON.stringify(cp.user))}); 'ok'`)
+      await nav('about:blank')
+      // 变更单:搜索框定位 DEMO-CHG-001
+      await nav(`${BASE}/#/panelx/list/RD_CHANGE`); await new Promise((r) => setTimeout(r, 2600))
+      const typed = await ev(`(function(){
+        var inp=[].slice.call(document.querySelectorAll('input')).filter(function(i){return i.offsetParent && (i.placeholder||'').indexOf('搜索')>=0})[0]
+        if(!inp) return 'no-search'
+        Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(inp, 'DEMO-CHG-001')
+        inp.dispatchEvent(new Event('input',{bubbles:true})); return 'typed' })()`)
+      await new Promise((r) => setTimeout(r, 2400))
+      await ev(`(function(){ var rows=[].slice.call(document.querySelectorAll('.el-table__row, tr'))
+        for (var i=0;i<rows.length;i++){ if((rows[i].innerText||'').indexOf('DEMO-CHG-001')>=0){ rows[i].click(); return 'row' } } return 'none' })()`)
+      await new Promise((r) => setTimeout(r, 2600))
+      const body = String(await ev(`(document.body.innerText||'')`) || '')
+      const f1 = await shot('chg-sheet')
+      info(`变更单页面(${typed}):含 7 部门行 = ${['开发部', '成型工艺科', '仓管部'].every((d) => body.includes(d))},含「提交会签」= ${body.includes('提交会签')}`)
+      if (body.includes('DEMO-CHG-001') && body.includes('提交会签')) ok('界面能看到演示变更单,且发起人侧栏有「提交会签」')
+      else bad('界面没打开到演示变更单或无提交会签按钮')
+      const f2 = await shot('prod-doclist')
+      await nav(`${BASE}/#/panelx/list/RD_PROD_DOCLIST`); await new Promise((r) => setTimeout(r, 3000))
+      const f3 = await shot('prod-doclist2')
+      info('截图:' + [f1, f3].filter(Boolean).join(' , '))
+    } finally {
+      if (ws) try { ws.close() } catch { /* ignore */ }
+      edge.kill()
+    }
+  }
+
   console.log(failed ? `\n${failed} 项断言失败` : '\nALL PASSED —— 演示数据可用,工作人员可直接开跑')
   process.exit(failed ? 1 : 0)
 }
