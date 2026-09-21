@@ -1,0 +1,4 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-pf-arch.sql ==
+  | Y | 
+[OK] _probe-pf-arch.sql (1 batches)

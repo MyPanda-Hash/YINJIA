@@ -1,0 +1,8 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-tidy6.sql ==
+  | DEMO 产品信息表 | 0 | 
+  | demo 账号 | 6 | 
+  | DEMO 成型清单 | 0 | 
+  | DEMO 变更单 | 0 | 
+  | DEMO 状态行 | 0 | 
+[OK] _q-tidy6.sql (2 batches)

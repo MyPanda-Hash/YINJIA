@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-pf-drafts.sql ==
+  | RD_MOLD_PROC | MP-2026-09-0152 | CHG-2026-09-0029 | 
+  | RD_SPEC_DOC | SD-2026-09-0059 | CHG-2026-09-0029 | 
+[OK] _probe-pf-drafts.sql (1 batches)

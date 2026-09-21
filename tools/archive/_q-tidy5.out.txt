@@ -1,0 +1,13 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-tidy5.sql ==
+  | rd_asm_proc_detail | **缺** | **缺** | 
+  | rd_asm_proc_head | 有 | 有 | 
+  | rd_change_head | 有 | 有 | 
+  | rd_dev_task | 有 | 有 | 
+  | rd_insp_plan_detail | **缺** | **缺** | 
+  | rd_insp_plan_head | **缺** | 有 | 
+  | rd_mold_proc_head | 有 | 有 | 
+  | rd_prod_info_detail | **缺** | **缺** | 
+  | rd_prod_info_head | 有 | 有 | 
+  | rd_spec_doc_head | **缺** | **缺** | 
+[OK] _q-tidy5.sql (2 batches)

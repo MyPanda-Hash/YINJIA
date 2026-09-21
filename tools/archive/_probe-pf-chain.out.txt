@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-pf-chain.sql ==
+  | MP-2026-09-0151 | (旧版/原始) | 
+  | MP-2026-09-0152 | CHG-2026-09-0029 | 
+[OK] _probe-pf-chain.sql (1 batches)

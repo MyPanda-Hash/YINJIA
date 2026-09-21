@@ -1,0 +1,12 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-final-state.sql ==
+  | 产品信息表 | 2 | 2 | 
+  | 成型工艺清单 | 2 | 2 | 
+  | 组装工艺清单 | 2 | 2 | 
+  | 规格书 | 2 | 2 | 
+  | 出货检验计划表 | 2 | 2 | 
+  | 产品变更申请单 | 1 | 1 | 
+  | 责任人分工行 | 8 | 8 | 
+  | 演示账号(demo_) | 6 | - | 
+  | 探针账号残留 | 0 | - | 
+[OK] _q-final-state.sql (2 batches)

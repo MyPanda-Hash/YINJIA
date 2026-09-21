@@ -1,0 +1,8 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-tidy7.sql ==
+  | 产品名称 | 4 | 8 | A74EC1540D54F079 | 
+  | 客户项目名称 | 6 | 12 | A25B37627998EE760D54F079 | 
+  | 我写的字面量 | 4 | 8 | A74EC1540D54F079 | 
+  | dbo | rd_dev_task | 
+  | dbo | rd_prod_info_head | 
+[OK] _q-tidy7.sql (4 batches)

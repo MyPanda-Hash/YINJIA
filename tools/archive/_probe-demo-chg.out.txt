@@ -1,0 +1,10 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-demo-chg.sql ==
+  | 开发部 | 同意变更：模具芯棒直径同步改 12.02mm，图纸已更新（演示内容） | 陈秀丽 | 
+  | 成型工艺科 |  |  | 
+  | 组装车间 |  |  | 
+  | 销售部 |  |  | 
+  | 品质部 |  |  | 
+  | 计划组 |  |  | 
+  | 仓管部 |  |  | 
+[OK] _probe-demo-chg.sql (1 batches)

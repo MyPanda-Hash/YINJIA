@@ -1,0 +1,413 @@
+tables=410 withDesc=409
+address	位置信息
+area_city	省份城市
+area_code	省市区代码
+area_country	区域国家
+area_district	城市区域
+area_province	中国省份
+bacord	条码
+bd_account	会计科目档案
+bd_dispatch	工序派工单头表(经典遗留面板)
+bd_expense_type	费用类别档案
+bd_finish_in	产成品入库单头表(切炭双出口直销自动生成并审核)
+bd_manu_order	生产加工单头表(经典遗留面板)
+bd_material_out	材料出库单(领料)头表
+bd_other_in	其他入库单头表
+bd_other_out	其他出库单头表
+bd_outsource_in	委外入库单头表
+bd_outsource_issue	委外发料单头表
+bd_outsource_order	委外加工单头表
+bd_pu_order	采购订单头表
+bd_pu_req	请购单头表
+bd_purchase_in	采购入库单头表(审核过账kucun入库)
+bd_sale_out	销售出库单头表(审核过账kucun出库)
+bd_so_order	销售订单头表(星辰ERP同步)
+bd_tax_type	税别档案
+bl_dispatch	工序派工单行表(经典遗留面板)
+bl_finish_in	产成品入库单行表(负数量=红字冲回)
+bl_manu_order	生产加工单行表(经典遗留面板)
+bl_material_out	材料出库单(领料)行表(BOM展开生成)
+bl_other_in	其他入库单行表
+bl_other_out	其他出库单行表
+bl_outsource_in	委外入库单行表
+bl_outsource_issue	委外发料单行表
+bl_outsource_order	委外加工单行表
+bl_pu_order	采购订单行表
+bl_pu_req	请购单行表
+bl_purchase_in	采购入库单行表(批号三键入库)
+bl_sale_out	销售出库单行表(批号三键出库)
+bl_so_order	销售订单行表(星辰ERP同步)
+bs_bom	物料清单BOM(父件-子件-定额数量,默认BOM标志)
+bs_dept	部门档案(遗留,组织架构用yj_dept)
+bs_dict	数据字典
+bs_emp	员工档案(遗留,组织架构用yj_user)
+bs_equip	设备档案(设备点检/保养计划参照源)
+bs_inv	存货档案(物料/产品主数据,含是否检验标志)
+bs_inv_price	存货价格本
+bs_op	工序档案(五道工序:混料/成型/切炭/组装/装箱)
+bs_partner	往来单位档案
+bs_proj	项目档案
+bs_qc_item	检验项目档案(检验内容/标准/判定规则)
+bs_qc_plan	检验方案(适用存货/检验方式/抽检比例)
+bs_region	地区档案
+bs_reject	不合格原因档案
+bs_route	工艺路线(工序顺序/加工方式)
+bs_team	班组档案
+bs_uom	计量单位档案
+bs_wc	工作中心档案
+bs_wh	仓库档案(仓库编码/名称,库存台账仓库真源)
+bxsq	报销申请
+cbhs	成本核算
+chdcmx	出货订舱明细
+chsq	出货申请
+chtz	出货通知
+computer	电脑ID
+cp_barcode	产品出厂条码
+cpfpmx	次品废品明细
+day_report	生产日报表头表(自制物料/成型/切炭/组装四车间合一)
+day_report_detail	生产日报表行表(姓名/时间/产品/数量/报废等)
+dh	质检项目设定
+dm_ck	仓库代码
+dm_dbzsd	线组长设定（作废不用,并入dm_gx）
+dm_fylb	费用类别
+dm_gf	厂商代码
+dm_gfjj	厂商进价
+dm_gx	工序及数据字典
+dm_gz	工种
+dm_jjlb	奖金类别
+dm_key	各种软件接口Key值表
+dm_kh	客户代码
+dm_khgjjl	客户跟进记录
+dm_khlxr	客户联系人
+dm_khsj	客户售价设定
+dm_khzl	客户款号资料
+dm_ks	科室/部门
+dm_langue	语言（作废）
+dm_myjj	名言惊句
+dm_py	拼音码(遗留)
+dm_style	形体代码
+dm_sys	系统表
+dm_tax	税别代码
+dm_wz	物料代码
+dm_wzbacord	货品多条码
+dm_wzddw	货品多单位
+dm_wzlb	物料类别
+dm_wzsx	物料属性(遗留)
+dm_xl	学历
+dm_yh	银行代码
+dm_ywy	员工编码
+dm_ywylb	员工类别
+dm_zjfl	质检分类
+dm_zw	职务
+dorder	请购单
+dtproperties	
+equip_check	设备点检记录头表
+equip_check_detail	设备点检记录行表(检查内容/方法/标准/结果/解决措施)
+erp_imp_log	ERP导入日志(金蝶星辰数据导入批次)
+erp_imp_row	ERP导入行明细(逐行导入结果)
+feed_confirm	投料确认单头表(阶段:溶解/合成/A液/B液/浆体)
+feed_confirm_detail	投料确认单行表(投料成分/理论/实际)
+fgjl	返工记录
+fgjl_ls	返工记录-历史资料
+fgjlhz	反攻记录汇总
+flash	广告动画
+form_flow_link	单据流链接表(上游生单→下游单据占用,link_status=ACTIVE|RELEASED)
+from_excel	从excel导入
+gdzc	固定资产
+gran_record	造粒记录头表(温湿度/PE/纯水/捏合吹扫/水分)
+gran_record_detail	造粒记录占位行表(恒空,doc模式要求)
+gscs	公司参数
+gssp	工时水平
+gszl	工时资料
+gxgs	工序工时
+gzb	工资表
+gzffjl	工资发放记录
+gzzc	工资支出记录
+huiyuan	会员
+huiyuan_hz	会员汇总
+inh	进货单
+Invoice	形式发票
+jgsd	价格设定
+jrhz	今日汇总
+jrhz_ls	今日汇总-历史资料
+jyd	检验单
+jyd_bs	检验单明细
+khts	投诉单
+kjkm	会计科目
+kjpz	会计凭证
+kjpz_bs	会计凭证_表身
+kmye	科目余额
+kqbc	考勤报餐
+kqewm	考勤二维码
+kqjjr	节假日设定
+kqqjd	考勤请假单
+kqsj	考勤数据
+kqsj_ls	考勤数据-历史资料
+kqyc	严重违规记录
+kucun	库存资料
+log	日志（作废，用s_log）
+maint_plan	保养计划头表
+maint_plan_detail	保养计划行表(设备/保养项目/周期/情况)
+mate	BOM
+mate_jtsh	BOM子件的阶梯损耗率
+
+
+mix_record	物料混合记录头表(四次混合行式化)
+mix_record_detail	物料混合记录行表(混合次序/物料批次/重量)
+odprice_bs	报价单明细
+odprice_bt	报价单
+OdSample_bs	样品单明细
+OdSample_wl	样品单物料
+order_bs	订单明细
+order_bt	订单
+order1	订单-无明细
+OrderSample	样品单明细
+outh	出货单
+pack_confirm	封箱确认头表(装箱人/确认人/主管签名)
+pack_confirm_detail	封箱确认占位行表(恒空,doc模式要求)
+pandian	盘点单
+pd_history	盘点-历史
+pd_zzp	盘点-在制品
+pd_zzphistory	盘点-在制品-历史
+pd_zzprq	盘点-在制品-日期
+permission	权限明细
+pjjl	品检记录
+pjjl_sz	品检记录-测试数值
+plang	工单
+plang_pc	工单排产
+Porder	采购单
+pr_asm_daily	组装日报表(PR系列,已下架)
+pr_asm_incoming	组装来料检查(PR系列,已下架)
+pr_asm_return	不良退货记录(PR系列,已下架)
+pr_black_test	黑水测试记录(PR系列,已下架)
+pr_cut_daily	切炭日报表(PR系列,已下架)
+pr_demold_qc	脱模检验记录(PR系列,已下架)
+pr_efficiency	人均效率表(PR系列,已下架)
+pr_flow_card	产品流动标识卡(PR系列,已下架)
+pr_form_daily	成型日报表(PR系列,已下架)
+pr_form_first	成型首件记录(PR系列,已下架)
+pr_maintenance	预防性保养计划(PR系列,已下架)
+pr_mat_inspect	材料进厂检查(PR系列,已下架)
+pr_mix_blend	物料混合记录(PR系列,已下架)
+pr_mix_check	设备点检表(PR系列,已下架)
+pr_mix_confirm	投料确认表(PR系列,已下架)
+pr_mix_daily	混料日报表(PR系列,已下架)
+pr_mix_feed	阻垢投料单(PR系列,已下架)
+pr_mix_granule	造粒过程控制(PR系列,已下架)
+pr_mix_process	阻垢工序控制(PR系列,已下架)
+pr_no_black	无黑处理登记(PR系列,已下架)
+pr_pack_confirm	封箱数量确认(PR系列,已下架)
+pr_patrol_qc	巡线抽检记录(PR系列,已下架)
+pr_qc_control	品质管控点要求(PR系列,已下架)
+pr_scrap	物料产品报废单(PR系列,已下架)
+pr_sinter_qc	烧结制程检验(PR系列,已下架)
+pzfk	品质反馈
+qc_disposal	不良品处理单(转隔离仓/报废,审核即移仓过账)
+qc_insp	来料检验单头表(合格/不合格拆行处置)
+qc_insp_detail	来料检验单行表(处置方式:入库/退货)
+qc_op	工序质检单头表(制程检验,首件/巡检语义)
+qc_op_detail	工序质检单行表(检验项目/标准/实测值)
+qc_record	检验记录单头表(八类合一:首件/烧结制程/脱模/来料/材料进厂/黑水/巡线/管控点)
+qc_record_detail	检验记录单行表(检验项目/标准要求/结果/品序号)
+qc_recv	送料暂收单头表(收货自动生成批号)
+qc_recv_detail	送料暂收单行表
+qc_return	暂收退回单头表
+qc_return_detail	暂收退回单行表
+qkd	请款单
+qr_batch_registry	二维码批号登记表(批号=日期+流水取号留痕)
+rd_alkaline	碱性测试(旧单表)
+rd_alkaline_detail	碱性测试行表
+rd_alkaline_head	碱性测试头表
+rd_antibact	抑菌测试(旧单表)
+rd_antibact_detail	抑菌测试行表
+rd_antibact_head	抑菌测试头表
+rd_approval	立项申请表(文件类,管理员保存即归档)
+rd_approval_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_approval_detail	立项申请表占位行表(恒空,doc模式要求)
+rd_approval_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_asm_bom	组装BOM表(旧单表)
+rd_asm_bom_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_asm_bom_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_asm_proc	组装工艺清单(旧单表)
+rd_asm_proc_detail	组装工艺清单行表
+rd_asm_proc_head	组装工艺清单头表
+rd_dev_task	研发任务下发记录(产品开发按钮分发留痕)
+rd_dom_test	内部委托测试申请单(旧单表)
+rd_dom_test_detail	内部委托测试申请单行表
+rd_dom_test_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_dom_test_head	内部委托测试申请单头表
+rd_dom_test_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_drop_prec	压降精度测试(旧单表)
+rd_drop_prec_detail	压降精度测试行表
+rd_drop_prec_head	压降精度测试头表
+rd_equip_use	设备使用登记表(旧单表)
+rd_equip_use_detail	设备使用登记表行表
+rd_equip_use_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_equip_use_head	设备使用登记表头表
+rd_equip_use_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_filter_eff	功能性滤效(旧单表)
+rd_filter_eff_detail	功能性滤效行表
+rd_filter_eff_head	功能性滤效头表
+rd_insp_plan	出货检验计划表(旧单表)
+rd_insp_plan_detail	出货检验计划表行表
+rd_insp_plan_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_insp_plan_head	出货检验计划表头表
+rd_insp_plan_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_instr_use	仪器使用记录表(旧单表)
+rd_instr_use_detail	仪器使用记录表行表
+rd_instr_use_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_instr_use_head	仪器使用记录表头表
+rd_instr_use_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_mineral	矿化测试(旧单表)
+rd_mineral_detail	矿化测试行表
+rd_mineral_head	矿化测试头表
+rd_mold_formula	成型配方(旧单表)
+rd_mold_formula_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_mold_formula_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_mold_proc	成型工艺清单(旧单表)
+rd_mold_proc_detail	成型工艺清单行表
+rd_mold_proc_head	成型工艺清单头表
+rd_plan	项目实施计划(10阶段×五字段:计划内容/计划开始/计划完成/实际完成/责任人,项目定级必填下拉)
+rd_plan_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_plan_detail	项目实施计划占位行表(恒空,doc模式要求)
+rd_plan_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_prod_info_detail	产品信息表行表
+rd_prod_info_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_prod_info_head	产品信息表头表(归档后产品开发下发5个下游文件)
+rd_prod_info_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_product_info	产品信息(旧单表,已被rd_prod_info_head/detail取代)
+rd_progress	项目进度查询头表
+rd_progress_detail	项目进度查询行表(实施计划阶段完成自动同步状态/里程完成/项目负责)
+rd_ro_protect	RO保护测试(旧单表)
+rd_ro_protect_detail	RO保护测试行表
+rd_ro_protect_head	RO保护测试头表
+rd_scale	阻垢性能测试(旧单表)
+rd_scale_detail	阻垢性能测试行表
+rd_scale_head	阻垢性能测试头表
+rd_soak	浸泡安全测试(旧单表)
+rd_soak_detail	浸泡安全测试行表
+rd_soak_head	浸泡安全测试头表
+rd_spec_assign	规格书分派(产品编号+种类→责任人)
+rd_spec_doc	规格书(旧单表)
+rd_spec_doc_detail	规格书行表
+rd_spec_doc_head	规格书头表(按规格书种类页签)
+rd_spike_water	加标水配置记录表(旧单表)
+rd_spike_water_detail	加标水配置记录表行表
+rd_spike_water_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+rd_spike_water_head	加标水配置记录表头表
+rd_spike_water_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_approval_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_approval_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_dom_test_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_dom_test_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_equip_use_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_equip_use_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_insp_plan_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_insp_plan_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_instr_use_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_instr_use_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_plan_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_plan_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_prod_info_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_prod_info_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_spike_water_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_rd_spike_water_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_yj_doc_modify_log_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173159_yj_doc_status_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_approval_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_approval_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_dom_test_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_dom_test_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_equip_use_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_equip_use_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_insp_plan_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_insp_plan_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_instr_use_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_instr_use_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_plan_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_plan_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_prod_info_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_prod_info_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_spike_water_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_rd_spike_water_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_yj_doc_modify_log_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_173205_yj_doc_status_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+RENAME_20260911_213754_yj_doc_status_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+report_column_settings	报表列设置(用户自定义列布局,按panel_code存JSON)
+rod_return	炭棒不良退货登记头表
+rod_return_detail	炭棒不良退货登记占位行表(恒空,doc模式要求)
+s_allno	单据编号
+s_commdata	通讯数据
+s_cookie	Cookie值
+s_error	错误信息
+s_fromexcel	EXCEL导入设置
+s_log	上机日志
+s_otherfunc	窗体_其他功能
+s_phrase	通讯短语
+s_remoteprint	远程打印
+s_repbody	报表表身
+s_repdraw	报表画线
+s_repformat	窗体_报表格式
+s_repheader	报表表头
+s_repinfo	报表信息
+s_roles	用户角色
+s_rzxz	入职须知
+s_screen	屏幕参数
+s_SelWhere	查询条件设置(遗留)
+s_sys	系统表
+s_xtcs	系统参数
+s_ycdy	远程打印记录
+sample_req	样品申请单头表(录入/审核/执行三级)
+sample_req_detail	样品申请单行表(样品种类/规格/打样背景/交期)
+scjd	生产进度
+scjd_ls	生产进度-历史资料
+scjl	生产记录
+scpc	生产排程
+scrb	生成日报
+scrb_bs	生产日报-明细
+sczxd	装箱单
+setdate	数据库设置
+sfkcz	收付款冲账明细
+sfkmx	收付款明细
+t1	临时表(可清理)
+t2	临时表(可清理)
+tmp_excel	临时表-EXCEL
+tmp_report	临时表-表身
+tmp_report_head	临时表-标头
+users	用户
+wbgd	外包工单
+wh_record	无黑处理登记头表(加湿前后重量/无黑时间)
+wh_record_detail	无黑处理登记占位行表(恒空,doc模式要求)
+wlxx	物流信息
+wo_line_stock	线边库存(PR系列,已下架)
+wo_material_pick	工序领料记录(PR系列,已下架)
+wo_order	生产工单(五工序计划预填,产品批号取号)
+wo_progress	工单工序进度(报工审核按工序累计完成数量)
+wo_report	工序报工单(切炭行支持直销数量双出口)
+wo_stage_report	工序报工记录(PR系列,已下架)
+xjjl	巡检记录
+xjjl_sz	巡检记录-测试数值
+xsdh	销售订货(遗留)
+yj_attachment	单据附件表(panel_code+doc_no+field_key定位,文件名/存储名/大小/类型)
+yj_dept	部门表(多级,parentId)
+yj_doc_modify_log	归档单修改记录(修改前后差异快照与审批链)
+yj_doc_modify_log_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+yj_doc_status	单据状态表(shr审核/canceled作废/stopped中止/pending审批中/archived归档/modify_state修改态)
+yj_doc_status_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)
+yj_field	面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)
+yj_form_approval	审批流记录(提交/通过/驳回留痕)
+yj_locale	语言表(启用语言清单,插行即出现语言切换器)
+yj_lot_seq	批号流水表(批号=yyyymmdd+3位流水,材料/产品批号统一取号)
+yj_message	站内消息表(收件人/消息码/关联面板与单据/已读)
+yj_panel	面板注册表(元数据核心:面板编码/模式doc|flat|archive/头行表/前缀/日期列/模块分组)
+yj_plan_term	计划条款表(阶段中止/恢复申请:stage/reason/state)
+yj_report_template	报表模板表(ADR-0002:DB 存储精细模板,上传即编译校验生效免重启;template_code 唯一,panel_code 绑定面板)
+yj_role	角色表(角色编码/名称/is_admin)
+yj_role_panel	角色-面板授权表(perms动作词表含view等,can_approve=审批权)
+yj_schema_log	数据库结构脚本执行日志(script_name+content_hash 幂等记录)
+yj_std_lib	标准库(lib_code+item_code 内容片段,供文书面板引用)
+yj_translation	多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)
+yj_usage_log	使用日志(登录与面板操作留痕,使用权限查看页面数据源)
+yj_user	用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)
+ysfk	收付款(遗留)
+zc	转仓单

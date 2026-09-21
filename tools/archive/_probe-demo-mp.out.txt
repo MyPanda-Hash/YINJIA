@@ -1,0 +1,4 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-demo-mp.sql ==
+  | DEMO-MP-001 | 
+[OK] _probe-demo-mp.sql (1 batches)

@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT ISNULL(审核人二级,N'-')+'|'+ISNULL(审核人一级,N'-') FROM rd_prod_info_head WHERE 单据编号=N'PI-2026-09-0082';

@@ -1,0 +1,4 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-change-gate-cleanup.sql ==
+  | 变更单残留 | 0 | 
+[OK] _probe-change-gate-cleanup.sql (1 batches)

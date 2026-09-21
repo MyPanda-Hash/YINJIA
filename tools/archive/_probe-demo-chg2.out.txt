@@ -1,0 +1,4 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-demo-chg2.sql ==
+  | 是 | glm53,demo_pinzhi | 成型工艺清单、规格书 | DEMO-A-001 | 
+[OK] _probe-demo-chg2.sql (1 batches)

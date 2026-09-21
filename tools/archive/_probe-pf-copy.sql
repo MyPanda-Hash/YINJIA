@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT CAST((COUNT(*)) AS nvarchar(20)) FROM rd_mold_proc_detail WHERE 单据编号=N'MP-2026-09-0152' AND ISNULL(asp_cancel,'N')<>'Y';

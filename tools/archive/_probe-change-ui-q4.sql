@@ -1,0 +1,2 @@
+SET NOCOUNT ON;
+SELECT COUNT(*) AS n FROM rd_mold_proc_head WHERE 变更来源单号 = N'CHG-2026-09-0020';

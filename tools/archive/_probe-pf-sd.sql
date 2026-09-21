@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT ISNULL(archived,N'-') FROM yj_doc_status WHERE panel_code=N'RD_SPEC_DOC' AND doc_no=N'SD-2026-09-0059';

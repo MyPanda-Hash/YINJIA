@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-final.sql ==
+  | CHG 单据 | 2 | 
+  | 探针字样残留 | 0 | 
+[OK] _q-final.sql (3 batches)

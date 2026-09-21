@@ -1,0 +1,6 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-demo-st.sql ==
+  | PI | 1 | 
+  | FILES | 4 | 
+  | TASK | 4 | 
+[OK] _probe-demo-st.sql (1 batches)

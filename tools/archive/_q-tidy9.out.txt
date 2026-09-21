@@ -1,0 +1,9 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-tidy9.sql ==
+  | rd_asm_proc_detail | id,单据编号,工序,工序控制内容,管控要求,检查比例,asp_user1,asp_time1,asp_user2,asp_time2,asp_cancel,表区,序号,物料名,物料编号,物料规格,外观要求,用量,更改内容,更改原因,更改时间,责任人,备注,日期,版本号 | 
+  | rd_change_detail | id,单据编号,表区,部门,变更后内容,签字,日期,备注,asp_user1,asp_time1,asp_user2,asp_time2,asp_cancel | 
+  | rd_insp_plan_detail | id,单据编号,控制项目,质量控制内容,检测仪器,控制标准及要求,检验,不合格应对措施,检测频率,取样方式,检验内容,控制方法,asp_user1,asp_time1,asp_user2,asp_time2,asp_cancel,检验类别,序号,备注 | 
+  | rd_mold_proc_detail | id,单据编号,asp_user1,asp_time1,asp_user2,asp_time2,asp_cancel,表区,序号,物料种类,物料编号,物料名称,实际添加比例,单支物料含量,设计添加量,更改内容,更改原因,更改时间,责任人,备注 | 
+  | rd_prod_info_head | id,单据编号,单据日期,产品编号,产品名称,产品类别,产品类型,产品整体尺寸,客户料号,炭棒尺寸,特殊性能描述,下单数量,产品分类,产品形态,客户图纸或规格书,责任人,审核人,备注,asp_user1,asp_time1,asp_user2,asp_time2,asp_cancel,客户项目名称,产品管控等级,产品功能类别,编辑人,审核人一级,审核人二级,炭棒内径,炭棒外径,炭棒长度 | 
+  | yj_doc_status | id,panel_code,doc_no,shr,shsj,canceled,cancel_by,cancel_at,pending,pending_by,pending_at,update_at,stopped,stop_by,stop_at,saved,archived,deleting,delete_req_by,delete_req_at,modify_state,modify_req_by,modify_req_at,modify_appr_by,modify_appr_at,archived_at,approve_node,l2_approver,effective | 
+[OK] _q-tidy9.sql (2 batches)
