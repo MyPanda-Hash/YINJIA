@@ -1,0 +1,24 @@
+/* 探针清理:产品文件界面走查(_probe-prodfile-ui.cjs);按测试产品前缀 T-PFU-% 圈定 */
+USE HSDZ_MES; SET NOCOUNT ON;
+DECLARE @pi TABLE (no nvarchar(200) PRIMARY KEY);
+INSERT INTO @pi (no) SELECT 单据编号 FROM rd_prod_info_head WHERE 产品编号 LIKE N'T-PFU-%';
+DECLARE @files TABLE (no nvarchar(200) PRIMARY KEY);
+INSERT INTO @files (no) SELECT 单据编号 FROM rd_mold_proc_head WHERE 产品编号 LIKE N'T-PFU-%';
+INSERT INTO @files (no) SELECT 单据编号 FROM rd_asm_proc_head  WHERE 产品编号 LIKE N'T-PFU-%';
+INSERT INTO @files (no) SELECT 单据编号 FROM rd_insp_plan_head WHERE 产品编号 LIKE N'T-PFU-%';
+INSERT INTO @files (no) SELECT 单据编号 FROM rd_spec_doc_head  WHERE 编号 LIKE N'T-PFU-%';
+DELETE FROM yj_message WHERE 单据编号 IN (SELECT no FROM @pi) OR 单据编号 IN (SELECT no FROM @files);
+DELETE FROM yj_form_approval WHERE form_no IN (SELECT no FROM @pi) OR form_no IN (SELECT no FROM @files);
+DELETE FROM yj_doc_status WHERE doc_no IN (SELECT no FROM @pi) OR doc_no IN (SELECT no FROM @files);
+DELETE FROM rd_mold_proc_detail WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_asm_proc_detail  WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_insp_plan_detail WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_spec_doc_detail  WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_mold_proc_head WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_asm_proc_head  WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_insp_plan_head WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_spec_doc_head  WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_prod_info_detail WHERE 单据编号 IN (SELECT no FROM @pi);
+DELETE FROM rd_prod_info_head   WHERE 单据编号 IN (SELECT no FROM @pi);
+DELETE FROM rd_dev_task WHERE 产品编号 LIKE N'T-PFU-%';
+SELECT N'本次残留' AS 检查, CAST(COUNT(*) AS nvarchar) AS n FROM rd_prod_info_head WHERE 产品编号 LIKE N'T-PFU-%';
