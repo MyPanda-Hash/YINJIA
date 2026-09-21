@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="panelx-list" @click="closeCtx">
     <!-- ══════════ ① 顶部工具栏（T+ 灰条 + 单据翻页）══════════ -->
     <div v-if="!isApprovalDoc" class="tools">
@@ -2468,7 +2468,8 @@ const sheetAllFields = computed(() => {
   return [...header, ...detail]
 })
 const queryDialogFields = computed(() => {
-  const fields = reportMode.value ? queryFields.value : headerEditFields.value
+  // 档案/单单据面板(基础资料):表头只剩「备注」,查询条件取元数据登记的常规字段(queryFields,每面板 ≤6 个)
+  const fields = (reportMode.value || singleDocMode.value) ? queryFields.value : headerEditFields.value
   return fields.filter((field) => headerFieldKey(field) !== '备注')
     // 级联面板(台账/库存状况):仓库/存货改用联动下拉(互相约束),不走通用参照控件
     .filter((field) => !(isCascadePanel.value && ['仓库', '存货'].includes(headerFieldKey(field))))
@@ -2493,7 +2494,7 @@ const draftEditable = computed(() => {
  *  + 采购链的送料暂收/来料检验/暂收退回/采购入库(见 migrate-order-attach / migrate-attach-restore)。 */
 const ATTACH_EDIT_PANELS = new Set([
   'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
-  'SL_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT',
+  'QC_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT',
 ])
 const attachEditable = computed(() => {
   if (draftEditable.value) return true
@@ -2507,16 +2508,27 @@ const attachEditable = computed(() => {
 const batchSendVisible = ref(false)
 const batchSend = ref(null) // {sourcePanel, targetPanel, sourceNo}
 const batchTargetCache = new Map()
-async function isBatchTargetPanel(target) {
-  if (!target) return false
-  if (batchTargetCache.has(target)) return batchTargetCache.get(target)
+/** 面板是否配了「批次号」字段(= 分批链路上的单据) */
+async function panelHasBatchField(panel) {
+  if (!panel) return false
+  if (batchTargetCache.has(panel)) return batchTargetCache.get(panel)
   let yes = false
   try {
-    const cfg = await engine.getPanelConfig(target)
+    const cfg = await engine.getPanelConfig(panel)
     yes = (cfg?.dataSchema?.fields || []).some((f) => (f.dataName || f.label) === '批次号')
   } catch { yes = false }
-  batchTargetCache.set(target, yes)
+  batchTargetCache.set(panel, yes)
   return yes
+}
+/**
+ * 生单是否走「分批送料对话框」——**只在批次源头那一跳**(用户口径 2026-09-20):
+ * 采购订单→送料暂收单:来源(订单)无批次号 → 弹框逐行填本次送料量,可多次分批;
+ * 送料暂收→来料检验:来源已带批次号 → **一键整单生单**(送检数量 = 剩余全部,批次号继承),不弹框。
+ */
+async function needBatchDialog(target) {
+  if (!target) return false
+  if (!(await panelHasBatchField(target))) return false
+  return !(await panelHasBatchField(panelCode.value))
 }
 /** 分批生单完成:跳到目标面板继续填写(与推式生单同款:关源页签、开目标页签、新单按创建时间倒序在第一张) */
 function onBatchGenerated({ panel, no, batchNo }) {
@@ -2657,10 +2669,10 @@ async function guardPageAction(run) {
 // 值=该单据左栏的中间列(重要字段);首列单号/次列日期/末列审核状态由下方组装兜底(键含各单据别名);
 // 中间列支持字符串(行键)或列对象(derive 派生列,如采购入库的 ERP 状态)
 /** 左栏「单据选择」每页条数(整页翻的步长;2026-09-20 按用户口径统一 50 条,
- *  原 SL_RECV/QC_INSP/QC_RETURN 面板配置是 20 条 → 带左栏的面板一律按此值分页) */
+ *  原 QC_RECV/QC_INSP/QC_RETURN 面板配置是 20 条 → 带左栏的面板一律按此值分页) */
 const RAIL_PAGE_SIZE = 50
 const DOC_RAIL_PANELS = {
-  SL_RECV: ['供应商', '采购订单号', '批次号'],   // 送料暂收单(原「部门」实测 12 单仅 1 单有值,按链路可见性换成采购订单号;2026-09-20 加批次号)
+  QC_RECV: ['供应商', '采购订单号', '批次号'],   // 送料暂收单(2026-09-20 面板编码由 SL_RECV 改;原「部门」列实测 12 单仅 1 单有值,按链路可见性换成采购订单号,再加批次号)
   QC_INSP: ['供应商', '采购订单号', '批次号'],   // 来料检验单(「部门」11 单全空,换采购订单号;批次号随链带入)
   QC_RETURN: ['供应商', '检验单号', '批次号'],   // 暂收退料单(qc_return 无「部门」列,恒空;检验单号可直接追到检验单)
   PU_ORDER: ['供应商'],          // 采购订单(币种列 2026-09-16 按用户口径删)
@@ -4817,7 +4829,7 @@ function markSavedSnapshot() {
 
 /** 守卫对比数据:在表单数据上剔除附件列位键——附件格挂载后异步回写头列位
  *  (AttachmentService 聚合值落表单,晚于载入快照),属服务端值同步而非用户编辑,
- *  不剔除会把带附件面板(QC_INSP/SL_RECV 等)的载入误判成未保存,守卫永远误弹。 */
+ *  不剔除会把带附件面板(QC_INSP/QC_RECV 等)的载入误判成未保存,守卫永远误弹。 */
 function guardFormData() {
   const data = currentFormData(cur.value.detail || {})
   for (const k of attachKeys.value) delete data[k]
@@ -4958,10 +4970,10 @@ async function onButton(action) {
     openQrLabels()
     return
   }
-      // ═══ 分批送料(2026-09-20 P0):目标面板配了批次号 = 分批链路(如 采购订单→送料暂收单)═══
-      // 点「生成送料暂收单」不再整单一次性生成,改弹分批对话框逐行填本次送料数量(可多次分批)
+      // ═══ 分批送料(2026-09-20):仅"批次源头那一跳"(采购订单→送料暂收单)弹分批对话框 ═══
+      // 逐行填本次送料数量、可多次分批;下游(暂收→检验)来源已带批次号 → 一键整单生单,不弹框
       const pushTarget = cfgCache.value?.metadata?.pushTargets?.[action]
-      if (pushTarget && await isBatchTargetPanel(pushTarget)) {
+      if (await needBatchDialog(pushTarget)) {
         const no = current.value?.['单据编号'] || current.value?.['编号'] || ''
         if (!no) return ElMessage.warning('请先选择一张单据')
         batchSend.value = { sourcePanel: panelCode.value, targetPanel: pushTarget, sourceNo: no }

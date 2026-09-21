@@ -125,7 +125,12 @@ public class PanelConfigService {
 
         Map<String, Object> tablePage = new LinkedHashMap<>();
         tablePage.put("tableName", panelDisplay + (foreign ? " List" : "列表"));
-        tablePage.put("queryFields", List.of());
+        // 查询字段(2026-09-20):档案/单单据面板是"一张虚拟单据 + 全量明细行",表头只剩「备注」,
+        // 原来这里硬编码空列表 → 「查询」弹窗没有任何可用条件;改为取元数据里登记了 query 位的常规字段
+        // (migrate-basedata-query-fields.sql 给每个基础资料面板挑了 ≤6 个:编码/名称/规格/分类/停用…)
+        List<Map<String, Object>> singleQueryFields = new ArrayList<>();
+        for (PanelRegistry.FieldDef f : def.fieldsAt("query")) singleQueryFields.add(fieldSpec(def, f));
+        tablePage.put("queryFields", singleQueryFields);
         tablePage.put("gridTabs", List.of(gridTab));
         tablePage.put("topBarBtn", List.of(
                 Map.of("buttonName", "新增流程"), Map.of("buttonName", "删除"), Map.of("buttonName", "刷新")));
@@ -702,7 +707,7 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
             // 来料检验单(原检验单,2026-09-15 改名):选单=送料暂收单(QC_RECV 暂收入库单已下线,
-            // 其表头角色由 SL_RECV 承接);审核/审批通过时自动生成
+            // 其表头角色由 QC_RECV 送料暂收单承接);审核/审批通过时自动生成
             // 采购入库单(合格行,实收数量=合格数量)+暂收退回单(不良行,数量=不良数量)
             // (ButtonService.inspAutoPurchaseIn/inspAutoReturn)。工具栏生单组保留占位(对齐 T+ 灰按钮):
             // 无 pushTarget 实现时由 metadata.disabledActions 输出恒灰占位,不参与实际生单
@@ -730,9 +735,9 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 送料暂收单(库存核算):选单=采购订单;生单=来料检验单;修改保存后由
-            // ButtonService.syncInspFromSlRecv 同步修改已生成的来料检验单
-            java.util.Map.entry("SL_RECV", List.of(
+            // 送料暂收单(库存核算,2026-09-20 面板编码 SL_RECV→QC_RECV):选单=采购订单;生单=来料检验单;
+            // 修改保存后由 ButtonService.syncInspFromSlRecv 同步修改已生成的来料检验单
+            java.util.Map.entry("QC_RECV", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选采购订单"},
                     new String[]{"修改", "修改"},
@@ -851,11 +856,11 @@ public class PanelConfigService {
     private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
             java.util.Map.entry("PU_REQ|生成采购订单", "PU_ORDER"),
             java.util.Map.entry("PU_ORDER|生成采购入库单", "PURCHASE_IN"),
-            java.util.Map.entry("PU_ORDER|生成送料暂收单", "SL_RECV"),
+            java.util.Map.entry("PU_ORDER|生成送料暂收单", "QC_RECV"),
             java.util.Map.entry("SO_ORDER|生成生产加工单", "MANU_ORDER"),
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
             java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
-            java.util.Map.entry("SL_RECV|生成来料检验单", "QC_INSP"),
+            java.util.Map.entry("QC_RECV|生成来料检验单", "QC_INSP"),
             java.util.Map.entry("WO_ORDER|生成领料单", "MATERIAL_OUT")
     )));
 
@@ -895,8 +900,8 @@ public class PanelConfigService {
             java.util.Map.entry("SALE_OUT", "SO_ORDER"),             // 销售订单 → 销售出库单
             java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产加工单(销售-生产链)
             java.util.Map.entry("PU_ORDER", "PU_REQ"),               // 请购单 → 采购订单
-            java.util.Map.entry("SL_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15)
-            java.util.Map.entry("QC_INSP", "SL_RECV"),               // 送料暂收单 → 来料检验单(QC_RECV 暂收入库单已下线,来源切至 SL_RECV)
+            java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15;编码 9-20 由 SL_RECV 改)
+            java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
             java.util.Map.entry("WO_ORDER", "SO_ORDER"),             // 销售订单 → 生产工单(计划层:选单生单)
             java.util.Map.entry("RKD", "CGD"),                       // 采购单(旧) → 入库单(旧)
@@ -904,7 +909,7 @@ public class PanelConfigService {
     )));
 
     /** 头字段映射排除项(状态/审批类不参与选单带入;附件1-6是按单号锚定的文件实体,
-     *  靠字段值映射带入既无意义又占 7 条映射上限的坑——曾把 SL_RECV→QC_INSP 的日期挤丢)。 */
+     *  靠字段值映射带入既无意义又占 7 条映射上限的坑——曾把 QC_RECV→QC_INSP 的日期挤丢)。 */
     private static final java.util.Set<String> FLOW_HEAD_EXCLUDE = java.util.Set.of(
             "编号", "单据状态", "审核人", "审核时间", "审批人", "审批时间", "创建时间", "更新时间",
             "附件1", "附件2", "附件3", "附件4", "附件5", "附件6");
@@ -957,10 +962,10 @@ public class PanelConfigService {
             // 采购订单 → 送料暂收单:表头日期标签不同(单据日期→日期);供应商编码→供应商代码(异名,不带则生单丢失编码)
             // + 采购订单号(2026-09-20:订单号/订单行号须沿链下传,转ERP 时作金蝶源单关联 src_bill_no/src_seq)
             // 注:批次号由分批生单自动取号写入(PushGenerateHandler.generateBatch),不走映射
-            "PU_ORDER|SL_RECV", new String[][]{{"单据日期", "日期"}, {"供应商编码", "供应商代码"}, {"单据编号", "采购订单号"}},
+            "PU_ORDER|QC_RECV", new String[][]{{"单据日期", "日期"}, {"供应商编码", "供应商代码"}, {"单据编号", "采购订单号"}},
             // 送料暂收单 → 来料检验单:日期同名,但头映射 7 条上限曾被附件占坑挤丢,同义词追加无上限兜底
             // (采购订单号同理显式登记,不受同名 7 条上限影响;批次号同批补,保证检验单继承暂收单批次)
-            "SL_RECV|QC_INSP", new String[][]{{"日期", "日期"}, {"采购订单号", "采购订单号"}, {"批次号", "批次号"}}
+            "QC_RECV|QC_INSP", new String[][]{{"日期", "日期"}, {"采购订单号", "采购订单号"}, {"批次号", "批次号"}}
     )));
 
     /** 生单/选单共用的头行映射(目标面板 → {source, headerMap, detailMap});供 PushGenerateHandler 复用。 */
