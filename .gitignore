@@ -6,6 +6,11 @@ target/
 *.rar
 *.tar.gz
 *.log
+# 根目录日志/诊断文本:原先只 ignore 了 *.log,logs-*.txt 这类漏网(2026-09-21 实测
+# git check-ignore 对 logs-8090-appjar.txt 不命中,属"随时可能被误提交"状态)。
+# 诊断产物一律别放仓库根目录:写 $env:TEMP,或按规范放 tools/archive/_*。
+logs-*.txt
+logs*.txt
 .env
 .env.local
 *.local
