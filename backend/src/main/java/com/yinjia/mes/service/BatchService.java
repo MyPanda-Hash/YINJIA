@@ -4,7 +4,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -236,19 +238,163 @@ public class BatchService {
         return batches(srcPanel, srcNo, false);
     }
 
-    /** 批次清单:activeOnly=true 只列 ACTIVE/PENDING;false 连历史释放行一起列(反查/审计用) */
+    /**
+     * 批次清单:activeOnly=true 只列 ACTIVE/PENDING;false 连历史释放行一起列(反查/审计用)。
+     * 每行的 targetPanel/targetFormNo = **链路终点单据**(由 resolveEndTarget 解析,见其注释);
+     * 台账登记时的原始目标单另存在 firstTargetPanel/firstTargetFormNo,不丢信息。
+     */
     public List<Map<String, Object>> batches(String srcPanel, String srcNo, boolean includeReleased) {
         List<Map<String, Object>> out = new ArrayList<>();
         try {
-            out = jdbc.queryForList("SELECT batch_no AS batchNo, batch_seq AS batchSeq, batch_qty AS batchQty,"
+            out = jdbc.queryForList("SELECT id AS batchId, batch_no AS batchNo, batch_seq AS batchSeq, batch_qty AS batchQty,"
                     + " status, target_panel_code AS targetPanel, target_form_no AS targetFormNo,"
                     + " CONVERT(varchar(19), create_time, 120) AS createTime"
                     + " FROM yj_doc_batch WHERE source_panel_code=? AND source_form_no=?"
                     + (includeReleased ? "" : " AND status IN ('ACTIVE','PENDING')")
                     + " ORDER BY batch_seq, id", srcPanel, srcNo);
         } catch (Exception ignore) { /* 表未建 */ }
+        for (Map<String, Object> row : out) resolveEndTarget(row);
         return out;
     }
+
+    // ==================== 台账去向单号 = 链路终点(2026-09-21) ====================
+
+    /**
+     * 链路前进站优先级(同一站数有多条 ACTIVE 下游时取前者):主链 采购入库 → 退货 → 检验 → 暂收。
+     * 只影响「同一站数」的分支取舍,不改变"站数多者优先"的终点口径。
+     */
+    private static final List<String> CHAIN_PRIORITY = List.of("PURCHASE_IN", "QC_RETURN", "QC_INSP", "QC_RECV");
+
+    /** 链路最大前进站数(正常 暂收→检验→入库 共 2 跳;限制站数防脏数据成环/超长链) */
+    private static final int MAX_CHAIN_HOPS = 8;
+
+    /**
+     * 解析该台账行的**终点单据**(用户口径 2026-09-21:去向单号要随链路前进,不能停在生成时那张单):
+     * - 起点 = 台账行登记的 target_panel_code/target_form_no(通常是送料暂收单,也可能是免检直达的采购入库单);
+     * - 沿 form_flow_link(**link_status='ACTIVE'**)广搜前进:QC_RECV → QC_INSP → PURCHASE_IN / QC_RETURN
+     *   (优先同批次 batch_id 的链路;该批次无链路时放宽为按单号匹配,兼容未写 batch_id 的历史链路);
+     * - **终止条件**:没有 ACTIVE 下游了(或已到 MAX_CHAIN_HOPS/已成环)—— 取**站数最多**的那一站;
+     * - **作废回退**:yj_doc_status.canceled='Y' / deleting='Y',或单据表 asp_cancel='Y' 的单据**不能当终点**,
+     *   在可达链上取「站数最多的有效单据」(例:入库单已作废 → 终点回到检验单);
+     *   整条链都作废时兜底回起点(与改动前一致,不让「去向单号」凭空变空);
+     * - 结果写回 targetPanel/targetFormNo(前端「查看」据此跳转),起点另存 firstTarget* 并附 targetHops(跳数)。
+     *
+     * 只在展示/反查路径(batches)调用,**不参与**按量占用、剩余量、linksOfBatch、/batchFlow/generate。
+     */
+    private void resolveEndTarget(Map<String, Object> row) {
+        String startPanel = str(row.get("targetPanel"));
+        String startNo = str(row.get("targetFormNo"));
+        row.put("firstTargetPanel", startPanel);
+        row.put("firstTargetFormNo", startNo);
+        if (startPanel.isEmpty() || startNo.isEmpty()) return;   // 未绑定目标单:保持原值
+        int batchId = row.get("batchId") instanceof Number n ? n.intValue() : 0;
+
+        // ① 广搜:站点键 "panel|no" → 单号对;站数 0 = 起点
+        Map<String, String[]> docs = new LinkedHashMap<>();
+        Map<String, Integer> depth = new HashMap<>();
+        ArrayDeque<String[]> queue = new ArrayDeque<>();
+        String startKey = startPanel + "|" + startNo;
+        docs.put(startKey, new String[]{startPanel, startNo});
+        depth.put(startKey, 0);
+        queue.add(new String[]{startPanel, startNo});
+        while (!queue.isEmpty()) {
+            String[] cur = queue.poll();
+            int d = depth.getOrDefault(cur[0] + "|" + cur[1], 0);
+            if (d >= MAX_CHAIN_HOPS) continue;
+            for (String[] nxt : downstream(cur[0], cur[1], batchId)) {
+                String k = nxt[0] + "|" + nxt[1];
+                if (docs.containsKey(k)) continue;               // 已成环/重复站:不再入队
+                docs.put(k, nxt);
+                depth.put(k, d + 1);
+                queue.add(nxt);
+            }
+        }
+
+        // ② 终点 = 可达链上「站数最多的有效单据」(同站数按 CHAIN_PRIORITY,插入序即优先级序)
+        String[] end = null;
+        int endDepth = -1;
+        for (Map.Entry<String, String[]> e : docs.entrySet()) {
+            String[] doc = e.getValue();
+            if (!docAlive(doc[0], doc[1])) continue;
+            int d = depth.getOrDefault(e.getKey(), 0);
+            if (d > endDepth) { endDepth = d; end = doc; }
+        }
+        if (end == null) end = new String[]{startPanel, startNo}; // 兜底:全链皆作废 → 仍给起点
+        row.put("targetPanel", end[0]);
+        row.put("targetFormNo", end[1]);
+        row.put("targetHops", endDepth);
+    }
+
+    /**
+     * 下一站:该单的 ACTIVE 下游(排除已访问站点),按 CHAIN_PRIORITY 排序。
+     * 优先取**同批次**(batch_id=该台账行 id)的链路;该批次一条都没有时放宽为不限批次。
+     */
+    private List<String[]> downstream(String panel, String no, int batchId) {
+        List<Map<String, Object>> rows = linkTargets(panel, no, batchId);
+        if (rows.isEmpty() && batchId > 0) rows = linkTargets(panel, no, 0);
+        List<String[]> out = new ArrayList<>();
+        for (String p : CHAIN_PRIORITY) {
+            for (Map<String, Object> r : rows) {
+                String tp = str(r.get("panel"));
+                String tn = str(r.get("no"));
+                if (tp.equals(p) && !tn.isEmpty() && !outContains(out, tp, tn)) out.add(new String[]{tp, tn});
+            }
+        }
+        for (Map<String, Object> r : rows) {                      // 优先级表外的面板(兜底,保持可前进)
+            String tp = str(r.get("panel"));
+            String tn = str(r.get("no"));
+            if (!tp.isEmpty() && !tn.isEmpty() && !outContains(out, tp, tn)) out.add(new String[]{tp, tn});
+        }
+        return out;
+    }
+
+    private static boolean outContains(List<String[]> list, String panel, String no) {
+        for (String[] a : list) if (a[0].equals(panel) && a[1].equals(no)) return true;
+        return false;
+    }
+
+    /** 某单的 ACTIVE 下游单号(batchId>0 时只取该批次的链路) */
+    private List<Map<String, Object>> linkTargets(String panel, String no, int batchId) {
+        String sql = "SELECT DISTINCT target_panel_code AS panel, target_form_no AS no FROM form_flow_link"
+                + " WHERE source_panel_code=? AND source_form_no=? AND link_status='ACTIVE'"
+                + " AND target_panel_code IS NOT NULL AND target_form_no IS NOT NULL"
+                + " AND LTRIM(RTRIM(target_form_no))<>''"
+                + (batchId > 0 ? " AND batch_id=?" : "");
+        try {
+            return batchId > 0 ? jdbc.queryForList(sql, panel, no, batchId) : jdbc.queryForList(sql, panel, no);
+        } catch (Exception ignore) { /* 表未建 */ return new ArrayList<>(); }
+    }
+
+    /** 单据是否**有效**:yj_doc_status.canceled/deleting='Y' 或单据表 asp_cancel='Y' → 无效(不能当终点) */
+    private boolean docAlive(String panel, String no) {
+        try {
+            List<Map<String, Object>> st = jdbc.queryForList(
+                    "SELECT ISNULL(canceled,'N') AS c, ISNULL(deleting,'N') AS d"
+                            + " FROM yj_doc_status WHERE panel_code=? AND doc_no=?", panel, no);
+            for (Map<String, Object> r : st) {
+                if ("Y".equalsIgnoreCase(str(r.get("c"))) || "Y".equalsIgnoreCase(str(r.get("d")))) return false;
+            }
+        } catch (Exception ignore) { /* 表未建 */ }
+        String table = headTable(panel);
+        if (table != null) {
+            try {
+                List<String> v = jdbc.queryForList(
+                        "SELECT TOP 1 ISNULL(asp_cancel,'N') FROM " + table + " WHERE 单据编号=?", String.class, no);
+                if (!v.isEmpty() && "Y".equalsIgnoreCase(str(v.get(0)))) return false;
+            } catch (Exception ignore) { /* 列/表缺失:不阻断 */ }
+        }
+        return true;
+    }
+
+    /** 面板单头表(取自面板元数据;面板不存在/未配单头表 → null,则跳过期表内作废标记) */
+    private String headTable(String panelCode) {
+        try {
+            String t = registry.panel(panelCode).headTable();
+            return t == null || t.isBlank() ? null : t;
+        } catch (Exception ignore) { return null; }
+    }
+
+    private static String str(Object o) { return o == null ? "" : String.valueOf(o).trim(); }
 
     /** 反查:某批次号的台账行(历史格式号与同号留痕取最近一次使用) */
     public Map<String, Object> batchOf(String batchNo) {

@@ -597,7 +597,6 @@
           <span class="batch-anchor" aria-hidden="true"></span>
         </template>
         <div class="batch-pop-body" v-loading="batchTab.loading">
-          <div class="bpb-head">{{ tt('送料批次') }} · {{ curDocNo }}{{ batchTab.sum.sent ? ` · ${tt('已送合计')} ${batchTab.sum.sent}` : '' }}</div>
           <el-table :data="batchTab.rows" border size="small" max-height="330">
             <el-table-column prop="batchNo" :label="tt('批次号')" min-width="180" />
             <el-table-column prop="createTime" :label="tt('日期')" width="150" />
@@ -6038,11 +6037,7 @@ onUnmounted(() => {
 .batch-pop-body {
   min-width: 700px;
 }
-.batch-pop-body .bpb-head {
-  font-size: 12px;
-  color: #475569;
-  margin-bottom: 6px;
-}.doc-batch {
+.doc-batch {
   font-size: 12px;
   padding: 1px 8px;
   border-radius: 8px;

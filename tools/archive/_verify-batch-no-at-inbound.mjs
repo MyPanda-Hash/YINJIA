@@ -133,8 +133,10 @@ ok(Number(s1.head?.recvLNull) === Number(s1.head?.recvLCnt) && Number(s1.head?.r
   `暂收单**行**批次号全为空(${s1.head?.recvLNull}/${s1.head?.recvLCnt})`);
 ok(N(s1.led?.status) === 'PENDING' && isBlank(s1.led?.batch_no), `台账 status=PENDING 且 batch_no=NULL(实得 ${JSON.stringify(s1.led)})`);
 // 前端「送料」摘要的数据源:采购订单表头摘要读 /batchFlow/lines 的 batches,据 status=PENDING 追加「(M 批待编号)」
+// 注(2026-09-21 去向跟随链路前进后):targetFormNo 已是**链路终点**(此处已前进到入库单),
+// 要按「生成时那张暂收单」定位台账行,改用起点字段 firstTargetFormNo。
 const lsAfter = await post('/px/batchFlow/lines', { sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: PO1.no });
-const pendingRow = (lsAfter?.batches || []).find((b) => N(b.status) === 'PENDING' && N(b.targetFormNo) === C1.recv);
+const pendingRow = (lsAfter?.batches || []).find((b) => N(b.status) === 'PENDING' && N(b.firstTargetFormNo) === C1.recv);
 ok(!!pendingRow && isBlank(pendingRow.batchNo),
   `送料摘要接口列出该待编号批次(status=PENDING、batchNo 空;前端据此显示「(M 批待编号)」):${JSON.stringify(pendingRow)}`);
 
