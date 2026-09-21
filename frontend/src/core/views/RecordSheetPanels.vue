@@ -2695,6 +2695,19 @@ function chartOf(dt) {
   display: block;
   min-height: 60px;
 }
+/**
+ * 规格书章节行(1.适用范围 / 2.整体规格参数 / 3.产品主要性能)的**只读值**不能是 60px 高。
+ * 2026-09-21 用户口径:「归档之后这三个字段之间间隔太远」。实测(探针 _probe-spec-docrow.cjs):
+ * 只读态每行 = rsp-pre 的 min-height 60px + td 上下 padding 4px ⇒ 三行章节块 **202px**,
+ * 而《规格书细分.xlsx》「页面-产品信息」里这一整块只有 **87px**;同一行在**编辑态**是 22px 的填写线
+ * (见下面 .rsp-doccell :deep(.el-textarea__inner) 的 min-height:22px)。
+ * 这里把 doc 行的只读值拉回与编辑态同高 —— 编辑时看到的行距就是打印出来的行距。
+ * ⚠ 只覆盖 .rsp-docval:.rsp-pre 的其它用处(检验要求/方法/依据、row.tall 的长文本格)
+ *   仍需要 60px 的可打印块高,不能一起改掉。
+ */
+.rsp-docval.rsp-pre {
+  min-height: 22px;
+}
 .rs-t-in,
 .rs-c-in {
   width: 100%;

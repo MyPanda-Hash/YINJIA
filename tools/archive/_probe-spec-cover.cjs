@@ -1,4 +1,4 @@
-/**
+﻿/**
  * _probe-spec-cover.cjs — 规格书封面按设计重排的自检
  *
  * 三层各查一遍(缺一层就会出现"代码改了但用户看到的没变"):
@@ -31,7 +31,8 @@ const DESIGN = {
   titleTop: 58, titleH: 48,
   gridTop: 106, rowH: 46,
   signTop: 605, signRowH: 33,
-  tailReserve: 220,
+  tailReserve: 120,   // 必须与 recordSheetConfigs.js 的 coverTailReserve 一致(2026-09-21 由 220 收到 100:
+  //   只读态三行实测 88px、编辑态 93px;原 220 是按被 .rsp-pre 误撑成 71px/行的只读值算出来的)
   // 横向:公司名(左起)与居中大标题的实测用字宽(用于越界与相撞判定)
   // 「惠州市银嘉环保科技有限公司」= 13 字(别数成 17);「产品规格书」= 5 字
   companyLeft: 44, companyFont: 20.7, companyChars: 13,
