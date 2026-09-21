@@ -320,6 +320,15 @@
               <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
                    该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
               <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
+              <!-- 项目定级(2026-09-21):立项申请审核通过后,由审核人给项目定级;已定级显示当前等级,可再改 -->
+              <div
+                class="as-side-btn"
+                v-if="panelCode === 'RD_APPROVAL'"
+                :class="{ disabled: !canGradeProject }"
+                :title="canGradeProject ? tt('给该项目定级(一/二/三/四级)')
+                  : (['已审核', '已归档'].includes(curDocStatus) ? tt('仅审批人（或管理员）可项目定级') : tt('仅已审核或已归档的立项申请可项目定级'))"
+                @click="openGrade"
+              >{{ tt('项目定级') }}{{ cur && cur['项目等级'] ? '·' + cur['项目等级'] : '' }}</div>
               <!-- 分发责任人(2026-09-20;原名「产品开发下发」):仅产品信息表;
                    已归档 **且 二级审核人 ∪ 管理员** 才可点;已分发后按钮变「改责任人」(分发后随时可改) -->
               <div
@@ -1285,6 +1294,27 @@
       <template #footer>
         <el-button @click="l2PickVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" :loading="l2PickBusy" @click="confirmL2Pick">{{ tt('确认审批通过') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 项目定级弹窗(2026-09-21):立项申请审核通过后由审核人选等级;一/二/三/四级 -->
+    <el-dialog v-model="gradeVisible" :title="tt('项目定级')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('等级作为后续立项（实施计划）与进度流程的属性，会随「文档编号」参照自动带到下游。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('项目等级') }}</span>
+          <el-radio-group v-model="gradeLevel">
+            <el-radio-button v-for="lv in gradeOptions" :key="lv" :value="lv">{{ tt(lv) }}</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div class="dq-row" style="align-items:flex-start">
+          <span class="dq-label">{{ tt('定级说明') }}</span>
+          <el-input v-model="gradeOpinion" type="textarea" :rows="3" :placeholder="tt('定级说明（选填）')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="gradeVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="gradeBusy" @click="confirmGrade">{{ tt('确定定级') }}</el-button>
       </template>
     </el-dialog>
 
@@ -3416,6 +3446,49 @@ function filterGroups(raw) {
   return (raw || [])
     .map((g) => ({ ...g, actions: (g.actions || g.items || []).filter((a) => !APPROVE_ACTIONS.includes(a)) }))
     .filter((g) => (g.actions || []).length > 0)
+}
+
+// ---------- 项目定级(2026-09-21):立项申请表审核通过后,由审核人给项目定级 ----------
+// 等级(一/二/三/四级)是后续立项(实施计划)与进度流程的属性:计划按「文档编号」参照本单时
+// 由 REF_SYNONYMS(项目等级 → 项目定级)自动带回;进度查询再从计划同步。
+const GRADE_PANEL = 'RD_APPROVAL'
+const canGradeProject = computed(() => panelCode.value === GRADE_PANEL
+  && ['已审核', '已归档'].includes(curDocStatus.value)
+  && (user.isAdmin || user.approvePanels.includes(GRADE_PANEL)))
+const gradeVisible = ref(false)
+const gradeBusy = ref(false)
+const gradeLevel = ref('')
+const gradeOpinion = ref('')
+/** 等级候选:取本面板「项目等级」字段的字典(一/二/三/四级,与下游同字典) */
+const gradeOptions = computed(() => {
+  const f = (cfgCache.value?.dataSchema?.fields || []).find((x) => (x.dataName || x.code) === '项目等级')
+  return (f?.options || []).map((o) => (typeof o === 'string' ? o : (o.value ?? o.label)))
+})
+function openGrade() {
+  if (!canGradeProject.value) return
+  gradeLevel.value = String(cur.value?.['项目等级'] || '')
+  gradeOpinion.value = ''
+  gradeVisible.value = true
+}
+async function confirmGrade() {
+  if (!gradeLevel.value) return ElMessage.warning(tt('请选择项目等级'))
+  if (gradeBusy.value) return
+  gradeBusy.value = true
+  try {
+    const no = cur.value?.['编号'] || cur.value?.['单据编号'] || ''
+    await engine.callButton({
+      panelCode: GRADE_PANEL, buttonName: '项目定级',
+      formData: { 编号: no, 项目等级: gradeLevel.value, ...(gradeOpinion.value ? { 审批意见: gradeOpinion.value } : {}) },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('项目已定级：') + gradeLevel.value)
+    gradeVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('项目定级失败'))
+  } finally {
+    gradeBusy.value = false
+  }
 }
 
 // ---------- 工具栏分组（配置 {name, actions}：主按钮=第一个 action，actions>1 显示 ▼ 下拉） ----------

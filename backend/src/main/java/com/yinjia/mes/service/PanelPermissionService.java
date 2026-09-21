@@ -64,7 +64,9 @@ public class PanelPermissionService {
         m.put("撤回修改申请", new String[]{"modify", "audit"});
         m.put("撤回终止申请", new String[]{"modify", "audit"});
         // 审批类(audit → can_approve,与 ButtonService.requireApprover 同口径)
+        // 「项目定级」= 立项申请审核通过后由审核人给项目定级(2026-09-21),同属审批权动作
         for (String b : new String[]{"审核", "弃审", "提交审批", "审批通过", "审批驳回", "中止", "取消中止",
+                "项目定级",
                 "删除审批通过", "删除审批驳回", "修改审批通过", "修改审批驳回"})
             m.put(b, new String[]{"audit"});
         BUTTON_PERMS = Map.copyOf(m);

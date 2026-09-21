@@ -96,6 +96,9 @@ public class ButtonService {
             case "删除审批驳回" -> rejectDelete(def, formData);
             // 文件类面板:归档后申请修改(管理员审批进入修改态,再审批归档+修改记录全量留痕)
             case "申请修改" -> modifyRequest(def, formData);
+            // 立项申请:审核通过(已审核/已归档)后由审核人给项目定级(2026-09-21 用户口径)——
+            // 等级是后续立项(实施计划)与进度流程的属性,按参照自动带给下游 项目定级
+            case "项目定级" -> gradeProject(def, formData);
             // 产品信息表:归档后由二级审核人把四个下游文件的**责任人**分发下去(2026-09-20;
             // 原名「产品开发」= 只写任务行不带分工,保留兼容)
             case "产品开发", "分发责任人" -> dispatchDev(def, formData);
@@ -2384,6 +2387,45 @@ public class ButtonService {
             return false;
         }
     }
+
+    /**
+     * 项目定级(2026-09-21 用户口径):立项申请表**审核通过之后**,由审核人在系统里给项目定级。
+     *
+     * 口径(grill 两问):
+     *   · 可点人 = 管理员 ∪ 该面板审批人(`yj_role_panel.can_approve`,即含刚通过的那位审核人);
+     *   · 时机 = 单据已审核 / 已归档(没通过审核就定级无意义);
+     *   · 载荷「项目等级」∈ 一级/二级/三级/四级(与下游 RD_PLAN.项目定级 同字典);
+     *   · 写 `rd_approval.项目等级` + 一条审批留痕(action=GRADE,result=GRADED,意见里带新旧等级);
+     *     已定级的可再改,每次留痕(不覆盖历史)。
+     * 下游:实施计划按「文档编号」参照立项申请时,项目等级 → 项目定级 由 REF_SYNONYMS 自动带回;
+     *   进度查询继续由 syncPlanToProgress 从计划同步(既有链路)。
+     */
+    private Map<String, Object> gradeProject(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_APPROVAL".equals(def.code())) throw new IllegalStateException("仅立项申请表可项目定级");
+        requireApprover(def.code());
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String status = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if (!"已审核".equals(status) && !"已归档".equals(status))
+            throw new IllegalStateException("仅已审核或已归档的立项申请可项目定级(当前:" + status + ")");
+        String level = pickOf(formData, "项目等级");
+        if (!PROJECT_LEVELS.contains(level))
+            throw new IllegalStateException("项目等级取值不合法(应为 一级/二级/三级/四级):" + level);
+        String old = "";
+        List<String> cur = jdbc.queryForList(
+                "SELECT TOP 1 项目等级 FROM rd_approval WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, no);
+        if (!cur.isEmpty() && cur.get(0) != null) old = cur.get(0).trim();
+        int n = jdbc.update("UPDATE rd_approval SET 项目等级 = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", level, currentUserName(), no);
+        if (n == 0) throw new IllegalStateException("立项申请不存在或已作废:" + no);
+        String opinion = old.isEmpty() ? "项目定级：" + level : "项目定级：" + old + " → " + level;
+        recordApproval(def.code(), no, "GRADE", "GRADED", opinion);
+        return result(no, status.isEmpty() ? "已审核" : status);
+    }
+
+    /** 项目等级取值(与下游 RD_PLAN.项目定级 / RD_PROGRESS.项目定级 同字典;2026-09-21 四级统一) */
+    private static final java.util.Set<String> PROJECT_LEVELS =
+            java.util.Set.of("一级", "二级", "三级", "四级");
 
     /**
      * 分发责任人(2026-09-20;按钮名沿用「产品开发」兼容,新名「分发责任人」)。

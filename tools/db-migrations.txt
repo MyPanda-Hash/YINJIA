@@ -722,3 +722,21 @@ migrate-sinter-tolerance.sql
 # 验收:界面探针 ⑧ 段 11 项(标签齐、旧标签撤、三值并排、⌄/⧉入口、压降是否测试格、选项确实来自库)
 #   + 原有 ①~⑦ 段全部照旧通过(配方计算回填四格未受影响)。
 migrate-mold-proc-p1-redesign.sql
+
+# —— 2026-09-21 立项申请表「项目等级」(审核人定级)+ 全链路四级统一 ——
+# 用户口径:①立项申请审核通过后由**审核人**在系统里定级,等级作为后续立项(实施计划)与进度流程的属性;
+#   ②选项在原有基础上升为 **一级/二级/三级/四级**;③形态:归档后侧栏「项目定级」按钮
+#   (管理员 ∪ 该面板审批人 can_approve),弹窗选级,写单据 + 一条 GRADE/GRADED 留痕,可再改(每次留痕)。
+# migrate-approval-level.sql —— 数据层:
+#   §1 rd_approval 补 [项目等级] nvarchar(20)(⚠ 头表就叫 rd_approval,没有 _head);
+#   §2 yj_field 登记 RD_APPROVAL.项目等级(header/下拉框/一~四级/非必填 —— 定级是事后动作);
+#   §3 下游字典统一补「一级」:RD_PLAN.项目定级、RD_PROGRESS.项目定级(detail 的 项目层级);
+#      ⚠ RD_PROGRESS 表头那个 label 是「项目(一/二级)」,语义是"一二级并档",**不动**;
+#   §4 列注释 + 译名(项目等级 10 语言;选项值属数据键不翻译,ADR-0001)。
+# 后端:ButtonService.gradeProject(按钮「项目定级」)、PanelPermissionService(项目定级 → audit 词)、
+#   PanelConfigService.REF_SYNONYMS 加「项目等级 → 项目定级」—— 实施计划按文档编号参照立项申请时
+#   自动把等级带进计划的 项目定级(等级由此成为下游属性),进度查询继续由 syncPlanToProgress 同步。
+# 前端:PanelxList 侧栏「项目定级·当前等级」按钮 + 定级弹窗(四档单选 + 定级说明)、en.js 12 条词条。
+# 验收探针 tools/archive/_probe-approval-grade.cjs 12 项全绿(草稿态被拒/无审批权被拒/定级落库+留痕/
+#   改级留痕含轨迹/非法取值被拒/下游 refMap 与两处字典/界面按钮与四档弹窗)。
+migrate-approval-level.sql
