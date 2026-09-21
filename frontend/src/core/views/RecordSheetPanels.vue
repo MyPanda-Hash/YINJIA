@@ -96,11 +96,14 @@
               <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
               <el-icon class="rs-ref-ico"><Search /></el-icon>
             </div>
-            <div v-else-if="editable" class="rs-docno-wrap">
+            <!-- 文档类面板(编号字段=文档编号):编号由人填,给输入框 -->
+            <div v-else-if="editable && docNoKey === '文档编号'" class="rs-docno-wrap">
               <span class="rs-docno-prefix">{{ tt('编号：') }}</span>
-              <el-input v-model="head['文档编号']" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt('编号：')" @input="emit('dirty')" />
+              <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt('编号：')" @input="emit('dirty')" />
             </div>
-            <template v-else><span class="rs-docno-prefix">{{ tt('编号：') }}</span>{{ head['文档编号'] || head['单据编号'] || cfg.docNoDefault || 'YJ-PD-01' }}</template>
+            <!-- 单据类面板(编号字段=单据编号):号是后端「新增」时自动生成的,只读显示 ——
+                 给输入框既没意义又会被误改(打印/预览还必须看得见号) -->
+            <template v-else><span class="rs-docno-prefix">{{ tt('编号：') }}</span>{{ head[docNoKey] || cfg.docNoDefault || 'YJ-PD-01' }}</template>
           </td>
         </tr>
         <tr>
@@ -145,6 +148,11 @@
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
           <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
             <span>{{ tt(sec.bar) }}</span>
+            <!-- 从物料清单引用:本节后面紧跟的表要它时挂在本节标题行上(2026-09-20)
+                 —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
+                    按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
+            <span v-if="materialPickAt(sec) && editable" class="rs-lib-btn"
+                  style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(materialPickAt(sec))">📦 {{ tt('从物料清单引用') }}</span>
             <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
@@ -517,6 +525,11 @@
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
           <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
             <span>{{ tt(sec.bar) }}</span>
+            <!-- 从物料清单引用:本节后面紧跟的表要它时挂在本节标题行上(2026-09-20)
+                 —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
+                    按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
+            <span v-if="materialPickAt(sec) && editable" class="rs-lib-btn"
+                  style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(materialPickAt(sec))">📦 {{ tt('从物料清单引用') }}</span>
             <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
@@ -901,20 +914,39 @@
       </template>
     </el-dialog>
 
-    <!-- ═══ 章节标准库(yj_std_lib,lib=spec.section):点击填入 / 自行补充 / 删除 ═══ -->
-    <!-- ═══ 从物料清单引用(父件口径):勾选父件,一次导入其全部子件 ═══ -->
-    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用(选父件,导入其全部子件)')" width="760px" append-to-body>
-      <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索父件编码/名称')" clearable style="margin-bottom:8px;width:300px" @input="filterMatPick" />
-      <el-table :data="matPickFiltered" size="small" border max-height="420" @selection-change="(sel) => (matPickChecked = sel)">
-        <el-table-column type="selection" width="42" />
+    <!-- ═══ 从物料清单引用(基础档案 BOM):勾选「父件」行,按**导入范围**带出父件/子件 ═══
+         2026-09-20 优化:可切 父件 / 父件及所含子件 / 仅子件(默认**父件**);
+         原先只会导子件 —— 勾「无子件」的父件(库里的 M-xxx 单行)会"导入 0 行还报成功",现置灰并标注。 -->
+    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用')" width="820px" append-to-body>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
+        <span style="color:#606266;font-size:13px">{{ tt('导入范围') }}</span>
+        <el-radio-group v-model="matPickScope" size="small" @change="onMatPickScopeChange">
+          <el-radio-button value="parent">{{ tt('父件') }}</el-radio-button>
+          <el-radio-button value="both">{{ tt('父件及所含子件') }}</el-radio-button>
+          <el-radio-button value="child">{{ tt('仅子件') }}</el-radio-button>
+        </el-radio-group>
+        <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索父件编码/名称')" clearable style="width:240px" @input="filterMatPick" />
+      </div>
+      <el-table ref="matPickTableRef" :data="matPickFiltered" size="small" border max-height="420" :row-key="(r) => r['父件编码']"
+                :selectable="matPickSelectable" @selection-change="(sel) => (matPickChecked = sel)">
+        <el-table-column type="selection" width="42" :selectable="matPickSelectable" />
         <el-table-column prop="父件编码" :label="tt('父件编码')" width="120" />
-        <el-table-column prop="父件名称" :label="tt('父件名称')" min-width="180" show-overflow-tooltip />
-        <el-table-column prop="版本号" :label="tt('版本号')" width="90" />
-        <el-table-column prop="childCount" :label="tt('子件数')" width="80" align="center" />
+        <el-table-column prop="父件名称" :label="tt('父件名称')" min-width="170" show-overflow-tooltip />
+        <el-table-column prop="版本号" :label="tt('版本号')" width="80" />
+        <el-table-column :label="tt('子件数')" width="86" align="center">
+          <template #default="{ row }">
+            <span v-if="row.childCount">{{ row.childCount }}</span>
+            <el-tag v-else size="small" type="info">{{ tt('无子件') }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column :label="tt('父件规格')" min-width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ (row.self && row.self['物料规格']) || '' }}</template>
+        </el-table-column>
       </el-table>
+      <div style="color:#909399;font-size:12px;margin-top:6px">{{ matPickHint }}</div>
       <template #footer>
         <el-button @click="matPickVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="confirmMaterialPick">{{ tt('导入所选父件的全部子件') }}({{ matPickChecked.length }})</el-button>
+        <el-button type="primary" @click="confirmMaterialPick">{{ tt('导入') }}({{ matPickChecked.length }})</el-button>
       </template>
     </el-dialog>
 
@@ -978,6 +1010,7 @@ import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
+import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -992,6 +1025,9 @@ const props = defineProps({
 const emit = defineEmits(['dirty', 'refresh-config'])
 
 const cfg = computed(() => recordSheetConfigs[props.panelCode] || null)
+// 纸张右上「编号：」格绑哪个键 —— 文档类面板=文档编号,单据类面板=单据编号(写死文档编号会让
+// 单据类面板编辑期间那格永远空白;见 @/core/panel/sheetDocNo 的说明)
+const docNoKey = computed(() => docNoKeyOf(props.head))
 // 版式:'report' | 'plain'——面板级值是缺省,多页签面板可按页覆盖(见 effPlain)
 
 /** 动态列变体:按头字段值解析(加标水经 variantOptions 映射/委托单直取),缺省第一个变体 */
@@ -1236,6 +1272,20 @@ function isAtOrBeforeTableAnchor(sec) {
   })
   if (lastAnchor < 0) return true
   return samePage.indexOf(sec) <= lastAnchor
+}
+
+/**
+ * 本节标题行要挂「从物料清单引用」按钮吗(2026-09-20)。
+ * 判据:本节的 bar 是某张 dataTable 的 tablesAfterBar 锚点,且那张表声明了 materialPick
+ * 且**它自己没有 bar 行** —— 有 bar 的(组装BOM表页)按钮已经渲染在表格的 bar 行上,别挂两处。
+ * 为什么需要:规格书第 4 页「1.关键物料列表」的表故意没有 bar(标题由本节出,加了会重复标题),
+ * 原先按钮只认 dt.bar ⇒ 那张表上配了 materialPick 也永远渲染不出来(用户报「加上这个功能」即此)。
+ */
+function materialPickAt(sec) {
+  const c = cfg.value || {}
+  if (!sec || !sec.bar) return null
+  return (c.dataTables || []).find((d) =>
+    d.materialPick && !d.bar && d.tablesAfterBar === sec.bar && pageOf(d) === pageOf(sec)) || null
 }
 
 watch(() => props.panelCode, () => { activePage.value = 0 })
@@ -2172,13 +2222,34 @@ watch(() => [props.editable, props.head], ([v]) => {
   }
 })
 
-// ── 从物料清单引用(基础档案 BOM 面板数据):勾选后回填 物料名/编号/规格/外观要求 ──
+// ── 从物料清单引用(基础档案 BOM 面板数据)──
+// 2026-09-20 优化:导入范围三档 父件 / 父件及所含子件 / 仅子件(默认**父件**,用户口径)。
+// 数据形状(实测库):一行 = 「父件编码/父件名称/版本号 + 子件编码/子件名称/规格型号/定额数量」;
+//   父件自己那一行以**空子件编码**出现(M-xxx 那 29 行即此),T382 这类没有自己的行 ⇒ 父件规格留空。
 const matPickVisible = ref(false)
 const matPickRows = ref([])
 const matPickFiltered = ref([])
 const matPickChecked = ref([])
 const matPickKeyword = ref('')
 const matPickTargetDt = ref(null)
+const matPickTableRef = ref(null)
+/** 导入范围:'parent' 只导父件 | 'both' 父件 + 其全部子件 | 'child' 只导子件 */
+const matPickScope = ref('parent')
+const matPickHint = computed(() => ({
+  parent: tt('只导入勾选的父件本身(规格取该父件自己在物料清单里的那一行,没有则留空)'),
+  both: tt('导入勾选的父件 + 它下面的全部子件'),
+  child: tt('只导入子件;没有子件的父件不可勾选(灰)'),
+}[matPickScope.value] || ''))
+/** 仅子件档下,无子件的父件不可勾(修「勾了没子件的父件 → 导入 0 行还报成功」) */
+function matPickSelectable(row) {
+  return !(matPickScope.value === 'child' && !(row?.childCount > 0))
+}
+/** 切档:把因新档位不可选的勾去掉(否则确认时会静默跳过) */
+function onMatPickScopeChange() {
+  matPickChecked.value = matPickChecked.value.filter((r) => matPickSelectable(r))
+  matPickTableRef.value?.clearSelection?.()
+  for (const r of matPickChecked.value) matPickTableRef.value?.toggleRowSelection?.(r, true)
+}
 async function openMaterialPick(dt) {
   matPickTargetDt.value = dt
   matPickKeyword.value = ''
@@ -2186,18 +2257,18 @@ async function openMaterialPick(dt) {
   matPickVisible.value = true
   try {
     const res = await request.post('/px/queryFormDataList', { panelCode: 'BOM', condition: {}, pageNo: 1, pageSize: 500 })
-    // BOM 面板返回主从结构:list[0].detail.children = 子件行(锚点行已被上游过滤亦可再兜底)
+    // BOM 面板返回主从结构:list[0].detail.children = 全部行(既含子件行,也含"父件自己那一行")
     const masters = res?.data?.list || res?.data?.rows || res?.data || []
-    const children = []
+    const all = []
     if (Array.isArray(masters)) {
       for (const m of masters) {
         const kids = m?.detail?.children || m?.detail?.items || []
-        if (Array.isArray(kids)) children.push(...kids.filter((k) => String(k['子件编码'] || '').trim()))
+        if (Array.isArray(kids)) all.push(...kids)
       }
     }
-    // 父件口径:按 父件编码 分组,一行=一个父件,确认后导入其全部子件
+    // 父件口径:按 父件编码 分组;子件编码为空的行 = 父件自己那一行(取它的规格/外观)
     const byParent = new Map()
-    for (const k of children) {
+    for (const k of all) {
       const code = String(k['父件编码'] || '').trim()
       if (!code) continue
       if (!byParent.has(code)) {
@@ -2207,11 +2278,16 @@ async function openMaterialPick(dt) {
           版本号: k['版本号'] || '',
           childCount: 0,
           children: [],
+          self: null,
         })
       }
       const p = byParent.get(code)
-      p.childCount++
-      p.children.push(k)
+      if (String(k['子件编码'] || '').trim()) {
+        p.childCount++
+        p.children.push(k)
+      } else {
+        p.self = k
+      }
     }
     matPickRows.value = [...byParent.values()]
     matPickFiltered.value = matPickRows.value
@@ -2228,40 +2304,62 @@ function filterMatPick() {
     String(r['父件名称'] || '').toLowerCase().includes(kw)
   )
 }
+/**
+ * 确认导入。按 `matPickScope` 决定带出父件行 / 子件行:
+ *   parent = 只父件;both = 父件 + 子件;child = 只子件。
+ * 字段映射按**目标表的列定义**匹配(组装BOM = 物料名/物料编号/物料规格/外观要求/用量;
+ * 规格书第 4 页 = 物料编码/物料名称/规格参数/数量/备注);去重按目标表的编码列。
+ * 父件行的规格/外观取「该父件自己在物料清单里的那一行」,没有(如 T382)就留空手填。
+ */
 function confirmMaterialPick() {
   const dt = matPickTargetDt.value
   if (!dt) return
+  const scope = matPickScope.value
   const arr = touch()
-  // 字段映射:按目标面板的列定义匹配(组装BOM=物料名/物料编号/物料规格;规格书=物料编码/物料名称/规格参数)
   const colKeys = new Set((dt.cols || []).map((c) => c.key))
   const codeKey = colKeys.has('物料编号') ? '物料编号' : (colKeys.has('物料编码') ? '物料编码' : null)
   const existCodes = new Set(arr.map((r) => String(r[codeKey] || '').trim()).filter(Boolean))
-  let added = 0
+  let addedP = 0
+  let addedC = 0
   let skipped = 0
+  const put = (code, name, spec, look, qty) => {
+    const c = String(code || '').trim()
+    if (!c) return false
+    if (codeKey && existCodes.has(c)) { skipped++; return false }
+    const row = { '表区': dt.filterVal }
+    if (colKeys.has('物料名')) row['物料名'] = name || ''              // 组装BOM
+    if (colKeys.has('物料编号')) row['物料编号'] = c
+    if (colKeys.has('物料规格')) row['物料规格'] = spec || ''
+    if (colKeys.has('外观要求')) row['外观要求'] = look || ''
+    if (colKeys.has('物料编码')) row['物料编码'] = c                    // 规格书
+    if (colKeys.has('物料名称')) row['物料名称'] = name || ''
+    if (colKeys.has('规格参数')) row['规格参数'] = spec || ''
+    if (colKeys.has('数量')) row['数量'] = qty || ''
+    if (colKeys.has('备注')) row['备注'] = ''
+    if (colKeys.has('用量')) row['用量'] = qty || ''
+    arr.push(row)
+    if (codeKey) existCodes.add(c)
+    return true
+  }
   for (const parent of matPickChecked.value) {
-    for (const m of parent.children || []) {
-      // 去重:目标表已有同编码物料则跳过
-      if (codeKey && existCodes.has(String(m['子件编码'] || '').trim())) { skipped++; continue }
-      const row = { '表区': dt.filterVal }
-      if (colKeys.has('物料名')) row['物料名'] = m['子件名称'] || ''            // 组装BOM
-      if (colKeys.has('物料编号')) row['物料编号'] = m['子件编码'] || ''
-      if (colKeys.has('物料规格')) row['物料规格'] = m['物料规格'] || ''
-      if (colKeys.has('外观要求')) row['外观要求'] = m['外观要求'] || ''
-      if (colKeys.has('物料编码')) row['物料编码'] = m['子件编码'] || ''          // 规格书
-      if (colKeys.has('物料名称')) row['物料名称'] = m['子件名称'] || ''
-      if (colKeys.has('规格参数')) row['规格参数'] = m['物料规格'] || ''
-      if (colKeys.has('数量')) row['数量'] = ''
-      if (colKeys.has('备注')) row['备注'] = ''
-      if (colKeys.has('用量')) row['用量'] = ''
-      arr.push(row)
-      if (codeKey) existCodes.add(String(m['子件编码'] || '').trim())
-      added++
+    if (scope !== 'child') {
+      const self = parent.self || {}
+      if (put(parent['父件编码'], parent['父件名称'], self['物料规格'], self['外观要求'], '')) addedP++
+    }
+    if (scope !== 'parent') {
+      for (const m of parent.children || []) {
+        if (put(m['子件编码'], m['子件名称'], m['物料规格'], m['外观要求'], m['定额数量'])) addedC++
+      }
     }
   }
   matPickChecked.value = []
   matPickVisible.value = false
   emit('dirty')
-  ElMessage.success(tt('已导入 {n} 行子件') .replace('{n}', added) + (skipped ? tt('(跳过重复 {n} 行)').replace('{n}', skipped) : ''))
+  const parts = []
+  if (addedP) parts.push(tt('父件 {n}').replace('{n}', addedP))
+  if (addedC) parts.push(tt('子件 {n}').replace('{n}', addedC))
+  ElMessage.success(tt('已导入 {n} 行').replace('{n}', addedP + addedC) + (parts.length ? `(${parts.join(' · ')})` : '')
+    + (skipped ? tt('(跳过重复 {n} 行)').replace('{n}', skipped) : ''))
 }
 
 // ---------- 配方计算(成型工艺清单:读页 2 配方表 → 算 → 回填页 1 与配方表) ----------
