@@ -1,0 +1,89 @@
+tr0 [] 0:-cs9«惠州市银嘉环保科技有限公司» | 1:INPUTcs2«编号：»
+tr1 [] 0:-cs7rs4«炭棒工艺管控清单» | 1:-cs2«表单管理人» | 2:INPUTcs2
+tr2 [] 0:-cs2«密级» | 1:SELECT+INPUTcs2«请选择»
+tr3 [] 0:-cs2«使用范围» | 1:SELECT+INPUTcs2«请选择»
+tr4 [] 0:-cs2«版本号» | 1:INPUTcs2
+=== 区段条: 产品基本信息
+tr5 [] 0:-cs11«产品基本信息»
+tr6 [] 0:-cs2rs1«炭棒编号» | 1:-cs2rs1«产品名称» | 2:-cs3rs1«炭棒规格» | 3:-cs2rs1«产品管控类型» | 4:-cs1rs1«产品形态» | 5:-cs1rs1«生产车间»
+tr7 [] 0:REFcs2rs1«点击选择» | 1:INPUTcs2rs1 | 2:INPUTcs1rs1 | 3:INPUTcs1rs1 | 4:INPUTcs1rs1 | 5:SELECT+INPUTcs2rs1 | 6:SELECT+INPUTcs1rs1 | 7:REFcs1rs1«点击选择»
+=== 区段条: 工序
+tr8 [] 0:-cs11«工序»
+tr9 [] 0:-cs1rs1«工序» | 1:-cs10rs1«工序管控要求»
+tr10 [] 0:-cs1rs1«配料要求» | 1:TEXTAREAcs10rs1«⌄ 标准库»
+tr11 [] 0:-cs1rs5«灌料» | 1:-cs3rs1«理论最低灌料重量g» | 2:-cs3rs1«理论灌料中间值g» | 3:-cs4rs1«理论最高灌料重量g»
+tr12 [] 0:INPUTcs3rs1 | 1:INPUTcs3rs1 | 2:INPUTcs4rs1
+tr13 [] 0:-cs2rs1«理论水分» | 1:INPUTcs8rs1
+tr14 [] 0:-cs2rs1«实际灌料重量计算公式» | 1:INPUTcs8rs1
+tr15 [] 0:-cs2rs1«灌料要求» | 1:TEXTAREAcs8rs1
+tr16 [] 0:-cs1rs1«烧结» | 1:-cs2rs1«烧结炉参数» | 2:SELECT+INPUTcs3rs1«⧉ 标准库维护» | 3:-cs2rs1«烧结时间/调速器参数» | 4:SELECT+INPUTcs3rs1«⧉ 标准库维护»
+tr17 [] 0:-cs1rs1«热压» | 1:-cs2rs1«热压要求» | 2:TEXTAREAcs8rs1«⌄ 标准库»
+tr18 [] 0:-cs1rs1«冷却» | 1:-cs2rs1«冷却参数设置» | 2:SELECT+INPUTcs8rs1«⧉ 标准库维护»
+tr19 [] 0:-cs1rs4«脱模» | 1:-cs6rs1«长度要求» | 2:-cs4rs1«重量要求»
+tr20 [] 0:-cs2rs1«最短长度mm» | 1:INPUTcs4rs1 | 2:-cs2rs1«最低重量g» | 3:INPUTcs2rs1
+tr21 [] 0:-cs2rs1«中间值mm» | 1:INPUTcs4rs1 | 2:-cs2rs1«中间值g» | 3:INPUTcs2rs1
+tr22 [] 0:-cs2rs1«最长长度mm» | 1:INPUTcs4rs1 | 2:-cs2rs1«最高重量g» | 3:INPUTcs2rs1
+=== 区段条: 检验要求
+tr23 [] 0:-cs11«检验要求»
+tr24 [] 0:-cs1rs2«炭棒尺寸» | 1:-cs2rs1«炭棒外径mm» | 2:-cs3rs1«炭棒外径公差mm» | 3:-cs2rs1«炭棒内径mm» | 4:-cs3rs1«炭棒内径公差mm»
+tr25 [] 0:INPUTcs2rs1 | 1:INPUTcs3rs1 | 2:INPUTcs2rs1 | 3:INPUTcs3rs1
+tr26 [] 0:-cs1rs2«密度管控» | 1:-cs2rs1«管控要求» | 2:-cs4rs1«实际密度管控下限» | 3:-cs4rs1«实际密度管控上限»
+tr27 [] 0:INPUTcs2rs1 | 1:INPUTcs4rs1 | 2:INPUTcs4rs1
+tr28 [] 0:-cs1rs2«跌落强度» | 1:-cs2rs1«高度cm» | 2:-cs4rs1«跌落次数» | 3:-cs4rs1«要求»
+tr29 [] 0:INPUTcs2rs1 | 1:INPUTcs4rs1 | 2:INPUTcs4rs1
+tr30 [] 0:-cs1rs2«抗压强度» | 1:-cs2rs1«测试间距mm» | 2:-cs4rs1«压头下降速度mm/min» | 3:-cs4rs1«强度要求kgf»
+tr31 [] 0:INPUTcs2rs1 | 1:INPUTcs4rs1 | 2:INPUTcs4rs1
+tr32 [] 0:-cs1rs3«压降» | 1:-cs2rs1«测试管路» | 2:-cs4rs1«测试流速L/min» | 3:-cs4rs1«压降标准kpa»
+tr33 [] 0:INPUTcs2rs1 | 1:INPUTcs4rs1 | 2:INPUTcs4rs1
+tr34 [] 0:SELECT+INPUTcs10rs1«是否测试丨 √ × 丨»
+=== 区段条: 产品基本信息
+tr35 [] 0:-cs11«产品基本信息»
+tr36 [] 0:-cs2rs1«炭棒编号» | 1:-cs2rs1«产品名称» | 2:-cs3rs1«炭棒规格» | 3:-cs1rs1«产品管控类型» | 4:-cs2rs1«产品形态» | 5:-cs3rs1«生产车间»
+tr37 [] 0:REFcs2rs1«点击选择» | 1:INPUTcs2rs1 | 2:INPUTcs1rs1 | 3:INPUTcs1rs1 | 4:INPUTcs1rs1 | 5:SELECT+INPUTcs1rs1 | 6:SELECT+INPUTcs2rs1 | 7:REFcs3rs1«点击选择»
+tr38 [] 0:-cs6«修订记录» | 1:-
+tr39 [rs-grp] 0:-rs1«序号» | 1:-rs1«更改内容» | 2:-rs1«更改原因» | 3:-rs1«更改时间» | 4:-rs1«责任人» | 5:-rs1«备注» | 6:-rs1
+tr40 [] 0:-cs6«—» | 1:-
+=== 区段条: 配方表🧮 配方计算✎ 字段编辑
+tr41 [] 0:-cs13«配方表🧮 配方计算✎ 字段编辑» | 1:-
+tr42 [rs-grp] 0:-rs1«No.» | 1:-cs2rs1«物料种类» | 2:-cs4rs1«物料编号» | 3:-cs3rs1«物料名称» | 4:-rs1«实际添加 比例%» | 5:-rs1«单支 物料含量g» | 6:-rs1«设计添加 量» | 7:-rs1
+tr43 [] 0:-cs13«—» | 1:-
+=== 区段条: 产品基本信息
+tr44 [] 0:-cs11«产品基本信息»
+tr45 [] 0:-cs2rs1«炭棒编号» | 1:-cs2rs1«产品名称» | 2:-cs3rs1«炭棒规格» | 3:-cs2rs1«产品管控类型» | 4:-cs1rs1«产品形态» | 5:-cs1rs1«生产车间»
+tr46 [] 0:REFcs2rs1«点击选择» | 1:INPUTcs2rs1 | 2:INPUTcs1rs1 | 3:INPUTcs1rs1 | 4:INPUTcs1rs1 | 5:SELECT+INPUTcs2rs1 | 6:SELECT+INPUTcs1rs1 | 7:REFcs1rs1«点击选择»
+=== 区段条: 工序
+tr47 [] 0:-cs11«工序»
+tr48 [] 0:-cs1rs1«工序» | 1:-cs10rs1«工序管控要求»
+tr49 [] 0:-cs1rs1«配料要求» | 1:TEXTAREAcs10rs1«⌄ 标准库»
+tr50 [] 0:-cs1rs5«灌料» | 1:-cs3rs1«理论最低灌料重量g» | 2:-cs3rs1«理论灌料中间值g» | 3:-cs4rs1«理论最高灌料重量g»
+tr51 [] 0:INPUTcs3rs1 | 1:INPUTcs3rs1 | 2:INPUTcs4rs1
+tr52 [] 0:-cs2rs1«理论水分» | 1:INPUTcs8rs1
+tr53 [] 0:-cs2rs1«实际灌料重量计算公式» | 1:INPUTcs8rs1
+tr54 [] 0:-cs2rs1«灌料要求» | 1:TEXTAREAcs8rs1
+tr55 [] 0:-cs1rs1«烧结» | 1:-cs2rs1«烧结炉参数» | 2:SELECT+INPUTcs3rs1«⧉ 标准库维护» | 3:-cs2rs1«烧结时间/调速器参数» | 4:SELECT+INPUTcs3rs1«⧉ 标准库维护»
+tr56 [] 0:-cs1rs1«热压» | 1:-cs2rs1«热压要求» | 2:TEXTAREAcs8rs1«⌄ 标准库»
+tr57 [] 0:-cs1rs1«冷却» | 1:-cs2rs1«冷却参数设置» | 2:SELECT+INPUTcs8rs1«⧉ 标准库维护»
+tr58 [] 0:-cs1rs4«脱模» | 1:-cs6rs1«长度要求» | 2:-cs4rs1«重量要求»
+tr59 [] 0:-cs2rs1«最短长度mm» | 1:INPUTcs4rs1 | 2:-cs2rs1«最低重量g» | 3:INPUTcs2rs1
+tr60 [] 0:-cs2rs1«中间值mm» | 1:INPUTcs4rs1 | 2:-cs2rs1«中间值g» | 3:INPUTcs2rs1
+tr61 [] 0:-cs2rs1«最长长度mm» | 1:INPUTcs4rs1 | 2:-cs2rs1«最高重量g» | 3:INPUTcs2rs1
+=== 区段条: 检验要求
+tr62 [] 0:-cs11«检验要求»
+tr63 [] 0:-cs1rs2«炭棒尺寸» | 1:-cs2rs1«炭棒外径mm» | 2:-cs3rs1«炭棒外径公差mm» | 3:-cs2rs1«炭棒内径mm» | 4:-cs3rs1«炭棒内径公差mm»
+tr64 [] 0:INPUTcs2rs1 | 1:INPUTcs3rs1 | 2:INPUTcs2rs1 | 3:INPUTcs3rs1
+tr65 [] 0:-cs1rs2«密度管控» | 1:-cs2rs1«管控要求» | 2:-cs4rs1«实际密度管控下限» | 3:-cs4rs1«实际密度管控上限»
+tr66 [] 0:INPUTcs2rs1 | 1:INPUTcs4rs1 | 2:INPUTcs4rs1
+tr67 [] 0:-cs1rs2«跌落强度» | 1:-cs2rs1«高度cm» | 2:-cs4rs1«跌落次数» | 3:-cs4rs1«要求»
+tr68 [] 0:INPUTcs2rs1 | 1:INPUTcs4rs1 | 2:INPUTcs4rs1
+tr69 [] 0:-cs1rs2«抗压强度» | 1:-cs2rs1«测试间距mm» | 2:-cs4rs1«压头下降速度mm/min» | 3:-cs4rs1«强度要求kgf»
+tr70 [] 0:INPUTcs2rs1 | 1:INPUTcs4rs1 | 2:INPUTcs4rs1
+tr71 [] 0:-cs1rs3«压降» | 1:-cs2rs1«测试管路» | 2:-cs4rs1«测试流速L/min» | 3:-cs4rs1«压降标准kpa»
+tr72 [] 0:INPUTcs2rs1 | 1:INPUTcs4rs1 | 2:INPUTcs4rs1
+tr73 [] 0:SELECT+INPUTcs10rs1«是否测试丨 √ × 丨»
+=== 区段条: 产品基本信息
+tr74 [] 0:-cs11«产品基本信息»
+tr75 [] 0:-cs2rs1«炭棒编号» | 1:-cs2rs1«产品名称» | 2:-cs3rs1«炭棒规格» | 3:-cs1rs1«产品管控类型» | 4:-cs2rs1«产品形态» | 5:-cs3rs1«生产车间»
+tr76 [] 0:REFcs2rs1«点击选择» | 1:INPUTcs2rs1 | 2:INPUTcs1rs1 | 3:INPUTcs1rs1 | 4:INPUTcs1rs1 | 5:SELECT+INPUTcs1rs1 | 6:SELECT+INPUTcs2rs1 | 7:REFcs3rs1«点击选择»
+=== 区段条: 配料要求
+tr77 [] 0:-cs11«配料要求»
+tr78 [] 0:-«配料要求» | 1:TEXTAREAcs10

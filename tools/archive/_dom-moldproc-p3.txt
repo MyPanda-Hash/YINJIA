@@ -1,0 +1,67 @@
+{
+  "修订记录": {
+    "visibleSections": [],
+    "visibleRows": 3,
+    "totalRows": 74,
+    "visAddBtnOwner": "NONE",
+    "visibleLabels": {}
+  },
+  "成型工艺清单": {
+    "visibleSections": [
+      "产品基本信息",
+      "工序",
+      "检验要求"
+    ],
+    "visibleRows": 35,
+    "totalRows": 79,
+    "visAddBtnOwner": "NONE",
+    "visibleLabels": {
+      "炭棒编号": [
+        1
+      ],
+      "配料要求": [
+        2
+      ],
+      "理论最低灌料重量g": [
+        3
+      ],
+      "实际灌料重量计算公式": [
+        6
+      ],
+      "烧结炉参数": [
+        8
+      ],
+      "最短长度mm": [
+        12
+      ],
+      "炭棒外径mm": [
+        1
+      ],
+      "压降": [
+        9
+      ]
+    }
+  },
+  "成型配方": {
+    "visibleSections": [
+      "产品基本信息",
+      "配方表🧮 配方计算✎ 字段编辑",
+      "配料要求"
+    ],
+    "visibleRows": 13,
+    "totalRows": 79,
+    "visAddBtnOwner": "NONE",
+    "visibleLabels": {
+      "炭棒编号": [
+        1
+      ],
+      "配方表": [
+        0
+      ],
+      "配料要求": [
+        0,
+        1
+      ]
+    }
+  }
+}
