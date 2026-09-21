@@ -467,7 +467,7 @@
         />
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
-      <div class="field" v-for="(field, idx) in headerEditFields" :key="headerFieldKey(field)" :style="{ order: batchFieldOrder(idx) }">
+      <div class="field" v-for="field in headerEditFields" :key="headerFieldKey(field)">
         <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}</label>
         <template v-if="draftEditable">
           <div v-if="isRefSelect(field)" class="query-ref-select">
@@ -2923,13 +2923,8 @@ watch(
   { immediate: true }
 )
 watch(batchPopover, (open) => { if (open && curDocNo.value) loadBatchTab(curDocNo.value, true) })
-// 摘要行的落位:摘要按 DOM 顺序紧跟「单据编号(=采购订单号)」,其后的表头字段用 flex order 排到它后面
-const batchDocNoIdx = computed(() => (headerEditFields.value || []).findIndex((f) => headerFieldKey(f) === '单据编号'))
-function batchFieldOrder(idx) {
-  const d = batchDocNoIdx.value
-  if (d < 0) return 0
-  return idx > d ? 2 : 0
-}
+// 摘要行的落位:排在**所有表头字段之后**(DOM 顺序即最后一项)——表头字段怎么改(显隐/栏目设置/顺序),
+// 摘要行始终跟在最后一个字段后面;浮层锚点再排其后,故浮层永远落在字段区末尾。
 function buildBlocks(cfg) {
   if (!cfg) return []
   const tp = cfg.metadata?.panelPageDto?.tablePages?.[0]
@@ -6024,10 +6019,9 @@ onUnmounted(() => {
   font-size: 10px;
   color: #6366f1;
 }
-/* 浮层锚点:占位 0 宽 + 自动推到字段区右侧末尾(order 3 = 所有字段之后),
-   浮层(placement=bottom-end)因此出现在表头字段区下方末尾,不遮挡字段 */
+/* 浮层锚点:0 宽 0 高、独占一行排在字段区最后(紧跟摘要行之后),
+   浮层(placement=bottom-end)因此出现在表头字段区下方末尾,不遮挡任何字段 */
 .batch-anchor {
-  order: 3;
   flex-basis: 100%;
   width: 1px;
   height: 0;

@@ -73,7 +73,6 @@ const READ = `(() => {
   const wr = R(wrap), pr = R(popper);
   const fields = wrap ? [...wrap.querySelectorAll('.field')].map((f) => ({ label: (f.querySelector('label')?.textContent || '').trim(), rect: R(f) })) : [];
   const overlap = (a, b) => !(a.right <= b.x || b.right <= a.x || a.bottom <= b.y || b.bottom <= a.y);
-  const docNo = fields.find((f) => f.label === '单据编号');
   const cr = R(line);
   return {
     summary: line ? line.textContent.replace(/\\s+/g, ' ').trim() : null,
@@ -84,13 +83,19 @@ const READ = `(() => {
     popRows: tb ? [...tb.querySelectorAll('tbody tr')].map((tr) => [...tr.children].map((td) => td.textContent.trim())) : [],
     empty: pop ? (pop.querySelector('.el-table__empty-text')?.textContent.trim() || '') : '',
     calls: performance.getEntriesByType('resource').filter((r) => r.name.includes('batchFlow/lines')).length,
-    /* 布局断言用:浮层是否落在表头字段区下方末尾、是否遮挡字段;摘要行是否紧贴「单据编号」 */
+    /* 布局断言用:浮层是否落在表头字段区下方末尾、是否遮挡字段;摘要行是否是最后一个字段之后的最后一项 */
     layout: (wr && pr) ? {
       fieldsRect: wr, popRect: pr,
       belowFields: pr.y >= wr.bottom - 2,
       rightAligned: Math.abs(pr.right - wr.right) <= 12,
       coveredFields: fields.filter((f) => overlap(pr, f.rect)).map((f) => f.label),
-      chipNextToDocNo: docNo && cr ? (cr.x >= docNo.rect.right - 2 && Math.abs(cr.y - docNo.rect.y) < 14) : null,
+      /* 摘要行必须排在所有表头字段之后:①DOM 上除锚点外是最后一项 ②几何上没有任何字段在它后面(同行更右 或 更靠下) */
+      chipAfterLastField: fields.every((f) => (cr.y > f.rect.y + 4) || (Math.abs(cr.y - f.rect.y) <= 14 && cr.x >= f.rect.right - 2)),
+      chipIsLastItem: (() => {
+        const kids = [...wrap.children].filter((el) => !el.classList.contains('batch-anchor'));
+        return kids.length > 0 && kids[kids.length - 1] === line;
+      })(),
+      fieldCount: fields.length,
     } : null,
   };
 })()`;
@@ -138,7 +143,9 @@ console.log('   浮层位置:', JSON.stringify(st.layout));
 ok(st.layout?.belowFields, '浮层落在表头字段区**下方**(不压字段)');
 ok(st.layout?.rightAligned, '浮层右缘对齐表头字段区右缘(字段区末尾)');
 ok((st.layout?.coveredFields || []).length === 0, `浮层未遮挡任何表头字段(${JSON.stringify(st.layout?.coveredFields)})`);
-ok(st.layout?.chipNextToDocNo === true, '摘要行仍紧贴「单据编号」右侧同一行');
+ok(st.layout?.chipIsLastItem === true, '摘要行是表头字段区里最后一个字段之后的最后一项(DOM 顺序,表头怎么改都成立)');
+ok(st.layout?.chipAfterLastField === true, `没有任何表头字段排在摘要行之后(字段数 ${st.layout?.fieldCount})`);
+const baseFieldCount = st.layout?.fieldCount; // ⑥ 的基线:界面可见表头字段数(表头改动前的口径)
 
 // ── ④ 查看 → 跳暂收单 ──
 const targetNo = (api.data?.batches || [])[0]?.targetFormNo;
@@ -156,6 +163,33 @@ if (stopped) {
   const s2 = await openPanel('PU_ORDER', String(stopped['单据编号']));
   ok(s2.summary === null, '已中止订单不显示送料摘要行');
 }
+// ── ⑥ 「表头修改后仍然跟在最后一个字段之后」 ──
+// 复用表头调整的真实保存接口(/px/saveHeaderPrefs → yj_field 的 seq/alias/hidden/visible),
+// 临时隐藏一个表头字段 → 校验摘要行仍排在最后一个字段之后;验完把原表头原样写回并核对库值。
+console.log('\n=== ⑥ 表头修改后:摘要行仍跟在最后一个字段之后 ===');
+const origRows = await q(`SELECT col_name, seq, alias, hidden, visible FROM yj_field WHERE panel_code='PU_ORDER' AND place LIKE '%header%' ORDER BY seq`);
+const origCols = origRows.map((r) => ({ label: r.col_name, alias: r.alias || '', visible: !!r.visible }));
+const hideTarget = origRows.find((r) => r.visible && r.col_name === '供应商') || origRows.find((r) => r.visible);
+const newCols = origCols.map((c) => (c.label === hideTarget.col_name ? { ...c, visible: false } : c));
+await post('/px/saveHeaderPrefs', { panelCode: 'PU_ORDER', columns: newCols });
+await sleep(1200);
+try {
+  const s6 = await openPanel('PU_ORDER', withBatch);
+  ok(s6.summary !== null, `隐藏字段「${hideTarget.col_name}」后摘要行仍在`);
+  ok(s6.layout?.chipIsLastItem === true, '表头改后:摘要行仍是字段区最后一项(DOM 顺序)');
+  ok(s6.layout?.chipAfterLastField === true, `表头改后:没有字段排在摘要行之后(字段数 ${s6.layout?.fieldCount},改前 ${baseFieldCount})`);
+  ok(s6.layout?.fieldCount === baseFieldCount - 1, `隐藏生效(界面可见字段 ${baseFieldCount} → ${s6.layout?.fieldCount}),且摘要行未受影响`);
+} finally {
+  await post('/px/saveHeaderPrefs', { panelCode: 'PU_ORDER', columns: origCols });
+  await sleep(1200);
+  const back = await q(`SELECT col_name, seq, alias, hidden, visible FROM yj_field WHERE panel_code='PU_ORDER' AND place LIKE '%header%' ORDER BY seq`);
+  // 注:/px/saveHeaderPrefs 会按提交顺序把 seq 归一为 (i+1)*10(表头调整的既定行为),
+  //     故还原校验比「字段顺序 + alias/hidden/visible 逐项一致」,不比对 seq 数值。
+  const snap = (rs) => JSON.stringify(rs.map((r) => [r.col_name, r.alias, r.hidden, r.visible]));
+  const orderSame = JSON.stringify(back.map((r) => r.col_name)) === JSON.stringify(origRows.map((r) => r.col_name));
+  ok(snap(back) === snap(origRows) && orderSame, '表头字段配置已原样还原(字段顺序 + alias/hidden/visible 与改动前一致)');
+}
+
 // ── ⑤ 独立台账面板已下线 ──
 console.log('\n=== ⑤ 独立台账面板已下线 ===');
 const cfg = await fetch(API + '/px/getPanelConfig?panelCode=BATCH_LEDGER', { headers: H }).then((r) => r.json()).catch(() => ({}));
