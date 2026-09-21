@@ -1,0 +1,448 @@
+[
+  {
+    "table": "dm_py",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "dm_wzsx",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "dtproperties",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "form_flow_link",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "PushGenerateHandler.java",
+      "WoPickingHandler.java",
+      "ButtonService.java",
+      "VoucherFlowService.java"
+    ]
+  },
+  {
+    "table": "gran_record_detail",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "pack_confirm_detail",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "qr_batch_registry",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "QrBatchService.java"
+    ]
+  },
+  {
+    "table": "rd_alkaline",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_antibact",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_asm_bom",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_asm_proc",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "DevTaskService.java"
+    ]
+  },
+  {
+    "table": "rd_dev_task",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "ButtonService.java",
+      "DevTaskService.java"
+    ]
+  },
+  {
+    "table": "rd_dom_test",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_drop_prec",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_equip_use",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_filter_eff",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_insp_plan",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "ButtonService.java",
+      "DevTaskService.java"
+    ]
+  },
+  {
+    "table": "rd_instr_use",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_mineral",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_mold_formula",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_mold_proc",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "DevTaskService.java"
+    ]
+  },
+  {
+    "table": "rd_product_info",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_ro_protect",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_scale",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_soak",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "rd_spec_assign",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "ButtonService.java",
+      "DevTaskService.java"
+    ]
+  },
+  {
+    "table": "rd_spec_doc",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "ButtonService.java",
+      "DevTaskService.java"
+    ]
+  },
+  {
+    "table": "rd_spike_water",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "report_column_settings",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "ReportColumnSettingsService.java"
+    ]
+  },
+  {
+    "table": "rod_return_detail",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "s_SelWhere",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "wh_record_detail",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "xsdh",
+    "panels": [],
+    "views": 2,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "yj_attachment",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "AttachmentController.java",
+      "ShareFileController.java",
+      "AttachmentService.java",
+      "ShareFileService.java"
+    ]
+  },
+  {
+    "table": "yj_dept",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "SysAdminController.java"
+    ]
+  },
+  {
+    "table": "yj_doc_modify_log",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "ButtonService.java"
+    ]
+  },
+  {
+    "table": "yj_doc_status",
+    "panels": [],
+    "views": 4,
+    "dictSql": false,
+    "java": [
+      "ShellController.java",
+      "ButtonService.java",
+      "DevTaskService.java",
+      "KingdeePushService.java"
+    ]
+  },
+  {
+    "table": "yj_field",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "AttachmentService.java",
+      "GenericReportSupport.java",
+      "PanelConfigService.java",
+      "PanelPermissionService.java"
+    ]
+  },
+  {
+    "table": "yj_form_approval",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "ButtonService.java"
+    ]
+  },
+  {
+    "table": "yj_locale",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "LocaleController.java"
+    ]
+  },
+  {
+    "table": "yj_lot_seq",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "LotSeqService.java"
+    ]
+  },
+  {
+    "table": "yj_message",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "MessageService.java"
+    ]
+  },
+  {
+    "table": "yj_panel",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "SysAdminController.java",
+      "PushGenerateHandler.java",
+      "AttachmentService.java",
+      "PanelConfigService.java"
+    ]
+  },
+  {
+    "table": "yj_plan_term",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "ButtonService.java",
+      "QueryService.java"
+    ]
+  },
+  {
+    "table": "yj_role",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "AuthController.java",
+      "PxController.java",
+      "SysAdminController.java",
+      "ButtonService.java"
+    ]
+  },
+  {
+    "table": "yj_role_panel",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "AuthController.java",
+      "PxController.java",
+      "SysAdminController.java",
+      "ButtonService.java"
+    ]
+  },
+  {
+    "table": "yj_schema_log",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  },
+  {
+    "table": "yj_std_lib",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "StdLibController.java",
+      "PanelConfigService.java"
+    ]
+  },
+  {
+    "table": "yj_translation",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "TranslationService.java"
+    ]
+  },
+  {
+    "table": "yj_usage_log",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "UsageLogService.java"
+    ]
+  },
+  {
+    "table": "yj_user",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": [
+      "AuthController.java",
+      "PxController.java",
+      "SysAdminController.java",
+      "MesApplication.java"
+    ]
+  },
+  {
+    "table": "ysfk",
+    "panels": [],
+    "views": 0,
+    "dictSql": false,
+    "java": []
+  }
+]
