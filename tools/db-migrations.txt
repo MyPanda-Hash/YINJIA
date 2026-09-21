@@ -740,3 +740,23 @@ migrate-mold-proc-p1-redesign.sql
 # 验收探针 tools/archive/_probe-approval-grade.cjs 12 项全绿(草稿态被拒/无审批权被拒/定级落库+留痕/
 #   改级留痕含轨迹/非法取值被拒/下游 refMap 与两处字典/界面按钮与四档弹窗)。
 migrate-approval-level.sql
+
+# —— 2026-09-21 产品变更申请单(RD_CHANGE)全新线上流程·第一步:数据层 ——
+# 用户口径:产品变更在系统里以「变更申请单」走完整线上流程(替代目前仅上传附件的做法):
+#   ①发起人建单(变更原因/验证数据/其他信息);②按**产品编号**关联该产品四个受控文件
+#   (成型工艺清单/组装工艺清单/规格书/出货检验计划表)并勾选本次要变的文件 + 选原料/半成品/成品处理方式;
+#   ③各部门按各自账号填本部门栏目(每人只能改自己填的),留「变更后内容」可编辑区;
+#   ④范围较大时相关人员**会签**;⑤填完提交冯总(admin)审核,通过即生效:对应受控文件据此
+#   **自动建下一版草稿(带来源单号)** + 通知责任人重走受控审核。
+# 版式基础:《产品开发\…\副本变更模板(1).xlsx》sheet「KPC变更申请通知单」(YJ-QR-130,已走查入库
+#   tools/archive/_walk/src-change-*.txt;另一张「变更申请-变更通知单」YJ-QR-131 仅作对照,未采用)。
+# migrate-change-request.sql —— 数据层:
+#   §1 rd_change_head(31 列:基础信息/性质/产品编号参照/变更事由/验证数据/变更文件/相关变更/
+#      需会签+会签人/原料·半成品·成品 数量+处理方式/变更来源单号/密级等)+ rd_change_detail
+#      (表区+部门+变更后内容+签字+日期;7 部门评审行);
+#   §2 两表 MS_Description 中文注明;§3 yj_panel 注册(⚠ category 必填,首版漏了实测报"不能将 NULL 插入 category");
+#   §4 yj_field 头 25 + 明细 5(label 即数据键;产品编号参照 RD_PROD_INFO);§5 译名(en/zh-TW/ja 为主);
+#   §6 yj_role_panel 普通用户 view/query/add/modify/modlog/del/export/print。
+# 下一步(未做):ButtonService 的部门按格编辑门禁、会签子流程、审批+生效钩子;前端纸张配置与
+#   四文件勾选控件、部门行只读态;i18n 其余语言;端到端探针。
+migrate-change-request.sql
