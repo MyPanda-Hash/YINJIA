@@ -193,6 +193,91 @@ export function sinterPatch(row) {
   return { 外径mm: pick('炭棒外径'), 外径公差: pick('炭棒外径公差'), 内径mm: pick('炭棒内径'), 内径公差: pick('炭棒内径公差') }
 }
 
+/** 文本 → 数字(空/非数字给 null,别把 null 当 0 比) */
+function numOf(v) {
+  const s = String(v ?? '').trim()
+  if (!s) return null
+  const n = Number(s)
+  return Number.isFinite(n) ? n : null
+}
+
+/**
+ * 按外径/内径在烧结尺寸表里找型号(「按产品规格一键带出」用它自动选中型号)。
+ * 口径:
+ *   · 先只看**正好等于单据车间**的行;没有再用 sinterRowsForWorkshop(把 `1/3` 这类共用行按 / 拆开);
+ *   · 该车间里没有这个规格就返回 '' —— **不跨车间乱选**(选错车间等于选错模具);
+ *   · 命中多行也返回 ''(宁可让人手选,也不猜)。
+ * @returns {string} 型号(带括号说明的原样文本),没匹配到给 ''
+ */
+export function matchSinterModel(rows, workshop, od, id) {
+  const w = String(workshop ?? '').trim()
+  const list = rows || []
+  const odN = numOf(od)
+  const idN = numOf(id)
+  if (odN === null || idN === null) return ''
+  const exact = w ? list.filter((r) => String(r?.['车间'] ?? '').trim() === w) : []
+  const pool = exact.length ? exact : (w ? sinterRowsForWorkshop(list, w) : list)
+  const hit = pool.filter((r) => numOf(r?.['炭棒外径']) === odN && numOf(r?.['炭棒内径']) === idN)
+  return hit.length === 1 ? String(hit[0]?.['型号'] ?? '').trim() : ''
+}
+
+/**
+ * 一张单据表头里的密度范围:上下限优先,只有「密度管控要求」文本时按 parseDensityRange 解析。
+ * 解析口径只此一处(带出/带出历史筛选/校验都走它),免得两处规则漂移。
+ * @returns {{low: string, high: string}|null} 取不到给 null(不猜)
+ */
+export function densityOf(row) {
+  let low = String(row?.['实际密度管控下限'] ?? '').trim()
+  let high = String(row?.['实际密度管控上限'] ?? '').trim()
+  if (!low || !high) {
+    const range = parseDensityRange(row?.['密度管控要求'])
+    if (range) { low = String(range[0]); high = String(range[1]) }
+  }
+  return low && high ? { low, high } : null
+}
+
+/**
+ * 「按产品规格一键带出」:产品信息行 + 该产品最近一张已保存单据 → 页 1 该补的格。
+ *
+ * 数据来源(都不编造,取不到就如实报 missing):
+ *   · 炭棒规格 1/2/3(外径/内径/长度)← 产品信息表 RD_PROD_INFO 的 炭棒外径/炭棒内径/炭棒长度;
+ *   · 密度上下限 ← 该产品最近一张成型工艺清单(densityOf:上下限,或解析「密度管控要求」文本)。
+ *
+ * 硬口径:**只填空格**。工艺员已经填过的格一律不动,值不同则记进 skipped 交给界面提示
+ * (静默覆盖等于偷偷改掉人已确认的工艺参数)。
+ *
+ * @param {{[k:string]: any}|null} product 产品信息行(可为 null/{}:取不到)
+ * @param {{[k:string]: any}|null} history 该产品最近一张单据的表头行(可为 null)
+ * @param {{[k:string]: any}|null} head 当前单据表头
+ * @returns {{patch: Record<string,string>, skipped: string[], missing: string[]}}
+ */
+export function specCarryFrom(product, history, head) {
+  const h = head || {}
+  const p = product || {}
+  const patch = {}
+  const skipped = []
+  const missing = []
+  const put = (key, val) => {
+    const v = String(val ?? '').trim()
+    if (!v) return
+    const old = String(h[key] ?? '').trim()
+    if (old) { if (old !== v) skipped.push(key); return }
+    patch[key] = v
+  }
+
+  const specs = [['炭棒规格1', p['炭棒外径']], ['炭棒规格2', p['炭棒内径']], ['炭棒规格3', p['炭棒长度']]]
+  if (specs.some(([, v]) => String(v ?? '').trim())) specs.forEach(([k, v]) => put(k, v))
+  else missing.push('炭棒规格')
+
+  const dens = densityOf(history)
+  if (dens) {
+    put('实际密度管控下限', dens.low)
+    put('实际密度管控上限', dens.high)
+  } else missing.push('密度')
+
+  return { patch, skipped, missing }
+}
+
 /** 长度越界提示(设计源的「长度范围」就是干这个的);解析不出范围或长度不可数则不提示 */
 export function sinterLengthWarning(row, length) {
   const range = parseLengthRange(row?.['长度范围'])

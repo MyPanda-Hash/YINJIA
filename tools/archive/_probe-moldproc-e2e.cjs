@@ -88,11 +88,19 @@ async function main() {
 
   // ── 准备:先建一张探针产品信息(真实流程里工艺员也得先有产品,参照弹窗才选得到)──
   const prodCreated = await callBtn(PROD_PANEL, '保存为草稿', {
-    产品编号: PROD_CODE, 产品名称: PROD_NAME, 产品形态: '圆柱', 产品管控等级: 'B', 炭棒外径: '59.5', 炭棒内径: '39.5',
+    产品编号: PROD_CODE, 产品名称: PROD_NAME, 产品形态: '圆柱', 产品管控等级: 'B',
+    炭棒外径: '59.5', 炭棒内径: '39.5', 炭棒长度: '120',
   })
   const prodNo = prodCreated?.data?.['编号']
   if (!prodNo) throw new Error('探针产品信息建失败:' + JSON.stringify(prodCreated))
   console.log(`  --   造数:产品信息 ${prodNo}(${PROD_CODE} / ${PROD_NAME})`)
+  // ── 再造一张该产品的历史成型单(带密度上下限):「按产品规格带出」的密度就是从这里来的 ──
+  const histCreated = await callBtn(MOLD, '保存为草稿', {
+    产品编号: PROD_CODE, 产品名称: PROD_NAME, 实际密度管控下限: '0.58', 实际密度管控上限: '0.60',
+  })
+  const historyNo = histCreated?.data?.['编号'] || ''
+  if (!historyNo) throw new Error('探针历史单建失败:' + JSON.stringify(histCreated))
+  console.log(`  --   造数:历史成型单 ${historyNo}(密度 0.58~0.60,作带出源)`)
 
   fs.mkdirSync(SHOTS, { recursive: true })
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yj-molde2e-'))
@@ -240,19 +248,23 @@ async function main() {
             if(bars[j].compareDocumentPosition(bs[i]) & Node.DOCUMENT_POSITION_FOLLOWING){ if((bars[j].textContent||'').trim()) bar=bars[j].textContent.trim() } }
           if(bar.indexOf(barText)>=0){ bs[i].click(); return 'CLICKED' } }
         return 'NO_ADD_BTN' };
-      window.__gridRows = function(){ var hdr=[].slice.call(document.querySelectorAll('.record-sheet tr')).filter(function(tr){
+      window.__gridCell = function(rowIdx, colIdx){ var rows=window.__gridTrs(); if(!rows[rowIdx]) return null
+        return rows[rowIdx].children[colIdx] || null };
+      window.__gridPick = function(rowIdx, colIdx, text){
+        var td=window.__gridCell(rowIdx, colIdx); if(!td) return 'NO_CELL'
+        var w=td.querySelector('.el-select__wrapper'); if(!w) return 'NOT_SELECT'
+        w.click(); return 'OPENED' };
+      window.__gridTrs = function(){ var hdr=[].slice.call(document.querySelectorAll('.record-sheet tr')).filter(function(tr){
           return tr.offsetParent && (tr.innerText||'').indexOf('物料种类')>=0 && tr.querySelector('th') })[0]
         if(!hdr) return []
         var out=[], n=hdr.nextElementSibling
         while(n && !n.querySelector('th')){ if(n.offsetParent && !n.querySelector('td.rs-empty') && (n.children[0] ? (n.children[0].innerText||'').trim() !== '合计' : false)) out.push(n); n=n.nextElementSibling }
-        return out.map(function(tr){ return [].slice.call(tr.children).map(function(td){ var i=td.querySelector('input'); return i ? i.value : (td.innerText||'').trim() }) }) };
-      window.__gridSet = function(rowIdx, colIdx, v){ var hdr=[].slice.call(document.querySelectorAll('.record-sheet tr')).filter(function(tr){
-          return tr.offsetParent && (tr.innerText||'').indexOf('物料种类')>=0 && tr.querySelector('th') })[0]
-        if(!hdr) return 'NO_HDR'
-        var rows=[], n=hdr.nextElementSibling
-        while(n && !n.querySelector('th')){ if(n.offsetParent && !n.querySelector('td.rs-empty')) rows.push(n); n=n.nextElementSibling }
-        if(!rows[rowIdx]) return 'NO_ROW('+rows.length+')'
-        var td=rows[rowIdx].children[colIdx]; if(!td) return 'NO_COL'
+        return out };
+      // 格子的显示值:输入框读 value;下拉格读它显示的文本(⚠ 下拉的 input 是筛选框,value 恒空)
+      window.__gridCellText = function(td){ var sel=td.querySelector('.el-select'); if(sel) return (sel.innerText||'').replace(/\\s+/g,' ').trim()
+        var i=td.querySelector('input'); return i ? i.value : (td.innerText||'').trim() };
+      window.__gridRows = function(){ return window.__gridTrs().map(function(tr){ return [].slice.call(tr.children).map(function(td){ return window.__gridCellText(td) }) }) };
+      window.__gridSet = function(rowIdx, colIdx, v){ var td=window.__gridCell(rowIdx, colIdx); if(!td) return 'NO_ROW'
         var i=td.querySelector('input'); if(!i) return 'NO_INPUT'
         return window.__V(i, v) };
       'KIT-OK'`
@@ -325,13 +337,10 @@ async function main() {
     const nameBack = await ev(`window.__getVal('炭棒编号', 1)`)
     if (String(nameBack).indexOf(PROD_NAME) >= 0) ok(`②-2 产品名称自动带出 = ${nameBack}(refMap)`)
     else bad(`②-2 产品名称没带出:${JSON.stringify(nameBack)}`)
-    for (const [i, v] of [['0', '59.5'], ['1', '39.5'], ['2', '120']]) {
-      const r = await ev(`window.__setVal('炭棒编号', ${i} + 2, ${JSON.stringify(v)})`)
-      if (r !== 'SET') bad(`②-3 炭棒规格${Number(i) + 1} 填值失败:${r}`)
-    }
-    const specOk = JSON.stringify(await ev(`[0,1,2].map(function(i){ return window.__getVal('炭棒编号', i+2) })`)) === JSON.stringify(['59.5', '39.5', '120'])
-    if (specOk) ok('②-3 炭棒规格三格 = 59.5 / 39.5 / 120')
-    else bad(`②-3 炭棒规格三格异常:${JSON.stringify(await ev(`[0,1,2].map(function(i){ return window.__getVal('炭棒编号', i+2) })`))}`)
+    // 炭棒规格三格**故意留空**:由后面「按产品规格一键带出」从产品信息填(顺手验证带出)
+    const specBefore = await ev(`[0,1,2].map(function(i){ return window.__getVal('炭棒编号', i+2) })`)
+    if (Array.isArray(specBefore) && specBefore.every((v) => !String(v || '').trim())) ok('②-3 炭棒规格三格留空(留给「按产品规格带出」填)')
+    else bad(`②-3 炭棒规格三格应为空:${JSON.stringify(specBefore)}`)
     // 产品管控类型 / 产品形态 = 下拉(值行第 5、6 格)
     for (const [idx, label] of [[5, '产品管控类型'], [6, '产品形态']]) {
       const opened = await ev(`(function(){ var cs=window.__valRow('炭棒编号'); if(!cs||!cs[${idx}]) return 'NO_IDX'
@@ -390,13 +399,14 @@ async function main() {
     if (dropOpened === 'OPENED' && String(dropPicked).indexOf('PICKED') === 0) ok(`③-3 压降是否测试 选得 ${JSON.stringify(String(dropVal).trim())}`)
     else bad(`③-3 压降是否测试 异常:open=${dropOpened} pick=${dropPicked} 格=${JSON.stringify(dropVal)}`)
 
-    /* ═══════════ ③b 检验要求:密度管控要求(配方计算的密度来源)═══════════
+    /* ═══════════ ③b 检验要求:密度管控(**故意留空**)═══════════
        ⚠ 工艺依赖:配方计算要 密度下限/上限 —— 要么直接填 实际密度管控下限/上限,
          要么填「密度管控要求」文本(如 0.58~0.60)由弹窗解析。两者都空时弹窗 ③ 只出
-         blockReason 不给结果(设计如此,不是 bug),e2e 里必须先填一格。 */
-    const densFill = await ev(`window.__setVal('管控要求', 0, '0.58~0.60')`)
-    if (densFill === 'SET') ok('③-4 密度管控要求 = 0.58~0.60(配方计算的密度来源)')
-    else bad(`③-4 密度管控要求 填值失败:${densFill}`)
+         blockReason 不给结果(设计如此,不是 bug)。本探针故意留空,用后面的
+         「按产品规格带出」来解锁 —— 顺带验证那个按钮真的能把计算从"卡住"变"算出来"。 */
+    const densBefore = await ev(`[1,2].map(function(i){ return window.__getAny('实际密度管控下限', i) })`)
+    if (Array.isArray(densBefore) && densBefore.every((v) => !String(v || '').trim())) ok('③-4 密度管控上下限留空(留给「按产品规格带出」填)')
+    else bad(`③-4 密度管控上下限应为空:${JSON.stringify(densBefore)}`)
 
     /* ═══════════ ④ 配方表(成型配方页)═══════════ */
     await clickTab('成型配方'); await sleep(1400)
@@ -411,11 +421,26 @@ async function main() {
     const rowCount = await ev(`window.__gridRows().length`)
     if (rowCount === RECIPE_ROWS.length) ok(`④-2 配方表加到 ${rowCount} 行`)
     else bad(`④-2 配方表行数 = ${rowCount},期望 ${RECIPE_ROWS.length}`)
-    // 列序:0=序号 1=物料种类 2=物料编号 3=物料名称 4=实际添加比例 5=单支物料含量 6=设计添加量
+    // 列序:0=序号 1=物料种类(下拉) 2=物料编号 3=物料名称 4=实际添加比例 5=单支物料含量 6=设计添加量
+    // 「物料种类」走下拉:先看选项是不是档案口径那四个词,再从下拉里选(不再手敲)
+    const kindOpen = await ev(`window.__gridPick(0, 1, '')`)
+    const kindOpts = kindOpen === 'OPENED' ? await waitFor(`(function(){ var o=window.__options(); return o.length ? o : '' })()`, 6000) : []
+    await ev(`window.__pickOption(${JSON.stringify(RECIPE_ROWS[0].物料种类)})`)
+    await sleep(300)
+    const kindOk = JSON.stringify(kindOpts) === JSON.stringify(['炭粉', '胶粉', '功能料-粉末', '功能料-颗粒'])
+    if (kindOk) ok(`④-3 物料种类是下拉,选项 = 档案口径四类(${kindOpts.join(' / ')})`)
+    else bad(`④-3 物料种类下拉选项异常:${JSON.stringify(kindOpts)}(open=${kindOpen})`)
     let fillFail = ''
     for (let r = 0; r < RECIPE_ROWS.length; r++) {
       const row = RECIPE_ROWS[r]
-      for (const [col, key] of [[1, '物料种类'], [2, '物料编号'], [3, '物料名称'], [6, '设计添加量']]) {
+      if (r > 0) {
+        const opened = await ev(`window.__gridPick(${r}, 1, '')`)
+        await waitFor(`window.__options().length ? 'O' : ''`, 6000)
+        const picked = await ev(`window.__pickOption(${JSON.stringify(row['物料种类'])})`)
+        if (opened !== 'OPENED' || String(picked).indexOf('PICKED') !== 0) fillFail += ` r${r}种类=${opened}/${picked}`
+        await sleep(250)
+      }
+      for (const [col, key] of [[2, '物料编号'], [3, '物料名称'], [6, '设计添加量']]) {
         const res = await ev(`window.__gridSet(${r}, ${col}, ${JSON.stringify(row[key])})`)
         if (res !== 'SET') fillFail += ` r${r}c${col}=${res}`
       }
@@ -424,8 +449,8 @@ async function main() {
     const grid = await ev('window.__gridRows()')
     const gridOk = Array.isArray(grid) && grid.length === RECIPE_ROWS.length &&
       grid.every((g, i) => g[1] === RECIPE_ROWS[i].物料种类 && g[2] === RECIPE_ROWS[i].物料编号 && g[6] === RECIPE_ROWS[i].设计添加量)
-    if (gridOk) ok(`④-3 四行配方填好(${grid.map((g) => g[2]).join(' / ')})`)
-    else bad(`④-3 配方行内容异常:${JSON.stringify(grid)} 填值失败:${fillFail || '无'}`)
+    if (gridOk) ok(`④-4 四行配方填好(下拉选种类 + 手填编号/名称/设计量):${grid.map((g) => g[2]).join(' / ')}`)
+    else bad(`④-4 配方行内容异常:${JSON.stringify(grid)} 填值失败:${fillFail || '无'}`)
     await shot('02-recipe-rows')
 
     /* ═══════════ ⑤ 打开弹窗:参数 / 料位 / 含水率 ═══════════ */
@@ -463,6 +488,8 @@ async function main() {
     else bad(`⑤-4 料位 1 含水率 = ${JSON.stringify(moisture1)},期望 6(档案 bs_inv.水分含量=0.06)`)
     const archTag = await ev(`(function(){ var d=window.__dlg(); if(!d) return 0
       return [].slice.call(d.querySelectorAll('.rcd-src')).filter(function(s){ var r=s.getBoundingClientRect(); return r.width>0 }).length })()`)
+    console.log('  --   弹窗提示文本: ' + JSON.stringify(await ev(`(function(){ var d=window.__dlg(); if(!d) return ''
+      return [].slice.call(d.querySelectorAll('.rcd-muted')).map(function(n){return (n.textContent||'').trim()}).filter(Boolean) })()`)))
     if (archTag > 0) ok(`⑤-4b 带出格有「档案」来源标记(${archTag} 处)`)
     else bad('⑤-4b 没有「档案」来源标记')
     // 一切几 = 2(探针期望值按 2 腔算)
@@ -470,6 +497,36 @@ async function main() {
     await sleep(600)
     if (setCav === 'SET') ok('⑤-5 工艺参数可改(一切几 = 2)')
     else bad(`⑤-5 参数改不动:${setCav}`)
+
+    /* ═══════════ ⑤b 「按产品规格带出」:把被密度/长度卡住的计算解锁 ═══════════
+       规格三格与密度上下限本探针**故意留空**(②-3/③-4),所以此刻计算应该是卡住的;
+       点一下带出按钮,规格应从产品信息、密度应从该产品历史单带出来 —— 这正是工艺员
+       做同产品第二张单时的真实用法。 */
+    const blocked = await ev(`(function(){ var d=window.__dlg(); if(!d) return ''
+      return [].slice.call(d.querySelectorAll('.rcd-warn')).map(function(x){return (x.textContent||'').trim()}).join(' ‖ ') })()`)
+    const resBefore = await ev('window.__dlgRows()')
+    const noResultYet = !resBefore || !Object.keys(resBefore).length
+    if (String(blocked).includes('缺') && noResultYet) ok(`⑤b-1 带出前计算被前置条件卡住(提示:${String(blocked).slice(0, 70)})`)
+    else bad(`⑤b-1 带出前本应卡住,实际 提示=${JSON.stringify(blocked)} 结果=${JSON.stringify(resBefore)}`)
+    const carryClick = await ev(`window.__clickContains('.rcd-act', '按产品规格带出')`)
+    await sleep(2600)
+    const carryMsg = await msgText()
+    const specAfter = await ev(`[0,1,2].map(function(i){ return window.__getAny('炭棒编号', i+2) })`)
+    if (JSON.stringify(specAfter) === JSON.stringify(['59.5', '39.5', '120']))
+      ok(`⑤b-2 规格三格由产品信息带出 = ${specAfter.join(' / ')}(提示:「${String(carryMsg).replace(/\s+/g, ' ').slice(0, 46)}」)`)
+    else bad(`⑤b-2 规格三格没带出:${JSON.stringify(specAfter)} click=${carryClick} 提示=${JSON.stringify(carryMsg)}`)
+    // ⚠ 密度在「检验要求」区,只在成型工艺清单页渲染;此刻停在成型配方页 ⇒ 这里按提示文本断言,
+    //   真正的落格断言在 ⑧-4b(填入单据后切回页 1)与 ⑤b-4(算得出来就说明密度进去了)
+    if (/实际密度管控下限/.test(String(carryMsg)) && /实际密度管控上限/.test(String(carryMsg)))
+      ok(`⑤b-3 带出提示含密度上下限(源:该产品历史单 ${historyNo})`)
+    else bad(`⑤b-3 带出提示里没有密度:${JSON.stringify(carryMsg)} 历史单=${historyNo}`)
+    const resAfter = await waitFor(`(function(){ var r=window.__dlgRows(); return (r && r['理论灌料中间值g']) ? r : '' })()`, 9000)
+    if (resAfter) ok(`⑤b-4 带出后计算自动解锁(灌料中间值 = ${resAfter['理论灌料中间值g']})`)
+    else bad(`⑤b-4 带出后仍然算不出来(blocked=${JSON.stringify(blocked)})`)
+    console.log('  --   带出的提示: ' + String(carryMsg).replace(/\s+/g, ' '))
+    // ⚠ 带出会连发几条 ElMessage,而提示条是 position:fixed 浮在顶部 —— 不等它消失,
+    //   后面点 ①b 的下拉会被提示条挡住(点了没反应/选项空)。实测踩到过。
+    await waitFor(`document.querySelectorAll('.el-message').length ? '' : 'CLEAR'`, 15000)
 
     /* ═══════════ ⑥ 烧结尺寸(模具)═══════════ */
     const wsOpen2 = await ev(`window.__dlgSel('车间')`)
@@ -634,8 +691,12 @@ async function main() {
     try { edge.kill() } catch { }
     /* ── 清理:探针建的两张单按精确单号物理删除,残留 0 ── */
     if (docNo) {
-      SQL(`DELETE FROM rd_mold_proc_detail WHERE 单据编号='${docNo}'; DELETE FROM rd_mold_proc_head WHERE 单据编号='${docNo}';`)
+      SQL(`DELETE FROM rd_mold_proc_detail WHERE 单据编号='${docNo}'; DELETE FROM rd_mold_proc_head WHERE 单据编号='${docNo}'; DELETE FROM yj_doc_status WHERE doc_no='${docNo}';`)
       console.log(`  --   清理成型单 ${docNo}`)
+    }
+    if (historyNo) {
+      SQL(`DELETE FROM rd_mold_proc_detail WHERE 单据编号='${historyNo}'; DELETE FROM rd_mold_proc_head WHERE 单据编号='${historyNo}'; DELETE FROM yj_doc_status WHERE doc_no='${historyNo}';`)
+      console.log(`  --   清理历史成型单 ${historyNo}`)
     }
     if (prodNo) {
       SQL(`DELETE FROM rd_prod_info_detail WHERE 单据编号='${prodNo}'; DELETE FROM rd_prod_info_head WHERE 单据编号='${prodNo}';`)

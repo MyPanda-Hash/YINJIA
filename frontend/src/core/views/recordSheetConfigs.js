@@ -49,6 +49,10 @@
 // ⚠ 必须带 .js 扩展名:Node 的 ESM 解析不做扩展名补全(node --test 直接跑源码时
 //   无扩展名会 ERR_MODULE_NOT_FOUND);Vite 两种写法都接受,故带扩展名对两端都安全。
 import { SPEC_TEST_LIB } from './specTestLib.js'
+// 配方表「物料种类」的词表:引擎只认物料档案口径的四个类别,集中放在 core/mold/materialKinds.js,
+// 并由 materialKinds.test.js 钉住"下拉里每个词都必须被引擎认出来"(填错会静默算错,见该文件注释)
+// ⚠ 必须相对路径:本文件被 node --test 直接 import(keys.test.js),`@/` 别名只有 Vite 认
+import { MATERIAL_KINDS } from '../mold/materialKinds.js'
 
 // ═══════════ 被并入面板的原始配置(2026-09-11 并入工艺清单面板第 2 页签,菜单已下线)═══════════
 // RD_MOLD_FORMULA 仍按页引用到成型工艺面板(sections/dataTables/tailSections 上的 page 标明归属;
@@ -417,7 +421,7 @@ const RD_MOLD_FORMULA = {
       // 口径见 CONTEXT.md「配方计算器」/ docs/adr/0004 —— 弹窗输入不落库,只有回填值随单据保存
       { page: 2, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
-          { key: '物料种类', label: '物料种类', span: 2 },
+          { key: '物料种类', label: '物料种类', span: 2, type: 'select', options: MATERIAL_KINDS },
           { key: '物料编号', label: '物料编号', span: 4 },
           { key: '物料名称', label: '物料名称', span: 3 },
           { key: '实际添加比例', label: '实际添加\n比例%' },

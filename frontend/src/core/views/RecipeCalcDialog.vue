@@ -95,6 +95,8 @@
       <!-- ③ 结果 -->
       <div class="rcd-sec-h">
         <span class="rcd-sec-t">③ {{ tt('计算结果') }}</span>
+        <!-- 算不出来时最需要它:规格/型号/密度一键从产品信息与历史单带出(只填空格,不覆盖已填值) -->
+        <span class="rcd-act" :class="{ 'rcd-act-off': carrying }" @click="carrySpec">{{ tt('按产品规格带出') }}</span>
         <span v-if="blockReason" class="rcd-warn">{{ blockReason }}</span>
       </div>
       <div v-if="result" class="rcd-grid">
@@ -161,8 +163,8 @@ import request from '@/core/request'
 import { tt } from '@/i18n'
 import StdLibManager from './StdLibManager.vue'
 import { compute } from '@/core/mold/recipeEngine.js'
-import { applyArchiveMoisture, buildPatch, moisturePercent, paramsFromHead, slotsFromRows,
-  sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery } from '@/core/mold/recipeSheet.js'
+import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisturePercent, paramsFromHead, slotsFromRows,
+  specCarryFrom, sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery } from '@/core/mold/recipeSheet.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
 
 /**
@@ -452,6 +454,83 @@ async function saveParams() {
   }
 }
 
+/* ── 按产品规格一键带出(2026-09-21)────────────────────────────────────────
+   做同一产品的第二张单时,炭棒规格/烧结型号/密度范围本来都要重敲;这三样都能从已有数据推出来:
+     · 炭棒规格 1/2/3 ← 产品信息表 RD_PROD_INFO(炭棒外径/炭棒内径/炭棒长度);
+     · 烧结型号       ← 按外径/内径在烧结尺寸表里匹配(先看单据车间,匹配不到不猜);
+     · 密度上下限     ← **该产品最近一张已保存的成型工艺清单**(只有「密度管控要求」文本也能解析)。
+   取不到就如实提示,**绝不编造密度**(质量口径的数不能猜);已填的格一律不动(specCarryFrom 有单测)。
+   放在 ③ 区头:算不出来时(blockReason)它就在眼前。 */
+const carrying = ref(false)
+/** 该面板下某条件的最新一张单据号(列表按新→旧;单据类面板列表键是「编号」,档案类是「单据编号」) */
+async function listDocNos(panelCode, condition) {
+  const res = await request.post('/px/queryFormDataList', { panelCode, condition, pageNo: 1, pageSize: 6 })
+  const d = res?.data
+  const list = Array.isArray(d) ? d : (d?.list || d?.rows || [])
+  return list.map((r) => String(r?.['编号'] ?? r?.['单据编号'] ?? '').trim()).filter(Boolean)
+}
+/** 单据表头(字段名口径,与页 1 一致) */
+async function fetchHeadRow(panelCode, code) {
+  const res = await request.get('/px/getFormDescriptor', { params: { panelCode, code } })
+  const d = res?.data
+  return (d && (d.data || d)) || null
+}
+/**
+ * 该产品最近一张**带密度**的成型工艺清单。
+ * ⚠ 必须跳过当前这张单:它自己就是该产品最新的一张(还没填密度),不跳就会误判"历史没有密度"。
+ * 取不到就给 null —— 界面据此提示"密度请手工填",绝不猜一个密度出来。
+ */
+async function findDensityHistory(code) {
+  const cur = String(props.head?.['单据编号'] ?? props.head?.['编号'] ?? '').trim()
+  const nos = (await listDocNos('RD_MOLD_PROC', { 产品编号: code })).filter((no) => no !== cur)
+  for (const no of nos.slice(0, 3)) {
+    const head = await fetchHeadRow('RD_MOLD_PROC', no)
+    if (densityOf(head)) return head
+  }
+  return null
+}
+async function carrySpec() {
+  if (carrying.value) return
+  const code = productCode.value
+  if (!code) { ElMessage.warning(tt('请先在页 1 产品基本信息里选「炭棒编号」')); return }
+  carrying.value = true
+  try {
+    let product = null
+    let history = null
+    try {
+      const pNo = (await listDocNos('RD_PROD_INFO', { 产品编号: code }))[0]
+      if (pNo) product = await fetchHeadRow('RD_PROD_INFO', pNo)
+    } catch { /* 读不到就当没有,靠 missing 提示 */ }
+    try {
+      history = await findDensityHistory(code)
+    } catch { /* 同上 */ }
+
+    const { patch, skipped, missing } = specCarryFrom(product, history, props.head)
+    const keys = Object.keys(patch)
+    keys.forEach((k) => { props.head[k] = patch[k] })
+
+    // 烧结型号:拿带出后的外径/内径(含单据上已有的)去尺寸表匹配,匹配到就选中
+    const od = patch['炭棒规格1'] || props.head?.['炭棒规格1']
+    const id = patch['炭棒规格2'] || props.head?.['炭棒规格2']
+    const model = matchSinterModel(sinterRows.value, sinterWorkshop.value || String(props.head?.['生产车间'] ?? ''), od, id)
+    if (model) sinterModel.value = model
+
+    const uniqSkip = [...new Set(skipped)]
+    if (keys.length) ElMessage.success(`${tt('已带出')} ${keys.length} ${tt('处')}：${keys.join('、')}`)
+    if (uniqSkip.length) ElMessage.info(`${tt('已有值未覆盖')}：${uniqSkip.join('、')}`)
+    if (model) ElMessage.success(`${tt('烧结型号已选中')}：${model}`)
+    else if (od && id) ElMessage.info(tt('尺寸表里没匹配到型号，请手工选'))
+    if (missing.length) {
+      const extra = missing.includes('密度') ? tt('（密度范围请手工填，或先给该产品存一张成型工艺清单）') : ''
+      ElMessage.warning(`${tt('没有可带出的')}：${missing.join('、')}${extra}`)
+    }
+  } catch (e) {
+    ElMessage.error(tt('带出失败') + '：' + (e?.message || e))
+  } finally {
+    carrying.value = false
+  }
+}
+
 /** 回填:页 1 十一个格 + 配方表对应行的两列(设计文档口径:比例 2 位小数带 %、含量 2 位小数) */
 function apply() {
   if (!patch.value) return
@@ -476,6 +555,7 @@ function apply() {
 .rcd-muted { color: #909399; font-size: 11px; line-height: 1.5; }
 .rcd-act { color: #409eff; cursor: pointer; border: 1px solid #a0cfff; border-radius: 3px; padding: 1px 8px; font-size: 11px; }
 .rcd-act:hover { background: #ecf5ff; }
+.rcd-act-off { opacity: 0.5; pointer-events: none; }
 .rcd-params { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px 14px; }
 .rcd-pf { display: flex; align-items: center; gap: 8px; }
 .rcd-pf-lb { width: 132px; color: #606266; text-align: right; }

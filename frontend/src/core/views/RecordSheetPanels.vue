@@ -466,6 +466,22 @@
             <tr v-else v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }">
               <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :style="designTdStyle(dt)" :colspan="(c.span || 1) > 1 ? c.span : undefined">
                 <el-input v-if="editable && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
+                <!-- 下拉列(配置 c.type='select'):配方表「物料种类」用它 —— 自由文本会让引擎
+                     静默认不出、把折算料当比例算(见 core/mold/materialKinds.js 注释)。
+                     filterable+allow-create:预设四个档案类别,新增类别也能直接敲(口径由工艺科定) -->
+                <el-select
+                  v-else-if="editable && c.type === 'select'"
+                  v-model="row[c.key]"
+                  size="small"
+                  filterable
+                  allow-create
+                  default-first-option
+                  class="rs-c-in"
+                  :style="designInputStyle(dt)"
+                  @change="emit('dirty')"
+                >
+                  <el-option v-for="o in (c.options || [])" :key="o" :label="tt(o)" :value="o" />
+                </el-select>
                 <el-input v-else-if="editable" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
                 <span v-else class="rs-txt rsp-cell">{{ row[c.key] || ' / ' }}</span>
               </td>
@@ -928,6 +944,7 @@
         <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索父件编码/名称')" clearable style="width:240px" @input="filterMatPick" />
       </div>
       <el-table ref="matPickTableRef" :data="matPickFiltered" size="small" border max-height="420" :row-key="(r) => r['父件编码']"
+                :tree-props="{ children: '__noTree' }"
                 :selectable="matPickSelectable" @selection-change="(sel) => (matPickChecked = sel)">
         <el-table-column type="selection" width="42" :selectable="matPickSelectable" />
         <el-table-column prop="父件编码" :label="tt('父件编码')" width="120" />
@@ -2267,6 +2284,9 @@ async function openMaterialPick(dt) {
       }
     }
     // 父件口径:按 父件编码 分组;子件编码为空的行 = 父件自己那一行(取它的规格/外观)
+    // ⚠ 分组对象里**不能叫 children**:el-table 默认 tree-props.children='children',
+    //   会把子件数组当成**树形子行**渲染出来 —— 表现为"点/看一个父件,冒出 N 行跟父件一模一样的行"
+    //   (子行套用的是父件列:父件编码/父件名称,所以看起来就是父件的副本)。实测踩过 ⇒ 叫 kids。
     const byParent = new Map()
     for (const k of all) {
       const code = String(k['父件编码'] || '').trim()
@@ -2277,14 +2297,14 @@ async function openMaterialPick(dt) {
           父件名称: k['父件名称'] || '',
           版本号: k['版本号'] || '',
           childCount: 0,
-          children: [],
+          kids: [],
           self: null,
         })
       }
       const p = byParent.get(code)
       if (String(k['子件编码'] || '').trim()) {
         p.childCount++
-        p.children.push(k)
+        p.kids.push(k)
       } else {
         p.self = k
       }
@@ -2347,7 +2367,7 @@ function confirmMaterialPick() {
       if (put(parent['父件编码'], parent['父件名称'], self['物料规格'], self['外观要求'], '')) addedP++
     }
     if (scope !== 'parent') {
-      for (const m of parent.children || []) {
+      for (const m of parent.kids || []) {
         if (put(m['子件编码'], m['子件名称'], m['物料规格'], m['外观要求'], m['定额数量'])) addedC++
       }
     }
