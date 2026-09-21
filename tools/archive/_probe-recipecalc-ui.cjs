@@ -459,6 +459,11 @@ async function main() {
     else bad(`⑧-10 新字段「灌料要求」没随面板描述下发:${JSON.stringify(pourReq)}`)
     if ((metaOf('配料要求').stdLib || '') === 'mold.batching') ok('⑧-11 配料要求已挂标准库 mold.batching(库先空着,由工艺科录模板)')
     else bad(`⑧-11 配料要求的 stdLib 应为 mold.batching,实际 ${JSON.stringify(metaOf('配料要求').stdLib)}`)
+    const phOk = await ev(`(function(){ var rs=document.querySelector('.record-sheet'); if(!rs) return false
+      var ph='实际灌料重量中间值=（1-理论水分%）/（1-实际水分%）*理论灌料重量中间值'
+      return !!rs.querySelector('input[placeholder="'+ph+'"], textarea[placeholder="'+ph+'"]') })()`)
+    if (phOk) ok('⑧-12 「实际灌料重量计算公式」空着时显示设计模板文字作为背景提示词')
+    else bad('⑧-12 实际灌料重量计算公式 的背景提示词没渲染出来')
     const shot8 = await shot('08-page1-relayout')
     console.log('  --   截图(⑧):' + shot8)
   } finally {

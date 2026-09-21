@@ -1936,6 +1936,7 @@ export default {
     '压降是否测试': 'Pressure Drop Tested',
     '是否测试丨 √ × 丨': 'Tested? √ / X',
     '用户输入': 'Enter manually',
+    '实际灌料重量中间值=（1-理论水分%）/（1-实际水分%）*理论灌料重量中间值': 'Mid actual filling weight = (1 − theoretical moisture%) / (1 − actual moisture%) × mid theoretical filling weight',
   },
 }
 
