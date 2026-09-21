@@ -149,6 +149,7 @@
           v-else-if="isRecordSheetPanel"
           ref="approvalSheetRef"
           :head="cur" :fields="sheetAllFields" :editable="draftEditable" :panel-code="panelCode"
+          :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -285,6 +286,26 @@
                   <div class="as-side-btn" :class="{ disabled: isDisabled('审批通过') }" @click="onSideAction('审批通过')">{{ tt('审批通过') }}</div>
                   <div class="as-side-btn" :class="{ disabled: isDisabled('审批驳回') }" @click="onSideAction('审批驳回')">{{ tt('审批驳回') }}</div>
                   <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
+                </template>
+                <div class="as-side-btn" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
+              </template>
+              <!-- 产品变更申请单(RD_CHANGE,2026-09-21):会签子流程 + 审批(冯总=admin)。
+                   状态链 草稿 →(填写中)→ 会签中(可选)→ 审批中(admin)→ 已生效;驳回回草稿。
+                   显隐按"状态 × 身份":发起人(∪管理员)才提交/撤回,会签人(∪管理员)才签,
+                   审批权口径与其它面板一致(canApproveHere)。服务端每步都再校验一次身份。 -->
+              <template v-if="isChangePanel">
+                <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] === '是' && isChangeInitiator"
+                     class="as-side-btn" @click="onSideAction('提交会签')">{{ tt('提交会签') }}</div>
+                <template v-if="curDocStatus === '会签中'">
+                  <div v-if="iAmChangeSigner" class="as-side-btn" @click="onSideAction('会签通过')">{{ tt('会签通过') }}</div>
+                  <div v-if="iAmChangeSigner" class="as-side-btn" @click="onSideAction('会签驳回')">{{ tt('会签驳回') }}</div>
+                  <div v-if="isChangeInitiator" class="as-side-btn" @click="onSideAction('撤回会签')">{{ tt('撤回会签') }}</div>
+                </template>
+                <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] !== '是' && isChangeInitiator"
+                     class="as-side-btn" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
+                <template v-if="IN_APPROVAL.includes(curDocStatus) && canApproveHere()">
+                  <div class="as-side-btn" @click="onSideAction('审批通过')">{{ tt('审批通过') }}</div>
+                  <div class="as-side-btn" @click="onSideAction('审批驳回')">{{ tt('审批驳回') }}</div>
                 </template>
                 <div class="as-side-btn" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
               </template>
@@ -1552,6 +1573,19 @@ const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(S
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
 const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
+/** 产品变更申请单:当前账号可填的纸面部门行(后端按 yj_user.dept_id → yj_change_dept 算,metadata 下发)。
+ *  仅 RD_CHANGE 有该键;其它面板拿到空数组也无害(没有 lockKey 的表根本不看它)。 */
+const changeDeptRows = computed(() => cfgCache.value?.metadata?.changeDepts || [])
+
+// ── 产品变更申请单:会签按钮组的身份判据(2026-09-21)──
+// 会签人 = 头字段「会签人」里的账号(顿号/逗号分隔);发起人 = 纸面「申请人」= 当前用户姓名。
+// 两者只决定**按钮显不显示**:服务端 ButtonService.requireSigner / requireChangeInitiator 才是门禁。
+const isChangePanel = computed(() => String(panelCode.value) === 'RD_CHANGE')
+const changeSigners = computed(() => String(cur.value?.['会签人'] ?? '')
+  .split(/[,，、;；\s]+/).map((s) => s.trim()).filter(Boolean))
+const iAmChangeSigner = computed(() => changeSigners.value.includes(String(user.account || user.userName || '')))
+const isChangeInitiator = computed(() => user.isAdmin === true
+  || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
 const docSheetConfig = computed(() => qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
 const bomMasterRows = computed(() => {
   if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
@@ -5430,10 +5464,35 @@ async function onButton(action) {
       approvalNo.value = current.value['编号'] || current.value['单据编号'] || ''
       approvalVisible.value = true
       return
+    } else if (['提交会签', '会签通过', '会签驳回', '撤回会签'].includes(action)) {
+      // 产品变更申请单会签组(2026-09-21):驳回必须填意见;其余给一次确认(会签=对别人负责的动作)
+      if (!current.value) return ElMessage.warning('请先选择一行数据')
+      const no2 = current.value['编号'] || current.value['单据编号'] || ''
+      try {
+        if (action === '会签驳回') {
+          const { value } = await ElMessageBox.prompt(
+            '单据：' + no2 + '（当前状态：会签中）\n驳回必须填写意见',
+            '会签驳回确认',
+            { confirmButtonText: '确认驳回', cancelButtonText: '取消', inputType: 'textarea',
+              inputPlaceholder: '驳回意见（必填）', inputValidator: (v) => (v && v.trim() ? true : '会签驳回必须填写意见') }
+          )
+          approvalOpinion = value || ''
+        } else {
+          await ElMessageBox.confirm(
+            '单据：' + no2 + '（当前状态：' + (current.value['单据状态'] || '') + '）',
+            action + '确认',
+            { confirmButtonText: '确认' + action, cancelButtonText: '取消', type: 'warning' }
+          )
+          if (action === '会签通过') approvalOpinion = ''
+        }
+      } catch (e) {
+        return
+      }
     }
     const actionDocumentNo = current.value?.['编号'] || current.value?.['单据编号'] || ''
     // 列表页草稿是前端内联编辑态；审核/提交审批前必须先落库，否则状态刷新后会显示数据库中的旧空明细。
-    if (['审核', '提交审批'].includes(action) && draftEditable.value) {
+    // (提交会签同此:需会签/会签人 是头字段,刚填的必须先生效,否则后端按库里的旧值判"没填会签人")
+    if (['审核', '提交审批', '提交会签'].includes(action) && draftEditable.value) {
       const saved = await saveInlineDraft('保存', { silent: true })
       if (!saved) return
     }

@@ -69,6 +69,11 @@ export const menuTree = [
           //     不为它单开"样品管理"分组 —— 一个分组只挂一张表就是分组噪音。
           { code: 'rdProdDocList', title: '产品文件列表', path: '/panelx/list/RD_PROD_DOCLIST', panelCode: 'RD_PROD_DOCLIST', icon: 'Grid' },
           { code: 'rdSampleNo', title: '样品编号表', path: '/panelx/list/RD_SAMPLE_NO', panelCode: 'RD_SAMPLE_NO', icon: 'Tickets', operationName: '新增流程' },
+          // 2026-09-21 新增:产品变更申请单(RD_CHANGE,YJ-QR-130《KPC变更申请通知单》)——
+          // 产品变更**走单**的载体:发起人建单 → 各受控文件勾选 → 部门按账号填本部门栏 →(需会签时)会签
+          // → 冯总(admin)审批 → 生效即按勾选文件建下一版草稿并通知责任人重走受控审核。
+          // 归「产品文件」组:它改的就是这四个受控文件,与产品信息表/四文件同一族。
+          { code: 'rdChange', title: '产品变更申请单', path: '/panelx/list/RD_CHANGE', panelCode: 'RD_CHANGE', icon: 'Refresh' },
         ],
       },
       {

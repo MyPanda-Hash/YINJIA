@@ -1362,4 +1362,151 @@ export const recordSheetConfigs = {
       footerNote: '若规格书有变动提示管控文件需更新' },
     ],
   },
+
+  /**
+   * 产品变更申请单(2026-09-21 新增)—— 版式照《副本变更模板(1).xlsx》sheet「KPC变更申请通知单」
+   * (YJ-QR-130,走查产物 tools/archive/_walk/src-change-KPC变更申请通知单.txt):
+   *   大标题「KPC管控点申请单」/ 一、基础信息 / 二、变更·新增申请事由 / 三、部门评审意见(7 行)
+   *   / 三.相关变更 / 四、库存产品处理方式(原料·半成品·成品 各 数量+处理方式)/ 批准。
+   * 列网格 = 纸面 B..G 实测列宽(175/324/698/232/332/202,合计 1963),上下竖线自然对齐。
+   * 报告头不带信息块(纸面右侧没有密级/适用范围那四格 ⇒ info: [])。
+   *
+   * 与其它文书面板的三处不同,都是**用户口径**决定的:
+   *   ① 部门评审意见的 7 行是**库里预置的行**(建单时后端 ensureChangeDeptRows 铺好),
+   *      故该表 fixedRows=true —— 不出 ＋/× 也不出底部"新增数据记录行";
+   *      lockKey/lockCols 配合 props.myDeptRows 做**行级只读**:不是本部门的行整行置灰不可编
+   *      (服务端 ButtonService.gateChangeDetail 另有强制还原,界面只是先说清楚);
+   *   ② 性质 / 变更文件 用 type:'checks' 复选格(存储是顿号分隔文本,不是新字段类型);
+   *   ③ 签字/日期 由服务端盖章(填了「变更后内容」才盖),界面上同样只读。
+   */
+  RD_CHANGE: {
+    headMode: 'report',
+    // 纸面大标题是**印死的表单名**(YJ-QR-130 的 B2),不是每张单各写各的 ⇒ 用 staticTitle
+    // (titlePlaceholder 只在没有 staticTitle 时当输入框灰字占位,不落纸)
+    staticTitle: 'KPC管控点申请单',
+    titlePlaceholder: 'KPC管控点申请单',
+    grid: [175, 324, 698, 232, 332, 202],
+    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    info: [],   // 纸面报告头只有公司名 + 编号 + 大标题,没有右侧信息块
+    sections: [
+      { bar: '一、基础信息', rows: [
+        { grid: [
+          { label: '文件编码' },
+          { fixed: 'YJ-QR-130' },
+          { label: '申请日期' },
+          { key: '申请日期', span: 3 },
+        ]},
+        { grid: [
+          { label: '申请部门' },
+          { key: '申请部门', span: 2 },
+          { label: '性质' },
+          { key: '性质', type: 'checks', single: true, options: ['变更', '新增'], span: 2 },
+        ]},
+        { grid: [
+          { label: '产品编码' },
+          { key: '产品编号', span: 2 },
+          { label: '申请人' },
+          { key: '申请人', span: 2 },
+        ]},
+        { grid: [
+          { label: '产品名称' },
+          { key: '产品名称', span: 2 },
+          { label: '单据编号' },
+          { key: '单据编号', span: 2 },
+        ]},
+        // 会签(用户口径第④条):需会签=是 时「提交会签」把会签人点亮;会签人写账号,多人用逗号/顿号分隔
+        { grid: [
+          { label: '需会签' },
+          { key: '需会签', type: 'checks', single: true, options: ['是', '否'] },
+          { label: '会签人' },
+          { key: '会签人', span: 3, ph: '多人用逗号分隔（账号）' },
+        ]},
+      ]},
+      { bar: '二、变更/新增申请事由', rows: [
+        { grid: [
+          { label: '变更事由' },
+          { key: '变更事由', span: 5, area: true, ph: '本次要改什么、为什么改' },
+        ]},
+        { grid: [
+          { label: '验证数据' },
+          { key: '验证数据', span: 5, area: true, ph: '支持本次变更的验证数据/试验结论' },
+        ]},
+        // 四个受控文件的勾选(用户口径第②条):勾哪些,生效时就按哪些建下一版草稿
+        { grid: [
+          { label: '变更文件' },
+          { key: '变更文件', type: 'checks', span: 5,
+            options: ['成型工艺清单', '组装工艺清单', '规格书', '出货检验计划表'] },
+        ]},
+      ]},
+    ],
+    dataTables: [
+      { page: 0, bar: '三、部门评审意见', fixedRows: true, lockKey: '部门', lockCols: ['变更后内容', '备注'],
+        filterKey: '表区', filterVal: '部门评审意见',
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true },
+          { key: '部门', label: '部门', w: 175 },
+          { key: '变更后内容', label: '变更/新增申请内容', w: 1022, area: true },
+          { key: '签字', label: '签字', w: 232 },
+          { key: '日期', label: '日期', w: 534 },
+        ]},
+    ],
+    tailSections: [
+      { page: 0, bar: '三.相关变更', rows: [
+        { grid: [
+          { label: '相关变更' },
+          { key: '相关变更', span: 5, area: true, ph: '与哪些文件/工序/在制品相关联' },
+        ]},
+      ]},
+      { page: 0, bar: '四、库存产品处理方式', rows: [
+        { grid: [
+          { label: '原料' },
+          { label: '数量' },
+          { key: '原料数量' },
+          { label: '处理方式' },
+          { key: '原料处理方式', type: 'select', span: 2 },
+        ]},
+        { grid: [
+          { label: '半成品' },
+          { label: '数量' },
+          { key: '半成品数量' },
+          { label: '处理方式' },
+          { key: '半成品处理方式', type: 'select', span: 2 },
+        ]},
+        { grid: [
+          { label: '成品' },
+          { label: '数量' },
+          { key: '成品数量' },
+          { label: '处理方式' },
+          { key: '成品处理方式', type: 'select', span: 2 },
+        ]},
+      ]},
+      { page: 0, bar: '五、其它', rows: [
+        { grid: [
+          { label: '文件管理人' },
+          { key: '文件管理人', span: 2 },
+          { label: '密级' },
+          { key: '密级', type: 'select', span: 2 },
+        ]},
+        { grid: [
+          { label: '文件使用范围' },
+          { key: '文件使用范围', type: 'select', span: 2 },
+          { label: '备注' },
+          { key: '备注', span: 2 },
+        ]},
+      ]},
+      // 批准行:纸面 B24:C24=批准 + D24:G24 签字区(留白手签)
+      { page: 0, bar: '批准', rows: [
+        { grid: [
+          { label: '批准', span: 2 },
+          { label: '签字', span: 2 },
+          { label: '日期', span: 2 },
+        ]},
+        { grid: [
+          { span: 2 },
+          { span: 2 },
+          { span: 2 },
+        ]},
+      ]},
+    ],
+  },
 }

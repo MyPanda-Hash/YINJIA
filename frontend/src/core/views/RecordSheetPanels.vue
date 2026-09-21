@@ -232,6 +232,20 @@
                   </el-select>
                   <span v-if="stdLibOf(c.key)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(c.key))">⧉ {{ tt('标准库维护') }}</span>
                 </template>
+                <template v-else-if="editable && c.type === 'checks'">
+                  <!-- 复选格(变更申请单 YJ-QR-130):「性质」□变更 □新增(c.single=单选语义)、
+                       「变更文件」□成型工艺清单 □组装工艺清单 □规格书 □出货检验计划表(多选)。
+                       存储口径 = **顿号分隔的文本**(与 rd_change_head.变更文件 一致,后端按 contains 判定);
+                       不新增字段类型,纸面上就是几个方框。 -->
+                  <span class="rs-checks">
+                    <el-checkbox
+                      v-for="o in (c.options || [])"
+                      :key="o"
+                      :model-value="checkList(head[c.key]).includes(o)"
+                      @change="toggleCheck(c.key, o, !!c.single)"
+                    >{{ tt(o) }}</el-checkbox>
+                  </span>
+                </template>
                 <template v-else-if="editable && c.key">
                   <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
@@ -471,13 +485,13 @@
               </tr>
             </template>
             <tr v-else v-for="(row, i) in rowsOf(dt)" :key="row.id ?? ('new' + di + '-' + i)" :class="{ 'rsp-design': dt.design }">
-              <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :style="designTdStyle(dt)" :colspan="(c.span || 1) > 1 ? c.span : undefined">
-                <el-input v-if="editable && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
+              <td v-for="c in visCols(dt)" :key="c.key" class="rs-td" :class="{ 'rsp-locked': isLockedCell(dt, row, c) }" :style="designTdStyle(dt)" :colspan="(c.span || 1) > 1 ? c.span : undefined">
+                <el-input v-if="cellEditable(dt, row, c) && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
                 <!-- 下拉列(配置 c.type='select'):配方表「物料种类」用它 —— 自由文本会让引擎
                      静默认不出、把折算料当比例算(见 core/mold/materialKinds.js 注释)。
                      filterable+allow-create:预设四个档案类别,新增类别也能直接敲(口径由工艺科定) -->
                 <el-select
-                  v-else-if="editable && c.type === 'select'"
+                  v-else-if="cellEditable(dt, row, c) && c.type === 'select'"
                   v-model="row[c.key]"
                   size="small"
                   filterable
@@ -489,14 +503,14 @@
                 >
                   <el-option v-for="o in (c.options || [])" :key="o" :label="tt(o)" :value="o" />
                 </el-select>
-                <el-input v-else-if="editable" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
-                <span v-else class="rs-txt rsp-cell">{{ row[c.key] || ' / ' }}</span>
+                <el-input v-else-if="cellEditable(dt, row, c)" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
+                <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ row[c.key] || ' / ' }}</span>
               </td>
-              <td v-if="editable" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
+              <td v-if="editable && !dt.fixedRows" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
             </tr>
             <tr v-if="!rowsOf(dt).length">
               <td :colspan="totalSpan(dt)" class="rs-empty">—</td>
-              <td v-if="editable" class="rsp-op-pad"></td>
+              <td v-if="editable && !dt.fixedRows" class="rsp-op-pad"></td>
             </tr>
             <!-- 合计行(成型配方:比例/含量/设计添加量数值求和)——「合计」格跨度跟首列跨度走(13 格配方表首列 No. 占 1 格) -->
             <tr v-if="dt.totalCols && rowsOf(dt).length">
@@ -513,7 +527,7 @@
             </tr>
           </tbody>
         </table>
-        <div v-if="editable" class="rs-add" :style="{ width: (effPlain ? plainW(dt) : (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : gridW)) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
+        <div v-if="editable && !dt.fixedRows" class="rs-add" :style="{ width: (effPlain ? plainW(dt) : (dtOwnsWidth(dt) ? (dt.design ? dtW(dt) * designK(dt) : dtW(dt)) : gridW)) + 'px' }" @click="addRow(dt)">＋ {{ tt('新增数据记录行') }}</div>
       </div>
       <!-- 矿化:Excel 原表右侧 4 张散点图(RO出水/浸泡30min/煮沸晾凉 × 累计流量) -->
       <div v-if="dt.charts" class="rsp-chart">
@@ -631,6 +645,20 @@
                     <el-option v-for="o in selectOptions(c.key)" :key="o.value" :label="o.label" :value="o.value" />
                   </el-select>
                   <span v-if="stdLibOf(c.key)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(c.key))">⧉ {{ tt('标准库维护') }}</span>
+                </template>
+                <template v-else-if="editable && c.type === 'checks'">
+                  <!-- 复选格(变更申请单 YJ-QR-130):「性质」□变更 □新增(c.single=单选语义)、
+                       「变更文件」□成型工艺清单 □组装工艺清单 □规格书 □出货检验计划表(多选)。
+                       存储口径 = **顿号分隔的文本**(与 rd_change_head.变更文件 一致,后端按 contains 判定);
+                       不新增字段类型,纸面上就是几个方框。 -->
+                  <span class="rs-checks">
+                    <el-checkbox
+                      v-for="o in (c.options || [])"
+                      :key="o"
+                      :model-value="checkList(head[c.key]).includes(o)"
+                      @change="toggleCheck(c.key, o, !!c.single)"
+                    >{{ tt(o) }}</el-checkbox>
+                  </span>
                 </template>
                 <template v-else-if="editable && c.key">
                   <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
@@ -1046,6 +1074,11 @@ const props = defineProps({
   fields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
   panelCode: { type: String, required: true },
+  // 行级编辑门禁(产品变更申请单「部门评审意见」):当前账号可填的纸面部门行清单 ——
+  // 由面板配置 metadata.changeDepts 下发(服务端按 yj_user.dept_id → yj_change_dept 算),
+  // deptLockAll = 管理员豁免(可代填任何部门行)。两者只影响**界面**,服务端另有强制还原。
+  myDeptRows: { type: Array, default: () => [] },
+  deptLockAll: { type: Boolean, default: false },
 })
 const emit = defineEmits(['dirty', 'refresh-config'])
 
@@ -1314,6 +1347,51 @@ function materialPickAt(sec) {
 }
 
 watch(() => props.panelCode, () => { activePage.value = 0 })
+
+// ── 复选格(变更申请单):顿号分隔文本 ⇄ 勾选态 ──
+/**
+ * 文本 → 勾选项数组(顿号/逗号/分号/空格都当分隔符;空值=没勾)。
+ * 与后端 ButtonService/changeHead 的判定同一口径(后端用的是 contains,故顺序无关)。
+ */
+function checkList(v) {
+  return String(v ?? '').split(/[、,，;；\s]+/).map((s) => s.trim()).filter(Boolean)
+}
+
+/** 勾选态 → 文本(顿号分隔;不勾就写空串 —— 注意本引擎"空串=不改动",要清空得靠后端还原口径) */
+function toggleCheck(key, opt, single) {
+  const cur = checkList(props.head?.[key])
+  let next
+  if (single) next = cur.includes(opt) ? [] : [opt]
+  else next = cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt]
+  props.head[key] = next.join('、')
+  emit('dirty')
+}
+
+// ── 行级编辑门禁(变更申请单「部门评审意见」)──
+/**
+ * 某张明细表的某一行该不该锁:dt.lockKey 声明"按哪一列判部门"(如 '部门')时,
+ * 只有 props.myDeptRows(服务端按账号部门算出来的可填部门行)里的行才可编;
+ * 管理员(deptLockAll)豁免;声明了 dt.lockCols 时只有这些列可编(表区/部门/签字/日期 一律不可编)。
+ * ⚠ 只影响界面:服务端 ButtonService.gateChangeDetail 另有强制还原,双保险。
+ */
+function rowLocked(dt, row) {
+  if (!dt || !dt.lockKey) return false
+  if (props.deptLockAll) return false
+  return !props.myDeptRows.includes(String(row?.[dt.lockKey] ?? '').trim())
+}
+
+/** 单元格可否编辑:表可编 + 行不属于锁 + (声明了 lockCols 时)列在放行清单里 */
+function cellEditable(dt, row, c) {
+  if (!props.editable) return false
+  if (rowLocked(dt, row)) return false
+  if (dt.lockCols && !dt.lockCols.includes(c.key)) return false
+  return true
+}
+
+/** 该格是否"因为不是本部门"被锁(给个灰底 + tooltip,免得用户以为坏了) */
+function isLockedCell(dt, row, c) {
+  return props.editable && rowLocked(dt, row) && !(dt.lockCols && !dt.lockCols.includes(c.key))
+}
 
 // ── 校验定位(供 PanelxList 保存校验调用):翻到字段所在页 + 滚动 + 闪烁 ──
 /** 找到 label 所在页签(封面字段=0;sections/tailSections 按 page 归属;找不到返回 null) */
@@ -3104,6 +3182,23 @@ function chartOf(dt) {
   text-align: center;
   white-space: nowrap;
   overflow: visible;
+}
+/* 复选格(变更申请单 性质/变更文件):方框横排,不撑破单元格 */
+.rs-checks {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  align-items: center;
+  min-height: 24px;
+}
+.rs-checks :deep(.el-checkbox) {
+  margin-right: 0;
+  height: 22px;
+}
+/* 非本部门栏目(行级门禁):灰底 + 灰字,提示"这行不是你的" */
+.rsp-locked {
+  background: #f5f7fa;
+  color: #909399;
 }
 .rs-op-add,
 .rs-op-del {

@@ -25,10 +25,10 @@ test('测试记录组下挂数据记录表 8 张与实验室使用记录表 4 �
   assert.equal((lab.children || []).length, 4)
 })
 
-test('产品文件组 7 张(2026-09-18 新增 产品文件列表 + 样品编号表)', () => {
+test('产品文件组 8 张(2026-09-21 新增 产品变更申请单)', () => {
   assert.deepEqual(leafCodes(group('rdFiles')), [
     'RD_PROD_INFO', 'RD_MOLD_PROC', 'RD_SPEC_DOC', 'RD_ASM_PROC', 'RD_INSP_PLAN',
-    'RD_PROD_DOCLIST', 'RD_SAMPLE_NO',
+    'RD_PROD_DOCLIST', 'RD_SAMPLE_NO', 'RD_CHANGE',
   ])
   // 下线面板不得从别处溜回导航(RD_MOLD_FORMULA/RD_ASM_BOM 仍是合法面板,只是没有菜单入口)
   const all = JSON.stringify(menuTree)
@@ -50,11 +50,12 @@ test('二级目录里不再出现"叶子项与分组混排"', () => {
 
 /**
  * 2026-09-18:新增 产品文件列表 与 样品编号表(设计对照的 2 张新面板)⇒ 21 → 23 张。
+ * 2026-09-21:新增 产品变更申请单 RD_CHANGE ⇒ 23 → 24 张。
  * 计数断言保留价值:防止面板被误删/误加而不自知。
  */
-test('研发管理 23 个面板一个不少(21 + 新增 产品文件列表/样品编号表)', () => {
+test('研发管理 24 个面板一个不少(23 + 新增 产品变更申请单)', () => {
   const collect = (node) => (node.children || []).flatMap((child) => (child.children ? collect(child) : [child.panelCode]))
   const codes = collect(rd).filter(Boolean)
-  assert.equal(codes.length, 23)
-  assert.equal(new Set(codes).size, 23)
+  assert.equal(codes.length, 24)
+  assert.equal(new Set(codes).size, 24)
 })

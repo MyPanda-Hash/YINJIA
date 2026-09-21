@@ -349,6 +349,12 @@ public class PanelConfigService {
         // 保存即归档文书面板(真源 ButtonService.DOC_ARCHIVE_PANELS):前端据此放出
         // 「申请修改/修改审批/修改记录」闭环按钮(2026-09-11 起从产品文件 7 面板放开到全部文书归档面板)
         metadata.put("docArchive", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code()));
+        // 产品变更申请单(2026-09-21):按账号部门的**行级编辑门禁**要下发给前端(界面把非本部门行置灰只读)。
+        // 真源 = yj_change_dept(纸面部门 ↔ 系统部门映射),与后端 ButtonService.gateChangeDetail 同一张表;
+        // 前端拿到的是"我能填哪几个部门行",管理员另行豁免(前端按登录用户 isAdmin 判)。
+        if ("RD_CHANGE".equals(def.code())) {
+            metadata.put("changeDepts", changeDeptsOfCurrentUser());
+        }
         metadata.put("panelState", Map.of(
                 "dataName", "单据状态",
                 "dataType", "STRING",
@@ -1346,6 +1352,29 @@ public class PanelConfigService {
             return compact.contains("\"singleDoc\":true");
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    /**
+     * 当前登录账号可填写的产品变更申请单**纸面部门行**(2026-09-21)。
+     * 口径与 ButtonService.gateChangeDetail 完全一致:yj_user.dept_id → yj_change_dept.dept_id → 纸面部门名;
+     * 取不到账号/未登记部门返回空表(前端则整表只读,只有管理员可代填)。
+     */
+    private List<String> changeDeptsOfCurrentUser() {
+        try {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            String user = auth == null ? null : auth.getName();
+            if (user == null || user.isBlank()) return List.of();
+            // ⚠ 不能用 SELECT DISTINCT ... ORDER BY sort:SQL Server 要求 DISTINCT 的排序列出现在选择列表里,
+            //    否则整条语句报错(被本方法的 catch 吞成空表 → 界面整表只读,2026-09-21 实测踩到)。
+            //    与 ButtonService.changeDeptRows 同一写法:GROUP BY 部门, sort + ORDER BY MIN(sort)。
+            return jdbc.queryForList("SELECT c.部门 FROM yj_change_dept c JOIN yj_user u ON u.dept_id = c.dept_id"
+                    + " WHERE u.username = ? GROUP BY c.部门, c.sort ORDER BY MIN(c.sort)", String.class, user);
+        } catch (Exception e) {
+            // 表还没迁移/查询失败:返回空=界面整表只读(服务端仍有强制还原),但**要留日志**,别静默
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[RD_CHANGE] 读取当前账号可填部门失败,界面将整表只读: {}", e.getMessage());
+            return List.of();
         }
     }
 }
