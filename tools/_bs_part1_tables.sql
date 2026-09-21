@@ -1,6 +1,6 @@
 -- 基础设置模块迁移(light-mes → HSDZ_MES):18 面板 archive 模式
 -- 生成物:物理表 bs_* + yj_panel/yj_field + 现有数据;翻译词条由 gen-locales/dict 接口补齐
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 
 -- ===== BOM 物料清单 =====

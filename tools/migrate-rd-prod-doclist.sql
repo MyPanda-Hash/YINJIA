@@ -13,7 +13,7 @@
 --   ⇒ 所以本脚本只建**面板壳**(面板注册 + 头表 + 明细行),业务数据由 DevTaskService 实时推导。
 --
 -- 幂等:IF NOT EXISTS / COL_LENGTH,可重复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

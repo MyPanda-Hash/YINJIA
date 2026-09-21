@@ -1,7 +1,7 @@
 ﻿/* 审批流迁移(照搬 light-mes 审批逻辑):
    1) yj_form_approval 审批记录表(提交/通过/驳回/弃审全留痕,结构对齐 light-mes form_approval)
    2) yj_doc_status 增加 审批中 标记(pending/pending_by/pending_at) */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 IF OBJECT_ID('yj_form_approval') IS NOT NULL DROP TABLE yj_form_approval;

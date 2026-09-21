@@ -11,7 +11,7 @@
 --   · 多条件用逗号分隔:"k=v,k2=v2"(当前只需单条件,但解析器支持)
 --
 -- 幂等:COL_LENGTH / 条件 UPDATE,可重复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

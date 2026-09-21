@@ -2,7 +2,7 @@
    1) yj_panel 增加 detail_key(单单据明细键)
    2) 档案面板 category -> 基础档案
    3) 档案字段 place 全部归入 detail(取消 query/header) */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 IF COL_LENGTH('yj_panel', 'detail_key') IS NULL

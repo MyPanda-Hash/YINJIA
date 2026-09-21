@@ -1,7 +1,7 @@
 -- 最终修复 v2:DETAIL 视图"单据状态/审核人"由 yj_doc_status 工作流注册表派生,
 -- 与单据面板(销售订单/采购入库…)显示保持一致,不再读业务表物理列
 -- (种子数据直写的状态值与 UI 审核留痕从此不再打架)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 DECLARE @dn sysname, @dd nvarchar(max);
 -- 只清本脚本负责重建的 v_*_detail/_stats 视图;排除其他脚本维护的同名视图:

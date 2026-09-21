@@ -3,7 +3,7 @@
 -- 口径:敏感密文(bank_account/addr/tel/mobile/email/birthday/qq/wechat/证件号)不落;接口不提供的字段(客户洞察/标签/来源/禁用人)不做;
 --      纯 id 字段(creator_id/storekeeper_id 等)不落(保留其名称/编码孪生字段)。
 -- 幂等:列 COL_LENGTH 守卫 / yj_field IF NOT EXISTS / 译名 MERGE NOT MATCHED。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

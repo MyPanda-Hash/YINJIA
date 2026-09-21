@@ -1,7 +1,7 @@
 -- YINJIA-MES 多国语言 P3:面板字段与面板名的英文译名列
 -- 契约(ADR-0001 + CONTEXT):label/panel_name 保持中文,是前后端数据键,永不改;
 -- label_en/panel_name_en 仅作显示层翻译,随 locale 选择下发。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 GO
 
 IF COL_LENGTH('dbo.yj_field', 'label_en') IS NULL ALTER TABLE yj_field ADD label_en nvarchar(200) NULL;

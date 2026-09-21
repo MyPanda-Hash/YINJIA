@@ -17,7 +17,7 @@
 --   · 后端改造(写新列)由 ButtonService 同步提交,脚本生效后即对齐
 --
 -- 幂等:COL_LENGTH / NOT EXISTS / 条件 UPDATE,可重复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

@@ -27,7 +27,7 @@
    用法:java -cp lib\mssql-jdbc.jar SqlRunner.java <jdbcUrl> yinjia env tools\migrate-mold-proc-revision.sql
         (或 sqlcmd -f 65001 -i —— 本机 sqlcmd **输出**编码跟随控制台 GBK,核对中文请走 JDBC/API)
    ═══════════════════════════════════════════════════════════════════════════════ */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

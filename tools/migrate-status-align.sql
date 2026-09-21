@@ -1,7 +1,7 @@
 -- 单据状态对齐迁移(以工作流注册表 yj_doc_status 为准):
 -- A. 种子数据直写的"已审核/审批中"重置回草稿(无注册表审核留痕的)
 -- B. 重建 v_sales_order_detail(状态列派生,与其他明细视图同构)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 
 -- ===== A. 重置种子噪音(有真实审核留痕的不动) =====

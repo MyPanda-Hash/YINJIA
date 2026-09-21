@@ -9,7 +9,7 @@
 -- 列定位按第 2 行表头:裸棒 sheet 的 管控要求 横向合并 C:D ⇒ 检查比例 在 E 列。
 -- 存在则 UPDATE(本次修复必须能覆盖已入库的 203-206),否则 INSERT。
 -- 运行(UTF-8 无 BOM):sqlcmd -f 65001 -i tools/migrate-asm-proc-lib.sql 或 SqlRunner
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

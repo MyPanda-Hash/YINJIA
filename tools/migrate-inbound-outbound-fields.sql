@@ -1,6 +1,6 @@
 -- migrate-inbound-outbound-fields.sql — 采购入库/销售出库面板字段与接口并集对应(不含同步脚本)
 -- 生成器:tools/archive/_gen-inbound-outbound.mjs(标签=订单已验证覆盖表;默认隐藏 id/创建修改/附件/费用分录)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

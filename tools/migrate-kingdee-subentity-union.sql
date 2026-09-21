@@ -1,6 +1,6 @@
 -- migrate-kingdee-subentity-union.sql — 子实体(订单行+联系人)字段与文档并集完全对应
 -- 生成器:tools/archive/_gen-subentity-union.mjs;行级补 bl_so_order/bl_pu_order,联系人级补 dm_kh/dm_gf(dotted 路径 bomentity.xx)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

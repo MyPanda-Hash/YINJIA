@@ -12,7 +12,7 @@
 --     故此脚本不建「编 号」「版 本」这两个伪译名键(建了反而会误导后人以为是字段)。
 --
 -- 幂等:NOT EXISTS 按 (scope, ref_key, locale) 去重。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

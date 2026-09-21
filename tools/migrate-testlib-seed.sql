@@ -3,7 +3,7 @@
 -- NOTE: 本脚本只新增(NOT EXISTS 幂等),不删除已有条目;整库替换请跑 tools/migrate-spec-testlib-replace.sql。
 -- 幂等:按 lib+item+JSON $.name 去重;用户已建同名条目不覆盖。条目正文=规范结构 v2。
 -- 运行(UTF-8 无 BOM): java -cp .m2-repo/.../mssql-jdbc-*.jar SqlRunner.java <url> yinjia <pw> migrate-testlib-seed.sql
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 IF NOT EXISTS (SELECT 1 FROM yj_std_lib WHERE lib_code=N'spec.test' AND item_code=N'*外观' AND ISNULL(JSON_VALUE(content,'$.name'),N'')=N'' AND ISNULL(JSON_VALUE(content,'$.quality'),N'')=N'') INSERT INTO yj_std_lib (lib_code, item_code, seq, content, asp_user1, asp_time1) VALUES (N'spec.test', N'*外观', 10, N'{"v":2,"group":"*外观","name":"","req":"-清洁、无破损无压痕，无裂纹,无倾斜等缺陷\n-切面平整无锯齿纹路，无明显缺角\n-切面无残留炭渣","method":"目视","basis":"银嘉测试标准"}', N'seed', SYSDATETIME());
 IF NOT EXISTS (SELECT 1 FROM yj_std_lib WHERE lib_code=N'spec.test' AND item_code=N'*炭棒尺寸' AND ISNULL(JSON_VALUE(content,'$.name'),N'')=N'' AND ISNULL(JSON_VALUE(content,'$.quality'),N'')=N'') INSERT INTO yj_std_lib (lib_code, item_code, seq, content, asp_user1, asp_time1) VALUES (N'spec.test', N'*炭棒尺寸', 20, N'{"v":2,"group":"*炭棒尺寸","name":"","req":"外径：34.5±0.5mm","method":"游标卡尺","basis":"银嘉测试标准"}', N'seed', SYSDATETIME());

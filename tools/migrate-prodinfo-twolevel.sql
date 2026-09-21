@@ -21,7 +21,7 @@
    幂等:账号按 username NOT EXISTS;列走 IF COL_LENGTH IS NULL;注释按 extended_properties 判重。
    用法:java -cp lib\mssql-jdbc.jar SqlRunner.java <jdbcUrl> yinjia env tools\migrate-prodinfo-twolevel.sql
    ═══════════════════════════════════════════════════════════════════════════════ */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

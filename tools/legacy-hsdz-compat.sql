@@ -2,7 +2,7 @@
 -- 覆盖:s_allno(单号池) / s_log(操作日志);其余面板数据表(dm_*、inh/outh/Porder、order_*、mate、kucun)
 --       由下方生成段从 setup-db.sql 的 yj_field 定义自动生成(列与面板字段一一对应)。
 -- 幂等:仅当表不存在时创建。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 IF OBJECT_ID('dbo.s_allno') IS NULL

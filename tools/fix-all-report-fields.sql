@@ -1,6 +1,6 @@
 -- 全面修复:报表面板字段与视图实际列对齐
 -- 问题:yj_field 自动注册时用了旧列名(含点/已改名),视图重建后列名已变,yj_field 未同步
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 
 -- 1. 删除所有报表面板(DETAIL/STATS)的旧字段

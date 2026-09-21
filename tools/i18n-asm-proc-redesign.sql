@@ -13,7 +13,7 @@
 -- 幂等:NOT EXISTS 按 (scope, ref_key, locale) 去重,可重复执行。
 -- 语言:与 yj_locale 启用清单一致(en/ja/ko/es/fr/de/ru/vi/th/zh-TW 共 10 种;zh-CN 是源语言不建行)。
 -- 用法:sqlcmd -f 65001 -i tools/i18n-asm-proc-redesign.sql 或 SqlRunner
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

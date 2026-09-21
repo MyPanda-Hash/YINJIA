@@ -14,7 +14,7 @@
 --
 -- 幂等:全部 IF NOT EXISTS / COL_LENGTH / 条件 UPDATE,可重复执行。
 -- 运行(UTF-8 无 BOM):SqlRunner 或 sqlcmd -f 65001
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

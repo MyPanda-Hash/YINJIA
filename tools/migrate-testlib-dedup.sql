@@ -5,7 +5,7 @@
 --      (互通期的写路径会把同一内容写进两库/重复行;业务上"同控制项目多行"因 quality 不同不会被误删)
 --   ② 种子行(asp_user1='seed')全部恢复启用(实验期间被停用的复原)
 -- 运行后输出各库剩余行数,供与 48(spec.test)/13(insp.plan) 种子基线比对。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 ;WITH d AS (

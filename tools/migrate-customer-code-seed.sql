@@ -8,7 +8,7 @@
 -- 用法:标准库下拉 item_code=项目名称,content=代号;字段 RD_SAMPLE_NO.客户项目代号(data_type=标准库)。
 --
 -- 幂等去重键:lib_code + item_code(项目名称);可重复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

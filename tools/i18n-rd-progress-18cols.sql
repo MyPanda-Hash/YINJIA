@@ -11,7 +11,7 @@
 --   已有 10 语言不动:项目定级 / 项目名称 / 状态 / 紧急程度
 --
 -- 幂等:NOT EXISTS 按 (scope, ref_key, locale) 去重,可重复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

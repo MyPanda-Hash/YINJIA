@@ -10,7 +10,7 @@
 --   ① 客户项目代号必须纯字母  ② 项目编号必须以 -<数字> 结尾  ③ 同一项目编号只出一张样品
 --
 -- 幂等:IF NOT EXISTS / COL_LENGTH,可重复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

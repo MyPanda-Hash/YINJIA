@@ -19,7 +19,7 @@
    幂等:列走 IF COL_LENGTH IS NULL;字段行按 (panel_code, col_name, place) NOT EXISTS;字典直接覆盖写。
    用法:java -cp lib\mssql-jdbc.jar SqlRunner.java <jdbcUrl> yinjia env tools\migrate-approval-level.sql
    ═══════════════════════════════════════════════════════════════════════════════ */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

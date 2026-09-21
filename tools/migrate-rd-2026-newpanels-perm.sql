@@ -18,7 +18,7 @@
 -- 幂等:NOT EXISTS 按 role_id + panel_code 去重,可重复执行。
 SET QUOTED_IDENTIFIER ON;
 SET NOCOUNT ON;
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 
 DECLARE @perms TABLE (panel_code nvarchar(40), perms nvarchar(400));
 INSERT INTO @perms VALUES

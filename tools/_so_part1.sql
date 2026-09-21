@@ -1,5 +1,5 @@
 -- 销售订单迁移(SO_ORDER + 明细/统计报表)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 
 IF OBJECT_ID('bd_so_order') IS NULL CREATE TABLE bd_so_order (

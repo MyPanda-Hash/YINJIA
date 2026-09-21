@@ -5,7 +5,7 @@
    🔴 防误伤(2026-09-15):本脚本是「全新建库初始化」语义(DROP 重建 yj_* 并种基线);
       已初始化的库因内容哈希变化被 DbSync 重跑时,只执行上方登录/授权幂等段,
       检测到 yj_panel 已存在即 SET NOEXEC 跳过其余全部批次(重置库请先手工 DROP yj_panel)。 */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 IF SUSER_ID('yinjia') IS NULL

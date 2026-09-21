@@ -11,6 +11,8 @@ import java.sql.SQLWarning;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * YINJIA-MES 数据库增量同步(配合 git pull 使用,见 pull-sync.bat)。
@@ -70,6 +72,7 @@ public class DbSync {
                 String s = args[1];
                 Path f = base.resolve(s);
                 if (!Files.exists(f)) { System.err.println("[FATAL] 脚本不存在: " + f); System.exit(2); }
+                checkTargetDb(f, s);
                 boolean ok = runFile(c, f);
                 if (ok) markApplied(c, s, sha256(f));
                 System.exit(ok ? 0 : 1);
@@ -85,6 +88,7 @@ public class DbSync {
                 String logged = loggedHash(c, s);
                 if (logged != null && logged.equals(hash)) { skipped++; continue; }
                 System.out.println(logged == null ? "[新增] " + s : "[变更] " + s + "(内容与上次执行时不同,重新执行)");
+                checkTargetDb(f, s);
                 if (runFile(c, f)) { markApplied(c, s, hash); ran++; }
                 else { System.err.println("[SQL FAIL] " + s + " — 中止,后续脚本未执行"); failed++; break; }
             }
@@ -149,6 +153,47 @@ public class DbSync {
         StringBuilder sb = new StringBuilder();
         for (byte b : d) sb.append(String.format("%02x", b));
         return sb.toString();
+    }
+
+    /** 整行的无条件 `USE <库>`(不含 IF 守卫的形式)。 */
+    static final Pattern BARE_USE =
+            Pattern.compile("^\\s*USE\\s+\\[?([A-Za-z0-9_]+)\\]?\\s*;?\\s*$", Pattern.CASE_INSENSITIVE);
+
+    /**
+     * 取出脚本里的无条件 `USE <库>` 的库名,没有则返回 null。
+     * 为什么要拦:实测「连 HSDZ_MES_TEST 后执行 USE HSDZ_MES」会把会话切到正式库
+     * (DB_NAME() 由 HSDZ_MES_TEST 变 HSDZ_MES)——于是本类承诺的
+     * 「YINJIA_SQL_DB=HSDZ_MES_TEST 给测试账套补迁移,不碰生产库」会被静默打穿:
+     * 实际改的是正式库,测试库一条也没补,而且不报任何错。
+     * 2026-09-21 已把清单里 98 个这样的脚本改成 `IF DB_NAME() = N'master' USE ...` 守卫形式,
+     * 本检查用于拦住今后再写出来的同款脚本。
+     */
+    static String bareUseOf(String sql) {
+        String noBlockComment = sql.replaceAll("(?s)/\\*.*?\\*/", "");
+        for (String line : noBlockComment.split("\r?\n")) {
+            String t = line.trim();
+            if (t.isEmpty() || t.startsWith("--")) continue;
+            Matcher m = BARE_USE.matcher(t);
+            if (m.matches()) return m.group(1);
+        }
+        return null;
+    }
+
+    /** 脚本硬切的库与本次目标库不一致 → 中止整个执行(宁可不动,也不要静默改错库) */
+    static void checkTargetDb(Path file, String script) {
+        String sql;
+        try {
+            sql = Files.readString(file, StandardCharsets.UTF_8);
+        } catch (Exception e) {
+            return;
+        }
+        String used = bareUseOf(sql);
+        if (used != null && !used.equalsIgnoreCase(DB)) {
+            System.err.println("[FATAL] " + script + " 含无条件 `USE " + used + "`,而本次目标库是 " + DB + "。");
+            System.err.println("        该行会把会话切到 " + used + " —— 等于改错库,且不会报错(静默失败)。");
+            System.err.println("        改成 `IF DB_NAME() = N'master' USE " + used + ";` 或删除该行后重跑。");
+            System.exit(3);
+        }
     }
 
     static boolean runFile(Connection c, Path file) {

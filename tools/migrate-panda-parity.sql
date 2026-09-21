@@ -11,7 +11,7 @@
 --   G. 明细报表 asp_* 列改友好名(制单人/创建时间),隐藏修改留痕列
 -- 差异明细见 _diff-report.md(由 _panda-compare.cjs 生成)。
 -- ============================================================================
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 DECLARE @sql nvarchar(max);
 

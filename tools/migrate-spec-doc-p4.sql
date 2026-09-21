@@ -27,7 +27,7 @@
 --   本轮**照设计原文**改成 1..6(用户口径「按这里面的来」)。
 --
 -- 幂等:COL_LENGTH / NOT EXISTS,可重复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

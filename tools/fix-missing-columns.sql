@@ -1,5 +1,5 @@
 -- 系统性修复:①bl_* 行表补 asp_cancel;②STATS 视图补 id 列
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 
 -- ① 所有 bl_* 行表补 asp_cancel 列(仅缺列的表;原 OBJECT_ID(name) 里 name 误解析为内层 sys.columns.name,判断恒失效)

@@ -4,7 +4,7 @@
 -- 文件本体存后端磁盘(存储名=UUID+安全扩展,杜绝路径穿越),本表只存元数据,原文件名保留。
 -- 幂等:可重复执行。运行(UTF-8 无 BOM,需 -f 65001):
 --   sqlcmd -S localhost -H HSDZ_MES -E -f 65001 -i migrate-attachment.sql
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 IF OBJECT_ID('yj_attachment') IS NULL CREATE TABLE yj_attachment (

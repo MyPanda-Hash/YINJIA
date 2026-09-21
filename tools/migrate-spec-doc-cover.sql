@@ -29,7 +29,7 @@
 --   —— 这三列本就是 nvarchar(200),历史值即 `陈秀丽/2026/06/24` 形态,零结构变更。
 --
 -- 幂等:COL_LENGTH / NOT EXISTS,可重复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

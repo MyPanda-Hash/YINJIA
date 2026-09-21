@@ -18,7 +18,7 @@
 
    幂等:列 IF COL_LENGTH IS NULL;元数据行 NOT EXISTS;译名 NOT EXISTS。
    ═══════════════════════════════════════════════════════════════════════════════ */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

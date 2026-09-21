@@ -11,7 +11,7 @@
 --     ADR-0001「字典翻」口径:下拉候选来自 dict_sql,显示层按 yj_translation(scope='field') 命中
 --
 -- 幂等:NOT EXISTS 按 (scope, ref_key, locale) 去重。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

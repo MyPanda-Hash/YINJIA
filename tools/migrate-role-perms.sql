@@ -1,6 +1,6 @@
 ﻿/* 角色面板操作权限扩展:从 可见+审批 两个维度 扩展为 11 项操作权限
    perms 列存储逗号分隔的操作码 */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 -- 幂等:守卫与 ALTER 必须同批次,RETURN 在独立批次里拦不住后续批次

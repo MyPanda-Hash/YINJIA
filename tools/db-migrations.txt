@@ -22,7 +22,9 @@ _bs_part1_tables.sql
 _bs_part2_meta.sql
 _bs_part3_data.sql
 _bs_part4_translations.sql
-cleanup-base-panels.sql
+# ↑ cleanup-base-panels.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/cleanup-base-panels.sql
 _doc_part1_tables.sql
 _doc_part2_meta.sql
 _doc_part3_data.sql
@@ -130,13 +132,27 @@ migrate-rd-lab.sql
 migrate-usage-log.sql
 migrate-dispatch.sql
 migrate-dispatch-fix.sql
-fix-views-def.sql
-fix-views-definitive.sql
-fix-views-final.sql
-fix-views-v2.sql
-fix-views-v3.sql
-fix-views-v4.sql
-fix-views-v5-gen.sql
+# ↑ fix-views-def.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-def.sql
+# ↑ fix-views-definitive.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-definitive.sql
+# ↑ fix-views-final.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-final.sql
+# ↑ fix-views-v2.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v2.sql
+# ↑ fix-views-v3.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v3.sql
+# ↑ fix-views-v4.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v4.sql
+# ↑ fix-views-v5-gen.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v5-gen.sql
 migrate-audit-cols-fix.sql
 setup-stock-status.sql
 
@@ -489,8 +505,10 @@ i18n-rd-progress-18cols.sql
 # migrate-rd-2026-design.sql(重跑) —— §E 收敛为:仅保留 4 处 label 对齐(主要性能描述/产品负责人/
 #   客户名称/表单管理人)+ 显式归一 3 处(序号/控制项目/控制标准及要求 的 label==col_name,显示名进 alias);
 #   清理第一版误建的 [检验备注](label 也叫「备注」⇒ 同面板 label 重复,保存链按 label 匹配会写错列)
-migrate-rd-2026-design.sql
-migrate-rd-progress-18cols.sql
+# ↑ migrate-rd-2026-design.sql 重复登记已删(首次登记在 L458)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
+# ↑ migrate-rd-progress-18cols.sql 重复登记已删(首次登记在 L475)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
 
 # —— 2026-09-18 Phase 3 多语言补充:序号/检验项目/检验要求(alias 显示名)不含新 label,无需新增词条 ——
 
@@ -504,8 +522,10 @@ migrate-rd-progress-18cols.sql
 #   4 个关键控制清单变体原先没有任何字段能表达"本单用哪一套工序",默认只画首次复刻的那一套。
 # i18n-rd-2026-design.sql(重跑) —— 补 工艺形态 + 4 变体名 + 关键控制清单标准库 + 变体/工序数,各 10 语言
 migrate-asm-proc-lib.sql
-migrate-rd-2026-design.sql
-i18n-rd-2026-design.sql
+# ↑ migrate-rd-2026-design.sql 重复登记已删(首次登记在 L458)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
+# ↑ i18n-rd-2026-design.sql 重复登记已删(首次登记在 L465)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
 
 # —— 2026-09-18 Phase 5/重启测试修正(2 新面板前端 + 行表硬约定补齐)——
 # migrate-rd-prod-doclist.sql(重跑) —— ⚠ 补齐行表硬约定列:rd_prod_doclist_detail 缺 asp_cancel
@@ -515,8 +535,10 @@ i18n-rd-2026-design.sql
 #   —— singleDoc 只隐藏新增入口,单据本身不存在则 queryDocs 返回空列表、矩阵无处挂载。
 #   清理第一版误建的死列(产品负责人/是否受控/受控日期/备注 均为派生值,永不写入)。
 # migrate-rd-sample-no.sql(重跑) —— rd_sample_no_detail 同样补齐 asp_cancel + asp_user1/2 + asp_time1/2。
-migrate-rd-prod-doclist.sql
-migrate-rd-sample-no.sql
+# ↑ migrate-rd-prod-doclist.sql 重复登记已删(首次登记在 L461)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
+# ↑ migrate-rd-sample-no.sql 重复登记已删(首次登记在 L460)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
 
 # —— 2026-09-18 Phase 5 前端:ProdDocListSheet.vue(产品文件列表只读矩阵)+ PanelxList 接入 + menus 新增 2 面板 ——
 # 后端:/px/prodDocList 端点(复用 DevTaskService.board(),只补 是否受控/受控日期 派生);
@@ -590,7 +612,8 @@ migrate-spec-doc-p4.sql
 # ⚠ 3 页签的页序/表归属/条件区 grid/变体标题在**前端配置** recordSheetConfigs.js:
 #   每条 dataTable 必须带 filterKey+filterVal 且值互不重复,否则三张表互相串行、
 #   且「从标准库勾选」的整表替换会删掉表区为空的全部行。
-migrate-asm-proc-lib.sql
+# ↑ migrate-asm-proc-lib.sql 重复登记已删(首次登记在 L506)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
 migrate-asm-proc-redesign-2026-09-20.sql
 i18n-asm-proc-redesign.sql
 
@@ -792,7 +815,6 @@ migrate-change-flow.sql
 
 # —— 2026-09-18 商品·来料检验(金蝶自定义字段)接线——金蝶界面定义自定义字段后 API 可读(沙箱键 custom_field__1__62jiaob3z7yj97 实证:CL004=是 全链路通);bs_inv 建真实列 来料检验(是/否,金蝶维护MES只读);check_type 语义纠正回 商品类型(1普通/2套装/3服务,此前误更名检验方式);sync-core CF_INSPECTION_KEYS 登记表(真实账套键待其定义后登记);INV面板 detail列只读。幂等可重跑 ——
 migrate-material-inspection-field.sql
-
 
 # —— 2026-09-21 机翻坏译名修复(强度要求kgf / zh-TW 的 2 个 U+FFFD)——
 # migrate-i18n-fix-zhtw-strength.sql —— 坏值由 158ea03 机翻补缺口写入(该提交的 git blob 原文即坏,

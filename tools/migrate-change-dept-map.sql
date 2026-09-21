@@ -16,7 +16,7 @@
 
    幂等:建表 IF OBJECT_ID IS NULL;注释/映射行 NOT EXISTS;用法同其它迁移(见 tools/README.md)。
    ═══════════════════════════════════════════════════════════════════════════════ */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

@@ -3,7 +3,7 @@
 --   物理列一律保留(部分 MES 业务逻辑读列,如品检分流),只删 yj_field(面板不再展示)。
 --   本会话早前新增的"与旧列语义重复"的列一并删除,改映射到旧列。
 -- 幂等:DELETE/UPDATE 直写同值,DROP 带 COL_LENGTH 守卫。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

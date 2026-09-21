@@ -1,7 +1,7 @@
 -- migrate-kingdee-full-union.sql — 面板字段与「文档并集(列表∪详情)」完全对应
 -- 生成器:tools/archive/_gen-full-union.mjs(访问记录哨兵自动求差集;标签取面板字段对照.md 说明列)
 -- 敏感键走解密(dec);数组键拼接 JSON(join);其余文本。订单头键 place=header。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 
