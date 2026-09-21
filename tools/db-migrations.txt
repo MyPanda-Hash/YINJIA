@@ -669,3 +669,20 @@ migrate-chain-field-complete.sql
 #   前端采购订单表头「送料」摘要追加「(M 批待编号)」,分批送料对话框不再预告批次号。
 #   验证:tools/archive/_verify-batch-no-at-inbound.mjs(8 条断言全 PASS;回归 _verify-chain-field-complete.mjs)。
 migrate-batch-no-at-inbound.sql
+
+# —— 2026-09-21 来料品质:特采单面板(独立面板 + 独立表) ——
+#   来源:《品质资料 2026.09.19.xlsx》「特采单」页签(该页签实为内嵌扫描图 = YJ-QR-60 特采申请单)。
+#   与已有 QC_TC「特采申请单」(质量单据组)独立并存:两套表单分开存放、各自编号,互不影响。
+#   ① 头表 qc_tc_in(列与 qc_tc 一致)+ 恒空明细 qc_tc_in_detail(doc 模式要求 line_table,
+#      必须物理空表:doc 保存会执行缺席软删 UPDATE(asp_cancel),视图不可更新报 4406)。
+#   ② yj_panel:QC_TC_IN / 特采单 / 单据 / doc / 前缀 TCI(TC 已被 QC_TC 占用) / 模块 品质管理。
+#   ③ 与 QC_TC 的两处口径差异(按现行规范,不照抄旧值):
+#      · 供应商 参照 GFDA(供应商档案);QC_TC 用的 PARTNER 面板已于 2026-09-17 下线,
+#        同为来料品质的 QC_INSP 用的正是 GFDA。
+#      · 最终处理结果 字典三值(正常使用/管控使用/挑选使用);Excel 原图三个勾选框,QC_TC 只有两值。
+#   ④ 表/关键列带 MS_Description 中文注明(AGENTS.md 2026-09-14 起强制)。
+#   ⑤ 前端版式 docSheetConfigs.js 的 qcSheetCfgs.QC_TC_IN(1:1 对齐原图,含上述不良说明/严重程度
+#      拆行);菜单入口 menus.js 的 品质管理 > 来料品质。Java 后端零改动(按钮/流水号/审批流全按
+#      yj_panel 泛化;不进 DOC_ARCHIVE_PANELS/DOC_NO_PANELS —— 那两个集合只含 RD_* 文件类面板)。
+#   验证:tools/archive/_v-tcin.sql(元数据/表列/注明/译名逐项核对,已跑通且幂等)。
+migrate-qc-tc-in.sql

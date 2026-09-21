@@ -1830,6 +1830,9 @@ export default {
     '按纸张实际尺寸单页生成，直接下载，无需打印机': 'Single page at actual sheet size, direct download, no printer needed',
   },
   biz: {
+    // 来料品质·特采单(2026-09-21;与「特采申请单」是两份独立单据,菜单标题区分)
+    // 与 yj_translation(scope='panel') 的 特采单 译名保持一致
+    '特采单': 'Incoming Special Procurement',
     '分批送料': 'Batch delivery',
     '本次送料数量': 'Delivery qty (this time)',
     '已送': 'Delivered',

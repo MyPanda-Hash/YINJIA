@@ -256,8 +256,11 @@ export const menuTree = [
     children: [
       {
         // 来料品质(流程图·采购支线:检验;暂收入库单已下线,暂收角色由「库存核算·送料暂收单」承接)
+        // 特采单(2026-09-21)与「质量单据·特采申请单」是两份独立单据:来料特采走本入口(前缀 TCI),
+        // 同一张 YJ-QR-60 表单,独立面板 QC_TC_IN / 独立表 qc_tc_in。
         code: 'incoming', title: '来料品质', children: [
           { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
+          { code: 'qcTcIn', title: '特采单', path: '/panelx/list/QC_TC_IN', icon: 'DocumentAdd', panelCode: 'QC_TC_IN', operationName: '新增流程' },
         ],
       },
       {

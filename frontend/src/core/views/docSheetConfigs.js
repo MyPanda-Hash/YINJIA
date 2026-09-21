@@ -79,6 +79,7 @@ export const planSheetCfg = {
 
 /**
  * ═══ 品质管理八单据(YJ-QR-11/59/60/64/92/118/119/120):按原表格版式渲染 ═══
+ * 另含 QC_TC_IN(来料品质特采单):与 QC_TC 同一张 YJ-QR-60 表单,但独立面板/独立表/独立编号(TCI)。
  * 行型: pairs(网格行:标签|值 多组)/section(章节行:标题+填写区/勾选/子区+签名行)/dept(部门会签行)
  * 约定: key=数据列名(=字段 label);checks 单选语义存选项值;dept 子区勾选为纸面装饰(同意/不同意由审批留痕);
  *       右上信息表 info: static=印刷值,date/ref/input 自动判型;底部 signKind:'plain'=编制/审核/批准 简单行。
@@ -212,6 +213,47 @@ export const qcSheetCfgs = {
       { kind: 'dept', label: '研发意见', h: 80, subs: [{ key: '研发意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
       { kind: 'section', label: '二．最终处理结果', key: '最终处理结果', h: 60,
         checks: ['正常使用', '挑选使用'] },
+    ],
+    signKind: 'plain',
+    signCells: qcSignStd('编制人'),
+  },
+
+  // 来料品质特采单(同一张 YJ-QR-60 表单,独立面板+独立表,挂 品质管理 > 来料品质)
+  // 与上方 QC_TC 是两份独立单据(分开存放、各自编号 TCI/TC);版式同样 1:1 对齐原扫描图。
+  QC_TC_IN: {
+    docno: 'YJ-QR-60',
+    titlePart1: '特采申请单', titlePart2: '', titlePart3: '', deco: false,
+    info: qcInfo('采购部'),
+    rows: [
+      { kind: 'pairs', cells: [
+        { label: '供应商', key: '供应商', flex: 1.2 },
+        { label: '采购单号', key: '采购单号', flex: 1 },
+        { label: '产品名称', key: '产品名称', flex: 1 },
+      ] },
+      { kind: 'pairs', cells: [
+        { label: '总数量', key: '总数量', flex: 0.9 },
+        { label: '不合格品数量', key: '不合格品数量', flex: 1 },
+        { label: '不合格品比例', key: '不合格品比例', flex: 0.9 },
+      ] },
+      // 原图:不良说明 与 严重程度 是上下两行、各占整宽(不是并排)→ 各用单元素 pairs 行
+      { kind: 'pairs', h: 60, cells: [
+        { label: '不良说明', key: '不良说明', flex: 1 },
+      ] },
+      { kind: 'pairs', h: 44, cells: [
+        { label: '严重程度', key: '严重程度', kind: 'checks', options: ['严重', '一般', '轻微'], flex: 1 },
+      ] },
+      { kind: 'section', label: '特采理由', key: '特采理由', h: 110, max: 1000, sign: '申请人', signKey: '编制人' },
+      { kind: 'section', label: '一．相关部门处理意见', h: 34 },
+      { kind: 'dept', label: '产品开发部意见', h: 130, subs: [
+        { label: '性能', key: '产品开发部性能意见', checks: ['同意使用', '不同意使用'], max: 250 },
+        { label: '工艺', key: '产品开发部工艺意见', checks: ['同意使用', '不同意使用'], max: 250 },
+      ] },
+      { kind: 'dept', label: '品质部意见', h: 80, subs: [{ key: '品质部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
+      { kind: 'dept', label: '销售部意见', h: 80, subs: [{ key: '销售部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
+      { kind: 'dept', label: '研发意见', h: 80, subs: [{ key: '研发意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
+      // 原图:三个勾选框(QC_TC 旧配置漏了「管控使用」)
+      { kind: 'section', label: '二．最终处理结果', key: '最终处理结果', h: 60,
+        checks: ['正常使用', '管控使用', '挑选使用'] },
     ],
     signKind: 'plain',
     signCells: qcSignStd('编制人'),
