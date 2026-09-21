@@ -6,6 +6,9 @@
 -- 保留:基础档案(bs_*)、yj_* 元数据/用户/角色、金蝶同步单据(pu/so 的 jdy-sync 行)、期初库存(kucun 中 migration 建的行)
 -- 清除:业务测试单据 + 单据状态 + 日志 + 号池(归零) + 批号流水 + 二维码登记
 -- ⚠ 破坏性脚本:执行前必须已做保险备份(HSDZ_MES_pre_golive_*.bak);服务器库勿直接执行本脚本
+-- ⚠ sqlcmd 执行须加 -I(QUOTED_IDENTIFIER ON):sqlcmd 默认 OFF,pu/so 订单表带过滤索引,
+--    DELETE 会报 Msg 1934 拒删(2026-09-17 实测;SSMS 默认 ON 故旧机未暴露)。完整命令:
+--    sqlcmd -S localhost -d HSDZ_MES -U sa -P ... -C -f 65001 -I -i tools\migrate-golive-cleanup.sql
 SET NOCOUNT ON;
 
 -- ── 1. 行表先清(细节) ──
