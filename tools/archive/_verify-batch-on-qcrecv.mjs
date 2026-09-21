@@ -1,0 +1,15 @@
+﻿const API='http://localhost:8090/api';
+const lj=await (await fetch(API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json; charset=utf-8'},body:JSON.stringify({userName:'admin',password:'123456'})})).json();
+const H={'Content-Type':'application/json; charset=utf-8',Authorization:'Bearer '+lj.data.token};
+const post=async(u,b)=>{const r=await fetch(API+u,{method:'POST',headers:H,body:JSON.stringify(b)});const j=await r.json();if(j.code!==0&&j.code!==200)throw new Error(`${u} → ${j.message}`);return j.data;};
+const PO='YJ-20260916-01';
+const st=await post('/px/batchFlow/lines',{sourcePanel:'PU_ORDER',targetPanel:'QC_RECV',sourceNo:PO});
+const line=st.lines.find(l=>Number(l.剩余数量)>0);
+console.log('① 新编码 QC_RECV 行状态:', st.nextBatchNo, '行数', st.lines.length, '测试行剩余', line?.剩余数量);
+const gen=await post('/px/batchFlow/generate',{sourcePanel:'PU_ORDER',targetPanel:'QC_RECV',sourceNo:PO,lines:[{lineKey:line.lineKey,qty:30}]});
+console.log('② 分批生单 →', gen['编号'], '批次号', gen['批次号'], '合计', gen['本次送料合计']);
+const doc=(await post('/px/queryFormDataList',{panelCode:'QC_RECV',condition:{单据编号:gen['编号']},pageNo:1,pageSize:5})).list[0];
+console.log('③ 暂收单头批次号=', doc['批次号'], '采购订单号=', doc['采购订单号'], '行批次号=', doc.detail?.items?.[0]?.['批次号']);
+console.log('④ 清理:', (await post('/px/callButton',{panelCode:'QC_RECV',buttonName:'删除',formData:{编号:gen['编号']},buttonParam:{}})) ? 'ok' : 'ok');
+const back=await (await fetch(`${API}/px/batchFlow/batch?batchNo=${encodeURIComponent(gen['批次号'])}`,{headers:H})).json();
+console.log('⑤ 台账状态:', back.data.batch.status);

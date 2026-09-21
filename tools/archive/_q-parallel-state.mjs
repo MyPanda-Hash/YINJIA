@@ -1,0 +1,10 @@
+﻿import { createRequire } from 'node:module';
+const mssql = createRequire('D:/jdy-sync/package.json')('mssql');
+const pool = await new mssql.ConnectionPool({ server:'127.0.0.1', port:1433, database:'HSDZ_MES', user:'yinjia', password:'Yinjia@2026', options:{encrypt:false,trustServerCertificate:true} }).connect();
+const q = async (s) => (await new mssql.Request(pool).query(s)).recordset;
+console.log('面板 SL_RECV / QC_RECV:', JSON.stringify(await q("SELECT panel_code, panel_name, mode, head_table, line_table, category FROM yj_panel WHERE panel_code IN ('SL_RECV','QC_RECV')")));
+console.log('\n各面板 yj_field 行数:', JSON.stringify(await q("SELECT panel_code, COUNT(*) n FROM yj_field WHERE panel_code IN ('SL_RECV','QC_RECV','QC_INSP','QC_RETURN','PURCHASE_IN') GROUP BY panel_code")));
+console.log('\n批次号字段现存:', JSON.stringify(await q("SELECT panel_code, place, seq, hidden FROM yj_field WHERE col_name=N'批次号' ORDER BY panel_code")));
+console.log('\n附件字段现存:', JSON.stringify(await q("SELECT panel_code, COUNT(*) n FROM yj_field WHERE data_type=N'附件' GROUP BY panel_code")));
+console.log('\n我的批次台账/占用:', JSON.stringify(await q("SELECT (SELECT COUNT(*) FROM yj_doc_batch) 台账, (SELECT COUNT(*) FROM form_flow_link WHERE ISNULL(batch_no,'')<>'') 带批次占用")));
+await pool.close();

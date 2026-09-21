@@ -1,0 +1,10 @@
+﻿import { createRequire } from 'node:module';
+const mssql = createRequire('D:/jdy-sync/package.json')('mssql');
+const pool = await new mssql.ConnectionPool({ server:'127.0.0.1', port:1433, database:'HSDZ_MES', user:'yinjia', password:'Yinjia@2026', options:{encrypt:false,trustServerCertificate:true} }).connect();
+const q = async (s) => (await new mssql.Request(pool).query(s)).recordset;
+console.log('yj_schema_log 最近 12 条:', JSON.stringify(await q("SELECT TOP 12 script_name, executed_at FROM yj_schema_log ORDER BY executed_at DESC"), null, 0));
+console.log('\nyj_panel 里 SL/QC 暂收相关:', JSON.stringify(await q("SELECT panel_code, panel_name, mode, head_table, line_table, module_group, category FROM yj_panel WHERE panel_code IN ('SL_RECV','QC_RECV')")));
+console.log('\nyj_field 字段数 TOP:', JSON.stringify(await q("SELECT TOP 6 panel_code, COUNT(*) n FROM yj_field GROUP BY panel_code ORDER BY n DESC")));
+console.log('sl_recv 行数:', JSON.stringify(await q("SELECT COUNT(*) n FROM sl_recv")));
+console.log('qc_recv 行数:', JSON.stringify((await q("SELECT COUNT(*) n FROM qc_recv"))[0]));
+await pool.close();

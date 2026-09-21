@@ -1,0 +1,12 @@
+﻿import { createRequire } from 'node:module';
+const mssql = createRequire('D:/jdy-sync/package.json')('mssql');
+const API='http://localhost:8090/api';
+const pool = await new mssql.ConnectionPool({ server:'127.0.0.1', port:1433, database:'HSDZ_MES', user:'yinjia', password:'Yinjia@2026', options:{encrypt:false,trustServerCertificate:true} }).connect();
+const q = async (s) => (await new mssql.Request(pool).query(s)).recordset;
+console.log('DB 里 SL_RECV 批次号字段:', JSON.stringify(await q("SELECT label, col_name, place, seq, hidden, visible FROM yj_field WHERE panel_code='SL_RECV' AND col_name=N'批次号'")));
+console.log('DB 里 SL_RECV 全部字段数:', JSON.stringify(await q("SELECT COUNT(*) n FROM yj_field WHERE panel_code='SL_RECV'")));
+const lj=await (await fetch(API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json; charset=utf-8'},body:JSON.stringify({userName:'admin',password:'123456'})})).json();
+const cfg=(await (await fetch(API+'/px/getPanelConfig?panelCode=SL_RECV',{headers:{Authorization:'Bearer '+lj.data.token}})).json()).data||{};
+console.log('接口表头字段:', JSON.stringify((cfg?.dataSchema?.fields||[]).map(f=>`${f.dataName||f.label}${f.hidden?'(hidden)':''}`)));
+console.log('接口明细字段:', JSON.stringify((cfg?.detail?.tabs?.[0]?.fields||[]).map(f=>f.dataName||f.label)));
+await pool.close();
