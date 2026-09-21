@@ -487,7 +487,7 @@ public class ButtonService {
                                 + " FROM sl_recv_detail WHERE id = ?", Boolean.class, srcId);
                 if (srcAlive == null) continue;
                 if (srcAlive) {
-                    jdbc.update("UPDATE d SET d.物料编码 = s.物料编码, d.物料名称 = s.物料名称, d.型号 = s.型号,"
+                    jdbc.update("UPDATE d SET d.物料编码 = s.物料编码, d.物料名称 = s.物料名称, d.规格型号 = s.规格型号,"
                                     + " d.物料描述 = s.物料描述, d.数量 = s.数量, d.箱数 = s.箱数, d.日期 = s.日期,"
                                     + " d.计量单位 = s.计量单位, d.单价 = s.单价, d.采购订单行号 = s.采购订单行号,"
                                     + " d.备注 = s.备注, d.结案 = s.结案, d.部门 = s.部门, d.部门名称 = s.部门名称,"
@@ -1406,7 +1406,7 @@ public class ButtonService {
                         + " AND target_panel_code='PURCHASE_IN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, 型号, 数量, 合格数量, 仓库代码, 计量单位, 单价, 采购订单行号"
+                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量, 仓库代码, 计量单位, 单价, 采购订单行号"
                         + " FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> pass = rows.stream()
@@ -1423,7 +1423,7 @@ public class ButtonService {
             Map<String, Object> line = new LinkedHashMap<>();
             line.put("存货编码", r.get("物料编码"));
             line.put("存货名称", r.get("物料名称"));
-            line.put("规格型号", r.get("型号"));
+            line.put("规格型号", r.get("规格型号"));
             line.put("实收数量", r.get("合格数量"));
             line.put("计量单位", r.get("计量单位"));
             line.put("单价", r.get("单价"));
@@ -1489,7 +1489,7 @@ public class ButtonService {
                         + " AND target_panel_code='QC_RETURN' AND link_status='ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, 型号, 数量, 不良数量, 备注, 计量单位, 单价, 采购订单行号"
+                "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 不良数量, 备注, 计量单位, 单价, 采购订单行号"
                         + " FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
         List<Map<String, Object>> defect = rows.stream()
@@ -1505,7 +1505,7 @@ public class ButtonService {
             Map<String, Object> line = new LinkedHashMap<>();
             line.put("物料编码", r.get("物料编码"));
             line.put("物料名称", r.get("物料名称"));
-            line.put("规格型号", r.get("型号"));   // 退回行字段=规格型号(原写「型号」落不下)
+            line.put("规格型号", r.get("规格型号"));   // 退回行字段=规格型号(原写「型号」落不下)
             line.put("退货数量", r.get("不良数量")); // 退回行数量字段=退货数量(原写「数量」落不下)
             line.put("计量单位", r.get("计量单位"));
             line.put("单价", r.get("单价"));
