@@ -790,5 +790,21 @@ migrate-change-dept-map.sql
 #   因为该面板不是文书归档面板、普通用户没有 audit 词)、QueryService 列表状态同步。
 migrate-change-flow.sql
 
-# ���� 2026-09-18 ��Ʒ�����ϼ���(����Զ����ֶ�)���ߡ���������涨���Զ����ֶκ� API �ɶ�(ɳ��� custom_field__1__62jiaob3z7yj97 ʵ֤:CL004=�� ȫ��·ͨ);bs_inv ����ʵ�� ���ϼ���(��/��,���ά��MESֻ��);check_type ��������� ��Ʒ����(1��ͨ/2��װ/3����,��ǰ��������鷽ʽ);sync-core CF_INSPECTION_KEYS �ǼǱ�(��ʵ���׼����䶨���Ǽ�);INV��� detail��ֻ�����ݵȿ����� ����
+# —— 2026-09-18 商品·来料检验(金蝶自定义字段)接线——金蝶界面定义自定义字段后 API 可读(沙箱键 custom_field__1__62jiaob3z7yj97 实证:CL004=是 全链路通);bs_inv 建真实列 来料检验(是/否,金蝶维护MES只读);check_type 语义纠正回 商品类型(1普通/2套装/3服务,此前误更名检验方式);sync-core CF_INSPECTION_KEYS 登记表(真实账套键待其定义后登记);INV面板 detail列只读。幂等可重跑 ——
 migrate-material-inspection-field.sql
+
+
+# —— 2026-09-21 机翻坏译名修复(强度要求kgf / zh-TW 的 2 个 U+FFFD)——
+# migrate-i18n-fix-zhtw-strength.sql —— 坏值由 158ea03 机翻补缺口写入(该提交的 git blob 原文即坏,
+#   git 里没有干净版本可还原);只删坏字符、保留原有空格(同批 de/ru/th/vi/ko/es 均为「文字 + 空格 + kgf」,
+#   空格是未损坏的 ASCII),source 由 mt 升级 manual。两个账套均已执行,残留坏译名 0。
+#   ⚠ 两个坑(实测,勿重蹈):
+#     ① U+FFFD 在 Windows 排序规则下按 **best-fit** 匹配 ——
+#        `LIKE N'%'+NCHAR(65533)+N'%'` 命中全表(18080 行,等于没筛);
+#        `REPLACE(text, NCHAR(65533), N'')` **静默空操作**(脚本报成功但一个字符没改)。
+#        必须显式 `COLLATE Latin1_General_BIN2`;检测坏译名用
+#        CHARINDEX(NCHAR(65533) COLLATE Latin1_General_BIN2, text COLLATE Latin1_General_BIN2) > 0。
+#     ② 库侧 yj_translation 与前端语言包是**两处真源**(tt() 合并词典),只改一处会残留 ——
+#        前端 frontend/src/i18n/locales/zh-TW.js 的同名坏值本轮一并修
+#        (由 tools/archive/_fix-encoding-fffd-gbk.mjs 处理)。
+migrate-i18n-fix-zhtw-strength.sql
