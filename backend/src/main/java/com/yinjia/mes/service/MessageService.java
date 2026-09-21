@@ -67,6 +67,16 @@ public class MessageService {
     public static final String APPROVAL_L2_ASSIGNED = "APPROVAL_L2_ASSIGNED";
     /** 消息码:产品开发已分发责任人 → 四个下游文件的责任人(2026-09-20 分发责任人) */
     public static final String TASK_ASSIGNED = "TASK_ASSIGNED";
+    /** 消息码:产品变更申请单提交会签 → 各会签人(2026-09-21 变更线上流程④) */
+    public static final String SIGNOFF_REQUESTED = "SIGNOFF_REQUESTED";
+    /** 消息码:会签全部通过、已自动转审批 → 发起人 */
+    public static final String SIGNOFF_PASSED = "SIGNOFF_PASSED";
+    /** 消息码:会签被驳回 → 发起人(回草稿) */
+    public static final String SIGNOFF_REJECTED = "SIGNOFF_REJECTED";
+    /** 消息码:变更已生效、本文件已生成下一版草稿 → 该文件责任人 */
+    public static final String CHANGE_EFFECTIVE = "CHANGE_EFFECTIVE";
+    /** 消息码:变更单审批被驳回 → 发起人与已填写部门(2026-09-21 变更线上流程⑤) */
+    public static final String CHANGE_REJECTED = "CHANGE_REJECTED";
 
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;

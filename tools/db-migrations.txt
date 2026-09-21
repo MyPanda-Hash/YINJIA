@@ -773,3 +773,19 @@ migrate-change-request.sql
 #   部门行清单 = 本表「部门」去重(按 sort)⇒ 加减部门行只改数据、不改代码。
 # 配套代码:ButtonService.ensureChangeDeptRows(建单铺 7 行)/ gateChangeDetail(按格门禁,见下条提交)。
 migrate-change-dept-map.sql
+
+# —— 2026-09-21 产品变更申请单(RD_CHANGE)·第三步:会签 / 审批 / 生效钩子 ——
+# 用户口径(第④⑤条):范围较大时由相关人员**会签**;填完提交冯总(admin)审核,**通过后变更生效**。
+# 状态链:草稿 →(填写中)→ 会签中(可选)→ 审批中(admin)→ 已生效;驳回回草稿。
+# migrate-change-flow.sql:
+#   §1 yj_doc_status 补 [effective](已生效标记;「已生效」与「已审核」区分开);
+#   §2 四个受控文件头表(rd_mold_proc_head/rd_asm_proc_head/rd_spec_doc_head/rd_insp_plan_head)补
+#      [变更来源单号]:下一版草稿记下"我因哪张变更单而生";
+#   §3 四个面板登记该字段(place='query' 列表可见 + hidden=1 **不上纸张**,不动四张既有版面 + editable=0)+ 译名;
+#   §4 会签**不建表**:会签人存 rd_change_head.会签人,每签一行落既有 yj_form_approval
+#      (action='SIGNOFF', result PENDING/APPROVED/REJECTED/CANCELED/WITHDRAWN),「会签中」由存在
+#      PENDING 签名推导 —— 与项目实施计划终止流(yj_plan_term + yj_form_approval)同一套做法。
+# 配套代码:ButtonService(submitSignoff/signoffApprove/signoffReject/signoffWithdraw/applyChangeEffect/
+#   cloneDocForChange)、PanelPermissionService 面板级按钮权限覆盖(RD_CHANGE 的提交类按钮改判 add/modify,
+#   因为该面板不是文书归档面板、普通用户没有 audit 词)、QueryService 列表状态同步。
+migrate-change-flow.sql

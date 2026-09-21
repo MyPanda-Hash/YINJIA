@@ -96,6 +96,11 @@ public class ButtonService {
             case "删除审批驳回" -> rejectDelete(def, formData);
             // 文件类面板:归档后申请修改(管理员审批进入修改态,再审批归档+修改记录全量留痕)
             case "申请修改" -> modifyRequest(def, formData);
+            // 产品变更申请单:会签子流程(发起人勾「需会签」+选会签人 → 全部通过才进审核,2026-09-21)
+            case "提交会签" -> submitSignoff(def, formData);
+            case "会签通过" -> signoffApprove(def, formData);
+            case "会签驳回" -> signoffReject(def, formData);
+            case "撤回会签" -> signoffWithdraw(def, formData);
             // 立项申请:审核通过(已审核/已归档)后由审核人给项目定级(2026-09-21 用户口径)——
             // 等级是后续立项(实施计划)与进度流程的属性,按参照自动带给下游 项目定级
             case "项目定级" -> gradeProject(def, formData);
@@ -241,6 +246,9 @@ public class ButtonService {
         if ("待二级审批".equals(stStatus)) throw new IllegalStateException("待二级审批单据不可保存，请等待二级审批完成或驳回");
         if ("已中止".equals(stStatus)) throw new IllegalStateException("已中止单据不可保存，请先恢复");
         if ("已终止".equals(stStatus)) throw new IllegalStateException("已终止单据不可保存");
+        // 产品变更申请单(2026-09-21):已生效=终态(要改只能再开一张变更单);会签中锁编辑(免得签的和改的不是一版)
+        if ("已生效".equals(stStatus)) throw new IllegalStateException("已生效单据不可保存，如需再次变更请另开一张变更申请单");
+        if ("会签中".equals(stStatus)) throw new IllegalStateException("会签中单据不可保存，请等会签完成或由发起人撤回会签");
         if (stStatus.startsWith("终止审批中")) throw new IllegalStateException("终止审批中单据不可保存，请等待审批完成或撤回");
         // 在途申请期间锁定(2026-09-12):删除/修改申请待审批时单据不可保存——此前只拦审批中,
         // 申请期间仍可改数据:改动落在修改快照之后 diff 失真,极端时序还会造出无人能解的死状态
@@ -1085,10 +1093,26 @@ public class ButtonService {
 
     // ---- 审批流(照搬 light-mes PxService):提交/通过/驳回全留痕,防伪校验 ----
 
-    /** 提交审批:仅草稿 → 审批中 */
+    /** 提交审批(对外动作:仅草稿/修改中 → 审批中;变更单另有发起人身份与会签前置校验) */
     private Map<String, Object> submitApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
         ensureDocExists(def, no);
+        String operator = currentUserName();
+        // 产品变更申请单(2026-09-21):提交审批 = 发起人(∪管理员)的动作;勾了「需会签=是」的单
+        // 必须先会签全部通过才能送审(用户口径:会签通过才进审核)
+        if (CHANGE_PANEL.equals(def.code())) {
+            requireChangeInitiator(no, operator);
+            if ("是".equals(changeHead(no, "需会签")) && !signoffAllApproved(no))
+                throw new IllegalStateException("本单勾选了「需会签」，请先提交会签并等全部会签通过后再提交审批");
+        }
+        return doSubmitApproval(def, no, opinionOf(formData));
+    }
+
+    /**
+     * 提交审批内核(会签全部通过后由系统自动调用,故**不校验发起人身份**:最后一位会签人不是发起人)。
+     * 其余逐字同原路径:仅草稿/修改中可提交,写 pending='Y' + SUBMIT 留痕 + 通知审批人。
+     */
+    private Map<String, Object> doSubmitApproval(PanelRegistry.PanelDef def, String no, String opinion) {
         Map<String, Object> st = docStatusOf(def.code(), no);
         // 修改态(文件类:申请修改经管理员审批通过)同样可提交审批,通过后 finalizeModify 再归档
         if (!"草稿".equals(st.get("status")) && !"修改中".equals(st.get("status")))
@@ -1100,7 +1124,7 @@ public class ButtonService {
                         + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, pending, pending_by, pending_at, canceled, approve_node, update_at) "
                         + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), 'N', 1, GETDATE());",
                 def.code(), no, operator, operator);
-        recordApproval(def.code(), no, "SUBMIT", "PENDING", opinionOf(formData));
+        recordApproval(def.code(), no, "SUBMIT", "PENDING", opinion);
         // 消息:提交审批 → 该面板审批人
         notify(() -> messageService.sendToApprovers(def.code(), MessageService.APPROVAL_SUBMITTED, no,
                 Map.of("docNo", no, "actor", operator), operator));
@@ -1159,6 +1183,18 @@ public class ButtonService {
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion);
+        // 产品变更申请单:审批通过即**生效**(2026-09-21 用户口径第⑤条)——状态转「已生效」,
+        // 并按勾选的受控文件建下一版草稿(带来源单号)+ 通知各文件责任人重走受控审核
+        if (CHANGE_PANEL.equals(def.code())) {
+            jdbc.update("UPDATE yj_doc_status SET effective = 'Y', update_at = GETDATE() WHERE panel_code = ? AND doc_no = ?",
+                    def.code(), no);
+            String made = applyChangeEffect(no, operator);
+            recordApproval(def.code(), no, "EFFECT", "APPLIED", "已生成下一版草稿：" + made);
+            final String madeF = made;
+            notify(() -> messageService.sendToAuthor(def.headTable(), def.code(), no, MessageService.APPROVAL_APPROVED,
+                    Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion, "effect", madeF), operator));
+            return result(no, "已生效");
+        }
         // 来料检验单审批通过(与「审核」同效为已审核) → 同样触发自动生单(2026-09-16 修复:
         // 此前钩子只挂在审核路径,走 提交审批→审批通过 的检验单不生成采购入库单/暂收退回单,
         // 用户只好点手工生单按钮,而手工路径实收数量映射错误且退回单被死过滤器挡住)
@@ -1230,6 +1266,8 @@ public class ButtonService {
         notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
                 def.code(), no, MessageService.APPROVAL_REJECTED,
                 Map.of("docNo", no, "actor", rejectBy, "opinion", opinion), rejectBy));
+        // 产品变更申请单:驳回还要通知**已填写的部门**(部门行的签字人 → 账号),他们会知道要重填(口径 E)
+        if (CHANGE_PANEL.equals(def.code())) notifyChangeRejected(def, no, rejectBy, opinion);
         return result(no, "草稿");
     }
 
@@ -2579,6 +2617,279 @@ public class ButtonService {
         it.put("日期", LocalDate.now().toString());
     }
 
+    // ══════════ 产品变更申请单:会签 / 审批 / 生效钩子(2026-09-21 第④⑤条) ══════════
+    // 状态链:草稿 →(填写中)→ 会签中(可选)→ 审批中(admin)→ 已生效;驳回回草稿。
+    // 会签不改表:会签人在 rd_change_head.会签人(账号,逗号/顿号/分号分隔),每签一行落既有
+    //   yj_form_approval(action='SIGNOFF'),「会签中」= 存在 PENDING 签名(照 yj_plan_term 的做法)。
+    // 生效 = 按勾选的受控文件**复制出下一版草稿**(带「变更来源单号」)+ 通知该文件责任人。
+
+    /** 四个受控文件:显示名(勾选写入 rd_change_head.变更文件,顿号分隔)→ 面板编码 */
+    private static final Map<String, String> CHANGE_FILE_PANELS = Map.of(
+            "成型工艺清单", "RD_MOLD_PROC",
+            "组装工艺清单", "RD_ASM_PROC",
+            "规格书", "RD_SPEC_DOC",
+            "出货检验计划表", "RD_INSP_PLAN");
+
+    /** 变更单头字段取值(取不到返回空串) */
+    private String changeHead(String no, String col) {
+        List<String> v = jdbc.queryForList("SELECT ISNULL([" + col + "], N'') FROM rd_change_head WHERE 单据编号 = ?", String.class, no);
+        return v.isEmpty() ? "" : String.valueOf(v.get(0)).trim();
+    }
+
+    /** 制单人(rd_change_head.asp_user1;查不到返回空串) */
+    private String changeAuthor(String no) {
+        List<String> v = jdbc.queryForList("SELECT TOP 1 ISNULL(asp_user1, N'') FROM rd_change_head WHERE 单据编号 = ?", String.class, no);
+        return v.isEmpty() ? "" : String.valueOf(v.get(0)).trim();
+    }
+
+    /** 变更单的身份门禁:只有**发起人(制单人)∪ 管理员**能提交会签/提交审批/撤回会签 */
+    private void requireChangeInitiator(String no, String user) {
+        if (isAdminUser(user)) return;
+        String author = changeAuthor(no);
+        if (author.isEmpty() || !author.equals(user))
+            throw new org.springframework.security.access.AccessDeniedException("只有本变更单的发起人（或管理员）可以执行该动作");
+    }
+
+    /** 会签人账号清单(rd_change_head.会签人:逗号/顿号/分号/空格分隔;去重保序) */
+    private List<String> signersOf(String no) {
+        String raw = changeHead(no, "会签人");
+        Set<String> seen = new java.util.LinkedHashSet<>();
+        for (String s : raw.split("[,，、;；\\s]+")) if (!s.isBlank()) seen.add(s.trim());
+        return new ArrayList<>(seen);
+    }
+
+    /** 会签结果(会签人账号 → result);重发会签时旧行已删,故一账号一行 */
+    private Map<String, String> signoffResults(String no) {
+        Map<String, String> out = new LinkedHashMap<>();
+        jdbc.query("SELECT operator, result FROM yj_form_approval WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' ORDER BY id",
+                (java.sql.ResultSet rs) -> {   // 块体=void → RowCallbackHandler(表达式体会被当成 ResultSetExtractor,不遍历行)
+                    out.put(String.valueOf(rs.getString("operator")).trim(), String.valueOf(rs.getString("result")));
+                },
+                CHANGE_PANEL, no);
+        return out;
+    }
+
+    /** 还等着签的会签人(「会签中」的判据) */
+    private List<String> signoffPending(String no) {
+        return signoffResults(no).entrySet().stream()
+                .filter(e -> "PENDING".equals(e.getValue())).map(Map.Entry::getKey).toList();
+    }
+
+    /** 会签是否已全部通过(至少一人,且无 PENDING/REJECTED) */
+    private boolean signoffAllApproved(String no) {
+        Map<String, String> res = signoffResults(no);
+        return !res.isEmpty() && res.values().stream().allMatch("APPROVED"::equals);
+    }
+
+    /** 会签留痕(operator = 会签人本人,不是当前操作者) */
+    private void recordSignoff(String no, String signer, String result, String opinion) {
+        jdbc.update("INSERT INTO yj_form_approval (panel_code, form_no, action, result, node_no, operator, opinion, create_time) "
+                        + "VALUES (?,?,?,?,1,?,?,SYSDATETIME())",
+                CHANGE_PANEL, no, "SIGNOFF", result, signer, opinion == null || opinion.isEmpty() ? null : opinion);
+    }
+
+    /**
+     * 提交会签(发起人 ∪ 管理员):勾了「需会签=是」且填了会签人才能提交。
+     * 重发会签会清掉上一轮签名(驳回后再发起=新一轮),每个会签人收 SIGNOFF_REQUESTED。
+     */
+    private Map<String, Object> submitSignoff(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!CHANGE_PANEL.equals(def.code())) throw new IllegalStateException("仅产品变更申请单可提交会签");
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String user = currentUserName();
+        requireChangeInitiator(no, user);
+        String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if ("会签中".equals(st)) throw new IllegalStateException("本单会签进行中，无需重复提交");
+        if (!"草稿".equals(st)) throw new IllegalStateException("仅草稿状态可提交会签（当前：" + st + "）");
+        if (!"是".equals(changeHead(no, "需会签"))) throw new IllegalStateException("本单未勾选「需会签」，直接提交审批即可");
+        List<String> signers = signersOf(no);
+        if (signers.isEmpty()) throw new IllegalStateException("请先填写会签人（账号）");
+        if (signers.contains(user) && !isAdminUser(user))
+            throw new IllegalStateException("发起人不能是会签人（编制与会签分离）");
+        for (String s : signers)
+            if (!isEnabledUser(s)) throw new IllegalStateException("会签人账号不存在或已停用：" + s);
+        jdbc.update("DELETE FROM yj_form_approval WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF'", CHANGE_PANEL, no);
+        for (String s : signers) recordSignoff(no, s, "PENDING", "");
+        recordApproval(def.code(), no, "SIGNOFF_SUBMIT", "PENDING", "会签人：" + String.join("、", signers));
+        notify(() -> messageService.send(signers, MessageService.SIGNOFF_REQUESTED, def.code(), no,
+                Map.of("docNo", no, "actor", user, "panelName", def.name()), user));
+        return result(no, "会签中");
+    }
+
+    /** 会签通过(仅本单会签人):全部签完 → **自动**转审批中(用户口径:会签通过才进审核) */
+    private Map<String, Object> signoffApprove(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String user = currentUserName();
+        requireSigner(no, user);
+        String opinion = opinionOf(formData);
+        int n = jdbc.update("UPDATE yj_form_approval SET result = 'APPROVED', opinion = ?, create_time = SYSDATETIME() "
+                        + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING' AND operator = ?",
+                opinion.isEmpty() ? null : opinion, CHANGE_PANEL, no, user);
+        if (n == 0) throw new IllegalStateException("会签已处理，请刷新后查看");
+        if (signoffPending(no).isEmpty()) {
+            // 全部通过:转审批中(走提交内核——刻意跳过发起人校验,最后一位会签人通常不是发起人)
+            doSubmitApproval(def, no, opinion);
+            notify(() -> messageService.sendToAuthor(def.headTable(), def.code(), no, MessageService.SIGNOFF_PASSED,
+                    Map.of("docNo", no, "actor", user, "panelName", def.name()), user));
+            return result(no, "审批中");
+        }
+        return result(no, "会签中");
+    }
+
+    /** 会签驳回(仅本单会签人,意见必填):回草稿,其余待签一并作废,通知发起人 */
+    private Map<String, Object> signoffReject(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String user = currentUserName();
+        requireSigner(no, user);
+        String opinion = opinionOf(formData);
+        if (opinion.isEmpty()) throw new IllegalStateException("会签驳回必须填写意见");
+        int n = jdbc.update("UPDATE yj_form_approval SET result = 'REJECTED', opinion = ?, create_time = SYSDATETIME() "
+                        + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING' AND operator = ?",
+                opinion, CHANGE_PANEL, no, user);
+        if (n == 0) throw new IllegalStateException("会签已处理，请刷新后查看");
+        // 其余待签作废(一票否决:不留"还在会签中"的假状态)
+        jdbc.update("UPDATE yj_form_approval SET result = 'CANCELED', opinion = N'他人已驳回，本签作废', create_time = SYSDATETIME() "
+                + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING'", CHANGE_PANEL, no);
+        recordApproval(def.code(), no, "SIGNOFF_REJECT", "REJECTED", opinion);
+        notify(() -> messageService.sendToAuthor(def.headTable(), def.code(), no, MessageService.SIGNOFF_REJECTED,
+                Map.of("docNo", no, "actor", user, "opinion", opinion, "panelName", def.name()), user));
+        return result(no, "草稿");
+    }
+
+    /** 撤回会签(发起人 ∪ 管理员):会签中 → 草稿(卡死出口,照「撤回删除/修改申请」口径) */
+    private Map<String, Object> signoffWithdraw(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String user = currentUserName();
+        requireChangeInitiator(no, user);
+        if (signoffPending(no).isEmpty()) throw new IllegalStateException("本单当前没有待签的会签");
+        jdbc.update("UPDATE yj_form_approval SET result = 'WITHDRAWN', opinion = N'发起人撤回', create_time = SYSDATETIME() "
+                + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING'", CHANGE_PANEL, no);
+        recordApproval(def.code(), no, "SIGNOFF_WITHDRAW", "WITHDRAWN", "撤回人：" + user);
+        // 不打扰会签人:撤回=这轮不算,发起人改完会重新发起会签(那时会再收到请求)
+        return result(no, "草稿");
+    }
+
+    /** 会签人身份校验(管理员豁免:救急可代签,与其余动作同口径) */
+    private void requireSigner(String no, String user) {
+        if (isAdminUser(user)) return;
+        if (!signersOf(no).contains(user))
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "仅本单会签人（" + String.join("、", signersOf(no)) + "）可会签");
+    }
+
+    /**
+     * 变更生效钩子(审批通过时执行):按 rd_change_head.变更文件 勾选的每个文件
+     * **复制出下一版草稿**(带「变更来源单号」= 本变更单号)+ 通知该文件责任人(rd_dev_task.负责人;
+     * 没登记责任人时兜底通知管理员,避免"生成了没人知道")。
+     * 返回「显示名 新单号」清单(写进生效留痕,便于日后追)。
+     */
+    private String applyChangeEffect(String no, String operator) {
+        List<String> names = new ArrayList<>();
+        for (Map.Entry<String, String> e : CHANGE_FILE_PANELS.entrySet()) {
+            if (!changeHead(no, "变更文件").contains(e.getKey())) continue;
+            String panelCode = e.getValue();
+            try {
+                String product = changeHead(no, "产品编号");
+                String newNo = cloneDocForChange(panelCode, product, no, operator);
+                if (newNo == null) continue;
+                names.add(e.getKey() + " " + newNo);
+                String assignee = devTaskService.assignsOf(product).get(panelCode);
+                final String doc = newNo, actor = operator, productName = changeHead(no, "产品名称");
+                if (assignee != null && !assignee.isBlank()) {
+                    notify(() -> messageService.send(List.of(assignee), MessageService.CHANGE_EFFECTIVE, panelCode, doc,
+                            Map.of("docNo", doc, "changeNo", no, "actor", actor, "panelName", e.getKey()), actor));
+                } else {
+                    notify(() -> messageService.sendToAdmins(panelCode, doc, MessageService.CHANGE_EFFECTIVE,
+                            Map.of("docNo", doc, "changeNo", no, "actor", actor, "panelName", e.getKey()), actor));
+                }
+            } catch (Exception ex) {
+                log.warn("change-effect: 生成下一版草稿失败 panel={} change={} err={}", panelCode, no, ex.getMessage());
+                names.add(e.getKey() + " 生成失败：" + ex.getMessage());
+            }
+        }
+        return names.isEmpty() ? "（本单未勾选受控文件，未生成草稿）" : String.join("；", names);
+    }
+
+    /**
+     * 为变更单复制出某受控文件的**下一版草稿**:
+     * 有既有版本(该产品最新一张未作废单)→ 整单复制(头字段 + 全部明细行),新单号、`变更来源单号`=变更单号;
+     * 没有既有版本 → 建一张只带产品标识与来源单号的空白草稿(受控文件本来就是新做的)。
+     * 新单是**草稿**(saved='Y' 未审核),责任人按正常流程编辑→保存→重新走受控审核。
+     */
+    private String cloneDocForChange(String panelCode, String product, String changeNo, String operator) {
+        PanelRegistry.PanelDef t = registry.panel(panelCode);
+        if (t == null || !t.isDoc()) return null;
+        String pkey = DevTaskService.productKeyOf(panelCode);
+        String srcNo = null;
+        if (product != null && !product.isBlank()) {
+            List<String> src = jdbc.queryForList("SELECT TOP 1 " + t.groupCol() + " FROM " + t.headTable()
+                    + " WHERE [" + pkey + "] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC", String.class, product);
+            srcNo = src.isEmpty() ? null : String.valueOf(src.get(0));
+        }
+        String newNo = formNoService.next(t.prefix(), operator);
+        Map<String, Object> headCols = new LinkedHashMap<>();
+        if (srcNo != null) {
+            Map<String, Object> src = jdbc.queryForMap("SELECT * FROM " + t.headTable() + " WHERE " + t.groupCol() + " = ?", srcNo);
+            for (Map.Entry<String, Object> e : src.entrySet()) {
+                String c = e.getKey();
+                if ("id".equals(c) || t.groupCol().equals(c) || c.startsWith("asp_") || "变更来源单号".equals(c)) continue;
+                headCols.put(c, e.getValue());
+            }
+        } else {
+            if (product != null && !product.isBlank()) headCols.put(pkey, product);
+        }
+        if (tableCols(t.headTable()).contains("变更来源单号")) headCols.put("变更来源单号", changeNo);
+        headCols.put(t.groupCol(), newNo);
+        insertRow(t.headTable(), headCols, operator);
+        if (srcNo != null) {
+            List<Map<String, Object>> lines = jdbc.queryForList("SELECT * FROM " + t.lineTable()
+                    + " WHERE " + t.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", srcNo);
+            for (Map<String, Object> line : lines) {
+                Map<String, Object> cols = new LinkedHashMap<>();
+                for (Map.Entry<String, Object> e : line.entrySet()) {
+                    String c = e.getKey();
+                    if ("id".equals(c) || t.groupCol().equals(c) || c.startsWith("asp_")) continue;
+                    cols.put(c, e.getValue());
+                }
+                cols.keySet().retainAll(tableCols(t.lineTable()));
+                cols.put(t.groupCol(), newNo);
+                insertRow(t.lineTable(), cols, operator);
+            }
+        }
+        markDocSaved(panelCode, newNo, true);
+        return newNo;
+    }
+
+    /** 变更单审批驳回:通知发起人与**已填写部门**(部门行的签字人 → 账号),让他们知道要重新填 */
+    private void notifyChangeRejected(PanelRegistry.PanelDef def, String no, String actor, String opinion) {
+        Set<String> targets = new java.util.LinkedHashSet<>();
+        String author = changeAuthor(no);
+        if (!author.isBlank()) targets.add(author);
+        jdbc.query("SELECT DISTINCT 签字 FROM rd_change_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' "
+                        + "AND ISNULL(签字, N'') <> N''", (java.sql.ResultSet rs) -> {
+                    String name = String.valueOf(rs.getString(1)).trim();
+                    if (!name.isEmpty()) targets.add(name);
+                }, no);
+        if (targets.isEmpty()) return;
+        // 签字存的是姓名:能对上账号的按账号通知,对不上的落管理员(不静默丢)
+        List<String> users = new ArrayList<>();
+        for (String t : targets) {
+            String u = devTaskService.resolveUsername(t);
+            if (u != null && !u.isBlank() && isEnabledUser(u)) users.add(u);
+        }
+        final String op = opinion;
+        if (users.isEmpty()) {
+            notify(() -> messageService.sendToAdmins(def.code(), no, MessageService.CHANGE_REJECTED,
+                    Map.of("docNo", no, "actor", actor, "opinion", op, "panelName", def.name()), actor));
+            return;
+        }
+        notify(() -> messageService.send(users, MessageService.CHANGE_REJECTED, def.code(), no,
+                Map.of("docNo", no, "actor", actor, "opinion", op, "panelName", def.name()), actor));
+    }
+
     /**
      * 分发责任人(2026-09-20;按钮名沿用「产品开发」兼容,新名「分发责任人」)。
      *
@@ -3163,7 +3474,7 @@ public class ButtonService {
      *   另一处在 QueryService.docStatus,管列表行状态) */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at, approve_node, l2_approver FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at, approve_node, l2_approver, effective FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
                 panelCode, no);
         Map<String, Object> out = new HashMap<>();
         Map<String, Object> r = rows.isEmpty() ? null : rows.get(0);
@@ -3185,10 +3496,16 @@ public class ButtonService {
             out.put("status", "终止审批中（立项人）");
         } else if ("R".equals(r.get("modify_state"))) {
             out.put("status", "修改申请中");
+        } else if (CHANGE_PANEL.equals(panelCode) && !signoffPending(no).isEmpty()) {
+            // 产品变更申请单:有 PENDING 签名 = 会签中(排在审批中之前;会签全通过时会自动转审批)
+            out.put("status", "会签中");
         } else if ("Y".equals(r.get("pending"))) {
             out.put("status", nodeOf(r) == 2 ? "待二级审批" : "审批中");
         } else if ("Y".equals(r.get("modify_state"))) {
             out.put("status", "修改中");
+        } else if ("Y".equals(r.get("effective"))) {
+            // 产品变更申请单:审批通过即生效(终态,不再叫「已审核」)
+            out.put("status", "已生效");
         } else if ("Y".equals(r.get("archived"))) {
             out.put("status", "已归档");
         } else if (r.get("shr") != null) {

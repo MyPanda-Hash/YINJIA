@@ -72,11 +72,27 @@ public class PanelPermissionService {
         BUTTON_PERMS = Map.copyOf(m);
     }
 
+    /**
+     * 面板级按钮权限覆盖(默认表之外的口径;管理员恒过)。键 = 「面板编码|按钮名」。
+     * 2026-09-21 产品变更申请单:它**不是**文书归档面板(保存不自动送审),所以「提交审批」必须
+     * 由**发起人**自己点 —— 而全局表把「提交审批」归到 audit(普通用户没有该词,cp 实测 403),
+     * 故本面板改判 add/modify(真正的身份门禁在 ButtonService.requireChangeInitiator:
+     * 只有制单人 ∪ 管理员能提交/撤回,别人即使有编辑权也点不动)。
+     * 会签类按钮同理:会签人是被指定的普通人(按账号指定即授权),身份校验在方法内。
+     */
+    private static final Map<String, String[]> BUTTON_PERMS_OVERRIDE = Map.of(
+            "RD_CHANGE|提交审批", new String[]{"add", "modify"},
+            "RD_CHANGE|提交会签", new String[]{"add", "modify"},
+            "RD_CHANGE|撤回会签", new String[]{"add", "modify", "audit"},
+            "RD_CHANGE|会签通过", new String[]{"view"},
+            "RD_CHANGE|会签驳回", new String[]{"view"});
+
     /** 按钮权限校验:未映射的按钮放行(由 ButtonService「未定义按钮规则」兜底拦截) */
     public void requireButton(String panelCode, String buttonName) {
         String user = currentUserName();
         if (isAdmin(user)) return;
-        String[] need = BUTTON_PERMS.get(buttonName == null ? "" : buttonName);
+        String[] need = BUTTON_PERMS_OVERRIDE.get(panelCode + "|" + buttonName);
+        if (need == null) need = BUTTON_PERMS.get(buttonName == null ? "" : buttonName);
         if (need == null) return;
         Set<String> perms = permsOf(user).getOrDefault(panelCode, Set.of());
         for (String n : need) if (perms.contains(n)) return;

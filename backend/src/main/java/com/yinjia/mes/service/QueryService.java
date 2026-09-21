@@ -339,7 +339,7 @@ public class QueryService {
         List<Object> args = new ArrayList<>(List.of(panelCode));
         args.addAll(docNos);
         Map<String, Map<String, Object>> out = new HashMap<>();
-        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, saved, approve_node, l2_approver FROM yj_doc_status"
+        jdbc.query("SELECT doc_no, shr, shsj, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, saved, approve_node, l2_approver, effective FROM yj_doc_status"
                 + " WHERE panel_code = ? AND doc_no IN (" + in + ")", rs -> {
             Map<String, Object> m = new HashMap<>();
             m.put("shr", rs.getString("shr"));
@@ -355,8 +355,17 @@ public class QueryService {
                 m.put("saved", rs.getString("saved"));
             m.put("approve_node", rs.getObject("approve_node"));
             m.put("l2_approver", rs.getString("l2_approver"));
+            m.put("effective", rs.getString("effective"));
             out.put(rs.getString("doc_no"), m);
         }, args.toArray());
+        // 产品变更申请单:会签中判据 = 还有 PENDING 签名(yj_form_approval,照 RD_PLAN 终止状态的补法)
+        if ("RD_CHANGE".equals(panelCode)) {
+            jdbc.query("SELECT DISTINCT form_no FROM yj_form_approval WHERE panel_code = 'RD_CHANGE' AND action = 'SIGNOFF'"
+                    + " AND result = 'PENDING' AND form_no IN (" + in + ")", rs -> {
+                Map<String, Object> m = out.get(rs.getString("form_no"));
+                if (m != null) m.put("signoff_pending", "Y");
+            }, docNos.toArray());
+        }
         // 项目实施计划:补终止审批状态(yj_plan_term,一单一行;RTRIM 防 char(2) 尾空格)
         if ("RD_PLAN".equals(panelCode)) {
             jdbc.query("SELECT doc_no, RTRIM(state) AS term_state FROM yj_plan_term WHERE panel_code='RD_PLAN' AND doc_no IN (" + in + ")",
@@ -380,10 +389,12 @@ public class QueryService {
         if (st != null && "P2".equals(st.get("term_state"))) return "终止审批中（管理员）";
         if (st != null && "P1".equals(st.get("term_state"))) return "终止审批中（立项人）";
         if (st != null && "R".equals(st.get("modify_state"))) return "修改申请中";
+        if (st != null && "Y".equals(st.get("signoff_pending"))) return "会签中";
         if (st != null && "Y".equals(st.get("pending"))) {
             return l2Node(st) ? "待二级审批" : "审批中";
         }
         if (st != null && "Y".equals(st.get("modify_state"))) return "修改中";
+        if (st != null && "Y".equals(st.get("effective"))) return "已生效";
         if (st != null && "Y".equals(st.get("archived"))) return "已归档";
         if (st != null && st.get("shr") != null) return "已审核";
         return "草稿";
