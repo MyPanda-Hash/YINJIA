@@ -153,6 +153,8 @@ public class KingdeePushService {
         else body.put("customer_number", str(head.get("客户编码")));
 
         ArrayNode entities = body.putArray("material_entity");
+        // 来源单引用(金蝶行级 src_* 族):采购入库单带 采购订单号 → 金蝶按来源订单挂联
+        String poNo = str(head.get("采购订单号"));
         int rowNo = 0;
         for (Map<String, Object> line : lines) {
             rowNo++;
@@ -177,6 +179,11 @@ public class KingdeePushService {
             if (stock.isEmpty()) stock = "CK00001";
             e.put("stock_number", stock);
             String batch = str(line.get("批号")); if (!batch.isEmpty()) e.put("batch_no", batch);
+            // 来源单:行级src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
+            if (isPur && !poNo.isEmpty()) {
+                e.put("src_bill_no", poNo);
+                e.put("src_bill_type_name", "采购订单");
+            }
         }
 
         // ⑤ 推送(纯 Java HTTP)
@@ -220,6 +227,7 @@ public class KingdeePushService {
      * 切换测试/真实账套后自动按新凭证重拉,无需改代码或本地档案。
      */
     private synchronized Map<String, String> unitMap() throws Exception {
+        ensureCreds(); // 凭证先行:本方法可能先于 getToken() 被调用(推送流程④),Spring 未配时须先装 config.json,否则 clientSecret 为空 → SecretKeySpec "Empty key"
         if (unitIdByName != null && System.currentTimeMillis() - unitCacheAt < 22 * 3600_000L) return unitIdByName;
         Map<String, String> m = new HashMap<>();
         for (int page = 1; page <= 10; page++) {

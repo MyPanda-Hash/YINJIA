@@ -57,6 +57,19 @@ function autoExtraLines(code, lineElem) {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const N_SYNC_USER = '金蝶同步'; // 星辰审核人缺失时 yj_doc_status.shr 的兜底留痕
 
+/** 来料检验自定义字段键登记表:各账套在金蝶界面定义后,把键ID加进来(值 是/否)。
+ *  测试沙箱(Wyaf4sPe): custom_field__1__62jiaob3z7yj97 (2026-09-18 定义);
+ *  真实账套(359797): 待定义后登记。 */
+const CF_INSPECTION_KEYS = ['custom_field__1__62jiaob3z7yj97'];
+function cfInspection(d) {
+  const cf = (d && d.custom_field) || {};
+  for (const k of CF_INSPECTION_KEYS) {
+    const v = String(cf[k] ?? '').trim();
+    if (v) return v;
+  }
+  return null;
+}
+
 // ---------- 类型注册表 ----------
 // 订单条目:{ code,label,listPath,detailPath,headTable,lineTable,fingerprintOf,mapHead,mapLines }
 // 档案条目:{ code,label,archive:true,listPath,detailPath(可空=仅列表),table,codeCol,
@@ -201,9 +214,10 @@ export const DOCS = [
         计价方式: costWay, 品牌: null, 计量单位: str(d.base_unit_name), 属性: attr, 条形码: str(d.barcode),
         建档日期: (str(d.create_time) || '').slice(0, 10) || null,
         停用: d.enable !== '1', 状态: d.enable === '1' ? '启用' : '停用',
-        是否检验: 0, 数据来源: '金蝶同步', ERP更新时间: str(d.modify_time) || nowLocal(),
+        是否检验: str(d.check_type) === '1' ? 1 : 0, 数据来源: '金蝶同步', ERP更新时间: str(d.modify_time) || nowLocal(),
         // 按接口实测补齐(①档)
         备注: str(d.remark), 助记码: str(d.help_code), 产地: str(d.producing_pace), 商品类型: str(d.check_type),
+        来料检验: cfInspection(d),
         是否可销售: d.is_sale === true, 是否可采购: d.is_purchase === true,
         是否启用称重: d.is_weight === true, 是否序列号管理: d.is_serial === true, 是否批次管理: d.is_batch === true,
         是否为子件: d.is_subpart === true, 是否为组件: d.is_assembly === true,

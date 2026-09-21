@@ -7,9 +7,9 @@ import { fileURLToPath } from 'node:url'
  * 架构审计(移植自 light-mes tools/architecture-audit.mjs):
  * 1) frontend/src/core/(面板引擎)禁止 import business 层 —— 通用视图与业务适配层隔离;
  * 2) PxController 只能面向 PanelRuntimeService 接口,不得直接依赖 PxRuntimeService 实现。
- * 提交前运行:node tools/architecture-audit.mjs(违规 exit 1)。
+ * 提交前运行:node tools/verify/architecture-audit.mjs(违规 exit 1)。
  */
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..')
 const core = path.join(root, 'frontend', 'src', 'core')
 const errors = []
 

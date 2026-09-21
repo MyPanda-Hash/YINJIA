@@ -179,6 +179,8 @@ IF OBJECT_ID('qc_insp') IS NULL CREATE TABLE qc_insp (
   asp_user1 nvarchar(50) NULL, asp_time1 datetime2 NULL, asp_user2 nvarchar(50) NULL, asp_time2 datetime2 NULL, asp_cancel char(1) NULL DEFAULT 'N'
 );
 IF OBJECT_ID('qc_insp') IS NOT NULL AND COL_LENGTH('dbo.qc_insp', N'附件1') IS NULL ALTER TABLE qc_insp ADD [业务员] nvarchar(50) NULL, [供应商代码] nvarchar(100) NULL, [部门] nvarchar(100) NULL, [部门名称] nvarchar(100) NULL, [数量] decimal(18,4) NULL, [附件1] nvarchar(500) NULL, [附件2] nvarchar(500) NULL, [附件3] nvarchar(500) NULL, [附件4] nvarchar(500) NULL, [附件5] nvarchar(500) NULL, [附件6] nvarchar(500) NULL;
+-- 检验员/批号/送检数量:legacy 真实表本无此三列,但 v_lot_trace(批号追溯视图)在用,重建保留(2026-09-17 收编入链时补)
+IF OBJECT_ID('qc_insp') IS NOT NULL AND COL_LENGTH('dbo.qc_insp', N'检验员') IS NULL ALTER TABLE qc_insp ADD [检验员] nvarchar(50) NULL;
 IF OBJECT_ID('qc_insp_detail') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_insp_detail) DROP TABLE qc_insp_detail;
 IF OBJECT_ID('qc_insp_detail') IS NULL CREATE TABLE qc_insp_detail (
   id int IDENTITY(1,1) PRIMARY KEY,
@@ -187,6 +189,8 @@ IF OBJECT_ID('qc_insp_detail') IS NULL CREATE TABLE qc_insp_detail (
   [物料名称] nvarchar(200) NULL,
   [型号] nvarchar(200) NULL,
   [物料描述] nvarchar(500) NULL,
+  [批号] nvarchar(30) NULL,
+  [送检数量] decimal(18,4) NULL,
   [数量] decimal(18,4) NULL,
   [箱数] decimal(18,4) NULL,
   [日期] nvarchar(20) NULL,
@@ -205,6 +209,7 @@ IF OBJECT_ID('qc_insp_detail') IS NULL CREATE TABLE qc_insp_detail (
   asp_user1 nvarchar(50) NULL, asp_time1 datetime2 NULL, asp_user2 nvarchar(50) NULL, asp_time2 datetime2 NULL, asp_cancel char(1) NULL DEFAULT 'N'
 );
 IF OBJECT_ID('qc_insp_detail') IS NOT NULL AND COL_LENGTH('dbo.qc_insp_detail', N'箱数') IS NULL ALTER TABLE qc_insp_detail ADD [型号] nvarchar(200) NULL, [物料描述] nvarchar(500) NULL, [箱数] decimal(18,4) NULL, [日期] nvarchar(20) NULL, [结案] nvarchar(10) NULL, [入库单号] nvarchar(60) NULL, [仓库代码] nvarchar(60) NULL, [抽样方案] nvarchar(100) NULL, [品质复核人] nvarchar(50) NULL, [品质复核时间] nvarchar(30) NULL, [部门] nvarchar(100) NULL, [部门名称] nvarchar(100) NULL, [业务员] nvarchar(50) NULL;
+IF OBJECT_ID('qc_insp_detail') IS NOT NULL AND COL_LENGTH('dbo.qc_insp_detail', N'批号') IS NULL ALTER TABLE qc_insp_detail ADD [批号] nvarchar(30) NULL, [送检数量] decimal(18,4) NULL;
 GO
 
 -- ══════════ 4. 面板注册/改名(编码不变;全新库 INSERT,已有库 UPDATE 改名) ══════════
@@ -394,7 +399,8 @@ IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'�
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'订单号' AND locale='ja') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'订单号', 'ja', N'注文番号', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'箱数' AND locale='ja') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'箱数', 'ja', N'箱数', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'合格数量' AND locale='ja') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'合格数量', 'ja', N'合格数量', 'manual');
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'不良数量' AND locale='ja') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'不良数量', 'ja', N'不良数量', 'manual');
+UPDATE yj_translation SET text = N'不良数' WHERE scope='field' AND ref_key=N'不良数量' AND locale='ja' AND text=N'不良数量';
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'不良数量' AND locale='ja') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'不良数量', 'ja', N'不良数', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'入库单号' AND locale='ja') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'入库单号', 'ja', N'入庫番号', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'仓库代码' AND locale='ja') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'仓库代码', 'ja', N'倉庫コード', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'抽样方案' AND locale='ja') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'抽样方案', 'ja', N'サンプリング方式', 'manual');
