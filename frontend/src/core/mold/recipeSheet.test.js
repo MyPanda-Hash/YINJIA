@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  SLOT_GROUPS, groupOfMaterialType, parseRatio, parseDensityRange,
+  SLOT_GROUPS, groupOfMaterialType, parseRatio, parseDensityRange, moisturePercent,
   slotsFromRows, paramsFromHead, buildPatch,
 } from './recipeSheet.js'
 import { compute } from './recipeEngine.js'
@@ -51,6 +51,18 @@ test('设计添加量:小数直接当比例,"62"/"62%" 按百分数解释并标�
   assert.equal(parseRatio(''), null)
   assert.equal(parseRatio(null), null)
   assert.equal(parseRatio('abc'), null)
+})
+
+test('含水率输入是百分数:弹窗里填 6 表示 6%,交给引擎的必须是 0.06', () => {
+  // 弹窗那一格标签是「含水率%」(与 exe 前端一致:它把物料的 0.06 显示成 6.0),
+  // 而引擎的 moisture 是小数 —— 少这一步换算,填 6 会被当成 600%,灌料湿重直接算飞。
+  assert.equal(moisturePercent('6'), 0.06)
+  assert.equal(moisturePercent('6.5'), 0.065)
+  assert.equal(moisturePercent('0.06'), 0.0006)   // 照百分数解释:0.06% 就是 0.0006
+  assert.equal(moisturePercent('0'), 0)
+  assert.equal(moisturePercent(''), null)
+  assert.equal(moisturePercent(null), null)
+  assert.equal(moisturePercent('abc'), null)
 })
 
 test('密度范围文本可解析:密度范围：0.56~0.58', () => {
@@ -110,6 +122,19 @@ test('行数不足 10 时补空料位(折叠料位不参与计算)', () => {
   assert.equal(slots[2].code, '')
   assert.equal(slots[2].designRatio, null)
   assert.equal(slots[9].group, '折算料')
+})
+
+test('折算料行不该报"按百分数解释"的假告警(它的设计值本来就是克/支,>1 很正常)', () => {
+  // 界面探针实测到过这条假告警:「料位 8 的『设计添加量』填的是 2,已按百分数解释为 2.00%」——
+  // 数值本身没错(折算料就是按 2 克/支算的),但这条提示会让工艺员去改一个本来就对的格。
+  const { slots, warnings } = slotsFromRows([
+    row('炭粉', 'A', '1'), row('炭粉', 'A', ''), row('炭粉', 'A', ''), row('炭粉', 'A', ''), row('炭粉', 'A', ''),
+    row('胶粉', 'B', '0'), row('胶粉', 'B', ''),
+    row('功能料-颗粒', 'C', '2'), row('功能料-颗粒', 'C', '10'), row('功能料-颗粒', 'C', ''),
+  ])
+  assert.equal(slots[7].amountG, 2)
+  assert.equal(slots[8].amountG, 10)
+  assert.deepEqual(warnings, [])
 })
 
 test('已知局限:把「功能料-粉末」的物料填进折算料位会被分到粉料位(超容量即告警,不会静默算错)', () => {

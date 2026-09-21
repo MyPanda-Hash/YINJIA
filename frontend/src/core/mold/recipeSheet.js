@@ -52,6 +52,18 @@ function parseNumber(text) {
   return Number.isFinite(num) ? num : null
 }
 
+/**
+ * 弹窗那一格「含水率%」→ 引擎要的小数。
+ * 弹窗标签与 exe 前端一致用百分数(exe 把物料的 0.06 显示成 6.0),
+ * 而引擎的 moisture 是小数 —— 少这一步换算,填 6 会被当成 600%,灌料湿重直接算飞。
+ */
+export function moisturePercent(text) {
+  const raw = String(text ?? '').trim()
+  if (!raw) return null
+  const num = Number(raw.replace('%', '').trim())
+  return Number.isFinite(num) ? num / 100 : null
+}
+
 /** 「密度范围：0.56~0.58」这类文本 → [下限, 上限] */
 export function parseDensityRange(text) {
   const raw = String(text ?? '')
@@ -95,7 +107,9 @@ export function slotsFromRows(rows) {
     const designText = r?.['设计添加量']
     const isConverted = group === SLOT_GROUPS.CONVERTED
     const parsed = parseRatio(designText)
-    if (parsed?.percentAssumed) {
+    // ⚠ 只有粉料/胶粉位才谈得上"比例" —— 折算料位的设计值本来就是克/支,>1 是正常的,
+    //   对它报"已按百分数解释"是假告警(界面探针实测到过),会把工艺员引去改一个本来就对的格。
+    if (!isConverted && parsed?.percentAssumed) {
       warnings.push(`料位 ${slotNo} 的「设计添加量」填的是 ${String(designText).trim()}，已按百分数解释为 ${(parsed.value * 100).toFixed(2)}%`)
     }
     slots.push({

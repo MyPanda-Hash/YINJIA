@@ -120,7 +120,7 @@ import { ElMessage } from 'element-plus'
 import request from '@/core/request'
 import { tt } from '@/i18n'
 import { compute } from '@/core/mold/recipeEngine.js'
-import { buildPatch, paramsFromHead, slotsFromRows } from '@/core/mold/recipeSheet.js'
+import { buildPatch, moisturePercent, paramsFromHead, slotsFromRows } from '@/core/mold/recipeSheet.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
 
 /**
@@ -165,7 +165,8 @@ const overrides = computed(() => Object.fromEntries(
   Object.entries(form).map(([k, v]) => [k, Number(String(v).trim())]).filter(([, v]) => Number.isFinite(v))))
 
 const slots = computed(() => slotsFromRows(props.rows).slots
-  .map((s, i) => ({ ...s, moisture: String(moisture.value[i] ?? '').trim() === '' ? null : Number(moisture.value[i]) })))
+  // 弹窗输入是百分数(exe 前端同款),引擎吃小数 —— 换算在 recipeSheet.moisturePercent 里,有单测
+  .map((s, i) => ({ ...s, moisture: moisturePercent(moisture.value[i]) })))
 
 const parsed = computed(() => {
   const { params, missing } = paramsFromHead(props.head, overrides.value)
