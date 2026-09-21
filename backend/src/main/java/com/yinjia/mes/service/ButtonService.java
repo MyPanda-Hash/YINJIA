@@ -208,6 +208,8 @@ public class ButtonService {
                 if (tableCols(table).contains("创建时间")) cols.put("创建时间", LocalDateTime.now().format(TS_FMT));
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
+                // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
+                if (CHANGE_PANEL.equals(def.code())) ensureChangeDeptRows(def, no, user);
                 // directAdd 占位草稿:未保存过 -> saved='N'(前端 isFreshAddedDoc 依赖本标记界定"本次新增"窗口)
                 markDocSaved(def.code(), no, markSaved);
                 return result(no, "草稿");
@@ -266,6 +268,11 @@ public class ButtonService {
         // 保存后比对——变了就通知关联出货检验计划表核对(编号=产品编号,2026-09-11 用户口径)
         List<String> specTestOld = "RD_SPEC_DOC".equals(def.code()) && no != null
                 && "Y".equals(modifyStateOf(def.code(), no)) ? specTestRowsSnapshot(no) : null;
+        // 产品变更申请单:先保 7 个部门行在册,再按"部门↔账号"过一遍按格门禁(非本部门一律还原)
+        if (CHANGE_PANEL.equals(def.code())) {
+            ensureChangeDeptRows(def, no, user);
+            gateChangeDetail(def, items, no, user);
+        }
         if (split) {
             upsertHeadRow(def, head, no, user);
             upsertLineRows(def, items, no, l2c, user);
@@ -2426,6 +2433,151 @@ public class ButtonService {
     /** 项目等级取值(与下游 RD_PLAN.项目定级 / RD_PROGRESS.项目定级 同字典;2026-09-21 四级统一) */
     private static final java.util.Set<String> PROJECT_LEVELS =
             java.util.Set.of("一级", "二级", "三级", "四级");
+
+    // ══════════ 产品变更申请单(RD_CHANGE):部门评审行 + 按部门按格编辑门禁 ══════════
+    // 用户口径(2026-09-21 第③条):各部门按各自账号分工填本部门栏目,每人只能改自己填写的内容,
+    //   「变更后内容」是可编辑区。部门行 = 纸面 YJ-QR-130「部门评审意见」的 7 行(开发部/成型工艺科/
+    //   组装车间/销售部/品质部/计划组/仓管部);账号能填哪一行 = yj_user.dept_id → yj_change_dept
+    //   (纸面部门 ↔ 系统部门映射,因为纸面部门名在 yj_dept 里并不存在,见 migrate-change-dept-map.sql)。
+    // 门禁是**按格**的:本部门行只放行「变更后内容/备注」(表区/部门/签字/日期一律按库内现值还原),
+    //   别的部门行整体还原;载荷省略某行不会把它软删(省略即删除=抹掉别人已填内容);
+    //   新增行只允许预置部门名。管理员豁免(可代填任何行)。签字/日期由服务端盖章(防伪造签名)。
+
+    /** 变更申请单面板编码 */
+    private static final String CHANGE_PANEL = "RD_CHANGE";
+    /** 部门评审行的表区值(与前端纸张配置同名) */
+    private static final String CHANGE_DEPT_SECTION = "部门评审意见";
+    /** 部门行里可由填写人改的列(其余列一律以库内现值为准) */
+    private static final java.util.Set<String> CHANGE_EDITABLE_COLS =
+            java.util.Set.of("变更后内容", "备注");
+
+    /** 纸面部门行清单(去重,按 sort;映射表为空=不铺行,只留管理员可用) */
+    private List<String> changeDeptRows() {
+        return jdbc.queryForList("SELECT 部门 FROM yj_change_dept GROUP BY 部门, sort ORDER BY MIN(sort), 部门", String.class);
+    }
+
+    /** 当前账号可填的纸面部门行(按 yj_user.dept_id 命中 yj_change_dept;管理员另行豁免,不在此列) */
+    private java.util.Set<String> changeDeptsOf(String user) {
+        return new java.util.HashSet<>(jdbc.queryForList(
+                "SELECT DISTINCT c.部门 FROM yj_change_dept c JOIN yj_user u ON u.dept_id = c.dept_id WHERE u.username = ?",
+                String.class, user));
+    }
+
+    /** 操作人姓名(签字盖章用;取不到回退账号) */
+    private String realNameOf(String user) {
+        List<String> names = jdbc.queryForList("SELECT real_name FROM yj_user WHERE username = ?", String.class, user);
+        return names.isEmpty() || names.get(0) == null || names.get(0).isBlank() ? user : names.get(0);
+    }
+
+    /** 空值安全的字符串(去空白;null/空 → 空串) */
+    private static String blankSafe(Object o) {
+        return o == null ? "" : String.valueOf(o).trim();
+    }
+
+    /**
+     * 确保 7 个预置部门行存在(幂等,建单/每次保存都调):
+     * ① 有存活行 → 不动;② 有被软删的行 → 复活它(保住 id,行号/引用不乱);③ 都没有 → 插一行空白行。
+     */
+    private void ensureChangeDeptRows(PanelRegistry.PanelDef def, String no, String user) {
+        for (String dept : changeDeptRows()) {
+            List<Object> dead = jdbc.queryForList("SELECT TOP 1 id FROM " + def.lineTable()
+                            + " WHERE " + def.groupCol() + " = ? AND 部门 = ? AND ISNULL(asp_cancel,'N') = 'Y' ORDER BY id",
+                    Object.class, no, dept);
+            if (!dead.isEmpty()) {
+                jdbc.update("UPDATE " + def.lineTable() + " SET asp_cancel = 'N', 表区 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
+                        CHANGE_DEPT_SECTION, user, dead.get(0));
+                continue;
+            }
+            Integer alive = jdbc.queryForObject("SELECT COUNT(*) FROM " + def.lineTable()
+                            + " WHERE " + def.groupCol() + " = ? AND 部门 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    Integer.class, no, dept);
+            if (alive != null && alive > 0) continue;
+            Map<String, Object> cols = new LinkedHashMap<>();
+            cols.put(def.groupCol(), no);
+            cols.put("表区", CHANGE_DEPT_SECTION);
+            cols.put("部门", dept);
+            cols.put("变更后内容", "");
+            insertRow(def.lineTable(), cols, user);
+        }
+    }
+
+    /**
+     * 按格门禁:就地改写 items(调用方随后照常 upsert)。
+     * 还原口径 —— 非本部门行(或本部门的非可编辑列)= 库内现值;缺席的部门行 = 原值补回(不软删)。
+     */
+    private void gateChangeDetail(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String no, String user) {
+        boolean admin = isAdminUser(user);
+        java.util.Set<String> mine = admin ? java.util.Set.of() : changeDeptsOf(user);
+        List<String> canonical = changeDeptRows();
+        List<Map<String, Object>> db = jdbc.queryForList("SELECT id, 部门, 表区, 变更后内容, 签字, 日期, 备注 FROM "
+                + def.lineTable() + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
+        Map<String, Map<String, Object>> byId = new LinkedHashMap<>();
+        Map<String, Map<String, Object>> byDept = new LinkedHashMap<>();
+        for (Map<String, Object> r : db) {
+            byId.put(String.valueOf(r.get("id")), r);
+            byDept.putIfAbsent(blankSafe(r.get("部门")), r);
+        }
+        String operator = realNameOf(user);
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Map<String, Object> it : items) {
+            Object id = it.get("id");
+            Map<String, Object> cur = id == null || String.valueOf(id).isBlank() ? null : byId.get(String.valueOf(id));
+            if (cur == null) {
+                // 新增行:只认预置部门名(否则等于自己造一行"自己的部门"绕过映射表)
+                String dept = blankSafe(it.get("部门"));
+                if (!canonical.contains(dept))
+                    throw new IllegalStateException("部门评审只能填预置部门行（" + String.join("、", canonical)
+                            + "），不能新增「" + dept + "」行");
+                if (!admin && !mine.contains(dept))
+                    throw new org.springframework.security.access.AccessDeniedException(
+                            "只能填写本部门（" + String.join("、", mine) + "）的栏目");
+                Map<String, Object> exist = byDept.get(dept);
+                if (exist != null) {   // 该部门已有行(如并发插入过):按那一行改写,不另插一行
+                    seen.add(String.valueOf(exist.get("id")));
+                    restoreRow(exist, it, true);
+                    stampSignature(it, exist, operator);
+                } else {
+                    it.put("表区", CHANGE_DEPT_SECTION);
+                    stampSignature(it, null, operator);
+                }
+                continue;
+            }
+            seen.add(String.valueOf(cur.get("id")));
+            boolean own = admin || mine.contains(blankSafe(cur.get("部门")));
+            restoreRow(cur, it, own);
+            if (own) stampSignature(it, cur, operator);
+        }
+        // 缺席行补回:部门行不因载荷省略而被软删(软删 = 抹掉别的部门已填的内容)
+        for (Map.Entry<String, Map<String, Object>> e : byId.entrySet()) {
+            if (seen.contains(e.getKey())) continue;
+            items.add(new LinkedHashMap<>(e.getValue()));
+        }
+    }
+
+    /** 还原:可编辑列保留载荷值,其余列(含 部门/表区/签字/日期/单据编号)一律写回库内现值 */
+    private void restoreRow(Map<String, Object> cur, Map<String, Object> it, boolean editable) {
+        for (Map.Entry<String, Object> e : cur.entrySet()) {
+            String k = e.getKey();
+            if ("id".equals(k)) continue;
+            if (editable && CHANGE_EDITABLE_COLS.contains(k)) continue;
+            it.put(k, e.getValue());
+        }
+        it.put("id", cur.get("id"));
+    }
+
+    /**
+     * 服务端盖章:只有「变更后内容」真的变成了非空文本才动签字/日期 ——
+     * 签字 = 操作人姓名、日期 = 今天;空值/没变 → 一律不动(①空串在本引擎里是"不改动"语义,
+     * 见 labelsToCols 注释;②管理员只改表头时不能把各部门的签字刷成自己)。
+     * 载荷自带的签字/日期已被 restoreRow 还原,伪造签名到不了这里。
+     */
+    private void stampSignature(Map<String, Object> it, Map<String, Object> cur, String operator) {
+        String now = blankSafe(it.get("变更后内容"));
+        String old = cur == null ? "" : blankSafe(cur.get("变更后内容"));
+        if (now.isEmpty() || now.equals(old)) return;
+        it.put("签字", operator);
+        it.put("日期", LocalDate.now().toString());
+    }
 
     /**
      * 分发责任人(2026-09-20;按钮名沿用「产品开发」兼容,新名「分发责任人」)。
