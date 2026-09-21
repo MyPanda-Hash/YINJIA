@@ -198,9 +198,12 @@ export const qcSheetCfgs = {
         { label: '不合格品数量', key: '不合格品数量', flex: 1 },
         { label: '不合格品比例', key: '不合格品比例', flex: 0.9 },
       ] },
-      { kind: 'pairs', cells: [
-        { label: '严重程度', key: '严重程度', kind: 'checks', options: ['严重', '一般', '轻微'], flex: 1.7 },
-        { label: '不良说明', key: '不良说明', flex: 2 },
+      // 原图:不良说明 与 严重程度 是上下两行、各占整宽(不是并排)→ 各用单元素 pairs 行
+      { kind: 'pairs', h: 60, cells: [
+        { label: '不良说明', key: '不良说明', flex: 1 },
+      ] },
+      { kind: 'pairs', h: 44, cells: [
+        { label: '严重程度', key: '严重程度', kind: 'checks', options: ['严重', '一般', '轻微'], flex: 1 },
       ] },
       { kind: 'section', label: '特采理由', key: '特采理由', h: 110, max: 1000, sign: '申请人', signKey: '编制人' },
       { kind: 'section', label: '一．相关部门处理意见', h: 34 },
@@ -211,8 +214,9 @@ export const qcSheetCfgs = {
       { kind: 'dept', label: '品质部意见', h: 80, subs: [{ key: '品质部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
       { kind: 'dept', label: '销售部意见', h: 80, subs: [{ key: '销售部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
       { kind: 'dept', label: '研发意见', h: 80, subs: [{ key: '研发意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
+      // 原图:三个勾选框(旧配置漏了「管控使用」)
       { kind: 'section', label: '二．最终处理结果', key: '最终处理结果', h: 60,
-        checks: ['正常使用', '挑选使用'] },
+        checks: ['正常使用', '管控使用', '挑选使用'] },
     ],
     signKind: 'plain',
     signCells: qcSignStd('编制人'),

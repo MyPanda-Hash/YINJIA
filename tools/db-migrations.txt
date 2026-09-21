@@ -686,3 +686,11 @@ migrate-batch-no-at-inbound.sql
 #      yj_panel 泛化;不进 DOC_ARCHIVE_PANELS/DOC_NO_PANELS —— 那两个集合只含 RD_* 文件类面板)。
 #   验证:tools/archive/_v-tcin.sql(元数据/表列/注明/译名逐项核对,已跑通且幂等)。
 migrate-qc-tc-in.sql
+
+# —— 2026-09-21 特采申请单(QC_TC):「最终处理结果」字典补第三值「管控使用」 ——
+#   纸面 YJ-QR-60 原图「二．最终处理结果」印的是三个勾选框(正常使用/管控使用/挑选使用),
+#   而 QC_TC 该字段字典只有两值(实测 seq=170)。前端版式随同一提交改为三值
+#   (docSheetConfigs.js 的 QC_TC),本迁移负责把库内 yj_field 字典对齐,
+#   否则查询弹窗下拉仍只出两值、与纸面不符。新面板 QC_TC_IN 建表即三值,不涉及。
+#   自检:tools/archive/_q-tc-final.sql(QC_TC 与 QC_TC_IN 字典应一致、均三值)。幂等。
+migrate-qc-tc-final-result.sql
