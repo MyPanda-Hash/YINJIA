@@ -29,7 +29,13 @@ public class DbSync {
     /** SQL Server 提示类消息码(0=PRINT,5701=库上下文,5703/5704=语言,15477=sp_rename 注意事项),不算错误 */
     static final java.util.Set<Integer> INFO_CODES = java.util.Set.of(0, 5701, 5703, 5704, 15477);
 
-    static final String URL = "jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false;loginTimeout=10";
+    /**
+     * 目标库可用环境变量 YINJIA_SQL_DB 覆盖(默认 HSDZ_MES)。
+     * 用途:① 在测试库/一次性克隆库上演练整条迁移链,不碰生产库;
+     *      ② 服务器侧要对测试账套 HSDZ_MES_TEST 补迁移时,不必改代码。
+     */
+    static final String DB = System.getenv().getOrDefault("YINJIA_SQL_DB", "HSDZ_MES");
+    static final String URL = "jdbc:sqlserver://127.0.0.1:1433;databaseName=" + DB + ";encrypt=false;loginTimeout=10";
     static final String USER = "yinjia";
     static final String PASS = System.getenv().getOrDefault("YINJIA_SQL_PASS", "Yinjia@2026");
 
