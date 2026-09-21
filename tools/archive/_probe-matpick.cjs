@@ -212,6 +212,17 @@ async function main() {
     if (active === '父件') ok('默认档 = 父件(用户口径)')
     else bad(`默认档应为父件,实际 ${active}`)
     const shotDlg = await shot('dialog-parent')
+    // 弹窗行数必须 = 父件数(库 30 个父件);且点一下父件勾选只应勾 1 行
+    // (踩过的坑:分组对象里带 children 字段 ⇒ el-table 当树展开,冒出 N 行跟父件一模一样的子行)
+    const dlgRows = await ev(`(function(){
+      var dlgs=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(x){return x.getBoundingClientRect().height>0})
+      var d=dlgs[dlgs.length-1]; if(!d) return null
+      var trs=[].slice.call(d.querySelectorAll('.el-table__body-wrapper tbody tr'))
+      var nested=trs.filter(function(tr){ return (tr.className||'').indexOf('level-')>=0 }).length
+      return { rows:trs.length, nested:nested, checked:trs.filter(function(tr){ var c=tr.querySelector('.el-checkbox'); return c&&c.classList.contains('is-checked') }).length } })()`)
+    console.log('     弹窗行数检查:' + JSON.stringify(dlgRows))
+    if (dlgRows && dlgRows.rows === 30 && dlgRows.nested === 0) ok(`弹窗恰 30 行(一父件一行,无树形展开子行)`)
+    else bad(`弹窗行数异常:${JSON.stringify(dlgRows)}(期望 30 行、0 行嵌套)`)
 
     // ════ ③ 三档导入行数 ════
     step('③ 三档导入行数(库:父件 T382 有 29 个子件 ⇒ 父件 1 / 父件及子件 30 / 仅子件 29)')
