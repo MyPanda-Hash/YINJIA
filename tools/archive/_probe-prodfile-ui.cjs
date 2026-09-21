@@ -1,4 +1,4 @@
-/**
+﻿/**
  * _probe-prodfile-ui.cjs —— 「产品文件」各面板界面走查(2026-09-21)
  *
  * 前半段建一条真实数据链(产品信息表 → 两级审核 → 分发责任人 → 四文件归档),
@@ -51,6 +51,17 @@ function sqlRows(name, text) {
 }
 const one = (n, t) => (sqlRows(n, t)[0] || [''])[0]
 
+/** 表区值必须取配置里**声明的 filterVal**(按页面名硬编码会写出"没有表认领"的行 —— 2026-09-21 走查踩过:
+ *  给成型配方页写 表区='成型配方' 而不是 '配方表',行入了库但界面上哪张表都不显示)。
+ *  对照表由 frontend 的 recordSheetConfigs 现读,并有单测钉住(filtervals.test.js)。 */
+async function loadFilterVals() {
+  const { pathToFileURL } = require('node:url')
+  const cfgPath = path.join(__dirname, '..', '..', 'frontend', 'src', 'core', 'views', 'recordSheetConfigs.js')
+  const { recordSheetConfigs } = await import(pathToFileURL(cfgPath).href)
+  const pick = (panel) => Object.fromEntries((recordSheetConfigs[panel]?.dataTables || [])
+    .filter((d) => d.filterVal).map((d) => [d.bar || d.pageTitle || ('page' + d.page), d.filterVal]))
+  return { mold: pick('RD_MOLD_PROC'), asm: pick('RD_ASM_PROC') }
+}
 async function main() {
   const tok = async (u, p = '123456') => {
     const r = await (await fetch(`${BASE}/api/auth/login`, {
@@ -70,6 +81,7 @@ async function main() {
       post: async (p, b) => (await (await fetch(BASE + p, { method: 'POST', headers: H, body: JSON.stringify(b) })).json()),
     }
   }
+  const FV = await loadFilterVals()   // 表区值取配置(见 loadFilterVals 注释)
   const admin = await tok('admin'); const A = api(admin.token)
   const cp = await tok('cp'); const C = api(cp.token)
   const glm = await tok('glm53'); const G = api(glm.token)
@@ -90,12 +102,12 @@ async function main() {
   await A.btn('RD_PROD_INFO', '审批通过', { 编号: piNo, 二级审批人: 'glm53', 审批意见: '转二级' })
   await G.btn('RD_PROD_INFO', '审批通过', { 编号: piNo, 审批意见: '同意' })
   await G.btn('RD_PROD_INFO', '分发责任人', { 编号: piNo, 分发责任人: { RD_MOLD_PROC: 'cp', RD_ASM_PROC: 'glm53', RD_SPEC_DOC: 'cp', RD_INSP_PLAN: 'glm53' } })
-  const mp = await C.btn('RD_MOLD_PROC', '保存', { 产品编号: PROD, 产品名称: PRODNAME, detail: { items: [{ 表区: '配方表', 序号: '1', 物料种类: '粉料', 物料名称: '界面走查粉料', 实际添加比例: '0.6' }] } })
+  const mp = await C.btn('RD_MOLD_PROC', '保存', { 产品编号: PROD, 产品名称: PRODNAME, detail: { items: [{ 表区: FV.mold['配方表'], 序号: '1', 物料种类: '粉料', 物料名称: '界面走查粉料', 实际添加比例: '0.6' }] } })
   const mpNo = mp?.data?.['编号']
   await A.btn('RD_MOLD_PROC', '审批通过', { 编号: mpNo, 审批意见: '同意归档' })
   // 再留一张**草稿态**的成型工艺清单(同产品、责任人 cp):用它验证"非责任人打开别人负责的文件"时界面怎么表现
   const mpDraft = await C.btn('RD_MOLD_PROC', '保存为草稿', {
-    产品编号: PROD, 产品名称: PRODNAME, detail: { items: [{ 表区: '配方表', 序号: '2', 物料种类: '胶粉', 物料名称: '草稿态物料' }] },
+    产品编号: PROD, 产品名称: PRODNAME, detail: { items: [{ 表区: FV.mold['配方表'], 序号: '2', 物料种类: '胶粉', 物料名称: '草稿态物料' }] },
   })
   const mpDraftNo = mpDraft?.data?.['编号']
   info(`产品信息表 = ${piNo}  成型工艺清单 = ${mpNo}(已归档)  草稿态 = ${mpDraftNo}(${mpDraft?.data?.['单据状态']})`)

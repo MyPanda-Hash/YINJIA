@@ -57,6 +57,17 @@ function sql(name, text) {
 const one = (name, text) => (sql(name, text)[0] || [''])[0]
 const castN = (v) => `CAST((${v}) AS nvarchar(20))`
 
+/** 表区值必须取配置里**声明的 filterVal**(按页面名硬编码会写出"没有表认领"的行 —— 2026-09-21 走查踩过:
+ *  给成型配方页写 表区='成型配方' 而不是 '配方表',行入了库但界面上哪张表都不显示)。
+ *  对照表由 frontend 的 recordSheetConfigs 现读,并有单测钉住(filtervals.test.js)。 */
+async function loadFilterVals() {
+  const { pathToFileURL } = require('node:url')
+  const cfgPath = path.join(__dirname, '..', '..', 'frontend', 'src', 'core', 'views', 'recordSheetConfigs.js')
+  const { recordSheetConfigs } = await import(pathToFileURL(cfgPath).href)
+  const pick = (panel) => Object.fromEntries((recordSheetConfigs[panel]?.dataTables || [])
+    .filter((d) => d.filterVal).map((d) => [d.bar || d.pageTitle || ('page' + d.page), d.filterVal]))
+  return { mold: pick('RD_MOLD_PROC'), asm: pick('RD_ASM_PROC') }
+}
 async function main() {
   const tok = async (u, p = '123456') => {
     const r = await (await fetch(`${BASE}/api/auth/login`, {
@@ -77,6 +88,7 @@ async function main() {
     }
   }
 
+  const FV = await loadFilterVals()   // 表区值取配置(见 loadFilterVals 注释)
   const admin = await tok('admin')
   const A = api(admin.token)
   const cp = await tok('cp'); const C = api(cp.token)
@@ -168,14 +180,14 @@ SELECT 目标面板, ISNULL(负责人,N'-') FROM rd_dev_task WHERE 产品编号 
   // 成型工艺清单(责任人 cp)
   const m1 = await C.btn('RD_MOLD_PROC', '保存', {
     产品编号: PROD, 产品名称: PRODNAME,
-    detail: { items: [{ 表区: '配方表', 序号: '1', 物料种类: '粉料', 物料名称: '测试粉料A', 实际添加比例: '0.6' }] },
+    detail: { items: [{ 表区: FV.mold['配方表'], 序号: '1', 物料种类: '粉料', 物料名称: '测试粉料A', 实际添加比例: '0.6' }] },
   })
   docs.RD_MOLD_PROC = m1?.data?.['编号']
   info(`成型工艺清单 = ${docs.RD_MOLD_PROC}(${m1?.data?.['单据状态']})`)
   // 组装工艺清单(责任人 glm53)
   const a1 = await G.btn('RD_ASM_PROC', '保存', {
     产品编号: PROD, 产品名称: PRODNAME,
-    detail: { items: [{ 表区: '物料清单', 物料名称: '测试包材A', 用量: '1' }] },
+    detail: { items: [{ 表区: FV.asm['BOM表'], 物料名称: '测试包材A', 用量: '1' }] },
   })
   docs.RD_ASM_PROC = a1?.data?.['编号']
   info(`组装工艺清单 = ${docs.RD_ASM_PROC}(${a1?.data?.['单据状态']})`)
@@ -313,7 +325,7 @@ UNION ALL SELECT N'RD_ASM_PROC', 单据编号, ISNULL(变更来源单号,N'-') F
   const mp2 = newDocs.RD_MOLD_PROC
   const edit = await C.btn('RD_MOLD_PROC', '保存', {
     编号: mp2, 产品编号: PROD, 产品名称: PRODNAME,
-    detail: { items: [{ 表区: '配方表', 序号: '1', 物料种类: '粉料', 物料名称: '测试粉料A', 实际添加比例: '0.55' }] },
+    detail: { items: [{ 表区: FV.mold['配方表'], 序号: '1', 物料种类: '粉料', 物料名称: '测试粉料A', 实际添加比例: '0.55' }] },
   })
   info(`新版成型工艺清单保存 → ${JSON.stringify(edit?.data?.['单据状态'] || edit?.message)}`)
   const mpSt = one('_probe-pf-mp2', `SET NOCOUNT ON; SELECT ISNULL(pending,N'-') FROM yj_doc_status WHERE panel_code=N'RD_MOLD_PROC' AND doc_no=N'${mp2}';`)
