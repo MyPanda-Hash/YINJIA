@@ -100,8 +100,18 @@ public class PxController {
         return ApiResult.ok(devTaskService.enabledUsers());
     }
 
-    /** 单据编号 → 产品编号(产品信息表侧边栏用;查不到返回空串) */
-    private String productCodeOf(String docNo) {
+    /**
+     * 四个受控文件「我能不能编这张单」(2026-09-21):前端据此把非责任人的纸张置灰 + 提示责任人是谁。
+     * 口径与保存门禁**同一真源**(ButtonService.devFileEditState → devFileEditVerdict),
+     * 免得再出现"界面让改、保存被拒"。
+     */
+    @GetMapping("/rdDev/fileEdit")
+    public ApiResult<Map<String, Object>> rdDevFileEdit(@RequestParam String panelCode, @RequestParam String docNo) {
+        perm.requirePanelView(panelCode);
+        return ApiResult.ok(buttons.devFileEditState(panelCode, docNo));
+    }
+
+    /** 单据编号 → 产品编号(产品信息表侧边栏用;查不到返回空串) */    private String productCodeOf(String docNo) {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT TOP 1 产品编号 FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
         if (rows.isEmpty() || rows.get(0).get("产品编号") == null) return "";

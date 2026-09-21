@@ -293,6 +293,11 @@ export async function specAssignDoc(no) {
   return unwrap(await request.get('/px/specAssign/doc', { params: { no } }))
 }
 
+/** 四个受控文件:我能不能编这张单 { applicable, canEdit, reason, productCode, owner, ownerName }(2026-09-21) */
+export async function rdDevFileEdit(panelCode, docNo) {
+  return unwrap(await request.get('/px/rdDev/fileEdit', { params: { panelCode, docNo } }))
+}
+
 /**
  * 按库存状况表口径回填明细现存量：有仓库取仓库库存，无仓库取全部仓库合计。
  * 选择存货后即时调用，避免引用存货档案中的静态值。

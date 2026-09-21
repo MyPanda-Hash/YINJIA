@@ -273,6 +273,12 @@
                   </template>
                 </div>
               </div>
+              <!-- 四个受控文件:非该文件责任人只读时,把"责任人是谁"写在侧栏(否则用户只会觉得点不动) -->
+              <div v-if="devFileGate?.applicable && devFileGate.canEdit === false"
+                   style="font-size:12px;color:#e6a23c;line-height:1.7;padding:2px 0 6px;border-bottom:1px dashed #dcdfe6;margin-bottom:4px">
+                <div v-if="devFileGate.ownerName">{{ tt('本文件责任人') }}：{{ devFileGate.ownerName }}（{{ tt('只读') }}）</div>
+                <div v-else>{{ tt('尚未分发责任人') }}：{{ tt('请先在产品信息表点「分发责任人」') }}</div>
+              </div>
               <!-- 规格书两级分发:已分配单展示归属;非 责任人∪总负责人∪管理员 只读 -->
               <div v-if="panelCode === 'RD_SPEC_DOC' && specDocAssign?.hasAssign"
                    style="font-size:12px;color:#606266;line-height:1.7;padding:2px 0 6px;border-bottom:1px dashed #dcdfe6;margin-bottom:4px">
@@ -2388,6 +2394,25 @@ const specAssignBlocked = computed(() => !!(specDocAssign.value?.hasAssign)
   && user.account !== specDocAssign.value?.owner
   && user.account !== specDocAssign.value?.supervisor)
 const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocStatus.value) && !specAssignBlocked.value)
+
+// ── 四个受控文件的编辑门禁 → 前端置灰(2026-09-21 全流程走查补)──
+// 服务端 ensureDevFileEditable 早就拦住了非责任人,但界面不置灰:用户能改、能点保存,点完才被拒。
+// 现在判定经 /px/rdDev/fileEdit 下发(与保存门禁同一真源),非责任人打开就只读 + 看得到责任人是谁。
+const DEV_FILE_PANELS = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+const devFileGate = ref(null)
+/** 门禁不适用(非四文件面板/历史单/管理员)时为 false */
+const devFileBlocked = computed(() => !!(devFileGate.value?.applicable && devFileGate.value?.canEdit === false))
+async function loadDevFileGate() {
+  if (!DEV_FILE_PANELS.includes(String(panelCode.value))) { devFileGate.value = null; return }
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) { devFileGate.value = null; return }
+  try {
+    devFileGate.value = await engine.rdDevFileEdit(panelCode.value, no)
+  } catch {
+    // 取不到判定 ⇒ 不锁(宁可不置灰,也别把责任人自己锁在外面;保存时服务端仍会兜底)
+    devFileGate.value = null
+  }
+}
 const modifyLogVisible = ref(false)
 const modifyLogRecords = ref([])
 const modifyLogNo = ref('')
@@ -2617,6 +2642,8 @@ const draftEditable = computed(() => {
   if (reportMode.value || ['BOM_FWD', 'BOM_REV'].includes(String(panelCode.value))) return false
   // 规格书已分配:非 责任人∪总负责人∪管理员 只读(服务端三个入口同口径强制,这里提前置灰)
   if (specAssignBlocked.value) return false
+  // 四个受控文件:非该文件责任人只读(判定来自服务端,与保存门禁同一真源)
+  if (devFileBlocked.value) return false
   const st = cur.value?.['单据状态']
   if (st === '草稿') return true
   // 修改态(文件类:申请修改经管理员审批通过):可编辑,保存不再自动归档,走再审批
@@ -2694,7 +2721,7 @@ const curNo = computed(() => (list.value.length ? Math.min(curIdx.value, list.va
 
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
-watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign() }, { immediate: true })
+watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate() }, { immediate: true })
 
 // 文书默认值:文书面板的「新增」= directAdd 建一张空白草稿(库端 saved='N'),此时 draftEditable 为真,
 // 本 watch 生效。锁定字段(申请立项人/负责人)只在「本次新增且尚未保存过」时带出——用 isFreshAddedDoc()

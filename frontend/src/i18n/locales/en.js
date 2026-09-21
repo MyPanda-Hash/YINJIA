@@ -1754,6 +1754,10 @@ export default {
     '已生效': 'Effective',
     '变更来源单号': 'Change Source No.',
     '非本部门栏目（只读）': 'Not your department (read-only)',
+    /* ── 四受控文件编辑门禁 → 前端置灰(2026-09-21) ── */
+    '本文件责任人': 'Owner of this document',
+    '尚未分发责任人': 'No owner dispatched yet',
+    '请先在产品信息表点「分发责任人」': 'Ask an admin to dispatch owners on the Product Info sheet first',
     '多人用逗号分隔（账号）': 'Separate multiple accounts with commas',
     '本次要改什么、为什么改': 'What changes and why',
     '支持本次变更的验证数据/试验结论': 'Verification data / test conclusion supporting this change',

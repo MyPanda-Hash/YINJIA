@@ -2979,8 +2979,33 @@ public class ButtonService {
      *     不让既有 rd_spec_assign 分配白做(新口径的责任人在分发时会被设为 rd_dev_task.负责人,两套一致)。
      */
     private void ensureDevFileEditable(PanelRegistry.PanelDef def, String no, Map<String, Object> head, String user) {
-        if (!DevTaskService.devPanelCodes().contains(def.code())) return;
-        if (isAdminUser(user)) return;
+        DevFileEdit v = devFileEditVerdict(def, no, head, user);
+        if (!v.ok()) throw v.denied() == 1
+                ? new IllegalStateException(v.reason())
+                : new org.springframework.security.access.AccessDeniedException(v.reason());
+    }
+
+    /**
+     * 四文件能不能编的**判定**(单一真源):保存门禁 {@link #ensureDevFileEditable} 与前端置灰用的
+     * 接口 {@link #devFileEditState} 都走这里 —— 两边口径必须逐字一致,否则又会出现
+     * "界面让改、保存被拒"(2026-09-21 走查发现的 UX 缺口)。
+     *
+     * @param denied 拒绝类型:1 = 未分发给 IllegalStateException(业务态,提示去分发),
+     *               2 = 非责任人给 AccessDeniedException(权限态)
+     */
+    private record DevFileEdit(boolean applicable, boolean ok, String reason, String productCode,
+                               String owner, String ownerName, int denied) {
+        static DevFileEdit notApplicable() { return new DevFileEdit(false, true, "", "", "", "", 0); }
+    }
+
+    /** 责任人姓名(空账号回空串;用于前端提示"本文件责任人是谁") */
+    private String ownerNameOf(String username) {
+        return username == null || username.isBlank() ? "" : realNameOf(username);
+    }
+
+    private DevFileEdit devFileEditVerdict(PanelRegistry.PanelDef def, String no, Map<String, Object> head, String user) {
+        if (!DevTaskService.devPanelCodes().contains(def.code())) return DevFileEdit.notApplicable();
+        if (isAdminUser(user)) return new DevFileEdit(true, true, "", "", "", "", 0);
         String key = DevTaskService.productKeyOf(def.code());
         String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
         String productCode = "";
@@ -2992,29 +3017,56 @@ public class ButtonService {
             if (v != null && !String.valueOf(v).isBlank()) productCode = String.valueOf(v).trim();
         }
         // ② 再看库里已存值
-        if (productCode.isEmpty()) {
+        if (productCode.isEmpty() && no != null && !no.isBlank()) {
             try {
                 List<String> rows = jdbc.queryForList("SELECT TOP 1 [" + key + "] FROM " + table
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, no);
                 if (!rows.isEmpty() && rows.get(0) != null) productCode = rows.get(0).trim();
             } catch (Exception e) {
-                return; // 取不到产品键(缺列等)⇒ 不拦,避免误伤
+                return DevFileEdit.notApplicable(); // 取不到产品键(缺列等)⇒ 不拦,避免误伤
             }
         }
-        if (productCode.isEmpty()) return;
+        if (productCode.isEmpty()) return DevFileEdit.notApplicable();   // 历史单(无产品编号)豁免
+        String owner = null, ownerName = "";
         Map<String, String> assigns = devTaskService.assignsOf(productCode);
         if (assigns.isEmpty())
-            throw new IllegalStateException("该产品(" + productCode + ")尚未分发责任人，请先在产品信息表点「分发责任人」");
-        String owner = assigns.get(def.code());
-        if (user.equals(owner)) return;
+            return new DevFileEdit(true, false,
+                    "该产品(" + productCode + ")尚未分发责任人，请先在产品信息表点「分发责任人」",
+                    productCode, "", "", 1);
+        owner = assigns.get(def.code());
+        if (user.equals(owner)) return new DevFileEdit(true, true, "", productCode, owner, ownerNameOf(owner), 0);
         if ("RD_SPEC_DOC".equals(def.code())) {
             // 兼容既有规格书两级分发:已分配的责任人 / 产品总负责人照样可编辑
             Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM rd_spec_assign WHERE 单据编号 = ? AND 责任人 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                     Integer.class, no, user);
-            if (n != null && n > 0) return;
-            if (user.equals(devTaskService.supervisorOf(productCode))) return;
+            if (n != null && n > 0) return new DevFileEdit(true, true, "", productCode, owner, ownerNameOf(owner), 0);
+            if (user.equals(devTaskService.supervisorOf(productCode)))
+                return new DevFileEdit(true, true, "", productCode, owner, ownerNameOf(owner), 0);
         }
-        throw new org.springframework.security.access.AccessDeniedException("只有该文件的责任人（或管理员）可以编辑");
+        return new DevFileEdit(true, false, "只有该文件的责任人（或管理员）可以编辑", productCode,
+                owner == null ? "" : owner, ownerNameOf(owner), 2);
+    }
+
+    /**
+     * 前端置灰用:当下登录账号对「某面板某单据」有没有编辑权(四文件门禁)。
+     * 返回 { applicable, canEdit, reason, productCode, owner, ownerName };applicable=false = 该面板不受此门禁约束。
+     */
+    public Map<String, Object> devFileEditState(String panelCode, String docNo) {
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (def == null) {
+            out.put("applicable", false);
+            out.put("canEdit", true);
+            return out;
+        }
+        DevFileEdit v = devFileEditVerdict(def, docNo, null, currentUserName());
+        out.put("applicable", v.applicable());
+        out.put("canEdit", v.ok());
+        out.put("reason", v.reason());
+        out.put("productCode", v.productCode());
+        out.put("owner", v.owner());
+        out.put("ownerName", v.ownerName());
+        return out;
     }
 
     /**
