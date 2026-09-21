@@ -655,3 +655,20 @@ i18n-insp-plan-redesign.sql
 # ⚠ 按钮词表:分发动作沿用「产品开发」这个已授权动作词(前端显示改叫「分发责任人」),
 #   避免为一个动作改全体角色的权限行。
 migrate-prodinfo-twolevel.sql
+
+# ── 2026-09-20 配方计算(成型工艺清单 · 面板按钮 + 弹窗)────────────────────────────────
+# 口径:CONTEXT.md「配方计算器」/ docs/adr/0004(推翻了《研发管理-新面板设计与改动方案》§12 的
+#   "成型工艺清单第 3 个页签"落点:弹窗输入不落库、不打印,只有回填进单据字段的值随单据保存)。
+# 公式:frontend/src/core/mold/recipeEngine.js,逐条对齐《炭棒工艺配方设计器》exe 的
+#   app.domain.engine(期望值由 exe 真引擎产出:黄金向量 24 条真实记录 + 85 例边界/随机,逐位一致)。
+# migrate-mold-calcparam.sql —— 数据层:配方计算的**系统默认工艺参数**条目
+#   (yj_std_lib:lib_code='mold.calcparam', item_code=N'默认';按产品编号覆盖的条目由用户在弹窗里
+#   点「存为该产品参数」写入,同库同表)。**不建新表、不加新字段**:弹窗回填的全部是既有数据键
+#   (理论最低/中间/最高灌料重量g、理论水分、最短/中间值/最长长度mm、最低/中间值/最高重量g、
+#   实际密度管控下限/上限、配方表的实际添加比例/单支物料含量)。
+# 前端:core/mold/{recipeEngine,recipeConstants,recipeSheet}.js + core/views/RecipeCalcDialog.vue、
+#   RecordSheetPanels.vue 表头按钮(dt.recipeCalc)、recordSheetConfigs 配方表加 recipeCalc:true、
+#   en.js 词条。无后端改动(参数库走既有 /api/stdlib 接口)。
+# 未纳入本期(按 grill 决议排后):bs_inv 补「水分含量」列 + 84 种配方物料播种(含水率先手填)、
+#   60 行烧结尺寸表 rd_sinter_tolerance(弹窗尺寸先读单据现有格)。
+migrate-mold-calcparam.sql

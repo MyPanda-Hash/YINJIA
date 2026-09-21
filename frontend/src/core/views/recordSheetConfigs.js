@@ -390,7 +390,9 @@ const RD_MOLD_FORMULA = {
       ]},
     ],
     dataTables: [
-      { page: 2, bar: '配方表', autoSeqBar: true, totalCols: true, filterKey: '表区', filterVal: '配方表', cols: [
+      // recipeCalc:表头上出「配方计算」按钮(读本表行 → 算 → 回填页 1 与本表两列);
+      // 口径见 CONTEXT.md「配方计算器」/ docs/adr/0004 —— 弹窗输入不落库,只有回填值随单据保存
+      { page: 2, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
           { key: '物料种类', label: '物料种类', span: 2 },
           { key: '物料编号', label: '物料编号', span: 4 },

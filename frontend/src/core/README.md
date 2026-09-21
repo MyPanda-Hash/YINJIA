@@ -21,6 +21,7 @@
 | `views/PanelxForm.vue` | 配置驱动的表单和明细编辑 |
 | `views/*Dialog.vue` | 参照、选单、审批历史、导入和业务明细弹窗 |
 | `mold/recipeEngine.js` | 炭棒配方 12 步计算引擎(唯一实现,与《炭棒工艺配方设计器》exe 逐位一致;常量在 `mold/recipeConstants.js`,黄金向量在 `mold/__fixtures__/`) |
+| `mold/recipeSheet.js` | 配方表行 ⇄ 引擎的接线纯逻辑(料位分组 / 双单位解释 / 料位 1 补差 / 头字段取参 / 回填补丁);弹窗 `views/RecipeCalcDialog.vue` 只负责渲染与写回 |
 
 ## 边界
 

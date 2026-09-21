@@ -389,6 +389,7 @@
                   <span>{{ tt(dt.bar) }}</span>
                   <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
                   <span v-if="dt.materialPick && editable" class="rs-lib-btn" style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(dt)">📦 {{ tt('从物料清单引用') }}</span>
+                  <span v-if="dt.recipeCalc && editable" class="rs-lib-btn" style="color:#409eff;border-color:#a0cfff" @click.stop="openRecipeCalc(dt)">🧮 {{ tt('配方计算') }}</span>
                   <span v-if="di === fieldEditAt" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
                 </span>
               </td>
@@ -933,6 +934,9 @@
     </el-dialog>
 
 
+    <!-- ═══ 配方计算(成型工艺清单:读页 2 配方表 → 算 → 回填页 1 与配方表;输入不落库) ═══ -->
+    <RecipeCalcDialog v-model="recipeCalcVisible" :head="head" :rows="recipeCalcRows" @applied="emit('dirty')" />
+
     <!-- ═══ 参照选择(产品编号 -> 产品信息表):确认后按 refMap 带回 产品名称 等 ═══ -->
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" :owner-panel="panelCode" @confirm="onProdRefConfirm" />
   </div>
@@ -949,6 +953,7 @@ import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import StdLibManager from './StdLibManager.vue'
+import RecipeCalcDialog from './RecipeCalcDialog.vue'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -2229,6 +2234,16 @@ function confirmMaterialPick() {
   matPickVisible.value = false
   emit('dirty')
   ElMessage.success(tt('已导入 {n} 行子件') .replace('{n}', added) + (skipped ? tt('(跳过重复 {n} 行)').replace('{n}', skipped) : ''))
+}
+
+// ---------- 配方计算(成型工艺清单:读页 2 配方表 → 算 → 回填页 1 与配方表) ----------
+// 口径见 CONTEXT.md「配方计算器」与 docs/adr/0004:公式固定(与设计器 exe 逐位一致)、
+// 弹窗输入不落库不打印,只有回填进单据字段的值随单据保存。逻辑全在 core/mold/,这里只负责把行喂给它。
+const recipeCalcVisible = ref(false)
+const recipeCalcRows = ref([])
+function openRecipeCalc(dt) {
+  recipeCalcRows.value = rowsOf(dt)
+  recipeCalcVisible.value = true
 }
 
 // ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──
