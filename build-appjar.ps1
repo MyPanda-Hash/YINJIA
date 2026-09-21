@@ -1,4 +1,4 @@
-﻿<#
+<#
   YINJIA-MES 一键打包 -> app.jar(服务器内测部署产物)
   ==================================================
   流程: 前端 npm run build -> dist 镜像同步到后端内嵌 static(/MIR 清陈旧产物)
@@ -8,6 +8,14 @@
          powershell -ExecutionPolicy Bypass -File build-appjar.ps1 -SkipFrontend   # 前端未改时跳过
 
   部署:  上传 app.jar 覆盖服务器同名文件,重启进程即可(首次部署见 docs\deploy\服务器部署.md)
+
+  ⚠ 打包前必须先停掉本机正在运行的后端(2026-09-21 实测踩到):
+    后端跑的就是 backend\target\yinjia-mes-backend-0.1.0.jar,Windows 上它占着这个文件,
+    spring-boot:repackage 想把旧 jar 改名为 .original 会失败("Unable to rename ...")。
+    失败后**磁盘上留下的是一个瘦 jar**(只有 class、没有 BOOT-INF/lib,约 15MB):
+    此时服务仍在跑(已加载进内存)看似正常,但只要重启/重启机器就再也起不来。
+    正确顺序:停服务 → 打包 → 起服务;打完用 `jar tf app.jar | findstr BOOT-INF/lib` 核一下
+    (fat jar 应有上百条 BOOT-INF/lib 条目)。
 #>
 [CmdletBinding()]
 param(
