@@ -672,3 +672,17 @@ migrate-prodinfo-twolevel.sql
 # 未纳入本期(按 grill 决议排后):bs_inv 补「水分含量」列 + 84 种配方物料播种(含水率先手填)、
 #   60 行烧结尺寸表 rd_sinter_tolerance(弹窗尺寸先读单据现有格)。
 migrate-mold-calcparam.sql
+
+# ── 2026-09-20 配方计算的数据底座:84 种配方物料 + 含水率 ───────────────────────────────
+# 口径:CONTEXT.md「配方计算器」/ docs/adr/0004 —— 含水率是物料固有属性,一次维护长期复用;
+#   弹窗按物料编号自动带出(实测链路:弹窗 → 商品面板 INV 等值查 → bs_inv.水分含量 → 灌料湿重)。
+# 来源:设计源《20267月22日-最新烧结配方模板-1.xlsx》sheet「物料清单」(A1:D85,84 行),
+#   由 tools/gen/gen-recipe-materials.cjs 生成(不要手改生成的 SQL):
+#     node tools/gen/gen-recipe-materials.cjs
+# migrate-recipe-materials.sql —— ① bs_inv 补「水分含量」decimal(9,4) + MS_Description 中文注明;
+#   ② 84 种配方物料**按需播种**(已存在的按存货编码跳过 ⇒ 正式库 3850 行里已有的绝不造重复),
+#   水分含量只在为空时补、不覆盖人工维护过的值;③ yj_field(商品面板可见可维护)+ en 译名。
+#   ⚠ 执行须带 QUOTED_IDENTIFIER ON:`sqlcmd -I`(否则 bs_inv 上的 INSERT 会因
+#   QUOTED_IDENTIFIER 报错 —— 同一个脚本在测试库能过、在正式库失败,就是这个坑)。
+# 前端:core/mold/recipeSheet.js 的 applyArchiveMoisture(有单测)+ RecipeCalcDialog 自动带出并标「档案」来源。
+migrate-recipe-materials.sql

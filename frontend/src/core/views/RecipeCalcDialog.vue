@@ -31,7 +31,8 @@
       <!-- ② 料位(读单据页 2 配方表)+ 含水率 -->
       <div class="rcd-sec-h">
         <span class="rcd-sec-t">② {{ tt('料位与含水率') }}</span>
-        <span class="rcd-muted">{{ tt('料位按配方表的物料种类分组(粉料 1~5 / 胶粉 6~7 / 折算料 8~10);料位 1 是补差位。含水率只有粉料位参与计算,档案有值时应自动带出,本期先手填。') }}</span>
+        <span class="rcd-muted">{{ tt('料位按配方表的物料种类分组(粉料 1~5 / 胶粉 6~7 / 折算料 8~10);料位 1 是补差位。含水率默认从物料档案(商品·水分含量)按物料编号带出,档案没有的请手填 —— 只有粉料位的含水率参与计算。') }}</span>
+        <span v-if="archiveTip" class="rcd-muted">{{ archiveTip }}</span>
       </div>
       <table class="rcd-tb">
         <thead>
@@ -54,8 +55,9 @@
             <td>{{ s.name }}</td>
             <td class="rcd-c">{{ designText(s) }}</td>
             <td class="rcd-c">
-              <el-input v-if="isPowder(s)" v-model="moisture[i]" size="small" class="rcd-mini" @input="onDirtyInput" />
+              <el-input v-if="isPowder(s)" v-model="moisture[i]" size="small" class="rcd-mini" @input="onMoistureInput(i)" />
               <span v-else class="rcd-muted">—</span>
+              <span v-if="archiveFilled.includes(s.slot)" class="rcd-src" :title="tt('来自物料档案')">{{ tt('档案') }}</span>
             </td>
             <td class="rcd-c">{{ cell(i, 'ratio') }}</td>
             <td class="rcd-c">{{ cell(i, 'amount') }}</td>
@@ -120,7 +122,7 @@ import { ElMessage } from 'element-plus'
 import request from '@/core/request'
 import { tt } from '@/i18n'
 import { compute } from '@/core/mold/recipeEngine.js'
-import { buildPatch, moisturePercent, paramsFromHead, slotsFromRows } from '@/core/mold/recipeSheet.js'
+import { applyArchiveMoisture, buildPatch, moisturePercent, paramsFromHead, slotsFromRows } from '@/core/mold/recipeSheet.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
 
 /**
@@ -154,12 +156,19 @@ const builtinDefaults = () => Object.fromEntries(PARAM_FIELDS.map((f) => [f.key,
 
 const form = reactive(builtinDefaults())
 const moisture = ref(Array(10).fill(''))
+const moistureTouched = ref([])          // 用户手改过的料位下标(档案不许覆盖)
+const archiveFilled = ref([])            // 本次由档案带出的料位号(界面上标「档案」)
+const archiveTip = ref('')
 const paramEntryId = ref(null)
 const paramScopeTip = ref('')
 
 const productCode = computed(() => String(props.head?.['产品编号'] || '').trim())
 const scopeTip = () => (productCode.value ? `${tt('当前产品')}：${productCode.value}` : tt('当前单据没有产品编号，参数只能按系统默认用'))
 const onDirtyInput = () => { /* 输入即触发 computed 重算,这里只作为 el-input 的挂钩点 */ }
+/** 含水率手感:用户改过的料位记下来,后续档案加载不再覆盖它 */
+function onMoistureInput(i) {
+  if (!moistureTouched.value.includes(i)) moistureTouched.value = [...moistureTouched.value, i]
+}
 
 const overrides = computed(() => Object.fromEntries(
   Object.entries(form).map(([k, v]) => [k, Number(String(v).trim())]).filter(([, v]) => Number.isFinite(v))))
@@ -239,6 +248,9 @@ const footTip = computed(() => {
 /** 打开时:载入该产品的参数(没有就用系统默认条目,再没有就用内置默认) */
 async function onOpen() {
   moisture.value = Array(10).fill('')
+  moistureTouched.value = []
+  archiveFilled.value = []
+  archiveTip.value = ''
   paramEntryId.value = null
   Object.assign(form, builtinDefaults())
   paramScopeTip.value = scopeTip()
@@ -253,6 +265,40 @@ async function onOpen() {
   } catch {
     paramScopeTip.value = `${scopeTip()}；${tt('参数库读取失败，已退回内置默认值')}`
   }
+  await loadArchiveMoisture()
+}
+
+/**
+ * 含水率从物料档案带出(商品面板 INV 的「水分含量」,见 tools/migrate-recipe-materials.sql)。
+ * 口径:只查粉料位的物料(只有它们参与湿重换算);按物料编号逐个查(等值条件),
+ * 结果用 applyArchiveMoisture 合并 —— 用户手改过的格不覆盖。档案读不到就退回手填,不阻断计算。
+ */
+async function loadArchiveMoisture() {
+  const codes = [...new Set(slots.value.filter((s) => isPowder(s) && s.code).map((s) => s.code))]
+  if (!codes.length) return
+  const archive = {}
+  await Promise.all(codes.map(async (code) => {
+    try {
+      const res = await request.post('/px/queryFormDataList', {
+        panelCode: 'INV', condition: { 存货编码: code }, pageNo: 1, pageSize: 1,
+      })
+      const d = res?.data
+      const list = Array.isArray(d) ? d : (d?.list || d?.rows || [])
+      // ⚠ 档案面板返回的是**主从结构**:list[0].detail.items[0] 才是行数据(实测),
+      //   直接把 list[0] 当行会拿到 {编号,状态,单据状态,detail} 四个键、含水量永远取不到。
+      const row = list.length ? (list[0]?.detail?.items?.[0] || list[0]) : null
+      const v = row ? Number(row['水分含量']) : NaN
+      archive[code] = Number.isFinite(v) && v > 0 ? v : null
+    } catch {
+      archive[code] = null   // 无权限/查不到都按"档案没有"处理,转手填
+    }
+  }))
+  const merged = applyArchiveMoisture(slots.value, moisture.value, moistureTouched.value, archive)
+  moisture.value = merged.values
+  archiveFilled.value = merged.filledSlots
+  archiveTip.value = merged.filledSlots.length
+    ? `· ${tt('已从档案带出')} ${merged.filledSlots.length} ${tt('个料位的含水率')}`
+    : `· ${tt('档案里没有这些物料的含水率，请手填')}`
 }
 async function fetchParam(item) {
   const res = await request.get('/stdlib/list', { params: { lib: LIB, item, all: 1 } })
@@ -327,8 +373,9 @@ function apply() {
 .rcd-tb th { background: #fafafa; font-weight: 500; color: #606266; }
 .rcd-c { text-align: center; }
 .rcd-empty { background: #fbfbfb; color: #c0c4cc; }
-.rcd-mini { width: 92px; }
+.rcd-mini { width: 78px; }
 .rcd-mini :deep(.el-input__inner) { text-align: center; }
+.rcd-src { margin-left: 3px; font-size: 10px; color: #67c23a; border: 1px solid #b3e19d; border-radius: 2px; padding: 0 2px; vertical-align: middle; }
 .rcd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 14px; }
 .rcd-r { display: flex; justify-content: space-between; border-bottom: 1px dashed #ebeef5; padding: 2px 0; }
 .rcd-r-lb { color: #606266; }

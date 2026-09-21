@@ -188,6 +188,33 @@ export function paramsFromHead(head, overrides = {}) {
 /** 位数口径(照《炭棒BOM及工艺信息表单需求设计内容》):灌料/脱模/长度 1 位,水分 2 位,比例 2 位带 % */
 const fixed = (x, digits) => (Number.isFinite(x) ? x.toFixed(digits) : '')
 
+/**
+ * 把物料档案里的含水率(bs_inv.水分含量,小数)并进弹窗输入。
+ * 口径:只有粉料位的含水率参与计算(胶粉/折算料不进公式),所以只填粉料位;
+ * **用户手改过的格不许被覆盖**(touched 下标),档案没有的物料编号记进 missingCodes 让人手填。
+ * @returns {{values: string[], filledSlots: number[], missingCodes: string[]}} values 是百分数字符串(与输入框同单位)
+ */
+export function applyArchiveMoisture(slots, current, touched, archiveByCode) {
+  const values = Array.isArray(current) ? current.slice() : []
+  while (values.length < SLOT_COUNT) values.push('')
+  const touchedSet = new Set(touched || [])
+  const archive = archiveByCode || {}
+  const filledSlots = []
+  const missingCodes = []
+  slots.slice(0, SLOT_COUNT).forEach((s, i) => {
+    if (s.group !== SLOT_GROUPS.POWDER || !s.code) return
+    if (touchedSet.has(i)) return
+    const hit = archive[s.code]
+    if (hit === undefined || hit === null) { missingCodes.push(s.code); return }
+    const pct = Number(hit) * 100
+    if (!Number.isFinite(pct)) { missingCodes.push(s.code); return }
+    // 去掉多余的 0:0.06 → '6'、0.055 → '5.5'(与输入框的人读习惯一致)
+    values[i] = String(Number(pct.toFixed(2)))
+    filledSlots.push(s.slot)
+  })
+  return { values, filledSlots, missingCodes }
+}
+
 /** 引擎结果 → 回填补丁(只含有行或有值的料位;空料位不产生行补丁) */
 export function buildPatch(result, slots) {
   const p = result.params

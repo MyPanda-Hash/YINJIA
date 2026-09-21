@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   SLOT_GROUPS, groupOfMaterialType, parseRatio, parseDensityRange, moisturePercent,
-  slotsFromRows, paramsFromHead, buildPatch,
+  slotsFromRows, paramsFromHead, buildPatch, applyArchiveMoisture,
 } from './recipeSheet.js'
 import { compute } from './recipeEngine.js'
 
@@ -63,6 +63,34 @@ test('含水率输入是百分数:弹窗里填 6 表示 6%,交给引擎的必须
   assert.equal(moisturePercent(''), null)
   assert.equal(moisturePercent(null), null)
   assert.equal(moisturePercent('abc'), null)
+})
+
+test('含水率从物料档案带出:只填粉料位里"没被用户改过"的空格,档案没有的记下来让人手填', () => {
+  const { slots } = slotsFromRows([
+    row('炭粉', 'M-A', '0.5'), row('炭粉', 'M-B', '0'), row('炭粉', 'M-C', '0'), row('炭粉', 'M-D', '0'), row('炭粉', 'M-E', '0'),
+    row('胶粉', 'M-F', '0.5'), row('胶粉', 'M-G', ''),
+    row('功能料-颗粒', 'M-H', '1'), row('功能料-颗粒', 'M-I', ''), row('功能料-颗粒', 'M-J', ''),
+  ])
+  const archive = { 'M-A': 0.06, 'M-B': 0.055, 'M-C': null, 'M-D': null, 'M-E': null, 'M-F': 0.1 }
+  const r1 = applyArchiveMoisture(slots, Array(10).fill(''), [], archive)
+  assert.equal(r1.values[0], '6')                       // 0.06 → 6(%)
+  assert.equal(r1.values[1], '5.5')                     // 0.055 → 5.5(%)
+  assert.equal(r1.values[2], '')                        // 档案没值 ⇒ 留空
+  assert.deepEqual(r1.filledSlots, [1, 2])
+  assert.deepEqual(r1.missingCodes, ['M-C', 'M-D', 'M-E'])   // 只有粉料位要报缺
+  assert.equal(r1.values[5], '')                        // 胶粉位不参与(它的含水率不进公式)
+
+  // 用户改过的格不许被档案覆盖
+  const touched = [0]
+  const r2 = applyArchiveMoisture(slots, ['7', '', '', '', '', '', '', '', '', ''], touched, archive)
+  assert.equal(r2.values[0], '7')
+  assert.deepEqual(r2.filledSlots, [2])
+
+  // 空料位(没有物料编号)不报缺,也不填
+  const { slots: sparse } = slotsFromRows([row('炭粉', 'M-A', '1')])
+  const r3 = applyArchiveMoisture(sparse, Array(10).fill(''), [], archive)
+  assert.equal(r3.values[0], '6')
+  assert.deepEqual(r3.missingCodes, [])
 })
 
 test('密度范围文本可解析:密度范围：0.56~0.58', () => {

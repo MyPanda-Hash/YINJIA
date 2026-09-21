@@ -43,11 +43,16 @@ const EXP = {
   slot8_比例: '1.69%', slot8_含量: '4.00',
 }
 
+/** 配方行:用**真实种子的物料编号**(tools/migrate-recipe-materials.sql),
+ *  这样含水率应当由档案自动带出 —— 探针不再手敲含水率,直接验证"档案 → 灌料湿重"这条链路。
+ *  粉料 5 个的档案含水率分别是 0.06 / 0.05 / 0.04 / 0.08 / 0.05 ⇒ 输入框应为 6 / 5 / 4 / 8 / 5。
+ *  注意:只有料位 1 的设计比例非 0,而物料平均水分按比例加权 ⇒ 生效的只有 0.06,EXP 与手填 6% 时完全一致。 */
 const RECIPE_ROWS = [
-  ['炭粉', 'UC-P1', '0.62'], ['炭粉', 'UC-P2', '0'], ['炭粉', 'UC-P3', '0'], ['炭粉', 'UC-P4', '0'], ['炭粉', 'UC-P5', '0'],
-  ['胶粉', 'UC-G1', '0.30'], ['胶粉', 'UC-G2', '0.08'],
-  ['功能料-颗粒', 'UC-C1', '2'], ['功能料-颗粒', 'UC-C2', '0'], ['功能料-颗粒', 'UC-C3', '0'],
+  ['炭粉', 'YJ-XH-001', '0.62'], ['炭粉', 'YJ-XH-002', '0'], ['炭粉', 'XH-SX80250SX', '0'], ['炭粉', 'YJ-YPS-002', '0'], ['炭粉', 'YJ-YPS-003', '0'],
+  ['胶粉', 'YJ-ZX-003', '0.30'], ['胶粉', 'YJ-SLD-009', '0.08'],
+  ['功能料-颗粒', 'HP-12', '2'], ['功能料-颗粒', 'LP-08', '0'], ['功能料-颗粒', 'BHP-12', '0'],
 ]
+const EXP_MOISTURE = ['6', '5', '4', '8', '5']
 
 let failed = 0
 const ok = (m) => console.log('  ok   ' + m)
@@ -229,13 +234,20 @@ async function main() {
     await sleep(300)
     await setParam('成型长度公差上限mm', '3.5')
     await sleep(400)
-    const moistSet = await ev(`(function(){ var d=${DLG}; if(!d) return 0
-      var trs=[].slice.call(d.querySelectorAll('.rcd-tb')[0].querySelectorAll('tbody tr')); var n=0
-      trs.forEach(function(tr){ var i=tr.querySelectorAll('td')[5].querySelector('input')
-        if(i){ Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(i,'6')
-               i.dispatchEvent(new Event('input',{bubbles:true})); n++ } }); return n })()`)
-    if (moistSet === 5) ok('③-1 粉料 5 个料位的含水率填 6(%),非粉料位不可填')
-    else bad(`③-1 可填含水率的料位数 = ${moistSet},期望 5(只粉料位)`)
+    const moistSet = await ev(`(function(){ var d=${DLG}; if(!d) return null
+      var trs=[].slice.call(d.querySelectorAll('.rcd-tb')[0].querySelectorAll('tbody tr'))
+      return trs.map(function(tr){ var td=tr.querySelectorAll('td')[5]
+        var i=td.querySelector('input'); return i ? i.value : '—' }) })()`)
+    const powderFilled = (moistSet || []).slice(0, 5)
+    if (JSON.stringify(powderFilled) === JSON.stringify(EXP_MOISTURE)) {
+      ok(`③-1 粉料 5 个料位的含水率由物料档案自动带出 = ${JSON.stringify(powderFilled)}(0.06/0.05/0.04/0.08/0.05 → 6/5/4/8/5)`)
+    } else bad(`③-1 档案带出的含水率应为 ${JSON.stringify(EXP_MOISTURE)},实际 ${JSON.stringify(powderFilled)}`)
+    if ((moistSet || []).slice(5).every((v) => v === '—')) ok('③-1b 非粉料位不填含水率(胶粉/折算料不进公式)')
+    else bad(`③-1b 非粉料位不该有含水率输入:${JSON.stringify((moistSet || []).slice(5))}`)
+    const srcTags = await ev(`(function(){ var d=${DLG}; if(!d) return 0
+      return d.querySelectorAll('.rcd-tb')[0] ? d.querySelectorAll('.rcd-tb')[0].querySelectorAll('.rcd-src').length : 0 })()`)
+    if (srcTags === 5) ok('③-1c 5 个带出的料位标了「档案」来源')
+    else bad(`③-1c 来源标记数应为 5,实际 ${srcTags}`)
     await sleep(800)
     const res = await dlgResults() || {}
     // 结果区只比"页 1 那十项";slot* 是料位表里的值,由 ③-3 单独比(别混在一起比)
@@ -284,7 +296,7 @@ async function main() {
           var vals=[].slice.call(tr.querySelectorAll('td')).map(function(td){ var i=td.querySelector('input,textarea'); return i? i.value : (td.textContent||'').trim() })
           if(vals.join('').trim()) out.push(vals) }) })
       return out })()`)
-    const row1 = (fRows || []).find((r) => r.join('|').includes('UC-P1')) || []
+    const row1 = (fRows || []).find((r) => r.join('|').includes('YJ-XH-001')) || []
     if (row1.join('|').includes('60.63') && row1.join('|').includes('143.55')) ok(`⑤-3 配方表首行已回填 实际添加比例/单支物料含量(${JSON.stringify(row1)})`)
     else bad(`⑤-3 配方表首行没回填:${JSON.stringify(row1)}`)
     const shot4 = await shot('04-formula-filled')
