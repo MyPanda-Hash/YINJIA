@@ -215,6 +215,11 @@ public class ButtonService {
                 insertRow(table, cols, user);
                 // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
                 if (CHANGE_PANEL.equals(def.code())) ensureChangeDeptRows(def, no, user);
+                // 四个受控文件的编辑门禁在**空草稿分支也要过**(2026-09-21 全流程走查发现的门禁洞):
+                // 该分支原来直接 return,于是"带产品编号 + 不带明细"的一次调用就能给**别人负责的已分发
+                // 产品**建出一张空白草稿(实测品质部账号建成 MP-xxxx)。UI 的「新增」不带产品编号,
+                // 正常建单不受影响;带产品编号建单=替别人开单,本就该拦。
+                if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, head, user);
                 // directAdd 占位草稿:未保存过 -> saved='N'(前端 isFreshAddedDoc 依赖本标记界定"本次新增"窗口)
                 markDocSaved(def.code(), no, markSaved);
                 return result(no, "草稿");
