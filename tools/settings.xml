@@ -1,8 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- YINJIA-MES 本地构建用 Maven 配置:
-     本地仓库放工作区内(避免写 C:\Users\...\.m2),中央仓库走阿里云镜像(国内加速)。 -->
+     本地仓库放工作区内(避免写 C:\Users\...\.m2),中央仓库走阿里云镜像(国内加速)。
+
+     ⚠ localRepository 的取法(2026-09-21 改):
+     原先写 ${env.YINJIA_M2_REPO},靠 backend/build.bat 与 build-appjar.ps1 注入绝对路径。
+     但只要有人**没设该环境变量**就从子目录跑 `mvn -s tools/settings.xml`,Maven 不展开未定义变量、
+     把字面串当成相对路径 ⇒ 在 cwd 下建出名为 `${env.YINJIA_M2_REPO}` 的目录
+     (实测:backend 下积了 103MB / 1715 个文件;frontend 下建出一个空目录)。
+
+     现改用 Maven 自带的 ${maven.multiModuleProjectDirectory}(由 mvn.cmd 向上找 `.mvn` 目录得出),
+     配合仓库根的 `.mvn/maven.config` 锚点 ⇒ 无论从仓库根、backend 还是更深目录调用,
+     都稳定解析到 <仓库根>/.m2-repo,不再依赖环境变量、也不会再建出字面名目录。
+     环境变量 YINJIA_M2_REPO 已不再被本文件使用(build 脚本里仍设置它,无害)。 -->
 <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
-  <localRepository>${env.YINJIA_M2_REPO}</localRepository>
+  <localRepository>${maven.multiModuleProjectDirectory}/.m2-repo</localRepository>
   <mirrors>
     <mirror>
       <id>aliyun-central</id>
