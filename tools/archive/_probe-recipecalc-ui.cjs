@@ -63,10 +63,11 @@ const bad = (m) => { failed++; console.log('  FAIL ' + m) }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 async function main() {
-  // ── 服务可达性(先确认探的是带本次改动的那一份) ──
+  // ── 服务可达性 + 探的是哪一份(dev 源码服务 / 打包内嵌产物 都合格,但要说明白) ──
   const front = await fetch(FRONT + '/').then((r) => r.text()).catch(() => '')
   if (front.includes('/src/main.js')) ok(`①-0 探的是 dev 源码服务 ${FRONT}(带本次改动)`)
-  else bad(`①-0 ${FRONT} 不是 vite dev(拿不到带改动的源码);请确认前端 dev 已启动`)
+  else if (/assets\/index-[A-Za-z0-9_-]+\.js/.test(front)) ok(`①-0 探的是打包产物 ${FRONT}(内嵌 static;功能在不在里面由后面的断言说话)`)
+  else bad(`①-0 ${FRONT} 既不是 vite dev 也不像打包产物 —— 探错对象了`)
 
   // ── 造一张探针单(产品编号留空 ⇒ 不过四文件编辑门禁,草稿可编) ──
   const lr = await (await fetch(`${BASE}/api/auth/login`, {
