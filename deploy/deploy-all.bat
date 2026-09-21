@@ -196,8 +196,19 @@ echo.
 echo [5/8] restore our DB (restore-db.sql)
 sqlcmd -S localhost -E -h -1 -W -f i:65001,o:65001 -i "%SRC%\restore-db.sql" > "%LOGDIR%\step-restore.txt" 2>&1
 type "%LOGDIR%\step-restore.txt"
-findstr /c:"RESULT: DB-OK" "%LOGDIR%\step-restore.txt" >nul 2>nul
-if errorlevel 1 ( echo RESULT: FAIL-RESTORE & exit /b 1 )
+rem NOTE: the authoritative success marker is RESULT: RESTORE-DONE (printed only inside
+rem the restore branch). Do NOT gate on "RESULT: DB-PRESENT" - when the guard stops the
+rem restore, the OLD database is still there and would print that line too (fail-open:
+rem we would swap the new jar onto the stale DB and call it a success).
+set RESTORED=0
+findstr /c:"RESULT: RESTORE-DONE" "%LOGDIR%\step-restore.txt" >nul 2>nul
+if not errorlevel 1 set RESTORED=1
+findstr /c:"RESULT: NOT-RESTORED" "%LOGDIR%\step-restore.txt" >nul 2>nul
+if not errorlevel 1 if "%RESTORED%"=="0" echo RESULT: FAIL-RESTORE-GUARD-STOPPED - staged bak unreadable, server DB untouched
+if "%RESTORED%"=="0" (
+  echo RESULT: FAIL-RESTORE - no "RESULT: RESTORE-DONE" in step-restore.txt
+  exit /b 1
+)
 echo RESULT: RESTORE-GATE-PASSED
 
 rem ---- 6. verify restored data -----------------------------------
