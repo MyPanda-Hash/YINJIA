@@ -20,6 +20,7 @@
         <span class="rcd-muted">{{ paramScopeTip }}</span>
         <span class="rcd-act" @click="saveParams">{{ tt('存为该产品参数') }}</span>
         <span class="rcd-act" @click="loadSystemDefaults">{{ tt('恢复系统默认') }}</span>
+        <span class="rcd-act" @click="openParamLib">{{ tt('参数库维护') }}</span>
       </div>
       <div class="rcd-params">
         <label v-for="f in PARAM_FIELDS" :key="f.key" class="rcd-pf">
@@ -108,6 +109,17 @@
       </div>
     </div>
 
+    <!-- 参数库维护(共用组件):条目名=产品编号,「默认」=系统默认;新增走本弹窗的「存为该产品参数」 -->
+    <el-dialog v-model="paramLibVisible" :title="tt('参数库维护') + ' · ' + tt('配方计算参数')" width="820px" append-to-body>
+      <div class="rcd-note">
+        {{ tt('条目名 = 产品编号(「默认」那条是系统默认);按产品的条目由本弹窗的「存为该产品参数」生成,所以这里不提供新增输入行。停用只影响以后的计算带出,已录入单据的值不变。') }}
+      </div>
+      <StdLibManager lib="mold.calcparam" show-item :show-add="false" @changed="onParamLibChanged" />
+      <template #footer>
+        <el-button @click="paramLibVisible = false">{{ tt('关闭') }}</el-button>
+      </template>
+    </el-dialog>
+
     <template #footer>
       <span class="rcd-foot">{{ footTip }}</span>
       <el-button @click="emit('update:modelValue', false)">{{ tt('取消') }}</el-button>
@@ -121,6 +133,7 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import request from '@/core/request'
 import { tt } from '@/i18n'
+import StdLibManager from './StdLibManager.vue'
 import { compute } from '@/core/mold/recipeEngine.js'
 import { applyArchiveMoisture, buildPatch, moisturePercent, paramsFromHead, slotsFromRows } from '@/core/mold/recipeSheet.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
@@ -161,6 +174,23 @@ const archiveFilled = ref([])            // 本次由档案带出的料位号(�
 const archiveTip = ref('')
 const paramEntryId = ref(null)
 const paramScopeTip = ref('')
+const paramLibVisible = ref(false)
+
+/** 参数库维护:改完(编辑/停用/恢复启用)立刻把当前产品的参数重新载入,免得界面还显示旧值 */
+function openParamLib() { paramLibVisible.value = true }
+async function onParamLibChanged() {
+  paramEntryId.value = null
+  const key = productCode.value || DEFAULT_ITEM
+  try {
+    const hit = await fetchParam(key)
+    if (hit) applyEntry(hit)
+    else if (key !== DEFAULT_ITEM) {
+      const sys = await fetchParam(DEFAULT_ITEM)
+      if (sys) applyEntry(sys)
+      else { paramScopeTip.value = `${scopeTip()}；${tt('标准库里还没有系统默认条目，当前用内置默认值')}` }
+    }
+  } catch { /* 读不到就保持当前值,不打断 */ }
+}
 
 const productCode = computed(() => String(props.head?.['产品编号'] || '').trim())
 const scopeTip = () => (productCode.value ? `${tt('当前产品')}：${productCode.value}` : tt('当前单据没有产品编号，参数只能按系统默认用'))

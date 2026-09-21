@@ -76,6 +76,18 @@ async function main() {
   const btn = async (buttonName, formData) => (await (await fetch(`${BASE}/api/px/callButton`, {
     method: 'POST', headers: H, body: JSON.stringify({ panelCode: MOLD, buttonName, formData, buttonParam: {} }),
   })).json())
+  const stdlib = async (path, body) => (await (await fetch(`${BASE}/api/stdlib${path}`, {
+    method: 'POST', headers: H, body: JSON.stringify(body),
+  })).json())
+  const stdlibList = async (lib) => (await (await fetch(`${BASE}/api/stdlib/list?lib=${lib}&all=1`, { headers: H })).json())
+
+  // ── 参数库维护要验的是"一条=一个产品"的库能不能看清并停用 ⇒ 先塞一条**临时条目**,
+  //    不动系统默认那条(否则会把全局默认参数改坏)。
+  const PROBE_ITEM = 'ZZ-探针产品'
+  const added = await stdlib('/add', { lib: 'mold.calcparam', item: PROBE_ITEM, content: '{"cavities":3,"conversion_ratio":0.4}' })
+  if (added?.code !== 200) throw new Error('临时参数条目新增失败:' + JSON.stringify(added))
+  const probeEntryId = (await stdlibList('mold.calcparam'))?.data?.find((r) => r.item === PROBE_ITEM)?.id
+  console.log(`  --   造数:标准库临时参数条目 ${PROBE_ITEM}(id=${probeEntryId})`)
 
   // ⚠ 用「保存为草稿」而不是「保存」:后者会跑必填校验(产品编号/产品名称不能为空),
   //   而一填产品编号就触发「四文件编辑门禁」(未分发禁编),探针单在界面上会变成不可编辑、
@@ -184,6 +196,10 @@ async function main() {
     const dlgBtn = (label) => ev(`(function(){ var d=${DLG}; if(!d) return 'NO_DLG'
       var bs=[].slice.call(d.closest('.el-dialog__wrapper') ? d.closest('.el-dialog__wrapper').querySelectorAll('button') : d.querySelectorAll('button'))
       for(var i=0;i<bs.length;i++){ if(bs[i].textContent.trim().indexOf(${JSON.stringify(label)})>=0){ bs[i].click(); return 'CLICKED' } } return 'NO_BTN' })()`)
+    /** 弹窗里的行内动作是 <span class="rcd-act">(不是 button),得单独点 */
+    const clickAct = (label) => ev(`(function(){ var d=${DLG}; if(!d) return 'NO_DLG'
+      var as=[].slice.call(d.querySelectorAll('.rcd-act'))
+      for(var i=0;i<as.length;i++){ if(as[i].textContent.trim().indexOf(${JSON.stringify(label)})>=0){ as[i].click(); return 'CLICKED' } } return 'NO_ACT' })()`)
 
     // ════ ① 页面:切到成型配方页,表头应有「配方计算」按钮 ════
     // ⚠ 面板默认停在「修订记录」页,而那页**不出报告头**(设计如此)⇒ 那页读不到单据编号。
@@ -302,6 +318,54 @@ async function main() {
     const shot4 = await shot('04-formula-filled')
 
     console.log('  --   截图:' + [shot1, shot2, shot3, shot4].filter(Boolean).join(' , '))
+
+    // ════ ⑥ 参数库维护:条目名看得见 + 能停用(复用共用组件 StdLibManager,show-item 打开) ════
+    await ev(`(function(){ var bs=[].slice.call(document.querySelectorAll('.rs-lib-btn'))
+      for(var i=0;i<bs.length;i++){ if(bs[i].textContent.indexOf('配方计算')>=0){ bs[i].click(); return 1 } } return 0 })()`)
+    await sleep(1600)
+    const opened = await clickAct('参数库维护')
+    if (opened !== 'CLICKED') bad(`⑥-0 没点到「参数库维护」按钮(${opened})`)
+    await sleep(1200)
+    const SLM = `[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.querySelector('.slm') && d.getBoundingClientRect().height>0}).pop()`
+    const slmInfo = await ev(`(function(){ var s=${SLM}; if(!s) return null
+      var heads=[].slice.call(s.querySelectorAll('.el-table__header th')).map(function(t){return (t.textContent||'').trim()}).filter(Boolean)
+      var rows=[].slice.call(s.querySelectorAll('.el-table__body tbody tr')).map(function(tr){
+        return [].slice.call(tr.querySelectorAll('td')).map(function(td){return (td.textContent||'').trim()}) })
+      return { heads: heads, rows: rows, addBox: !!s.querySelector('.slm-add') } })()`)
+    if (slmInfo) {
+      if (slmInfo.heads.includes('条目名')) ok(`⑥-1 维护界面有「条目名」列(${JSON.stringify(slmInfo.heads)})`)
+      else bad(`⑥-1 维护界面缺「条目名」列,列头 = ${JSON.stringify(slmInfo.heads)}(分不清哪条是哪个产品)`)
+      const items = slmInfo.rows.map((r) => r[1])
+      if (items.includes('默认') && items.includes(PROBE_ITEM)) ok(`⑥-2 条目名列出 系统默认 + 临时产品条目 = ${JSON.stringify(items)}`)
+      else bad(`⑥-2 条目名应含「默认」与 ${PROBE_ITEM},实际 ${JSON.stringify(items)}`)
+      if (slmInfo.addBox === false) ok('⑥-3 不提供「新增条目」输入行(避免把第二条塞成重复的「默认」)')
+      else bad('⑥-3 维护界面不该有新增输入行(该库一条=一个键,新增走「存为该产品参数」)')
+    } else bad('⑥-1 参数库维护弹窗没打开')
+    const shot5 = await shot('05-param-lib')
+
+    // 勾选临时条目 → 停用 → 状态应变「已停用」(走的是共用组件那套 勾选→动作)
+    await ev(`(function(){ var s=${SLM}; if(!s) return 0
+      var rows=[].slice.call(s.querySelectorAll('.el-table__body tbody tr'))
+      for(var i=0;i<rows.length;i++){ var td=rows[i].querySelectorAll('td')[1]
+        if(td && td.textContent.trim()===${JSON.stringify(PROBE_ITEM)}){ var cb=rows[i].querySelector('.el-checkbox'); if(cb){ cb.click(); return 1 } } } return 0 })()`)
+    await sleep(400)
+    await ev(`(function(){ var s=${SLM}; if(!s) return 0
+      var bs=[].slice.call(s.querySelectorAll('.slm-actions button'))
+      for(var i=0;i<bs.length;i++){ if(bs[i].textContent.trim()==='停用'){ bs[i].click(); return 1 } } return 0 })()`)
+    await sleep(1500)
+    const afterOff = await ev(`(function(){ var s=${SLM}; if(!s) return null
+      var rows=[].slice.call(s.querySelectorAll('.el-table__body tbody tr'))
+      for(var i=0;i<rows.length;i++){ var tds=rows[i].querySelectorAll('td')
+        if(tds[1] && tds[1].textContent.trim()===${JSON.stringify(PROBE_ITEM)}) return (tds[tds.length-1]||{}).textContent.trim() }
+      return null })()`)
+    if (afterOff === '已停用') ok('⑥-4 勾选临时条目 →「停用」→ 状态变「已停用」(共用组件的维护动作可用)')
+    else bad(`⑥-4 停用后状态应为「已停用」,实际 ${JSON.stringify(afterOff)}`)
+
+    // 清理:删掉临时条目,库回到"只有系统默认"那条
+    await stdlib('/destroy', { id: probeEntryId })
+    const left = ((await stdlibList('mold.calcparam'))?.data || []).map((r) => r.item)
+    if (!left.includes(PROBE_ITEM)) ok(`⑥-5 临时条目已清理,库里剩 ${JSON.stringify(left)}`)
+    else bad(`⑥-5 临时条目没清掉:${JSON.stringify(left)}`)
   } finally {
     if (ws) { try { ws.close() } catch { /* ignore */ } }
     try { edge.kill() } catch { /* ignore */ }
