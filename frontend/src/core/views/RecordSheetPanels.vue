@@ -412,6 +412,13 @@
                   <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
                   <span v-if="dt.materialPick && editable" class="rs-lib-btn" style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(dt)">📦 {{ tt('从物料清单引用') }}</span>
                   <span v-if="dt.recipeCalc && editable" class="rs-lib-btn" style="color:#409eff;border-color:#a0cfff" @click.stop="openRecipeCalc(dt)">🧮 {{ tt('配方计算') }}</span>
+                  <!-- 规格书变动:单子填完之后规格书又变了 ⇒ 就地表态并可一键按规格书更新 -->
+                  <span
+                    v-if="specDriftState && editable && cfg.autoFillSpec && autoFillTargetDt(cfg.autoFillSpec) === dt"
+                    class="rs-lib-btn rs-drift-btn"
+                    :title="specDriftText"
+                    @click.stop="autoFillFromSpec(props.head[cfg.autoFillSpec.fromKey], cfg.autoFillSpec)"
+                  >⚠ {{ specDriftText }}</span>
                   <span v-if="di === fieldEditAt" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
                 </span>
               </td>
@@ -1028,7 +1035,7 @@ import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
-import { specCarryFailure } from '@/core/insp/specCarry'
+import { specCarryFailure, specDrift } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -2057,7 +2064,50 @@ async function autoFillFromSpec(code, afs) {
   emit('dirty')
   const more = Number(payload.matched) > 1 ? tt('（该产品有多张规格书，按最新的填）') : ''
   ElMessage.success(tt('已按规格书 {no} 自动填充').replace('{no}', payload.单据编号 || '') + more)
+  // 刚按规格书填过 ⇒ 与规格书一致,把"变动"提示清掉
+  specDriftState.value = null
 }
+
+/* ── 规格书变动提示(2026-09-21 用户口径:「规格书变动就提示当前出货检验」)──────────────
+   单子填完之后规格书又变了(同张改了内容 / 出了新版本),打开这张出货检验计划表时要看得见
+   "与规格书不一致",并能一键按规格书更新。判据 = core/insp/specCarry.specDrift(只比内容不比单号)。 */
+const specDriftState = ref(null)   // { specNo, added[], removed[], changed[], drifted }
+let specDriftCheckedKey = ''       // 同一次载入只查一次(表头每次编辑都会触发 watch,不能每次都打接口)
+let specDriftCheckedHead = null    // 记表头对象:对象换了=重新载入了(重开同一张单也要重查,不能只看单据号)
+
+/** 按当前明细 + 规格书算差异(取规格书走与自动填充同一个受门禁保护的口径) */
+async function checkSpecDrift() {
+  const afs = cfg.value?.autoFillSpec
+  if (!afs || !props.editable) return
+  const dt = autoFillTargetDt(afs)
+  const code = String(props.head?.[afs.fromKey] ?? '').trim()
+  if (!dt || !code) { specDriftState.value = null; return }
+  try {
+    const res = await request.get('/px/specByProduct', { params: { code } })
+    const payload = res?.data ?? res ?? null
+    if (!payload || !payload.found) { specDriftState.value = null; return }
+    const specRows = (Array.isArray(payload.items) ? payload.items : []).map((r) => ({
+      检验项目: r['检验项目'], 检验要求: r['检验要求'], 检验方法: r['检验方法'],
+    }))
+    const drift = specDrift(specRows, rowsOf(dt))
+    specDriftState.value = drift.drifted
+      ? { ...drift, specNo: payload.单据编号 || '', specVersion: payload['版本'] || props.head?.['版本号'] || '' }
+      : null
+  } catch {
+    specDriftState.value = null   // 读不到就不提示(不打扰),但绝不假装"一致"
+  }
+}
+
+/** 变动提示文案(挂在表头条上,与「从标准库勾选」同一排动作) */
+const specDriftText = computed(() => {
+  const d = specDriftState.value
+  if (!d) return ''
+  const parts = []
+  if (d.added.length) parts.push(tt('规格书新增') + ' ' + d.added.join('、'))
+  if (d.removed.length) parts.push(tt('规格书已删') + ' ' + d.removed.join('、'))
+  if (d.changed.length) parts.push(tt('规格书已改') + ' ' + d.changed.map((c) => `${c.item}(${c.fields.join('/')})`).join('、'))
+  return tt('规格书已变动') + '：' + parts.join('；') + tt(' —— 点这里按规格书更新')
+})
 
 // ── 字段编辑(数据记录表):列名可改,应对复杂测试环境 ──
 /** 动态列头标签:优先取后端 yj_field 的 alias/displayName,缺省回退配置硬编码 label */
@@ -2247,6 +2297,24 @@ watch(() => [props.editable, props.head], ([v]) => {
     }
   }
 })
+
+/**
+ * 规格书变动检查:可编辑单据载入后查一次。
+ * ⚠ 去重按「表头对象 + 单据编号|产品编号」:表头每次编辑都会触发这个 watch,不按对象去重就会
+ *   每敲一个字打一次接口;而**重开同一张单**时表头是新的对象 ⇒ 必须重查(否则改版提示永远不刷新)。
+ */
+watch(
+  () => [props.editable, props.head, cfg.value?.autoFillSpec ? props.head?.[cfg.value.autoFillSpec.fromKey] : ''],
+  async ([v, head, code]) => {
+    if (!v || !cfg.value?.autoFillSpec || !head || !head['单据编号'] || !code) { specDriftState.value = null; return }
+    const key = `${head['单据编号']}|${code}`
+    if (key === specDriftCheckedKey && head === specDriftCheckedHead) return
+    specDriftCheckedKey = key
+    specDriftCheckedHead = head
+    await checkSpecDrift()
+  },
+  { immediate: true },
+)
 
 // ── 从物料清单引用(基础档案 BOM 面板数据)──
 // 2026-09-20 优化:导入范围三档 父件 / 父件及所含子件 / 仅子件(默认**父件**,用户口径)。
@@ -3323,6 +3391,19 @@ function chartOf(dt) {
 }
 .rs-lib-btn:hover {
   background: #e8f2ff;
+}
+/* 规格书变动:警示色 + 可换行(文案里有项目清单,窄屏不能撑破表头) */
+.rs-drift-btn {
+  color: #b88230;
+  border-color: #e6c07a;
+  background: #fdf6ec;
+  max-width: 100%;
+  white-space: normal;
+  line-height: 1.5;
+  text-align: left;
+}
+.rs-drift-btn:hover {
+  background: #faecd8;
 }
 
 /* ═══ plain 版式:标题条 + 副标题行 + 页脚须知 ═══ */

@@ -1,4 +1,4 @@
-﻿'use strict'
+'use strict'
 /**
  * _probe-insp-spec-carry.cjs — 出货检验计划表「检验方法按规格书自动填充」+ **规格书必须审批完**的门禁
  *
@@ -84,6 +84,7 @@ async function main() {
     '--window-size=1760,1600', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' })
   let ws = null
   let planNo = ''
+  let specNoB = ''
   try {
     await sleep(3000)
     const tab = await (await fetch(`http://127.0.0.1:${PORT}/json/new?about:blank`, { method: 'PUT' })).json()
@@ -290,6 +291,60 @@ async function main() {
     else bad(`④-3 提示里没说明来源规格书:${JSON.stringify(msg2)}`)
     await shot('02-approved-filled')
     console.log(`  --   选产品时的动作:opened=${r2.opened} pick=${r2.picked} 替换确认=${r2.hasConfirm}`)
+
+    /* ⑤ 规格书改版 ⇒ 打开既有出货检验单要看得见"与规格书不一致",并能一键按规格书更新 */
+    const SPEC_B_ROWS = [
+      { 表区: '检验要求', 序号: '1', 检验项目: '外观', 检验要求: '无黑点、无杂质', 检验方法: '目视检查' },
+      { 表区: '检验要求', 序号: '2', 检验项目: '压降', 检验要求: '≤6 kPa', 检验方法: '压降试验台(新版)' },  // 改了要求与方法
+      { 表区: '检验要求', 序号: '3', 检验项目: '铅含量', 检验要求: '≤0.01 mg/L', 检验方法: 'ICP-MS' },       // 新增(抗压强度被删)
+    ]
+    const sc2 = await call(SPEC, '保存为草稿', { 名称: SPEC_NAME + '-B', 规格书种类: '飞利浦沐浴阻垢滤芯', ...SPEC_HEAD, detail: { items: SPEC_B_ROWS } })
+    specNoB = sc2?.data?.['编号'] || ''
+    if (!specNoB) throw new Error('规格书 B 建失败:' + JSON.stringify(sc2))
+    SQL(`UPDATE rd_spec_doc_head SET 编号=N'${PROD_CODE}' WHERE 单据编号='${specNoB}';`)
+    await call(SPEC, '提交审批', { 编号: specNoB }); await sleep(1000)
+    await call(SPEC, '审批通过', { 编号: specNoB }); await sleep(1200)
+    const stB = (await list(SPEC, { 单据编号: specNoB }))[0]?.['单据状态'] || ''
+    ok(`⑤-0 规格书改版:${specNoB}(改 压降 的要求与方法 / 加 铅含量 / 去掉 抗压强度),状态 = ${stB}`)
+
+    // 保存为草稿 → 按单号重开:载入即查"与规格书是否一致"
+    await clickSide('保存为草稿')
+    await sleep(2400)
+    await clickSide('查询单据'); await sleep(1300)
+    const q1 = await ev(`(function(){ var ds=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent && (d.innerText||'').indexOf('查询单据')>=0})
+      var d=ds.pop(); if(!d) return 'NO_DIALOG'; var inp=d.querySelector('input'); if(!inp) return 'NO_INPUT'
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set.call(inp, ${JSON.stringify(planNo)})
+      inp.dispatchEvent(new Event('input',{bubbles:true})); return 'SET' })()`)
+    await sleep(400)
+    await ev(`(function(){ var ds=[].slice.call(document.querySelectorAll('.el-dialog')).filter(function(d){return d.offsetParent && (d.innerText||'').indexOf('查询单据')>=0})
+      var d=ds.pop(); if(!d) return 0; var bs=[].slice.call(d.querySelectorAll('button'))
+      for(var i=0;i<bs.length;i++){ if((bs[i].textContent||'').trim()==='查询'){ bs[i].click(); return 1 } } return 0 })()`)
+    await sleep(2600)
+    const driftText = await waitFor(`(function(){ var el=document.querySelector('.rs-drift-btn'); return el ? (el.innerText||'').trim() : '' })()`, 14000)
+    const driftOk = /规格书已变动/.test(String(driftText)) && /铅含量/.test(String(driftText)) && /压降/.test(String(driftText))
+    if (driftOk) ok(`⑤-1 打开既有出货检验单即出现变动提示:${String(driftText).replace(/\s+/g, ' ').slice(0, 118)}`)
+    else bad(`⑤-1 没出现规格书变动提示:${JSON.stringify(driftText)}(查询=${q1})`)
+    await shot('03-spec-drift-hint')
+
+    // 点提示 ⇒ 按规格书更新(已有行 ⇒ 弹"替换"确认)
+    await ev(`window.__clickVisible('.rs-drift-btn')`)
+    await sleep(1600)
+    const replaced = await ev(`(function(){ var bs=[].slice.call(document.querySelectorAll('.el-message-box')).filter(function(b){ return b.getBoundingClientRect().height>0 })
+      if(!bs.length) return 'NO_CONFIRM'
+      var b2=[].slice.call(bs[bs.length-1].querySelectorAll('button'))
+      for(var i=0;i<b2.length;i++){ if((b2[i].textContent||'').trim()==='替换'){ b2[i].click(); return 'REPLACED' } }
+      return 'NO_REPLACE_BTN' })()`)
+    await sleep(2200)
+    const itemsB = (await ev(`window.__gridGet('检验项目')`)).filter((x) => String(x || '').trim())
+    const methodsB = (await ev(`window.__gridGet('检验方法')`)).filter((x) => String(x || '').trim())
+    const bodyOkB = JSON.stringify(itemsB) === JSON.stringify(SPEC_B_ROWS.map((r) => r.检验项目)) &&
+      JSON.stringify(methodsB) === JSON.stringify(SPEC_B_ROWS.map((r) => r.检验方法))
+    if (bodyOkB) ok(`⑤-2 按规格书更新后与新版一致(项目 ${JSON.stringify(itemsB)} / 方法 ${JSON.stringify(methodsB)};替换=${replaced})`)
+    else bad(`⑤-2 更新后仍不一致:项目=${JSON.stringify(itemsB)} 方法=${JSON.stringify(methodsB)} 替换=${replaced}`)
+    const driftGone = await ev(`document.querySelector('.rs-drift-btn') ? 'STILL' : 'GONE'`)
+    if (driftGone === 'GONE') ok('⑤-3 更新后变动提示自动消失')
+    else bad('⑤-3 更新后变动提示还在')
+    await shot('04-spec-updated')
   } finally {
     try { if (ws) ws.close() } catch { }
     try { edge.kill() } catch { }
@@ -297,9 +352,10 @@ async function main() {
       SQL(`DELETE FROM rd_insp_plan_detail WHERE 单据编号='${planNo}'; DELETE FROM rd_insp_plan_head WHERE 单据编号='${planNo}'; DELETE FROM yj_doc_status WHERE doc_no='${planNo}';`)
       console.log(`  --   清理计划表 ${planNo}`)
     }
-    if (specNo) {
-      SQL(`DELETE FROM rd_spec_doc_detail WHERE 单据编号='${specNo}'; DELETE FROM rd_spec_doc_head WHERE 单据编号='${specNo}'; DELETE FROM yj_doc_status WHERE doc_no='${specNo}';`)
-      console.log(`  --   清理规格书 ${specNo}`)
+    for (const sp of [specNo, specNoB]) {
+      if (!sp) continue
+      SQL(`DELETE FROM rd_spec_doc_detail WHERE 单据编号='${sp}'; DELETE FROM rd_spec_doc_head WHERE 单据编号='${sp}'; DELETE FROM yj_doc_status WHERE doc_no='${sp}';`)
+      console.log(`  --   清理规格书 ${sp}`)
     }
     if (prodNo) {
       SQL(`DELETE FROM rd_prod_info_detail WHERE 单据编号='${prodNo}'; DELETE FROM rd_prod_info_head WHERE 单据编号='${prodNo}'; DELETE FROM yj_doc_status WHERE doc_no='${prodNo}';`)
