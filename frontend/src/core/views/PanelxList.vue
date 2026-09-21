@@ -605,7 +605,7 @@
             <el-table-column :label="tt('状态')" width="90" align="center">
               <template #default="{ row }">{{ tt(row.status === 'ACTIVE' ? '有效' : row.status === 'PENDING' ? '待编号' : '已释放') }}</template>
             </el-table-column>
-            <el-table-column prop="targetFormNo" :label="tt('暂收单')" min-width="150" />
+            <el-table-column prop="targetFormNo" :label="tt('去向单号')" min-width="150" />
             <el-table-column :label="tt('操作')" width="80" align="center">
               <template #default="{ row }">
                 <el-button link type="primary" :disabled="!row.targetFormNo" @click="onBatchTabRow(row)">{{ tt('查看') }}</el-button>
