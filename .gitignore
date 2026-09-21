@@ -78,3 +78,7 @@ temp-push-sandbox/
 
 # 单文件传输包(部署用,含 app.jar/.bak,不入库)
 deploy/*.zip
+
+# JDK 安装包(服务器部署前置件,110MB 二进制,绝不入库;2026-09-21 增)
+deploy/*.msi
+*.msi

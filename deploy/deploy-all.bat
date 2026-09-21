@@ -70,7 +70,7 @@ set "RC=%ERRORLEVEL%"
 chcp 65001 >nul 2>nul
 type "%LOG%"
 echo.
-echo log: %LOG%   (exit code %RC%)
+echo log: %LOG%   ^(exit code %RC%^)
 exit /b %RC%
 
 rem ==================================================================
@@ -83,6 +83,22 @@ echo ================================================================
 
 rem ---- 1. prerequisites -------------------------------------------
 echo.
+echo [0/8] sanity: package must NOT live inside the install dir
+rem If the zip was extracted INTO C:\yinjia, step 4b would first move the package's own
+rem HSDZ_MES.bak to backup\ and then the copy-back would fail with FAIL-STAGE-BAK, which
+rem reads like data loss. Catch it here instead, before touching anything.
+if /i "%SRC%"=="%DEST%" (
+  echo RESULT: FAIL-PKG-IN-INSTALL-DIR - package dir == install dir %DEST%
+  echo   extract the zip into its own folder ^(for example C:\yj-deploy^) and run it from there
+  exit /b 2
+)
+if /i "%BAK%"=="%DEST%\HSDZ_MES.bak" (
+  echo RESULT: FAIL-PKG-IN-INSTALL-DIR - %BAK% is the copy inside the install dir
+  exit /b 2
+)
+echo RESULT: PKG-DIR-OK %SRC%
+
+echo.
 echo [1/8] prerequisites
 where sqlcmd >nul 2>nul
 if errorlevel 1 ( echo RESULT: FAIL-NO-SQLCMD & exit /b 2 )
@@ -94,6 +110,26 @@ if not exist "%DEST%" ( echo RESULT: FAIL-NO-DEST %DEST% & exit /b 2 )
 echo RESULT: DEST-OK %DEST%
 if not exist "%NEWJAR%" ( echo RESULT: FAIL-NO-NEW-JAR %NEWJAR% & exit /b 2 )
 for %%F in ("%NEWJAR%") do echo RESULT: NEW-JAR %%~zF bytes  %%~tF
+
+rem Can this machine's Java actually run the new jar? app.jar is assembled by
+rem patching an older jar, so it silently inherits that jar's class-file version;
+rem on 2026-09-21 the server had only JDK 21 while the class file was major 69 ->
+rem UnsupportedClassVersionError, found only AFTER the database was already swapped.
+rem Gate it here, before anything is touched.
+if not exist "%SRC%\check-jar-runtime.ps1" (
+  echo RESULT: WARN-NO-RUNTIME-CHECK - check-jar-runtime.ps1 missing from the package
+) else (
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%SRC%\check-jar-runtime.ps1" -Jar "%NEWJAR%" > "%LOGDIR%\step-1-runtime.txt" 2>&1
+  set "RTCHK=!errorlevel!"
+  type "%LOGDIR%\step-1-runtime.txt"
+  if not "!RTCHK!"=="0" (
+    echo RESULT: FAIL-JAVA-TOO-OLD - the new app.jar cannot run on this machine's Java
+    echo   install JDK 25 ^(Temurin^) and re-run; see deploy notes section 1.1
+    exit /b 2
+  )
+  echo RESULT: RUNTIME-GATE-PASSED
+)
+
 if "%SCOPE%"=="APP" goto :skip_bak_check
 if not exist "%BAK%" ( echo RESULT: FAIL-NO-DB-BAK %BAK% & exit /b 2 )
 for %%F in ("%BAK%") do echo RESULT: DB-BAK %%~zF bytes  %%~tF
@@ -104,7 +140,7 @@ if "%CAMEHOME%"=="1" ( echo RESULT: LOG-HOME-YES ) else ( echo RESULT: LOG-HOME-
 
 rem ---- 2. server state (read-only) --------------------------------
 echo.
-echo [2/8] server state (check-db.sql)
+echo [2/8] server state ^(check-db.sql^)
 sqlcmd -S localhost -E -h -1 -W -f i:65001,o:65001 -i "%SRC%\check-db.sql"
 if errorlevel 1 ( echo RESULT: FAIL-CHECKSQL & exit /b 1 )
 
@@ -118,7 +154,7 @@ echo [2b/8] environment forensics
 echo --- scheduled task ---
 schtasks /query /tn "%TASK%" /fo list /v 2>nul | findstr /i "TaskName Task-To-Run Task To Run Start In Status"
 schtasks /query /tn "%TASK%" /xml 2>nul | findstr /i "<Command> <Arguments> <WorkingDirectory>"
-echo --- start-service.bat (first 25 lines, if present) ---
+echo --- start-service.bat ^(first 25 lines, if present^) ---
 if exist "%DEST%\start-service.bat" (
   set "N=0"
   for /f "usebackq delims=" %%L in ("%DEST%\start-service.bat") do (
@@ -126,14 +162,14 @@ if exist "%DEST%\start-service.bat" (
     if !N! leq 25 echo   %%L
   )
 ) else (
-  echo   (no start-service.bat in %DEST%)
+  echo   no start-service.bat in %DEST%
 )
 echo --- %DEST% listing ---
 dir /b "%DEST%" 2>nul
 echo --- existing .bak in %DEST% ---
 dir /b /o-d "%DEST%\*.bak" 2>nul
 if exist "%DEST%\backup" (
-  echo --- %DEST%\backup (newest 5) ---
+  echo --- %DEST%\backup ^(newest 5^) ---
   dir /b /o-d "%DEST%\backup" 2>nul | findstr /b /r "[1-5]:"
   dir /b /o-d "%DEST%\backup\*.bak" 2>nul | findstr /b /r "[1-5]:"
 )
@@ -238,7 +274,7 @@ echo RESULT: SQL-LOGIN-GATE-PASSED
 
 if /i "%SCOPE%"=="DB" (
   echo.
-  echo DB restored. app.jar untouched (SCOPE=DB) - starting app back up.
+  echo DB restored. app.jar untouched ^(SCOPE=DB^) - starting app back up.
   schtasks /run /tn "%TASK%" >nul 2>nul
   call :waitlogin
   exit /b !LOGINRC!
