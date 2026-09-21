@@ -67,6 +67,7 @@ async function main() {
   }
   const cp = await tok('cp')
   const glm = await tok('glm53')
+  const admin = await tok('admin')
 
   // 造一张变更单(cp 发起),供界面查看
   step('⓪ 造数:cp 建一张变更单(需会签=是,会签人=glm53)')
@@ -272,14 +273,85 @@ SELECT (SELECT COUNT(*) FROM yj_form_approval WHERE panel_code=N'RD_CHANGE' AND 
     if (Number(dbSt[1]?.[0]) === 1) ok('库里 1 条待签(glm53)')
     else bad('待签数不符:' + JSON.stringify(dbSt))
 
+    // ════ ⑨ 会签人在界面上点「会签通过」→ 全部通过 → 自动进审批中 ════
+    step('⑨ glm53 在界面上点「会签通过」')
+    await ev(`(function(){ var b=[].slice.call(document.querySelectorAll('.as-side-btn')).filter(function(x){return x.offsetParent && (x.textContent||'').trim()==='会签通过'})[0]
+      if(!b) return 'none'; b.click(); return 'clicked' })()`)
+    await sleep(1200)
+    const dlg9 = await ev(`(function(){ var ds=[].slice.call(document.querySelectorAll('.el-message-box')).filter(function(d){return d.getBoundingClientRect().height>0})
+      if(!ds.length) return 'NODLG'; var d=ds[ds.length-1]
+      var t=(d.innerText||'').replace(/\\s+/g,' ').slice(0,80)
+      var b=d.querySelector('.el-message-box__btns button.el-button--primary')
+      if(b){ b.click(); return t + ' →CLICKED' }
+      return t + ' →NO-PRIMARY-BTN' })()`)
+    console.log('     弹窗:' + dlg9)
+    await sleep(3200)
+    const after9 = await ev(`(function(){ var s=document.querySelector('.record-sheet')
+      return { status: s? ((s.innerText||'').match(/审批中|会签中|已生效|草稿/)||[''])[0] : '',
+               buttons: [].slice.call(document.querySelectorAll('.as-side-btn')).filter(function(b){return b.offsetParent}).map(function(b){return (b.textContent||'').trim()}) } })()`)
+    console.log('     ' + JSON.stringify(after9))
+    const p9 = sqlRows('_probe-change-ui-q2', `SET NOCOUNT ON;
+SELECT CAST(ISNULL(pending,'') AS nvarchar(4)), CAST(ISNULL(effective,'') AS nvarchar(4)) FROM yj_doc_status WHERE panel_code=N'RD_CHANGE' AND doc_no=N'${no}';`)
+    console.log('     库里 pending/effective = ' + JSON.stringify(p9))
+    if (p9[0] && p9[0][0] === 'Y') ok('全部会签通过 → 库里 pending=Y(自动进审批)')
+    else bad('未自动进审批:' + JSON.stringify(p9))
+    if (!(after9?.buttons || []).some((t) => t.includes('会签通过'))) ok('会签按钮已收起(不再是会签人该管的阶段)')
+    else bad('审批中仍显示会签按钮')
+
+    // ════ ⑩ admin 审批通过 → 已生效 ════
+    step('⑩ admin 打开同单点「审批通过」→ 已生效')
+    await login(admin.token, admin.user)
+    await openDoc()
+    const aBtns = await ev(`[].slice.call(document.querySelectorAll('.as-side-btn')).filter(function(b){return b.offsetParent}).map(function(b){return (b.textContent||'').trim()})`)
+    console.log('     admin 侧栏:' + JSON.stringify(aBtns))
+    if ((aBtns || []).some((t) => t.includes('审批通过'))) ok('审批中:admin 看到「审批通过/审批驳回」')
+    else bad('admin 看不到审批按钮')
+    await ev(`(function(){ var b=[].slice.call(document.querySelectorAll('.as-side-btn')).filter(function(x){return x.offsetParent && (x.textContent||'').trim()==='审批通过'})[0]
+      if(!b) return 'none'; b.click(); return 'clicked' })()`)
+    await sleep(1200)
+    const dlg10 = await ev(`(function(){ var ds=[].slice.call(document.querySelectorAll('.el-message-box')).filter(function(d){return d.getBoundingClientRect().height>0})
+      if(!ds.length) return 'NODLG'; var d=ds[ds.length-1]
+      var b=d.querySelector('.el-message-box__btns button.el-button--primary')
+      if(b){ b.click(); return 'CLICKED' } return 'NO-PRIMARY-BTN' })()`)
+    console.log('     弹窗:' + dlg10)
+    await sleep(3400)
+    const p10 = sqlRows('_probe-change-ui-q3', `SET NOCOUNT ON;
+SELECT CAST(ISNULL(effective,'') AS nvarchar(4)) AS eff FROM yj_doc_status WHERE panel_code = N'RD_CHANGE' AND doc_no = N'${no}';`)
+    const madeBy10 = sqlRows('_probe-change-ui-q4', `SET NOCOUNT ON;
+SELECT COUNT(*) AS n FROM rd_mold_proc_head WHERE 变更来源单号 = N'${no}';`)
+    console.log('     effective = ' + JSON.stringify(p10) + ' 生成的下一版草稿 = ' + JSON.stringify(madeBy10))
+    if (p10[0] && p10[0][0] === 'Y') ok('审批通过 → 已生效(effective=Y)')
+    else bad('未生效:' + JSON.stringify(p10))
+    if (Number(madeBy10[0]?.[0]) === 1) ok('生效钩子:为成型工艺清单生成了带来源单号的下一版草稿')
+    else bad('未生成下一版草稿:' + JSON.stringify(madeBy10))
+    const shot4 = await shot('admin-effective')
+
     fs.writeFileSync(CLEANUP, `/* 探针清理:产品变更申请单 界面验收(_probe-change-ui.cjs) */
 USE HSDZ_MES; SET NOCOUNT ON;
-DELETE FROM yj_message WHERE 单据编号 = N'${no}';
-DELETE FROM yj_form_approval WHERE panel_code = N'RD_CHANGE' AND form_no = N'${no}';
-DELETE FROM yj_doc_status WHERE panel_code = N'RD_CHANGE' AND doc_no = N'${no}';
+DECLARE @made TABLE (no nvarchar(200) PRIMARY KEY);
+INSERT INTO @made (no) SELECT 单据编号 FROM rd_mold_proc_head WHERE 变更来源单号 = N'${no}';
+INSERT INTO @made (no) SELECT 单据编号 FROM rd_asm_proc_head  WHERE 变更来源单号 = N'${no}';
+INSERT INTO @made (no) SELECT 单据编号 FROM rd_insp_plan_head WHERE 变更来源单号 = N'${no}';
+INSERT INTO @made (no) SELECT 单据编号 FROM rd_spec_doc_head  WHERE 变更来源单号 = N'${no}';
+DELETE FROM yj_message WHERE 单据编号 = N'${no}' OR 单据编号 IN (SELECT no FROM @made);
+DELETE FROM yj_form_approval WHERE form_no = N'${no}' OR form_no IN (SELECT no FROM @made);
+DELETE FROM yj_doc_status WHERE doc_no = N'${no}' OR doc_no IN (SELECT no FROM @made);
 DELETE FROM rd_change_detail WHERE 单据编号 = N'${no}';
 DELETE FROM rd_change_head   WHERE 单据编号 = N'${no}';
-SELECT N'界面探针残留' AS 检查, CAST(COUNT(*) AS nvarchar) AS n FROM rd_change_head WHERE 单据编号 = N'${no}';
+DELETE FROM rd_mold_proc_detail WHERE 单据编号 IN (SELECT no FROM @made);
+DELETE FROM rd_asm_proc_detail  WHERE 单据编号 IN (SELECT no FROM @made);
+DELETE FROM rd_insp_plan_detail WHERE 单据编号 IN (SELECT no FROM @made);
+DELETE FROM rd_spec_doc_detail  WHERE 单据编号 IN (SELECT no FROM @made);
+DELETE FROM rd_mold_proc_head WHERE 单据编号 IN (SELECT no FROM @made);
+DELETE FROM rd_asm_proc_head  WHERE 单据编号 IN (SELECT no FROM @made);
+DELETE FROM rd_insp_plan_head WHERE 单据编号 IN (SELECT no FROM @made);
+DELETE FROM rd_spec_doc_head  WHERE 单据编号 IN (SELECT no FROM @made);
+SELECT N'界面探针残留' AS 检查, CAST(COUNT(*) AS nvarchar) AS n FROM rd_change_head WHERE 单据编号 = N'${no}'
+UNION ALL SELECT N'生成物残留', CAST(COUNT(*) AS nvarchar) FROM (
+  SELECT 单据编号 FROM rd_mold_proc_head WHERE 变更来源单号 = N'${no}'
+  UNION ALL SELECT 单据编号 FROM rd_asm_proc_head  WHERE 变更来源单号 = N'${no}'
+  UNION ALL SELECT 单据编号 FROM rd_insp_plan_head WHERE 变更来源单号 = N'${no}'
+  UNION ALL SELECT 单据编号 FROM rd_spec_doc_head  WHERE 变更来源单号 = N'${no}') t;
 `, 'utf8')
     console.log(`\n  --   清理 SQL:${CLEANUP}(单号 ${no})`)
     console.log('     截图:' + [shotFile, shot2, shot3].filter(Boolean).join(' , '))
