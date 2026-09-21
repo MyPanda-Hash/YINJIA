@@ -1,0 +1,275 @@
+=== 选样(造测试链,不动 YJ-20260915-11) ===
+         采购订单A YJ-20260915-10(行 1 剩余 290)/ 采购订单B YJ-20260915-09(行 1 剩余 400);补仓库用:恒亿仓
+
+=== ① 作废的退料单(QC_RETURN)不作终点:回退到有效单据 ===
+         [A] 暂收单=SL-2026-09-0073 检验单=IJ-2026-09-0060 批次键=70
+         检验单审核(不良数量=10,合格 0)→ 自动生成暂收退回单 TH-2026-09-0014;未生成入库单(无)
+  [PASS] 检验单审核自动生成暂收退回单 TH-2026-09-0014
+         退料单生效时 接口行={"batchId":70,"batchNo":null,"batchSeq":0,"batchQty":10,"status":"PENDING","targetPanel":"QC_RETURN","targetFormNo":"TH-2026-09-0014","createTime":"2026-09-21 17:41:10","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0073","targetInvalid":false,"targetHops":2}
+  [PASS] 退料单有效时去向 = 退料单(期望 QC_RETURN/TH-2026-09-0014,实得 QC_RETURN/TH-2026-09-0014)
+         ①-1 单据作废但链路 ACTIVE 时 接口行={"batchId":70,"batchNo":null,"batchSeq":0,"batchQty":10,"status":"PENDING","targetPanel":"QC_INSP","targetFormNo":"IJ-2026-09-0060","createTime":"2026-09-21 17:41:10","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0073","targetInvalid":false,"targetHops":1}
+  [PASS] 去向**不指向**已作废的退料单 TH-2026-09-0014(实得 QC_INSP/IJ-2026-09-0060)
+  [PASS] 去向**回退**到链上有效单据 检验单(期望 QC_INSP/IJ-2026-09-0060,实得 QC_INSP/IJ-2026-09-0060)
+  [PASS] 接口去向 = 探针独立算出的链路终点(QC_INSP IJ-2026-09-0060;可达链 QC_RECV SL-2026-09-0073(0) → QC_INSP IJ-2026-09-0060(1) → QC_RETURN TH-2026-09-0014(2))
+         ①-2 表内 asp_cancel='Y' 时 接口行={"batchId":70,"batchNo":null,"batchSeq":0,"batchQty":10,"status":"PENDING","targetPanel":"QC_INSP","targetFormNo":"IJ-2026-09-0060","createTime":"2026-09-21 17:41:10","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0073","targetInvalid":false,"targetHops":1}
+  [PASS] 表内 asp_cancel='Y' 同样不作终点(实得 QC_INSP/IJ-2026-09-0060)
+         ①-3 作废结果:已作废;退料单状态=已作废;链路=RELEASED;接口行={"batchId":70,"batchNo":null,"batchSeq":0,"batchQty":10,"status":"PENDING","targetPanel":"QC_INSP","targetFormNo":"IJ-2026-09-0060","createTime":"2026-09-21 17:41:10","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0073","targetInvalid":false,"targetHops":1}
+  [PASS] 退料单 TH-2026-09-0014 已命中作废口径(实得 已作废)
+  [PASS] 去向**不指向**已作废的退料单 TH-2026-09-0014
+  [PASS] 去向回退到检验单(期望 QC_INSP/IJ-2026-09-0060,实得 QC_INSP/IJ-2026-09-0060)
+
+=== ② 作废的采购入库单不作终点:回退到检验单 ===
+         [B] 暂收单=SL-2026-09-0074 检验单=IJ-2026-09-0061 批次键=71
+  [PASS] 检验单审核自动生成采购入库单 PI-2026-09-0064
+         入库单生效时 接口行={"batchId":71,"batchNo":null,"batchSeq":0,"batchQty":10,"status":"PENDING","targetPanel":"PURCHASE_IN","targetFormNo":"PI-2026-09-0064","createTime":"2026-09-21 17:41:14","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0074","targetInvalid":false,"targetHops":2}
+  [PASS] 去向 = 采购入库单(期望 PURCHASE_IN/PI-2026-09-0064,实得 PURCHASE_IN/PI-2026-09-0064)
+         作废操作:已作废;入库单状态=已作废;接口行={"batchId":71,"batchNo":"2026092105","batchSeq":5,"batchQty":10,"status":"ACTIVE","targetPanel":"QC_INSP","targetFormNo":"IJ-2026-09-0061","createTime":"2026-09-21 17:41:14","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0074","targetInvalid":false,"targetHops":1}
+  [PASS] 入库单 PI-2026-09-0064 已命中作废口径(实得 已作废)
+  [PASS] 去向回退到检验单(期望 QC_INSP/IJ-2026-09-0061,实得 QC_INSP/IJ-2026-09-0061)
+  [PASS] 去向**不指向已作废**的入库单 PI-2026-09-0064
+
+=== ③ 整链皆作废:targetInvalid=true、去向为空,行仍在浮层里 ===
+         作废级联:检验弃审✓ 暂收弃审✓ QC_INSP删除✓ QC_RECV删除✓;三单状态={"暂收":"已作废","检验":"已作废","入库":"已作废"};接口行={"batchId":71,"batchNo":"2026092105","batchSeq":5,"batchQty":10,"status":"ACTIVE","targetPanel":"","targetFormNo":"","createTime":"2026-09-21 17:41:14","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0074","targetInvalid":true,"targetHops":-1}
+  [PASS] 整条链上的单据全部已作废({"暂收":"已作废","检验":"已作废","入库":"已作废"})
+  [PASS] 整链皆作废的批次行**仍出现在浮层数据里**(batchId=71)
+  [PASS] targetInvalid=true(实得 true)
+  [PASS] targetFormNo/targetPanel 置空,不再给作废单号(实得 ""/"")
+  [PASS] 起点仍保留在 firstTarget*(排查用:期望 QC_RECV/SL-2026-09-0074,实得 QC_RECV/SL-2026-09-0074)
+  [PASS] 探针独立复算同样判「整链无效」(可达链 QC_RECV SL-2026-09-0074(0))
+  ── ③-b 真实订单里整链皆作废的批次(YJ-20260915-11 batchId=38/39) ──
+         batchId=38 起点 QC_RECV/SL-2026-09-0041(已作废) 接口行={"batchId":38,"batchNo":"2026092101","batchSeq":1,"batchQty":10,"status":"ACTIVE","targetPanel":"","targetFormNo":"","createTime":"2026-09-21 16:41:14","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0041","targetInvalid":true,"targetHops":-1}
+  [PASS] batchId=38:起点已作废 → targetInvalid=true 且去向为空(实得 true/"")
+         batchId=39 起点 QC_RECV/SL-2026-09-0042(已作废) 接口行={"batchId":39,"batchNo":"2026092102","batchSeq":2,"batchQty":10,"status":"ACTIVE","targetPanel":"","targetFormNo":"","createTime":"2026-09-21 16:41:18","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0042","targetInvalid":true,"targetHops":-1}
+  [PASS] batchId=39:起点已作废 → targetInvalid=true 且去向为空(实得 true/"")
+
+=== ④ 真实订单 YJ-20260915-11 逐行:改前 vs 改后 + 去向单据作废状态 ===
+  [PASS] 批次键 44(待编号):改后去向 TH-2026-09-0011 → 单据状态=有效
+  [PASS] 批次键 29(YJ-20260915-11-001):改后去向 PI-2026-09-0030 → 单据状态=有效
+  [PASS] 批次键 38(2026092101):改后去向 (空/已作废) → targetInvalid=true(不给作废单号)
+  [PASS] 批次键 30(YJ-20260915-11-002):改后去向 PI-2026-09-0031 → 单据状态=有效
+  [PASS] 批次键 39(2026092102):改后去向 (空/已作废) → targetInvalid=true(不给作废单号)
+  [PASS] 批次键 31(YJ-20260915-11-003):改后去向 PI-2026-09-0032 → 单据状态=有效
+  [PASS] 批次键 32(YJ-20260915-11-004):改后去向 IJ-2026-09-0024 → 单据状态=有效
+  [PASS] 批次键 33(YJ-20260915-11-005):改后去向 IJ-2026-09-0025 → 单据状态=有效
+  [PASS] 批次键 34(YJ-20260915-11-006):改后去向 PI-2026-09-0033 → 单据状态=有效
+  [PASS] 批次键 35(YJ-20260915-11-007):改后去向 TH-2026-09-0010 → 单据状态=有效
+  改前/改后逐行对照表:
+┌─────────┬────────┬──────────────────────┬───────────┬───────────────────────────────┬───────────────────────────────┬──────────────────┬───────────────────────────────┬──────────────────┬───────────────┐
+│ (index) │ 批次键 │ 批次号               │ 状态      │ 台账原始去向                  │ 改前去向(修复前)              │ 改前去向单据状态 │ 改后去向(修复后)              │ 改后去向单据状态 │ targetInvalid │
+├─────────┼────────┼──────────────────────┼───────────┼───────────────────────────────┼───────────────────────────────┼──────────────────┼───────────────────────────────┼──────────────────┼───────────────┤
+│ 0       │ 44     │ '(待编号)'           │ 'PENDING' │ 'QC_RECV/SL-2026-09-0047'     │ 'QC_RETURN/TH-2026-09-0011'   │ '有效'           │ 'QC_RETURN/TH-2026-09-0011'   │ '有效'           │ false         │
+│ 1       │ 29     │ 'YJ-20260915-11-001' │ 'ACTIVE'  │ 'PURCHASE_IN/PI-2026-09-0030' │ 'PURCHASE_IN/PI-2026-09-0030' │ '有效'           │ 'PURCHASE_IN/PI-2026-09-0030' │ '有效'           │ false         │
+│ 2       │ 38     │ '2026092101'         │ 'ACTIVE'  │ 'QC_RECV/SL-2026-09-0041'     │ 'QC_RECV/SL-2026-09-0041'     │ '已作废'         │ '(空)'                        │ '(去向为空)'     │ true          │
+│ 3       │ 30     │ 'YJ-20260915-11-002' │ 'ACTIVE'  │ 'PURCHASE_IN/PI-2026-09-0031' │ 'PURCHASE_IN/PI-2026-09-0031' │ '有效'           │ 'PURCHASE_IN/PI-2026-09-0031' │ '有效'           │ false         │
+│ 4       │ 39     │ '2026092102'         │ 'ACTIVE'  │ 'QC_RECV/SL-2026-09-0042'     │ 'QC_RECV/SL-2026-09-0042'     │ '已作废'         │ '(空)'                        │ '(去向为空)'     │ true          │
+│ 5       │ 31     │ 'YJ-20260915-11-003' │ 'ACTIVE'  │ 'QC_RECV/SL-2026-09-0034'     │ 'PURCHASE_IN/PI-2026-09-0032' │ '有效'           │ 'PURCHASE_IN/PI-2026-09-0032' │ '有效'           │ false         │
+│ 6       │ 32     │ 'YJ-20260915-11-004' │ 'ACTIVE'  │ 'QC_RECV/SL-2026-09-0035'     │ 'QC_INSP/IJ-2026-09-0024'     │ '有效'           │ 'QC_INSP/IJ-2026-09-0024'     │ '有效'           │ false         │
+│ 7       │ 33     │ 'YJ-20260915-11-005' │ 'ACTIVE'  │ 'QC_RECV/SL-2026-09-0036'     │ 'QC_INSP/IJ-2026-09-0025'     │ '有效'           │ 'QC_INSP/IJ-2026-09-0025'     │ '有效'           │ false         │
+│ 8       │ 34     │ 'YJ-20260915-11-006' │ 'ACTIVE'  │ 'QC_RECV/SL-2026-09-0037'     │ 'PURCHASE_IN/PI-2026-09-0033' │ '有效'           │ 'PURCHASE_IN/PI-2026-09-0033' │ '有效'           │ false         │
+│ 9       │ 35     │ 'YJ-20260915-11-007' │ 'ACTIVE'  │ 'QC_RECV/SL-2026-09-0038'     │ 'QC_RETURN/TH-2026-09-0010'   │ '有效'           │ 'QC_RETURN/TH-2026-09-0010'   │ '有效'           │ false         │
+└─────────┴────────┴──────────────────────┴───────────┴───────────────────────────────┴───────────────────────────────┴──────────────────┴───────────────────────────────┴──────────────────┴───────────────┘
+  [PASS] **没有任何一行**的去向是已作废/不存在的单据(命中 0 行)
+  [PASS] 确有批次行的去向被修正(改前 ≠ 改后 的行数 = 2)
+         改前 YJ-20260915-11 有 2 行的去向指向已作废单据(点击「查看」→ 面板空白),改后全部消除
+
+=== ⑤ 界面(CDP http://localhost:8090):去向单号列 + 「查看」禁用态 = 接口;有效行仍可跳转 ===
+         [症状] 已作废退料单 QC_RETURN/TH-2026-09-0001 ?docNo= 定位到 0 张(单据状态=已作废)
+  [PASS] 已作废的退料单号在面板里定位 **0 行** → 直接点进去就是空白(复现用户报的「面板没数据」:TH-2026-09-0001)
+         [对照] 有效退料单 QC_RETURN/TH-2026-09-0002 ?docNo= 定位到 1 张(单据状态=有效)
+  [PASS] 有效退料单号仍能定位(本次修复不误伤正常去向:TH-2026-09-0002 → 1 张)
+  [PASS] [复现] 改前去向 QC_RECV/SL-2026-09-0041 面板定位 0 行 → 点「查看」必空白
+  [PASS] [复现] 改前去向 QC_RECV/SL-2026-09-0042 面板定位 0 行 → 点「查看」必空白
+         ④ 的改前态里命中「作废去向 → 面板 0 行」的行数 = 2
+  [PASS] 修复后 8 行的去向**全部**能被面板 ?docNo= 定位到(不可定位 0 行)
+  [PASS] 打开采购订单 YJ-20260915-11 且出现表头「送料」摘要行
+         浮层列头=["批次号","日期","数量","状态","去向单号","操作"]
+  浮层逐行:
+┌─────────┬──────────────────────┬───────────────────────┬──────┬──────────┬───────────────────┬────────┐
+│ (index) │ 0                    │ 1                     │ 2    │ 3        │ 4                 │ 5      │
+├─────────┼──────────────────────┼───────────────────────┼──────┼──────────┼───────────────────┼────────┤
+│ 0       │ ''                   │ '2026-09-21 16:42:09' │ '1'  │ '待编号' │ 'TH-2026-09-0011' │ '查看' │
+│ 1       │ 'YJ-20260915-11-001' │ '2026-09-21 15:21:12' │ '1'  │ '有效'   │ 'PI-2026-09-0030' │ '查看' │
+│ 2       │ '2026092101'         │ '2026-09-21 16:41:14' │ '10' │ '有效'   │ '已作废'          │ '查看' │
+│ 3       │ 'YJ-20260915-11-002' │ '2026-09-21 15:21:47' │ '1'  │ '有效'   │ 'PI-2026-09-0031' │ '查看' │
+│ 4       │ '2026092102'         │ '2026-09-21 16:41:18' │ '10' │ '有效'   │ '已作废'          │ '查看' │
+│ 5       │ 'YJ-20260915-11-003' │ '2026-09-21 15:21:56' │ '1'  │ '有效'   │ 'PI-2026-09-0032' │ '查看' │
+│ 6       │ 'YJ-20260915-11-004' │ '2026-09-21 15:54:03' │ '1'  │ '有效'   │ 'IJ-2026-09-0024' │ '查看' │
+│ 7       │ 'YJ-20260915-11-005' │ '2026-09-21 15:54:16' │ '1'  │ '有效'   │ 'IJ-2026-09-0025' │ '查看' │
+│ 8       │ 'YJ-20260915-11-006' │ '2026-09-21 15:55:27' │ '1'  │ '有效'   │ 'PI-2026-09-0033' │ '查看' │
+│ 9       │ 'YJ-20260915-11-007' │ '2026-09-21 15:56:33' │ '1'  │ '有效'   │ 'TH-2026-09-0010' │ '查看' │
+└─────────┴──────────────────────┴───────────────────────┴──────┴──────────┴───────────────────┴────────┘
+  [PASS] 点摘要行弹出浮层
+  [PASS] 浮层行数 = 接口批次行数(10/10)
+  [PASS] 浮层「去向单号」列 = 接口(有值→单号 / 空→已作废)(界面 ["TH-2026-09-0011","PI-2026-09-0030","已作废","PI-2026-09-0031","已作废","PI-2026-09-0032","IJ-2026-09-0024","IJ-2026-09-0025","PI-2026-09-0033","TH-2026-09-0010"] / 期望 ["TH-2026-09-0011","PI-2026-09-0030","已作废","PI-2026-09-0031","已作废","PI-2026-09-0032","IJ-2026-09-0024","IJ-2026-09-0025","PI-2026-09-0033","TH-2026-09-0010"])
+  [PASS] 「查看」禁用态 = 接口 targetInvalid/去向为空(界面 [false,false,true,false,true,false,false,false,false,false] / 期望 [false,false,true,false,true,false,false,false,false,false])
+  [PASS] 整链皆作废的行(第 3 行)显示「已作废」且「查看」禁用
+  [PASS] 浮层里仍能看到这些行(未被隐藏),仅按钮禁用
+         点第 6 行「查看」:起点 QC_RECV/SL-2026-09-0034 → 终点 PURCHASE_IN/PI-2026-09-0032
+         跳转后 hash=#/panelx/list/PURCHASE_IN 表头值=["2026-09-21","PI-2026-09-0032","广东元丰化学试剂有限公司","2026-09-21","YJ-20260915-11-003","YJ-20260915-11"]
+  [PASS] 跳到的面板 = 终点面板 PURCHASE_IN(hash=#/panelx/list/PURCHASE_IN)
+  [PASS] 定位到终点单据 PI-2026-09-0032(表头值 ["2026-09-21","PI-2026-09-0032","广东元丰化学试剂有限公司","2026-09-21","YJ-20260915-11-003","YJ-20260915-11"])
+  [PASS] 真实订单里存在「去向 = 暂收退回单(QC_RETURN)」的有效行(用户报的场景)
+         退料单行(第 1 行)跳转:hash=#/panelx/list/QC_RETURN 页面上出现该单号=true 表头值=["TH-2026-09-0011","2026-09-21","YJ-20260915-11","广东元丰化学试剂有限公司","草稿"]
+  [PASS] 跳到暂收退回单(QC_RETURN)面板(hash=#/panelx/list/QC_RETURN)
+  [PASS] 面板上有这张退料单(页面文本出现 TH-2026-09-0011 = true)
+  [PASS] 该退料单 TH-2026-09-0011 在面板里可定位(1 张)
+  [PASS] 面板上看到的就是该退料单 TH-2026-09-0011(表头=["TH-2026-09-0011","2026-09-21","YJ-20260915-11","广东元丰化学试剂有限公司","草稿"] / tools-right="单据：TH-2026-09-0011草稿◁◀第 1/1 张▶▷")
+         改前那个作废去向 QC_RECV/SL-2026-09-0041 直接打开:页面上出现该单号=false 表头值=[]
+  [PASS] 作废单号「?docNo=」在原面板里定位不到(复现用户报的「面板没数据」:SL-2026-09-0041)
+
+=== 清理本次测试单据(反序 弃审 → 删除;批次号不回收) ===
+  PURCHASE_IN PI-2026-09-0064 弃审 跳过:/px/callButton → {"code":409,"message":"仅已审核或已归档状态可弃审","data":null}
+  PURCHASE_IN PI-2026-09-0064 删除 跳过:/px/callButton → {"code":409,"message":"仅草稿状态可删除（已审核请先弃审）","data":null}
+  QC_INSP IJ-2026-09-0061 弃审 跳过:/px/callButton → {"code":409,"message":"仅已审核或已归档状态可弃审","data":null}
+  QC_INSP IJ-2026-09-0061 删除 跳过:/px/callButton → {"code":409,"message":"仅草稿状态可删除（已审核请先弃审）","data":null}
+  QC_RECV SL-2026-09-0074 弃审 跳过:/px/callButton → {"code":409,"message":"仅已审核或已归档状态可弃审","data":null}
+  QC_RECV SL-2026-09-0074 删除 跳过:/px/callButton → {"code":409,"message":"仅草稿状态可删除（已审核请先弃审）","data":null}
+  QC_RETURN TH-2026-09-0014 弃审 跳过:/px/callButton → {"code":409,"message":"仅已审核或已归档状态可弃审","data":null}
+  QC_RETURN TH-2026-09-0014 删除 跳过:/px/callButton → {"code":409,"message":"仅草稿状态可删除（已审核请先弃审）","data":null}
+  QC_INSP IJ-2026-09-0060 弃审 ✓
+  QC_INSP IJ-2026-09-0060 删除 ✓
+  QC_RECV SL-2026-09-0073 弃审 ✓
+  QC_RECV SL-2026-09-0073 删除 ✓
+
+=== 测试单据与台账留证 ===
+  A: 采购订单 YJ-20260915-10 / 暂收单 SL-2026-09-0073 / 检验单 IJ-2026-09-0060 / 退料单 TH-2026-09-0014 / 批次键 70
+  B: 采购订单 YJ-20260915-09 / 暂收单 SL-2026-09-0074 / 检验单 IJ-2026-09-0061 / 入库单 PI-2026-09-0064 / 批次键 71
+┌─────────┬────┬──────────────────┬──────────────┬───────────┬───────────────────┬───────────────────┐
+│ (index) │ id │ source_form_no   │ batch_no     │ status    │ target_panel_code │ target_form_no    │
+├─────────┼────┼──────────────────┼──────────────┼───────────┼───────────────────┼───────────────────┤
+│ 0       │ 70 │ 'YJ-20260915-10' │ null         │ 'PENDING' │ 'QC_RECV'         │ 'SL-2026-09-0073' │
+│ 1       │ 71 │ 'YJ-20260915-09' │ '2026092105' │ 'ACTIVE'  │ 'QC_RECV'         │ 'SL-2026-09-0074' │
+└─────────┴────┴──────────────────┴──────────────┴───────────┴───────────────────┴───────────────────┘
+
+=== ⑥ 回归:上一轮探针 ===
+
+──────── node tools/archive/_verify-batch-target-chain.mjs ────────
+面板单头表:{"BOM":"","CGD":"","CKD":"","CKDA":"","CUR":"","CUSGRP":"","DAY_REPORT":"day_report","DEPT":"","DISPATCH":"bd_dispatch","DISPATCH_DETAIL":"","DISPATCH_STATS":"","EMP":"","EQUIP":"","EQUIP_CHECK":"equip_check","ERPLG":"","ERPLG_ROW":"","FEED_CONFIRM":"feed_confirm","FIN_ACC":"","FIN_EXP":"","FIN_TAX":"","FINISH_IN":"bd_finish_in","FINISH_IN_DETAIL":"","FINISH_IN_STATS":"","GFDA":"","GRAN_RECORD":"gran_record","INV":"","INV_PRICE":"","KHDA":"","KHDD":"order_bt","LOT_TRACE":"","MAINT_PLAN":"maint_plan","MANU_ORDER":"bd_manu_order","MANU_ORDER_DETAIL":"","MANU_ORDER_STATS":"","MATERIAL_OUT":"bd_material_out","MATERIAL_OUT_DETAIL":"","MATERIAL_OUT_STATS":"","MATGRP":"","MIX_RECORD":"mix_record","OP":"","OTHER_IN":"bd_other_in","OTHER_IN_DETAIL":"","OTHER_IN_STATS":"","OTHER_OUT":"bd_other_out","OTHER_OUT_DETAIL":"","OTHER_OUT_STATS":"","OUTSOURCE_IN":"bd_outsource_in","OUTSOURCE_IN_DETAIL":"","OUTSOURCE_IN_STATS":"","OUTSOURCE_ISSUE":"bd_outsource_issue","OUTSOURCE_ISSUE_DETAIL":"","OUTSOURCE_ISSUE_STATS":"","OUTSOURCE_ORDER":"bd_outsource_order","PACK_CONFIRM":"pack_confirm","PARTNER":"","PR_ASM_DAILY":"pr_asm_daily","PR_ASM_INCOMING":"pr_asm_incoming","PR_ASM_RETURN":"pr_asm_return","PR_BLACK_TEST":"pr_black_test","PR_CUT_DAILY":"pr_cut_daily","PR_DEMOLD_QC":"pr_demold_qc","PR_EFFICIENCY":"pr_efficiency","PR_FLOW_CARD":"pr_flow_card","PR_FORM_DAILY":"pr_form_daily","PR_FORM_FIRST":"pr_form_first","PR_MAINTENANCE":"pr_maintenance","PR_MAT_INSPECT":"pr_mat_inspect","PR_MIX_BLEND":"pr_mix_blend","PR_MIX_CHECK":"pr_mix_check","PR_MIX_CONFIRM":"pr_mix_confirm","PR_MIX_DAILY":"pr_mix_daily","PR_MIX_FEED":"pr_mix_feed","PR_MIX_GRANULE":"pr_mix_granule","PR_MIX_PROCESS":"pr_mix_process","PR_NO_BLACK":"pr_no_black","PR_PACK_CONFIRM":"pr_pack_confirm","PR_PATROL_QC":"pr_patrol_qc","PR_QC_CONTROL":"pr_qc_control","PR_SCRAP":"pr_scrap","PR_SINTER_QC":"pr_sinter_qc","PROJ":"","PU_ORDER":"bd_pu_order","PU_REQ":"bd_pu_req","PURCHASE_IN":"bd_purchase_in","PURCHASE_IN_DETAIL":"","PURCHASE_IN_STATS":"","QC_BHC":"qc_bhc","QC_BHG":"qc_bhg","QC_BHZ":"qc_bhz","QC_DISPOSAL":"","QC_INSP":"qc_insp","QC_ITEM":"","QC_JJF":"qc_jjf","QC_LYB":"qc_lyb","QC_OP":"qc_op","QC_PLAN":"","QC_RECORD":"qc_record","QC_RECV":"sl_recv","QC_RETURN":"qc_return","QC_SCP":"qc_scp","QC_SCY":"qc_scy","QC_TC":"qc_tc","QC_TC_IN":"qc_tc_in","RD_ALKALINE":"rd_alkaline_head","RD_ANTIBACT":"rd_antibact_head","RD_APPROVAL":"rd_approval","RD_ASM_BOM":"rd_asm_bom_head","RD_ASM_PROC":"rd_asm_proc_head","RD_DOM_TEST":"rd_dom_test_head","RD_DROP_PREC":"rd_drop_prec_head","RD_EQUIP_USE":"rd_equip_use_head","RD_FILTER_EFF":"rd_filter_eff_head","RD_INSP_PLAN":"rd_insp_plan_head","RD_INSTR_USE":"rd_instr_use_head","RD_MINERAL":"rd_mineral_head","RD_MOLD_FORMULA":"rd_mold_formula_head","RD_MOLD_PROC":"rd_mold_proc_head","RD_PLAN":"rd_plan","RD_PROD_INFO":"rd_prod_info_head","RD_PROGRESS":"rd_progress","RD_RO_PROTECT":"rd_ro_protect_head","RD_SCALE":"rd_scale_head","RD_SOAK":"rd_soak_head","RD_SPEC_DOC":"rd_spec_doc_head","RD_SPIKE_WATER":"rd_spike_water_head","REGION":"","REJECT":"","RKD":"","ROD_RETURN":"rod_return","ROUTE":"","SALE_OUT":"bd_sale_out","SALE_OUT_DETAIL":"","SALE_OUT_STATS":"","SALES_ORDER_DETAIL":"","SALES_ORDER_STATS":"","SAMPLE_REQ":"sample_req","SETTLE":"","SO_ORDER":"bd_so_order","STOCK_BALANCE":"","STOCK_LEDGER":"","STOCK_STATUS":"","STOCK_SUMMARY":"","SUPGRP":"","TEAM":"","UOM":"","WC":"","WH":"","WH_RECORD":"wh_record","WLBOM":"","WO_KIT":"","WO_LINE":"","WO_ORDER":"wo_order","WO_PICK":"","WO_PROGRESS":"","WO_REPORT":"","WO_REPORT_LIST":"","WO_SCHEDULE":"","WO_STAGE":"","YWYDA":"","ZDGL":""}
+
+=== 选样(造测试链,不动 YJ-20260915-11) ===
+         采购订单 YJ-20260915-10(行 1 剩余 290);补仓库用:恒亿仓
+         暂收单=SL-2026-09-0075 批次键=72 台账={"id":72,"batch_no":null,"status":"PENDING","target_panel_code":"QC_RECV","target_form_no":"SL-2026-09-0075"}
+
+=== ① 只有暂收单(未审核、无下游)→ 去向 = 暂收单 ===
+         接口行={"batchId":72,"batchNo":null,"batchSeq":0,"batchQty":10,"status":"PENDING","targetPanel":"QC_RECV","targetFormNo":"SL-2026-09-0075","createTime":"2026-09-21 17:42:03","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0075","targetInvalid":false,"targetHops":0}
+  [PASS] 接口列出该批次(batchId=72)
+  [PASS] 去向 = 暂收单(期望 QC_RECV/SL-2026-09-0075,实得 QC_RECV/SL-2026-09-0075)
+  [PASS] firstTargetFormNo 仍记起点暂收单(实得 SL-2026-09-0075)
+  [PASS] 尚未前进(targetHops=0,实得 0)
+
+=== ② 暂收单已审核并生成检验单 → 去向 = 检验单 ===
+         检验单=IJ-2026-09-0062  接口行={"batchId":72,"batchNo":null,"batchSeq":0,"batchQty":10,"status":"PENDING","targetPanel":"QC_INSP","targetFormNo":"IJ-2026-09-0062","createTime":"2026-09-21 17:42:03","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0075","targetInvalid":false,"targetHops":1}
+  [PASS] 已生成来料检验单 IJ-2026-09-0062
+  [PASS] 去向 = 检验单(期望 QC_INSP/IJ-2026-09-0062,实得 QC_INSP/IJ-2026-09-0062)
+  [PASS] firstTargetFormNo 仍是起点暂收单 SL-2026-09-0075(实得 SL-2026-09-0075)
+  [PASS] 前进 1 跳(targetHops=1,实得 1)
+
+=== ③ 检验单已审核并生成采购入库单 → 去向 = 采购入库单 ===
+         入库单=PI-2026-09-0065  接口行={"batchId":72,"batchNo":null,"batchSeq":0,"batchQty":10,"status":"PENDING","targetPanel":"PURCHASE_IN","targetFormNo":"PI-2026-09-0065","createTime":"2026-09-21 17:42:03","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0075","targetInvalid":false,"targetHops":2}
+  [PASS] 检验单审核自动生成采购入库单 PI-2026-09-0065
+  [PASS] 去向 = 采购入库单(期望 PURCHASE_IN/PI-2026-09-0065,实得 PURCHASE_IN/PI-2026-09-0065)
+  [PASS] 前进 2 跳(targetHops=2,实得 2)
+
+=== ④ 入库单已作废 → 去向回退到检验单 ===
+         入库单审核后 接口行={"batchId":72,"batchNo":"2026092105","batchSeq":5,"batchQty":10,"status":"ACTIVE","targetPanel":"PURCHASE_IN","targetFormNo":"PI-2026-09-0065","createTime":"2026-09-21 17:42:03","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0075","targetInvalid":false,"targetHops":2}
+  [PASS] 入库单审核后去向仍 = 采购入库单 PI-2026-09-0065(实得 PI-2026-09-0065)
+         入库单作废操作:已作废;yj_doc_status={"c":"Y","d":"N"};bd_purchase_in.asp_cancel={"a":"N"}
+  [PASS] 入库单 PI-2026-09-0065 已命中作废口径(canceled/deleting/asp_cancel='Y')
+         接口行={"batchId":72,"batchNo":"2026092105","batchSeq":5,"batchQty":10,"status":"ACTIVE","targetPanel":"QC_INSP","targetFormNo":"IJ-2026-09-0062","createTime":"2026-09-21 17:42:03","firstTargetPanel":"QC_RECV","firstTargetFormNo":"SL-2026-09-0075","targetInvalid":false,"targetHops":1}
+  [PASS] 去向回退到检验单(期望 QC_INSP/IJ-2026-09-0062,实得 QC_INSP/IJ-2026-09-0062)
+  [PASS] 去向**不指向已作废**的入库单 PI-2026-09-0065
+  [PASS] 接口去向 = 探针独立算出的链路终点(QC_INSP IJ-2026-09-0062;可达链 QC_RECV SL-2026-09-0075(0) → QC_INSP IJ-2026-09-0062(1))
+
+=== ⑤ 真实订单 YJ-20260915-11 逐行对照 ===
+  form_flow_link(该订单各批次):
+┌─────────┬────────┬───────────────────────────┬───────────────────────────────┬────────────┐
+│ (index) │ 批次键 │ 源                        │ 目标                          │ 链路       │
+├─────────┼────────┼───────────────────────────┼───────────────────────────────┼────────────┤
+│ 0       │ 38     │ 'PU_ORDER YJ-20260915-11' │ 'QC_RECV SL-2026-09-0041'     │ 'RELEASED' │
+│ 1       │ 38     │ 'QC_RECV SL-2026-09-0041' │ 'QC_INSP IJ-2026-09-0030'     │ 'RELEASED' │
+│ 2       │ 38     │ 'QC_INSP IJ-2026-09-0030' │ 'PURCHASE_IN PI-2026-09-0037' │ 'RELEASED' │
+│ 3       │ 39     │ 'PU_ORDER YJ-20260915-11' │ 'QC_RECV SL-2026-09-0042'     │ 'RELEASED' │
+│ 4       │ 39     │ 'QC_RECV SL-2026-09-0042' │ 'QC_INSP IJ-2026-09-0031'     │ 'RELEASED' │
+│ 5       │ 39     │ 'QC_INSP IJ-2026-09-0031' │ 'PURCHASE_IN PI-2026-09-0038' │ 'RELEASED' │
+│ 6       │ 44     │ 'PU_ORDER YJ-20260915-11' │ 'QC_RECV SL-2026-09-0047'     │ 'ACTIVE'   │
+│ 7       │ 44     │ 'QC_RECV SL-2026-09-0047' │ 'QC_INSP IJ-2026-09-0036'     │ 'ACTIVE'   │
+│ 8       │ 44     │ 'QC_INSP IJ-2026-09-0036' │ 'PURCHASE_IN PI-2026-09-0043' │ 'RELEASED' │
+│ 9       │ 44     │ 'QC_INSP IJ-2026-09-0036' │ 'QC_RETURN TH-2026-09-0011'   │ 'ACTIVE'   │
+└─────────┴────────┴───────────────────────────┴───────────────────────────────┴────────────┘
+  [PASS] 批次键 44(待编号):接口去向 QC_RETURN/TH-2026-09-0011 = 链路终点 QC_RETURN/TH-2026-09-0011(跳 2)
+            可达链:QC_RECV SL-2026-09-0047(0) → QC_INSP IJ-2026-09-0036(1) → QC_RETURN TH-2026-09-0011(2)
+  [PASS] 批次键 29(YJ-20260915-11-001):接口去向 PURCHASE_IN/PI-2026-09-0030 = 链路终点 PURCHASE_IN/PI-2026-09-0030(跳 0)
+            可达链:PURCHASE_IN PI-2026-09-0030(0)
+  [PASS] 批次键 38(2026092101):接口去向 /(空) = 链路终点 (整链皆作废)
+            可达链:QC_RECV SL-2026-09-0041(0)
+  [PASS] 批次键 30(YJ-20260915-11-002):接口去向 PURCHASE_IN/PI-2026-09-0031 = 链路终点 PURCHASE_IN/PI-2026-09-0031(跳 0)
+            可达链:PURCHASE_IN PI-2026-09-0031(0)
+  [PASS] 批次键 39(2026092102):接口去向 /(空) = 链路终点 (整链皆作废)
+            可达链:QC_RECV SL-2026-09-0042(0)
+  [PASS] 批次键 31(YJ-20260915-11-003):接口去向 PURCHASE_IN/PI-2026-09-0032 = 链路终点 PURCHASE_IN/PI-2026-09-0032(跳 2)
+            可达链:QC_RECV SL-2026-09-0034(0) → QC_INSP IJ-2026-09-0023(1) → PURCHASE_IN PI-2026-09-0032(2)
+  [PASS] 批次键 32(YJ-20260915-11-004):接口去向 QC_INSP/IJ-2026-09-0024 = 链路终点 QC_INSP/IJ-2026-09-0024(跳 1)
+            可达链:QC_RECV SL-2026-09-0035(0) → QC_INSP IJ-2026-09-0024(1)
+  [PASS] 批次键 33(YJ-20260915-11-005):接口去向 QC_INSP/IJ-2026-09-0025 = 链路终点 QC_INSP/IJ-2026-09-0025(跳 1)
+            可达链:QC_RECV SL-2026-09-0036(0) → QC_INSP IJ-2026-09-0025(1)
+  [PASS] 批次键 34(YJ-20260915-11-006):接口去向 PURCHASE_IN/PI-2026-09-0033 = 链路终点 PURCHASE_IN/PI-2026-09-0033(跳 2)
+            可达链:QC_RECV SL-2026-09-0037(0) → QC_INSP IJ-2026-09-0026(1) → PURCHASE_IN PI-2026-09-0033(2)
+  [PASS] 批次键 35(YJ-20260915-11-007):接口去向 QC_RETURN/TH-2026-09-0010 = 链路终点 QC_RETURN/TH-2026-09-0010(跳 2)
+            可达链:QC_RECV SL-2026-09-0038(0) → QC_INSP IJ-2026-09-0027(1) → QC_RETURN TH-2026-09-0010(2)
+  前后对照表:
+┌─────────┬────────┬──────────────────────┬───────────┬───────────────────────────────┬───────────────────────────────┬────────────────────────────────────┬──────┐
+│ (index) │ 批次键 │ 批次号               │ 状态      │ 台账原始去向_前               │ 接口去向_后                   │ 直查链路终点                       │ 一致 │
+├─────────┼────────┼──────────────────────┼───────────┼───────────────────────────────┼───────────────────────────────┼────────────────────────────────────┼──────┤
+│ 0       │ 44     │ '(待编号)'           │ 'PENDING' │ 'QC_RECV SL-2026-09-0047'     │ 'QC_RETURN TH-2026-09-0011'   │ 'QC_RETURN TH-2026-09-0011(跳2)'   │ 'OK' │
+│ 1       │ 29     │ 'YJ-20260915-11-001' │ 'ACTIVE'  │ 'PURCHASE_IN PI-2026-09-0030' │ 'PURCHASE_IN PI-2026-09-0030' │ 'PURCHASE_IN PI-2026-09-0030(跳0)' │ 'OK' │
+│ 2       │ 38     │ '2026092101'         │ 'ACTIVE'  │ 'QC_RECV SL-2026-09-0041'     │ ' '                           │ '(整链皆作废 → 不给去向)'          │ 'OK' │
+│ 3       │ 30     │ 'YJ-20260915-11-002' │ 'ACTIVE'  │ 'PURCHASE_IN PI-2026-09-0031' │ 'PURCHASE_IN PI-2026-09-0031' │ 'PURCHASE_IN PI-2026-09-0031(跳0)' │ 'OK' │
+│ 4       │ 39     │ '2026092102'         │ 'ACTIVE'  │ 'QC_RECV SL-2026-09-0042'     │ ' '                           │ '(整链皆作废 → 不给去向)'          │ 'OK' │
+│ 5       │ 31     │ 'YJ-20260915-11-003' │ 'ACTIVE'  │ 'QC_RECV SL-2026-09-0034'     │ 'PURCHASE_IN PI-2026-09-0032' │ 'PURCHASE_IN PI-2026-09-0032(跳2)' │ 'OK' │
+│ 6       │ 32     │ 'YJ-20260915-11-004' │ 'ACTIVE'  │ 'QC_RECV SL-2026-09-0035'     │ 'QC_INSP IJ-2026-09-0024'     │ 'QC_INSP IJ-2026-09-0024(跳1)'     │ 'OK' │
+│ 7       │ 33     │ 'YJ-20260915-11-005' │ 'ACTIVE'  │ 'QC_RECV SL-2026-09-0036'     │ 'QC_INSP IJ-2026-09-0025'     │ 'QC_INSP IJ-2026-09-0025(跳1)'     │ 'OK' │
+│ 8       │ 34     │ 'YJ-20260915-11-006' │ 'ACTIVE'  │ 'QC_RECV SL-2026-09-0037'     │ 'PURCHASE_IN PI-2026-09-0033' │ 'PURCHASE_IN PI-2026-09-0033(跳2)' │ 'OK' │
+│ 9       │ 35     │ 'YJ-20260915-11-007' │ 'ACTIVE'  │ 'QC_RECV SL-2026-09-0038'     │ 'QC_RETURN TH-2026-09-0010'   │ 'QC_RETURN TH-2026-09-0010(跳2)'   │ 'OK' │
+└─────────┴────────┴──────────────────────┴───────────┴───────────────────────────────┴───────────────────────────────┴────────────────────────────────────┴──────┘
+  [PASS] 该订单确有批次「去向前进」(前 ≠ 后 的行数 = 8,证明不再停在生成时那张单)
+
+=== ⑥ 界面(CDP http://localhost:8090):无 .bpb-head + 列头 + 「查看」跳终点 ===
+  [PASS] 打开采购订单 YJ-20260915-11 且出现表头「送料」摘要行
+         浮层列头=["批次号","日期","数量","状态","去向单号","操作"]
+         浮层行=[["","2026-09-21 16:42:09","1","待编号","TH-2026-09-0011","查看"],["YJ-20260915-11-001","2026-09-21 15:21:12","1","有效","PI-2026-09-0030","查看"],["2026092101","2026-09-21 16:41:14","10","有效","已作废","查看"],["YJ-20260915-11-002","2026-09-21 15:21:47","1","有效","PI-2026-09-0031","查看"],["2026092102","2026-09-21 16:41:18","10","有效","已作废","查看"],["YJ-20260915-11-003","2026-09-21 15:21:56","1","有效","PI-2026-09-0032","查看"],["YJ-20260915-11-004","2026-09-21 15:54:03","1","有效","IJ-2026-09-0024","查看"],["YJ-20260915-11-005","2026-09-21 15:54:16","1","有效","IJ-2026-09-0025","查看"],["YJ-20260915-11-006","2026-09-21 15:55:27","1","有效","PI-2026-09-0033","查看"],["YJ-20260915-11-007","2026-09-21 15:56:33","1","有效","TH-2026-09-0010","查看"]]
+         浮层标题节点(.bpb-head)=null
+  [PASS] 点摘要行弹出浮层
+  [PASS] 浮层里**不存在** .bpb-head 标题行(hasHead=false,文本=null)
+  [PASS] 浮层文本里也没有「送料批次 · … · 已送合计 N」标题痕迹("批次号日期数量状态去向单号操作2026-09-21 16:42:091待编号TH-2026-09-0011查看YJ-20"…)
+  [PASS] 表格列头仍为 批次号/日期/数量/状态/去向单号/操作(实得 批次号|日期|数量|状态|去向单号|操作)
+  [PASS] 浮层行数 = 接口批次行数(10/10)
+  [PASS] 浮层「去向单号」列 = 接口 targetFormNo 列(空则显示「已作废」)(界面 ["TH-2026-09-0011","PI-2026-09-0030","已作废","PI-2026-09-0031","已作废","PI-2026-09-0032","IJ-2026-09-0024","IJ-2026-09-0025","PI-2026-09-0033","TH-2026-09-0010"] / 接口 ["TH-2026-09-0011","PI-2026-09-0030","已作废","PI-2026-09-0031","已作废","PI-2026-09-0032","IJ-2026-09-0024","IJ-2026-09-0025","PI-2026-09-0033","TH-2026-09-0010"])
+         点第 6 行「查看」:起点 QC_RECV/SL-2026-09-0034 → 终点 PURCHASE_IN/PI-2026-09-0032
+         跳转后 hash=#/panelx/list/PURCHASE_IN
+         跳转后 单据头=单据：PI-2026-09-0032批次号: YJ-20260915-11-003草稿◁◀第 1/1 张▶▷
+  [PASS] 跳到的面板 = 终点面板 PURCHASE_IN(hash=#/panelx/list/PURCHASE_IN)
+  [PASS] 定位到终点单据 PI-2026-09-0032
+  [PASS] 未停在起点单据 QC_RECV/SL-2026-09-0034
+
+=== 清理本次测试单据(反序 弃审 → 删除;批次号不回收) ===
+  PURCHASE_IN PI-2026-09-0065 弃审 跳过:/px/callButton → {"code":409,"message":"仅已审核或已归档状态可弃审","data":null}
+  PURCHASE_IN PI-2026-09-0065 删除 跳过:/px/callButton → {"code":409,"message":"仅草稿状态可删除（已审核请先弃审）","data":null}
+  QC_INSP IJ-2026-09-0062 弃审 ✓
+  QC_INSP IJ-2026-09-0062 删除 ✓
+  QC_RECV SL-2026-09-0075 弃审 ✓
+  QC_RECV SL-2026-09-0075 删除 ✓
+
+=== 本次测试造的单据与台账留证 ===
+  采购订单 YJ-20260915-10(未改动)/ 送料暂收单 SL-2026-09-0075 / 来料检验单 IJ-2026-09-0062 / 采购入库单 PI-2026-09-0065(已作废)/ 批次键 72
+┌─────────┬────┬──────────────────┬──────────────┬───────────┬──────────┬───────────────────┬───────────────────┐
+│ (index) │ id │ source_form_no   │ batch_no     │ batch_seq │ status   │ target_panel_code │ target_form_no    │
+├─────────┼────┼──────────────────┼──────────────┼───────────┼──────────┼───────────────────┼───────────────────┤
+│ 0       │ 72 │ 'YJ-20260915-10' │ '2026092105' │ 5         │ 'ACTIVE' │ 'QC_RECV'         │ 'SL-2026-09-0075' │
+└─────────┴────┴──────────────────┴──────────────┴───────────┴──────────┴───────────────────┴───────────────────┘
+
+✅ 全部通过
+  [PASS] tools/archive/_verify-batch-target-chain.mjs 退出码 = 0(实得 0)
+
+──────── node tools/archive/_verify-batch-no-at-inbound.mjs ────────
+=== 选样 ===
+  探针补仓库用:恒亿仓

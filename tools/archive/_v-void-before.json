@@ -1,0 +1,468 @@
+{
+ "at": "2026-09-21T09:28:42.154Z",
+ "api": "http://localhost:8090/api",
+ "orders": {
+  "YJ-20260916-04": [
+   {
+    "batchId": 26,
+    "batchNo": "YJ-20260916-04-001",
+    "status": "ACTIVE",
+    "firstTargetPanel": "PURCHASE_IN",
+    "firstTargetFormNo": "PI-2026-09-0029",
+    "targetPanel": "PURCHASE_IN",
+    "targetFormNo": "PI-2026-09-0029",
+    "targetHops": 0,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260916-03": [
+   {
+    "batchId": 27,
+    "batchNo": "YJ-20260916-03-001",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0032",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0032",
+    "targetHops": 0,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260916-01": [
+   {
+    "batchId": 28,
+    "batchNo": "YJ-20260916-01-001",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0033",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0033",
+    "targetHops": 0,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260915-11": [
+   {
+    "batchId": 44,
+    "batchNo": "",
+    "status": "PENDING",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0047",
+    "targetPanel": "QC_RETURN",
+    "targetFormNo": "TH-2026-09-0011",
+    "targetHops": 2,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 29,
+    "batchNo": "YJ-20260915-11-001",
+    "status": "ACTIVE",
+    "firstTargetPanel": "PURCHASE_IN",
+    "firstTargetFormNo": "PI-2026-09-0030",
+    "targetPanel": "PURCHASE_IN",
+    "targetFormNo": "PI-2026-09-0030",
+    "targetHops": 0,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 38,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0041",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0041",
+    "targetHops": -1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 30,
+    "batchNo": "YJ-20260915-11-002",
+    "status": "ACTIVE",
+    "firstTargetPanel": "PURCHASE_IN",
+    "firstTargetFormNo": "PI-2026-09-0031",
+    "targetPanel": "PURCHASE_IN",
+    "targetFormNo": "PI-2026-09-0031",
+    "targetHops": 0,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 39,
+    "batchNo": "2026092102",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0042",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0042",
+    "targetHops": -1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 31,
+    "batchNo": "YJ-20260915-11-003",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0034",
+    "targetPanel": "PURCHASE_IN",
+    "targetFormNo": "PI-2026-09-0032",
+    "targetHops": 2,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 32,
+    "batchNo": "YJ-20260915-11-004",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0035",
+    "targetPanel": "QC_INSP",
+    "targetFormNo": "IJ-2026-09-0024",
+    "targetHops": 1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 33,
+    "batchNo": "YJ-20260915-11-005",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0036",
+    "targetPanel": "QC_INSP",
+    "targetFormNo": "IJ-2026-09-0025",
+    "targetHops": 1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 34,
+    "batchNo": "YJ-20260915-11-006",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0037",
+    "targetPanel": "PURCHASE_IN",
+    "targetFormNo": "PI-2026-09-0033",
+    "targetHops": 2,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 35,
+    "batchNo": "YJ-20260915-11-007",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0038",
+    "targetPanel": "QC_RETURN",
+    "targetFormNo": "TH-2026-09-0010",
+    "targetHops": 2,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260915-10": [
+   {
+    "batchId": 40,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0043",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0043",
+    "targetHops": -1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 51,
+    "batchNo": "2026092102",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0054",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0054",
+    "targetHops": -1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 52,
+    "batchNo": "2026092103",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0055",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0055",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260915-09": [
+   {
+    "batchId": 41,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0044",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0044",
+    "targetHops": -1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 42,
+    "batchNo": "2026092102",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0045",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0045",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260915-12": [
+   {
+    "batchId": 43,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0046",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0046",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260915-08": [
+   {
+    "batchId": 4,
+    "batchNo": "YJ-20260915-08-001",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0012",
+    "targetPanel": "PURCHASE_IN",
+    "targetFormNo": "PI-2026-09-0020",
+    "targetHops": 2,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260915-06": [
+   {
+    "batchId": 3,
+    "batchNo": "YJ-20260915-06-001",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0011",
+    "targetPanel": "PURCHASE_IN",
+    "targetFormNo": "PI-2026-09-0019",
+    "targetHops": 2,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260912-07": [
+   {
+    "batchId": 2,
+    "batchNo": "YJ-20260912-07-001",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0001",
+    "targetPanel": "QC_INSP",
+    "targetFormNo": "IJ-2026-09-0001",
+    "targetHops": 1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260912-05": [
+   {
+    "batchId": 45,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0048",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0048",
+    "targetHops": -1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 46,
+    "batchNo": "2026092102",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0049",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0049",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260912-02": [
+   {
+    "batchId": 1,
+    "batchNo": "YJ-20260912-02-001",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0004",
+    "targetPanel": "QC_INSP",
+    "targetFormNo": "IJ-2026-09-0002",
+    "targetHops": 1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260912-01": [
+   {
+    "batchId": 47,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0050",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0050",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260911-05": [
+   {
+    "batchId": 48,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0051",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0051",
+    "targetHops": -1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 49,
+    "batchNo": "2026092102",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0052",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0052",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260911-04": [
+   {
+    "batchId": 50,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0053",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0053",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260911-01": [
+   {
+    "batchId": 53,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0056",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0056",
+    "targetHops": -1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 54,
+    "batchNo": "2026092102",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0057",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0057",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260910-01": [
+   {
+    "batchId": 55,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0058",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0058",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260909-05": [
+   {
+    "batchId": 56,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0059",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0059",
+    "targetHops": -1,
+    "targetInvalid": false
+   },
+   {
+    "batchId": 57,
+    "batchNo": "2026092102",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0060",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0060",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260909-04": [
+   {
+    "batchId": 58,
+    "batchNo": "2026092101",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0061",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0061",
+    "targetHops": -1,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260908-12": [
+   {
+    "batchId": 60,
+    "batchNo": "",
+    "status": "PENDING",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0063",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0063",
+    "targetHops": 0,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260908-15": [
+   {
+    "batchId": 59,
+    "batchNo": "",
+    "status": "PENDING",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0062",
+    "targetPanel": "QC_RECV",
+    "targetFormNo": "SL-2026-09-0062",
+    "targetHops": 0,
+    "targetInvalid": false
+   }
+  ],
+  "YJ-20260908-08": [
+   {
+    "batchId": 18,
+    "batchNo": "YJ-20260908-08-001",
+    "status": "ACTIVE",
+    "firstTargetPanel": "QC_RECV",
+    "firstTargetFormNo": "SL-2026-09-0024",
+    "targetPanel": "PURCHASE_IN",
+    "targetFormNo": "PI-2026-09-0028",
+    "targetHops": 2,
+    "targetInvalid": false
+   }
+  ]
+ }
+}

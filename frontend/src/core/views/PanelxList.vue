@@ -604,10 +604,17 @@
             <el-table-column :label="tt('状态')" width="90" align="center">
               <template #default="{ row }">{{ tt(row.status === 'ACTIVE' ? '有效' : row.status === 'PENDING' ? '待编号' : '已释放') }}</template>
             </el-table-column>
-            <el-table-column prop="targetFormNo" :label="tt('去向单号')" min-width="150" />
+            <el-table-column :label="tt('去向单号')" min-width="150">
+              <!-- 整条链上的单据(含起点)全部作废/已删除/不存在时,后端 targetFormNo 为空并置 targetInvalid
+                   —— 不给作废单号,列里显示「已作废」而不是一个点进去空白的单号(2026-09-21) -->
+              <template #default="{ row }">
+                <span v-if="row.targetInvalid || !row.targetFormNo" class="bpb-void">{{ tt('已作废') }}</span>
+                <span v-else>{{ row.targetFormNo }}</span>
+              </template>
+            </el-table-column>
             <el-table-column :label="tt('操作')" width="80" align="center">
               <template #default="{ row }">
-                <el-button link type="primary" :disabled="!row.targetFormNo" @click="onBatchTabRow(row)">{{ tt('查看') }}</el-button>
+                <el-button link type="primary" :disabled="!row.targetFormNo || row.targetInvalid" @click="onBatchTabRow(row)">{{ tt('查看') }}</el-button>
               </template>
             </el-table-column>
             <template #empty>{{ tt('该订单暂无送料批次') }}</template>
@@ -2909,10 +2916,11 @@ async function loadBatchTab(docNo, force = false) {
     }
   } catch { batchTab.rows = []; batchTab.sum = { batches: 0, pending: 0, sent: 0, left: 0, ret: 0 } } finally { batchTab.loading = false }
 }
-/** 浮层里点批次行 = 跳到该批次生成的送料暂收单 */
+/** 浮层里点批次行 = 跳到该批次生成的送料暂收单(已走到下游则直达链路终点) */
 function onBatchTabRow(row) {
   const no = row?.targetFormNo
-  if (!no) return
+  // 整链皆作废/单据不存在:后端已置空并标 targetInvalid,不跳(列表按状态过滤,跳过去是空白页)
+  if (!no || row?.targetInvalid) return
   const panel = row.targetPanel || BATCH_SUMMARY_TARGET
   const base = `/panelx/list/${panel}`
   batchPopover.value = false
@@ -6036,6 +6044,10 @@ onUnmounted(() => {
 }
 .batch-pop-body {
   min-width: 700px;
+}
+/* 去向单号=已作废(整链皆作废/单据不存在):灰字提示,与正常单号区分 */
+.batch-pop-body .bpb-void {
+  color: #c0c4cc;
 }
 .doc-batch {
   font-size: 12px;

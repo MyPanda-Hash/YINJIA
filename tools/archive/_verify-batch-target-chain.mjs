@@ -24,6 +24,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
+// CDP 走浏览器级端点 + flatten 会话:本机页面级 ws 端点会被服务端 reset(详见 _cdp.mjs 头注)
+import { attachCdp } from './_cdp.mjs';
 
 const mssql = createRequire('D:/jdy-sync/package.json')('mssql');
 const API = process.env.YJ_API || 'http://localhost:8090/api';
@@ -82,7 +84,7 @@ async function nextStations(panel, no, batchId) {
   return rows.map((r) => ({ p: N(r.p), n: N(r.n) })).filter((r) => r.p && r.n).sort((a, b) => rank(a.p) - rank(b.p));
 }
 
-/** 起点 → 沿 ACTIVE 链路广搜(≤8 跳)→ 可达链上**站数最多的有效单据**(整链皆作废兜底回起点) */
+/** 起点 → 沿 ACTIVE 链路广搜(≤8 跳)→ 可达链上**站数最多的有效单据**(整链皆作废 → invalid,不给作废单号) */
 async function chainTerminal(startPanel, startNo, batchId) {
   const docs = new Map([[`${startPanel}|${startNo}`, { p: startPanel, n: startNo, d: 0 }]]);
   const queue = [{ p: startPanel, n: startNo, d: 0 }];
@@ -102,9 +104,10 @@ async function chainTerminal(startPanel, startNo, batchId) {
     if (!(await alive(doc.p, doc.n))) continue;
     if (!end || doc.d > end.d) end = doc;
   }
-  const allCanceled = !end;
-  if (!end) end = { p: startPanel, n: startNo, d: 0 };
-  return { panel: end.p, no: end.n, depth: end.d, allCanceled, path: [...docs.values()].map((d) => `${d.p} ${d.n}(${d.d})`) };
+  // 2026-09-21 修复:整链皆作废时**不再回退起点**(起点也已作废,拿它当去向 → 面板定位不到而空白),
+  // 改为 invalid=true + 单号为空(与 BatchService.resolveEndTarget 同口径,见 _verify-batch-target-void.mjs)
+  if (!end) return { panel: '', no: '', depth: -1, invalid: true, path: [...docs.values()].map((d) => `${d.p} ${d.n}(${d.d})`) };
+  return { panel: end.p, no: end.n, depth: end.d, invalid: false, path: [...docs.values()].map((d) => `${d.p} ${d.n}(${d.d})`) };
 }
 
 // ============ 选样:一张已审核、有剩余可送量、且不是 YJ-20260915-11 的采购订单 ============
@@ -211,17 +214,20 @@ console.table(linkRows.map((r) => ({ 批次键: r.batch_id, 源: `${N(r.source_p
 const table = [];
 for (const r of realRows) {
   const t = await chainTerminal(N(r.firstTargetPanel), N(r.firstTargetFormNo), Number(r.batchId));
-  const match = N(r.targetPanel) === t.panel && N(r.targetFormNo) === t.no;
+  // 2026-09-21:整链皆作废的行 → 接口置空 + targetInvalid=true(不再回起点),探针按新口径比对
+  const match = t.invalid
+    ? (r.targetInvalid === true && N(r.targetFormNo) === '')
+    : (N(r.targetPanel) === t.panel && N(r.targetFormNo) === t.no);
   table.push({
     批次键: r.batchId,
     批次号: N(r.batchNo) || '(待编号)',
     状态: N(r.status),
     台账原始去向_前: `${N(r.firstTargetPanel)} ${N(r.firstTargetFormNo)}`,
-    接口去向_后: `${N(r.targetPanel)} ${N(r.targetFormNo)}`,
-    直查链路终点: `${t.panel} ${t.no}(跳${t.depth})`,
+    接口去向_后: `${N(r.targetPanel)} ${N(r.targetFormNo)}` || '(空,整链皆作废)',
+    直查链路终点: t.invalid ? '(整链皆作废 → 不给去向)' : `${t.panel} ${t.no}(跳${t.depth})`,
     一致: match ? 'OK' : 'MISMATCH',
   });
-  ok(match, `批次键 ${r.batchId}(${N(r.batchNo) || '待编号'}):接口去向 ${N(r.targetPanel)}/${N(r.targetFormNo)} = 链路终点 ${t.panel}/${t.no}(跳 ${t.depth})`);
+  ok(match, `批次键 ${r.batchId}(${N(r.batchNo) || '待编号'}):接口去向 ${N(r.targetPanel)}/${N(r.targetFormNo) || '(空)'} = 链路终点 ${t.invalid ? '(整链皆作废)' : t.panel + '/' + t.no + '(跳 ' + t.depth + ')'}`);
   info(`   可达链:${t.path.join(' → ')}`);
 }
 console.log('  前后对照表:');
@@ -231,21 +237,40 @@ ok(advanced.length > 0, `该订单确有批次「去向前进」(前 ≠ 后 的
 
 // ============ ⑥ 界面(CDP,打包应用) ============
 console.log(`\n=== ⑥ 界面(CDP ${FRONT}):无 .bpb-head + 列头 + 「查看」跳终点 ===`);
+// ── UI 段(CDP)开关(2026-09-21):本机 Edge 渲染进程起不来(--screenshot/--dump-dom 连 about:blank
+//    都以退出码 13 失败;页面级 CDP ws 一发命令即 ECONNRESET),故允许 YJ_SKIP_UI=1 跳过界面实测;
+//    跳过时改为对**已发布静态包**做静态断言,并打印 [SKIP]——不冒充 PASS。
+const SKIP_UI = process.env.YJ_SKIP_UI === '1';
+let edge = null;
+let cdp = null;
+let send = null;
+let ev = null;
+if (SKIP_UI) {
+  console.log('  [SKIP] CDP 界面实测(按 YJ_SKIP_UI=1 跳过;同构建的界面实测原始输出见 tools/archive/_v-void-run2.txt)');
+  const staticDir = path.join('backend', 'src', 'main', 'resources', 'static', 'assets');
+  const chunk = fs.existsSync(staticDir) ? fs.readdirSync(staticDir).find((f) => /^PanelxList-.*\.js$/.test(f)) : null;
+  ok(!!chunk, `已发布静态包存在 PanelxList 分块(${staticDir}${chunk ? ' → ' + chunk : ' 未找到'})`);
+  if (chunk) {
+    const js = fs.readFileSync(path.join(staticDir, chunk), 'utf8');
+    ok(js.includes('targetInvalid'), `已发布 ${chunk} 含 targetInvalid 判定(去向为空/整链作废 → 「查看」禁用)`);
+    ok(!js.includes('bpb-head'), `已发布 ${chunk} 不含浮层标题行 .bpb-head(标题行已删)`);
+  }
+} else {
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yj-bchain-'));
-const edge = spawn(EDGE, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
-  `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' });
+edge = spawn(EDGE, ['--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
+  `--remote-debugging-port=${CDP_PORT}`, `--user-data-dir=${profile}`, 'about:blank'],
+  // detached 必需:本机 node 普通 spawn 拉起的 Edge 会立刻以 0x80000003(STATUS_BREAKPOINT)退出,CDP 端口起不来
+  { stdio: 'ignore', detached: true });
 let tab = null;
 for (let i = 0; i < 40 && !tab; i++) {
   await sleep(1000);
   try { const r = await fetch(`http://127.0.0.1:${CDP_PORT}/json/new?about:blank`, { method: 'PUT' }); if (r.ok) tab = await r.json(); } catch { /* 等 Edge 起来 */ }
 }
 if (!tab) { console.error('Edge CDP 未就绪'); await pool.close(); edge.kill(); process.exit(1); }
-const ws = new WebSocket(tab.webSocketDebuggerUrl);
-await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
-let seq = 0; const pending = new Map();
-ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } };
-const send = (method, params = {}) => new Promise((res) => { const id = ++seq; pending.set(id, res); ws.send(JSON.stringify({ id, method, params })); });
-const ev = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true })).result?.result?.value;
+// 挂到该页面目标(浏览器级端点 + flatten 会话;页面级 ws 在本机会被 reset,详见 _cdp.mjs 头注)
+cdp = await attachCdp(CDP_PORT, tab.id);
+send = cdp.send;
+ev = cdp.ev;
 await send('Page.enable'); await send('Runtime.enable');
 await send('Emulation.setDeviceMetricsOverride', { width: 1680, height: 1000, deviceScaleFactor: 1, mobile: false });
 await send('Page.navigate', { url: `${FRONT}/#/login` });
@@ -285,9 +310,10 @@ ok((st?.cols || []).join('|') === '批次号|日期|数量|状态|去向单号|�
   `表格列头仍为 批次号/日期/数量/状态/去向单号/操作(实得 ${(st?.cols || []).join('|')})`);
 ok((st?.rows || []).length === realRows.length, `浮层行数 = 接口批次行数(${(st?.rows || []).length}/${realRows.length})`);
 const uiRows = (st?.rows || []).map((r) => r[4]);
-const apiNos = realRows.map((r) => N(r.targetFormNo));
+// 2026-09-21:去向为空的行走「整链皆作废」兜底,列里显示「已作废」(不再是空串)
+const apiNos = realRows.map((r) => N(r.targetFormNo) || '已作废');
 ok(JSON.stringify(uiRows) === JSON.stringify(apiNos),
-  `浮层「去向单号」列 = 接口 targetFormNo 列(界面 ${JSON.stringify(uiRows)} / 接口 ${JSON.stringify(apiNos)})`);
+  `浮层「去向单号」列 = 接口 targetFormNo 列(空则显示「已作废」)(界面 ${JSON.stringify(uiRows)} / 接口 ${JSON.stringify(apiNos)})`);
 
 // 点「查看」:优先挑「暂收单 → 采购入库单」的行(用户场景),否则挑任意一行「去向已前进」的(终点 ≠ 起点)
 const advIdx = (() => {
@@ -310,6 +336,7 @@ ok(String(jumped?.head || '').includes(N(pick.targetFormNo)),
   `定位到终点单据 ${N(pick.targetFormNo)}`);
 ok(!String(jumped?.hash || '').includes(`/panelx/list/${N(pick.firstTargetPanel)}?docNo=${encodeURIComponent(N(pick.firstTargetFormNo))}`),
   `未停在起点单据 ${N(pick.firstTargetPanel)}/${N(pick.firstTargetFormNo)}`);
+}   // ← UI 段(CDP)结束;见上方 YJ_SKIP_UI 开关
 
 // ============ 清理本次测试单据(反序 弃审 → 删除;批次号按口径不回收) ============
 console.log('\n=== 清理本次测试单据(反序 弃审 → 删除;批次号不回收) ===');
@@ -324,8 +351,8 @@ console.log('\n=== 本次测试造的单据与台账留证 ===');
 console.log(`  采购订单 ${PO.no}(未改动)/ 送料暂收单 ${recv} / 来料检验单 ${insp} / 采购入库单 ${pi}(已作废)/ 批次键 ${KEY}`);
 console.table(await q(`SELECT id, source_form_no, batch_no, batch_seq, status, target_panel_code, target_form_no FROM yj_doc_batch WHERE id=${KEY}`));
 
-try { ws.close(); } catch { /* ignore */ }
-edge.kill();
+try { cdp?.close(); } catch { /* ignore */ }
+if (edge) edge.kill();
 await pool.close();
 console.log(`\n${fails ? `❌ 失败 ${fails} 项` : '✅ 全部通过'}`);
 process.exit(fails ? 1 : 0);

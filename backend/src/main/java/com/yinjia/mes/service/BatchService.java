@@ -274,9 +274,14 @@ public class BatchService {
      * - 沿 form_flow_link(**link_status='ACTIVE'**)广搜前进:QC_RECV → QC_INSP → PURCHASE_IN / QC_RETURN
      *   (优先同批次 batch_id 的链路;该批次无链路时放宽为按单号匹配,兼容未写 batch_id 的历史链路);
      * - **终止条件**:没有 ACTIVE 下游了(或已到 MAX_CHAIN_HOPS/已成环)—— 取**站数最多**的那一站;
-     * - **作废回退**:yj_doc_status.canceled='Y' / deleting='Y',或单据表 asp_cancel='Y' 的单据**不能当终点**,
-     *   在可达链上取「站数最多的有效单据」(例:入库单已作废 → 终点回到检验单);
-     *   整条链都作废时兜底回起点(与改动前一致,不让「去向单号」凭空变空);
+     * - **作废回退**:yj_doc_status.canceled='Y' / deleting='Y',或单据表 asp_cancel='Y',或单头表里
+     *   根本没有这张单(不存在)的单据**不能当终点**,在可达链上取「站数最多的有效单据」
+     *   (例:入库单已作废 → 终点回到检验单;退料单已作废 → 终点回到检验单);
+     * - **整链皆无效**(含起点在内全部作废/已删除/不存在):**不把作废单号当去向** ——
+     *   targetPanel/targetFormNo 置空 + 新增 `targetInvalid=true`(前端「查看」禁用、去向列显示「已作废」),
+     *   起点仍在 firstTarget* 里保留供排查。
+     *   2026-09-21 修复:此前"整链皆作废时兜底回起点"会把**已作废的暂收单**当去向单号,
+     *   而列表面板按单据状态过滤(QueryService 排除 yj_doc_status.canceled='Y'),`?docNo=` 定位不到 → 面板空白;
      * - 结果写回 targetPanel/targetFormNo(前端「查看」据此跳转),起点另存 firstTarget* 并附 targetHops(跳数)。
      *
      * 只在展示/反查路径(batches)调用,**不参与**按量占用、剩余量、linksOfBatch、/batchFlow/generate。
@@ -286,6 +291,7 @@ public class BatchService {
         String startNo = str(row.get("targetFormNo"));
         row.put("firstTargetPanel", startPanel);
         row.put("firstTargetFormNo", startNo);
+        row.put("targetInvalid", false);
         if (startPanel.isEmpty() || startNo.isEmpty()) return;   // 未绑定目标单:保持原值
         int batchId = row.get("batchId") instanceof Number n ? n.intValue() : 0;
 
@@ -319,7 +325,15 @@ public class BatchService {
             int d = depth.getOrDefault(e.getKey(), 0);
             if (d > endDepth) { endDepth = d; end = doc; }
         }
-        if (end == null) end = new String[]{startPanel, startNo}; // 兜底:全链皆作废 → 仍给起点
+        if (end == null) {
+            // ③ 整条可达链(含起点)全部作废/已删除/不存在 —— 不给作废单号:
+            //    置空 + targetInvalid=true,行照旧出现在浮层里,前端据此禁用「查看」并显示「已作废」
+            row.put("targetPanel", "");
+            row.put("targetFormNo", "");
+            row.put("targetHops", -1);
+            row.put("targetInvalid", true);
+            return;
+        }
         row.put("targetPanel", end[0]);
         row.put("targetFormNo", end[1]);
         row.put("targetHops", endDepth);
@@ -365,25 +379,39 @@ public class BatchService {
         } catch (Exception ignore) { /* 表未建 */ return new ArrayList<>(); }
     }
 
-    /** 单据是否**有效**:yj_doc_status.canceled/deleting='Y' 或单据表 asp_cancel='Y' → 无效(不能当终点) */
+    /** 单据有效性三态:有效=可当终点;已作废/已删除=软删或表内删除标记;不存在=单头表里查不到这张单 */
+    private static final int DOC_VALID = 0;
+    private static final int DOC_VOID = 1;
+    private static final int DOC_MISSING = 2;
+
+    /**
+     * 单据是否**有效**(可当终点):yj_doc_status.canceled/deleting='Y' 或单据表 asp_cancel='Y'
+     * 或单头表里没有这张单 → 无效。
+     * 单头表/列缺失等**查询失败**的情况按「有效」处理(不阻断,保持加这道校验之前的行为)。
+     */
     private boolean docAlive(String panel, String no) {
+        return docState(panel, no) == DOC_VALID;
+    }
+
+    private int docState(String panel, String no) {
         try {
             List<Map<String, Object>> st = jdbc.queryForList(
                     "SELECT ISNULL(canceled,'N') AS c, ISNULL(deleting,'N') AS d"
                             + " FROM yj_doc_status WHERE panel_code=? AND doc_no=?", panel, no);
             for (Map<String, Object> r : st) {
-                if ("Y".equalsIgnoreCase(str(r.get("c"))) || "Y".equalsIgnoreCase(str(r.get("d")))) return false;
+                if ("Y".equalsIgnoreCase(str(r.get("c"))) || "Y".equalsIgnoreCase(str(r.get("d")))) return DOC_VOID;
             }
         } catch (Exception ignore) { /* 表未建 */ }
         String table = headTable(panel);
         if (table != null) {
             try {
-                List<String> v = jdbc.queryForList(
-                        "SELECT TOP 1 ISNULL(asp_cancel,'N') FROM " + table + " WHERE 单据编号=?", String.class, no);
-                if (!v.isEmpty() && "Y".equalsIgnoreCase(str(v.get(0)))) return false;
-            } catch (Exception ignore) { /* 列/表缺失:不阻断 */ }
+                List<Map<String, Object>> rows = jdbc.queryForList(
+                        "SELECT TOP 1 ISNULL(asp_cancel,'N') AS a FROM " + table + " WHERE 单据编号=?", no);
+                if (rows.isEmpty()) return DOC_MISSING;      // 单头表里没有这张单 = 不存在(如链路指向已物理删除的单号)
+                if ("Y".equalsIgnoreCase(str(rows.get(0).get("a")))) return DOC_VOID;
+            } catch (Exception ignore) { /* 列/表缺失:不阻断(视为有效,保持旧口径) */ }
         }
-        return true;
+        return DOC_VALID;
     }
 
     /** 面板单头表(取自面板元数据;面板不存在/未配单头表 → null,则跳过期表内作废标记) */
