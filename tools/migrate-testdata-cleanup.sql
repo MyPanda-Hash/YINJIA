@@ -135,6 +135,19 @@ SELECT N'RD_CHANGE', h.单据编号 FROM rd_change_head h
  WHERE NOT EXISTS (SELECT 1 FROM rd_change_detail d WHERE d.单据编号 = h.单据编号 AND ISNULL(d.asp_cancel,'N')<>'Y')
    AND (NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_CHANGE' AND s.doc_no = h.单据编号)
         OR EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = N'RD_CHANGE' AND s.doc_no = h.单据编号 AND ISNULL(s.saved,'N') = 'N'));
+-- R1b **单据编号本身**带探针特征的单(2026-09-21 补:规格书那类面板会把载荷里的「编号」当单据标识取走,
+--     于是 单据编号='PROBE-RMT-xxx' 而 编号/名称 两列里查不到任何特征 —— 只查名称字段会漏掉它们)
+INSERT INTO #kill (panel, doc_no)
+SELECT v.panel, v.no FROM (
+  SELECT N'RD_PROD_INFO' AS panel, 单据编号 AS no FROM rd_prod_info_head
+  UNION ALL SELECT N'RD_MOLD_PROC', 单据编号 FROM rd_mold_proc_head
+  UNION ALL SELECT N'RD_ASM_PROC',  单据编号 FROM rd_asm_proc_head
+  UNION ALL SELECT N'RD_SPEC_DOC',  单据编号 FROM rd_spec_doc_head
+  UNION ALL SELECT N'RD_INSP_PLAN', 单据编号 FROM rd_insp_plan_head
+  UNION ALL SELECT N'RD_CHANGE',    单据编号 FROM rd_change_head
+) AS v
+WHERE v.no LIKE N'%PROBE%' OR v.no LIKE N'%MATPICK-%' OR v.no LIKE N'%探针%'
+   OR v.no LIKE N'%T-PF%'  OR v.no LIKE N'%测试产品%' OR v.no LIKE N'%TEST-%';
 -- 演示数据(DEMO- 前缀)一律**不清**
 DELETE FROM #kill WHERE doc_no LIKE N'DEMO-%'
    OR doc_no IN (SELECT 单据编号 FROM rd_prod_info_head WHERE 产品编号 LIKE N'DEMO-%')
