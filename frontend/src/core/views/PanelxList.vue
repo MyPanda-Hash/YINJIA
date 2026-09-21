@@ -574,6 +574,8 @@
       >
         <span class="bsl-tag">{{ tt('送料') }}</span>
         <span>{{ tt('已送') }} {{ batchTab.sum.batches }} {{ tt('批') }}</span>
+        <!-- 已送未编号:2026-09-21 起批次号在**采购入库单审核时**才取号,故这里点名几批还在等编号 -->
+        <span v-if="batchTab.sum.pending" class="bsl-pending">({{ tt('{n} 批待编号').replace('{n}', batchTab.sum.pending) }})</span>
         <span class="bsl-sep">/</span>
         <span>{{ tt('剩余') }} {{ batchTab.sum.left }}</span>
         <span class="bsl-sep">/</span>
@@ -601,7 +603,7 @@
             <el-table-column prop="createTime" :label="tt('日期')" width="150" />
             <el-table-column prop="batchQty" :label="tt('数量')" width="90" align="right" />
             <el-table-column :label="tt('状态')" width="90" align="center">
-              <template #default="{ row }">{{ tt(row.status === 'ACTIVE' ? '有效' : '已释放') }}</template>
+              <template #default="{ row }">{{ tt(row.status === 'ACTIVE' ? '有效' : row.status === 'PENDING' ? '待编号' : '已释放') }}</template>
             </el-table-column>
             <el-table-column prop="targetFormNo" :label="tt('暂收单')" min-width="150" />
             <el-table-column :label="tt('操作')" width="80" align="center">
@@ -2580,10 +2582,11 @@ async function needBatchDialog(target) {
   return !(await panelHasBatchField(panelCode.value))
 }
 /** 分批生单完成:跳到目标面板继续填写(与推式生单同款:关源页签、开目标页签、新单按创建时间倒序在第一张) */
-function onBatchGenerated({ panel, no, batchNo }) {
+function onBatchGenerated({ panel, no }) {
   const targetPanel = panel || batchSend.value?.targetPanel || ''
   if (!targetPanel) return
-  ElMessage.success(`已生成 ${targetPanel} ${no}（批次号 ${batchNo}），请在列表页继续填写`)
+  // 批次号在采购入库单审核时才取号(2026-09-21 口径),生成阶段没有号可显示
+  ElMessage.success(`已生成 ${targetPanel} ${no}（批次号待采购入库单审核时生成），请在列表页继续填写`)
   const targetPath = `/panelx/list/${targetPanel}`
   tabs.close(route.path)
   router.push(targetPath)
@@ -2884,7 +2887,7 @@ function mainRowCls({ row }) {
 //       点开浮层时强制刷新一次(保证看的时候是最新);不点不看 = 不产生额外请求。
 const APPROVED_STATUS_VALUES = ['已审批', '已通过'] // 审批判据统一:后端只产 '已通过',历史数据有 '已审批'
 const BATCH_SUMMARY_TARGET = 'QC_RECV'
-const batchTab = reactive({ doc: '', loading: false, rows: [], sum: { batches: 0, sent: 0, left: 0, ret: 0 } })
+const batchTab = reactive({ doc: '', loading: false, rows: [], sum: { batches: 0, pending: 0, sent: 0, left: 0, ret: 0 } })
 const batchPopover = ref(false)
 const showBatchSummary = computed(() => panelCode.value === 'PU_ORDER' && !!curDocNo.value
   && APPROVED_STATUS_VALUES.includes(String(cur.value?.['审批状态'] || ''))
@@ -2899,11 +2902,13 @@ async function loadBatchTab(docNo, force = false) {
     const lines = res?.lines || []
     batchTab.sum = {
       batches: batchTab.rows.length,
+      // 待编号批次数(台账 status='PENDING',批次号留空 —— 采购入库单审核时才取号)
+      pending: batchTab.rows.filter((r) => r.status === 'PENDING').length,
       sent: lines.reduce((a, l) => a + Number(l.已送数量 || 0), 0),
       left: lines.reduce((a, l) => a + Number(l.剩余数量 || 0), 0),
       ret: lines.reduce((a, l) => a + Number(l.已退回数量 || 0), 0),
     }
-  } catch { batchTab.rows = []; batchTab.sum = { batches: 0, sent: 0, left: 0, ret: 0 } } finally { batchTab.loading = false }
+  } catch { batchTab.rows = []; batchTab.sum = { batches: 0, pending: 0, sent: 0, left: 0, ret: 0 } } finally { batchTab.loading = false }
 }
 /** 浮层里点批次行 = 跳到该批次生成的送料暂收单 */
 function onBatchTabRow(row) {
@@ -6014,6 +6019,9 @@ onUnmounted(() => {
 }
 .batch-sum-line .bsl-sep {
   color: #a5b4fc;
+}
+.batch-sum-line .bsl-pending {
+  color: #b45309;
 }
 .batch-sum-line .bsl-caret {
   font-size: 10px;

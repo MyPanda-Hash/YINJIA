@@ -230,7 +230,8 @@ public class PushGenerateHandler implements PanelActionHandler {
 
     /**
      * 分批送料对话框的行状态:每行 订单量 / 已送 / 已退回(回冲) / 剩余 / 可送上限,
-     * 并附 下一批次号预览 + 该订单已有批次清单。前端「生成送料暂收单」据此弹出分批对话框。
+     * 并附 该订单已有批次清单(含"待编号"批次)。前端「生成送料暂收单」据此弹出分批对话框。
+     * 注:2026-09-21 起批次号在**采购入库单审核时**才取号,故不再返回"下一批次号预览"。
      */
     public Map<String, Object> batchLines(String sourcePanel, String targetPanel, String sourceNo) {
         PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
@@ -266,17 +267,18 @@ public class PushGenerateHandler implements PanelActionHandler {
         out.put("sourceNo", sourceNo);
         out.put("targetPanel", targetPanel);
         out.put("overRatio", ratio);
-        out.put("nextBatchNo", batchService.peekNextNo(sourcePanel, sourceNo));
-        out.put("batches", batchService.batches(sourcePanel, sourceNo)); // 只列有效批次(历史释放行见 /batchFlow/batch 反查)
+        out.put("batches", batchService.batches(sourcePanel, sourceNo)); // 有效批次(ACTIVE 已编号 + PENDING 待编号)
         out.put("lines", rows);
         return out;
     }
 
     /**
-     * 分批生单:按行指定「本次送料数量」生成一张目标草稿(送料暂收单),自动取批次号并写批次台账 + 按量占用。
+     * 分批生单:按行指定「本次送料量」生成一张目标草稿(送料暂收单),写**待编号**批次台账 + 按量占用。
      * - qtyByLineKey 为空 = 所有"还有剩余"的行按剩余量全部送出(推式按钮直接点、或选单一次性送完);
      * - 校验:来源已审核 / 目标为分批面板 / 每行 0 < 本次 ≤ 剩余×(1+超送比例) / 至少一行;
-     * - 失败回滚:批次号占位行删除(序号回收),不产生脏数据(@Transactional)。
+     * - **批次号此时留空**(2026-09-21 用户口径):只登记一行 status='PENDING'、batch_no=NULL 的台账
+     *   (create_time=送料当天),把该行 id 作「批次键」逐站带下去,采购入库单审核时才取号并回填;
+     * - 失败回滚:台账行随 @Transactional 一并回滚,不再有"回收序号"一说(@Transactional)。
      */
     @Transactional
     public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
@@ -289,6 +291,7 @@ public class PushGenerateHandler implements PanelActionHandler {
      * 为空则用系统参数 `receive_over_ratio`。比例夹在 0~1(0=不允许超送,1=允许 100% 超送)。
      */
     @Transactional
+    @SuppressWarnings("unchecked")
     public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
                                              String user, Map<String, Double> qtyByLineKey, Double overRatioOverride) {
         PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
@@ -334,85 +337,85 @@ public class PushGenerateHandler implements PanelActionHandler {
         }
         if (picked.isEmpty()) throw new IllegalStateException("该单据已无剩余可送(各明细行均已送满)");
 
-        // 4) 头/行映射(与选单共用 buildSelectConfig),再覆盖 本次数量 + 批次号
+        // 4) 头/行映射(与选单共用 buildSelectConfig),再覆盖 本次数量 + 批次键
         Map<String, Object> maps = configService.flowMaps(sourcePanel, targetPanel);
         if (maps == null) throw new IllegalStateException("目标面板未配置流转来源:" + targetPanel);
         List<Map<String, String>> headerMap = (List<Map<String, String>>) maps.get("headerMap");
         List<Map<String, String>> detailMap = (List<Map<String, String>>) maps.get("detailMap");
         String tgtQtyLabel = qtyLabelOf(tgtDef, "detail");
 
-        // 批次号来源(2026-09-20):**来源单自带批次号时继承,不再新取号** ——
-        // 批次号在「采购订单→送料暂收单」这一跳产生,下游(暂收→检验→入库/退回)一律继承同一批次,
-        // 否则每跳都会给上游单再发一个批次号(如 SL-xxx-001),批次追溯直接断链。
-        Object srcBatchObj = head.get("批次号");
-        String srcBatchNo = srcBatchObj == null ? "" : String.valueOf(srcBatchObj).trim();
-        boolean inheritBatch = !srcBatchNo.isBlank();
-        // 订单来源(无批次)→ 取新号并写台账;下游继承 → 不占新号、不动台账(该批次台账属订单那一跳)
-        String batchNo = inheritBatch ? srcBatchNo : batchService.reserve(sourcePanel, sourceNo, targetPanel, user);
-        try {
-            Map<String, Object> targetHead = new LinkedHashMap<>();
-            for (Map<String, String> m : headerMap) {
-                Object v = head.get(m.get("from"));
-                if (v != null) targetHead.put(m.get("to"), v);
-            }
-            targetHead.put("来源单据", srcDef.name());
-            targetHead.put("来源单号", sourceNo);
-            targetHead.put("批次号", batchNo);
-            String dateLabel = "单据日期";
-            if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
-                PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
-                if (df != null) dateLabel = df.label();
-            }
-            targetHead.put(dateLabel, java.time.LocalDate.now().toString());
+        // 批次键来源(2026-09-21):**来源单已带「批次键」时继承,不再新登记台账** ——
+        // 键在「采购订单→送料暂收单」这一跳产生(该跳台账行属那张采购订单),下游(暂收→检验→入库/退回)
+        // 一律继承同一个键;批次号此时**一律留空**,待采购入库单审核时由 BatchService.assignNoAndBackfill
+        // 顺键取号并回填全链(否则每跳都会给上游单再发一个批次键,批次追溯断链)。
+        Object srcKeyObj = head.get("批次键");
+        Integer inheritKey = srcKeyObj instanceof Number n ? n.intValue()
+                : (srcKeyObj == null || String.valueOf(srcKeyObj).isBlank() ? null
+                : Integer.valueOf(String.valueOf(srcKeyObj).trim()));
+        int batchId = inheritKey != null ? inheritKey
+                : batchService.createPending(sourcePanel, sourceNo, targetPanel, user);
 
-            List<Map<String, Object>> targetItems = new ArrayList<>();
-            for (Map<String, Object> p : picked) {
-                Map<String, Object> item = (Map<String, Object>) p.get("item");
-                Map<String, Object> row = new LinkedHashMap<>();
-                for (Map<String, String> m : detailMap) {
-                    Object v = item.get(m.get("from"));
-                    if (v != null) row.put(m.get("to"), v);
-                }
-                row.put(tgtQtyLabel, p.get("qty"));   // 本次送料数量
-                row.put("批次号", batchNo);
-                applyInspectionFlag(sourcePanel, targetPanel, row);
-                targetItems.add(row);
-            }
-
-            Map<String, Object> formData = new LinkedHashMap<>(targetHead);
-            formData.put("detail", Map.of("items", targetItems));
-            Map<String, Object> saved = buttonService.save(tgtDef, formData, false);
-            String newNo = String.valueOf(saved.get("编号"));
-
-            // 5) 按量占用(带批次号):目标行按保存顺序取行表 id
-            List<Integer> tgtIds = jdbc.queryForList("SELECT id FROM " + tgtDef.lineTable()
-                            + " WHERE [" + tgtDef.groupCol() + "] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
-                    Integer.class, newNo);
-            List<VoucherFlowService.BatchLine> links = new ArrayList<>();
-            double sum = 0;
-            for (int i = 0; i < picked.size(); i++) {
-                Map<String, Object> item = (Map<String, Object>) picked.get(i).get("item");
-                double qty = (double) picked.get(i).get("qty");
-                sum += qty;
-                links.add(new VoucherFlowService.BatchLine(
-                        sourceNo + "#" + item.get("id"),
-                        i < tgtIds.size() ? newNo + "#" + tgtIds.get(i) : null,
-                        item.get("物料编码") == null ? null : String.valueOf(item.get("物料编码")),
-                        numOf(item.get("数量")), qty));
-            }
-            voucherFlow.linkBatch(sourcePanel, sourceNo, targetPanel, newNo, batchNo, links);
-            if (!inheritBatch) batchService.bind(batchNo, targetPanel, newNo, round2(sum)); // 继承批次不改台账(归订单那一跳)
-
-            Map<String, Object> out = new LinkedHashMap<>();
-            out.put("编号", newNo);
-            out.put("批次号", batchNo);
-            out.put("单据状态", "草稿");
-            out.put("gotoPanel", targetPanel);
-            out.put("本次送料合计", round2(sum));
-            return out;
-        } catch (RuntimeException e) {
-            if (!inheritBatch) batchService.drop(batchNo);   // 生成失败:回收批次号占位(继承时不占号,无需回收)
-            throw e;
+        Map<String, Object> targetHead = new LinkedHashMap<>();
+        for (Map<String, String> m : headerMap) {
+            Object v = head.get(m.get("from"));
+            if (v != null) targetHead.put(m.get("to"), v);
         }
+        targetHead.put("来源单据", srcDef.name());
+        targetHead.put("来源单号", sourceNo);
+        targetHead.put("批次键", batchId);      // 链路键:审核时顺它回填(目标面板未登记该字段时被通用保存忽略)
+        targetHead.remove("批次号");            // 审核前批次号留空(上游若已有历史批次号,不再向下传)
+        String dateLabel = "单据日期";
+        if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
+            PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
+            if (df != null) dateLabel = df.label();
+        }
+        targetHead.put(dateLabel, java.time.LocalDate.now().toString());
+
+        List<Map<String, Object>> targetItems = new ArrayList<>();
+        for (Map<String, Object> p : picked) {
+            Map<String, Object> item = (Map<String, Object>) p.get("item");
+            Map<String, Object> row = new LinkedHashMap<>();
+            for (Map<String, String> m : detailMap) {
+                Object v = item.get(m.get("from"));
+                if (v != null) row.put(m.get("to"), v);
+            }
+            row.put(tgtQtyLabel, p.get("qty"));   // 本次送料数量
+            row.remove("批次号");                  // 行批次号同样留空(审核取号后回填)
+            applyInspectionFlag(sourcePanel, targetPanel, row);
+            targetItems.add(row);
+        }
+
+        Map<String, Object> formData = new LinkedHashMap<>(targetHead);
+        formData.put("detail", Map.of("items", targetItems));
+        Map<String, Object> saved = buttonService.save(tgtDef, formData, false);
+        String newNo = String.valueOf(saved.get("编号"));
+
+        // 5) 按量占用(带批次键):目标行按保存顺序取行表 id
+        List<Integer> tgtIds = jdbc.queryForList("SELECT id FROM " + tgtDef.lineTable()
+                        + " WHERE [" + tgtDef.groupCol() + "] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
+                Integer.class, newNo);
+        List<VoucherFlowService.BatchLine> links = new ArrayList<>();
+        double sum = 0;
+        for (int i = 0; i < picked.size(); i++) {
+            Map<String, Object> item = (Map<String, Object>) picked.get(i).get("item");
+            double qty = (double) picked.get(i).get("qty");
+            sum += qty;
+            links.add(new VoucherFlowService.BatchLine(
+                    sourceNo + "#" + item.get("id"),
+                    i < tgtIds.size() ? newNo + "#" + tgtIds.get(i) : null,
+                    item.get("物料编码") == null ? null : String.valueOf(item.get("物料编码")),
+                    numOf(item.get("数量")), qty));
+        }
+        voucherFlow.linkBatch(sourcePanel, sourceNo, targetPanel, newNo, null, batchId, links);
+        if (inheritKey == null) batchService.bind(batchId, targetPanel, newNo, round2(sum)); // 继承批次键时不改台账(归订单那一跳)
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", newNo);
+        out.put("批次号", "");                  // 审核前留空(前端据此不再预告批次号)
+        out.put("批次键", batchId);
+        out.put("单据状态", "草稿");
+        out.put("gotoPanel", targetPanel);
+        out.put("本次送料合计", round2(sum));
+        return out;
     }
 }

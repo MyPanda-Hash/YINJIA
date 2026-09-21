@@ -5,25 +5,30 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
- * 采购订单分批送料:批次号取号 / 批次台账 / 行级已送量与退货回冲(P0,2026-09-20)。
+ * 采购订单分批送料:批次台账 / 送料量统计 / **采购入库单审核时取号并回填**(P0,2026-09-20;
+ * 取号时机迁移 2026-09-21)。
  *
- * 口径(见 docs/方案-采购订单分批送料与批次号.md):
- * - 批次号 = `采购订单号-3位序号`(如 YJ-20260915-08-001);**序号可回收** —— 取该订单当前"有效批次"
- *   (台账现存行)中最小的未占用序号,删除下游草稿时台账行随之删除、序号回到可用池。
- * - **一张暂收单 = 一个批次**(决策 3):台账 target_* 指向生成的那张暂收单。
- * - 可送量(按订单行) = 订单行数量 − Σ有效批次送料量 + Σ退货数量(退货回冲,决策 4);
- *   退货只认**已审核且未作废**的暂收退回单(QC_RETURN),退货行按「采购订单行号」回到对应订单行。
- * - 允许超送:上限 = 剩余量 ×(1 + yj_app_setting.receive_over_ratio)(决策 2)。
+ * 口径(用户定稿,见 tools/migrate-batch-no-at-inbound.sql 头注释与
+ * docs/方案-采购订单分批送料与批次号.md):
+ * - 批次号 = `yyyyMMdd` + **两位序号**(无分隔符,如 2026092101 = 2026-09-21 第 1 批);
+ * - 日期部分取**送料当天**(台账行 create_time),**不是**审核当天;
+ * - 唯一性范围 = **采购订单号 + 批次号**(不同采购订单之间允许重号,不是全局唯一
+ *   —— 由筛选唯一索引 UX_yj_doc_batch_no_active 保证);
+ * - 取号 = 同订单 + 同送料日「已用最大序号 + 1」;**弃审/作废不回收**(会跳号,绝不重号);
+ * - 取号时机 = **采购入库单审核**;审核之前链路上所有单据的批次号**留空**;
+ * - 一单一单(暂收 = 检验 = 入库),批次号挂**单头**(行上另冗余一份,保持现状)。
  *
- * 台账生命周期:reserve(取号占位)→ bind(生成成功绑定单据与数量)/ drop(生成失败回收序号);
- *   删除下游草稿 → releaseByTarget(删台账,序号回收)。释放痕迹另由 form_flow_link 的 RELEASED 行保留。
+ * 台账生命周期(新口径):
+ *   createPending(分批送料时插一行 **PENDING、batch_no=NULL** 的台账,返回行 id 作「批次键」)
+ *     → bind(生成成功:绑定目标单与本次送料量;失败由外层事务整体回滚,不再有"回收序号"一说)
+ *     → assignNoAndBackfill(采购入库单审核:取号 → 回填台账/链路/三单头行)。
+ * 「批次键」= yj_doc_batch.id,写进 sl_recv/qc_insp/bd_purchase_in 的 [批次键] 列与
+ * form_flow_link.batch_id:审核时**顺着键**回填,不按单号字符串匹配(单号复用/改号不会回填错单)。
  */
 @Service
 public class BatchService {
@@ -31,14 +36,32 @@ public class BatchService {
     /** 系统参数键:收料超送比例 */
     public static final String KEY_OVER_RATIO = "receive_over_ratio";
 
+    /**
+     * 作废/弃审是否回收批次号:**否**(2026-09-21 用户口径)。
+     * 旧口径序号可回收(释放后序号回到可用池),新口径**不回收** —— 因此会跳号,但绝不重号。
+     * 保留开关(而非直接删旧 SQL)是为了口径需要回退时一处可切。
+     */
+    public static final boolean RECYCLE_ON_RELEASE = false;
+
+    /** 批次号列名(链路三单同名同列) */
+    private static final String BATCH_COL = "批次号";
+
+    /** 批次键列名(链路三单同名同列;form_flow_link 用 batch_id) */
+    private static final String KEY_COL = "批次键";
+
+    /** 批次键所在的三张单(面板码 → 单头表;行表与分组列由 PanelRegistry 提供) */
+    private static final String[] KEY_PANELS = {"QC_RECV", "QC_INSP", "PURCHASE_IN"};
+
     private final JdbcTemplate jdbc;
+    private final PanelRegistry registry;
 
     /** 超送比例缓存(30 秒,与 PanelRegistry TTL 同量级,避免每次生单查库) */
     private volatile double ratioCache = 0d;
     private volatile long ratioAt = 0L;
 
-    public BatchService(JdbcTemplate jdbc) {
+    public BatchService(JdbcTemplate jdbc, PanelRegistry registry) {
         this.jdbc = jdbc;
+        this.registry = registry;
     }
 
     // ==================== 参数 ====================
@@ -59,77 +82,161 @@ public class BatchService {
         return v;
     }
 
-    // ==================== 取号与台账 ====================
+    // ==================== 分批送料:登记待编号台账 ====================
 
-    /** 批次号拼装:订单号(超长截断)-3 位序号 */
-    public static String batchNo(String sourceFormNo, int seq) {
-        String base = sourceFormNo == null ? "" : sourceFormNo.trim();
-        if (base.length() > 40) base = base.substring(0, 40);
-        return base + "-" + String.format("%03d", seq);
-    }
-
-    /** 预览下一个批次号(不占号,仅用于界面展示) */
-    public String peekNextNo(String srcPanel, String srcNo) {
-        return batchNo(srcNo, nextSeq(srcPanel, srcNo));
-    }
-
-    private int nextSeq(String srcPanel, String srcNo) {
-        Set<Integer> used = new HashSet<>();
-        try {
-            // 只有 ACTIVE(有效)批次占号:释放后的批次行保留留痕但序号回到可用池(用户口径:批次号要回收)
-            used.addAll(jdbc.queryForList("SELECT batch_seq FROM yj_doc_batch"
-                    + " WHERE source_panel_code=? AND source_form_no=? AND status='ACTIVE'",
-                    Integer.class, srcPanel, srcNo));
-        } catch (Exception ignore) { /* 表未建 */ }
-        int seq = 1;
-        while (used.contains(seq)) seq++;
-        return seq;
-    }
-
-    /** 取号占位(写台账,状态 ACTIVE,未绑定目标单);生成失败请调用 drop 回收序号 */
+    /**
+     * 分批送料生成下游单时登记一行**未编号**台账(status='PENDING'、batch_no=NULL),
+     * 返回该行 id 作为「批次键」写入目标单头。
+     * create_time = 送料当天 —— 取号时日期部分取它(不是审核当天,用户口径②)。
+     * 生成失败不需要"回收":本方法随调用方事务回滚(@Transactional 由 generateBatch 承担)。
+     */
     @Transactional
-    public String reserve(String srcPanel, String srcNo, String targetPanel, String user) {
-        int seq = nextSeq(srcPanel, srcNo);
-        String no = batchNo(srcNo, seq);
-        jdbc.update("INSERT INTO yj_doc_batch (source_panel_code, source_form_no, batch_seq, batch_no, batch_qty, status,"
-                        + " target_panel_code, create_by, create_time, remark)"
-                        + " VALUES (?,?,?,?,0,'ACTIVE',?,?,SYSDATETIME(),N'分批送料占位')",
-                srcPanel, srcNo, seq, no, targetPanel, user);
+    public int createPending(String srcPanel, String srcNo, String targetPanel, String user) {
+        String sql = "INSERT INTO yj_doc_batch (source_panel_code, source_form_no, batch_seq, batch_no, batch_qty,"
+                + " status, target_panel_code, create_by, create_time, remark)"
+                + " VALUES (?,?,0,NULL,0,'PENDING',?,?,SYSDATETIME(),N'分批送料待编号')";
+        org.springframework.jdbc.support.GeneratedKeyHolder kh = new org.springframework.jdbc.support.GeneratedKeyHolder();
+        jdbc.update(con -> {
+            java.sql.PreparedStatement ps = con.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS);
+            ps.setString(1, srcPanel);
+            ps.setString(2, srcNo);
+            ps.setString(3, targetPanel);
+            ps.setString(4, user);
+            return ps;
+        }, kh);
+        for (Map<String, Object> keys : kh.getKeyList()) {
+            for (Object v : keys.values()) if (v instanceof Number n) return n.intValue();
+        }
+        throw new IllegalStateException("批次台账登记失败(未取得行 id):" + srcPanel + " " + srcNo);
+    }
+
+    /** 生成成功:绑定目标单据与本次送料数量合计(只更新本次 PENDING 行,历史行不动) */
+    public void bind(int batchId, String targetPanel, String targetFormNo, double qty) {
+        jdbc.update("UPDATE yj_doc_batch SET target_panel_code=?, target_form_no=?, batch_qty=? WHERE id=? AND status='PENDING'",
+                targetPanel, targetFormNo, qty, batchId);
+    }
+
+    // ==================== 采购入库单审核:取号并回填全链 ====================
+
+    /**
+     * 采购入库单审核时取号并回填全链。**幂等**:该台账行已有批次号 → 直接返回,不重复取号。
+     *
+     * @param batchId 批次键(台账行 id)
+     * @param user    操作人(写入台账 remark 留痕)
+     * @return 批次号(yyyyMMdd + 两位序号)
+     */
+    @Transactional
+    public String assignNoAndBackfill(int batchId, String user) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT source_form_no AS srcNo, CONVERT(varchar(8), create_time, 112) AS sendDate, batch_no AS batchNo"
+                        + " FROM yj_doc_batch WHERE id = ?", batchId);
+        if (rows.isEmpty()) throw new IllegalStateException("批次台账行不存在:" + batchId);
+        Map<String, Object> row = rows.get(0);
+        String exist = row.get("batchNo") == null ? "" : String.valueOf(row.get("batchNo")).trim();
+        if (!exist.isEmpty()) return exist;                       // 幂等:弃审后重新审核沿用原号
+        String srcNo = row.get("srcNo") == null ? "" : String.valueOf(row.get("srcNo"));
+        String date = row.get("sendDate") == null ? "" : String.valueOf(row.get("sendDate"));
+        if (date.length() != 8) throw new IllegalStateException("批次台账行无送料日期,无法取号:" + batchId);
+
+        // 序号 = 同采购订单 + 同送料日「已用最大序号 + 1」(弃审不回收 → 会跳号,绝不重号)。
+        // UPDLOCK/HOLDLOCK:同订单同日并发双审时串行取号;若仍撞车(极端),由筛选唯一索引
+        // (source_form_no, batch_no) WHERE status='ACTIVE' AND batch_no IS NOT NULL 拒绝后整体回滚。
+        Integer maxSeq = jdbc.queryForObject(
+                "SELECT ISNULL(MAX(TRY_CAST(RIGHT(batch_no, 2) AS int)), 0) FROM yj_doc_batch WITH (UPDLOCK, HOLDLOCK)"
+                        + " WHERE source_form_no = ? AND batch_no LIKE ?",
+                Integer.class, srcNo, date + "%");
+        int seq = (maxSeq == null ? 0 : maxSeq) + 1;
+        if (seq > 99) {
+            throw new IllegalStateException("采购订单 " + srcNo + " 在 " + date + " 的批次序号已用满 99,"
+                    + "两位序号无法表达,请联系开发调整批次号长度");
+        }
+        String no = date + String.format("%02d", seq);
+
+        // 1) 台账:编号 + PENDING → ACTIVE(留痕写 remark:谁在何时取的号)
+        jdbc.update("UPDATE yj_doc_batch SET batch_no=?, batch_seq=?, status='ACTIVE', release_time=NULL,"
+                        + " remark = N'分批送料 · 入库审核取号(' + ISNULL(?, N'system') + N')' WHERE id=?",
+                no, seq, user, batchId);
+        // 2) 链路台账:该批次 id 关联的所有跳(含 QC_INSP→QC_RETURN 等旁支)
+        jdbc.update("UPDATE form_flow_link SET batch_no=? WHERE batch_id=?", no, batchId);
+        // 3) 三单头 + 行(按「批次键」定位,不按单号字符串)
+        for (String panel : KEY_PANELS) backfill(panel, batchId, no);
+        // 留痕说明:未写 yj_doc_modify_log —— 该表是「申请修改/弃审留痕」闭环(snapshot_head/snapshot_rows
+        // + apply_by/approve_by,create_at NOT NULL),塞一条取号事件会污染「修改记录」界面语义;
+        // 取号留痕落在 yj_doc_batch(create_by/create_time/remark/release_time)+ form_flow_link.batch_no。
         return no;
     }
 
-    /** 生成成功:绑定目标单据与本次送料数量合计(只更新本次 ACTIVE 占位行;历史 RELEASED 留痕行不动) */
-    public void bind(String batchNo, String targetPanel, String targetFormNo, double qty) {
-        jdbc.update("UPDATE yj_doc_batch SET target_panel_code=?, target_form_no=?, batch_qty=?, remark=N'分批送料'"
-                + " WHERE batch_no=? AND status='ACTIVE' AND ISNULL(target_form_no,'')=''",
-                targetPanel, targetFormNo, qty, batchNo);
-    }
-
-    /** 生单失败:删占位台账(序号回收;只删"未绑定目标单"的本轮 ACTIVE 占位行) */
-    public void drop(String batchNo) {
-        try {
-            jdbc.update("DELETE FROM yj_doc_batch WHERE batch_no=? AND status='ACTIVE' AND ISNULL(target_form_no,'')=''",
-                    batchNo);
-        } catch (Exception ignore) { /* 不阻断主流程 */ }
+    /** 按「批次键」把批次号回填到某单的头与行(头列/行表/分组列都取自面板元数据) */
+    private void backfill(String panelCode, int batchId, String batchNo) {
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        String head = def.headTable();
+        String line = def.lineTable();
+        String g = def.groupCol();
+        // 行:按其所属单头(批次键命中)定位,写**批次号**列;头:按批次键命中写批次号
+        jdbc.update("UPDATE " + line + " SET [" + BATCH_COL + "] = ? WHERE [" + g + "] IN"
+                + " (SELECT [" + g + "] FROM " + head + " WHERE [" + KEY_COL + "] = ?)", batchNo, batchId);
+        jdbc.update("UPDATE " + head + " SET [" + BATCH_COL + "] = ? WHERE [" + KEY_COL + "] = ?", batchNo, batchId);
     }
 
     /**
-     * 释放批次(下游单作废/删除):状态置 RELEASED + 留痕,序号回到可用池。
-     * 注意:不删台账行 —— 留痕用于审计;序号复用由 §nextSeq 只认 ACTIVE 实现(用户口径:批次号要回收)。
+     * 按入库单号找「批次键」:① 入库单头自带的 [批次键];
+     * ② 退回 form_flow_link(batch_id)→ 该入库单的链路键;
+     * ③ 再退回「该入库单的来源单(检验单/暂收单)头上的批次键」。
+     * 返回 0 = 未找到(该入库单不走分批送料,如历史单/免检直达且无链路)。
+     */
+    public int findPendingBatchId(String panelCode, String docNo) {
+        if (!"PURCHASE_IN".equals(panelCode) || docNo == null || docNo.isBlank()) return 0;
+        Integer id = jdbc.queryForObject("SELECT TOP 1 [" + KEY_COL + "] FROM bd_purchase_in WHERE 单据编号 = ?",
+                Integer.class, docNo);
+        if (id != null && id > 0) return id;
+        id = jdbc.queryForObject("SELECT TOP 1 batch_id FROM form_flow_link WHERE target_panel_code='PURCHASE_IN'"
+                + " AND target_form_no=? AND batch_id IS NOT NULL ORDER BY id", Integer.class, docNo);
+        if (id != null && id > 0) return id;
+        // 来源单头上的批次键(检验单 QC_INSP / 送料暂收单 QC_RECV;采购订单免检直达时无此列,跳过)
+        List<Map<String, Object>> srces = jdbc.queryForList(
+                "SELECT DISTINCT source_panel_code AS pc, source_form_no AS no FROM form_flow_link"
+                        + " WHERE target_panel_code='PURCHASE_IN' AND target_form_no=?", docNo);
+        for (Map<String, Object> s : srces) {
+            String pc = String.valueOf(s.get("pc"));
+            String table = switch (pc) {
+                case "QC_INSP" -> "qc_insp";
+                case "QC_RECV" -> "sl_recv";
+                default -> null;
+            };
+            if (table == null) continue;
+            try {
+                List<Map<String, Object>> r = jdbc.queryForList(
+                        "SELECT TOP 1 [" + KEY_COL + "] AS k FROM " + table + " WHERE 单据编号 = ?", s.get("no"));
+                if (!r.isEmpty() && r.get(0).get("k") instanceof Number n && n.intValue() > 0) return n.intValue();
+            } catch (Exception ignore) { /* 列未加(未跑迁移)等场景不阻断审核 */ }
+        }
+        return 0;
+    }
+
+    // ==================== 释放(新口径:不回收) ====================
+
+    /**
+     * 下游单作废/删除时的台账释放。**新口径(2026-09-21):不回收** —— 批次号与台账 status 一律保留,
+     * 因为批次号在采购入库单审核时已经确定,回收会让"已编号批次"重号(用户口径④:
+     * 弃审/作废不回收批次号,因此会跳号,但绝不重号)。
+     * 保留本方法(而非删掉调用点)是为了让"作废不回收"这一口径集中在一处可查、可回退(见 RECYCLE_ON_RELEASE)。
      */
     public void releaseByTarget(String targetPanel, String targetFormNo) {
+        if (!RECYCLE_ON_RELEASE) return;
         try {
             jdbc.update("UPDATE yj_doc_batch SET status='RELEASED', release_time=SYSDATETIME()"
                     + " WHERE target_panel_code=? AND target_form_no=? AND status='ACTIVE'", targetPanel, targetFormNo);
         } catch (Exception ignore) { /* 表未建等场景不阻断删除 */ }
     }
 
-    /** 某来源单的批次清单(默认只列有效批次;含历史释放行见 includeReleased) */
+    // ==================== 查询 ====================
+
+    /** 某来源单的批次清单(默认只列有效批次:已编号 ACTIVE + 待编号 PENDING;含历史释放行见 includeReleased) */
     public List<Map<String, Object>> batches(String srcPanel, String srcNo) {
         return batches(srcPanel, srcNo, false);
     }
 
-    /** 批次清单:activeOnly=true 只列 ACTIVE;false 连历史释放行一起列(反查/审计用) */
+    /** 批次清单:activeOnly=true 只列 ACTIVE/PENDING;false 连历史释放行一起列(反查/审计用) */
     public List<Map<String, Object>> batches(String srcPanel, String srcNo, boolean includeReleased) {
         List<Map<String, Object>> out = new ArrayList<>();
         try {
@@ -137,13 +244,13 @@ public class BatchService {
                     + " status, target_panel_code AS targetPanel, target_form_no AS targetFormNo,"
                     + " CONVERT(varchar(19), create_time, 120) AS createTime"
                     + " FROM yj_doc_batch WHERE source_panel_code=? AND source_form_no=?"
-                    + (includeReleased ? "" : " AND status='ACTIVE'")
+                    + (includeReleased ? "" : " AND status IN ('ACTIVE','PENDING')")
                     + " ORDER BY batch_seq, id", srcPanel, srcNo);
         } catch (Exception ignore) { /* 表未建 */ }
         return out;
     }
 
-    /** 反查:某批次号的台账行(取最近一次使用;序号回收后同号会有多条留痕行) */
+    /** 反查:某批次号的台账行(历史格式号与同号留痕取最近一次使用) */
     public Map<String, Object> batchOf(String batchNo) {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT TOP 1 source_panel_code AS sourcePanel, source_form_no AS sourceFormNo, batch_seq AS batchSeq,"

@@ -1,7 +1,9 @@
 <template>
   <!-- 分批送料对话框(2026-09-20 P0):采购订单 →「生成送料暂收单」不再整单一次性生成,
        而是逐行填「本次送料数量」(默认=剩余量),可多次分批;
-       批次号由后端自动取号(采购订单号-3位序号),超送受系统比例约束。 -->
+       超送受系统比例约束。
+       批次号(2026-09-21 口径变更):**采购入库单审核时才取号**(yyyyMMdd+两位序号),
+       本对话框不再预告批次号 —— 此时只登记一行"待编号"批次台账。 -->
   <el-dialog
     :model-value="modelValue"
     :title="tt('分批送料') + ' · ' + sourceNo"
@@ -14,7 +16,7 @@
     <div v-loading="loading" class="bsd">
       <div class="bsd-bar">
         <span class="bsd-chip">{{ tt('采购订单') }}: {{ sourceNo }}</span>
-        <span class="bsd-chip">{{ tt('批次号') }}: <b>{{ nextBatchNo || '-' }}</b></span>
+        <span class="bsd-chip">{{ tt('批次号') }}: <b>{{ tt('待采购入库单审核时生成') }}</b></span>
         <span class="bsd-chip bsd-ratio">
           {{ tt('超送比例') }}:
           <el-input-number v-model="overRatioPct" :min="0" :max="100" :step="1" :precision="0" size="small"
@@ -22,7 +24,7 @@
           %<span class="bsd-ratio-tip">{{ tt('（0 = 不允许超送；本次生效）') }}</span>
         </span>
         <span v-if="(batches || []).length" class="bsd-chip">{{
-          tt('已有批次') }}: {{ batches.map((b) => b.batchNo).join('、') }}</span>
+          tt('已有批次') }}: {{ batches.map((b) => b.batchNo || tt('待编号')).join('、') }}</span>
       </div>
       <el-table :data="rows" border size="small" height="380" @selection-change="(r) => (picked = r)">
         <el-table-column type="selection" width="42" />
@@ -78,7 +80,6 @@ const loading = ref(false)
 const saving = ref(false)
 const rows = ref([])
 const picked = ref([])
-const nextBatchNo = ref('')
 const overRatio = ref(0)       // 系统默认比例(0~1)
 const overRatioPct = ref(5)    // 本次生效比例(%):可调,生单时随请求带给后端
 const batches = ref([])
@@ -107,7 +108,6 @@ async function load() {
       sourcePanel: props.sourcePanel, targetPanel: props.targetPanel, sourceNo: props.sourceNo,
     })
     rows.value = res?.lines || []
-    nextBatchNo.value = res?.nextBatchNo || ''
     overRatio.value = Number(res?.overRatio || 0)
     overRatioPct.value = Math.round(overRatio.value * 100)
     batches.value = res?.batches || []
@@ -138,7 +138,7 @@ async function confirm() {
       sourcePanel: props.sourcePanel, targetPanel: props.targetPanel, sourceNo: props.sourceNo, lines,
       overRatio: ratio.value,
     })
-    ElMessage.success(`${tt('已生成')} ${res['编号']}（${tt('批次号')} ${res['批次号']}）`)
+    ElMessage.success(`${tt('已生成')} ${res['编号']}（${tt('批次号')} ${tt('待采购入库单审核时生成')}）`)
     emit('generated', { panel: res.gotoPanel || props.targetPanel, no: res['编号'], batchNo: res['批次号'] })
     emit('update:modelValue', false)
   } catch (e) {

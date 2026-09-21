@@ -844,6 +844,11 @@ public class ButtonService {
         }
         // 库存记账(材料入库链):采购入库单审核 → kucun 入账(失败抛错整笔回滚)
         stockLedger.postIn(def.code(), no, currentUserName());
+        // 分批送料批次号(2026-09-21 取号时机迁移):**采购入库单审核时**取号并回填全链 ——
+        // 送料暂收单/来料检验单/采购入库单(头+行)、批次台账、form_flow_link.batch_no。
+        // 顺序:入库审核 → 取号回填 → 转ERP(转ERP 是独立按钮,天然在其之后,故不需要"补推批号")。
+        // 幂等(台账行已有批次号则沿用);失败抛错,整笔回滚(审核状态一并回退)。
+        assignBatchNoOnInbound(def.code(), no, auditor);
         // 工序报工记账(生产过程层):报工单审核 → wo_progress.完成数量 累计
         woReport.post(def.code(), no, currentUserName());
         // 切炭双出口(已确认):报工审核后,直销数量自动生成成品入库单并审核入账(成品仓)
@@ -983,6 +988,8 @@ public class ButtonService {
         // 用户只好点手工生单按钮,而手工路径实收数量映射错误且退回单被死过滤器挡住)
         inspAutoPurchaseIn(def.code(), no, operator);
         inspAutoReturn(def.code(), no, operator);
+        // 采购入库单走审批通过的同样取号回填(与「审核」钩子同口径,防走审批流时批次号取不到)
+        assignBatchNoOnInbound(def.code(), no, operator);
         // 消息:审批通过 → 制单人
         notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
                 def.code(), no, MessageService.APPROVAL_APPROVED,
@@ -1117,7 +1124,8 @@ public class ButtonService {
                 def.code(), no, user, user);
         jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"
                 + " WHERE target_panel_code = ? AND target_form_no = ? AND link_status = 'ACTIVE'", def.code(), no);
-        // 分批送料:作废释放该批次的送料数量与序号(台账行置 RELEASED 留痕,序号回到可用池)
+        // 分批送料:作废**不回收**批次号与台账号(2026-09-21 口径 —— 批次号在采购入库单审核时已定,
+        // 回收会让已编号批次重号;弃审/作废只作废单据,台账号原样保留,见 BatchService.RECYCLE_ON_RELEASE)
         batchService.releaseByTarget(def.code(), no);
         return result(no, "已作废");
     }
@@ -1200,7 +1208,7 @@ public class ButtonService {
         // 作废同步释放选单占用(与草稿作废 voidDoc 同口径,2026-09-12:此前审批作废不释放,来源行永久占死)
         jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"
                 + " WHERE target_panel_code = ? AND target_form_no = ? AND link_status = 'ACTIVE'", def.code(), no);
-        batchService.releaseByTarget(def.code(), no); // 分批送料:同 voidDoc,释放该批次数量与序号
+        batchService.releaseByTarget(def.code(), no); // 分批送料:同 voidDoc,不回收批次号/台账号(2026-09-21 口径)
         // 消息:审批结果 → 删除申请人
         if (!reqBy.isBlank()) notify(() -> messageService.send(List.of(reqBy), MessageService.DELETE_APPROVED, def.code(), no,
                 Map.of("docNo", no, "actor", user, "opinion", opinion), user));
@@ -1388,6 +1396,23 @@ public class ButtonService {
 
     // ==================== 来料检验单审核 → 自动生成采购入库单(2026-09-15) ====================
 
+    // ============ 分批送料批次号:入库审核取号回填(2026-09-21 取号时机迁移) ============
+
+    /**
+     * 采购入库单审核(或审批通过)时:顺「批次键」找到批次台账行 → 取号并回填全链。
+     *
+     * 口径(用户定稿):批次号 = yyyyMMdd + 两位序号(日期取**送料当天**);唯一性范围 =
+     * 采购订单号 + 批次号;取号 = 同订单同送料日「已用最大序号 + 1」;弃审/作废**不回收**。
+     * 审核之前链路上所有单据的批次号留空 —— 空值由本钩子一次性补齐,不是"漏填"。
+     * 无「批次键」的入库单(历史单/手工单)直接跳过,不动其批次号(历史 YJ- 格式号原样保留)。
+     */
+    private void assignBatchNoOnInbound(String panelCode, String no, String user) {
+        if (!"PURCHASE_IN".equals(panelCode)) return;
+        int batchId = batchService.findPendingBatchId(panelCode, no);
+        if (batchId <= 0) return;
+        batchService.assignNoAndBackfill(batchId, user);
+    }
+
     /**
      * 来料检验单(QC_INSP)审核后,把 合格数量>0 的明细行自动生成采购入库单(PURCHASE_IN)草稿:
      * 实收数量=合格数量;存货编码/存货名称/规格型号 ← 物料编码/物料名称/型号;行仓库 ← 仓库代码;
@@ -1415,7 +1440,7 @@ public class ButtonService {
                 .filter(r -> numOr(r.get("合格数量")) > 0).toList();
         if (pass.isEmpty()) return;
         List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT 供应商代码, 供应商, 采购订单号, 批次号"
+                "SELECT 供应商代码, 供应商, 采购订单号, 批次号, 批次键"
                         + " FROM qc_insp"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + no);
@@ -1454,6 +1479,9 @@ public class ButtonService {
             head.put("采购订单号", h.get("采购订单号"));
         }
         if (h.get("批次号") != null && !String.valueOf(h.get("批次号")).isBlank()) head.put("批次号", h.get("批次号"));
+        // 批次键随链带入(2026-09-21 取号时机迁移):入库审核时凭它取号并回填全链。
+        // 批次号此时**一律留空**(检验单审核时还没取号),故上面那行对新单不写值、只兼容历史单。
+        if (h.get("批次键") != null) head.put("批次键", h.get("批次键"));
         head.put("外部单据号", no);
         head.put("来源单据", "来料检验单");
         head.put("来源单号", no);
@@ -1468,10 +1496,10 @@ public class ButtonService {
             Map<String, Object> r = pass.get(i);
             jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
                             + " target_panel_code, target_form_no, target_line_key, inventory_code,"
-                            + " source_quantity, linked_quantity, batch_no, link_status, create_by)"
-                            + " VALUES ('QC_INSP', ?, ?, 'PURCHASE_IN', ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
+                            + " source_quantity, linked_quantity, batch_no, batch_id, link_status, create_by)"
+                            + " VALUES ('QC_INSP', ?, ?, 'PURCHASE_IN', ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
                     no, no + "#" + r.get("id"), piNo, piNo + "#" + tgtIds.get(i), r.get("物料编码"),
-                    r.get("数量"), r.get("合格数量"), h.get("批次号"), user);
+                    r.get("数量"), r.get("合格数量"), h.get("批次号"), h.get("批次键"), user);
             jdbc.update("UPDATE qc_insp_detail SET 入库单号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
                     piNo, user, r.get("id"));
         }
@@ -1506,7 +1534,7 @@ public class ButtonService {
                 .filter(r -> numOr(r.get("不良数量")) > 0).toList();
         if (defect.isEmpty()) return;
         List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT 业务员, 供应商代码, 供应商, 部门, 部门名称, 采购订单号, 批次号 FROM qc_insp"
+                "SELECT 业务员, 供应商代码, 供应商, 部门, 部门名称, 采购订单号, 批次号, 批次键 FROM qc_insp"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + no);
         Map<String, Object> h = heads.get(0);
@@ -1551,10 +1579,10 @@ public class ButtonService {
             Map<String, Object> r = defect.get(i);
             jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
                             + " target_panel_code, target_form_no, target_line_key, inventory_code,"
-                            + " source_quantity, linked_quantity, batch_no, link_status, create_by)"
-                            + " VALUES ('QC_INSP', ?, ?, 'QC_RETURN', ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
+                            + " source_quantity, linked_quantity, batch_no, batch_id, link_status, create_by)"
+                            + " VALUES ('QC_INSP', ?, ?, 'QC_RETURN', ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
                     no, no + "#" + r.get("id"), thNo, thNo + "#" + tgtIds.get(i), r.get("物料编码"),
-                    r.get("数量"), r.get("不良数量"), h.get("批次号"), user);
+                    r.get("数量"), r.get("不良数量"), h.get("批次号"), h.get("批次键"), user);
         }
     }
 

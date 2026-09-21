@@ -1864,5 +1864,8 @@ export default {
     '该订单暂无送料批次': 'No delivery batch for this order',
     '点击查看送料批次': 'Click to view delivery batches',
     '已送合计': 'Delivered total',
+    '待编号': 'Pending No.',
+    '{n} 批待编号': '{n} batch(es) pending No.',
+    '待采购入库单审核时生成': 'Generated when the purchase receipt is approved',
   },
 }

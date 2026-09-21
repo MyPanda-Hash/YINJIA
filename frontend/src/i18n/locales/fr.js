@@ -1598,5 +1598,8 @@ export default {
     '该订单暂无送料批次': 'Aucun lot de livraison pour cette commande',
     '点击查看送料批次': 'Cliquer pour voir les lots de livraison',
     '已送合计': 'Total livré',
+    '待编号': 'N° en attente',
+    '{n} 批待编号': '{n} lot(s) sans n°',
+    '待采购入库单审核时生成': 'Généré à la validation de la réception',
   },
 }

@@ -419,7 +419,8 @@ async function generate() {
     } else for (const source of sources) {
       const no = source['编号'] || source['单据编号'] || ''
       if (!no) continue
-      // 分批送料(2026-09-20 P0):目标面板配了批次号 → 走分批生单接口(自动取批次号 + 按量占用 + 台账),
+      // 分批送料(2026-09-20 P0):目标面板配了批次号 → 走分批生单接口(按量占用 + 待编号台账,
+      // 批次号在**采购入库单审核时**才取号,故这里没有号可带 —— 2026-09-21 口径),
       // 本次数量 = 各来源行的「剩余数量」(选单界面不做逐行填量;要按量分批用来源单据上的「生成XX」对话框)
       if (config.batchFlow) {
         const lines = sourceItems(source)
@@ -429,7 +430,7 @@ async function generate() {
         const res = await engine.batchFlowGenerate({
           sourcePanel: config.source, targetPanel: props.panelCode, sourceNo: no, lines,
         })
-        if (res?.['编号']) generated.push({ panel: res.gotoPanel || props.panelCode, no: res['编号'], sourceNo: no, batchNo: res['批次号'] })
+        if (res?.['编号']) generated.push({ panel: res.gotoPanel || props.panelCode, no: res['编号'], sourceNo: no })
         continue
       }
       if (config.generateButton) {

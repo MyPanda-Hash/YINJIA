@@ -1598,5 +1598,8 @@ export default {
     '该订单暂无送料批次': 'Keine Liefercharge für diesen Auftrag',
     '点击查看送料批次': 'Klicken für Lieferchargen',
     '已送合计': 'Geliefert gesamt',
+    '待编号': 'Nr. ausstehend',
+    '{n} 批待编号': '{n} Charge(n) ohne Nr.',
+    '待采购入库单审核时生成': 'Wird bei Freigabe des Wareneingangs vergeben',
   },
 }

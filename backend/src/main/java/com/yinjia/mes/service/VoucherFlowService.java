@@ -110,17 +110,19 @@ public class VoucherFlowService {
     /**
      * 分批送料占用(2026-09-20 P0):按调用方给出的「来源行 → 本次送料量 → 目标行」逐行落 link,并带批次号。
      * 关键差异:`linked_quantity` = **本次实际送料量**(不是来源行整行量),这样剩余量能按批次逐次核减。
+     * 2026-09-21 取号时机迁移:生成时批次号还没取(采购入库单审核时才取),batchNo 传 null,
+     * 由 **batchId(批次键)** 兜住 —— 取号后 `UPDATE form_flow_link SET batch_no=? WHERE batch_id=?` 一并回填。
      */
     public void linkBatch(String sourcePanel, String sourceNo, String targetPanel, String targetNo,
-                          String batchNo, List<BatchLine> lines) {
+                          String batchNo, Integer batchId, List<BatchLine> lines) {
         String user = currentUser();
         for (BatchLine l : lines) {
             jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
                             + " target_panel_code, target_form_no, target_line_key, inventory_code,"
-                            + " source_quantity, linked_quantity, batch_no, link_status, create_by)"
-                            + " VALUES (?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)",
+                            + " source_quantity, linked_quantity, batch_no, batch_id, link_status, create_by)"
+                            + " VALUES (?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)",
                     sourcePanel, sourceNo, l.sourceLineKey(), targetPanel, targetNo, l.targetLineKey(),
-                    l.inventoryCode(), l.sourceQty(), l.qty(), batchNo, user);
+                    l.inventoryCode(), l.sourceQty(), l.qty(), batchNo, batchId, user);
         }
     }
 
@@ -128,7 +130,9 @@ public class VoucherFlowService {
     public record BatchLine(String sourceLineKey, String targetLineKey, String inventoryCode,
                             double sourceQty, double qty) { }
 
-    /** 释放占用(删除/作废下游单据):link 置 RELEASED + 批次台账置 RELEASED(序号回到可用池),来源行重新可选 */
+    /** 释放占用(删除/作废下游单据):link 置 RELEASED,来源行重新可选。
+     *  2026-09-21 取号时机迁移:批次台账**不再回收**(批次号在采购入库单审核时已定,回收会重号,
+     *  用户口径「弃审/作废不回收批次号」)—— batchService.releaseByTarget 现为不回收实现。 */
     public void release(String targetPanel, String targetFormNo) {
         try {
             jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"

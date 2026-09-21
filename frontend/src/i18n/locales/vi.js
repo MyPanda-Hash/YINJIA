@@ -1613,5 +1613,8 @@ export default {
     '该订单暂无送料批次': 'Đơn này chưa có lô giao hàng',
     '点击查看送料批次': 'Nhấn để xem lô giao hàng',
     '已送合计': 'Tổng đã giao',
+    '待编号': 'Chờ số',
+    '{n} 批待编号': '{n} lô chờ số',
+    '待采购入库单审核时生成': 'Sinh số khi duyệt phiếu nhập mua',
   },
 }
