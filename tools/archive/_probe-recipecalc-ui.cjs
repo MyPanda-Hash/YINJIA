@@ -429,8 +429,19 @@ async function main() {
     if (!gone.length) ok('⑧-2 新版面已撤掉「外观要求」「内孔要求」(数据键与历史值仍在库里)')
     else bad(`⑧-2 旧标签还在:${JSON.stringify(gone)}`)
     const trio = p1.rows.find((r) => r.includes('理论最低灌料重量g')) || ''
-    if (trio.includes('理论灌料中间值g') && trio.includes('理论最高灌料重量g')) ok('⑧-3 灌料三值同一行并排(理论最低/中间/最高)')
-    else bad(`⑧-3 三值没并排,该行 = ${JSON.stringify(trio)}`)
+    const trioIdx = p1.rows.indexOf(trio)
+    const trioNext = p1.rows[trioIdx + 1] || ''
+    // 2026-09-21 用户口径:三个标签连在一行,数值填在**下方那一行**(不是标签右边)
+    if (trio.includes('理论灌料中间值g') && trio.includes('理论最高灌料重量g')) ok('⑧-3 三个灌料重量标签连在同一行')
+    else bad(`⑧-3 三个标签没在同一行,该行 = ${JSON.stringify(trio)}`)
+    const trioInputs = await ev(`(function(){ var rs=document.querySelector('.record-sheet'); if(!rs) return -1
+      var trs=[].slice.call(rs.querySelectorAll('tr'))
+      var i=trs.findIndex(function(tr){return (tr.textContent||'').indexOf('理论最低灌料重量g')>=0})
+      if(i<0) return -1
+      var nxt=trs[i+1]; if(!nxt) return -1
+      return nxt.querySelectorAll('input,textarea').length })()`)
+    if (trioInputs === 3) ok('⑧-3b 下一行正好 3 个输入格(值填在下方行)')
+    else bad(`⑧-3b 标签下方那行的输入格数应为 3,实际 ${trioInputs}`)
     if (p1.libPicks >= 2) ok(`⑧-4 文本框版式的标准库字段带「⌄标准库」(实际 ${p1.libPicks} 处:配料要求/热压要求)`)
     else bad(`⑧-4 期望 ≥2 处 ⌄标准库,实际 ${p1.libPicks}`)
     if (p1.libMaint >= 3) ok(`⑧-5 下拉版式的标准库字段带「⧉标准库维护」(实际 ${p1.libMaint} 处)`)
@@ -464,6 +475,16 @@ async function main() {
       return !!rs.querySelector('input[placeholder="'+ph+'"], textarea[placeholder="'+ph+'"]') })()`)
     if (phOk) ok('⑧-12 「实际灌料重量计算公式」空着时显示设计模板文字作为背景提示词')
     else bad('⑧-12 实际灌料重量计算公式 的背景提示词没渲染出来')
+    // 产品基本信息 与 工序 之间不该有空白行(2026-09-21 用户口径)
+    const between = await ev(`(function(){ var rs=document.querySelector('.record-sheet'); if(!rs) return null
+      var trs=[].slice.call(rs.querySelectorAll('tr'))
+      var ib=trs.findIndex(function(tr){return tr.querySelector('.rs-sectionbar') && tr.textContent.indexOf('产品基本信息')>=0})
+      var ip=trs.findIndex(function(tr){return tr.querySelector('.rs-sectionbar') && tr.textContent.indexOf('工序')>=0})
+      if(ib<0||ip<0) return null
+      var mid=trs.slice(ib+1, ip).map(function(tr){ return (tr.innerText||'').replace(/\\s/g,'') })
+      return { count: mid.length, rows: mid } })()`)
+    if (between && between.count === 2) ok(`⑧-13 产品基本信息 与 工序 之间只有 2 行(标签行+值行),没有空白行`)
+    else bad(`⑧-13 产品基本信息与工序之间应为 2 行,实际 ${JSON.stringify(between)}`)
     const shot8 = await shot('08-page1-relayout')
     console.log('  --   截图(⑧):' + shot8)
   } finally {

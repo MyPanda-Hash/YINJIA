@@ -232,7 +232,6 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '外观要求', type: 'select' },
           { key: '生产车间', type: 'select' },
         ]},
-        { grid: [{ fixed: '·', span: 11 }] },
       ]},
       { page: 1, bar: '工序', rows: [
         { grid: [
@@ -244,18 +243,18 @@ const RD_MOLD_PROC_SEC0 = [
           { label: '配料要求' },
           { key: '配料要求', span: 10, area: true },
         ]},
-        // 灌料:三值并排(设计口径 1 位小数,数值由配方计算回填)
+        // 灌料:标签行 + 值行 两行式(设计图:三个标签连在一行,数值填在**下方那一行**)
         { grid: [
           { label: '灌料', rowspan: 5 },
-          { label: '理论最低灌料重量g', span: 2 },
-          { key: '理论最低灌料重量g', span: 2 },
-          { label: '理论灌料中间值g', span: 2 },
-          { key: '理论灌料中间值g' },
-          { label: '理论最高灌料重量g', span: 2 },
-          { key: '理论最高灌料重量g' },
+          { label: '理论最低灌料重量g', span: 3 },
+          { label: '理论灌料中间值g', span: 3 },
+          { label: '理论最高灌料重量g', span: 4 },
         ]},
-        // 设计图里三值下方留一个空白行(保持纸面行距,不承载任何字段)
-        { grid: [{ fixed: '·', span: 10 }] },
+        { grid: [
+          { key: '理论最低灌料重量g', span: 3 },
+          { key: '理论灌料中间值g', span: 3 },
+          { key: '理论最高灌料重量g', span: 4 },
+        ]},
         { grid: [
           { label: '理论水分', span: 2 },
           { key: '理论水分', span: 8 },
