@@ -923,7 +923,9 @@ public class PanelConfigService {
     private static final Map<String, String[][]> FLOW_HEAD_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
             "PU_REQ|PU_ORDER", new String[][]{{"建议供应商", "供应商"}},
             "PU_ORDER|PURCHASE_IN", new String[][]{{"单据编号", "采购订单号"}},
-            "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}},
+            // 销售订单 → 生产加工单:订单号落 销售订单号;交期落 预完工日(2026-09-21 补:
+            // 加工单排产要以订单交期为预完工日,缺此条则生单后交期为空)
+            "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "预完工日"}},
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}},
             "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}},
