@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 import {
   SLOT_GROUPS, groupOfMaterialType, parseRatio, parseDensityRange, moisturePercent,
   slotsFromRows, paramsFromHead, buildPatch, applyArchiveMoisture,
+  parseLengthRange, sinterRowsFromQuery, sinterRowsForWorkshop, sinterParams, sinterPatch, sinterLengthWarning,
 } from './recipeSheet.js'
 import { compute } from './recipeEngine.js'
 
@@ -91,6 +92,79 @@ test('含水率从物料档案带出:只填粉料位里"没被用户改过"的�
   const r3 = applyArchiveMoisture(sparse, Array(10).fill(''), [], archive)
   assert.equal(r3.values[0], '6')
   assert.deepEqual(r3.missingCodes, [])
+})
+
+/* ── 烧结尺寸表(60 行模具↔炭棒内外径公差对照):弹窗按 车间+型号 带出尺寸 ── */
+
+const sinterRow = (over = {}) => ({
+  车间: '1', 型号: '57*30', 模具尺寸: '57', 中心杆尺寸: '30',
+  炭棒外径: '56.5', 炭棒外径公差: '±0.5', 炭棒内径: '29.5', 炭棒内径公差: '±0.5', 长度范围: '10-300', ...over,
+})
+
+test('长度范围只解析前段数字(设计源有 3 行脏值:混车间备注/带精度说明)', () => {
+  assert.deepEqual(parseLengthRange('10-120'), [10, 120])
+  assert.deepEqual(parseLengthRange('10-300 （只可做低精度）'), [10, 300])
+  // 设计源原样保留的那行:'1#车间不封底10-300 ⏎4#车间封底200-220' —— 取第一个 NNN-NNN
+  assert.deepEqual(parseLengthRange('1#车间不封底10-300 \n4#车间封底200-220'), [10, 300])
+  assert.equal(parseLengthRange(''), null)
+  assert.equal(parseLengthRange('（只可做低精度）'), null)
+})
+
+test('档案面板的主从响应要拍平,停用的行不参与(否则工艺员会选到停用模具)', () => {
+  const raw = { totalSize: 3, list: [{ 编号: '烧结尺寸表', detail: { items: [
+    sinterRow(), sinterRow({ 型号: '60*45', 炭棒外径: '59.5' }), sinterRow({ 型号: '旧模', 停用: true }),
+  ] } }] }
+  const rows = sinterRowsFromQuery(raw)
+  assert.equal(rows.length, 2)
+  assert.deepEqual(rows.map((r) => r.型号), ['57*30', '60*45'])
+  // 也兼容"平铺数组"形状,避免换个接口就静默变空
+  assert.equal(sinterRowsFromQuery([sinterRow()]).length, 1)
+  assert.equal(sinterRowsFromQuery(null).length, 0)
+  // 车间 `1/3` 表示两个车间共用该型号 ⇒ 按 '/' 拆开匹配,否则 1 号车间的人选不到 45*25
+  const shared = [sinterRow({ 车间: '1/3', 型号: '45*25' }), sinterRow({ 车间: '2', 型号: '28*11' })]
+  assert.deepEqual(sinterRowsForWorkshop(shared, '1').map((r) => r.型号), ['45*25'])
+  assert.deepEqual(sinterRowsForWorkshop(shared, '3').map((r) => r.型号), ['45*25'])
+  assert.deepEqual(sinterRowsForWorkshop(shared, '2').map((r) => r.型号), ['28*11'])
+  assert.equal(sinterRowsForWorkshop(shared, '').length, 2)   // 没选车间 = 全部
+})
+
+test('选中型号 → 引擎尺寸与回填四格都来自这张表', () => {
+  const r = sinterRow()
+  assert.deepEqual(sinterParams(r), { od: 56.5, id: 29.5 })
+  assert.deepEqual(sinterPatch(r), { 外径mm: '56.5', 外径公差: '±0.5', 内径mm: '29.5', 内径公差: '±0.5' })
+})
+
+test('选了模具后引擎尺寸以表为准(压过单据上的炭棒规格)', () => {
+  const head = { 炭棒规格1: '59.5', 炭棒规格2: '39.5', 炭棒规格3: '120', 实际密度管控下限: '0.58', 实际密度管控上限: '0.60' }
+  const plain = paramsFromHead(head, { cavities: 2, conversion_ratio: 0.5 })
+  assert.equal(plain.params.od, 59.5)
+  const picked = paramsFromHead(head, { cavities: 2, conversion_ratio: 0.5, od: 16, id: 9 })
+  assert.equal(picked.params.od, 16)
+  assert.equal(picked.params.id, 9)
+  assert.equal(picked.missing.length, 0)
+  // 只带 od 也要能用(id 仍回退单据)
+  const half = paramsFromHead(head, { cavities: 2, conversion_ratio: 0.5, od: 16 })
+  assert.equal(half.params.od, 16)
+  assert.equal(half.params.id, 39.5)
+})
+
+test('选了模具后长度越界要提示(设计源的长度范围就是干这个的)', () => {
+  assert.equal(sinterLengthWarning(sinterRow(), 120), null)
+  assert.equal(sinterLengthWarning(sinterRow(), 300), null)
+  assert.ok(sinterLengthWarning(sinterRow(), 301)?.includes('超过'))
+  assert.ok(sinterLengthWarning(sinterRow(), 9)?.includes('小于'))
+  assert.equal(sinterLengthWarning(sinterRow({ 长度范围: '（只可做低精度）' }), 999), null)  // 解析不出范围就不提示
+})
+
+test('回填补丁可以带上烧结尺寸四格(与引擎算出的项合并,不互相覆盖)', () => {
+  const { slots } = slotsFromRows(rows14)
+  const result = compute(
+    { od: 45, id: 30, length: 200, cavities: 1, density_low: 1.2, density_high: 1.4, conversion_ratio: 0.5 },
+    slots.map((s) => ({ design_ratio: s.designRatio, amount_g: s.amountG, moisture: 0.05 })))
+  const patch = buildPatch(result, slots, sinterPatch(sinterRow()))
+  assert.equal(patch.head.外径mm, '56.5')
+  assert.equal(patch.head.内径公差, '±0.5')
+  assert.equal(patch.head.理论灌料中间值g, result.pour_weights.std.toFixed(1))
 })
 
 test('密度范围文本可解析:密度范围：0.56~0.58', () => {

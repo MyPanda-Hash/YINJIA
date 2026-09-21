@@ -29,6 +29,32 @@
         </label>
       </div>
 
+      <!-- ①b 烧结尺寸(模具):选了型号就用它的炭棒内外径与公差,不再手敲 -->
+      <div class="rcd-sec-h">
+        <span class="rcd-sec-t">①b {{ tt('烧结尺寸(模具)') }}</span>
+        <span class="rcd-muted">{{ sinterTip }}</span>
+        <span class="rcd-act" @click="openSinterTable">{{ tt('维护尺寸表') }}</span>
+      </div>
+      <div class="rcd-params">
+        <label class="rcd-pf">
+          <span class="rcd-pf-lb">{{ tt('车间') }}</span>
+          <el-select v-model="sinterWorkshop" size="small" class="rcd-pf-in" clearable @change="onSinterWorkshopChange">
+            <el-option v-for="w in sinterWorkshops" :key="w" :label="w" :value="w" />
+          </el-select>
+        </label>
+        <label class="rcd-pf">
+          <span class="rcd-pf-lb">{{ tt('型号') }}</span>
+          <el-select v-model="sinterModel" size="small" class="rcd-pf-in" clearable filterable @change="onDirtyInput">
+            <el-option v-for="r in sinterRowsInWorkshop" :key="r['型号']" :value="r['型号']"
+                       :label="`${r['型号']}（${tt('炭棒')}${r['炭棒外径']}*${r['炭棒内径']}）`" />
+          </el-select>
+        </label>
+        <div class="rcd-pf">
+          <span class="rcd-pf-lb">{{ tt('带出尺寸') }}</span>
+          <span class="rcd-r-v">{{ sinterSummary }}</span>
+        </div>
+      </div>
+
       <!-- ② 料位(读单据页 2 配方表)+ 含水率 -->
       <div class="rcd-sec-h">
         <span class="rcd-sec-t">② {{ tt('料位与含水率') }}</span>
@@ -135,7 +161,8 @@ import request from '@/core/request'
 import { tt } from '@/i18n'
 import StdLibManager from './StdLibManager.vue'
 import { compute } from '@/core/mold/recipeEngine.js'
-import { applyArchiveMoisture, buildPatch, moisturePercent, paramsFromHead, slotsFromRows } from '@/core/mold/recipeSheet.js'
+import { applyArchiveMoisture, buildPatch, moisturePercent, paramsFromHead, slotsFromRows,
+  sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery } from '@/core/mold/recipeSheet.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
 
 /**
@@ -176,6 +203,47 @@ const paramEntryId = ref(null)
 const paramScopeTip = ref('')
 const paramLibVisible = ref(false)
 
+/* ── 烧结尺寸表(60 行模具↔炭棒内外径公差对照):选了型号 ⇒ 尺寸以表为准 + 回填页 1 检验要求四格 ── */
+const sinterRows = ref([])
+const sinterWorkshop = ref('')
+const sinterModel = ref('')
+const sinterTip = ref('')
+const sinterWorkshops = computed(() => [...new Set(sinterRows.value.map((r) => String(r['车间'] ?? '').trim()).filter(Boolean))])
+const sinterRowsInWorkshop = computed(() => sinterRowsForWorkshop(sinterRows.value, sinterWorkshop.value || String(props.head?.['生产车间'] ?? '')))
+const sinterRow = computed(() => sinterRowsInWorkshop.value.find((r) => String(r['型号'] ?? '').trim() === sinterModel.value) || null)
+const sinterSummary = computed(() => {
+  const r = sinterRow.value
+  if (!r) return tt('未选型号 —— 尺寸按单据上的炭棒规格')
+  return `${tt('外径')} ${r['炭棒外径']} ${r['炭棒外径公差']} / ${tt('内径')} ${r['炭棒内径']} ${r['炭棒内径公差']}`
+})
+const sinterHint = computed(() => (sinterRow.value ? (sinterLengthWarning(sinterRow.value, props.head?.['炭棒规格3']) || '') : ''))
+
+/** 车间默认取单据上的生产车间;表里 `1/3` 这类写法由 sinterRowsForWorkshop 按 '/' 拆开匹配 */
+function onSinterWorkshopChange() { sinterModel.value = '' }
+
+async function loadSinterRows() {
+  sinterTip.value = tt('正在读取烧结尺寸表…')
+  try {
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: 'RD_SINTER_TOL', condition: {}, pageNo: 1, pageSize: 500,
+    })
+    sinterRows.value = sinterRowsFromQuery(res)
+    sinterTip.value = sinterRows.value.length
+      ? `· ${tt('来自烧结尺寸表')} ${sinterRows.value.length} ${tt('个型号')}`
+      : `· ${tt('尺寸表没有可用行')}`
+  } catch {
+    // 权限/接口异常都按"读不到"处理:退回单据上手填,不阻断计算(探测过的 403 场景)
+    sinterRows.value = []
+    sinterTip.value = `· ${tt('读不到烧结尺寸表（可能没有该面板权限），尺寸按单据上手填')}`
+  }
+}
+
+/** 维护入口:直接开那个档案面板(它没有侧栏菜单,入口就放在用它的人手边) */
+function openSinterTable() {
+  const url = `${location.origin}${location.pathname}#/panelx/list/RD_SINTER_TOL`
+  window.open(url, '_blank')
+}
+
 /** 参数库维护:改完(编辑/停用/恢复启用)立刻把当前产品的参数重新载入,免得界面还显示旧值 */
 function openParamLib() { paramLibVisible.value = true }
 async function onParamLibChanged() {
@@ -200,8 +268,17 @@ function onMoistureInput(i) {
   if (!moistureTouched.value.includes(i)) moistureTouched.value = [...moistureTouched.value, i]
 }
 
-const overrides = computed(() => Object.fromEntries(
-  Object.entries(form).map(([k, v]) => [k, Number(String(v).trim())]).filter(([, v]) => Number.isFinite(v))))
+const overrides = computed(() => {
+  const base = Object.fromEntries(
+    Object.entries(form).map(([k, v]) => [k, Number(String(v).trim())]).filter(([, v]) => Number.isFinite(v)))
+  // 选了烧结尺寸 ⇒ 外径/内径以表为准(engine 入参用 od/id 覆盖,单据上的炭棒规格退居兜底)
+  if (sinterRow.value) {
+    const sp = sinterParams(sinterRow.value)
+    if (sp.od !== null) base.od = sp.od
+    if (sp.id !== null) base.id = sp.id
+  }
+  return base
+})
 
 const slots = computed(() => slotsFromRows(props.rows).slots
   // 弹窗输入是百分数(exe 前端同款),引擎吃小数 —— 换算在 recipeSheet.moisturePercent 里,有单测
@@ -222,7 +299,9 @@ const blockReason = computed(() => {
   if (parsed.value.error) return parsed.value.error
   return ''
 })
-const patch = computed(() => (result.value ? buildPatch(result.value, slots.value) : null))
+const patch = computed(() => (result.value
+  ? buildPatch(result.value, slots.value, sinterRow.value ? sinterPatch(sinterRow.value) : null)
+  : null))
 const rowWarnings = computed(() => slotsFromRows(props.rows).warnings)
 /** 空料位不必报"水分未采集"(那不是问题,是没这个料位) */
 const visibleWarnings = computed(() => {
@@ -284,6 +363,8 @@ async function onOpen() {
   paramEntryId.value = null
   Object.assign(form, builtinDefaults())
   paramScopeTip.value = scopeTip()
+  sinterModel.value = ''
+  sinterWorkshop.value = String(props.head?.['生产车间'] ?? '').trim()
   const key = productCode.value || DEFAULT_ITEM
   try {
     const hit = await fetchParam(key)
@@ -296,6 +377,7 @@ async function onOpen() {
     paramScopeTip.value = `${scopeTip()}；${tt('参数库读取失败，已退回内置默认值')}`
   }
   await loadArchiveMoisture()
+  await loadSinterRows()
 }
 
 /**

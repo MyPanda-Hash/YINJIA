@@ -54,6 +54,9 @@ const RECIPE_ROWS = [
 ]
 const EXP_MOISTURE = ['6', '5', '4', '8', '5']
 
+/** 第 ⑦ 段:选 4# 车间 16*9 模具后的期望值(同样由 exe 真引擎算出:od 15.5 / id 8.5) */
+const EXP_SINTER = { low: '22.7', std: '22.8', high: '22.9', slot1_ratio: '47.22%', slot1_amt: '10.35' }
+
 let failed = 0
 const ok = (m) => console.log('  ok   ' + m)
 const bad = (m) => { failed++; console.log('  FAIL ' + m) }
@@ -366,6 +369,45 @@ async function main() {
     const left = ((await stdlibList('mold.calcparam'))?.data || []).map((r) => r.item)
     if (!left.includes(PROBE_ITEM)) ok(`⑥-5 临时条目已清理,库里剩 ${JSON.stringify(left)}`)
     else bad(`⑥-5 临时条目没清掉:${JSON.stringify(left)}`)
+
+    // ════ ⑦ 烧结尺寸表:选型号 → 尺寸以表为准 + 回填页 1 检验要求四格 ════
+    await dlgBtn('关闭'); await sleep(800)
+    // ⑥ 里重开过弹窗 ⇒ 参数回到"系统默认"(一切几 1 / 公差 2.5,本单没有产品编号,这是设计行为);
+    // 期望值按 2 腔 + 上限 3.5 算,这里显式再设一遍,否则比的是另一组数
+    await setParam('一切几', '2'); await sleep(300)
+    await setParam('成型长度公差上限mm', '3.5'); await sleep(400)
+    const picks = await ev(`(function(){ var d=${DLG}; if(!d) return 0
+      var rows=[].slice.call(d.querySelectorAll('.rcd-pf'))
+      for(var i=0;i<rows.length;i++){ if(rows[i].textContent.indexOf('型号')>=0){ var inp=rows[i].querySelector('input'); if(inp){ inp.click(); return 1 } } } return 0 })()`)
+    if (picks !== 1) bad('⑦-0 点不开「型号」下拉')
+    await sleep(900)
+    const chosen = await ev(`(function(){
+      var items=[].slice.call(document.querySelectorAll('.el-select-dropdown__item')).filter(function(i){return i.offsetParent})
+      for(var i=0;i<items.length;i++){ if(items[i].textContent.trim().indexOf('16*9')===0){ items[i].click(); return items[i].textContent.trim() } } return null })()`)
+    if (chosen) ok(`⑦-1 选中烧结尺寸型号:${chosen}`)
+    else bad('⑦-1 下拉里没找到 16*9(烧结尺寸表没读到?)')
+    await sleep(1000)
+    const resS = await dlgResults() || {}
+    const expS = { 理论最低灌料重量g: EXP_SINTER.low, 理论灌料中间值g: EXP_SINTER.std, 理论最高灌料重量g: EXP_SINTER.high, 中间值mm: '256.0' }
+    const diffS = Object.entries(expS).filter(([k, v]) => !String(Object.entries(resS).find(([rk]) => rk === k)?.[1] ?? '').includes(v))
+    if (!diffS.length) ok(`⑦-2 选了 16*9 后引擎尺寸改用表的 15.5/8.5,结果与 exe 一致(${EXP_SINTER.low} / ${EXP_SINTER.std} / ${EXP_SINTER.high} / 中间值mm 256.0)`)
+    else bad(`⑦-2 换模具后结果不对:${JSON.stringify(diffS.map(([k, v]) => [k, '期望含' + v, Object.entries(resS).find(([rk]) => rk === k)?.[1]]))}`)
+    const slotS = (await dlgSlots() || [])[0] || []
+    if (slotS[6] === EXP_SINTER.slot1_ratio && slotS[7] === EXP_SINTER.slot1_amt) ok(`⑦-3 料位1 随尺寸改写为 ${EXP_SINTER.slot1_ratio}/${EXP_SINTER.slot1_amt}`)
+    else bad(`⑦-3 料位1 应为 ${EXP_SINTER.slot1_ratio}/${EXP_SINTER.slot1_amt},实际 ${slotS[6]}/${slotS[7]}`)
+    const prevS = await dlgPreview()
+    if (prevS.includes('外径mm') && prevS.includes('15.5') && prevS.includes('内径公差') && prevS.includes('±0.5')) {
+      ok('⑦-4 回填预览包含烧结尺寸四格(外径mm/外径公差/内径mm/内径公差)')
+    } else bad(`⑦-4 回填预览缺烧结尺寸四格:${JSON.stringify(prevS.slice(0, 200))}`)
+    const shot6 = await shot('06-sinter-picked')
+
+    await dlgBtn('填入单据'); await sleep(1800)
+    await clickTab('成型工艺清单'); await sleep(1200)
+    const p1s = String(await ev(`(function(){ return [].slice.call(document.querySelectorAll('input,textarea')).map(function(i){return i.value}).join('~') })()`))
+    if (p1s.includes('15.5') && p1s.includes('8.5') && p1s.includes('±0.5')) ok('⑦-5 页 1「检验要求·炭棒尺寸」四格已按烧结尺寸表回填(15.5 / 8.5 / ±0.5)')
+    else bad(`⑦-5 页 1 没看到烧结尺寸:${JSON.stringify(p1s.slice(0, 300))}`)
+    const shot7 = await shot('07-page1-sinter')
+    console.log('  --   截图(⑦):' + [shot6, shot7].filter(Boolean).join(' , '))
   } finally {
     if (ws) { try { ws.close() } catch { /* ignore */ } }
     try { edge.kill() } catch { /* ignore */ }

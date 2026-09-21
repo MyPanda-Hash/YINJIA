@@ -139,6 +139,70 @@ export function slotsFromRows(rows) {
   return { slots, warnings }
 }
 
+/* ── 烧结尺寸表(60 行模具↔炭棒内外径公差对照,表 rd_sinter_tolerance)──────────────── */
+
+/**
+ * 「长度范围」文本 → [下限, 上限]。
+ * 设计源有 3 行脏值(`1#车间不封底10-300 ⏎4#车间封底200-220`、两行带 `（只可做低精度）`),
+ * 按 §12.4 的口径**原样存库**,解析时只取前段 `NNN-NNN`(取不到就不提示,不猜)。
+ */
+export function parseLengthRange(text) {
+  const m = String(text ?? '').match(/(\d+)\s*-\s*(\d+)/)
+  if (!m) return null
+  const a = Number(m[1]); const b = Number(m[2])
+  return a <= b ? [a, b] : [b, a]
+}
+
+/**
+ * 档案面板查询结果 → 行数组。
+ * ⚠ 档案面板返回**主从结构**(list[0].detail.items[]),平铺数组也兜住;停用的行剔除 ——
+ * 否则工艺员会在弹窗里选到一个已经停用的模具。
+ */
+export function sinterRowsFromQuery(data) {
+  const d = (data && data.data !== undefined) ? data.data : data
+  const list = Array.isArray(d) ? d : (d?.list || d?.rows || [])
+  const rows = []
+  list.forEach((m) => {
+    const items = m?.detail?.items || m?.detail?.children
+    if (Array.isArray(items)) rows.push(...items)
+    else if (m && typeof m === 'object') rows.push(m)
+  })
+  const isOff = (v) => v === true || v === 1 || v === '1' || v === 'Y' || v === '是' || String(v ?? '').trim() === 'True'
+  return rows.filter((r) => !isOff(r['停用']))
+}
+
+/** 按车间挑行:表里 `1/3` 这种写法表示两个车间共用该型号,所以按 '/' 拆开匹配 */
+export function sinterRowsForWorkshop(rows, workshop) {
+  const w = String(workshop ?? '').trim()
+  if (!w) return rows || []
+  return (rows || []).filter((r) => String(r?.['车间'] ?? '').split('/').map((s) => s.trim()).includes(w))
+}
+
+/** 选中行 → 引擎要的外径/内径(取不到给 null,交给 paramsFromHead 回退单据) */
+export function sinterParams(row) {
+  const toNum = (k) => {
+    const v = Number(String(row?.[k] ?? '').trim())
+    return Number.isFinite(v) ? v : null
+  }
+  return { od: toNum('炭棒外径'), id: toNum('炭棒内径') }
+}
+
+/** 选中行 → 页 1「检验要求 · 炭棒尺寸」四格(设计口径:炭棒尺寸引用模具尺寸表) */
+export function sinterPatch(row) {
+  const pick = (k) => String(row?.[k] ?? '').trim()
+  return { 外径mm: pick('炭棒外径'), 外径公差: pick('炭棒外径公差'), 内径mm: pick('炭棒内径'), 内径公差: pick('炭棒内径公差') }
+}
+
+/** 长度越界提示(设计源的「长度范围」就是干这个的);解析不出范围或长度不可数则不提示 */
+export function sinterLengthWarning(row, length) {
+  const range = parseLengthRange(row?.['长度范围'])
+  const len = Number(length)
+  if (!range || !Number.isFinite(len)) return null
+  if (len > range[1]) return `长度 ${len} 超过该模具的可做范围 ${range[0]}-${range[1]}`
+  if (len < range[0]) return `长度 ${len} 小于该模具的可做范围 ${range[0]}-${range[1]}`
+  return null
+}
+
 /** 引擎入参:尺寸/密度读单据,工艺参数来自参数集(弹窗传入) */
 export function paramsFromHead(head, overrides = {}) {
   const h = head || {}
@@ -149,8 +213,11 @@ export function paramsFromHead(head, overrides = {}) {
     }
     return null
   }
-  const od = pick('炭棒规格1', '外径mm')
-  const id = pick('炭棒规格2', '内径mm')
+  // 尺寸优先取弹窗里选中的烧结尺寸行(表 rd_sinter_tolerance),没选才回退单据上的炭棒规格/外径内径
+  const overOd = parseNumber(overrides.od)
+  const overId = parseNumber(overrides.id)
+  const od = overOd !== null ? overOd : pick('炭棒规格1', '外径mm')
+  const id = overId !== null ? overId : pick('炭棒规格2', '内径mm')
   const length = pick('炭棒规格3')
   let densityLow = pick('实际密度管控下限')
   let densityHigh = pick('实际密度管控上限')
@@ -215,12 +282,14 @@ export function applyArchiveMoisture(slots, current, touched, archiveByCode) {
   return { values, filledSlots, missingCodes }
 }
 
-/** 引擎结果 → 回填补丁(只含有行或有值的料位;空料位不产生行补丁) */
-export function buildPatch(result, slots) {
+/** 引擎结果 → 回填补丁(只含有行或有值的料位;空料位不产生行补丁)
+ *  extraHead:额外要写的头字段(如烧结尺寸表带出的外径mm/外径公差/内径mm/内径公差);
+ *  **引擎算出来的项优先**,extraHead 只补它没有的键 —— 免得外部传错键把算好的值覆盖掉。 */
+export function buildPatch(result, slots, extraHead) {
   const p = result.params
-  const head = {
-    理论最低灌料重量g: fixed(result.pour_weights.low, 1),
-    理论灌料中间值g: fixed(result.pour_weights.std, 1),
+  const head = { ...(extraHead || {}) }
+  const engineHead = {
+    理论最低灌料重量g: fixed(result.pour_weights.low, 1),    理论灌料中间值g: fixed(result.pour_weights.std, 1),
     理论最高灌料重量g: fixed(result.pour_weights.high, 1),
     理论水分: fixed(result.moisture.powder_avg * 100, 2),
     最短长度mm: fixed(result.lengths.low, 1),
@@ -232,6 +301,7 @@ export function buildPatch(result, slots) {
     实际密度管控下限: fixed(p.density_low, 2),
     实际密度管控上限: fixed(p.density_high, 2),
   }
+  Object.assign(head, engineHead)   // 引擎算出来的项优先
   const rows = []
   slots.forEach((s, i) => {
     if (s.rowIndex < 0) return

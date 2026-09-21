@@ -686,3 +686,21 @@ migrate-mold-calcparam.sql
 #   QUOTED_IDENTIFIER 报错 —— 同一个脚本在测试库能过、在正式库失败,就是这个坑)。
 # 前端:core/mold/recipeSheet.js 的 applyArchiveMoisture(有单测)+ RecipeCalcDialog 自动带出并标「档案」来源。
 migrate-recipe-materials.sql
+
+# ── 2026-09-21 烧结尺寸表(60 行模具↔炭棒内外径公差对照)+ 档案面板 ─────────────────────
+# 用途:配方计算弹窗按「车间 + 型号」从这张表带出炭棒外径/内径与公差 ⇒ 回填页 1
+#   「检验要求 · 炭棒尺寸」四格,并作为引擎的 od/id(压过单据上的炭棒规格);工艺员不必再手敲。
+# 来源:设计源《20267月22日-最新烧结配方模板-1.xlsx》sheet「烧结尺寸表」(A1:I63,R4~R63 共 60 行),
+#   由 tools/gen/gen-sinter-tolerance.cjs 生成(不要手改生成的 SQL):
+#     node tools/gen/gen-sinter-tolerance.cjs
+# migrate-sinter-tolerance.sql —— ① 建表 rd_sinter_tolerance + 表/列中文注明;
+#   ② 登记**档案面板** RD_SINTER_TOL(mode='archive',用现成列表/内联编辑维护 60 行,不另写维护界面)
+#   + 10 个字段 + 译名;③ 60 行种子(按 车间+型号 去重,已存在不覆盖);按车间 1#22 / 2#12 / 3#13 / 4#12 / 1/3#1。
+#   ⚠ 脏值原样保留(§12.4):长度范围混车间备注的 1 行、带「（只可做低精度）」的 2 行 ——
+#     程式只解析前段 NNN-NNN(parseLengthRange),越界给提示不拦。
+#   ⚠ 车间列有 `1/3` 写法(两车间共用型号):挑行按 '/' 拆开匹配(sinterRowsForWorkshop)。
+#   ⚠ 该面板没有侧栏菜单(研发管理四个分组各有其语义,塞进去会污染产品开发下发矩阵)——
+#     入口放在配方计算弹窗的「维护尺寸表」上;要挂侧栏再说,记得同改 menus.test.js 的计数断言。
+# 前端:recipeSheet.js 的 parseLengthRange/sinterRowsFromQuery/sinterRowsForWorkshop/sinterParams/
+#   sinterPatch/sinterLengthWarning(均有单测)+ RecipeCalcDialog 的「①b 烧结尺寸(模具)」块。
+migrate-sinter-tolerance.sql
