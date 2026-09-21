@@ -140,7 +140,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         targetHead.put("来源单据", srcDef.name());
         targetHead.put("来源单号", sourceNo);
         // 单据日期=创建当日,不继承来源单日期(2026-09-17 用户口径)。注意:head 键=目标字段标签
-        // (save 按标签映射列),而 yj_panel.date_col 是列名(如 SL_RECV 列=单据日期/标签=日期),
+        // (save 按标签映射列),而 yj_panel.date_col 是列名(如 QC_RECV 列=单据日期/标签=日期),
         // 故先按列名反查目标字段再用其标签写入;查不到时兜底「单据日期」标签。
         PanelRegistry.PanelDef tgtDef = registry.panel(target);
         String dateLabel = "单据日期";
@@ -320,7 +320,7 @@ public class PushGenerateHandler implements PanelActionHandler {
             p.put("qty", qty);
             picked.add(p);
         }
-        if (picked.isEmpty()) throw new IllegalStateException("该采购订单已无剩余可送(各明细行均已送满)");
+        if (picked.isEmpty()) throw new IllegalStateException("该单据已无剩余可送(各明细行均已送满)");
 
         // 4) 头/行映射(与选单共用 buildSelectConfig),再覆盖 本次数量 + 批次号
         Map<String, Object> maps = configService.flowMaps(sourcePanel, targetPanel);

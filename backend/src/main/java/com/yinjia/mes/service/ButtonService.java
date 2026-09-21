@@ -289,8 +289,9 @@ public class ButtonService {
         if (DOC_ARCHIVE_PANELS.contains(def.code())) refreshModifyDiff(def, no);
         // 规格书修改态保存且检验项目及标准页发生变化 → 通知关联出货检验计划表(仅变更提醒,不做内容比对)
         if (specTestOld != null) notifyInspPlansOnSpecTestChange(no, specTestOld, user);
-        // 送料暂收单:保存(含修改)后同步修改由它生成的来料检验单(共享字段镜像,见 syncInspFromSlRecv)
-        if ("SL_RECV".equals(def.code())) syncInspFromSlRecv(no, user);
+        // 送料暂收单(面板编码 QC_RECV,2026-09-20 由 SL_RECV 改):保存(含修改)后同步修改
+        // 由它生成的来料检验单(共享字段镜像,见 syncInspFromSlRecv)
+        if ("QC_RECV".equals(def.code())) syncInspFromSlRecv(no, user);
 
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
         if (DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
@@ -378,16 +379,17 @@ public class ButtonService {
     // ==================== 送料暂收单 → 来料检验单 同步修改(2026-09-15) ====================
 
     /**
-     * 送料暂收单(SL_RECV)弃审联动(2026-09-17):由它生成的来料检验单若已审核则一并弃审——
+     * 送料暂收单(QC_RECV,原名 SL_RECV,2026-09-20 改面板编码)弃审联动(2026-09-17):
+     * 由它生成的来料检验单若已审核则一并弃审——
      * 递归复用 unaudit(QC_INSP) 的全部联动(其下游入库/退料草稿作废释放,已审核则拒绝并提示先弃审)。
      * 检验单为草稿则不动(暂收保存时 syncInspFromSlRecv 会镜像同步)。
-     * 链路口径:SL→IJ 占用在检验单作废时才 RELEASED,审核不变更,联动弃审后链保持 ACTIVE,同步可寻址。
+     * 链路口径:暂收→IJ 占用在检验单作废时才 RELEASED,审核不变更,联动弃审后链保持 ACTIVE,同步可寻址。
      */
     private void slUnauditCascade(String panelCode, String no, String user) {
-        if (!"SL_RECV".equals(panelCode)) return;
+        if (!"QC_RECV".equals(panelCode)) return;
         List<String> targets = jdbc.queryForList(
                 "SELECT DISTINCT target_form_no FROM form_flow_link"
-                        + " WHERE source_panel_code = 'SL_RECV' AND source_form_no = ?"
+                        + " WHERE source_panel_code = 'QC_RECV' AND source_form_no = ?"
                         + " AND target_panel_code = 'QC_INSP'", String.class, no);
         for (String tno : targets) {
             String st = String.valueOf(docStatusOf("QC_INSP", tno).get("status"));
@@ -445,8 +447,8 @@ public class ButtonService {
 
 
     /**
-     * 送料暂收单(SL_RECV)保存后,同步修改由它生成的来料检验单(QC_INSP):
-     * - 关联 = form_flow_link(SL_RECV→QC_INSP,ACTIVE,生单时写入;行键=单号#行表id,行 id 跨保存稳定);
+     * 送料暂收单(QC_RECV,原名 SL_RECV,2026-09-20 改面板编码)保存后,同步修改由它生成的来料检验单(QC_INSP):
+     * - 关联 = form_flow_link(QC_RECV→QC_INSP,ACTIVE,生单时写入;行键=单号#行表id,行 id 跨保存稳定);
      * - 仅当检验单仍可编辑(草稿/修改中)时同步——已审核/审批中/已作废等不越权改动;
      * - 表头镜像 业务员/供应商代码/供应商/部门/部门名称/数量(单据日期不镜像——
      *   检验单保持自己的创建日期,2026-09-17 口径:被生单据日期=创建当日);
@@ -458,7 +460,7 @@ public class ButtonService {
     private void syncInspFromSlRecv(String no, String user) {
         List<String> targets = jdbc.queryForList(
                 "SELECT DISTINCT target_form_no FROM form_flow_link"
-                        + " WHERE source_panel_code = 'SL_RECV' AND source_form_no = ?"
+                        + " WHERE source_panel_code = 'QC_RECV' AND source_form_no = ?"
                         + " AND target_panel_code = 'QC_INSP' AND link_status = 'ACTIVE'", String.class, no);
         for (String tno : targets) {
             String st = String.valueOf(docStatusOf("QC_INSP", tno).get("status"));
@@ -473,7 +475,7 @@ public class ButtonService {
                     user, no, tno);
             List<Map<String, Object>> links = jdbc.queryForList(
                     "SELECT source_line_key, target_line_key FROM form_flow_link"
-                            + " WHERE source_panel_code = 'SL_RECV' AND source_form_no = ?"
+                            + " WHERE source_panel_code = 'QC_RECV' AND source_form_no = ?"
                             + " AND target_panel_code = 'QC_INSP' AND target_form_no = ? AND link_status = 'ACTIVE'",
                     no, tno);
             for (Map<String, Object> lk : links) {

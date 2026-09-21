@@ -663,7 +663,7 @@ const editable = computed(() => !isEdit.value || status.value === '草稿' || st
  *  (佐证材料,只写附件列与 yj_attachment,不动业务字段;金蝶同步进来的订单本来就是已审核);仅「已作废」禁止 */
 const ATTACH_EDIT_PANELS = new Set([
   'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
-  'SL_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT',
+  'QC_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT',
 ])
 const attachEditable = computed(() => {
   if (editable.value) return true
