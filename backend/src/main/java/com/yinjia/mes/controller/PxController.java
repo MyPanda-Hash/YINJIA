@@ -259,7 +259,24 @@ public class PxController {
         out.put("matched", nos.size());
         if (nos.isEmpty()) return ApiResult.ok(out);
 
-        String no = nos.get(0);
+        // 门禁(2026-09-21 用户口径):出货检验计划表按规格书自动带入检验方法,必须规格书**填写并提交审批完**
+        // 才行 —— 未定稿的检验方法填进出货检验计划,等于把没批准的检验口径发到产线。
+        // 门禁落在服务端(客户端绕不过);挑不到就把"是哪一张、什么状态"带回去,界面据此把原因说清楚。
+        String no = "";
+        String blockedNo = "";
+        String blockedStatus = "";
+        for (String cand : nos) {
+            String st = specStatusOf(cand);
+            if (specUsable(st)) { no = cand; break; }
+            if (blockedNo.isEmpty()) { blockedNo = cand; blockedStatus = st; }
+        }
+        if (no.isEmpty()) {
+            out.put("reason", "not_approved");
+            out.put("规格书编号", blockedNo);
+            out.put("规格书状态", blockedStatus);
+            return ApiResult.ok(out);
+        }
+        out.put("状态", specStatusOf(no));
         List<Map<String, Object>> heads = jdbc.queryForList(
                 "SELECT 单据编号, ISNULL(编号, N'') AS 编号, ISNULL(客户项目名称, N'') AS 客户项目名称,"
                         + " ISNULL(产品类别, N'') AS 产品类别, ISNULL(整体规格参数, N'') AS 整体规格参数"
@@ -278,6 +295,34 @@ public class PxController {
                         + " ISNULL(检验依据, N'') AS 检验依据"
                         + " FROM rd_spec_doc_detail WHERE 单据编号 = ? AND 表区 = N'检验要求' ORDER BY id", no));
         return ApiResult.ok(out);
+    }
+
+    /** 规格书可用状态:填写并提交审批完(审批通过 ⇒ 已归档/已审核)。草稿/审批中/修改中/已作废一律不可用 */
+    private static boolean specUsable(String status) {
+        return "已审核".equals(status) || "已归档".equals(status);
+    }
+
+    /**
+     * 规格书单据状态 —— 口径与 DevTaskService 的分发弹窗(CASE 派生)一致:
+     * 已作废 &gt; 已中止 &gt; 删除申请中 &gt; 修改申请中 &gt; 审批中 &gt; 修改中 &gt; 已归档 &gt; 已审核 &gt; 草稿。
+     * 读不到(表缺失/无状态行)一律按不可用返回"草稿" —— 宁可不带入,也不能拿没审批的口径去填出货检验计划。
+     */
+    private String specStatusOf(String no) {
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废' WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
+                            + " WHEN ISNULL(s.deleting,'N')='Y' THEN N'删除申请中' WHEN ISNULL(s.modify_state,N'')='R' THEN N'修改申请中'"
+                            + " WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' WHEN ISNULL(s.modify_state,N'')='Y' THEN N'修改中'"
+                            + " WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档'"
+                            + " WHEN ISNULL(s.shr,N'') <> N'' THEN N'已审核' ELSE N'草稿' END AS status"
+                            + " FROM rd_spec_doc_head h LEFT JOIN yj_doc_status s"
+                            + " ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = h.单据编号"
+                            + " WHERE h.单据编号 = ?", no);
+            if (rows.isEmpty() || rows.get(0).get("status") == null) return "草稿";
+            return String.valueOf(rows.get(0).get("status"));
+        } catch (Exception e) {
+            return "草稿";
+        }
     }
 
     /** 产品编号 → 该产品已分发的规格书单号(最新在前,去重);rd_spec_assign 优先,退回 head.编号 盖章 */

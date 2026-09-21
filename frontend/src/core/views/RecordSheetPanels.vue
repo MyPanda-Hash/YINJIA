@@ -1028,6 +1028,7 @@ import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
+import { specCarryFailure } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -1999,6 +2000,14 @@ async function autoFillFromSpec(code, afs) {
     return
   }
   if (!payload || !payload.found) {
+    // 门禁口径见 core/insp/specCarry.js:规格书必须填写并提交审批完,否则一个格都不带入
+    const fail = specCarryFailure(payload)
+    if (fail && fail.kind === 'not_approved') {
+      ElMessage.warning(tt('该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批')
+        .replace('{no}', fail.specNo || '')
+        .replace('{st}', fail.status || tt('未知')))
+      return
+    }
     ElMessage.info(tt('该产品编号还没有对应的规格书，请先分发规格书后再来引用'))
     return
   }
