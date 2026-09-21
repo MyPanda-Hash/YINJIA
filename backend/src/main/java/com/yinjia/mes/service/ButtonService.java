@@ -469,6 +469,7 @@ public class ButtonService {
             // 原写 s.单据编号 = t.单据编号 恒不匹配,表头镜像从未生效)
             jdbc.update("UPDATE t SET t.业务员 = s.业务员, t.供应商代码 = s.供应商代码,"
                             + " t.供应商 = s.供应商, t.部门 = s.部门, t.部门名称 = s.部门名称, t.数量 = s.数量,"
+                            + " t.暂收单号 = s.单据编号,"
                             + " t.asp_user2 = ?, t.asp_time2 = GETDATE()"
                             + " FROM qc_insp t JOIN sl_recv s ON s.单据编号 = ?"
                             + " WHERE t.单据编号 = ? AND ISNULL(t.asp_cancel, 'N') <> 'Y' AND ISNULL(s.asp_cancel, 'N') <> 'Y'",
@@ -1427,6 +1428,9 @@ public class ButtonService {
             line.put("实收数量", r.get("合格数量"));
             line.put("计量单位", r.get("计量单位"));
             line.put("单价", r.get("单价"));
+            // 是否来料检验:本单由**来料检验单**审核自动生成 → 该批物料走过检验 = 是
+            // (免检直达的入库单由采购订单生单,写「否」,见 PushGenerateHandler.applyInspectionFlag)
+            line.put("是否来料检验", "是");
             // 采购订单行号 → 采购入库行(列 源单行号,标签 采购订单行号):转ERP 时推 src_seq
             if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
             // 批次号随链带入采购入库行(2026-09-20 分批送料:同一批次可反查四单)

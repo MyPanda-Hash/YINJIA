@@ -158,6 +158,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                 if (v != null) row.put(m.get("to"), v);
             }
             targetItems.add(row);
+            applyInspectionFlag(sourcePanel, target, row);
         }
 
         // 5) 保存为目标草稿(复用通用保存语义:头行分表/默认值/号池取号)
@@ -195,6 +196,17 @@ public class PushGenerateHandler implements PanelActionHandler {
             if (v != null && !String.valueOf(v).isBlank()) return String.valueOf(v).trim();
         }
         return "";
+    }
+
+    /**
+     * 采购入库行的「是否来料检验」:由**来源单据**判定(2026-09-21 用户口径)。
+     * - 来源 = 来料检验单(QC_INSP):该批物料走过检验 → 是
+     * - 来源 = 采购订单(PU_ORDER,免检直达入库)→ 否
+     * 只对目标面板 = 采购入库单(PURCHASE_IN)生效;目标面板未登记该字段时写入会被通用保存静默忽略。
+     */
+    private void applyInspectionFlag(String sourcePanel, String targetPanel, Map<String, Object> row) {
+        if (!"PURCHASE_IN".equals(targetPanel) || row == null) return;
+        row.put("是否来料检验", "QC_INSP".equals(sourcePanel) ? "是" : "否");
     }
 
     private double numOf(Object v) {
@@ -363,6 +375,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                 }
                 row.put(tgtQtyLabel, p.get("qty"));   // 本次送料数量
                 row.put("批次号", batchNo);
+                applyInspectionFlag(sourcePanel, targetPanel, row);
                 targetItems.add(row);
             }
 
