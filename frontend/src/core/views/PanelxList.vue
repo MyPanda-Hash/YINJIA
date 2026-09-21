@@ -675,7 +675,24 @@
             @current-change="(p) => (archPage = p)"
           />
         </div>
+        <div v-if="activeTab(b).batch" v-loading="batchTab.loading" class="batch-tab">
+          <el-table :data="batchTab.rows" border size="small" :height="tableH(b)">
+            <el-table-column prop="batchNo" :label="tt('批次号')" min-width="190" />
+            <el-table-column prop="createTime" :label="tt('日期')" width="150" />
+            <el-table-column prop="batchQty" :label="tt('数量')" width="100" align="right" />
+            <el-table-column :label="tt('状态')" width="90" align="center">
+              <template #default="{ row }">{{ tt(row.status === 'ACTIVE' ? '有效' : '已释放') }}</template>
+            </el-table-column>
+            <el-table-column prop="targetFormNo" :label="tt('暂收单')" min-width="150" />
+            <el-table-column :label="tt('操作')" width="90" align="center">
+              <template #default="{ row }"><el-button link type="primary" :disabled="!row.targetFormNo" @click="onBatchTabRow(row)">{{ tt('查看') }}</el-button></template>
+            </el-table-column>
+            <template #empty>{{ tt('该订单暂无送料批次') }}</template>
+          </el-table>
+          <div class="batch-sum">{{ tt('已送') }} {{ batchTab.sum.batches }} {{ tt('批次数') }} · {{ tt('已送合计') }} {{ batchTab.sum.sent }} · {{ tt('剩余') }} {{ batchTab.sum.left }} · {{ tt('已退回(可补送)') }} {{ batchTab.sum.ret }}</div>
+        </div>
         <el-table
+          v-if="!activeTab(b).batch"
           :data="pagedBlockRows(b)"
           :height="tableH(b)"
           border
@@ -2829,6 +2846,38 @@ function mainRowCls({ row }) {
   return row === cur.value ? 'row-cur' : ''
 }
 
+// ═══ 采购订单「送料批次」页签(方案B,2026-09-20):纯查看 + 跳转;
+// 懒加载 —— 只有点开该页签那一刻才请求一次(不进 load()、不进首屏,不影响启动性能) ═══
+const BATCH_TAB_TARGET = 'QC_RECV'
+const batchTab = reactive({ doc: '', loading: false, rows: [], sum: { batches: 0, sent: 0, left: 0, ret: 0 } })
+async function loadBatchTab(docNo) {
+  if (!docNo || batchTab.doc === docNo) return
+  batchTab.doc = docNo
+  batchTab.loading = true
+  try {
+    const res = await engine.batchFlowLines({ sourcePanel: panelCode.value, targetPanel: BATCH_TAB_TARGET, sourceNo: docNo })
+    batchTab.rows = res?.batches || []
+    const lines = res?.lines || []
+    batchTab.sum = {
+      batches: batchTab.rows.length,
+      sent: lines.reduce((a, l) => a + Number(l.已送数量 || 0), 0),
+      left: lines.reduce((a, l) => a + Number(l.剩余数量 || 0), 0),
+      ret: lines.reduce((a, l) => a + Number(l.已退回数量 || 0), 0),
+    }
+  } catch { batchTab.rows = [] } finally { batchTab.loading = false }
+}
+/** 点批次行 = 跳到该批次生成的送料暂收单(页签按 route.path 归并,故 query 只走路由不带进页签路径) */
+function onBatchTabRow(row) {
+  const no = row?.targetFormNo
+  if (!no) return
+  const panel = row.targetPanel || BATCH_TAB_TARGET
+  const base = `/panelx/list/${panel}`
+  tabs.open({ path: base, title: panel })
+  router.push({ path: base, query: { docNo: no } })
+}
+// 审批通过的状态值(判据统一 2026-09-11:后端 QueryService 只产 '已通过'/历史数据有 '已审批',
+// 两值都认,禁止各处再手写单值比较)。声明前置:送料批次页签可见性在 buildBlocks 里也要用
+const APPROVED_STATUS_VALUES = ['已审批', '已通过']
 function buildBlocks(cfg) {
   if (!cfg) return []
   const tp = cfg.metadata?.panelPageDto?.tablePages?.[0]
@@ -2864,6 +2913,16 @@ function buildBlocks(cfg) {
     return cols.length ? mkTab(t.key, t.label, cols, t.summaryItems || [], t.summaryItems?.length ? t.label + '汇总' : '', !!(t.summaryItems?.length), aliasesOfFields(t.fields)) : null
   }).filter(Boolean)
   if (rest.length) out.push({ id: 'B', isMain: false, tabs: rest })
+  // 采购订单「送料批次」页签(方案B):仅采购订单且已审批(审批状态=已通过/已审批,排除已中止)时出现 ——
+  // 单据状态走到「已完成」的订单同样要看批次,故不能只认「已审核」;
+  // 未送过料的订单也显示该页签(空表 + 提示),这样不必为「是否有批次」多发一次请求
+  if (panelCode.value === 'PU_ORDER' && APPROVED_STATUS_VALUES.includes(String(cur.value?.['审批状态'] || '')) && String(cur.value?.['单据状态'] || '') !== '已中止') {
+    const bt = mkTab('batch', '送料批次', [], [], '', false, {})
+    bt.batch = true
+    const blk = out.find((x) => x.id === 'B')
+    if (blk) blk.tabs.push(bt)
+    else out.push({ id: 'B', isMain: false, tabs: [bt] })
+  }
   return out
 }
 
@@ -2895,6 +2954,8 @@ function isOn(b, item) {
 function switchTab(b, item) {
   view[b.id + ':tab'] = item.key
   view[b.id + ':' + item.key + ':view'] = item.kind === 'sum' ? 'summary' : 'detail'
+  const t2 = b.tabs.find((x) => x.key === item.key)
+  if (t2?.batch) loadBatchTab(curDocNo.value) // 送料批次:懒加载,仅首次/换单请求
 }
 
 // 明细数据：单据类取 cur.detail[block.key]；平铺类（档案/报表）把当前行当明细
@@ -3323,7 +3384,6 @@ function sumMethod({ columns, data }) {
 // 审批流：当前单据已审批 → 表格左上角「已审批」角标；已审批明细行浅绿底色
 // 判据统一(2026-09-11):后端 QueryService 只产 '已通过'(shr 非空)/'审批中',历史数据里也有 '已审批',
 // 两值都认;禁止各处再手写单值比较(口径见 CONTEXT.md「已审批判据」)。
-const APPROVED_STATUS_VALUES = ['已审批', '已通过']
 const isApproved = computed(() => cur.value && APPROVED_STATUS_VALUES.includes(cur.value['审批状态']))
 
 function rowCls({ row }, b) {
@@ -5425,6 +5485,7 @@ async function load(clamping = false) {
     const res = await engine.queryFormDataList(params)
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
     list.value = res.list || []
+    batchTab.doc = '' // 换单/刷新后,送料批次页签重新懒加载
     total.value = res.totalSize || 0
     // 页码越界自愈(末页删单/换每页条数/筛选后页码残留):回落到最后一页重取,避免空白页与页码错乱
     const lp = Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize)))
@@ -5665,7 +5726,30 @@ watch(
     detailRefVisible.value = false
     detailRefPick.value = null
     curIdx.value = 0
-    search()
+    // 跨面板跳转(采购订单「送料批次」→暂收单、左栏链路跳转等):同一路由记录换面板时组件被复用,
+    // onMounted 不再执行 —— 这里同样消费 ?docNo=,否则会退回「列表第一张」而定位不到目标单据
+    if (applyDocNoQuery()) load()
+    else search()
+  }
+)
+
+let lastDocJumpAt = 0
+/** 消费 URL 上的 ?docNo=(定位到指定单据);消费后从地址栏摘除,避免污染后续切换。挂载与路由变化共用 */
+function applyDocNoQuery() {
+  const no = route.query.docNo
+  if (!no) return false
+  docQueryNo.value = String(no)
+  condition['_docNo'] = String(no)
+  lastDocJumpAt = Date.now()
+  router.replace({ path: route.path, query: { ...route.query, docNo: undefined } })
+  return true
+}
+// 同一面板内跳另一张单据(panelCode 不变,上面的 watcher 不触发)
+watch(
+  () => route.query.docNo,
+  (v) => {
+    if (!v || Date.now() - lastDocJumpAt < 400) return
+    if (applyDocNoQuery()) load()
   }
 )
 
@@ -5724,12 +5808,7 @@ onMounted(() => {
     return
   }
   // 从「我的桌面 · 产品开发」矩阵跳转:带 ?docNo= 直接定位到该单据
-  const jumpDocNo = route.query.docNo
-  if (jumpDocNo) {
-    docQueryNo.value = String(jumpDocNo)
-    condition['_docNo'] = String(jumpDocNo)
-    router.replace({ path: route.path, query: { ...route.query, docNo: undefined } })
-  }
+  applyDocNoQuery()
   load()
 })
 
@@ -5874,6 +5953,15 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+/* 采购订单「送料批次」页签(方案B):只读窄表 + 底部汇总 */
+.batch-tab {
+  padding: 4px 0 2px;
+}
+.batch-sum {
+  font-size: 12px;
+  color: #46586e;
+  padding: 4px 2px;
 }
 .doc-batch {
   font-size: 12px;
