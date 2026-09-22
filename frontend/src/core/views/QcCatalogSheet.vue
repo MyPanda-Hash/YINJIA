@@ -22,7 +22,8 @@
             <th class="c-mat" rowspan="2">{{ tt('物料名称') }}</th>
             <th class="c-code" rowspan="2">{{ tt('物料编码') }}</th>
             <th class="c-group" :colspan="catalogCols.length">{{ tt('检验记录目录') }}</th>
-            <th class="c-op" :rowspan="2"></th>
+            <!-- 操作列表头:列内是行按钮,表头无内容 —— 去边框/底色(视觉上不出现空框),保留单元格以稳定列宽 -->
+            <th class="c-op c-op-plain" :rowspan="2"></th>
           </tr>
           <tr>
             <th v-for="c in catalogCols" :key="c.key" :class="colClass(c.key)">{{ tt(c.label) }}</th>
@@ -512,6 +513,11 @@ defineExpose({ exportCatalogExcel })
 .c-ok { width: 76px; text-align: center; }
 .c-no { width: 150px; }
 .c-op { width: 132px; text-align: center; }
+/* 操作列表头:无内容 → 无框无底色(用户口径:把没数据的空框去掉),仍占列以稳住固定布局 */
+.cs-table th.c-op-plain {
+  border: none;
+  background: transparent;
+}
 .cs-status-tag {
   display: inline-block; padding: 1px 7px; border-radius: 9px; font-size: 12px; line-height: 18px; white-space: nowrap;
 }

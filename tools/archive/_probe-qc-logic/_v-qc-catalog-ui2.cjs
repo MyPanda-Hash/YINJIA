@@ -68,6 +68,18 @@ async function main() {
     ok('行上出现动作按钮(完成检验/修改/✕)', (snap?.acts || []).length > 0, JSON.stringify(snap?.acts))
     ok('两个单号带查看/跳转链接', (snap?.links || 0) >= 2, `链接数=${snap?.links}`)
     ok('含物料编码/类别/数量示例数据', /折叠棉|YJ-YCYX|kg/.test(snap?.text || ''), (snap?.text || '').slice(0, 120).replace(/\n/g, '|'))
+
+    // 操作列表头不应出现「没数据的空框」(用户口径):无边框/无底色
+    const opHead = await evaluate(`(() => {
+      const th = document.querySelector('.catalog-sheet thead th.c-op') || document.querySelector('.catalog-sheet thead th.c-op-plain')
+      if (!th) return 'NO_TH'
+      const cs = getComputedStyle(th)
+      return JSON.stringify({ text: th.innerText.trim(), borderTop: cs.borderTopWidth, borderRight: cs.borderRightWidth, bg: cs.backgroundColor })
+    })()`)
+    const op = JSON.parse(opHead === 'NO_TH' ? '{"text":"缺失"}' : opHead)
+    ok('操作列表头无文字', op.text === '', opHead)
+    ok('操作列表头无边框(空框已去掉)', op.borderTop === '0px' && op.borderRight === '0px', opHead)
+    ok('操作列表头无底色', /rgba\(0, 0, 0, 0\)|transparent/.test(String(op.bg)), opHead)
   } finally {
     edge.kill()
     try { fs.rmSync(profile, { recursive: true, force: true }) } catch { /* ignore */ }
