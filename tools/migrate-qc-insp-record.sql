@@ -234,7 +234,17 @@ WHERE panel_code = 'QC_INSP_REC'
   AND ISNULL(panel_name_en, N'') <> (SELECT text FROM yj_translation WHERE scope='panel' AND ref_key=N'检验数据记录' AND locale='en');
 GO
 
--- ═════════════ 8. 自检 ═════════════
+-- ═════════════ 9. 物料批次不参与录入校验(2026-09-22 用户口径) ═════════════
+-- 报告的物料批次号由采购入库单审核取号后按挂靠关系自动回填(见 tools/migrate-qc-catalog-auto.sql
+-- 与 QcCatalogService.refreshBatchNosFromInsp),**建单与审批时留空**、不需要人填 ——
+-- 故放开必填校验,否则保存/审批会被「物料批次不能为空」拦死。
+UPDATE yj_field SET required = 0 WHERE panel_code = 'QC_INSP_REC' AND col_name = N'物料批次';
+GO
+
+-- ═════════════ 10. 自检 ═════════════
+SELECT N'物料批次必填' AS k, required AS v FROM yj_field WHERE panel_code = N'QC_INSP_REC' AND col_name = N'物料批次';
+GO
+
 SELECT N'面板' AS k, panel_code, panel_name, mode, head_table, line_table, prefix FROM yj_panel WHERE panel_code = N'QC_INSP_REC';
 SELECT N'字段' AS k, col_name, place, seq, data_type, dict_sql FROM yj_field WHERE panel_code = N'QC_INSP_REC' ORDER BY CASE place WHEN N'query' THEN 0 WHEN N'header' THEN 1 ELSE 2 END, seq;
 SELECT N'检验项库' AS k, lib_code, COUNT(*) AS n FROM yj_std_lib WHERE lib_code = N'qc.insp_item' GROUP BY lib_code;

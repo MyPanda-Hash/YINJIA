@@ -114,6 +114,11 @@ async function main() {
       throw new Error('面板未就绪,终止')
     }
 
+    // 侧栏应有明确的审批按钮组(用户口径:检验数据记录要有审批与审批通过按钮)
+    const rail0 = await evaluate(`[...document.querySelectorAll('.approval-side .as-side-btn')].map(e => e.innerText.replace(/\\s/g,''))`)
+    for (const b of ['提交审批', '审批通过', '审批驳回', '弃审', '审批情况'])
+      ok(`侧栏有「${b}」按钮`, (rail0 || []).includes(b), JSON.stringify(rail0))
+
     // ① 纸张与版式(先记下现有单据号,保存后据此判定"这是一张新报告")
     const existingNos = (await apiRows(token)).map((r) => r['单据编号'])
 

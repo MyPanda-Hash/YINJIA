@@ -289,7 +289,8 @@
                 <div>{{ tt('总负责人') }}：{{ specDocAssign.supervisorName || specDocAssign.supervisor || tt('未落实') }}</div>
               </div>
               <!-- 审批组:品质单据等标准流文书面板(草稿需显式提交审批;审批通过/驳回需审批权限;审批情况公开) -->
-              <template v-if="isStandardFlowSheet">
+              <!-- 审批组:标准流文书面板(品质单据等)+ 检验数据记录(QC_INSP_REC,用户口径要求有审批按钮) -->
+              <template v-if="hasApprovalBtns">
                 <div class="as-side-btn" :class="{ disabled: isDisabled('提交审批') }" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
                 <template v-if="canApproveHere()">
                   <div class="as-side-btn" :class="{ disabled: isDisabled('审批通过') }" @click="onSideAction('审批通过')">{{ tt('审批通过') }}</div>
@@ -2382,6 +2383,12 @@ const isDocArchivePanel = computed(() => !!cfgCache.value?.metadata?.docArchive)
 const isModLogPanel = computed(() => isDocArchivePanel.value || String(panelCode.value) === 'QC_CATALOG')
 /** 品质单据等标准流文书面板:非文件类(保存不自动提交审批),侧栏需显式审批动作组 */
 const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(qcSheetCfgs, String(panelCode.value)))
+/**
+ * 侧栏是否放出「提交审批 / 审批通过 / 审批驳回 / 弃审 / 审批情况」按钮组:
+ * 标准流文书面板(特采单等)照旧;检验数据记录(QC_INSP_REC)虽走归档一族(保存即归档),
+ * 但用户口径要求有明确的审批与审批通过按钮,故一并放开。
+ */
+const hasApprovalBtns = computed(() => isStandardFlowSheet.value || String(panelCode.value) === 'QC_INSP_REC')
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
 // 规格书两级分发(2026-09-12):已分配单仅 责任人∪总负责人∪管理员 可编辑,其他人可见只读
