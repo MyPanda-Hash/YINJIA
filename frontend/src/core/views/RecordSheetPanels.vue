@@ -83,28 +83,41 @@
         </template>
         <!-- 标准报告头(其它文书面板) -->
         <template v-else>
+        <!-- 报告头第 1 行「公司名格 | 编号格」的分列**照设计原表**:公司名格占
+             title+infoLabel 列、编号格占末尾 head.noSpan 列,两格之间/右侧的空列按 head.noGapSpan 留白
+             (设计里那列没并进任何一格)。head.noSpan === 0 = 设计与实现**都是同一格含两段文字**
+             (阻垢性能 A1:J1 / 浸泡安全 B2:G2):公司名靠左、编号靠右排在同一格里。
+             三个跨度都由模板算(companySpan/docnoSpan/gapLeftSpan/gapRightSpan),合计恒 = nCols。 -->
         <tr>
-          <td class="rs-td rs-company-cell" :colspan="nCols - docnoSpan">惠州市银嘉环保科技有限公司</td>
-          <td class="rs-td rs-docno" :colspan="docnoSpan">
-            <!-- 文档编号(纸张右上角那一格):前置固定标识「编号：」——23 个面板统一。
-                 三种形态都要带上标识:
-                   · 参照控件(如数据记录表→立项申请):空时提示语也带标识
-                   · 可编辑纯输入:用 placeholder(用户选定的形式,不动版式)
-                   · 只读:标识 + 值(原来是裸值,纸面上分不清这格是什么) -->
-            <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
-              <span class="rs-docno-prefix">{{ tt('编号：') }}</span>
-              <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
-              <el-icon class="rs-ref-ico"><Search /></el-icon>
+          <td v-if="companySpan > 0" class="rs-td rs-company-cell" :colspan="companySpan">{{ COMPANY_NAME }}</td>
+          <td v-if="gapLeftSpan > 0" class="rs-td" :colspan="gapLeftSpan"></td>
+          <td v-if="docnoSpan > 0" class="rs-td rs-docno" :colspan="docnoSpan">
+            <!-- ⚠ 同格版式的排排坐必须落在**内层 div** 上:给 <td> 加 display:flex 会让它不再是
+                 table-cell(浏览器另生匿名格包住它,colspan 随之失效 —— 实测 colspan=10 的格子只剩
+                 一列宽、公司名与编号挤成两行)。缺省(非 rs-onecell)时这层 div 就是普通块级,
+                 与改造前逐字等价。 -->
+            <div class="rs-docno-in" :class="{ 'rs-onecell': sameCellDocno }">
+              <!-- 同格版式:公司名与编号同处一格(设计一格含两段文字),公司名内联在编号左边 -->
+              <span v-if="sameCellDocno" class="rs-company-inline">{{ COMPANY_NAME }}</span>
+              <!-- 文档编号(纸张右上角那一格)。前置标识「编号：」**由 head.docnoPrefix 决定**:
+                   设计原表的原值都是裸编号(碱性 N2=" YJ-PD-01"、功能性滤效 K2="YJ-PD-01"…),
+                   故缺省 false = 按设计显示裸值;哪个面板要标识(或非纸面场景要提示)就在它的 head 里写 true。 -->
+              <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>
+                <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
+                <el-icon class="rs-ref-ico"><Search /></el-icon>
+              </div>
+              <!-- 文档类面板(编号字段=文档编号):编号由人填,给输入框 -->
+              <div v-else-if="editable && docNoKey === '文档编号'" class="rs-docno-wrap">
+                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>
+                <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt(docnoPrefix ? '编号：' : docNoKey)" @input="emit('dirty')" />
+              </div>
+              <!-- 单据类面板(编号字段=单据编号):号是后端「新增」时自动生成的,只读显示 ——
+                   给输入框既没意义又会被误改(打印/预览还必须看得见号) -->
+              <template v-else><span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>{{ head[docNoKey] || cfg.docNoDefault || 'YJ-PD-01' }}</template>
             </div>
-            <!-- 文档类面板(编号字段=文档编号):编号由人填,给输入框 -->
-            <div v-else-if="editable && docNoKey === '文档编号'" class="rs-docno-wrap">
-              <span class="rs-docno-prefix">{{ tt('编号：') }}</span>
-              <el-input v-model="head[docNoKey]" size="small" maxlength="30" class="rs-docno-input" :placeholder="tt('编号：')" @input="emit('dirty')" />
-            </div>
-            <!-- 单据类面板(编号字段=单据编号):号是后端「新增」时自动生成的,只读显示 ——
-                 给输入框既没意义又会被误改(打印/预览还必须看得见号) -->
-            <template v-else><span class="rs-docno-prefix">{{ tt('编号：') }}</span>{{ head[docNoKey] || cfg.docNoDefault || 'YJ-PD-01' }}</template>
           </td>
+          <td v-if="gapRightSpan > 0" class="rs-td" :colspan="gapRightSpan"></td>
         </tr>
         <tr>
           <td class="rs-td rs-topic-cell" :colspan="infoSpan ? effHead.title : nCols" :rowspan="infoSpan || 1">
@@ -1173,11 +1186,30 @@ const showReportHead = computed(() => {
 const nCols = computed(() => effGrid.value.length)
 /** 网格总宽:所有表格显式用这个宽度,列分界线全页严格一致(数据表编辑态另加 60px 操作列) */
 const gridW = computed(() => effGrid.value.reduce((s, w) => s + w, 0))
+/** 报告头左侧公司名(7 张数据记录表 + 其它文书面板的纸面首行文字,逐张一致;尾随空格不计) */
+const COMPANY_NAME = '惠州市银嘉环保科技有限公司'
+/** 报告头第 1 行「公司名格 | 编号格」的分列 —— 优先按**设计原表的 !merges**显式切分:
+ *    head.noSpan     编号格占末尾几列(碱性设计 N2=1 列、压降 L2=1 列…);
+ *                    **0 = 编号与公司名同一格**(阻垢性能 A1:J1、浸泡安全 B2:G2 —— 一格含两段文字);
+ *    head.noGapSpan  设计里没并进公司名/编号任一格的空列数(RO保护 J2、压降 K2 在两格之间;
+ *                    阻垢性能 K1 在同格版式的右侧)—— 并进任何一格都会把竖线挪到设计之外的位置;
+ *    head.docnoPrefix 编号前是否渲染「编号：」标识 —— 逐张核对过设计的面板(7 张数据记录表)
+ *                    设计原值都是**裸编号**,故它们显式写 false;**未写 = 保留原有「编号：」标识**
+ *                    (改造前是 23 个面板统一带标识,没核过设计的面板不该被顺手改掉纸面观感)。
+ *  不写 head.noSpan = 退回下面的动态算法(未按设计逐张核对的面板维持原样,零影响)。 */
+const sameCellDocno = computed(() => effHead.value.noSpan === 0)
+const noGapSpan = computed(() => Math.max(0, Math.floor(Number(effHead.value.noGapSpan) || 0)))
+const gapLeftSpan = computed(() => (sameCellDocno.value ? 0 : noGapSpan.value))
+const gapRightSpan = computed(() => (sameCellDocno.value ? noGapSpan.value : 0))
+const docnoPrefix = computed(() => effHead.value.docnoPrefix !== false)
+
 /** 右上角编号格占末尾几列:末尾列宽不足时向左并列凑到 ≥160px——
  *  现有最长编号 YJ-AB-SAMPLE-1 实测 98px,加参照图标/间距约 145px;
- *  只并列不改列宽,全页竖线位置不变(并掉的列整列被编号格覆盖)。 */
+ *  只并列不改列宽,全页竖线位置不变(并掉的列整列被编号格覆盖)。
+ *  ⚠ 这是**没按设计核过**的面板(未声明 head.noSpan)的兜底:它按列宽湊,凑出来的位置
+ *  未必等于纸面(如碱性纸面 12/1,凑出来是 11/2)。纸面切分已核过的面板请写 head.noSpan。 */
 const DOCNO_MIN_W = 160
-const docnoSpan = computed(() => {
+const dynamicDocnoSpan = computed(() => {
   const g = effGrid.value || []
   if (g.length < 2) return 1
   let sum = 0
@@ -1189,6 +1221,16 @@ const docnoSpan = computed(() => {
   }
   return Math.min(k, g.length - 1)
 })
+const docnoSpan = computed(() => {
+  const n = nCols.value
+  // 同格版式:整格从第 1 列跨到空列之前(阻垢性能 11−1=10、浸泡安全 6−0=6)
+  if (sameCellDocno.value) return Math.max(1, n - gapRightSpan.value)
+  const explicit = Number(effHead.value.noSpan)
+  if (Number.isFinite(explicit) && explicit > 0) return Math.min(explicit, n - 1)
+  return dynamicDocnoSpan.value
+})
+/** 公司名格占几列 = 总列数 − 两段留白 − 编号格(同格版式时不出公司名格 ⇒ 0) */
+const companySpan = computed(() => Math.max(0, nCols.value - gapLeftSpan.value - docnoSpan.value - gapRightSpan.value))
 
 /* ── 规格书文档式封面(设计画布 767×794,内层坐标=设计像素,由 --cok 等比缩放) ──
    几何改为按《规格书细分.xlsx》「封面（产品信息）」sheet 的**行高/列宽**折算 —— 设计像素 = 磅 × 4/3:
@@ -2785,6 +2827,27 @@ function chartOf(dt) {
   white-space: nowrap;
   font-style: normal;
   font-weight: 600;
+}
+/* 同格版式(head.noSpan === 0,阻垢性能/浸泡安全):设计是**一格含两段文字** ——
+   公司名与编号排在同一格的一行里,公司名靠左、编号靠右。编号块(参照控件/输入框/裸值)
+   占满剩余宽度,内部仍各自右对齐。
+   ⚠ flex 加在 .rs-docno **内层** div 上,不能加在 <td> 上(见模板注释:td 脱离 table-cell 会丢 colspan)。 */
+.rs-onecell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.rs-company-inline {
+  flex: none;
+  font-size: 17px;
+  font-weight: 400;
+  color: #333;
+}
+.rs-onecell > .rs-docno-wrap,
+.rs-onecell > .rs-ref-ctl {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .rs-docno-empty {
   color: #b6bcc6;

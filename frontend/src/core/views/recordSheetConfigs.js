@@ -16,6 +16,14 @@
  *            ⚠ 每页都必须有自己的 grid(或回落到面板 grid):report 页的 section 宽度取自 effGrid,
  *              取不到就写 width:0px,而 .rs-t 是 table-layout:fixed ⇒ 整块塌掉。
  *   head {title, infoLabel, infoValue} —— report 版式报告头三段列跨度(大标题|信息标签|信息值),合计 = grid 列数
+ *   head.noSpan / head.noGapSpan / head.docnoPrefix —— 报告头第 1 行「公司名格 | 编号格」的分列,
+ *        按**设计原表的 !merges 显式切分**(不再由列宽向左凑 ≥160px 的动态算法拍位置;
+ *        动态算法总列数常常对、切开的位置错,如碱性设计 12/1 而算成 11/2):
+ *          noSpan       编号格占末尾几列;0 = 编号与公司名**同一格**(纸面一格含两段文字,编号靠右);
+ *          noGapSpan    没并进两格的空列数(两格版式夹在公司名与编号之间;同格版式落在该格右侧);
+ *          docnoPrefix  true 才在编号前渲染「编号：」标识 —— 设计原值都是**裸编号**,缺省即 false。
+ *        noSpan 不写 = 退回动态算法(未按设计逐张核对的面板行为不变)。
+ *        逐张证据(设计原表 _dump-xlsx 解析结果)钉在 recordSheetConfigs.docno.test.js。
  *   info —— report 版式右侧信息块行(缺省=密级/适用范围/测试负责人/报告编号;委托单自定义 文件管理人/密级/文件使用范围)
  *   docNoDefault —— 文档编号缺省(默认 YJ-PD-01;委托单 YJ-RIR001)
  *   titleFromKey/titleSuffix —— 标题由头字段派生(如 申请单类型+'-测试申请单')
@@ -440,7 +448,8 @@ export const recordSheetConfigs = {
   RD_ALKALINE: {
     titlePlaceholder: '伊可普碱性寿命测试',
     grid: [115, 80, 93, 98, 84, 90, 90, 90, 90, 70, 70, 85, 128],
-    head: { title: 11, infoLabel: 1, infoValue: 1 },
+    // 设计「碱性」第 2 行:B2:M2 公司名(12 列)+ N2 编号(1 列,裸值 " YJ-PD-01")
+    head: { title: 11, infoLabel: 1, infoValue: 1, noSpan: 1, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试目的/背景', key: '测试目的/背景', type: 'area' },
@@ -480,7 +489,8 @@ export const recordSheetConfigs = {
   RD_MINERAL: {
     titlePlaceholder: '伊可普 RO后置矿化滤芯 纯水寿命测试',
     grid: [170, 170, 170, 170, 170],
-    head: { title: 3, infoLabel: 1, infoValue: 1 },
+    // 设计「矿化」第 2 行:B2:E2 公司名(4 列)+ F2 编号(1 列,裸值 "YJ-PD-01")
+    head: { title: 3, infoLabel: 1, infoValue: 1, noSpan: 1, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试目的/背景', key: '测试目的/背景', type: 'area' },
@@ -565,7 +575,9 @@ export const recordSheetConfigs = {
   RD_SCALE: {
     titlePlaceholder: '阻垢炭棒阻垢率测试',
     grid: [125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125],
-    head: { title: 6, infoLabel: 1, infoValue: 4 },
+    // 设计「阻垢性能」第 1 行是**一格含两段文字**:A1:J1 = 公司名 + 靠右的编号
+    // "惠州市银嘉环保科技有限公司……YJ-PD-01",第 11 列 K1 空 ⇒ noSpan:0(同格)+ 右侧留 1 空列
+    head: { title: 6, infoLabel: 1, infoValue: 4, noSpan: 0, noGapSpan: 1, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试目的/背景', key: '测试目的/背景', type: 'area' },
@@ -602,7 +614,8 @@ export const recordSheetConfigs = {
   RD_RO_PROTECT: {
     titlePlaceholder: '桌面机RO保护测试',
     grid: [158, 78, 106, 78, 78, 78, 78, 78, 78, 78],
-    head: { title: 6, infoLabel: 2, infoValue: 2 },
+    // 设计「RO保护」第 2 行:B2:I2 公司名(8 列)/ J2 空 / K2 编号(1 列,裸值 "YJ-PD-01")
+    head: { title: 6, infoLabel: 2, infoValue: 2, noSpan: 1, noGapSpan: 1, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试背景/目的', key: '测试背景/目的', type: 'area' },
@@ -640,7 +653,9 @@ export const recordSheetConfigs = {
   RD_SOAK: {
     titlePlaceholder: '伊可普高品质冰箱炭棒项目浸泡安全测试',
     grid: [177, 164, 204, 206, 200, 209],
-    head: { title: 4, infoLabel: 1, infoValue: 1 },
+    // 设计「浸泡安全」第 2 行 B2:G2 把**整行并成一格**,一格含两段文字
+    // (公司名 + 靠右的编号 "……YJ-D-01")⇒ noSpan:0 同格、无空列
+    head: { title: 4, infoLabel: 1, infoValue: 1, noSpan: 0, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试目的/背景', key: '测试目的/背景', type: 'area' },
@@ -690,7 +705,8 @@ export const recordSheetConfigs = {
   RD_DROP_PREC: {
     titlePlaceholder: '伊可普冰箱滤芯（需求3）压降、一级精度测试',
     grid: [157, 280, 120, 100, 106, 106, 116, 116, 127, 116, 165],
-    head: { title: 9, infoLabel: 1, infoValue: 1 },
+    // 设计「压降、精度」第 2 行:B2:J2 公司名(9 列)/ K2 空 / L2 编号(1 列,裸值 " YJ-PD-01")
+    head: { title: 9, infoLabel: 1, infoValue: 1, noSpan: 1, noGapSpan: 1, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试目的/背景', key: '测试目的/背景', type: 'area' },

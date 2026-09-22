@@ -11,6 +11,8 @@ target/
 # 诊断产物一律别放仓库根目录:写 $env:TEMP,或按规范放 tools/archive/_*。
 logs-*.txt
 logs*.txt
+# harness(DSH)视觉工具的产物目录:截图/标注落在工作区根目录,属工具缓存,不入库(2026-09-22 实测出现)
+.dsh-tool-vision/
 .env
 .env.local
 *.local
