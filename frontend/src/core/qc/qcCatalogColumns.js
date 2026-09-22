@@ -17,18 +17,20 @@ export const QC_CATALOG_DETAIL_COLUMNS = Object.freeze([
   '检验单号', '检验数据记录单号',
 ])
 
-/** 表头三级分组(与原表 第1类/第2类/第3类 行一致;第2类=物料层,第3类=检验记录目录) */
+/**
+ * 表头分组(2026-09-22 用户口径:去掉「第1类/第2类/第3类」层级标签行,只留「检验记录目录」分组)
+ * 表头两行:第一行 = 检测物料类别(rowspan) / 物料名称(rowspan) / 物料编码(rowspan) / 检验记录目录(colspan);
+ *          第二行 = 检验记录目录下的六个叶子列(批次号|数量|检验状态|是否合格|检验单号|检验数据记录单号)。
+ */
 export const QC_CATALOG_HEADER_GROUPS = Object.freeze([
-  { label: '第1类', span: 1 },
-  { label: '第2类', span: 2 },
-  { label: '第3类', span: 6 },
+  { label: '检验记录目录', span: 6 },
 ])
 
-/** 列定义:label=表头显示名,key=落库数据键(本表同名),group=所属二/三级表头 */
+/** 列定义:label=表头显示名,key=落库数据键(本表同名);group 仅用于「检验记录目录」分组下的叶子列 */
 export const QC_CATALOG_COLUMNS = Object.freeze([
-  { label: '检测物料类别', key: '检测物料类别', width: 14, group: '第1类' },
-  { label: '物料名称', key: '物料名称', width: 16, group: '第2类' },
-  { label: '物料编码', key: '物料编码', width: 13, group: '第2类' },
+  { label: '检测物料类别', key: '检测物料类别', width: 14 },
+  { label: '物料名称', key: '物料名称', width: 16 },
+  { label: '物料编码', key: '物料编码', width: 13 },
   { label: '批次号', key: '批次号', width: 12, group: '检验记录目录' },
   { label: '数量', key: '数量', width: 9, group: '检验记录目录' },
   { label: '检验状态', key: '检验状态', width: 11, group: '检验记录目录' },

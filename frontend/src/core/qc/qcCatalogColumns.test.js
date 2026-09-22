@@ -31,13 +31,16 @@ test('表格一比一 + 联动列:9 列,顺序=类别/名称/编码/批次号/�
   assert.equal(new Set(QC_CATALOG_COLUMNS.map((c) => c.label)).size, 9)
 })
 
-test('三级表头:第1类/第2类/第3类 的跨度合计 = 列数(第2类=物料名称+物料编码)', () => {
-  assert.deepEqual(QC_CATALOG_HEADER_GROUPS.map((g) => g.label), ['第1类', '第2类', '第3类'])
+test('表头分组:只保留「检验记录目录」分组(第1/2/3类 层级标签行已按用户口径删除)', () => {
+  assert.deepEqual(QC_CATALOG_HEADER_GROUPS.map((g) => g.label), ['检验记录目录'])
   const span = QC_CATALOG_HEADER_GROUPS.reduce((n, g) => n + g.span, 0)
-  assert.equal(span, QC_CATALOG_COLUMNS.length)
-  // 第3类 覆盖「检验记录目录」六列(含两个挂靠单号)
+  assert.equal(span, 6, '检验记录目录覆盖其后六列')
+  // 该分组覆盖的六列(含两个挂靠单号)
   const third = QC_CATALOG_COLUMNS.filter((c) => c.group === '检验记录目录')
   assert.deepEqual(third.map((c) => c.label), ['批次号', '数量', '检验状态', '是否合格', '检验单号', '检验数据记录单号'])
+  // 物料层三列各有自己的列名(不再依赖 第1类/第2类)
+  assert.deepEqual(QC_CATALOG_COLUMNS.slice(0, 3).map((c) => c.label), ['检测物料类别', '物料名称', '物料编码'])
+  assert.ok(QC_CATALOG_COLUMNS.slice(0, 3).every((c) => !c.group), '物料层三列不挂在分组下')
 })
 
 test('分组列 = 前两列(合并单元格);必填列 = 类别/物料名称/批次号(与 yj_field required 一致)', () => {

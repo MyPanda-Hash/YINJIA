@@ -13,21 +13,16 @@
       <div class="cs-title">{{ tt('检验目录') }}</div>
     </div>
 
-    <!-- ② 控制表(三级表头;第1类 检测物料类别 → 第2类 物料名称/物料编码 → 第3类 检验记录目录) -->
+    <!-- ② 控制表(两行表头:物料层三列各有列名,检验记录目录跨其后六列) -->
     <div class="cs-scroll">
       <table class="cs-table">
         <thead>
-          <tr>
-            <th class="c-cat">{{ tt('第1类') }}</th>
-            <th class="c-mat" colspan="2">{{ tt('第2类') }}</th>
-            <th class="c-group" :colspan="catalogCols.length">{{ tt('第3类') }}</th>
-            <th class="c-op" :rowspan="3"></th>
-          </tr>
           <tr>
             <th class="c-cat" rowspan="2">{{ tt('检测物料类别') }}</th>
             <th class="c-mat" rowspan="2">{{ tt('物料名称') }}</th>
             <th class="c-code" rowspan="2">{{ tt('物料编码') }}</th>
             <th class="c-group" :colspan="catalogCols.length">{{ tt('检验记录目录') }}</th>
+            <th class="c-op" :rowspan="2"></th>
           </tr>
           <tr>
             <th v-for="c in catalogCols" :key="c.key" :class="colClass(c.key)">{{ tt(c.label) }}</th>
@@ -502,7 +497,6 @@ defineExpose({ exportCatalogExcel })
 }
 .cs-table thead tr:nth-child(1) th { top: 0; }
 .cs-table thead tr:nth-child(2) th { top: 26px; }
-.cs-table thead tr:nth-child(3) th { top: 52px; }
 .cs-table td { background: #fff; height: 24px; }
 .cs-table tr:hover td { background: #f7fbff; }
 .cs-table td.c-cat { background: #d9ecfb; color: #1f5fa8; text-align: center; }

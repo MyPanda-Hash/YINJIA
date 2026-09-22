@@ -53,14 +53,17 @@ async function main() {
           })
         })()`)
         const j = s ? JSON.parse(s) : null
-        if (j && j.rows > 0) { snap = j; break }
+        // 就绪判定要认「真的有数据行」:空态占位行(暂无检验记录)也算 1 行,不能用 rows>0
+        if (j && (j.acts.length > 0 || j.links > 0)) { snap = j; break }
         await sleep(800)
       }
       if (!snap) console.log(`   [重试 ${a}/5] 纸面未就绪`)
     }
     ok('纸张已渲染且有数据行', !!snap && snap.rows > 0, JSON.stringify(snap && { rows: snap.rows }))
-    for (const h of ['第1类', '第2类', '第3类', '检测物料类别', '物料名称', '物料编码', '批次号', '数量', '检验状态', '是否合格', '检验单号', '检验数据记录单号', '检验记录目录'])
+    for (const h of ['检测物料类别', '物料名称', '物料编码', '批次号', '数量', '检验状态', '是否合格', '检验单号', '检验数据记录单号', '检验记录目录'])
       ok(`表头 ${h}`, (snap?.heads || []).some((x) => x.includes(h)))
+    for (const h of ['第1类', '第2类', '第3类'])
+      ok(`表头已删除 ${h}`, !(snap?.heads || []).some((x) => x.includes(h)))
     ok('纸面只读(表体无输入框)', (snap?.bodyInputs || 0) === 0, `输入框=${snap?.bodyInputs}`)
     ok('行上出现动作按钮(完成检验/修改/✕)', (snap?.acts || []).length > 0, JSON.stringify(snap?.acts))
     ok('两个单号带查看/跳转链接', (snap?.links || 0) >= 2, `链接数=${snap?.links}`)
