@@ -7,6 +7,24 @@ const DESK_DEFAULT = {
   showTodo: true,
 }
 
+/**
+ * 角色预设(2026-09-22 桌面展示优化):只在「用户从未保存过桌面设置」时套用**一次**。
+ *   · 管理员:全局视角 —— 生产执行核心 + 质量待办 + 事件流/数据内核都在;
+ *   · 普通用户:聚焦「要我做/要我看」—— 首屏 KPI + 质量与待办为主,生产执行核心默认收起
+ *     (它是长列表+图表,对仓管/工艺员这类角色日常价值低),快捷入口把「快速报工」提到第一位。
+ * 用户在工作台设置里改过之后就不再覆盖(以 localStorage 里的保存值为准)。
+ */
+const DESK_PRESET_ADMIN = { ...DESK_DEFAULT }
+const DESK_PRESET_USER = { ...DESK_DEFAULT, quick: ['quickReport', 'newOrder', 'board'], showProgress: false }
+
+function deskSavedByUser() {
+  try {
+    return !!localStorage.getItem('mes_desk_settings')
+  } catch (e) {
+    return false
+  }
+}
+
 function loadDeskSettings() {
   try {
     const s = JSON.parse(localStorage.getItem('mes_desk_settings') || 'null')
@@ -87,6 +105,13 @@ export const useAppStore = defineStore('app', {
     saveDeskSettings(patch) {
       this.deskSettings = { ...this.deskSettings, ...patch }
       localStorage.setItem('mes_desk_settings', JSON.stringify(this.deskSettings))
+    },
+    /** 首次进入桌面时按角色套预设;返回是否套用了(用户已保存过则不动,返回 false) */
+    applyRoleDeskPreset(isAdmin) {
+      if (deskSavedByUser()) return false
+      this.deskSettings = { ...(isAdmin ? DESK_PRESET_ADMIN : DESK_PRESET_USER) }
+      localStorage.setItem('mes_desk_settings', JSON.stringify(this.deskSettings))
+      return true
     },
   },
 })

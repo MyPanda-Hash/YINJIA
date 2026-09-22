@@ -110,7 +110,7 @@ localStorage.setItem('mes_login_date','2026-09-22'); 'ok'`)
           module: document.querySelector('.mod-tab.on') && document.querySelector('.mod-tab.on').innerText.trim(),
           cards: cards.length,
           grid: gs ? { cols: gs.gridTemplateColumns.split(' ').length, gap: gs.gap } : null,
-          cardBoxes: cards.slice(0, 8).map(c => ({ cls: (c.className||'').replace(/card|reveal-item/g,'').trim().slice(0,26), w: Math.round(c.getBoundingClientRect().width), h: Math.round(c.getBoundingClientRect().height), r: px(getComputedStyle(c).borderTopLeftRadius), sh: getComputedStyle(c).boxShadow.slice(0, 46), p: getComputedStyle(c).padding })),
+          cardBoxes: cards.slice(0, 12).map(c => ({ cls: (c.className||'').replace(/card|reveal-item/g,'').trim().slice(0,26), w: Math.round(c.getBoundingClientRect().width), h: Math.round(c.getBoundingClientRect().height), r: px(getComputedStyle(c).borderTopLeftRadius), sh: getComputedStyle(c).boxShadow.slice(0, 46), p: getComputedStyle(c).padding })),
           kpiFont: kpiNums.length ? getComputedStyle(kpiNums[0]).fontSize : null,
           kpiNumeric: kpiNums.length ? getComputedStyle(kpiNums[0]).fontVariantNumeric : null,
           titleFonts: fs,
