@@ -115,6 +115,10 @@ async function main() {
                  return { x0: px(a.left + scrollX), x1: px(a.right + scrollX),
                           y0: px(a.top + scrollY), y1: px(b.bottom + scrollY), dpr: devicePixelRatio }
                })(),
+               vchars: [...table.querySelectorAll('.q-vchar')].map(c => {
+                 const b = c.getBoundingClientRect()
+                 return { ch: c.innerText, y0: px(b.top + scrollY), y1: px(b.bottom + scrollY) }
+               }),
                editState: { 编辑框: sheet.querySelectorAll('.el-textarea__inner').length,
                             只读块: sheet.querySelectorAll('.as-ro-text').length } }
     })()`)
@@ -172,6 +176,11 @@ async function main() {
     }
     const real = errors.filter(e => !/favicon|WebSocket connection|vite/.test(e))
     // 像素核查:竖排列(申请单位)是合并格,内部不得再有横线(原扫描图实测:行间横线覆盖率 78.4%,只到列右沿)
+    if (geom.strip && geom.vchars?.length) {
+      const gc = (geom.vchars[0].y0 + geom.vchars[geom.vchars.length - 1].y1) / 2
+      const sc = (geom.strip.y0 + geom.strip.y1) / 2
+      console.log(`竖列字组「${geom.vchars.map(v => v.ch).join('')}」中心=${gc.toFixed(1)}  列中心=${sc.toFixed(1)}  偏差=${(gc - sc).toFixed(1)}px(应≈0)`)
+    }
     let seams = -1
     if (geom.strip && shot.result?.data) {
       // 遮挡诊断:竖列中心点上最顶层是哪个元素、什么背景

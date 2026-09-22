@@ -98,17 +98,76 @@
     <!-- ③ 内容表 -->
     <div class="as-table">
       <!-- 行型:网格(pairs)/章节(section)/部门会签(dept)/单字段/多子区/阶段框 -->
-      <template v-for="(row, ri) in config.rows" :key="row.key || row.label || ri">
+      <template v-for="({ row, run, rows, chars }, gi) in rowGroups" :key="gi">
+        <!-- vcell 连续段:左侧一格真正的合并竖列(字组整体垂直居中,原图如此);
+             行间横线只画到列右沿(列内无线),段底整宽横线由 .q-vrun 自己的 border-bottom 画 -->
+        <div v-if="run" class="q-vrun">
+          <div class="q-vlabel" :style="{ width: (config.vcol || 65) + 'px' }">
+            <span v-for="(ch, ci) in chars" :key="ci" class="q-vchar">{{ tt(ch) }}</span>
+          </div>
+          <div class="q-vrows">
+            <div v-for="(row, ri) in rows" :key="row.key || row.label || ri" class="as-row q-pairs" :style="{ minHeight: (row.h || 40) + 'px' }">
+              <!-- 格子 markup 与下方普通 pairs 行同一套(改版式时两处同步;此处无 vlabel:竖列已在段首合并) -->
+              <div v-for="(c, ci) in row.cells" :key="(c.key || c.label) + ci" class="q-pair" :style="{ flex: c.flex || 1 }">
+                <div v-if="c.label" class="q-label" :style="{ width: (c.labelW || row.labelW || config.labelW || 110) + 'px' }">{{ tt(c.label) }}</div>
+                <div class="q-value" :class="{ 'q-col': c.kind === 'textarea' }">
+                  <div v-if="c.kind === 'checks'" class="q-checks" :class="{ spread: c.spread }">
+                    <span
+                      v-for="o in c.options" :key="o" class="q-check" :class="{ on: head[c.key] === o }"
+                      @click="setCheck(c.key, o)"
+                    >{{ head[c.key] === o ? '☑' : '□' }} {{ tt(o) }}</span>
+                  </div>
+                  <!-- 大填写区(可选末行右侧签名,如特采理由→申请人:原图签名在填写区最下一行) -->
+                  <template v-else-if="c.kind === 'textarea'">
+                    <el-input
+                      v-if="editable" v-model="head[c.key]" type="textarea"
+                      :rows="c.rows || 3" :maxlength="c.max || 2000"
+                      class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
+                    />
+                    <div v-else class="as-ro-text">{{ head[c.key] || '' }}</div>
+                    <div v-if="c.sign" class="q-signline end">
+                      <span class="q-sign-label">{{ tt(c.sign) }}：</span>
+                      <span class="q-sign-val">
+                        <el-input
+                          v-if="editable" v-model="head[c.signKey || '填写人']" size="small"
+                          maxlength="50" class="as-cell-input q-sign-input" @input="emit('dirty')"
+                        />
+                        <span v-else>{{ head[c.signKey || '填写人'] || '' }}</span>
+                      </span>
+                      <span class="q-sign-date">　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
+                    </div>
+                  </template>
+                  <div v-else-if="editable && isRefKey(c.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
+                    <span class="as-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
+                    <el-icon class="as-ref-ico"><Search /></el-icon>
+                  </div>
+                  <el-date-picker
+                    v-else-if="editable && c.kind === 'date'"
+                    v-model="head[c.key]" type="date" value-format="YYYY-MM-DD"
+                    size="small" class="as-date" :clearable="false" @change="emit('dirty')"
+                  />
+                  <el-select
+                    v-else-if="editable && c.kind === 'select'"
+                    v-model="head[c.key]" size="small" class="as-cell-input" :clearable="false" @change="emit('dirty')"
+                  >
+                    <el-option v-for="o in cellOptions(c)" :key="o.value" :label="o.label" :value="o.value" />
+                  </el-select>
+                  <el-input
+                    v-else-if="editable"
+                    v-model="head[c.key]" size="small" :maxlength="c.max || 200"
+                    class="as-cell-input" @input="emit('dirty')"
+                  />
+                  <div v-else class="q-ro">{{ head[c.key] || '' }}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <template v-else>
         <!-- 网格行:一行多组 标签|值(品质单据表头区);cell.kind: input/date/select/ref/checks(单选,存选项值)/textarea(大填写区)
              行高与列宽按纸面原图实测值给定:labelW 落在固定列上、flex 取实测像素比例 → 各行竖线重合不错位 -->
         <div v-if="row.kind === 'pairs'" class="as-row q-pairs" :style="{ minHeight: (row.h || 40) + 'px' }">
-          <!-- 左侧竖排格(如「申请单位」一行一字:原图里它是一列、每行一个字,故按行给 vcell;未声明则无此格)
-               q-join=下一行还是竖排列 → 原图此列是合并格,行间横线不穿过它(见扫描实测:内部横线只到列右沿) -->
-          <div
-            v-if="row.vcell !== undefined" class="q-vlabel"
-            :class="{ 'q-join': config.rows[ri + 1]?.vcell !== undefined }"
-            :style="{ width: (config.vcol || 65) + 'px' }"
-          >{{ tt(row.vcell) }}</div>
           <div v-for="(c, ci) in row.cells" :key="(c.key || c.label) + ci" class="q-pair" :style="{ flex: c.flex || 1 }">
             <div v-if="c.label" class="q-label" :style="{ width: (c.labelW || row.labelW || config.labelW || 110) + 'px' }">{{ tt(c.label) }}</div>
             <div class="q-value" :class="{ 'q-col': c.kind === 'textarea' }">
@@ -396,6 +455,7 @@
           </div>
           <div v-if="config.deco" class="as-deco"></div>
         </div>
+        </template>
       </template>
 
       <!-- ④ 底部签名:signKind='plain'=纸面简单行(编制/审核/批准);默认=蓝格签名区 -->
@@ -469,6 +529,22 @@ const stageLoading = ref(0)
 
 /** 阶段完成按钮可用:非编辑态 + 已审核 */
 const canStageComplete = computed(() => !props.editable && props.audited && props.panelCode === 'RD_PLAN')
+
+/** vcell 连续的 pairs 行合成一段(渲染成左侧一格真正的合并竖列):
+ *  原图(扫描实测):申请单位 申/请/单/位 四字紧排成一组,组中心 207 ≈ 整段中心 208,
+ *  即字组在整条合并格里垂直居中,而非逐行居中;行间横线只画到列右沿(列内无线)。 */
+const rowGroups = computed(() => {
+  const out = []
+  for (const row of props.config?.rows || []) {
+    if (row.kind === 'pairs' && row.vcell !== undefined) {
+      let g = out[out.length - 1]
+      if (!g?.run) { g = { run: true, rows: [], chars: '' }; out.push(g) }
+      g.rows.push(row)
+      if (row.vcell) g.chars += row.vcell
+    } else out.push({ row })
+  }
+  return out
+})
 
 /** 阶段计划开始:归一空值(清空时 el-date-picker 给 null),别把 null 存进库 */
 function onPhaseStart(phaseKey, v) {
@@ -1044,9 +1120,13 @@ defineExpose({ focusField })
   line-height: 1.4;
 }
 /* 左侧竖排格(申请单位列):逐行一格、一行一字,竖线因此贯通整个表头区 */
+/* 竖排列合并格:整个 vcell 连续段只有这一格(在 .q-vrun 里)。
+   原图实测:申/请/单/位 四字紧排成一组,字组中心 ≈ 整段中心(垂直居中),
+   字距换算到纸面 ≈32px → 13.5px 字配 line-height 2.4,字组高 ≈111px 与原图一致 */
 .q-vlabel {
   flex: none;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 2px 0;
@@ -1054,12 +1134,24 @@ defineExpose({ focusField })
   color: #1f5fa8;
   font-size: 13.5px;
   border-right: 1px solid #8a8a8a;
-  line-height: 1.4;
 }
-/* 竖排列合并格:下一行仍是竖排列时,本格背景下探 1px 盖掉本行底边线在列内的那一段
-   (流内非定位子元素后于父边框绘制,天然盖得住;父级无 overflow 裁剪)。列顶/底的边界线不受影响 */
-.q-vlabel.q-join {
-  margin-bottom: -1px;
+.q-vchar {
+  line-height: 2.4;
+}
+/* vcell 连续段:左合并竖列 + 右侧按行堆叠。行间横线只画到列右沿(与原图一致),
+   段底整宽横线由 .q-vrun 自己的 border-bottom 出(内部末行不再画,避免双线) */
+.q-vrun {
+  display: flex;
+  border-bottom: 1px solid #8a8a8a;
+}
+.q-vrows {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.q-vrows .as-row:last-child {
+  border-bottom: none;
 }
 .q-value {
   flex: 1;
