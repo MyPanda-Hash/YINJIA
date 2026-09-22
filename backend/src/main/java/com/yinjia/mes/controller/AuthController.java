@@ -47,6 +47,9 @@ public class AuthController {
         if (rows.isEmpty() || !encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
             throw new IllegalStateException("用户名或密码错误");
         }
+        // 过渡期收口:存量 BCrypt 哈希在登录成功时顺手升级成自写格式(
+        // BCrypt 不可逆、拿不到明文,只能借"用户自己带明文来登录"这一次机会换掉)
+        upgradeStoredHashIfNeeded(username, password, String.valueOf(rows.get(0).get("password_hash")));
         Map<String, Object> u = rows.get(0);
         boolean admin = "Y".equals(u.get("is_admin"));
         // 使用记录:登录成功事件(失败不记)
@@ -117,6 +120,21 @@ public class AuthController {
         return jdbc.query(
                 "SELECT panel_code FROM yj_role_panel WHERE role_id = ? AND can_approve = 'Y'",
                 (rs, i) -> rs.getString(1), roleId);
+    }
+
+    /**
+     * 过渡期收口:库里的存量哈希若仍是旧格式(BCrypt),借"用户带着明文来登录"这一次机会
+     * 重新编码成自写格式写回。BCrypt 不可逆,除此之外没有任何办法拿到明文换算法。
+     * 失败绝不影响本次登录(只打日志)——升级是锦上添花,不是登录的前提。
+     */
+    private void upgradeStoredHashIfNeeded(String username, String rawPassword, String storedHash) {
+        try {
+            if (!encoder.upgradeEncoding(storedHash)) return;
+            String upgraded = encoder.encode(rawPassword);
+            jdbc.update("UPDATE yj_user SET password_hash = ? WHERE username = ?", upgraded, username);
+        } catch (RuntimeException e) {
+            System.err.println("[login] 存量口令哈希升级失败(不影响本次登录): " + e.getMessage());
+        }
     }
 
     /** 客户端 IP(直连内网部署,取 remoteAddr 即可;带代理时取 X-Forwarded-For 首段)。 */
