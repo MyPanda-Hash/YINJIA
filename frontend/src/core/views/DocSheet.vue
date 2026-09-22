@@ -98,18 +98,44 @@
     <!-- ③ 内容表 -->
     <div class="as-table">
       <!-- 行型:网格(pairs)/章节(section)/部门会签(dept)/单字段/多子区/阶段框 -->
-      <template v-for="(row, ri) in config.rows" :key="row.key || row.label">
-        <!-- 网格行:一行多组 标签|值(品质单据表头区);cell.kind: input/date/select/ref/checks(单选,存选项值) -->
+      <template v-for="(row, ri) in config.rows" :key="row.key || row.label || ri">
+        <!-- 网格行:一行多组 标签|值(品质单据表头区);cell.kind: input/date/select/ref/checks(单选,存选项值)/textarea(大填写区)
+             行高与列宽按纸面原图实测值给定:labelW 落在固定列上、flex 取实测像素比例 → 各行竖线重合不错位 -->
         <div v-if="row.kind === 'pairs'" class="as-row q-pairs" :style="{ minHeight: (row.h || 40) + 'px' }">
+          <!-- 左侧竖排格(如「申请单位」一行一字:原图里它是一列、每行一个字,故按行给 vcell;未声明则无此格) -->
+          <div
+            v-if="row.vcell !== undefined" class="q-vlabel"
+            :style="{ width: (config.vcol || 65) + 'px' }"
+          >{{ tt(row.vcell) }}</div>
           <div v-for="(c, ci) in row.cells" :key="(c.key || c.label) + ci" class="q-pair" :style="{ flex: c.flex || 1 }">
-            <div class="q-label" :style="{ width: (c.labelW || row.labelW || 110) + 'px' }">{{ tt(c.label) }}</div>
-            <div class="q-value">
-              <div v-if="c.kind === 'checks'" class="q-checks">
+            <div v-if="c.label" class="q-label" :style="{ width: (c.labelW || row.labelW || config.labelW || 110) + 'px' }">{{ tt(c.label) }}</div>
+            <div class="q-value" :class="{ 'q-col': c.kind === 'textarea' }">
+              <div v-if="c.kind === 'checks'" class="q-checks" :class="{ spread: c.spread }">
                 <span
                   v-for="o in c.options" :key="o" class="q-check" :class="{ on: head[c.key] === o }"
                   @click="setCheck(c.key, o)"
                 >{{ head[c.key] === o ? '☑' : '□' }} {{ tt(o) }}</span>
               </div>
+              <!-- 大填写区(可选末行右侧签名,如特采理由→申请人:原图签名在填写区最下一行) -->
+              <template v-else-if="c.kind === 'textarea'">
+                <el-input
+                  v-if="editable" v-model="head[c.key]" type="textarea"
+                  :rows="c.rows || 3" :maxlength="c.max || 2000"
+                  class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
+                />
+                <div v-else class="as-ro-text">{{ head[c.key] || '' }}</div>
+                <div v-if="c.sign" class="q-signline end">
+                  <span class="q-sign-label">{{ tt(c.sign) }}：</span>
+                  <span class="q-sign-val">
+                    <el-input
+                      v-if="editable" v-model="head[c.signKey || '填写人']" size="small"
+                      maxlength="50" class="as-cell-input q-sign-input" @input="emit('dirty')"
+                    />
+                    <span v-else>{{ head[c.signKey || '填写人'] || '' }}</span>
+                  </span>
+                  <span class="q-sign-date">　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
+                </div>
+              </template>
               <div v-else-if="editable && isRefKey(c.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
                 <span class="as-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
                 <el-icon class="as-ref-ico"><Search /></el-icon>
@@ -156,7 +182,7 @@
               class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
             />
             <div v-else-if="row.key && !row.checks" class="as-ro-text">{{ head[row.key] || '' }}</div>
-            <div v-if="row.checks" class="q-checks">
+            <div v-if="row.checks" class="q-checks" :class="{ spread: row.spread }">
               <span
                 v-for="o in row.checks" :key="o" class="q-check" :class="{ on: head[row.key] === o }"
                 @click="setCheck(row.key, o)"
@@ -176,17 +202,22 @@
           </div>
         </div>
 
-        <!-- 部门会签行:左部门名格 + 右意见区(子区可带 纸面勾选样式;同意/不同意由审批流留痕,勾选为装饰) -->
+        <!-- 部门会签行:左部门名格 + 右意见区(子区可带 纸面勾选样式;同意/不同意由审批流留痕,勾选为装饰)
+             deptSignBottom=签名行落在子区最下一行(原图如此);否则签名行在子区首行右侧
+             sub.flex=子区高度比例(按原图实测分配,不给则按内容) -->
         <div v-else-if="row.kind === 'dept'" class="as-row q-dept" :style="{ minHeight: (row.h || 90) + 'px' }">
-          <div class="q-dept-name">{{ tt(row.label) }}</div>
+          <div class="q-dept-name" :style="{ width: (row.nameW || 130) + 'px' }">{{ tt(row.label) }}</div>
           <div class="q-dept-body">
-            <div v-for="(sub, si) in row.subs" :key="sub.key" class="q-dept-sub" :class="{ first: si === 0 }">
+            <div
+              v-for="(sub, si) in row.subs" :key="sub.key" class="q-dept-sub"
+              :class="{ first: si === 0, 'q-sub-h': !!sub.flex }" :style="sub.flex ? { flex: sub.flex } : {}"
+            >
               <div class="q-dept-sub-head">
                 <span v-if="sub.label" class="q-dept-sub-label">{{ tt(sub.label) }}</span>
                 <span v-if="sub.checks" class="q-checks deco">
                   <span v-for="o in sub.checks" :key="o" class="q-check">□ {{ tt(o) }}</span>
                 </span>
-                <span class="q-dept-sign">{{ tt('签名') }}：　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
+                <span v-if="!config.deptSignBottom" class="q-dept-sign">{{ tt('签名') }}：　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
               </div>
               <el-input
                 v-if="editable" v-model="head[sub.key]" type="textarea"
@@ -194,6 +225,7 @@
                 class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
               />
               <div v-else class="as-ro-text">{{ head[sub.key] || '' }}</div>
+              <div v-if="config.deptSignBottom" class="q-dept-signline">{{ tt('签名') }}：　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</div>
             </div>
           </div>
         </div>
@@ -1009,6 +1041,19 @@ defineExpose({ focusField })
   text-align: right;
   line-height: 1.4;
 }
+/* 左侧竖排格(申请单位列):逐行一格、一行一字,竖线因此贯通整个表头区 */
+.q-vlabel {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 0;
+  background: #eef7fd;
+  color: #1f5fa8;
+  font-size: 13.5px;
+  border-right: 1px solid #8a8a8a;
+  line-height: 1.4;
+}
 .q-value {
   flex: 1;
   min-width: 0;
@@ -1016,6 +1061,12 @@ defineExpose({ focusField })
   align-items: center;
   padding: 3px 6px;
   min-height: 32px;
+}
+/* 大填写区取值格:纵向排布 —— 填写区自适应撑满,签名行贴在本格最下一行 */
+.q-value.q-col {
+  flex-direction: column;
+  align-items: stretch;
+  padding: 3px 8px 4px;
 }
 .q-value .as-ref-ctl {
   width: 100%;
@@ -1032,6 +1083,13 @@ defineExpose({ focusField })
   flex-wrap: wrap;
   gap: 4px 16px;
   font-size: 13.5px;
+}
+/* 勾选行占满取值格(否则 flex 子项按内容收缩,space-around 无空间可铺);spread=按原图左起均匀铺开 */
+.q-value > .q-checks {
+  flex: 1;
+}
+.q-checks.spread {
+  justify-content: space-around;
 }
 .q-check {
   white-space: nowrap;
@@ -1086,6 +1144,14 @@ defineExpose({ focusField })
   gap: 6px;
   padding: 2px 2px 0;
   font-size: 13.5px;
+}
+/* 签名行贴底(填写区 flex:1 撑开,签名行自然落在最下一行;再兜一层) */
+.q-value.q-col .q-signline {
+  margin-top: auto;
+}
+/* 签名行靠右(原图:申请人/签名 位于填写区右端) */
+.q-signline.end {
+  justify-content: flex-end;
 }
 .q-sign-label {
   color: #333;
@@ -1142,6 +1208,20 @@ defineExpose({ focusField })
 .q-dept-sign {
   margin-left: auto;
   color: #333;
+}
+/* 签名行落子区最下一行(原图);填写区 flex:1 撑开,margin-top:auto 兜底 */
+.q-dept-signline {
+  margin-top: auto;
+  padding-top: 2px;
+  text-align: right;
+  font-size: 13.5px;
+  color: #333;
+}
+/* 填写区撑满剩余高度:textarea 本体高度跟随。仅在**已由 flex 定高**的格子里生效
+   (q-sub-h / q-col);高度不确定的容器里 100% 会退化,故不做全局注入,免得影响其它面板 */
+.q-dept-sub.q-sub-h .as-fill-area :deep(.el-textarea__inner),
+.q-value.q-col .as-fill-area :deep(.el-textarea__inner) {
+  height: 100%;
 }
 
 .q-signrow {

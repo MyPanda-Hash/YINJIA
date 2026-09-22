@@ -186,41 +186,58 @@ export const qcSheetCfgs = {
   // 来料品质特采单(YJ-QR-60 表单,独立面板 + 独立表,挂 品质管理 > 来料品质)
   // 2026-09-22:原「质量单据·特采申请单」QC_TC 与本单同表同版式、属重复,已整体下线
   // (面板行/表/版式键一并删除,见 tools/migrate-qc-tc-drop.sql)→ 特采只此一个入口,前缀 TCI。
-  // 版式 1:1 对齐原扫描图(YJ-QR-60)。
+  // 版式 1:1 对齐原扫描图(YJ-QR-60):表体 x48..495=447px → 纸面 938px(比例 2.098),以下
+  //   列宽 / 行高全部取实测值换算,不用估:「申请单位」竖排列 31px→65px(vcol,一行一字 vcell)、
+  //   其后标签列 50px→105px(labelW)、三组「标签|值」50+66 / 82+79 / 62+77 → 243 / 338 / 292(flex);
+  //   表头五行共用这两条竖线(申请单位列 65 与标签列右沿 170)→ 竖线贯通不断,故不错位;
+  //   部门会签名格取 170px(nameW),与标签列右沿同一条线 → 整张表是一张网格。
   QC_TC_IN: {
     docno: 'YJ-QR-60',
     titlePart1: '特采申请单', titlePart2: '', titlePart3: '', deco: false,
     info: qcInfo('采购部'),
+    vcol: 65,
+    labelW: 105,
+    deptSignBottom: true,
     rows: [
-      { kind: 'pairs', cells: [
-        { label: '供应商', key: '供应商', flex: 1.2 },
-        { label: '采购单号', key: '采购单号', flex: 1 },
-        { label: '产品名称', key: '产品名称', flex: 1 },
+      { kind: 'pairs', h: 52, vcell: '申', cells: [
+        { label: '供应商', key: '供应商', labelW: 105, flex: 243 },
+        { label: '采购单号', key: '采购单号', labelW: 172, flex: 338 },
+        { label: '产品名称', key: '产品名称', labelW: 130, flex: 292 },
       ] },
-      { kind: 'pairs', cells: [
-        { label: '总数量', key: '总数量', flex: 0.9 },
-        { label: '不合格品数量', key: '不合格品数量', flex: 1 },
-        { label: '不合格品比例', key: '不合格品比例', flex: 0.9 },
+      // 与上一行同一组列宽(原图两行竖线本是重合的)→ 两组值区左右边界逐格对齐
+      { kind: 'pairs', h: 63, vcell: '请', cells: [
+        { label: '总数量', key: '总数量', labelW: 105, flex: 243 },
+        { label: '不合格品数量', key: '不合格品数量', labelW: 172, flex: 338 },
+        { label: '不合格品比例', key: '不合格品比例', labelW: 130, flex: 292 },
       ] },
       // 原图:不良说明 与 严重程度 是上下两行、各占整宽(不是并排)→ 各用单元素 pairs 行
-      { kind: 'pairs', h: 60, cells: [
+      { kind: 'pairs', h: 63, vcell: '单', cells: [
         { label: '不良说明', key: '不良说明', flex: 1 },
       ] },
-      { kind: 'pairs', h: 44, cells: [
-        { label: '严重程度', key: '严重程度', kind: 'checks', options: ['严重', '一般', '轻微'], flex: 1 },
+      { kind: 'pairs', h: 61, vcell: '位', cells: [
+        { label: '严重程度', key: '严重程度', kind: 'checks', options: ['严重', '一般', '轻微'], spread: true, flex: 1 },
       ] },
-      { kind: 'section', label: '特采理由', key: '特采理由', h: 110, max: 1000, sign: '申请人', signKey: '编制人' },
+      // 原图:特采理由 一格到底 —— 左侧标签 + 整宽填写区,最下一行右端「申请人：　年　月　日」
+      // (申请单位列在此行只有竖线、无字,故 vcell 给空串)
+      { kind: 'pairs', h: 185, vcell: '', cells: [
+        { label: '特采理由', key: '特采理由', kind: 'textarea', rows: 3, max: 1000,
+          sign: '申请人', signKey: '编制人', flex: 1 },
+      ] },
       { kind: 'section', label: '一．相关部门处理意见', h: 34 },
-      { kind: 'dept', label: '产品开发部意见', h: 130, subs: [
-        { label: '性能', key: '产品开发部性能意见', checks: ['同意使用', '不同意使用'], max: 250 },
-        { label: '工艺', key: '产品开发部工艺意见', checks: ['同意使用', '不同意使用'], max: 250 },
+      // 部门意见区:原图只有「签名：　年　月　日」(落在各块最下一行),没有勾选框(同意/不同意由审批流留痕);
+      // 行高与子区比例(性能 101 / 工艺 124)、品质/销售/研发 124/122/92 均取原图实测
+      { kind: 'dept', label: '产品开发部意见', h: 225, nameW: 170, subs: [
+        { label: '性能', key: '产品开发部性能意见', max: 250, rows: 1, flex: 101 },
+        { label: '工艺', key: '产品开发部工艺意见', max: 250, rows: 1, flex: 124 },
       ] },
-      { kind: 'dept', label: '品质部意见', h: 80, subs: [{ key: '品质部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
-      { kind: 'dept', label: '销售部意见', h: 80, subs: [{ key: '销售部意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
-      { kind: 'dept', label: '研发意见', h: 80, subs: [{ key: '研发意见', checks: ['同意使用', '不同意使用'], max: 250 }] },
-      // 原图:三个勾选框(正常使用/管控使用/挑选使用)
-      { kind: 'section', label: '二．最终处理结果', key: '最终处理结果', h: 60,
-        checks: ['正常使用', '管控使用', '挑选使用'] },
+      { kind: 'dept', label: '品质部意见', h: 124, nameW: 170, subs: [{ key: '品质部意见', max: 250, rows: 1, flex: 1 }] },
+      { kind: 'dept', label: '销售部意见', h: 122, nameW: 170, subs: [{ key: '销售部意见', max: 250, rows: 1, flex: 1 }] },
+      { kind: 'dept', label: '研发意见', h: 92, nameW: 170, subs: [{ key: '研发意见', max: 250, rows: 1, flex: 1 }] },
+      // 原图:先一条整宽标题带,再一行整宽勾选(正常使用/管控使用/挑选使用,左起均匀铺开)
+      { kind: 'section', label: '二．最终处理结果', h: 36 },
+      { kind: 'pairs', h: 71, cells: [
+        { key: '最终处理结果', kind: 'checks', options: ['正常使用', '管控使用', '挑选使用'], spread: true, flex: 1 },
+      ] },
     ],
     signKind: 'plain',
     signCells: qcSignStd('编制人'),
