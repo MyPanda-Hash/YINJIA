@@ -66,6 +66,31 @@ async function main() {
       ok(`表头已删除 ${h}`, !(snap?.heads || []).some((x) => x.includes(h)))
     ok('纸面只读(表体无输入框)', (snap?.bodyInputs || 0) === 0, `输入框=${snap?.bodyInputs}`)
     ok('行上出现动作按钮(完成检验/修改/✕)', (snap?.acts || []).length > 0, JSON.stringify(snap?.acts))
+    const actCount = (name) => (snap?.acts || []).filter((t) => t === name).length
+    ok('每行都有「完成检验」「修改」「✕」三钮', actCount('完成检验') === snap.rows && actCount('修改') === snap.rows && actCount('✕') === snap.rows,
+      `行=${snap.rows} 完成检验=${actCount('完成检验')} 修改=${actCount('修改')} ✕=${actCount('✕')}`)
+
+    // 列对齐:所有数据行的 批次号/数量/检验单号 单元格 x 必须一致(空类别行曾因合并判定不自洽而整行左移)
+    const align = await evaluate(`(() => {
+      const table = document.querySelector('.catalog-sheet .cs-table')
+      const rows = [...table.querySelectorAll('tbody tr')].filter(r => r.querySelector('td'))
+      const col = (r, sel) => { const c = r.querySelector(sel); return c ? Math.round(c.getBoundingClientRect().x) : null }
+      const xs = (sel) => rows.map(r => col(r, sel)).filter(v => v !== null)
+      const uniq = (a) => [...new Set(a)]
+      return JSON.stringify({
+        rows: rows.length,
+        batchX: uniq(xs('td.c-batch')), qtyX: uniq(xs('td.c-qty')),
+        noX: uniq(xs('td.c-no')), opX: uniq(xs('td.c-op')),
+        firstCellTags: rows.map(r => r.children[0]?.className || ''),
+      })
+    })()`)
+    const al = JSON.parse(align || '{}')
+    ok('批次号/数量列所有行 x 一致(无错列)', (al.batchX || []).length === 1 && (al.qtyX || []).length === 1, align)
+    ok('检验单号/操作列所有行 x 一致', (al.noX || []).length === 1 && (al.opX || []).length === 1, align)
+    // 错列检测:行首单元格只可能是 类别(c-cat, 未合并时的组首)/编码(c-code, 物料名称被上行 rowspan 覆盖)/
+    // 物料名称(c-mat);若出现 c-batch/c-qty 等,说明该行整体左移(历史 bug)
+    ok('无整行左移(行首格只可能是 类别/物料名称/编码)',
+      (al.firstCellTags || []).every((c) => /c-cat|c-code|c-mat/.test(String(c))), JSON.stringify(al.firstCellTags))
     ok('两个单号带查看/跳转链接', (snap?.links || 0) >= 2, `链接数=${snap?.links}`)
     ok('含物料编码/类别/数量示例数据', /折叠棉|YJ-YCYX|kg/.test(snap?.text || ''), (snap?.text || '').slice(0, 120).replace(/\n/g, '|'))
 

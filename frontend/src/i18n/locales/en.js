@@ -201,6 +201,8 @@ export default {
     '取消完成后该目录行回到「正在检验中」，之后才可反审核挂靠的检验单与检验数据记录。确定取消完成吗？': 'After cancelling, this catalog row returns to “In Progress”; only then can the linked inspection sheet and inspection data record be un-audited. Cancel completion?',
     '已标记为已完成检验': 'Marked as inspection completed',
     '已取消完成（已写入修改记录）': 'Completion cancelled (change log written)',
+    '仅「已完成检验」的行可取消完成': 'Only rows marked “Inspection Completed” can be reopened',
+    '该行已完成检验': 'This row is already marked completed',
     '删除记录': 'Delete Record',
     '删除目录记录': 'Delete Catalog Record',
     '删除该目录记录前，需先删除挂靠的检验单与检验数据记录。确定删除吗？': 'Before deleting this catalog record, the linked inspection sheet and inspection data record must be deleted first. Delete anyway?',

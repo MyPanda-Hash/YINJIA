@@ -66,20 +66,23 @@
               </span>
               <span v-else class="cs-cell-text">—</span>
             </td>
-            <!-- 行操作:完成 / 修改 / 删除记录 -->
+            <!-- 行操作:完成检验 / 修改(两钮常在,不适用时置灰并说明)/ 删除记录 -->
             <td class="c-op no-print">
               <span
-                v-if="row[K.STATUS] !== QC_STATUS_DONE"
                 class="cs-act"
-                :class="{ disabled: !row[K.INSP] || !row[K.REC] }"
-                :title="tt('完成检验（需关联的检验单与检验数据记录都已审批）')"
+                :class="{ disabled: row[K.STATUS] === QC_STATUS_DONE || !row[K.INSP] || !row[K.REC] }"
+                :title="row[K.STATUS] === QC_STATUS_DONE
+                  ? tt('该行已完成检验')
+                  : tt('完成检验（需关联的检验单与检验数据记录都已审批）')"
                 @click.stop="openComplete(row)"
               >{{ tt('完成检验') }}</span>
               <span
-                v-else
                 class="cs-act warn"
-                :title="tt('取消完成并回弹为正在检验中（之后才可反审核挂靠单据）')"
-                @click.stop="doReopen(row)"
+                :class="{ disabled: row[K.STATUS] !== QC_STATUS_DONE }"
+                :title="row[K.STATUS] === QC_STATUS_DONE
+                  ? tt('取消完成并回弹为正在检验中（之后才可反审核挂靠单据）')
+                  : tt('仅「已完成检验」的行可取消完成')"
+                @click.stop="row[K.STATUS] === QC_STATUS_DONE && doReopen(row)"
               >{{ tt('修改') }}</span>
               <span class="cs-act danger" :title="tt('删除该目录记录（需先删除挂靠的检验单与检验数据记录）')" @click.stop="doDelete(row)">✕</span>
             </td>
@@ -196,10 +199,12 @@ function optionsOf(key) {
 /** 是否合格候选(字典值=中文数据键) */
 const qualifiedOptions = computed(() => optionsOf(K.OK))
 
-/** 分组合并:检测物料类别(空值不归纳,单独成行) */
+/** 分组合并:检测物料类别(空值不归纳 —— 每行各自渲染单元格,避免与 groupSpan 不自洽导致整行错列) */
 function isGroupHead(i, key) {
+  const v = items.value[i]?.[key]
+  if (!v) return true                 // 空类别:本行自成一行(必须渲染单元格)
   if (i <= 0) return true
-  return items.value[i]?.[key] !== items.value[i - 1]?.[key]
+  return v !== items.value[i - 1]?.[key]
 }
 function groupSpan(i, key) {
   if (!isGroupHead(i, key)) return 0
@@ -209,13 +214,15 @@ function groupSpan(i, key) {
   while (i + n < items.value.length && items.value[i + n]?.[key] === v) n++
   return n
 }
-/** 物料层:按「物料名称 + 物料编码」合并 */
+/** 物料层:按「物料名称 + 物料编码」合并;两者皆空时每行自成一行(同空值不自洽会错列) */
 function matKeyOf(row) {
   return [row?.[K.MAT] || '', row?.[K.CODE] || ''].join('|')
 }
 function isMatHead(i) {
   if (i <= 0) return true
-  return matKeyOf(items.value[i]) !== matKeyOf(items.value[i - 1])
+  const k = matKeyOf(items.value[i])
+  if (k === '|') return true
+  return k !== matKeyOf(items.value[i - 1])
 }
 function matSpan(i) {
   if (!isMatHead(i)) return 0
@@ -482,6 +489,7 @@ defineExpose({ exportCatalogExcel })
 .cs-act.warn { color: #b26a00; background: #fff8ee; border-color: #ffd9a8; }
 .cs-act.danger { color: #c0392b; background: #fff5f5; border-color: #f0b4ae; }
 .cs-act.disabled { opacity: 0.45; cursor: not-allowed; }
+.c-op .cs-act { margin: 1px 1px; padding: 0 4px; font-size: 11.5px; }
 /* ═══ 脚注(原表第16行 + 只读说明) ═══ */
 .cs-note {
   border-top: 1px solid #8a8a8a; padding: 6px 12px; background: #f7fbff; color: #5a6b7d; font-size: 12.5px;
