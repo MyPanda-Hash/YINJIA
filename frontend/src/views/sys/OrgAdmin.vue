@@ -683,7 +683,7 @@ async function applyBatchRole() {
     batchRoleId.value = null
     await loadUsers()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '批量分配失败')
+    ElMessage.error(e?.response?.data?.message || tt('批量分配失败'))
   }
 }
 
@@ -712,7 +712,7 @@ async function copyRolePerms() {
     }
     ElMessage.success(`${tt('已复制')}「${src.roleName}」${tt('的权限，确认无误后请保存')}`)
   } catch (e) {
-    ElMessage.error('复制权限失败')
+    ElMessage.error(tt('复制权限失败'))
   }
 }
 const selRole = ref(null)
@@ -746,7 +746,7 @@ async function loadDepts() {
     const r = await request.get('/sys/dept/tree')
     deptTree.value = r?.data || []
   } catch (e) {
-    ElMessage.error('部门加载失败')
+    ElMessage.error(tt('部门加载失败'))
   }
 }
 
@@ -755,7 +755,7 @@ async function loadUsers() {
     const r = await request.get('/sys/user/list')
     users.value = r?.data || []
   } catch (e) {
-    ElMessage.error('用户列表加载失败')
+    ElMessage.error(tt('用户列表加载失败'))
   }
 }
 
@@ -764,7 +764,7 @@ async function loadRoles() {
     const r = await request.get('/sys/role/list')
     roles.value = r?.data || []
   } catch (e) {
-    ElMessage.error('角色列表加载失败')
+    ElMessage.error(tt('角色列表加载失败'))
   }
 }
 
@@ -787,15 +787,15 @@ function editDept(d) {
 }
 
 async function saveDept() {
-  if (!deptForm.deptName.trim()) return ElMessage.warning('请输入部门名称')
+  if (!deptForm.deptName.trim()) return ElMessage.warning(tt('请输入部门名称'))
   savingDept.value = true
   try {
     await request.post('/sys/dept/save', { id: deptForm.id, parentId: deptForm.parentId || 0, deptName: deptForm.deptName })
-    ElMessage.success('部门已保存')
+    ElMessage.success(tt('部门已保存'))
     deptVisible.value = false
     await loadDepts()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '保存失败')
+    ElMessage.error(e?.response?.data?.message || tt('保存失败'))
   } finally {
     savingDept.value = false
   }
@@ -803,16 +803,20 @@ async function saveDept() {
 
 async function delDept(d) {
   try {
-    await ElMessageBox.confirm('删除部门「' + d.deptName + '」？', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(
+      tt('删除部门「{name}」？').replace('{name}', d.deptName),
+      tt('提示'),
+      { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
+    )
   } catch (e) {
     return
   }
   try {
     await request.delete('/sys/dept/' + d.id)
-    ElMessage.success('部门已删除')
+    ElMessage.success(tt('部门已删除'))
     await loadDepts()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '删除失败')
+    ElMessage.error(e?.response?.data?.message || tt('删除失败'))
   }
 }
 
@@ -860,35 +864,35 @@ function openUser(row) {
 }
 
 async function saveUser() {
-  if (!userForm.userName.trim()) return ElMessage.warning('请输入账号')
+  if (!userForm.userName.trim()) return ElMessage.warning(tt('请输入账号'))
   savingUser.value = true
   try {
     const body = { ...userForm }
     if (editingUser.value) body.id = editingUser.value.id
     await request.post('/sys/user/save', body)
-    ElMessage.success('用户已保存')
+    ElMessage.success(tt('用户已保存'))
     userVisible.value = false
     await loadUsers()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '保存失败')
+    ElMessage.error(e?.response?.data?.message || tt('保存失败'))
   } finally {
     savingUser.value = false
   }
 }
 
 async function saveRole() {
-  if (!roleForm.roleCode.trim() || !roleForm.roleName.trim()) return ElMessage.warning('请填写编码与名称')
+  if (!roleForm.roleCode.trim() || !roleForm.roleName.trim()) return ElMessage.warning(tt('请填写编码与名称'))
   savingRole.value = true
   try {
     await request.post('/sys/role/save', { ...roleForm })
-    ElMessage.success('角色已创建')
+    ElMessage.success(tt('角色已创建'))
     newRoleVisible.value = false
     roleForm.roleCode = ''
     roleForm.roleName = ''
     roleForm.remark = ''
     await loadRoles()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '创建失败')
+    ElMessage.error(e?.response?.data?.message || tt('创建失败'))
   } finally {
     savingRole.value = false
   }
@@ -896,20 +900,24 @@ async function saveRole() {
 
 async function delRole(row) {
   try {
-    await ElMessageBox.confirm('删除角色「' + row.roleName + '」？其下用户角色将清空', '提示', { type: 'warning' })
+    await ElMessageBox.confirm(
+      tt('删除角色「{name}」？其下用户角色将清空').replace('{name}', row.roleName),
+      tt('提示'),
+      { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
+    )
   } catch (e) {
     return
   }
   try {
     await request.delete('/sys/role/' + row.id)
-    ElMessage.success('角色已删除')
+    ElMessage.success(tt('角色已删除'))
     if (selRole.value && selRole.value.id === row.id) {
       selRole.value = null
       panelRows.value = []
     }
     await loadRoles()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '删除失败')
+    ElMessage.error(e?.response?.data?.message || tt('删除失败'))
   }
 }
 
@@ -937,7 +945,7 @@ async function loadRolePanels(row) {
     }))
     buildHeadMarkCache() // 首次渲染前备好快照(thead 三态绑定读缓存)
   } catch (e) {
-    ElMessage.error('面板权限加载失败')
+    ElMessage.error(tt('面板权限加载失败'))
   }
 }
 
@@ -948,10 +956,10 @@ async function savePanels() {
       .filter((p) => p.permsSet && p.permsSet.size > 0)
       .map((p) => ({ panelCode: p.panelCode, perms: [...p.permsSet].join(',') }))
     await request.post('/sys/role/' + selRole.value.id + '/panels', { panels })
-    ElMessage.success('面板权限已保存')
+    ElMessage.success(tt('面板权限已保存'))
     if (selRole.value.roleCode === user.roleCode) await user.fetchPerms()
   } catch (e) {
-    ElMessage.error(e?.response?.data?.message || '保存失败')
+    ElMessage.error(e?.response?.data?.message || tt('保存失败'))
   } finally {
     saving.value = false
   }

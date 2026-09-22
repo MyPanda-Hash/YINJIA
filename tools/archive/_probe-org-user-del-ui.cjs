@@ -220,6 +220,34 @@ localStorage.setItem('mes_login_date','2026-09-23'); 'ok'`)
     const shotDone = await shot('org-user-del-done.png')
     console.log('  截图 → ' + shotDone)
 
+    // ⑦ 旧路径(删除角色弹窗)本轮一并 tt 化,英文态同样要英文化
+    console.log('\nE) 删除角色弹窗(旧路径,本轮一并 tt 化)')
+    const opened = await evaluate(`(() => {
+      const col = document.querySelector('.org-col.roles')
+      if (!col) return 'no-roles-col'
+      const row = [...col.querySelectorAll('.el-table__row')].find((r) => [...r.querySelectorAll('button')].some((b) => /删除|Delete/i.test(b.innerText)))
+      if (!row) return 'no-deletable-role'
+      const btn = [...row.querySelectorAll('button')].find((b) => /删除|Delete/i.test((b.innerText || '').trim()))
+      btn.click(); return 'clicked'
+    })()`)
+    await sleep(900)
+    const roleDlg = await evaluate(`(() => {
+      const box = document.querySelector('.el-message-box')
+      if (!box) return { visible: false, opened: ${JSON.stringify('x')} }
+      return {
+        visible: true,
+        title: (box.querySelector('.el-message-box__title')?.innerText || '').trim(),
+        msg: (box.querySelector('.el-message-box__message')?.innerText || '').trim(),
+        btns: [...box.querySelectorAll('.el-message-box__btns button')].map((b) => (b.innerText || '').trim()),
+      }
+    })()`)
+    console.log('  打开结果=' + opened + ' 弹窗=' + JSON.stringify(roleDlg))
+    ok('E1 角色弹窗英文标题', roleDlg.visible === true && roleDlg.title === 'Notice', JSON.stringify(roleDlg))
+    ok('E2 角色弹窗英文正文', /^Delete role/.test(roleDlg.msg || ''), roleDlg.msg)
+    ok('E3 角色弹窗英文按钮', (roleDlg.btns || []).includes('OK') && (roleDlg.btns || []).includes('Cancel'), JSON.stringify(roleDlg.btns))
+    await evaluate(`(() => { const b=[...document.querySelectorAll('.el-message-box__btns button')].find(x=>/取消|Cancel/i.test(x.innerText)); if(b) b.click(); return 'x' })()`)
+    await sleep(500)
+
     ws.close()
   } finally {
     edge.kill()
