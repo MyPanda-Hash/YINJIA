@@ -3501,11 +3501,17 @@ function closeCtx() {
 
 // ---------- 审批按钮权限（提交审批/审批情况公开；审批通过/驳回需角色审批权限） ----------
 const APPROVE_ACTIONS = ['审批通过', '审批驳回']
+// 直接「审核」仅管理员（2026-09-22）：审批下拉最下的直审按钮收权——
+// 有审批权的角色走 提交审批→审批通过（同效已审核），不再保留直审入口；后端 audit() 同口径拒绝
+const ADMIN_ONLY_ACTIONS = ['审核']
 function filterGroups(raw) {
   const canApprove = user.isAdmin || user.approvePanels.includes(panelCode.value)
-  if (canApprove) return raw
   return (raw || [])
-    .map((g) => ({ ...g, actions: (g.actions || g.items || []).filter((a) => !APPROVE_ACTIONS.includes(a)) }))
+    .map((g) => {
+      let actions = (g.actions || g.items || []).filter((a) => !(!user.isAdmin && ADMIN_ONLY_ACTIONS.includes(a)))
+      if (!canApprove) actions = actions.filter((a) => !APPROVE_ACTIONS.includes(a))
+      return { ...g, actions }
+    })
     .filter((g) => (g.actions || []).length > 0)
 }
 

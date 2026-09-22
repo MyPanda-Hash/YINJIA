@@ -815,8 +815,11 @@ public class ButtonService {
     // ============ 状态机(照搬 light-mes:草稿⇄已审核 + 审批流) ============
 
     private Map<String, Object> audit(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        // 审批权校验:审核与审批通过/驳回同口径(管理员 ∪ yj_role_panel.can_approve='Y')
-        requireApprover(def.code());
+        // 直审收权(2026-09-22):直接「审核」仅管理员——此前与审批通过/驳回同口径(管理员 ∪ can_approve),
+        // 有审批权的角色现在走 提交审批→审批通过(同效已审核,钩子同口径);前端审批下拉对非管理员同步隐藏
+        String auditor = currentUserName();
+        if (!isAdminUser(auditor))
+            throw new org.springframework.security.access.AccessDeniedException("仅管理员可直接审核，其他角色请走提交审批");
         if (!def.isDoc()) throw new IllegalStateException("档案面板无审核动作");
         String no = requireNo(formData);
         ensureDocExists(def, no);
@@ -825,7 +828,6 @@ public class ButtonService {
         if ("已中止".equals(st.get("status"))) throw new IllegalStateException("已中止单据不可审核，请先恢复");
         if ("已审核".equals(st.get("status"))) throw new IllegalStateException("单据已是已审核状态");
         if ("审批中".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
-        String auditor = currentUserName();
         // 编制审核分离(2026-09-12):审核人不得是制单人本人——此前有审批权的用户可自审自己制的单;
         // 管理员豁免(管理员保存即归档本就是等价权力,堵死反而制造死路)
         if (!isAdminUser(auditor) && auditor.equals(authorOfDoc(def, no)))
