@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="轻 MES">
+  <!-- 轻 MES 站点图标:制造绿底 + 白色 M(与顶栏 logo「轻MES」同色系 #116a5b)。
+       为什么要有它:浏览器默认会请求 /favicon.ico,缺失时服务端会返回 500 并在日志里刷错误。 -->
+  <rect width="64" height="64" rx="14" fill="#116a5b"/>
+  <path d="M15 47V17h7.6l9.4 14.6L41.4 17H49v30h-7.4V30.2L32 43.6 22.4 30.2V47z" fill="#ffffff"/>
+</svg>
