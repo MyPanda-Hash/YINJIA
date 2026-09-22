@@ -842,13 +842,13 @@ public class ButtonService {
         if (!auditor.equals(shrAfter == null ? "" : String.valueOf(shrAfter))) {
             throw new IllegalStateException("单据已被他人审核，请刷新后查看");
         }
+        // 分批送料批次号(2026-09-21 取号时机迁移):**采购入库单审核时**确认批次号并回填全链 ——
+        // 送料暂收单/来料检验单/采购入库单(头+行)、批次台账、form_flow_link.batch_no。
+        // 顺序(2026-09-22 调整):**先**确认批次号再库存过账 —— 否则 kucun.lot_no 落的是确认前的
+        // 空值(台账批号口径=批次号优先,见 StockLedgerService.loadRows)。整体同一事务,任一步失败一并回滚。
+        assignBatchNoOnInbound(def.code(), no, auditor);
         // 库存记账(材料入库链):采购入库单审核 → kucun 入账(失败抛错整笔回滚)
         stockLedger.postIn(def.code(), no, currentUserName());
-        // 分批送料批次号(2026-09-21 取号时机迁移):**采购入库单审核时**取号并回填全链 ——
-        // 送料暂收单/来料检验单/采购入库单(头+行)、批次台账、form_flow_link.batch_no。
-        // 顺序:入库审核 → 取号回填 → 转ERP(转ERP 是独立按钮,天然在其之后,故不需要"补推批号")。
-        // 幂等(台账行已有批次号则沿用);失败抛错,整笔回滚(审核状态一并回退)。
-        assignBatchNoOnInbound(def.code(), no, auditor);
         // 工序报工记账(生产过程层):报工单审核 → wo_progress.完成数量 累计
         woReport.post(def.code(), no, currentUserName());
         // 切炭双出口(已确认):报工审核后,直销数量自动生成成品入库单并审核入账(成品仓)
@@ -1000,6 +1000,10 @@ public class ButtonService {
         tcInApprovedGenerate(def.code(), no, operator);
         // 采购入库单走审批通过的同样取号回填(与「审核」钩子同口径,防走审批流时批次号取不到)
         assignBatchNoOnInbound(def.code(), no, operator);
+        // 库存记账(2026-09-22 补):「审批通过」与「审核」同效为已审核,但此前只在审核路径过账 ——
+        // 走 提交审批→审批通过 的库存单据(采购入库/产成品入库/材料出库等)漏记台账。
+        // 与 audit() 同序:先确认批次号再过账;非记账面板 postIn 内部直接跳过。
+        stockLedger.postIn(def.code(), no, operator);
         // 消息:审批通过 → 制单人
         notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
                 def.code(), no, MessageService.APPROVAL_APPROVED,

@@ -59,6 +59,12 @@ public class StockLedgerService {
         for (Map<String, Object> r : rows) {
             String code = str(r.get("code"));
             String lot = str(r.get("lot"));
+            // 冲回兜底(2026-09-22):采购入库的批号取值改为「批次号优先、批号兜底」后,
+            // 历史单据可能按旧口径(批号/NULL)记的账 —— 主批号冲不回时按备选批号再冲一次
+            // (备选**存在但为空**也算:按 NULL 安全匹配冲旧的无批号行),
+            // 避免"账在、批号口径变了、冲回静默跳过"的库存虚挂。
+            boolean hasAlt = r.containsKey("lotAlt");           // 只有采购链的查询带 lotAlt 键
+            String lotAlt = str(r.get("lotAlt"));
             double qty = num(r.get("qty"));
             String whName = str(r.get("行仓库")) != null ? str(r.get("行仓库")) : str(r.get("头仓库"));
             Double price = r.get("price") == null ? null : num(r.get("price"));
@@ -68,12 +74,20 @@ public class StockLedgerService {
             if (!forward && whName == null) continue;
             String ckdm = resolveCkdm(whName);
             if (ckdm == null) throw new IllegalStateException("仓库档案不存在:[" + whName + "],请先在基础档案-仓库中建立");
-            if (inbound) applyIn(code, ckdm, lot, qty, price, user, forward);
-            else applyOut(code, ckdm, lot, qty, user, forward);
+            if (inbound) {
+                int n = applyIn(code, ckdm, lot, qty, price, user, forward);
+                boolean altDiffers = lotAlt == null || lotAlt.isEmpty() || !lotAlt.equals(lot);
+                if (n == 0 && !forward && hasAlt && altDiffers) {
+                    applyIn(code, ckdm, lotAlt == null || lotAlt.isEmpty() ? null : lotAlt, qty, price, user, forward);
+                }
+            } else {
+                applyOut(code, ckdm, lot, qty, user, forward);
+            }
         }
     }
 
-    private void applyIn(String code, String ckdm, String lot, double qty, Double price, String user, boolean forward) {
+    /** @return 冲回时命中的台账行数(0=没冲到,供备选批号兜底);过账(前进)时无意义 */
+    private int applyIn(String code, String ckdm, String lot, double qty, Double price, String user, boolean forward) {
         double sign = forward ? 1 : -1;
         // lot 为 NULL 时 =(null) 永不匹配:无批号入库行(如来料检验单生成的采购入库单)会插入
         // lot_no=NULL 台账行,弃审却永远匹配不到 → "台账无该行"死锁;改为 NULL 安全匹配
@@ -85,17 +99,18 @@ public class StockLedgerService {
             if (!forward || qty < 0) {
                 // 同步脚本设的已审核单据跳过了正常审核流程(未写台账),弃审时台账无行 → 跳过冲回
                 // 正常 UI 审核过的单据台账必有行,不会走这个分支
-                return;
+                return 0;
             }
             jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, yl, price, asp_user1, asp_time1, asp_cancel)"
                             + " VALUES (?, ?, ?, GETDATE(), ?, ?, ?, ?, GETDATE(), 'N')",
                     code, ckdm, lot, qty, qty, price, "stock:" + user);
-            return;
+            return 0;
         }
         if (!forward || qty < 0) {
             Double yl = bal(code, ckdm, lot);
             if (yl != null && yl < -0.0001) throw new IllegalStateException("冲回将使现存量为负(物料 " + code + " 批 " + lot + " 余额 " + yl + "),库存已被消耗,不可冲回");
         }
+        return n;
     }
 
     private void applyOut(String code, String ckdm, String lot, double qty, String user, boolean forward) {
@@ -126,7 +141,13 @@ public class StockLedgerService {
     private List<Map<String, Object>> loadRows(String panelCode, String no) {
         return switch (panelCode) {
             case "PURCHASE_IN" -> jdbc.queryForList(
-                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[实收数量] AS qty, l.[单价] AS price"
+                    // 批号口径(2026-09-22):**批次号优先、(供应商)批号兜底** —— 采购链按「只用批次号」
+                    // 口径标识批次(纯入库日期),且批次号在**入库审核时**才确认,故调用顺序必须
+                    // 先确认批次号(ButtonService.assignBatchNoOnInbound)再过账,台账 lot_no 才有值。
+                    // lotAlt=备选批号(旧值):冲回时主批号没冲到按它兜底(历史单据按旧口径记的账)。
+                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库],"
+                            + " ISNULL(NULLIF(l.[批次号], N''), l.[批号]) AS lot, l.[批号] AS lotAlt,"
+                            + " l.[实收数量] AS qty, l.[单价] AS price"
                             + " FROM bl_purchase_in l LEFT JOIN bd_purchase_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "FINISH_IN" -> jdbc.queryForList(
