@@ -1,8 +1,8 @@
 import request from '@core/request'
-import { unwrap, errMsg } from '@core/panel-engine'
+import { unwrap, unwrapStrict, errMsg } from '@core/panel-engine'
 
 // 通用层函数继续对外导出（保持既有调用方兼容）
-export { unwrap, errMsg }
+export { unwrap, unwrapStrict, errMsg }
 
 /** 财务字段十进制四舍五入，修正 15.5 * 1.13 = 17.514999... 一类二进制浮点边界。 */
 export function roundDecimal(value, digits = 2) {
@@ -242,13 +242,16 @@ export async function getNewFormPermMatrix({ panelCode, operationName }) {
 }
 
 export async function getFormDescriptor({ panelCode, code }) {
+  // 严格解包:无该面板查看权限时后端返回 HTTP 200 + code 403,必须当错误抛出
+  // 才能让表单页出提示,而不是渲染一张空表单(2026-09-22)
   return normalizeApprovalPayload(
-    unwrap(await request.get('/px/getFormDescriptor', { params: { panelCode, code } })),
+    unwrapStrict(await request.get('/px/getFormDescriptor', { params: { panelCode, code } })),
   )
 }
 
 export async function queryFormDataList(params) {
-  return unwrap(await request.post('/px/queryFormDataList', params))
+  // 同上:列表页原先 `res.list || []` 把权限拒绝吃成空表,用户看不到原因
+  return unwrapStrict(await request.post('/px/queryFormDataList', params))
 }
 
 // ==================== 产品开发下发(2026-09-09) ====================
