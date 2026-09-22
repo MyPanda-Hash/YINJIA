@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="renderer" content="webkit|ie-comp|ie-stand">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+    <meta http-equiv="Cache-Control" content="no-siteapp" />
+    <link rel="Bookmark" href="/favicon.ico">
+    <link rel="Shortcut Icon" href="/favicon.ico" />
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="~/admin/lib/html5shiv.js"></script>
+    <script type="text/javascript" src="~/admin/lib/respond.min.js"></script>
+    <![endif]-->
+    <link href="/admin/static/h-ui/css/H-ui.css" rel="stylesheet" type="text/css" />
+    <link href="/admin/static/h-ui.admin/css/H-ui.admin.css" rel="stylesheet" type="text/css" />
+    <link href="/admin/static/h-ui.admin/css/H-ui.admin.extension.css" rel="stylesheet" type="text/css" />
+    <link href="/admin/lib/Hui-iconfont/1.0.8/iconfont.css" rel="stylesheet" type="text/css" />
+    <link href="/admin/static/h-ui.admin/skin/green/skin.css" rel="stylesheet" type="text/css" id="skin" />
+    <link href="/admin/static/h-ui.admin/css/style.css" rel="stylesheet" type="text/css" />
+    
+    <link href="/admin/static/h-ui.admin/css/H-ui.login.css" rel="stylesheet" type="text/css" />
+
+    <!--[if IE 6]>
+    <script type="text/javascript" src="~/admin/lib/DD_belatedPNG_0.0.8a-min.js" ></script>
+    <script>DD_belatedPNG.fix('*');</script>
+    <![endif]-->
+    <title>&#x5B8F;&#x665F;&#x7535;&#x5B50;&#x667A;&#x80FD;&#x667A;&#x9020;&#x7BA1;&#x7406;&#x5E73;&#x53F0;</title>
+    <meta name="keywords" content="LdCms.NetCore">
+    <meta name="description" content="LdCms.NetCore">
+</head>
+<body>
+     
+<input type="hidden" id="TenantId" name="TenantId" value="" />
+<div class="header"></div>
+
+
+<div></div>
+<div class="div1" style="color: rgb(255, 0, 140);"></div>
+
+<Script type="text/javascript">
+    const div = document.querySelector('div')
+
+    function showTime() {
+
+        const date = new Date();
+        let h = date.getHours();
+        let m = date.getMinutes();
+        let s = date.getSeconds();
+        h = h < 10 ? '0' + h : h;
+        m = m < 10 ? '0' + m : m;
+        s = s < 10 ? '0' + s : s;
+        const d = ['星期天-Sunday', '星期一-Monday', '星期二-Tuesday', '星期三-Wednesday', '星期四-Thursday', '星期五-Friday', '星期六-Saturday']
+
+        var screen_h = window.screen.height;//获取屏幕高度
+        var screen_w = window.screen.width;//获取屏幕宽度
+        
+        var xhr;
+        if (window.XMLHttpRequest) {
+            xhr = new window.XMLHttpRequest;
+        }
+        else { xhr = new ActiveXObject("Microsoft.XMLHTTP"); }
+        xhr.onreadystatechange = success;
+        
+        var url = '/admin/SMDL?BarCode=https%3A%2F%2Fwww.aspmis.com%2Fcodeyj2%2F%E5%99%98ea2b225605a74839838567860563e7c9';
+
+        xhr.open("POST", url, false);
+        xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+        xhr.setRequestHeader('screen_w', screen_w);
+        xhr.setRequestHeader('screen_h', screen_h);
+        xhr.setRequestHeader('CompanyID', '');
+        xhr.setRequestHeader('StaffID', '');
+        var params = "{\"BarCode\": ViewBag.BarCode,\"screen_w\": "+ screen_w + ",\"screen_h\": "+ screen_h+ "}";
+        xhr.send(JSON.stringify(params));
+
+        function success() {
+            if (xhr.readyState == 4 && xhr.status == 200) {
+                console.info(xhr.responseText);
+                if (xhr.responseText.includes("成功")) {
+                   
+                    window.location.href = '/admin/login/sys?BarCode=https%3A%2F%2Fwww.aspmis.com%2Fcodeyj2%2F%E5%99%98ea2b225605a74839838567860563e7c9';  //登录
+                }
+
+                return true;
+            }
+            else { return false; }
+        }
+ 
+
+        return `&#x5F53;&#x524D;&#x65F6;&#x95F4;： ${date.getFullYear()} &#x5E74; ${date.getMonth() + 1} &#x6708; ${date.getDate()} &#x65E5; ${h}:${m}:${s} ${d[new Date().getDay()]} `
+    }
+
+    div.innerText.innerHTML = showTime();
+    
+    setInterval(function () {
+        div.innerHTML = "<h3>" + showTime() + "</h3>";
+       
+    }, 1000)
+
+    const div1 = document.querySelector('.div1')
+     
+
+</Script>
+
+
+ 
+
+
+<div class="loginWraper">
+    <div class="loginBox">
+        <img class="avatar size-XL " style="width:120px;height:120px;left:400px;top:100px"  src="https://www.aspmis.com/YJLS_QY/pict/qrcode.png">
+    </div>
+  
+    
+
+    <div id="loginform" class="loginBox">
+        <form id="form" name="form" class="form form-horizontal" action="/admin/login/sys" method="post">
+            <div class="row cl">
+                <label class="form-label col-xs-3"> &#x8BED;&#x8A00;:</label>
+                <div class="formControls col-xs-8" style="width: 230px;" onchange="$.mainu.Login_Re()">
+                    <select class="select" size="1" id="LANGUAGE" name="LANGUAGE">
+                        <option value= selected></option>
+                        <option value="简体">简体</option>
+                        <option value="繁體">繁體</option>
+                        <option value="English">English</option>
+                        <option value="Other"></option>
+                    </select>
+                </div>
+                <a href="javascript:;" onclick="$.mainu.ReBarcode()"> (&#x5237;&#x65B0;&#x4E8C;&#x7EF4;&#x7801;)</a>  
+            </div>
+            <div class="row cl">
+                <label class="form-label col-xs-3"><i class="Hui-iconfont"></i>&#x516C;&#x53F8;:</label> 
+                <div class="formControls col-xs-8" onchange="$.mainu.UpdComm()">
+                    <input id="companyid" name="companyid" type="text" placeholder="公司" class="input-text size-L" style="width:200px" value=>
+
+                </div>
+            </div>
+            <div class="row cl">
+                <label class="form-label col-xs-3"><i class="Hui-iconfont"></i>&#x8D26;&#x6237;:</label> 
+                <div class="formControls col-xs-8" onchange="$.mainu.UpdComm()">
+                    <input id="username" name="username" type="text" placeholder="账户" class="input-text size-L" style="width:200px">
+
+                </div>
+            </div>
+            <div class="row cl">
+                <label class="form-label col-xs-3"><i class="Hui-iconfont"></i>&#x5BC6;&#x7801;:</label> 
+                <div class="formControls col-xs-8">
+                    <input id="password" name="password" type="password" placeholder="密码" class="input-text size-L" style="width:200px" value="">
+                </div>
+            </div>
+
+            <input id="maxrecord" name="maxrecord" type="text" placeholder="显示最大记录数" class="input-text size-L" hidden>  
+
+        
+            <div class="row cl">
+                <div class="formControls col-xs-8 col-xs-offset-3">
+                    <input name="" type="submit" class="btn btn-success radius size-L" value="&nbsp;&#x767B; &#x5F55;&nbsp;">  
+                    <input name="" type="reset" class="btn btn-default radius size-L" value="&nbsp;&#x53D6; &#x6D88; &nbsp;">  
+                    <a href="javascript:;" onclick="$.mainu.RegBatch()" class="btn btn-warning radius size-L">&nbsp;&#x6CE8; &#x518C; &nbsp;</a> 
+                    <a href="javascript:;" onclick="$.mainu.KFBatch()" class="btn btn-danger radius size-L">&nbsp;&#x5BA2; &#x670D; &nbsp;</a> 
+                </div>
+            </div>
+        </form>
+
+    </div>
+
+</div>
+<div class="footer">
+    <div style="width:100%; height:180px; line-height:80px; position:fixed; bottom:0px; left:0px; font-size:14px; text-align:center;color:red"></div>
+
+    <div style="width:100%; height:80px; line-height:80px; position:fixed; bottom:0px; left:0px; font-size:14px; text-align:center;">Copyright©惠州市宏晟电子有限公司2025,All Rights Reserved</div>
+    <div style="width:100%; height:30px; line-height:30px; position:fixed; bottom:0px; left:0px; font-size:14px; text-align:center;"><a href="https://beian.miit.gov.cn/" target="_blank">粤ICP备19006807号-1</a></div>
+</div>
+
+
+    <script type="text/javascript" src="/admin/lib/jquery/1.9.1/jquery.min.js"></script>
+    <script type="text/javascript" src="/admin/lib/jquery.cookie/jquery.cookie.js"></script>
+    <script type="text/javascript" src="/admin/lib/layer/2.4/layer.js"></script>
+    <script type="text/javascript" src="/admin/static/h-ui/js/H-ui.min.js"></script>
+    <script type="text/javascript" src="/admin/static/h-ui.admin/js/H-ui.admin.js"></script>
+    <script type="text/javascript" src="/admin/static/h-ui.admin/js/H-ui.admin.common.js"></script>
+    <script type="text/javascript" src="/admin/static/h-ui.admin/js/H-ui.admin.extension.js"></script>
+    
+    <script type="text/javascript" src="/admin/lib/jquery.validation/1.14.0/jquery.validate.js"></script>
+    <script type="text/javascript" src="/admin/lib/jquery.validation/1.14.0/validate-methods.js"></script>
+    <script type="text/javascript" src="/admin/lib/jquery.validation/1.14.0/messages_zh.js"></script>
+    <script type="text/javascript">
+        (function ($) {
+            $.mainu = {
+                init: function () {
+                    setTimeout(function () {
+                        //var code = $.cookie('VerifyCode');
+                        var url = "/verifycode/get";
+                        var data = { code: encodeURI(code) };
+                        $.get(url, data, function (data) {
+                            //$("#companyid").val("sys");
+                            //$("#username").val("admin");
+                            //$("#password").val("admin");
+                            $('#online').attr("checked", true);
+                            $("#verifyCode").val(data);
+                        });
+                    }, 500);
+                },
+
+                Login_Re: function () {
+                    var arrId = [];
+                     arrId.push($("select[name='LANGUAGE']").val());
+                     arrId.push("刷新");
+
+                     $.ajax({
+                            type: 'POST',
+                            url: '/admin/UpdComm',
+                            data: { arrid: arrId },
+                            dataType: 'json',
+                            success: function (result) {
+                                var state = result.state;
+                                var message = result.message;
+                                if (state == "success") {
+                                    location.reload();  //刷新界面
+                                } else {
+                                    layer.msg(message, { icon: 6, time: 1000 });
+                                }
+                            },
+                            error: function (data) {
+                                console.log(data.msg);
+                            },
+                        });
+                },
+
+                //注册
+                RegBatch: function () {
+                    layer_show('注册', '/admin/Reg?StaffId=9999888877776666', '750', '450', '');
+
+                },
+
+                //刷新二维码
+                ReBarcode: function () {
+                    var arrId = [];
+                    arrId.push($("input[name='companyid']").val());
+
+                     $.ajax({
+                            type: 'POST',
+                            url: '/admin/ReBarcode',
+                            data: { arrid: arrId },
+                            dataType: 'json',
+                            success: function (result) {
+                                var state = result.state;
+                                var message = result.message;
+                                if (state == "success") {
+                                    location.reload();  //刷新界面
+                                } else {
+                                    layer.msg(message, { icon: 6, time: 1000 });
+                                }
+                            },
+                            error: function (data) {
+                                console.log(data.msg);
+                            },
+                        });
+                },
+
+                //公司修改
+                UpdComm: function () {
+                    var arrId = [];
+                    arrId.push($("input[name='companyid']").val());
+                    arrId.push($("input[name='username']").val());
+
+                    $.ajax({
+                        type: 'POST',
+                        url: '/admin/UpdComm',
+                        data: { arrid: arrId },
+                        dataType: 'json',
+                        success: function (result) {
+                            var state = result.state;
+                            var message = result.message;
+                            // if (state == "success") {
+                            //     location.reload();  //刷新界面
+                            // } else {
+                            //     layer.msg(message, { icon: 6, time: 1000 });
+                            // }
+                        },
+                        error: function (data) {
+                            console.log(data.msg);
+                        },
+                    });
+                },
+
+                //客服
+                KFBatch: function () {
+                    layer_show('售后服务团队', '/admin/KF?StaffId=9999888877776666', '1050', '550', '');
+
+                },
+
+                verifyCode: function () {
+                    var indexTime = (new Date()).getTime();
+                    var codeSrc = "/verifycode/index?s=" + indexTime;
+                    $("#verifyCodeSrc").attr({ src: codeSrc });
+                },
+                formSubmit: function () {
+                    var options = {
+                        cache: false,
+                        error: function (XMLHttpRequest, textStatus, errorThrown) {
+                            if (XMLHttpRequest.status != 200) {
+                                layer.alert('系统忙！', { icon: 5 });
+                            }
+                        },
+                        success: function (result) {
+                            var state = result.state;
+                            var message = result.message;
+                            if (state == "success") {
+                                if (message == "成功" || message == "success") {
+                                    window.location.href = '/admin';
+                                }
+                                eles
+                                {
+                                    layer.msg(message, { icon: 6 }, 3000);
+                                }
+                            } else {
+                                layer.msg(message, { icon: 5 }, 3000);
+                            }
+                        }
+                    };
+                    $("#form").ajaxForm(options);
+                }
+            };
+            $(function () {
+                $.mainu.init();
+                $.mainu.formSubmit();
+            });
+        })(jQuery);
+    </script>
+
+    <script>
+        var _hmt = _hmt || [];
+        (function () {
+            var hm = document.createElement("script");
+            hm.src = "https://hm.baidu.com/hm.js?a7c0f06355739a07c54353f3a83e52b0";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+</body>
+</html>
+
