@@ -1,7 +1,8 @@
 <template>
   <div class="panelx-list" @click="closeCtx">
     <!-- ══════════ ① 顶部工具栏（T+ 灰条 + 单据翻页）══════════ -->
-    <div v-if="!isApprovalDoc" class="tools">
+    <!-- 来料检验要求(档案特例):7 页签 Excel 复刻整表,工具栏/单据卡片/明细表格/页脚全部不渲染,由组件自带迷你工具栏接管 -->
+    <div v-if="!isApprovalDoc && !isQcInspReq" class="tools">
       <button type="button" class="toolbar-query-btn" :title="tt('按表头字段查询单据')" @click.stop="openQueryDialog">
         <el-icon><Search /></el-icon>
         <span>{{ tt('查询') }}</span>
@@ -452,8 +453,9 @@
 
 
     <!-- !isApprovalDoc:文书式面板(RD 全系)只走上方纸张分支,单据卡片(含表头字段条)整体不渲染——
-         9357460 拆分报表链时此排除丢失,曾致 RD 每个面板纸张下方多出一条全空表头 -->
-    <template v-else-if="!isApprovalDoc">
+         9357460 拆分报表链时此排除丢失,曾致 RD 每个面板纸张下方多出一条全空表头。
+         来料检验要求同样走专属分支,单据卡片不渲染 -->
+    <template v-else-if="!isApprovalDoc && !isQcInspReq">
       <!-- 单据卡片:左「单据选择」栏(送料暂收单等启用,对齐 PANDA 左停靠选择列表) + 右侧表头/明细 -->
       <div class="doc-rail-layout" :class="{ 'rail-on': !!docRailCfg && !railCollapsed }">
         <DocSelectRail
@@ -672,7 +674,7 @@
       </table>
     </div>
 
-    <div v-if="!isApprovalDoc" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading && !isBomMasterPanel">
+    <div v-if="!isApprovalDoc && !isQcInspReq" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading && !isBomMasterPanel">
       <!-- ══════════ 物料清单专用：父件表格 + 子件表格联动（BOM/BOM_FWD/BOM_REV） ══════════ -->
       <BomMasterDetail
         v-if="isBomMasterPanel"
@@ -903,6 +905,21 @@
       </div>
     </div>
         </div>
+      </div>
+    </template>
+
+    <!-- 来料检验要求(QC_INSP_REQ,档案式特例):品质资料 7 张检验要求表=规格书式页签+Excel 复刻表格。
+         整表一张虚拟单(detail.items 全量行按物料类别分页签),保存走 saveInlineDraft(saveArchive 整表 upsert)。
+         上一分支(458 起,直到本注释前的 </template>)条件含 !isQcInspReq,对 QC_INSP_REQ 恒假——
+         本面板内容必须作为外层链的独立分支接在其后,放进那个 template 内部永远不渲染(空白页教训)。 -->
+    <template v-else-if="isQcInspReq">
+      <div class="qc-insp-wrap" v-loading="loading">
+        <QcInspReqSheet
+          :head="cur" :editable="draftEditable" :panel-code="panelCode"
+          @dirty="markInlineDirty"
+          @save="saveInlineDraft('保存')"
+          @refresh="load()"
+        />
       </div>
     </template>
 
@@ -1517,6 +1534,7 @@ import QcCatalogSheet from './QcCatalogSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
+import QcInspReqSheet from './QcInspReqSheet.vue'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
@@ -1550,6 +1568,8 @@ const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(S
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
 const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', 'QC_CATALOG', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
+// 来料检验要求(品质资料 7 表):档案式特例面板——工具栏/单据卡片/明细表格/页脚全隐,QcInspReqSheet 整体接管
+const isQcInspReq = computed(() => String(panelCode.value) === 'QC_INSP_REQ')
 const docSheetConfig = computed(() => qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
 const bomMasterRows = computed(() => {
   if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
@@ -3418,6 +3438,8 @@ function blockCols(b) {
 const showFooter = computed(() => {
   // 文书式面板(立项申请):不按表头/表中/表尾三段式,页脚(备注+审核行)整体隐藏
   if (isApprovalDoc.value) return false
+  // 来料检验要求(档案特例):整表 Excel 复刻面板,无备注/审核行
+  if (isQcInspReq.value) return false
   const cfg = cfgCache.value
   return cfg?.metadata?.panelCategory === '单据' || (cfg?.detail?.tabs || []).length > 0
 })

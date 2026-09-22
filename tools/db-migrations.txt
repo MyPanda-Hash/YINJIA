@@ -785,3 +785,22 @@ migrate-over-ratio-cap.sql
 #   配套代码(同提交):前端 menus.js 品质管理 > 来料品质 挂入口 + 10 语言 locales 词条。
 #   菜单位置:品质管理 > 来料品质 > 检验目录。幂等可重跑(自检段输出面板/字段/目录单/行/译名)。
 migrate-qc-catalog.sql
+
+# —— 2026-09-22 来料品质「来料检验要求」面板(QC_INSP_REQ,档案式 7 页签) ——
+#   来源:《品质资料 2026.09.19.xlsx》自「折叠棉」起的 7 张检验要求表(折叠棉/垫片/无纺布/网套/
+#   PP管/端盖/PP棉),一面板 7 页签整表复刻:页签条=规格书式,每页=大标题行+两行分组表头+
+#   Excel 原列宽数据行(前端 QcInspReqSheet + qcInspReqConfig 配置驱动)。
+#   形态:表格而非翻页单据 —— mode='archive'(queryArchive 整表一张虚拟单 detail.items,
+#   saveArchive 按行 id upsert+缺席行软删);行以 [物料类别]=页签 key 分流。
+#   存储:一张并集宽表 qc_insp_req(同名叶列跨页签共用一列,如 脏污、头发丝 6 页签共用;
+#   PP管 原表 B 空列未建);表+全列 MS_Description 中文注明。
+#   ① yj_panel:QC_INSP_REQ / 来料检验要求 / 档案 / archive / 行表 qc_insp_req / 模块 品质管理;
+#   ② yj_field 33 行(物料类别 下拉 7 值+物料编号 必填,其余 31 值列 detail 文本);
+#   ③ 译名:panel+field en/zh-TW manual(7 物料类别/7 表标题/31 值列/规格组名),其余语言机翻兜底;
+#   ④ yj_role_panel 全角色 view,query(维护权=组织架构按角色勾 add/modify,管理员恒全量);
+#   ⑤ 播种 77 行(折叠棉 25/PP管 1/PP棉 51;垫片·无纺布·网套·端盖 原表仅表头无数据行),
+#      仅表空时播种,防复活用户删过的行。
+#   配套代码(同提交):PanelxList 手术(工具栏/单据卡片/明细表格/页脚对 QC_INSP_REQ 全隐,
+#   QcInspReqSheet 接管,保存走 saveInlineDraft)+ menus.js 来料品质挂入口 + en.js 词条。
+#   菜单位置:品质管理 > 来料品质 > 来料检验要求。幂等可重跑(验证段输出 面板/字段/权限/种子/译名)。
+migrate-qc-insp-req.sql
