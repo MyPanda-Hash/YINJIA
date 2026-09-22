@@ -139,6 +139,14 @@
           :head="cur" :fields="sheetAllFields" :editable="draftEditable"
           @dirty="markInlineDirty"
         />
+        <!-- 来料品质·检验数据记录(QC_INSP_REC):纸张式检验报告,与原表「检验数据记录模版」一比一 -->
+        <QcInspRecSheet
+          v-else-if="panelCode === 'QC_INSP_REC'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
+          @dirty="markInlineDirty"
+          @refresh-config="onFieldEditRefresh"
+        />
         <DataRecordSheet
           v-else-if="panelCode === 'RD_FILTER_EFF'"
           ref="approvalSheetRef"
@@ -1531,6 +1539,7 @@ import DocSheet from './DocSheet.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import ProgressControlSheet from './ProgressControlSheet.vue'
 import QcCatalogSheet from './QcCatalogSheet.vue'
+import QcInspRecSheet from './QcInspRecSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
@@ -1566,7 +1575,7 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
-const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', 'QC_CATALOG', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
+const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 // 来料检验要求(品质资料 7 表):档案式特例面板——工具栏/单据卡片/明细表格/页脚全隐,QcInspReqSheet 整体接管
 const isQcInspReq = computed(() => String(panelCode.value) === 'QC_INSP_REQ')
@@ -3600,7 +3609,7 @@ async function exportSheetPdf() {
   // $el 在 dev 下可能是 fragment 注释锚点(组件含多个 append-to-body 弹窗)——不是元素时按纸张根类名兜底
   const el0 = approvalSheetRef.value?.$el
   const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
-    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, .approval-layout .catalog-sheet')
+    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, .approval-layout .catalog-sheet, .approval-layout .qc-rec-sheet')
   if (!el || !(el instanceof HTMLElement)) return ElMessage.warning(tt('未找到可导出的单据'))
   const loadingMsg = ElMessage({ message: tt('正在生成 PDF…'), duration: 0 })
   let holder = null
@@ -6398,7 +6407,8 @@ onUnmounted(() => {
 }
 .approval-layout :deep(.approval-sheet),
 .approval-layout :deep(.progress-sheet),
-.approval-layout :deep(.catalog-sheet) {
+.approval-layout :deep(.catalog-sheet),
+.approval-layout :deep(.qc-rec-sheet) {
   flex: 1;
   min-width: 0;
 }

@@ -263,6 +263,9 @@ export const menuTree = [
           { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
           { code: 'qcTcIn', title: '特采单', path: '/panelx/list/QC_TC_IN', icon: 'DocumentAdd', panelCode: 'QC_TC_IN', operationName: '新增流程' },
           { code: 'qcCatalog', title: '检验目录', path: '/panelx/list/QC_CATALOG', icon: 'Notebook', panelCode: 'QC_CATALOG' },
+          // 检验数据记录(2026-09-22):纸张式检验报告 YJ-QR-96,版式对照《品质资料 2026.09.19.xlsx》「检验数据记录模版」;
+          // 检验目录行上的批次号 📄 可按物料批次查阅本面板的报告。
+          { code: 'qcInspRec', title: '检验数据记录', path: '/panelx/list/QC_INSP_REC', icon: 'Document', panelCode: 'QC_INSP_REC', operationName: '新增流程' },
           // 来料检验要求(2026-09-22):《品质资料 2026.09.19.xlsx》折叠棉~PP棉 7 张检验要求表,
           // 档案式整表面板(规格书式页签+Excel 复刻表格,非翻页单据),行按物料类别分流 7 页签
           { code: 'qcInspReq', title: '来料检验要求', path: '/panelx/list/QC_INSP_REQ', icon: 'Grid', panelCode: 'QC_INSP_REQ' },

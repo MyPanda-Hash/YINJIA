@@ -185,15 +185,35 @@
       </template>
     </el-dialog>
 
-    <!-- 该批次检验单弹窗(查阅详细 / 新增检验):按批次号查来料检验单 -->
-    <el-dialog v-model="inspVisible" :title="tt('批次检验记录')" width="920px" append-to-body>
+    <!-- 该批次检验记录弹窗(查阅详细 / 新增检验):按批次号查检验数据记录 + 来料检验单 -->
+    <el-dialog v-model="inspVisible" :title="tt('批次检验记录')" width="980px" append-to-body>
       <div class="csd-head">
         <span>{{ tt('批次号') }}：<b>{{ inspBatch }}</b></span>
-        <span v-if="inspRows.length">{{ tt('共') }} {{ inspRows.length }} {{ tt('张') }}</span>
+        <span v-if="inspRecRows.length">{{ tt('检验数据记录') }} {{ inspRecRows.length }} {{ tt('张') }}</span>
+        <span v-if="inspRows.length">{{ tt('来料检验单') }} {{ inspRows.length }} {{ tt('张') }}</span>
       </div>
       <div v-if="inspLoading" class="csd-loading">{{ tt('查询中…') }}</div>
-      <template v-else-if="inspRows.length">
-        <el-table :data="inspRows" size="small" border highlight-current-row max-height="220" @row-click="openInspDetail">
+      <template v-else>
+        <!-- ① 检验数据记录(检验报告 YJ-QR-96):原表脚注「查阅详细」的正解 -->
+        <div class="csd-sec">{{ tt('检验数据记录') }}</div>
+        <el-table v-if="inspRecRows.length" :data="inspRecRows" size="small" border highlight-current-row max-height="200" @row-click="(r) => openInspDetail(r, 'QC_INSP_REC')">
+          <el-table-column prop="单据编号" :label="tt('单据编号')" width="170" />
+          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="150" show-overflow-tooltip />
+          <el-table-column prop="检验日期" :label="tt('检验日期')" width="110" />
+          <el-table-column prop="检验结论" :label="tt('检验结论')" min-width="160" show-overflow-tooltip />
+          <el-table-column prop="检验人" :label="tt('检验人')" width="100" />
+          <el-table-column prop="单据状态" :label="tt('单据状态')" width="100" />
+          <el-table-column :label="tt('操作')" width="90" align="center">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click.stop="openInspDetail(row, 'QC_INSP_REC')">{{ tt('查阅详细') }}</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+        <div v-else class="csd-empty">{{ tt('该批次暂无检验数据记录') }}</div>
+
+        <!-- ② 来料检验单(采购链单据) -->
+        <div class="csd-sec">{{ tt('来料检验单') }}</div>
+        <el-table v-if="inspRows.length" :data="inspRows" size="small" border highlight-current-row max-height="200" @row-click="(r) => openInspDetail(r, 'QC_INSP')">
           <el-table-column prop="单据编号" :label="tt('单据编号')" width="170" />
           <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
           <el-table-column prop="供应商" :label="tt('供应商')" min-width="150" show-overflow-tooltip />
@@ -201,13 +221,15 @@
           <el-table-column prop="单据状态" :label="tt('单据状态')" width="100" />
           <el-table-column :label="tt('操作')" width="90" align="center">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click.stop="openInspDetail(row)">{{ tt('查阅详细') }}</el-button>
+              <el-button link type="primary" size="small" @click.stop="openInspDetail(row, 'QC_INSP')">{{ tt('查阅详细') }}</el-button>
             </template>
           </el-table-column>
         </el-table>
-        <!-- 只读渲染选中检验单(头字段 + 明细行) -->
+        <div v-else class="csd-empty">{{ tt('该批次暂无检验单') }}</div>
+
+        <!-- 只读渲染选中单据(头字段 + 明细行) -->
         <div v-if="inspDetail" class="csd-detail">
-          <div class="csd-detail-title">{{ tt('检验单') }} {{ inspDetail.no }}</div>
+          <div class="csd-detail-title">{{ inspDetail.panelName }} {{ inspDetail.no }}</div>
           <el-table :data="inspDetail.head" size="small" border class="csd-kv">
             <el-table-column prop="label" :label="tt('项目')" width="150" />
             <el-table-column prop="value" :label="tt('内容')" min-width="260" show-overflow-tooltip />
@@ -228,7 +250,6 @@
           </template>
         </div>
       </template>
-      <div v-else class="csd-empty">{{ tt('该批次暂无检验单') }}</div>
       <template #footer>
         <el-button @click="inspVisible = false">{{ tt('关闭') }}</el-button>
         <el-button type="primary" @click="gotoNewInspection">{{ tt('新增检验') }}</el-button>
@@ -368,46 +389,47 @@ function confirmAdd() {
   emit('dirty')
 }
 
-// ---------- 点批次号 → 该批次的来料检验单(查阅详细 / 新增检验) ----------
+// ---------- 点批次号 → 该批次的检验记录(检验数据记录 + 来料检验单) ----------
 const inspVisible = ref(false)
 const inspLoading = ref(false)
 const inspBatch = ref('')
-const inspRows = ref([])
+const inspRows = ref([])      // 来料检验单(QC_INSP,按 批次号)
+const inspRecRows = ref([])   // 检验数据记录(QC_INSP_REC,按 物料批次)
 const inspDetail = ref(null)
 async function openInspection(row) {
   const batch = String(row?.[K.BATCH] || '').trim()
   if (!batch) return ElMessage.warning(tt('请先填写批次号'))
   inspBatch.value = batch
   inspRows.value = []
+  inspRecRows.value = []
   inspDetail.value = null
   inspVisible.value = true
   inspLoading.value = true
-  try {
-    const res = await engine.queryFormDataList({
-      panelCode: 'QC_INSP',
-      condition: { [K.BATCH]: batch },
-      pageNo: 1,
-      pageSize: 50,
-    })
-    inspRows.value = res?.list || res?.rows || []
-  } catch (e) {
-    ElMessage.error(engine.errMsg(e) || tt('查询失败'))
-  } finally {
-    inspLoading.value = false
+  // 两个面板各查一次:检验数据记录是「查阅详细」的正解,来料检验单是采购链单据;单个失败不拖垮另一个
+  const [rec, insp] = await Promise.allSettled([
+    engine.queryFormDataList({ panelCode: 'QC_INSP_REC', condition: { [K.BATCH]: batch }, pageNo: 1, pageSize: 50 }),
+    engine.queryFormDataList({ panelCode: 'QC_INSP', condition: { [K.BATCH]: batch }, pageNo: 1, pageSize: 50 }),
+  ])
+  if (rec.status === 'fulfilled') inspRecRows.value = rec.value?.list || rec.value?.rows || []
+  if (insp.status === 'fulfilled') inspRows.value = insp.value?.list || insp.value?.rows || []
+  if (rec.status === 'rejected' && insp.status === 'rejected') {
+    ElMessage.error(engine.errMsg(rec.reason) || tt('查询失败'))
   }
+  inspLoading.value = false
 }
-/** 查阅详细:取该检验单只读渲染(头字段键值 + 明细行) */
-async function openInspDetail(row) {
+/** 查阅详细:取目标单据只读渲染(头字段键值 + 明细行);panel 缺省按来料检验单 */
+async function openInspDetail(row, panel = 'QC_INSP') {
   const no = row?.['单据编号'] || row?.['编号']
   if (!no) return
   try {
-    const fd = await engine.getFormDescriptor({ panelCode: 'QC_INSP', code: no })
+    const fd = await engine.getFormDescriptor({ panelCode: panel, code: no })
     const head = fd?.data || {}
     const tabs = fd?.detail?.tabs || []
     const tab = tabs[0] || { fields: [] }
     const rows = fd?.detailData?.[tab.key || 'items'] || []
     inspDetail.value = {
       no,
+      panelName: panel === 'QC_INSP_REC' ? tt('检验数据记录') : tt('来料检验单'),
       head: Object.entries(head)
         .filter(([k, v]) => !['saved', '编号'].includes(k) && v !== null && v !== '' && v !== undefined)
         .map(([k, v]) => ({ label: k, value: String(v) })),
@@ -418,10 +440,18 @@ async function openInspDetail(row) {
     ElMessage.error(engine.errMsg(e) || tt('查询失败'))
   }
 }
-/** 新增检验:跳来料检验单面板的新增(?new=1 由面板统一处理) */
+/** 新增检验:跳检验数据记录面板新增,并把本行批次/物料带过去(新单空值时预填) */
 function gotoNewInspection() {
   inspVisible.value = false
-  router.push({ path: '/panelx/list/QC_INSP', query: { new: 1 } })
+  const row = items.value.find((r) => String(r?.[K.BATCH] || '').trim() === inspBatch.value) || {}
+  router.push({
+    path: '/panelx/list/QC_INSP_REC',
+    query: {
+      new: 1,
+      prefillBatch: inspBatch.value,
+      prefillMaterial: String(row[K.MAT] || ''),
+    },
+  })
 }
 
 /** 导出 Excel:标题 + 列头 + 全部批次行(列定义见 qcCatalogColumns.js,与纸面同源) */
@@ -664,6 +694,14 @@ defineExpose({ exportCatalogExcel })
 }
 .csd-detail {
   margin-top: 12px;
+}
+.csd-sec {
+  margin: 10px 0 6px;
+  font-weight: 600;
+  color: #1f5fa8;
+  font-size: 13px;
+  border-left: 3px solid #b9dbf8;
+  padding-left: 8px;
 }
 .csd-detail-title {
   margin: 8px 0 6px;

@@ -9,7 +9,17 @@ const xlsx = process.argv[2]
 const sheetFile = process.argv[3] || 'sheet12.xml'
 const tmp = path.join(os.tmpdir(), 'xlsx_dump_' + Date.now())
 fs.mkdirSync(tmp, { recursive: true })
-execFileSync('unzip', ['-o', xlsx, '-d', tmp], { stdio: 'ignore' })
+// 解压:优先 unzip(类 Unix);Windows 无 unzip 时回退 PowerShell Expand-Archive,
+// 这样本工具在没有 unzip 的机器上也能用(2026-09-22 在 Win 上实测 unzip ENOENT)。
+try {
+  execFileSync('unzip', ['-o', xlsx, '-d', tmp], { stdio: 'ignore' })
+} catch (e) {
+  if (e.code !== 'ENOENT') throw e
+  const zip = path.join(tmp, '_book.zip')
+  fs.copyFileSync(xlsx, zip)
+  execFileSync('powershell', ['-NoProfile', '-Command',
+    `Expand-Archive -LiteralPath '${zip}' -DestinationPath '${tmp}' -Force`], { stdio: 'ignore' })
+}
 
 const sharedXml = fs.readFileSync(path.join(tmp, 'xl/sharedStrings.xml'), 'utf8')
 const strs = []
