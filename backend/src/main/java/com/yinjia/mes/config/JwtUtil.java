@@ -30,24 +30,39 @@ public class JwtUtil {
         this.expireHours = expireHours;
     }
 
-    public String generate(String username) {
+    /** 令牌里的身份:账号 + 登录时选的工厂(ADR-0003 一系统两账套)。 */
+    public record Token(String username, String factory) {}
+
+    /**
+     * 签发令牌。factory 为登录页所选工厂(YJ / YJ_TEST),写进令牌声明 ——
+     * JwtAuthFilter 按它把该请求线程切到对应库,故**令牌签发时绑定工厂、改选必须重登**。
+     */
+    public String generate(String username, String factory) {
         Date now = new Date();
         return Jwts.builder()
                 .subject(username)
+                .claim("factory", factory)
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expireHours * 3600_000L))
                 .signWith(key)
                 .compact();
     }
 
-    /** 校验并返回用户名;失败返回 null */
-    public String validate(String token) {
+    /** 解析令牌;失败返回 null。旧令牌无 factory 声明时回退正式库(安全默认,见 DataSourceRouter)。 */
+    public Token parse(String token) {
         try {
             Claims claims = Jwts.parser().verifyWith(key).build()
                     .parseSignedClaims(token).getPayload();
-            return claims.getSubject();
+            String factory = claims.get("factory", String.class);
+            return new Token(claims.getSubject(), factory == null || factory.isBlank() ? "YJ" : factory);
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** 校验并返回用户名;失败返回 null */
+    public String validate(String token) {
+        Token t = parse(token);
+        return t == null ? null : t.username();
     }
 }

@@ -1,5 +1,6 @@
 package com.yinjia.mes.controller;
 
+import com.yinjia.mes.config.DataSourceRouter;
 import com.yinjia.mes.config.JwtUtil;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.UsageLogService;
@@ -42,30 +43,42 @@ public class AuthController {
         if (username.isBlank() || password.isBlank()) {
             throw new IllegalArgumentException("用户名和密码不能为空");
         }
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT username, password_hash, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
-        if (rows.isEmpty() || !encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
-            throw new IllegalStateException("用户名或密码错误");
+        // ADR-0003(一系统两账套):登录页所选工厂决定这次登录**查哪个库** —— 账号与口令两账套各自独立,
+        // 且令牌签发时把工厂写进声明,后续请求由 JwtAuthFilter 按声明路由。改选工厂必须重登。
+        // ⚠ 本方法走 permitAll、请求上没有 Bearer 令牌,故 JwtAuthFilter 不会代劳设上下文与清理,
+        //   必须在这里自己 use() + finally clear()(容器线程复用,不清会把下一次请求带进错误的库)。
+        String factory = DataSourceRouter.TEST.equals(body.get("factory"))
+                ? DataSourceRouter.TEST : DataSourceRouter.PROD;
+        DataSourceRouter.use(factory);
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT username, password_hash, real_name, is_admin, role_id FROM yj_user WHERE username = ?", username);
+            if (rows.isEmpty() || !encoder.matches(password, String.valueOf(rows.get(0).get("password_hash")))) {
+                throw new IllegalStateException("用户名或密码错误");
+            }
+            // 过渡期收口:存量 BCrypt 哈希在登录成功时顺手升级成自写格式(
+            // BCrypt 不可逆、拿不到明文,只能借"用户自己带明文来登录"这一次机会换掉)
+            upgradeStoredHashIfNeeded(username, password, String.valueOf(rows.get(0).get("password_hash")));
+            Map<String, Object> u = rows.get(0);
+            boolean admin = "Y".equals(u.get("is_admin"));
+            // 使用记录:登录成功事件(失败不记);按所选账套记入对应库
+            usageLog.recordLogin(username, String.valueOf(u.get("real_name")), clientIp(request));
+            Map<String, Object> user = new HashMap<>();
+            user.put("userName", u.get("username"));
+            user.put("realName", u.get("real_name"));
+            user.put("roleCode", admin ? "admin" : "user");
+            user.put("isAdmin", admin);
+            user.put("factory", factory);
+            user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
+            // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
+            user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
+            Map<String, Object> out = new HashMap<>();
+            out.put("token", jwtUtil.generate(username, factory));
+            out.put("user", user);
+            return ApiResult.ok(out);
+        } finally {
+            DataSourceRouter.clear();
         }
-        // 过渡期收口:存量 BCrypt 哈希在登录成功时顺手升级成自写格式(
-        // BCrypt 不可逆、拿不到明文,只能借"用户自己带明文来登录"这一次机会换掉)
-        upgradeStoredHashIfNeeded(username, password, String.valueOf(rows.get(0).get("password_hash")));
-        Map<String, Object> u = rows.get(0);
-        boolean admin = "Y".equals(u.get("is_admin"));
-        // 使用记录:登录成功事件(失败不记)
-        usageLog.recordLogin(username, String.valueOf(u.get("real_name")), clientIp(request));
-        Map<String, Object> user = new HashMap<>();
-        user.put("userName", u.get("username"));
-        user.put("realName", u.get("real_name"));
-        user.put("roleCode", admin ? "admin" : "user");
-        user.put("isAdmin", admin);
-        user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
-        // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
-        user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
-        Map<String, Object> out = new HashMap<>();
-        out.put("token", jwtUtil.generate(username));
-        out.put("user", user);
-        return ApiResult.ok(out);
     }
 
     @GetMapping("/perms")
