@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  pickedKeySet, defaultPickKeys, buildBatchSendLines, sumPickedQty,
+  pickedKeySet, defaultPickKeys, buildBatchSendLines, sumPickedQty, overAllowance,
 } from './batchSendLines.js'
 
 /**
@@ -64,4 +64,42 @@ test('数量为小数:合计按两位精度归整,payload 保留原值', () => {
   const rows = [{ lineKey: 'A', 剩余数量: 1.005 }, { lineKey: 'B', 剩余数量: 2.004 }]
   assert.equal(sumPickedQty(rows, ['A', 'B'], { A: 1.005, B: 2.004 }), 3.01)
   assert.deepEqual(buildBatchSendLines(rows, ['A'], { A: 1.005 }), [{ lineKey: 'A', qty: 1.005 }])
+})
+
+/* ────────── 超送可送上限(2026-09-22 口径:按订单**全部数量**算,比例最高 50%) ──────────
+ * 用户报的缺陷:「超送计算有问题,应该是按全部数量来计算的」——
+ * 旧口径 剩余×(1+比例) 每批只给当批剩余的比例额,分批越多额度越少;正确语义:
+ * 整张订单行累计最多收 订单数量×(1+比例),本次还能收 = 该额度 − 已送 + 已退回。
+ */
+test('未送:上限 = 订单数量×(1+比例)', () => {
+  assert.equal(overAllowance(100, 0, 0, 5), 105)
+  assert.equal(overAllowance(100, 0, 0, 0), 100)
+})
+
+test('已送满订单(剩余=0):仍可超送 订单数量×比例 —— 旧口径这里会算成 0', () => {
+  assert.equal(overAllowance(100, 100, 0, 5), 5)
+})
+
+test('分批累计:额度随"总额度−已送"递减,送满总额度后归 0(不再每批重算比例额)', () => {
+  assert.equal(overAllowance(100, 50, 0, 5), 55)   // 第一批送 50 后还能送 55(总 105)
+  assert.equal(overAllowance(100, 105, 0, 5), 0)   // 累计到顶
+  assert.equal(overAllowance(100, 103, 0, 5), 2)
+})
+
+test('退回回冲:已退回的部分腾出等量额度', () => {
+  assert.equal(overAllowance(100, 60, 10, 5), 55)  // 105 − 60 + 10
+})
+
+test('比例钳制:超过 50% 按 50% 算(用户口径:超送最高 50%)', () => {
+  assert.equal(overAllowance(100, 0, 0, 80), 150)
+  assert.equal(overAllowance(100, 0, 0, 50), 150)
+  assert.equal(overAllowance(100, 0, 0, -5), 100)  // 负数按 0
+})
+
+test('负额度归 0(已送超过总额度,如人工调过参数)', () => {
+  assert.equal(overAllowance(100, 110, 0, 5), 0)
+})
+
+test('小数精度:按两位归整', () => {
+  assert.equal(overAllowance(100.005, 0, 0, 5), 105.01)
 })

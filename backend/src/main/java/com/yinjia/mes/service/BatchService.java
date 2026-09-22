@@ -73,7 +73,11 @@ public class BatchService {
 
     // ==================== 参数 ====================
 
-    /** 收料超送比例(0~1;参数缺失或非法按 0 处理) */
+    /**
+     * 收料超送比例(0~1;参数缺失按 0 处理)。
+     * 2026-09-22 用户口径:**最高 50%** —— 库里存得再大也钳到 0.5(旧口径 v>5 视为非法归 0,
+     * 现改为夹紧,避免有人存 0.6/1.0 时口径漂移);负数仍按 0。
+     */
     public double overRatio() {
         long now = System.currentTimeMillis();
         if (now - ratioAt < 30_000) return ratioCache;
@@ -83,7 +87,8 @@ public class BatchService {
                     "SELECT setting_value FROM yj_app_setting WHERE setting_key = ?", String.class, KEY_OVER_RATIO);
             if (!rows.isEmpty() && rows.get(0) != null) v = Double.parseDouble(rows.get(0).trim());
         } catch (Exception ignore) { /* 表未建等场景按 0 */ }
-        if (v < 0 || v > 5) v = 0; // 兜底:负数/离谱值视为不允许超送
+        if (v < 0) v = 0;
+        if (v > 0.5d) v = 0.5d;   // 超送比例上限 50%(2026-09-22 用户口径)
         ratioCache = v;
         ratioAt = now;
         return v;

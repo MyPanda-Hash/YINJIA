@@ -1843,7 +1843,6 @@ export default {
     '本次合计': 'Total this time',
     '按剩余量填充': 'Fill remaining',
     '确定生单': 'Create',
-    '每行留空或 0 = 本次不送;不超过「可送上限」(剩余 ×（1+超送比例）)': 'Blank or 0 = not delivered this time; must not exceed "Max deliverable" (remaining × (1 + over-delivery ratio))',
     '请至少填写一行的本次送料数量': 'Fill the delivery qty of at least one line',
     '分批送料数据加载失败': 'Failed to load batch delivery data',
     '所选来源行已无剩余可送': 'Selected source lines have no remaining qty',
@@ -1870,7 +1869,8 @@ export default {
     '待编号': 'Pending No.',
     '{n} 批待编号': '{n} batch(es) pending No.',
     '采购入库单填单时按入库日期预设,可修改': 'Preset from the receipt date when filling the purchase receipt; editable',
-    '只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」': 'Only checked lines are generated (qty 0 = not delivered), within the max deliverable',
+    '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Only checked lines are generated; max deliverable = ordered qty × (1 + over-delivery ratio) − sent + returned (over-delivery capped at 50%)',
+    '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = none; max 50%, allowance based on ordered qty)',
     '请至少勾选一行并填写本次送料数量': 'Check at least one line and enter the delivery qty',
   },
 }

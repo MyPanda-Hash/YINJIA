@@ -1574,7 +1574,6 @@ export default {
     '本次合计': 'Summe (diesmal)',
     '按剩余量填充': 'Restmenge einsetzen',
     '确定生单': 'Erzeugen',
-    '每行留空或 0 = 本次不送;不超过「可送上限」(剩余 ×（1+超送比例）)': 'Leer oder 0 = diesmal keine Lieferung; max. "Max. lieferbar" (Rest × (1 + Quote))',
     '请至少填写一行的本次送料数量': 'Bitte für mindestens eine Zeile die Liefermenge eintragen',
     '分批送料数据加载失败': 'Teillieferungsdaten konnten nicht geladen werden',
     '所选来源行已无剩余可送': 'Ausgewählte Zeilen haben keine Restmenge',
@@ -1601,7 +1600,8 @@ export default {
     '待编号': 'Nr. ausstehend',
     '{n} 批待编号': '{n} Charge(n) ohne Nr.',
     '采购入库单填单时按入库日期预设,可修改': 'Chargennummer wird beim Erfassen des Wareneingangs aus dem Wareneingangsdatum vorbelegt; änderbar',
-    '只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」': 'Nur angehakte Zeilen werden erzeugt (Menge 0 = keine Lieferung), bis zur maximalen Liefermenge',
+    '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Nur angehakte Zeilen werden erzeugt; Maximum = Bestellmenge × (1 + Quote) − geliefert + retourniert (Überlieferung max. 50 %)',
+    '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = nicht erlaubt; max. 50 %, Spielraum nach Bestellmenge)',
     '请至少勾选一行并填写本次送料数量': 'Mindestens eine Zeile anhaken und Liefermenge eingeben',
   },
 }

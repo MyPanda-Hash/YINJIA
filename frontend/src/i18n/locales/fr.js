@@ -1574,7 +1574,6 @@ export default {
     '本次合计': 'Total cette fois',
     '按剩余量填充': 'Remplir le reste',
     '确定生单': 'Créer',
-    '每行留空或 0 = 本次不送;不超过「可送上限」(剩余 ×（1+超送比例）)': 'Vide ou 0 = non livré cette fois ; ne pas dépasser le max livrable (reste × (1 + taux))',
     '请至少填写一行的本次送料数量': 'Saisissez la quantité d\'au moins une ligne',
     '分批送料数据加载失败': 'Échec du chargement des données de livraison partielle',
     '所选来源行已无剩余可送': 'Les lignes sélectionnées n\'ont plus de reste',
@@ -1601,7 +1600,8 @@ export default {
     '待编号': 'N° en attente',
     '{n} 批待编号': '{n} lot(s) sans n°',
     '采购入库单填单时按入库日期预设,可修改': 'Le lot est prédéfini depuis la date de réception lors de la saisie du bon de réception; modifiable',
-    '只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」': 'Seules les lignes cochées sont générées (quantité 0 = non livrée), dans la limite du maximum livrable',
+    '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Seules les lignes cochées sont générées ; max = qté commandée × (1 + taux) − livré + retourné (sur-livraison max 50 %)',
+    '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = interdit ; max 50 %, quota basé sur la quantité commandée)',
     '请至少勾选一行并填写本次送料数量': 'Cochez au moins une ligne et saisissez la quantité à livrer',
   },
 }

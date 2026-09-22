@@ -1589,7 +1589,6 @@ export default {
     '本次合计': 'Tổng lần này',
     '按剩余量填充': 'Điền phần còn lại',
     '确定生单': 'Tạo',
-    '每行留空或 0 = 本次不送;不超过「可送上限」(剩余 ×（1+超送比例）)': 'Để trống hoặc 0 = không giao lần này; không vượt mức tối đa (còn lại × (1 + tỷ lệ))',
     '请至少填写一行的本次送料数量': 'Nhập số lượng cho ít nhất một dòng',
     '分批送料数据加载失败': 'Không tải được dữ liệu giao theo lô',
     '所选来源行已无剩余可送': 'Các dòng đã chọn không còn phần còn lại',
@@ -1616,7 +1615,8 @@ export default {
     '待编号': 'Chờ số',
     '{n} 批待编号': '{n} lô chờ số',
     '采购入库单填单时按入库日期预设,可修改': 'Số lô được đặt trước theo ngày nhập khi lập phiếu nhập mua; có thể sửa',
-    '只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」': 'Chỉ tạo các dòng đã chọn (dòng số lượng 0 không gửi), không vượt mức tối đa',
+    '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Chỉ tạo các dòng đã chọn; mức tối đa = số lượng đặt × (1 + tỷ lệ) − đã giao + đã trả (tối đa 50%)',
+    '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = không cho phép; tối đa 50%, hạn mức theo số lượng đặt)',
     '请至少勾选一行并填写本次送料数量': 'Chọn ít nhất một dòng và nhập số lượng giao lần này',
   },
 }

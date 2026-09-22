@@ -22,9 +22,9 @@
         <span class="bsd-chip">{{ tt('批次号') }}: <b>{{ tt('采购入库单填单时按入库日期预设,可修改') }}</b></span>
         <span class="bsd-chip bsd-ratio">
           {{ tt('超送比例') }}:
-          <el-input-number v-model="overRatioPct" :min="0" :max="100" :step="1" :precision="0" size="small"
+          <el-input-number v-model="overRatioPct" :min="0" :max="50" :step="1" :precision="0" size="small"
             :controls="false" style="width: 62px" @change="recompute" />
-          %<span class="bsd-ratio-tip">{{ tt('（0 = 不允许超送；本次生效）') }}</span>
+          %<span class="bsd-ratio-tip">{{ tt('（0 = 不允许；最高 50%，额度按订单数量算）') }}</span>
         </span>
         <span v-if="(batches || []).length" class="bsd-chip">{{
           tt('已有批次') }}: {{ batches.map((b) => b.batchNo || tt('待编号')).join('、') }}</span>
@@ -45,14 +45,14 @@
         <el-table-column :label="tt('本次送料数量')" width="150">
           <template #default="{ row }">
             <el-input-number v-model="qtyOf[row.lineKey]" :min="0" :max="capOf(row)" :controls="false"
-              :disabled="!row.剩余数量" :precision="2" style="width: 130px" />
+              :disabled="!(capOf(row) > 0)" :precision="2" style="width: 130px" />
           </template>
         </el-table-column>
         <el-table-column prop="计量单位" :label="tt('计量单位')" width="90" />
       </el-table>
       <div class="bsd-foot">
         <span>{{ tt('已选') }} <b>{{ picked.length }}</b> {{ tt('行') }} · {{ tt('本次合计') }}: <b>{{ totalQty }}</b></span>
-        <span class="bsd-tip">{{ tt('只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」') }}</span>
+        <span class="bsd-tip">{{ tt('只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）') }}</span>
       </div>
     </div>
     <template #footer>
@@ -69,7 +69,8 @@ import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 // 生单行构造:勾选是权威(未勾选的行不生成)—— 纯函数,见 core/selection/batchSendLines.js
-import { buildBatchSendLines, defaultPickKeys, sumPickedQty } from '@core/selection/batchSendLines'
+// 可送上限同源纯函数 overAllowance(2026-09-22 口径:按订单全部数量算,超送最高 50%)
+import { buildBatchSendLines, defaultPickKeys, sumPickedQty, overAllowance } from '@core/selection/batchSendLines'
 
 const engine = usePanelRuntime()
 
@@ -94,11 +95,11 @@ const qtyOf = reactive({})
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.lineKey)))
 /** 本次合计:只算**已勾选**的行(未勾选行即使填了量也不送,合计必须与生单结果一致) */
 const totalQty = computed(() => sumPickedQty(rows.value, pickedKeys.value, qtyOf))
-/** 本次生效超送比例(0~1) */
-const ratio = computed(() => Math.max(0, Math.min(100, Number(overRatioPct.value) || 0)) / 100)
-/** 行的可送上限 = 剩余 ×(1+本次比例);比例一改即时重算(后端同口径再校验一次) */
+/** 本次生效超送比例(0~1;**最高 50%** —— 2026-09-22 用户口径,超出按 50 算) */
+const ratio = computed(() => Math.max(0, Math.min(50, Number(overRatioPct.value) || 0)) / 100)
+/** 行的可送上限 = 订单数量×(1+本次比例)−已送+已退回(按**全部数量**算;比例一改即时重算,后端同口径再校验) */
 function capOf(row) {
-  return Math.round(Number(row.剩余数量 || 0) * (1 + ratio.value) * 100) / 100
+  return overAllowance(row.数量, row.已送数量, row.已退回数量, overRatioPct.value)
 }
 function recompute() {
   // 比例调小后可能低于已填数量 → 收敛到新上限,避免提交时被后端拒

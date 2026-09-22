@@ -249,6 +249,21 @@ public class PushGenerateHandler implements PanelActionHandler {
         return "true".equalsIgnoreCase(s) || "是".equals(s) || "1".equals(s);
     }
 
+    /** 超送比例上限(2026-09-22 用户口径):**最高 50%** —— 弹窗覆盖与系统参数一律钳在 0~0.5 */
+    private static final double MAX_OVER_RATIO = 0.5d;
+
+    /**
+     * 行的「可送上限」(2026-09-22 口径:**按全部数量算**)—— 订单数量×(1+超送比例) − 已送 + 已退回,负数归 0。
+     * 旧口径 剩余×(1+比例) 的问题:每批只给"当批剩余"的比例额,分批越多超送额度越算越少,
+     * 累计超送永远到不了订单总量的比例额;正确语义是"整张订单行**累计**最多收 数量×(1+比例)"。
+     * 前端同公式:core/selection/batchSendLines.js 的 overAllowance(纯函数,有单测)。
+     */
+    private static double overAllowance(double orderQty, double sent, double returned, double ratio) {
+        double r = Math.max(0d, Math.min(MAX_OVER_RATIO, ratio));
+        double v = orderQty * (1 + r) - sent + returned;
+        return v > 0 ? v : 0d;
+    }
+
     /**
      * 特采闸门(2026-09-22):来源=来料检验单(QC_INSP)时,勾了「特采」的明细行**不得**经
      * 选单/推式路径直接生成 采购入库单/暂收退回单 —— 它们的去向是特采单,特采单审核通过后
@@ -288,7 +303,8 @@ public class PushGenerateHandler implements PanelActionHandler {
             row.put("已送数量", round2(used));
             row.put("已退回数量", round2(ret));
             row.put("剩余数量", round2(left));
-            row.put("可送上限", round2(left * (1 + ratio)));
+            // 可送上限(2026-09-22 口径):按**订单全部数量**算,不再用 剩余×(1+比例)
+            row.put("可送上限", round2(overAllowance(qty, used, ret, ratio)));
             rows.add(row);
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -304,7 +320,8 @@ public class PushGenerateHandler implements PanelActionHandler {
     /**
      * 分批生单:按行指定「本次送料量」生成一张目标草稿(送料暂收单),写**待编号**批次台账 + 按量占用。
      * - qtyByLineKey 为空 = 所有"还有剩余"的行按剩余量全部送出(推式按钮直接点、或选单一次性送完);
-     * - 校验:来源已审核 / 目标为分批面板 / 每行 0 < 本次 ≤ 剩余×(1+超送比例) / 至少一行;
+     * - 校验:来源已审核 / 目标为分批面板 / 每行 0 < 本次 ≤ 可送上限(= 订单数量×(1+超送比例)−已送+已退回,
+     *   **按全部数量算**,2026-09-22 口径;超送比例最高 50%) / 至少一行;
      * - **暂收单批次号留空**(2026-09-21 二次口径):本跳只登记一行 status='PENDING'、batch_no=NULL 的台账
      *   (create_time=送料当天),把该行 id 作「批次键」逐站带下去;批次号到**采购入库单**填单时预设
      *   (=入库单「单据日期」,前端 docDefaults)并可人工改,审核时由 BatchService.assignNoAndBackfill 确认并回填全链;
@@ -318,7 +335,8 @@ public class PushGenerateHandler implements PanelActionHandler {
 
     /**
      * 分批生单(带超送比例覆盖):overRatioOverride 非空时按本次指定比例校验上限(界面弹窗可调),
-     * 为空则用系统参数 `receive_over_ratio`。比例夹在 0~1(0=不允许超送,1=允许 100% 超送)。
+     * 为空则用系统参数 `receive_over_ratio`。比例夹在 0~**0.5**(0=不允许超送;2026-09-22 用户口径:
+     * 超送最高 50%)。上限按**订单全部数量**算:数量×(1+比例)−已送+已退回(见 overAllowance)。
      */
     @Transactional
     @SuppressWarnings("unchecked")
@@ -343,24 +361,29 @@ public class PushGenerateHandler implements PanelActionHandler {
         // 3) 行级剩余量核算(含退货回冲) + 本次送料量校验
         Map<String, Double> sent = batchService.sentByLineKey(sourcePanel, sourceNo);
         Map<String, Double> returned = batchService.returnedByOrderLine(sourceNo);
-        // 超送比例:弹窗可临时覆盖(夹 0~1),未给则用系统参数 receive_over_ratio
+        // 超送比例:弹窗可临时覆盖(夹 0~**0.5**,2026-09-22 用户口径:超送最高 50%),
+        // 未给则用系统参数 receive_over_ratio(BatchService.overRatio 同样钳 0~0.5)
         double ratio = overRatioOverride == null ? batchService.overRatio()
-                : Math.max(0d, Math.min(1d, overRatioOverride));
+                : Math.max(0d, Math.min(MAX_OVER_RATIO, overRatioOverride));
         List<Map<String, Object>> picked = new ArrayList<>();   // {item, qty}
         for (Map<String, Object> it : srcItems) {
             // 特采行(2026-09-22 闸门):不得经此路径生成入库/退料 —— 走特采单(审核后整行入库)
             if ("QC_INSP".equals(sourcePanel) && isSpecialAccept(it)) continue;
             String lineKey = sourceNo + "#" + it.get("id");
-            double left = Math.max(0, numOf(it.get("数量")) - sent.getOrDefault(lineKey, 0d)
-                    + returned.getOrDefault(lineNoOf(it), 0d));
-            if (left <= 0.000001) continue;                      // 该行已送满(且无退回额度)
+            double orderQty = numOf(it.get("数量"));
+            double used = sent.getOrDefault(lineKey, 0d);
+            double ret = returned.getOrDefault(lineNoOf(it), 0d);
+            double left = Math.max(0, orderQty - used + ret);
+            // 可送上限(2026-09-22 口径):**按订单全部数量算** = 数量×(1+比例)−已送+已退回 ——
+            // 已送满订单(剩余=0)的行仍可收 订单数量×比例 的超送额度;默认整送=剩余(不主动超送),
+            // 只有"累计到顶后还显式要送"才报具体的上限(而不是笼统的"已无剩余可送")
+            double cap = overAllowance(orderQty, used, ret, ratio);
             double qty = qtyByLineKey == null ? left : qtyByLineKey.getOrDefault(lineKey, 0d);
             if (qty <= 0.000001) continue;                       // 本次不送
-            double cap = left * (1 + ratio);
             if (qty > cap + 0.000001) {
                 throw new IllegalStateException("第 " + it.get("行号") + " 行本次送料量 " + round2(qty)
-                        + " 超出允许上限 " + round2(cap) + "(剩余 " + round2(left) + " + 超送比例 "
-                        + Math.round(ratio * 100) + "%)");
+                        + " 超出允许上限 " + round2(cap) + "(订单数量 " + round2(orderQty) + " ×(1 + 超送比例 "
+                        + Math.round(ratio * 100) + "%)− 已送 " + round2(used) + " + 已退回 " + round2(ret) + ")");
             }
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("item", it);

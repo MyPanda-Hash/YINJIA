@@ -752,3 +752,18 @@ migrate-qc-tcin-sign.sql
 #   验证:tools/archive/_verify-qc-tc-flow.mjs(35 项断言全 PASS)+ 回归 _verify-batch-target-void.mjs
 #   (146 PASS)。台账留证见探针输出 _v-tc-flow-run3.txt。
 migrate-qc-insp-tc-flow.sql
+
+# —— 2026-09-22 分批送料「超送」口径修正:上限按订单全部数量算 + 比例封顶 50%(无 DDL) ——
+#   用户口径:「超送设置最高是 50,并且逻辑有问题,超送计算有问题。应该是按全部数量来计算的」。
+#   ① 可送上限 = **订单数量×(1+超送比例) − 已送 + 已退回**(按全部数量算)——
+#      旧口径 剩余×(1+比例) 每批只给"当批剩余"的比例额,分批越多额度越算越少,
+#      累计超送永远到不了订单总量的比例额;新口径下"剩余=0 的行"仍可收 订单数量×比例 的超送额度;
+#   ② 超送比例**最高 50%**:弹窗覆盖与系统参数一律钳 0~0.5(本脚本把库里 >0.5 的值钳回 0.5
+#      并更新参数备注为新公式;当前库 0.05 不受影响)。
+#   配套代码(同提交):PushGenerateHandler(overAllowance 公式 + batchLines 可送上限 +
+#      generateBatch 校验,超限报错给出 订单数量×(1+比例)−已送+已退回 的明细)、
+#      VoucherFlowService.sources(选单路径同公式,剩余=0 行保留)、BatchService.overRatio(钳 0~0.5)、
+#      前端 BatchSendDialog(比例输入 max 50、capOf 按全部数量)+ batchSendLines.overAllowance(纯函数)。
+#   验证:tools/archive/_verify-over-ratio.mjs(9 项全 PASS)+ 前端 node --test(138 项)
+#      + 回归 _verify-batch-target-void.mjs(全 PASS)。原始输出 _v-over-ratio-run3.txt。
+migrate-over-ratio-cap.sql

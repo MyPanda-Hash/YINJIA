@@ -58,3 +58,16 @@ export function sumPickedQty(rows = [], picked = [], qtyOf = {}) {
   }
   return Math.round(sum * 100) / 100
 }
+
+/**
+ * 分批送料「可送上限」(2026-09-22 口径):**按全部数量算** ——
+ *   订单数量 ×(1 + 超送比例)− 已送 + 已退回,负数归 0;
+ *   超送比例给百分数(0~50,超出按 50 钳制 —— 用户口径:超送最高 50%)。
+ * 旧口径 剩余×(1+比例) 的问题:每批只给"当批剩余"的比例额,分批越多超送额度越算越少,
+ * 累计超送永远到不了订单总量的比例额;正确语义是"整张订单行累计最多收 数量×(1+比例)"。
+ */
+export function overAllowance(orderQty, sent, returned, ratioPct = 0) {
+  const r = Math.max(0, Math.min(50, Number(ratioPct) || 0)) / 100
+  const v = Number(orderQty || 0) * (1 + r) - Number(sent || 0) + Number(returned || 0)
+  return v > 0 ? Math.round(v * 100) / 100 : 0
+}

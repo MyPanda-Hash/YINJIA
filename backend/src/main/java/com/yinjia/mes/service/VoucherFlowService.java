@@ -18,7 +18,8 @@ import java.util.Map;
  * 2026-09-20 分批送料(P0,docs/方案-采购订单分批送料与批次号.md):
  * - 已送量按**来源单**汇总(不再按"来源→目标"限定),否则同一采购订单既走暂收又走直接入库会重复计量;
  * - 剩余量 = 订单行数量 − Σ有效批次送料量 + **Σ已审核退回单的退货数量**(退货回冲,决策 4);
- * - 另给 可送上限 = 剩余量 ×(1 + 超送比例),供分批生单与选单界面校验(决策 2)。
+ * - 另给 可送上限 = 订单数量×(1 + 超送比例)− 已送 + 已退回(2026-09-22 口径:**按全部数量算**,
+ *   比例最高 50%),供分批生单与选单界面校验(决策 2)。
  */
 @Service
 public class VoucherFlowService {
@@ -70,11 +71,16 @@ public class VoucherFlowService {
                 double used = sent.getOrDefault(lineKey, 0.0);
                 double ret = returned.getOrDefault(lineNoOf(item), 0.0);
                 double left = qty - used + ret;
+                // 可送上限(2026-09-22 口径):**按订单全部数量算** = 数量×(1+超送比例)−已送+已退回,
+                // 超送比例最高 50% —— 与 PushGenerateHandler.overAllowance / 前端 overAllowance 同公式;
+                // 旧口径 剩余×(1+比例) 会随分批把超送额度越算越少。
+                double cap = qty * (1 + Math.max(0d, Math.min(0.5d, overRatio))) - used + ret;
                 item.put("已生单数量", round(used));
                 item.put("已退回数量", round(ret));
                 item.put("剩余数量", round(Math.max(0, left)));
-                item.put("可送上限", round(Math.max(0, left) * (1 + overRatio)));
-                if (qty <= 0 || left > 0.000001) remain.add(item);
+                item.put("可送上限", round(Math.max(0, cap)));
+                // 行保留条件:还有剩余,或超送额度没用完(剩余=0 仍可收 订单数量×比例)
+                if (qty <= 0 || left > 0.000001 || cap > 0.000001) remain.add(item);
             }
             if (remain.isEmpty()) continue;
             doc.put("detail", Map.of("items", remain));

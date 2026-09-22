@@ -1574,7 +1574,6 @@ export default {
     '本次合计': 'Total esta vez',
     '按剩余量填充': 'Rellenar el resto',
     '确定生单': 'Crear',
-    '每行留空或 0 = 本次不送;不超过「可送上限」(剩余 ×（1+超送比例）)': 'Vacío o 0 = no entregado; no superar el máximo (resto × (1 + ratio))',
     '请至少填写一行的本次送料数量': 'Introduzca la cantidad de al menos una línea',
     '分批送料数据加载失败': 'Error al cargar datos de entrega parcial',
     '所选来源行已无剩余可送': 'Las líneas seleccionadas no tienen resto',
@@ -1601,7 +1600,8 @@ export default {
     '待编号': 'N.º pendiente',
     '{n} 批待编号': '{n} lote(s) sin n.º',
     '采购入库单填单时按入库日期预设,可修改': 'El lote se preajusta con la fecha de entrada al rellenar el albarán de compra; modificable',
-    '只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」': 'Solo se generan las líneas marcadas (cantidad 0 = no se entrega), hasta el máximo entregable',
+    '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Solo se generan las líneas marcadas; máximo = cantidad pedida × (1 + ratio) − entregado + devuelto (sobreentrega máx. 50 %)',
+    '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = no permitido; máx. 50 %, cupo según cantidad pedida)',
     '请至少勾选一行并填写本次送料数量': 'Marque al menos una línea e introduzca la cantidad a entregar',
   },
 }
