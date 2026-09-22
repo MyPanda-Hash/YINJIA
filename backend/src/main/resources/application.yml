@@ -30,6 +30,13 @@ yinjia:
   # 登录工厂清单显示名(ADR-0003:YJ=正式 HSDZ_MES / YJ_TEST=测试 HSDZ_MES_TEST)
   factory-name: "YINJIA-MES"
   test-factory-name: "YINJIA-MES·测试库"
+  # 本服务器是否提供"测试账套"(2026-09-22b):
+  #   开发机(true)= 登录页与顶栏都有两个账套;
+  #   服务器(false)= 只出现正式账套 —— 生产服务器上并没有 HSDZ_MES_TEST,
+  #     菜单挂着"点了就报连不上库"的选项纯属坑人。服务器打开方式(任选其一,重启生效):
+  #       · 启动参数:java -jar app.jar --yinjia.enable-test-ledger=false
+  #       · 环境变量:set YINJIA_ENABLETESTLEDGER=false   (Spring 宽松绑定,大小写/连字符不敏感)
+  enable-test-ledger: true
   test-datasource:
     url: jdbc:sqlserver://localhost:1433;databaseName=HSDZ_MES_TEST;encrypt=false;trustServerCertificate=true;loginTimeout=10
     username: yinjia
