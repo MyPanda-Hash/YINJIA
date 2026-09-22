@@ -80,6 +80,20 @@ async function main() {
     ok('操作列表头无文字', op.text === '', opHead)
     ok('操作列表头无边框(空框已去掉)', op.borderTop === '0px' && op.borderRight === '0px', opHead)
     ok('操作列表头无底色', /rgba\(0, 0, 0, 0\)|transparent/.test(String(op.bg)), opHead)
+
+    // 「修改记录」入口应在右侧竖排按钮栏,而不是纸面底部(用户口径)
+    const rail = await evaluate(`[...document.querySelectorAll('.approval-side .as-side-btn')].map(e => e.innerText.replace(/\\s/g,''))`)
+    ok('右侧按钮栏有「修改记录」', (rail || []).includes('修改记录'), JSON.stringify(rail))
+    const sheetLogBtn = await evaluate(`!!document.querySelector('.catalog-sheet .cs-add')`)
+    ok('纸面底部已无「修改记录」按钮', sheetLogBtn === false)
+    // 点开侧栏「修改记录」→ 弹出弹窗
+    await evaluate(`(() => { const b = [...document.querySelectorAll('.approval-side .as-side-btn')].find(e => e.innerText.replace(/\\s/g,'') === '修改记录'); b?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return !!b })()`)
+    let dlgTitle = ''
+    for (let i = 0; i < 12 && !dlgTitle; i++) {
+      await sleep(600)
+      dlgTitle = await evaluate(`(() => { const d = [...document.querySelectorAll('.el-dialog')].find(e => e.offsetParent !== null); return d ? d.innerText.slice(0, 40) : '' })()`)
+    }
+    ok('点「修改记录」弹出记录弹窗', /修改记录|修改进行中|次修改|暂无修改记录/.test(String(dlgTitle)), String(dlgTitle).replace(/\n/g, '|'))
   } finally {
     edge.kill()
     try { fs.rmSync(profile, { recursive: true, force: true }) } catch { /* ignore */ }

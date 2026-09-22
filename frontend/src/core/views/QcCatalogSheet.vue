@@ -91,13 +91,10 @@
       </table>
     </div>
 
-    <!-- ③ 页签脚注(原表第16行) -->
-    <div class="cs-note">{{ tt('输入批次号后点击批次号可查阅详细或者新增检验') }}</div>
-
-    <!-- ④ 底部动作条 -->
-    <div class="cs-addbar">
-      <div class="cs-add" @click="openModifyLog">🕘 {{ tt('修改记录') }}</div>
-      <span class="cs-addbar-tip">{{ tt('目录记录由检验单生单自动生成、不可手工修改；状态变更走行上的「完成 / 修改」。') }}</span>
+    <!-- ③ 页签脚注(原表第16行)+ 只读说明(「修改记录」入口已移至右侧竖排按钮栏) -->
+    <div class="cs-note">
+      <div>{{ tt('输入批次号后点击批次号可查阅详细或者新增检验') }}</div>
+      <div class="cs-note-sub">{{ tt('目录记录由检验单生单自动生成、不可手工修改；状态变更走行上的「完成 / 修改」。') }}</div>
     </div>
 
     <!-- 完成弹窗:确认 + 是否合格 -->
@@ -116,30 +113,6 @@
       <template #footer>
         <el-button @click="completeVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" :loading="acting" @click="doComplete">{{ tt('确定') }}</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 修改记录弹窗(复用后端「修改记录」按钮的数据) -->
-    <el-dialog v-model="logVisible" :title="tt('修改记录')" width="620px" append-to-body>
-      <div v-if="!logRecords.length" class="csd-empty">{{ tt('暂无修改记录') }}</div>
-      <div v-for="(r, ri) in logRecords" :key="ri" class="csd-log">
-        <div class="csd-log-head">
-          <span>{{ tt('第') }} {{ logRecords.length - ri }} {{ tt('次修改') }}</span>
-          <span>{{ tt('操作') }}：{{ r.applyBy || '-' }} {{ r.applyAt || '' }}</span>
-        </div>
-        <table v-if="(r.changes || []).length" class="csd-log-table">
-          <thead><tr><th>{{ tt('字段') }}</th><th>{{ tt('原内容') }}</th><th>{{ tt('新内容') }}</th></tr></thead>
-          <tbody>
-            <tr v-for="(c, ci) in r.changes" :key="ci">
-              <td>{{ c.label }}</td>
-              <td>{{ c.old || '—' }}</td>
-              <td>{{ c.new || '—' }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <template #footer>
-        <el-button @click="logVisible = false">{{ tt('关闭') }}</el-button>
       </template>
     </el-dialog>
 
@@ -332,32 +305,6 @@ async function doDelete(row) {
   ElMessage.success(tt('已删除该目录记录'))
 }
 
-// ---------- 修改记录 ----------
-const logVisible = ref(false)
-const logRecords = ref([])
-async function openModifyLog() {
-  const no = props.head['单据编号']
-  if (!no) return
-  try {
-    const res = await engine.callButton({
-      panelCode: 'QC_CATALOG',
-      buttonName: '修改记录',
-      formData: { 编号: no },
-      buttonParam: {},
-    })
-    logRecords.value = (res?.records || []).map((r) => ({
-      ...r,
-      changes: typeof r.changes === 'string' ? (safeJson(r.changes) || []) : (r.changes || []),
-    }))
-    logVisible.value = true
-  } catch (e) {
-    ElMessage.error(engine.errMsg(e) || tt('查询失败'))
-  }
-}
-function safeJson(s) {
-  try { return JSON.parse(s) } catch { return null }
-}
-
 // ---------- 查看/跳转关联单据 ----------
 const docVisible = ref(false)
 const docLoading = ref(false)
@@ -535,17 +482,11 @@ defineExpose({ exportCatalogExcel })
 .cs-act.warn { color: #b26a00; background: #fff8ee; border-color: #ffd9a8; }
 .cs-act.danger { color: #c0392b; background: #fff5f5; border-color: #f0b4ae; }
 .cs-act.disabled { opacity: 0.45; cursor: not-allowed; }
-/* ═══ 脚注 / 动作条 ═══ */
+/* ═══ 脚注(原表第16行 + 只读说明) ═══ */
 .cs-note {
   border-top: 1px solid #8a8a8a; padding: 6px 12px; background: #f7fbff; color: #5a6b7d; font-size: 12.5px;
 }
-.cs-addbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 6px 8px; }
-.cs-add {
-  padding: 5px 10px; border: 1px dashed #8fb4e0; border-radius: 4px; background: #f4f9ff;
-  color: #1c4f8a; font-size: 13px; cursor: pointer; user-select: none;
-}
-.cs-add:hover { background: #e8f2ff; border-style: solid; }
-.cs-addbar-tip { font-size: 11.5px; color: #8a97a6; }
+.cs-note-sub { margin-top: 2px; font-size: 11.5px; color: #8a97a6; }
 .cs-empty { text-align: center; color: #98a4b3; padding: 18px 0 !important; }
 /* ═══ 弹窗 ═══ */
 .cs-dlg-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
@@ -555,10 +496,6 @@ defineExpose({ exportCatalogExcel })
 .csd-empty { padding: 16px 4px; color: #909399; font-size: 13px; }
 .csd-sec { margin: 10px 0 6px; font-weight: 600; color: #1f5fa8; font-size: 13px; border-left: 3px solid #b9dbf8; padding-left: 8px; }
 .csd-kv :deep(.el-table__cell) { font-size: 12px; }
-.csd-log { border: 1px solid #e4edf5; border-radius: 4px; padding: 8px 10px; margin-bottom: 8px; }
-.csd-log-head { display: flex; gap: 16px; font-size: 12.5px; color: #5a6b7d; margin-bottom: 6px; }
-.csd-log-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.csd-log-table th, .csd-log-table td { border: 1px solid #e4edf5; padding: 3px 6px; text-align: left; }
 </style>
 
 <!-- 打印整张:只保留纸张(与项目进度查询/检验数据记录同口径) -->
@@ -594,7 +531,6 @@ defineExpose({ exportCatalogExcel })
   body.approval-printing .cs-table th, body.approval-printing .cs-table td {
     font-size: 10px !important; padding: 1px 2px !important; height: auto !important;
   }
-  body.approval-printing .cs-addbar { display: none !important; }
   @page { margin: 8mm; }
 }
 </style>

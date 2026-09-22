@@ -321,7 +321,7 @@
                   <div class="as-side-menu-item" @click="pickModAction('审批情况')">{{ tt('审批情况') }}</div>
                 </div>
               </div>
-              <div class="as-side-btn" v-if="isDocArchivePanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
+              <div class="as-side-btn" v-if="isModLogPanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
               <div class="as-side-section">{{ tt('文档输出') }}</div>
               <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
               <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
@@ -2374,6 +2374,12 @@ async function openPreviewCard(c) {
 }
 /** 文书归档面板(保存即归档):修改闭环按钮组的显隐开关,真源后端 metadata.docArchive */
 const isDocArchivePanel = computed(() => !!cfgCache.value?.metadata?.docArchive)
+/**
+ * 侧栏是否放出「修改记录」按钮:文书归档面板一族(isDocArchivePanel)照旧;
+ * 检验目录(QC_CATALOG)不是归档面板,但其「修改」动作会把「已完成检验」回弹并写 yj_doc_modify_log
+ * (2026-09-22 用户口径:修改记录要放在按钮栏处),故一并放开。
+ */
+const isModLogPanel = computed(() => isDocArchivePanel.value || String(panelCode.value) === 'QC_CATALOG')
 /** 品质单据等标准流文书面板:非文件类(保存不自动提交审批),侧栏需显式审批动作组 */
 const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(qcSheetCfgs, String(panelCode.value)))
 const openModMenu = ref(false)
