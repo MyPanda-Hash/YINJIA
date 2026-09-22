@@ -1239,9 +1239,9 @@ async function onButton(action) {
     if (!editable.value) {
       try {
         await ElMessageBox.confirm(
-          '当前单据不可编辑，扫描结果将保存为一张新草稿。',
-          '扫描填单',
-          { confirmButtonText: '继续扫描', cancelButtonText: '取消', type: 'warning' },
+          tt('当前单据不可编辑，扫描结果将保存为一张新草稿。'),
+          tt('扫描填单'),
+          { confirmButtonText: tt('继续扫描'), cancelButtonText: tt('取消'), type: 'warning' },
         )
       } catch (error) {
         return
@@ -1285,7 +1285,7 @@ async function onButton(action) {
   if (action === '新增') {
     if (isEdit.value && status.value === '草稿') {
       try {
-        await ElMessageBox.confirm('当前单据尚未保存，切换新增将丢弃修改，是否继续？', '提示', { type: 'warning' })
+        await ElMessageBox.confirm(tt('当前单据尚未保存，切换新增将丢弃修改，是否继续？'), tt('提示'), { type: 'warning' })
       } catch (e) {
         return
       }
@@ -1308,18 +1308,18 @@ async function onButton(action) {
     const no = form['单据编号'] || form['锭号'] || form['编号'] || ''
     try {
       const { value } = await ElMessageBox.prompt(
-        '单据：' + no + '（当前状态：' + status.value + '）',
-        '人工审核确认',
-        { confirmButtonText: '确认审核', cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: '审核意见（选填）' }
+        tt('单据：{no}（当前状态：{st}）').replace('{no}', no).replace('{st}', status.value),
+        tt('人工审核确认'),
+        { confirmButtonText: tt('确认审核'), cancelButtonText: tt('取消'), inputType: 'textarea', inputPlaceholder: tt('审核意见（选填）') }
       )
       auditOpinion = value || ''
     } catch (e) {
       return
     }
   } else if (action === '弃审') {
-    if (status.value !== '已审核') return ElMessage.warning('仅已审核状态可弃审')
+    if (status.value !== '已审核') return ElMessage.warning(tt('仅已审核状态可弃审'))
     try {
-      await ElMessageBox.confirm('确认弃审该单据？弃审后需重新审核。', '弃审确认', { type: 'warning' })
+      await ElMessageBox.confirm(tt('确认弃审该单据？弃审后需重新审核。'), tt('弃审确认'), { type: 'warning' })
     } catch (e) {
       return
     }
@@ -1328,26 +1328,26 @@ async function onButton(action) {
   let approvalOpinion = ''
   if (action === '提交审批' || action === '审批通过') {
     const need = action === '提交审批' ? '草稿' : '审批中'
-    if (status.value !== need) return ElMessage.warning(action === '提交审批' ? '仅草稿状态可提交审批' : '仅审批中状态可审批通过')
+    if (status.value !== need) return ElMessage.warning(tt(action === '提交审批' ? '仅草稿状态可提交审批' : '仅审批中状态可审批通过'))
     const no = form['单据编号'] || form['锭号'] || form['编号'] || ''
     try {
       const { value } = await ElMessageBox.prompt(
-        '单据：' + no + '（当前状态：' + status.value + '）',
-        action + '确认',
-        { confirmButtonText: '确认' + action, cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: action === '审批通过' ? '审批意见（选填）' : '提交说明（选填）' }
+        tt('单据：{no}（当前状态：{st}）').replace('{no}', no).replace('{st}', status.value),
+        tt('{action}确认').replace('{action}', tt(action)),
+        { confirmButtonText: tt('确认{n}').replace('{n}', tt(action)), cancelButtonText: tt('取消'), inputType: 'textarea', inputPlaceholder: tt(action === '审批通过' ? '审批意见（选填）' : '提交说明（选填）') }
       )
       approvalOpinion = value || ''
     } catch (e) {
       return
     }
   } else if (action === '审批驳回') {
-    if (status.value !== '审批中') return ElMessage.warning('仅审批中状态可审批驳回')
+    if (status.value !== '审批中') return ElMessage.warning(tt('仅审批中状态可审批驳回'))
     const no = form['单据编号'] || form['锭号'] || form['编号'] || ''
     try {
       const { value } = await ElMessageBox.prompt(
-        '单据：' + no + '（当前状态：审批中）\n驳回必须填写审批意见',
-        '审批驳回确认',
-        { confirmButtonText: '确认驳回', cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: '驳回原因（必填）', inputValidator: (v) => (v && v.trim() ? true : '驳回必须填写审批意见') }
+        tt('单据：{no}（当前状态：审批中）\n驳回必须填写审批意见').replace('{no}', no),
+        tt('审批驳回确认'),
+        { confirmButtonText: tt('确认驳回'), cancelButtonText: tt('取消'), inputType: 'textarea', inputPlaceholder: tt('驳回原因（必填）'), inputValidator: (v) => (v && v.trim() ? true : tt('驳回必须填写审批意见')) }
       )
       approvalOpinion = value || ''
     } catch (e) {

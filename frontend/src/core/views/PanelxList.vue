@@ -3889,7 +3889,7 @@ async function toggleTpl(row) {
 }
 async function removeTpl(row) {
   try {
-    await ElMessageBox.confirm(`确认删除模板「${row.name}」？删除后不可恢复。`, tt('删除确认'), { type: 'warning' })
+    await ElMessageBox.confirm(tt('确认删除模板「{name}」？删除后不可恢复。').replace('{name}', row.name), tt('删除确认'), { type: 'warning' })
   } catch { return }
   try {
     await request.delete(`/report/templates/${row.id}`)
@@ -5217,7 +5217,7 @@ async function onButton(action) {
   }
   // 复制(列表页):整单复制为一张新草稿(表头+明细,去掉编号/状态/行 id)
   if (action === '复制') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     if (cfgCache.value?.metadata?.singleDoc) return ElMessage.info('档案面板不支持整单复制')
     const srcNo = current.value['编号'] || current.value['单据编号']
     try {
@@ -5283,7 +5283,7 @@ async function onButton(action) {
     return
   }
   if (action === '修改') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     openForm(current.value)
     return
   }
@@ -5353,10 +5353,10 @@ async function onButton(action) {
     return
   }
   if (action === '删除单据') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     const no = current.value['编号'] || current.value['单据编号'] || ''
     try {
-      await ElMessageBox.confirm('确认删除整张单据 ' + no + '？该操作不可恢复。', '删除单据确认', { type: 'warning' })
+      await ElMessageBox.confirm(tt('确认删除整张单据 {no}？该操作不可恢复。').replace('{no}', no), tt('删除单据确认'), { type: 'warning' })
     } catch (e) {
       return
     }
@@ -5372,15 +5372,15 @@ async function onButton(action) {
     return
   }
   if (action === '删除') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     if (!delMode.value) {
       delMode.value = true
       ElMessage.info('已进入删除模式：勾选要删除的行，再点「删除」确认；点「刷新」或翻页取消')
       return
     }
-    if (!delSel.value.length) return ElMessage.warning('请先勾选要删除的行')
+    if (!delSel.value.length) return ElMessage.warning(tt('请先勾选要删除的行'))
     try {
-      await ElMessageBox.confirm('确认删除勾选的 ' + delSel.value.length + ' 行明细？', '删除确认', { type: 'warning' })
+      await ElMessageBox.confirm(tt('确认删除勾选的 {n} 行明细？').replace('{n}', delSel.value.length), tt('删除确认'), { type: 'warning' })
     } catch (e) {
       return
     }
@@ -5414,18 +5414,18 @@ async function onButton(action) {
     return
   }
   if (['中止执行', '整单中止', '草稿', '取消中止', '提交审批', '审批通过', '驳回审批'].includes(action)) {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
   }
   // 人工审核：确认弹窗 + 审核意见（选填）；审核人取当前登录人（后端从 JWT 取）
   let auditOpinion = ''
   if (action === '审核') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     // 已审核过的单据不允许再次审核，也不允许补填审批意见
     if (current.value['单据状态'] !== '草稿') return ElMessage.warning('仅草稿状态可审核，已审核单据不允许再次审核')
     const no = current.value['编号'] || current.value['单据编号'] || ''
     try {
       const { value } = await ElMessageBox.prompt(
-        '单据：' + no + '（当前状态：' + (current.value['单据状态'] || '') + '）',
+        tt('单据：{no}（当前状态：{st}）').replace('{no}', no).replace('{st}', current.value['单据状态'] || ''),
         '人工审核确认',
         { confirmButtonText: '确认审核', cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: '审核意见（选填）' }
       )
@@ -5434,10 +5434,10 @@ async function onButton(action) {
       return
     }
   } else if (action === '弃审') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
-    if (current.value['单据状态'] !== '已审核') return ElMessage.warning('仅已审核状态可弃审')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+    if (current.value['单据状态'] !== '已审核') return ElMessage.warning(tt('仅已审核状态可弃审'))
     try {
-      await ElMessageBox.confirm('确认弃审该单据？弃审后需重新审核。', '弃审确认', { type: 'warning' })
+      await ElMessageBox.confirm(tt('确认弃审该单据？弃审后需重新审核。'), tt('弃审确认'), { type: 'warning' })
     } catch (e) {
       return
     }
@@ -5446,7 +5446,7 @@ async function onButton(action) {
     // 审批流：提交审批/审批通过（确认+意见）、审批驳回（意见必填）、审批情况（历史弹窗）
     let approvalOpinion = ''
     if (action === '提交审批' || action === '审批通过') {
-      if (!current.value) return ElMessage.warning('请先选择一行数据')
+      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
       // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过:审批中(一级)/待二级审批(二级)
       if (action === '提交审批') {
         if (!['草稿', '修改中'].includes(current.value['单据状态'])) return ElMessage.warning('仅草稿或修改中状态可提交审批')
@@ -5464,7 +5464,7 @@ async function onButton(action) {
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
         const { value } = await ElMessageBox.prompt(
-          '单据：' + no + '（当前状态：' + (current.value['单据状态'] || '') + '）',
+          tt('单据：{no}（当前状态：{st}）').replace('{no}', no).replace('{st}', current.value['单据状态'] || ''),
           action + '确认',
           { confirmButtonText: '确认' + action, cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: action === '审批通过' ? '审批意见（选填）' : '提交说明（选填）' }
         )
@@ -5473,40 +5473,40 @@ async function onButton(action) {
         return
       }
     } else if (action === '审批驳回') {
-      if (!current.value) return ElMessage.warning('请先选择一行数据')
-      if (!IN_APPROVAL.includes(current.value['单据状态'])) return ElMessage.warning('仅审批中或待二级审批状态可审批驳回')
+      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+      if (!IN_APPROVAL.includes(current.value['单据状态'])) return ElMessage.warning(tt('仅审批中或待二级审批状态可审批驳回'))
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
         const { value } = await ElMessageBox.prompt(
-          '单据：' + no + '（当前状态：审批中）\n驳回必须填写审批意见',
-          '审批驳回确认',
-          { confirmButtonText: '确认驳回', cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: '驳回原因（必填）', inputValidator: (v) => (v && v.trim() ? true : '驳回必须填写审批意见') }
+          tt('单据：{no}（当前状态：审批中）\n驳回必须填写审批意见').replace('{no}', no),
+          tt('审批驳回确认'),
+          { confirmButtonText: tt('确认驳回'), cancelButtonText: tt('取消'), inputType: 'textarea', inputPlaceholder: tt('驳回原因（必填）'), inputValidator: (v) => (v && v.trim() ? true : tt('驳回必须填写审批意见')) }
         )
         approvalOpinion = value || ''
       } catch (e) {
         return
       }
     } else if (action === '审批情况') {
-      if (!current.value) return ElMessage.warning('请先选择一行数据')
+      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
       approvalNo.value = current.value['编号'] || current.value['单据编号'] || ''
       approvalVisible.value = true
       return
     } else if (['提交会签', '会签通过', '会签驳回', '撤回会签'].includes(action)) {
       // 产品变更申请单会签组(2026-09-21):驳回必须填意见;其余给一次确认(会签=对别人负责的动作)
-      if (!current.value) return ElMessage.warning('请先选择一行数据')
+      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
       const no2 = current.value['编号'] || current.value['单据编号'] || ''
       try {
         if (action === '会签驳回') {
           const { value } = await ElMessageBox.prompt(
-            '单据：' + no2 + '（当前状态：会签中）\n驳回必须填写意见',
-            '会签驳回确认',
+            tt('单据：{no}（当前状态：会签中）\n驳回必须填写意见').replace('{no}', no2),
+            tt('会签驳回确认'),
             { confirmButtonText: '确认驳回', cancelButtonText: '取消', inputType: 'textarea',
-              inputPlaceholder: '驳回意见（必填）', inputValidator: (v) => (v && v.trim() ? true : '会签驳回必须填写意见') }
+              inputPlaceholder: tt('驳回意见（必填）'), inputValidator: (v) => (v && v.trim() ? true : tt('会签驳回必须填写意见')) }
           )
           approvalOpinion = value || ''
         } else {
           await ElMessageBox.confirm(
-            '单据：' + no2 + '（当前状态：' + (current.value['单据状态'] || '') + '）',
+            tt('单据：{no}（当前状态：{st}）').replace('{no}', no2).replace('{st}', current.value['单据状态'] || ''),
             action + '确认',
             { confirmButtonText: '确认' + action, cancelButtonText: '取消', type: 'warning' }
           )
