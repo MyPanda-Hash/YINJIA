@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -104,7 +105,9 @@ public class ButtonService {
             case "规格书分发" -> specAssign(def, formData);
             case "修改审批通过" -> modifyApprove(def, formData);
             case "修改审批驳回" -> modifyReject(def, formData);
-            case "修改记录" -> modifyHistory(def, formData);
+            // 修改记录:文书面板=归档后申请修改/审批/再归档的闭环留痕;档案式面板(如 QC_INSP_REQ
+            // 来料检验要求)没有该闭环,取存档留痕表(每次保存一条:行增删改摘要 + 字段级变化)
+            case "修改记录" -> def.isDoc() ? modifyHistory(def, formData) : archiveChangeHistory(def);
             // 卡死单据出口(2026-09-11):删除/修改申请提交后无人审批,发起人或审批人可撤回
             case "撤回删除申请" -> withdrawDeleteRequest(def, formData);
             case "撤回修改申请" -> withdrawModifyRequest(def, formData);
@@ -596,6 +599,8 @@ public class ButtonService {
             throw new IllegalStateException("该档案存活行数 " + live + " 已超出全量加载上限 " + QueryService.ARCH_LOAD_CAP
                     + ",保存已阻止:未加载的行会被当作删除处理,请联系开发提高上限或先清理/归档数据");
         }
+        // 存档留痕(2026-09-22):先快照存活行,保存后比对出「修改记录」(用户要求与立项申请同义的留痕)
+        Map<Object, Map<String, String>> before = archiveRowSnapshot(def);
         Set<Object> liveIds = new HashSet<>();
         for (Map<String, Object> item : items) {
             Object id = item.get("id");
@@ -618,6 +623,7 @@ public class ButtonService {
             args.addAll(liveIds);
             jdbc.update(sql.toString(), args.toArray());
         }
+        recordArchiveChange(def, before, items, liveIds, user);
         return result(def.name(), "启用");
     }
 
@@ -2577,6 +2583,148 @@ public class ButtonService {
         if (!reqBy.isBlank()) notify(() -> messageService.send(List.of(reqBy), MessageService.MODIFY_REJECTED, def.code(), no,
                 Map.of("docNo", no, "actor", user, "opinion", opinion), user));
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
+    }
+
+    // ══════════ 档案式面板「修改记录」(2026-09-22):每次存档留痕 ══════════
+    // 档案式面板(QC_INSP_REQ 来料检验要求等)是整表 upsert 的全局资料,没有「申请修改/审批/再归档」闭环,
+    // 故另立一张 yj_archive_change_log:每次保存比对「保存前快照 vs 提交内容」,记一条
+    // (谁/何时/新增·删除·修改了几行/字段级 原值→新值)。库内全量保留,展示只取最近 3 条。
+
+    /** 存档前快照:存活行 (行id -> 字段label -> 文本值),供保存后比对 */
+    private Map<Object, Map<String, String>> archiveRowSnapshot(PanelRegistry.PanelDef def) {
+        Map<Object, Map<String, String>> out = new LinkedHashMap<>();
+        if (def.isDoc() || def.lineTable() == null || def.fields().isEmpty()) return out;
+        LinkedHashSet<String> cols = new LinkedHashSet<>();
+        for (PanelRegistry.FieldDef f : def.fields()) if (f.col() != null) cols.add(f.col());
+        StringBuilder sql = new StringBuilder("SELECT ").append(def.pkCol());
+        for (String c : cols) sql.append(", [").append(c).append("]");
+        sql.append(" FROM ").append(def.lineTable()).append(" WHERE ISNULL(asp_cancel,'N')<>'Y'");
+        for (Map<String, Object> r : jdbc.queryForList(sql.toString())) {
+            Object id = pickCol(r, def.pkCol());
+            if (id == null) continue;
+            Map<String, String> vals = new LinkedHashMap<>();
+            for (PanelRegistry.FieldDef f : def.fields()) vals.put(f.label(), nv(pickCol(r, f.col())));
+            out.put(id, vals);
+        }
+        return out;
+    }
+
+    /** 存档后写一条修改记录(无变化不写;字段级变化最多 80 条,超出置 truncated) */
+    private void recordArchiveChange(PanelRegistry.PanelDef def, Map<Object, Map<String, String>> before,
+                                     List<Map<String, Object>> items, Set<Object> liveIds, String user) {
+        if (def.isDoc() || def.lineTable() == null) return;
+        List<Map<String, Object>> changes = new ArrayList<>();
+        List<String> addedSamples = new ArrayList<>(), changedSamples = new ArrayList<>(), removedSamples = new ArrayList<>();
+        int addedRows = 0, changedRows = 0, removedRows = 0;
+        boolean truncated = false;
+        for (Map<String, Object> item : items) {
+            Object id = item.get("id");
+            String sample = archiveRowSample(def, item);
+            if (id == null || String.valueOf(id).isBlank()) { // 无 id = 新增行
+                addedRows++;
+                if (addedSamples.size() < 5) addedSamples.add(sample);
+                continue;
+            }
+            Map<String, String> old = before.get(id);
+            if (old == null) { // 库里原无此行(软删后复活):记行级变更,不做字段比对
+                changedRows++;
+                if (changedSamples.size() < 5) changedSamples.add(sample);
+                continue;
+            }
+            boolean touched = false;
+            for (PanelRegistry.FieldDef f : def.fields()) {
+                String o = old.getOrDefault(f.label(), "");
+                String n = nv(item.get(f.label()));
+                if (o.equals(n)) continue;
+                touched = true;
+                if (changes.size() < 80) {
+                    Map<String, Object> c = new LinkedHashMap<>();
+                    c.put("label", sample + " · " + f.label());
+                    c.put("kind", o.isEmpty() ? "补充" : (n.isEmpty() ? "清空" : "变化"));
+                    c.put("old", o);
+                    c.put("new", n);
+                    changes.add(c);
+                } else {
+                    truncated = true;
+                }
+            }
+            if (touched) {
+                changedRows++;
+                if (changedSamples.size() < 5) changedSamples.add(sample);
+            }
+        }
+        for (Map.Entry<Object, Map<String, String>> e : before.entrySet()) {
+            if (liveIds.contains(e.getKey())) continue;
+            removedRows++;
+            if (removedSamples.size() < 5) removedSamples.add(archiveRowSample(def, e.getValue()));
+        }
+        if (addedRows + changedRows + removedRows == 0) return; // 空存不留痕
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("addedRows", addedRows);
+        meta.put("removedRows", removedRows);
+        meta.put("changedRows", changedRows);
+        meta.put("addedSamples", addedSamples);
+        meta.put("removedSamples", removedSamples);
+        meta.put("changedSamples", changedSamples);
+        if (truncated) meta.put("truncated", true);
+        jdbc.update("INSERT INTO yj_archive_change_log (panel_code, doc_no, user_name, saved_at, change_meta, changes)"
+                        + " VALUES (?,?,?,GETDATE(),?,?)",
+                def.code(), def.name(), user, toJson(meta), toJson(changes));
+    }
+
+    /** 行的可读标识:优先「编号/名称/类别」类字段取前两个非空值(如「折叠棉 YJ-YCYX-006」),退回首列值 */
+    private String archiveRowSample(PanelRegistry.PanelDef def, Map<String, ?> row) {
+        List<String> picks = new ArrayList<>();
+        for (PanelRegistry.FieldDef f : def.fields()) {
+            String label = f.label() == null ? "" : f.label();
+            if (!(label.contains("编号") || label.contains("名称") || label.contains("类别"))) continue;
+            String v = nv(row.get(label));
+            if (v.isEmpty()) continue;
+            picks.add(v);
+            if (picks.size() >= 2) break;
+        }
+        if (picks.isEmpty()) {
+            for (PanelRegistry.FieldDef f : def.fields()) {
+                String v = nv(row.get(f.label()));
+                if (!v.isEmpty()) { picks.add(v); break; }
+            }
+        }
+        return picks.isEmpty() ? "(空行)" : String.join(" ", picks);
+    }
+
+    /** 档案式面板修改记录:近 3 条存档留痕(库内全量保留不删) */
+    private Map<String, Object> archiveChangeHistory(PanelRegistry.PanelDef def) {
+        List<Map<String, Object>> records = jdbc.queryForList(
+                "SELECT TOP 3 user_name, saved_at, changes, change_meta FROM yj_archive_change_log"
+                        + " WHERE panel_code=? ORDER BY id DESC", def.code());
+        List<Map<String, Object>> list = new ArrayList<>();
+        for (Map<String, Object> r : records) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("applyBy", pickCol(r, "user_name"));
+            m.put("applyAt", fmtTime(pickCol(r, "saved_at")));
+            m.put("changes", pickCol(r, "changes"));
+            m.put("changeMeta", pickCol(r, "change_meta"));
+            list.add(m);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("编号", def.name());
+        out.put("records", list);
+        return out;
+    }
+
+    /** 结果集取值:列名大小写/别名兜底(驱动回传的键名不一定与 SQL 字面一致) */
+    private static Object pickCol(Map<String, Object> row, String key) {
+        if (row == null || key == null) return null;
+        if (row.containsKey(key)) return row.get(key);
+        for (Map.Entry<String, Object> e : row.entrySet())
+            if (e.getKey() != null && e.getKey().equalsIgnoreCase(key)) return e.getValue();
+        return null;
+    }
+
+    /** 留痕用文本:null/空 -> "" */
+    private static String nv(Object o) {
+        String s = str(o);
+        return s == null ? "" : s;
     }
 
     /** 修改记录:展示最近3条(库内全量留痕不删,2026-09-12);打开即刷新未收尾记录的 diff */

@@ -281,6 +281,16 @@ export default {
     '输入关键字过滤本页数据': 'Type a keyword to filter this page',
     '本页无匹配行': 'No matching row on this page',
     '其他页签命中': 'Other tabs',
+    // ---- 模糊搜索 + 修改记录(2026-09-22:与立项申请同义的查找与本表留痕) ----
+    '未找到匹配行': 'No matching row',
+    '（清单仅显示前 {m} 行）': ' (list shows only the first {m} rows)',
+    '次保存': 'th save',
+    '操作人': 'Operator',
+    '行变化': 'Row changes',
+    '本次保存未变更字段值': 'No field value changed in this save',
+    '字段变化过多，仅显示前 80 条': 'Too many field changes; only the first 80 are shown',
+    '按字段+内容多条件查找(可跨页签,点结果跳到该行)': 'Find by field + content (multiple conditions AND, across tabs; click a result to jump to that row)',
+    '查看本表的修改记录(每次保存留痕,近 3 次)': 'View this table\'s change log (one entry per save, latest 3)',
     '暂收退料单': 'Temporary Receipt Return',
     '生产异常分析报告': 'Production Abnormality Analysis Report',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

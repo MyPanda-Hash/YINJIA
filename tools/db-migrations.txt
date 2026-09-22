@@ -826,3 +826,16 @@ migrate-qc-insp-req.sql
 #      增「检验数据记录」区(点批次查报告/查阅详细/带料号跳新增)。
 #   验证:tools/archive/_probe-qc-insp-rec/(接口+纸面+填写保存落库+跳转预填,连跑 3 次全过)。
 migrate-qc-insp-record.sql
+
+# —— 2026-09-22 档案式面板「修改记录」留痕表(用户口径:要与立项申请同义可查) ——
+#   来料检验要求(QC_INSP_REQ)是档案式整表面板,没有「申请修改→审批→再归档」闭环,
+#   但同样是多人维护的全局资料,故另立 yj_archive_change_log:每次存档(saveArchive 整表 upsert)
+#   记一条 —— 谁(user_name)/何时(saved_at)/新增·删除·修改几行(change_meta JSON)/
+#   字段级 原值→新值(changes JSON,kind=变化|补充|清空);库内全量保留,面板「修改记录」展示近 3 条。
+#   **为什么不复用 yj_doc_modify_log**:那张表是文书闭环的快照表(snapshot_head/snapshot_rows +
+#   rearchive_by IS NULL 判「未收尾」),混用会让归档面板的普通保存被当成"未收尾修改"。
+#   配套代码(同提交):ButtonService.saveArchive 保存前后比对写日志(无变化不写,字段级最多 80 条)
+#   + 「修改记录」按钮按 def.isDoc() 分流到 archiveChangeHistory;前端 QcInspReqSheet 第二行工具钮
+#   「模糊搜索/修改记录」(模糊搜索为纯前端:字段+内容多条件 AND、跨页签、点结果跳行高亮)。
+#   自检:表/索引/表注释/7 个列注释齐备;幂等可重跑(已存在不重建)。
+migrate-archive-change-log.sql

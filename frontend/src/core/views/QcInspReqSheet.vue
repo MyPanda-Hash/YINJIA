@@ -23,6 +23,55 @@
       <span class="qc-bar-btn" :title="tt('重新加载数据')" @click="reload">↻ {{ tt('刷新') }}</span>
       <span class="qc-bar-btn primary" :title="tt('保存整表(缺席行视为删除)')" @click="emit('save')">{{ tt('保存') }}</span>
     </div>
+    <!-- 第二行(2026-09-22):与立项申请同义的「模糊搜索」+ 本表「修改记录」(每次保存留痕) -->
+    <div class="qc-bar qc-bar2">
+      <span class="qc-bar-btn" :title="tt('按字段+内容多条件查找(可跨页签,点结果跳到该行)')" @click="toggleFuzzy">🔍 {{ tt('模糊搜索') }}</span>
+      <span class="qc-bar-btn" :title="tt('查看本表的修改记录(每次保存留痕,近 3 次)')" @click="openModifyLog">🕘 {{ tt('修改记录') }}</span>
+    </div>
+
+    <!-- 模糊搜索态:字段+内容条件行 → 查找 → 结果清单(点行跳到对应页签并高亮) -->
+    <div v-if="fuzzyOpen" class="fuzzy-panel">
+      <div class="fuzzy-head">
+        <span>{{ tt('模糊搜索') }}</span>
+        <span class="fuzzy-back" :title="tt('返回')" @click="closeFuzzy">↩</span>
+      </div>
+      <div v-for="(row, fi) in fuzzyRows" :key="'fz' + fi" class="fuzzy-row">
+        <el-select v-model="row.field" size="small" filterable class="fuzzy-field" :placeholder="tt('字段')">
+          <el-option value="" :label="tt('全部字段')" />
+          <el-option-group v-for="g in fuzzyFieldGroups" :key="g.label" :label="g.label">
+            <el-option v-for="o in g.options" :key="o.value" :label="o.label" :value="o.value" />
+          </el-option-group>
+        </el-select>
+        <el-input
+          v-model="row.value"
+          size="small"
+          class="fuzzy-value"
+          :placeholder="tt('内容')"
+          @keyup.enter="runFuzzySearch"
+        />
+        <span class="fuzzy-del" :title="tt('删除该条件')" @click="removeFuzzyRow(fi)">×</span>
+      </div>
+      <div class="fuzzy-btns">
+        <span class="qc-bar-btn" @click="addFuzzyRow">{{ tt('添加条件') }}</span>
+        <span class="qc-bar-btn primary" @click="runFuzzySearch">{{ tt('查找') }}</span>
+      </div>
+      <div v-if="fuzzySearched" class="fuzzy-result">
+        <div class="fuzzy-result-head">
+          {{ tt('结果') }}：{{ fuzzyResults.length }} {{ tt('行') }}
+          <span v-if="fuzzyResults.length > FUZZY_SHOW">{{ tt('（清单仅显示前 {m} 行）').replace('{m}', String(FUZZY_SHOW)) }}</span>
+        </div>
+        <div
+          v-for="(r, ri) in fuzzyResults.slice(0, FUZZY_SHOW)"
+          :key="'fr' + ri"
+          class="fuzzy-result-row"
+          @click="openFuzzyResult(r)"
+        >
+          <span class="fz-no">{{ tt(r.tabKey) }} · {{ r.no }}</span>
+          <span class="fz-meta">{{ r.hit }}</span>
+        </div>
+        <div v-if="!fuzzyResults.length" class="fuzzy-empty">{{ tt('未找到匹配行') }}</div>
+      </div>
+    </div>
 
     <!-- 页签条(规格书式) -->
     <div class="rsp-pages">
@@ -64,7 +113,7 @@
           </tr>
           <!-- 数据行:值列全部文本(±公差/区间是文本),物料类别由页签隐式携带不显示。
                只读态=纯文本;仅「修改」过的那一行(或刚新增的行)渲染输入框 -->
-          <tr v-for="(row, i) in rowsOf(tab)" :key="row.id ?? ('new' + i)">
+          <tr v-for="(row, i) in rowsOf(tab)" :key="row.id ?? ('new' + i)" :class="{ 'qc-flash': isFlash(row) }">
             <td v-for="c in tab.cols" :key="c.key" class="rs-td">
               <el-input
                 v-if="editable && isEditing(row)"
@@ -89,13 +138,53 @@
       </table>
       <div v-if="editable" class="rs-add" :style="{ width: gridW(tab) + 'px' }" @click="addRow(tab)">＋ {{ tt('新增数据记录行') }}</div>
     </div>
+
+    <!-- 修改记录(2026-09-22):每次保存留痕——操作人/时间 + 行变化摘要 + 字段级 原值→新值(近 3 次) -->
+    <el-dialog v-model="modLogVisible" :title="tt('修改记录') + (modLogNo ? ' · ' + modLogNo : '')" width="760px" append-to-body>
+      <div v-if="modLogLoading" class="mod-log-empty">{{ tt('查询中…') }}</div>
+      <div v-else-if="!modLogRecords.length" class="mod-log-empty">{{ tt('暂无修改记录') }}</div>
+      <div v-else class="mod-log-list">
+        <div v-for="(r, ri) in modLogRecords" :key="'ml' + ri" class="mod-log-card">
+          <div class="mod-log-head">
+            <span class="mod-log-seq">{{ tt('第') }} {{ modLogRecords.length - ri }} {{ tt('次保存') }}</span>
+            <span>{{ tt('操作人') }}：{{ r.applyBy || '-' }} {{ r.applyAt || '' }}</span>
+          </div>
+          <table v-if="(r.changes || []).length" class="mod-log-table">
+            <thead>
+              <tr>
+                <th style="width: 70px">{{ tt('类型') }}</th>
+                <th style="width: 260px">{{ tt('字段') }}</th>
+                <th>{{ tt('原内容') }}</th>
+                <th>{{ tt('新内容') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(c, ci) in r.changes" :key="ci">
+                <td><span class="mod-kind" :class="String(c.kind)">{{ tt(String(c.kind)) }}</span></td>
+                <td>{{ c.label }}</td>
+                <td class="mod-old">{{ c.old || '—' }}</td>
+                <td class="mod-new">{{ c.new || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-else class="mod-log-nodata">{{ tt('本次保存未变更字段值') }}</div>
+          <div v-if="r.changeMeta && (r.changeMeta.addedRows || r.changeMeta.removedRows || r.changeMeta.changedRows)" class="mod-log-meta">
+            {{ tt('行变化') }}：{{ tt('新增') }} {{ r.changeMeta.addedRows || 0 }} {{ tt('行') }} / {{ tt('删除') }} {{ r.changeMeta.removedRows || 0 }} {{ tt('行') }} / {{ tt('修改') }} {{ r.changeMeta.changedRows || 0 }} {{ tt('行') }}
+            <span v-if="(r.changeMeta.addedSamples || []).length">（{{ tt('新增') }}：{{ r.changeMeta.addedSamples.join('、') }}）</span>
+            <span v-if="(r.changeMeta.removedSamples || []).length">（{{ tt('删除') }}：{{ r.changeMeta.removedSamples.join('、') }}）</span>
+            <span v-if="r.changeMeta.truncated">（{{ tt('字段变化过多，仅显示前 80 条') }}）</span>
+          </div>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { computed, ref, toRaw, watch } from 'vue'
+import { computed, nextTick, ref, toRaw, watch } from 'vue'
 import { tt } from '@/i18n'
-import { ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { callButton, errMsg } from '@/business/engine'
 import { qcInspReqTabs } from './qcInspReqConfig'
 
 const props = defineProps({
@@ -135,6 +224,11 @@ function startEdit(row) {
 }
 function endEdit() {
   editRow.value = null
+}
+/** 模糊搜索跳转后的高亮行(同样两侧取 raw 比) */
+const flashRow = ref(null)
+function isFlash(row) {
+  return flashRow.value !== null && toRaw(row) === toRaw(flashRow.value)
 }
 /** 页签行集:按物料类别过滤;id 升序对齐 Excel 原序(服务端返回 id 倒序),新行殿后 */
 function tabRows(t) {
@@ -199,6 +293,94 @@ async function reload() {
   emit('refresh')
 }
 
+// ── 模糊搜索(同立项申请那套:字段+内容多条件 AND,可跨页签)→ 点结果跳到该行并高亮 ──
+const FUZZY_SHOW = 50
+const fuzzyOpen = ref(false)
+const fuzzySearched = ref(false)
+const fuzzyRows = ref([{ field: '', value: '' }])
+/** 条件字段下拉:按页签分组列全部叶子列(同一列出现在多个页签时各自成项,匹配跨页签生效) */
+const fuzzyFieldGroups = computed(() => tabs.map((t) => ({
+  label: t.key,
+  options: t.cols.map((c) => ({ value: c.key, label: c.key })),
+})))
+function toggleFuzzy() {
+  fuzzyOpen.value = !fuzzyOpen.value
+  if (!fuzzyOpen.value) fuzzySearched.value = false
+}
+function closeFuzzy() {
+  fuzzyOpen.value = false
+  fuzzySearched.value = false
+}
+function addFuzzyRow() {
+  fuzzyRows.value.push({ field: '', value: '' })
+}
+function removeFuzzyRow(i) {
+  fuzzyRows.value.splice(i, 1)
+  if (!fuzzyRows.value.length) addFuzzyRow()
+}
+/** 查找=置标记,结果由 fuzzyResults 计算属性即时算(与立项申请同款:改条件要重新点查找) */
+function runFuzzySearch() {
+  fuzzySearched.value = true
+}
+/** 结果行集:每个条件都要命中(字段空=该页签任意列),命中列与值一并带出便于核对 */
+const fuzzyResults = computed(() => {
+  if (!fuzzySearched.value) return []
+  const conds = fuzzyRows.value.map((r) => ({ field: r.field || '', value: String(r.value || '').trim().toLowerCase() })).filter((c) => c.value)
+  if (!conds.length) return []
+  const out = []
+  tabs.forEach((t, ti) => {
+    for (const row of tabRows(t)) {
+      const hits = []
+      let ok = true
+      for (const c of conds) {
+        const cols = c.field ? [c.field] : t.cols.map((x) => x.key)
+        const hitCol = cols.find((k) => String(row[k] ?? '').toLowerCase().includes(c.value))
+        if (!hitCol) { ok = false; break }
+        hits.push(`${hitCol}=${String(row[hitCol] ?? '').trim()}`)
+      }
+      if (ok) out.push({ tabIndex: ti, tabKey: t.key, row, no: row[t.cols[0].key] || row['物料编号'] || '#' + (row.id ?? ''), hit: hits.join('；') })
+    }
+  })
+  return out
+})
+function openFuzzyResult(r) {
+  activeTab.value = r.tabIndex
+  flashRow.value = toRaw(r.row)
+  nextTick(() => {
+    const el = document.querySelector('.qc-insp-sheet .qc-flash')
+    if (el && el.scrollIntoView) el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  })
+  setTimeout(() => { flashRow.value = null }, 2600)
+}
+
+// ── 修改记录(本表每次保存留痕:操作人/时间 + 行变化摘要 + 字段级变化) ──
+const modLogVisible = ref(false)
+const modLogLoading = ref(false)
+const modLogRecords = ref([])
+const modLogNo = ref('')
+async function openModifyLog() {
+  const no = props.head?.['编号'] || props.head?.['单据编号'] || ''
+  modLogVisible.value = true
+  modLogLoading.value = true
+  try {
+    const res = await callButton({ panelCode: props.panelCode, buttonName: '修改记录', formData: { 编号: no }, buttonParam: {} })
+    modLogNo.value = res?.编号 || no
+    modLogRecords.value = (res?.records || []).map((r) => ({
+      ...r,
+      changes: typeof r.changes === 'string' ? (safeParseJson(r.changes) || []) : (r.changes || []),
+      changeMeta: typeof r.changeMeta === 'string' ? (safeParseJson(r.changeMeta) || {}) : (r.changeMeta || {}),
+    }))
+  } catch (e) {
+    modLogRecords.value = []
+    ElMessage.error(errMsg(e) || tt('查询失败'))
+  } finally {
+    modLogLoading.value = false
+  }
+}
+function safeParseJson(s) {
+  try { return JSON.parse(s) } catch { return null }
+}
+
 // ── 表头(同 RecordSheetPanels 两行分组表头算法,配置源=页签 cols) ──
 function groupCols(t) {
   return t.cols.filter((c) => c.group)
@@ -260,6 +442,196 @@ function gridW(t) {
 }
 .qc-bar-btn.primary:hover {
   background: #2a63a5;
+}
+
+/* ── 第二行工具钮(模糊搜索/修改记录),与第一行同款按钮 ── */
+.qc-bar2 {
+  justify-content: flex-end;
+  padding-bottom: 6px;
+}
+
+/* ── 模糊搜索(同 PanelxList 立项申请那套版式) ── */
+.fuzzy-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  margin: 0 0 8px;
+  border: 1px solid #dbe6f3;
+  border-radius: 6px;
+  background: #f8fbff;
+}
+.fuzzy-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 600;
+  color: #303133;
+  padding: 0 2px 2px;
+}
+.fuzzy-back {
+  cursor: pointer;
+  color: #909399;
+  font-size: 13px;
+}
+.fuzzy-back:hover {
+  color: #409eff;
+}
+.fuzzy-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.fuzzy-field {
+  width: 130px;
+  flex: none;
+}
+.fuzzy-value {
+  flex: 1;
+  min-width: 0;
+}
+.fuzzy-del {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  cursor: pointer;
+  color: #c0c4cc;
+  font-size: 14px;
+  line-height: 1;
+}
+.fuzzy-del:hover {
+  color: #f56c6c;
+}
+.fuzzy-btns {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.fuzzy-result {
+  margin-top: 4px;
+  border-top: 1px dashed #e4e7ed;
+  padding-top: 6px;
+  max-height: 320px;
+  overflow: auto;
+}
+.fuzzy-result-head {
+  font-size: 12px;
+  color: #606266;
+  margin-bottom: 4px;
+}
+.fuzzy-result-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 3px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.fuzzy-result-row:hover {
+  background: #eef6ff;
+}
+.fz-no {
+  color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.fz-meta {
+  color: #909399;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.fuzzy-empty {
+  font-size: 12px;
+  color: #909399;
+  padding: 4px;
+}
+/* 模糊搜索结果跳过来的那一行:短暂高亮(2.6s 后自动褪去) */
+.qc-flash > td {
+  background: #fff8dc !important;
+  transition: background 0.6s ease;
+}
+
+/* ── 修改记录弹窗(同 PanelxList 版式) ── */
+.mod-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 60vh;
+  overflow: auto;
+}
+.mod-log-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.mod-log-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+.mod-log-seq {
+  font-weight: 600;
+  color: #374151;
+}
+.mod-log-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+.mod-log-table th,
+.mod-log-table td {
+  border: 1px solid #e5e7eb;
+  padding: 4px 8px;
+  text-align: left;
+  vertical-align: top;
+  word-break: break-all;
+}
+.mod-log-table th {
+  background: #f3f4f6;
+  font-weight: 500;
+}
+.mod-old {
+  color: #9ca3af;
+}
+.mod-new {
+  color: #111827;
+}
+.mod-kind {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  line-height: 18px;
+}
+.mod-kind.变化 {
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+.mod-kind.补充 {
+  color: #047857;
+  background: #ecfdf5;
+}
+.mod-kind.清空 {
+  color: #b45309;
+  background: #fffbeb;
+}
+.mod-log-meta {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #6b7280;
+}
+.mod-log-empty,
+.mod-log-nodata {
+  font-size: 12.5px;
+  color: #9ca3af;
+  padding: 6px 0;
 }
 
 /* ── 页签条(规格书式,同 RecordSheetPanels rsp-pages) ── */
