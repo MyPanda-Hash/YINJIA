@@ -156,3 +156,14 @@ test('密级默认不得覆盖用户已选值(仅空时填)', () => {
   applyDocDefaults('RD_APPROVAL', form, USER, { isNew: true, today: T })
   assert.equal(form['密级'], '内部', '已有值不应被默认值覆盖')
 })
+
+/**
+ * 2026-09-22:项目进度查询(控制列表)纸面右上印的是「密级=绝密 / 适用范围=工程技术中心」
+ * (设计 P2/Q2、P3/Q3)。适用范围早就带了默认值,密级漏了 ⇒ 补上。
+ */
+test('项目进度查询:密级默认「绝密」+ 适用范围默认「工程技术中心」', () => {
+  const form = {}
+  applyDocDefaults('RD_PROGRESS', form, USER, { isNew: true, today: T })
+  assert.equal(form['密级'], '绝密', '设计 P2/Q2 印的是绝密')
+  assert.equal(form['文件使用范围'], '工程技术中心', '设计 P3/Q3 印的是工程技术中心')
+})

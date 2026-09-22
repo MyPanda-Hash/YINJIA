@@ -43,7 +43,9 @@
           </span>
         </div>
         <div class="ps-info-row">
-          <span class="ps-info-label">{{ tt('文件使用范围') }}</span>
+          <!-- 显示名照设计(P3 是「适用范围」);下方 v-model/字典仍用字段 label「文件使用范围」——
+               数据键不能改(ADR-0001 数据键永久不变),两者分叉只影响显示 -->
+          <span class="ps-info-label">{{ tt('适用范围') }}</span>
           <span class="ps-info-value">
             <el-select
               v-if="editable"
@@ -61,8 +63,8 @@
       </div>
     </div>
 
-    <!-- ③ 项目定级原则说明段(打印/导出保留,原图固定文本) -->
-    <div class="ps-principle">{{ tt('项目定级原则') }}：1. 二级项目=形成B级客户或该产品一年内有望给经济收益、对应技术产品有重大推广价值、部分对客户新品有重大影响的项目；2. 三级项目=针对小批量订单或客户有较大需求、能够为下一年下半年带来显著收益的项目；3. 四级项目=单机项目（型试验单）。</div>
+    <!-- ③ 项目定级原则说明段(打印/导出保留,原文照设计 B4 逐字照录) -->
+    <div class="ps-principle">{{ tt('项目定级原则') }}：1.二级项目-开发性项目　2.三级项目-A级或B级客户/近期（一年内）可能有重要经济效益；　3.四级项目-简单应对（检测/打样）</div>
 
     <!-- ⑤ 主从控制表 -->
     <div class="ps-scroll">
@@ -73,15 +75,11 @@
             <th class="c-name">{{ tt('项目名称') }}</th>
             <th class="c-sub">{{ tt('子项目/尺寸') }}</th>
             <th class="c-remark">{{ tt('项目编号') }}</th>
-            <th class="c-complex">{{ tt('开发复杂度') }}</th>
-            <th class="c-degree">{{ tt('重要程度') }}</th>
-            <th class="c-urgency">{{ tt('紧急程度') }}</th>
             <th class="c-content">{{ tt('内容') }}</th>
             <th class="c-grade">{{ tt('项目发起人') }}</th>
             <th class="c-owner">{{ tt('项目负责人') }}</th>
             <th class="c-progress">{{ tt('立项日期') }}</th>
             <th class="c-mile">{{ tt('预计完成日期') }}</th>
-            <th class="c-change">{{ tt('项目定及变更') }}</th>
             <th class="c-status">{{ tt('状态') }}</th>
             <th class="c-tester">{{ tt('测试情况') }}</th>
             <th class="c-approve">{{ tt('技术目标达成') }}</th>
@@ -136,19 +134,6 @@
                 <span v-else class="ps-cell-text">{{ row[K['项目编号']] || '' }}</span>
               </template>
             </td>
-            <!-- 2026-09-18 设计新增 4 列(开发复杂度/重要程度/紧急程度/项目定及变更)-->
-            <td class="c-complex">
-              <el-input v-if="editable" v-model="row[K['开发复杂度']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row[K['开发复杂度']] || '' }}</span>
-            </td>
-            <td class="c-degree">
-              <el-input v-if="editable" v-model="row[K['重要程度']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row[K['重要程度']] || '' }}</span>
-            </td>
-            <td class="c-urgency">
-              <el-input v-if="editable" v-model="row[K['紧急程度']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row[K['紧急程度']] || '' }}</span>
-            </td>
             <td class="c-content">
               <el-input v-if="editable" v-model="row[K['内容']]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row[K['内容']] || '' }}</span>
@@ -169,11 +154,7 @@
               <el-input v-if="editable" v-model="row[K['预计完成日期']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row[K['预计完成日期']] || '' }}</span>
             </td>
-            <!-- 项目定及变更(设计 O 列原始语义:手填的状态/变更说明,与派生只读的「状态」列不同)-->
-            <td class="c-change">
-              <el-input v-if="editable" v-model="row[K['项目定及变更']]" type="textarea" :autosize="{ minRows: 1, maxRows: 5 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row[K['项目定及变更']] || '' }}</span>
-            </td>
+            <!-- 2026-09-22:「项目定及变更」不上控制列表(用户口径,14 列);物理列与数据保留 -->
             <td class="c-status">
               <!-- 状态=按实施计划阶段自动派生(只读):点它看阶段计划与完成情况 -->
               <span
@@ -207,7 +188,7 @@
             </td>
           </tr>
           <tr v-if="!items.length">
-            <td :colspan="editable ? 19 : 18" class="ps-empty">{{ tt('暂无子项目，点击下方按钮新增') }}</td>
+            <td :colspan="editable ? 15 : 14" class="ps-empty">{{ tt('暂无子项目，点击下方按钮新增') }}</td>
           </tr>
         </tbody>
       </table>
@@ -215,7 +196,7 @@
         <div class="ps-add" @click="openAddProject">＋ {{ tt('新增项目') }}</div>
         <div class="ps-add" @click="syncStageProgress">⟳ {{ tt('同步阶段进度') }}</div>
         <div class="ps-add" @click="pickImportFile">⬆ {{ tt('导入Excel') }}</div>
-        <span class="ps-addbar-tip">{{ tt('导入Excel列与面板一致（项目定级/项目名称/子项目尺寸/项目编号/开发复杂度/重要程度/紧急程度/内容/项目发起人/项目负责人/立项日期/预计完成日期/项目定及变更/状态/测试情况/技术目标达成/是否市场转化/未转换原因），导入后自动追加子项目行，请保存入库。') }}</span>
+        <span class="ps-addbar-tip">{{ tt('导入Excel列与面板一致（项目定级/项目名称/子项目尺寸/项目编号/内容/项目发起人/项目负责人/立项日期/预计完成日期/状态/测试情况/技术目标达成/是否市场转化/未转换原因），导入后自动追加子项目行，请保存入库。') }}</span>
         <input ref="fileRef" type="file" accept=".xlsx,.xls" style="display: none" @change="importExcelFile" />
       </div>
     </div>

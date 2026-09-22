@@ -94,7 +94,7 @@ localStorage.setItem('mes_login_date','2026-09-22'); 'ok'`)
       })()`)
       await sleep(2500)
       const info = await evaluate(`(() => {
-        const sheet = document.querySelector('.approval-sheet') || document.querySelector('.rsp-sheet') || document.querySelector('.body')
+        const sheet = document.querySelector('.approval-sheet') || document.querySelector('.rsp-sheet') || document.querySelector('.ps-table') || document.querySelector('.body')
         const errs = [...document.querySelectorAll('.el-message--error')].map(e => e.textContent.trim())
         const txt = sheet ? sheet.innerText.replace(/\\s+/g,' ') : ''
         const remark = document.querySelector('.as-remark')
@@ -105,12 +105,18 @@ localStorage.setItem('mes_login_date','2026-09-22'); 'ok'`)
           h: Math.round(r.getBoundingClientRect().height),
           second: !!r.querySelector('.as-second'),
         }))
+        // 控制列表面板(ProgressControlSheet):表头格文字 + 原则说明段
+        const psTh = [...document.querySelectorAll('.ps-table thead th')].map(e => e.textContent.trim()).filter(Boolean)
+        const psTd = [...document.querySelectorAll('.ps-table tbody tr:first-child td')].length
+        const principle = ((document.querySelector('.ps-principle')||{}).textContent || '').replace(/\\s+/g,' ').trim()
+        const infoLabels = [...document.querySelectorAll('.ps-info-label')].map(e => e.textContent.trim())
         return {
           hasSheet: !!sheet, errs, clicked: ${JSON.stringify(clicked)},
           titleText: txt.slice(0, 120),
           hasRemarkCol: !!remark, hasRemarkInput: !!remarkInput,
           signLabels: [...document.querySelectorAll('.as-sign-cell, .q-signitem-label, .as-sign-pair')].map(e=>e.textContent.trim()).slice(0,6),
           rows: rows.slice(0, 12),
+          psTh, psTd, principle, infoLabels,
           companyCell: (document.querySelector('.rs-company-cell')||{}).textContent || '',
           docnoCell: (document.querySelector('.rs-docno')||{}).textContent || '',
           docnoColspan: (() => { const td = document.querySelector('.rs-docno'); return td ? td.getAttribute('colspan') : null })(),

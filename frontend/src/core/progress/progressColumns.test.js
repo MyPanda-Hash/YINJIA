@@ -9,14 +9,24 @@ import {
   readCell,
 } from './progressColumns.js'
 
-/** 设计原表(B5:S5)的 18 个表头,顺序即列序 —— 回归基线 */
+/**
+ * 控制列表的列序基线 —— 回归基线。
+ *
+ * 2026-09-22 用户口径(拿设计截图确认):控制列表是 **14 列**。
+ * 设计文件 `二三级四级项目控制表2026.xlsx` 的表头行是 18 格,多出的 4 格为:
+ *   开发复杂度 / 重要程度 / 紧急程度 —— 每行都填着占位符 `n n n`(从未有真实数据;
+ *     三列物理列由 migrate-rd-progress-18cols.sql 新增,无旧列对应)
+ *   项目定及变更 —— 18cols 迁移为承接「设计 O 列(状态)的手填说明」而建;用户确认不上控制列表
+ *     (物理列与已回填的数据都保留,只是不占纸面)
+ */
 const DESIGN_LABELS = [
-  '项目定级', '项目名称', '子项目/尺寸', '项目编号',
-  '开发复杂度', '重要程度', '紧急程度', '内容',
-  '项目发起人', '项目负责人', '立项日期', '预计完成日期',
-  '项目定及变更', '状态', '测试情况',
-  '技术目标达成', '是否市场转化', '未转换原因',
+  '项目定级', '项目名称', '子项目/尺寸', '项目编号', '内容',
+  '项目发起人', '项目负责人', '立项日期', '预计完成日期', '状态',
+  '测试情况', '技术目标达成', '是否市场转化', '未转换原因',
 ]
+
+/** 不上控制列表、但保留在明细元数据里的列(不参与纸面,数据不删) */
+const OFF_SHEET_LABELS = ['开发复杂度', '重要程度', '紧急程度', '项目定及变更']
 
 /**
  * 这条断言守的是 2026-09-10 那个 bug:
@@ -30,10 +40,17 @@ test('每个可落库列的 key 必须存在于 RD_PROGRESS 明细元数据列�
   assert.deepEqual(bad, [], `以下列的落库键不在 rd_progress_detail / yj_field 里,保存会被丢弃:\n  ${bad.join('\n  ')}`)
 })
 
-test('列数固定为 18(设计原表 18 个表头),显示名与设计逐字一致且顺序相同', () => {
-  assert.equal(PROGRESS_COLUMNS.length, 18)
+test('列数固定为 14(用户 2026-09-22 口径),显示名与设计逐字一致且顺序相同', () => {
+  assert.equal(PROGRESS_COLUMNS.length, 14)
   assert.deepEqual(PROGRESS_COLUMNS.map((c) => c.label), DESIGN_LABELS)
-  assert.equal(new Set(PROGRESS_COLUMNS.map((c) => c.label)).size, 18)
+  assert.equal(new Set(PROGRESS_COLUMNS.map((c) => c.label)).size, 14)
+  // 那 4 列必须彻底不在控制列表里(否则又会多出列)
+  const onSheet = PROGRESS_COLUMNS.map((c) => c.label)
+  for (const off of OFF_SHEET_LABELS) {
+    assert.ok(!onSheet.includes(off), `${off} 不应出现在控制列表`)
+    // 但明细元数据列仍保留(数据不删,保存链/历史数据不受影响)
+    assert.ok(RD_PROGRESS_DETAIL_COLUMNS.includes(off), `${off} 应保留在明细元数据列里`)
+  }
 })
 
 /**
@@ -46,7 +63,7 @@ test('不再有 pendingAlign 列(3 列已全部真落库)', () => {
   assert.deepEqual(pending, [], `这些列又被标成"只显示不落库": ${pending.join(', ')}`)
 })
 
-test('明细元数据列包含设计 18 列 + 3 个内部列', () => {
+test('明细元数据列包含设计 14 列 + 4 个不上纸面的列 + 4 个内部列', () => {
   for (const label of DESIGN_LABELS) {
     // 每列都必须能经 K 映射找到落库键(即 key 在元数据列里)
     assert.ok(columnByLabel(label), `缺列定义: ${label}`)

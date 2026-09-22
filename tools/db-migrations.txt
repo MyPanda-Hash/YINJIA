@@ -853,3 +853,16 @@ migrate-rd-approval-remark-field.sql
 #   ⚠ 测试库为纯 no-op(18cols 从未在该库执行,13 个新列都不存在)—— 测试库落后于迁移链属既有缺陷,
 #     刷新方式见 docs/development/环境与数据库.md(make-test-db.ps1)。
 migrate-rd-progress-drop-orphan-cols.sql
+
+# —— 2026-09-22 项目进度查询控制列表定为 14 列(4 列不上纸面,只标 hidden 不动数据)——
+# migrate-rd-progress-offsheet-cols.sql —— 用户拿设计截图确认控制列表就是 14 列,而 18cols 迁移当初按
+#   设计文件表头行的 18 格建了 18 列,其中 4 格不上纸面:
+#     · 开发复杂度/重要程度/紧急程度 —— 设计里每行都填着占位符 `n n n`,从无真实数据;
+#     · 项目定及变更 —— 为承接「设计 O 列(状态)的手填说明」而建,用户确认不上控制列表。
+#   本脚本**只改元数据**:这 4 行的 yj_field.hidden 置 1(保留 visible=1),同步表注明写清
+#   「纸面 14 列 + 4 列保留不上纸面」。物理列与数据一律不动;前端纸面列由
+#   frontend/src/core/progress/progressColumns.js 的 PROGRESS_COLUMNS(14 项)决定,
+#   QueryService.selectCols 不过滤 hidden ⇒ 行模型键不变、保存链不丢值。
+#   正式库自检 ①②③④ = 4/4/14/9(hidden=0 只有 9 个是预期:14 列里有 5 个的数据键是退隐的旧列
+#   项目级/项目负责/实施进度/里程完成/测试员,控制列表仍读它们);测试库因从未跑 18cols 为 0/0/10/14。
+migrate-rd-progress-offsheet-cols.sql
