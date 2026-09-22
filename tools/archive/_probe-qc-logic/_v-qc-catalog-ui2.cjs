@@ -91,6 +91,17 @@ async function main() {
     // 物料名称(c-mat);若出现 c-batch/c-qty 等,说明该行整体左移(历史 bug)
     ok('无整行左移(行首格只可能是 类别/物料名称/编码)',
       (al.firstCellTags || []).every((c) => /c-cat|c-code|c-mat/.test(String(c))), JSON.stringify(al.firstCellTags))
+
+    // 「类别相同的归为一整个大类」:每个非空类别在纸面上只能出现一个合并块(块 = 一个 rowspan 单元格)
+    const blocks = await evaluate(`(() => {
+      const table = document.querySelector('.catalog-sheet .cs-table')
+      const cells = [...table.querySelectorAll('tbody td.c-cat')]
+      return JSON.stringify(cells.map(c => ({ cat: c.innerText.trim(), span: +c.getAttribute('rowspan') || 1 })))
+    })()`)
+    const bs = JSON.parse(blocks || '[]')
+    const cats = bs.map((b) => b.cat).filter((c) => c && c !== '—')
+    ok('每个类别只出现一个合并块(同类别已归为一个大类)', new Set(cats).size === cats.length,
+      `块=${JSON.stringify(bs)}`)
     ok('两个单号带查看/跳转链接', (snap?.links || 0) >= 2, `链接数=${snap?.links}`)
     ok('含物料编码/类别/数量示例数据', /折叠棉|YJ-YCYX|kg/.test(snap?.text || ''), (snap?.text || '').slice(0, 120).replace(/\n/g, '|'))
 

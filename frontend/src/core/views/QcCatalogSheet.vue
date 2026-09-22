@@ -30,7 +30,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, i) in items" :key="row.id ?? ('r' + i)">
+          <tr v-for="(row, i) in displayRows" :key="row.id ?? ('r' + i)">
             <!-- 检测物料类别(第1类):同类别合并;类别为空不归纳(单独成行) -->
             <td v-if="isGroupHead(i, K.CAT)" class="c-cat" :rowspan="groupSpan(i, K.CAT)">
               <span class="cs-cell-text cs-block">{{ row[K.CAT] || '—' }}</span>
@@ -87,7 +87,7 @@
               <span class="cs-act danger" :title="tt('删除该目录记录（需先删除挂靠的检验单与检验数据记录）')" @click.stop="doDelete(row)">✕</span>
             </td>
           </tr>
-          <tr v-if="!items.length">
+          <tr v-if="!displayRows.length">
             <td :colspan="catalogCols.length + 4" class="cs-empty">{{ tt('暂无检验记录，暂收单生单生成检验单后自动带入') }}</td>
           </tr>
         </tbody>
@@ -189,6 +189,25 @@ const items = computed(() => {
   return d && Array.isArray(d.items) ? d.items : []
 })
 
+/**
+ * 展示顺序(用户口径:类别相同的归为一整个大类):
+ * 按「检测物料类别」整块聚合 —— 同类别行不论原来分散在哪都收拢成连续一块(块内保持原顺序),
+ * 大类的先后 = 该类别首次出现的位置;类别为空的行不归纳,各自单独成行(在原位置附近输出)。
+ */
+const displayRows = computed(() => {
+  const rows = items.value || []
+  const out = []
+  const done = new Set()
+  for (const r of rows) {
+    const cat = r?.[K.CAT]
+    if (!cat) { out.push(r); continue }              // 空类别:各自成行
+    if (done.has(cat)) continue                      // 该类别的整块已在首次出现处输出
+    done.add(cat)
+    for (const x of rows) if (x?.[K.CAT] === cat) out.push(x)
+  }
+  return out
+})
+
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))
 function optionsOf(key) {
   const f = fieldMap.value.get(key)
@@ -201,17 +220,17 @@ const qualifiedOptions = computed(() => optionsOf(K.OK))
 
 /** 分组合并:检测物料类别(空值不归纳 —— 每行各自渲染单元格,避免与 groupSpan 不自洽导致整行错列) */
 function isGroupHead(i, key) {
-  const v = items.value[i]?.[key]
+  const v = displayRows.value[i]?.[key]
   if (!v) return true                 // 空类别:本行自成一行(必须渲染单元格)
   if (i <= 0) return true
-  return v !== items.value[i - 1]?.[key]
+  return v !== displayRows.value[i - 1]?.[key]
 }
 function groupSpan(i, key) {
   if (!isGroupHead(i, key)) return 0
-  const v = items.value[i]?.[key]
+  const v = displayRows.value[i]?.[key]
   if (!v) return 1
   let n = 1
-  while (i + n < items.value.length && items.value[i + n]?.[key] === v) n++
+  while (i + n < displayRows.value.length && displayRows.value[i + n]?.[key] === v) n++
   return n
 }
 /** 物料层:按「物料名称 + 物料编码」合并;两者皆空时每行自成一行(同空值不自洽会错列) */
@@ -220,16 +239,16 @@ function matKeyOf(row) {
 }
 function isMatHead(i) {
   if (i <= 0) return true
-  const k = matKeyOf(items.value[i])
+  const k = matKeyOf(displayRows.value[i])
   if (k === '|') return true
-  return k !== matKeyOf(items.value[i - 1])
+  return k !== matKeyOf(displayRows.value[i - 1])
 }
 function matSpan(i) {
   if (!isMatHead(i)) return 0
-  const k = matKeyOf(items.value[i])
+  const k = matKeyOf(displayRows.value[i])
   if (k === '|') return 1
   let n = 1
-  while (i + n < items.value.length && matKeyOf(items.value[i + n]) === k) n++
+  while (i + n < displayRows.value.length && matKeyOf(displayRows.value[i + n]) === k) n++
   return n
 }
 function colClass(key) {
@@ -374,7 +393,7 @@ async function reloadDoc() {
 /** 导出 Excel:标题 + 列头 + 全部目录行(与 qcCatalogColumns 同源) */
 async function exportCatalogExcel() {
   const XLSX = await import('xlsx')
-  const rows = items.value || []
+  const rows = displayRows.value || []   // 导出与纸面同序(类别整块聚合后的顺序)
   const title = '检验目录'
   const header = exportHeaderRow()
   const aoa = [[title], [], header, ...rows.map((r) => exportRow(r))]
