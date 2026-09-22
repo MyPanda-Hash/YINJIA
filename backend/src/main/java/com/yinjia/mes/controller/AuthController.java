@@ -28,12 +28,16 @@ public class AuthController {
     private final JwtUtil jwtUtil;
     private final PasswordEncoder encoder;
     private final UsageLogService usageLog;
+    /** 本服务器是否提供"测试账套"(yinjia.enable-test-ledger,默认开) */
+    private final boolean testLedgerEnabled;
 
-    public AuthController(JdbcTemplate jdbc, JwtUtil jwtUtil, PasswordEncoder encoder, UsageLogService usageLog) {
+    public AuthController(JdbcTemplate jdbc, JwtUtil jwtUtil, PasswordEncoder encoder, UsageLogService usageLog,
+                          @org.springframework.beans.factory.annotation.Value("${yinjia.enable-test-ledger:true}") boolean testLedgerEnabled) {
         this.jdbc = jdbc;
         this.jwtUtil = jwtUtil;
         this.encoder = encoder;
         this.usageLog = usageLog;
+        this.testLedgerEnabled = testLedgerEnabled;
     }
 
     @PostMapping("/login")
@@ -49,6 +53,11 @@ public class AuthController {
         //   必须在这里自己 use() + finally clear()(容器线程复用,不清会把下一次请求带进错误的库)。
         String factory = DataSourceRouter.TEST.equals(body.get("factory"))
                 ? DataSourceRouter.TEST : DataSourceRouter.PROD;
+        // 本服务器关掉了测试账套(没有 HSDZ_MES_TEST)时**提前拒绝**:否则会走到建连失败,
+        // 用户看到的是 "服务异常:Failed to obtain JDBC Connection"(2026-09-22 服务器实测)。
+        if (DataSourceRouter.TEST.equals(factory) && !testLedgerEnabled) {
+            throw new IllegalArgumentException("本服务器未启用测试账套(如需使用,请让运维在服务端打开 yinjia.enable-test-ledger)");
+        }
         DataSourceRouter.use(factory);
         try {
             List<Map<String, Object>> rows = jdbc.queryForList(

@@ -26,15 +26,19 @@ public class ShellController {
     private final QrBatchService qrBatch;
     private final String factoryName;
     private final String testFactoryName;
+    /** 本服务器是否提供"测试账套"(yinjia.enable-test-ledger,默认开)。见 factories() 注释。 */
+    private final boolean testLedgerEnabled;
 
     public ShellController(PanelRegistry registry, JdbcTemplate jdbc, QrBatchService qrBatch,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.factory-name:YINJIA-MES}") String factoryName,
-                           @org.springframework.beans.factory.annotation.Value("${yinjia.test-factory-name:YINJIA-MES·测试库}") String testFactoryName) {
+                           @org.springframework.beans.factory.annotation.Value("${yinjia.test-factory-name:YINJIA-MES·测试库}") String testFactoryName,
+                           @org.springframework.beans.factory.annotation.Value("${yinjia.enable-test-ledger:true}") boolean testLedgerEnabled) {
         this.registry = registry;
         this.jdbc = jdbc;
         this.qrBatch = qrBatch;
         this.factoryName = factoryName;
         this.testFactoryName = testFactoryName;
+        this.testLedgerEnabled = testLedgerEnabled;
     }
 
     /**
@@ -42,6 +46,10 @@ public class ShellController {
      * 显示名取配置(yinjia.factory-name / test-factory-name),与顶栏一致。
      * ⚠ 这里返回的 code 会随登录请求回传,后端据此决定这次登录查哪个库、并写进令牌声明 ——
      * 两个 code 必须与 DataSourceRouter.PROD / TEST 一致,改名要一起改。
+     *
+     * yinjia.enable-test-ledger=false(2026-09-22b 补):只返回正式账套 —— 服务器上并没有
+     * HSDZ_MES_TEST 这个库(两账套只在开发机),菜单里挂着"点了就 500 的选项"纯属坑人;
+     * 关掉后登录页与顶栏切换菜单都不再出现测试库。服务器打开方式见 deploy/部署说明.md §A4。
      */
     @GetMapping("/base/factory/list")
     public ApiResult<List<Map<String, Object>>> factories() {
@@ -50,10 +58,12 @@ public class ShellController {
         prod.put("code", DataSourceRouter.PROD);
         prod.put("name", factoryName);
         list.add(prod);
-        Map<String, Object> test = new HashMap<>();
-        test.put("code", DataSourceRouter.TEST);
-        test.put("name", testFactoryName);
-        list.add(test);
+        if (testLedgerEnabled) {
+            Map<String, Object> test = new HashMap<>();
+            test.put("code", DataSourceRouter.TEST);
+            test.put("name", testFactoryName);
+            list.add(test);
+        }
         return ApiResult.ok(list);
     }
 
