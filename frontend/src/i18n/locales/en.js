@@ -170,6 +170,7 @@ export default {
     '制程品质': 'Process Quality',
     '来料品质': 'Incoming Quality',
     '来料检验单': 'Incoming Inspection Sheet',
+    '检验目录': 'Inspection Catalog',
     '暂收退料单': 'Temporary Receipt Return',
     '生产异常分析报告': 'Production Abnormality Analysis Report',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

@@ -117,6 +117,7 @@ export default {
     '制程品质': 'Calidad de proceso',
     '来料品质': 'Calidad de entrada',
     '来料检验单': 'Hoja de inspección de entrada',
+    '检验目录': 'Catálogo de inspección',
     '暂收退料单': 'Devolución de mercancía temporal',
     '生产异常分析报告': 'Informe de Análisis de Anomalías de Producción',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

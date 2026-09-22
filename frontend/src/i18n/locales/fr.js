@@ -117,6 +117,7 @@ export default {
     '制程品质': 'Qualité processus',
     '来料品质': 'Qualité réception',
     '来料检验单': 'Fiche d\'inspection à réception',
+    '检验目录': 'Catalogue d\'inspection',
     '暂收退料单': 'Retour de réception provisoire',
     '生产异常分析报告': 'Rapport d\'Analyse d\'Anomalie de Production',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----

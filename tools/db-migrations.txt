@@ -767,3 +767,21 @@ migrate-qc-insp-tc-flow.sql
 #   验证:tools/archive/_verify-over-ratio.mjs(9 项全 PASS)+ 前端 node --test(138 项)
 #      + 回归 _verify-batch-target-void.mjs(全 PASS)。原始输出 _v-over-ratio-run3.txt。
 migrate-over-ratio-cap.sql
+
+# —— 2026-09-22 来料品质「检验目录」面板(QC_CATALOG,单单据) ——
+#   来源:《品质资料 2026.09.19.xlsx》「检验目录」页签,表格一比一落库:
+#   第1类 检测物料类别 → 第2类 物料名称 → 第3类 检验记录目录(批次号/数量/检验状态/是否合格);
+#   检验状态 = 正在检验中/已完成检验;是否合格 = 合格/不合格。
+#   方式:一比一对照「项目进度查询」(RD_PROGRESS)—— yj_panel doc 模式 + config {"singleDoc":true},
+#   全部检验批次记录进同一张目录单(JYML-2026-09-0001,前缀 JYML),表头只留单据身份字段
+#   (单据编号/单据日期/备注),业务数据全在明细行(与 rd_progress_detail 同构);永远草稿,
+#   不进 DOC_ARCHIVE_PANELS。查询位字段(检测物料类别/物料名称/批次号/检验状态/是否合格)
+#   落明细行,QueryService 头行式过滤自动走 EXISTS 行表。
+#   ① 头表 qc_catalog + 行表 qc_catalog_detail,两表及关键列带 MS_Description 中文注明;
+#   ② yj_panel:QC_CATALOG / 检验目录 / 单据 / doc / 前缀 JYML / 模块 品质管理 / singleDoc;
+#   ③ yj_field 14 行(query 5 + header 3 + detail 6,两下拉字典即原表两列取值);
+#   ④ 播种唯一目录单 + 原表示例两行(阻垢料/HP-12/260807/51Kg、260907)+ yj_doc_status 草稿行;
+#   ⑤ 译名:panel 检验目录 + field 检测物料类别/检验状态/是否合格(en manual,其余语言机翻兜底)。
+#   配套代码(同提交):前端 menus.js 品质管理 > 来料品质 挂入口 + 10 语言 locales 词条。
+#   菜单位置:品质管理 > 来料品质 > 检验目录。幂等可重跑(自检段输出面板/字段/目录单/行/译名)。
+migrate-qc-catalog.sql
