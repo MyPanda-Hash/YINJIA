@@ -256,8 +256,8 @@ export const menuTree = [
     children: [
       {
         // 来料品质(流程图·采购支线:检验;暂收入库单已下线,暂收角色由「库存核算·送料暂收单」承接)
-        // 特采单(2026-09-21)与「质量单据·特采申请单」是两份独立单据:来料特采走本入口(前缀 TCI),
-        // 同一张 YJ-QR-60 表单,独立面板 QC_TC_IN / 独立表 qc_tc_in。
+        // 特采单(2026-09-21):独立面板 QC_TC_IN / 独立表 qc_tc_in / 前缀 TCI,同一张 YJ-QR-60 表单。
+        // (2026-09-22:「质量单据·特采申请单」QC_TC 与它同表同版式、重复,已整体下线 → 特采只此一个入口。)
         code: 'incoming', title: '来料品质', children: [
           { code: 'qcInsp', title: '来料检验单', path: '/panelx/list/QC_INSP', icon: 'Search', panelCode: 'QC_INSP', operationName: '新增流程' },
           { code: 'qcTcIn', title: '特采单', path: '/panelx/list/QC_TC_IN', icon: 'DocumentAdd', panelCode: 'QC_TC_IN', operationName: '新增流程' },
@@ -283,11 +283,13 @@ export const menuTree = [
         ],
       },
       {
-        // 质量单据(YJ-QR 体系八表)
+        // 质量单据(YJ-QR 体系;2026-09-22 起为七表 —— 特采申请单已整体下线)
+        // 2026-09-22 下线:特采申请单(QC_TC)—— 与「来料品质·特采单」QC_TC_IN 同表同版式、重复,
+        // 按用户口径删的就是这一个。注意:面板与业务表 qc_tc 已整体删除(tools/migrate-qc-tc-drop.sql),
+        // 不是仅摘菜单,放开注释也恢复不了;特采单入口在 品质管理 > 来料品质 > 特采单。
         code: 'qcDoc', title: '质量单据', icon: 'DocumentChecked', children: [
           { code: 'qcNcrp', title: '不合格报告(制程)', path: '/panelx/list/QC_BHG', icon: 'CircleClose', panelCode: 'QC_BHG', operationName: '新增流程' },
           { code: 'qcNcdp', title: '不合格品处理单(制程)', path: '/panelx/list/QC_BHC', icon: 'Box', panelCode: 'QC_BHC', operationName: '新增流程' },
-          { code: 'qcTc', title: '特采申请单', path: '/panelx/list/QC_TC', icon: 'DocumentAdd', panelCode: 'QC_TC', operationName: '新增流程' },
           { code: 'qcNcdz', title: '不合格品处理单(自制物料)', path: '/panelx/list/QC_BHZ', icon: 'Files', panelCode: 'QC_BHZ', operationName: '新增流程' },
           { code: 'qcJjf', title: '紧急放行申请单', path: '/panelx/list/QC_JJF', icon: 'AlarmClock', panelCode: 'QC_JJF', operationName: '新增流程' },
           { code: 'qcScp', title: '试产材料使用申请单', path: '/panelx/list/QC_SCP', icon: 'DocumentChecked', panelCode: 'QC_SCP', operationName: '新增流程' },

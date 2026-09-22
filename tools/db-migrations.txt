@@ -694,3 +694,16 @@ migrate-qc-tc-in.sql
 #   否则查询弹窗下拉仍只出两值、与纸面不符。新面板 QC_TC_IN 建表即三值,不涉及。
 #   自检:tools/archive/_q-tc-final.sql(QC_TC 与 QC_TC_IN 字典应一致、均三值)。幂等。
 migrate-qc-tc-final-result.sql
+
+# —— 2026-09-22 质量单据「特采申请单」(QC_TC)整体下线 ——
+#   用户口径:两个特采单重复,去掉「质量单据」组那个;保留 品质管理 > 来料品质 >「特采单」
+#   (QC_TC_IN,独立表 qc_tc_in,前缀 TCI,与 YJ-QR-60 同一张版式)。
+#   删除范围:业务表 qc_tc(0 行)+ qc_tc_detail(0 行)、yj_panel 1 行、yj_field 23 行、
+#   s_allno 号池 lb='TC' 残留、状态/链路/权限/附件/审批/报表设置等挂账行(删前实测全 0)。
+#   刻意保留:yj_translation(panel, N'特采申请单') —— QC_TC_IN 建面板时复用它的 text。
+#   同步改动(缺一不可):migrate-qc-8sheets.sql 摘掉 QC_TC 的建表/面板行/23 字段行三段
+#   (该脚本每条语句都有 IF 守卫、重跑无副作用;不摘掉则未来重跑会把已删面板复活成孤儿行);
+#   前端 menus.js 摘菜单行、docSheetConfigs.js 删 qcSheetCfgs.QC_TC 版式键。
+#   历史保留:migrate-qc-tc-final-result.sql 不再单独维护(其 UPDATE 此后命中 0 行,幂等无害)。
+#   删前勘查留档:tools/archive/_q-tc-predrop.sql(行数/依赖/号池)、_q-tc-sweep.sql(全库 panel_code 扫描)。
+migrate-qc-tc-drop.sql

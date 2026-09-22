@@ -84,44 +84,12 @@ IF OBJECT_ID('qc_bhc_detail') IS NULL CREATE TABLE qc_bhc_detail (
   asp_time1 datetime2 NULL, asp_time2 datetime2 NULL
 );
 GO
--- ══ 3. 特采申请单 YJ-QR-60(qc_tc,前缀 TC) ══
-IF OBJECT_ID('qc_tc') IS NULL CREATE TABLE qc_tc (
-  id int IDENTITY(1,1) PRIMARY KEY,
-  [单据编号] nvarchar(60) NOT NULL,
-  [单据日期] nvarchar(20) NULL,
-  [文档编号] nvarchar(30) NOT NULL CONSTRAINT DF_qc_tc_docno DEFAULT N'YJ-QR-60',
-  [供应商] nvarchar(200) NULL,
-  [采购单号] nvarchar(60) NULL,
-  [产品名称] nvarchar(200) NULL,
-  [总数量] decimal(18,4) NULL,
-  [不合格品数量] decimal(18,4) NULL,
-  [不合格品比例] nvarchar(20) NULL,
-  [不良说明] nvarchar(1000) NULL,
-  [严重程度] nvarchar(20) NULL,
-  [特采理由] nvarchar(1000) NULL,
-  [产品开发部性能意见] nvarchar(500) NULL,
-  [产品开发部工艺意见] nvarchar(500) NULL,
-  [品质部意见] nvarchar(500) NULL,
-  [销售部意见] nvarchar(500) NULL,
-  [研发意见] nvarchar(500) NULL,
-  [最终处理结果] nvarchar(20) NULL,
-  [编制人] nvarchar(50) NULL,
-  [备注] nvarchar(500) NULL,
-  [单据状态] nvarchar(10) NOT NULL DEFAULT N'草稿',
-  [审核人] nvarchar(50) NULL,
-  [审核时间] nvarchar(30) NULL,
-  [审批人] nvarchar(50) NULL,
-  [审批时间] nvarchar(30) NULL,
-  asp_user1 nvarchar(50) NULL, asp_time1 datetime2 NULL, asp_user2 nvarchar(50) NULL, asp_time2 datetime2 NULL, asp_cancel char(1) NULL DEFAULT 'N'
-);
-ELSE IF COL_LENGTH('qc_tc','编制人') IS NULL ALTER TABLE qc_tc ADD [编制人] nvarchar(50) NULL;
-IF OBJECT_ID('qc_tc_detail') IS NULL CREATE TABLE qc_tc_detail (
-  id int IDENTITY(1,1) PRIMARY KEY,
-  [单据编号] nvarchar(60) NULL,
-  asp_cancel char(1) NULL DEFAULT 'N',
-  asp_user1 nvarchar(50) NULL, asp_user2 nvarchar(50) NULL,
-  asp_time1 datetime2 NULL, asp_time2 datetime2 NULL
-);
+-- ══ 3. 特采申请单 YJ-QR-60(qc_tc,前缀 TC)—— 2026-09-22 整体下线,本段已移除 ══
+-- 原第 3 段建 qc_tc / qc_tc_detail 两张表。该面板与「来料品质·特采单」(QC_TC_IN,
+-- 同一张 YJ-QR-60 版式、独立表 qc_tc_in、前缀 TCI)重复,按用户口径删除;
+-- 表与注册行的删除见 tools/migrate-qc-tc-drop.sql。
+-- 本脚本每条语句都有 IF 守卫、重跑无副作用,故把本段摘掉即可 —— 否则一旦重跑,
+-- 会把已删的 QC_TC 复活成僵尸面板(菜单与版式都已不存在,只剩库里的孤儿行)。
 GO
 -- ══ 4. 不合格品处理单(自制物料) YJ-QR-64(qc_bhz,前缀 BHZ) ══
 IF OBJECT_ID('qc_bhz') IS NULL CREATE TABLE qc_bhz (
@@ -300,7 +268,7 @@ GO
 -- ══ 9. 面板注册(doc 模式,品质管理分组;前缀已核对 s_allno/yj_panel 无冲突) ══
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'QC_BHG') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('QC_BHG', N'不合格报告(制程)', N'单据', 'doc', 'qc_bhg_detail', 'qc_bhg', N'单据编号', N'id', N'单据编号', N'BHG', N'单据日期', 20, 'items', N'品质管理');
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'QC_BHC') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('QC_BHC', N'不合格品处理单(制程)', N'单据', 'doc', 'qc_bhc_detail', 'qc_bhc', N'单据编号', N'id', N'单据编号', N'BHC', N'单据日期', 20, 'items', N'品质管理');
-IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'QC_TC') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('QC_TC', N'特采申请单', N'单据', 'doc', 'qc_tc_detail', 'qc_tc', N'单据编号', N'id', N'单据编号', N'TC', N'单据日期', 20, 'items', N'品质管理');
+-- 特采申请单(QC_TC,前缀 TC)已于 2026-09-22 整体下线,面板行不再注册:见 tools/migrate-qc-tc-drop.sql
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'QC_BHZ') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('QC_BHZ', N'不合格品处理单(自制物料)', N'单据', 'doc', 'qc_bhz_detail', 'qc_bhz', N'单据编号', N'id', N'单据编号', N'BHZ', N'单据日期', 20, 'items', N'品质管理');
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'QC_JJF') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('QC_JJF', N'紧急放行申请单', N'单据', 'doc', 'qc_jjf_detail', 'qc_jjf', N'单据编号', N'id', N'单据编号', N'JJF', N'单据日期', 20, 'items', N'品质管理');
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code = 'QC_SCP') INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group) VALUES ('QC_SCP', N'试产材料使用申请单', N'单据', 'doc', 'qc_scp_detail', 'qc_scp', N'单据编号', N'id', N'单据编号', N'SCP', N'单据日期', 20, 'items', N'品质管理');
@@ -362,31 +330,8 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_BHC' AND col_name=N'�
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_BHC' AND col_name=N'审核时间') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_BHC', N'审核时间', N'审核时间', N'文本', NULL, NULL, NULL, NULL, N'header', 260, 140, 0, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_BHC' AND col_name=N'文档编号') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_BHC', N'文档编号', N'文档编号', N'文本', NULL, NULL, NULL, NULL, N'header', 265, 120, 1, 0, 1, 1);
 GO
--- 特采申请单
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'单据编号') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'单据编号', N'单据编号', N'文本', NULL, NULL, NULL, NULL, N'query,header', 10, 140, 0, 1, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'单据日期') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'单据日期', N'单据日期', N'日期', NULL, NULL, NULL, NULL, N'query,header', 20, 120, 1, 1, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'供应商') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'供应商', N'供应商', N'参照', NULL, N'PARTNER', N'往来单位名称', N'往来单位名称', N'query,header', 30, 180, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'采购单号') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'采购单号', N'采购单号', N'参照', NULL, N'PU_ORDER', N'单据编号', N'单据编号', N'query,header', 40, 140, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'产品名称') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'产品名称', N'产品名称', N'文本', NULL, NULL, NULL, NULL, N'header', 50, 160, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'总数量') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'总数量', N'总数量', N'小数', NULL, NULL, NULL, NULL, N'header', 60, 100, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'不合格品数量') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'不合格品数量', N'不合格品数量', N'小数', NULL, NULL, NULL, NULL, N'header', 70, 110, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'不合格品比例') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'不合格品比例', N'不合格品比例', N'文本', NULL, NULL, NULL, NULL, N'header', 80, 110, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'不良说明') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'不良说明', N'不良说明', N'文本', NULL, NULL, NULL, NULL, N'header', 90, 300, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'严重程度') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'严重程度', N'严重程度', N'下拉框', N'SELECT v FROM (VALUES (N''严重''),(N''一般''),(N''轻微'')) AS t(v)', NULL, NULL, NULL, N'query,header', 100, 100, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'特采理由') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'特采理由', N'特采理由', N'文本', NULL, NULL, NULL, NULL, N'header', 110, 400, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'产品开发部性能意见') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'产品开发部性能意见', N'产品开发部性能意见', N'文本', NULL, NULL, NULL, NULL, N'header', 120, 260, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'产品开发部工艺意见') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'产品开发部工艺意见', N'产品开发部工艺意见', N'文本', NULL, NULL, NULL, NULL, N'header', 130, 260, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'品质部意见') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'品质部意见', N'品质部意见', N'文本', NULL, NULL, NULL, NULL, N'header', 140, 240, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'销售部意见') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'销售部意见', N'销售部意见', N'文本', NULL, NULL, NULL, NULL, N'header', 150, 240, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'研发意见') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'研发意见', N'研发意见', N'文本', NULL, NULL, NULL, NULL, N'header', 160, 240, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'最终处理结果') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'最终处理结果', N'最终处理结果', N'下拉框', N'SELECT v FROM (VALUES (N''正常使用''),(N''挑选使用'')) AS t(v)', NULL, NULL, NULL, N'query,header', 170, 120, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'备注') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'备注', N'备注', N'文本', NULL, NULL, NULL, NULL, N'header', 180, 220, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'单据状态') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'单据状态', N'单据状态', N'文本', NULL, NULL, NULL, NULL, N'query,header', 190, 90, 0, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'审核人') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'审核人', N'审核人', N'文本', NULL, NULL, NULL, NULL, N'header', 200, 90, 0, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'审核时间') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'审核时间', N'审核时间', N'文本', NULL, NULL, NULL, NULL, N'header', 210, 140, 0, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'文档编号') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'文档编号', N'文档编号', N'文本', NULL, NULL, NULL, NULL, N'header', 215, 120, 1, 0, 1, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_TC' AND col_name=N'编制人') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_TC', N'编制人', N'编制人', N'文本', NULL, NULL, NULL, NULL, N'header', 220, 100, 1, 0, 0, 1);
-GO
+-- 特采申请单(2026-09-22 整体下线:面板行与 23 条字段行均已移除)。
+-- 表与注册行的实际删除见 tools/migrate-qc-tc-drop.sql。
 -- 不合格品处理单(自制物料)
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_BHZ' AND col_name=N'单据编号') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_BHZ', N'单据编号', N'单据编号', N'文本', NULL, NULL, NULL, NULL, N'query,header', 10, 140, 0, 1, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='QC_BHZ' AND col_name=N'单据日期') INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES ('QC_BHZ', N'单据日期', N'单据日期', N'日期', NULL, NULL, NULL, NULL, N'query,header', 20, 120, 1, 1, 0, 1);
@@ -497,6 +442,8 @@ GO
 -- 面板
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='panel' AND ref_key=N'不合格报告(制程)' AND locale='en') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('panel', N'不合格报告(制程)', 'en', N'Nonconformance Report (Process)', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='panel' AND ref_key=N'不合格品处理单(制程)' AND locale='en') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('panel', N'不合格品处理单(制程)', 'en', N'Nonconforming Product Disposition (Process)', 'manual');
+-- 注:「特采申请单」这条面板译名归 QC_TC_IN(来料品质·特采单)使用 —— QC_TC 已于
+--     2026-09-22 下线,但本行必须保留(新库建 QC_TC_IN 时靠它取 panel_name_en)。
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='panel' AND ref_key=N'特采申请单' AND locale='en') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('panel', N'特采申请单', 'en', N'Special Procurement Application', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='panel' AND ref_key=N'不合格品处理单(自制物料)' AND locale='en') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('panel', N'不合格品处理单(自制物料)', 'en', N'Nonconforming Product Disposition (Self-made Material)', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='panel' AND ref_key=N'紧急放行申请单' AND locale='en') INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('panel', N'紧急放行申请单', 'en', N'Emergency Release Application', 'manual');
