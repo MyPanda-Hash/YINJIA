@@ -2261,29 +2261,31 @@ public class ButtonService {
         final String projNo = planDocNo != null ? planDocNo : "";
 
         // 2026-09-18(Phase 2 · RD_PROGRESS 18 列重构)写入口径:
-        //   · 全部写**新列**(结论类):项目编号 / 预计完成日期 / 项目负责人 —— 设计列名
-        //   · [项目层级] 是设计「项目定级」的物理列(col_name 历史遗留,**不改名**)⇒ 照旧写它
-        //   · [说明] = 新列 [项目编号] 的**同一把匹配键**,必须与新列写同值,否则
-        //     UPDATE 的 `ISNULL([说明],N'')=?` 匹配不上 → 每轮都会重复 INSERT 新行(踩过)
-        //   · 不再写 [项目负责]/[里程完成]/[实施进度] —— 它们是已退隐的旧列
-        //     (migrate-rd-progress-18cols.sql §8);[实施进度] 改由手填承载「立项日期」
+        //   · 数据键一律用**旧物理列**:[项目层级](=设计「项目定级」)/[项目负责](=设计「项目负责人」)/
+        //     [里程完成](=设计「预计完成日期」)/[说明](=设计「项目编号」的匹配键)
+        //     —— 前端 progressColumns.js 的 key、Excel 导入导出、ProgressControlSheet 的
+        //     `K[label]` 全部指向这些旧列名(2026-09-18 决策:col_name 永不改,改则历史单据数据键全丢)。
+        //   · [说明] 必须与 [项目编号] 写同值,否则 UPDATE 的 `ISNULL([说明],N'')=?` 匹配不上
+        //     → 每轮都会重复 INSERT 新行(踩过)。
+        //   · [实施进度] 不写:它改由手填承载「立项日期」。
+        //   ⚠ 2026-09-22 更正:此前本方法的 SQL **同时**写 [项目负责人]/[预计完成日期](与上一行注释
+        //     宣称的"只写新列"不符),同一事实两个物理列各存一份,COALESCE 参数为 NULL 时必然分叉;
+        //     现改为只写旧列,那批无人读的新列由 migrate-rd-progress-drop-orphan-cols.sql 删除。
         int n = jdbc.update("UPDATE rd_progress_detail SET [项目层级] = COALESCE(?, [项目层级]),"
-                        + " [子项目/尺寸] = ?, [项目负责人] = COALESCE(?, [项目负责人]),"
-                        + " [项目负责] = COALESCE(?, [项目负责]),"
-                        + " [预计完成日期] = COALESCE(?, [预计完成日期]),"
+                        + " [子项目/尺寸] = ?, [项目负责] = COALESCE(?, [项目负责]),"
                         + " [里程完成] = COALESCE(?, [里程完成]), [状态] = ?"
                         + " WHERE [单据编号] = ? AND [项目名称] = ? AND ISNULL([说明], N'') = ?"
                         + " AND ISNULL(asp_cancel,'N') <> 'Y'",
-                level, spec, owner, owner, due, due, status, progressNo, projectName, projNo);
+                level, spec, owner, due, status, progressNo, projectName, projNo);
         if (n > 0) {
             org.slf4j.LoggerFactory.getLogger(ButtonService.class)
                     .info("[RD_PLAN→RD_PROGRESS] 更新 {} 行, 项目={}, 子项目={}, 状态={}", n, projectName, spec, status);
             return RES_UPDATED;
         }
         jdbc.update("INSERT INTO rd_progress_detail ([单据编号], [项目名称], [项目层级], [子项目/尺寸], [说明], [项目编号],"
-                        + " [项目负责人], [项目负责], [预计完成日期], [里程完成], [状态], asp_user1, asp_time1)"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())",
-                progressNo, projectName, level, spec, projNo, projNo, owner, owner, due, due, status, currentUserName());
+                        + " [项目负责], [里程完成], [状态], asp_user1, asp_time1)"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())",
+                progressNo, projectName, level, spec, projNo, projNo, owner, due, status, currentUserName());
         org.slf4j.LoggerFactory.getLogger(ButtonService.class)
                 .info("[RD_PLAN→RD_PROGRESS] 新增 1 行, 进度单={}, 项目={}, 子项目={}, 状态={}", progressNo, projectName, spec, status);
         return RES_INSERTED;

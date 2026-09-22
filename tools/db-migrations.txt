@@ -838,3 +838,18 @@ migrate-i18n-fix-zhtw-strength.sql
 #   脚本登记该字段(place=header,seq=165)。译名「备注」10 语言实测已存在,无需新增。
 #   两个账套均连跑两遍,自检三项(列存在/字段已登记/译名 en)均为 1。
 migrate-rd-approval-remark-field.sql
+
+# —— 2026-09-22 RD_PROGRESS 删除 5 个孤儿列(同一事实双写 → 收敛成一个真源)——
+# migrate-rd-progress-drop-orphan-cols.sql —— migrate-rd-progress-18cols.sql 建的 13 个新列里,这 5 个
+#   (项目发起人/项目负责人/立项日期/预计完成日期/测试情况)**没有真源**:前端 ProgressControlSheet 的
+#   K[label] 与 Excel 导入导出都指向旧列(项目级/项目负责/实施进度/里程完成/测试员);而后端
+#   ButtonService.syncPlanToProgress 此前**新旧双写**(注释却写"不再写旧列")⇒ 同一事实两个物理列各存
+#   一份,COALESCE 参数为 NULL 时必然分叉。本轮先把后端收敛为只写旧列,再删这 5 列。
+#   ⚠ 结构:5 个逐列一致性闸门(旧列 vs 新列不一致即 RAISERROR 中止,DROP 批不下发)+ COL_LENGTH 守卫的
+#     DROP + 删 yj_field(限定 place='detail')+ 更新表注明 + 自检。闸门有效性已实测(事务内注入 1 行
+#     不一致 → 拦下、exit=1、DROP 未执行)。
+#   ⚠ 备份表 rd_progress_detail_bak_20260918 **是 0 行空快照**,不构成回滚依据;本次不丢数据靠闸门
+#     diff=0 且这 5 列非空计数全 0(10 行全空)。
+#   ⚠ 测试库为纯 no-op(18cols 从未在该库执行,13 个新列都不存在)—— 测试库落后于迁移链属既有缺陷,
+#     刷新方式见 docs/development/环境与数据库.md(make-test-db.ps1)。
+migrate-rd-progress-drop-orphan-cols.sql
