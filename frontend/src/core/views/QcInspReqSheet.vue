@@ -6,20 +6,15 @@
        保存走父级 saveInlineDraft(saveArchive 整表 upsert,缺席行=删除)。
        行操作(2026-09-22 按用户口径):默认**整表只读**,点某行「修改」该行才转输入框(防随意改),
        改完点「完成」收起;「删除」先弹确认;新增走表尾「＋ 新增数据记录行」(新行自动进入可编辑)。
-       查询=工具栏关键字框,按当前页签各列模糊过滤,并提示其他页签的命中条数(可点跳过去)。
+       查询(2026-09-22 晚定稿):统一走第二行工具钮「🔍 模糊搜索」——字段+内容多条件 AND、跨页签,
+       点结果跳到该页签并高亮该行;原先表头那个「关键字过滤本页」的输入框与其「其他页签命中」提示已删。
+       「🕘 修改记录」看本表每次保存的留痕(后端 ButtonService.archiveChangeHistory)。
        注意:档案明细行被 markArchListRaw 预打 raw 标记(无响应式),本组件用 rows 镜像数组
        驱动界面,行对象与 detail.items 同引用——镜像增删同步双写,保存数据不失真。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="qc-insp-sheet">
-    <!-- 迷你工具栏:关键字查询 + 刷新/保存(通用工具栏与单据卡片对本面板整体不渲染) -->
+    <!-- 迷你工具栏:刷新/保存(通用工具栏与单据卡片对本面板整体不渲染) -->
     <div class="qc-bar">
-      <el-input
-        v-model="keyword"
-        class="qc-search"
-        size="small"
-        clearable
-        :placeholder="tt('输入关键字过滤本页数据')"
-      />
       <span class="qc-bar-btn" :title="tt('重新加载数据')" @click="reload">↻ {{ tt('刷新') }}</span>
       <span class="qc-bar-btn primary" :title="tt('保存整表(缺席行视为删除)')" @click="emit('save')">{{ tt('保存') }}</span>
     </div>
@@ -84,12 +79,6 @@
       >{{ tt(t.key) }}</div>
     </div>
 
-    <!-- 关键字命中其他页签时给一行提示(点击切过去) -->
-    <div v-if="otherHits.length" class="qc-hits">
-      <span class="qc-hits-label">{{ tt('其他页签命中') }}：</span>
-      <span v-for="h in otherHits" :key="'hit' + h.i" class="qc-hit" @click="activeTab = h.i">{{ tt(h.key) }} {{ h.n }} {{ tt('条') }}</span>
-    </div>
-
     <!-- 当前页签的 Excel 复刻表 -->
     <div class="qc-paper" :style="{ width: gridW(tab) + 'px' }">
       <table class="rs-t" :style="{ width: gridW(tab) + 'px' }">
@@ -131,7 +120,7 @@
             </td>
           </tr>
           <tr v-if="!rowsOf(tab).length">
-            <td :colspan="tab.cols.length" class="rs-empty">{{ keyword.trim() ? tt('本页无匹配行') : tt('暂无数据') }}</td>
+            <td :colspan="tab.cols.length" class="rs-empty">{{ tt('暂无数据') }}</td>
             <td v-if="editable" class="rsp-op-pad"></td>
           </tr>
         </tbody>
@@ -197,8 +186,6 @@ const emit = defineEmits(['dirty', 'save', 'refresh'])
 const tabs = qcInspReqTabs
 const activeTab = ref(0)
 const tab = computed(() => tabs[activeTab.value] || tabs[0])
-/** 表内查询关键字:按当前页签各列模糊过滤(空=不过滤) */
-const keyword = ref('')
 
 // ── 行数据:与 head.detail.items 同引用的工作镜像(raw 数组无响应式,镜像驱动界面) ──
 const rows = ref([])
@@ -237,26 +224,10 @@ function tabRows(t) {
     .slice()
     .sort((a, b) => (a.id ?? 1e15) - (b.id ?? 1e15))
 }
-/** 关键字:整行各列任一命中(大小写不敏感) */
-function hitRow(r, t) {
-  const k = keyword.value.trim().toLowerCase()
-  if (!k) return true
-  return t.cols.some((c) => String(r[c.key] ?? '').toLowerCase().includes(k))
-}
+/** 当前页签的行集(2026-09-22:原来的表头关键字过滤框已删,查找统一走「模糊搜索」) */
 function rowsOf(t) {
-  return tabRows(t).filter((r) => hitRow(r, t))
+  return tabRows(t)
 }
-/** 关键字在「别的页签」里的命中条数(提示可点跳转) */
-const otherHits = computed(() => {
-  if (!keyword.value.trim()) return []
-  const out = []
-  tabs.forEach((t, i) => {
-    if (i === activeTab.value) return
-    const n = tabRows(t).filter((r) => hitRow(r, t)).length
-    if (n) out.push({ i, key: t.key, n })
-  })
-  return out
-})
 
 function addRow(t) {
   const row = { '物料类别': t.key }
@@ -415,10 +386,6 @@ function gridW(t) {
   justify-content: flex-end;
   gap: 8px;
   padding: 0 4px 10px;
-}
-.qc-search {
-  width: 260px;
-  margin-right: auto;
 }
 .qc-bar-btn {
   padding: 4px 14px;
@@ -660,31 +627,6 @@ function gridW(t) {
   color: #1c4f8a;
   font-weight: 700;
   border-color: #8fb4e0;
-}
-
-/* ── 关键字命中其他页签的提示 ── */
-.qc-hits {
-  text-align: center;
-  margin: 0 0 8px;
-  font-size: 12.5px;
-  color: #6b7c93;
-}
-.qc-hits-label {
-  margin-right: 2px;
-}
-.qc-hit {
-  display: inline-block;
-  margin: 0 3px;
-  padding: 1px 8px;
-  border: 1px dashed #8fb4e0;
-  border-radius: 10px;
-  background: #f4f9ff;
-  color: #1c4f8a;
-  cursor: pointer;
-}
-.qc-hit:hover {
-  background: #e8f2ff;
-  border-style: solid;
 }
 
 /* ── Excel 复刻网格(同 RecordSheetPanels rs-* 版式) ── */
