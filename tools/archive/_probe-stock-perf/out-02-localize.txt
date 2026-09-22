@@ -1,0 +1,8 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-02-localize.sql ==
+  (0 rows)
+  | 1 v_stock_movement | 235 | 23466 | 
+  | 2 inv_cost_ledger | 235 | 4 | 
+  | 3 movement LEFT JOIN cost | 235 | 22416 | 
+  | 4 v_stock_balance COUNT(*) | 84 | 65021 | 
+[OK] q-02-localize.sql (7 batches)

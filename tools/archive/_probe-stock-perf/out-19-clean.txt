@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-19-clean.sql ==
+  | 探针残留行(应为0) | 0 | 
+  | kucun 行数 | 31 | 
+[OK] q-19-clean.sql (2 batches)

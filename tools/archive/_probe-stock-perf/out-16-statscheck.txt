@@ -1,0 +1,14 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-16-statscheck.sql ==
+  | ST | bd_finish_in | ST_bd_finish_in_单据状态 | null | null | 
+  | ST | bd_material_out | ST_bd_material_out_单据状态 | 1 | 1 | 
+  | ST | bd_other_in | ST_bd_other_in_单据状态 | null | null | 
+  | ST | bd_other_out | ST_bd_other_out_单据状态 | null | null | 
+  | ST | bd_outsource_in | ST_bd_outsource_in_单据状态 | null | null | 
+  | ST | bd_outsource_issue | ST_bd_outsource_issue_单据状态 | null | null | 
+  | ST | bd_purchase_in | ST_bd_purchase_in_单据状态 | 184 | 2 | 
+  | ST | bd_purchase_in | ST_bd_purchase_in_单据状态2 | 184 | 2 | 
+  | ST | bd_sale_out | ST_bd_sale_out_单据状态 | 54 | 1 | 
+  | ST | bd_sale_out | ST_bd_sale_out_单据状态2 | 54 | 2 | 
+  | ST | kucun | ST_kucun_asp_cancel | 31 | 1 | 
+[OK] q-16-statscheck.sql (2 batches)

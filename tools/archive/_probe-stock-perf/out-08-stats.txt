@@ -1,0 +1,22 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-08-stats.sql ==
+  | bl_purchase_in | 0 | 94 | 247 | 
+  | inv_cost_ledger | 2 | 7 | 235 | 
+  | bd_purchase_in | 0 | 132 | 184 | 
+  | bl_sale_out | 0 | 116 | 123 | 
+  | bd_sale_out | 0 | 133 | 54 | 
+  | kucun | 0 | 19 | 31 | 
+  | bs_wh | 1 | 30 | 6 | 
+  | bl_material_out | 0 | 18 | 2 | 
+  | bd_material_out | 0 | 20 | 1 | 
+  | bd_other_in | 0 | 16 | 0 | 
+  | bd_other_out | 0 | 23 | 0 | 
+  | bd_outsource_in | 0 | 16 | 0 | 
+  | bd_finish_in | 0 | 19 | 0 | 
+  | bd_outsource_issue | 0 | 17 | 0 | 
+  | bl_other_in | 0 | 18 | 0 | 
+  | bl_other_out | 0 | 16 | 0 | 
+  | bl_outsource_in | 0 | 15 | 0 | 
+  | bl_outsource_issue | 0 | 15 | 0 | 
+  | bl_finish_in | 0 | 19 | 0 | 
+[SQL FAIL] 无法绑定由多个部分组成的标识符 "s.object_id"。

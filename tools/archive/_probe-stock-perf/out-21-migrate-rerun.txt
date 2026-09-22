@@ -1,0 +1,73 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== migrate-stock-report-perf.sql ==
+  | A.参与表索引覆盖 | bd_finish_in | 1 | 0 | 
+  | A.参与表索引覆盖 | bd_material_out | 1 | 1 | 
+  | A.参与表索引覆盖 | bd_other_in | 1 | 0 | 
+  | A.参与表索引覆盖 | bd_other_out | 1 | 0 | 
+  | A.参与表索引覆盖 | bd_outsource_in | 1 | 0 | 
+  | A.参与表索引覆盖 | bd_outsource_issue | 1 | 0 | 
+  | A.参与表索引覆盖 | bd_purchase_in | 1 | 184 | 
+  | A.参与表索引覆盖 | bd_sale_out | 1 | 54 | 
+  | A.参与表索引覆盖 | bl_finish_in | 1 | 0 | 
+  | A.参与表索引覆盖 | bl_material_out | 1 | 2 | 
+  | A.参与表索引覆盖 | bl_other_in | 1 | 0 | 
+  | A.参与表索引覆盖 | bl_other_out | 1 | 0 | 
+  | A.参与表索引覆盖 | bl_outsource_in | 1 | 0 | 
+  | A.参与表索引覆盖 | bl_outsource_issue | 1 | 0 | 
+  | A.参与表索引覆盖 | bl_purchase_in | 1 | 247 | 
+  | A.参与表索引覆盖 | bl_sale_out | 1 | 123 | 
+  | A.参与表索引覆盖 | bs_wh | 2 | 6 | 
+  | A.参与表索引覆盖 | kucun | 1 | 31 | 
+  | B.本次新建对象 | bd_finish_in | MS_Description | 产成品入库单头表(切炭双出口直销自动生成并审核) | 
+  | B.本次新建对象 | bd_finish_in | MS_Description | 产成品入库单头表连接键(v_stock_movement 第2路) | 
+  | B.本次新建对象 | bd_material_out | MS_Description | 材料出库单头表连接键(v_stock_movement 第6路) | 
+  | B.本次新建对象 | bd_material_out | MS_Description | 材料出库单(领料)头表 | 
+  | B.本次新建对象 | bd_other_in | MS_Description | 其他入库单头表 | 
+  | B.本次新建对象 | bd_other_in | MS_Description | 其他入库单头表连接键(v_stock_movement 第3路) | 
+  | B.本次新建对象 | bd_other_out | MS_Description | 其他出库单头表连接键(v_stock_movement 第7路) | 
+  | B.本次新建对象 | bd_other_out | MS_Description | 其他出库单头表 | 
+  | B.本次新建对象 | bd_outsource_in | MS_Description | 委外入库单头表 | 
+  | B.本次新建对象 | bd_outsource_in | MS_Description | 委外入库单头表连接键(v_stock_movement 第4路) | 
+  | B.本次新建对象 | bd_outsource_issue | MS_Description | 委外发料单头表连接键(v_stock_movement 第8路) | 
+  | B.本次新建对象 | bd_outsource_issue | MS_Description | 委外发料单头表 | 
+  | B.本次新建对象 | bd_purchase_in | MS_Description | 采购入库单头表(审核过账kucun入库) | 
+  | B.本次新建对象 | bd_purchase_in | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_purchase_in | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_purchase_in | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_purchase_in | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_purchase_in | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_purchase_in | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_purchase_in | MS_Description | 送料批次号(采购订单分批送料:批次号=采购订单号+3位序号;由生单自动生成,贯通暂收/检验/入库/退回) | 
+  | B.本次新建对象 | bd_purchase_in | MS_Description | 批次键:批次台账 yj_doc_batch.id;采购入库单审核时凭它取号并回填全链批次号 | 
+  | B.本次新建对象 | bd_purchase_in | MS_Description | 采购入库单头表连接键(v_stock_movement 第1路) | 
+  | B.本次新建对象 | bd_sale_out | MS_Description | 销售出库单头表连接键(v_stock_movement 第5路) | 
+  | B.本次新建对象 | bd_sale_out | MS_Description | 销售出库单头表(审核过账kucun出库) | 
+  | B.本次新建对象 | bd_sale_out | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_sale_out | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_sale_out | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_sale_out | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_sale_out | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bd_sale_out | MS_Description | 单据附件列位(与送料暂收单同款:页面单格聚合,上传按序占位,文件实体存 yj_attachment) | 
+  | B.本次新建对象 | bl_finish_in | MS_Description | 产成品入库单行表(负数量=红字冲回) | 
+  | B.本次新建对象 | bl_finish_in | MS_Description | 产成品入库单行→头表连接键(v_stock_movement 第2路) | 
+  | B.本次新建对象 | bl_material_out | MS_Description | 材料出库单行→头表连接键(v_stock_movement 第6路) | 
+  | B.本次新建对象 | bl_material_out | MS_Description | 材料出库单(领料)行表(BOM展开生成) | 
+  | B.本次新建对象 | bl_other_in | MS_Description | 其他入库单行表 | 
+  | B.本次新建对象 | bl_other_in | MS_Description | 其他入库单行→头表连接键(v_stock_movement 第3路) | 
+  | B.本次新建对象 | bl_other_out | MS_Description | 其他出库单行→头表连接键(v_stock_movement 第7路) | 
+  | B.本次新建对象 | bl_other_out | MS_Description | 其他出库单行表 | 
+  | B.本次新建对象 | bl_outsource_in | MS_Description | 委外入库单行表 | 
+  | B.本次新建对象 | bl_outsource_in | MS_Description | 委外入库单行→头表连接键(v_stock_movement 第4路) | 
+  | B.本次新建对象 | bl_outsource_issue | MS_Description | 委外发料单行→头表连接键(v_stock_movement 第8路) | 
+  | B.本次新建对象 | bl_outsource_issue | MS_Description | 委外发料单行表 | 
+  | B.本次新建对象 | bl_purchase_in | MS_Description | 采购入库单行表(批号三键入库) | 
+  | B.本次新建对象 | bl_purchase_in | MS_Description | 采购订单行号(链路带入;金蝶同步时落 src_seq;转ERP 推送为 src_seq) | 
+  | B.本次新建对象 | bl_purchase_in | MS_Description | 是否来料检验(本地MES维护;金蝶按商品档案检验方式自行触发,不推接口) | 
+  | B.本次新建对象 | bl_purchase_in | MS_Description | 送料批次号(采购订单分批送料:批次号=采购订单号+3位序号;由生单自动生成,贯通暂收/检验/入库/退回) | 
+  | B.本次新建对象 | bl_purchase_in | MS_Description | 送检数量(来源来料检验单,2026-09-21 补齐) | 
+  | B.本次新建对象 | bl_purchase_in | MS_Description | 部门名称(来源来料检验单,2026-09-21 补齐) | 
+  | B.本次新建对象 | bl_purchase_in | MS_Description | 生产日期(来源来料检验单,2026-09-21 补齐) | 
+  | B.本次新建对象 | bl_purchase_in | MS_Description | 采购入库单行→头表连接键(v_stock_movement 第1路);原表为无索引堆表,缺它导致基数估算退化、选出坏计划 | 
+  | C.视图耗时(ms) | 235 | 8 | 84 | 5 | 235 | 5 | 
+  | D.口径自证 SUM(结存金额) | 84 | 3099936.6387 | 
+[OK] migrate-stock-report-perf.sql (8 batches)

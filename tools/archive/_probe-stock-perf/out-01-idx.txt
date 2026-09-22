@@ -1,0 +1,25 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-01-idx.sql ==
+  | T | bl_purchase_in | 247 | 
+  | T | inv_cost_ledger | 235 | 
+  | T | bd_purchase_in | 184 | 
+  | T | bl_sale_out | 123 | 
+  | T | bd_sale_out | 54 | 
+  | T | kucun | 31 | 
+  | T | bs_wh | 6 | 
+  | T | bl_material_out | 2 | 
+  | T | bd_material_out | 1 | 
+  | T | bd_other_in | 0 | 
+  | T | bd_other_out | 0 | 
+  | T | bd_outsource_in | 0 | 
+  | T | bd_outsource_issue | 0 | 
+  | T | bl_other_in | 0 | 
+  | T | bl_other_out | 0 | 
+  | T | bl_outsource_in | 0 | 
+  | T | bl_outsource_issue | 0 | 
+  | T | bl_finish_in | 0 | 
+  | T | bd_finish_in | 0 | 
+  | I | bs_wh | ux_bs_wh_ext_id | NONCLUSTERED | 外部数据ID | 
+  | I | inv_cost_ledger | PK_inv_cost_ledger | CLUSTERED | src,rid | 
+  | I | inv_cost_ledger | IX_inv_cost_ledger_part | NONCLUSTERED | 仓库键,存货编码 | 
+[OK] q-01-idx.sql (2 batches)

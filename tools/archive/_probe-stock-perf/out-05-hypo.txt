@@ -1,0 +1,61 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-05-hypo.sql ==
+  | STATS | bd_purchase_in | _WA_Sys_00000001_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000002_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000003_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000004_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000005_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000006_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000007_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000008_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000009_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000000A_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000000B_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000000C_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000000D_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000000E_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000000F_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000010_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000011_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000012_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000013_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000014_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000015_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000016_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000017_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000019_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000001A_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000001B_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000001C_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000001D_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000001E_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000001F_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000020_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000021_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000022_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000023_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000002A_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000007A_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000007B_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000007C_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000007D_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000007E_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_0000007F_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000080_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000081_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000082_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000083_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000084_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000085_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000086_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000087_4760840B | 1 | 0 | 
+  | STATS | bd_purchase_in | _WA_Sys_00000088_4760840B | 1 | 0 | 
+  | AUTO | HSDZ_MES | 1 | 1 | 0 | 
+  | 235 | 
+  | A v_stock_movement RECOMPILE | 36 | 
+  | 235 | 
+  | B v_stock_movement HASH+RECOMPILE | 33 | 
+  | C SELECT * INTO #m FROM v_stock_movement | 28 | 235 | 
+  | 84 | 
+  | D v_stock_balance RECOMPILE | 42 | 
+[OK] q-05-hypo.sql (6 batches)

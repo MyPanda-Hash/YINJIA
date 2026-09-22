@@ -1,0 +1,26 @@
+[login] ok  user=admin
+
+── 1. 串行 · 4 个库存报表面板(取 20 行) ──
+PASS  STOCK_BALANCE < 2000ms  · 179 ms · totalSize=84 rows=20
+PASS  STOCK_LEDGER < 2000ms  · 154 ms · totalSize=235 rows=20
+PASS  STOCK_SUMMARY < 2000ms  · 199 ms · totalSize=137 rows=20
+PASS  STOCK_STATUS < 2000ms  · 32 ms · totalSize=31 rows=20
+
+── 2. 串行 · 无关面板(检验链,库空闲时应远低于阈值) ──
+PASS  QC_CATALOG < 500ms  · 58 ms · totalSize=1 rows=1
+PASS  QC_INSP_REC < 500ms  · 73 ms · totalSize=13 rows=13
+
+── 3. 并发 · 3 库存 + 1 无关 同时发起 ──
+PASS  并发 STOCK_BALANCE < 2000ms  · 236 ms
+PASS  并发 STOCK_LEDGER < 2000ms  · 213 ms
+PASS  并发 STOCK_SUMMARY < 2000ms  · 249 ms
+PASS  并发 QC_CATALOG < 500ms  · 20 ms
+PASS  并发总耗时 ≈ 最慢单次  · wall=251 ms · slowest=249 ms
+PASS  并发无 15s 超时  · none
+
+── 4. 台账条件路径(期初/期末合成行 + 带 hint 的附加 SQL) ──
+PASS  台账条件查询 < 2000ms  · page1=349 ms page2=494 ms totalSize=21
+PASS  首行=期初结存  · 首行=期初结存
+PASS  末页末行=期末结存  · 末页2 末行=期末结存
+
+ALL PASS

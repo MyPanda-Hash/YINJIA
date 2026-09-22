@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-18-kucunid.sql ==
+  | kucun.id 属性 | 1 | 0 | 0 | 
+  | 不带 id 插入后取到的 id | 671 | __PROBE__ | 
+[OK] q-18-kucunid.sql (4 batches)

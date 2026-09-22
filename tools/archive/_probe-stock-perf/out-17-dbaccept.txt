@@ -1,0 +1,9 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-17-dbaccept.sql ==
+  | v_stock_balance COUNT(*) | 84 | 7 | 
+  | v_stock_movement COUNT(*) | 235 | 5 | 
+  | v_stock_ledger COUNT(*) | 235 | 4 | 
+  | v_stock_summary COUNT(*) | 137 | 8 | 
+  | kucun COUNT(*) | 31 | 0 | 
+  | 口径自证 | 84 | 3099936.6387 | 
+[OK] q-17-dbaccept.sql (7 batches)

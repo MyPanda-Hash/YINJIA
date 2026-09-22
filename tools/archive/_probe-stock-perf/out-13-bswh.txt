@@ -1,0 +1,37 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-13-bswh.sql ==
+  | bs_wh | id | 
+  | bs_wh | 仓库编码 | 
+  | bs_wh | 仓库名称 | 
+  | bs_wh | 仓库地址 | 
+  | bs_wh | 负责人 | 
+  | bs_wh | 停用 | 
+  | bs_wh | 允许零库存出库 | 
+  | bs_wh | 备注 | 
+  | bs_wh | 状态 | 
+  | bs_wh | asp_user1 | 
+  | bs_wh | asp_time1 | 
+  | bs_wh | asp_user2 | 
+  | bs_wh | asp_time2 | 
+  | bs_wh | asp_cancel | 
+  | bs_wh | 仓库类型 | 
+  | bs_wh | 所属车间 | 
+  | bs_wh | 联系人 | 
+  | bs_wh | 联系电话 | 
+  | bs_wh | 外部数据ID | 
+  | bs_wh | 外部单据号 | 
+  | bs_wh | 外部指纹 | 
+  | bs_wh | 国家 | 
+  | bs_wh | 省 | 
+  | bs_wh | 市 | 
+  | bs_wh | 区 | 
+  | bs_wh | 启用仓位管理 | 
+  | bs_wh | 仓库管理员编码 | 
+  | bs_wh | 仓库分类 | 
+  | bs_wh | 仓库分类编码 | 
+  | bs_wh | 分类id | 
+  | bs_wh | 仓库管理员id | 
+  | kucun 关键列 | id | 
+  | kucun 关键列 | kucun_no | 
+  | kucun 关键列 | asp_cancel | 
+[OK] q-13-bswh.sql (3 batches)

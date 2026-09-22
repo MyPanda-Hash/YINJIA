@@ -1,0 +1,3 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-03-plan.sql ==
+[SQL FAIL] 在数据库 'HSDZ_MES' 中拒绝了 SHOWPLAN 权限。

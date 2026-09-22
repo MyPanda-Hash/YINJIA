@@ -1,0 +1,70 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-10-kucun.sql ==
+  | kucun | comm | nvarchar | 
+  | kucun | id | int | 
+  | kucun | kucun_no | nvarchar | 
+  | kucun | khdm | nvarchar | 
+  | kucun | wzdm | nvarchar | 
+  | kucun | update_date | datetime | 
+  | kucun | ckdm | nvarchar | 
+  | kucun | lot_no | nvarchar | 
+  | kucun | color | nvarchar | 
+  | kucun | siz | nvarchar | 
+  | kucun | in_date | datetime2 | 
+  | kucun | rkl | float | 
+  | kucun | rkl2 | float | 
+  | kucun | out_date | datetime2 | 
+  | kucun | ckl | float | 
+  | kucun | ckl2 | float | 
+  | kucun | yl | float | 
+  | kucun | yl2 | float | 
+  | kucun | price | float | 
+  | kucun | price2 | float | 
+  | kucun | bz | nvarchar | 
+  | kucun | total_je | float | 
+  | kucun | asp_user1 | nvarchar | 
+  | kucun | asp_time1 | datetime2 | 
+  | kucun | asp_user2 | nvarchar | 
+  | kucun | asp_time2 | datetime2 | 
+  | kucun | asp_user3 | nvarchar | 
+  | kucun | asp_time3 | datetime2 | 
+  | kucun | asp_cancel | nvarchar | 
+  | kucun | asp_user4 | nvarchar | 
+  | kucun | asp_time4 | datetime2 | 
+  | kucun | asp_print | int | 
+  | kucun | 预警数量 | decimal | 
+  | 存在性 | bd_finish_in | 
+  | 存在性 | bd_material_out | 
+  | 存在性 | bd_other_in | 
+  | 存在性 | bd_other_out | 
+  | 存在性 | bd_outsource_in | 
+  | 存在性 | bd_outsource_issue | 
+  | 存在性 | bd_purchase_in | 
+  | 存在性 | bd_sale_out | 
+  | 存在性 | bl_finish_in | 
+  | 存在性 | bl_material_out | 
+  | 存在性 | bl_other_in | 
+  | 存在性 | bl_other_out | 
+  | 存在性 | bl_outsource_in | 
+  | 存在性 | bl_outsource_issue | 
+  | 存在性 | bl_purchase_in | 
+  | 存在性 | bl_sale_out | 
+  | 存在性 | bs_wh | 
+  | 存在性 | kucun | 
+  | 单据编号列 | bd_finish_in | 
+  | 单据编号列 | bd_material_out | 
+  | 单据编号列 | bd_other_in | 
+  | 单据编号列 | bd_other_out | 
+  | 单据编号列 | bd_outsource_in | 
+  | 单据编号列 | bd_outsource_issue | 
+  | 单据编号列 | bd_purchase_in | 
+  | 单据编号列 | bd_sale_out | 
+  | 单据编号列 | bl_finish_in | 
+  | 单据编号列 | bl_material_out | 
+  | 单据编号列 | bl_other_in | 
+  | 单据编号列 | bl_other_out | 
+  | 单据编号列 | bl_outsource_in | 
+  | 单据编号列 | bl_outsource_issue | 
+  | 单据编号列 | bl_purchase_in | 
+  | 单据编号列 | bl_sale_out | 
+[OK] q-10-kucun.sql (4 batches)

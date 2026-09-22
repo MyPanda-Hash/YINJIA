@@ -868,3 +868,29 @@ migrate-qc-insp-record.sql
 #   验证:tools/archive/_probe-qc-logic/_v-qc-catalog-auto.cjs(生单→建行→完成闸门→完成→反审核守卫→修改回弹→删除守卫,
 #   全过;类别非空验证=折叠棉)+ _v-qc-catalog-ui2.cjs(只读纸面/新列/动作按钮/链接)。
 migrate-qc-catalog-auto.sql
+
+# —— 2026-09-22 库存报表面板读性能修复(前端 15s 超时) ——
+#   现象:库存报表面板偶发 axios `timeout of 15000ms exceeded`;实测 v_stock_balance 单次 65,290 ms
+#   (最坏 190 s)、接口 queryFormDataList STOCK_BALANCE 190,325 ms,库被占住导致无关面板排队超时。
+#   ★ 根因(与初判「视图本质慢」不同,已实测确认):**坏缓存计划**。同一条 SQL、同一份数据、同一时刻:
+#       v_stock_movement  缓存计划 23,466 ms  vs  OPTION (RECOMPILE) 36 ms
+#       v_stock_balance   缓存计划 65,021 ms  vs  OPTION (RECOMPILE) 42 ms   —— 差 600 倍。
+#     RECOMPILE 跑过一轮后连不带 hint 的原查询也降到 5~8 ms。成因:v_stock_movement 是 8 路 UNION
+#     收敛 16 张表,而这 16 张表**全部 idx_n=0**(纯堆表无索引)→ 无可靠统计信息 → 兼容级别 100 的
+#     基数估算把 UNION 产物估成 1 行 → 选嵌套循环反复重算;坏计划进缓存后**永不重优化**。
+#     (同库只有 bs_wh 1 个 / inv_cost_ledger 2 个索引 —— 恰好就是不慢的两张表。)
+#   ★ 本脚本:给参与表补**索引 + 显式统计信息**,让优化器拿得到真实基数,不再选出坏计划。
+#     **不动视图定义、不动金额口径、不动软删语义**;未新建任何表/列(故除索引注释外无需补 MS_Description;
+#     统计信息不支持扩展属性,实测 sp_addextendedproperty 的 @level2type 无 STATISTICS 一词表)。
+#     ① 16 张单据头/行表各建 [单据编号] 索引(即 8 路 UNION 的全部 JOIN 键);
+#     ② bs_wh[仓库名称] 索引(仓库键三级兜底 LEFT JOIN 用);③ kucun[id] 唯一索引(31 行堆表,实测 id 唯一;
+#        STOCK_STATUS 面板 ORDER BY id + OFFSET/FETCH 分页正是靠它);④ 11 条 FULLSCAN 显式统计信息,
+#        覆盖各分支 WHERE 用的 单据状态/单据状态2/asp_cancel(不依赖"首次查询才自动创建"的时机,
+#        数据库还原后也能立刻拿到准确基数 —— 还原不清计划缓存,正是本次事故最可能的触发器)。
+#   配套代码(同提交):QueryService.queryFlat 给这 4 张报表取数加 OPTION (RECOMPILE)。
+#     必要性:视图**不能带 hint**,索引只降低坏计划概率、不能消除"旧计划残留"。
+#   口径自证(未变):SUM(结存金额) = 3,099,936.6387 ≈ 上一任务记录值 3,099,936.64 ✓
+#   验收(同批留档 tools/archive/_probe-stock-perf/):视图 COUNT(*) 4~8 ms(原 65,290 ms);
+#     接口四面板 32~1,035 ms(稳后 ~150 ms,原 190,325 ms);无关面板 19~113 ms;并发墙钟 242 ms ≈ 最慢单次。
+#   幂等可重跑(先判后建);自检段输出索引覆盖度/新建对象/视图耗时/口径合计。
+migrate-stock-report-perf.sql

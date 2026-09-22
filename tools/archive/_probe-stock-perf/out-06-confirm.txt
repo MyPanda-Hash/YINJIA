@@ -1,0 +1,11 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-06-confirm.sql ==
+  | 235 | 
+  | 1 movement (cached plan) | 8 | 
+  | 235 | 
+  | 2 movement (cached plan, 2nd) | 5 | 
+  | 84 | 
+  | 3 balance (cached plan) | 7 | 
+  | 4 SUM(结存金额) 现有口径 | 84 | 3099936.6387 | 
+  | 5 SUM(现存量) | 30666.0000 | 
+[OK] q-06-confirm.sql (6 batches)

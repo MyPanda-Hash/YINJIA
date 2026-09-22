@@ -45,16 +45,17 @@ public class QueryService {
                                           Map<String, Object> condition, Map<String, String> l2c,
                                           int pageNo, int pageSize) {
         boolean ledger = "STOCK_LEDGER".equals(def.code()); // 台账:正序 + 首期初行/末期末行(T+ 三段式)
+        String hint = recompileOnRead(def.lineTable()) ? " OPTION (RECOMPILE)" : "";
         String cols = selectCols(def, def.fields());
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
         appendDirectFilters(def, def.lineTable(), where, args, keyword, condition, l2c, "t");
 
         Integer total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + def.lineTable() + " t " + where, Integer.class, args.toArray());
+                "SELECT COUNT(*) FROM " + def.lineTable() + " t " + where + hint, Integer.class, args.toArray());
 
         String sql = "SELECT t.id AS __id, " + cols + " FROM " + def.lineTable() + " t " + where
-                + " ORDER BY t.id " + (ledger ? "ASC" : "DESC") + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY";
+                + " ORDER BY t.id " + (ledger ? "ASC" : "DESC") + " OFFSET ? ROWS FETCH NEXT ? ROWS ONLY" + hint;
         args.add((pageNo - 1) * pageSize);
         args.add(pageSize);
         List<Map<String, Object>> rows = jdbc.queryForList(sql, args.toArray());
@@ -80,12 +81,12 @@ public class QueryService {
                 Map<String, Object> opening = jdbc.queryForMap(
                         "SELECT ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入数量 - 发出数量 ELSE 0 END),0) AS q,"
                                 + " ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入金额 - 发出金额 ELSE 0 END),0) AS a"
-                                + " FROM v_stock_ledger WHERE RTRIM(仓库)=? AND RTRIM(存货)=? AND 单据日期 <= ?",
+                                + " FROM v_stock_ledger WHERE RTRIM(仓库)=? AND RTRIM(存货)=? AND 单据日期 <= ?" + hint,
                         ds, ds, wh, item, de);
                 double oq = numD(opening.get("q")), oa = numD(opening.get("a"));
                 Map<String, Object> netm = jdbc.queryForMap(
                         "SELECT ISNULL(SUM(收入数量 - 发出数量),0) AS q, ISNULL(SUM(收入金额 - 发出金额),0) AS a"
-                                + " FROM v_stock_ledger WHERE RTRIM(仓库)=? AND RTRIM(存货)=? AND 单据日期 >= ? AND 单据日期 <= ?",
+                                + " FROM v_stock_ledger WHERE RTRIM(仓库)=? AND RTRIM(存货)=? AND 单据日期 >= ? AND 单据日期 <= ?" + hint,
                         wh, item, ds, de);
                 double cq = oq + numD(netm.get("q")), ca = oa + numD(netm.get("a"));
                 totalOut += 2;
@@ -99,6 +100,30 @@ public class QueryService {
         out.put("totalSize", totalOut);
         out.put("list", list);
         return out;
+    }
+
+    /**
+     * 取数是否要带 OPTION (RECOMPILE) —— 库存报表 4 张「报表式平表」专属(2026-09-22)。
+     *
+     * <p>为什么必须加:这 4 张表的取数参与表全是**无索引堆表**(已由
+     * tools/migrate-stock-report-perf.sql 补索引与统计信息),兼容级别 100 下基数估算
+     * 极易退化;坏计划一旦进计划缓存就**永不重优化**。实测同一条 SQL、同一份数据:
+     * 缓存计划 65,021 ms vs OPTION (RECOMPILE) 42 ms,差 600 倍 —— 前端 axios 15 s 超时
+     * 就是这么来的。视图**不能带 hint**,故只能在取数 SQL 上补。
+     *
+     * <p>代价可忽略:这几张报表最大 247 行,单次编译约 ms 级;调用方对 4 张表之外的
+     * 面板不产生任何影响(单据/档案模式走 queryDocs/queryArchive,与此无关)。
+     */
+    private static boolean recompileOnRead(String lineTable) {
+        switch (lineTable == null ? "" : lineTable) {
+            case "v_stock_balance":  // STOCK_BALANCE 库存状况表
+            case "v_stock_ledger":   // STOCK_LEDGER  库存台账
+            case "v_stock_summary":  // STOCK_SUMMARY 收发存汇总表
+            case "kucun":            // STOCK_STATUS  库存状况
+                return true;
+            default:
+                return false;
+        }
     }
 
     /** 台账合成行:期初行只填期初组,期末行只填期末组;单价=金额/数量(数量0→0) */

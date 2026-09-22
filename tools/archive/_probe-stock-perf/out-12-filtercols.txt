@@ -1,0 +1,54 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== q-12-filtercols.sql ==
+  | 列 | bd_account | asp_cancel | 
+  | 列 | bd_account | id | 
+  | 列 | bd_dispatch | asp_cancel | 
+  | 列 | bd_dispatch | id | 
+  | 列 | bd_dispatch | 单据状态 | 
+  | 列 | bd_expense_type | asp_cancel | 
+  | 列 | bd_expense_type | id | 
+  | 列 | bd_finish_in | asp_cancel | 
+  | 列 | bd_finish_in | id | 
+  | 列 | bd_finish_in | 单据状态 | 
+  | 列 | bd_manu_order | asp_cancel | 
+  | 列 | bd_manu_order | id | 
+  | 列 | bd_manu_order | 单据状态 | 
+  | 列 | bd_material_out | asp_cancel | 
+  | 列 | bd_material_out | id | 
+  | 列 | bd_material_out | 单据状态 | 
+  | 列 | bd_other_in | asp_cancel | 
+  | 列 | bd_other_in | id | 
+  | 列 | bd_other_in | 单据状态 | 
+  | 列 | bd_other_out | asp_cancel | 
+  | 列 | bd_other_out | id | 
+  | 列 | bd_other_out | 单据状态 | 
+  | 列 | bd_outsource_in | asp_cancel | 
+  | 列 | bd_outsource_in | id | 
+  | 列 | bd_outsource_in | 单据状态 | 
+  | 列 | bd_outsource_issue | asp_cancel | 
+  | 列 | bd_outsource_issue | id | 
+  | 列 | bd_outsource_issue | 单据状态 | 
+  | 列 | bd_outsource_order | asp_cancel | 
+  | 列 | bd_outsource_order | id | 
+  | 列 | bd_outsource_order | 单据状态 | 
+  | 列 | bd_pu_order | asp_cancel | 
+  | 列 | bd_pu_order | id | 
+  | 列 | bd_pu_order | 单据状态 | 
+  | 列 | bd_pu_req | asp_cancel | 
+  | 列 | bd_pu_req | id | 
+  | 列 | bd_pu_req | 单据状态 | 
+  | 列 | bd_purchase_in | asp_cancel | 
+  | 列 | bd_purchase_in | id | 
+  | 列 | bd_purchase_in | 单据状态 | 
+  | 列 | bd_purchase_in | 单据状态2 | 
+  | 列 | bd_sale_out | asp_cancel | 
+  | 列 | bd_sale_out | id | 
+  | 列 | bd_sale_out | 单据状态 | 
+  | 列 | bd_sale_out | 单据状态2 | 
+  | 列 | bd_so_order | asp_cancel | 
+  | 列 | bd_so_order | id | 
+  | 列 | bd_so_order | 单据状态 | 
+  | 列 | bd_tax_type | asp_cancel | 
+  | 列 | bd_tax_type | id | 
+  | kucun.id 唯一性 | 31 | 31 | 0 | 
+[OK] q-12-filtercols.sql (3 batches)
