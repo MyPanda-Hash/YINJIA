@@ -100,12 +100,12 @@ public class QcCatalogService {
             if (existId != null) {
                 // 已生成过:复用其检验数据记录单号(仍存活才复用,否则新建)
                 String oldRec = str(firstValue("SELECT 检验数据记录单号 FROM qc_catalog_detail WHERE id=?", existId));
-                recNo = recExists(oldRec) ? oldRec : createInspRecord(invName, invCode, curBatch, qty, inspDate, user);
+                recNo = recExists(oldRec) ? oldRec : createInspRecord(invName, invCode, qty, inspDate, user);
                 jdbc.update("UPDATE qc_catalog_detail SET 检测物料类别=?, 物料名称=?, 数量=?, 批次号=?, 检验数据记录单号=?,"
                         + " asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                         nv(category), nv(invName), nv(qty), nv(curBatch), nv(recNo), user, existId);
             } else {
-                recNo = createInspRecord(invName, invCode, curBatch, qty, inspDate, user);
+                recNo = createInspRecord(invName, invCode, qty, inspDate, user);
                 jdbc.update("INSERT INTO qc_catalog_detail (单据编号, 检测物料类别, 物料名称, 物料编码, 批次号, 数量,"
                         + " 检验状态, 是否合格, 检验单号, 检验数据记录单号, asp_user1, asp_time1)"
                         + " VALUES (?,?,?,?,?,?,?,NULL,?,?,?,GETDATE())",
@@ -156,20 +156,24 @@ public class QcCatalogService {
         return newNo;
     }
 
-    /** 建检验数据记录草稿(检验报告:抬头带出物料/批次/数量,表体留空待品质录入) */
-    private String createInspRecord(String invName, String invCode, String batch, String qty, String inspDate, String user) {
+    /**
+     * 建检验数据记录(检验报告):抬头带出物料/数量等,**建出来就是已保存态**(用户口径:报告数据要已经保存好的);
+     * **物料批次号不在此处写** —— 批次号由采购入库单审核取号后回填,故留空,
+     * 待入库后经 {@link #refreshBatchNosFromInsp()} 自动回填(用户口径:物料批次号是后面入库后自动回填的)。
+     */
+    private String createInspRecord(String invName, String invCode, String qty, String inspDate, String user) {
         String no = formNoService.next(REC_PREFIX, user);
         String date = LocalDate.now().toString();
         jdbc.update("INSERT INTO qc_insp_rec (单据编号, 单据日期, 物料名称, 物料编码, 物料批次, 检验日期, 来料数量,"
                 + " 文件编码, 检验依据, 检验人, 表单审核人, asp_user1, asp_time1)"
-                + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,GETDATE())",
-                no, date, nv(invName), nv(invCode), nv(batch), nv(inspDate.isBlank() ? date : inspDate), nv(qty),
+                + " VALUES (?,?,?,?,NULL,?,?,?,?,?,?,?,GETDATE())",
+                no, date, nv(invName), nv(invCode), nv(inspDate.isBlank() ? date : inspDate), nv(qty),
                 REC_DOC_CODE, REC_BASIS, user, REC_REVIEWER, user);
-        mergeStatus(REC_PANEL, no, user, false);
+        mergeStatus(REC_PANEL, no, user, true);
         return no;
     }
 
-    /** 状态行:目录单/报告草稿(未保存态 saved='N';与按钮保存写入的状态行同构) */
+    /** 状态行(merger 幂等):saved=Y 表示报告建出来即已保存态;目录单同口径写 Y */
     private void mergeStatus(String panelCode, String docNo, String user, boolean saved) {
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?,?)) AS s(panel_code, doc_no)"
                 + " ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no"
@@ -304,9 +308,17 @@ public class QcCatalogService {
      */
     @Transactional
     public int refreshBatchNosFromInsp() {
-        return jdbc.update("UPDATE d SET d.批次号 = h.批次号, d.asp_user2 = 'system', d.asp_time2 = GETDATE()"
+        // ① 目录行:挂靠检验单已有批次号时补齐空批次号
+        int n = jdbc.update("UPDATE d SET d.批次号 = h.批次号, d.asp_user2 = 'system', d.asp_time2 = GETDATE()"
                 + " FROM qc_catalog_detail d INNER JOIN qc_insp h ON h.单据编号 = d.检验单号"
                 + " WHERE ISNULL(d.asp_cancel,'N') <> 'Y' AND ISNULL(d.批次号, N'') = '' AND ISNULL(h.批次号, N'') <> ''");
+        // ② 检验数据记录(检验报告):物料批次号同样靠入库回填 —— 报告建单时留空,此处按挂靠关系自动补上
+        n += jdbc.update("UPDATE r SET r.物料批次 = h.批次号, r.asp_user2 = 'system', r.asp_time2 = GETDATE()"
+                + " FROM qc_insp_rec r"
+                + " INNER JOIN qc_catalog_detail d ON d.检验数据记录单号 = r.单据编号 AND ISNULL(d.asp_cancel,'N') <> 'Y'"
+                + " INNER JOIN qc_insp h ON h.单据编号 = d.检验单号"
+                + " WHERE ISNULL(r.asp_cancel,'N') <> 'Y' AND ISNULL(r.物料批次, N'') = '' AND ISNULL(h.批次号, N'') <> ''");
+        return n;
     }
 
     // ==================== 小工具 ====================

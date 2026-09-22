@@ -114,10 +114,14 @@ async function main() {
     `目录=${r0['检测物料类别']} 商品档案=${EXPECT_CAT}`)
   ok('类别非空(非空验证,证明映射真的生效)', !!String(r0['检测物料类别'] || '').trim(), String(r0['检测物料类别']))
 
-  // 检验数据记录草稿确实建出来了
+  // 检验数据记录:① 建出来就是已保存态(用户口径)② 物料批次号留空、待入库回填(用户口径)
   const recDoc = await desc('QC_INSP_REC', r0['检验数据记录单号'])
   ok('检验数据记录已自动建草稿', !!(recDoc?.data && (recDoc.data['物料编码'] || recDoc.data['物料名称'])),
     JSON.stringify(recDoc?.data || null).slice(0, 160))
+  ok('报告为已保存态(不是未保存占位)', recDoc?.data?.saved === 'Y', String(recDoc?.data?.saved))
+  ok('报告物料批次号留空(等入库回填)', !String(recDoc?.data?.['物料批次'] || '').trim(), JSON.stringify(recDoc?.data?.['物料批次']))
+  ok('报告已带物料/数量/检验人等数据', !!recDoc?.data?.['物料编码'] && !!recDoc?.data?.['检验人'],
+    JSON.stringify({ 物料编码: recDoc?.data?.['物料编码'], 检验人: recDoc?.data?.['检验人'], 来料数量: recDoc?.data?.['来料数量'] }))
 
   // ── ② 完成闸门:挂靠单据未审批 → 被拒 ──
   let blocked = ''
