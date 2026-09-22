@@ -97,13 +97,14 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 
 ## 🔴 验证与收尾:开发机服务(2026-09-22 起生效)
 
-**环境前提:JDK 25**。`backend/pom.xml` 是 `<java.version>25</java.version>`(class major 69),
+**环境前提:JDK 25**。`backend/pom.xml` 是 `<java.version>25</java.version>`(class major 69)。
+**本机系统默认已统一到 25**(2026-09-22:Machine `JAVA_HOME` = `C:\Program Files\Java\jdk-25`,
+并把它的 `bin` 前置到 Machine `PATH`;设置/回滚脚本 `tools/archive/_set-jdk25-default.ps1`)——
+`java` / `javac` / `mvn` 直接跑即是 25。旧 Oracle JDK 24 仍在机器上但已被遮蔽。
 仓库脚本一律**优先取 `JAVA_HOME`**、其次探测 `C:\Program Files\Java\jdk-25` /
-`D:\Program Files\Java\jdk-25` / `%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2`。
-本机系统 PATH 里的 `java` 是 **Oracle JDK 24**(Machine 级 javapath,用户 PATH 覆盖不了),
-所以**直接跑 `mvn` 会报「不支持发行版本 25」** —— 处置:`JAVA_HOME` 指向 JDK 25,
-核对与验证命令见 `docs/development/环境与数据库.md`「开发机环境」。
-新写脚本**沿用上述探测,不要把 JDK 路径写死**。
+`D:\Program Files\Java\jdk-25` / `%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2`;
+**新写脚本沿用这套探测,不要把 JDK 路径写死**。核对与排障(如 `mvn` 报
+「不支持发行版本 25」)见 `docs/development/环境与数据库.md`「开发机环境」。
 
 改完**要看效果**的活儿(界面/版面/交互/导出),先确认开发机服务在跑,**没开就一并开**,
 别只跑构建就下结论;纯只读排查(看代码/查库)不必折腾服务。
