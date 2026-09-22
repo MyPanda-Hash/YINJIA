@@ -1,4 +1,4 @@
-# _win-watch.ps1 — 最小化后窗口事件监控(前台窗口PID/标题 + 所有msedge顶层窗口状态)
+﻿# _win-watch.ps1 — 最小化后窗口事件监控(前台窗口PID/标题 + 所有msedge顶层窗口状态)
 Add-Type -Namespace W9 -Name U9 -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int c);
 [DllImport("user32.dll")] public static extern bool IsIconic(IntPtr h);

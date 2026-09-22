@@ -1,4 +1,4 @@
-# _minimize-hang.ps1 — 真实最小化诊断:ShowWindow 模拟点击最小化,量化渲染进程 CPU 与 JS 主线程响应
+﻿# _minimize-hang.ps1 — 真实最小化诊断:ShowWindow 模拟点击最小化,量化渲染进程 CPU 与 JS 主线程响应
 # 用法: .\_minimize-hang.ps1 <URL> [标签]   例: .\_minimize-hang.ps1 http://localhost:5173/#/panelx/list/RD_PROGRESS 进度查询
 param(
   [string]$Url = 'http://localhost:8090/#/dashboard',

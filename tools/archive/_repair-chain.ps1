@@ -1,4 +1,4 @@
-# 一次性修复驱动:按 db-migrations.txt 顺序强制重跑全部已登记脚本(修复 09-15 setup-db 破坏性重跑造成的零散缺失)
+﻿# 一次性修复驱动:按 db-migrations.txt 顺序强制重跑全部已登记脚本(修复 09-15 setup-db 破坏性重跑造成的零散缺失)
 # 跳过:setup-db.sql(破坏性重建,现有元数据/用户保留)与 6 个演示数据种子(避免复活测试数据/清空 bs_bom)
 $ErrorActionPreference = 'Continue'
 Set-Location D:\YINJIA-main\tools

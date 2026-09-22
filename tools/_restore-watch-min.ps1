@@ -1,4 +1,4 @@
-# _restore-watch-min.ps1 — 仅负责最小化真实 Edge 窗口(配 _restore-watch.cjs 的页面监控)
+﻿# _restore-watch-min.ps1 — 仅负责最小化真实 Edge 窗口(配 _restore-watch.cjs 的页面监控)
 param([int]$DelayMs = 2000)
 Add-Type -Namespace W3 -Name U3 -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);

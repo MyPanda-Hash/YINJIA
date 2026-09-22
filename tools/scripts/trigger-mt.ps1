@@ -1,4 +1,4 @@
-# trigger-mt.ps1
+﻿# trigger-mt.ps1
 # 批量机器翻译:把全部面板名/字段标签(中文)补齐到 en + 8 种语言(yj_translation, source='mt')。
 # 步骤:
 #   1) 查询 yj_panel.panel_name + yj_field.label 的全集(仅含中文者)作为 keys 真源

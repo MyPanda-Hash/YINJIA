@@ -1,4 +1,4 @@
-# _rdp-run.ps1 - drive keystrokes into a running RDP session (2026-09-21)
+﻿# _rdp-run.ps1 - drive keystrokes into a running RDP session (2026-09-21)
 #
 # WHY: the server only exposes 3389 (RDP) and 8090 (HTTP) - no WinRM/SSH/SMB,
 # so ops work has to go through the RDP GUI (see 部署说明.md section 7).

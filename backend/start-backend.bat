@@ -1,6 +1,6 @@
 @echo off
 title YINJIA-MES backend (8090) - KEEP THIS WINDOW OPEN
-rem 工作目录必须是仓库根:转ERP凭证兜底按 {工作目录}\deploy\push\config.json 查找
+rem Working dir must be repo root: ERP push credential fallback looks up {cwd}\deploy\push\config.json
 cd /d %~dp0..
 :loop
 "%USERPROFILE%\.jdks\ms-25.0.4\bin\java.exe" -jar backend\target\yinjia-mes-backend-0.1.0.jar
