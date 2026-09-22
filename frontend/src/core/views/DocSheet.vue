@@ -102,9 +102,11 @@
         <!-- 网格行:一行多组 标签|值(品质单据表头区);cell.kind: input/date/select/ref/checks(单选,存选项值)/textarea(大填写区)
              行高与列宽按纸面原图实测值给定:labelW 落在固定列上、flex 取实测像素比例 → 各行竖线重合不错位 -->
         <div v-if="row.kind === 'pairs'" class="as-row q-pairs" :style="{ minHeight: (row.h || 40) + 'px' }">
-          <!-- 左侧竖排格(如「申请单位」一行一字:原图里它是一列、每行一个字,故按行给 vcell;未声明则无此格) -->
+          <!-- 左侧竖排格(如「申请单位」一行一字:原图里它是一列、每行一个字,故按行给 vcell;未声明则无此格)
+               q-join=下一行还是竖排列 → 原图此列是合并格,行间横线不穿过它(见扫描实测:内部横线只到列右沿) -->
           <div
             v-if="row.vcell !== undefined" class="q-vlabel"
+            :class="{ 'q-join': config.rows[ri + 1]?.vcell !== undefined }"
             :style="{ width: (config.vcol || 65) + 'px' }"
           >{{ tt(row.vcell) }}</div>
           <div v-for="(c, ci) in row.cells" :key="(c.key || c.label) + ci" class="q-pair" :style="{ flex: c.flex || 1 }">
@@ -1053,6 +1055,11 @@ defineExpose({ focusField })
   font-size: 13.5px;
   border-right: 1px solid #8a8a8a;
   line-height: 1.4;
+}
+/* 竖排列合并格:下一行仍是竖排列时,本格背景下探 1px 盖掉本行底边线在列内的那一段
+   (流内非定位子元素后于父边框绘制,天然盖得住;父级无 overflow 裁剪)。列顶/底的边界线不受影响 */
+.q-vlabel.q-join {
+  margin-bottom: -1px;
 }
 .q-value {
   flex: 1;
