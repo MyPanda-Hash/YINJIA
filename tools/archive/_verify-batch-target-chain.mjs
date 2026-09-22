@@ -26,6 +26,8 @@ import path from 'node:path';
 import { createRequire } from 'node:module';
 // CDP 走浏览器级端点 + flatten 会话:本机页面级 ws 端点会被服务端 reset(详见 _cdp.mjs 头注)
 import { attachCdp } from './_cdp.mjs';
+// API 取数带网络级重试(undici 复用被服务端关掉的 keep-alive 连接会偶发 fetch failed,见 _apifetch.mjs)
+import { fetchRetry } from './_apifetch.mjs';
 
 const mssql = createRequire('D:/jdy-sync/package.json')('mssql');
 const API = process.env.YJ_API || 'http://localhost:8090/api';
@@ -43,11 +45,11 @@ const one = async (s) => (await q(s))[0] || null;
 const N = (v) => (v === null || v === undefined ? '' : String(v).trim());
 const esc = (v) => String(v == null ? '' : v).replace(/'/g, "''");
 
-const lj = await (await fetch(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ userName: 'admin', password: '123456' }) })).json();
+const lj = await (await fetchRetry(API + '/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' }, body: JSON.stringify({ userName: 'admin', password: '123456' }) })).json();
 if (!lj?.data?.token) { console.error('登录失败:' + JSON.stringify(lj)); process.exit(1); }
 const H = { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + lj.data.token };
 const post = async (url, body) => {
-  const j = await (await fetch(API + url, { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
+  const j = await (await fetchRetry(API + url, { method: 'POST', headers: H, body: JSON.stringify(body) })).json();
   if (j.code !== 0 && j.code !== 200) throw new Error(`${url} → ${JSON.stringify(j).slice(0, 300)}`);
   return j.data;
 };
