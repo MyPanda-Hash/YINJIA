@@ -91,12 +91,13 @@ async function main() {
       await navigate('http://localhost:5173/#/panelx/list/QC_INSP_REC')
       await sleep(3500)
       await evaluate(`(() => { const wz = document.querySelector('.wizard-mask'); if (wz) (wz.querySelector('.wz-close') || wz.querySelector('.wz-skip'))?.click(); return 1 })()`)
-      // 等:纸张 + 侧栏「保存」(配置加载完) + 抬头输入框出现(可编辑态=已载入单据)
+      // 等:纸张 + 侧栏「保存/新增」(配置加载完)。
+      // 注:本面板 2026-09-22 起进 DOC_ARCHIVE_PANELS(保存即归档),打开时多半落在**已归档只读单**上,
+      //     故就绪只看纸张与按钮,随后统一走「新增」拿一张可编辑空单再断言。
       ready = await waitFor(`(() => {
         const sheet = document.querySelector('.qc-rec-sheet')
         const side = [...document.querySelectorAll('.approval-side .as-side-btn')].map(e => e.innerText.replace(/\\s/g,''))
-        const inputs = sheet ? [...sheet.querySelectorAll('input')].map(e => e.value) : []
-        return (sheet && side.includes('保存') && inputs.includes('YJ-QR-96')) ? 'READY' : ''
+        return (sheet && side.includes('保存') && side.includes('新增')) ? 'READY' : ''
       })()`, 20000)
       if (!ready) console.log(`   [重试 ${attempt}/5] 面板未就绪(配置未回/列表 0/0)`)
     }
@@ -125,6 +126,11 @@ async function main() {
       freshNo = (await apiRows(token)).map((r) => r['单据编号']).find((n) => !existingNos.includes(n)) || ''
     }
     ok('API 确认已新建一张报告', !!freshNo, freshNo || '(未新建)')
+    await waitFor(`(() => {
+      const sheet = document.querySelector('.qc-rec-sheet')
+      const inputs = sheet ? [...sheet.querySelectorAll('input')].map(e => e.value) : []
+      return inputs.includes('YJ-QR-96') ? 'EDITABLE' : ''
+    })()`, 15000)
     const fresh = await waitFor(`(() => {
       const sheet = document.querySelector('.qc-rec-sheet')
       if (!sheet) return ''

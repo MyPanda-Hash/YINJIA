@@ -2811,7 +2811,11 @@ public class ButtonService {
             "RD_APPROVAL", "RD_PLAN", "RD_FILTER_EFF",
             "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC",
             "RD_SPIKE_WATER", "RD_DOM_TEST", "RD_EQUIP_USE", "RD_INSTR_USE",
-            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO");
+            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
+            // 来料品质·检验数据记录(2026-09-22 用户口径:「需要审批流程,要和立项申请有完全一致的按钮功能」):
+            // 登记进本集合即获得与立项申请同一套文书闭环 —— 保存即归档(管理员)/保存进审批(普通用户)、
+            // 申请修改+修改记录+提交审批、删除申请+删除审批;前端据 metadata.docArchive 放出同一组侧栏按钮。
+            "QC_INSP_REC");
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复) */
     private static final java.util.Set<String> DOC_NO_PANELS = java.util.Set.of(
             "RD_APPROVAL", "RD_PLAN", "RD_PROGRESS", "RD_FILTER_EFF",

@@ -12,8 +12,14 @@
       <div class="qr-title">{{ tt('检验报告') }}</div>
     </div>
 
-    <!-- ② 抬头(四行 × 标签/值 两对,对齐原表 B/C:D + E/F:I) -->
+    <!-- ② 抬头(四行 × 标签/值 两对,对齐原表 B|C:D|E|F:I) -->
     <table class="qr-head-table">
+      <colgroup>
+        <col class="fc-label" />
+        <col class="fc-v1" />
+        <col class="fc-label2" />
+        <col class="fc-v2" />
+      </colgroup>
       <tbody>
         <tr v-for="(pair, ri) in QC_INSP_REC_HEAD_ROWS" :key="'h' + ri">
           <template v-for="cell in pair" :key="cell.key">
@@ -130,17 +136,24 @@
       <div class="qr-add" @click="addItem">＋ {{ tt('新增检验项') }}</div>
     </div>
 
-    <!-- ⑤ 表尾:检验结论 / 处理意见(整宽) -->
+    <!-- ⑤ 表尾:检验结论 / 处理意见(值格铺满表格右侧,对齐原表 C:I 合并) + 签名行 -->
     <table class="qr-foot-table">
+      <!-- 列宽与原表一致:标签列=表体首列(B),值区=C:I(其余三列合并) -->
+      <colgroup>
+        <col class="fc-label" />
+        <col class="fc-v1" />
+        <col class="fc-label2" />
+        <col class="fc-v2" />
+      </colgroup>
       <tbody>
         <tr v-for="cell in QC_INSP_REC_FOOT_FULL" :key="cell.key">
           <th class="qr-label">{{ tt(cell.label) }}</th>
-          <td class="qr-value">
+          <td class="qr-value qr-value-wide" colspan="3">
             <el-input
               v-if="editable"
               v-model="head[cell.key]"
               type="textarea"
-              :autosize="{ minRows: 1, maxRows: 4 }"
+              :autosize="{ minRows: 2, maxRows: 8 }"
               size="small"
               class="qr-cell-input"
               maxlength="1000"
@@ -369,12 +382,24 @@ watch(
   font-size: 12.5px;
 }
 .qr-label {
-  width: 88px;
   background: #eef6fe;
   color: #1f5fa8;
   font-weight: 600;
   text-align: center;
   white-space: nowrap;
+}
+/* 整张纸共用一套列宽(与原表 B|C:D|E|F:I 同节奏):
+   标签列 20% / 值列 30% / 标签列 20% / 值列 30%;表尾「检验结论/处理意见」值格跨后三列铺到表格右缘 */
+.qr-head-table col.fc-label,
+.qr-foot-table col.fc-label { width: 20%; }
+.qr-head-table col.fc-v1,
+.qr-foot-table col.fc-v1 { width: 30%; }
+.qr-head-table col.fc-label2,
+.qr-foot-table col.fc-label2 { width: 20%; }
+.qr-head-table col.fc-v2,
+.qr-foot-table col.fc-v2 { width: 30%; }
+.qr-value-wide {
+  vertical-align: top;
 }
 .qr-value {
   background: #fff;
