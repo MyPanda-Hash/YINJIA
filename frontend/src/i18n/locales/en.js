@@ -270,9 +270,17 @@ export default {
     '破损、变形': 'Damage / Deformation',
     '脏污、头发丝': 'Stains / Hair',
     '重新加载数据': 'Reload data',
-    '放弃未保存的修改': 'Discard unsaved changes',
     '保存整表(缺席行视为删除)': 'Save the whole table (absent rows are treated as deleted)',
-    '放弃后未保存的修改将丢失,确定放弃?': 'Unsaved changes will be lost. Discard anyway?',
+    // ---- 行操作与表内查询(2026-09-22 用户口径:默认只读、点「修改」才可改;删除二次确认;
+    //      去掉「放弃」按钮,未保存的丢失风险改由「刷新」前拦一道;关键字过滤本页并提示其他页签命中) ----
+    '完成': 'Done',
+    '删除该行': 'Delete Row',
+    '删除该行后点「保存」才会落库,确定删除?': 'The row is removed only after you click Save. Delete it?',
+    '未保存的修改将丢失,确定重新加载?': 'Unsaved changes will be lost. Reload anyway?',
+    '提示': 'Notice',
+    '输入关键字过滤本页数据': 'Type a keyword to filter this page',
+    '本页无匹配行': 'No matching row on this page',
+    '其他页签命中': 'Other tabs',
     '暂收退料单': 'Temporary Receipt Return',
     '生产异常分析报告': 'Production Abnormality Analysis Report',
     // ---- 未保存离开守卫(规范 §6.2 弹窗三态) ----
