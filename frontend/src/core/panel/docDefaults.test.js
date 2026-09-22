@@ -134,3 +134,25 @@ test('todayStr:按本地时区给 YYYY-MM-DD(不能因 UTC 偏移差一天)', ()
   assert.match(todayStr(new Date(2026, 8, 11, 0, 30, 0)), /^2026-09-11$/)
   assert.match(todayStr(new Date(2026, 8, 11, 23, 30, 0)), /^2026-09-11$/)
 })
+
+/**
+ * 2026-09-22:立项申请表 / 项目实施计划补「密级」默认值。
+ * 依据:两份设计纸的右上信息表印的就是「密级 = 保密」
+ *   (立项申请表.xlsx G3 / 项目实施计划.xlsx G4);
+ * 同族面板(RD_FILTER_EFF / RD_SAMPLE_NO / RD_PROD_DOCLIST)早就带该默认值,
+ * 唯独这两张漏了 ⇒ 新建单据时密级是空的,与纸面对不上。
+ * 口径与 文件管理人=陈秀丽 一致:走"默认值"(仅空时填、可人工改),不是锁定只读。
+ */
+test('新增立项申请/实施计划:密级默认带出「保密」(设计纸面印的固定值)', () => {
+  for (const code of ['RD_APPROVAL', 'RD_PLAN']) {
+    const form = {}
+    applyDocDefaults(code, form, USER, { isNew: true, today: T })
+    assert.equal(form['密级'], '保密', `${code} 的密级应默认保密(设计 G3/G4)`)
+  }
+})
+
+test('密级默认不得覆盖用户已选值(仅空时填)', () => {
+  const form = { 密级: '内部' }
+  applyDocDefaults('RD_APPROVAL', form, USER, { isNew: true, today: T })
+  assert.equal(form['密级'], '内部', '已有值不应被默认值覆盖')
+})
