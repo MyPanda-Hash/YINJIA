@@ -43,6 +43,7 @@ public class ButtonService {
     private final QcDisposalService qcDisposal;
     private final KingdeePushService kingdeePush;
     private final BatchService batchService;
+    private final InvCostService invCost;
     /** 检验目录联动(生单建行/完成/修改/守卫);本服务只单向依赖它,避免循环依赖 */
     private final QcCatalogService qcCatalog;
 
@@ -52,7 +53,7 @@ public class ButtonService {
                          LotSeqService lotSeqService, StockLedgerService stockLedger,
                          WoReportService woReport, QcDisposalService qcDisposal,
                          KingdeePushService kingdeePush, BatchService batchService,
-                         QcCatalogService qcCatalog) {
+                         InvCostService invCost, QcCatalogService qcCatalog) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -65,6 +66,7 @@ public class ButtonService {
         this.qcDisposal = qcDisposal;
         this.kingdeePush = kingdeePush;
         this.batchService = batchService;
+        this.invCost = invCost;
         this.qcCatalog = qcCatalog;
     }
 
@@ -125,6 +127,8 @@ public class ButtonService {
             case "查询可转ERP" -> listPushableErp(def);
             // 报表弹窗联动选项(台账/库存状况):仓库/存货互相约束(选项=对应视图真实组合)
             case "台账联动选项" -> ledgerRefOptions(def, formData);
+            // 库存报表「重算成本」:全量重算移动加权成本物化表(审核钩子之外的兜底,如同步/导入旁路写入)
+            case "重算成本" -> recalcInvCost(def);
             // 生产工单:成型后生成产品批号(打印产品二维码的数据源,一次生成终身复用)
             case "生成产品批号" -> genProductLot(def, formData);
             // 项目实施计划:阶段完成按钮(填写实际完成时间)
@@ -915,9 +919,13 @@ public class ButtonService {
         // 送料暂收单/来料检验单/采购入库单(头+行)、批次台账、form_flow_link.batch_no。
         // 顺序(2026-09-22 调整):**先**确认批次号再库存过账 —— 否则 kucun.lot_no 落的是确认前的
         // 空值(台账批号口径=批次号优先,见 StockLedgerService.loadRows)。整体同一事务,任一步失败一并回滚。
+        // 之后转ERP(转ERP 是独立按钮,天然在其之后,故不需要"补推批号")。幂等(台账行已有号则沿用)。
         assignBatchNoOnInbound(def.code(), no, auditor);
         // 库存记账(材料入库链):采购入库单审核 → kucun 入账(失败抛错整笔回滚)
         stockLedger.postIn(def.code(), no, currentUserName());
+        // 库存成本重算(移动加权):本单已进入 v_stock_movement(仅已审核单据进视图),成本物化表随之作废。
+        // 全量重算而非按分区:单据可能改动了仓库/存货编码,旧分区行不会被范围 DELETE 清掉。
+        recalcInvCostIfStockDoc(def.code());
         // 工序报工记账(生产过程层):报工单审核 → wo_progress.完成数量 累计
         woReport.post(def.code(), no, currentUserName());
         // 切炭双出口(已确认):报工审核后,直销数量自动生成成品入库单并审核入账(成品仓)
@@ -953,6 +961,8 @@ public class ButtonService {
         qcCatalog.assertLinkedRowNotCompleted(def.code(), no);
         // 库存冲回(材料入库链):先冲账再弃审,余额不足或台账缺失则拒绝,整笔回滚
         stockLedger.unpostIn(def.code(), no, currentUserName());
+        // 库存成本重算:单据退出 v_stock_movement 后,成本物化表同样需重算(与审核对称)
+        recalcInvCostIfStockDoc(def.code());
         // 报工冲回(生产过程层):完成数量对称扣减,为负则拒绝
         woReport.unpost(def.code(), no, currentUserName());
         // 切炭双出口冲回:弃审报工 → 自动生成红字(负数量)成品入库单冲回台账
@@ -1548,6 +1558,7 @@ public class ButtonService {
             line.put("规格型号", r.get("规格型号"));
             line.put("实收数量", r.get("合格数量"));
             line.put("计量单位", r.get("计量单位"));
+            if (r.get("单位") != null) line.put("单位", r.get("单位")); // 退回行另有「单位」列(2026-09-21 补齐,原先只写计量单位 → 单位全空)
             line.put("单价", r.get("单价"));
             // 是否来料检验:本单由**来料检验单**审核自动生成 → 该批物料走过检验 = 是
             // (免检直达的入库单由采购订单生单,写「否」,见 PushGenerateHandler.applyInspectionFlag)
@@ -1652,7 +1663,7 @@ public class ButtonService {
             items.add(line);
         }
         Map<String, Object> head = new LinkedHashMap<>();
-        head.put("单据日期", LocalDate.now().toString()); // 创建当日,不继承检验单日期(2026-09-17 口径);2026-09-21 标签由「日期」改为「单据日期」(原写「日期」对不上目标字段 → 退回头日期全空)
+        head.put("单据日期", LocalDate.now().toString()); // 创建当日,不继承检验单日期(2026-09-17 口径)
         head.put("业务员", h.get("业务员"));
         head.put("供应商代码", h.get("供应商代码"));
         head.put("供应商", h.get("供应商"));
@@ -1793,8 +1804,8 @@ public class ButtonService {
      * - 仅对「由检验行生成」的特采单生效(链路上有 QC_INSP→QC_TC_IN 的 ACTIVE 占用);
      *   纯手工新建的特采单不自动生成(无检验行/采购订单上下文,避免凭空入库);
      * - 数量 = 特采单「总数量」(审批人可在特采单上改数后批准,按批准值入库);
-     * - 头/行对齐 inspAutoPurchaseIn(供应商/供应商编码/采购订单号/批次键),行上 是否来料检验=是;
-     *   注:不写 外部单据号/来源单据/来源单号(2026-09-21 口径下线),追溯走链路与检验行「入库单号」;
+     * - 头/行对齐 inspAutoPurchaseIn(供应商/供应商编码/采购订单号/批次键/外部单据号=检验单号),
+     *   行上 是否来料检验=是;
      * - 行级占用写 form_flow_link(QC_TC_IN→PURCHASE_IN)并回填检验行「入库单号」;
      * - 入库单留草稿由仓库确认审核;审核时凭批次键回填批次号,回填范围含特采单头
      *   (BatchService.KEY_PANELS)。幂等:该特采单已有 ACTIVE 入库单占用(重审)跳过。
@@ -1823,7 +1834,7 @@ public class ButtonService {
         if (iheads.isEmpty()) throw new IllegalStateException("来源检验单不存在:" + inspNo);
         Map<String, Object> ih = iheads.get(0);
         Integer rowId = null;
-        try { rowId = Integer.valueOf(lineKey.substring(lineKey.indexOf('#') + 1)); } catch (Exception ignore) { /* 行键异常时按单据兜底 */ }
+        try { rowId = Integer.valueOf(lineKey.substring(lineKey.indexOf('#') + 1)); } catch (Exception ignore) { /* 行键异常时按单据+物料兜底 */ }
         List<Map<String, Object>> drows = rowId != null
                 ? jdbc.queryForList("SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
                         + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
@@ -1860,6 +1871,8 @@ public class ButtonService {
                 ? String.valueOf(tc.get("采购单号")) : String.valueOf(ih.get("采购订单号") == null ? "" : ih.get("采购订单号"));
         if (!poNo.isBlank()) head.put("采购订单号", poNo);
         if (ih.get("批次键") != null) head.put("批次键", ih.get("批次键"));
+        // 注:不写 外部单据号/来源单据/来源单号 —— 采购入库单已按 2026-09-21 用户口径
+        // 「入库单用采购订单号就够了」下线这三列;追溯走 form_flow_link 与检验行「入库单号」
         head.put("detail", Map.of("items", List.of(line)));
         Map<String, Object> saved = save(registry.panel("PURCHASE_IN"), head, false);
         String piNo = String.valueOf(saved.get("编号"));
@@ -2321,11 +2334,34 @@ public class ButtonService {
         return n == null ? 0 : n;
     }
 
-    // ══════════ 转ERP(金蝶星辰) ══════════
+    // ══════════ 库存移动加权成本 ══════════
 
-    /** 批量转ERP:查询所有已审核+未转ERP的单据(前端弹窗列表勾选) */
+    /** 库存三报表(都读 inv_cost_ledger 的成本),支持手工全量重算。 */
+    private static final List<String> INV_COST_PANELS = List.of("STOCK_LEDGER", "STOCK_SUMMARY", "STOCK_BALANCE");
+
+    /**
+     * 出入库单据审核/弃审后重算成本。
+     * 面板集合与 {@link StockLedgerService#postsStock} 同源(那 8 类正是 v_stock_movement 的来源),
+     * 非库存单据不触发。全量重算而非按分区:单据可能改动了仓库/存货编码,
+     * 旧分区行不会被范围 DELETE 清掉(见 InvCostService#recalc 注释)。
+     */
+    private void recalcInvCostIfStockDoc(String panelCode) {
+        if (StockLedgerService.postsStock(panelCode)) invCost.recalcAll();
+    }
+
+    /** 「重算成本」按钮:全量重算移动加权成本物化表(审核钩子之外的兜底:金蝶同步等旁路写入不走审核动作)。 */
+    private Map<String, Object> recalcInvCost(PanelRegistry.PanelDef def) {
+        if (!INV_COST_PANELS.contains(def.code())) throw new IllegalStateException("该面板不支持重算成本");
+        int rows = invCost.recalcAll();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("重算行数", rows);
+        return out;
+    }
     /** 报表弹窗联动选项(台账/库存状况):仓库/存货互相约束——选项=对应视图真实存在的组合,
-     *  选了存货→仓库只列该存货有流水的仓;选了仓库→存货只列该仓有流水的存货 */
+     *  选了存货→仓库只列该存货有流水的仓;选了仓库→存货只列该仓有流水的存货。
+     *  2026-09-21:「选项以基础资料为准」——两个列表再与 仓库档案(bs_wh)/存货档案(bs_inv)
+     *  按名称取交集,即 档案 ∩ 有流水。未建档的值(台账里 CK01原料仓 等)不再出现在选项里,
+     *  查询弹窗据此把「当前存货在档案仓里没有流水」的仓置灰,并自动清掉换仓后无流水的存货。 */
     private Map<String, Object> ledgerRefOptions(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String view = switch (def.code()) {
             case "STOCK_LEDGER" -> "v_stock_ledger";
@@ -2338,14 +2374,22 @@ public class ButtonService {
         // RTRIM:源列可能带尾随空格(nchar/手工导入),选项须干净值回传才能精确匹配。
         // 口径:选项只来自 仓库非空 的行——无仓库的行不在任何可查组合内,不进选项
         // (台账必填仓库+存货;状况表快照本就按仓库聚合,天然非空)。
+        // 排除 '(未填仓库)':v_stock_movement 把空仓库写成该标签以便分组(不再是 NULL/空串),
+        // 若不排除会冒出一个可选的伪仓库。
         List<String> whs = jdbc.queryForList(
                 "SELECT DISTINCT RTRIM(仓库) AS 仓库 FROM " + view + " WHERE 仓库 IS NOT NULL AND RTRIM(仓库) <> ''"
+                + " AND 仓库 NOT LIKE N'(未填%'"
                 + (item.isBlank() ? "" : " AND RTRIM(存货) = N'" + item.replace("'", "''") + "'")
+                + " AND EXISTS (SELECT 1 FROM bs_wh w WHERE RTRIM(w.仓库名称) = RTRIM(" + view + ".仓库)"
+                + "               AND ISNULL(w.asp_cancel,'N') <> 'Y')"
                 + " ORDER BY 1", String.class);
         List<String> items = jdbc.queryForList(
                 "SELECT DISTINCT RTRIM(存货) AS 存货 FROM " + view + " WHERE 存货 IS NOT NULL AND RTRIM(存货) <> ''"
                 + " AND 仓库 IS NOT NULL AND RTRIM(仓库) <> ''"
+                + " AND 仓库 NOT LIKE N'(未填%'"
                 + (wh.isBlank() ? "" : " AND RTRIM(仓库) = N'" + wh.replace("'", "''") + "'")
+                + " AND EXISTS (SELECT 1 FROM bs_inv i WHERE RTRIM(i.存货名称) = RTRIM(" + view + ".存货)"
+                + "               AND ISNULL(i.asp_cancel,'N') <> 'Y')"
                 + " ORDER BY 1", String.class);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("仓库列表", whs);
@@ -3030,11 +3074,11 @@ public class ButtonService {
             "RD_APPROVAL", "RD_PLAN", "RD_FILTER_EFF",
             "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC",
             "RD_SPIKE_WATER", "RD_DOM_TEST", "RD_EQUIP_USE", "RD_INSTR_USE",
-            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
-            // 来料品质·检验数据记录(2026-09-22 用户口径:「需要审批流程,要和立项申请有完全一致的按钮功能」):
-            // 登记进本集合即获得与立项申请同一套文书闭环 —— 保存即归档(管理员)/保存进审批(普通用户)、
-            // 申请修改+修改记录+提交审批、删除申请+删除审批;前端据 metadata.docArchive 放出同一组侧栏按钮。
-            "QC_INSP_REC");
+            // 来料品质·检验数据记录(2026-09-22 用户口径):走**普通审批流**而非"保存即归档"一族 ——
+            // 保存=草稿、提交审批=审批中、审批通过=已审核、弃审回草稿(与特采单同一套审批语义);
+            // 侧栏审批按钮组由前端 hasApprovalBtns(=标准流 ∪ QC_INSP_REC)放出。
+            // (曾登记进本集合,但管理员保存即归档会让"提交审批"看起来直接归档,用户口径不认 → 移出。)
+            "RD_PROD_INFO");
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复) */
     private static final java.util.Set<String> DOC_NO_PANELS = java.util.Set.of(
             "RD_APPROVAL", "RD_PLAN", "RD_PROGRESS", "RD_FILTER_EFF",
