@@ -6,12 +6,15 @@ cd /d %~dp0..
 
 rem ---- JDK 探测(与 build.bat 同口径:JAVA_HOME → 常见安装目录 → PATH) ----
 rem 2026-09-20 修复:原写死 %USERPROFILE%\.jdks\ms-25.0.4\bin\java.exe,本机不存在 → 窗口每 5 秒刷错误
+rem 2026-09-22:工具链切到 **JDK 25**(Temurin 25.0.4.1,与 backend/pom.xml 的 java.version=25 对齐);
+rem   下面仍保留 26 / jdk-25 等历史路径作兜底(别的机器可能只装了那些)。
 set "JAVA_EXE="
 if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" set "JAVA_EXE=%JAVA_HOME%\bin\java.exe"
-if not defined JAVA_EXE if exist "%USERPROFILE%\.jdks\openjdk-26.0.2\bin\java.exe" set "JAVA_EXE=%USERPROFILE%\.jdks\openjdk-26.0.2\bin\java.exe"
-if not defined JAVA_EXE if exist "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2\bin\java.exe" set "JAVA_EXE=%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2\bin\java.exe"
+if not defined JAVA_EXE if exist "%USERPROFILE%\.jdks\temurin-25.0.4.1\bin\java.exe" set "JAVA_EXE=%USERPROFILE%\.jdks\temurin-25.0.4.1\bin\java.exe"
 if not defined JAVA_EXE if exist "C:\Program Files\Java\jdk-25\bin\java.exe" set "JAVA_EXE=C:\Program Files\Java\jdk-25\bin\java.exe"
 if not defined JAVA_EXE if exist "D:\Program Files\Java\jdk-25\bin\java.exe" set "JAVA_EXE=D:\Program Files\Java\jdk-25\bin\java.exe"
+if not defined JAVA_EXE if exist "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2\bin\java.exe" set "JAVA_EXE=%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2\bin\java.exe"
+if not defined JAVA_EXE if exist "%USERPROFILE%\.jdks\openjdk-26.0.2\bin\java.exe" set "JAVA_EXE=%USERPROFILE%\.jdks\openjdk-26.0.2\bin\java.exe"
 if not defined JAVA_EXE set "JAVA_EXE=java"
 echo [YINJIA-MES] backend 8090 starting with %JAVA_EXE%
 

@@ -3,9 +3,9 @@ chcp 65001 >nul
 rem YINJIA-MES 一键启动:后端(8090) + 前端 dev(5173)
 setlocal
 
-rem ---- JDK 探测(与 build.bat 一致) ----
+rem ---- JDK 探测(与 build.bat 一致;2026-09-22 起首选本机 JDK 25: %USERPROFILE%\.jdks\temurin-25.0.4.1) ----
 if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" goto :jdk_ok
-for %%D in ("C:\Program Files\Java\jdk-25" "D:\Program Files\Java\jdk-25" "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2") do (
+for %%D in ("%USERPROFILE%\.jdks\temurin-25.0.4.1" "C:\Program Files\Java\jdk-25" "D:\Program Files\Java\jdk-25" "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2") do (
   if exist "%%~D\bin\java.exe" ( set "JAVA_HOME=%%~D" & goto :jdk_ok )
 )
 where java >nul 2>nul || ( echo [错误] 未找到 JDK 25 & goto :fail )

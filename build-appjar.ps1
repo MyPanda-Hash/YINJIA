@@ -1,4 +1,4 @@
-﻿<#
+<#
   YINJIA-MES 一键打包 -> app.jar(服务器内测部署产物)
   ==================================================
   流程: 前端 npm run build -> dist 镜像同步到后端内嵌 static(/MIR 清陈旧产物)
@@ -42,7 +42,8 @@ Write-Host '[2/4] static 同步 OK'
 # ---------- 3/4 Maven 打包 ----------
 $env:YINJIA_M2_REPO = "$root\.m2-repo"
 if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME\bin\java.exe")) {
-  foreach ($cand in @('C:\Program Files\Java\jdk-25', 'D:\Program Files\Java\jdk-25', "$env:USERPROFILE\.jdk\jdk-25\jdk-25.0.2")) {
+  # 2026-09-22 起首选本机 JDK 25(Temurin 25.0.4.1,与 pom 的 java.version=25 对齐)
+  foreach ($cand in @("$env:USERPROFILE\.jdks\temurin-25.0.4.1", 'C:\Program Files\Java\jdk-25', 'D:\Program Files\Java\jdk-25', "$env:USERPROFILE\.jdk\jdk-25\jdk-25.0.2")) {
     if (Test-Path "$cand\bin\java.exe") { $env:JAVA_HOME = $cand; break }
   }
 }

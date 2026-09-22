@@ -5,7 +5,7 @@ setlocal
 
 rem ---- JDK detect: JAVA_HOME -> common dirs -> PATH ----
 if defined JAVA_HOME if exist "%JAVA_HOME%\bin\java.exe" goto :jdk_ok
-for %%D in ("C:\Program Files\Java\jdk-25" "D:\Program Files\Java\jdk-25" "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2") do (
+for %%D in ("%USERPROFILE%\.jdks\temurin-25.0.4.1" "C:\Program Files\Java\jdk-25" "D:\Program Files\Java\jdk-25" "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2") do (
   if exist "%%~D\bin\java.exe" ( set "JAVA_HOME=%%~D" & goto :jdk_ok )
 )
 where java >nul 2>nul

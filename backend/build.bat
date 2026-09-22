@@ -8,7 +8,7 @@ rem ---- JDK 探测: JAVA_HOME -> 常见安装目录 -> PATH ----
 if not defined JAVA_HOME goto :jdk_scan
 if exist "%JAVA_HOME%\bin\java.exe" goto :jdk_ok
 :jdk_scan
-for %%D in ("C:\Program Files\Java\jdk-25" "D:\Program Files\Java\jdk-25" "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2") do (
+for %%D in ("%USERPROFILE%\.jdks\temurin-25.0.4.1" "C:\Program Files\Java\jdk-25" "D:\Program Files\Java\jdk-25" "%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2") do (
   if exist "%%~D\bin\java.exe" ( set "JAVA_HOME=%%~D" & goto :jdk_ok )
 )
 where java >nul 2>nul && goto :jdk_ok
