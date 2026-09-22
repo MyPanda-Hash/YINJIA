@@ -231,7 +231,8 @@ public class PushGenerateHandler implements PanelActionHandler {
     /**
      * 分批送料对话框的行状态:每行 订单量 / 已送 / 已退回(回冲) / 剩余 / 可送上限,
      * 并附 该订单已有批次清单(含"待编号"批次)。前端「生成送料暂收单」据此弹出分批对话框。
-     * 注:2026-09-21 起批次号在**采购入库单审核时**才取号,故不再返回"下一批次号预览"。
+     * 注:2026-09-21 二次口径 —— 批次号 = 采购入库单「单据日期」(纯 yyyyMMdd,同一日期同一批次),
+     * 填单时预设、可人工改,审核时确认并回填;生单这一跳(暂收/检验)不做预告,故不返回"下一批次号"。
      */
     public Map<String, Object> batchLines(String sourcePanel, String targetPanel, String sourceNo) {
         PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
@@ -276,8 +277,9 @@ public class PushGenerateHandler implements PanelActionHandler {
      * 分批生单:按行指定「本次送料量」生成一张目标草稿(送料暂收单),写**待编号**批次台账 + 按量占用。
      * - qtyByLineKey 为空 = 所有"还有剩余"的行按剩余量全部送出(推式按钮直接点、或选单一次性送完);
      * - 校验:来源已审核 / 目标为分批面板 / 每行 0 < 本次 ≤ 剩余×(1+超送比例) / 至少一行;
-     * - **批次号此时留空**(2026-09-21 用户口径):只登记一行 status='PENDING'、batch_no=NULL 的台账
-     *   (create_time=送料当天),把该行 id 作「批次键」逐站带下去,采购入库单审核时才取号并回填;
+     * - **暂收单批次号留空**(2026-09-21 二次口径):本跳只登记一行 status='PENDING'、batch_no=NULL 的台账
+     *   (create_time=送料当天),把该行 id 作「批次键」逐站带下去;批次号到**采购入库单**填单时预设
+     *   (=入库单「单据日期」,前端 docDefaults)并可人工改,审核时由 BatchService.assignNoAndBackfill 确认并回填全链;
      * - 失败回滚:台账行随 @Transactional 一并回滚,不再有"回收序号"一说(@Transactional)。
      */
     @Transactional
@@ -346,8 +348,9 @@ public class PushGenerateHandler implements PanelActionHandler {
 
         // 批次键来源(2026-09-21):**来源单已带「批次键」时继承,不再新登记台账** ——
         // 键在「采购订单→送料暂收单」这一跳产生(该跳台账行属那张采购订单),下游(暂收→检验→入库/退回)
-        // 一律继承同一个键;批次号此时**一律留空**,待采购入库单审核时由 BatchService.assignNoAndBackfill
-        // 顺键取号并回填全链(否则每跳都会给上游单再发一个批次键,批次追溯断链)。
+        // 一律继承同一个键;本跳目标(暂收/检验/退料)的批次号**留空** —— 采购入库单的号在填单时预设
+        // (=入库单「单据日期」,前端 docDefaults)、可人工改,审核时由 BatchService.assignNoAndBackfill
+        // 确认后再顺键回填全链(否则每跳都会给上游单再发一个批次键,批次追溯断链)。
         Object srcKeyObj = head.get("批次键");
         Integer inheritKey = srcKeyObj instanceof Number n ? n.intValue()
                 : (srcKeyObj == null || String.valueOf(srcKeyObj).isBlank() ? null
@@ -363,7 +366,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         targetHead.put("来源单据", srcDef.name());
         targetHead.put("来源单号", sourceNo);
         targetHead.put("批次键", batchId);      // 链路键:审核时顺它回填(目标面板未登记该字段时被通用保存忽略)
-        targetHead.remove("批次号");            // 审核前批次号留空(上游若已有历史批次号,不再向下传)
+        targetHead.remove("批次号");            // 本跳(暂收/检验/退料)批次号留空;入库单的号在填单时预设、审核时确认
         String dateLabel = "单据日期";
         if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
             PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
@@ -380,7 +383,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                 if (v != null) row.put(m.get("to"), v);
             }
             row.put(tgtQtyLabel, p.get("qty"));   // 本次送料数量
-            row.remove("批次号");                  // 行批次号同样留空(审核取号后回填)
+            row.remove("批次号");                  // 行批次号同样留空(入库审核确认批次号时按批次键回填)
             applyInspectionFlag(sourcePanel, targetPanel, row);
             targetItems.add(row);
         }
@@ -411,7 +414,7 @@ public class PushGenerateHandler implements PanelActionHandler {
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("编号", newNo);
-        out.put("批次号", "");                  // 审核前留空(前端据此不再预告批次号)
+        out.put("批次号", "");                  // 本跳不预告批次号(入库单填单时按单据日期预设)
         out.put("批次键", batchId);
         out.put("单据状态", "草稿");
         out.put("gotoPanel", targetPanel);

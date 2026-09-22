@@ -1869,6 +1869,8 @@ export default {
     '已送合计': 'Delivered total',
     '待编号': 'Pending No.',
     '{n} 批待编号': '{n} batch(es) pending No.',
-    '待采购入库单审核时生成': 'Generated when the purchase receipt is approved',
+    '采购入库单填单时按入库日期预设,可修改': 'Preset from the receipt date when filling the purchase receipt; editable',
+    '只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」': 'Only checked lines are generated (qty 0 = not delivered), within the max deliverable',
+    '请至少勾选一行并填写本次送料数量': 'Check at least one line and enter the delivery qty',
   },
 }

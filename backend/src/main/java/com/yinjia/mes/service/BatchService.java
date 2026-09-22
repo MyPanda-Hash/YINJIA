@@ -12,23 +12,24 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 采购订单分批送料:批次台账 / 送料量统计 / **采购入库单审核时取号并回填**(P0,2026-09-20;
- * 取号时机迁移 2026-09-21)。
+ * 采购订单分批送料:批次台账 / 送料量统计 / **采购入库单审核时确认批次号并回填**(P0,2026-09-20;
+ * 取号时机迁移 2026-09-21;格式与唯一性**二次变更** 2026-09-21 —— 见 tools/migrate-batch-no-date-only.sql)。
  *
- * 口径(用户定稿,见 tools/migrate-batch-no-at-inbound.sql 头注释与
- * docs/方案-采购订单分批送料与批次号.md):
- * - 批次号 = `yyyyMMdd` + **两位序号**(无分隔符,如 2026092101 = 2026-09-21 第 1 批);
- * - 日期部分取**送料当天**(台账行 create_time),**不是**审核当天;
- * - 唯一性范围 = **采购订单号 + 批次号**(不同采购订单之间允许重号,不是全局唯一
- *   —— 由筛选唯一索引 UX_yj_doc_batch_no_active 保证);
- * - 取号 = 同订单 + 同送料日「已用最大序号 + 1」;**弃审/作废不回收**(会跳号,绝不重号);
- * - 取号时机 = **采购入库单审核**;审核之前链路上所有单据的批次号**留空**;
- * - 一单一单(暂收 = 检验 = 入库),批次号挂**单头**(行上另冗余一份,保持现状)。
+ * 口径(用户定稿,**以二次变更为准**):
+ * - 批次号 = **纯入库日期 yyyyMMdd**(如 20260921),**不带序号**;
+ * - 日期取**采购入库单的「单据日期」**(不是送料当天,也不是审核当天);
+ * - 「同一日期算同一批次」:同一天多批**共号**(允许重复)—— 旧的筛选唯一索引
+ *   UX_yj_doc_batch_no_active(唯一键 = 采购订单号 + 批次号)已由迁移删除,改非唯一索引;
+ * - **预设 + 人工修改**:入库单填单/生单时预设(前端 docDefaults 取「单据日期」),用户可改;
+ *   审核时**以入库单表头「批次号」为准**,为空才按「单据日期」补;
+ * - 回填时机 = **采购入库单审核**;审核之前暂收/检验单的批次号留空(入库单自身带预设值);
+ * - 一单一单(暂收 = 检验 = 入库),批次号挂**单头**(行上另冗余一份,保持现状);
+ * - 历史批次号(YJ-…. / 10 位旧号)原样保留,只对新单生效。
  *
- * 台账生命周期(新口径):
+ * 台账生命周期:
  *   createPending(分批送料时插一行 **PENDING、batch_no=NULL** 的台账,返回行 id 作「批次键」)
- *     → bind(生成成功:绑定目标单与本次送料量;失败由外层事务整体回滚,不再有"回收序号"一说)
- *     → assignNoAndBackfill(采购入库单审核:取号 → 回填台账/链路/三单头行)。
+ *     → bind(生成成功:绑定目标单与本次送料量;失败由外层事务整体回滚)
+ *     → assignNoAndBackfill(采购入库单审核:确认批次号 → 回填台账/链路/三单头行)。
  * 「批次键」= yj_doc_batch.id,写进 sl_recv/qc_insp/bd_purchase_in 的 [批次键] 列与
  * form_flow_link.batch_id:审核时**顺着键**回填,不按单号字符串匹配(单号复用/改号不会回填错单)。
  */
@@ -118,54 +119,78 @@ public class BatchService {
                 targetPanel, targetFormNo, qty, batchId);
     }
 
-    // ==================== 采购入库单审核:取号并回填全链 ====================
+    // ==================== 采购入库单审核:确认批次号并回填全链 ====================
 
     /**
-     * 采购入库单审核时取号并回填全链。**幂等**:该台账行已有批次号 → 直接返回,不重复取号。
+     * 采购入库单审核时**确认批次号并回填全链**(2026-09-21 二次口径,取代原先的"算序号取号")。
+     *
+     * 取值优先级:
+     *   ① 入库单表头「批次号」—— 填单/生单时的预设值,或用户**人工修改**的值(最高优先);
+     *   ② 台账已有的批次号 —— 弃审后重新审核沿用,幂等不换号;
+     *   ③ 入库单「单据日期」的 yyyyMMdd —— 表头与台账都空时兜底;
+     *   ④ 系统当天 —— 连单据日期都没有(历史脏数据)时的最后兜底。
+     * **不再计算序号**:「同一日期算同一批次」,同一天多批共号,唯一性已由迁移取消。
      *
      * @param batchId 批次键(台账行 id)
      * @param user    操作人(写入台账 remark 留痕)
-     * @return 批次号(yyyyMMdd + 两位序号)
+     * @return 最终批次号
      */
     @Transactional
     public String assignNoAndBackfill(int batchId, String user) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT source_form_no AS srcNo, CONVERT(varchar(8), create_time, 112) AS sendDate, batch_no AS batchNo"
-                        + " FROM yj_doc_batch WHERE id = ?", batchId);
+                "SELECT source_form_no AS srcNo, batch_no AS batchNo FROM yj_doc_batch WHERE id = ?", batchId);
         if (rows.isEmpty()) throw new IllegalStateException("批次台账行不存在:" + batchId);
         Map<String, Object> row = rows.get(0);
-        String exist = row.get("batchNo") == null ? "" : String.valueOf(row.get("batchNo")).trim();
-        if (!exist.isEmpty()) return exist;                       // 幂等:弃审后重新审核沿用原号
+        String ledgerNo = row.get("batchNo") == null ? "" : String.valueOf(row.get("batchNo")).trim();
         String srcNo = row.get("srcNo") == null ? "" : String.valueOf(row.get("srcNo"));
-        String date = row.get("sendDate") == null ? "" : String.valueOf(row.get("sendDate"));
-        if (date.length() != 8) throw new IllegalStateException("批次台账行无送料日期,无法取号:" + batchId);
 
-        // 序号 = 同采购订单 + 同送料日「已用最大序号 + 1」(弃审不回收 → 会跳号,绝不重号)。
-        // UPDLOCK/HOLDLOCK:同订单同日并发双审时串行取号;若仍撞车(极端),由筛选唯一索引
-        // (source_form_no, batch_no) WHERE status='ACTIVE' AND batch_no IS NOT NULL 拒绝后整体回滚。
-        Integer maxSeq = jdbc.queryForObject(
-                "SELECT ISNULL(MAX(TRY_CAST(RIGHT(batch_no, 2) AS int)), 0) FROM yj_doc_batch WITH (UPDLOCK, HOLDLOCK)"
-                        + " WHERE source_form_no = ? AND batch_no LIKE ?",
-                Integer.class, srcNo, date + "%");
-        int seq = (maxSeq == null ? 0 : maxSeq) + 1;
-        if (seq > 99) {
-            throw new IllegalStateException("采购订单 " + srcNo + " 在 " + date + " 的批次序号已用满 99,"
-                    + "两位序号无法表达,请联系开发调整批次号长度");
-        }
-        String no = date + String.format("%02d", seq);
+        // ① 入库单表头(带该批次键的那张):预设值/人工修改值优先;顺带取「单据日期」作兜底
+        String headNo = "";
+        String docDate = "";
+        try {
+            List<Map<String, Object>> pi = jdbc.queryForList(
+                    "SELECT ISNULL([" + BATCH_COL + "], N'') AS b,"
+                            + " CONVERT(varchar(10), [单据日期], 120) AS d"
+                            + " FROM bd_purchase_in WHERE [" + KEY_COL + "] = ?", batchId);
+            if (!pi.isEmpty()) {
+                headNo = str(pi.get(0).get("b"));
+                docDate = str(pi.get(0).get("d"));
+            }
+        } catch (Exception ignore) { /* 列/表缺失:退回台账与当天 */ }
 
-        // 1) 台账:编号 + PENDING → ACTIVE(留痕写 remark:谁在何时取的号)
+        String no = headNo;
+        String from = "入库单表头";
+        if (no.isEmpty()) { no = ledgerNo; from = "台账沿用"; }
+        if (no.isEmpty()) { no = ymd8(docDate); from = "入库单单据日期"; }
+        if (no.isEmpty()) { no = ymd8(java.time.LocalDate.now().toString()); from = "系统当天"; }
+
+        // ② 台账:确认批次号 + PENDING → ACTIVE。batch_seq 退化为**内部计数**(同订单同号第几批,
+        //    不再拼进号里):同一天共号时它只是"当天第几批"的痕迹,便于排查。
+        Integer seq = jdbc.queryForObject(
+                "SELECT ISNULL(MAX(batch_seq), 0) + 1 FROM yj_doc_batch WITH (UPDLOCK, HOLDLOCK)"
+                        + " WHERE source_form_no = ? AND batch_no = ?", Integer.class, srcNo, no);
         jdbc.update("UPDATE yj_doc_batch SET batch_no=?, batch_seq=?, status='ACTIVE', release_time=NULL,"
-                        + " remark = N'分批送料 · 入库审核取号(' + ISNULL(?, N'system') + N')' WHERE id=?",
-                no, seq, user, batchId);
-        // 2) 链路台账:该批次 id 关联的所有跳(含 QC_INSP→QC_RETURN 等旁支)
+                        + " remark = N'分批送料 · 入库审核确认批次号(' + ISNULL(?, N'system') + N',取自' + ? + N')'"
+                        + " WHERE id=?",
+                no, seq == null ? 1 : seq, user, from, batchId);
+        // ③ 表头为空(既没预设也没人工填)时,把确认下来的号写回入库单,保证单据自洽、转ERP有号可推
+        if (headNo.isEmpty()) {
+            jdbc.update("UPDATE bd_purchase_in SET [" + BATCH_COL + "] = ? WHERE [" + KEY_COL + "] = ?", no, batchId);
+        }
+        // ④ 链路台账:该批次 id 关联的所有跳(含 QC_INSP→QC_RETURN 等旁支)
         jdbc.update("UPDATE form_flow_link SET batch_no=? WHERE batch_id=?", no, batchId);
-        // 3) 三单头 + 行(按「批次键」定位,不按单号字符串)
+        // ⑤ 三单头 + 行(按「批次键」定位,不按单号字符串)
         for (String panel : KEY_PANELS) backfill(panel, batchId, no);
         // 留痕说明:未写 yj_doc_modify_log —— 该表是「申请修改/弃审留痕」闭环(snapshot_head/snapshot_rows
-        // + apply_by/approve_by,create_at NOT NULL),塞一条取号事件会污染「修改记录」界面语义;
-        // 取号留痕落在 yj_doc_batch(create_by/create_time/remark/release_time)+ form_flow_link.batch_no。
+        // + apply_by/approve_by,create_at NOT NULL),塞一条确认批次号事件会污染「修改记录」界面语义;
+        // 留痕落在 yj_doc_batch(create_by/create_time/remark/release_time)+ form_flow_link.batch_no。
         return no;
+    }
+
+    /** 'yyyy-MM-dd' / '2026/09/21' / '2026092101' → 'yyyyMMdd'(取前 8 位数字;不足 8 位返回空串) */
+    private static String ymd8(String s) {
+        String digits = str(s).replaceAll("\\D", "");
+        return digits.length() >= 8 ? digits.substring(0, 8) : "";
     }
 
     /** 按「批次键」把批次号回填到某单的头与行(头列/行表/分组列都取自面板元数据) */

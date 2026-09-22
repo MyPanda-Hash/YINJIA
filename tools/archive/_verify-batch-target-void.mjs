@@ -566,7 +566,7 @@ if (process.env.YJ_SKIP_REGRESS === '1') {
   console.log('\n=== ⑥ 回归(已按 YJ_SKIP_REGRESS=1 跳过) ===');
 } else {
   console.log('\n=== ⑥ 回归:上一轮探针 ===');
-  for (const f of ['tools/archive/_verify-batch-target-chain.mjs', 'tools/archive/_verify-batch-no-at-inbound.mjs']) {
+  for (const f of ['tools/archive/_verify-batch-target-chain.mjs', 'tools/archive/_verify-batch-no-date-only.mjs']) {
     console.log(`\n──────── node ${f} ────────`);
     const code = await new Promise((res) => {
       const p = spawn(process.execPath, [f], { stdio: 'inherit' });

@@ -1488,7 +1488,7 @@ import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
-import { applyDocDefaults, todayStr } from '@core/panel/docDefaults'
+import { applyDocDefaults, todayStr, syncBatchNoWithDocDate } from '@core/panel/docDefaults'
 import QrLabelDialog from './QrLabelDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
@@ -2591,8 +2591,9 @@ async function needBatchDialog(target) {
 function onBatchGenerated({ panel, no }) {
   const targetPanel = panel || batchSend.value?.targetPanel || ''
   if (!targetPanel) return
-  // 批次号在采购入库单审核时才取号(2026-09-21 口径),生成阶段没有号可显示
-  ElMessage.success(`已生成 ${targetPanel} ${no}（批次号待采购入库单审核时生成），请在列表页继续填写`)
+  // 批次号在采购入库单填单时按入库日期预设(2026-09-21 二次口径:纯 yyyyMMdd,同一日期同一批次),
+  // 故生成暂收单阶段没有号可显示
+  ElMessage.success(`已生成 ${targetPanel} ${no}（批次号在采购入库单填单时按入库日期预设），请在列表页继续填写`)
   const targetPath = `/panelx/list/${targetPanel}`
   tabs.close(route.path)
   router.push(targetPath)
@@ -2688,6 +2689,26 @@ watch(
     if (!isApprovalDoc.value || !draftEditable.value || !cur.value) return
     applyDocDefaults(panelCode.value, cur.value, user, { isNew: isFreshAddedDoc(), today: todayStr() })
   },
+)
+
+// 采购入库单批次号(2026-09-21 二次口径):批次号 = **入库日期**(纯 yyyyMMdd,同一日期算同一批次),
+// 填单时就预设好、用户**可人工改**;审核时以表头值为准回填全链(BatchService.assignNoAndBackfill)。
+//  · 预设/补空:applyDocDefaults 的 PURCHASE_IN 项(仅空值带出 → 已审核单的历史号/人工号不会被碰);
+//  · 「单据日期」联动:日期改了就跟着走 —— 但只当批次号是空的、或仍是上一次自动带出的值(人工优先)。
+//    跨单据/跨次打开要可靠 → prevAuto 在单据切换(单据编号变化)时按当前值重新取一次。
+const lastAutoBatchNo = ref('')
+const autoBatchDocNo = ref('')
+watch(
+  () => [panelCode.value, cur.value?.['单据编号'], cur.value?.['单据日期']],
+  () => {
+    if (panelCode.value !== 'PURCHASE_IN' || !cur.value) return
+    if (!draftEditable.value) { lastAutoBatchNo.value = ''; autoBatchDocNo.value = ''; return }  // 只读态(已审核/作废)不碰
+    const docNo = String(cur.value?.['单据编号'] ?? '')
+    if (docNo !== autoBatchDocNo.value) { lastAutoBatchNo.value = ''; autoBatchDocNo.value = docNo }  // 换单:自动值基线重置
+    applyDocDefaults('PURCHASE_IN', cur.value, user, { isNew: isFreshAddedDoc(), today: todayStr() })
+    lastAutoBatchNo.value = syncBatchNoWithDocDate(cur.value, lastAutoBatchNo.value, todayStr())
+  },
+  { immediate: true },
 )
 
 watch(cur, (v) => {

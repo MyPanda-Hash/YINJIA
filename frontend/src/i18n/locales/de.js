@@ -1600,6 +1600,8 @@ export default {
     '已送合计': 'Geliefert gesamt',
     '待编号': 'Nr. ausstehend',
     '{n} 批待编号': '{n} Charge(n) ohne Nr.',
-    '待采购入库单审核时生成': 'Wird bei Freigabe des Wareneingangs vergeben',
+    '采购入库单填单时按入库日期预设,可修改': 'Chargennummer wird beim Erfassen des Wareneingangs aus dem Wareneingangsdatum vorbelegt; änderbar',
+    '只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」': 'Nur angehakte Zeilen werden erzeugt (Menge 0 = keine Lieferung), bis zur maximalen Liefermenge',
+    '请至少勾选一行并填写本次送料数量': 'Mindestens eine Zeile anhaken und Liefermenge eingeben',
   },
 }

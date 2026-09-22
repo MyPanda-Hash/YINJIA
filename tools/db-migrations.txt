@@ -707,3 +707,22 @@ migrate-qc-tc-final-result.sql
 #   历史保留:migrate-qc-tc-final-result.sql 不再单独维护(其 UPDATE 此后命中 0 行,幂等无害)。
 #   删前勘查留档:tools/archive/_q-tc-predrop.sql(行数/依赖/号池)、_q-tc-sweep.sql(全库 panel_code 扫描)。
 migrate-qc-tc-drop.sql
+
+# —— 2026-09-21 送料批次号口径再变更:yyyyMMdd+两位序号 → **纯入库日期**,且可人工修改 ——
+#   用户口径:「批次号要按同一日期算,同一日期算同一批次。批次号只要日期并且按入库日期算,
+#   并且在填入库订单时有预设,也可以人工修改」。
+#   ① 格式 = 纯日期 yyyyMMdd(如 20260921),**不带序号**;②「同一日期算同一批次」= 同一天多批**共号**;
+#   ③ 日期取**采购入库单「单据日期」**(非送料当天、非审核当天);④ 入库单填单/生单时**预设**、可人工改;
+#   ⑤ 审核时以**表头「批次号」为准**(人工优先),为空才按单据日期补,再回填全链;⑥ 历史号原样保留。
+#   本脚本:① 删筛选唯一索引 UX_yj_doc_batch_no_active(唯一键 = 采购订单号+批次号;
+#   新口径"同一天共号"下它会把同订单当天第二张入库单直接拒掉 → 唯一性整体取消);
+#   ② 建**非唯一**筛选索引 IX_yj_doc_batch_no_active (batch_no, source_form_no)
+#   WHERE status='ACTIVE' AND batch_no IS NOT NULL(保留按号/按订单+号反查性能);
+#   ③ 改写 yj_doc_batch.batch_no 的 MS_Description 为新口径;④ 三条自检。幂等可重跑。
+#   ⚠ 筛选索引要求 SET QUOTED_IDENTIFIER ON(脚本头部已显式置位)。
+#   配套代码(同提交):BatchService.assignNoAndBackfill(不再算序号:表头值 → 台账 → 单据日期 → 当天)、
+#   前端 core/panel/docDefaults.js(采购入库单批次号预设=单据日期 + 「单据日期→批次号」联动,人工改过则不动)、
+#   core/views/BatchSendDialog.vue(修复"只勾选一行却全部生单":勾选成为权威)。
+#   验证:tools/archive/_verify-batch-no-date-only.mjs(新口径探针)+ 前端 node --test
+#   (src/core/panel/docDefaults.test.js、src/core/selection/batchSendLines.test.js)。
+migrate-batch-no-date-only.sql

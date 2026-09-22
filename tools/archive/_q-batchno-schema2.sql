@@ -1,0 +1,9 @@
+SET NOCOUNT ON;
+SELECT N'1-单据日期列型' AS 段, TABLE_NAME, COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+FROM INFORMATION_SCHEMA.COLUMNS
+WHERE TABLE_NAME = 'bd_purchase_in' AND COLUMN_NAME IN (N'单据日期', N'批次号', N'批次键');
+
+SELECT N'2-日期样本' AS 段, RTRIM(单据编号) AS 单据编号,
+       CONVERT(varchar(10), [单据日期], 120) AS 单据日期_规范化,
+       ISNULL([批次号], N'(空)') AS 批次号
+FROM bd_purchase_in ORDER BY id DESC OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY;

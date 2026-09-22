@@ -1600,6 +1600,8 @@ export default {
     '已送合计': 'Total livré',
     '待编号': 'N° en attente',
     '{n} 批待编号': '{n} lot(s) sans n°',
-    '待采购入库单审核时生成': 'Généré à la validation de la réception',
+    '采购入库单填单时按入库日期预设,可修改': 'Le lot est prédéfini depuis la date de réception lors de la saisie du bon de réception; modifiable',
+    '只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」': 'Seules les lignes cochées sont générées (quantité 0 = non livrée), dans la limite du maximum livrable',
+    '请至少勾选一行并填写本次送料数量': 'Cochez au moins une ligne et saisissez la quantité à livrer',
   },
 }

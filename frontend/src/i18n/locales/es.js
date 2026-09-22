@@ -1600,6 +1600,8 @@ export default {
     '已送合计': 'Total entregado',
     '待编号': 'N.º pendiente',
     '{n} 批待编号': '{n} lote(s) sin n.º',
-    '待采购入库单审核时生成': 'Se genera al aprobar la entrada de compra',
+    '采购入库单填单时按入库日期预设,可修改': 'El lote se preajusta con la fecha de entrada al rellenar el albarán de compra; modificable',
+    '只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」': 'Solo se generan las líneas marcadas (cantidad 0 = no se entrega), hasta el máximo entregable',
+    '请至少勾选一行并填写本次送料数量': 'Marque al menos una línea e introduzca la cantidad a entregar',
   },
 }

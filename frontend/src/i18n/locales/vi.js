@@ -1615,6 +1615,8 @@ export default {
     '已送合计': 'Tổng đã giao',
     '待编号': 'Chờ số',
     '{n} 批待编号': '{n} lô chờ số',
-    '待采购入库单审核时生成': 'Sinh số khi duyệt phiếu nhập mua',
+    '采购入库单填单时按入库日期预设,可修改': 'Số lô được đặt trước theo ngày nhập khi lập phiếu nhập mua; có thể sửa',
+    '只生成已勾选的行(数量为 0 的行不送),且不超过「可送上限」': 'Chỉ tạo các dòng đã chọn (dòng số lượng 0 không gửi), không vượt mức tối đa',
+    '请至少勾选一行并填写本次送料数量': 'Chọn ít nhất một dòng và nhập số lượng giao lần này',
   },
 }
