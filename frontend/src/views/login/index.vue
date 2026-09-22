@@ -201,9 +201,9 @@ async function doLogin() {
   try {
     // 所选工厂随登录请求一起发给后端(ADR-0003):它决定这次登录查哪个账套,
     // 并由后端写进令牌声明 —— 后续请求按声明路由,故换了工厂必须重新登录。
+    // (账套显示名由 user.login 按登录响应里的 factory 自行落定,这里不必再补一次;
+    //  switchFactory 自 2026-09-22 起是"按目标账套重登"的语义,登录流程里不能再调它。)
     await user.login({ userName: form.userName, password: form.password, factory: form.factory })
-    const selectedFactory = user.factories.find((item) => item.code === form.factory)
-    if (selectedFactory) user.switchFactory(selectedFactory)
     if (rememberAccount.value) localStorage.setItem(REMEMBERED_ACCOUNT_KEY, form.userName)
     else localStorage.removeItem(REMEMBERED_ACCOUNT_KEY)
     await router.replace('/dashboard')

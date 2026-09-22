@@ -111,6 +111,10 @@ public class AuthController {
         user.put("realName", u.get("real_name"));
         user.put("roleCode", admin ? "admin" : "user");
         user.put("isAdmin", admin);
+        // 账套(工厂):取自本次请求的线程上下文 —— JwtAuthFilter 按令牌声明设置的,就是"这个请求正在查哪个库"。
+        // 2026-09-22 补:原先这里不含 factory,前端启动时用本响应覆盖 mes_user,
+        // 会把登录时带进来的 factory 抹掉,顶栏账套名只能靠可能陈旧的 localStorage 缓存 —— 又是"显示与实查不一致"的老坑。
+        user.put("factory", DataSourceRouter.current());
         user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
         user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         return user;

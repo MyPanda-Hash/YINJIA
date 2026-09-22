@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { apiLogin, apiGetUserInfo } from '@/business/api'
+import { pickCurrentFactory } from '@core/auth/factory'
 
 export const useUserStore = defineStore('user', {
   state: () => {
@@ -38,6 +39,15 @@ export const useUserStore = defineStore('user', {
       localStorage.setItem('mes_token', res.token)
       localStorage.setItem('mes_user', JSON.stringify(res.user))
       localStorage.setItem('mes_login_date', today)
+      // 账套以**登录响应**为准(后端把令牌声明里的 factory 一并返回):
+      // 顶栏/桌面显示的名字必须等于"正在被查询的那个库",不能由可陈旧的缓存说了算。
+      // 账套清单可能还没加载(直接调 API 登录的场景),先记 code,名字由 fetchFactories 补齐。
+      if (res.user && res.user.factory) {
+        const code = res.user.factory
+        const hit = this.factories.find((f) => f && f.code === code)
+        this.factory = hit || { code, name: this.factory && this.factory.code === code ? this.factory.name : '' }
+        localStorage.setItem('mes_factory', JSON.stringify(this.factory))
+      }
       return res
     },
     // 从登录/用户信息中提取角色权限
@@ -70,8 +80,11 @@ export const useUserStore = defineStore('user', {
     async fetchFactories() {
       const { apiGetFactories } = await import('@/business/api')
       this.factories = await apiGetFactories()
-      const currentCode = this.factory?.code || this.userInfo?.factoryCode
-      const latest = this.factories.find((item) => item.code === currentCode) || this.factories[0]
+      // 当前账套 = 会话里那个(令牌声明随登录响应进来),缓存只作兜底 —— 见 core/auth/factory.js
+      const latest = pickCurrentFactory(this.factories, {
+        sessionCode: this.userInfo && this.userInfo.factory,
+        cachedCode: this.factory && this.factory.code,
+      })
       if (latest) {
         // Replace the whole cached object so corrected names/addresses take effect
         // after a database repair without requiring users to clear localStorage.
@@ -79,9 +92,23 @@ export const useUserStore = defineStore('user', {
         localStorage.setItem('mes_factory', JSON.stringify(this.factory))
       }
     },
-    switchFactory(r) {
-      this.factory = r
-      localStorage.setItem('mes_factory', JSON.stringify(r))
+    /**
+     * 切换账套(工厂)。2026-09-22 修正:原先这里只改本地对象 + localStorage,令牌没换,
+     * 后端仍按旧令牌声明路由到旧库 —— 名字变了数据没变,用户报的"无效、并未切换"就是这个。
+     * 现在按 ADR-0003 走"用目标账套的密码重新登录"(调用方传入 login):
+     *   · 验密在**目标账套**上做(AuthController 先路由再查 yj_user);
+     *   · 换掉令牌 ⇒ 后续请求由 JwtAuthFilter 按新声明路由到新库;
+     *   · 成功后调用方负责刷新页面,让菜单/面板/数据全部按新库重建。
+     * 失败原样抛出(密码错/该账套无此账号),由调用方展示,不改动当前会话。
+     */
+    async switchFactory(target, password) {
+      if (!target || !target.code) throw new Error('未选择账套')
+      const res = await this.login({
+        userName: this.account || (this.userInfo && this.userInfo.userName),
+        password,
+        factory: target.code,
+      })
+      return res
     },
     logout() {
       this.token = ''
