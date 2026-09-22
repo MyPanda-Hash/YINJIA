@@ -52,8 +52,12 @@ public class BatchService {
     /** 批次键列名(链路三单同名同列;form_flow_link 用 batch_id) */
     private static final String KEY_COL = "批次键";
 
-    /** 批次键所在的三张单(面板码 → 单头表;行表与分组列由 PanelRegistry 提供) */
-    private static final String[] KEY_PANELS = {"QC_RECV", "QC_INSP", "PURCHASE_IN"};
+    /**
+     * 批次键所在的单(面板码 → 单头表;行表与分组列由 PanelRegistry 提供)。
+     * 含特采单(QC_TC_IN,2026-09-22 特采闸门):入库审核回填批次号时把特采单头一并带上
+     * (其明细表 qc_tc_in_detail 是 doc 模式要求的恒空表、无 批次号 列 —— backfill 会先探列再决定跳过行更新)。
+     */
+    private static final String[] KEY_PANELS = {"QC_RECV", "QC_INSP", "PURCHASE_IN", "QC_TC_IN"};
 
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;
@@ -199,9 +203,14 @@ public class BatchService {
         String head = def.headTable();
         String line = def.lineTable();
         String g = def.groupCol();
-        // 行:按其所属单头(批次键命中)定位,写**批次号**列;头:按批次键命中写批次号
-        jdbc.update("UPDATE " + line + " SET [" + BATCH_COL + "] = ? WHERE [" + g + "] IN"
-                + " (SELECT [" + g + "] FROM " + head + " WHERE [" + KEY_COL + "] = ?)", batchNo, batchId);
+        // 行:按其所属单头(批次键命中)定位,写**批次号**列;头:按批次键命中写批次号。
+        // 行表没有 批次号 列时跳过行更新(特采单明细表 qc_tc_in_detail 是 doc 模式恒空表,无该列)。
+        Integer lineCol = line == null ? null : jdbc.queryForObject(
+                "SELECT COL_LENGTH(?, N'批次号')", Integer.class, "dbo." + line);
+        if (lineCol != null && lineCol != 0) {
+            jdbc.update("UPDATE " + line + " SET [" + BATCH_COL + "] = ? WHERE [" + g + "] IN"
+                    + " (SELECT [" + g + "] FROM " + head + " WHERE [" + KEY_COL + "] = ?)", batchNo, batchId);
+        }
         jdbc.update("UPDATE " + head + " SET [" + BATCH_COL + "] = ? WHERE [" + KEY_COL + "] = ?", batchNo, batchId);
     }
 
@@ -219,7 +228,7 @@ public class BatchService {
         id = jdbc.queryForObject("SELECT TOP 1 batch_id FROM form_flow_link WHERE target_panel_code='PURCHASE_IN'"
                 + " AND target_form_no=? AND batch_id IS NOT NULL ORDER BY id", Integer.class, docNo);
         if (id != null && id > 0) return id;
-        // 来源单头上的批次键(检验单 QC_INSP / 送料暂收单 QC_RECV;采购订单免检直达时无此列,跳过)
+        // 来源单头上的批次键(检验单 QC_INSP / 送料暂收单 QC_RECV / 特采单 QC_TC_IN;采购订单免检直达时无此列,跳过)
         List<Map<String, Object>> srces = jdbc.queryForList(
                 "SELECT DISTINCT source_panel_code AS pc, source_form_no AS no FROM form_flow_link"
                         + " WHERE target_panel_code='PURCHASE_IN' AND target_form_no=?", docNo);
@@ -228,6 +237,7 @@ public class BatchService {
             String table = switch (pc) {
                 case "QC_INSP" -> "qc_insp";
                 case "QC_RECV" -> "sl_recv";
+                case "QC_TC_IN" -> "qc_tc_in";   // 特采闸门(2026-09-22):特采单审核生成的入库单
                 default -> null;
             };
             if (table == null) continue;
@@ -285,10 +295,12 @@ public class BatchService {
     // ==================== 台账去向单号 = 链路终点(2026-09-21) ====================
 
     /**
-     * 链路前进站优先级(同一站数有多条 ACTIVE 下游时取前者):主链 采购入库 → 退货 → 检验 → 暂收。
+     * 链路前进站优先级(同一站数有多条 ACTIVE 下游时取前者):主链 采购入库 → 退货 → 特采单 → 检验 → 暂收。
+     * 特采单(QC_TC_IN,2026-09-22 特采闸门)排在入库/退回之后:正常它只是中转站,
+     * 特采审核后生成的入库单站数更深,终点仍是采购入库单。
      * 只影响「同一站数」的分支取舍,不改变"站数多者优先"的终点口径。
      */
-    private static final List<String> CHAIN_PRIORITY = List.of("PURCHASE_IN", "QC_RETURN", "QC_INSP", "QC_RECV");
+    private static final List<String> CHAIN_PRIORITY = List.of("PURCHASE_IN", "QC_RETURN", "QC_TC_IN", "QC_INSP", "QC_RECV");
 
     /** 链路最大前进站数(正常 暂收→检验→入库 共 2 跳;限制站数防脏数据成环/超长链) */
     private static final int MAX_CHAIN_HOPS = 8;

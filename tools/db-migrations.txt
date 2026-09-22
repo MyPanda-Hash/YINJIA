@@ -733,3 +733,22 @@ migrate-batch-no-date-only.sql
 #   配套代码(同提交):DocSheet 部门会签签名行与 textarea 签名行的 年/月/日 三段可填输入;
 #   日期存 'YYYY-MM-DD'(允许部分填写)。验证:tools/archive/_v-tcin-sign-save.cjs(填→存→查库)。
 migrate-qc-tcin-sign.sql
+
+# —— 2026-09-22 来料检验「特采」开关 + 特采闸门(检验行 → 特采单 → 采购入库) ——
+#   用户口径:「为来料检验单的表格明细加一个特采的 bool 开关;选择特采后,合格数量和不合格数量
+#   审批后流转到特采单;特采单审批通过后才可以进入采购入库单与退料单」+ 追加澄清
+#   「特采不用到退料,全部入库就行」。定稿:一特采行一特采单;特采单「审核」=审批通过;
+#   审批后按特采单「总数量」生成**一张**采购入库单(不走退料);闸门 自动+手工 都拦。
+#   ① qc_insp_detail 加 [特采] bit 默认 0(是否=明细开关,yj_field seq 125 紧跟 不合格数量);
+#   ② qc_tc_in 加 [检验单号]/[批次键]/[批次号] 三个隐藏链路列(纸面 YJ-QR-60 无此三项),
+#      批次号在采购入库单审核时随批次键回填到特采单头;
+#   ③ 译名:「特采」×10 语言;新增列全部 MS_Description;5 条自检。幂等可重跑。
+#   配套代码(同提交):ButtonService(inspAutoPurchaseIn/inspAutoReturn 排除特采行;
+#   inspAutoSpecialAccept 检验审核→生成特采单+占用 QC_INSP→QC_TC_IN;tcInApprovedGenerate
+#   特采审核→生成采购入库单(全部数量,是否来料检验=是)+占用+回填检验行入库单号;
+#   inspUnauditCascade/tcInUnauditCascade 弃审级联)、PushGenerateHandler(QC_INSP→PURCHASE_IN/
+#   QC_RETURN 的 batchLines/generateBatch/handle 三处拦特采行)、BatchService(KEY_PANELS 加 QC_TC_IN,
+#   backfill 对无批次号列的明细表跳过行更新;CHAIN_PRIORITY 加 QC_TC_IN;findPendingBatchId 加来源)。
+#   验证:tools/archive/_verify-qc-tc-flow.mjs(35 项断言全 PASS)+ 回归 _verify-batch-target-void.mjs
+#   (146 PASS)。台账留证见探针输出 _v-tc-flow-run3.txt。
+migrate-qc-insp-tc-flow.sql

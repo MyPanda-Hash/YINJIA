@@ -125,6 +125,11 @@ public class PushGenerateHandler implements PanelActionHandler {
             }
         }
 
+        // 3c) 特采闸门(2026-09-22):来源=来料检验单时,勾了特采的行不得经此路径生成入库/退料
+        //     (该路径现为灰色占位,此处为防御性闸门 —— 特采行只能经特采单走,见 ButtonService)
+        items = dropSpecialAccept(sourcePanel, items);
+        if (items.isEmpty()) throw new IllegalStateException("该检验单的明细行均已勾选特采:特采=让步接收,需先经特采单审批通过(由特采单生成采购入库单)");
+
         // 4) 头/行映射:与选单共用 buildSelectConfig 生成的 headerMap/detailMap(from=源标签,to=目标标签)
         //    显式传来源(目标面板可有多来源,如 采购入库单 ← 采购订单/来料检验单)
         Map<String, Object> maps = configService.flowMaps(sourcePanel, target);
@@ -234,6 +239,26 @@ public class PushGenerateHandler implements PanelActionHandler {
      * 注:2026-09-21 二次口径 —— 批次号 = 采购入库单「单据日期」(纯 yyyyMMdd,同一日期同一批次),
      * 填单时预设、可人工改,审核时确认并回填;生单这一跳(暂收/检验)不做预告,故不返回"下一批次号"。
      */
+    /** 检验行的「特采」标志为真(bit/Boolean/是/true/1 均认) */
+    private static boolean isSpecialAccept(Map<String, Object> item) {
+        Object v = item == null ? null : item.get("特采");
+        if (v == null) return false;
+        if (v instanceof Boolean b) return b;
+        if (v instanceof Number n) return n.doubleValue() != 0d;
+        String s = String.valueOf(v).trim();
+        return "true".equalsIgnoreCase(s) || "是".equals(s) || "1".equals(s);
+    }
+
+    /**
+     * 特采闸门(2026-09-22):来源=来料检验单(QC_INSP)时,勾了「特采」的明细行**不得**经
+     * 选单/推式路径直接生成 采购入库单/暂收退回单 —— 它们的去向是特采单,特采单审核通过后
+     * 由 ButtonService.tcInApprovedGenerate 整行(合格+不合格)生成入库单(不走退料)。
+     */
+    private static List<Map<String, Object>> dropSpecialAccept(String sourcePanel, List<Map<String, Object>> items) {
+        if (!"QC_INSP".equals(sourcePanel)) return items;
+        return items.stream().filter(it -> !isSpecialAccept(it)).collect(java.util.stream.Collectors.toList());
+    }
+
     public Map<String, Object> batchLines(String sourcePanel, String targetPanel, String sourceNo) {
         PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
         Map<String, Object> src = queryService.loadOneDoc(srcDef, sourceNo);
@@ -242,6 +267,9 @@ public class PushGenerateHandler implements PanelActionHandler {
         double ratio = batchService.overRatio();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Map<String, Object> it : itemsOf(src)) {
+            // 特采行(2026-09-22 闸门):不进选单/生单列表 —— 剩余量已被 QC_INSP→QC_TC_IN 占用吃掉,
+            // 这里再显式排除一道,保证特采行在任何手工路径都不可见
+            if ("QC_INSP".equals(sourcePanel) && isSpecialAccept(it)) continue;
             Object id = it.get("id");
             String lineKey = sourceNo + "#" + (id == null ? "" : String.valueOf(id));
             double qty = numOf(it.get("数量"));
@@ -320,6 +348,8 @@ public class PushGenerateHandler implements PanelActionHandler {
                 : Math.max(0d, Math.min(1d, overRatioOverride));
         List<Map<String, Object>> picked = new ArrayList<>();   // {item, qty}
         for (Map<String, Object> it : srcItems) {
+            // 特采行(2026-09-22 闸门):不得经此路径生成入库/退料 —— 走特采单(审核后整行入库)
+            if ("QC_INSP".equals(sourcePanel) && isSpecialAccept(it)) continue;
             String lineKey = sourceNo + "#" + it.get("id");
             double left = Math.max(0, numOf(it.get("数量")) - sent.getOrDefault(lineKey, 0d)
                     + returned.getOrDefault(lineNoOf(it), 0d));
@@ -337,7 +367,13 @@ public class PushGenerateHandler implements PanelActionHandler {
             p.put("qty", qty);
             picked.add(p);
         }
-        if (picked.isEmpty()) throw new IllegalStateException("该单据已无剩余可送(各明细行均已送满)");
+        if (picked.isEmpty()) {
+            boolean allSpecial = "QC_INSP".equals(sourcePanel) && !srcItems.isEmpty()
+                    && srcItems.stream().allMatch(PushGenerateHandler::isSpecialAccept);
+            throw new IllegalStateException(allSpecial
+                    ? "该检验单的明细行均已勾选特采:特采=让步接收,需先经特采单审批通过(由特采单生成采购入库单,不走此路径)"
+                    : "该单据已无剩余可送(各明细行均已送满)");
+        }
 
         // 4) 头/行映射(与选单共用 buildSelectConfig),再覆盖 本次数量 + 批次键
         Map<String, Object> maps = configService.flowMaps(sourcePanel, targetPanel);
