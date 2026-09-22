@@ -131,6 +131,13 @@
           @dirty="markInlineDirty"
           @open-sheets="openDataSheets"
         />
+        <!-- 来料品质·检验目录(QC_CATALOG):纸张式控制列表,与项目进度查询同一呈现方式 -->
+        <QcCatalogSheet
+          v-else-if="panelCode === 'QC_CATALOG'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
+          @dirty="markInlineDirty"
+        />
         <DataRecordSheet
           v-else-if="panelCode === 'RD_FILTER_EFF'"
           ref="approvalSheetRef"
@@ -1506,6 +1513,7 @@ import BomMasterDetail from './BomMasterDetail.vue'
 import DocSheet from './DocSheet.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import ProgressControlSheet from './ProgressControlSheet.vue'
+import QcCatalogSheet from './QcCatalogSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
@@ -1540,7 +1548,7 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
-const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
+const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', 'QC_CATALOG', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 const docSheetConfig = computed(() => qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
 const bomMasterRows = computed(() => {
@@ -3570,7 +3578,7 @@ async function exportSheetPdf() {
   // $el 在 dev 下可能是 fragment 注释锚点(组件含多个 append-to-body 弹窗)——不是元素时按纸张根类名兜底
   const el0 = approvalSheetRef.value?.$el
   const el = el0 instanceof HTMLElement && el0.offsetWidth > 0 ? el0 : document.querySelector(
-    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet')
+    '.approval-layout .record-sheet, .approval-layout .approval-sheet, .approval-layout .progress-sheet, .approval-layout .catalog-sheet')
   if (!el || !(el instanceof HTMLElement)) return ElMessage.warning(tt('未找到可导出的单据'))
   const loadingMsg = ElMessage({ message: tt('正在生成 PDF…'), duration: 0 })
   let holder = null
@@ -3620,14 +3628,16 @@ async function exportSheetPdf() {
 /** 导出 Excel(.xlsx):当前单据 头字段键值 + 各明细页签(全字段全数据,不受纸张限制);控制列表走专属导出 */
 async function exportSheetExcel() {
   exportFmtVisible.value = false
-  if (panelCode.value === 'RD_PROGRESS') {
+  // 控制列表专属导出:列定义与纸面同源(项目进度查询 / 检验目录)
+  const catalogExporter = { RD_PROGRESS: 'exportProgressExcel', QC_CATALOG: 'exportCatalogExcel' }[panelCode.value]
+  if (catalogExporter) {
     const sheet = approvalSheetRef.value
-    if (sheet && typeof sheet.exportProgressExcel === 'function') {
+    if (sheet && typeof sheet[catalogExporter] === 'function') {
       try {
-        sheet.exportProgressExcel()
+        sheet[catalogExporter]()
         ElMessage.success(tt('已导出') + ' Excel')
       } catch (e) {
-        console.error('progress-excel-export failed', e)
+        console.error('sheet-excel-export failed', e)
         ElMessage.error(tt('导出失败'))
       }
       return
@@ -6365,7 +6375,8 @@ onUnmounted(() => {
   padding-right: 0;
 }
 .approval-layout :deep(.approval-sheet),
-.approval-layout :deep(.progress-sheet) {
+.approval-layout :deep(.progress-sheet),
+.approval-layout :deep(.catalog-sheet) {
   flex: 1;
   min-width: 0;
 }
