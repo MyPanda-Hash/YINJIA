@@ -134,7 +134,18 @@
                         />
                         <span v-else>{{ head[c.signKey || '填写人'] || '' }}</span>
                       </span>
-                      <span class="q-sign-date">　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
+                      <span class="q-sign-date">
+                    <template v-if="c.dateKey && editable">
+                      <el-input class="as-cell-input q-date-in q-dy" size="small" :model-value="datePart(c.dateKey, 'y')" @update:model-value="v => setDatePart(c.dateKey, 'y', v)" />
+                      {{ tt('年') }}
+                      <el-input class="as-cell-input q-date-in q-dm" size="small" :model-value="datePart(c.dateKey, 'm')" @update:model-value="v => setDatePart(c.dateKey, 'm', v)" />
+                      {{ tt('月') }}
+                      <el-input class="as-cell-input q-date-in q-dm" size="small" :model-value="datePart(c.dateKey, 'd')" @update:model-value="v => setDatePart(c.dateKey, 'd', v)" />
+                      {{ tt('日') }}
+                    </template>
+                    <template v-else-if="c.dateKey && head[c.dateKey]">{{ datePart(c.dateKey, 'y') }} {{ tt('年') }} {{ datePart(c.dateKey, 'm') }} {{ tt('月') }} {{ datePart(c.dateKey, 'd') }} {{ tt('日') }}</template>
+                    <template v-else>　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</template>
+                  </span>
                     </div>
                   </template>
                   <div v-else-if="editable && isRefKey(c.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
@@ -194,7 +205,18 @@
                     />
                     <span v-else>{{ head[c.signKey || '填写人'] || '' }}</span>
                   </span>
-                  <span class="q-sign-date">　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</span>
+                  <span class="q-sign-date">
+                    <template v-if="c.dateKey && editable">
+                      <el-input class="as-cell-input q-date-in q-dy" size="small" :model-value="datePart(c.dateKey, 'y')" @update:model-value="v => setDatePart(c.dateKey, 'y', v)" />
+                      {{ tt('年') }}
+                      <el-input class="as-cell-input q-date-in q-dm" size="small" :model-value="datePart(c.dateKey, 'm')" @update:model-value="v => setDatePart(c.dateKey, 'm', v)" />
+                      {{ tt('月') }}
+                      <el-input class="as-cell-input q-date-in q-dm" size="small" :model-value="datePart(c.dateKey, 'd')" @update:model-value="v => setDatePart(c.dateKey, 'd', v)" />
+                      {{ tt('日') }}
+                    </template>
+                    <template v-else-if="c.dateKey && head[c.dateKey]">{{ datePart(c.dateKey, 'y') }} {{ tt('年') }} {{ datePart(c.dateKey, 'm') }} {{ tt('月') }} {{ datePart(c.dateKey, 'd') }} {{ tt('日') }}</template>
+                    <template v-else>　　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</template>
+                  </span>
                 </div>
               </template>
               <div v-else-if="editable && isRefKey(c.key)" class="as-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
@@ -286,7 +308,32 @@
                 class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
               />
               <div v-else class="as-ro-text">{{ head[sub.key] || '' }}</div>
-              <div v-if="config.deptSignBottom" class="q-dept-signline">{{ tt('签名') }}：　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</div>
+              <!-- 签名行落子区最下一行(原图);signKey/dateKey=签名与年月日可填写(编辑态输入、只读回显),
+                   不给则维持纯印刷文本(其它面板现状) -->
+              <div v-if="config.deptSignBottom" class="q-dept-signline">
+                <template v-if="row.signKey">
+                  {{ tt('签名') }}：
+                  <el-input
+                    v-if="editable" v-model="head[row.signKey]" size="small"
+                    maxlength="50" class="as-cell-input q-sign-input q-sign-name" @input="emit('dirty')"
+                  />
+                  <span v-else class="q-sign-name">{{ head[row.signKey] || '' }}</span>
+                </template>
+                <template v-else>{{ tt('签名') }}：　　　　</template>
+                <template v-if="row.dateKey">
+                  <template v-if="editable">
+                    <el-input class="as-cell-input q-date-in q-dy" size="small" :model-value="datePart(row.dateKey, 'y')" @update:model-value="v => setDatePart(row.dateKey, 'y', v)" />
+                    {{ tt('年') }}
+                    <el-input class="as-cell-input q-date-in q-dm" size="small" :model-value="datePart(row.dateKey, 'm')" @update:model-value="v => setDatePart(row.dateKey, 'm', v)" />
+                    {{ tt('月') }}
+                    <el-input class="as-cell-input q-date-in q-dm" size="small" :model-value="datePart(row.dateKey, 'd')" @update:model-value="v => setDatePart(row.dateKey, 'd', v)" />
+                    {{ tt('日') }}
+                  </template>
+                  <template v-else-if="head[row.dateKey]">{{ datePart(row.dateKey, 'y') }} {{ tt('年') }} {{ datePart(row.dateKey, 'm') }} {{ tt('月') }} {{ datePart(row.dateKey, 'd') }} {{ tt('日') }}</template>
+                  <template v-else>　　　　{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</template>
+                </template>
+                <template v-else>{{ tt('年') }}　　{{ tt('月') }}　　{{ tt('日') }}</template>
+              </div>
             </div>
           </div>
         </div>
@@ -545,6 +592,19 @@ const rowGroups = computed(() => {
   }
   return out
 })
+
+/** 签名日期:纸面是 年_月_日 三段空,单字段存 'YYYY-MM-DD'。允许部分填写(如只填年 → '2026-');
+ *  全空存 ''。datePart 取段,setDatePart 只改本段、只留数字(年 4 位/月日 2 位)。 */
+const datePart = (key, p) => {
+  const s = String(props.head?.[key] ?? '').split('-')
+  return (p === 'y' ? s[0] : p === 'm' ? s[1] : s[2]) || ''
+}
+const setDatePart = (key, p, v) => {
+  const parts = [datePart(key, 'y'), datePart(key, 'm'), datePart(key, 'd')]
+  parts[p === 'y' ? 0 : p === 'm' ? 1 : 2] = String(v ?? '').replace(/\D/g, '').slice(0, p === 'y' ? 4 : 2)
+  props.head[key] = parts.every(x => !x) ? '' : parts.join('-')
+  emit('dirty')
+}
 
 /** 阶段计划开始:归一空值(清空时 el-date-picker 给 null),别把 null 存进库 */
 function onPhaseStart(phaseKey, v) {
@@ -1260,6 +1320,26 @@ defineExpose({ focusField })
 }
 .q-sign-date {
   color: #333;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+/* 签名日期 年/月/日 三段空(纸面样式):年 4 位宽、月日 2 位宽,居中无边距 */
+.q-date-in {
+  flex: none;
+  width: 30px;
+}
+.q-date-in.q-dy {
+  width: 48px;
+}
+.q-sign-date :deep(.el-input__inner),
+.q-dept-signline :deep(.el-input__inner) {
+  text-align: center;
+  padding: 0 3px;
+}
+.q-sign-name {
+  display: inline-block;
+  min-width: 90px;
 }
 
 .q-dept {
@@ -1308,13 +1388,21 @@ defineExpose({ focusField })
   margin-left: auto;
   color: #333;
 }
-/* 签名行落子区最下一行(原图);填写区 flex:1 撑开,margin-top:auto 兜底 */
+/* 签名行落子区最下一行(原图);填写区 flex:1 撑开,margin-top:auto 兜底。
+   flex 行布局容纳可填的 签名/年/月/日 输入框(不给 signKey/dateKey 时是纯文本,排布不变) */
 .q-dept-signline {
   margin-top: auto;
   padding-top: 2px;
-  text-align: right;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 2px;
   font-size: 13.5px;
   color: #333;
+}
+.q-dept-signline .q-sign-name.el-input {
+  flex: none;
+  width: 90px;
 }
 /* 填写区撑满剩余高度:textarea 本体高度跟随。仅在**已由 flex 定高**的格子里生效
    (q-sub-h / q-col);高度不确定的容器里 100% 会退化,故不做全局注入,免得影响其它面板 */

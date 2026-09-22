@@ -726,3 +726,10 @@ migrate-qc-tc-drop.sql
 #   验证:tools/archive/_verify-batch-no-date-only.mjs(新口径探针)+ 前端 node --test
 #   (src/core/panel/docDefaults.test.js、src/core/selection/batchSendLines.test.js)。
 migrate-batch-no-date-only.sql
+
+# —— 2026-09-22 特采单签名/日期可填写(QC_TC_IN) ——
+#   头表加 9 列(特采理由日期 + 四个部门的 签名/日期 各两列),yj_field 注册 hidden=1
+#   (仅文书表单绑定落库,不进通用表单/列表,与 文档编号 同口径),补 en 译名。
+#   配套代码(同提交):DocSheet 部门会签签名行与 textarea 签名行的 年/月/日 三段可填输入;
+#   日期存 'YYYY-MM-DD'(允许部分填写)。验证:tools/archive/_v-tcin-sign-save.cjs(填→存→查库)。
+migrate-qc-tcin-sign.sql

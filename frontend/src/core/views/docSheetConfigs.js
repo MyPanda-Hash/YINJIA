@@ -218,21 +218,22 @@ export const qcSheetCfgs = {
         { label: '严重程度', key: '严重程度', kind: 'checks', options: ['严重', '一般', '轻微'], spread: true, flex: 1 },
       ] },
       // 原图:特采理由 一格到底 —— 左侧标签 + 整宽填写区,最下一行右端「申请人：　年　月　日」
-      // (申请单位列在此行只有竖线、无字,故 vcell 给空串)
+      // (申请单位列在此行只有竖线、无字,故 vcell 给空串;dateKey=年月日三段可填,存 特采理由日期)
       { kind: 'pairs', h: 185, vcell: '', cells: [
         { label: '特采理由', key: '特采理由', kind: 'textarea', rows: 3, max: 1000,
-          sign: '申请人', signKey: '编制人', flex: 1 },
+          sign: '申请人', signKey: '编制人', dateKey: '特采理由日期', flex: 1 },
       ] },
       { kind: 'section', label: '一．相关部门处理意见', h: 34 },
       // 部门意见区:原图只有「签名：　年　月　日」(落在各块最下一行),没有勾选框(同意/不同意由审批流留痕);
-      // 行高与子区比例(性能 101 / 工艺 124)、品质/销售/研发 124/122/92 均取原图实测
-      { kind: 'dept', label: '产品开发部意见', h: 225, nameW: 170, subs: [
+      // 行高与子区比例(性能 101 / 工艺 124)、品质/销售/研发 124/122/92 均取原图实测;
+      // signKey/dateKey=会签签名与年月日可填(各落一列,hidden 字段,不进通用表单)
+      { kind: 'dept', label: '产品开发部意见', h: 225, nameW: 170, signKey: '产品开发部签名', dateKey: '产品开发部日期', subs: [
         { label: '性能', key: '产品开发部性能意见', max: 250, rows: 1, flex: 101 },
         { label: '工艺', key: '产品开发部工艺意见', max: 250, rows: 1, flex: 124 },
       ] },
-      { kind: 'dept', label: '品质部意见', h: 124, nameW: 170, subs: [{ key: '品质部意见', max: 250, rows: 1, flex: 1 }] },
-      { kind: 'dept', label: '销售部意见', h: 122, nameW: 170, subs: [{ key: '销售部意见', max: 250, rows: 1, flex: 1 }] },
-      { kind: 'dept', label: '研发意见', h: 92, nameW: 170, subs: [{ key: '研发意见', max: 250, rows: 1, flex: 1 }] },
+      { kind: 'dept', label: '品质部意见', h: 124, nameW: 170, signKey: '品质部签名', dateKey: '品质部日期', subs: [{ key: '品质部意见', max: 250, rows: 1, flex: 1 }] },
+      { kind: 'dept', label: '销售部意见', h: 122, nameW: 170, signKey: '销售部签名', dateKey: '销售部日期', subs: [{ key: '销售部意见', max: 250, rows: 1, flex: 1 }] },
+      { kind: 'dept', label: '研发意见', h: 92, nameW: 170, signKey: '研发签名', dateKey: '研发日期', subs: [{ key: '研发意见', max: 250, rows: 1, flex: 1 }] },
       // 原图:先一条整宽标题带,再一行整宽勾选(正常使用/管控使用/挑选使用,左起均匀铺开)
       { kind: 'section', label: '二．最终处理结果', h: 36 },
       { kind: 'pairs', h: 71, cells: [
