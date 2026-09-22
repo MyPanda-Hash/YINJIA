@@ -830,3 +830,11 @@ migrate-material-inspection-field.sql
 #        前端 frontend/src/i18n/locales/zh-TW.js 的同名坏值本轮一并修
 #        (由 tools/archive/_fix-encoding-fffd-gbk.mjs 处理)。
 migrate-i18n-fix-zhtw-strength.sql
+
+# —— 2026-09-22 立项申请表右侧「备注」区登记为可填字段(版式对齐设计 F5/F6:G15)——
+# migrate-rd-approval-remark-field.sql —— 设计右侧一列是「备注」标签 + 合并填写区,实现此前只画
+#   装饰虚线(docSheetConfigs 的 deco),而 rd_approval.[备注](nvarchar(1000)) 列一直存在却从未登记
+#   yj_field ⇒ 界面上不可填、不入库。本次版式改为 remark 列(DocSheet 渲染文本域绑 head['备注']),
+#   脚本登记该字段(place=header,seq=165)。译名「备注」10 语言实测已存在,无需新增。
+#   两个账套均连跑两遍,自检三项(列存在/字段已登记/译名 en)均为 1。
+migrate-rd-approval-remark-field.sql

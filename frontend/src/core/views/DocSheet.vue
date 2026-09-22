@@ -95,7 +95,8 @@
       </div>
     </div>
 
-    <!-- ③ 内容表 -->
+    <!-- ③ 内容表 + 右侧备注列(立项申请表设计:F5「备注」标签 + F6:G15 合并填写区) -->
+    <div class="as-body">
     <div class="as-table">
       <!-- 行型:网格(pairs)/章节(section)/部门会签(dept)/单字段/多子区/阶段框 -->
       <template v-for="(row, ri) in config.rows" :key="row.key || row.label">
@@ -199,48 +200,72 @@
         </div>
 
         <!-- 单字段行 / 多子区行 / 阶段框行(测试计划) -->
-        <div v-else-if="!row.subs && row.kind !== 'phases'" class="as-row" :style="{ height: row.h + 'px' }">
+        <!-- minHeight 而非 height:行高按设计磅值给,但控件(文本域/下拉)不得被裁切 -->
+        <div v-else-if="!row.subs && row.kind !== 'phases'" class="as-row" :style="{ minHeight: row.h + 'px' }">
           <div class="as-no">{{ row.num }}</div>
           <div class="as-name">{{ tt(row.label) }}</div>
           <div class="as-fill">
             <div v-if="row.hint" class="as-hint">{{ tt(row.hint) }}</div>
-            <el-input
-              v-if="editable && row.kind === 'input'"
-              v-model="head[row.key]"
-              type="text"
-              :maxlength="row.max || 50"
-              :style="{ height: (row.h - 14) + 'px' }"
-              class="as-fill-input"
-              @input="emit('dirty')"
-            />
-            <el-select
-              v-else-if="editable && row.kind === 'select'"
-              v-model="head[row.key]"
-              :style="{ height: (row.h - 14) + 'px' }"
-              class="as-fill-input as-fill-select"
-              :clearable="false"
-              :placeholder="row.hint ? tt(row.hint) : tt('请选择')"
-              @change="emit('dirty')"
-            >
-              <el-option v-for="o in (row.options || [])" :key="o.value" :label="tt(o.label)" :value="o.value" />
-            </el-select>
-            <el-input
-              v-else-if="editable"
-              v-model="head[row.key]"
-              type="textarea"
-              :rows="row.h > 90 ? 4 : 2"
-              :maxlength="row.max || 2000"
-              class="as-fill-input as-fill-area"
-              resize="none"
-              @input="emit('dirty')"
-            />
-            <div v-else class="as-ro-text">{{ head[row.key] || '' }}</div>
+            <div class="as-fill-main">
+              <el-input
+                v-if="editable && !signLocked(row) && row.kind === 'input'"
+                v-model="head[row.key]"
+                type="text"
+                :maxlength="row.max || 50"
+                :style="{ height: (row.h - 14) + 'px' }"
+                class="as-fill-input"
+                @input="emit('dirty')"
+              />
+              <el-select
+                v-else-if="editable && !signLocked(row) && row.kind === 'select'"
+                v-model="head[row.key]"
+                :style="{ height: (row.h - 14) + 'px' }"
+                class="as-fill-input as-fill-select"
+                :clearable="false"
+                :placeholder="row.hint ? tt(row.hint) : tt('请选择')"
+                @change="emit('dirty')"
+              >
+                <el-option v-for="o in (row.options || [])" :key="o.value" :label="tt(o.label)" :value="o.value" />
+              </el-select>
+              <el-input
+                v-else-if="editable && !signLocked(row)"
+                v-model="head[row.key]"
+                type="textarea"
+                :maxlength="row.max || 2000"
+                class="as-fill-input as-fill-area"
+                resize="none"
+                @input="emit('dirty')"
+              />
+              <div v-else class="as-ro-text">{{ head[row.key] || '' }}</div>
+            </div>
+            <!-- 同一行右侧的第二字段:实施计划第 8 行 = 负责人 + 编制日期(设计 B15/C15/F15) -->
+            <div v-if="row.second" class="as-second">
+              <span class="as-second-label">{{ tt(row.second.label) }}：</span>
+              <el-date-picker
+                v-if="editable && !signLocked(row.second) && row.second.kind === 'date'"
+                v-model="head[row.second.key]"
+                type="date"
+                value-format="YYYY-MM-DD"
+                size="small"
+                class="as-date as-second-input"
+                :clearable="false"
+                @change="emit('dirty')"
+              />
+              <el-input
+                v-else-if="editable && !signLocked(row.second)"
+                v-model="head[row.second.key]"
+                size="small"
+                maxlength="50"
+                class="as-cell-input as-second-input"
+                @input="emit('dirty')"
+              />
+              <span v-else class="as-ro-text">{{ head[row.second.key] || '' }}</span>
+            </div>
           </div>
-          <div v-if="config.deco" class="as-deco"></div>
         </div>
 
         <!-- 多子区行:如 测试方案(条件/方法/标准) -->
-        <div v-else-if="row.subs" class="as-row" :style="{ height: row.h + 'px' }">
+        <div v-else-if="row.subs" class="as-row" :style="{ minHeight: row.h + 'px' }">
           <div class="as-no">{{ row.num }}</div>
           <div class="as-name">{{ tt(row.label) }}</div>
           <div class="as-fill as-fill-multi">
@@ -259,7 +284,6 @@
               <div v-else class="as-ro-text">{{ head[sub.key] || '' }}</div>
             </div>
           </div>
-          <div v-if="config.deco" class="as-deco"></div>
         </div>
 
         <!-- 阶段框行:10个阶段框,每框5行(计划内容/计划开始/计划完成/实际完成/责任人),完成按钮在五行最下边 -->
@@ -360,7 +384,6 @@
               {{ tt('显示全部') }}（{{ row.phases.length }}）
             </div>
           </div>
-          <div v-if="config.deco" class="as-deco"></div>
         </div>
       </template>
 
@@ -400,6 +423,22 @@
             <template v-else>{{ head[c.key] || '' }}</template>
           </div>
         </div>
+      </div>
+    </div>
+      <!-- 备注列(设计:立项申请表 F5「备注」标签 + F6:G15 合并填写区)
+           2026-09-22 前这里是 deco 装饰虚线(只画不填),而 rd_approval.备注 列一直存在却没登记字段 -->
+      <div v-if="config.remark" class="as-remark">
+        <div class="as-remark-label">{{ tt(config.remark.label) }}</div>
+        <el-input
+          v-if="editable"
+          v-model="head[config.remark.key]"
+          type="textarea"
+          :maxlength="config.remark.max || 2000"
+          class="as-remark-input"
+          resize="none"
+          @input="emit('dirty')"
+        />
+        <div v-else class="as-ro-text as-remark-ro">{{ head[config.remark.key] || '' }}</div>
       </div>
     </div>
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" @confirm="onProdRefConfirm" />
@@ -889,10 +928,76 @@ defineExpose({ focusField })
   word-break: break-all;
   padding: 2px 4px;
 }
-.as-deco {
+/* 内容区左右分栏:左=表格(序号/项目名/填写区),右=可填备注列(设计 立项申请表 F5/F6:G15)
+   备注列原先是 .as-deco 装饰虚线(只画不填),2026-09-22 改为真字段 */
+.as-body {
+  display: flex;
+  align-items: stretch;
+}
+.as-body > .as-table {
+  flex: 1;
+  min-width: 0;
+}
+.as-remark {
   width: 250px;
   flex: none;
   border-left: 3px dotted #9a9a9a;
+  display: flex;
+  flex-direction: column;
+  padding: 3px 6px;
+}
+.as-remark-label {
+  flex: none;
+  font-size: 15px;
+  color: #333;
+  padding: 2px 0 4px;
+}
+.as-remark-input {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.as-remark-input :deep(.el-textarea__inner) {
+  height: 100%;
+  line-height: 1.7;
+}
+.as-remark-ro {
+  flex: 1;
+}
+/* 行内第二字段(实施计划第 8 行:负责人 + 编制日期):占行内右侧约 40% */
+.as-second {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 40%;
+  padding-top: 2px;
+}
+.as-second-label {
+  flex: none;
+  font-size: 13px;
+  color: #333;
+}
+.as-second-input {
+  flex: 1;
+  min-width: 0;
+}
+/* 填写区主控件:文本域撑满行高(行高按设计磅值给,文本域随之变高) */
+.as-fill-main {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.as-fill-main .as-fill-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.as-fill-main .as-fill-area :deep(.el-textarea__inner) {
+  height: 100% !important;
 }
 /* 多子区行:如 测试方案(条件/方法/标准) */
 .as-fill-multi {
