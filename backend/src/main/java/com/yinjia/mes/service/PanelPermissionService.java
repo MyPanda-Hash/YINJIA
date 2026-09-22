@@ -129,6 +129,25 @@ public class PanelPermissionService {
         throw new AccessDeniedException("当前角色无该面板的查看权限：" + panelCode);
     }
 
+    /**
+     * 面板**读取**权限校验(元数据/配置/个人表格偏好这类入口,2026-09-22 补):
+     * 放行集合与 requirePanelView 相同(readablePanels = 可见 ∪ 参照目标 ∪ 同模块),
+     * 但**语义分家** —— 前端对"参照面板"也要取配置(business/engine.js 的 refPanel 分支)、
+     * 选单目标面板也要取配置(该流程本身已按 view 校验),若这里硬按 view 拦会打断合法参照链。
+     *
+     * 起因:`GET /px/getPanelConfig` / `getPermMatrix` / `getNewFormPermMatrix` /
+     * `saveColumnPrefs` / `saveHeaderPrefs` 此前**完全无闸门** —— 任何登录用户拿 token 就能
+     * 取到任意面板的字段结构(与字段级 ref_panel/字典绑定关系),或往任意面板写自己那份表格偏好。
+     * 拿不到业务数据,但属于不该开放的面板元数据面。
+     */
+    public void requirePanelRead(String panelCode) {
+        String user = currentUserName();
+        if (isAdmin(user)) return;
+        if (panelCode == null || panelCode.isBlank()) throw new AccessDeniedException("面板编码不能为空");
+        if (readablePanels(user).contains(panelCode)) return;
+        throw new AccessDeniedException("当前角色无该面板的读取权限：" + panelCode);
+    }
+
     /** 用户面板权限:panelCode → perms 词集(单角色,但按多行合并兜底) */
     public Map<String, Set<String>> permsOf(String user) {
         Map<String, Set<String>> out = new HashMap<>();
