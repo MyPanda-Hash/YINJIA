@@ -45,6 +45,10 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    '提示': 'Notice',
+    '删除账号「{name}」？删除后该账号无法再登录，历史单据上的记录不受影响。': 'Delete account "{name}"? The account will no longer be able to sign in; records on existing documents are unaffected.',
+    '账号已删除': 'Account deleted',
+    '；管理员账号与当前登录账号不可删除': '; admin accounts and the current account cannot be deleted',
     '该文件无法在线预览，已转为下载': 'This file cannot be previewed online; it has been downloaded instead',
     '正在打开预览…': 'Opening preview…',
     '已开始下载': 'Download started',

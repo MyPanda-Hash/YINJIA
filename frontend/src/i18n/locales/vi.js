@@ -1,6 +1,10 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '提示': 'Thông báo',
+    '删除账号「{name}」？删除后该账号无法再登录，历史单据上的记录不受影响。': 'Xóa tài khoản "{name}"? Sau khi xóa, tài khoản không thể đăng nhập nữa; các ghi nhận trên chứng từ cũ không bị ảnh hưởng.',
+    '账号已删除': 'Đã xóa tài khoản',
+    '；管理员账号与当前登录账号不可删除': '; tài khoản quản trị và tài khoản đang đăng nhập không thể xóa',
     '该文件无法在线预览，已转为下载': 'Tệp này không thể xem trước trực tuyến, đã chuyển sang tải xuống',
     '正在打开预览…': 'Đang mở xem trước…',
     '已开始下载': 'Đã bắt đầu tải xuống',

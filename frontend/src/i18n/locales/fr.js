@@ -1,6 +1,10 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '提示': 'Information',
+    '删除账号「{name}」？删除后该账号无法再登录，历史单据上的记录不受影响。': 'Supprimer le compte « {name} » ? Le compte ne pourra plus se connecter ; les enregistrements des documents existants ne sont pas affectés.',
+    '账号已删除': 'Compte supprimé',
+    '；管理员账号与当前登录账号不可删除': ' ; les comptes administrateur et le compte actuel ne peuvent pas être supprimés',
     '标准、测试报告、认证报告，指定人上传维护，其余仅查阅': 'Ressources partagées de toute l\'entreprise : normes / rapports d\'essai / rapports de certification. Seules les personnes désignées téléversent ; les autres consultent seulement',
     '该文件无法在线预览，已转为下载': 'Ce fichier ne peut pas être prévisualisé en ligne; il a été téléchargé',
     '正在打开预览…': 'Ouverture de l’aperçu…',

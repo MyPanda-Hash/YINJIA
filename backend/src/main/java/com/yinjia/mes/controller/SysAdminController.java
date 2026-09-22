@@ -229,8 +229,37 @@ public class SysAdminController {
         return ApiResult.ok(null);
     }
 
-    // ============ 角色 ============
+    /**
+     * 删除账号(物理删除 yj_user 行,仅管理员)。
+     *
+     * 守卫(顺序有意:先判"删自己"再判"管理员",否则管理员删自己会拿到管理员那条文案):
+     *   ① 账号不存在 → 报「账号不存在」(前端列表可能已过期)
+     *   ② 删当前登录账号 → 拒绝(防自锁:删掉自己就再也进不来组织架构了)
+     *   ③ 管理员账号(is_admin='Y')→ 拒绝(防把最后一个管理员删掉后无人能管组织架构)
+     *
+     * 为何物理删除是安全的:业务留痕存的是**账号/姓名文本**,不是外键 ——
+     *   asp_user1/asp_user2(制单/审核账号)、yj_doc_status.shr、yj_usage_log.username、
+     *   yj_form_approval.actor 等全部按 username 存字符串;全库也没有任何外键指向 yj_user。
+     *   所以删掉账号行不会破坏历史单据,留下的仍是当时那个人名(审计要求:留痕不随账号消失而抹除)。
+     */
+    @DeleteMapping("/user/{id}")
+    public ApiResult<Void> userDelete(@PathVariable int id) {
+        requireAdmin("维护用户");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT username, is_admin FROM yj_user WHERE id = ?", id);
+        if (rows.isEmpty()) throw new IllegalStateException("账号不存在");
+        String target = String.valueOf(rows.get(0).get("username"));
+        if (target.equalsIgnoreCase(currentUsername())) {
+            throw new IllegalStateException("不能删除当前登录的账号");
+        }
+        if ("Y".equals(String.valueOf(rows.get(0).get("is_admin")))) {
+            throw new IllegalStateException("管理员账号不能删除：" + target);
+        }
+        jdbc.update("DELETE FROM yj_user WHERE id = ?", id);
+        return ApiResult.ok(null);
+    }
 
+    // ============ 角色 ============
     @GetMapping("/role/list")
     public ApiResult<List<Map<String, Object>>> roleList() {
         return ApiResult.ok(jdbc.queryForList(

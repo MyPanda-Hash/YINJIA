@@ -54,13 +54,14 @@
             <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? tt('启用') : tt('停用') }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column :label="tt('操作')" width="56" align="center">
+        <el-table-column :label="tt('操作')" width="104" align="center">
           <template #default="{ row }">
             <el-button size="small" link type="primary" @click.stop="openUser(row)">{{ tt('编辑') }}</el-button>
+            <el-button v-if="canDelUser(row)" size="small" link type="danger" @click.stop="delUser(row)">{{ tt('删除') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
-      <div class="col-tip">{{ tt('点击用户行可分配部门 / 角色 / 启停用') }}</div>
+      <div class="col-tip">{{ tt('点击用户行可分配部门 / 角色 / 启停用') }}{{ tt('；管理员账号与当前登录账号不可删除') }}</div>
     </div>
 
     <!-- 右：角色与面板权限 -->
@@ -812,6 +813,38 @@ async function delDept(d) {
     await loadDepts()
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || '删除失败')
+  }
+}
+
+/** 可删的账号:管理员账号与当前登录账号不给删(服务端同样拦,这里只是不显示按钮) */
+function canDelUser(row) {
+  return !!row && !row.isAdmin && String(row.userName) !== String(user.account || '')
+}
+
+/**
+ * 删除账号(物理删除 yj_user 行)。
+ * 历史单据上的制单人/审核人存的是账号与姓名**文本**,不随账号消失而改变 —— 故弹窗里明确写清
+ * "历史单据记录不受影响",避免用户以为会把单据一起删掉而不敢用。
+ * 确认按钮文案走 tt()(ElMessageBox 默认按钮文案来自 Element Plus 自带语言包,不随本系统切语言)。
+ */
+async function delUser(row) {
+  try {
+    await ElMessageBox.confirm(
+      tt('删除账号「{name}」？删除后该账号无法再登录，历史单据上的记录不受影响。').replace('{name}', row.userName),
+      tt('提示'),
+      { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') },
+    )
+  } catch (e) {
+    return
+  }
+  try {
+    await request.delete('/sys/user/' + row.id)
+    ElMessage.success(tt('账号已删除'))
+    if (editingUser.value && editingUser.value.id === row.id) editingUser.value = null
+    userSel.value = []
+    await loadUsers()
+  } catch (e) {
+    ElMessage.error(e?.response?.data?.message || tt('删除失败'))
   }
 }
 

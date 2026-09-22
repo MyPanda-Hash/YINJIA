@@ -1,6 +1,10 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '提示': 'Aviso',
+    '删除账号「{name}」？删除后该账号无法再登录，历史单据上的记录不受影响。': '¿Eliminar la cuenta "{name}"? La cuenta ya no podrá iniciar sesión; los registros de los documentos existentes no se verán afectados.',
+    '账号已删除': 'Cuenta eliminada',
+    '；管理员账号与当前登录账号不可删除': '; las cuentas de administrador y la cuenta actual no se pueden eliminar',
     '该文件无法在线预览，已转为下载': 'Este archivo no se puede previsualizar en línea; se ha descargado',
     '正在打开预览…': 'Abriendo vista previa…',
     '已开始下载': 'Descarga iniciada',
