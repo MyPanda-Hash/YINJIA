@@ -11,10 +11,16 @@
  *   key       存 localStorage.mes_desk_settings.quick(稳定标识,改中文标题不影响存储)
  *   title     按钮文案,显示层一律走 tt()
  *   path      点击后跳转的路由;/panelx/form/<面板码> 无 id 即"新增"
- *   panelCode 有值时按 user.visiblePanels 过滤(与 filterMenuTree 同一份语义,admin 全量);
- *             功能页(快速报工/生产看板)不绑面板,对所有角色可见
+ *   panelCode **必填** —— 按 user.visiblePanels 过滤(与 filterMenuTree 同语义,admin 全量)。
+ *             桌面按钮都要能判定"这个账号有没有资格点";不绑面板的入口=人人可点却可能
+ *             点不动(2026-09-22 用户把两个这样的按钮否掉了)。将来若真出现非面板的功能页
+ *             入口,再加显式的豁免标记,不要默认放行。
  *   hint      可选,按钮 title 提示(说明点进去填哪张表)
  *   primary   可选,标出主操作(只有新建加工单)
+ *
+ * 已下架(2026-09-22,用户报"无效按钮,暂时无对应功能",恢复前请先有真功能+真路由):
+ *   quickReport 快速报工 → /prod/shop/procReport 在 router 里没有这条路由(仅 ModuleView 占位 key)
+ *   board       生产看板 → ManufactureBoard.vue 自述"数据接口尚未接入 SQL 后端"
  */
 
 /** 当前候选版本:v2 = 新增 项目申请 / 产品开发(用于给老用户增量补默认值) */
@@ -24,17 +30,15 @@ export const DESK_QUICK_V2_ADDED = ['rdApply', 'rdProduct']
 
 export const QUICK_ENTRIES = [
   { key: 'newOrder', title: '新建加工单', path: '/panelx/form/MANU_ORDER', panelCode: 'MANU_ORDER', primary: true },
-  { key: 'quickReport', title: '快速报工', path: '/prod/shop/procReport' },
-  { key: 'board', title: '生产看板', path: '/prod/manufacture/board' },
   { key: 'rdApply', title: '项目申请', path: '/panelx/form/RD_APPROVAL', panelCode: 'RD_APPROVAL', hint: '填写立项申请表' },
   { key: 'rdProduct', title: '产品开发', path: '/panelx/form/RD_PROD_INFO', panelCode: 'RD_PROD_INFO', hint: '填写产品信息表' },
 ]
 
-/** 该入口对当前用户是否可见:不绑面板的常显;绑面板的按 visiblePanels(admin 全量) */
+/** 该入口对当前用户是否可见:绑面板的按 visiblePanels(admin 全量);拿不到用户则不显示 */
 function visibleFor(entry, user) {
-  if (!entry.panelCode) return true
-  if (user && user.isAdmin) return true
-  const vis = user && Array.isArray(user.visiblePanels) ? user.visiblePanels : []
+  if (!user) return false
+  if (user.isAdmin) return true
+  const vis = Array.isArray(user.visiblePanels) ? user.visiblePanels : []
   return vis.includes(entry.panelCode)
 }
 

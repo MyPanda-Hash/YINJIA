@@ -1,10 +1,11 @@
-﻿/**
+/**
  * 临时探针(2026-09-22):桌面右上角快捷入口"可自定义"的端到端核对
- *   A 全新浏览器(无存储)→ 管理员应看到 5 个按钮
- *   B 老用户(v1 存储,只勾了快速报工,且关掉了 KPI 卡)→ 打开桌面后自动补 项目申请/产品开发,
- *     用户自己的勾选与开关不被改动,存储里 v 升到 2
+ *   A 全新浏览器(无存储)→ 管理员应看到 3 个按钮(新建加工单/项目申请/产品开发)
+ *   B 老用户(v1 存储:勾着已下架的快速报工/生产看板 + 关掉 KPI 卡)→ 打开桌面后下架入口
+ *     不再渲染、自动补 项目申请/产品开发,用户自己的开关不被改动,存储升到 v2
  *   C 点「项目申请」→ 落到 /panelx/form/RD_APPROVAL 且是"新增"态
  *   D 工作台设置弹窗:勾选项来自同一份候选清单,且按权限过滤
+ *   E 回归:欢迎条里不得再出现「快速报工」「生产看板」(用户报的无效按钮)
  * 用法: node --experimental-websocket tools/archive/_probe-desk-quick.cjs [FRONT]
  */
 const { spawn } = require('node:child_process')
@@ -91,21 +92,21 @@ localStorage.setItem('mes_login_date','2026-09-22');`
     console.log('\nA. 全新浏览器(管理员,无历史设置)')
     await openDashboard()
     const a = await quickTexts()
-    chk('右上角 5 个入口(含项目申请/产品开发)', JSON.stringify(a) === JSON.stringify(['新建加工单', '快速报工', '生产看板', '项目申请', '产品开发']), a)
+    chk('右上角 3 个入口(新建加工单/项目申请/产品开发)', JSON.stringify(a) === JSON.stringify(['新建加工单', '项目申请', '产品开发']), a)
     const storeA = await evaluate(`localStorage.getItem('mes_desk_settings')`)
     chk('预设已落盘且带版本号 v=2', !!storeA && JSON.parse(storeA).v === 2, storeA)
     await shot('quick-a-fresh-admin')
 
-    console.log('\nB. 老用户(v1 存储:只勾快速报工 + KPI 卡关闭)')
+    console.log('\nB. 老用户(v1 存储:勾着已下架的快速报工/生产看板 + KPI 卡关闭)')
     await send('Page.navigate', { url: 'about:blank' }); await sleep(400)
     await send('Page.navigate', { url: `${FRONT}/#/login` }); await sleep(1600)
-    await evaluate(`localStorage.setItem('mes_desk_settings', JSON.stringify({ quick: ['quickReport'], showKpi: false, showProgress: true, showTodo: true })); ${loginStorage} 'ok'`)
+    await evaluate(`localStorage.setItem('mes_desk_settings', JSON.stringify({ quick: ['newOrder', 'quickReport', 'board'], showKpi: false, showProgress: true, showTodo: true })); ${loginStorage} 'ok'`)
     await send('Page.navigate', { url: 'about:blank' }); await sleep(400)
     await send('Page.navigate', { url: `${FRONT}/#/dashboard` }); await sleep(4200)
     await evaluate(`(() => { const s = document.querySelector('.wz-skip'); if (s) s.click(); return 'x' })()`)
     await sleep(1000)
     const b = await quickTexts()
-    chk('自动补上 项目申请/产品开发,原有勾选保留', JSON.stringify(b) === JSON.stringify(['快速报工', '项目申请', '产品开发']), b)
+    chk('下架入口不再渲染 + 自动补 项目申请/产品开发', JSON.stringify(b) === JSON.stringify(['新建加工单', '项目申请', '产品开发']), b)
     const storeB = await evaluate(`JSON.parse(localStorage.getItem('mes_desk_settings'))`)
     chk('存储升到 v=2 且未打开用户关掉的 KPI 卡', storeB.v === 2 && storeB.showKpi === false, storeB)
     const kpiVisible = await evaluate(`document.querySelectorAll('.live-metric').length`)
@@ -131,12 +132,21 @@ localStorage.setItem('mes_login_date','2026-09-22');`
     console.log('   打开设置 = ' + menuOpened)
     await sleep(1200)
     const boxes = await evaluate(`[...document.querySelectorAll('.desk-setting .el-checkbox')].map(c => c.innerText.trim())`)
-    chk('勾选项 = 候选清单 5 项', JSON.stringify(boxes) === JSON.stringify(['新建加工单', '快速报工', '生产看板', '项目申请', '产品开发']), boxes)
+    chk('勾选项 = 候选清单 3 项', JSON.stringify(boxes) === JSON.stringify(['新建加工单', '项目申请', '产品开发']), boxes)
     const tip = await evaluate(`(() => { const t = document.querySelector('.desk-setting .set-tip'); return t ? t.innerText.trim() : null })()`)
     chk('写明按权限过滤的提示', !!tip && tip.includes('权限'), tip)
     const checked = await evaluate(`[...document.querySelectorAll('.desk-setting .el-checkbox.is-checked')].map(c => c.innerText.trim())`)
-    chk('勾选状态与桌面按钮一致', JSON.stringify(checked) === JSON.stringify(['快速报工', '项目申请', '产品开发']), checked)
+    chk('勾选状态与桌面按钮一致', JSON.stringify(checked) === JSON.stringify(['新建加工单', '项目申请', '产品开发']), checked)
     await shot('quick-d-desk-settings')
+
+    console.log('\nE. 回归:已下架的无效按钮不得再出现')
+    await evaluate(`(() => { const c = document.querySelector('.el-dialog__headerbtn'); if (c) c.click(); return 'ok' })()`)
+    await sleep(900)
+    const welcomeText = await evaluate(`(() => { const w = document.querySelector('.welcome'); return w ? w.innerText.replace(/\\s+/g, ' ').trim() : 'NO-WELCOME' })()`)
+    chk('欢迎条不含「快速报工」', !welcomeText.includes('快速报工'), welcomeText.slice(0, 60))
+    chk('欢迎条不含「生产看板」', !welcomeText.includes('生产看板'), welcomeText.slice(0, 60))
+    const deadHref = await evaluate(`[...document.querySelectorAll('.quick .el-button')].filter(b => b.innerText.includes('快速报工') || b.innerText.includes('生产看板')).length`)
+    chk('快捷按钮区域也没有残留这两个', deadHref === 0, deadHref)
   } finally {
     edge.kill()
   }
