@@ -4,10 +4,10 @@
       <div class="set-group">
         <div class="set-group-title">{{ tt('快捷入口') }}</div>
         <el-checkbox-group v-model="quick" @change="save">
-          <el-checkbox value="newOrder">{{ tt('新建加工单') }}</el-checkbox>
-          <el-checkbox value="quickReport">{{ tt('快速报工') }}</el-checkbox>
-          <el-checkbox value="board">{{ tt('生产看板') }}</el-checkbox>
+          <el-checkbox v-for="e in quickOptions" :key="e.key" :value="e.key">{{ tt(e.title) }}</el-checkbox>
         </el-checkbox-group>
+        <div v-if="!quickOptions.length" class="set-tip">{{ tt('当前账号没有可用的快捷入口。') }}</div>
+        <div v-else class="set-tip">{{ tt('只列出你有权限的面板，勾选后显示在「我的桌面」右上角。') }}</div>
       </div>
       <div class="set-group">
         <div class="set-group-title">{{ tt('内容卡片') }}</div>
@@ -30,14 +30,20 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAppStore } from '@/stores/app'
+import { useUserStore } from '@/stores/user'
+import { availableQuickEntries } from '@core/dashboard/deskQuick'
 import { tt } from '@/i18n'
 
 defineProps({ modelValue: Boolean })
 defineEmits(['update:modelValue'])
 
 const app = useAppStore()
+const user = useUserStore()
+
+// 候选来自与桌面按钮同一份清单,并按当前用户的面板权限过滤
+const quickOptions = computed(() => availableQuickEntries({ isAdmin: user.isAdmin, visiblePanels: user.visiblePanels }))
 
 const quick = ref([...app.deskSettings.quick])
 const showKpi = ref(app.deskSettings.showKpi)
@@ -96,6 +102,12 @@ watch(
 .set-hint {
   margin-top: 10px;
   font-size: 12px;
+  color: var(--t-text-3);
+}
+.set-tip {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
   color: var(--t-text-3);
 }
 </style>

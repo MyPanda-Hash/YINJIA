@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { DESK_QUICK_VERSION, upgradeDeskSettings as upgradeQuick } from '@core/dashboard/deskQuick'
 
 const DESK_DEFAULT = {
   quick: ['newOrder', 'quickReport', 'board'],
@@ -6,16 +7,20 @@ const DESK_DEFAULT = {
   showProgress: true,
   showTodo: true,
 }
+// 注意:DESK_DEFAULT 刻意不带 v —— loadDeskSettings 会把默认值摊到存储值上,
+// 若默认值里有 v,老用户(v1)会被误判成"已升级",增量补默认就永不执行。
 
 /**
  * 角色预设(2026-09-22 桌面展示优化):只在「用户从未保存过桌面设置」时套用**一次**。
- *   · 管理员:全局视角 —— 生产执行核心 + 质量待办 + 事件流/数据内核都在;
+ *   · 管理员:全局视角 —— 生产执行核心 + 质量待办 + 事件流/数据内核都在,快捷入口带
+ *     研发两个入口(项目申请/产品开发) —— 填表是管理员的日常起点;
  *   · 普通用户:聚焦「要我做/要我看」—— 首屏 KPI + 质量与待办为主,生产执行核心默认收起
- *     (它是长列表+图表,对仓管/工艺员这类角色日常价值低),快捷入口把「快速报工」提到第一位。
+ *     (它是长列表+图表,对仓管/工艺员这类角色日常价值低),快捷入口把「快速报工」提到第一位,
+ *     研发两个入口默认不勾(车间账号用不上,且多无该面板权限,勾了也点不动)。
  * 用户在工作台设置里改过之后就不再覆盖(以 localStorage 里的保存值为准)。
  */
-const DESK_PRESET_ADMIN = { ...DESK_DEFAULT }
-const DESK_PRESET_USER = { ...DESK_DEFAULT, quick: ['quickReport', 'newOrder', 'board'], showProgress: false }
+const DESK_PRESET_ADMIN = { ...DESK_DEFAULT, v: DESK_QUICK_VERSION, quick: ['newOrder', 'quickReport', 'board', 'rdApply', 'rdProduct'] }
+const DESK_PRESET_USER = { ...DESK_DEFAULT, v: DESK_QUICK_VERSION, quick: ['quickReport', 'newOrder', 'board'], showProgress: false }
 
 function deskSavedByUser() {
   try {
@@ -111,6 +116,19 @@ export const useAppStore = defineStore('app', {
       if (deskSavedByUser()) return false
       this.deskSettings = { ...(isAdmin ? DESK_PRESET_ADMIN : DESK_PRESET_USER) }
       localStorage.setItem('mes_desk_settings', JSON.stringify(this.deskSettings))
+      return true
+    },
+    /**
+     * 新候选上线时的增量补默认(v1→v2:项目申请/产品开发)。
+     * 老用户(已保存过设置)不会走 applyRoleDeskPreset,若不补就永远看不到新按钮;
+     * 只补"角色默认包含且用户没见过"的 key,用户自己的勾选一律不动。
+     */
+    upgradeDeskSettings(isAdmin) {
+      const cur = this.deskSettings
+      const next = upgradeQuick(cur, { presetQuick: (isAdmin ? DESK_PRESET_ADMIN : DESK_PRESET_USER).quick })
+      if (next === cur) return false
+      this.deskSettings = next
+      localStorage.setItem('mes_desk_settings', JSON.stringify(next))
       return true
     },
   },

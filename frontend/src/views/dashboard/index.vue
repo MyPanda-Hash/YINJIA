@@ -16,7 +16,8 @@
         <el-button
           v-for="q in quickEntries"
           :key="q.key"
-          :type="q.key === 'newOrder' ? 'primary' : 'default'"
+          :type="q.primary ? 'primary' : 'default'"
+          :title="q.hint ? tt(q.hint) : ''"
           @click="go(q.path, q.title)"
         >{{ tt(q.title) }}</el-button>
       </div>
@@ -440,6 +441,7 @@ import SLine from './SLine.vue'
 import STree from './STree.vue'
 import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
 import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
+import { pickQuickEntries } from '@core/dashboard/deskQuick'
 import { tt } from '@/i18n'
 
 const user = useUserStore()
@@ -449,12 +451,12 @@ const router = useRouter()
 
 const desk = computed(() => app.deskSettings)
 
-const QUICK_DEFS = [
-  { key: 'newOrder', title: '新建加工单', path: '/panelx/form/MANU_ORDER' },
-  { key: 'quickReport', title: '快速报工', path: '/prod/shop/procReport' },
-  { key: 'board', title: '生产看板', path: '/prod/manufacture/board' },
-]
-const quickEntries = computed(() => QUICK_DEFS.filter((q) => desk.value.quick.includes(q.key)))
+// 右上角快捷入口:候选清单真源在 @core/dashboard/deskQuick.js
+// (与「工作台设置」的勾选项同一份,加入口只改那里一行)
+const quickEntries = computed(() => pickQuickEntries(desk.value.quick, {
+  isAdmin: user.isAdmin,
+  visiblePanels: user.visiblePanels,
+}))
 
 // ---------- 看板模块 ----------
 const MODULES = [
@@ -654,6 +656,8 @@ let countdownTimer = null
 onMounted(() => {
   // 首次进入桌面:按角色套一次预设(用户已自定义过则不动)—— 2026-09-22 展示优化
   app.applyRoleDeskPreset(user.isAdmin)
+  // 老用户增量补新候选(项目申请/产品开发),不动用户自己的勾选
+  app.upgradeDeskSettings(user.isAdmin)
   load()
   refreshTimer = setInterval(load, 300000)
   countdownTimer = setInterval(() => {
@@ -2258,6 +2262,16 @@ html.dark .dashboard {
 .dev-board > .empty {
   flex: 1;
   min-height: 120px;
+}
+
+/* 快捷入口加到 5 个后:手机端改"换行"而不是横向滚动
+   (原 ≤768 规则是 overflow-x:auto,按钮多了会被藏在看不见的横向滚动里) */
+@media (max-width: 768px) {
+  .quick {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: var(--sp-2);
+  }
 }
 
 /* 长列表内滚:卡片高度不随数据条数变化 */
