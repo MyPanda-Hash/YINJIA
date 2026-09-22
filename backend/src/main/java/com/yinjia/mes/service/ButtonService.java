@@ -43,13 +43,16 @@ public class ButtonService {
     private final QcDisposalService qcDisposal;
     private final KingdeePushService kingdeePush;
     private final BatchService batchService;
+    /** 检验目录联动(生单建行/完成/修改/守卫);本服务只单向依赖它,避免循环依赖 */
+    private final QcCatalogService qcCatalog;
 
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
                          DevTaskService devTaskService, MessageService messageService,
                          LotSeqService lotSeqService, StockLedgerService stockLedger,
                          WoReportService woReport, QcDisposalService qcDisposal,
-                         KingdeePushService kingdeePush, BatchService batchService) {
+                         KingdeePushService kingdeePush, BatchService batchService,
+                         QcCatalogService qcCatalog) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -62,6 +65,7 @@ public class ButtonService {
         this.qcDisposal = qcDisposal;
         this.kingdeePush = kingdeePush;
         this.batchService = batchService;
+        this.qcCatalog = qcCatalog;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -132,8 +136,65 @@ public class ButtonService {
             case "撤回终止申请" -> termWithdraw(def, formData);
             // 项目进度查询:把全部实施计划实时导入唯一那张进度单(幂等,手动触发用)
             case "同步进度" -> syncAllPlansToProgress();
+            // ── 检验目录(QC_CATALOG,2026-09-22 用户口径)─────────────────────────────
+            // 完成:校验关联的检验单与检验数据记录都已审批 → 置「已完成检验」并给出是否合格
+            case "完成" -> completeCatalogRow(def, formData, buttonParam);
+            // 修改:把「已完成检验」回弹为「正在检验中」并写修改记录(之后才可反审核挂靠单据)
+            case "修改" -> reopenCatalogRow(def, formData);
+            // 删除记录(行级):挂靠的检验单/检验数据记录还在时拒绝,提示先删除它们
+            case "删除记录" -> deleteCatalogRow(def, formData);
             default -> throw new IllegalStateException("未定义按钮规则：" + buttonName + "（可在 ButtonService 扩展）");
         };
+    }
+
+    // ============ 检验目录联动(QC_CATALOG,2026-09-22 用户口径) ============
+
+    /** 目录行 id:纸面行按钮放在 formData.id,也兼容 buttonParam.id */
+    private Long catalogRowId(Map<String, Object> formData, Map<String, Object> buttonParam) {
+        Object v = formData == null ? null : formData.get("id");
+        if (v == null && buttonParam != null) v = buttonParam.get("id");
+        if (v == null) throw new IllegalArgumentException("缺少检验目录行 id");
+        return v instanceof Number n ? n.longValue() : Long.valueOf(String.valueOf(v));
+    }
+
+    private String docNoOf(Map<String, Object> formData) {
+        if (formData == null) return "";
+        Object v = formData.get("编号") != null ? formData.get("编号") : formData.get("单据编号");
+        return v == null ? "" : String.valueOf(v);
+    }
+
+    /**
+     * 目录行「完成」:校验关联检验单已审核 + 检验数据记录已归档/已审核 → 置「已完成检验」并给出是否合格。
+     * 挂靠单据状态用与生单/审核同一状态机推导(docStatusOf),服务层不另立口径。
+     */
+    private Map<String, Object> completeCatalogRow(PanelRegistry.PanelDef def, Map<String, Object> formData,
+                                                   Map<String, Object> buttonParam) {
+        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅检验目录可用");
+        Long id = catalogRowId(formData, buttonParam);
+        Map<String, Object> row = jdbc.queryForMap("SELECT 检验单号, 检验数据记录单号 FROM qc_catalog_detail WHERE id=?", id);
+        String inspNo = row.get("检验单号") == null ? "" : String.valueOf(row.get("检验单号"));
+        String recNo = row.get("检验数据记录单号") == null ? "" : String.valueOf(row.get("检验数据记录单号"));
+        String inspStatus = inspNo.isBlank() ? "无关联检验单" : String.valueOf(docStatusOf(QcCatalogService.INSP_PANEL, inspNo).get("status"));
+        String recStatus = recNo.isBlank() ? "无关联检验数据记录" : String.valueOf(docStatusOf(QcCatalogService.REC_PANEL, recNo).get("status"));
+        String qualified = formData == null || formData.get("是否合格") == null ? "" : String.valueOf(formData.get("是否合格"));
+        return qcCatalog.completeRow(id, inspStatus, recStatus, qualified, currentUserName());
+    }
+
+    /** 目录行「修改」:已完成 → 正在检验中(回弹)+ 写修改记录 */
+    private Map<String, Object> reopenCatalogRow(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅检验目录可用");
+        return qcCatalog.reopenRow(docNoOf(formData), catalogRowId(formData, null), currentUserName());
+    }
+
+    /** 目录行「删除记录」:挂靠单据还在时拒绝(提示先删除),否则软删该行 */
+    private Map<String, Object> deleteCatalogRow(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!QcCatalogService.CATALOG_PANEL.equals(def.code())) throw new IllegalStateException("该按钮仅检验目录可用");
+        Long id = catalogRowId(formData, null);
+        int n = qcCatalog.deleteRow(id, currentUserName());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", id);
+        out.put("删除行数", n);
+        return out;
     }
 
     // ============ 保存 ============
@@ -887,6 +948,9 @@ public class ButtonService {
         Map<String, Object> st = docStatusOf(def.code(), no);
         String status = String.valueOf(st.get("status"));
         if (!"已审核".equals(status) && !"已归档".equals(status)) throw new IllegalStateException("仅已审核或已归档状态可弃审");
+        // 检验目录守卫(2026-09-22 用户口径):挂靠单据在检验目录中已「已完成检验」时不许反审核 ——
+        // 需先在检验目录点「修改」把状态回弹为「正在检验中」,再回来反审核修改
+        qcCatalog.assertLinkedRowNotCompleted(def.code(), no);
         // 库存冲回(材料入库链):先冲账再弃审,余额不足或台账缺失则拒绝,整笔回滚
         stockLedger.unpostIn(def.code(), no, currentUserName());
         // 报工冲回(生产过程层):完成数量对称扣减,为负则拒绝
@@ -1433,6 +1497,13 @@ public class ButtonService {
         int batchId = batchService.findPendingBatchId(panelCode, no);
         if (batchId <= 0) return;
         batchService.assignNoAndBackfill(batchId, user);
+        // 批次号回填全链后,把检验目录里挂靠该检验单的空批次号补齐(2026-09-22 用户口径:批次号靠回填得到)
+        try {
+            qcCatalog.refreshBatchNosFromInsp();
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("[QC目录] 批次号回填目录失败(不影响入库审核): {}", e.getMessage());
+        }
     }
 
     /**

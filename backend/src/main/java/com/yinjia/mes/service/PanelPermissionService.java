@@ -47,7 +47,8 @@ public class PanelPermissionService {
     static {
         Map<String, String[]> m = new HashMap<>();
         // 只读/查询类(view 即可;方法内自有状态与身份校验)
-        for (String b : new String[]{"刷新", "查找", "审批情况", "同步进度", "终止审批通过", "终止审批驳回"})
+        for (String b : new String[]{"刷新", "查找", "审批情况", "同步进度", "终止审批通过", "终止审批驳回",
+                "完成", "修改", "删除记录"})
             m.put(b, new String[]{"view"});
         m.put("修改记录", new String[]{"view", "modlog"});
         // 编辑类(新增保存/申请修改 词表语义)

@@ -5,6 +5,7 @@ import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PanelConfigService;
 import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.QueryService;
+import com.yinjia.mes.service.QcCatalogService;
 import com.yinjia.mes.service.VoucherFlowService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
@@ -37,10 +38,12 @@ public class PushGenerateHandler implements PanelActionHandler {
     private final PanelConfigService configService;
     private final BatchService batchService;
     private final JdbcTemplate jdbc;
+    /** 检验目录联动:检验单生成后按明细物料建报告草稿 + 目录行(2026-09-22) */
+    private final QcCatalogService qcCatalog;
 
     public PushGenerateHandler(PanelRegistry registry, QueryService queryService, ButtonService buttonService,
                                VoucherFlowService voucherFlow, PanelConfigService configService,
-                               BatchService batchService, JdbcTemplate jdbc) {
+                               BatchService batchService, JdbcTemplate jdbc, QcCatalogService qcCatalog) {
         this.registry = registry;
         this.queryService = queryService;
         this.buttonService = buttonService;
@@ -48,6 +51,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         this.configService = configService;
         this.batchService = batchService;
         this.jdbc = jdbc;
+        this.qcCatalog = qcCatalog;
     }
 
     /** 可分批生单的目标面板:配了「批次号」表头字段(暂收/检验/入库/退回 四张单) */
@@ -171,6 +175,9 @@ public class PushGenerateHandler implements PanelActionHandler {
         formData.put("detail", Map.of("items", targetItems));
         Map<String, Object> saved = buttonService.save(registry.panel(target), formData, false);
         String newNo = String.valueOf(saved.get("编号"));
+
+        // 5b) 检验目录联动(2026-09-22 用户口径):生成了来料检验单 → 按明细物料建检验数据记录草稿 + 目录行
+        if ("QC_INSP".equals(target)) qcCatalog.syncFromInspection(newNo, context.userName());
 
         // 6) 写占用:来源行不再出现在选单列表(与选单同一占用语义)
         voucherFlow.link(sourcePanel, sourceNo, null, target, newNo, null, 0, "");
@@ -451,6 +458,9 @@ public class PushGenerateHandler implements PanelActionHandler {
         formData.put("detail", Map.of("items", targetItems));
         Map<String, Object> saved = buttonService.save(tgtDef, formData, false);
         String newNo = String.valueOf(saved.get("编号"));
+
+        // 4b) 检验目录联动(2026-09-22 用户口径):分批生单目标=来料检验单时同样建报告草稿 + 目录行
+        if ("QC_INSP".equals(targetPanel)) qcCatalog.syncFromInspection(newNo, user);
 
         // 5) 按量占用(带批次键):目标行按保存顺序取行表 id
         List<Integer> tgtIds = jdbc.queryForList("SELECT id FROM " + tgtDef.lineTable()

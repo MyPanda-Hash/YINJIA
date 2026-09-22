@@ -193,6 +193,28 @@ export default {
     '删除该行': 'Delete this row',
     '选择日期': 'Select date',
     '该批次暂无检验数据记录': 'No inspection data record for this batch',
+    // ---- 检验目录自动化联动(生单自动生成行 + 完成/修改/删除记录) ----
+    '完成检验': 'Complete Inspection',
+    '完成检验（需关联的检验单与检验数据记录都已审批）': 'Complete the inspection (the linked inspection sheet and inspection data record must both be approved)',
+    '取消完成': 'Cancel Completion',
+    '取消完成并回弹为正在检验中（之后才可反审核挂靠单据）': 'Cancel completion and roll back to In Progress (then the linked documents can be un-audited)',
+    '取消完成后该目录行回到「正在检验中」，之后才可反审核挂靠的检验单与检验数据记录。确定取消完成吗？': 'After cancelling, this catalog row returns to “In Progress”; only then can the linked inspection sheet and inspection data record be un-audited. Cancel completion?',
+    '已标记为已完成检验': 'Marked as inspection completed',
+    '已取消完成（已写入修改记录）': 'Completion cancelled (change log written)',
+    '删除记录': 'Delete Record',
+    '删除目录记录': 'Delete Catalog Record',
+    '删除该目录记录前，需先删除挂靠的检验单与检验数据记录。确定删除吗？': 'Before deleting this catalog record, the linked inspection sheet and inspection data record must be deleted first. Delete anyway?',
+    '已删除该目录记录': 'Catalog record deleted',
+    '该目录行缺少关联的检验单或检验数据记录，无法完成': 'This catalog row has no linked inspection sheet / inspection data record, so it cannot be completed',
+    '完成前会校验：关联的检验单已审核、检验数据记录已审批（归档）。': 'Before completing, the system verifies that the linked inspection sheet is audited and the inspection data record is approved (archived).',
+    '查看该检验单详情': 'View the inspection sheet',
+    '查看该检验数据记录详情': 'View the inspection data record',
+    '跳转到该检验单': 'Open the inspection sheet',
+    '跳转到该检验数据记录': 'Open the inspection data record',
+    '跳转到该单据': 'Open this document',
+    '目录记录由检验单生单自动生成、不可手工修改；状态变更走行上的「完成 / 修改」。': 'Catalog records are generated automatically when the inspection sheet is created and cannot be edited by hand; state changes go through “Complete / Modify” on the row.',
+    '暂无检验记录，暂收单生单生成检验单后自动带入': 'No inspection record yet — rows are added automatically when a temporary receipt generates an inspection sheet',
+    '物料': 'Material',
     // ---- 检验目录纸张式控制列表(QcCatalogSheet:三级表头 + 批次行 + 批次检验单弹窗) ----
     '第1类': 'Category 1',
     '第2类': 'Category 2',
@@ -272,15 +294,13 @@ export default {
     '重新加载数据': 'Reload data',
     '保存整表(缺席行视为删除)': 'Save the whole table (absent rows are treated as deleted)',
     // ---- 行操作与表内查询(2026-09-22 用户口径:默认只读、点「修改」才可改;删除二次确认;
-    //      去掉「放弃」按钮,未保存的丢失风险改由「刷新」前拦一道;关键字过滤本页并提示其他页签命中) ----
+    //      去掉「放弃」按钮,未保存的丢失风险改由「刷新」前拦一道) ----
     '完成': 'Done',
     '删除该行': 'Delete Row',
     '删除该行后点「保存」才会落库,确定删除?': 'The row is removed only after you click Save. Delete it?',
     '未保存的修改将丢失,确定重新加载?': 'Unsaved changes will be lost. Reload anyway?',
     '提示': 'Notice',
-    '输入关键字过滤本页数据': 'Type a keyword to filter this page',
-    '本页无匹配行': 'No matching row on this page',
-    '其他页签命中': 'Other tabs',
+    // (2026-09-22 晚:表头关键字过滤框与「其他页签命中」提示已删——查找统一走下面的「模糊搜索」)
     // ---- 模糊搜索 + 修改记录(2026-09-22:与立项申请同义的查找与本表留痕) ----
     '未找到匹配行': 'No matching row',
     '（清单仅显示前 {m} 行）': ' (list shows only the first {m} rows)',
