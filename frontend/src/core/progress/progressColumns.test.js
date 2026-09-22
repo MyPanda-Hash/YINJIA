@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import {
   PROGRESS_COLUMNS,
   RD_PROGRESS_DETAIL_COLUMNS,
+  RD_PROGRESS_DETAIL_LABELS,
   columnByLabel,
   dataKeyOf,
   readCell,
@@ -31,13 +32,16 @@ const OFF_SHEET_LABELS = ['开发复杂度', '重要程度', '紧急程度', '�
 /**
  * 这条断言守的是 2026-09-10 那个 bug:
  * 前端拿"显示名"当数据键 → 后端按元数据过滤 → 值保存时被静默丢弃。
- * 只要某个 key 不在 RD_PROGRESS 明细列里,保存就一定丢,必须在这里拦住。
+ * 2026-09-22 修正判据:后端认可的键是 **yj_field.label**(QueryService.rowToLabels 用
+ * `row.get(f.label())` 输出、ButtonService.labelsToCols 用 `row.get(f.label())` 取值),
+ * 所以要比的是**字段 label 清单**(RD_PROGRESS_DETAIL_LABELS),不是物理列清单
+ * —— 用后者会让「项目定级」(label=项目定级 / 物理列=项目层级) 这类列漏网。
  */
-test('每个可落库列的 key 必须存在于 RD_PROGRESS 明细元数据列里', () => {
+test('每个可落库列的 key 必须是 RD_PROGRESS 明细字段的 label(后端按 label 收发)', () => {
   const bad = PROGRESS_COLUMNS
-    .filter((c) => !RD_PROGRESS_DETAIL_COLUMNS.includes(c.key))
+    .filter((c) => !RD_PROGRESS_DETAIL_LABELS.includes(c.key))
     .map((c) => `${c.label}(key=${c.key})`)
-  assert.deepEqual(bad, [], `以下列的落库键不在 rd_progress_detail / yj_field 里,保存会被丢弃:\n  ${bad.join('\n  ')}`)
+  assert.deepEqual(bad, [], `以下列的 key 不是任何明细字段的 label,后端按 label 取不到值 ⇒ 读空+写丢弃:\n  ${bad.join('\n  ')}`)
 })
 
 test('列数固定为 14(用户 2026-09-22 口径),显示名与设计逐字一致且顺序相同', () => {
@@ -48,8 +52,8 @@ test('列数固定为 14(用户 2026-09-22 口径),显示名与设计逐字一�
   const onSheet = PROGRESS_COLUMNS.map((c) => c.label)
   for (const off of OFF_SHEET_LABELS) {
     assert.ok(!onSheet.includes(off), `${off} 不应出现在控制列表`)
-    // 但明细元数据列仍保留(数据不删,保存链/历史数据不受影响)
-    assert.ok(RD_PROGRESS_DETAIL_COLUMNS.includes(off), `${off} 应保留在明细元数据列里`)
+    // 但明细元数据(:yj_field detail 字段)仍保留(数据不删,保存链/历史数据不受影响)
+    assert.ok(RD_PROGRESS_DETAIL_LABELS.includes(off), `${off} 应保留在明细字段里`)
   }
 })
 
@@ -63,23 +67,27 @@ test('不再有 pendingAlign 列(3 列已全部真落库)', () => {
   assert.deepEqual(pending, [], `这些列又被标成"只显示不落库": ${pending.join(', ')}`)
 })
 
-test('明细元数据列包含设计 14 列 + 4 个不上纸面的列 + 4 个内部列', () => {
+test('明细字段清单包含设计 14 列 + 4 个不上纸面的列 + 4 个内部列', () => {
   for (const label of DESIGN_LABELS) {
-    // 每列都必须能经 K 映射找到落库键(即 key 在元数据列里)
+    // 每列都必须能经 K 映射找到落库键(即 key 在字段 label 清单里)
     assert.ok(columnByLabel(label), `缺列定义: ${label}`)
   }
   for (const internal of ['说明', '谁来批准', '谁来检验', '未批准原因']) {
-    assert.ok(RD_PROGRESS_DETAIL_COLUMNS.includes(internal), `缺内部列: ${internal}`)
+    assert.ok(RD_PROGRESS_DETAIL_LABELS.includes(internal), `缺内部列: ${internal}`)
+    assert.ok(RD_PROGRESS_DETAIL_COLUMNS.includes(internal), `缺内部物理列: ${internal}`)
   }
 })
 
 /**
- * 6 处 label≠key 是**刻意的**(数据库列名历史遗留;2026-09-18 决策 col_name 一律不改),
- * 其余 13 列显示名应与数据键同名 —— 逐列钉死,防止将来误改一侧造成静默丢值。
+ * 界面显示名(key 之外的那个 label)与落库键的关系 —— 逐列钉死,防止将来误改一侧造成静默丢值。
+ *
+ * 2026-09-22 修正:落库键 = yj_field.label,而 yj_field 里这些字段的 label 仍是**旧名**
+ * (项目负责/实施进度/里程完成/测试员/项目级),界面按最新设计显示新名(项目负责人/立项日期/…),
+ * 于是这 5 列显示名 ≠ key。「项目定级」此前被误写成物理列名 `项目层级`(读空+写丢弃),
+ * 现已改为 '项目定级' —— 它与设计显示名同名,不再属于这组。
  */
-test('label≠key 的列恰好是那 6 处历史遗留,其余同名列不得漂移', () => {
+test('显示名≠落库键的列恰好是那 5 处历史遗留(元数据 label 仍是旧名)', () => {
   const legacy = {
-    项目定级: '项目层级',
     项目发起人: '项目级',
     项目负责人: '项目负责',
     立项日期: '实施进度',
@@ -89,27 +97,28 @@ test('label≠key 的列恰好是那 6 处历史遗留,其余同名列不得漂�
   const actual = Object.fromEntries(
     PROGRESS_COLUMNS.filter((c) => c.key !== c.label).map((c) => [c.label, c.key]),
   )
-  assert.deepEqual(actual, legacy, 'label≠key 的列集合与预期不符')
+  assert.deepEqual(actual, legacy, '显示名≠落库键的列集合与预期不符')
 })
 
 /**
- * label≠key 的 6 列必须带 alias,使**旧模板导出的 Excel 仍能落库**;
- * 其余列显示名与数据键同名,不需要 alias。逐列钉死。
+ * 带 alias 的列必须让**旧模板导出的 Excel 仍能落库**:readCell 依次试 label → alias。
+ * 本表的 alias 是"另一套表头写法"的兜底,与 key 无关(2026-09-22 起不再用 key≠label 过滤)。
  */
-test('6 处历史遗留列的 alias 恰好是"旧模板表头"集合', () => {
+test('需要兜底的列 alias 恰好是这批旧表头写法', () => {
   const expected = {
     项目定级: ['项目等级'],                    // 旧版界面/导入表头叫「项目等级」
-    项目发起人: ['项目发起人'],                 // 旧物理列名 项目级,旧表头即显示名
+    '子项目/尺寸': ['子项目尺寸'],
+    项目编号: ['说明'],
+    项目发起人: ['项目发起人'],
     项目负责人: ['项目负责人'],
     立项日期: ['立项日期'],
     预计完成日期: ['预计完成日期'],
     测试情况: ['测试情况'],
   }
   const actual = Object.fromEntries(
-    PROGRESS_COLUMNS.filter((c) => c.key !== c.label && c.alias)
-      .map((c) => [c.label, c.alias]),
+    PROGRESS_COLUMNS.filter((c) => c.alias).map((c) => [c.label, c.alias]),
   )
-  assert.deepEqual(actual, expected, 'label≠key 列的 alias 集合与预期不符')
+  assert.deepEqual(actual, expected, '带 alias 的列集合与预期不符')
 })
 
 test('readCell:显示名优先,旧模板表头(alias)兜底', () => {
@@ -127,8 +136,8 @@ test('readCell:显示名优先,旧模板表头(alias)兜底', () => {
   assert.equal(readCell({ x: 1 }, '不存在的列'), undefined)
 })
 
-test('dataKeyOf:每列都返回真实落库键(不再有 null)', () => {
-  assert.equal(dataKeyOf('项目定级'), '项目层级')
+test('dataKeyOf:每列都返回真实落库键(=字段 label,后端按它收发)', () => {
+  assert.equal(dataKeyOf('项目定级'), '项目定级')     // 物理列是「项目层级」,但载荷键必须用 label
   assert.equal(dataKeyOf('项目负责人'), '项目负责')
   assert.equal(dataKeyOf('预计完成日期'), '里程完成')
   assert.equal(dataKeyOf('技术目标达成'), '技术目标达成')   // 本轮起真落库

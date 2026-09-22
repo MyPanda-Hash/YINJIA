@@ -1736,6 +1736,10 @@ export default {
     '仅审批人（或管理员）可项目定级': 'Only an approver (or admin) can grade the project',
     '仅已审核或已归档的立项申请可项目定级': 'Only approved or archived project applications can be graded',
     '等级作为后续立项（实施计划）与进度流程的属性，会随「文档编号」参照自动带到下游。': 'The level is an attribute of the downstream project plan and progress flow; it is carried automatically when referencing by Document No.',
+    /* ── 项目进度查询:项目等级不再手选,由实施计划带入(2026-09-22 用户口径)── */
+    '项目等级来自项目实施计划，请在实施计划中修改': 'The project level comes from the project plan; edit it there',
+    '（由项目实施计划带入）': '(carried from the project plan)',
+    '项目等级由项目实施计划带入，不在此手选；选中的计划没有等级时，请先到实施计划里填写。': 'The project level is carried from the project plan and is not selected here; if the chosen plan has no level, fill it in the plan first.',
     /* ── 产品变更申请单(2026-09-21,YJ-QR-130《KPC变更申请通知单》):会签 + 生效 ── */
     'KPC管控点申请单': 'KPC Control Point Change Notice',
     '提交会签': 'Submit for Sign-off',

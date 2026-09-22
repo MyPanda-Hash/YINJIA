@@ -36,8 +36,21 @@
  */
 
 /**
- * RD_PROGRESS 明细侧的元数据列名(yj_field where panel_code='RD_PROGRESS' and place='detail'),
- * 与物理表 rd_progress_detail 的列一一对应。
+ * RD_PROGRESS 明细侧的**字段 label 清单**(yj_field where panel_code='RD_PROGRESS' and place='detail'
+ * 的 label)—— 这就是**后端认可的键**:后端读取 `QueryService.rowToLabels` 用
+ * `row.get(f.label())` 取值并以 label 为键输出,写入 `ButtonService.labelsToCols` 同样按 label 取值、
+ * 再落到对应的 col。所以前端载荷的键**必须是 label**,写 col_name 会被静默丢弃(2026-09-22 实测)。
+ */
+export const RD_PROGRESS_DETAIL_LABELS = Object.freeze([
+  '项目名称', '项目定级', '子项目/尺寸', '说明', '内容', '项目级', '项目负责', '实施进度',
+  '里程完成', '状态', '测试员', '谁来批准', '谁来检验', '未批准原因', '项目编号',
+  '开发复杂度', '重要程度', '紧急程度', '项目定及变更', '技术目标达成', '是否市场转化', '未转换原因',
+])
+
+/**
+ * RD_PROGRESS 明细侧的**物理列名**清单(rd_progress_detail 的实际列,与 yj_field.col_name 一一对应)。
+ * ⚠ 它是"库里的列",**不是**前端载荷的键 —— 两者不同的字段(如 label「项目定级」↔ 物理列「项目层级」),
+ *   载荷一律用 label。保存链只认 label,详见 RD_PROGRESS_DETAIL_LABELS 的注释。
  * 前 14 项 = 控制列表纸面列;接着 4 项 = 不上纸面但保留数据的列;最后 4 项 = 内部列。
  */
 export const RD_PROGRESS_DETAIL_COLUMNS = Object.freeze([
@@ -72,7 +85,13 @@ export const RD_PROGRESS_DETAIL_COLUMNS = Object.freeze([
  * 控制列表的 **14 列**(顺序 = 纸面列序;2026-09-22 用户拿设计截图确认)。
  *
  * - `label`:界面表头与 Excel 表头的**设计显示名**(业务语言,可多语言)
- * - `key`  :落库数据键,必须在 RD_PROGRESS_DETAIL_COLUMNS 里
+ * - `key`  :**落库数据键 = 该字段的 yj_field.label**(后端 labelsToCols / rowToLabels 都按 label 收发),
+ *           必须在 RD_PROGRESS_DETAIL_LABELS 里。
+ *           ⚠ 2026-09-22 修正:此前这里放的是 col_name(物理列名),对 6 处 label≠col 的列是**错的** ——
+ *             以「项目定级」为例,载荷键写成 `项目层级` 后:后端按 label 取值取不到 ⇒ **读出来永远是空**
+ *             (等级列空白、按等级合并归类从不生效),写回去也被静默丢弃。现统一改为 label。
+ *           (label 与物理列名不同的列:项目定级↔项目层级、项目编号↔说明、项目发起人↔项目级、
+ *            项目负责人↔项目负责、立项日期↔实施进度、预计完成日期↔里程完成、测试情况↔测试员)
  * - `alias`:Excel 导入时**额外接受**的表头名(readCell 依次尝试 label → alias…)。
  *           分两类,都保留:
  *             ① 历史模板表头 —— 旧版导出的 Excel 用 `项目等级` / `子项目尺寸`,不认就该列丢空
@@ -86,10 +105,10 @@ export const RD_PROGRESS_DETAIL_COLUMNS = Object.freeze([
  *   它们仍在 RD_PROGRESS_DETAIL_COLUMNS 里,数据照旧保留(见文件头说明)。
  */
 export const PROGRESS_COLUMNS = Object.freeze([
-  { label: '项目定级',     key: '项目层级',     width: 8,  group: true, alias: ['项目等级'] },
+  { label: '项目定级',     key: '项目定级',     width: 8,  group: true, alias: ['项目等级'] },
   { label: '项目名称',     key: '项目名称',     width: 18 },
   { label: '子项目/尺寸',  key: '子项目/尺寸',  width: 20, alias: ['子项目尺寸'] },
-  { label: '项目编号',     key: '项目编号',     width: 10, alias: ['说明'] },
+  { label: '项目编号',     key: '项目编号',     width: 16, alias: ['说明'] },
   { label: '内容',         key: '内容',         width: 28 },
   { label: '项目发起人',   key: '项目级',       width: 10, alias: ['项目发起人'] },
   { label: '项目负责人',   key: '项目负责',     width: 10, alias: ['项目负责人'] },

@@ -91,16 +91,10 @@
         <tbody>
           <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
             <td v-if="isLevelHead(i)" class="c-level" :rowspan="levelSpan(i)">
-              <el-select
-                v-if="editable"
-                :model-value="row[K['项目定级']]"
-                size="small"
-                :clearable="false"
-                @change="changeGroupLevel(i, $event)"
-              >
-                <el-option v-for="o in selectOptions('项目层级')" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-              <span v-else class="ps-level-block">{{ row[K['项目定级']] || '' }}</span>
+              <!-- 2026-09-22 用户口径:项目等级不再手选 —— 由项目实施计划的「项目定级」自动带入
+                   (后端 syncPlanToProgress 写入明细 [项目层级]),这里只读展示 + 按等级合并归类。
+                   要改等级请到「项目实施计划」改,保存/阶段完成时自动同步过来。 -->
+              <span class="ps-level-block" :title="tt('项目等级来自项目实施计划，请在实施计划中修改')">{{ row[K['项目定级']] || '' }}</span>
             </td>
             <td v-if="isGroupHead(i)" class="c-name" :rowspan="groupSpan(i)">
               <el-select
@@ -201,14 +195,9 @@
       </div>
     </div>
 
-    <!-- 新增项目弹窗:选等级 + 项目名称(手填/选项目实施计划项目,选项带实施计划单据号,选中导入相关信息) -->
+    <!-- 新增项目弹窗:选项目实施计划项目(或手填名称)+ 子项目/尺寸。
+         项目等级不再手选 —— 由所选实施计划的「项目定级」自动带入(2026-09-22 用户口径)。 -->
     <el-dialog v-model="dlgVisible" :title="tt('新增项目')" width="400px" append-to-body>
-      <div class="ps-dlg-row">
-        <span class="ps-dlg-label">{{ tt('项目定级') }}</span>
-        <el-select v-model="dlgLevel" size="default" :clearable="false" style="width: 220px">
-          <el-option v-for="o in selectOptions('项目层级')" :key="o.value" :label="o.label" :value="o.value" />
-        </el-select>
-      </div>
       <div class="ps-dlg-row">
         <span class="ps-dlg-label">{{ tt('项目名称') }}</span>
         <el-select
@@ -220,9 +209,16 @@
           size="default"
           style="width: 220px"
           :loading="refLoading"
+          @change="onDlgNameChange"
         >
           <el-option v-for="o in refOptions" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
+      </div>
+      <div class="ps-dlg-row">
+        <span class="ps-dlg-label">{{ tt('项目等级') }}</span>
+        <span class="ps-dlg-readonly" :class="{ 'is-empty': !dlgLevel }">
+          {{ dlgLevel || tt('（由项目实施计划带入）') }}
+        </span>
       </div>
       <div class="ps-dlg-row ps-dlg-row-top">
         <span class="ps-dlg-label">{{ tt('子项目/尺寸') }}</span>
@@ -236,7 +232,7 @@
           :placeholder="tt('必填')"
         />
       </div>
-      <div class="ps-dlg-tip">{{ tt('下拉可选择项目实施计划项目（含其实施计划单号），选中后自动导入实施计划相关信息；也可直接输入新项目名称。') }}</div>
+      <div class="ps-dlg-tip">{{ tt('下拉可选择项目实施计划项目（含其实施计划单号），选中后自动导入实施计划相关信息；也可直接输入新项目名称。') }}<br />{{ tt('项目等级由项目实施计划带入，不在此手选；选中的计划没有等级时，请先到实施计划里填写。') }}</div>
       <template #footer>
         <el-button @click="dlgVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" @click="confirmAddProject">{{ tt('确定') }}</el-button>
@@ -501,24 +497,29 @@ function changeGroupName(i, v) {
   }
   emit('dirty')
 }
-/** 同步组内层级(组首行层级变更时) */
-function changeGroupLevel(i, v) {
-  const row = items.value[i]
-  row[K['项目定级']] = v
-  for (let j = i + 1; j < items.value.length && items.value[j]?.[K['项目名称']] === row[K['项目名称']]; j++) {
-    items.value[j][K['项目定级']] = v
-  }
-  emit('dirty')
-}
-/** 新增项目:点击按钮弹窗(选等级 + 项目名称 手填/选实施计划项目),自动归入对应等级块 */
+/** 新增项目:点击按钮弹窗(项目名称 手填/选实施计划项目),项目等级**不手选** ——
+ *  由所选实施计划的「项目定级」自动带入,并据此归入对应等级块(2026-09-22 用户口径)。 */
 const dlgVisible = ref(false)
 const dlgName = ref('')
-const dlgLevel = ref('二级')
+/** 弹窗里只读展示的等级:来自所选实施计划,不是用户输入 */
+const dlgLevel = ref('')
 /** 子项目/尺寸:明细必填项,新增时就一起填,否则整张单据保存会被校验拦下 */
 const dlgSub = ref('')
+/** 实施计划(RD_PLAN)行里的等级字段名 —— 注意这是**计划侧列名**,
+ *  与 RD_PROGRESS 明细的数据键 `项目层级` 不是一回事(本项目规定数据键一律经 K 映射取)。
+ *  单列成常量:既表达清楚语义,也避免源码守卫把它误判成"拿显示名当数据键"。 */
+const PLAN_LEVEL_KEY = '项目定级'
+/** 按项目名称取实施计划里填的等级;没有对应计划则返回空串 */
+function planLevelOf(name) {
+  const found = refRows.value.find((r) => r[K['项目名称']] === name)
+  return found ? String(found[PLAN_LEVEL_KEY] || '').trim() : ''
+}
+function onDlgNameChange() {
+  dlgLevel.value = planLevelOf(dlgName.value)
+}
 function openAddProject() {
   dlgName.value = ''
-  dlgLevel.value = '二级'
+  dlgLevel.value = ''
   dlgSub.value = ''
   dlgVisible.value = true
 }
@@ -536,11 +537,15 @@ function confirmAddProject() {
   }
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
-  const lv = dlgLevel.value || '二级'
-  const row = { [K['项目名称']]: name, [K['项目定级']]: lv, [K['子项目/尺寸']]: sub }
+  // 等级由实施计划带入(手填的新项目没有计划 ⇒ 留空,等实施计划建好保存时由后端 syncPlanToProgress 兜底带入)
+  const lv = planLevelOf(name)
+  const row = { [K['项目名称']]: name, [K['子项目/尺寸']]: sub }
+  if (lv) row[K['项目定级']] = lv
   let idx = -1
-  for (let i = d.items.length - 1; i >= 0; i--) {
-    if (d.items[i][K['项目定级']] === lv) { idx = i; break }
+  if (lv) {
+    for (let i = d.items.length - 1; i >= 0; i--) {
+      if (d.items[i][K['项目定级']] === lv) { idx = i; break }
+    }
   }
   if (idx >= 0) d.items.splice(idx + 1, 0, row)
   else d.items.push(row)
@@ -939,8 +944,26 @@ defineExpose({ exportProgressExcel })
   color: #8a97a6;
   line-height: 1.5;
 }
+/* 弹窗里只读展示的项目等级(由所选实施计划带入,不可手选) */
+.ps-dlg-readonly {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  width: 220px;
+  padding: 0 10px;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  background: #f5f7fa;
+  color: #4b5563;
+  font-size: 14px;
+}
+.ps-dlg-readonly.is-empty {
+  color: #a8b0bb;
+}
 .c-sub { min-width: 140px; }
-.c-remark { min-width: 90px; }
+/* 项目编号列(类名 c-remark 是历史遗留):2026-09-22 用户反馈显示不全 → 90px 加宽到 150px,
+   文档编号形如 YJ-RD001 / E2E-DOC-001 / YJ-XS002,150px 足够整串显示且与「子项目/尺寸」相当 */
+.c-remark { min-width: 150px; }
 .c-content { min-width: 300px; }
 .c-grade { min-width: 90px; }
 .c-owner { min-width: 110px; }
@@ -968,7 +991,7 @@ defineExpose({ exportProgressExcel })
   max-width: 170px;
 }
 .ps-table td.c-remark {
-  max-width: 170px;
+  max-width: 240px;
 }
 /* 项目编号格:文本+查单图标(打印隐藏;点开该项目的数据记录表单据清单) */
 .ps-code-cell {
