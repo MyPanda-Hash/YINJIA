@@ -409,17 +409,21 @@ public class PxController {
 
     @GetMapping("/getPanelConfig")
     public ApiResult<Map<String, Object>> getPanelConfig(@RequestParam String panelCode) {
+        // 面板元数据(字段/参照绑定)不是人人可取:按读放行集合(可见 ∪ 参照目标 ∪ 同模块)校验,2026-09-22 补
+        perm.requirePanelRead(panelCode);
         return ApiResult.ok(service.getPanelConfig(panelCode));
     }
 
     @GetMapping("/getPermMatrix")
     public ApiResult<Map<String, Object>> getPermMatrix(@RequestParam String panelCode) {
+        perm.requirePanelRead(panelCode);
         return ApiResult.ok(service.getPermMatrix(panelCode));
     }
 
     @GetMapping("/getNewFormPermMatrix")
     public ApiResult<Map<String, Object>> getNewFormPermMatrix(@RequestParam String panelCode,
                                                                @RequestParam(required = false) String operationName) {
+        perm.requirePanelRead(panelCode);
         return ApiResult.ok(service.getNewFormPermMatrix(panelCode, operationName));
     }
 
@@ -552,6 +556,7 @@ public class PxController {
     @SuppressWarnings("unchecked")
     public ApiResult<Void> saveColumnPrefs(@RequestBody Map<String, Object> body) {
         String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
         List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
         configService.saveColumnPrefs(panelCode, columns);
         return ApiResult.ok(null);
@@ -562,6 +567,7 @@ public class PxController {
     @SuppressWarnings("unchecked")
     public ApiResult<Void> saveHeaderPrefs(@RequestBody Map<String, Object> body) {
         String panelCode = String.valueOf(body.getOrDefault("panelCode", ""));
+        perm.requirePanelRead(panelCode);
         List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
         configService.saveHeaderPrefs(panelCode, columns);
         return ApiResult.ok(null);
