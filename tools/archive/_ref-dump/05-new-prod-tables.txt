@@ -1,0 +1,326 @@
+# 新系统生产管理域表结构(参考库口径落地)
+
+==== TABLE bd_manu_order ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+合同号 | nvarchar(100) | 0 | 0 | 合同号
+锭号 | nvarchar(400) | 0 | 0 | 锭号
+批号 | nvarchar(200) | 0 | 0 | 批号
+生产车间 | nvarchar(200) | 0 | 0 | 生产车间
+预开工日 | date | 1 | 0 | 预开工日
+预完工日 | date | 1 | 0 | 预完工日
+销售订单号 | nvarchar(400) | 1 | 0 | 销售订单号
+客户编码 | nvarchar(400) | 1 | 0 | 客户编码
+客户 | nvarchar(400) | 1 | 0 | 客户
+测试程序 | nvarchar(200) | 0 | 0 | 测试程序
+测试程序2 | nvarchar(400) | 1 | 0 | 测试程序2
+生产订单客户 | nvarchar(400) | 1 | 0 | 生产订单客户
+机构 | nvarchar(200) | 0 | 0 | 机构
+重量 | decimal(18,4) | 1 | 0 | 重量
+开工日期 | date | 1 | 0 | 开工日期
+完工日期 | date | 1 | 0 | 完工日期
+启用派工 | bit | 1 | 0 | 启用派工
+自动转移 | bit | 1 | 0 | 自动转移
+产品自动添加到材料 | bit | 1 | 0 | 产品自动添加到材料
+是否手工修改单据编码 | bit | 1 | 0 | 是否手工修改单据编码
+外部单据号 | nvarchar(400) | 1 | 0 | 外部单据号
+负责人 | nvarchar(200) | 1 | 0 | 负责人
+启用领料申请 | bit | 1 | 0 | 启用领料申请
+对方仓库 | nvarchar(200) | 1 | 0 | 对方仓库
+备注 | nvarchar(1000) | 1 | 0 | 备注
+单据状态 | nvarchar(20) | 0 | 0 | 单据状态
+审核人 | nvarchar(100) | 1 | 0 | 审核人
+审核时间 | datetime2 | 1 | 0 | 审核时间
+审批人 | nvarchar(100) | 1 | 0 | 审批人
+审批时间 | datetime2 | 1 | 0 | 审批时间
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+单据日期 | date | 1 | 0 | 单据日期
+生产线 | nvarchar(200) | 1 | 0 | 生产线(参考库 plang_pc.scx;排产时指派)
+操作员 | nvarchar(200) | 1 | 0 | 操作员(参考库 plang_pc.pl_man)
+需求数量 | decimal(18,4) | 1 | 0 | 需求数量(来源订单转入,参考库 plang_pc.xq_sl)
+排产数量 | decimal(18,4) | 1 | 0 | 排产数量(头级汇总=明细排产数量之和,参考库 plang_pc.pl_sl)
+入库数量 | decimal(18,4) | 1 | 0 | 已入库数量(完工入库回填,参考库 plang_pc.rk_sl)
+余量 | decimal(18,4) | 1 | 0 | 余量=排产数量-入库数量(参考库 plang_pc.yl)
+入库单号 | nvarchar(200) | 1 | 0 | 入库单号(完工入库回填,参考库 plang_pc.rk_no)
+领料单号 | nvarchar(200) | 1 | 0 | 领料单号(生产领料回填,参考库 plang_pc.ll_no2)
+外包单号 | nvarchar(200) | 1 | 0 | 外包单号(委外加工关联,参考库 plang_pc.wb_no)
+结案 | nvarchar(2) | 1 | 0 | 结案标记 Y/N(参考库 plang_pc.ja;结案后不再参与需求统计)
+单据类型 | nvarchar(100) | 1 | 0 | 单据类型(参考库 plang_pc.djlx;如 自制/委外/返工)
+来料性质 | nvarchar(100) | 1 | 0 | 来料性质(参考库 plang_pc.llxz;新货/返工/客退等)
+来料单号 | nvarchar(200) | 1 | 0 | 来料单号(参考库 plang_pc.lldh;承接送料暂收/来料检验)
+采购入库单号 | nvarchar(200) | 1 | 0 | 采购入库单号(参考库 plang_pc.cgrkdh)
+单价 | decimal(18,4) | 1 | 0 | 单价(参考库 plang_pc.dj)
+金额 | decimal(18,4) | 1 | 0 | 金额(参考库 plang_pc.jine)
+源工单号 | nvarchar(100) | 1 | 0 | 拆单源工单号(空=原始工单;V2.0 §3.2 拆单父子关联)
+拆分序号 | int | 1 | 0 | 拆单序号(源工单的第几拆,从 1 起)
+-- 55 rows
+
+==== TABLE bl_manu_order ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+合同号 | nvarchar(200) | 0 | 0 | 合同号
+生产类型 | nvarchar(200) | 1 | 0 | 生产类型
+产品编码 | nvarchar(200) | 1 | 0 | 产品编码
+存货图片 | nvarchar(400) | 1 | 0 | 存货图片
+产品名称 | nvarchar(400) | 1 | 0 | 产品名称
+规格型号 | nvarchar(400) | 1 | 0 | 规格型号
+型号 | nvarchar(400) | 1 | 0 | 型号
+适用BOM | nvarchar(200) | 1 | 0 | 适用BOM
+BOM展开方式 | nvarchar(200) | 1 | 0 | BOM展开方式
+生产单位 | nvarchar(200) | 1 | 0 | 生产单位
+数量 | decimal(18,4) | 1 | 0 | 数量
+齐套数量(主) | decimal(18,4) | 1 | 0 | 齐套数量(主)
+累计汇报套数(工序单位) | decimal(18,4) | 1 | 0 | 累计汇报套数(工序单位)
+可用量 | decimal(18,4) | 1 | 0 | 可用量
+可用量说明 | nvarchar(400) | 1 | 0 | 可用量说明
+现存量 | decimal(18,4) | 1 | 0 | 现存量
+现存量说明 | nvarchar(400) | 1 | 0 | 现存量说明
+产品字符公用自定义项1 | nvarchar(400) | 1 | 0 | 产品字符公用自定义项1
+图号 | nvarchar(400) | 1 | 0 | 图号
+单重 | decimal(18,4) | 1 | 0 | 单重
+总重 | decimal(18,4) | 1 | 0 | 总重
+需求令号 | nvarchar(400) | 1 | 0 | 需求令号
+备注 | nvarchar(1000) | 1 | 0 | 备注
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+批号 | nvarchar(100) | 1 | 0 | 批号(产品/来料批号,参考库 plang_pc.lot_no)
+需求数量 | decimal(18,4) | 1 | 0 | 需求数量(=订单数量,选单/生单带入)
+排产数量 | decimal(18,4) | 1 | 0 | 排产数量(排产确认数量,参考库 plang_pc.pl_sl)
+入库数量 | decimal(18,4) | 1 | 0 | 已入库数量(完工入库回填)
+余量 | decimal(18,4) | 1 | 0 | 余量=排产数量-入库数量
+单价 | decimal(18,4) | 1 | 0 | 单价(来源订单单价)
+金额 | decimal(18,4) | 1 | 0 | 金额
+-- 36 rows
+
+==== TABLE bd_dispatch ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+单据日期 | date | 0 | 0 | 单据日期
+单据编号 | nvarchar(400) | 0 | 0 | 单据编号
+业务类型 | nvarchar(200) | 0 | 0 | 业务类型
+生产车间 | nvarchar(400) | 0 | 0 | 生产车间
+加工单号 | nvarchar(400) | 1 | 0 | 加工单号
+产品名称 | nvarchar(400) | 1 | 0 | 产品名称
+预开工日 | date | 1 | 0 | 预开工日
+预完工日 | date | 1 | 0 | 预完工日
+经手人 | nvarchar(400) | 1 | 0 | 经手人
+项目 | nvarchar(400) | 1 | 0 | 项目
+部门 | nvarchar(400) | 1 | 0 | 部门
+备注 | nvarchar(400) | 1 | 0 | 备注
+单据状态 | nvarchar(20) | 0 | 0 | 单据状态
+审核人 | nvarchar(100) | 1 | 0 | 审核人
+审核时间 | datetime2 | 1 | 0 | 审核时间
+审批人 | nvarchar(100) | 1 | 0 | 审批人
+审批时间 | datetime2 | 1 | 0 | 审批时间
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+-- 23 rows
+
+==== TABLE bl_dispatch ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+单据编号 | nvarchar(200) | 0 | 0 | 单据编号
+工序编码 | nvarchar(400) | 0 | 0 | 工序编码
+工序名称 | nvarchar(400) | 1 | 0 | 工序名称
+产品名称 | nvarchar(400) | 1 | 0 | 产品名称
+生产车间 | nvarchar(400) | 1 | 0 | 生产车间
+工作中心 | nvarchar(400) | 1 | 0 | 工作中心
+设备 | nvarchar(400) | 1 | 0 | 设备
+班组 | nvarchar(400) | 1 | 0 | 班组
+工人 | nvarchar(400) | 1 | 0 | 工人
+加工类型 | nvarchar(200) | 0 | 0 | 加工类型
+计划数量 | decimal(18,4) | 1 | 0 | 计划数量
+已派工数量 | decimal(18,4) | 1 | 0 | 已派工数量
+派工数量 | decimal(18,4) | 0 | 0 | 派工数量
+计量单位 | nvarchar(200) | 0 | 0 | 计量单位
+预开工日 | date | 1 | 0 | 预开工日
+预完工日 | date | 1 | 0 | 预完工日
+派工加工状态 | nvarchar(200) | 1 | 0 | 派工加工状态
+累计汇报数量 | decimal(18,4) | 1 | 0 | 累计汇报数量
+委外供应商 | nvarchar(400) | 1 | 0 | 委外供应商
+规格型号 | nvarchar(400) | 1 | 0 | 规格型号
+备注 | nvarchar(400) | 1 | 0 | 备注
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+-- 27 rows
+
+==== TABLE wo_order ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+单据编号 | nvarchar(120) | 0 | 0 | 单据编号
+单据日期 | nvarchar(40) | 1 | 0 | 单据日期
+销售订单号 | nvarchar(120) | 1 | 0 | 销售订单号
+客户 | nvarchar(400) | 1 | 0 | 客户
+产品编码 | nvarchar(200) | 1 | 0 | 产品编码
+产品名称 | nvarchar(400) | 1 | 0 | 产品名称
+规格型号 | nvarchar(400) | 1 | 0 | 规格型号
+单位 | nvarchar(100) | 1 | 0 | 单位
+订单数量 | decimal(18,4) | 1 | 0 | 订单数量
+成型计划数量 | decimal(18,4) | 1 | 0 | 成型计划数量
+交期 | nvarchar(40) | 1 | 0 | 交期
+生产车间 | nvarchar(200) | 1 | 0 | 生产车间
+工单状态 | nvarchar(20) | 0 | 0 | 工单状态
+审核人 | nvarchar(100) | 1 | 0 | 审核人
+审核时间 | nvarchar(60) | 1 | 0 | 审核时间
+备注 | nvarchar(1000) | 1 | 0 | 备注
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+产品批号 | nvarchar(60) | 1 | 0 | 产品批号
+-- 23 rows
+
+==== TABLE wo_progress ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+单据编号 | nvarchar(120) | 0 | 0 | 单据编号
+工序 | nvarchar(100) | 1 | 0 | 工序
+计划数量 | decimal(18,4) | 1 | 0 | 计划数量
+完成数量 | decimal(18,4) | 1 | 0 | 完成数量
+备注 | nvarchar(400) | 1 | 0 | 备注
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+-- 11 rows
+
+==== TABLE wo_report ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+单据编号 | nvarchar(120) | 0 | 0 | 单据编号
+单据日期 | nvarchar(40) | 1 | 0 | 单据日期
+工单号 | nvarchar(120) | 1 | 0 | 工单号
+工序 | nvarchar(100) | 1 | 0 | 工序
+报工数量 | decimal(18,4) | 1 | 0 | 报工数量
+报工人 | nvarchar(100) | 1 | 0 | 报工人
+备注 | nvarchar(1000) | 1 | 0 | 备注
+单据状态 | nvarchar(20) | 0 | 0 | 单据状态
+审核人 | nvarchar(100) | 1 | 0 | 审核人
+审核时间 | nvarchar(60) | 1 | 0 | 审核时间
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+直销数量 | decimal(18,4) | 1 | 0 | 直销数量
+-- 17 rows
+
+==== TABLE wo_stage_report ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+manu_order_no | nvarchar(100) | 0 | 0 | 工单号
+stage | nvarchar(40) | 0 | 0 | 工序
+report_date | date | 0 | 0 | 报工日期
+shift | nvarchar(20) | 1 | 0 | 班次
+worker | nvarchar(100) | 1 | 0 | 操作工
+plan_qty | decimal(18,4) | 1 | 0 | 计划数量
+actual_qty | decimal(18,4) | 1 | 0 | 完成数量
+defect_qty | decimal(18,4) | 1 | 0 | 不良数量
+dual_out_qty | decimal(18,4) | 1 | 0 | 直销数量
+batch_no | nvarchar(100) | 1 | 0 | 批号
+qr_code | nvarchar(200) | 1 | 0 | 
+device_no | nvarchar(100) | 1 | 0 | 设备编号
+notes | nvarchar(1000) | 1 | 0 | 备注
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+-- 19 rows
+
+==== TABLE wo_material_pick ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+manu_order_no | nvarchar(100) | 0 | 0 | 工单号
+stage | nvarchar(40) | 0 | 0 | 工序
+item_code | nvarchar(100) | 0 | 0 | 物料/产品编码
+item_name | nvarchar(200) | 1 | 0 | 物料名称
+batch_no | nvarchar(100) | 1 | 0 | 批号
+qty | decimal(18,4) | 0 | 0 | 订单数量
+picker | nvarchar(100) | 1 | 0 | 领料人
+pick_time | datetime2 | 1 | 0 | 
+qr_code | nvarchar(200) | 1 | 0 | 
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+-- 15 rows
+
+==== TABLE wo_line_stock ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+manu_order_no | nvarchar(100) | 0 | 0 | 工单号
+stage | nvarchar(40) | 0 | 0 | 工序
+item_code | nvarchar(100) | 1 | 0 | 物料/产品编码
+batch_no | nvarchar(100) | 1 | 0 | 批号
+qty | decimal(18,4) | 0 | 0 | 订单数量
+warehouse | nvarchar(40) | 1 | 0 | 
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+-- 12 rows
+
+==== TABLE day_report ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+单据编号 | nvarchar(120) | 0 | 0 | 单据编号
+单据日期 | nvarchar(40) | 1 | 0 | 单据日期
+车间 | nvarchar(60) | 1 | 0 | 车间
+出勤人数 | int | 1 | 0 | 出勤人数
+填表人 | nvarchar(100) | 1 | 0 | 填表人
+备注 | nvarchar(1000) | 1 | 0 | 备注
+单据状态 | nvarchar(20) | 0 | 0 | 单据状态
+审核人 | nvarchar(100) | 1 | 0 | 审核人
+审核时间 | nvarchar(60) | 1 | 0 | 审核时间
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+-- 15 rows
+
+==== TABLE day_report_detail ====
+name | typ | is_nullable | is_identity | cmt
+id | int | 0 | 1 | 
+单据编号 | nvarchar(120) | 0 | 0 | 单据编号
+姓名 | nvarchar(100) | 1 | 0 | 姓名
+时间 | nvarchar(40) | 1 | 0 | 时间
+产品编码 | nvarchar(200) | 1 | 0 | 产品编码
+产品名称 | nvarchar(400) | 1 | 0 | 产品名称
+规格 | nvarchar(400) | 1 | 0 | 规格
+单位 | nvarchar(100) | 1 | 0 | 单位
+数量 | decimal(18,4) | 1 | 0 | 数量
+工作内容 | nvarchar(1000) | 1 | 0 | 工作内容
+灌料重每支 | decimal(18,4) | 1 | 0 | 灌料重/支
+物料总用量 | decimal(18,4) | 1 | 0 | 物料总用量
+报废 | decimal(18,4) | 1 | 0 | 报废
+料头料尾重量 | decimal(18,4) | 1 | 0 | 料头料尾重量
+工序内容 | nvarchar(400) | 1 | 0 | 工序内容(组装)
+合格数量 | decimal(18,4) | 1 | 0 | 合格数量
+损失时间 | nvarchar(100) | 1 | 0 | 损失时间
+原因 | nvarchar(400) | 1 | 0 | 原因
+备注 | nvarchar(400) | 1 | 0 | 备注
+asp_user1 | nvarchar(100) | 1 | 0 | asp_user1
+asp_time1 | datetime2 | 1 | 0 | asp_time1
+asp_user2 | nvarchar(100) | 1 | 0 | asp_user2
+asp_time2 | datetime2 | 1 | 0 | asp_time2
+asp_cancel | char(1) | 1 | 0 | asp_cancel
+-- 24 rows

@@ -1,0 +1,512 @@
+# 旧系统视图定义(参考库逻辑实现载体)
+
+==== VIEW VIEW_barcord ====
+def
+CREATE VIEW dbo.VIEW_barcord  AS  SELECT  dbo.dm_wz.comm, ISNULL(dbo.dm_wz.cz, dbo.dm_wz.dm) AS dm, RTRIM(dbo.dm_wz.mc) AS mc, RTRIM(dbo.dm_wz.jldw)                      AS jldw, RTRIM(dbo.dm_wz.lb) AS lb, dbo.dm_wz.rkj, dbo.dm_wz.pict, RTRIM(dbo.dm_wz.ys) AS ys, RTRIM(dbo.dm_wz.cz)                      AS cz, RTRIM(dbo.dm_wz.gg) AS gg, dbo.dm_wz.bz, dbo.dm_wz.yxrq, dbo.dm_wz.cj, dbo.dm_wz.lsj, dbo.dm_wz.fxj,                      dbo.kucun.ckdm, dbo.kucun.lot_no, dbo.kucun.color, dbo.kucun.siz, SUM(dbo.kucun.sl) AS sl, SUM(dbo.kucun.total_je)                      AS total_je, 0 AS cost  FROM      dbo.dm_wz LEFT OUTER JOIN                     dbo.kucun ON dbo.dm_wz.comm = dbo.kucun.comm AND dbo.dm_wz.dm = dbo.kucun.wzdm  GROUP BY ISNULL(dbo.dm_wz.cz, dbo.dm_wz.dm), RTRIM(dbo.dm_wz.mc), RTRIM(dbo.dm_wz.jldw), RTRIM(dbo.dm_wz.lb),                      dbo.dm_wz.rkj, dbo.dm_wz.pict, RTRIM(dbo.dm_wz.ys), RTRIM(dbo.dm_wz.cz), RTRIM(dbo.dm_wz.gg), dbo.dm_wz.bz,                      dbo.dm_wz.yxrq, dbo.dm_wz.cj, dbo.dm_wz.lsj, dbo.dm_wz.fxj, dbo.kucun.lot_no, dbo.kucun.color, dbo.kucun.siz,                      dbo.kucun.ckdm, dbo.dm_wz.comm  
+-- 1 rows
+
+----
+
+==== VIEW View_BOM ====
+def
+CREATE VIEW dbo.View_BOM  AS  SELECT  TOP (100) PERCENT dbo.mate.comm, dbo.mate.m_no, dbo.mate.m_date, dbo.mate.wzdm1, dbo.dm_wz.mc, dbo.dm_wz.gg,                      dbo.mate.lot_no1, dbo.mate.color1, dbo.mate.siz1, dbo.mate.ywdm, dbo.dm_ywy.mc AS ywmc, dbo.mate.bz  FROM      dbo.mate LEFT OUTER JOIN                     dbo.dm_ywy ON dbo.mate.comm = dbo.dm_ywy.comm AND dbo.mate.ywdm = dbo.dm_ywy.dm LEFT OUTER JOIN                     dbo.dm_wz ON dbo.mate.comm = dbo.dm_wz.comm AND dbo.mate.wzdm1 = dbo.dm_wz.dm  GROUP BY dbo.mate.m_no, dbo.mate.m_date, dbo.mate.wzdm1, dbo.dm_wz.mc, dbo.dm_wz.gg, dbo.mate.lot_no1, dbo.mate.color1,                      dbo.mate.siz1, dbo.mate.ywdm, dbo.dm_ywy.mc, dbo.mate.bz, dbo.mate.comm  ORDER BY dbo.mate.m_no DESC  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_CK ====
+def
+CREATE VIEW dbo.VIEW_CK  AS  SELECT  dbo.outh.comm, dbo.outh.wzdm, dbo.outh.ckdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, SUM(dbo.outh.sl) AS rkl, MAX(dbo.outh.out_date) AS indate,                  SUM(dbo.outh.ddwsl) AS sl2, dbo.outh.bz1, dbo.outh.outh_no AS inh_no, dbo.outh.khdm AS gfdm, dbo.outh.ywman, dbo.users.userna,                  dbo.dm_ck.mc AS ckmc, dbo.outh.od_no AS od_no2, dbo.outh.od_xc AS od_xc2, dbo.outh.o_zk AS i_zk, dbo.outh.o_zke AS i_zke, dbo.outh.total_m,                  dbo.outh.tax, dbo.outh.tax_dm, dbo.outh.tax_sm, dbo.outh.bz, dbo.outh.qr, dbo.outh.id + 50000000000 AS id  FROM     dbo.outh LEFT OUTER JOIN                 dbo.dm_ck ON dbo.outh.comm = dbo.dm_ck.comm AND dbo.outh.ckdm = dbo.dm_ck.dm LEFT OUTER JOIN                 dbo.users ON dbo.outh.comm = dbo.users.comm AND dbo.outh.ywman = dbo.users.id  WHERE   (CONVERT(varchar(6), dbo.outh.out_date, 112) = CONVERT(varchar(6), GETDATE(), 112)) AND (dbo.outh.qr = N'Y')  GROUP BY dbo.outh.wzdm, dbo.outh.ckdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, dbo.outh.comm, dbo.outh.bz1, dbo.outh.outh_no, dbo.outh.khdm,                  dbo.outh.ywman, dbo.users.userna, dbo.dm_ck.mc, dbo.outh.od_no, dbo.outh.od_xc, dbo.outh.o_zk, dbo.outh.o_zke, dbo.outh.total_m, dbo.outh.tax,                  dbo.outh.tax_dm, dbo.outh.tax_sm, dbo.outh.bz, dbo.outh.qr, dbo.outh.id + 50000000000  
+-- 1 rows
+
+----
+
+==== VIEW View_CRK ====
+def
+CREATE VIEW dbo.View_CRK  AS  SELECT  *  FROM     VIEW_RK  UNION  SELECT  *  FROM     VIEW_CK  
+-- 1 rows
+
+----
+
+==== VIEW View_FKZE ====
+def
+CREATE VIEW dbo.View_FKZE  AS  SELECT  comm, xsdh_no, sl, SUM(o_zke) AS jine  FROM      dbo.xsdh  WHERE   (wzdm = N'付款')  GROUP BY xsdh_no, sl, comm  
+-- 1 rows
+
+----
+
+==== VIEW View_GX ====
+def
+CREATE VIEW dbo.View_GX  AS  SELECT  comm, dm, mc, bz  FROM      dbo.dm_gx  WHERE   (lb = N'GX')  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_inh ====
+def
+/****** Object:  View dbo.VIEW_inh    Script Date: 2013-09-13 23:02:09 *****  ***** Object:  View dbo.VIEW_inh    Script Date: 2013-09-06 23:55:50 ******/  CREATE VIEW dbo.VIEW_inh  AS  SELECT  dbo.inh.comm, dbo.dm_ywy.mc AS ywymc, dbo.dm_gf.mc AS khmc, dbo.dm_ck.mc AS ckmc, dbo.dm_wz.mc AS wzmc,                      dbo.inh.wzdm, dbo.inh.sl, dbo.inh.sl2, dbo.inh.ddw, dbo.inh.in_danj AS out_danj, dbo.inh.i_zk AS o_zk,                      dbo.inh.i_zke AS o_zke, 0 AS cost_dj, dbo.inh.in_date AS out_date, dbo.inh.inh_no AS outh_no, dbo.dm_wz.gg,                      dbo.dm_wz.cz, dbo.dm_wz.ys, dbo.inh.id, dbo.inh.ckdm, dbo.inh.lot_no, dbo.inh.color, dbo.inh.siz, dbo.inh.bz1,                      dbo.inh.tax_dm, dbo.inh.tax_sm, dbo.inh.tax, dbo.inh.total_m, dbo.inh.od_no, dbo.inh.od_xc, dbo.dm_wz.jldw, dbo.inh.bz,                      0 AS od_sl, dbo.inh.gfdm AS khdm, '' AS odwzmc, dbo.inh.od_no2, dbo.inh.od_xc2, '' AS tm, dbo.inh.qr,                      dbo.inh.bom_qty  FROM      dbo.inh LEFT OUTER JOIN                     dbo.dm_wz ON dbo.inh.comm = dbo.dm_wz.comm AND dbo.inh.wzdm = dbo.dm_wz.dm LEFT OUTER JOIN                     dbo.dm_ck ON dbo.inh.comm = dbo.dm_ck.comm AND dbo.inh.ckdm = dbo.dm_ck.dm LEFT OUTER JOIN                     dbo.dm_gf ON dbo.inh.comm = dbo.dm_gf.comm AND dbo.inh.gfdm = dbo.dm_gf.dm LEFT OUTER JOIN                     dbo.dm_ywy ON dbo.inh.comm = dbo.dm_ywy.comm AND dbo.inh.ywman = dbo.dm_ywy.dm  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_kucun ====
+def
+/****** Object:  View dbo.VIEW_kucun    Script Date: 2013-09-13 23:02:09 *****  ***** Object:  View dbo.VIEW_kucun    Script Date: 2013-09-06 23:55:50 ******/  CREATE VIEW dbo.VIEW_kucun  AS  SELECT  dbo.dm_ck.mc AS ckmc, dbo.dm_wz.mc AS wzmc, dbo.kucun.update_date, dbo.kucun.wzdm, dbo.kucun.yl, dbo.kucun.total_je, dbo.dm_wz.gg,                  dbo.dm_wz.cz, dbo.dm_wz.ys, dbo.kucun.ckdm, dbo.kucun.lot_no, dbo.kucun.color, dbo.kucun.siz  FROM     dbo.kucun LEFT OUTER JOIN                 dbo.dm_ck ON dbo.kucun.comm = dbo.dm_ck.comm AND dbo.kucun.ckdm = dbo.dm_ck.mc LEFT OUTER JOIN                 dbo.dm_wz ON dbo.kucun.comm = dbo.dm_wz.comm AND dbo.kucun.wzdm = dbo.dm_wz.dm  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk00 ====
+def
+CREATE VIEW dbo.View_llrk00  AS  SELECT  comm, in_date, ywman, inh_no, gfdm, wzdm, lot_no, sl, ddwsl, od_xc, asp_cancel, cust_po, id, bz1, qr  FROM     dbo.inh  WHERE   (bz1 = N'来料入库') AND (qr = N'Y') AND (asp_cancel <> 'Y')  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk01 ====
+def
+CREATE VIEW dbo.View_llrk01  AS  SELECT  dbo.View_llrk00.comm, dbo.View_llrk00.in_date, dbo.View_llrk00.ywman, dbo.View_llrk00.inh_no, dbo.View_llrk00.gfdm, dbo.dm_kh.mc AS khmc,                  dbo.View_llrk00.wzdm, dbo.dm_khzl.mc, dbo.dm_khzl.dz, dbo.dm_khzl.mh, dbo.dm_khzl.cz, dbo.View_llrk00.lot_no, dbo.View_llrk00.sl AS llsl,                  dbo.View_llrk00.ddwsl AS lsps, dbo.View_llrk00.od_xc AS lsmpsl, ISNULL(dbo.View_llrk02.inh_no, N'') AS dcldh, ISNULL(dbo.View_llrk02.dclsl, 0) AS dclsl,                  ISNULL(dbo.View_llrk02.dclps, 0) AS dclps, ISNULL(dbo.View_llrk03.inh_no, N'') AS tscdh, ISNULL(dbo.View_llrk03.tscsl, 0) AS tscsl,                  ISNULL(dbo.View_llrk03.tscps, 0) AS tscps, ISNULL(dbo.View_llrk04.inh_no, N'') AS bfpdh, ISNULL(dbo.View_llrk04.bfpsl, 0) AS bfpsl,                  ISNULL(dbo.View_llrk04.bfpps, 0) AS bfpps, ISNULL(dbo.View_llrk05.outh_no, N'') AS xhdh, ISNULL(dbo.View_llrk05.cksl, 0) AS xhsl,                  ISNULL(dbo.View_llrk05.ckps, 0) AS xhps, ISNULL(dbo.View_llrk06.outh_no, N'') AS tscckdh, ISNULL(dbo.View_llrk06.tsccksl, 0) AS tsccksl,                  ISNULL(dbo.View_llrk06.tscckps, 0) AS tscckps, ISNULL(dbo.View_llrk07.outh_no, N'') AS bfpckdh, ISNULL(dbo.View_llrk07.bfpcksl, 0) AS bfpcksl,                  ISNULL(dbo.View_llrk07.bfpckps, 0) AS bfpckps, dbo.View_llrk00.sl - ISNULL(dbo.View_llrk05.cksl, 0) - ISNULL(dbo.View_llrk06.tsccksl, 0)                  - ISNULL(dbo.View_llrk07.bfpcksl, 0) AS wchsl, dbo.View_llrk00.ddwsl - ISNULL(dbo.View_llrk05.ckps, 0) - ISNULL(dbo.View_llrk06.tscckps, 0)                  - ISNULL(dbo.View_llrk07.bfpckps, 0) AS wchps, dbo.View_llrk00.asp_cancel, dbo.View_llrk00.cust_po, dbo.View_llrk05.out_date,                  ROUND(ISNULL(dbo.View_llrk03.tscsl, 0) / dbo.View_llrk00.sl * 100, 2) AS BLL, ROUND(ISNULL(dbo.View_llrk07.bfpcksl, 0) / dbo.View_llrk00.sl * 100, 2)                  AS BFL, dbo.View_llrk08.yl AS kcl, dbo.View_llrk00.id  FROM     dbo.View_llrk00 LEFT OUTER JOIN                 dbo.View_llrk08 ON dbo.View_llrk00.comm = dbo.View_llrk08.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk08.lot_no LEFT OUTER JOIN                 dbo.View_llrk07 ON dbo.View_llrk00.comm = dbo.View_llrk07.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk07.lot_no LEFT OUTER JOIN                 dbo.View_llrk06 ON dbo.View_llrk00.comm = dbo.View_llrk06.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk06.lot_no LEFT OUTER JOIN                 dbo.View_llrk05 ON dbo.View_llrk00.comm = dbo.View_llrk05.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk05.lot_no LEFT OUTER JOIN                 dbo.View_llrk04 ON dbo.View_llrk00.comm = dbo.View_llrk04.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk04.lot_no LEFT OUTER JOIN                 dbo.View_llrk03 ON dbo.View_llrk00.comm = dbo.View_llrk03.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk03.lot_no LEFT OUTER JOIN                 dbo.View_llrk02 ON dbo.View_llrk00.comm = dbo.View_llrk02.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk02.lot_no LEFT OUTER JOIN                 dbo.dm_kh ON dbo.View_llrk00.comm = dbo.dm_kh.comm AND dbo.View_llrk00.gfdm = dbo.dm_kh.dm LEFT OUTER JOIN                 dbo.dm_khzl ON dbo.View_llrk00.comm = dbo.dm_khzl.comm AND dbo.View_llrk00.wzdm = dbo.dm_khzl.dm AND dbo.View_llrk00.gfdm = dbo.dm_khzl.khdm  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk01A ====
+def
+CREATE VIEW dbo.View_llrk01A  AS  SELECT  dbo.View_llrk00.comm, dbo.View_llrk00.in_date, dbo.View_llrk00.ywman, dbo.View_llrk00.inh_no, dbo.View_llrk00.gfdm, dbo.dm_kh.mc AS khmc,                  dbo.View_llrk00.wzdm, dbo.dm_khzl.mc, dbo.dm_khzl.dz, dbo.dm_khzl.mh, dbo.dm_khzl.cz, dbo.View_llrk00.lot_no, dbo.View_llrk00.sl AS llsl,                  dbo.View_llrk00.ddwsl AS lsps, dbo.View_llrk00.od_xc AS lsmpsl, ISNULL(dbo.View_llrk02A.dclsl, 0) AS dclsl, ISNULL(dbo.View_llrk02A.dclps, 0) AS dclps,                  ISNULL(dbo.View_llrk03A.tscsl, 0) AS tscsl, ISNULL(dbo.View_llrk03A.tscps, 0) AS tscps, ISNULL(dbo.View_llrk04A.bfpsl, 0) AS bfpsl,                  ISNULL(dbo.View_llrk04A.bfpps, 0) AS bfpps, ISNULL(dbo.View_llrk05A.cksl, 0) AS xhsl, ISNULL(dbo.View_llrk05A.ckps, 0) AS xhps,                  ISNULL(dbo.View_llrk06A.tsccksl, 0) AS tsccksl, ISNULL(dbo.View_llrk06A.tscckps, 0) AS tscckps, ISNULL(dbo.View_llrk07A.bfpcksl, 0) AS bfpcksl,                  ISNULL(dbo.View_llrk07A.bfpckps, 0) AS bfpckps, dbo.View_llrk00.sl - ISNULL(dbo.View_llrk05A.cksl, 0) - ISNULL(dbo.View_llrk06A.tsccksl, 0)                  - ISNULL(dbo.View_llrk07A.bfpcksl, 0) AS wchsl, dbo.View_llrk00.ddwsl - ISNULL(dbo.View_llrk05A.ckps, 0) - ISNULL(dbo.View_llrk06A.tscckps, 0)                  - ISNULL(dbo.View_llrk07A.bfpckps, 0) AS wchps, dbo.View_llrk00.asp_cancel, dbo.View_llrk00.cust_po, ROUND(ISNULL(dbo.View_llrk03A.tscsl, 0)                  / dbo.View_llrk00.sl * 100, 2) AS BLL, ROUND(ISNULL(dbo.View_llrk07A.bfpcksl, 0) / dbo.View_llrk00.sl * 100, 2) AS BFL, dbo.View_llrk08.yl AS kcl,                  dbo.View_llrk00.id, '‘无’' AS dcldh, '‘无’' AS bfpckdh, '‘无’' AS bfpdh, '‘无’' AS tscdh, '‘无’' AS tscckdh, '‘无’' AS xhdh,                  dbo.View_llrk05A.out_date  FROM     dbo.View_llrk00 LEFT OUTER JOIN                 dbo.View_llrk08 ON dbo.View_llrk00.comm = dbo.View_llrk08.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk08.lot_no LEFT OUTER JOIN                 dbo.View_llrk07A ON dbo.View_llrk00.comm = dbo.View_llrk07A.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk07A.lot_no LEFT OUTER JOIN                 dbo.View_llrk06A ON dbo.View_llrk00.comm = dbo.View_llrk06A.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk06A.lot_no LEFT OUTER JOIN                 dbo.View_llrk05A ON dbo.View_llrk00.comm = dbo.View_llrk05A.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk05A.lot_no LEFT OUTER JOIN                 dbo.View_llrk04A ON dbo.View_llrk00.comm = dbo.View_llrk04A.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk04A.lot_no LEFT OUTER JOIN                 dbo.View_llrk03A ON dbo.View_llrk00.comm = dbo.View_llrk03A.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk03A.lot_no LEFT OUTER JOIN                 dbo.View_llrk02A ON dbo.View_llrk00.comm = dbo.View_llrk02A.comm AND dbo.View_llrk00.lot_no = dbo.View_llrk02A.lot_no LEFT OUTER JOIN                 dbo.dm_kh ON dbo.View_llrk00.comm = dbo.dm_kh.comm AND dbo.View_llrk00.gfdm = dbo.dm_kh.dm LEFT OUTER JOIN                 dbo.dm_khzl ON dbo.View_llrk00.comm = dbo.dm_khzl.comm AND dbo.View_llrk00.wzdm = dbo.dm_khzl.dm AND                  dbo.View_llrk00.gfdm = dbo.dm_khzl.khdm  WHERE   (dbo.View_llrk00.bz1 = N'来料入库') AND (dbo.View_llrk00.qr = N'Y') AND (dbo.View_llrk00.asp_cancel <> 'Y')  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk02 ====
+def
+CREATE VIEW dbo.View_llrk02  AS  SELECT  comm, gfdm, wzdm, inh_no, in_date, lot_no, sl AS dclsl, ddwsl AS dclps, od_xc AS dllmpsl  FROM     dbo.inh  WHERE   (bz1 = N'其他入库') AND (ckdm = N'DCLC') AND (qr = N'Y') AND (asp_cancel <> 'Y')  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk02A ====
+def
+CREATE VIEW dbo.View_llrk02A  AS  SELECT  comm, lot_no, SUM(sl) AS dclsl, SUM(ddwsl) AS dclps, MAX(od_xc) AS dllmpsl  FROM     dbo.inh  WHERE   (bz1 = N'其他入库') AND (ckdm = N'DCLC') AND (qr = N'Y') AND (asp_cancel <> 'Y')  GROUP BY comm, lot_no  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk03 ====
+def
+CREATE VIEW dbo.View_llrk03  AS  SELECT  comm, gfdm, wzdm, inh_no, in_date, lot_no, sl AS tscsl, ddwsl AS tscps, od_xc AS tscmpsl  FROM     dbo.inh  WHERE   (bz1 = N'其他入库') AND (ckdm = N'BLPC') AND (qr = N'Y') AND (asp_cancel <> 'Y')  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk03A ====
+def
+CREATE VIEW dbo.View_llrk03A  AS  SELECT  comm, lot_no, SUM(sl) AS tscsl, SUM(ddwsl) AS tscps, SUM(od_xc) AS tscmpsl  FROM     dbo.inh  WHERE   (bz1 = N'其他入库') AND (ckdm = N'BLPC') AND (qr = N'Y') AND (asp_cancel <> 'Y')  GROUP BY comm, lot_no  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk04 ====
+def
+CREATE VIEW dbo.View_llrk04  AS  SELECT  comm, gfdm, wzdm, inh_no, in_date, lot_no, sl AS bfpsl, ddwsl AS bfpps, od_xc AS bfptscmpsl  FROM     dbo.inh  WHERE   (bz1 = N'其他入库') AND (ckdm = N'BFC') AND (qr = N'Y') AND (asp_cancel <> 'Y')  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk04A ====
+def
+CREATE VIEW dbo.View_llrk04A  AS  SELECT  comm, lot_no, SUM(sl) AS bfpsl, SUM(ddwsl) AS bfpps, od_xc AS bfptscmpsl  FROM     dbo.inh  WHERE   (bz1 = N'其他入库') AND (ckdm = N'BFC') AND (qr = N'Y') AND (asp_cancel <> 'Y')  GROUP BY comm, lot_no, od_xc  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk05 ====
+def
+CREATE VIEW dbo.View_llrk05  AS  SELECT  comm, out_date, ywman, outh_no, khdm, wzdm, ckdm, lot_no, sl AS cksl, ddwsl AS ckps  FROM     dbo.outh  WHERE   (bz1 = N'销货出库') AND (qr = N'Y') AND (asp_cancel <> 'Y')  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk05A ====
+def
+CREATE VIEW dbo.View_llrk05A  AS  SELECT  comm, lot_no, out_date, SUM(sl) AS cksl, SUM(ddwsl) AS ckps  FROM     dbo.outh  WHERE   (bz1 = N'销货出库') AND (qr = N'Y') AND (asp_cancel <> 'Y')  GROUP BY comm, lot_no, out_date  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk06 ====
+def
+CREATE VIEW dbo.View_llrk06  AS  SELECT  comm, out_date, ywman, outh_no, khdm, wzdm, ckdm, lot_no, sl AS tsccksl, ddwsl AS tscckps  FROM     dbo.outh  WHERE   (bz1 = N'其他出库') AND (qr = N'Y') AND (ckdm = N'BLPC') AND (asp_cancel <> 'Y')  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk06A ====
+def
+CREATE VIEW dbo.View_llrk06A  AS  SELECT  comm, lot_no, SUM(sl) AS tsccksl, SUM(ddwsl) AS tscckps  FROM     dbo.outh  WHERE   (bz1 = N'其他出库') AND (qr = N'Y') AND (asp_cancel <> 'Y')  GROUP BY lot_no, comm  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk07 ====
+def
+CREATE VIEW dbo.View_llrk07  AS  SELECT  comm, out_date, ywman, outh_no, khdm, wzdm, ckdm, lot_no, sl AS bfpcksl, ddwsl AS bfpckps  FROM     dbo.outh  WHERE   (bz1 = N'其他出库') AND (qr = N'Y') AND (ckdm = N'BFC') AND (asp_cancel <> 'Y')  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk07A ====
+def
+CREATE VIEW dbo.View_llrk07A  AS  SELECT  comm, lot_no, SUM(sl) AS bfpcksl, SUM(ddwsl) AS bfpckps  FROM     dbo.outh  WHERE   (bz1 = N'其他出库') AND (qr = N'Y') AND (asp_cancel <> 'Y')  GROUP BY comm, lot_no  
+-- 1 rows
+
+----
+
+==== VIEW View_llrk08 ====
+def
+CREATE VIEW dbo.View_llrk08  AS  SELECT  comm, lot_no, SUM(yl) AS yl  FROM     dbo.kucun  GROUP BY comm, lot_no  
+-- 1 rows
+
+----
+
+==== VIEW View_od_cost ====
+def
+CREATE VIEW dbo.View_od_cost  AS  SELECT  dbo.order1.od_no, dbo.order1.od_xc, dbo.order1.od_date, dbo.order1.wzdm, dbo.dm_wz.mc, dbo.order1.sl,                      dbo.order1.od_danj, dbo.order1.od_zke, ISNULL(dbo.View_od_cost1.total_m, 0) AS cg_je, ISNULL(dbo.View_od_cost2.i_zke,                      0) AS ww_je, ISNULL(dbo.View_od_cost3.jg_je, 0) AS jg_je, ISNULL(dbo.View_od_cost1.total_m, 0)                      + ISNULL(dbo.View_od_cost2.i_zke, 0) + ISNULL(dbo.View_od_cost3.jg_je, 0) AS cb_hj,                      dbo.order1.od_zke - (ISNULL(dbo.View_od_cost1.total_m, 0) + ISNULL(dbo.View_od_cost2.i_zke, 0)                      + ISNULL(dbo.View_od_cost3.jg_je, 0)) AS lr_je, dbo.order1.jh_date, dbo.View_od_cost4.out_date之最大值 AS last_date,                      ISNULL(dbo.View_od_cost4.chsl, 0) AS chsl, dbo.order1.ja  FROM      dbo.order1 LEFT OUTER JOIN                     dbo.dm_wz ON dbo.order1.comm = dbo.dm_wz.comm AND dbo.order1.wzdm = dbo.dm_wz.dm LEFT OUTER JOIN                     dbo.View_od_cost1 ON dbo.order1.comm = dbo.View_od_cost1.comm AND                      dbo.order1.od_no = dbo.View_od_cost1.od_no2 AND dbo.order1.od_xc = dbo.View_od_cost1.od_xc2 LEFT OUTER JOIN                     dbo.View_od_cost2 ON dbo.order1.comm = dbo.View_od_cost2.comm AND                      dbo.order1.od_no = dbo.View_od_cost2.od_no AND dbo.order1.od_xc = dbo.View_od_cost2.od_xc LEFT OUTER JOIN                     dbo.View_od_cost3 ON dbo.order1.comm = dbo.View_od_cost3.comm AND                      dbo.order1.od_no = dbo.View_od_cost3.od_no AND dbo.order1.od_xc = dbo.View_od_cost3.od_xc LEFT OUTER JOIN                     dbo.View_od_cost4 ON dbo.order1.comm = dbo.View_od_cost4.comm AND                      dbo.order1.od_no = dbo.View_od_cost4.od_no AND dbo.order1.od_xc = dbo.View_od_cost4.od_xc  
+-- 1 rows
+
+----
+
+==== VIEW View_od_cost1 ====
+def
+CREATE VIEW dbo.View_od_cost1  AS  SELECT  comm, od_no2, od_xc2, SUM(total_m) AS total_m  FROM      dbo.Porder  WHERE   (ja = N'T') OR                     (ja = N'Y')  GROUP BY od_no2, od_xc2, ja, comm  HAVING  (od_no2 IS NOT NULL) AND (od_no2 <> '')  
+-- 1 rows
+
+----
+
+==== VIEW View_od_cost2 ====
+def
+CREATE VIEW dbo.View_od_cost2  AS  SELECT  comm, od_no, od_xc, SUM(i_zke) AS i_zke  FROM      dbo.dh  WHERE   (ja = N'T') OR                     (ja = N'Y')  GROUP BY od_no, od_xc, ja, comm  HAVING  (od_no IS NOT NULL) AND (od_no <> '')  
+-- 1 rows
+
+----
+
+==== VIEW View_od_cost3 ====
+def
+CREATE VIEW dbo.View_od_cost3  AS  SELECT  dbo.scjl.comm, dbo.plang.od_no, dbo.plang.od_xc, SUM(ROUND(dbo.scjl.gs * dbo.View_GX.bz, 2)) AS jg_je  FROM      dbo.scjl LEFT OUTER JOIN                     dbo.View_GX ON dbo.scjl.comm = dbo.View_GX.comm AND dbo.scjl.gxdm = dbo.View_GX.dm LEFT OUTER JOIN                     dbo.plang ON dbo.scjl.comm = dbo.plang.comm AND dbo.scjl.gldh = dbo.plang.pl_no  GROUP BY dbo.plang.od_no, dbo.plang.od_xc, dbo.scjl.comm  
+-- 1 rows
+
+----
+
+==== VIEW View_od_cost4 ====
+def
+CREATE VIEW dbo.View_od_cost4  AS  SELECT  comm, od_no, od_xc, MAX(out_date) AS out_date之最大值, SUM(sl) AS chsl  FROM      dbo.outh  WHERE   (qr = N'Y') AND (asp_cancel IS NULL OR                     asp_cancel <> 'Y')  GROUP BY od_no, od_xc, comm  HAVING  (od_no IS NOT NULL)  
+-- 1 rows
+
+----
+
+==== VIEW View_od_sqdchl ====
+def
+CREATE VIEW dbo.View_od_sqdchl  AS  SELECT  TOP (100) PERCENT dbo.chsq.outh_no AS sq_no, dbo.chsq.od_no, dbo.chsq.od_xc, dbo.chsq.sl AS sql,                      SUM(ISNULL(dbo.outh.sl, 0)) AS chl  FROM      dbo.outh RIGHT OUTER JOIN                     dbo.chsq ON dbo.outh.comm = dbo.chsq.comm AND dbo.outh.od_xc = dbo.chsq.od_xc AND                      dbo.outh.od_no = dbo.chsq.od_no AND dbo.outh.bombz = dbo.chsq.outh_no  WHERE   (dbo.outh.bz1 = N'销售出库') AND (dbo.outh.qr = N'Y') AND (dbo.chsq.qr = N'Y')  GROUP BY dbo.chsq.od_no, dbo.chsq.od_xc, dbo.chsq.outh_no, dbo.chsq.sl  ORDER BY sq_no DESC  
+-- 1 rows
+
+----
+
+==== VIEW View_OD_WLQTY1 ====
+def
+CREATE VIEW dbo.View_OD_WLQTY1  AS  SELECT  dbo.order1.comm, dbo.order1.od_no, dbo.order1.od_xc, dbo.order1.khdm, dbo.dm_kh.mc AS khmc, dbo.order1.ywman,                      dbo.dm_ywy.mc AS ywmc, dbo.order1.tm, dbo.order1.wzdm AS cpdm, dbo.dm_wz.mc AS cpmc, dbo.dm_wz.gg AS cpgg,                      dbo.order1.od_date, dbo.order1.jh_date, dbo.order1.sl, dbo.mate.xc, dbo.mate.wzdm2 AS wldm, dm_wz_1.mc AS wlmc,                      dm_wz_1.gg AS wlgg, dm_wz_1.jldw, dbo.order1.od_no AS lot_no2, dbo.mate.color2, dbo.mate.siz2,                      ROUND(dbo.mate.sl2 * dbo.order1.sl, 3) AS wlsl  FROM      dbo.mate FULL OUTER JOIN                     dbo.dm_wz RIGHT OUTER JOIN                     dbo.dm_wz AS dm_wz_1 INNER JOIN                     dbo.order1 ON dm_wz_1.comm = dbo.order1.comm LEFT OUTER JOIN                     dbo.dm_ywy ON dbo.order1.comm = dbo.dm_ywy.comm AND dbo.order1.ywman = dbo.dm_ywy.dm LEFT OUTER JOIN                     dbo.dm_kh ON dbo.order1.comm = dbo.dm_kh.comm AND dbo.order1.khdm = dbo.dm_kh.dm ON                      dbo.dm_wz.comm = dbo.order1.comm AND dbo.dm_wz.dm = dbo.order1.wzdm ON dbo.mate.comm = dbo.order1.comm AND                      dbo.mate.lot_no1 = dbo.order1.lot_no AND dbo.mate.siz1 = dbo.order1.siz AND dbo.mate.color1 = dbo.order1.color AND                      dbo.mate.wzdm1 = dbo.order1.wzdm AND dbo.mate.wzdm2 = dm_wz_1.dm  WHERE   (dbo.order1.ja <> N'Y')  
+-- 1 rows
+
+----
+
+==== VIEW View_OD_WLQTY2 ====
+def
+CREATE VIEW dbo.View_OD_WLQTY2  AS  SELECT  comm, od_no2, od_xc2, wzdm, SUM(sl) AS odcgqty, od_no2 AS lot_no, color, siz  FROM      dbo.Porder  GROUP BY od_no2, od_xc2, wzdm, color, siz, comm  
+-- 1 rows
+
+----
+
+==== VIEW View_OD_WLQTY3 ====
+def
+CREATE VIEW dbo.View_OD_WLQTY3  AS  SELECT  comm, od_no2, od_xc2, wzdm, SUM(sl) AS odrkqty, lot_no, color, siz  FROM      dbo.inh  WHERE   (bz1 = N'采购入库') AND (qr = N'Y')  GROUP BY od_no2, od_xc2, wzdm, color, siz, lot_no, comm  
+-- 1 rows
+
+----
+
+==== VIEW View_OD_WLQTY4 ====
+def
+CREATE VIEW dbo.View_OD_WLQTY4  AS  SELECT  comm, od_no, od_xc, wzdm, SUM(sl) AS odllqty, lot_no, color, siz  FROM      dbo.outh  WHERE   (bz1 = N'生产领料') AND (qr = N'Y')  GROUP BY od_no, od_xc, wzdm, color, siz, lot_no, comm  HAVING  (SUM(sl) > 0)  
+-- 1 rows
+
+----
+
+==== VIEW View_OD_WLQTY41 ====
+def
+CREATE VIEW dbo.View_OD_WLQTY41  AS  SELECT  comm, od_no, od_xc, wzdm, SUM(sl) AS odtlqty, lot_no, color, siz  FROM      dbo.outh  WHERE   (bz1 = N'生产领料') AND (qr = N'Y')  GROUP BY od_no, od_xc, wzdm, color, siz, lot_no, comm  HAVING  (SUM(sl) < 0)  
+-- 1 rows
+
+----
+
+==== VIEW View_OD_WLQTY5 ====
+def
+CREATE VIEW dbo.View_OD_WLQTY5  AS  SELECT  dbo.inh.comm, dbo.inh.od_no2 AS od_no, dbo.inh.od_xc2 AS od_xc, dbo.mate.wzdm2, dbo.inh.lot_no AS lot_no2,                      dbo.mate.color2, dbo.mate.siz2, SUM(ROUND(dbo.inh.sl * dbo.mate.sl2, 3)) AS wgsl  FROM      dbo.inh LEFT OUTER JOIN                     dbo.mate ON dbo.inh.comm = dbo.mate.comm AND dbo.inh.wzdm = dbo.mate.wzdm1 AND                      dbo.inh.color = dbo.mate.color1 AND dbo.inh.siz = dbo.mate.siz1  WHERE   (dbo.inh.bz1 = N'生产入库') AND (dbo.inh.qr = N'Y')  GROUP BY dbo.inh.od_no2, dbo.inh.od_xc2, dbo.mate.wzdm2, dbo.inh.lot_no, dbo.mate.color2, dbo.mate.siz2, dbo.inh.comm  
+-- 1 rows
+
+----
+
+==== VIEW View_OD_WLQTY6 ====
+def
+CREATE VIEW dbo.View_OD_WLQTY6  AS  SELECT  comm, wzdm, lot_no, color, siz, SUM(yl) AS kcsl  FROM      dbo.VIEW_QTY  GROUP BY wzdm, lot_no, color, siz, comm  
+-- 1 rows
+
+----
+
+==== VIEW View_OD_WLQTY7 ====
+def
+CREATE VIEW dbo.View_OD_WLQTY7  AS  SELECT  dbo.inh.comm, dbo.inh.od_no2, dbo.inh.od_xc2, dbo.mate.wzdm2, SUM(dbo.inh.sl * dbo.mate.sl2) AS odwgqty,                      dbo.inh.lot_no AS lot_no2, dbo.mate.color2, dbo.mate.siz2  FROM      dbo.inh LEFT OUTER JOIN                     dbo.mate ON dbo.inh.comm = dbo.mate.comm AND dbo.inh.siz = dbo.mate.siz1 AND dbo.inh.color = dbo.mate.color1 AND                      dbo.inh.wzdm = dbo.mate.wzdm1  WHERE   (dbo.inh.bz1 = N'生产入库') AND (dbo.inh.qr = N'Y')  GROUP BY dbo.inh.od_no2, dbo.inh.od_xc2, dbo.mate.wzdm2, dbo.inh.lot_no, dbo.mate.color2, dbo.mate.siz2, dbo.inh.comm  
+-- 1 rows
+
+----
+
+==== VIEW View_OD_WLQTY9 ====
+def
+CREATE VIEW dbo.View_OD_WLQTY9  AS  SELECT  dbo.View_OD_WLQTY1.comm, dbo.View_OD_WLQTY1.od_no, dbo.View_OD_WLQTY1.od_xc, dbo.View_OD_WLQTY1.khdm,                      dbo.View_OD_WLQTY1.khmc, dbo.View_OD_WLQTY1.ywman, dbo.View_OD_WLQTY1.ywmc, dbo.View_OD_WLQTY1.tm,                      dbo.View_OD_WLQTY1.cpdm, dbo.View_OD_WLQTY1.cpmc, dbo.View_OD_WLQTY1.cpgg, dbo.View_OD_WLQTY1.od_date,                      dbo.View_OD_WLQTY1.jh_date, dbo.View_OD_WLQTY1.sl, dbo.View_OD_WLQTY1.xc, dbo.View_OD_WLQTY1.wldm,                      dbo.View_OD_WLQTY1.wlmc, dbo.View_OD_WLQTY1.wlgg, dbo.View_OD_WLQTY1.jldw, dbo.View_OD_WLQTY1.lot_no2,                      dbo.View_OD_WLQTY1.color2, dbo.View_OD_WLQTY1.siz2, dbo.View_OD_WLQTY1.wlsl,                      ISNULL(dbo.View_OD_WLQTY2.odcgqty, 0) AS odcgqty, ROUND(ISNULL(dbo.View_OD_WLQTY3.odrkqty, 0), 3) AS odrkqty,                      ROUND(ISNULL(dbo.View_OD_WLQTY4.odllqty, 0), 3) AS odllqty, ROUND(ISNULL(dbo.View_OD_WLQTY41.odtlqty, 0), 3)                      AS odtlqty, ROUND(ISNULL(dbo.View_OD_WLQTY5.wgsl, 0), 3) AS odwgsl, ROUND(ISNULL(dbo.View_OD_WLQTY6.kcsl, 0),                      3) AS odkcsl, dbo.View_OD_WLQTY1.wlsl - ROUND(ISNULL(dbo.View_OD_WLQTY4.odllqty, 0), 3)                      - ROUND(ISNULL(dbo.View_OD_WLQTY41.odtlqty, 0), 3) AS odwlqty, ROUND(ISNULL(dbo.View_OD_WLQTY7.odwgqty, 0), 3)                      AS odwgqty, ROUND(ISNULL(dbo.View_OD_WLQTY4.odllqty, 0), 3) - ROUND(ISNULL(dbo.View_OD_WLQTY7.odwgqty, 0), 3)                      + ROUND(ISNULL(dbo.View_OD_WLQTY41.odtlqty, 0), 3) AS odzzqty  FROM      dbo.View_OD_WLQTY1 LEFT OUTER JOIN                     dbo.View_OD_WLQTY5 ON dbo.View_OD_WLQTY1.comm = dbo.View_OD_WLQTY5.comm AND                      dbo.View_OD_WLQTY1.lot_no2 = dbo.View_OD_WLQTY5.lot_no2 AND                      dbo.View_OD_WLQTY1.siz2 = dbo.View_OD_WLQTY5.siz2 AND                      dbo.View_OD_WLQTY1.color2 = dbo.View_OD_WLQTY5.color2 AND                      dbo.View_OD_WLQTY1.wldm = dbo.View_OD_WLQTY5.wzdm2 AND                      dbo.View_OD_WLQTY1.od_no = dbo.View_OD_WLQTY5.od_no AND                      dbo.View_OD_WLQTY1.od_xc = dbo.View_OD_WLQTY5.od_xc LEFT OUTER JOIN                     dbo.View_OD_WLQTY7 ON dbo.View_OD_WLQTY1.comm = dbo.View_OD_WLQTY7.comm AND                      dbo.View_OD_WLQTY1.lot_no2 = dbo.View_OD_WLQTY7.lot_no2 AND                      dbo.View_OD_WLQTY1.siz2 = dbo.View_OD_WLQTY7.siz2 AND                      dbo.View_OD_WLQTY1.color2 = dbo.View_OD_WLQTY7.color2 AND                      dbo.View_OD_WLQTY1.wldm = dbo.View_OD_WLQTY7.wzdm2 AND                      dbo.View_OD_WLQTY1.od_xc = dbo.View_OD_WLQTY7.od_xc2 AND                      dbo.View_OD_WLQTY1.od_no = dbo.View_OD_WLQTY7.od_no2 LEFT OUTER JOIN                     dbo.View_OD_WLQTY4 ON dbo.View_OD_WLQTY1.comm = dbo.View_OD_WLQTY4.comm AND                      dbo.View_OD_WLQTY1.lot_no2 = dbo.View_OD_WLQTY4.lot_no AND                      dbo.View_OD_WLQTY1.od_no = dbo.View_OD_WLQTY4.od_no AND                      dbo.View_OD_WLQTY1.od_xc = dbo.View_OD_WLQTY4.od_xc AND                      dbo.View_OD_WLQTY1.wldm = dbo.View_OD_WLQTY4.wzdm AND                      dbo.View_OD_WLQTY1.color2 = dbo.View_OD_WLQTY4.color AND                      dbo.View_OD_WLQTY1.siz2 = dbo.View_OD_WLQTY4.siz LEFT OUTER JOIN                     dbo.View_OD_WLQTY3 ON dbo.View_OD_WLQTY1.comm = dbo.View_OD_WLQTY3.comm AND                      dbo.View_OD_WLQTY1.lot_no2 = dbo.View_OD_WLQTY3.lot_no AND                      dbo.View_OD_WLQTY1.od_no = dbo.View_OD_WLQTY3.od_no2 AND                      dbo.View_OD_WLQTY1.od_xc = dbo.View_OD_WLQTY3.od_xc2 AND                      dbo.View_OD_WLQTY1.wldm = dbo.View_OD_WLQTY3.wzdm AND                      dbo.View_OD_WLQTY1.color2 = dbo.View_OD_WLQTY3.color AND                      dbo.View_OD_WLQTY1.siz2 = dbo.View_OD_WLQTY3.siz LEFT OUTER JOIN                     dbo.View_OD_WLQTY2 ON dbo.View_OD_WLQTY1.comm = dbo.View_OD_WLQTY2.comm AND                      dbo.View_OD_WLQTY1.lot_no2 = dbo.View_OD_WLQTY2.lot_no AND                      dbo.View_OD_WLQTY1.od_no = dbo.View_OD_WLQTY2.od_no2 AND                      dbo.View_OD_WLQTY1.od_xc = dbo.View_OD_WLQTY2.od_xc2 AND                      dbo.View_OD_WLQTY1.wldm = dbo.View_OD_WLQTY2.wzdm AND                      dbo.View_OD_WLQTY1.color2 = dbo.View_OD_WLQTY2.color AND                      dbo.View_OD_WLQTY1.siz2 = dbo.View_OD_WLQTY2.siz LEFT OUTER JOIN                     dbo.View_OD_WLQTY41 ON dbo.View_OD_WLQTY1.comm = dbo.View_OD_WLQTY41.comm AND                      dbo.View_OD_WLQTY1.od_no = dbo.View_OD_WLQTY41.od_no AND                      dbo.View_OD_WLQTY1.od_xc = dbo.View_OD_WLQTY41.od_xc AND                      dbo.View_OD_WLQTY1.wldm = dbo.View_OD_WLQTY41.wzdm AND                      dbo.View_OD_WLQTY1.lot_no2 = dbo.View_OD_WLQTY41.lot_no AND                      dbo.View_OD_WLQTY1.color2 = dbo.View_OD_WLQTY41.color AND                      dbo.View_OD_WLQTY1.siz2 = dbo.View_OD_WLQTY41.siz LEFT OUTER JOIN                     dbo.View_OD_WLQTY6 ON dbo.View_OD_WLQTY1.comm = dbo.View_OD_WLQTY6.comm AND                      dbo.View_OD_WLQTY1.od_no = dbo.View_OD_WLQTY6.lot_no AND                      dbo.View_OD_WLQTY1.siz2 = dbo.View_OD_WLQTY6.siz AND                      dbo.View_OD_WLQTY1.color2 = dbo.View_OD_WLQTY6.color AND                      dbo.View_OD_WLQTY1.wldm = dbo.View_OD_WLQTY6.wzdm  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_odqty ====
+def
+CREATE VIEW dbo.VIEW_odqty  AS  SELECT  dbo.order1.comm, dbo.order1.od_no, dbo.order1.od_xc, dbo.order1.tm, dbo.order1.th, dbo.order1.wzdm, dbo.dm_wz.mc,                      dbo.dm_wz.jldw, dbo.dm_wz.gg, dbo.order1.pf, dbo.order1.scgy, dbo.order1.cpms, dbo.order1.bq, dbo.order1.od_date,                      dbo.order1.jh_date, dbo.order1.sjld, dbo.order1.sl, dbo.order1.od_danj, dbo.order1.od_zk, dbo.order1.od_zke,                      dbo.order1.sl2, dbo.order1.ys, dbo.order1.sbyq, dbo.order1.bzyq, dbo.order1.tz, dbo.order1.ck_sl, dbo.order1.sczt,                      dbo.order1.ywman, dbo.dm_ywy.mc AS ywmc, dbo.order1.khdm, dbo.dm_kh.mc AS khmc, dbo.order1.bz, dbo.order1.ja,                      ISNULL(dbo.View_odqty1.sl, 0) AS ch_qty, dbo.order1.lot_no, dbo.order1.color, dbo.order1.siz, dbo.order1.tax_dm,                      dbo.order1.tax_sm, dbo.order1.tax, dbo.order1.total_m, ISNULL(dbo.View_odqty2.sl, 0) AS tl_qty,                      ISNULL(dbo.View_odqty3.sl, 0) AS rk_qty  FROM      dbo.View_odqty3 RIGHT OUTER JOIN                     dbo.order1 LEFT OUTER JOIN                     dbo.dm_kh ON dbo.order1.comm = dbo.dm_kh.comm AND dbo.order1.khdm = dbo.dm_kh.dm LEFT OUTER JOIN                     dbo.View_odqty2 ON dbo.order1.comm = dbo.View_odqty2.comm AND dbo.order1.od_no = dbo.View_odqty2.od_no2 AND                      dbo.order1.od_xc = dbo.View_odqty2.od_xc2 LEFT OUTER JOIN                     dbo.dm_ywy ON dbo.order1.comm = dbo.dm_ywy.comm AND dbo.order1.ywman = dbo.dm_ywy.dm ON                      dbo.View_odqty3.comm = dbo.order1.comm AND dbo.View_odqty3.od_no2 = dbo.order1.od_no AND                      dbo.View_odqty3.od_xc2 = dbo.order1.od_xc LEFT OUTER JOIN                     dbo.dm_wz ON dbo.order1.comm = dbo.dm_wz.comm AND dbo.order1.wzdm = dbo.dm_wz.dm LEFT OUTER JOIN                     dbo.View_odqty1 ON dbo.order1.comm = dbo.View_odqty1.comm AND dbo.order1.od_no = dbo.View_odqty1.od_no AND                      dbo.order1.od_xc = dbo.View_odqty1.od_xc  WHERE   (dbo.order1.ja IS NULL OR                     dbo.order1.ja <> N'Y') AND (dbo.order1.od_no <> N'')  
+-- 1 rows
+
+----
+
+==== VIEW View_odqty1 ====
+def
+CREATE VIEW dbo.View_odqty1  AS  SELECT  comm, od_no, od_xc, SUM(sl) AS sl  FROM      dbo.outh  WHERE   (bz1 = N'销售出库') AND (qr = N'Y')  GROUP BY od_no, od_xc, comm  HAVING  (od_no <> N'')  
+-- 1 rows
+
+----
+
+==== VIEW View_odqty2 ====
+def
+CREATE VIEW dbo.View_odqty2  AS  SELECT  comm, od_no2, od_xc2, SUM(sl) AS sl  FROM      dbo.inh  WHERE   (bz1 = N'采购入库') AND (qr = N'Y')  GROUP BY od_no2, od_xc2, comm  HAVING  (od_no2 <> N'') AND (SUM(sl) < 0)  
+-- 1 rows
+
+----
+
+==== VIEW View_odqty3 ====
+def
+CREATE VIEW dbo.View_odqty3  AS  SELECT  comm, od_no2, od_xc2, SUM(sl) AS sl  FROM      dbo.inh  WHERE   (bz1 = N'生产入库') AND (qr = N'Y')  GROUP BY od_no2, od_xc2, comm  HAVING  (od_no2 <> N'')  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_order ====
+def
+CREATE VIEW dbo.VIEW_order  AS  SELECT  dbo.order1.comm, dbo.order1.od_no, dbo.order1.od_xc, dbo.order1.tm, dbo.order1.th, dbo.order1.wzdm, dbo.order1.lot_no,                      dbo.order1.color, dbo.order1.siz, dbo.order1.pf, dbo.order1.scgy, dbo.order1.cpms, dbo.order1.bq, dbo.order1.od_date,                      dbo.order1.jh_date, dbo.order1.sjld, dbo.order1.sl, dbo.order1.od_danj, dbo.order1.od_zk, dbo.order1.od_zke,                      dbo.order1.sl2, dbo.order1.ddw AS ys, dbo.order1.ddwsl AS sbyq, dbo.order1.ys AS bzyq, dbo.order1.sbyq AS tz,                      dbo.order1.bzyq AS ck_sl, dbo.order1.tz AS sczt, dbo.order1.ck_sl AS ywman, dbo.order1.sczt AS khdm,                      dbo.order1.ywman AS ja, dbo.order1.khdm AS bz, dbo.order1.ja AS id, dbo.order1.bz AS tax_dm, dbo.order1.id AS tax_sm,                      dbo.order1.tax_dm AS tax, dbo.order1.tax_sm AS total_m, dbo.order1.tax AS mc, dbo.order1.total_m AS jldw,                      dbo.order1.asp_user1 AS cj, dbo.order1.asp_time1 AS gg, dbo.order1.asp_user2 AS cz, dbo.order1.asp_time2,                      dbo.order1.asp_user3, dbo.order1.asp_time3, dbo.order1.asp_cancel, dbo.order1.asp_user4, dbo.order1.asp_time4,                      dbo.order1.asp_print, dbo.dm_wz.mc AS Expr1, dbo.dm_wz.jldw AS Expr2, dbo.dm_wz.cj AS Expr3, dbo.dm_wz.gg AS Expr4,                      dbo.dm_wz.cz AS Expr5  FROM      dbo.order1 LEFT OUTER JOIN                     dbo.dm_wz ON dbo.order1.comm = dbo.dm_wz.comm AND dbo.order1.wzdm = dbo.dm_wz.dm  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_outh ====
+def
+CREATE VIEW dbo.VIEW_outh  AS  SELECT  dbo.outh.comm, dbo.dm_ywy.mc AS ywymc, dbo.dm_kh.mc AS khmc, dbo.dm_ck.mc AS ckmc, dm_wz_1.mc AS wzmc,                      dbo.outh.wzdm, dbo.outh.sl, dbo.outh.sl2, dbo.outh.ddw, dbo.outh.out_danj, dbo.outh.o_zk, dbo.outh.o_zke,                      dbo.outh.o_cost AS cost_dj, dbo.outh.out_date, dbo.outh.outh_no, dm_wz_1.gg, dm_wz_1.cz, dm_wz_1.ys, dbo.outh.id,                      dbo.outh.ckdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, dbo.outh.bz1, dbo.outh.tax_dm, dbo.outh.tax_sm, dbo.outh.tax,                      dbo.outh.total_m, dbo.outh.od_no, dbo.outh.od_xc, dm_wz_1.jldw, dbo.outh.bz, dbo.order1.sl AS od_sl, dbo.outh.khdm,                      dbo.dm_wz.mc AS odwzmc, dbo.outh.od_no AS od_no2, dbo.outh.od_xc AS od_xc2, dbo.order1.tm, dbo.outh.qr,                      dbo.outh.bom_qty  FROM      dbo.dm_wz RIGHT OUTER JOIN                     dbo.order1 ON dbo.dm_wz.comm = dbo.order1.comm AND dbo.dm_wz.dm = dbo.order1.wzdm FULL OUTER JOIN                     dbo.outh LEFT OUTER JOIN                     dbo.dm_ck ON dbo.outh.comm = dbo.dm_ck.comm AND dbo.outh.ckdm = dbo.dm_ck.dm LEFT OUTER JOIN                     dbo.dm_wz AS dm_wz_1 ON dbo.outh.comm = dm_wz_1.comm AND dbo.outh.wzdm = dm_wz_1.dm LEFT OUTER JOIN                     dbo.dm_kh ON dbo.outh.comm = dbo.dm_kh.comm AND dbo.outh.khdm = dbo.dm_kh.dm LEFT OUTER JOIN                     dbo.dm_ywy ON dbo.outh.comm = dbo.dm_ywy.comm AND dbo.outh.ywman = dbo.dm_ywy.dm ON                      dbo.order1.comm = dbo.outh.comm AND dbo.order1.od_no = dbo.outh.od_no AND dbo.order1.od_xc = dbo.outh.od_xc  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_pandian ====
+def
+CREATE VIEW dbo.VIEW_pandian  AS  SELECT  dbo.pandian.comm, dbo.dm_ck.mc AS ckmc, dbo.dm_wz.mc AS wzmc, dbo.pandian.wzdm, dbo.pandian.pd_date,                      dbo.pandian.sl, dbo.pandian.total_je, dbo.pandian.pd_sl, dbo.pandian.pd_je, dbo.pandian.bz, dbo.dm_wz.gg, dbo.dm_wz.cz,                      dbo.dm_wz.ys, dbo.pandian.ckdm, dbo.pandian.lot_no, dbo.pandian.color, dbo.pandian.siz  FROM      dbo.pandian LEFT OUTER JOIN                     dbo.dm_ck ON dbo.pandian.comm = dbo.dm_ck.comm AND dbo.pandian.ckdm = dbo.dm_ck.dm LEFT OUTER JOIN                     dbo.dm_wz ON dbo.pandian.comm = dbo.dm_wz.comm AND dbo.pandian.wzdm = dbo.dm_wz.dm  
+-- 1 rows
+
+----
+
+==== VIEW View_pcqty ====
+def
+CREATE VIEW dbo.View_pcqty  AS  SELECT  dbo.order_bs.comm, dbo.order_bs.od_no, dbo.order_bs.od_xc, SUM(ISNULL(dbo.plang_pc.pl_sl, 0)) AS pc_qty, SUM(ISNULL(dbo.plang_pc.pl_sl2, 0))                  AS pc_qty2, dbo.order_bs.id  FROM     dbo.plang_pc RIGHT OUTER JOIN                 dbo.order_bs ON dbo.plang_pc.od_xc = dbo.order_bs.id AND dbo.plang_pc.comm = dbo.order_bs.comm AND                  dbo.plang_pc.od_no = dbo.order_bs.od_no  WHERE   (dbo.order_bs.asp_cancel <> N'Y')  GROUP BY dbo.order_bs.od_no, dbo.order_bs.od_xc, dbo.order_bs.comm, dbo.order_bs.id  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_podyl ====
+def
+CREATE VIEW dbo.VIEW_podyl  AS  SELECT  dbo.Porder.comm, dbo.Porder.od_no, dbo.Porder.od_xc, dbo.dm_wz.mc AS wzmc, dbo.dm_gf.mc AS khmc,                      dbo.VIEW_podyl1.rkqty, SUM(dbo.Porder.sl - dbo.VIEW_podyl1.rkqty) AS YL, dbo.Porder.ywman, dbo.Porder.csdm,                      dbo.Porder.wzdm, dbo.Porder.ja, dbo.Porder.od_no2, dbo.Porder.od_xc2  FROM      dbo.Porder LEFT OUTER JOIN                     dbo.dm_gf ON dbo.Porder.comm = dbo.dm_gf.comm AND dbo.Porder.csdm = dbo.dm_gf.dm LEFT OUTER JOIN                     dbo.dm_wz ON dbo.Porder.comm = dbo.dm_wz.comm AND dbo.Porder.wzdm = dbo.dm_wz.dm LEFT OUTER JOIN                     dbo.VIEW_podyl1 ON dbo.Porder.comm = dbo.VIEW_podyl1.comm AND dbo.Porder.od_no = dbo.VIEW_podyl1.od_no AND                      dbo.Porder.od_xc = dbo.VIEW_podyl1.od_xc  GROUP BY dbo.dm_wz.mc, dbo.dm_gf.mc, dbo.Porder.ywman, dbo.Porder.csdm, dbo.Porder.wzdm, dbo.Porder.ja, dbo.Porder.od_no,                      dbo.Porder.od_xc, dbo.Porder.od_no2, dbo.Porder.od_xc2, dbo.VIEW_podyl1.rkqty, dbo.Porder.comm  HAVING  (dbo.Porder.ja IS NULL OR                     dbo.Porder.ja <> N'Y') AND (SUM(dbo.Porder.sl - dbo.VIEW_podyl1.rkqty) > 0)  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_podyl1 ====
+def
+CREATE VIEW dbo.VIEW_podyl1  AS  SELECT  comm, od_no, od_xc, wzdm, SUM(sl) AS rkqty, SUM(total_m) AS totalje, SUM(tax) AS totaltax  FROM      dbo.inh  WHERE   (qr = N'Y') AND (od_no <> N'')  GROUP BY od_no, od_xc, wzdm, comm  HAVING  (NOT (od_no IS NULL))  
+-- 1 rows
+
+----
+
+==== VIEW View_Porder ====
+def
+CREATE VIEW dbo.View_Porder  AS  SELECT  TOP (100) PERCENT dbo.Porder.comm, dbo.Porder.od_no, dbo.Porder.od_xc, dbo.Porder.csdm, dbo.dm_gf.mc,                      dbo.Porder.wzdm, dbo.dm_wz.mc AS wzmc, dbo.Porder.lot_no, dbo.Porder.color, dbo.Porder.siz, dbo.Porder.od_date,                      dbo.Porder.rk_date, dbo.Porder.sl, dbo.Porder.od_danj, dbo.Porder.od_zk, dbo.Porder.od_zke, dbo.Porder.tax_dm,                      dbo.Porder.tax_sm, dbo.Porder.tax, dbo.Porder.total_m, dbo.Porder.ywman, dbo.dm_ywy.mc AS ywmc, dbo.Porder.tm,                      dbo.Porder.rk_sl, dbo.Porder.yl, dbo.Porder.gs, dbo.Porder.lot_no1, dbo.Porder.ja, dbo.dm_wz.gg, dbo.dm_wz.jldw,                      dbo.Porder.bz, dbo.Porder.id, dbo.Porder.od_no2, dbo.Porder.od_xc2, dbo.dm_gf.addr, dbo.dm_gf.tel,                      dbo.dm_gf.ywman AS lxr  FROM      dbo.Porder LEFT OUTER JOIN                     dbo.dm_gf ON dbo.Porder.comm = dbo.dm_gf.comm AND dbo.Porder.csdm = dbo.dm_gf.dm LEFT OUTER JOIN                     dbo.dm_ywy ON dbo.Porder.comm = dbo.dm_ywy.comm AND dbo.Porder.ywman = dbo.dm_ywy.dm LEFT OUTER JOIN                     dbo.dm_wz ON dbo.Porder.comm = dbo.dm_wz.comm AND dbo.Porder.wzdm = dbo.dm_wz.dm  ORDER BY dbo.Porder.od_no DESC  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_QTY ====
+def
+CREATE VIEW dbo.VIEW_QTY  AS  SELECT  comm, wzdm, ckdm, lot_no, color, siz, MAX(indate) AS indate, SUM(rkl) AS rkl, MAX(outdate) AS outdate, SUM(ckl) AS ckl,                      SUM(yl) AS yl, SUM(rkl2) AS rkl2, SUM(ckl2) AS ckl2, SUM(yl2) AS yl2  FROM      dbo.VIEW_QTY3  GROUP BY wzdm, ckdm, lot_no, color, siz, comm  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_QTY1 ====
+def
+CREATE VIEW dbo.VIEW_QTY1  AS  SELECT  dbo.VIEW_RK.comm, dbo.VIEW_RK.wzdm, dbo.VIEW_RK.ckdm, dbo.VIEW_RK.lot_no, dbo.VIEW_RK.color, dbo.VIEW_RK.siz,                      dbo.VIEW_RK.indate, ROUND(dbo.VIEW_RK.rkl, 4) AS rkl, dbo.VIEW_CK.outdate, ROUND(dbo.VIEW_CK.ckl, 4) AS ckl,                      ROUND(dbo.VIEW_RK.rkl - ISNULL(dbo.VIEW_CK.ckl, 0), 4) AS yl, ROUND(dbo.VIEW_RK.sl2, 4) AS rkl2,                      ROUND(dbo.VIEW_CK.sl2, 4) AS ckl2, ROUND(dbo.VIEW_RK.sl2 - ISNULL(dbo.VIEW_CK.sl2, 0), 4) AS yl2  FROM      dbo.VIEW_RK LEFT OUTER JOIN                     dbo.VIEW_CK ON dbo.VIEW_RK.comm = dbo.VIEW_CK.comm AND dbo.VIEW_RK.wzdm = dbo.VIEW_CK.wzdm AND                      dbo.VIEW_RK.ckdm = dbo.VIEW_CK.ckdm AND dbo.VIEW_RK.lot_no = dbo.VIEW_CK.lot_no AND                      dbo.VIEW_RK.color = dbo.VIEW_CK.color AND dbo.VIEW_RK.siz = dbo.VIEW_CK.siz  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_QTY2 ====
+def
+CREATE VIEW dbo.VIEW_QTY2  AS  SELECT  dbo.outh.comm, dbo.outh.wzdm, dbo.outh.ckdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, '' AS indate, 0 AS rkl, MAX(dbo.outh.out_date) AS outdate,                  SUM(dbo.outh.sl) AS ckl, SUM(0 - dbo.outh.sl) AS yl, 0 AS rkl2, SUM(dbo.outh.ddwsl) AS ckl2, SUM(0 - dbo.outh.ddwsl) AS yl2  FROM     dbo.outh LEFT OUTER JOIN                 dbo.VIEW_RK ON dbo.outh.comm = dbo.VIEW_RK.comm AND dbo.outh.wzdm = dbo.VIEW_RK.wzdm AND dbo.outh.ckdm = dbo.VIEW_RK.ckdm AND                  dbo.outh.lot_no = dbo.VIEW_RK.lot_no AND dbo.outh.color = dbo.VIEW_RK.color AND dbo.outh.siz = dbo.VIEW_RK.siz  WHERE   (dbo.VIEW_RK.indate IS NULL) AND (CONVERT(varchar(6), dbo.outh.out_date, 112) = CONVERT(varchar(6), GETDATE(), 112)) AND (dbo.outh.qr = N'Y')  GROUP BY dbo.outh.wzdm, dbo.outh.ckdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, dbo.outh.comm  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_QTY3 ====
+def
+CREATE VIEW dbo.VIEW_QTY3  AS  SELECT  *  FROM      VIEW_QTY1  UNION  SELECT  *  FROM      VIEW_QTY2  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_RK ====
+def
+CREATE VIEW dbo.VIEW_RK  AS  SELECT  dbo.inh.comm, dbo.inh.wzdm, dbo.inh.ckdm, dbo.inh.lot_no, dbo.inh.color, dbo.inh.siz, SUM(dbo.inh.sl) AS rkl, MIN(dbo.inh.in_date) AS indate,                  SUM(dbo.inh.ddwsl) AS sl2, dbo.inh.bz1, dbo.inh.inh_no, dbo.inh.gfdm, dbo.inh.ywman, dbo.users.userna, dbo.dm_ck.mc AS ckmc, dbo.inh.od_no2,                  dbo.inh.od_xc2, dbo.inh.i_zk, dbo.inh.i_zke, dbo.inh.total_m, dbo.inh.tax, dbo.inh.tax_dm, dbo.inh.tax_sm, dbo.inh.bz, dbo.inh.qr,                  dbo.inh.id + 10000000000 AS id  FROM     dbo.inh LEFT OUTER JOIN                 dbo.dm_ck ON dbo.inh.comm = dbo.dm_ck.comm AND dbo.inh.ckdm = dbo.dm_ck.dm LEFT OUTER JOIN                 dbo.users ON dbo.inh.comm = dbo.users.comm AND dbo.inh.ywman = dbo.users.id  WHERE   (CONVERT(varchar(6), dbo.inh.in_date, 112) = CONVERT(varchar(6), GETDATE(), 112)) AND (dbo.inh.qr = N'Y')  GROUP BY dbo.inh.wzdm, dbo.inh.ckdm, dbo.inh.lot_no, dbo.inh.color, dbo.inh.siz, dbo.inh.comm, dbo.inh.bz1, dbo.inh.inh_no, dbo.inh.gfdm, dbo.inh.ywman,                  dbo.users.userna, dbo.dm_ck.mc, dbo.inh.od_no2, dbo.inh.od_xc2, dbo.inh.i_zk, dbo.inh.i_zke, dbo.inh.total_m, dbo.inh.tax, dbo.inh.tax_dm, dbo.inh.tax_sm,                  dbo.inh.bz, dbo.inh.qr, dbo.inh.id + 10000000000  
+-- 1 rows
+
+----
+
+==== VIEW View_SCGD ====
+def
+CREATE VIEW dbo.View_SCGD  AS  SELECT  TOP (100) PERCENT dbo.plang.comm, dbo.plang.pl_no, dbo.plang.pl_date, dbo.plang.jldw AS scx, dbo.plang.mc AS scxmc,                      dbo.plang.od_no, dbo.plang.od_xc, dbo.plang.dm, dbo.dm_wz.mc, dbo.plang.color, dbo.plang.pl_sl, dbo.plang.rk_sl,                      dbo.plang.yl, dbo.plang.cp_date, dbo.plang.st_date, dbo.plang.dj, dbo.plang.jine, dbo.plang.rk_no, dbo.plang.bz,                      dbo.plang.pl_man, dbo.dm_ywy.mc AS ywmc, dbo.plang.ja, dbo.dm_wz.jldw AS dw, dbo.dm_wz.gg, dbo.plang.lot_no,                      dbo.plang.siz, dbo.plang.ll_no, dbo.plang.wb_no, dbo.plang.id, dbo.plang.mjlx, dbo.plang.lb  FROM      dbo.plang LEFT OUTER JOIN                     dbo.dm_ywy ON dbo.plang.comm = dbo.dm_ywy.comm AND dbo.plang.pl_man = dbo.dm_ywy.dm LEFT OUTER JOIN                     dbo.dm_wz ON dbo.plang.comm = dbo.dm_wz.comm AND dbo.plang.dm = dbo.dm_wz.dm  WHERE   (dbo.plang.lb IS NULL)  ORDER BY dbo.plang.pl_no DESC  
+-- 1 rows
+
+----
+
+==== VIEW View_SCX ====
+def
+CREATE VIEW dbo.View_SCX  AS  SELECT  comm, dm, mc, bz  FROM      dbo.dm_gx  WHERE   (lb = N'SCX')  
+-- 1 rows
+
+----
+
+==== VIEW View_SKZE ====
+def
+CREATE VIEW dbo.View_SKZE  AS  SELECT  xsdh_no, sl, SUM(o_zke) AS jine  FROM      dbo.xsdh  WHERE   (wzdm = N'收款')  GROUP BY xsdh_no, sl  
+-- 1 rows
+
+----
+
+==== VIEW View_WB_WLQTY1 ====
+def
+CREATE VIEW dbo.View_WB_WLQTY1  AS  SELECT  dbo.dh.comm, dbo.dh.dh_no, dbo.dh.wzdm, dbo.dm_wz.mc AS cpmc, dbo.dm_wz.gg AS cpgg, dbo.dh.lot_no, dbo.dh.color,                      dbo.dh.siz, dbo.dh.sl, dbo.dh.in_date, dbo.dh.ywman, dbo.dm_ywy.mc AS ywmc, dbo.dh.gfdm, dbo.dm_gf.mc AS csmc,                      dbo.dh.in_danj, dbo.dh.i_zk, dbo.dh.i_zke, dbo.dh.od_no, dbo.dh.od_xc, dbo.mate.xc, dbo.mate.wzdm2 AS wldm,                      dm_wz_1.mc AS wlmc, dm_wz_1.gg AS wlgg, dm_wz_1.jldw, dbo.mate.lot_no2, dbo.mate.color2, dbo.mate.siz2,                      dbo.mate.sl2 * dbo.dh.sl AS wlsl  FROM      dbo.dm_ywy RIGHT OUTER JOIN                     dbo.dm_wz AS dm_wz_1 INNER JOIN                     dbo.dh ON dm_wz_1.comm = dbo.dh.comm FULL OUTER JOIN                     dbo.mate ON dbo.dh.comm = dbo.mate.comm AND dbo.dh.wzdm = dbo.mate.wzdm1 AND                      dbo.dh.lot_no = dbo.mate.lot_no1 AND dbo.dh.color = dbo.mate.color1 AND dbo.dh.siz = dbo.mate.siz1 AND                      dm_wz_1.dm = dbo.mate.wzdm2 ON dbo.dm_ywy.comm = dbo.dh.comm AND                      dbo.dm_ywy.dm = dbo.dh.ywman LEFT OUTER JOIN                     dbo.dm_gf ON dbo.dh.comm = dbo.dm_gf.comm AND dbo.dh.gfdm = dbo.dm_gf.dm LEFT OUTER JOIN                     dbo.dm_wz ON dbo.dh.comm = dbo.dm_wz.comm AND dbo.dh.wzdm = dbo.dm_wz.dm  WHERE   (dbo.dh.ja <> N'Y')  
+-- 1 rows
+
+----
+
+==== VIEW View_WB_WLQTY2 ====
+def
+CREATE VIEW dbo.View_WB_WLQTY2  AS  SELECT  comm, od_no, wzdm, lot_no, color, siz, SUM(sl) AS yfsl  FROM      dbo.outh  WHERE   (bz1 = N'委外领料') AND (qr = N'Y')  GROUP BY od_no, wzdm, lot_no, color, siz, comm  
+-- 1 rows
+
+----
+
+==== VIEW View_WB_WLQTY3 ====
+def
+CREATE VIEW dbo.View_WB_WLQTY3  AS  SELECT  dbo.inh.comm, dbo.inh.od_no, dbo.mate.wzdm2, dbo.mate.lot_no2, dbo.mate.color2, dbo.mate.siz2,                      SUM(dbo.inh.sl * dbo.mate.sl2) AS wgsl  FROM      dbo.inh LEFT OUTER JOIN                     dbo.mate ON dbo.inh.comm = dbo.mate.comm AND dbo.inh.wzdm = dbo.mate.wzdm1 AND                      dbo.inh.lot_no = dbo.mate.lot_no1 AND dbo.inh.color = dbo.mate.color1 AND dbo.inh.siz = dbo.mate.siz1  WHERE   (dbo.inh.bz1 = N'委外入库') AND (dbo.inh.qr = N'Y')  GROUP BY dbo.inh.od_no, dbo.mate.wzdm2, dbo.mate.lot_no2, dbo.mate.color2, dbo.mate.siz2, dbo.inh.comm  
+-- 1 rows
+
+----
+
+==== VIEW View_WB_WLQTY9 ====
+def
+CREATE VIEW dbo.View_WB_WLQTY9  AS  SELECT  dbo.View_WB_WLQTY1.comm, dbo.View_WB_WLQTY1.dh_no, dbo.View_WB_WLQTY1.wzdm, dbo.View_WB_WLQTY1.cpmc,                      dbo.View_WB_WLQTY1.cpgg, dbo.View_WB_WLQTY1.lot_no, dbo.View_WB_WLQTY1.color, dbo.View_WB_WLQTY1.siz,                      dbo.View_WB_WLQTY1.sl, dbo.View_WB_WLQTY1.in_date, dbo.View_WB_WLQTY1.ywman, dbo.View_WB_WLQTY1.ywmc,                      dbo.View_WB_WLQTY1.gfdm, dbo.View_WB_WLQTY1.csmc, dbo.View_WB_WLQTY1.in_danj, dbo.View_WB_WLQTY1.i_zk,                      dbo.View_WB_WLQTY1.i_zke, dbo.View_WB_WLQTY1.od_no, dbo.View_WB_WLQTY1.od_xc, dbo.View_WB_WLQTY1.xc,                      dbo.View_WB_WLQTY1.wldm, dbo.View_WB_WLQTY1.wlmc, dbo.View_WB_WLQTY1.wlgg, dbo.View_WB_WLQTY1.jldw,                      dbo.View_WB_WLQTY1.lot_no2, dbo.View_WB_WLQTY1.color2, dbo.View_WB_WLQTY1.siz2, dbo.View_WB_WLQTY1.wlsl,                      ISNULL(dbo.View_WB_WLQTY2.yfsl, 0) AS yfsl, ISNULL(dbo.View_WB_WLQTY3.wgsl, 0) AS wgsl,                      ISNULL(dbo.View_WB_WLQTY2.yfsl, 0) - ISNULL(dbo.View_WB_WLQTY3.wgsl, 0) AS yl  FROM      dbo.View_WB_WLQTY1 LEFT OUTER JOIN                     dbo.View_WB_WLQTY2 ON dbo.View_WB_WLQTY1.comm = dbo.View_WB_WLQTY2.comm AND                      dbo.View_WB_WLQTY1.siz2 = dbo.View_WB_WLQTY2.siz AND                      dbo.View_WB_WLQTY1.color2 = dbo.View_WB_WLQTY2.color AND                      dbo.View_WB_WLQTY1.lot_no2 = dbo.View_WB_WLQTY2.lot_no AND                      dbo.View_WB_WLQTY1.wldm = dbo.View_WB_WLQTY2.wzdm AND                      dbo.View_WB_WLQTY1.dh_no = dbo.View_WB_WLQTY2.od_no LEFT OUTER JOIN                     dbo.View_WB_WLQTY3 ON dbo.View_WB_WLQTY1.comm = dbo.View_WB_WLQTY3.comm AND                      dbo.View_WB_WLQTY1.siz2 = dbo.View_WB_WLQTY3.siz2 AND                      dbo.View_WB_WLQTY1.color2 = dbo.View_WB_WLQTY3.color2 AND                      dbo.View_WB_WLQTY1.lot_no2 = dbo.View_WB_WLQTY3.lot_no2 AND                      dbo.View_WB_WLQTY1.wldm = dbo.View_WB_WLQTY3.wzdm2 AND                      dbo.View_WB_WLQTY1.dh_no = dbo.View_WB_WLQTY3.od_no  
+-- 1 rows
+
+----
+
+==== VIEW VIEW_zc ====
+def
+CREATE VIEW dbo.VIEW_zc  AS  SELECT  dbo.zc.comm, dbo.dm_ywy.mc AS ywymc, dbo.dm_ck.mc AS o_ckdm, dm_ck_1.mc AS i_ckmc, dbo.dm_wz.mc AS wzmc,                      dbo.zc.wzdm, dbo.zc.zc_no, dbo.zc.zc_date, dbo.zc.sl, dbo.zc.total_je, dbo.zc.bz, dbo.dm_wz.gg, dbo.dm_wz.cz,                      dbo.dm_wz.ys, dbo.zc.lot_no, dbo.zc.color, dbo.zc.siz  FROM      dbo.zc LEFT OUTER JOIN                     dbo.dm_ck AS dm_ck_1 ON dbo.zc.comm = dm_ck_1.comm AND dbo.zc.i_ckdm = dm_ck_1.dm LEFT OUTER JOIN                     dbo.dm_ck ON dbo.zc.comm = dbo.dm_ck.comm AND dbo.zc.o_ckdm = dbo.dm_ck.dm LEFT OUTER JOIN                     dbo.dm_wz ON dbo.zc.comm = dbo.dm_wz.comm AND dbo.zc.wzdm = dbo.dm_wz.dm LEFT OUTER JOIN                     dbo.dm_ywy ON dbo.zc.comm = dbo.dm_ywy.comm AND dbo.zc.ywman = dbo.dm_ywy.dm  
+-- 1 rows
+
+----
+
+==== VIEW View_ZZPQTY ====
+def
+CREATE VIEW dbo.View_ZZPQTY  AS  SELECT  dbo.View_ZZPQTY0.comm, dbo.View_ZZPQTY0.wzdm, dbo.View_ZZPQTY0.lot_no, dbo.View_ZZPQTY0.color,                      dbo.View_ZZPQTY0.siz, ISNULL(dbo.View_ZZPQTY2.PDL, 0) AS pdl, ISNULL(dbo.View_ZZPQTY4.LLL, 0) AS lll,                      ISNULL(dbo.View_ZZPQTY5.WGL, 0) AS wgl, ISNULL(dbo.View_ZZPQTY2.PDL, 0) + ISNULL(dbo.View_ZZPQTY4.LLL, 0)                      - ISNULL(dbo.View_ZZPQTY5.WGL, 0) + ISNULL(dbo.View_ZZPQTY6.SCTL, 0) + ISNULL(dbo.View_ZZPQTY8.CEL, 0) AS zzzl,                      ISNULL(dbo.View_ZZPQTY1.YL, 0) AS kcl, dbo.View_ZZPQTY1.YL + ISNULL(dbo.View_ZZPQTY2.PDL, 0)                      + ISNULL(dbo.View_ZZPQTY4.LLL, 0) - ISNULL(dbo.View_ZZPQTY5.WGL, 0) - ISNULL(dbo.View_ZZPQTY7.XSTH, 0)                      + ISNULL(dbo.View_ZZPQTY8.CEL, 0) AS zl, ISNULL(dbo.View_ZZPQTY6.SCTL, 0) AS tll,                      0 - ISNULL(dbo.View_ZZPQTY7.XSTH, 0) AS thl, ISNULL(dbo.View_ZZPQTY8.CEL, 0) AS cel  FROM      dbo.View_ZZPQTY4 RIGHT OUTER JOIN                     dbo.View_ZZPQTY0 ON dbo.View_ZZPQTY4.comm = dbo.View_ZZPQTY0.comm AND                      dbo.View_ZZPQTY4.wzdm = dbo.View_ZZPQTY0.wzdm AND dbo.View_ZZPQTY4.lot_no = dbo.View_ZZPQTY0.lot_no AND                      dbo.View_ZZPQTY4.color = dbo.View_ZZPQTY0.color AND                      dbo.View_ZZPQTY4.siz = dbo.View_ZZPQTY0.siz LEFT OUTER JOIN                     dbo.View_ZZPQTY6 ON dbo.View_ZZPQTY0.comm = dbo.View_ZZPQTY6.comm AND                      dbo.View_ZZPQTY0.wzdm = dbo.View_ZZPQTY6.wzdm AND dbo.View_ZZPQTY0.lot_no = dbo.View_ZZPQTY6.lot_no AND                      dbo.View_ZZPQTY0.color = dbo.View_ZZPQTY6.color AND                      dbo.View_ZZPQTY0.siz = dbo.View_ZZPQTY6.siz LEFT OUTER JOIN                     dbo.View_ZZPQTY1 ON dbo.View_ZZPQTY0.comm = dbo.View_ZZPQTY1.comm AND                      dbo.View_ZZPQTY0.wzdm = dbo.View_ZZPQTY1.wzdm AND dbo.View_ZZPQTY0.lot_no = dbo.View_ZZPQTY1.lot_no AND                      dbo.View_ZZPQTY0.color = dbo.View_ZZPQTY1.color AND                      dbo.View_ZZPQTY0.siz = dbo.View_ZZPQTY1.siz LEFT OUTER JOIN                     dbo.View_ZZPQTY7 ON dbo.View_ZZPQTY0.comm = dbo.View_ZZPQTY7.comm AND                      dbo.View_ZZPQTY0.wzdm = dbo.View_ZZPQTY7.wzdm AND dbo.View_ZZPQTY0.lot_no = dbo.View_ZZPQTY7.lot_no AND                      dbo.View_ZZPQTY0.color = dbo.View_ZZPQTY7.color AND                      dbo.View_ZZPQTY0.siz = dbo.View_ZZPQTY7.siz LEFT OUTER JOIN                     dbo.View_ZZPQTY5 ON dbo.View_ZZPQTY0.comm = dbo.View_ZZPQTY5.comm AND                      dbo.View_ZZPQTY0.wzdm = dbo.View_ZZPQTY5.wzdm AND dbo.View_ZZPQTY0.siz = dbo.View_ZZPQTY5.siz AND                      dbo.View_ZZPQTY0.lot_no = dbo.View_ZZPQTY5.lot_no AND                      dbo.View_ZZPQTY0.color = dbo.View_ZZPQTY5.color LEFT OUTER JOIN                     dbo.View_ZZPQTY8 ON dbo.View_ZZPQTY0.comm = dbo.View_ZZPQTY8.comm AND                      dbo.View_ZZPQTY0.wzdm = dbo.View_ZZPQTY8.wzdm AND dbo.View_ZZPQTY0.lot_no = dbo.View_ZZPQTY8.od_no AND                      dbo.View_ZZPQTY0.color = dbo.View_ZZPQTY8.color AND                      dbo.View_ZZPQTY0.siz = dbo.View_ZZPQTY8.siz LEFT OUTER JOIN                     dbo.View_ZZPQTY2 ON dbo.View_ZZPQTY0.comm = dbo.View_ZZPQTY2.comm AND                      dbo.View_ZZPQTY0.wzdm = dbo.View_ZZPQTY2.wzdm AND dbo.View_ZZPQTY0.lot_no = dbo.View_ZZPQTY2.lot_no AND                      dbo.View_ZZPQTY0.color = dbo.View_ZZPQTY2.color AND dbo.View_ZZPQTY0.siz = dbo.View_ZZPQTY2.siz  
+-- 1 rows
+
+----
+
+==== VIEW View_ZZPQTY0 ====
+def
+CREATE VIEW dbo.View_ZZPQTY0  AS  SELECT  dbo.order1.comm, dbo.mate.wzdm2 AS wzdm, dbo.order1.od_no AS lot_no, dbo.mate.color2 AS color,                      dbo.mate.siz2 AS siz  FROM      dbo.order1 LEFT OUTER JOIN                     dbo.mate ON dbo.order1.comm = dbo.mate.comm AND dbo.order1.wzdm = dbo.mate.wzdm1 AND                      dbo.order1.lot_no = dbo.mate.lot_no1 AND dbo.order1.color = dbo.mate.color1 AND dbo.order1.siz = dbo.mate.siz1  WHERE   (dbo.order1.ja <> N'Y')  GROUP BY dbo.mate.wzdm2, dbo.order1.od_no, dbo.mate.color2, dbo.mate.siz2, dbo.order1.comm  HAVING  (NOT (dbo.mate.wzdm2 IS NULL))  
+-- 1 rows
+
+----
+
+==== VIEW View_ZZPQTY1 ====
+def
+CREATE VIEW dbo.View_ZZPQTY1  AS  SELECT  dbo.VIEW_QTY.comm, dbo.VIEW_QTY.wzdm, dbo.VIEW_QTY.lot_no, dbo.VIEW_QTY.color, dbo.VIEW_QTY.siz,                      SUM(dbo.VIEW_QTY.rkl) AS RKL, SUM(dbo.VIEW_QTY.ckl) AS CKL, SUM(dbo.VIEW_QTY.yl) AS YL  FROM      dbo.VIEW_QTY LEFT OUTER JOIN                     dbo.dm_wz ON dbo.VIEW_QTY.comm = dbo.dm_wz.comm AND dbo.VIEW_QTY.wzdm = dbo.dm_wz.dm  WHERE   (dbo.dm_wz.lb <> N'成品')  GROUP BY dbo.VIEW_QTY.wzdm, dbo.VIEW_QTY.lot_no, dbo.VIEW_QTY.color, dbo.VIEW_QTY.siz, dbo.VIEW_QTY.comm  
+-- 1 rows
+
+----
+
+==== VIEW View_ZZPQTY2 ====
+def
+CREATE VIEW dbo.View_ZZPQTY2  AS  SELECT  comm, wzdm, lot_no, color, siz, SUM(pd_sl) AS PDL  FROM      dbo.pd_zzp  WHERE   (sh = N'Y')  GROUP BY wzdm, lot_no, color, siz, comm  
+-- 1 rows
+
+----
+
+==== VIEW View_ZZPQTY3 ====
+def
+CREATE VIEW dbo.View_ZZPQTY3  AS  SELECT  TOP (1) comm, CONVERT(varchar(100), pd_date, 112) AS RQ  FROM      dbo.pd_zzprq  
+-- 1 rows
+
+----
+
+==== VIEW View_ZZPQTY4 ====
+def
+CREATE VIEW dbo.View_ZZPQTY4  AS  SELECT  dbo.outh.comm, dbo.outh.wzdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, SUM(dbo.outh.sl) AS LLL  FROM      dbo.outh LEFT OUTER JOIN                     dbo.View_ZZPQTY3 ON CONVERT(varchar(100), dbo.outh.out_date, 112) > ISNULL(dbo.View_ZZPQTY3.RQ, '19000101') AND                      dbo.outh.comm = dbo.View_ZZPQTY3.comm  WHERE   (dbo.outh.bz1 = N'生产领料' OR                     dbo.outh.bz1 = N'其它出库') AND (dbo.outh.sl > 0) AND (dbo.outh.qr = N'Y')  GROUP BY dbo.outh.wzdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, dbo.outh.comm  
+-- 1 rows
+
+----
+
+==== VIEW View_ZZPQTY5 ====
+def
+CREATE VIEW dbo.View_ZZPQTY5  AS  SELECT  dbo.inh.comm, dbo.mate.wzdm2 AS wzdm, dbo.inh.od_no2 AS lot_no, dbo.mate.color2 AS color, dbo.mate.siz2 AS siz,                      SUM(ROUND(dbo.inh.sl * dbo.mate.sl2, 3)) AS WGL  FROM      dbo.inh LEFT OUTER JOIN                     dbo.mate ON dbo.inh.comm = dbo.mate.comm AND dbo.inh.wzdm = dbo.mate.wzdm1 AND                      dbo.inh.color = dbo.mate.color1 AND dbo.inh.siz = dbo.mate.siz1 LEFT OUTER JOIN                     dbo.View_ZZPQTY3 ON CONVERT(varchar(100), dbo.inh.in_date, 112) > ISNULL(dbo.View_ZZPQTY3.RQ, '19000101') AND                      dbo.inh.comm = dbo.View_ZZPQTY3.comm  WHERE   (dbo.inh.bz1 = N'生产入库') AND (dbo.inh.qr = N'Y')  GROUP BY dbo.mate.wzdm2, dbo.inh.od_no2, dbo.mate.color2, dbo.mate.siz2, dbo.inh.comm  
+-- 1 rows
+
+----
+
+==== VIEW View_ZZPQTY6 ====
+def
+CREATE VIEW dbo.View_ZZPQTY6  AS  SELECT  dbo.outh.comm, dbo.outh.wzdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, SUM(dbo.outh.sl) AS SCTL  FROM      dbo.outh LEFT OUTER JOIN                     dbo.View_ZZPQTY3 ON CONVERT(varchar(100), dbo.outh.out_date, 112) > ISNULL(dbo.View_ZZPQTY3.RQ, '19000101') AND                      dbo.outh.comm = dbo.View_ZZPQTY3.comm  WHERE   (dbo.outh.bz1 = N'生产领料' OR                     dbo.outh.bz1 = N'其它出库') AND (dbo.outh.sl < 0) AND (dbo.outh.qr = N'Y')  GROUP BY dbo.outh.wzdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, dbo.outh.comm  
+-- 1 rows
+
+----
+
+==== VIEW View_ZZPQTY7 ====
+def
+CREATE VIEW dbo.View_ZZPQTY7  AS  SELECT  dbo.outh.comm, dbo.outh.wzdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, SUM(dbo.outh.sl) AS XSTH  FROM      dbo.outh LEFT OUTER JOIN                     dbo.View_ZZPQTY3 ON CONVERT(varchar(100), dbo.outh.out_date, 112) > ISNULL(dbo.View_ZZPQTY3.RQ, '19000101') AND                      dbo.outh.comm = dbo.View_ZZPQTY3.comm  WHERE   (dbo.outh.bz1 = N'销售出库') AND (dbo.outh.sl < 0) AND (dbo.outh.qr = N'Y')  GROUP BY dbo.outh.wzdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, dbo.outh.comm  
+-- 1 rows
+
+----
+
+==== VIEW View_ZZPQTY8 ====
+def
+CREATE VIEW dbo.View_ZZPQTY8  AS  SELECT  dbo.outh.comm, dbo.outh.wzdm, dbo.outh.lot_no AS od_no, dbo.outh.color, dbo.outh.siz, SUM(dbo.outh.sl) AS CEL  FROM      dbo.outh LEFT OUTER JOIN                     dbo.View_ZZPQTY3 ON CONVERT(varchar(100), dbo.outh.out_date, 112) > ISNULL(dbo.View_ZZPQTY3.RQ, '19000101') AND                      dbo.outh.comm = dbo.View_ZZPQTY3.comm  WHERE   (dbo.outh.bz1 = N'超额领料') AND (dbo.outh.qr = N'Y')  GROUP BY dbo.outh.wzdm, dbo.outh.lot_no, dbo.outh.color, dbo.outh.siz, dbo.outh.comm  
+-- 1 rows
+
+----
