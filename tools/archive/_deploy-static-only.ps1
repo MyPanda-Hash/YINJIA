@@ -1,4 +1,4 @@
-# _deploy-static-only.ps1 — 前端-only 热更:构建前端 → 同步 dist 到 static → 仅更新 app.jar 的 static(不编译 Java,避开并行会话的 JasperReports 半成品)
+﻿# _deploy-static-only.ps1 — 前端-only 热更:构建前端 → 同步 dist 到 static → 仅更新 app.jar 的 static(不编译 Java,避开并行会话的 JasperReports 半成品)
 $ErrorActionPreference = 'Stop'
 Set-Location C:\INCER\YINJIA-MES
 $prevEap = $ErrorActionPreference

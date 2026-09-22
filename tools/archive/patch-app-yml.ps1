@@ -1,4 +1,4 @@
-# patch-app-yml.ps1 — application.yml 补测试数据源与工厂名(一次性补丁)
+﻿# patch-app-yml.ps1 — application.yml 补测试数据源与工厂名(一次性补丁)
 $ErrorActionPreference = "Stop"
 $p = "C:\INCER\YINJIA-MES\backend\src\main\resources\application.yml"
 $raw = [IO.File]::ReadAllText($p, [Text.Encoding]::UTF8)

@@ -1,4 +1,4 @@
-# 通用报表铺开验证(PDF + XLSX 逐面板抽查;输出可粘贴)
+﻿# 通用报表铺开验证(PDF + XLSX 逐面板抽查;输出可粘贴)
 # 用法: powershell -NoProfile -ExecutionPolicy Bypass -File tools\_probe-report-rollout.ps1
 $ErrorActionPreference = 'Continue'
 $out = 'C:\INCER\DSHTemp\roll-export-log.txt'
