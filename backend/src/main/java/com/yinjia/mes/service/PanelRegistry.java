@@ -1,5 +1,6 @@
 package com.yinjia.mes.service;
 
+import com.yinjia.mes.config.DataSourceRouter;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -7,10 +8,16 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 面板注册表:从 HSDZ_MES 的 yj_panel/yj_field 读取元数据。
+ * 面板注册表:从 yj_panel/yj_field 读取元数据。
  * 面板与字段定义全部以数据库为准(可手工调整 yj_field 后自动生效)。
+ *
+ * ⚠ 两账套(ADR-0003):元数据**按账套各存一份**(键 = {@link DataSourceRouter#current()})。
+ * 早期版本只有一个 cache 字段 + 30s TTL ⇒ 两个账套在 TTL 窗口内共用同一份,
+ * 「谁先刷新谁说了算」——症状是在测试账套新增面板/字段后接口仍报「面板不存在」或按旧结构返回
+ * (2026-09-22 实测,见技术债 #11 与回归探针 tools/verify/panel-cache-ledger-test.cjs)。
  */
 @Service
 public class PanelRegistry {
@@ -71,8 +78,9 @@ public class PanelRegistry {
     }
 
     private final JdbcTemplate jdbc;
-    private volatile Map<String, PanelDef> cache;
-    private volatile long loadedAt = 0;
+    /** 每账套一份快照:ledger(DataSourceRouter.PROD/TEST) -> 该库的面板定义 */
+    private record Snapshot(Map<String, PanelDef> defs, long loadedAt) {}
+    private final Map<String, Snapshot> caches = new ConcurrentHashMap<>();
     private static final long TTL_MS = 30_000;
 
     public PanelRegistry(JdbcTemplate jdbc) {
@@ -102,19 +110,28 @@ public class PanelRegistry {
                             rs.getString("prefix"), rs.getString("date_col"), (Integer) rs.getObject("page_size"),
                             rs.getString("detail_key"), rs.getString("module_group"), byPanel.getOrDefault(code, List.of())));
                 });
-        this.cache = out;
-        this.loadedAt = System.currentTimeMillis();
+        caches.put(DataSourceRouter.current(), new Snapshot(out, System.currentTimeMillis()));
+    }
+
+    /** 当前账套的元数据快照;过期或无则重载。账套取自路由上下文(无上下文=正式库,安全默认)。 */
+    private Map<String, PanelDef> snapshot() {
+        String ledger = DataSourceRouter.current();
+        Snapshot s = caches.get(ledger);
+        if (s == null || System.currentTimeMillis() - s.loadedAt() > TTL_MS) {
+            reload();
+            s = caches.get(ledger);
+            if (s == null) throw new IllegalStateException("面板注册表加载失败：" + ledger);
+        }
+        return s.defs();
     }
 
     public PanelDef panel(String panelCode) {
-        if (cache == null || System.currentTimeMillis() - loadedAt > TTL_MS) reload();
-        PanelDef def = cache.get(panelCode);
+        PanelDef def = snapshot().get(panelCode);
         if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
         return def;
     }
 
     public List<PanelDef> all() {
-        if (cache == null || System.currentTimeMillis() - loadedAt > TTL_MS) reload();
-        return new ArrayList<>(cache.values());
+        return new ArrayList<>(snapshot().values());
     }
 }
