@@ -204,7 +204,8 @@
         <div v-else-if="!row.subs && row.kind !== 'phases'" class="as-row" :style="{ minHeight: row.h + 'px' }">
           <div class="as-no">{{ row.num }}</div>
           <div class="as-name">{{ tt(row.label) }}</div>
-          <div class="as-fill">
+          <!-- 有 row.second 的行横向切成两段(实施计划第 8 行:负责人值区 | 编制日期),设计里有竖线分隔 -->
+          <div class="as-fill" :class="{ 'as-fill-split': !!row.second }">
             <div v-if="row.hint" class="as-hint">{{ tt(row.hint) }}</div>
             <div class="as-fill-main">
               <el-input
@@ -238,28 +239,32 @@
               />
               <div v-else class="as-ro-text">{{ head[row.key] || '' }}</div>
             </div>
-            <!-- 同一行右侧的第二字段:实施计划第 8 行 = 负责人 + 编制日期(设计 B15/C15/F15) -->
+            <!-- 同一行右侧的第二字段:实施计划第 8 行 = 负责人 + 编制日期
+                 设计(B15..G15)是三格并排:负责人值区(D:E) | 「编制日期：」标签格(F) | 日期值区(G),
+                 故这里是「标签格 + 值格」两格,与左侧值区之间靠 .as-fill-split 的竖线分隔 -->
             <div v-if="row.second" class="as-second">
               <span class="as-second-label">{{ tt(row.second.label) }}：</span>
-              <el-date-picker
-                v-if="editable && !signLocked(row.second) && row.second.kind === 'date'"
-                v-model="head[row.second.key]"
-                type="date"
-                value-format="YYYY-MM-DD"
-                size="small"
-                class="as-date as-second-input"
-                :clearable="false"
-                @change="emit('dirty')"
-              />
-              <el-input
-                v-else-if="editable && !signLocked(row.second)"
-                v-model="head[row.second.key]"
-                size="small"
-                maxlength="50"
-                class="as-cell-input as-second-input"
-                @input="emit('dirty')"
-              />
-              <span v-else class="as-ro-text">{{ head[row.second.key] || '' }}</span>
+              <span class="as-second-value">
+                <el-date-picker
+                  v-if="editable && !signLocked(row.second) && row.second.kind === 'date'"
+                  v-model="head[row.second.key]"
+                  type="date"
+                  value-format="YYYY-MM-DD"
+                  size="small"
+                  class="as-date as-second-input"
+                  :clearable="false"
+                  @change="emit('dirty')"
+                />
+                <el-input
+                  v-else-if="editable && !signLocked(row.second)"
+                  v-model="head[row.second.key]"
+                  size="small"
+                  maxlength="50"
+                  class="as-cell-input as-second-input"
+                  @input="emit('dirty')"
+                />
+                <span v-else class="as-ro-text">{{ head[row.second.key] || '' }}</span>
+              </span>
             </div>
           </div>
         </div>
@@ -965,19 +970,45 @@ defineExpose({ focusField })
 .as-remark-ro {
   flex: 1;
 }
-/* 行内第二字段(实施计划第 8 行:负责人 + 编制日期):占行内右侧约 40% */
-.as-second {
-  flex: none;
+/* 行内第二字段(实施计划第 8 行:负责人 + 编制日期)
+   设计 B15..G15 是三格并排「负责人值区(D:E) | 编制日期：标签格(F) | 日期值区(G)」,
+   列宽 20.5+20.5 : 12 : 16.13 ⇒ 值区:标签:值 = 41 : 12 : 16.13。
+   ⚠ .as-fill 缺省是 flex-direction: column —— 不切成 row 的话第二字段会被挤到**下一行**(实测踩过)。 */
+.as-fill-split {
+  flex-direction: row;
+  align-items: stretch;
+  padding: 0;
+}
+.as-fill-split > .as-fill-main {
+  flex: 41 1 0;
+  padding: 3px 6px;
+  border-right: 1px solid #8a8a8a;
+}
+.as-fill-split > .as-second {
+  flex: 29.13 1 0;
+  width: auto;
+  padding: 0;
   display: flex;
-  align-items: center;
-  gap: 4px;
-  width: 40%;
-  padding-top: 2px;
+  flex-direction: row;
+  align-items: stretch;
 }
 .as-second-label {
-  flex: none;
+  flex: 12 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 6px;
+  border-right: 1px solid #8a8a8a;
   font-size: 13px;
   color: #333;
+  white-space: nowrap;
+}
+.as-second-value {
+  flex: 16.13 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  padding: 3px 6px;
 }
 .as-second-input {
   flex: 1;

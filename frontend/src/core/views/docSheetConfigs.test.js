@@ -22,6 +22,7 @@
  */
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { approvalSheetCfg, planSheetCfg } from './docSheetConfigs.js'
 
 /** 96dpi：1pt = 4/3 px，四舍五入到整数像素 */
@@ -81,6 +82,25 @@ test('负责人/编制日期 不得同时出现在签名区（避免同一字段
   for (const l of ['负责人', '编制日期']) {
     assert.ok(!labels.includes(l), `${l} 已移到第 8 行，签名区不得重复`)
   }
+})
+
+/**
+ * 版式细节(row.second 必须横向排布):
+ * 设计 B15..G15 是三格并排「负责人值区(D:E) | 编制日期：标签格(F) | 日期值区(G)」。
+ * `.as-fill` 缺省是 `flex-direction: column` —— 少了 `.as-fill-split` 的横向覆盖,
+ * 第二字段会被挤到**下一行**(2026-09-22 实测踩到,用户拿设计照片指出来的)。
+ * 单测跑不了 CSS,所以这里按仓库既有做法(同 recordSheetConfigs.docno.test.js)读源码断言。
+ */
+test('DocSheet 对 row.second 的行必须切成横向(.as-fill-split + flex-direction: row)', () => {
+  const src = readFileSync(new URL('./DocSheet.vue', import.meta.url), 'utf8')
+  assert.ok(
+    /class="as-fill"\s+:class="\{ 'as-fill-split': !!row\.second \}"/.test(src),
+    '单字段行的 .as-fill 必须按 row.second 挂 as-fill-split(否则第二字段落到下一行)',
+  )
+  assert.ok(
+    /\.as-fill-split\s*\{[^}]*flex-direction:\s*row/.test(src),
+    '.as-fill-split 必须显式 flex-direction: row(覆盖 .as-fill 的 column)',
+  )
 })
 
 // ── 行高：按设计磅值 ×4/3 ──────────────────────────────────────────────────
