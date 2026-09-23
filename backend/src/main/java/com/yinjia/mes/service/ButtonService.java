@@ -41,13 +41,14 @@ public class ButtonService {
     private final WoReportService woReport;
     private final QcDisposalService qcDisposal;
     private final KingdeePushService kingdeePush;
+    private final ManuWritebackService manuWriteback;
 
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
                          DevTaskService devTaskService, MessageService messageService,
                          LotSeqService lotSeqService, StockLedgerService stockLedger,
                          WoReportService woReport, QcDisposalService qcDisposal,
-                         KingdeePushService kingdeePush) {
+                         KingdeePushService kingdeePush, ManuWritebackService manuWriteback) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -59,6 +60,7 @@ public class ButtonService {
         this.woReport = woReport;
         this.qcDisposal = qcDisposal;
         this.kingdeePush = kingdeePush;
+        this.manuWriteback = manuWriteback;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -828,6 +830,9 @@ public class ButtonService {
         woReport.post(def.code(), no, currentUserName());
         // 切炭双出口(已确认):报工审核后,直销数量自动生成成品入库单并审核入账(成品仓)
         dualOutFinishIn(def.code(), no, currentUserName());
+        // 生产加工单执行回填(参考库 plang_pc:完工入库回写 rk_sl/rk_no、领料回写 ll_no2):
+        // 重算式(以该工单名下已审核入库/领料单为真源),审核/弃审对称;切炭自动入库经上方同路径已覆盖
+        manuWriteback.post(def.code(), no, currentUserName());
         // 不良品处理记账(品质层):处理单审核 → 原仓扣减+目标仓(隔离/不良品)移仓或报废
         qcDisposal.post(def.code(), no, currentUserName());
         // 来料检验单审核 → 自动生单(2026-09-16 双出口口径):合格数量>0 的行生成采购入库单草稿,
@@ -850,6 +855,16 @@ public class ButtonService {
         Map<String, Object> st = docStatusOf(def.code(), no);
         String status = String.valueOf(st.get("status"));
         if (!"已审核".equals(status) && !"已归档".equals(status)) throw new IllegalStateException("仅已审核或已归档状态可弃审");
+        // 排产锁定(2026-09-23 用户要求):已进入排产(指派了生产线)的加工单不可弃审——
+        // 弃审会回到草稿而排产信息仍在,池口径/负荷/占用与单据状态错位;请先在排产工作台撤销排产
+        if ("MANU_ORDER".equals(def.code())) {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT ISNULL([生产线],N'') AS 生产线 FROM bd_manu_order WHERE [合同号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+            String line = rows.isEmpty() ? null : String.valueOf(rows.get(0).get("生产线"));
+            if (line != null && !line.isBlank()) {
+                throw new IllegalStateException("该加工单已排产(生产线:" + line + "),不能弃审;请先在 排产工作台→今日已排产 撤销排产,再回来弃审");
+            }
+        }
         // 库存冲回(材料入库链):先冲账再弃审,余额不足或台账缺失则拒绝,整笔回滚
         stockLedger.unpostIn(def.code(), no, currentUserName());
         // 报工冲回(生产过程层):完成数量对称扣减,为负则拒绝
@@ -878,6 +893,9 @@ public class ButtonService {
             jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
         }
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
+        // 生产加工单执行回填(对称重算):必须在上方 yj_doc_status 置 shr=NULL **之后**执行——
+        // 重算以"已审核集合"为真源,挂钩早于状态清除会把弃审单仍按已审核计入,回填回旧值(2026-09-22 实测踩坑)
+        manuWriteback.unpost(def.code(), no, currentUserName());
         return result(no, "草稿");
     }
 
@@ -1284,20 +1302,26 @@ public class ButtonService {
     }
 
     /**
-     * 生成产品批号(生产工单):成型后打印产品二维码的数据源。
+     * 生成产品批号:成型后打印产品二维码的数据源(V1.2 #8)。
      * 批号=入库日期+3位流水(与材料批号同一号池);一次生成终身复用,重复调用返回已有批号。
+     * 单轨口径(2026-09-22):生产加工单(MANU_ORDER→头.批号);兼容过渡期 GD-生产工单(→产品批号列)。
      */
     private Map<String, Object> genProductLot(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!"WO_ORDER".equals(def.code())) throw new IllegalStateException("仅生产工单支持生成产品批号");
+        boolean manu = "MANU_ORDER".equals(def.code());
+        if (!manu && !"WO_ORDER".equals(def.code())) throw new IllegalStateException("仅生产加工单/生产工单支持生成产品批号");
         String no = requireNo(formData);
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT [产品批号] FROM wo_order WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        List<Map<String, Object>> rows = manu
+                ? jdbc.queryForList("SELECT [批号] AS 产品批号 FROM bd_manu_order WHERE [合同号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no)
+                : jdbc.queryForList("SELECT [产品批号] FROM wo_order WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (rows.isEmpty()) throw new IllegalStateException("工单不存在:" + no);
         Object cur = rows.get(0).get("产品批号");
         String lot = cur == null || String.valueOf(cur).isBlank() ? null : String.valueOf(cur).trim();
         if (lot == null) {
             lot = lotSeqService.next();
-            jdbc.update("UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?", lot, no);
+            jdbc.update(manu
+                            ? "UPDATE bd_manu_order SET [批号] = ? WHERE [合同号] = ?"
+                            : "UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?",
+                    lot, no);
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("编号", no);
@@ -1327,26 +1351,47 @@ public class ButtonService {
                         + " AND target_panel_code = 'FINISH_IN' AND link_status = 'ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已生成过直销入库(重审幂等)
         String wo = String.valueOf(rep.get("工单号"));
+        // 单轨口径(2026-09-22):工单号=生产加工单(MANU_ORDER.合同号),产品取其行表;
+        // 兼容过渡期 GD-生产工单(WO_ORDER)——先查加工单,查不到再回退旧工单表
         List<Map<String, Object>> ws = jdbc.queryForList(
-                "SELECT [产品编码], [产品名称], [单位], [产品批号] FROM wo_order WHERE [单据编号] = ?", wo);
+                "SELECT TOP 1 l.[产品编码], l.[产品名称], l.[生产单位] AS 单位, h.[批号] AS 产品批号"
+                        + " FROM bd_manu_order h JOIN bl_manu_order l ON l.[合同号] = h.[合同号] AND ISNULL(l.asp_cancel,'N') <> 'Y'"
+                        + " WHERE h.[合同号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'", wo);
+        boolean fromManu = !ws.isEmpty();
+        if (ws.isEmpty()) {
+            ws = jdbc.queryForList(
+                    "SELECT [产品编码], [产品名称], [单位], [产品批号] FROM wo_order WHERE [单据编号] = ?", wo);
+        }
         if (ws.isEmpty()) throw new IllegalStateException("工单不存在:" + wo);
         Map<String, Object> w = ws.get(0);
         Object lotObj = w.get("产品批号");
         String lot = lotObj == null || String.valueOf(lotObj).isBlank() ? null : String.valueOf(lotObj).trim();
         if (lot == null) {
             lot = lotSeqService.next();
-            jdbc.update("UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?", lot, wo);
+            jdbc.update(fromManu
+                            ? "UPDATE bd_manu_order SET [批号] = ? WHERE [合同号] = ?"
+                            : "UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?",
+                    lot, wo);
         }
+        // 成品仓解析:优先成品类启用仓(名称/分类含"成品"),无则取首个启用仓——本地档案无"成品仓"时硬编码会审拒绝
+        List<String> whs = jdbc.queryForList(
+                "SELECT TOP 1 仓库名称 FROM bs_wh WHERE ISNULL(停用,0) = 0 AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " AND (仓库名称 LIKE N'%成品%' OR 仓库分类 LIKE N'%成品%') ORDER BY id", String.class);
+        if (whs.isEmpty()) {
+            whs = jdbc.queryForList(
+                    "SELECT TOP 1 仓库名称 FROM bs_wh WHERE ISNULL(停用,0) = 0 AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", String.class);
+        }
+        String finishWh = whs.isEmpty() ? "成品仓" : whs.get(0);
         Map<String, Object> line = new LinkedHashMap<>();
         line.put("产品编码", w.get("产品编码"));
         line.put("产品名称", w.get("产品名称"));
         line.put("实收数量", dual);
         line.put("计量单位", w.get("单位"));
         line.put("批号", lot);
-        line.put("仓库", "成品仓");
+        line.put("仓库", finishWh);
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", LocalDate.now().toString());
-        head.put("仓库", "成品仓");
+        head.put("仓库", finishWh);
         head.put("生产车间", "切炭车间");
         head.put("加工单号", wo);
         head.put("经手人", user);
@@ -1356,6 +1401,8 @@ public class ButtonService {
         audit(registry.panel("FINISH_IN"), Map.of("编号", (Object) fiNo));
         jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key, target_panel_code, target_form_no, link_status, create_by, create_time)"
                         + " VALUES ('WO_REPORT', ?, '', 'FINISH_IN', ?, 'ACTIVE', ?, GETDATE())", no, fiNo, user);
+        // 报工扣减链路(2026-09-23):直销入库回执回填报工单(参考库 scjl.post_no 对齐)
+        jdbc.update("UPDATE wo_report SET [入库单号] = ? WHERE [单据编号] = ?", fiNo, no);
     }
 
     private static double numOr(Object o) {

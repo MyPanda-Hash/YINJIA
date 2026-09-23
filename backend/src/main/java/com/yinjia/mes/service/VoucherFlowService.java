@@ -92,6 +92,22 @@ public class VoucherFlowService {
         }
     }
 
+    /**
+     * 行级占用:来源单据的**某一条明细行** → 目标单据(单行)。
+     * 用于「按订单行 1:1 生成工单」的排产口径(参考库 plang_pc:一张工单=一条订单行,可分批增量排产),
+     * 与 {@link #link} 的整单批量映射并存;行键沿用 lineKey(docNo#行id) 约定,选单过滤据此识别已排产行。
+     */
+    public void linkLine(String sourcePanel, String sourceNo, String sourceLineKey, String inventoryCode, double qty,
+                         String targetPanel, String targetNo, String targetLineKey, String businessType) {
+        jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_detail_key, source_line_key,"
+                        + " target_panel_code, target_form_no, target_detail_key, target_line_key,"
+                        + " inventory_code, source_quantity, linked_quantity, link_status, create_by)"
+                        + " VALUES (?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)",
+                sourcePanel, sourceNo, null, sourceLineKey,
+                targetPanel, targetNo, null, targetLineKey,
+                inventoryCode, qty, qty, currentUser());
+    }
+
     /** 删除/作废下游单据时释放占用,来源行重新可选 */
     public void release(String targetPanel, String targetFormNo) {
         try {

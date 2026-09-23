@@ -51,16 +51,33 @@ public class WoReportService {
         String op = str(r.get("工序"));
         double qty = num(r.get("报工数量"));
         if (wo == null || op == null) throw new IllegalStateException("报工单缺少工单号或工序,不能过账");
-        // 工单必须已审核(yj_doc_status.shr 非空)
+        // 工单必须已审核——单轨口径(2026-09-22):工单号=生产加工单(MANU_ORDER.合同号);
+        // 兼容过渡期存量 GD-生产工单(WO_ORDER),两者任一已审核即放行
         List<String> shr = jdbc.queryForList(
-                "SELECT shr FROM yj_doc_status WHERE panel_code = 'WO_ORDER' AND doc_no = ?", String.class, wo);
+                "SELECT shr FROM yj_doc_status WHERE panel_code = 'MANU_ORDER' AND doc_no = ?", String.class, wo);
+        if (shr.isEmpty() || shr.get(0) == null) {
+            shr = jdbc.queryForList(
+                    "SELECT shr FROM yj_doc_status WHERE panel_code = 'WO_ORDER' AND doc_no = ?", String.class, wo);
+        }
         if (shr.isEmpty() || shr.get(0) == null) {
             throw new IllegalStateException("工单 " + wo + " 尚未审核,不能报工");
         }
+        // 过账:有工序行则累计;无行且为报工方向则按参考库口径即时建行(计划数量=工单排产数量)——
+        // 单轨加工单不预填工序行(plang_pc 同款),报工即进度;弃审冲回要求行已存在(负数守卫)
         int n = jdbc.update("UPDATE wo_progress SET [完成数量] = [完成数量] + ?, asp_user2 = ?, asp_time2 = GETDATE()"
                         + " WHERE [单据编号] = ? AND [工序] = ?",
                 sign * qty, user, wo, op);
-        if (n == 0) throw new IllegalStateException("工单 " + wo + " 无 [" + op + "] 工序行,不能报工");
+        if (n == 0) {
+            if (sign < 0) throw new IllegalStateException("工单 " + wo + " 无 [" + op + "] 工序进度行,不可冲回");
+            Double plan = null;
+            List<Double> p = jdbc.queryForList(
+                    "SELECT [排产数量] FROM bd_manu_order WHERE [合同号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    Double.class, wo);
+            if (!p.isEmpty() && p.get(0) != null) plan = p.get(0);
+            jdbc.update("INSERT INTO wo_progress ([单据编号], [工序], [计划数量], [完成数量], [备注], asp_user1, asp_time1, asp_cancel)"
+                            + " VALUES (?,?,?,?, N'报工建行', ?, GETDATE(), 'N')",
+                    wo, op, plan, qty, user);
+        }
         if (sign < 0) {
             Double done = jdbc.queryForObject(
                     "SELECT [完成数量] FROM wo_progress WHERE [单据编号] = ? AND [工序] = ?", Double.class, wo, op);

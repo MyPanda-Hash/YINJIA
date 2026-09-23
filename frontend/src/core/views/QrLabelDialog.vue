@@ -1,7 +1,7 @@
 <template>
-  <el-dialog v-model="visibleModel" :title="tt('材料二维码标签')" width="720px" append-to-body class="qr-label-dlg" @opened="renderQr">
+  <el-dialog v-model="visibleModel" :title="props.title || tt('材料二维码标签')" width="720px" append-to-body class="qr-label-dlg" @opened="renderQr">
     <div class="qr-label-toolbar">
-      <span class="qr-label-tip">{{ tt('二维码 = 物料编码|批号（扫描后可解析出入库与追溯信息），每行物料一张标签') }}</span>
+      <span class="qr-label-tip">{{ props.tip || tt('二维码 = 物料编码|批号（扫描后可解析出入库与追溯信息），每行物料一张标签') }}</span>
       <el-button size="small" type="primary" @click="print">{{ tt('打印') }}</el-button>
     </div>
     <div class="qr-label-grid" ref="gridRef">
@@ -32,8 +32,11 @@ import { tt } from '@/i18n'
 
 const props = defineProps({
   modelValue: Boolean,
-  /** [{code, name, lot, qty, unit, doc}] */
+  /** [{code, name, lot, qty, unit, doc, qrText?}] */
   labels: { type: Array, default: () => [] },
+  /** 标题/提示可覆盖(工单二维码标签等复用本对话框) */
+  title: { type: String, default: '' },
+  tip: { type: String, default: '' },
 })
 const emit = defineEmits(['update:modelValue'])
 const visibleModel = computed({ get: () => props.modelValue, set: v => emit('update:modelValue', v) })
@@ -42,7 +45,7 @@ const gridRef = ref(null)
 async function renderQr() {
   for (const lb of props.labels) {
     if (!lb.qr && lb.code) {
-      const text = lb.lot ? `${lb.code}|${lb.lot}` : String(lb.code)
+      const text = lb.qrText || (lb.lot ? `${lb.code}|${lb.lot}` : String(lb.code))
       try { lb.qr = await QRCode.toDataURL(text, { width: 160, margin: 1, errorCorrectionLevel: 'M' }) }
       catch { /* 单张失败不影响其余 */ }
     }
