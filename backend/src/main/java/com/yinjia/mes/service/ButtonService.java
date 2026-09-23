@@ -1919,10 +1919,10 @@ public class ButtonService {
             if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
             // 批次号随链带入采购入库行(2026-09-20 分批送料:同一批次可反查四单)
             if (h.get("批次号") != null && !String.valueOf(h.get("批次号")).isBlank()) line.put("批次号", h.get("批次号"));
-            // 行仓库(2026-09-23 收敛):检验行「仓库代码」的值(名称形)落入库行「仓库名称」——
-            // 入库明细的旧列 [仓库] 已删(migrate-pin-wh-unify),界面参照/推送兜底/台账都只认 仓库名称+仓库编码
+            // 行仓库(2026-09-23 正名):检验行「仓库代码」的值(名称形)落入库行「仓库」——
+            // 单据选仓库字段已全局统一叫「仓库」(migrate-wh-field-rename),参照/必填/推送兜底同列
             Object wh = r.get("仓库代码");
-            if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库名称", wh);
+            if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
             items.add(line);
         }
         Map<String, Object> head = new LinkedHashMap<>();
@@ -2214,9 +2214,9 @@ public class ButtonService {
         if (r.get("生产日期") != null) line.put("生产日期", r.get("生产日期"));
         if (r.get("备注") != null && !String.valueOf(r.get("备注")).isBlank()) line.put("备注", r.get("备注"));
         if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
-        // 行仓库(2026-09-23 收敛):同 inspAutoPurchaseIn —— 落「仓库名称」,旧列 [仓库] 已删
+        // 行仓库(2026-09-23 正名):同 inspAutoPurchaseIn —— 落「仓库」(字段已全局正名)
         Object wh = r.get("仓库代码");
-        if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库名称", wh);
+        if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", LocalDate.now().toString());
         head.put("供应商", ih.get("供应商"));

@@ -56,10 +56,10 @@ EXEC(N'
 CREATE VIEW dbo.v_stock_movement AS
 WITH mv AS (
   -- 1 采购入库单(入库 +)
-  -- (2026-09-23 仓库收敛:名称源由旧列 l.仓库 改为 l.仓库名称 —— migrate-pin-wh-unify 删了 bl_purchase_in.仓库,
-  --  链路/参照/台账/推送兜底统一走 仓库名称+仓库编码 两列)
+  -- (2026-09-23 仓库正名:migrate-wh-field-rename 把 bl_purchase_in.仓库名称 改名回了 仓库 —— 单据选仓库
+  --  字段全局统一叫「仓库」,本视图采购段照读 l.仓库;输出列名 仓库名称 是视图对外契约,不改)
   SELECT 1 AS src, l.id AS rid, h.单据日期, N''采购入库单'' AS 单据类型, l.单据编号, N''入库'' AS 业务类型,
-         l.仓库名称 AS 仓库名称, NULLIF(RTRIM(CAST(l.仓库编码 AS nvarchar(200))),N'''') AS 自身仓库编码,
+         l.仓库 AS 仓库名称, NULLIF(RTRIM(CAST(l.仓库编码 AS nvarchar(200))),N'''') AS 自身仓库编码,
          ISNULL(NULLIF(RTRIM(CAST(l.存货编码 AS nvarchar(200))),N''''), N''(未填存货)'') AS 存货编码,
          l.存货名称 AS 存货, l.规格型号, l.计量单位,
          ISNULL(NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''''), N''(未填批号)'') AS 批号,

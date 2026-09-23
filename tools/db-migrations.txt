@@ -1448,3 +1448,20 @@ migrate-rd-progress-offsheet-cols.sql
 #   ⚠ 依赖视图脚本先行,必须走 DbSync 链序执行。验证:HSDZ_MES 台账快照 235 行/Σ65790/78 仓库键
 #   改前改后一致(inv_cost_ledger 由启动自检按新仓库键自愈重算)。
 migrate-pin-wh-unify.sql
+
+# —— 2026-09-23 仓库字段正名:单据上的「仓库名称」统一改名「仓库」(+必填),销售出库同样 ——
+#   用户口径(接上一条):「所有仓库名称的字段统一改名为仓库(必填),销售出库也一样」。
+#   范围=业务单据选仓库字段;仓库档案本体(WH/CKDA 面板、bs_wh.仓库名称)不动:
+#   ① bl_sale_out:仓库名称补空←仓库(并数据)→ 删旧仓库列 → 仓库名称改名仓库;
+#      SALE_OUT 本就有一条 query,header,detail 的「仓库」参照行(与仓库名称并存=用户所见重复)——
+#      删冗余的仓库名称字段行,既有仓库行设 required=1;
+#   ② bl_purchase_in / bl_so_order:列与字段行直接改名 仓库名称→仓库(参照 WH/必填 原样);
+#   ③ 视图配套:v_stock_movement 与 v_lot_trace 的采购入库段改回 l.仓库(两脚本源已同批改,
+#      哈希漂移链序重跑;销售出库两视图段本就读 l.仓库 不动)。
+#   配套代码(同提交):ButtonService 两处自动生单改写「仓库」;PanelConfigService 撤掉上轮的
+#   {仓库代码→仓库名称} 对(原 {仓库代码→仓库} 重新覆盖入库链);StockLedgerService.loadRows
+#   采购入库段回到 l.[仓库] AS 行仓库;KingdeePushService 不动(兜底 仓库名称→仓库,前者键缺席自动落仓库)。
+#   应用顺序:本脚本先改名列,视图脚本随后链序重跑 l.仓库 即有效;新库链尾执行,与 pin-wh-unify
+#   的删列形成「删旧列→改名回填」净效果一致。幂等(判存)。验证:台账快照 235 行/Σ65790/78 仓库键
+#   三度一致;两面板 仓库=参照(WH)+required=1;明细无 仓库名称 残留。
+migrate-wh-field-rename.sql
