@@ -741,6 +741,8 @@ public class PanelConfigService {
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成送料暂收单"},
+                    // 转ERP(2026-09-23):采购订单直推金蝶 pur_order(测试沙箱联调用;同号已存在会拒)
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"导入", "导入"},

@@ -1,0 +1,19 @@
+feat: 采购订单直推金蝶(pur_order)——YJ-20260909-01 实测入沙箱,ERP单号 CGDD-20260909-00001
+
+用户口径:「把采购订单 YJ-20260909-01 传到测试沙箱的采购订单里去」(入库单那张留用户亲自验证)。
+- KingdeePushService.pushDocument 增 PU_ORDER 分支:
+  · 头:bill_date/供应商编码(supplier_number)/备注[MES:单号];行:物料编码/数量/单价/税率/规格型号;
+  · pur_order 接口 proto 比 pur_inbound 严:qty/price/cess 按字符串收(实测数字型 price 报
+    "invalid value for string type")→ plainDecimal(去尾零非科学计数);单位先按名称在当前凭证
+    账套解析(行上"单位id"是同步来源账套的ID,跨账套会静默错单位),解析不到再退行上ID;
+  · 不推仓库/批号/src(订单无入库语义);目标账套同号订单已存在则拒(订单是下游源头,
+    重复落单会源单关联错乱);
+- ButtonService:转ERP/查询可转ERP/弃审清标记 三处放行 PU_ORDER;
+  PanelConfigService:PU_ORDER 工具栏加 转ERP 组(转ERP/批量转ERP)
+- migrate-po-push-erp.sql:bd_pu_order 补 是否已转ERP/ERP单号/转ERP操作人/转ERP时间
+  (对齐 bd_purchase_in 口径)+ yj_field hidden 注册;两账套失败 0
+- 环境修复:deploy/push/config.json 更新沙箱 appSecret 并去掉 PS Set-Content 写入的 UTF-8 BOM
+  (Jackson 读凭证曾因此报错;文件在 .gitignore,不入库)
+
+实测:YJ-20260909-01(3 行 YJ-XWR-003×20000 / 031×5000 / 032×10000)推入沙箱,
+ERP 单号 CGDD-20260909-00001,回写四列齐;PI-2026-09-0128 保持未转(待用户界面亲验)。

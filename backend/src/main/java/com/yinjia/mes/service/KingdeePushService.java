@@ -132,8 +132,11 @@ public class KingdeePushService {
     public Map<String, Object> pushDocument(String panelCode, String docNo, String operator) throws Exception {
         assertPushTargetAllowed(); // 守卫先行:真实账套未开启 allowProd 时,连 token 都不取
         boolean isPur = "PURCHASE_IN".equals(panelCode);
-        String headTable = isPur ? "bd_purchase_in" : "bd_sale_out";
-        String lineTable = isPur ? "bl_purchase_in" : "bl_sale_out";
+        // 采购订单直推(2026-09-23):作为**金蝶采购订单**落到目标账套(用户口径:测试沙箱的采购订单里);
+        // 与入库单推送互不影响 —— 订单推 pur_order,入库单推 pur_inbound(后者带 src 挂回订单)。
+        boolean isOrder = "PU_ORDER".equals(panelCode);
+        String headTable = isOrder ? "bd_pu_order" : isPur ? "bd_purchase_in" : "bd_sale_out";
+        String lineTable = isOrder ? "bl_pu_order" : isPur ? "bl_purchase_in" : "bl_sale_out";
 
         Map<String, Object> head = jdbc.queryForMap(
                 "SELECT * FROM " + headTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
@@ -157,13 +160,21 @@ public class KingdeePushService {
         } catch (Exception ignored) {}
         if (auditUser == null) throw new RuntimeException("仅已审核(审批通过)单据可转ERP");
 
+        // ②b 采购订单直推的查重:目标账套已存在**同号**采购订单则拒绝 —— 订单是下游单据的源头,
+        //     重复落一张会造成两边各一张、源单关联错乱(同步进来的订单本身就带金蝶号,天然会命中此守卫)
+        if (isOrder && resolvePoRefs(docNo) != null) {
+            throw new RuntimeException("目标账套已存在同号采购订单[" + docNo + "],不重复推送"
+                    + "(如确需重推:先在金蝶删除该订单并弃审本单清标记后再转)");
+        }
+
         List<Map<String, Object>> lines = jdbc.queryForList(
                 "SELECT * FROM " + lineTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
         if (lines.isEmpty()) throw new RuntimeException("单据无明细行，不可转ERP");
 
         // ③ 行仓库编码:空的从 bs_wh 解析(2026-09-23:采购入库/销售出库的明细仓库由「参照选仓库」
         //    录入,值可能只落在 仓库名称 或 仓库 上;两者都按「名称或编码」匹配 bs_wh)
-        for (Map<String, Object> line : lines) {
+        //    采购订单不推仓库(订单无入库语义,仓档不全的账套反而拒单),跳过
+        if (!isOrder) for (Map<String, Object> line : lines) {
             Object stockCode = line.get("仓库编码");
             if (stockCode != null && !String.valueOf(stockCode).isBlank()) continue;
             String raw = str(line.get("仓库名称"));
@@ -179,10 +190,10 @@ public class KingdeePushService {
         // ④ 构建金蝶 body(平铺;不传 bill_no → 金蝶自动生成编号,MES 编号放备注追溯)
         ObjectNode body = json.createObjectNode();
         body.put("bill_date", str(head.get("单据日期")));
-        body.put("trans_type", "2");
+        if (!isOrder) body.put("trans_type", "2"); // 入库/出库单的业务类型;采购订单无此项
         String remark = str(head.get("备注"));
         body.put("remark", (remark.isEmpty() ? "" : remark) + " [MES:" + docNo + "]");
-        if (isPur) body.put("supplier_number", str(head.get("供应商编码")));
+        if (isPur || isOrder) body.put("supplier_number", str(head.get("供应商编码")));
         else body.put("customer_number", str(head.get("客户编码")));
 
         ArrayNode entities = body.putArray("material_entity");
@@ -210,11 +221,16 @@ public class KingdeePushService {
             }
         }
         boolean linkSrc = isPur && poRefs != null;
+        // 采购订单直推的字段口径:订单行叫 物料编码/数量/单价/单位;入库行叫 存货编码/实收数量/单价/计量单位
+        String matKey = isOrder ? "物料编码" : "存货编码";
+        String qtyKey = isPur ? "实收数量" : "数量";
+        String priceKey = isPur || isOrder ? "单价" : "售价";
+        String unitKey = isOrder ? "单位" : "计量单位";
         int rowNo = 0;
         for (Map<String, Object> line : lines) {
             rowNo++;
             ObjectNode e = entities.addObject();
-            String materialNo = str(line.get("存货编码"));
+            String materialNo = str(line.get(matKey));
             e.put("material_number", materialNo);
             // 商品ID:挂来源单时必须与源单分录一致(金蝶按 material_id 比对),故按存货编码解析后一并传;
             // 解析不到不阻断(无来源单的普通入库单靠 material_number 即可),仅在挂联场景下报错提示
@@ -225,29 +241,47 @@ public class KingdeePushService {
             } else {
                 e.put("material_id", materialId);
             }
-            e.put("qty", num(line, isPur ? "实收数量" : "数量"));
-            e.put("price", num(line, isPur ? "单价" : "售价"));
+            // 采购订单接口(pur_order)的 proto 校验比入库单严:qty/price/cess 按**字符串**收
+            // (实测:数字型 price 报 "proto: invalid value for string type: 0.39");
+            // 入库/出库接口照旧收数字,两类单据分开发。
+            if (isOrder) {
+                e.put("qty", plainDecimal(num(line, qtyKey)));
+                e.put("price", plainDecimal(num(line, priceKey)));
+                double cessO = num(line, "税率%"); if (cessO != 0) e.put("cess", plainDecimal(cessO));
+            } else {
+                e.put("qty", num(line, qtyKey));
+                e.put("price", num(line, priceKey));
+                double cess = num(line, "税率%"); if (cess != 0) e.put("cess", cess);
+            }
             String model = str(line.get("规格型号")); if (!model.isEmpty()) e.put("material_model", model);
-            double cess = num(line, "税率%"); if (cess != 0) e.put("cess", cess);
             // 计量单位(保存接口要 unit_id=金蝶单位ID,报错文案里的"unit"即此):行上"单位id"列
             // → 当前账套单位主数据(measure_unit)按名称换ID。单位ID按账套各不同(bs_uom 存的是
             // 读入账套的ID,跨账套复用会静默错单位),按当前凭证实时拉取 → 测试/真实套切换零改动
-            String unit = str(line.get("计量单位"));
+            String unit = str(line.get(unitKey));
             String unitId = str(line.get("单位id"));
+            // 采购订单直推:行上"单位id"是**当初同步来源账套**的ID,跨账套会静默错单位 ——
+            // 先按名称在当前凭证账套解析(unitMap),解析不到再退行上ID(与入库单的顺序相反,原因同上注释)
+            if (isOrder && !unit.isEmpty()) {
+                String resolved = str(unitMap().get(unit));
+                if (!resolved.isEmpty()) unitId = resolved;
+            }
             if (unitId.isEmpty() && !unit.isEmpty()) unitId = str(unitMap().get(unit));
             if (unitId.isEmpty()) throw new RuntimeException(
                     "第" + rowNo + "行计量单位[" + unit + "]在当前账套金蝶单位档案中无对应ID,无法转ERP"
                             + (unit.isEmpty() ? "(行上未填计量单位)" : ""));
             e.put("unit_id", unitId);
             // 仓库编码:行级 > 头级 > 默认正品仓(金蝶要求非服务商品必须录入仓库);
-            // 落到默认仓时打日志 —— 否则"单据没录仓库"会被静默推成 CK00001,账面上看不出来
-            String stock = str(line.get("仓库编码")); if (stock.isEmpty()) stock = str(head.get("仓库编码"));
-            if (stock.isEmpty()) {
-                stock = "CK00001";
-                log.warn("单据[{}]第{}行无行级/头级仓库编码,已按默认正品仓 CK00001 推送,请核对单据仓库", docNo, rowNo);
+            // 落到默认仓时打日志 —— 否则"单据没录仓库"会被静默推成 CK00001,账面上看不出来。
+            // 采购订单不推仓库(订单无入库语义)
+            if (!isOrder) {
+                String stock = str(line.get("仓库编码")); if (stock.isEmpty()) stock = str(head.get("仓库编码"));
+                if (stock.isEmpty()) {
+                    stock = "CK00001";
+                    log.warn("单据[{}]第{}行无行级/头级仓库编码,已按默认正品仓 CK00001 推送,请核对单据仓库", docNo, rowNo);
+                }
+                e.put("stock_number", stock);
             }
-            e.put("stock_number", stock);
-            String batch = str(line.get("批号")); if (!batch.isEmpty()) e.put("batch_no", batch);
+            String batch = str(line.get("批号")); if (!batch.isEmpty() && !isOrder) e.put("batch_no", batch);
             // 来源单:行级 src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
             // src_seq=该行对应的采购订单行号(采购订单行 行号,沿 订单→暂收→检验→入库 逐站带下来)
             // 仅当订单在金蝶解析到(linkSrc)才推整组;src_seq 必须在订单确有该分录时才推,
@@ -279,7 +313,8 @@ public class KingdeePushService {
         }
 
         // ⑤ 推送(纯 Java HTTP)
-        String apiPath = isPur ? "/jdy/v2/scm/pur_inbound" : "/jdy/v2/scm/sal_out_bound";
+        String apiPath = isOrder ? "/jdy/v2/scm/pur_order"
+                : isPur ? "/jdy/v2/scm/pur_inbound" : "/jdy/v2/scm/sal_out_bound";
         JsonNode res = postJson(apiPath, body);
         if (res.path("errcode").asInt(-1) != 0) {
             String err = res.path("description_cn").asText(res.path("description").asText(res.toString()));
@@ -392,6 +427,12 @@ public class KingdeePushService {
         } catch (NumberFormatException e) {
             return null;
         }
+    }
+
+    /** 数值 → 干净的十进制字符串(去尾零、不用科学计数):pur_order 接口的 qty/price/cess 按字符串收 */
+    private static String plainDecimal(double d) {
+        if (d == 0) return "0";
+        return java.math.BigDecimal.valueOf(d).stripTrailingZeros().toPlainString();
     }
 
     /**

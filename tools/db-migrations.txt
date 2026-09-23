@@ -1465,3 +1465,18 @@ migrate-pin-wh-unify.sql
 #   的删列形成「删旧列→改名回填」净效果一致。幂等(判存)。验证:台账快照 235 行/Σ65790/78 仓库键
 #   三度一致;两面板 仓库=参照(WH)+required=1;明细无 仓库名称 残留。
 migrate-wh-field-rename.sql
+
+# —— 2026-09-23 采购订单(PU_ORDER)开通转ERP:直推金蝶 pur_order(测试沙箱联调) ——
+#   用户口径:「把采购订单 YJ-20260909-01 传到测试沙箱的采购订单里去」——此前转ERP只支持
+#   采购入库/销售出库(pur_inbound/sal_out_bound),本次给采购订单开直推(pur_order)。
+#   ① bd_pu_order 补 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(对齐 bd_purchase_in 口径)+
+#      yj_field hidden 注册(仅回写落库,标签译名全局共享);
+#   ② KingdeePushService.pushDocument 增 PU_ORDER 分支:物料编码/数量/单价/单位(行上"单位id"是
+#      同步来源账套的ID,先按名称在当前凭证账套解析再兜底),不推仓库/批号/src(订单无入库语义);
+#      **目标账套同号订单已存在则拒**(订单是下游源头,重复落单会造成源单关联错乱);
+#   ③ ButtonService 转ERP/查询可转ERP/弃审清标记 三处放行 PU_ORDER;
+#      PanelConfigService PU_ORDER 工具栏加 转ERP 组(转ERP/批量转ERP)。
+#   另:本任务修复 deploy/push/config.json 的 UTF-8 BOM(PS Set-Content 写入,Jackson 读凭证报错)
+#   并更新沙箱 appSecret。验证:YJ-20260909-01(3 行 YJ-XWR-003/031/032)实测推入沙箱,ERP单号见
+#   bd_pu_order 回写;入库单 PI-2026-09-0128 未动(用户将亲自在界面验证)。
+migrate-po-push-erp.sql
