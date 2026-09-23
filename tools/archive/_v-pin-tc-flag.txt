@@ -1,0 +1,59 @@
+﻿=== ① 存储:bl_purchase_in.[特采] + 中文注明 ===
+  [PASS] 列已建(1 行)
+   类型 nvarchar(20) 可空=true
+   注明: 特采:是=本行由特采单(QC_TC_IN)审批通过后生成 —— 即来料检验判定为特采(让步接收)的物料,全部数量入库;否=普通来料检验合格入库或免检直达。来源:检验单明细「特采」开关经 特采单 闸门带下,生单时写入,只读
+  [PASS] 列有中文注明
+
+=== ② 元数据 / 面板配置 / 多语言 ===
+  [PASS] yj_field 已登记
+   {"col_name":"特采","label":"特采","data_type":"下拉框","dict_sql":"SELECT v FROM (VALUES (N'是'),(N'否')) AS t(v)","place":"detail","seq":165,"width":90,"editable":false,"required":false,"hidden":false,"visible":true}
+  [PASS] data_type=下拉框(实测 下拉框;写「下拉」前端会退化成文本框)
+  [PASS] 明细列 / 只读 / 可见
+  [PASS] 字典含 是/否 两项
+  [PASS] 面板配置明细字段含「特采」(界面据此渲染列)
+   {"dataName":"特采","dataType":"下拉框","width":90,"readonly":true,"options":["是","否"],"isRequired":false}
+  [PASS] 配置:下拉框 + 只读
+  [PASS] 选项 = 是/否(实测 ["是","否"])
+   en 显示名: Special acceptance
+  [PASS] en 下显示 Special acceptance(不回落中文)
+
+=== ③ 存量回填 ===
+   分布: [{"v":"否","c":257},{"v":"是","c":8}]
+  [PASS] 无空值
+   特采链路单据 8 张: ["PI-2026-09-0102=是","PI-2026-09-0103=是","PI-2026-09-0104=是","PI-2026-09-0105=是","PI-2026-09-0113=是","PI-2026-09-0114=是","PI-2026-09-0115=是","PI-2026-09-0143=是"]
+  [PASS] 特采链路单据的入库行全为「是」
+
+=== ④ 全链实测:检验勾「特采」→ 特采单 → 采购入库单 ===
+   特采链:采购订单 YJ-20260915-10 → 暂收单 SL-2026-09-0187 → 检验单 IJ-2026-09-0150(本次 1)
+   检验行(勾特采): [{"物料编码":"Y-GL-300400","送检数量":1,"合格数量":1,"特采":true}]
+   特采行 → 特采单 TCI-2026-09-0023
+  [PASS] 审核检验单 → 自动生成特采单(检验行 特采 已带下)
+   特采单头: {"总数量":1,"不合格品数量":0,"检验单号":"IJ-2026-09-0150"}
+   特采单审核 → 采购入库单 PI-2026-09-0144
+   入库行: [{"存货编码":"Y-GL-300400","规格型号":null,"实收数量":1,"是否来料检验":"是","特采":"是"}]
+  [PASS] 特采链入库行 特采=是(实测 ["是"])
+  [PASS] 同链 是否来料检验=是(与既有口径一致)
+
+=== ⑤ 对照实测:不勾特采 → 采购入库单 特采=否 ===
+   普通链:采购订单 YJ-20260915-10 → 暂收单 SL-2026-09-0188 → 检验单 IJ-2026-09-0151(本次 1)
+  [PASS] 对照链检验行 特采=0
+   检验单审核 → 采购入库单 PI-2026-09-0145
+   入库行: [{"存货编码":"Y-GL-300400","实收数量":1,"是否来料检验":"是","特采":"否"}]
+  [PASS] 普通链入库行 特采=否(实测 ["否"])
+
+=== ⑥ 界面:采购入库单明细列「特采」 ===
+node : file:///D:/YINJIA-main/tools/archive/_verify-purchase-in-tc-flag.mjs:197
+所在位置 行:10 字符: 12
++ if ($up) { node tools\archive\_verify-purchase-in-tc-flag.mjs 2>&1 |  ...
++            ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (file:///D:/YINJ...tc-flag.mjs:197:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  const ws = new WebSocket(tab.webSocketDebuggerUrl);
+                               ^
+
+TypeError: Cannot read properties of null (reading 'webSocketDebuggerUrl')
+    at file:///D:/YINJIA-main/tools/archive/_verify-purchase-in-tc-flag.mjs:197:32
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+
+Node.js v24.18.0

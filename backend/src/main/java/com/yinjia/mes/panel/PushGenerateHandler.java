@@ -167,7 +167,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                 if (v != null) row.put(m.get("to"), v);
             }
             targetItems.add(row);
-            applyInspectionFlag(sourcePanel, target, row);
+            applySourceFlags(sourcePanel, target, item, row);
         }
 
         // 5) 保存为目标草稿(复用通用保存语义:头行分表/默认值/号池取号)
@@ -211,15 +211,22 @@ public class PushGenerateHandler implements PanelActionHandler {
     }
 
     /**
-     * 采购入库行的「是否来料检验」:由**来源单据**判定(2026-09-21 用户口径)。
-     * - 来源 = 来料检验单(QC_INSP):该批物料走过检验 → 是
-     * - 来源 = 送料暂收单(QC_RECV,暂收后人工判免检直达入库)→ 否
-     * 2026-09-22 起采购入库单只有这两个来源(采购订单的免检直达出口已取消),判定无需再改。
+     * 采购入库行的两个「来源判定」字段:由**来源单据 / 来源行**带下(2026-09-21、2026-09-23 两次用户口径)。
+     * - 是否来料检验:来源 = 来料检验单(QC_INSP):该批物料走过检验 → 是
+     *   来源 = 送料暂收单(QC_RECV,暂收后人工判免检直达入库)→ 否
+     *   2026-09-22 起采购入库单只有这两个来源(采购订单的免检直达出口已取消),判定无需再改。
+     * - 特采(2026-09-23 用户口径「这个字段和来料检验的字段一样,是从来料检验来的」):
+     *   取**来源检验行**的「特采」开关 —— 勾了=是,没勾=否;来源行没有该字段(暂收单等)=否。
+     *   注意本路径看不见特采数据:勾了特采的检验行已被 {@link #dropSpecialAccept} 闸门排除,
+     *   它们的去向是特采单(QC_TC_IN),由 ButtonService.tcInApprovedGenerate 在特采单审批通过时
+     *   生成入库单并写 特采=是。此处仍按来源行取值(而不是硬写「否」),闸门口径若变也不会写错。
      * 只对目标面板 = 采购入库单(PURCHASE_IN)生效;目标面板未登记该字段时写入会被通用保存静默忽略。
      */
-    private void applyInspectionFlag(String sourcePanel, String targetPanel, Map<String, Object> row) {
+    private void applySourceFlags(String sourcePanel, String targetPanel,
+                                  Map<String, Object> srcItem, Map<String, Object> row) {
         if (!"PURCHASE_IN".equals(targetPanel) || row == null) return;
         row.put("是否来料检验", "QC_INSP".equals(sourcePanel) ? "是" : "否");
+        row.put("特采", isSpecialAccept(srcItem) ? "是" : "否");
     }
 
     private double numOf(Object v) {
@@ -451,7 +458,7 @@ public class PushGenerateHandler implements PanelActionHandler {
             }
             row.put(tgtQtyLabel, p.get("qty"));   // 本次送料数量
             row.remove("批次号");                  // 行批次号同样留空(入库审核确认批次号时按批次键回填)
-            applyInspectionFlag(sourcePanel, targetPanel, row);
+            applySourceFlags(sourcePanel, targetPanel, item, row);
             targetItems.add(row);
         }
 

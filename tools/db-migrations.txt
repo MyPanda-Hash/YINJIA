@@ -919,3 +919,21 @@ migrate-qc-insp-rec-batch-locked.sql
 #     「请填写批号却填不了」,需业务确认后决定是否放开 required(本次按用户口径只改 editable)。
 #   程序化回填不走 editable 校验,不受影响;幂等可重跑(自检段输出 QC 链批号字段 editable,应全为 0)。
 migrate-qc-backfill-batch-readonly.sql
+
+# ── migrate-purchase-in-tc-flag.sql(2026-09-23)──────────────────────────────
+#   采购入库单明细加「特采」标记(用户口径:「采购入库单的明细表缺少一个特采字段,来判定
+#   来料检验单过来的数据是否是特采的」「这个字段和来料检验的字段一样,是从来料检验来的」)。
+#   缘由:来料检验明细的「特采」开关(qc_insp_detail.特采)勾上后走特采单闸门 —— 检验审核不
+#     直接生成入库单,而是逐行生成特采单(QC_TC_IN),特采单审核通过才生成采购入库单;
+#     而采购入库行只有「是否来料检验」,仓库无法判断这张入库单是不是特采落下来的。
+#   ① bl_purchase_in 加 [特采] nvarchar(10) NULL + MS_Description 中文注明;
+#   ② 存量回填:链路台账 form_flow_link 有 QC_TC_IN→PURCHASE_IN 占用的单=是(任意 link_status,
+#      「曾由特采单生成过」即算),其余=否;仅填空值;
+#   ③ yj_field:PURCHASE_IN 明细「特采」下拉 是/否、seq 165(紧跟 是否来料检验 160)、
+#      **editable=0 只读**(值由生单路径按来源检验行带下,不许人工改,与同表 是否来料检验 同口径);
+#   ④ 译名:field「特采」×10 语言(与 QC_INSP 同标签共享,已有不重复插)。
+#   配套代码(同提交):ButtonService.tcInApprovedGenerate(特采单审核→入库行走来源检验行特采)、
+#     inspAutoPurchaseIn(非特采行→否)、PushGenerateHandler.applySourceFlags(原 applyInspectionFlag,
+#     改名并把 是否来料检验/特采 两个来源判定字段一并带下;特采行已被闸门排除 → 恒否)。
+#   验证:tools/archive/_verify-purchase-in-tc-flag.mjs(8 张特采链路单行=是、其余=否、界面列可见)。
+migrate-purchase-in-tc-flag.sql

@@ -1,0 +1,13 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== migrate-purchase-in-tc-flag.sql ==
+[OK] migrate-purchase-in-tc-flag.sql (8 batches)
+== _q-pin-tc-verify.sql ==
+  | 是否来料检验 | nvarchar | 20 | 1 | 是否来料检验(本地MES维护;金蝶按商品档案检验方式自行触发,不推接口) | 
+  | 特采 | nvarchar | 20 | 1 | 特采:是=本行由特采单(QC_TC_IN)审批通过后生成 —— 即来料检验判定为特采(让步接收)的物料,全部数量入库;否=普通来料检验合格入库或免检直达。来源:检验单明细「特采」开关经 特采单 闸门带下,生单时写入,只读 | 
+  | PURCHASE_IN | 是否来料检验 | 是否来料检验 | 下拉框 | SELECT v FROM (VALUES (N'是'),(N'否')) AS t(v) | detail | 160 | 90 | 0 | 0 | 0 | 1 | 
+  | PURCHASE_IN | 特采 | 特采 | 下拉框 | SELECT v FROM (VALUES (N'是'),(N'否')) AS t(v) | detail | 165 | 90 | 0 | 0 | 0 | 1 | 
+  | 否 | 257 | 
+  | 是 | 8 | 
+  | 8 | 8 | 
+  | 10 | 
+[OK] _q-pin-tc-verify.sql (6 batches)

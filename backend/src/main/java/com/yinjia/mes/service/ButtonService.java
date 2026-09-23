@@ -1536,7 +1536,7 @@ public class ButtonService {
         if (linked != null && linked > 0) return; // 已自动生单(重审幂等;下游作废释放后可再生成)
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量, 仓库代码, 计量单位, 单价, 采购订单行号,"
-                        + " 送检数量, 部门名称, 生产日期, 备注"
+                        + " 送检数量, 部门名称, 生产日期, 备注, CAST(ISNULL(特采,0) AS int) AS 特采"
                         + " FROM qc_insp_detail"
                         // 特采行(2026-09-22 口径)不直接生成入库单 —— 走特采单闸门(inspAutoSpecialAccept),
                         // 特采单审核通过后由 tcInApprovedGenerate 整行(合格+不合格)生成入库单
@@ -1561,8 +1561,12 @@ public class ButtonService {
             if (r.get("单位") != null) line.put("单位", r.get("单位")); // 退回行另有「单位」列(2026-09-21 补齐,原先只写计量单位 → 单位全空)
             line.put("单价", r.get("单价"));
             // 是否来料检验:本单由**来料检验单**审核自动生成 → 该批物料走过检验 = 是
-            // (免检直达的入库单由采购订单生单,写「否」,见 PushGenerateHandler.applyInspectionFlag)
+            // (免检直达的入库单由采购订单生单,写「否」,见 PushGenerateHandler.applySourceFlags)
             line.put("是否来料检验", "是");
+            // 特采(2026-09-23 用户口径):与检验行「特采」同源 —— 本路径只收**未勾特采**的行
+            // (上面 WHERE 已排除 ISNULL(特采,0)=1),故恒为「否」;勾了特采的行走特采单闸门
+            // (inspAutoSpecialAccept → 特采单审核 → tcInApprovedGenerate),由那条路径写「是」
+            line.put("特采", numOr(r.get("特采")) != 0 ? "是" : "否");
             // 采购入库单补齐(2026-09-21 用户口径「保证采购入库单完整」):送检数量/部门名称/生产日期/行备注随链带入
             line.put("送检数量", r.get("送检数量"));
             if (r.get("部门名称") != null) line.put("部门名称", r.get("部门名称"));
@@ -1805,7 +1809,7 @@ public class ButtonService {
      *   纯手工新建的特采单不自动生成(无检验行/采购订单上下文,避免凭空入库);
      * - 数量 = 特采单「总数量」(审批人可在特采单上改数后批准,按批准值入库);
      * - 头/行对齐 inspAutoPurchaseIn(供应商/供应商编码/采购订单号/批次键/外部单据号=检验单号),
-     *   行上 是否来料检验=是;
+     *   行上 是否来料检验=是,特采=是(2026-09-23:按来源检验行「特采」开关带下,与来料检验字段同源);
      * - 行级占用写 form_flow_link(QC_TC_IN→PURCHASE_IN)并回填检验行「入库单号」;
      * - 入库单留草稿由仓库确认审核;审核时凭批次键回填批次号,回填范围含特采单头
      *   (BatchService.KEY_PANELS)。幂等:该特采单已有 ACTIVE 入库单占用(重审)跳过。
@@ -1838,10 +1842,10 @@ public class ButtonService {
         List<Map<String, Object>> drows = rowId != null
                 ? jdbc.queryForList("SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
                         + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
-                        + " 送检数量, 部门名称, 生产日期, 备注 FROM qc_insp_detail WHERE id = ? AND ISNULL(asp_cancel,'N') <> 'Y'", rowId)
+                        + " 送检数量, 部门名称, 生产日期, 备注, CAST(ISNULL(特采,0) AS int) AS 特采 FROM qc_insp_detail WHERE id = ? AND ISNULL(asp_cancel,'N') <> 'Y'", rowId)
                 : jdbc.queryForList("SELECT TOP 1 id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 数量, 合格数量,"
                         + " ISNULL(NULLIF(不合格数量,0), 不良数量) AS 不合格数量, 仓库代码, 计量单位, 单位, 单价, 采购订单行号,"
-                        + " 送检数量, 部门名称, 生产日期, 备注 FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " 送检数量, 部门名称, 生产日期, 备注, CAST(ISNULL(特采,0) AS int) AS 特采 FROM qc_insp_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                         + " ORDER BY id", inspNo);
         if (drows.isEmpty()) throw new IllegalStateException("来源检验行不存在:" + lineKey);
         Map<String, Object> r = drows.get(0);
@@ -1856,6 +1860,10 @@ public class ButtonService {
         line.put("单价", r.get("单价"));
         // 是否来料检验:该批物料走过检验 = 是(与 inspAutoPurchaseIn 同口径)
         line.put("是否来料检验", "是");
+        // 特采(2026-09-23 用户口径「这个字段和来料检验的字段一样,是从来料检验来的」):
+        // 按**来源检验行**的「特采」开关带下 —— 本单由特采单审批通过生成,而特采单又由勾了特采的
+        // 检验行触发,故恒为「是」;仍取来源值而非硬写,保证与检验行口径永远一致
+        line.put("特采", numOr(r.get("特采")) != 0 ? "是" : "否");
         if (r.get("送检数量") != null) line.put("送检数量", r.get("送检数量"));
         if (r.get("部门名称") != null) line.put("部门名称", r.get("部门名称"));
         if (r.get("生产日期") != null) line.put("生产日期", r.get("生产日期"));
