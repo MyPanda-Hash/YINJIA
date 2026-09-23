@@ -1315,8 +1315,12 @@ defineExpose({ focusField })
 .q-sign-label {
   color: #333;
 }
+/* 签名留白 = 5 个字符(纸面:签名处留 5 格)= 90px —— 与同页部门会签行的
+   `.q-sign-name`(只读 span)/ `.q-dept-signline .q-sign-name.el-input`(编辑输入框)同宽,
+   三处一个口径。改前这里是 130px(≈7 字符,比部门会签那几行宽出一截),故用户觉得
+   「签名的间隔巨大」。本类编辑态与只读态共用,改一处两边同时生效。 */
 .q-sign-val {
-  width: 130px;
+  width: 90px;
 }
 .q-sign-date {
   color: #333;
@@ -1324,8 +1328,13 @@ defineExpose({ focusField })
   align-items: center;
   gap: 2px;
 }
-/* 签名日期 年/月/日 三段空(纸面样式):年 4 位宽、月日 2 位宽,居中无边距 */
-.q-date-in {
+/* 签名日期 年/月/日 三段空(纸面样式):年 4 位宽、月日 2 位宽(30px≈2 字符),居中无边距。
+   ⚠ 选择器必须写**两个类**:上面的 `.approval-sheet :deep(.as-cell-input){width:100%}` 编译后是
+   (0,3,0),单个 `.q-date-in` 只有 (0,2,0) → 被它压成 width:100%,月/日 输入框撑满整行
+   (即用户报的「编辑态间隔巨大」)。`.q-dy` 当年正是这么两个类绕开的;`.q-dm` 漏了,故单坏月/日。
+   两个类 = (0,3,0) 与之打平,再靠源码顺序在后取胜(本块在 812 行之后)。 */
+.q-date-in.q-dm,
+.q-date-in.q-dy {
   flex: none;
   width: 30px;
 }
@@ -1337,6 +1346,7 @@ defineExpose({ focusField })
   text-align: center;
   padding: 0 3px;
 }
+/* 签名留白 = 5 个字符,与 .q-sign-val 同口径;只读态是空 span,靠 min-width 撑出同一格 */
 .q-sign-name {
   display: inline-block;
   min-width: 90px;
@@ -1400,6 +1410,7 @@ defineExpose({ focusField })
   font-size: 13.5px;
   color: #333;
 }
+/* 部门会签行的签名输入框:与 .q-sign-name / .q-sign-val 同宽(5 个字符),编辑态与只读态对齐 */
 .q-dept-signline .q-sign-name.el-input {
   flex: none;
   width: 90px;
