@@ -266,6 +266,12 @@ public class KingdeePushService {
                 if (!resolved.isEmpty()) unitId = resolved;
             }
             if (unitId.isEmpty() && !unit.isEmpty()) unitId = str(unitMap().get(unit));
+            if (unitId.isEmpty() && !unit.isEmpty()) {
+                // 单位缓存 22h:目标账套刚补建了单位(如沙箱补「张」)而缓存还是旧的 → 强制失效重拉一次,
+                // 免去"补了单位还要重启后端"(2026-09-23 沙箱实测踩坑:补建后重试仍报无对应ID)
+                unitIdByName = null;
+                unitId = str(unitMap().get(unit));
+            }
             if (unitId.isEmpty()) throw new RuntimeException(
                     "第" + rowNo + "行计量单位[" + unit + "]在当前账套金蝶单位档案中无对应ID,无法转ERP"
                             + (unit.isEmpty() ? "(行上未填计量单位)" : ""));
