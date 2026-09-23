@@ -42,6 +42,11 @@ test('抬头四行成对(左标签-右值),与 Excel 模版一致', () => {
     '物料批次', '文件编码', '检验日期', '检验依据',
   ])
   for (const row of QC_INSP_REC_HEAD_ROWS) assert.equal(row.length, 2, '每行两对')
+  // 物料批次=回填字段(入库审核时才分配批次号并回填)→ 不可编辑(纸面显示为文本)
+  const batchCell = QC_INSP_REC_HEAD_ROWS.flat().find((c) => c.key === '物料批次')
+  assert.equal(batchCell.locked, true, '物料批次由回填得到 → 锁定只读')
+  // 其余抬头字段仍可填(不要顺手把所有抬头都锁了)
+  assert.equal(QC_INSP_REC_HEAD_ROWS[0][0].locked, undefined, '物料名称可填')
 })
 
 test('表尾:检验结论/处理意见整宽 + 签名行(检验人锁定、审核人走专属列)', () => {

@@ -894,3 +894,12 @@ migrate-qc-catalog-auto.sql
 #     接口四面板 32~1,035 ms(稳后 ~150 ms,原 190,325 ms);无关面板 19~113 ms;并发墙钟 242 ms ≈ 最慢单次。
 #   幂等可重跑(先判后建);自检段输出索引覆盖度/新建对象/视图耗时/口径合计。
 migrate-stock-report-perf.sql
+
+# ── migrate-qc-insp-rec-batch-locked.sql(2026-09-23)────────────────────────
+#   检验数据记录(QC_INSP_REC)「物料批次」置为**不可编辑**(editable=0)。
+#   缘由(用户口径):需要回填的批次号都不可以手填 —— 批次号在采购入库审核时才分配并回填
+#     (BatchService.assignNoAndBackfill → 检验单/检验目录/本报告),录入阶段不该能改。
+#   前端同步:QcInspRecSheet.vue 抬头按 locked 渲染为纯文本(真源 qcInspRecColumns.js)。
+#   注意:程序化回填(检验目录→本报告跳转预填、后端回填)不走 editable 校验,不受影响。
+#   幂等可重跑(先判后改);自检段输出该字段的 editable 取值(应为 0)。
+migrate-qc-insp-rec-batch-locked.sql

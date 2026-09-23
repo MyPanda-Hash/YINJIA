@@ -26,7 +26,7 @@
             <th class="qr-label">{{ tt(cell.label) }}</th>
             <td class="qr-value">
               <el-date-picker
-                v-if="isDateField(cell.key) && editable"
+                v-if="isDateField(cell.key) && editable && !cell.locked"
                 v-model="head[cell.key]"
                 type="date"
                 value-format="YYYY-MM-DD"
@@ -36,13 +36,14 @@
                 @change="emit('dirty')"
               />
               <el-input
-                v-else-if="editable"
+                v-else-if="editable && !cell.locked"
                 v-model="head[cell.key]"
                 size="small"
                 class="qr-cell-input"
                 maxlength="200"
                 @input="emit('dirty')"
               />
+              <!-- locked 字段(物料批次=回填批次号)即便在草稿态也只显示文本,不允许手填 -->
               <span v-else class="qr-cell-text">{{ head[cell.key] || '' }}</span>
             </td>
           </template>
