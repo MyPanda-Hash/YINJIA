@@ -75,3 +75,7 @@ deploy/push/push-state.json
 deploy/push/config.json
 deploy/push/config.test.json
 temp-push-sandbox/
+
+# 会话导出包(AI 工具产物,勿入库)
+dsh-session-*/
+.zcodeignore
