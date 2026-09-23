@@ -161,20 +161,19 @@ public class KingdeePushService {
                 "SELECT * FROM " + lineTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
         if (lines.isEmpty()) throw new RuntimeException("单据无明细行，不可转ERP");
 
-        // ③ 行仓库编码:空的从 bs_wh 查
+        // ③ 行仓库编码:空的从 bs_wh 解析(2026-09-23:采购入库/销售出库的明细仓库由「参照选仓库」
+        //    录入,值可能只落在 仓库名称 或 仓库 上;两者都按「名称或编码」匹配 bs_wh)
         for (Map<String, Object> line : lines) {
             Object stockCode = line.get("仓库编码");
-            if (stockCode == null || String.valueOf(stockCode).isBlank()) {
-                Object stockName = line.get("仓库");
-                if (stockName == null || String.valueOf(stockName).isBlank()) stockName = line.get("仓库名称");
-                if (stockName != null && !String.valueOf(stockName).isBlank()) {
-                    try {
-                        String code = jdbc.queryForObject(
-                                "SELECT 仓库编码 FROM bs_wh WHERE 仓库名称 = ?", String.class, String.valueOf(stockName).trim());
-                        if (code != null) line.put("仓库编码", code);
-                    } catch (Exception ignored) {}
-                }
-            }
+            if (stockCode != null && !String.valueOf(stockCode).isBlank()) continue;
+            String raw = str(line.get("仓库名称"));
+            if (raw.isEmpty()) raw = str(line.get("仓库"));
+            if (raw.isEmpty()) continue;
+            try {
+                List<String> hit = jdbc.queryForList(
+                        "SELECT 仓库编码 FROM bs_wh WHERE 仓库名称 = ? OR 仓库编码 = ?", String.class, raw, raw);
+                if (!hit.isEmpty()) line.put("仓库编码", hit.get(0));
+            } catch (Exception ignored) {}
         }
 
         // ④ 构建金蝶 body(平铺;不传 bill_no → 金蝶自动生成编号,MES 编号放备注追溯)
@@ -240,9 +239,13 @@ public class KingdeePushService {
                     "第" + rowNo + "行计量单位[" + unit + "]在当前账套金蝶单位档案中无对应ID,无法转ERP"
                             + (unit.isEmpty() ? "(行上未填计量单位)" : ""));
             e.put("unit_id", unitId);
-            // 仓库编码:行级 > 头级 > 默认正品仓(金蝶要求非服务商品必须录入仓库)
+            // 仓库编码:行级 > 头级 > 默认正品仓(金蝶要求非服务商品必须录入仓库);
+            // 落到默认仓时打日志 —— 否则"单据没录仓库"会被静默推成 CK00001,账面上看不出来
             String stock = str(line.get("仓库编码")); if (stock.isEmpty()) stock = str(head.get("仓库编码"));
-            if (stock.isEmpty()) stock = "CK00001";
+            if (stock.isEmpty()) {
+                stock = "CK00001";
+                log.warn("单据[{}]第{}行无行级/头级仓库编码,已按默认正品仓 CK00001 推送,请核对单据仓库", docNo, rowNo);
+            }
             e.put("stock_number", stock);
             String batch = str(line.get("批号")); if (!batch.isEmpty()) e.put("batch_no", batch);
             // 来源单:行级 src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)

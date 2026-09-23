@@ -51,8 +51,11 @@ public class StockLedgerService {
         };
         List<Map<String, Object>> rows = loadRows(panelCode, no);
         // 弃审时无明细行或仓库缺失 → 跳过台账冲回(不阻断弃审;正常审核过的必有行和仓库)
+        // 2026-09-23:仓库三列(仓库/仓库名称/仓库编码)全为空才算"缺失"
         if (!forward && (rows.isEmpty() || rows.stream().allMatch(r ->
-                str(r.get("行仓库")) == null && str(r.get("头仓库")) == null))) {
+                str(r.get("行仓库")) == null && str(r.get("头仓库")) == null
+                        && str(r.get("行仓库名称")) == null && str(r.get("行仓库编码")) == null
+                        && str(r.get("头仓库编码")) == null))) {
             return;
         }
         if (rows.isEmpty()) throw new IllegalStateException(panelCode + " " + no + " 无明细行,不能记账");
@@ -66,14 +69,20 @@ public class StockLedgerService {
             boolean hasAlt = r.containsKey("lotAlt");           // 只有采购链的查询带 lotAlt 键
             String lotAlt = str(r.get("lotAlt"));
             double qty = num(r.get("qty"));
-            String whName = str(r.get("行仓库")) != null ? str(r.get("行仓库")) : str(r.get("头仓库"));
+            // 仓库(2026-09-23):**编码优先、名称兜底** —— 采购入库/销售出库的明细仓库由
+            // 「参照选仓库」写进 仓库名称+仓库编码 两列(界面必填的是 仓库名称),旧列 [仓库]
+            // 可能为空;只认 [仓库] 会抛「仓库档案不存在:[null]」导致审核不过
+            // (用户报的采购入库单 PI-2026-09-0128 即此:行上 仓库名称=华北工控仓、仓库编码=CK00006、仓库=NULL)
+            String whCode = firstNonBlank(str(r.get("行仓库编码")), str(r.get("头仓库编码")));
+            String whName = firstNonBlank(str(r.get("行仓库")), str(r.get("行仓库名称")), str(r.get("头仓库")));
             Double price = r.get("price") == null ? null : num(r.get("price"));
             if (code == null) throw new IllegalStateException("存在缺少[材料/存货编码]的明细行,不能记账");
             if (qty == 0) continue; // 零行跳过;负数=红字冲回,正常过账(applyIn 内含负库存守卫)
             // 弃审时该行仓库为空 → 跳过该行(审核时可能没填仓库就没过账)
-            if (!forward && whName == null) continue;
-            String ckdm = resolveCkdm(whName);
-            if (ckdm == null) throw new IllegalStateException("仓库档案不存在:[" + whName + "],请先在基础档案-仓库中建立");
+            if (!forward && whName == null && whCode == null) continue;
+            String ckdm = resolveWh(whCode, whName);
+            if (ckdm == null) throw new IllegalStateException(
+                    "仓库档案不存在:[" + (whName != null ? whName : whCode) + "],请先在基础档案-仓库中建立");
             if (inbound) {
                 int n = applyIn(code, ckdm, lot, qty, price, user, forward);
                 boolean altDiffers = lotAlt == null || lotAlt.isEmpty() || !lotAlt.equals(lot);
@@ -139,6 +148,10 @@ public class StockLedgerService {
     }
 
     private List<Map<String, Object>> loadRows(String panelCode, String no) {
+        // 仓库取值口径(2026-09-23):采购入库/销售出库的**明细仓库**由「参照选仓库」写入
+        // `仓库名称`+`仓库编码` 两列(界面必填的是 仓库名称),旧列 `仓库` 可能为空 ——
+        // 故这两张单的查询把三列一起取出,由 resolveWh 做「编码优先、名称兜底」解析;
+        // 其余行表没有这两列(已核实),保持原样。
         return switch (panelCode) {
             case "PURCHASE_IN" -> jdbc.queryForList(
                     // 批号口径(2026-09-22):**批次号优先、(供应商)批号兜底** —— 采购链按「只用批次号」
@@ -146,6 +159,7 @@ public class StockLedgerService {
                     // 先确认批次号(ButtonService.assignBatchNoOnInbound)再过账,台账 lot_no 才有值。
                     // lotAlt=备选批号(旧值):冲回时主批号没冲到按它兜底(历史单据按旧口径记的账)。
                     "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库],"
+                            + " l.[仓库名称] AS [行仓库名称], l.[仓库编码] AS [行仓库编码], h.[仓库编码] AS [头仓库编码],"
                             + " ISNULL(NULLIF(l.[批次号], N''), l.[批号]) AS lot, l.[批号] AS lotAlt,"
                             + " l.[实收数量] AS qty, l.[单价] AS price"
                             + " FROM bl_purchase_in l LEFT JOIN bd_purchase_in h ON h.[单据编号] = l.[单据编号]"
@@ -164,7 +178,9 @@ public class StockLedgerService {
                             + " FROM bl_outsource_in l LEFT JOIN bd_outsource_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "SALE_OUT" -> jdbc.queryForList(
-                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
+                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库],"
+                            + " l.[仓库名称] AS [行仓库名称], l.[仓库编码] AS [行仓库编码],"
+                            + " l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
                             + " FROM bl_sale_out l LEFT JOIN bd_sale_out h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "OTHER_OUT" -> jdbc.queryForList(
@@ -183,12 +199,32 @@ public class StockLedgerService {
         };
     }
 
+    /** 仓库解析(2026-09-23):**编码优先、名称兜底**。
+     *  为什么编码优先:编码是稳定标识(仓库改名不会断链),且采购入库/销售出库的明细仓库
+     *  由参照录入写的是 `仓库编码`+`仓库名称`;编码必须在 bs_wh 里存在(启用)才采用,
+     *  否则回退按名称解析。两者都取不到返回 null(调用方抛"仓库档案不存在")。 */
+    private String resolveWh(String whCode, String whName) {
+        if (whCode != null && !whCode.isBlank()) {
+            List<String> hit = jdbc.queryForList(
+                    "SELECT [仓库编码] FROM bs_wh WHERE [仓库编码] = ? AND ISNULL([状态], N'启用') = N'启用'",
+                    String.class, whCode.trim());
+            if (!hit.isEmpty()) return hit.get(0);
+        }
+        return resolveCkdm(whName);
+    }
+
     /** 仓库名称 → 编码(bs_wh)。 */
     private String resolveCkdm(String whName) {
         if (whName == null || whName.isBlank()) return null;
         List<String> codes = jdbc.queryForList(
                 "SELECT [仓库编码] FROM bs_wh WHERE [仓库名称] = ? AND ISNULL([状态], N'启用') = N'启用'", String.class, whName);
         return codes.isEmpty() ? null : codes.get(0);
+    }
+
+    /** 取第一个非空值(仓库三列兜底用) */
+    private static String firstNonBlank(String... vs) {
+        for (String v : vs) if (v != null && !v.isBlank()) return v;
+        return null;
     }
 
     private static String str(Object o) {
