@@ -5,7 +5,7 @@
 -- 方案:补列与其它单据头表对齐;存量行以创建时间(asp_time1)回登;保持可空——
 --       销售订单生成生产加工单(SO_ORDER→MANU_ORDER 生单链路)写头表时不带该列,
 --       若 NOT NULL 无默认值会挡生单。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 
 IF COL_LENGTH('dbo.bd_manu_order', N'单据日期') IS NULL

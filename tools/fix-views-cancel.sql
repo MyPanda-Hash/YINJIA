@@ -1,5 +1,5 @@
 -- 修复:报表视图补 asp_cancel 列(后端通用查询的软删过滤条件)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 DECLARE @name sysname, @def nvarchar(max), @newdef nvarchar(max), @fromPos int;
 DECLARE c CURSOR FOR SELECT v.name FROM sys.views v WHERE v.name LIKE 'v[_]%' ORDER BY v.name;

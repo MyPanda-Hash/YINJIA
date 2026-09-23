@@ -1,5 +1,5 @@
 -- 工序派工单 明细表/统计表(基于 bd_dispatch/bl_dispatch 生成)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 -- 明细视图:头行平铺(服务器口径:l 列与 bl_dispatch 中文列一一对应;产品名称在头表 h.* 中)

@@ -86,7 +86,13 @@ public class PanelConfigService {
         List<Map<String, Object>> buttonGroups = new ArrayList<>();
         buttonGroups.add(group("新增", List.of("新增")));
         buttonGroups.add(group("修改", List.of("修改")));
-        buttonGroups.add(group("保存", List.of("保存", "保存新增")));
+        // 保存组:「保存」= 落库并按面板语义流转(归档面板:管理员保存即归档 / 普通用户自动提交审批);
+        // 「保存为草稿」= 只落库不流转(markSaved=false,见 ButtonService)。
+        // 用户口径(2026-09-20):侧边栏要同时给「保存(草稿)」与「保存(提交)」两条路,
+        // 否则文书面板存一半就必须送审(DOC_ARCHIVE_PANELS 上「保存」会自动归档/送审)。
+        // 动作在组里的位置决定侧边栏主按钮与下拉:第一个 = 主按钮,其余进 ▼ 菜单
+        // ⇒ 主按钮保持「保存」(即提交),草稿落在下拉,不改变既有主路径的点击习惯。
+        buttonGroups.add(group("保存", List.of("保存", "保存新增", "保存为草稿")));
         buttonGroups.add(group("删除", List.of("删除", "删除单据")));
         buttonGroups.add(group("查找", List.of("查找", "刷新")));
         buttonGroups.add(group("打印", List.of("打印", "预览")));
@@ -265,7 +271,13 @@ public class PanelConfigService {
                 buttonGroups.add(group("选单", List.of("选单")));
                 disabledActions.add("选单");
             }
-            buttonGroups.add(group("保存", List.of("保存")));
+            // 保存组:「保存」= 落库并按面板语义流转(归档面板:管理员保存即归档 / 普通用户自动提交审批);
+            // 「保存为草稿」= 只落库不流转(markSaved=false,见 ButtonService)。
+            // 用户口径(2026-09-20):侧边栏要同时给「保存(草稿)」与「保存(提交)」两条路 ——
+            //   没这条动作时,文书面板存一半就必须送审(DOC_ARCHIVE_PANELS 上「保存」会自动归档/送审)。
+            // 位置:第一个动作 = 侧边栏主按钮,其余进 ▼ 下拉 ⇒ 主按钮仍是「保存」(即提交),
+            //   草稿落在下拉,不改变既有主路径的点击习惯(与 PANDA_BUTTONS 各单据的写法一致)。
+            buttonGroups.add(group("保存", List.of("保存", "保存为草稿")));
             buttonGroups.add(group("删除", List.of("删除")));
             buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
             buttonGroups.add(group("生单", List.of("生单")));
@@ -347,6 +359,12 @@ public class PanelConfigService {
         // 保存即归档文书面板(真源 ButtonService.DOC_ARCHIVE_PANELS):前端据此放出
         // 「申请修改/修改审批/修改记录」闭环按钮(2026-09-11 起从产品文件 7 面板放开到全部文书归档面板)
         metadata.put("docArchive", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code()));
+        // 产品变更申请单(2026-09-21):按账号部门的**行级编辑门禁**要下发给前端(界面把非本部门行置灰只读)。
+        // 真源 = yj_change_dept(纸面部门 ↔ 系统部门映射),与后端 ButtonService.gateChangeDetail 同一张表;
+        // 前端拿到的是"我能填哪几个部门行",管理员另行豁免(前端按登录用户 isAdmin 判)。
+        if ("RD_CHANGE".equals(def.code())) {
+            metadata.put("changeDepts", changeDeptsOfCurrentUser());
+        }
         metadata.put("panelState", Map.of(
                 "dataName", "单据状态",
                 "dataType", "STRING",
@@ -521,13 +539,37 @@ public class PanelConfigService {
             m.put("refPanel", f.refPanel());
             m.put("refField", refLabelOf(f.refPanel(), f.refField()));
             m.put("displayField", refLabelOf(f.refPanel(), f.displayField()));
-            // 立项申请参照:仅已归档单据可选——草稿/审批中项目的右上角编号尚未定稿,
-            // 被数据记录表引用会落空(或后续改号对不上),对齐「仅已归档可引用」口径。
-            if ("RD_APPROVAL".equals(f.refPanel())) m.put("filter", Map.of("单据状态", "已归档"));
+            // 参照过滤(数据驱动,存 yj_field.ref_filter;见 tools/migrate-ref-filter.sql):
+            //   原先硬编码 if ("RD_APPROVAL".equals(refPanel)) —— 新增参照(RD_PROD_INFO/RD_PROGRESS)
+            //   同样要"只列已归档"口径,继续堆 if 就是又一份清单,与新面板/新字段脱节。
+            //   ref_filter 为 NULL ⇒ 不下发 filter ⇒ 行为与改造前**逐字等价**(纯增量)。
+            Map<String, Object> refFilter = parseRefFilter(f.refFilter());
+            if (!refFilter.isEmpty()) m.put("filter", refFilter);
             List<Map<String, String>> refMap = buildRefMap(def, f);
             if (!refMap.isEmpty()) m.put("refMap", refMap);
         }
         return m;
+    }
+
+    /**
+     * 解析参照过滤条件文本 → Map。
+     * 格式:<b>k=v</b> 单条件,或 <b>k=v,k2=v2</b> 多条件(逗号分隔,值可含 =)。
+     * 空白/非法项直接跳过 —— 解析不出任何条件时返回空 Map(等价"不过滤"),
+     * 保证老数据(ref_filter 为 NULL)行为不变。
+     */
+    private Map<String, Object> parseRefFilter(String raw) {
+        if (raw == null || raw.isBlank()) return Map.of();
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (String part : raw.split(",")) {
+            String seg = part.trim();
+            if (seg.isEmpty()) continue;
+            int i = seg.indexOf('=');
+            if (i <= 0 || i == seg.length() - 1) continue;       // 缺键或缺值:跳过
+            String k = seg.substring(0, i).trim();
+            String v = seg.substring(i + 1).trim();
+            if (!k.isEmpty() && !v.isEmpty()) out.put(k, v);
+        }
+        return out;
     }
 
     /** 参照带回映射(对齐 light-mes ref.map 契约):
@@ -599,7 +641,11 @@ public class PanelConfigService {
             "供应商编码", List.of("供应商代码"),
             "供应商名称", List.of("供应商"),
             // 产品信息表 炭棒尺寸(整串) → 产品文件面板异名规格字段;三窄格 炭棒规格1/2/3 由前端拆分回填
-            "炭棒尺寸", List.of("炭棒规格", "滤芯尺寸")
+            "炭棒尺寸", List.of("炭棒规格", "滤芯尺寸"),
+            // 立项申请 项目等级(审核人定级) → 项目实施计划的 项目定级(异名同义):
+            // 计划按「文档编号」参照立项申请时自动把等级带过来 —— 等级因此成为后续立项/进度流程的属性
+            // (2026-09-21 用户口径:全链路一/二/三/四级)
+            "项目等级", List.of("项目定级")
     )));
 
     /** 委外三单共用按钮组骨架(选单来源各自不同,见下方三常量)。 */
@@ -1316,7 +1362,10 @@ public class PanelConfigService {
                 ref.put("panel", f.refPanel());
                 ref.put("field", refLabelOf(f.refPanel(), f.refField()));
                 ref.put("display", refLabelOf(f.refPanel(), f.displayField()));
-                ref.put("filter", null);
+                // 参照过滤:此前**硬编码 null** ⇒ 表单侧参照弹窗拿不到"只列已归档"限制,
+                // 与列表侧 fieldSpec 下发的不一致(同一字段两处口径不同)。改为同源解析。
+                Map<String, Object> refFilter = parseRefFilter(f.refFilter());
+                ref.put("filter", refFilter.isEmpty() ? null : refFilter);
                 ref.put("map", buildRefMap(def, f));
                 ref.put("multi", false);
                 ref.put("columns", null);
@@ -1373,6 +1422,29 @@ public class PanelConfigService {
             return compact.contains("\"singleDoc\":true");
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    /**
+     * 当前登录账号可填写的产品变更申请单**纸面部门行**(2026-09-21)。
+     * 口径与 ButtonService.gateChangeDetail 完全一致:yj_user.dept_id → yj_change_dept.dept_id → 纸面部门名;
+     * 取不到账号/未登记部门返回空表(前端则整表只读,只有管理员可代填)。
+     */
+    private List<String> changeDeptsOfCurrentUser() {
+        try {
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            String user = auth == null ? null : auth.getName();
+            if (user == null || user.isBlank()) return List.of();
+            // ⚠ 不能用 SELECT DISTINCT ... ORDER BY sort:SQL Server 要求 DISTINCT 的排序列出现在选择列表里,
+            //    否则整条语句报错(被本方法的 catch 吞成空表 → 界面整表只读,2026-09-21 实测踩到)。
+            //    与 ButtonService.changeDeptRows 同一写法:GROUP BY 部门, sort + ORDER BY MIN(sort)。
+            return jdbc.queryForList("SELECT c.部门 FROM yj_change_dept c JOIN yj_user u ON u.dept_id = c.dept_id"
+                    + " WHERE u.username = ? GROUP BY c.部门, c.sort ORDER BY MIN(c.sort)", String.class, user);
+        } catch (Exception e) {
+            // 表还没迁移/查询失败:返回空=界面整表只读(服务端仍有强制还原),但**要留日志**,别静默
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[RD_CHANGE] 读取当前账号可填部门失败,界面将整表只读: {}", e.getMessage());
+            return List.of();
         }
     }
 }

@@ -1,0 +1,8 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-pfcheck.sql ==
+  | 测试产品(PI/变更/四文件) | 0 | 
+  | 四文件(测试产品) | 0 | 
+  | 变更单(测试) | 0 | 
+  | 责任人行(测试) | 0 | 
+  | 部门探针账号 | 0 | 
+[OK] _q-pfcheck.sql (2 batches)

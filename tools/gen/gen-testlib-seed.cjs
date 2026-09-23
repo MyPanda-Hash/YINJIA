@@ -10,8 +10,10 @@
 const fs = require('node:fs')
 const path = require('node:path')
 
-const ROOT = path.resolve(__dirname, '..')
-const OUT = path.join(__dirname, 'migrate-testlib-seed.sql')
+// ⚠ 本脚本位于 tools/gen/,ROOT 要上溯两级才到仓库根;OUT 是迁移脚本,放回 tools/ 根层
+//   (曾有版本只上溯一级 ⇒ 去 tools/frontend/... 找文件而报 ENOENT,已修)
+const ROOT = path.resolve(__dirname, '..', '..')
+const OUT = path.resolve(__dirname, '..', 'migrate-testlib-seed.sql')
 
 /** 读 ESM 数据文件为对象:剥掉 import/export 后求值(纯数据常量;deps 提供被剥 import 的绑定) */
 function loadModule(file, names, deps = {}) {
@@ -65,7 +67,8 @@ function emit(lib, entries) {
 
 const sql = [
   '-- migrate-testlib-seed.sql — 检验项目标准库种子(生成物,由 tools/gen-testlib-seed.cjs 生成,勿手改)',
-  '-- 规格书(spec.test)=SPEC_TEST_LIB 26 组/48 子项;出货检验计划(insp.plan)=必测项 7 + 型式检验 6。',
+  `-- spec.test=${specLib.length} 组/${specEntries.length} 子项;insp.plan=必测项 7 + 型式检验 6。`,
+  '-- NOTE: 本脚本只新增(NOT EXISTS 幂等),不删除已有条目;整库替换请跑 tools/migrate-spec-testlib-replace.sql。',
   '-- 幂等:按 lib+item+JSON $.name 去重;用户已建同名条目不覆盖。条目正文=规范结构 v2。',
   '-- 运行(UTF-8 无 BOM): java -cp .m2-repo/.../mssql-jdbc-*.jar SqlRunner.java <url> yinjia <pw> migrate-testlib-seed.sql',
   'USE HSDZ_MES;',

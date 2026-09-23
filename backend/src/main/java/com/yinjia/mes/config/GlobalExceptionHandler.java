@@ -67,6 +67,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(409).body(ApiResult.error(409, e.getMessage()));
     }
 
+    /**
+     * 静态资源不存在 → **404**(2026-09-22 实测补):浏览器默认会请求 /favicon.ico,
+     * 而缺文件被兜底的 serverError() 当成 500 返回「服务异常：No static resource favicon.ico.」——
+     * 每次打开页面都在控制台留红线、还在服务端日志里刷 500。
+     */
+    @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+    public ResponseEntity<ApiResult<Object>> notFound(org.springframework.web.servlet.resource.NoResourceFoundException e) {
+        return ResponseEntity.status(404).body(ApiResult.error(404, "资源不存在：" + e.getResourcePath()));
+    }
+
+    /**
+     * 数据库连不上(账套库缺失/网络/口令错) → 给**能读懂的**提示(503),别暴露驱动原文。
+     * 实测触发场景:服务器上没有 HSDZ_MES_TEST,却从账套菜单切到"测试库"。
+     */
+    @ExceptionHandler(org.springframework.jdbc.CannotGetJdbcConnectionException.class)
+    public ResponseEntity<ApiResult<Object>> noDb(org.springframework.jdbc.CannotGetJdbcConnectionException e) {
+        return ResponseEntity.status(503).body(ApiResult.error(503,
+                "数据库连接失败：当前账套的数据库不可用。若显示的是「测试库」账套，说明本服务器没有部署该账套 —— "
+                        + "请改用正式账套登录，或让运维在服务端打开 yinjia.enable-test-ledger"));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResult<Object>> serverError(Exception e) {
         String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();

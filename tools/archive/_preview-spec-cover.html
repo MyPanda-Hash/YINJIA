@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<!--
+  _preview-spec-cover.html — 规格书封面静态样张(供截图目视核对,不依赖浏览器自动化)
+
+  ⚠ 这是**样张**不是实现,值取设计 xlsx 原样(C-95-33 / 伊可普高品质功能炭棒 …),只用于看版式。
+    真正的渲染源是 RecordSheetPanels.vue + recordSheetConfigs.js。
+  ⚠ 关键:与本实现**同一套做法** —— 两列由浏览器按内容定宽(auto + nowrap),
+    容器 width:max-content 居中,签字栏 width:100% 跟随 ⇒ 与字段表同宽。
+    (旧样张手写了 178/287 固定列宽,那正是"字段重叠"的根源,已废弃。)
+-->
+<meta charset="utf-8">
+<style>
+  body { margin: 0; background: #e9e9ea; padding: 24px; font-family: 'Microsoft YaHei', sans-serif; }
+  .cap { font-size: 12px; color: #555; margin-bottom: 6px; }
+  /* 纸张:设计画布 767×794(设计像素)按 1:1 展示 */
+  .paper { position: relative; width: 767px; height: 794px; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.18); overflow: hidden; }
+  /* ── 竖向 4 分区(首尾相接,互不重叠)──
+     ① 公司名 y25..58  ② 大标题 y58..106(高=106−58,由分区反推)  ③ 字段表 y106  ④ 签字栏 y605
+     ⚠ 曾把公司名与标题都放 top:25 ⇒ 同带水平相撞,标题压住公司名末尾(用户报过) */
+  .company { position: absolute; left: 44px; top: 25px; height: 33px; display: flex; align-items: center; font-size: 20.7px; line-height: 1; }
+  .title { position: absolute; left: 50%; transform: translateX(-50%); top: 58px; height: 48px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: SimSun, serif; font-size: 47.3px; letter-spacing: -1.33px; line-height: 1; }
+  /* 居中定位层:只管居中 */
+  .block { position: absolute; left: 50%; transform: translateX(-50%); top: 106px; }
+  /* 按内容定宽层:inline-block 由内容撑开;签字表 width:100% 跟随 ⇒ 两表同宽。
+     ⚠ 不要用 width:max-content —— 与子元素 width:100% 循环依赖,会把整块塌成空
+       (边框在、文字全部不渲染,已实测)。 */
+  .blockin { display: inline-block; }
+  table.fields { border-collapse: collapse; table-layout: auto; width: 100%; }
+  table.fields td { border: 1.4px solid #000; padding: 0 8px; vertical-align: middle; }
+  table.fields tr { height: 46px; }
+  td.lb { text-align: center; font-family: SimSun, serif; font-size: 27.3px; white-space: nowrap; }
+  td.vl { text-align: left; font-family: SimSun, serif; font-size: 27.3px; white-space: nowrap; min-width: 280px; }
+  /* 签字栏:width:100% 跟随容器 ⇒ 与字段表同宽 */
+  table.sign { width: 100%; margin-top: 85px; border-collapse: collapse; table-layout: fixed; }
+  table.sign th, table.sign td { border: 1.5px solid #000; }
+  table.sign th { height: 33px; font-family: SimSun, serif; font-size: 16px; font-weight: 400; }
+  table.sign td { height: 33px; font-family: SimSun, serif; font-size: 12px; text-align: center; word-break: break-all; }
+</style>
+<div class="cap">规格书封面 · 按《规格书细分.xlsx》「封面（产品信息）」重排（去右上角编号 · 整块居中 · 列宽由内容决定）</div>
+<div class="paper">
+  <div class="company">惠州市银嘉环保科技有限公司</div>
+  <div class="title">产品规格书</div>
+  <div class="block">
+    <div class="blockin">
+    <table class="fields">
+      <tr><td class="lb">编　号</td><td class="vl">C-95-33</td></tr>
+      <tr><td class="lb">产品类别</td><td class="vl">伊可普高品质功能炭棒</td></tr>
+      <tr><td class="lb">客户名称</td><td class="vl">青岛伊可普</td></tr>
+      <tr><td class="lb">客户料号</td><td class="vl">3-01-01-0014</td></tr>
+      <tr><td class="lb">客户项目名称</td><td class="vl">伊可普需求3</td></tr>
+      <tr><td class="lb">应用场景</td><td class="vl">抽水壶</td></tr>
+      <tr><td class="lb">整体规格参数</td><td class="vl">35*13*99</td></tr>
+      <tr><td class="lb">产品主要性能</td><td class="vl"></td></tr>
+      <tr><td class="lb">版　本</td><td class="vl">V20260624</td></tr>
+    </table>
+    <table class="sign">
+      <colgroup><col style="width:32.53%"><col style="width:34.14%"><col style="width:34.14%"></colgroup>
+      <tr><th>制订/日期</th><th>审核/日期</th><th>批准/日期</th></tr>
+      <tr><td></td><td></td><td></td></tr>
+    </table>
+    </div>
+  </div>
+</div>

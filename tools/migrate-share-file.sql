@@ -86,12 +86,17 @@ BEGIN
 END
 GO
 
--- ══════════ 5. 面板注册(mode=archive 不触发审批;head_table/group_col 供附件头列同步;菜单走专用路由不进面板引擎) ══════════
+-- ══════════ 5. 面板注册(mode=archive 不触发审批;line_table/head_table 供附件头列同步;菜单走专用路由不进面板引擎) ══════════
+-- ⚠ 2026-09-22 修:原写成 line_table=NULL + head_table='yj_share_file',而 yj_panel.line_table 是 **NOT NULL**
+--    ⇒ 这条 INSERT 必然失败,面板行一直缺失(而第 6/8 段的 yj_field / yj_role_panel 都插进去了 ⇒ 三张表状态不自洽)。
+--    archive 模式的既有口径是 line_table=数据表 / head_table=NULL(BOM、CUR、CUSGRP 皆然);本面板另需
+--    head_table 供 AttachmentService 同步附件头列,故**两者同指 yj_share_file** —— ButtonService 对
+--    `lineTable == headTable` 有显式短路(不重复分行),这是被支持的写法。
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='RD_SHARE_FILE')
   INSERT INTO yj_panel (panel_code, panel_name, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group, panel_name_en)
-  VALUES ('RD_SHARE_FILE', N'共享文件库', N'研发管理', 'archive', NULL, 'yj_share_file', N'文件编号', N'id', N'文件编号', NULL, N'上传时间', 20, 'items', N'研发管理', N'Shared Files');
+  VALUES ('RD_SHARE_FILE', N'共享文件库', N'研发管理', 'archive', 'yj_share_file', 'yj_share_file', N'文件编号', N'id', N'文件编号', NULL, N'上传时间', 20, 'items', N'研发管理', N'Shared Files');
 ELSE
-  UPDATE yj_panel SET panel_name=N'共享文件库', panel_name_en=N'Shared Files', head_table='yj_share_file', group_col=N'文件编号', module_group=N'研发管理' WHERE panel_code='RD_SHARE_FILE';
+  UPDATE yj_panel SET panel_name=N'共享文件库', panel_name_en=N'Shared Files', line_table='yj_share_file', head_table='yj_share_file', group_col=N'文件编号', module_group=N'研发管理' WHERE panel_code='RD_SHARE_FILE';
 GO
 
 -- ══════════ 6. 字段注册(仅 文件 附件列:附件服务头列同步的注册前提) ══════════

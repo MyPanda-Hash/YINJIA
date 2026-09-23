@@ -1,7 +1,7 @@
 -- 清理 yj_field 孤儿字段:面板声明的列在行表/头表(含视图)中已不存在时删除。
 -- 背景:报表视图经多轮重建(报表版↔单据版),字段注册只增不删,残留旧列导致
 --       后端按 yj_field 拼 SELECT 时报 207 Invalid column name。幂等,可反复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 DECLARE @p sysname, @lt sysname, @ht sysname, @n int = 0, @total int = 0;

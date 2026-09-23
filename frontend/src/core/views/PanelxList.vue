@@ -147,6 +147,13 @@
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
+        <!-- 产品文件列表:4 文件×状态矩阵(设计《文件汇总表》)。只读视图 ——
+             数据源与产品信息表侧栏「产品开发」按钮同一份(DevTaskService),不另存状态 -->
+        <ProdDocListSheet
+          v-else-if="panelCode === 'RD_PROD_DOCLIST'"
+          ref="approvalSheetRef"
+          :head="cur" :panel-code="panelCode"
+        />
         <DataRecordSheet
           v-else-if="panelCode === 'RD_FILTER_EFF'"
           ref="approvalSheetRef"
@@ -159,6 +166,7 @@
           v-else-if="isRecordSheetPanel"
           ref="approvalSheetRef"
           :head="cur" :fields="sheetAllFields" :editable="draftEditable" :panel-code="panelCode"
+          :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -282,6 +290,12 @@
                   </template>
                 </div>
               </div>
+              <!-- 四个受控文件:非该文件责任人只读时,把"责任人是谁"写在侧栏(否则用户只会觉得点不动) -->
+              <div v-if="devFileGate?.applicable && devFileGate.canEdit === false"
+                   style="font-size:12px;color:#e6a23c;line-height:1.7;padding:2px 0 6px;border-bottom:1px dashed #dcdfe6;margin-bottom:4px">
+                <div v-if="devFileGate.ownerName">{{ tt('本文件责任人') }}：{{ devFileGate.ownerName }}（{{ tt('只读') }}）</div>
+                <div v-else>{{ tt('尚未分发责任人') }}：{{ tt('请先在产品信息表点「分发责任人」') }}</div>
+              </div>
               <!-- 规格书两级分发:已分配单展示归属;非 责任人∪总负责人∪管理员 只读 -->
               <div v-if="panelCode === 'RD_SPEC_DOC' && specDocAssign?.hasAssign"
                    style="font-size:12px;color:#606266;line-height:1.7;padding:2px 0 6px;border-bottom:1px dashed #dcdfe6;margin-bottom:4px">
@@ -299,6 +313,26 @@
                 </template>
                 <div class="as-side-btn" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
               </template>
+              <!-- 产品变更申请单(RD_CHANGE,2026-09-21):会签子流程 + 审批(冯总=admin)。
+                   状态链 草稿 →(填写中)→ 会签中(可选)→ 审批中(admin)→ 已生效;驳回回草稿。
+                   显隐按"状态 × 身份":发起人(∪管理员)才提交/撤回,会签人(∪管理员)才签,
+                   审批权口径与其它面板一致(canApproveHere)。服务端每步都再校验一次身份。 -->
+              <template v-if="isChangePanel">
+                <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] === '是' && isChangeInitiator"
+                     class="as-side-btn" @click="onSideAction('提交会签')">{{ tt('提交会签') }}</div>
+                <template v-if="curDocStatus === '会签中'">
+                  <div v-if="iAmChangeSigner" class="as-side-btn" @click="onSideAction('会签通过')">{{ tt('会签通过') }}</div>
+                  <div v-if="iAmChangeSigner" class="as-side-btn" @click="onSideAction('会签驳回')">{{ tt('会签驳回') }}</div>
+                  <div v-if="isChangeInitiator" class="as-side-btn" @click="onSideAction('撤回会签')">{{ tt('撤回会签') }}</div>
+                </template>
+                <div v-if="['草稿', '修改中'].includes(curDocStatus) && cur['需会签'] !== '是' && isChangeInitiator"
+                     class="as-side-btn" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
+                <template v-if="IN_APPROVAL.includes(curDocStatus) && canApproveHere()">
+                  <div class="as-side-btn" @click="onSideAction('审批通过')">{{ tt('审批通过') }}</div>
+                  <div class="as-side-btn" @click="onSideAction('审批驳回')">{{ tt('审批驳回') }}</div>
+                </template>
+                <div class="as-side-btn" @click="onSideAction('审批情况')">{{ tt('审批情况') }}</div>
+              </template>
               <!-- 修改组:归档后申请修改(管理员审批进入修改态);修改态出「提交审批」,审批中出管理员审批;修改申请中出「撤回修改申请」;修改记录弹窗(滚动3条) -->
               <div class="as-side-del" v-if="isDocArchivePanel">
                 <div class="as-side-btn-row">
@@ -309,12 +343,14 @@
                 <!-- 修改申请中:同删除申请,卡死时由发起人本人或审批人撤回 -->
                 <div v-if="curDocStatus === '修改申请中'" class="as-side-btn" @click="pickModAction('撤回修改申请')">{{ tt('撤回修改申请') }}</div>
                 <div v-if="openModMenu" class="as-side-menu flip-up" @click.stop>
-                  <template v-if="canApproveHere()">
+                  <template v-if="canApproveHere() || l2ApproverNow">
                     <template v-if="curDocStatus === '修改申请中'">
                       <div class="as-side-menu-item" @click="pickModAction('修改审批通过')">{{ tt('修改审批通过') }}</div>
                       <div class="as-side-menu-item" @click="pickModAction('修改审批驳回')">{{ tt('修改审批驳回') }}</div>
                     </template>
-                    <template v-else-if="curDocStatus === '审批中'">
+                    <!-- 两级审批(2026-09-20):一级节点(审批中)由审批人处理;二级节点(待二级审批)
+                         由一级选定的二级审核人处理 —— 被选中即授权,不依赖角色 can_approve -->
+                    <template v-else-if="IN_APPROVAL.includes(curDocStatus) && (curDocStatus === '待二级审批' ? l2ApproverNow : canApproveHere())">
                       <div class="as-side-menu-item" @click="pickModAction('审批通过')">{{ tt('审批通过') }}</div>
                       <div class="as-side-menu-item" @click="pickModAction('审批驳回')">{{ tt('审批驳回') }}</div>
                     </template>
@@ -329,14 +365,26 @@
               <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
                    该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
               <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
-              <!-- 产品开发下发:仅产品信息表;归档后可点;下发过则置灰显示「已下发」 -->
+              <!-- 项目定级(2026-09-21):立项申请审核通过后,由审核人给项目定级;已定级显示当前等级,可再改 -->
+              <div
+                class="as-side-btn"
+                v-if="panelCode === 'RD_APPROVAL'"
+                :class="{ disabled: !canGradeProject }"
+                :title="canGradeProject ? tt('给该项目定级(一/二/三/四级)')
+                  : (['已审核', '已归档'].includes(curDocStatus) ? tt('仅审批人（或管理员）可项目定级') : tt('仅已审核或已归档的立项申请可项目定级'))"
+                @click="openGrade"
+              >{{ tt('项目定级') }}{{ cur && cur['项目等级'] ? '·' + cur['项目等级'] : '' }}</div>
+              <!-- 分发责任人(2026-09-20;原名「产品开发下发」):仅产品信息表;
+                   已归档 **且 二级审核人 ∪ 管理员** 才可点;已分发后按钮变「改责任人」(分发后随时可改) -->
               <div
                 class="as-side-btn"
                 v-if="panelCode === 'RD_PROD_INFO'"
-                :class="{ disabled: !canDevDispatch || devDispatch.dispatched }"
-                :title="devDispatch.dispatched ? tt('该产品已下发到下游面板') : (canDevDispatch ? tt('把该产品下发到下游 5 个文件面板') : tt('仅已归档的产品信息表可下发'))"
+                :class="{ disabled: !canDevDispatch || devDispatch.busy }"
+                :title="devDispatch.dispatched ? tt('重新分发/调整四个文件的责任人')
+                  : (canDevDispatch ? tt('把四个下游文件各自分给责任人')
+                    : (curDocStatus === '已归档' ? tt('仅二级审核人或管理员可分发责任人') : tt('仅已归档的产品信息表可分发责任人')))"
                 @click="onDevDispatch"
-              >{{ devDispatch.dispatched ? tt('已下发') : tt('产品开发') }}</div>
+              >{{ devDispatch.dispatched ? tt('改责任人') : tt('分发责任人') }}</div>
               <!-- 规格书两级分发(第二级):已下发产品出现;仅总负责人/管理员可用,负责人未落实(挂起)时置灰 -->
               <div
                 class="as-side-btn"
@@ -1353,6 +1401,67 @@
         <el-button type="primary" :loading="specAssignBusy" @click="submitSpecAssign">{{ tt('分发') }}</el-button>
       </template>
     </el-dialog>
+    <!-- 分发责任人弹窗(2026-09-20):四个下游文件各选一个责任人(默认为产品负责人,可逐个改)。
+         二级审核人把开发任务落到人头上以后,四个文件才对该责任人开放编辑 —— 四文件并行,无串行依赖。 -->
+    <el-dialog v-model="devAssignVisible" :title="tt('分发责任人') + (devDispatch.productCode ? ' · ' + devDispatch.productCode : '')" width="620px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('为四个下游文件各指定一个责任人；分发后这四个文件同时对该责任人开放编辑（互不依赖）。') }}</div>
+        <div v-for="row in devAssignRows" :key="row.panel" class="dq-row" style="align-items:center">
+          <span class="dq-label" style="width:130px">{{ tt(row.label) }}</span>
+          <el-select v-model="row.owner" style="flex:1" filterable clearable :placeholder="tt('请选择责任人（留空=挂起）')">
+            <el-option v-for="u in devAssignUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+          </el-select>
+        </div>
+        <div class="mod-log-meta">{{ tt('二级审核人') }}：{{ devDispatch.l2Approver || tt('（未选，历史单由有编辑权的人分发）') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="devAssignVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="devAssignBusy" @click="confirmDevAssign">{{ tt('分发') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 一级通过时选取二级审核人(2026-09-20 两级审批):被选人收到消息并完成二级签核 -->
+    <el-dialog v-model="l2PickVisible" :title="tt('选取二级审核人')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('一级审批通过后，由该审核人完成二级签核；二级通过即归档，随后由其分发责任人。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('二级审核人') }}</span>
+          <el-select v-model="l2PickUser" style="flex:1" filterable :placeholder="tt('请选择二级审核人')">
+            <el-option v-for="u in l2PickUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+          </el-select>
+        </div>
+        <div class="dq-row" style="align-items:flex-start">
+          <span class="dq-label">{{ tt('审批意见') }}</span>
+          <el-input v-model="l2PickOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="l2PickVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="l2PickBusy" @click="confirmL2Pick">{{ tt('确认审批通过') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 项目定级弹窗(2026-09-21):立项申请审核通过后由审核人选等级;一/二/三/四级 -->
+    <el-dialog v-model="gradeVisible" :title="tt('项目定级')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('等级作为后续立项（实施计划）与进度流程的属性，会随「文档编号」参照自动带到下游。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('项目等级') }}</span>
+          <el-radio-group v-model="gradeLevel">
+            <el-radio-button v-for="lv in gradeOptions" :key="lv" :value="lv">{{ tt(lv) }}</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div class="dq-row" style="align-items:flex-start">
+          <span class="dq-label">{{ tt('定级说明') }}</span>
+          <el-input v-model="gradeOpinion" type="textarea" :rows="3" :placeholder="tt('定级说明（选填）')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="gradeVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="gradeBusy" @click="confirmGrade">{{ tt('确定定级') }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 查询单据弹窗(文件面板):编号模糊(单据编号/文档编号) + 首次归档时间区间 -->
     <el-dialog v-model="docQueryVisible" :title="tt('查询单据')" width="480px" append-to-body>
       <div class="dq-form">
@@ -1553,6 +1662,7 @@ import FileAttachCell from './FileAttachCell.vue'
 import ProgressControlSheet from './ProgressControlSheet.vue'
 import QcCatalogSheet from './QcCatalogSheet.vue'
 import QcInspRecSheet from './QcInspRecSheet.vue'
+import ProdDocListSheet from './ProdDocListSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
@@ -1588,10 +1698,23 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
-const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
+const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 // 来料检验要求(品质资料 7 表):档案式特例面板——工具栏/单据卡片/明细表格/页脚全隐,QcInspReqSheet 整体接管
 const isQcInspReq = computed(() => String(panelCode.value) === 'QC_INSP_REQ')
+/** 产品变更申请单:当前账号可填的纸面部门行(后端按 yj_user.dept_id → yj_change_dept 算,metadata 下发)。
+ *  仅 RD_CHANGE 有该键;其它面板拿到空数组也无害(没有 lockKey 的表根本不看它)。 */
+const changeDeptRows = computed(() => cfgCache.value?.metadata?.changeDepts || [])
+
+// ── 产品变更申请单:会签按钮组的身份判据(2026-09-21)──
+// 会签人 = 头字段「会签人」里的账号(顿号/逗号分隔);发起人 = 纸面「申请人」= 当前用户姓名。
+// 两者只决定**按钮显不显示**:服务端 ButtonService.requireSigner / requireChangeInitiator 才是门禁。
+const isChangePanel = computed(() => String(panelCode.value) === 'RD_CHANGE')
+const changeSigners = computed(() => String(cur.value?.['会签人'] ?? '')
+  .split(/[,，、;；\s]+/).map((s) => s.trim()).filter(Boolean))
+const iAmChangeSigner = computed(() => changeSigners.value.includes(String(user.account || user.userName || '')))
+const isChangeInitiator = computed(() => user.isAdmin === true
+  || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
 const docSheetConfig = computed(() => qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
 const bomMasterRows = computed(() => {
   if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
@@ -2442,29 +2565,41 @@ const specAssignBlocked = computed(() => !!(specDocAssign.value?.hasAssign)
   && user.account !== specDocAssign.value?.owner
   && user.account !== specDocAssign.value?.supervisor)
 const canModifyReq = computed(() => ['已归档', '已审核'].includes(curDocStatus.value) && !specAssignBlocked.value)
+
+// ── 四个受控文件的编辑门禁 → 前端置灰(2026-09-21 全流程走查补)──
+// 服务端 ensureDevFileEditable 早就拦住了非责任人,但界面不置灰:用户能改、能点保存,点完才被拒。
+// 现在判定经 /px/rdDev/fileEdit 下发(与保存门禁同一真源),非责任人打开就只读 + 看得到责任人是谁。
+const DEV_FILE_PANELS = ['RD_MOLD_PROC', 'RD_ASM_PROC', 'RD_SPEC_DOC', 'RD_INSP_PLAN']
+const devFileGate = ref(null)
+/** 门禁不适用(非四文件面板/历史单/管理员)时为 false */
+const devFileBlocked = computed(() => !!(devFileGate.value?.applicable && devFileGate.value?.canEdit === false))
+async function loadDevFileGate() {
+  if (!DEV_FILE_PANELS.includes(String(panelCode.value))) { devFileGate.value = null; return }
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) { devFileGate.value = null; return }
+  try {
+    devFileGate.value = await engine.rdDevFileEdit(panelCode.value, no)
+  } catch {
+    // 取不到判定 ⇒ 不锁(宁可不置灰,也别把责任人自己锁在外面;保存时服务端仍会兜底)
+    devFileGate.value = null
+  }
+}
 const modifyLogVisible = ref(false)
 const modifyLogRecords = ref([])
 const modifyLogNo = ref('')
 
-// ── 产品开发下发(2026-09-09):仅产品信息表;归档后可用;按产品编号下发过则置灰「已下发」 ──
-const devDispatch = reactive({ productCode: '', dispatched: false, busy: false, supervisor: '', supervisorName: '', supervisorResolved: false })
-const canDevDispatch = computed(() => panelCode.value === 'RD_PROD_INFO' && curDocStatus.value === '已归档')
+// ── 分发责任人(2026-09-20;原名「产品开发下发」2026-09-09)──
+// 口径:已归档 + (二级审核人 ∪ 管理员)可分发;四个下游文件**各自**一个责任人,分发后随时可改。
+const devDispatch = reactive({ productCode: '', dispatched: false, busy: false, supervisor: '', supervisorName: '', supervisorResolved: false, canAssign: false, l2Approver: '', isL2: false, assigns: {} })
+const canDevDispatch = computed(() => panelCode.value === 'RD_PROD_INFO' && curDocStatus.value === '已归档' && devDispatch.canAssign)
 async function loadDevDispatchState() {
   if (panelCode.value !== 'RD_PROD_INFO') {
-    devDispatch.productCode = ''
-    devDispatch.dispatched = false
-    devDispatch.supervisor = ''
-    devDispatch.supervisorName = ''
-    devDispatch.supervisorResolved = false
+    Object.assign(devDispatch, { productCode: '', dispatched: false, supervisor: '', supervisorName: '', supervisorResolved: false, canAssign: false, l2Approver: '', assigns: {} })
     return
   }
   const no = cur.value?.['单据编号'] || ''
   if (!no) {
-    devDispatch.productCode = ''
-    devDispatch.dispatched = false
-    devDispatch.supervisor = ''
-    devDispatch.supervisorName = ''
-    devDispatch.supervisorResolved = false
+    Object.assign(devDispatch, { productCode: '', dispatched: false, supervisor: '', supervisorName: '', supervisorResolved: false, canAssign: false, l2Approver: '', assigns: {} })
     return
   }
   try {
@@ -2475,22 +2610,72 @@ async function loadDevDispatchState() {
     devDispatch.supervisor = res?.supervisor || ''
     devDispatch.supervisorName = res?.supervisorName || ''
     devDispatch.supervisorResolved = !!res?.supervisorResolved
+    devDispatch.canAssign = !!res?.canAssign
+    devDispatch.l2Approver = res?.l2Approver || ''
+    devDispatch.isL2 = !!res?.isL2Approver
+    devDispatch.assigns = res?.assigns || {}
   } catch (e) {
-    devDispatch.productCode = ''
-    devDispatch.dispatched = false
-    devDispatch.supervisor = ''
-    devDispatch.supervisorName = ''
-    devDispatch.supervisorResolved = false
+    Object.assign(devDispatch, { productCode: '', dispatched: false, supervisor: '', supervisorName: '', supervisorResolved: false, canAssign: false, l2Approver: '', assigns: {} })
   }
 }
 async function onDevDispatch() {
-  if (!canDevDispatch.value || devDispatch.dispatched || devDispatch.busy) return
-  devDispatch.busy = true
+  if (!canDevDispatch.value || devDispatch.busy) return
+  await openDevAssign()
+}
+
+/** 本单据一级选定的二级审核人 = 当前登录人(二级节点才由他审批;被选中即授权) */
+const l2ApproverNow = computed(() => panelCode.value === 'RD_PROD_INFO' && !!devDispatch.isL2)
+
+// ── 分发责任人弹窗(2026-09-20):四个下游文件各选一个责任人 ──
+const devAssignVisible = ref(false)
+const devAssignBusy = ref(false)
+const devAssignUsers = ref([])
+const DEV_PANELS = [
+  { code: 'RD_MOLD_PROC', label: '成型工艺清单' },
+  { code: 'RD_ASM_PROC', label: '组装工艺清单' },
+  { code: 'RD_SPEC_DOC', label: '规格书' },
+  { code: 'RD_INSP_PLAN', label: '出货检验计划表' },
+]
+const devAssignRows = ref(DEV_PANELS.map((p) => ({ panel: p.code, label: p.label, owner: '' })))
+const devAssignDocNo = ref('')
+async function openDevAssign() {
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) return ElMessage.warning('请先保存单据')
+  devAssignBusy.value = true
   try {
-    await onButton('产品开发')
-    await loadDevDispatchState()
+    if (!devAssignUsers.value.length) devAssignUsers.value = (await engine.rdDevUsers()) || []
+    const st = await engine.rdDevAssignState(no)
+    const assigns = st?.assigns || {}
+    // 默认带出产品负责人(后端 buttonState.supervisor),四个文件各自可改
+    const fallback = devDispatch.supervisor || ''
+    devAssignRows.value = DEV_PANELS.map((p) => ({ panel: p.code, label: p.label, owner: assigns[p.code] || fallback }))
+    devAssignDocNo.value = no
+    devAssignVisible.value = true
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '读取分发状态失败')
   } finally {
-    devDispatch.busy = false
+    devAssignBusy.value = false
+  }
+}
+async function confirmDevAssign() {
+  if (devAssignBusy.value) return
+  devAssignBusy.value = true
+  try {
+    const 分发责任人 = {}
+    for (const r of devAssignRows.value) if (r.owner) 分发责任人[r.panel] = r.owner
+    const res = await engine.callButton({
+      panelCode: 'RD_PROD_INFO', buttonName: '分发责任人',
+      formData: { 编号: devAssignDocNo.value, 分发责任人 }, buttonParam: {},
+    })
+    const n = Object.keys(res?.assigns || {}).length
+    ElMessage.success(`已分发 ${n} 个文件的责任人`)
+    devAssignVisible.value = false
+    await loadDevDispatchState()
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '分发失败')
+  } finally {
+    devAssignBusy.value = false
   }
 }
 
@@ -2628,6 +2813,8 @@ const draftEditable = computed(() => {
   if (reportMode.value || ['BOM_FWD', 'BOM_REV'].includes(String(panelCode.value))) return false
   // 规格书已分配:非 责任人∪总负责人∪管理员 只读(服务端三个入口同口径强制,这里提前置灰)
   if (specAssignBlocked.value) return false
+  // 四个受控文件:非该文件责任人只读(判定来自服务端,与保存门禁同一真源)
+  if (devFileBlocked.value) return false
   const st = cur.value?.['单据状态']
   if (st === '草稿') return true
   // 修改态(文件类:申请修改经管理员审批通过):可编辑,保存不再自动归档,走再审批
@@ -2771,7 +2958,7 @@ const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, 
 
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
-watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign() }, { immediate: true })
+watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate() }, { immediate: true })
 
 // 文书默认值:文书面板的「新增」= directAdd 建一张空白草稿(库端 saved='N'),此时 draftEditable 为真,
 // 本 watch 生效。锁定字段(申请立项人/负责人)只在「本次新增且尚未保存过」时带出——用 isFreshAddedDoc()
@@ -3601,6 +3788,52 @@ const APPROVE_ACTIONS = ['审批通过', '审批驳回']
 // 直接「审核」仅管理员（2026-09-22）：审批下拉最下的直审按钮收权——
 // 有审批权的角色走 提交审批→审批通过（同效已审核），不再保留直审入口；后端 audit() 同口径拒绝
 const ADMIN_ONLY_ACTIONS = ['审核']
+
+/** 处于审批流程中的状态(2026-09-20 两级审批:一级「审批中」/二级「待二级审批」) */
+const IN_APPROVAL = ['审批中', '待二级审批']
+
+// ---------- 二级审核人选取(2026-09-20 两级审批:一级通过时必须选人) ----------
+const l2PickVisible = ref(false)
+const l2PickBusy = ref(false)
+const l2PickUser = ref('')
+const l2PickOpinion = ref('')
+const l2PickUsers = ref([])
+const l2PickDocNo = ref('')
+/** 一级审批通过入口:产品信息表的一级节点必须先选二级审核人,其余面板/二级节点走原确认框 */
+async function openL2Pick(no) {
+  l2PickDocNo.value = no
+  l2PickUser.value = ''
+  l2PickOpinion.value = ''
+  if (!l2PickUsers.value.length) {
+    try {
+      l2PickUsers.value = (await engine.rdDevUsers()) || []
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || '读取账号列表失败')
+      return
+    }
+  }
+  l2PickVisible.value = true
+}
+async function confirmL2Pick() {
+  if (!l2PickUser.value) return ElMessage.warning(tt('请选取二级审核人'))
+  if (l2PickBusy.value) return
+  l2PickBusy.value = true
+  try {
+    await engine.callButton({
+      panelCode: 'RD_PROD_INFO', buttonName: '审批通过',
+      formData: { 编号: l2PickDocNo.value, 二级审批人: l2PickUser.value, ...(l2PickOpinion.value ? { 审批意见: l2PickOpinion.value } : {}) },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('已转交二级审核人'))
+    l2PickVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '审批失败')
+  } finally {
+    l2PickBusy.value = false
+  }
+}
+
 function filterGroups(raw) {
   const canApprove = user.isAdmin || user.approvePanels.includes(panelCode.value)
   return (raw || [])
@@ -3610,6 +3843,49 @@ function filterGroups(raw) {
       return { ...g, actions }
     })
     .filter((g) => (g.actions || []).length > 0)
+}
+
+// ---------- 项目定级(2026-09-21):立项申请表审核通过后,由审核人给项目定级 ----------
+// 等级(一/二/三/四级)是后续立项(实施计划)与进度流程的属性:计划按「文档编号」参照本单时
+// 由 REF_SYNONYMS(项目等级 → 项目定级)自动带回;进度查询再从计划同步。
+const GRADE_PANEL = 'RD_APPROVAL'
+const canGradeProject = computed(() => panelCode.value === GRADE_PANEL
+  && ['已审核', '已归档'].includes(curDocStatus.value)
+  && (user.isAdmin || user.approvePanels.includes(GRADE_PANEL)))
+const gradeVisible = ref(false)
+const gradeBusy = ref(false)
+const gradeLevel = ref('')
+const gradeOpinion = ref('')
+/** 等级候选:取本面板「项目等级」字段的字典(一/二/三/四级,与下游同字典) */
+const gradeOptions = computed(() => {
+  const f = (cfgCache.value?.dataSchema?.fields || []).find((x) => (x.dataName || x.code) === '项目等级')
+  return (f?.options || []).map((o) => (typeof o === 'string' ? o : (o.value ?? o.label)))
+})
+function openGrade() {
+  if (!canGradeProject.value) return
+  gradeLevel.value = String(cur.value?.['项目等级'] || '')
+  gradeOpinion.value = ''
+  gradeVisible.value = true
+}
+async function confirmGrade() {
+  if (!gradeLevel.value) return ElMessage.warning(tt('请选择项目等级'))
+  if (gradeBusy.value) return
+  gradeBusy.value = true
+  try {
+    const no = cur.value?.['编号'] || cur.value?.['单据编号'] || ''
+    await engine.callButton({
+      panelCode: GRADE_PANEL, buttonName: '项目定级',
+      formData: { 编号: no, 项目等级: gradeLevel.value, ...(gradeOpinion.value ? { 审批意见: gradeOpinion.value } : {}) },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('项目已定级：') + gradeLevel.value)
+    gradeVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('项目定级失败'))
+  } finally {
+    gradeBusy.value = false
+  }
 }
 
 // ---------- 工具栏分组（配置 {name, actions}：主按钮=第一个 action，actions>1 显示 ▼ 下拉） ----------
@@ -3951,7 +4227,7 @@ async function toggleTpl(row) {
 }
 async function removeTpl(row) {
   try {
-    await ElMessageBox.confirm(`确认删除模板「${row.name}」？删除后不可恢复。`, tt('删除确认'), { type: 'warning' })
+    await ElMessageBox.confirm(tt('确认删除模板「{name}」？删除后不可恢复。').replace('{name}', row.name), tt('删除确认'), { type: 'warning' })
   } catch { return }
   try {
     await request.delete(`/report/templates/${row.id}`)
@@ -4404,7 +4680,11 @@ function validateInlineDraft() {
 
 async function saveInlineDraft(buttonName = '保存', { silent = false, skipValidation = false } = {}) {
   if (!draftEditable.value || inlineSaving.value) return false
-  const validation = validateInlineDraft()
+  // ⚠ skipValidation 必须在这里真正生效(2026-09-20 修):
+  //   参数早就声明了、调用方也传了(「保存为草稿」传 true),但函数体里**从来没读过它** ——
+  //   于是草稿路径照样跑全量必填校验 ⇒ "保存为草稿"做不到"存一半"。
+  //   用户口径:保存为草稿不做必填限制;保存/提交才做。
+  const validation = skipValidation ? '' : validateInlineDraft()
   if (validation) {
     ElMessage.warning(validation)
     // 文书面板(RecordSheetPanels/DocSheet/DataRecordSheet):自动定位缺失字段(翻页/滚动/闪烁);仅必填触发
@@ -4867,9 +5147,9 @@ function isDisabled(action) {
     修改: !current.value || !['已审核', '生产中', '已完工'].includes(st),
     审批情况: false,
     提交审批: !current.value || (st !== '草稿' && st !== '修改中'),
-    审批通过: !current.value || st !== '审批中',
-    审批驳回: !current.value || st !== '审批中',
-   驳回审批: !current.value || st !== '审批中',
+    审批通过: !current.value || !IN_APPROVAL.includes(st),
+    审批驳回: !current.value || !IN_APPROVAL.includes(st),
+   驳回审批: !current.value || !IN_APPROVAL.includes(st),
     // 卡死单据出口(2026-09-11):撤回删除/修改申请仅在对应申请态可点
     撤回删除申请: !current.value || st !== '删除申请中',
     撤回修改申请: !current.value || st !== '修改申请中',
@@ -5316,7 +5596,7 @@ async function onButton(action) {
   }
   // 复制(列表页):整单复制为一张新草稿(表头+明细,去掉编号/状态/行 id)
   if (action === '复制') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     if (cfgCache.value?.metadata?.singleDoc) return ElMessage.info('档案面板不支持整单复制')
     const srcNo = current.value['编号'] || current.value['单据编号']
     try {
@@ -5382,7 +5662,7 @@ async function onButton(action) {
     return
   }
   if (action === '修改') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     openForm(current.value)
     return
   }
@@ -5452,10 +5732,10 @@ async function onButton(action) {
     return
   }
   if (action === '删除单据') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     const no = current.value['编号'] || current.value['单据编号'] || ''
     try {
-      await ElMessageBox.confirm('确认删除整张单据 ' + no + '？该操作不可恢复。', '删除单据确认', { type: 'warning' })
+      await ElMessageBox.confirm(tt('确认删除整张单据 {no}？该操作不可恢复。').replace('{no}', no), tt('删除单据确认'), { type: 'warning' })
     } catch (e) {
       return
     }
@@ -5471,15 +5751,15 @@ async function onButton(action) {
     return
   }
   if (action === '删除') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     if (!delMode.value) {
       delMode.value = true
       ElMessage.info('已进入删除模式：勾选要删除的行，再点「删除」确认；点「刷新」或翻页取消')
       return
     }
-    if (!delSel.value.length) return ElMessage.warning('请先勾选要删除的行')
+    if (!delSel.value.length) return ElMessage.warning(tt('请先勾选要删除的行'))
     try {
-      await ElMessageBox.confirm('确认删除勾选的 ' + delSel.value.length + ' 行明细？', '删除确认', { type: 'warning' })
+      await ElMessageBox.confirm(tt('确认删除勾选的 {n} 行明细？').replace('{n}', delSel.value.length), tt('删除确认'), { type: 'warning' })
     } catch (e) {
       return
     }
@@ -5513,18 +5793,18 @@ async function onButton(action) {
     return
   }
   if (['中止执行', '整单中止', '草稿', '取消中止', '提交审批', '审批通过', '驳回审批'].includes(action)) {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
   }
   // 人工审核：确认弹窗 + 审核意见（选填）；审核人取当前登录人（后端从 JWT 取）
   let auditOpinion = ''
   if (action === '审核') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
     // 已审核过的单据不允许再次审核，也不允许补填审批意见
     if (current.value['单据状态'] !== '草稿') return ElMessage.warning('仅草稿状态可审核，已审核单据不允许再次审核')
     const no = current.value['编号'] || current.value['单据编号'] || ''
     try {
       const { value } = await ElMessageBox.prompt(
-        '单据：' + no + '（当前状态：' + (current.value['单据状态'] || '') + '）',
+        tt('单据：{no}（当前状态：{st}）').replace('{no}', no).replace('{st}', current.value['单据状态'] || ''),
         '人工审核确认',
         { confirmButtonText: '确认审核', cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: '审核意见（选填）' }
       )
@@ -5533,10 +5813,10 @@ async function onButton(action) {
       return
     }
   } else if (action === '弃审') {
-    if (!current.value) return ElMessage.warning('请先选择一行数据')
-    if (current.value['单据状态'] !== '已审核') return ElMessage.warning('仅已审核状态可弃审')
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+    if (current.value['单据状态'] !== '已审核') return ElMessage.warning(tt('仅已审核状态可弃审'))
     try {
-      await ElMessageBox.confirm('确认弃审该单据？弃审后需重新审核。', '弃审确认', { type: 'warning' })
+      await ElMessageBox.confirm(tt('确认弃审该单据？弃审后需重新审核。'), tt('弃审确认'), { type: 'warning' })
     } catch (e) {
       return
     }
@@ -5545,17 +5825,25 @@ async function onButton(action) {
     // 审批流：提交审批/审批通过（确认+意见）、审批驳回（意见必填）、审批情况（历史弹窗）
     let approvalOpinion = ''
     if (action === '提交审批' || action === '审批通过') {
-      if (!current.value) return ElMessage.warning('请先选择一行数据')
-      // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过仅审批中
+      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+      // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过:审批中(一级)/待二级审批(二级)
       if (action === '提交审批') {
         if (!['草稿', '修改中'].includes(current.value['单据状态'])) return ElMessage.warning('仅草稿或修改中状态可提交审批')
-      } else if (current.value['单据状态'] !== '审批中') {
-        return ElMessage.warning('仅审批中状态可审批通过')
+      } else if (!IN_APPROVAL.includes(current.value['单据状态'])) {
+        return ElMessage.warning('仅审批中或待二级审批状态可审批通过')
+      }
+      // 产品信息表一级节点(状态=审批中):走「选取二级审核人」弹窗(二级签核人由一级指定)
+      if (action === '审批通过' && panelCode.value === 'RD_PROD_INFO' && current.value['单据状态'] === '审批中') {
+        if (draftEditable.value) {
+          const saved = await saveInlineDraft('保存', { silent: true })
+          if (!saved) return
+        }
+        return openL2Pick(current.value['编号'] || current.value['单据编号'] || '')
       }
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
         const { value } = await ElMessageBox.prompt(
-          '单据：' + no + '（当前状态：' + (current.value['单据状态'] || '') + '）',
+          tt('单据：{no}（当前状态：{st}）').replace('{no}', no).replace('{st}', current.value['单据状态'] || ''),
           action + '确认',
           { confirmButtonText: '确认' + action, cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: action === '审批通过' ? '审批意见（选填）' : '提交说明（选填）' }
         )
@@ -5564,28 +5852,53 @@ async function onButton(action) {
         return
       }
     } else if (action === '审批驳回') {
-      if (!current.value) return ElMessage.warning('请先选择一行数据')
-      if (current.value['单据状态'] !== '审批中') return ElMessage.warning('仅审批中状态可审批驳回')
+      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+      if (!IN_APPROVAL.includes(current.value['单据状态'])) return ElMessage.warning(tt('仅审批中或待二级审批状态可审批驳回'))
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {
         const { value } = await ElMessageBox.prompt(
-          '单据：' + no + '（当前状态：审批中）\n驳回必须填写审批意见',
-          '审批驳回确认',
-          { confirmButtonText: '确认驳回', cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: '驳回原因（必填）', inputValidator: (v) => (v && v.trim() ? true : '驳回必须填写审批意见') }
+          tt('单据：{no}（当前状态：审批中）\n驳回必须填写审批意见').replace('{no}', no),
+          tt('审批驳回确认'),
+          { confirmButtonText: tt('确认驳回'), cancelButtonText: tt('取消'), inputType: 'textarea', inputPlaceholder: tt('驳回原因（必填）'), inputValidator: (v) => (v && v.trim() ? true : tt('驳回必须填写审批意见')) }
         )
         approvalOpinion = value || ''
       } catch (e) {
         return
       }
     } else if (action === '审批情况') {
-      if (!current.value) return ElMessage.warning('请先选择一行数据')
+      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
       approvalNo.value = current.value['编号'] || current.value['单据编号'] || ''
       approvalVisible.value = true
       return
+    } else if (['提交会签', '会签通过', '会签驳回', '撤回会签'].includes(action)) {
+      // 产品变更申请单会签组(2026-09-21):驳回必须填意见;其余给一次确认(会签=对别人负责的动作)
+      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+      const no2 = current.value['编号'] || current.value['单据编号'] || ''
+      try {
+        if (action === '会签驳回') {
+          const { value } = await ElMessageBox.prompt(
+            tt('单据：{no}（当前状态：会签中）\n驳回必须填写意见').replace('{no}', no2),
+            tt('会签驳回确认'),
+            { confirmButtonText: '确认驳回', cancelButtonText: '取消', inputType: 'textarea',
+              inputPlaceholder: tt('驳回意见（必填）'), inputValidator: (v) => (v && v.trim() ? true : tt('会签驳回必须填写意见')) }
+          )
+          approvalOpinion = value || ''
+        } else {
+          await ElMessageBox.confirm(
+            tt('单据：{no}（当前状态：{st}）').replace('{no}', no2).replace('{st}', current.value['单据状态'] || ''),
+            action + '确认',
+            { confirmButtonText: '确认' + action, cancelButtonText: '取消', type: 'warning' }
+          )
+          if (action === '会签通过') approvalOpinion = ''
+        }
+      } catch (e) {
+        return
+      }
     }
     const actionDocumentNo = current.value?.['编号'] || current.value?.['单据编号'] || ''
     // 列表页草稿是前端内联编辑态；审核/提交审批前必须先落库，否则状态刷新后会显示数据库中的旧空明细。
-    if (['审核', '提交审批'].includes(action) && draftEditable.value) {
+    // (提交会签同此:需会签/会签人 是头字段,刚填的必须先生效,否则后端按库里的旧值判"没填会签人")
+    if (['审核', '提交审批', '提交会签'].includes(action) && draftEditable.value) {
       const saved = await saveInlineDraft('保存', { silent: true })
       if (!saved) return
     }

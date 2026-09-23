@@ -1,0 +1,7 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-change-cleanup-all.sql ==
+  | CHG 残留 | 0 | 
+  | rd_dev_task 残留 | 0 | 
+  | 四文件探针残留 | 0 | 
+  | 探针账号残留 | 0 | 
+[OK] _probe-change-cleanup-all.sql (2 batches)

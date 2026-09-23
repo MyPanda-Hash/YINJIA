@@ -56,6 +56,14 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
    新表及关键列写入 `MS_Description` 中文扩展属性(幂等写法参照
    `tools/migrate-table-comments.sql` 与 `tools/migrate-report-template-comments.sql`)。
    只建表不注明 = 任务未完成。改动已有表结构时鼓励补注。
+
+   **全库表清单 = `docs/development/数据库表清单.md`**(437 表 + 101 视图逐张登记:
+   表名/中文名/列数/关联面板,按 yj_/bs_/bd_bl_/rd_/qc_/wo_/已下架/ERP/遗留/备份 十组)。
+   建表或改表前**先查这份清单**确认前缀归属与「这张表能不能动」:
+   - 第 9 组 `legacy`(dm_/s_/拼音缩写)仍被面板引用的(`dm_ck`/`kucun`/`mate`/`inh`/`outh`/`Porder`/`order_bs`)——改动前须评估面板影响;
+   - 第 7 组(已下架 `pr_*`/部分 `wo_*`)与第 10 组(`RENAME_*`/`*_bak_*`/`tmp_*`/`t1`/`t2`)——**禁止新代码引用**;
+   - 新增表前缀按清单 §0 选,单据必须 `bd_` 头 + `bl_` 行(或 `*_head`/`*_detail`)成对且带 `asp_user1/2`+`asp_time1/2`。
+   表结构变更后重跑清单末尾两条命令刷新并随任务提交。
 2. **部署默认全量**:下次服务器部署走「全量恢复备份」路线(deploy/部署说明.md 二、A)——
    用本地库整体覆盖服务器。因此:
    - 打部署备份**之前**,必须先清掉本地库里的测试数据
@@ -87,8 +95,67 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 4. **本地工作区干净才能换任务**:一个任务 commit 后才开始下一个;推不推送不限,本地 commit 即达标。
 5. 规范变更本身也按此提交(如本文件更新 = 一个 docs commit)。
 
+## 🔴 验证与收尾:开发机服务(2026-09-22 起生效)
+
+**环境前提:JDK 25**。`backend/pom.xml` 是 `<java.version>25</java.version>`(class major 69)。
+**本机系统默认已统一到 25**(2026-09-22:Machine `JAVA_HOME` = `C:\Program Files\Java\jdk-25`,
+并把它的 `bin` 前置到 Machine `PATH`;设置/回滚脚本 `tools/archive/_set-jdk25-default.ps1`)——
+`java` / `javac` / `mvn` 直接跑即是 25。旧 Oracle JDK 24 仍在机器上但已被遮蔽。
+仓库脚本一律**优先取 `JAVA_HOME`**、其次探测 `C:\Program Files\Java\jdk-25` /
+`D:\Program Files\Java\jdk-25` / `%USERPROFILE%\.jdk\jdk-25\jdk-25.0.2`;
+**新写脚本沿用这套探测,不要把 JDK 路径写死**。核对与排障(如 `mvn` 报
+「不支持发行版本 25」)见 `docs/development/环境与数据库.md`「开发机环境」。
+
+改完**要看效果**的活儿(界面/版面/交互/导出),先确认开发机服务在跑,**没开就一并开**,
+别只跑构建就下结论;纯只读排查(看代码/查库)不必折腾服务。
+
+| 用途 | 命令 | 地址 |
+|---|---|---|
+| 后端(正式账套 HSDZ_MES) | `tools/scripts/start-prod.ps1` | http://127.0.0.1:8090 |
+| 前端热更(改完即刷) | `frontend/start-vite.bat` | http://localhost:5173 |
+
+- `start-prod.ps1` **自身幂等**:8090 已在跑就只打印「正式实例已在运行」并 exit 0,`-Stop` 才停 ——
+  所以「没开就开、开着就跳过」不需要额外判断,直接跑它即可。
+- **收尾时服务保持运行,不要停**(用户常要立刻看效果);汇报里给出 URL 并注明「服务是我起的」。
+- 起长驻进程**别阻塞当前流程**(后台起);**不要重启已在跑的服务**(会打断用户正在看的会话)。
+- 只跑了构建/单测 ≠ 验证过界面:渲染/版式类改动要落到真实服务上看过再说(或明确声明未做像素级验证)。
+
+## 🔴 两账套(正式库 / 测试库)纪律(2026-09-22 起生效,不可豁免)
+
+系统有**两个账套**,登录页「登录工厂」选择即切换(ADR-0003,已接通):
+
+| 登录工厂 | 库 | 用途 |
+|---|---|---|
+| YINJIA-MES | `HSDZ_MES`(正式) | **只录真实业务** |
+| YINJIA-MES·测试库 | `HSDZ_MES_TEST`(测试) | 演示/试用/批量造数 |
+
+> ⚠️ **测试库不是"另一个数据库",它是正式库的一份快照副本** —— 这两条务必记住:
+
+1. **一切库变更必须两个账套都执行**(先正式、后测试;脚本均幂等)。只跑一个 = 任务未完成。
+   命令:`tools/` 下 `YINJIA_SQL_DB=HSDZ_MES_TEST java -cp lib\mssql-jdbc.jar DbSync.java`。
+2. **测试库会陈旧,而且"补迁移"修不好它**:它是某个时间点的正式库快照,
+   同名对象可能与正式库**结构不同源**(2026-09-22 实测:测试库 `bl_dispatch` 是 27 列**英文旧表**
+   `dispatch_no/plan_qty/…`,而正式库是中文列 —— `IF OBJECT_ID(...) IS NULL CREATE TABLE` 因此永远 no-op,
+   补迁移只会一路报「列名无效」)。
+   **判定与处置**:对同一面板查询,正式库 200 而测试库报 `列名 'x' 无效` ⇒ 测试库结构陈旧,
+   **不要逐张表去补**,直接重建:
+   ```powershell
+   # 需 SQL sysadmin(本机 PANDA\x1787 即是);会覆盖测试库数据,先确认可弃
+   powershell -ExecutionPolicy Bypass -File tools\scripts\make-test-db.ps1
+   ```
+   ⚠ 重建会 `ALTER DATABASE … SINGLE_USER WITH ROLLBACK IMMEDIATE`,**踢掉 8090 应用连测试库的连接池**
+   (正式库池不受影响,应用不停;Hikari 会自愈)。详见 `docs/development/环境与数据库.md`「测试库」节。
+3. **迁移链卫生**:`yj_schema_log` 是「哪些脚本已执行」的唯一凭据,`DbSync` 按**内容哈希**判断是否重跑 ⇒
+   **改动任何 `tools/*.sql` 的字节都会让它下次被"重跑"**(历史脚本重跑会撞 schema 演进、甚至重复灌演示数据)。
+   三种模式:`sync`(默认增量)/ `baseline`(**只登记不执行**,用于把"已应用但没登记"的脚本补上)/ `run <脚本>`(强制跑一条)。
+   **判断「能不能 baseline」要先有证据**:用 `tools/archive/_verify-migration-claims.mjs` 逐条核对
+   脚本声明的对象(表/列/视图/面板/字段)在目标库是否已存在(用法见该文件头;2026-09-22 实测输出
+   111 条待执行里 87 条"声明全部已存在"、45 条无可核对声明,余下逐项查证后均为改名/有意裁剪)。
+4. 新增/改动迁移脚本后,**必须**对两个账套验证一遍(至少 `DbSync` 跑到「执行 0、失败 0」)。
+
 ## 架构速查(补充)
 
 - 通用设计资产库(供其它项目 agent 参考实现):`https://github.com/MyPanda-Hash/CHENGXIAO`(9 专题+代码片段+表结构)
+- **数据库表清单**:**`docs/development/数据库表清单.md`**(全库 437 表 + 101 视图逐张登记 + §0 命名与归属规范;建表/改表/查表先看它,刷新命令见文档末尾)
 - **代码规范与防臃肿**:**`docs/development/代码规范与防臃肿.md`**(A 分层边界/B 契约数据驱动/C 文件红线/D 反复制粘贴/E 清理与技术债台账/F 自动化防线);新代码必须满足该规范,违背即视为任务未完成
 - **踩坑台账**:`docs/development/开发与质量.md` §5.5(2026-09-11 前端导出/探针专项:jsPDF px 单位、html2canvas、$el fragment 锚点、离屏克隆全宽截图、PS 命令通道 CJK 键、char(2) 尾空格等);**涉 PDF 生成/截图导出/CDP 探针/PS 工具脚本/定长列比较,先读该节再动手,违者即重复事故**

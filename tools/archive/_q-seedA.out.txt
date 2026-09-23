@@ -1,0 +1,3 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-seedA.sql ==
+[SQL FAIL] 列名 '产品负责人' 无效。

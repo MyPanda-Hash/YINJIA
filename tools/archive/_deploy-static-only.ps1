@@ -12,7 +12,17 @@ $static = 'backend\src\main\resources\static'
 Remove-Item "$static\*" -Recurse -Force -ErrorAction SilentlyContinue
 Copy-Item 'frontend\dist\*' $static -Recurse -Force
 $jar = 'backend\target\app.jar'
-$jarTool = 'C:\Program Files\Java\jdk-24\bin\jar.exe'
+# JDK 探测(2026-09-22:原先两处硬编码 'C:\Program Files\Java\jdk-24\bin\…',换 JDK 版本后必挂)
+if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME\bin\jar.exe")) {
+  foreach ($cand in @('C:\Program Files\Java\jdk-25', 'D:\Program Files\Java\jdk-25', "$env:USERPROFILE\.jdk\jdk-25\jdk-25.0.2")) {
+    if (Test-Path "$cand\bin\jar.exe") { $env:JAVA_HOME = $cand; break }
+  }
+}
+if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME\bin\jar.exe")) {
+  throw "未找到 JDK 25:请设 JAVA_HOME 指向 JDK 25(候选:C:\Program Files\Java\jdk-25 / $env:USERPROFILE\.jdk\jdk-25\jdk-25.0.2)"
+}
+$jarTool = "$env:JAVA_HOME\bin\jar.exe"
+$javaExe = "$env:JAVA_HOME\bin\java.exe"
 $stage = 'backend\target\jar-static-stage'
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory "$stage\BOOT-INF\classes" -Force | Out-Null
@@ -23,5 +33,5 @@ Push-Location $stage
 & $jarTool uf 'C:\INCER\YINJIA-MES\backend\target\app.jar' 'BOOT-INF'
 Pop-Location
 if ($LASTEXITCODE -ne 0) { throw 'jar update failed' }
-Start-Process -FilePath 'C:\Program Files\Java\jdk-24\bin\java.exe' -ArgumentList '-jar', 'C:\INCER\YINJIA-MES\backend\target\app.jar' -WorkingDirectory 'C:\INCER\YINJIA-MES\backend' -WindowStyle Hidden
+Start-Process -FilePath $javaExe -ArgumentList '-jar', 'C:\INCER\YINJIA-MES\backend\target\app.jar' -WorkingDirectory 'C:\INCER\YINJIA-MES\backend' -WindowStyle Hidden
 Write-Host 'static-only deploy done, server restarting'

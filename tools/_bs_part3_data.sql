@@ -1,5 +1,5 @@
 -- 基础设置数据迁移(light-mes form_data → bs_*)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 
 INSERT INTO bs_bom ([物料清单编码], [父件编码], [父件名称], [虚拟件], [版本号], [计量单位], [生产数量], [生产车间], [预入仓库], [默认BOM], [子件编码], [子件名称], [规格型号], [子件计量单位], [定额数量], [损耗率%], [需用数量], [备注], [asp_user1], [asp_time1]) VALUES (N'BOM-001', N'CP001', N'铝棒 Φ80', 0, N'V1.0', N'件', 1, N'熔铸车间', N'成品仓', 1, N'CL002', N'6061铝锭', N'A00', N'kg', 1.05, 5, 1.05, N'', N'migration', SYSDATETIME());

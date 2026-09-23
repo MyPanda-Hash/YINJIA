@@ -66,15 +66,33 @@ public class SysAdminController {
         return ApiResult.ok(usageLog.queryGrouped(userName, panelName, actionName, start, end));
     }
 
-    /** 当前登录用户须为系统管理员,否则 403。 */
-    private void requireAdmin() {
+    /** 当前登录账号名(未登录抛 403,不触发前端登出)。 */
+    private String currentUsername() {
         String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
                 : SecurityContextHolder.getContext().getAuthentication().getName();
         if (username == null) throw new AccessDeniedException("未登录");
+        return username;
+    }
+
+    private void requireAdmin() {
+        requireAdmin("查看使用记录");
+    }
+
+    /**
+     * 组织架构维护与使用记录查看一律限系统管理员,否则 403。
+     * ⚠ 走 AccessDeniedException → GlobalExceptionHandler 归一成 **HTTP 200 + body code 403**,
+     * 这是刻意的:前端 request.js 把 HTTP 401/403 当作认证失效并强制登出,
+     * 若这里返回真 403,非管理员点一下组织架构就会被踢出登录。
+     *
+     * 读接口(部门树/用户清单/角色清单/角色面板)不设此校验:
+     * PanelxList 的「规格书分发责任人」选人依赖 GET /sys/user/list,非管理员也要用。
+     */
+    private void requireAdmin(String action) {
+        String username = currentUsername();
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT is_admin FROM yj_user WHERE username = ?", username);
         boolean admin = !rows.isEmpty() && "Y".equals(rows.get(0).get("is_admin"));
-        if (!admin) throw new AccessDeniedException("仅管理员可查看使用记录");
+        if (!admin) throw new AccessDeniedException("仅管理员可" + action);
     }
 
     // ============ 部门 ============
@@ -105,6 +123,7 @@ public class SysAdminController {
 
     @PostMapping("/dept/save")
     public ApiResult<Void> deptSave(@RequestBody Map<String, Object> body) {
+        requireAdmin("维护部门");
         String name = String.valueOf(body.getOrDefault("deptName", "")).trim();
         if (name.isBlank()) throw new IllegalArgumentException("请输入部门名称");
         int parentId = parseInt(body.get("parentId"), 0);
@@ -120,6 +139,7 @@ public class SysAdminController {
 
     @DeleteMapping("/dept/{id}")
     public ApiResult<Void> deptDelete(@PathVariable int id) {
+        requireAdmin("维护部门");
         Integer children = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM yj_dept WHERE parent_id = ?", Integer.class, id);
         if (children != null && children > 0) throw new IllegalStateException("存在下级部门，不能删除");
@@ -144,6 +164,7 @@ public class SysAdminController {
 
     @PostMapping("/user/save")
     public ApiResult<Void> userSave(@RequestBody Map<String, Object> body) {
+        requireAdmin("维护用户");
         String userName = String.valueOf(body.getOrDefault("userName", "")).trim();
         if (userName.isBlank()) throw new IllegalArgumentException("请输入账号");
         String realName = String.valueOf(body.getOrDefault("realName", "")).trim();
@@ -151,12 +172,14 @@ public class SysAdminController {
         Integer deptId = (Integer) body.get("deptId");
         Integer roleId = (Integer) body.get("roleId");
         String enabled = "0".equals(String.valueOf(body.getOrDefault("enabled", 1))) ? "0" : "1";
-        // 权限随角色:管理员角色 -> is_admin=Y
-        String isAdmin = "Y";
+        // 权限随角色:仅当所选角色本身就是管理员角色时 is_admin=Y。
+        // ⚠ 旧写法把初值写成 "Y"、只在 roleId 非空时才可能改成 "N" —— 于是
+        // 「不选角色新建的账号」直接成为系统管理员(2026-09-22 探针实测:id=61/62 两个无角色账号 is_admin=Y)。
+        String isAdmin = "N";
         if (roleId != null) {
             List<String> r = jdbc.query(
                     "SELECT is_admin FROM yj_role WHERE id = ?", (rs, i) -> rs.getString(1), roleId);
-            isAdmin = r.isEmpty() || !"Y".equals(r.get(0)) ? "N" : "Y";
+            isAdmin = (!r.isEmpty() && "Y".equals(r.get(0))) ? "Y" : "N";
         }
         Object id = body.get("id");
         if (id != null && !String.valueOf(id).isBlank()) {
@@ -182,6 +205,7 @@ public class SysAdminController {
     /** 批量分配角色:给一组用户统一换角色;权限随角色,is_admin 同步角色口径,管理员账号自动跳过 */
     @PostMapping("/user/batch-role")
     public ApiResult<Void> userBatchRole(@RequestBody Map<String, Object> body) {
+        requireAdmin("维护用户");
         Object idsObj = body.get("userIds");
         Object roleObj = body.get("roleId");
         if (!(idsObj instanceof List<?> ids) || ids.isEmpty()) throw new IllegalArgumentException("请选择用户");
@@ -205,8 +229,37 @@ public class SysAdminController {
         return ApiResult.ok(null);
     }
 
-    // ============ 角色 ============
+    /**
+     * 删除账号(物理删除 yj_user 行,仅管理员)。
+     *
+     * 守卫(顺序有意:先判"删自己"再判"管理员",否则管理员删自己会拿到管理员那条文案):
+     *   ① 账号不存在 → 报「账号不存在」(前端列表可能已过期)
+     *   ② 删当前登录账号 → 拒绝(防自锁:删掉自己就再也进不来组织架构了)
+     *   ③ 管理员账号(is_admin='Y')→ 拒绝(防把最后一个管理员删掉后无人能管组织架构)
+     *
+     * 为何物理删除是安全的:业务留痕存的是**账号/姓名文本**,不是外键 ——
+     *   asp_user1/asp_user2(制单/审核账号)、yj_doc_status.shr、yj_usage_log.username、
+     *   yj_form_approval.actor 等全部按 username 存字符串;全库也没有任何外键指向 yj_user。
+     *   所以删掉账号行不会破坏历史单据,留下的仍是当时那个人名(审计要求:留痕不随账号消失而抹除)。
+     */
+    @DeleteMapping("/user/{id}")
+    public ApiResult<Void> userDelete(@PathVariable int id) {
+        requireAdmin("维护用户");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT username, is_admin FROM yj_user WHERE id = ?", id);
+        if (rows.isEmpty()) throw new IllegalStateException("账号不存在");
+        String target = String.valueOf(rows.get(0).get("username"));
+        if (target.equalsIgnoreCase(currentUsername())) {
+            throw new IllegalStateException("不能删除当前登录的账号");
+        }
+        if ("Y".equals(String.valueOf(rows.get(0).get("is_admin")))) {
+            throw new IllegalStateException("管理员账号不能删除：" + target);
+        }
+        jdbc.update("DELETE FROM yj_user WHERE id = ?", id);
+        return ApiResult.ok(null);
+    }
 
+    // ============ 角色 ============
     @GetMapping("/role/list")
     public ApiResult<List<Map<String, Object>>> roleList() {
         return ApiResult.ok(jdbc.queryForList(
@@ -216,6 +269,7 @@ public class SysAdminController {
 
     @PostMapping("/role/save")
     public ApiResult<Void> roleSave(@RequestBody Map<String, Object> body) {
+        requireAdmin("维护角色");
         String code = String.valueOf(body.getOrDefault("roleCode", "")).trim();
         String name = String.valueOf(body.getOrDefault("roleName", "")).trim();
         if (code.isBlank() || name.isBlank()) throw new IllegalArgumentException("请填写角色编码与名称");
@@ -229,6 +283,7 @@ public class SysAdminController {
 
     @DeleteMapping("/role/{id}")
     public ApiResult<Void> roleDelete(@PathVariable int id) {
+        requireAdmin("维护角色");
         Integer users = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM yj_user WHERE role_id = ?", Integer.class, id);
         if (users != null && users > 0) throw new IllegalStateException("角色下存在用户，先调整用户角色");
@@ -313,6 +368,7 @@ public class SysAdminController {
     @PostMapping("/role/{id}/panels")
     @SuppressWarnings("unchecked")
     public ApiResult<Void> rolePanelsSave(@PathVariable int id, @RequestBody Map<String, Object> body) {
+        requireAdmin("维护角色权限");
         List<Map<String, Object>> panels = (List<Map<String, Object>>) body.getOrDefault("panels", List.of());
         jdbc.update("DELETE FROM yj_role_panel WHERE role_id = ?", id);
         for (Map<String, Object> p : panels) {

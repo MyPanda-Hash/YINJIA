@@ -3,7 +3,7 @@
 -- 由 _replica-gen2.cjs 生成;幂等。配套 _replica-plan.md 为改动清单。
 -- 无数据源的 PANDA 布局列以 NULL 输出(保留 T+ 版式,业务启用后接数据)。
 -- ============================================================
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 
 -- ===== Part 1 单据面板:查询/表单/明细列 1:1 =====

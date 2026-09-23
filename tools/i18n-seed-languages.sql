@@ -1,5 +1,5 @@
 -- 预置 8 种语言的核心翻译(字段 78 + 面板 11),不依赖机翻,切换即生效
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 GO
 DELETE FROM yj_translation WHERE locale IN ('ja','ko','es','fr','de','ru','vi','th');
 GO

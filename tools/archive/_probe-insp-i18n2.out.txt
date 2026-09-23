@@ -1,0 +1,67 @@
+===== yj_translation 的 scope 分布 =====
+scope	行数
+field	6784
+panel	1002
+ui	10241
+
+===== 本轮 10 键的 scope 铺开 =====
+ref_key	scope	行数	语言数
+编写人	field	10	10
+不合格应对措施	field	1	1
+不合格应对措施	ui	9	9
+产品编号	field	2	2
+产品编号	ui	9	9
+出货检验项目控制计划	field	10	10
+检测频率	field	1	1
+检测频率	ui	9	9
+检查频率	field	10	10
+检验方法	field	1	1
+检验方法	ui	9	9
+检验项目	field	10	10
+检验项目	panel	10	10
+检验项目	ui	10	10
+检验要求	field	10	10
+检验要求	ui	9	9
+若规格书有变动提示管控文件需更新	field	10	10
+
+===== ⚠ 同键同语言的重复行(0 行最好) =====
+ref_key	locale	条数	scope_a	scope_b
+产品编号	ja	2	field	ui
+检验项目	de	3	field	ui
+检验项目	en	3	field	ui
+检验项目	es	3	field	ui
+检验项目	fr	3	field	ui
+检验项目	ja	3	field	ui
+检验项目	ko	3	field	ui
+检验项目	ru	3	field	ui
+检验项目	th	3	field	ui
+检验项目	vi	3	field	ui
+检验项目	zh-TW	3	field	ui
+检验要求	de	2	field	ui
+检验要求	es	2	field	ui
+检验要求	fr	2	field	ui
+检验要求	ja	2	field	ui
+检验要求	ko	2	field	ui
+检验要求	ru	2	field	ui
+检验要求	th	2	field	ui
+检验要求	vi	2	field	ui
+检验要求	zh-TW	2	field	ui
+
+===== RD_INSP_PLAN 内重复 label(改版前就有的) =====
+label	place	seq	col_name
+备注	detail	120	备注
+备注	header	150	备注
+标题	header	40	标题
+标题	query	10	标题
+产品编号	header	70	产品编号
+产品编号	query	20	产品编号
+
+===== 检验类别/备注/序号 的 place 归属 =====
+place	seq	col_name	label	alias	data_type	visible
+detail	120	备注	备注		文本	True
+header	150	备注	备注		文本	True
+detail	70	检测频率	检测频率	检查频率	下拉框	True
+detail	5	检验类别	检验类别		下拉框	True
+detail	100	控制方法	控制方法	检验方法	文本	True
+detail	2	序号	序号	序 号	文本	True
+

@@ -4,7 +4,7 @@
    幂等契约:部门/角色/面板权限是用户在界面上配置的数据,本脚本重跑【不得 DROP/清空】;
    缺表才建(yj_role_panel 建表含 perms 列,与 migrate-role-perms 的最终结构一致),
    种子只在表为空/缺行时补。 */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 IF OBJECT_ID('yj_dept') IS NULL CREATE TABLE yj_dept (

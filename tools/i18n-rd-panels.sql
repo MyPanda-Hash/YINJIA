@@ -1,5 +1,5 @@
 ﻿/* 研发管理全部面板+字段的英文翻译 */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 -- 面板名翻译

@@ -4,6 +4,7 @@ import com.aliyun.alimt20181012.Client;
 import com.aliyun.alimt20181012.models.TranslateGeneralRequest;
 import com.aliyun.alimt20181012.models.TranslateGeneralResponse;
 import com.aliyun.teaopenapi.models.Config;
+import com.yinjia.mes.config.DataSourceRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -65,13 +66,14 @@ public class TranslationService {
     /** 加载某语言全部译名(scope→(中文原文→译名)),带 TTL 缓存。 */
     public Map<String, Map<String, String>> byLocale(String locale) {
         String key = keyOf(locale);
+        String ck = cacheKey(key);
         Map<String, Map<String, Map<String, String>>> snapshot = cache;
-        Long ts = loadedAtByLocale.get(key);
-        if (!snapshot.containsKey(key) || ts == null || System.currentTimeMillis() - ts > TTL_MS) {
+        Long ts = loadedAtByLocale.get(ck);
+        if (!snapshot.containsKey(ck) || ts == null || System.currentTimeMillis() - ts > TTL_MS) {
             reload(key);
             snapshot = cache;
         }
-        Map<String, Map<String, String>> result = snapshot.get(key);
+        Map<String, Map<String, String>> result = snapshot.get(ck);
         return result != null ? result : Map.of();
     }
 
@@ -80,18 +82,19 @@ public class TranslationService {
         return byLocale(locale).getOrDefault(scope, Map.of());
     }
 
-    private synchronized void reload(String key) {
+    private synchronized void reload(String localeKey) {
+        String ck = cacheKey(localeKey);
         Map<String, Map<String, Map<String, String>>> next = new HashMap<>(cache);
         Map<String, Map<String, String>> loaded = new HashMap<>();
-        for (Map<String, Object> row : jdbc.queryForList("SELECT scope, ref_key, text FROM yj_translation WHERE locale = ?", key)) {
+        for (Map<String, Object> row : jdbc.queryForList("SELECT scope, ref_key, text FROM yj_translation WHERE locale = ?", localeKey)) {
             String scope = String.valueOf(row.get("scope"));
             String refKey = String.valueOf(row.get("ref_key"));
             Object text = row.get("text");
             if (text != null) loaded.computeIfAbsent(scope, k -> new HashMap<>()).put(refKey, String.valueOf(text));
         }
-        next.put(key, loaded);
+        next.put(ck, loaded);
         this.cache = next;
-        this.loadedAtByLocale.put(key, System.currentTimeMillis());
+        this.loadedAtByLocale.put(ck, System.currentTimeMillis());
     }
 
     /**
@@ -135,10 +138,21 @@ public class TranslationService {
     }
 
     private void invalidate(String locale) {
+        String ck = cacheKey(keyOf(locale));
         Map<String, Map<String, Map<String, String>>> next = new HashMap<>(cache);
-        next.remove(locale);
+        next.remove(ck);
         this.cache = next;
-        this.loadedAtByLocale.remove(locale);
+        this.loadedAtByLocale.remove(ck);
+    }
+
+    /**
+     * 译名缓存键 = **账套 + 语言**。
+     * ⚠ 不能只用语言:`yj_translation` 是**分账套**的(ADR-0003 两账套,各库各一份译名),
+     * 只按语言做键会让两个账套共用同一份缓存 —— 「谁先刷新谁说了算」,
+     * 于是在测试账套新增/改的译名看不见(与 PanelRegistry 同一类缺陷,2026-09-22 一并修)。
+     */
+    private static String cacheKey(String localeKey) {
+        return DataSourceRouter.current() + '\u0000' + keyOf(localeKey);
     }
 
     private void upsert(String locale, String scope, String refKey, String text) {

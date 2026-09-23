@@ -22,13 +22,18 @@ const LOCKED_PERSON = {
   RD_PLAN: '负责人',
   // 检验数据记录(YJ-QR-96 检验报告):原表「检验人=账号登录人自动生成」——由登录用户锁定填入
   QC_INSP_REC: '检验人',
+  // 2026-09-18:出货检验计划表「编写人」= 编写人固定登录账号人员(设计原文),元数据 editable=0
+  RD_INSP_PLAN: '编写人',
 }
 
-/** 非锁定默认值:'@today' 占位表示当天日期;函数形式按 (form, ctx) 现算 */
+/** 非锁定默认值:'@today' 占位表示当天日期(可内嵌,如「V@today」⇒ V2026-09-20);函数形式按 (form, ctx) 现算 */
 const DOC_DEFAULTS = {
-  RD_APPROVAL: [['申请立项日期', '@today'], ['文件管理人', '陈秀丽']],
-  RD_PLAN: [['文件管理人', '陈秀丽']],
-  RD_PROGRESS: [['文件使用范围', '工程技术中心']],
+  // 2026-09-22:补「密级=保密」——两份设计纸的右上信息表印的就是它
+  // (立项申请表.xlsx G3 / 项目实施计划.xlsx G4);同族面板(FILTER_EFF/SAMPLE_NO/PROD_DOCLIST)早有该默认值
+  RD_APPROVAL: [['申请立项日期', '@today'], ['文件管理人', '陈秀丽'], ['密级', '保密']],
+  RD_PLAN: [['文件管理人', '陈秀丽'], ['密级', '保密']],
+  // 2026-09-22:控制列表纸面印的是「密级=绝密 / 适用范围=工程技术中心」(设计 P2/Q2、P3/Q3)
+  RD_PROGRESS: [['文件使用范围', '工程技术中心'], ['密级', '绝密']],
   RD_FILTER_EFF: [['密级', '保密'], ['适用范围', '银嘉内部'], ['测试主题', '伊可普需求2炭棒除VOC测试']],
   // 检验数据记录(YJ-QR-96 检验报告):原表固定项——文件编码 YJ-QR-96 / 检验依据 YJ-Q-30 / 审核人 固定:冯敏
   // (签名行落库列名是「表单审核人」:叫「审核人」会被 ButtonService 保存时显式丢弃,见该面板迁移注释)
@@ -37,6 +42,31 @@ const DOC_DEFAULTS = {
   // 填单时就预设好、用户可人工改;审核时以表头值为准回填全链(见 BatchService.assignNoAndBackfill)。
   // 旧口径是"审核时才取号、之前留空"—— 那个口径下用户填单时看不到号,已废弃。
   PURCHASE_IN: [['批次号', (form, ctx) => docNoFromDate(form['单据日期'] || ctx.today)]],
+  // 2026-09-18 新增 2 面(研发管理 × 产品开发最新设计)
+  // 样品编号表:设计源纸张右上角为「密级 绝密 / 适用范围 工程技术中心」
+  RD_SAMPLE_NO: [['密级', '绝密'], ['文件使用范围', '工程技术中心'], ['文件管理人', '陈秀丽']],
+  RD_PROD_DOCLIST: [['密级', '保密'], ['文件使用范围', '工程技术中心'], ['文件管理人', '陈秀丽']],
+  // 2026-09-18 第二轮(产品信息表界面调整):
+  //   两级审批人**固定填写** 冯总 / 秀丽(用户口径)。
+  //   ⚠ 走"默认值"而不是"锁定只读":固定是业务口径,但发文人偶尔需要按实际改
+  //     (与 文件管理人=陈秀丽 同款处理);若将来要收紧成不可改,改 yj_field.editable=0 即可。
+  RD_PROD_INFO: [
+    ['审核人一级', '冯总'],
+    ['审核人二级', '秀丽'],
+  ],
+  // 2026-09-20 出货检验项目控制计划按《出货检验项目控制计划.xlsx》重排为「一张表 7 列」。
+  //   设计纸张上写死的那几格(表单管理人=冯敏 / 密级=保密 / 使用范围=全公司 / 审核人=冯加劲)
+  //   照录为默认值 —— 走"默认值"而非"锁定只读",因为这几格是业务常值不是身份,
+  //   与 RD_PROD_INFO 的两级审批人同款口径。
+  //   版本号设计原文是「V + 按照日期来」⇒ 'V@today' 展开成「V2026-09-20」(当天)。
+  //   ⚠ 编写人不在这里:它由登录人决定,在 LOCKED_PERSON 里(editable=0,UI 三处按只读渲染)。
+  RD_INSP_PLAN: [
+    ['表单管理人', '冯敏'],
+    ['密级', '保密'],
+    ['使用范围', '全公司'],
+    ['审核人', '冯加劲'],
+    ['版本号', 'V@today'],
+  ],
 }
 
 /** 该面板由当前用户锁定的字段标签;没有则 null */
@@ -84,6 +114,11 @@ export function syncBatchNoWithDocDate(form, prevAuto = '', today = todayStr()) 
   return cur
 }
 
+/** 展开值里的 '@today'(整串或内嵌:「V@today」⇒ V2026-09-20);没有占位就原样返回 */
+function expandToday(value, today) {
+  return typeof value === 'string' && value.includes('@today') ? value.split('@today').join(today) : value
+}
+
 /** 当前用户显示名(user store 的 realName getter 同口径:姓名优先,退回账号) */
 function displayNameOf(user) {
   return String((user && (user.realName || user.userName)) || '').trim()
@@ -109,7 +144,7 @@ export function applyDocDefaults(panelCode, form, user, opts = {}) {
 
   for (const [key, value] of DOC_DEFAULTS[code] || []) {
     if (!isEmpty(form[key])) continue
-    form[key] = typeof value === 'function' ? value(form, { today }) : (value === '@today' ? today : value)
+    form[key] = typeof value === 'function' ? value(form, { today }) : expandToday(value, today)
   }
   return form
 }

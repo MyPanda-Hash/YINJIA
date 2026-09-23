@@ -1,0 +1,8 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-prodfile-e2e-cleanup.sql ==
+  | 变更单残留 | 0 | 
+  | 产品信息表残留 | 0 | 
+  | 四文件残留 | 0 | 
+  | 责任人行残留 | 0 | 
+  | 部门账号残留 | 0 | 
+[OK] _probe-prodfile-e2e-cleanup.sql (1 batches)

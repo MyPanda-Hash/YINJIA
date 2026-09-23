@@ -2,7 +2,7 @@
 -- 覆盖:复刻新增列(制单人/创建时间/主辅单位系列/布局列等)+ 既有缺口(预计交货日期/销售单位/单据状态等)
 -- 幂等:MERGE 仅补缺失行,不动已有 manual/mt 译名;locale 覆盖 en/ja/ko/de/es/fr/ru/th/vi
 -- 执行:sqlcmd -f 65001(UTF-8 无 BOM,见 docs/development/开发与质量.md §3.1)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 
 MERGE yj_translation AS t USING (VALUES

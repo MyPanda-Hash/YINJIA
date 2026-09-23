@@ -105,8 +105,17 @@ public class ButtonService {
             case "删除审批驳回" -> rejectDelete(def, formData);
             // 文件类面板:归档后申请修改(管理员审批进入修改态,再审批归档+修改记录全量留痕)
             case "申请修改" -> modifyRequest(def, formData);
-            // 产品信息表:归档后下发产品开发到 5 个下游文件面板(2026-09-09)
-            case "产品开发" -> dispatchDev(def, formData);
+            // 产品变更申请单:会签子流程(发起人勾「需会签」+选会签人 → 全部通过才进审核,2026-09-21)
+            case "提交会签" -> submitSignoff(def, formData);
+            case "会签通过" -> signoffApprove(def, formData);
+            case "会签驳回" -> signoffReject(def, formData);
+            case "撤回会签" -> signoffWithdraw(def, formData);
+            // 立项申请:审核通过(已审核/已归档)后由审核人给项目定级(2026-09-21 用户口径)——
+            // 等级是后续立项(实施计划)与进度流程的属性,按参照自动带给下游 项目定级
+            case "项目定级" -> gradeProject(def, formData);
+            // 产品信息表:归档后由二级审核人把四个下游文件的**责任人**分发下去(2026-09-20;
+            // 原名「产品开发」= 只写任务行不带分工,保留兼容)
+            case "产品开发", "分发责任人" -> dispatchDev(def, formData);
             // 产品信息表:总负责人把规格书按种类分发责任人并建草稿单(2026-09-12 两级分发)
             case "规格书分发" -> specAssign(def, formData);
             case "修改审批通过" -> modifyApprove(def, formData);
@@ -274,6 +283,13 @@ public class ButtonService {
                 if (tableCols(table).contains("创建时间")) cols.put("创建时间", LocalDateTime.now().format(TS_FMT));
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
+                // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
+                if (CHANGE_PANEL.equals(def.code())) ensureChangeDeptRows(def, no, user);
+                // 四个受控文件的编辑门禁在**空草稿分支也要过**(2026-09-21 全流程走查发现的门禁洞):
+                // 该分支原来直接 return,于是"带产品编号 + 不带明细"的一次调用就能给**别人负责的已分发
+                // 产品**建出一张空白草稿(实测品质部账号建成 MP-xxxx)。UI 的「新增」不带产品编号,
+                // 正常建单不受影响;带产品编号建单=替别人开单,本就该拦。
+                if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, head, user);
                 // directAdd 占位草稿:未保存过 -> saved='N'(前端 isFreshAddedDoc 依赖本标记界定"本次新增"窗口)
                 markDocSaved(def.code(), no, markSaved);
                 return result(no, "草稿");
@@ -293,13 +309,21 @@ public class ButtonService {
             ensureSpecCreateAllowed(def, no, user);
             ensureSpecAssignEditable(def, no, user);
         }
+        // 四个下游文件的编辑门禁(2026-09-20):未分发禁编 / 分发后只放该文件责任人 ∪ 管理员。
+        // 产品编号为空的历史单在门禁里豁免(否则既有单据被锁死);head 传进来是为了拦住
+        // "本次保存才第一次填上产品编号"这一档(库里此时还是 NULL)。
+        if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, head, user);
         // 已审核/审批中/已中止单据不允许保存(照搬 light-mes:仅草稿可改);终止审批中/已终止同样锁定
         Map<String, Object> st = docStatusOf(def.code(), no);
         String stStatus = String.valueOf(st.get("status"));
         if ("已审核".equals(stStatus)) throw new IllegalStateException("已审核单据不可保存，请先弃审");
         if ("审批中".equals(stStatus)) throw new IllegalStateException("审批中单据不可保存，请等待审批完成或驳回");
+        if ("待二级审批".equals(stStatus)) throw new IllegalStateException("待二级审批单据不可保存，请等待二级审批完成或驳回");
         if ("已中止".equals(stStatus)) throw new IllegalStateException("已中止单据不可保存，请先恢复");
         if ("已终止".equals(stStatus)) throw new IllegalStateException("已终止单据不可保存");
+        // 产品变更申请单(2026-09-21):已生效=终态(要改只能再开一张变更单);会签中锁编辑(免得签的和改的不是一版)
+        if ("已生效".equals(stStatus)) throw new IllegalStateException("已生效单据不可保存，如需再次变更请另开一张变更申请单");
+        if ("会签中".equals(stStatus)) throw new IllegalStateException("会签中单据不可保存，请等会签完成或由发起人撤回会签");
         if (stStatus.startsWith("终止审批中")) throw new IllegalStateException("终止审批中单据不可保存，请等待审批完成或撤回");
         // 在途申请期间锁定(2026-09-12):删除/修改申请待审批时单据不可保存——此前只拦审批中,
         // 申请期间仍可改数据:改动落在修改快照之后 diff 失真,极端时序还会造出无人能解的死状态
@@ -309,12 +333,29 @@ public class ButtonService {
         if ("修改申请中".equals(stStatus)) throw new IllegalStateException("修改申请审批期间不可保存，请等待审批完成或撤回申请");
         // 来料检验单数量守恒:每行 合格数量+不良数量 ≤ 数量(送检数量),超限拒绝保存
         if ("QC_INSP".equals(def.code())) validateInspQty(items);
+        // 样品编号表:样品编号 = 客户项目代号 + 项目编号(确定性拼接),同面板内不允许重复
+        if ("RD_SAMPLE_NO".equals(def.code())) ensureSampleNoUnique(no, items);
+        // 必填校验(2026-09-20):仅「保存/提交」路径(markSaved=true)执行;
+        // 「保存为草稿」「新增」放行 —— 用户口径:草稿不做必填限制,提交审批才做。
+        // 补这层的理由:此前必填**只在前端校验**,直连 /px/callButton 就能把缺必填的单提交/归档
+        // (实测:文档编号/测试主题为空仍可保存并归档)。前端仍保留校验(即时提示+定位字段),两层各司其职。
+        if (markSaved) {
+            ensureRequiredFilled(def, head, no);
+            // 明细行必填(2026-09-20):表头之外还有明细级必填(如 RD_SAMPLE_NO 的
+            // 客户项目代号/样品编号/项目编号全在明细),只查表头等于这些面板没校验。
+            ensureDetailRequiredFilled(def, items);
+        }
 
         Map<String, String> l2c = def.labelToCol();
         // 规格书修改态:落库前留「4.产品性能检验项目及检验标准」页旧值快照(表区=检验要求),
         // 保存后比对——变了就通知关联出货检验计划表核对(编号=产品编号,2026-09-11 用户口径)
         List<String> specTestOld = "RD_SPEC_DOC".equals(def.code()) && no != null
                 && "Y".equals(modifyStateOf(def.code(), no)) ? specTestRowsSnapshot(no) : null;
+        // 产品变更申请单:先保 7 个部门行在册,再按"部门↔账号"过一遍按格门禁(非本部门一律还原)
+        if (CHANGE_PANEL.equals(def.code())) {
+            ensureChangeDeptRows(def, no, user);
+            gateChangeDetail(def, items, no, user);
+        }
         if (split) {
             upsertHeadRow(def, head, no, user);
             upsertLineRows(def, items, no, l2c, user);
@@ -362,7 +403,10 @@ public class ButtonService {
         if ("QC_RECV".equals(def.code())) syncInspFromSlRecv(no, user);
 
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
-        if (DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
+        // 文档编号唯一性(实施计划单号等):不允许与其他单据重复。
+        // 「保存为草稿」不校验(2026-09-20 用户口径):草稿=允许存一半,唯一性属于提交口径;
+        // 两条草稿可以先占用同一个文档编号,谁先提交谁占住,后提交的那张在提交时被拒。
+        if (markSaved && DOC_NO_PANELS.contains(def.code())) ensureDocNoUnique(def, head, no);
         return result(no, String.valueOf(docStatusOf(def.code(), no).get("status")));
     }
 
@@ -371,6 +415,117 @@ public class ButtonService {
      *  yj_doc_status.canceled='Y',不软删业务行),不排除的话"作废掉再新建同号"永远撞唯一性。
      *  两侧都排:业务表软删标记 asp_cancel='Y'(表若无该列则跳过,故先查 sys.columns)+
      *  状态表 yj_doc_status.canceled='Y'。 */
+    /**
+     * 必填校验(2026-09-20):仅「保存/提交」路径调用;「保存为草稿」「新增」不调用。
+     *
+     * 用户口径:保存为草稿不做必填限制(允许存一半);保存/提交审批才做。
+     * 为什么要在后端也做:此前必填**只在前端**(PanelxList.validateInlineDraft),
+     * 直连 /px/controller callButton 就能把缺必填的单保存并归档(实测:文档编号/测试主题为空仍归档成功)。
+     * 前端校验仍保留(即时提示 + 自动翻页定位字段),两层各司其职;此处是"绕过界面也拦得住"的兜底。
+     *
+     * 口径与前端保持一致:
+     *   · 只看 place=header 的必填字段;
+     *   · 跳过系统自动填写的字段(单据编号=autoCode、单据日期=当天默认、创建时间/编辑人/编辑日期);
+     *   · 表单里**没带**该字段(前端局部提交)时回退查-库存值,避免误报"未填";
+     *   · 字段有值但为空串也算未填。
+     */
+    private void ensureRequiredFilled(PanelRegistry.PanelDef def, Map<String, Object> head, String no) {
+        List<PanelRegistry.FieldDef> required = def.fieldsAt("header").stream()
+                .filter(PanelRegistry.FieldDef::required)
+                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.col()))
+                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.label()))
+                // 隐藏字段不校验:前端 headerFields = dataSchema.fields.filter(f => !f.hidden)
+                // (PanelxList.vue:2436 起,validateInlineDraft 只遍历它) —— 后端若强校验,
+                // 会出现"要求的字段界面上根本没渲染",用户无路可走。现存:RDDOM_TEST.文档编号、
+                // RD_PROD_INFO.产品类型(hidden=1/visible=1)。
+                .filter(f -> !f.hidden())
+                .toList();
+        if (required.isEmpty()) return;
+        // ⚠ labelsToCols 会把**空串归一化成 null 并跳过**,所以这里取不到"提交了空值"这件事;
+        //   取不到时回退查库中已存值(见下),两者都空才算未填。
+        Map<String, Object> submitted = labelsToCols(def.fieldsAt("header"), head);
+        List<String> missing = new ArrayList<>();
+        for (PanelRegistry.FieldDef f : required) {
+            Object v = submitted.get(f.col());
+            boolean blank = (v == null || String.valueOf(v).isBlank());
+            if (blank && no != null && def.hasHeadTable()) {
+                // 表单没带该字段(空串被丢弃,或本就未提交)⇒ 用库中已存值判定,避免把"没改"误判成"没填"
+                blank = isStoredBlank(def.headTable(), f.col(), def.groupCol(), no);
+            }
+            if (blank) missing.add(f.displayName());
+        }
+        if (!missing.isEmpty()) {
+            throw new IllegalArgumentException(String.join("、", missing) + "不能为空");
+        }
+    }
+
+    /**
+     * 不参与用户必填校验的字段(与前端 validateInlineDraft 的跳过口径逐条对齐):
+     *   · 系统自动填写:单据日期=当天默认、单据编号=后端发号、创建时间/编辑人/编辑日期;
+     *   · 规格书种类:页签分类,新单与旧草稿都可能是空的(PanelxList.vue:4055 显式跳过);
+     *   · 编号:save() 把载荷里的「编号」当**单据标识**取走(body.remove("编号")),
+     *     同名列的字段永远无法随保存落库(实测 rd_spec_doc_head.编号 3 张单全为 NULL)
+     *     ⇒ 拿它做必填 = 永远填不进去的死结。
+     * 命中 col_name 或 label 任一即跳过。
+     */
+    private static final java.util.Set<String> REQUIRED_SYS_FIELDS =
+            java.util.Set.of("单据编号", "单据日期", "创建时间", "更新时间", "编辑人", "编辑日期", "规格书种类", "编号");
+
+    /**
+     * 明细行必填校验(2026-09-20 补):与前端 validateInlineDraft 的**逐行**口径一致
+     * (PanelxList.vue「明细第 N 行X不能为空」),只取第一条违规,便于前端定位。
+     *
+     * 只校验**载荷里明确带了该键**的字段:
+     *   · 前端 newDetailRow() 会把每个字段都物化成 ''(空串),所以"用户清空了必填项"
+     *     必然是"键在、值为空"——这一档拦得住;
+     *   · 键缺失则视为"局部提交/选单生成"(SelectVoucherDialog/NewVoucherDialog 按来源单据
+     *     逐字段映射,目标面板多出的必填列本来就不在载荷里),不误报;
+     *   · items 为空(未带明细页签)时整体跳过——与表头"取不到就回退查库、不误报"同口径。
+     * 刻意**不做**页签级"至少添加一行"(前端 tab.isRequired 那条):后端拿不到"明细页签是空的"
+     * 与"这次根本没提交明细"的区别(singleDoc/局部提交路径都只发页签子集),由前端把关。
+     * 内部调用方(送料暂收单同步来料检验单、WoPickingHandler、PushGenerateHandler)走的都是
+     * markSaved=false,不经此处。
+     */
+    private void ensureDetailRequiredFilled(PanelRegistry.PanelDef def, List<Map<String, Object>> items) {
+        if (items == null || items.isEmpty()) return;
+        List<PanelRegistry.FieldDef> required = def.fieldsAt("detail").stream()
+                .filter(PanelRegistry.FieldDef::required)
+                .filter(f -> !REQUIRED_SYS_FIELDS.contains(f.col()))
+                .toList();
+        if (required.isEmpty()) return;
+        for (int i = 0; i < items.size(); i++) {
+            Map<String, Object> row = items.get(i);
+            if (row == null) continue;
+            for (PanelRegistry.FieldDef f : required) {
+                if (!row.containsKey(f.label())) continue; // 未提交该键 ⇒ 不误报(见方法注释)
+                Object v = row.get(f.label());
+                if (v != null && !String.valueOf(v).isBlank()) continue;
+                throw new IllegalArgumentException("明细第 " + (i + 1) + " 行" + f.displayName() + "不能为空");
+            }
+        }
+    }
+
+    /** 库中该列是否为空(列不存在 / 取不到时按"空"处理,不因缺列或异常而报错) */
+    private boolean isStoredBlank(String table, String col, String groupCol, String no) {
+        if (table == null || table.isBlank() || groupCol == null || groupCol.isBlank()) return true;
+        if (!tableCols(table).contains(col)) return true;
+        // ⚠ 三个坑(都踩过,靠跨面板探针才发现):
+        //   ① 用 queryForList(...).stream().findFirst() 取到的是 **Map** 而不是值,空值被误判为"已填";
+        //   ② queryForObject(String.class) 在该单**有多行**时抛
+        //      "Incorrect result size: expected 1, actual 2"(RD_FILTER_EFF/RD_MOLD_PROC 都命中);
+        //   ③ 头表可能根本没有该列(如单据编号列在头行错位),直接查会报"列名无效"。
+        //   ⇒ 取 TOP 1 + 捕获一切异常并回退为"空"(宁可误报必填,也不要 500)。
+        try {
+            String v = jdbc.queryForObject(
+                    "SELECT TOP 1 t.[" + col + "] FROM " + table + " t WHERE t.[" + groupCol + "] = ?",
+                    String.class, no);
+            return v == null || v.isBlank();
+        } catch (Exception e) {
+            log.debug("必填校验回退:取库中值失败(视为空) table={} col={} no={} : {}", table, col, no, e.getMessage());
+            return true;
+        }
+    }
+
     private void ensureDocNoUnique(PanelRegistry.PanelDef def, Map<String, Object> head, String no) {
         Object v = head.get("文档编号");
         if (v == null || String.valueOf(v).isBlank()) return;
@@ -393,6 +548,33 @@ public class ButtonService {
         }
         Integer dup = jdbc.queryForObject(sql.toString(), Integer.class, args.toArray());
         if (dup != null && dup > 0) throw new IllegalArgumentException("文档编号不允许重复：" + docNo);
+    }
+
+    /** 样品编号不允许重复(RD_SAMPLE_NO,2026-09-18)。
+     *  口径:样品编号 = 客户项目代号 + 项目编号(确定性拼接,无计数器 —— 见
+     *  docs/design/研发管理-新面板设计与改动方案.md §14),所以重复必然意味着
+     *  同一 (代号, 项目编号) 被录了两次。此处按明细列查重(与 ensureDocNoUnique 判头表不同,
+     *  它是**明细行**唯一),作废单据不计占用(两侧都排,口径同 ensureDocNoUnique)。 */
+    private void ensureSampleNoUnique(String docNo, List<Map<String, Object>> items) {
+        if (items == null || items.isEmpty()) return;
+        java.util.Set<String> seen = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> it : items) {
+            Object v = it.get("样品编号");
+            if (v == null) continue;
+            String sampleNo = String.valueOf(v).trim();
+            if (sampleNo.isEmpty()) continue;
+            // 同一次提交内部先查重(数据库里还没有这些行)
+            if (!seen.add(sampleNo)) throw new IllegalArgumentException("样品编号不允许重复：" + sampleNo);
+            Integer dup = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM rd_sample_no_detail d "
+                            + "JOIN rd_sample_no_head h ON h.[单据编号] = d.[单据编号] "
+                            + "WHERE d.[样品编号] = ? AND d.[单据编号] <> ? "
+                            + "AND ISNULL(h.asp_cancel,'N') <> 'Y' "
+                            + "AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_SAMPLE_NO' "
+                            + "                AND s.doc_no = h.[单据编号] AND s.canceled = 'Y')",
+                    Integer.class, sampleNo, docNo == null ? "" : docNo);
+            if (dup != null && dup > 0) throw new IllegalArgumentException("样品编号不允许重复：" + sampleNo);
+        }
     }
 
     // ==================== 规格书检验项目变更 → 出货检验计划表核对提醒(2026-09-11) ====================
@@ -898,7 +1080,8 @@ public class ButtonService {
         if ("已作废".equals(st.get("status"))) throw new IllegalStateException("已作废单据不可审核");
         if ("已中止".equals(st.get("status"))) throw new IllegalStateException("已中止单据不可审核，请先恢复");
         if ("已审核".equals(st.get("status"))) throw new IllegalStateException("单据已是已审核状态");
-        if ("审批中".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
+        // 两级审批(远端 2026-09-20):「待二级审批」同样不可直审,与「审批中」同口径拦截
+        if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
         // 编制审核分离(2026-09-12):审核人不得是制单人本人——此前有审批权的用户可自审自己制的单;
         // 管理员豁免(管理员保存即归档本就是等价权力,堵死反而制造死路)
         if (!isAdminUser(auditor) && auditor.equals(authorOfDoc(def, no)))
@@ -1030,10 +1213,26 @@ public class ButtonService {
 
     // ---- 审批流(照搬 light-mes PxService):提交/通过/驳回全留痕,防伪校验 ----
 
-    /** 提交审批:仅草稿 → 审批中 */
+    /** 提交审批(对外动作:仅草稿/修改中 → 审批中;变更单另有发起人身份与会签前置校验) */
     private Map<String, Object> submitApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
         ensureDocExists(def, no);
+        String operator = currentUserName();
+        // 产品变更申请单(2026-09-21):提交审批 = 发起人(∪管理员)的动作;勾了「需会签=是」的单
+        // 必须先会签全部通过才能送审(用户口径:会签通过才进审核)
+        if (CHANGE_PANEL.equals(def.code())) {
+            requireChangeInitiator(no, operator);
+            if ("是".equals(changeHead(no, "需会签")) && !signoffAllApproved(no))
+                throw new IllegalStateException("本单勾选了「需会签」，请先提交会签并等全部会签通过后再提交审批");
+        }
+        return doSubmitApproval(def, no, opinionOf(formData));
+    }
+
+    /**
+     * 提交审批内核(会签全部通过后由系统自动调用,故**不校验发起人身份**:最后一位会签人不是发起人)。
+     * 其余逐字同原路径:仅草稿/修改中可提交,写 pending='Y' + SUBMIT 留痕 + 通知审批人。
+     */
+    private Map<String, Object> doSubmitApproval(PanelRegistry.PanelDef def, String no, String opinion) {
         Map<String, Object> st = docStatusOf(def.code(), no);
         // 修改态(文件类:申请修改经管理员审批通过)同样可提交审批,通过后 finalizeModify 再归档
         if (!"草稿".equals(st.get("status")) && !"修改中".equals(st.get("status")))
@@ -1041,37 +1240,81 @@ public class ButtonService {
         String operator = currentUserName();
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                         + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
-                        + "WHEN MATCHED THEN UPDATE SET pending = 'Y', pending_by = ?, pending_at = GETDATE(), shr = NULL, shsj = NULL, canceled = 'N', update_at = GETDATE() "
-                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, pending, pending_by, pending_at, canceled, update_at) "
-                        + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), 'N', GETDATE());",
+                        + "WHEN MATCHED THEN UPDATE SET pending = 'Y', pending_by = ?, pending_at = GETDATE(), shr = NULL, shsj = NULL, canceled = 'N', approve_node = 1, l2_approver = NULL, update_at = GETDATE() "
+                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, pending, pending_by, pending_at, canceled, approve_node, update_at) "
+                        + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), 'N', 1, GETDATE());",
                 def.code(), no, operator, operator);
-        recordApproval(def.code(), no, "SUBMIT", "PENDING", opinionOf(formData));
+        recordApproval(def.code(), no, "SUBMIT", "PENDING", opinion);
         // 消息:提交审批 → 该面板审批人
         notify(() -> messageService.sendToApprovers(def.code(), MessageService.APPROVAL_SUBMITTED, no,
                 Map.of("docNo", no, "actor", operator), operator));
         return result(no, "审批中");
     }
 
-    /** 审批通过:仅审批中 → 已审核(需管理员/审批权限;审核人=当前登录人) */
+    /**
+     * 审批通过(2026-09-20 起支持两级:见 TWO_LEVEL_PANELS)。
+     *
+     * 一级(节点 1):现有审批权口径(管理员 ∪ 角色 can_approve)通过 → **必须选取二级审核人**
+     *   (载荷 key「二级审批人」= 账号,候选=全部启用账号;被选中即授权,不要求角色审批权),
+     *   写回纸面「审核人（二级审批人）」,单据转「待二级审批」(pending 仍为 'Y',approve_node=2),
+     *   **不归档**;被选人收 APPROVAL_L2_ASSIGNED 消息。
+     * 二级(节点 2):**被选定的二级审核人本人 ∪ 管理员**通过 → 归档(归档面板)/已审核。
+     *   二级节点不再要求 requireApprover:选取本身就是授权(cp 这类普通账号也因此能签核)。
+     * 非两级面板(其余全部面板)走原单节点路径,逐字不变。
+     */
     private Map<String, Object> approveApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
+        String operator = currentUserName();
+        int node = pendingNodeOf(def.code(), no);
+        if (node == 2) return approveSecond(def, no, operator, formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
         if (!"审批中".equals(st.get("status"))) throw new IllegalStateException("仅审批中状态可审批通过");
         requirePendingSubmission(def.code(), no);
         requireApprover(def.code());
-        String operator = currentUserName();
         // 编制审批分离(2026-09-12):审批人不得是提交人本人——此前有审批权的用户可批自己提交的单;
         // 管理员豁免(保存即归档本就是等价权力,且管理员提交后无他人可批会造死路)
         Object row = st.get("row");
         Object pendingBy = row instanceof Map<?, ?> mp ? ((Map<?, ?>) mp).get("pending_by") : null;
-        if (!isAdminUser(operator) && operator.equals(pendingBy == null ? "" : String.valueOf(pendingBy)))
+        String submitter = pendingBy == null ? "" : String.valueOf(pendingBy);
+        if (!isAdminUser(operator) && operator.equals(submitter))
             throw new org.springframework.security.access.AccessDeniedException("审批人不能与提交人相同（编制与审批分离）");
         String opinion = opinionOf(formData);
+        // ── 两级面板:一级通过 = 选二级审核人 + 转「待二级审批」,不归档 ──
+        if (TWO_LEVEL_PANELS.contains(def.code())) {
+            String l2 = pickOf(formData, "二级审批人");
+            if (l2.isEmpty()) throw new IllegalStateException("一级审批通过前必须选取二级审核人");
+            if (!isEnabledUser(l2)) throw new IllegalStateException("二级审核人账号不存在或已停用：" + l2);
+            if (!isAdminUser(operator) && l2.equals(submitter))
+                throw new IllegalStateException("二级审核人不能是提交人本人（编制与审批分离）");
+            // 竞态守卫:WHERE 带 pending='Y' 且节点=1,双击/并发只有一次生效
+            int n = jdbc.update("UPDATE yj_doc_status SET approve_node = 2, l2_approver = ?, update_at = GETDATE()"
+                            + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND ISNULL(approve_node,1) = 1",
+                    l2, def.code(), no);
+            if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
+            writeBackL2Approver(def.code(), no, l2);
+            recordApproval(def.code(), no, "APPROVE_L1", "L1_PASSED", opinion, 1);
+            final String l2f = l2;
+            notify(() -> messageService.send(List.of(l2f), MessageService.APPROVAL_L2_ASSIGNED, def.code(), no,
+                    Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion), operator));
+            return result(no, "待二级审批");
+        }
         // 竞态守卫(2026-09-12):WHERE 带 pending='Y',双击/两审批人并发只有一次生效,不再重复留痕
         int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), update_at = GETDATE()"
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion);
+        // 产品变更申请单:审批通过即**生效**(2026-09-21 用户口径第⑤条)——状态转「已生效」,
+        // 并按勾选的受控文件建下一版草稿(带来源单号)+ 通知各文件责任人重走受控审核
+        if (CHANGE_PANEL.equals(def.code())) {
+            jdbc.update("UPDATE yj_doc_status SET effective = 'Y', update_at = GETDATE() WHERE panel_code = ? AND doc_no = ?",
+                    def.code(), no);
+            String made = applyChangeEffect(no, operator);
+            recordApproval(def.code(), no, "EFFECT", "APPLIED", "已生成下一版草稿：" + made);
+            final String madeF = made;
+            notify(() -> messageService.sendToAuthor(def.headTable(), def.code(), no, MessageService.APPROVAL_APPROVED,
+                    Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion, "effect", madeF), operator));
+            return result(no, "已生效");
+        }
         // 来料检验单审批通过(与「审核」同效为已审核) → 同样触发自动生单(2026-09-16 修复:
         // 此前钩子只挂在审核路径,走 提交审批→审批通过 的检验单不生成采购入库单/暂收退回单,
         // 用户只好点手工生单按钮,而手工路径实收数量映射错误且退回单被死过滤器挡住)
@@ -1099,25 +1342,61 @@ public class ButtonService {
         return result(no, "已审核");
     }
 
-    /** 审批驳回:仅审批中 → 草稿(意见必填,驳回后修改可重新提交) */
+    /** 二级审批通过:被选定的二级审核人 ∪ 管理员 → 归档(归档面板)/已审核 */
+    private Map<String, Object> approveSecond(PanelRegistry.PanelDef def, String no, String operator, Map<String, Object> formData) {
+        String l2 = l2ApproverOf(def.code(), no);
+        if (!isAdminUser(operator) && (l2 == null || !l2.equals(operator)))
+            throw new org.springframework.security.access.AccessDeniedException("仅被选定的二级审核人（或管理员）可完成二级审批");
+        String opinion = opinionOf(formData);
+        int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), approve_node = NULL, update_at = GETDATE()"
+                        + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND approve_node = 2", operator, def.code(), no);
+        if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
+        recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion, 2);
+        inspAutoPurchaseIn(def.code(), no, operator);
+        inspAutoReturn(def.code(), no, operator);
+        notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
+                def.code(), no, MessageService.APPROVAL_APPROVED,
+                Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion), operator));
+        if (DOC_ARCHIVE_PANELS.contains(def.code())) {
+            finalizeOpenModify(def, no, operator);
+            markArchived(def.code(), no, operator);
+            return result(no, "已归档");
+        }
+        return result(no, "已审核");
+    }
+
+    /** 审批驳回:仅审批中/待二级审批 → 草稿(意见必填,驳回后修改可重新提交)
+     *  2026-09-20:两级面板任一级驳回都直接回草稿并通知制单人(口径:不退回上一级),节点标记一并清空。 */
     private Map<String, Object> rejectApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
+        int node = pendingNodeOf(def.code(), no);
+        if (node == 2) {
+            // 二级节点:被选定的二级审核人 ∪ 管理员(不要求角色审批权,选取即授权)
+            String l2 = l2ApproverOf(def.code(), no);
+            String who = currentUserName();
+            if (!isAdminUser(who) && (l2 == null || !l2.equals(who)))
+                throw new org.springframework.security.access.AccessDeniedException("仅被选定的二级审核人（或管理员）可驳回二级审批");
+        } else {
+            requirePendingSubmission(def.code(), no);
+            requireApprover(def.code());
+        }
         Map<String, Object> st = docStatusOf(def.code(), no);
-        if (!"审批中".equals(st.get("status"))) throw new IllegalStateException("仅审批中状态可审批驳回");
-        requirePendingSubmission(def.code(), no);
-        requireApprover(def.code());
+        if (!"审批中".equals(st.get("status")) && !"待二级审批".equals(st.get("status")))
+            throw new IllegalStateException("仅审批中或待二级审批状态可审批驳回");
         String opinion = opinionOf(formData);
         if (opinion.isEmpty()) throw new IllegalStateException("审批驳回必须填写审批意见");
         // 竞态守卫(2026-09-12):WHERE 带 pending='Y',并发驳回/通过只有一次生效
-        int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', update_at = GETDATE()"
+        int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', approve_node = NULL, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
-        recordApproval(def.code(), no, "REJECT", "REJECTED", opinion);
+        recordApproval(def.code(), no, "REJECT", "REJECTED", opinion, node);
         // 消息:审批驳回 → 制单人(驳回意见随消息带上)
         String rejectBy = currentUserName();
         notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
                 def.code(), no, MessageService.APPROVAL_REJECTED,
                 Map.of("docNo", no, "actor", rejectBy, "opinion", opinion), rejectBy));
+        // 产品变更申请单:驳回还要通知**已填写的部门**(部门行的签字人 → 账号),他们会知道要重填(口径 E)
+        if (CHANGE_PANEL.equals(def.code())) notifyChangeRejected(def, no, rejectBy, opinion);
         return result(no, "草稿");
     }
 
@@ -1158,10 +1437,73 @@ public class ButtonService {
     }
 
     private void recordApproval(String panelCode, String formNo, String action, String result, String opinion) {
+        recordApproval(panelCode, formNo, action, result, opinion, 1);
+    }
+
+    /** 审批留痕(带节点号):node=1 一级 / node=2 二级(两级面板用) */
+    private void recordApproval(String panelCode, String formNo, String action, String result, String opinion, int node) {
         jdbc.update("INSERT INTO yj_form_approval (panel_code, form_no, action, result, node_no, operator, opinion, create_time) "
-                        + "VALUES (?,?,?,?,1,?,?,SYSDATETIME())",
-                panelCode, formNo, action, result, currentUserName(),
+                        + "VALUES (?,?,?,?,?,?,?,SYSDATETIME())",
+                panelCode, formNo, action, result, node, currentUserName(),
                 opinion == null || opinion.isEmpty() ? null : opinion);
+    }
+
+    // ---- 两级审批公共件(2026-09-20)----
+
+    /** 走两级审批的面板(当前试点只有产品信息表;其余面板单节点路径逐字不变) */
+    private static final java.util.Set<String> TWO_LEVEL_PANELS = java.util.Set.of("RD_PROD_INFO");
+
+    /** 当前待审批节点:1=待一级(缺省)/2=待二级;不在审批中返回 1 */
+    private int pendingNodeOf(String panelCode, String no) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT approve_node, pending FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?", panelCode, no);
+        if (rows.isEmpty()) return 1;
+        Map<String, Object> r = rows.get(0);
+        if (!"Y".equals(r.get("pending"))) return 1;
+        return nodeOf(r);
+    }
+
+    /** approve_node 归一(空/0 都当 1) */
+    private static int nodeOf(Map<String, Object> row) {
+        Object v = row == null ? null : row.get("approve_node");
+        if (v == null) return 1;
+        int n = Integer.parseInt(String.valueOf(v));
+        return n == 2 ? 2 : 1;
+    }
+
+    /** 该单据一级通过时选定的二级审核人账号(无则空串) */
+    private String l2ApproverOf(String panelCode, String no) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT TOP 1 l2_approver FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?", panelCode, no);
+        if (rows.isEmpty() || rows.get(0).get("l2_approver") == null) return "";
+        return String.valueOf(rows.get(0).get("l2_approver")).trim();
+    }
+
+    /** 从载荷取一个字符串参数(去空白);键不存在返回空串 */
+    private static String pickOf(Map<String, Object> formData, String key) {
+        Object v = formData == null ? null : formData.get(key);
+        return v == null ? "" : String.valueOf(v).trim();
+    }
+
+    /** 账号是否存在且启用 */
+    private boolean isEnabledUser(String username) {
+        if (username == null || username.isBlank()) return false;
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM yj_user WHERE username = ? AND ISNULL(enabled,'1') = '1'", Integer.class, username);
+        return n != null && n > 0;
+    }
+
+    /** 一级通过:把选定的二级审核人姓名写回纸面「审核人（二级审批人）」格 */
+    private void writeBackL2Approver(String panelCode, String no, String l2Account) {
+        if (!"RD_PROD_INFO".equals(panelCode)) return;
+        List<String> names = jdbc.queryForList("SELECT real_name FROM yj_user WHERE username = ?", String.class, l2Account);
+        String name = names.isEmpty() || names.get(0) == null ? l2Account : names.get(0);
+        try {
+            jdbc.update("UPDATE rd_prod_info_head SET 审核人二级 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    name, no);
+        } catch (Exception e) {
+            log.warn("[两级审批] 写回审核人二级失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+        }
     }
 
     private String opinionOf(Map<String, Object> formData) {
@@ -1276,6 +1618,7 @@ public class ButtonService {
         if (!def.isDoc()) return delete(def, formData);
         String no = requireNo(formData);
         ensureSpecAssignEditable(def, no, user); // 已分配规格书:删除/删除申请同样仅 责任人∪总负责人∪管理员
+        if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, null, user); // 四文件门禁同口径
         String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
         if ("删除申请中".equals(st)) throw new IllegalStateException("删除申请已提交，待管理员审核");
         if ("草稿".equals(st)) return delete(def, formData);
@@ -2303,6 +2646,17 @@ public class ButtonService {
         if (spec == null) spec = planDocNo != null ? planDocNo : projectName;
         final String projNo = planDocNo != null ? planDocNo : "";
 
+        // 2026-09-18(Phase 2 · RD_PROGRESS 18 列重构)写入口径:
+        //   · 数据键一律用**旧物理列**:[项目层级](=设计「项目定级」)/[项目负责](=设计「项目负责人」)/
+        //     [里程完成](=设计「预计完成日期」)/[说明](=设计「项目编号」的匹配键)
+        //     —— 前端 progressColumns.js 的 key、Excel 导入导出、ProgressControlSheet 的
+        //     `K[label]` 全部指向这些旧列名(2026-09-18 决策:col_name 永不改,改则历史单据数据键全丢)。
+        //   · [说明] 必须与 [项目编号] 写同值,否则 UPDATE 的 `ISNULL([说明],N'')=?` 匹配不上
+        //     → 每轮都会重复 INSERT 新行(踩过)。
+        //   · [实施进度] 不写:它改由手填承载「立项日期」。
+        //   ⚠ 2026-09-22 更正:此前本方法的 SQL **同时**写 [项目负责人]/[预计完成日期](与上一行注释
+        //     宣称的"只写新列"不符),同一事实两个物理列各存一份,COALESCE 参数为 NULL 时必然分叉;
+        //     现改为只写旧列,那批无人读的新列由 migrate-rd-progress-drop-orphan-cols.sql 删除。
         int n = jdbc.update("UPDATE rd_progress_detail SET [项目层级] = COALESCE(?, [项目层级]),"
                         + " [子项目/尺寸] = ?, [项目负责] = COALESCE(?, [项目负责]),"
                         + " [里程完成] = COALESCE(?, [里程完成]), [状态] = ?"
@@ -2314,10 +2668,10 @@ public class ButtonService {
                     .info("[RD_PLAN→RD_PROGRESS] 更新 {} 行, 项目={}, 子项目={}, 状态={}", n, projectName, spec, status);
             return RES_UPDATED;
         }
-        jdbc.update("INSERT INTO rd_progress_detail ([单据编号], [项目名称], [项目层级], [子项目/尺寸], [说明],"
+        jdbc.update("INSERT INTO rd_progress_detail ([单据编号], [项目名称], [项目层级], [子项目/尺寸], [说明], [项目编号],"
                         + " [项目负责], [里程完成], [状态], asp_user1, asp_time1)"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())",
-                progressNo, projectName, level, spec, projNo, owner, due, status, currentUserName());
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())",
+                progressNo, projectName, level, spec, projNo, projNo, owner, due, status, currentUserName());
         org.slf4j.LoggerFactory.getLogger(ButtonService.class)
                 .info("[RD_PLAN→RD_PROGRESS] 新增 1 行, 进度单={}, 项目={}, 子项目={}, 状态={}", progressNo, projectName, spec, status);
         return RES_INSERTED;
@@ -2472,28 +2826,552 @@ public class ButtonService {
         return v == null ? "" : String.valueOf(v).trim();
     }
 
-    /** 产品开发下发(2026-09-09):仅产品信息表、仅已归档、按产品编号幂等 → 写 rd_dev_task 5 行。
-     *  2026-09-12:下发同时解析总负责人(「责任人」姓名→启用账号)快照进 rd_dev_task;
-     *  首次下发且负责人落实时通知负责人前来分发规格书(查无账号=挂起,不发消息,懒重解补挂)。 */
+    /** 当前登录用户是否就是该单据一级选定的二级审核人(前端据此显示「审批通过/驳回」) */
+    public boolean isL2Approver(String no) {
+        String acc = l2ApproverOf("RD_PROD_INFO", no);
+        return !acc.isEmpty() && acc.equals(currentUserName());
+    }
+
+    /** 该单据一级通过时选定的二级审核人**姓名**(前端回显;无则空串) */
+    public String l2ApproverName(String no) {
+        String acc = l2ApproverOf("RD_PROD_INFO", no);
+        if (acc.isEmpty()) return "";
+        List<String> names = jdbc.queryForList("SELECT real_name FROM yj_user WHERE username = ?", String.class, acc);
+        return names.isEmpty() || names.get(0) == null ? acc : names.get(0);
+    }
+
+    /**
+     * 「分发责任人」按钮可用性(前端侧边栏显隐/置灰用):已归档 且 (二级审核人 ∪ 管理员)。
+     * 历史单没选过二级审核人的(2026-09-20 之前的归档单)退回旧口径:有本面板编辑权即可 —— 否则存量单据无人能分发。
+     */
+    public boolean canAssignDev(String no) {
+        try {
+            String user = currentUserName();
+            if (!"已归档".equals(String.valueOf(docStatusOf("RD_PROD_INFO", no).get("status")))) return false;
+            if (!canEdit(user, "RD_PROD_INFO")) return false;
+            String l2 = l2ApproverOf("RD_PROD_INFO", no);
+            if (l2.isEmpty()) return true;
+            return isAdminUser(user) || l2.equals(user);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * 项目定级(2026-09-21 用户口径):立项申请表**审核通过之后**,由审核人在系统里给项目定级。
+     *
+     * 口径(grill 两问):
+     *   · 可点人 = 管理员 ∪ 该面板审批人(`yj_role_panel.can_approve`,即含刚通过的那位审核人);
+     *   · 时机 = 单据已审核 / 已归档(没通过审核就定级无意义);
+     *   · 载荷「项目等级」∈ 一级/二级/三级/四级(与下游 RD_PLAN.项目定级 同字典);
+     *   · 写 `rd_approval.项目等级` + 一条审批留痕(action=GRADE,result=GRADED,意见里带新旧等级);
+     *     已定级的可再改,每次留痕(不覆盖历史)。
+     * 下游:实施计划按「文档编号」参照立项申请时,项目等级 → 项目定级 由 REF_SYNONYMS 自动带回;
+     *   进度查询继续由 syncPlanToProgress 从计划同步(既有链路)。
+     */
+    private Map<String, Object> gradeProject(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_APPROVAL".equals(def.code())) throw new IllegalStateException("仅立项申请表可项目定级");
+        requireApprover(def.code());
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String status = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if (!"已审核".equals(status) && !"已归档".equals(status))
+            throw new IllegalStateException("仅已审核或已归档的立项申请可项目定级(当前:" + status + ")");
+        String level = pickOf(formData, "项目等级");
+        if (!PROJECT_LEVELS.contains(level))
+            throw new IllegalStateException("项目等级取值不合法(应为 一级/二级/三级/四级):" + level);
+        String old = "";
+        List<String> cur = jdbc.queryForList(
+                "SELECT TOP 1 项目等级 FROM rd_approval WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, no);
+        if (!cur.isEmpty() && cur.get(0) != null) old = cur.get(0).trim();
+        int n = jdbc.update("UPDATE rd_approval SET 项目等级 = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", level, currentUserName(), no);
+        if (n == 0) throw new IllegalStateException("立项申请不存在或已作废:" + no);
+        String opinion = old.isEmpty() ? "项目定级：" + level : "项目定级：" + old + " → " + level;
+        recordApproval(def.code(), no, "GRADE", "GRADED", opinion);
+        return result(no, status.isEmpty() ? "已审核" : status);
+    }
+
+    /** 项目等级取值(与下游 RD_PLAN.项目定级 / RD_PROGRESS.项目定级 同字典;2026-09-21 四级统一) */
+    private static final java.util.Set<String> PROJECT_LEVELS =
+            java.util.Set.of("一级", "二级", "三级", "四级");
+
+    // ══════════ 产品变更申请单(RD_CHANGE):部门评审行 + 按部门按格编辑门禁 ══════════
+    // 用户口径(2026-09-21 第③条):各部门按各自账号分工填本部门栏目,每人只能改自己填写的内容,
+    //   「变更后内容」是可编辑区。部门行 = 纸面 YJ-QR-130「部门评审意见」的 7 行(开发部/成型工艺科/
+    //   组装车间/销售部/品质部/计划组/仓管部);账号能填哪一行 = yj_user.dept_id → yj_change_dept
+    //   (纸面部门 ↔ 系统部门映射,因为纸面部门名在 yj_dept 里并不存在,见 migrate-change-dept-map.sql)。
+    // 门禁是**按格**的:本部门行只放行「变更后内容/备注」(表区/部门/签字/日期一律按库内现值还原),
+    //   别的部门行整体还原;载荷省略某行不会把它软删(省略即删除=抹掉别人已填内容);
+    //   新增行只允许预置部门名。管理员豁免(可代填任何行)。签字/日期由服务端盖章(防伪造签名)。
+
+    /** 变更申请单面板编码 */
+    private static final String CHANGE_PANEL = "RD_CHANGE";
+    /** 部门评审行的表区值(与前端纸张配置同名) */
+    private static final String CHANGE_DEPT_SECTION = "部门评审意见";
+    /** 部门行里可由填写人改的列(其余列一律以库内现值为准) */
+    private static final java.util.Set<String> CHANGE_EDITABLE_COLS =
+            java.util.Set.of("变更后内容", "备注");
+
+    /** 纸面部门行清单(去重,按 sort;映射表为空=不铺行,只留管理员可用) */
+    private List<String> changeDeptRows() {
+        return jdbc.queryForList("SELECT 部门 FROM yj_change_dept GROUP BY 部门, sort ORDER BY MIN(sort), 部门", String.class);
+    }
+
+    /** 当前账号可填的纸面部门行(按 yj_user.dept_id 命中 yj_change_dept;管理员另行豁免,不在此列) */
+    private java.util.Set<String> changeDeptsOf(String user) {
+        return new java.util.HashSet<>(jdbc.queryForList(
+                "SELECT DISTINCT c.部门 FROM yj_change_dept c JOIN yj_user u ON u.dept_id = c.dept_id WHERE u.username = ?",
+                String.class, user));
+    }
+
+    /** 操作人姓名(签字盖章用;取不到回退账号) */
+    private String realNameOf(String user) {
+        List<String> names = jdbc.queryForList("SELECT real_name FROM yj_user WHERE username = ?", String.class, user);
+        return names.isEmpty() || names.get(0) == null || names.get(0).isBlank() ? user : names.get(0);
+    }
+
+    /** 空值安全的字符串(去空白;null/空 → 空串) */
+    private static String blankSafe(Object o) {
+        return o == null ? "" : String.valueOf(o).trim();
+    }
+
+    /**
+     * 确保 7 个预置部门行存在(幂等,建单/每次保存都调):
+     * ① 有存活行 → 不动;② 有被软删的行 → 复活它(保住 id,行号/引用不乱);③ 都没有 → 插一行空白行。
+     */
+    private void ensureChangeDeptRows(PanelRegistry.PanelDef def, String no, String user) {
+        for (String dept : changeDeptRows()) {
+            List<Object> dead = jdbc.queryForList("SELECT TOP 1 id FROM " + def.lineTable()
+                            + " WHERE " + def.groupCol() + " = ? AND 部门 = ? AND ISNULL(asp_cancel,'N') = 'Y' ORDER BY id",
+                    Object.class, no, dept);
+            if (!dead.isEmpty()) {
+                jdbc.update("UPDATE " + def.lineTable() + " SET asp_cancel = 'N', 表区 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
+                        CHANGE_DEPT_SECTION, user, dead.get(0));
+                continue;
+            }
+            Integer alive = jdbc.queryForObject("SELECT COUNT(*) FROM " + def.lineTable()
+                            + " WHERE " + def.groupCol() + " = ? AND 部门 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    Integer.class, no, dept);
+            if (alive != null && alive > 0) continue;
+            Map<String, Object> cols = new LinkedHashMap<>();
+            cols.put(def.groupCol(), no);
+            cols.put("表区", CHANGE_DEPT_SECTION);
+            cols.put("部门", dept);
+            cols.put("变更后内容", "");
+            insertRow(def.lineTable(), cols, user);
+        }
+    }
+
+    /**
+     * 按格门禁:就地改写 items(调用方随后照常 upsert)。
+     * 还原口径 —— 非本部门行(或本部门的非可编辑列)= 库内现值;缺席的部门行 = 原值补回(不软删)。
+     */
+    private void gateChangeDetail(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String no, String user) {
+        boolean admin = isAdminUser(user);
+        java.util.Set<String> mine = admin ? java.util.Set.of() : changeDeptsOf(user);
+        List<String> canonical = changeDeptRows();
+        List<Map<String, Object>> db = jdbc.queryForList("SELECT id, 部门, 表区, 变更后内容, 签字, 日期, 备注 FROM "
+                + def.lineTable() + " WHERE " + def.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
+        Map<String, Map<String, Object>> byId = new LinkedHashMap<>();
+        Map<String, Map<String, Object>> byDept = new LinkedHashMap<>();
+        for (Map<String, Object> r : db) {
+            byId.put(String.valueOf(r.get("id")), r);
+            byDept.putIfAbsent(blankSafe(r.get("部门")), r);
+        }
+        String operator = realNameOf(user);
+        java.util.Set<String> seen = new java.util.HashSet<>();
+        for (Map<String, Object> it : items) {
+            Object id = it.get("id");
+            Map<String, Object> cur = id == null || String.valueOf(id).isBlank() ? null : byId.get(String.valueOf(id));
+            if (cur == null) {
+                // 新增行:只认预置部门名(否则等于自己造一行"自己的部门"绕过映射表)
+                String dept = blankSafe(it.get("部门"));
+                if (!canonical.contains(dept))
+                    throw new IllegalStateException("部门评审只能填预置部门行（" + String.join("、", canonical)
+                            + "），不能新增「" + dept + "」行");
+                if (!admin && !mine.contains(dept))
+                    throw new org.springframework.security.access.AccessDeniedException(
+                            "只能填写本部门（" + String.join("、", mine) + "）的栏目");
+                Map<String, Object> exist = byDept.get(dept);
+                if (exist != null) {   // 该部门已有行(如并发插入过):按那一行改写,不另插一行
+                    seen.add(String.valueOf(exist.get("id")));
+                    restoreRow(exist, it, true);
+                    stampSignature(it, exist, operator);
+                } else {
+                    it.put("表区", CHANGE_DEPT_SECTION);
+                    stampSignature(it, null, operator);
+                }
+                continue;
+            }
+            seen.add(String.valueOf(cur.get("id")));
+            boolean own = admin || mine.contains(blankSafe(cur.get("部门")));
+            restoreRow(cur, it, own);
+            if (own) stampSignature(it, cur, operator);
+        }
+        // 缺席行补回:部门行不因载荷省略而被软删(软删 = 抹掉别的部门已填的内容)
+        for (Map.Entry<String, Map<String, Object>> e : byId.entrySet()) {
+            if (seen.contains(e.getKey())) continue;
+            items.add(new LinkedHashMap<>(e.getValue()));
+        }
+    }
+
+    /** 还原:可编辑列保留载荷值,其余列(含 部门/表区/签字/日期/单据编号)一律写回库内现值 */
+    private void restoreRow(Map<String, Object> cur, Map<String, Object> it, boolean editable) {
+        for (Map.Entry<String, Object> e : cur.entrySet()) {
+            String k = e.getKey();
+            if ("id".equals(k)) continue;
+            if (editable && CHANGE_EDITABLE_COLS.contains(k)) continue;
+            it.put(k, e.getValue());
+        }
+        it.put("id", cur.get("id"));
+    }
+
+    /**
+     * 服务端盖章:只有「变更后内容」真的变成了非空文本才动签字/日期 ——
+     * 签字 = 操作人姓名、日期 = 今天;空值/没变 → 一律不动(①空串在本引擎里是"不改动"语义,
+     * 见 labelsToCols 注释;②管理员只改表头时不能把各部门的签字刷成自己)。
+     * 载荷自带的签字/日期已被 restoreRow 还原,伪造签名到不了这里。
+     */
+    private void stampSignature(Map<String, Object> it, Map<String, Object> cur, String operator) {
+        String now = blankSafe(it.get("变更后内容"));
+        String old = cur == null ? "" : blankSafe(cur.get("变更后内容"));
+        if (now.isEmpty() || now.equals(old)) return;
+        it.put("签字", operator);
+        it.put("日期", LocalDate.now().toString());
+    }
+
+    // ══════════ 产品变更申请单:会签 / 审批 / 生效钩子(2026-09-21 第④⑤条) ══════════
+    // 状态链:草稿 →(填写中)→ 会签中(可选)→ 审批中(admin)→ 已生效;驳回回草稿。
+    // 会签不改表:会签人在 rd_change_head.会签人(账号,逗号/顿号/分号分隔),每签一行落既有
+    //   yj_form_approval(action='SIGNOFF'),「会签中」= 存在 PENDING 签名(照 yj_plan_term 的做法)。
+    // 生效 = 按勾选的受控文件**复制出下一版草稿**(带「变更来源单号」)+ 通知该文件责任人。
+
+    /** 四个受控文件:显示名(勾选写入 rd_change_head.变更文件,顿号分隔)→ 面板编码 */
+    private static final Map<String, String> CHANGE_FILE_PANELS = Map.of(
+            "成型工艺清单", "RD_MOLD_PROC",
+            "组装工艺清单", "RD_ASM_PROC",
+            "规格书", "RD_SPEC_DOC",
+            "出货检验计划表", "RD_INSP_PLAN");
+
+    /** 变更单头字段取值(取不到返回空串) */
+    private String changeHead(String no, String col) {
+        List<String> v = jdbc.queryForList("SELECT ISNULL([" + col + "], N'') FROM rd_change_head WHERE 单据编号 = ?", String.class, no);
+        return v.isEmpty() ? "" : String.valueOf(v.get(0)).trim();
+    }
+
+    /** 制单人(rd_change_head.asp_user1;查不到返回空串) */
+    private String changeAuthor(String no) {
+        List<String> v = jdbc.queryForList("SELECT TOP 1 ISNULL(asp_user1, N'') FROM rd_change_head WHERE 单据编号 = ?", String.class, no);
+        return v.isEmpty() ? "" : String.valueOf(v.get(0)).trim();
+    }
+
+    /** 变更单的身份门禁:只有**发起人(制单人)∪ 管理员**能提交会签/提交审批/撤回会签 */
+    private void requireChangeInitiator(String no, String user) {
+        if (isAdminUser(user)) return;
+        String author = changeAuthor(no);
+        if (author.isEmpty() || !author.equals(user))
+            throw new org.springframework.security.access.AccessDeniedException("只有本变更单的发起人（或管理员）可以执行该动作");
+    }
+
+    /** 会签人账号清单(rd_change_head.会签人:逗号/顿号/分号/空格分隔;去重保序) */
+    private List<String> signersOf(String no) {
+        String raw = changeHead(no, "会签人");
+        Set<String> seen = new java.util.LinkedHashSet<>();
+        for (String s : raw.split("[,，、;；\\s]+")) if (!s.isBlank()) seen.add(s.trim());
+        return new ArrayList<>(seen);
+    }
+
+    /** 会签结果(会签人账号 → result);重发会签时旧行已删,故一账号一行 */
+    private Map<String, String> signoffResults(String no) {
+        Map<String, String> out = new LinkedHashMap<>();
+        jdbc.query("SELECT operator, result FROM yj_form_approval WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' ORDER BY id",
+                (java.sql.ResultSet rs) -> {   // 块体=void → RowCallbackHandler(表达式体会被当成 ResultSetExtractor,不遍历行)
+                    out.put(String.valueOf(rs.getString("operator")).trim(), String.valueOf(rs.getString("result")));
+                },
+                CHANGE_PANEL, no);
+        return out;
+    }
+
+    /** 还等着签的会签人(「会签中」的判据) */
+    private List<String> signoffPending(String no) {
+        return signoffResults(no).entrySet().stream()
+                .filter(e -> "PENDING".equals(e.getValue())).map(Map.Entry::getKey).toList();
+    }
+
+    /** 会签是否已全部通过(至少一人,且无 PENDING/REJECTED) */
+    private boolean signoffAllApproved(String no) {
+        Map<String, String> res = signoffResults(no);
+        return !res.isEmpty() && res.values().stream().allMatch("APPROVED"::equals);
+    }
+
+    /** 会签留痕(operator = 会签人本人,不是当前操作者) */
+    private void recordSignoff(String no, String signer, String result, String opinion) {
+        jdbc.update("INSERT INTO yj_form_approval (panel_code, form_no, action, result, node_no, operator, opinion, create_time) "
+                        + "VALUES (?,?,?,?,1,?,?,SYSDATETIME())",
+                CHANGE_PANEL, no, "SIGNOFF", result, signer, opinion == null || opinion.isEmpty() ? null : opinion);
+    }
+
+    /**
+     * 提交会签(发起人 ∪ 管理员):勾了「需会签=是」且填了会签人才能提交。
+     * 重发会签会清掉上一轮签名(驳回后再发起=新一轮),每个会签人收 SIGNOFF_REQUESTED。
+     */
+    private Map<String, Object> submitSignoff(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!CHANGE_PANEL.equals(def.code())) throw new IllegalStateException("仅产品变更申请单可提交会签");
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String user = currentUserName();
+        requireChangeInitiator(no, user);
+        String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if ("会签中".equals(st)) throw new IllegalStateException("本单会签进行中，无需重复提交");
+        if (!"草稿".equals(st)) throw new IllegalStateException("仅草稿状态可提交会签（当前：" + st + "）");
+        if (!"是".equals(changeHead(no, "需会签"))) throw new IllegalStateException("本单未勾选「需会签」，直接提交审批即可");
+        List<String> signers = signersOf(no);
+        if (signers.isEmpty()) throw new IllegalStateException("请先填写会签人（账号）");
+        if (signers.contains(user) && !isAdminUser(user))
+            throw new IllegalStateException("发起人不能是会签人（编制与会签分离）");
+        for (String s : signers)
+            if (!isEnabledUser(s)) throw new IllegalStateException("会签人账号不存在或已停用：" + s);
+        jdbc.update("DELETE FROM yj_form_approval WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF'", CHANGE_PANEL, no);
+        for (String s : signers) recordSignoff(no, s, "PENDING", "");
+        recordApproval(def.code(), no, "SIGNOFF_SUBMIT", "PENDING", "会签人：" + String.join("、", signers));
+        notify(() -> messageService.send(signers, MessageService.SIGNOFF_REQUESTED, def.code(), no,
+                Map.of("docNo", no, "actor", user, "panelName", def.name()), user));
+        return result(no, "会签中");
+    }
+
+    /** 会签通过(仅本单会签人):全部签完 → **自动**转审批中(用户口径:会签通过才进审核) */
+    private Map<String, Object> signoffApprove(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String user = currentUserName();
+        requireSigner(no, user);
+        String opinion = opinionOf(formData);
+        int n = jdbc.update("UPDATE yj_form_approval SET result = 'APPROVED', opinion = ?, create_time = SYSDATETIME() "
+                        + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING' AND operator = ?",
+                opinion.isEmpty() ? null : opinion, CHANGE_PANEL, no, user);
+        if (n == 0) throw new IllegalStateException("会签已处理，请刷新后查看");
+        if (signoffPending(no).isEmpty()) {
+            // 全部通过:转审批中(走提交内核——刻意跳过发起人校验,最后一位会签人通常不是发起人)
+            doSubmitApproval(def, no, opinion);
+            notify(() -> messageService.sendToAuthor(def.headTable(), def.code(), no, MessageService.SIGNOFF_PASSED,
+                    Map.of("docNo", no, "actor", user, "panelName", def.name()), user));
+            return result(no, "审批中");
+        }
+        return result(no, "会签中");
+    }
+
+    /** 会签驳回(仅本单会签人,意见必填):回草稿,其余待签一并作废,通知发起人 */
+    private Map<String, Object> signoffReject(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String user = currentUserName();
+        requireSigner(no, user);
+        String opinion = opinionOf(formData);
+        if (opinion.isEmpty()) throw new IllegalStateException("会签驳回必须填写意见");
+        int n = jdbc.update("UPDATE yj_form_approval SET result = 'REJECTED', opinion = ?, create_time = SYSDATETIME() "
+                        + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING' AND operator = ?",
+                opinion, CHANGE_PANEL, no, user);
+        if (n == 0) throw new IllegalStateException("会签已处理，请刷新后查看");
+        // 其余待签作废(一票否决:不留"还在会签中"的假状态)
+        jdbc.update("UPDATE yj_form_approval SET result = 'CANCELED', opinion = N'他人已驳回，本签作废', create_time = SYSDATETIME() "
+                + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING'", CHANGE_PANEL, no);
+        recordApproval(def.code(), no, "SIGNOFF_REJECT", "REJECTED", opinion);
+        notify(() -> messageService.sendToAuthor(def.headTable(), def.code(), no, MessageService.SIGNOFF_REJECTED,
+                Map.of("docNo", no, "actor", user, "opinion", opinion, "panelName", def.name()), user));
+        return result(no, "草稿");
+    }
+
+    /** 撤回会签(发起人 ∪ 管理员):会签中 → 草稿(卡死出口,照「撤回删除/修改申请」口径) */
+    private Map<String, Object> signoffWithdraw(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String user = currentUserName();
+        requireChangeInitiator(no, user);
+        if (signoffPending(no).isEmpty()) throw new IllegalStateException("本单当前没有待签的会签");
+        jdbc.update("UPDATE yj_form_approval SET result = 'WITHDRAWN', opinion = N'发起人撤回', create_time = SYSDATETIME() "
+                + "WHERE panel_code = ? AND form_no = ? AND action = 'SIGNOFF' AND result = 'PENDING'", CHANGE_PANEL, no);
+        recordApproval(def.code(), no, "SIGNOFF_WITHDRAW", "WITHDRAWN", "撤回人：" + user);
+        // 不打扰会签人:撤回=这轮不算,发起人改完会重新发起会签(那时会再收到请求)
+        return result(no, "草稿");
+    }
+
+    /** 会签人身份校验(管理员豁免:救急可代签,与其余动作同口径) */
+    private void requireSigner(String no, String user) {
+        if (isAdminUser(user)) return;
+        if (!signersOf(no).contains(user))
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "仅本单会签人（" + String.join("、", signersOf(no)) + "）可会签");
+    }
+
+    /**
+     * 变更生效钩子(审批通过时执行):按 rd_change_head.变更文件 勾选的每个文件
+     * **复制出下一版草稿**(带「变更来源单号」= 本变更单号)+ 通知该文件责任人(rd_dev_task.负责人;
+     * 没登记责任人时兜底通知管理员,避免"生成了没人知道")。
+     * 返回「显示名 新单号」清单(写进生效留痕,便于日后追)。
+     */
+    private String applyChangeEffect(String no, String operator) {
+        List<String> names = new ArrayList<>();
+        for (Map.Entry<String, String> e : CHANGE_FILE_PANELS.entrySet()) {
+            if (!changeHead(no, "变更文件").contains(e.getKey())) continue;
+            String panelCode = e.getValue();
+            try {
+                String product = changeHead(no, "产品编号");
+                String newNo = cloneDocForChange(panelCode, product, no, operator);
+                if (newNo == null) continue;
+                names.add(e.getKey() + " " + newNo);
+                String assignee = devTaskService.assignsOf(product).get(panelCode);
+                final String doc = newNo, actor = operator, productName = changeHead(no, "产品名称");
+                if (assignee != null && !assignee.isBlank()) {
+                    notify(() -> messageService.send(List.of(assignee), MessageService.CHANGE_EFFECTIVE, panelCode, doc,
+                            Map.of("docNo", doc, "changeNo", no, "actor", actor, "panelName", e.getKey()), actor));
+                } else {
+                    notify(() -> messageService.sendToAdmins(panelCode, doc, MessageService.CHANGE_EFFECTIVE,
+                            Map.of("docNo", doc, "changeNo", no, "actor", actor, "panelName", e.getKey()), actor));
+                }
+            } catch (Exception ex) {
+                log.warn("change-effect: 生成下一版草稿失败 panel={} change={} err={}", panelCode, no, ex.getMessage());
+                names.add(e.getKey() + " 生成失败：" + ex.getMessage());
+            }
+        }
+        return names.isEmpty() ? "（本单未勾选受控文件，未生成草稿）" : String.join("；", names);
+    }
+
+    /**
+     * 为变更单复制出某受控文件的**下一版草稿**:
+     * 有既有版本(该产品最新一张未作废单)→ 整单复制(头字段 + 全部明细行),新单号、`变更来源单号`=变更单号;
+     * 没有既有版本 → 建一张只带产品标识与来源单号的空白草稿(受控文件本来就是新做的)。
+     * 新单是**草稿**(saved='Y' 未审核),责任人按正常流程编辑→保存→重新走受控审核。
+     */
+    private String cloneDocForChange(String panelCode, String product, String changeNo, String operator) {
+        PanelRegistry.PanelDef t = registry.panel(panelCode);
+        if (t == null || !t.isDoc()) return null;
+        String pkey = DevTaskService.productKeyOf(panelCode);
+        String srcNo = null;
+        if (product != null && !product.isBlank()) {
+            List<String> src = jdbc.queryForList("SELECT TOP 1 " + t.groupCol() + " FROM " + t.headTable()
+                    + " WHERE [" + pkey + "] = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC", String.class, product);
+            srcNo = src.isEmpty() ? null : String.valueOf(src.get(0));
+        }
+        String newNo = formNoService.next(t.prefix(), operator);
+        Map<String, Object> headCols = new LinkedHashMap<>();
+        if (srcNo != null) {
+            Map<String, Object> src = jdbc.queryForMap("SELECT * FROM " + t.headTable() + " WHERE " + t.groupCol() + " = ?", srcNo);
+            for (Map.Entry<String, Object> e : src.entrySet()) {
+                String c = e.getKey();
+                if ("id".equals(c) || t.groupCol().equals(c) || c.startsWith("asp_") || "变更来源单号".equals(c)) continue;
+                headCols.put(c, e.getValue());
+            }
+        } else {
+            if (product != null && !product.isBlank()) headCols.put(pkey, product);
+        }
+        if (tableCols(t.headTable()).contains("变更来源单号")) headCols.put("变更来源单号", changeNo);
+        headCols.put(t.groupCol(), newNo);
+        insertRow(t.headTable(), headCols, operator);
+        if (srcNo != null) {
+            List<Map<String, Object>> lines = jdbc.queryForList("SELECT * FROM " + t.lineTable()
+                    + " WHERE " + t.groupCol() + " = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", srcNo);
+            for (Map<String, Object> line : lines) {
+                Map<String, Object> cols = new LinkedHashMap<>();
+                for (Map.Entry<String, Object> e : line.entrySet()) {
+                    String c = e.getKey();
+                    if ("id".equals(c) || t.groupCol().equals(c) || c.startsWith("asp_")) continue;
+                    cols.put(c, e.getValue());
+                }
+                cols.keySet().retainAll(tableCols(t.lineTable()));
+                cols.put(t.groupCol(), newNo);
+                insertRow(t.lineTable(), cols, operator);
+            }
+        }
+        markDocSaved(panelCode, newNo, true);
+        return newNo;
+    }
+
+    /** 变更单审批驳回:通知发起人与**已填写部门**(部门行的签字人 → 账号),让他们知道要重新填 */
+    private void notifyChangeRejected(PanelRegistry.PanelDef def, String no, String actor, String opinion) {
+        Set<String> targets = new java.util.LinkedHashSet<>();
+        String author = changeAuthor(no);
+        if (!author.isBlank()) targets.add(author);
+        jdbc.query("SELECT DISTINCT 签字 FROM rd_change_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' "
+                        + "AND ISNULL(签字, N'') <> N''", (java.sql.ResultSet rs) -> {
+                    String name = String.valueOf(rs.getString(1)).trim();
+                    if (!name.isEmpty()) targets.add(name);
+                }, no);
+        if (targets.isEmpty()) return;
+        // 签字存的是姓名:能对上账号的按账号通知,对不上的落管理员(不静默丢)
+        List<String> users = new ArrayList<>();
+        for (String t : targets) {
+            String u = devTaskService.resolveUsername(t);
+            if (u != null && !u.isBlank() && isEnabledUser(u)) users.add(u);
+        }
+        final String op = opinion;
+        if (users.isEmpty()) {
+            notify(() -> messageService.sendToAdmins(def.code(), no, MessageService.CHANGE_REJECTED,
+                    Map.of("docNo", no, "actor", actor, "opinion", op, "panelName", def.name()), actor));
+            return;
+        }
+        notify(() -> messageService.send(users, MessageService.CHANGE_REJECTED, def.code(), no,
+                Map.of("docNo", no, "actor", actor, "opinion", op, "panelName", def.name()), actor));
+    }
+
+    /**
+     * 分发责任人(2026-09-20;按钮名沿用「产品开发」兼容,新名「分发责任人」)。
+     *
+     * 口径(grill 六问):仅产品信息表、仅**已归档**;执行人 = **一级通过时选定的二级审核人 ∪ 管理员**
+     *   (历史单没选过二级审核人的,退回旧口径:有本面板编辑权即可,避免存量卡死);
+     * 载荷「分发责任人」= { 面板编码: 账号 } —— 四个下游文件**各自**指定一个责任人;
+     *   不传该键时按旧口径用「产品负责人」解析出的账号兜底(可为空 = 任务挂起)。
+     * 幂等:已分发过的产品可**随时改人**(改写 rd_dev_task.负责人),不再是"发过一次就锁死";
+     * 每个责任人收到 TASK_ASSIGNED 消息(操作人自己除外)。
+     */
     private Map<String, Object> dispatchDev(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!"RD_PROD_INFO".equals(def.code())) throw new IllegalStateException("仅产品信息表可下发产品开发");
+        if (!"RD_PROD_INFO".equals(def.code())) throw new IllegalStateException("仅产品信息表可分发责任人");
         String user = currentUserName();
         if (!canEdit(user, def.code()))
             throw new org.springframework.security.access.AccessDeniedException("当前角色无该面板编辑权限");
         String no = requireNo(formData);
         ensureDocExists(def, no);
         String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
-        if (!"已归档".equals(st)) throw new IllegalStateException("仅已归档的产品信息表可下发产品开发");
+        if (!"已归档".equals(st)) throw new IllegalStateException("仅已归档的产品信息表可分发责任人");
+        String l2 = l2ApproverOf(def.code(), no);
+        if (!l2.isEmpty() && !isAdminUser(user) && !l2.equals(user))
+            throw new org.springframework.security.access.AccessDeniedException("仅二级审核人或管理员可分发责任人");
         Map<String, Object> head = jdbc.queryForMap(
                 "SELECT TOP 1 产品编号, 产品名称, 责任人 FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         String productCode = head.get("产品编号") == null ? "" : String.valueOf(head.get("产品编号")).trim();
         String productName = head.get("产品名称") == null ? "" : String.valueOf(head.get("产品名称")).trim();
-        if (productCode.isEmpty()) throw new IllegalStateException("产品信息表的「产品编号」为空,无法下发");
+        if (productCode.isEmpty()) throw new IllegalStateException("产品信息表的「产品编号」为空,无法分发责任人");
         String respName = head.get("责任人") == null ? "" : String.valueOf(head.get("责任人")).trim();
         String supervisor = devTaskService.resolveUsername(respName);
-        Map<String, Object> out = devTaskService.dispatch(productCode, productName, no, user, supervisor);
-        boolean fresh = !Boolean.TRUE.equals(out.get("already"));
-        if (fresh && supervisor != null && !supervisor.equals(user)) {
+        // 分工:载荷「分发责任人」= { 面板: 账号 };只认四个下游面板,账号必须存在且启用
+        Map<String, String> picks = new java.util.LinkedHashMap<>();
+        Object raw = formData == null ? null : formData.get("分发责任人");
+        if (raw instanceof Map<?, ?> m) {
+            for (Map.Entry<?, ?> e : m.entrySet()) {
+                String panel = String.valueOf(e.getKey());
+                String acc = e.getValue() == null ? "" : String.valueOf(e.getValue()).trim();
+                if (!DevTaskService.devPanelCodes().contains(panel)) continue;
+                if (acc.isEmpty()) continue;
+                if (!isEnabledUser(acc)) throw new IllegalStateException("责任人账号不存在或已停用：" + acc);
+                picks.put(panel, acc);
+            }
+        }
+        Map<String, Object> out = devTaskService.dispatch(productCode, productName, no, user, supervisor, picks);
+        // 每个新指定的责任人(≠操作人)收 TASK_ASSIGNED 消息
+        @SuppressWarnings("unchecked")
+        Map<String, String> assigns = (Map<String, String>) out.getOrDefault("assigns", Map.of());
+        Set<String> fresh = new java.util.LinkedHashSet<>();
+        for (Map.Entry<String, String> e : assigns.entrySet()) {
+            if (e.getValue() != null && !e.getValue().isBlank() && !e.getValue().equals(user)) fresh.add(e.getValue());
+        }
+        if (!fresh.isEmpty()) {
+            final List<String> to = new ArrayList<>(fresh);
+            notify(() -> messageService.send(to, MessageService.TASK_ASSIGNED, "RD_PROD_INFO", no,
+                    Map.of("productCode", productCode, "productName", productName), user));
+        }
+        // 旧口径消息:首次分发且总负责人落实时,提醒他安排规格书(二级审核人 ≠ 总负责人时才有意义)
+        boolean firstTime = !Boolean.TRUE.equals(out.get("already"));
+        if (firstTime && supervisor != null && !supervisor.equals(user) && !fresh.contains(supervisor)) {
             final String sup = supervisor;
             notify(() -> messageService.send(List.of(sup), MessageService.SPEC_DISPATCHED, "RD_PROD_INFO", no,
                     Map.of("productCode", productCode, "productName", productName), user));
@@ -2502,10 +3380,112 @@ public class ButtonService {
         r.put("already", out.get("already"));
         r.put("productCode", productCode);
         r.put("panels", out.get("panels"));
+        r.put("assigns", assigns);
         r.put("supervisor", out.get("supervisor"));
         r.put("supervisorName", out.get("supervisorName"));
         r.put("supervisorResolved", out.get("supervisorResolved"));
         return r;
+    }
+
+    /**
+     * 四个下游文件的编辑门禁(2026-09-20 用户口径:未分发禁编;分发后只放该文件责任人 ∪ 管理员;
+     * 四文件并行、无串行依赖)。服务端强制(前端仍保留提示)。
+     *
+     * 三条豁免/放宽:
+     *   · 管理员恒可;
+     *   · 单据**产品编号为空**(历史单/未关联产品的旧单)不拦 —— 否则 22 张既有成型工艺清单被锁死;
+     *   · 规格书额外放「该单已分配的责任人 / 产品总负责人」:沿用 2026-09-12 的两级分发口径,
+     *     不让既有 rd_spec_assign 分配白做(新口径的责任人在分发时会被设为 rd_dev_task.负责人,两套一致)。
+     */
+    private void ensureDevFileEditable(PanelRegistry.PanelDef def, String no, Map<String, Object> head, String user) {
+        DevFileEdit v = devFileEditVerdict(def, no, head, user);
+        if (!v.ok()) throw v.denied() == 1
+                ? new IllegalStateException(v.reason())
+                : new org.springframework.security.access.AccessDeniedException(v.reason());
+    }
+
+    /**
+     * 四文件能不能编的**判定**(单一真源):保存门禁 {@link #ensureDevFileEditable} 与前端置灰用的
+     * 接口 {@link #devFileEditState} 都走这里 —— 两边口径必须逐字一致,否则又会出现
+     * "界面让改、保存被拒"(2026-09-21 走查发现的 UX 缺口)。
+     *
+     * @param denied 拒绝类型:1 = 未分发给 IllegalStateException(业务态,提示去分发),
+     *               2 = 非责任人给 AccessDeniedException(权限态)
+     */
+    private record DevFileEdit(boolean applicable, boolean ok, String reason, String productCode,
+                               String owner, String ownerName, int denied) {
+        static DevFileEdit notApplicable() { return new DevFileEdit(false, true, "", "", "", "", 0); }
+    }
+
+    /** 责任人姓名(空账号回空串;用于前端提示"本文件责任人是谁") */
+    private String ownerNameOf(String username) {
+        return username == null || username.isBlank() ? "" : realNameOf(username);
+    }
+
+    private DevFileEdit devFileEditVerdict(PanelRegistry.PanelDef def, String no, Map<String, Object> head, String user) {
+        if (!DevTaskService.devPanelCodes().contains(def.code())) return DevFileEdit.notApplicable();
+        if (isAdminUser(user)) return new DevFileEdit(true, true, "", "", "", "", 0);
+        String key = DevTaskService.productKeyOf(def.code());
+        String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
+        String productCode = "";
+        // ① 先看**本次载荷**:新建/首次填产品编号时库里还没有这一格,只看库会漏拦(实测漏过)
+        //    ⚠ 规格书例外:save() 把载荷「编号」当单据标识取走,产品编号只能从库读(由规格书分发盖章)
+        if (head != null && !"RD_SPEC_DOC".equals(def.code())) {
+            Object v = head.get(key);
+            if (v == null) v = head.get("产品编号");
+            if (v != null && !String.valueOf(v).isBlank()) productCode = String.valueOf(v).trim();
+        }
+        // ② 再看库里已存值
+        if (productCode.isEmpty() && no != null && !no.isBlank()) {
+            try {
+                List<String> rows = jdbc.queryForList("SELECT TOP 1 [" + key + "] FROM " + table
+                        + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, no);
+                if (!rows.isEmpty() && rows.get(0) != null) productCode = rows.get(0).trim();
+            } catch (Exception e) {
+                return DevFileEdit.notApplicable(); // 取不到产品键(缺列等)⇒ 不拦,避免误伤
+            }
+        }
+        if (productCode.isEmpty()) return DevFileEdit.notApplicable();   // 历史单(无产品编号)豁免
+        String owner = null, ownerName = "";
+        Map<String, String> assigns = devTaskService.assignsOf(productCode);
+        if (assigns.isEmpty())
+            return new DevFileEdit(true, false,
+                    "该产品(" + productCode + ")尚未分发责任人，请先在产品信息表点「分发责任人」",
+                    productCode, "", "", 1);
+        owner = assigns.get(def.code());
+        if (user.equals(owner)) return new DevFileEdit(true, true, "", productCode, owner, ownerNameOf(owner), 0);
+        if ("RD_SPEC_DOC".equals(def.code())) {
+            // 兼容既有规格书两级分发:已分配的责任人 / 产品总负责人照样可编辑
+            Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM rd_spec_assign WHERE 单据编号 = ? AND 责任人 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    Integer.class, no, user);
+            if (n != null && n > 0) return new DevFileEdit(true, true, "", productCode, owner, ownerNameOf(owner), 0);
+            if (user.equals(devTaskService.supervisorOf(productCode)))
+                return new DevFileEdit(true, true, "", productCode, owner, ownerNameOf(owner), 0);
+        }
+        return new DevFileEdit(true, false, "只有该文件的责任人（或管理员）可以编辑", productCode,
+                owner == null ? "" : owner, ownerNameOf(owner), 2);
+    }
+
+    /**
+     * 前端置灰用:当下登录账号对「某面板某单据」有没有编辑权(四文件门禁)。
+     * 返回 { applicable, canEdit, reason, productCode, owner, ownerName };applicable=false = 该面板不受此门禁约束。
+     */
+    public Map<String, Object> devFileEditState(String panelCode, String docNo) {
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (def == null) {
+            out.put("applicable", false);
+            out.put("canEdit", true);
+            return out;
+        }
+        DevFileEdit v = devFileEditVerdict(def, docNo, null, currentUserName());
+        out.put("applicable", v.applicable());
+        out.put("canEdit", v.ok());
+        out.put("reason", v.reason());
+        out.put("productCode", v.productCode());
+        out.put("owner", v.owner());
+        out.put("ownerName", v.ownerName());
+        return out;
     }
 
     /**
@@ -2652,6 +3632,7 @@ public class ButtonService {
         String no = requireNo(formData);
         ensureDocExists(def, no);
         ensureSpecAssignEditable(def, no, user); // 已分配规格书:申请修改同样仅 责任人∪总负责人∪管理员
+        if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, null, user); // 四文件门禁同口径
         String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
         if (!"已归档".equals(st) && !"已审核".equals(st)) throw new IllegalStateException("仅已归档单据可申请修改");
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
@@ -3082,26 +4063,39 @@ public class ButtonService {
             "RD_APPROVAL", "RD_PLAN", "RD_FILTER_EFF",
             "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC",
             "RD_SPIKE_WATER", "RD_DOM_TEST", "RD_EQUIP_USE", "RD_INSTR_USE",
-            // 来料品质·检验数据记录(2026-09-22 用户口径):走**普通审批流**而非"保存即归档"一族 ——
-            // 保存=草稿、提交审批=审批中、审批通过=已审核、弃审回草稿(与特采单同一套审批语义);
-            // 侧栏审批按钮组由前端 hasApprovalBtns(=标准流 ∪ QC_INSP_REC)放出。
-            // (曾登记进本集合,但管理员保存即归档会让"提交审批"看起来直接归档,用户口径不认 → 移出。)
-            "RD_PROD_INFO");
-    /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复) */
+            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
+            // 2026-09-18 新增:样品编号表 —— 发号台账,改样品编号=改追溯锚点,必须防篡改,故入归档闭环。
+            // ⚠ RD_PROD_DOCLIST(产品文件列表)**刻意不入本集合**:它是**只读派生视图**
+            //   (4 文件×状态矩阵由 DevTaskService 实时推导,面板本身没有可归档的"纸"),
+            //   没有「新增」入口、永远没有单据可归档;登记进来只会让归档/修改闭环指向空集合。
+            //   与 RD_PROGRESS(单单据、永远草稿、刻意排除)同一类处置 —— 见 CONTEXT「文书归档面板」。
+            // 来料品质·检验数据记录(QC_INSP_REC,2026-09-22 用户口径)同样**不入本集合**:
+            //   走**普通审批流**(保存=草稿/提交审批=审批中/审批通过=已审核)而非"保存即归档"
+            //   —— 管理员保存即归档会让"提交审批"看起来直接归档,用户口径不认(曾登记后移出)。
+            "RD_SAMPLE_NO");
+    /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复)。
+     *  ⚠ RD_INSP_PLAN(出货检验计划表)**刻意不入本集合**(2026-09-20 用户口径):
+     *   它的文档编号不是"单据号"而是**表单固定值** —— 前端 recordSheetConfigs.js 的
+     *   docNoDefault='YJ-RD001' 与 DB 默认约束 DF_insp_docno DEFAULT N'YJ-RD001'
+     *   (tools/migrate-rd-prod-sheets.sql)双双把它钉死;留在集合里 ⇒ 第二张计划一保存就被
+     *   "文档编号不允许重复：YJ-RD001" 挡下,面板实际只能存在一张单(已稳定复现)。
+     *   一个产品一份检验计划应能共存 ⇒ 移出集合。 */
     private static final java.util.Set<String> DOC_NO_PANELS = java.util.Set.of(
             "RD_APPROVAL", "RD_PLAN", "RD_PROGRESS", "RD_FILTER_EFF",
             "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC",
-            "RD_DOM_TEST", "RD_INSP_PLAN");
+            "RD_DOM_TEST");
 
     /** 单据状态查询(供生单等领域动作校验来源单状态) */
     public Map<String, Object> docStatus(String panelCode, String no) {
         return docStatusOf(panelCode, no);
     }
 
-    /** 状态推导:已作废 > 已中止(含金蝶手动关闭) > 删除申请中 > 修改申请中 > 审批中 > 修改中 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿 */
+    /** 状态推导:已作废 > 已中止(含金蝶手动关闭) > 删除申请中 > 修改申请中 > 待二级审批/审批中 > 修改中 > 已生效 > 已归档 > 已完成(金蝶自动关单) > 已审核 > 草稿
+     *  (2026-09-20 两级审批:待一级=「审批中」,一级通过后=「待二级审批」—— 两处推导必须同改,
+     *   另一处在 QueryService.docStatus,管列表行状态) */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at, erp_close_state FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at, approve_node, l2_approver, effective, erp_close_state FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
                 panelCode, no);
         Map<String, Object> out = new HashMap<>();
         Map<String, Object> r = rows.isEmpty() ? null : rows.get(0);
@@ -3126,10 +4120,16 @@ public class ButtonService {
             out.put("status", "终止审批中（立项人）");
         } else if ("R".equals(r.get("modify_state"))) {
             out.put("status", "修改申请中");
+        } else if (CHANGE_PANEL.equals(panelCode) && !signoffPending(no).isEmpty()) {
+            // 产品变更申请单:有 PENDING 签名 = 会签中(排在审批中之前;会签全通过时会自动转审批)
+            out.put("status", "会签中");
         } else if ("Y".equals(r.get("pending"))) {
-            out.put("status", "审批中");
+            out.put("status", nodeOf(r) == 2 ? "待二级审批" : "审批中");
         } else if ("Y".equals(r.get("modify_state"))) {
             out.put("status", "修改中");
+        } else if ("Y".equals(r.get("effective"))) {
+            // 产品变更申请单:审批通过即生效(终态,不再叫「已审核」)
+            out.put("status", "已生效");
         } else if ("Y".equals(r.get("archived"))) {
             out.put("status", "已归档");
         } else if ("S".equals(r.get("erp_close_state"))) {

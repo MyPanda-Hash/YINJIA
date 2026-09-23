@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT CAST(COUNT(*) AS nvarchar(20)) FROM yj_message WHERE 收件人=N'cp' AND 消息码=N'CHANGE_REJECTED' AND 单据编号=N'CHG-2026-09-0013';

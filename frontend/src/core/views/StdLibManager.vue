@@ -15,6 +15,11 @@
     </div>
     <el-table :data="rows" size="small" border max-height="360" row-key="id" @selection-change="(s) => (checked = s)">
       <el-table-column type="selection" width="42" />
+      <!-- 条目名(可选):一条=一个键的库(配方计算参数:条目名=产品编号,「默认」=系统默认)必须显示它,
+           否则整屏都是 JSON、分不清哪条是谁的。默认关 ⇒ 既有调用方(规格书章节/实验室 4 库)零变化。 -->
+      <el-table-column v-if="showItem" :label="tt('条目名')" width="150" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.item }}</template>
+      </el-table-column>
       <el-table-column :label="tt('条目内容')" min-width="260">
         <template #default="{ row }">
           <el-input v-if="editingId === row.id && multiline" v-model="editText" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" @keyup.ctrl.enter="saveEdit" />
@@ -61,6 +66,8 @@ const props = defineProps({
   pickable: { type: Boolean, default: false },
   /** 是否自带「新增条目」输入行(章节库正文是多行,用调用方自己的文本框) */
   showAdd: { type: Boolean, default: true },
+  /** 是否显示「条目名」列:一条=一个键的库需要它(配方计算参数:条目名=产品编号);默认关,不影响既有调用方 */
+  showItem: { type: Boolean, default: false },
 })
 const emit = defineEmits(['pick', 'changed'])
 

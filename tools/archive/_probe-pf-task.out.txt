@@ -1,0 +1,7 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-pf-task.sql ==
+  | RD_ASM_PROC | glm53 | 
+  | RD_INSP_PLAN | glm53 | 
+  | RD_MOLD_PROC | cp | 
+  | RD_SPEC_DOC | cp | 
+[OK] _probe-pf-task.sql (1 batches)

@@ -60,6 +60,20 @@ export const menuTree = [
           // 组装工艺清单 = 页1 关键工序控制清单 + 页2 组装BOM表(物料清单 + 修订记录)
           { code: 'rdAsmProc', title: '组装工艺清单', path: '/panelx/list/RD_ASM_PROC', panelCode: 'RD_ASM_PROC', icon: 'Operation' },
           { code: 'rdInspPlan', title: '出货检验计划表', path: '/panelx/list/RD_INSP_PLAN', panelCode: 'RD_INSP_PLAN', icon: 'CircleCheck' },
+          // 2026-09-18 新增 2 张(研发管理 × 产品开发最新设计):
+          //   · 产品文件列表 —— 设计《产品开发系统需求汇总》sheet「文件汇总表」;
+          //     **只读派生视图**(产品×4文件 开发状态矩阵),数据源与产品信息表侧栏「产品开发」同一份
+          //   · 样品编号表 —— 设计《二三级四级项目控制表2026》sheet「产品开发样品编号」。
+          //     它是产品文件的**发号台账**(编号 = 客户代号 + 项目编号,`sampleNo.js` 纯函数生成),
+          //     与「产品文件」同属"按产品编号推进的开发资料"这一族 ⇒ 归本组;
+          //     不为它单开"样品管理"分组 —— 一个分组只挂一张表就是分组噪音。
+          { code: 'rdProdDocList', title: '产品文件列表', path: '/panelx/list/RD_PROD_DOCLIST', panelCode: 'RD_PROD_DOCLIST', icon: 'Grid' },
+          { code: 'rdSampleNo', title: '样品编号表', path: '/panelx/list/RD_SAMPLE_NO', panelCode: 'RD_SAMPLE_NO', icon: 'Tickets', operationName: '新增流程' },
+          // 2026-09-21 新增:产品变更申请单(RD_CHANGE,YJ-QR-130《KPC变更申请通知单》)——
+          // 产品变更**走单**的载体:发起人建单 → 各受控文件勾选 → 部门按账号填本部门栏 →(需会签时)会签
+          // → 冯总(admin)审批 → 生效即按勾选文件建下一版草稿并通知责任人重走受控审核。
+          // 归「产品文件」组:它改的就是这四个受控文件,与产品信息表/四文件同一族。
+          { code: 'rdChange', title: '产品变更申请单', path: '/panelx/list/RD_CHANGE', panelCode: 'RD_CHANGE', icon: 'Refresh' },
         ],
       },
       {

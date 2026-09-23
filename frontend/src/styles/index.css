@@ -1,5 +1,11 @@
 /* 轻 MES 全局设计 token：制造绿 + 安全黄 + 中性钢灰。 */
 
+/* macOS 下统一字体平滑,避免与 Windows 观感差异(仅影响 WebKit/Blink on macOS) */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 :root {
   --t-primary: #116a5b;
   --t-primary-dark: #0d584c;

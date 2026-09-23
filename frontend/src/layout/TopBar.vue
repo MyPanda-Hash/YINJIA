@@ -5,7 +5,7 @@
       <el-icon class="hamburger" @click="app.toggleMobileNav()"><Menu /></el-icon>
       <div class="logo">轻<span>MES</span></div>
       <div class="t-split"></div>
-      <el-dropdown @command="(f) => user.switchFactory(f)">
+      <el-dropdown @command="onPickFactory">
         <span
           class="factory"
           :aria-label="user.factoryName || tt('选择工厂')"
@@ -226,6 +226,7 @@
 
     <UiSettingsDialog v-model="uiSettingVisible" />
     <DeskSettingsDialog v-model="deskSettingVisible" />
+    <FactorySwitchDialog v-model="factorySwitchVisible" :target="factorySwitchTarget" />
   </div>
 </template>
 
@@ -241,6 +242,8 @@ import { ElMessage } from 'element-plus'
 import NoticeCenter from './NoticeCenter.vue'
 import UiSettingsDialog from './UiSettingsDialog.vue'
 import DeskSettingsDialog from './DeskSettingsDialog.vue'
+import FactorySwitchDialog from './FactorySwitchDialog.vue'
+import { needsRelogin } from '@core/auth/factory'
 import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 
@@ -259,6 +262,20 @@ const router = useRouter()
 const keyword = ref('')
 const searchOpen = ref(false)
 const searchWrapRef = ref(null)
+
+// ---------- 账套(工厂)切换:ADR-0003 —— 账套绑在令牌里,切换必须重登 ----------
+const factorySwitchVisible = ref(false)
+const factorySwitchTarget = ref(null)
+/** 选中另一个账套:同一个就提示一下;不同的才弹密码框(不验密换不掉库,见 FactorySwitchDialog) */
+function onPickFactory(f) {
+  if (!f || !f.code) return
+  if (!needsRelogin(user.factory && user.factory.code, f.code)) {
+    ElMessage.info(tt('已经是当前账套'))
+    return
+  }
+  factorySwitchTarget.value = f
+  factorySwitchVisible.value = true
+}
 
 const matched = computed(() => {
   const k = keyword.value.trim().toLowerCase()

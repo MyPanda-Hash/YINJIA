@@ -1,8 +1,8 @@
 import request from '@core/request'
-import { unwrap, errMsg } from '@core/panel-engine'
+import { unwrap, unwrapStrict, errMsg } from '@core/panel-engine'
 
 // 通用层函数继续对外导出（保持既有调用方兼容）
-export { unwrap, errMsg }
+export { unwrap, unwrapStrict, errMsg }
 
 /** 财务字段十进制四舍五入，修正 15.5 * 1.13 = 17.514999... 一类二进制浮点边界。 */
 export function roundDecimal(value, digits = 2) {
@@ -242,13 +242,16 @@ export async function getNewFormPermMatrix({ panelCode, operationName }) {
 }
 
 export async function getFormDescriptor({ panelCode, code }) {
+  // 严格解包:无该面板查看权限时后端返回 HTTP 200 + code 403,必须当错误抛出
+  // 才能让表单页出提示,而不是渲染一张空表单(2026-09-22)
   return normalizeApprovalPayload(
-    unwrap(await request.get('/px/getFormDescriptor', { params: { panelCode, code } })),
+    unwrapStrict(await request.get('/px/getFormDescriptor', { params: { panelCode, code } })),
   )
 }
 
 export async function queryFormDataList(params) {
-  return unwrap(await request.post('/px/queryFormDataList', params))
+  // 同上:列表页原先 `res.list || []` 把权限拒绝吃成空表,用户看不到原因
+  return unwrapStrict(await request.post('/px/queryFormDataList', params))
 }
 
 // ==================== 产品开发下发(2026-09-09) ====================
@@ -258,9 +261,19 @@ export async function rdDevMeta() {
   return unwrap(await request.get('/px/rdDev/meta'))
 }
 
-/** 产品信息表侧边栏按钮状态:{ productCode, dispatched } */
+/** 产品信息表侧边栏按钮状态:{ productCode, dispatched, canAssign, l2Approver, assigns } */
 export async function rdDevButtonState(docNo) {
   return unwrap(await request.get('/px/rdDev/buttonState', { params: { docNo } }))
+}
+
+/** 四文件分工状态(分发责任人弹窗回显):{ productCode, dispatched, assigns, assignNames, canAssign } */
+export async function rdDevAssignState(docNo) {
+  return unwrap(await request.get('/px/rdDev/assignState', { params: { docNo } }))
+}
+
+/** 启用账号清单(一级通过选二级审核人 / 分发责任人选人):[{username, realName}] */
+export async function rdDevUsers() {
+  return unwrap(await request.get('/px/rdDev/users'))
 }
 
 /** 已下发产品的开发矩阵 */
@@ -281,6 +294,11 @@ export async function specAssignState(code) {
 /** 规格书两级分发:单张规格书单的分配(编辑闸门;hasAssign=false 不受封锁) */
 export async function specAssignDoc(no) {
   return unwrap(await request.get('/px/specAssign/doc', { params: { no } }))
+}
+
+/** 四个受控文件:我能不能编这张单 { applicable, canEdit, reason, productCode, owner, ownerName }(2026-09-21) */
+export async function rdDevFileEdit(panelCode, docNo) {
+  return unwrap(await request.get('/px/rdDev/fileEdit', { params: { panelCode, docNo } }))
 }
 
 /**
@@ -320,7 +338,14 @@ export async function fillCurrentStock(rows) {
 
 export async function callButton({ panelCode, buttonName, formData, buttonParam }) {
   // 按钮名对齐 SQL 后端（中止执行/整单中止→中止、草稿→取消中止、保存类→提交）
-  const apiName = buttonName === '中止执行' || buttonName === '整单中止' ? '中止' : buttonName === '草稿' ? '取消中止' : buttonName === '保存' || buttonName === '保存为草稿' || buttonName === '保存新增' ? '提交' : buttonName
+  // ⚠ 「保存为草稿」**不在**此列(2026-09-20 修):它必须原样透传给后端,后端 case "保存为草稿"
+  //   走 save(markSaved=false) —— 只落库、不归档/不送审、不做必填校验。
+  //   此前它和「保存」一起被改写成「提交」⇒ 点「保存为草稿」实际发的是提交请求:
+  //   草稿被直接归档/送审,而且缺必填还会被后端挡下(实测:界面点草稿→后端收到 buttonName="提交"→400)。
+  const apiName = buttonName === '中止执行' || buttonName === '整单中止' ? '中止'
+    : buttonName === '草稿' ? '取消中止'
+      : buttonName === '保存' || buttonName === '保存新增' ? '提交'
+        : buttonName
   return unwrap(await request.post('/px/callButton', { panelCode, buttonName: apiName, formData, buttonParam }))
 }
 

@@ -3,7 +3,7 @@
 --   取到接口值的键=可同步;映射里硬编码 null 的键(部门负责人/项目/品牌/到货地址/发货状态/
 --   合同号/订金金额/付款方式/现存量说明)= 永远无值 → 从面板删除(物理列保留)。
 -- 生成器:tools/archive/_gen-order-keep-syncable.mjs
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

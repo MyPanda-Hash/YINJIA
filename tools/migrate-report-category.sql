@@ -3,7 +3,7 @@
    使前端 reportMode 生效(工具栏"栏目"+列头排序/筛选);
    菜单分组不受影响(走 module_group)。
    同时清空面板配置缓存(config/config_at)使 panelCategory 立即刷新。 */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 UPDATE yj_panel SET category = N'报表', config = NULL, config_at = NULL
 WHERE mode = 'flat' AND category <> N'报表';

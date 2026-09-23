@@ -1,0 +1,73 @@
+===== source 列分布 =====
+scope	source	行数
+field	manual	5444
+field	mt	1340
+panel	manual	549
+panel	mt	453
+ui	mt	10231
+ui	manual	10
+
+===== 检验要求/检验项目 逐行(带 source 与 id) =====
+id	scope	ref_key	locale	text	source
+26300	field	检验项目	de	Inspektions gegenstände	manual
+32075	panel	检验项目	de	Inspektions gegenstände	mt
+25093	ui	检验项目	de	Inspektions gegenstände	mt
+25620	field	检验项目	en	Inspection Item	manual
+32098	panel	检验项目	en	Inspection Item	mt
+24422	ui	检验项目	en	Inspection Item	mt
+26028	field	检验项目	es	Artículos de inspección	manual
+32121	panel	检验项目	es	Artículos de inspección	mt
+24824	ui	检验项目	es	Artículos de inspección	mt
+26164	field	检验项目	fr	Articles d'inspection	manual
+32144	panel	检验项目	fr	Articles d'inspection	mt
+24958	ui	检验项目	fr	Articles d'inspection	mt
+25756	field	检验项目	ja	検査項目	manual
+32167	panel	检验项目	ja	検査項目	mt
+24557	ui	检验项目	ja	検査項目	mt
+25892	field	检验项目	ko	검사 항목	manual
+32190	panel	检验项目	ko	검사 항목	mt
+24688	ui	检验项目	ko	검사 항목	mt
+26431	field	检验项目	ru	Инспекционные элементы	manual
+32213	panel	检验项目	ru	Инспекционные элементы	mt
+25224	ui	检验项目	ru	Инспекционные элементы	mt
+26700	field	检验项目	th	รายการตรวจสอบ	manual
+32236	panel	检验项目	th	รายการตรวจสอบ	mt
+25485	ui	检验项目	th	รายการตรวจสอบ	mt
+26564	field	检验项目	vi	Chỉ tiêu kiểm tra	manual
+32259	panel	检验项目	vi	Chỉ tiêu kiểm tra	mt
+25348	ui	检验项目	vi	Chỉ tiêu kiểm tra	mt
+38596	field	检验项目	zh-TW	檢驗項目	manual
+33210	panel	检验项目	zh-TW	檢驗項目	mt
+32485	ui	检验项目	zh-TW	檢驗項目	mt
+38597	field	检验要求	de	Prüfanforderung	manual
+35779	ui	检验要求	de	Inspektions anforderungen	mt
+33496	field	检验要求	en	Requirement	manual
+38598	field	检验要求	es	Requisito de inspección	manual
+34974	ui	检验要求	es	Requisitos de inspección	mt
+38599	field	检验要求	fr	Exigence d'inspection	manual
+35378	ui	检验要求	fr	Exigences d'inspection	mt
+38600	field	检验要求	ja	検査要件	manual
+34170	ui	检验要求	ja	検査要求	mt
+38601	field	检验要求	ko	검사 요구사항	manual
+34574	ui	检验要求	ko	검사 요구 사항	mt
+38602	field	检验要求	ru	Требование контроля	manual
+36179	ui	检验要求	ru	Требования к проверке	mt
+38603	field	检验要求	th	ข้อกำหนดการตรวจสอบ	manual
+36985	ui	检验要求	th	ข้อกำหนดการตรวจสอบ	mt
+38604	field	检验要求	vi	Yêu cầu kiểm tra	manual
+36582	ui	检验要求	vi	Yêu cầu kiểm tra	mt
+38605	field	检验要求	zh-TW	檢驗要求	manual
+33768	ui	检验要求	zh-TW	檢驗要求	mt
+
+===== 产品编号 ja 的两条 =====
+id	scope	ref_key	locale	text	source
+37525	field	产品编号	ja	製品番号	manual
+34177	ui	产品编号	ja	製品番号	mt
+
+===== 本脚本实际写入的行数 =====
+scope	行数
+field	63
+
+===== yj_translation 上的触发器 =====
+name	is_disabled
+

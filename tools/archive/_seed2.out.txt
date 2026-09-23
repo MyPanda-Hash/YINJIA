@@ -1,0 +1,3 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== seed-demo-prodfile.sql ==
+[SQL FAIL] 列名 'asp_user1' 无效。

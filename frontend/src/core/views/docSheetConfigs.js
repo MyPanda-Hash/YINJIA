@@ -1,25 +1,35 @@
 /**
  * 文件类文书面板配置(数据驱动:DocSheet 按配置渲染版式)
  * row 类型:
- *  - field: { num, label, key, max, h, kind:'input'|'textarea', hint? }   单字段行
+ *  - field: { num, label, key, max, h, kind:'input'|'textarea', hint?,
+ *             second?:{ label, key, kind:'date'|'text' } }   单字段行(second = 同一行右侧的第二字段)
  *  - multi: { num, label, h, subs:[{ label, key, max }] }                  多子区行(如 测试方案)
  * signCells: 底部签名区 [ { label, key, w(蓝格宽), type:'text'|'date', flex(占比), white(白底蓝字) } ]
+ * remark:    { label, key, max }  右侧**可填**备注列(立项申请表设计 F5 标签 + F6:G15 填写区);
+ *            2026-09-22 前该列是 deco 装饰虚线(只画不填),已被 remark 取代 —— deco 开关与渲染分支已删除
+ * 行高 h 的口径:设计 xlsx 的**磅值 × 4/3**(96dpi),合并行取参与合并各行之和;
+ *            因控件不得被裁切,DocSheet 对「单字段行/多子区行/阶段框行」一律按 min-height 渲染。
+ * 依据与不变量见同目录 docSheetConfigs.test.js(标题/下拉口径/备注区/第 8 行/行高)
  */
 export const approvalSheetCfg = {
   titlePart1: '立项申请表',
-  titlePart2: '二三级项目',
+  titlePart2: '二三四级项目',
   titlePart3: '',
   seq: 'cn',
-  deco: true,
+  // 设计右侧是可填的「备注」区(F5 标签 + F6:G15 合并填写区)⇒ 渲染成真的备注列,
+  // 不再是 deco 装饰虚线(2026-09-22 对齐设计;rd_approval.备注 列本就存在,只是没登记字段)
+  remark: { label: '备注', key: '备注', max: 1000 },
   rows: [
-    { num: '一', label: '客户名', key: '客户名', max: 0, h: 47, kind: 'input' },
-    { num: '二', label: '立项背景', key: '立项背景', max: 250, h: 96, kind: 'textarea' },
-    { num: '三', label: '机型及应用位置', key: '机型及应用位置', max: 50, h: 58, kind: 'textarea' },
-    { num: '四', label: '滤芯/炭棒规格或结构', key: '滤芯/炭棒规格或结构', max: 100, h: 71, kind: 'textarea' },
-    { num: '五', label: '项目开发目标', key: '项目开发目标', max: 250, h: 155, kind: 'textarea' },
-    { num: '六', label: '项目输出', key: '项目输出', max: 100, h: 97, kind: 'textarea' },
-    { num: '七', label: '开发周期要求', key: '开发周期要求', max: 50, h: 45, kind: 'textarea' },
-    { num: '八', label: '其它要求', key: '其它要求', max: 250, h: 132, kind: 'textarea' },
+    // 行高 = 设计磅值 × 4/3(96dpi),来源「立项申请表.xlsx」行高
+    // [33,24,18.75,20.25,33.75,38.25,33,null,null,41.25,75.75,157.5,70.5,41.25,41.25,33]
+    { num: '一', label: '客户名', key: '客户名', max: 0, h: 45, kind: 'input' },
+    { num: '二', label: '立项背景', key: '立项背景', max: 250, h: 133, kind: 'textarea' },
+    { num: '三', label: '机型及应用位置', key: '机型及应用位置', max: 50, h: 55, kind: 'textarea' },
+    { num: '四', label: '滤芯/炭棒规格或结构', key: '滤芯/炭棒规格或结构', max: 100, h: 101, kind: 'textarea' },
+    { num: '五', label: '项目开发目标', key: '项目开发目标', max: 250, h: 210, kind: 'textarea' },
+    { num: '六', label: '项目输出', key: '项目输出', max: 100, h: 94, kind: 'textarea' },
+    { num: '七', label: '开发周期要求', key: '开发周期要求', max: 50, h: 55, kind: 'textarea' },
+    { num: '八', label: '其它要求', key: '其它要求', max: 250, h: 55, kind: 'textarea' },
   ],
   signCells: [
     { label: '申请立项人', key: '申请立项人', w: 202, type: 'text', flex: 53 },
@@ -27,27 +37,31 @@ export const approvalSheetCfg = {
   ],
 }
 
-/** 项目实施计划(二三级项目):原图无右侧虚列;测试方案行为三子区(条件/方法/标准);底部 负责人+编制日期 */
+/** 项目实施计划(二三四级项目):原图无右侧虚列;测试方案行为三子区(条件/方法/标准);末行 负责人+编制日期 */
 export const planSheetCfg = {
   titlePart1: '项目',
-  titlePart2: '二三级项目',
+  titlePart2: '二三四级',
   titlePart3: '实施计划',
   seq: 'num',
-  deco: false,
   rows: [
-    { num: '1', label: '项目名称', key: '项目名称', max: 50, h: 71, kind: 'input' },
-    { num: '2', label: '项目定级', key: '项目定级', max: 0, h: 53, kind: 'select',
+    // 行高 = 设计磅值 × 4/3(96dpi),来源「项目实施计划.xlsx」行高
+    // [20.15,27.75,27.75,27.75,33.75,33.75,32.1,77.1,60.95,39.95,39.95,39.95,68.25,30]
+    { num: '1', label: '项目名称', key: '项目名称', max: 50, h: 45, kind: 'input' },
+    // 下拉口径必须与库字典一致:RD_PLAN.项目定级 已被 migrate-approval-level.sql(2026-09-21)
+    // 补入「一级」(下游承接立项申请的 项目等级 一~四级),少一级会让参照带入的值选不中
+    { num: '2', label: '项目定级', key: '项目定级', max: 0, h: 45, kind: 'select',
       options: [
+        { value: '一级', label: '一级' },
         { value: '二级', label: '二级' },
         { value: '三级', label: '三级' },
         { value: '四级', label: '四级' },
       ], required: true,
       hint: '必填' },
-    { num: '3', label: '测试内容', key: '测试内容', max: 100, h: 77, kind: 'textarea' },
+    { num: '3', label: '测试内容', key: '测试内容', max: 100, h: 43, kind: 'textarea' },
     { num: '4', label: '测试产品打样要求', key: '测试产品打样要求', max: 100, h: 103, kind: 'textarea' },
-    { num: '5', label: '测试目标', key: '测试目标', max: 50, h: 78, kind: 'textarea' },
+    { num: '5', label: '测试目标', key: '测试目标', max: 50, h: 81, kind: 'textarea' },
     {
-      num: '6', label: '测试方案', h: 225,
+      num: '6', label: '测试方案', h: 160,
       subs: [
         { label: '测试条件', key: '测试条件', max: 150 },
         { label: '测试方法', key: '测试方法', max: 150 },
@@ -55,8 +69,9 @@ export const planSheetCfg = {
       ],
     },
     // 测试计划:10 个阶段框(默认全显示;每个框可隐藏/显示,隐藏后下方自动接上;导出按实际显示)
+    // 设计该行只有 68.25pt 高的一格,而实现是 10 个阶段框×5 字段的功能面板 ⇒ h 只作最小高度
     {
-      num: '7', label: '测试计划', kind: 'phases', h: 200,
+      num: '7', label: '测试计划', kind: 'phases', h: 91,
       phases: [
         { num: 1, key: '阶段1', max: 500 },
         { num: 2, key: '阶段2', max: 500 },
@@ -70,11 +85,12 @@ export const planSheetCfg = {
         { num: 10, key: '阶段10', max: 500 },
       ],
     },
+    // 第 8 行 = 设计末行(B15=8 / C15=负责人 / F15=编制日期:):负责人在左、编制日期在右同一行,
+    // 2026-09-22 前落在底部签名区(与设计不符);负责人由登录人锁定,渲染按字段级只读
+    { num: '8', label: '负责人', key: '负责人', max: 50, h: 40, kind: 'input',
+      second: { label: '编制日期', key: '编制日期', kind: 'date' } },
   ],
-  signCells: [
-    { label: '负责人', key: '负责人', w: 202, type: 'text', flex: 58 },
-    { label: '编制日期', key: '编制日期', w: 180, type: 'date', flex: 42, white: true },
-  ],
+  signCells: [],
 }
 
 /**
@@ -104,7 +120,7 @@ export const qcSheetCfgs = {
   // YJ-QR-11 不合格报告(制程)
   QC_BHG: {
     docno: 'YJ-QR-11',
-    titlePart1: '不合格品分析报告', titlePart2: '制程', titlePart3: '', deco: false,
+    titlePart1: '不合格品分析报告', titlePart2: '制程', titlePart3: '',
     info: [
       { label: '填写部门', key: '填写部门' },
       { label: '填写人', key: '填写人' },
@@ -140,7 +156,7 @@ export const qcSheetCfgs = {
   // YJ-QR-59 不合格品处理单(制程)
   QC_BHC: {
     docno: 'YJ-QR-59',
-    titlePart1: '不合格品处理单', titlePart2: '制程', titlePart3: '', deco: false,
+    titlePart1: '不合格品处理单', titlePart2: '制程', titlePart3: '',
     info: qcInfo('质量管理中心'),
     rows: [
       { kind: 'pairs', cells: [
@@ -193,7 +209,7 @@ export const qcSheetCfgs = {
   //   部门会签名格取 170px(nameW),与标签列右沿同一条线 → 整张表是一张网格。
   QC_TC_IN: {
     docno: 'YJ-QR-60',
-    titlePart1: '特采申请单', titlePart2: '', titlePart3: '', deco: false,
+    titlePart1: '特采申请单', titlePart2: '', titlePart3: '',
     info: qcInfo('采购部'),
     vcol: 65,
     labelW: 105,
@@ -247,7 +263,7 @@ export const qcSheetCfgs = {
   // YJ-QR-64 不合格品处理单(自制物料)
   QC_BHZ: {
     docno: 'YJ-QR-64',
-    titlePart1: '不合格品处理单', titlePart2: '自制物料', titlePart3: '', deco: false,
+    titlePart1: '不合格品处理单', titlePart2: '自制物料', titlePart3: '',
     info: qcInfo('质量管理中心'),
     rows: [
       { kind: 'pairs', cells: [
@@ -283,7 +299,7 @@ export const qcSheetCfgs = {
   // YJ-QR-92 紧急放行申请单
   QC_JJF: {
     docno: 'YJ-QR-92',
-    titlePart1: '紧急放行通知单', titlePart2: '', titlePart3: '', deco: false,
+    titlePart1: '紧急放行通知单', titlePart2: '', titlePart3: '',
     info: qcInfo(''),
     rows: [
       { kind: 'pairs', cells: [
@@ -313,7 +329,7 @@ export const qcSheetCfgs = {
   // YJ-QR-118 试产材料使用申请单
   QC_SCP: {
     docno: 'YJ-QR-118',
-    titlePart1: '试产材料使用申请单', titlePart2: '', titlePart3: '', deco: false,
+    titlePart1: '试产材料使用申请单', titlePart2: '', titlePart3: '',
     info: qcInfo('研发部'),
     rows: [
       { kind: 'pairs', cells: [
@@ -339,7 +355,7 @@ export const qcSheetCfgs = {
   // YJ-QR-119 来料异常分析报告
   QC_LYB: {
     docno: 'YJ-QR-119',
-    titlePart1: '来料异常分析报告', titlePart2: '', titlePart3: '', deco: false,
+    titlePart1: '来料异常分析报告', titlePart2: '', titlePart3: '',
     info: qcInfo(''),
     rows: [
       { kind: 'pairs', cells: [
@@ -370,7 +386,7 @@ export const qcSheetCfgs = {
   // YJ-QR-120 生产异常分析报告
   QC_SCY: {
     docno: 'YJ-QR-120',
-    titlePart1: '生产异常分析报告', titlePart2: '', titlePart3: '', deco: false,
+    titlePart1: '生产异常分析报告', titlePart2: '', titlePart3: '',
     info: qcInfo('生产部'),
     rows: [
       { kind: 'pairs', cells: [

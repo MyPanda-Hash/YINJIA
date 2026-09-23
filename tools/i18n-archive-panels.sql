@@ -1,5 +1,5 @@
 -- 基础档案面板名译名补录(17 面板 × 9 语言,scope='panel')——EN 走查发现档案面板名全缺(Doc: 部门)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 
 MERGE yj_translation AS t USING (VALUES

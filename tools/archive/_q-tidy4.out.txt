@@ -1,0 +1,10 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-tidy4.sql ==
+  | CP382S | T382S | 除重金属炭棒滤芯S | 0 | - | - | - | admin | 
+  | MP2609090001 | T382 | 除重金属炭棒滤芯 | 0 | - | - | - | admin | 
+  | RKD | IC-2026-09-0001 | Y | - | N | 
+  | RKD | IC-2026-09-0002 | Y | - | N | 
+  | RKD | IC-2026-09-0003 | Y | N | N | 
+  | RKD | IC-2026-09-0004 | Y | - | N | 
+  | RKD | IC-2026-09-0005 | Y | - | N | 
+[OK] _q-tidy4.sql (3 batches)

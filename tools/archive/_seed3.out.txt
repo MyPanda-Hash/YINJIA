@@ -1,0 +1,9 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== seed-demo-prodfile.sql ==
+  | 产品信息表(演示) | 2 | 
+  | 四文件(演示) | 8 | 
+  | 责任人分工行 | 8 | 
+  | 变更单+部门行 | 8 | 
+  | 部门演示账号 | 6 | 
+  | 已归档演示单(DEMO-* 状态行) | 10 | 
+[OK] seed-demo-prodfile.sql (17 batches)

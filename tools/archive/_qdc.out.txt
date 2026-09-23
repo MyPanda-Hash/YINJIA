@@ -1,0 +1,11 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-demo-check.sql ==
+  | 产品信息表 | 2 | 
+  | 四文件 | 8 | 
+  | 责任人分工 | 8 | 
+  | 变更单 | 1 | 
+  | 变更单部门行 | 7 | 
+  | 演示账号 | 6 | 
+  | 探针残留单 | 0 | 
+  | 全库规格书 | 2 | 
+[OK] _q-demo-check.sql (2 batches)

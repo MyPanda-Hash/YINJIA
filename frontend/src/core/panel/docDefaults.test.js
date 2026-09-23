@@ -115,6 +115,23 @@ test('未知面板:不做任何写入', () => {
   assert.deepEqual(form, {})
 })
 
+/**
+ * 2026-09-18 第二轮:产品信息表两级审批人固定填写 冯总 / 秀丽。
+ * 口径:走"默认值"(仅空时填、可人工改),不是"锁定只读" —— 与 文件管理人=陈秀丽 同款。
+ * 若将来要收紧成不可改,改 yj_field.editable=0 即可(那时这条测试要改成断言 lockedPersonLabel)。
+ */
+test('产品信息表:两级审批人默认带出 冯总 / 秀丽', () => {
+  const form = {}
+  applyDocDefaults('RD_PROD_INFO', form, USER, { isNew: true, today: T })
+  assert.equal(form['审核人一级'], '冯总')
+  assert.equal(form['审核人二级'], '秀丽')
+  // 不是锁定字段(不在 LOCKED_PERSON 里):用户可改 ⇒ 已填值时不再覆盖
+  const filled = { 审核人一级: '张三' }
+  applyDocDefaults('RD_PROD_INFO', filled, USER, { isNew: true, today: T })
+  assert.equal(filled['审核人一级'], '张三', '已有值不应被默认值覆盖')
+  assert.equal(filled['审核人二级'], '秀丽', '空值仍应带出默认')
+})
+
 test('todayStr:按本地时区给 YYYY-MM-DD(不能因 UTC 偏移差一天)', () => {
   assert.match(todayStr(new Date(2026, 8, 11, 0, 30, 0)), /^2026-09-11$/)
   assert.match(todayStr(new Date(2026, 8, 11, 23, 30, 0)), /^2026-09-11$/)
@@ -183,4 +200,37 @@ test('联动:批次号被清空 → 按当前单据日期重新带出', () => {
 test('联动:没有单据日期时退回当天', () => {
   const form = { 批次号: '' }
   assert.equal(syncBatchNoWithDocDate(form, '', T), '20260911')
+})
+
+/**
+ * 2026-09-22:立项申请表 / 项目实施计划补「密级」默认值。
+ * 依据:两份设计纸的右上信息表印的就是「密级 = 保密」
+ *   (立项申请表.xlsx G3 / 项目实施计划.xlsx G4);
+ * 同族面板(RD_FILTER_EFF / RD_SAMPLE_NO / RD_PROD_DOCLIST)早就带该默认值,
+ * 唯独这两张漏了 ⇒ 新建单据时密级是空的,与纸面对不上。
+ * 口径与 文件管理人=陈秀丽 一致:走"默认值"(仅空时填、可人工改),不是锁定只读。
+ */
+test('新增立项申请/实施计划:密级默认带出「保密」(设计纸面印的固定值)', () => {
+  for (const code of ['RD_APPROVAL', 'RD_PLAN']) {
+    const form = {}
+    applyDocDefaults(code, form, USER, { isNew: true, today: T })
+    assert.equal(form['密级'], '保密', `${code} 的密级应默认保密(设计 G3/G4)`)
+  }
+})
+
+test('密级默认不得覆盖用户已选值(仅空时填)', () => {
+  const form = { 密级: '内部' }
+  applyDocDefaults('RD_APPROVAL', form, USER, { isNew: true, today: T })
+  assert.equal(form['密级'], '内部', '已有值不应被默认值覆盖')
+})
+
+/**
+ * 2026-09-22:项目进度查询(控制列表)纸面右上印的是「密级=绝密 / 适用范围=工程技术中心」
+ * (设计 P2/Q2、P3/Q3)。适用范围早就带了默认值,密级漏了 ⇒ 补上。
+ */
+test('项目进度查询:密级默认「绝密」+ 适用范围默认「工程技术中心」', () => {
+  const form = {}
+  applyDocDefaults('RD_PROGRESS', form, USER, { isNew: true, today: T })
+  assert.equal(form['密级'], '绝密', '设计 P2/Q2 印的是绝密')
+  assert.equal(form['文件使用范围'], '工程技术中心', '设计 P3/Q3 印的是工程技术中心')
 })

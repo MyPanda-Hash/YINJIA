@@ -22,7 +22,9 @@ _bs_part1_tables.sql
 _bs_part2_meta.sql
 _bs_part3_data.sql
 _bs_part4_translations.sql
-cleanup-base-panels.sql
+# ↑ cleanup-base-panels.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/cleanup-base-panels.sql
 _doc_part1_tables.sql
 _doc_part2_meta.sql
 _doc_part3_data.sql
@@ -113,32 +115,6 @@ migrate-wo-schedule-fix.sql
 migrate-wo-report.sql
 migrate-lot-trace.sql
 migrate-qc-3docs.sql
-# —— 2026-09-17 补登(脚本产自 2026-09-14,一直未入链):来料三单按生产 legacy 真实字段重建——
-# 上行 migrate-qc-3docs 建的是简化草稿,本脚本按 legacy 真实表结构重建 qc_recv/qc_return/qc_insp 六表并
-# 重注册三面板字段(清旧插新);检验员/批号/送检数量 三列为 v_lot_trace 批号追溯保留的加列(收编时补守卫)。
-# 注意:其 DELETE yj_field 会清掉后续脚本加的字段——链上它之后的 migrate-qc-return-attach / migrate-qc-insp-sync-cols
-# 已执行过的库需人工 `DbSync run` 强制重跑这两份(哈希未变不会自动重跑);空表才重建,不丢数据。
-migrate-qc-3docs-rebuild.sql
-migrate-qc-op.sql
-migrate-phase23-production.sql
-migrate-phase23-forms.sql
-migrate-phase23-forms-batch2.sql
-i18n-rd-panels.sql
-migrate-rd-files.sql
-migrate-rd-panels.sql
-migrate-rd-lab.sql
-migrate-usage-log.sql
-migrate-dispatch.sql
-migrate-dispatch-fix.sql
-fix-views-def.sql
-fix-views-definitive.sql
-fix-views-final.sql
-fix-views-v2.sql
-fix-views-v3.sql
-fix-views-v4.sql
-fix-views-v5-gen.sql
-migrate-audit-cols-fix.sql
-setup-stock-status.sql
 
 # —— 2026-09-10 登记:生产相关 11 面板(表格数字化)新增脚本,登记即完成第 2 步 ——
 # 顺序:先建表+面板注册,再逐份插 yj_field 字段与译名(后者依赖前者已注册的 panel_code)。
@@ -390,20 +366,28 @@ migrate-stock-summary-query.sql
 migrate-stock-ledger-query.sql
 
 # —— 2026-09-17 报表弹窗字段终版——删 开始/结束日期 查询字段(改为弹窗内置单个「单据日期」区间控件);台账 仓库/存货 required=1(单一仓库的一种存货),汇总 required=0;库存状况表(STOCK_BALANCE)零改动 ——
+
 # —— 2026-09-17 bd_so_order补建金蝶同步扩展4列(折前价税合计/业务模式/交货方式id/发票类型,9452c01漏建致SO同步10/10失败)+yj_field注册+en译名+中文注明;幂等可重跑 ——
 migrate-so-extra-cols.sql
+
 # —— 2026-09-17 GFDA补注册9个原始档案字段(dm/mc/addr/tel/ywman/sui_no/bank/bank_no/bz;cleanup事故删后链上只自愈金蝶口径致33≠链重放42;税号空数据按治理口径默认隐藏;9标签译名全局共享已有)——
 migrate-gfda-restore-fields.sql
+
 # —— 2026-09-17 采购→暂收→检验→入库链路修复——PURCHASE_IN仓库名称必填;SL_RECV/QC_INSP明细补计量单位列+字段(随物料参照同名带回);PU_ORDER/PURCHASE_IN供应商参照改存名称(mc,与列内数据/金蝶同步口径一致);幂等可重跑 ——
 migrate-sl-chain-fixes.sql
+
 # —— 2026-09-17 暂收单/检验单供应商参照源改指供应商档案——SL_RECV头供应商(名称mc)/供应商代码(编码dm)+明细供应商、QC_INSP头两字段,由往来单位PARTNER改为GFDA;编码名称双向联动由REF_SYNONYMS新词条支持;幂等可重跑 ——
 migrate-sl-supplier-ref.sql
+
 # —— 2026-09-17 供应商参照源改指供应商档案第二批——QC_RETURN头供应商/供应商代码+明细供应商、PURCHASE_IN头供应商编码,由PARTNER改GFDA;至此四单据(暂收/检验/退料/采购入库)供应商系列10处参照全统一;幂等可重跑 ——
 migrate-supplier-ref-v2.sql
+
 # —— 2026-09-17 暂收退料单明细补计量单位列+字段——采购链单位流转补全(采购订单单位→暂收/检验/退料/入库计量单位),链路映射走既有同名词典+同名自动映射零代码;幂等可重跑 ——
 migrate-qc-return-uom.sql
+
 # —— 2026-09-17 采购入库单仓库名称启用仓库参照(WH)点选——data_type文本改参照(ref配置本就有,序列化只认参照型故此前不弹);同名映射连带带出隐藏仓库编码列;幂等可重跑 ——
 migrate-purchase-in-wh-ref.sql
+
 # —— 2026-09-17 计量单位存量回填两批——v1按商品档案(bs_inv)填空;v2沿form_flow_link占用链从采购订单行逐级下带+孤儿行同物料借值+错位行以检验行为准纠正+TEST-1测试残留清理;幂等只填空/只纠链路行 ——
 migrate-uom-backfill.sql
 migrate-uom-backfill-v2.sql
@@ -437,8 +421,181 @@ migrate-report-template.sql
 migrate-report-template-comments.sql
 migrate-po-inbound-fields.sql
 
-# ���� 2026-09-18 ��Ʒ�����ϼ���(����Զ����ֶ�)���ߡ���������涨���Զ����ֶκ� API �ɶ�(ɳ��� custom_field__1__62jiaob3z7yj97 ʵ֤:CL004=�� ȫ��·ͨ);bs_inv ����ʵ�� ���ϼ���(��/��,���ά��MESֻ��);check_type ��������� ��Ʒ����(1��ͨ/2��װ/3����,��ǰ��������鷽ʽ);sync-core CF_INSPECTION_KEYS �ǼǱ�(��ʵ���׼����䶨���Ǽ�);INV��� detail��ֻ�����ݵȿ����� ����
-migrate-material-inspection-field.sql
+# —— 2026-09-17 补登(脚本产自 2026-09-14,一直未入链):来料三单按生产 legacy 真实字段重建——
+# 上行 migrate-qc-3docs 建的是简化草稿,本脚本按 legacy 真实表结构重建 qc_recv/qc_return/qc_insp 六表并
+# 重注册三面板字段(清旧插新);检验员/批号/送检数量 三列为 v_lot_trace 批号追溯保留的加列(收编时补守卫)。
+# 注意:其 DELETE yj_field 会清掉后续脚本加的字段——链上它之后的 migrate-qc-return-attach / migrate-qc-insp-sync-cols
+# 已执行过的库需人工 `DbSync run` 强制重跑这两份(哈希未变不会自动重跑);空表才重建,不丢数据。
+migrate-qc-3docs-rebuild.sql
+migrate-qc-op.sql
+migrate-phase23-production.sql
+migrate-phase23-forms.sql
+migrate-phase23-forms-batch2.sql
+i18n-rd-panels.sql
+migrate-rd-files.sql
+migrate-rd-panels.sql
+migrate-rd-lab.sql
+migrate-usage-log.sql
+migrate-dispatch.sql
+migrate-dispatch-fix.sql
+# ↑ fix-views-def.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-def.sql
+# ↑ fix-views-definitive.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-definitive.sql
+# ↑ fix-views-final.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-final.sql
+# ↑ fix-views-v2.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v2.sql
+# ↑ fix-views-v3.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v3.sql
+# ↑ fix-views-v4.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v4.sql
+# ↑ fix-views-v5-gen.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v5-gen.sql
+migrate-audit-cols-fix.sql
+setup-stock-status.sql
+
+# —— 2026-09-18 研发管理 × 产品开发最新设计(Phase 1 字段能力层)——
+# 对照源:C:\Users\x1787\OneDrive\Desktop\产品开发\产品开发(25 份设计文件);差异分析见
+# docs/design/研发管理-面板与设计对照.md,实施设计见 docs/design/研发管理-新面板设计与改动方案.md。
+# 口径:① col_name 一律不改(只 UPDATE label)② 改 label 必须同步 i18n ③ 新列一律 required=0(避幽灵必填)。
+# migrate-rd-2026-design.sql —— RD_PROD_INFO 三分类收口(产品类别换20项字典/新增产品管控等级·产品功能类别·
+#   客户项目名称·编辑人·两级审核人,历史值从 产品类别/产品分类 搬迁)、RD_ASM_PROC 2引用字段+变更履历日期·版本号、
+#   RD_INSP_PLAN 产品功能类别·序号·检验备注(⚠不叫[备注]——共表会被他行吞值)·检测频率改下拉·编写人锁定、
+#   RD_SPEC_DOC 客户项目名称·应用场景、11 处 label 对齐
+# migrate-ref-filter.sql —— 参照过滤数据驱动化(yj_field.ref_filter 新列 + 中文列注明):替代硬编码
+#   if(refPanel==RD_APPROVAL);⚠白名单式只改本次新增 4 字段 —— 用 ref_panel IN(...) 会误改既有
+#   RD_*_PROC/RD_INSP_PLAN.产品编号 与 RD_SPEC_DOC.编号,导致规格书选不到在研产品(流程堵死);
+#   3 个例外显式不过滤(产品文件列表.产品编号 / 规格书.编号 / 样品编号表.项目名称)
+# migrate-rd-sample-no.sql —— 样品编号表 RD_SAMPLE_NO 新面板(头+明细,7 明细列)+ 中文表注明
+# migrate-rd-prod-doclist.sql —— 产品文件列表 RD_PROD_DOCLIST 新面板(只建面板壳,业务数据由
+#   DevTaskService.DEV_PANELS 实时推导,不双写)+ 中文表注明
+# migrate-customer-code-seed.sql —— 客户项目代号标准库 rd.customer_code 34 条(由 tools/gen-customer-code.cjs
+#   从设计 38 样例反推;幂等键 lib_code+item_code)
+migrate-rd-2026-design.sql
+migrate-ref-filter.sql
+migrate-rd-sample-no.sql
+migrate-rd-prod-doclist.sql
+migrate-customer-code-seed.sql
+
+# —— 2026-09-18 研发管理最新设计 多语言(10 语言 × 新面板/新字段/改 label 字段)——
+i18n-rd-2026-design.sql
+
+# —— 2026-09-18 研发管理最新设计 Phase 2(RD_PROGRESS 18 列重构)——
+# migrate-rd-progress-18cols.sql —— 项目进度查询按设计《产品开发项目（二三级）2026》18 列重构:
+#   新增 13 物理列(项目编号/开发复杂度/重要程度/紧急程度/项目发起人/项目负责人/立项日期/预计完成日期/
+#   项目定及变更/测试情况/技术目标达成/是否市场转化/未转换原因)+ [项目层级] label 改「项目定级」+字典二级/三级/四级
+#   + 技术目标达成·是否市场转化 改下拉 + 项目编号/文档编号 显隐调整 + 旧列退隐。
+#   ⚠ 只新增列、只写新列、不动任何旧列 ⇒ 可安全回滚(基线备份 rd_progress_detail_bak_20260918);
+#   ⚠ [说明] 仍是后端同步链的匹配键,不搬迁不清空;后端已同步改为写新列(ButtonService.syncPlanToProgress)
+#   ⚠ 实测本机该面板 0 行数据,搬迁语句为空跑
+migrate-rd-progress-18cols.sql
+
+# —— 2026-09-18 Phase 2 多语言:RD_PROGRESS 界面 18 个表头 × 10 语言 ——
+i18n-rd-progress-18cols.sql
+
+# —— 2026-09-18 研发管理最新设计 Phase 3(产品文件 6 面板配置对齐 + 数据键不变量防线)——
+# ⚠⚠ 铁律(2026-09-18 实测确立,违反即静默丢值):
+#   后端 QueryService.selectCols 用 	.[col_name] AS [label] 出列、rowToLabels 按 **label** 建行模型,
+#   保存链 labelsToCols 再用 label 反查 col_name 落库 ⇒ **配置里的数据键必须等于该字段当前的 label**。
+#   等价地:**改 label 就是改数据键**,必须同步改 recordSheetConfigs.js 的 key,否则该列取不到值(整列空白)
+#   且保存时被静默丢弃。本轮据此回退了 3 处 label 改名(物料名/更改原因/更改内容)与 1 处(内孔要求),
+#   并把「出货检验计划表」设计列名(序 号/检验项目/检验要求)改由 yj_field.alias 承载(effColLabel 优先取 alias)。
+#   自动化防线:frontend/src/core/views/recordSheetConfigs.keys.test.js + rdPanelLabels.fixture.json
+#   (基线由 node tools/gen-config-key-fixture.cjs 从活库导出;改过 label/字段后必须重跑)。
+# migrate-rd-2026-design.sql(重跑) —— §E 收敛为:仅保留 4 处 label 对齐(主要性能描述/产品负责人/
+#   客户名称/表单管理人)+ 显式归一 3 处(序号/控制项目/控制标准及要求 的 label==col_name,显示名进 alias);
+#   清理第一版误建的 [检验备注](label 也叫「备注」⇒ 同面板 label 重复,保存链按 label 匹配会写错列)
+# ↑ migrate-rd-2026-design.sql 重复登记已删(首次登记在 L458)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
+# ↑ migrate-rd-progress-18cols.sql 重复登记已删(首次登记在 L475)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
+
+# —— 2026-09-18 Phase 3 多语言补充:序号/检验项目/检验要求(alias 显示名)不含新 label,无需新增词条 ——
+
+# —— 2026-09-18 研发管理最新设计 Phase 4(组装工艺 4 变体标准库化)——
+# migrate-asm-proc-lib.sql —— 组装工艺 4 变体标准库种子(lib_code=asm.proc;裸棒/机器包布/复合半成品/成品,
+#   合计 39 道工序,管控要求 0 条为空)。**生成物**,由 tools/gen/gen-asm-proc-lib.cjs 从设计
+#   《关键控制清单--标准库.xlsx》4 个 sheet 生成 —— 生成器已展开设计的合并单元格(工序/检查比例纵向合并、
+#   工序控制内容横向多行);⚠ 旧 RD_ASM_PROC_DT0.seedRows 只有 21 条(= 首次复刻把合并单元格塌缩的产物)
+#   且多条管控要求为空,本种子以设计为准重建。幂等键 lib_code+item_code。
+# migrate-rd-2026-design.sql(重跑) —— §F 新增 RD_ASM_PROC.工艺形态(4 变体承载字段,字典=4 个 sheet 名):
+#   4 个关键控制清单变体原先没有任何字段能表达"本单用哪一套工序",默认只画首次复刻的那一套。
+# i18n-rd-2026-design.sql(重跑) —— 补 工艺形态 + 4 变体名 + 关键控制清单标准库 + 变体/工序数,各 10 语言
+migrate-asm-proc-lib.sql
+# ↑ migrate-rd-2026-design.sql 重复登记已删(首次登记在 L458)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
+# ↑ i18n-rd-2026-design.sql 重复登记已删(首次登记在 L465)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
+
+# —— 2026-09-18 Phase 5/重启测试修正(2 新面板前端 + 行表硬约定补齐)——
+# migrate-rd-prod-doclist.sql(重跑) —— ⚠ 补齐行表硬约定列:rd_prod_doclist_detail 缺 asp_cancel
+#   导致 QueryService.loadDetail 的 ISNULL(t.asp_cancel,'N')<>'Y' 直接 500、面板列表打不开(实测踩到);
+#   同族 rd_*_detail 表都带 asp_cancel + asp_user1/2 + asp_time1/2,两张新行表一并补齐(幂等 ALTER)。
+#   另:面板配 singleDoc=true(矩阵只有一张单,隐藏「新增」)+ 补承载单据 PDL-0001
+#   —— singleDoc 只隐藏新增入口,单据本身不存在则 queryDocs 返回空列表、矩阵无处挂载。
+#   清理第一版误建的死列(产品负责人/是否受控/受控日期/备注 均为派生值,永不写入)。
+# migrate-rd-sample-no.sql(重跑) —— rd_sample_no_detail 同样补齐 asp_cancel + asp_user1/2 + asp_time1/2。
+# ↑ migrate-rd-prod-doclist.sql 重复登记已删(首次登记在 L461)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
+# ↑ migrate-rd-sample-no.sql 重复登记已删(首次登记在 L460)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
+
+# —— 2026-09-18 Phase 5 前端:ProdDocListSheet.vue(产品文件列表只读矩阵)+ PanelxList 接入 + menus 新增 2 面板 ——
+# 后端:/px/prodDocList 端点(复用 DevTaskService.board(),只补 是否受控/受控日期 派生);
+#       StdLibController.list 的 SELECT 补 seq(前端据 seq 恢复 asm.proc 的设计序,原先 ORDER BY 字母序)
+
+# —— 2026-09-18 Phase 6 收尾:新面板角色授权行 + 前端静态产物重建 ——
+# migrate-rd-2026-newpanels-perm.sql —— 两张新面板的 yj_role_panel 授权行(非管理员可见性真源):
+#   RD_PROD_DOCLIST 只给 view,query,export,print(只读派生矩阵,给 add/modify/del 是无意义权限位);
+#   RD_SAMPLE_NO 照普通文书面板 view,query,add,modify,modlog,del,export。幂等键 role_id+panel_code。
+migrate-rd-2026-newpanels-perm.sql
+
+# —— 2026-09-18 产品信息表界面调整(用户口径 5 项)——
+# migrate-rd-prodinfo-ui.sql —— ③两级审批人 label 改「审核人（一级/二级审批人）」;
+#   ④产品功能类别 改下拉框(除余氯/VOC/重金属);⑤炭棒尺寸拆三格:新增 炭棒内径/炭棒外径/炭棒长度
+#   三列(照设计《产品信息表内容.xlsx》B13「内径*外径*长度(模具尺寸)」原文),
+#   旧整串 [炭棒尺寸] 退化为历史列(hidden=1+visible=1,不进纸面但不丢值)。
+#   ⚠ 不把旧列当"外径":旧列存整串(如 35*13*107),当外径用会把整串写进去。
+# i18n-rd-prodinfo-ui.sql —— 「编号：」+ 炭棒三格 label 与提示词 + 两级审批人新标签
+#   + 产品功能类别字典值(除余氯/重金属),各 10 语言。
+#   ⚠ 踩坑:字段 label 与提示词是**两套译名键**(译名以 label 为键)——
+#     第一版只加了提示词(内径(mm))那套,字段 label(炭棒内径)那套漏了,en 下字段名仍显中文。
+migrate-rd-prodinfo-ui.sql
+i18n-rd-prodinfo-ui.sql
+
+# —— 2026-09-18 规格书封面按设计重排(用户口径:照《规格书细分.xlsx》封面 sheet)——
+# 设计源:《产品开发\2.产品文件\2.1规格书\规格书细分.xlsx》sheet「封面（产品信息）」
+#        = 封面(首页)版式:范围 B5:E18、11 个合并区、标签1列+值3列。
+# migrate-spec-doc-cover.sql —— 新增 [产品类别] 字段(参照 RD_PROD_INFO.产品类别,不另存字典:
+#   产品信息表已有该字段 20 个选项,规格书新建时经参照带出,避免同一事实两处维护)
+#   + 建 rd_spec_doc_head.[产品类别] 列(产品主要性能/三签字列**早已存在**,本轮不动)。
+#   签字栏沿用既有三列 制订/审核/批准日期 存「姓名/日期」合写串(均 nvarchar(200),历史即此形态)。
+# i18n-spec-doc-cover.sql —— 产品类别(实测 field scope 已有 9 语言,兜底补)+ 产品主要性能
+#   + 封面既有标签(编号/客户料号/整体规格参数/版本/三签字栏)原先**只有 en 一条**,
+#     本轮补齐到 9 语言(否则切日语/韩语封面会露中文)。zh-CN 是源语言不建行。
+#   ⚠ 封面 9 行顺序与「编 号/版 本」这类两端对齐空格在**前端配置**(recordSheetConfigs.js):
+#     显示文案照设计原文,数据键必须是 yj_field.label —— 两者不同就分开写(label/key)。
+migrate-spec-doc-cover.sql
+i18n-spec-doc-cover.sql
+
+# —— 2026-09-18 规格书第 4 页(成品及包装运输)按设计补全 6 节 ——
+# 设计源同《规格书细分.xlsx》sheet「成品及包装运输」(B4:G34,0 合并区)。
+# 设计是 6 节,原实现只有 3 节且编号不符(1 + 5/6/7/8),本轮照设计改成 1..6:
+#   1.关键物料列表 / 2.炭棒处理要求(新) / 3.包装方式 / 4.出货检验报告(新) / 5.运输要求 / 6.存储环境
+# migrate-spec-doc-p4.sql —— 新增 [炭棒处理要求] / [出货检验报告] 两列 + 字段(label 即数据键),
+#   并把设计原文写入 alias 作字段级默认文案。
+# i18n-spec-doc-cover.sql 已含这两字段的 10 语言译名(同一轮)。
+# ⚠ 节的顺序/编号/归属在前端 recordSheetConfigs.js;
+#   物料表的 filterKey/filterVal([表区]='物料清单')必须保留,否则整张明细被当物料显示。
+migrate-spec-doc-p4.sql
 
 # —— 2026-09-20 采购链 采购订单号 / 采购订单行号 贯通(采购订单→送料暂收→来料检验→采购入库) ——
 #   bl_pu_order 补 行号(=金蝶 pur_order 分录 seq,sync-core.mapLines 写入 + 存量回填);
@@ -534,6 +691,163 @@ migrate-batch-backfill.sql
 #   **不删表**:qc_recv/qc_recv_detail 两张 0 行空表保留——v_lot_trace(批号追溯面板)「暂收」段仍引用;
 #      空表清理须连视图改写(sl_recv 侧列不同:无 批号/仓库/经手人)另案做。幂等可重跑。
 migrate-panel-merge-qc.sql
+
+# —— 2026-09-20 组装工艺清单按设计重排为 3 页签(用户口径:照《组装工艺控制.xlsx》)——
+# 设计源:《产品开发\2.产品文件\2.组装\组装工艺控制.xlsx》(3 个 sheet:修订记录 / BOM表 / 关键控制清单)
+#         + 《关键控制清单--标准库.xlsx》(同一目录,4 类标准库内容)。
+# gen/gen-asm-proc-lib.cjs —— 生成标准库种子 SQL。本轮修了两处:
+#   ① 裸棒 sheet 的管控要求跨 C:D 合并,原生成器写死取第 4 列 ⇒ 4 条工序的「检查比例」全空。
+#      改为**按表头定位列号**(headerIndex),不再依赖固定列偏移。
+#   ② 成品 sheet 第 36-40 行把「套折叠棉/扎橡皮筋 + 套PP棉」原样重复了一遍(设计缺陷),
+#      生成器对四元组做精确去重(20→18 条工序)。
+# migrate-asm-proc-lib.sql —— 4 个变体的标准库内容改为 **upsert**(原为 INSERT-only,
+#   重复执行会撞主键);内容键 = 四列表头原文 = yj_field.label。
+# migrate-asm-proc-redesign-2026-09-20.sql —— 表结构 + 字段:
+#   §1 rd_asm_proc_head 增 5 列(产品整体尺寸 / 表单管理人 / 密级 / 使用范围 / 版本号);
+#   §2 把 [表区] 从 place='header' 移到 'detail'(三张逻辑表共表,靠它分块 —— 留在 header 会
+#      导致明细永远查不到分块列,三张表互相串行);
+#   §3 新增 4 个 header 字段(产品整体尺寸 参照 RD_PROD_INFO,不另存第二份);
+#   §4 [物料名] 显示名改 **alias** 而非 label —— 改 label 就是改数据键,会波及
+#      RD_ASM_BOM / RD_SPEC_DOC 的同名字段;[产品名称/产品种类/整体规格外径/整体规格长度/成品重量]
+#      在本面板置 visible=0(设计里没有,字段保留给别的面板用)。
+# i18n-asm-proc-redesign.sql —— [关键控制清单] 10 语言 + [修订记录/产品整体尺寸/密级/使用范围]
+#   各 9 语言(en 已在)。zh-CN 是源语言不建行。
+# ⚠ 3 页签的页序/表归属/条件区 grid/变体标题在**前端配置** recordSheetConfigs.js:
+#   每条 dataTable 必须带 filterKey+filterVal 且值互不重复,否则三张表互相串行、
+#   且「从标准库勾选」的整表替换会删掉表区为空的全部行。
+# ↑ migrate-asm-proc-lib.sql 重复登记已删(首次登记在 L506)——
+#   DbSync 按内容哈希跳过未变化脚本,重复登记不会带来“再跑一次”,只会谎报执行顺序。
+migrate-asm-proc-redesign-2026-09-20.sql
+i18n-asm-proc-redesign.sql
+
+# —— 2026-09-20 成型工艺清单补「修订记录」页签(用户口径:和组装工艺清单的一样)—— 
+# 页签 0 = 修订记录(新增),原「成型工艺清单 / 成型配方」顺延为页 1 / 页 2;
+# 列与组装工艺清单的修订记录页**逐字一致**:表区(隐藏)/序号/更改内容/更改原因/更改时间/责任人/备注。
+# migrate-mold-proc-revision.sql —— 只解决"能不能落库/能不能读回",两处改动:
+#   §1 rd_mold_proc_detail 补 5 列(与 rd_asm_proc_detail 同名同型);
+#   §2 [表区] 由 place='header' 改挂 'detail' —— 明细查询只取 place='detail' 的列,
+#      留在 header 时明细行上的 [表区] 永远查不回来,而 rowsOf() 按它过滤 ⇒
+#      修订记录与配方表**重开单据都会一行都看不见**(组装侧 2026-09-20 同坑)。
+# 落点:修订记录行与配方行共用 rd_mold_proc_detail,靠 [表区]='修订记录'/'配方表' 分块;
+# 不新建物理表、不动已有 22 张头表的语义。
+# ⚠ 页序/列序/列宽/设计像素在**前端配置** recordSheetConfigs.js(RD_MOLD_PROC_DT_REVISION);
+#   断言⑦(recordSheetConfigs.keys.test.js)钉住"每页有 grid/showHead + 表区值唯一 + 与组装逐字一致"。
+migrate-mold-proc-revision.sql
+
+# —— 2026-09-20 出货检验项目控制计划按《出货检验项目控制计划.xlsx》重排为「一张表 7 列」——
+# 设计源单 sheet,无页签:报告头 + 三行三格表头 + 单张 7 列表 + 跨 7 列表尾注。
+#
+# migrate-insp-plan-redesign-2026-09-20.sql —— 表结构 + 字段:
+#   §1 rd_insp_plan_head 增 3 列(客户项目名称 / 产品整体尺寸 / 使用范围);
+#   §2 新增 3 个 header 字段;
+#   §3 两处 **alias**(不是 label):[控制方法] 显示成「检验方法」、[检测频率] 显示成「检查频率」
+#      —— label 就是前端数据键,改 label 会让数据静默丢失(QueryService 的 AS [label] 口径)。
+#   ⚠ 宽度对齐**取值源**而非观感(客户项目名称 ← 规格书同名 200;产品整体尺寸 ← 规格书
+#     整体规格参数 1000),窄了保存时静默截断。
+# i18n-insp-plan-redesign.sql —— 大标题 / 表尾注 / 检查频率 / 检验项目 / 检验要求 /
+#   不合格应对措施 / 编写人 / 产品编号 各补齐到 10 语言。
+#   ⚠ 去重键取 (ref_key, locale) **不带 scope**:tt() 查的是 field+ui 合并词典,
+#     「检验方法」「检测频率」在 ui 侧已有 9 条,按 scope 去重再补 field 行会在合并词典里
+#     同键同语言撞车。该脚本对这两个键**一行不写**。
+# ⚠ 版式三条硬约束(改前端 recordSheetConfigs.js 的 grid/head/sections 时逐条核对):
+#   ① grid 7 格 = 设计 B..H 列宽,总宽 1187;
+#   ② head {title:5, infoLabel:1, infoValue:1} 合计 7 = grid 格数;
+#   ③ sections 每行靠 lspan/vspan 拼满 7 格,表体因列带 w 而 dtOwnsWidth ⇒ dtW 同 1187。
+# ⚠ 本面板**没有 filterKey/filterVal**:rd_insp_plan_detail 连 [表区] 物理列都没有,
+#   照抄组装工艺那边的 filterKey:'表区' 只会得到一张空表。检验类别改由 libGroupKey 承载。
+# 「自动填充规格书」走后端 GET /px/specByProduct(新增,见 PxController)——规格书的 编号
+#   (=产品键)在通用查询链路里被 QueryService.loadDocs 用单据编号覆盖,取不到真值。
+migrate-insp-plan-redesign-2026-09-20.sql
+i18n-insp-plan-redesign.sql
+
+# —— 2026-09-20 产品信息表两级审批 + 分发责任人(用户口径:一级=admin、一级通过选二级审核人、二级通过即归档)——
+# 口径(grill 六问全定,详见 CONTEXT.md「两级审批(产品信息表)」术语与同轮决策行):
+#   ① 两级审批:一级=admin(现有审批权口径);一级通过时**选取**二级审核人(候选=全部启用账号),
+#      写入纸面「审核人(二级审批人)」并转「待二级审批」;**二级通过即归档**(不新增中间态);
+#   ② 归档后二级审核人做「分发责任人」:四个下游文件**各自**一个责任人(默认带出产品负责人,
+#      可逐个改),落 rd_dev_task.负责人(该表本就是「产品×面板」一行),分发后可随时改人;
+#   ③ 四文件服务端硬门禁:未分发禁编,分发后只放该文件责任人 ∪ 管理员,四文件并行无串行依赖
+#      (产品编号为空的历史单豁免,否则既有单据被锁死;规格书另放已分配责任人/总负责人以兼容旧两级分发);
+#   ④ 二级驳回一律回草稿并通知制单人;非二级审核人代批被拒(管理员恒可);
+#   ⑤ 新增账号 cp(陈秀丽):普通用户角色,二级审批权靠"被一级选中即授权",不依赖 can_approve。
+# migrate-prodinfo-twolevel.sql —— 数据层:cp 账号 + yj_doc_status 两列
+#   (approve_node=当前待审批节点 1/2、l2_approver=选定的二级审核人账号;默认 NULL ⇒ 其余面板行为不变)。
+# 后端:ButtonService(两级状态机 approveApproval/approveSecond、rejectApproval、dispatchDev 改造、
+#   ensureDevFileEditable 门禁)、DevTaskService(dispatch 带分工 + assignsOf/assignState/enabledUsers)、
+#   QueryService.docStatus 与 ButtonService.docStatusOf **两处同改**加「待二级审批」、
+#   PanelPermissionService.isL2ApproverOf(二级审批绕过 audit 词表校验,否则 cp 点不动第二级)。
+# 前端:PanelxList(「选取二级审核人」弹窗 + 侧栏「分发责任人/改责任人」+ 四行分工弹窗 +
+#   审批组下拉在 待二级审批 态对被选人开放)、engine.js 两个新接口、en.js 词条。
+# ⚠ 按钮词表:分发动作沿用「产品开发」这个已授权动作词(前端显示改叫「分发责任人」),
+#   避免为一个动作改全体角色的权限行。
+migrate-prodinfo-twolevel.sql
+
+# ── 2026-09-20 配方计算(成型工艺清单 · 面板按钮 + 弹窗)────────────────────────────────
+# 口径:CONTEXT.md「配方计算器」/ docs/adr/0004(推翻了《研发管理-新面板设计与改动方案》§12 的
+#   "成型工艺清单第 3 个页签"落点:弹窗输入不落库、不打印,只有回填进单据字段的值随单据保存)。
+# 公式:frontend/src/core/mold/recipeEngine.js,逐条对齐《炭棒工艺配方设计器》exe 的
+#   app.domain.engine(期望值由 exe 真引擎产出:黄金向量 24 条真实记录 + 85 例边界/随机,逐位一致)。
+# migrate-mold-calcparam.sql —— 数据层:配方计算的**系统默认工艺参数**条目
+#   (yj_std_lib:lib_code='mold.calcparam', item_code=N'默认';按产品编号覆盖的条目由用户在弹窗里
+#   点「存为该产品参数」写入,同库同表)。**不建新表、不加新字段**:弹窗回填的全部是既有数据键
+#   (理论最低/中间/最高灌料重量g、理论水分、最短/中间值/最长长度mm、最低/中间值/最高重量g、
+#   实际密度管控下限/上限、配方表的实际添加比例/单支物料含量)。
+# 前端:core/mold/{recipeEngine,recipeConstants,recipeSheet}.js + core/views/RecipeCalcDialog.vue、
+#   RecordSheetPanels.vue 表头按钮(dt.recipeCalc)、recordSheetConfigs 配方表加 recipeCalc:true、
+#   en.js 词条。无后端改动(参数库走既有 /api/stdlib 接口)。
+# 未纳入本期(按 grill 决议排后):bs_inv 补「水分含量」列 + 84 种配方物料播种(含水率先手填)、
+#   60 行烧结尺寸表 rd_sinter_tolerance(弹窗尺寸先读单据现有格)。
+migrate-mold-calcparam.sql
+
+# ── 2026-09-20 配方计算的数据底座:84 种配方物料 + 含水率 ───────────────────────────────
+# 口径:CONTEXT.md「配方计算器」/ docs/adr/0004 —— 含水率是物料固有属性,一次维护长期复用;
+#   弹窗按物料编号自动带出(实测链路:弹窗 → 商品面板 INV 等值查 → bs_inv.水分含量 → 灌料湿重)。
+# 来源:设计源《20267月22日-最新烧结配方模板-1.xlsx》sheet「物料清单」(A1:D85,84 行),
+#   由 tools/gen/gen-recipe-materials.cjs 生成(不要手改生成的 SQL):
+#     node tools/gen/gen-recipe-materials.cjs
+# migrate-recipe-materials.sql —— ① bs_inv 补「水分含量」decimal(9,4) + MS_Description 中文注明;
+#   ② 84 种配方物料**按需播种**(已存在的按存货编码跳过 ⇒ 正式库 3850 行里已有的绝不造重复),
+#   水分含量只在为空时补、不覆盖人工维护过的值;③ yj_field(商品面板可见可维护)+ en 译名。
+#   ⚠ 执行须带 QUOTED_IDENTIFIER ON:`sqlcmd -I`(否则 bs_inv 上的 INSERT 会因
+#   QUOTED_IDENTIFIER 报错 —— 同一个脚本在测试库能过、在正式库失败,就是这个坑)。
+# 前端:core/mold/recipeSheet.js 的 applyArchiveMoisture(有单测)+ RecipeCalcDialog 自动带出并标「档案」来源。
+migrate-recipe-materials.sql
+
+# ── 2026-09-21 烧结尺寸表(60 行模具↔炭棒内外径公差对照)+ 档案面板 ─────────────────────
+# 用途:配方计算弹窗按「车间 + 型号」从这张表带出炭棒外径/内径与公差 ⇒ 回填页 1
+#   「检验要求 · 炭棒尺寸」四格,并作为引擎的 od/id(压过单据上的炭棒规格);工艺员不必再手敲。
+# 来源:设计源《20267月22日-最新烧结配方模板-1.xlsx》sheet「烧结尺寸表」(A1:I63,R4~R63 共 60 行),
+#   由 tools/gen/gen-sinter-tolerance.cjs 生成(不要手改生成的 SQL):
+#     node tools/gen/gen-sinter-tolerance.cjs
+# migrate-sinter-tolerance.sql —— ① 建表 rd_sinter_tolerance + 表/列中文注明;
+#   ② 登记**档案面板** RD_SINTER_TOL(mode='archive',用现成列表/内联编辑维护 60 行,不另写维护界面)
+#   + 10 个字段 + 译名;③ 60 行种子(按 车间+型号 去重,已存在不覆盖);按车间 1#22 / 2#12 / 3#13 / 4#12 / 1/3#1。
+#   ⚠ 脏值原样保留(§12.4):长度范围混车间备注的 1 行、带「（只可做低精度）」的 2 行 ——
+#     程式只解析前段 NNN-NNN(parseLengthRange),越界给提示不拦。
+#   ⚠ 车间列有 `1/3` 写法(两车间共用型号):挑行按 '/' 拆开匹配(sinterRowsForWorkshop)。
+#   ⚠ 该面板没有侧栏菜单(研发管理四个分组各有其语义,塞进去会污染产品开发下发矩阵)——
+#     入口放在配方计算弹窗的「维护尺寸表」上;要挂侧栏再说,记得同改 menus.test.js 的计数断言。
+# 前端:recipeSheet.js 的 parseLengthRange/sinterRowsFromQuery/sinterRowsForWorkshop/sinterParams/
+#   sinterPatch/sinterLengthWarning(均有单测)+ RecipeCalcDialog 的「①b 烧结尺寸(模具)」块。
+migrate-sinter-tolerance.sql
+
+# ── 2026-09-21 成型工艺清单(页1)按设计图重排字段与来源 ───────────────────────────────
+# 口径:用户给的版面照片 + 《炭棒BOM及工艺信息表单需求设计内容》第三/四页。
+# migrate-mold-proc-p1-redesign.sql —— ① 新字段 2 个(灌料要求 / 压降是否测试)+ 物理列 + 中文注明;
+#   ② 显示改名 7 处走 **yj_field.alias**(产品编号→炭棒编号、外观要求→产品形态、外径mm/外径公差/内径mm/
+#   内径公差→炭棒外径mm/炭棒外径公差mm/炭棒内径mm/炭棒内径公差mm、烧结时间调速器参数→烧结时间/调速器参数)
+#   —— **数据键一律不动**:参照(产品编号→产品信息表)、四文件编辑门禁、配方计算回填全按数据键走;
+#   ③ 五个工序字段(配料要求/烧结炉参数/烧结时间调速器参数/热压要求/冷却参数设置)改挂**标准库**
+#   (mold.batching / mold.sinter / mold.sintertime / mold.hotpress / mold.cooling),原来写死在
+#   yj_field.dict_sql 里的候选值搬进库(16 条,值不丢);配料要求/热压要求 两个库先空着,模板由工艺科录。
+#   ⚠ 标准库型字段的 dict_sql 必须是**库编码不是 SQL**(写 SQL ⇒ 下拉空白且不报错)。
+# 前端:recordSheetConfigs 的 RD_MOLD_PROC_SEC0 整段重排(配料要求行 / 灌料三值并排+空白行+灌料要求行 /
+#   炭棒尺寸四格、撤掉内孔要求 / 压降块补第三行「压降是否测试」);RecordSheetPanels 的 grid 分支支持
+#   area 文本域、标准库下拉(filterable+allow-create+⧉维护)、文本域旁的「⌄标准库」选择(库按字段声明走);
+#   rdPanelLabels.fixture.json 已按活库重生成;en.js 补纸面新标签词条。
+# 验收:界面探针 ⑧ 段 11 项(标签齐、旧标签撤、三值并排、⌄/⧉入口、压降是否测试格、选项确实来自库)
+#   + 原有 ①~⑦ 段全部照旧通过(配方计算回填四格未受影响)。
+migrate-mold-proc-p1-redesign.sql
 
 # —— 2026-09-21 来料检验单 QC_INSP 按参照库「品检系」补齐字段(10 个) ——
 #   参照来源:参照库备份(光缆厂现网,同款 legacy MES)的品检系面板——品检明细/品检数据/扫码全检
@@ -645,6 +959,7 @@ migrate-chain-insp-fields.sql
 #   退回头日期标签 日期→单据日期)、PanelConfigService(明细同义词 仓库↔仓库代码、
 #   QC_INSP|PURCHASE_IN 增 供应商代码→供应商编码、清理失效的日期同义词)。
 migrate-chain-field-complete.sql
+
 # —— 2026-09-21 送料批次号取号时机:分批送料生成时 → **采购入库单审核时** ——
 #   用户定稿口径:① 格式 yyyyMMdd + 两位序号**无分隔符**(2026092101 = 2026-09-21 第 1 批);
 #   ② 日期取**送料当天**(暂收单/台账行创建那天),不是审核当天;③ 唯一性范围 = 采购订单号 + 批次号
@@ -669,6 +984,7 @@ migrate-chain-field-complete.sql
 #   前端采购订单表头「送料」摘要追加「(M 批待编号)」,分批送料对话框不再预告批次号。
 #   验证:tools/archive/_verify-batch-no-at-inbound.mjs(8 条断言全 PASS;回归 _verify-chain-field-complete.mjs)。
 migrate-batch-no-at-inbound.sql
+
 # —— 2026-09-21 库存报表三面版:结存改移动加权成本 + 台账补 6 列 ——
 #   实测缺陷:三面版(库存台账/收发存汇总/库存状况)的「发出金额」取的是售价/单据金额,
 #   结存金额算成 Σ收入−Σ售价(旧口径 −198,515.28),不是成本;台账还缺批号/往来单位/经手人/含税/税额。
@@ -772,6 +1088,91 @@ migrate-qc-tc-in.sql
 #   否则查询弹窗下拉仍只出两值、与纸面不符。新面板 QC_TC_IN 建表即三值,不涉及。
 #   自检:tools/archive/_q-tc-final.sql(QC_TC 与 QC_TC_IN 字典应一致、均三值)。幂等。
 migrate-qc-tc-final-result.sql
+
+# —— 2026-09-21 立项申请表「项目等级」(审核人定级)+ 全链路四级统一 ——
+# 用户口径:①立项申请审核通过后由**审核人**在系统里定级,等级作为后续立项(实施计划)与进度流程的属性;
+#   ②选项在原有基础上升为 **一级/二级/三级/四级**;③形态:归档后侧栏「项目定级」按钮
+#   (管理员 ∪ 该面板审批人 can_approve),弹窗选级,写单据 + 一条 GRADE/GRADED 留痕,可再改(每次留痕)。
+# migrate-approval-level.sql —— 数据层:
+#   §1 rd_approval 补 [项目等级] nvarchar(20)(⚠ 头表就叫 rd_approval,没有 _head);
+#   §2 yj_field 登记 RD_APPROVAL.项目等级(header/下拉框/一~四级/非必填 —— 定级是事后动作);
+#   §3 下游字典统一补「一级」:RD_PLAN.项目定级、RD_PROGRESS.项目定级(detail 的 项目层级);
+#      ⚠ RD_PROGRESS 表头那个 label 是「项目(一/二级)」,语义是"一二级并档",**不动**;
+#   §4 列注释 + 译名(项目等级 10 语言;选项值属数据键不翻译,ADR-0001)。
+# 后端:ButtonService.gradeProject(按钮「项目定级」)、PanelPermissionService(项目定级 → audit 词)、
+#   PanelConfigService.REF_SYNONYMS 加「项目等级 → 项目定级」—— 实施计划按文档编号参照立项申请时
+#   自动把等级带进计划的 项目定级(等级由此成为下游属性),进度查询继续由 syncPlanToProgress 同步。
+# 前端:PanelxList 侧栏「项目定级·当前等级」按钮 + 定级弹窗(四档单选 + 定级说明)、en.js 12 条词条。
+# 验收探针 tools/archive/_probe-approval-grade.cjs 12 项全绿(草稿态被拒/无审批权被拒/定级落库+留痕/
+#   改级留痕含轨迹/非法取值被拒/下游 refMap 与两处字典/界面按钮与四档弹窗)。
+migrate-approval-level.sql
+
+# —— 2026-09-21 产品变更申请单(RD_CHANGE)全新线上流程·第一步:数据层 ——
+# 用户口径:产品变更在系统里以「变更申请单」走完整线上流程(替代目前仅上传附件的做法):
+#   ①发起人建单(变更原因/验证数据/其他信息);②按**产品编号**关联该产品四个受控文件
+#   (成型工艺清单/组装工艺清单/规格书/出货检验计划表)并勾选本次要变的文件 + 选原料/半成品/成品处理方式;
+#   ③各部门按各自账号填本部门栏目(每人只能改自己填的),留「变更后内容」可编辑区;
+#   ④范围较大时相关人员**会签**;⑤填完提交冯总(admin)审核,通过即生效:对应受控文件据此
+#   **自动建下一版草稿(带来源单号)** + 通知责任人重走受控审核。
+# 版式基础:《产品开发\…\副本变更模板(1).xlsx》sheet「KPC变更申请通知单」(YJ-QR-130,已走查入库
+#   tools/archive/_walk/src-change-*.txt;另一张「变更申请-变更通知单」YJ-QR-131 仅作对照,未采用)。
+# migrate-change-request.sql —— 数据层:
+#   §1 rd_change_head(31 列:基础信息/性质/产品编号参照/变更事由/验证数据/变更文件/相关变更/
+#      需会签+会签人/原料·半成品·成品 数量+处理方式/变更来源单号/密级等)+ rd_change_detail
+#      (表区+部门+变更后内容+签字+日期;7 部门评审行);
+#   §2 两表 MS_Description 中文注明;§3 yj_panel 注册(⚠ category 必填,首版漏了实测报"不能将 NULL 插入 category");
+#   §4 yj_field 头 25 + 明细 5(label 即数据键;产品编号参照 RD_PROD_INFO);§5 译名(en/zh-TW/ja 为主);
+#   §6 yj_role_panel 普通用户 view/query/add/modify/modlog/del/export/print。
+# 下一步(未做):ButtonService 的部门按格编辑门禁、会签子流程、审批+生效钩子;前端纸张配置与
+#   四文件勾选控件、部门行只读态;i18n 其余语言;端到端探针。
+migrate-change-request.sql
+
+# —— 2026-09-21 产品变更申请单(RD_CHANGE)·第二步:部门行 ↔ 系统部门(账号)映射 ——
+# 问题:YJ-QR-130「部门评审意见」是**纸面 7 个部门**(开发部/成型工艺科/组装车间/销售部/
+#   品质部/计划组/仓管部),而 yj_dept 是人事口径的实际部门(产品开发部/开发科/工艺科/
+#   生产部/销售中心/质量管理部/检测科/生产管理中心/仓管部…)——两套口径不是一对一,纸面
+#   部门名在 yj_dept 里根本不存在,所以「各部门按账号填本部门栏目」的门禁必须有一层映射。
+# migrate-change-dept-map.sql —— 建 yj_change_dept(纸面部门 / dept_id / sort)+ 表列中文注明
+#   + 预置 12 条映射(7 个纸面部门落到现有系统部门):开发部←产品开发部/开发科/材料研发部,
+#   成型工艺科←工艺科,组装车间←生产部,销售部←销售中心/市场营销/业务跟单,
+#   品质部←质量管理部/检测科,计划组←生产管理中心,仓管部←仓管部。
+#   部门行清单 = 本表「部门」去重(按 sort)⇒ 加减部门行只改数据、不改代码。
+# 配套代码:ButtonService.ensureChangeDeptRows(建单铺 7 行)/ gateChangeDetail(按格门禁,见下条提交)。
+migrate-change-dept-map.sql
+
+# —— 2026-09-21 产品变更申请单(RD_CHANGE)·第三步:会签 / 审批 / 生效钩子 ——
+# 用户口径(第④⑤条):范围较大时由相关人员**会签**;填完提交冯总(admin)审核,**通过后变更生效**。
+# 状态链:草稿 →(填写中)→ 会签中(可选)→ 审批中(admin)→ 已生效;驳回回草稿。
+# migrate-change-flow.sql:
+#   §1 yj_doc_status 补 [effective](已生效标记;「已生效」与「已审核」区分开);
+#   §2 四个受控文件头表(rd_mold_proc_head/rd_asm_proc_head/rd_spec_doc_head/rd_insp_plan_head)补
+#      [变更来源单号]:下一版草稿记下"我因哪张变更单而生";
+#   §3 四个面板登记该字段(place='query' 列表可见 + hidden=1 **不上纸张**,不动四张既有版面 + editable=0)+ 译名;
+#   §4 会签**不建表**:会签人存 rd_change_head.会签人,每签一行落既有 yj_form_approval
+#      (action='SIGNOFF', result PENDING/APPROVED/REJECTED/CANCELED/WITHDRAWN),「会签中」由存在
+#      PENDING 签名推导 —— 与项目实施计划终止流(yj_plan_term + yj_form_approval)同一套做法。
+# 配套代码:ButtonService(submitSignoff/signoffApprove/signoffReject/signoffWithdraw/applyChangeEffect/
+#   cloneDocForChange)、PanelPermissionService 面板级按钮权限覆盖(RD_CHANGE 的提交类按钮改判 add/modify,
+#   因为该面板不是文书归档面板、普通用户没有 audit 词)、QueryService 列表状态同步。
+migrate-change-flow.sql
+
+# —— 2026-09-18 商品·来料检验(金蝶自定义字段)接线——金蝶界面定义自定义字段后 API 可读(沙箱键 custom_field__1__62jiaob3z7yj97 实证:CL004=是 全链路通);bs_inv 建真实列 来料检验(是/否,金蝶维护MES只读);check_type 语义纠正回 商品类型(1普通/2套装/3服务,此前误更名检验方式);sync-core CF_INSPECTION_KEYS 登记表(真实账套键待其定义后登记);INV面板 detail列只读。幂等可重跑 ——
+migrate-material-inspection-field.sql
+
+# —— 2026-09-21 机翻坏译名修复(强度要求kgf / zh-TW 的 2 个 U+FFFD)——
+# migrate-i18n-fix-zhtw-strength.sql —— 坏值由 158ea03 机翻补缺口写入(该提交的 git blob 原文即坏,
+#   git 里没有干净版本可还原);只删坏字符、保留原有空格(同批 de/ru/th/vi/ko/es 均为「文字 + 空格 + kgf」,
+#   空格是未损坏的 ASCII),source 由 mt 升级 manual。两个账套均已执行,残留坏译名 0。
+#   ⚠ 两个坑(实测,勿重蹈):
+#     ① U+FFFD 在 Windows 排序规则下按 **best-fit** 匹配 ——
+#        `LIKE N'%'+NCHAR(65533)+N'%'` 命中全表(18080 行,等于没筛);
+#        `REPLACE(text, NCHAR(65533), N'')` **静默空操作**(脚本报成功但一个字符没改)。
+#        必须显式 `COLLATE Latin1_General_BIN2`;检测坏译名用
+#        CHARINDEX(NCHAR(65533) COLLATE Latin1_General_BIN2, text COLLATE Latin1_General_BIN2) > 0。
+#     ② 库侧 yj_translation 与前端语言包是**两处真源**(tt() 合并词典),只改一处会残留 ——
+#        前端 frontend/src/i18n/locales/zh-TW.js 的同名坏值本轮一并修
+#        (由 tools/archive/_fix-encoding-fffd-gbk.mjs 处理)。
+migrate-i18n-fix-zhtw-strength.sql
 
 # —— 2026-09-22 质量单据「特采申请单」(QC_TC)整体下线 ——
 #   用户口径:两个特采单重复,去掉「质量单据」组那个;保留 品质管理 > 来料品质 >「特采单」
@@ -1006,3 +1407,39 @@ migrate-qc-backfill-batch-readonly.sql
 #     改名并把 是否来料检验/特采 两个来源判定字段一并带下;特采行已被闸门排除 → 恒否)。
 #   验证:tools/archive/_verify-purchase-in-tc-flag.mjs(8 张特采链路单行=是、其余=否、界面列可见)。
 migrate-purchase-in-tc-flag.sql
+
+# —— 2026-09-22 立项申请表右侧「备注」区登记为可填字段(版式对齐设计 F5/F6:G15)——
+# migrate-rd-approval-remark-field.sql —— 设计右侧一列是「备注」标签 + 合并填写区,实现此前只画
+#   装饰虚线(docSheetConfigs 的 deco),而 rd_approval.[备注](nvarchar(1000)) 列一直存在却从未登记
+#   yj_field ⇒ 界面上不可填、不入库。本次版式改为 remark 列(DocSheet 渲染文本域绑 head['备注']),
+#   脚本登记该字段(place=header,seq=165)。译名「备注」10 语言实测已存在,无需新增。
+#   两个账套均连跑两遍,自检三项(列存在/字段已登记/译名 en)均为 1。
+migrate-rd-approval-remark-field.sql
+
+# —— 2026-09-22 RD_PROGRESS 删除 5 个孤儿列(同一事实双写 → 收敛成一个真源)——
+# migrate-rd-progress-drop-orphan-cols.sql —— migrate-rd-progress-18cols.sql 建的 13 个新列里,这 5 个
+#   (项目发起人/项目负责人/立项日期/预计完成日期/测试情况)**没有真源**:前端 ProgressControlSheet 的
+#   K[label] 与 Excel 导入导出都指向旧列(项目级/项目负责/实施进度/里程完成/测试员);而后端
+#   ButtonService.syncPlanToProgress 此前**新旧双写**(注释却写"不再写旧列")⇒ 同一事实两个物理列各存
+#   一份,COALESCE 参数为 NULL 时必然分叉。本轮先把后端收敛为只写旧列,再删这 5 列。
+#   ⚠ 结构:5 个逐列一致性闸门(旧列 vs 新列不一致即 RAISERROR 中止,DROP 批不下发)+ COL_LENGTH 守卫的
+#     DROP + 删 yj_field(限定 place='detail')+ 更新表注明 + 自检。闸门有效性已实测(事务内注入 1 行
+#     不一致 → 拦下、exit=1、DROP 未执行)。
+#   ⚠ 备份表 rd_progress_detail_bak_20260918 **是 0 行空快照**,不构成回滚依据;本次不丢数据靠闸门
+#     diff=0 且这 5 列非空计数全 0(10 行全空)。
+#   ⚠ 测试库为纯 no-op(18cols 从未在该库执行,13 个新列都不存在)—— 测试库落后于迁移链属既有缺陷,
+#     刷新方式见 docs/development/环境与数据库.md(make-test-db.ps1)。
+migrate-rd-progress-drop-orphan-cols.sql
+
+# —— 2026-09-22 项目进度查询控制列表定为 14 列(4 列不上纸面,只标 hidden 不动数据)——
+# migrate-rd-progress-offsheet-cols.sql —— 用户拿设计截图确认控制列表就是 14 列,而 18cols 迁移当初按
+#   设计文件表头行的 18 格建了 18 列,其中 4 格不上纸面:
+#     · 开发复杂度/重要程度/紧急程度 —— 设计里每行都填着占位符 `n n n`,从无真实数据;
+#     · 项目定及变更 —— 为承接「设计 O 列(状态)的手填说明」而建,用户确认不上控制列表。
+#   本脚本**只改元数据**:这 4 行的 yj_field.hidden 置 1(保留 visible=1),同步表注明写清
+#   「纸面 14 列 + 4 列保留不上纸面」。物理列与数据一律不动;前端纸面列由
+#   frontend/src/core/progress/progressColumns.js 的 PROGRESS_COLUMNS(14 项)决定,
+#   QueryService.selectCols 不过滤 hidden ⇒ 行模型键不变、保存链不丢值。
+#   正式库自检 ①②③④ = 4/4/14/9(hidden=0 只有 9 个是预期:14 列里有 5 个的数据键是退隐的旧列
+#   项目级/项目负责/实施进度/里程完成/测试员,控制列表仍读它们);测试库因从未跑 18cols 为 0/0/10/14。
+migrate-rd-progress-offsheet-cols.sql

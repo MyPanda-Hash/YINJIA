@@ -69,6 +69,10 @@ YINJIA-MES/
 
 ## 本地启动
 
+> 前提:**JDK 25**(`pom.xml` 的 `<java.version>25</java.version>`,class 是 major 69)。
+> 仓库脚本会自动探测 JDK 25;若直接跑 `mvn` 报「不支持发行版本 25」,就是 `JAVA_HOME` 没指向 JDK 25 ——
+> 处置与验证见 `docs/development/环境与数据库.md` 的「开发机环境」。
+
 ```powershell
 # 后端(自动注入阿里云 AK)
 cd C:\INCER\YINJIA-MES\backend

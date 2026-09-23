@@ -9,7 +9,7 @@
 --   EMP : 业务员 证件类型 职务 职称 | DEPT: 部门类型 电话 | WH: 允许零库存出库 仓库类型 所属车间
 --   UOM : 单位类型 主单位 换算率
 -- 幂等:UPDATE 直写同值,可重复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

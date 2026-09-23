@@ -1,5 +1,5 @@
 ﻿/* 表格列自定义:yj_field 增加 alias(栏名别名) 和 visible(是否显示) */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 IF COL_LENGTH('yj_field', 'alias') IS NULL

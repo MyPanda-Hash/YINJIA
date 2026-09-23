@@ -6,6 +6,13 @@ target/
 *.rar
 *.tar.gz
 *.log
+# 根目录日志/诊断文本:原先只 ignore 了 *.log,logs-*.txt 这类漏网(2026-09-21 实测
+# git check-ignore 对 logs-8090-appjar.txt 不命中,属"随时可能被误提交"状态)。
+# 诊断产物一律别放仓库根目录:写 $env:TEMP,或按规范放 tools/archive/_*。
+logs-*.txt
+logs*.txt
+# harness(DSH)视觉工具的产物目录:截图/标注落在工作区根目录,属工具缓存,不入库(2026-09-22 实测出现)
+.dsh-tool-vision/
 .env
 .env.local
 *.local
@@ -88,3 +95,10 @@ deploy/push/push-state.json
 deploy/push/config.json
 deploy/push/config.test.json
 temp-push-sandbox/
+
+# 单文件传输包(部署用,含 app.jar/.bak,不入库)
+deploy/*.zip
+
+# JDK 安装包(服务器部署前置件,110MB 二进制,绝不入库;2026-09-21 增)
+deploy/*.msi
+*.msi

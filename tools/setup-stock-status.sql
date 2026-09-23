@@ -1,6 +1,6 @@
 ﻿/* STOCK_STATUS 库存状况面板(flat 平表模式,读 kucun 库存台账)
    标签对齐 light-mes fillCurrentStock 契约(存货编码/存货/仓库/现存量(主)) */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 DELETE FROM yj_field WHERE panel_code = 'STOCK_STATUS';

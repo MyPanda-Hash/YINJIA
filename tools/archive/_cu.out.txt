@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-change-ui-cleanup.sql ==
+  | 界面探针残留 | 0 | 
+  | 生成物残留 | 2 | 
+[OK] _probe-change-ui-cleanup.sql (1 batches)

@@ -1,7 +1,7 @@
 /* 报表栏目设置表(报表表头筛选与排序补丁):
    按面板编码持久化 JSON {columns:[{prop,label,visible}],sort:{prop,order}},
    全部用户共享;后端 /api/px/reportColumnSettings 读写。 */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 IF OBJECT_ID('report_column_settings') IS NULL
 CREATE TABLE report_column_settings (

@@ -1,4 +1,4 @@
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 GO
 IF COL_LENGTH('bs_dict','asp_cancel') IS NULL
   ALTER TABLE bs_dict ADD asp_cancel char(1) NULL DEFAULT 'N';

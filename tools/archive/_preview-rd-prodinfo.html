@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<!--
+  _preview-rd-prodinfo.html — 产品信息表新纸张版式的**静态样张**(仅用于视觉核对)
+  复刻 RecordSheetPanels 报告头 + 四个 section 的表格结构与 CSS(标签 td.rs-label / 值 td / 网格 4 列 130·260·130·260),
+  目的是在无浏览器自动化的环境下,用截图核对下列五项改动的**版式效果**:
+    ① 右上角「编号：」前置标识   ② 编辑人在上、日期在下
+    ③ 一级/二级审批人各占一行    ④ 产品功能类别下拉   ⑤ 炭棒尺寸三格 + 提示词
+  这不是应用代码,只是排版样张;数值为示意。
+-->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>产品信息表 — 新版式样张</title>
+<style>
+  body { margin: 0; padding: 18px; background: #f0f2f5; font: 13px/1.5 "Microsoft YaHei", sans-serif; color: #333; }
+  .rs { width: 1040px; background: #fff; border: 1px solid #d0d5dd; padding: 14px; }
+  table { border-collapse: collapse; width: 1040px; table-layout: fixed; }
+  td, th { border: 1px solid #c9ced6; padding: 4px 6px; font-size: 12.5px; vertical-align: middle; }
+  .rs-label { background: #d9d9d9; color: #333; text-align: center; font-weight: 500; }
+  .rs-company-cell { font-family: "KaiTi","STKaiti","SimSun",serif; font-style: italic; font-size: 17px; padding: 7px 14px; }
+  .rs-docno { text-align: right; font-family: "KaiTi","STKaiti","SimSun",serif; font-weight: 600; font-style: italic; font-size: 14px; padding: 6px 14px; }
+  .rs-docno-prefix { white-space: nowrap; font-style: normal; font-weight: 600; }
+  .rs-docno-wrap { display: flex; align-items: center; justify-content: flex-end; gap: 2px; }
+  .rs-docno-input { width: 90%; border: none; background: transparent; text-align: right; font: inherit; font-style: italic; }
+  .rs-topic-cell { background: #2f6fbf; color: #fff; font-weight: 700; font-size: 15px; letter-spacing: 2px; text-align: center; padding: 7px 0; }
+  .rs-info-label { background: #d9d9d9; text-align: center; font-weight: 500; }
+  .bar { background: #eef2f7; font-weight: 700; }
+  .val { color: #111; }
+  .ph { color: #b6bcc6; }
+  .sel { display: flex; justify-content: space-between; align-items: center; border: 1px solid #dcdfe6; border-radius: 3px; padding: 1px 6px; background: #fff; }
+  .sel i { font-style: normal; color: #a8abb2; font-size: 10px; }
+  h3 { margin: 16px 0 6px; font-size: 13px; color: #606266; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="rs">
+  <h3>报告头(右上角「编号：」标识 · 编辑人在上、日期在下)</h3>
+  <table>
+    <colgroup><col style="width:130px"><col style="width:260px"><col style="width:130px"><col style="width:260px"></colgroup>
+    <tr>
+      <td class="rs-company-cell" colspan="3">惠州市银嘉环保科技有限公司</td>
+      <td class="rs-docno">
+        <div class="rs-docno-wrap"><span class="rs-docno-prefix">编号：</span><input class="rs-docno-input" value="YJ-PD-01" readonly></div>
+      </td>
+    </tr>
+    <tr>
+      <td class="rs-topic-cell" colspan="2" rowspan="2">产品信息表</td>
+      <td class="rs-info-label">编辑人</td><td class="val">陈秀丽</td>
+    </tr>
+    <tr>
+      <td class="rs-info-label">单据日期</td><td class="val">2026-09-20</td>
+    </tr>
+  </table>
+
+  <h3>一、产品基本信息(双列行:标签1+值1+标签1+值1 = 4 列)</h3>
+  <table>
+    <colgroup><col style="width:130px"><col style="width:260px"><col style="width:130px"><col style="width:260px"></colgroup>
+    <tr><td class="rs-label">产品编号</td><td class="val">C-95-33</td><td class="rs-label">客户项目名称</td><td class="val">伊可普需求3</td></tr>
+    <tr><td class="rs-label">客户料号</td><td class="val">3-01-01-0014</td><td class="rs-label">产品管控等级</td><td><div class="sel"><span>重点产品</span><i>▼</i></div></td></tr>
+    <tr><td class="rs-label">产品功能类别</td><td><div class="sel"><span class="ph">请选择</span><i>▼</i></div></td><td class="rs-label">产品形态</td><td><div class="sel"><span>包布</span><i>▼</i></div></td></tr>
+  </table>
+
+  <h3>二、规格与尺寸(整行值区 vspan 3;炭棒尺寸三格 内径*外径*长度)</h3>
+  <table>
+    <colgroup><col style="width:130px"><col style="width:260px"><col style="width:130px"><col style="width:260px"></colgroup>
+    <tr><td class="rs-label">产品整体尺寸</td><td class="val" colspan="3">35*13*107mm</td></tr>
+    <tr>
+      <td class="rs-label">炭棒尺寸</td>
+      <td><input class="ph" style="width:100%;border:none;background:transparent" placeholder="内径(mm)"></td>
+      <td><input class="ph" style="width:100%;border:none;background:transparent" placeholder="外径(mm)"></td>
+      <td><input class="ph" style="width:100%;border:none;background:transparent" placeholder="长度(mm)"></td>
+    </tr>
+  </table>
+
+  <h3>三、特殊性能描述 / 四、文件与签署(两级审批人各占一行)</h3>
+  <table>
+    <colgroup><col style="width:130px"><col style="width:260px"><col style="width:130px"><col style="width:260px"></colgroup>
+    <tr><td class="rs-label">主要性能描述</td><td class="val" colspan="3">客户特殊要求……</td></tr>
+    <tr><td class="rs-label">客户图纸或规格书</td><td class="val" colspan="3">图纸.pdf、规格书.pdf</td></tr>
+    <tr><td class="rs-label">审核人（一级审批人）</td><td class="val" colspan="3">冯总</td></tr>
+    <tr><td class="rs-label">审核人（二级审批人）</td><td class="val" colspan="3">秀丽</td></tr>
+    <tr><td class="rs-label">产品负责人</td><td class="val" colspan="3">陈秀丽</td></tr>
+    <tr><td class="rs-label">备注</td><td class="val" colspan="3">&nbsp;</td></tr>
+  </table>
+</div>
+</body>
+</html>

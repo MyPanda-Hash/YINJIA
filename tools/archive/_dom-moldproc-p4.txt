@@ -1,0 +1,28 @@
+{
+  "headText": "tr0: 惠州市银嘉环保科技有限公司 编号： || tr1: 炭棒工艺管控清单 表单管理人  || tr2: 密级 请选择",
+  "inputs": [
+    "el-input__inner|ph=编号：|v=|ro=false",
+    "el-input__inner|ph=-|v=|ro=false",
+    "el-select__input is-small|ph=-|v=|ro=true",
+    "el-select__input is-small|ph=-|v=|ro=true",
+    "el-input__inner|ph=-|v=|ro=false",
+    "el-input__inner|ph=-|v=|ro=false",
+    "el-input__inner|ph=-|v=|ro=false",
+    "el-input__inner|ph=-|v=|ro=false",
+    "el-input__inner|ph=-|v=|ro=false",
+    "el-select__input is-small|ph=-|v=|ro=true",
+    "el-select__input is-small|ph=-|v=|ro=true",
+    "el-input__inner|ph=-|v=|ro=false"
+  ],
+  "docno": "<td data-v-b4df25ea=\"\" class=\"rs-td rs-docno\" colspan=\"2\"><div data-v-b4df25ea=\"\" class=\"rs-docno-wrap\"><span data-v-b4df25ea=\"\" class=\"rs-docno-prefix\">编号：</span><div data-v-b4df25ea=\"\" class=\"el-input el-input--small rs-docno-input\"><!-- input --><!-- prepen",
+  "mpAnywhere": "NONE",
+  "rsAdd": [
+    "DIV|vis=0|text=＋ 新增数据记录行|bar=产品基本信息",
+    "DIV|vis=0|text=＋ 新增数据记录行|bar=配方表🧮 配方计算✎ 字段编辑"
+  ],
+  "tabAct": [
+    "修订记录",
+    "成型工艺清单*",
+    "成型配方"
+  ]
+}

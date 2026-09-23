@@ -1,6 +1,6 @@
 ﻿/* 面板模块分组(对齐 HSDZ 真实模块体系 permission.GROP):
    JCZL 基础资料 / DDGL 订单管理 / CKGL 仓库管理 / SCGL 生产管理 */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 IF COL_LENGTH('yj_panel', 'module_group') IS NULL

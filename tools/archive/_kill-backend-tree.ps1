@@ -1,4 +1,4 @@
-# _kill-backend-tree.ps1 — 停掉后端自愈循环(cmd)+java(8090),防重建时 jar 被锁
+﻿# _kill-backend-tree.ps1 — 停掉后端自愈循环(cmd)+java(8090),防重建时 jar 被锁
 $conn = Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $conn) { Write-Output '8090 no listener'; exit }
 $javaPid = $conn.OwningProcess

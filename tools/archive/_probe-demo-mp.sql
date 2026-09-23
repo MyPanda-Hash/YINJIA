@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT 单据编号 FROM rd_mold_proc_head WHERE 产品编号 = N'DEMO-A-001';

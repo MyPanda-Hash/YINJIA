@@ -31,7 +31,11 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/api/**").permitAll()
                         // 单 jar 部署(前端静态资源内嵌):放行页面与资源,API 保持认证
-                        .requestMatchers("/", "/index.html", "/favicon.ico", "/assets/**", "/vite.svg").permitAll()
+                        // ⚠ 图标要**逐个列全**:浏览器在登录页(无令牌)就会请求它,漏一个就是 403
+                        //   (2026-09-22b 实测:/favicon.svg 未列 → 登录页 403 空响应)
+                        .requestMatchers("/", "/index.html", "/assets/**", "/vite.svg",
+                                "/favicon.ico", "/favicon.svg", "/favicon.png",
+                                "/apple-touch-icon.png", "/robots.txt").permitAll()
                         .requestMatchers("/api/auth/login", "/api/base/factory/list", "/api/locale/list", "/api/locale/dict").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)

@@ -144,6 +144,14 @@ const MSG_TPL = {
   // 规格书两级分发(2026-09-12):下发→总负责人,分发→责任人
   SPEC_DISPATCHED: { title: '产品开发已下发', body: '产品「{productName}（{productCode}）」已下发产品开发，请使用「规格书分发」安排规格书编写。' },
   SPEC_ASSIGNED: { title: '新的规格书任务', body: '「{productName}（{productCode}）」的{kind}规格书已分发给您，请填写并保存（单据 {docNo}）。' },
+  // 产品变更申请单(2026-09-21):会签三码 + 生效一码 + 驳回一码。
+  // ⚠ CHANGE_EFFECTIVE 的 单据编号 挂的是**新建的下一版草稿**(点开就是自己那份文件),
+  //   变更单号在参数 changeNo 里 —— 文案里两个号都给出来。
+  SIGNOFF_REQUESTED: { title: '新的会签请求', body: '{actor} 提交了「{panelName} {docNo}」会签，请审阅并签署意见。' },
+  SIGNOFF_PASSED: { title: '会签已全部通过', body: '「{panelName} {docNo}」的会签已全部通过，已自动转交管理员审批。' },
+  SIGNOFF_REJECTED: { title: '会签被驳回', body: '「{panelName} {docNo}」的会签被 {actor} 驳回，已退回草稿。意见：{opinion}' },
+  CHANGE_EFFECTIVE: { title: '变更已生效：本文件要出新版', body: '变更单 {changeNo} 已生效，已为「{panelName} {docNo}」生成下一版草稿，请据此修改后重新走受控审核。' },
+  CHANGE_REJECTED: { title: '变更单被驳回', body: '变更单「{panelName} {docNo}」被 {actor} 驳回，请按意见修改后重新提交。意见：{opinion}' },
 }
 
 function fillTpl(text, params) {

@@ -1,0 +1,3 @@
+rd_spec_doc_detail (22): id, 单据编号, 表区, 序号, 更改内容, 更改原因, 更改时间, 责任人, 备注, 检验项目, 检验要求, 检验方法, 检验依据, 物料编码, 物料名称, 规格参数, 数量, asp_user1, asp_time1, asp_user2, asp_time2, asp_cancel
+rd_spec_doc_head (30): id, 单据编号, 单据日期, 名称, 编号, 客户名, 客户料号, 版本, 日期, 制订日期, 审核日期, 批准日期, 备注, asp_user1, asp_time1, asp_user2, asp_time2, asp_cancel, 规格书种类, 适用范围, 整体规格参数, 产品主要性能, 包装方式, 运输要求, 存储环境, 客户项目名称, 应用场景, 产品类别, 炭棒处理要求, 出货检验报告
+rd_spec_assign (11): id, 产品编号, 单据编号, 规格书种类, 负责人, 责任人, asp_user1, asp_time1, asp_user2, asp_time2, asp_cancel

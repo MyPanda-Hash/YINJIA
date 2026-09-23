@@ -1,0 +1,35 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-tidy3.sql ==
+  | id | 
+  | source_panel_code | 
+  | source_form_no | 
+  | source_detail_key | 
+  | source_line_key | 
+  | target_panel_code | 
+  | target_form_no | 
+  | target_detail_key | 
+  | target_line_key | 
+  | inventory_code | 
+  | source_quantity | 
+  | linked_quantity | 
+  | link_status | 
+  | create_by | 
+  | create_time | 
+  | release_time | 
+  | id | 
+  | panel_code | 
+  | doc_no | 
+  | field_key | 
+  | file_name | 
+  | stored_name | 
+  | file_size | 
+  | content_type | 
+  | asp_user1 | 
+  | asp_time1 | 
+  | asp_user2 | 
+  | asp_time2 | 
+  | rd_sample_no_head | 有 | 
+  | rd_dom_test_head | 有 | 
+  | rd_prod_info_detail | 有 | 
+  | yj_doc_modify_log | 有 | 
+[OK] _q-tidy3.sql (4 batches)

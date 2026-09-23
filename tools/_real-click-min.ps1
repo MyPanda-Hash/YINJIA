@@ -1,4 +1,4 @@
-# _real-click-min.ps1 — 用 SendInput 真实鼠标点击最小化按钮(最贴近用户操作),观测结果
+﻿# _real-click-min.ps1 — 用 SendInput 真实鼠标点击最小化按钮(最贴近用户操作),观测结果
 param([string]$Url = 'http://localhost:8090/#/login', [string]$Tag = 'page')
 Add-Type -Namespace WD -Name UD -MemberDefinition @'
 [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc cb, IntPtr lp);

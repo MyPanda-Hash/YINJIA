@@ -1,4 +1,4 @@
-# _grant-net.ps1 — 单用户模式下用 .NET SqlClient(非ODBC,绕开 Driver17 SSPI bug)集成认证授权
+﻿# _grant-net.ps1 — 单用户模式下用 .NET SqlClient(非ODBC,绕开 Driver17 SSPI bug)集成认证授权
 # 由 _grant-ddladmin.bat 在服务已进入单用户模式时调用(需管理员)
 $ErrorActionPreference = 'Stop'
 $conns = @(

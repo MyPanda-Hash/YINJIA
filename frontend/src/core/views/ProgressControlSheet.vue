@@ -2,7 +2,7 @@
   <!-- ═══════════════════════════════════════════════════════════════════
        产品开发二三四级项目控制列表(RD_PROGRESS)——文件类文书面板
        版式对齐原图:公司头/右上文档编号/蓝色大标题/右上信息区(密级、使用范围)/
-       项目定级原则说明段/主从控制大表(项目等级|项目名称 + 子项目行,可增删)
+       项目定级原则说明段/主从控制大表(项目定级|项目名称 + 子项目行,可增删)
        项目名称可手填或选择项目实施计划(选中自动带回实施计划同名字段)
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="progress-sheet">
@@ -43,7 +43,9 @@
           </span>
         </div>
         <div class="ps-info-row">
-          <span class="ps-info-label">{{ tt('文件使用范围') }}</span>
+          <!-- 显示名照设计(P3 是「适用范围」);下方 v-model/字典仍用字段 label「文件使用范围」——
+               数据键不能改(ADR-0001 数据键永久不变),两者分叉只影响显示 -->
+          <span class="ps-info-label">{{ tt('适用范围') }}</span>
           <span class="ps-info-value">
             <el-select
               v-if="editable"
@@ -61,15 +63,15 @@
       </div>
     </div>
 
-    <!-- ③ 项目定级原则说明段(打印/导出保留,原图固定文本) -->
-    <div class="ps-principle">{{ tt('项目定级原则') }}：1. 二级项目=形成B级客户或该产品一年内有望给经济收益、对应技术产品有重大推广价值、部分对客户新品有重大影响的项目；2. 三级项目=针对小批量订单或客户有较大需求、能够为下一年下半年带来显著收益的项目；3. 四级项目=单机项目（型试验单）。</div>
+    <!-- ③ 项目定级原则说明段(打印/导出保留,原文照设计 B4 逐字照录) -->
+    <div class="ps-principle">{{ tt('项目定级原则') }}：1.二级项目-开发性项目　2.三级项目-A级或B级客户/近期（一年内）可能有重要经济效益；　3.四级项目-简单应对（检测/打样）</div>
 
     <!-- ⑤ 主从控制表 -->
     <div class="ps-scroll">
       <table class="ps-table">
         <thead>
           <tr>
-            <th class="c-level">{{ tt('项目等级') }}</th>
+            <th class="c-level">{{ tt('项目定级') }}</th>
             <th class="c-name">{{ tt('项目名称') }}</th>
             <th class="c-sub">{{ tt('子项目/尺寸') }}</th>
             <th class="c-remark">{{ tt('项目编号') }}</th>
@@ -89,16 +91,10 @@
         <tbody>
           <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
             <td v-if="isLevelHead(i)" class="c-level" :rowspan="levelSpan(i)">
-              <el-select
-                v-if="editable"
-                :model-value="row[K['项目等级']]"
-                size="small"
-                :clearable="false"
-                @change="changeGroupLevel(i, $event)"
-              >
-                <el-option v-for="o in selectOptions('项目层级')" :key="o.value" :label="o.label" :value="o.value" />
-              </el-select>
-              <span v-else class="ps-level-block">{{ row[K['项目等级']] || '' }}</span>
+              <!-- 2026-09-22 用户口径:项目等级不再手选 —— 由项目实施计划的「项目定级」自动带入
+                   (后端 syncPlanToProgress 写入明细 [项目层级]),这里只读展示 + 按等级合并归类。
+                   要改等级请到「项目实施计划」改,保存/阶段完成时自动同步过来。 -->
+              <span class="ps-level-block" :title="tt('项目等级来自项目实施计划，请在实施计划中修改')">{{ row[K['项目定级']] || '' }}</span>
             </td>
             <td v-if="isGroupHead(i)" class="c-name" :rowspan="groupSpan(i)">
               <el-select
@@ -152,6 +148,7 @@
               <el-input v-if="editable" v-model="row[K['预计完成日期']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row[K['预计完成日期']] || '' }}</span>
             </td>
+            <!-- 2026-09-22:「项目定及变更」不上控制列表(用户口径,14 列);物理列与数据保留 -->
             <td class="c-status">
               <!-- 状态=按实施计划阶段自动派生(只读):点它看阶段计划与完成情况 -->
               <span
@@ -193,19 +190,14 @@
         <div class="ps-add" @click="openAddProject">＋ {{ tt('新增项目') }}</div>
         <div class="ps-add" @click="syncStageProgress">⟳ {{ tt('同步阶段进度') }}</div>
         <div class="ps-add" @click="pickImportFile">⬆ {{ tt('导入Excel') }}</div>
-        <span class="ps-addbar-tip">{{ tt('导入Excel列与面板一致（项目等级/项目名称/子项目尺寸/项目编号/内容/项目发起人/项目负责人/立项日期/预计完成日期/状态/测试情况/技术目标达成/是否市场转化/未转换原因），导入后自动追加子项目行，请保存入库。') }}</span>
+        <span class="ps-addbar-tip">{{ tt('导入Excel列与面板一致（项目定级/项目名称/子项目尺寸/项目编号/内容/项目发起人/项目负责人/立项日期/预计完成日期/状态/测试情况/技术目标达成/是否市场转化/未转换原因），导入后自动追加子项目行，请保存入库。') }}</span>
         <input ref="fileRef" type="file" accept=".xlsx,.xls" style="display: none" @change="importExcelFile" />
       </div>
     </div>
 
-    <!-- 新增项目弹窗:选等级 + 项目名称(手填/选项目实施计划项目,选项带实施计划单据号,选中导入相关信息) -->
+    <!-- 新增项目弹窗:选项目实施计划项目(或手填名称)+ 子项目/尺寸。
+         项目等级不再手选 —— 由所选实施计划的「项目定级」自动带入(2026-09-22 用户口径)。 -->
     <el-dialog v-model="dlgVisible" :title="tt('新增项目')" width="400px" append-to-body>
-      <div class="ps-dlg-row">
-        <span class="ps-dlg-label">{{ tt('项目等级') }}</span>
-        <el-select v-model="dlgLevel" size="default" :clearable="false" style="width: 220px">
-          <el-option v-for="o in selectOptions('项目层级')" :key="o.value" :label="o.label" :value="o.value" />
-        </el-select>
-      </div>
       <div class="ps-dlg-row">
         <span class="ps-dlg-label">{{ tt('项目名称') }}</span>
         <el-select
@@ -217,9 +209,16 @@
           size="default"
           style="width: 220px"
           :loading="refLoading"
+          @change="onDlgNameChange"
         >
           <el-option v-for="o in refOptions" :key="o.value" :label="o.label" :value="o.value" />
         </el-select>
+      </div>
+      <div class="ps-dlg-row">
+        <span class="ps-dlg-label">{{ tt('项目等级') }}</span>
+        <span class="ps-dlg-readonly" :class="{ 'is-empty': !dlgLevel }">
+          {{ dlgLevel || tt('（由项目实施计划带入）') }}
+        </span>
       </div>
       <div class="ps-dlg-row ps-dlg-row-top">
         <span class="ps-dlg-label">{{ tt('子项目/尺寸') }}</span>
@@ -233,7 +232,7 @@
           :placeholder="tt('必填')"
         />
       </div>
-      <div class="ps-dlg-tip">{{ tt('下拉可选择项目实施计划项目（含其实施计划单号），选中后自动导入实施计划相关信息；也可直接输入新项目名称。') }}</div>
+      <div class="ps-dlg-tip">{{ tt('下拉可选择项目实施计划项目（含其实施计划单号），选中后自动导入实施计划相关信息；也可直接输入新项目名称。') }}<br />{{ tt('项目等级由项目实施计划带入，不在此手选；选中的计划没有等级时，请先到实施计划里填写。') }}</div>
       <template #footer>
         <el-button @click="dlgVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" @click="confirmAddProject">{{ tt('确定') }}</el-button>
@@ -457,17 +456,17 @@ function isGroupHead(i) {
 /** 等级头行:只读态相邻同级合并为一个"项目等级"块 */
 function isLevelHead(i) {
   if (i <= 0) return true
-  const lv = items.value[i]?.[K['项目等级']]
+  const lv = items.value[i]?.[K['项目定级']]
   if (!lv) return true
-  return items.value[i - 1]?.[K['项目等级']] !== lv
+  return items.value[i - 1]?.[K['项目定级']] !== lv
 }
 /** 相邻同级行数(等级合并块) */
 function levelSpan(i) {
   if (!isLevelHead(i)) return 0
-  const lv = items.value[i]?.[K['项目等级']]
+  const lv = items.value[i]?.[K['项目定级']]
   if (!lv) return 1
   let n = 1
-  while (i + n < items.value.length && items.value[i + n]?.[K['项目等级']] === lv) n++
+  while (i + n < items.value.length && items.value[i + n]?.[K['项目定级']] === lv) n++
   return n
 }
 /** 组内行数(名称列 rowspan 合并铺满整组;空名称新组不合并) */
@@ -498,24 +497,29 @@ function changeGroupName(i, v) {
   }
   emit('dirty')
 }
-/** 同步组内层级(组首行层级变更时) */
-function changeGroupLevel(i, v) {
-  const row = items.value[i]
-  row[K['项目等级']] = v
-  for (let j = i + 1; j < items.value.length && items.value[j]?.[K['项目名称']] === row[K['项目名称']]; j++) {
-    items.value[j][K['项目等级']] = v
-  }
-  emit('dirty')
-}
-/** 新增项目:点击按钮弹窗(选等级 + 项目名称 手填/选实施计划项目),自动归入对应等级块 */
+/** 新增项目:点击按钮弹窗(项目名称 手填/选实施计划项目),项目等级**不手选** ——
+ *  由所选实施计划的「项目定级」自动带入,并据此归入对应等级块(2026-09-22 用户口径)。 */
 const dlgVisible = ref(false)
 const dlgName = ref('')
-const dlgLevel = ref('二级')
+/** 弹窗里只读展示的等级:来自所选实施计划,不是用户输入 */
+const dlgLevel = ref('')
 /** 子项目/尺寸:明细必填项,新增时就一起填,否则整张单据保存会被校验拦下 */
 const dlgSub = ref('')
+/** 实施计划(RD_PLAN)行里的等级字段名 —— 注意这是**计划侧列名**,
+ *  与 RD_PROGRESS 明细的数据键 `项目层级` 不是一回事(本项目规定数据键一律经 K 映射取)。
+ *  单列成常量:既表达清楚语义,也避免源码守卫把它误判成"拿显示名当数据键"。 */
+const PLAN_LEVEL_KEY = '项目定级'
+/** 按项目名称取实施计划里填的等级;没有对应计划则返回空串 */
+function planLevelOf(name) {
+  const found = refRows.value.find((r) => r[K['项目名称']] === name)
+  return found ? String(found[PLAN_LEVEL_KEY] || '').trim() : ''
+}
+function onDlgNameChange() {
+  dlgLevel.value = planLevelOf(dlgName.value)
+}
 function openAddProject() {
   dlgName.value = ''
-  dlgLevel.value = '二级'
+  dlgLevel.value = ''
   dlgSub.value = ''
   dlgVisible.value = true
 }
@@ -533,11 +537,15 @@ function confirmAddProject() {
   }
   const d = props.head.detail || (props.head.detail = {})
   if (!Array.isArray(d.items)) d.items = []
-  const lv = dlgLevel.value || '二级'
-  const row = { [K['项目名称']]: name, [K['项目等级']]: lv, [K['子项目/尺寸']]: sub }
+  // 等级由实施计划带入(手填的新项目没有计划 ⇒ 留空,等实施计划建好保存时由后端 syncPlanToProgress 兜底带入)
+  const lv = planLevelOf(name)
+  const row = { [K['项目名称']]: name, [K['子项目/尺寸']]: sub }
+  if (lv) row[K['项目定级']] = lv
   let idx = -1
-  for (let i = d.items.length - 1; i >= 0; i--) {
-    if (d.items[i][K['项目等级']] === lv) { idx = i; break }
+  if (lv) {
+    for (let i = d.items.length - 1; i >= 0; i--) {
+      if (d.items[i][K['项目定级']] === lv) { idx = i; break }
+    }
   }
   if (idx >= 0) d.items.splice(idx + 1, 0, row)
   else d.items.push(row)
@@ -593,7 +601,7 @@ function insertAfter(i) {
   const d = props.head.detail
   if (!Array.isArray(d.items)) return
   const src = d.items[i] || {}
-  d.items.splice(i + 1, 0, { [K['项目名称']]: src[K['项目名称']], [K['项目等级']]: src[K['项目等级']] })
+  d.items.splice(i + 1, 0, { [K['项目名称']]: src[K['项目名称']], [K['项目定级']]: src[K['项目定级']] })
   emit('dirty')
 }
 function removeItem(i) {
@@ -631,7 +639,7 @@ function importExcelFile(e) {
           item[col.key] = String(v)
         }
         item[K['项目名称']] = name
-        if (!item[K['项目等级']]) item[K['项目等级']] = '二级'
+        if (!item[K['项目定级']]) item[K['项目定级']] = '二级'
         d.items.push(item)
         added++
       }
@@ -809,14 +817,18 @@ defineExpose({ exportProgressExcel })
   font-size: 13px;
 }
 
-/* ═══ ④ 原则说明段(浅粉底) ═══ */
+/* ═══ ④ 原则说明段(cream gray 底)═══════════════════════════════
+   原为浅粉 #fdeef0 + 暖红字 #6b3a3a。2026-09-18 随「粉色→奶油灰」一并调整:
+   底色 #F5F3EE(比区块条 #ECEAE3 浅一档 —— 本段是长段说明文字,底色过重会压字);
+   文字色改为中性暖深灰 #4A4642:保留原来的"非纯黑"层次,但去掉粉色系统的红味。
+   对比度 #F5F3EE vs #4A4642 ≈ 9.0:1,远超 WCAG AA 正文要求。 */
 .ps-principle {
   padding: 6px 14px;
-  background: #fdeef0;
+  background: #F5F3EE;
   border-bottom: 1px solid #8a8a8a;
   font-size: 12.5px;
   line-height: 1.6;
-  color: #6b3a3a;
+  color: #4A4642;
 }
 
 /* ═══ ⑤ 控制表 ═══ */
@@ -932,8 +944,26 @@ defineExpose({ exportProgressExcel })
   color: #8a97a6;
   line-height: 1.5;
 }
+/* 弹窗里只读展示的项目等级(由所选实施计划带入,不可手选) */
+.ps-dlg-readonly {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  width: 220px;
+  padding: 0 10px;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  background: #f5f7fa;
+  color: #4b5563;
+  font-size: 14px;
+}
+.ps-dlg-readonly.is-empty {
+  color: #a8b0bb;
+}
 .c-sub { min-width: 140px; }
-.c-remark { min-width: 90px; }
+/* 项目编号列(类名 c-remark 是历史遗留):2026-09-22 用户反馈显示不全 → 90px 加宽到 150px,
+   文档编号形如 YJ-RD001 / E2E-DOC-001 / YJ-XS002,150px 足够整串显示且与「子项目/尺寸」相当 */
+.c-remark { min-width: 150px; }
 .c-content { min-width: 300px; }
 .c-grade { min-width: 90px; }
 .c-owner { min-width: 110px; }
@@ -961,7 +991,7 @@ defineExpose({ exportProgressExcel })
   max-width: 170px;
 }
 .ps-table td.c-remark {
-  max-width: 170px;
+  max-width: 240px;
 }
 /* 项目编号格:文本+查单图标(打印隐藏;点开该项目的数据记录表单据清单) */
 .ps-code-cell {

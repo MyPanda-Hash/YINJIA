@@ -1,0 +1,17 @@
+{
+  "tabs": [
+    "修订记录[ACTIVE]",
+    "成型工艺清单",
+    "成型配方"
+  ],
+  "containers": [
+    "DIV.record-sheet rsp-sheet trs=74 vis=1 parent=approval-layout"
+  ],
+  "buttons": [
+    "rs-add|＋ 新增数据记录行|vis=1",
+    "rs-add|＋ 新增数据记录行|vis=0"
+  ],
+  "refCtl": "{\"refTag\":\"DIV\",\"refCls\":\"rs-ref-ctl\",\"refHtml\":\"<div data-v-1191bfa0=\\\"\\\" class=\\\"rs-ref-ctl\\\" title=\\\"点击选择\\\"><span data-v-1191bfa0=\\\"\\\" class=\\\"rs-ref-text\\\">点击选择</span><!--v-if--><i data-v-1191bfa0=\\\"\\\" class=\\\"el-icon rs-ref-ico\\\"><svg data-v-1191bfa0=\\\"\\\" xmlns=\\\"http://www.w3.org/2000/svg\\\" viewBox=\\\"0 0 1024 1024\\\"><path fill=\\\"currentColor\\\" d=\\\"m795.904 750.72 \",\"tdIdx\":0}",
+  "selectCtl": "{\"inputCls\":\"el-select__input is-small\",\"inputPh\":null,\"readOnly\":true,\"wrapperCls\":\"el-select__wrapper el-tooltip__trigger el-tooltip__trigger\",\"html\":\"<!-- 标准库型字段(成型工艺的 烧结炉参数/烧结时间调速器参数/冷却参数设置):\\r\\n                       选项来自可维护库,故 filterable+allow-create —— 能选预设也能直接敲新值\\r\\n                       (设计口径「下拉选择项 + 选择后同时支持再次修改」);旁挂标准库维护入口。 --><div data-v-1191bfa0=\\\"\\\" class=\\\"el-select el-select--small\\\"><div class=\\\"el-sel\"}",
+  "gridSection": "grpTr=34 hdr=序号/更改内容/更改原因/更改时间/责任人/备注/\ngrpTr=37 hdr=No./物料种类/物料编号/物料名称/实际添加\n比例%/单支\n物料含量g/设计添加\n量/\nBAR_HTML=<td data-v-1191bfa0=\"\" colspan=\"13\" class=\"rs-sectionbar\"><span data-v-1191bfa0=\"\" style=\"display: inline-flex; align-items: center; gap: 12px; justify-content: center; width: 100%;\"><span data-v-1191bfa0=\"\">配方表</span><!--v-if--><!--v-if--><span data-v-1191bfa0=\"\" class=\"rs-lib-btn\" style=\"color: rgb(64, 158, 255); border-color: rgb(160, 207, 255);\">🧮 配方计算</span><span data-v-1191bfa0=\"\" class=\"rs\nafter0=<th data-v-1191bfa0=\"\" class=\"rs-th\" rowspan=\"1\">No.</th><th data-v-1191bfa0=\"\" class=\"rs-th\" rowspan=\"1\" colspan=\"2\">物料种类</th><th data-v-1191bfa0=\"\" class=\"rs-th\" rowspan=\"1\" colspan=\"4\">物料编号</th><th data-v-1191bfa0=\"\" class=\"rs-th\" rowspan=\"1\" colspan=\"3\">物料名称</th><th data-v-1191bfa0=\"\" class=\"rs-th\" rowspan=\"1\">实际添加\nafter1=<td data-v-1191bfa0=\"\" colspan=\"13\" class=\"rs-empty\">—</td><td data-v-1191bfa0=\"\" class=\"rsp-op-pad\"></td>"
+}

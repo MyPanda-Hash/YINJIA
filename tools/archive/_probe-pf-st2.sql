@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT ISNULL(l2_approver,N'-') + N'/' + ISNULL(CAST(approve_node AS nvarchar(10)), N'-') FROM yj_doc_status WHERE panel_code=N'RD_PROD_INFO' AND doc_no=N'PI-2026-09-0082';

@@ -1,4 +1,4 @@
-# verify-i18n.ps1 — 多语言规范校验(§3.1)
+﻿# verify-i18n.ps1 — 多语言规范校验(§3.1)
 # 检查 yj_panel / yj_field 中缺失译名的行;缺失即退出码 1(CI/提交前跑)。
 # 用法: pwsh tools\verify-i18n.ps1  [-Locale en]  [-SqlCmd <sqlcmd路径>]
 param(

@@ -1,5 +1,5 @@
 -- 数据字典性能修复:迁到新表 + 静态选项 + 分页
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 -- 1. 建新表(轻量,只有需要的列)
 IF OBJECT_ID('bs_dict') IS NULL CREATE TABLE bs_dict (

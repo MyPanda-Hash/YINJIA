@@ -17,6 +17,7 @@ tools/
 ├── scripts/         正式运维脚本:verify-api.ps1、audit-*.ps1、trigger-mt.ps1、
 │                    enable-mixed-auth.ps1、build-hot-update.ps1、start-backend.bat 等
 ├── gen/             历史数据生成器 gen-*.{cjs,py} + 数据文件(*.tsv/*.jsonl)
+│                    + 数据库表清单生成器(GenDbCatalogDump.java + gen-db-catalog.cjs)
 ├── verify/          验证/冒烟/审计:*-smoke.cjs、*-test.cjs、i18n-verify-*.cjs、
 │                    menu-check*.cjs、analyze-panels.cjs、architecture-audit.mjs
 └── archive/         一次性探针与任务产物(_ 前缀,入库保档;历史会话的诊断脚本)
@@ -44,6 +45,18 @@ tools/
 | UI 冒烟(CDP) | `node verify\panels-ui-smoke.cjs`(在 tools/ 下运行,依赖 node_modules) |
 | 热更新包(仅后端 class) | `pwsh -File scripts\build-hot-update.ps1`(在仓库根或见 deploy/部署说明.md) |
 | 生成器重跑 | `node gen\gen-xxx.cjs`(历史迁移数据生成,一般不重跑;重跑前先读脚本内注释) |
+| **刷新数据库表清单**(表结构变更后必跑) | `java -cp lib\mssql-jdbc.jar gen\GenDbCatalogDump.java` → `node gen\gen-db-catalog.cjs`(重写 `docs\development\数据库表清单.md`) |
+| **清杂项测试数据**(留演示数据,可重复执行) | `java -cp lib\mssql-jdbc.jar SqlRunner.java "jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false;trustServerCertificate=true" yinjia env migrate-testdata-cleanup.sql` |
+| **灌产品文件演示数据**(两个演示产品+四文件+责任人+一张草稿态变更单+六个部门账号) | 同上,换成 `seed-demo-prodfile.sql` |
+| **上线前清空业务数据**(核弹,部署备份前用) | 同上,换成 `migrate-golive-cleanup.sql`(先做保险备份) |
+
+**三个"数据面"脚本的分工**(别用错):
+
+| 脚本 | 干什么 | 什么时候用 | 对演示数据(DEMO-*) |
+|---|---|---|---|
+| `migrate-testdata-cleanup.sql` | 按特征清**杂项测试单**(探针/空壳/孤儿痕迹),可重复执行 | 平时整理库、给客户演示前 | **保留** |
+| `seed-demo-prodfile.sql` | 灌一套能直接跑通流程的演示数据(幂等) | 部署到服务器后让工作人员试功能 | 自己生成 |
+| `migrate-golive-cleanup.sql` | 全表 DELETE 业务数据(基础档案/元数据/ERP 订单/期初库存保留) | 正式上线前打部署备份之前 | 一并不留 |
 
 ## archive/ 约定
 

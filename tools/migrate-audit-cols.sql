@@ -1,5 +1,5 @@
 -- 审计留痕列补齐:bd_ 与 bl_ 前缀的单据表统一补 asp_user1 / asp_time1 / asp_user2 / asp_time2 / asp_cancel(幂等)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 DECLARE @t sysname, @cols nvarchar(max), @sql nvarchar(max);
 DECLARE c CURSOR FOR SELECT name FROM sys.tables WHERE name LIKE 'bd[_]%' OR name LIKE 'bl[_]%';

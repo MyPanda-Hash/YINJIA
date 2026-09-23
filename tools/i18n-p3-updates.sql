@@ -1,5 +1,5 @@
 -- 仅翻译 UPDATE(列已存在;用 -f 65001 以 UTF-8 执行)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 UPDATE yj_field SET label_en = N'Purchase Order No.'    WHERE label = N'采购单号';
 UPDATE yj_field SET label_en = N'Purchase Date'         WHERE label = N'采购日期';
 UPDATE yj_field SET label_en = N'Delivery Date'         WHERE label = N'交货日期';

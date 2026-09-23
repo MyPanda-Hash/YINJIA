@@ -1,0 +1,177 @@
+===== yj_translation 的 scope 分布 =====
+scope	行数	语言数	键数
+field	6745	10	1649
+panel	1002	10	139
+ui	10241	10	1227
+
+===== 本轮相关 field 译名 =====
+ref_key	locale	text
+版本号	de	Versions nummer
+版本号	en	Version number
+版本号	es	Número de versión
+版本号	fr	Numéro de version
+版本号	ja	バージョン番号
+版本号	ko	버전 번호
+版本号	ru	Номер версии
+版本号	th	หมายเลขเวอร์ชัน
+版本号	vi	Số phiên bản
+版本号	zh-TW	版本號
+备注	de	Bemerkung
+备注	en	Remark
+备注	es	Observaciones
+备注	fr	Remarque
+备注	ja	備考
+备注	ko	비고
+备注	ru	Примечание
+备注	th	หมายเหตุ
+备注	vi	Ghi chú
+备注	zh-TW	備註
+编写人	en	Writer
+表单管理人	de	Formularverwalter
+表单管理人	en	Form Keeper
+表单管理人	es	Administrador del formulario
+表单管理人	fr	Gestionnaire de formulaire
+表单管理人	ja	様式管理者
+表单管理人	ko	양식 관리자
+表单管理人	ru	Администратор формы
+表单管理人	th	ผู้ดูแลแบบฟอร์ม
+表单管理人	vi	Người quản lý biểu mẫu
+表单管理人	zh-TW	表單管理人
+不合格应对措施	en	Non-conformance Action
+产品编号	en	Product No.
+产品编号	ja	製品番号
+产品功能类别	de	Produktfunktionskategorie
+产品功能类别	en	Product Function Category
+产品功能类别	es	Categoría funcional del producto
+产品功能类别	fr	Catégorie fonctionnelle
+产品功能类别	ja	製品機能分類
+产品功能类别	ko	제품 기능 분류
+产品功能类别	ru	Функциональная категория
+产品功能类别	th	หมวดหมู่ฟังก์ชันผลิตภัณฑ์
+产品功能类别	vi	Loại chức năng sản phẩm
+产品功能类别	zh-TW	產品功能類別
+产品整体尺寸	de	Gesamtmaße des Produkts
+产品整体尺寸	en	Overall Size
+产品整体尺寸	es	Dimensiones generales del producto
+产品整体尺寸	fr	Dimensions globales du produit
+产品整体尺寸	ja	製品全体寸法
+产品整体尺寸	ko	제품 전체 치수
+产品整体尺寸	ru	Габаритные размеры изделия
+产品整体尺寸	th	ขนาดโดยรวมของผลิตภัณฑ์
+产品整体尺寸	vi	Kích thước tổng thể sản phẩm
+产品整体尺寸	zh-TW	產品整體尺寸
+管理人	en	Keeper
+检测频率	en	Frequency
+检验方法	en	Method
+客户名	en	Customer
+客户名称	de	Kundenname
+客户名称	en	Customer Name
+客户名称	es	Nombre de cliente
+客户名称	fr	Nom du client
+客户名称	ja	顧客名
+客户名称	ko	고객명
+客户名称	ru	Название клиента
+客户名称	th	ชื่อลูกค้า
+客户名称	vi	Tên khách hàng
+客户名称	zh-TW	客戶名稱
+客户项目名称	de	Kundenprojektname
+客户项目名称	en	Customer Project Name
+客户项目名称	es	Nombre del proyecto del cliente
+客户项目名称	fr	Nom du projet client
+客户项目名称	ja	顧客プロジェクト名
+客户项目名称	ko	고객 프로젝트명
+客户项目名称	ru	Название проекта клиента
+客户项目名称	th	ชื่อโครงการของลูกค้า
+客户项目名称	vi	Tên dự án khách hàng
+客户项目名称	zh-TW	客戶專案名稱
+滤芯尺寸	en	Filter Size
+审核人	de	Prüfer
+审核人	en	Reviewer
+审核人	es	Revisor
+审核人	fr	Vérificateur
+审核人	ja	審査者
+审核人	ko	리뷰어
+审核人	ru	Ревизор
+审核人	th	ผู้ตรวจสอบ
+审核人	vi	Người đánh giá
+审核人	zh-TW	審核人
+使用范围	de	Verwendungsbereich
+使用范围	en	Usage Scope
+使用范围	es	Ámbito de uso
+使用范围	fr	Domaine d'utilisation
+使用范围	ja	使用範囲
+使用范围	ko	사용 범위
+使用范围	ru	Область применения
+使用范围	th	ขอบเขตการใช้งาน
+使用范围	vi	Phạm vi sử dụng
+使用范围	zh-TW	使用範圍
+授权使用人	en	Authorized Users
+序 号	de	Nr.
+序 号	en	No.
+序 号	es	N.º
+序 号	fr	N°
+序 号	ja	番号
+序 号	ko	번호
+序 号	ru	№
+序 号	th	ลำดับ
+序 号	vi	STT
+序 号	zh-TW	序 號
+序号	en	No.
+序号	ja	番号
+主要性能	en	Main Performance
+
+===== 长句译名先例 =====
+ref_key	locale
+请各位实验人员知悉：
+1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。
+2.态度恶劣者，实验室负责人将拒接该人员进入实验室。	de
+请各位实验人员知悉：
+1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。
+2.态度恶劣者，实验室负责人将拒接该人员进入实验室。	es
+请各位实验人员知悉：
+1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。
+2.态度恶劣者，实验室负责人将拒接该人员进入实验室。	fr
+请各位实验人员知悉：
+1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。
+2.态度恶劣者，实验室负责人将拒接该人员进入实验室。	ja
+请各位实验人员知悉：
+1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。
+2.态度恶劣者，实验室负责人将拒接该人员进入实验室。	ko
+请各位实验人员知悉：
+1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。
+2.态度恶劣者，实验室负责人将拒接该人员进入实验室。	ru
+请各位实验人员知悉：
+1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。
+2.态度恶劣者，实验室负责人将拒接该人员进入实验室。	th
+请各位实验人员知悉：
+1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。
+2.态度恶劣者，实验室负责人将拒接该人员进入实验室。	vi
+请各位实验人员知悉：
+1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。
+2.态度恶劣者，实验室负责人将拒接该人员进入实验室。	zh-TW
+请各位实验人员知悉：\n1.不进行使用登记人员，一经发现实验室负责人将不给与使用该仪器权限。\n2.态度恶劣者，实验室负责人将拒接该人员进入实验室。	zh-TW
+
+===== ui 侧同名键(冲突预检) =====
+scope	ref_key	locale	text
+ui	检测频率	de	Erkennungs frequenz
+ui	检测频率	es	Frecuencia de detección
+ui	检测频率	fr	Fréquence de détection
+ui	检测频率	ja	検出頻度
+ui	检测频率	ko	검출 주파수
+ui	检测频率	ru	Частота обнаружения
+ui	检测频率	th	ความถี่ในการตรวจจับ
+ui	检测频率	vi	Tần số phát hiện
+ui	检测频率	zh-TW	檢測頻率
+ui	检验方法	de	Inspektions methode
+ui	检验方法	es	Método de inspección
+ui	检验方法	fr	Méthodes d'inspection
+ui	检验方法	ja	検査方法
+ui	检验方法	ko	검사 방법
+ui	检验方法	ru	Методы проверки
+ui	检验方法	th	วิธีการตรวจสอบ
+ui	检验方法	vi	Phương pháp kiểm tra
+ui	检验方法	zh-TW	檢驗方法
+
+===== 已重设计面板的标题键 =====
+scope	ref_key	语言数
+

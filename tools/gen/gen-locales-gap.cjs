@@ -1,13 +1,16 @@
 // gen-locales-gap.cjs — 按缺口自动补齐语言包(以 en.js 为基准,阿里云机翻)
-// 用法: node gen-locales-gap.cjs [locale...]      (默认全部非中文语言包)
-// 依赖: 后端运行 + ALIBABA_CLOUD_ACCESS_KEY_* 已配置(机翻可用)
+// 用法: node tools/gen/gen-locales-gap.cjs [locale...]   (默认全部非中文语言包)
+// 依赖: 后端运行 **且注入了 ALIBABA_CLOUD_ACCESS_KEY_*(backend\.env)** —— 用 start-prod.ps1
+//       启动即会注入;没注入时 /api/locale/dict 会静默返回空词典(表现为"一条都没补")
 // 幂等: 已有词条跳过,不覆盖人工翻译;可重复执行
 // 取键方式: 直接 import 语言包模块(权威,能正确处理含换行/引号的键)
 const fs = require('fs')
 const path = require('path')
 
 const BASE = 'http://localhost:8090'
-const DIR = path.join(__dirname, '..', 'frontend', 'src', 'i18n', 'locales')
+// ⚠ 本脚本在 tools/gen/ 下,要往**上两级**才到仓库根(2026-09-23 修:此前只上一级,
+//   是按它还在 tools/ 根层时写的,挪进 gen/ 后路径失效 ⇒ 一跑就 Cannot find module)
+const DIR = path.join(__dirname, '..', '..', 'frontend', 'src', 'i18n', 'locales')
 const DEFAULT_LOCALES = ['ja', 'ko', 'es', 'fr', 'de', 'ru', 'vi', 'th', 'zh-TW']
 const CHUNK = 50
 

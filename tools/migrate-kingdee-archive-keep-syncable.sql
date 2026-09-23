@@ -3,7 +3,7 @@
 --   其余一律删除(敏感密文字段当前策略不落库→删;金蝶接口无此键→删;纯 id 无名称孪生→不建)。
 --   物理列保留(不 DROP),只删 yj_field 面板字段,可随时按需恢复。
 -- 生成器:tools/archive/_gen-keep-syncable.mjs(与映射同源,防手工漂移)
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

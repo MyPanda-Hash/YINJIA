@@ -23,7 +23,29 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <jjwt.version>0.12.6</jjwt.version>
     <aliyun-ocr.version>3.1.3</aliyun-ocr.version>
-    <!-- jasperreports 钉在 6.21.3:7.x 的解析器拒收按 JR6 语法写的 so_order.jrxml(jshell 实测 2026-09-14),升 7 需先重写全部模板 -->
+    <!--
+      jasperreports 钉在 6.21.3 —— 2026-09-22 实测复核过,别再只改个版本号就升 7.x:
+
+      · 7.x 换了 XML 解析器(Digester → Jackson),**.jrxml 格式整体变了**,不是语法微调:
+        不再有 xmlns/xsi:schemaLocation;`<title><band height="30">` 变成 `<title height="30">`;
+        `<reportElement>` + `<staticText>` 合并成 `<element kind="staticText">`。
+        JR7 jar 内**没有任何旧格式加载器**(只有 JacksonReportLoader),升 7 必须把全部模板改成新格式。
+      · 实测(同一套依赖,只换 jasperreports 版本):
+        6.21.3 → reports/so_order.jrxml、report-generic.jrxml、sl_recv.jrxml、inv-qr-label.jrxml
+                 以及库里 yj_report_template 的模板文本(导出实际用的那份)**全部编译通过**;
+        7.0.7  → 全部失败。且报错极具误导性:`Unable to load report`,**没有 cause 链** ——
+                 真因在 JacksonReportLoader 里被吞成 Optional.empty();实测真异常是
+                 `UnrecognizedPropertyException: Unrecognized field "schemaLocation" (JasperDesign)`,
+                 去掉 schemaLocation 后还会接着报 `<band>` 不是 JRDesignBand 的属性。
+      · 7.0.7 的意义是修反序列化 CVE(CVE-2025-10492 / CVE-2026-6009)。本项目**不走反序列化路径**:
+        全仓库无 JRLoader.loadObject / ObjectInputStream / .jasper 加载,只做"编译 JRXML 文本 + 填充 + 导出"
+        (可自行 grep 复核),故该 CVE 在本仓库不可达。
+      · 要升 7.x 是独立任务,清单:
+        ① 用 JR7 重写 4 个模板 + GenericReportSupport 动态拼的 XML(它同样带 xsi:schemaLocation);
+        ② 同步更新 yj_report_template 的模板文本(导出用的是库里的那份,不是文件);
+        ③ 以 JR7 自己的 JRXmlWriter 输出为格式基准(往返编译通过)逐张迁移;
+        ④ 验证覆盖 so_order / sl_recv / 二维码标签 / 通用动态报表(generic) × PDF+XLSX × 中文嵌入字体。
+    -->
     <jasperreports.version>6.21.3</jasperreports.version>
     <!-- JR 6.x 的 xlsx 导出器依赖 POI(上游为可选依赖,必须显式声明) -->
     <poi.version>5.4.1</poi.version>

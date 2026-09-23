@@ -7,14 +7,23 @@
  *   pages —— 多页签面板(pages 缺省 = 单页面板)。每页可**各自**声明:
  *              pages[i].grid     本页专用列网格(不写则用面板 grid;两页版式不同时必须各写一套,
  *                                否则其中一页会被另一页的网格挤变形 —— 成型/组装两对面板即如此)
- *              pages[i].headMode 本页专用版式 'report'|'plain'(不写则用面板 headMode;
- *                                如 组装工艺清单页 plain / 组装BOM表页 report)
+ *              pages[i].headMode 本页专用版式 'report'|'plain'(不写则用面板 headMode)
  *              pages[i].head     本页专用报告头跨度(网格列数不同的页要各自给 title/infoLabel/infoValue)
- *              pages[i].showHead true=本页也渲染报告头(被并入同一张单、但原本是独立单据的那页);
- *                                缺省=沿用历史行为「只有第 1 页有报告头」
+ *              pages[i].showHead true=本页渲染报告头 / false=本页不渲染;
+ *                                **不写**=沿用历史行为「只有第 0 页有报告头」⇒ 多页面板请逐页显式写
  *              pages[i].staticTitle 本页报告头大标题(两页本是两张单据,各有各的标题,不能共用面板 staticTitle)
- *            区块用对象上的 page:i 归属到第 i 个页签(缺省 0)
+ *            区块用对象上的 page:i 归属到第 i 个页签(缺省 0;漏写会挤到第 0 页)
+ *            ⚠ 每页都必须有自己的 grid(或回落到面板 grid):report 页的 section 宽度取自 effGrid,
+ *              取不到就写 width:0px,而 .rs-t 是 table-layout:fixed ⇒ 整块塌掉。
  *   head {title, infoLabel, infoValue} —— report 版式报告头三段列跨度(大标题|信息标签|信息值),合计 = grid 列数
+ *   head.noSpan / head.noGapSpan / head.docnoPrefix —— 报告头第 1 行「公司名格 | 编号格」的分列,
+ *        按**设计原表的 !merges 显式切分**(不再由列宽向左凑 ≥160px 的动态算法拍位置;
+ *        动态算法总列数常常对、切开的位置错,如碱性设计 12/1 而算成 11/2):
+ *          noSpan       编号格占末尾几列;0 = 编号与公司名**同一格**(纸面一格含两段文字,编号靠右);
+ *          noGapSpan    没并进两格的空列数(两格版式夹在公司名与编号之间;同格版式落在该格右侧);
+ *          docnoPrefix  true 才在编号前渲染「编号：」标识 —— 设计原值都是**裸编号**,缺省即 false。
+ *        noSpan 不写 = 退回动态算法(未按设计逐张核对的面板行为不变)。
+ *        逐张证据(设计原表 _dump-xlsx 解析结果)钉在 recordSheetConfigs.docno.test.js。
  *   info —— report 版式右侧信息块行(缺省=密级/适用范围/测试负责人/报告编号;委托单自定义 文件管理人/密级/文件使用范围)
  *   docNoDefault —— 文档编号缺省(默认 YJ-PD-01;委托单 YJ-RIR001)
  *   titleFromKey/titleSuffix —— 标题由头字段派生(如 申请单类型+'-测试申请单')
@@ -25,19 +34,61 @@
  *   waterColspans(碱性) —— 原水水质条 6 指标格各自跨的网格列数(Excel C:D/E/F:H/I:J/K:L/M:N)
  *   soakColspans(浸泡安全) —— 特例块值区跨度(Excel D/E/F:G)
  *   dataTables[{bar,subHeads[],cols[{key,label,span,group,area,w}],charts,footerNote}] —— 数据记录表(两级表头:同 group 合并)
+ *              cols[].key   = **数据键,必须是该字段当前的 yj_field.label**
+ *              cols[].label = 显示文案(缺省同 key);与 key 不同即为「显示改名」,不改数据键
+ *              dt.noVariant = true ⇒ 本表不渲染表头的变体切换行(工艺形态已在条件区有一格时用;
+ *                                    组装工艺清单三张表全标 —— 页 1/2 的「产品基本信息」已有该格,页 0 无格可改)
+ *              dt.filterKey/filterVal ⇒ 多张逻辑表共用一张行表时的物理分块(见 CONTEXT「表区是物理列」)
+ *              dt.libGroupKey = 明细列名 ⇒ **单表**面板的替代分组通道。设计只有一张表时没有 filterVal
+ *                                    可当分组名,勾选标准库落下来的行靠这一格记住自己属于哪个分组
+ *                                    (出货检验计划表用:'检验类别' → '必测项'/'型式检验')。
+ *                                    仅参与写库,不上纸(该列通常同时 hiddenCol)。
+ *   autoFillSpec —— 「自动填充规格书」:选定 fromKey(产品编号)后,按该值拉**规格书**(RD_SPEC_DOC)
+ *                   的表头与检验要求明细,回填到本表。结构:
+ *              fromKey  触发字段(必须是一个产品编号参照格)
+ *              head[]   {to: 本面板表头键, from: 规格书字段名} —— 逐格回填报告头
+ *              detail[] {to: 本表明细键,   from: 规格书明细字段名}(规格书「检验要求」表区)
+ *              defaults 每次填充后兜底写入的固定值(如不合格应对措施三段式);已有内容的格子不覆盖
+ *              取值走后端 GET /px/specByProduct —— **不能**走通用查询链路:
+ *              规格书的 编号(=产品键)会被 QueryService.loadDocs 用单据编号覆盖掉(见该处注释)。
  *   conclusion{bar,key} —— 结论区(Excel 无结论区的表不配置)
  *   seedRows(浸泡安全) —— 标准卫生项目 17 行(新增草稿自动预填)
  */
-import { SPEC_TEST_LIB } from './specTestLib'
+// ⚠ 必须带 .js 扩展名:Node 的 ESM 解析不做扩展名补全(node --test 直接跑源码时
+//   无扩展名会 ERR_MODULE_NOT_FOUND);Vite 两种写法都接受,故带扩展名对两端都安全。
+import { SPEC_TEST_LIB } from './specTestLib.js'
+// 配方表「物料种类」的词表:引擎只认物料档案口径的四个类别,集中放在 core/mold/materialKinds.js,
+// 并由 materialKinds.test.js 钉住"下拉里每个词都必须被引擎认出来"(填错会静默算错,见该文件注释)
+// ⚠ 必须相对路径:本文件被 node --test 直接 import(keys.test.js),`@/` 别名只有 Vite 认
+import { MATERIAL_KINDS } from '../mold/materialKinds.js'
 
 // ═══════════ 被并入面板的原始配置(2026-09-11 并入工艺清单面板第 2 页签,菜单已下线)═══════════
-// 这两份是**页 2 的唯一真源**:主面板按页引用它们的 sections/dataTables/tailSections,
-// 区块上的 page:1 标明归属第 2 页签;面板级 headMode 挪到主面板 pages[1] 声明(页 2 版式)。
-// 与合并前(e20bd9a~1)的原文逐字一致,可直接作为回滚参考。
+// RD_MOLD_FORMULA 仍按页引用到成型工艺面板(sections/dataTables/tailSections 上的 page 标明归属;
+// 2026-09-20 修订记录页插到最前后,原两页顺延 ⇒ 它现在是 page:2)。
+//
+// ⚠ 2026-09-20 起,**组装侧不再是"并入"关系**:组装工艺清单按《组装工艺控制.xlsx》重排为 3 个页签,
+//   第 2 个页签(组装BOM表)照设计 sheet 独立复刻,不再复用原来的 RD_ASM_BOM 常量 ——
+//   两者的列序本就不同(设计是 物料编号|物料名称|… ,RD_ASM_BOM 常量是 物料名|物料编号|… ),
+//   继续复用会按错误列序渲染。该常量已随本次重排删除(需要时见 e20bd9a~1 之前的 git 历史);
+//   组装BOM表**面板**(RD_ASM_BOM)菜单早已下线(menus.test.js 钉着),实体表与 yj_field 保留不动。
 
-/** 组装工艺清单(页 1)的原始数据表:21 道工序预置;逐字取自 e20bd9a~1,提成常量以便与页 2 的两张表并存 */
+/** 组装工艺清单 · 页签 2「关键控制清单」= 设计《组装工艺控制.xlsx》sheet「组装工艺控制-关键控制清单」
+ *  2026-09-18(Phase 4):改为**标准库驱动**(lib:'asm.proc',一变体一条目,勾选即整表替换),
+ *  seedRows 降级为"未跑种子的环境"兜底 —— 沿用检验项目标准库重构的同一降级模式。
+ *  2026-09-20:设计改为 3 页签后,本表归属第 3 页(page:2),并补 filterKey/filterVal —
+ *    rd_asm_proc_detail 现由三张逻辑表共用(修订记录/物料清单/关键控制清单),
+ *    没有表区过滤时 rowsOf() 会把整份明细当本表显示、confirmLib() 会删掉"表区为空"的行。
+ *  ⚠ seedRows 是首次复刻时**合并单元格被塌缩**的产物,且多条 管控要求 为空串;
+ *    权威内容以 asm.proc 库为准(4 变体 37 道工序、检查比例 0 条为空,
+ *    见 tools/gen/gen-asm-proc-lib.cjs 的实测输出)。 */
 const RD_ASM_PROC_DT0 = [
-      { seedRows: [
+      { lib: 'asm.proc',   // 标准库:组装工艺 4 变体(裸棒/机器包布/复合半成品/成品)
+        page: 2,
+        bar: '关键控制清单',
+        filterKey: '表区', filterVal: '关键控制清单',
+        // 工艺形态 已在「产品基本信息」区有一格(见 sections),表头不再重复一条变体切换行
+        noVariant: true,
+        seedRows: [
           { 工序: '无黑处理', 工序控制内容: '无黑时间', 管控要求: '将炭棒单层摆车无黑处理，破损、裂纹等不良挑出无黑处理时间：12-24小时', 检查比例: '随机取2支测试黑水' },
           { 工序: '机器除尘', 工序控制内容: '1.机器毛刷松紧度2.除尘后清洁效果', 管控要求: '', 检查比例: '3%' },
           { 工序: '投首', 工序控制内容: '尺寸：长度、内径、外径外观：表面、脱粉、强度', 管控要求: '尺寸：长度66-67mm,外径：56-57mm,内径：20.3-21.3mm切面平整，无锯齿纹，无明显缺角，无残留渣脱粉检查方法;用搓三次炭棒表面后，无继续有粉脱落为合格强度：用手捏炭棒切口，无捏碎、捏裂及疏松为合格', 检查比例: '尺寸：3%外观：3%' },
@@ -60,22 +111,127 @@ const RD_ASM_PROC_DT0 = [
           { 工序: '扣盒盖/封胶纸', 工序控制内容: '1.配件数量2.封胶方式', 管控要求: '1.检查产品无漏装堵头、说明书、反冲洗垫片，然后将盒盖扣好2.用透明胶纸：十字交叉方式：盒宽面连接盒底封一圈+盒盖窄面封一条', 检查比例: '全检' },
           { 工序: '封箱', 工序控制内容: '1.装箱方式2.数量', 管控要求: '准备好纸箱，折好刀卡，将外观合格的产品端盖朝上竖放在纸箱内，具体方法：每排装6盒，装4排，每盒2支，每箱装48支，封箱方式为“工”字形', 检查比例: '全检' },
         ], cols: [
+          { key: '表区', label: '表区', hiddenCol: true, w: 90 },
           { key: '工序', label: '工序', w: 130 },
           { key: '工序控制内容', label: '工序控制内容', w: 320, area: true },
           { key: '管控要求', label: '管控要求', w: 430, area: true },
-          { key: '检查比例', label: '检查比例', w: 120 },
+          { key: '检查比例', label: '检查比例', w: 160 },
         ]},
     ]
 
-/** 成型工艺清单(页 1)的原始区块:产品基本信息 / 工序 / 检验要求;逐字取自 e20bd9a~1 */
+/** 组装工艺清单 · 页签 0「修订记录」= 设计《组装工艺控制.xlsx》sheet「修订记录」(B6:G16)
+ *  该 sheet 只有一行居中大标题 + 一行表头,没有公司抬头/编号/信息栏 ⇒ 本页 showHead:false,
+ *  由 dt.pageTitle 出居中标题(与 RD_SPEC_DOC 的「修订记录」页同一做法)。
+ *  列宽按 1040 总宽配平(与另两页的报告头/表格同宽,打印时三页左右缘对齐)。 */
+const RD_ASM_PROC_DT_REVISION = {
+  page: 0,
+  pageTitle: '修订记录',
+  filterKey: '表区', filterVal: '修订记录',
+  // 本页无「产品基本信息」区,变体切换行在这里既不驱动本页标题(本页出 pageTitle 居中大标题)
+  // 也没有可改的工艺形态格 —— 留着只会在表头上多一条无作用的「工艺形态：请选择」。
+  noVariant: true,
+  design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+  cols: [
+    { key: '表区', label: '表区', hiddenCol: true, w: 46 },
+    { key: '序号', label: '序号', w: 60, align: 'center' },
+    { key: '更改内容', label: '更改内容', w: 300, area: true },
+    { key: '更改原因', label: '更改原因', w: 200 },
+    { key: '更改时间', label: '更改时间', w: 130 },
+    { key: '责任人', label: '责任人', w: 120 },
+    { key: '备注', label: '备注', w: 184, area: true },
+  ],
+}
+
+/** 组装工艺清单 · 页签 1「组装BOM表」= 设计《组装工艺控制.xlsx》sheet「组装工艺控制-BOM表」
+ *  ⚠ 列序照设计第 13 行(物料编号 | 物料名称 | 物料规格 | 外观要求 | 用量)——
+ *    与组装BOM表面板(RD_ASM_BOM)的列序**不同**,故这里独立声明、不复用它的 dataTables。
+ *  ⚠ 「物料名称」是**显示文案**,数据键仍是 yj_field.label `物料名`
+ *    (改 label 会同时漂移 RD_ASM_BOM/RD_SPEC_DOC 两处数据键,2026-09-18 已定不改;
+ *     这里靠 yj_field.alias 在显示层改名,见 migrate-asm-proc-redesign-2026-09-20.sql §4)。 */
+const RD_ASM_PROC_DT_BOM = {
+  page: 1,
+  bar: 'BOM表',
+  filterKey: '表区', filterVal: '物料清单',
+  materialPick: true,   // 从基础档案 BOM 面板引用物料
+  // 本页有「产品基本信息」区且其中已有 工艺形态 一格 ⇒ 表头不再重复一条变体切换行
+  // (实测:不写这行时同页会出现两个「工艺形态」下拉,一个在信息区、一个在表格表头上)
+  noVariant: true,
+  cols: [
+    { key: '表区', label: '表区', hiddenCol: true, w: 90 },
+    { key: '物料编号', label: '物料编号', w: 130 },
+    { key: '物料名', label: '物料名称', w: 140 },
+    { key: '物料规格', label: '物料规格', w: 300, area: true },
+    { key: '外观要求', label: '外观要求', w: 340 },
+    { key: '用量', label: '用量', w: 130 },
+  ],
+}
+
+/** 三个页签的「产品基本信息」区(设计两张表都有 B9:G9 这一块,格子相同)
+ *  按用户口径只保留设计的四格 + 工艺形态(驱动 4 个关键控制清单变体的字段)——
+ *  产品名称/产品种类/成品重量/整体规格(外径)/整体规格(长度) 已置 visible=0 退出编辑面板。 */
+const RD_ASM_PROC_INFO_SEC = (page) => ({
+  page,
+  bar: '产品基本信息',
+  rows: [
+    { pairs: [
+      { label: '产品编号', key: '产品编号', type: 'text' },
+      { label: '客户项目名称', key: '客户项目名称', type: 'text' },
+    ]},
+    { pairs: [
+      { label: '产品功能类别', key: '产品功能类别', type: 'text' },
+      { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text' },
+    ]},
+    { pairs: [
+      { label: '工艺形态', key: '工艺形态', type: 'select' },
+    ]},
+  ],
+})
+
+/** 成型工艺清单 · 页签 0「修订记录」(2026-09-20 新增,与组装工艺清单同款 —— 用户口径「和组装的一样」)
+ *  该页不出报告头(设计只有一行居中大标题 + 一行表头),由 dt.pageTitle 出标题,
+ *  与 RD_SPEC_DOC / RD_ASM_PROC 的修订记录页同一做法;列宽按 1040 总宽配平(三页左右缘对齐)。
+ *  行落主面板行表 rd_mold_proc_detail,靠物理列 [表区]='修订记录' 分块(filterKey 模式),
+ *  与「配方表」共用一张行表 —— 见 tools/migrate-mold-proc-revision.sql。
+ *  ⚠ 与 RD_ASM_PROC_DT_REVISION 逐字一致是**刻意的**(断言⑦钉住两侧一致);
+ *    各写一份而不是共用同一个常量:两侧各有各的面板与行表,改一侧不该悄悄改另一侧
+ *    (2026-09-20 组装侧重排就是"共用配置"把列序带坏的)。 */
+const RD_MOLD_PROC_DT_REVISION = {
+  page: 0,
+  pageTitle: '修订记录',
+  filterKey: '表区', filterVal: '修订记录',
+  // 本页无「产品基本信息」区(没有 工艺形态 格可改),也不靠变体切标题 ⇒ 不渲染表头变体切换行
+  noVariant: true,
+  design: { titleSize: 21, titleTop: 24, titleGap: 40, headerH: 44, rowH: 43, fontSize: 16 },
+  cols: [
+    { key: '表区', label: '表区', hiddenCol: true, w: 46 },
+    { key: '序号', label: '序号', w: 60, align: 'center' },
+    { key: '更改内容', label: '更改内容', w: 300, area: true },
+    { key: '更改原因', label: '更改原因', w: 200 },
+    { key: '更改时间', label: '更改时间', w: 130 },
+    { key: '责任人', label: '责任人', w: 120 },
+    { key: '备注', label: '备注', w: 184, area: true },
+  ],
+}
+
+/** 成型工艺清单(页 1)的原始区块:产品基本信息 / 工序 / 检验要求。
+ *  2026-09-21 按设计图(用户给的版面照片)重排,与《炭棒BOM及工艺信息表单需求设计内容》第三/四页一致:
+ *   - 产品基本信息:纸面标签改 炭棒编号 / 产品名称 / 炭棒规格 / 产品管控类型 / 产品形态 / 生产车间
+ *     (**只是纸面的字**:数据键仍是 产品编号/外观要求 等,改名走 yj_field.alias —— 参照链路、
+ *     四文件编辑门禁、配方计算回填都按数据键走,改 label 会让历史单据丢字段);
+ *   - 工序:补「配料要求」行(工序名=要求项,要求格横跨整行)+ 灌料块补「灌料要求」行;
+ *     三值改并排(理论最低/中间/最高灌料重量g),其后保留一个空白行;
+ *   - 检验要求:炭棒尺寸块改 4 格(炭棒外径mm/炭棒外径公差mm/炭棒内径mm/炭棒内径公差mm,原「内孔要求」
+ *     新版面无 ⇒ 从配置里撤掉,字段与历史值保留在库里);压降块补第三行「压降是否测试」(√/×);
+ *   - 工序五个字段(配料要求/烧结炉参数/烧结时间调速器参数/热压要求/冷却参数设置)挂标准库:
+ *     文本框版式的给「⌄标准库」选择(选完还能改),下拉版式的选项即库条目 + 「⧉标准库维护」。 */
 const RD_MOLD_PROC_SEC0 = [
-      { bar: '产品基本信息', rows: [
+      { page: 1, bar: '产品基本信息', rows: [
         { grid: [
-          { label: '产品编号', span: 2 },
+          { label: '炭棒编号', span: 2 },
           { label: '产品名称', span: 2 },
           { label: '炭棒规格', span: 3 },
           { label: '产品管控类型', span: 2 },
-          { label: '外观要求' },
+          { label: '产品形态' },
           { label: '生产车间' },
         ]},
         { grid: [
@@ -88,51 +244,60 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '外观要求', type: 'select' },
           { key: '生产车间', type: 'select' },
         ]},
-        { grid: [{ fixed: '·', span: 11 }] },
       ]},
-      { bar: '工序', rows: [
+      { page: 1, bar: '工序', rows: [
         { grid: [
           { label: '工序', cap: true },
           { label: '工序管控要求', cap: true, span: 10 },
         ]},
+        // 配料要求:工序名即要求项,要求内容横跨整行(文本框 + ⌄标准库预设模板)
+        { grid: [
+          { label: '配料要求' },
+          { key: '配料要求', span: 10, area: true },
+        ]},
+        // 灌料:标签行 + 值行 两行式(设计图:三个标签连在一行,数值填在**下方那一行**)
         { grid: [
           { label: '灌料', rowspan: 5 },
-          { label: '理论最低灌料重量g', span: 2 },
-          { key: '理论最低灌料重量g', span: 4 },
-          { fixed: '0', span: 4, rowspan: 4 },
+          { label: '理论最低灌料重量g', span: 3 },
+          { label: '理论灌料中间值g', span: 3 },
+          { label: '理论最高灌料重量g', span: 4 },
         ]},
         { grid: [
-          { label: '理论灌料中间值g', span: 2 },
-          { key: '理论灌料中间值g', span: 4 },
-        ]},
-        { grid: [
-          { label: '理论最高灌料重量g', span: 2 },
+          { key: '理论最低灌料重量g', span: 3 },
+          { key: '理论灌料中间值g', span: 3 },
           { key: '理论最高灌料重量g', span: 4 },
         ]},
         { grid: [
           { label: '理论水分', span: 2 },
-          { key: '理论水分', span: 4 },
+          { key: '理论水分', span: 8 },
         ]},
         { grid: [
           { label: '实际灌料重量计算公式', span: 2 },
-          { key: '实际灌料重量计算公式', span: 9 },
+          // 背景提示词:把设计模板文字显示成灰字(填了就以填的为准)。
+          // 与设计源的区别:原表是"默认值"(存进每张单),这里做成 placeholder —— 不强迫每张单都带这段文字,
+          // 要真正预填成值的话走 docDefaults/列默认值,那是另一处改动。
+          { key: '实际灌料重量计算公式', span: 8, ph: '实际灌料重量中间值=（1-理论水分%）/（1-实际水分%）*理论灌料重量中间值' },
+        ]},
+        { grid: [
+          { label: '灌料要求', span: 2 },
+          { key: '灌料要求', span: 8, area: true, ph: '用户输入' },
         ]},
         { grid: [
           { label: '烧结' },
           { label: '烧结炉参数', span: 2 },
-          { key: '烧结炉参数', span: 4 },
-          { label: '烧结时间/调速器参数' },
-          { key: '烧结时间调速器参数', span: 3 },
+          { key: '烧结炉参数', type: 'select', span: 3 },
+          { label: '烧结时间/调速器参数', span: 2 },
+          { key: '烧结时间调速器参数', type: 'select', span: 3 },
         ]},
         { grid: [
           { label: '热压' },
           { label: '热压要求', span: 2 },
-          { key: '热压要求', span: 8 },
+          { key: '热压要求', span: 8, area: true },
         ]},
         { grid: [
           { label: '冷却' },
           { label: '冷却参数设置', span: 2 },
-          { key: '冷却参数设置', span: 8 },
+          { key: '冷却参数设置', type: 'select', span: 8 },
         ]},
         { grid: [
           { label: '脱模', rowspan: 4 },
@@ -158,19 +323,20 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '最高重量g', span: 2 },
         ]},
       ]},
-      { bar: '检验要求', rows: [
+      { page: 1, bar: '检验要求', rows: [
+        // 炭棒尺寸:标签行 4 格 + 值行 4 格,标签与值同列对齐(新版面无「内孔要求」)
         { grid: [
           { label: '炭棒尺寸', rowspan: 2 },
-          { label: '外径mm', span: 2 },
-          { label: '内径mm', span: 4 },
-          { label: '内孔要求', span: 4 },
+          { label: '炭棒外径mm', span: 2 },
+          { label: '炭棒外径公差mm', span: 3 },
+          { label: '炭棒内径mm', span: 2 },
+          { label: '炭棒内径公差mm', span: 3 },
         ]},
         { grid: [
-          { key: '外径mm' },
-          { key: '外径公差' },
-          { key: '内径mm' },
+          { key: '外径mm', span: 2 },
+          { key: '外径公差', span: 3 },
+          { key: '内径mm', span: 2 },
           { key: '内径公差', span: 3 },
-          { key: '内孔要求', span: 4 },
         ]},
         { grid: [
           { label: '密度管控', rowspan: 2 },
@@ -205,8 +371,9 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '压头下降速度', span: 4 },
           { key: '强度要求kgf', span: 4 },
         ]},
+        // 压降:块名跨 3 行 —— 第三行是设计图上的「是否测试丨 √ × 丨」(口径:压降是否抽检)
         { grid: [
-          { label: '压降', rowspan: 2 },
+          { label: '压降', rowspan: 3 },
           { label: '测试管路', span: 2 },
           { label: '测试流速L/min', span: 4 },
           { label: '压降标准kpa', span: 4 },
@@ -216,22 +383,27 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '压降测试流速', span: 4 },
           { key: '压降标准kpa', span: 4 },
         ]},
+        { grid: [
+          { key: '压降是否测试', type: 'select', span: 10, ph: '是否测试丨 √ × 丨' },
+        ]},
       ]},
     ]
 
+// ⚠ 2026-09-20 起本常量归属**页 3(索引 2)**:修订记录页插到最前,原「成型工艺清单/成型配方」两页顺延。
+//   除这 6 处 page 号外,常量内容一字未动(它既是页 2 的渲染来源,也是天然的回滚参考)。
 const RD_MOLD_FORMULA = {
     staticTitle: '炭棒配方管控清单',
     info: [
-      { page: 1, label: '表单管理人', key: '表单管理人', type: 'text' },
-      { page: 1, label: '密级', key: '密级', type: 'select' },
-      { page: 1, label: '使用范围', key: '使用范围', type: 'select' },
-      { page: 1, label: '版本号', key: '版本号', type: 'text' },
+      { page: 2, label: '表单管理人', key: '表单管理人', type: 'text' },
+      { page: 2, label: '密级', key: '密级', type: 'select' },
+      { page: 2, label: '使用范围', key: '使用范围', type: 'select' },
+      { page: 2, label: '版本号', key: '版本号', type: 'text' },
     ],
     grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57],
     // 横向对齐:报告头三段跨度合计 = 网格列数(13),右缘与 产品基本信息/配方表/配料要求 平齐
     head: { title: 7, infoLabel: 2, infoValue: 4 },
     sections: [
-      { page: 1, bar: '产品基本信息', rows: [
+      { page: 2, bar: '产品基本信息', rows: [
         { grid: [
           { label: '产品编号', span: 2 },
           { label: '产品名称', span: 2 },
@@ -253,9 +425,11 @@ const RD_MOLD_FORMULA = {
       ]},
     ],
     dataTables: [
-      { page: 1, bar: '配方表', autoSeqBar: true, totalCols: true, filterKey: '表区', filterVal: '配方表', cols: [
+      // recipeCalc:表头上出「配方计算」按钮(读本表行 → 算 → 回填页 1 与本表两列);
+      // 口径见 CONTEXT.md「配方计算器」/ docs/adr/0004 —— 弹窗输入不落库,只有回填值随单据保存
+      { page: 2, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
-          { key: '物料种类', label: '物料种类', span: 2 },
+          { key: '物料种类', label: '物料种类', span: 2, type: 'select', options: MATERIAL_KINDS },
           { key: '物料编号', label: '物料编号', span: 4 },
           { key: '物料名称', label: '物料名称', span: 3 },
           { key: '实际添加比例', label: '实际添加\n比例%' },
@@ -264,53 +438,9 @@ const RD_MOLD_FORMULA = {
         ]},
     ],
     tailSections: [
-      { page: 1, bar: '配料要求', rows: [
+      { page: 2, bar: '配料要求', rows: [
         { label: '配料要求', key: '配料要求', type: 'area' },
       ]},
-    ],
-  }
-
-const RD_ASM_BOM = {
-    staticTitle: '组装BOM表',
-    info: [],
-    grid: [130, 390, 130, 390],
-    head: { title: 2, infoLabel: 1, infoValue: 1 },
-    sections: [
-      { page: 1, bar: '一、产品基本信息', rows: [
-        { pairs: [
-          { label: '产品编号', key: '产品编号', type: 'text' },
-          { label: '产品名称', key: '产品名称', type: 'text' },
-        ]},
-        { pairs: [
-          { label: '产品种类', key: '产品种类', type: 'text' },
-          { label: '成品重量', key: '成品重量', type: 'text' },
-        ]},
-        { pairs: [
-          { label: '整体规格（外径）', key: '整体规格外径', type: 'text' },
-          { label: '整体规格（长度）', key: '整体规格长度', type: 'text' },
-        ]},
-      ]},
-    ],
-    dataTables: [
-      { page: 1, bar: '二、炭棒滤芯组装/包装物料清单', filterKey: '表区', filterVal: '物料清单',
-        materialPick: true,  // 从基础档案 BOM 面板引用物料
-        cols: [
-          { key: '表区', label: '表区', hiddenCol: true, w: 90 },
-          { key: '物料名', label: '物料名', w: 140 },
-          { key: '物料编号', label: '物料编号', w: 130 },
-          { key: '物料规格', label: '物料规格', w: 300, area: true },
-          { key: '外观要求', label: '外观要求', w: 340 },
-          { key: '用量', label: '用量', w: 130 },
-        ]},
-      { page: 1, bar: '修订记录', filterKey: '表区', filterVal: '修订记录', cols: [
-          { key: '表区', label: '表区', hiddenCol: true, w: 90 },
-          { key: '序号', label: '序号', w: 60 },
-          { key: '更改内容', label: '更改内容', w: 300, area: true },
-          { key: '更改原因', label: '更改原因', w: 200 },
-          { key: '更改时间', label: '更改时间', w: 130 },
-          { key: '责任人', label: '责任人', w: 120 },
-          { key: '备注', label: '备注', w: 230 },
-        ]},
     ],
   }
 
@@ -318,7 +448,8 @@ export const recordSheetConfigs = {
   RD_ALKALINE: {
     titlePlaceholder: '伊可普碱性寿命测试',
     grid: [115, 80, 93, 98, 84, 90, 90, 90, 90, 70, 70, 85, 128],
-    head: { title: 11, infoLabel: 1, infoValue: 1 },
+    // 设计「碱性」第 2 行:B2:M2 公司名(12 列)+ N2 编号(1 列,裸值 " YJ-PD-01")
+    head: { title: 11, infoLabel: 1, infoValue: 1, noSpan: 1, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试目的/背景', key: '测试目的/背景', type: 'area' },
@@ -358,7 +489,8 @@ export const recordSheetConfigs = {
   RD_MINERAL: {
     titlePlaceholder: '伊可普 RO后置矿化滤芯 纯水寿命测试',
     grid: [170, 170, 170, 170, 170],
-    head: { title: 3, infoLabel: 1, infoValue: 1 },
+    // 设计「矿化」第 2 行:B2:E2 公司名(4 列)+ F2 编号(1 列,裸值 "YJ-PD-01")
+    head: { title: 3, infoLabel: 1, infoValue: 1, noSpan: 1, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试目的/背景', key: '测试目的/背景', type: 'area' },
@@ -443,7 +575,9 @@ export const recordSheetConfigs = {
   RD_SCALE: {
     titlePlaceholder: '阻垢炭棒阻垢率测试',
     grid: [125, 125, 125, 125, 125, 125, 125, 125, 125, 125, 125],
-    head: { title: 6, infoLabel: 1, infoValue: 4 },
+    // 设计「阻垢性能」第 1 行是**一格含两段文字**:A1:J1 = 公司名 + 靠右的编号
+    // "惠州市银嘉环保科技有限公司……YJ-PD-01",第 11 列 K1 空 ⇒ noSpan:0(同格)+ 右侧留 1 空列
+    head: { title: 6, infoLabel: 1, infoValue: 4, noSpan: 0, noGapSpan: 1, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试目的/背景', key: '测试目的/背景', type: 'area' },
@@ -480,7 +614,8 @@ export const recordSheetConfigs = {
   RD_RO_PROTECT: {
     titlePlaceholder: '桌面机RO保护测试',
     grid: [158, 78, 106, 78, 78, 78, 78, 78, 78, 78],
-    head: { title: 6, infoLabel: 2, infoValue: 2 },
+    // 设计「RO保护」第 2 行:B2:I2 公司名(8 列)/ J2 空 / K2 编号(1 列,裸值 "YJ-PD-01")
+    head: { title: 6, infoLabel: 2, infoValue: 2, noSpan: 1, noGapSpan: 1, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试背景/目的', key: '测试背景/目的', type: 'area' },
@@ -518,7 +653,9 @@ export const recordSheetConfigs = {
   RD_SOAK: {
     titlePlaceholder: '伊可普高品质冰箱炭棒项目浸泡安全测试',
     grid: [177, 164, 204, 206, 200, 209],
-    head: { title: 4, infoLabel: 1, infoValue: 1 },
+    // 设计「浸泡安全」第 2 行 B2:G2 把**整行并成一格**,一格含两段文字
+    // (公司名 + 靠右的编号 "……YJ-D-01")⇒ noSpan:0 同格、无空列
+    head: { title: 4, infoLabel: 1, infoValue: 1, noSpan: 0, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试目的/背景', key: '测试目的/背景', type: 'area' },
@@ -568,7 +705,8 @@ export const recordSheetConfigs = {
   RD_DROP_PREC: {
     titlePlaceholder: '伊可普冰箱滤芯（需求3）压降、一级精度测试',
     grid: [157, 280, 120, 100, 106, 106, 116, 116, 127, 116, 165],
-    head: { title: 9, infoLabel: 1, infoValue: 1 },
+    // 设计「压降、精度」第 2 行:B2:J2 公司名(9 列)/ K2 空 / L2 编号(1 列,裸值 " YJ-PD-01")
+    head: { title: 9, infoLabel: 1, infoValue: 1, noSpan: 1, noGapSpan: 1, docnoPrefix: false },
     sections: [
       { bar: '1.基本信息', rows: [
         { label: '测试目的/背景', key: '测试目的/背景', type: 'area' },
@@ -768,11 +906,13 @@ export const recordSheetConfigs = {
 
   // ═══════════ 产品文件 6 面板(《2.产品文件》) ═══════════
 
-  // 成型工艺清单(炭棒工艺管控清单)+ 成型配方(炭棒配方管控清单) —— **一张单两个页签**(2026-09-11)
-  // 页 1 = 成型工艺清单(原样:纯表单,工序/检验要求按「标签行+值行」两行式)
-  // 页 2 = 成型配方(原 RD_MOLD_FORMULA 的内容:产品基本信息 + 配方表 + 配料要求)
-  // 两个页签共用同一套 11 列网格(A..K):配方表的 13 格在 11 列网格上分配跨度
-  //(No.1 / 物料种类3[=146+64+64] / 物料编号2[=52+52+... ] 见下方配方表 cols 注释),总宽 1040 不变。
+  // 成型工艺清单(炭棒工艺管控清单)+ 成型配方(炭棒配方管控清单)+ 修订记录 —— **一张单三个页签**
+  //   页 0 = 修订记录(2026-09-20 新增,与组装工艺清单的修订记录页逐字一致)
+  //   页 1 = 成型工艺清单(原样:纯表单,工序/检验要求按「标签行+值行」两行式)
+  //   页 2 = 成型配方(原 RD_MOLD_FORMULA 的内容:产品基本信息 + 配方表 + 配料要求)
+  // 页 1/页 2 两个页签共用同一套 11 列网格(A..K):配方表的 13 格在 11 列网格上分配跨度
+  //(No.1 / 物料种类3[=146+64+64] / 物料编号2[=52+52+... ] 见下方配方表 cols 注释),总宽 1040 不变;
+  // 页 0 只有一张自持列宽的数据表(合计 1040,与另两页左右缘对齐),不画报告头。
   RD_MOLD_PROC: {
     headMode: 'report',
     staticTitle: '炭棒工艺管控清单',
@@ -785,18 +925,28 @@ export const recordSheetConfigs = {
     // 列宽再分配(2026-09-09):原 [150,130,80,120,80,80,80,120,80,60,60] 让「外观要求/生产车间」各只有 60px,
     // 下拉选值后被裁切;从富余列(产品编号 280→240、产品名称 200→170、产品管控类型 200→170、炭棒规格列 80→70)匀出,
     // 给这两列各 125px。总宽仍 1040(纸张宽度不变)。
-    grid: [130, 110, 70, 100, 70, 70, 70, 100, 70, 125, 125],
+    // 2026-09-20(用户口径):检验要求「炭棒尺寸」的 外径/内径 两块改成**各自对半平分** ——
+    // 只在两个块**内部**挪列宽,块总宽 B:C=180 / D:G=310 / H:K=420 与行总宽 1040 全部不变:
+    //   · 外径:B=110,C=70 ⇒ B=C=90(外径mm 90 | 外径公差 90)
+    //   · 内径:D=100,E/F/G=70 ⇒ D+E=85+70=155,F+G=78+77=155(内径mm 155 | 内径公差 155)
+    // 受影响的只有跨这几条内部竖线的格子,且幅度极小(产品名称 170→175、炭棒规格1/2/3 70→70/78/77);
+    // B:C/D:G/H:I/J:K 这些**块宽一分未动**,其它行的格子宽度逐像素不变。
+    grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125],
     head: { title: 7, infoLabel: 2, infoValue: 2 },
-    // ── 页签:两页**各用各的原始版式**(合并时曾统一成 11 列并把页 2 跨列重排,已恢复原设计)──
-    // head:true —— 两页原本都是**独立一张单据**(工艺管控清单 / 配方管控清单),各自有自己的报告头;
-    // 并入同一张单后仍照原样各渲染各的报告头(报告头只在声明 head:true 的页出现)。
+    // ── 页签:三页**各用各的原始版式**(合并时曾统一成 11 列并把页 2 跨列重排,已恢复原设计)──
+    // showHead:true —— 页 1/页 2 原本都是**独立一张单据**(工艺管控清单 / 配方管控清单),各自有自己的报告头;
+    // 并入同一张单后仍照原样各渲染各的报告头。页 0(修订记录)不出报告头:设计与组装那页一样,
+    // 只有一行居中大标题 + 一行表头(靠 dt.pageTitle 出标题,靠 showHead:false 关掉报告头)。
     pages: [
-      { title: '成型工艺清单', grid: [130, 110, 70, 100, 70, 70, 70, 100, 70, 125, 125], showHead: true },
-      // 页 2 原始 13 列网格;报告头三段跨度合计 = 13,右缘与 产品基本信息/配方表/配料要求 平齐
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125] },
+      { title: '成型工艺清单', grid: [130, 90, 90, 85, 70, 78, 77, 100, 70, 125, 125], showHead: true },
+      // 页 3 原始 13 列网格;报告头三段跨度合计 = 13,右缘与 产品基本信息/配方表/配料要求 平齐
       { title: '成型配方', grid: [101, 60, 109, 85, 52, 52, 52, 146, 64, 64, 121, 77, 57], head: { title: 7, infoLabel: 2, infoValue: 4 }, showHead: true, staticTitle: '炭棒配方管控清单' },
     ],
     sections: [...RD_MOLD_PROC_SEC0, ...RD_MOLD_FORMULA.sections],
-    dataTables: [...RD_MOLD_FORMULA.dataTables],
+    // 两张逻辑表共用行表 rd_mold_proc_detail ⇒ 每条都必须带 filterKey:'表区' + filterVal
+    //(修订记录 / 配方表),少一条 rowsOf() 就会把整份明细当本表显示。
+    dataTables: [RD_MOLD_PROC_DT_REVISION, ...RD_MOLD_FORMULA.dataTables],
     tailSections: [...RD_MOLD_FORMULA.tailSections],
   },
 // 产品信息表:14 字段纯表单升级为文书面板(纸张式,与产品文件家族同视觉语言);
@@ -804,47 +954,73 @@ export const recordSheetConfigs = {
   RD_PROD_INFO: {
     headMode: 'report',
     staticTitle: '产品信息表',
-    info: [{ label: '单据日期', key: '单据日期', type: 'text' }],
+    // 报告头右侧信息块:**编辑人在上、单据日期在下**(用户口径:原来上下颠倒了)。
+    // 设计纸面 B21:E23 右侧就是「编号：/ 编辑人 / 日期」竖排,编号即报告头右上角那一格。
+    info: [
+      { label: '编辑人', key: '编辑人', type: 'text' },
+      { label: '单据日期', key: '单据日期', type: 'text' },
+    ],
     grid: [130, 260, 130, 260],
     head: { title: 2, infoLabel: 1, infoValue: 1 },
     sections: [
+      // 一、产品基本信息 = 设计 B25:E27 三行(产品编号|客户项目名称、客户料号|产品管控等级、产品功能类别|产品形态)
+      // ⚠ 行宽对齐:双列行的占法是「左标签1 + 左值1 + 右标签1 + 右值1 = 4」——
+      //   右值**不能再写 vspan:3**(那会变 6 列超宽,纸面直接串行;本次自检工具抓到的就是这个)。
+      //   只有"整行一个值"的行才用 标签1 + vspan3。
       { bar: '一、产品基本信息', rows: [
         { pairs: [
           { label: '产品编号', key: '产品编号', type: 'text' },
-          { label: '产品名称', key: '产品名称', type: 'text' },
+          { label: '客户项目名称', key: '客户项目名称', type: 'text' },
         ]},
         { pairs: [
-          { label: '产品类别', key: '产品类别', type: 'select' },
-          { label: '产品类型', key: '产品类型', type: 'select' },
+          { label: '客户料号', key: '客户料号', type: 'text' },
+          { label: '产品管控等级', key: '产品管控等级', type: 'select' },
         ]},
         { pairs: [
-          { label: '产品分类', key: '产品分类', type: 'select' },
+          { label: '产品功能类别', key: '产品功能类别', type: 'select' },
           { label: '产品形态', key: '产品形态', type: 'select' },
         ]},
       ]},
+      // 二、规格与尺寸:产品整体尺寸一行 + 炭棒尺寸一行(各整行,值区 vspan 3)
+      // 炭棒尺寸按用户口径**默认分三内格**:内径 * 外径 * 长度
+      // (顺照设计《产品信息表内容.xlsx》B13 填写说明原文「内径*外径*长度(模具尺寸)」),
+      // 三格用 pair.cells 铺开、各带 placeholder 提示词;旧的整串 [炭棒尺寸] 退化为历史列(不进纸面)
+      // 注:产品名称/产品类别/产品类型/产品分类/下单数量 保留在元数据但不进纸面(兼容历史单据)
       { bar: '二、规格与尺寸', rows: [
         { pairs: [
-          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text' },
-          { label: '客户料号', key: '客户料号', type: 'text' },
+          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text', vspan: 3 },
         ]},
         { pairs: [
-          { label: '炭棒尺寸', key: '炭棒尺寸', type: 'text' },
-          { label: '下单数量', key: '下单数量', type: 'text' },
+          { label: '炭棒尺寸', cells: [
+            { key: '炭棒内径', ph: '内径(mm)' },
+            { key: '炭棒外径', ph: '外径(mm)' },
+            { key: '炭棒长度', ph: '长度(mm)' },
+          ], vspan: 3 },
         ]},
       ]},
+      // 三、特殊性能描述 = 设计 B31「主要性能描述」;数据键仍是 特殊性能描述(col_name 一律不改)
       { bar: '三、特殊性能描述', rows: [
         { pairs: [
-          { label: '特殊性能描述', key: '特殊性能描述', vspan: 3 },
+          { label: '主要性能描述', key: '特殊性能描述', vspan: 3 },
         ]},
       ]},
+      // 四、文件与签署 = 设计 B33 客户图纸或规格书 / B34-B35 两级审核 / B36 产品负责人 / B37 备注
       { bar: '四、文件与签署', rows: [
         { pairs: [
           // 客户图纸或规格书:附件字段(源 Excel 该格提示即"上传图片")——上传保留原文件名,点击查看,打印/PDF 只见文件名
           { label: '客户图纸或规格书', key: '客户图纸或规格书', type: 'file', vspan: 3 },
         ]},
+        // 两级审批人**各占一行**(用户口径:原来挤在同一行);固定值 冯总 / 秀丽 由
+        // docDefaults.js 在新建时带出(与 申请立项人/负责人 同机制,仍可人工改)。
+        // 原「审核人」列保留为历史列(hidden=1 + visible=1 ⇒ 列表隐藏、表单仍可见,旧值不丢)。
         { pairs: [
-          { label: '责任人', key: '责任人', type: 'text' },
-          { label: '审核人', key: '审核人', type: 'text' },
+          { label: '审核人（一级审批人）', key: '审核人一级', type: 'text', vspan: 3 },
+        ]},
+        { pairs: [
+          { label: '审核人（二级审批人）', key: '审核人二级', type: 'text', vspan: 3 },
+        ]},
+        { pairs: [
+          { label: '产品负责人', key: '责任人', type: 'text', vspan: 3 },
         ]},
         { pairs: [
           { label: '备注', key: '备注', vspan: 3 },
@@ -853,24 +1029,68 @@ export const recordSheetConfigs = {
     ],
   },
 
-// 组装工艺清单 + 组装BOM表 —— **一张单两个页签**(2026-09-11)
-  // 页 1 = 组装工艺清单(原样:plain 清单式,工序/控制内容/管控要求/检查比例,21 道工序预置)+ 产品基本信息
-  // 页 2 = 组装BOM表(原 RD_ASM_BOM 的内容:产品基本信息 + 物料清单 + 修订记录)
-  // plain 版式没有全页网格:每张数据表按自己的 cols.w 铺宽,两张表都按 1040 总宽排(与纸张可印宽度一致)。
+// 组装工艺清单 —— **一张单 3 个页签**(2026-09-20 按《组装工艺控制.xlsx》重排)
+  // 设计源 3 个 sheet 与 3 个页签一一对应:
+  //   页 0 修订记录         ← sheet「修订记录」
+  //   页 1 组装BOM表        ← sheet「组装工艺控制-BOM表」
+  //   页 2 组装工艺清单     ← sheet「组装工艺控制-组装/包装关键控制清单」
+  // 三张表共用 rd_asm_proc_detail,靠 [表区] 物理分列区分 ⇒ 每条 dataTable 都必须带
+  // filterKey:'表区' + filterVal(修订记录/物料清单/关键控制清单),少一条就会串表。
+  //
+  // ⚠ 版式要点(踩过的坑,改 pages 时逐条核对):
+  //   · **每页都要写 grid**:effGrid 退不到面板级 grid 时 secW() 会写 width:0px,
+  //     而 .rs-t 是 table-layout:fixed ⇒ 整块 section 塌掉。
+  //   · **showHead 必须每页显式写**:未声明时的兜底是 `activePage === 0`,
+  //     页 0 恰好不需要报告头(设计与修订记录 sheet 一致),但页 1/页 2 必须 showHead:true。
+  //   · headMode 每页显式写 report:面板级是 report,页 0 也用 report(靠 showHead:false 关掉
+  //     报告头)而不是 plain —— plain 会走 plainTitleOf,那是**面板级、按变体**的标题,
+  //     会把「…---裸棒」印到修订记录页上。
   RD_ASM_PROC: {
-    headMode: 'plain',
+    headMode: 'report',
     plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单',
-    // ── 页签:页 1 = 组装BOM表(report 报告头 + 4 列网格,info:[] 原版无信息块);页 2 = 组装工艺清单(plain 清单)──
-    // 2026-09-11 按用户要求调换顺序(BOM 在前);页归属翻转用 map 改写 page,RD_ASM_BOM 原配置保持不动(回滚参考)。
-    // BOM 页声明 info:[] = 原版无右侧信息块——修复误回退默认四件套导致大标题挤进第一列(130px)的错位。
-    pages: [
-      { title: '组装BOM表', headMode: 'report', grid: [130, 390, 130, 390], showHead: true, staticTitle: '组装BOM表', info: [], head: { title: 2, infoLabel: 1, infoValue: 1 } },
-      { title: '组装工艺清单' },
+    // 报告头(页 1/页 2 共用):公司名 + 编号 + 居中大标题 + 右侧信息栏四格。
+    // 信息栏照设计 F5:G8(D5:E5..D8:E8)= 表单管理人/密级/使用范围/版本号,
+    // 与成型工艺管控清单(RD_MOLD_PROC)同一套;字段见 migrate-asm-proc-redesign-2026-09-20.sql §3。
+    grid: [130, 390, 130, 390],
+    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    info: [
+      { label: '表单管理人', key: '表单管理人', type: 'text' },
+      { label: '密级', key: '密级', type: 'text' },
+      { label: '使用范围', key: '使用范围', type: 'text' },
+      { label: '版本号', key: '版本号', type: 'text' },
     ],
-    sections: RD_ASM_BOM.sections.map((s) => ({ ...s, page: 0 })),
+    pages: [
+      // 页 0:设计 sheet「修订记录」只有 B6:G6 一行居中大标题 + B7 表头 ⇒ 不出报告头,
+      // 由 dt.pageTitle 出标题(RD_SPEC_DOC 的修订记录页即此做法)。
+      { title: '修订记录', headMode: 'report', showHead: false, grid: [130, 390, 130, 390] },
+      { title: '组装BOM表', headMode: 'report', showHead: true, grid: [130, 390, 130, 390],
+        staticTitle: '组装工艺控制-BOM表' },
+      { title: '组装工艺清单', headMode: 'report', showHead: true, grid: [130, 390, 130, 390],
+        staticTitle: '组装工艺控制-组装/包装关键控制清单' },
+    ],
+    // 设计两张表的 B9:G9 都是「产品基本信息」,格子相同 ⇒ 同一份声明给两页(各声明 page)。
+    sections: [RD_ASM_PROC_INFO_SEC(1), RD_ASM_PROC_INFO_SEC(2)],
+    // 4 个关键控制清单变体(设计《关键控制清单--标准库》4 个 sheet)各有各的纸面标题。
+    // 变体内容**不在配置里** —— 内容源是 asm.proc 标准库(勾选即整表替换),
+    // 这里只为"按头字段切标题"声明骨架;variants 的键必须与 工艺形态 字典 / asm.proc 的 item_code 一致。
+    // ⚠ 2026-09-20 起三页都是 report,plainTitle 不再上纸(staticTitle 才是页标题);
+    //   保留它是因为 confirmLib() 勾选时仍会把变体名写回 head['工艺形态'],
+    //   且 variants/variantKey 的键集是测试断言⑤的三处同源之一(组5 字典 / variants / 库 item_code)。
+    variants: {
+      裸棒: { plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单---裸棒' },
+      机器包布: { plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单---机器包布' },
+      复合半成品: { plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单---复合半成品' },
+      成品: { plainTitle: '炭棒滤芯组装/包装段-关键工序控制清单---成品' },
+    },
+    /** 关键控制清单变体 = 产品基本信息区「工艺形态」的值(设计《关键控制清单--标准库》4 个 sheet 名)。
+     *  ⚠ 4 个 sheet 是**四个独立变体**,没有"默认那个"之说 ⇒ 新单 工艺形态 为空时
+     *    不假装是某一个变体:内容由用户从标准库勾选某个变体带入(勾选时一并写回 工艺形态)。 */
+    variantKey: '工艺形态',
+    // 列序/表区值见各常量;三页的列宽都配平到 1040(与 grid 总宽一致,打印左右缘对齐)。
     dataTables: [
-      ...RD_ASM_PROC_DT0.map((dt) => ({ ...dt, page: 1 })),
-      ...RD_ASM_BOM.dataTables.map((dt) => ({ ...dt, page: 0 })),
+      RD_ASM_PROC_DT_REVISION,
+      RD_ASM_PROC_DT_BOM,
+      ...RD_ASM_PROC_DT0,
     ],
   },
 
@@ -880,15 +1100,26 @@ export const recordSheetConfigs = {
   RD_SPEC_DOC: {
     headMode: 'report',
     staticTitle: '产品规格书',
+    // 封面逐行 = 《规格书细分.xlsx》「封面（产品信息）」sheet 的 B7..B15(9 行)+ B17/B18 签字栏:
+    //   编号 / 产品类别 / 客户名称 / 客户料号 / 客户项目名称 / 应用场景 / 整体规格参数 / 产品主要性能 / 版本
+    // ⚠ label = **显示文案**(照设计原文),key = **数据键,必须是该字段当前的 yj_field.label**。
+    //   两者不同正是这里要分开的原因:数据库列名 客户名 永久不变,但该字段 label 早在
+    //   migrate-rd-2026-design.sql 已对齐设计改成「客户名称」⇒ 老配置写 key:'客户名' 取到的是
+    //   undefined(**整格空白且保存静默丢值**)。本表修复即为此 —— 见下方 key:'客户名称'。
     cover: {
       fields: [
-        { label: '名 称', key: '名称' },
         { label: '编  号', key: '编号' },
-        { label: '客户名', key: '客户名' },
+        { label: '产品类别', key: '产品类别' },
+        { label: '客户名称', key: '客户名称' },
         { label: '客户料号', key: '客户料号' },
+        { label: '客户项目名称', key: '客户项目名称' },
+        { label: '应用场景', key: '应用场景' },
+        { label: '整体规格参数', key: '整体规格参数' },
+        { label: '产品主要性能', key: '产品主要性能' },
         { label: '版  本', key: '版本' },
-        { label: '日  期', key: '日期' },
       ],
+      // 设计 B17/B18:三组「角色/日期」签订栏,姓名与日期**合写一格**(如 陈秀丽/2026/06/24)——
+      // 三列均为 nvarchar(200),历史值就是这种合写串,故不拆列(用户 2026-09-18 确认)。
       sign: [
         { label: '制订/日期', key: '制订日期' },
         { label: '审核/日期', key: '审核日期' },
@@ -906,9 +1137,16 @@ export const recordSheetConfigs = {
     // 全部按 k=网格宽÷各自设计宽 等比缩放,整份规格书以 A4 原比例呈现(字体不出框)
     // coverTailReserve:封面之下的 1-3 章节块预留高度——封面画布按 A4 高减去这块,
     // 整张「产品信息」纸面才装得进一页打印纸(不预扣会多出一个只有三行的空白页)。
-    // 取值:只读(归档单,打印态)时这三行 = 3×71px = 213px(doc 值域 .rsp-pre 有 60px 最小高),
-    // 留 220 兜住;行内文字再长会继续长高,超过 A4 余量就会溢到第二页(见探针的「长文本」对照)。
-    coverTailReserve: 220,
+    // 取值(2026-09-21 重测屏幕真实像素,探针 tools/archive/_probe-spec-docrow.cjs):
+    //   A4 高 1123px(794×297/210);页面第 0 页 = 封面画布(.rs-head-t)+ 章节块表格(.rs-t);
+    //   只读态章节块表格实测 **96px**(三行值 22px + td 上下 padding,块内行间 8px),编辑态同款 93px。
+    //   取 120 = 96 + 24 余量 ⇒ 封面 1003 + 章节 96 = 1099px,留 24px 给文字略长时的行高增长。
+    //   历史上这里写 220,因为只读值被 `.rsp-pre{min-height:60px}` 撑成 71px/行(3×71=213)—— 
+    //   那是误伤(规格书章节行是一句话,设计图整块只有 87px),已用
+    //   `.rsp-docval.rsp-pre{min-height:22px}` 拉回编辑态同高,预留随之从 220 收到 120;
+    //   封面画布因此多出 100px 高度,更接近设计画布本身的比例。
+    //   行内文字再长仍会继续长高,超过 A4 余量就会溢到第二页(见探针的「长文本」对照)。
+    coverTailReserve: 120,
     grid: [69, 207, 69, 166, 69, 69, 69, 76],
     head: { title: 5, infoLabel: 1, infoValue: 2 },
     sections: [
@@ -921,15 +1159,35 @@ export const recordSheetConfigs = {
           { label: '2.整体规格参数', key: '整体规格参数' },
           { label: '3.产品主要性能', key: '产品主要性能' },
         ]},
+
+      // ── 第 4 页《规格书细分.xlsx》「成品及包装运输」6 节(2026-09-18 照设计补全)──
+      // ⚠ **节的编号按设计原文**为 1..6(现实现原为 1 + 5/6/7/8,与设计不符,本轮改为照设计):
+      //   1.关键物料列表 / 2.炭棒处理要求 / 3.包装方式 / 4.出货检验报告 / 5.运输要求 / 6.存储环境。
+      // ⚠ 顺序:模板渲染次序是 **sections → dataTables**,而设计里 1.关键物料列表在最前
+      //   ⇒ 第 1 节必须留在 sections 里(靠 sections 先渲染把「1.」顶到表格之前);
+      //   它的表体由 dataTables 那条表渲染,紧随其下 ⇒ 呈现为「标题 → 表头 → 行」。
+      //   ⚠ 而**标题只能有一个来源**:曾让第 1 节的 bar 与表的 bar 同时存在 ⇒ 同一标题
+      //     渲染两遍(用户报「空余行重复了」)。故那条**表不带 bar**。
+      // ⚠ 表格为何能紧跟本标题:靠前端 isAtOrBeforeTableAnchor() 把章节拆成"表前/表后"两段渲染,
+      //   本节点**不需要**任何标记。曾在这里加过 tablesSlot,那是"克隆式"实现的遗迹,已废弃删除。
+      { page: 3, bar: '1.关键物料列表', doc: true, rows: [] },
+      { page: 3, bar: '2.炭棒处理要求', doc: true, rows: [
+          { label: '炭棒处理要求', key: '炭棒处理要求', area: true, max: 2000 },
+        ]},
+      { page: 3, bar: '3.包装方式', doc: true, rows: [
+          { label: '包装方式', key: '包装方式', area: true, max: 2000 },
+        ]},
+      { page: 3, bar: '4.出货检验报告', doc: true, rows: [
+          { label: '出货检验报告', key: '出货检验报告', area: true, max: 2000 },
+        ]},
+      { page: 3, bar: '5.运输要求', doc: true, rows: [
+          { label: '运输要求', key: '运输要求', area: true, max: 2000 },
+        ]},
+      { page: 3, bar: '6.存储环境', doc: true, rows: [
+          { label: '存储环境', key: '存储环境', area: true, max: 2000 },
+        ]},
     ],
-    // 第 4 页(成品及包装运输):5.关键物料列表(数据表)在上,6-8 章节行在下(tailDoc=数据表之后渲染)
-    tailDocSections: [
-      { page: 3, doc: true, rows: [
-        { label: '6.包装方式', key: '包装方式', area: true },
-        { label: '7.运输要求', key: '运输要求', area: true },
-        { label: '8.存储环境', key: '存储环境', area: true },
-      ]},
-    ],
+    // 第 4 页的章节已并入上面的 sections(page:3);原 tailDocSections 的 6/7/8 编号与设计不符,已移除
     dataTables: [
       { page: 1, pageTitle: '修订记录', filterKey: '表区', filterVal: '修订记录',
         design: { titleSize: 21, titleTop: 24, titleGap: 61, headerH: 44, rowH: 43, fontSize: 16 },
@@ -955,7 +1213,13 @@ export const recordSheetConfigs = {
           { key: '检验方法', label: '检验方法', w: 241, align: 'left', area: true },
           { key: '检验依据', label: '检验依据', w: 83, align: 'left', area: true },
         ]},
-      { page: 3, bar: '5.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
+      // 第 4 页 1.关键物料列表:表头照设计 B6 = 序号|物料编码|物料名称|规格参数|数量|备注。
+      // ⚠ **不要给这张表加 bar**:它的标题已由上面 page:3 那个 sections 块出(为了排在表格之前),
+      //    两者都有 = 同一标题渲染两遍(用户报「空余行重复了」)。
+      // materialPick = 设计 [E4]「由材料库引用：输入物料编号自动引入」的落地(编辑态出「从物料清单引用」按钮)。
+      // ⚠ filterKey/filterVal 保留:规格书全部明细共用一张 rd_spec_doc_detail,靠 [表区]='物料清单'
+      //    把物料行与修订记录/检验项目行分开;删掉会把整张明细当物料显示(踩过)。
+      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },
           { key: '物料编码', label: '物料编码' },
@@ -967,84 +1231,305 @@ export const recordSheetConfigs = {
     ],
     // 检验项目标准库(分组):SPEC_TEST_LIB 由 tools/gen/gen-spec-testlib.cjs 从《测试项目汇总.xlsx》生成
     testLib: SPEC_TEST_LIB,
-    // 7./8. 通用文案默认预填(《规格书示例》通行文本;新单草稿进入编辑且字段为空时带入)
+    // 第 4 页各节默认文案(照《规格书细分.xlsx》「成品及包装运输」原文;
+    // 新单草稿进入编辑且字段为空时带入,人工可改)
     sectionDefaults: {
+      '炭棒处理要求': '炭棒有无黑要求、有颗粒物处理要求；',
+      '包装方式': '（1）按照包装规范进行包装作业；\n（2）纸箱外层左上角黏贴白色标签，标签内容包括：采购单号、物料编号、生产批号、包装箱号等信息；',
+      '出货检验报告': '出货时附上产品出货检验报告',
       '运输要求': '产品在运输中应避免冲击、挤压、雨淋、受潮及化学品腐蚀。',
       '存储环境': '产品应贮存在通风良好、干燥的室内，不得与酸、碱及有腐蚀性的物品放置一起。',
     },
   },
 
-  // 出货检验计划表(出货检验项目控制计划):全页共用 10 列网格(与数据表同列)——
-  // 产品编号↔控制项目、客户名↔控制标准及要求、版本号↔检测频率/取样方式,上下总宽一致
+  // 出货检验项目控制计划(出货检验计划表)—— **一张表 7 列**(2026-09-20 按设计重排)
+  // 设计源:《产品开发\2.产品文件\3.检验计划表\出货检验项目控制计划.xlsx》(单 sheet,无页签)
+  //   报告头 r2-r4  公司名 + 右上角 编号 YJ-QR-88 + 居中大标题 + 右侧两格信息栏(表单管理人/密级)
+  //   表头块 r5-r7  三行三格;使用范围/版本号 在设计里落在 G/H 列,与 产品编号/产品功能类别 同行
+  //   表体   r8-r9  7 列:序号 | 检验项目 | 检验要求 | 检验方法 | 不合格应对措施 | 检查频率 | 备注
+  //   表尾   r10    跨 7 列的表尾注
+  // 结构改动(加 3 个表头列 + 2 处 alias)见 tools/migrate-insp-plan-redesign-2026-09-20.sql。
+  //
+  // ⚠ 版式三条硬约束(改 grid/sections/cols 时逐条核对,错一条整页错位):
+  //   ① grid 7 格 = 设计 B..H 的列宽(px ≈ w*7+5),总宽 1187;
+  //   ② head {title:5, infoLabel:1, infoValue:1} 合计 7 = grid 格数 ⇒ 大标题跨 B..F(=870,
+  //      与设计 B3:F4 的合并区同宽),信息栏落在 G/H 两列;
+  //   ③ sections 每行靠 lspan/vspan 拼满 7 格,表体因列带 w 而 dtOwnsWidth ⇒ dtW = 1187。
+  //      三处同宽,整页竖线才对得齐、打印左右缘才齐平。
+  //
+  // 【为什么没有 filterKey/filterVal】设计只有**一张表**,全部明细行都上纸。
+  //   ⚠ 千万别照抄组装工艺面板那边的 filterKey:'表区' —— 本面板连 [表区] 物理列都没有
+  //     (yj_field 里那条是 header 遗留),按它过滤只会得到一张空表。
+  //   检验类别(必测项/型式检验)改由 libGroupKey 承载,只用于标准库勾选时落分组,不上纸。
   RD_INSP_PLAN: {
     headMode: 'report',
-    docNoDefault: 'YJ-RD001',
-    titlePlaceholder: '伊可普碱性炭棒出货检验项目控制计划',
+    docNoDefault: 'YJ-QR-88',
+    titlePlaceholder: '出货检验项目控制计划',
+    // 信息栏 = 设计 G3:H4 两格。设计 G5:H7 的 使用范围/版本号 **不在这里** ——
+    // 它们在设计里与 产品编号/产品功能类别 同行,所以归 sections 的表头三行(见下)。
     info: [
-      { label: '标题', key: '标题', type: 'text' },
-      { label: '版本号', key: '版本号', type: 'text' },
+      { label: '表单管理人', key: '表单管理人', type: 'text' },
       { label: '密级', key: '密级', type: 'select' },
     ],
-    grid: [110, 130, 120, 320, 70, 270, 120, 110, 170, 110],
-    head: { title: 6, infoLabel: 2, infoValue: 2 },
+    grid: [144, 144, 144, 144, 294, 165, 152],
+    head: { title: 5, infoLabel: 1, infoValue: 1 },
+    // 表头三行照设计 r5/r6/r7 逐格对位(每行 3 对 = 7 格;产品编号/产品功能类别/编写人 的值格跨 C:D):
+    //   r5 [产品编号 | 客户项目名称 | 使用范围]
+    //   r6 [产品功能类别 | 产品整体尺寸 | 版本号]
+    //   r7 [编写人 | 审核人 | (版本号 的值格 rowspan:2 续占 G:H)]
+    // 两处 span 都是照设计来的,不是随手写的:
+    //   · 版本号 pair 带 rowspan:2 —— 设计 G6:H7 是**纵向合并**的一格(版本号占两行),
+    //     所以 r7 只有 4 格,右端两列由它续占。漏写 rowspan 会让 r7 缺格、缺右边框。
+    //   · 值格 vspan:2 —— 设计 C5:D5 / C6:D6 / C7:D7 都是横向两列合并。
+    // 其中 客户项目名称 / 产品功能类别 / 产品整体尺寸 三格设计标了「自动填充规格书」,
+    // 由选完产品编号后的 autoFillSpec 回填(见本块末尾)。
     sections: [
       { rows: [
         { pairs: [
           { label: '产品编号', key: '产品编号', type: 'text', vspan: 2 },
-          { label: '客户名', key: '客户名', type: 'text', vspan: 2 },
-          { label: '管理人', key: '管理人', type: 'text', lspan: 2, vspan: 2 },
+          { label: '客户项目名称', key: '客户项目名称', type: 'text' },
+          { label: '使用范围', key: '使用范围', type: 'text' },
         ]},
         { pairs: [
-          { label: '主要性能', key: '主要性能', type: 'text', vspan: 2 },
-          { label: '滤芯尺寸', key: '滤芯尺寸', type: 'text', vspan: 2 },
-          { label: '授权使用人', key: '授权使用人', type: 'text', lspan: 2, vspan: 2 },
+          { label: '产品功能类别', key: '产品功能类别', type: 'text', vspan: 2 },
+          { label: '产品整体尺寸', key: '产品整体尺寸', type: 'text' },
+          { label: '版本号', key: '版本号', type: 'text', rowspan: 2 },
+        ]},
+        { pairs: [
+          { label: '编写人', key: '编写人', type: 'text', vspan: 2 },
+          { label: '审核人', key: '审核人', type: 'text' },
+        ]},
+      ]},
+    ],
+    /**
+     * 「自动填充规格书」:设计里 8 个格标了这四个字 ——
+     *   表头 客户项目名称 / 产品功能类别 / 产品整体尺寸,表体 序号 / 检验项目 / 检验要求 / 检验方法。
+     * 语义是「**按产品编号引用之后,把对应规格书的数据自动填进来**」,落地在
+     * onProdRefConfirm() → 后端 GET /api/px/specByProduct?code=。
+     *   · fromKey  —— 触发字段(选完它才动手;本面板其它参照字段选完不该重灌整张表体);
+     *   · head     —— 表头格 ← 规格书表头列(to=本面板数据键,from=规格书数据键);
+     *   · detail   —— 表体列 ← 规格书「检验要求」行(to=本面板数据键,from=规格书数据键);
+     *   · defaults —— 规格书里没有的口径列,落行时带出的默认文案(设计 r9 模板行原文,可改)。
+     * ⚠ 产品功能类别 取值源是规格书的 产品类别(不是 RD_PROD_INFO.产品功能类别)——
+     *   设计那一格标的是「自动填充规格书」,取值源就只有规格书一处。
+     */
+    autoFillSpec: {
+      fromKey: '产品编号',
+      head: [
+        { to: '客户项目名称', from: '客户项目名称' },
+        { to: '产品功能类别', from: '产品类别' },
+        { to: '产品整体尺寸', from: '整体规格参数' },
+      ],
+      detail: [
+        { to: '序号', from: '序号' },
+        { to: '控制项目', from: '检验项目' },
+        { to: '控制标准及要求', from: '检验要求' },
+        { to: '控制方法', from: '检验方法' },
+      ],
+      defaults: {
+        // 设计 F9 模板行的三段应对措施(与标准库各条目的 measure 同文)
+        不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性',
+      },
+    },
+    dataTables: [
+      // ⚠ bar 是**必需**的:设计上没有这一条,但「⧉ 从标准库勾选」按钮只长在 bar 行里
+      //   (模板 `v-if="dt.bar && !dt.pageTitle"`)—— 去掉 bar 等于砍掉本面板的标准库入口。
+      //   文案取中性的「检验项目」,不假装是设计里的某个分节标题。
+      // lib 必须是**数组**:openLib 用 `Array.isArray(dt.lib)` 判是否走扁平 insp.plan 库 ——
+      //   写成 true 会被当成 spec.test 分组库,弹窗形态整个不对。
+      // 下面这份是「库里一条都没有」(未跑种子)时的内置兜底展示,**不是真源**;
+      // 有 yj_std_lib 数据时一律以库为准(真源,可在弹窗里编辑/停用/恢复)。
+      { bar: '检验项目', libGroupKey: '检验类别', lib: [
+        // 每行都带 检验类别 = 该条目在 yj_std_lib 里的 item_code。单表形态没有 filterVal 可推分组,
+        // confirmLib 勾选落明细时靠这一格把 必测项/型式检验 带回明细行(row['检验类别'])。
+        // ── 内置兜底 A:必测项 ──
+        { 检验类别: '必测项', 控制项目: '*外观', 质量控制内容: '外观', 检测仪器: '目视', 控制标准及要求: '清洁、无破损无压痕，无裂纹,无倾斜等缺陷；切面平整无锯齿纹路，无明显缺角；切面无残留炭渣', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '生产量*1%', 检验内容: '检验炭棒外观是否符合要求', 控制方法: '常规抽检' },
+        { 检验类别: '必测项', 控制项目: '*整体尺寸(外包无纺布)', 质量控制内容: '尺寸', 检测仪器: '游标卡尺', 控制标准及要求: '外径：46±0.5mm\n内径：9.5±0.5mm\n长度：23±0.5mm', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '生产量*1%', 检验内容: '检验整体尺寸是否符合要求', 控制方法: '常规抽检' },
+        { 检验类别: '必测项', 控制项目: '*出货重量', 质量控制内容: '炭棒重量', 检测仪器: '电子秤', 控制标准及要求: '>22g', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '生产量*1%', 检验内容: '检验炭棒出货重量是否符合要求', 控制方法: '常规抽检' },
+        { 检验类别: '必测项', 控制项目: '*抗压强度（裸棒）', 质量控制内容: '强度', 检测仪器: '普研PY-880', 控制标准及要求: '将炭棒水平放置在水平面板上，设置下压速度5mm/min，按测试键，仪器自动下压，断裂后读取压断时最大力压力值。\n控制标准：>50kgf', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒抗压强度是否符合要求', 控制方法: '常规抽检' },
+        { 检验类别: '必测项', 控制项目: '*压降测试', 质量控制内容: '压降', 检测仪器: '数显压力表', 控制标准及要求: '将炭棒组装好装入滤瓶（可旋盖大T），滤瓶进出水用2分管直接连接，测试流速0.24L/min，滤前前后接装压力表，压力表距离滤芯接口位置长度50mm，通水10min后记录压差值（滤芯前压-后压）。\n控制标准：≤25kpa', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒压降是否符合要求', 控制方法: '常规抽检' },
+        { 检验类别: '必测项', 控制项目: '*黑水及颗粒物测试（无黑后）', 质量控制内容: '黑水测试', 检测仪器: '烧杯，哈希2100q', 控制标准及要求: '将炭棒组装好装入滤瓶（透明大T），按进水方向通水，测试流速0.24±0.05L/min\n1.用烧杯接第一杯水250ml，观察出水及测试浊度值；\n2.冲水5min后，浸泡24H，陶瓷杯接出水100ml，观察出水情况及测试浊度值；\n控制标准：1.初始：轻微黑水，浊度≤20NTU\n2.浸泡24H：无肉眼可见黑水，浊度≤3NTU', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒黑水测试是否符合要求', 控制方法: '常规抽检' },
+        { 检验类别: '必测项', 控制项目: '*黑水及颗粒物测试（无黑后）', 质量控制内容: '浸泡颗粒物', 检测仪器: '烧杯', 控制标准及要求: '将炭棒组装好装入滤瓶（可旋盖大T），按进水方向通水，测试流速0.24±0.05L/min，\n完成黑水测试后，炭棒静置浸泡24H，用陶瓷杯接出水100ml，正常照明下，用肉眼观察杯底部颗粒物，颗粒物≤4颗\n控制标准：浸泡4H颗粒物≤4颗', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒浸泡颗粒物是否符合要求', 控制方法: '常规抽检' },
+        // ── 内置兜底 B:型式检验(分组名与 yj_std_lib 的 item_code 同源) ──
+        { 检验类别: '型式检验', 控制项目: '*碱性性能测试', 质量控制内容: '*初始PH增加值测试', 检测仪器: 'PH计', 控制标准及要求: '将炭棒组装好装入伊可普工装，按进水方向通RO纯水（水效水500+RO机），测试流速0.24L/min,冲水5min后，浸泡30min后，测试出水PH，接水量为500ml。\n控制标准：初始PH增加值＞3.0', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒初始PH增加值测试是否符合要求', 控制方法: '常规抽检' },
+        { 检验类别: '型式检验', 控制项目: '*碱性性能测试', 质量控制内容: '*浸泡24H口感测试', 检测仪器: 'PH计、TDS笔', 控制标准及要求: '将炭棒组装好装入伊可普工装，按进水方向通RO纯水（水效水500+RO机），测试流速0.24L/min,冲水5min后，浸泡24H后，接出水（连续接五杯，接水量为100ml）及原水，测试口感、PH、TDS\n控制标准：1.五杯口感均无异常\n2.第一杯TDS增加值小于150\n3.第一杯出水PH增加值＞4.0', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验浸泡24H口感测试是否符合要求', 控制方法: '常规抽检' },
+        { 检验类别: '型式检验', 控制项目: '*碱性性能测试', 质量控制内容: '碱性寿命', 检测仪器: 'PH计', 控制标准及要求: '将炭棒组装好装入伊可普工装，全程RO纯水（水效水500+RO机）加标测试控制水温25±3℃、流速0.24L/min，在额定净水0%、25%、50%、75%、100%，浸泡30min后取炭棒滤后水进行测试记录节点流速及炭棒出水PH（寿命1000L，每天冲水约145L，测试周期约为7天）。寿命1000L，PH增加值≥0.5', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '型式检验半年一次', 取样方式: '', 检验内容: '检验炭棒碱性寿命测试是否符合要求', 控制方法: '型式检测报告' },
+        { 检验类别: '型式检验', 控制项目: '余氯性能测试', 质量控制内容: '*余氯初始去除率', 检测仪器: '哈希DR3900', 控制标准及要求: '将炭棒组装好装入单筒，滤瓶进出水用2分直接连接，水流方向外进内出，测试流速0.24L/min，采用次氯酸钠原液（有效氯≥10％）稀释后进行余氯去除率的加标试验，余氯浓度控制在2.0±0.2mg/L，，通入加标水5min后取样测试，计算去除率。\n控制标准：余氯初始去除率≥99%', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验初始余氯去除率是否符合要求', 控制方法: '常规抽检' },
+        { 检验类别: '型式检验', 控制项目: '余氯性能测试', 质量控制内容: '余氯寿命测试', 检测仪器: '哈希DR3900', 控制标准及要求: '将炭棒组装好装入单筒，滤瓶进出水用2分直接连接，水流方向外进内出，测试流速0.24L/min，采用次氯酸钠原液（有效氯≥10％）稀释后进行余氯去除率的加标试验，余氯浓度控制在2.0±0.2mg/L，在额定净水0%、25%、50%、75%、100%进行取样测试。全程加标，寿命1000L， 去除率≥90%', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '型式检验半年一次', 取样方式: '', 检验内容: '检验炭棒余氯寿命测试是否符合要求', 控制方法: '型式检测报告' },
+        { 检验类别: '型式检验', 控制项目: '卫生浸泡', 质量控制内容: '/', 检测仪器: '/', 控制标准及要求: '符合《生活饮用水输配水设备及防护材料卫生安全评价规范》', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '型式检验半年一次', 取样方式: '', 检验内容: '检验炭棒浸泡安全是否符合要求', 控制方法: '型式检测报告' },
+      ], cols: [
+        // 7 个展示列 = 设计 r8 的 B..H,列宽照抄设计列宽(grid 的 7 格同值 ⇒ 上下竖线对齐)。
+        // label 写**设计原文**,key 写**该字段当前的 yj_field.label**(数据键)—— 与本文件既有口径一致。
+        // 四列的设计原名实际由 yj_field.alias 提供(effColLabel 优先取 alias),这里的 label
+        // 只是 fieldMap 里查不到时的兜底,顺带让配置读起来就是纸面样子。
+        { key: '序号', label: '序 号', w: 144, align: 'center' },
+        { key: '控制项目', label: '检验项目', w: 144 },
+        { key: '控制标准及要求', label: '检验要求', w: 144, area: true },
+        { key: '控制方法', label: '检验方法', w: 144, area: true },
+        { key: '不合格应对措施', label: '不合格应对措施', w: 294, area: true },
+        { key: '检测频率', label: '检查频率', w: 165 },
+        { key: '备注', label: '备注', w: 152 },
+        // 6 个不上纸的列:hiddenCol 只管**渲染**(值照常逐格往返 —— 保存链路按 yj_field 走,与 cols 无关)。
+        // 上面 5 个非序号列 + 这 6 列正好是标准库 insp.plan 的规范字段(toCanonical/toInspRow 一一对应),
+        // 藏的是**列**不是数据;删掉它们等于断掉标准库往返。
+        // ⚠ 老配置里那条 { key: '表区' } 是**幽灵列**:rd_insp_plan_detail 根本没有 [表区] 物理列,
+        //   本轮一并删掉(这也正是本面板绝不能用 filterKey:'表区' 的原因)。
+        { key: '检验类别', label: '检验类别', hiddenCol: true },
+        { key: '质量控制内容', label: '质量控制内容', hiddenCol: true },
+        { key: '检测仪器', label: '检测仪器、工具', hiddenCol: true },
+        { key: '检验', label: '检验', hiddenCol: true },
+        { key: '取样方式', label: '取样方式', hiddenCol: true },
+        { key: '检验内容', label: '检验内容', hiddenCol: true },
+      ],
+      // 表尾注(设计 r10 的 B10:H10):totalSpan(dt) = 可见列数 = 7 ⇒ 自动跨满七列
+      footerNote: '若规格书有变动提示管控文件需更新' },
+    ],
+  },
+
+  /**
+   * 产品变更申请单(2026-09-21 新增)—— 版式照《副本变更模板(1).xlsx》sheet「KPC变更申请通知单」
+   * (YJ-QR-130,走查产物 tools/archive/_walk/src-change-KPC变更申请通知单.txt):
+   *   大标题「KPC管控点申请单」/ 一、基础信息 / 二、变更·新增申请事由 / 三、部门评审意见(7 行)
+   *   / 三.相关变更 / 四、库存产品处理方式(原料·半成品·成品 各 数量+处理方式)/ 批准。
+   * 列网格 = 纸面 B..G 实测列宽(175/324/698/232/332/202,合计 1963),上下竖线自然对齐。
+   * 报告头不带信息块(纸面右侧没有密级/适用范围那四格 ⇒ info: [])。
+   *
+   * 与其它文书面板的三处不同,都是**用户口径**决定的:
+   *   ① 部门评审意见的 7 行是**库里预置的行**(建单时后端 ensureChangeDeptRows 铺好),
+   *      故该表 fixedRows=true —— 不出 ＋/× 也不出底部"新增数据记录行";
+   *      lockKey/lockCols 配合 props.myDeptRows 做**行级只读**:不是本部门的行整行置灰不可编
+   *      (服务端 ButtonService.gateChangeDetail 另有强制还原,界面只是先说清楚);
+   *   ② 性质 / 变更文件 用 type:'checks' 复选格(存储是顿号分隔文本,不是新字段类型);
+   *   ③ 签字/日期 由服务端盖章(填了「变更后内容」才盖),界面上同样只读。
+   */
+  RD_CHANGE: {
+    headMode: 'report',
+    // 纸面大标题是**印死的表单名**(YJ-QR-130 的 B2),不是每张单各写各的 ⇒ 用 staticTitle
+    // (titlePlaceholder 只在没有 staticTitle 时当输入框灰字占位,不落纸)
+    staticTitle: 'KPC管控点申请单',
+    titlePlaceholder: 'KPC管控点申请单',
+    grid: [175, 324, 698, 232, 332, 202],
+    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    info: [],   // 纸面报告头只有公司名 + 编号 + 大标题,没有右侧信息块
+    sections: [
+      { bar: '一、基础信息', rows: [
+        { grid: [
+          { label: '文件编码' },
+          { fixed: 'YJ-QR-130' },
+          { label: '申请日期' },
+          { key: '申请日期', span: 3 },
+        ]},
+        { grid: [
+          { label: '申请部门' },
+          { key: '申请部门', span: 2 },
+          { label: '性质' },
+          { key: '性质', type: 'checks', single: true, options: ['变更', '新增'], span: 2 },
+        ]},
+        { grid: [
+          { label: '产品编码' },
+          { key: '产品编号', span: 2 },
+          { label: '申请人' },
+          { key: '申请人', span: 2 },
+        ]},
+        { grid: [
+          { label: '产品名称' },
+          { key: '产品名称', span: 2 },
+          { label: '单据编号' },
+          { key: '单据编号', span: 2 },
+        ]},
+        // 会签(用户口径第④条):需会签=是 时「提交会签」把会签人点亮;会签人写账号,多人用逗号/顿号分隔
+        { grid: [
+          { label: '需会签' },
+          { key: '需会签', type: 'checks', single: true, options: ['是', '否'] },
+          { label: '会签人' },
+          { key: '会签人', span: 3, ph: '多人用逗号分隔（账号）' },
+        ]},
+      ]},
+      { bar: '二、变更/新增申请事由', rows: [
+        { grid: [
+          { label: '变更事由' },
+          { key: '变更事由', span: 5, area: true, ph: '本次要改什么、为什么改' },
+        ]},
+        { grid: [
+          { label: '验证数据' },
+          { key: '验证数据', span: 5, area: true, ph: '支持本次变更的验证数据/试验结论' },
+        ]},
+        // 四个受控文件的勾选(用户口径第②条):勾哪些,生效时就按哪些建下一版草稿
+        { grid: [
+          { label: '变更文件' },
+          { key: '变更文件', type: 'checks', span: 5,
+            options: ['成型工艺清单', '组装工艺清单', '规格书', '出货检验计划表'] },
         ]},
       ]},
     ],
     dataTables: [
-      { bar: '必测项', filterKey: '检验类别', filterVal: '必测项', lib: [
-        { 控制项目: '*外观', 质量控制内容: '外观', 检测仪器: '目视', 控制标准及要求: '清洁、无破损无压痕，无裂纹,无倾斜等缺陷；切面平整无锯齿纹路，无明显缺角；切面无残留炭渣', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '生产量*1%', 检验内容: '检验炭棒外观是否符合要求', 控制方法: '常规抽检' },
-        { 控制项目: '*整体尺寸(外包无纺布)', 质量控制内容: '尺寸', 检测仪器: '游标卡尺', 控制标准及要求: '外径：46±0.5mm\n内径：9.5±0.5mm\n长度：23±0.5mm', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '生产量*1%', 检验内容: '检验整体尺寸是否符合要求', 控制方法: '常规抽检' },
-        { 控制项目: '*出货重量', 质量控制内容: '炭棒重量', 检测仪器: '电子秤', 控制标准及要求: '>22g', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '生产量*1%', 检验内容: '检验炭棒出货重量是否符合要求', 控制方法: '常规抽检' },
-        { 控制项目: '*抗压强度（裸棒）', 质量控制内容: '强度', 检测仪器: '普研PY-880', 控制标准及要求: '将炭棒水平放置在水平面板上，设置下压速度5mm/min，按测试键，仪器自动下压，断裂后读取压断时最大力压力值。\n控制标准：>50kgf', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒抗压强度是否符合要求', 控制方法: '常规抽检' },
-        { 控制项目: '*压降测试', 质量控制内容: '压降', 检测仪器: '数显压力表', 控制标准及要求: '将炭棒组装好装入滤瓶（可旋盖大T），滤瓶进出水用2分管直接连接，测试流速0.24L/min，滤前前后接装压力表，压力表距离滤芯接口位置长度50mm，通水10min后记录压差值（滤芯前压-后压）。\n控制标准：≤25kpa', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒压降是否符合要求', 控制方法: '常规抽检' },
-        { 控制项目: '*黑水及颗粒物测试（无黑后）', 质量控制内容: '黑水测试', 检测仪器: '烧杯，哈希2100q', 控制标准及要求: '将炭棒组装好装入滤瓶（透明大T），按进水方向通水，测试流速0.24±0.05L/min\n1.用烧杯接第一杯水250ml，观察出水及测试浊度值；\n2.冲水5min后，浸泡24H，陶瓷杯接出水100ml，观察出水情况及测试浊度值；\n控制标准：1.初始：轻微黑水，浊度≤20NTU\n2.浸泡24H：无肉眼可见黑水，浊度≤3NTU', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒黑水测试是否符合要求', 控制方法: '常规抽检' },
-        { 控制项目: '*黑水及颗粒物测试（无黑后）', 质量控制内容: '浸泡颗粒物', 检测仪器: '烧杯', 控制标准及要求: '将炭棒组装好装入滤瓶（可旋盖大T），按进水方向通水，测试流速0.24±0.05L/min，\n完成黑水测试后，炭棒静置浸泡24H，用陶瓷杯接出水100ml，正常照明下，用肉眼观察杯底部颗粒物，颗粒物≤4颗\n控制标准：浸泡4H颗粒物≤4颗', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒浸泡颗粒物是否符合要求', 控制方法: '常规抽检' },
-      ], cols: [
+      { page: 0, bar: '三、部门评审意见', fixedRows: true, lockKey: '部门', lockCols: ['变更后内容', '备注'],
+        filterKey: '表区', filterVal: '部门评审意见',
+        cols: [
           { key: '表区', label: '表区', hiddenCol: true },
-          { key: '检验类别', label: '检验类别', hiddenCol: true },
-          { key: '控制项目', label: '控制项目' },
-          { key: '质量控制内容', label: '质量控制内容' },
-          { key: '检测仪器', label: '检测仪器、工具' },
-          { key: '控制标准及要求', label: '控制标准及要求', area: true },
-          { key: '检验', label: '检验' },
-          { key: '不合格应对措施', label: '不合格应对措施', area: true },
-          { key: '检测频率', label: '检测频率' },
-          { key: '取样方式', label: '取样方式' },
-          { key: '检验内容', label: '检验内容' },
-          { key: '控制方法', label: '控制方法' },
+          { key: '部门', label: '部门', w: 175 },
+          { key: '变更后内容', label: '变更/新增申请内容', w: 1022, area: true },
+          { key: '签字', label: '签字', w: 232 },
+          { key: '日期', label: '日期', w: 534 },
         ]},
-      { bar: '型式检验或者必测项', filterKey: '检验类别', filterVal: '型式检验', lib: [
-        { 控制项目: '*碱性性能测试', 质量控制内容: '*初始PH增加值测试', 检测仪器: 'PH计', 控制标准及要求: '将炭棒组装好装入伊可普工装，按进水方向通RO纯水（水效水500+RO机），测试流速0.24L/min,冲水5min后，浸泡30min后，测试出水PH，接水量为500ml。\n控制标准：初始PH增加值＞3.0', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验炭棒初始PH增加值测试是否符合要求', 控制方法: '常规抽检' },
-        { 控制项目: '*碱性性能测试', 质量控制内容: '*浸泡24H口感测试', 检测仪器: 'PH计、TDS笔', 控制标准及要求: '将炭棒组装好装入伊可普工装，按进水方向通RO纯水（水效水500+RO机），测试流速0.24L/min,冲水5min后，浸泡24H后，接出水（连续接五杯，接水量为100ml）及原水，测试口感、PH、TDS\n控制标准：1.五杯口感均无异常\n2.第一杯TDS增加值小于150\n3.第一杯出水PH增加值＞4.0', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验浸泡24H口感测试是否符合要求', 控制方法: '常规抽检' },
-        { 控制项目: '*碱性性能测试', 质量控制内容: '碱性寿命', 检测仪器: 'PH计', 控制标准及要求: '将炭棒组装好装入伊可普工装，全程RO纯水（水效水500+RO机）加标测试控制水温25±3℃、流速0.24L/min，在额定净水0%、25%、50%、75%、100%，浸泡30min后取炭棒滤后水进行测试记录节点流速及炭棒出水PH（寿命1000L，每天冲水约145L，测试周期约为7天）。寿命1000L，PH增加值≥0.5', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '型式检验半年一次', 取样方式: '', 检验内容: '检验炭棒碱性寿命测试是否符合要求', 控制方法: '型式检测报告' },
-        { 控制项目: '余氯性能测试', 质量控制内容: '*余氯初始去除率', 检测仪器: '哈希DR3900', 控制标准及要求: '将炭棒组装好装入单筒，滤瓶进出水用2分直接连接，水流方向外进内出，测试流速0.24L/min，采用次氯酸钠原液（有效氯≥10％）稀释后进行余氯去除率的加标试验，余氯浓度控制在2.0±0.2mg/L，，通入加标水5min后取样测试，计算去除率。\n控制标准：余氯初始去除率≥99%', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '每批次', 取样方式: '1PCS/一个生产批次', 检验内容: '检验初始余氯去除率是否符合要求', 控制方法: '常规抽检' },
-        { 控制项目: '余氯性能测试', 质量控制内容: '余氯寿命测试', 检测仪器: '哈希DR3900', 控制标准及要求: '将炭棒组装好装入单筒，滤瓶进出水用2分直接连接，水流方向外进内出，测试流速0.24L/min，采用次氯酸钠原液（有效氯≥10％）稀释后进行余氯去除率的加标试验，余氯浓度控制在2.0±0.2mg/L，在额定净水0%、25%、50%、75%、100%进行取样测试。全程加标，寿命1000L， 去除率≥90%', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '型式检验半年一次', 取样方式: '', 检验内容: '检验炭棒余氯寿命测试是否符合要求', 控制方法: '型式检测报告' },
-        { 控制项目: '卫生浸泡', 质量控制内容: '/', 检测仪器: '/', 控制标准及要求: '符合《生活饮用水输配水设备及防护材料卫生安全评价规范》', 检验: 'IQC', 不合格应对措施: '1. 暂停该批次继续生产，隔离已生产不合格品，防止流入下工序\n2. 复核检验方法、量具、标准，确认是否误判\n3. 扩大抽检比例，判定问题是偶发还是批量性', 检测频率: '型式检验半年一次', 取样方式: '', 检验内容: '检验炭棒浸泡安全是否符合要求', 控制方法: '型式检测报告' },
-      ], cols: [
-          { key: '表区', label: '表区', hiddenCol: true },
-          { key: '检验类别', label: '检验类别', hiddenCol: true },
-          { key: '控制项目', label: '控制项目' },
-          { key: '质量控制内容', label: '质量控制内容' },
-          { key: '检测仪器', label: '检测仪器、工具' },
-          { key: '控制标准及要求', label: '控制标准及要求', area: true },
-          { key: '检验', label: '检验' },
-          { key: '不合格应对措施', label: '不合格应对措施', area: true },
-          { key: '检测频率', label: '检测频率' },
-          { key: '取样方式', label: '取样方式' },
-          { key: '检验内容', label: '检验内容' },
-          { key: '控制方法', label: '控制方法' },
+    ],
+    tailSections: [
+      { page: 0, bar: '三.相关变更', rows: [
+        { grid: [
+          { label: '相关变更' },
+          { key: '相关变更', span: 5, area: true, ph: '与哪些文件/工序/在制品相关联' },
         ]},
+      ]},
+      { page: 0, bar: '四、库存产品处理方式', rows: [
+        { grid: [
+          { label: '原料' },
+          { label: '数量' },
+          { key: '原料数量' },
+          { label: '处理方式' },
+          { key: '原料处理方式', type: 'select', span: 2 },
+        ]},
+        { grid: [
+          { label: '半成品' },
+          { label: '数量' },
+          { key: '半成品数量' },
+          { label: '处理方式' },
+          { key: '半成品处理方式', type: 'select', span: 2 },
+        ]},
+        { grid: [
+          { label: '成品' },
+          { label: '数量' },
+          { key: '成品数量' },
+          { label: '处理方式' },
+          { key: '成品处理方式', type: 'select', span: 2 },
+        ]},
+      ]},
+      { page: 0, bar: '五、其它', rows: [
+        { grid: [
+          { label: '文件管理人' },
+          { key: '文件管理人', span: 2 },
+          { label: '密级' },
+          { key: '密级', type: 'select', span: 2 },
+        ]},
+        { grid: [
+          { label: '文件使用范围' },
+          { key: '文件使用范围', type: 'select', span: 2 },
+          { label: '备注' },
+          { key: '备注', span: 2 },
+        ]},
+      ]},
+      // 批准行:纸面 B24:C24=批准 + D24:G24 签字区(留白手签)
+      { page: 0, bar: '批准', rows: [
+        { grid: [
+          { label: '批准', span: 2 },
+          { label: '签字', span: 2 },
+          { label: '日期', span: 2 },
+        ]},
+        { grid: [
+          { span: 2 },
+          { span: 2 },
+          { span: 2 },
+        ]},
+      ]},
     ],
   },
 }

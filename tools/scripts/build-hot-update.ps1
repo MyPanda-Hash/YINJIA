@@ -1,5 +1,6 @@
-# build-hot-update.ps1 - YINJIA-MES hot update build (run on dev machine)
-# Usage: powershell -File C:\INCER\YINJIA-MES\tools\build-hot-update.ps1
+﻿# build-hot-update.ps1 - YINJIA-MES hot update build (run on dev machine)
+# Usage: powershell -File C:\INCER\YINJIA-MES\tools\scripts\build-hot-update.ps1
+# Prereq: JDK 25 (JAVA_HOME or one of the standard install dirs; see the JDK detection below)
 # Output: C:\INCER\YINJIA-MES\deploy\app.jar -> copy to server C:\yinjia\update\ then run update.bat
 
 $ErrorActionPreference = 'Stop'
@@ -14,8 +15,22 @@ $backend  = "$root\backend"
 $static   = "$backend\src\main\resources\static"
 $jar      = "$backend\target\app.jar"
 $deploy   = "$root\deploy"
-$javac    = 'C:\Program Files\Java\jdk-24\bin\javac.exe'
-$jarTool  = 'C:\Program Files\Java\jdk-24\bin\jar.exe'
+
+# JDK 探测(与 build-appjar.ps1 / 各 .bat 同一模式):JAVA_HOME → 常见安装目录 → 明确报错。
+# 2026-09-22:原先三处硬编码 'C:\Program Files\Java\jdk-24\bin\…',本机 JDK 已是 25,
+# 硬编码在换版本后必挂;改为探测并统一从 JAVA_HOME 取(javac/jar/java 三个都要)。
+if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME\bin\javac.exe")) {
+    foreach ($cand in @('C:\Program Files\Java\jdk-25', 'D:\Program Files\Java\jdk-25', "$env:USERPROFILE\.jdk\jdk-25\jdk-25.0.2")) {
+        if (Test-Path "$cand\bin\javac.exe") { $env:JAVA_HOME = $cand; break }
+    }
+}
+if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME\bin\javac.exe")) {
+    throw "未找到 JDK 25:请设 JAVA_HOME 指向 JDK 25(候选:C:\Program Files\Java\jdk-25 / $env:USERPROFILE\.jdk\jdk-25\jdk-25.0.2)"
+}
+$javac   = "$env:JAVA_HOME\bin\javac.exe"
+$jarTool = "$env:JAVA_HOME\bin\jar.exe"
+$javaExe = "$env:JAVA_HOME\bin\java.exe"
+Write-Host "JDK: $env:JAVA_HOME" -ForegroundColor DarkGray
 
 Write-Host '=== 1/5 Frontend build ===' -ForegroundColor Cyan
 Push-Location $frontend
@@ -40,7 +55,7 @@ if (-not (Test-Path "$inspect\BOOT-INF\lib")) {
 }
 $srcJava = "$backend\src\main\java\com\yinjia\mes"
 $javaFiles = Get-ChildItem $srcJava -Recurse -Filter '*.java' | ForEach-Object { $_.FullName }
-& $javac --release 17 -parameters -encoding UTF-8 -cp "$inspect\BOOT-INF\classes;$inspect\BOOT-INF\lib\*" -d "$inspect\BOOT-INF\classes" @javaFiles
+& $javac --release 25 -parameters -encoding UTF-8 -cp "$inspect\BOOT-INF\classes;$inspect\BOOT-INF\lib\*" -d "$inspect\BOOT-INF\classes" @javaFiles
 if ($LASTEXITCODE -ne 0) { throw "Backend compile failed" }
 
 Write-Host '=== 3/5 Sync dist to static ===' -ForegroundColor Cyan
@@ -69,7 +84,7 @@ $size = [math]::Round((Get-Item "$deploy\app.jar").Length / 1MB, 1)
 Write-Host "  OK: $deploy\app.jar ($size MB)" -ForegroundColor Green
 
 # Restart local dev server
-Start-Process -FilePath 'C:\Program Files\Java\jdk-24\bin\java.exe' -ArgumentList '-jar', $jar -WorkingDirectory $backend -WindowStyle Hidden
+Start-Process -FilePath $javaExe -ArgumentList '-jar', $jar -WorkingDirectory $backend -WindowStyle Hidden
 Write-Host ''
 Write-Host '===== HOT UPDATE PACKAGE READY =====' -ForegroundColor Yellow
 Write-Host "Next: copy $deploy\app.jar to server C:\yinjia\update\ then run update.bat"

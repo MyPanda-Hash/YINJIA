@@ -65,17 +65,35 @@ public class PanelPermissionService {
         m.put("撤回修改申请", new String[]{"modify", "audit"});
         m.put("撤回终止申请", new String[]{"modify", "audit"});
         // 审批类(audit → can_approve,与 ButtonService.requireApprover 同口径)
+        // 「项目定级」= 立项申请审核通过后由审核人给项目定级(2026-09-21),同属审批权动作
         for (String b : new String[]{"审核", "弃审", "提交审批", "审批通过", "审批驳回", "中止", "取消中止",
+                "项目定级",
                 "删除审批通过", "删除审批驳回", "修改审批通过", "修改审批驳回"})
             m.put(b, new String[]{"audit"});
         BUTTON_PERMS = Map.copyOf(m);
     }
 
+    /**
+     * 面板级按钮权限覆盖(默认表之外的口径;管理员恒过)。键 = 「面板编码|按钮名」。
+     * 2026-09-21 产品变更申请单:它**不是**文书归档面板(保存不自动送审),所以「提交审批」必须
+     * 由**发起人**自己点 —— 而全局表把「提交审批」归到 audit(普通用户没有该词,cp 实测 403),
+     * 故本面板改判 add/modify(真正的身份门禁在 ButtonService.requireChangeInitiator:
+     * 只有制单人 ∪ 管理员能提交/撤回,别人即使有编辑权也点不动)。
+     * 会签类按钮同理:会签人是被指定的普通人(按账号指定即授权),身份校验在方法内。
+     */
+    private static final Map<String, String[]> BUTTON_PERMS_OVERRIDE = Map.of(
+            "RD_CHANGE|提交审批", new String[]{"add", "modify"},
+            "RD_CHANGE|提交会签", new String[]{"add", "modify"},
+            "RD_CHANGE|撤回会签", new String[]{"add", "modify", "audit"},
+            "RD_CHANGE|会签通过", new String[]{"view"},
+            "RD_CHANGE|会签驳回", new String[]{"view"});
+
     /** 按钮权限校验:未映射的按钮放行(由 ButtonService「未定义按钮规则」兜底拦截) */
     public void requireButton(String panelCode, String buttonName) {
         String user = currentUserName();
         if (isAdmin(user)) return;
-        String[] need = BUTTON_PERMS.get(buttonName == null ? "" : buttonName);
+        String[] need = BUTTON_PERMS_OVERRIDE.get(panelCode + "|" + buttonName);
+        if (need == null) need = BUTTON_PERMS.get(buttonName == null ? "" : buttonName);
         if (need == null) return;
         Set<String> perms = permsOf(user).getOrDefault(panelCode, Set.of());
         for (String n : need) if (perms.contains(n)) return;
@@ -87,12 +105,48 @@ public class PanelPermissionService {
         throw new AccessDeniedException("当前角色无该面板「" + labels + "」权限，无法执行「" + buttonName + "」");
     }
 
-    /** 面板查看权限校验(数据读取类接口:列表/单据/审批历史/报表导出) */
-    public void requirePanelView(String panelCode) {
+    /**
+     * 二级审批例外(2026-09-20 两级审批):产品信息表的「审批通过/审批驳回」在**二级节点**上
+     * 由一级审核人选定的审核人执行 —— 选取本身就是授权,不要求其角色有 audit 词
+     * (否则 cp 这类普通账号点不动第二级,而给它 audit 又会让它越权批一级)。
+     * 判据完全落库:yj_doc_status.pending='Y' + approve_node=2 + l2_approver=当前用户。
+     */
+    public boolean isL2ApproverOf(String panelCode, String targetPanel, String buttonName, Map<String, Object> formData) {
+        if (!panelCode.equals(targetPanel)) return false;
+        if (!"审批通过".equals(buttonName) && !"审批驳回".equals(buttonName)) return false;
+        String no = formData == null || formData.get("编号") == null ? "" : String.valueOf(formData.get("编号")).trim();
+        if (no.isEmpty()) return false;
+        String user = currentUserName();
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM yj_doc_status WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'"
+                        + " AND approve_node = 2 AND l2_approver = ?", Integer.class, panelCode, no, user);
+        return n != null && n > 0;
+    }
+
+    /** 面板查看权限校验(数据读取类接口:列表/单据/审批历史/报表导出) */    public void requirePanelView(String panelCode) {
         String user = currentUserName();
         if (isAdmin(user)) return;
         if (readablePanels(user).contains(panelCode)) return;
         throw new AccessDeniedException("当前角色无该面板的查看权限：" + panelCode);
+    }
+
+    /**
+     * 面板**读取**权限校验(元数据/配置/个人表格偏好这类入口,2026-09-22 补):
+     * 放行集合与 requirePanelView 相同(readablePanels = 可见 ∪ 参照目标 ∪ 同模块),
+     * 但**语义分家** —— 前端对"参照面板"也要取配置(business/engine.js 的 refPanel 分支)、
+     * 选单目标面板也要取配置(该流程本身已按 view 校验),若这里硬按 view 拦会打断合法参照链。
+     *
+     * 起因:`GET /px/getPanelConfig` / `getPermMatrix` / `getNewFormPermMatrix` /
+     * `saveColumnPrefs` / `saveHeaderPrefs` 此前**完全无闸门** —— 任何登录用户拿 token 就能
+     * 取到任意面板的字段结构(与字段级 ref_panel/字典绑定关系),或往任意面板写自己那份表格偏好。
+     * 拿不到业务数据,但属于不该开放的面板元数据面。
+     */
+    public void requirePanelRead(String panelCode) {
+        String user = currentUserName();
+        if (isAdmin(user)) return;
+        if (panelCode == null || panelCode.isBlank()) throw new AccessDeniedException("面板编码不能为空");
+        if (readablePanels(user).contains(panelCode)) return;
+        throw new AccessDeniedException("当前角色无该面板的读取权限：" + panelCode);
     }
 
     /** 用户面板权限:panelCode → perms 词集(单角色,但按多行合并兜底) */

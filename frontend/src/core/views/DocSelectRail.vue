@@ -130,7 +130,7 @@ const viewRows = computed(() => props.rows.map((row, idx) => ({
 const TAG_OK = ['已审核', '已归档', '生产中', '已完工', '已关闭', '已审批', '已通过', '已转']
 /** 已完成(金蝶自动关单):与「已审核」同为正常终态,但语义是"做完了",用青蓝一眼区分 */
 const TAG_DONE = ['已完成']
-const TAG_PENDING = ['审批中', '修改中', '删除申请中', '修改申请中', '提交审批']
+const TAG_PENDING = ['审批中', '待二级审批', '修改中', '删除申请中', '修改申请中', '提交审批']
 const TAG_DANGER = ['已作废', '已中止', '已终止', '审批驳回', '驳回']
 function tagClass(status) {
   const s = String(status || '')

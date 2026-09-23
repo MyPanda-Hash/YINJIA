@@ -1,5 +1,5 @@
 ﻿/* yj_user 补自增主键(重建表;OrgAdmin 契约需要 row.id) */
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 -- 幂等:守卫必须与重建语句同批次,RETURN 在独立批次里拦不住后续批次

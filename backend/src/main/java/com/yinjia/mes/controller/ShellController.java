@@ -1,5 +1,6 @@
 package com.yinjia.mes.controller;
 
+import com.yinjia.mes.config.DataSourceRouter;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PanelRegistry;
@@ -23,19 +24,47 @@ public class ShellController {
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
     private final QrBatchService qrBatch;
+    private final String factoryName;
+    private final String testFactoryName;
+    /** 本服务器是否提供"测试账套"(yinjia.enable-test-ledger,默认开)。见 factories() 注释。 */
+    private final boolean testLedgerEnabled;
 
-    public ShellController(PanelRegistry registry, JdbcTemplate jdbc, QrBatchService qrBatch) {
+    public ShellController(PanelRegistry registry, JdbcTemplate jdbc, QrBatchService qrBatch,
+                           @org.springframework.beans.factory.annotation.Value("${yinjia.factory-name:YINJIA-MES}") String factoryName,
+                           @org.springframework.beans.factory.annotation.Value("${yinjia.test-factory-name:YINJIA-MES·测试库}") String testFactoryName,
+                           @org.springframework.beans.factory.annotation.Value("${yinjia.enable-test-ledger:true}") boolean testLedgerEnabled) {
         this.registry = registry;
         this.jdbc = jdbc;
         this.qrBatch = qrBatch;
+        this.factoryName = factoryName;
+        this.testFactoryName = testFactoryName;
+        this.testLedgerEnabled = testLedgerEnabled;
     }
 
+    /**
+     * 登录页「登录工厂」下拉(ADR-0003 一系统两账套):正式 YJ + 测试 YJ_TEST。
+     * 显示名取配置(yinjia.factory-name / test-factory-name),与顶栏一致。
+     * ⚠ 这里返回的 code 会随登录请求回传,后端据此决定这次登录查哪个库、并写进令牌声明 ——
+     * 两个 code 必须与 DataSourceRouter.PROD / TEST 一致,改名要一起改。
+     *
+     * yinjia.enable-test-ledger=false(2026-09-22b 补):只返回正式账套 —— 服务器上并没有
+     * HSDZ_MES_TEST 这个库(两账套只在开发机),菜单里挂着"点了就 500 的选项"纯属坑人;
+     * 关掉后登录页与顶栏切换菜单都不再出现测试库。服务器打开方式见 deploy/部署说明.md §A4。
+     */
     @GetMapping("/base/factory/list")
     public ApiResult<List<Map<String, Object>>> factories() {
-        Map<String, Object> f = new HashMap<>();
-        f.put("code", "YJ");
-        f.put("name", "YINJIA-MES");
-        return ApiResult.ok(List.of(f));
+        List<Map<String, Object>> list = new ArrayList<>();
+        Map<String, Object> prod = new HashMap<>();
+        prod.put("code", DataSourceRouter.PROD);
+        prod.put("name", factoryName);
+        list.add(prod);
+        if (testLedgerEnabled) {
+            Map<String, Object> test = new HashMap<>();
+            test.put("code", DataSourceRouter.TEST);
+            test.put("name", testFactoryName);
+            list.add(test);
+        }
+        return ApiResult.ok(list);
     }
 
     /** 仓库下拉:引用基础档案·仓库面板明细(bs_wh,按仓库编码绑定,字典改名不影响);

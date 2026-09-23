@@ -9,7 +9,7 @@
 --   §4 DISPATCH_DETAIL/DISPATCH_STATS 面板注册 + 全部 22 个报表面板字段按终版视图列重注册
 --   §5 自检
 -- 幂等:可重复执行(视图 CREATE OR ALTER / 字段先删后注册 / 表按列形态守卫)。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

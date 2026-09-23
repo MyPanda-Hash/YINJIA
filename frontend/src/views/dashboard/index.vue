@@ -16,7 +16,8 @@
         <el-button
           v-for="q in quickEntries"
           :key="q.key"
-          :type="q.key === 'newOrder' ? 'primary' : 'default'"
+          :type="q.primary ? 'primary' : 'default'"
+          :title="q.hint ? tt(q.hint) : ''"
           @click="go(q.path, q.title)"
         >{{ tt(q.title) }}</el-button>
       </div>
@@ -24,9 +25,17 @@
 
     <!-- 看板模块切换 -->
     <div class="mod-tabs">
-      <span v-for="m in MODULES" :key="m.key" class="mod-tab" :class="{ on: mod === m.key }" @click="mod = m.key">
+      <button
+        v-for="m in MODULES"
+        :key="m.key"
+        type="button"
+        class="mod-tab"
+        :class="{ on: mod === m.key }"
+        :aria-pressed="mod === m.key"
+        @click="mod = m.key"
+      >
         <el-icon><component :is="m.icon" /></el-icon>{{ tt(m.title) }}
-      </span>
+      </button>
     </div>
 
     <!-- ===== 概览 ===== -->
@@ -71,7 +80,7 @@
           <div class="panel-heading">
             <div>
               <div class="card-title">{{ tt('生产执行核心') }}</div>
-              <p>工单生命周期与近 7 天执行脉冲</p>
+              <p>{{ tt('工单生命周期与近 7 天执行脉冲') }}</p>
             </div>
             <div class="live-chip"><i></i>LIVE · {{ lastUpdatedText }}</div>
           </div>
@@ -106,14 +115,15 @@
                 <span>{{ tt('新增 / 完工趋势') }}</span>
                 <span>{{ tt('近 7 天') }}</span>
               </div>
-              <SLine :data="prod.trend7 || []" compact />
+              <SLine v-if="(prod.trend7 || []).length" :data="prod.trend7" compact />
+              <div v-else class="empty compact-empty trend-empty">{{ tt('暂无趋势数据') }}</div>
               <div class="order-queue">
                 <div v-for="order in progress.slice(0, 3)" :key="order['编号']" class="order-row">
-                  <div class="order-copy">
+                  <div class="order-copy" :title="`${order['产品'] || tt('未指定产品')} ${order['编号'] || ''}`">
                     <strong>{{ order['产品'] || tt('未指定产品') }}</strong>
                     <span>{{ order['编号'] }}</span>
                   </div>
-                  <div class="stage-track" :aria-label="`当前状态：${order['状态']}`">
+                  <div class="stage-track" :aria-label="tt('当前状态：') + (order['状态'] || '')">
                     <i
                       v-for="stageIndex in 4"
                       :key="stageIndex"
@@ -122,7 +132,10 @@
                   </div>
                   <span class="order-status" :class="statusTone(order['状态'])">{{ tt(order['状态']) }}</span>
                 </div>
-                <div v-if="!progress.length" class="empty compact-empty">{{ tt('暂无工单执行数据') }}</div>
+                <div v-if="!progress.length" class="empty compact-empty">
+                  <span>{{ tt('暂无工单执行数据') }}</span>
+                  <em>{{ tt('可在「新建加工单」里建第一张单') }}</em>
+                </div>
               </div>
             </div>
           </div>
@@ -208,9 +221,12 @@
                   <td v-for="m in devMeta" :key="m.panelCode">
                     <span
                       class="dev-cell"
-                      :class="[devTone(row.cells[m.panelCode]), { clickable: row.cells[m.panelCode] === '开发审核中' && canApprovePanel(m.panelCode) }]"
+                      :role="devClickable(row, m) ? 'button' : null"
+                      :tabindex="devClickable(row, m) ? 0 : -1"
+                      :class="[devTone(row.cells[m.panelCode]), { clickable: devClickable(row, m) }]"
                       :title="row.cells[m.panelCode] === '开发审核中' ? (canApprovePanel(m.panelCode) ? tt('点击去审批') : tt('无该面板审批权限')) : ''"
                       @click="onDevCell(row, m)"
+                      @keydown.enter="onDevCell(row, m)"
                     >{{ tt(row.cells[m.panelCode]) }}</span>
                   </td>
                   <td>{{ row.doneCount }}/{{ row.totalCount }}</td>
@@ -224,7 +240,7 @@
             <div v-for="(event, index) in latest.slice(0, 6)" :key="`${event['编号']}-${index}`" class="event-row">
               <div class="event-axis"><i :class="{ pulse: index === 0 }"></i></div>
               <div class="event-icon"><el-icon><component :is="eventIcon(event.panel)" /></el-icon></div>
-              <div class="event-copy">
+              <div class="event-copy" :title="`${tt(panelTitle(event.panel))} ${event['编号'] || ''}`">
                 <strong>{{ tt(panelTitle(event.panel)) }}</strong>
                 <span>{{ event['编号'] }}</span>
               </div>
@@ -249,8 +265,8 @@
           </div>
 
           <div class="doc-volume">
-            <div v-for="doc in docStats" :key="doc.panelCode" class="doc-row">
-              <span>{{ tt(doc.panelName) }}</span>
+            <div v-for="doc in docVolume" :key="doc.panelCode" class="doc-row">
+              <span :title="tt(doc.panelName)">{{ tt(doc.panelName) }}</span>
               <div><i :style="{ width: `${docPercent(doc.count)}%` }"></i></div>
               <strong>{{ doc.count }}</strong>
             </div>
@@ -336,28 +352,28 @@
           <div class="card-head"><h3>{{ tt('修改申请动态') }}</h3><span class="rd-sub">{{ tt('待管理员审批的文件') }}</span></div>
           <div v-if="!rdData.modifyRequests.length" class="rd-empty">{{ tt('暂无修改申请') }}</div>
           <div v-else class="rd-list">
-            <div v-for="m in rdData.modifyRequests" :key="m.panelCode + ':' + m.docNo" class="rd-item" @click="goPanel(m.panelCode, m.docNo)">
+            <button v-for="m in rdData.modifyRequests" :key="m.panelCode + ':' + m.docNo" type="button" class="rd-item" @click="goPanel(m.panelCode, m.docNo)">
               <span class="rd-badge mod">{{ tt('修改申请') }}</span>
-              <span class="rd-txt">{{ tt(m.panelName) }} {{ m.docNo }}</span>
+              <span class="rd-txt" :title="`${tt(m.panelName)} ${m.docNo}`">{{ tt(m.panelName) }} {{ m.docNo }}</span>
               <span class="rd-meta">{{ m.by || '-' }} · {{ fmtRdTime(m.at) }}</span>
-            </div>
+            </button>
           </div>
         </section>
         <section class="card rd-feed">
           <div class="card-head"><h3>{{ tt('最新单据') }}</h3><span class="rd-sub">{{ tt('各面板最近新增') }}</span></div>
           <div v-if="!rdData.newDocs.length" class="rd-empty">{{ tt('暂无单据') }}</div>
           <div v-else class="rd-list">
-            <div v-for="(d, i) in rdData.newDocs" :key="i" class="rd-item" @click="goPanel(d.panelCode, d.docNo)">
+            <button v-for="(d, i) in rdData.newDocs" :key="i" type="button" class="rd-item" @click="goPanel(d.panelCode, d.docNo)">
               <span class="rd-badge new">{{ tt('新增') }}</span>
-              <span class="rd-txt">{{ tt(d.panelName) }} {{ d.docNo }}</span>
+              <span class="rd-txt" :title="`${tt(d.panelName)} ${d.docNo}`">{{ tt(d.panelName) }} {{ d.docNo }}</span>
               <span class="rd-meta">{{ d.creator || '-' }} · {{ fmtRdTime(d.at) }}</span>
-            </div>
+            </button>
           </div>
         </section>
         <section class="card rd-archive">
           <div class="card-head"><h3>{{ tt('面板档案本') }}</h3><span class="rd-sub">{{ tt('像翻档案一样查阅各面板文件') }}</span></div>
           <div class="rd-chips">
-            <span v-for="p in rdData.panels" :key="p.code" class="rd-chip" @click="openArchive(p.code)">{{ tt(p.name) }}</span>
+            <button v-for="p in rdData.panels" :key="p.code" type="button" class="rd-chip" @click="openArchive(p.code)">{{ tt(p.name) }}</button>
           </div>
           <div v-if="!rdData.panels.length" class="rd-empty">{{ tt('暂无面板') }}</div>
         </section>
@@ -385,11 +401,11 @@
     <!-- 档案本弹窗:像翻档案一样查阅各文件面板的单据(文书面板纸张渲染 + 翻页) -->
     <el-dialog v-model="archVisible" :title="tt('档案本') + ' · ' + archPanelName" width="920px" top="4vh" append-to-body class="arch-dialog">
       <div class="arch-bar">
-        <span class="arch-btn" @click="archIdx = 0">◁</span>
-        <span class="arch-btn" @click="archIdx = Math.max(0, archIdx - 1)">◀</span>
+        <button type="button" class="arch-btn" :title="tt('第一页')" :disabled="!archIdx" @click="archIdx = 0">◁</button>
+        <button type="button" class="arch-btn" :title="tt('上一页')" :disabled="!archIdx" @click="archIdx = Math.max(0, archIdx - 1)">◀</button>
         <span class="arch-no">{{ archIdx + 1 }} / {{ archDocs.length }}</span>
-        <span class="arch-btn" @click="archIdx = Math.min(archDocs.length - 1, archIdx + 1)">▶</span>
-        <span class="arch-btn" @click="archIdx = archDocs.length - 1">▷</span>
+        <button type="button" class="arch-btn" :title="tt('下一页')" :disabled="archIdx >= archDocs.length - 1" @click="archIdx = Math.min(archDocs.length - 1, archIdx + 1)">▶</button>
+        <button type="button" class="arch-btn" :title="tt('末页')" :disabled="archIdx >= archDocs.length - 1" @click="archIdx = archDocs.length - 1">▷</button>
         <span v-if="archDoc && archDoc['单据状态']" class="arch-status" :class="archDoc['单据状态']">{{ tt(archDoc['单据状态']) }}</span>
       </div>
       <div v-loading="archLoading" class="arch-body">
@@ -425,6 +441,7 @@ import SLine from './SLine.vue'
 import STree from './STree.vue'
 import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
 import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
+import { pickQuickEntries } from '@core/dashboard/deskQuick'
 import { tt } from '@/i18n'
 
 const user = useUserStore()
@@ -434,12 +451,12 @@ const router = useRouter()
 
 const desk = computed(() => app.deskSettings)
 
-const QUICK_DEFS = [
-  { key: 'newOrder', title: '新建加工单', path: '/panelx/form/MANU_ORDER' },
-  { key: 'quickReport', title: '快速报工', path: '/prod/shop/procReport' },
-  { key: 'board', title: '生产看板', path: '/prod/manufacture/board' },
-]
-const quickEntries = computed(() => QUICK_DEFS.filter((q) => desk.value.quick.includes(q.key)))
+// 右上角快捷入口:候选清单真源在 @core/dashboard/deskQuick.js
+// (与「工作台设置」的勾选项同一份,加入口只改那里一行)
+const quickEntries = computed(() => pickQuickEntries(desk.value.quick, {
+  isAdmin: user.isAdmin,
+  visiblePanels: user.visiblePanels,
+}))
 
 // ---------- 看板模块 ----------
 const MODULES = [
@@ -608,6 +625,10 @@ function canApprovePanel(panelCode) {
   const ap = user.approvePanels || []
   return !!user.isAdmin || ap.includes('*') || ap.includes(String(panelCode))
 }
+/** 矩阵单元格是否可点去审批(与 :class/:title/:tabindex 共用一份判定) */
+function devClickable(row, m) {
+  return row.cells && row.cells[m.panelCode] === '开发审核中' && canApprovePanel(m.panelCode)
+}
 async function onDevCell(row, m) {
   const st = row.cells ? row.cells[m.panelCode] : ''
   if (st !== '开发审核中') return
@@ -633,6 +654,10 @@ async function onDevCell(row, m) {
 let countdownTimer = null
 
 onMounted(() => {
+  // 首次进入桌面:按角色套一次预设(用户已自定义过则不动)—— 2026-09-22 展示优化
+  app.applyRoleDeskPreset(user.isAdmin)
+  // 老用户增量补新候选(项目申请/产品开发),不动用户自己的勾选
+  app.upgradeDeskSettings(user.isAdmin)
   load()
   refreshTimer = setInterval(load, 300000)
   countdownTimer = setInterval(() => {
@@ -649,6 +674,13 @@ onBeforeUnmount(() => {
 // ---------- 概览数据 ----------
 const todos = computed(() => stats.value.todos || [])
 const docStats = computed(() => stats.value.docStats || [])
+/** 单据流量:有量的排前面(降序),空面板垫底,最多 9 行 —— 30 个面板全摊开只是噪音 */
+const docVolume = computed(() => {
+  const all = docStats.value.map((d) => ({ ...d, n: Number(d.count || 0) }))
+  const hot = all.filter((d) => d.n > 0).sort((a, b) => b.n - a.n)
+  const cold = all.filter((d) => d.n === 0)
+  return [...hot, ...cold].slice(0, 9)
+})
 const archives = computed(() => stats.value.archives || {})
 const latest = computed(() => stats.value.latest || [])
 const progress = computed(() => stats.value.progress || [])
@@ -2095,5 +2127,359 @@ function go(path, title) {
   font-size: 13px;
   color: #222;
   word-break: break-all;
+}
+/* ═══════════ 展示打磨:便捷 + 克制(2026-09-22)═══════════
+   原则:① 不引入新色相,只用项目既有五色 primary #116a5b / steel #537786 /
+   amber #b87816 / brick #b94d3f / neutral #68785c;② 圆角与间距走刻度;
+   ③ 空态不撑空、长列表内滚;④ 动效收敛,只留一处脉冲高亮。 */
+
+.dashboard {
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --d-accent: #116a5b;
+  --d-steel: #537786;
+  --d-amber: #b87816;
+  --d-brick: #b94d3f;
+  --d-neutral: #68785c;
+  --d-accent-soft: rgba(17, 106, 91, 0.1);
+  --d-steel-soft: rgba(83, 119, 134, 0.12);
+  --d-amber-soft: rgba(184, 120, 22, 0.12);
+  /* 计数/时间/占比等动态数字等宽,刷新时不左右抖动 */
+  font-variant-numeric: tabular-nums;
+}
+
+html.dark .dashboard {
+  --d-accent: #58b09e;
+  --d-steel: #8fadb9;
+  --d-amber: #e0a83a;
+  --d-brick: #d97364;
+  --d-neutral: #9aab8c;
+  --d-accent-soft: rgba(88, 176, 158, 0.16);
+  --d-steel-soft: rgba(143, 173, 185, 0.16);
+  --d-amber-soft: rgba(224, 168, 58, 0.16);
+}
+
+/* 文本:短标题平衡换行,正文避孤字 */
+.card-title,
+.card-head h3,
+.hello {
+  text-wrap: balance;
+}
+.panel-heading p,
+.card-heading p,
+.metric-label,
+.rd-sub {
+  text-wrap: pretty;
+}
+
+/* 间距刻度:宽屏主栅格 16px(窄屏保持 12px 以免挤压) */
+@media (min-width: 769px) {
+  .dash-grid,
+  .rd-grid {
+    gap: var(--sp-4);
+  }
+
+  .welcome,
+  .mod-tabs {
+    margin-bottom: var(--sp-4);
+  }
+}
+
+/* 圆角分级:外层 8,内层 6,胶囊件全圆 */
+.card,
+.mod-tabs,
+.live-metric {
+  border-radius: 8px;
+}
+.mod-tab,
+.metric-icon,
+.empty {
+  border-radius: 6px;
+}
+.rd-chip,
+.doc-row > div,
+.doc-row i {
+  border-radius: 999px;
+}
+
+/* 层次:轻描边 + 极浅投影,不靠重阴影堆叠 */
+.card {
+  box-shadow: 0 1px 2px rgba(20, 43, 36, 0.04), 0 4px 12px rgba(20, 43, 36, 0.035);
+}
+.welcome {
+  box-shadow: 0 4px 14px rgba(19, 61, 53, 0.1);
+}
+
+/* 高度交给同一行网格对齐,不再写死最小高度撑出空白 */
+.operation-core,
+.quality-watch,
+.event-stream,
+.business-vitals,
+.core-layout {
+  min-height: 0;
+}
+
+/* 空态:尺寸稳定、居中、给下一步提示 */
+.empty {
+  min-height: 96px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--sp-1);
+  padding: var(--sp-4) var(--sp-3);
+  border: 1px dashed var(--t-border);
+  background: var(--t-sidebar-bg);
+  color: var(--t-text-3);
+  text-align: center;
+}
+.empty em {
+  font-style: normal;
+  font-size: 11px;
+  opacity: 0.85;
+}
+.empty.compact-empty {
+  min-height: 72px;
+  padding: 10px var(--sp-2);
+}
+.trend-empty {
+  margin-bottom: var(--sp-2);
+}
+
+/* 小字号可读性:9px 在 1440 宽下已难辨认,统一抬到 11px */
+.resource-grid span {
+  font-size: 11px;
+}
+
+/* 同排卡片高度对齐靠网格,空态撑满剩余高度,不留"空一半"的错觉 */
+.event-stream,
+.business-vitals {
+  display: flex;
+  flex-direction: column;
+}
+.event-list,
+.dev-board {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+.event-list > .empty,
+.dev-board > .empty {
+  flex: 1;
+  min-height: 120px;
+}
+
+/* 快捷入口加到 5 个后:手机端改"换行"而不是横向滚动
+   (原 ≤768 规则是 overflow-x:auto,按钮多了会被藏在看不见的横向滚动里) */
+@media (max-width: 768px) {
+  .quick {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: var(--sp-2);
+  }
+}
+
+/* 长列表内滚:卡片高度不随数据条数变化 */
+.doc-volume {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-2) var(--sp-4);
+}
+.doc-row {
+  grid-template-columns: 104px minmax(40px, 1fr) 32px;
+  gap: var(--sp-2);
+}
+@media (max-width: 768px) {
+  .doc-volume {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .doc-row {
+    grid-template-columns: 120px minmax(56px, 1fr) 36px;
+    gap: var(--sp-3);
+  }
+}
+.order-queue {
+  max-height: 152px;
+}
+.doc-volume {
+  max-height: 224px;
+}
+.order-queue,
+.doc-volume {
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+.order-queue::-webkit-scrollbar,
+.doc-volume::-webkit-scrollbar {
+  width: 6px;
+}
+.order-queue::-webkit-scrollbar-thumb,
+.doc-volume::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: var(--t-border);
+}
+
+/* 动效收敛:脉冲放慢变淡,整页只保留这一处呼吸 */
+.live-chip i,
+.data-link i,
+.event-axis i.pulse {
+  animation-duration: 2.6s;
+}
+@keyframes live-pulse {
+  0%, 70% { box-shadow: 0 0 0 0 rgba(62, 157, 116, 0.22); }
+  100% { box-shadow: 0 0 0 6px rgba(62, 157, 116, 0); }
+}
+@keyframes event-pulse {
+  0%, 70% { box-shadow: 0 0 0 1px rgba(62, 157, 116, 0.9); }
+  100% { box-shadow: 0 0 0 6px rgba(62, 157, 116, 0); }
+}
+
+/* 交互件(已按钮化):补外观、hover/active/focus-visible/disabled */
+.rd-item,
+.rd-chip,
+.arch-btn,
+.mod-tab,
+.dev-cell {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+}
+.rd-item,
+.rd-chip,
+.arch-btn,
+.mod-tab {
+  font-family: inherit;
+}
+.rd-item {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+.arch-btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  line-height: 26px;
+}
+.mod-tab:hover {
+  color: var(--t-text-1);
+  background: var(--t-hover-bg);
+}
+.mod-tab.on {
+  font-weight: 650;
+  box-shadow: inset 0 0 0 1px var(--d-accent-soft);
+}
+.rd-item:hover {
+  background: var(--t-hover-bg);
+}
+.rd-item:active {
+  background: var(--t-border-light);
+}
+.dev-cell.clickable:hover {
+  background: rgba(184, 120, 22, 0.22);
+}
+.mod-tab:focus-visible,
+.rd-item:focus-visible,
+.rd-chip:focus-visible,
+.arch-btn:focus-visible,
+.dev-cell:focus-visible {
+  outline: 2px solid var(--d-accent);
+  outline-offset: 2px;
+}
+.rd-item:focus-visible,
+.rd-chip:focus-visible {
+  outline-offset: 0;
+}
+.arch-btn:disabled {
+  border-color: var(--t-border-light);
+  color: var(--t-text-3);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* 研发管理:去掉蓝/浅蓝,回落到项目色板 */
+.rd-txt {
+  color: var(--t-text-1);
+}
+.rd-sub,
+.rd-meta,
+.rd-empty {
+  color: var(--t-text-3);
+}
+.rd-item:hover .rd-txt {
+  color: var(--d-accent);
+}
+.rd-badge.mod {
+  color: var(--d-amber);
+  background: var(--d-amber-soft);
+}
+.rd-badge.new {
+  color: var(--d-accent);
+  background: var(--d-accent-soft);
+}
+.rd-chip {
+  color: var(--t-text-1);
+  border-color: var(--t-border);
+  background: var(--t-card-bg);
+}
+.rd-chip:hover {
+  color: var(--d-accent);
+  border-color: var(--d-accent);
+  background: var(--t-hover-bg);
+}
+.arch-btn {
+  color: var(--t-text-1);
+  border-color: var(--t-border);
+  background: var(--t-card-bg);
+}
+.arch-btn:hover:not(:disabled) {
+  color: var(--d-accent);
+  border-color: var(--d-accent);
+}
+.arch-no {
+  color: var(--t-text-2);
+}
+.arch-status {
+  color: var(--t-text-2);
+  border-color: var(--t-border);
+  background: var(--t-sidebar-bg);
+}
+.arch-status.修改中,
+.arch-status.审批中 {
+  color: var(--d-accent);
+  border-color: var(--d-accent-soft);
+  background: var(--d-accent-soft);
+}
+.arch-status.修改申请中 {
+  color: var(--d-amber);
+  border-color: var(--d-amber-soft);
+  background: var(--d-amber-soft);
+}
+
+/* 产品开发矩阵:蓝/另两种绿 → 钢青 / 琥珀 / 主绿 */
+.dev-cell.none {
+  background: var(--t-border-light);
+  color: var(--t-text-3);
+}
+.dev-cell.doing {
+  color: var(--d-steel);
+  background: var(--d-steel-soft);
+}
+.dev-cell.review {
+  color: var(--d-amber);
+  background: var(--d-amber-soft);
+}
+.dev-cell.done {
+  color: var(--d-accent);
+  background: var(--d-accent-soft);
+}
+.dev-cell.clickable {
+  box-shadow: inset 0 0 0 1px var(--d-amber);
+}
+.dev-table th {
+  color: var(--t-text-2);
+  background: var(--t-card-bg);
 }
 </style>

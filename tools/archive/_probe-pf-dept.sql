@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT CAST((id) AS nvarchar(20)) FROM yj_dept WHERE dept_name = N'仓管部';

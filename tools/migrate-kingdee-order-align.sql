@@ -10,7 +10,7 @@
 --   3. 同步锚点列收编进链(deploy/migrate-add-external-cols.sql 同款守卫,列已在则空跑)。
 --   4. 新标签 9 语言译名(结算期限/部门负责人;其余新标签已有译名)。
 -- 幂等:COL_LENGTH 守卫 / IF NOT EXISTS / MERGE NOT MATCHED,可重复执行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 

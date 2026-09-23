@@ -1,0 +1,26 @@
+﻿/* 探针清理:四文件前端置灰门禁验收(_probe-prodfile-gateui.cjs);按测试前缀 T-PFG% 圈定 */
+USE HSDZ_MES; SET NOCOUNT ON;
+DECLARE @pi TABLE (no nvarchar(200) PRIMARY KEY);
+INSERT INTO @pi (no) SELECT 单据编号 FROM rd_prod_info_head WHERE 产品编号 LIKE N'T-PFG%';
+DECLARE @files TABLE (no nvarchar(200) PRIMARY KEY);
+INSERT INTO @files (no) SELECT 单据编号 FROM rd_mold_proc_head WHERE 产品编号 LIKE N'T-PFG%' OR (产品编号 IS NULL AND 产品名称 LIKE N'历史单%');
+INSERT INTO @files (no) SELECT 单据编号 FROM rd_asm_proc_head  WHERE 产品编号 LIKE N'T-PFG%';
+INSERT INTO @files (no) SELECT 单据编号 FROM rd_insp_plan_head WHERE 产品编号 LIKE N'T-PFG%';
+INSERT INTO @files (no) SELECT 单据编号 FROM rd_spec_doc_head  WHERE 编号 LIKE N'T-PFG%';
+DELETE FROM yj_message WHERE 单据编号 IN (SELECT no FROM @pi) OR 单据编号 IN (SELECT no FROM @files);
+DELETE FROM yj_form_approval WHERE form_no IN (SELECT no FROM @pi) OR form_no IN (SELECT no FROM @files);
+DELETE FROM yj_doc_status WHERE doc_no IN (SELECT no FROM @pi) OR doc_no IN (SELECT no FROM @files);
+DELETE FROM rd_mold_proc_detail WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_asm_proc_detail  WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_insp_plan_detail WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_spec_doc_detail  WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_mold_proc_head WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_asm_proc_head  WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_insp_plan_head WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_spec_doc_head  WHERE 单据编号 IN (SELECT no FROM @files);
+DELETE FROM rd_prod_info_detail WHERE 单据编号 IN (SELECT no FROM @pi);
+DELETE FROM rd_prod_info_head   WHERE 单据编号 IN (SELECT no FROM @pi);
+DELETE FROM rd_dev_task WHERE 产品编号 LIKE N'T-PFG%';
+-- 探针按需创建的品质部测试账号
+DELETE FROM yj_user WHERE username = N'probe_qc';
+SELECT N'本次残留' AS 检查, CAST(COUNT(*) AS nvarchar) AS n FROM rd_mold_proc_head WHERE 产品编号 LIKE N'T-PFG%' OR (产品编号 IS NULL AND 产品名称 LIKE N'历史单%');

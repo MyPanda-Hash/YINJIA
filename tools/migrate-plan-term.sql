@@ -3,7 +3,7 @@
 -- 驳回/撤回删行(可重新申请);历史留痕走 yj_form_approval(TERM_* 动作)。
 -- 立项人 = 本计划 文档编号 所引立项申请(rd_approval)的「申请立项人」,按姓名匹配 yj_user.real_name(严格口径,无账号则挂起待其有账号)。
 -- 幂等:可重复执行。运行(UTF-8 无 BOM): SqlRunner / sqlcmd -f 65001
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 SET NOCOUNT ON;
 GO
 IF OBJECT_ID('yj_plan_term') IS NULL CREATE TABLE yj_plan_term (

@@ -1,6 +1,6 @@
 -- 多语言扩展地基:通用翻译表 + 语言注册表(任意语言=加行不加列)
 -- 契约(CONTEXT.md 翻译表决策):label/panel_name 保持中文为键;译名存行。
-USE HSDZ_MES;
+IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库(选定测试库/克隆库时不得被切走)
 GO
 IF OBJECT_ID('yj_translation') IS NULL
 CREATE TABLE yj_translation (
