@@ -23,17 +23,10 @@
       <tbody>
         <tr v-for="(pair, ri) in QC_INSP_REC_HEAD_ROWS" :key="'h' + ri">
           <template v-for="cell in pair" :key="cell.key">
-            <th class="qr-label">
-              {{ tt(cell.label) }}
-              <!-- 按物料编码查该物料的来料检验要求(2026-09-23 用户口径):纸面不打印 -->
-              <span
-                v-if="cell.key === '物料编码'"
-                class="qr-lib-btn no-print"
-                :title="tt('按物料编码查看来料检验要求相关内容')"
-                @click="openReqView"
-              >⧉ {{ tt('检验要求') }}</span>
-            </th>
-            <td class="qr-value">
+            <th class="qr-label">{{ tt(cell.label) }}</th>
+            <!-- 物料编码的值格:编码(可填输入框)右侧跟「检验要求」查看链接 —— 2026-09-23
+                 用户口径「把检验要求的链接放在右边物料编码后面」;纸面打印不出现(no-print) -->
+            <td class="qr-value" :class="{ 'qr-value-code': cell.key === '物料编码' }">
               <el-date-picker
                 v-if="isDateField(cell.key) && editable && !cell.locked"
                 v-model="head[cell.key]"
@@ -54,6 +47,12 @@
               />
               <!-- locked 字段(物料批次=回填批次号)即便在草稿态也只显示文本,不允许手填 -->
               <span v-else class="qr-cell-text">{{ head[cell.key] || '' }}</span>
+              <span
+                v-if="cell.key === '物料编码'"
+                class="qr-lib-btn no-print"
+                :title="tt('按物料编码查看来料检验要求相关内容')"
+                @click="openReqView"
+              >⧉ {{ tt('检验要求') }}</span>
             </td>
           </template>
         </tr>
@@ -497,6 +496,17 @@ watch(
   white-space: nowrap;
 }
 .qr-lib-btn:hover { text-decoration: underline; }
+/* 物料编码值格:编码(或编码输入框)+ 右侧「检验要求」链接 同行排布,链接紧跟编码后面 */
+.qr-value-code {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.qr-value-code .qr-cell-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
 .qr-empty {
   text-align: center;
   color: #98a4b3;

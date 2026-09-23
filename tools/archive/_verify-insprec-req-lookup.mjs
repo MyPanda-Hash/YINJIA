@@ -84,7 +84,7 @@ await ev(`localStorage.setItem('mes_token', ${JSON.stringify(token)});
  *  否则点链接时物料编码还是空 → 会走「请先填写物料编码」拦截而不是弹窗(打包入口加载更慢,实测踩过)。 */
 async function openRec(no, expectText) {
   await send('Page.navigate', { url: `${FRONT}/?_v=${Date.now()}#/panelx/list/QC_INSP_REC?docNo=${encodeURIComponent(no)}` });
-  for (let i = 0; i < 90; i++) { await sleep(400); if (await ev(`!!document.querySelector('.qc-rec-sheet .qr-label .qr-lib-btn')`)) break; }
+  for (let i = 0; i < 90; i++) { await sleep(400); if (await ev(`!!document.querySelector('.qr-head-table td.qr-value-code .qr-lib-btn')`)) break; }
   if (expectText) {
     for (let i = 0; i < 60; i++) {
       const got = await ev(`document.body.innerText.includes(${JSON.stringify(expectText)})`);
@@ -99,17 +99,26 @@ async function openRec(no, expectText) {
 console.log('\n=== ① 入口:抬头「物料编码」旁「检验要求」链接 ===');
 await openRec(hitDoc.no, hitDoc.code);
 const entry = await ev(`(() => {
-  const btn = document.querySelector('.qc-rec-sheet .qr-label .qr-lib-btn');
+  const btn = document.querySelector('.qr-head-table td.qr-value-code .qr-lib-btn');
   if (!btn) return null;
-  const th = btn.closest('th');
-  return { label: th.textContent.replace(/\\s+/g,' ').trim(), btn: btn.textContent.replace(/\\s+/g,' ').trim() };
+  const tr = btn.closest('tr');
+  const labels = [...tr.querySelectorAll('th.qr-label')].map((th) => th.textContent.trim());
+  const td = btn.closest('td');
+  // 链接必须排在编码值**后面**:td 内前面的文本先出现编码,链接在其后
+  const beforeBtn = [...td.childNodes].filter((n) => n !== btn).map((n) => n.textContent || '').join('').trim();
+  const btnAt = [...td.childNodes].indexOf(btn);
+  return { labels, cell: td.textContent.replace(/\\s+/g,' ').trim(), beforeBtn, btnAt, btn: btn.textContent.replace(/\\s+/g,' ').trim() };
 })()`);
-console.log('   抬头格:', JSON.stringify(entry));
-ok(!!entry && /物料编码/.test(entry.label) && /检验要求/.test(entry.btn), '「物料编码」格内有「检验要求」链接');
+console.log('   行标签:', JSON.stringify(entry && entry.labels));
+console.log('   值格:', JSON.stringify(entry && entry.cell));
+ok(!!entry, '「检验要求」链接存在');
+ok(entry && entry.labels.includes('物料编码'), '链接在「物料编码」那一行');
+ok(entry && entry.btnAt > 0 && entry.beforeBtn !== '', '链接排在编码值后面(不是标签格里)');
+ok(entry && /检验要求/.test(entry.btn) && entry.cell.includes(entry.beforeBtn), '值格内容 = 编码 + 检验要求链接');
 
 /* ---------- ② 命中:弹窗 + 只读嵌入 + 该物料的要求行 ---------- */
 console.log('\n=== ② 命中:按物料编码查到要求行(只读嵌入) ===');
-await ev(`document.querySelector('.qc-rec-sheet .qr-label .qr-lib-btn').click()`);
+await ev(`document.querySelector('.qr-head-table td.qr-value-code .qr-lib-btn').click()`);
 for (let i = 0; i < 40; i++) { await sleep(300); if (await ev(`!!document.querySelector('.req-view-sub') || !!document.querySelector('.req-view-tip')`)) break; }
 await sleep(1200);
 const dlg = await ev(`(() => {
@@ -154,7 +163,7 @@ console.log('\n=== ③ 未维护:空态 ===');
 await ev(`document.querySelector('.el-dialog__headerbtn')?.click()`);
 await sleep(600);
 await openRec(missDoc.no, missDoc.code);
-await ev(`document.querySelector('.qc-rec-sheet .qr-label .qr-lib-btn').click()`);
+await ev(`document.querySelector('.qr-head-table td.qr-value-code .qr-lib-btn').click()`);
 for (let i = 0; i < 40; i++) { await sleep(300); if (await ev(`!!document.querySelector('.req-view-tip')`)) break; }
 const miss = await ev(`(() => {
   const t = document.querySelector('.req-view-tip');
@@ -169,7 +178,7 @@ console.log('\n=== ④ 未填物料编码:拦下并提示 ===');
 await ev(`document.querySelector('.el-dialog__headerbtn')?.click()`);
 await sleep(600);
 await openRec(blankDoc.no);
-await ev(`document.querySelector('.qc-rec-sheet .qr-label .qr-lib-btn').click()`);
+await ev(`document.querySelector('.qr-head-table td.qr-value-code .qr-lib-btn').click()`);
 await sleep(900);
 const blank = await ev(`(() => {
   const msg = [...document.querySelectorAll('.el-message')].map((m) => m.textContent.trim()).join(' | ');
