@@ -1,0 +1,94 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 417
++ ... Timeout=5"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java $u ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-11-user-role.sql ==
+  | 1 | admin | 系统管理员 | Y | 1 | null | 1 | 
+  | 1 | admin | 管理员 | Y | 
+  | 2 | user | 普通用户 | N | 
+  | so_order | SO_ORDER | 销售订单 | Y | 19755 | 
+  | PR_DEMOLD_QC | 脱模检验记录 | 生产制造 | 单据 | doc | pr_demold_qc | pr_demold_qc | 
+  | PR_SINTER_QC | 烧结制程检验 | 生产制造 | 单据 | doc | pr_sinter_qc | pr_sinter_qc | 
+  | QC_BHC | 不合格品处理单(制程) | 品质管理 | 单据 | doc | qc_bhc_detail | qc_bhc | 
+  | QC_BHG | 不合格报告(制程) | 品质管理 | 单据 | doc | qc_bhg_detail | qc_bhg | 
+  | QC_BHZ | 不合格品处理单(自制物料) | 品质管理 | 单据 | doc | qc_bhz_detail | qc_bhz | 
+  | QC_DISPOSAL | 不良品处理单 | 生产制造 | 生产管理 | doc | qc_disposal | null | 
+  | QC_INSP | 来料检验单 | 智能供应链 | 采购管理 | doc | qc_insp_detail | qc_insp | 
+  | QC_ITEM | 检验项目 | 基础设置 | 基础档案 | archive | bs_qc_item | null | 
+  | QC_JJF | 紧急放行申请单 | 品质管理 | 单据 | doc | qc_jjf_detail | qc_jjf | 
+  | QC_LYB | 来料异常分析报告 | 品质管理 | 单据 | doc | qc_lyb_detail | qc_lyb | 
+  | QC_OP | 工序质检单 | 生产制造 | 生产管理 | doc | qc_op_detail | qc_op | 
+  | QC_PLAN | 检验方案 | 基础设置 | 基础档案 | archive | bs_qc_plan | null | 
+  | QC_RECORD | 检验记录单 | 生产制造 | 生产管理 | doc | qc_record_detail | qc_record | 
+  | QC_RECV | 送料暂收单 | 库存核算 | 库存核算 | doc | sl_recv_detail | sl_recv | 
+  | QC_RETURN | 暂收退回单 | 智能供应链 | 采购管理 | doc | qc_return_detail | qc_return | 
+  | QC_SCP | 试产材料使用申请单 | 品质管理 | 单据 | doc | qc_scp_detail | qc_scp | 
+  | QC_SCY | 生产异常分析报告 | 品质管理 | 单据 | doc | qc_scy_detail | qc_scy | 
+  | QC_TC | 特采申请单 | 品质管理 | 单据 | doc | qc_tc_detail | qc_tc | 
+  | RD_INSP_PLAN | 出货检验计划表 | 研发管理 | 单据 | doc | rd_insp_plan_detail | rd_insp_plan_head | 
+  | QC_BHC | 27 | 
+  | QC_BHG | 22 | 
+  | QC_BHZ | 23 | 
+  | QC_DISPOSAL | 15 | 
+  | QC_INSP | 48 | 
+  | QC_ITEM | 10 | 
+  | QC_JJF | 19 | 
+  | QC_LYB | 19 | 
+  | QC_OP | 15 | 
+  | QC_PLAN | 7 | 
+  | QC_RECORD | 19 | 
+  | QC_RECV | 60 | 
+  | QC_RETURN | 32 | 
+  | QC_SCP | 17 | 
+  | QC_SCY | 17 | 
+  | QC_TC | 23 | 
+  | lab.apply_type | 2 | 
+  | lab.device | 7 | 
+  | lab.test_item | 3 | 
+  | spec.section | 24 | 
+  | 28 | lab.apply_type | 默认 | 开发性 | 
+  | 29 | lab.apply_type | 默认 | 品质委托 | 
+  | 30 | lab.device | 默认 | 加标测试系统1# | 
+  | 31 | lab.device | 默认 | 加标测试系统2# | 
+  | 32 | lab.device | 默认 | 加标测试系统3# | 
+  | 33 | lab.device | 默认 | 加标测试系统4# | 
+  | 34 | lab.device | 默认 | 加标测试系统5# | 
+  | 35 | lab.device | 默认 | 加标测试系统6# | 
+  | 36 | lab.device | 默认 | 加标测试系统7# | 
+  | 25 | lab.test_item | 默认 | NSF 53-除铅（PH8.5） | 
+  | 26 | lab.test_item | 默认 | NSF 53-除汞（PH8.5） | 
+  | 27 | lab.test_item | 默认 | NSF 53-除VOC | 
+  | 1 | spec.section | 1.适用范围 | 应用于沐浴过滤装置，直通式无需封装端盖 | 
+  | 7 | spec.section | 2.整体规格参数 | 40.5(OD)*16（ID)*27(L) | 
+  | 13 | spec.section | 3.产品主要性能 | 阻垢 | 
+  | 24 | spec.section | 8.存储环境 | 产品应贮存在通风良好、干燥的室内，不得与酸、碱及有腐蚀性的物品放置一起。 | 
+  | 23 | spec.section | 7.运输要求 | 产品在运输中应避免冲击、挤压、雨淋、受潮及化学品腐蚀。 | 
+  | 19 | spec.section | 6.包装方式 | 按照包装规范进行包装作业；
+（2）纸箱外层左上角黏贴白色标签，标签内容包括：采购单号、物料编号、生产 | 
+  | 20 | spec.section | 6.包装方式 | （1）按照包装规范进行包装作业
+（2）纸箱外层左上角黏贴白色标签，标签内容包括：采购单号、物料编号、 | 
+  | 14 | spec.section | 3.产品主要性能 | 矿化寿命 | 
+  | 8 | spec.section | 2.整体规格参数 | 27.5(OD)*12（ID)*110L) | 
+  | 2 | spec.section | 1.适用范围 | 傲美矿化后置烧结棒 | 
+  | 3 | spec.section | 1.适用范围 | 迈博瑞重力式陶瓷炭棒复合滤芯（2只装） | 
+  | 15 | spec.section | 3.产品主要性能 | 重力式低流速、除余氯、浊度、大肠、铅砷、汞、铬、VOCs、氯胺、PFAS等。 | 
+  | 9 | spec.section | 2.整体规格参数 | 60.5(OD)*173(L) | 
+  | 21 | spec.section | 6.包装方式 | （1）炭棒需无黑、无颗粒物处理要求；
+（2）炭棒立式放置，箱内用PP材质包装袋作为内衬；整箱套袋、放 | 
+  | 22 | spec.section | 6.包装方式 | 炭棒有无黑要求、有颗粒物要求；
+按照包装规范进行包装作业；
+（3）纸箱外层左上角黏贴白色标签，标签内 | 
+  | 10 | spec.section | 2.整体规格参数 | 见下表 | 
+  | 16 | spec.section | 3.产品主要性能 | 除铅、余氯、孢囊等 | 
+  | 4 | spec.section | 1.适用范围 | 伊可普006项目冰箱炭棒 | 
+  | 5 | spec.section | 1.适用范围 | 伊可普抑菌炭棒 | 
+  | 11 | spec.section | 2.整体规格参数 | 59.5(OD)*29.5（ID)*175(L) | 
+  | 17 | spec.section | 3.产品主要性能 | 抑菌、去余氯、一级颗粒物 | 
+  | 18 | spec.section | 3.产品主要性能 | 矿化寿命、余氯寿命. | 
+  | 12 | spec.section | 2.整体规格参数 | 24(OD)*10（ID)*120(L) | 
+  | 6 | spec.section | 1.适用范围 | 伊可普矿化炭棒 | 
+[OK] c-11-user-role.sql (9 batches)

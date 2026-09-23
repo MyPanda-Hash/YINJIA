@@ -1,0 +1,17 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s1-06-status.sql ==
+  | S1-20: yj_doc_status 各 RD 面板状态分布(派生) | RD_PROGRESS | 1 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | null | 
+  | S1-22: 四个受控文件业务表实际行数 | rd_spec_doc_head | 0 | 
+  | S1-22 | rd_asm_proc_head | 0 | 
+  | S1-22 | rd_insp_plan_head | 0 | 
+  | S1-22 | rd_asm_bom_head | 0 | 
+  | S1-22 | rd_prod_info_head | 0 | 
+  | S1-22 | rd_mold_proc_head | 0 | 
+[OK] s1-06-status.sql (6 batches)

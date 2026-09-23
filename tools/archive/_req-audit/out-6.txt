@@ -1,0 +1,43 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s2-6.sql ==
+  | 20 | 0 | 0 | 
+  | 6 | OP-HL | 混料 | 自制物料车间 | null | 启用 | null | 
+  | 7 | OP-CX | 成型 | 成型1号车间 | null | 启用 | null | 
+  | 8 | OP-QT | 切炭 | 切炭车间 | null | 启用 | null | 
+  | 9 | OP-ZZ | 组装 | 组装车间 | null | 启用 | null | 
+  | 10 | OP-ZX | 装箱 | 装箱车间 | null | 启用 | null | 
+  | GXLX | GXLX01 | 工序派工 | 
+  | GXLX | GXLX02 | 委外派工 | 
+  | OP_TYPE | OP_TYPE01 | 成型 | 
+  | OP_TYPE | OP_TYPE02 | 切炭 | 
+  | OP_TYPE | OP_TYPE03 | 组装 | 
+  | OP_TYPE | OP_TYPE04 | 检验 | 
+  | OP_TYPE | OP_TYPE05 | 包装 | 
+  | OP_TYPE | OP_TYPE06 | 其他 | 
+  | WH_TYPE | WH_TYPE01 | 原料仓 | 
+  | WH_TYPE | WH_TYPE02 | 辅料仓 | 
+  | WH_TYPE | WH_TYPE03 | 半成品仓 | 
+  | WH_TYPE | WH_TYPE04 | 成品仓 | 
+  | WH_TYPE | WH_TYPE05 | 不良品仓 | 
+  | WH_TYPE | WH_TYPE06 | 其他 | 
+  | WLFZ | WLFZ01 | 成品 | 
+  | WLFZ | WLFZ02 | 半成品 | 
+  | WLFZ | WLFZ03 | 材料 | 
+  | WLFZ | WLFZ04 | 其他 | 
+  | DEPT_TYPE | 4 | 职能|车间|仓库|销售 | 
+  | EQUIP_STATUS | 4 | 在用|维修中|停用|报废 | 
+  | IMPTYP | 4 | 资料|BOM|采购单|销售订单 | 
+  | JGZT | 4 | 待测试|测试中|已完成|已取消 | 
+  | JYRY | 4 | 18|19|20|21 | 
+  | PCXZ | 4 | 普通|急货|加急|特急 | 
+  | WLFZ | 4 | 成品|半成品|材料|其他 | 
+  | 0 | 
+  | 0 | 
+[OK] s2-6.sql (9 batches)

@@ -1,0 +1,5 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== migrate-batch-no-date-only.sql ==
+  (0 rows)
+  (0 rows)
+[OK] migrate-batch-no-date-only.sql (7 batches)

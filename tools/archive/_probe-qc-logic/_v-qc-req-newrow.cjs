@@ -1,12 +1,15 @@
 /* _v-qc-req-newrow.cjs — 来料检验要求(QC_INSP_REQ)「折叠棉页签 ＋新增数据记录行」不可见问题实测
    目标:新行输入框"能输入但看不见" —— 量出输入框尺寸/可见性/被谁裁剪/在滚动区内的位置。
-   用法:node tools/archive/_probe-qc-logic/_v-qc-req-newrow.cjs(需 5173 + 8090 已起) */
+   用法:node tools/archive/_probe-qc-logic/_v-qc-req-newrow.cjs [前端基址](需 5173 或 8090 + 8090 接口已起)
+        第 2 参默认 http://localhost:5173;量部署产物传 http://localhost:8090 */
 const { spawn } = require('node:child_process')
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path')
 const PORT = 9361
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
 const BASE = 'http://localhost:8090/api'
+const WEB = process.argv[2] || 'http://localhost:5173'
 const sleep = ms => new Promise(r => setTimeout(r, ms))
+const T0 = Date.now()
 const ok = (name, cond, detail) => { console.log(`${cond ? 'PASS' : 'FAIL'}  ${name}${detail ? '  · ' + detail : ''}`); if (!cond) process.exitCode = 1 }
 
 // 页面内注入的度量函数:量一个元素 + 逐级祖先的裁剪情况
@@ -33,7 +36,7 @@ async function main() {
   const login = await (await fetch(`${BASE}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userName: 'admin', password: '123456' }) })).json()
   const token = login.data.token
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yj-req-'))
-  spawn(EDGE, ['--headless=new', '--disable-gpu', '--no-first-run', '--window-size=1400,900', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' })
+  const edge = spawn(EDGE, ['--headless=new', '--disable-gpu', '--no-first-run', '--window-size=1400,900', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank'], { stdio: 'ignore' })
   await sleep(2500)
   const tab = await (await fetch(`http://127.0.0.1:${PORT}/json/new?about:blank`, { method: 'PUT' })).json()
   const ws = new WebSocket(tab.webSocketDebuggerUrl)
@@ -46,20 +49,24 @@ async function main() {
   const waitFor = async (exp, ms = 30000, step = 800) => { for (let i = 0; i < Math.ceil(ms / step); i++) { const v = await evaluate(exp); if (v) return v; await sleep(step) } return null }
   await send('Page.enable'); await send('Runtime.enable')
 
-  await navigate('http://localhost:5173/#/login')
+  await navigate(`${WEB}/#/login`)
   await evaluate(`localStorage.setItem('mes_token', ${JSON.stringify(token)}); localStorage.setItem('mes_user', ${JSON.stringify(JSON.stringify(login.data.user))}); 'ok'`)
   let ready = null
-  for (let a = 1; a <= 5 && !ready; a++) {
+  for (let a = 1; a <= 2 && !ready; a++) {
     await navigate('about:blank')
-    await navigate('http://localhost:5173/#/panelx/list/QC_INSP_REQ')
-    await sleep(3500)
+    await navigate(`${WEB}/#/panelx/list/QC_INSP_REQ`)
+    await sleep(3000)
+    // 关掉「MES 初始配置」向导遮罩:上一次截图发现它盖住表格,导致度量/截图失真
+    await evaluate(`(() => { const wz = document.querySelector('.wizard-mask'); if (wz) (wz.querySelector('.wz-close') || wz.querySelector('.wz-skip'))?.click(); return 1 })()`)
+    await waitFor(`!document.querySelector('.wizard-mask')`, 8000, 400)
     ready = await waitFor(`(() => {
       const papers = [...document.querySelectorAll('.qc-paper')]
       const f = papers.find(p => (p.querySelector('.qc-title')?.innerText || '').includes('折叠棉'))
       return (f && f.querySelector('.rs-add')) ? 'READY' : ''
-    })()`, 20000)
-    if (!ready) console.log(`   [重试 ${a}/5] 折叠棉页签未就绪`)
+    })()`, 15000)
+    if (!ready) console.log(`   [重试 ${a}/2] 折叠棉页签未就绪`)
   }
+  console.log('向导遮罩(应为 false):', await evaluate(`!!document.querySelector('.wizard-mask')`))
   ok('折叠棉页签就绪(纸面 + ＋新增数据记录行)', ready === 'READY', ready)
   if (ready !== 'READY') {
     console.log('诊断:', await evaluate(`(() => JSON.stringify({ url: location.hash, papers: document.querySelectorAll('.qc-paper').length, body: document.body.innerText.slice(0, 200) }))()`))
@@ -134,6 +141,30 @@ async function main() {
     })
   })()`)
   console.log('诊断:', diag)
+
+  // 截图取证:新增行滚进视野后,输入框到底长什么样(供人眼判断"看不见"到底是哪种)
+  await evaluate(`(() => { const el = document.querySelector('.qc-paper tr[data-edit="1"]'); if (el) el.scrollIntoView({ block: 'center' }); return 1 })()`)
+  await sleep(800)
+  const shot1 = await send('Page.captureScreenshot', { format: 'png' })
+  fs.writeFileSync('tools/archive/_probe-qc-logic/_newrow.png', Buffer.from(shot1.result.data, 'base64'))
+  // 再往新行第一个输入框打一段字,看字形/边框是否出现
+  await evaluate(`(() => {
+    const el = document.querySelector('.qc-paper tr[data-edit="1"] input')
+    if (!el) return 'no-input'
+    el.focus()
+    el.value = '测试123'
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    return 'typed'
+  })()`)
+  await sleep(800)
+  const shot2 = await send('Page.captureScreenshot', { format: 'png' })
+  fs.writeFileSync('tools/archive/_probe-qc-logic/_newrow-typed.png', Buffer.from(shot2.result.data, 'base64'))
+  console.log('截图: tools/archive/_probe-qc-logic/_newrow.png 与 _newrow-typed.png')
+  // ⚠ 必须杀掉浏览器子进程并显式退出:否则 node 事件循环被 child 句柄挂住,
+  //   进程不退出 → 外层命令一直等到超时(这就是"探针要跑几分钟"的真正原因)
+  try { edge.kill() } catch {}
   ws.close()
+  console.log(`总耗时 ${Math.round((Date.now() - T0) / 1000)}s`)
+  process.exit(0)
 }
 main().catch(e => { console.error('探针异常:', e.message); process.exitCode = 1 })

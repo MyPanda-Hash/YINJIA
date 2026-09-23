@@ -1,0 +1,13 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 689
++ ... NFIG====="; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-06-config.sql ==
+  | QC_INSP | 智能供应链 | 采购管理 | doc | null | null | 
+  | QC_RECV | null | null | 
+  | QC_RETURN | null | null | 
+[OK] c-06-config.sql (4 batches)

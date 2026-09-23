@@ -1,0 +1,24 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 417
++ ... Timeout=5"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java $u ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-13-final.sql ==
+  | QC_TC | 特采理由 | 特采理由 | null | 
+  | sl_recv | 32 | 
+  | qc_recv | 0 | 
+  | qc_insp | 22 | 
+  | qc_return | 9 | 
+  | qc_tc | 0 | 
+  | qc_jjf | 0 | 
+  | bd_purchase_in | 86 | 
+  | bd_pu_order | 2137 | 
+  | yj_role_panel | 0 | 
+  | yj_user | 1 | 
+  | yj_doc_batch | 27 | 
+  | null | 22 | 
+  | null | 40 | 
+[SQL FAIL] 列名 '到货日期' 无效。

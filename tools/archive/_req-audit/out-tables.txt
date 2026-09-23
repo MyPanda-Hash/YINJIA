@@ -1,0 +1,131 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s2-tables.sql ==
+  | rd_asm_bom_detail | id | int | null | NO | 
+  | rd_asm_bom_detail | 单据编号 | nvarchar | 60 | NO | 
+  | rd_asm_bom_detail | 物料名 | nvarchar | 100 | YES | 
+  | rd_asm_bom_detail | 物料编号 | nvarchar | 60 | YES | 
+  | rd_asm_bom_detail | 物料规格 | nvarchar | 500 | YES | 
+  | rd_asm_bom_detail | 外观要求 | nvarchar | 500 | YES | 
+  | rd_asm_bom_detail | 用量 | nvarchar | 30 | YES | 
+  | rd_asm_bom_detail | asp_user1 | nvarchar | 50 | YES | 
+  | rd_asm_bom_detail | asp_time1 | datetime2 | null | YES | 
+  | rd_asm_bom_detail | asp_user2 | nvarchar | 50 | YES | 
+  | rd_asm_bom_detail | asp_time2 | datetime2 | null | YES | 
+  | rd_asm_bom_detail | asp_cancel | char | 1 | YES | 
+  | rd_asm_bom_detail | 表区 | nvarchar | 20 | YES | 
+  | rd_asm_bom_detail | 序号 | nvarchar | 20 | YES | 
+  | rd_asm_bom_detail | 更改内容 | nvarchar | 500 | YES | 
+  | rd_asm_bom_detail | 更改原因 | nvarchar | 200 | YES | 
+  | rd_asm_bom_detail | 更改时间 | nvarchar | 50 | YES | 
+  | rd_asm_bom_detail | 责任人 | nvarchar | 50 | YES | 
+  | rd_asm_bom_detail | 备注 | nvarchar | 200 | YES | 
+  | rd_asm_bom_head | id | int | null | NO | 
+  | rd_asm_bom_head | 单据编号 | nvarchar | 60 | NO | 
+  | rd_asm_bom_head | 单据日期 | nvarchar | 20 | YES | 
+  | rd_asm_bom_head | 备注 | nvarchar | 500 | YES | 
+  | rd_asm_bom_head | asp_user1 | nvarchar | 50 | YES | 
+  | rd_asm_bom_head | asp_time1 | datetime2 | null | YES | 
+  | rd_asm_bom_head | asp_user2 | nvarchar | 50 | YES | 
+  | rd_asm_bom_head | asp_time2 | datetime2 | null | YES | 
+  | rd_asm_bom_head | asp_cancel | char | 1 | YES | 
+  | rd_asm_bom_head | 产品编号 | nvarchar | 60 | YES | 
+  | rd_asm_bom_head | 产品名称 | nvarchar | 200 | YES | 
+  | rd_asm_bom_head | 产品种类 | nvarchar | 100 | YES | 
+  | rd_asm_bom_head | 整体规格外径 | nvarchar | 100 | YES | 
+  | rd_asm_bom_head | 整体规格长度 | nvarchar | 100 | YES | 
+  | rd_asm_bom_head | 成品重量 | nvarchar | 50 | YES | 
+  | rd_asm_proc_detail | id | int | null | NO | 
+  | rd_asm_proc_detail | 单据编号 | nvarchar | 60 | NO | 
+  | rd_asm_proc_detail | 工序 | nvarchar | 60 | YES | 
+  | rd_asm_proc_detail | 工序控制内容 | nvarchar | 500 | YES | 
+  | rd_asm_proc_detail | 管控要求 | nvarchar | 1000 | YES | 
+  | rd_asm_proc_detail | 检查比例 | nvarchar | 100 | YES | 
+  | rd_asm_proc_detail | asp_user1 | nvarchar | 50 | YES | 
+  | rd_asm_proc_detail | asp_time1 | datetime2 | null | YES | 
+  | rd_asm_proc_detail | asp_user2 | nvarchar | 50 | YES | 
+  | rd_asm_proc_detail | asp_time2 | datetime2 | null | YES | 
+  | rd_asm_proc_detail | asp_cancel | char | 1 | YES | 
+  | rd_asm_proc_detail | 表区 | nvarchar | 20 | YES | 
+  | rd_asm_proc_detail | 序号 | nvarchar | 20 | YES | 
+  | rd_asm_proc_detail | 物料名 | nvarchar | 100 | YES | 
+  | rd_asm_proc_detail | 物料编号 | nvarchar | 60 | YES | 
+  | rd_asm_proc_detail | 物料规格 | nvarchar | 500 | YES | 
+  | rd_prod_info_head | 0 | 
+  | rd_prod_info_detail | 0 | 
+  | rd_spec_doc_head | 0 | 
+  | rd_spec_doc_detail | 0 | 
+  | rd_asm_proc_head | 0 | 
+  | rd_asm_proc_detail | 0 | 
+  | rd_insp_plan_head | 0 | 
+  | rd_insp_plan_detail | 0 | 
+  | rd_asm_bom_head | 0 | 
+  | rd_asm_bom_detail | 0 | 
+  | rd_mold_proc_head | 0 | 
+  | rd_mold_proc_detail | 0 | 
+  | bs_bom | 
+  | bs_currency | 
+  | bs_customer_group | 
+  | bs_dept | 
+  | bs_dict | 
+  | bs_emp | 
+  | bs_equip | 
+  | bs_inv | 
+  | bs_inv_price | 
+  | bs_material_group | 
+  | bs_op | 
+  | bs_partner | 
+  | bs_proj | 
+  | bs_qc_item | 
+  | bs_qc_plan | 
+  | bs_region | 
+  | bs_reject | 
+  | bs_route | 
+  | bs_settle_type | 
+  | bs_supplier_group | 
+  | bs_team | 
+  | bs_uom | 
+  | bs_wc | 
+  | bs_wh | 
+  | pr_mix_process | 
+  | rd_asm_proc | 
+  | rd_asm_proc_detail | 
+  | rd_asm_proc_head | 
+  | rd_mold_proc | 
+  | rd_mold_proc_detail | 
+  | rd_mold_proc_head | 
+  | yj_std_lib | 
+  | bd_dispatch | 
+  | bl_dispatch | 
+  | form_flow_link | 
+  | pr_flow_card | 
+  | rd_approval | 
+  | rd_approval_detail | 
+  | rd_dev_task | 
+  | rd_spec_assign | 
+  | v_dispatch_detail | 
+  | v_dispatch_stats | 
+  | yj_doc_status | 
+  | yj_form_approval | 
+  | yj_message | 
+  | id | int | null | NO | 
+  | 产品编号 | nvarchar | 200 | NO | 
+  | 产品名称 | nvarchar | 200 | YES | 
+  | 源单据号 | nvarchar | 100 | YES | 
+  | 目标面板 | varchar | 50 | NO | 
+  | 下发人 | nvarchar | 100 | YES | 
+  | 下发时间 | datetime2 | null | NO | 
+  | asp_user1 | nvarchar | 100 | YES | 
+  | asp_time1 | datetime2 | null | YES | 
+  | asp_user2 | nvarchar | 100 | YES | 
+  | asp_time2 | datetime2 | null | YES | 
+  | asp_cancel | char | 1 | NO | 
+  | 负责人 | nvarchar | 50 | YES | 
+  | 0 | 
+[SQL FAIL] 列名 '面板代码' 无效。

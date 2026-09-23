@@ -1,0 +1,40 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s1-01-docstatus.sql ==
+  | id | int | null | NO | 
+  | panel_code | varchar | 40 | NO | 
+  | doc_no | nvarchar | 60 | NO | 
+  | shr | nvarchar | 40 | YES | 
+  | shsj | datetime | null | YES | 
+  | canceled | char | 1 | NO | 
+  | cancel_by | nvarchar | 40 | YES | 
+  | cancel_at | datetime | null | YES | 
+  | pending | char | 1 | YES | 
+  | pending_by | nvarchar | 40 | YES | 
+  | pending_at | datetime | null | YES | 
+  | update_at | datetime | null | NO | 
+  | archived | char | 1 | YES | 
+  | deleting | char | 1 | YES | 
+  | delete_req_by | nvarchar | 50 | YES | 
+  | delete_req_at | datetime2 | null | YES | 
+  | stopped | char | 1 | YES | 
+  | stop_by | nvarchar | 50 | YES | 
+  | stop_at | datetime2 | null | YES | 
+  | saved | char | 1 | NO | 
+  | modify_state | char | 1 | YES | 
+  | modify_req_by | nvarchar | 50 | YES | 
+  | modify_req_at | datetime2 | null | YES | 
+  | modify_appr_by | nvarchar | 50 | YES | 
+  | modify_appr_at | datetime2 | null | YES | 
+  | archived_at | datetime2 | null | YES | 
+  | erp_close_state | nvarchar | 1 | YES | 
+  | id,panel_code,doc_no,shr,shsj,canceled,cancel_by,cancel_at,pending,pending_by,pending_at,update_at,archived,deleting,delete_req_by,delete_req_at,stopped,stop_by,stop_at,saved,modify_state,modify_req_by,modify_req_at,modify_appr_by,modify_appr_at,archived_at,erp_close_state | 
+  | 1 | 
+  | yj_doc_status | 
+[OK] s1-01-docstatus.sql (6 batches)

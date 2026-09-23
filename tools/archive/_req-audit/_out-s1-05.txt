@@ -1,0 +1,138 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s1-05-rdtables.sql ==
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_asm_bom | product_code | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_asm_proc | product_code | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_insp_plan | product_code | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_insp_plan | version | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_insp_plan_head | 版本号 | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_mold_formula | material_code | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_mold_formula | product_code | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_mold_formula_head | 版本号 | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_mold_proc | product_code | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_mold_proc_head | 版本号 | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_product_info | product_code | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_spec_doc | product_code | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_spec_doc | version | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_spec_doc_detail | 物料编码 | nvarchar | 
+  | S1-13: RD_* 物理表列名含 编码/受控/履历/章/version | rd_spec_doc_head | 版本 | nvarchar | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | id | int | null | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | 单据编号 | nvarchar | 60 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | 单据日期 | nvarchar | 20 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | 备注 | nvarchar | 500 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | asp_user1 | nvarchar | 50 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | asp_time1 | datetime2 | null | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | asp_user2 | nvarchar | 50 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | asp_time2 | datetime2 | null | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | asp_cancel | char | 1 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | 产品编号 | nvarchar | 60 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | 产品名称 | nvarchar | 200 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | 产品种类 | nvarchar | 100 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | 整体规格外径 | nvarchar | 100 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | 整体规格长度 | nvarchar | 100 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_bom_head | 成品重量 | nvarchar | 50 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | id | int | null | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 单据编号 | nvarchar | 60 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 工序 | nvarchar | 60 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 工序控制内容 | nvarchar | 500 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 管控要求 | nvarchar | 1000 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 检查比例 | nvarchar | 100 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | asp_user1 | nvarchar | 50 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | asp_time1 | datetime2 | null | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | asp_user2 | nvarchar | 50 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | asp_time2 | datetime2 | null | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | asp_cancel | char | 1 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 表区 | nvarchar | 20 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 序号 | nvarchar | 20 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 物料名 | nvarchar | 100 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 物料编号 | nvarchar | 60 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 物料规格 | nvarchar | 500 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 外观要求 | nvarchar | 500 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 用量 | nvarchar | 30 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 更改内容 | nvarchar | 500 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 更改原因 | nvarchar | 200 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 更改时间 | nvarchar | 50 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 责任人 | nvarchar | 50 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_detail | 备注 | nvarchar | 200 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | id | int | null | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | 单据编号 | nvarchar | 60 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | 单据日期 | nvarchar | 20 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | 备注 | nvarchar | 500 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | asp_user1 | nvarchar | 50 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | asp_time1 | datetime2 | null | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | asp_user2 | nvarchar | 50 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | asp_time2 | datetime2 | null | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | asp_cancel | char | 1 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | 产品编号 | nvarchar | 60 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | 产品名称 | nvarchar | 200 | 
+  | S1-14: RD_SPEC_DOC/RD_ASM_PROC/RD_INSP_PLAN 头表全列 | rd_asm_proc_head | 产品种类 | nvarchar | 100 | 
+  | S1-15: RD_* 相关全部表名 | pr_asm_daily | 
+  | S1-15: RD_* 相关全部表名 | pr_asm_incoming | 
+  | S1-15: RD_* 相关全部表名 | pr_asm_return | 
+  | S1-15: RD_* 相关全部表名 | pr_mat_inspect | 
+  | S1-15: RD_* 相关全部表名 | qc_insp | 
+  | S1-15: RD_* 相关全部表名 | qc_insp_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_alkaline | 
+  | S1-15: RD_* 相关全部表名 | rd_alkaline_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_alkaline_head | 
+  | S1-15: RD_* 相关全部表名 | rd_antibact | 
+  | S1-15: RD_* 相关全部表名 | rd_antibact_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_antibact_head | 
+  | S1-15: RD_* 相关全部表名 | rd_approval | 
+  | S1-15: RD_* 相关全部表名 | rd_approval_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_asm_bom | 
+  | S1-15: RD_* 相关全部表名 | rd_asm_bom_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_asm_bom_head | 
+  | S1-15: RD_* 相关全部表名 | rd_asm_proc | 
+  | S1-15: RD_* 相关全部表名 | rd_asm_proc_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_asm_proc_head | 
+  | S1-15: RD_* 相关全部表名 | rd_dev_task | 
+  | S1-15: RD_* 相关全部表名 | rd_dom_test | 
+  | S1-15: RD_* 相关全部表名 | rd_dom_test_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_dom_test_head | 
+  | S1-15: RD_* 相关全部表名 | rd_drop_prec | 
+  | S1-15: RD_* 相关全部表名 | rd_drop_prec_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_drop_prec_head | 
+  | S1-15: RD_* 相关全部表名 | rd_equip_use | 
+  | S1-15: RD_* 相关全部表名 | rd_equip_use_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_equip_use_head | 
+  | S1-15: RD_* 相关全部表名 | rd_filter_eff | 
+  | S1-15: RD_* 相关全部表名 | rd_filter_eff_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_filter_eff_head | 
+  | S1-15: RD_* 相关全部表名 | rd_insp_plan | 
+  | S1-15: RD_* 相关全部表名 | rd_insp_plan_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_insp_plan_head | 
+  | S1-15: RD_* 相关全部表名 | rd_instr_use | 
+  | S1-15: RD_* 相关全部表名 | rd_instr_use_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_instr_use_head | 
+  | S1-15: RD_* 相关全部表名 | rd_mineral | 
+  | S1-15: RD_* 相关全部表名 | rd_mineral_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_mineral_head | 
+  | S1-15: RD_* 相关全部表名 | rd_mold_formula | 
+  | S1-15: RD_* 相关全部表名 | rd_mold_formula_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_mold_formula_head | 
+  | S1-15: RD_* 相关全部表名 | rd_mold_proc | 
+  | S1-15: RD_* 相关全部表名 | rd_mold_proc_detail | 
+  | S1-15: RD_* 相关全部表名 | rd_mold_proc_head | 
+  | S1-15: RD_* 相关全部表名 | rd_plan | 
+  | S1-15: RD_* 相关全部表名 | rd_plan_detail | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | erp_imp_log | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | gran_record | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | gran_record_detail | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | mix_record | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | mix_record_detail | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | qc_record | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | qc_record_detail | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | s_log | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | wh_record | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | wh_record_detail | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | yj_doc_modify_log | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | yj_schema_log | 
+  | S1-16: 含 修订 字样的表名(规格书修订记录) | yj_usage_log | 
+[OK] s1-05-rdtables.sql (6 batches)

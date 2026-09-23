@@ -1,0 +1,97 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-tc-flow-recon.sql ==
+  | 1-qc_tc_in 列 | id | int | null | 
+  | 1-qc_tc_in 列 | 单据编号 | nvarchar | 60 | 
+  | 1-qc_tc_in 列 | 单据日期 | nvarchar | 20 | 
+  | 1-qc_tc_in 列 | 文档编号 | nvarchar | 30 | 
+  | 1-qc_tc_in 列 | 供应商 | nvarchar | 200 | 
+  | 1-qc_tc_in 列 | 采购单号 | nvarchar | 60 | 
+  | 1-qc_tc_in 列 | 产品名称 | nvarchar | 200 | 
+  | 1-qc_tc_in 列 | 总数量 | decimal | null | 
+  | 1-qc_tc_in 列 | 不合格品数量 | decimal | null | 
+  | 1-qc_tc_in 列 | 不合格品比例 | nvarchar | 20 | 
+  | 1-qc_tc_in 列 | 不良说明 | nvarchar | 1000 | 
+  | 1-qc_tc_in 列 | 严重程度 | nvarchar | 20 | 
+  | 1-qc_tc_in 列 | 特采理由 | nvarchar | 1000 | 
+  | 1-qc_tc_in 列 | 产品开发部性能意见 | nvarchar | 500 | 
+  | 1-qc_tc_in 列 | 产品开发部工艺意见 | nvarchar | 500 | 
+  | 1-qc_tc_in 列 | 品质部意见 | nvarchar | 500 | 
+  | 1-qc_tc_in 列 | 销售部意见 | nvarchar | 500 | 
+  | 1-qc_tc_in 列 | 研发意见 | nvarchar | 500 | 
+  | 1-qc_tc_in 列 | 最终处理结果 | nvarchar | 20 | 
+  | 1-qc_tc_in 列 | 编制人 | nvarchar | 50 | 
+  | 1-qc_tc_in 列 | 备注 | nvarchar | 500 | 
+  | 1-qc_tc_in 列 | 单据状态 | nvarchar | 10 | 
+  | 1-qc_tc_in 列 | 审核人 | nvarchar | 50 | 
+  | 1-qc_tc_in 列 | 审核时间 | nvarchar | 30 | 
+  | 1-qc_tc_in 列 | 审批人 | nvarchar | 50 | 
+  | 1-qc_tc_in 列 | 审批时间 | nvarchar | 30 | 
+  | 1-qc_tc_in 列 | asp_user1 | nvarchar | 50 | 
+  | 1-qc_tc_in 列 | asp_time1 | datetime2 | null | 
+  | 1-qc_tc_in 列 | asp_user2 | nvarchar | 50 | 
+  | 1-qc_tc_in 列 | asp_time2 | datetime2 | null | 
+  | 1-qc_tc_in 列 | asp_cancel | char | 1 | 
+  | 2-QC_TC_IN 字段 | 产品名称 | 产品名称 | 文本 | header | 1 | 1 | 0 | 50 | 
+  | 2-QC_TC_IN 字段 | 总数量 | 总数量 | 小数 | header | 1 | 1 | 0 | 60 | 
+  | 2-QC_TC_IN 字段 | 不合格品数量 | 不合格品数量 | 小数 | header | 1 | 1 | 0 | 70 | 
+  | 2-QC_TC_IN 字段 | 不合格品比例 | 不合格品比例 | 文本 | header | 1 | 1 | 0 | 80 | 
+  | 2-QC_TC_IN 字段 | 不良说明 | 不良说明 | 文本 | header | 1 | 1 | 0 | 90 | 
+  | 2-QC_TC_IN 字段 | 特采理由 | 特采理由 | 文本 | header | 1 | 1 | 0 | 110 | 
+  | 2-QC_TC_IN 字段 | 产品开发部性能意见 | 产品开发部性能意见 | 文本 | header | 1 | 1 | 0 | 120 | 
+  | 2-QC_TC_IN 字段 | 产品开发部工艺意见 | 产品开发部工艺意见 | 文本 | header | 1 | 1 | 0 | 130 | 
+  | 2-QC_TC_IN 字段 | 品质部意见 | 品质部意见 | 文本 | header | 1 | 1 | 0 | 140 | 
+  | 2-QC_TC_IN 字段 | 销售部意见 | 销售部意见 | 文本 | header | 1 | 1 | 0 | 150 | 
+  | 2-QC_TC_IN 字段 | 研发意见 | 研发意见 | 文本 | header | 1 | 1 | 0 | 160 | 
+  | 2-QC_TC_IN 字段 | 备注 | 备注 | 文本 | header | 1 | 1 | 0 | 180 | 
+  | 2-QC_TC_IN 字段 | 审核人 | 审核人 | 文本 | header | 0 | 1 | 0 | 200 | 
+  | 2-QC_TC_IN 字段 | 审核时间 | 审核时间 | 文本 | header | 0 | 1 | 0 | 210 | 
+  | 2-QC_TC_IN 字段 | 文档编号 | 文档编号 | 文本 | header | 1 | 1 | 1 | 215 | 
+  | 2-QC_TC_IN 字段 | 编制人 | 编制人 | 文本 | header | 1 | 1 | 0 | 220 | 
+  | 2-QC_TC_IN 字段 | 单据编号 | 单据编号 | 文本 | query,header | 0 | 1 | 0 | 10 | 
+  | 2-QC_TC_IN 字段 | 单据日期 | 单据日期 | 日期 | query,header | 1 | 1 | 0 | 20 | 
+  | 2-QC_TC_IN 字段 | 供应商 | 供应商 | 参照 | query,header | 1 | 1 | 0 | 30 | 
+  | 2-QC_TC_IN 字段 | 采购单号 | 采购单号 | 参照 | query,header | 1 | 1 | 0 | 40 | 
+  | 2-QC_TC_IN 字段 | 严重程度 | 严重程度 | 下拉框 | query,header | 1 | 1 | 0 | 100 | 
+  | 2-QC_TC_IN 字段 | 最终处理结果 | 最终处理结果 | 下拉框 | query,header | 1 | 1 | 0 | 170 | 
+  | 2-QC_TC_IN 字段 | 单据状态 | 单据状态 | 文本 | query,header | 0 | 1 | 0 | 190 | 
+  | 3-QC_TC_IN 面板 | QC_TC_IN | 特采单 | 单据 | doc | qc_tc_in | qc_tc_in_detail | 单据编号 | id | 单据编号 | TCI | 单据日期 | 
+  | 4-qc_insp_detail 列 | id | int | null | 
+  | 4-qc_insp_detail 列 | 单据编号 | nvarchar | 60 | 
+  | 4-qc_insp_detail 列 | 物料编码 | nvarchar | 100 | 
+  | 4-qc_insp_detail 列 | 物料名称 | nvarchar | 200 | 
+  | 4-qc_insp_detail 列 | 规格型号 | nvarchar | 200 | 
+  | 4-qc_insp_detail 列 | 单位 | nvarchar | 50 | 
+  | 4-qc_insp_detail 列 | 送检数量 | decimal | null | 
+  | 4-qc_insp_detail 列 | 合格数量 | decimal | null | 
+  | 4-qc_insp_detail 列 | 不合格数量 | decimal | null | 
+  | 4-qc_insp_detail 列 | 处置方式 | nvarchar | 20 | 
+  | 4-qc_insp_detail 列 | 批号 | nvarchar | 30 | 
+  | 4-qc_insp_detail 列 | 备注 | nvarchar | 200 | 
+  | 4-qc_insp_detail 列 | asp_user1 | nvarchar | 50 | 
+  | 4-qc_insp_detail 列 | asp_time1 | datetime2 | null | 
+  | 4-qc_insp_detail 列 | asp_user2 | nvarchar | 50 | 
+  | 4-qc_insp_detail 列 | asp_time2 | datetime2 | null | 
+  | 4-qc_insp_detail 列 | asp_cancel | char | 1 | 
+  | 4-qc_insp_detail 列 | 型号 | nvarchar | 100 | 
+  | 4-qc_insp_detail 列 | 数量 | float | null | 
+  | 4-qc_insp_detail 列 | 仓库代码 | nvarchar | 50 | 
+  | 4-qc_insp_detail 列 | 物料描述 | nvarchar | 1000 | 
+  | 4-qc_insp_detail 列 | 箱数 | float | null | 
+  | 4-qc_insp_detail 列 | 日期 | nvarchar | 40 | 
+  | 4-qc_insp_detail 列 | 结案 | nvarchar | 20 | 
+  | 4-qc_insp_detail 列 | 部门 | nvarchar | 200 | 
+  | 4-qc_insp_detail 列 | 部门名称 | nvarchar | 200 | 
+  | 4-qc_insp_detail 列 | 入库单号 | nvarchar | 50 | 
+  | 4-qc_insp_detail 列 | 不良数量 | decimal | null | 
+  | 4-qc_insp_detail 列 | 采购订单行号 | nvarchar | 500 | 
+  | 4-qc_insp_detail 列 | 计量单位 | nvarchar | 50 | 
+  | 4-qc_insp_detail 列 | 单价 | decimal | null | 
+  | 4-qc_insp_detail 列 | 批次号 | nvarchar | 50 | 
+  | 4-qc_insp_detail 列 | 报废数量 | decimal | null | 
+  | 4-qc_insp_detail 列 | 损耗 | decimal | null | 
+  | 4-qc_insp_detail 列 | 损耗率 | decimal | null | 
+  | 4-qc_insp_detail 列 | 条码 | nvarchar | 100 | 
+  | 4-qc_insp_detail 列 | 成品编号 | nvarchar | 60 | 
+  | 4-qc_insp_detail 列 | 生产日期 | nvarchar | 20 | 
+  | 6-数据量 | 1 | 0 | 105 | 123 | 
+[OK] _q-tc-flow-recon.sql (1 batches)

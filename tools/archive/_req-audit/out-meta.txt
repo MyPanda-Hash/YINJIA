@@ -1,0 +1,197 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s2-meta.sql ==
+  | RD_ASM_BOM | 组装BOM表 | 单据 | doc | rd_asm_bom_detail | rd_asm_bom_head | 单据编号 | id | 单据编号 | AB2 | 单据日期 | 20 | items | 研发管理 | null | 
+  | RD_ASM_PROC | 组装工艺清单 | 单据 | doc | rd_asm_proc_detail | rd_asm_proc_head | 单据编号 | id | 单据编号 | AP | 单据日期 | 20 | items | 研发管理 | null | 
+  | RD_INSP_PLAN | 出货检验计划表 | 单据 | doc | rd_insp_plan_detail | rd_insp_plan_head | 单据编号 | id | 单据编号 | IP | 单据日期 | 20 | items | 研发管理 | null | 
+  | RD_MOLD_PROC | 成型工艺清单 | 单据 | doc | rd_mold_proc_detail | rd_mold_proc_head | 单据编号 | id | 单据编号 | MP | 单据日期 | 20 | items | 研发管理 | null | 
+  | RD_PROD_INFO | 产品信息表 | 单据 | doc | rd_prod_info_detail | rd_prod_info_head | 单据编号 | id | 单据编号 | PI | 单据日期 | 20 | items | 研发管理 | null | 
+  | RD_SPEC_DOC | 规格书 | 单据 | doc | rd_spec_doc_detail | rd_spec_doc_head | 单据编号 | id | 单据编号 | SD | 单据日期 | 20 | items | 研发管理 | null | 
+  | RD_PROD_INFO | 单据编号 | 单据编号 | 文本 | null | null | null | null | header | 10 | 140 | 0 | 1 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 单据日期 | 单据日期 | 日期 | null | null | null | null | header | 20 | 120 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 产品编号 | 产品编号 | 文本 | null | null | null | null | header | 30 | 130 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 产品名称 | 产品名称 | 文本 | null | null | null | null | header | 40 | 200 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 产品类别 | 产品类别 | 下拉框 | SELECT v FROM (VALUES (N'阻垢'),(N'除铅'),(N'除余氯'),(N'VOC'),(N'抑菌'),(N'矿化'),(N'碱性')) AS t(v) | null | null | null | header | 50 | 110 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 产品类型 | 产品类型 | 下拉框 | SELECT v FROM (VALUES (N'成品'),(N'半成品'),(N'裸棒')) AS t(v) | null | null | null | header | 60 | 100 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 产品整体尺寸 | 产品整体尺寸 | 文本 | null | null | null | null | header | 70 | 180 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 客户料号 | 客户料号 | 文本 | null | null | null | null | header | 80 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 炭棒尺寸 | 炭棒尺寸 | 文本 | null | null | null | null | header | 90 | 180 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 特殊性能描述 | 特殊性能描述 | 文本 | null | null | null | null | header | 100 | 200 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 下单数量 | 下单数量 | 文本 | null | null | null | null | header | 110 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 产品分类 | 产品分类 | 下拉框 | SELECT v FROM (VALUES (N'重点产品'),(N'KPC产品'),(N'其他')) AS t(v) | null | null | null | header | 120 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 产品形态 | 产品形态 | 下拉框 | SELECT v FROM (VALUES (N'包布'),(N'套网'),(N'打端盖'),(N'套PP棉')) AS t(v) | null | null | null | header | 130 | 120 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 客户图纸或规格书 | 客户图纸或规格书 | 文本 | null | null | null | null | header | 140 | 180 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 责任人 | 责任人 | 文本 | null | null | null | null | header | 150 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 审核人 | 审核人 | 参照 | null | EMP | 员工名称 | 员工名称 | header | 160 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 备注 | 备注 | 文本 | null | null | null | null | header | 170 | 160 | 1 | 0 | 0 | null | 1 | Remark | null | 
+  | RD_PROD_INFO | 产品编号 | 产品编号 | 文本 | null | null | null | null | query | 10 | 130 | 0 | 0 | 0 | null | 1 | null | null | 
+  | RD_PROD_INFO | 产品名称 | 产品名称 | 文本 | null | null | null | null | query | 20 | 180 | 0 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 表区 | 表区 | 下拉框 | SELECT v FROM (VALUES (N'修订记录'),(N'检验要求'),(N'物料清单')) AS t(v) | null | null | null | detail | 5 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 序号 | 序号 | 文本 | null | null | null | null | detail | 10 | 60 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 更改内容 | 更改内容 | 文本 | null | null | null | null | detail | 20 | 220 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 更改原因 | 更改原因 | 文本 | null | null | null | null | detail | 30 | 160 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 更改时间 | 更改时间 | 文本 | null | null | null | null | detail | 40 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 责任人 | 责任人 | 文本 | null | null | null | null | detail | 50 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 备注 | 备注 | 文本 | null | null | null | null | detail | 60 | 120 | 1 | 0 | 0 | null | 1 | Remark | null | 
+  | RD_SPEC_DOC | 检验项目 | 检验项目 | 文本 | null | null | null | null | detail | 70 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 检验要求 | 检验要求 | 文本 | null | null | null | null | detail | 80 | 260 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 检验方法 | 检验方法 | 文本 | null | null | null | null | detail | 90 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 检验依据 | 检验依据 | 文本 | null | null | null | null | detail | 100 | 120 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 物料编码 | 物料编码 | 文本 | null | null | null | null | detail | 110 | 110 | 1 | 0 | 0 | null | 1 | Material Code | null | 
+  | RD_SPEC_DOC | 物料名称 | 物料名称 | 文本 | null | null | null | null | detail | 120 | 130 | 1 | 0 | 0 | null | 1 | Material Name | null | 
+  | RD_SPEC_DOC | 规格参数 | 规格参数 | 文本 | null | null | null | null | detail | 130 | 240 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 数量 | 数量 | 文本 | null | null | null | null | detail | 140 | 70 | 1 | 0 | 0 | null | 1 | Quantity | null | 
+  | RD_SPEC_DOC | 单据编号 | 单据编号 | 文本 | null | null | null | null | header | 10 | 140 | 0 | 1 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 单据日期 | 单据日期 | 日期 | null | null | null | null | header | 20 | 120 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 规格书种类 | 规格书种类 | 下拉框 | SELECT v FROM (VALUES (N'飞利浦沐浴阻垢滤芯'),(N'矿化烧结炭棒'),(N'除铅炭棒'),(N'抑菌炭棒'),(N'X14折叠复合滤芯'),(N'碱性炭棒'),(N'矿化炭棒'),(N'多功能炭棒')) AS t(v) | null | null | null | header | 30 | 160 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 名称 | 名称 | 文本 | null | null | null | null | header | 40 | 220 | 1 | 1 | 0 | null | 1 | Name | null | 
+  | RD_SPEC_DOC | 编号 | 编号 | 参照 | null | RD_PROD_INFO | 产品编号 | 产品名称 | header | 50 | 100 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 客户名 | 客户名 | 文本 | null | null | null | null | header | 60 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 客户料号 | 客户料号 | 文本 | null | null | null | null | header | 70 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 版本 | 版本 | 文本 | null | null | null | null | header | 80 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 日期 | 日期 | 文本 | null | null | null | null | header | 90 | 100 | 1 | 0 | 0 | null | 1 | Date | null | 
+  | RD_SPEC_DOC | 制订日期 | 制订日期 | 文本 | null | null | null | null | header | 100 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 审核日期 | 审核日期 | 文本 | null | null | null | null | header | 110 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 批准日期 | 批准日期 | 文本 | null | null | null | null | header | 120 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 适用范围 | 适用范围 | 文本 | null | null | null | null | header | 130 | 260 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 整体规格参数 | 整体规格参数 | 文本 | null | null | null | null | header | 140 | 260 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 产品主要性能 | 产品主要性能 | 文本 | null | null | null | null | header | 150 | 220 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 包装方式 | 包装方式 | 文本 | null | null | null | null | header | 160 | 260 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 运输要求 | 运输要求 | 文本 | null | null | null | null | header | 170 | 260 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 存储环境 | 存储环境 | 文本 | null | null | null | null | header | 180 | 260 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 备注 | 备注 | 文本 | null | null | null | null | header | 190 | 160 | 1 | 0 | 0 | null | 1 | Remark | null | 
+  | RD_SPEC_DOC | 规格书种类 | 规格书种类 | 下拉框 | SELECT v FROM (VALUES (N'飞利浦沐浴阻垢滤芯'),(N'矿化烧结炭棒'),(N'除铅炭棒'),(N'抑菌炭棒'),(N'X14折叠复合滤芯'),(N'碱性炭棒'),(N'矿化炭棒'),(N'多功能炭棒')) AS t(v) | null | null | null | query | 10 | 160 | 0 | 0 | 0 | null | 1 | null | null | 
+  | RD_SPEC_DOC | 名称 | 名称 | 文本 | null | null | null | null | query | 20 | 200 | 0 | 0 | 0 | null | 1 | Name | null | 
+  | RD_SPEC_DOC | 编号 | 编号 | 参照 | null | RD_PROD_INFO | 产品编号 | 产品名称 | query | 30 | 110 | 0 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 序号 | 序号 | 文本 | null | null | null | null | detail | 5 | 60 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 工序 | 工序 | 文本 | null | null | null | null | detail | 10 | 120 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 工序控制内容 | 工序控制内容 | 文本 | null | null | null | null | detail | 20 | 280 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 管控要求 | 管控要求 | 文本 | null | null | null | null | detail | 30 | 380 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 检查比例 | 检查比例 | 文本 | null | null | null | null | detail | 40 | 120 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 物料名 | 物料名 | 文本 | null | null | null | null | detail | 50 | 140 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 物料编号 | 物料编号 | 文本 | null | null | null | null | detail | 60 | 130 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 物料规格 | 物料规格 | 文本 | null | null | null | null | detail | 70 | 260 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 外观要求 | 外观要求 | 文本 | null | null | null | null | detail | 80 | 260 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 用量 | 用量 | 文本 | null | null | null | null | detail | 90 | 80 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 更改内容 | 更改内容 | 文本 | null | null | null | null | detail | 100 | 200 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 更改原因 | 更改原因 | 文本 | null | null | null | null | detail | 110 | 140 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 更改时间 | 更改时间 | 文本 | null | null | null | null | detail | 120 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 责任人 | 责任人 | 文本 | null | null | null | null | detail | 130 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 备注 | 备注 | 文本 | null | null | null | null | detail | 140 | 200 | 1 | 0 | 0 | null | 1 | Remark | null | 
+  | RD_ASM_PROC | 单据编号 | 单据编号 | 文本 | null | null | null | null | header | 10 | 140 | 0 | 1 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 单据日期 | 单据日期 | 日期 | null | null | null | null | header | 20 | 120 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 备注 | 备注 | 文本 | null | null | null | null | header | 30 | 160 | 1 | 0 | 0 | null | 1 | Remark | null | 
+  | RD_ASM_PROC | 产品编号 | 产品编号 | 参照 | null | RD_PROD_INFO | 产品编号 | 产品名称 | header | 30 | 130 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 产品名称 | 产品名称 | 文本 | null | null | null | null | header | 40 | 200 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 产品种类 | 产品种类 | 文本 | null | null | null | null | header | 50 | 130 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 整体规格外径 | 整体规格（外径） | 文本 | null | null | null | null | header | 60 | 150 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 整体规格长度 | 整体规格（长度） | 文本 | null | null | null | null | header | 70 | 150 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 成品重量 | 成品重量 | 文本 | null | null | null | null | header | 80 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_PROC | 表区 | 表区 | 文本 | null | null | null | null | header | 90 | 90 | 1 | 0 | 1 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 检验类别 | 检验类别 | 下拉框 | SELECT v FROM (VALUES (N'必测项'),(N'型式检验')) AS t(v) | null | null | null | detail | 5 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 控制项目 | 控制项目 | 文本 | null | null | null | null | detail | 10 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 质量控制内容 | 质量控制内容 | 文本 | null | null | null | null | detail | 20 | 130 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 检测仪器 | 检测仪器 | 文本 | null | null | null | null | detail | 30 | 120 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 控制标准及要求 | 控制标准及要求 | 文本 | null | null | null | null | detail | 40 | 320 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 检验 | 检验 | 文本 | null | null | null | null | detail | 50 | 70 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 不合格应对措施 | 不合格应对措施 | 文本 | null | null | null | null | detail | 60 | 280 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 检测频率 | 检测频率 | 文本 | null | null | null | null | detail | 70 | 120 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 取样方式 | 取样方式 | 文本 | null | null | null | null | detail | 80 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 检验内容 | 检验内容 | 文本 | null | null | null | null | detail | 90 | 180 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 控制方法 | 控制方法 | 文本 | null | null | null | null | detail | 100 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 单据编号 | 单据编号 | 文本 | null | null | null | null | header | 10 | 140 | 0 | 1 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 单据日期 | 单据日期 | 日期 | null | null | null | null | header | 20 | 120 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 文档编号 | 文档编号 | 文本 | null | null | null | null | header | 30 | 110 | 1 | 0 | 1 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 标题 | 标题 | 文本 | null | null | null | null | header | 40 | 220 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 版本号 | 版本号 | 文本 | null | null | null | null | header | 50 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 密级 | 密级 | 下拉框 | SELECT v FROM (VALUES (N'保密'),(N'内部'),(N'公开')) AS t(v) | null | null | null | header | 60 | 80 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 产品编号 | 产品编号 | 参照 | null | RD_PROD_INFO | 产品编号 | 产品名称 | header | 70 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 客户名 | 客户名 | 文本 | null | null | null | null | header | 80 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 管理人 | 管理人 | 文本 | null | null | null | null | header | 90 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 主要性能 | 主要性能 | 文本 | null | null | null | null | header | 100 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 滤芯尺寸 | 滤芯尺寸 | 文本 | null | null | null | null | header | 110 | 160 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 授权使用人 | 授权使用人 | 文本 | null | null | null | null | header | 120 | 200 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 编写人 | 编写人 | 文本 | null | null | null | null | header | 130 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 审核人 | 审核人 | 参照 | null | EMP | 员工名称 | 员工名称 | header | 140 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 备注 | 备注 | 文本 | null | null | null | null | header | 150 | 160 | 1 | 0 | 0 | null | 1 | Remark | null | 
+  | RD_INSP_PLAN | 标题 | 标题 | 文本 | null | null | null | null | query | 10 | 220 | 0 | 0 | 0 | null | 1 | null | null | 
+  | RD_INSP_PLAN | 产品编号 | 产品编号 | 文本 | null | null | null | null | query | 20 | 110 | 0 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 表区 | 表区 | 下拉框 | SELECT v FROM (VALUES (N'修订记录'),(N'物料清单')) AS t(v) | null | null | null | detail | 5 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 序号 | 序号 | 文本 | null | null | null | null | detail | 10 | 60 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 更改内容 | 更改内容 | 文本 | null | null | null | null | detail | 20 | 200 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 更改原因 | 更改原因 | 文本 | null | null | null | null | detail | 30 | 140 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 更改时间 | 更改时间 | 文本 | null | null | null | null | detail | 40 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 责任人 | 责任人 | 文本 | null | null | null | null | detail | 50 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 备注 | 备注 | 文本 | null | null | null | null | detail | 55 | 120 | 1 | 0 | 0 | null | 1 | Remark | null | 
+  | RD_ASM_BOM | 物料名 | 物料名 | 文本 | null | null | null | null | detail | 60 | 140 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 物料编号 | 物料编号 | 文本 | null | null | null | null | detail | 70 | 120 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 物料规格 | 物料规格 | 文本 | null | null | null | null | detail | 80 | 260 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 外观要求 | 外观要求 | 文本 | null | null | null | null | detail | 90 | 260 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 用量 | 用量 | 文本 | null | null | null | null | detail | 100 | 80 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 单据编号 | 单据编号 | 文本 | null | null | null | null | header | 10 | 140 | 0 | 1 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 单据日期 | 单据日期 | 日期 | null | null | null | null | header | 20 | 120 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 产品编号 | 产品编号 | 参照 | null | RD_PROD_INFO | 产品编号 | 产品名称 | header | 30 | 130 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 产品名称 | 产品名称 | 文本 | null | null | null | null | header | 40 | 200 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 产品种类 | 产品种类 | 文本 | null | null | null | null | header | 50 | 130 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 整体规格外径 | 整体规格（外径） | 文本 | null | null | null | null | header | 60 | 150 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 整体规格长度 | 整体规格（长度） | 文本 | null | null | null | null | header | 70 | 150 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 成品重量 | 成品重量 | 文本 | null | null | null | null | header | 80 | 110 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_ASM_BOM | 备注 | 备注 | 文本 | null | null | null | null | header | 90 | 160 | 1 | 0 | 0 | null | 1 | Remark | null | 
+  | RD_ASM_BOM | 产品编号 | 产品编号 | 参照 | null | RD_PROD_INFO | 产品编号 | 产品名称 | query | 10 | 130 | 0 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 序号 | 序号 | 文本 | null | null | null | null | detail | 10 | 60 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 物料种类 | 物料种类 | 文本 | null | null | null | null | detail | 20 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 物料编号 | 物料编号 | 文本 | null | null | null | null | detail | 30 | 130 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 物料名称 | 物料名称 | 文本 | null | null | null | null | detail | 40 | 140 | 1 | 0 | 0 | null | 1 | Material Name | null | 
+  | RD_MOLD_PROC | 实际添加比例 | 实际添加比例 | 文本 | null | null | null | null | detail | 50 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 单支物料含量 | 单支物料含量 | 文本 | null | null | null | null | detail | 60 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 设计添加量 | 设计添加量 | 文本 | null | null | null | null | detail | 70 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 单据编号 | 单据编号 | 文本 | null | null | null | null | header | 10 | 140 | 0 | 1 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 单据日期 | 单据日期 | 日期 | null | null | null | null | header | 20 | 120 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 表单管理人 | 表单管理人 | 文本 | null | null | null | null | header | 30 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 密级 | 密级 | 下拉框 | SELECT v FROM (VALUES (N'保密'),(N'内部'),(N'公开')) AS t(v) | null | null | null | header | 40 | 80 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 使用范围 | 使用范围 | 下拉框 | SELECT v FROM (VALUES (N'工艺科/成型车间'),(N'工程技术中心'),(N'银嘉内部'),(N'公司内')) AS t(v) | null | null | null | header | 50 | 130 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 版本号 | 版本号 | 文本 | null | null | null | null | header | 60 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 产品编号 | 产品编号 | 参照 | null | RD_PROD_INFO | 产品编号 | 产品名称 | header | 70 | 100 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 产品名称 | 产品名称 | 文本 | null | null | null | null | header | 80 | 160 | 1 | 1 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 炭棒规格1 | 炭棒规格1 | 文本 | null | null | null | null | header | 90 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 炭棒规格2 | 炭棒规格2 | 文本 | null | null | null | null | header | 100 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 炭棒规格3 | 炭棒规格3 | 文本 | null | null | null | null | header | 110 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 产品管控类型 | 产品管控类型 | 下拉框 | SELECT v FROM (VALUES (N'·重点管控产品'),(N'·一般管控产品')) AS t(v) | null | null | null | header | 120 | 120 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 炭棒规格 | 炭棒规格 | 文本 | null | null | null | null | header | 125 | 100 | 0 | 0 | 1 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 外观要求 | 外观要求 | 下拉框 | SELECT v FROM (VALUES (N'·成品'),(N'·半成品')) AS t(v) | null | null | null | header | 130 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 生产车间 | 生产车间 | 参照 | null | DEPT | 部门编码 | 部门名称 | header | 140 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 理论最低灌料重量g | 理论最低灌料重量g | 文本 | null | null | null | null | header | 150 | 130 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 理论灌料中间值g | 理论灌料中间值g | 文本 | null | null | null | null | header | 160 | 130 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 理论最高灌料重量g | 理论最高灌料重量g | 文本 | null | null | null | null | header | 170 | 130 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 理论水分 | 理论水分 | 文本 | null | null | null | null | header | 180 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 实际灌料重量计算公式 | 实际灌料重量计算公式 | 文本 | null | null | null | null | header | 190 | 220 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 工序 | 工序 | 文本 | null | null | null | null | header | 200 | 60 | 0 | 0 | 1 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 烧结炉参数 | 烧结炉参数 | 下拉框 | SELECT v FROM (VALUES (N'170度'),(N'180度'),(N'185度'),(N'190度'),(N'200度')) AS t(v) | null | null | null | header | 200 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 工序管控要求 | 工序管控要求 | 文本 | null | null | null | null | header | 201 | 100 | 0 | 0 | 1 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 灌料 | 灌料 | 文本 | null | null | null | null | header | 202 | 60 | 0 | 0 | 1 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 烧结 | 烧结 | 文本 | null | null | null | null | header | 203 | 60 | 0 | 0 | 1 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 烧结时间/调速器参数 | 烧结时间/调速器参数 | 文本 | null | null | null | null | header | 204 | 100 | 0 | 0 | 1 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 热压 | 热压 | 文本 | null | null | null | null | header | 205 | 60 | 0 | 0 | 1 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 冷却 | 冷却 | 文本 | null | null | null | null | header | 206 | 60 | 0 | 0 | 1 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 脱模 | 脱模 | 文本 | null | null | null | null | header | 207 | 60 | 0 | 0 | 1 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 烧结时间调速器参数 | 烧结时间调速器参数 | 下拉框 | SELECT v FROM (VALUES (N'40分钟'),(N'55分钟'),(N'60分钟'),(N'65分钟'),(N'80分钟'),(N'125分钟')) AS t(v) | null | null | null | header | 210 | 130 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 热压要求 | 热压要求 | 文本 | null | null | null | null | header | 220 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 冷却参数设置 | 冷却参数设置 | 下拉框 | SELECT v FROM (VALUES (N'打开全部冷却风扇'),(N'关闭全部冷却风扇'),(N'冷却调速设置3.7~4.3，打开全部冷却风扇'),(N'冷却调速设置12，关闭全部冷却风扇'),(N'冷却调速设置35-45，打开冷却线入口及出口冷却风扇')) AS t(v) | null | null | null | header | 230 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 长度要求 | 长度要求 | 文本 | null | null | null | null | header | 240 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 重量要求 | 重量要求 | 文本 | null | null | null | null | header | 250 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 最短长度mm | 最短长度mm | 文本 | null | null | null | null | header | 260 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 中间值mm | 中间值mm | 文本 | null | null | null | null | header | 270 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 最长长度mm | 最长长度mm | 文本 | null | null | null | null | header | 280 | 100 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 最低重量g | 最低重量g | 文本 | null | null | null | null | header | 290 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 中间值g | 中间值g | 文本 | null | null | null | null | header | 300 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 最高重量g | 最高重量g | 文本 | null | null | null | null | header | 310 | 90 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 炭棒尺寸 | 炭棒尺寸 | 文本 | null | null | null | null | header | 315 | 80 | 0 | 0 | 1 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 外径mm | 外径mm | 文本 | null | null | null | null | header | 320 | 80 | 1 | 0 | 0 | null | 1 | null | null | 
+  | RD_MOLD_PROC | 外径公差 | 外径公差 | 文本 | null | null | null | null | header | 330 | 80 | 1 | 0 | 0 | null | 1 | null | null | 
+[OK] s2-meta.sql (8 batches)

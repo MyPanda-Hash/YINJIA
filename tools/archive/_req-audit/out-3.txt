@@ -1,0 +1,197 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 590
++ ... \out-2.txt; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s2-3.sql ==
+  | id | int | null | 
+  | lib_code | nvarchar | 40 | 
+  | item_code | nvarchar | 60 | 
+  | content | nvarchar | -1 | 
+  | seq | int | null | 
+  | enabled | int | null | 
+  | asp_user1 | nvarchar | 50 | 
+  | asp_time1 | datetime2 | null | 
+  | asp_user2 | nvarchar | 50 | 
+  | asp_time2 | datetime2 | null | 
+  | asp_cancel | char | 1 | 
+  | 36 | 
+  | 1 | spec.section | 1.适用范围 | 应用于沐浴过滤装置，直通式无需封装端盖 | 10 | 1 | seed | null | null | null | N | 
+  | 2 | spec.section | 1.适用范围 | 傲美矿化后置烧结棒 | 20 | 1 | seed | null | null | null | N | 
+  | 3 | spec.section | 1.适用范围 | 迈博瑞重力式陶瓷炭棒复合滤芯（2只装） | 30 | 1 | seed | null | null | null | N | 
+  | 4 | spec.section | 1.适用范围 | 伊可普006项目冰箱炭棒 | 40 | 1 | seed | null | null | null | N | 
+  | 5 | spec.section | 1.适用范围 | 伊可普抑菌炭棒 | 50 | 1 | seed | null | null | null | N | 
+  | 6 | spec.section | 1.适用范围 | 伊可普矿化炭棒 | 60 | 1 | seed | null | null | null | N | 
+  | 7 | spec.section | 2.整体规格参数 | 40.5(OD)*16（ID)*27(L) | 10 | 1 | seed | null | null | null | N | 
+  | 8 | spec.section | 2.整体规格参数 | 27.5(OD)*12（ID)*110L) | 20 | 1 | seed | null | null | null | N | 
+  | 9 | spec.section | 2.整体规格参数 | 60.5(OD)*173(L) | 30 | 1 | seed | null | null | null | N | 
+  | 10 | spec.section | 2.整体规格参数 | 见下表 | 40 | 1 | seed | null | null | null | N | 
+  | 11 | spec.section | 2.整体规格参数 | 59.5(OD)*29.5（ID)*175(L) | 50 | 1 | seed | null | null | null | N | 
+  | 12 | spec.section | 2.整体规格参数 | 24(OD)*10（ID)*120(L) | 60 | 1 | seed | null | null | null | N | 
+  | 13 | spec.section | 3.产品主要性能 | 阻垢 | 10 | 1 | seed | null | null | null | N | 
+  | 14 | spec.section | 3.产品主要性能 | 矿化寿命 | 20 | 1 | seed | null | null | null | N | 
+  | 15 | spec.section | 3.产品主要性能 | 重力式低流速、除余氯、浊度、大肠、铅砷、汞、铬、VOCs、氯胺、PFAS等。 | 30 | 1 | seed | null | null | null | N | 
+  | 16 | spec.section | 3.产品主要性能 | 除铅、余氯、孢囊等 | 40 | 1 | seed | null | null | null | N | 
+  | 17 | spec.section | 3.产品主要性能 | 抑菌、去余氯、一级颗粒物 | 50 | 1 | seed | null | null | null | N | 
+  | 18 | spec.section | 3.产品主要性能 | 矿化寿命、余氯寿命. | 60 | 1 | seed | null | null | null | N | 
+  | 19 | spec.section | 6.包装方式 | 按照包装规范进行包装作业；
+（2）纸箱外层左上角黏贴白色标签，标签内容包括：采购单号、物料编号、生产批号、包装箱号等信息；
+（3）托盘外层附送货信息及产品检测报告。 | 10 | 1 | seed | null | null | null | N | 
+  | 20 | spec.section | 6.包装方式 | （1）按照包装规范进行包装作业
+（2）纸箱外层左上角黏贴白色标签，标签内容包括：采购单号、物料编号、生产批号、包装箱号等信息； | 20 | 1 | seed | null | null | null | N | 
+  | 21 | spec.section | 6.包装方式 | （1）炭棒需无黑、无颗粒物处理要求；
+（2）炭棒立式放置，箱内用PP材质包装袋作为内衬；整箱套袋、放刀卡
+（3）纸箱外层左上角黏贴白色标签，标签内容包括：采购单号、物料编号、生产批号、包装箱号等信息；
+（4）托盘外层附送货信息及产品检测报告。 | 30 | 1 | seed | null | null | null | N | 
+  | 22 | spec.section | 6.包装方式 | 炭棒有无黑要求、有颗粒物要求；
+按照包装规范进行包装作业；
+（3）纸箱外层左上角黏贴白色标签，标签内容包括：采购单号、物料编号、生产批号、包装箱号等信息；
+（4）托盘外层附送货信息及产品检测报告。 | 40 | 1 | seed | null | null | null | N | 
+  | 23 | spec.section | 7.运输要求 | 产品在运输中应避免冲击、挤压、雨淋、受潮及化学品腐蚀。 | 10 | 1 | seed | null | null | null | N | 
+  | 24 | spec.section | 8.存储环境 | 产品应贮存在通风良好、干燥的室内，不得与酸、碱及有腐蚀性的物品放置一起。 | 10 | 1 | seed | null | null | null | N | 
+  | 25 | lab.test_item | 默认 | NSF 53-除铅（PH8.5） | 10 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 26 | lab.test_item | 默认 | NSF 53-除汞（PH8.5） | 20 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 27 | lab.test_item | 默认 | NSF 53-除VOC | 30 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 28 | lab.apply_type | 默认 | 开发性 | 10 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 29 | lab.apply_type | 默认 | 品质委托 | 20 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 30 | lab.device | 默认 | 加标测试系统1# | 10 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 31 | lab.device | 默认 | 加标测试系统2# | 20 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 32 | lab.device | 默认 | 加标测试系统3# | 30 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 33 | lab.device | 默认 | 加标测试系统4# | 40 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 34 | lab.device | 默认 | 加标测试系统5# | 50 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 35 | lab.device | 默认 | 加标测试系统6# | 60 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | 36 | lab.device | 默认 | 加标测试系统7# | 70 | 1 | seed | 2026-09-15 12:18:16.7800095 | null | null | N | 
+  | bs_op | id | int | null | 
+  | bs_op | 工序编码 | nvarchar | 200 | 
+  | bs_op | 工序名称 | nvarchar | 200 | 
+  | bs_op | 默认车间 | nvarchar | 100 | 
+  | bs_op | 关键工序 | bit | null | 
+  | bs_op | 加工方式 | nvarchar | 100 | 
+  | bs_op | 标准合格率% | decimal | null | 
+  | bs_op | 按辅单位计价 | bit | null | 
+  | bs_op | 辅单位 | nvarchar | 100 | 
+  | bs_op | 换算率 | decimal | null | 
+  | bs_op | 默认工资类型 | nvarchar | 100 | 
+  | bs_op | 计件依据 | nvarchar | 100 | 
+  | bs_op | 是否停用 | bit | null | 
+  | bs_op | 备注 | nvarchar | 500 | 
+  | bs_op | 状态 | nvarchar | 10 | 
+  | bs_op | asp_user1 | nvarchar | 50 | 
+  | bs_op | asp_time1 | datetime2 | null | 
+  | bs_op | asp_user2 | nvarchar | 50 | 
+  | bs_op | asp_time2 | datetime2 | null | 
+  | bs_op | asp_cancel | char | 1 | 
+  | bs_op | 标准工时(分钟) | decimal | null | 
+  | bs_op | 工序类型 | nvarchar | 50 | 
+  | bs_op | 检验要求 | nvarchar | 500 | 
+  | bs_route | id | int | null | 
+  | bs_route | 工艺路线编码 | nvarchar | 200 | 
+  | bs_route | 工艺路线名称 | nvarchar | 200 | 
+  | bs_route | 停用 | bit | null | 
+  | bs_route | 加工顺序 | int | null | 
+  | bs_route | 工序编码 | nvarchar | 200 | 
+  | bs_route | 工序名称 | nvarchar | 200 | 
+  | bs_route | 加工方式 | nvarchar | 100 | 
+  | bs_route | 生产车间 | nvarchar | 100 | 
+  | bs_route | 工资类型 | nvarchar | 100 | 
+  | bs_route | 计件依据 | nvarchar | 100 | 
+  | bs_route | 委外供应商 | nvarchar | 200 | 
+  | bs_route | 按辅单位计价 | bit | null | 
+  | bs_route | 辅单位 | nvarchar | 100 | 
+  | bs_route | 换算率 | decimal | null | 
+  | bs_route | 默认报工数量 | decimal | null | 
+  | bs_route | 关键工序 | bit | null | 
+  | bs_route | 标准合格率% | decimal | null | 
+  | bs_route | 备注 | nvarchar | 500 | 
+  | bs_route | 状态 | nvarchar | 10 | 
+  | bs_route | asp_user1 | nvarchar | 50 | 
+  | bs_route | asp_time1 | datetime2 | null | 
+  | bs_route | asp_user2 | nvarchar | 50 | 
+  | bs_route | asp_time2 | datetime2 | null | 
+  | bs_route | asp_cancel | char | 1 | 
+  | 30 | 
+  | 20 | 
+  | 1 | GY-001 | 铝棒 Φ80 加工路线 | 0 | 1 | PX001 | 下料 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-08-31 11:18:55.6935071 | null | null | N | 
+  | 2 | GY-001 | 铝棒 Φ80 加工路线 | 0 | 2 | PX002 | 车削 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 1 | 98.0000 | null | 启用 | migration | 2026-08-31 11:18:55.6935071 | null | null | N | 
+  | 3 | GY-001 | 铝棒 Φ80 加工路线 | 0 | 3 | PX007 | 检验 | 自制 | 测试车间 | 计时 | 完工数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-08-31 11:18:55.6945068 | null | null | N | 
+  | 4 | GY-002 | 减速箱体 A 加工路线 | 0 | 1 | PX001 | 下料 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-08-31 11:18:55.6945068 | null | null | N | 
+  | 5 | GY-002 | 减速箱体 A 加工路线 | 0 | 2 | PX003 | 铣削 | 自制 | 精整车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 1 | 97.0000 | null | 启用 | migration | 2026-08-31 11:18:55.6945068 | null | null | N | 
+  | 6 | GY-002 | 减速箱体 A 加工路线 | 0 | 3 | PX005 | 热处理 | 委外 | 轧制车间 | 计时 | 完工数量 | 华东热处理厂 | 1 | kg | 1.0000 | 0.0000 | 1 | 100.0000 | null | 启用 | migration | 2026-08-31 11:18:55.6945068 | null | null | N | 
+  | 7 | GY-002 | 减速箱体 A 加工路线 | 0 | 4 | PX007 | 检验 | 自制 | 测试车间 | 计时 | 完工数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-08-31 11:18:55.6945068 | null | null | N | 
+  | 8 | GY-003 | 制门加工路线 | 0 | 1 | PX001 | 下料 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-08-31 11:18:55.6955104 | null | null | N | 
+  | 9 | GY-003 | 制门加工路线 | 0 | 2 | PX002 | 车削 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 1 | 98.0000 | null | 启用 | migration | 2026-08-31 11:18:55.6955104 | null | null | N | 
+  | 10 | GY-003 | 制门加工路线 | 0 | 3 | PX007 | 检验 | 自制 | 测试车间 | 计时 | 完工数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-08-31 11:18:55.6955104 | null | null | N | 
+  | 11 | GY-001 | 铝棒 Φ80 加工路线 | 0 | 1 | PX001 | 下料 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:32:46.7030576 | null | null | N | 
+  | 12 | GY-001 | 铝棒 Φ80 加工路线 | 0 | 2 | PX002 | 车削 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 1 | 98.0000 | null | 启用 | migration | 2026-09-15 09:32:46.7038445 | null | null | N | 
+  | 13 | GY-001 | 铝棒 Φ80 加工路线 | 0 | 3 | PX007 | 检验 | 自制 | 测试车间 | 计时 | 完工数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:32:46.7038445 | null | null | N | 
+  | 14 | GY-002 | 减速箱体 A 加工路线 | 0 | 1 | PX001 | 下料 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:32:46.7038445 | null | null | N | 
+  | 15 | GY-002 | 减速箱体 A 加工路线 | 0 | 2 | PX003 | 铣削 | 自制 | 精整车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 1 | 97.0000 | null | 启用 | migration | 2026-09-15 09:32:46.7038445 | null | null | N | 
+  | 16 | GY-002 | 减速箱体 A 加工路线 | 0 | 3 | PX005 | 热处理 | 委外 | 轧制车间 | 计时 | 完工数量 | 华东热处理厂 | 1 | kg | 1.0000 | 0.0000 | 1 | 100.0000 | null | 启用 | migration | 2026-09-15 09:32:46.7038445 | null | null | N | 
+  | 17 | GY-002 | 减速箱体 A 加工路线 | 0 | 4 | PX007 | 检验 | 自制 | 测试车间 | 计时 | 完工数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:32:46.7038445 | null | null | N | 
+  | 18 | GY-003 | 制门加工路线 | 0 | 1 | PX001 | 下料 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:32:46.7038445 | null | null | N | 
+  | 19 | GY-003 | 制门加工路线 | 0 | 2 | PX002 | 车削 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 1 | 98.0000 | null | 启用 | migration | 2026-09-15 09:32:46.7048460 | null | null | N | 
+  | 20 | GY-003 | 制门加工路线 | 0 | 3 | PX007 | 检验 | 自制 | 测试车间 | 计时 | 完工数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:32:46.7048460 | null | null | N | 
+  | 21 | GY-001 | 铝棒 Φ80 加工路线 | 0 | 1 | PX001 | 下料 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:35:35.1466616 | null | null | N | 
+  | 22 | GY-001 | 铝棒 Φ80 加工路线 | 0 | 2 | PX002 | 车削 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 1 | 98.0000 | null | 启用 | migration | 2026-09-15 09:35:35.1466616 | null | null | N | 
+  | 23 | GY-001 | 铝棒 Φ80 加工路线 | 0 | 3 | PX007 | 检验 | 自制 | 测试车间 | 计时 | 完工数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:35:35.1466616 | null | null | N | 
+  | 24 | GY-002 | 减速箱体 A 加工路线 | 0 | 1 | PX001 | 下料 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:35:35.1466616 | null | null | N | 
+  | 25 | GY-002 | 减速箱体 A 加工路线 | 0 | 2 | PX003 | 铣削 | 自制 | 精整车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 1 | 97.0000 | null | 启用 | migration | 2026-09-15 09:35:35.1476648 | null | null | N | 
+  | 26 | GY-002 | 减速箱体 A 加工路线 | 0 | 3 | PX005 | 热处理 | 委外 | 轧制车间 | 计时 | 完工数量 | 华东热处理厂 | 1 | kg | 1.0000 | 0.0000 | 1 | 100.0000 | null | 启用 | migration | 2026-09-15 09:35:35.1476648 | null | null | N | 
+  | 27 | GY-002 | 减速箱体 A 加工路线 | 0 | 4 | PX007 | 检验 | 自制 | 测试车间 | 计时 | 完工数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:35:35.1476648 | null | null | N | 
+  | 28 | GY-003 | 制门加工路线 | 0 | 1 | PX001 | 下料 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:35:35.1476648 | null | null | N | 
+  | 29 | GY-003 | 制门加工路线 | 0 | 2 | PX002 | 车削 | 自制 | 熔铸车间 | 计件 | 合格数量 |  | 0 | 件 | 1.0000 | 0.0000 | 1 | 98.0000 | null | 启用 | migration | 2026-09-15 09:35:35.1476648 | null | null | N | 
+  | 30 | GY-003 | 制门加工路线 | 0 | 3 | PX007 | 检验 | 自制 | 测试车间 | 计时 | 完工数量 |  | 0 | 件 | 1.0000 | 0.0000 | 0 | 100.0000 | null | 启用 | migration | 2026-09-15 09:35:35.1476648 | null | null | N | 
+  | bd_account | 
+  | bd_dispatch | 
+  | bd_expense_type | 
+  | bd_finish_in | 
+  | bd_manu_order | 
+  | bd_material_out | 
+  | bd_other_in | 
+  | bd_other_out | 
+  | bd_outsource_in | 
+  | bd_outsource_issue | 
+  | bd_outsource_order | 
+  | bd_pu_order | 
+  | bd_pu_req | 
+  | bd_purchase_in | 
+  | bd_sale_out | 
+  | bd_so_order | 
+  | bd_tax_type | 
+  | bl_dispatch | 
+  | bl_finish_in | 
+  | bl_manu_order | 
+  | bl_material_out | 
+  | bl_other_in | 
+  | bl_other_out | 
+  | bl_outsource_in | 
+  | bl_outsource_issue | 
+  | bl_outsource_order | 
+  | bl_pu_order | 
+  | bl_pu_req | 
+  | bl_purchase_in | 
+  | bl_sale_out | 
+  | bl_so_order | 
+  | bs_bom | 
+  | bs_currency | 
+  | bs_customer_group | 
+  | bs_dept | 
+  | bs_dict | 
+  | bs_emp | 
+  | bs_equip | 
+  | bs_inv | 
+  | bs_inv_price | 
+  | bs_material_group | 
+  | bs_op | 
+  | bs_partner | 
+  | bs_proj | 
+  | bs_qc_item | 
+  | bs_qc_plan | 
+  | bs_region | 
+  | bs_reject | 
+  | bs_route | 
+  | bs_settle_type | 
+[OK] s2-3.sql (9 batches)

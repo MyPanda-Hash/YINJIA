@@ -1,0 +1,11 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 417
++ ... Timeout=5"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java $u ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-07-configlist.sql ==
+  | RD_PROGRESS | doc | 18 | 
+[OK] c-07-configlist.sql (2 batches)

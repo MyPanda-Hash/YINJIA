@@ -1,0 +1,22 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s1-12-i18n.sql ==
+  | S1-61: yj_translation scope 分布 | field | 4957 | 
+  | S1-61: yj_translation scope 分布 | panel | 733 | 
+  | S1-62: yj_translation 是否含 文件汇总表 | panel | 收发存汇总表 | en | In/Out/Balance Summary | 
+  | S1-63: yj_field 四个文件表的 editable 汇总(是否随状态变化) | RD_ASM_PROC | detail | 15 | 15 | 
+  | S1-63: yj_field 四个文件表的 editable 汇总(是否随状态变化) | RD_ASM_PROC | header | 10 | 9 | 
+  | S1-63: yj_field 四个文件表的 editable 汇总(是否随状态变化) | RD_INSP_PLAN | detail | 11 | 11 | 
+  | S1-63: yj_field 四个文件表的 editable 汇总(是否随状态变化) | RD_INSP_PLAN | header | 15 | 14 | 
+  | S1-63: yj_field 四个文件表的 editable 汇总(是否随状态变化) | RD_INSP_PLAN | query | 2 | 0 | 
+  | S1-63: yj_field 四个文件表的 editable 汇总(是否随状态变化) | RD_SPEC_DOC | detail | 15 | 15 | 
+  | S1-63: yj_field 四个文件表的 editable 汇总(是否随状态变化) | RD_SPEC_DOC | header | 19 | 18 | 
+  | S1-63: yj_field 四个文件表的 editable 汇总(是否随状态变化) | RD_SPEC_DOC | query | 3 | 0 | 
+  | S1-64: 是否存在 按状态改 editable 的配置列(全库检索 yj_field 无状态相关列已确认,列校验) | 19 | 
+[OK] s1-12-i18n.sql (7 batches)

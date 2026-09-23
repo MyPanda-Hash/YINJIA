@@ -1,0 +1,43 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-inbound-unit.sql ==
+  | 1-面板 | PURCHASE_IN | 采购入库单 | bd_purchase_in | bl_purchase_in | 
+  | 1-面板 | QC_INSP | 来料检验单 | qc_insp | qc_insp_detail | 
+  | 1-面板 | QC_RETURN | 暂收退回单 | qc_return | qc_return_detail | 
+  | 2-面板字段 | PURCHASE_IN | 单位id | 单位id | 文本 | detail | 1 | 
+  | 2-面板字段 | PURCHASE_IN | 单位编码 | 单位编码 | 文本 | detail | 1 | 
+  | 2-面板字段 | PURCHASE_IN | 单位成本视图 | 单位成本视图 | 文本 | detail | 1 | 
+  | 2-面板字段 | PURCHASE_IN | 辅助单位id | 辅助单位id | 文本 | detail | 1 | 
+  | 2-面板字段 | PURCHASE_IN | 辅助单位编码 | 辅助单位编码 | 文本 | detail | 1 | 
+  | 2-面板字段 | PURCHASE_IN | 基本单位id | 基本单位id | 文本 | detail | 1 | 
+  | 2-面板字段 | PURCHASE_IN | 基本单位编码 | 基本单位编码 | 文本 | detail | 1 | 
+  | 2-面板字段 | PURCHASE_IN | 基本单位名称 | 基本单位名称 | 文本 | detail | 1 | 
+  | 2-面板字段 | PURCHASE_IN | 计量单位 | 计量单位 | 下拉框 | detail | 0 | 
+  | 2-面板字段 | PURCHASE_IN | 计量单位2 | 计量单位2 | 下拉框 | detail | 0 | 
+  | 2-面板字段 | PURCHASE_IN | 商品是否多单位 | 商品是否多单位 | 文本 | detail | 1 | 
+  | 2-面板字段 | QC_INSP | 单位 | 单位 | 参照 | detail | 0 | 
+  | 2-面板字段 | QC_INSP | 计量单位 | 计量单位 | 参照 | detail | 0 | 
+  | 2-面板字段 | QC_RETURN | 单位 | 单位 | 参照 | detail | 1 | 
+  | 2-面板字段 | QC_RETURN | 计量单位 | 计量单位 | 参照 | detail | 0 | 
+  | 3-行表列 | bl_purchase_in | 单位id | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 单位编码 | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 单位成本视图 | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 辅助单位id | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 辅助单位编码 | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 基本单位id | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 基本单位编码 | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 基本单位名称 | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 计量单位 | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 计量单位2 | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 计量单位组合 | nvarchar | 
+  | 3-行表列 | bl_purchase_in | 商品是否多单位 | nvarchar | 
+  | 3-行表列 | qc_insp_detail | 单位 | nvarchar | 
+  | 3-行表列 | qc_insp_detail | 计量单位 | nvarchar | 
+  | 3-行表列 | qc_return_detail | 单位 | nvarchar | 
+  | 3-行表列 | qc_return_detail | 计量单位 | nvarchar | 
+java.exe : [SQL FAIL] ������ 'bd_purchase_in_detail' ��Ч��
+所在位置 行:1 字符: 321
++ ... jre11.jar"; & "$env:JAVA_HOME\bin\java.exe" "-Dstdout.encoding=UTF-8" ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([SQL FAIL] ����...n_detail' ��Ч��:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

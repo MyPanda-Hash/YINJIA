@@ -1,0 +1,27 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s1-07-perm.sql ==
+  | S1-24: yj_role_panel 列 | id | int | 
+  | S1-24: yj_role_panel 列 | role_id | int | 
+  | S1-24: yj_role_panel 列 | panel_code | nvarchar | 
+  | S1-24: yj_role_panel 列 | can_approve | char | 
+  | S1-24: yj_role_panel 列 | perms | nvarchar | 
+  | S1-27: 角色表 | 1 | admin | 管理员 | 全部面板与审批权限 | Y | 
+  | S1-27: 角色表 | 2 | user | 普通用户 | 按角色授权面板 | N | 
+  | S1-28: yj_panel 中 mode/category 取值分布 | archive | 基础档案 | 32 | 
+  | S1-28: yj_panel 中 mode/category 取值分布 | doc | 采购管理 | 4 | 
+  | S1-28: yj_panel 中 mode/category 取值分布 | doc | 单据 | 61 | 
+  | S1-28: yj_panel 中 mode/category 取值分布 | doc | 库存核算 | 7 | 
+  | S1-28: yj_panel 中 mode/category 取值分布 | doc | 生产管理 | 15 | 
+  | S1-28: yj_panel 中 mode/category 取值分布 | doc | 生产制造 | 1 | 
+  | S1-28: yj_panel 中 mode/category 取值分布 | doc | 委外加工 | 3 | 
+  | S1-28: yj_panel 中 mode/category 取值分布 | doc | 智能供应链 | 1 | 
+  | S1-28: yj_panel 中 mode/category 取值分布 | flat | 报表 | 35 | 
+  | S1-29: yj_panel 中带有 config 的面板(全部) | RD_PROGRESS | 项目进度查询 | 18 | {"singleDoc":true} | 
+[OK] s1-07-perm.sql (8 batches)

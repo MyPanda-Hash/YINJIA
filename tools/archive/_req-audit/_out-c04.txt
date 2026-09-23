@@ -1,0 +1,52 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-04-fields.sql ==
+  | CKD | 15 | 1 | 2 | 15 | 3 | 
+  | INV | 109 | 4 | 0 | 107 | 3 | 
+  | OTHER_IN | 22 | 4 | 5 | 22 | 7 | 
+  | OTHER_OUT | 27 | 3 | 7 | 27 | 9 | 
+  | PU_ORDER | 183 | 2 | 6 | 182 | 11 | 
+  | PURCHASE_IN | 152 | 3 | 10 | 147 | 9 | 
+  | QC_BHC | 27 | 2 | 3 | 23 | 2 | 
+  | QC_INSP | 48 | 3 | 10 | 43 | 4 | 
+  | QC_JJF | 19 | 1 | 2 | 15 | 2 | 
+  | QC_LYB | 19 | 1 | 3 | 15 | 2 | 
+  | QC_RECV | 60 | 1 | 14 | 56 | 3 | 
+  | QC_RETURN | 32 | 1 | 10 | 28 | 4 | 
+  | QC_TC | 23 | 2 | 3 | 19 | 2 | 
+  | RKD | 16 | 0 | 2 | 16 | 3 | 
+  | STOCK_BALANCE | 9 | 0 | 2 | 0 | 0 | 
+  | STOCK_LEDGER | 23 | 0 | 2 | 0 | 2 | 
+  | STOCK_SUMMARY | 20 | 0 | 2 | 0 | 0 | 
+  | CKD . llxz [领料性质] => SELECT mc FROM dm_gx WHERE lb='LHXZ' AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY dm | 
+  | INV . 所属类别 [所属类别] => SELECT v FROM (VALUES (N'产成品'),(N'原材料'),(N'辅助材料'),(N'包装物'),(N'半成品')) AS t(v) | 
+  | INV . 计价方式 [计价方式] => SELECT v FROM (VALUES (N'移动平均'),(N'全月平均'),(N'个别计价'),(N'先进先出')) AS t(v) | 
+  | INV . 计量单位 [计量单位] => SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升'),(N'台')) AS t(v) | 
+  | INV . 属性 [属性] => SELECT v FROM (VALUES (N'自制'),(N'外购'),(N'委外'),(N'自制+外购')) AS t(v) | 
+  | OTHER_IN . 业务类型 [业务类型] => SELECT v FROM (VALUES (N'采购入库'),(N'产成品入库'),(N'其他入库')) AS t(v) | 
+  | OTHER_IN . 计量单位 [计量单位] => SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v) | 
+  | OTHER_IN . 入库类别 [入库类别] => SELECT v FROM (VALUES (N'盘盈入库'),(N'调整入库'),(N'其他')) AS t(v) | 
+  | OTHER_IN . 计量单位2 [计量单位2] => SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v) | 
+  | OTHER_OUT . 业务类型 [业务类型] => SELECT v FROM (VALUES (N'销售出库'),(N'材料出库'),(N'其他出库')) AS t(v) | 
+  | OTHER_OUT . 出库类别 [出库类别] => SELECT v FROM (VALUES (N'盘亏出库'),(N'调整出库'),(N'其他')) AS t(v) | 
+  | OTHER_OUT . 计量单位 [计量单位] => SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v) | 
+  | PU_ORDER . 单位 [单位] => SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v) | 
+  | PU_ORDER . 税率% [税率%] => SELECT v FROM (VALUES (N'0'),(N'3'),(N'6'),(N'9'),(N'13')) AS t(v) | 
+  | PURCHASE_IN . 计量单位 [计量单位] => SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v) | 
+  | PURCHASE_IN . 计量单位2 [计量单位2] => SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v) | 
+  | PURCHASE_IN . 税率% [税率%] => SELECT v FROM (VALUES (N'0'),(N'3'),(N'6'),(N'9'),(N'13')) AS t(v) | 
+  | QC_INSP . 检验类型 [检验类型] => SELECT v FROM (VALUES (N'全检'),(N'抽检'),(N'免检')) AS t(v) | 
+  | QC_INSP . 总结论 [总结论] => SELECT v FROM (VALUES (N'合格'),(N'不合格'),(N'让步接收')) AS t(v) | 
+  | QC_INSP . 处置方式 [处置方式] => SELECT v FROM (VALUES (N'入库'),(N'退货'),(N'让步入库')) AS t(v) | 
+  | QC_JJF . 物料类型 [物料类型] => SELECT v FROM (VALUES (N'外部来料'),(N'自制物料')) AS t(v) | 
+  | QC_RECV . 结案 [结案] => SELECT v FROM (VALUES (N'是'),(N'否')) AS t(v) | 
+  | QC_RETURN . 退货类型 [退货类型] => SELECT v FROM (VALUES (N'退供应商'),(N'报废'),(N'让步接收')) AS t(v) | 
+  | QC_TC . 严重程度 [严重程度] => SELECT v FROM (VALUES (N'严重'),(N'一般'),(N'轻微')) AS t(v) | 
+  | QC_TC . 最终处理结果 [最终处理结果] => SELECT v FROM (VALUES (N'正常使用'),(N'挑选使用')) AS t(v) | 
+[OK] c-04-fields.sql (3 batches)

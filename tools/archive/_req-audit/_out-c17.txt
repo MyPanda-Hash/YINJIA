@@ -1,0 +1,21 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 417
++ ... Timeout=5"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java $u ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-17-batch-lot.sql ==
+  | OTHER_IN | 批号 | 批号 | query,detail | 0 | 1 | 1 | 
+  | OTHER_OUT | 批号 | 批号 | query,detail | 0 | 1 | 1 | 
+  | PURCHASE_IN | 批次号 | 批次号 | detail | 0 | 1 | 1 | 
+  | PURCHASE_IN | 批次号 | 批次号 | query,header | 0 | 1 | 1 | 
+  | PURCHASE_IN | 批号 | 批号 | detail | 0 | 1 | 1 | 
+  | QC_INSP | 批次号 | 批次号 | detail | 0 | 1 | 1 | 
+  | QC_INSP | 批次号 | 批次号 | query,header | 0 | 1 | 1 | 
+  | QC_RECV | 批次号 | 批次号 | detail | 0 | 1 | 1 | 
+  | QC_RECV | 批次号 | 批次号 | query,header | 0 | 1 | 1 | 
+  | QC_RETURN | 批次号 | 批次号 | detail | 0 | 1 | 1 | 
+  | QC_RETURN | 批次号 | 批次号 | query,header | 0 | 1 | 1 | 
+[SQL FAIL] 列名 '批号' 无效。

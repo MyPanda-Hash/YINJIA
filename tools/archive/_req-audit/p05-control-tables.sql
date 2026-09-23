@@ -1,0 +1,23 @@
+SET NOCOUNT ON;
+PRINT N'=== 1. yj_doc_status 列 ===';
+SELECT COLUMN_NAME, DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='yj_doc_status' ORDER BY ORDINAL_POSITION;
+GO
+PRINT N'=== 2. yj_doc_status 中 RD_* 面板的状态分布 ===';
+SELECT panel_code, 单据状态, COUNT(*) AS cnt FROM yj_doc_status WHERE panel_code LIKE 'RD%' GROUP BY panel_code, 单据状态 ORDER BY panel_code, 单据状态;
+GO
+PRINT N'=== 3. yj_form_approval 列 + RD_* 动作分布 ===';
+SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='yj_form_approval' ORDER BY ORDINAL_POSITION;
+GO
+SELECT TOP 50 * FROM yj_form_approval ORDER BY 1 DESC;
+GO
+PRINT N'=== 4. yj_std_lib 列 + 内容分布 ===';
+SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='yj_std_lib' ORDER BY ORDINAL_POSITION;
+GO
+SELECT COUNT(*) AS total FROM yj_std_lib;
+GO
+PRINT N'=== 5. rd_dev_task 列 ===';
+SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='rd_dev_task' ORDER BY ORDINAL_POSITION;
+GO
+PRINT N'=== 6. yj_plan_term 行数/state ===';
+SELECT state, COUNT(*) FROM yj_plan_term GROUP BY state;
+GO

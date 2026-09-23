@@ -1,0 +1,27 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 417
++ ... Timeout=5"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java $u ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-20-chain2.sql ==
+  | 40 | 40 | 15 | 
+  | 149 | 40 | 132 | 
+  | (空) | 15 | 
+  | 否 | 64 | 
+  | 是 | 7 | 
+  | IJ-2026-09-0022 | null | YJ-20260916-01 | YJ-20260916-01-001 | 草稿 | null | 
+  | IJ-2026-09-0021 | null | YJ-20260916-01 | YJ-20260916-01-001 | 草稿 | null | 
+  | IJ-2026-09-0020 | null | YJ-20260908-08 | YJ-20260908-08-001 | 草稿 | null | 
+  | IJ-2026-09-0019 | null | YJ-20260916-01 | YJ-20260916-01-001 | 草稿 | null | 
+  | IJ-2026-09-0018 | null | YJ-20260916-03 | YJ-20260916-03-001 | 草稿 | null | 
+  | IJ-2026-09-0017 | null | YJ-20260915-12 | YJ-20260915-12-001 | 草稿 | null | 
+  | SL-2026-09-0032 | YJ-20260916-03 | YJ-20260916-03-001 | null | null | 
+  | SL-2026-09-0031 | YJ-20260916-01 | YJ-20260916-01-001 | null | null | 
+  | SL-2026-09-0030 | YJ-20260916-01 | YJ-20260916-01-001 | null | null | 
+  | SL-2026-09-0029 | YJ-20260916-01 | YJ-20260916-01-001 | null | null | 
+  | SL-2026-09-0028 | YJ-20260916-01 | YJ-20260916-01-001 | null | null | 
+  | SL-2026-09-0027 | YJ-20260916-01 | YJ-20260916-01-001 | null | null | 
+[OK] c-20-chain2.sql (6 batches)

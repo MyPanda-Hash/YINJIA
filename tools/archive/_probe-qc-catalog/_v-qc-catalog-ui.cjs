@@ -44,18 +44,34 @@ async function main() {
     await navigate('http://localhost:5173/#/login')
     await evaluate(`localStorage.setItem('mes_token', ${JSON.stringify(login.data.token)}); localStorage.setItem('mes_user', ${JSON.stringify(JSON.stringify(login.data.user))}); 'ok'`)
     await navigate('about:blank')
-    await navigate('http://localhost:5173/#/panelx/list/QC_CATALOG')
-    await sleep(5000)
-    await evaluate(`(() => { const wz = document.querySelector('.wizard-mask'); if (wz) { (wz.querySelector('.wz-close') || wz.querySelector('.wz-skip'))?.click(); return 'WZ' } return 'NONE' })()`)
-    await sleep(1500)
+
+    // dev server 上并行开发会触发 HMR 整页重载,偶发落在"配置未回/列表 0/0"的瞬时态 —— 整页重开重试
+    let ready = null
+    for (let attempt = 1; attempt <= 5 && !ready; attempt++) {
+      await navigate('about:blank')
+      await navigate('http://localhost:5173/#/panelx/list/QC_CATALOG')
+      await sleep(3500)
+      await evaluate(`(() => { const wz = document.querySelector('.wizard-mask'); if (wz) (wz.querySelector('.wz-close') || wz.querySelector('.wz-skip'))?.click(); return 1 })()`)
+      ready = await (async () => {
+        for (let i = 0; i < 25; i++) {
+          const v = await evaluate(`(() => {
+            const sheet = document.querySelector('.catalog-sheet')
+            const side = [...document.querySelectorAll('.approval-side .as-side-btn')].map(e => e.innerText.replace(/\\s/g,''))
+            const vals = sheet ? [...sheet.querySelectorAll('tbody input, tbody textarea')].map(e => e.value) : []
+            return (sheet && side.includes('保存') && vals.includes('260807')) ? 'READY' : ''
+          })()`)
+          if (v) return v
+          await sleep(800)
+        }
+        return null
+      })()
+      if (!ready) console.log(`   [重试 ${attempt}/5] 面板未就绪(配置未回/列表 0/0)`)
+    }
+    ok('面板就绪(纸面 + 侧栏保存 + 示例行)', ready === 'READY', ready)
+    if (ready !== 'READY') throw new Error('面板未就绪,终止')
 
     // ① 纸张
-    let sheet = ''
-    for (let i = 0; i < 12; i++) {
-      sheet = await evaluate(`document.querySelector('.catalog-sheet')?.innerText?.slice(0, 4000) || ''`)
-      if (sheet.includes('260807')) break
-      await sleep(1000)
-    }
+    let sheet = await evaluate(`document.querySelector('.catalog-sheet')?.innerText?.slice(0, 4000) || ''`)
     ok('纸张 .catalog-sheet 已渲染', !!sheet)
     ok('纸张标题=检验目录', sheet.trim().startsWith('检验目录'), sheet.slice(0, 20).replace(/\n/g, '|'))
     ok('右侧操作栏存在(approval-side)', await evaluate(`!!document.querySelector('.approval-side')`))

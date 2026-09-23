@@ -1,0 +1,129 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s1-11-hdr.sql ==
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_BOM | 10 | 单据编号 | 单据编号 | 文本 | 0 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_BOM | 20 | 单据日期 | 单据日期 | 日期 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_BOM | 30 | 产品编号 | 产品编号 | 参照 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_BOM | 40 | 产品名称 | 产品名称 | 文本 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_BOM | 50 | 产品种类 | 产品种类 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_BOM | 60 | 整体规格外径 | 整体规格（外径） | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_BOM | 70 | 整体规格长度 | 整体规格（长度） | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_BOM | 80 | 成品重量 | 成品重量 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_BOM | 90 | 备注 | 备注 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_PROC | 10 | 单据编号 | 单据编号 | 文本 | 0 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_PROC | 20 | 单据日期 | 单据日期 | 日期 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_PROC | 30 | 备注 | 备注 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_PROC | 30 | 产品编号 | 产品编号 | 参照 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_PROC | 40 | 产品名称 | 产品名称 | 文本 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_PROC | 50 | 产品种类 | 产品种类 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_PROC | 60 | 整体规格外径 | 整体规格（外径） | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_PROC | 70 | 整体规格长度 | 整体规格（长度） | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_PROC | 80 | 成品重量 | 成品重量 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_ASM_PROC | 90 | 表区 | 表区 | 文本 | 1 | 0 | 1 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 10 | 单据编号 | 单据编号 | 文本 | 0 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 20 | 单据日期 | 单据日期 | 日期 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 30 | 文档编号 | 文档编号 | 文本 | 1 | 0 | 1 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 40 | 标题 | 标题 | 文本 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 50 | 版本号 | 版本号 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 60 | 密级 | 密级 | 下拉框 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 70 | 产品编号 | 产品编号 | 参照 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 80 | 客户名 | 客户名 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 90 | 管理人 | 管理人 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 100 | 主要性能 | 主要性能 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 110 | 滤芯尺寸 | 滤芯尺寸 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 120 | 授权使用人 | 授权使用人 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 130 | 编写人 | 编写人 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 140 | 审核人 | 审核人 | 参照 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_INSP_PLAN | 150 | 备注 | 备注 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 10 | 单据编号 | 单据编号 | 文本 | 0 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 20 | 单据日期 | 单据日期 | 日期 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 30 | 规格书种类 | 规格书种类 | 下拉框 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 40 | 名称 | 名称 | 文本 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 50 | 编号 | 编号 | 参照 | 1 | 1 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 60 | 客户名 | 客户名 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 70 | 客户料号 | 客户料号 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 80 | 版本 | 版本 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 90 | 日期 | 日期 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 100 | 制订日期 | 制订日期 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 110 | 审核日期 | 审核日期 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 120 | 批准日期 | 批准日期 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 130 | 适用范围 | 适用范围 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 140 | 整体规格参数 | 整体规格参数 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 150 | 产品主要性能 | 产品主要性能 | 文本 | 1 | 0 | 0 | 
+  | S1-45: 四文件 header 字段(仅表头,查文件编码) | RD_SPEC_DOC | 160 | 包装方式 | 包装方式 | 文本 | 1 | 0 | 0 | 
+  | S1-46: RD_SPEC_DOC 全部字段(place 分组计数) | detail | 213 | 
+  | S1-46: RD_SPEC_DOC 全部字段(place 分组计数) | header | 457 | 
+  | S1-46: RD_SPEC_DOC 全部字段(place 分组计数) | query | 33 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 5 | 表区 | 表区 | 下拉框 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 10 | 序号 | 序号 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 20 | 更改内容 | 更改内容 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 30 | 更改原因 | 更改原因 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 40 | 更改时间 | 更改时间 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 50 | 责任人 | 责任人 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 60 | 备注 | 备注 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 70 | 检验项目 | 检验项目 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 80 | 检验要求 | 检验要求 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 90 | 检验方法 | 检验方法 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 100 | 检验依据 | 检验依据 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 110 | 物料编码 | 物料编码 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 120 | 物料名称 | 物料名称 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 130 | 规格参数 | 规格参数 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 140 | 数量 | 数量 | 文本 | detail | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 10 | 单据编号 | 单据编号 | 文本 | header | 0 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 20 | 单据日期 | 单据日期 | 日期 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 30 | 规格书种类 | 规格书种类 | 下拉框 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 40 | 名称 | 名称 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 50 | 编号 | 编号 | 参照 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 60 | 客户名 | 客户名 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 70 | 客户料号 | 客户料号 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 80 | 版本 | 版本 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 90 | 日期 | 日期 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 100 | 制订日期 | 制订日期 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 110 | 审核日期 | 审核日期 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 120 | 批准日期 | 批准日期 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 130 | 适用范围 | 适用范围 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 140 | 整体规格参数 | 整体规格参数 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 150 | 产品主要性能 | 产品主要性能 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 160 | 包装方式 | 包装方式 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 170 | 运输要求 | 运输要求 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 180 | 存储环境 | 存储环境 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 190 | 备注 | 备注 | 文本 | header | 1 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 10 | 规格书种类 | 规格书种类 | 下拉框 | query | 0 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 20 | 名称 | 名称 | 文本 | query | 0 | 1 | 
+  | S1-47: RD_SPEC_DOC 全部字段 | 30 | 编号 | 编号 | 参照 | query | 0 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 5 | 检验类别 | 检验类别 | 下拉框 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 10 | 控制项目 | 控制项目 | 文本 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 20 | 质量控制内容 | 质量控制内容 | 文本 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 30 | 检测仪器 | 检测仪器 | 文本 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 40 | 控制标准及要求 | 控制标准及要求 | 文本 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 50 | 检验 | 检验 | 文本 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 60 | 不合格应对措施 | 不合格应对措施 | 文本 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 70 | 检测频率 | 检测频率 | 文本 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 80 | 取样方式 | 取样方式 | 文本 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 90 | 检验内容 | 检验内容 | 文本 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 100 | 控制方法 | 控制方法 | 文本 | detail | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 10 | 单据编号 | 单据编号 | 文本 | header | 0 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 20 | 单据日期 | 单据日期 | 日期 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 30 | 文档编号 | 文档编号 | 文本 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 40 | 标题 | 标题 | 文本 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 50 | 版本号 | 版本号 | 文本 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 60 | 密级 | 密级 | 下拉框 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 70 | 产品编号 | 产品编号 | 参照 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 80 | 客户名 | 客户名 | 文本 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 90 | 管理人 | 管理人 | 文本 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 100 | 主要性能 | 主要性能 | 文本 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 110 | 滤芯尺寸 | 滤芯尺寸 | 文本 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 120 | 授权使用人 | 授权使用人 | 文本 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 130 | 编写人 | 编写人 | 文本 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 140 | 审核人 | 审核人 | 参照 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 150 | 备注 | 备注 | 文本 | header | 1 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 10 | 标题 | 标题 | 文本 | query | 0 | 1 | 
+  | S1-48: RD_INSP_PLAN 全部字段 | 20 | 产品编号 | 产品编号 | 文本 | query | 0 | 1 | 
+  | S1-50: yj_doc_modify_log 总行数 | 0 | 
+[OK] s1-11-hdr.sql (8 batches)

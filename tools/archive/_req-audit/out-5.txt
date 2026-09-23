@@ -1,0 +1,182 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s2-5.sql ==
+  | PURCHASE_IN | APPROVE | APPROVED | 9 | 1 | 1 | 
+  | PURCHASE_IN | SUBMIT | PENDING | 9 | 1 | 1 | 
+  | PURCHASE_IN | UNAUDIT | PENDING | 19 | 1 | 1 | 
+  | QC_INSP | UNAUDIT | PENDING | 10 | 1 | 1 | 
+  | QC_RECV | APPROVE | APPROVED | 2 | 1 | 1 | 
+  | QC_RECV | SUBMIT | PENDING | 2 | 1 | 1 | 
+  | QC_RECV | UNAUDIT | PENDING | 17 | 1 | 1 | 
+  | SO_ORDER | UNAUDIT | PENDING | 1 | 1 | 1 | 
+  | 0 | 
+  | RD_PROGRESS | 1 | 0 | 0 | 0 | 
+  | lab.apply_type | 2 | 默认 | 
+  | lab.device | 7 | 默认 | 
+  | lab.test_item | 3 | 默认 | 
+  | spec.section | 24 | 1.适用范围 | 
+  | A供 | 1 | A级供应商 | 
+  | BAL_DIR | 2 | 贷 | 
+  | BB | 2 | 白班 | 
+  | BFYY | 1 | XX超标 | 
+  | CPH | 3 | 粤BFW940 | 
+  | CPZT | 3 | 开发中 | 
+  | DCLYY | 2 | 原因1 | 
+  | DEPT_TYPE | 4 | 仓库 | 
+  | DW | 2 | KG | 
+  | DYJ | 15 | 1#打印机 | 
+  | DZ | 16 | Cu：u" Ni：u" | 
+  | EQUIP_STATUS | 4 | 报废 | 
+  | GXLX | 2 | 工序派工 | 
+  | HPCZ | 12 | A.LingT | 
+  | IMPTYP | 4 | BOM | 
+  | JGZT | 4 | 测试中 | 
+  | JHFS | 2 | 发货 | 
+  | JJCD | 3 | 紧急 | 
+  | JLDW | 6 | K | 
+  | JMBDX | 2 | 按物料 | 
+  | JSFS | 6 | 电汇 | 
+  | JYFS | 2 | 抽检 | 
+  | JYJG | 6 | 报废 | 
+  | JYRY | 4 | 18 | 
+  | KHFZ | 5 | A级供应商 | 
+  | KHLY | 10 | 电话营销 | 
+  | LHXZ | 8 | 补退货 | 
+  | OP_TYPE | 6 | 包装 | 
+  | PCXZ | 4 | 急货 | 
+  | QY | 6 | 华北地区 | 
+  | QZ | 1 | 材料编码前缀 | 
+  | REJECT_CLASS | 5 | 尺寸 | 
+  | REM | 19 |  | 
+  | SCX | 24 | 挂镀_手动线 | 
+  | SKTJ | 12 | 国内信用证 | 
+  | TLYY | 2 | 原因1 | 
+  | WDZT | 2 | 当前 | 
+  | WH_TYPE | 6 | 半成品仓 | 
+  | WLFZ | 4 | 半成品 | 
+  | XSJGLX | 2 | 促销价格 | 
+  | YSFS | 3 | 比例验收 | 
+  | YWYQ | 3 | 10H | 
+  | GXLX | GXLX01 | 工序派工 | null | 
+  | WH_TYPE | WH_TYPE03 | 半成品仓 | null | 
+  | WH_TYPE | WH_TYPE04 | 成品仓 | null | 
+  | WLFZ | WLFZ01 | 成品 | null | 
+  | WLFZ | WLFZ02 | 半成品 | null | 
+  | OP_TYPE | OP_TYPE01 | 成型 | null | 
+  | OP_TYPE | OP_TYPE02 | 切炭 | null | 
+  | OP_TYPE | OP_TYPE03 | 组装 | null | 
+  | OP_TYPE | OP_TYPE04 | 检验 | null | 
+  | OP_TYPE | OP_TYPE05 | 包装 | null | 
+  | OP_TYPE | OP_TYPE06 | 其他 | null | 
+  | bs_bom | 物料种类 | 
+  | bs_currency | 汇率类型 | 
+  | bs_dept | 部门类型 | 
+  | bs_dict | 字典类别 | 
+  | bs_emp | 结算类型id | 
+  | bs_emp | 证件类型 | 
+  | bs_inv | 商品类别编码 | 
+  | bs_inv | 商品类型 | 
+  | bs_inv | 税收分类编码 | 
+  | bs_inv | 所属类别 | 
+  | bs_op | 工序编码 | 
+  | bs_op | 工序类型 | 
+  | bs_op | 工序名称 | 
+  | bs_op | 关键工序 | 
+  | bs_op | 默认工资类型 | 
+  | bs_proj | 所属类别 | 
+  | bs_qc_item | 数据类型 | 
+  | bs_qc_plan | 适用存货类别 | 
+  | bs_reject | 适用工序 | 
+  | bs_reject | 原因分类 | 
+  | bs_route | 工序编码 | 
+  | bs_route | 工序名称 | 
+  | bs_route | 工资类型 | 
+  | bs_route | 关键工序 | 
+  | bs_uom | 单位类型 | 
+  | bs_wc | 所属分类 | 
+  | bs_wh | 仓库分类 | 
+  | bs_wh | 仓库分类编码 | 
+  | bs_wh | 仓库类型 | 
+  | bs_wh | 分类id | 
+  | rd_asm_bom_head | 产品种类 | 
+  | rd_asm_proc_detail | 工序 | 
+  | rd_asm_proc_detail | 工序控制内容 | 
+  | rd_asm_proc_head | 产品种类 | 
+  | rd_dom_test_head | 申请单类型 | 
+  | rd_insp_plan_detail | 检验类别 | 
+  | rd_mold_formula_detail | 物料种类 | 
+  | rd_mold_formula_head | 产品管控类型 | 
+  | rd_mold_proc_detail | 物料种类 | 
+  | rd_mold_proc_head | 产品管控类型 | 
+  | rd_mold_proc_head | 工序 | 
+  | rd_mold_proc_head | 工序管控要求 | 
+  | rd_prod_info_head | 产品分类 | 
+  | rd_prod_info_head | 产品类别 | 
+  | rd_prod_info_head | 产品类型 | 
+  | rd_spec_assign | 规格书种类 | 
+  | rd_spec_doc_head | 规格书种类 | 
+  | rd_alkaline | 
+  | rd_alkaline_detail | 
+  | rd_alkaline_head | 
+  | rd_antibact | 
+  | rd_antibact_detail | 
+  | rd_antibact_head | 
+  | rd_approval | 
+  | rd_approval_detail | 
+  | rd_asm_bom | 
+  | rd_asm_bom_detail | 
+  | rd_asm_bom_head | 
+  | rd_asm_proc | 
+  | rd_asm_proc_detail | 
+  | rd_asm_proc_head | 
+  | rd_dev_task | 
+  | rd_dom_test | 
+  | rd_dom_test_detail | 
+  | rd_dom_test_head | 
+  | rd_drop_prec | 
+  | rd_drop_prec_detail | 
+  | rd_drop_prec_head | 
+  | rd_equip_use | 
+  | rd_equip_use_detail | 
+  | rd_equip_use_head | 
+  | rd_filter_eff | 
+  | rd_filter_eff_detail | 
+  | rd_filter_eff_head | 
+  | rd_insp_plan | 
+  | rd_insp_plan_detail | 
+  | rd_insp_plan_head | 
+  | rd_instr_use | 
+  | rd_instr_use_detail | 
+  | rd_instr_use_head | 
+  | rd_mineral | 
+  | rd_mineral_detail | 
+  | rd_mineral_head | 
+  | rd_mold_formula | 
+  | rd_mold_formula_detail | 
+  | rd_mold_formula_head | 
+  | rd_mold_proc | 
+  | rd_mold_proc_detail | 
+  | rd_mold_proc_head | 
+  | rd_plan | 
+  | rd_plan_detail | 
+  | rd_prod_info_detail | 
+  | rd_prod_info_head | 
+  | rd_product_info | 
+  | rd_progress | 
+  | rd_progress_detail | 
+  | rd_ro_protect | 
+  | rd_prod_info_head | 0 | 
+  | rd_spec_doc_head | 0 | 
+  | rd_asm_proc_head | 0 | 
+  | rd_insp_plan_head | 0 | 
+  | rd_mold_proc_head | 0 | 
+  | rd_asm_bom_head | 0 | 
+  | rd_dev_task | 0 | 
+  | rd_spec_assign | 0 | 
+[OK] s2-5.sql (11 batches)

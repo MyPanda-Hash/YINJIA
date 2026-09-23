@@ -1,0 +1,97 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s1-10-fields4.sql ==
+  | S1-39: yj_form_approval 列 | id | int | 
+  | S1-39: yj_form_approval 列 | panel_code | nvarchar | 
+  | S1-39: yj_form_approval 列 | form_no | nvarchar | 
+  | S1-39: yj_form_approval 列 | action | nvarchar | 
+  | S1-39: yj_form_approval 列 | result | nvarchar | 
+  | S1-39: yj_form_approval 列 | node_no | int | 
+  | S1-39: yj_form_approval 列 | operator | nvarchar | 
+  | S1-39: yj_form_approval 列 | opinion | nvarchar | 
+  | S1-39: yj_form_approval 列 | create_time | datetime2 | 
+  | S1-41: yj_form_approval 总行数 | 69 | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | id | bigint | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | panel_code | nvarchar | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | doc_no | nvarchar | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | apply_by | nvarchar | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | apply_at | datetime2 | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | approve_by | nvarchar | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | approve_at | datetime2 | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | rearchive_by | nvarchar | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | rearchive_at | datetime2 | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | snapshot_head | nvarchar | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | snapshot_rows | nvarchar | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | changes | nvarchar | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | change_meta | nvarchar | 
+  | S1-42: yj_doc_modify_log 列(修改记录/履历近亲) | create_at | datetime2 | 
+  | S1-43: rd_dev_task 列 + 行数 | id | int | 
+  | S1-43: rd_dev_task 列 + 行数 | 产品编号 | nvarchar | 
+  | S1-43: rd_dev_task 列 + 行数 | 产品名称 | nvarchar | 
+  | S1-43: rd_dev_task 列 + 行数 | 源单据号 | nvarchar | 
+  | S1-43: rd_dev_task 列 + 行数 | 目标面板 | varchar | 
+  | S1-43: rd_dev_task 列 + 行数 | 下发人 | nvarchar | 
+  | S1-43: rd_dev_task 列 + 行数 | 下发时间 | datetime2 | 
+  | S1-43: rd_dev_task 列 + 行数 | asp_user1 | nvarchar | 
+  | S1-43: rd_dev_task 列 + 行数 | asp_time1 | datetime2 | 
+  | S1-43: rd_dev_task 列 + 行数 | asp_user2 | nvarchar | 
+  | S1-43: rd_dev_task 列 + 行数 | asp_time2 | datetime2 | 
+  | S1-43: rd_dev_task 列 + 行数 | asp_cancel | char | 
+  | S1-43: rd_dev_task 列 + 行数 | 负责人 | nvarchar | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 5 | 表区 | 表区 | 下拉框 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 10 | 序号 | 序号 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 20 | 更改内容 | 更改内容 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 30 | 更改原因 | 更改原因 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 40 | 更改时间 | 更改时间 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 50 | 责任人 | 责任人 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 55 | 备注 | 备注 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 60 | 物料名 | 物料名 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 70 | 物料编号 | 物料编号 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 80 | 物料规格 | 物料规格 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 90 | 外观要求 | 外观要求 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 100 | 用量 | 用量 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 10 | 单据编号 | 单据编号 | 文本 | header | 0 | 1 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 20 | 单据日期 | 单据日期 | 日期 | header | 1 | 1 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 30 | 产品编号 | 产品编号 | 参照 | header | 1 | 1 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 40 | 产品名称 | 产品名称 | 文本 | header | 1 | 1 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 50 | 产品种类 | 产品种类 | 文本 | header | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 60 | 整体规格外径 | 整体规格（外径） | 文本 | header | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 70 | 整体规格长度 | 整体规格（长度） | 文本 | header | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 80 | 成品重量 | 成品重量 | 文本 | header | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 90 | 备注 | 备注 | 文本 | header | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_BOM | 10 | 产品编号 | 产品编号 | 参照 | query | 0 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 5 | 序号 | 序号 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 10 | 工序 | 工序 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 20 | 工序控制内容 | 工序控制内容 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 30 | 管控要求 | 管控要求 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 40 | 检查比例 | 检查比例 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 50 | 物料名 | 物料名 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 60 | 物料编号 | 物料编号 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 70 | 物料规格 | 物料规格 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 80 | 外观要求 | 外观要求 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 90 | 用量 | 用量 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 100 | 更改内容 | 更改内容 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 110 | 更改原因 | 更改原因 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 120 | 更改时间 | 更改时间 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 130 | 责任人 | 责任人 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 140 | 备注 | 备注 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 10 | 单据编号 | 单据编号 | 文本 | header | 0 | 1 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 20 | 单据日期 | 单据日期 | 日期 | header | 1 | 1 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 30 | 备注 | 备注 | 文本 | header | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 30 | 产品编号 | 产品编号 | 参照 | header | 1 | 1 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 40 | 产品名称 | 产品名称 | 文本 | header | 1 | 1 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 50 | 产品种类 | 产品种类 | 文本 | header | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 60 | 整体规格外径 | 整体规格（外径） | 文本 | header | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 70 | 整体规格长度 | 整体规格（长度） | 文本 | header | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 80 | 成品重量 | 成品重量 | 文本 | header | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_ASM_PROC | 90 | 表区 | 表区 | 文本 | header | 1 | 0 | 1 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_INSP_PLAN | 5 | 检验类别 | 检验类别 | 下拉框 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_INSP_PLAN | 10 | 控制项目 | 控制项目 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | S1-44: 四个受控文件的 yj_field 全字段(核对表头是否有文件编码) | RD_INSP_PLAN | 20 | 质量控制内容 | 质量控制内容 | 文本 | detail | 1 | 0 | 0 | 1 | 
+[OK] s1-10-fields4.sql (8 batches)

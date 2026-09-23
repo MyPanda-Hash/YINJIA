@@ -1,0 +1,104 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s1-02-panel-meta.sql ==
+  | panel_code | varchar | 
+  | panel_name | nvarchar | 
+  | category | nvarchar | 
+  | mode | varchar | 
+  | line_table | nvarchar | 
+  | head_table | nvarchar | 
+  | group_col | nvarchar | 
+  | pk_col | nvarchar | 
+  | code_col | nvarchar | 
+  | prefix | varchar | 
+  | date_col | nvarchar | 
+  | page_size | int | 
+  | detail_key | nvarchar | 
+  | module_group | nvarchar | 
+  | config | nvarchar | 
+  | config_at | datetime | 
+  | panel_name_en | nvarchar | 
+  | RD_SPEC_DOC | 规格书 | null | 
+  | STOCK_SUMMARY | 收发存汇总表 | In-Out-Balance Summary | 
+  | RD_ALKALINE | 碱性 | 单据 | doc | 研发管理 | rd_alkaline_detail | rd_alkaline_head | 
+  | RD_ANTIBACT | 抑菌 | 单据 | doc | 研发管理 | rd_antibact_detail | rd_antibact_head | 
+  | RD_APPROVAL | 立项申请 | 单据 | doc | 研发管理 | rd_approval_detail | rd_approval | 
+  | RD_ASM_BOM | 组装BOM表 | 单据 | doc | 研发管理 | rd_asm_bom_detail | rd_asm_bom_head | 
+  | RD_ASM_PROC | 组装工艺清单 | 单据 | doc | 研发管理 | rd_asm_proc_detail | rd_asm_proc_head | 
+  | RD_DOM_TEST | 内部委托测试申请单 | 单据 | doc | 研发管理 | rd_dom_test_detail | rd_dom_test_head | 
+  | RD_DROP_PREC | 压降精度 | 单据 | doc | 研发管理 | rd_drop_prec_detail | rd_drop_prec_head | 
+  | RD_EQUIP_USE | 设备使用登记表 | 单据 | doc | 研发管理 | rd_equip_use_detail | rd_equip_use_head | 
+  | RD_FILTER_EFF | 功能性滤效 | 单据 | doc | 研发管理 | rd_filter_eff_detail | rd_filter_eff_head | 
+  | RD_INSP_PLAN | 出货检验计划表 | 单据 | doc | 研发管理 | rd_insp_plan_detail | rd_insp_plan_head | 
+  | RD_INSTR_USE | 仪器使用记录表 | 单据 | doc | 研发管理 | rd_instr_use_detail | rd_instr_use_head | 
+  | RD_MINERAL | 矿化 | 单据 | doc | 研发管理 | rd_mineral_detail | rd_mineral_head | 
+  | RD_MOLD_FORMULA | 成型配方 | 单据 | doc | 研发管理 | rd_mold_formula_detail | rd_mold_formula_head | 
+  | RD_MOLD_PROC | 成型工艺清单 | 单据 | doc | 研发管理 | rd_mold_proc_detail | rd_mold_proc_head | 
+  | RD_PLAN | 项目实施计划 | 单据 | doc | 研发管理 | rd_plan_detail | rd_plan | 
+  | RD_PROD_INFO | 产品信息表 | 单据 | doc | 研发管理 | rd_prod_info_detail | rd_prod_info_head | 
+  | RD_PROGRESS | 项目进度查询 | 单据 | doc | 研发管理 | rd_progress_detail | rd_progress | 
+  | RD_RO_PROTECT | RO保护 | 单据 | doc | 研发管理 | rd_ro_protect_detail | rd_ro_protect_head | 
+  | RD_SCALE | 阻垢性能 | 单据 | doc | 研发管理 | rd_scale_detail | rd_scale_head | 
+  | RD_SOAK | 浸泡安全 | 单据 | doc | 研发管理 | rd_soak_detail | rd_soak_head | 
+  | RD_SPEC_DOC | 规格书 | 单据 | doc | 研发管理 | rd_spec_doc_detail | rd_spec_doc_head | 
+  | RD_SPIKE_WATER | 加标水配置记录表 | 单据 | doc | 研发管理 | rd_spike_water_detail | rd_spike_water_head | 
+  | BOM | 物料清单编码 | 物料清单编码 | 文本 | null | 
+  | BOM | 父件编码 | 父件编码 | 参照 | null | 
+  | BOM | 版本号 | 版本号 | 文本 | null | 
+  | BOM | 子件编码 | 子件编码 | 参照 | null | 
+  | CKDA | dm | 仓库编码 | 文本 | null | 
+  | CUR | 编码 | 编码 | 文本 | null | 
+  | CUSGRP | 编码 | 编码 | 文本 | null | 
+  | CUSGRP | 上级编码 | 上级编码 | 文本 | null | 
+  | DAY_REPORT | 审核人 | 审核人 | 参照 | null | 
+  | DAY_REPORT | 审核时间 | 审核时间 | 文本 | null | 
+  | DAY_REPORT | 产品编码 | 产品编码 | 文本 | null | 
+  | DEPT | 部门编码 | 部门编码 | 文本 | null | 
+  | DEPT | 长编码 | 长编码 | 文本 | null | 
+  | DEPT | 上级编码 | 上级编码 | 文本 | null | 
+  | DISPATCH | 工序编码 | 工序编码 | 文本 | null | 
+  | DISPATCH_DETAIL | 审核人 | 审核人 | 文本 | null | 
+  | DISPATCH_DETAIL | 审核时间 | 审核时间 | 文本 | null | 
+  | DISPATCH_DETAIL | 工序编码 | 工序编码 | 文本 | null | 
+  | EMP | 员工编码 | 员工编码 | 文本 | null | 
+  | EMP | 部门编码 | 部门编码 | 文本 | null | 
+  | EQUIP | 设备编码 | 设备编码 | 文本 | null | 
+  | FEED_CONFIRM | 审核人 | 审核人 | 参照 | null | 
+  | FIN_ACC | 科目编码 | 科目编码 | 文本 | null | 
+  | FIN_EXP | 费用类别编码 | 费用类别编码 | 文本 | null | 
+  | FIN_TAX | 税别编码 | 税别编码 | 文本 | null | 
+  | FINISH_IN | 产品编码 | 产品编码 | 参照 | null | 
+  | FINISH_IN_DETAIL | 审核人 | 审核人 | 文本 | null | 
+  | FINISH_IN_DETAIL | 审核时间 | 审核时间 | 文本 | null | 
+  | GFDA | dm | 供应商编码 | 文本 | null | 
+  | GFDA | 供应商分类编码 | 供应商分类编码 | 文本 | null | 
+  | GFDA | 国家-编码 | 国家-编码 | 文本 | null | 
+  | GFDA | 省-编码 | 省-编码 | 文本 | null | 
+  | GFDA | 市-编码 | 市-编码 | 文本 | null | 
+  | GFDA | 区-编码 | 区-编码 | 文本 | null | 
+  | GFDA | 分类编码 | 分类编码 | 文本 | null | 
+  | GRAN_RECORD | 审核人 | 审核人 | 参照 | null | 
+  | INV | 存货编码 | 存货编码 | 文本 | null | 
+  | INV | 品牌编码 | 品牌编码 | 文本 | null | 
+  | INV | 默认仓库编码 | 默认仓库编码 | 文本 | null | 
+  | INV | 基本单位编码 | 基本单位编码 | 文本 | null | 
+  | INV | 辅助单位编码 | 辅助单位编码 | 文本 | null | 
+  | INV | 默认生产车间编码 | 默认生产车间编码 | 文本 | null | 
+  | INV | 倒冲仓库编码 | 倒冲仓库编码 | 文本 | null | 
+  | INV | 商品类别编码 | 商品类别编码 | 文本 | null | 
+  | INV | 税收分类编码 | 税收分类编码 | 文本 | null | 
+  | INV | 倒冲仓位编码 | 倒冲仓位编码 | 文本 | null | 
+  | INV_PRICE | 存货编码 | 存货编码 | 文本 | null | 
+  | KHDA | dm | 客户编码 | 文本 | null | 
+  | KHDA | 客户分类编码 | 客户分类编码 | 文本 | null | 
+  | KHDA | 价格等级编码 | 价格等级编码 | 文本 | null | 
+  | RD_EQUIP_USE | 设备状态 | 设备状态\n（检查管路、阀门、启动是否正常） | 文本 | null | 
+  | RD_INSTR_USE | 仪器状态 | 仪器状态\n√/× | 下拉框 | SELECT v FROM (VALUES (N'√'),(N'×')) AS t(v) | 
+  | RD_PROGRESS | 状态 | 状态 | 下拉框 | SELECT v FROM (VALUES (N'待启动'),(N'进行中'),(N'测试中'),(N'已完成测试'),(N'已完成'),(N'有待批准'),(N'未批准')) AS t(v) | 
+[OK] s1-02-panel-meta.sql (7 batches)

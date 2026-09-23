@@ -1,0 +1,191 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s2-4.sql ==
+  | 1 | PX001 | 下料 | 熔铸车间 | 0 | 自制 | 100.0000 | 0 | 件 | 1.0000 | 计件 | 合格数量 | 0 |  | 启用 | migration | 2026-08-31 11:18:55.6842792 | null | null | N | null | null | null | 
+  | 2 | PX002 | 车削 | 熔铸车间 | 1 | 自制 | 98.0000 | 0 | 件 | 1.0000 | 计件 | 合格数量 | 0 |  | 启用 | migration | 2026-08-31 11:18:55.6842792 | null | null | N | null | null | null | 
+  | 3 | PX003 | 铣削 | 精整车间 | 1 | 自制 | 97.0000 | 0 | 件 | 1.0000 | 计件 | 合格数量 | 0 |  | 启用 | migration | 2026-08-31 11:18:55.6842792 | null | null | N | null | null | null | 
+  | 4 | PX005 | 热处理 | 轧制车间 | 1 | 委外 | 100.0000 | 1 | kg | 1.0000 | 计时 | 完工数量 | 0 | 委外工序 | 启用 | migration | 2026-08-31 11:18:55.6842792 | null | null | N | null | null | null | 
+  | 5 | PX007 | 检验 | 测试车间 | 0 | 自制 | 100.0000 | 0 | 件 | 1.0000 | 计时 | 完工数量 | 0 |  | 启用 | migration | 2026-08-31 11:18:55.6852803 | null | null | N | null | null | null | 
+  | 6 | OP-HL | 混料 | 自制物料车间 | 0 | null | null | null | null | null | null | null | null | null | 启用 | null | null | null | null | N | null | null | null | 
+  | 7 | OP-CX | 成型 | 成型1号车间 | 1 | null | null | null | null | null | null | null | null | null | 启用 | null | null | null | null | N | null | null | null | 
+  | 8 | OP-QT | 切炭 | 切炭车间 | 1 | null | null | null | null | null | null | null | null | null | 启用 | null | null | null | null | N | null | null | null | 
+  | 9 | OP-ZZ | 组装 | 组装车间 | 0 | null | null | null | null | null | null | null | null | null | 启用 | null | null | null | null | N | null | null | null | 
+  | 10 | OP-ZX | 装箱 | 装箱车间 | 0 | null | null | null | null | null | null | null | null | null | 启用 | null | null | null | null | N | null | null | null | 
+  | 11 | PX001 | 下料 | 熔铸车间 | 0 | 自制 | 100.0000 | 0 | 件 | 1.0000 | 计件 | 合格数量 | 0 |  | 启用 | migration | 2026-09-15 09:32:46.6982280 | null | null | N | null | null | null | 
+  | 12 | PX002 | 车削 | 熔铸车间 | 1 | 自制 | 98.0000 | 0 | 件 | 1.0000 | 计件 | 合格数量 | 0 |  | 启用 | migration | 2026-09-15 09:32:46.6992260 | null | null | N | null | null | null | 
+  | 13 | PX003 | 铣削 | 精整车间 | 1 | 自制 | 97.0000 | 0 | 件 | 1.0000 | 计件 | 合格数量 | 0 |  | 启用 | migration | 2026-09-15 09:32:46.6992260 | null | null | N | null | null | null | 
+  | 14 | PX005 | 热处理 | 轧制车间 | 1 | 委外 | 100.0000 | 1 | kg | 1.0000 | 计时 | 完工数量 | 0 | 委外工序 | 启用 | migration | 2026-09-15 09:32:46.6992260 | null | null | N | null | null | null | 
+  | 15 | PX007 | 检验 | 测试车间 | 0 | 自制 | 100.0000 | 0 | 件 | 1.0000 | 计时 | 完工数量 | 0 |  | 启用 | migration | 2026-09-15 09:32:46.6992260 | null | null | N | null | null | null | 
+  | 16 | PX001 | 下料 | 熔铸车间 | 0 | 自制 | 100.0000 | 0 | 件 | 1.0000 | 计件 | 合格数量 | 0 |  | 启用 | migration | 2026-09-15 09:35:35.1418843 | null | null | N | null | null | null | 
+  | 17 | PX002 | 车削 | 熔铸车间 | 1 | 自制 | 98.0000 | 0 | 件 | 1.0000 | 计件 | 合格数量 | 0 |  | 启用 | migration | 2026-09-15 09:35:35.1418843 | null | null | N | null | null | null | 
+  | 18 | PX003 | 铣削 | 精整车间 | 1 | 自制 | 97.0000 | 0 | 件 | 1.0000 | 计件 | 合格数量 | 0 |  | 启用 | migration | 2026-09-15 09:35:35.1428825 | null | null | N | null | null | null | 
+  | 19 | PX005 | 热处理 | 轧制车间 | 1 | 委外 | 100.0000 | 1 | kg | 1.0000 | 计时 | 完工数量 | 0 | 委外工序 | 启用 | migration | 2026-09-15 09:35:35.1428825 | null | null | N | null | null | null | 
+  | 20 | PX007 | 检验 | 测试车间 | 0 | 自制 | 100.0000 | 0 | 件 | 1.0000 | 计时 | 完工数量 | 0 |  | 启用 | migration | 2026-09-15 09:35:35.1428825 | null | null | N | null | null | null | 
+  | null | 20 | 
+  | null | 5 | 
+  | 委外 | 3 | 
+  | 自制 | 12 | 
+  | id | int | null | 
+  | 物料清单编码 | nvarchar | 200 | 
+  | 父件编码 | nvarchar | 200 | 
+  | 父件名称 | nvarchar | 200 | 
+  | 虚拟件 | bit | null | 
+  | 版本号 | nvarchar | 200 | 
+  | 计量单位 | nvarchar | 100 | 
+  | 生产数量 | decimal | null | 
+  | 生产车间 | nvarchar | 100 | 
+  | 预入仓库 | nvarchar | 200 | 
+  | 默认BOM | bit | null | 
+  | 子件编码 | nvarchar | 200 | 
+  | 子件名称 | nvarchar | 200 | 
+  | 规格型号 | nvarchar | 200 | 
+  | 子件计量单位 | nvarchar | 100 | 
+  | 定额数量 | decimal | null | 
+  | 损耗率% | decimal | null | 
+  | 需用数量 | decimal | null | 
+  | 备注 | nvarchar | 500 | 
+  | 状态 | nvarchar | 10 | 
+  | asp_user1 | nvarchar | 50 | 
+  | asp_time1 | datetime2 | null | 
+  | asp_user2 | nvarchar | 50 | 
+  | asp_time2 | datetime2 | null | 
+  | asp_cancel | char | 1 | 
+  | 物料种类 | nvarchar | 50 | 
+  | 物料规格 | nvarchar | 200 | 
+  | 外观要求 | nvarchar | 500 | 
+  | 68 | 
+  | 1 | BOM-001 | CP001 | 铝棒 Φ80 | 0 | V1.0 | 件 | 1.0000 | 熔铸车间 | 成品仓 | 1 | CL002 | 6061铝锭 | A00 | kg | 1.0500 | 5.0000 | 1.0500 |  | 启用 | migration | 2026-08-31 11:18:55.6686351 | null | null | N | null | null | null | 
+  | 2 | BOM-001 | CP001 | 铝棒 Φ80 | 0 | V1.0 | 件 | 1.0000 | 熔铸车间 | 成品仓 | 1 | CL004 | 切削液 | 20L/桶 | 升 | 0.0200 | 2.0000 | 0.0200 |  | 启用 | migration | 2026-08-31 11:18:55.6686351 | null | null | N | null | null | null | 
+  | 3 | BOM-002 | CP003 | 铝型材-散热片 | 0 | V1.0 | 件 | 1.0000 | 精整车间 | 成品仓 | 1 | CL003 | 6063铝棒 | Φ120 | kg | 1.1000 | 10.0000 | 1.1000 |  | 启用 | migration | 2026-08-31 11:18:55.6686351 | null | null | N | null | null | null | 
+  | 4 | BOM-002 | CP003 | 铝型材-散热片 | 0 | V1.0 | 件 | 1.0000 | 精整车间 | 成品仓 | 1 | CL005 | 包装木箱 | 1200×800 | 件 | 0.0200 | 0.0000 | 0.0200 | 包装 | 启用 | migration | 2026-08-31 11:18:55.6686351 | null | null | N | null | null | null | 
+  | 5 | BOM-003 | CP002 | 铝板 6061 | 0 | V1.0 | 件 | 1.0000 | 轧制车间 | 成品仓 | 1 | CL002 | 6061铝锭 | A00 | kg | 1.0800 | 8.0000 | 1.0800 |  | 启用 | migration | 2026-08-31 11:18:55.6698731 | null | null | N | null | null | null | 
+  | 6 | BOM-003 | CP002 | 铝板 6061 | 0 | V1.0 | 件 | 1.0000 | 轧制车间 | 成品仓 | 1 | CL004 | 切削液 | 20L/桶 | 升 | 0.0300 | 2.0000 | 0.0300 |  | 启用 | migration | 2026-08-31 11:18:55.6698731 | null | null | N | null | null | null | 
+  | 7 | BOM-004 | CP004 | 减速箱体 A | 0 | V1.0 | 件 | 1.0000 | 测试车间 | 成品仓 | 1 | CL001 | 45#圆钢 | Φ60 | kg | 42.0000 | 5.0000 | 42.0000 |  | 启用 | migration | 2026-08-31 11:18:55.6698731 | null | null | N | null | null | null | 
+  | 8 | BOM-004 | CP004 | 减速箱体 A | 0 | V1.0 | 件 | 1.0000 | 测试车间 | 成品仓 | 1 | CL004 | 切削液 | 20L/桶 | 升 | 0.5000 | 2.0000 | 0.5000 |  | 启用 | migration | 2026-08-31 11:18:55.6698731 | null | null | N | null | null | null | 
+  | 9 | BOM-004 | CP004 | 减速箱体 A | 0 | V1.0 | 件 | 1.0000 | 测试车间 | 成品仓 | 1 | CL005 | 包装木箱 | 1200×800 | 件 | 0.5000 | 0.0000 | 0.5000 |  | 启用 | migration | 2026-08-31 11:18:55.6708853 | null | null | N | null | null | null | 
+  | 10 | BOM-005 | CP005 | 轴套 C | 0 | V1.0 | 件 | 1.0000 | 精整车间 | 成品仓 | 1 | CL001 | 45#圆钢 | Φ60 | kg | 0.6000 | 3.0000 | 0.6000 |  | 启用 | migration | 2026-08-31 11:18:55.6708853 | null | null | N | null | null | null | 
+  | 11 | BOM-005 | CP005 | 轴套 C | 0 | V1.0 | 件 | 1.0000 | 精整车间 | 成品仓 | 1 | CL004 | 切削液 | 20L/桶 | 升 | 0.0500 | 2.0000 | 0.0500 |  | 启用 | migration | 2026-08-31 11:18:55.6708853 | null | null | N | null | null | null | 
+  | 12 | BOM-006 | CL002 | 6061铝锭 | 0 | V1.0 | kg | 1.0000 | 熔铸车间 | 成品仓 | 1 | CL003 | 6063铝棒 | Φ120 | kg | 0.5000 | 2.0000 | 0.5000 |  | 启用 | migration | 2026-08-31 11:18:55.6708853 | null | null | N | null | null | null | 
+  | 13 | BOM-2026-08-2501 | CP003 | 铝型材-散热片 | 0 |  | 件 | 1.0000 |  |  | 0 | CL004 | 切削液 | 20L/桶 | 升 | 0.0000 | 0.0000 | 0.0000 |  | 启用 | migration | 2026-08-31 11:18:55.6718828 | null | null | N | null | null | null | 
+  | 14 | BOM-001 | CP001 | 铝棒 Φ80 | 0 | V1.0 | 件 | 1.0000 | 熔铸车间 | 成品仓 | 1 | CL002 | 6061铝锭 | A00 | kg | 1.0500 | 5.0000 | 1.0500 |  | 启用 | migration | 2026-09-15 09:32:46.6858240 | null | null | N | null | null | null | 
+  | 15 | BOM-001 | CP001 | 铝棒 Φ80 | 0 | V1.0 | 件 | 1.0000 | 熔铸车间 | 成品仓 | 1 | CL004 | 切削液 | 20L/桶 | 升 | 0.0200 | 2.0000 | 0.0200 |  | 启用 | migration | 2026-09-15 09:32:46.6870374 | null | null | N | null | null | null | 
+  | 16 | BOM-002 | CP003 | 铝型材-散热片 | 0 | V1.0 | 件 | 1.0000 | 精整车间 | 成品仓 | 1 | CL003 | 6063铝棒 | Φ120 | kg | 1.1000 | 10.0000 | 1.1000 |  | 启用 | migration | 2026-09-15 09:32:46.6874125 | null | null | N | null | null | null | 
+  | 17 | BOM-002 | CP003 | 铝型材-散热片 | 0 | V1.0 | 件 | 1.0000 | 精整车间 | 成品仓 | 1 | CL005 | 包装木箱 | 1200×800 | 件 | 0.0200 | 0.0000 | 0.0200 | 包装 | 启用 | migration | 2026-09-15 09:32:46.6876985 | null | null | N | null | null | null | 
+  | 18 | BOM-003 | CP002 | 铝板 6061 | 0 | V1.0 | 件 | 1.0000 | 轧制车间 | 成品仓 | 1 | CL002 | 6061铝锭 | A00 | kg | 1.0800 | 8.0000 | 1.0800 |  | 启用 | migration | 2026-09-15 09:32:46.6880242 | null | null | N | null | null | null | 
+  | 19 | BOM-003 | CP002 | 铝板 6061 | 0 | V1.0 | 件 | 1.0000 | 轧制车间 | 成品仓 | 1 | CL004 | 切削液 | 20L/桶 | 升 | 0.0300 | 2.0000 | 0.0300 |  | 启用 | migration | 2026-09-15 09:32:46.6882375 | null | null | N | null | null | null | 
+  | 20 | BOM-004 | CP004 | 减速箱体 A | 0 | V1.0 | 件 | 1.0000 | 测试车间 | 成品仓 | 1 | CL001 | 45#圆钢 | Φ60 | kg | 42.0000 | 5.0000 | 42.0000 |  | 启用 | migration | 2026-09-15 09:32:46.6884580 | null | null | N | null | null | null | 
+  | id | int | null | 
+  | 所属类别 | nvarchar | 100 | 
+  | 存货编码 | nvarchar | 200 | 
+  | 存货名称 | nvarchar | 200 | 
+  | 规格型号 | nvarchar | 200 | 
+  | 计价方式 | nvarchar | 100 | 
+  | 品牌 | nvarchar | 200 | 
+  | 计量单位 | nvarchar | 100 | 
+  | 属性 | nvarchar | 100 | 
+  | 参考成本 | decimal | null | 
+  | 最新成本 | decimal | null | 
+  | 建档日期 | date | null | 
+  | 停用 | bit | null | 
+  | 备注 | nvarchar | 500 | 
+  | 状态 | nvarchar | 10 | 
+  | asp_user1 | nvarchar | 50 | 
+  | asp_time1 | datetime2 | null | 
+  | asp_user2 | nvarchar | 50 | 
+  | asp_time2 | datetime2 | null | 
+  | asp_cancel | char | 1 | 
+  | 是否检验 | bit | null | 
+  | 检验方式 | nvarchar | 20 | 
+  | 数据来源 | nvarchar | 20 | 
+  | ERP更新时间 | datetime2 | null | 
+  | 条形码 | nvarchar | 100 | 
+  | 外部数据ID | nvarchar | 64 | 
+  | 外部单据号 | nvarchar | 200 | 
+  | 外部指纹 | nvarchar | 500 | 
+  | 助记码 | nvarchar | 100 | 
+  | 产地 | nvarchar | 200 | 
+  | 商品类型 | nvarchar | 20 | 
+  | 是否可销售 | bit | null | 
+  | 是否可采购 | bit | null | 
+  | 是否为子件 | bit | null | 
+  | 是否为组件 | bit | null | 
+  | 是否多单位 | bit | null | 
+  | 辅助单位 | nvarchar | 100 | 
+  | 辅助单位编码 | nvarchar | 100 | 
+  | 是否启用保质期 | bit | null | 
+  | 保质期 | decimal | null | 
+  | 保质期单位 | nvarchar | 10 | 
+  | 预警天数 | decimal | null | 
+  | 是否启用辅助属性 | bit | null | 
+  | 库存管理方式 | nvarchar | 20 | 
+  | 最低库存 | decimal | null | 
+  | 最高库存 | decimal | null | 
+  | 预警库存 | decimal | null | 
+  | 销项税率 | decimal | null | 
+  | 进项税率 | decimal | null | 
+  | 生产许可证 | nvarchar | 200 | 
+  | 3838 | 
+  | 7279 | 成品 | C-32-01 | A+级烧结炭棒/滤芯 | 63*40*242.5 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:20.0000000 | null | null | N | 1 | null | 金蝶同步 | 2026-08-22 15:16:10.0000000 | null | 2182903040053442560 | C-32-01 | C-32-01|A+级烧结炭棒/滤芯||63*40*242.5|SPFL00002| | 吉之美活性炭棒滤芯标 | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 11.4000 | 0.0000 | 11.4000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7280 | 成品 | C-53-02 | A+级烧结炭棒/滤芯 | 45*25*212 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:20.0000000 | null | null | N | 1 | null | 金蝶同步 | 2025-06-17 22:40:02.0000000 | null | 2182903040523205632 | C-53-02 | C-53-02|A+级烧结炭棒/滤芯||45*25*212|SPFL00002| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7281 | 成品 | C-53-04 | A+级烧结炭棒/滤芯 | 63*40*244.5 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:21.0000000 | null | null | N | 1 | null | 金蝶同步 | 2025-06-17 22:40:02.0000000 | null | 2182903040548371456 | C-53-04 | C-53-04|A+级烧结炭棒/滤芯||63*40*244.5|SPFL00002| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7282 | 成品 | C-54-01 | A+级烧结炭棒/滤芯 | 60*30*254 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:21.0000000 | null | null | N | 1 | null | 金蝶同步 | 2026-08-22 15:25:48.0000000 | null | 2182903040556759040 | C-54-01 | C-54-01|A+级烧结炭棒/滤芯||60*30*254|SPFL00002| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 26.0000 | 0.0000 | 26.0000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7283 | 成品 | C-54-03 | A+级烧结炭棒/滤芯 | 63*40*227.5 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:21.0000000 | null | null | N | 1 | null | 金蝶同步 | 2026-08-22 15:26:46.0000000 | null | 2182903040573536256 | C-54-03 | C-54-03|A+级烧结炭棒/滤芯||63*40*227.5|SPFL00002| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 20.5000 | 0.0000 | 20.5000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7284 | 成品 | C-54-04 | A+级烧结炭棒/滤芯 | 48*30*146 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:22.0000000 | null | null | N | 1 | null | 金蝶同步 | 2026-08-22 15:27:07.0000000 | null | 2182903040581925888 | C-54-04 | C-54-04|A+级烧结炭棒/滤芯||48*30*146|SPFL00002| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7285 | 成品 | C-73-02 | A+级烧结炭棒/滤芯 | 63*40*183 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:22.0000000 | null | null | N | 1 | null | 金蝶同步 | 2025-11-24 14:53:01.0000000 | null | 2182903040984579072 | C-73-02 | C-73-02|A+级烧结炭棒/滤芯||63*40*183|SPFL00002| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 13.8000 | 0.0000 | 13.8000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7286 | 成品 | C-77-01 | A+级烧结炭棒/滤芯 | 63*40*243 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:22.0000000 | null | null | N | 1 | null | 金蝶同步 | 2026-08-22 15:54:32.0000000 | null | 2182903041378842624 | C-77-01 | C-77-01|A+级烧结炭棒/滤芯||63*40*243|SPFL00002| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7287 | 成品 | C-90-01 | A+级烧结炭棒/滤芯 | 34*12*125 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:22.0000000 | null | null | N | 1 | null | 金蝶同步 | 2026-08-22 16:14:15.0000000 | null | 2182903041647278080 | C-90-01 | C-90-01|A+级烧结炭棒/滤芯||34*12*125|SPFL00002| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 3.6000 | 0.0000 | 3.6000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7288 | 成品 | D-001 | A+级烧结炭棒/滤芯 | 63*40*213 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:23.0000000 | null | null | N | 1 | null | 金蝶同步 | 2025-06-17 22:40:02.0000000 | null | 2182903272149449728 | D-001 | D-001|A+级烧结炭棒/滤芯||63*40*213|SPFL00002| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7289 | 成品 | D-003 | A+级烧结炭棒/滤芯 | 60*40*212 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:23.0000000 | null | null | N | 1 | null | 金蝶同步 | 2025-06-17 22:40:02.0000000 | null | 2182903272166226944 | D-003 | D-003|A+级烧结炭棒/滤芯||60*40*212|SPFL00002| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 成品 | SPFL00002 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7290 | 裸棒 | D-01-01 | A+级烧结炭棒/滤芯 | null | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:24.0000000 | null | null | N | 1 | null | 金蝶同步 | 2026-08-25 15:32:35.0000000 | null | 2182903272216557568 | D-01-01 | D-01-01|A+级烧结炭棒/滤芯|||SPFL00004| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 裸棒 | SPFL00004 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7291 | 裸棒 | D-01-08 | A+级烧结炭棒/滤芯 | 45*25*134.5 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:24.0000000 | null | null | N | 1 | null | 金蝶同步 | 2026-08-25 15:34:31.0000000 | null | 2182903272275278848 | D-01-08 | D-01-08|A+级烧结炭棒/滤芯||45*25*134.5|SPFL00004| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 4.8000 | 0.0000 | 4.8000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 裸棒 | SPFL00004 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7292 | 裸棒 | D-01-09 | A+级烧结炭棒/滤芯 | 45*25*36 | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:24.0000000 | null | null | N | 1 | null | 金蝶同步 | 2026-08-26 16:20:58.0000000 | null | 2182903272283666432 | D-01-09 | D-01-09|A+级烧结炭棒/滤芯||45*25*36|SPFL00004| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 1.9000 | 0.0000 | 1.9000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 裸棒 | SPFL00004 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | 7293 | 裸棒 | D-01-12 | A+级烧结炭棒/滤芯 | null | 移动平均 | null | 支 | 批次管理 | 0.0000 | null | null | 0 | null | 启用 | jdy-sync | 2026-09-20 05:08:25.0000000 | null | null | N | 1 | null | 金蝶同步 | 2025-04-15 18:06:10.0000000 | null | 2182903272317221888 | D-01-12 | D-01-12|A+级烧结炭棒/滤芯|||SPFL00004| | A+jsjtb/lx | null | 1 | 1 | 1 | 1 | 1 | 0 | 支 | 支 | 0 | 0.0000 | null | 0.0000 | 0 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0 | null | null | null | null | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | null | 0.0000 | 支 | null | null | null | 支 | 0 | null | null | 0 | 0 | 1 | 裸棒 | SPFL00004 | false | null | 3 | null | 3 | null | 0 | null | null | 0 | null | null | 0 | null | 3 | 3 | 3 | [] | [] | null | null | null | null | null | [] | [] | [] | null | null | null | null | null | 
+  | PR_QC_CONTROL | 检验频率 | 检验频率 | 文本 | null | null | null | header | 7 | 
+  | RD_INSP_PLAN | 检测频率 | 检测频率 | 文本 | null | null | null | detail | 70 | 
+  | RD_INSP_PLAN | 检验类别 | 检验类别 | 下拉框 | SELECT v FROM (VALUES (N'必测项'),(N'型式检验')) AS t(v) | 
+  | INV | 所属类别 | 所属类别 | 下拉框 | SELECT v FROM (VALUES (N'产成品'),(N'原材料'),(N'辅助材料'),(N'包装物'),(N'半成品')) AS t(v) | 
+  | FINISH_IN | 业务类型 | 业务类型 | 下拉框 | SELECT v FROM (VALUES (N'采购入库'),(N'产成品入库'),(N'其他入库')) AS t(v) | 
+  | MANU_ORDER | 对方仓库 | 对方仓库 | 下拉框 | SELECT v FROM (VALUES (N'原料仓'),(N'辅料仓'),(N'成品仓'),(N'半成品仓')) AS t(v) | 
+  | OTHER_IN | 业务类型 | 业务类型 | 下拉框 | SELECT v FROM (VALUES (N'采购入库'),(N'产成品入库'),(N'其他入库')) AS t(v) | 
+  | RD_MOLD_PROC | 外观要求 | 外观要求 | 下拉框 | SELECT v FROM (VALUES (N'·成品'),(N'·半成品')) AS t(v) | 
+  | RD_MOLD_FORMULA | 外观要求 | 外观要求 | 下拉框 | SELECT v FROM (VALUES (N'·成品'),(N'·半成品')) AS t(v) | 
+  | RD_PROD_INFO | 产品类型 | 产品类型 | 下拉框 | SELECT v FROM (VALUES (N'成品'),(N'半成品'),(N'裸棒')) AS t(v) | 
+  | QC_BHZ | 问题来源 | 问题来源 | 下拉框 | SELECT v FROM (VALUES (N'制程'),(N'成品')) AS t(v) | 
+  | DAY_REPORT | 工序内容 | 工序内容(组装) | 文本 | null | null | null | detail | 320 | 
+  | DISPATCH | 工序编码 | 工序编码 | 文本 | null | null | null | detail | 20 | 
+  | DISPATCH | 工序名称 | 工序名称 | 文本 | null | null | null | query,detail | 21 | 
+  | DISPATCH_DETAIL | 工序编码 | 工序编码 | 文本 | null | null | null | detail | 230 | 
+  | DISPATCH_DETAIL | 工序名称 | 工序名称 | 文本 | null | null | null | detail | 240 | 
+  | DISPATCH_STATS | 工序名称 | 工序名称 | 文本 | null | null | null | detail | 40 | 
+  | MANU_ORDER | 累计汇报套数(工序单位) | 累计汇报套数(工序单位) | 小数 | null | null | null | detail | 120 | 
+  | MANU_ORDER_DETAIL | 累计汇报套数(工序单位) | 累计汇报套数(工序单位) | 文本 | null | null | null | detail | 480 | 
+  | OP | 工序类型 | 工序类型 | 下拉框 | SELECT 名称 FROM bs_dict WHERE 字典类别='OP_TYPE' AND ISNULL(停用,0)=0 ORDER BY 代码 | null | null | detail | 140 | 
+  | OP | 工序编码 | 工序编码 | 文本 | null | null | null | query,detail | 10 | 
+  | OP | 工序名称 | 工序名称 | 文本 | null | null | null | query,detail | 20 | 
+  | OP | 关键工序 | 关键工序 | 是否 | null | null | null | query,detail | 40 | 
+  | PR_MIX_PROCESS | 工序步骤 | 工序步骤 | 文本 | null | null | null | header | 4 | 
+  | PR_PATROL_QC | 工序 | 工序 | 下拉框 | SELECT N'混料' AS val,N'混料' AS lbl UNION ALL SELECT N'成型',N'成型' UNION ALL SELECT N'切炭',N'切炭' UNION ALL SELECT N'组装',N'组装' UNION ALL SELECT N'装箱',N'装箱' | null | null | header | 3 | 
+  | QC_OP | 工序 | 工序 | 下拉框 | SELECT 工序名称 FROM bs_op WHERE ISNULL([状态],N'启用')=N'启用' AND ISNULL(是否停用,0)=0 ORDER BY id | null | null | query,header | 40 | 
+  | RD_ASM_PROC | 工序 | 工序 | 文本 | null | null | null | detail | 10 | 
+  | RD_ASM_PROC | 工序控制内容 | 工序控制内容 | 文本 | null | null | null | detail | 20 | 
+  | RD_MOLD_PROC | 工序 | 工序 | 文本 | null | null | null | header | 200 | 
+  | RD_MOLD_PROC | 工序管控要求 | 工序管控要求 | 文本 | null | null | null | header | 201 | 
+  | REJECT | 适用工序 | 适用工序 | 参照 | null | OP | 工序编码 | query,detail | 50 | 
+  | ROUTE | 关键工序 | 关键工序 | 是否 | null | null | null | detail | 160 | 
+  | ROUTE | 工序编码 | 工序编码 | 参照 | null | OP | 工序编码 | query,detail | 50 | 
+  | ROUTE | 工序名称 | 工序名称 | 文本 | null | null | null | query,detail | 60 | 
+  | WO_LINE | stage | 所在工序 | 下拉框 | SELECT N'混料' AS val, N'混料' AS lbl UNION ALL SELECT N'成型',N'成型' UNION ALL SELECT N'切炭',N'切炭' UNION ALL SELECT N'组装',N'组装' UNION ALL SELECT N'装箱',N'装箱' | null | null | detail | 2 | 
+  | WO_ORDER | 工序 | 工序 | 下拉框 | SELECT 工序名称 FROM bs_op WHERE ISNULL([状态],N'启用')=N'启用' AND ISNULL(是否停用,0)=0 ORDER BY id | null | null | detail | 200 | 
+  | WO_PICK | stage | 领料工序 | 下拉框 | SELECT N'混料' AS val, N'混料' AS lbl UNION ALL SELECT N'成型',N'成型' UNION ALL SELECT N'组装',N'组装' | null | null | detail | 2 | 
+  | WO_PROGRESS | 工序 | 工序 | 文本 | null | null | null | query,detail | 20 | 
+  | WO_REPORT | 工序 | 工序 | 下拉框 | SELECT 工序名称 FROM bs_op WHERE ISNULL([状态],N'启用')=N'启用' AND ISNULL(是否停用,0)=0 ORDER BY id | null | null | query,header | 40 | 
+  | WO_REPORT_LIST | 工序 | 工序 | 文本 | null | null | null | query,detail | 40 | 
+  | WO_STAGE | stage | 工序 | 下拉框 | SELECT N'混料' AS val, N'混料' AS lbl UNION ALL SELECT N'成型',N'成型' UNION ALL SELECT N'切炭',N'切炭' UNION ALL SELECT N'组装',N'组装' UNION ALL SELECT N'装箱',N'装箱' | null | null | detail | 2 | 
+  | WO_STAGE | stage | 工序 | 下拉框 | null | null | null | query | 2 | 
+[OK] s2-4.sql (14 batches)

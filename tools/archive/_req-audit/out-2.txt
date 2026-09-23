@@ -1,0 +1,191 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s2-2.sql ==
+  | id | int | null | 
+  | 产品编号 | nvarchar | 200 | 
+  | 单据编号 | nvarchar | 50 | 
+  | 规格书种类 | nvarchar | 60 | 
+  | 负责人 | nvarchar | 50 | 
+  | 责任人 | nvarchar | 50 | 
+  | asp_user1 | nvarchar | 100 | 
+  | asp_time1 | datetime2 | null | 
+  | asp_user2 | nvarchar | 100 | 
+  | asp_time2 | datetime2 | null | 
+  | asp_cancel | char | 1 | 
+  | 0 | 
+  | id | int | null | 
+  | panel_code | nvarchar | 40 | 
+  | form_no | nvarchar | 60 | 
+  | action | nvarchar | 20 | 
+  | result | nvarchar | 10 | 
+  | node_no | int | null | 
+  | operator | nvarchar | 40 | 
+  | opinion | nvarchar | -1 | 
+  | create_time | datetime2 | null | 
+  | 69 | 
+  | 1 | PURCHASE_IN | PI-2026-09-0002 | SUBMIT | PENDING | 1 | admin | null | 2026-09-16 18:27:39.017 | 
+  | 2 | PURCHASE_IN | PI-2026-09-0002 | APPROVE | APPROVED | 1 | admin | null | 2026-09-16 18:27:41.182 | 
+  | 3 | PURCHASE_IN | PI-2026-09-0003 | SUBMIT | PENDING | 1 | admin | null | 2026-09-16 19:27:05.558 | 
+  | 4 | PURCHASE_IN | PI-2026-09-0003 | APPROVE | APPROVED | 1 | admin | null | 2026-09-16 19:27:12.125 | 
+  | 5 | PURCHASE_IN | CGRK-20260916-03215 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-16 20:03:59.627 | 
+  | 6 | PURCHASE_IN | CGRK-20260916-03215 | SUBMIT | PENDING | 1 | admin | null | 2026-09-16 20:04:17.640 | 
+  | 7 | PURCHASE_IN | CGRK-20260916-03215 | APPROVE | APPROVED | 1 | admin | null | 2026-09-16 20:04:28.652 | 
+  | 8 | PURCHASE_IN | CGRK-20260916-03215 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-16 20:12:49.534 | 
+  | 9 | PURCHASE_IN | CGRK-20260916-03215 | SUBMIT | PENDING | 1 | admin | null | 2026-09-16 20:12:58.733 | 
+  | 10 | PURCHASE_IN | CGRK-20260916-03215 | APPROVE | APPROVED | 1 | admin | null | 2026-09-16 20:14:25.015 | 
+  | 11 | PURCHASE_IN | PI-2026-09-0003 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-16 20:43:59.258 | 
+  | 12 | PURCHASE_IN | PI-2026-09-0002 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-16 20:44:06.113 | 
+  | 13 | PURCHASE_IN | CGRK-20260916-03215 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-16 21:10:33.556 | 
+  | 14 | PURCHASE_IN | CGRK-20260916-03215 | SUBMIT | PENDING | 1 | admin | null | 2026-09-16 21:10:43.968 | 
+  | 15 | PURCHASE_IN | CGRK-20260916-03215 | APPROVE | APPROVED | 1 | admin | null | 2026-09-16 21:10:46.946 | 
+  | 16 | PURCHASE_IN | CGRK-20260916-03215 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-16 21:12:34.785 | 
+  | 17 | PURCHASE_IN | CGRK-20260915-03214 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-16 21:21:07.938 | 
+  | 18 | PURCHASE_IN | CGRK-20260915-03214 | SUBMIT | PENDING | 1 | admin | null | 2026-09-16 21:21:12.608 | 
+  | 19 | PURCHASE_IN | CGRK-20260915-03214 | APPROVE | APPROVED | 1 | admin | null | 2026-09-16 21:21:15.156 | 
+  | 20 | PURCHASE_IN | CGRK-20260916-03215 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-16 21:29:16.514 | 
+  | 21 | PURCHASE_IN | CGRK-20260916-03215 | SUBMIT | PENDING | 1 | admin | null | 2026-09-16 21:29:22.979 | 
+  | 22 | PURCHASE_IN | CGRK-20260916-03215 | APPROVE | APPROVED | 1 | admin | null | 2026-09-16 21:29:25.972 | 
+  | 23 | PURCHASE_IN | CGRK-20260915-03214 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-16 21:30:50.919 | 
+  | 24 | PURCHASE_IN | CGRK-20260915-03214 | SUBMIT | PENDING | 1 | admin | null | 2026-09-16 21:30:57.936 | 
+  | 25 | PURCHASE_IN | CGRK-20260915-03214 | APPROVE | APPROVED | 1 | admin | null | 2026-09-16 21:31:04.531 | 
+  | 26 | SO_ORDER | ZL-20260916-06 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-17 09:58:52.216 | 
+  | 27 | QC_RECV | SL-2026-09-0001 | SUBMIT | PENDING | 1 | admin | null | 2026-09-17 10:30:11.423 | 
+  | 28 | QC_RECV | SL-2026-09-0001 | APPROVE | APPROVED | 1 | admin | null | 2026-09-17 10:30:14.010 | 
+  | 29 | QC_RECV | SL-2026-09-0001 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-17 10:33:32.398 | 
+  | 30 | PURCHASE_IN | CGRK-20260915-03214 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-17 12:11:47.871 | 
+  | 31 | PURCHASE_IN | CGRK-20260915-03214 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-17 13:08:30.499 | 
+  | 32 | PURCHASE_IN | PI-2026-09-0006 | SUBMIT | PENDING | 1 | admin | null | 2026-09-17 13:20:14.172 | 
+  | 33 | PURCHASE_IN | PI-2026-09-0006 | APPROVE | APPROVED | 1 | admin | null | 2026-09-17 13:20:16.893 | 
+  | 34 | QC_RECV | SL-2026-09-0005 | SUBMIT | PENDING | 1 | admin | null | 2026-09-20 10:34:17.568 | 
+  | 35 | QC_RECV | SL-2026-09-0005 | APPROVE | APPROVED | 1 | admin | null | 2026-09-20 10:34:20.190 | 
+  | 36 | QC_RECV | SL-2026-09-0006 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:35:45.942 | 
+  | 37 | QC_RECV | SL-2026-09-0007 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:36:53.264 | 
+  | 38 | QC_INSP | IJ-2026-09-0007 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:36:57.696 | 
+  | 39 | QC_RECV | SL-2026-09-0008 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:36:57.728 | 
+  | 40 | QC_INSP | IJ-2026-09-0008 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:37:36.081 | 
+  | 41 | QC_RECV | SL-2026-09-0009 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:37:36.119 | 
+  | 42 | PURCHASE_IN | PI-2026-09-0009 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:43:44.160 | 
+  | 43 | PURCHASE_IN | PI-2026-09-0011 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:44:35.141 | 
+  | 44 | PURCHASE_IN | PI-2026-09-0012 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:44:48.862 | 
+  | 45 | PURCHASE_IN | PI-2026-09-0013 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:46:55.696 | 
+  | 46 | PURCHASE_IN | PI-2026-09-0014 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:47:52.518 | 
+  | 47 | PURCHASE_IN | PI-2026-09-0015 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:51:30.015 | 
+  | 48 | PURCHASE_IN | PI-2026-09-0016 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:56:42.852 | 
+  | 49 | PURCHASE_IN | PI-2026-09-0017 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 11:57:03.725 | 
+  | 50 | QC_INSP | IJ-2026-09-0009 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-20 14:01:06.751 | 
+  | id | int | null | 
+  | panel_code | varchar | 40 | 
+  | doc_no | nvarchar | 60 | 
+  | shr | nvarchar | 40 | 
+  | shsj | datetime | null | 
+  | canceled | char | 1 | 
+  | cancel_by | nvarchar | 40 | 
+  | cancel_at | datetime | null | 
+  | pending | char | 1 | 
+  | pending_by | nvarchar | 40 | 
+  | pending_at | datetime | null | 
+  | update_at | datetime | null | 
+  | archived | char | 1 | 
+  | deleting | char | 1 | 
+  | delete_req_by | nvarchar | 50 | 
+  | delete_req_at | datetime2 | null | 
+  | stopped | char | 1 | 
+  | stop_by | nvarchar | 50 | 
+  | stop_at | datetime2 | null | 
+  | saved | char | 1 | 
+  | modify_state | char | 1 | 
+  | modify_req_by | nvarchar | 50 | 
+  | modify_req_at | datetime2 | null | 
+  | modify_appr_by | nvarchar | 50 | 
+  | modify_appr_at | datetime2 | null | 
+  | archived_at | datetime2 | null | 
+  | erp_close_state | nvarchar | 1 | 
+  | 6141 | 
+  | 1 | RD_PROGRESS | LXJ2609040100 | null | null | N | null | null | N | null | null | 2026-09-15 12:18:15.51 | N | N | null | null | null | null | null | N | null | null | null | null | null | null | null | 
+  | 2 | RKD | IC-2026-09-0001 | null | null | Y | admin | 2026-09-15 12:44:34.16 | N | null | null | 2026-09-15 12:44:34.16 | N | N | null | null | null | null | null | Y | null | null | null | null | null | null | null | 
+  | 5 | MANU_ORDER | MO-2026-09-0001 | null | null | Y | admin | 2026-09-15 12:44:34.217 | N | null | null | 2026-09-15 12:44:34.217 | N | N | null | null | null | null | null | Y | null | null | null | null | null | null | null | 
+  | 15 | SO_ORDER | ZXL-20260914-02 | 王光珍 | 2026-09-14 17:44:20.0 | N | null | null | N | null | null | 2026-09-17 09:56:18.933 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 16 | SO_ORDER | ZXL-20260914-01 | 王光珍 | 2026-09-14 17:32:16.0 | N | null | null | N | null | null | 2026-09-20 12:13:51.12 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | S | 
+  | 17 | SO_ORDER | ZL-20260914-01 | 王光珍 | 2026-09-14 17:41:15.0 | N | null | null | N | null | null | 2026-09-20 12:13:51.12 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | S | 
+  | 18 | SO_ORDER | LZW-20260914-03 | 王光珍 | 2026-09-15 10:26:25.0 | N | null | null | N | null | null | 2026-09-17 09:56:20.27 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 19 | SO_ORDER | LZW-20260914-02 | 王光珍 | 2026-09-14 17:44:11.0 | N | null | null | N | null | null | 2026-09-17 09:56:20.753 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 20 | SO_ORDER | LZW-20260914-01 | 王光珍 | 2026-09-14 17:44:11.0 | N | null | null | N | null | null | 2026-09-17 09:56:21.47 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 21 | SO_ORDER | ZXL-20260912-01 | 王光珍 | 2026-09-12 15:50:43.0 | N | null | null | N | null | null | 2026-09-17 09:56:21.91 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 22 | SO_ORDER | ZL-20260912-02 | 王光珍 | 2026-09-12 15:39:09.0 | N | null | null | N | null | null | 2026-09-17 09:56:22.427 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 23 | SO_ORDER | ZL-20260912-01 | 王光珍 | 2026-09-12 18:34:28.0 | N | null | null | N | null | null | 2026-09-17 09:56:23.01 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 24 | SO_ORDER | XQ-20260912-01 | 王光珍 | 2026-09-17 09:41:11.0 | N | null | null | N | null | null | 2026-09-17 09:56:23.417 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 25 | SO_ORDER | LZW-20260912-02 | 王光珍 | 2026-09-12 18:14:55.0 | N | null | null | N | null | null | 2026-09-17 09:56:23.83 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 26 | SO_ORDER | LZW-20260912-01 | 王光珍 | 2026-09-12 15:46:36.0 | N | null | null | N | null | null | 2026-09-17 09:56:24.443 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 27 | SO_ORDER | LYZ-20260912-01 | 王光珍 | 2026-09-12 15:46:44.0 | N | null | null | N | null | null | 2026-09-17 09:56:24.853 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 28 | SO_ORDER | ZL-20260911-07 | 王光珍 | 2026-09-15 09:13:34.0 | N | null | null | N | null | null | 2026-09-17 09:56:25.21 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 29 | SO_ORDER | ZL-20260911-06 | 王光珍 | 2026-09-11 16:46:11.0 | N | null | null | N | null | null | 2026-09-17 09:56:25.67 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 30 | SO_ORDER | ZL-20260911-05 | 王光珍 | 2026-09-14 10:07:25.0 | N | null | null | N | null | null | 2026-09-17 09:56:26.087 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 31 | SO_ORDER | ZL-20260911-04 | 王光珍 | 2026-09-11 18:17:52.0 | N | null | null | N | null | null | 2026-09-17 09:56:26.503 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 32 | SO_ORDER | ZL-20260911-03 | 王光珍 | 2026-09-11 18:17:58.0 | N | null | null | N | null | null | 2026-09-17 09:56:27.0 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 33 | SO_ORDER | ZL-20260911-02 | 王光珍 | 2026-09-12 13:48:10.0 | N | null | null | N | null | null | 2026-09-17 09:56:27.413 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 34 | SO_ORDER | ZL-20260911-01 | 王光珍 | 2026-09-12 14:18:51.0 | N | null | null | N | null | null | 2026-09-17 09:56:27.837 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 35 | SO_ORDER | LZW-20260911-01 | 王光珍 | 2026-09-12 10:07:38.0 | N | null | null | N | null | null | 2026-09-17 09:56:28.367 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 36 | SO_ORDER | ZXL-20260910-02 | 王光珍 | 2026-09-11 11:03:57.0 | N | null | null | N | null | null | 2026-09-17 09:56:28.74 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 37 | SO_ORDER | ZXL-20260910-01 | 王光珍 | 2026-09-16 14:32:57.0 | N | null | null | N | null | null | 2026-09-17 09:56:29.17 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 38 | SO_ORDER | ZL-20260910-01 | 王光珍 | 2026-09-14 13:42:49.0 | N | null | null | N | null | null | 2026-09-20 12:13:51.12 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | S | 
+  | 39 | SO_ORDER | LZW-20260910-03 | 王光珍 | 2026-09-11 09:59:41.0 | N | null | null | N | null | null | 2026-09-17 09:56:29.98 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 40 | SO_ORDER | LZW-20260910-02 | 王光珍 | 2026-09-12 09:44:56.0 | N | null | null | N | null | null | 2026-09-17 09:56:30.483 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 41 | SO_ORDER | LZW-20260910-01 | 王光珍 | 2026-09-10 15:26:46.0 | N | null | null | N | null | null | 2026-09-17 09:56:30.833 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 42 | SO_ORDER | GD-20260910-01 | 王光珍 | 2026-09-11 08:51:15.0 | N | null | null | N | null | null | 2026-09-20 12:13:51.12 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | S | 
+  | 43 | SO_ORDER | ZXL-20260909-05 | 王光珍 | 2026-09-12 18:13:24.0 | N | null | null | N | null | null | 2026-09-17 09:56:31.61 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 44 | SO_ORDER | ZXL-20260909-03 | 王光珍 | 2026-09-12 08:42:17.0 | N | null | null | N | null | null | 2026-09-17 09:56:32.13 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 45 | SO_ORDER | ZXL-20260909-02 | 王光珍 | 2026-09-10 15:47:55.0 | N | null | null | N | null | null | 2026-09-17 09:56:32.543 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 46 | SO_ORDER | ZXL-20260909-01 | 王光珍 | 2026-09-12 13:05:13.0 | N | null | null | N | null | null | 2026-09-17 09:56:32.94 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 47 | SO_ORDER | ZL-20260909-02 | 王光珍 | 2026-09-12 09:22:09.0 | N | null | null | N | null | null | 2026-09-17 09:56:33.36 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 48 | SO_ORDER | ZL-20260909-01 | 王光珍 | 2026-09-10 13:56:14.0 | N | null | null | N | null | null | 2026-09-17 09:56:33.76 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 49 | SO_ORDER | LZW-20260909-02 | 王光珍 | 2026-09-12 13:21:35.0 | N | null | null | N | null | null | 2026-09-17 09:56:34.097 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 50 | SO_ORDER | LZW-20260909-01 | 王光珍 | 2026-09-12 19:27:32.0 | N | null | null | N | null | null | 2026-09-17 09:56:34.583 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 51 | SO_ORDER | LYZ-20260909-01 | 王光珍 | 2026-09-09 14:40:46.0 | N | null | null | N | null | null | 2026-09-17 09:56:34.987 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 52 | SO_ORDER | K-20260909-05 | 王光珍 | 2026-09-09 17:07:14.0 | N | null | null | N | null | null | 2026-09-17 09:56:35.397 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 53 | SO_ORDER | K-20260909-04 | 王光珍 | 2026-09-11 13:17:29.0 | N | null | null | N | null | null | 2026-09-17 09:56:35.91 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 54 | SO_ORDER | K-20260909-03 | 王光珍 | 2026-09-12 18:54:06.0 | N | null | null | N | null | null | 2026-09-17 09:56:36.423 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 55 | SO_ORDER | K-20260909-02 | 冯加劲 | 2026-09-14 18:02:40.0 | N | null | null | N | null | null | 2026-09-17 09:56:36.83 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 56 | SO_ORDER | ZL-20260908-03 | 王光珍 | 2026-09-12 18:33:51.0 | N | null | null | N | null | null | 2026-09-16 10:21:33.23 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 57 | SO_ORDER | ZL-20260908-02 | 王光珍 | 2026-09-14 13:55:47.0 | N | null | null | N | null | null | 2026-09-20 12:13:51.12 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | S | 
+  | 58 | SO_ORDER | ZL-20260908-01 | 王光珍 | 2026-09-11 09:15:28.0 | N | null | null | N | null | null | 2026-09-16 10:21:34.057 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 59 | SO_ORDER | XQ-20260908-02 | 王光珍 | 2026-09-08 15:07:26.0 | N | null | null | N | null | null | 2026-09-16 10:21:34.563 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 60 | SO_ORDER | XQ-20260908-01 | 王光珍 | 2026-09-08 15:07:31.0 | N | null | null | N | null | null | 2026-09-16 10:21:35.06 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | 61 | SO_ORDER | LZW-20260908-02 | 王光珍 | 2026-09-08 15:08:17.0 | N | null | null | N | null | null | 2026-09-16 10:21:35.483 | N | N | null | null | N | null | null | N | null | null | null | null | null | null | null | 
+  | id | int | null | 
+  | 单据编号 | nvarchar | 60 | 
+  | 单据日期 | nvarchar | 20 | 
+  | 客户名 | nvarchar | 100 | 
+  | 立项背景 | nvarchar | 1000 | 
+  | 机型及应用位置 | nvarchar | 200 | 
+  | 滤芯炭棒规格或结构 | nvarchar | 400 | 
+  | 项目开发目标 | nvarchar | 1000 | 
+  | 项目输出 | nvarchar | 400 | 
+  | 开发周期要求 | nvarchar | 200 | 
+  | 其它要求 | nvarchar | 1000 | 
+  | 申请立项人 | nvarchar | 50 | 
+  | 申请立项日期 | nvarchar | 20 | 
+  | 文件管理人 | nvarchar | 50 | 
+  | 密级 | nvarchar | 20 | 
+  | 文件使用范围 | nvarchar | 50 | 
+  | 文档编号 | nvarchar | 30 | 
+  | 备注 | nvarchar | 500 | 
+  | asp_user1 | nvarchar | 50 | 
+  | asp_time1 | datetime2 | null | 
+  | asp_user2 | nvarchar | 50 | 
+  | asp_time2 | datetime2 | null | 
+  | asp_cancel | char | 1 | 
+  | id | int | null | 
+  | 单据编号 | nvarchar | 60 | 
+  | asp_cancel | char | 1 | 
+  | asp_user1 | nvarchar | 50 | 
+  | asp_user2 | nvarchar | 50 | 
+  | asp_time1 | datetime2 | null | 
+  | asp_time2 | datetime2 | null | 
+  | 0 | 
+[OK] s2-2.sql (15 batches)

@@ -1,0 +1,127 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s1-03-fields.sql ==
+  | S1-8b: RD_* 面板中 label 含 受控/履历/文件编码/审核/版本/修订 | RD_INSP_PLAN | 版本号 | 版本号 | 文本 | null | 
+  | S1-8b: RD_* 面板中 label 含 受控/履历/文件编码/审核/版本/修订 | RD_INSP_PLAN | 审核人 | 审核人 | 参照 | null | 
+  | S1-8b: RD_* 面板中 label 含 受控/履历/文件编码/审核/版本/修订 | RD_MOLD_FORMULA | 版本号 | 版本号 | 文本 | null | 
+  | S1-8b: RD_* 面板中 label 含 受控/履历/文件编码/审核/版本/修订 | RD_MOLD_PROC | 版本号 | 版本号 | 文本 | null | 
+  | S1-8b: RD_* 面板中 label 含 受控/履历/文件编码/审核/版本/修订 | RD_PROD_INFO | 审核人 | 审核人 | 参照 | null | 
+  | S1-8b: RD_* 面板中 label 含 受控/履历/文件编码/审核/版本/修订 | RD_SPEC_DOC | 版本 | 版本 | 文本 | null | 
+  | S1-8b: RD_* 面板中 label 含 受控/履历/文件编码/审核/版本/修订 | RD_SPEC_DOC | 审核日期 | 审核日期 | 文本 | null | 
+  | S1-8c: 任意面板 label 精确含 受控/履历/文件编码/修订/版本 | BOM | 版本号 | 版本号 | 文本 | 
+  | S1-8c: 任意面板 label 精确含 受控/履历/文件编码/修订/版本 | PU_REQ | 版本号 | 版本号 | 文本 | 
+  | S1-8c: 任意面板 label 精确含 受控/履历/文件编码/修订/版本 | RD_INSP_PLAN | 版本号 | 版本号 | 文本 | 
+  | S1-8c: 任意面板 label 精确含 受控/履历/文件编码/修订/版本 | RD_MOLD_FORMULA | 版本号 | 版本号 | 文本 | 
+  | S1-8c: 任意面板 label 精确含 受控/履历/文件编码/修订/版本 | RD_MOLD_PROC | 版本号 | 版本号 | 文本 | 
+  | S1-8c: 任意面板 label 精确含 受控/履历/文件编码/修订/版本 | RD_SPEC_DOC | 版本 | 版本 | 文本 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | BOM | 物料清单编码 | 物料清单编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | BOM | 父件编码 | 父件编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | BOM | 子件编码 | 子件编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | CUR | 编码 | 编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | CUSGRP | 编码 | 编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | CUSGRP | 上级编码 | 上级编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | DAY_REPORT | 产品编码 | 产品编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | DEPT | 部门编码 | 部门编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | DEPT | 长编码 | 长编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | DEPT | 上级编码 | 上级编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | DISPATCH | 工序编码 | 工序编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | DISPATCH_DETAIL | 工序编码 | 工序编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | EMP | 员工编码 | 员工编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | EMP | 部门编码 | 部门编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | EQUIP | 设备编码 | 设备编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | FIN_ACC | 科目编码 | 科目编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | FIN_EXP | 费用类别编码 | 费用类别编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | FIN_TAX | 税别编码 | 税别编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | FINISH_IN | 产品编码 | 产品编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | GFDA | 供应商分类编码 | 供应商分类编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | GFDA | 国家-编码 | 国家-编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | GFDA | 省-编码 | 省-编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | GFDA | 市-编码 | 市-编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | GFDA | 区-编码 | 区-编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | GFDA | 分类编码 | 分类编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV | 存货编码 | 存货编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV | 品牌编码 | 品牌编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV | 默认仓库编码 | 默认仓库编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV | 基本单位编码 | 基本单位编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV | 辅助单位编码 | 辅助单位编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV | 默认生产车间编码 | 默认生产车间编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV | 倒冲仓库编码 | 倒冲仓库编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV | 商品类别编码 | 商品类别编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV | 税收分类编码 | 税收分类编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV | 倒冲仓位编码 | 倒冲仓位编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | INV_PRICE | 存货编码 | 存货编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 客户分类编码 | 客户分类编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 价格等级编码 | 价格等级编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 业务员编码 | 业务员编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 结算客户编码 | 结算客户编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 部门编码 | 部门编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 国家编码 | 国家编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 省份编码 | 省份编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 城市编码 | 城市编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 区县编码 | 区县编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 结算期限编码 | 结算期限编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 国家-编码 | 国家-编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 省-编码 | 省-编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 市-编码 | 市-编码 | 
+  | S1-8d: 任意面板 col_name 含 受控/履历/编码/filecode/control | KHDA | 区-编码 | 区-编码 | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_account | 科目编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_expense_type | 费用类别编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_manu_order | 客户编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_manu_order | 是否手工修改单据编码 | bit | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 部门编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 创建人编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 供应商编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 供应商发货地址国家编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 供应商发货地址区县编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 供应商发货地址省份编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 供应商发货地址市区编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 结算期限编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 客户编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 审核人编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 收货地址国家编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 收货地址区编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 收货地址区县编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 收货地址省份编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 修改人编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_order | 业务员编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_pu_req | 建议供应商编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 部门编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 仓库编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 仓位编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 创建人编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 发货国家编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 发货区县编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 发货省份编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 发货市区编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 付款方式编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 付款账户编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 供应商编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 交货方式编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 结算期限编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 经手人编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 客户编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 联系人国家编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 联系人区县编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 联系人省份编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 联系人市区编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 审核人编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_purchase_in | 修改人编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_sale_out | 部门编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_sale_out | 创建人编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_sale_out | 发货国家编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_sale_out | 发货区县编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_sale_out | 发货省份编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_sale_out | 发货市区编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_sale_out | 交货方式编码 | nvarchar | 
+  | S1-8e: 物理表列名含 受控/履历/编码/受控章 | bd_sale_out | 结算期限编码 | nvarchar | 
+  | S1-8f: 表名含 受控/履历/汇总/编码/contro/ledger/archive | inv_cost_ledger | 
+  | S1-8f: 表名含 受控/履历/汇总/编码/contro/ledger/archive | pr_qc_control | 
+  | S1-8f: 表名含 受控/履历/汇总/编码/contro/ledger/archive | v_stock_ledger | 
+  | S1-8f: 表名含 受控/履历/汇总/编码/contro/ledger/archive | v_stock_summary | 
+[OK] s1-03-fields.sql (7 batches)

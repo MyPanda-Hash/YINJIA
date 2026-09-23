@@ -1,0 +1,7 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== migrate-qc-insp-tc-flow.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+[OK] migrate-qc-insp-tc-flow.sql (9 batches)

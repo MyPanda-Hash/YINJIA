@@ -1,0 +1,58 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 611
++ ... ut-c07.txt; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java $u ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-08-presetloc.sql ==
+  | INV | 倒冲仓位名称 | 倒冲仓位名称 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | INV | 默认仓位 | 默认仓位 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | INV | 倒冲仓位id | 倒冲仓位id | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | INV | 倒冲仓位编码 | 倒冲仓位编码 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | PU_ORDER | 仓库启用仓位管理 | 仓库启用仓位管理 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | PU_ORDER | 仓位id | 仓位id | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | PU_ORDER | 仓位名称 | 仓位名称 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | PU_ORDER | 仓位编码 | 仓位编码 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | PURCHASE_IN | 仓位 | 仓位 | header | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | PURCHASE_IN | 仓位编码 | 仓位编码 | header | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | PURCHASE_IN | 仓库启用仓位管理 | 仓库启用仓位管理 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | PURCHASE_IN | 仓位id | 仓位id | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | PURCHASE_IN | 仓位名称 | 仓位名称 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | RD_APPROVAL | 机型及应用位置 | 机型及应用位置 | header | 1 | 0 | 0 | 1 | null | null | null | null | 
+  | SALE_OUT | 仓库启用仓位管理 | 仓库启用仓位管理 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | SALE_OUT | 仓位id | 仓位id | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | SALE_OUT | 仓位名称 | 仓位名称 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | SALE_OUT | 仓位编码 | 仓位编码 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | SO_ORDER | 仓库启用仓位管理 | 仓库启用仓位管理 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | SO_ORDER | 仓位id | 仓位id | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | SO_ORDER | 仓位名称 | 仓位名称 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | SO_ORDER | 仓位编码 | 仓位编码 | detail | 1 | 0 | 1 | 0 | null | null | null | null | 
+  | WH | 启用仓位管理 | 启用仓位管理 | detail | 1 | 0 | 0 | 1 | null | null | null | null | 
+  | bd_purchase_in | 仓位id | nvarchar | 1000 | 
+  | bd_purchase_in | 仓位 | nvarchar | 1000 | 
+  | bd_purchase_in | 仓位编码 | nvarchar | 1000 | 
+  | bl_pu_order | 仓库启用仓位管理 | nvarchar | 1000 | 
+  | bl_pu_order | 仓位id | nvarchar | 1000 | 
+  | bl_pu_order | 仓位名称 | nvarchar | 1000 | 
+  | bl_pu_order | 仓位编码 | nvarchar | 1000 | 
+  | bl_purchase_in | 仓库启用仓位管理 | nvarchar | 1000 | 
+  | bl_purchase_in | 仓位id | nvarchar | 1000 | 
+  | bl_purchase_in | 仓位编码 | nvarchar | 1000 | 
+  | bl_purchase_in | 仓位名称 | nvarchar | 400 | 
+  | bl_sale_out | 仓库启用仓位管理 | nvarchar | 1000 | 
+  | bl_sale_out | 仓位id | nvarchar | 1000 | 
+  | bl_sale_out | 仓位编码 | nvarchar | 1000 | 
+  | bl_sale_out | 仓位名称 | nvarchar | 400 | 
+  | bl_so_order | 仓库启用仓位管理 | nvarchar | 1000 | 
+  | bl_so_order | 仓位id | nvarchar | 1000 | 
+  | bl_so_order | 仓位名称 | nvarchar | 1000 | 
+  | bl_so_order | 仓位编码 | nvarchar | 1000 | 
+  | bs_inv | 倒冲仓位名称 | nvarchar | 400 | 
+  | bs_inv | 默认仓位 | nvarchar | 1000 | 
+  | bs_inv | 倒冲仓位id | nvarchar | 1000 | 
+  | bs_inv | 倒冲仓位编码 | nvarchar | 1000 | 
+  | bs_wh | 启用仓位管理 | bit | 1 | 
+  | bs_inv | 124 | 
+[OK] c-08-presetloc.sql (4 batches)

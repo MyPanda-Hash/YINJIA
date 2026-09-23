@@ -1,0 +1,33 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== s1-09-users.sql ==
+  | S1-32: yj_user 账号/角色/管理员 | admin | 1 | Y | 
+  | S1-37: 含 approval 的表名 | rd_approval | 
+  | S1-37: 含 approval 的表名 | rd_approval_detail | 
+  | S1-37: 含 approval 的表名 | yj_form_approval | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | MANU_ORDER | 1 | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | PU_ORDER | 2137 | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | PURCHASE_IN | 85 | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | QC_INSP | 22 | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | QC_RECV | 32 | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | QC_RETURN | 9 | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | RD_PROGRESS | 1 | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | RKD | 1 | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | SALE_OUT | 53 | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | SO_ORDER | 3799 | 
+  | S1-34: yj_doc_status 总行数 + 按 panel_code | WO_ORDER | 1 | 
+  | S1-35: yj_doc_status 状态标志组合分布(全库) | N | N | N | N | N | - | 1 | 6035 | 
+  | S1-35: yj_doc_status 状态标志组合分布(全库) | Y | - | - | N | Y | - | 0 | 36 | 
+  | S1-35: yj_doc_status 状态标志组合分布(全库) | Y | - | N | N | N | - | 0 | 30 | 
+  | S1-35: yj_doc_status 状态标志组合分布(全库) | N | - | N | N | Y | - | 1 | 14 | 
+  | S1-35: yj_doc_status 状态标志组合分布(全库) | Y | - | N | N | Y | - | 0 | 12 | 
+  | S1-35: yj_doc_status 状态标志组合分布(全库) | N | - | N | N | N | - | 0 | 10 | 
+  | S1-35: yj_doc_status 状态标志组合分布(全库) | N | - | - | N | Y | - | 1 | 3 | 
+  | S1-35: yj_doc_status 状态标志组合分布(全库) | N | N | - | N | N | - | 0 | 1 | 
+[OK] s1-09-users.sql (7 batches)

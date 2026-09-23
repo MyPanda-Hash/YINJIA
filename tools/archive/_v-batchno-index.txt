@@ -1,0 +1,5 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-batchno-index.sql ==
+  | 1-台账索引现状 | IX_yj_doc_batch_no_active | 0 | ([status]='ACTIVE' AND [batch_no] IS NOT NULL) | batch_no, source_form_no | 
+  | 3-列注明 | 送料批次号:纯入库日期 yyyyMMdd(如 20260921);同一日期算同一批次(同一天多批同号,不唯一);日期取采购入库单「单据日期」,填单时预设、可人工修改,审核时以表头值为准并回填全链;历史 YJ-/10位号原样保留 | 
+[OK] _q-batchno-index.sql (1 batches)

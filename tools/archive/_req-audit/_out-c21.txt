@@ -1,0 +1,34 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 417
++ ... Timeout=5"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java $u ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-21-inspdata.sql ==
+  | 22 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 
+  | 草稿 | 22 | 
+  | 草稿 | 32 | 
+  | PU_ORDER | PURCHASE_IN | 3 | 
+  | QC_INSP | PURCHASE_IN | 24 | 
+  | QC_RECV | QC_INSP | 40 | 
+  | PU_ORDER | QC_RECV | 59 | 
+  | QC_INSP | QC_RETURN | 10 | 
+  | 1 | PURCHASE_IN | PI-2026-09-0002 | SUBMIT | PENDING | 1 | admin | null | 2026-09-16 18:27:39.017 | 
+  | 2 | PURCHASE_IN | PI-2026-09-0002 | APPROVE | APPROVED | 1 | admin | null | 2026-09-16 18:27:41.182 | 
+  | 3 | PURCHASE_IN | PI-2026-09-0003 | SUBMIT | PENDING | 1 | admin | null | 2026-09-16 19:27:05.558 | 
+  | 4 | PURCHASE_IN | PI-2026-09-0003 | APPROVE | APPROVED | 1 | admin | null | 2026-09-16 19:27:12.125 | 
+  | 5 | PURCHASE_IN | CGRK-20260916-03215 | UNAUDIT | PENDING | 1 | admin | null | 2026-09-16 20:03:59.627 | 
+  | MANU_ORDER | 1 | 
+  | PU_ORDER | 2137 | 
+  | PURCHASE_IN | 85 | 
+  | QC_INSP | 22 | 
+  | QC_RECV | 32 | 
+  | QC_RETURN | 9 | 
+  | RD_PROGRESS | 1 | 
+  | RKD | 1 | 
+  | SALE_OUT | 53 | 
+  | SO_ORDER | 3799 | 
+  | WO_ORDER | 1 | 
+[OK] c-21-inspdata.sql (7 batches)

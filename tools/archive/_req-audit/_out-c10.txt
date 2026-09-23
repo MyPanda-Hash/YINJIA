@@ -1,0 +1,16 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 417
++ ... Timeout=5"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java $u ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-10-user-report.sql ==
+  | yj_doc_status | 1:id | 2:panel_code | 3:doc_no | 4:shr | 5:shsj | 6:canceled | 7:cancel_by | 8:cancel_at | 9:pending | 10:pending_by | 11:pending_at | 12:update_at | 13:archived | 14:deleting | 15:delete_req_by | 16:delete_req_at | 17:stopped | 18:stop_by | 19:stop_at | 20:saved | 21:modify_state | 22:modify_req_by | 23:modify_req_at | 24:modify_appr_by | 25:modify_appr_at | 26:archived_at | 27:erp_close_state | 
+  | yj_report_template | 1:id | 2:template_code | 3:panel_code | 4:name | 5:jrxml_text | 6:enabled | 7:remark | 8:create_by | 9:create_at | 10:update_by | 11:update_at | 
+  | yj_role | 1:id | 2:role_code | 3:role_name | 4:remark | 5:is_admin | 
+  | yj_role_panel | 1:id | 2:role_id | 3:panel_code | 4:can_approve | 5:perms | 
+  | yj_std_lib | 1:id | 2:lib_code | 3:item_code | 4:content | 5:seq | 6:enabled | 7:asp_user1 | 8:asp_time1 | 9:asp_user2 | 10:asp_time2 | 11:asp_cancel | 
+  | yj_user | 1:id | 2:username | 3:password_hash | 4:real_name | 5:is_admin | 6:dept_id | 7:role_id | 8:enabled | 
+[SQL FAIL] 列名 'account' 无效。

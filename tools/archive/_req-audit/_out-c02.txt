@@ -1,0 +1,150 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 300
++ ... ing=UTF-8"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java "j ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-02-tables.sql ==
+  | qc_insp | 1 | id | int | null | NO | 
+  | qc_insp | 2 | 单据编号 | nvarchar | 60 | NO | 
+  | qc_insp | 3 | 单据日期 | nvarchar | 20 | YES | 
+  | qc_insp | 4 | 暂收单号 | nvarchar | 60 | YES | 
+  | qc_insp | 5 | 供应商 | nvarchar | 200 | YES | 
+  | qc_insp | 6 | 检验员 | nvarchar | 50 | YES | 
+  | qc_insp | 7 | 检验日期 | nvarchar | 20 | YES | 
+  | qc_insp | 8 | 检验方案 | nvarchar | 100 | YES | 
+  | qc_insp | 9 | 总结论 | nvarchar | 20 | YES | 
+  | qc_insp | 10 | 备注 | nvarchar | 500 | YES | 
+  | qc_insp | 11 | 单据状态 | nvarchar | 10 | NO | 
+  | qc_insp | 12 | 审核人 | nvarchar | 50 | YES | 
+  | qc_insp | 13 | 审核时间 | nvarchar | 30 | YES | 
+  | qc_insp | 14 | 审批人 | nvarchar | 50 | YES | 
+  | qc_insp | 15 | 审批时间 | nvarchar | 30 | YES | 
+  | qc_insp | 16 | asp_user1 | nvarchar | 50 | YES | 
+  | qc_insp | 17 | asp_time1 | datetime2 | null | YES | 
+  | qc_insp | 18 | asp_user2 | nvarchar | 50 | YES | 
+  | qc_insp | 19 | asp_time2 | datetime2 | null | YES | 
+  | qc_insp | 20 | asp_cancel | char | 1 | YES | 
+  | qc_insp | 21 | 业务员 | nvarchar | 50 | YES | 
+  | qc_insp | 22 | 供应商代码 | nvarchar | 50 | YES | 
+  | qc_insp | 23 | 部门 | nvarchar | 50 | YES | 
+  | qc_insp | 24 | 部门名称 | nvarchar | 50 | YES | 
+  | qc_insp | 25 | 数量 | float | null | YES | 
+  | qc_insp | 26 | 采购订单号 | nvarchar | 500 | YES | 
+  | qc_insp | 27 | 附件1 | nvarchar | 500 | YES | 
+  | qc_insp | 28 | 附件2 | nvarchar | 500 | YES | 
+  | qc_insp | 29 | 附件3 | nvarchar | 500 | YES | 
+  | qc_insp | 30 | 附件4 | nvarchar | 500 | YES | 
+  | qc_insp | 31 | 附件5 | nvarchar | 500 | YES | 
+  | qc_insp | 32 | 附件6 | nvarchar | 500 | YES | 
+  | qc_insp | 33 | 批次号 | nvarchar | 50 | YES | 
+  | qc_insp | 34 | 检验编号 | nvarchar | 60 | YES | 
+  | qc_insp | 35 | 执行标准 | nvarchar | 200 | YES | 
+  | qc_insp | 36 | 检验类型 | nvarchar | 50 | YES | 
+  | qc_jjf | 1 | id | int | null | NO | 
+  | qc_jjf | 2 | 单据编号 | nvarchar | 60 | NO | 
+  | qc_jjf | 3 | 单据日期 | nvarchar | 20 | YES | 
+  | qc_jjf | 4 | 文档编号 | nvarchar | 30 | NO | 
+  | qc_jjf | 5 | 物料类型 | nvarchar | 20 | YES | 
+  | qc_jjf | 6 | 物料名称 | nvarchar | 200 | YES | 
+  | qc_jjf | 7 | 物料编码 | nvarchar | 100 | YES | 
+  | qc_jjf | 8 | 申请放行数量 | decimal | null | YES | 
+  | qc_jjf | 9 | 批次号 | nvarchar | 60 | YES | 
+  | qc_jjf | 10 | 紧急放行原因 | nvarchar | 2000 | YES | 
+  | qc_jjf | 11 | 产品开发部性能意见 | nvarchar | 500 | YES | 
+  | qc_jjf | 12 | 产品开发部工艺意见 | nvarchar | 500 | YES | 
+  | qc_jjf | 13 | 品质部意见 | nvarchar | 500 | YES | 
+  | qc_jjf | 14 | 检测结果 | nvarchar | 1000 | YES | 
+  | bd_dispatch | 
+  | bl_dispatch | 
+  | pr_asm_return | 
+  | pr_mat_inspect | 
+  | qc_bhc | 
+  | qc_bhc_detail | 
+  | qc_bhg | 
+  | qc_bhg_detail | 
+  | qc_bhz | 
+  | qc_bhz_detail | 
+  | qc_disposal | 
+  | qc_insp | 
+  | qc_insp_detail | 
+  | qc_jjf | 
+  | qc_jjf_detail | 
+  | qc_lyb | 
+  | qc_lyb_detail | 
+  | qc_op | 
+  | qc_op_detail | 
+  | qc_record | 
+  | qc_record_detail | 
+  | qc_recv | 
+  | qc_recv_detail | 
+  | qc_return | 
+  | qc_return_detail | 
+  | qc_scp | 
+  | qc_scp_detail | 
+  | qc_scy | 
+  | qc_scy_detail | 
+  | qc_tc | 
+  | qc_tc_detail | 
+  | qr_batch_registry | 
+  | rd_insp_plan | 
+  | rd_insp_plan_detail | 
+  | rd_insp_plan_head | 
+  | rod_return | 
+  | rod_return_detail | 
+  | sl_recv | 
+  | sl_recv_detail | 
+  | yj_doc_batch | 
+  | dt_addtosourcecontrol | SQL_STORED_PROCEDURE | 
+  | dt_addtosourcecontrol_u | SQL_STORED_PROCEDURE | 
+  | dt_adduserobject | SQL_STORED_PROCEDURE | 
+  | dt_adduserobject_vcs | SQL_STORED_PROCEDURE | 
+  | dt_checkinobject | SQL_STORED_PROCEDURE | 
+  | dt_checkinobject_u | SQL_STORED_PROCEDURE | 
+  | dt_checkoutobject | SQL_STORED_PROCEDURE | 
+  | dt_checkoutobject_u | SQL_STORED_PROCEDURE | 
+  | dt_displayoaerror | SQL_STORED_PROCEDURE | 
+  | dt_displayoaerror_u | SQL_STORED_PROCEDURE | 
+  | dt_droppropertiesbyid | SQL_STORED_PROCEDURE | 
+  | dt_dropuserobjectbyid | SQL_STORED_PROCEDURE | 
+  | dt_generateansiname | SQL_STORED_PROCEDURE | 
+  | dt_getobjwithprop | SQL_STORED_PROCEDURE | 
+  | dt_getobjwithprop_u | SQL_STORED_PROCEDURE | 
+  | dt_getpropertiesbyid | SQL_STORED_PROCEDURE | 
+  | dt_getpropertiesbyid_u | SQL_STORED_PROCEDURE | 
+  | dt_getpropertiesbyid_vcs | SQL_STORED_PROCEDURE | 
+  | dt_getpropertiesbyid_vcs_u | SQL_STORED_PROCEDURE | 
+  | dt_isundersourcecontrol | SQL_STORED_PROCEDURE | 
+  | dt_isundersourcecontrol_u | SQL_STORED_PROCEDURE | 
+  | dt_removefromsourcecontrol | SQL_STORED_PROCEDURE | 
+  | dt_setpropertybyid | SQL_STORED_PROCEDURE | 
+  | dt_setpropertybyid_u | SQL_STORED_PROCEDURE | 
+  | dt_validateloginparams | SQL_STORED_PROCEDURE | 
+  | dt_validateloginparams_u | SQL_STORED_PROCEDURE | 
+  | dt_vcsenabled | SQL_STORED_PROCEDURE | 
+  | dt_verstamp006 | SQL_STORED_PROCEDURE | 
+  | dt_verstamp007 | SQL_STORED_PROCEDURE | 
+  | dt_whocheckedout | SQL_STORED_PROCEDURE | 
+  | dt_whocheckedout_u | SQL_STORED_PROCEDURE | 
+  | v_dispatch_detail | VIEW | 
+  | v_dispatch_stats | VIEW | 
+  | v_finish_in_detail | VIEW | 
+  | v_finish_in_stats | VIEW | 
+  | v_lot_trace | VIEW | 
+  | v_manu_order_detail | VIEW | 
+  | v_manu_order_stats | VIEW | 
+  | v_material_out_detail | VIEW | 
+  | v_material_out_stats | VIEW | 
+  | v_other_in_detail | VIEW | 
+  | v_other_in_stats | VIEW | 
+  | v_other_out_detail | VIEW | 
+  | v_other_out_stats | VIEW | 
+  | v_outsource_in_detail | VIEW | 
+  | v_outsource_in_stats | VIEW | 
+  | v_outsource_issue_detail | VIEW | 
+  | v_outsource_issue_stats | VIEW | 
+  | v_purchase_in_detail | VIEW | 
+  | v_purchase_in_stats | VIEW | 
+[OK] c-02-tables.sql (4 batches)

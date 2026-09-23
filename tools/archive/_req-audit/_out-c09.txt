@@ -1,0 +1,37 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 417
++ ... Timeout=5"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java $u ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-09-stockpanel.sql ==
+  | STOCK_BALANCE | 库存状况表 | null | 报表 | flat | v_stock_balance | null | 
+  | STOCK_LEDGER | 库存台账 | null | 报表 | flat | v_stock_ledger | null | 
+  | STOCK_STATUS | 库存状况 | null | 报表 | flat | kucun | null | 
+  | STOCK_SUMMARY | 收发存汇总表 | null | 报表 | flat | v_stock_summary | null | 
+  | WO_LINE | 线边库存 | 生产制造 | 报表 | flat | wo_line_stock | null | 
+  | RD_PROGRESS | 项目进度查询 | 研发管理 | 单据 | doc | rd_progress_detail | rd_progress | 
+  | yj_app_setting | 
+  | yj_attachment | 
+  | yj_dept | 
+  | yj_doc_batch | 
+  | yj_doc_modify_log | 
+  | yj_doc_status | 
+  | yj_field | 
+  | yj_form_approval | 
+  | yj_locale | 
+  | yj_lot_seq | 
+  | yj_message | 
+  | yj_panel | 
+  | yj_plan_term | 
+  | yj_report_template | 
+  | yj_role | 
+  | yj_role_panel | 
+  | yj_schema_log | 
+  | yj_std_lib | 
+  | yj_translation | 
+  | yj_usage_log | 
+  | yj_user | 
+[OK] c-09-stockpanel.sql (3 batches)

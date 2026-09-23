@@ -1,0 +1,29 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8
+所在位置 行:1 字符: 417
++ ... Timeout=5"; java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java $u ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== c-16-qclib.sql ==
+  | 0 | 
+  | 0 | 
+  | query,detail | 项目编码 | 项目编码 | null | null | null | 0 | 
+  | query,detail | 项目名称 | 项目名称 | null | null | null | 0 | 
+  | query,detail | 检验内容 | 检验内容 | null | null | null | 0 | 
+  | query,detail | 检验标准 | 检验标准 | null | null | null | 0 | 
+  | detail | 数据类型 | 数据类型 | null | null | null | 0 | 
+  | query,detail | 计量单位 | 计量单位 | null | null | null | 0 | 
+  | detail | 判定规则 | 判定规则 | null | null | null | 0 | 
+  | detail | 标准下限 | 标准下限 | null | null | null | 0 | 
+  | detail | 标准上限 | 标准上限 | null | null | null | 0 | 
+  | query,detail | 停用 | 停用 | null | null | null | 0 | 
+  | query,detail | 方案编码 | 方案编码 | null | null | null | 0 | 
+  | query,detail | 方案名称 | 方案名称 | null | null | null | 0 | 
+  | query,detail | 适用存货 | 适用存货 | INV | 存货名称 | 存货名称 | 0 | 
+  | query,detail | 适用存货类别 | 适用存货类别 | null | null | null | 0 | 
+  | query,detail | 检验方式 | 检验方式 | null | null | null | 0 | 
+  | detail | 抽检比例% | 抽检比例% | null | null | null | 0 | 
+  | query,detail | 停用 | 停用 | null | null | null | 0 | 
+[OK] c-16-qclib.sql (6 batches)
