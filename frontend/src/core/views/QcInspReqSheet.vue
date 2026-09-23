@@ -102,7 +102,12 @@
           </tr>
           <!-- 数据行:值列全部文本(±公差/区间是文本),物料类别由页签隐式携带不显示。
                只读态=纯文本;仅「修改」过的那一行(或刚新增的行)渲染输入框 -->
-          <tr v-for="(row, i) in rowsOf(tab)" :key="row.id ?? ('new' + i)" :class="{ 'qc-flash': isFlash(row) }">
+          <tr
+            v-for="(row, i) in rowsOf(tab)"
+            :key="row.id ?? ('new' + i)"
+            :class="{ 'qc-flash': isFlash(row) }"
+            :data-edit="isEditing(row) ? '1' : null"
+          >
             <td v-for="c in tab.cols" :key="c.key" class="rs-td">
               <el-input
                 v-if="editable && isEditing(row)"
@@ -224,6 +229,18 @@ function isEditing(row) {
 }
 function startEdit(row) {
   editRow.value = toRaw(row)
+  scrollEditIntoView()
+}
+/** 把「正在编辑/刚新增」的那一行滚进视野(2026-09-23)。
+ *  缘由:折叠棉等页签行数多(实测 26 行),新增行按 id 排到**表格最下面**、
+ *  落在视口之外 —— 输入框其实已渲染且能打字(实测 123×22、visible、无裁剪),
+ *  但用户看不到,表现就是"新增时填写看不见""点修改也不可编辑"(其实状态已切换)。
+ *  用 block:'nearest' 只做最小滚动,不把整页跳走。 */
+function scrollEditIntoView() {
+  nextTick(() => {
+    const el = document.querySelector('.qc-paper tr[data-edit="1"]')
+    if (el) el.scrollIntoView({ block: 'nearest' })
+  })
 }
 function endEdit() {
   editRow.value = null
@@ -251,6 +268,7 @@ function addRow(t) {
   rows.value.push(row) // 镜像(界面响应)
   editRow.value = row // 新行直接可填
   touchDirty()
+  scrollEditIntoView() // 新行在表格最下面,滚进视野(否则"填写时看不见")
 }
 async function removeRow(row) {
   try {
