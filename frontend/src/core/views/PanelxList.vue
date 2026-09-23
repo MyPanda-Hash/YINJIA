@@ -2679,7 +2679,9 @@ function selectConfigFor(action = '选单') {
   const cfg = cfgCache.value || {}
   const configs = cfg.selectConfigs || {}
   if (configs[action]) return configs[action]
-  if (action === '选单') return cfg.selectConfig || Object.values(configs)[0]
+  // 后端目前只下发单来源的 selectConfig(不发 selectConfigs),所以「选XX」下拉项此前一律返回 null、
+  // 点了只弹「演示环境暂未实现」—— 与「选单」同样回落到 selectConfig(不影响已能工作的路径)。
+  if (action === '选单' || action.startsWith('选')) return cfg.selectConfig || Object.values(configs)[0]
   return null
 }
 const delMode = ref(false)

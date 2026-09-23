@@ -677,7 +677,7 @@ public class PanelConfigService {
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"导入", "导入"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 采购订单:选单=请购单;生单=采购入库单/送料暂收单(已实现)
+            // 采购订单:选单=请购单;生单=送料暂收单(唯一出口,2026-09-22 起不再免检直达采购入库单)
             java.util.Map.entry("PU_ORDER", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选请购单"},
@@ -686,15 +686,18 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生成采购入库单", "生成送料暂收单"},
+                    new String[]{"生单", "生成送料暂收单"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"导入", "导入"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 采购入库单:选单=采购订单;生单灰(PANDA:生成进货单,进货单未迁移)
+            // 采购入库单:选单=送料暂收单(2026-09-22 起;原为采购订单,那条免检直达已被取消);
+            // 生单灰(PANDA:生成进货单,进货单未迁移)。
+            // 打头的「选单」必须保留:工具栏主按钮取 actions[0],而 selectConfigFor() 只认字面量
+            // 「选单」—— 主按钮若写成「选XX」会回落成「演示环境暂未实现」。
             java.util.Map.entry("PURCHASE_IN", List.of(
                     new String[]{"新增", "新增"},
-                    new String[]{"选单", "选单", "选采购订单"},
+                    new String[]{"选单", "选单", "选送料暂收单"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
@@ -735,7 +738,9 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 送料暂收单(库存核算,2026-09-20 面板编码 SL_RECV→QC_RECV):选单=采购订单;生单=来料检验单;
+            // 送料暂收单(库存核算,2026-09-20 面板编码 SL_RECV→QC_RECV):选单=采购订单;
+            // 生单=来料检验单(主按钮,走品检)/ 采购入库单(2026-09-22 新增,免检直达 —— 采购订单的生单
+            // 出口已收敛到本单,去向由暂收这一个人工判定);两条都走分批生单(本单头有批次号 → 一键整单、不弹框)。
             // 修改保存后由 ButtonService.syncInspFromSlRecv 同步修改已生成的来料检验单
             java.util.Map.entry("QC_RECV", List.of(
                     new String[]{"新增", "新增"},
@@ -745,7 +750,7 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生成来料检验单"},
+                    new String[]{"生单", "生成来料检验单", "生成采购入库单"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
@@ -852,15 +857,20 @@ public class PanelConfigService {
     /**
      * 推式生单已实现链路((面板|动作) → 目标面板)。与 PushGenerateHandler 共用——
      * Handler 经 {@link #pushTarget} 查询;按钮生成据此区分可执行动作与灰色占位。
+     *
+     * 2026-09-22 用户口径:**所有采购订单都必须先生成送料暂收单** —— 取消「采购订单→采购入库单」
+     * 免检直达(该跳原为 PU_ORDER|生成采购入库单),改由送料暂收单去向分流的两个按钮承接:
+     * 暂收单人工判:走检验 → QC_RECV|生成来料检验单;免检直达 → QC_RECV|生成采购入库单。
+     * 两条出口必须同时关(PUSH_TARGETS 这一条 + SELECT_FLOWS 的 PURCHASE_IN 来源),否则选单路径仍可绕过。
      */
     private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
             java.util.Map.entry("PU_REQ|生成采购订单", "PU_ORDER"),
-            java.util.Map.entry("PU_ORDER|生成采购入库单", "PURCHASE_IN"),
             java.util.Map.entry("PU_ORDER|生成送料暂收单", "QC_RECV"),
             java.util.Map.entry("SO_ORDER|生成生产加工单", "MANU_ORDER"),
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
             java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
             java.util.Map.entry("QC_RECV|生成来料检验单", "QC_INSP"),
+            java.util.Map.entry("QC_RECV|生成采购入库单", "PURCHASE_IN"),
             java.util.Map.entry("WO_ORDER|生成领料单", "MATERIAL_OUT")
     )));
 
@@ -890,7 +900,8 @@ public class PanelConfigService {
 
     /** 单据流转关系(目标面板 ← 来源面板;对齐 T+ 业务流)。有配置即出现「选单」按钮。 */
     private static final Map<String, String> SELECT_FLOWS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
-            java.util.Map.entry("PURCHASE_IN", "PU_ORDER"),          // 采购订单 → 采购入库单
+            java.util.Map.entry("PURCHASE_IN", "QC_RECV"),           // 送料暂收单 → 采购入库单(2026-09-22:原 采购订单,
+                                                                     //   免检直达已取消,来源收敛到暂收单;见 PUSH_TARGETS 注释)
             java.util.Map.entry("MATERIAL_OUT", "MANU_ORDER"),       // 生产加工单 → 材料出库单
             java.util.Map.entry("FINISH_IN", "MANU_ORDER"),          // 生产加工单 → 产成品入库单
             java.util.Map.entry("DISPATCH", "MANU_ORDER"),           // 生产加工单 → 工序派工单
@@ -948,7 +959,12 @@ public class PanelConfigService {
     /** 头字段同义词(按链路 source|target 键控;同名映射之外的补充)。 */
     private static final Map<String, String[][]> FLOW_HEAD_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
             "PU_REQ|PU_ORDER", new String[][]{{"建议供应商", "供应商"}},
-            "PU_ORDER|PURCHASE_IN", new String[][]{{"单据编号", "采购订单号"}},
+            // 送料暂收单 → 采购入库单(2026-09-22 新增;原 PU_ORDER|PURCHASE_IN 免检直达已取消,
+            // 那条只需 单据编号→采购订单号,本跳的采购订单号随链从采购订单带下来了、同名直通无需登记)。
+            // 供应商代码→供应商编码:暂收单头叫「供应商代码」,入库头叫「供应商编码」——异名不带则入库单
+            // 供应商编码恒空(与 QC_INSP|PURCHASE_IN 当年同一个坑)。注:批次键由
+            // PushGenerateHandler.generateBatch 直接写入,不走映射(头映射 7 条上限会把它挤掉,不影响)。
+            "QC_RECV|PURCHASE_IN", new String[][]{{"供应商代码", "供应商编码"}},
             "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}},
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
@@ -977,7 +993,8 @@ public class PanelConfigService {
     }
 
     /**
-     * 指定来源的头行映射:推式生单用(目标面板可有多个来源,如 采购入库单 ← 采购订单(免检) / 来料检验单(检验合格));
+     * 指定来源的头行映射:推式生单用(目标面板可有多个来源,如 采购入库单 ← 送料暂收单(暂收后判免检) /
+     * 来料检验单(检验合格);2026-09-22 起来源不再含采购订单本身);
      * 选单 UI 仍用单来源 flowMaps(target)(SELECT_FLOWS 主来源)。
      */
     public Map<String, Object> flowMaps(String sourcePanel, String targetPanel) {

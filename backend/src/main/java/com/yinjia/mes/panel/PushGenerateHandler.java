@@ -213,7 +213,8 @@ public class PushGenerateHandler implements PanelActionHandler {
     /**
      * 采购入库行的「是否来料检验」:由**来源单据**判定(2026-09-21 用户口径)。
      * - 来源 = 来料检验单(QC_INSP):该批物料走过检验 → 是
-     * - 来源 = 采购订单(PU_ORDER,免检直达入库)→ 否
+     * - 来源 = 送料暂收单(QC_RECV,暂收后人工判免检直达入库)→ 否
+     * 2026-09-22 起采购入库单只有这两个来源(采购订单的免检直达出口已取消),判定无需再改。
      * 只对目标面板 = 采购入库单(PURCHASE_IN)生效;目标面板未登记该字段时写入会被通用保存静默忽略。
      */
     private void applyInspectionFlag(String sourcePanel, String targetPanel, Map<String, Object> row) {
