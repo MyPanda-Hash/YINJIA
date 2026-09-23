@@ -197,9 +197,25 @@ function sourceItems() {
   if (!Array.isArray(props.head.detail.items)) props.head.detail.items = []
   return props.head.detail.items
 }
+// 镜像同步(2026-09-23 修):本 watch 只在 detail.items **引用变化**时触发 —— 即载入/切单/刷新,
+// 以及 addRow 里 sourceItems() 首次创建 detail.items 的那一次。原实现无条件清 editRow,于是
+// 「＋新增数据记录行」加出来的那一行(排在表格最下面)刚进入可填状态就被清成只读文本
+// (填写时看不见),再点「修改」也会被同一批重置冲掉(还是不肯修改)。
+// 故:编辑进行中**保留编辑态与脏标记**(只同步镜像,新行不丢);
+//     非编辑态(载入/切单/保存后刷新)照旧重置镜像并清脏标记。
 watch(
   () => props.head?.detail?.items,
-  (arr) => { rows.value = Array.isArray(arr) ? [...arr] : []; dirty.value = false; editRow.value = null },
+  (arr) => {
+    const next = Array.isArray(arr) ? arr : []
+    if (editRow.value !== null) {
+      if (next.length !== rows.value.length || next.some((r, i) => toRaw(r) !== toRaw(rows.value[i]))) {
+        rows.value = [...next]
+      }
+      return
+    }
+    rows.value = [...next]
+    dirty.value = false
+  },
   { immediate: true },
 )
 /** 两侧都取 raw 再比:ref 里的对象读出来是 reactive 代理,模板里的行也是代理,代理≠原对象 */
@@ -261,6 +277,8 @@ async function reload() {
       await ElMessageBox.confirm(tt('未保存的修改将丢失,确定重新加载?'), tt('提示'), { type: 'warning' })
     } catch { return }
   }
+  // 镜像 watch 在"编辑进行中"会保留编辑态,刷新属于真·重载,先把编辑态清掉再取数
+  editRow.value = null
   emit('refresh')
 }
 
