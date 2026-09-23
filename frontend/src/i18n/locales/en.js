@@ -2017,5 +2017,12 @@ export default {
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Only checked lines are generated; max deliverable = ordered qty × (1 + over-delivery ratio) − sent + returned (over-delivery capped at 50%)',
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = none; max 50%, allowance based on ordered qty)',
     '请至少勾选一行并填写本次送料数量': 'Check at least one line and enter the delivery qty',
+
+    // 检验数据记录·按物料编码查看来料检验要求(2026-09-23;弹窗只读复用 QC_INSP_REQ 表)
+    '按物料编码查看来料检验要求相关内容': 'View the incoming inspection requirements for this material code',
+    '请先填写物料编码': 'Please enter the material code first',
+    '该物料未维护来料检验要求': 'No incoming inspection requirement is maintained for this material',
+    '共 {n} 行': '{n} row(s) in total',
+    '另有 {n} 行物料类别不在检验要求模板中': '{n} more row(s) whose material category is not in the requirement template',
   },
 }

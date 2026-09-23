@@ -11,21 +11,25 @@
        「🕘 修改记录」看本表每次保存的留痕(后端 ButtonService.archiveChangeHistory)。
        注意:档案明细行被 markArchListRaw 预打 raw 标记(无响应式),本组件用 rows 镜像数组
        驱动界面,行对象与 detail.items 同引用——镜像增删同步双写,保存数据不失真。
+       编辑态输入框**不能**直接 v-model 到 row[c.key](行不响应式 → 敲进去的字会被 el-input
+       的 setNativeInputValue 刷回去,看着就是"不可编辑"),一律绑 editDraft 响应式草稿,
+       由 watch 即时回写原行 —— 详见 editDraft 处注释。
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="qc-insp-sheet">
-    <!-- 迷你工具栏:刷新/保存(通用工具栏与单据卡片对本面板整体不渲染) -->
-    <div class="qc-bar">
+  <div class="qc-insp-sheet" :class="{ 'qc-insp-sheet--embed': !showToolbar }">
+    <!-- 迷你工具栏:刷新/保存(通用工具栏与单据卡片对本面板整体不渲染)。
+         只读嵌入模式(检验数据记录的「检验要求」弹窗)隐藏整条外壳 -->
+    <div v-if="showToolbar" class="qc-bar">
       <span class="qc-bar-btn" :title="tt('重新加载数据')" @click="reload">↻ {{ tt('刷新') }}</span>
       <span class="qc-bar-btn primary" :title="tt('保存整表(缺席行视为删除)')" @click="emit('save')">{{ tt('保存') }}</span>
     </div>
     <!-- 第二行(2026-09-22):与立项申请同义的「模糊搜索」+ 本表「修改记录」(每次保存留痕) -->
-    <div class="qc-bar qc-bar2">
+    <div v-if="showToolbar" class="qc-bar qc-bar2">
       <span class="qc-bar-btn" :title="tt('按字段+内容多条件查找(可跨页签,点结果跳到该行)')" @click="toggleFuzzy">🔍 {{ tt('模糊搜索') }}</span>
       <span class="qc-bar-btn" :title="tt('查看本表的修改记录(每次保存留痕,近 3 次)')" @click="openModifyLog">🕘 {{ tt('修改记录') }}</span>
     </div>
 
     <!-- 模糊搜索态:字段+内容条件行 → 查找 → 结果清单(点行跳到对应页签并高亮) -->
-    <div v-if="fuzzyOpen" class="fuzzy-panel">
+    <div v-if="showToolbar && fuzzyOpen" class="fuzzy-panel">
       <div class="fuzzy-head">
         <span>{{ tt('模糊搜索') }}</span>
         <span class="fuzzy-back" :title="tt('返回')" @click="closeFuzzy">↩</span>
@@ -111,7 +115,7 @@
             <td v-for="c in tab.cols" :key="c.key" class="rs-td">
               <el-input
                 v-if="editable && isEditing(row)"
-                v-model="row[c.key]"
+                v-model="editDraft[c.key]"
                 size="small"
                 class="rs-c-in"
                 @input="touchDirty()"
@@ -185,18 +189,48 @@ const props = defineProps({
   head: { type: Object, required: true },
   editable: { type: Boolean, default: false },
   panelCode: { type: String, required: true },
+  /** 只读嵌入模式(检验数据记录的「检验要求」弹窗用):隐藏本面板自带的迷你工具栏与
+   *  模糊搜索/修改记录入口,并收掉为浮动行操作按钮预留的右侧 84px 留白。
+   *  只影响"外壳",表格本体(页签 + Excel 一比一表)完全复用 —— 一处维护两处显示。 */
+  showToolbar: { type: Boolean, default: true },
+  /** 只渲染指定页签(数组;空=全部 7 页签)。弹窗里只显示命中该物料的那几个页签。 */
+  tabKeys: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['dirty', 'save', 'refresh'])
 
-const tabs = qcInspReqTabs
+/** 页签集:tabKeys 为空时=全部 7 页签(维护面板);弹窗按命中的物料类别收窄 */
+const tabs = computed(() => {
+  const keys = props.tabKeys
+  if (!Array.isArray(keys) || !keys.length) return qcInspReqTabs
+  const filtered = qcInspReqTabs.filter((t) => keys.includes(t.key))
+  return filtered.length ? filtered : qcInspReqTabs
+})
 const activeTab = ref(0)
-const tab = computed(() => tabs[activeTab.value] || tabs[0])
+const tab = computed(() => tabs.value[activeTab.value] || tabs.value[0] || qcInspReqTabs[0])
 
 // ── 行数据:与 head.detail.items 同引用的工作镜像(raw 数组无响应式,镜像驱动界面) ──
 const rows = ref([])
 const dirty = ref(false)
 /** 当前处于编辑态的行(按对象引用比):默认 null=整表只读,防止随手改到数据 */
 const editRow = ref(null)
+/** 编辑态字段值的响应式草稿(2026-09-23 修「字敲进去又弹回来」)。
+ *  根因:档案明细行与行数组都被 markArchListRaw/normalizeArchRaw 打了 raw 标记(无响应式),
+ *  v-model 直接绑 row[c.key] 时写值不触发重渲染 —— 而 el-input 的 handleInput 在 emit 之后会
+ *  await nextTick() 再用**上一帧的 modelValue** 把 DOM 值刷回去,于是屏幕上刚敲的字原地消失
+ *  (实测 `_v-qc-req-type2.cjs`:打完 600ms 后 DOM value 弹回原值,可点「完成」离开编辑态就看得见
+ *  那个新值 —— 字确实写进了行对象,只是界面不刷新)。新增行更早一步被打 raw:addRow 里的
+ *  touchDirty() → 父级 markInlineDirty → normalizeArchRaw 在它第一次渲染前就标记完了。
+ *  故输入框一律绑这层草稿(响应式、驱动界面),每次变更立即回写原行(保存取数不失真)。 */
+const editDraft = ref({})
+watch(
+  editDraft,
+  (d) => {
+    const row = editRow.value
+    if (!row || !d) return
+    for (const k of Object.keys(d)) row[k] = d[k]
+  },
+  { deep: true },
+)
 function sourceItems() {
   if (!props.head?.detail) props.head.detail = {}
   if (!Array.isArray(props.head.detail.items)) props.head.detail.items = []
@@ -228,7 +262,10 @@ function isEditing(row) {
   return editRow.value !== null && toRaw(row) === toRaw(editRow.value)
 }
 function startEdit(row) {
-  editRow.value = toRaw(row)
+  const raw = toRaw(row)
+  editRow.value = raw
+  // 草稿整行浅拷贝(不只当前页签的列:切页签后列可能变,少了键会显示成空格)
+  editDraft.value = { ...raw }
   scrollEditIntoView()
 }
 /** 把「正在编辑/刚新增」的那一行滚进视野(2026-09-23)。
@@ -244,6 +281,7 @@ function scrollEditIntoView() {
 }
 function endEdit() {
   editRow.value = null
+  editDraft.value = {}
 }
 /** 模糊搜索跳转后的高亮行(同样两侧取 raw 比) */
 const flashRow = ref(null)
@@ -266,7 +304,7 @@ function addRow(t) {
   const row = { '物料类别': t.key }
   sourceItems().push(row) // 原数组(保存取数)
   rows.value.push(row) // 镜像(界面响应)
-  editRow.value = row // 新行直接可填
+  startEdit(row) // 新行直接可填(顺带建好响应式草稿)
   touchDirty()
   scrollEditIntoView() // 新行在表格最下面,滚进视野(否则"填写时看不见")
 }
@@ -281,7 +319,7 @@ async function removeRow(row) {
   if (i >= 0) src.splice(i, 1)
   const j = rows.value.indexOf(row)
   if (j >= 0) rows.value.splice(j, 1)
-  if (editRow.value !== null && raw === toRaw(editRow.value)) editRow.value = null
+  if (editRow.value !== null && raw === toRaw(editRow.value)) endEdit()
   touchDirty()
 }
 function touchDirty() {
@@ -296,7 +334,7 @@ async function reload() {
     } catch { return }
   }
   // 镜像 watch 在"编辑进行中"会保留编辑态,刷新属于真·重载,先把编辑态清掉再取数
-  editRow.value = null
+  endEdit()
   emit('refresh')
 }
 
@@ -306,7 +344,7 @@ const fuzzyOpen = ref(false)
 const fuzzySearched = ref(false)
 const fuzzyRows = ref([{ field: '', value: '' }])
 /** 条件字段下拉:按页签分组列全部叶子列(同一列出现在多个页签时各自成项,匹配跨页签生效) */
-const fuzzyFieldGroups = computed(() => tabs.map((t) => ({
+const fuzzyFieldGroups = computed(() => tabs.value.map((t) => ({
   label: t.key,
   options: t.cols.map((c) => ({ value: c.key, label: c.key })),
 })))
@@ -335,7 +373,7 @@ const fuzzyResults = computed(() => {
   const conds = fuzzyRows.value.map((r) => ({ field: r.field || '', value: String(r.value || '').trim().toLowerCase() })).filter((c) => c.value)
   if (!conds.length) return []
   const out = []
-  tabs.forEach((t, ti) => {
+  tabs.value.forEach((t, ti) => {
     for (const row of tabRows(t)) {
       const hits = []
       let ok = true
@@ -415,6 +453,14 @@ function gridW(t) {
    右侧留出 84px:行操作按钮是浮在网格右缘之外的,不留白会被裁掉 */
 .qc-insp-sheet {
   padding: 12px 84px 30px 0;
+}
+/* 只读嵌入(检验数据记录的「检验要求」弹窗):没有浮动行操作按钮,右侧 84px 留白收掉;
+   宽度交给弹窗,别再按视口算(否则弹窗里横向溢出) */
+.qc-insp-sheet--embed {
+  padding: 0 4px 8px;
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
 }
 .qc-bar {
   display: flex;

@@ -23,7 +23,16 @@
       <tbody>
         <tr v-for="(pair, ri) in QC_INSP_REC_HEAD_ROWS" :key="'h' + ri">
           <template v-for="cell in pair" :key="cell.key">
-            <th class="qr-label">{{ tt(cell.label) }}</th>
+            <th class="qr-label">
+              {{ tt(cell.label) }}
+              <!-- 按物料编码查该物料的来料检验要求(2026-09-23 用户口径):纸面不打印 -->
+              <span
+                v-if="cell.key === '物料编码'"
+                class="qr-lib-btn no-print"
+                :title="tt('按物料编码查看来料检验要求相关内容')"
+                @click="openReqView"
+              >⧉ {{ tt('检验要求') }}</span>
+            </th>
             <td class="qr-value">
               <el-date-picker
                 v-if="isDateField(cell.key) && editable && !cell.locked"
@@ -190,14 +199,19 @@
         <el-button @click="stdLibVisible = false">{{ tt('关闭') }}</el-button>
       </template>
     </el-dialog>
+
+    <!-- 来料检验要求·按本单物料编码查看(只读;内容取自品质管理 > 来料检验要求) -->
+    <QcInspReqViewDialog v-model="reqViewVisible" :material-code="materialCode" />
   </div>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import StdLibManager from './StdLibManager.vue'
+import QcInspReqViewDialog from './QcInspReqViewDialog.vue'
 import {
   QC_INSP_REC_HEAD_ROWS,
   QC_INSP_REC_FOOT_FULL,
@@ -284,6 +298,20 @@ function openStdLib() {
 }
 function onStdLibChanged() {
   emit('refresh-config')
+}
+
+/**
+ * 按「物料编码」查看来料检验要求(2026-09-23 用户口径)。
+ * 只读弹窗按物料编号精确匹配品质管理 > 来料检验要求里的行;本单没填物料编码时先提示再拦。
+ */
+const reqViewVisible = ref(false)
+const materialCode = computed(() => String(props.head?.['物料编码'] ?? '').trim())
+function openReqView() {
+  if (!materialCode.value) {
+    ElMessage.warning(tt('请先填写物料编码'))
+    return
+  }
+  reqViewVisible.value = true
 }
 
 /**
