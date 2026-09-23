@@ -59,14 +59,19 @@ public class SqlRunner {
                 boolean hasRs = st.execute(b);
                 while (true) {
                     if (hasRs) {
-                        try (ResultSet rs = st.getResultSet()) {
-                            int cols = rs.getMetaData().getColumnCount();
-                            int n = 0;
-                            while (rs.next() && n < 50) {
-                                StringBuilder sb = new StringBuilder("  | ");
-                                for (int i = 1; i <= cols; i++) sb.append(rs.getString(i)).append(" | ");
-                                System.out.println(sb);
-                                n++;
+                        // execute() 返回 true 时 getResultSet() 仍可能为 null(实测 CREATE INDEX 如此),
+                        // 不判空会 NPE 打死整个进程、且看不到是哪条语句 —— 这里降级为「无输出」继续跑
+                        ResultSet rs = st.getResultSet();
+                        if (rs != null) {
+                            try (rs) {
+                                int cols = rs.getMetaData().getColumnCount();
+                                int n = 0;
+                                while (rs.next() && n < 50) {
+                                    StringBuilder sb = new StringBuilder("  | ");
+                                    for (int i = 1; i <= cols; i++) sb.append(rs.getString(i)).append(" | ");
+                                    System.out.println(sb);
+                                    n++;
+                                }
                             }
                         }
                     } else {
@@ -80,6 +85,10 @@ public class SqlRunner {
             return true;
         } catch (SQLException e) {
             System.err.println("[SQL FAIL] " + e.getMessage());
+            return false;
+        } catch (RuntimeException e) {
+            // 驱动怪癖抛的运行时异常不该打死整个进程(否则看不到是哪条语句、哪一批就退了)
+            System.err.println("[SQL FAIL] " + e.getClass().getSimpleName() + ": " + e.getMessage());
             return false;
         }
     }

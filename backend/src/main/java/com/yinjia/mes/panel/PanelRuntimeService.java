@@ -17,6 +17,11 @@ public interface PanelRuntimeService {
     Map<String, Object> queryFormDataList(String panelCode, String keyword,
                                           Map<String, Object> condition, int pageNo, int pageSize);
 
+    /** 同上,外加查询弹窗「高级筛选」条件行(仅报表/平表面板生效) */
+    Map<String, Object> queryFormDataList(String panelCode, String keyword,
+                                          Map<String, Object> condition, int pageNo, int pageSize,
+                                          List<Map<String, Object>> advFilters);
+
     List<Map<String, Object>> getApprovalHistory(String panelCode, String formNo);
 
     Map<String, Object> callButton(String panelCode, String buttonName,

@@ -32,9 +32,20 @@ public class QueryService {
 
     public Map<String, Object> queryFormDataList(String panelCode, String keyword,
                                                  Map<String, Object> condition, int pageNo, int pageSize) {
+        return queryFormDataList(panelCode, keyword, condition, pageNo, pageSize, null);
+    }
+
+    /**
+     * @param advFilters 查询弹窗「高级筛选」条件行 [{field=字段标签, op, value}];仅平表模式(报表)生效,
+     *                   逐条 AND 并入 WHERE —— 全表过滤,分页 totalSize 与导出口径一致。
+     *                   单据/档案模式忽略该参数(它们本来就在 Java 侧按行过滤)。
+     */
+    public Map<String, Object> queryFormDataList(String panelCode, String keyword,
+                                                 Map<String, Object> condition, int pageNo, int pageSize,
+                                                 List<Map<String, Object>> advFilters) {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         Map<String, String> l2c = def.labelToCol();
-        if ("flat".equals(def.mode())) return queryFlat(def, keyword, condition, l2c, pageNo, pageSize);
+        if ("flat".equals(def.mode())) return queryFlat(def, keyword, condition, l2c, pageNo, pageSize, advFilters);
         return def.isDoc() ? queryDocs(def, keyword, condition, l2c, pageNo, pageSize)
                 : queryArchive(def, keyword, condition, l2c, pageNo, pageSize);
     }
@@ -43,13 +54,14 @@ public class QueryService {
 
     private Map<String, Object> queryFlat(PanelRegistry.PanelDef def, String keyword,
                                           Map<String, Object> condition, Map<String, String> l2c,
-                                          int pageNo, int pageSize) {
+                                          int pageNo, int pageSize, List<Map<String, Object>> advFilters) {
         boolean ledger = "STOCK_LEDGER".equals(def.code()); // 台账:正序 + 首期初行/末期末行(T+ 三段式)
         String hint = recompileOnRead(def.lineTable()) ? " OPTION (RECOMPILE)" : "";
         String cols = selectCols(def, def.fields());
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
         appendDirectFilters(def, def.lineTable(), where, args, keyword, condition, l2c, "t");
+        appendAdvFilters(advFilters, where, args, l2c, "t");
 
         Integer total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + def.lineTable() + " t " + where + hint, Integer.class, args.toArray());
@@ -473,6 +485,85 @@ public class QueryService {
                 where.append(" AND (").append(or).append(")");
                 args.addAll(kargs);
             }
+        }
+    }
+
+    /**
+     * 查询弹窗「高级筛选」→ WHERE。逐条 AND 组合(与前端 applyAdvFilters 的 every 语义一致),
+     * 算子:contains(LIKE %v%) / eq、ne(去前后空格后按字符串比) / empty、notEmpty(空串判空)
+     * / gt、lt、ge、le(两边都能当数字时按数值,否则按字符串比)。
+     *
+     * 与服务端 keyword、字段条件三者是 AND 关系;台账的期初/期末合成行按 仓库+存货+日期段
+     * 另行聚合,不受这里影响(与 keyword 同款行为)。
+     * 字段标签在本面板找不到列(改过名/来自别的面板)→ 跳过该行而非报错,避免旧查询方案打不开面板。
+     */
+    private void appendAdvFilters(List<Map<String, Object>> advFilters, StringBuilder where,
+                                  List<Object> args, Map<String, String> l2c, String alias) {
+        if (advFilters == null || advFilters.isEmpty()) return;
+        StringBuilder and = new StringBuilder();
+        List<Object> aargs = new ArrayList<>();
+        for (Map<String, Object> f : advFilters) {
+            if (f == null) continue;
+            String col = l2c.get(strOf(f.get("field")));
+            String op = strOf(f.get("op"));
+            String val = strOf(f.get("value"));
+            if (col == null || op.isEmpty()) continue;
+            boolean valueless = "empty".equals(op) || "notEmpty".equals(op);
+            if (!valueless && val.isEmpty()) continue; // 未填值的行不参与过滤(同前端)
+            String c = alias + ".[" + col + "]";
+            switch (op) {
+                case "contains" -> {
+                    and.append(" AND ").append(c).append(" LIKE ?");
+                    aargs.add("%" + val + "%");
+                }
+                case "eq" -> {
+                    and.append(" AND ").append(txtExpr(c)).append(" = ?");
+                    aargs.add(val);
+                }
+                case "ne" -> {
+                    and.append(" AND ").append(txtExpr(c)).append(" <> ?");
+                    aargs.add(val);
+                }
+                case "empty" -> and.append(" AND ").append(txtExpr(c)).append(" = N''");
+                case "notEmpty" -> and.append(" AND ").append(txtExpr(c)).append(" <> N''");
+                case "gt", "lt", "ge", "le" -> {
+                    String sym = switch (op) { case "gt" -> ">"; case "lt" -> "<"; case "ge" -> ">="; default -> "<="; };
+                    String num = val.replace(",", ""); // 前端 parseFloat 前也去千分位
+                    if (isNumeric(num)) {
+                        and.append(" AND ").append(numExpr(c)).append(" ").append(sym).append(" ?");
+                        aargs.add(Double.parseDouble(num));
+                    } else {
+                        and.append(" AND ").append(txtExpr(c)).append(" ").append(sym).append(" ?");
+                        aargs.add(val);
+                    }
+                }
+                default -> { /* 未知算子:不过滤(同前端兜底) */ }
+            }
+        }
+        if (and.length() > 0) {
+            where.append(and);
+            args.addAll(aargs);
+        }
+    }
+
+    /** 去前后空格的字符串形态:eq/ne/空判/字符串区间都比它,对齐前端 String(v).trim() */
+    private String txtExpr(String col) {
+        return "ISNULL(LTRIM(RTRIM(CAST(" + col + " AS nvarchar(4000)))),N'')";
+    }
+
+    /** 数值形态:比较值能当数字时用它。脏值(如 '暂无')经 TRY_CAST 变 NULL → 比较不成立、该行不命中;
+     *  这种情况前端是退化成字符串比(可能命中),属已知的口径差 —— 数值列的脏值本来就不该参与数值比较。 */
+    private String numExpr(String col) {
+        return "TRY_CAST(REPLACE(" + txtExpr(col) + ",N',',N'') AS float)";
+    }
+
+    private boolean isNumeric(String s) {
+        if (s.isEmpty()) return false;
+        try {
+            Double.parseDouble(s);
+            return true;
+        } catch (NumberFormatException e) {
+            return false;
         }
     }
 

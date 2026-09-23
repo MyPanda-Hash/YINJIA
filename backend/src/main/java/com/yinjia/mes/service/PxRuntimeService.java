@@ -59,6 +59,13 @@ public class PxRuntimeService implements PanelRuntimeService {
     }
 
     @Override
+    public Map<String, Object> queryFormDataList(String panelCode, String keyword,
+                                                 Map<String, Object> condition, int pageNo, int pageSize,
+                                                 List<Map<String, Object>> advFilters) {
+        return queryService.queryFormDataList(panelCode, keyword, condition, pageNo, pageSize, advFilters);
+    }
+
+    @Override
     public List<Map<String, Object>> getApprovalHistory(String panelCode, String formNo) {
         return facade.getApprovalHistory(panelCode, formNo);
     }

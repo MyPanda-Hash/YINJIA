@@ -2024,5 +2024,14 @@ export default {
     '该物料未维护来料检验要求': 'No incoming inspection requirement is maintained for this material',
     '共 {n} 行': '{n} row(s) in total',
     '另有 {n} 行物料类别不在检验要求模板中': '{n} more row(s) whose material category is not in the requirement template',
+
+    // 库存报表三面板(2026-09-21):重算成本按钮 + 查询弹窗「档案∩有流水」联动提示 + 模糊搜索
+    '重算成本': 'Recalculate cost',
+    '该仓无此存货流水，已清空存货': 'No stock movement for this item in the selected warehouse; item cleared',
+    '候选已按所选仓库收窄': 'Candidates narrowed by the selected warehouse:',
+    '该仓库在存货档案内无流水存货': 'No archived item has stock movement in this warehouse',
+    '该存货在各仓库均无流水': 'This item has no stock movement in any warehouse',
+    '任意字段包含关键字': 'Any field contains the keyword',
+    '按钮执行失败': 'Button action failed',
   },
 }

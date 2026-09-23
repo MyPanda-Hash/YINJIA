@@ -1009,26 +1009,35 @@
             style="width: 100%"
           />
         </div>
-        <!-- 级联面板:仓库/存货联动下拉(选项=对应视图真实组合,互相约束);台账必填,状况表选填 -->
-        <template v-if="isCascadePanel">
-          <div class="query-dialog-field">
-            <label :class="{ 'req-label': rqdFieldRequired({ dataName: '仓库' }) }">{{ tt('仓库') }}<span v-if="rqdFieldRequired({ dataName: '仓库' })" class="req-star">*</span></label>
-            <el-select v-model="queryDraft['仓库']" filterable clearable :loading="ledgerOptsLoading" style="width:100%" @change="onLedgerWhChange">
-              <el-option v-for="w in ledgerWhOptions" :key="w" :label="w" :value="w" />
-            </el-select>
-          </div>
-          <div class="query-dialog-field">
-            <label :class="{ 'req-label': rqdFieldRequired({ dataName: '存货' }) }">{{ tt('存货') }}<span v-if="rqdFieldRequired({ dataName: '存货' })" class="req-star">*</span></label>
-            <el-select v-model="queryDraft['存货']" filterable clearable :loading="ledgerOptsLoading" style="width:100%" @change="onLedgerItemChange">
-              <el-option v-for="i in ledgerItemOptions" :key="i" :label="i" :value="i" />
-            </el-select>
-          </div>
-        </template>
+        <!-- 模糊搜索(报表面板):后端 keyword 全字段 OR LIKE,与字段条件/高级筛选三者 AND -->
+        <div v-if="reportMode" class="query-dialog-field">
+          <label>{{ tt('模糊搜索') }}</label>
+          <el-input v-model="reportKeyword" clearable :placeholder="tt('任意字段包含关键字')" @keyup.enter="applyHeaderQuery" />
+        </div>
         <div v-for="field in queryDialogFields" :key="headerFieldKey(field)" class="query-dialog-field">
           <label :class="{ 'req-label': rqdFieldRequired(field) }">
             {{ headerFieldLabel(field) }}<span v-if="rqdFieldRequired(field)" class="req-star">*</span>
           </label>
-          <div v-if="isReferenceField(field)" class="query-ref">
+          <!-- 参照双模(2026-09-21):按档案行数自动选控件 —— ≤20 行可搜索下拉(仓库 6 个),
+               >20 行参照弹窗(存货 3838 个);都不开 allow-create,未建档值手输不进条件 -->
+          <el-select
+            v-if="isReferenceField(field) && refModeMap[headerFieldKey(field)] === 'select'"
+            v-model="queryDraft[headerFieldKey(field)]"
+            clearable filterable remote default-first-option
+            :remote-method="(kw) => loadRefSelectOptions(field, headerFieldKey(field), kw)"
+            :loading="refSelectData[headerFieldKey(field)]?.loading"
+            :placeholder="tt('输入搜索')"
+            style="width: 100%"
+            @focus="checkRefMode(field, headerFieldKey(field))"
+            @change="onDialogRefSelectChange(field)"
+          >
+            <el-option
+              v-for="o in (refSelectData[headerFieldKey(field)]?.options || [])"
+              :key="o.value" :label="o.label" :value="o.value"
+              :disabled="ledgerOptionDisabled(field, o)"
+            />
+          </el-select>
+          <div v-else-if="isReferenceField(field)" class="query-ref">
             <el-input
               :model-value="queryDraft[headerFieldKey(field)] ?? ''"
               readonly
@@ -1049,9 +1058,12 @@
             <el-option label="否" :value="false" />
           </el-select>
           <el-input v-else v-model="queryDraft[headerFieldKey(field)]" clearable @keyup.enter="applyHeaderQuery" />
+          <!-- 台账/库存状况(2026-09-21):「档案∩有流水」联动提示 —— 选仓后存货候选收窄;选存货后无流水仓置灰 -->
+          <div v-if="dialogFieldHint(field)" class="query-field-hint">{{ dialogFieldHint(field) }}</div>
         </div>
       </div>
-      <!-- 高级筛选:字段(单据全部字段)+ 运算符 + 值,点击查询执行前端过滤 -->
+      <!-- 高级筛选:字段(全部字段)+ 运算符 + 值。报表=服务端全表过滤(点查询定格条件 POST advFilters,
+           分页 totalSize/导出与所见一致);单据/档案=前端过滤当前加载行(mainRows/blockRows) -->
       <div class="adv-filter-section">
         <div class="adv-filter-head">
           <span class="adv-filter-title">{{ tt('高级筛选') }}</span>
@@ -1981,8 +1993,16 @@ const reportMode = computed(() => cfgCache.value?.metadata?.report === true || c
 // 字段:单据日期(区间控件,必填) + 仓库/存货(参照;台账必填单一仓库+单一存货,汇总选填)
 // 进入态差异:①未完成过查询就关闭(✕/取消)=退出页面 ②必填项校验(applyHeaderQuery)。
 const reportQueryDialog = computed(() => cfgCache.value?.metadata?.reportQueryDialog === true)
-// 级联查询面板:仓库/存货下拉互相约束(台账=联动+必填;库存状况表=联动+选填,快照无日期)
+// 级联查询面板(台账/库存状况):仓库/存货走基础资料参照(WH/INV)+「档案∩有流水」联动收窄;
+// 台账 仓库/存货 必填(单一仓库的一种存货);库存状况表选填(快照,无日期)
 const isCascadePanel = computed(() => ['STOCK_LEDGER', 'STOCK_BALANCE'].includes(panelCode.value))
+/** 查询条件只进弹窗、无内联查询区的面板(台账/汇总=强制弹窗;状况表=级联)——「查询」按钮统一开弹窗 */
+const queryInDialogOnly = computed(() => reportQueryDialog.value || isCascadePanel.value)
+// 报表弹窗「模糊搜索」关键字(后端 keyword 全字段 OR LIKE;进弹窗回显上次值,点查询生效)
+const reportKeyword = ref('')
+// 高级筛选「生效中」快照:applyHeaderQuery 定格;报表面板随查询 POST 给后端全表过滤,
+// 单据/档案面板不用它(仍走 mainRows/blockRows 的前端过滤)
+const activeAdvFilters = ref([])
 const rqdDone = ref(false) // 本面板本轮是否已通过弹窗查询(未过弹窗前拦截一切列表加载)
 const rqdRange = ref([])   // 单据日期区间 [开始, 结束](YYYY-MM-DD)
 /** 台账:仓库/存货必填(单选一个仓库的一种存货);汇总:仅单据日期必填 */
@@ -2013,8 +2033,32 @@ async function loadLedgerRefOptions({ keepWh = true, keepItem = true } = {}) {
     ledgerOptsLoading.value = false
   }
 }
-function onLedgerWhChange() { loadLedgerRefOptions({ keepWh: true, keepItem: false }) } // 换仓→存货按新仓收敛
-function onLedgerItemChange() { loadLedgerRefOptions({ keepWh: false, keepItem: true }) } // 换存货→仓库按新存货收敛
+/** 弹窗参照下拉选中变化:仅台账/库存状况的「仓库」要重拉联动(存货可能因换仓失效被清)。其余参照不联动 */
+async function onDialogRefSelectChange(field) {
+  if (!isCascadePanel.value || headerFieldKey(field) !== '仓库') return
+  const hadItem = queryDraft['存货']
+  await loadLedgerRefOptions({ keepWh: true, keepItem: false })
+  if (hadItem && !queryDraft['存货']) ElMessage.info(tt('该仓无此存货流水，已清空存货'))
+}
+/** 仓库下拉选项置灰(选了存货后):该存货无流水的仓不可选 —— 选项=档案(bs_wh) ∩ 有流水 */
+function ledgerOptionDisabled(field, option) {
+  return isCascadePanel.value && headerFieldKey(field) === '仓库'
+    && !!queryDraft['存货'] && !ledgerWhOptions.value.includes(option.label)
+}
+/** 弹窗字段下方的联动提示行:选仓后存货候选收窄计数 / 选存货后全仓无流水的说明 */
+function dialogFieldHint(field) {
+  if (!isCascadePanel.value) return ''
+  const key = headerFieldKey(field)
+  if (key === '存货' && queryDraft['仓库']) {
+    return ledgerItemOptions.value.length
+      ? `${tt('候选已按所选仓库收窄')} ${ledgerItemOptions.value.length} ${tt('项')}`
+      : tt('该仓库在存货档案内无流水存货')
+  }
+  if (key === '仓库' && queryDraft['存货'] && !ledgerWhOptions.value.length) {
+    return tt('该存货在各仓库均无流水')
+  }
+  return ''
+}
 /** 弹窗关闭:查询弹窗面板在未完成过一次查询时,关闭(✕/取消)即退出页面(对齐 T+ 报表交互) */
 function onQueryDialogClose() {
   if (reportQueryDialog.value && !rqdDone.value) router.push('/dashboard')
@@ -2578,8 +2622,7 @@ const queryDialogFields = computed(() => {
   // 档案/单单据面板(基础资料):表头只剩「备注」,查询条件取元数据登记的常规字段(queryFields,每面板 ≤6 个)
   const fields = (reportMode.value || singleDocMode.value) ? queryFields.value : headerEditFields.value
   return fields.filter((field) => headerFieldKey(field) !== '备注')
-    // 级联面板(台账/库存状况):仓库/存货改用联动下拉(互相约束),不走通用参照控件
-    .filter((field) => !(isCascadePanel.value && ['仓库', '存货'].includes(headerFieldKey(field))))
+    // 台账/库存状况的 仓库/存货 也走通用渲染:参照双模(仓库 6 行下拉/存货 3838 行弹窗)+ 联动收窄提示
 })
 const draftEditable = computed(() => {
   if (reportMode.value || ['BOM_FWD', 'BOM_REV'].includes(String(panelCode.value))) return false
@@ -4536,6 +4579,13 @@ function openQueryDialog() {
 }
 
 function openQueryRef(qr, context = 'page') {
+  // 台账/库存状况(2026-09-21):弹窗里选「存货」且已选仓库 → 候选按「该仓有流水」收窄。
+  // 注入数组型 filter{存货名称:[…]}(engine.queryRefRows 对数组 filter 在展平后的档案行上逐行精确匹配,
+  // 不会误发给后端当查询条件);该仓无任何有流水的档案存货时不收窄(不给空清单)。
+  if (context === 'dialog' && isCascadePanel.value && headerFieldKey(qr) === '存货' && queryDraft['仓库']) {
+    const names = ledgerItemOptions.value
+    if (names.length) qr = { ...qr, filter: { ...(qr.filter || {}), 存货名称: names } }
+  }
   queryRefField.value = qr
   queryRefContext.value = context
   queryRefVisible.value = true
@@ -4561,6 +4611,10 @@ function onQueryRefConfirm(rows) {
   target[headerFieldKey(field)] = row[valueField] ?? ''
   queryRefVisible.value = false
   queryRefField.value = null
+  // 台账/库存状况:弹窗选了存货 → 重拉联动(该存货无流水的仓置灰;当前仓无此存货流水则清仓)
+  if (queryRefContext.value === 'dialog' && isCascadePanel.value && headerFieldKey(field) === '存货') {
+    loadLedgerRefOptions({ keepWh: false, keepItem: true })
+  }
   if (queryRefContext.value === 'page') search()
 }
 
@@ -4583,6 +4637,9 @@ function applyHeaderQuery() {
   for (const [key, value] of Object.entries(queryDraft)) {
     if (value !== undefined && value !== null && String(value) !== '') condition[key] = value
   }
+  // 高级筛选定格为「生效中」:报表面板随本次查询 POST 给后端全表过滤(分页/导出口径一致);
+  // 单据/档案面板仍是前端过滤(applyAdvFilters 读的是编辑中的 advFilters,不受此快照影响)
+  activeAdvFilters.value = advFilters.value.filter((f) => f.field && (f.op === 'empty' || f.op === 'notEmpty' || String(f.value ?? '').trim() !== ''))
   rqdDone.value = true // 已通过弹窗查询(此后关闭弹窗不再退页)
   queryDialogVisible.value = false
   search()
@@ -4689,6 +4746,8 @@ function resetHeaderQuery() {
   Object.keys(condition).forEach((key) => delete condition[key])
   rqdRange.value = [] // 弹窗面板:单据日期区间一并重置
   advFilters.value = []
+  activeAdvFilters.value = []
+  reportKeyword.value = ''
   query.keyword = ''
   queryDialogVisible.value = false
   search()
@@ -5205,9 +5264,20 @@ async function onButton(action) {
     return
   }
   if (action === '查询' || action === '查找') {
-    // 查询弹窗面板(T+ 收发存):查询按钮重开条件弹窗,而非直接刷新
-  if (reportQueryDialog.value) { openQueryDialog(); return }
+    // 查询弹窗面板(T+ 收发存/台账 + 库存状况):查询按钮重开条件弹窗,而非直接刷新
+    if (queryInDialogOnly.value) { openQueryDialog(); return }
     search()
+    return
+  }
+  // 库存三报表「重算成本」:全量重算移动加权物化表(审核钩子之外的兜底 —— 金蝶同步等旁路写入)
+  if (action === '重算成本') {
+    try {
+      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: action, formData: {}, buttonParam: {} })
+      ElMessage.success(`${tt('重算成本')}${tt('完成')}(${res?.['重算行数'] ?? '?'} ${tt('行')})`)
+      await load()
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('按钮执行失败'))
+    }
     return
   }
   if (action === '导出') {
@@ -5612,6 +5682,14 @@ async function load(clamping = false) {
       if (!query.keyword && fuzzyApplied.value.keyword) params.keyword = fuzzyApplied.value.keyword
     }
     if (query.keyword) params.keyword = query.keyword
+    // 报表面板:高级筛选服务端化(后端 queryFlat 逐条 AND 并入 WHERE,全表过滤 → 分页 totalSize
+    // 与导出一致);台账期初/期末合成行按 仓库+存货+日期段 另算,不受影响。弹窗「模糊搜索」同批发。
+    if (reportMode.value) {
+      if (activeAdvFilters.value.length) {
+        params.advFilters = activeAdvFilters.value.map((f) => ({ field: f.field, op: f.op, value: String(f.value ?? '').trim() }))
+      }
+      if (reportKeyword.value.trim()) params.keyword = reportKeyword.value.trim()
+    }
     const res = await engine.queryFormDataList(params)
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
     list.value = res.list || []
@@ -6841,6 +6919,13 @@ onUnmounted(() => {
 .query-dialog-field .query-ref :deep(.el-input) {
   width: auto;
   flex: 1;
+}
+/* 台账/库存状况「档案∩有流水」联动提示行(选仓后存货收窄计数 / 全仓无流水说明) */
+.query-dialog-field .query-field-hint {
+  grid-column: 2;
+  color: #9ca3af;
+  font-size: 12px;
+  line-height: 1.4;
 }
 
 /* ═══════ ③ 明细区块 ═══════ */

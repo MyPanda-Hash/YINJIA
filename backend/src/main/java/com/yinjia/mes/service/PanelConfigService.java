@@ -238,7 +238,12 @@ public class PanelConfigService {
             // 报表(明细/统计表)统一:查询|查询,刷新 + 打印|打印,预览,导出 + 更多|发送邮件,表格调整,退出
             buttonGroups.add(group("查询", List.of("查询", "刷新")));
             buttonGroups.add(group("打印", List.of("打印", "预览", "导出")));
-            buttonGroups.add(group("更多", List.of("发送邮件", "表格调整", "退出")));
+            // 库存三报表的金额列读 inv_cost_ledger(移动加权成本),口径=物化值,需可手工重算:
+            // 审核钩子覆盖走 ButtonService 的审核,但金蝶同步等旁路写入不经过审核动作。
+            // 插在 表格调整 之前——其后的「表头调整」是按 表格调整 的位置注入的,不能打乱。
+            buttonGroups.add(group("更多", INV_COST_PANELS.contains(def.code())
+                    ? List.of("发送邮件", "重算成本", "表格调整", "退出")
+                    : List.of("发送邮件", "表格调整", "退出")));
         } else if (doc && panda != null) {
             for (String[] g : panda) {
                 buttonGroups.add(group(g[0], List.of(g).subList(1, g.length)));
@@ -653,6 +658,9 @@ public class PanelConfigService {
      * - 可执行动作与 PANDA 一致(保存/删除/审批/打印/查找/导入/更多含表格调整);
      *   审核+审批 双组由前端 normalizeApprovalGroups 归一为一个审批组(动作并集)。
      */
+    /** 读 inv_cost_ledger(移动加权成本)的库存三报表:工具栏放出「重算成本」(与 ButtonService.INV_COST_PANELS 同集合)。 */
+    private static final List<String> INV_COST_PANELS = List.of("STOCK_LEDGER", "STOCK_SUMMARY", "STOCK_BALANCE");
+
     private static final Map<String, List<String[]>> PANDA_BUTTONS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
             // 销售订单:选单灰(无上游);生单=生产加工单/销售出库单(已实现)
             java.util.Map.entry("SO_ORDER", List.of(
@@ -946,7 +954,9 @@ public class PanelConfigService {
             {"数量", "送检数量"},
             {"合格数量", "实收数量"},
             {"不合格数量", "退货数量"},
-            // 行级仓库沿链贯通(2026-09-21):采购订单行/暂收行叫「仓库」,检验行叫「仓库代码」,入库行又叫「仓库」:采购订单行 行号(金蝶 seq)→ 下游各站 采购订单行号,
+            // 行级仓库沿链贯通(2026-09-21):采购订单行/暂收行叫「仓库」,检验行叫「仓库代码」,入库行又叫「仓库」
+            {"仓库", "仓库代码"}, {"仓库代码", "仓库"},
+            // 采购链订单行号(2026-09-20):采购订单行 行号(金蝶 seq)→ 下游各站 采购订单行号,
             // 逐站下传后在 采购入库行 落 源单行号,转ERP 推给金蝶作 src_seq
             {"行号", "采购订单行号"},
             // 送料批次号(2026-09-20 分批送料 P0):同名直通,逐站下传(暂收→检验→入库/退回)
@@ -970,7 +980,10 @@ public class PanelConfigService {
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
             // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoPurchaseIn 同步补列)
             // + 批次号(2026-09-20 分批送料 P0:批次号沿 暂收→检验→入库 贯通,同一批次可反查四单)
-            "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}, {"采购订单号", "采购订单号"}, {"批次号", "批次号"}, {"批次键", "批次键"}, {"供应商代码", "供应商编码"}}, // 异名不带则入库头供应商编码恒空(实测 0/13)
+            "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}, {"采购订单号", "采购订单号"}, {"批次号", "批次号"}, {"批次键", "批次键"},
+                    // 供应商编码(2026-09-21):检验单头字段叫「供应商代码」,入库头叫「供应商编码」——
+                    // 异名不带则入库单供应商编码恒空(实测 0/13,并连带影响下游)
+                    {"供应商代码", "供应商编码"}},
             // 来料检验单 → 暂收退回单:检验单号落「检验单号」;采购订单号随链带入(2026-09-20,
             // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoReturn)+ 批次号
             "QC_INSP|QC_RETURN", new String[][]{{"单据编号", "检验单号"}, {"采购订单号", "采购订单号"}, {"批次号", "批次号"}},

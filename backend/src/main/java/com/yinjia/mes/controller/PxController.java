@@ -261,7 +261,22 @@ public class PxController {
         int pageNo = body.get("pageNo") == null ? 1 : Integer.parseInt(String.valueOf(body.get("pageNo")));
         int pageSize = body.get("pageSize") == null ? 20 : Integer.parseInt(String.valueOf(body.get("pageSize")));
         Map<String, Object> condition = (Map<String, Object>) body.getOrDefault("condition", Map.of());
-        return ApiResult.ok(service.queryFormDataList(panelCode, keyword, condition, pageNo, pageSize));
+        // 查询弹窗「高级筛选」条件行:[{field:字段标签, op:算子, value}]。只在报表(平表)面板生效。
+        // 只取 field/op/value 三个键并限行数,避免把任意结构透进 SQL 构造层。
+        List<Map<String, Object>> advFilters = new java.util.ArrayList<>();
+        Object advRaw = body.get("advFilters");
+        if (advRaw instanceof List<?> rawList) {
+            for (Object o : rawList) {
+                if (advFilters.size() >= 30) break; // 弹窗实际行数远小于此,纯防呆上限
+                if (!(o instanceof Map<?, ?> m)) continue;
+                Map<String, Object> row = new java.util.LinkedHashMap<>();
+                row.put("field", m.get("field") == null ? "" : String.valueOf(m.get("field")));
+                row.put("op", m.get("op") == null ? "" : String.valueOf(m.get("op")));
+                row.put("value", m.get("value") == null ? "" : String.valueOf(m.get("value")));
+                advFilters.add(row);
+            }
+        }
+        return ApiResult.ok(service.queryFormDataList(panelCode, keyword, condition, pageNo, pageSize, advFilters));
     }
 
     @GetMapping("/getApprovalHistory")
