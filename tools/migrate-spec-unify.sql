@@ -29,6 +29,18 @@ BEGIN
     EXEC sp_rename N'dbo.sl_recv_detail.型号', N'规格型号', N'COLUMN';
     PRINT N'已重命名列:sl_recv_detail.型号 → 规格型号';
 END
+ELSE IF COL_LENGTH('dbo.sl_recv_detail', N'型号') IS NOT NULL AND COL_LENGTH('dbo.sl_recv_detail', N'规格型号') IS NOT NULL
+BEGIN
+    /* 2026-09-23 合并重放修复:两列并存(本地库当年由不同脚本分别建过 型号 与 规格型号)——
+       先把 规格型号 的空值用 型号 补齐(不覆盖已有值),再清注明、DROP 型号,收敛为单列。 */
+    EXEC sp_executesql N'UPDATE sl_recv_detail SET [规格型号] = [型号]
+                          WHERE ISNULL([规格型号], N'''') = N'''' AND ISNULL([型号], N'''') <> N'''';';
+    IF EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id = OBJECT_ID('dbo.sl_recv_detail')
+               AND minor_id = COLUMNPROPERTY(OBJECT_ID('dbo.sl_recv_detail'), N'型号', 'ColumnId') AND name = 'MS_Description')
+        EXEC sp_dropextendedproperty N'MS_Description', N'SCHEMA', N'dbo', N'TABLE', N'sl_recv_detail', N'COLUMN', N'型号';
+    EXEC(N'ALTER TABLE sl_recv_detail DROP COLUMN [型号]');
+    PRINT N'两列并存已合并:规格型号 补空值后 DROP 型号 列';
+END
 ELSE IF COL_LENGTH('dbo.sl_recv_detail', N'规格型号') IS NOT NULL
     PRINT N'列 sl_recv_detail.规格型号 已存在,跳过重命名';
 ELSE
@@ -42,7 +54,7 @@ GO
 /* ---------- ② 字段登记统一:QC_RECV 明细字段 型号 → 规格型号 ---------- */
 UPDATE yj_field
    SET col_name = N'规格型号', label = N'规格型号'
- WHERE panel_code = 'QC_RECV' AND col_name = N'型号' AND label = N'型号';
+ WHERE panel_code IN ('QC_RECV', 'SL_RECV') AND col_name = N'型号' AND label = N'型号';
 PRINT N'yj_field 更新行数: ' + CAST(@@ROWCOUNT AS nvarchar(10));
 GO
 
@@ -97,10 +109,10 @@ IF COL_LENGTH('dbo.sl_recv_detail', N'型号') IS NOT NULL
     RAISERROR(N'sl_recv_detail.型号 仍存在(重命名未生效)', 16, 1);
 IF COL_LENGTH('dbo.sl_recv_detail', N'规格型号') IS NULL
     RAISERROR(N'sl_recv_detail.规格型号 缺失', 16, 1);
-IF EXISTS (SELECT 1 FROM yj_field WHERE panel_code = 'QC_RECV' AND col_name = N'型号')
-    RAISERROR(N'QC_RECV 仍有 col_name=型号 的字段行', 16, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = 'QC_RECV' AND col_name = N'规格型号' AND label = N'规格型号')
-    RAISERROR(N'QC_RECV 未登记 规格型号 字段', 16, 1);
+IF EXISTS (SELECT 1 FROM yj_field WHERE panel_code IN ('QC_RECV', 'SL_RECV') AND col_name = N'型号')
+    RAISERROR(N'暂收单仍有 col_name=型号 的字段行', 16, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code IN ('QC_RECV', 'SL_RECV') AND col_name = N'规格型号' AND label = N'规格型号')
+    RAISERROR(N'暂收单未登记 规格型号 字段', 16, 1);
 DECLARE @left INT = (SELECT COUNT(*) FROM qc_insp_detail d JOIN form_flow_link l
         ON l.target_panel_code='QC_INSP' AND l.target_line_key = l.target_form_no + N'#' + CAST(d.id AS nvarchar(20))
       WHERE ISNULL(d.[规格型号], N'') = N'');

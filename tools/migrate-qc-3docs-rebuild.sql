@@ -12,7 +12,7 @@
 SET NOCOUNT ON;
 
 -- ══════════ 1. 暂收入库单 QC_RECV(qc_recv/qc_recv_detail,前缀 ZS) ══════════
-IF OBJECT_ID('qc_recv') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_recv) DROP TABLE qc_recv;
+EXEC(N'IF OBJECT_ID(''qc_recv'') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_recv) DROP TABLE qc_recv;'); -- 动态SQL:表不存在时同批编译不过(2026-09-23 合并重放修复)
 IF OBJECT_ID('qc_recv') IS NULL CREATE TABLE qc_recv (
   id int IDENTITY(1,1) PRIMARY KEY,
   [单据编号] nvarchar(60) NOT NULL,
@@ -32,7 +32,7 @@ IF OBJECT_ID('qc_recv') IS NULL CREATE TABLE qc_recv (
   asp_user1 nvarchar(50) NULL, asp_time1 datetime2 NULL, asp_user2 nvarchar(50) NULL, asp_time2 datetime2 NULL, asp_cancel char(1) NULL DEFAULT 'N'
 );
 IF OBJECT_ID('qc_recv') IS NOT NULL AND COL_LENGTH('dbo.qc_recv', N'业务员') IS NULL ALTER TABLE qc_recv ADD [业务员] nvarchar(50) NULL, [供应商代码] nvarchar(100) NULL, [部门] nvarchar(100) NULL, [部门名称] nvarchar(100) NULL, [数量] decimal(18,4) NULL;
-IF OBJECT_ID('qc_recv_detail') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_recv_detail) DROP TABLE qc_recv_detail;
+EXEC(N'IF OBJECT_ID(''qc_recv_detail'') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_recv_detail) DROP TABLE qc_recv_detail;'); -- 动态SQL:表不存在时同批编译不过(2026-09-23 合并重放修复)
 IF OBJECT_ID('qc_recv_detail') IS NULL CREATE TABLE qc_recv_detail (
   id int IDENTITY(1,1) PRIMARY KEY,
   [单据编号] nvarchar(60) NOT NULL,
@@ -85,7 +85,7 @@ IF OBJECT_ID('qc_recv_detail') IS NOT NULL AND COL_LENGTH('dbo.qc_recv_detail', 
 IF OBJECT_ID('qc_recv_detail') IS NOT NULL AND COL_LENGTH('dbo.qc_recv_detail', N'部门名称') IS NULL ALTER TABLE qc_recv_detail ADD [部门名称] nvarchar(100) NULL;
 GO
 -- ══════════ 2. 暂收退料单 QC_RETURN(qc_return/qc_return_detail,前缀 TH,与入库一致) ══════════
-IF OBJECT_ID('qc_return') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_return) DROP TABLE qc_return;
+EXEC(N'IF OBJECT_ID(''qc_return'') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_return) DROP TABLE qc_return;'); -- 动态SQL:表不存在时同批编译不过(2026-09-23 合并重放修复)
 IF OBJECT_ID('qc_return') IS NULL CREATE TABLE qc_return (
   id int IDENTITY(1,1) PRIMARY KEY,
   [单据编号] nvarchar(60) NOT NULL,
@@ -105,7 +105,7 @@ IF OBJECT_ID('qc_return') IS NULL CREATE TABLE qc_return (
   asp_user1 nvarchar(50) NULL, asp_time1 datetime2 NULL, asp_user2 nvarchar(50) NULL, asp_time2 datetime2 NULL, asp_cancel char(1) NULL DEFAULT 'N'
 );
 IF OBJECT_ID('qc_return') IS NOT NULL AND COL_LENGTH('dbo.qc_return', N'业务员') IS NULL ALTER TABLE qc_return ADD [业务员] nvarchar(50) NULL, [供应商代码] nvarchar(100) NULL, [部门] nvarchar(100) NULL, [部门名称] nvarchar(100) NULL, [数量] decimal(18,4) NULL;
-IF OBJECT_ID('qc_return_detail') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_return_detail) DROP TABLE qc_return_detail;
+EXEC(N'IF OBJECT_ID(''qc_return_detail'') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_return_detail) DROP TABLE qc_return_detail;'); -- 动态SQL:表不存在时同批编译不过(2026-09-23 合并重放修复)
 IF OBJECT_ID('qc_return_detail') IS NULL CREATE TABLE qc_return_detail (
   id int IDENTITY(1,1) PRIMARY KEY,
   [单据编号] nvarchar(60) NOT NULL,
@@ -157,7 +157,7 @@ IF OBJECT_ID('qc_return_detail') IS NOT NULL AND COL_LENGTH('dbo.qc_return_detai
 IF OBJECT_ID('qc_return_detail') IS NOT NULL AND COL_LENGTH('dbo.qc_return_detail', N'部门名称') IS NULL ALTER TABLE qc_return_detail ADD [部门名称] nvarchar(100) NULL;
 GO
 -- ══════════ 3. 检验单 QC_INSP(qc_insp/qc_insp_detail,前缀 IJ,头部 6 附件) ══════════
-IF OBJECT_ID('qc_insp') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_insp) DROP TABLE qc_insp;
+EXEC(N'IF OBJECT_ID(''qc_insp'') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_insp) DROP TABLE qc_insp;'); -- 动态SQL:表不存在时同批编译不过(2026-09-23 合并重放修复)
 IF OBJECT_ID('qc_insp') IS NULL CREATE TABLE qc_insp (
   id int IDENTITY(1,1) PRIMARY KEY,
   [单据编号] nvarchar(60) NOT NULL,
@@ -181,7 +181,7 @@ IF OBJECT_ID('qc_insp') IS NULL CREATE TABLE qc_insp (
 IF OBJECT_ID('qc_insp') IS NOT NULL AND COL_LENGTH('dbo.qc_insp', N'附件1') IS NULL ALTER TABLE qc_insp ADD [业务员] nvarchar(50) NULL, [供应商代码] nvarchar(100) NULL, [部门] nvarchar(100) NULL, [部门名称] nvarchar(100) NULL, [数量] decimal(18,4) NULL, [附件1] nvarchar(500) NULL, [附件2] nvarchar(500) NULL, [附件3] nvarchar(500) NULL, [附件4] nvarchar(500) NULL, [附件5] nvarchar(500) NULL, [附件6] nvarchar(500) NULL;
 -- 检验员/批号/送检数量:legacy 真实表本无此三列,但 v_lot_trace(批号追溯视图)在用,重建保留(2026-09-17 收编入链时补)
 IF OBJECT_ID('qc_insp') IS NOT NULL AND COL_LENGTH('dbo.qc_insp', N'检验员') IS NULL ALTER TABLE qc_insp ADD [检验员] nvarchar(50) NULL;
-IF OBJECT_ID('qc_insp_detail') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_insp_detail) DROP TABLE qc_insp_detail;
+EXEC(N'IF OBJECT_ID(''qc_insp_detail'') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM qc_insp_detail) DROP TABLE qc_insp_detail;'); -- 动态SQL:表不存在时同批编译不过(2026-09-23 合并重放修复)
 IF OBJECT_ID('qc_insp_detail') IS NULL CREATE TABLE qc_insp_detail (
   id int IDENTITY(1,1) PRIMARY KEY,
   [单据编号] nvarchar(60) NOT NULL,

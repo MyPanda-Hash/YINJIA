@@ -38,20 +38,21 @@ ELSE
 GO
 
 -- ══════════════ 3. 清空列则 DROP(有数据则保留并告警) ══════════════
+-- (2026-09-23 合并重放修复:列不存在的库上,IF 守卫内的裸列引用同批编译不过 → 改动态 SQL。)
 IF COL_LENGTH('dbo.qc_insp_detail', N'盘号') IS NOT NULL
 BEGIN
-    IF EXISTS (SELECT 1 FROM qc_insp_detail WHERE 盘号 IS NOT NULL AND 盘号 <> N'')
-    BEGIN
-        DECLARE @n int = (SELECT COUNT(*) FROM qc_insp_detail WHERE 盘号 IS NOT NULL AND 盘号 <> N'');
-        PRINT N'[qc-pannum] 警告:盘号列有 ' + CAST(@n AS nvarchar(10)) + N' 行数据,保留列不删(请人工确认后处置)';
-    END
+    DECLARE @hasData int = 0
+    EXEC sp_executesql N'SELECT @hasData = COUNT(*) FROM qc_insp_detail WHERE 盘号 IS NOT NULL AND 盘号 <> N''''',
+         N'@hasData int OUTPUT', @hasData OUTPUT
+    IF @hasData > 0
+        PRINT N'[qc-pannum] 警告:盘号列有 ' + CAST(@hasData AS nvarchar(10)) + N' 行数据,保留列不删(请人工确认后处置)'
     ELSE
     BEGIN
         -- 先删列的中文注明扩展属性,再删列(否则残留孤儿属性)
         IF EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id=OBJECT_ID('dbo.qc_insp_detail')
                    AND minor_id=COLUMNPROPERTY(OBJECT_ID('dbo.qc_insp_detail'),'盘号','ColumnId') AND name='MS_Description')
             EXEC sp_dropextendedproperty N'MS_Description', N'SCHEMA',N'dbo',N'TABLE',N'qc_insp_detail',N'COLUMN',N'盘号';
-        ALTER TABLE qc_insp_detail DROP COLUMN 盘号;
+        EXEC(N'ALTER TABLE qc_insp_detail DROP COLUMN 盘号');
         PRINT N'[qc-pannum] 空列已 DROP(qc_insp_detail.盘号)';
     END
 END

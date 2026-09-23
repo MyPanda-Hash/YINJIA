@@ -115,6 +115,46 @@ migrate-wo-schedule-fix.sql
 migrate-wo-report.sql
 migrate-lot-trace.sql
 migrate-qc-3docs.sql
+# —— 2026-09-17 补登(脚本产自 2026-09-14,一直未入链):来料三单按生产 legacy 真实字段重建——
+# 上行 migrate-qc-3docs 建的是简化草稿,本脚本按 legacy 真实表结构重建 qc_recv/qc_return/qc_insp 六表并
+# 重注册三面板字段(清旧插新);检验员/批号/送检数量 三列为 v_lot_trace 批号追溯保留的加列(收编时补守卫)。
+# 注意:其 DELETE yj_field 会清掉后续脚本加的字段——链上它之后的 migrate-qc-return-attach / migrate-qc-insp-sync-cols
+# 已执行过的库需人工 `DbSync run` 强制重跑这两份(哈希未变不会自动重跑);空表才重建,不丢数据。
+migrate-qc-3docs-rebuild.sql
+migrate-qc-op.sql
+migrate-phase23-production.sql
+migrate-phase23-forms.sql
+migrate-phase23-forms-batch2.sql
+i18n-rd-panels.sql
+migrate-rd-files.sql
+migrate-rd-panels.sql
+migrate-rd-lab.sql
+migrate-usage-log.sql
+migrate-dispatch.sql
+migrate-dispatch-fix.sql
+# ↑ fix-views-def.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-def.sql
+# ↑ fix-views-definitive.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-definitive.sql
+# ↑ fix-views-final.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-final.sql
+# ↑ fix-views-v2.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v2.sql
+# ↑ fix-views-v3.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v3.sql
+# ↑ fix-views-v4.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v4.sql
+# ↑ fix-views-v5-gen.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
+#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
+#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v5-gen.sql
+migrate-audit-cols-fix.sql
+setup-stock-status.sql
 
 # —— 2026-09-10 登记:生产相关 11 面板(表格数字化)新增脚本,登记即完成第 2 步 ——
 # 顺序:先建表+面板注册,再逐份插 yj_field 字段与译名(后者依赖前者已注册的 panel_code)。
@@ -366,28 +406,20 @@ migrate-stock-summary-query.sql
 migrate-stock-ledger-query.sql
 
 # —— 2026-09-17 报表弹窗字段终版——删 开始/结束日期 查询字段(改为弹窗内置单个「单据日期」区间控件);台账 仓库/存货 required=1(单一仓库的一种存货),汇总 required=0;库存状况表(STOCK_BALANCE)零改动 ——
-
 # —— 2026-09-17 bd_so_order补建金蝶同步扩展4列(折前价税合计/业务模式/交货方式id/发票类型,9452c01漏建致SO同步10/10失败)+yj_field注册+en译名+中文注明;幂等可重跑 ——
 migrate-so-extra-cols.sql
-
 # —— 2026-09-17 GFDA补注册9个原始档案字段(dm/mc/addr/tel/ywman/sui_no/bank/bank_no/bz;cleanup事故删后链上只自愈金蝶口径致33≠链重放42;税号空数据按治理口径默认隐藏;9标签译名全局共享已有)——
 migrate-gfda-restore-fields.sql
-
 # —— 2026-09-17 采购→暂收→检验→入库链路修复——PURCHASE_IN仓库名称必填;SL_RECV/QC_INSP明细补计量单位列+字段(随物料参照同名带回);PU_ORDER/PURCHASE_IN供应商参照改存名称(mc,与列内数据/金蝶同步口径一致);幂等可重跑 ——
 migrate-sl-chain-fixes.sql
-
 # —— 2026-09-17 暂收单/检验单供应商参照源改指供应商档案——SL_RECV头供应商(名称mc)/供应商代码(编码dm)+明细供应商、QC_INSP头两字段,由往来单位PARTNER改为GFDA;编码名称双向联动由REF_SYNONYMS新词条支持;幂等可重跑 ——
 migrate-sl-supplier-ref.sql
-
 # —— 2026-09-17 供应商参照源改指供应商档案第二批——QC_RETURN头供应商/供应商代码+明细供应商、PURCHASE_IN头供应商编码,由PARTNER改GFDA;至此四单据(暂收/检验/退料/采购入库)供应商系列10处参照全统一;幂等可重跑 ——
 migrate-supplier-ref-v2.sql
-
 # —— 2026-09-17 暂收退料单明细补计量单位列+字段——采购链单位流转补全(采购订单单位→暂收/检验/退料/入库计量单位),链路映射走既有同名词典+同名自动映射零代码;幂等可重跑 ——
 migrate-qc-return-uom.sql
-
 # —— 2026-09-17 采购入库单仓库名称启用仓库参照(WH)点选——data_type文本改参照(ref配置本就有,序列化只认参照型故此前不弹);同名映射连带带出隐藏仓库编码列;幂等可重跑 ——
 migrate-purchase-in-wh-ref.sql
-
 # —— 2026-09-17 计量单位存量回填两批——v1按商品档案(bs_inv)填空;v2沿form_flow_link占用链从采购订单行逐级下带+孤儿行同物料借值+错位行以检验行为准纠正+TEST-1测试残留清理;幂等只填空/只纠链路行 ——
 migrate-uom-backfill.sql
 migrate-uom-backfill-v2.sql
@@ -420,47 +452,6 @@ migrate-doc-required-v2.sql
 migrate-report-template.sql
 migrate-report-template-comments.sql
 migrate-po-inbound-fields.sql
-
-# —— 2026-09-17 补登(脚本产自 2026-09-14,一直未入链):来料三单按生产 legacy 真实字段重建——
-# 上行 migrate-qc-3docs 建的是简化草稿,本脚本按 legacy 真实表结构重建 qc_recv/qc_return/qc_insp 六表并
-# 重注册三面板字段(清旧插新);检验员/批号/送检数量 三列为 v_lot_trace 批号追溯保留的加列(收编时补守卫)。
-# 注意:其 DELETE yj_field 会清掉后续脚本加的字段——链上它之后的 migrate-qc-return-attach / migrate-qc-insp-sync-cols
-# 已执行过的库需人工 `DbSync run` 强制重跑这两份(哈希未变不会自动重跑);空表才重建,不丢数据。
-migrate-qc-3docs-rebuild.sql
-migrate-qc-op.sql
-migrate-phase23-production.sql
-migrate-phase23-forms.sql
-migrate-phase23-forms-batch2.sql
-i18n-rd-panels.sql
-migrate-rd-files.sql
-migrate-rd-panels.sql
-migrate-rd-lab.sql
-migrate-usage-log.sql
-migrate-dispatch.sql
-migrate-dispatch-fix.sql
-# ↑ fix-views-def.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
-#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
-#   中性化原因与原文见 git 历史及 tools/archive/fix-views-def.sql
-# ↑ fix-views-definitive.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
-#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
-#   中性化原因与原文见 git 历史及 tools/archive/fix-views-definitive.sql
-# ↑ fix-views-final.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
-#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
-#   中性化原因与原文见 git 历史及 tools/archive/fix-views-final.sql
-# ↑ fix-views-v2.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
-#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
-#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v2.sql
-# ↑ fix-views-v3.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
-#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
-#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v3.sql
-# ↑ fix-views-v4.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
-#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
-#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v4.sql
-# ↑ fix-views-v5-gen.sql 已于 2026-09-21 移出清单并归档 tools/archive/ ——
-#   该脚本 2026-09-15 事故收口时已中性化(内容仅 PRINT),留在链里只会让“清单里有什么”与“真跑了什么”对不上;
-#   中性化原因与原文见 git 历史及 tools/archive/fix-views-v5-gen.sql
-migrate-audit-cols-fix.sql
-setup-stock-status.sql
 
 # —— 2026-09-18 研发管理 × 产品开发最新设计(Phase 1 字段能力层)——
 # 对照源:C:\Users\x1787\OneDrive\Desktop\产品开发\产品开发(25 份设计文件);差异分析见

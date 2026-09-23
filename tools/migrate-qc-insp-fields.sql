@@ -114,7 +114,7 @@ INSERT INTO #qc_tr (label, locale, txt) VALUES
  (N'执行标准','de',N'Ausführungsstandard'), (N'执行标准','fr',N'Norme d''exécution'), (N'执行标准','es',N'Estándar de ejecución'),
  (N'执行标准','ru',N'Стандарт исполнения'), (N'执行标准','th',N'มาตรฐานการดำเนินการ'), (N'执行标准','vi',N'Tiêu chuẩn thực hiện'),
  (N'执行标准','zh-TW',N'執行標準'),
- (N'检验类型','ja',N'検査タイプ'),          (N'检验类型','ko',N'검사 유형'),        (N'检验类型','de',N'Prüfart'),
+ (N'检验类型','en',N'Inspection Type'),      (N'检验类型','ja',N'検査タイプ'),        (N'检验类型','ko',N'검사 유형'),        (N'检验类型','de',N'Prüfart'),
  (N'检验类型','fr',N'Type d''inspection'),  (N'检验类型','es',N'Tipo de inspección'), (N'检验类型','ru',N'Тип проверки'),
  (N'检验类型','th',N'ประเภทการตรวจสอบ'),    (N'检验类型','vi',N'Loại kiểm tra'),    (N'检验类型','zh-TW',N'檢驗類型'),
  (N'报废数量','en',N'Scrap Quantity'),      (N'报废数量','ja',N'廃棄数量'),        (N'报废数量','ko',N'폐기 수량'),
@@ -137,7 +137,7 @@ INSERT INTO #qc_tr (label, locale, txt) VALUES
  (N'成品编号','de',N'Fertigproduktnummer'), (N'成品编号','fr',N'N° de produit fini'), (N'成品编号','es',N'N.º de producto terminado'),
  (N'成品编号','ru',N'Номер готовой продукции'), (N'成品编号','th',N'หมายเลขผลิตภัณฑ์สำเร็จรูป'), (N'成品编号','vi',N'Số thành phẩm'),
  (N'成品编号','zh-TW',N'成品編號'),
- (N'生产日期','ja',N'製造日'),              (N'生产日期','ko',N'생산일'),          (N'生产日期','de',N'Produktionsdatum'),
+ (N'生产日期','en',N'Production Date'),      (N'生产日期','ja',N'製造日'),          (N'生产日期','ko',N'생산일'),          (N'生产日期','de',N'Produktionsdatum'),
  (N'生产日期','fr',N'Date de production'),  (N'生产日期','es',N'Fecha de producción'), (N'生产日期','ru',N'Дата производства'),
  (N'生产日期','th',N'วันที่ผลิต'),           (N'生产日期','vi',N'Ngày sản xuất'),    (N'生产日期','zh-TW',N'生產日期');
 INSERT INTO yj_translation (scope, ref_key, locale, text, source)

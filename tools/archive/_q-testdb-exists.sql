@@ -1,0 +1,3 @@
+SET NOCOUNT ON;
+SELECT name FROM sys.databases WHERE name IN ('HSDZ_MES', 'HSDZ_MES_TEST');
+GO

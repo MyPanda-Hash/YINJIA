@@ -76,6 +76,16 @@ GO
 IF OBJECT_ID('dbo.yj_doc_batch') IS NOT NULL AND EXISTS (SELECT 1 FROM sys.indexes WHERE name='UX_yj_doc_batch_seq' AND object_id=OBJECT_ID('dbo.yj_doc_batch'))
     DROP INDEX UX_yj_doc_batch_seq ON yj_doc_batch;
 GO
+-- 2026-09-23 合并重放修复:历史上无唯一索引期间,库内可能已产生同 (source_panel_code, source_form_no,
+-- batch_seq) 的多条 ACTIVE 行(实测本地库 PU_ORDER|YJ-20260909-01|1 重复)——先留最新一条 ACTIVE,
+-- 其余置 RELEASED(保留 target 链路留痕,符合"RELEASED=序号可复用"语义),否则筛选唯一索引建不起来。
+IF OBJECT_ID('dbo.yj_doc_batch') IS NOT NULL
+UPDATE b SET b.status = 'RELEASED'
+  FROM yj_doc_batch b
+  JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY source_panel_code, source_form_no, batch_seq
+                                        ORDER BY id DESC) AS rn
+          FROM yj_doc_batch WHERE status = 'ACTIVE') t ON t.id = b.id AND t.rn > 1;
+GO
 IF OBJECT_ID('dbo.yj_doc_batch') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name='UX_yj_doc_batch_active' AND object_id=OBJECT_ID('dbo.yj_doc_batch'))
     CREATE UNIQUE INDEX UX_yj_doc_batch_active ON yj_doc_batch (source_panel_code, source_form_no, batch_seq) WHERE status = 'ACTIVE';
 GO

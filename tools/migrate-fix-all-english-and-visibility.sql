@@ -29,7 +29,10 @@ DECLARE rc CURSOR LOCAL FAST_FORWARD FOR SELECT old, new, tbl FROM @ren;
 OPEN rc;
 FETCH NEXT FROM rc INTO @o, @n, @t;
 WHILE @@FETCH_STATUS = 0 BEGIN
-  DECLARE @sql nvarchar(max) = N'IF COL_LENGTH(''dbo.' + @t + ''', ''' + @o + ''') IS NOT NULL EXEC sp_rename ''dbo.' + @t + '.' + @o + ''', N''' + @n + ''', ''COLUMN'';';
+  -- 2026-09-23 合并守卫:目标中文列已存在(本地库当年直接建中文列,未走改名路径)时跳过——
+  -- sp_rename 撞已存在目标列会报「列名在 COLUMN 子句中重复」;英文原列留作无害遗留。
+  -- 守卫对改名过的库(源列已不存在)同样幂等。
+  DECLARE @sql nvarchar(max) = N'IF COL_LENGTH(''dbo.' + @t + ''', ''' + @o + ''') IS NOT NULL AND COL_LENGTH(''dbo.' + @t + ''', ''' + @n + ''') IS NULL EXEC sp_rename ''dbo.' + @t + '.' + @o + ''', N''' + @n + ''', ''COLUMN'';';
   EXEC(@sql);
   UPDATE yj_field SET col_name = @n, label = @n WHERE panel_code IN ('PURCHASE_IN','SALE_OUT') AND col_name = @o;
   -- 幂等守卫:目标词条已存在(先前链上已建同中文键)时跳过改名,防 UPDATE 撞 uq_translation

@@ -64,6 +64,16 @@ IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_yj_doc_batch_active' AND o
 PRINT N'旧筛选唯一索引 UX_yj_doc_batch_active 已删(旧口径:序号可回收)';
 GO
 
+/* 2026-09-23 合并重放修复:历史上无唯一索引期间可能已产生同 (source_form_no, batch_no) 的多条 ACTIVE 行
+   ——下面的"数据干净才建索引"守卫会因此静默跳过建索引,而自检又要求索引必须存在(死锁)。
+   先留最新一条 ACTIVE、其余置 RELEASED(留痕、序号可复用),再建索引。 */
+UPDATE b SET b.status = 'RELEASED'
+  FROM dbo.yj_doc_batch b
+  JOIN (SELECT id, ROW_NUMBER() OVER (PARTITION BY source_form_no, batch_no ORDER BY id DESC) AS rn
+          FROM dbo.yj_doc_batch WHERE status = 'ACTIVE' AND batch_no IS NOT NULL) t
+    ON t.id = b.id AND t.rn > 1;
+GO
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'UX_yj_doc_batch_no_active' AND object_id = OBJECT_ID('dbo.yj_doc_batch'))
    AND NOT EXISTS (SELECT 1 FROM yj_doc_batch WHERE status = 'ACTIVE' AND batch_no IS NOT NULL
                    GROUP BY source_form_no, batch_no HAVING COUNT(*) > 1)

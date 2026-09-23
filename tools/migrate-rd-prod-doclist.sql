@@ -40,13 +40,7 @@ GO
 -- ═══ 1c. 承载单据(幂等:缺则补一张)═══
 --  与 RD_PROGRESS 的"唯一一张进度单"同一模式。矩阵数据不落这张单,它只是**视图宿主**:
 --  Sheet 组件由这张单挂载,内容来自 /px/prodDocList 现算。
-IF NOT EXISTS (SELECT 1 FROM rd_prod_doclist_head WHERE ISNULL(asp_cancel,'N') <> 'Y')
-INSERT INTO rd_prod_doclist_head (单据编号, 单据日期, 密级, 文件使用范围, 文件管理人, 备注)
-VALUES (N'PDL-0001', CONVERT(nvarchar(30), CONVERT(date, GETDATE()), 23), N'保密', N'工程技术中心', N'陈秀丽', N'产品文件列表视图宿主单据');
-
-IF NOT EXISTS (SELECT 1 FROM yj_doc_status WHERE panel_code = 'RD_PROD_DOCLIST' AND doc_no = N'PDL-0001')
-INSERT INTO yj_doc_status (panel_code, doc_no, saved, archived) VALUES ('RD_PROD_DOCLIST', N'PDL-0001', 'Y', 'N');
-GO
+--  (2026-09-23 合并重放修复:种子 INSERT 原在建表之前,表不存在的库上同批编译不过 —— 挪到建表后。)
 
 IF OBJECT_ID('rd_prod_doclist_head') IS NULL
 CREATE TABLE rd_prod_doclist_head (
@@ -92,6 +86,15 @@ IF COL_LENGTH('rd_prod_doclist_detail','asp_user1')  IS NULL ALTER TABLE rd_prod
 IF COL_LENGTH('rd_prod_doclist_detail','asp_time1')  IS NULL ALTER TABLE rd_prod_doclist_detail ADD asp_time1 datetime NULL;
 IF COL_LENGTH('rd_prod_doclist_detail','asp_user2')  IS NULL ALTER TABLE rd_prod_doclist_detail ADD asp_user2 nvarchar(50) NULL;
 IF COL_LENGTH('rd_prod_doclist_detail','asp_time2')  IS NULL ALTER TABLE rd_prod_doclist_detail ADD asp_time2 datetime NULL;
+GO
+
+-- ═══ 1c(挪位). 承载单据种子(建表后执行;幂等)═══
+IF NOT EXISTS (SELECT 1 FROM rd_prod_doclist_head WHERE ISNULL(asp_cancel,'N') <> 'Y')
+INSERT INTO rd_prod_doclist_head (单据编号, 单据日期, 密级, 文件使用范围, 文件管理人, 备注)
+VALUES (N'PDL-0001', CONVERT(nvarchar(30), CONVERT(date, GETDATE()), 23), N'保密', N'工程技术中心', N'陈秀丽', N'产品文件列表视图宿主单据');
+
+IF NOT EXISTS (SELECT 1 FROM yj_doc_status WHERE panel_code = 'RD_PROD_DOCLIST' AND doc_no = N'PDL-0001')
+INSERT INTO yj_doc_status (panel_code, doc_no, saved, archived) VALUES ('RD_PROD_DOCLIST', N'PDL-0001', 'Y', 'N');
 GO
 
 -- ═══ 4. 字段登记 ═══

@@ -1,0 +1,1 @@
+SET NOCOUNT ON; UPDATE yj_schema_log SET content_hash = 'b7a3330be99d43e1de00c1c5ad77be36a8e68e42e57f6256d43d6e6738c9ae26' WHERE script_name = N'migrate-qc-3docs-rebuild.sql'; SELECT script_name, LEFT(content_hash,12) FROM yj_schema_log WHERE script_name = N'migrate-qc-3docs-rebuild.sql';
