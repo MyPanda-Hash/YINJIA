@@ -221,14 +221,6 @@ public class ButtonService {
                 ? new ArrayList<>((List<Map<String, Object>>) tabRows)
                 : detail.get("items") instanceof List<?> l
                 ? new ArrayList<>((List<Map<String, Object>>) l) : new ArrayList<>();
-        // 档案模式「差异提交」(2026-09-22):前端只回传变更行(新增/修改) + 显式删除集,
-        // 后端不再把"未回传的行"当作已删除 —— 这是档案列表可以分页取数(不再整表 4 MB)的前提。
-        // 未带 diffSave 的旧调用保持「整表 upsert,缺席行=已删除」原语义。
-        boolean diffSave = Boolean.TRUE.equals(body.remove("diffSave"));
-        List<Object> deletedIds = new ArrayList<>();
-        if (detail.remove("deletedIds") instanceof List<?> dl) {
-            for (Object x : dl) if (x != null && !String.valueOf(x).isBlank()) deletedIds.add(x);
-        }
         if (items.isEmpty() && detail.values().stream().findFirst().map(v -> v instanceof List).orElse(false)) {
             items = new ArrayList<>((List<Map<String, Object>>) detail.values().iterator().next());
         }
@@ -257,7 +249,7 @@ public class ButtonService {
         if (def.isDoc()) {
             return saveDoc(def, body, items, no, user, markSaved);
         }
-        return saveArchive(def, items, user, diffSave, deletedIds);
+        return saveArchive(def, items, user);
     }
 
     /** 单据保存:头字段并入每行(单表式)或分别写头表/行表(头行式);无编号=新建 */
@@ -662,25 +654,15 @@ public class ButtonService {
         }
     }
 
-    /** 档案保存:整份明细 upsert(插入回填自增 id),缺席行软删。
-     *  diffSave=true 时改为「差异提交」:items 只含变更行,删除集由 deletedIds 显式给出,
-     *  **未回传的行一律保持原样** —— 列表因此可以分页取数(2026-09-22)。 */
-    private Map<String, Object> saveArchive(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String user,
-                                            boolean diffSave, List<Object> deletedIds) {
-        // 数据量护栏:整表提交仍按「库里存活行数」判定(2026-09-16:全量 upsert 时库里超上限,
-        // 前端看到的就是截断数据,放行会把未加载的行全部误删);差异提交只按「本次提交行数」判定。
-        if (diffSave) {
-            if (items.size() > QueryService.ARCH_LOAD_CAP) {
-                throw new IllegalStateException("本次提交行数 " + items.size() + " 已超出单次上限 "
-                        + QueryService.ARCH_LOAD_CAP + ",请分批保存");
-            }
-        } else {
-            Integer live = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM " + def.lineTable() + " WHERE ISNULL(asp_cancel,'N')<>'Y'", Integer.class);
-            if (live != null && live > QueryService.ARCH_LOAD_CAP) {
-                throw new IllegalStateException("该档案存活行数 " + live + " 已超出全量加载上限 " + QueryService.ARCH_LOAD_CAP
-                        + ",保存已阻止:未加载的行会被当作删除处理,请联系开发提高上限或先清理/归档数据");
-            }
+    /** 档案保存:整份明细 upsert(插入回填自增 id),缺席行软删 */
+    private Map<String, Object> saveArchive(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String user) {
+        // 数据量护栏(2026-09-16):档案保存=全量 upsert(缺席行=已删除);库里存活行数一旦超出
+        // 全量加载上限,前端看到的就是截断数据,此时放行保存会把未加载的行全部误删——直接拒绝
+        Integer live = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + def.lineTable() + " WHERE ISNULL(asp_cancel,'N')<>'Y'", Integer.class);
+        if (live != null && live > QueryService.ARCH_LOAD_CAP) {
+            throw new IllegalStateException("该档案存活行数 " + live + " 已超出全量加载上限 " + QueryService.ARCH_LOAD_CAP
+                    + ",保存已阻止:未加载的行会被当作删除处理,请联系开发提高上限或先清理/归档数据");
         }
         // 存档留痕(2026-09-22):先快照存活行,保存后比对出「修改记录」(用户要求与立项申请同义的留痕)
         Map<Object, Map<String, String>> before = archiveRowSnapshot(def);
@@ -696,11 +678,8 @@ public class ButtonService {
                 if (newId != null) liveIds.add(newId);
             }
         }
-        if (diffSave) {
-            // 差异提交:只软删「显式删除集」里的行,其余未回传的行原样保留
-            softDeleteArchiveRows(def, deletedIds, user);
-        } else if (!liveIds.isEmpty()) {
-            // 档案缺席行 = 已删除 -> 全表软删不在 keepIds 的存活行(全部缺席时不清理,防止误清整档)
+        // 档案缺席行 = 已删除 -> 全表软删不在 keepIds 的存活行(全部缺席时不清理,防止误清整档)
+        if (!liveIds.isEmpty()) {
             StringBuilder sql = new StringBuilder("UPDATE " + def.lineTable()
                     + " SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE() WHERE ISNULL(asp_cancel,'N')<>'Y'");
             List<Object> args = new ArrayList<>(List.of(user));
@@ -709,26 +688,8 @@ public class ButtonService {
             args.addAll(liveIds);
             jdbc.update(sql.toString(), args.toArray());
         }
-        // 修改记录:removed = 保存前存活、保存后不存活的行。差异提交下未回传的行仍存活,
-        // 必须并入 keep 集,否则会把整表未改动行误判成「删除」。
-        Set<Object> keepForLog = new HashSet<>(liveIds);
-        if (diffSave) {
-            Set<String> deleted = new HashSet<>();
-            for (Object id : deletedIds) deleted.add(String.valueOf(id));
-            for (Object id : before.keySet()) if (!deleted.contains(String.valueOf(id))) keepForLog.add(id);
-        }
-        recordArchiveChange(def, before, items, keepForLog, user);
+        recordArchiveChange(def, before, items, liveIds, user);
         return result(def.name(), "启用");
-    }
-
-    /** 按主键软删指定行(差异提交的删除集);空集不动,幂等(已软删的不会重复写时间戳) */
-    private void softDeleteArchiveRows(PanelRegistry.PanelDef def, List<Object> ids, String user) {
-        if (ids == null || ids.isEmpty()) return;
-        String marks = String.join(",", ids.stream().map(x -> "?").toList());
-        jdbc.update("UPDATE " + def.lineTable()
-                        + " SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE()"
-                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND " + def.pkCol() + " IN (" + marks + ")",
-                java.util.stream.Stream.concat(java.util.stream.Stream.of(user), ids.stream()).toArray());
     }
 
     /** 标签键 -> 列名键(仅取字段定义内的列,忽略 id/__no 等保留键)。
