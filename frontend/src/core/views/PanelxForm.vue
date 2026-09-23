@@ -27,7 +27,7 @@
       <!-- 单据标题 -->
       <div class="head">
         <div class="title">
-          <span class="no">{{ isEdit ? (form['单据编号'] || form['锭号'] || form['编号'] || '') : tt('（新增）') }}</span>
+          <span class="no">{{ isEdit ? (form['单据编号'] || form['编号'] || '') : tt('（新增）') }}</span>
           <el-tag v-if="form['单据状态']" size="small" :type="statusTag(form['单据状态'])">{{ tt(form['单据状态']) }}</el-tag>
         </div>
       </div>
@@ -573,7 +573,7 @@ async function openSelectDialog(cfg = selectConfigFor()) {
           d[key].forEach((it, index) => flat.push({
             ...r,
             ...it,
-            _sourceFormNo: r['编号'] || r['单据编号'] || r['锭号'] || '',
+            _sourceFormNo: r['编号'] || r['单据编号'] || '',
             _sourceRowNo: index + 1,
           }))
         }
@@ -629,7 +629,7 @@ function confirmSelect() {
     for (const m of cfg.detailMap || []) {
       out[m.to] = r[m.from] ?? ''
     }
-    const sourceNo = r._sourceFormNo || r['编号'] || r['单据编号'] || r['锭号'] || sourceNos[0] || ''
+    const sourceNo = r._sourceFormNo || r['编号'] || r['单据编号'] || sourceNos[0] || ''
     const sourceQtyField = cfg.sourceQuantityField || '数量'
     const targetQtyField = cfg.targetQuantityField || ''
     out['来源面板'] = cfg.source || ''
@@ -687,7 +687,7 @@ function applyAttachSlots(map) {
 }
 
 function fieldLocked(r) {
-  // 锭号：自动编码；仅勾选「是否手工修改单据编码」时草稿可改
+  // 单据编号：自动编码；仅勾选「是否手工修改单据编码」时草稿可改
   if (r.autoCode) return !(status.value === '草稿' && form['是否手工修改单据编码'])
   // 存货类别：创建后固定，不允许修改
   if (r.code === '类别' && isEdit.value) return true
@@ -1214,7 +1214,7 @@ async function load() {
     autoExpandBom()
     // 页签标题 = 面板名-单据号（新单显示 面板名-新增），便于多单据区分（弹窗嵌入模式跳过）
     if (!props.embedded) {
-      const no = isEdit.value ? (form['单据编号'] || form['锭号'] || form['编号'] || '') : '新增'
+      const no = isEdit.value ? (form['单据编号'] || form['编号'] || '') : '新增'
       // 复用顶部 tabsStore
       const cur = tabsStore.tabs.find((x) => x.path === route.path)
       if (cur) cur.title = (payload.panelName || '表单') + '-' + no
@@ -1295,7 +1295,7 @@ async function onButton(action) {
   }
   if (action === '删除') {
     try {
-      await ElMessageBox.confirm(`确认删除单据 ${form['单据编号'] || form['锭号'] || form['编号']}？`, '提示', { type: 'warning' })
+      await ElMessageBox.confirm(`确认删除单据 ${form['单据编号'] || form['编号']}？`, '提示', { type: 'warning' })
     } catch (e) {
       return
     }
@@ -1305,7 +1305,7 @@ async function onButton(action) {
   if (action === '审核') {
     // 已审核过的单据不允许再次审核，也不允许补填审批意见
     if (status.value !== '草稿') return ElMessage.warning('仅草稿状态可审核，已审核单据不允许再次审核')
-    const no = form['单据编号'] || form['锭号'] || form['编号'] || ''
+    const no = form['单据编号'] || form['编号'] || ''
     try {
       const { value } = await ElMessageBox.prompt(
         '单据：' + no + '（当前状态：' + status.value + '）',
@@ -1329,7 +1329,7 @@ async function onButton(action) {
   if (action === '提交审批' || action === '审批通过') {
     const need = action === '提交审批' ? '草稿' : '审批中'
     if (status.value !== need) return ElMessage.warning(action === '提交审批' ? '仅草稿状态可提交审批' : '仅审批中状态可审批通过')
-    const no = form['单据编号'] || form['锭号'] || form['编号'] || ''
+    const no = form['单据编号'] || form['编号'] || ''
     try {
       const { value } = await ElMessageBox.prompt(
         '单据：' + no + '（当前状态：' + status.value + '）',
@@ -1342,7 +1342,7 @@ async function onButton(action) {
     }
   } else if (action === '审批驳回') {
     if (status.value !== '审批中') return ElMessage.warning('仅审批中状态可审批驳回')
-    const no = form['单据编号'] || form['锭号'] || form['编号'] || ''
+    const no = form['单据编号'] || form['编号'] || ''
     try {
       const { value } = await ElMessageBox.prompt(
         '单据：' + no + '（当前状态：审批中）\n驳回必须填写审批意见',
@@ -1354,7 +1354,7 @@ async function onButton(action) {
       return
     }
   } else if (action === '审批情况') {
-    approvalNo.value = form['编号'] || form['单据编号'] || form['锭号'] || ''
+    approvalNo.value = form['编号'] || form['单据编号'] || ''
     approvalVisible.value = true
     return
   }

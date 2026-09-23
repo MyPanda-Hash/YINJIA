@@ -188,12 +188,12 @@ function sourceItems(row) {
 }
 function cellText(col, row) {
   if (row[col] !== undefined && row[col] !== null && row[col] !== '') return row[col]
-  if (col === '单据编号') return row['锭号'] || row['编号'] || ''
+  if (col === '单据编号') return row['编号'] || ''
   return sourceItems(row)[0]?.[col] ?? ''
 }
 function selVal(row, field) {
   if (row[field] !== undefined && row[field] !== null && row[field] !== '') return row[field]
-  if (field === '单据编号') return row['锭号'] || row['编号'] || ''
+  if (field === '单据编号') return row['编号'] || ''
   return row[field] ?? ''
 }
 function itemsText(row) {
