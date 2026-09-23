@@ -1434,3 +1434,17 @@ migrate-rd-progress-drop-orphan-cols.sql
 #   正式库自检 ①②③④ = 4/4/14/9(hidden=0 只有 9 个是预期:14 列里有 5 个的数据键是退隐的旧列
 #   项目级/项目负责/实施进度/里程完成/测试员,控制列表仍读它们);测试库因从未跑 18cols 为 0/0/10/14。
 migrate-rd-progress-offsheet-cols.sql
+
+# —— 2026-09-23 采购入库单仓库字段收敛:删旧列 [仓库],统一 仓库名称+仓库编码 ——
+#   用户口径:「明细又有仓库又有仓库名称,查清哪个真实上传金蝶,另一个删掉」。查证:金蝶收到的
+#   是 **仓库编码**(KingdeePushService 行级>头级>默认 CK00001);编码空时按 仓库名称→仓库 解析 bs_wh
+#   补码(都是兜底源);界面参照绑定 **仓库名称**(refMap 同写两列)。故保留 仓库名称+仓库编码,
+#   删 [仓库](头/行两表):①仓库名称补空回填(209 行旧值);②v_stock_movement 与 v_lot_trace 的
+#   采购入库段改读 l.仓库名称(两脚本源文件已同批修改,哈希漂移触发链序重跑,先于本脚本);
+#   ③DROP COLUMN ×2(含注明);④yj_field 删 [仓库] 注册。
+#   配套代码(同提交):ButtonService 检验→入库/特采→入库 两处自动生单改写 仓库名称;
+#   PanelConfigService 同义词补 {仓库代码→仓库名称}(多目标,退料单仍吃旧对);
+#   StockLedgerService.loadRows 采购入库段去 行仓库/头仓库;KingdeePushService 不动(销售出库不受影响)。
+#   ⚠ 依赖视图脚本先行,必须走 DbSync 链序执行。验证:HSDZ_MES 台账快照 235 行/Σ65790/78 仓库键
+#   改前改后一致(inv_cost_ledger 由启动自检按新仓库键自愈重算)。
+migrate-pin-wh-unify.sql

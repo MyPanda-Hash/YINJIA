@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT (CASE WHEN COL_LENGTH('dbo.bl_purchase_in',N'仓库') IS NULL THEN 0 ELSE 1 END) AS 行表旧列, (CASE WHEN COL_LENGTH('dbo.bd_purchase_in',N'仓库') IS NULL THEN 0 ELSE 1 END) AS 头表旧列, (SELECT COUNT(*) FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'仓库') AS 字段残留, (SELECT COUNT(*) FROM bl_purchase_in WHERE ISNULL([仓库名称],N'')<>N'') AS 行有仓库名称;

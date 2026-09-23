@@ -158,8 +158,9 @@ public class StockLedgerService {
                     // 口径标识批次(纯入库日期),且批次号在**入库审核时**才确认,故调用顺序必须
                     // 先确认批次号(ButtonService.assignBatchNoOnInbound)再过账,台账 lot_no 才有值。
                     // lotAlt=备选批号(旧值):冲回时主批号没冲到按它兜底(历史单据按旧口径记的账)。
-                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库],"
-                            + " l.[仓库名称] AS [行仓库名称], l.[仓库编码] AS [行仓库编码], h.[仓库编码] AS [头仓库编码],"
+                    // 2026-09-23 仓库收敛:入库明细旧列 [仓库] 已删(migrate-pin-wh-unify),名称源=仓库名称;
+                    // 头表 [仓库] 同删,头侧只剩 仓库编码 兜底。其它面板(FINISH_IN 等)的行/头 [仓库] 照旧。
+                    "SELECT l.[存货编码] AS code, l.[仓库名称] AS [行仓库名称], l.[仓库编码] AS [行仓库编码], h.[仓库编码] AS [头仓库编码],"
                             + " ISNULL(NULLIF(l.[批次号], N''), l.[批号]) AS lot, l.[批号] AS lotAlt,"
                             + " l.[实收数量] AS qty, l.[单价] AS price"
                             + " FROM bl_purchase_in l LEFT JOIN bd_purchase_in h ON h.[单据编号] = l.[单据编号]"

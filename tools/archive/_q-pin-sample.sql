@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT TOP 6 h.[单据编号], h.[采购订单号], h.[外部单据号], l.[源单行号] FROM bd_purchase_in h LEFT JOIN bl_purchase_in l ON l.[单据编号]=h.[单据编号] WHERE ISNULL(h.asp_cancel,'N')<>'Y' AND h.[采购订单号] IS NOT NULL AND h.[采购订单号]<>'' ORDER BY h.id DESC;

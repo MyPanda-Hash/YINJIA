@@ -26,7 +26,8 @@ FROM qc_insp_detail d JOIN qc_insp h ON h.[单据编号] = d.[单据编号]
 LEFT JOIN yj_doc_status st ON st.panel_code = ''QC_INSP'' AND st.doc_no = h.[单据编号]
 WHERE d.[批号] IS NOT NULL AND ISNULL(d.asp_cancel,''N'')<>''Y''
 UNION ALL
-SELECT l.[批号], l.[存货编码], l.[存货名称], N''采购入库'', h.[单据编号], h.[单据日期], l.[实收数量], l.[仓库],
+-- (2026-09-23 仓库收敛:采购入库明细旧列 [仓库] 已删(migrate-pin-wh-unify),批号追溯该段改读 [仓库名称])
+SELECT l.[批号], l.[存货编码], l.[存货名称], N''采购入库'', h.[单据编号], h.[单据日期], l.[实收数量], l.[仓库名称],
        CASE WHEN ISNULL(st.canceled,''N'')=''Y'' THEN N''已作废'' WHEN st.shr IS NOT NULL THEN N''已审核'' ELSE N''草稿'' END,
        h.[审核人], h.[供应商], CAST(NULL AS char(1))
 FROM bl_purchase_in l JOIN bd_purchase_in h ON h.[单据编号] = l.[单据编号]
