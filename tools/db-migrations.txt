@@ -903,3 +903,19 @@ migrate-stock-report-perf.sql
 #   注意:程序化回填(检验目录→本报告跳转预填、后端回填)不走 editable 校验,不受影响。
 #   幂等可重跑(先判后改);自检段输出该字段的 editable 取值(应为 0)。
 migrate-qc-insp-rec-batch-locked.sql
+
+# ── migrate-qc-backfill-batch-readonly.sql(2026-09-23)───────────────────────
+#   回填批次号**一律只读**(用户口径:「需要回填的批次号都不可以编辑」)。
+#   缘由:批次号在采购入库审核时才分配并回填(BatchService.assignNoAndBackfill →
+#     检验单/送料暂收单/检验目录/检验数据记录),报废/退货等记录面板的批号同为下游回填值。
+#   覆盖(15 个字段,实测 12 个由 1 改 0、3 个原本已是 0):
+#     QC_INSP 批次号(header/detail)+批次键;QC_RECV 批次号(header/detail)+批次键;
+#     QC_RETURN 批次号(header/detail);QC_DISPOSAL 批号;QC_LYB/QC_SCP/QC_BHZ 物料批次;
+#     QC_JJF 批次号;QC_SCY 产品/物料批次;QC_TC_IN 批次号+批次键;
+#     QC_CATALOG 批次号、QC_INSP_REC 物料批次(各自迁移已置 0,此处兜底)。
+#   **不动**出库/生产链批号:MATERIAL_OUT/OTHER_OUT/OUTSOURCE_ISSUE 的批号是扫码/人工录入,
+#     生产链(MANU_ORDER 等)由计划录入 —— 都不是回填值。
+#   ⚠ 遗留:QC_DISPOSAL 批号 原为 required=1,现在"必填但不可编辑" —— 若该单靠人工新建会出现
+#     「请填写批号却填不了」,需业务确认后决定是否放开 required(本次按用户口径只改 editable)。
+#   程序化回填不走 editable 校验,不受影响;幂等可重跑(自检段输出 QC 链批号字段 editable,应全为 0)。
+migrate-qc-backfill-batch-readonly.sql
