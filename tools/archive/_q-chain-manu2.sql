@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH('dbo.bl_manu_order',N'锭号') IS NULL THEN 'bl_manu缺' ELSE 'bl_manu有' END, CASE WHEN COL_LENGTH('dbo.bd_dispatch',N'锭号') IS NULL THEN 'bd_disp缺' ELSE 'bd_disp有' END;

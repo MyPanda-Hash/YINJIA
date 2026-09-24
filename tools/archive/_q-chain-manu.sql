@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH('dbo.bd_manu_order',N'锭号') IS NULL THEN '缺锭号' ELSE '有锭号' END AS bd_manu, CASE WHEN OBJECT_ID('dbo.bd_manu_order') IS NULL THEN '表未建' ELSE '表在' END AS tbl;

@@ -1,0 +1,1 @@
+SET NOCOUNT ON; IF NOT EXISTS (SELECT 1 FROM yj_schema_log WHERE script_name='_doc_part3_data.sql') INSERT INTO yj_schema_log (script_name, content_hash) VALUES ('_doc_part3_data.sql', 'f35efa5b09bebcfe7d643e2d1b16a72be95f28eb7856b91111b3840822133265'); SELECT COUNT(*) AS skipped FROM yj_schema_log WHERE script_name='_doc_part3_data.sql';

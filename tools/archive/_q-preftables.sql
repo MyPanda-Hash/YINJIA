@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT name FROM sys.tables WHERE name LIKE '%pref%' OR name LIKE '%user_field%' OR name LIKE '%layout%';
