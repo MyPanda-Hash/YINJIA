@@ -2104,7 +2104,7 @@ public class ButtonService {
         if (!"QC_INSP".equals(panelCode)) return;
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT id, 物料编码, 物料名称, ISNULL(NULLIF(规格型号, N''), 型号) AS 规格型号, 送检数量,"
-                        + " 合格数量, ISNULL(NULLIF(不合格数量, 0), 不良数量) AS 不合格数量"
+                        + " 合格数量, ISNULL(NULLIF(不合格数量, 0), 不良数量) AS 不合格数量, 计量单位"
                         + " FROM qc_insp_detail"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(特采,0) = 1 ORDER BY id", no);
         if (rows.isEmpty()) return;
@@ -2133,6 +2133,9 @@ public class ButtonService {
             head.put("总数量", tot);
             head.put("不合格品数量", bad);
             head.put("不合格品比例", trimZero(Math.round(bad / tot * 1000.0) / 10.0) + "%");
+            if (r.get("计量单位") != null && !String.valueOf(r.get("计量单位")).isBlank()) {
+                head.put("计量单位", r.get("计量单位"));           // 2026-09-24:总数量的单位随行带入
+            }
             head.put("检验单号", no);                                // 隐藏链路列
             if (h.get("批次键") != null) head.put("批次键", h.get("批次键"));
             head.put("备注", "特采行:物料编码=" + r.get("物料编码") + ",规格型号=" + r.get("规格型号")

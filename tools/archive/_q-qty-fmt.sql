@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT TOP 3 单据编号, 物料名称, 数量 FROM qc_catalog_detail ORDER BY id DESC; SELECT TOP 3 单据编号, 来料数量 FROM qc_insp_rec ORDER BY id DESC;

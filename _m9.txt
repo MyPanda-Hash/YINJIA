@@ -1,0 +1,11 @@
+feat: 检验目录/检验数据记录/特采单 补「计量单位」列与流转——单位与数量分列保存(两账套)
+
+用户口径:三面板也要流转计量单位,单位一般与数量一起保存。
+- migrate-qc-unit-flow.sql:①qc_catalog_detail/qc_insp_rec/qc_tc_in 三表补 计量单位 列(MS_Description);
+  ②yj_field 注册(目录 detail;记录单/特采单 header,均紧随数量列);③存量回填+已拼文本拆分
+  (目录按 检验单号+物料编码;记录单经目录桥接;特采按 检验单号;'1kg'→数量1+单位kg);
+- QcCatalogService:qtyNum/unitOf 分列,UPDATE/INSERT 带单位列,createInspRecord 加单位参数
+  (旧 qtyWithUnit 拼文本保留兼容);ButtonService.inspAutoSpecialAccept 检验行 SELECT+特采头
+  拷 计量单位;
+- 验证:两账套自检过,回填 目录22/记录22/特采10,字段3/3,API 下发三面板均有 计量单位;
+  mvn package 通过。

@@ -89,7 +89,8 @@ public class QcCatalogService {
             String invCode = str(r.get("物料编码"));
             if (invCode.isBlank()) continue;                     // 无物料编码的行不进目录(无从取类别)
             String invName = str(r.get("物料名称"));
-            String qty = qtyWithUnit(r);
+            String qty = qtyNum(r);                               // 数量纯数值(2026-09-24 分列)
+            String unit = unitOf(r);                              // 计量单位独立列
             String category = categoryOf(invCode);               // 商品档案 所属类别(空则不填,不归纳)
             String curBatch = str(r.get("批次号"));
             if (curBatch.isBlank()) curBatch = batchNo;          // 明细批次号为空时用检验单头(批次号可能后回填)
@@ -100,16 +101,16 @@ public class QcCatalogService {
             if (existId != null) {
                 // 已生成过:复用其检验数据记录单号(仍存活才复用,否则新建)
                 String oldRec = str(firstValue("SELECT 检验数据记录单号 FROM qc_catalog_detail WHERE id=?", existId));
-                recNo = recExists(oldRec) ? oldRec : createInspRecord(invName, invCode, qty, inspDate, user);
-                jdbc.update("UPDATE qc_catalog_detail SET 检测物料类别=?, 物料名称=?, 数量=?, 批次号=?, 检验数据记录单号=?,"
+                recNo = recExists(oldRec) ? oldRec : createInspRecord(invName, invCode, qty, unit, inspDate, user);
+                jdbc.update("UPDATE qc_catalog_detail SET 检测物料类别=?, 物料名称=?, 数量=?, 计量单位=?, 批次号=?, 检验数据记录单号=?,"
                         + " asp_user2=?, asp_time2=GETDATE() WHERE id=?",
-                        nv(category), nv(invName), nv(qty), nv(curBatch), nv(recNo), user, existId);
+                        nv(category), nv(invName), nv(qty), nv(unit), nv(curBatch), nv(recNo), user, existId);
             } else {
-                recNo = createInspRecord(invName, invCode, qty, inspDate, user);
-                jdbc.update("INSERT INTO qc_catalog_detail (单据编号, 检测物料类别, 物料名称, 物料编码, 批次号, 数量,"
+                recNo = createInspRecord(invName, invCode, qty, unit, inspDate, user);
+                jdbc.update("INSERT INTO qc_catalog_detail (单据编号, 检测物料类别, 物料名称, 物料编码, 批次号, 数量, 计量单位,"
                         + " 检验状态, 是否合格, 检验单号, 检验数据记录单号, asp_user1, asp_time1)"
                         + " VALUES (?,?,?,?,?,?,?,NULL,?,?,?,GETDATE())",
-                        catalogNo, nv(category), nv(invName), nv(invCode), nv(curBatch), nv(qty),
+                        catalogNo, nv(category), nv(invName), nv(invCode), nv(curBatch), nv(qty), nv(unit),
                         ST_DOING, inspNo, nv(recNo), user);
             }
             n++;
@@ -124,15 +125,27 @@ public class QcCatalogService {
                 + " FROM qc_insp_detail WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", inspNo);
     }
 
-    /** 数量 = 送检数量(缺失退回 数量)+ 单位(缺失退回 计量单位) */
-    private String qtyWithUnit(Map<String, Object> row) {
+    /** 数量(纯数值)与 计量单位 分列返回(2026-09-24 用户口径:单位与数量一起保存但各自成列,
+     *  不再拼文本——旧版 qtyWithUnit 拼成 '1kg' 塞进数量列,报表/统计取数困难)。 */
+    private String qtyNum(Map<String, Object> row) {
         Object q = row.get("送检数量");
         if (q == null) q = row.get("数量");
+        if (q == null) return "";
+        return q instanceof Number num0 ? trimNum(num0.doubleValue()) : str(q);
+    }
+
+    /** 单位 = 单位(缺失退回 计量单位) */
+    private String unitOf(Map<String, Object> row) {
         String unit = str(row.get("单位"));
         if (unit.isBlank()) unit = str(row.get("计量单位"));
-        if (q == null) return unit;
-        String num = q instanceof Number num0 ? trimNum(num0.doubleValue()) : str(q);
-        return num + unit;
+        return unit;
+    }
+
+    /** 兼容旧调用:数量+单位拼文本(纸面展示用) */
+    private String qtyWithUnit(Map<String, Object> row) {
+        String num = qtyNum(row);
+        String unit = unitOf(row);
+        return num.isEmpty() ? unit : num + unit;
     }
 
     private static String trimNum(double v) {
@@ -161,13 +174,13 @@ public class QcCatalogService {
      * **物料批次号不在此处写** —— 批次号由采购入库单审核取号后回填,故留空,
      * 待入库后经 {@link #refreshBatchNosFromInsp()} 自动回填(用户口径:物料批次号是后面入库后自动回填的)。
      */
-    private String createInspRecord(String invName, String invCode, String qty, String inspDate, String user) {
+    private String createInspRecord(String invName, String invCode, String qty, String unit, String inspDate, String user) {
         String no = formNoService.next(REC_PREFIX, user);
         String date = LocalDate.now().toString();
-        jdbc.update("INSERT INTO qc_insp_rec (单据编号, 单据日期, 物料名称, 物料编码, 物料批次, 检验日期, 来料数量,"
+        jdbc.update("INSERT INTO qc_insp_rec (单据编号, 单据日期, 物料名称, 物料编码, 物料批次, 检验日期, 来料数量, 计量单位,"
                 + " 文件编码, 检验依据, 检验人, 表单审核人, asp_user1, asp_time1)"
                 + " VALUES (?,?,?,?,NULL,?,?,?,?,?,?,?,GETDATE())",
-                no, date, nv(invName), nv(invCode), nv(inspDate.isBlank() ? date : inspDate), nv(qty),
+                no, date, nv(invName), nv(invCode), nv(inspDate.isBlank() ? date : inspDate), nv(qty), nv(unit),
                 REC_DOC_CODE, REC_BASIS, user, REC_REVIEWER, user);
         mergeStatus(REC_PANEL, no, user, true);
         return no;

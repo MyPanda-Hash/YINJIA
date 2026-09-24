@@ -1480,3 +1480,22 @@ migrate-wh-field-rename.sql
 #   并更新沙箱 appSecret。验证:YJ-20260909-01(3 行 YJ-XWR-003/031/032)实测推入沙箱,ERP单号见
 #   bd_pu_order 回写;入库单 PI-2026-09-0128 未动(用户将亲自在界面验证)。
 migrate-po-push-erp.sql
+
+# —— 2026-09-24 送料暂收单补「计量单位」字段注册(收敛期丢失)+三表存量回填 ——
+#   QC_RECV.计量单位 yj_field 行在 09-23 首轮合并收敛期间丢失(13:23 快照已无),物理列与存量数据完好;
+#   断两跳:订单.单位→暂收.计量单位(新暂收 SL-0189/0190 空)、暂收→检验→入库(IJ-0152/0153、
+#   PI-0146/0147 空)。补注册 detail seq245 紧随数量;回填按同表同物料取非空值(单位是物料固有属性);
+#   剩余空 暂收0/检验0/入库1(该物料全链无值,需档案补)。链路 16 关键字段注册矩阵核对齐备。
+migrate-qcrecv-unit-field.sql
+
+# —— 2026-09-24 检验目录/检验数据记录/特采单 补「计量单位」列与流转(单位与数量分列保存) ——
+#   用户口径:三面板也要流转计量单位——单位一般与数量一起保存。现状:目录.数量 与 记录单.来料数量
+#   由 QcCatalogService#qtyWithUnit 拼成文本('1kg')入库,无独立单位列;特采单只有总数量不带单位。
+#   ①三表补 计量单位 列(qc_catalog_detail/qc_insp_rec/qc_tc_in,带 MS_Description);
+#   ②yj_field 注册(目录 detail 紧随数量;记录单/特采单 header 紧随数量列);
+#   ③存量回填:目录按 检验单号+物料编码 取检验行单位,已拼数量文本拆分(尾部单位剥离);
+#     记录单经目录行桥接(检验数据记录单号→检验单号+物料编码),来料数量同拆;特采按 检验单号;
+#   ④配套代码(同提交):QcCatalogService 数量(qtyNum)/单位(unitOf)分列写入,createInspRecord 带
+#     单位参数;ButtonService.inspAutoSpecialAccept SELECT+head 拷 计量单位(特采总数量的单位)。
+#   验证:两账套自检过(字段 3/3;回填 目录22/记录22/特采10;拆分样例 1kg→1+kg、200→200+支)。
+migrate-qc-unit-flow.sql
