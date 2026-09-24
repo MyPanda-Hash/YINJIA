@@ -191,6 +191,10 @@ public class KingdeePushService {
         ObjectNode body = json.createObjectNode();
         body.put("bill_date", str(head.get("单据日期")));
         if (!isOrder) body.put("trans_type", "2"); // 入库/出库单的业务类型;采购订单无此项
+        // 采购订单直推带 bill_no(2026-09-23):沿用公司 YJ- 编号(MES 同号)——真实账套的订单本来就是
+        // YJ- 号(实测 YJ-20260924-01 等),入库单按号挂源单;不带 bill_no 金蝶自动编号(CGDD-…),
+        // 入库单的 src_bill_no 按 MES 号就查不到源单(沙箱踩坑:CGDD-20260909-00001 无法被 YJ 号挂联)
+        if (isOrder) body.put("bill_no", docNo);
         String remark = str(head.get("备注"));
         body.put("remark", (remark.isEmpty() ? "" : remark) + " [MES:" + docNo + "]");
         if (isPur || isOrder) body.put("supplier_number", str(head.get("供应商编码")));
@@ -214,6 +218,15 @@ public class KingdeePushService {
                     + "金蝶侧显示为无来源单的普通入库单", docNo);
         } else if (isPur) {
             poRefs = resolvePoRefs(poNo);
+            if (poRefs == null) {
+                // 兜底(2026-09-23):订单直推过金蝶的话,MES 已把金蝶侧真实号回写在 bd_pu_order.ERP单号
+                // (直推不传 bill_no 时金蝶自动编号,如沙箱 CGDD-…;按 MES 号查不到源单就按 ERP单号 再查一次)
+                String erpNo = mesOrderErpNo(poNo);
+                if (!erpNo.isEmpty()) {
+                    poRefs = resolvePoRefs(erpNo);
+                    if (poRefs != null) poNo = erpNo; // src_bill_no 必须写金蝶侧真实号才能挂上
+                }
+            }
             if (poRefs == null) {
                 linkWarning = "；注意:金蝶账套内未找到采购订单[" + poNo + "],本次未挂来源单(请核对账套/订单号,"
                         + "或先在金蝶补建该订单后重审再转)";
@@ -439,6 +452,18 @@ public class KingdeePushService {
     private static String plainDecimal(double d) {
         if (d == 0) return "0";
         return java.math.BigDecimal.valueOf(d).stripTrailingZeros().toPlainString();
+    }
+
+    /** MES 采购订单直推后回写的金蝶侧真实号(bd_pu_order.ERP单号);未推过返回空串 */
+    private String mesOrderErpNo(String poNo) {
+        if (poNo == null || poNo.isBlank()) return "";
+        try {
+            return jdbc.queryForObject(
+                    "SELECT ISNULL(ERP单号, N'') FROM bd_pu_order WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    String.class, poNo);
+        } catch (Exception e) {
+            return ""; // 查不到/多行异常都按"无"处理,不影响推送主流程
+        }
     }
 
     /**
