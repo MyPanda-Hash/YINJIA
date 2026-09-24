@@ -1,0 +1,14 @@
+fix: 回滚生产域合并——本地恢复到合并前(3cc11d8f)并修复合并期脚本重放对采购链的库侧污染
+
+用户报:合并拉取后智能供应链板块被污染,整条采购链受影响,要求恢复到合并生产域之前。
+处置:
+- 代码:git reset --hard backup-pre-merge-20260923b(=3cc11d8f,合并生产域 19 提交之前);
+  mvn package 重打 pre-merge jar 并重启,前端产物随 reset 回到 pre-merge 构建。
+- 库侧污染根因(实测):合并期哈希漂移重放的 panda/replica 脚本把 PURCHASE_IN 的「仓库」
+  字段行改写为 place=query,header,detail——头表 bd_purchase_in.仓库 已在仓库收敛中删除,
+  头级 SELECT 直接 500(采购入库单列表打不开,即用户所见污染)。
+  修复:该行修回 place=detail(明细 bl_purchase_in.仓库 才是正名后的合法落点),两账套同修。
+- 验证:rename 冒烟 8/8(采购入库列表 74 张/销售出库 54/台账 235/状况表 84);
+  质检链四面板 + 暂收单 188 张健康;生产模块(旧代码+裁剪库)MANU_ORDER 7 张/WO_REPORT 可开。
+- 远端 main 仍含生产域合并(1c2a5bbd),本地 behind 21——是否对远端同步回滚(force-push)待用户拍板;
+  生产域工作在 feat/manu-order-from-so-20260921 分支完好,不丢失。
