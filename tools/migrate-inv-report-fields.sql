@@ -72,7 +72,8 @@ WITH mv AS (
          h.经手人 AS 经手人
   FROM bl_purchase_in l JOIN bd_purchase_in h ON l.单据编号=h.单据编号
   WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y''
-    AND (h.单据状态=N''已审核'' OR ISNULL(h.单据状态2,'''')=''C'')
+    AND (h.单据状态=N''已审核'' OR ISNULL(h.单据状态2,'''')=''C''
+         OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code=''PURCHASE_IN'' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
   UNION ALL
   -- 2 产成品入库单(入库 +)
   SELECT 2, l.id, h.单据日期, N''产成品入库单'', l.单据编号, N''入库'',
@@ -86,7 +87,8 @@ WITH mv AS (
          NULL, NULL,
          NULL, NULL, h.经手人
   FROM bl_finish_in l JOIN bd_finish_in h ON l.单据编号=h.单据编号
-  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y'' AND h.单据状态=N''已审核''
+  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y''
+    AND (h.单据状态=N''已审核'' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code=''FINISH_IN'' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
   UNION ALL
   -- 3 其他入库单(入库 +);bd_other_in 无 经手人 列 → NULL
   SELECT 3, l.id, h.单据日期, N''其他入库单'', l.单据编号, N''入库'',
@@ -100,7 +102,8 @@ WITH mv AS (
          NULL, NULL,
          NULL, NULL, NULL
   FROM bl_other_in l JOIN bd_other_in h ON l.单据编号=h.单据编号
-  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y'' AND h.单据状态=N''已审核''
+  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y''
+    AND (h.单据状态=N''已审核'' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code=''OTHER_IN'' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
   UNION ALL
   -- 4 委外入库单(入库 +)
   SELECT 4, l.id, h.单据日期, N''委外入库单'', l.单据编号, N''入库'',
@@ -114,7 +117,8 @@ WITH mv AS (
          NULL, NULL,
          NULL, NULL, h.经手人
   FROM bl_outsource_in l JOIN bd_outsource_in h ON l.单据编号=h.单据编号
-  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y'' AND h.单据状态=N''已审核''
+  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y''
+    AND (h.单据状态=N''已审核'' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code=''OUTSOURCE_IN'' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
   UNION ALL
   -- 5 销售出库单(出库 −):收入金额 0,售价金额单列(成本由物化表给)
   SELECT 5, l.id, h.单据日期, N''销售出库单'', l.单据编号, N''出库'',
@@ -129,7 +133,8 @@ WITH mv AS (
          h.客户, NULLIF(RTRIM(CAST(h.客户编码 AS nvarchar(200))),N''''), h.经手人
   FROM bl_sale_out l JOIN bd_sale_out h ON l.单据编号=h.单据编号
   WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y''
-    AND (h.单据状态=N''已审核'' OR ISNULL(h.单据状态2,'''')=''C'')
+    AND (h.单据状态=N''已审核'' OR ISNULL(h.单据状态2,'''')=''C''
+         OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code=''SALE_OUT'' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
   UNION ALL
   -- 6 材料出库单(出库 −);bd_material_out 无 经手人 列(有 领用人,语义不同)→ NULL
   SELECT 6, l.id, h.单据日期, N''材料出库单'', l.单据编号, N''出库'',
@@ -143,7 +148,8 @@ WITH mv AS (
          NULL, NULL,
          NULL, NULL, NULL
   FROM bl_material_out l JOIN bd_material_out h ON l.单据编号=h.单据编号
-  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y'' AND h.单据状态=N''已审核''
+  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y''
+    AND (h.单据状态=N''已审核'' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code=''MATERIAL_OUT'' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
   UNION ALL
   -- 7 其他出库单(出库 −)
   SELECT 7, l.id, h.单据日期, N''其他出库单'', l.单据编号, N''出库'',
@@ -157,7 +163,8 @@ WITH mv AS (
          NULL, NULL,
          NULL, NULL, h.经手人
   FROM bl_other_out l JOIN bd_other_out h ON l.单据编号=h.单据编号
-  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y'' AND h.单据状态=N''已审核''
+  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y''
+    AND (h.单据状态=N''已审核'' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code=''OTHER_OUT'' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
   UNION ALL
   -- 8 委外发料单(出库 −)
   SELECT 8, l.id, h.单据日期, N''委外发料单'', l.单据编号, N''出库'',
@@ -171,7 +178,8 @@ WITH mv AS (
          NULL, NULL,
          NULL, NULL, h.经手人
   FROM bl_outsource_issue l JOIN bd_outsource_issue h ON l.单据编号=h.单据编号
-  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y'' AND h.单据状态=N''已审核''
+  WHERE ISNULL(l.asp_cancel,''N'')<>''Y'' AND ISNULL(h.asp_cancel,''N'')<>''Y''
+    AND (h.单据状态=N''已审核'' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code=''OUTSOURCE_ISSUE'' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
 )
 SELECT m.src, m.rid, m.单据日期, m.单据类型, m.单据编号, m.业务类型,
        -- 仓库键 = 自身编码 → bs_wh 按名称兜底 → ''#''+名称(都无时)

@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT src, 单据编号, 仓库, 存货, 收入数量, 收入金额 FROM v_stock_movement WHERE 单据编号 IN (N'PI-2026-09-0143',N'PI-2026-09-0128') ORDER BY 单据编号; SELECT COUNT(*) AS 流水总数, SUM(CASE WHEN 单据类型=N'采购入库单' THEN 1 ELSE 0 END) AS 采购入库行 FROM v_stock_movement; SELECT COUNT(*) AS 无成本流水 FROM v_stock_movement m WHERE NOT EXISTS (SELECT 1 FROM inv_cost_ledger c WHERE c.src=m.src AND c.rid=m.rid);
