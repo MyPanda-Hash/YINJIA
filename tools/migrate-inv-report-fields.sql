@@ -62,7 +62,9 @@ WITH mv AS (
          l.仓库 AS 仓库名称, NULLIF(RTRIM(CAST(l.仓库编码 AS nvarchar(200))),N'''') AS 自身仓库编码,
          ISNULL(NULLIF(RTRIM(CAST(l.存货编码 AS nvarchar(200))),N''''), N''(未填存货)'') AS 存货编码,
          l.存货名称 AS 存货, l.规格型号, l.计量单位,
-         ISNULL(NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''''), N''(未填批号)'') AS 批号,
+         -- 批号口径(2026-09-24 修):批次号(分批送料链路落的列)优先、批号(金蝶同步列)兜底——
+         -- 旧版只读 批号,115 行批次号有值而批号空的全部显示「(未填批号)」(与 kucun 台账口径对齐)
+         COALESCE(NULLIF(RTRIM(CAST(l.批次号 AS nvarchar(60))),N''''), NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''''), N''(未填批号)'') AS 批号,
          CAST(l.实收数量 AS decimal(18,4)) AS 收入数量, CAST(0 AS decimal(18,4)) AS 发出数量,
          CAST(ISNULL(l.金额, l.单价 * l.实收数量) AS decimal(18,4)) AS 收入金额,
          CAST(0 AS decimal(18,4)) AS 发出单据金额,
