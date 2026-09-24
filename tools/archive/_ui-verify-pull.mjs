@@ -19,6 +19,8 @@ const PAGES = [
   { code: 'scheduleBoard', label: '排产工作台(生产域)', hash: '/prod/plan/scheduleBoard', shot: true },
   { code: 'workOrderBoard', label: '工单排产(生产域)', hash: '/prod/plan/workOrderBoard', shot: true },
   { code: 'PROD_LINE', label: '生产线档案(生产域·停用开关)', hash: '/panelx/list/PROD_LINE', shot: true },
+  { code: 'OP_TIME', label: '工序工时(生产域·gxgs 建表后)', hash: '/panelx/list/OP_TIME', shot: false },
+  { code: 'LINE_LOAD', label: '产线排产负荷(生产域)', hash: '/panelx/list/LINE_LOAD', shot: false },
   { code: 'PURCHASE_IN', label: '采购入库单(智能供应链)', hash: '/panelx/list/PURCHASE_IN', shot: false },
   { code: 'SALE_OUT', label: '销售出库单(智能供应链)', hash: '/panelx/list/SALE_OUT', shot: false },
   { code: 'PU_ORDER', label: '采购订单(智能供应链)', hash: '/panelx/list/PU_ORDER', shot: false },

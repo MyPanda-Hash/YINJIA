@@ -1514,6 +1514,8 @@ migrate-qc-unit-merge.sql
 # —— 2026-09-21 生产加工单补排产/执行字段(参考库 plang_pc 口径:需求/排产/入库/余量/入库单号/领料单号/外包单号/结案/来料性质·单号·采购入库单号/单据类型/生产线/操作员/单价/金额 + 拆单源工单号·拆分序号) + 新建「生产排产」面板(v_manu_schedule);新增列带中文注明、新字段带 en 译名。幂等可重跑 ——
 migrate-manu-order-schedule.sql
 
+# —— 2026-09-24 工序工时 gxgs 建表(补缺口:面板 line_table 指向该表,但本机两账套从未建过表;按参考库 71 列结构逐列重建 + 列中文注明齐;幂等) ——
+migrate-op-time-table.sql
 # —— 2026-09-21 工序工时(gxgs)面板化 + 产线层级补录(dm_gx.SCX→bs_dict 106/10601/10602) ——
 migrate-op-time-and-scx.sql
 
