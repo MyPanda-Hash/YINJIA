@@ -874,6 +874,14 @@
               <template v-else>
               <template v-if="archEditable(b) && !row._placeholder">
                 <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <!-- 生产线档案「停用」列:开关形式(同生产加工单表单开关风格)——@change 同步乐观翻转(点击即动画),
+                     POST 落库,失败回滚;停用后从排产工作台消失、排入被后端拦截(2026-09-24 随生产域下拉) -->
+                <span v-else-if="isLineToggleCol(c.prop)" class="line-toggle-cell">
+                  <el-switch
+                    :model-value="toBool(row[c.prop])"
+                    @change="(v) => toggleLineDisable(row, v)"
+                  />
+                </span>
                 <!-- 档案页参照列同样懒挂载(2026-09-16):大数据档案每行常驻参照编辑器是 DOM 膨胀主源之一;
                      单据页行数少,保持常驻(点即选)不变 -->
                 <div v-else-if="isReferenceField(c.field) && (!singleDocMode.value || isActiveCell(row, b, c.prop))" class="inline-ref-editor" :class="{ active: isActiveDetailRefRow(row, b, c.prop) }">
@@ -4429,6 +4437,41 @@ function isBooleanField(field) {
   return ['是否', 'Boolean', 'BOOL'].includes(fieldType(field))
 }
 
+/** 生产线档案「停用」列按钮化:仅 PROD_LINE 面板的 停用 列走行内切换按钮(2026-09-24 随生产域下拉) */
+function isLineToggleCol(prop) {
+  return panelCode.value === 'PROD_LINE' && prop === '停用'
+}
+
+/** 生产线档案「停用」列:开关切换——@change 给出的新值**同步乐观翻转**(点击立即出动画),
+ *  POST 落库以服务端结果校准,失败回滚。⚠ 档案行是 markRaw 的(去响应式优化),
+ *  改 row 属性不触发重渲染——每次写值后按平台约定 bump archVersion 驱动刷新 */
+async function toggleLineDisable(row, next) {
+  if (row._toggling) return
+  const old = row['停用']
+  row['停用'] = next ? 1 : 0                 // 乐观更新
+  archVersion.value++                        // 档案行 markRaw:bump 版本号 → 重渲染 → 动画立即播放
+  row._toggling = true
+  try {
+    const res = await request.post('/px/prodLine/toggle', { 生产线: row.生产线 })
+    row['停用'] = res.data?.['停用'] ?? row['停用']   // 以服务端翻转结果为准
+    archVersion.value++
+    ElMessage.success(row['停用'] === 1
+      ? tt('已停用') + '：' + row.生产线 + tt('（排产工作台已不可选）')
+      : tt('已启用') + '：' + row.生产线)
+  } catch (e) {
+    row['停用'] = old                      // 失败回滚(反向动画退回)
+    archVersion.value++
+    ElMessage.error(e?.response?.data?.message || tt('操作失败'))
+  } finally {
+    row._toggling = false
+  }
+}
+
+/** 布尔归一化:后端 bit 经行映射可能为 boolean/1/'1'/'true'/'是'(字符串 '0' 在 JS 为真值,必须显式归一) */
+function toBool(v) {
+  return v === true || v === 1 || v === '1' || v === 'true' || v === 'True' || v === '是'
+}
+
 function fieldOptions(field) {
   return (field?.options || engine.fieldOptions(field || {}) || []).map((option) => (
     typeof option === 'object'
@@ -4439,7 +4482,7 @@ function fieldOptions(field) {
 
 function formatFieldValue(field, value) {
   if (value === undefined || value === null || value === '') return ''
-  if (isBooleanField(field)) return value ? '是' : '否'
+  if (isBooleanField(field)) return toBool(value) ? '是' : '否'
   return String(value)
 }
 
@@ -5509,14 +5552,19 @@ async function onButton(action) {
         batchSendVisible.value = true
         return
       }
-  // 工单二维码(计划层):单产品工单一张标签,二维码=工单号(扫码报工/领料入口)
+  // 工单二维码(计划层):单产品工单一张标签,二维码=工单号|批号|产品|数量|产线(扫码报工/领料入口);
+  // 2026-09-24 随生产域下拉:面板化后适配生产加工单(MANU_ORDER)字段(合同号/排产数量/生产单位/工序交期/生产线)
   if (action === '打印工单二维码') {
     const cur = current.value || {}
-    const no = cur['单据编号'] || cur['编号'] || ''
+    const no = cur['单据编号'] || cur['编号'] || cur['合同号'] || cur['加工单号'] || ''
     if (!no) return ElMessage.warning('请先选择一张工单')
+    const qty = cur['排产数量'] ?? cur['订单数量'] ?? cur['数量'] ?? ''
+    const unit = cur['生产单位'] || cur['单位'] || ''
+    const due = cur['工序交期'] || cur['预完工日'] || cur['交期'] || '-'
     qrLabels.value = [{
-      code: no, name: cur['产品名称'] || '', lot: '', qty: cur['订单数量'], unit: cur['单位'] || '',
-      doc: `交期 ${cur['交期'] || '-'}`, qr: '',
+      code: no, name: cur['产品名称'] || cur['品名'] || '', lot: cur['批号'] || '', qty, unit,
+      doc: `交期 ${due}` + (cur['生产线'] ? ` · ${cur['生产线']}` : ''),
+      qrText: `${no}|${cur['批号'] || ''}|${cur['产品编码'] || ''}|${qty}|${cur['生产线'] || ''}`, qr: '',
     }]
     qrVisible.value = true
     return

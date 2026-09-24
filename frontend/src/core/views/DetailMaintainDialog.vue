@@ -47,7 +47,14 @@
           >
             <el-option v-for="o in f.options || []" :key="o.label ?? o" :label="o.label ?? o" :value="o.value ?? o" />
           </el-select>
-          <el-switch v-else-if="f.dataType === '是否'" v-model="row[f.dataName]" :disabled="!editable" />
+          <!-- 布尔归一:后端行值可能为 '1'/'0' 字符串(JS 中 '0' 为真值),显式转 bool 再绑开关;
+               行对象可能是 markRaw 的(档案行去响应式),写值后 bump 版本号驱动翻转动画 -->
+          <el-switch
+            v-else-if="f.dataType === '是否'"
+            :model-value="boolOf(row[f.dataName])"
+            :disabled="!editable"
+            @change="(v) => { row[f.dataName] = v; swBump++ }"
+          />
           <el-input-number
             v-else-if="f.dataType === '小数' || f.dataType === '整数'"
             v-model="row[f.dataName]"
@@ -89,6 +96,13 @@ const props = defineProps({
   row: { type: Object, default: null }, // 当前单据行（含 编号/单据状态 + detail）
 })
 const emit = defineEmits(['update:modelValue', 'saved'])
+
+// 布尔开关渲染依赖(行对象可能 markRaw 去响应式,值变化不触发重渲染——写值后 bump 本版本号驱动翻转动画)
+const swBump = ref(0)
+function boolOf(v) {
+  void swBump.value // 建立渲染依赖
+  return v === true || v === 1 || v === '1' || v === 'true' || v === '是'
+}
 
 const info = ref(null) // 表头 data（getFormDescriptor.data）
 const detailDef = ref(null) // detail 定义（tabs）

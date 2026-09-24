@@ -1,0 +1,1293 @@
+# 参考库(同源 HSDZ_MES)生产管理相关表结构
+
+==== TABLE plang ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+pl_no | nvarchar(28) | 0 |  | 0 | 工单号
+pl_xc | int | 1 | ((0)) | 0 | 项次
+scx | nvarchar(36) | 1 |  | 0 | 生产线
+pl_man | nvarchar(40) | 1 |  | 0 | 操作员
+pl_date | datetime | 1 |  | 0 | 工单日期
+khdm | nvarchar(16) | 1 |  | 0 | 客户代码
+dm | nvarchar(100) | 1 |  | 0 | 产品代码
+mc | nvarchar(500) | 1 |  | 0 | 产品名称
+gg | nvarchar(500) | 1 |  | 0 | 产品规格
+gg2 | nvarchar(500) | 1 |  | 0 | 产品规格2
+jldw | nvarchar(16) | 1 |  | 0 | 计量单位
+pl_sl | float | 1 | ((0)) | 0 | 排产数量
+pl_sl2 | float | 1 | ((0)) | 0 | 排产数量2
+xq_sl | float | 1 | ((0)) | 0 | 需求数量
+rk_sl | float | 1 | ((0)) | 0 | 入库数量
+yl | float | 1 | ((0)) | 0 | 余量
+dj | float | 1 | ((0)) | 0 | 单价
+jine | float | 1 | ((0)) | 0 | 金额
+cp_date | datetime | 1 |  | 0 | 计划完工日期
+st_date | datetime | 1 |  | 0 | 开始日期
+cp_date2 | datetime | 1 |  | 0 | 实际完工日期
+rk_no | nvarchar(60) | 1 |  | 0 | 入库单号
+bz | ntext | 1 |  | 0 | 备注
+ja | nvarchar(2) | 1 |  | 0 | 结案
+od_no | nvarchar(48) | 1 |  | 0 | 订单号
+od_xc | float | 1 | ((0)) | 0 | 订单项次
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 颜色
+siz | nvarchar(60) | 1 |  | 0 | 尺码
+ll_no | nvarchar(60) | 1 |  | 0 | 领料单号
+wb_no | nvarchar(60) | 1 |  | 0 | 外包单号
+lb | nvarchar(4) | 1 |  | 0 | 类别
+mjlx | nvarchar(40) | 1 |  | 0 | 模具类型
+BomId | int | 1 | ((0)) | 0 | 完工标记
+ypl_sl | float | 1 | ((0)) | 0 | 已排产数量
+ll_no2 | nvarchar(60) | 1 |  | 0 | 领料单号2
+remark | nvarchar(500) | 1 |  | 0 | 备注2
+MoDId | int | 1 |  | 0 | 生产工单明细ID  
+llxz | nvarchar(60) | 1 |  | 0 | 来料性质
+cgrkdh | nvarchar(60) | 1 |  | 0 | 采购入库单号
+lldh | nvarchar(60) | 1 |  | 0 | 来料单号
+djlx | nvarchar(60) | 1 |  | 0 | 单据类型
+zl | float | 1 | ((0)) | 0 | 重量
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | 创建人
+asp_time1 | datetime | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | 最后修改人
+asp_time2 | datetime | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 审核人
+asp_time3 | datetime | 1 |  | 0 | 审核时间
+asp_cancel | varchar(1) | 1 |  | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 删除人
+asp_time4 | datetime | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 55 rows
+
+==== TABLE plang_pc ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+pl_no | nvarchar(28) | 0 |  | 0 | 工单号
+pl_xc | int | 1 | ((0)) | 0 | 项次
+scx | nvarchar(36) | 1 |  | 0 | 生产线
+pl_man | nvarchar(40) | 1 |  | 0 | 操作员
+pl_date | datetime | 1 |  | 0 | 工单日期
+khdm | nvarchar(16) | 1 |  | 0 | 客户代码
+dm | nvarchar(100) | 1 |  | 0 | 产品代码
+mc | nvarchar(500) | 1 |  | 0 | 产品名称
+gg | nvarchar(500) | 1 |  | 0 | 产品规格
+gg2 | nvarchar(500) | 1 |  | 0 | 产品规格2
+jldw | nvarchar(16) | 1 |  | 0 | 计量单位
+pl_sl | float | 1 | ((0)) | 0 | 排产数量
+pl_sl2 | float | 1 | ((0)) | 0 | 排产数量2
+xq_sl | float | 1 | ((0)) | 0 | 需求数量
+rk_sl | float | 1 | ((0)) | 0 | 入库数量
+yl | float | 1 | ((0)) | 0 | 余量
+dj | float | 1 | ((0)) | 0 | 单价
+jine | float | 1 | ((0)) | 0 | 金额
+cp_date | datetime | 1 |  | 0 | 计划完工日期
+st_date | datetime | 1 |  | 0 | 开始日期
+cp_date2 | datetime | 1 |  | 0 | 实际完工日期
+rk_no | nvarchar(60) | 1 |  | 0 | 入库单号
+bz | ntext | 1 |  | 0 | 备注
+ja | nvarchar(2) | 1 |  | 0 | 结案
+od_no | nvarchar(48) | 1 |  | 0 | 订单号
+od_xc | float | 1 | ((0)) | 0 | 订单表身ID
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 颜色
+siz | nvarchar(60) | 1 |  | 0 | 尺码
+ll_no | nvarchar(60) | 1 |  | 0 | 客户PO
+wb_no | nvarchar(60) | 1 |  | 0 | 外包单号
+lb | nvarchar(4) | 1 |  | 0 | 类别
+mjlx | nvarchar(40) | 1 |  | 0 | 模具类型
+BomId | int | 1 | ((0)) | 0 | 完工标记
+jh_date | datetime | 1 |  | 0 | 订单交期
+ll_no2 | nvarchar(60) | 1 |  | 0 | 领料单号
+remark | nvarchar(500) | 1 |  | 0 | 备注2
+MoDId | int | 1 |  | 0 | 生产工单明细ID  
+llxz | nvarchar(60) | 1 |  | 0 | 来料性质
+cgrkdh | nvarchar(60) | 1 |  | 0 | 采购入库单号
+lldh | nvarchar(60) | 1 |  | 0 | 来料单号
+djlx | nvarchar(60) | 1 |  | 0 | 单据类型
+zl | float | 1 | ((0)) | 0 | 重量
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | 创建人
+asp_time1 | datetime | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | 最后修改人
+asp_time2 | datetime | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 审核人
+asp_time3 | datetime | 1 |  | 0 | 审核时间
+asp_cancel | varchar(1) | 1 |  | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 删除人
+asp_time4 | datetime | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 55 rows
+
+==== TABLE scjl ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+sc_no | nvarchar(28) | 0 |  | 0 | 生产单号
+wzdm | nvarchar(100) | 1 |  | 0 | 物料编码
+mc | nvarchar(500) | 1 |  | 0 | 产品名称
+gg | nvarchar(500) | 1 |  | 0 | 产品规格
+jldw | nvarchar(16) | 1 |  | 0 | 计量单位
+sc_date | datetime | 1 |  | 0 | 生产日期
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+gldh | nvarchar(40) | 1 |  | 0 | 工单号码
+gd_id | int | 1 | ((0)) | 0 | 工单ID
+gxdm | nvarchar(16) | 1 |  | 0 | 工序代码
+sl | float | 1 | ((0)) | 0 | 数量
+loss | float | 1 | ((0)) | 0 | 损耗
+loss_ra | float | 1 | ((0)) | 0 | 损耗率
+bf_qty | float | 1 | ((0)) | 0 | 报废数量
+bl_qty | float | 1 | ((0)) | 0 | 不良数量
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 颜色
+siz | nvarchar(60) | 1 |  | 0 | 尺码
+gs | float | 1 | ((0)) | 0 | 工时
+gz | float | 1 | ((0)) | 0 | 工资
+dwzt | nvarchar(4) | 1 |  | 0 | 到位状态
+dwsj | datetime | 1 |  | 0 | 到位时间
+kszt | nvarchar(4) | 1 |  | 0 | 开始状态
+kssj | datetime | 1 |  | 0 | 开始时间
+wgzt | nvarchar(4) | 1 |  | 0 | 完工状态
+wgsj | datetime | 1 |  | 0 | 完工时间
+bz | nvarchar(200) | 1 | ((0)) | 0 | 备注
+scx | nvarchar(36) | 1 |  | 0 | 生产线
+scxmc | nvarchar(40) | 1 |  | 0 | 生产线名称
+tm | nvarchar(60) | 1 |  | 0 | 条码
+delmark | int | 1 | ((0)) | 0 | 删除标记
+post_no | nvarchar(40) | 1 |  | 0 | POS机号
+kk | float | 1 | ((0)) | 0 | 扣款
+zfjl | float | 1 | ((0)) | 0 | 需求数量
+other | float | 1 | ((0)) | 0 | 其他
+jc_no | nvarchar(60) | 1 |  | 0 | 进厂编号
+cp_no | nvarchar(60) | 1 |  | 0 | 产品编号
+gd_ph | nvarchar(60) | 1 |  | 0 | 工单盘号
+lx | nvarchar(200) | 1 |  | 0 | 挂具名称
+wj | nvarchar(60) | 1 |  | 0 | 每挂数量
+htys | nvarchar(500) | 1 |  | 0 | 不良原因
+cpcz | nvarchar(500) | 1 |  | 0 | 产品材质
+sx | nvarchar(500) | 1 |  | 0 | 纱型
+jm | nvarchar(60) | 1 |  | 0 | 计米
+sjd | nvarchar(500) | 1 |  | 0 | 松紧度
+jbbh | text | 1 |  | 0 | 班别
+zsdd | nvarchar(500) | 1 |  | 0 | 报废原因
+cplsh | nvarchar(260) | 1 |  | 0 | 产成品流水号
+pl_sl | float | 1 | ((0)) | 0 | 排产数量
+pp | nvarchar(60) | 1 |  | 0 | 客户PO
+khdm | nvarchar(16) | 1 |  | 0 | 客户代码
+ddwsl | float | 1 | ((0)) | 0 | 多单位数量
+jh_date | datetime | 1 |  | 0 | 订单交期
+od_no | nvarchar(48) | 1 |  | 0 | 订单号
+od_xc | float | 1 | ((0)) | 0 | 订单表身ID
+ywymc | nvarchar(40) | 1 |  | 0 | 业务员名称
+gsje | float | 1 | ((0)) | 0 | 工时金额
+llxz | nvarchar(60) | 1 |  | 0 | 来料性质
+cgrkdh | nvarchar(60) | 1 |  | 0 | 采购入库单号
+lldh | nvarchar(60) | 1 |  | 0 | 来料单号
+djlx | nvarchar(60) | 1 |  | 0 | 单据类型
+zl | float | 1 | ((0)) | 0 | 重量
+sl2 | float | 1 | ((0)) | 0 | 盘数
+sl3 | float | 1 | ((0)) | 0 | 每盘数量
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | 创建人
+asp_time1 | datetime | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | 最后修改人
+asp_time2 | datetime | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 审核人
+asp_time3 | datetime | 1 |  | 0 | 审核时间
+asp_cancel | varchar(1) | 1 | ('N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 删除人
+asp_time4 | datetime | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 76 rows
+
+==== TABLE scpc ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+scx | nvarchar(60) | 1 |  | 0 | 生产线
+ll_scx | nvarchar(60) | 1 |  | 0 | 理论生产线
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+sc_no | nvarchar(28) | 1 |  | 0 | 单号
+wzdm | nvarchar(60) | 1 |  | 0 | 货品代码
+sc_date | datetime2 | 1 |  | 0 | 日期
+od_no | nvarchar(60) | 1 |  | 0 | 订单号码
+od_xc | int | 1 | ((0)) | 0 | 订单项次
+cm | nvarchar(12) | 1 |  | 0 | 尺码
+sl | float | 1 | ((0)) | 0 | 数量
+loss | float | 1 | ((0)) | 0 | 损耗
+loss_ra | float | 1 | ((0)) | 0 | 损耗率
+bf_qty | float | 1 | ((0)) | 0 | 报废数量
+bl_qty | float | 1 | ((0)) | 0 | 不良数量
+bz | nvarchar(400) | 1 |  | 0 | 备注
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 颜色
+siz | nvarchar(60) | 1 |  | 0 | 尺寸
+dyid | int | 1 | ((0)) | 0 | 菲票ID
+ddw | nvarchar(20) | 1 |  | 0 | 多单位
+ddwsl | float | 1 | ((0)) | 0 | 多单位数量
+dwzt | nvarchar(4) | 1 |  | 0 | 到位状态
+dwsj | datetime2 | 1 |  | 0 | 到位时间
+kszt | nvarchar(4) | 1 |  | 0 | 开始状态
+kssj | datetime2 | 1 |  | 0 | 开始时间
+wgzt | nvarchar(4) | 1 |  | 0 | 完工状态
+wgsj | datetime2 | 1 |  | 0 | 完工时间
+gs | float | 1 | ((0)) | 0 | 工时
+gz | float | 1 | ((0)) | 0 | 工资
+ch | nvarchar(28) | 1 |  | 0 | 床号
+cc | nvarchar(22) | 1 |  | 0 | 床次
+zh | nvarchar(22) | 1 |  | 0 | 扎号
+khys | nvarchar(100) | 1 |  | 0 | 款号颜色
+ys | nvarchar(100) | 1 |  | 0 | 颜色
+gxlx | nvarchar(20) | 1 |  | 0 | 工序类型
+dygx | nvarchar(20) | 1 |  | 0 | 是否第一工序
+bxf | nvarchar(2) | 1 |  | 0 | 是否并序
+bxbw | nvarchar(20) | 1 |  | 0 | 并序部位
+bxzd | nvarchar(12) | 1 |  | 0 | 并序完工后转到工序
+ygcn | float | 1 | ((0)) | 0 | 员工产能
+totalcn | float | 1 | ((0)) | 0 | 总产能
+totalqty | float | 1 | ((0)) | 0 | 总分配数(实裁数量)
+llqty | float | 1 | ((0)) | 0 | 理论分配数
+khdm | nvarchar(16) | 1 |  | 0 | 客户代码
+pxzd2 | int | 1 | ((0)) | 0 | 排序字段2
+jgdj | float | 1 | ((0)) | 0 | 加工单价合计
+ywman2 | nvarchar(40) | 1 |  | 0 | 业务员2（理论分配量姓名）
+cust_po | nvarchar(80) | 1 |  | 0 | 制单号
+sfpw | nvarchar(2) | 1 | (N'N') | 0 | 是否排完
+qr | nvarchar(2) | 1 | (N'N') | 0 | 审核(系统排产=Y，人工排产=R)
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 0 | ((0)) | 0 | 打印次数
+-- 62 rows
+
+==== TABLE scjd ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+od_no | nvarchar(60) | 1 |  | 0 | 订单号
+gldh | nvarchar(40) | 1 |  | 0 | 工单号码
+ch | nvarchar(40) | 1 |  | 0 | 用户
+zh | nvarchar(10) | 1 |  | 0 | 用户
+sl | float | 1 | ((0)) | 0 | 数量
+khys | nvarchar(80) | 1 |  | 0 | 款号颜色
+cm | nvarchar(80) | 1 |  | 0 | 尺码
+sc_date | datetime2 | 1 |  | 0 | 日期
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+ywymc | nvarchar(40) | 1 |  | 0 | 业务员名称
+wgzt | nvarchar(4) | 1 |  | 0 | 完工状态
+wgsj | datetime2 | 1 |  | 0 | 完工时间
+gxxc | int | 1 | ((0)) | 0 | 工序项次
+gxdm | nvarchar(12) | 1 |  | 0 | 工序代码
+gxmc | nvarchar(60) | 1 |  | 0 | 工序名称
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 27 rows
+
+==== TABLE scjd_ls ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id2 | int | 0 |  | 1 | 
+id | int | 0 | ((0)) | 0 | 原单ID
+od_no | nvarchar(60) | 1 |  | 0 | 订单号
+gldh | nvarchar(40) | 1 |  | 0 | 工单号码
+ch | nvarchar(40) | 1 |  | 0 | 用户
+zh | nvarchar(10) | 1 |  | 0 | 用户
+sl | float | 1 | ((0)) | 0 | 数量
+khys | nvarchar(80) | 1 |  | 0 | 款号颜色
+cm | nvarchar(80) | 1 |  | 0 | 尺码
+sc_date | datetime2 | 1 |  | 0 | 日期
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+ywymc | nvarchar(40) | 1 |  | 0 | 业务员名称
+wgzt | nvarchar(4) | 1 |  | 0 | 完工状态
+wgsj | datetime2 | 1 |  | 0 | 完工时间
+gxxc | int | 1 | ((0)) | 0 | 工序项次
+gxdm | nvarchar(12) | 1 |  | 0 | 工序代码
+gxmc | nvarchar(60) | 1 |  | 0 | 工序名称
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 28 rows
+
+==== TABLE scrb ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+sc_no | nvarchar(28) | 0 |  | 0 | 单号
+sc_date | datetime | 1 |  | 0 | 日期
+scx | nvarchar(16) | 1 |  | 0 | 生产线
+ygxb | nvarchar(16) | 1 |  | 0 | 员工线别
+wzdm | nvarchar(60) | 0 |  | 0 | 货品代码
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 颜色
+siz | nvarchar(60) | 1 |  | 0 | 尺码
+tr_sl | float | 1 | ((0)) | 0 | 投入数量
+cc_sl | float | 1 | ((0)) | 0 | 产出数量
+bl_sl | float | 1 | ((0)) | 0 | 不良数量
+sjgs | float | 1 | ((0)) | 0 | 实际工时
+bzgs | float | 1 | ((0)) | 0 | 计件工时
+qtgs | float | 1 | ((0)) | 0 | 其他工时
+scxl | float | 1 | ((0)) | 0 | 生产效率
+od_no | nvarchar(28) | 1 |  | 0 | 订单号
+od_xc | float | 1 | ((0)) | 0 | 订单项次
+pl_no | nvarchar(28) | 1 |  | 0 | 工单号码
+rk_no | nvarchar(60) | 1 |  | 0 | 入库单号
+ll_no | nvarchar(60) | 1 |  | 0 | 领料单号
+xz_name | nvarchar(28) | 1 |  | 0 | 线长姓名
+ja | nvarchar(2) | 1 |  | 0 | 结案
+bz | nvarchar(200) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | asp_user1
+asp_time1 | datetime | 1 | (getdate()) | 0 | asp_time1
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | asp_user2
+asp_time2 | datetime | 1 |  | 0 | asp_time2
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 
+asp_time3 | datetime | 1 |  | 0 | 
+asp_cancel | varchar(1) | 1 | ('N') | 0 | asp_cancel
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 
+asp_time4 | datetime | 1 |  | 0 | 
+asp_print | int | 1 | ((0)) | 0 | 
+-- 35 rows
+
+==== TABLE scrb_bs ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+sc_no | nvarchar(28) | 0 |  | 0 | 单号
+xc | int | 0 |  | 0 | 项次
+gh | nvarchar(16) | 1 |  | 0 | 工号
+xm | nvarchar(40) | 1 |  | 0 | 姓名
+jsgs | float | 1 | ((0)) | 0 | 计时工时
+jjgs | float | 1 | ((0)) | 0 | 计件工时
+kk | float | 1 | ((0)) | 0 | 扣款
+zfjl | float | 1 | ((0)) | 0 | 支付记录
+gwbt | float | 1 | ((0)) | 0 | 
+gz | float | 1 | ((0)) | 0 | 工资
+jjgz | float | 1 | ((0)) | 0 | 计件工资
+jsgz | float | 1 | ((0)) | 0 | 计时工资
+bz | nvarchar(100) | 1 |  | 0 | 备注
+jsbz | nvarchar(100) | 1 |  | 0 | 计时标准
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | asp_user1
+asp_time1 | datetime | 1 | (getdate()) | 0 | asp_time1
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | asp_user2
+asp_time2 | datetime | 1 |  | 0 | asp_time2
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 
+asp_time3 | datetime | 1 |  | 0 | 
+asp_cancel | varchar(1) | 1 | ('N') | 0 | asp_cancel
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 
+asp_time4 | datetime | 1 |  | 0 | 
+asp_print | int | 1 | ((0)) | 0 | 
+-- 26 rows
+
+==== TABLE wbgd ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 | ((0)) | 0 | 公司
+id | int | 0 |  | 1 | 
+dh_no | nvarchar(28) | 0 |  | 0 | 外包工单号
+xc | int | 1 | ((0)) | 0 | 项次
+wzdm | nvarchar(460) | 0 |  | 0 | 物料编码
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 颜色
+siz | nvarchar(60) | 1 |  | 0 | 尺码
+sl | float | 1 | ((0)) | 0 | 数量
+ddw | nvarchar(16) | 1 |  | 0 | 多单位
+ddwsl | float | 1 | ((0)) | 0 | 数量(米，公斤)
+in_date | datetime | 1 |  | 0 | 工单日期
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+in_danj | float | 1 | ((0)) | 0 | 单价
+i_zk | float | 1 | ((0)) | 0 | 折扣
+i_zke | float | 1 | ((0)) | 0 | 金额
+rk_sl | float | 1 | ((0)) | 0 | 入库数量
+tax_dm | nvarchar(16) | 1 |  | 0 | 税别代码
+tax_sm | nvarchar(40) | 1 |  | 0 | 税别说明
+tax | float | 1 | ((0)) | 0 | 税额
+total_m | float | 1 | ((0)) | 0 | 总金额
+bz | nvarchar(200) | 1 |  | 0 | 备注
+od_no | nvarchar(28) | 1 |  | 0 | 订单号
+od_xc | float | 1 | ((0)) | 0 | 订单表身ID
+pl_no | nvarchar(28) | 1 |  | 0 | 工单号
+rk_no | nvarchar(60) | 1 |  | 0 | 入库单号
+gfdm | nvarchar(16) | 1 |  | 0 | 厂商代码
+ll_no | nvarchar(60) | 1 |  | 0 | 领料单号
+ja | nvarchar(2) | 1 |  | 0 | 结案
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | 创建人
+asp_time1 | datetime | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | 最后修改人
+asp_time2 | datetime | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 审核人
+asp_time3 | datetime | 1 |  | 0 | 审核时间
+asp_cancel | varchar(1) | 1 | ('N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 删除人
+asp_time4 | datetime | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 39 rows
+
+==== TABLE gxgs ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+dm | nvarchar(40) | 1 |  | 0 | 代码
+mc | nvarchar(40) | 1 |  | 0 | 款号名称
+khdm | nvarchar(40) | 1 |  | 0 | 客户代码
+xc | int | 1 | ((0)) | 0 | 项次
+rq | datetime2 | 1 |  | 0 | 创建时间
+gxdm | nvarchar(16) | 1 |  | 0 | 工序代码
+gxmc | nvarchar(60) | 1 |  | 0 | 工序名称
+gxsm | nvarchar(100) | 1 |  | 0 | 工序说明
+hxsj | float | 1 | ((0)) | 0 | 换线时间
+bzsj | float | 1 | ((0)) | 0 | 标准时间
+zksj | float | 1 | ((0)) | 0 | 最快时间
+zmsj | float | 1 | ((0)) | 0 | 最慢时间
+pjsj | float | 1 | ((0)) | 0 | 平均时间
+jgdj | float | 1 | ((0)) | 0 | 加工单价
+jgdj2 | float | 1 | ((0)) | 0 | 加工单价2
+sfbx | nvarchar(16) | 1 |  | 0 | 是否并序
+mjdm | nvarchar(40) | 1 |  | 0 | 模具代码
+gxtj | nvarchar(100) | 1 |  | 0 | 加工条件
+scx | nvarchar(10) | 1 |  | 0 | 生产线
+sfdf | nvarchar(2) | 1 |  | 0 | 是否打非
+jjdm | nvarchar(40) | 1 |  | 0 | 使用检具
+ysjt | nvarchar(10) | 1 |  | 0 | 预设机台
+zylc | nvarchar(200) | 1 |  | 0 | 作业流程
+zysx | nvarchar(100) | 1 |  | 0 | 注意事项
+jcfs | nvarchar(100) | 1 |  | 0 | 检查方式
+sh | nvarchar(4) | 1 |  | 0 | 审核
+tsgn | nvarchar(40) | 1 |  | 0 | 特殊功能
+bz | nvarchar(100) | 1 |  | 0 | 备注
+bw2 | nvarchar(16) | 1 |  | 0 | 并序部位
+gxmc2 | nvarchar(60) | 1 |  | 0 | 工序名称
+gxsm2 | nvarchar(100) | 1 |  | 0 | 工序说明
+bxdj2 | float | 1 | ((0)) | 0 | 并序加工单价
+zd2 | nvarchar(40) | 1 |  | 0 | 完工后转到
+bw3 | nvarchar(16) | 1 |  | 0 | 并序部位
+gxmc3 | nvarchar(60) | 1 |  | 0 | 工序名称
+gxsm3 | nvarchar(100) | 1 |  | 0 | 工序说明
+bxdj3 | float | 1 | ((0)) | 0 | 并序加工单价
+zd3 | nvarchar(40) | 1 |  | 0 | 完工后转到
+bw4 | nvarchar(16) | 1 |  | 0 | 并序部位
+gxmc4 | nvarchar(60) | 1 |  | 0 | 工序名称
+gxsm4 | nvarchar(100) | 1 |  | 0 | 工序说明
+bxdj4 | float | 1 | ((0)) | 0 | 并序加工单价
+zd4 | nvarchar(40) | 1 |  | 0 | 完工后转到
+bw5 | nvarchar(16) | 1 |  | 0 | 并序部位
+gxmc5 | nvarchar(60) | 1 |  | 0 | 工序名称
+gxsm5 | nvarchar(100) | 1 |  | 0 | 工序说明
+bxdj5 | float | 1 | ((0)) | 0 | 并序加工单价
+zd5 | nvarchar(40) | 1 |  | 0 | 完工后转到
+bw6 | nvarchar(16) | 1 |  | 0 | 并序部位
+gxmc6 | nvarchar(60) | 1 |  | 0 | 工序名称
+gxsm6 | nvarchar(100) | 1 |  | 0 | 工序说明
+bxdj6 | float | 1 | ((0)) | 0 | 并序加工单价
+zd6 | nvarchar(40) | 1 |  | 0 | 完工后转到
+bw7 | nvarchar(16) | 1 |  | 0 | 并序部位
+gxmc7 | nvarchar(60) | 1 |  | 0 | 工序名称
+gxsm7 | nvarchar(100) | 1 |  | 0 | 工序说明
+bxdj7 | float | 1 | ((0)) | 0 | 并序加工单价
+zd7 | nvarchar(40) | 1 |  | 0 | 完工后转到
+sfsm | nvarchar(2) | 1 | (N'Y') | 0 | 是否扫码
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 71 rows
+
+==== TABLE gszl ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+in_date | datetime2 | 1 |  | 0 | 日期
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+ywmc | nvarchar(40) | 1 |  | 0 | 业务员姓名
+dh_no | nvarchar(28) | 1 |  | 0 | 单号
+wzdm | nvarchar(80) | 1 |  | 0 | 款号
+sl | float | 1 | ((0)) | 0 | 数量
+dj | float | 1 | ((0)) | 0 | 单价
+total_m | float | 1 | ((0)) | 0 | 总金额
+qr | nvarchar(4) | 1 |  | 0 | 确认
+bz | nvarchar(200) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 22 rows
+
+==== TABLE gssp ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+ny | nvarchar(16) | 1 |  | 0 | 年月
+scx | nvarchar(40) | 1 |  | 0 | 生产线
+fzcl_je | float | 1 | ((0)) | 0 | 辅助材料金额
+rldl_je | float | 1 | ((0)) | 0 | 燃料动力金额
+zjrg_je | float | 1 | ((0)) | 0 | 直接人工金额
+fpss_je | float | 1 | ((0)) | 0 | 废品损失金额
+zzfy_je | float | 1 | ((0)) | 0 | 制造费用金额
+qtfy_je | float | 1 | ((0)) | 0 | 其他费用金额
+zje | float | 1 | ((0)) | 0 | 总金额
+zgs | float | 1 | ((0)) | 0 | 总工时
+fzcl | float | 1 | ((0)) | 0 | 辅助材料
+rldl | float | 1 | ((0)) | 0 | 燃料动力
+zjrg | float | 1 | ((0)) | 0 | 直接人工
+fpss | float | 1 | ((0)) | 0 | 废品损失
+zzfy | float | 1 | ((0)) | 0 | 制造费用
+qtfy | float | 1 | ((0)) | 0 | 其他费用
+hj | float | 1 | ((0)) | 0 | 合计
+bz | nvarchar(100) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 30 rows
+
+==== TABLE mate ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 | ((0)) | 0 | 公司
+id | int | 0 |  | 1 | ID
+m_no | nvarchar(28) | 0 |  | 0 | 代码
+m_date | datetime | 1 |  | 0 | 日期
+wzdm1 | nvarchar(80) | 1 |  | 0 | 主物料编码
+lot_no1 | nvarchar(60) | 1 |  | 0 | 主批号
+color1 | nvarchar(60) | 1 |  | 0 | 主颜色
+siz1 | nvarchar(60) | 1 |  | 0 | 主尺码
+wzmc1 | nvarchar(500) | 1 |  | 0 | 主物料名称
+jldw1 | nvarchar(8) | 1 |  | 0 | 主单位
+xc | int | 1 | ((0)) | 0 | 项次
+wzdm2 | nvarchar(80) | 0 |  | 0 | 子物料编码
+lot_no2 | nvarchar(60) | 1 |  | 0 | 子批号
+color2 | nvarchar(60) | 1 |  | 0 | 子颜色
+siz2 | nvarchar(60) | 1 |  | 0 | 子尺码
+wzmc2 | nvarchar(500) | 1 |  | 0 | 子物料名称
+gg2 | nvarchar(500) | 1 |  | 0 | 子产品规格
+jldw2 | nvarchar(8) | 1 |  | 0 | 子单位
+bzl | float | 1 | ((0)) | 0 | 标准量
+shl | float | 1 | ((0)) | 0 | 损耗率
+sl2 | float | 1 | ((0)) | 0 | 分母数量
+in_dj | float | 1 | ((0)) | 0 | 单价
+jine | float | 1 | ((0)) | 0 | 金额
+ywdm | nvarchar(16) | 1 |  | 0 | 业务员
+bz | nvarchar(500) | 1 |  | 0 | 备注
+OpComponentId | int | 1 |  | 0 | Bom子件表ID 
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | 创建人
+asp_time1 | datetime | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | 最后修改人
+asp_time2 | datetime | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 审核人
+asp_time3 | datetime | 1 |  | 0 | 审核时间
+asp_cancel | varchar(1) | 1 |  | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 删除人
+asp_time4 | datetime | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 36 rows
+
+==== TABLE mate_jtsh ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 | ((0)) | 0 | 公司
+id | int | 0 |  | 1 | ID
+OpComponentId | int | 1 |  | 0 | Bom子件表ID 
+xc | int | 1 | ((0)) | 0 | 项次
+FromQty | float | 1 | ((0)) | 0 | 起始数量
+ToQty | float | 1 | ((0)) | 0 | 结束数量
+sl2 | float | 1 | ((0)) | 0 | 分母数量
+CompScrap | float | 1 | ((0)) | 0 | 损耗率
+bz | nvarchar(500) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | 创建人
+asp_time1 | datetime | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | 最后修改人
+asp_time2 | datetime | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 审核人
+asp_time3 | datetime | 1 |  | 0 | 审核时间
+asp_cancel | varchar(1) | 1 |  | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 删除人
+asp_time4 | datetime | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 19 rows
+
+==== TABLE jrhz ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+ywymc | nvarchar(40) | 1 |  | 0 | 业务员名称
+wzdm | nvarchar(60) | 1 |  | 0 | 货品代码
+ksmc | nvarchar(80) | 1 |  | 0 | 款式名称
+sc_date | datetime2 | 1 |  | 0 | 日期
+khys | nvarchar(80) | 1 |  | 0 | 款号颜色
+sl | float | 1 | ((0)) | 0 | 数量
+gz | float | 1 | ((0)) | 0 | 工资
+gsje | float | 1 | ((0)) | 0 | 工时金额
+jjje | float | 1 | ((0)) | 0 | 计件金额
+gxsm | nvarchar(100) | 1 |  | 0 | 工序说明
+rem | nvarchar(80) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 24 rows
+
+==== TABLE jrhz_ls ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id2 | int | 0 |  | 1 | 
+id | int | 0 | ((0)) | 0 | 原单ID
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+ywymc | nvarchar(40) | 1 |  | 0 | 业务员名称
+wzdm | nvarchar(60) | 1 |  | 0 | 货品代码
+ksmc | nvarchar(80) | 1 |  | 0 | 款式名称
+sc_date | datetime2 | 1 |  | 0 | 日期
+khys | nvarchar(80) | 1 |  | 0 | 款号颜色
+sl | float | 1 | ((0)) | 0 | 数量
+gz | float | 1 | ((0)) | 0 | 工资
+gsje | float | 1 | ((0)) | 0 | 工时金额
+jjje | float | 1 | ((0)) | 0 | 计件金额
+rem | nvarchar(80) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 24 rows
+
+==== TABLE cpfpmx ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+ch | nvarchar(28) | 1 |  | 0 | 床号
+zh | nvarchar(22) | 1 |  | 0 | 扎号
+od_no | nvarchar(60) | 1 |  | 0 | 订单号
+od_xc | int | 1 | ((0)) | 0 | 订单项次
+cust_po | nvarchar(80) | 1 |  | 0 | 制单号
+rq | datetime2 | 1 |  | 0 | 日期
+wzdm | nvarchar(60) | 1 |  | 0 | 物料代码(款号)
+cm | nvarchar(40) | 1 |  | 0 | 尺码
+khys | nvarchar(100) | 1 |  | 0 | 款号颜色
+ys | nvarchar(100) | 1 |  | 0 | 颜色
+sl | float | 1 | ((0)) | 0 | 总数量
+lx | nvarchar(4) | 1 |  | 0 | 类型(次品，废品)
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 24 rows
+
+==== TABLE fgjl ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+sc_no | nvarchar(28) | 1 |  | 0 | 单号
+wzdm | nvarchar(60) | 1 |  | 0 | 货品代码
+sc_date | datetime2 | 1 |  | 0 | 日期
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+gldh | nvarchar(40) | 1 |  | 0 | 工单号码
+gxdm | nvarchar(12) | 1 |  | 0 | 工序代码
+gxxc | int | 1 | ((0)) | 0 | 工序项次
+sl | float | 1 | ((0)) | 0 | 数量
+loss | float | 1 | ((0)) | 0 | 损耗(工时单价)
+loss_ra | float | 1 | ((0)) | 0 | 损耗率(件单价)
+bf_qty | float | 1 | ((0)) | 0 | 报废数量
+bl_qty | float | 1 | ((0)) | 0 | 不良数量
+bz | nvarchar(400) | 1 |  | 0 | 备注
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 颜色
+siz | nvarchar(60) | 1 |  | 0 | 尺寸
+dyid | int | 1 | ((0)) | 0 | 菲票ID
+ddw | nvarchar(20) | 1 |  | 0 | 多单位
+ddwsl | float | 1 | ((0)) | 0 | 多单位数量
+dwzt | nvarchar(4) | 1 |  | 0 | 到位状态
+dwsj | datetime2 | 1 |  | 0 | 到位时间
+kszt | nvarchar(4) | 1 |  | 0 | 开始状态
+kssj | datetime2 | 1 |  | 0 | 开始时间
+wgzt | nvarchar(4) | 1 |  | 0 | 完工状态
+wgsj | datetime2 | 1 |  | 0 | 完工时间
+gs | float | 1 | ((0)) | 0 | 工时
+gz | float | 1 | ((0)) | 0 | 工资
+od_no | nvarchar(60) | 1 |  | 0 | 订单号
+od_jq | date | 1 |  | 0 | 订单交期
+ch | nvarchar(28) | 1 |  | 0 | 床号
+zh | nvarchar(22) | 1 |  | 0 | 扎号
+fg_no | nvarchar(60) | 1 |  | 0 | 返工单号
+fg_lx | nvarchar(10) | 1 |  | 0 | 返工类型
+fg_gs | nvarchar(60) | 1 |  | 0 | 返工归属
+tscs | int | 1 | ((0)) | 0 | 信息提示次数
+blgx | nvarchar(200) | 1 |  | 0 | 不良工序
+blyy | nvarchar(60) | 1 |  | 0 | 不良原因
+qtsm | nvarchar(60) | 1 |  | 0 | 其他说明
+lastywy | nvarchar(40) | 1 |  | 0 | 上道业务员
+nextywy | nvarchar(40) | 1 |  | 0 | 下道业务员
+scx | nvarchar(60) | 1 |  | 0 | 生产线
+fgsfsj | datetime2 | 1 |  | 0 | 师傅收到时间
+sfxm | nvarchar(40) | 1 |  | 0 | 车间师傅姓名
+fgfhsj | datetime2 | 1 |  | 0 | 返工人收货时间
+bxf | nvarchar(2) | 1 |  | 0 | 是否并序
+bxbw | nvarchar(20) | 1 |  | 0 | 并序部位
+bxzd | nvarchar(12) | 1 |  | 0 | 并序完工后转到工序
+gxlx | nvarchar(20) | 1 |  | 0 | 工序类型
+cffgcs | int | 1 | ((1)) | 0 | 重复返工次数（超时的3倍）
+mlr | float | 1 | ((0)) | 0 | 毛利润
+gsje | float | 1 | ((0)) | 0 | 工时金额
+khdm | nvarchar(80) | 1 |  | 0 | 客户代码
+gxmc | nvarchar(60) | 1 |  | 0 | 工序名称
+gxsm | nvarchar(100) | 1 |  | 0 | 工序说明
+khys | nvarchar(80) | 1 |  | 0 | 款号颜色
+size | nvarchar(80) | 1 |  | 0 | 尺码
+cust_po | nvarchar(80) | 1 |  | 0 | 制单号
+cfwg | nvarchar(2) | 1 |  | 0 | 车缝工序是否全部完工
+ywymc | nvarchar(40) | 1 |  | 0 | 业务员名称
+bzry | nvarchar(40) | 1 |  | 0 | 包装人员
+bzsj | datetime2 | 1 |  | 0 | 包装时间
+bzzjry | nvarchar(40) | 1 |  | 0 | 包装质检人员
+bzzjsj | datetime2 | 1 |  | 0 | 包装质检时间
+byf | nvarchar(2) | 1 | (N'N') | 0 | 是否播音提示(车缝完工)
+byf2 | nvarchar(2) | 1 | (N'N') | 0 | 是否播音提示(新单生成)
+fpf | nvarchar(2) | 1 | (N'N') | 0 | 分配否（二次分配）
+qr | nvarchar(2) | 1 |  | 0 | 审核
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 79 rows
+
+==== TABLE fgjl_ls ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id2 | int | 0 |  | 1 | 
+id | int | 0 | ((0)) | 0 | 原单ID
+sc_no | nvarchar(28) | 1 |  | 0 | 单号
+wzdm | nvarchar(60) | 1 |  | 0 | 货品代码
+sc_date | datetime2 | 1 |  | 0 | 日期
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+gldh | nvarchar(40) | 1 |  | 0 | 工单号码
+gxdm | nvarchar(12) | 1 |  | 0 | 工序代码
+gxxc | int | 1 | ((0)) | 0 | 工序项次
+sl | float | 1 | ((0)) | 0 | 数量
+loss | float | 1 | ((0)) | 0 | 损耗(工时单价)
+loss_ra | float | 1 | ((0)) | 0 | 损耗率(件单价)
+bf_qty | float | 1 | ((0)) | 0 | 报废数量
+bl_qty | float | 1 | ((0)) | 0 | 不良数量
+bz | nvarchar(400) | 1 |  | 0 | 备注
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 颜色
+siz | nvarchar(60) | 1 |  | 0 | 尺寸
+dyid | int | 1 | ((0)) | 0 | 菲票ID
+ddw | nvarchar(20) | 1 |  | 0 | 多单位
+ddwsl | float | 1 | ((0)) | 0 | 多单位数量
+dwzt | nvarchar(4) | 1 |  | 0 | 到位状态
+dwsj | datetime2 | 1 |  | 0 | 到位时间
+kszt | nvarchar(4) | 1 |  | 0 | 开始状态
+kssj | datetime2 | 1 |  | 0 | 开始时间
+wgzt | nvarchar(4) | 1 |  | 0 | 完工状态
+wgsj | datetime2 | 1 |  | 0 | 完工时间
+gs | float | 1 | ((0)) | 0 | 工时
+gz | float | 1 | ((0)) | 0 | 工资
+od_no | nvarchar(60) | 1 |  | 0 | 订单号
+od_jq | date | 1 |  | 0 | 订单交期
+ch | nvarchar(28) | 1 |  | 0 | 床号
+zh | nvarchar(22) | 1 |  | 0 | 扎号
+fg_no | nvarchar(60) | 1 |  | 0 | 返工单号
+fg_lx | nvarchar(10) | 1 |  | 0 | 返工类型
+fg_gs | nvarchar(60) | 1 |  | 0 | 返工归属
+tscs | int | 1 | ((0)) | 0 | 信息提示次数
+blgx | nvarchar(60) | 1 |  | 0 | 不良工序
+blyy | nvarchar(60) | 1 |  | 0 | 不良原因
+qtsm | nvarchar(60) | 1 |  | 0 | 其他说明
+lastywy | nvarchar(40) | 1 |  | 0 | 上道业务员
+nextywy | nvarchar(40) | 1 |  | 0 | 下道业务员
+scx | nvarchar(60) | 1 |  | 0 | 生产线
+fgsfsj | datetime2 | 1 |  | 0 | 师傅收到时间
+sfxm | nvarchar(40) | 1 |  | 0 | 车间师傅姓名
+fgfhsj | datetime2 | 1 |  | 0 | 返工人收货时间
+bxf | nvarchar(2) | 1 |  | 0 | 是否并序
+bxbw | nvarchar(20) | 1 |  | 0 | 并序部位
+bxzd | nvarchar(12) | 1 |  | 0 | 并序完工后转到工序
+gxlx | nvarchar(20) | 1 |  | 0 | 工序类型
+cffgcs | int | 1 | ((1)) | 0 | 重复返工次数（超时的3倍）
+mlr | float | 1 | ((0)) | 0 | 毛利润
+gsje | float | 1 | ((0)) | 0 | 工时金额
+khdm | nvarchar(80) | 1 |  | 0 | 客户代码
+gxmc | nvarchar(60) | 1 |  | 0 | 工序名称
+gxsm | nvarchar(100) | 1 |  | 0 | 工序说明
+khys | nvarchar(80) | 1 |  | 0 | 款号颜色
+size | nvarchar(80) | 1 |  | 0 | 尺码
+cust_po | nvarchar(80) | 1 |  | 0 | 制单号
+cfwg | nvarchar(2) | 1 |  | 0 | 车缝工序是否全部完工
+ywymc | nvarchar(40) | 1 |  | 0 | 业务员名称
+bzry | nvarchar(40) | 1 |  | 0 | 包装人员
+bzsj | datetime2 | 1 |  | 0 | 包装时间
+bzzjry | nvarchar(40) | 1 |  | 0 | 包装质检人员
+bzzjsj | datetime2 | 1 |  | 0 | 包装质检时间
+byf | nvarchar(2) | 1 | (N'N') | 0 | 是否播音提示(车缝完工)
+byf2 | nvarchar(2) | 1 | (N'N') | 0 | 是否播音提示(新单生成)
+fpf | nvarchar(2) | 1 | (N'N') | 0 | 分配否（二次分配）
+qr | nvarchar(2) | 1 |  | 0 | 审核
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 80 rows
+
+==== TABLE fgjlhz ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+ny | nvarchar(28) | 1 |  | 0 | 年月
+ywman | nvarchar(40) | 1 |  | 0 | 业务员
+ywymc | nvarchar(40) | 1 |  | 0 | 业务员名称
+sl | float | 1 | ((0)) | 0 | 数量
+cffgcs | int | 1 | ((1)) | 0 | 重复返工次数（超时的3倍）
+zcs | float | 1 | ((0)) | 0 | 总次数
+dj | float | 1 | ((0)) | 0 | 等级
+bz | nvarchar(400) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 20 rows
+
+==== TABLE pd_zzp ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+pd_date | datetime | 0 |  | 0 | 
+wzdm | nvarchar(60) | 0 |  | 0 | 物料代码
+ckdm | nvarchar(12) | 0 |  | 0 | 仓库
+lot_no | nvarchar(60) | 0 |  | 0 | 批号
+color | nvarchar(60) | 0 |  | 0 | 
+siz | nvarchar(60) | 0 |  | 0 | 
+sl | float | 1 | ((0)) | 0 | 数量
+total_je | float | 1 | ((0)) | 0 | 
+pd_sl | float | 1 | ((0)) | 0 | 
+pd_je | float | 1 | ((0)) | 0 | 
+bz | nvarchar(100) | 1 |  | 0 | 备注
+sh | nvarchar(4) | 1 | (N'N') | 0 | 
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | asp_user1
+asp_time1 | datetime | 1 | (getdate()) | 0 | asp_time1
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | asp_user2
+asp_time2 | datetime | 1 |  | 0 | asp_time2
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 
+asp_time3 | datetime | 1 |  | 0 | 
+asp_cancel | varchar(1) | 1 |  | 0 | asp_cancel
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 
+asp_time4 | datetime | 1 |  | 0 | 
+asp_print | int | 1 | ((0)) | 0 | 
+-- 24 rows
+
+==== TABLE pd_zzphistory ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+pd_date | datetime | 0 |  | 0 | 
+wzdm | nvarchar(60) | 0 |  | 0 | 物料代码
+ckdm | nvarchar(12) | 0 |  | 0 | 仓库
+lot_no | nvarchar(60) | 0 | (N'N') | 0 | 批号
+color | nvarchar(60) | 0 | (N'N') | 0 | 
+siz | nvarchar(60) | 0 | (N'N') | 0 | 
+sl | float | 1 | ((0)) | 0 | 数量
+total_je | float | 1 | ((0)) | 0 | 
+pd_sl | float | 1 | ((0)) | 0 | 
+pd_je | float | 1 | ((0)) | 0 | 
+bz | nvarchar(100) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | asp_user1
+asp_time1 | datetime | 1 | (getdate()) | 0 | asp_time1
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | asp_user2
+asp_time2 | datetime | 1 |  | 0 | asp_time2
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 
+asp_time3 | datetime | 1 |  | 0 | 
+asp_cancel | varchar(1) | 1 |  | 0 | asp_cancel
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 
+asp_time4 | datetime | 1 |  | 0 | 
+asp_print | int | 1 | ((0)) | 0 | 
+-- 23 rows
+
+==== TABLE pd_zzprq ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+last_date | datetime | 0 |  | 0 | 
+pd_date | datetime | 0 |  | 0 | 
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | asp_user1
+asp_time1 | datetime | 1 | (getdate()) | 0 | asp_time1
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | asp_user2
+asp_time2 | datetime | 1 |  | 0 | asp_time2
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 
+asp_time3 | datetime | 1 |  | 0 | 
+asp_cancel | varchar(1) | 1 |  | 0 | asp_cancel
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 
+asp_time4 | datetime | 1 |  | 0 | 
+asp_print | int | 1 | ((0)) | 0 | 
+-- 13 rows
+
+==== TABLE dm_gx ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+dm | nvarchar(40) | 1 |  | 0 | 代码
+mc | nvarchar(320) | 1 |  | 0 | 名称
+gxlx | nvarchar(60) | 1 |  | 0 | 工序类型
+lb | nvarchar(60) | 1 |  | 0 | 类别
+pcsl | int | 1 | ((0)) | 0 | 平车数量
+kcsl | int | 1 | ((0)) | 0 | 冚车数量
+zcsl | int | 1 | ((0)) | 0 | 扎车数量
+lcsl | int | 1 | ((0)) | 0 | 拉车数量
+qtsl | int | 1 | ((0)) | 0 | 其他数量
+zggh | nvarchar(40) | 1 |  | 0 | 主管工号
+sfgh | nvarchar(40) | 1 |  | 0 | 车间师傅工号
+qjspr | nvarchar(40) | 1 |  | 0 | 请假审批人工号
+zhjsr | nvarchar(40) | 1 |  | 0 | 账号解锁人工号
+jsjs | int | 1 | ((0)) | 0 | 分货时减少件数
+czbl | nvarchar(40) | 1 |  | 0 | 车种比例（扎：平： 冚）
+sgsj | nvarchar(40) | 1 |  | 0 | 班组统一上岗打卡时间（限制不能提前打卡）
+swsb1 | int | 1 | ((0)) | 0 | 上午上班小时
+swsb2 | int | 1 | ((0)) | 0 | 上午上班分钟
+swxb1 | int | 1 | ((0)) | 0 | 上午下班小时
+swxb2 | int | 1 | ((0)) | 0 | 上午下班分钟
+xwsb1 | int | 1 | ((0)) | 0 | 下午上班小时
+xwsb2 | int | 1 | ((0)) | 0 | 下午上班分钟
+xwxb1 | int | 1 | ((0)) | 0 | 下午下班小时
+xwxb2 | int | 1 | ((0)) | 0 | 下午下班分钟
+ybsb1 | int | 1 | ((0)) | 0 | 夜班上班小时
+ybsb2 | int | 1 | ((0)) | 0 | 夜班上班分钟
+ybxb1 | int | 1 | ((0)) | 0 | 夜班下班小时
+ybxb2 | int | 1 | ((0)) | 0 | 夜班下班分钟
+bz | nvarchar(510) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 0 | ((0)) | 0 | 打印次数
+-- 41 rows
+
+==== TABLE dm_gz ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+dm | nvarchar(12) | 1 |  | 0 | 代码
+mc | nvarchar(80) | 1 |  | 0 | 名称
+bz | nvarchar(510) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 15 rows
+
+==== TABLE dm_dbzsd ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 0 | 
+dm | nvarchar(30) | 1 |  | 0 | 员工代码
+mc | nvarchar(40) | 1 |  | 0 | 姓名
+scx | nvarchar(60) | 1 |  | 0 | 生产线代码
+jzgz | nvarchar(40) | 1 |  | 0 | 兼职工种
+jzcn | float | 1 | ((0)) | 0 | 兼职产能
+rq | datetime2 | 1 |  | 0 | 日期
+gsbm | nvarchar(40) | 1 |  | 0 | 归属部门
+scgz | nvarchar(40) | 1 |  | 0 | 原工种
+brcn | float | 1 | ((0)) | 0 | 原本日产能
+bz | nvarchar(510) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 22 rows
+
+==== TABLE dh ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 | ((0)) | 0 | 公司
+id | int | 0 |  | 1 | 
+dh_no | nvarchar(28) | 0 |  | 0 | 项目类别
+xc | int | 1 | ((0)) | 0 | 项次
+wzdm | nvarchar(460) | 0 |  | 0 | 检验项目
+lot_no | nvarchar(60) | 1 |  | 0 | 判定基准
+color | nvarchar(60) | 1 |  | 0 | 检验仪器/方法
+siz | nvarchar(60) | 1 |  | 0 | 判定结果
+sl | float | 1 | ((0)) | 0 | 不良数量
+in_date | datetime | 1 |  | 0 | 检测日期
+ywman | nvarchar(40) | 1 |  | 0 | 检验员
+in_danj | float | 1 | ((0)) | 0 | 测量值1
+i_zk | float | 1 | ((0)) | 0 | 测量值2
+i_zke | float | 1 | ((0)) | 0 | 测量值3
+rk_sl | float | 1 | ((0)) | 0 | 测量值5
+bz | nvarchar(200) | 1 |  | 0 | 测量值4
+od_no | nvarchar(28) | 1 |  | 0 | 来源单号
+od_xc | float | 1 | ((0)) | 0 | 行号
+pl_no | nvarchar(28) | 1 |  | 0 | 
+rk_no | nvarchar(60) | 1 |  | 0 | 
+gfdm | nvarchar(16) | 1 |  | 0 | 厂商代码
+ll_no | nvarchar(60) | 1 |  | 0 | 
+ja | nvarchar(2) | 1 |  | 0 | 
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | 创建人
+asp_time1 | datetime | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | 最后修改人
+asp_time2 | datetime | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 审核人
+asp_time3 | datetime | 1 |  | 0 | 审核时间
+asp_cancel | varchar(1) | 1 | ('N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 删除人
+asp_time4 | datetime | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 33 rows
+
+==== TABLE pjjl ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+id | int | 0 |  | 1 | 
+sc_no | nvarchar(28) | 0 |  | 0 | 生产单号
+wzdm | nvarchar(80) | 1 |  | 0 | 物料编码
+mc | nvarchar(500) | 1 |  | 0 | 产品名称
+gg | nvarchar(500) | 1 |  | 0 | 产品规格
+jldw | nvarchar(16) | 1 |  | 0 | 计量单位
+sc_date | datetime | 1 |  | 0 | 检验日期
+gd_id | int | 1 | ((0)) | 0 | 生产ID
+ywman | nvarchar(40) | 1 |  | 0 | 检验员
+gldh | nvarchar(40) | 1 |  | 0 | 工单号码
+pl_xc | int | 1 | ((0)) | 0 | 工单项次
+gxdm | nvarchar(16) | 1 |  | 0 | 工序代码
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 颜色
+siz | nvarchar(60) | 1 |  | 0 | 尺码
+sl | float | 1 | ((0)) | 0 | 数量
+loss | float | 1 | ((0)) | 0 | 损耗
+loss_ra | float | 1 | ((0)) | 0 | 损耗率
+bf_qty | float | 1 | ((0)) | 0 | 报废数量
+bl_qty | float | 1 | ((0)) | 0 | 不良数量
+bz | nvarchar(200) | 1 | ((0)) | 0 | 备注
+scx | nvarchar(16) | 1 |  | 0 | 生产线
+scxmc | nvarchar(40) | 1 |  | 0 | 生产线名称
+tm | nvarchar(60) | 1 |  | 0 | 条码
+jybh | nvarchar(60) | 1 |  | 0 | 检验编号
+lx | nvarchar(200) | 1 |  | 0 | 类型
+wj | nvarchar(60) | 1 |  | 0 | 外径
+htys | nvarchar(500) | 1 |  | 0 | 护套颜色
+cpcz | nvarchar(500) | 1 |  | 0 | 产品材质
+sx | nvarchar(500) | 1 |  | 0 | 纱型
+jm | nvarchar(60) | 1 |  | 0 | 计米
+zxbz | nvarchar(60) | 1 |  | 0 | 执行标准
+jyjl | nvarchar(40) | 1 |  | 0 | 检验结论
+sjd | nvarchar(500) | 1 |  | 0 | 松紧度
+tdyt | nvarchar(300) | 1 |  | 0 | 特定用途
+jbbh | text | 1 |  | 0 | 紧包编号
+gd_ph | nvarchar(60) | 1 |  | 0 | 工单盘号
+mc_e | nvarchar(500) | 1 |  | 0 | 英文名称
+gg_e | nvarchar(500) | 1 |  | 0 | 英文规格
+pp | nvarchar(60) | 1 |  | 0 | 品牌
+type | nvarchar(60) | 1 |  | 0 | 检验类型
+rk_no | nvarchar(28) | 1 |  | 0 | 入库单号
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | 创建人
+asp_time1 | datetime | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | 最后修改人
+asp_time2 | datetime | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 审核人
+asp_time3 | datetime | 1 |  | 0 | 审核时间
+asp_cancel | varchar(1) | 1 |  | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 删除人
+asp_time4 | datetime | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 53 rows
+
+==== TABLE pjjl_sz ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 | ((0)) | 0 | 公司
+id | int | 0 |  | 1 | 
+pj_id | int | 0 |  | 0 | 品检单ID
+dh_no | nvarchar(28) | 0 |  | 0 | 项目类别
+xc | int | 1 | ((0)) | 0 | 项次
+wzdm | nvarchar(460) | 0 |  | 0 | 检验项目
+lot_no | nvarchar(60) | 1 |  | 0 | 判定基准
+color | nvarchar(60) | 1 |  | 0 | 检验仪器/方法
+siz | nvarchar(60) | 1 |  | 0 | 判定结果
+sl | float | 1 | ((0)) | 0 | 不良数量
+in_date | datetime | 1 |  | 0 | 检测日期
+ywman | nvarchar(40) | 1 |  | 0 | 检验员
+in_danj | float | 1 | ((0)) | 0 | 测量值1
+i_zk | float | 1 | ((0)) | 0 | 测量值2
+i_zke | float | 1 | ((0)) | 0 | 测量值3
+rk_sl | float | 1 | ((0)) | 0 | 测量值5
+bz | nvarchar(200) | 1 |  | 0 | 测量值4
+od_no | nvarchar(28) | 1 |  | 0 | 来源单号
+od_xc | float | 1 | ((0)) | 0 | 行号
+pl_no | nvarchar(28) | 1 |  | 0 | 
+rk_no | nvarchar(60) | 1 |  | 0 | 
+gfdm | nvarchar(16) | 1 |  | 0 | 厂商代码
+ll_no | nvarchar(60) | 1 |  | 0 | 
+ja | nvarchar(2) | 1 |  | 0 | 
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | 创建人
+asp_time1 | datetime | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | 最后修改人
+asp_time2 | datetime | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 审核人
+asp_time3 | datetime | 1 |  | 0 | 审核时间
+asp_cancel | varchar(1) | 1 | ('N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 删除人
+asp_time4 | datetime | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 34 rows
+
+==== TABLE kucun ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 | ((0)) | 0 | 公司
+id | int | 0 |  | 1 | 
+kucun_no | nvarchar(28) | 1 |  | 0 | 
+khdm | nvarchar(16) | 1 |  | 0 | 客户代码
+wzdm | nvarchar(60) | 0 |  | 0 | 物料代码
+update_date | datetime | 1 |  | 0 | 
+ckdm | nvarchar(12) | 1 |  | 0 | 仓库
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 颜色
+siz | nvarchar(60) | 1 |  | 0 | 尺寸
+in_date | datetime2 | 1 |  | 0 | 最晚入库日期
+rkl | float | 1 | ((0)) | 0 | 入库量
+rkl2 | float | 1 | ((0)) | 0 | 入库量（匹）
+out_date | datetime2 | 1 |  | 0 | 最晚出库日期
+ckl | float | 1 | ((0)) | 0 | 出库量
+ckl2 | float | 1 | ((0)) | 0 | 出库量（匹）
+yl | float | 1 | ((0)) | 0 | 余量
+yl2 | float | 1 | ((0)) | 0 | 余量(盘)
+price | float | 1 | ((0)) | 0 | 单价
+price2 | float | 1 | ((0)) | 0 | 不含税单价
+bz | nvarchar(200) | 1 |  | 0 | 备注
+total_je | float | 1 | ((0)) | 0 | 
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+预警数量 | decimal(18,4) | 1 |  | 0 | 
+-- 33 rows
+
+==== TABLE zc ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 | ((0)) | 0 | 公司
+id | int | 0 |  | 1 | 
+zc_no | nvarchar(28) | 0 |  | 0 | 
+zc_date | datetime | 1 |  | 0 | 
+ywman | nvarchar(16) | 1 |  | 0 | 业务员
+o_ckdm | nvarchar(12) | 1 |  | 0 | 
+i_ckdm | nvarchar(12) | 1 |  | 0 | 
+wzdm | nvarchar(60) | 0 |  | 0 | 物料代码
+lot_no | nvarchar(60) | 1 |  | 0 | 批号
+color | nvarchar(60) | 1 |  | 0 | 
+siz | nvarchar(60) | 1 |  | 0 | 
+sl | float | 1 | ((0)) | 0 | 数量
+total_je | float | 1 | ((0)) | 0 | 
+bz | nvarchar(200) | 1 |  | 0 | 备注
+sh | nvarchar(2) | 1 |  | 0 | 
+asp_user1 | nvarchar(40) | 1 | ('') | 0 | 创建人
+asp_time1 | datetime | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 | ('') | 0 | 最后修改人
+asp_time2 | datetime | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 | ('') | 0 | 审核人
+asp_time3 | datetime | 1 |  | 0 | 审核时间
+asp_cancel | varchar(1) | 1 |  | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 | ('') | 0 | 删除人
+asp_time4 | datetime | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 25 rows
+
+==== TABLE s_allno ====
+name | typ | is_nullable | dflt | is_identity | cmt
+comm | nvarchar(40) | 0 |  | 0 | 公司
+ID | int | 0 |  | 1 | 
+dh | nvarchar(40) | 1 |  | 0 | 单号
+lb | nvarchar(40) | 1 |  | 0 | 类别
+ny | nvarchar(20) | 1 |  | 0 | 年月
+bz | nvarchar(100) | 1 |  | 0 | 备注
+asp_user1 | nvarchar(40) | 1 |  | 0 | 创建人
+asp_time1 | datetime2 | 1 | (getdate()) | 0 | 创建时间
+asp_user2 | nvarchar(40) | 1 |  | 0 | 最后修改人
+asp_time2 | datetime2 | 1 |  | 0 | 最后修改时间
+asp_user3 | nvarchar(40) | 1 |  | 0 | 审核人
+asp_time3 | datetime2 | 1 |  | 0 | 审核时间
+asp_cancel | nvarchar(2) | 1 | (N'N') | 0 | 删除标记
+asp_user4 | nvarchar(40) | 1 |  | 0 | 删除人
+asp_time4 | datetime2 | 1 |  | 0 | 删除时间
+asp_print | int | 1 | ((0)) | 0 | 打印次数
+-- 16 rows

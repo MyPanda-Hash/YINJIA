@@ -136,6 +136,23 @@ public class VoucherFlowService {
     public record BatchLine(String sourceLineKey, String targetLineKey, String inventoryCode,
                             double sourceQty, double qty) { }
 
+    /**
+     * 行级占用:来源单据的**某一条明细行** → 目标单据(单行)。
+     * 用于「按订单行 1:1 生成工单」的排产口径(参考库 plang_pc:一张工单=一条订单行,可分批增量排产),
+     * 与 {@link #link} 的整单批量映射并存;行键沿用 lineKey(docNo#行id) 约定,选单过滤据此识别已排产行。
+     * (2026-09-24 随生产域「订单结转/排产工作台」下拉)
+     */
+    public void linkLine(String sourcePanel, String sourceNo, String sourceLineKey, String inventoryCode, double qty,
+                         String targetPanel, String targetNo, String targetLineKey, String businessType) {
+        jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_detail_key, source_line_key,"
+                        + " target_panel_code, target_form_no, target_detail_key, target_line_key,"
+                        + " inventory_code, source_quantity, linked_quantity, link_status, create_by)"
+                        + " VALUES (?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?)",
+                sourcePanel, sourceNo, null, sourceLineKey,
+                targetPanel, targetNo, null, targetLineKey,
+                inventoryCode, qty, qty, currentUser());
+    }
+
     /** 释放占用(删除/作废下游单据):link 置 RELEASED,来源行重新可选。
      *  2026-09-21 取号时机迁移:批次台账**不再回收**(批次号在采购入库单审核时已定,回收会重号,
      *  用户口径「弃审/作废不回收批次号」)—— batchService.releaseByTarget 现为不回收实现。 */

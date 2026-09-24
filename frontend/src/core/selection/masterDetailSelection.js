@@ -3,7 +3,7 @@ function text(value) {
 }
 
 export function sourceDocumentNo(row) {
-  return text(row?.来源单号 || row?.单据编号 || row?.编号 || row?.锭号)
+  return text(row?.来源单号 || row?.单据编号 || row?.编号)
 }
 
 export function sourceLineKey(row, index = 0) {

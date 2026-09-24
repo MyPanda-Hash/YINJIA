@@ -1,0 +1,53 @@
+﻿diff --git a/tools/db-migrations.txt b/tools/db-migrations.txt
+index 80f3e475..4ed51a60 100644
+--- a/tools/db-migrations.txt
++++ b/tools/db-migrations.txt
+@@ -438,4 +438,46 @@ migrate-report-template-comments.sql
+ migrate-po-inbound-fields.sql
+ 
+ # ���� 2026-09-18 ��Ʒ�����ϼ���(����Զ����ֶ�)���ߡ���������涨���Զ����ֶκ� API �ɶ�(ɳ��� custom_field__1__62jiaob3z7yj97 ʵ֤:CL004=�� ȫ��·ͨ);bs_inv ����ʵ�� ���ϼ���(��/��,���ά��MESֻ��);check_type ��������� ��Ʒ����(1��ͨ/2��װ/3����,��ǰ��������鷽ʽ);sync-core CF_INSPECTION_KEYS �ǼǱ�(��ʵ���׼����䶨���Ǽ�);INV��� detail��ֻ�����ݵȿ����� ����
+-migrate-material-inspection-field.sql
+\ No newline at end of file
++migrate-material-inspection-field.sql
++# —— 2026-09-21 生产加工单补排产/执行字段(参考库 plang_pc 口径:需求/排产/入库/余量/入库单号/领料单号/外包单号/结案/来料性质·单号·采购入库单号/单据类型/生产线/操作员/单价/金额 + 拆单源工单号·拆分序号) + 新建「生产排产」面板(v_manu_schedule);新增列带中文注明、新字段带 en 译名。幂等可重跑 ——
++migrate-manu-order-schedule.sql
++
++# —— 2026-09-21 工序工时(gxgs)面板化 + 产线层级补录(dm_gx.SCX→bs_dict 106/10601/10602) ——
++migrate-op-time-and-scx.sql
++
++# —— 2026-09-22 单轨改造(用户拍板·参考库式):报工锚 MANU_ORDER(WO_REPORT.工单号参照换锚+upsert 建行/Java);齐套 v_wo_kit 改指 bd_manu_order;排产看板并入五工序完成/未完成数量(migrate-manu-order-schedule 同步改);WO_ORDER/WO_SCHEDULE 菜单下线(menus.js,面板权限保留可回滚) ——
++migrate-single-track-report.sql
++
++# —— 2026-09-22 快速排产(专用界面)配套:加工单行「每箱数量」列+字段+en 译名(银嘉口径替代旧「每盘数量」) ——
++migrate-quick-schedule.sql
++
++# —— 2026-09-22 排单计划表(手写表)口径落地 + 快速排产改锚生产加工单 ——
++# 内容:①bd_manu_order 补「重点管控」列(手写表「是否重点管控产品」落点)+字段+en 译名+中文注明;
++#      ②重建 v_manu_schedule:补 重点管控/生产订单数量/每箱数量/箱数/计划开工日,
++#        五工序(混料·成型·切炭·组装·装箱)「计划数量/未完成数量」成列(完成数=报工求和口径不变);
++#      ③MANU_SCHEDULE 面板登记上述新列 + en 译名 14 条。
++# 幂等:COL_LENGTH / IF NOT EXISTS / 视图先删后建。依赖:migrate-single-track-report.sql(wo_progress 单轨)。
++migrate-schedule-plan-form.sql
++
++# —— 2026-09-22 产线产能设定 + 待产/完工口径(用户流程图 ⑤⑦) ——
++# 内容:①新建 bs_line_capacity 产线产能(生产线唯一索引 + 表/列中文注明);
++#      ②重建 v_manu_schedule 补 开产量(首道有报工工序完成数量)/生产状态(完工·在产·待产·未排产);
++#      ③MANU_SCHEDULE 登记 开产量/生产状态 + en 译名。
++# 幂等:OBJECT_ID / IF NOT EXISTS / 视图先删后建。依赖:migrate-schedule-plan-form.sql(52 列基线)。
++migrate-schedule-capacity.sql
++
++# —— 2026-09-22 生产部需求:批次链(混料批次号)+首件通知字段+加工单附件1~6+生产异常处理单 PROD_ABN(档案式闭环 v1) ——
++migrate-prod-batch-first-article.sql
++
++migrate-panel-flow.sql
++migrate-manu-mold-print.sql
++migrate-prod-line-archive.sql
++migrate-schedule-board.sql
++# —— 2026-09-23 工单排产看板开线表:bs_line_open(日×线 是否开线);当日用户拍板去班别,无白/夜班维度 ——
++migrate-line-shift-open.sql
++# —— 2026-09-23 生产加工单 A 类死字段下线(用户拍板):头15列(含锭号:建表冗余编号;含生产车间:车间=产线档案属性,v_manu_schedule 重建挂档案小时产能,v_line_load 联动重建;单据编号真源=合同号)+行6列(GD 模板残留/plang 无对应/全流程无读写;含旧状态五件套,真源 yj_doc_status);v_manu_order_detail 重建;面板字段注销+孤儿词条清理;锭号/测试程序/机构/负责人/是否手工修改单据编码 保留 ——
++migrate-manu-prune-legacy.sql
++# —— 2026-09-23 工序报工单升级(对照参考库 scjl 底稿):删旧状态三件套(真源 yj_doc_status)+加 批号/生产线/入库单号;工序下拉五道+生产线=启用档案;v_manu_schedule 加已报工列(五道完成MAX);报工扣减未交量=排产−max(入库,已报工) ——
++migrate-wo-report-upgrade.sql
++# —— 2026-09-23 工单明细留痕四列(旧系统 ProSchedList 对齐):bd_manu_order 补 结案人/结案时间(ManuCloseHandler 结案写入·取消结案清空)/打印人/打印时间(/px/scheduleBoard/printStamp 打印生产任务单写入);展示=工单排产看板明细列+追溯弹窗,不进 MANU_ORDER 表单 ——
++migrate-manu-close-print-stamp.sql

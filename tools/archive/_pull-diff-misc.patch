@@ -1,0 +1,145 @@
+﻿diff --git a/.gitignore b/.gitignore
+index 87b846ba..79d30d9d 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -75,3 +75,7 @@ deploy/push/push-state.json
+ deploy/push/config.json
+ deploy/push/config.test.json
+ temp-push-sandbox/
++
++# 会话导出包(AI 工具产物,勿入库)
++dsh-session-*/
++.zcodeignore
+diff --git a/backend/src/main/java/com/yinjia/mes/panel/WoPickingHandler.java b/backend/src/main/java/com/yinjia/mes/panel/WoPickingHandler.java
+index 05cb12a6..372b6743 100644
+--- a/backend/src/main/java/com/yinjia/mes/panel/WoPickingHandler.java
++++ b/backend/src/main/java/com/yinjia/mes/panel/WoPickingHandler.java
+@@ -74,7 +74,11 @@ public class WoPickingHandler implements PanelActionHandler {
+                         + " AND ISNULL(asp_cancel, 'N') <> 'Y' AND [子件编码] IS NOT NULL ORDER BY id", productCode);
+         if (bom.isEmpty()) throw new IllegalStateException("产品 " + productCode + " 未维护默认 BOM,不能生成领料单");
+ 
+-        String workshop = str(head.get("生产车间"));
++        // 车间=产线档案属性(2026-09-23 加工单去生产车间列后改查档案)
++        String workshop = null;
++        try { workshop = jdbc.queryForObject(
++                "SELECT [生产车间] FROM bs_prod_line WHERE [生产线] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
++                String.class, str(head.get("生产线"))); } catch (org.springframework.dao.EmptyResultDataAccessException ignore) { }
+         // 4) 组装材料出库单草稿:头 + BOM 行(数量=定额×订单数量;批号留空由扫码补)
+         Map<String, Object> targetHead = new LinkedHashMap<>();
+         targetHead.put("单据日期", java.time.LocalDate.now().toString());
+diff --git a/frontend/src/core/views/DetailMaintainDialog.vue b/frontend/src/core/views/DetailMaintainDialog.vue
+index 00639baa..db7aa9cb 100644
+--- a/frontend/src/core/views/DetailMaintainDialog.vue
++++ b/frontend/src/core/views/DetailMaintainDialog.vue
+@@ -47,7 +47,14 @@
+           >
+             <el-option v-for="o in f.options || []" :key="o.label ?? o" :label="o.label ?? o" :value="o.value ?? o" />
+           </el-select>
+-          <el-switch v-else-if="f.dataType === '是否'" v-model="row[f.dataName]" :disabled="!editable" />
++          <!-- 布尔归一:后端行值可能为 '1'/'0' 字符串(JS 中 '0' 为真值),显式转 bool 再绑开关;
++               行对象可能是 markRaw 的(档案行去响应式),写值后 bump 版本号驱动翻转动画 -->
++          <el-switch
++            v-else-if="f.dataType === '是否'"
++            :model-value="boolOf(row[f.dataName])"
++            :disabled="!editable"
++            @change="(v) => { row[f.dataName] = v; swBump++ }"
++          />
+           <el-input-number
+             v-else-if="f.dataType === '小数' || f.dataType === '整数'"
+             v-model="row[f.dataName]"
+@@ -90,6 +97,13 @@ const props = defineProps({
+ })
+ const emit = defineEmits(['update:modelValue', 'saved'])
+ 
++// 布尔开关渲染依赖(行对象可能 markRaw 去响应式,值变化不触发重渲染——写值后 bump 本版本号驱动翻转动画)
++const swBump = ref(0)
++function boolOf(v) {
++  void swBump.value // 建立渲染依赖
++  return v === true || v === 1 || v === '1' || v === 'true' || v === '是'
++}
++
+ const info = ref(null) // 表头 data（getFormDescriptor.data）
+ const detailDef = ref(null) // detail 定义（tabs）
+ const rows = ref([])
+diff --git a/frontend/src/core/views/QrLabelDialog.vue b/frontend/src/core/views/QrLabelDialog.vue
+index b05c3599..6f1d9c52 100644
+--- a/frontend/src/core/views/QrLabelDialog.vue
++++ b/frontend/src/core/views/QrLabelDialog.vue
+@@ -1,7 +1,7 @@
+ <template>
+-  <el-dialog v-model="visibleModel" :title="tt('材料二维码标签')" width="720px" append-to-body class="qr-label-dlg" @opened="renderQr">
++  <el-dialog v-model="visibleModel" :title="props.title || tt('材料二维码标签')" width="720px" append-to-body class="qr-label-dlg" @opened="renderQr">
+     <div class="qr-label-toolbar">
+-      <span class="qr-label-tip">{{ tt('二维码 = 物料编码|批号（扫描后可解析出入库与追溯信息），每行物料一张标签') }}</span>
++      <span class="qr-label-tip">{{ props.tip || tt('二维码 = 物料编码|批号（扫描后可解析出入库与追溯信息），每行物料一张标签') }}</span>
+       <el-button size="small" type="primary" @click="print">{{ tt('打印') }}</el-button>
+     </div>
+     <div class="qr-label-grid" ref="gridRef">
+@@ -32,8 +32,11 @@ import { tt } from '@/i18n'
+ 
+ const props = defineProps({
+   modelValue: Boolean,
+-  /** [{code, name, lot, qty, unit, doc}] */
++  /** [{code, name, lot, qty, unit, doc, qrText?}] */
+   labels: { type: Array, default: () => [] },
++  /** 标题/提示可覆盖(工单二维码标签等复用本对话框) */
++  title: { type: String, default: '' },
++  tip: { type: String, default: '' },
+ })
+ const emit = defineEmits(['update:modelValue'])
+ const visibleModel = computed({ get: () => props.modelValue, set: v => emit('update:modelValue', v) })
+@@ -42,7 +45,7 @@ const gridRef = ref(null)
+ async function renderQr() {
+   for (const lb of props.labels) {
+     if (!lb.qr && lb.code) {
+-      const text = lb.lot ? `${lb.code}|${lb.lot}` : String(lb.code)
++      const text = lb.qrText || (lb.lot ? `${lb.code}|${lb.lot}` : String(lb.code))
+       try { lb.qr = await QRCode.toDataURL(text, { width: 160, margin: 1, errorCorrectionLevel: 'M' }) }
+       catch { /* 单张失败不影响其余 */ }
+     }
+diff --git a/frontend/src/core/views/SelectVoucherDialog.vue b/frontend/src/core/views/SelectVoucherDialog.vue
+index 20577287..4d27f429 100644
+--- a/frontend/src/core/views/SelectVoucherDialog.vue
++++ b/frontend/src/core/views/SelectVoucherDialog.vue
+@@ -188,12 +188,12 @@ function sourceItems(row) {
+ }
+ function cellText(col, row) {
+   if (row[col] !== undefined && row[col] !== null && row[col] !== '') return row[col]
+-  if (col === '单据编号') return row['锭号'] || row['编号'] || ''
++  if (col === '单据编号') return row['编号'] || ''
+   return sourceItems(row)[0]?.[col] ?? ''
+ }
+ function selVal(row, field) {
+   if (row[field] !== undefined && row[field] !== null && row[field] !== '') return row[field]
+-  if (field === '单据编号') return row['锭号'] || row['编号'] || ''
++  if (field === '单据编号') return row['编号'] || ''
+   return row[field] ?? ''
+ }
+ function itemsText(row) {
+diff --git a/frontend/src/layout/HelpPanel.vue b/frontend/src/layout/HelpPanel.vue
+index 7fc522f6..c4f13b30 100644
+--- a/frontend/src/layout/HelpPanel.vue
++++ b/frontend/src/layout/HelpPanel.vue
+@@ -112,7 +112,7 @@ const messages = [
+ ]
+ 
+ const faqs = [
+-  { q: '如何新建一张生产加工单？', a: '点击左侧菜单「单据查询/新增单据」或在生产管理模块打开「生产加工单」，点击工具栏「新增流程」按钮，填写合同号、锭号、批号等必填项后提交。' },
++  { q: '如何新建一张生产加工单？', a: '点击左侧菜单「单据查询/新增单据」或在生产管理模块打开「生产加工单」，点击工具栏「新增流程」按钮，填写合同号、批号等必填项后提交。' },
+   { q: '单据状态是如何流转的？', a: '草稿 → 提交后待审核 → 审核通过进入「已审核」→ 开工后「生产中」→ 完工后「已完工」→ 归档「已关闭」。草稿状态可编辑删除，审核后可弃审回退。' },
+   { q: '如何切换工厂（账套）？', a: '点击顶栏左侧工厂名称下拉，选择目标工厂即可切换，业务数据按工厂隔离。' },
+   { q: '暗色模式如何开启？', a: '点击顶栏右侧用户头像下拉菜单，选择「换肤（暗色）」，或在「界面设置」中切换。' },
+diff --git a/tools/migrate-golive-cleanup.sql b/tools/migrate-golive-cleanup.sql
+index a4e31004..13c75c09 100644
+--- a/tools/migrate-golive-cleanup.sql
++++ b/tools/migrate-golive-cleanup.sql
+@@ -6,6 +6,9 @@
+ -- 保留:基础档案(bs_*)、yj_* 元数据/用户/角色、金蝶同步单据(pu/so 的 jdy-sync 行)、期初库存(kucun 中 migration 建的行)
+ -- 清除:业务测试单据 + 单据状态 + 日志 + 号池(归零) + 批号流水 + 二维码登记
+ -- ⚠ 破坏性脚本:执行前必须已做保险备份(HSDZ_MES_pre_golive_*.bak);服务器库勿直接执行本脚本
++-- ⚠ sqlcmd 执行须加 -I(QUOTED_IDENTIFIER ON):sqlcmd 默认 OFF,pu/so 订单表带过滤索引,
++--    DELETE 会报 Msg 1934 拒删(2026-09-17 实测;SSMS 默认 ON 故旧机未暴露)。完整命令:
++--    sqlcmd -S localhost -d HSDZ_MES -U sa -P ... -C -f 65001 -I -i tools\migrate-golive-cleanup.sql
+ SET NOCOUNT ON;
+ 
+ -- ── 1. 行表先清(细节) ──

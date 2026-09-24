@@ -1,0 +1,572 @@
+﻿diff --git a/frontend/src/business/menus.js b/frontend/src/business/menus.js
+index fb73570a..e1e8534e 100644
+--- a/frontend/src/business/menus.js
++++ b/frontend/src/business/menus.js
+@@ -191,8 +191,23 @@ export const menuTree = [
+           {
+             // 生产计划(流程图·生管泳道):销售订单→工单→排产→齐套
+             code: 'plan', title: '生产计划', children: [
+-              { code: 'woOrder', title: '生产工单', path: '/panelx/list/WO_ORDER', icon: 'Tickets', panelCode: 'WO_ORDER', operationName: '新增流程' },
+-              { code: 'woSchedule', title: '排单计划', path: '/panelx/list/WO_SCHEDULE', panelCode: 'WO_SCHEDULE', icon: 'DataLine' },
++              // 订单结转·发单工作台(方案 V1.0):待结转行(剩余=需求−已排产−已采购)→转工单/转采购单;
++              // 防重复=行级占用链,转满自动消失;不改销售订单状态。置首位:发单是排产的上一步。
++              { code: 'orderConvert', title: '订单结转', path: '/prod/plan/orderConvert', icon: 'Switch' },
++              // 排产工作台(实现总结 V1.0 §5):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
++              // 排产单一入口(加工单「排产」按钮已下线,表单产线/开工·完工日只读)
++              { code: 'scheduleBoard', title: '排产工作台', path: '/prod/plan/scheduleBoard', icon: 'AlarmClock' },
++              // 2026-09-22 单轨改造(参考库式,用户拍板):生产工单/排单计划菜单下线——
++              // 工单=生产加工单(MANU_ORDER),看板职责由「生产排产 MANU_SCHEDULE」承接(含五工序完成/未完成数量);
++              // 面板与权限行保留可回滚(同 组装BOM表 并页签先例)。恢复:取消下两行注释即可。
++              // { code: 'woOrder', title: '生产工单', path: '/panelx/list/WO_ORDER', icon: 'Tickets', panelCode: 'WO_ORDER', operationName: '新增流程' },
++              // { code: 'woSchedule', title: '排单计划', path: '/panelx/list/WO_SCHEDULE', panelCode: 'WO_SCHEDULE', icon: 'DataLine' },
++              // 2026-09-23 纠偏(用户拍板):「生产排产」平铺看板改为「工单排产」产线骨架视图(参考旧系统工单排产页,
++              // 按产线查看正在运行的工单任务);MANU_SCHEDULE 面板/权限行保留可回滚(同 WO_ORDER 先例)。
++              // { code: 'manuSchedule', title: '生产排产', path: '/panelx/list/MANU_SCHEDULE', panelCode: 'MANU_SCHEDULE', icon: 'Histogram' },
++              { code: 'workOrderBoard', title: '工单排产', path: '/prod/plan/workOrderBoard', icon: 'Histogram' },
++              // 生产线档案在 基础资料→生产(PROD_LINE,2026-09-23 归位);此处负荷看板按 生产线档案日产能 判超载
++              { code: 'lineLoad', title: '产线排产负荷', path: '/panelx/list/LINE_LOAD', panelCode: 'LINE_LOAD', icon: 'DataLine' },
+               { code: 'woKit', title: '工单齐套表', path: '/panelx/list/WO_KIT', panelCode: 'WO_KIT', icon: 'Box' },
+             ],
+           },
+@@ -201,6 +216,8 @@ export const menuTree = [
+             code: 'exec', title: '生产执行', children: [
+               { code: 'woReport', title: '工序报工单', path: '/panelx/list/WO_REPORT', icon: 'Promotion', panelCode: 'WO_REPORT', operationName: '新增流程' },
+               { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
++              // 生产异常闭环(生产部纪要 三:异常提出→分析→处理→结案;挂工单号/批次号按批追溯)
++              { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'WarningFilled' },
+             ],
+           },
+           {
+@@ -351,8 +368,12 @@ export const menuTree = [
+           { code: 'equip', title: '设备', path: '/panelx/list/EQUIP', icon: 'Cpu', panelCode: 'EQUIP', operationName: '新增流程' },
+           { code: 'team', title: '班组', path: '/panelx/list/TEAM', icon: 'UserFilled', panelCode: 'TEAM', operationName: '新增流程' },
+           { code: 'wc', title: '工作中心', path: '/panelx/list/WC', icon: 'Odometer', panelCode: 'WC', operationName: '新增流程' },
++          // 生产线档案(2026-09-23 归位基础资料):排产指派对象,日产能=负荷/超载基准;原「产线产能」(生产计划组)收编下线
++          { code: 'prodLine', title: '生产线', path: '/panelx/list/PROD_LINE', icon: 'DCaret', panelCode: 'PROD_LINE', operationName: '新增流程' },
+           { code: 'process', title: '工序', path: '/panelx/list/OP', icon: 'SetUp', panelCode: 'OP', operationName: '新增流程' },
+           { code: 'routing', title: '工艺路线', path: '/panelx/list/ROUTE', icon: 'Guide', panelCode: 'ROUTE', operationName: '新增流程' },
++          // 工序工时:参考库 gxgs——按 客户×物料×工序 维护 换线/标准·最快·最慢·平均时间与加工单价(排产产能/计件依据)
++          { code: 'opTime', title: '工序工时', path: '/panelx/list/OP_TIME', icon: 'Timer', panelCode: 'OP_TIME', operationName: '新增流程' },
+           { code: 'reject', title: '不合格原因', path: '/panelx/list/REJECT', icon: 'CircleClose', panelCode: 'REJECT', operationName: '新增流程' },
+           { code: 'qcItem', title: '检验项目', path: '/panelx/list/QC_ITEM', icon: 'List', panelCode: 'QC_ITEM', operationName: '新增流程' },
+           { code: 'qcPlan', title: '检验方案', path: '/panelx/list/QC_PLAN', icon: 'DocumentChecked', panelCode: 'QC_PLAN', operationName: '新增流程' },
+diff --git a/frontend/src/core/selection/masterDetailSelection.js b/frontend/src/core/selection/masterDetailSelection.js
+index 40892874..87123a17 100644
+--- a/frontend/src/core/selection/masterDetailSelection.js
++++ b/frontend/src/core/selection/masterDetailSelection.js
+@@ -3,7 +3,7 @@ function text(value) {
+ }
+ 
+ export function sourceDocumentNo(row) {
+-  return text(row?.来源单号 || row?.单据编号 || row?.编号 || row?.锭号)
++  return text(row?.来源单号 || row?.单据编号 || row?.编号)
+ }
+ 
+ export function sourceLineKey(row, index = 0) {
+diff --git a/frontend/src/core/views/PanelxForm.vue b/frontend/src/core/views/PanelxForm.vue
+index d7678f58..94bf7a39 100644
+--- a/frontend/src/core/views/PanelxForm.vue
++++ b/frontend/src/core/views/PanelxForm.vue
+@@ -27,7 +27,7 @@
+       <!-- 单据标题 -->
+       <div class="head">
+         <div class="title">
+-          <span class="no">{{ isEdit ? (form['单据编号'] || form['锭号'] || form['编号'] || '') : tt('（新增）') }}</span>
++          <span class="no">{{ isEdit ? (form['单据编号'] || form['编号'] || '') : tt('（新增）') }}</span>
+           <el-tag v-if="form['单据状态']" size="small" :type="statusTag(form['单据状态'])">{{ tt(form['单据状态']) }}</el-tag>
+         </div>
+       </div>
+@@ -573,7 +573,7 @@ async function openSelectDialog(cfg = selectConfigFor()) {
+           d[key].forEach((it, index) => flat.push({
+             ...r,
+             ...it,
+-            _sourceFormNo: r['编号'] || r['单据编号'] || r['锭号'] || '',
++            _sourceFormNo: r['编号'] || r['单据编号'] || '',
+             _sourceRowNo: index + 1,
+           }))
+         }
+@@ -629,7 +629,7 @@ function confirmSelect() {
+     for (const m of cfg.detailMap || []) {
+       out[m.to] = r[m.from] ?? ''
+     }
+-    const sourceNo = r._sourceFormNo || r['编号'] || r['单据编号'] || r['锭号'] || sourceNos[0] || ''
++    const sourceNo = r._sourceFormNo || r['编号'] || r['单据编号'] || sourceNos[0] || ''
+     const sourceQtyField = cfg.sourceQuantityField || '数量'
+     const targetQtyField = cfg.targetQuantityField || ''
+     out['来源面板'] = cfg.source || ''
+@@ -687,7 +687,7 @@ function applyAttachSlots(map) {
+ }
+ 
+ function fieldLocked(r) {
+-  // 锭号：自动编码；仅勾选「是否手工修改单据编码」时草稿可改
++  // 单据编号：自动编码；仅勾选「是否手工修改单据编码」时草稿可改
+   if (r.autoCode) return !(status.value === '草稿' && form['是否手工修改单据编码'])
+   // 存货类别：创建后固定，不允许修改
+   if (r.code === '类别' && isEdit.value) return true
+@@ -1214,7 +1214,7 @@ async function load() {
+     autoExpandBom()
+     // 页签标题 = 面板名-单据号（新单显示 面板名-新增），便于多单据区分（弹窗嵌入模式跳过）
+     if (!props.embedded) {
+-      const no = isEdit.value ? (form['单据编号'] || form['锭号'] || form['编号'] || '') : '新增'
++      const no = isEdit.value ? (form['单据编号'] || form['编号'] || '') : '新增'
+       // 复用顶部 tabsStore
+       const cur = tabsStore.tabs.find((x) => x.path === route.path)
+       if (cur) cur.title = (payload.panelName || '表单') + '-' + no
+@@ -1295,7 +1295,7 @@ async function onButton(action) {
+   }
+   if (action === '删除') {
+     try {
+-      await ElMessageBox.confirm(`确认删除单据 ${form['单据编号'] || form['锭号'] || form['编号']}？`, '提示', { type: 'warning' })
++      await ElMessageBox.confirm(`确认删除单据 ${form['单据编号'] || form['编号']}？`, '提示', { type: 'warning' })
+     } catch (e) {
+       return
+     }
+@@ -1305,7 +1305,7 @@ async function onButton(action) {
+   if (action === '审核') {
+     // 已审核过的单据不允许再次审核，也不允许补填审批意见
+     if (status.value !== '草稿') return ElMessage.warning('仅草稿状态可审核，已审核单据不允许再次审核')
+-    const no = form['单据编号'] || form['锭号'] || form['编号'] || ''
++    const no = form['单据编号'] || form['编号'] || ''
+     try {
+       const { value } = await ElMessageBox.prompt(
+         '单据：' + no + '（当前状态：' + status.value + '）',
+@@ -1329,7 +1329,7 @@ async function onButton(action) {
+   if (action === '提交审批' || action === '审批通过') {
+     const need = action === '提交审批' ? '草稿' : '审批中'
+     if (status.value !== need) return ElMessage.warning(action === '提交审批' ? '仅草稿状态可提交审批' : '仅审批中状态可审批通过')
+-    const no = form['单据编号'] || form['锭号'] || form['编号'] || ''
++    const no = form['单据编号'] || form['编号'] || ''
+     try {
+       const { value } = await ElMessageBox.prompt(
+         '单据：' + no + '（当前状态：' + status.value + '）',
+@@ -1342,7 +1342,7 @@ async function onButton(action) {
+     }
+   } else if (action === '审批驳回') {
+     if (status.value !== '审批中') return ElMessage.warning('仅审批中状态可审批驳回')
+-    const no = form['单据编号'] || form['锭号'] || form['编号'] || ''
++    const no = form['单据编号'] || form['编号'] || ''
+     try {
+       const { value } = await ElMessageBox.prompt(
+         '单据：' + no + '（当前状态：审批中）\n驳回必须填写审批意见',
+@@ -1354,7 +1354,7 @@ async function onButton(action) {
+       return
+     }
+   } else if (action === '审批情况') {
+-    approvalNo.value = form['编号'] || form['单据编号'] || form['锭号'] || ''
++    approvalNo.value = form['编号'] || form['单据编号'] || ''
+     approvalVisible.value = true
+     return
+   }
+diff --git a/frontend/src/core/views/PanelxList.vue b/frontend/src/core/views/PanelxList.vue
+index a4771164..b15ce318 100644
+--- a/frontend/src/core/views/PanelxList.vue
++++ b/frontend/src/core/views/PanelxList.vue
+@@ -542,9 +542,9 @@
+           />
+           <el-switch
+             v-else-if="isBooleanField(field)"
+-            v-model="cur[headerFieldKey(field)]"
++            :model-value="toBool(cur[headerFieldKey(field)])"
+             :disabled="headerFieldLocked(field)"
+-            @change="markInlineDirty"
++            @change="(v) => { cur[headerFieldKey(field)] = v; markInlineDirty() }"
+           />
+           <el-input
+             v-else
+@@ -744,6 +744,14 @@
+               <template v-else>
+               <template v-if="archEditable(b) && !row._placeholder">
+                 <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
++                <!-- 生产线档案「停用」列:开关形式(同生产加工单表单开关风格)——@change 同步乐观翻转(点击即动画),
++                     POST 落库,失败回滚;停用后从排产工作台消失、排入被后端拦截 -->
++                <span v-else-if="isLineToggleCol(c.prop)" class="line-toggle-cell">
++                  <el-switch
++                    :model-value="toBool(row[c.prop])"
++                    @change="(v) => toggleLineDisable(row, v)"
++                  />
++                </span>
+                 <!-- 档案页参照列同样懒挂载(2026-09-16):大数据档案每行常驻参照编辑器是 DOM 膨胀主源之一;
+                      单据页行数少,保持常驻(点即选)不变 -->
+                 <div v-else-if="isReferenceField(c.field) && (!singleDocMode.value || isActiveCell(row, b, c.prop))" class="inline-ref-editor" :class="{ active: isActiveDetailRefRow(row, b, c.prop) }">
+@@ -757,8 +765,10 @@
+                 </div>
+                 <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                 <!-- 编辑器懒渲染:仅激活单元格挂载编辑控件,其余单元格显示纯文本,
+-                     避免大数据量面板(如数据字典 210 行)每格常驻编辑器导致 DOM 膨胀 -->
+-                <template v-else-if="isActiveCell(row, b, c.prop)">
++                     避免大数据量面板(如数据字典 210 行)每格常驻编辑器导致 DOM 膨胀。
++                     布尔列(是否)不做格内开关(激活即开关会造成点一处蹦一处/窜行误观感,2026-09-23 用户拍板去除),
++                     明细格永久显示 是/否 文本,开关仅在编辑弹窗内(DetailMaintainDialog)。 -->
++                <template v-else-if="isActiveCell(row, b, c.prop) && !isBooleanField(c.field)">
+                   <el-select
+                     v-if="isSelectField(c.field)"
+                     v-model="row[c.prop]"
+@@ -785,12 +795,6 @@
+                     :controls="false"
+                     @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+                   />
+-                  <el-switch
+-                    v-else-if="isBooleanField(c.field)"
+-                    v-model="row[c.prop]"
+-                    :disabled="c.field.computed"
+-                    @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+-                  />
+                   <el-input
+                     v-else
+                     v-model="row[c.prop]"
+@@ -804,7 +808,7 @@
+                 <span>{{ tt(row[c.prop] ?? '') }}</span>
+                 <span v-if="hasSubBom(row[c.prop])" class="mat-star" :title="tt('该材料有下级子件 BOM，点击行查看')">*</span>
+               </span>
+-              <span v-else>{{ tt(row[c.prop] ?? '') }}</span>
++              <span v-else>{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+               </template>
+             </template>
+           </el-table-column>
+@@ -3815,6 +3819,41 @@ function isBooleanField(field) {
+   return ['是否', 'Boolean', 'BOOL'].includes(fieldType(field))
+ }
+ 
++/** 生产线档案「停用」列按钮化:仅 PROD_LINE 面板的 停用 列走行内切换按钮 */
++function isLineToggleCol(prop) {
++  return panelCode.value === 'PROD_LINE' && prop === '停用'
++}
++
++/** 生产线档案「停用」列:开关切换——@change 给出的新值**同步乐观翻转**(点击立即出动画),
++ *  POST 落库以服务端结果校准,失败回滚。⚠ 档案行是 markRaw 的(去响应式优化),
++ *  改 row 属性不触发重渲染——每次写值后按平台约定 bump archVersion 驱动刷新 */
++async function toggleLineDisable(row, next) {
++  if (row._toggling) return
++  const old = row['停用']
++  row['停用'] = next ? 1 : 0                 // 乐观更新
++  archVersion.value++                        // 档案行 markRaw:bump 版本号 → 重渲染 → 动画立即播放
++  row._toggling = true
++  try {
++    const res = await request.post('/px/prodLine/toggle', { 生产线: row.生产线 })
++    row['停用'] = res.data?.['停用'] ?? row['停用']   // 以服务端翻转结果为准
++    archVersion.value++
++    ElMessage.success(row['停用'] === 1
++      ? tt('已停用') + '：' + row.生产线 + tt('（排产工作台已不可选）')
++      : tt('已启用') + '：' + row.生产线)
++  } catch (e) {
++    row['停用'] = old                      // 失败回滚(反向动画退回)
++    archVersion.value++
++    ElMessage.error(e?.response?.data?.message || tt('操作失败'))
++  } finally {
++    row._toggling = false
++  }
++}
++
++/** 布尔归一化:后端 bit 经行映射可能为 boolean/1/'1'/'true'/'是'(字符串 '0' 在 JS 为真值,必须显式归一) */
++function toBool(v) {
++  return v === true || v === 1 || v === '1' || v === 'true' || v === 'True' || v === '是'
++}
++
+ function fieldOptions(field) {
+   return (field?.options || engine.fieldOptions(field || {}) || []).map((option) => (
+     typeof option === 'object'
+@@ -3825,7 +3864,7 @@ function fieldOptions(field) {
+ 
+ function formatFieldValue(field, value) {
+   if (value === undefined || value === null || value === '') return ''
+-  if (isBooleanField(field)) return value ? '是' : '否'
++  if (isBooleanField(field)) return toBool(value) ? '是' : '否'
+   return String(value)
+ }
+ 
+@@ -4552,7 +4591,7 @@ function openForm(row) {
+   }
+   const q = { operationName: operationName.value }
+   if (row && row['编号']) q.code = row['编号']
+-  const no = row ? row['单据编号'] || row['锭号'] || row['编号'] : ''
++  const no = row ? row['单据编号'] || row['编号'] : ''
+   const title = row ? `${panelName.value}-${no}` : `${panelName.value}-新增`
+   router.push({ path: `/panelx/form/${panelCode.value}`, query: q })
+   tabs.open({ path: `/panelx/form/${panelCode.value}`, title, query: q })
+@@ -4861,14 +4900,19 @@ async function onButton(action) {
+     openQrLabels()
+     return
+   }
+-  // 工单二维码(计划层):单产品工单一张标签,二维码=工单号(扫码报工/领料入口)
++  // 工单二维码(计划层):单产品工单一张标签,二维码=工单号|批号|产品|数量|产线(扫码报工/领料入口);
++  // 2026-09-22 面板化:适配生产加工单(MANU_ORDER)字段(合同号/排产数量/生产单位/工序交期/生产线)
+   if (action === '打印工单二维码') {
+     const cur = current.value || {}
+-    const no = cur['单据编号'] || cur['编号'] || ''
++    const no = cur['单据编号'] || cur['编号'] || cur['合同号'] || cur['加工单号'] || ''
+     if (!no) return ElMessage.warning('请先选择一张工单')
++    const qty = cur['排产数量'] ?? cur['订单数量'] ?? cur['数量'] ?? ''
++    const unit = cur['生产单位'] || cur['单位'] || ''
++    const due = cur['工序交期'] || cur['预完工日'] || cur['交期'] || '-'
+     qrLabels.value = [{
+-      code: no, name: cur['产品名称'] || '', lot: '', qty: cur['订单数量'], unit: cur['单位'] || '',
+-      doc: `交期 ${cur['交期'] || '-'}`, qr: '',
++      code: no, name: cur['产品名称'] || cur['品名'] || '', lot: cur['批号'] || '', qty, unit,
++      doc: `交期 ${due}` + (cur['生产线'] ? ` · ${cur['生产线']}` : ''),
++      qrText: `${no}|${cur['批号'] || ''}|${cur['产品编码'] || ''}|${qty}|${cur['生产线'] || ''}`, qr: '',
+     }]
+     qrVisible.value = true
+     return
+@@ -5228,7 +5272,7 @@ async function onButton(action) {
+     ElMessage.success(`「${action}」执行成功`)
+     await load()
+     const actionIndex = list.value.findIndex((item) => (
+-      (item['编号'] || item['单据编号'] || item['锭号']) === actionDocumentNo
++      (item['编号'] || item['单据编号']) === actionDocumentNo
+     ))
+     if (actionIndex >= 0) curIdx.value = actionIndex
+   } catch (e) {
+@@ -5311,7 +5355,7 @@ async function load() {
+     // 2026-08-25：?focus=单号 定位（选单/生单从表单页跳转过来时直接显示目标单据）
+     const focus = route.query.focus
+     if (focus) {
+-      const fi = list.value.findIndex((r) => (r['编号'] || r['单据编号'] || r['锭号']) === String(focus))
++      const fi = list.value.findIndex((r) => (r['编号'] || r['单据编号']) === String(focus))
+       if (fi >= 0) curIdx.value = fi
+       router.replace({ path: route.path, query: { ...route.query, focus: undefined } })
+     }
+@@ -5350,7 +5394,7 @@ function onSelGenerated(generated) {
+   const finish = () => {
+     if (first) {
+       // 2026-08-25：选单生成后不再弹窗，直接定位到列表页新选入单据（一屏一单流览）
+-      const idx = list.value.findIndex((r) => (r['编号'] || r['单据编号'] || r['锭号']) === first.no)
++      const idx = list.value.findIndex((r) => (r['编号'] || r['单据编号']) === first.no)
+       curIdx.value = idx >= 0 ? idx : 0
+     }
+   }
+diff --git a/frontend/src/i18n/locales/en.js b/frontend/src/i18n/locales/en.js
+index 3fefe938..734cee54 100644
+--- a/frontend/src/i18n/locales/en.js
++++ b/frontend/src/i18n/locales/en.js
+@@ -45,6 +45,175 @@ export default {
+     logout: 'Sign out',
+   },
+   biz: {
++    // 生产排产域·面板按钮名(面板↔面板流转,2026-09-22;字段标签走 yj_translation,不在此重复)
++    '排产': 'Schedule',
++    '生成生产加工单': 'Create Production Order',
++    '首件完成通知': 'First Article Notice',
++    '生成采购申请': 'Create Purchase Request',
++    '打印工单二维码': 'Print WO QR Code',
++    // 订单结转·发单工作台(方案 V1.0,2026-09-22)
++    '订单结转': 'Order Convert',
++    '未结转订单汇总': 'Unconverted Orders',
++    '今日结转订单汇总': 'Converted Today',
++    '当前数据': 'Current',
++    '总订单笔数': 'Lines',
++    '总款数': 'Items',
++    '总下单数量': 'Total Qty',
++    '查询条件': 'Filter',
++    '订单号 / 客户 / 物料': 'Order no. / customer / item',
++    '转工单': 'To Work Order',
++    '转采购单': 'To Purchase',
++    '订单资料': 'Order Info',
++    '重点管控': 'Key Control',
++    '需求数量': 'Demand Qty',
++    '已排产数量': 'Scheduled Qty',
++    '已采购数量': 'Purchased Qty',
++    '剩余数量': 'Remaining Qty',
++    '本次转单数量': 'Qty This Run',
++    '请先勾选要结转的订单行': 'Select order lines to convert first',
++    '确认将选中的': 'Convert the selected',
++    '行': 'line(s)',
++    '合计': 'Total',
++    '已生成': 'Created',
++    '张': 'doc(s)',
++    '跳过': 'skipped',
++    '前往查看': 'Go to Panel',
++    '留在本页': 'Stay Here',
++    '转单失败': 'Convert failed',
++    // 排产工作台·线班骨架(参考工单排产页,2026-09-23)
++    '排产明细': 'Scheduled Detail',
++    // 工单排产(2026-09-23 纠偏:产线骨架看板,替代「生产排产」菜单;同日去班别,骨架=档案全部线)
++    '工单排产': 'Work Order Scheduling',
++    '未完工量': 'Outstanding',
++    '未交量': 'Backlog',
++    '已报工': 'Reported',
++    '（点击左侧选择）': '(select on the left)',
++    '排产日期': 'Scheduled On',
++    '计划完工日期': 'Planned Finish',
++    '停用线不可开线': 'Disabled lines cannot be opened',
++    '确认将': 'Confirm to set',
++    '每箱数量': 'Qty / Box',
++    '日产能': 'Daily Capacity',
++    // 工单排产·明细列+取消结案/追溯/打印工单(2026-09-23,旧系统 ProSchedList 对齐)
++    '取消结案': 'Unclose',
++    '追溯': 'Trace',
++    '打印工单': 'Print WO',
++    '实际完工日期': 'Actual Finish',
++    '领料单号': 'Picking No.',
++    '结案': 'Closed',
++    '已结案': 'Closed',
++    '结案人': 'Closed By',
++    '结案时间': 'Closed At',
++    '打印人': 'Printed By',
++    '打印时间': 'Printed At',
++    '打印次数': 'Print Count',
++    '工单追溯': 'WO Trace',
++    '产品': 'Product',
++    '未排产': 'Unscheduled',
++    '流转时间线': 'Flow Timeline',
++    '步骤': 'Step',
++    '操作人': 'Operator',
++    '排产数据': 'Scheduling Data',
++    '开产量': 'Started Qty',
++    '计划开工日': 'Planned Start',
++    '完工数据': 'Completion Data',
++    '暂无报工': 'No reports yet',
++    '报工人': 'Reported By',
++    '报工时间': 'Reported At',
++    '入库单据': 'Receipt Docs',
++    '暂无入库': 'No receipts yet',
++    '领料数据': 'Picking Data',
++    '暂无领料': 'No pickings yet',
++    '领料日期': 'Picking Date',
++    '选中工单中没有已结案的': 'No closed work orders among the selected',
++    '确认取消选中的': 'Confirm to unclose the selected',
++    '张工单的结案': 'work orders?',
++    '取消后回到已审核,可继续排产/报工': 'They return to audited state and can be scheduled/reported again',
++    '已取消结案': 'Unclosed',
++    '生产任务单': 'Production Task Sheet',
++    '线体': 'Line',
++    '制单': 'Prepared By',
++    '浏览器拦截了打印窗口,请允许弹出窗口': 'Print window blocked; please allow pop-ups',
++    '已发送打印': 'Sent to print:',
++    '开线': 'Line Open',
++    '未开线': 'Not Open',
++    '已开线': 'Open',
++    '开线管理': 'Line Open/Close',
++    '关闭开线': 'Close this line?',
++    '设为开线': 'Open this line?',
++    '开线状态已更新': 'Line status updated',
++    '点击切换开线/关线': 'Click to toggle line open/close',
++    '未完工': 'Unfinished',
++    '已完工': 'Finished',
++    '目标生产线': 'Target Line',
++    '确认调线': 'Confirm Move',
++    '批量调线': 'Batch Move',
++    '已调线': 'Moved',
++    '调线失败': 'Move failed',
++    '请选择目标生产线': 'Select a target line',
++    '启用': 'Enable',
++    '停用': 'Disable',
++    '已停用': 'Disabled: ',
++    '已启用': 'Enabled: ',
++    '（排产工作台已不可选）': ' (removed from schedule board)',
++    '操作失败': 'Operation failed',
++    '保存交期': 'Save Due Dates',
++    '交期已保存': 'Due dates saved',
++    '同步交期常与创建日期雷同，可在此修正；保存交期或转单时回写订单行': 'Synced due dates often equal the created date; correct here - saved on Save or on convert',
++    // 排产工作台(实现总结 V1.0 §5,2026-09-23)
++    '排产工作台': 'Schedule Board',
++    '排产参数': 'Assign Params',
++    '选择生产线': 'Select line',
++    '今日负荷': 'Today Load',
++    '排产班组': 'Team',
++    '预开工日': 'Planned Start',
++    '预完工日': 'Planned End',
++    '排产数量': 'Qty to Schedule',
++    '空=全排': 'blank = all',
++    '客户': 'Customer',
++    '关键字': 'Keyword',
++    '订单号 / 加工单号 / 产品 / 品名': 'Order / MO no. / item / name',
++    '批量排入勾选': 'Assign Selected',
++    '待排产': 'Pending',
++    '笔': 'rows',
++    '今日排产': 'Scheduled Today',
++    '张': 'docs',
++    '件': 'pcs',
++    '总未完成量': 'Total Outstanding',
++    '双击行即排入该单': 'Double-click a row to assign it',
++    '客户等级': 'Grade',
++    '客户订单号': 'Cust. Order No.',
++    '加工单号': 'MO No.',
++    '单据日期': 'Doc Date',
++    '产品编号': 'Item Code',
++    '品名': 'Item Name',
++    '型号': 'Model',
++    '单位': 'UOM',
++    '混料批次号': 'Mixing Lot',
++    '工序交期': 'Process Due',
++    '交期紧迫度': 'Due Urgency',
++    '本次排产数量': 'Qty This Run',
++    '今日已排产': "Today's Assigned",
++    '全部已排产': 'All Assigned',
++    '全部': 'All',
++    '撤销排产': 'Unassign',
++    '生产线': 'Line',
++    '生产状态': 'Status',
++    '箱数': 'Boxes',
++    '入库数量': 'Received',
++    '余量': 'Balance',
++    '确认将选中的': 'Assign the selected',
++    '张加工单排入': 'work orders to line',
++    '已排产': 'Assigned',
++    '超载': 'Overload',
++    '排产回执': 'Assign Receipt',
++    '知道了': 'Got it',
++    '请先在顶部选择生产线': 'Select a production line first',
++    '排产失败': 'Assign failed',
++    '确认撤销选中的': 'Unassign the selected',
++    '张加工单的排产': 'work orders?',
++    '已撤销': 'Unassigned',
++    '撤销失败': 'Unassign failed',
+     '该文件无法在线预览，已转为下载': 'This file cannot be previewed online; it has been downloaded instead',
+     '正在打开预览…': 'Opening preview…',
+     '已开始下载': 'Download started',
+@@ -942,33 +1111,20 @@ export default {
+     '现存量说明': 'Quantity on Hand Description',
+     '图号': 'Drawing number',
+     '合同号': 'Contract Number',
+-    '锭号': 'Ingots No.',
+     '客户编码': 'Customer Code',
+     '测试程序': 'Test program',
+-    '测试程序2': 'Test Procedure 2',
+-    '生产订单客户': 'Production Order Customer',
+     '机构': 'Institution',
+     '重量': 'Weight',
+     '开工日期': 'Start date of construction',
+     '完工日期': 'Completion Date',
+-    '启用派工': 'Enable Dispatch',
+-    '自动转移': 'Automatic Transfer',
+-    '产品自动添加到材料': 'Products are automatically added to materials',
+     '是否手工修改单据编码': 'Manually modify document code',
+     '外部单据号': 'External Document Number',
+-    '启用领料申请': 'Enable Pair Request',
+-    '对方仓库': 'The other warehouse',
+-    '生产类型': 'Production type',
+     '产品编码': 'Product code',
+     '型号': 'Model',
+-    '适用BOM': 'Applicable BOM',
+-    'BOM展开方式': 'BOM expansion method',
+     '生产单位': 'Production unit',
+     '齐套数量(主)': 'Qty of full sets (main)',
+     '累计汇报套数(工序单位)': 'Cumulative reporting units (process unit)',
+     '可用量': 'Available quantity',
+-    '可用量说明': 'Description of available quantity',
+-    '产品字符公用自定义项1': 'Product Character Common Customizations 1',
+     '单重': 'Single weight',
+     '总重': 'Total weight',
+     '需求令号': 'Demand Order No.',
+diff --git a/frontend/src/router/index.js b/frontend/src/router/index.js
+index d45492c6..3a0fe466 100644
+--- a/frontend/src/router/index.js
++++ b/frontend/src/router/index.js
+@@ -26,10 +26,16 @@ const routes = [
+       { path: 'scm/serialNumber', component: () => import('@/views/scm/SerialNumber.vue'), meta: { title: '序列号管理', code: 'serialNumber' } },
+       // 共享文件库(研发管理·全公司共享资料):panelCode=RD_SHARE_FILE 带权限,故不进 flatMenus 自动路由,显式注册
+       { path: 'rd/shareFile', component: () => import('@/views/rd/ShareFileCenter.vue'), meta: { title: '共享文件库', code: 'rdShareFile' } },
++      // 订单结转·发单工作台(方案 V1.0):待结转行→转工单/转采购单;panelCode 无,按 SO_ORDER 授权,不进 flatMenus 自动路由
++      { path: 'prod/plan/orderConvert', component: () => import('@/views/modules/plan/OrderConvert.vue'), meta: { title: '订单结转', code: 'orderConvert' } },
++      // 排产工作台(实现总结 V1.0 §5):待排产池→排线→撤销;按 MANU_ORDER 授权,不进 flatMenus 自动路由
++      { path: 'prod/plan/scheduleBoard', component: () => import('@/views/modules/plan/ScheduleBoard.vue'), meta: { title: '排产工作台', code: 'scheduleBoard' } },
++      // 工单排产(2026-09-23 纠偏,替代「生产排产」平铺看板):产线×班别骨架+按线查看运行中工单;按 MANU_ORDER 授权,不进 flatMenus 自动路由
++      { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard' } },
+       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
+       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
+       ...flatMenus()
+-        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && !m.panelCode)
++        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && !m.panelCode)
+         .map((m) => ({
+           path: m.path.slice(1),
+           component: ModuleView,

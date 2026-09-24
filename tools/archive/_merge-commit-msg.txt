@@ -1,0 +1,39 @@
+feat: 下拉云端生产域分支(订单结转/排产工作台/工单排产/报工升级)——三大自有域保本地口径
+
+合并 origin/feat/manu-order-from-so-20260921(18 提交,含生产加工单单轨改造、订单结转发单
+工作台、排产工作台、工单排产看板、工序报工扣减、拆单/结案/首件/生成采购申请等)。合并原
+则是用户口径「智能供应链 + 品质管理 + 研发不要修改到,本地优先级最高」:
+
+- 受保护域冲突一律取本地:ButtonService(保留检验目录守卫/待二级审批闸门,远端对
+  RD_PROGRESS 的归档登记**不采纳**)、PanelConfigService(保留 QC_RECV→PURCHASE_IN 头映射)、
+  VoucherFlowService(保留 linkBatch 分批送料 + 追加 linkLine)、PanelxForm/PanelxList/
+  SelectVoucherDialog/masterDetailSelection(保留本地下拉/参照改造与 锭号 回退)。
+- 新增「链路专属明细同义词」FLOW_DETAIL_SYNONYMS_SCOPED:远端把 {批次号→批号}、
+  {数量→需求数量} 写进**全局** FLOW_DETAIL_SYNONYMS 会连带改写 来料检验→采购入库 等
+  采购/品质链路的行映射(QC_INSP 有 批次号、PURCHASE_IN 有 批号),改为只在
+  SO_ORDER|MANU_ORDER 链路生效,生产口径不减、他域零影响。
+- PanelxList 只移植生产域增量:PROD_LINE「停用」行内开关(isLineToggleCol/toggleLineDisable/
+  toBool)、工单二维码按 MANU_ORDER 口径(合同号/排产数量/生产单位/工序交期/生产线 + qrText);
+  **不采纳**远端的全局明细布尔开关移除与 锭号 回退删除(会改动到自有域行为)。
+- 迁移链:登记生产域 15 支(其中 migrate-manu-prune-legacy / migrate-wo-report-upgrade
+  保留本地哈希版本——与 yj_schema_log 已登记内容一致);db-migrations.txt 以「本地全量 +
+  追加生产域条目」合并(修复合并工具误插的孤立 AD 行)。
+- 修复 migrate-qc-unit-merge.sql:原稿 `IF ... ELSE BEGIN ... GO ... END GO` 跨批导致
+  「GO 附近语法错误」、引用临时列的 UPDATE 编译期「列名无效」,改为各自独立批次守卫 +
+  动态 SQL,两账套实测通过。
+- 生产域面板元数据修复:回滚期清理把 LINE_LOAD/MANU_SCHEDULE 面板字段注册清空,且
+  migrate-manu-order-schedule / -panel-flow / -schedule-plan-form / -schedule-capacity
+  因 bd_manu_order.[生产车间] 已被 prune-legacy 裁剪而**不可整体重放**(DbSync 遇错即中止),
+  故按批次抽取其纯元数据 INSERT 生成 tools/archive/_prodfix-metadata.sql 补登记;
+  视图 v_manu_schedule/v_line_load/v_manu_order_detail/v_wo_kit 由 prune-legacy +
+  wo-report-upgrade 重放恢复(两账套一致)。
+- 前端重建 static(dist 镜像)+ mvn package 产出 app.jar(105.6MB/128 libs),后端已重启 8090。
+
+验证(两账套均为 执行 0 / 跳过 288 / 失败 0):
+- API 冒烟 _probe-pull-prod-smoke.mjs 21/21(生产域新端点 + 智能供应链/品质/研发 14 面板配置与查询);
+- 界面走查 _ui-verify-pull.mjs 11/11(生产域 4 新页 + 产线/供应链/品质/研发代表面板,无 console 报错);
+- 生产域 DOM 断言 _ui-check-prod-dom.mjs 7/7(MANU_ORDER 新按钮齐、「排产」已下线、SO_ORDER 可转工单、
+  PROD_LINE 停用行内开关 9/8、三新页要素齐)。
+遗留(需用户拍板,未擅改):①OP_TIME(工序工时)菜单指向的 gxgs 表在本机两账套缺失(参考库
+结构在 tools/archive/_ref-dump/01-table-structure.txt:442),不建表则点开报「对象名 gxgs 无效」;
+②en.js 本地既有 '张' → 'Zhang'(远端为 'doc(s)'),按「本地优先」未覆盖。

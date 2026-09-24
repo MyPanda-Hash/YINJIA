@@ -102,3 +102,7 @@ deploy/*.zip
 # JDK 安装包(服务器部署前置件,110MB 二进制,绝不入库;2026-09-21 增)
 deploy/*.msi
 *.msi
+
+# 会话导出包(AI 工具产物,勿入库)
+dsh-session-*/
+.zcodeignore

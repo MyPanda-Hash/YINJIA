@@ -74,7 +74,11 @@ public class WoPickingHandler implements PanelActionHandler {
                         + " AND ISNULL(asp_cancel, 'N') <> 'Y' AND [子件编码] IS NOT NULL ORDER BY id", productCode);
         if (bom.isEmpty()) throw new IllegalStateException("产品 " + productCode + " 未维护默认 BOM,不能生成领料单");
 
-        String workshop = str(head.get("生产车间"));
+        // 车间=产线档案属性(2026-09-23 加工单去生产车间列后改查档案)
+        String workshop = null;
+        try { workshop = jdbc.queryForObject(
+                "SELECT [生产车间] FROM bs_prod_line WHERE [生产线] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                String.class, str(head.get("生产线"))); } catch (org.springframework.dao.EmptyResultDataAccessException ignore) { }
         // 4) 组装材料出库单草稿:头 + BOM 行(数量=定额×订单数量;批号留空由扫码补)
         Map<String, Object> targetHead = new LinkedHashMap<>();
         targetHead.put("单据日期", java.time.LocalDate.now().toString());

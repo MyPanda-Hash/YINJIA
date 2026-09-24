@@ -65,7 +65,10 @@ public class PushGenerateHandler implements PanelActionHandler {
     }
 
     /** 已由专用处理器接管的生单动作(仍登记 PUSH_TARGETS 供前端亮钮,但通用映射不认领)。 */
-    private static final java.util.Set<String> CUSTOM_OWNED = java.util.Set.of("WO_ORDER|生成领料单");
+    private static final java.util.Set<String> CUSTOM_OWNED = java.util.Set.of(
+            "WO_ORDER|生成领料单",
+            // 生产加工单排产:按订单行 1:1 生成(参考库口径),由 ManuScheduleHandler 接管
+            "SO_ORDER|生成生产加工单");
 
     @Override
     public boolean supports(String panelCode, String action) {

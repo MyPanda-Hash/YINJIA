@@ -1,0 +1,199 @@
+# 行数与样本
+
+==== 生产相关表行数 ====
+name | rows
+cpfpmx | 0
+dh | 232
+dm_dbzsd | 0
+dm_gx | 206
+dm_gz | 38
+fgjl | 0
+fgjl_ls | 0
+fgjlhz | 0
+gssp | 0
+gszl | 0
+gxgs | 1
+jrhz | 0
+jrhz_ls | 0
+kucun | 31
+mate | 35578
+mate_jtsh | 0
+pd_zzp | 0
+pd_zzphistory | 0
+pd_zzprq | 0
+pjjl | 6
+pjjl_sz | 0
+plang | 0
+plang_pc | 25
+s_allno | 15
+scjd | 0
+scjd_ls | 0
+scjl | 7
+scpc | 0
+scrb | 0
+scrb_bs | 0
+wbgd | 4
+zc | 0
+-- 32 rows
+
+==== SCGL 生产管理权限屏(SRC=permission) ====
+MODULE1 | RW | n
+BOM明细 | YYYYYYYYY | 1
+工单排产 | YYNYYNYNY | 19
+工单排产 | YYYYYYYNN | 1
+工单排产 | YYYYYYYNY | 3
+工单排产 | YYYYYYYYY | 1
+工单排产-挂镀 | YYYYYYYNY | 3
+工单排产-挂镀明细 | YYYYYYYNY | 3
+工单排产明细 | YYYYYYYNN | 1
+工单排产明细 | YYYYYYYNY | 3
+工单排产明细 | YYYYYYYYY | 1
+工单排产-手机端 | YYYYYYYNN | 1
+工单排产-手机端 | YYYYYYYNY | 3
+工单排产-手机端 | YYYYYYYYY | 1
+工序报工 | YYYYYYYNN | 1
+工序报工 | YYYYYYYNY | 3
+工序报工 | YYYYYYYYY | 1
+工序报工-手机端 | YYYYYYYNN | 1
+工序报工-手机端 | YYYYYYYNY | 3
+工序报工-手机端 | YYYYYYYYY | 1
+快速排产 | YYYYYYYNN | 1
+快速排产 | YYYYYYYNY | 3
+快速排产 | YYYYYYYYY | 1
+品检明细 | YYNYYNYNY | 19
+品检数据 | YYNYYNYNY | 19
+生产工单 | YYNYYNYNY | 19
+生产工单 | YYYYYYYYY | 1
+完工登记 | YYNYYNYNY | 19
+完工登记 | YYYYYYYNN | 1
+完工登记 | YYYYYYYNY | 3
+完工登记 | YYYYYYYYY | 1
+完工明细 | YYNYYNYNY | 19
+完工明细 | YYYYYYYNN | 1
+完工明细 | YYYYYYYNY | 3
+完工明细 | YYYYYYYYY | 1
+-- 34 rows
+
+==== dm_gx lb 分布 ====
+lb | n
+A供 | 1
+BB | 2
+BFYY | 1
+CPH | 3
+CPZT | 3
+DCLYY | 2
+DW | 2
+DYJ | 15
+DZ | 16
+GXLX | 2
+HPCZ | 12
+IMPTYP | 4
+JGZT | 4
+JHFS | 2
+JJCD | 3
+JLDW | 6
+JMBDX | 2
+JSFS | 6
+JYFS | 2
+JYJG | 6
+JYRY | 4
+KHFZ | 5
+KHLY | 10
+LHXZ | 8
+PCXZ | 4
+QY | 6
+QZ | 1
+REM | 19
+SCX | 27
+SKTJ | 12
+TLYY | 2
+WDZT | 2
+WLFZ | 4
+XSJGLX | 2
+YSFS | 3
+YWYQ | 3
+-- 36 rows
+
+==== dm_gx SCX 生产线 ====
+dm | mc
+106 | 生产部
+10601 | 挂镀车间
+1060101 | 挂镀_手动线
+1060101 | 挂镀_手动线
+1060102 | 挂镀_自动线
+1060102 | 挂镀_自动线
+1060103 | 挂镀_自动线镀铜缸
+1060103 | 挂镀_自动线镀铜缸
+10602 | 连续镀车间
+1060201 | 雾锡A线
+1060201 | 雾锡A线
+1060202 | 亮锡B线
+1060202 | 亮锡B线
+1060203 | 雾锡C线
+1060203 | 雾锡C线
+1060204 | 亮锡D线
+1060204 | 亮锡D线
+1060205 | 亮锡E线
+1060205 | 亮锡E线
+1060206 | 亮锡F线
+1060206 | 亮锡F线
+1060207 | 亮锡G线
+1060207 | 亮锡G线
+1060208 | 亮锡H线
+1060208 | 亮锡H线
+1060209 | 铜板线
+1060209 | 铜板线
+-- 27 rows
+
+==== s_allno 号池(生产相关) ====
+comm | ID | dh | lb | ny | bz | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_user3 | asp_time3 | asp_cancel | asp_user4 | asp_time4 | asp_print
+0 | 152989 | SL-2026-09-0001 | SL | 2026-09 | null | admin | 2026-09-18 05:16:59.4000000 | null | null | null | null | N | null | null | 0
+0 | 152990 | IJ-2026-09-0001 | IJ | 2026-09 | null | admin | 2026-09-18 05:17:14.3200000 | null | null | null | null | N | null | null | 0
+0 | 152991 | PI-2026-09-0001 | PI | 2026-09 | null | admin | 2026-09-18 05:17:37.9830000 | null | null | null | null | N | null | null | 0
+0 | 152992 | PI-2026-09-0002 | PI | 2026-09 | null | admin | 2026-09-20 07:29:47.6800000 | null | null | null | null | N | null | null | 0
+0 | 152993 | MO-2026-09-0001 | MO | 2026-09 | null | admin | 2026-09-21 09:39:09.5000000 | null | null | null | null | N | null | null | 0
+0 | 152994 | MO-2026-09-0002 | MO | 2026-09 | null | admin | 2026-09-21 09:44:12.0570000 | null | null | null | null | N | null | null | 0
+0 | 152995 | MO-2026-09-0003 | MO | 2026-09 | null | admin | 2026-09-21 09:44:12.0900000 | null | null | null | null | N | null | null | 0
+0 | 152996 | MO-2026-09-0004 | MO | 2026-09 | null | admin | 2026-09-21 09:44:12.1070000 | null | null | null | null | N | null | null | 0
+0 | 152997 | MO-2026-09-0005 | MO | 2026-09 | null | admin | 2026-09-21 09:44:12.1700000 | null | null | null | null | N | null | null | 0
+0 | 152998 | MO-2026-09-0006 | MO | 2026-09 | null | admin | 2026-09-21 09:44:12.1900000 | null | null | null | null | N | null | null | 0
+0 | 152999 | MO-2026-09-0007 | MO | 2026-09 | null | admin | 2026-09-22 01:11:37.6330000 | null | null | null | null | N | null | null | 0
+0 | 153000 | MO-2026-09-0008 | MO | 2026-09 | null | admin | 2026-09-22 01:11:37.7130000 | null | null | null | null | N | null | null | 0
+0 | 153001 | MO-2026-09-0009 | MO | 2026-09 | null | admin | 2026-09-22 01:11:37.7330000 | null | null | null | null | N | null | null | 0
+0 | 153002 | MO-2026-09-0010 | MO | 2026-09 | null | admin | 2026-09-22 01:11:37.8500000 | null | null | null | null | N | null | null | 0
+0 | 153003 | MO-2026-09-0011 | MO | 2026-09 | null | admin | 2026-09-22 01:11:37.8700000 | null | null | null | null | N | null | null | 0
+-- 15 rows
+
+==== 样本 plang TOP 3 ====
+comm | id | pl_no | pl_xc | scx | pl_man | pl_date | khdm | dm | mc | gg | gg2 | jldw | pl_sl | pl_sl2 | xq_sl | rk_sl | yl | dj | jine | cp_date | st_date | cp_date2 | rk_no | bz | ja | od_no | od_xc | lot_no | color | siz | ll_no | wb_no | lb | mjlx | BomId | ypl_sl | ll_no2 | remark | MoDId | llxz | cgrkdh | lldh | djlx | zl | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_user3 | asp_time3 | asp_cancel | asp_user4 | asp_time4 | asp_print
+-- 0 rows
+
+==== 样本 plang_pc TOP 3 ====
+comm | id | pl_no | pl_xc | scx | pl_man | pl_date | khdm | dm | mc | gg | gg2 | jldw | pl_sl | pl_sl2 | xq_sl | rk_sl | yl | dj | jine | cp_date | st_date | cp_date2 | rk_no | bz | ja | od_no | od_xc | lot_no | color | siz | ll_no | wb_no | lb | mjlx | BomId | jh_date | ll_no2 | remark | MoDId | llxz | cgrkdh | lldh | djlx | zl | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_user3 | asp_time3 | asp_cancel | asp_user4 | asp_time4 | asp_print
+0 | 535 | GD2608260013 | 1 | 铜板线 | Admin | 2026-08-26 15:13:37.0 | TY | C5191H-0D20X15D8-AE | C5191H-0D20X15D8-AE | Ni-Sn | null | KG | 300.0 | 5.0 | 300.0 | 280.0 | 20.0 | 0.0 | 0.0 | 2026-08-27 00:00:00.0 | 2026-08-26 00:00:00.0 | 2026-08-26 16:01:39.0 |  |  | T | IC-2026-08-0012 | 7493.0 | 2026082600005 | N | N | 83S6-260826002 |  | 白班 |  | 60 | 1900-01-01 00:00:00.0 | LL2608260002 |  | 0 | 新货 |  |  | 其他入库单【连续镀】 | 300.0 | Admin | 2026-08-26 15:13:37.0 |  | null |  | null | N | 系统管理员 | 2026-08-26 16:00:08.0 | 0
+0 | 534 | GD2608260012 | 1 | 铜板线 | Admin | 2026-08-26 15:13:37.0 | TY | C5191H-0D20X11D5-AE | C5191H-0D20X11D5-AE | Ni-Sn | null | KG | 300.0 | 6.0 | 300.0 | 0.0 | 300.0 | 0.0 | 0.0 | 2026-08-27 00:00:00.0 | 2026-08-26 00:00:00.0 | null |  |  | T | IC-2026-08-0012 | 7492.0 | 2026082600005 | N | N | 83S6-260826001 |  | 白班 |  | 50 | 1900-01-01 00:00:00.0 | LL2608260002 |  | 0 | 新货 |  |  | 其他入库单【连续镀】 | 300.0 | Admin | 2026-08-26 15:13:37.0 |  | null |  | null | N |  | null | 0
+0 | 533 | GD2608260011 | 1 | 雾锡C线 | Admin | 2026-08-26 15:10:44.0 | 2020007 | 1501 | B1501T0P-5e | Ni-WSn | null | K | 360.0 | 45.0 | 360.0 | 0.0 | 360.0 | 0.0 | 0.0 | 2026-08-27 00:00:00.0 | 2026-08-27 00:00:00.0 | null |  |  | T | IC-2026-08-0005 | 7462.0 | 20260815150100001 | N | N |  |  | 白班 |  | 8 | 1900-01-01 00:00:00.0 | LL2608260003 |  | 0 | 新货 | 3502-260814003 |  | 其他入库单【连续镀】 | 0.0 | Admin | 2026-08-26 15:10:44.0 |  | null |  | null | N | 系统管理员 | 2026-08-26 15:11:39.0 | 0
+-- 3 rows
+
+==== 样本 scjl TOP 3 ====
+comm | id | sc_no | wzdm | mc | gg | jldw | sc_date | ywman | gldh | gd_id | gxdm | sl | loss | loss_ra | bf_qty | bl_qty | lot_no | color | siz | gs | gz | dwzt | dwsj | kszt | kssj | wgzt | wgsj | bz | scx | scxmc | tm | delmark | post_no | kk | zfjl | other | jc_no | cp_no | gd_ph | lx | wj | htys | cpcz | sx | jm | sjd | jbbh | zsdd | cplsh | pl_sl | pp | khdm | ddwsl | jh_date | od_no | od_xc | ywymc | gsje | llxz | cgrkdh | lldh | djlx | zl | sl2 | sl3 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_user3 | asp_time3 | asp_cancel | asp_user4 | asp_time4 | asp_print
+0 | 20 | GD2608260013 | C5191H-0D20X15D8-AE | C5191H-0D20X15D8-AE | Ni-Sn | KG | 2026-08-26 16:01:39.0 | Admin | GD2608260013 | 535 | null | 280.0 | 0.0 | 1.0 | 0.0 | 0.0 | 2026082600005 | N | N | 0.0 | 0.0 | null | null | null | 2026-08-26 00:00:00.0 | Y | 2026-08-26 16:01:39.0 |  | 1060209 | 铜板线 | GD2608260013 | 0 | null | 0.0 | 300.0 | 0.0 | RK2608260004 | null | 00000001 |  |  |  |  |  |  |  | 白班 |  | 1060209--260826-00000001 | 300.0 | 83S6-260826002 | TY | 4.666666666666667 | 1900-01-01 00:00:00.0 | IC-2026-08-0012 | 7493.0 | null | 0.0 | 新货 |  |  | 其他入库单【连续镀】 | 300.0 | 5.0 | 60.0 | Admin | 2026-08-26 16:01:39.067 |  | null |  | null | N |  | null | 0
+0 | 17 | GD2608190010 | 1.5T-1-M-B黄铜 | 1.5T-1-M-B黄铜 | Ni-Sn | K | 2026-08-26 13:35:30.0 | Admin | GD2608190010 | 522 | null | 11.0 | 1.0 | 1.0 | 1.0 | 1.0 | 20260818-B黄铜00001 | N | N | 0.0 | 0.0 | null | null | null | 2026-08-20 00:00:00.0 | Y | 2026-08-26 13:35:30.0 |  | 1060205 | 亮锡E线 | GD2608190010 | 0 | null | 0.0 | 1900.0 | 0.0 | RK2608260001 | null | 00000001 |  |  |  |  |  |  |  | 白班 |  | 1060205--260826-00000001 | 1900.0 |  | 005 | 0.55 | 1900-01-01 00:00:00.0 | IC-2026-08-0006 | 7474.0 | null | 0.0 | 新货 |  | WW20260818089 | 其他入库单【连续镀】 | 0.0 | 95.0 | 20.0 | Admin | 2026-08-26 13:35:31.513 |  | null |  | null | N |  | null | 0
+0 | 16 | GD2608190008 | 6 | 红铜 H12-18-1-2 | Cu-Ni-WSn | PCS | 2026-08-19 15:44:14.0 | Admin | GD2608190008 | 520 | null | 6900.0 | 0.0 | 1.0 | 0.0 | 0.0 | 2026081800002 | N | N | 0.0 | 0.0 | null | null | null | 2026-08-19 00:00:00.0 | Y | 2026-08-19 15:44:14.0 |  | 1060102 | 挂镀_自动线 | GD2608190008 | 0 | null | 0.0 | 6900.0 | 0.0 | RK2608190001 | null | 00000001 | 80个一挂 | 80 |  |  |  |  |  | 白班 |  | 1060102-80个一挂-260819-00000001 | 6900.0 |  | 004 | 50.0 | 1900-01-01 00:00:00.0 | IC-2026-08-0007 | 7481.0 | null | 0.0 | 新货 |  | PO-202608094 | 其他入库单【挂镀】 | 188.86 | 50.0 | 0.0 | Admin | 2026-08-19 15:44:14.19 |  | null |  | null | N |  | null | 0
+-- 3 rows
+
+==== 样本 gxgs TOP 5 ====
+comm | id | dm | mc | khdm | xc | rq | gxdm | gxmc | gxsm | hxsj | bzsj | zksj | zmsj | pjsj | jgdj | jgdj2 | sfbx | mjdm | gxtj | scx | sfdf | jjdm | ysjt | zylc | zysx | jcfs | sh | tsgn | bz | bw2 | gxmc2 | gxsm2 | bxdj2 | zd2 | bw3 | gxmc3 | gxsm3 | bxdj3 | zd3 | bw4 | gxmc4 | gxsm4 | bxdj4 | zd4 | bw5 | gxmc5 | gxsm5 | bxdj5 | zd5 | bw6 | gxmc6 | gxsm6 | bxdj6 | zd6 | bw7 | gxmc7 | gxsm7 | bxdj7 | zd7 | sfsm | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_user3 | asp_time3 | asp_cancel | asp_user4 | asp_time4 | asp_print
+0 | 1 | A1001-TPE-A | A1001-TPE-A | CD | 1 | null | gx01 | ces |  | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 | 0.0 |  | null | null | null |  | null | null |  |  |  | null |  |  | null | null | null | 0.0 | null | null | null | null | 0.0 | null | null | null | null | 0.0 | null | null | null | null | 0.0 | null | null | null | null | 0.0 | null | null | null | null | 0.0 | null | Y | null | 2025-08-31 07:24:43.3200000 | null | null | null | null | N | null | null | 0
+-- 1 rows
+
+==== 样本 scpc TOP 3 ====
+comm | id | scx | ll_scx | ywman | sc_no | wzdm | sc_date | od_no | od_xc | cm | sl | loss | loss_ra | bf_qty | bl_qty | bz | lot_no | color | siz | dyid | ddw | ddwsl | dwzt | dwsj | kszt | kssj | wgzt | wgsj | gs | gz | ch | cc | zh | khys | ys | gxlx | dygx | bxf | bxbw | bxzd | ygcn | totalcn | totalqty | llqty | khdm | pxzd2 | jgdj | ywman2 | cust_po | sfpw | qr | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_user3 | asp_time3 | asp_cancel | asp_user4 | asp_time4 | asp_print
+-- 0 rows
+
+==== 样本 wbgd TOP 3 ====
+comm | id | dh_no | xc | wzdm | lot_no | color | siz | sl | ddw | ddwsl | in_date | ywman | in_danj | i_zk | i_zke | rk_sl | tax_dm | tax_sm | tax | total_m | bz | od_no | od_xc | pl_no | rk_no | gfdm | ll_no | ja | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_user3 | asp_time3 | asp_cancel | asp_user4 | asp_time4 | asp_print
+0 | 4 | WW2510090001 | 1 | 50801T0P-2E-NK-J | LR25100900040005 | N | N | 10.0 |  | 10.0 | 2025-10-09 14:59:24.0 | Admin | 0.0 | 100.0 | 0.0 | 0.0 | SB01 | 内含税16% | 0.0 | 0.0 |  | OD2510090008 | 124.0 |  |  | S009 |  | N | Admin | 2025-10-09 14:59:24.0 |  | null |  | null | N |  | null | 0
+0 | 3 | WW2508280001 | 2 | 0.15*15.7Y | N | N | N | 222.0 |  | 222.0 | 2025-08-28 01:24:51.0 | Admin | 0.0 | 100.0 | 0.0 | 0.0 | SB01 | 内含税16% | 0.0 | 0.0 |  | OD2508270009 | 59.0 |  |  | S016 |  | N | Admin | 2025-08-28 01:24:51.0 |  | null |  | null | N |  | null | 0
+0 | 2 | WW2508280001 | 1 | 0.15*15.7Y | N | N | N | 222.0 |  | 222.0 | 2025-08-28 01:24:50.0 | Admin | 0.0 | 100.0 | 0.0 | 0.0 | SB01 | 内含税16% | 0.0 | 0.0 |  | OD2508270009 | 58.0 |  |  | S016 |  | N | Admin | 2025-08-28 01:24:50.0 |  | null |  | null | N |  | null | 0
+-- 3 rows

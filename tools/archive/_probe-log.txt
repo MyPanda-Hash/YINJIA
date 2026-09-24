@@ -1,0 +1,9 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== SELECT name FROM sys.columns WHERE object_id=OBJECT_ID('yj_schema_log') ==
+java.exe : [READ FAIL] SELECT name FROM sys.columns WHERE object_id=OBJECT_ID('yj_schema_log')
+所在位置 行:1 字符: 414
++ ... cate=true'; & $java -cp tools\lib\mssql-jdbc.jar tools\SqlRunner.java ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([READ FAIL] SEL...yj_schema_log'):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

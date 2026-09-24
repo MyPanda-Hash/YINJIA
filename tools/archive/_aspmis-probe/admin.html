@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="renderer" content="webkit|ie-comp|ie-stand">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+    <meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1.0,maximum-scale=1.0,user-scalable=no" />
+    <meta http-equiv="Cache-Control" content="no-siteapp" />
+    <link rel="Bookmark" href="/favicon.ico">
+    <link rel="Shortcut Icon" href="/favicon.ico" />
+    <!--[if lt IE 9]>
+    <script type="text/javascript" src="~/admin/lib/html5shiv.js"></script>
+    <script type="text/javascript" src="~/admin/lib/respond.min.js"></script>
+    <![endif]-->
+    <link href="/admin/static/h-ui/css/H-ui.css" rel="stylesheet" type="text/css" />
+    <link href="/admin/static/h-ui.admin/css/H-ui.admin.css" rel="stylesheet" type="text/css" />
+    <link href="/admin/static/h-ui.admin/css/H-ui.admin.extension.css" rel="stylesheet" type="text/css" />
+    <link href="/admin/lib/Hui-iconfont/1.0.8/iconfont.css" rel="stylesheet" type="text/css" />
+    <link href="/admin/static/h-ui.admin/skin/green/skin.css" rel="stylesheet" type="text/css" id="skin" />
+    <link href="/admin/static/h-ui.admin/css/style.css" rel="stylesheet" type="text/css" />
+    
+    <!--[if IE 6]>
+    <script type="text/javascript" src="~/admin/lib/DD_belatedPNG_0.0.8a-min.js" ></script>
+    <script>DD_belatedPNG.fix('*');</script>
+    <![endif]-->
+    <title>&#x5B8F;&#x665F;&#x7535;&#x5B50;&#x667A;&#x80FD;&#x667A;&#x9020;&#x7BA1;&#x7406;&#x5E73;&#x53F0;</title>
+    <meta name="keywords">
+    <meta name="description">
+</head>
+<body>
+    <header class="navbar-wrapper">
+    <div class="navbar navbar-fixed-top">
+        <div class="container-fluid cl">
+            <a class="logo navbar-logo f-l mr-10 hidden-xs" href="/admin"> &#x5B8F;&#x665F;&#x7535;&#x5B50;&#x6D4B;&#x8BD5;&#x6570;&#x636E; </a> <a class="logo navbar-logo-m f-l mr-10 visible-xs" href="/aboutHui.shtml">LdCms</a>
+            <a aria-hidden="false" class="nav-toggle Hui-iconfont visible-xs" href="javascript:;">&#xe667;</a>
+            <nav class="nav navbar-nav">
+                <ul class="cl">
+                    <li class="dropDown dropDown_hover">
+                    </li>
+                    <li class="navbar-levelone"><a href="javascript:;">N&#x1EC1;n t&#x1EA3;ng</a></li> 
+                    <li class="navbar-levelone"><a href="javascript:;">&#x110;&#x1EB7;t h&#xE0;ng</a></li> 
+                    <li class="navbar-levelone"><a href="javascript:;">Trang ch&#x1EE7;</a></li> 
+                    <li class="navbar-levelone"><a href="javascript:;">&#x1ED1;ng th&#xF4;</a></li> 
+                    <li class="navbar-levelone"><a href="javascript:;">Ch&#x1EA5;t l&#x1B0;&#x1EE3;ng</a></li> 
+                    <li class="navbar-levelone"><a href="javascript:;">Thi&#x1EBF;t b&#x1ECB;</a></li> 
+                    <li class="navbar-levelone"><a href="javascript:;">T&#xE0;i ch&#xED;nh</a></li> 
+                    <li class="navbar-levelone"><a href="javascript:;">H&#x1EC7; th&#x1ED1;ng</a></li> 
+
+
+                </ul>
+            </nav>
+            <nav id="Hui-userbar" class="nav navbar-nav navbar-userbar hidden-xs">
+                <ul class="cl">
+                    <li>&#x7CFB;&#x7EDF;&#x7BA1;&#x7406;&#x5458;</li>
+                    <li class="dropDown dropDown_hover">
+                        <a href="#" class="dropDown_A">Admin <i class="Hui-iconfont">&#xe6d5;</i></a>
+                        <ul class="dropDown-menu menu radius box-shadow">
+                            
+                            <li><a href="/admin/logout">Chuy&#x1EC3;n &#x111;&#x1ED5;i t&#xE0;i kho&#x1EA3;n</a></li> 
+                            <li><a href="/admin/logout">Tho&#xE1;t</a></li> 
+                            <li><a href="/admin/PassWord">Thay &#x111;&#x1ED5;i m&#x1EAD;t kh&#x1EA9;u</a></li> 
+ 
+                            <li><a>------------</a></li>
+                            <li><a href="javascript:;" onClick="Language('简体')">简体</a></li> 
+                            <li><a href="javascript:;" onClick="Language('繁體')">繁體</a></li>
+                            <li><a href="javascript:;" onClick="Language('English')">English</a></li>
+                            <li><a href="javascript:;" onClick="Language('Other')">Ti&#x1EBF;ng Vi&#x1EC7;t</a></li>
+                        </ul>
+                    </li>
+                    <li id="Hui-msg"> <a href="#" title="Th&#xF4;ng &#x111;i&#x1EC7;p"><span class="badge badge-danger">1</span><i class="Hui-iconfont" style="font-size:18px">&#xe68a;</i></a> </li>
+                    <li id="Hui-skin" class="dropDown right dropDown_hover">
+                        <a href="javascript:;" class="dropDown_A" title="Thay &#x111;&#x1ED5;i da"><i class="Hui-iconfont" style="font-size:18px">&#xe62a;</i></a>
+                        <ul class="dropDown-menu menu radius box-shadow">
+                            <li><a href="javascript:;" data-val="green" title="Xanh l&#xE1; c&#xE2;y">Xanh l&#xE1; c&#xE2;y</a></li> 
+                            <li><a href="javascript:;" data-val="blue" title="Xanh d&#x1B0;&#x1A1;ng">Xanh d&#x1B0;&#x1A1;ng</a></li> 
+                            <li><a href="javascript:;" data-val="orange" title="color">color</a></li> 
+                            <li><a href="javascript:;" data-val="yellow" title="V&#xE0;ng">V&#xE0;ng</a></li> 
+                            <li><a href="javascript:;" data-val="red" title="&#x110;&#x1ECF;">&#x110;&#x1ECF;</a></li> 
+                            <li><a href="javascript:;" data-val="default" title="&#x110;en">&#x110;en</a></li> 
+                        </ul>
+                    </li>
+                </ul>
+            </nav>
+        </div>
+    </div>
+</header>
+<aside class="Hui-aside" style="background-color:#2d6dcc;color:white">
+
+    <div id="platform" class="menu_dropdown bk_2" >
+        <dl id="menu-admin">
+            <dt class="selected"><i class="Hui-iconfont" style="font-size:16px; line-height:30px;background-color:#2d6dcc;color:orange">&#xe643; N&#x1EC1;n t&#x1EA3;ng</i>   </dt>
+            <dd style="display: block;">
+                <ul >
+                    <li style="background-color:#2d6dcc;color:orange">----------基础数据----------</li>
+                        <li><a data-href="/BasCust/List" data-title="Th&#xF4;ng tin kh&#xE1;ch h&#xE0;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe638 Th&#xF4;ng tin kh&#xE1;ch h&#xE0;ng</i></a></li>
+                        <li><a data-href="/BasSupplier/List" data-title="Th&#xF4;ng tin nh&#xE0; s&#x1EA3;n xu&#x1EA5;t" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe602 Th&#xF4;ng tin nh&#xE0; s&#x1EA3;n xu&#x1EA5;t</i></a></li>
+
+                        <li><a data-href="/BasMaterial/List" data-title="M&#xE3; h&#xF3;a v&#x1EAD;t li&#x1EC7;u" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe72b M&#xE3; h&#xF3;a v&#x1EAD;t li&#x1EC7;u</i></a></li>
+                        <li><a data-href="/BasCuMaterial/BasCuMaterial" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style=" background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe627 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/BasMaterialGrop/List" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe72d &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+
+                        <li><a data-href="/BasProPriceList/BasProPriceList" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe63e &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/BasProPrice/BasProPrice" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe63c Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/BasMatCustPrice/BasMatCustPrice" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe626 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/BasSupPriceList/BasSupPriceList" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe623 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/BasSupPrice/BasSupPrice" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe639 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/BasMatPrice/BasMatPrice" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe692 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/BasCode/BasCode" data-title="T&#x1EEB; &#x111;i&#x1EC3;n d&#x1EEF; li&#x1EC7;u" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe687 T&#x1EEB; &#x111;i&#x1EC3;n d&#x1EEF; li&#x1EC7;u</i></a></li>
+
+                        <li><a data-href="/BasFormula/BasFormula" data-title="C&#xF4;ng th&#x1EE9;c s&#x1EA3;n xu&#x1EA5;t" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe636 C&#xF4;ng th&#x1EE9;c s&#x1EA3;n xu&#x1EA5;t</i></a></li>
+                      
+                        <li><a data-href="/BasLine/List" data-title="D&#xE2;y chuy&#x1EC1;n s&#x1EA3;n xu&#x1EA5;t" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe616 D&#xE2;y chuy&#x1EC1;n s&#x1EA3;n xu&#x1EA5;t</i></a></li>
+                        <li><a data-href="/EdiProcessPrice/EdiProcessPriceList" data-title="Quy tr&#xEC;nh chi ph&#xED;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe681 Quy tr&#xEC;nh chi ph&#xED;</i></a></li>
+                        <li><a data-href="/BasHourLevel/List" data-title="M&#x1EE9;c gi&#x1EDD; l&#xE0;m vi&#x1EC7;c" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe62e M&#x1EE9;c gi&#x1EDD; l&#xE0;m vi&#x1EC7;c</i></a></li>
+
+                        <li><a data-href="/BasWarehouse/List" data-title="C&#xE0;i &#x111;&#x1EB7;t bit th&#x1B0; vi&#x1EC7;n" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe616 C&#xE0;i &#x111;&#x1EB7;t bit th&#x1B0; vi&#x1EC7;n</i></a></li>
+
+                        <li><a data-href="/BasDept/List" data-title="Thi&#x1EBF;t l&#x1EAD;p b&#x1ED9; ph&#x1EAD;n" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe72a Thi&#x1EBF;t l&#x1EAD;p b&#x1ED9; ph&#x1EAD;n</i></a></li>
+                        <li><a data-href="/Employee/SelList" data-title="Th&#xF4;ng tin nh&#xE2;n vi&#xEA;n" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe720 Th&#xF4;ng tin nh&#xE2;n vi&#xEA;n</i></a></li>
+
+                        <li><a data-href="/BasTax/List" data-title="税别资料" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe610 税别资料</i></a></li>
+
+                        <li><a data-href="/BasExpCate/List" data-title="费用类别" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61d 费用类别</i></a></li>
+                        <li><a data-href="/FinAccount/List" data-title="会计科目" href="javascript:void(0)" style=" background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe60c 会计科目</i></a></li>
+
+                </ul>
+            </dd>
+        </dl>
+
+    </div>
+
+    <div id="platform" class="menu_dropdown bk_2">
+        <dl id="menu-admin">
+            <dt class="selected"><i class="Hui-iconfont" style="font-size:16px; line-height:30px;background-color:#2d6dcc;color:orange">&#xe638; &#x110;&#x1EB7;t h&#xE0;ng</i>   </dt>
+            <dd style="display: block;">
+                <ul>
+                    <li style="background-color:#2d6dcc;color:orange">----------销售管理----------</li>
+                        <li><a data-href="/OdPice/OdPice" data-title="Danh s&#xE1;ch kh&#xE1;ch h&#xE0;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6bb Danh s&#xE1;ch kh&#xE1;ch h&#xE0;ng</i></a></li>
+                        <li><a data-href="/OdPice/List2" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6bb Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/OdIncom/OdIncom" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6cf &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/OdIncom/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61c &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                  
+                        <li><a data-href="/OdOrder/OdOrder" data-title="Kh&#xE1;ch h&#xE0;ng &#x111;&#x1EB7;t h&#xE0;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe618 Kh&#xE1;ch h&#xE0;ng &#x111;&#x1EB7;t h&#xE0;ng</i></a></li>
+                        <li><a data-href="/OdOrder/List2" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61a Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/OdOrder/ToGD" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61e &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/OdShip/List" data-title="Y&#xEA;u c&#x1EA7;u v&#x1EAD;n chuy&#x1EC3;n" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe635 Y&#xEA;u c&#x1EA7;u v&#x1EAD;n chuy&#x1EC3;n</i></a></li>
+                        <li><a data-href="/OdShip/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe621 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/OdSales/OdSales" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe70c Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/OdSales/List2" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6b5 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/OdSalesList/List" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6b3 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/OdLogistics/List" data-title="V&#x1EAD;n chuy&#x1EC3;n h&#xE0;ng h&#xF3;a" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe68a V&#x1EAD;n chuy&#x1EC3;n h&#xE0;ng h&#xF3;a</i></a></li>
+                        <li><a data-href="/OdTrack/List" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe686 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                    <li style ="background-color:#2d6dcc;color:orange">----------采购管理----------</li>
+                        <li><a data-href="/OdPurReq/Power" data-title="Y&#xEA;u c&#x1EA7;u mua h&#xE0;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6d3 Y&#xEA;u c&#x1EA7;u mua h&#xE0;ng</i></a></li>
+                        <li><a data-href="/OdPurReqList/Power" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe72c Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/OdPurOrder/OdPurOrder" data-title="&#x110;&#x1A1;n &#x111;&#x1EB7;t h&#xE0;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6cc &#x110;&#x1A1;n &#x111;&#x1EB7;t h&#xE0;ng</i></a></li>
+                        <li><a data-href="/OdPurOrder/List2" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6b4 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/PurEntry/PurEntry" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe643 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/PurEntry/List2" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe70d Ph&#x1EE5; t&#xF9;ng</i></a></li>
+
+
+
+                </ul>
+            </dd>
+        </dl>
+
+    </div>
+
+
+    <div id="platform" class="menu_dropdown bk_2">
+        <dl id="menu-admin">
+            <dt class="selected"><i class="Hui-iconfont" style="font-size:16px; line-height:30px;background-color:#2d6dcc;color:orange">&#xe6d3; Trang ch&#x1EE7;</i>   </dt>
+            <dd style="display: block;">
+                <li style="background-color:#2d6dcc;color:orange">-------仓库WMS管理-------</li>
+                <ul>
+                        <li><a data-href="/StoInStorage/StoInStorage" data-title="Nh&#x1EAD;p kho s&#x1EA3;n ph&#x1EA9;m" href="javascript:void(0)" style=" background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe692 Nh&#x1EAD;p kho s&#x1EA3;n ph&#x1EA9;m</i></a></li>
+                        <li><a data-href="/StoInStorage/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe687 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/StoInWW/StoInWW" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe636 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/StoInWW/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe681 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/StoInOth/StoInOth" data-title="Nh&#x1EAD;p kho kh&#xE1;c" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe62e Nh&#x1EAD;p kho kh&#xE1;c</i></a></li>
+                        <li><a data-href="/StoInOth/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe616 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                    <li style="background-color:#2d6dcc;color:orange">--------出库管理--------</li>
+                  
+                        <li><a data-href="/Stopicking/Stopicking" data-title="S&#x1EA3;n xu&#x1EA5;t h&#xE0;ng may m&#x1EB7;c" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe72a S&#x1EA3;n xu&#x1EA5;t h&#xE0;ng may m&#x1EB7;c</i></a></li>
+                        <li><a data-href="/Stopicking/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe720 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/StoMaterialRe/StoMaterialRe" data-title="S&#x1EA3;n xu&#x1EA5;t tr&#x1EA3; l&#x1EA1;i" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe695 S&#x1EA3;n xu&#x1EA5;t tr&#x1EA3; l&#x1EA1;i</i></a></li>
+                        <li><a data-href="/StoMaterialRe/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61d &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/StoProcurement/StoProcurement" data-title="Thu mua" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe60c Thu mua</i></a></li>
+                        <li><a data-href="/StoProcurement/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6d3 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/StoComOption/StoComOption" data-title="C&#xE1;c th&#x1B0; vi&#x1EC7;n kh&#xE1;c" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6c6 C&#xE1;c th&#x1B0; vi&#x1EC7;n kh&#xE1;c</i></a></li>
+                        <li><a data-href="/StoComOption/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6f2 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                    <li style="background-color:#2d6dcc;color:orange">--------库存查询--------</li>
+                  
+                        <li><a data-href="/StoPower/List" data-title="Chi ti&#x1EBF;t c&#x1ED5; phi&#x1EBF;u" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe621 Chi ti&#x1EBF;t c&#x1ED5; phi&#x1EBF;u</i></a></li>
+                        <li><a data-href="/StoCuPower/List" data-title="Xu&#x1EA5;t nh&#x1EAD;p kho Chi ti&#x1EBF;t" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe635 Xu&#x1EA5;t nh&#x1EAD;p kho Chi ti&#x1EBF;t</i></a></li>
+                        <li><a data-href="/StoOutIn/List" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61e &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/StoInvDeta/Power" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61a Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                    <li style="background-color:#2d6dcc;color:orange">--------盘点调拨--------</li>
+                        <li><a data-href="/StoAllocation/StoAllocation" data-title="Chuy&#x1EC3;n kho" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe620 Chuy&#x1EC3;n kho</i></a></li>
+                        <li><a data-href="/StoAllocation/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6ca &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/StoInventory/StoInventory" data-title="Danh s&#xE1;ch ki&#x1EC3;m k&#xEA;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe63a Danh s&#xE1;ch ki&#x1EC3;m k&#xEA;</i></a></li>
+                        <li><a data-href="/StoInventory/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6b7 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/StoAdjust/StoAdjust" data-title="L&#x1EC7;nh &#x111;i&#x1EC1;u ch&#x1EC9;nh h&#xE0;ng t&#x1ED3;n kho" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6b6 L&#x1EC7;nh &#x111;i&#x1EC1;u ch&#x1EC9;nh h&#xE0;ng t&#x1ED3;n kho</i></a></li>
+                        <li><a data-href="/StoAdjust/List2" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"> <i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6bb &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                </ul>
+            </dd>
+        </dl>
+
+    </div>
+
+    <div id="platform" class="menu_dropdown bk_2">
+        <dl id="menu-admin">
+            <dt class="selected"><i class="Hui-iconfont" style="font-size:16px; line-height:30px;background-color:#2d6dcc;color:orange">&#xe72c; &#x1ED1;ng th&#xF4;</i>   </dt>
+            <dd style="display: block;">
+                <ul>
+                    <li style="background-color:#2d6dcc;color:orange">-------生产计划管理-------</li>
+                        <li><a data-href="/ProGD/ProGD" data-title="&#x110;&#x1A1;n &#x111;&#x1EB7;t h&#xE0;ng c&#xF4;ng vi&#x1EC7;c s&#x1EA3;n xu&#x1EA5;t" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6ad &#x110;&#x1A1;n &#x111;&#x1EB7;t h&#xE0;ng c&#xF4;ng vi&#x1EC7;c s&#x1EA3;n xu&#x1EA5;t</i></a></li>
+                        <li><a data-href="/ProScheduling/add3" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6af &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/ProScheduling/ProScheduling" data-title="&#x110;&#x1A1;n &#x111;&#x1EB7;t h&#xE0;ng s&#x1EA3;n xu&#x1EA5;t" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe72b &#x110;&#x1A1;n &#x111;&#x1EB7;t h&#xE0;ng s&#x1EA3;n xu&#x1EA5;t</i></a></li>
+                        <li><a data-href="/ProSchedul_gd/ProSchedul_gd" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe72b &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+
+                        <li><a data-href="/ProSchedulList/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe72d Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/ProPiece/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe627 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+
+                        <li><a data-href="/ProRework/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe63c Ph&#x1EE5; t&#xF9;ng</i></a></li>
+
+                    <li style="background-color:#2d6dcc;color:orange">-------生产过程管理-------</li>
+                        <li><a data-href="/ProCompReg/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe63e Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/ProCompRegList/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe626 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                  
+                        <li><a data-href="/ProPassing/List" data-title="Nh&#x1EAD;p gi&#x1EDD; l&#xE0;m vi&#x1EC7;c" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe623 Nh&#x1EAD;p gi&#x1EDD; l&#xE0;m vi&#x1EC7;c</i></a></li>
+
+
+                    <li style="background-color:#2d6dcc;color:orange">-------报表&看板-------</li>
+                        <li><a data-href="/ProDigital/List" data-title="Kanban &#x111;i&#x1EC7;n t&#x1EED;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe639 Kanban &#x111;i&#x1EC7;n t&#x1EED;</i></a></li>
+
+                   
+
+                </ul>
+            </dd>
+        </dl>
+
+    </div>
+
+   
+    <div id="platform" class="menu_dropdown bk_2">
+        <dl id="menu-admin">
+            <dt class="selected"><i class="Hui-iconfont" style="font-size:16px; line-height:30px;background-color:#2d6dcc;color:orange">&#xe66a; Ch&#x1EA5;t l&#x1B0;&#x1EE3;ng</i>   </dt>
+            <dd style="display: block;">
+                <ul>
+                    <li style="background-color:#2d6dcc;color:orange">----------品质管理----------</li>
+                        <li><a data-href="/ProQualityAll/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6d3 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/ProQualityData/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6ad Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/ProQualityList/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe72c Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/ProQualityProcess/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6cc Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/ProQualityXJMX/List" data-title="Ph&#x1EE5; t&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6b4 Ph&#x1EE5; t&#xF9;ng</i></a></li>
+                        <li><a data-href="/QuaIncoming/List" data-title="Ch&#x1EA5;t l&#x1B0;&#x1EE3;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe643 Ki&#x1EC3;m tra th&#x1EE9;c &#x103;n</i></a></li>
+                        <li><a data-href="/QuaIPQC/List" data-title="T&#xE0;i li&#x1EC7;u IPQC" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe70d T&#xE0;i li&#x1EC7;u IPQC</i></a></li>
+
+                        <li><a data-href="/QuaOQC/List" data-title="T&#xE0;i li&#x1EC7;u OQC" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe638 T&#xE0;i li&#x1EC7;u OQC</i></a></li>
+                        <li><a data-href="/ProQuaTrac/List" data-title="Ch&#x1EA5;t l&#x1B0;&#x1EE3;ng theo d&#xF5;i" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe602 Ch&#x1EA5;t l&#x1B0;&#x1EE3;ng theo d&#xF5;i</i></a></li>
+                </ul>
+            </dd>
+        </dl>
+
+    </div>
+
+    <div id="platform" class="menu_dropdown bk_2">
+        <dl id="menu-admin">
+            <dt class="selected"><i class="Hui-iconfont" style="font-size:16px; line-height:30px;background-color:#2d6dcc;color:orange">&#xe669; Thi&#x1EBF;t b&#x1ECB;</i>   </dt>
+            <dd style="display: block;">
+                <ul>
+                    <li style="background-color:#2d6dcc;color:orange">----------设备管理----------</li>
+                        <li><a data-href="/EquFailure/List" data-title="B&#x1EA3;n ghi l&#x1ED7;i thi&#x1EBF;t b&#x1ECB;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe618 B&#x1EA3;n ghi l&#x1ED7;i thi&#x1EBF;t b&#x1ECB;</i></a></li>
+                        <li><a data-href="/EquMainList/List" data-title="H&#x1ED3; s&#x1A1; s&#x1EED;a ch&#x1EEF;a thi&#x1EBF;t b&#x1ECB;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61a H&#x1ED3; s&#x1A1; s&#x1EED;a ch&#x1EEF;a thi&#x1EBF;t b&#x1ECB;</i></a></li>
+
+                        <li><a data-href="/EquMaintenance/List" data-title="B&#x1EA3;o tr&#xEC; thi&#x1EBF;t b&#x1ECB;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61e B&#x1EA3;o tr&#xEC; thi&#x1EBF;t b&#x1ECB;</i></a></li>
+                        <li><a data-href="/EquOutsourced/List" data-title="S&#x1EED;a ch&#x1EEF;a b&#xEA;n ngo&#xE0;i &#x1EE7;y ban" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe635 S&#x1EED;a ch&#x1EEF;a b&#xEA;n ngo&#xE0;i &#x1EE7;y ban</i></a></li>
+
+                        <li><a data-href="/EquParts/List" data-title="Linh ki&#x1EC7;n c&#x1ED5; &#xE1;o" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe621 Linh ki&#x1EC7;n c&#x1ED5; &#xE1;o</i></a></li>
+
+                </ul>
+            </dd>
+        </dl>
+
+    </div>
+
+    <div id="platform" class="menu_dropdown bk_2">
+        <dl id="menu-admin">
+            <dt class="selected"><i class="Hui-iconfont" style="font-size:16px; line-height:30px;background-color:#2d6dcc;color:orange">&#xe6ca; T&#xE0;i ch&#xED;nh</i>   </dt>
+            <dd style="display: block;">
+                <ul>
+                    <li style="background-color:#2d6dcc;color:orange">----------财务管理----------</li>
+                        <li><a data-href="/FinReim/List" data-title="Y&#xEA;u c&#x1EA7;u b&#x1ED3;i ho&#xE0;n" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6eb Y&#xEA;u c&#x1EA7;u b&#x1ED3;i ho&#xE0;n</i></a></li>
+                        <li><a data-href="/FinCashDetails/List" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6f2 &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/FinBankDeposit/List" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6ca &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/Payroll/List" data-title="B&#x1EA3;ng l&#x1B0;&#x1A1;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe63a B&#x1EA3;ng l&#x1B0;&#x1A1;ng</i></a></li>
+                        <li><a data-href="/FinSalary/List" data-title="B&#x1EA3;ng l&#x1B0;&#x1A1;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6b7 B&#x1EA3;ng l&#x1B0;&#x1A1;ng</i></a></li>
+                        <li><a data-href="/FinCost/List" data-title="K&#x1EBF; to&#xE1;n chi ph&#xED;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6bb K&#x1EBF; to&#xE1;n chi ph&#xED;</i></a></li>
+                    <li style="background-color:#2d6dcc;color:orange">----------应收帐款----------</li>
+                        <li><a data-href="/FinAdvance/List" data-title="Thu tr&#x1B0;&#x1EDB;c" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe620 Thu tr&#x1B0;&#x1EDB;c</i></a></li>
+                        <li><a data-href="/FinReceivable/FinReceivable" data-title="T&#xE0;i kho&#x1EA3;n ph&#x1EA3;i thu" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe63a T&#xE0;i kho&#x1EA3;n ph&#x1EA3;i thu</i></a></li>
+                        <li><a data-href="/FinApplication/Power" data-title="Y&#xEA;u c&#x1EA7;u thu ti&#x1EC1;n" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6ca Y&#xEA;u c&#x1EA7;u thu ti&#x1EC1;n</i></a></li>
+                        <li><a data-href="/FinDetails/FinDetails" data-title="Chi ti&#x1EBF;t thu ti&#x1EC1;n" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6b7 Chi ti&#x1EBF;t thu ti&#x1EC1;n</i></a></li>
+                    <li style="background-color:#2d6dcc;color:orange">----------应付帐款----------</li>
+                        <li><a data-href="/FinAdvancePay/List" data-title="Thanh to&#xE1;n tr&#x1B0;&#x1EDB;c" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6b6 Thanh to&#xE1;n tr&#x1B0;&#x1EDB;c</i></a></li>
+                        <li><a data-href="/FinPayable/FinPayable" data-title="T&#xE0;i kho&#x1EA3;n ph&#x1EA3;i tr&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6bb T&#xE0;i kho&#x1EA3;n ph&#x1EA3;i tr&#x1EA3;</i></a></li>
+                        <li><a data-href="/FinPayAppl/Power" data-title="Y&#xEA;u c&#x1EA7;u thanh to&#xE1;n" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe628 Y&#xEA;u c&#x1EA7;u thanh to&#xE1;n</i></a></li>
+                        <li><a data-href="/FinPayment/FinPayment" data-title="Chi ti&#x1EBF;t thanh to&#xE1;n" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe669 Chi ti&#x1EBF;t thanh to&#xE1;n</i></a></li>
+                    <li style="background-color:#2d6dcc;color:orange">----------发票管理----------</li>
+                        <li><a data-href="/FinOutInvoice/List" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6cf &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                        <li><a data-href="/FinInInvoice/List" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61c &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+
+
+                </ul>
+            </dd>
+        </dl>
+
+    </div>
+
+    <div id="platform" class="menu_dropdown bk_2">
+        <dl id="menu-admin">
+            <dt class="selected"><i class="Hui-iconfont" style="font-size:16px; line-height:30px;background-color:#2d6dcc;color:orange">&#xe63c; H&#x1EC7; th&#x1ED1;ng</i>   </dt>
+            <dd style="display: block;">
+                <ul>
+                    <li style="background-color:#2d6dcc;color:orange">----------系统管理----------</li>
+                        <li><a data-href="/SysOperator/List" data-title="Thi&#x1EBF;t l&#x1EAD;p ng&#x1B0;&#x1EDD;i d&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe720 Thi&#x1EBF;t l&#x1EAD;p ng&#x1B0;&#x1EDD;i d&#xF9;ng</i></a></li>
+                        <li><a data-href="/SysPower/Power" data-title="Quy&#x1EC1;n ng&#x1B0;&#x1EDD;i d&#xF9;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe61d Quy&#x1EC1;n ng&#x1B0;&#x1EDD;i d&#xF9;ng</i></a></li>
+                        <li><a data-href="/SysRoles/Power" data-title="Qu&#x1EA3;n l&#xFD; vai tr&#xF2;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe60c Qu&#x1EA3;n l&#xFD; vai tr&#xF2;</i></a></li>
+                        <li><a data-href="/SysLog/List" data-title="Nh&#x1EAD;t k&#xFD; h&#x1EC7; th&#x1ED1;ng" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6c6 Nh&#x1EAD;t k&#xFD; h&#x1EC7; th&#x1ED1;ng</i></a></li>
+                        <li><a data-href="/SysCommInfo/List" data-title="Th&#xF4;ng s&#x1ED1; c&#xF4;ng ty" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6eb Th&#xF4;ng s&#x1ED1; c&#xF4;ng ty</i></a></li>
+
+                        <li><a data-href="/SysInfo/List" data-title="&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;" href="javascript:void(0)" style="background-color:#2d6dcc;color:white"><i class="Hui-iconfont" style="font-size:16px; line-height:30px; color:white;">&#xe6ea &#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3;</i></a></li>
+                </ul>
+            </dd>
+        </dl>
+
+    </div>
+
+
+</aside>
+<div class="dislpayArrow hidden-xs">
+    <a class="pngfix" href="javascript:void(0);" onClick="displaynavbar(this)"></a>
+</div>
+<section class="Hui-article-box">
+    <div id="Hui-tabNav" class="Hui-tabNav hidden-xs">
+        <div class="Hui-tabNav-wp">
+            <ul id="min_title_list" class="acrossTab cl">
+                <li class="active">
+                    <span title="Th&#xF4;ng s&#x1ED1; h&#x1EC7; th&#x1ED1;ng" data-href="welcome.html">Th&#xF4;ng s&#x1ED1; h&#x1EC7; th&#x1ED1;ng</span>  
+                    <em></em>
+                </li>
+            </ul>
+        </div>
+        <div class="Hui-tabNav-more btn-group"><a id="js-tabNav-prev" class="btn radius btn-default size-S" href="javascript:;"><i class="Hui-iconfont">&#xe6d4;</i></a><a id="js-tabNav-next" class="btn radius btn-default size-S" href="javascript:;"><i class="Hui-iconfont">&#xe6d7;</i></a></div>
+    </div>
+    <div id="iframe_box" class="Hui-article">
+        <div class="show_iframe">
+            <div style="display:none" class="loading"></div>
+            <iframe scrolling="yes" frameborder="0" src="/admin/welcome"></iframe>
+        </div>
+    </div>
+</section>
+<div class="contextMenu" id="Huiadminmenu">
+    <ul>
+        <li id="closethis">&#x110;&#xF3;ng hi&#x1EC7;n t&#x1EA1;i </li> 
+        <li id="closeall">&#x110;&#xF3;ng t&#x1EA5;t c&#x1EA3; </li> 
+    </ul>
+</div>
+
+    <script type="text/javascript" src="/admin/lib/jquery/1.9.1/jquery.min.js"></script>
+    <script type="text/javascript" src="/admin/lib/jquery.cookie/jquery.cookie.js"></script>
+    <script type="text/javascript" src="/admin/lib/layer/2.4/layer.js"></script>
+    <script type="text/javascript" src="/admin/static/h-ui/js/H-ui.min.js"></script>
+    <script type="text/javascript" src="/admin/static/h-ui.admin/js/H-ui.admin.js"></script>
+    <script type="text/javascript" src="/admin/static/h-ui.admin/js/H-ui.admin.common.js"></script>
+    <script type="text/javascript" src="/admin/static/h-ui.admin/js/H-ui.admin.extension.js"></script>
+    
+    <!--请在下方写此页面业务相关的脚本-->
+    <script type="text/javascript" src="/admin/lib/jquery.contextmenu/jquery.contextmenu.r2.js"></script>
+    <script type="text/javascript">
+        $(function () {
+            /*$("#min_title_list li").contextMenu('Huiadminmenu', {
+                bindings: {
+                    'closethis': function(t) {
+                        console.log(t);
+                        if(t.find("i")){
+                            t.find("i").trigger("click");
+                        }
+                    },
+                    'closeall': function(t) {
+                        alert('Trigger was '+t.id+'\nAction was Email');
+                    },
+                }
+            });*/
+            $("body").Huitab({
+                tabBar: ".navbar-wrapper .navbar-levelone",
+                tabCon: ".Hui-aside .menu_dropdown",
+                className: "current",
+                index: 0,
+            });
+        });
+        /*个人信息*/
+        function myselfinfo() {
+            layer.open({
+                type: 1,
+                area: ['800px', '568px'],
+                fix: false, //不固定
+                maxmin: true,
+                shade: 0.4,
+                title: '查看信息',
+                content: '<div>管理员信息</div>'
+            });
+        }
+ 
+           /*语言转换*/
+        function Language(L) {
+            var arrId = [];
+            arrId.push(L);
+
+            $.ajax({
+                type: 'POST',
+                url: '/admin/Language',
+                data: { arrid: arrId },
+                dataType: 'json',
+                success: function (result) {
+                    var state = result.state;
+                    var message = result.message;
+                    if (state == "success") {
+                        location.reload();  //刷新界面
+                    } else {
+                        layer.msg(message, { icon: 6, time: 1000 });
+                    }
+                },
+                error: function (data) {
+                    console.log(data.msg);
+                },
+            });
+
+        }
+
+        
+         //修改密码
+        function PassWord() {
+            layer_show('修改密码', '/admin/PassWord', '1024', '750', '');
+
+        }
+
+        //电子看板
+        function DigSig() {
+            layer_show('电子看板', '/admin/List3', '1124', '550', '');
+
+        }
+
+        /*资讯-添加*/
+        function article_add(title, url) {
+            var index = layer.open({
+                type: 2,
+                title: title,
+                content: url
+            });
+            layer.full(index);
+        }
+        /*图片-添加*/
+        function picture_add(title, url) {
+            var index = layer.open({
+                type: 2,
+                title: title,
+                content: url
+            });
+            layer.full(index);
+        }
+        /*产品-添加*/
+        function product_add(title, url) {
+            var index = layer.open({
+                type: 2,
+                title: title,
+                content: url
+            });
+            layer.full(index);
+        }
+        /*用户-添加*/
+        function member_add(title, url, w, h) {
+            layer_show(title, url, w, h);
+        }
+    </script>
+
+    <script>
+        var _hmt = _hmt || [];
+        (function () {
+            var hm = document.createElement("script");
+            hm.src = "https://hm.baidu.com/hm.js?a7c0f06355739a07c54353f3a83e52b0";
+            var s = document.getElementsByTagName("script")[0];
+            s.parentNode.insertBefore(hm, s);
+        })();
+    </script>
+</body>
+</html>
+

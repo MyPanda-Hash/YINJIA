@@ -906,8 +906,14 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审批", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"生单", "生成产成品入库单"},
-                    new String[]{"打印", "打印", "预览", "导出"},
-                    new String[]{"更多", "复制", "放弃", "草稿", "中止执行", "取消中止", "表格调整", "刷新"}))
+                    new String[]{"打印", "打印", "预览", "导出", "打印工单二维码"},
+                    // 拆单(V2.0 §3.2):按数量拆成多张,父子关联(源工单号/拆分序号);由 ManuSplitHandler 接管
+                    // 结案(参考库 plang_pc.ja):已审核人工结案,退出需求统计;由 ManuCloseHandler 接管,可取消结案
+                    // 生成产品批号(V1.2 #8 成型后打印产品二维码数据源;2026-09-22 单轨改造挂到加工单)
+                    // 首件完成通知(生产部纪要 三):置首件标志+站内消息提醒品质取样;由 ManuFirstArticleHandler 接管
+                    // 生成采购申请(生产部纪要 五·订单结转):BOM×排产数量−库存 → PU_REQ 草稿+推送采购;由 ManuPurchaseReqHandler 接管
+                    // 排产单一入口=排产工作台(2026-09-23 实现总结 §5):「排产」按钮下线,表单 产线/开工·完工日已转只读,统一由工作台 assign
+                    new String[]{"更多", "拆单", "结案", "取消结案", "首件完成通知", "生成采购申请", "生成产品批号", "复制", "放弃", "草稿", "中止执行", "取消中止", "表格调整", "刷新"}))
     )));
 
     /**
@@ -1016,16 +1022,28 @@ public class PanelConfigService {
             {"数量", "订单数量"},
     };
 
+    /** 明细字段同义词(按链路 source|target 键控;只在**该链路**生效)。
+     *  2026-09-24 随生产域「订单结转/排产工作台」下拉:销售订单 → 生产加工单要按参考库 plang_pc 口径
+     *  落「需求数量」(订单需求)与「批号」(订单批次)。⚠ 刻意**不写进上面的全局表** ——
+     *  全局表对所有链路生效,`批次号→批号` 会连带改写 来料检验→采购入库 等采购/品质链路的行映射
+     *  (QC_INSP 有 批次号、PURCHASE_IN 有 批号),属用户不可接受的越域改动。 */
+    private static final Map<String, String[][]> FLOW_DETAIL_SYNONYMS_SCOPED =
+            java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
+            // 生产加工单排产口径(2026-09-21,对齐参考库 plang_pc):订单数落「需求数量」、批次号落「批号」;
+            // 单价/金额与「数量」为同名自动映射,需求数量与数量并存(前者=订单需求,后者=排产数量口径)
+            "SO_ORDER|MANU_ORDER", new String[][]{{"数量", "需求数量"}, {"批次号", "批号"}})));
+
     /** 头字段同义词(按链路 source|target 键控;同名映射之外的补充)。 */
     private static final Map<String, String[][]> FLOW_HEAD_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
-            "PU_REQ|PU_ORDER", new String[][]{{"建议供应商", "供应商"}},
             // 送料暂收单 → 采购入库单(2026-09-22 新增;原 PU_ORDER|PURCHASE_IN 免检直达已取消,
             // 那条只需 单据编号→采购订单号,本跳的采购订单号随链从采购订单带下来了、同名直通无需登记)。
             // 供应商代码→供应商编码:暂收单头叫「供应商代码」,入库头叫「供应商编码」——异名不带则入库单
             // 供应商编码恒空(与 QC_INSP|PURCHASE_IN 当年同一个坑)。注:批次键由
             // PushGenerateHandler.generateBatch 直接写入,不走映射(头映射 7 条上限会把它挤掉,不影响)。
             "QC_RECV|PURCHASE_IN", new String[][]{{"供应商代码", "供应商编码"}},
-            "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}},
+            // 销售订单 → 生产加工单:订单号落 销售订单号;交期落 预完工日(2026-09-21 补:
+            // 加工单排产要以订单交期为预完工日,缺此条则生单后交期为空;2026-09-24 随生产域下拉)
+            "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "预完工日"}},
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
             // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoPurchaseIn 同步补列)
@@ -1174,6 +1192,15 @@ public class PanelConfigService {
             for (String[] syn : FLOW_DETAIL_SYNONYMS) {
                 if (src.byLabel(syn[0]) != null && targetDets.contains(syn[1]) && mapped.add(syn[1])) {
                     dmap.add(Map.of("from", syn[0], "to", syn[1]));
+                }
+            }
+            // 链路专属明细同义词(仅本链路;见 FLOW_DETAIL_SYNONYMS_SCOPED 注释)
+            String[][] detSyn = FLOW_DETAIL_SYNONYMS_SCOPED.get(sourceCode + "|" + def.code());
+            if (detSyn != null) {
+                for (String[] syn : detSyn) {
+                    if (src.byLabel(syn[0]) != null && targetDets.contains(syn[1]) && mapped.add(syn[1])) {
+                        dmap.add(Map.of("from", syn[0], "to", syn[1]));
+                    }
                 }
             }
             cfg.put("detailMap", dmap);
