@@ -1,0 +1,1 @@
+SET NOCOUNT ON; SELECT CASE WHEN COL_LENGTH('dbo.bl_purchase_in',N'仓库') IS NULL THEN '列被误删!' ELSE '列在✓' END AS c1, (SELECT COUNT(*) FROM bl_purchase_in WHERE ISNULL([仓库],N'')<>N'') AS 有值行, (SELECT COUNT(*) FROM yj_field WHERE panel_code='PURCHASE_IN' AND col_name=N'仓库') AS 字段行;

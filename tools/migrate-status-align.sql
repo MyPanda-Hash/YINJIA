@@ -9,8 +9,7 @@ UPDATE bd_so_order SET 单据状态=N'草稿', 审核人=NULL, 审核时间=NULL
 WHERE 单据状态<>N'草稿' AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code='SO_ORDER' AND s.doc_no=bd_so_order.[单据编号] AND (s.shr IS NOT NULL OR ISNULL(s.canceled,'N')='Y'));
 UPDATE bd_pu_order SET 单据状态=N'草稿', 审核人=NULL, 审核时间=NULL, 审批人=NULL, 审批时间=NULL
 WHERE 单据状态<>N'草稿' AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code='PU_ORDER' AND s.doc_no=bd_pu_order.[单据编号] AND (s.shr IS NOT NULL OR ISNULL(s.canceled,'N')='Y'));
-UPDATE bd_manu_order SET 单据状态=N'草稿', 审核人=NULL, 审核时间=NULL, 审批人=NULL, 审批时间=NULL
-WHERE 单据状态<>N'草稿' AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code='MANU_ORDER' AND s.doc_no=bd_manu_order.[合同号] AND (s.shr IS NOT NULL OR ISNULL(s.canceled,'N')='Y'));
+-- bd_manu_order 状态五件套已下线(2026-09-23;真源 yj_doc_status),本段跳过
 UPDATE bd_dispatch SET 单据状态=N'草稿', 审核人=NULL, 审核时间=NULL, 审批人=NULL, 审批时间=NULL
 WHERE 单据状态<>N'草稿' AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code='DISPATCH' AND s.doc_no=bd_dispatch.[单据编号] AND (s.shr IS NOT NULL OR ISNULL(s.canceled,'N')='Y'));
 UPDATE bd_outsource_order SET 单据状态=N'草稿', 审核人=NULL, 审核时间=NULL, 审批人=NULL, 审批时间=NULL

@@ -276,7 +276,8 @@ GO
 
 
 -- ===== 报表 MANU_ORDER_DETAIL 生产加工单明细表(视图 v_manu_order_detail)===== 
-EXEC('CREATE OR ALTER VIEW v_manu_order_detail AS SELECT NULL AS [单据编号], NULL AS [单据状态], h.[生产车间], h.[客户编码], h.[客户], l.[产品编码], l.[产品名称], l.[规格型号], l.[生产单位], l.[数量], l.[齐套数量(主)], l.[累计汇报套数(工序单位)], l.[可用量], l.[现存量], l.[图号], l.[单重], l.[总重], l.[需求令号], h.[预开工日], h.[预完工日] FROM bd_manu_order h LEFT JOIN bl_manu_order l ON h.[合同号] = l.[合同号];');
+-- 2026-09-24 对齐 migrate-manu-prune-legacy(死字段下线后新版:头 h.* 自动瘦身,行表显式列)
+EXEC('CREATE OR ALTER VIEW v_manu_order_detail AS SELECT h.[合同号] AS [单据编号], h.*, l.[产品编码], l.[存货图片], l.[产品名称], l.[规格型号], l.[型号], l.[生产单位], l.[数量], l.[齐套数量(主)], l.[累计汇报套数(工序单位)], l.[可用量], l.[现存量], l.[图号], l.[单重], l.[总重], l.[需求令号] FROM bd_manu_order h LEFT JOIN bl_manu_order l ON h.[合同号]=l.[合同号];');
 
 
 -- ===== 报表 MANU_ORDER_STATS 生产加工单统计表(视图 v_manu_order_stats)===== 
@@ -786,11 +787,14 @@ GO
 
 
 -- ===== 报表 PURCHASE_IN_DETAIL 采购入库单明细表(视图 v_purchase_in_detail)===== 
-EXEC('CREATE OR ALTER VIEW v_purchase_in_detail AS SELECT h.[单据日期], NULL AS [创建时间], h.[单据编号], h.[业务类型], NULL AS [仓库编码], h.[仓库], NULL AS [入库类别], h.[供应商编码], h.[供应商], NULL AS [部门编码], NULL AS [部门], NULL AS [经手人编码], h.[经手人], NULL AS [备注], NULL AS [制单人], NULL AS [审核人], NULL AS [存货编码], NULL AS [存货], l.[规格型号], l.[计量单位], l.[实收数量], l.[单价], l.[金额], l.[计量单位2], l.[实收数量2], NULL AS [入库调整], l.[费用调整], NULL AS [总成本], l.[费用金额] FROM bd_purchase_in h LEFT JOIN bl_purchase_in l ON h.[单据编号] = l.[单据编号];');
+-- (2026-09-24 仓库正名对齐:bd_purchase_in 头上 [仓库] 已删(migrate-pin-wh-unify),视图该列改 NULL 占位;
+--  真源视图版式见 fix-db-restore-20260915/后续脚本)
+EXEC('CREATE OR ALTER VIEW v_purchase_in_detail AS SELECT h.[单据日期], NULL AS [创建时间], h.[单据编号], h.[业务类型], NULL AS [仓库编码], NULL AS [仓库], NULL AS [入库类别], h.[供应商编码], h.[供应商], NULL AS [部门编码], NULL AS [部门], NULL AS [经手人编码], h.[经手人], NULL AS [备注], NULL AS [制单人], NULL AS [审核人], NULL AS [存货编码], NULL AS [存货], l.[规格型号], l.[计量单位], l.[实收数量], l.[单价], l.[金额], l.[计量单位2], l.[实收数量2], NULL AS [入库调整], l.[费用调整], NULL AS [总成本], l.[费用金额] FROM bd_purchase_in h LEFT JOIN bl_purchase_in l ON h.[单据编号] = l.[单据编号];');
 
 
 -- ===== 报表 PURCHASE_IN_STATS 采购入库单统计表(视图 v_purchase_in_stats)===== 
-EXEC('CREATE OR ALTER VIEW v_purchase_in_stats AS SELECT NULL AS [仓库编码], h.[仓库], MAX(h.[供应商编码]) AS [供应商编码], h.[供应商], NULL AS [存货编码], NULL AS [存货], MAX(l.[规格型号]) AS [规格型号], NULL AS [主单位], NULL AS [辅单位], NULL AS [实收数量(主单位)], NULL AS [单价(主单位)], SUM(COALESCE(l.[金额], 0)) AS [金额], NULL AS [单价(辅单位)], NULL AS [入库调整], SUM(COALESCE(l.[费用调整], 0)) AS [费用调整], NULL AS [总成本], SUM(COALESCE(l.[费用金额], 0)) AS [费用金额], h.[单据日期] FROM bd_purchase_in h LEFT JOIN bl_purchase_in l ON h.[单据编号] = l.[单据编号] GROUP BY h.[仓库], h.[供应商], h.[单据日期];');
+-- (2026-09-24 同上:GROUP BY 与 SELECT 的 h.[仓库] 改 NULL 占位,头列已下线)
+EXEC('CREATE OR ALTER VIEW v_purchase_in_stats AS SELECT NULL AS [仓库编码], NULL AS [仓库], MAX(h.[供应商编码]) AS [供应商编码], h.[供应商], NULL AS [存货编码], NULL AS [存货], MAX(l.[规格型号]) AS [规格型号], NULL AS [主单位], NULL AS [辅单位], NULL AS [实收数量(主单位)], NULL AS [单价(主单位)], SUM(COALESCE(l.[金额], 0)) AS [金额], NULL AS [单价(辅单位)], NULL AS [入库调整], SUM(COALESCE(l.[费用调整], 0)) AS [费用调整], NULL AS [总成本], SUM(COALESCE(l.[费用金额], 0)) AS [费用金额], h.[单据日期] FROM bd_purchase_in h LEFT JOIN bl_purchase_in l ON h.[单据编号] = l.[单据编号] GROUP BY h.[供应商], h.[单据日期];');
 
 
 -- ===== PU_ORDER 采购订单(头 bd_pu_order / 行 bl_pu_order)===== 

@@ -455,8 +455,9 @@ INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editab
 INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('SALES_ORDER_DETAIL',N'审核人',N'审核人',N'文本',N'detail',240,120,0,0,0,1);
 UPDATE yj_field SET place=N'query,detail' WHERE panel_code='SALES_ORDER_DETAIL' AND label=N'单据状态';
 -- PURCHASE_IN_DETAIL(采购入库单明细表):PANDA 30 列
+-- (2026-09-24 仓库正名对齐:bd_purchase_in 头上 [仓库] 已删(migrate-pin-wh-unify),该列 NULL 占位)
 EXEC('CREATE OR ALTER VIEW v_purchase_in_detail AS
-SELECT ROW_NUMBER() OVER(ORDER BY h.id DESC, l.id) AS id, h.asp_cancel, h.[单据日期], h.asp_time1 AS [创建时间], h.[单据编号], h.[业务类型], NULL AS [仓库编码] /* 无数据源,布局列 */, h.[仓库], h.[入库类别], h.[供应商编码], h.[供应商], NULL AS [部门编码] /* 无数据源,布局列 */, NULL AS [部门] /* 无数据源,布局列 */, NULL AS [经手人编码] /* 无数据源,布局列 */, h.[经手人], h.[备注], h.asp_user1 AS [制单人], s.shr AS [审核人], NULL AS [存货编码] /* 无数据源,布局列 */, l.[存货名称] AS [存货], l.[规格型号], l.[计量单位], l.[实收数量], l.[单价], l.[金额], l.[单价2], l.[计量单位2], l.[实收数量2], NULL AS [入库调整] /* 无数据源,布局列 */, l.[费用调整], NULL AS [总成本] /* 无数据源,布局列 */, l.[费用金额]
+SELECT ROW_NUMBER() OVER(ORDER BY h.id DESC, l.id) AS id, h.asp_cancel, h.[单据日期], h.asp_time1 AS [创建时间], h.[单据编号], h.[业务类型], NULL AS [仓库编码] /* 无数据源,布局列 */, NULL AS [仓库] /* 头列已下线,占位 */, h.[入库类别], h.[供应商编码], h.[供应商], NULL AS [部门编码] /* 无数据源,布局列 */, NULL AS [部门] /* 无数据源,布局列 */, NULL AS [经手人编码] /* 无数据源,布局列 */, h.[经手人], h.[备注], h.asp_user1 AS [制单人], s.shr AS [审核人], NULL AS [存货编码] /* 无数据源,布局列 */, l.[存货名称] AS [存货], l.[规格型号], l.[计量单位], l.[实收数量], l.[单价], l.[金额], l.[单价2], l.[计量单位2], l.[实收数量2], NULL AS [入库调整] /* 无数据源,布局列 */, l.[费用调整], NULL AS [总成本] /* 无数据源,布局列 */, l.[费用金额]
 FROM bd_purchase_in h LEFT JOIN bl_purchase_in l ON h.[单据编号]=l.[单据编号]
 LEFT JOIN yj_doc_status s ON s.panel_code=''PURCHASE_IN'' AND s.doc_no=h.[单据编号]');
 DELETE yj_field WHERE panel_code='PURCHASE_IN_DETAIL';
@@ -652,33 +653,34 @@ INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editab
 INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('OTHER_OUT_DETAIL',N'合理损耗数量',N'合理损耗数量',N'小数',N'detail',260,120,0,0,0,1);
 INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('OTHER_OUT_DETAIL',N'入库单号',N'入库单号',N'文本',N'detail',270,120,0,0,0,1);
 -- MANU_ORDER_DETAIL(生产加工单明细表):PANDA 20 列
-EXEC('CREATE OR ALTER VIEW v_manu_order_detail AS
-SELECT ROW_NUMBER() OVER(ORDER BY h.id DESC, l.id) AS id, h.asp_cancel, h.[合同号] AS [单据编号], CASE WHEN ISNULL(s.canceled,N''N'')=N''Y'' THEN N''已作废'' WHEN ISNULL(s.stopped,N''N'')=N''Y'' THEN N''已中止'' WHEN ISNULL(s.pending,N''N'')=N''Y'' THEN N''审批中'' WHEN s.shr IS NOT NULL THEN N''已审核'' ELSE N''草稿'' END AS [单据状态], h.[生产车间], h.[客户编码], h.[客户], l.[产品编码], l.[产品名称], l.[规格型号], l.[生产单位], l.[数量], l.[齐套数量(主)], l.[累计汇报套数(工序单位)], l.[可用量], l.[现存量], l.[图号], l.[单重], l.[总重], l.[需求令号], h.[预开工日], h.[预完工日]
-FROM bd_manu_order h LEFT JOIN bl_manu_order l ON h.[合同号]=l.[合同号]
-LEFT JOIN yj_doc_status s ON s.panel_code=''MANU_ORDER'' AND s.doc_no=h.[合同号]');
+-- 2026-09-24 对齐死字段下线后现状(头表 h.* 瘦身,字段=现存列;生产车间/单据状态/锭号等已删)
+EXEC('CREATE OR ALTER VIEW v_manu_order_detail AS SELECT h.[合同号] AS [单据编号], h.*, l.[产品编码], l.[存货图片], l.[产品名称], l.[规格型号], l.[型号], l.[生产单位], l.[数量], l.[齐套数量(主)], l.[累计汇报套数(工序单位)], l.[可用量], l.[现存量], l.[图号], l.[单重], l.[总重], l.[需求令号] FROM bd_manu_order h LEFT JOIN bl_manu_order l ON h.[合同号]=l.[合同号]');
 DELETE yj_field WHERE panel_code='MANU_ORDER_DETAIL';
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'单据编号',N'单据编号',N'文本',N'query,detail',10,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'单据状态',N'单据状态',N'文本',N'query,detail',20,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'生产车间',N'生产车间',N'文本',N'query,detail',30,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'客户编码',N'客户编码',N'文本',N'detail',40,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'客户',N'客户',N'文本',N'query,detail',50,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'产品编码',N'产品编码',N'文本',N'detail',60,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'产品名称',N'产品名称',N'文本',N'detail',70,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'规格型号',N'规格型号',N'文本',N'detail',80,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'生产单位',N'生产单位',N'文本',N'detail',90,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'数量',N'数量',N'小数',N'detail',100,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'齐套数量(主)',N'齐套数量(主)',N'小数',N'detail',110,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'累计汇报套数(工序单位)',N'累计汇报套数(工序单位)',N'文本',N'detail',120,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'可用量',N'可用量',N'文本',N'detail',130,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'现存量',N'现存量',N'文本',N'detail',140,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'图号',N'图号',N'文本',N'detail',150,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'单重',N'单重',N'小数',N'detail',160,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'总重',N'总重',N'小数',N'detail',170,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'需求令号',N'需求令号',N'文本',N'detail',180,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'预开工日',N'预开工日',N'文本',N'detail',190,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'预完工日',N'预完工日',N'文本',N'detail',200,120,0,0,0,1);
-INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'产品名称',N'存货',N'文本',N'query',5,120,0,0,0,0);
-UPDATE yj_field SET place=N'query,detail' WHERE panel_code='MANU_ORDER_DETAIL' AND label=N'单据状态';
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'单据编号',N'单据编号',N'文本',N'query,detail',1,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'客户编码',N'客户编码',N'文本',N'query,detail',2,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'客户',N'客户',N'文本',N'query,detail',3,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'产品编码',N'产品编码',N'文本',N'query,detail',4,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'产品名称',N'产品名称',N'文本',N'query,detail',5,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'规格型号',N'规格型号',N'文本',N'query,detail',6,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'型号',N'型号',N'文本',N'query,detail',7,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'生产单位',N'生产单位',N'文本',N'query,detail',8,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'数量',N'数量',N'文本',N'query,detail',9,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'齐套数量(主)',N'齐套数量(主)',N'文本',N'query,detail',10,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'累计汇报套数(工序单位)',N'累计汇报套数(工序单位)',N'文本',N'query,detail',11,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'可用量',N'可用量',N'文本',N'query,detail',12,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'现存量',N'现存量',N'文本',N'query,detail',13,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'图号',N'图号',N'文本',N'query,detail',14,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'单重',N'单重',N'文本',N'query,detail',15,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'总重',N'总重',N'文本',N'query,detail',16,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'需求令号',N'需求令号',N'文本',N'query,detail',17,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'批号',N'批号',N'文本',N'query,detail',18,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'预开工日',N'预开工日',N'文本',N'query,detail',19,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'预完工日',N'预完工日',N'文本',N'query,detail',20,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'生产线',N'生产线',N'文本',N'query,detail',21,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'排产数量',N'排产数量',N'文本',N'query,detail',22,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'入库数量',N'入库数量',N'文本',N'query,detail',23,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'余量',N'余量',N'文本',N'query,detail',24,110,0,0,0,1);
+INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_ORDER_DETAIL',N'需求数量',N'需求数量',N'文本',N'query,detail',25,110,0,0,0,1);
 
 -- ===== Part 3 统计表:视图重建(PANDA 列名+维度聚合)+ yj_field 重建 =====
 -- SALES_ORDER_STATS(销售订单统计表):PANDA 15 列
@@ -704,11 +706,12 @@ INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editab
 INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('SALES_ORDER_STATS',N'折扣金额',N'折扣金额',N'小数',N'detail',140,120,0,0,0,1);
 INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('SALES_ORDER_STATS',N'预计交货日期',N'预计交货日期',N'日期',N'detail',150,120,0,0,0,1);
 -- PURCHASE_IN_STATS(采购入库单统计表):PANDA 17 列
+-- (2026-09-24 仓库正名对齐:bd_purchase_in 头上 [仓库] 已删(migrate-pin-wh-unify),该列 NULL 占位并退出 GROUP BY)
 EXEC('CREATE OR ALTER VIEW v_purchase_in_stats AS
-SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.asp_cancel, NULL AS [仓库编码], h.[仓库], h.[供应商编码], h.[供应商], NULL AS [存货编码], l.[存货名称] AS [存货], l.[规格型号], l.[计量单位] AS [主单位], l.[计量单位2] AS [辅单位], SUM(COALESCE(l.[实收数量],0)) AS [实收数量(主单位)], SUM(COALESCE(l.[金额],0))/NULLIF(SUM(COALESCE(l.[实收数量],0)),0) AS [单价(主单位)], SUM(COALESCE(l.[金额],0)) AS [金额], NULL AS [单价(辅单位)], NULL AS [入库调整], SUM(COALESCE(l.[费用调整],0)) AS [费用调整], SUM(COALESCE(l.[金额],0)+COALESCE(l.[费用调整],0)+COALESCE(l.[费用金额],0)) AS [总成本], SUM(COALESCE(l.[费用金额],0)) AS [费用金额]
+SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.asp_cancel, NULL AS [仓库编码], NULL AS [仓库], h.[供应商编码], h.[供应商], NULL AS [存货编码], l.[存货名称] AS [存货], l.[规格型号], l.[计量单位] AS [主单位], l.[计量单位2] AS [辅单位], SUM(COALESCE(l.[实收数量],0)) AS [实收数量(主单位)], SUM(COALESCE(l.[金额],0))/NULLIF(SUM(COALESCE(l.[实收数量],0)),0) AS [单价(主单位)], SUM(COALESCE(l.[金额],0)) AS [金额], NULL AS [单价(辅单位)], NULL AS [入库调整], SUM(COALESCE(l.[费用调整],0)) AS [费用调整], SUM(COALESCE(l.[金额],0)+COALESCE(l.[费用调整],0)+COALESCE(l.[费用金额],0)) AS [总成本], SUM(COALESCE(l.[费用金额],0)) AS [费用金额]
 FROM bd_purchase_in h LEFT JOIN bl_purchase_in l ON h.[单据编号]=l.[单据编号]
 WHERE NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code=''PURCHASE_IN'' AND s.doc_no=h.[单据编号] AND s.canceled=''Y'')
-GROUP BY h.asp_cancel, h.[仓库], h.[供应商编码], h.[供应商], l.[存货名称], l.[规格型号], l.[计量单位], l.[计量单位2]');
+GROUP BY h.asp_cancel, h.[供应商编码], h.[供应商], l.[存货名称], l.[规格型号], l.[计量单位], l.[计量单位2]');
 DELETE yj_field WHERE panel_code='PURCHASE_IN_STATS';
 INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('PURCHASE_IN_STATS',N'仓库编码',N'仓库编码',N'文本',N'detail',10,120,0,0,0,1);
 INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('PURCHASE_IN_STATS',N'仓库',N'仓库',N'文本',N'query,detail',20,120,0,0,0,1);

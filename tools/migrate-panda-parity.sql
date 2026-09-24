@@ -201,14 +201,15 @@ WHERE NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code=''SO_ORDER'' 
 GROUP BY h.[单据日期], h.asp_cancel, h.[客户编码], h.[客户], h.[部门], h.[业务员], l.[存货编码], l.[存货名称], l.[规格型号], l.[销售单位]');
 
 EXEC('CREATE OR ALTER VIEW v_purchase_in_stats AS
+-- (2026-09-24 仓库正名对齐:bd_purchase_in 头上 [仓库] 已删,该列 NULL 占位并退出 GROUP BY)
 SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.[单据日期], h.asp_cancel,
-  h.[仓库], h.[供应商编码], h.[供应商], l.[存货名称], l.[规格型号], l.[计量单位],
+  NULL AS [仓库], h.[供应商编码], h.[供应商], l.[存货名称], l.[规格型号], l.[计量单位],
   COUNT(DISTINCT h.[单据编号]) AS [单据数], SUM(COALESCE(l.[实收数量],0)) AS [实收数量],
   SUM(COALESCE(l.[金额],0)) AS [金额], SUM(COALESCE(l.[含税金额],0)) AS [含税金额],
   SUM(COALESCE(l.[费用调整],0)) AS [费用调整], SUM(COALESCE(l.[费用金额],0)) AS [费用金额]
 FROM bd_purchase_in h LEFT JOIN bl_purchase_in l ON h.[单据编号]=l.[单据编号]
 WHERE NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code=''PURCHASE_IN'' AND s.doc_no=h.[单据编号] AND s.canceled=''Y'')
-GROUP BY h.[单据日期], h.asp_cancel, h.[仓库], h.[供应商编码], h.[供应商], l.[存货名称], l.[规格型号], l.[计量单位]');
+GROUP BY h.[单据日期], h.asp_cancel, h.[供应商编码], h.[供应商], l.[存货名称], l.[规格型号], l.[计量单位]');
 
 EXEC('CREATE OR ALTER VIEW v_finish_in_stats AS
 SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.[单据日期], h.asp_cancel,
@@ -256,16 +257,20 @@ FROM bd_other_out h LEFT JOIN bl_other_out l ON h.[单据编号]=l.[单据编号
 WHERE NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code=''OTHER_OUT'' AND s.doc_no=h.[单据编号] AND s.canceled=''Y'')
 GROUP BY h.[单据日期], h.asp_cancel, l.[仓库], h.[部门], l.[存货名称], l.[规格型号], l.[计量单位]');
 
+-- (2026-09-24 判存守卫:bs_prod_line 由生产域迁移(链尾)创建;链中段先跑时表未建,跳过本视图,
+--  后续 fix-db-restore/生产域脚本会建终版 —— 视图版式以链上最后一版为准)
+IF OBJECT_ID('dbo.bs_prod_line') IS NOT NULL
 EXEC('CREATE OR ALTER VIEW v_manu_order_stats AS
 SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.asp_cancel,
-  h.[生产车间], h.[客户], l.[产品编码], l.[产品名称], l.[规格型号], l.[生产单位],
+  pl.[生产车间] AS [生产车间], h.[客户], l.[产品编码], l.[产品名称], l.[规格型号], l.[生产单位],
   COUNT(DISTINCT h.[合同号]) AS [单据数], SUM(COALESCE(l.[数量],0)) AS [计划数量],
   SUM(COALESCE(l.[累计汇报套数(工序单位)],0)) AS [累计汇报数量],
   SUM(CASE WHEN h.[完工日期] IS NOT NULL THEN COALESCE(l.[数量],0) ELSE 0 END) AS [完工数量],
   CAST(ISNULL(100.0*SUM(COALESCE(l.[累计汇报套数(工序单位)],0))/NULLIF(SUM(COALESCE(l.[数量],0)),0),0) AS decimal(18,2)) AS [生产进度%]
 FROM bd_manu_order h LEFT JOIN bl_manu_order l ON h.[合同号]=l.[合同号]
+LEFT JOIN bs_prod_line pl ON pl.[生产线]=h.[生产线] AND ISNULL(pl.asp_cancel,''N'')<>''Y''
 WHERE NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code=''MANU_ORDER'' AND s.doc_no=h.[合同号] AND s.canceled=''Y'')
-GROUP BY h.asp_cancel, h.[生产车间], h.[客户], l.[产品编码], l.[产品名称], l.[规格型号], l.[生产单位]');
+GROUP BY h.asp_cancel, pl.[生产车间], h.[客户], l.[产品编码], l.[产品名称], l.[规格型号], l.[生产单位]');
 
 EXEC('CREATE OR ALTER VIEW v_dispatch_stats AS
 SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.[单据日期], h.asp_cancel,

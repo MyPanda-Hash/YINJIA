@@ -23,47 +23,60 @@ SET QUOTED_IDENTIFIER ON;
 GO
 
 -- ═══ 1. 存量回填:仓库名称 ← 仓库(仅补空) ═══
-UPDATE bl_purchase_in SET [仓库名称] = [仓库]
- WHERE ISNULL([仓库名称], N'') = N'' AND ISNULL([仓库], N'') <> N'';
-PRINT N'[pin-wh-unify] 行表回填: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行(仓库名称 ← 仓库,只补空)';
+-- (2026-09-24 重放守卫:两列并存才回填,改动态 SQL —— 列已改名/已删的库上裸 UPDATE 编译不过,实测踩过)
+IF COL_LENGTH('dbo.bl_purchase_in', N'仓库名称') IS NOT NULL AND COL_LENGTH('dbo.bl_purchase_in', N'仓库') IS NOT NULL
+    EXEC(N'UPDATE bl_purchase_in SET [仓库名称] = [仓库]
+           WHERE ISNULL([仓库名称], N'''') = N'''' AND ISNULL([仓库], N'''') <> N'''';');
+PRINT N'[pin-wh-unify] 行表回填(两列并存时)完成';
 GO
 
 -- ═══ 2. 删列(含 MS_Description 注明;动态 SQL 判存在) ═══
-DECLARE @drop TABLE(tbl sysname, col sysname);
-INSERT INTO @drop VALUES (N'bl_purchase_in', N'仓库'), (N'bd_purchase_in', N'仓库');
-DECLARE @t sysname, @c sysname;
-DECLARE dc CURSOR LOCAL FAST_FORWARD FOR SELECT tbl, col FROM @drop;
-OPEN dc; FETCH NEXT FROM dc INTO @t, @c;
+-- (2026-09-24 重放守卫:**两列并存**(=改名前的原始双列态)才删 [仓库]——改名终态的库上
+-- [仓库] 是正名列(由 仓库名称 改名而来),只判存在会把它误删(实测事故,靠快照复原)。
+DECLARE @drop TABLE(tbl sysname, col sysname, sib sysname);
+INSERT INTO @drop VALUES (N'bl_purchase_in', N'仓库', N'仓库名称'), (N'bd_purchase_in', N'仓库', N'仓库名称');
+DECLARE @t sysname, @c sysname, @s sysname;
+DECLARE dc CURSOR LOCAL FAST_FORWARD FOR SELECT tbl, col, sib FROM @drop;
+OPEN dc; FETCH NEXT FROM dc INTO @t, @c, @s;
 WHILE @@FETCH_STATUS = 0 BEGIN
-    IF COL_LENGTH('dbo.' + @t, @c) IS NOT NULL
+    IF COL_LENGTH('dbo.' + @t, @c) IS NOT NULL AND COL_LENGTH('dbo.' + @t, @s) IS NOT NULL
     BEGIN
         IF EXISTS (SELECT 1 FROM sys.extended_properties WHERE major_id = OBJECT_ID('dbo.' + @t)
                    AND minor_id = COLUMNPROPERTY(OBJECT_ID('dbo.' + @t), @c, 'ColumnId') AND name = 'MS_Description')
             EXEC sys.sp_dropextendedproperty N'MS_Description', N'SCHEMA', N'dbo', N'TABLE', @t, N'COLUMN', @c;
         EXEC(N'ALTER TABLE dbo.' + @t + N' DROP COLUMN ' + @c + N';');
-        PRINT N'[pin-wh-unify] 已删列: ' + @t + N'.' + @c;
+        PRINT N'[pin-wh-unify] 已删列(双列并存态): ' + @t + N'.' + @c;
     END
     ELSE
-        PRINT N'[pin-wh-unify] 列不存在(幂等跳过): ' + @t + N'.' + @c;
-    FETCH NEXT FROM dc INTO @t, @c;
+        PRINT N'[pin-wh-unify] 非双列并存态(幂等跳过,保护正名仓库列): ' + @t + N'.' + @c;
+    FETCH NEXT FROM dc INTO @t, @c, @s;
 END
 CLOSE dc; DEALLOCATE dc;
 GO
 
--- ═══ 3. yj_field:删 PURCHASE_IN 的 [仓库] 注册 ═══
-DELETE FROM yj_field WHERE panel_code = 'PURCHASE_IN' AND col_name = N'仓库';
-PRINT N'[pin-wh-unify] yj_field 删除 PURCHASE_IN.仓库 注册: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行';
+-- ═══ 3. yj_field:删 PURCHASE_IN 的**旧头级/查询级** [仓库] 注册 ═══
+-- (2026-09-24 终态语义:正名后明细位也有合法的 [仓库] 行(由 仓库名称 改名而来),只清 header/query 位)
+DELETE FROM yj_field WHERE panel_code = 'PURCHASE_IN' AND col_name = N'仓库'
+ AND (place LIKE '%header%' OR place LIKE '%query%');
+PRINT N'[pin-wh-unify] yj_field 删除 PURCHASE_IN 头级/查询级 仓库 注册: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行';
 GO
 
--- ═══ 4. 自检 ═══
-DECLARE @c1 int = CASE WHEN COL_LENGTH('dbo.bl_purchase_in', N'仓库') IS NULL THEN 0 ELSE 1 END;
-DECLARE @c2 int = CASE WHEN COL_LENGTH('dbo.bd_purchase_in', N'仓库') IS NULL THEN 0 ELSE 1 END;
-DECLARE @f  int = (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'PURCHASE_IN' AND col_name = N'仓库');
+-- ═══ 4. 自检(终态口径) ═══
+DECLARE @f  int = (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'PURCHASE_IN' AND col_name = N'仓库'
+                    AND (place LIKE '%header%' OR place LIKE '%query%'));
 DECLARE @keep int = (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'PURCHASE_IN'
-                      AND col_name = N'仓库名称' AND data_type = N'参照' AND ref_panel = 'WH' AND ISNULL(hidden,0) = 0);
-DECLARE @bl int = (SELECT COUNT(*) FROM bl_purchase_in WHERE ISNULL([仓库名称],N'') = N'' AND ISNULL([仓库编码],N'') = N'');
-IF @c1 <> 0 OR @c2 <> 0 OR @f <> 0 OR @keep <> 1
-    RAISERROR(N'[pin-wh-unify] 自检失败:行表旧列 %d/头表旧列 %d(应 0/0);字段残留 %d(应 0);仓库名称参照注册 %d(应 1)', 16, 1, @c1, @c2, @f, @keep);
+                      AND col_name = N'仓库' AND place = 'detail' AND data_type = N'参照' AND ref_panel = 'WH');
+-- (改名前 era:keep 也兼容 仓库名称 行——两个名字任一在明细位注册为 WH 参照即算就位)
+DECLARE @keep2 int = (SELECT COUNT(*) FROM yj_field WHERE panel_code = 'PURCHASE_IN'
+                       AND col_name = N'仓库名称' AND place = 'detail' AND data_type = N'参照' AND ref_panel = 'WH');
+-- (2026-09-24 重放守卫:行数统计判列存在再动态执行——改名终态库上 [仓库名称] 已删,裸引用编译不过)
+DECLARE @bl int = 0;
+IF COL_LENGTH('dbo.bl_purchase_in', N'仓库名称') IS NOT NULL
+    EXEC sp_executesql N'SELECT @bl = COUNT(*) FROM bl_purchase_in WHERE ISNULL([仓库名称],N'''') = N'''' AND ISNULL([仓库编码],N'''') = N'''';',
+         N'@bl int OUTPUT', @bl OUTPUT;
+DECLARE @sum int = @keep + @keep2;  -- RAISERROR 参数只收变量,不能内联表达式
+IF @f <> 0 OR @sum <> 1
+    RAISERROR(N'[pin-wh-unify] 自检失败:头级/查询级残留 %d(应 0);明细仓库(参照 WH)注册 %d(应 1)', 16, 1, @f, @sum);
 ELSE
-    PRINT N'[pin-wh-unify] 自检通过:旧列已删、字段注册已清、仓库名称(参照/WH/可见)就位;两列全空的行 ' + CAST(@bl AS nvarchar(10)) + N'(本就没填仓库,不计)';
+    PRINT N'[pin-wh-unify] 自检通过:头级/查询级已清、明细仓库(参照 WH)就位;两列全空的行 ' + CAST(@bl AS nvarchar(10)) + N'(本就没填仓库,不计)';
 GO
