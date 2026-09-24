@@ -89,8 +89,8 @@ public class QcCatalogService {
             String invCode = str(r.get("物料编码"));
             if (invCode.isBlank()) continue;                     // 无物料编码的行不进目录(无从取类别)
             String invName = str(r.get("物料名称"));
-            String qty = qtyNum(r);                               // 数量纯数值(2026-09-24 分列)
-            String unit = unitOf(r);                              // 计量单位独立列
+            String qty = qtyWithUnit(r);                          // 数量+单位拼合文本(2026-09-24 用户口径:合在一起,不拆列)
+            String unit = unitOf(r);                              // 计量单位独立列仅作链路流转(界面隐藏)
             String category = categoryOf(invCode);               // 商品档案 所属类别(空则不填,不归纳)
             String curBatch = str(r.get("批次号"));
             if (curBatch.isBlank()) curBatch = batchNo;          // 明细批次号为空时用检验单头(批次号可能后回填)
@@ -177,6 +177,7 @@ public class QcCatalogService {
     private String createInspRecord(String invName, String invCode, String qty, String unit, String inspDate, String user) {
         String no = formNoService.next(REC_PREFIX, user);
         String date = LocalDate.now().toString();
+        // 来料数量 = 数量+单位拼合(用户口径:合在一起);计量单位列仅作链路(界面隐藏)
         jdbc.update("INSERT INTO qc_insp_rec (单据编号, 单据日期, 物料名称, 物料编码, 物料批次, 检验日期, 来料数量, 计量单位,"
                 + " 文件编码, 检验依据, 检验人, 表单审核人, asp_user1, asp_time1)"
                 + " VALUES (?,?,?,?,NULL,?,?,?,?,?,?,?,GETDATE())",

@@ -2130,12 +2130,12 @@ public class ButtonService {
                 head.put("采购单号", h.get("采购订单号"));
             }
             head.put("产品名称", r.get("物料名称"));
-            head.put("总数量", tot);
             head.put("不合格品数量", bad);
             head.put("不合格品比例", trimZero(Math.round(bad / tot * 1000.0) / 10.0) + "%");
-            if (r.get("计量单位") != null && !String.valueOf(r.get("计量单位")).isBlank()) {
-                head.put("计量单位", r.get("计量单位"));           // 2026-09-24:总数量的单位随行带入
-            }
+            // 总数量 = 数值+单位拼合(2026-09-24 用户口径:三面板数量与单位合在一起,不拆列;
+            // 列已改 nvarchar。计量单位列保留隐藏做链路)。生成入库时按前缀数字解析(见 tcInApprovedGenerate)
+            String tcUnit = r.get("计量单位") != null ? String.valueOf(r.get("计量单位")) : "";
+            head.put("总数量", trimZero(tot) + tcUnit);
             head.put("检验单号", no);                                // 隐藏链路列
             if (h.get("批次键") != null) head.put("批次键", h.get("批次键"));
             head.put("备注", "特采行:物料编码=" + r.get("物料编码") + ",规格型号=" + r.get("规格型号")
@@ -2198,7 +2198,13 @@ public class ButtonService {
                         + " ORDER BY id", inspNo);
         if (drows.isEmpty()) throw new IllegalStateException("来源检验行不存在:" + lineKey);
         Map<String, Object> r = drows.get(0);
-        double qty = numOr(tc.get("总数量")) > 0.000001 ? numOr(tc.get("总数量"))
+        // 特采单总数量是 数值+单位 拼合文本('200支';2026-09-24 用户口径)→ 取前缀数字,解析失败退检验行数量
+        double totQty;
+        try {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("^-?\\d+(\\.\\d+)?").matcher(str(tc.get("总数量")));
+            totQty = m.find() ? Double.parseDouble(m.group()) : 0;
+        } catch (Exception e) { totQty = 0; }
+        double qty = totQty > 0.000001 ? totQty
                 : numOr(r.get("合格数量")) + numOr(r.get("不合格数量"));
         Map<String, Object> line = new LinkedHashMap<>();
         line.put("存货编码", r.get("物料编码"));

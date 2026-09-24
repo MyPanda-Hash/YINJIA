@@ -1499,3 +1499,15 @@ migrate-qcrecv-unit-field.sql
 #     单位参数;ButtonService.inspAutoSpecialAccept SELECT+head 拷 计量单位(特采总数量的单位)。
 #   验证:两账套自检过(字段 3/3;回填 目录22/记录22/特采10;拆分样例 1kg→1+kg、200→200+支)。
 migrate-qc-unit-flow.sql
+
+# —— 2026-09-24 撤拆列:三面板数量+单位恢复拼合口径(用户口径:数量和计量单位是合在一起的) ——
+#   上一条(unit-flow)把数量/单位拆成两列,用户纠正:检验目录/检验数据记录/特采单的数量与单位
+#   **合在一起**(数量列即 '200支'/'1kg' 文本),不拆开。本条恢复:
+#   ①目录.数量 / 记录单.来料数量:计量单位拼回数量文本(仅纯数值行拼,幂等);
+#   ②特采单.总数量 decimal→nvarchar(50) 并拼单位(分批 DDL+文本型守卫防重复执行双拼);
+#   ③三面板 计量单位 字段 hidden=1(列与数据保留做链路流转——生成入库单仍取得到单位,界面不显示)。
+#   配套代码(同提交):QcCatalogService 数量恢复 qtyWithUnit 拼文本(计量单位列照写);
+#   inspAutoSpecialAccept 总数量写 trimZero(tot)+单位;tcInApprovedGenerate 解析总数量前缀数字
+#   (剥单位后缀,解析失败退检验行合格+不合格)。修复迁移重复执行产生的 '200.0000支支' 双拼
+#   (取前缀数字重拼,两账套)。验证:目录/记录 '200支'/'1kg',特采 '200支'/'1kg',残留 0。
+migrate-qc-unit-merge.sql
