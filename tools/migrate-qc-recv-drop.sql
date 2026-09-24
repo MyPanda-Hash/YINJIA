@@ -69,26 +69,27 @@ LEFT JOIN yj_doc_status st ON st.panel_code = ''SALE_OUT'' AND st.doc_no = h.[�
 WHERE l.[批号] IS NOT NULL AND ISNULL(l.asp_cancel,''N'')<>''Y''');
 GO
 
--- ══════════ 1. 业务表(含数据:草稿测试单) ══════════
-IF OBJECT_ID('qc_recv_detail') IS NOT NULL DROP TABLE qc_recv_detail;
-IF OBJECT_ID('qc_recv') IS NOT NULL DROP TABLE qc_recv;
-GO
-
--- ══════════ 2. 面板/字段注册 ══════════
-DELETE FROM yj_field WHERE panel_code = 'QC_RECV';
-DELETE FROM yj_panel WHERE panel_code = 'QC_RECV';
-GO
-
--- ══════════ 3. 面板译名 ══════════
-DELETE FROM yj_translation WHERE scope = 'panel' AND ref_key = N'暂收入库单';
-GO
-
--- ══════════ 4. 状态/占用/权限/附件(防御性;当前 0 行) ══════════
-DELETE FROM yj_doc_status WHERE panel_code = 'QC_RECV';
-DELETE FROM form_flow_link WHERE source_panel_code = 'QC_RECV' OR target_panel_code = 'QC_RECV';
-DELETE FROM yj_role_panel WHERE panel_code = 'QC_RECV';
-DELETE FROM yj_attachment WHERE panel_code = 'QC_RECV';
-DELETE FROM yj_form_approval WHERE panel_code = 'QC_RECV';
+-- ══════════ 1-4. 旧壳整体删除(2026-09-23 重放守卫:收进单批次) ══════════
+-- 删除对象是**旧壳 QC_RECV**(qc_recv/qc_recv_detail 两张物理表)。表已不存在的库上重跑
+-- (哈希漂移触发)必须整体跳过 —— 否则会把 panel-merge-qc 合并出来的新 QC_RECV 面板
+-- (sl_recv 表,188 张存量单)连同 yj_doc_status/form_flow_link/yj_role_panel 等全部误删
+-- (实测事故:重跑后面板消失、列表 0 张,靠 HSDZ_MES-for-test.bak 快照恢复)。
+IF OBJECT_ID('qc_recv') IS NOT NULL OR OBJECT_ID('qc_recv_detail') IS NOT NULL
+BEGIN
+    DROP TABLE IF EXISTS qc_recv_detail;
+    DROP TABLE IF EXISTS qc_recv;
+    DELETE FROM yj_field WHERE panel_code = 'QC_RECV';
+    DELETE FROM yj_panel WHERE panel_code = 'QC_RECV';
+    DELETE FROM yj_translation WHERE scope = 'panel' AND ref_key = N'暂收入库单';
+    DELETE FROM yj_doc_status WHERE panel_code = 'QC_RECV';
+    DELETE FROM form_flow_link WHERE source_panel_code = 'QC_RECV' OR target_panel_code = 'QC_RECV';
+    DELETE FROM yj_role_panel WHERE panel_code = 'QC_RECV';
+    DELETE FROM yj_attachment WHERE panel_code = 'QC_RECV';
+    DELETE FROM yj_form_approval WHERE panel_code = 'QC_RECV';
+    PRINT N'[qc-recv-drop] 旧壳已清:表 + 面板/字段/译名 + 状态/链路/权限/附件';
+END
+ELSE
+    PRINT N'[qc-recv-drop] 旧壳物理表(qc_recv/qc_recv_detail)已不存在:全部删除跳过(幂等;保护合并后的 QC_RECV 面板)';
 GO
 
 -- ══════════ 5. 自检(应全为 0;table 不存在) ══════════

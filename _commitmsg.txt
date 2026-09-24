@@ -1,18 +1,15 @@
-fix: 转ERP源单挂联分析与修复——订单直推带 bill_no 保持 YJ- 编号 + 挂联按 ERP单号 兜底
+fix: QC_RECV 面板误删事故恢复 + migrate-qc-recv-drop 补重放守卫(两账套)
 
-用户报:推入库单后 源单单号/订单单号/源单行号 均未转成功;问接口有无 采购订单号/采购订单行号 字段。
-只读探针(_probe-src-fields.mjs,真实账套零写入)证据:
-  · pur_inbound 行共 83 字段,**没有**独立的 采购订单号/采购订单行号 字段;源单信息只有 src_* 族:
-    src_bill_no/src_bill_type_id|number|name/src_seq/src_inter_id/src_entry_id;
-  · 真实账套既有入库单(CGRK-20260923-03272 等)就是这么写的:src_bill_no=YJ-20260701-04 +
-    src_bill_type_id=pur_bill_order + src_seq=1 + 真实内部 id —— UI 的「采购订单号/采购订单行号」列
-    即 src_bill_no/src_seq(源单类型=采购订单时的显示名);转ERP 用 src_bill_no 就是正确口径;
-  · 未挂上的根因:沙箱里此前那张订单被金蝶自动编号成 CGDD-…,入库单按 MES 号(YJ-…)resolvePoRefs
-    查不到 → 按设计整组不推(沙箱 CGRK-20260922-00036 实测 src 全空)。
-修复:
-  ① 订单直推带 bill_no=MES 单号(对齐真实账套口径:订单本就 YJ- 号,下游按号挂联);
-  ② 入库挂联查不到 MES 号时,按 bd_pu_order.ERP单号(直推回写的金蝶真实号)兜底再查,
-    查到则 src_bill_no 用金蝶真实号;mesOrderErpNo() 只读查询,异常按无处理。
-沙箱终态(实测):YJ-20260909-01 订单已存在(3 分录,seq 1/2/3 齐)——重推被查重守卫正确拦截;
-MES 侧标记已对齐(_fix-po-erp-mark.sql:已转/ERP单号=同号)。入库单 PI-2026-09-0128 留给用户
-界面亲验:弃审→审核→转ERP,src_bill_no=YJ-20260909-01 + src_seq=行号 应全落。
+事故:重启后健康检查发现 QC_RECV(送料暂收单)面板消失(配置 undefined/列表 0 张;sl_recv 数据 188 张完好)。
+根因:migrate-qc-recv-drop.sql 的 §1-§4 删除(表/面板/字段/译名/状态/链路/权限/附件)全裸奔无守卫——
+仓库收敛/正名两轮修改该脚本(v_lot_trace 取数列)致哈希漂移,DbSync 重跑时把 panel-merge-qc
+合并出来的新 QC_RECV 面板(sl_recv 表)连同 yj_field 69 行、yj_doc_batch 8 行一并误删。
+(快照核验:暂收单本就不走 yj_doc_status 状态机,状态/链路/权限行在快照里也是 0——实际受损即面板+字段+批次。)
+
+恢复:合并轮快照 C:\SQLBackup\HSDZ_MES-for-test.bak(13:23,早于事故)还原为临时库
+HSDZ_MES_RESTORE(restore-snapshot-temp.ps1),按 QC_RECV 域把 yj_panel/yj_field/yj_doc_batch
+等行搬回两账套(NOT EXISTS 幂等+IDENTITY_INSERT 保 id);恢复后核验 面板1/字段69/批次180,
+API 实测 panelName=送料暂收单、列表 188 张。临时库已删(drop-restore-temp.ps1)。
+
+守卫:recv-drop 的全部删除收进单批次 IF(旧壳物理表 qc_recv/qc_recv_detail 存在才执行)——
+表已不存在的库上重跑整体跳过,保住合并后的 QC_RECV;DbSync 已在两账套重跑登记(失败 0)。
