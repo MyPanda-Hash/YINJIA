@@ -29,14 +29,12 @@
       <span class="wol-count">{{ tt('共有数据') }}: <b>{{ rows.length }}</b> {{ tt('条') }}</span>
     </div>
 
-    <!-- 按钮条 -->
+    <!-- 按钮条(2026-09-26 用户拍板:生产工单=纯查询+打印,不再作为快速排产任务——调线/修改入口移除) -->
     <div class="wol-btns">
-      <el-button size="small" @click="onModify" :disabled="!currentRow">{{ tt('修改') }}</el-button>
       <el-button size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
       <el-button size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
       <el-button size="small" @click="printTask" :disabled="!checked.length && !currentRow">{{ tt('打印工单') }}</el-button>
       <el-button size="small" @click="printPick" :disabled="!checked.length">{{ tt('打印领料单') }}</el-button>
-      <el-button size="small" type="warning" plain @click="batchMove" :disabled="!checked.length">{{ tt('批量调线') }}</el-button>
       <el-button size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
     </div>
@@ -102,19 +100,6 @@
         <el-table-column :label="tt('定额数量')" prop="定额数量" width="100" align="right" />
       </el-table>
     </el-dialog>
-
-    <!-- 批量调线弹窗 -->
-    <el-dialog v-model="mvVisible" :title="tt('批量调线')" width="380px" append-to-body>
-      <div class="wol-lb" style="margin-bottom: 8px">{{ tt('目标生产线') }}
-        <el-select v-model="mvLine" size="small" filterable style="width: 200px">
-          <el-option v-for="l in lines" :key="l.v" :label="l.t" :value="l.v" />
-        </el-select>
-      </div>
-      <template #footer>
-        <el-button @click="mvVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="doMove">{{ tt('确认调线') }}</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
@@ -125,9 +110,7 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { printProductionTask } from '@/business/print-formats'
 import { useUserStore } from '@/stores/user'
-import { useTabsStore } from '@/stores/tabs'
 
-const tabs = useTabsStore()
 const rows = ref([])
 const checked = ref([])
 const currentRow = ref(null)
@@ -144,8 +127,6 @@ const bomVisible = ref(false)
 const bomRow = ref(null)
 const bomRows = ref([])
 const bomLoading = ref(false)
-const mvVisible = ref(false)
-const mvLine = ref('')
 
 const filtered = computed(() => rows.value.filter((r) => {
   if (stateFilter.value === '未完工' && r.生产状态 === '完工') return false
@@ -181,12 +162,6 @@ function applyLineMeta() {
   for (const r of rows.value) if (!r.生产线) r.生产线 = ''
   lineCode.value = lineFilter.value ? (lines.value.find((x) => x.v === lineFilter.value)?.t.split('·')[1] || '') : ''
   void l
-}
-
-function onModify() {
-  const no = currentRow.value?.工单号
-  if (!no) return
-  tabs.open({ path: `/panelx/form/MANU_ORDER?code=${encodeURIComponent(no)}`, title: no })
 }
 
 async function onClose(close) {
@@ -259,29 +234,6 @@ async function printPick() {
     win.focus()
     win.print()
   } catch (e) { err(e, '打印失败') }
-}
-
-function batchMove() {
-  if (!checked.value.length) return
-  mvLine.value = lineFilter.value || (lines.value[0]?.v ?? '')
-  mvVisible.value = true
-}
-
-async function doMove() {
-  if (!mvLine.value) { ElMessage.warning(tt('请选择目标生产线')); return }
-  try {
-    const res = await request.post('/px/workOrderList/reassign', {
-      rows: [...new Set(checked.value.map((r) => r.工单号))].map((no) => {
-        const r = checked.value.find((x) => x.工单号 === no)
-        return { 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号 }
-      }),
-      目标生产线: mvLine.value,
-    })
-    const d = res.data || {}
-    ElMessage.success(`${tt('已调线')} ${d['调线张数']} ${tt('张')} → ${d['目标']}`)
-    mvVisible.value = false
-    load()
-  } catch (e) { err(e, '调线失败') }
 }
 
 async function showBom(row) {
