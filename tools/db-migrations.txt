@@ -1554,4 +1554,5 @@ migrate-manu-prune-legacy.sql
 # —— 2026-09-23 工序报工单升级(对照参考库 scjl 底稿):删旧状态三件套(真源 yj_doc_status)+加 批号/生产线/入库单号;工序下拉五道+生产线=启用档案;v_manu_schedule 加已报工列(五道完成MAX);报工扣减未交量=排产−max(入库,已报工) ——
 migrate-wo-report-upgrade.sql
 # —— 2026-09-23 工单明细留痕四列(旧系统 ProSchedList 对齐):bd_manu_order 补 结案人/结案时间(ManuCloseHandler 结案写入·取消结案清空)/打印人/打印时间(/px/scheduleBoard/printStamp 打印生产任务单写入);展示=工单排产看板明细列+追溯弹窗,不进 MANU_ORDER 表单 ——
-migrate-manu-close-print-stamp.sql
+migrate-manu-close-print-stamp.sql# —— 2026-09-24 生产工单列表数据源切参考库 plang(用户拍板:外部系统直接写 plang,键=公司代码+工单号+工单行号):plang 补 打印人/打印时间 两列(打印生产任务单留痕,对齐 bd_manu_order 同名同义);/px/workOrderList 改查 plang+新增 printStamp/close/reassign 三端点;plang 无面板/代码引用,纯增量加列,幂等 ——
+migrate-plang-workorder.sql
