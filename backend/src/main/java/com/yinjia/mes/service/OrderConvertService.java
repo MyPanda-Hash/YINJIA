@@ -114,8 +114,14 @@ public class OrderConvertService {
      * 复用 {@link QuickScheduleService#createFromOrderLine}(占用守恒/需求数量=订单数量等口径已内置);
      * 本方法额外把「已采购占用」计入剩余(两通道共用),避免外购已占用后重复转自制;
      * 行内若修改了 交货日期 → 先回写订单行(applyDateEdit),并把加工单 预完工日 覆盖为修正后交期。
+     *
+     * <p>⚠ 不加 @Transactional(2026-09-26 修复):行级独立提交——createFromOrderLine 自带事务,
+     * 外层再包事务时某行守卫失败(如"剩余数量 0")会把共享事务标记 rollback-only,
+     * 循环继续、部分行已成功,末尾提交即抛
+     * "Transaction rolled back because it has been marked as rollback-only"(用户实测报障)。
+     * 去掉外层事务后每行独立开事务:失败行自身回滚进 failed,成功行各自提交,语义与本方法的
+     * created/failed 双清单一致。行级捕获放宽到 RuntimeException(交期回写/存单的数据异常同样进失败行)。
      */
-    @Transactional
     public Map<String, Object> toManu(List<Map<String, Object>> rows, String user) {
         if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要转工单的订单行");
         List<String> created = new ArrayList<>();
@@ -133,8 +139,8 @@ public class OrderConvertService {
                             java.time.LocalDate.parse(due), mo);
                 }
                 created.add(mo);
-            } catch (IllegalStateException e) {
-                failed.add(soNo + "#" + lineId + ":" + e.getMessage());
+            } catch (RuntimeException e) {
+                failed.add(soNo + "#" + lineId + ":" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             }
         }
         if (created.isEmpty()) throw new IllegalStateException("无行可转:" + String.join("; ", failed));
@@ -149,8 +155,8 @@ public class OrderConvertService {
     /**
      * 转采购单(外购成品):逐行生成采购申请 PU_REQ 草稿——行=订单产品本身(存货编码=物料编码,数量=两通道剩余),
      * 需求日期=行级交货日期;SO→PU_REQ 行级占用(linkLine)+站内消息推采购。
+     * <p>⚠ 不加 @Transactional,行级独立提交(同 toManu 的 rollback-only 根因,2026-09-26 修复)。
      */
-    @Transactional
     public Map<String, Object> toPurchase(List<Map<String, Object>> rows, String user) {
         if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要转采购单的订单行");
         List<String> created = new ArrayList<>();
@@ -202,8 +208,8 @@ public class OrderConvertService {
                         "PU_REQ", newNo, newNo + "#0", "");
                 created.add(newNo);
                 total += qty;
-            } catch (IllegalStateException e) {
-                failed.add(soNo + "#" + lineId + ":" + e.getMessage());
+            } catch (RuntimeException e) {
+                failed.add(soNo + "#" + lineId + ":" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             }
         }
         if (created.isEmpty()) throw new IllegalStateException("无行可转:" + String.join("; ", failed));

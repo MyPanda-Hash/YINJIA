@@ -109,8 +109,11 @@ public class ScheduleBoardService {
      * 批量排入:每行 {加工单号, 行id?, 排产数量?(行内,空=全排), 生产线?(行内覆盖顶部参数)} + 公共参数
      * {生产线, 排产班组, 预开工日, 预完工日}(由前端把顶部参数并入每行;生产车间=产线档案属性已下线)。
      * 逐张 scheduleOne(参数写入→守卫→守恒→留痕);回执按受影响产线汇总 当日负荷/日产能/超载提示。
+     * <p>⚠ 不加 @Transactional(2026-09-26 修复):scheduleOne 自带事务,外层再包时某行守卫失败
+     * (如"仅已审核工单可排产")会把共享事务标 rollback-only,部分成功后提交即抛
+     * "Transaction rolled back because it has been marked as rollback-only"(与订单结转 toManu 同根因)。
+     * 行级独立提交:失败行自身回滚进 failed,成功行各自提交。
      */
-    @Transactional
     public Map<String, Object> assign(List<Map<String, Object>> rows, String user) {
         if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要排产的加工单");
         List<String> done = new ArrayList<>();
