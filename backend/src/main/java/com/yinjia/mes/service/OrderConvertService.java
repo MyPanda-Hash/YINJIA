@@ -67,7 +67,14 @@ public class OrderConvertService {
                         + " FROM bd_so_order o"
                         + " JOIN bl_so_order l ON l.[单据编号] = o.[单据编号] AND ISNULL(l.asp_cancel,'N') <> 'Y'"
                         + " JOIN yj_doc_status s ON s.panel_code = 'SO_ORDER' AND s.doc_no = o.[单据编号]"
-                        + "   AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N') <> 'Y' AND ISNULL(s.stopped,'N') <> 'Y'"
+                        + "   AND s.shr IS NOT NULL"
+                        // 严格「已审核」(2026-09-26 用户要求:结转页不出现已审核以外流程的数据)——
+                        // 排除 作废/中止(含金蝶手动关闭 H)/删除申请/修改申请·修改中/会签/审批中/已生效/已归档/已完成(S)
+                        + "   AND ISNULL(s.canceled,'N') <> 'Y' AND ISNULL(s.stopped,'N') <> 'Y'"
+                        + "   AND ISNULL(s.erp_close_state,'') NOT IN ('H','S')"
+                        + "   AND ISNULL(s.deleting,'N') <> 'Y' AND ISNULL(s.modify_state,'') NOT IN ('R','Y')"
+                        + "   AND ISNULL(s.pending,'N') <> 'Y'"
+                        + "   AND ISNULL(s.effective,'N') <> 'Y' AND ISNULL(s.archived,'N') <> 'Y'"
                         + " LEFT JOIN bs_partner pt ON pt.[往来单位编码] = o.[客户编码]"
                         + "   OR (ISNULL(o.[客户编码],N'') = N'' AND pt.[往来单位名称] = o.[客户])"
                         + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
@@ -154,12 +161,17 @@ public class OrderConvertService {
      * 差异:落 plang;占用通道 target_panel_code='PLANG';交期落 cp_date(计划完工日期)。
      */
     private String createPlangFromOrderLine(String soNo, String lineId, Double qtyOverride, String dueOverride, String user) {
-        // ① 来源订单必须已审核(未作废/未中止)——与旧生单同闸门
+        // ① 来源订单必须「已审核」(严格口径:排除 作废/中止(金蝶手动关闭 H)/审批中/删除·修改申请/已生效/已归档/已完成 S)
         Integer audited = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM yj_doc_status WHERE panel_code='SO_ORDER' AND doc_no=?"
-                        + " AND shr IS NOT NULL AND ISNULL(canceled,'N')<>'Y' AND ISNULL(stopped,'N')<>'Y'",
+                        + " AND shr IS NOT NULL"
+                        + " AND ISNULL(canceled,'N')<>'Y' AND ISNULL(stopped,'N')<>'Y'"
+                        + " AND ISNULL(erp_close_state,'') NOT IN ('H','S')"
+                        + " AND ISNULL(deleting,'N')<>'Y' AND ISNULL(modify_state,'') NOT IN ('R','Y')"
+                        + " AND ISNULL(pending,'N')<>'Y'"
+                        + " AND ISNULL(effective,'N')<>'Y' AND ISNULL(archived,'N')<>'Y'",
                 Integer.class, soNo);
-        if (audited == null || audited == 0) throw new IllegalStateException("销售订单 " + soNo + " 尚未审核,不能转工单");
+        if (audited == null || audited == 0) throw new IllegalStateException("销售订单 " + soNo + " 非已审核状态,不能转工单");
         // ② 订单行
         Map<String, Object> line = jdbc.queryForMap(
                 "SELECT l.[存货编码], ISNULL(l.[存货名称],N'') AS 存货名称, ISNULL(l.[规格型号],N'') AS 规格型号,"
