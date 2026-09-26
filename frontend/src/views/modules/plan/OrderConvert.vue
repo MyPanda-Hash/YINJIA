@@ -137,7 +137,7 @@ async function saveDates() {
 }
 
 async function toManu() {
-  await convert('toManu', '转工单', 'MANU_ORDER')
+  await convert('toManu', '转工单', '/prod/plan/workOrderList')
 }
 async function toPurchase() {
   await convert('toPurchase', '转采购单', 'PU_REQ')
@@ -171,7 +171,9 @@ async function convert(api, label, gotoPanel) {
         tt('订单结转') + '·' + tt(label),
         { confirmButtonText: tt('前往查看'), cancelButtonText: tt('留在本页') },
       )
-      window.location.hash = `#/panelx/list/${gotoPanel}`
+      // 2026-09-26 单轨:转工单落 plang,前往查看=生产工单列表页(/prod/plan/workOrderList);
+      // 面板类(如 PU_REQ)仍走 /panelx/list/<code>
+      window.location.hash = gotoPanel.startsWith('/') ? `#${gotoPanel}` : `#/panelx/list/${gotoPanel}`
     } catch { /* 留在本页 */ }
     loadAll()
   } catch (e) {

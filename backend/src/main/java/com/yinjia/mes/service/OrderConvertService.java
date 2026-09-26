@@ -13,26 +13,31 @@ import java.util.Map;
  * 订单结转·发单工作台(方案《订单结转实现方案-V1.0》2026-09-22)。
  *
  * <p>定位:结转页只是**发单调度台**——判断每行订单"库存/排产够不够"后 转加工单(自制)/转采购单(外购成品),
- * 处理完的行自动消失;生成的加工单/采购申请是标准面板单据,后续仍按面板↔面板流转。
+ * 处理完的行自动消失;生成的加工单/采购申请是标准单据,后续按各自列表页流转。
  *
- * <p>防重复 = 行级占用链 form_flow_link(SO→MANU_ORDER / SO→PU_REQ),剩余数量=需求数量−各通道占用之和;
+ * <p>防重复 = 行级占用链 form_flow_link(SO→加工单 / SO→采购申请),剩余数量=需求数量−各通道占用之和;
  * 转满的行退出列表(列表过滤),重复提交被后端剩余量校验拒绝(双保险);**不改销售订单状态**(ERP 同步真源)。
  * 与 BOM 齐套互不替代:材料缺口走 加工单「生成采购申请」(BOM×排产−库存);本页采购的是**订单产品本身**。
+ *
+ * <p>2026-09-26 数据源单轨(用户拍板「工单数据都在 plang」):转工单不再写 bd/bl_manu_order,
+ * 直接落参考库工单表 **plang**(键=公司代码 comm + 工单号 pl_no + 工单行号 pl_xc;生产工单列表页/
+ * 打印/结案/调线已挂 plang);占用通道记录为 target_panel_code='PLANG'(与存量 'MANU_ORDER' 占用
+ * 并列计入剩余);转单完成**不再跳转生产加工单表单页**(该页随数据源切换不再承载新单,处理完的行自动消失)。
  */
 @Service
 public class OrderConvertService {
 
     private final JdbcTemplate jdbc;
-    private final QuickScheduleService quickSchedule;
+    private final FormNoService formNo;
     private final PanelRegistry registry;
     private final ButtonService buttonService;
     private final VoucherFlowService voucherFlow;
     private final MessageService message;
 
-    public OrderConvertService(JdbcTemplate jdbc, QuickScheduleService quickSchedule, PanelRegistry registry,
+    public OrderConvertService(JdbcTemplate jdbc, FormNoService formNo, PanelRegistry registry,
                                ButtonService buttonService, VoucherFlowService voucherFlow, MessageService message) {
         this.jdbc = jdbc;
-        this.quickSchedule = quickSchedule;
+        this.formNo = formNo;
         this.registry = registry;
         this.buttonService = buttonService;
         this.voucherFlow = voucherFlow;
@@ -70,7 +75,7 @@ public class OrderConvertService {
                         + " LEFT JOIN dm_kh dk ON dk.dm = o.[客户编码]"
                         + " OUTER APPLY (SELECT SUM(ISNULL(linked_quantity,0)) AS linked FROM form_flow_link f"
                         + "   WHERE f.source_panel_code='SO_ORDER' AND f.source_line_key = o.[单据编号]+N'#'+CAST(l.[id] AS nvarchar(20))"
-                        + "     AND f.target_panel_code='MANU_ORDER' AND f.link_status='ACTIVE') m"
+                        + "     AND f.target_panel_code IN ('MANU_ORDER','PLANG') AND f.link_status='ACTIVE') m"
                         + " OUTER APPLY (SELECT SUM(ISNULL(linked_quantity,0)) AS linked FROM form_flow_link f"
                         + "   WHERE f.source_panel_code='SO_ORDER' AND f.source_line_key = o.[单据编号]+N'#'+CAST(l.[id] AS nvarchar(20))"
                         + "     AND f.target_panel_code='PU_REQ' AND f.link_status='ACTIVE') p"
@@ -95,7 +100,7 @@ public class OrderConvertService {
         Map<String, Object> today = jdbc.queryForMap(
                 "SELECT COUNT(DISTINCT source_line_key) AS cnt, COUNT(DISTINCT ISNULL(inventory_code,N'')) AS styles,"
                         + " SUM(ISNULL(linked_quantity,0)) AS qty FROM form_flow_link"
-                        + " WHERE source_panel_code='SO_ORDER' AND target_panel_code IN ('MANU_ORDER','PU_REQ')"
+                        + " WHERE source_panel_code='SO_ORDER' AND target_panel_code IN ('MANU_ORDER','PU_REQ','PLANG')"
                         + "   AND link_status='ACTIVE' AND CONVERT(varchar(10), create_time, 120) = CONVERT(varchar(10), GETDATE(), 120)");
         Map<String, Object> done = new LinkedHashMap<>();
         done.put("总订单笔数", num(today.get("cnt")));
@@ -110,17 +115,14 @@ public class OrderConvertService {
     }
 
     /**
-     * 转工单(自制):逐行按 生单数量(缺省=两通道剩余)生成加工单草稿。
-     * 复用 {@link QuickScheduleService#createFromOrderLine}(占用守恒/需求数量=订单数量等口径已内置);
-     * 本方法额外把「已采购占用」计入剩余(两通道共用),避免外购已占用后重复转自制;
-     * 行内若修改了 交货日期 → 先回写订单行(applyDateEdit),并把加工单 预完工日 覆盖为修正后交期。
+     * 转工单(自制):逐行按 生单数量(缺省=两通道剩余)生成工单——**直接写参考库 plang**
+     * (2026-09-26 数据源单轨:不再写 bd/bl_manu_order,不再跳转生产加工单表单页)。
+     * 行内若修改了 交货日期 → 先回写订单行(applyDateEdit),工单 计划完工日期 取修正后交期。
      *
-     * <p>⚠ 不加 @Transactional(2026-09-26 修复):行级独立提交——createFromOrderLine 自带事务,
-     * 外层再包事务时某行守卫失败(如"剩余数量 0")会把共享事务标记 rollback-only,
-     * 循环继续、部分行已成功,末尾提交即抛
+     * <p>⚠ 不加 @Transactional(2026-09-26 修复):行级独立提交——此前外层事务+内层事务方法
+     * 的组合,某行守卫失败会把共享事务标 rollback-only,提交即抛
      * "Transaction rolled back because it has been marked as rollback-only"(用户实测报障)。
-     * 去掉外层事务后每行独立开事务:失败行自身回滚进 failed,成功行各自提交,语义与本方法的
-     * created/failed 双清单一致。行级捕获放宽到 RuntimeException(交期回写/存单的数据异常同样进失败行)。
+     * 行级捕获 RuntimeException:失败行自身回滚进 failed,成功行各自提交(created/failed 双清单语义)。
      */
     public Map<String, Object> toManu(List<Map<String, Object>> rows, String user) {
         if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要转工单的订单行");
@@ -133,12 +135,7 @@ public class OrderConvertService {
             try {
                 String due = applyDateEdit(r, user);
                 Double qty = num2(str(r.get("生单数量")) == null ? null : r.get("生单数量"));
-                String mo = quickSchedule.createFromOrderLine(soNo, lineId, qty, user);
-                if (due != null) {   // 交期修正贯穿:预完工日=修正后交期(生单同义词取头级日期,此处显式覆盖行级口径)
-                    jdbc.update("UPDATE bd_manu_order SET [预完工日] = ? WHERE [合同号] = ?",
-                            java.time.LocalDate.parse(due), mo);
-                }
-                created.add(mo);
+                created.add(createPlangFromOrderLine(soNo, lineId, qty, due, user));
             } catch (RuntimeException e) {
                 failed.add(soNo + "#" + lineId + ":" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             }
@@ -148,8 +145,62 @@ public class OrderConvertService {
         out.put("生成张数", created.size());
         out.put("编号清单", created);
         out.put("失败行", failed);
-        out.put("gotoPanel", "MANU_ORDER");
         return out;
+    }
+
+    /**
+     * 单条订单行 → 一行 plang 工单(工单号=MO 号池续号,行号=1,需求数量=订单行数量,排产=生单数量)。
+     * 口径与 QuickScheduleService.createFromOrderLine 一致(仅已审核/占用守恒/需求数量不缩水),
+     * 差异:落 plang;占用通道 target_panel_code='PLANG';交期落 cp_date(计划完工日期)。
+     */
+    private String createPlangFromOrderLine(String soNo, String lineId, Double qtyOverride, String dueOverride, String user) {
+        // ① 来源订单必须已审核(未作废/未中止)——与旧生单同闸门
+        Integer audited = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM yj_doc_status WHERE panel_code='SO_ORDER' AND doc_no=?"
+                        + " AND shr IS NOT NULL AND ISNULL(canceled,'N')<>'Y' AND ISNULL(stopped,'N')<>'Y'",
+                Integer.class, soNo);
+        if (audited == null || audited == 0) throw new IllegalStateException("销售订单 " + soNo + " 尚未审核,不能转工单");
+        // ② 订单行
+        Map<String, Object> line = jdbc.queryForMap(
+                "SELECT l.[存货编码], ISNULL(l.[存货名称],N'') AS 存货名称, ISNULL(l.[规格型号],N'') AS 规格型号,"
+                        + " ISNULL(l.[数量],0) AS 数量, ISNULL(l.[销售单位],N'') AS 销售单位,"
+                        + " ISNULL(l.[批次号],N'') AS 批次号,"
+                        + " CONVERT(varchar(10), ISNULL(l.[预计交货日期], o.[预计交货日期]), 120) AS 交货日期,"
+                        + " ISNULL(o.[客户编码],N'') AS 客户编码"
+                        + " FROM bl_so_order l JOIN bd_so_order o ON o.[单据编号] = l.[单据编号]"
+                        + " WHERE l.[单据编号] = ? AND l.[id] = ?", soNo, Integer.parseInt(lineId));
+        // ③ 两通道剩余(已转工单 MANU_ORDER/PLANG 占用 + 已转采购 PU_REQ 占用)
+        Double manu = jdbc.queryForObject(
+                "SELECT ISNULL(SUM(ISNULL(linked_quantity,0)),0) FROM form_flow_link"
+                        + " WHERE source_panel_code='SO_ORDER' AND source_line_key=?"
+                        + " AND target_panel_code IN ('MANU_ORDER','PLANG') AND link_status='ACTIVE'",
+                Double.class, soNo + "#" + lineId);
+        Double pu = jdbc.queryForObject(
+                "SELECT ISNULL(SUM(ISNULL(linked_quantity,0)),0) FROM form_flow_link"
+                        + " WHERE source_panel_code='SO_ORDER' AND source_line_key=?"
+                        + " AND target_panel_code='PU_REQ' AND link_status='ACTIVE'",
+                Double.class, soNo + "#" + lineId);
+        double demand = num(line.get("数量"));
+        double residual = demand - (manu == null ? 0 : manu) - (pu == null ? 0 : pu);
+        if (residual <= 0.0001) throw new IllegalStateException("该订单行已全部转出(剩余可转数量 0)");
+        double qty = qtyOverride != null && qtyOverride > 0 ? Math.min(qtyOverride, residual) : residual;
+        if (qty <= 0) throw new IllegalStateException("生单数量必须大于 0");
+        if (qty > residual + 0.0001) throw new IllegalStateException("生单数量 " + qty + " 超过剩余可转数量 " + residual);
+        // ④ 落 plang(工单号沿用 MO 号池;公司代码恒 '0' 与全库口径一致;行号=1)
+        String plNo = formNo.next("MO", user);
+        String due = dueOverride != null ? dueOverride : str(line.get("交货日期"));
+        jdbc.update("INSERT INTO plang (comm, pl_no, pl_xc, pl_date, khdm, dm, mc, gg, jldw,"
+                        + " xq_sl, pl_sl, yl, cp_date, lot_no, od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1)"
+                        + " VALUES (N'0', ?, 1, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
+                        + " CASE WHEN ? IS NULL OR ? = N'' THEN NULL ELSE CONVERT(datetime, ?, 120) END,"
+                        + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE())",
+                plNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
+                str(line.get("规格型号")), str(line.get("销售单位")),
+                demand, qty, qty, due, due, due, str(line.get("批次号")), soNo, lineId, user);
+        // ⑤ 行级占用(通道=PLANG;目标行键=工单号#1)
+        voucherFlow.linkLine("SO_ORDER", soNo, soNo + "#" + lineId, str(line.get("存货编码")), qty,
+                "PLANG", plNo, plNo + "#1", "");
+        return plNo;
     }
 
     /**
@@ -176,7 +227,7 @@ public class OrderConvertService {
                 Double manu = jdbc.queryForObject(
                         "SELECT ISNULL(SUM(ISNULL(linked_quantity,0)),0) FROM form_flow_link"
                                 + " WHERE source_panel_code='SO_ORDER' AND source_form_no=? AND source_line_key=?"
-                                + " AND target_panel_code='MANU_ORDER' AND link_status='ACTIVE'",
+                                + " AND target_panel_code IN ('MANU_ORDER','PLANG') AND link_status='ACTIVE'",
                         Double.class, soNo, soNo + "#" + lineId);
                 Double pu = jdbc.queryForObject(
                         "SELECT ISNULL(SUM(ISNULL(linked_quantity,0)),0) FROM form_flow_link"
