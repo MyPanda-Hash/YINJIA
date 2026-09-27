@@ -159,8 +159,8 @@ public class ScheduleBoardService {
                 Map<String, Object> head;
                 try {
                     head = rowId != null
-                            ? jdbc.queryForMap("SELECT id, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(xq_sl,0) AS xq_sl FROM dbo.plang WHERE id=?", rowId)
-                            : jdbc.queryForMap("SELECT TOP 1 id, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(xq_sl,0) AS xq_sl FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(scx,N'')=N'' ORDER BY id", no);
+                            ? jdbc.queryForMap("SELECT id, pl_xc, ISNULL([批次号],N'') AS pc_batch, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(xq_sl,0) AS xq_sl FROM dbo.plang WHERE id=?", rowId)
+                            : jdbc.queryForMap("SELECT TOP 1 id, pl_xc, ISNULL([批次号],N'') AS pc_batch, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(xq_sl,0) AS xq_sl FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(scx,N'')=N'' ORDER BY id", no);
                 } catch (org.springframework.dao.EmptyResultDataAccessException e) {
                     throw new IllegalStateException("工单不存在:" + no);
                 }
@@ -183,6 +183,18 @@ public class ScheduleBoardService {
                 sql.append(", asp_user2=?, asp_time2=GETDATE() WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'");
                 args.add(user); args.add(head.get("id"));
                 jdbc.update(sql.toString(), args.toArray());
+                // 同步落排产表 plang_pc(薄记录:排产字段;工单排产看板/调线读它)——幂等:先删后插
+                jdbc.update("DELETE FROM dbo.plang_pc WHERE pl_no=? AND pl_xc=? AND ISNULL([批次号],N'')=?",
+                        no, head.get("pl_xc"), head.get("pc_batch"));
+                jdbc.update("INSERT INTO plang_pc (comm, pl_no, pl_xc, pl_date, scx, pl_man, lb, st_date, cp_date, jh_date,"
+                                + " od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号])"
+                                + " SELECT p.comm, p.pl_no, p.pl_xc, p.pl_date, ?, ?, ?, ?, ?, NULL,"
+                                + " p.od_no, p.od_xc, p.ja, N'N', ?, GETDATE(), p.[批次号]"
+                                + " FROM dbo.plang p WHERE p.id=?",
+                        line, user, (team != null && !team.isBlank() && team.length() <= 10) ? team : null,
+                        start == null ? null : java.time.LocalDate.parse(start),
+                        end == null ? null : java.time.LocalDate.parse(end),
+                        user, head.get("id"));
                 logUsage(user, "排产", no);
                 done.add(no);
                 if (!lines.contains(line)) lines.add(line);
@@ -235,6 +247,7 @@ public class ScheduleBoardService {
                                 + " asp_user2=?, asp_time2=GETDATE() WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
                         user, no);
                 if (n == 0) throw new IllegalStateException("撤销未生效");
+                jdbc.update("DELETE FROM dbo.plang_pc WHERE pl_no=?", no);
                 logUsage(user, "撤销排产", no);
                 done.add(no);
             } catch (IllegalStateException e) {
@@ -273,25 +286,25 @@ public class ScheduleBoardService {
     }
 
     /**
-     * 左侧骨架(参考工单排产页,2026-09-23 去班别):生产线档案**全部线**(含停用,与基础资料一一对应)
-     * 的 未交量汇总。未交量 = 该线已排工单的 Σ(排产−max(入库,已报工))(未结案未作废)——
-     * 报工扣减链路(2026-09-23):报工即产出,与入库取大防双扣;已报工=五道工序完成数最大值。
-     * 停用线仅可查看(排产/调线守卫在 assign/reassign)。开线管理已按用户拍板去除(2026-09-24,bs_line_open 表下线)。
+     * 左侧骨架(2026-09-27 切 plang_pc×plang):生产线档案**全部线**(含停用)的 未交量汇总。
+     * 未交量 = 该线已排工单的 Σ(排产−max(入库,已报工))(未结案未作废)——排产行=plang_pc(薄记录),
+     * 数量/状态=plang 活数据;已报工=wo_progress 按工单号完成数最大值。
      */
     public List<Map<String, Object>> linesSummary(String date) {
         String d = (date == null || date.isBlank()) ? java.time.LocalDate.now().toString() : date.trim();
         List<Map<String, Object>> backlog = jdbc.queryForList(
-                "SELECT ISNULL(h.[生产线],N'') AS 生产线,"
-                        + " SUM(ISNULL(l.[排产数量],0) - CASE WHEN COALESCE(h.[入库数量], ISNULL(l.[入库数量],0)) >= ISNULL(prg.[完成],0)"
-                        + " THEN COALESCE(h.[入库数量], ISNULL(l.[入库数量],0)) ELSE ISNULL(prg.[完成],0) END) AS 未交量,"
-                        + " COUNT(DISTINCT h.[合同号]) AS 单数"
-                        + " FROM bd_manu_order h JOIN bl_manu_order l ON l.[合同号]=h.[合同号] AND ISNULL(l.asp_cancel,'N')<>'Y'"
+                "SELECT ISNULL(pc.scx,N'') AS 生产线,"
+                        + " SUM(ISNULL(p.pl_sl,0) - CASE WHEN ISNULL(p.rk_sl,0) >= ISNULL(prg.[完成],0)"
+                        + " THEN ISNULL(p.rk_sl,0) ELSE ISNULL(prg.[完成],0) END) AS 未交量,"
+                        + " COUNT(DISTINCT pc.pl_no) AS 单数"
+                        + " FROM dbo.plang_pc pc"
+                        + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
+                        + "   AND ISNULL(pc.[批次号],N'') = ISNULL(p.[批次号],N'') AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + " LEFT JOIN (SELECT [单据编号], MAX([完成数量]) AS [完成] FROM wo_progress"
-                        + "   WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY [单据编号]) prg ON prg.[单据编号]=h.[合同号]"
-                        + " LEFT JOIN yj_doc_status s ON s.panel_code='MANU_ORDER' AND s.doc_no=h.[合同号]"
-                        + " WHERE ISNULL(h.asp_cancel,'N')<>'Y' AND ISNULL(h.[生产线],N'')<>N'' AND ISNULL(h.[结案],'N')<>'Y'"
-                        + "   AND ISNULL(s.canceled,'N')<>'Y' AND ISNULL(s.stopped,'N')<>'Y'"
-                        + " GROUP BY h.[生产线]");
+                        + "   WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY [单据编号]) prg ON prg.[单据编号]=p.pl_no"
+                        + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'')<>N''"
+                        + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        + " GROUP BY pc.scx");
         Map<String, Double> bk = new LinkedHashMap<>();
         for (Map<String, Object> b : backlog) {
             bk.put(String.valueOf(b.get("生产线")), Num.of(b.get("未交量")));
@@ -316,41 +329,53 @@ public class ScheduleBoardService {
         return out;
     }
 
-    /** 选中线 的排产明细(scope=未完工/已完工/全部);排产日期=排产留痕 asp_time2。
-     *  列口径对齐旧系统 工单排产明细.列表(ProSchedList,用户 2026-09-23 提供):工单信息+执行回填+结案/打印留痕;
-     *  电镀域列(膜厚/环保号/序列号/采购订单号/客户来料单号)未落库,不返回。 */
+    /**
+     * 选中线 的排产明细(scope=未完工/已完工/全部)——2026-09-27 切 plang_pc×plang:
+     * 排产字段(scx/lb/st_date/cp_date/pl_man/排产日期)取 plang_pc 薄记录,
+     * 数量/结案/打印等活数据取 plang(与生产工单列表页一致);列口径对齐 WorkOrderBoard 表格。
+     */
     public List<Map<String, Object>> scheduled(String line, String scope) {
         String complete;
-        if ("已完工".equals(scope)) complete = " AND ISNULL(v.[生产状态],N'') = N'完工'";
+        if ("已完工".equals(scope)) complete = " AND st.[生产状态] = N'完工'";
         else if ("全部".equals(scope)) complete = "";
-        else complete = " AND ISNULL(v.[生产状态],N'') <> N'完工'";
+        else complete = " AND st.[生产状态] <> N'完工'";
         return jdbc.queryForList(
-                "SELECT v.[加工单号], ISNULL(v.[客户],N'') AS 客户,"
-                        + " CONVERT(varchar(10), h.asp_time2, 120) AS 排产日期,"
-                        + " ISNULL(v.[销售订单号],N'') AS 客户PO, ISNULL(v.[产品编码],N'') AS 物料编码,"
-                        + " CONVERT(varchar(10), v.[计划开工日], 120) AS 开工日期,"
-                        + " CONVERT(varchar(10), v.[工序交期], 120) AS 计划完工日期,"
-                        + " CONVERT(varchar(10), h.[完工日期], 120) AS 实际完工日期,"
-                        + " v.[产品名称] AS 产品名称, ISNULL(v.[规格型号],N'') AS 规格型号,"
-                        + " ISNULL(v.[生产单位],N'') AS 单位, ISNULL(v.[生产状态],N'') AS 生产状态,"
-                        + " ISNULL(v.[排产数量],0) AS 排产数量, ISNULL(v.[需求数量],0) AS 需求数量,"
-                        + " ISNULL(v.[入库数量],0) AS 入库数量, ISNULL(v.[余量],0) AS 余量,"
-                        + " ISNULL(v.[每箱数量],0) AS 每箱数量,"
-                        + " CASE WHEN ISNULL(v.[每箱数量],0)>0 THEN CAST(v.[排产数量]/v.[每箱数量] AS decimal(18,2)) ELSE 0 END AS 箱数,"
-                        + " ISNULL(v.[批号],N'') AS 批号, ISNULL(v.[重点管控],N'') AS 重点管控,"
-                        + " ISNULL(h.[操作员],N'') AS 操作员, ISNULL(h.[备注],N'') AS 备注,"
-                        + " ISNULL(h.[领料单号],N'') AS 领料单号, ISNULL(h.[入库单号],N'') AS 入库单号,"
-                        + " ISNULL(h.[结案],N'N') AS 结案, ISNULL(h.[结案人],N'') AS 结案人,"
-                        + " CONVERT(varchar(16), h.[结案时间], 120) AS 结案时间,"
-                        + " ISNULL(h.[打印人],N'') AS 打印人, CONVERT(varchar(16), h.[打印时间], 120) AS 打印时间,"
-                        + " ISNULL(h.[打印次数],0) AS 打印次数,"
-                        // 报工扣减链路(2026-09-23):已报工=五道完成数最大;未交量=排产−max(入库,已报工)
-                        + " ISNULL(v.[已报工],0) AS 已报工,"
-                        + " ISNULL(v.[排产数量],0) - CASE WHEN ISNULL(v.[入库数量],0) >= ISNULL(v.[已报工],0)"
-                        + " THEN ISNULL(v.[入库数量],0) ELSE ISNULL(v.[已报工],0) END AS 未交量"
-                        + " FROM v_manu_schedule v JOIN bd_manu_order h ON h.[合同号] = v.[加工单号]"
-                        + " WHERE ISNULL(v.[生产线],N'') = ? AND ISNULL(v.[单据状态],N'') <> N'已作废'" + complete
-                        + " ORDER BY v.[工序交期], v.[加工单号]",
+                "SELECT pc.pl_no AS 加工单号, ISNULL(dk.mc, p.khdm) AS 客户,"
+                        + " CONVERT(varchar(10), pc.asp_time2, 120) AS 排产日期,"
+                        + " ISNULL(p.od_no,N'') AS 客户PO, p.dm AS 物料编码,"
+                        + " CONVERT(varchar(10), pc.st_date, 120) AS 开工日期,"
+                        + " CONVERT(varchar(10), pc.cp_date, 120) AS 计划完工日期,"
+                        + " CONVERT(varchar(10), p.cp_date2, 120) AS 实际完工日期,"
+                        + " ISNULL(p.mc,N'') AS 产品名称, ISNULL(p.gg,N'') AS 规格型号,"
+                        + " ISNULL(p.jldw,N'') AS 单位,"
+                        + " CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN N'完工'"
+                        + "      WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
+                        + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
+                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0) AS 余量,"
+                        + " 0 AS 每箱数量, 0 AS 箱数,"
+                        + " ISNULL(p.lot_no,N'') AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
+                        + " ISNULL(pc.pl_man,N'') AS 操作员, CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注,"
+                        + " ISNULL(p.ll_no2,N'') AS 领料单号, ISNULL(p.rk_no,N'') AS 入库单号,"
+                        + " CASE WHEN p.ja IN (N'T',N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
+                        + " N'' AS 结案人, CAST(NULL AS datetime) AS 结案时间,"
+                        + " ISNULL(p.[打印人],N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
+                        + " ISNULL(p.asp_print,0) AS 打印次数,"
+                        + " ISNULL(prg.[完成],0) AS 已报工,"
+                        + " ISNULL(p.pl_sl,0) - CASE WHEN ISNULL(p.rk_sl,0) >= ISNULL(prg.[完成],0)"
+                        + " THEN ISNULL(p.rk_sl,0) ELSE ISNULL(prg.[完成],0) END AS 未交量,"
+                        + " ISNULL(pc.[批次号],N'') AS 批次号"
+                        + " FROM dbo.plang_pc pc"
+                        + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
+                        + "   AND ISNULL(pc.[批次号],N'') = ISNULL(p.[批次号],N'') AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + " LEFT JOIN dbo.dm_kh dk ON dk.comm = p.comm AND dk.dm = p.khdm"
+                        + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
+                        + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
+                        + " LEFT JOIN (SELECT [单据编号], MAX([完成数量]) AS [完成] FROM wo_progress"
+                        + "   WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY [单据编号]) prg ON prg.[单据编号]=p.pl_no"
+                        + " CROSS APPLY (SELECT CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0)"
+                        + "   THEN N'完工' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS [生产状态]) st"
+                        + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'') = ?" + complete
+                        + " ORDER BY pc.cp_date, pc.pl_no, pc.pl_xc",
                 line == null ? "" : line);
     }
 
@@ -477,7 +502,8 @@ public class ScheduleBoardService {
         return out;
     }
 
-    /** 批量调线:勾选已排工单 → 调到目标生产线(数量/日期/班组保留;留痕;作废/结案拒绝,停用线拒绝) */
+    /** 批量调线(2026-09-27 切 plang_pc×plang):勾选已排工单 → 调到目标生产线;
+     *  同步改 plang_pc.scx(排产表)与 plang.scx(工单主表);作废/结案拒绝,停用线拒绝;留痕。 */
     @Transactional
     public Map<String, Object> reassign(List<Map<String, Object>> rows, String toLine, String user) {
         if (toLine == null || toLine.isBlank()) throw new IllegalArgumentException("请选择目标生产线");
@@ -498,16 +524,17 @@ public class ScheduleBoardService {
             String no = str(r.get("加工单号"));
             if (no == null) continue;
             try {
-                Map<String, Object> head = jdbc.queryForMap(
-                        "SELECT ISNULL(h.asp_cancel,'N') AS asp_cancel, ISNULL(h.[结案],'N') AS 结案 FROM bd_manu_order h WHERE h.[合同号]=?", no);
-                if ("Y".equals(str(head.get("asp_cancel")))) throw new IllegalStateException("已作废");
-                if ("Y".equals(str(head.get("结案")))) throw new IllegalStateException("已结案,不能调线");
-                jdbc.update("UPDATE bd_manu_order SET [生产线]=?, asp_user2=?, asp_time2=SYSDATETIME()"
-                                + " WHERE [合同号]=?", toLine, user, no);
-                try {
-                    jdbc.update("INSERT INTO yj_usage_log (user_name, event_type, panel_name, action_name, doc_no, created_at)"
-                                    + " VALUES (?, N'排产', N'生产工单', N'批量调线', ?, GETDATE())", user, no);
-                } catch (Exception ignore) { }
+                Integer closed = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                                + " AND ISNULL(p.ja,'N') IN ('T','Y')", Integer.class, no);
+                if (closed != null && closed > 0) throw new IllegalStateException("已结案,不能调线");
+                int n = jdbc.update("UPDATE pc SET pc.scx=?, pc.asp_user2=?, pc.asp_time2=GETDATE()"
+                                + " FROM dbo.plang_pc pc WHERE pc.pl_no=? AND ISNULL(pc.asp_cancel,'N')<>'Y'",
+                        toLine, user, no);
+                if (n == 0) throw new IllegalStateException("该单未排产(排产表无记录)");
+                jdbc.update("UPDATE dbo.plang SET scx=?, asp_user2=?, asp_time2=GETDATE()"
+                                + " WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(scx,N'')<>N''", toLine, user, no);
+                logUsage(user, "批量调线", no);
                 done.add(no);
             } catch (IllegalStateException e) {
                 failed.add(no + ":" + e.getMessage());

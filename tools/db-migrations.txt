@@ -1587,3 +1587,5 @@ migrate-so-line-no.sql
 migrate-plang-batch.sql
 # —— 2026-09-27 快速排产切 plang 配套:lb 扩宽 nvarchar2→10字符(排产班组名写入);pending/stats/assign/unassign/today 五端点改读 plang(转工单即入池) ——
 migrate-plang-schedule.sql
+# —— 2026-09-27 工单排产看板切 plang_pc(pl_no/lb 扩宽+批次号列+已排五回填;骨架/按线明细/调线读 plang_pc×plang;快速排产排入同步落 plang_pc 薄记录) ——
+migrate-plangpc-board.sql
