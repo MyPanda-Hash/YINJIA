@@ -142,14 +142,9 @@ public class OrderConvertService {
             String lineId = str(r.get("行id"));
             if (soNo == null || lineId == null) throw new IllegalArgumentException("转单行缺少 订单号/行id");
             try {
-                String due = applyDateEdit(r, user);
+                applyDateEdit(r, user);   // 交期修正先回写订单行 → createFromOrderLine 读行交期即为修正值(cp_date)
                 Double qty = num2(str(r.get("生单数量")) == null ? null : r.get("生单数量"));
-                String plNo = quickSchedule.createFromOrderLine(soNo, lineId, qty, user);
-                if (due != null) {   // 交期修正贯穿:转单行 计划完工日期=修正后交期(落表默认取订单行交期,此处覆盖)
-                    jdbc.update("UPDATE plang SET cp_date = CONVERT(datetime, ?, 120)"
-                            + " WHERE pl_no = ? AND pl_xc = (SELECT MAX(pl_xc) FROM plang WHERE pl_no = ?)", due, plNo, plNo);
-                }
-                created.add(plNo);
+                created.add(quickSchedule.createFromOrderLine(soNo, lineId, qty, user));
             } catch (RuntimeException e) {
                 failed.add(soNo + "#" + lineId + ":" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             }
