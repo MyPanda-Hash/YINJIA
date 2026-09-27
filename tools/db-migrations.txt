@@ -1553,9 +1553,34 @@ migrate-line-shift-open.sql
 migrate-manu-prune-legacy.sql
 # —— 2026-09-23 工序报工单升级(对照参考库 scjl 底稿):删旧状态三件套(真源 yj_doc_status)+加 批号/生产线/入库单号;工序下拉五道+生产线=启用档案;v_manu_schedule 加已报工列(五道完成MAX);报工扣减未交量=排产−max(入库,已报工) ——
 migrate-wo-report-upgrade.sql
+# —— 2026-09-24 合并对齐补缺:qc_insp 补 4 列(暂收单号/检验日期/检验方案/总结论,远程建表声明本地老表缺)+暂收单号字段注册(参照 SL_RECV)+en 译名;为被跳过的 chain-insp-fields 等铺依赖 ——
+migrate-align-merge-20260924.sql
+# —— 2026-09-24 合并对齐二:报表视图缺列修复(远程库上直改未入链;前置 panda 三支重放;委外三视图对齐面板字段;lot_trace 补 id) ——
+migrate-align-views-20260924.sql
+# —— 2026-09-24 合并对齐三:字段位缺口 7 项补齐(列在但 yj_field 漏注册=界面少列:INV最新成本/UOM换算率/PU_ORDER双单位2/STOCK_STATUS预警数量/DEPT电话/WH联系人) ——
+migrate-align-fields-20260924.sql
+# —— 2026-09-24 送料暂收供应商参照回正(GFDA)+头重复行清理+计量单位列序245+存量回填;根因=sl-supplier-ref 旧编码 SL_RECV 重放0行命中 ——
+migrate-fix-qc-recv-ref-20260924.sql
+# —— 2026-09-24 检验/退料明细缺列补齐(规格型号/不合格数量/处置方式;spec-unify 与特采生单依赖,远程库上直改未入链;面板字段 型号→规格型号) ——
+migrate-align-qc-col-fix-20260924.sql
+# —— 2026-09-24 kucun.ckdm 扩宽 6→200(7位仓库编码 CK0000x 入库审核截断报错;对齐 bs_wh.仓库编码宽度) ——
+migrate-kucun-ckdm-widen-20260924.sql
+# —— 2026-09-24 智能供应链+品质管理 两模块角色授权补齐(51面板;报表类只读档/单据类全权;授权行 39→282) ——
+migrate-scm-qc-perms-20260924.sql
 # —— 2026-09-23 工单明细留痕四列(旧系统 ProSchedList 对齐):bd_manu_order 补 结案人/结案时间(ManuCloseHandler 结案写入·取消结案清空)/打印人/打印时间(/px/scheduleBoard/printStamp 打印生产任务单写入);展示=工单排产看板明细列+追溯弹窗,不进 MANU_ORDER 表单 ——
-migrate-manu-close-print-stamp.sql# —— 2026-09-24 生产工单列表数据源切参考库 plang(用户拍板:外部系统直接写 plang,键=公司代码+工单号+工单行号):plang 补 打印人/打印时间 两列(打印生产任务单留痕,对齐 bd_manu_order 同名同义);/px/workOrderList 改查 plang+新增 printStamp/close/reassign 三端点;plang 无面板/代码引用,纯增量加列,幂等 ——
+migrate-manu-close-print-stamp.sql
+# —— 2026-09-23 暂收退料单明细幽灵字段清理:yj_field 多登记 明细.规格型号(表列实为 型号)致 getFormDescriptor 500;守卫式删除,共享词条不动 ——
+migrate-qc-return-drop-ghost-spec.sql
+# —— 2026-09-24 开线管理整体下线(用户拍板):工单排产看板去开线标签/切换,setOpen 端点与 linesSummary.开线 字段删除;DROP bs_line_open(原建表脚本 migrate-line-shift-open.sql 保持原样,新库=先建后删) ——
+migrate-line-open-drop.sql
+# —— 2026-09-24 生产加工单→生产工单 改名(用户拍板):yj_panel 面板名+panel_name_en(MANU_ORDER/明细表/统计表)+老 WO_ORDER 让位「生产工单(旧版)」+panel 译名键迁移;不动 panel_code/权限/表结构/占用链 ——
+migrate-manu-rename-workorder.sql
+# —— 2026-09-24 生产工单列表字段对齐(用户清单):列表 16 列定序+非清单字段退表单+补 备注/创建时间+清重复字段行;标签不动(标签=数据键) ——
+migrate-manu-workorder-fields.sql
+# —— 2026-09-24 生产工单列表数据源切参考库 plang(用户拍板:外部系统直接写 plang,键=公司代码+工单号+工单行号):plang 补 打印人/打印时间 两列(打印生产任务单留痕,对齐 bd_manu_order 同名同义);/px/workOrderList 改查 plang+新增 printStamp/close/reassign 三端点;plang 无面板/代码引用,纯增量加列,幂等 ——
 migrate-plang-workorder.sql
+# —— 2026-09-27 bl_so_order补建「仓库名称」行级列(仓库关联改造加映射漏建列,致SO同步50/50失败)+yj_field注册+注明;幂等可重跑 ——
+migrate-so-line-whname.sql
 # —— 2026-09-27 销售订单明细行加「行号」(金蝶分录 seq 从 1 连续,对齐 bl_pu_order.行号 先例;存量回填 ROW_NUMBER;SO_ORDER 明细字段注册):订单结转页展示,转工单时工单行号 pl_xc=订单行号 同值下传 ——
 migrate-so-line-no.sql
 # —— 2026-09-27 plang 加「批次号」(转单日期 yyyyMMdd,分批转单按日期分批:不同日期=不同批次行,同日同批累加不插行;存量回填=pl_date) ——
