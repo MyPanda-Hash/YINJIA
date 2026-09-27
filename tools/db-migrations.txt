@@ -1585,3 +1585,5 @@ migrate-so-line-whname.sql
 migrate-so-line-no.sql
 # —— 2026-09-27 plang 加「批次号」(转单日期 yyyyMMdd,分批转单按日期分批:不同日期=不同批次行,同日同批累加不插行;存量回填=pl_date) ——
 migrate-plang-batch.sql
+# —— 2026-09-27 快速排产切 plang 配套:lb 扩宽 nvarchar2→10字符(排产班组名写入);pending/stats/assign/unassign/today 五端点改读 plang(转工单即入池) ——
+migrate-plang-schedule.sql
