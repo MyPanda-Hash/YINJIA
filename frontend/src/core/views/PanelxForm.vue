@@ -1249,17 +1249,6 @@ function validate() {
 async function load() {
   loading.value = true
   try {
-    // 检验目录(常驻目录单):打开表单未带编号时自动装载唯一那张目录单
-    // (JYML-2026-09-0001)——目录是常驻清单,不该让用户先查单再看到行(2026-09-27 用户反馈)
-    if (panelCode.value === 'QC_CATALOG' && !isEdit.value) {
-      try {
-        const lst = await engine.queryFormDataList({ panelCode: 'QC_CATALOG', condition: {}, pageNo: 1, pageSize: 1 })
-        const rows = lst?.list || lst?.data?.rows || (Array.isArray(lst?.data) ? lst.data : [])
-        const first = rows[0]
-        const firstNo = first && (first['单据编号'] || first['编号'])
-        if (firstNo) { code.value = String(firstNo); isEdit.value = true }
-      } catch { /* 自动装载失败按新增打开 */ }
-    }
     const configPromise = engine.getPanelConfig(panelCode.value).catch(() => null)
     let payload
     if (isEdit.value) {
