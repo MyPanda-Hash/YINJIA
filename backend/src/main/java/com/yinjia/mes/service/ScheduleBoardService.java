@@ -262,13 +262,14 @@ public class ScheduleBoardService {
         return out;
     }
 
-    /** 今日已排产(mode=today,按排产留痕 asp_time2)/全部已排产(mode=all)——plang 单轨 */
+    /** 今日已排产(mode=today,按排产留痕 asp_time1)/全部已排产(mode=all)——plang 单轨;含 工单行号/批次号 */
     public List<Map<String, Object>> today(String mode, String keyword) {
         String kw = keyword == null ? "" : keyword.trim();
         String like = "%" + kw + "%";
         boolean all = "all".equalsIgnoreCase(mode);
         return jdbc.queryForList(
-                "SELECT ISNULL(p.scx,N'') AS 生产线, p.pl_no AS 加工单号, ISNULL(p.lb,N'') AS 排产班组,"
+                "SELECT ISNULL(p.scx,N'') AS 生产线, p.pl_no AS 加工单号, p.pl_xc AS 工单行号,"
+                        + " ISNULL(p.[批次号],N'') AS 批次号, ISNULL(p.lb,N'') AS 排产班组,"
                         + " CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN N'完工'"
                         + "      WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, 0 AS 每箱数量, 0 AS 箱数,"
@@ -341,7 +342,7 @@ public class ScheduleBoardService {
         else if ("全部".equals(scope)) complete = "";
         else complete = " AND st.[生产状态] <> N'完工'";
         return jdbc.queryForList(
-                "SELECT pc.pl_no AS 加工单号, ISNULL(dk.mc, p.khdm) AS 客户,"
+                "SELECT pc.pl_no AS 加工单号, pc.pl_xc AS 工单行号, ISNULL(dk.mc, p.khdm) AS 客户,"
                         // 排产日期=实际排入时间(plang_pc.asp_time1,排入即写);asp_time2 仅调线/改动时才有
                         + " CONVERT(varchar(10), pc.asp_time1, 120) AS 排产日期,"
                         + " ISNULL(p.od_no,N'') AS 客户PO, p.dm AS 物料编码,"

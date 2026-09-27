@@ -74,6 +74,7 @@
                     @selection-change="(r) => (checkedSched = r)">
             <el-table-column type="selection" width="42" />
             <el-table-column :label="tt('工单号')" prop="加工单号" width="150" fixed />
+            <el-table-column :label="tt('工单行号')" prop="工单行号" width="90" sortable />
             <el-table-column :label="tt('客户')" prop="客户" min-width="130" fixed show-overflow-tooltip />
             <el-table-column :label="tt('排产日期')" prop="排产日期" width="95" />
             <el-table-column :label="tt('客户PO')" prop="客户PO" width="110" show-overflow-tooltip />
