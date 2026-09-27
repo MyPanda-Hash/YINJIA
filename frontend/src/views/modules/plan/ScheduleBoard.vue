@@ -190,7 +190,7 @@ async function assign(rows) {
   if (!param.line) { ElMessage.warning(tt('请先在顶部选择生产线')); return }
   try {
     await ElMessageBox.confirm(`${tt('确认将选中的')} ${list.length} ${tt('张加工单排入')}「${param.line}」？`,
-      tt('排产工作台'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
+      tt('快速排产'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
   } catch { return }
   try {
     const res = await request.post('/px/scheduleBoard/assign', { rows: list.map(rowParams) })

@@ -319,12 +319,13 @@ export default {
     '已调线': 'Moved',
     '调线失败': 'Move failed',
     '请选择目标生产线': 'Select a target line',
-    '（排产工作台已不可选）': ' (removed from schedule board)',
+    '（快速排产已不可选）': ' (removed from schedule board)',
     '保存交期': 'Save Due Dates',
     '交期已保存': 'Due dates saved',
     '同步交期常与创建日期雷同，可在此修正；保存交期或转单时回写订单行': 'Synced due dates often equal the created date; correct here - saved on Save or on convert',
 
-    // 排产工作台(实现总结 V1.0 §5,2026-09-23)
+    // 快速排产(原「排产工作台」,2026-09-26 用户拍板改名;实现总结 V1.0 §5,2026-09-23)
+    '快速排产': 'Quick Scheduling',
     '排产工作台': 'Schedule Board',
     '排产参数': 'Assign Params',
     '选择生产线': 'Select line',

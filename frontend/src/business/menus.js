@@ -209,9 +209,9 @@ export const menuTree = [
               // 订单结转·发单工作台(方案 V1.0):待结转行(剩余=需求−已排产−已采购)→转工单/转采购单;
               // 防重复=行级占用链,转满自动消失;不改销售订单状态。置首位:发单是排产的上一步。
               { code: 'orderConvert', title: '订单结转', path: '/prod/plan/orderConvert', icon: 'Switch' },
-              // 排产工作台(实现总结 V1.0 §5):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
+              // 快速排产(原「排产工作台」,2026-09-26 用户拍板改名):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
               // 排产单一入口(加工单「排产」按钮已下线,表单产线/开工·完工日只读)
-              { code: 'scheduleBoard', title: '排产工作台', path: '/prod/plan/scheduleBoard', icon: 'AlarmClock' },
+              { code: 'scheduleBoard', title: '快速排产', path: '/prod/plan/scheduleBoard', icon: 'AlarmClock' },
               // 2026-09-22 单轨改造(参考库式,用户拍板):生产工单/排单计划菜单下线——
               // 工单=生产加工单(MANU_ORDER),看板职责由「生产排产 MANU_SCHEDULE」承接(含五工序完成/未完成数量);
               // 面板与权限行保留可回滚(同 组装BOM表 并页签先例)。恢复:取消下两行注释即可。

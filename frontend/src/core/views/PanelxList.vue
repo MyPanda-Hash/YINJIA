@@ -4456,7 +4456,7 @@ async function toggleLineDisable(row, next) {
     row['停用'] = res.data?.['停用'] ?? row['停用']   // 以服务端翻转结果为准
     archVersion.value++
     ElMessage.success(row['停用'] === 1
-      ? tt('已停用') + '：' + row.生产线 + tt('（排产工作台已不可选）')
+      ? tt('已停用') + '：' + row.生产线 + tt('（快速排产已不可选）')
       : tt('已启用') + '：' + row.生产线)
   } catch (e) {
     row['停用'] = old                      // 失败回滚(反向动画退回)
