@@ -64,20 +64,24 @@ public class QuickScheduleService {
     }
 
     /**
-     * 单行 → plang 工单行(方案一,2026-09-26 用户拍板:**同一销售订单共用一张工单**——
-     * pl_no 沿用该订单首次转单号,工单行号 pl_xc = 该工单当前最大行号+1(1 起连续,分批转单自动续行);
+     * 单行 → plang 工单行(2026-09-27 用户拍板,驳回"同单共用工单号"方案):
+     * **每行转单各生成一张新工单**(MO 号池);工单行号 pl_xc = **销售订单明细行的行号**
+     * (bl_so_order.行号,金蝶分录 seq 从 1 连续,migrate-so-line-no.sql)——工单行号与订单行号同值,
+     * 可直接对回订单表格;历史行 行号为空时按 id 序兜底计算。
      * 来源订单行以 od_no/od_xc 回链;占用通道 target_panel_code='PLANG'。
      * 严格「已审核」闸门;剩余=行数量−各通道占用(已转工单/已转采购);qtyOverride 空=剩余全部。
-     * 数据源单轨:不再写 bd/bl_manu_order。SO_ORDER「生成生产工单」按钮与订单结转页共用本实现。
+     * 数据源单轨:不再写 bd_manu_order。SO_ORDER「生成生产工单」按钮与订单结转页共用本实现。
      */
     @Transactional
     public String createFromOrderLine(String sourceNo, String lineId, Double qtyOverride, String user) {
         requireAudited(sourceNo);
-        // 订单行直查表(不走面板标签映射);来源单头取 客户编码
+        // 订单行直查表(不走面板标签映射);来源单头取 客户编码;行号带 id 序兜底(历史行 行号 可能为空)
         Map<String, Object> line = jdbc.queryForMap(
                 "SELECT l.[存货编码], ISNULL(l.[存货名称],N'') AS 存货名称, ISNULL(l.[规格型号],N'') AS 规格型号,"
                         + " ISNULL(l.[数量],0) AS 数量, ISNULL(l.[销售单位],N'') AS 销售单位, ISNULL(l.[批次号],N'') AS 批次号,"
                         + " ISNULL(o.[客户编码],N'') AS 客户编码,"
+                        + " ISNULL(l.[行号], (SELECT COUNT(*) FROM bl_so_order x WHERE x.[单据编号]=l.[单据编号]"
+                        + "   AND ISNULL(x.asp_cancel,'N')<>N'Y' AND x.[id]<=l.[id])) AS 行号,"
                         + " CONVERT(varchar(10), ISNULL(l.[预计交货日期], o.[预计交货日期]), 120) AS 交货日期"
                         + " FROM bl_so_order l JOIN bd_so_order o ON o.[单据编号] = l.[单据编号]"
                         + " WHERE l.[单据编号] = ? AND l.[id] = ?", sourceNo, Integer.parseInt(lineId));
@@ -99,30 +103,21 @@ public class QuickScheduleService {
         double qty = qtyOverride != null && qtyOverride > 0 ? Math.min(qtyOverride, residual) : residual;
         if (qty <= 0) throw new IllegalStateException("生单数量必须大于 0");
         if (qty > residual + 0.0001) throw new IllegalStateException("生单数量 " + qty + " 超过剩余可转数量 " + residual);
-        // 工单号与行号:同订单共用一张工单;首次转单取新 MO 号,续转沿用并续行
-        String plNo;
-        try {
-            plNo = jdbc.queryForObject(
-                    "SELECT TOP 1 pl_no FROM plang WHERE od_no = ? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY pl_xc DESC",
-                    String.class, sourceNo);
-        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
-            plNo = null;
-        }
-        if (plNo == null || plNo.isBlank()) plNo = formNo.next("MO", user);
-        Integer nextXc = jdbc.queryForObject(
-                "SELECT ISNULL(MAX(pl_xc),0)+1 FROM plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
-                Integer.class, plNo);
+        // 工单号与行号(2026-09-27 用户拍板,驳回共用工单号方案):每行转单各取新 MO 号;
+        // 工单行号 = 订单明细行行号(同值下传,SELECT 已兜底非空)
+        String plNo = formNo.next("MO", user);
+        Integer lineNo = line.get("行号") instanceof Number n ? n.intValue() : 1;
         String due = str(line.get("交货日期"));
         jdbc.update("INSERT INTO plang (comm, pl_no, pl_xc, pl_date, khdm, dm, mc, gg, jldw,"
                         + " xq_sl, pl_sl, yl, cp_date, lot_no, od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1)"
                         + " VALUES (N'0', ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
                         + " CASE WHEN ? IS NULL OR ? = N'' THEN NULL ELSE CONVERT(datetime, ?, 120) END,"
                         + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE())",
-                plNo, nextXc, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
+                plNo, lineNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
                 str(line.get("规格型号")), str(line.get("销售单位")), demand, qty, qty, due, due, due,
                 str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user);
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
-                "PLANG", plNo, plNo + "#" + nextXc, "");
+                "PLANG", plNo, plNo + "#" + lineNo, "");
         return plNo;
     }
 

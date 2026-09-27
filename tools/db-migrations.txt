@@ -1556,3 +1556,5 @@ migrate-wo-report-upgrade.sql
 # —— 2026-09-23 工单明细留痕四列(旧系统 ProSchedList 对齐):bd_manu_order 补 结案人/结案时间(ManuCloseHandler 结案写入·取消结案清空)/打印人/打印时间(/px/scheduleBoard/printStamp 打印生产任务单写入);展示=工单排产看板明细列+追溯弹窗,不进 MANU_ORDER 表单 ——
 migrate-manu-close-print-stamp.sql# —— 2026-09-24 生产工单列表数据源切参考库 plang(用户拍板:外部系统直接写 plang,键=公司代码+工单号+工单行号):plang 补 打印人/打印时间 两列(打印生产任务单留痕,对齐 bd_manu_order 同名同义);/px/workOrderList 改查 plang+新增 printStamp/close/reassign 三端点;plang 无面板/代码引用,纯增量加列,幂等 ——
 migrate-plang-workorder.sql
+# —— 2026-09-27 销售订单明细行加「行号」(金蝶分录 seq 从 1 连续,对齐 bl_pu_order.行号 先例;存量回填 ROW_NUMBER;SO_ORDER 明细字段注册):订单结转页展示,转工单时工单行号 pl_xc=订单行号 同值下传 ——
+migrate-so-line-no.sql

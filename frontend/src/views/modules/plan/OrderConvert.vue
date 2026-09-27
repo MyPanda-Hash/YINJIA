@@ -37,6 +37,7 @@
           <div class="oc-dim">{{ row.品名 }}</div>
         </template>
       </el-table-column>
+      <el-table-column :label="tt('行号')" prop="行号" width="70" />
       <el-table-column :label="tt('下单日期')" prop="下单日期" width="100" />
       <el-table-column :label="tt('交货日期')" width="150" fixed="left">
         <template #default="{ row }">

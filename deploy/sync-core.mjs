@@ -317,6 +317,9 @@ export const DOCS = [
     mapLines(d) {
       return (d.material_entity || []).map((m) => ({
         单据编号: str(d.bill_no), 品牌: null,
+        // 销售订单行号(2026-09-27,对齐采购订单先例):金蝶分录 seq,从 1 连续——
+        // 订单结转页展示;转工单时作为工单行号 plang.pl_xc 同值下传(bl_so_order.行号)
+        行号: num(m.seq),
         存货名称: str(m.material_name), 存货编码: str(m.material_number), 规格型号: str(m.material_model),
         数量: num(m.qty), 销售单位: str(m.unit_name) || str(m.unit_number),
         单价: num(m.price), '税率%': num(m.cess), 含税单价: num(m.tax_price),

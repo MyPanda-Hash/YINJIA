@@ -53,6 +53,8 @@ public class OrderConvertService {
         String like = "%" + kw + "%";
         return jdbc.queryForList(
                 "SELECT o.[单据编号] AS 订单号, l.[id] AS 行id,"
+                        + " ISNULL(l.[行号], (SELECT COUNT(*) FROM bl_so_order x WHERE x.[单据编号]=l.[单据编号]"
+                        + "   AND ISNULL(x.asp_cancel,'N') <> 'Y' AND x.[id] <= l.[id])) AS 行号,"
                         + " CONVERT(varchar(10), o.[单据日期], 120) AS 下单日期,"
                         + " CONVERT(varchar(10), ISNULL(l.[预计交货日期], o.[预计交货日期]), 120) AS 交货日期,"
                         + " ISNULL(o.[客户], N'') AS 客户原始值, ISNULL(o.[业务员], N'') AS 业务员,"
