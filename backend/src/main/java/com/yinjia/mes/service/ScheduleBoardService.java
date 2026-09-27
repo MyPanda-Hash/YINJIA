@@ -380,75 +380,75 @@ public class ScheduleBoardService {
     }
 
     /**
-     * 工单追溯(参考旧系统 品质追溯 ProQuaTrac 口径,2026-09-23):一张工单流转到哪一步。
-     * 返回 头信息+状态 / 流转时间线(创建→审核→按钮留痕→结案) / 排产数据(v_manu_schedule) /
-     * 完工数据(报工 wo_progress)+入库单据(bd_finish_in.加工单号) / 领料数据(bl_material_out.加工单号);
-     * 质检数据段暂缺(生产质检面板未建,接入后补)。
+     * 工单追溯(2026-09-27 切 plang/plang_pc,修复 plang 工单追溯报
+     * "Incorrect result size: expected 1, actual 0"——旧版查 bd_manu_order 必空):
+     * 头=plang(数量/结案/打印活数据) + 首个排产行的产线/日期;时间线=创建+按钮留痕(yj_usage_log)+
+     * 结案;排产数据=plang_pc 各排产行;完工=wo_progress(单据编号=工单号);入库/领料按 加工单号 关联
+     * (plang 工单的入库/领料回写链未接通前为空)。质量段暂缺。
      */
     public Map<String, Object> trace(String no) {
         String doc = no == null ? "" : no.trim();
-        Map<String, Object> head = jdbc.queryForMap(
-                "SELECT h.[合同号] AS 加工单号, CONVERT(varchar(10), h.[单据日期], 120) AS 工单日期,"
-                        + " ISNULL(h.[客户],N'') AS 客户, ISNULL(h.[销售订单号],N'') AS 客户订单号,"
-                        + " ISNULL(v.[产品编码],N'') AS 产品编码, ISNULL(v.[产品名称],N'') AS 产品名称,"
-                        + " ISNULL(v.[规格型号],N'') AS 规格型号, ISNULL(v.[生产单位],N'') AS 单位,"
-                        + " ISNULL(h.[生产线],N'') AS 生产线, ISNULL(h.[操作员],N'') AS 操作员,"
-                        + " ISNULL(h.[混料批次号],N'') AS 批号, ISNULL(h.[重点管控],N'否') AS 重点管控,"
-                        + " ISNULL(h.[排产数量],0) AS 排产数量, ISNULL(h.[需求数量],0) AS 需求数量,"
-                        + " ISNULL(h.[入库数量],0) AS 入库数量, ISNULL(h.[余量],0) AS 余量,"
-                        + " CONVERT(varchar(10), h.[预开工日], 120) AS 预开工日,"
-                        + " CONVERT(varchar(10), h.[预完工日], 120) AS 预完工日,"
-                        + " CONVERT(varchar(10), h.[完工日期], 120) AS 实际完工日期,"
-                        + " ISNULL(h.[结案],N'N') AS 结案, ISNULL(h.[结案人],N'') AS 结案人,"
-                        + " CONVERT(varchar(16), h.[结案时间], 120) AS 结案时间,"
-                        + " ISNULL(h.[领料单号],N'') AS 领料单号, ISNULL(h.[入库单号],N'') AS 入库单号,"
-                        + " ISNULL(h.[打印人],N'') AS 打印人, CONVERT(varchar(16), h.[打印时间], 120) AS 打印时间,"
-                        + " ISNULL(h.[打印次数],0) AS 打印次数,"
-                        + " ISNULL(s.[shr],N'') AS 审核人, CONVERT(varchar(16), s.[shsj], 120) AS 审核时间,"
-                        + " CASE WHEN ISNULL(s.[canceled],N'N')='Y' THEN N'已作废'"
-                        + "  WHEN ISNULL(s.[stopped],N'N')='Y' THEN N'已中止'"
-                        + "  WHEN s.[shr] IS NOT NULL THEN N'已审核' ELSE N'草稿' END AS 单据状态,"
-                        + " ISNULL(h.asp_user1,N'') AS 创建人, CONVERT(varchar(16), h.asp_time1, 120) AS 创建时间"
-                        + " FROM bd_manu_order h"
-                        + " LEFT JOIN yj_doc_status s ON s.panel_code='MANU_ORDER' AND s.doc_no=h.[合同号]"
-                        + " LEFT JOIN v_manu_schedule v ON v.[加工单号]=h.[合同号]"
-                        + " WHERE h.[合同号]=? AND ISNULL(h.asp_cancel,'N')<>'Y'", doc);
-        if (head == null || head.isEmpty()) throw new IllegalArgumentException("生产工单不存在:" + doc);
+        Map<String, Object> head;
+        try {
+            head = jdbc.queryForMap(
+                    "SELECT p.pl_no AS 加工单号, CONVERT(varchar(10), p.pl_date, 120) AS 工单日期,"
+                            + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.od_no,N'') AS 客户订单号,"
+                            + " p.dm AS 产品编码, ISNULL(p.mc,N'') AS 产品名称, ISNULL(p.gg,N'') AS 规格型号,"
+                            + " ISNULL(p.jldw,N'') AS 单位, ISNULL(p.scx,N'') AS 生产线, ISNULL(p.pl_man,N'') AS 操作员,"
+                            + " ISNULL(p.lot_no,N'') AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
+                            + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
+                            + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0) AS 余量,"
+                            + " CONVERT(varchar(10), p.st_date, 120) AS 预开工日,"
+                            + " CONVERT(varchar(10), p.cp_date, 120) AS 预完工日,"
+                            + " CONVERT(varchar(10), p.cp_date2, 120) AS 实际完工日期,"
+                            + " CASE WHEN p.ja IN (N'T',N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
+                            + " N'' AS 结案人, CONVERT(varchar(16), NULL, 120) AS 结案时间,"
+                            + " ISNULL(p.ll_no2,N'') AS 领料单号, ISNULL(p.rk_no,N'') AS 入库单号,"
+                            + " ISNULL(p.[打印人],N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
+                            + " ISNULL(p.asp_print,0) AS 打印次数,"
+                            + " CASE WHEN p.ja IN (N'T',N'Y') THEN N'已结案'"
+                            + "      WHEN ISNULL(p.scx,N'') <> N'' THEN N'已排产' ELSE N'未排产' END AS 单据状态,"
+                            + " ISNULL(p.asp_user1,N'') AS 创建人, CONVERT(varchar(16), p.asp_time1, 120) AS 创建时间"
+                            + " FROM dbo.plang p"
+                            + " LEFT JOIN dbo.dm_kh dk ON dk.comm = p.comm AND dk.dm = p.khdm"
+                            + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
+                            + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
+                            + " WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'", doc);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            throw new IllegalArgumentException("生产工单不存在:" + doc);
+        }
 
-        // 流转时间线:系统戳(创建/审核/结案) + 按钮留痕(yj_usage_log:保存/审核/排产/撤销排产/批量调线/拆单/结案…)
+        // 流转时间线:创建(plang 系统戳) + 按钮留痕(排产/撤销/调线/结案…;面板名含 快速排产/生产工单 两代)
         List<Map<String, Object>> timeline = new ArrayList<>();
         if (!String.valueOf(head.get("创建人")).isBlank()) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("步骤", "创建"); m.put("操作人", head.get("创建人")); m.put("时间", head.get("创建时间"));
             timeline.add(m);
         }
-        if (!String.valueOf(head.get("审核人")).isBlank()) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("步骤", "审核"); m.put("操作人", head.get("审核人")); m.put("时间", head.get("审核时间"));
-            timeline.add(m);
-        }
-        // 审核与结案已有权威系统戳(上文合成),日志里同名动作跳过防时间线重复;其余按钮留痕(排产/撤销排产/批量调线/拆单…)保留
-        // 面板名两代兼容:历史留痕写的是改名前的「生产加工单」(2026-09-24 前),改名后新留痕写「生产工单」
         jdbc.query("SELECT action_name, user_name, CONVERT(varchar(16), created_at, 120) AS at"
-                        + " FROM yj_usage_log WHERE panel_name IN (N'生产加工单', N'生产工单') AND doc_no=?"
+                        + " FROM yj_usage_log WHERE panel_name IN (N'快速排产', N'生产工单', N'生产加工单') AND doc_no=?"
                         + " AND action_name NOT IN (N'审核', N'结案') ORDER BY created_at",
                 rs -> {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("步骤", rs.getString(1)); m.put("操作人", rs.getString(2)); m.put("时间", rs.getString(3));
                     timeline.add(m);
                 }, doc);
-        if (!"N".equals(String.valueOf(head.get("结案")))) {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("步骤", "结案"); m.put("操作人", head.get("结案人")); m.put("时间", head.get("结案时间"));
-            timeline.add(m);
-        }
 
-        // 排产数据(v_manu_schedule 头级一行;未排产为空;生产车间列已随去班别下线)
+        // 排产数据:plang_pc 各排产行(未排产为空)
         List<Map<String, Object>> sched = jdbc.queryForList(
-                "SELECT 生产线, 排产数量, 需求数量, 入库数量, 余量, 每箱数量, 箱数, 生产状态, 开产量,"
-                        + " CONVERT(varchar(10), 计划开工日, 120) AS 计划开工日,"
-                        + " CONVERT(varchar(10), 工序交期, 120) AS 工序交期"
-                        + " FROM v_manu_schedule WHERE 加工单号=?", doc);
+                "SELECT pc.scx AS 生产线, ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
+                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0) AS 余量,"
+                        + " 0 AS 每箱数量, 0 AS 箱数, 0 AS 开产量,"
+                        + " CONVERT(varchar(10), pc.st_date, 120) AS 计划开工日,"
+                        + " CONVERT(varchar(10), pc.cp_date, 120) AS 工序交期,"
+                        + " CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN N'完工'"
+                        + "      WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
+                        + " ISNULL(pc.lb,N'') AS 排产班组, ISNULL(pc.pl_man,N'') AS 操作员,"
+                        + " ISNULL(pc.[批次号],N'') AS 批次号"
+                        + " FROM dbo.plang_pc pc"
+                        + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
+                        + "   AND ISNULL(pc.[批次号],N'') = ISNULL(p.[批次号],N'') AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + " WHERE pc.pl_no=? AND ISNULL(pc.asp_cancel,'N')<>'Y' ORDER BY pc.pl_xc, pc.[批次号]", doc);
 
         // 完工数据:报工进度(wo_progress.单据编号=合同号)
         List<Map<String, Object>> done = jdbc.queryForList(
