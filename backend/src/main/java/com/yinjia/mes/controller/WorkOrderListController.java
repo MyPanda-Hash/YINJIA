@@ -18,7 +18,7 @@ import java.util.Map;
  * 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 工单排产列表页):
  * ①/workOrderList 生产工单按**参考库 plang 表**展开(2026-09-24 用户拍板切源:外部系统直接写 plang,
  *   键=公司代码 comm + 工单号 pl_no + 工单行号 pl_xc;一单一行=一行,多行工单按 pl_xc 多行);
- *   条件:日期从/到(pl_date) + 单字段 like/eq(工单号/物料编码/客户/工单日期);
+ *   条件:日期从/到(pl_date) + 单框模糊搜索(keyword,工单号/物料编码/产品名称/客户代码/客户名称 多列 OR);
  * ②/workOrderBom 产品的默认 BOM 明细(操作列「BOM明细」弹窗,参照 bs_bom 与 WoPickingHandler 同口径);
  * ③/printStamp 打印生产任务单留痕(plang.asp_print+1、打印人/打印时间;修复原版从 scheduled('') 取数
  *   永远匹配不到已排产工单的缺陷——现直接打印列表勾选行,不再回查排产明细);
@@ -69,19 +69,12 @@ public class WorkOrderListController {
             w.append(" AND p.pl_date < DATEADD(day, 1, ?)");
             args.add(String.valueOf(b.get("日期到")));
         }
-        String qv = b.get("qText") == null ? "" : String.valueOf(b.get("qText")).trim();
-        // 字段映射(客户=dm_kh.mc 或 khdm 双侧匹配;工单日期=yyyy-MM-dd 文本比较)
-        String likeOp = "eq".equals(String.valueOf(b.get("qOp"))) ? " = ?" : " LIKE ?";
-        String likeVal = "eq".equals(String.valueOf(b.get("qOp"))) ? qv : "%" + qv + "%";
-        switch (String.valueOf(b.getOrDefault("qField", ""))) {
-            case "加工单号", "工单号" -> { w.append(" AND p.pl_no").append(likeOp); args.add(likeVal); }
-            case "物料编码" -> { w.append(" AND p.dm").append(likeOp); args.add(likeVal); }
-            case "客户" -> {
-                w.append(" AND (ISNULL(dk.mc, p.khdm)").append(likeOp).append(" OR p.khdm").append(likeOp).append(")");
-                args.add(likeVal); args.add(likeVal);
-            }
-            case "单据日期" -> { w.append(" AND CONVERT(varchar(10), p.pl_date, 120)").append(likeOp); args.add(likeVal); }
-            default -> { }
+        // 单框模糊搜索(2026-09-26 用户拍板):关键字在 工单号/物料编码/产品名称/客户代码/客户名称 多列 OR
+        String kw = b.get("keyword") == null ? "" : String.valueOf(b.get("keyword")).trim();
+        if (!kw.isEmpty()) {
+            String like = "%" + kw + "%";
+            w.append(" AND (p.pl_no LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR p.khdm LIKE ? OR ISNULL(dk.mc,N'') LIKE ?)");
+            for (int i = 0; i < 5; i++) args.add(like);
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT p.comm AS 公司代码, p.pl_no AS 工单号, p.pl_xc AS 工单行号,"

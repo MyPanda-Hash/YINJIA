@@ -1,30 +1,16 @@
-<!-- WorkOrderList.vue — 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 工单排产列表页)
-     报表式独立页:顶部 日期范围+字段查找;按钮条 修改/结案/取消结案/打印工单(勾选多个=批量打印)/打印领料单/批量调线/导出/打印;
-     产线+产线代号 筛选 + 未完工/已完工/追溯;明细大表(勾选+操作列 BOM明细)。
-     数据=参考库工单表 plang(2026-09-24 切源,外部系统直接写单,键=公司代码+工单号+工单行号);
-     打印工单=勾选行直打(不再回查排产明细,修复已排产工单匹配不到的缺陷);结案/调线走 plang 专属端点。 -->
+<!-- WorkOrderList.vue — 生产工单(2026-09-26 用户拍板:纯查询页,数据=参考库工单表 plang)
+     顶部 日期范围 + 单框模糊搜索(工单号/物料/客户/产品 多列 OR);按钮条 结案/取消结案/打印工单(勾选多个=批量)/打印领料单/导出/刷新;
+     产线筛选 + 未完工/已完工/追溯;明细大表(勾选+操作列 BOM明细)。打印工单=勾选行直打+留痕;结案走 plang 专属端点。 -->
 <template>
   <div class="wol-page">
-    <div class="wol-crumb">🏠 {{ tt('首页') }} &gt;&gt; {{ tt('工单排产·列表') }}</div>
-
-    <!-- 查询条:日期范围 + 字段 like -->
+    <!-- 查询行:日期范围 + 单框模糊搜索 -->
     <div class="wol-query">
       <span class="wol-lb">{{ tt('日期范围') }}</span>
       <el-date-picker v-model="dateFrom" type="date" value-format="YYYY-MM-DD" size="small" style="width: 130px" />
       <span class="wol-sep">-</span>
       <el-date-picker v-model="dateTo" type="date" value-format="YYYY-MM-DD" size="small" style="width: 130px" />
-      <span class="wol-lb" style="margin-left: 12px">{{ tt('并且') }}</span>
-      <el-select v-model="qField" size="small" style="width: 110px">
-        <el-option label="工单日期" value="单据日期" />
-        <el-option label="工单号" value="加工单号" />
-        <el-option label="物料编码" value="物料编码" />
-        <el-option label="客户" value="客户" />
-      </el-select>
-      <el-select v-model="qOp" size="small" style="width: 78px">
-        <el-option label="like" value="like" />
-        <el-option label="=" value="eq" />
-      </el-select>
-      <el-input v-model="qText" size="small" style="width: 180px" :placeholder="tt('输入查询条件...')" clearable @keyup.enter="load" />
+      <span class="wol-lb" style="margin-left: 12px">{{ tt('模糊搜索') }}</span>
+      <el-input v-model="qText" size="small" style="width: 220px" :placeholder="tt('输入查询条件...')" clearable @keyup.enter="load" />
       <el-button size="small" type="success" @click="load">{{ tt('查找') }}</el-button>
       <span class="wol-count">{{ tt('共有数据') }}: <b>{{ rows.length }}</b> {{ tt('条') }}</span>
     </div>
@@ -120,8 +106,6 @@ const lineCode = ref('')
 const stateFilter = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
-const qField = ref('单据日期')
-const qOp = ref('like')
 const qText = ref('')
 const bomVisible = ref(false)
 const bomRow = ref(null)
@@ -143,7 +127,7 @@ async function load() {
     const cond = {}
     if (dateFrom.value) cond['日期从'] = dateFrom.value
     if (dateTo.value) cond['日期到'] = dateTo.value
-    if (qText.value) cond[qField.value] = (qOp.value === 'like' ? '%' : '') + qText.value + (qOp.value === 'like' ? '%' : '')
+    if (qText.value.trim()) cond['keyword'] = qText.value.trim()
     const res = await request.post('/px/workOrderList', cond)
     rows.value = (res.data || []).map((r) => ({ ...r, rowKey: r.工单号 + '#' + r.工单行号 }))
     applyLineMeta()
@@ -276,7 +260,6 @@ onMounted(() => { load(); loadLines() })
 
 <style scoped>
 .wol-page { padding: 8px 12px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; background: #fff; overflow: auto; }
-.wol-crumb { font-size: 15px; font-weight: 600; color: #1e6fb8; }
 .wol-query, .wol-btns, .wol-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .wol-query { padding: 6px 0; border-bottom: 1px solid #eee; }
 .wol-lb { font-size: 13px; color: #606266; }
