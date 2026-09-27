@@ -1558,3 +1558,5 @@ migrate-manu-close-print-stamp.sql# —— 2026-09-24 生产工单列表数据�
 migrate-plang-workorder.sql
 # —— 2026-09-27 销售订单明细行加「行号」(金蝶分录 seq 从 1 连续,对齐 bl_pu_order.行号 先例;存量回填 ROW_NUMBER;SO_ORDER 明细字段注册):订单结转页展示,转工单时工单行号 pl_xc=订单行号 同值下传 ——
 migrate-so-line-no.sql
+# —— 2026-09-27 plang 加「批次号」(转单日期 yyyyMMdd,分批转单按日期分批:不同日期=不同批次行,同日同批累加不插行;存量回填=pl_date) ——
+migrate-plang-batch.sql

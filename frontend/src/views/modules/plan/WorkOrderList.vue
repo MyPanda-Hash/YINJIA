@@ -55,6 +55,7 @@
       <el-table-column :label="tt('公司代码')" prop="公司代码" width="90" show-overflow-tooltip />
       <el-table-column :label="tt('工单号')" prop="加工单号" width="150" sortable show-overflow-tooltip />
       <el-table-column :label="tt('工单行号')" prop="行号" width="90" sortable />
+      <el-table-column :label="tt('批次号')" prop="批次号" width="100" sortable />
       <el-table-column :label="tt('工单日期')" prop="单据日期" width="100" sortable />
       <el-table-column :label="tt('物料编码')" prop="物料编码" width="130" show-overflow-tooltip />
       <el-table-column :label="tt('产品名称')" prop="产品名称" min-width="180" show-overflow-tooltip />
@@ -129,7 +130,7 @@ async function load() {
     if (dateTo.value) cond['日期到'] = dateTo.value
     if (qText.value.trim()) cond['keyword'] = qText.value.trim()
     const res = await request.post('/px/workOrderList', cond)
-    rows.value = (res.data || []).map((r) => ({ ...r, rowKey: r.工单号 + '#' + r.工单行号 }))
+    rows.value = (res.data || []).map((r) => ({ ...r, rowKey: r.工单号 + '#' + r.工单行号 + '#' + (r.批次号 || '') }))
     applyLineMeta()
   } catch (e) { err(e, '查询失败') }
 }
@@ -159,7 +160,7 @@ async function onClose(close) {
   try {
     const res = await request.post('/px/workOrderList/close', {
       结案: close,
-      rows: checked.value.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号 })),
+      rows: checked.value.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号, 批次号: r.批次号 })),
     })
     if (res.status === 200) { ElMessage.success(tt('操作成功')); load() }
   } catch (e) { err(e, '操作失败') }
@@ -191,7 +192,7 @@ async function printTask() {
     const okPrint = await printProductionTask(rowsToPrint, { line: lineFilter.value || '', preparedBy: useUserStore().realName })
     if (okPrint) {
       await request.post('/px/workOrderList/printStamp', {
-        rows: src.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号 })),
+        rows: src.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号, 批次号: r.批次号 })),
       })
     }
     load()
@@ -246,7 +247,7 @@ function openTrace() {
 }
 
 function exportCsv() {
-  const head = ['公司代码', '工单号', '工单行号', '单据日期', '物料编码', '产品名称', '规格型号', '客户', '生产线', '排产数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
+  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '物料编码', '产品名称', '规格型号', '客户', '生产线', '排产数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
   const csv = '\ufeff' + [head.join(',')]
     .concat(filtered.value.map((r) => head.map((h) => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n')
   const a = document.createElement('a')

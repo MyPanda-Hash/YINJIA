@@ -38,8 +38,8 @@ public class WorkOrderListController {
         this.perm = perm;
     }
 
-    /** 工单行键:公司代码+工单号+工单行号(plang 自然键) */
-    private record Key(String comm, String no, Integer xc) {
+    /** 工单行键:公司代码+工单号+工单行号+批次号(plang 行键;批次号=转单日期 yyyyMMdd,同日同批累加) */
+    private record Key(String comm, String no, Integer xc, String batch) {
         static Key of(Map<String, Object> r) {
             String comm = str(r.get("公司代码"));
             String no = str(r.get("工单号"));
@@ -49,10 +49,13 @@ public class WorkOrderListController {
             else if (x != null && !String.valueOf(x).isBlank()) {
                 try { xc = Integer.valueOf(String.valueOf(x).trim()); } catch (NumberFormatException ignore) { }
             }
-            return new Key(comm == null ? "" : comm, no, xc);
+            String batch = str(r.get("批次号"));
+            return new Key(comm == null ? "" : comm, no, xc, batch == null ? "" : batch);
         }
 
         boolean valid() { return no != null && !no.isBlank(); }
+
+        String label() { return no + (xc == null ? "" : "#" + xc) + (batch == null || batch.isBlank() ? "" : "/" + batch); }
     }
 
     @PostMapping("/workOrderList")
@@ -78,6 +81,7 @@ public class WorkOrderListController {
         }
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT p.comm AS 公司代码, p.pl_no AS 工单号, p.pl_xc AS 工单行号,"
+                        + " ISNULL(p.[批次号], N'') AS 批次号,"
                         + " p.pl_no AS 加工单号, p.pl_xc AS 行id, p.pl_xc AS 行号,"
                         + " CONVERT(varchar(10), p.pl_date, 120) AS 单据日期,"
                         + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.khdm, N'') AS 客户代码,"
@@ -132,9 +136,11 @@ public class WorkOrderListController {
             if (!k.valid()) continue;
             int n = jdbc.update("UPDATE dbo.plang SET asp_print = ISNULL(asp_print,0) + 1,"
                             + " [打印人]=?, [打印时间]=SYSDATETIME()"
-                            + " WHERE comm=? AND pl_no=? AND pl_xc=? AND ISNULL(asp_cancel,'N')<>'Y'",
-                    user, k.comm(), k.no(), k.xc());
-            if (n > 0) done.add(k.no() + (k.xc() == null ? "" : "#" + k.xc()));
+                            + " WHERE comm=? AND pl_no=? AND pl_xc=?"
+                            + " AND ((? = N'' AND [批次号] IS NULL) OR [批次号] = ?)"
+                            + " AND ISNULL(asp_cancel,'N')<>'Y'",
+                    user, k.comm(), k.no(), k.xc(), k.batch(), k.batch());
+            if (n > 0) done.add(k.label());
         }
         if (done.isEmpty()) throw new IllegalStateException("无可打印的工单(plang 中未找到)");
         Map<String, Object> out = new LinkedHashMap<>();
@@ -159,11 +165,12 @@ public class WorkOrderListController {
             if (!k.valid()) continue;
             try {
                 int n = jdbc.update("UPDATE dbo.plang SET ja = ? WHERE comm=? AND pl_no=? AND pl_xc=?"
+                                + " AND ((? = N'' AND [批次号] IS NULL) OR [批次号] = ?)"
                                 + " AND ISNULL(asp_cancel,'N')<>'Y'",
-                        close ? "Y" : "N", k.comm(), k.no(), k.xc());
+                        close ? "Y" : "N", k.comm(), k.no(), k.xc(), k.batch(), k.batch());
                 if (n == 0) throw new IllegalStateException("plang 中未找到");
                 logUsage(user, close ? "结案" : "取消结案", k.no());
-                done.add(k.no() + (k.xc() == null ? "" : "#" + k.xc()));
+                done.add(k.label());
             } catch (IllegalStateException e) {
                 failed.add(k.no() + ":" + e.getMessage());
             }
