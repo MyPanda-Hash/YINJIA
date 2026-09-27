@@ -1591,3 +1591,5 @@ migrate-plang-schedule.sql
 migrate-plangpc-board.sql
 # —— 2026-09-27 报工切参考库 scjl 原始口径(scjl.gd_id=plang_pc.id+gldh=pl_no,审核即 wgzt=Y 完工,弃审软删,jc_no 产线-日期-流水;入库回填 plang FIFO+scjl.post_no;已报工读侧弃 wo_progress;切炭双出口工单源改 plang) ——
 migrate-scjl-report.sql
+# —— 2026-09-27 工序报工单表化(scjl 承载 WO_REPORT/WO_REPORT_LIST 两面板:加 报工单号/直销数量 列;字段重定义指 scjl 列;审核=行内 wgzt=Y+jc_no+镜像,弃审=回空留痕;双出口/红字冲回直读 scjl;wo_report 停用为遗留表) ——
+migrate-scjl-single-table.sql

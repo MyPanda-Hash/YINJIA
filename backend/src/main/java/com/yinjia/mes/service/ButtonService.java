@@ -1810,8 +1810,11 @@ public class ButtonService {
      */
     private void dualOutFinishIn(String panelCode, String no, String user) {
         if (!"WO_REPORT".equals(panelCode)) return;
+        // 2026-09-27 单表化:报工数据直读 scjl(按 报工单号)
         List<Map<String, Object>> reps = jdbc.queryForList(
-                "SELECT [工单号], [工序], [报工数量], [直销数量] FROM wo_report WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+                "SELECT ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL(sl,0) AS 报工数量,"
+                        + " ISNULL([直销数量],0) AS 直销数量 FROM dbo.scjl"
+                        + " WHERE [报工单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(wgzt,'N')='Y'", no);
         if (reps.isEmpty()) return;
         Map<String, Object> rep = reps.get(0);
         if (!"切炭".equals(String.valueOf(rep.get("工序")))) return;
@@ -1874,8 +1877,8 @@ public class ButtonService {
         audit(registry.panel("FINISH_IN"), Map.of("编号", (Object) fiNo));
         jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key, target_panel_code, target_form_no, link_status, create_by, create_time)"
                         + " VALUES ('WO_REPORT', ?, '', 'FINISH_IN', ?, 'ACTIVE', ?, GETDATE())", no, fiNo, user);
-        // 报工扣减链路(2026-09-23):直销入库回执回填报工单(参考库 scjl.post_no 对齐)
-        jdbc.update("UPDATE wo_report SET [入库单号] = ? WHERE [单据编号] = ?", fiNo, no);
+        // 直销入库回执回填报工行(参考库 scjl.post_no 对齐;单表化后直接写 scjl)
+        jdbc.update("UPDATE dbo.scjl SET post_no = ? WHERE [报工单号] = ?", fiNo, no);
     }
 
     private static double numOr(Object o) {
@@ -2329,9 +2332,10 @@ public class ButtonService {
      */
     private void dualOutRedReverse(String panelCode, String no, String user) {
         if (!"WO_REPORT".equals(panelCode)) return;
-        // 查报工单是否为切炭且有直销
+        // 查报工行是否为切炭且有直销(2026-09-27 单表化:直读 scjl)
         List<Map<String, Object>> reps = jdbc.queryForList(
-                "SELECT [工单号], [工序], [直销数量] FROM wo_report WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+                "SELECT ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL([直销数量],0) AS 直销数量"
+                        + " FROM dbo.scjl WHERE [报工单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (reps.isEmpty() || !"切炭".equals(String.valueOf(reps.get(0).get("工序")))) return;
         if (numOr(reps.get(0).get("直销数量")) <= 0) return;
         // 查 ACTIVE link → 原入库单号
