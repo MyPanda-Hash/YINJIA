@@ -1593,3 +1593,5 @@ migrate-plangpc-board.sql
 migrate-scjl-report.sql
 # —— 2026-09-27 工序报工单表化(scjl 承载 WO_REPORT/WO_REPORT_LIST 两面板:加 报工单号/直销数量 列;字段重定义指 scjl 列;审核=行内 wgzt=Y+jc_no+镜像,弃审=回空留痕;双出口/红字冲回直读 scjl;wo_report 停用为遗留表) ——
 migrate-scjl-single-table.sql
+# —— 2026-09-27 产线数据导入+工序种类(用户截图《新系统产线命名》22条:成型烧结/X烧结/切炭/组装装箱两级;bs_prod_line 加 工序种类 列可维护;PROD_LINE 面板字段注册+en 译名;存量按名称回填) ——
+migrate-prodline-import.sql
