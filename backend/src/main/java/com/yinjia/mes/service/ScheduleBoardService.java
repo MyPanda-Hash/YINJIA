@@ -227,8 +227,8 @@ public class ScheduleBoardService {
             try {
                 List<Map<String, Object>> heads = jdbc.queryForList(
                         "SELECT id, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(rk_sl,0) AS rk_sl,"
-                                + " ISNULL((SELECT SUM(ISNULL(w.[完成数量],0)) FROM wo_progress w WHERE w.[单据编号]=p.pl_no"
-                                + "   AND ISNULL(w.asp_cancel,'N')<>'Y'),0) AS 已报工"
+                                + " ISNULL((SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s WHERE s.gldh=p.pl_no"
+                                + "   AND ISNULL(s.asp_cancel,'N')<>'Y'),0) AS 已报工"
                                 + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'", no);
                 if (heads.isEmpty()) throw new IllegalStateException("工单不存在:" + no);
                 boolean any = false;
@@ -300,8 +300,9 @@ public class ScheduleBoardService {
                         + " FROM dbo.plang_pc pc"
                         + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
                         + "   AND ISNULL(pc.[批次号],N'') = ISNULL(p.[批次号],N'') AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                        + " LEFT JOIN (SELECT [单据编号], MAX([完成数量]) AS [完成] FROM wo_progress"
-                        + "   WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY [单据编号]) prg ON prg.[单据编号]=p.pl_no"
+                        + " LEFT JOIN (SELECT gldh AS 单据编号, MAX(s) AS [完成] FROM"
+                        + "   (SELECT gldh, SUM(ISNULL(sl,0)) AS s FROM dbo.scjl WHERE ISNULL(asp_cancel,'N')<>'Y'"
+                        + "    GROUP BY gldh, gxdm) t GROUP BY gldh) prg ON prg.[单据编号]=p.pl_no"
                         + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'')<>N''"
                         + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
                         + " GROUP BY pc.scx");
@@ -370,8 +371,9 @@ public class ScheduleBoardService {
                         + " LEFT JOIN dbo.dm_kh dk ON dk.comm = p.comm AND dk.dm = p.khdm"
                         + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
-                        + " LEFT JOIN (SELECT [单据编号], MAX([完成数量]) AS [完成] FROM wo_progress"
-                        + "   WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY [单据编号]) prg ON prg.[单据编号]=p.pl_no"
+                        + " LEFT JOIN (SELECT gldh AS 单据编号, MAX(s) AS [完成] FROM"
+                        + "   (SELECT gldh, SUM(ISNULL(sl,0)) AS s FROM dbo.scjl WHERE ISNULL(asp_cancel,'N')<>'Y'"
+                        + "    GROUP BY gldh, gxdm) t GROUP BY gldh) prg ON prg.[单据编号]=p.pl_no"
                         + " CROSS APPLY (SELECT CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0)"
                         + "   THEN N'完工' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS [生产状态]) st"
                         + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'') = ?" + complete
@@ -450,12 +452,13 @@ public class ScheduleBoardService {
                         + "   AND ISNULL(pc.[批次号],N'') = ISNULL(p.[批次号],N'') AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + " WHERE pc.pl_no=? AND ISNULL(pc.asp_cancel,'N')<>'Y' ORDER BY pc.pl_xc, pc.[批次号]", doc);
 
-        // 完工数据:报工进度(wo_progress.单据编号=合同号)
+        // 完工数据:报工记录(scjl,参考库口径;按 工序 汇总:完成数量=Σsl,计划数量=排产冗余)
         List<Map<String, Object>> done = jdbc.queryForList(
-                "SELECT p.[工序], ISNULL(p.[计划数量],0) AS 计划数量, ISNULL(p.[完成数量],0) AS 完成数量,"
-                        + " ISNULL(p.asp_user2,N'') AS 报工人, CONVERT(varchar(16), p.asp_time2, 120) AS 报工时间"
-                        + " FROM wo_progress p WHERE p.[单据编号]=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                        + " ORDER BY p.[id]", doc);
+                "SELECT ISNULL(s.gxdm, N'') AS 工序, MAX(ISNULL(s.pl_sl,0)) AS 计划数量,"
+                        + " SUM(ISNULL(s.sl,0)) AS 完成数量, MAX(s.asp_user1) AS 报工人,"
+                        + " CONVERT(varchar(16), MAX(s.asp_time1), 120) AS 报工时间"
+                        + " FROM dbo.scjl s WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                        + " GROUP BY s.gxdm ORDER BY s.gxdm", doc);
         // 入库单据(产成品入库单挂 加工单号)
         List<Map<String, Object>> fins = jdbc.queryForList(
                 "SELECT f.[单据编号], CONVERT(varchar(10), f.[单据日期], 120) AS 单据日期,"

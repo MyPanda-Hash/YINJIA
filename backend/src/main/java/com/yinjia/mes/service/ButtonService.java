@@ -1117,7 +1117,7 @@ public class ButtonService {
         woReport.post(def.code(), no, currentUserName());
         // 切炭双出口(已确认):报工审核后,直销数量自动生成成品入库单并审核入账(成品仓)
         dualOutFinishIn(def.code(), no, currentUserName());
-        // 生产加工单执行回填(参考库 plang_pc:完工入库回写 rk_sl/rk_no、领料回写 ll_no2):
+        // 生产工单执行回填(参考库 plang_pc:完工入库回写 rk_sl/rk_no、领料回写 ll_no2):
         // 重算式(以该工单名下已审核入库/领料单为真源),审核/弃审对称;切炭自动入库经上方同路径已覆盖
         manuWriteback.post(def.code(), no, currentUserName());
         // 不良品处理记账(品质层):处理单审核 → 原仓扣减+目标仓(隔离/不良品)移仓或报废
@@ -1193,13 +1193,13 @@ public class ButtonService {
             jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
         }
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
-        // 生产加工单执行回填(对称重算):必须在上方 yj_doc_status 置 shr=NULL **之后**执行——
+        // 生产工单执行回填(对称重算):必须在上方 yj_doc_status 置 shr=NULL **之后**执行——
         // 重算以"已审核集合"为真源,挂钩早于状态清除会把弃审单仍按已审核计入,回填回旧值(2026-09-22 实测踩坑)
         manuWriteback.unpost(def.code(), no, currentUserName());
         return result(no, "草稿");
     }
 
-    // ---- 中止(对齐 PANDA/T+ 整单中止、生产加工单中止执行):仅已审核可中止,恢复保留原审核留痕 ----
+    // ---- 中止(对齐 PANDA/T+ 整单中止、生产工单中止执行):仅已审核可中止,恢复保留原审核留痕 ----
 
     /** 中止:已审核 → 已中止(留痕 stop_by/stop_at;shr 保留,取消中止后回到已审核) */
     private Map<String, Object> stop(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -1220,7 +1220,7 @@ public class ButtonService {
         return result(no, "已中止");
     }
 
-    /** 取消中止(生产加工单「草稿」按钮):已中止 → 恢复(shr 保留则已审核,否则草稿) */
+    /** 取消中止(生产工单「草稿」按钮):已中止 → 恢复(shr 保留则已审核,否则草稿) */
     private Map<String, Object> unstop(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
@@ -1777,11 +1777,11 @@ public class ButtonService {
     /**
      * 生成产品批号:成型后打印产品二维码的数据源(V1.2 #8)。
      * 批号=入库日期+3位流水(与材料批号同一号池);一次生成终身复用,重复调用返回已有批号。
-     * 单轨口径(2026-09-22):生产加工单(MANU_ORDER→头.批号);兼容过渡期 GD-生产工单(→产品批号列)。
+     * 单轨口径(2026-09-22):生产工单(MANU_ORDER→头.批号);兼容过渡期 GD-生产工单(→产品批号列)。
      */
     private Map<String, Object> genProductLot(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         boolean manu = "MANU_ORDER".equals(def.code());
-        if (!manu && !"WO_ORDER".equals(def.code())) throw new IllegalStateException("仅生产加工单/生产工单支持生成产品批号");
+        if (!manu && !"WO_ORDER".equals(def.code())) throw new IllegalStateException("仅生产工单支持生成产品批号");
         String no = requireNo(formData);
         List<Map<String, Object>> rows = manu
                 ? jdbc.queryForList("SELECT [批号] AS 产品批号 FROM bd_manu_order WHERE [合同号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no)
@@ -1824,12 +1824,11 @@ public class ButtonService {
                         + " AND target_panel_code = 'FINISH_IN' AND link_status = 'ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已生成过直销入库(重审幂等)
         String wo = String.valueOf(rep.get("工单号"));
-        // 单轨口径(2026-09-22):工单号=生产加工单(MANU_ORDER.合同号),产品取其行表;
-        // 兼容过渡期 GD-生产工单(WO_ORDER)——先查加工单,查不到再回退旧工单表
+        // 工单数据源(2026-09-27 切 plang 单轨):工单号=plang.pl_no,产品/单位/批号取 plang 行;
+        // 批号 lot_no 空时现场取号并回写 plang 全部行
         List<Map<String, Object>> ws = jdbc.queryForList(
-                "SELECT TOP 1 l.[产品编码], l.[产品名称], l.[生产单位] AS 单位, h.[批号] AS 产品批号"
-                        + " FROM bd_manu_order h JOIN bl_manu_order l ON l.[合同号] = h.[合同号] AND ISNULL(l.asp_cancel,'N') <> 'Y'"
-                        + " WHERE h.[合同号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'", wo);
+                "SELECT TOP 1 [dm] AS 产品编码, [mc] AS 产品名称, [jldw] AS 单位, [lot_no] AS 产品批号,"
+                        + " ISNULL([dj], 0) AS 单价 FROM plang WHERE [pl_no] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", wo);
         boolean fromManu = !ws.isEmpty();
         if (ws.isEmpty()) {
             ws = jdbc.queryForList(
@@ -1842,7 +1841,7 @@ public class ButtonService {
         if (lot == null) {
             lot = lotSeqService.next();
             jdbc.update(fromManu
-                            ? "UPDATE bd_manu_order SET [批号] = ? WHERE [合同号] = ?"
+                            ? "UPDATE plang SET [lot_no] = ? WHERE [pl_no] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                             : "UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?",
                     lot, wo);
         }
@@ -1859,6 +1858,7 @@ public class ButtonService {
         line.put("产品编码", w.get("产品编码"));
         line.put("产品名称", w.get("产品名称"));
         line.put("实收数量", dual);
+        line.put("单价", numOr(w.get("单价")));   // 成本台账 收入金额 非空守卫(plang.dj 空则 0)
         line.put("计量单位", w.get("单位"));
         line.put("批号", lot);
         line.put("仓库", finishWh);

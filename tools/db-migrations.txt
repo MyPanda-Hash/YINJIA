@@ -1589,3 +1589,5 @@ migrate-plang-batch.sql
 migrate-plang-schedule.sql
 # —— 2026-09-27 工单排产看板切 plang_pc(pl_no/lb 扩宽+批次号列+已排五回填;骨架/按线明细/调线读 plang_pc×plang;快速排产排入同步落 plang_pc 薄记录) ——
 migrate-plangpc-board.sql
+# —— 2026-09-27 报工切参考库 scjl 原始口径(scjl.gd_id=plang_pc.id+gldh=pl_no,审核即 wgzt=Y 完工,弃审软删,jc_no 产线-日期-流水;入库回填 plang FIFO+scjl.post_no;已报工读侧弃 wo_progress;切炭双出口工单源改 plang) ——
+migrate-scjl-report.sql
