@@ -28,16 +28,16 @@ import java.util.Map;
 public class OrderConvertService {
 
     private final JdbcTemplate jdbc;
-    private final FormNoService formNo;
+    private final QuickScheduleService quickSchedule;
     private final PanelRegistry registry;
     private final ButtonService buttonService;
     private final VoucherFlowService voucherFlow;
     private final MessageService message;
 
-    public OrderConvertService(JdbcTemplate jdbc, FormNoService formNo, PanelRegistry registry,
+    public OrderConvertService(JdbcTemplate jdbc, QuickScheduleService quickSchedule, PanelRegistry registry,
                                ButtonService buttonService, VoucherFlowService voucherFlow, MessageService message) {
         this.jdbc = jdbc;
-        this.formNo = formNo;
+        this.quickSchedule = quickSchedule;
         this.registry = registry;
         this.buttonService = buttonService;
         this.voucherFlow = voucherFlow;
@@ -142,7 +142,12 @@ public class OrderConvertService {
             try {
                 String due = applyDateEdit(r, user);
                 Double qty = num2(str(r.get("生单数量")) == null ? null : r.get("生单数量"));
-                created.add(createPlangFromOrderLine(soNo, lineId, qty, due, user));
+                String plNo = quickSchedule.createFromOrderLine(soNo, lineId, qty, user);
+                if (due != null) {   // 交期修正贯穿:转单行 计划完工日期=修正后交期(落表默认取订单行交期,此处覆盖)
+                    jdbc.update("UPDATE plang SET cp_date = CONVERT(datetime, ?, 120)"
+                            + " WHERE pl_no = ? AND pl_xc = (SELECT MAX(pl_xc) FROM plang WHERE pl_no = ?)", due, plNo, plNo);
+                }
+                created.add(plNo);
             } catch (RuntimeException e) {
                 failed.add(soNo + "#" + lineId + ":" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             }
@@ -153,80 +158,6 @@ public class OrderConvertService {
         out.put("编号清单", created);
         out.put("失败行", failed);
         return out;
-    }
-
-    /**
-     * 单条订单行 → plang 工单行(方案一:同一销售订单共用一张工单——pl_no 沿用首次转单号,
-     * 工单行号 pl_xc = 该工单最大行号+1;来源订单行以 od_no/od_xc 回链,分批多次转单自动续行)。
-     * 口径与 QuickScheduleService.createFromOrderLine 一致(仅已审核/占用守恒/需求数量不缩水),
-     * 差异:落 plang;占用通道 target_panel_code='PLANG';交期落 cp_date(计划完工日期)。
-     */
-    private String createPlangFromOrderLine(String soNo, String lineId, Double qtyOverride, String dueOverride, String user) {
-        // ① 来源订单必须「已审核」(严格口径:排除 作废/中止(金蝶手动关闭 H)/审批中/删除·修改申请/已生效/已归档/已完成 S)
-        Integer audited = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM yj_doc_status WHERE panel_code='SO_ORDER' AND doc_no=?"
-                        + " AND shr IS NOT NULL"
-                        + " AND ISNULL(canceled,'N')<>'Y' AND ISNULL(stopped,'N')<>'Y'"
-                        + " AND ISNULL(erp_close_state,'') NOT IN ('H','S')"
-                        + " AND ISNULL(deleting,'N')<>'Y' AND ISNULL(modify_state,'') NOT IN ('R','Y')"
-                        + " AND ISNULL(pending,'N')<>'Y'"
-                        + " AND ISNULL(effective,'N')<>'Y' AND ISNULL(archived,'N')<>'Y'",
-                Integer.class, soNo);
-        if (audited == null || audited == 0) throw new IllegalStateException("销售订单 " + soNo + " 非已审核状态,不能转工单");
-        // ② 订单行
-        Map<String, Object> line = jdbc.queryForMap(
-                "SELECT l.[存货编码], ISNULL(l.[存货名称],N'') AS 存货名称, ISNULL(l.[规格型号],N'') AS 规格型号,"
-                        + " ISNULL(l.[数量],0) AS 数量, ISNULL(l.[销售单位],N'') AS 销售单位,"
-                        + " ISNULL(l.[批次号],N'') AS 批次号,"
-                        + " CONVERT(varchar(10), ISNULL(l.[预计交货日期], o.[预计交货日期]), 120) AS 交货日期,"
-                        + " ISNULL(o.[客户编码],N'') AS 客户编码"
-                        + " FROM bl_so_order l JOIN bd_so_order o ON o.[单据编号] = l.[单据编号]"
-                        + " WHERE l.[单据编号] = ? AND l.[id] = ?", soNo, Integer.parseInt(lineId));
-        // ③ 两通道剩余(已转工单 MANU_ORDER/PLANG 占用 + 已转采购 PU_REQ 占用)
-        Double manu = jdbc.queryForObject(
-                "SELECT ISNULL(SUM(ISNULL(linked_quantity,0)),0) FROM form_flow_link"
-                        + " WHERE source_panel_code='SO_ORDER' AND source_line_key=?"
-                        + " AND target_panel_code IN ('MANU_ORDER','PLANG') AND link_status='ACTIVE'",
-                Double.class, soNo + "#" + lineId);
-        Double pu = jdbc.queryForObject(
-                "SELECT ISNULL(SUM(ISNULL(linked_quantity,0)),0) FROM form_flow_link"
-                        + " WHERE source_panel_code='SO_ORDER' AND source_line_key=?"
-                        + " AND target_panel_code='PU_REQ' AND link_status='ACTIVE'",
-                Double.class, soNo + "#" + lineId);
-        double demand = num(line.get("数量"));
-        double residual = demand - (manu == null ? 0 : manu) - (pu == null ? 0 : pu);
-        if (residual <= 0.0001) throw new IllegalStateException("该订单行已全部转出(剩余可转数量 0)");
-        double qty = qtyOverride != null && qtyOverride > 0 ? Math.min(qtyOverride, residual) : residual;
-        if (qty <= 0) throw new IllegalStateException("生单数量必须大于 0");
-        if (qty > residual + 0.0001) throw new IllegalStateException("生单数量 " + qty + " 超过剩余可转数量 " + residual);
-        // ④ 工单号与行号(方案一,2026-09-26 用户拍板):**同一销售订单共用一张工单**——
-        //    pl_no 沿用该订单首次转单号;工单行号 pl_xc = 该工单当前最大行号+1(1 起连续,分批转单自动续号);
-        //    来源订单行仍以 od_no/od_xc 记录,可对回销售订单明细。同订单多行=同一工单号下多行。
-        String plNo;
-        try {
-            plNo = jdbc.queryForObject(
-                    "SELECT TOP 1 pl_no FROM plang WHERE od_no = ? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY pl_xc DESC",
-                    String.class, soNo);
-        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
-            plNo = null;   // 该订单尚未转过工单 → 取新号
-        }
-        if (plNo == null || plNo.isBlank()) plNo = formNo.next("MO", user);
-        Integer nextXc = jdbc.queryForObject(
-                "SELECT ISNULL(MAX(pl_xc),0)+1 FROM plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
-                Integer.class, plNo);
-        String due = dueOverride != null ? dueOverride : str(line.get("交货日期"));
-        jdbc.update("INSERT INTO plang (comm, pl_no, pl_xc, pl_date, khdm, dm, mc, gg, jldw,"
-                        + " xq_sl, pl_sl, yl, cp_date, lot_no, od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1)"
-                        + " VALUES (N'0', ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
-                        + " CASE WHEN ? IS NULL OR ? = N'' THEN NULL ELSE CONVERT(datetime, ?, 120) END,"
-                        + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE())",
-                plNo, nextXc, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
-                str(line.get("规格型号")), str(line.get("销售单位")),
-                demand, qty, qty, due, due, due, str(line.get("批次号")), soNo, lineId, user);
-        // ⑤ 行级占用(通道=PLANG;目标行键=工单号#行号)
-        voucherFlow.linkLine("SO_ORDER", soNo, soNo + "#" + lineId, str(line.get("存货编码")), qty,
-                "PLANG", plNo, plNo + "#" + nextXc, "");
-        return plNo;
     }
 
     /**

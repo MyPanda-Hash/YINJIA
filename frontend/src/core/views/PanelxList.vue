@@ -5957,7 +5957,14 @@ async function onButton(action) {
       buttonParam: {},
     })
     if (res?.gotoPanel) {
-      // 推式生单：直接跳转到目标面板列表页（不新开标签页），新生成的单据按创建时间倒序显示在第一张（草稿内联可编辑）
+      if (res.gotoPanel === 'WORK_ORDER_LIST') {
+        // 单轨(2026-09-26):生产工单落 plang,前往生产工单列表页(独立路由,非 panelx 面板)
+        ElMessage.success(`已生成生产工单：${(res['编号清单'] || [res['编号']]).join('、')}`)
+        tabs.close(route.path)
+        router.push('/prod/plan/workOrderList')
+        tabs.open({ path: '/prod/plan/workOrderList', title: '生产工单' })
+        return
+      }      // 推式生单：直接跳转到目标面板列表页（不新开标签页），新生成的单据按创建时间倒序显示在第一张（草稿内联可编辑）
       ElMessage.success(`已生成${res.gotoPanel === 'MANU_ORDER' ? '生产加工单' : res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
       const targetPath = `/panelx/list/${res.gotoPanel}`
       tabs.close(route.path) // 关闭当前源面板页签（页签被目标面板替换）
