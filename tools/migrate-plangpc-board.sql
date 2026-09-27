@@ -46,5 +46,34 @@ WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND ISNULL(p.scx,N'') <> N''
                   WHERE pc.comm = p.comm AND pc.pl_no = p.pl_no AND pc.pl_xc = p.pl_xc
                     AND ISNULL(pc.[批次号],N'') = ISNULL(p.[批次号],N''));
 GO
-PRINT N'plang_pc 工单排产就绪(扩宽+批次号+回填,幂等)';
+-- legacy 老行批次号同步(2026-09-27 补:plang_pc 原始 8 月老行批次号为 NULL,而 plang 侧批次号
+-- 已按 pl_date 回填(如 20260826)→ 两侧行键不一致,看板 JOIN 匹配不上老行。同步之,幂等。)
+UPDATE pc SET pc.[批次号] = p.[批次号]
+FROM dbo.plang_pc pc
+JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc
+  AND ISNULL(p.asp_cancel,'N') <> 'Y'
+WHERE pc.[批次号] IS NULL AND p.[批次号] IS NOT NULL;
+GO
+-- legacy 老行镜像进 plang(2026-09-27 补②:原始 plang_pc 的 GD 老行在 plang 无对应行,
+-- 看板 INNER JOIN plang 取活数据时被整行滤掉。把 plang_pc 存量行镜像 INSERT 进 plang,
+-- 批次号=pl_date(与 plang 老行回填口径一致),幂等:同(工单号,行号)已有任何 plang 行则跳过。)
+INSERT INTO plang (comm, pl_no, pl_xc, pl_date, khdm, dm, mc, gg, gg2, jldw,
+                   pl_sl, pl_sl2, xq_sl, rk_sl, yl, dj, jine, cp_date, st_date, cp_date2,
+                   rk_no, bz, ja, od_no, od_xc, lot_no, color, siz, ll_no, wb_no, lb, mjlx,
+                   BomId, ll_no2, remark, MoDId, llxz, cgrkdh, lldh, djlx, zl,
+                   asp_user1, asp_time1, asp_cancel, [批次号])
+SELECT pc.comm, pc.pl_no, pc.pl_xc, pc.pl_date, pc.khdm, pc.dm, pc.mc, pc.gg, pc.gg2, pc.jldw,
+       pc.pl_sl, pc.pl_sl2, pc.xq_sl, pc.rk_sl, pc.yl, pc.dj, pc.jine, pc.cp_date, pc.st_date, pc.cp_date2,
+       pc.rk_no, pc.bz, pc.ja, pc.od_no, pc.od_xc, pc.lot_no, pc.color, pc.siz, pc.ll_no, pc.wb_no, pc.lb, pc.mjlx,
+       pc.BomId, pc.ll_no2, pc.remark, pc.MoDId, pc.llxz, pc.cgrkdh, pc.lldh, pc.djlx, pc.zl,
+       pc.asp_user1, pc.asp_time1, N'N', CONVERT(varchar(8), pc.pl_date, 112)
+FROM dbo.plang_pc pc
+WHERE ISNULL(pc.asp_cancel,'N') <> 'Y'
+  AND NOT EXISTS (SELECT 1 FROM dbo.plang p WHERE p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc);
+GO
+-- 双侧批次号兜底(pc 侧 NULL→pl_date;此后与镜像行一致)
+UPDATE dbo.plang_pc SET [批次号] = CONVERT(varchar(8), pl_date, 112)
+WHERE [批次号] IS NULL AND pl_date IS NOT NULL;
+GO
+PRINT N'plang_pc 工单排产就绪(扩宽+批次号+回填+老行同步+老行镜像,幂等)';
 GO

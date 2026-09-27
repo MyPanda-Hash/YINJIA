@@ -342,7 +342,8 @@ public class ScheduleBoardService {
         else complete = " AND st.[生产状态] <> N'完工'";
         return jdbc.queryForList(
                 "SELECT pc.pl_no AS 加工单号, ISNULL(dk.mc, p.khdm) AS 客户,"
-                        + " CONVERT(varchar(10), pc.asp_time2, 120) AS 排产日期,"
+                        // 排产日期=实际排入时间(plang_pc.asp_time1,排入即写);asp_time2 仅调线/改动时才有
+                        + " CONVERT(varchar(10), pc.asp_time1, 120) AS 排产日期,"
                         + " ISNULL(p.od_no,N'') AS 客户PO, p.dm AS 物料编码,"
                         + " CONVERT(varchar(10), pc.st_date, 120) AS 开工日期,"
                         + " CONVERT(varchar(10), pc.cp_date, 120) AS 计划完工日期,"
@@ -354,7 +355,8 @@ public class ScheduleBoardService {
                         + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
                         + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0) AS 余量,"
                         + " 0 AS 每箱数量, 0 AS 箱数,"
-                        + " ISNULL(p.lot_no,N'') AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
+                        // 批号=转单批次号(与生产工单页「批次号」对应;legacy 旧行无批次号回退产品批号 lot_no)
+                        + " ISNULL(NULLIF(pc.[批次号],N''), ISNULL(pc.lot_no,N'')) AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
                         + " ISNULL(pc.pl_man,N'') AS 操作员, CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注,"
                         + " ISNULL(p.ll_no2,N'') AS 领料单号, ISNULL(p.rk_no,N'') AS 入库单号,"
                         + " CASE WHEN p.ja IN (N'T',N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
