@@ -156,7 +156,8 @@ public class OrderConvertService {
     }
 
     /**
-     * 单条订单行 → 一行 plang 工单(工单号=MO 号池续号,行号=1,需求数量=订单行数量,排产=生单数量)。
+     * 单条订单行 → plang 工单行(方案一:同一销售订单共用一张工单——pl_no 沿用首次转单号,
+     * 工单行号 pl_xc = 该工单最大行号+1;来源订单行以 od_no/od_xc 回链,分批多次转单自动续行)。
      * 口径与 QuickScheduleService.createFromOrderLine 一致(仅已审核/占用守恒/需求数量不缩水),
      * 差异:落 plang;占用通道 target_panel_code='PLANG';交期落 cp_date(计划完工日期)。
      */
@@ -198,20 +199,33 @@ public class OrderConvertService {
         double qty = qtyOverride != null && qtyOverride > 0 ? Math.min(qtyOverride, residual) : residual;
         if (qty <= 0) throw new IllegalStateException("生单数量必须大于 0");
         if (qty > residual + 0.0001) throw new IllegalStateException("生单数量 " + qty + " 超过剩余可转数量 " + residual);
-        // ④ 落 plang(工单号沿用 MO 号池;公司代码恒 '0' 与全库口径一致;行号=1)
-        String plNo = formNo.next("MO", user);
+        // ④ 工单号与行号(方案一,2026-09-26 用户拍板):**同一销售订单共用一张工单**——
+        //    pl_no 沿用该订单首次转单号;工单行号 pl_xc = 该工单当前最大行号+1(1 起连续,分批转单自动续号);
+        //    来源订单行仍以 od_no/od_xc 记录,可对回销售订单明细。同订单多行=同一工单号下多行。
+        String plNo;
+        try {
+            plNo = jdbc.queryForObject(
+                    "SELECT TOP 1 pl_no FROM plang WHERE od_no = ? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY pl_xc DESC",
+                    String.class, soNo);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            plNo = null;   // 该订单尚未转过工单 → 取新号
+        }
+        if (plNo == null || plNo.isBlank()) plNo = formNo.next("MO", user);
+        Integer nextXc = jdbc.queryForObject(
+                "SELECT ISNULL(MAX(pl_xc),0)+1 FROM plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                Integer.class, plNo);
         String due = dueOverride != null ? dueOverride : str(line.get("交货日期"));
         jdbc.update("INSERT INTO plang (comm, pl_no, pl_xc, pl_date, khdm, dm, mc, gg, jldw,"
                         + " xq_sl, pl_sl, yl, cp_date, lot_no, od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1)"
-                        + " VALUES (N'0', ?, 1, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
+                        + " VALUES (N'0', ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
                         + " CASE WHEN ? IS NULL OR ? = N'' THEN NULL ELSE CONVERT(datetime, ?, 120) END,"
                         + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE())",
-                plNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
+                plNo, nextXc, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
                 str(line.get("规格型号")), str(line.get("销售单位")),
                 demand, qty, qty, due, due, due, str(line.get("批次号")), soNo, lineId, user);
-        // ⑤ 行级占用(通道=PLANG;目标行键=工单号#1)
+        // ⑤ 行级占用(通道=PLANG;目标行键=工单号#行号)
         voucherFlow.linkLine("SO_ORDER", soNo, soNo + "#" + lineId, str(line.get("存货编码")), qty,
-                "PLANG", plNo, plNo + "#1", "");
+                "PLANG", plNo, plNo + "#" + nextXc, "");
         return plNo;
     }
 
