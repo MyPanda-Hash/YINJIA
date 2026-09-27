@@ -90,13 +90,16 @@ public class WorkOrderListController {
                         + " CASE WHEN p.ja IN (N'T', N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
                         + " p.dm AS 物料编码, ISNULL(p.mc, N'') AS 产品名称, ISNULL(p.gg, N'') AS 规格型号,"
                         + " ISNULL(p.jldw, N'') AS 生产单位,"
-                        + " ISNULL(p.pl_sl, 0) AS 排产数量, ISNULL(p.rk_sl, 0) AS 入库数量,"
+                        + " ISNULL(p.pl_sl, 0) AS 排产数量, ISNULL(p.xq_sl, 0) AS 需求数量, ISNULL(p.rk_sl, 0) AS 入库数量,"
                         + " ISNULL(p.pl_sl, 0) - ISNULL(p.rk_sl, 0) AS 余量,"
+                        + " ISNULL(管控.重点管控, N'否') AS 重点管控,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
                         + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
                         + " FROM dbo.plang p"
                         + " LEFT JOIN dbo.dm_kh dk ON dk.comm = p.comm AND dk.dm = p.khdm"
+                        + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
+                        + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
                         + w + " ORDER BY p.pl_date DESC, p.pl_no, p.pl_xc",
                 args.toArray());
         // 生产状态(与 v_manu_schedule 同口径:完工=入库≥排产;在产=有入库;其余未完工)

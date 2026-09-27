@@ -15,11 +15,19 @@
       <span class="wol-count">{{ tt('共有数据') }}: <b>{{ rows.length }}</b> {{ tt('条') }}</span>
     </div>
 
-    <!-- 按钮条(2026-09-26 用户拍板:生产工单=纯查询+打印,不再作为快速排产任务——调线/修改入口移除) -->
+    <!-- 按钮条(2026-09-26 用户拍板:生产工单=纯查询+打印;2026-09-27 打印工单=三模板可选) -->
     <div class="wol-btns">
       <el-button size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
       <el-button size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
-      <el-button size="small" @click="printTask" :disabled="!checked.length && !currentRow">{{ tt('打印工单') }}</el-button>
+      <el-dropdown split-button size="small" type="primary" @click="doPrintTask('成型生产任务单')" @command="doPrintTask"
+                   :disabled="!checked.length && !currentRow">
+        {{ tt('打印工单') }}
+        <template #dropdown>
+          <el-dropdown-item command="成型生产任务单">{{ tt('成型生产任务单') }}</el-dropdown-item>
+          <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
+          <el-dropdown-item command="生产投料单" divided>{{ tt('生产投料单') }}</el-dropdown-item>
+        </template>
+      </el-dropdown>
       <el-button size="small" @click="printPick" :disabled="!checked.length">{{ tt('打印领料单') }}</el-button>
       <el-button size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
@@ -95,7 +103,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
-import { printProductionTask } from '@/business/print-formats'
+import { printWorkTaskSheet, printFeedingSheet } from '@/business/print-formats'
 import { useUserStore } from '@/stores/user'
 
 const rows = ref([])
@@ -166,30 +174,50 @@ async function onClose(close) {
   } catch (e) { err(e, '操作失败') }
 }
 
-async function printTask() {
-  // 勾选多个=批量打印;无勾选回退当前行。直打列表行(plang 数据全量在行上),
-  // 不再回查 /px/scheduleBoard/scheduled —— 该端点按生产线过滤,传空串只返回未排产单,
-  // 已排产工单永远匹配不到(旧缺陷根因),打印留痕走 /px/workOrderList/printStamp。
+/**
+ * 打印工单(三模板可选,2026-09-27):勾选行直打,打印留痕回写 plang。
+ *   成型生产任务单/组装生产任务单 = 行表任务单(横版,列见截图版式);
+ *   生产投料单 = 每工单一页,物料行 = 默认 BOM × 需求数量(/px/workOrderBom)。
+ */
+async function doPrintTask(mode) {
   const src = checked.value.length ? checked.value : (currentRow.value ? [currentRow.value] : [])
-  if (!src.length) return
+  if (!src.length) { ElMessage.warning(tt('请先勾选要打印的工单')); return }
   try {
-    const rowsToPrint = src.map((r) => ({
-      加工单号: r.工单号,
-      客户: r.客户,
-      产品名称: r.产品名称,
-      批号: r.批号 || '',
-      规格型号: r.规格型号 || '',
-      重点管控: '',
-      客户PO: '',
-      排产数量: r.排产数量,
-      每箱数量: '',
-      箱数: '',
-      计划完工日期: r.计划完工日期 || '',
-      备注: r.备注 || '',
-      生产线: r.生产线 || lineFilter.value || '',
-      物料编码: r.物料编码 || '',
-    }))
-    const okPrint = await printProductionTask(rowsToPrint, { line: lineFilter.value || '', preparedBy: useUserStore().realName })
+    let okPrint = false
+    if (mode === '生产投料单') {
+      const orders = []
+      for (const r of src) {
+        let bom = []
+        try {
+          const res = await request.post('/px/workOrderBom', { 产品编码: r.物料编码 })
+          bom = (res.data || []).map((b) => ({
+            物料编码: b.子件编码, 物料名称: b.子件名称, 规格型号: b.规格型号,
+            数量: Math.round(Number(b.定额数量 || 0) * Number(r.需求数量 || 0) * 10000) / 10000,
+            单位: b.子件计量单位 || '', 行备注: '',
+          }))
+        } catch (e) { bom = [] }
+        orders.push({
+          单据编号: r.工单号, 产品编码: r.物料编码, 产品名称: r.产品名称,
+          产品规格: r.规格型号 || '', 数量: r.需求数量, 客户名称: r.客户 || '',
+          计划完工日期: r.计划完工日期 || '', 制单人: useUserStore().realName, bom,
+        })
+      }
+      okPrint = await printFeedingSheet(orders)
+    } else {
+      const rowsToPrint = src.map((r) => ({
+        单据编号: r.工单号,
+        是否重点管控产品: r.重点管控 || '',
+        商品编码: r.物料编码 || '',
+        商品名称: r.产品名称 || '',
+        规格型号: r.规格型号 || '',
+        订单数量: r.需求数量,
+        成型折算后数量: r.排产数量,
+        计划完工日期: r.计划完工日期 || '',
+        批号: r.批号 || '', 物料编码: r.物料编码 || '',
+        排产数量: r.排产数量, 生产线: r.生产线 || lineFilter.value || '',
+      }))
+      okPrint = await printWorkTaskSheet(mode, rowsToPrint, { line: lineFilter.value || '', preparedBy: useUserStore().realName })
+    }
     if (okPrint) {
       await request.post('/px/workOrderList/printStamp', {
         rows: src.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号, 批次号: r.批次号 })),
