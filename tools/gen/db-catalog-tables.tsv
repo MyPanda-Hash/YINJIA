@@ -161,7 +161,7 @@ TABLE	dbo	bs_supplier_group	供应商分类档案(金蝶云·星辰 supplier_gro
 TABLE	dbo	bs_team	班组档案	10	14
 TABLE	dbo	bs_uom	计量单位档案	16	26
 TABLE	dbo	bs_wc	工作中心档案	17	22
-TABLE	dbo	bs_wh	仓库档案(仓库编码/名称,库存台账仓库真源)	18	31
+TABLE	dbo	bs_wh	仓库档案(仓库编码/名称,库存台账仓库真源)	18	32
 TABLE	dbo	bxsq	报销申请	1	40
 TABLE	dbo	cbhs	成本核算	0	56
 TABLE	dbo	chdcmx	出货订舱明细	3	52

@@ -1595,3 +1595,5 @@ migrate-scjl-report.sql
 migrate-scjl-single-table.sql
 # —— 2026-09-27 产线数据导入+工序种类(用户截图《新系统产线命名》22条:成型烧结/X烧结/切炭/组装装箱两级;bs_prod_line 加 工序种类 列可维护;PROD_LINE 面板字段注册+en 译名;存量按名称回填) ——
 migrate-prodline-import.sql
+# —— 2026-09-28 仓库档案(WH)加 库位 字段(bs_wh 加列;detail 可编辑文本;九语言译名;列注明) ——
+migrate-wh-location.sql
