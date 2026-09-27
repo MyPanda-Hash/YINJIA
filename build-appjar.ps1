@@ -49,12 +49,21 @@ Write-Host '[2/4] static 同步 OK'
 
 # ---------- 3/4 Maven 打包 ----------
 $env:YINJIA_M2_REPO = "$root\.m2-repo"
-if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME\bin\java.exe")) {
-  # 2026-09-22 起首选本机 JDK 25(Temurin 25.0.4.1,与 pom 的 java.version=25 对齐)
-  foreach ($cand in @("$env:USERPROFILE\.jdks\temurin-25.0.4.1", 'C:\Program Files\Java\jdk-25', 'D:\Program Files\Java\jdk-25', "$env:USERPROFILE\.jdk\jdk-25\jdk-25.0.2")) {
-    if (Test-Path "$cand\bin\java.exe") { $env:JAVA_HOME = $cand; break }
+# JDK 动态发现:JAVA_HOME(校验)→ 扫描 .jdks / Program Files\Java 全部目录,取首个 release 声明主版本>=25 的 JDK
+# (jar=class 69,JDK 23/24 会 UnsupportedClassVersionError;不硬编码任何 JDK 目录名,2026-09-24)
+$javaOk = $null
+$cands = @()
+if ($env:JAVA_HOME) { $cands += $env:JAVA_HOME }
+$cands += (Get-ChildItem -Directory "$env:USERPROFILE\.jdks" -ErrorAction SilentlyContinue).FullName
+$cands += (Get-ChildItem -Directory 'C:\Program Files\Java' -ErrorAction SilentlyContinue).FullName
+$cands += (Get-ChildItem -Directory 'D:\Program Files\Java' -ErrorAction SilentlyContinue).FullName
+foreach ($c in $cands) {
+  if ($c -and (Test-Path "$c\bin\java.exe") -and (Select-String -Path "$c\release" -Pattern 'JAVA_VERSION="2[5-9]\.' -Quiet)) {
+    $javaOk = $c; break
   }
 }
+if (-not $javaOk) { throw "未找到 JDK 25+(pom java.version=25;请安装到 .jdks 或 Program Files\Java)" }
+$env:JAVA_HOME = $javaOk
 $mvn = "$root\tools\apache-maven-3.9.9\bin\mvn.cmd"
 if (-not (Test-Path $mvn)) { throw "未找到 Maven: $mvn(应位于 tools\apache-maven-3.9.9)" }
 Write-Host '[3/4] Maven package ...'

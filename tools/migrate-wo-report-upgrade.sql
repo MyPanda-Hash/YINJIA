@@ -46,15 +46,15 @@ GO
 -- ② 面板字段:注册新列(批号/生产线可编辑;入库单号只读回执)+工序列补五道下拉+生产线下拉=启用档案
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WO_REPORT' AND col_name=N'批号')
   INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible)
-  VALUES ('WO_REPORT', N'批号', N'批号', N'文本', NULL, NULL, NULL, NULL, N'query,header', 55, 120, 1, 0, 0, 1);
+  VALUES ('WO_REPORT', N'批号', N'批号', N'文本', NULL, NULL, NULL, NULL, N'query,detail', 55, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WO_REPORT' AND col_name=N'生产线')
   INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible)
   VALUES ('WO_REPORT', N'生产线', N'生产线', N'文本',
           N'SELECT [生产线] FROM bs_prod_line WHERE ISNULL(asp_cancel,''N'')<>''Y'' AND ISNULL(停用,0)=0 ORDER BY ISNULL(排序,999),[生产线]',
-          NULL, NULL, NULL, N'query,header', 56, 120, 1, 0, 0, 1);
+          NULL, NULL, NULL, N'query,detail', 56, 120, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='WO_REPORT' AND col_name=N'入库单号')
   INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible)
-  VALUES ('WO_REPORT', N'入库单号', N'入库单号', N'文本', NULL, NULL, NULL, NULL, N'header', 57, 140, 0, 0, 0, 1);
+  VALUES ('WO_REPORT', N'入库单号', N'入库单号', N'文本', NULL, NULL, NULL, NULL, N'query,detail', 57, 140, 0, 0, 0, 1);
 -- 工序下拉:五道(VALUES 常量,BOM.计量单位 同款样例)
 UPDATE yj_field SET dict_sql = N'SELECT v FROM (VALUES (N''混料''),(N''成型''),(N''切炭''),(N''组装''),(N''装箱'')) AS t(v)'
 WHERE panel_code = 'WO_REPORT' AND col_name = N'工序' AND (dict_sql IS NULL OR dict_sql = N'');
@@ -141,6 +141,10 @@ LEFT JOIN dbo.bs_inv iv ON iv.[存货编码] = l.[产品编码]
 LEFT JOIN dbo.bl_so_order so ON so.[单据编号] = h.[销售订单号] AND so.[存货编码] = l.[产品编码]
 WHERE ISNULL(h.asp_cancel,'N') <> 'Y'
 ) x;
+GO
+
+-- ⑥ place 修正(2026-09-24):报工业务字段=表格形态——面板无头表,place 须含 detail 才进表单明细表格与明细列查询(header 会导致表单无表格可填)
+UPDATE yj_field SET place=N'query,detail' WHERE panel_code='WO_REPORT' AND col_name IN (N'工单号',N'工序',N'批号',N'生产线',N'报工数量',N'直销数量',N'报工人',N'备注',N'入库单号');
 GO
 
 -- 验证输出

@@ -875,8 +875,7 @@
               <template v-if="archEditable(b) && !row._placeholder">
                 <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
                 <!-- 生产线档案「停用」列:开关形式(同生产加工单表单开关风格)——@change 同步乐观翻转(点击即动画),
-                     POST 落库,失败回滚;停用后从排产工作台消失、排入被后端拦截(2026-09-24 随生产域下拉) -->
-                <span v-else-if="isLineToggleCol(c.prop)" class="line-toggle-cell">
+                     POST 落库,失败回滚;停用后从排产工作台消失、排入被后端拦截(2026-09-24 随生产域下拉) -->                <span v-else-if="isLineToggleCol(c.prop)" class="line-toggle-cell">
                   <el-switch
                     :model-value="toBool(row[c.prop])"
                     @change="(v) => toggleLineDisable(row, v)"
@@ -969,7 +968,8 @@
         <span>{{ tt('审核意见：') }}{{ cur['审核意见'] || '-' }}</span>
       </div>
     </div>
-        </div>
+
+        </div>
       </div>
     </template>
 
@@ -1116,6 +1116,19 @@
           <el-input v-else v-model="queryDraft[headerFieldKey(field)]" clearable @keyup.enter="applyHeaderQuery" />
           <!-- 台账/库存状况(2026-09-21):「档案∩有流水」联动提示 —— 选仓后存货候选收窄;选存货后无流水仓置灰 -->
           <div v-if="dialogFieldHint(field)" class="query-field-hint">{{ dialogFieldHint(field) }}</div>
+        </div>
+      </div>
+      <!-- 日期范围(2026-09-24):起/止两段,查询时并入高级筛选(ge/le)服务端过滤 -->
+      <div v-if="dateFieldLabel" class="adv-filter-section">
+        <div class="adv-filter-head">
+          <span class="adv-filter-title">{{ tt('日期范围') }}</span>
+          <span class="adv-filter-dim">{{ tt(dateFieldLabel) }}</span>
+        </div>
+        <div class="adv-range-row">
+          <el-date-picker v-model="dateFrom" type="date" value-format="YYYY-MM-DD" size="small" :placeholder="tt('起')" style="width: 150px" />
+          <span class="adv-filter-dash">-</span>
+          <el-date-picker v-model="dateTo" type="date" value-format="YYYY-MM-DD" size="small" :placeholder="tt('止')" style="width: 150px" />
+          <el-button link type="primary" size="small" @click="clearDateRange">{{ tt('清空') }}</el-button>
         </div>
       </div>
       <!-- 高级筛选:字段(全部字段)+ 运算符 + 值。报表=服务端全表过滤(点查询定格条件 POST advFilters,
@@ -1525,6 +1538,31 @@
     </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <QrLabelDialog v-model="qrVisible" :labels="qrLabels" />
+
+    <!-- 生产工单「排产」弹窗(2026-09-24 用户要求):本单快捷排线——选产线/日期/数量,
+         后端复用排产工作台 assign(仅已审核可排/数量守恒/停用线拒绝/留痕),回执含当日负荷与超载提示 -->
+    <el-dialog v-model="moSchVisible" :title="tt('排产')" width="420px" append-to-body>
+      <div class="mo-sch-row">{{ tt('工单号') }}:<b>{{ moSchNo }}</b></div>
+      <div class="mo-sch-row">{{ tt('生产线') }}
+        <el-select v-model="moSchLine" filterable style="width: 240px" :placeholder="tt('选择生产线')">
+          <el-option v-for="l in moSchLines" :key="l['生产线']" :value="l['生产线']"
+                     :label="`${l['生产线']} · ${tt('今日负荷')}${l['今日负荷'] ?? 0}/${tt('日产能')}${l['日产能'] ?? 0}`" />
+        </el-select>
+      </div>
+      <div class="mo-sch-row">{{ tt('预开工日') }}
+        <el-date-picker v-model="moSchStart" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
+      </div>
+      <div class="mo-sch-row">{{ tt('预完工日') }}
+        <el-date-picker v-model="moSchEnd" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
+      </div>
+      <div class="mo-sch-row">{{ tt('排产数量') }}（{{ tt('空=全排') }}）
+        <el-input-number v-model="moSchQty" :min="0" :controls="false" style="width: 130px" />
+      </div>
+      <template #footer>
+        <el-button @click="moSchVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="submitPanelSchedule">{{ tt('确认排产') }}</el-button>
+      </template>
+    </el-dialog>
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <VoucherFormDialog v-model="formVisible" :panel-code="formPanel || panelCode" :code="formCode" @saved="onFormSaved" />
     <ScanFillDialog
@@ -1651,6 +1689,7 @@ import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, syncBatchNoWithDocDate } from '@core/panel/docDefaults'
+import { printPuOrder, printQcReturn, printProductCards, printProductionTask } from '@/business/print-formats'
 import QrLabelDialog from './QrLabelDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
@@ -1809,6 +1848,28 @@ const ADV_OPS = [
   { value: 'notEmpty', label: '不为空' },
 ]
 const advFilters = ref([])
+// 日期范围(2026-09-24 用户要求,对齐旧系统列表查询区):起/止 → 自动展开为 日期字段 ge/le 两条高级筛选,
+// 随查询一起服务端过滤(单据/报表/档案面板皆可);不入 advFilters 可见行,避免出现"凭空多出的条件行"。
+const dateFrom = ref('')
+const dateTo = ref('')
+/** 面板主日期字段:优先「单据日期」,否则取首个日期型查询字段 */
+const dateFieldLabel = computed(() => {
+  const qs = queryFields.value || []
+  const byName = qs.find((f) => ['单据日期', '日期'].includes(headerFieldKey(f)))
+  if (byName) return headerFieldKey(byName)
+  const anyDate = qs.find((f) => String(f.dataType || f.type || '').includes('日期'))
+  return anyDate ? headerFieldKey(anyDate) : ''
+})
+const dateAdvFilters = computed(() => {
+  const lf = dateFieldLabel.value
+  const out = []
+  if (lf && dateFrom.value) out.push({ field: lf, op: 'ge', value: dateFrom.value })
+  if (lf && dateTo.value) out.push({ field: lf, op: 'le', value: dateTo.value })
+  return out
+})
+/** 生效条件 = 高级筛选行 + 日期范围展开行 */
+const effectiveAdvFilters = computed(() => [...advFilters.value, ...dateAdvFilters.value])
+function clearDateRange() { dateFrom.value = ''; dateTo.value = '' }
 
 /** 可筛选字段:表头 + 查询字段 + 明细各页签字段(中文键去重,选项显示译名)。 */
 const advFilterFields = computed(() => {
@@ -1851,7 +1912,7 @@ function advMatch(row, f) {
 
 /** 应用全部有效高级筛选条件(AND 组合);空条件(未填值)不参与过滤。 */
 function applyAdvFilters(rows) {
-  const active = advFilters.value.filter((f) => f.field && (f.op === 'empty' || f.op === 'notEmpty' || String(f.value ?? '').trim() !== ''))
+  const active = effectiveAdvFilters.value.filter((f) => f.field && (f.op === 'empty' || f.op === 'notEmpty' || String(f.value ?? '').trim() !== ''))
   if (!active.length) return rows
   return rows.filter((row) => active.every((f) => advMatch(row, f)))
 }
@@ -2196,6 +2257,8 @@ function onQueryDialogClose() {
 }
 // YINJIA 适配:单单据面板(基础档案)只有一张虚拟单,隐藏单据切换按钮(◁◀ 第X/Y张 ▶▷)
 const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === true)
+/** 单据面板(头行/单表单据):既非报表平表、也非档案单单据 → 高级筛选走服务端(2026-09-24) */
+const docPanel = computed(() => !reportMode.value && !singleDocMode.value)
 const reportPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
 const reportPeriod = computed(() => {
   const start = condition['开始日期']
@@ -2835,7 +2898,7 @@ const draftEditable = computed(() => {
 /** 附件上传闸门(2026-09-20):草稿/修改中照旧可传;**凡配了附件列位的单据,已审核/已完成也允许补附件**
  *  (合同/送货单/检验报告等佐证材料,只写附件列与 yj_attachment,不动业务字段;金蝶同步进来的订单
  *  本来就是已审核,沿用"审核即锁定"这些单永远传不了附件)。仅「已作废」单据禁止。
- *  名单 = 已配 6 列位的单据:SALE/采购订单、生产加工单、委外加工单、生产工单、客户订单
+ *  名单 = 已配 6 列位的单据:SALE/采购订单、生产工单、委外加工单、生产工单、客户订单
  *  + 采购链的送料暂收/来料检验/暂收退回/采购入库(见 migrate-order-attach / migrate-attach-restore)。 */
 const ATTACH_EDIT_PANELS = new Set([
   'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
@@ -3185,8 +3248,10 @@ const mainRows = computed(() => {
   if (!l.length) return []
   const filtered = applyAdvFilters(applyColFilters(l.map((r) => r), mainCols.value.map((c) => ({ prop: c }))))
   // 排序在取前 5 行之前:排序后看到的是"本页该字段前 5 条",而不是"前 5 条里再排"
-  const rows = sortViewRows(filtered, mainSort).slice(0, 5)
-  while (rows.length < 5) rows.push({ _placeholder: true })
+  // 生产加工单=工单列表形态(2026-09-24):预览行数放开到 20(其余面板保持 5 行预览)
+  const LIMIT = panelCode.value === 'MANU_ORDER' ? 20 : 5
+  const rows = sortViewRows(filtered, mainSort).slice(0, LIMIT)
+  while (rows.length < LIMIT) rows.push({ _placeholder: true })
   return rows
 })
 async function onMainRowClick(row) {
@@ -3197,6 +3262,7 @@ function mainRowCls({ row }) {
   if (row._placeholder) return 'ph-row'
   return row === cur.value ? 'row-cur' : ''
 }
+
 
 // ═══ 采购订单表头「送料」只读摘要(方案 A 轻量版,2026-09-21)═══════════════════
 // 页面结构一点不动:只在表头字段区末尾多**一行只读文字**,点它弹一个小浮层(批次窄表)。
@@ -3465,6 +3531,99 @@ async function qrBlobErrMsg(e) {
     try { return JSON.parse(await data.text())?.message || '' } catch { /* 非 JSON 走兜底 */ }
   }
   return e?.response?.data?.message || e?.message || ''
+}
+
+// ═══ 生产工单:打印工单 / 排产(2026-09-24 用户要求,按钮挂 MANU_ORDER 面板) ═══
+// 打印工单=生产任务单固定版式(print-formats.printProductionTask,与工单排产看板同一实现)+ 打印留痕;
+// 排产=本单快捷排线(弹窗选产线/日期/数量 → 复用排产工作台 assign:仅已审核可排/数量守恒/停用线拒绝/留痕)。
+const moSchVisible = ref(false)
+const moSchNo = ref('')
+const moSchLine = ref('')
+const moSchStart = ref('')
+const moSchEnd = ref('')
+const moSchQty = ref(null)
+const moSchLines = ref([])
+
+/** 当前生产工单单号:头键=合同号(list 行/表单一致) */
+function moDocNo(row) {
+  const r = row || current.value || {}
+  return String(r['合同号'] || r['单据编号'] || r['编号'] || '').trim()
+}
+
+async function openPanelPrintWorkOrder() {
+  const no = moDocNo()
+  if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+  try {
+    const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+    const doc = res?.data || {}
+    const lines = Object.values(res?.detailData || {})[0] || []
+    const l = lines[0] || {}
+    const qty = doc['排产数量'] ?? l['排产数量'] ?? ''
+    const perBox = l['每箱数量'] ?? ''
+    const rows = [{
+      加工单号: no,
+      客户: doc['客户'] || '',
+      产品名称: l['产品名称'] || '',
+      批号: doc['批号'] || l['批号'] || '',
+      规格型号: l['规格型号'] || '',
+      重点管控: doc['重点管控'] || '',
+      客户PO: doc['销售订单号'] || '',
+      排产数量: qty,
+      每箱数量: perBox,
+      箱数: Number(perBox) > 0 ? Number(qty) / Number(perBox) : '',
+      计划完工日期: String(doc['预完工日'] || '').slice(0, 10),
+      备注: doc['备注'] || '',
+      生产线: doc['生产线'] || '',
+    }]
+    const sent = await printProductionTask(rows, { line: rows[0].生产线, preparedBy: user.realName })
+    try {
+      await request.post('/px/scheduleBoard/printStamp', { rows: [{ 加工单号: no }] })
+    } catch { /* 留痕失败不阻断打印 */ }
+    if (sent) ElMessage.success(tt('已发送打印'))
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+  }
+}
+
+/** 打开本单排产弹窗:产线源=排产工作台 stats(启用线 + 当日负荷/日产能) */
+async function openPanelSchedule() {
+  const no = moDocNo()
+  if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+  try {
+    const stats = await request.post('/px/scheduleBoard/stats', {})
+    moSchLines.value = (stats.data?.['产线'] || []).filter((l) => !l['停用'])
+  } catch { moSchLines.value = [] }
+  const cur = current.value || {}
+  moSchNo.value = no
+  moSchLine.value = cur['生产线'] || ''
+  moSchStart.value = String(cur['预开工日'] || '').slice(0, 10)
+  moSchEnd.value = String(cur['预完工日'] || '').slice(0, 10)
+  moSchQty.value = Number(cur['排产数量']) || null
+  moSchVisible.value = true
+}
+
+async function submitPanelSchedule() {
+  if (!moSchLine.value) return ElMessage.warning(tt('请选择生产线'))
+  try {
+    const res = await request.post('/px/scheduleBoard/assign', {
+      rows: [{
+        加工单号: moSchNo.value,
+        生产线: moSchLine.value,
+        预开工日: moSchStart.value || undefined,
+        预完工日: moSchEnd.value || undefined,
+        排产数量: moSchQty.value || undefined,
+      }],
+    })
+    const d = res.data || {}
+    const rc = (d['产线回执'] || []).map((l) => `${l['生产线']}:${tt('今日负荷')}${l['今日负荷'] ?? 0}/${tt('日产能')}${l['日产能'] ?? 0}${l['提示'] === '超载' ? ' ⚠' + tt('超载') : ''}`).join('；')
+    const failed = d['失败行'] || []
+    if (failed.length) ElMessage.warning(failed[0])
+    else ElMessage.success(`${tt('已排产')} ${moSchNo.value} → ${moSchLine.value}` + (rc ? `（${rc}）` : ''))
+    moSchVisible.value = false
+    await search()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('排产失败'))
+  }
 }
 /** 档案行非响应化(2026-09-16 四期,入口卡顿主因):几千行×几十列被 Vue 深度代理
  *  (首次全量过滤/排序/快照访问 ≈29 万属性走 proxy get)是"点进页面转圈"的最大开销源(实测单一 4.4s 长任务)。
@@ -4960,9 +5119,11 @@ function applyHeaderQuery() {
   for (const [key, value] of Object.entries(queryDraft)) {
     if (value !== undefined && value !== null && String(value) !== '') condition[key] = value
   }
-  // 高级筛选定格为「生效中」:报表面板随本次查询 POST 给后端全表过滤(分页/导出口径一致);
-  // 单据/档案面板仍是前端过滤(applyAdvFilters 读的是编辑中的 advFilters,不受此快照影响)
-  activeAdvFilters.value = advFilters.value.filter((f) => f.field && (f.op === 'empty' || f.op === 'notEmpty' || String(f.value ?? '').trim() !== ''))
+  // 高级筛选定格为「生效中」:报表/单据面板随本次查询 POST 给后端全表过滤(分页/导出口径一致;
+  // 单据面板 2026-09-24 起同样服务端化);档案面板仍是前端过滤。
+  // 日期范围(起/止)在此并入(ge/le 两条),不占可见条件行。
+  const act = (list) => list.filter((f) => f.field && (f.op === 'empty' || f.op === 'notEmpty' || String(f.value ?? '').trim() !== ''))
+  activeAdvFilters.value = act(effectiveAdvFilters.value)
   rqdDone.value = true // 已通过弹窗查询(此后关闭弹窗不再退页)
   queryDialogVisible.value = false
   search()
@@ -5003,7 +5164,7 @@ async function saveCurrentPlan() {
     })
     const name = String(value).trim()
     const exists = queryPlans.value.find((p) => p.name === name)
-    const plan = { name, condition: { ...cond }, advFilters: JSON.parse(JSON.stringify(adv)), updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') }
+    const plan = { name, condition: { ...cond }, advFilters: JSON.parse(JSON.stringify(adv)), dateFrom: dateFrom.value, dateTo: dateTo.value, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') }
     if (exists) Object.assign(exists, plan)
     else queryPlans.value.push(plan)
     persistPlans()
@@ -5019,6 +5180,8 @@ function applyPlan(name) {
   Object.keys(queryDraft).forEach((k) => delete queryDraft[k])
   Object.assign(queryDraft, plan.condition || {})
   advFilters.value = JSON.parse(JSON.stringify(plan.advFilters || []))
+  dateFrom.value = plan.dateFrom || ''
+  dateTo.value = plan.dateTo || ''
 }
 
 /** 维护操作:更新(以当前弹窗条件覆盖同名方案)/重命名/删除。 */
@@ -5061,6 +5224,7 @@ function planSummary(plan) {
   const condKeys = Object.keys(plan.condition || {})
   if (condKeys.length) parts.push(condKeys.slice(0, 3).join('、') + (condKeys.length > 3 ? ` …×${condKeys.length}` : ''))
   if ((plan.advFilters || []).length) parts.push(`${tt('高级筛选')}×${plan.advFilters.length}`)
+  if (plan.dateFrom || plan.dateTo) parts.push(`${tt('日期范围')} ${plan.dateFrom || ''}~${plan.dateTo || ''}`)
   return parts.join(' + ') || '-'
 }
 
@@ -5069,6 +5233,8 @@ function resetHeaderQuery() {
   Object.keys(condition).forEach((key) => delete condition[key])
   rqdRange.value = [] // 弹窗面板:单据日期区间一并重置
   advFilters.value = []
+  dateFrom.value = ''
+  dateTo.value = ''
   activeAdvFilters.value = []
   reportKeyword.value = ''
   query.keyword = ''
@@ -5553,8 +5719,16 @@ async function onButton(action) {
         return
       }
   // 工单二维码(计划层):单产品工单一张标签,二维码=工单号|批号|产品|数量|产线(扫码报工/领料入口);
-  // 2026-09-24 随生产域下拉:面板化后适配生产加工单(MANU_ORDER)字段(合同号/排产数量/生产单位/工序交期/生产线)
-  if (action === '打印工单二维码') {
+  // 2026-09-22 面板化:适配生产工单(MANU_ORDER)字段(合同号/排产数量/生产单位/工序交期/生产线)
+  // 生产工单:打印工单(生产任务单版式)/排产(本单快捷排线) —— 仅 MANU_ORDER 面板(2026-09-24 用户要求)
+  if (action === '打印工单' && panelCode.value === 'MANU_ORDER') {
+    await openPanelPrintWorkOrder()
+    return
+  }
+  if (action === '排产' && panelCode.value === 'MANU_ORDER') {
+    await openPanelSchedule()
+    return
+  }  if (action === '打印工单二维码') {
     const cur = current.value || {}
     const no = cur['单据编号'] || cur['编号'] || cur['合同号'] || cur['加工单号'] || ''
     if (!no) return ElMessage.warning('请先选择一张工单')
@@ -5567,6 +5741,26 @@ async function onButton(action) {
       qrText: `${no}|${cur['批号'] || ''}|${cur['产品编码'] || ''}|${qty}|${cur['生产线'] || ''}`, qr: '',
     }]
     qrVisible.value = true
+    return
+  }
+  // 银嘉固定版式纸质单打印(2026-09-23):采购订单/暂收退料单 → print-formats.js;
+  // 列表选中单 → getFormDescriptor 取头+明细行(§5.5 D3:头=data,明细=detailData 首页签),新窗口打印
+  // (无后端处理器,同 打印工单二维码 本地拦截先例)
+  if (action === '打印采购订单' || action === '打印退货单') {
+    const cur = current.value || {}
+    const no = cur['单据编号'] || cur['编号'] || ''
+    if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+    try {
+      const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+      const doc = res?.data || {}
+      const lines = Object.values(res?.detailData || {})[0] || []
+      // 头单号键随面板而异(PU_ORDER=单据编号,QC_RETURN=单号/编号,见 PxController 纸张右上角注释)
+      if (!doc['单据编号'] && !doc['单号'] && !doc['编号']) return ElMessage.warning(tt('未取到单据数据'))
+      if (action === '打印采购订单') printPuOrder(doc, lines)
+      else printQcReturn(doc, lines)
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+    }
     return
   }
   // 产品二维码(成型后):二维码=产品编码|产品批号;批号由后端按需取号(一次生成终身复用)
@@ -5751,8 +5945,19 @@ async function onButton(action) {
     return
   }
   if (action === '二维码标签') {
-    // 存货档案勾选即打:勾行→80×80mm 标签 PDF(二维码=存货编码);未勾选只提示,不生成
-    exportQrLabels()
+    // 二维码标签(2026-09-24 改版,用户拍板):勾行 → 75×100mm 七字段标签
+    // (订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,编码·规格取行,其余手填);
+    // 二维码=物料编码|物料规格|数量|批次(print-formats.printProductCards 本地生成;旧 /report/qr-label 暂留可回滚)
+    const sel = qrSel.value
+    const rows = []
+    for (const b of blocks.value) {
+      for (const r of archRows(b)) {
+        const k = qrRowKey(r)
+        if (k && sel.has(k)) rows.push({ 编码: k, 规格: r['规格型号'] || r['型号'] || '' })
+      }
+    }
+    if (!rows.length) return ElMessage.warning(tt('请先勾选要导出的商品'))
+    await printProductCards(rows)
     return
   }
   // 文件类面板(文书式):「删除」= 整单删除(草稿直接作废;已归档提交删除申请,管理员审批)
@@ -5956,7 +6161,7 @@ async function onButton(action) {
       formData: current.value ? { 编号: current.value['编号'], ...(auditOpinion !== '' ? { 审核意见: auditOpinion } : {}), ...(approvalOpinion !== '' ? { 审批意见: approvalOpinion } : {}) } : {},
       buttonParam: {},
     })
-    if (res?.gotoPanel) {
+      if (res?.gotoPanel) {
       if (res.gotoPanel === 'WORK_ORDER_LIST') {
         // 单轨(2026-09-26):生产工单落 plang,前往生产工单列表页(独立路由,非 panelx 面板)
         ElMessage.success(`已生成生产工单：${(res['编号清单'] || [res['编号']]).join('、')}`)
@@ -5964,8 +6169,9 @@ async function onButton(action) {
         router.push('/prod/plan/workOrderList')
         tabs.open({ path: '/prod/plan/workOrderList', title: '生产工单' })
         return
-      }      // 推式生单：直接跳转到目标面板列表页（不新开标签页），新生成的单据按创建时间倒序显示在第一张（草稿内联可编辑）
-      ElMessage.success(`已生成${res.gotoPanel === 'MANU_ORDER' ? '生产加工单' : res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
+      }
+      // 推式生单：直接跳转到目标面板列表页（不新开标签页），新生成的单据按创建时间倒序显示在第一张（草稿内联可编辑）
+      ElMessage.success(`已生成${res.gotoPanel === 'MANU_ORDER' ? '生产工单' : res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
       const targetPath = `/panelx/list/${res.gotoPanel}`
       tabs.close(route.path) // 关闭当前源面板页签（页签被目标面板替换）
       router.push(targetPath)
@@ -6050,13 +6256,14 @@ async function load(clamping = false) {
       if (!query.keyword && fuzzyApplied.value.keyword) params.keyword = fuzzyApplied.value.keyword
     }
     if (query.keyword) params.keyword = query.keyword
-    // 报表面板:高级筛选服务端化(后端 queryFlat 逐条 AND 并入 WHERE,全表过滤 → 分页 totalSize
-    // 与导出一致);台账期初/期末合成行按 仓库+存货+日期段 另算,不受影响。弹窗「模糊搜索」同批发。
-    if (reportMode.value) {
+    // 高级筛选服务端化:报表(平表)与单据(2026-09-24 起)都随查询 POST advFilters,后端逐条 AND 并入
+    // WHERE → 全表过滤,分页 totalSize 与导出一致;单据面板只认头表字段(行级字段后端剔除)。
+    // 台账期初/期末合成行按 仓库+存货+日期段 另算,不受影响。弹窗「模糊搜索」仅报表同批发。
+    if (reportMode.value || docPanel.value) {
       if (activeAdvFilters.value.length) {
         params.advFilters = activeAdvFilters.value.map((f) => ({ field: f.field, op: f.op, value: String(f.value ?? '').trim() }))
       }
-      if (reportKeyword.value.trim()) params.keyword = reportKeyword.value.trim()
+      if (reportMode.value && reportKeyword.value.trim()) params.keyword = reportKeyword.value.trim()
     }
     const res = await engine.queryFormDataList(params)
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
@@ -7253,6 +7460,24 @@ onUnmounted(() => {
 .adv-no-value {
   height: 24px;
   border-bottom: 1px dashed #d1d5db;
+}
+/* 日期范围行(2026-09-24):起 - 止 + 清空,与高级筛选行区分(独立 flex 布局) */
+.adv-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.adv-filter-dash { color: #909399; }
+.adv-filter-dim { font-size: 12px; color: #909399; margin-left: 8px; }
+/* 生产工单排产弹窗行 */
+.mo-sch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #606266;
 }
 .dark .adv-filter-section { border-color: #3a3b42; }
 .dark .adv-filter-title { color: #bbb; }

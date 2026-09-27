@@ -58,7 +58,7 @@ public class ManuFirstArticleHandler implements PanelActionHandler {
                         + " (SELECT TOP 1 l.[排产数量] FROM bl_manu_order l WHERE l.[合同号]=h.[合同号]"
                         + "   AND ISNULL(l.asp_cancel,'N')<>'Y' ORDER BY l.[id]) AS 排产数量"
                         + " FROM bd_manu_order h WHERE h.[合同号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'", no);
-        if (rows.isEmpty()) throw new IllegalStateException("生产加工单不存在:" + no);
+        if (rows.isEmpty()) throw new IllegalStateException("生产工单不存在:" + no);
         Map<String, Object> mo = rows.get(0);
 
         jdbc.update("UPDATE bd_manu_order SET [首件完成]=N'Y', [首件完成时间]=SYSDATETIME(), [首件通知人]=?,"

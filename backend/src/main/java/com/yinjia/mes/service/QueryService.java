@@ -46,7 +46,7 @@ public class QueryService {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         Map<String, String> l2c = def.labelToCol();
         if ("flat".equals(def.mode())) return queryFlat(def, keyword, condition, l2c, pageNo, pageSize, advFilters);
-        return def.isDoc() ? queryDocs(def, keyword, condition, l2c, pageNo, pageSize)
+        return def.isDoc() ? queryDocs(def, keyword, condition, l2c, pageNo, pageSize, advFilters)
                 : queryArchive(def, keyword, condition, l2c, pageNo, pageSize);
     }
 
@@ -206,7 +206,7 @@ public class QueryService {
 
     private Map<String, Object> queryDocs(PanelRegistry.PanelDef def, String keyword,
                                           Map<String, Object> condition, Map<String, String> l2c,
-                                          int pageNo, int pageSize) {
+                                          int pageNo, int pageSize, List<Map<String, Object>> advFilters) {
         boolean split = def.hasHeadTable();
         String docTable = split ? def.headTable() : def.lineTable();
         String g = def.groupCol();
@@ -214,6 +214,10 @@ public class QueryService {
 
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
+        // 高级筛选(2026-09-24 用户要求,对齐旧系统 列表查询):单据面板同样服务端逐条 AND 过滤——
+        // 全表过滤(分页 totalSize 与导出一致),不再只做前端当前页过滤。
+        // 头行单据只认头表字段:行级字段(物料编码/产品名称…)在头表不存在的会被剔除,避免无效列报错。
+        appendAdvFiltersForDocs(def, advFilters, where, args, l2c, split);
         // 文件面板「查询单据」自定义条件:_docNo=编号模糊(单据编号/文档编号),_archFrom/_archTo=首次归档时间区间(含端点)
         Object qDocNo = condition == null ? null : condition.get("_docNo");
         Object qFrom = condition == null ? null : condition.get("_archFrom");
@@ -520,6 +524,27 @@ public class QueryService {
      * 另行聚合,不受这里影响(与 keyword 同款行为)。
      * 字段标签在本面板找不到列(改过名/来自别的面板)→ 跳过该行而非报错,避免旧查询方案打不开面板。
      */
+    /**
+     * 单据面板的高级筛选:头行单据仅放行「头表字段」(place=header/query 的标签),其余剔除;
+     * 非头行单据(单表)全放行。算子/取值语义与平表完全相同(见 {@link #appendAdvFilters})。
+     */
+    private void appendAdvFiltersForDocs(PanelRegistry.PanelDef def, List<Map<String, Object>> advFilters,
+                                         StringBuilder where, List<Object> args, Map<String, String> l2c,
+                                         boolean split) {
+        if (advFilters == null || advFilters.isEmpty()) return;
+        List<Map<String, Object>> allow = advFilters;
+        if (split) {
+            java.util.Set<String> headLabels = new java.util.HashSet<>();
+            for (PanelRegistry.FieldDef f : def.fieldsAt("header")) headLabels.add(f.label());
+            for (PanelRegistry.FieldDef f : def.fieldsAt("query")) headLabels.add(f.label());
+            allow = new ArrayList<>();
+            for (Map<String, Object> f : advFilters) {
+                if (f != null && headLabels.contains(strOf(f.get("field")))) allow.add(f);
+            }
+        }
+        appendAdvFilters(allow, where, args, l2c, "t");
+    }
+
     private void appendAdvFilters(List<Map<String, Object>> advFilters, StringBuilder where,
                                   List<Object> args, Map<String, String> l2c, String alias) {
         if (advFilters == null || advFilters.isEmpty()) return;

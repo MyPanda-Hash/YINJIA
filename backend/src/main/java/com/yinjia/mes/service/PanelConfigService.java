@@ -100,6 +100,9 @@ public class PanelConfigService {
         // (原定打印与导入之间;远端已决策档案面板不提供导入,导入组移除后即紧跟打印),
         // 前端按 qrLabelKey 列勾行(跨页保留)→ POST /report/qr-label 出 80×80mm 标签 PDF(二维码=存货编码)
         boolean qrLabel = "INV".equals(def.code());
+        // 二维码标签(2026-09-24 改版,用户拍板):80×80 旧版式(物料编码/名称/规格+QR=存货编码)改为
+        // 75×100 七字段版式(订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,后四类手填),
+        // 二维码=物料编码|物料规格|数量|批次;前端 print-formats.printProductCards 本地生成,原 /report/qr-label 暂留可回滚
         if (qrLabel) buttonGroups.add(group("二维码标签", List.of("二维码标签")));
         // 导入仅限单据面板(档案面板不提供导入)
         // buttonGroups.add(group("导入", List.of("下载模板", "导入")));
@@ -587,6 +590,8 @@ public class PanelConfigService {
             for (PanelRegistry.FieldDef sibling : def.fields()) {
                 if (sibling.label().equals(f.label())) continue;
                 if (mapped.contains(sibling.label())) continue;
+                // 只读回执字段(editable=0,如报工单.入库单号)不参与参照带入——它是下游回执,不该被来源单覆盖(2026-09-24)
+                if (!sibling.editable()) continue;
                 PanelRegistry.FieldDef refSide = refDef.byLabel(sibling.label());
                 if (refSide != null && carryTypeAllowed(sibling.dataType(), refSide.dataType())) {
                     out.add(Map.of("from", sibling.label(), "to", sibling.label()));
@@ -708,14 +713,16 @@ public class PanelConfigService {
     private static final List<String> INV_COST_PANELS = List.of("STOCK_LEDGER", "STOCK_SUMMARY", "STOCK_BALANCE");
 
     private static final Map<String, List<String[]>> PANDA_BUTTONS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
-            // 销售订单:选单灰(无上游);生单=生产加工单/销售出库单(已实现)
+            // 销售订单:选单灰(无上游);生单=生产工单/销售出库单(已实现)
             java.util.Map.entry("SO_ORDER", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选单"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审", "审批情况", "提交审批", "审批通过", "审批驳回"},
-                    new String[]{"生单", "生成生产加工单", "生成销售出库单"},
+                    // 生成生产工单(2026-09-24 改名:原名「生成生产加工单」;按钮名是数据键,须与
+                    // ManuScheduleHandler.supports / PUSH_TARGETS / PushGenerateHandler 同步)
+                    new String[]{"生单", "生成生产工单", "生成销售出库单"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "整单中止", "表格调整", "导入", "刷新"})),
             // 请购单:选单灰;生单=采购订单(已实现)
@@ -741,10 +748,9 @@ public class PanelConfigService {
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成送料暂收单"},
-                    // 转ERP(2026-09-23):采购订单直推金蝶 pur_order(测试沙箱联调用;同号已存在会拒)
-                    new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"查找", "查找", "刷新"},
-                    new String[]{"打印", "打印", "预览", "导出"},
+                    // 打印采购订单(2026-09-23):银嘉固定版式纸质单(前端 print-formats.js,列表选中单打印,无后端处理器)
+                    new String[]{"打印", "打印", "预览", "导出", "打印采购订单"},
                     new String[]{"导入", "导入"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
             // 采购入库单:选单=送料暂收单(2026-09-22 起;原为采购订单,那条免检直达已被取消);
@@ -792,7 +798,8 @@ public class PanelConfigService {
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"查找", "查找", "刷新"},
-                    new String[]{"打印", "打印", "预览", "导出"},
+                    // 打印退货单(2026-09-23):银嘉固定版式纸质单(前端 print-formats.js,列表选中单打印,无后端处理器)
+                    new String[]{"打印", "打印", "预览", "导出", "打印退货单"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
             // 送料暂收单(库存核算,2026-09-20 面板编码 SL_RECV→QC_RECV):选单=采购订单;
             // 生单=来料检验单(主按钮,走品检)/ 采购入库单(2026-09-22 新增,免检直达 —— 采购订单的生单
@@ -824,10 +831,10 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 产成品入库单:选单=生产加工单;生单灰(PANDA:生成产成品入库单（自制退库）)
+            // 产成品入库单:选单=生产工单;生单灰(PANDA:生成产成品入库单（自制退库）)
             java.util.Map.entry("FINISH_IN", List.of(
                     new String[]{"新增", "新增"},
-                    new String[]{"选单", "选单", "选生产加工单"},
+                    new String[]{"选单", "选单", "选生产工单"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
@@ -865,10 +872,10 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 材料出库单:选单=生产加工单;生单灰(PANDA:生成材料出库单（直接退料）)
+            // 材料出库单:选单=生产工单;生单灰(PANDA:生成材料出库单（直接退料）)
             java.util.Map.entry("MATERIAL_OUT", List.of(
                     new String[]{"新增", "新增"},
-                    new String[]{"选单", "选单", "选生产加工单"},
+                    new String[]{"选单", "选单", "选生产工单"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
@@ -897,7 +904,7 @@ public class PanelConfigService {
             java.util.Map.entry("OUTSOURCE_IN", OUTSOURCE_GROUPS_IN),
             java.util.Map.entry("OUTSOURCE_ISSUE", OUTSOURCE_GROUPS_ISSUE),
             java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER),
-            // 生产加工单:选单=销售订单;生单=产成品入库单(已实现)
+            // 生产工单:选单=销售订单;生单=产成品入库单(已实现)
             java.util.Map.entry("MANU_ORDER", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选单", "选销售订单"},
@@ -906,14 +913,13 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审批", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"生单", "生成产成品入库单"},
-                    new String[]{"打印", "打印", "预览", "导出", "打印工单二维码"},
-                    // 拆单(V2.0 §3.2):按数量拆成多张,父子关联(源工单号/拆分序号);由 ManuSplitHandler 接管
-                    // 结案(参考库 plang_pc.ja):已审核人工结案,退出需求统计;由 ManuCloseHandler 接管,可取消结案
-                    // 生成产品批号(V1.2 #8 成型后打印产品二维码数据源;2026-09-22 单轨改造挂到加工单)
-                    // 首件完成通知(生产部纪要 三):置首件标志+站内消息提醒品质取样;由 ManuFirstArticleHandler 接管
-                    // 生成采购申请(生产部纪要 五·订单结转):BOM×排产数量−库存 → PU_REQ 草稿+推送采购;由 ManuPurchaseReqHandler 接管
-                    // 排产单一入口=排产工作台(2026-09-23 实现总结 §5):「排产」按钮下线,表单 产线/开工·完工日已转只读,统一由工作台 assign
-                    new String[]{"更多", "拆单", "结案", "取消结案", "首件完成通知", "生成采购申请", "生成产品批号", "复制", "放弃", "草稿", "中止执行", "取消中止", "表格调整", "刷新"}))
+                    // 2026-09-24 用户拍板(参考旧系统工单列表样式收敛):列表特殊按钮只保留
+                    // 打印工单(生产任务单固定版式)/排产(本单快捷排线,弹窗选产线,复用排产工作台
+                    // assign 守卫守恒留痕)/结案/取消结案(ManuCloseHandler);
+                    // 打印工单二维码(标签机场景)并入更多;拆单/首件通知/生成采购申请/生成产品批号下线出列表
+                    new String[]{"打印", "打印", "预览", "导出", "打印工单"},
+                    new String[]{"排产", "排产", "结案", "取消结案"},
+                    new String[]{"更多", "打印工单二维码", "复制", "放弃", "草稿", "中止执行", "取消中止", "表格调整", "刷新"}))
     )));
 
     /**
@@ -928,7 +934,7 @@ public class PanelConfigService {
     private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
             java.util.Map.entry("PU_REQ|生成采购订单", "PU_ORDER"),
             java.util.Map.entry("PU_ORDER|生成送料暂收单", "QC_RECV"),
-            java.util.Map.entry("SO_ORDER|生成生产加工单", "MANU_ORDER"),
+            java.util.Map.entry("SO_ORDER|生成生产工单", "MANU_ORDER"),
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
             java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
             java.util.Map.entry("QC_RECV|生成来料检验单", "QC_INSP"),
@@ -964,14 +970,14 @@ public class PanelConfigService {
     private static final Map<String, String> SELECT_FLOWS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
             java.util.Map.entry("PURCHASE_IN", "QC_RECV"),           // 送料暂收单 → 采购入库单(2026-09-22:原 采购订单,
                                                                      //   免检直达已取消,来源收敛到暂收单;见 PUSH_TARGETS 注释)
-            java.util.Map.entry("MATERIAL_OUT", "MANU_ORDER"),       // 生产加工单 → 材料出库单
-            java.util.Map.entry("FINISH_IN", "MANU_ORDER"),          // 生产加工单 → 产成品入库单
-            java.util.Map.entry("DISPATCH", "MANU_ORDER"),           // 生产加工单 → 工序派工单
+            java.util.Map.entry("MATERIAL_OUT", "MANU_ORDER"),       // 生产工单 → 材料出库单
+            java.util.Map.entry("FINISH_IN", "MANU_ORDER"),          // 生产工单 → 产成品入库单
+            java.util.Map.entry("DISPATCH", "MANU_ORDER"),           // 生产工单 → 工序派工单
             java.util.Map.entry("OUTSOURCE_ORDER", "SO_ORDER"),      // 销售订单 → 委外加工单
             java.util.Map.entry("OUTSOURCE_ISSUE", "OUTSOURCE_ORDER"), // 委外加工单 → 委外发料单
             java.util.Map.entry("OUTSOURCE_IN", "OUTSOURCE_ORDER"),  // 委外加工单 → 委外入库单
             java.util.Map.entry("SALE_OUT", "SO_ORDER"),             // 销售订单 → 销售出库单
-            java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产加工单(销售-生产链)
+            java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产工单(销售-生产链)
             java.util.Map.entry("PU_ORDER", "PU_REQ"),               // 请购单 → 采购订单
             java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15;编码 9-20 由 SL_RECV 改)
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)
@@ -1009,8 +1015,6 @@ public class PanelConfigService {
             {"合格数量", "实收数量"},
             {"不合格数量", "退货数量"},
             // 行级仓库沿链贯通(2026-09-21):采购订单行/暂收行叫「仓库」,检验行叫「仓库代码」,入库行又叫「仓库」
-            // (2026-09-23 正名后单据侧统一叫「仓库」——采购入库明细的 仓库名称 已改名仓库,本对重新覆盖入库链;
-            //  销售出库同理同名直通,无需额外对)
             {"仓库", "仓库代码"}, {"仓库代码", "仓库"},
             // 采购链订单行号(2026-09-20):采购订单行 行号(金蝶 seq)→ 下游各站 采购订单行号,
             // 逐站下传后在 采购入库行 落 源单行号,转ERP 推给金蝶作 src_seq
@@ -1020,29 +1024,23 @@ public class PanelConfigService {
             // 计划层(销售订单 → 生产工单)的产品口径换名
             {"存货编码", "产品编码"}, {"存货名称", "产品名称"},
             {"数量", "订单数量"},
-    };
-
-    /** 明细字段同义词(按链路 source|target 键控;只在**该链路**生效)。
-     *  2026-09-24 随生产域「订单结转/排产工作台」下拉:销售订单 → 生产加工单要按参考库 plang_pc 口径
-     *  落「需求数量」(订单需求)与「批号」(订单批次)。⚠ 刻意**不写进上面的全局表** ——
-     *  全局表对所有链路生效,`批次号→批号` 会连带改写 来料检验→采购入库 等采购/品质链路的行映射
-     *  (QC_INSP 有 批次号、PURCHASE_IN 有 批号),属用户不可接受的越域改动。 */
-    private static final Map<String, String[][]> FLOW_DETAIL_SYNONYMS_SCOPED =
-            java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
-            // 生产加工单排产口径(2026-09-21,对齐参考库 plang_pc):订单数落「需求数量」、批次号落「批号」;
+            // 生产工单排产口径(2026-09-21,对齐参考库 plang_pc):订单数落「需求数量」、批次号落「批号」;
             // 单价/金额与「数量」为同名自动映射,需求数量与数量并存(前者=订单需求,后者=排产数量口径)
-            "SO_ORDER|MANU_ORDER", new String[][]{{"数量", "需求数量"}, {"批次号", "批号"}})));
+            {"数量", "需求数量"}, {"批次号", "批号"},
+    };
 
     /** 头字段同义词(按链路 source|target 键控;同名映射之外的补充)。 */
     private static final Map<String, String[][]> FLOW_HEAD_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
+            "PU_REQ|PU_ORDER", new String[][]{{"建议供应商", "供应商"}},
             // 送料暂收单 → 采购入库单(2026-09-22 新增;原 PU_ORDER|PURCHASE_IN 免检直达已取消,
             // 那条只需 单据编号→采购订单号,本跳的采购订单号随链从采购订单带下来了、同名直通无需登记)。
             // 供应商代码→供应商编码:暂收单头叫「供应商代码」,入库头叫「供应商编码」——异名不带则入库单
             // 供应商编码恒空(与 QC_INSP|PURCHASE_IN 当年同一个坑)。注:批次键由
             // PushGenerateHandler.generateBatch 直接写入,不走映射(头映射 7 条上限会把它挤掉,不影响)。
             "QC_RECV|PURCHASE_IN", new String[][]{{"供应商代码", "供应商编码"}},
-            // 销售订单 → 生产加工单:订单号落 销售订单号;交期落 预完工日(2026-09-21 补:
-            // 加工单排产要以订单交期为预完工日,缺此条则生单后交期为空;2026-09-24 随生产域下拉)
+            "PU_ORDER|PURCHASE_IN", new String[][]{{"单据编号", "采购订单号"}},
+            // 销售订单 → 生产工单:订单号落 销售订单号;交期落 预完工日(2026-09-21 补:
+            // 加工单排产要以订单交期为预完工日,缺此条则生单后交期为空)
             "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "预完工日"}},
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
@@ -1192,15 +1190,6 @@ public class PanelConfigService {
             for (String[] syn : FLOW_DETAIL_SYNONYMS) {
                 if (src.byLabel(syn[0]) != null && targetDets.contains(syn[1]) && mapped.add(syn[1])) {
                     dmap.add(Map.of("from", syn[0], "to", syn[1]));
-                }
-            }
-            // 链路专属明细同义词(仅本链路;见 FLOW_DETAIL_SYNONYMS_SCOPED 注释)
-            String[][] detSyn = FLOW_DETAIL_SYNONYMS_SCOPED.get(sourceCode + "|" + def.code());
-            if (detSyn != null) {
-                for (String[] syn : detSyn) {
-                    if (src.byLabel(syn[0]) != null && targetDets.contains(syn[1]) && mapped.add(syn[1])) {
-                        dmap.add(Map.of("from", syn[0], "to", syn[1]));
-                    }
                 }
             }
             cfg.put("detailMap", dmap);

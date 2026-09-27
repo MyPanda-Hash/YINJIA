@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 生产加工单结案(参考库 plang_pc.ja 口径,盘点文档 §4.5 缺口②)。
+ * 生产工单结案(参考库 plang_pc.ja 口径,盘点文档 §4.5 缺口②)。
  *
  * <p>参考库标准(§3.1.5):结案 ja='T'/'Y' 后工单退出需求统计(View_od_cost1/2 取 ja IN('T','Y'))。
  * 新系统落点:bd_manu_order.结案 列(迁移已建)+ v_manu_schedule 排产看板"结案"列(已有);
@@ -45,7 +45,7 @@ public class ManuCloseHandler implements PanelActionHandler {
         String status = String.valueOf(st.get("status"));
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT ISNULL(结案,'N') AS ja FROM bd_manu_order WHERE 合同号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
-        if (rows.isEmpty()) throw new IllegalStateException("生产加工单不存在:" + no);
+        if (rows.isEmpty()) throw new IllegalStateException("生产工单不存在:" + no);
         boolean closed = "Y".equals(String.valueOf(rows.get(0).get("ja")));
 
         if (close) {

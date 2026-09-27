@@ -99,7 +99,7 @@ const unread = ref(2)
 const openFaqs = ref([])
 
 const dynamics = [
-  { id: 1, title: '生产加工单面板上线', desc: '首个 PanelX 配置驱动单据：支持新增/审核/弃审/关闭全流程。', time: '2026-08-13' },
+  { id: 1, title: '生产工单面板上线', desc: '首个 PanelX 配置驱动单据：支持新增/审核/弃审/关闭全流程。', time: '2026-08-13' },
   { id: 2, title: '门户壳升级为 T+ 形态', desc: '顶栏三段式、页签快捷按钮组、帮助面板与初始化向导。', time: '2026-08-13' },
   { id: 3, title: '消息通知中心上线', desc: '待办/消息/预警角标 + 详情弹窗（上一条/下一条/历史消息）。', time: '2026-08-12' },
   { id: 4, title: '工作台支持个性化设置', desc: '快捷入口与 KPI/进度/待办卡片可显隐配置。', time: '2026-08-12' },
@@ -112,7 +112,7 @@ const messages = [
 ]
 
 const faqs = [
-  { q: '如何新建一张生产加工单？', a: '点击左侧菜单「单据查询/新增单据」或在生产管理模块打开「生产加工单」，点击工具栏「新增流程」按钮，填写合同号、批号等必填项后提交。' },
+  { q: '如何新建一张生产工单？', a: '点击左侧菜单「单据查询/新增单据」或在生产管理模块打开「生产工单」，点击工具栏「新增流程」按钮，填写合同号、批号等必填项后提交。' },
   { q: '单据状态是如何流转的？', a: '草稿 → 提交后待审核 → 审核通过进入「已审核」→ 开工后「生产中」→ 完工后「已完工」→ 归档「已关闭」。草稿状态可编辑删除，审核后可弃审回退。' },
   { q: '如何切换工厂（账套）？', a: '点击顶栏左侧工厂名称下拉，选择目标工厂即可切换，业务数据按工厂隔离。' },
   { q: '暗色模式如何开启？', a: '点击顶栏右侧用户头像下拉菜单，选择「换肤（暗色）」，或在「界面设置」中切换。' },
@@ -123,12 +123,12 @@ const guide = [
   { title: '完成初始化向导', desc: '选择行业细分与经营业态，自动匹配专属桌面与菜单。' },
   { title: '维护基础资料', desc: '在「基础设置」录入存货、物料清单、工艺路线、仓库与工序。' },
   { title: '录入期初数据', desc: '在「初始化」录入库存期初余额与期初单据。' },
-  { title: '开始日常业务', desc: '从生产加工单开始，按 报工→出入库→质检 的流程运转。' },
+  { title: '开始日常业务', desc: '从生产工单开始，按 报工→出入库→质检 的流程运转。' },
 ]
 
 const shortcuts = [
   { title: '新建加工单', icon: 'DocumentAdd', path: '/panelx/form/MANU_ORDER?new=1', tabPath: '/panelx/form/MANU_ORDER', tabTitle: '新增加工单' },
-  { title: '打开加工单列表', icon: 'List', path: '/panelx/list/MANU_ORDER', tabPath: '/panelx/list/MANU_ORDER', tabTitle: '生产加工单' },
+  { title: '打开加工单列表', icon: 'List', path: '/panelx/list/MANU_ORDER', tabPath: '/panelx/list/MANU_ORDER', tabTitle: '生产工单' },
   { title: '我的桌面', icon: 'HomeFilled', path: '/dashboard', tabPath: '/dashboard', tabTitle: '我的桌面' },
   { title: '初始化向导', icon: 'MagicStick', action: 'init' },
 ]
