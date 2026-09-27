@@ -14,7 +14,8 @@ import java.util.Map;
 
 /**
  * 订单结转·发单工作台(《订单结转实现方案-V1.0》):
- * 待结转行(剩余=需求−已排产−已采购)/汇总/转工单(自制)/转采购单(外购成品)。
+ * 待结转行(剩余=需求−已排产−已采购)/汇总/转工单(落参考库 plang)。
+ * 转采购单已移除(2026-09-26 用户拍板:结转只转工单)。
  * 权限:查询类 SO_ORDER 可见;转单类 SO_ORDER 编辑权(add/modify)。
  */
 @RestController
@@ -53,7 +54,7 @@ public class OrderConvertController {
         return ApiResult.ok(service.saveDates(rows, currentUser()));
     }
 
-    /** 转工单(自制):勾选行 → 加工单草稿(生单数量缺省=两通道剩余) */
+    /** 转工单(自制):勾选行 → plang 工单行(生单数量缺省=两通道剩余) */
     @PostMapping("/toManu")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> toManu(@RequestBody Map<String, Object> body) {
@@ -61,16 +62,6 @@ public class OrderConvertController {
         perm.requireButton("SO_ORDER", "保存");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(service.toManu(rows, currentUser()));
-    }
-
-    /** 转采购单(外购成品):勾选行 → 采购申请草稿(行=订单产品本身,数量=剩余)+占用+推送采购 */
-    @PostMapping("/toPurchase")
-    @SuppressWarnings("unchecked")
-    public ApiResult<Map<String, Object>> toPurchase(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("SO_ORDER");
-        perm.requireButton("SO_ORDER", "保存");
-        List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
-        return ApiResult.ok(service.toPurchase(rows, currentUser()));
     }
 
     private static String currentUser() {

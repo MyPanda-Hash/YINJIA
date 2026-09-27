@@ -23,7 +23,6 @@
         {{ tt('保存交期') }}（{{ dateChanged.length }}）
       </el-button>
       <el-button type="success" :disabled="!checked.length" @click="toManu">{{ tt('转工单') }}（{{ checked.length }}）</el-button>
-      <el-button type="warning" :disabled="!checked.length" @click="toPurchase">{{ tt('转采购单') }}（{{ checked.length }}）</el-button>
     </el-form>
 
     <!-- 待结转表 -->
@@ -55,11 +54,6 @@
       <el-table-column :label="tt('已排产数量')" width="105" align="right">
         <template #default="{ row }">
           <span :class="{ 'oc-blue': Number(row.已排产数量) > 0 }">{{ row.已排产数量 }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column :label="tt('已采购数量')" width="105" align="right">
-        <template #default="{ row }">
-          <span :class="{ 'oc-orange': Number(row.已采购数量) > 0 }">{{ row.已采购数量 }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="tt('剩余数量')" width="100" align="right" fixed="right">
@@ -139,9 +133,6 @@ async function saveDates() {
 
 async function toManu() {
   await convert('toManu', '转工单', '/prod/plan/workOrderList')
-}
-async function toPurchase() {
-  await convert('toPurchase', '转采购单', 'PU_REQ')
 }
 
 async function convert(api, label, gotoPanel) {
