@@ -64,11 +64,11 @@ public class QuickScheduleService {
     }
 
     /**
-     * 单行 → plang 工单行(2026-09-27 定稿 + 批次号):
+     * 单行 → plang 工单行(2026-09-27 定稿 + 批次号终版:每次转单各自成批):
      * **同一销售订单共用一张工单**(pl_no 沿用该订单首次转单号,首次取新 MO 号);
      * **工单行号 pl_xc = 销售订单明细行的行号**(bl_so_order.行号,金蝶分录 seq 从 1 连续);
-     * **批次号 = 转单日期 yyyyMMdd**(plang.批次号,migrate-plang-batch.sql)——同一订单行
-     * **不同日期**转单=不同批次行(可区分);**同一天同行号**=同批次,**累加数量不插行**。
+     * **批次号 = 转单日期 yyyyMMdd,同一天多次转单各自成批依次 -2/-3 后缀**(每日重新起算;
+     * 首转=纯日期,再转=日期-2、日期-3…)——不再累加,每次转单=一条新批次行。
      * 来源订单行以 od_no/od_xc 回链;占用通道 target_panel_code='PLANG'。
      * 严格「已审核」闸门;剩余=行数量−各通道占用;qtyOverride 空=剩余全部。
      * 数据源单轨:不再写 bd_manu_order。SO_ORDER「生成生产工单」按钮与订单结转页共用本实现。
@@ -104,9 +104,8 @@ public class QuickScheduleService {
         double qty = qtyOverride != null && qtyOverride > 0 ? Math.min(qtyOverride, residual) : residual;
         if (qty <= 0) throw new IllegalStateException("生单数量必须大于 0");
         if (qty > residual + 0.0001) throw new IllegalStateException("生单数量 " + qty + " 超过剩余可转数量 " + residual);
-        // 工单号/行号/批次号(2026-09-27 定稿):同订单共用工单号;行号=订单行号;批次号=转单日期 yyyyMMdd。
-        // 匹配 (工单号,订单行号,当日批次) 已有行 → 同日同批**累加数量不插行**(SET 引用旧值,yl=旧pl_sl+qty−rk_sl);
-        // 不同日期(批次号不同)或首转 → INSERT 新批次行(需求数量=订单行数量,排产=本次数量)。
+        // 工单号/行号/批次号(2026-09-27 终版:每次转单各自成批):同订单共用工单号;行号=订单行号;
+        // 批次号=今日 yyyyMMdd,同日已有该行批次(纯日期或 -N)→ 依次 -2/-3(每日重新起算)。始终 INSERT 新行。
         String plNo;
         try {
             plNo = jdbc.queryForObject(
@@ -117,23 +116,32 @@ public class QuickScheduleService {
         }
         if (plNo == null || plNo.isBlank()) plNo = formNo.next("MO", user);
         Integer lineNo = line.get("行号") instanceof Number n ? n.intValue() : 1;
-        String batch = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
-        String due = str(line.get("交货日期"));
-        int accumulated = jdbc.update(
-                "UPDATE plang SET pl_sl = ISNULL(pl_sl,0) + ?, yl = ISNULL(pl_sl,0) + ? - ISNULL(rk_sl,0),"
-                        + " asp_user2 = ?, asp_time2 = GETDATE()"
-                        + " WHERE pl_no = ? AND pl_xc = ? AND [批次号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                qty, qty, user, plNo, lineNo, batch);
-        if (accumulated == 0) {
-            jdbc.update("INSERT INTO plang (comm, pl_no, pl_xc, pl_date, khdm, dm, mc, gg, jldw,"
-                            + " xq_sl, pl_sl, yl, cp_date, lot_no, od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号])"
-                            + " VALUES (N'0', ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
-                            + " CASE WHEN ? IS NULL OR ? = N'' THEN NULL ELSE CONVERT(datetime, ?, 120) END,"
-                            + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE(), ?)",
-                    plNo, lineNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
-                    str(line.get("规格型号")), str(line.get("销售单位")), demand, qty, qty, due, due, due,
-                    str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user, batch);
+        String base = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+        List<String> todayBatches = jdbc.queryForList(
+                "SELECT [批次号] FROM plang WHERE pl_no=? AND pl_xc=? AND ([批次号]=? OR [批次号] LIKE ?)"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y'",
+                String.class, plNo, lineNo, base, base + "-%");
+        String batch = base;
+        if (!todayBatches.isEmpty()) {
+            int maxSuffix = 0;
+            for (String b : todayBatches) {
+                if (b != null && b.equals(base)) maxSuffix = Math.max(maxSuffix, 1);
+                else if (b != null && b.startsWith(base + "-")) {
+                    try { maxSuffix = Math.max(maxSuffix, Integer.parseInt(b.substring(base.length() + 1))); }
+                    catch (NumberFormatException ignore) { }
+                }
+            }
+            batch = base + "-" + (maxSuffix + 1);
         }
+        String due = str(line.get("交货日期"));
+        jdbc.update("INSERT INTO plang (comm, pl_no, pl_xc, pl_date, khdm, dm, mc, gg, jldw,"
+                        + " xq_sl, pl_sl, yl, cp_date, lot_no, od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号])"
+                        + " VALUES (N'0', ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
+                        + " CASE WHEN ? IS NULL OR ? = N'' THEN NULL ELSE CONVERT(datetime, ?, 120) END,"
+                        + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE(), ?)",
+                plNo, lineNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
+                str(line.get("规格型号")), str(line.get("销售单位")), demand, qty, qty, due, due, due,
+                str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user, batch);
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
                 "PLANG", plNo, plNo + "#" + lineNo + "#" + batch, "");
         return plNo;
