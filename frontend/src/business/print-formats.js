@@ -116,7 +116,7 @@ export async function printWorkTaskSheet(title, rows, opts = {}) {
     + '<div class="hd"><span class="s">' + esc(COMPANY.woLineLabel) + ': ' + esc(line) + '</span>'
     + '<span class="t">' + esc(title) + '</span>'
     + '<span class="s">' + esc(COMPANY.woPreparedBy) + ': ' + esc(user) + '　' + esc(stamp) + '</span></div>'
-    + '<table><thead><tr><th>序号</th>' + ths + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
+    + '<table><thead><tr>' + ths + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
   if (!openPrintWindow(title, body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
   return true
 }
