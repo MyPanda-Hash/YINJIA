@@ -1,0 +1,24 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:19 字符: 145
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-kucun-vs-3reports.sql ==
+  | CK00006 | YJ-XWR-003 | 0.0 | 10000.0000 | 10000.0 | 
+  | YCL-01 | YJ-YCYX-054 | 0.0 | 500.0000 | 500.0 | 
+  | CK00006 | YJ-SX-031 | 4500.0 | 4600.0000 | 100.0 | 
+  | CK00006 | YJ-SX-035 | 1800.0 | 1800.0000 | 0.0 | 
+  | CK00006 | YJ-AJ-017 | 200.0 | 200.0000 | 0.0 | 
+  | CK00006 | YJ-KG-JC-B02 | 100.0 | 100.0000 | 0.0 | 
+  | YCL-01 | Y-S-T | 10.0 | 10.0000 | 0.0 | 
+  | CK00006 | YJ-XWR-031 | 200.0 | 200.0000 | 0.0 | 
+  | CK00006 | YJ-XWR-032 | 200.0 | 200.0000 | 0.0 | 
+  | v_stock_balance | 771 | 不含 kucun | 
+  | v_stock_ledger | 1167 | 不含 kucun | 
+  | v_stock_movement | 7740 | 含 kucun | 
+  | v_stock_summary | 1556 | 不含 kucun | 
+  | v_wo_kit | 1226 | 含 kucun | 
+[OK] _q-kucun-vs-3reports.sql (3 batches)

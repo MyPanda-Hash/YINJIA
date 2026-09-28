@@ -1,0 +1,15 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:19 字符: 145
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-3reports-mapping4.sql ==
+  | 1 | 采购入库单 | 120 | 
+  | 5 | 销售出库单 | 123 | 
+  | 145 | 
+  | CK00006 | YJ-SX-031 | 036 | 个 | 100.0000 | 1.000000 | 0.344565 | 
+  | CK00006 | YJ-SX-031 | 绿色中性（超棉） | PCS | 4500.0000 | 0.330000 | 0.344565 | 
+[OK] _q-3reports-mapping4.sql (4 batches)

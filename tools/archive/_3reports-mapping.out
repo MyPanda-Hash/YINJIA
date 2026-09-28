@@ -1,0 +1,16 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:25 字符: 144
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-3reports-mapping.sql ==
+  | v_stock_movement 行数(=已审核出入库明细笔数) | 243 | 
+  | v_stock_ledger 行数(=逐笔流水) | 243 | 
+  | inv_cost_ledger 行数(=每笔一行成本) | 243 | 
+  | 按 (仓库键,存货编码) 的成本分区数 | 86 | 
+  | v_stock_balance 行数(=状况表行) | 92 | 
+  | v_stock_summary 行数(=汇总行) | 145 | 
+[SQL FAIL] ���� 'src' ��Ч��
