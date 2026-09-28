@@ -2057,8 +2057,7 @@ export default {
     '是否测试丨 √ × 丨': 'Có kiểm tra 丨 √ × 丨',
     '用户输入': 'Đầu vào của người dùng',
     '实际灌料重量中间值=（1-理论水分%）/（1-实际水分%）*理论灌料重量中间值': 'Giá trị trung gian của trọng lượng rót thực tế =(1-độ ẩm lý thuyết %)/(1-độ ẩm thực tế %)* Giá trị trung gian của trọng lượng rót lý thuyết',
-  },
-  biz: {
+  
     '分批送料': 'Giao theo lô',
     '本次送料数量': 'Số lượng giao lần này',
     '已送': 'Đã giao',
@@ -2099,4 +2098,5 @@ export default {
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = không cho phép; tối đa 50%, hạn mức theo số lượng đặt)',
     '请至少勾选一行并填写本次送料数量': 'Chọn ít nhất một dòng và nhập số lượng giao lần này',
   },
+
 }

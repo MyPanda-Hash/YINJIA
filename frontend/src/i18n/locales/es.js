@@ -2052,8 +2052,7 @@ export default {
     '是否测试丨 √ × 丨': 'Ya sea para probar 丨 √ × 丨',
     '用户输入': 'Entrada de usuario',
     '实际灌料重量中间值=（1-理论水分%）/（1-实际水分%）*理论灌料重量中间值': 'Valor intermedio del peso de riego real =(1% de humedad teórica)/(1% de humedad real) * Valor intermedio del peso de riego teórico',
-  },
-  biz: {
+  
     '分批送料': 'Entrega parcial',
     '本次送料数量': 'Cantidad entregada (esta vez)',
     '已送': 'Entregado',
@@ -2094,4 +2093,5 @@ export default {
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = no permitido; máx. 50 %, cupo según cantidad pedida)',
     '请至少勾选一行并填写本次送料数量': 'Marque al menos una línea e introduzca la cantidad a entregar',
   },
+
 }

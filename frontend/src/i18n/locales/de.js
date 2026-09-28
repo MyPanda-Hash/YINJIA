@@ -2052,8 +2052,7 @@ export default {
     '是否测试丨 √ × 丨': 'Ob getestet werden soll 丨 √ × 丨',
     '用户输入': 'Benutzer eingabe',
     '实际灌料重量中间值=（1-理论水分%）/（1-实际水分%）*理论灌料重量中间值': 'Mittelwert des tatsächlichen Bewässerungs gewichts =(1-theoretisches Wasser %)/(1-tatsächliches Wasser %)* Zwischen wert des theoretischen Bewässerungs gewichts',
-  },
-  biz: {
+  
     '分批送料': 'Teillieferung',
     '本次送料数量': 'Liefermenge (diesmal)',
     '已送': 'Geliefert',
@@ -2094,4 +2093,5 @@ export default {
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = nicht erlaubt; max. 50 %, Spielraum nach Bestellmenge)',
     '请至少勾选一行并填写本次送料数量': 'Mindestens eine Zeile anhaken und Liefermenge eingeben',
   },
+
 }

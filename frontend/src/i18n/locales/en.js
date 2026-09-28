@@ -2560,8 +2560,7 @@ export default {
     '是否测试丨 √ × 丨': 'Tested? √ / X',
     '用户输入': 'Enter manually',
     '实际灌料重量中间值=（1-理论水分%）/（1-实际水分%）*理论灌料重量中间值': 'Mid actual filling weight = (1 − theoretical moisture%) / (1 − actual moisture%) × mid theoretical filling weight',
-  },
-  biz: {
+  
     // 来料品质·特采单(2026-09-21;与「特采申请单」是两份独立单据,菜单标题区分)
     // 与 yj_translation(scope='panel') 的 特采单 译名保持一致
     '特采单': 'Incoming Special Procurement',
@@ -2650,7 +2649,8 @@ export default {
     '停用字段「': 'Retire field "',
     '」?已录入数据将保留,重新绑定同名标签即可恢复显示。': '"? Entered data is kept; rebind the same label to restore.',
     /* ── 工单排产·转领料(2026-10-14,参考旧系统工单排产页同名按钮)。
-       ⚠ 本文件曾有两个顶层 biz 块,JS 语义后者胜出——词条必须落在本块(末个 biz)才生效 ── */
+       2026-10-14 双顶层 biz 块已合并(tools/archive/_merge-dup-biz-blocks.cjs):
+       原第二块条目拼接在本块末尾,latter-wins 语义不变;本块为唯一 biz 块 ── */
     '转领料': 'To Picking',
     '确认为选中的': 'Create pick lists for the selected',
     '张工单转领料': 'work order(s)?',
@@ -2658,4 +2658,5 @@ export default {
     '已生成领料单': 'Pick lists created',
     '转领料失败': 'Transfer to picking failed',
   },
+
 }

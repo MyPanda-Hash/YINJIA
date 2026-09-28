@@ -2052,8 +2052,7 @@ export default {
     '是否测试丨 √ × 丨': 'Tester ou non 丨 √ × 丨',
     '用户输入': 'Entrée utilisateur',
     '实际灌料重量中间值=（1-理论水分%）/（1-实际水分%）*理论灌料重量中间值': 'Valeur médiane du poids réel de l\'irrigation =(1-% de l\'humidité théorique)/(1-% de l\'humidité réelle) * Valeur intermédiaire du poids de l\'irrigation théorique',
-  },
-  biz: {
+  
     '分批送料': 'Livraison partielle',
     '本次送料数量': 'Qté livrée (cette fois)',
     '已送': 'Livré',
@@ -2094,4 +2093,5 @@ export default {
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = interdit ; max 50 %, quota basé sur la quantité commandée)',
     '请至少勾选一行并填写本次送料数量': 'Cochez au moins une ligne et saisissez la quantité à livrer',
   },
+
 }
