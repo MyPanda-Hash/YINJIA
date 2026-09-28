@@ -14,12 +14,15 @@ tools/
 │                    + DbInit/DbSync/SqlProbe/SqlRunner.java + lib\(JDBC 驱动)
 │                    + settings.xml(Maven 镜像) + package.json(cjs 依赖)
 │                    + pull-sync.bat(git pull + DbSync 增量同步)
+│                    + db-legacy-whitelist.txt(数据库规范:冻结/豁免/棘轮登记)
 ├── scripts/         正式运维脚本:verify-api.ps1、audit-*.ps1、trigger-mt.ps1、
 │                    enable-mixed-auth.ps1、build-hot-update.ps1、start-backend.bat 等
 ├── gen/             历史数据生成器 gen-*.{cjs,py} + 数据文件(*.tsv/*.jsonl)
 │                    + 数据库表清单生成器(GenDbCatalogDump.java + gen-db-catalog.cjs)
+│                    + 冻结登记生成器(gen-legacy-whitelist.sql)
 ├── verify/          验证/冒烟/审计:*-smoke.cjs、*-test.cjs、i18n-verify-*.cjs、
-│                    menu-check*.cjs、analyze-panels.cjs、architecture-audit.mjs
+│                    menu-check*.cjs、analyze-panels.cjs、architecture-audit.mjs、
+│                    DbNormAudit.java(数据库规范 12 项体检,见 docs/development/数据库规范.md)
 └── archive/         一次性探针与任务产物(_ 前缀,入库保档;历史会话的诊断脚本)
 ```
 
@@ -42,6 +45,7 @@ tools/
 | 临时查询 | `java -cp lib\mssql-jdbc.jar SqlProbe.java` / `SqlRunner.java` |
 | API 全链路回归 | `powershell -File scripts\verify-api.ps1`(需后端已启动) |
 | 面板配置/条件冒烟 | `scripts\audit-panels.ps1`、`scripts\audit-conditions.ps1` |
+| **数据库规范体检**(12 项:命名/注明/元数据漂移/链卫生) | `set YINJIA_SQL_PASS=<库口令> & java -cp lib\mssql-jdbc.jar verify\DbNormAudit.java`(两个账套;判定口径见 `docs\development\数据库规范.md` §6) |
 | UI 冒烟(CDP) | `node verify\panels-ui-smoke.cjs`(在 tools/ 下运行,依赖 node_modules) |
 | 热更新包(仅后端 class) | `pwsh -File scripts\build-hot-update.ps1`(在仓库根或见 deploy/部署说明.md) |
 | 生成器重跑 | `node gen\gen-xxx.cjs`(历史迁移数据生成,一般不重跑;重跑前先读脚本内注释) |
