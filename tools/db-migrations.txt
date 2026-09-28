@@ -1600,3 +1600,13 @@ migrate-wh-location.sql
 
 # —— 2026-09-28 服务器侧直改结构对齐:服务器 bak 演练发现 106 列"仅服务器存在"(asp_* 审计 3/4 套件、研发板块远端列、bl_dispatch 派工数量组、yj_user 遗留宽表列);守卫式补列,服务器上=全跳过 no-op,开发两账套补齐 → 三库同构 ——
 migrate-server-parity-20260928.sql
+
+# —— 2026-09-28 数据库规范化存量清理(qc_/sl_recv 表注明 + 重复字段行 + 重建 v_sales_order_detail + PR_SCRAP 漂移字段) ——
+migrate-db-norm-cleanup.sql
+
+# —— 2026-09-28 回登记:以下脚本当初手工执行、漏登记进链(体检工具 12 号项报「清单↔文件不一致」后补齐);
+#    已核实效果确实落库(探针:GFDA 面板行+42 字段 / 基础资料 query 字段 2~3 个 / spec.test 已是 19 项目 48 行新设计),
+#    因此登记后立即 baseline 记为「已执行」,不重复执行。 ——
+migrate-restore-gfda.sql
+migrate-basedata-query-fields.sql
+migrate-spec-testlib-replace.sql
