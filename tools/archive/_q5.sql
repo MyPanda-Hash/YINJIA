@@ -1,0 +1,6 @@
+SET NOCOUNT ON
+SELECT 'PURCHASE_IN.备注 物理列: '+CASE WHEN COL_LENGTH('bd_purchase_in',N'备注') IS NULL THEN N'❌' ELSE N'✓' END
+SELECT 'MATERIAL_OUT.备注 物理列: '+CASE WHEN COL_LENGTH('bd_material_out',N'备注') IS NULL THEN N'❌' ELSE N'✓' END
+SELECT 'FINISH_IN.备注 物理列: '+CASE WHEN COL_LENGTH('bd_finish_in',N'备注') IS NULL THEN N'❌' ELSE N'✓' END
+SELECT 'QC_INSP.单位(表列): '+CASE WHEN COL_LENGTH('qc_insp',N'单位') IS NULL THEN N'❌' ELSE N'✓' END
+SELECT 'QC_INSP.检验员 表列: '+CASE WHEN COL_LENGTH('qc_insp',N'检验员') IS NULL THEN N'❌' ELSE N'✓' END

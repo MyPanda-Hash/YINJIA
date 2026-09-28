@@ -1,0 +1,7 @@
+[DB] prod ledger HSDZ_MES
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+[新增] migrate-scm-qc-perms-20260924.sql
+== migrate-scm-qc-perms-20260924.sql ==
+  [OK] 1 batches
+=== 同步完成: 执行 1, 跳过 299, 失败 0 ===
+DB sync done.

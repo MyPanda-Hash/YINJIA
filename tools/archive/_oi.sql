@@ -1,0 +1,2 @@
+SET NOCOUNT ON
+SELECT col_name FROM yj_field WHERE panel_code='OUTSOURCE_ISSUE_DETAIL' ORDER BY seq

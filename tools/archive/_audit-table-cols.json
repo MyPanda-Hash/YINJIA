@@ -1,0 +1,77 @@
+[
+ {
+  "f": "ScheduleBoardService.java",
+  "tables": "bd_manu_order,bl_manu_order,wo_progress",
+  "col": "完成"
+ },
+ {
+  "f": "ScheduleBoardService.java",
+  "tables": "bd_manu_order,bl_manu_order,wo_progress",
+  "col": "完成"
+ },
+ {
+  "f": "ScheduleBoardService.java",
+  "tables": "v_manu_schedule,bd_manu_order",
+  "col": "工序交期"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_finish_in,bd_finish_in",
+  "col": "行仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_finish_in,bd_finish_in",
+  "col": "头仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_other_in,bd_other_in",
+  "col": "行仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_other_in,bd_other_in",
+  "col": "头仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_outsource_in,bd_outsource_in",
+  "col": "行仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_outsource_in,bd_outsource_in",
+  "col": "头仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_other_out",
+  "col": "行仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_other_out",
+  "col": "头仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_outsource_issue,bd_outsource_issue",
+  "col": "行仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_outsource_issue,bd_outsource_issue",
+  "col": "头仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_material_out,bd_material_out",
+  "col": "行仓库"
+ },
+ {
+  "f": "StockLedgerService.java",
+  "tables": "bl_material_out,bd_material_out",
+  "col": "头仓库"
+ }
+]

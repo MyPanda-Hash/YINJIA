@@ -1,0 +1,2 @@
+SET NOCOUNT ON
+SELECT DISTINCT panel_code FROM yj_field

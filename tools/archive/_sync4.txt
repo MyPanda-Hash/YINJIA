@@ -1,0 +1,7 @@
+[DB] prod ledger HSDZ_MES
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+[变更] migrate-batch-link.sql(内容与上次执行时不同,重新执行)
+== migrate-batch-link.sql ==
+  [OK] 21 batches
+=== 同步完成: 执行 1, 跳过 299, 失败 0 ===
+DB sync done.
