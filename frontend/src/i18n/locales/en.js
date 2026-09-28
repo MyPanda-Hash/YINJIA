@@ -2653,5 +2653,11 @@ export default {
     '近 30 天': 'last 30 days',
     '累计内': 'In window',
     '峰值': 'Peak',
+
+    // 单天产能对比(2026-09-28:产出/日产能上限)
+    '单天产能对比': 'Daily capacity vs limit',
+    '数据日期': 'Data date',
+    '产出/日产能上限': 'output / daily capacity limit',
+    '未配日产能上限，请在产线档案维护': 'No daily capacity limit set — maintain it in the production line archive',
   },
 }

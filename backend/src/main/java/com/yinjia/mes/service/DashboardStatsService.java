@@ -133,15 +133,90 @@ public class DashboardStatsService {
                     + " WHERE ISNULL(scx,'') <> '' GROUP BY scx ORDER BY COUNT(*) DESC"));
             prod.put("trend7", dateTrend("plang", "pl_date", "cp_date"));
             prod.put("stageRates", stageRates());
+            prod.put("capacityToday", capacityToday());
             prod.put("bomTree", List.of());
         } catch (Exception e) {
             prod.put("statusDist", List.of());
             prod.put("workshopDist", List.of());
             prod.put("trend7", List.of());
             prod.put("stageRates", List.of());
+            prod.put("capacityToday", List.of());
             prod.put("bomTree", List.of());
         }
         return prod;
+    }
+
+    /**
+     * 单天产能比(2026-09-28 用户需求:产线当日产能 ÷ 产能上限的直观对照):
+     *  - 上限 = bs_prod_line.日产能(PROD_LINE 面板可维护,按 生产线 名称关联);
+     *  - 产出 = scjl 当日报工 SUM(sl) 按 scxmc(产线名)分组,ISNULL(delmark,0)=0;
+     *  - 日期口径 = 今天;今天无报工则回看最近一个有报工的日期(date 字段随行下发,
+     *    标题展示数据日期 —— 节后首日/演示库不会一片空白);
+     *  - 未配日产能(0/空)的产线不出行(无基准的比较没有意义,配了就出现)。
+     */
+    private List<Map<String, Object>> capacityToday() {
+        try {
+            // 取数据日期:今天有报工用今天,否则最近有报工的一天
+            String day = jdbc.queryForObject(
+                    "SELECT CONVERT(varchar(10), MAX(CASE WHEN CONVERT(date, sc_date) = CONVERT(date, GETDATE()) THEN sc_date END), 23)"
+                            + " FROM scjl WHERE ISNULL(delmark,0)=0", String.class);
+            if (day == null) {
+                List<Map<String, Object>> last = jdbc.queryForList(
+                        "SELECT TOP 1 CONVERT(varchar(10), sc_date, 23) AS d FROM scjl"
+                                + " WHERE ISNULL(delmark,0)=0 AND sc_date IS NOT NULL ORDER BY sc_date DESC");
+                if (last.isEmpty()) return List.of();
+                day = String.valueOf(last.get(0).get("d"));
+            }
+            Map<String, Double> actualByLine = new LinkedHashMap<>();
+            for (Map<String, Object> r : jdbc.queryForList(
+                    "SELECT RTRIM(scxmc) AS line, SUM(ISNULL(sl,0)) AS q FROM scjl"
+                            + " WHERE ISNULL(delmark,0)=0 AND CONVERT(varchar(10), sc_date, 23) = ?"
+                            + " AND ISNULL(scxmc,'') <> '' GROUP BY RTRIM(scxmc)", day)) {
+                actualByLine.put(String.valueOf(r.get("line")), toD(r.get("q")));
+            }
+            Map<String, Double> limitByLine = new LinkedHashMap<>();
+            for (Map<String, Object> r : jdbc.queryForList(
+                    "SELECT RTRIM(生产线) AS line, 日产能 FROM bs_prod_line"
+                            + " WHERE ISNULL(停用,'N') <> '是' AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " AND ISNULL(日产能,0) > 0 AND ISNULL(生产线,'') <> ''")) {
+                limitByLine.put(String.valueOf(r.get("line")), toD(r.get("日产能")));
+            }
+            List<Map<String, Object>> out = new ArrayList<>();
+            for (Map.Entry<String, Double> e : limitByLine.entrySet()) {
+                double actual = actualByLine.getOrDefault(e.getKey(), 0.0);
+                double limit = e.getValue();
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("name", e.getKey());
+                m.put("actual", Math.round(actual));
+                m.put("limit", Math.round(limit));
+                m.put("pct", (int) Math.round(actual * 100.0 / limit));
+                m.put("date", day);
+                out.add(m);
+            }
+            // 有报工但未配上限的产线也露面(limit=null,前端提示去配)
+            for (Map.Entry<String, Double> e : actualByLine.entrySet()) {
+                if (limitByLine.containsKey(e.getKey())) continue;
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("name", e.getKey());
+                m.put("actual", Math.round(e.getValue()));
+                m.put("limit", null);
+                m.put("pct", null);
+                m.put("date", day);
+                out.add(m);
+            }
+            return out;
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
+
+    private static double toD(Object v) {
+        if (v instanceof Number n) return n.doubleValue();
+        try {
+            return Double.parseDouble(String.valueOf(v).trim());
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     /** 五工序(混料/成型/切炭/组装/装箱)报工完成率:scjl.gxdm 分组,完工=wgzt 已填;未报工工序不出条 */

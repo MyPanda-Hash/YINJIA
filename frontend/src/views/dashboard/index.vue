@@ -308,6 +308,10 @@
           <div class="chart-box"><SBars :data="prod.stageRates" :colors="['#116a5b', '#3b8978', '#d79a2b', '#b94d3f', '#537786']" /></div>
         </div>
         <div class="card col-8">
+          <div class="card-title">{{ tt('单天产能对比') }}<span class="chart-sub">{{ capacityDateSub }}</span></div>
+          <div class="chart-box"><SCapacity :rows="capacityRows" /></div>
+        </div>
+        <div class="card col-12">
           <div class="card-title">{{ tt('BOM 物料树（产品 → 材料，来自生产工单真实数据）') }}</div>
           <div class="chart-box tree-box"><STree :data="bomTree" /></div>
         </div>
@@ -481,6 +485,7 @@ import { ElNotification, ElMessage } from 'element-plus'
 import SBars from './SBars.vue'
 import SDonut from './SDonut.vue'
 import SLine from './SLine.vue'
+import SCapacity from './SCapacity.vue'
 import STree from './STree.vue'
 import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
 import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
@@ -730,6 +735,12 @@ const progress = computed(() => stats.value.progress || [])
 
 // ---------- 生产数据 ----------
 const prod = computed(() => stats.value.production || {})
+// 单天产能比(2026-09-28):产出/日产能上限;标题标注数据日期(今天无报工时回看最近有报工日)
+const capacityRows = computed(() => prod.value.capacityToday || [])
+const capacityDateSub = computed(() => {
+  const d = (capacityRows.value[0] || {}).date
+  return d ? `${tt('数据日期')} ${d} · ${tt('产出/日产能上限')}` : tt('产出/日产能上限')
+})
 const bomTree = computed(() =>
   (prod.value.bomTree || []).map((p) => ({
     label: p['产品'],
