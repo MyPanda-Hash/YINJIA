@@ -108,6 +108,7 @@
               <template #title>
                 <span class="g-title">{{ tt(g.name) }}</span>
                 <span class="g-count">{{ g.panels.length }} {{ tt('个面板') }}</span>
+                <span class="g-granted">{{ grantedOf(g) }} / {{ grantableOf(g) }}</span>
                 <span class="g-actions" @click.stop>
                   <el-button link size="small" type="primary" @click="setGroupPerms(g, 'all')">{{ tt('全选') }}</el-button>
                   <el-button link size="small" @click="setGroupPerms(g, 'none')">{{ tt('清空') }}</el-button>
@@ -352,6 +353,18 @@ function setGroupPerms(g, mode) {
   refreshHeadMarks()
 }
 
+// ---- 组头已勾计数(2026-09-28):勾选进度即时反馈,防盲选 ----
+function grantedOf(g) {
+  let n = 0
+  for (const r of g.panels) for (const a of r.actions || []) if (hasPerm(r, a[0])) n++
+  return n
+}
+function grantableOf(g) {
+  let n = 0
+  for (const r of g.panels) n += (r.actions || []).length
+  return n
+}
+
 // ---- 拖动框选:按住左键拉出矩形,框内格子实时应用按下格的状态;框缩小则实时回退 ----
 // 语义:pointerdown 切换按下格并记下"涂选值"(单击=只切换该格,无反馈标识);
 // 移动超过阈值后出现框选矩形,矩形当前覆盖到的格子应用涂选值,退出覆盖的格恢复拖动前状态
@@ -388,11 +401,17 @@ function colLabel(col) {
   const act = permActions.value.find((a) => a[0] === col)
   return act ? tt(act[1]) : col
 }
+/** 滚动容器层级补偿(2026-09-28 修):滚动结构改为每组 wrap 独立滚动后,
+ *  锚点/矩形的纵向换算除宿主(collapse,现不滚)外,还要减去按下时所在 wrap 的滚动量 ——
+ *  否则 wrap 滚轮滚动时框选矩形与锚点格漂移。 */
+function hostScrollExtra() {
+  return paintScrollEl && paintScrollEl !== paintHostEl ? paintScrollEl.scrollTop : 0
+}
 /** 由内容坐标换算锚点的视口纵坐标(容器自身滚动/页面滚动均自动跟随) */
 function anchorViewportY() {
   if (!paintHostEl) return paint.ay
   const r = paintHostEl.getBoundingClientRect()
-  return r.top + (paint.acy - paintHostEl.scrollTop)
+  return r.top + (paint.acy - paintHostEl.scrollTop - hostScrollExtra())
 }
 /** 找 td 的最近纵向可滚动祖先(如权限分组的 .perm-collapse) */
 function findScrollContainer(el) {
@@ -431,7 +450,7 @@ function syncPaintUi() {
     const s = rectRef.value.style
     s.left = (vx1 - r.left) + 'px'
     s.width = Math.max(0, vx2 - vx1) + 'px'
-    s.top = (vy1 - r.top + paintHostEl.scrollTop) + 'px'
+    s.top = (vy1 - r.top + paintHostEl.scrollTop + hostScrollExtra()) + 'px'
     s.height = Math.max(0, vy2 - vy1) + 'px'
   }
   if (badgeRef.value) {
@@ -1023,13 +1042,15 @@ onBeforeUnmount(() => {
 .perm-sub { font-weight: 400; color: #888; font-size: 12px; }
 .admin-tip { color: #c0392b; font-size: 12px; padding: 8px 0; }
 .perm-actions { margin-top: 10px; display: flex; gap: 8px; }
-/* 2026-08-25：按业务模块分组的权限配置 */
+/* 2026-08-25：按业务模块分组的权限配置
+   2026-09-28 滚动结构修复(盲选根因):原先 .perm-collapse 限高 340px 滚 + .perm-table-wrap 70vh 再滚
+   —— 双层滚动打架,thead 的 sticky 挂在内层而用户实际滚外层,列名与组头双双滚出视野。
+   现改为:collapse 不滚(组头恒在表格上方),每组表格在自己的 wrap 里滚,thead sticky 生效
+   —— 操作列名与模块组头在勾选全程恒可见。 */
 .perm-collapse {
   position: relative; /* 框选矩形的定位宿主:矩形在容器内绝对定位,越界被裁剪 */
   border: 1px solid #e3e8ef;
   border-radius: 6px;
-  max-height: 340px;
-  overflow-y: auto;
 }
 .perm-collapse :deep(.el-collapse-item__header) {
   height: 34px;
@@ -1039,6 +1060,10 @@ onBeforeUnmount(() => {
   font-weight: 600;
   color: #1c4f8a;
   background: #f7f9fc;
+  /* 组头吸顶:多组连续展开、页面滚动时当前组头钉在面板顶部,模块说明不丢 */
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 .perm-collapse :deep(.el-collapse-item__wrap) {
   padding: 6px 10px 10px;
@@ -1049,20 +1074,41 @@ onBeforeUnmount(() => {
   font-size: 12px;
   margin-left: 6px;
 }
+/* 组头已勾计数:勾选进度即时反馈,防盲选 */
+.g-granted {
+  font-weight: 500;
+  color: #116a5b;
+  font-size: 12px;
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+}
 .g-actions {
   margin-left: auto;
   margin-right: 14px;
   display: inline-flex;
   align-items: center;
 }
-/* 操作权限矩阵表(11 项) */
-.perm-table-wrap { overflow: auto; max-height: 70vh; }
+/* 操作权限矩阵表(11 项)—— wrap 是唯一滚动容器:thead sticky 在此生效 */
+.perm-table-wrap { overflow: auto; max-height: 50vh; }
 .perm-table thead th {
   position: sticky;
   top: 0;
   z-index: 2;
   background: #eef1f6;
+  box-shadow: 0 1px 0 #cdd5e0; /* 贴顶滚动时的列头分界线 */
 }
+/* 首列(面板名)钉左:横向滚动时始终知道这行是哪个面板 */
+.perm-table th.pt-panel,
+.perm-table td.pt-panel {
+  position: sticky;
+  left: 0;
+  background: inherit;
+}
+.perm-table th.pt-panel { z-index: 3; background: #eef1f6; }
+.perm-table td.pt-panel { z-index: 1; background: #fff; }
+/* 行 hover:整行高亮(含钉左首列),定位行列交叉 */
+.perm-table tbody tr:hover td { background: #f2f7fd; }
+.perm-table tbody tr:hover td.pt-panel { background: #eaf2fb; }
 .perm-table {
   width: 100%;
   border-collapse: collapse;
