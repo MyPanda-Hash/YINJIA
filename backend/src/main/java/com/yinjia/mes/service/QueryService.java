@@ -493,8 +493,18 @@ public class QueryService {
                 Object v = e.getValue();
                 if (col == null || v == null || String.valueOf(v).isBlank()) continue;
                 if ("开始日期".equals(e.getKey()) || "结束日期".equals(e.getKey())) continue; // 已按期次区间处理
-                where.append(" AND ").append(alias).append(".[").append(col).append("] LIKE ?");
-                args.add("%" + v + "%");
+                // 参照字段(2026-09-24):查询值来自档案参照/联动下拉,是「一个精确实体」而非关键字 → 等值匹配。
+                // LIKE 子串会串仓:仓库「成品仓」会同时命中「半成品仓」、「不良品仓」命中「原料不良品仓」
+                // (库存台账实测:查 成品仓 返回 93 行 = 成品仓 34 + 半成品仓 59,台账按仓分户的口径直接失真)。
+                // 文本字段保持模糊;RTRIM 防 nchar/手工导入尾随空格(与台账联动选项同款口径)。
+                PanelRegistry.FieldDef fd = def.byLabel(e.getKey());
+                if (fd != null && "参照".equals(fd.dataType())) {
+                    where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) = ?");
+                    args.add(String.valueOf(v).trim());
+                } else {
+                    where.append(" AND ").append(alias).append(".[").append(col).append("] LIKE ?");
+                    args.add("%" + v + "%");
+                }
             }
         }
         if (keyword != null && !keyword.isBlank()) {
