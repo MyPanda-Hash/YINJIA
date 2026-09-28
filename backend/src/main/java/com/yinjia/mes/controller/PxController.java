@@ -640,4 +640,35 @@ public class PxController {
         configService.saveHeaderPrefs(panelCode, columns);
         return ApiResult.ok(null);
     }
+
+    // ---------- 动态字段(备用列池;规格 docs/design/动态字段扩展-备用列池-V1.0.md) ----------
+
+    /** 字段管理总览:现有动态字段 + 备用列池占用/脏行 */
+    @GetMapping("/extFields")
+    public ApiResult<Map<String, Object>> extFields(@RequestParam String panel) {
+        perm.requirePanelRead(panel);
+        return ApiResult.ok(configService.extFieldOverview(panel));
+    }
+
+    /** 绑定新字段到空闲备用列(仅管理员;守卫 G1-G4) */
+    @PostMapping("/extField/add")
+    public ApiResult<Map<String, Object>> extFieldAdd(@RequestBody Map<String, Object> body) {
+        perm.requireAdmin();
+        return ApiResult.ok(configService.addExtField(body));
+    }
+
+    /** 退绑(数据保留,永不 DROP;仅管理员;守卫 G6) */
+    @PostMapping("/extField/retire")
+    public ApiResult<Void> extFieldRetire(@RequestBody Map<String, Object> body) {
+        perm.requireAdmin();
+        String panel = String.valueOf(body.getOrDefault("panel", ""));
+        int fieldId;
+        try {
+            fieldId = Integer.parseInt(String.valueOf(body.getOrDefault("fieldId", "0")));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("fieldId 必须是数字");
+        }
+        configService.retireExtField(panel, fieldId);
+        return ApiResult.ok(null);
+    }
 }

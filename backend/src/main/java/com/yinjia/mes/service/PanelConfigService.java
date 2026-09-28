@@ -392,6 +392,20 @@ public class PanelConfigService {
                 g.put("actions", merged);
             }
         }
+        // 字段管理(动态字段/备用列池,规格 §10):仅 doc/archive;紧跟表头调整/表格调整之后。
+        // 入口全员下发、前端对非 admin 隐藏;写操作的服务端真闸门是 requireAdmin(G5)。
+        if (doc || "archive".equals(def.mode())) {
+            for (Map<String, Object> g : buttonGroups) {
+                @SuppressWarnings("unchecked")
+                List<String> gActions = (List<String>) g.get("actions");
+                int anchor = gActions.indexOf("表头调整") >= 0 ? gActions.indexOf("表头调整") : gActions.indexOf("表格调整");
+                if (anchor >= 0 && !gActions.contains("字段管理")) {
+                    List<String> merged = new ArrayList<>(gActions);
+                    merged.add(anchor + 1, "字段管理");
+                    g.put("actions", merged);
+                }
+            }
+        }
         metadata.put("buttonGroups", buttonGroups);
         if (!disabledActions.isEmpty()) metadata.put("disabledActions", disabledActions);
         // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
@@ -1481,6 +1495,204 @@ public class PanelConfigService {
             org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
                     .warn("[RD_CHANGE] 读取当前账号可填部门失败,界面将整表只读: {}", e.getMessage());
             return List.of();
+        }
+    }
+
+    // ---------- 动态字段(备用列池;规格 docs/design/动态字段扩展-备用列池-V1.0.md) ----------
+
+    private static final java.util.Set<String> EXT_DATA_TYPES = java.util.Set.of("文本", "下拉框", "日期", "是否");
+    private static final int EXT_SPARE_COUNT = 20;
+
+    /** 动态字段总览:现有动态字段 + 各表备用列池占用/脏数据行数(规格 §8 契约 1) */
+    public Map<String, Object> extFieldOverview(String panelCode) {
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
+        List<Map<String, Object>> fields = new ArrayList<>();
+        for (PanelRegistry.FieldDef f : def.fields()) {
+            if (f.col() != null && f.col().matches("备用\\d+")) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", extFieldIdOf(panelCode, f.col()));
+                m.put("label", f.label());
+                m.put("col", f.col());
+                m.put("dataType", f.dataType());
+                m.put("place", f.place());
+                fields.add(m);
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("capacity", EXT_SPARE_COUNT);
+        out.put("fields", fields);
+        out.put("linePool", extPoolOf(def.lineTable()));
+        if (def.hasHeadTable()) out.put("headPool", extPoolOf(def.headTable()));
+        return out;
+    }
+
+    /** yj_field 行号(面板+备用列唯一定位) */
+    private Integer extFieldIdOf(String panelCode, String col) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id FROM yj_field WHERE panel_code = ? AND col_name = ?", panelCode, col);
+        return rows.isEmpty() ? null : ((Number) rows.get(0).get("id")).intValue();
+    }
+
+    /** 某表备用列池:占用(G3:任一面板引用即占用,表可跨面板共用)/空闲列脏行数 */
+    private List<Map<String, Object>> extPoolOf(String table) {
+        List<Map<String, Object>> pool = new ArrayList<>();
+        if (table == null || table.isBlank()) return pool;
+        for (int i = 1; i <= EXT_SPARE_COUNT; i++) {
+            String spare = "备用" + i;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("col", spare);
+            List<Map<String, Object>> bound = jdbc.queryForList(
+                    "SELECT TOP 1 f.label FROM yj_field f JOIN yj_panel p ON f.panel_code = p.panel_code "
+                            + "WHERE (p.line_table = ? OR p.head_table = ?) AND f.col_name = ?", table, table, spare);
+            m.put("bound", bound.isEmpty() ? null : bound.get(0).get("label"));
+            if (bound.isEmpty()) { // 仅空闲列算脏行(占用列的脏行无意义)
+                Integer dirty = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM " + bracket(table) + " WHERE " + bracket(spare) + " IS NOT NULL", Integer.class);
+                m.put("dirtyRows", dirty == null ? 0 : dirty);
+            }
+            pool.add(m);
+        }
+        return pool;
+    }
+
+    private static String bracket(String ident) {
+        return "[" + ident.replace("]", "]]") + "]";
+    }
+
+    /** 绑定新动态字段(规格 §4/§5,守卫 G1-G4) */
+    @org.springframework.transaction.annotation.Transactional
+    public Map<String, Object> addExtField(Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panel", "")).trim();
+        String label = String.valueOf(body.getOrDefault("label", "")).trim();
+        String labelEn = String.valueOf(body.getOrDefault("labelEn", "")).trim();
+        String dataType = String.valueOf(body.getOrDefault("dataType", "文本"));
+        String place = String.valueOf(body.getOrDefault("place", "detail"));
+        boolean inQuery = Boolean.TRUE.equals(body.get("inQuery"));
+        Integer width = body.get("width") instanceof Number n ? n.intValue() : 120;
+        boolean required = Boolean.TRUE.equals(body.get("required"));
+        boolean confirmDirty = Boolean.TRUE.equals(body.get("confirmDirty"));
+        boolean clearFirst = Boolean.TRUE.equals(body.get("clearFirst"));
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
+        // G1 标签守卫(列名安全规范:禁 . % / ( ) 与空格;数据键保持中文)
+        if (label.isEmpty() || label.length() > 60) throw new IllegalArgumentException("字段名必须 1-60 个字符");
+        for (char ch : label.toCharArray())
+            if (".%/() \t\r\n".indexOf(ch) >= 0) throw new IllegalArgumentException("字段名禁止含 . % / ( ) 或空格:" + label);
+        if (!labelEn.isEmpty() && labelEn.length() > 60) throw new IllegalArgumentException("英文名过长(≤60)");
+        if (!EXT_DATA_TYPES.contains(dataType)) throw new IllegalArgumentException("动态字段仅支持:文本/下拉框/日期/是否");
+        // G2 面板内标签唯一 —— 直查 yj_field(注册表快照有 30s TTL 窗口,不能当唯一性凭据)
+        Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM yj_field WHERE panel_code = ? AND label = ?", Integer.class, panelCode, label);
+        if (dup != null && dup > 0) throw new IllegalStateException("字段名已存在:" + label);
+        // place 规则:archive 固定 detail;doc 可 header/detail
+        if ("archive".equals(def.mode())) place = "detail";
+        else if (!"header".equals(place) && !"detail".equals(place)) throw new IllegalArgumentException("位置仅支持 header/detail");
+        if ("header".equals(place) && !def.hasHeadTable()) throw new IllegalArgumentException("该面板没有头表,不能加表头字段");
+        String table = "header".equals(place) ? def.headTable() : def.lineTable();
+        // 下拉框词表 → 引擎 VALUES 格式 dict_sql(dictOptions 是引擎唯一下发通道)
+        String dictSql = null;
+        if ("下拉框".equals(dataType)) {
+            String raw = String.valueOf(body.getOrDefault("dictOptions", "")).trim();
+            if (raw.isEmpty()) throw new IllegalArgumentException("下拉框必须提供词表(逗号分隔)");
+            StringBuilder sb = new StringBuilder("SELECT v FROM (VALUES ");
+            for (String w : raw.split("[,，]")) {
+                String t = w.trim();
+                if (t.isEmpty()) continue;
+                if (sb.charAt(sb.length() - 1) != '(') sb.append(",");
+                sb.append("(N'").append(t.replace("'", "''")).append("')");
+            }
+            sb.append(") AS t(v)");
+            dictSql = sb.toString();
+            if (dictSql.length() > 500) throw new IllegalArgumentException("词表过长(生成 SQL 超 500 字符),请精简");
+        }
+        // G3/G4 分配空闲备用列:优先干净列;脏列需 confirmDirty(+可选清空,规格:全系统唯一写业务数据的动作)
+        String chosen = null, dirtyWarn = null;
+        int dirtyRows = 0;
+        for (int i = 1; i <= EXT_SPARE_COUNT && chosen == null; i++) {
+            String spare = "备用" + i;
+            Integer occ = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_field f JOIN yj_panel p ON f.panel_code = p.panel_code "
+                            + "WHERE (p.line_table = ? OR p.head_table = ?) AND f.col_name = ?", Integer.class, table, table, spare);
+            if (occ != null && occ > 0) continue;
+            Integer dirty = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM " + bracket(table) + " WHERE " + bracket(spare) + " IS NOT NULL", Integer.class);
+            if (dirty != null && dirty > 0) {
+                if (dirtyWarn == null) { dirtyWarn = spare; dirtyRows = dirty; }
+                continue;
+            }
+            chosen = spare;
+        }
+        if (chosen == null && dirtyWarn != null) {
+            if (!confirmDirty) throw new IllegalStateException("备用列 " + dirtyWarn + " 存在历史数据 " + dirtyRows + " 行,需确认后才可绑定");
+            chosen = dirtyWarn;
+            if (clearFirst) {
+                jdbc.update("UPDATE " + bracket(table) + " SET " + bracket(chosen) + " = NULL");
+                extLog(panelCode, label, chosen, "clear", "清空历史数据 " + dirtyRows + " 行后绑定");
+            }
+        }
+        if (chosen == null) throw new IllegalStateException("备用列池已满(" + EXT_SPARE_COUNT + "/" + EXT_SPARE_COUNT + "),请走正式迁移扩展");
+        String finalPlace = (inQuery ? "query," : "") + place;
+        Integer maxSeq = jdbc.queryForObject(
+                "SELECT MAX(seq) FROM yj_field WHERE panel_code = ? AND place LIKE ?", Integer.class, panelCode, "%" + place + "%");
+        jdbc.update("INSERT INTO yj_field (panel_code, col_name, label, label_en, data_type, dict_sql, place, seq, width, editable, required, hidden, visible) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,0,1)",
+                panelCode, chosen, label, labelEn.isEmpty() ? null : labelEn, dataType, dictSql, finalPlace,
+                (maxSeq == null ? 0 : maxSeq) + 10, width, 1, required);
+        // 多语言强制规范(AGENTS):至少 en 译名(manual);label_en 列同写(引擎显示层直读)
+        jdbc.update("IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=? AND locale='en') "
+                        + "INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', ?, 'en', ?, 'manual')",
+                label, label, labelEn.isEmpty() ? label : labelEn);
+        extDescribe(table, chosen, label + "(动态字段,绑定" + chosen + ")");
+        extLog(panelCode, label, chosen, "bind", "place=" + finalPlace + ",type=" + dataType);
+        registry.reload();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("colName", chosen);
+        out.put("fieldId", extFieldIdOf(panelCode, chosen));
+        return out;
+    }
+
+    /** 退绑(规格 §7:数据保留,永不 DROP 物理列;守卫 G6 仅动态字段可退绑) */
+    @org.springframework.transaction.annotation.Transactional
+    public void retireExtField(String panelCode, int fieldId) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT col_name, label, place FROM yj_field WHERE id = ? AND panel_code = ?", fieldId, panelCode);
+        if (rows.isEmpty()) throw new IllegalArgumentException("字段不存在:id=" + fieldId);
+        String col = String.valueOf(rows.get(0).get("col_name"));
+        String label = String.valueOf(rows.get(0).get("label"));
+        String place = String.valueOf(rows.get(0).get("place"));
+        if (col == null || !col.matches("备用\\d+")) throw new IllegalArgumentException("仅动态字段(备用列)可停用:" + label);
+        jdbc.update("DELETE FROM yj_field WHERE id = ?", fieldId);
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def != null) {
+            String table = place.contains("header") && def.hasHeadTable() ? def.headTable() : def.lineTable();
+            extDescribe(table, col, "预留(已停用:原" + label + ")");
+        }
+        extLog(panelCode, label, col, "retire", null);
+        registry.reload();
+    }
+
+    /** MS_Description 幂等更新(先查后改,避免异常控制流) */
+    private void extDescribe(String table, String col, String descr) {
+        Integer has = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys.extended_properties ep JOIN sys.columns c ON c.object_id = ep.major_id AND c.column_id = ep.minor_id "
+                        + "WHERE ep.major_id = OBJECT_ID(?) AND ep.name = 'MS_Description' AND c.name = ?", Integer.class, table, col);
+        if (has != null && has > 0)
+            jdbc.update("EXEC sp_updateextendedproperty N'MS_Description', ?, N'SCHEMA', N'dbo', N'TABLE', ?, N'COLUMN', ?", descr, table, col);
+        else
+            jdbc.update("EXEC sp_addextendedproperty N'MS_Description', ?, N'SCHEMA', N'dbo', N'TABLE', ?, N'COLUMN', ?", descr, table, col);
+    }
+
+    /** 绑定审计(append-only;审计失败不阻断主流程) */
+    private void extLog(String panelCode, String label, String col, String action, String detail) {
+        try {
+            String user = "system";
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getName() != null && !auth.getName().isBlank()) user = auth.getName();
+            jdbc.update("INSERT INTO yj_ext_bind_log (panel_code, label, col_name, action, op_by, detail) VALUES (?,?,?,?,?,?)",
+                    panelCode, label, col, action, user, detail);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[EXT_FIELD] 绑定审计写入失败({} {} {}): {}", action, label, col, e.getMessage());
         }
     }
 }
