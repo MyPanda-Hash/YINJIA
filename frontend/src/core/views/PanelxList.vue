@@ -6607,12 +6607,21 @@ async function selectProduct(code) {
   }
 }
 
+// 切面板拆装分帧(2026-09-28):清空 cfgCache/gridTabs 会同步拆掉旧表格,而参照记忆化后
+// getPanelConfig 瞬时命中缓存(微任务边界)⇒ 拆旧+装新挤进同一个 patch —— 宽表面板实测
+// 233ms 单帧长任务。让出一帧(浏览器先提交"移除旧 DOM")再装新面板,长帧减半;
+// 连续快速切换用 token 只认最后一次,避免过期装载。
+let switchFrameToken = 0
 watch(
   () => [panelCode.value, operationName.value],
-  () => {
+  async () => {
     scanVisible.value = false
     // 2026-08-20：关闭页签/切走时 panelCode 变 undefined——不触发加载（避免「面板编号无效」误报）
     if (!panelCode.value || panelCode.value === 'undefined') return
+    // 拆除顺序(2026-09-28):先清行、再清配置 —— 若在仍挂着旧行数据时清 gridTabs,
+    // el-table 每删一列都会对全部行重渲染一次(O(列×行),宽表拆除的主长帧来源之一)。
+    list.value = []
+    total.value = 0
     cfgCache.value = null
     qrSel.value = new Set() // 二维码标签勾选集随面板清空(行键属于上一个档案)
     resetDictModes()
@@ -6639,6 +6648,11 @@ watch(
     curIdx.value = 0
     // 跨面板跳转(采购订单「送料批次」→暂收单、左栏链路跳转等):同一路由记录换面板时组件被复用,
     // onMounted 不再执行 —— 这里同样消费 ?docNo=,否则会退回「列表第一张」而定位不到目标单据
+    const tok = ++switchFrameToken
+    // 双 rAF:任务里注册的 rAF 在**同一帧**绘制前执行,拆装之间并不会发生绘制;
+    // 嵌套一层才真正等到"旧 DOM 已提交绘制"之后的下一帧(实测单层时 INV→SO_ORDER 仍有 200ms 同帧)。
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    if (tok !== switchFrameToken || !panelCode.value || panelCode.value === 'undefined') return
     if (applyDocNoQuery()) load()
     else search()
   }

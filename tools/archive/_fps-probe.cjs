@@ -107,10 +107,10 @@ async function main() {
     }
 
     console.log('\n==== A. 面板切换(逐帧) ====')
+    // FPS_PAIRS 环境变量可覆盖默认场景(如 "TEAM>SO_ORDER,INV>TEAM"),便于隔离拆/装两个方向
+    const pairs = (process.env.FPS_PAIRS || 'TEAM>INV,INV>SO_ORDER,SO_ORDER>TEAM').split(',').map((s) => s.trim().split('>'))
     if (!process.env.SKIP_AB) {
-      await switchTo('TEAM', 'INV')
-      await switchTo('INV', 'SO_ORDER')
-      await switchTo('SO_ORDER', 'TEAM')
+      for (const [f, t] of pairs) await switchTo(f, t)
     } else console.log('  (SKIP_AB=1,跳过 —— A 段数据另行取自上一轮)')
 
     // ---- B. 弹窗(在 PARTNER 上) ----
