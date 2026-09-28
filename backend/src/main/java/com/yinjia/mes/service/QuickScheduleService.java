@@ -134,13 +134,15 @@ public class QuickScheduleService {
             batch = base + "-" + (maxSuffix + 1);
         }
         String due = str(line.get("交货日期"));
+        // 余量口径(2026-09-27 用户拍板):余量=需求数量−排产数量(未排产),不再是排产数量
+        double remain = demand - qty;
         jdbc.update("INSERT INTO plang (comm, pl_no, pl_xc, pl_date, khdm, dm, mc, gg, jldw,"
                         + " xq_sl, pl_sl, yl, cp_date, lot_no, od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号])"
                         + " VALUES (N'0', ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
                         + " CASE WHEN ? IS NULL OR ? = N'' THEN NULL ELSE CONVERT(datetime, ?, 120) END,"
                         + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE(), ?)",
                 plNo, lineNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
-                str(line.get("规格型号")), str(line.get("销售单位")), demand, qty, qty, due, due, due,
+                str(line.get("规格型号")), str(line.get("销售单位")), demand, qty, remain, due, due, due,
                 str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user, batch);
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
                 "PLANG", plNo, plNo + "#" + lineNo + "#" + batch, "");

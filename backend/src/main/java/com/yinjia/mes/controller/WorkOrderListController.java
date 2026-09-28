@@ -96,7 +96,7 @@ public class WorkOrderListController {
                         + " p.dm AS 物料编码, ISNULL(p.mc, N'') AS 产品名称, ISNULL(p.gg, N'') AS 规格型号,"
                         + " ISNULL(p.jldw, N'') AS 生产单位,"
                         + " ISNULL(p.pl_sl, 0) AS 排产数量, ISNULL(p.xq_sl, 0) AS 需求数量, ISNULL(p.rk_sl, 0) AS 入库数量,"
-                        + " ISNULL(p.pl_sl, 0) - ISNULL(p.rk_sl, 0) AS 余量,"
+                        + " ISNULL(p.xq_sl, 0) - ISNULL(p.pl_sl, 0) AS 余量,"
                         + " ISNULL(管控.重点管控, N'否') AS 重点管控,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"

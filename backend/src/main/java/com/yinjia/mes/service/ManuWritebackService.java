@@ -81,10 +81,10 @@ public class ManuWritebackService {
             double cap = numOr(row.get("pl_sl"));
             double rk = Math.max(0, Math.min(qty - cumCap, cap));
             cumCap += cap;
-            jdbc.update("UPDATE dbo.plang SET rk_sl = ?, yl = ISNULL(pl_sl,0) - ?, rk_no = ?,"
+            jdbc.update("UPDATE dbo.plang SET rk_sl = ?, yl = ISNULL(xq_sl,0) - ISNULL(pl_sl,0), rk_no = ?,"
                             + " cp_date2 = COALESCE(cp_date2, CASE WHEN ? > 0 THEN CAST(GETDATE() AS date) END),"
                             + " asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
-                    rk, rk, noList.isEmpty() ? null : noList, rk, user, row.get("id"));
+                    rk, noList.isEmpty() ? null : noList, rk, user, row.get("id"));
         }
         // scjl.post_no 重算式回写(参考库完工即入库口径;对称:弃审入库单后随之清空,与 rk_no 同算)
         jdbc.update("UPDATE dbo.scjl SET post_no = ? WHERE gldh = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
