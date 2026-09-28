@@ -336,6 +336,8 @@ export default {
     '排产人': 'Scheduled By',
     '转单人': 'Converted By',
     '在产': 'In Production',
+    '结转剩余': 'Convert Remaining',
+    '转单数量': 'Converted Qty',
     '完工': 'Completed',
     // 固定版式单据打印按钮(2026-09-23:银嘉采购订单/退货单,版式文字为纸面事实不翻译,按钮/提示入翻译层)
     '打印采购订单': 'Print Purchase Order',

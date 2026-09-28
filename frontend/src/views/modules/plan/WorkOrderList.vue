@@ -73,7 +73,7 @@
       <el-table-column :label="tt('客户')" prop="客户" min-width="120" show-overflow-tooltip />
       <el-table-column :label="tt('生产线')" prop="生产线" width="110" show-overflow-tooltip />
       <el-table-column :label="tt('需求数量')" prop="需求数量" width="100" align="right" sortable />
-      <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
+      <el-table-column :label="tt('转单数量')" prop="排产数量" width="95" align="right" />
       <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
       <el-table-column :label="tt('余量')" prop="余量" width="90" align="right" />
       <el-table-column :label="tt('领料单号')" prop="领料单号" width="150" show-overflow-tooltip />
@@ -112,7 +112,7 @@
         <span>{{ tt('需求') }}: <b>{{ num(g.需求数量) }}</b></span>
         <span>{{ tt('累计排产') }}: <b>{{ num(g.累计排产) }}</b></span>
         <span>{{ tt('累计入库') }}: <b>{{ num(g.累计入库) }}</b></span>
-        <span>{{ tt('订单余量') }}: <b>{{ num(g.订单余量) }}</b></span>
+        <span>{{ tt('结转剩余') }}: <b>{{ num(g.结转剩余) }}</b></span>
         <span>{{ tt('分段') }}: <b>{{ g.分段行数 }}</b></span>
       </div>
       <el-table :data="segData?.分段 || []" border size="small" max-height="420" v-loading="segLoading">
@@ -338,7 +338,7 @@ function openTrace() {
 }
 
 function exportCsv() {
-  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '转单时间', '物料编码', '产品名称', '规格型号', '客户', '生产线', '需求数量', '排产数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
+  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '转单时间', '物料编码', '产品名称', '规格型号', '客户', '生产线', '需求数量', '转单数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
   const csv = '\ufeff' + [head.join(',')]
     .concat(filtered.value.map((r) => head.map((h) => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n')
   const a = document.createElement('a')

@@ -98,10 +98,12 @@ public class WorkOrderListController {
                         + " ISNULL(p.jldw, N'') AS 生产单位,"
                         + " ISNULL(p.pl_sl, 0) AS 排产数量, ISNULL(p.xq_sl, 0) AS 需求数量, ISNULL(p.rk_sl, 0) AS 入库数量,"
                         + " ISNULL(管控.重点管控, N'否') AS 重点管控,"
-                        // 余量(2026-09-28 用户拍板)=订单级:同工单号需求 − 同工单号累计排产(全部批次行);
-                        // 行级口径(本行需求−本行排产)会把同订单多批次行显示成多个独立余量,误导
-                        + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s"
-                        + "   WHERE s.pl_no = p.pl_no AND s.pl_xc = p.pl_xc AND ISNULL(s.asp_cancel,'N') <> 'Y' AND ISNULL(s.scx,N'') <> N''), 0) AS 余量,"
+                        // 余量(2026-09-28 用户定稿)=订单结转的剩余数量:订单行需求 − 已转出占用
+                        // (form_flow_link ACTIVE 占用,与订单结转页「剩余可转」同源;转工单/转采购都占)
+                        + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l"
+                        + "   WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no"
+                        + "     AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc))"
+                        + "     AND l.link_status = 'ACTIVE'), 0) AS 余量,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
                         + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
@@ -141,7 +143,7 @@ public class WorkOrderListController {
                         + " MAX(ISNULL(p.xq_sl,0)) AS 需求数量, SUM(ISNULL(p.pl_sl,0)) AS 累计转单,"
                         + " SUM(CASE WHEN ISNULL(p.scx,N'') <> N'' THEN ISNULL(p.pl_sl,0) ELSE 0 END) AS 累计排产,"
                         + " SUM(ISNULL(p.rk_sl,0)) AS 累计入库,"
-                        + " MAX(ISNULL(p.xq_sl,0)) - SUM(CASE WHEN ISNULL(p.scx,N'') <> N'' THEN ISNULL(p.pl_sl,0) ELSE 0 END) AS 订单余量,"
+                        + " MAX(ISNULL(p.xq_sl,0)) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = MAX(p.od_no) AND l.source_line_key = MAX(p.od_no) + N'#' + CONVERT(nvarchar(20), CONVERT(int, MAX(p.od_xc))) AND l.link_status = 'ACTIVE'), 0) AS 结转剩余,"
                         + " COUNT(*) AS 分段行数"
                         + " FROM dbo.plang p WHERE p.pl_no = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'"
                         + " GROUP BY p.pl_xc, p.dm, p.mc, p.gg ORDER BY p.pl_xc", no);
