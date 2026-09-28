@@ -1210,12 +1210,18 @@ public class PanelConfigService {
             java.util.Set<String> mappedHeads = new java.util.HashSet<>();
             List<Map<String, String>> hmap = new ArrayList<>();
             hmap.add(Map.of("from", noLabel, "to", "来源单号"));
-            for (PanelRegistry.FieldDef f : src.fieldsAt("header")) {
-                if (hmap.size() >= 7) break;
-                String l = f.label();
-                if (FLOW_HEAD_EXCLUDE.contains(l) || l.equals(noLabel) || !targetHeads.contains(l)) continue;
-                hmap.add(Map.of("from", l, "to", l));
-                mappedHeads.add(l);
+            // 2026-09-28 上限事故修复:旧逻辑单轮按 seq 先到先得、上限 7 且隐藏字段同占坑——
+            // 服务器实测 QC_RECV→QC_INSP 把 seq 靠后的可见字段「供应商」挤出映射窗口(代码能过、名称丢失)。
+            // 改两轮收集:先可见字段、后隐藏字段(保留隐藏字段可映射的旧能力),上限 7→12,seq 不再决定生死。
+            for (boolean visiblePass = true; ; visiblePass = false) {
+                for (PanelRegistry.FieldDef f : src.fieldsAt("header")) {
+                    if (hmap.size() >= 12) break;
+                    String l = f.label();
+                    if ((!f.hidden() && f.visible()) != visiblePass) continue;
+                    if (FLOW_HEAD_EXCLUDE.contains(l) || l.equals(noLabel) || !targetHeads.contains(l)) continue;
+                    if (mappedHeads.add(l)) hmap.add(Map.of("from", l, "to", l));
+                }
+                if (!visiblePass) break;
             }
             String[][] headSyn = FLOW_HEAD_SYNONYMS.get(sourceCode + "|" + def.code());
             if (headSyn != null) {

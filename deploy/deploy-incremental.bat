@@ -90,6 +90,16 @@ set /a WAITN+=1
 if %WAITN% lss 15 goto waitstop
 goto fail-appstop
 :appstopped
+REM 2026-09-28 incident fix: schtasks /end kills the task instance, but an orphaned
+REM start-service.bat cmd loop can survive and keep restarting java every 5s, racing
+REM the new instance for port 8090 (probe FAIL-LOGIN-TIMEOUT false negative). Kill
+REM every start-service wrapper now; the schtasks /run in step [6] starts a fresh one.
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='cmd.exe'\" | Where-Object { $_.CommandLine -like '*start-service*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >> "%LOG%" 2>&1
+tasklist 2>nul | findstr /i "java.exe" >nul
+if not errorlevel 1 (
+  taskkill /f /im java.exe >> "%LOG%" 2>&1
+  timeout /t 2 /nobreak >nul
+)
 echo RESULT: APP-STOPPED
 echo RESULT: APP-STOPPED >> "%LOG%"
 
@@ -158,14 +168,19 @@ echo RESULT: APP-STARTED
 echo RESULT: APP-STARTED >> "%LOG%"
 
 REM ---- 7) verify login ----
-echo [7] verifying login - up to 150s ...
+REM 2026-09-28 incident fix: the app restarts under start-service.bat and cold start
+REM takes a few seconds; the old 150s window could expire during a port race and
+REM report FAIL-LOGIN-TIMEOUT while the app was actually fine. Settle 15s first,
+REM then probe up to 240s.
+echo [7] verifying login - settle 15s then probe up to 240s ...
+timeout /t 15 /nobreak >nul
 set /a PROBEN=0
 :probe
 powershell -NoProfile -ExecutionPolicy Bypass -File "%PKG%\probe-login.ps1" > "%PKG%\logs\probe-%TS%.txt" 2>&1
 findstr /c:"LOGIN-OK" "%PKG%\logs\probe-%TS%.txt" >nul
 if not errorlevel 1 goto loginok
 set /a PROBEN+=1
-if %PROBEN% lss 30 (
+if %PROBEN% lss 48 (
   timeout /t 5 /nobreak >nul
   goto probe
 )

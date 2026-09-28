@@ -1629,3 +1629,6 @@ migrate-qcreturn-srcfix.sql
 migrate-whloc.sql
 # —— 2026-09-28 台账/状况表查询弹窗过滤改编码索引(修同名多码歧义):仓库/存货参照 ref_field 改绑 仓库编码/存货编码(display 不变仍显名称;bs_inv 重名实测「端盖」24码/「PP棉」18码,按名称收窄把同名异码整批放进候选且查询按名称并流,单一性破);配套后端联动选项/台账查询改编码精确等值(不走 LIKE,编码互为子串)+前端收窄注入 filter{存货编码:[…]};汇总表非级联不动;两视图本就有编码列无需重建 ——
 migrate-ledger-code-filter.sql
+
+# —— 2026-09-28 QC_RECV 供应商 seq 归位(45,紧跟供应商代码;服务器手工修复固化防环境重建复发;配套表头映射代码改两轮收集+上限12) ——
+migrate-qcrecv-supplier-seq.sql
