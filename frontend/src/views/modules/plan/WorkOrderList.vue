@@ -19,6 +19,7 @@
     <div class="wol-btns">
       <el-button size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
       <el-button size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
+      <el-button size="small" type="warning" plain @click="openSchedule" :disabled="!checked.length">{{ tt('排产') }}（{{ checked.length }}）</el-button>
       <el-dropdown split-button size="small" type="primary" @click="doPrintTask('成型生产任务单')" @command="doPrintTask"
                    :disabled="!checked.length && !currentRow">
         {{ tt('打印工单') }}
@@ -95,6 +96,22 @@
         <el-table-column :label="tt('定额数量')" prop="定额数量" width="100" align="right" />
       </el-table>
     </el-dialog>
+
+    <!-- 排产弹窗(2026-09-27 用户拍板:生产工单页直接排产——选生产线+排产数量,复用快速排产 assign 端点) -->
+    <el-dialog v-model="schVisible" :title="tt('排产') + ' — ' + checked.length + ' ' + tt('张工单')" width="420px" append-to-body>
+      <div class="wol-lb" style="margin-bottom: 10px">{{ tt('生产线') }}
+        <el-select v-model="schLine" filterable style="width: 220px" :placeholder="tt('请选择生产线')">
+          <el-option v-for="l in lines" :key="l.v" :label="l.t" :value="l.v" />
+        </el-select>
+      </div>
+      <div class="wol-lb">{{ tt('排产数量') }}（{{ tt('空=全排') }}）
+        <el-input-number v-model="schQty" :min="0" :controls="false" size="small" style="width: 140px" />
+      </div>
+      <template #footer>
+        <el-button @click="schVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="doSchedule">{{ tt('确认排产') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -116,6 +133,9 @@ const stateFilter = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
 const qText = ref('')
+const schVisible = ref(false)
+const schLine = ref('')
+const schQty = ref(null)
 const bomVisible = ref(false)
 const bomRow = ref(null)
 const bomRows = ref([])
@@ -137,6 +157,7 @@ async function load() {
     if (dateFrom.value) cond['日期从'] = dateFrom.value
     if (dateTo.value) cond['日期到'] = dateTo.value
     if (qText.value.trim()) cond['keyword'] = qText.value.trim()
+    if (lineFilter.value) cond['生产线'] = lineFilter.value
     const res = await request.post('/px/workOrderList', cond)
     rows.value = (res.data || []).map((r) => ({ ...r, rowKey: r.工单号 + '#' + r.工单行号 + '#' + (r.批次号 || '') }))
     applyLineMeta()
@@ -155,6 +176,38 @@ function applyLineMeta() {
   for (const r of rows.value) if (!r.生产线) r.生产线 = ''
   lineCode.value = lineFilter.value ? (lines.value.find((x) => x.v === lineFilter.value)?.t.split('·')[1] || '') : ''
   void l
+}
+
+/** 排产(2026-09-27):勾选行 → 弹窗选 生产线+排产数量(空=全排) → 复用快速排产 /assign(守卫/落 plang+plang_pc/负荷回执) */
+function openSchedule() {
+  if (!checked.value.length) { ElMessage.warning(tt('请先勾选要排产的工单')); return }
+  schLine.value = lineFilter.value || ''
+  schQty.value = null
+  schVisible.value = true
+}
+
+async function doSchedule() {
+  if (!schLine.value) { ElMessage.warning(tt('请选择生产线')); return }
+  try {
+    const res = await request.post('/px/scheduleBoard/assign', {
+      rows: checked.value.map((r) => ({
+        加工单号: r.工单号,
+        行id: r.行id,                      // plang.id(精确到批次行)
+        生产线: schLine.value,
+        排产数量: schQty.value > 0 ? schQty.value : undefined,
+        顶部生产线: schLine.value,
+      })),
+    })
+    const d = res.data || {}
+    const failed = d['失败行'] || []
+    const rc = (d['产线回执'] || [])[0]
+    ElMessage.success(tt('已排产') + ` ${d['排产张数']} ${tt('张')} → ${schLine.value}`
+      + (rc ? `（${tt('今日负荷')} ${num(rc['今日负荷'])}/${tt('日产能')} ${num(rc['日产能'])}${rc['提示'] ? '·' + tt('超载') : ''}）` : '')
+      + (failed.length ? `；${tt('跳过')} ${failed.length}：${failed[0]}` : ''))
+    schVisible.value = false
+    load()
+    loadLines()
+  } catch (e) { err(e, '排产失败') }
 }
 
 async function onClose(close) {

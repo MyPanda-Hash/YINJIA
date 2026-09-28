@@ -72,6 +72,11 @@ public class WorkOrderListController {
             w.append(" AND p.pl_date < DATEADD(day, 1, ?)");
             args.add(String.valueOf(b.get("日期到")));
         }
+        // 生产线筛选(2026-09-27 用户拍板:下拉此前无效——后端没接过滤条件)
+        if (b.get("生产线") != null && !String.valueOf(b.get("生产线")).isBlank()) {
+            w.append(" AND ISNULL(p.scx, N'') = ?");
+            args.add(String.valueOf(b.get("生产线")).trim());
+        }
         // 单框模糊搜索(2026-09-26 用户拍板):关键字在 工单号/物料编码/产品名称/客户代码/客户名称 多列 OR
         String kw = b.get("keyword") == null ? "" : String.valueOf(b.get("keyword")).trim();
         if (!kw.isEmpty()) {
@@ -82,7 +87,7 @@ public class WorkOrderListController {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT p.comm AS 公司代码, p.pl_no AS 工单号, p.pl_xc AS 工单行号,"
                         + " ISNULL(p.[批次号], N'') AS 批次号,"
-                        + " p.pl_no AS 加工单号, p.pl_xc AS 行id, p.pl_xc AS 行号,"
+                        + " p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 行号,"
                         + " CONVERT(varchar(10), p.pl_date, 120) AS 单据日期,"
                         + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.khdm, N'') AS 客户代码,"
                         + " ISNULL(p.scx, N'') AS 生产线,"
