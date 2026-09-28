@@ -45,7 +45,7 @@ tools/
 | 临时查询 | `java -cp lib\mssql-jdbc.jar SqlProbe.java` / `SqlRunner.java` |
 | API 全链路回归 | `powershell -File scripts\verify-api.ps1`(需后端已启动) |
 | 面板配置/条件冒烟 | `scripts\audit-panels.ps1`、`scripts\audit-conditions.ps1` |
-| **数据库规范体检**(12 项:命名/注明/元数据漂移/链卫生) | `set YINJIA_SQL_PASS=<库口令> & java -cp lib\mssql-jdbc.jar verify\DbNormAudit.java`(两个账套;判定口径见 `docs\development\数据库规范.md` §6) |
+| **数据库规范体检**(13 项:命名/注明/元数据漂移/面板对象必备列/链卫生) | `set YINJIA_SQL_PASS=<库口令> & java -cp lib\mssql-jdbc.jar verify\DbNormAudit.java`(两个账套;判定口径见 `docs\development\数据库规范.md` §6) |
 | UI 冒烟(CDP) | `node verify\panels-ui-smoke.cjs`(在 tools/ 下运行,依赖 node_modules) |
 | 热更新包(仅后端 class) | `pwsh -File scripts\build-hot-update.ps1`(在仓库根或见 deploy/部署说明.md) |
 | 生成器重跑 | `node gen\gen-xxx.cjs`(历史迁移数据生成,一般不重跑;重跑前先读脚本内注释) |

@@ -156,7 +156,7 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 ## 架构速查(补充)
 
 - 通用设计资产库(供其它项目 agent 参考实现):`https://github.com/MyPanda-Hash/CHENGXIAO`(9 专题+代码片段+表结构)
-- **DATABASE 规范**:**`docs/development/数据库规范.md`**(建表/改列/加面板字段的硬规矩 + `tools/verify/DbNormAudit.java` 12 项体检 + `tools/db-legacy-whitelist.txt` 冻结与棘轮登记);**新增表/列/字段必须满足该规范,体检 FAIL 视为任务未完成**;移交前跑 `java -cp lib\mssql-jdbc.jar verify/DbNormAudit.java`(在 tools 目录下,需 `YINJIA_SQL_PASS`,两个账套)
+- **DATABASE 规范**:**`docs/development/数据库规范.md`**(建表/改列/加面板字段的硬规矩 + `tools/verify/DbNormAudit.java` 13 项体检 + `tools/db-legacy-whitelist.txt` 冻结与棘轮登记);**新增表/列/字段必须满足该规范,体检 FAIL 视为任务未完成**;移交前跑 `java -cp lib\mssql-jdbc.jar verify/DbNormAudit.java`(在 tools 目录下,需 `YINJIA_SQL_PASS`,两个账套)
 - **数据库表清单**:**`docs/development/数据库表清单.md`**(全库表 + 视图逐张登记 + §0 命名与归属规范;建表/改表/查表先看它,刷新命令见文档末尾)
 - **代码规范与防臃肿**:**`docs/development/代码规范与防臃肿.md`**(A 分层边界/B 契约数据驱动/C 文件红线/D 反复制粘贴/E 清理与技术债台账/F 自动化防线);新代码必须满足该规范,违背即视为任务未完成
 - **踩坑台账**:`docs/development/开发与质量.md` §5.5(2026-09-11 前端导出/探针专项:jsPDF px 单位、html2canvas、$el fragment 锚点、离屏克隆全宽截图、PS 命令通道 CJK 键、char(2) 尾空格等);**涉 PDF 生成/截图导出/CDP 探针/PS 工具脚本/定长列比较,先读该节再动手,违者即重复事故**
