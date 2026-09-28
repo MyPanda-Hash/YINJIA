@@ -2027,7 +2027,19 @@ public class ButtonService {
      *   ① 数量 → **退货数量**(QC_RETURN 行的数量字段叫退货数量,原先写「数量」→ 退货数量恒空);
      *   ② 型号 → **规格型号**(退回行字段叫规格型号);
      *   ③ 计量单位/单价:退回行原先**没有这两列**(本迁移已补),否则与 ② 同样丢弃。
+     * 2026-09-30 再修正(① 的镜像事故):09-20 的「退货数量」是按旧版 qc-3docs 血统改的;rebuild 血统
+     *   (本地两库及服务器全量恢复后)的退回行数量字段叫「数量」且无「退货数量」列 → 写入再次被静默丢弃,
+     *   TH-2026-09-0002~0004 行数量全空。教训:生单写入的标签必须**按目标面板注册动态解析**,不能写死单侧血统
+     *   的字面量——同因顺手补了 头「检验单号」(rebuild 血统缺字段行,溯源断链,配套 migrate-qcreturn-srcfix)。
      */
+    /** 目标面板明细字段标签解析:按候选顺序取第一个已注册的标签(多血统字段名兼容,如 退货数量/数量) */
+    private static String pickDetailLabel(PanelRegistry.PanelDef def, String... candidates) {
+        java.util.Set<String> labels = new java.util.HashSet<>();
+        for (PanelRegistry.FieldDef f : def.fieldsAt("detail")) labels.add(f.label());
+        for (String c : candidates) if (labels.contains(c)) return c;
+        return null;
+    }
+
     private void inspAutoReturn(String panelCode, String no, String user) {
         if (!"QC_INSP".equals(panelCode)) return;
         Integer linked = jdbc.queryForObject(
@@ -2048,12 +2060,17 @@ public class ButtonService {
         if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + no);
         Map<String, Object> h = heads.get(0);
         List<Map<String, Object>> items = new ArrayList<>();
+        // 2026-09-30 血统兼容:退回行数量字段 rebuild 血统叫「数量」、旧版 qc-3docs 血统叫「退货数量」,
+        // 此前写死「退货数量」在 rebuild 库(列都没有)被保存层静默丢弃 → 自动退回单行数量全空
+        // (实证 TH-2026-09-0002~0004)。按目标面板注册的标签择一写入,两侧血统都能落。
+        PanelRegistry.PanelDef thDef = registry.panel("QC_RETURN");
+        String qtyLabel = pickDetailLabel(thDef, "退货数量", "数量");
         for (Map<String, Object> r : defect) {
             Map<String, Object> line = new LinkedHashMap<>();
             line.put("物料编码", r.get("物料编码"));
             line.put("物料名称", r.get("物料名称"));
             line.put("规格型号", r.get("规格型号"));   // 退回行字段=规格型号(原写「型号」落不下)
-            line.put("退货数量", r.get("不良数量")); // 退回行数量字段=退货数量(原写「数量」落不下)
+            if (qtyLabel != null) line.put(qtyLabel, r.get("不良数量")); // 数量=检验行不良数量(标签按目标注册二择一)
             line.put("计量单位", r.get("计量单位"));
             if (r.get("单位") != null) line.put("单位", r.get("单位")); // 退回行另有「单位」列(2026-09-21 补齐,原先只写计量单位 → 单位全空)
             line.put("单价", r.get("单价"));
@@ -2076,7 +2093,10 @@ public class ButtonService {
             head.put("采购订单号", h.get("采购订单号"));
         }
         if (h.get("批次号") != null && !String.valueOf(h.get("批次号")).isBlank()) head.put("批次号", h.get("批次号"));
-        head.put("检验单号", no); // 头「检验单号」=来源检验单(参照字段存单号)
+        // 头「检验单号」=来源检验单(参照字段存单号)。2026-09-30:按目标注册择标签写入——
+        // rebuild 血统原无该字段行(写入被静默丢弃,溯源断链),配套迁移 migrate-qcreturn-srcfix 已补;
+        // 此处守卫仅为再遇血统缺字段时显式跳过,不再静默碰运气。
+        if (thDef.byLabel("检验单号") != null) head.put("检验单号", no);
         head.put("detail", Map.of("items", items));
         Map<String, Object> saved = save(registry.panel("QC_RETURN"), head, false);
         String thNo = String.valueOf(saved.get("编号"));
