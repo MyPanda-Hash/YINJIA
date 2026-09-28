@@ -8,7 +8,7 @@ import es from 'element-plus/es/locale/lang/es'
 import fr from 'element-plus/es/locale/lang/fr'
 import de from 'element-plus/es/locale/lang/de'
 import ru from 'element-plus/es/locale/lang/ru'
-import { i18n, LOCALE_KEY, BIZ_KEYS } from '@/i18n'
+import { i18n, LOCALE_KEY, ensureLocalePack } from '@/i18n'
 
 /** Element Plus 组件库文案 locale 映射(缺失语言回退英文)。 */
 const EP_LOCALES = { 'zh-CN': zhCn, 'zh-TW': zhTw, en, ja, ko, es, fr, de, ru }
@@ -81,6 +81,9 @@ export const useLocaleStore = defineStore('locale', {
     },
     async set(locale) {
       if (!locale || locale === this.locale) return
+      // 语言包按需加载:先取包再切换,界面无中文闪烁;无本地包的动态语言空手而归,
+      // 词条由 tt() 的 miss → ensureDict 机翻管线兜底(与原机制一致)。
+      await ensureLocalePack(locale)
       this.locale = locale
       try { localStorage.setItem(LOCALE_KEY, locale) } catch { /* ignore */ }
       this.apply()

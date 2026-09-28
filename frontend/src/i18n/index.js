@@ -1,22 +1,11 @@
 import { createI18n } from 'vue-i18n'
 import { ref } from 'vue'
+// 语言包按需加载(2026-09-28 性能优化:11 个包 ~1.1MB 全静态打入主包)。
+// zh-CN 是源语言+回退语言,恒驻;其余包 ensureLocalePack() 动态 import 独立 chunk。
 import zhCN from './locales/zh-CN'
-import zhTW from './locales/zh-TW'
-import en from './locales/en'
-import ja from './locales/ja'
-import ko from './locales/ko'
-import es from './locales/es'
-import fr from './locales/fr'
-import de from './locales/de'
-import ru from './locales/ru'
-import vi from './locales/vi'
-import th from './locales/th'
 
 /** Supported locales at build time(zh-CN 恒在首位;其余来自后端 yj_locale 注册表动态扩展)。 */
 export const SUPPORTED = ['zh-CN', 'zh-TW', 'en']
-
-/** 业务直译词典的全部中文原文键(供后端 /api/locale/dict 机翻新语言)。 */
-export const BIZ_KEYS = Object.keys(en.biz || {})
 
 /** localStorage key for the anonymous/local fallback preference. */
 export const LOCALE_KEY = 'mes_locale'
@@ -39,27 +28,53 @@ export function detectLocale() {
   return DEFAULT_LOCALE
 }
 
+/** 有本地静态语言包的 locale(动态 import 的映射表;vite 据此为每个包建独立 chunk)。 */
+const PACKS = {
+  'zh-TW': () => import('./locales/zh-TW'),
+  en: () => import('./locales/en'),
+  ja: () => import('./locales/ja'),
+  ko: () => import('./locales/ko'),
+  es: () => import('./locales/es'),
+  fr: () => import('./locales/fr'),
+  de: () => import('./locales/de'),
+  ru: () => import('./locales/ru'),
+  vi: () => import('./locales/vi'),
+  th: () => import('./locales/th'),
+}
+
 /** 已带静态语言包的 locale(切换即生效,不依赖机翻)。 */
-export const STATIC_PACKED = ['zh-CN', 'zh-TW', 'en', 'ja', 'ko', 'es', 'fr', 'de', 'ru', 'vi', 'th']
+export const STATIC_PACKED = ['zh-CN', ...Object.keys(PACKS)]
 
 export const i18n = createI18n({
   legacy: false,
   locale: detectLocale(),
   fallbackLocale: DEFAULT_LOCALE,
-  messages: {
-    'zh-CN': zhCN,
-    'zh-TW': zhTW,
-    en,
-    ja,
-    ko,
-    es,
-    fr,
-    de,
-    ru,
-    vi,
-    th,
-  },
+  messages: { 'zh-CN': zhCN },
 })
+
+/* ---- 语言包按需加载 ----
+ * 已加载的去重;并发调用共享同一 Promise(先占位后回填,失败时清除以便重试)。
+ * zh-CN 恒在(源语言),无包语言(后端 yj_locale 扩展)直接空手而归——词条走
+ * tt() 的 miss → ensureDict 机翻管线,与既有机制无缝衔接。
+ */
+const packLoaded = new Set(['zh-CN'])
+const packLoading = new Map()
+
+export async function ensureLocalePack(locale) {
+  if (!locale || locale === 'zh-CN' || locale === 'zh' || packLoaded.has(locale)) return
+  let p = packLoading.get(locale)
+  if (!p) {
+    const loader = PACKS[locale]
+    p = loader
+      ? loader().then((mod) => { i18n.global.mergeLocaleMessage(locale, mod.default || {}) })
+          .then(() => { packLoaded.add(locale) })
+          .catch((e) => { console.warn('[i18n] 语言包加载失败:', locale, e) })
+          .finally(() => { packLoading.delete(locale) })
+      : Promise.resolve() // 无本地包的动态语言:交给机翻管线
+    packLoading.set(locale, p)
+  }
+  await p
+}
 
 /**
  * 业务直译 helper(全局语言切换,ADR-0001:仅显示层):

@@ -15,7 +15,7 @@ import router from './router'
 import './styles/index.css'
 import * as sqlPanelRuntime from './business/engine'
 import { installPanelRuntime } from './core/panel-runtime'
-import { i18n, registerDictFetcher } from './i18n'
+import { i18n, registerDictFetcher, ensureLocalePack } from './i18n'
 import { useLocaleStore } from './stores/locale'
 
 const app = createApp(App)
@@ -35,8 +35,14 @@ app.use(ElLoading)
 // 拉取动态语言列表(yj_locale 注册表);外语缺失词典(翻译表/机翻)后台补齐
 // (静态包词条挂载即生效,机翻补缺的零星词条下次刷新生效——翻译表已缓存)。
 const localeStore = useLocaleStore()
-// tt() 渲染 miss 的键 → 批量调词器(翻译表命中或机翻)→ merge → 重渲(light-mes 同款自动机翻)
-registerDictFetcher((locale, keys) => localeStore.ensureDict(locale, keys))
-localeStore.apply()
-localeStore.loadAvailable()
-app.mount('#app')
+// 语言包按需加载:启动 locale 可能来自 localStorage/浏览器探测(非中文),
+// 先取包再挂载,首屏无中文闪烁(zh-CN 恒驻零开销;动态语言无包时空手而归走机翻)。
+// 注:async IIFE 而非顶层 await —— vite 默认 target(es2020)不支持 TLA(实测报错)。
+;(async () => {
+  await ensureLocalePack(i18n.global.locale.value)
+  // tt() 渲染 miss 的键 → 批量调词器(翻译表命中或机翻)→ merge → 重渲(light-mes 同款自动机翻)
+  registerDictFetcher((locale, keys) => localeStore.ensureDict(locale, keys))
+  localeStore.apply()
+  localeStore.loadAvailable()
+  app.mount('#app')
+})()
