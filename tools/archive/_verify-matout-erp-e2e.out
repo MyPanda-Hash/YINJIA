@@ -1,0 +1,7 @@
+登录(测试账套): YJ_TEST
+保存: code=200 编号=CL-2026-09-0002 success
+提交审批 : code=200 success
+审批通过 : code=200 success
+查询可转ERP: count=1 → CL-2026-09-0002(白兴发)
+转ERP : code=500 msg=服务异常：转ERP失败: 获取app-token失败: 授权密钥校验失败，请获取最新密钥加密 data=
+DOCNO=CL-2026-09-0002

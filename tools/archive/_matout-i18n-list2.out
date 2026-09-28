@@ -1,0 +1,58 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:11 字符: 145
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-i18n-list2.sql ==
+  | 45 | 基本单位id | 
+  | 46 | 基本单位编码 | 
+  | 47 | 基本单位名称 | 
+  | 48 | 基本数量 | 
+  | 49 | 库存基本数量 | 
+  | 50 | 库存数量 | 
+  | 51 | 领料类型 | 
+  | 52 | 领料用途编码 | 
+  | 53 | 领料用途名称 | 
+  | 54 | 默认浮动数量 | 
+  | 55 | 商品id | 
+  | 56 | 商品是否保质期 | 
+  | 57 | 商品是否多单位 | 
+  | 58 | 商品是否辅助属性 | 
+  | 59 | 商品是否批次 | 
+  | 60 | 商品是否序列号 | 
+  | 61 | 审核人_auditor_name | 
+  | 62 | 审核人编码 | 
+  | 63 | 审核时间_audit_time | 
+  | 64 | 生产许可证 | 
+  | 65 | 是否已转ERP | 
+  | 66 | 条形码 | 
+  | 67 | 图片 | 
+  | 68 | 修改人 | 
+  | 69 | 修改人编码 | 
+  | 70 | 修改时间 | 
+  | 71 | 序列号流转ID | 
+  | 72 | 序列号清单 | 
+  | 73 | 有效期至 | 
+  | 74 | 源单编号 | 
+  | 75 | 源单产品分录id | 
+  | 76 | 源单分录id | 
+  | 77 | 源单类型id | 
+  | 78 | 源单类型编码 | 
+  | 79 | 源单类型名称 | 
+  | 80 | 源单内部id | 
+  | 81 | 源单日期 | 
+  | 82 | 源单行号 | 
+  | 83 | 注册证号 | 
+  | 84 | 转ERP操作人 | 
+  | 85 | 转ERP时间 | 
+  | 部门编码 | 部門コード | 
+  | 仓库编码 | 倉庫コード | 
+  | 创建时间 | 作成時間 | 
+  | 辅助数量 | 補助数量 | 
+  | 换算率 | 換算率 | 
+  | 经手人编码 | 担当者コード | 
+  | 行号 | 行番号 | 
+[OK] _q-matout-i18n-list2.sql (3 batches)

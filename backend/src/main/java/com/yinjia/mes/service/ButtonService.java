@@ -1187,9 +1187,10 @@ public class ButtonService {
         jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
         // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
-        if (List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER").contains(def.code())) {
+        if (List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT").contains(def.code())) {
             String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
-                    : "PU_ORDER".equals(def.code()) ? "bd_pu_order" : "bd_sale_out";
+                    : "PU_ORDER".equals(def.code()) ? "bd_pu_order"
+                    : "MATERIAL_OUT".equals(def.code()) ? "bd_material_out" : "bd_sale_out";
             jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
         }
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
@@ -2822,11 +2823,14 @@ public class ButtonService {
     }
 
     private Map<String, Object> listPushableErp(PanelRegistry.PanelDef def) {
-        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER").contains(def.code()))
-            throw new IllegalStateException("仅采购订单/采购入库/销售出库支持转ERP");
+        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT").contains(def.code()))
+            throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库支持转ERP");
         String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
-                : "PU_ORDER".equals(def.code()) ? "bd_pu_order" : "bd_sale_out";
-        String partnerCol = "SALE_OUT".equals(def.code()) ? "客户" : "供应商";
+                : "PU_ORDER".equals(def.code()) ? "bd_pu_order"
+                : "MATERIAL_OUT".equals(def.code()) ? "bd_material_out" : "bd_sale_out";
+        // 材料出库单没有 客户/供应商 列(领料是内部单据),往来单位取「领用人」
+        String partnerCol = "SALE_OUT".equals(def.code()) ? "客户"
+                : "MATERIAL_OUT".equals(def.code()) ? "领用人" : "供应商";
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT h.单据编号, h.单据日期, h." + partnerCol + " AS 往来单位, h." + partnerCol + " AS partner" +
                 " FROM " + tbl + " h" +
@@ -2840,10 +2844,10 @@ public class ButtonService {
         return out;
     }
 
-    /** 转ERP:已审核+未转过的采购入库/销售出库 → 推金蝶,回写ERP单号 */
+    /** 转ERP:已审核+未转过的采购入库/销售出库/材料出库 → 推金蝶,回写ERP单号 */
     private Map<String, Object> pushToErp(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER").contains(def.code()))
-            throw new IllegalStateException("仅采购订单/采购入库/销售出库支持转ERP");
+        if (!List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT").contains(def.code()))
+            throw new IllegalStateException("仅采购订单/采购入库/销售出库/材料出库支持转ERP");
         String docNo = String.valueOf(formData.getOrDefault("编号", formData.getOrDefault("单据编号", "")));
         if (docNo.isBlank()) throw new IllegalArgumentException("缺少单据编号");
         String operator = currentUserName();

@@ -1555,3 +1555,33 @@ migrate-manu-prune-legacy.sql
 migrate-wo-report-upgrade.sql
 # —— 2026-09-23 工单明细留痕四列(旧系统 ProSchedList 对齐):bd_manu_order 补 结案人/结案时间(ManuCloseHandler 结案写入·取消结案清空)/打印人/打印时间(/px/scheduleBoard/printStamp 打印生产任务单写入);展示=工单排产看板明细列+追溯弹窗,不进 MANU_ORDER 表单 ——
 migrate-manu-close-print-stamp.sql
+
+# —— 2026-09-28 材料出库单(MATERIAL_OUT)接口并集补全 + 开通转ERP(对口金蝶「生产领料单」inv_pick) ——
+#   用户口径:「bl_material_out 少了一些字段,这个要转ERP的;ERP 里有哪些字段要转过去这里都要加上,
+#   尤其关注价格、税金;先查金蝶真实账套有没有用到这张单、表里有没有数据;没有就按采购入库单的方式
+#   把接口字段并集全部写入,显示常见字段」。
+#   实测(金蝶真实账套只读,deploy/_probe-matout.mjs 与 _probe-invpick-fields.mjs):
+#     · 对表单 = **生产领料单** /jdy/v2/scm/inv_pick,**4801 张**(真实在用);
+#       对照 pur_inbound 3266 / sal_out_bound 5084 / inv_other_out 1130;其余候选路径 519 无此接口。
+#     · 头 33 键 + 行 74 键(采样 40 张/156 行);⚠ **无税金族**:没有 税率%/税额/含税单价/金额/价税合计
+#       (与采购入库/销售出库本质不同);价格族只有 price/cost/unit_cost 三键,且真实账套 244 行实测全为 0。
+#     · MES 侧 bl_material_out 仅 22 列(2 张/4 行数据),故按「接口并集全量写入」口径补齐。
+#   ① migrate-material-out-fields.sql(生成器 tools/archive/_gen-material-out.mjs):
+#      bd_material_out 补 25 列、bl_material_out 补 63 列(并集减去已由现有列代表的键),
+#      同脚本注册 yj_field(常见字段显示、id/创建修改/图片/空值族隐藏;价格族「成本/单位成本」强制显示)
+#      + en 译名 + 每列 MS_Description 中文注明。按用户口径**不建税金列**。
+#   ② migrate-material-out-erp.sql:bd_material_out 补 是否已转ERP/ERP单号/转ERP操作人/转ERP时间 四列 + 字段注册。
+#      配套代码(同提交):KingdeePushService 增 MATERIAL_OUT 分支(推 /jdy/v2/scm/inv_pick;不推 trans_type/
+#      供应商/客户/税金,头带 dept_number→部门编码·emp_number→经手人编码·pick_type,行带 price/cost/unit_cost/comment)、
+#      ButtonService 三处放行(转ERP/查询可转ERP/弃审清标记)、PanelConfigService MATERIAL_OUT 工具栏加 转ERP 组。
+#   ③ ⚠ 本脚本刻意**不写** `USE HSDZ_MES;`(采购入库那份生成器写了,对测试库跑会被切回正式库)—— 两账套各自生效。
+migrate-material-out-fields.sql
+migrate-material-out-erp.sql
+
+# —— 2026-09-28 材料出库单接口并集新字段的**日语**译名补齐(多语言强制规范·判定标准) ——
+#   实测:migrate-material-out-fields 按采购入库同款只写了 en,92 个新标签里仅 7 个(部门编码/仓库编码/
+#   创建时间/辅助数量/换算率/经手人编码/行号,均为跨面板共享标签)带 ja,其余 85 个切日语回落中文 ⇒ 判定不通过。
+#   本脚本补 85 条人工 ja(source='manual';仅插缺失、不覆盖已有),并把「MATERIAL_OUT 全部字段标签 ja 覆盖 100%」
+#   写成自检(缺一即 RAISERROR)。其余 7 语言仍走 TranslationService 机翻兜底(与采购入库那批同口径)。
+#   两个账套均已执行:117 标签 / 缺 en 0 / 缺 ja 0 / ja 人工译名 117。幂等(复跑插入 0 行)。
+migrate-material-out-i18n.sql

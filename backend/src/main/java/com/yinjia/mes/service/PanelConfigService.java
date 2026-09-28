@@ -866,6 +866,7 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
             // 材料出库单:选单=生产加工单;生单灰(PANDA:生成材料出库单（直接退料）)
+            // 转ERP(2026-09-28):材料出库单 → 金蝶「生产领料单」/jdy/v2/scm/inv_pick
             java.util.Map.entry("MATERIAL_OUT", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选单", "选生产加工单"},
@@ -874,6 +875,7 @@ public class PanelConfigService {
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成材料出库单（直接退料）"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},

@@ -1,0 +1,10 @@
+﻿头并集 33 键(已对应 5,补 25)
+行并集 74 键(已对应 9,补 63)
+
+【头·显示(10)】create_time→创建时间 | bill_status→单据状态_bill_status | dept_number→部门编码 | pick_type→领料类型 | modify_time→修改时间 | audit_time→审核时间_audit_time | bill_type_name→单据类型名称 | bill_type_number→单据类型编码 | auditor_name→审核人_auditor_name | emp_number→经手人编码
+【头·隐藏(15)】dept_id→dept_id | creator_id→creator_id | creator_name→创建人 | creator_number→创建人编码 | modifier_id→modifier_id | modifier_name→修改人 | modifier_number→修改人编码 | bill_type_id→bill_type_id | auditor_id→auditor_id | auditor_number→审核人编码 | emp_id→emp_id | mul_bill_label→单据标签 | pick_use_name→领料用途名称 | pick_use_id→pick_use_id | pick_use_number→领料用途编码
+
+【行·显示(16)】seq→行号 | material_is_multi_unit→商品是否多单位 | material_is_serial→商品是否序列号 | material_is_asst_attr→商品是否辅助属性 | material_is_kf_period→商品是否保质期 | material_is_batch→商品是否批次 | stock_number→仓库编码 | stock_is_allow_freight→仓库启用仓位管理 | base_unit_name→基本单位名称 | base_unit_number→基本单位编码 | unit_number→单位编码 | inv_qty→库存数量 | base_qty→基本数量 | coefficient→换算系数 | cost→成本 | unit_cost→单位成本
+【行·隐藏(47)】picture→图片 | material_id→商品id | stock_id→仓库id | sp_id→仓位id | sp_name→仓位名称 | sp_number→仓位编码 | aux_prop_id→辅助属性id | aux_prop_name→辅助属性名称 | aux_prop_number→辅助属性编码 | aux1_id→辅助属性1id | aux1_name→辅助属性1名称 | aux1_number→辅助属性1编码 | aux2_id→辅助属性2id | aux2_name→辅助属性2名称 | aux2_number→辅助属性2编码 | aux3_id→辅助属性3id | aux3_name→辅助属性3名称 | aux3_number→辅助属性3编码 | barcode→条形码 | pro_place→产地 | pro_reg_no→注册证号 | pro_license→生产许可证 | kf_date→保质期到期日 | valid_date→有效期至 | kf_type→保质期类型 | kf_period→保质期 | sn_list→序列号清单 | sn_list_id→序列号流转ID | base_unit_id→基本单位id | unit_id→单位id | aux_unit_id→辅助单位id | aux_unit_name→辅助单位名称 | aux_unit_number→辅助单位编码 | conversion_rate→换算率 | inv_base_qty→库存基本数量 | aux_qty→辅助数量 | def_float_qty→默认浮动数量 | aux_coefficient→辅助换算系数 | src_bill_no→源单编号 | src_bill_type_id→源单类型id | src_bill_type_name→源单类型名称 | src_bill_type_number→源单类型编码 | src_inter_id→源单内部id | src_bill_date→源单日期 | src_seq→源单行号 | src_entry_id→源单分录id | src_product_entry_id→源单产品分录id
+
+已生成:tools/migrate-material-out-fields.sql + deploy/kingdee-extra-fields.mjs(MATERIAL_OUT)

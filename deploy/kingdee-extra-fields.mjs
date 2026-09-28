@@ -1,7 +1,7 @@
 // kingdee-extra-fields.mjs — 全并集自动映射表(生成器产出,勿手改)
 //   EXTRA: 头/档案级 c=列 a=接口键(支持 dotted) t=dec/join/str
 //   EXTRA_LINES: 单据行级(键取自 material_entity 元素)
-//   注意:PURCHASE_IN/SALE_OUT 的条目已备好但 sync-core 尚未接入(待同步脚本特殊要求)
+//   注意:PURCHASE_IN/SALE_OUT/MATERIAL_OUT 的条目已备好但 sync-core 尚未接入(待同步脚本特殊要求)
 export const EXTRA = {
   "BD_SETTLE": [],
   "BD_CUSGRP": [],
@@ -2245,6 +2245,133 @@ export const EXTRA = {
       "a": "currency_name",
       "t": "str"
     }
+  ],
+  "MATERIAL_OUT": [
+    {
+      "c": "创建时间",
+      "a": "create_time",
+      "t": "str"
+    },
+    {
+      "c": "单据状态_bill_status",
+      "a": "bill_status",
+      "t": "str"
+    },
+    {
+      "c": "dept_id",
+      "a": "dept_id",
+      "t": "str"
+    },
+    {
+      "c": "部门编码",
+      "a": "dept_number",
+      "t": "str"
+    },
+    {
+      "c": "领料类型",
+      "a": "pick_type",
+      "t": "str"
+    },
+    {
+      "c": "修改时间",
+      "a": "modify_time",
+      "t": "str"
+    },
+    {
+      "c": "审核时间_audit_time",
+      "a": "audit_time",
+      "t": "str"
+    },
+    {
+      "c": "creator_id",
+      "a": "creator_id",
+      "t": "str"
+    },
+    {
+      "c": "创建人",
+      "a": "creator_name",
+      "t": "str"
+    },
+    {
+      "c": "创建人编码",
+      "a": "creator_number",
+      "t": "str"
+    },
+    {
+      "c": "modifier_id",
+      "a": "modifier_id",
+      "t": "str"
+    },
+    {
+      "c": "修改人",
+      "a": "modifier_name",
+      "t": "str"
+    },
+    {
+      "c": "修改人编码",
+      "a": "modifier_number",
+      "t": "str"
+    },
+    {
+      "c": "单据类型名称",
+      "a": "bill_type_name",
+      "t": "str"
+    },
+    {
+      "c": "单据类型编码",
+      "a": "bill_type_number",
+      "t": "str"
+    },
+    {
+      "c": "bill_type_id",
+      "a": "bill_type_id",
+      "t": "str"
+    },
+    {
+      "c": "auditor_id",
+      "a": "auditor_id",
+      "t": "str"
+    },
+    {
+      "c": "审核人_auditor_name",
+      "a": "auditor_name",
+      "t": "str"
+    },
+    {
+      "c": "审核人编码",
+      "a": "auditor_number",
+      "t": "str"
+    },
+    {
+      "c": "emp_id",
+      "a": "emp_id",
+      "t": "str"
+    },
+    {
+      "c": "经手人编码",
+      "a": "emp_number",
+      "t": "str"
+    },
+    {
+      "c": "单据标签",
+      "a": "mul_bill_label",
+      "t": "str"
+    },
+    {
+      "c": "领料用途名称",
+      "a": "pick_use_name",
+      "t": "str"
+    },
+    {
+      "c": "pick_use_id",
+      "a": "pick_use_id",
+      "t": "str"
+    },
+    {
+      "c": "领料用途编码",
+      "a": "pick_use_number",
+      "t": "str"
+    }
   ]
 };
 
@@ -3890,6 +4017,323 @@ export const EXTRA_LINES = {
       "c": "价税合计本位币",
       "a": "all_amount_for",
       "t": "num"
+    }
+  ],
+  "MATERIAL_OUT": [
+    {
+      "c": "图片",
+      "a": "picture",
+      "t": "str"
+    },
+    {
+      "c": "行号",
+      "a": "seq",
+      "t": "str"
+    },
+    {
+      "c": "商品id",
+      "a": "material_id",
+      "t": "str"
+    },
+    {
+      "c": "商品是否多单位",
+      "a": "material_is_multi_unit",
+      "t": "str"
+    },
+    {
+      "c": "商品是否序列号",
+      "a": "material_is_serial",
+      "t": "str"
+    },
+    {
+      "c": "商品是否辅助属性",
+      "a": "material_is_asst_attr",
+      "t": "str"
+    },
+    {
+      "c": "商品是否保质期",
+      "a": "material_is_kf_period",
+      "t": "str"
+    },
+    {
+      "c": "商品是否批次",
+      "a": "material_is_batch",
+      "t": "str"
+    },
+    {
+      "c": "仓库id",
+      "a": "stock_id",
+      "t": "str"
+    },
+    {
+      "c": "仓库编码",
+      "a": "stock_number",
+      "t": "str"
+    },
+    {
+      "c": "仓库启用仓位管理",
+      "a": "stock_is_allow_freight",
+      "t": "str"
+    },
+    {
+      "c": "仓位id",
+      "a": "sp_id",
+      "t": "str"
+    },
+    {
+      "c": "仓位名称",
+      "a": "sp_name",
+      "t": "str"
+    },
+    {
+      "c": "仓位编码",
+      "a": "sp_number",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性id",
+      "a": "aux_prop_id",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性名称",
+      "a": "aux_prop_name",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性编码",
+      "a": "aux_prop_number",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性1id",
+      "a": "aux1_id",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性1名称",
+      "a": "aux1_name",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性1编码",
+      "a": "aux1_number",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性2id",
+      "a": "aux2_id",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性2名称",
+      "a": "aux2_name",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性2编码",
+      "a": "aux2_number",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性3id",
+      "a": "aux3_id",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性3名称",
+      "a": "aux3_name",
+      "t": "str"
+    },
+    {
+      "c": "辅助属性3编码",
+      "a": "aux3_number",
+      "t": "str"
+    },
+    {
+      "c": "条形码",
+      "a": "barcode",
+      "t": "str"
+    },
+    {
+      "c": "产地",
+      "a": "pro_place",
+      "t": "str"
+    },
+    {
+      "c": "注册证号",
+      "a": "pro_reg_no",
+      "t": "str"
+    },
+    {
+      "c": "生产许可证",
+      "a": "pro_license",
+      "t": "str"
+    },
+    {
+      "c": "保质期到期日",
+      "a": "kf_date",
+      "t": "str"
+    },
+    {
+      "c": "有效期至",
+      "a": "valid_date",
+      "t": "str"
+    },
+    {
+      "c": "保质期类型",
+      "a": "kf_type",
+      "t": "str"
+    },
+    {
+      "c": "保质期",
+      "a": "kf_period",
+      "t": "str"
+    },
+    {
+      "c": "序列号清单",
+      "a": "sn_list",
+      "t": "str"
+    },
+    {
+      "c": "序列号流转ID",
+      "a": "sn_list_id",
+      "t": "str"
+    },
+    {
+      "c": "基本单位id",
+      "a": "base_unit_id",
+      "t": "str"
+    },
+    {
+      "c": "基本单位名称",
+      "a": "base_unit_name",
+      "t": "str"
+    },
+    {
+      "c": "基本单位编码",
+      "a": "base_unit_number",
+      "t": "str"
+    },
+    {
+      "c": "单位id",
+      "a": "unit_id",
+      "t": "str"
+    },
+    {
+      "c": "单位编码",
+      "a": "unit_number",
+      "t": "str"
+    },
+    {
+      "c": "辅助单位id",
+      "a": "aux_unit_id",
+      "t": "str"
+    },
+    {
+      "c": "辅助单位名称",
+      "a": "aux_unit_name",
+      "t": "str"
+    },
+    {
+      "c": "辅助单位编码",
+      "a": "aux_unit_number",
+      "t": "str"
+    },
+    {
+      "c": "换算率",
+      "a": "conversion_rate",
+      "t": "str"
+    },
+    {
+      "c": "库存数量",
+      "a": "inv_qty",
+      "t": "str"
+    },
+    {
+      "c": "基本数量",
+      "a": "base_qty",
+      "t": "str"
+    },
+    {
+      "c": "库存基本数量",
+      "a": "inv_base_qty",
+      "t": "str"
+    },
+    {
+      "c": "辅助数量",
+      "a": "aux_qty",
+      "t": "str"
+    },
+    {
+      "c": "默认浮动数量",
+      "a": "def_float_qty",
+      "t": "str"
+    },
+    {
+      "c": "辅助换算系数",
+      "a": "aux_coefficient",
+      "t": "str"
+    },
+    {
+      "c": "换算系数",
+      "a": "coefficient",
+      "t": "str"
+    },
+    {
+      "c": "成本",
+      "a": "cost",
+      "t": "str"
+    },
+    {
+      "c": "单位成本",
+      "a": "unit_cost",
+      "t": "str"
+    },
+    {
+      "c": "源单编号",
+      "a": "src_bill_no",
+      "t": "str"
+    },
+    {
+      "c": "源单类型id",
+      "a": "src_bill_type_id",
+      "t": "str"
+    },
+    {
+      "c": "源单类型名称",
+      "a": "src_bill_type_name",
+      "t": "str"
+    },
+    {
+      "c": "源单类型编码",
+      "a": "src_bill_type_number",
+      "t": "str"
+    },
+    {
+      "c": "源单内部id",
+      "a": "src_inter_id",
+      "t": "str"
+    },
+    {
+      "c": "源单日期",
+      "a": "src_bill_date",
+      "t": "str"
+    },
+    {
+      "c": "源单行号",
+      "a": "src_seq",
+      "t": "str"
+    },
+    {
+      "c": "源单分录id",
+      "a": "src_entry_id",
+      "t": "str"
+    },
+    {
+      "c": "源单产品分录id",
+      "a": "src_product_entry_id",
+      "t": "str"
     }
   ]
 };

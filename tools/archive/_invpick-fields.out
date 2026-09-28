@@ -1,0 +1,27 @@
+﻿【生产领料单 inv_pick】列表 count=4801 取回 50 张
+列表键 10: create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, remark, pick_type
+
+详情(/jdy/v2/scm/inv_pick_detail) 33 键: id, bill_no, bill_date, bill_status, create_time, modify_time, audit_time, creator_id, creator_name, creator_number, modifier_id, modifier_name, modifier_number, bill_type_name, bill_type_number, bill_type_id, auditor_id, auditor_name, auditor_number, remark, dept_id, dept_name, dept_number, emp_id, emp_name, emp_number, material_entity, custom_field, mul_bill_label, pick_use_name, pick_use_id, pick_use_number, pick_type
+子表 material_entity: 9 行, 74 键
+
+采样 40 张 / 156 行 —— 头字段非空率(按 40 张):
+id=40, bill_no=40, bill_date=40, bill_status=40, create_time=40, modify_time=40, audit_time=40, creator_id=40, creator_name=40, creator_number=40, modifier_id=40, modifier_name=40, modifier_number=40, bill_type_name=40, bill_type_number=40, bill_type_id=40, auditor_id=40, auditor_name=40, auditor_number=40, dept_id=40, dept_name=40, dept_number=40, emp_id=40, emp_name=40, custom_field=40, pick_type=40, emp_number=39
+
+行字段非空率(按 156 行):
+seq=156, id=156, material_id=156, material_name=156, material_number=156, material_is_multi_unit=156, material_is_serial=156, material_is_asst_attr=156, material_is_kf_period=156, material_is_batch=156, stock_id=156, stock_name=156, stock_number=156, stock_is_allow_freight=156, kf_period=156, sn_list_id=156, base_unit_id=156, base_unit_name=156, base_unit_number=156, unit_id=156, unit_name=156, unit_number=156, qty=156, inv_qty=156, base_qty=156, inv_base_qty=156, aux_qty=156, def_float_qty=156, aux_coefficient=156, coefficient=156, price=156, cost=156, unit_cost=156, src_inter_id=156, src_seq=156, src_entry_id=156, custom_entity_field=156, src_product_entry_id=156, material_model=127, batch_no=104, aux_unit_id=5, aux_unit_name=5, aux_unit_number=5, conversion_rate=5, comment=4
+
+价格/税金族样例值:
+{
+  "qty": 1020,
+  "inv_qty": 1020,
+  "base_qty": 1020,
+  "inv_base_qty": 0,
+  "aux_qty": 0,
+  "def_float_qty": 0,
+  "price": 0,
+  "cost": 0,
+  "unit_cost": 0,
+  "conversion_rate": "1 kg = 1000 g\n"
+}
+
+已写出 tools/archive/_invpick-fields.json

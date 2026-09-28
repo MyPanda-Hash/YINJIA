@@ -1,0 +1,68 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 211
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-verify2.sql ==
+  | 仓库 | 1 | 10 | 
+  | 单据日期 | 1 | 10 | 
+  | 加工单号 | 1 | 20 | 
+  | 单据编号 | 1 | 20 | 
+  | 业务类型 | 1 | 30 | 
+  | 生产车间 | 1 | 40 | 
+  | 出库类别 | 1 | 50 | 
+  | 领用人 | 1 | 60 | 
+  | 项目 | 1 | 70 | 
+  | 来源单据 | 1 | 80 | 
+  | 销售订单号 | 1 | 90 | 
+  | 来源单号 | 1 | 90 | 
+  | 匹配来源单号 | 1 | 100 | 
+  | ERP单号 | 1 | 270 | 
+  | 转ERP操作人 | 1 | 280 | 
+  | 转ERP时间 | 1 | 290 | 
+  | 是否已转ERP | 1 | 300 | 
+  | 创建时间 | 1 | 970 | 
+  | 单据状态_bill_status | 1 | 971 | 
+  | 部门编码 | 1 | 973 | 
+  | 领料类型 | 1 | 974 | 
+  | 修改时间 | 1 | 975 | 
+  | 审核时间_audit_time | 1 | 976 | 
+  | 单据类型名称 | 1 | 983 | 
+  | 单据类型编码 | 1 | 984 | 
+  | 审核人_auditor_name | 1 | 987 | 
+  | 经手人编码 | 1 | 990 | 
+  | dept_id | 0 | 972 | 
+  | creator_id | 0 | 977 | 
+  | 创建人 | 0 | 978 | 
+  | 创建人编码 | 0 | 979 | 
+  | modifier_id | 0 | 980 | 
+  | 修改人 | 0 | 981 | 
+  | 修改人编码 | 0 | 982 | 
+  | bill_type_id | 0 | 985 | 
+  | auditor_id | 0 | 986 | 
+  | 审核人编码 | 0 | 988 | 
+  | emp_id | 0 | 989 | 
+  | 单据标签 | 0 | 991 | 
+  | 领料用途名称 | 0 | 992 | 
+  | pick_use_id | 0 | 993 | 
+  | 领料用途编码 | 0 | 994 | 
+  | 行号 | 971 | 
+  | 商品是否多单位 | 973 | 
+  | 商品是否序列号 | 974 | 
+  | 商品是否辅助属性 | 975 | 
+  | 商品是否保质期 | 976 | 
+  | 商品是否批次 | 977 | 
+  | 仓库编码 | 979 | 
+  | 仓库启用仓位管理 | 980 | 
+  | 基本单位名称 | 1007 | 
+  | 基本单位编码 | 1008 | 
+  | 单位编码 | 1010 | 
+  | 库存数量 | 1015 | 
+  | 基本数量 | 1016 | 
+  | 换算系数 | 1021 | 
+  | 成本 | 1022 | 
+  | 单位成本 | 1023 | 
+[OK] _q-matout-verify2.sql (4 batches)

@@ -1,0 +1,25 @@
+﻿
+【真实账套·其他出库单】/jdy/v2/scm/inv_other_out count=1130
+  列表键 29: create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, trans_type_id, trans_type_name, trans_type_number, customer_id, customer_name, customer_number, contact_phone, contact_country_id, contact_country_name, contact_country_number, contact_province_id, contact_province_name, contact_province_number, contact_city_id, contact_city_name, contact_city_number, contact_district_id, contact_district_name, contact_district_number, contact_linkman, contact_address
+  详情 46 键: id, bill_no, bill_date, bill_status, create_time, modify_time, audit_time, creator_id, creator_name, creator_number, modifier_id, modifier_name, modifier_number, auditor_id, auditor_name, auditor_number, trans_type_id, trans_type_name, trans_type_number, customer_id, customer_name, customer_number, remark, dept_id, dept_name, dept_number, emp_id, emp_name, emp_number, contact_phone, contact_country_id, contact_country_name, contact_country_number, contact_province_id, contact_province_name, contact_province_number, contact_city_id, contact_city_name, contact_city_number, contact_district_id, contact_district_name, contact_linkman, contact_district_number, contact_address, material_entity, custom_field
+  子表 material_entity: 73 键
+  采样 15 张 / 19 行;价格税金族样例: {"s_price":0,"s_cost":0,"s_unit_cost":0,"s_qty":100}
+
+【生产领料单价格实测】抽查 244 行:price≠0 的 0 行,cost≠0 的 0 行
+node : file:///D:/YINJIA-main/deploy/kingdee-client.mjs:93
+所在位置 行:1 字符: 129
++ ... ng]::new($false); node deploy\_probe-invpick-compare.mjs 2>&1 | Out-F ...
++                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (file:///D:/YINJ...e-client.mjs:93:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+    throw new Error(`获取app-token失败 errcode=${json.errcode} ${json.description || ''}`);
+          ^
+
+Error: 获取app-token失败 errcode=1030002006 授权密钥校验失败，请获取最新密钥加密
+    at requestToken (file:///D:/YINJIA-main/deploy/kingdee-client.mjs:93:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async fetchAppToken (file:///D:/YINJIA-main/deploy/kingdee-client.mjs:110:21)
+    at async file:///D:/YINJIA-main/deploy/_probe-invpick-compare.mjs:80:21
+
+Node.js v24.18.0

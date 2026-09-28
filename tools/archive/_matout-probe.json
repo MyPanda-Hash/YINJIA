@@ -1,0 +1,130 @@
+[
+  {
+    "label": "生产领料单",
+    "path": "/jdy/v2/scm/inv_pick",
+    "count": 4801,
+    "sample": {
+      "create_time": "2026-09-28 09:14:00",
+      "bill_date": "2026-09-27",
+      "id": "2578307506614991872",
+      "bill_no": "SCLL-20260927-00015",
+      "bill_status": "C",
+      "dept_id": "2170470230466328579",
+      "dept_name": "仓库",
+      "dept_number": "BM00008",
+      "remark": "",
+      "pick_type": "1"
+    }
+  },
+  {
+    "label": "其他出库单",
+    "path": "/jdy/v2/scm/inv_other_out",
+    "count": 1130,
+    "sample": {
+      "create_time": "2026-09-27 15:55:35",
+      "bill_date": "2026-09-27",
+      "id": "2577783742970096640",
+      "bill_no": "QTCK-20260927-01152",
+      "bill_status": "C",
+      "dept_id": "2170469887338617856",
+      "dept_name": "组装车间",
+      "dept_number": "BM00005",
+      "trans_type_id": "13",
+      "trans_type_name": "其他出库",
+      "trans_type_number": "QTCKLX01",
+      "customer_id": "",
+      "customer_name": "",
+      "customer_number": "",
+      "contact_phone": "",
+      "contact_country_id": "",
+      "contact_country_name": "",
+      "contact_country_number": "",
+      "contact_province_id": "",
+      "contact_province_name": "",
+      "contact_province_number": "",
+      "contact_city_id": "",
+      "contact_city_name": "",
+      "contact_city_number": "",
+      "contact_district_id": "",
+      "contact_district_name": "",
+      "contact_district_number": "",
+      "contact_linkman": "",
+      "contact_address": ""
+    }
+  },
+  {
+    "label": "对照:采购入库",
+    "path": "/jdy/v2/scm/pur_inbound",
+    "count": 3266,
+    "sample": {
+      "create_time": "2026-09-28 09:07:18",
+      "bill_date": "2026-09-27",
+      "id": "2578303164134510598",
+      "bill_no": "CGRK-20260927-03297",
+      "bill_status": "C",
+      "bill_close_state": "",
+      "supplier_id": "2158089911956245504",
+      "supplier_name": "达格玛（厦门）环保科技有限公司",
+      "supplier_number": "YJ-DGM",
+      "emp_id": "2183434422324416512",
+      "emp_name": "王光珍",
+      "emp_number": "ZY00018",
+      "remark": "",
+      "total_amount": 31110,
+      "delivery_type_id": "",
+      "delivery_type_name": "",
+      "delivery_type_number": "",
+      "settle_status": "A"
+    }
+  },
+  {
+    "label": "对照:销售出库",
+    "path": "/jdy/v2/scm/sal_out_bound",
+    "count": 5084,
+    "sample": {
+      "create_time": "2026-09-28 09:12:11",
+      "bill_date": "2026-09-30",
+      "id": "2578305197390500864",
+      "bill_no": "XSCK-20260930-00001",
+      "bill_status": "Z",
+      "settle_status": "A",
+      "delivery_status": "C",
+      "customer_id": "2157959975866043392",
+      "customer_name": "佛山市水护盾健康科技有限公司",
+      "customer_number": "A-48",
+      "emp_id": "2157416037878976512",
+      "emp_name": "谢琴",
+      "emp_number": "XQ",
+      "total_amount": "54519.66",
+      "material_group": 0,
+      "material_qty": "",
+      "bill_dis_before_amount": "54519.6600000000",
+      "bill_dis_amount": "0",
+      "material_entity": [
+        {
+          "material_id": "2300217142609567744",
+          "cost": "0",
+          "entry_ivc_status": "1"
+        },
+        {
+          "material_id": "2300217142609567744",
+          "cost": "0",
+          "entry_ivc_status": "1"
+        }
+      ],
+      "express_entity": [
+        {
+          "id": "2578305674291358723",
+          "express_company_id": "",
+          "delivery_bill_no": "JYN800099676963",
+          "delivery_time": "2026-09-30 09:12:12",
+          "express_remark": "加运美:"
+        }
+      ],
+      "ivc_status ": "1",
+      "custom_field": {
+        "custom_field__1__4ujia65gxej1x1": ""
+      }
+    }
+  }
+]

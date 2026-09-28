@@ -135,8 +135,14 @@ public class KingdeePushService {
         // 采购订单直推(2026-09-23):作为**金蝶采购订单**落到目标账套(用户口径:测试沙箱的采购订单里);
         // 与入库单推送互不影响 —— 订单推 pur_order,入库单推 pur_inbound(后者带 src 挂回订单)。
         boolean isOrder = "PU_ORDER".equals(panelCode);
-        String headTable = isOrder ? "bd_pu_order" : isPur ? "bd_purchase_in" : "bd_sale_out";
-        String lineTable = isOrder ? "bl_pu_order" : isPur ? "bl_purchase_in" : "bl_sale_out";
+        // 材料出库单直推(2026-09-28):作为**金蝶生产领料单**(inv_pick)落到目标账套。
+        // 为什么是它:真实账套只读实测(deploy/_probe-matout.mjs)inv_pick 有 4801 张,是料件出库的对口单据;
+        // 同族对照 pur_inbound 3266 / sal_out_bound 5084 / inv_other_out 1130,其余候选路径一律 519 无此接口。
+        boolean isMatOut = "MATERIAL_OUT".equals(panelCode);
+        String headTable = isOrder ? "bd_pu_order" : isPur ? "bd_purchase_in" : isMatOut ? "bd_material_out" : "bd_sale_out";
+        String lineTable = isOrder ? "bl_pu_order" : isPur ? "bl_purchase_in" : isMatOut ? "bl_material_out" : "bl_sale_out";
+        // 日志文案用的单据名(此前硬编码"采购入库单",材料出库单接进来后会把日志写错单)
+        String docLabel = isOrder ? "采购订单" : isPur ? "采购入库单" : isMatOut ? "材料出库单" : "销售出库单";
 
         Map<String, Object> head = jdbc.queryForMap(
                 "SELECT * FROM " + headTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
@@ -190,7 +196,7 @@ public class KingdeePushService {
         // ④ 构建金蝶 body(平铺;不传 bill_no → 金蝶自动生成编号,MES 编号放备注追溯)
         ObjectNode body = json.createObjectNode();
         body.put("bill_date", str(head.get("单据日期")));
-        if (!isOrder) body.put("trans_type", "2"); // 入库/出库单的业务类型;采购订单无此项
+        if (!isOrder && !isMatOut) body.put("trans_type", "2"); // 入库/出库单的业务类型;采购订单/生产领料单无此项
         // 采购订单直推带 bill_no(2026-09-23):沿用公司 YJ- 编号(MES 同号)——真实账套的订单本来就是
         // YJ- 号(实测 YJ-20260924-01 等),入库单按号挂源单;不带 bill_no 金蝶自动编号(CGDD-…),
         // 入库单的 src_bill_no 按 MES 号就查不到源单(沙箱踩坑:CGDD-20260909-00001 无法被 YJ 号挂联)
@@ -198,7 +204,22 @@ public class KingdeePushService {
         String remark = str(head.get("备注"));
         body.put("remark", (remark.isEmpty() ? "" : remark) + " [MES:" + docNo + "]");
         if (isPur || isOrder) body.put("supplier_number", str(head.get("供应商编码")));
-        else body.put("customer_number", str(head.get("客户编码")));
+        else if (!isMatOut) body.put("customer_number", str(head.get("客户编码")));
+
+        // 材料出库单(生产领料单)头:部门 + 经手人 + 领料类型。
+        // 金蝶 inv_pick 头**没有** 供应商/客户/仓库/业务类型(与采购入库/销售出库不同),
+        // 但领料要落「部门(dept_number)」与「经手人(emp_number)」——MES 侧存的是名称(生产车间/领用人),
+        // 这里按档案解析成编码;解析不到就不带该字段(不阻断,金蝶按自己的默认值处理)。
+        if (isMatOut) {
+            String deptNo = str(head.get("部门编码"));
+            if (deptNo.isEmpty()) deptNo = archiveCode("bs_dept", "部门名称", "部门编码", str(head.get("生产车间")));
+            if (!deptNo.isEmpty()) body.put("dept_number", deptNo);
+            String empNo = str(head.get("经手人编码"));
+            if (empNo.isEmpty()) empNo = archiveCode("bs_emp", "员工名称", "员工编码", str(head.get("领用人")));
+            if (!empNo.isEmpty()) body.put("emp_number", empNo);
+            String pickType = str(head.get("领料类型")); // 金蝶 inv_pick.pick_type(真实账套恒 "1")
+            if (!pickType.isEmpty()) body.put("pick_type", pickType);
+        }
 
         ArrayNode entities = body.putArray("material_entity");
         // 来源单引用(金蝶行级 src_* 族):采购入库单带 采购订单号 → 金蝶按来源订单挂联
@@ -234,10 +255,11 @@ public class KingdeePushService {
             }
         }
         boolean linkSrc = isPur && poRefs != null;
-        // 采购订单直推的字段口径:订单行叫 物料编码/数量/单价/单位;入库行叫 存货编码/实收数量/单价/计量单位
-        String matKey = isOrder ? "物料编码" : "存货编码";
+        // 采购订单直推的字段口径:订单行叫 物料编码/数量/单价/单位;入库行叫 存货编码/实收数量/单价/计量单位;
+        // 材料出库行叫 材料编码/数量/单价/计量单位(料件口径,与采购入库的"存货"族不同名)
+        String matKey = isOrder ? "物料编码" : isMatOut ? "材料编码" : "存货编码";
         String qtyKey = isPur ? "实收数量" : "数量";
-        String priceKey = isPur || isOrder ? "单价" : "售价";
+        String priceKey = isPur || isOrder || isMatOut ? "单价" : "售价";
         String unitKey = isOrder ? "单位" : "计量单位";
         int rowNo = 0;
         for (Map<String, Object> line : lines) {
@@ -249,8 +271,8 @@ public class KingdeePushService {
             // 解析不到不阻断(无来源单的普通入库单靠 material_number 即可),仅在挂联场景下报错提示
             String materialId = materialNo.isEmpty() ? "" : str(materialMap().get(materialNo));
             if (materialId.isEmpty()) {
-                log.warn("采购入库单[{}]第{}行存货编码[{}]在当前账套金蝶商品档案中无对应ID:不传 material_id",
-                        docNo, rowNo, materialNo);
+                log.warn("{}[{}]第{}行存货编码[{}]在当前账套金蝶商品档案中无对应ID:不传 material_id",
+                        docLabel, docNo, rowNo, materialNo);
             } else {
                 e.put("material_id", materialId);
             }
@@ -264,7 +286,15 @@ public class KingdeePushService {
             } else {
                 e.put("qty", num(line, qtyKey));
                 e.put("price", num(line, priceKey));
-                double cess = num(line, "税率%"); if (cess != 0) e.put("cess", cess);
+                // 材料出库单(生产领料单)无税金族:金蝶 inv_pick 头/行**没有** cess/tax_price/tax_amount/
+                // amount/all_amount 键(真实账套实测),MES 行表也没有 税率% 列 —— 不推税金(2026-09-28 用户口径)。
+                if (!isMatOut) { double cess = num(line, "税率%"); if (cess != 0) e.put("cess", cess); }
+            }
+            // 价格族:生产领料单只有 price/cost/unit_cost 三键(无金额/含税价),成本两键有值才推
+            if (isMatOut) {
+                double cost = num(line, "成本"); if (cost != 0) e.put("cost", cost);
+                double unitCost = num(line, "单位成本"); if (unitCost != 0) e.put("unit_cost", unitCost);
+                String comment = str(line.get("明细备注")); if (!comment.isEmpty()) e.put("comment", comment);
             }
             String model = str(line.get("规格型号")); if (!model.isEmpty()) e.put("material_model", model);
             // 计量单位(保存接口要 unit_id=金蝶单位ID,报错文案里的"unit"即此):行上"单位id"列
@@ -333,7 +363,9 @@ public class KingdeePushService {
 
         // ⑤ 推送(纯 Java HTTP)
         String apiPath = isOrder ? "/jdy/v2/scm/pur_order"
-                : isPur ? "/jdy/v2/scm/pur_inbound" : "/jdy/v2/scm/sal_out_bound";
+                : isPur ? "/jdy/v2/scm/pur_inbound"
+                : isMatOut ? "/jdy/v2/scm/inv_pick"   // 材料出库单 → 金蝶「生产领料单」
+                : "/jdy/v2/scm/sal_out_bound";
         JsonNode res = postJson(apiPath, body);
         if (res.path("errcode").asInt(-1) != 0) {
             String err = res.path("description_cn").asText(res.path("description").asText(res.toString()));
@@ -434,6 +466,24 @@ public class KingdeePushService {
             throw new RuntimeException("金蝶接口失败(" + code + "): " + res.path("description").asText(res.toString()));
         }
         return res.path("data");
+    }
+
+    /**
+     * 档案名称 → 编码(材料出库单推送用:生产车间→部门编码、领用人→员工编码)。
+     * 档案表/列名由调用方给定(bs_dept 部门名称/部门编码、bs_emp 员工名称/员工编码);
+     * 查不到或库结构不一致一律返回空串 —— 该字段是"能带就带",绝不因档案缺失阻断转ERP。
+     */
+    private String archiveCode(String table, String nameCol, String codeCol, String name) {
+        if (name == null || name.isBlank()) return "";
+        try {
+            List<String> hit = jdbc.queryForList(
+                    "SELECT " + codeCol + " FROM " + table + " WHERE " + nameCol + " = ?"
+                            + " AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, name);
+            return hit.isEmpty() ? "" : String.valueOf(hit.get(0));
+        } catch (Exception e) {
+            log.warn("档案解析失败({}.{} = {})→{}: {}", table, nameCol, name, codeCol, e.getMessage());
+            return "";
+        }
     }
 
     /** 宽松取整(采购订单行号列是文本:"3"/"3.0" 都能取;非数字返回 null) */

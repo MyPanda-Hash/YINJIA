@@ -1,0 +1,148 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 211
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-gen-input.sql ==
+  | bd_material_out|id | 
+  | bd_material_out|单据日期 | 
+  | bd_material_out|单据编号 | 
+  | bd_material_out|业务类型 | 
+  | bd_material_out|生产车间 | 
+  | bd_material_out|出库类别 | 
+  | bd_material_out|领用人 | 
+  | bd_material_out|项目 | 
+  | bd_material_out|仓库 | 
+  | bd_material_out|来源单号 | 
+  | bd_material_out|加工单号 | 
+  | bd_material_out|备注 | 
+  | bd_material_out|单据状态 | 
+  | bd_material_out|审核人 | 
+  | bd_material_out|审核时间 | 
+  | bd_material_out|审批人 | 
+  | bd_material_out|审批时间 | 
+  | bd_material_out|asp_user1 | 
+  | bd_material_out|asp_time1 | 
+  | bd_material_out|asp_user2 | 
+  | bd_material_out|asp_time2 | 
+  | bd_material_out|asp_cancel | 
+  | bd_material_out|来源单据 | 
+  | bd_material_out|销售订单号 | 
+  | bd_material_out|匹配来源单号 | 
+  | bd_purchase_in|id | 
+  | bd_purchase_in|单据日期 | 
+  | bd_purchase_in|单据编号 | 
+  | bd_purchase_in|业务类型 | 
+  | bd_purchase_in|币种 | 
+  | bd_purchase_in|汇率 | 
+  | bd_purchase_in|供应商编码 | 
+  | bd_purchase_in|供应商 | 
+  | bd_purchase_in|供应商简称 | 
+  | bd_purchase_in|经手人 | 
+  | bd_purchase_in|项目 | 
+  | bd_purchase_in|外部单据号 | 
+  | bd_purchase_in|采购订单号 | 
+  | bd_purchase_in|合同号 | 
+  | bd_purchase_in|资金批次 | 
+  | bd_purchase_in|采购类型 | 
+  | bd_purchase_in|合同号最新 | 
+  | bd_purchase_in|备注 | 
+  | bd_purchase_in|单据状态 | 
+  | bd_purchase_in|审核人 | 
+  | bd_purchase_in|审核时间 | 
+  | bd_purchase_in|审批人 | 
+  | bd_purchase_in|审批时间 | 
+  | bd_purchase_in|asp_user1 | 
+  | bd_purchase_in|asp_time1 | 
+  | MATERIAL_OUT|仓库 | 
+  | MATERIAL_OUT|单据日期 | 
+  | MATERIAL_OUT|单据编号 | 
+  | MATERIAL_OUT|加工单号 | 
+  | MATERIAL_OUT|材料编码 | 
+  | MATERIAL_OUT|批号 | 
+  | MATERIAL_OUT|材料名称 | 
+  | MATERIAL_OUT|业务类型 | 
+  | MATERIAL_OUT|计量单位 | 
+  | MATERIAL_OUT|生产车间 | 
+  | MATERIAL_OUT|出库类别 | 
+  | MATERIAL_OUT|数量 | 
+  | MATERIAL_OUT|单价 | 
+  | MATERIAL_OUT|领用人 | 
+  | MATERIAL_OUT|金额 | 
+  | MATERIAL_OUT|项目 | 
+  | MATERIAL_OUT|规格型号 | 
+  | MATERIAL_OUT|来源单据 | 
+  | MATERIAL_OUT|来源单号 | 
+  | MATERIAL_OUT|手工确定成本 | 
+  | MATERIAL_OUT|销售订单号 | 
+  | MATERIAL_OUT|明细备注 | 
+  | MATERIAL_OUT|匹配来源单号 | 
+  | MATERIAL_OUT|现存量 | 
+  | MATERIAL_OUT|现存量说明 | 
+  | PURCHASE_IN|单据日期 | 
+  | PURCHASE_IN|存货编码 | 
+  | PURCHASE_IN|存货名称 | 
+  | PURCHASE_IN|单据编号 | 
+  | PURCHASE_IN|规格型号 | 
+  | PURCHASE_IN|入库类别 | 
+  | PURCHASE_IN|汇率 | 
+  | PURCHASE_IN|实收数量 | 
+  | PURCHASE_IN|供应商编码 | 
+  | PURCHASE_IN|计量单位 | 
+  | PURCHASE_IN|供应商 | 
+  | PURCHASE_IN|实收数量2 | 
+  | PURCHASE_IN|计量单位2 | 
+  | PURCHASE_IN|匹配来源单号 | 
+  | PURCHASE_IN|经手人 | 
+  | PURCHASE_IN|附件1 | 
+  | PURCHASE_IN|附件2 | 
+  | PURCHASE_IN|附件3 | 
+  | PURCHASE_IN|附件4 | 
+  | PURCHASE_IN|附件5 | 
+  | PURCHASE_IN|附件6 | 
+  | PURCHASE_IN|验货人 | 
+  | PURCHASE_IN|单价 | 
+  | PURCHASE_IN|税率% | 
+  | PURCHASE_IN|采购订单号 | 
+  | MATERIAL_OUT | 材料名称 | 材料名称 | 参照 | null | INV | 存货名称 | 存货名称 | detail | 30 | 140 | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | 计量单位 | 计量单位 | 下拉框 | SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v) | null | null | null | detail | 40 | 140 | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | 数量 | 数量 | 小数 | null | null | null | null | detail | 50 | 110 | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | 单价 | 单价 | 小数 | null | null | null | null | detail | 60 | 110 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 金额 | 金额 | 小数 | null | null | null | null | detail | 70 | 110 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 规格型号 | 规格型号 | 文本 | null | null | null | null | detail | 80 | 140 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 手工确定成本 | 手工确定成本 | 是否 | null | null | null | null | detail | 90 | 140 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 明细备注 | 明细备注 | 文本 | null | null | null | null | detail | 100 | 140 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 现存量 | 现存量 | 小数 | null | null | null | null | detail | 110 | 110 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 现存量说明 | 现存量说明 | 文本 | null | null | null | null | detail | 120 | 140 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 项目 | 项目 | 参照 | null | PROJ | 项目名称 | 项目名称 | header | 70 | 140 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 来源单号 | 来源单号 | 文本 | null | null | null | null | header | 90 | 140 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 加工单号 | 加工单号 | 文本 | null | null | null | null | header,detail | 20 | 120 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 材料编码 | 材料编码 | 参照 | null | INV | 存货编码 | 存货编码 | query,detail | 25 | 120 | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | 批号 | 批号 | 文本 | null | null | null | null | query,detail | 27 | 120 | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | 单据日期 | 单据日期 | 日期 | null | null | null | null | query,header | 10 | 140 | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | 单据编号 | 单据编号 | 文本 | null | null | null | null | query,header | 20 | 140 | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | 业务类型 | 业务类型 | 下拉框 | SELECT v FROM (VALUES (N'销售出库'),(N'材料出库'),(N'其他出库')) AS t(v) | null | null | null | query,header | 30 | 140 | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | 生产车间 | 生产车间 | 下拉框 | SELECT v FROM (VALUES (N'熔铸车间'),(N'轧制车间'),(N'精整车间'),(N'测试车间')) AS t(v) | null | null | null | query,header | 40 | 140 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 出库类别 | 出库类别 | 下拉框 | SELECT v FROM (VALUES (N'直接领料'),(N'自制领料'),(N'退料'),(N'共耗领料')) AS t(v) | null | null | null | query,header | 50 | 140 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 领用人 | 领用人 | 参照 | null | EMP | 员工名称 | 员工名称 | query,header | 60 | 140 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 来源单据 | 来源单据 | 文本 | null | null | null | null | query,header | 80 | 110 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 销售订单号 | 销售订单号 | 文本 | null | null | null | null | query,header | 90 | 130 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 匹配来源单号 | 匹配来源单号 | 文本 | null | null | null | null | query,header | 100 | 130 | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | 仓库 | 仓库 | 参照 | null | WH | 仓库名称 | 仓库名称 | query,header,detail | 10 | 110 | 1 | 0 | 0 | 1 | 
+  | bd_purchase_in | ERP单号 | 
+  | bd_purchase_in | 转ERP操作人 | 
+  | bd_purchase_in | 转ERP时间 | 
+  | bd_purchase_in | 是否已转ERP | 
+  | bl_purchase_in | 序列号流转ID | 
+  | PURCHASE_IN | 序列号流转ID | detail | 520 | 0 | 1 | 
+  | PURCHASE_IN | ERP单号 | header | 270 | 1 | 0 | 
+  | PURCHASE_IN | 转ERP操作人 | header | 280 | 1 | 0 | 
+  | PURCHASE_IN | 转ERP时间 | header | 290 | 1 | 0 | 
+  | PURCHASE_IN | 是否已转ERP | header | 300 | 1 | 0 | 
+  | MATERIAL_OUT | 材料出库单 | 库存核算 | doc | bd_material_out | bl_material_out | 单据编号 | id | 单据编号 | CL | 单据日期 | 50 | items | 
+  | erp_imp_log | 
+  | erp_imp_row | 
+[OK] _q-matout-gen-input.sql (2 batches)
