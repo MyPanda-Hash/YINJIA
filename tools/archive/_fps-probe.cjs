@@ -83,10 +83,15 @@ async function main() {
       console.log(`  ${name.padEnd(26)} ${String(st.ms).padStart(5)}ms ${String(st.frames).padStart(4)}帧 均FPS=${String(st.fps).padStart(3)} p95帧距=${String(st.p95dt).padStart(4)}ms 最大=${String(st.maxDt).padStart(5)}ms 掉帧>50ms=${String(st.d50).padStart(3)} >100ms=${String(st.d100).padStart(2)} LoAF=${String(loaf.length).padStart(2)}个${note ? '  ' + note : ''}`)
     }
     const waitPanel = async (p, ms = 15000) => {
+      // 列级虚拟化(2026-09-28)后,宽表面板 DOM 里只有可见列+左右占位列,表头数 ≠ 配置列数
+      // ⇒ 宽表(>16 列)就绪判据放宽为「遮罩消失且有表头」;窄面板仍用精确列数
+      const lazy = expect[p] > 16
       const t0 = Date.now()
       while (Date.now() - t0 < ms) {
         const th = await evaluate(`document.querySelectorAll('.el-table__header th').length`)
-        if (Math.abs(th - expect[p]) <= 2 && !(await evaluate(`!!document.querySelector('.el-loading-mask')`))) return Date.now() - t0
+        const mask = await evaluate(`!!document.querySelector('.el-loading-mask')`)
+        const okReady = lazy ? (th >= 4 && !mask) : (Math.abs(th - expect[p]) <= 2 && !mask)
+        if (okReady) return Date.now() - t0
         await sleep(100)
       }
       return -1

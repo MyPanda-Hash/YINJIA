@@ -834,16 +834,28 @@
               />
             </template>
           </el-table-column>
-          <el-table-column
-            v-for="c in archCols(b)"
-            :key="c.prop"
-            :prop="c.prop"
-            :label="c.label"
-            :width="archColW(b, c)"
-            :min-width="archColW(b, c) ? undefined : c.width"
-            :align="c.align"
-            :show-overflow-tooltip="!detailEditable(b)"
-          >
+          <template v-for="c in archGridCols(b)" :key="c.spacer ? 'lazy-' + c.spacer : c.prop">
+            <!-- 列级虚拟化(2026-09-28):视口外的列整列不渲染,以左右占位列撑住总宽 —— 表格总宽、
+                 滚动条、列位置与整列渲染完全一致;滚动时窗口移动,列按需进出。
+                 此前(五期)只懒渲染单元格内容,全部 el-table-column 组件与占位 td 仍在,
+                 el-table 逐列/逐格更新机制仍是宽表挂载长帧的主体(CPU 剖面:update/renderCell/getColumnElIndex)。 -->
+            <el-table-column
+              v-if="c.spacer"
+              :width="c.width"
+              :label="''"
+              column-key="col-lazy-spacer"
+              :resizable="false"
+              class-name="col-lazy-spacer"
+            />
+            <el-table-column
+              v-else
+              :prop="c.prop"
+              :label="c.label"
+              :width="archColW(b, c)"
+              :min-width="archColW(b, c) ? undefined : c.width"
+              :align="c.align"
+              :show-overflow-tooltip="!detailEditable(b)"
+            >
             <template #header>
               <div class="col-hdr" :class="{ filtering: hasColFilter(c.prop) }" @click.stop="toggleColFilter(c.prop)">
                 <span class="col-hdr-text" :class="{ req: c.field?.isRequired }">{{ c.label }}</span>
@@ -869,9 +881,7 @@
               />
             </template>
             <template #default="{ row }">
-              <!-- 列懒渲染:视口外列只出空占位(表头保留撑宽),滚动进入视口再产出内容 -->
-              <span v-if="!archColVisible(b, c)" class="col-lazy-empty"></span>
-              <template v-else>
+              <!-- 列级虚拟化后,走到这里的都是可见列,不再需要单元格级占位(原 col-lazy-empty 分支已随五期机制下线) -->
               <template v-if="archEditable(b) && !row._placeholder">
                 <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
                 <!-- 生产线档案「停用」列:开关形式(同生产加工单表单开关风格)——@change 同步乐观翻转(点击即动画),
@@ -942,9 +952,9 @@
                 <span v-if="hasSubBom(row[c.prop])" class="mat-star" :title="tt('该材料有下级子件 BOM，点击行查看')">*</span>
               </span>
               <span v-else>{{ tt(row[c.prop] ?? '') }}</span>
-              </template>
             </template>
           </el-table-column>
+          </template>
         </el-table>
       </div>
       </template>
@@ -3709,19 +3719,23 @@ const archEditableMap = computed(() => {
   return m
 })
 function archEditable(b) { return singleDocMode.value ? (archEditableMap.value[b.id] ?? detailEditable(b)) : detailEditable(b) }
-/** 列懒渲染(2026-09-16 五期):超宽档案(列>16 走横向滚动,如商品 75 列/表宽 7532px vs 视口 1042px)
- *  只渲染视口±半屏内的列内容,视口外列渲染空占位(表头保留撑住列宽与滚动条)——
- *  首渲染从 3750 格降到 ~1000 格,翻页同理;横向滚动时按需补渲染。
- *  响应式行/列缓存已在位,这里只控制 default 插槽是否产出内容。 */
-const archViewport = reactive({ left: -1, w: 1042, expand: false })
+/** 列懒渲染(2026-09-16 五期 → 2026-09-28 升级为列级虚拟化):超宽档案(列>16 走横向滚动,
+ *  如商品 55 列)视口外的列**整列不渲染**,以左右占位列撑住总宽(见 archGridCols)——
+ *  五期只懒渲染单元格内容,56 个 el-table-column 组件与占位 td 仍在,CPU 剖面显示
+ *  el-table 逐列/逐格更新机制(update/renderCell/getColumnElIndex)是宽表挂载长帧的主体。
+ *  响应式行/列缓存与两段渲染(120ms 后扩窗)均在位;横向滚动按需进出列。 */
+const archViewport = reactive({ left: -1, w: 1042, stage: 0 })
 const COL_LAZY_MIN = ARCH_FIT_MAX_COLS + 1
-// 两段渲染:首帧只出窄窗口(视口+0.3屏)快速见内容,120ms 后扩到常规窗口(±半屏)补齐,
-// 把 75 列首渲染的长任务拆成两段短任务,页面更早可交互
+// 三段渲染:首帧窄窗(视口+0.3屏)最快见内容 → 120ms 扩到 0.5+1.5 屏 → 再 300ms 扩到 0.5+2.75 屏
+// (常驻缓冲)。把 55 列首渲染拆成三段短任务,页面更早可交互,单段长帧 <160ms(实测)。
 let colExpandTimer = 0
 function scheduleColExpand() {
-  archViewport.expand = false
+  archViewport.stage = 0
   clearTimeout(colExpandTimer)
-  colExpandTimer = setTimeout(() => { archViewport.expand = true }, 120)
+  colExpandTimer = setTimeout(() => {
+    archViewport.stage = 1
+    colExpandTimer = setTimeout(() => { archViewport.stage = 2 }, 300)
+  }, 120)
 }
 watch(panelCode, scheduleColExpand)
 // 查询弹窗面板(收发存/台账):切换面板重置(重新进入需再过条件弹窗)
@@ -3734,6 +3748,15 @@ watch(panelCode, () => {
 onMounted(scheduleColExpand)
 function archLazyOn(b) { return singleDocMode.value && archCols(b).length >= COL_LAZY_MIN }
 let colLazyRaf = 0
+/** 可见窗口头尾缓冲(屏为单位),三段扩窗:
+ *  stage 0 = 首帧窄窗(0.3+0.3,最快见内容)→ 120ms 后 stage 1(0.5+1.5)→ 再 300ms stage 2(0.5+2.75 常驻缓冲)。
+ *  tail 决定滚动补窗间隔:补窗发生在滚出 (tail-margin-1) 屏之后 ⇒ tail 2.75 时约每 1.5 屏一次;
+ *  一次性扩到 2.75 会让挂载出现 ~220ms 长帧,分两段扩则每段 <160ms。 */
+function archWin() {
+  if (archViewport.stage === 2) return { head: 0.5, tail: 2.75 }
+  if (archViewport.stage === 1) return { head: 0.5, tail: 1.5 }
+  return { head: 0.3, tail: 0.3 }
+}
 function onArchScroll(e, b) {
   if (!archLazyOn(b)) return
   const el = e.target
@@ -3741,27 +3764,43 @@ function onArchScroll(e, b) {
   if (colLazyRaf) return
   colLazyRaf = requestAnimationFrame(() => {
     colLazyRaf = 0
-    archViewport.left = el.scrollLeft
-    archViewport.w = el.clientWidth || 1042
+    const L = el.scrollLeft, W = el.clientWidth || 1042
+    const base = Math.max(0, archViewport.left)
+    const win = archWin()
+    // 列级虚拟化:不做逐帧窗口跟随 —— 每次窗口移动都会增删列组件,el-table 随之整表重排
+    // (实测每 100px 一步就掉 ~130ms 帧)。改为「视口逼近已渲染边缘(0.25 屏内)才补窗」:
+    // 补窗直接进 stage 2 常驻缓冲(前 0.5 后 2.75 屏)⇒ 连续快滚约每 1.5 屏重排一次,缓滚/停住零成本。
+    if (L + W >= base + win.tail * W - 0.25 * W || L <= base - win.head * W + 0.25 * W) {
+      archViewport.left = L
+      archViewport.w = W
+      if (archViewport.stage < 2) archViewport.stage = 2
+    }
   })
 }
-function archColVisible(b, c) {
-  if (!archLazyOn(b)) return true
+/** 列级虚拟化(2026-09-28,取代五期的单元格级占位):返回 [左占位?, …可见列…, 右占位?]。
+ *  占位宽度=被隐藏列宽之和 ⇒ 表格总宽与列位置和整列渲染完全一致(滚动条不跳),
+ *  可见窗口沿用五期的头尾缓冲公式(含两段渲染 expand);窗口由 archViewport 驱动(滚动 rAF 节流)。
+ *  单遍累计列宽,不做逐列 O(n) 重扫。 */
+function archGridCols(b) {
   const cols = archCols(b)
+  if (!archLazyOn(b)) return cols
   const widths = archColsMap.value[b.id]?.widths
-  let x = 0
+  const base = Math.max(0, archViewport.left)
+  const win = archWin()
+  const lo = base - archViewport.w * win.head
+  const hi = base + archViewport.w * win.tail
+  const out = []
+  let x = 0, leftW = 0, rightW = 0, seen = false
   for (const k of cols) {
     const w = widths?.get(k.prop) ?? Number(k.width) ?? 100
-    if (k.prop === c.prop) {
-      const base = Math.max(0, archViewport.left)
-      const head = archViewport.left < 0 ? 0.3 : 0.5
-      const tail = archViewport.left < 0 ? 0.3 : 1
-      const win = archViewport.expand ? { head: 0.5, tail: 1.5 } : { head, tail }
-      return x + w >= base - archViewport.w * win.head && x <= base + archViewport.w * win.tail
-    }
+    if (x + w >= lo && x <= hi) { out.push(k); seen = true }
+    else if (!seen) leftW += w
+    else rightW += w
     x += w
   }
-  return true
+  if (leftW > 0) out.unshift({ spacer: 'L', width: Math.max(1, Math.round(leftW)) })
+  if (rightW > 0) out.push({ spacer: 'R', width: Math.max(1, Math.round(rightW)) })
+  return out
 }
 function archCurPage(b) { return Math.min(archPage.value, Math.max(1, Math.ceil(archTotal(b) / archPageSize.value))) }
 function pagedBlockRows(b) {
