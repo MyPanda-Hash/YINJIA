@@ -110,64 +110,64 @@ TABLE	dbo	area_country	区域国家	248	11
 TABLE	dbo	area_district	城市区域	2927	7
 TABLE	dbo	area_province	中国省份	34	8
 TABLE	dbo	bacord	条码	20	17
-TABLE	dbo	bd_account	会计科目档案	0	14
-TABLE	dbo	bd_dispatch	工序派工单头表(经典遗留面板)	0	23
-TABLE	dbo	bd_expense_type	费用类别档案	0	12
-TABLE	dbo	bd_finish_in	产成品入库单头表(切炭双出口直销自动生成并审核)	0	24
-TABLE	dbo	bd_manu_order	生产加工单头表(经典遗留面板)	0	58
-TABLE	dbo	bd_material_out	材料出库单(领料)头表	0	25
-TABLE	dbo	bd_other_in	其他入库单头表	0	21
-TABLE	dbo	bd_other_out	其他出库单头表	0	29
-TABLE	dbo	bd_outsource_in	委外入库单头表	0	21
-TABLE	dbo	bd_outsource_issue	委外发料单头表	0	22
-TABLE	dbo	bd_outsource_order	委外加工单头表	0	29
-TABLE	dbo	bd_prod_abn	生产异常处理单(闭环:异常提出→原因分析→处理措施→结案;挂 工单号/批次号(碳棒)/混料批次号,所有不良异常按批次号展开)	0	28
-TABLE	dbo	bd_pu_order	采购订单头表	0	105
-TABLE	dbo	bd_pu_req	请购单头表	0	31
-TABLE	dbo	bd_purchase_in	采购入库单头表(审核过账kucun入库)	0	133
-TABLE	dbo	bd_sale_out	销售出库单头表(审核过账kucun出库)	0	135
-TABLE	dbo	bd_so_order	销售订单头表(星辰ERP同步)	18	122
-TABLE	dbo	bd_tax_type	税别档案	0	12
-TABLE	dbo	bl_dispatch	工序派工单行表(中文列,服务器口径;含生产车间列供统计视图分组)	1	28
-TABLE	dbo	bl_finish_in	产成品入库单行表(负数量=红字冲回)	1	22
-TABLE	dbo	bl_manu_order	生产加工单行表(经典遗留面板)	0	31
-TABLE	dbo	bl_material_out	材料出库单(领料)行表(BOM展开生成)	1	22
-TABLE	dbo	bl_other_in	其他入库单行表	1	22
-TABLE	dbo	bl_other_out	其他出库单行表	1	19
-TABLE	dbo	bl_outsource_in	委外入库单行表	0	19
-TABLE	dbo	bl_outsource_issue	委外发料单行表	0	18
-TABLE	dbo	bl_outsource_order	委外加工单行表	0	17
-TABLE	dbo	bl_pu_order	采购订单行表	0	110
-TABLE	dbo	bl_pu_req	请购单行表	1	28
-TABLE	dbo	bl_purchase_in	采购入库单行表(批号三键入库)	1	103
-TABLE	dbo	bl_sale_out	销售出库单行表(批号三键出库)	1	116
-TABLE	dbo	bl_so_order	销售订单行表(星辰ERP同步)	30	112
-TABLE	dbo	bs_bom	物料清单BOM(父件-子件-定额数量,默认BOM标志)	58	28
-TABLE	dbo	bs_currency	币别档案(金蝶云·星辰 currency 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)	0	24
-TABLE	dbo	bs_customer_group	客户分类档案(金蝶云·星辰 customer_group 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)	0	17
-TABLE	dbo	bs_dept	部门档案(遗留,组织架构用yj_dept)	20	24
-TABLE	dbo	bs_dict	数据字典	413	13
-TABLE	dbo	bs_emp	员工档案(遗留,组织架构用yj_user)	16	32
-TABLE	dbo	bs_equip	设备档案(设备点检/保养计划参照源)	12	21
-TABLE	dbo	bs_inv	存货档案(物料/产品主数据,含是否检验标志)	114	125
-TABLE	dbo	bs_inv_price	存货价格本	30	32
+TABLE	dbo	bd_account	会计科目档案	0	34
+TABLE	dbo	bd_dispatch	工序派工单头表(经典遗留面板)	0	43
+TABLE	dbo	bd_expense_type	费用类别档案	0	32
+TABLE	dbo	bd_finish_in	产成品入库单头表(切炭双出口直销自动生成并审核)	0	44
+TABLE	dbo	bd_manu_order	生产加工单头表(经典遗留面板)	0	78
+TABLE	dbo	bd_material_out	材料出库单(领料)头表	0	45
+TABLE	dbo	bd_other_in	其他入库单头表	0	41
+TABLE	dbo	bd_other_out	其他出库单头表	0	49
+TABLE	dbo	bd_outsource_in	委外入库单头表	0	41
+TABLE	dbo	bd_outsource_issue	委外发料单头表	0	42
+TABLE	dbo	bd_outsource_order	委外加工单头表	0	49
+TABLE	dbo	bd_prod_abn	生产异常处理单(闭环:异常提出→原因分析→处理措施→结案;挂 工单号/批次号(碳棒)/混料批次号,所有不良异常按批次号展开)	0	48
+TABLE	dbo	bd_pu_order	采购订单头表	0	125
+TABLE	dbo	bd_pu_req	请购单头表	0	51
+TABLE	dbo	bd_purchase_in	采购入库单头表(审核过账kucun入库)	0	153
+TABLE	dbo	bd_sale_out	销售出库单头表(审核过账kucun出库)	0	155
+TABLE	dbo	bd_so_order	销售订单头表(星辰ERP同步)	18	142
+TABLE	dbo	bd_tax_type	税别档案	0	32
+TABLE	dbo	bl_dispatch	工序派工单行表(中文列,服务器口径;含生产车间列供统计视图分组)	1	48
+TABLE	dbo	bl_finish_in	产成品入库单行表(负数量=红字冲回)	1	42
+TABLE	dbo	bl_manu_order	生产加工单行表(经典遗留面板)	0	51
+TABLE	dbo	bl_material_out	材料出库单(领料)行表(BOM展开生成)	1	42
+TABLE	dbo	bl_other_in	其他入库单行表	1	42
+TABLE	dbo	bl_other_out	其他出库单行表	1	39
+TABLE	dbo	bl_outsource_in	委外入库单行表	0	39
+TABLE	dbo	bl_outsource_issue	委外发料单行表	0	38
+TABLE	dbo	bl_outsource_order	委外加工单行表	0	37
+TABLE	dbo	bl_pu_order	采购订单行表	0	130
+TABLE	dbo	bl_pu_req	请购单行表	1	48
+TABLE	dbo	bl_purchase_in	采购入库单行表(批号三键入库)	1	123
+TABLE	dbo	bl_sale_out	销售出库单行表(批号三键出库)	1	136
+TABLE	dbo	bl_so_order	销售订单行表(星辰ERP同步)	30	132
+TABLE	dbo	bs_bom	物料清单BOM(父件-子件-定额数量,默认BOM标志)	58	48
+TABLE	dbo	bs_currency	币别档案(金蝶云·星辰 currency 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)	0	44
+TABLE	dbo	bs_customer_group	客户分类档案(金蝶云·星辰 customer_group 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)	0	37
+TABLE	dbo	bs_dept	部门档案(遗留,组织架构用yj_dept)	20	44
+TABLE	dbo	bs_dict	数据字典	413	33
+TABLE	dbo	bs_emp	员工档案(遗留,组织架构用yj_user)	16	52
+TABLE	dbo	bs_equip	设备档案(设备点检/保养计划参照源)	12	41
+TABLE	dbo	bs_inv	存货档案(物料/产品主数据,含是否检验标志)	114	145
+TABLE	dbo	bs_inv_price	存货价格本	30	52
 TABLE	dbo	bs_line_open	产线开班表(日×线 是否开线;工单排产左侧骨架,未交量汇总与查看的前提展示)	0	8
-TABLE	dbo	bs_material_group	商品分类档案(金蝶云·星辰 material_group 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)	0	21
-TABLE	dbo	bs_op	工序档案(五道工序:混料/成型/切炭/组装/装箱)	15	23
-TABLE	dbo	bs_partner	往来单位档案	12	29
-TABLE	dbo	bs_prod_line	生产线档案(基础资料·生产组;排产指派对象,产能为属性:日产能=负荷/超载基准,小时产能与工序工时口径互补)	30	14
-TABLE	dbo	bs_proj	项目档案	6	16
-TABLE	dbo	bs_qc_item	检验项目档案(检验内容/标准/判定规则)	0	18
-TABLE	dbo	bs_qc_plan	检验方案(适用存货/检验方式/抽检比例)	0	15
-TABLE	dbo	bs_region	地区档案	8	12
-TABLE	dbo	bs_reject	不合格原因档案	10	13
-TABLE	dbo	bs_route	工艺路线(工序顺序/加工方式)	20	25
-TABLE	dbo	bs_settle_type	结算方式档案(金蝶云·星辰 settlement_type 同步目标表;名称=匹配列,外部数据ID=同步幂等锚点)	0	14
-TABLE	dbo	bs_supplier_group	供应商分类档案(金蝶云·星辰 supplier_group 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)	0	16
-TABLE	dbo	bs_team	班组档案	10	14
-TABLE	dbo	bs_uom	计量单位档案	16	26
-TABLE	dbo	bs_wc	工作中心档案	17	22
-TABLE	dbo	bs_wh	仓库档案(仓库编码/名称,库存台账仓库真源)	18	32
+TABLE	dbo	bs_material_group	商品分类档案(金蝶云·星辰 material_group 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)	0	41
+TABLE	dbo	bs_op	工序档案(五道工序:混料/成型/切炭/组装/装箱)	15	43
+TABLE	dbo	bs_partner	往来单位档案	12	49
+TABLE	dbo	bs_prod_line	生产线档案(基础资料·生产组;排产指派对象,产能为属性:日产能=负荷/超载基准,小时产能与工序工时口径互补)	30	34
+TABLE	dbo	bs_proj	项目档案	6	36
+TABLE	dbo	bs_qc_item	检验项目档案(检验内容/标准/判定规则)	0	38
+TABLE	dbo	bs_qc_plan	检验方案(适用存货/检验方式/抽检比例)	0	35
+TABLE	dbo	bs_region	地区档案	8	32
+TABLE	dbo	bs_reject	不合格原因档案	10	33
+TABLE	dbo	bs_route	工艺路线(工序顺序/加工方式)	20	45
+TABLE	dbo	bs_settle_type	结算方式档案(金蝶云·星辰 settlement_type 同步目标表;名称=匹配列,外部数据ID=同步幂等锚点)	0	34
+TABLE	dbo	bs_supplier_group	供应商分类档案(金蝶云·星辰 supplier_group 同步目标表;编码=匹配列,外部数据ID=同步幂等锚点)	0	36
+TABLE	dbo	bs_team	班组档案	10	34
+TABLE	dbo	bs_uom	计量单位档案	16	46
+TABLE	dbo	bs_wc	工作中心档案	17	42
+TABLE	dbo	bs_wh	仓库档案(仓库编码/名称,库存台账仓库真源)	18	52
 TABLE	dbo	bxsq	报销申请	1	40
 TABLE	dbo	cbhs	成本核算	0	56
 TABLE	dbo	chdcmx	出货订舱明细	3	52
@@ -236,7 +236,7 @@ TABLE	dbo	gzffjl	工资发放记录	0	46
 TABLE	dbo	gzzc	工资支出记录	40	19
 TABLE	dbo	huiyuan	会员	0	41
 TABLE	dbo	huiyuan_hz	会员汇总	0	41
-TABLE	dbo	inh	进货单	144	95
+TABLE	dbo	inh	进货单	145	95
 TABLE	dbo	inv_cost_ledger	库存移动加权成本物化表:由后端 InvCostService 重算(审核/弃审钩子 + 启动自检 + 面板「重算成本」),分区=(仓库键,存货编码)不含批号;PK (src,rid) 对应 v_stock_movement 一行	0	14
 TABLE	dbo	Invoice	形式发票	4	45
 TABLE	dbo	jgsd	价格设定	0	35
@@ -312,126 +312,126 @@ TABLE	dbo	pr_qc_control	品质管控点要求(PR系列,已下架)	0	14
 TABLE	dbo	pr_scrap	物料产品报废单(PR系列,已下架)	0	16
 TABLE	dbo	pr_sinter_qc	烧结制程检验(PR系列,已下架)	0	18
 TABLE	dbo	pzfk	品质反馈	2	24
-TABLE	dbo	qc_bhc	不合格品处理单(制程)头表——面板 QC_BHC;列名即中文标签	0	35
-TABLE	dbo	qc_bhc_detail	不合格品处理单(制程)行表——面板 QC_BHC 明细	0	7
-TABLE	dbo	qc_bhg	不合格报告(制程)头表——面板 QC_BHG;含检验工站/异常时间/责任部门	0	30
-TABLE	dbo	qc_bhg_detail	不合格报告(制程)行表——面板 QC_BHG 明细	0	7
-TABLE	dbo	qc_bhz	不合格品处理单(自制物料)头表——面板 QC_BHZ	0	31
-TABLE	dbo	qc_bhz_detail	不合格品处理单(自制物料)行表——面板 QC_BHZ 明细	0	7
-TABLE	dbo	qc_catalog	来料品质检验目录头表(单单据面板:全部检验批次记录进同一张目录单,单据号前缀 JYML,方式对照项目进度查询 RD_PROGRESS)	1	9
-TABLE	dbo	qc_catalog_detail	来料品质检验目录行表(检验记录目录,每行=一个物料批次;由检验单生单自动生成、不可手工编辑;检测物料类别来自商品档案所属类别)	2	17
-TABLE	dbo	qc_disposal	不良品处理单(转隔离仓/报废,审核即移仓过账)	0	21
-TABLE	dbo	qc_insp	检验单头表——面板 QC_INSP;暂收单号/采购订单号/批次号/供应商口径	0	34
-TABLE	dbo	qc_insp_detail	检验单行表——面板 QC_INSP 明细(检验项目与判定)	10	40
-TABLE	dbo	qc_insp_rec	来料品质检验数据记录头表(检验报告 YJ-QR-96:抬头/结论/处理意见/签名;一张报告一单,单据号前缀 JYSJ)	0	22
-TABLE	dbo	qc_insp_rec_detail	来料品质检验数据记录行表(检验结果表体:检验项=标准库 qc.insp_item 选择 | 检测标准 | 检测结果 | 单项判定)	0	11
-TABLE	dbo	qc_insp_req	来料检验要求表(品质资料 7 张检验要求表并集:折叠棉/垫片/无纺布/网套/PP管/端盖/PP棉;档案式全局资料,无单据号;物料类别=页签)	77	39
-TABLE	dbo	qc_jjf	紧急放行申请单头表——面板 QC_JJF	0	27
-TABLE	dbo	qc_jjf_detail	紧急放行申请单行表——面板 QC_JJF 明细	0	7
-TABLE	dbo	qc_lyb	来料异常分析报告头表——面板 QC_LYB;供应商/物料批次/不良率	0	27
-TABLE	dbo	qc_lyb_detail	来料异常分析报告行表——面板 QC_LYB 明细	0	7
-TABLE	dbo	qc_op	工序质检单头表(制程检验,首件/巡检语义)	0	17
-TABLE	dbo	qc_op_detail	工序质检单行表(检验项目/标准/实测值)	0	12
-TABLE	dbo	qc_record	检验记录单头表(八类合一:首件/烧结制程/脱模/来料/材料进厂/黑水/巡线/管控点)	0	21
-TABLE	dbo	qc_record_detail	检验记录单行表(检验项目/标准要求/结果/品序号)	0	13
-TABLE	dbo	qc_return	暂收退料单头表——面板 QC_RETURN;退货类型/仓库/供应商代码	0	30
-TABLE	dbo	qc_return_detail	暂收退料单行表——面板 QC_RETURN 明细	8	38
-TABLE	dbo	qc_scp	试产材料使用申请单头表——面板 QC_SCP	0	25
-TABLE	dbo	qc_scp_detail	试产材料使用申请单行表——面板 QC_SCP 明细	0	7
-TABLE	dbo	qc_scy	生产异常分析报告头表——面板 QC_SCY;异常描述/原因分析	0	25
-TABLE	dbo	qc_scy_detail	生产异常分析报告行表——面板 QC_SCY 明细	0	7
-TABLE	dbo	qc_tc_in	来料品质特采单头表(YJ-QR-60 特采申请单;表头一行一单,无明细行;单据号前缀 TCI)	0	44
-TABLE	dbo	qc_tc_in_detail	来料品质特采单明细表(恒空占位:doc 模式要求 line_table,特采单无明细行)	0	7
+TABLE	dbo	qc_bhc	不合格品处理单(制程)头表——面板 QC_BHC;列名即中文标签	0	55
+TABLE	dbo	qc_bhc_detail	不合格品处理单(制程)行表——面板 QC_BHC 明细	0	27
+TABLE	dbo	qc_bhg	不合格报告(制程)头表——面板 QC_BHG;含检验工站/异常时间/责任部门	0	50
+TABLE	dbo	qc_bhg_detail	不合格报告(制程)行表——面板 QC_BHG 明细	0	27
+TABLE	dbo	qc_bhz	不合格品处理单(自制物料)头表——面板 QC_BHZ	0	51
+TABLE	dbo	qc_bhz_detail	不合格品处理单(自制物料)行表——面板 QC_BHZ 明细	0	27
+TABLE	dbo	qc_catalog	来料品质检验目录头表(单单据面板:全部检验批次记录进同一张目录单,单据号前缀 JYML,方式对照项目进度查询 RD_PROGRESS)	1	29
+TABLE	dbo	qc_catalog_detail	来料品质检验目录行表(检验记录目录,每行=一个物料批次;由检验单生单自动生成、不可手工编辑;检测物料类别来自商品档案所属类别)	2	37
+TABLE	dbo	qc_disposal	不良品处理单(转隔离仓/报废,审核即移仓过账)	0	41
+TABLE	dbo	qc_insp	检验单头表——面板 QC_INSP;暂收单号/采购订单号/批次号/供应商口径	0	54
+TABLE	dbo	qc_insp_detail	检验单行表——面板 QC_INSP 明细(检验项目与判定)	10	60
+TABLE	dbo	qc_insp_rec	来料品质检验数据记录头表(检验报告 YJ-QR-96:抬头/结论/处理意见/签名;一张报告一单,单据号前缀 JYSJ)	0	42
+TABLE	dbo	qc_insp_rec_detail	来料品质检验数据记录行表(检验结果表体:检验项=标准库 qc.insp_item 选择 | 检测标准 | 检测结果 | 单项判定)	0	31
+TABLE	dbo	qc_insp_req	来料检验要求表(品质资料 7 张检验要求表并集:折叠棉/垫片/无纺布/网套/PP管/端盖/PP棉;档案式全局资料,无单据号;物料类别=页签)	77	59
+TABLE	dbo	qc_jjf	紧急放行申请单头表——面板 QC_JJF	0	47
+TABLE	dbo	qc_jjf_detail	紧急放行申请单行表——面板 QC_JJF 明细	0	27
+TABLE	dbo	qc_lyb	来料异常分析报告头表——面板 QC_LYB;供应商/物料批次/不良率	0	47
+TABLE	dbo	qc_lyb_detail	来料异常分析报告行表——面板 QC_LYB 明细	0	27
+TABLE	dbo	qc_op	工序质检单头表(制程检验,首件/巡检语义)	0	37
+TABLE	dbo	qc_op_detail	工序质检单行表(检验项目/标准/实测值)	0	32
+TABLE	dbo	qc_record	检验记录单头表(八类合一:首件/烧结制程/脱模/来料/材料进厂/黑水/巡线/管控点)	0	41
+TABLE	dbo	qc_record_detail	检验记录单行表(检验项目/标准要求/结果/品序号)	0	33
+TABLE	dbo	qc_return	暂收退料单头表——面板 QC_RETURN;退货类型/仓库/供应商代码	0	50
+TABLE	dbo	qc_return_detail	暂收退料单行表——面板 QC_RETURN 明细	8	58
+TABLE	dbo	qc_scp	试产材料使用申请单头表——面板 QC_SCP	0	45
+TABLE	dbo	qc_scp_detail	试产材料使用申请单行表——面板 QC_SCP 明细	0	27
+TABLE	dbo	qc_scy	生产异常分析报告头表——面板 QC_SCY;异常描述/原因分析	0	45
+TABLE	dbo	qc_scy_detail	生产异常分析报告行表——面板 QC_SCY 明细	0	27
+TABLE	dbo	qc_tc_in	来料品质特采单头表(YJ-QR-60 特采申请单;表头一行一单,无明细行;单据号前缀 TCI)	0	64
+TABLE	dbo	qc_tc_in_detail	来料品质特采单明细表(恒空占位:doc 模式要求 line_table,特采单无明细行)	0	27
 TABLE	dbo	qkd	请款单	1	45
 TABLE	dbo	qr_batch_registry	二维码批号登记表(批号=日期+流水取号留痕)	0	9
 TABLE	dbo	rd_alkaline	碱性测试(旧单表)	0	19
-TABLE	dbo	rd_alkaline_detail	碱性测试行表	0	20
-TABLE	dbo	rd_alkaline_head	碱性测试头表	7	28
+TABLE	dbo	rd_alkaline_detail	碱性测试行表	0	40
+TABLE	dbo	rd_alkaline_head	碱性测试头表	7	48
 TABLE	dbo	rd_antibact	抑菌测试(旧单表)	0	19
-TABLE	dbo	rd_antibact_detail	抑菌测试行表	2	13
-TABLE	dbo	rd_antibact_head	抑菌测试头表	13	24
-TABLE	dbo	rd_approval	立项申请表(文件类,管理员保存即归档)	2	24
+TABLE	dbo	rd_antibact_detail	抑菌测试行表	2	33
+TABLE	dbo	rd_antibact_head	抑菌测试头表	13	44
+TABLE	dbo	rd_approval	立项申请表(文件类,管理员保存即归档)	2	44
 TABLE	dbo	rd_approval_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	20	23
-TABLE	dbo	rd_approval_detail	立项申请表占位行表(恒空,doc模式要求)	0	7
+TABLE	dbo	rd_approval_detail	立项申请表占位行表(恒空,doc模式要求)	0	27
 TABLE	dbo	rd_approval_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	0	7
 TABLE	dbo	rd_asm_bom	组装BOM表(旧单表)	0	18
 TABLE	dbo	rd_asm_bom_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	4	19
 TABLE	dbo	rd_asm_bom_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	3	15
 TABLE	dbo	rd_asm_proc	组装工艺清单(旧单表)	0	16
-TABLE	dbo	rd_asm_proc_detail	组装工艺清单行表	5	25
-TABLE	dbo	rd_asm_proc_head	组装工艺清单头表	2	25
-TABLE	dbo	rd_change_detail	产品变更申请单行表(表区=部门评审:7 部门各一行,部门/变更后内容/签字/日期)	7	13
-TABLE	dbo	rd_change_head	产品变更申请单头表(照《副本变更模板(1).xlsx》sheet「KPC变更申请通知单」YJ-QR-130;产品编号关联四受控文件,部门评审在行表)	1	31
+TABLE	dbo	rd_asm_proc_detail	组装工艺清单行表	5	45
+TABLE	dbo	rd_asm_proc_head	组装工艺清单头表	2	45
+TABLE	dbo	rd_change_detail	产品变更申请单行表(表区=部门评审:7 部门各一行,部门/变更后内容/签字/日期)	7	33
+TABLE	dbo	rd_change_head	产品变更申请单头表(照《副本变更模板(1).xlsx》sheet「KPC变更申请通知单」YJ-QR-130;产品编号关联四受控文件,部门评审在行表)	1	51
 TABLE	dbo	rd_dev_task	研发任务下发记录(产品开发按钮分发留痕)	8	13
 TABLE	dbo	rd_dom_test	内部委托测试申请单(旧单表)	0	22
-TABLE	dbo	rd_dom_test_detail	内部委托测试申请单行表	0	26
+TABLE	dbo	rd_dom_test_detail	内部委托测试申请单行表	0	46
 TABLE	dbo	rd_dom_test_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	0	26
-TABLE	dbo	rd_dom_test_head	内部委托测试申请单头表	0	14
+TABLE	dbo	rd_dom_test_head	内部委托测试申请单头表	0	34
 TABLE	dbo	rd_dom_test_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	2	14
 TABLE	dbo	rd_drop_prec	压降精度测试(旧单表)	0	18
-TABLE	dbo	rd_drop_prec_detail	压降精度测试行表	1	18
-TABLE	dbo	rd_drop_prec_head	压降精度测试头表	4	21
+TABLE	dbo	rd_drop_prec_detail	压降精度测试行表	1	38
+TABLE	dbo	rd_drop_prec_head	压降精度测试头表	4	41
 TABLE	dbo	rd_equip_use	设备使用登记表(旧单表)	0	20
-TABLE	dbo	rd_equip_use_detail	设备使用登记表行表	2	14
+TABLE	dbo	rd_equip_use_detail	设备使用登记表行表	2	34
 TABLE	dbo	rd_equip_use_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	5	14
-TABLE	dbo	rd_equip_use_head	设备使用登记表头表	3	10
+TABLE	dbo	rd_equip_use_head	设备使用登记表头表	3	30
 TABLE	dbo	rd_equip_use_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	9	10
 TABLE	dbo	rd_filter_eff	功能性滤效(旧单表)	0	20
-TABLE	dbo	rd_filter_eff_detail	功能性滤效行表	6	36
-TABLE	dbo	rd_filter_eff_head	功能性滤效头表	15	47
+TABLE	dbo	rd_filter_eff_detail	功能性滤效行表	6	56
+TABLE	dbo	rd_filter_eff_head	功能性滤效头表	15	67
 TABLE	dbo	rd_insp_plan	出货检验计划表(旧单表)	0	18
-TABLE	dbo	rd_insp_plan_detail	出货检验计划表行表	3	20
+TABLE	dbo	rd_insp_plan_detail	出货检验计划表行表	3	40
 TABLE	dbo	rd_insp_plan_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	0	18
-TABLE	dbo	rd_insp_plan_head	出货检验计划表头表	2	26
+TABLE	dbo	rd_insp_plan_head	出货检验计划表头表	2	46
 TABLE	dbo	rd_insp_plan_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	2	21
 TABLE	dbo	rd_instr_use	仪器使用记录表(旧单表)	0	21
-TABLE	dbo	rd_instr_use_detail	仪器使用记录表行表	3	16
+TABLE	dbo	rd_instr_use_detail	仪器使用记录表行表	3	36
 TABLE	dbo	rd_instr_use_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	0	16
-TABLE	dbo	rd_instr_use_head	仪器使用记录表头表	4	10
+TABLE	dbo	rd_instr_use_head	仪器使用记录表头表	4	30
 TABLE	dbo	rd_instr_use_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	2	10
 TABLE	dbo	rd_mineral	矿化测试(旧单表)	0	19
-TABLE	dbo	rd_mineral_detail	矿化测试行表	0	13
-TABLE	dbo	rd_mineral_head	矿化测试头表	0	22
+TABLE	dbo	rd_mineral_detail	矿化测试行表	0	33
+TABLE	dbo	rd_mineral_head	矿化测试头表	0	42
 TABLE	dbo	rd_mold_formula	成型配方(旧单表)	0	16
 TABLE	dbo	rd_mold_formula_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	2	14
 TABLE	dbo	rd_mold_formula_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	3	22
 TABLE	dbo	rd_mold_proc	成型工艺清单(旧单表)	0	19
-TABLE	dbo	rd_mold_proc_detail	成型工艺清单行表	5	20
-TABLE	dbo	rd_mold_proc_head	成型工艺清单头表	2	80
-TABLE	dbo	rd_plan	项目实施计划(10阶段×五字段:计划内容/计划开始/计划完成/实际完成/责任人,项目定级必填下拉)	2	84
+TABLE	dbo	rd_mold_proc_detail	成型工艺清单行表	5	40
+TABLE	dbo	rd_mold_proc_head	成型工艺清单头表	2	100
+TABLE	dbo	rd_plan	项目实施计划(10阶段×五字段:计划内容/计划开始/计划完成/实际完成/责任人,项目定级必填下拉)	2	104
 TABLE	dbo	rd_plan_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	8	84
-TABLE	dbo	rd_plan_detail	项目实施计划占位行表(恒空,doc模式要求)	0	7
+TABLE	dbo	rd_plan_detail	项目实施计划占位行表(恒空,doc模式要求)	0	27
 TABLE	dbo	rd_plan_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	0	7
-TABLE	dbo	rd_prod_doclist_detail	产品文件列表明细表(占位,doc 模式要求):产品×4文件状态矩阵不落库,由 DevTaskService.board() 现算;是否受控/受控日期为派生值(4 份文件全归档 ⇒ 是)	0	10
-TABLE	dbo	rd_prod_doclist_head	产品文件列表(产品开发文件汇总):产品×4文件开发状态矩阵,状态由 DevTaskService 实时推导不存表	1	13
-TABLE	dbo	rd_prod_info_detail	产品信息表行表	0	7
+TABLE	dbo	rd_prod_doclist_detail	产品文件列表明细表(占位,doc 模式要求):产品×4文件状态矩阵不落库,由 DevTaskService.board() 现算;是否受控/受控日期为派生值(4 份文件全归档 ⇒ 是)	0	30
+TABLE	dbo	rd_prod_doclist_head	产品文件列表(产品开发文件汇总):产品×4文件开发状态矩阵,状态由 DevTaskService 实时推导不存表	1	33
+TABLE	dbo	rd_prod_info_detail	产品信息表行表	0	27
 TABLE	dbo	rd_prod_info_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	0	7
-TABLE	dbo	rd_prod_info_head	产品信息表头表(归档后产品开发下发5个下游文件)	2	32
+TABLE	dbo	rd_prod_info_head	产品信息表头表(归档后产品开发下发5个下游文件)	2	52
 TABLE	dbo	rd_prod_info_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	8	23
 TABLE	dbo	rd_product_info	产品信息(旧单表,已被rd_prod_info_head/detail取代)	0	17
-TABLE	dbo	rd_progress	项目进度查询头表	1	21
-TABLE	dbo	rd_progress_detail	项目进度查询行表(产品开发二三四级项目控制列表;纸面 14 列:项目定级=col 项目层级/项目名称/子项目/尺寸/项目编号/内容/项目发起人=col 项目级/项目负责人=col 项目负责/立项日期=col 实施进度/预计完成日期=col 里程完成/状态(按实施计划阶段派生,只读)/测试情况=col 测试员/技术目标达成/是否市场转化/未转换原因。另 4 列 开发复杂度/重要程度/紧急程度/项目定及变更 保留物理列与数据但不上纸面(hidden=1,2026-09-22 用户口径);[说明] 是 RD_PLAN→RD_PROGRESS 同步的匹配键,与 [项目编号] 同值)	11	29
+TABLE	dbo	rd_progress	项目进度查询头表	1	41
+TABLE	dbo	rd_progress_detail	项目进度查询行表(产品开发二三四级项目控制列表;纸面 14 列:项目定级=col 项目层级/项目名称/子项目/尺寸/项目编号/内容/项目发起人=col 项目级/项目负责人=col 项目负责/立项日期=col 实施进度/预计完成日期=col 里程完成/状态(按实施计划阶段派生,只读)/测试情况=col 测试员/技术目标达成/是否市场转化/未转换原因。另 4 列 开发复杂度/重要程度/紧急程度/项目定及变更 保留物理列与数据但不上纸面(hidden=1,2026-09-22 用户口径);[说明] 是 RD_PLAN→RD_PROGRESS 同步的匹配键,与 [项目编号] 同值)	11	49
 TABLE	dbo	rd_progress_detail_bak_20260918		0	21
 TABLE	dbo	rd_ro_protect	RO保护测试(旧单表)	0	18
-TABLE	dbo	rd_ro_protect_detail	RO保护测试行表	2	17
-TABLE	dbo	rd_ro_protect_head	RO保护测试头表	4	25
-TABLE	dbo	rd_sample_no_detail	样品编号表明细(客户项目代号/样品编号/项目名称/子项目/项目负责人/项目编号/炭棒尺寸)	0	16
-TABLE	dbo	rd_sample_no_head	样品编号表(产品开发样品编号):样品编号=客户项目代号+项目编号(确定性拼接,38样例验证)	0	13
+TABLE	dbo	rd_ro_protect_detail	RO保护测试行表	2	37
+TABLE	dbo	rd_ro_protect_head	RO保护测试头表	4	45
+TABLE	dbo	rd_sample_no_detail	样品编号表明细(客户项目代号/样品编号/项目名称/子项目/项目负责人/项目编号/炭棒尺寸)	0	36
+TABLE	dbo	rd_sample_no_head	样品编号表(产品开发样品编号):样品编号=客户项目代号+项目编号(确定性拼接,38样例验证)	0	33
 TABLE	dbo	rd_scale	阻垢性能测试(旧单表)	0	19
-TABLE	dbo	rd_scale_detail	阻垢性能测试行表	3	18
-TABLE	dbo	rd_scale_head	阻垢性能测试头表	2	23
-TABLE	dbo	rd_sinter_tolerance	烧结尺寸表:烧结车间模具对应的炭棒内外径与公差对照(配方计算按车间+型号带出尺寸)	60	17
+TABLE	dbo	rd_scale_detail	阻垢性能测试行表	3	38
+TABLE	dbo	rd_scale_head	阻垢性能测试头表	2	43
+TABLE	dbo	rd_sinter_tolerance	烧结尺寸表:烧结车间模具对应的炭棒内外径与公差对照(配方计算按车间+型号带出尺寸)	60	37
 TABLE	dbo	rd_soak	浸泡安全测试(旧单表)	0	19
-TABLE	dbo	rd_soak_detail	浸泡安全测试行表	21	13
-TABLE	dbo	rd_soak_head	浸泡安全测试头表	4	40
+TABLE	dbo	rd_soak_detail	浸泡安全测试行表	21	33
+TABLE	dbo	rd_soak_head	浸泡安全测试头表	4	60
 TABLE	dbo	rd_spec_assign	规格书分派(产品编号+种类→责任人)	0	11
 TABLE	dbo	rd_spec_doc	规格书(旧单表)	0	18
-TABLE	dbo	rd_spec_doc_detail	规格书行表	0	22
-TABLE	dbo	rd_spec_doc_head	规格书头表(按规格书种类页签)	2	31
+TABLE	dbo	rd_spec_doc_detail	规格书行表	0	42
+TABLE	dbo	rd_spec_doc_head	规格书头表(按规格书种类页签)	2	51
 TABLE	dbo	rd_spike_water	加标水配置记录表(旧单表)	0	18
-TABLE	dbo	rd_spike_water_detail	加标水配置记录表行表	2	28
+TABLE	dbo	rd_spike_water_detail	加标水配置记录表行表	2	48
 TABLE	dbo	rd_spike_water_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	0	28
-TABLE	dbo	rd_spike_water_head	加标水配置记录表头表	4	10
+TABLE	dbo	rd_spike_water_head	加标水配置记录表头表	4	30
 TABLE	dbo	rd_spike_water_head_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	2	10
 TABLE	dbo	RENAME_20260911_173159_rd_approval_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	20	23
 TABLE	dbo	RENAME_20260911_173159_rd_approval_detail_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	0	7
@@ -473,7 +473,7 @@ TABLE	dbo	RENAME_20260911_213754_yj_doc_status_bak_20260911	备份/改名残留(
 TABLE	dbo	report_column_settings	报表列设置(用户自定义列布局,按panel_code存JSON)	0	5
 TABLE	dbo	rod_return	炭棒不良退货登记头表	0	18
 TABLE	dbo	rod_return_detail	炭棒不良退货登记占位行表(恒空,doc模式要求)	0	7
-TABLE	dbo	s_allno	单据编号	571	16
+TABLE	dbo	s_allno	单据编号	572	16
 TABLE	dbo	s_commdata	通讯数据	712	28
 TABLE	dbo	s_cookie	Cookie值	0	15
 TABLE	dbo	s_error	错误信息	2	19
@@ -518,12 +518,12 @@ TABLE	dbo	wbgd	外包工单	4	39
 TABLE	dbo	wh_record	无黑处理登记头表(加湿前后重量/无黑时间)	0	19
 TABLE	dbo	wh_record_detail	无黑处理登记占位行表(恒空,doc模式要求)	0	7
 TABLE	dbo	wlxx	物流信息	0	22
-TABLE	dbo	wo_line_stock	线边库存(PR系列,已下架)	0	12
-TABLE	dbo	wo_material_pick	工序领料记录(PR系列,已下架)	0	15
-TABLE	dbo	wo_order	生产工单(五工序计划预填,产品批号取号)	0	29
-TABLE	dbo	wo_progress	工单工序进度(报工审核按工序累计完成数量)	10	11
+TABLE	dbo	wo_line_stock	线边库存(PR系列,已下架)	0	32
+TABLE	dbo	wo_material_pick	工序领料记录(PR系列,已下架)	0	35
+TABLE	dbo	wo_order	生产工单(五工序计划预填,产品批号取号)	0	49
+TABLE	dbo	wo_progress	工单工序进度(报工审核按工序累计完成数量)	10	31
 TABLE	dbo	wo_report	工序报工单(切炭行支持直销数量双出口)	0	17
-TABLE	dbo	wo_stage_report	工序报工记录(PR系列,已下架)	0	19
+TABLE	dbo	wo_stage_report	工序报工记录(PR系列,已下架)	0	39
 TABLE	dbo	xjjl	巡检记录	0	51
 TABLE	dbo	xjjl_sz	巡检记录-测试数值	0	34
 TABLE	dbo	xsdh	销售订货(遗留)	3	22
@@ -535,8 +535,9 @@ TABLE	dbo	yj_dept	部门表(多级,parentId)	20	4
 TABLE	dbo	yj_doc_batch	采购订单送料批次台账(每张暂收单一个批次;批次号=订单号+3位序号,序号在草稿删除后回收)	0	13
 TABLE	dbo	yj_doc_modify_log	归档单修改记录(修改前后差异快照与审批链)	0	14
 TABLE	dbo	yj_doc_modify_log_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	3	14
-TABLE	dbo	yj_doc_status	单据状态表(shr审核/canceled作废/stopped中止/pending审批中/archived归档/modify_state修改态)	23	30
+TABLE	dbo	yj_doc_status	单据状态表(shr审核/canceled作废/stopped中止/pending审批中/archived归档/modify_state修改态)	24	30
 TABLE	dbo	yj_doc_status_bak_20260911	备份/改名残留(20260911 面板结构调整前备份,可清理)	2	26
+TABLE	dbo	yj_ext_bind_log	动态字段绑定审计(bind绑定/retire退绑/clear清空;备用列池操作留痕)	54	8
 TABLE	dbo	yj_field	面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)	4198	20
 TABLE	dbo	yj_form_approval	审批流记录(提交/通过/驳回留痕)	44	9
 TABLE	dbo	yj_locale	语言表(启用语言清单,插行即出现语言切换器)	10	5
@@ -547,12 +548,12 @@ TABLE	dbo	yj_plan_term	计划条款表(阶段中止/恢复申请:stage/reason/st
 TABLE	dbo	yj_report_template	报表模板表(ADR-0002:DB 存储精细模板,上传即编译校验生效免重启;template_code 唯一,panel_code 绑定面板)	1	11
 TABLE	dbo	yj_role	角色表(角色编码/名称/is_admin)	3	5
 TABLE	dbo	yj_role_panel	角色-面板授权表(perms动作词表含view等,can_approve=审批权)	35	5
-TABLE	dbo	yj_schema_log	数据库结构脚本执行日志(script_name+content_hash 幂等记录)	311	3
+TABLE	dbo	yj_schema_log	数据库结构脚本执行日志(script_name+content_hash 幂等记录)	313	3
 TABLE	dbo	yj_share_file	共享文件表(研发管理·全公司共享资料:标准/测试报告/认证报告;1行=1份文件,文件本体存yj_attachment,权限=指定人上传改删、其余仅查阅)	0	17
 TABLE	dbo	yj_share_file_cat	共享文件分类表(树形 parent_id,研发管理·共享文件模块;分类可增减,有文件或子分类时禁删)	13	8
 TABLE	dbo	yj_std_lib	标准库(lib_code+item_code 内容片段,供文书面板引用)	178	11
-TABLE	dbo	yj_translation	多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)	5417	8
-TABLE	dbo	yj_usage_log	使用日志(登录与面板操作留痕,使用权限查看页面数据源)	2237	9
+TABLE	dbo	yj_translation	多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)	41794	8
+TABLE	dbo	yj_usage_log	使用日志(登录与面板操作留痕,使用权限查看页面数据源)	2263	9
 TABLE	dbo	yj_user	用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)	10	8
 TABLE	dbo	ysfk	收付款(遗留)	0	22
 TABLE	dbo	zc	转仓单	0	25
