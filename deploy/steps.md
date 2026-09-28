@@ -25,7 +25,8 @@ deploy-incremental.bat GO              :: ② 确认 ① 无误后执行,预期 
 :: -> APP-STARTED -> LOGIN-OK -> ALL-OK
 ```
 
-- GO 自动顺序:**停应用 → 备份库(C:\yinjia\backup\pre-deploy-<时间戳>.bak,失败硬停)→ DbSync 跑增量迁移(预期执行 84、重跑 ≤1)→ 换 jar(旧 jar 自动归档)→ 起应用 → 登录探针**。
+- GO 自动顺序:**停应用 → 备份库(C:\yinjia\backup\pre-deploy-<时间戳>.bak,失败硬停)→ 按包内 `to-run-20260928.txt` 强制执行 86 条迁移(84 条新链 + `rd-prod-sheets` 重建 4 张 09-11 被改名走的表 + parity 对齐)→ baseline 刷新旧哈希 → 裸 sync 复核 → 换 jar(旧 jar 自动归档)→ 起应用 → 登录探针**。
+- ⚠ 迁移为什么不用裸 sync:2026-09-28 用服务器 bak 在本地演练实测,服务器台账里 11 个旧种子脚本内容哈希已过期,裸 sync 会重跑并在 `_doc_part3_data.sql` 上失败;强制执行清单 + baseline 的三段式已在服务器分身上 84/84 全绿并收敛(裸 sync 复核「执行 0」)。
 - GO 期间应用停机约 5~15 分钟,挑没人用的时间窗。
 - 任何一步不过就打 `RESULT: FAIL-*` 并停止;详细输出在 `logs\deploy-<时间戳>.log`。
 

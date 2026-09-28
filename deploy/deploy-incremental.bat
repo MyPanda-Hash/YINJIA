@@ -107,10 +107,30 @@ echo RESULT: BACKUP-GATE-PASSED
 echo RESULT: BACKUP-GATE-PASSED bak=%BAKSIZE% >> "%LOG%"
 
 REM ---- 4) migrations ----
+REM 2026-09-28 rehearsal finding: a bare `DbSync` (sync) on the server re-runs ~11 old
+REM seed scripts whose bytes changed since 09-22 (stale hashes) and hard-fails on
+REM _doc_part3_data.sql (Invalid column name). Correct sequence, same as the local
+REM rehearsal that passed 84/84: force-run the curated to-run list, then baseline
+REM (refresh stale hashes, no data), then a bare sync must be a clean no-op.
 :migrate
 if "%DOMIG%"=="0" goto swap
-echo [4] running migrations via DbSync - detailed output in logs\deploy-%TS%.log ...
+if not exist "%PKG%\to-run-20260928.txt" goto fail-norunlist
+echo [4] migrations: force-run to-run list (84+2) - detailed output in logs\deploy-%TS%.log ...
 pushd "%PKG%\tools"
+set "RUNFAILED=0"
+for /f "usebackq eol=# delims=" %%s in ("%PKG%\to-run-20260928.txt") do (
+  java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp lib\mssql-jdbc.jar DbSync.java run %%s >> "%LOG%" 2>&1
+  if errorlevel 1 (
+    echo    FAILED: %%s
+    echo [4] run failed: %%s >> "%LOG%"
+    set "RUNFAILED=1"
+  )
+)
+if not "%RUNFAILED%"=="0" goto fail-migrations
+echo [4b] baseline - refresh stale hashes only, no data touched ...
+java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp lib\mssql-jdbc.jar DbSync.java baseline >> "%LOG%" 2>&1
+if errorlevel 1 goto fail-migrations
+echo [4c] verify bare sync is a no-op ...
 java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp lib\mssql-jdbc.jar DbSync.java >> "%LOG%" 2>&1
 set "MIGRC=%errorlevel%"
 popd
@@ -197,6 +217,10 @@ exit /b 1
 :fail-backup
 echo RESULT: FAIL-BACKUP >> "%LOG%"
 echo RESULT: FAIL-BACKUP - no rollback point, nothing else was touched
+exit /b 1
+:fail-norunlist
+echo RESULT: FAIL-NO-RUNLIST >> "%LOG%"
+echo RESULT: FAIL-NO-RUNLIST - to-run-20260928.txt missing from package
 exit /b 1
 :fail-migrations
 echo RESULT: FAIL-MIGRATIONS >> "%LOG%"
