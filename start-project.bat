@@ -26,12 +26,26 @@ if not exist "%~dp0backend\target\yinjia-mes-backend-0.1.0.jar" (
 rem aliyun keys: backend\.env (local, not in git); missing => translate/OCR degrade silently
 if exist "%~dp0backend\.env" for /f "usebackq delims=" %%L in ("%~dp0backend\.env") do set "%%L"
 
-echo [1/2] starting backend http://localhost:8090 ...
+rem ---- since 2026-09-24: incremental DB sync BEFORE start (fixes "code pulled but SQL not run") ----
+rem Only new/changed scripts in db-migrations.txt are executed (idempotent); failure does NOT block start.
+echo [0/3] syncing database (tools\db-migrations.txt incremental) ...
+call "%~dp0tools\sync-db.bat"
+if errorlevel 1 (
+  echo.
+  echo ============================================================
+  echo [WARN] DB sync FAILED - UI/fields may not match the code!
+  echo        Usual cause: SQL Server ^(Docker mssql2019^) not running.
+  echo        Fix: start the DB, then re-run  tools\sync-db.bat
+  echo ============================================================
+  echo.
+)
+
+echo [1/3] starting backend http://localhost:8090 ...
 start "YINJIA-MES backend" cmd /c ""%JAVA_HOME%\bin\java.exe" -jar "%~dp0backend\target\yinjia-mes-backend-0.1.0.jar""
 
 timeout /t 5 /nobreak >nul
 
-echo [2/2] starting frontend http://localhost:5173 ...
+echo [3/3] starting frontend http://localhost:5173 ...
 cd /d "%~dp0frontend"
 start "YINJIA-MES frontend" cmd /c "npm run dev"
 

@@ -1,4 +1,4 @@
-# 清理恢复用临时库 HSDZ_MES_RESTORE
+﻿# 清理恢复用临时库 HSDZ_MES_RESTORE
 $ErrorActionPreference = 'Stop'
 $conn = New-Object System.Data.SqlClient.SqlConnection("Server=localhost;Integrated Security=True;TrustServerCertificate=True")
 $conn.Open()

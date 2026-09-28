@@ -106,3 +106,6 @@ deploy/*.msi
 # 会话导出包(AI 工具产物,勿入库)
 dsh-session-*/
 .zcodeignore
+
+# esbuild 临时目录(前端构建产物,勿入库)
+.esbuild-tmp/

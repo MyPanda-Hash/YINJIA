@@ -1,4 +1,4 @@
-# 建空链验证库 HSDZ_MES_CHAIN(整条迁移链从头跑,产出链定义的标准字段态)
+﻿# 建空链验证库 HSDZ_MES_CHAIN(整条迁移链从头跑,产出链定义的标准字段态)
 $ErrorActionPreference = 'Stop'
 $conn = New-Object System.Data.SqlClient.SqlConnection("Server=localhost;Integrated Security=True;TrustServerCertificate=True")
 $conn.Open()
