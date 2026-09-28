@@ -35,9 +35,19 @@ const SKIP = new Set(['id', 'custom_field', 'custom_entity_field', 'material_ent
 // 标签表:沿用采购入库已验证的覆盖表(同名同义键跨面板共用一套中文标签与译名),
 // 并补齐 inv_pick 独有键(领料类型/领料用途/单据类型/辅助属性 1..3/源单产品分录)
 const LABEL = {
-  bill_status: '单据状态', create_time: '创建时间', modify_time: '修改时间', audit_time: '审核时间',
+  // ⚠ 2026-09-28「中英文混杂」清理:下列标签曾按采购入库那份生成器的兜底规则长成
+  //   `<中文>_<接口键>`(单据状态_bill_status / 审核时间_audit_time / 审核人_auditor_name),
+  //   id 类键还直接用了裸英文列名(dept_id/creator_id/…)。已由
+  //   tools/migrate-material-out-label-cleanup.sql 就地改名(列名+yj_field+译名),
+  //   这里同步成清洁名,保证**再跑本生成器不会又把混杂名写回去**。
+  //   注:磁盘上已应用的 tools/migrate-material-out-fields.sql 保留旧名(字节不能动,
+  //   一动 DbSync 会重跑);新库由「字段并集 → 标签清理」两步得到同样的清洁名
+  //   (清理脚本对「新旧两列并存」也有兜底,见该脚本注释)。
+  bill_status: '金蝶单据状态', create_time: '创建时间', modify_time: '修改时间', audit_time: '金蝶审核时间',
   creator_name: '创建人', creator_number: '创建人编码', modifier_name: '修改人', modifier_number: '修改人编码',
-  auditor_name: '审核人', auditor_number: '审核人编码', dept_name: '部门', dept_number: '部门编码',
+  auditor_name: '金蝶审核人', auditor_number: '审核人编码', dept_name: '部门', dept_number: '部门编码',
+  dept_id: '部门id', creator_id: '创建人id', modifier_id: '修改人id', auditor_id: '审核人id',
+  bill_type_id: '单据类型id', emp_id: '经手人id', pick_use_id: '领料用途id',
   emp_number: '经手人编码', bill_type_name: '单据类型名称', bill_type_number: '单据类型编码',
   pick_type: '领料类型', pick_use_name: '领料用途名称', pick_use_number: '领料用途编码',
   mul_bill_label: '单据标签',
@@ -73,6 +83,14 @@ const ALL_ZERO = new Set(['price', 'cost', 'unit_cost', 'inv_base_qty', 'aux_qty
 const FORCE_VISIBLE = /^(price|cost|unit_cost)$/;   // 价格族:用户口径「尤其关注价格」→ 一律显示
 const HIDE = /_id$|creator|modifier|auditor_id|auditor_number|attachments|custom_field|^id$|picture/;
 const humanize = (k) => k.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+// 英文译名覆盖:与 migrate-material-out-label-cleanup.sql 里写死的 en 保持一致 ——
+// 否则「先跑字段并集(新库)」与「先跑清理(老库)」两条路会得到不同的英文界面文案。
+const EN_OVERRIDE = {
+  bill_status: 'Kingdee Bill Status',
+  audit_time: 'Kingdee Audit Time',
+  auditor_name: 'Kingdee Auditor',
+};
+const enOf = (k) => EN_OVERRIDE[k] || humanize(k);
 
 const isCommon = (key, stat, total) => (Number(stat[key] || 0) >= 0.5 * total) && !ALL_ZERO.has(key);
 const isVisible = (key, stat, total) => (isCommon(key, stat, total) || FORCE_VISIBLE.test(key)) && !HIDE.test(key);
@@ -115,7 +133,7 @@ for (const k of headDelta) {
   sql.push(`IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'${label}')`);
   sql.push(`    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'${label}', N'${label}', N'文本', N'header', ${seqH++}, 130, 1, 0, ${1 - vis}, ${vis});`);
   sql.push(`IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'${label}' AND locale='en')`);
-  sql.push(`    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'${label}', 'en', N'${humanize(k)}', 'manual');`);
+  sql.push(`    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'${label}', 'en', N'${enOf(k)}', 'manual');`);
   comments.push([label, 'bd_material_out', k]);
 }
 sql.push('GO', '');
@@ -131,7 +149,7 @@ for (const k of lineDelta) {
   sql.push(`IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'${label}')`);
   sql.push(`    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'${label}', N'${label}', N'文本', N'detail', ${seqL++}, 120, 1, 0, ${1 - vis}, ${vis});`);
   sql.push(`IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'${label}' AND locale='en')`);
-  sql.push(`    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'${label}', 'en', N'${humanize(k)}', 'manual');`);
+  sql.push(`    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'${label}', 'en', N'${enOf(k)}', 'manual');`);
   comments.push([label, 'bl_material_out', k]);
 }
 sql.push('GO', '');
@@ -171,3 +189,4 @@ console.log(`【头·隐藏(${hiddenHead.length})】${hiddenHead.join(' | ')}`);
 console.log(`\n【行·显示(${visibleLine.length})】${visibleLine.join(' | ')}`);
 console.log(`【行·隐藏(${hiddenLine.length})】${hiddenLine.join(' | ')}`);
 console.log('\n已生成:tools/migrate-material-out-fields.sql + deploy/kingdee-extra-fields.mjs(MATERIAL_OUT)');
+

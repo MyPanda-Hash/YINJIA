@@ -1,0 +1,22 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:14 字符: 144
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-mixedlabel-scope.sql ==
+  | PU_ORDER | 40 | 0 | 
+  | SALE_OUT | 30 | 4 | 
+  | MATERIAL_OUT | 29 | 7 | 
+  | PURCHASE_IN | 23 | 4 | 
+  | PURCHASE_IN | ERP单号 | 
+  | PURCHASE_IN | 转ERP操作人 | 
+  | PURCHASE_IN | 转ERP时间 | 
+  | PURCHASE_IN | 是否已转ERP | 
+  | SALE_OUT | ERP单号 | 
+  | SALE_OUT | 转ERP操作人 | 
+  | SALE_OUT | 转ERP时间 | 
+  | SALE_OUT | 是否已转ERP | 
+[OK] _q-mixedlabel-scope.sql (3 batches)

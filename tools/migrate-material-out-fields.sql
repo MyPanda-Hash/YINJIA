@@ -14,18 +14,18 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_na
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'创建时间', N'创建时间', N'文本', N'header', 970, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'创建时间' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'创建时间', 'en', N'Create Time', 'manual');
--- 头.单据状态_bill_status  ← 金蝶 inv_pick 头键 bill_status(实测非空 40/40)
-IF COL_LENGTH('dbo.bd_material_out', N'单据状态_bill_status') IS NULL ALTER TABLE dbo.bd_material_out ADD [单据状态_bill_status] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'单据状态_bill_status')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'单据状态_bill_status', N'单据状态_bill_status', N'文本', N'header', 971, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'单据状态_bill_status' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'单据状态_bill_status', 'en', N'Bill Status', 'manual');
--- 头.dept_id  ← 金蝶 inv_pick 头键 dept_id(实测非空 40/40)
-IF COL_LENGTH('dbo.bd_material_out', N'dept_id') IS NULL ALTER TABLE dbo.bd_material_out ADD [dept_id] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'dept_id')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'dept_id', N'dept_id', N'文本', N'header', 972, 130, 1, 0, 1, 0);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'dept_id' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'dept_id', 'en', N'Dept Id', 'manual');
+-- 头.金蝶单据状态  ← 金蝶 inv_pick 头键 bill_status(实测非空 40/40)
+IF COL_LENGTH('dbo.bd_material_out', N'金蝶单据状态') IS NULL ALTER TABLE dbo.bd_material_out ADD [金蝶单据状态] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'金蝶单据状态')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'金蝶单据状态', N'金蝶单据状态', N'文本', N'header', 971, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'金蝶单据状态' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'金蝶单据状态', 'en', N'Kingdee Bill Status', 'manual');
+-- 头.部门id  ← 金蝶 inv_pick 头键 dept_id(实测非空 40/40)
+IF COL_LENGTH('dbo.bd_material_out', N'部门id') IS NULL ALTER TABLE dbo.bd_material_out ADD [部门id] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'部门id')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'部门id', N'部门id', N'文本', N'header', 972, 130, 1, 0, 1, 0);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'部门id' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'部门id', 'en', N'Dept Id', 'manual');
 -- 头.部门编码  ← 金蝶 inv_pick 头键 dept_number(实测非空 40/40)
 IF COL_LENGTH('dbo.bd_material_out', N'部门编码') IS NULL ALTER TABLE dbo.bd_material_out ADD [部门编码] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'部门编码')
@@ -44,18 +44,18 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_na
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'修改时间', N'修改时间', N'文本', N'header', 975, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'修改时间' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'修改时间', 'en', N'Modify Time', 'manual');
--- 头.审核时间_audit_time  ← 金蝶 inv_pick 头键 audit_time(实测非空 40/40)
-IF COL_LENGTH('dbo.bd_material_out', N'审核时间_audit_time') IS NULL ALTER TABLE dbo.bd_material_out ADD [审核时间_audit_time] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'审核时间_audit_time')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'审核时间_audit_time', N'审核时间_audit_time', N'文本', N'header', 976, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'审核时间_audit_time' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'审核时间_audit_time', 'en', N'Audit Time', 'manual');
--- 头.creator_id  ← 金蝶 inv_pick 头键 creator_id(实测非空 40/40)
-IF COL_LENGTH('dbo.bd_material_out', N'creator_id') IS NULL ALTER TABLE dbo.bd_material_out ADD [creator_id] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'creator_id')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'creator_id', N'creator_id', N'文本', N'header', 977, 130, 1, 0, 1, 0);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'creator_id' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'creator_id', 'en', N'Creator Id', 'manual');
+-- 头.金蝶审核时间  ← 金蝶 inv_pick 头键 audit_time(实测非空 40/40)
+IF COL_LENGTH('dbo.bd_material_out', N'金蝶审核时间') IS NULL ALTER TABLE dbo.bd_material_out ADD [金蝶审核时间] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'金蝶审核时间')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'金蝶审核时间', N'金蝶审核时间', N'文本', N'header', 976, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'金蝶审核时间' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'金蝶审核时间', 'en', N'Kingdee Audit Time', 'manual');
+-- 头.创建人id  ← 金蝶 inv_pick 头键 creator_id(实测非空 40/40)
+IF COL_LENGTH('dbo.bd_material_out', N'创建人id') IS NULL ALTER TABLE dbo.bd_material_out ADD [创建人id] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'创建人id')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'创建人id', N'创建人id', N'文本', N'header', 977, 130, 1, 0, 1, 0);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'创建人id' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'创建人id', 'en', N'Creator Id', 'manual');
 -- 头.创建人  ← 金蝶 inv_pick 头键 creator_name(实测非空 40/40)
 IF COL_LENGTH('dbo.bd_material_out', N'创建人') IS NULL ALTER TABLE dbo.bd_material_out ADD [创建人] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'创建人')
@@ -68,12 +68,12 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_na
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'创建人编码', N'创建人编码', N'文本', N'header', 979, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'创建人编码' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'创建人编码', 'en', N'Creator Number', 'manual');
--- 头.modifier_id  ← 金蝶 inv_pick 头键 modifier_id(实测非空 40/40)
-IF COL_LENGTH('dbo.bd_material_out', N'modifier_id') IS NULL ALTER TABLE dbo.bd_material_out ADD [modifier_id] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'modifier_id')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'modifier_id', N'modifier_id', N'文本', N'header', 980, 130, 1, 0, 1, 0);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'modifier_id' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'modifier_id', 'en', N'Modifier Id', 'manual');
+-- 头.修改人id  ← 金蝶 inv_pick 头键 modifier_id(实测非空 40/40)
+IF COL_LENGTH('dbo.bd_material_out', N'修改人id') IS NULL ALTER TABLE dbo.bd_material_out ADD [修改人id] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'修改人id')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'修改人id', N'修改人id', N'文本', N'header', 980, 130, 1, 0, 1, 0);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'修改人id' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'修改人id', 'en', N'Modifier Id', 'manual');
 -- 头.修改人  ← 金蝶 inv_pick 头键 modifier_name(实测非空 40/40)
 IF COL_LENGTH('dbo.bd_material_out', N'修改人') IS NULL ALTER TABLE dbo.bd_material_out ADD [修改人] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'修改人')
@@ -98,36 +98,36 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_na
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'单据类型编码', N'单据类型编码', N'文本', N'header', 984, 130, 1, 0, 0, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'单据类型编码' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'单据类型编码', 'en', N'Bill Type Number', 'manual');
--- 头.bill_type_id  ← 金蝶 inv_pick 头键 bill_type_id(实测非空 40/40)
-IF COL_LENGTH('dbo.bd_material_out', N'bill_type_id') IS NULL ALTER TABLE dbo.bd_material_out ADD [bill_type_id] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'bill_type_id')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'bill_type_id', N'bill_type_id', N'文本', N'header', 985, 130, 1, 0, 1, 0);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'bill_type_id' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'bill_type_id', 'en', N'Bill Type Id', 'manual');
--- 头.auditor_id  ← 金蝶 inv_pick 头键 auditor_id(实测非空 40/40)
-IF COL_LENGTH('dbo.bd_material_out', N'auditor_id') IS NULL ALTER TABLE dbo.bd_material_out ADD [auditor_id] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'auditor_id')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'auditor_id', N'auditor_id', N'文本', N'header', 986, 130, 1, 0, 1, 0);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'auditor_id' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'auditor_id', 'en', N'Auditor Id', 'manual');
--- 头.审核人_auditor_name  ← 金蝶 inv_pick 头键 auditor_name(实测非空 40/40)
-IF COL_LENGTH('dbo.bd_material_out', N'审核人_auditor_name') IS NULL ALTER TABLE dbo.bd_material_out ADD [审核人_auditor_name] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'审核人_auditor_name')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'审核人_auditor_name', N'审核人_auditor_name', N'文本', N'header', 987, 130, 1, 0, 0, 1);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'审核人_auditor_name' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'审核人_auditor_name', 'en', N'Auditor Name', 'manual');
+-- 头.单据类型id  ← 金蝶 inv_pick 头键 bill_type_id(实测非空 40/40)
+IF COL_LENGTH('dbo.bd_material_out', N'单据类型id') IS NULL ALTER TABLE dbo.bd_material_out ADD [单据类型id] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'单据类型id')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'单据类型id', N'单据类型id', N'文本', N'header', 985, 130, 1, 0, 1, 0);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'单据类型id' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'单据类型id', 'en', N'Bill Type Id', 'manual');
+-- 头.审核人id  ← 金蝶 inv_pick 头键 auditor_id(实测非空 40/40)
+IF COL_LENGTH('dbo.bd_material_out', N'审核人id') IS NULL ALTER TABLE dbo.bd_material_out ADD [审核人id] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'审核人id')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'审核人id', N'审核人id', N'文本', N'header', 986, 130, 1, 0, 1, 0);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'审核人id' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'审核人id', 'en', N'Auditor Id', 'manual');
+-- 头.金蝶审核人  ← 金蝶 inv_pick 头键 auditor_name(实测非空 40/40)
+IF COL_LENGTH('dbo.bd_material_out', N'金蝶审核人') IS NULL ALTER TABLE dbo.bd_material_out ADD [金蝶审核人] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'金蝶审核人')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'金蝶审核人', N'金蝶审核人', N'文本', N'header', 987, 130, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'金蝶审核人' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'金蝶审核人', 'en', N'Kingdee Auditor', 'manual');
 -- 头.审核人编码  ← 金蝶 inv_pick 头键 auditor_number(实测非空 40/40)
 IF COL_LENGTH('dbo.bd_material_out', N'审核人编码') IS NULL ALTER TABLE dbo.bd_material_out ADD [审核人编码] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'审核人编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'审核人编码', N'审核人编码', N'文本', N'header', 988, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'审核人编码' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'审核人编码', 'en', N'Auditor Number', 'manual');
--- 头.emp_id  ← 金蝶 inv_pick 头键 emp_id(实测非空 40/40)
-IF COL_LENGTH('dbo.bd_material_out', N'emp_id') IS NULL ALTER TABLE dbo.bd_material_out ADD [emp_id] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'emp_id')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'emp_id', N'emp_id', N'文本', N'header', 989, 130, 1, 0, 1, 0);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'emp_id' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'emp_id', 'en', N'Emp Id', 'manual');
+-- 头.经手人id  ← 金蝶 inv_pick 头键 emp_id(实测非空 40/40)
+IF COL_LENGTH('dbo.bd_material_out', N'经手人id') IS NULL ALTER TABLE dbo.bd_material_out ADD [经手人id] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'经手人id')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'经手人id', N'经手人id', N'文本', N'header', 989, 130, 1, 0, 1, 0);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'经手人id' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'经手人id', 'en', N'Emp Id', 'manual');
 -- 头.经手人编码  ← 金蝶 inv_pick 头键 emp_number(实测非空 39/40)
 IF COL_LENGTH('dbo.bd_material_out', N'经手人编码') IS NULL ALTER TABLE dbo.bd_material_out ADD [经手人编码] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'经手人编码')
@@ -146,12 +146,12 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_na
     INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'领料用途名称', N'领料用途名称', N'文本', N'header', 992, 130, 1, 0, 1, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'领料用途名称' AND locale='en')
     INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'领料用途名称', 'en', N'Pick Use Name', 'manual');
--- 头.pick_use_id  ← 金蝶 inv_pick 头键 pick_use_id(实测非空 0/40)
-IF COL_LENGTH('dbo.bd_material_out', N'pick_use_id') IS NULL ALTER TABLE dbo.bd_material_out ADD [pick_use_id] nvarchar(500) NULL;
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'pick_use_id')
-    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'pick_use_id', N'pick_use_id', N'文本', N'header', 993, 130, 1, 0, 1, 0);
-IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'pick_use_id' AND locale='en')
-    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'pick_use_id', 'en', N'Pick Use Id', 'manual');
+-- 头.领料用途id  ← 金蝶 inv_pick 头键 pick_use_id(实测非空 0/40)
+IF COL_LENGTH('dbo.bd_material_out', N'领料用途id') IS NULL ALTER TABLE dbo.bd_material_out ADD [领料用途id] nvarchar(500) NULL;
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'领料用途id')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible) VALUES ('MATERIAL_OUT', N'领料用途id', N'领料用途id', N'文本', N'header', 993, 130, 1, 0, 1, 0);
+IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=N'领料用途id' AND locale='en')
+    INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'领料用途id', 'en', N'Pick Use Id', 'manual');
 -- 头.领料用途编码  ← 金蝶 inv_pick 头键 pick_use_number(实测非空 0/40)
 IF COL_LENGTH('dbo.bd_material_out', N'领料用途编码') IS NULL ALTER TABLE dbo.bd_material_out ADD [领料用途编码] nvarchar(500) NULL;
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MATERIAL_OUT' AND col_name=N'领料用途编码')
@@ -543,26 +543,26 @@ GO
 -- ══ 新增列中文注明(AGENTS.md:结构变更补注;幂等) ══
 IF COL_LENGTH(N'dbo.bd_material_out', N'创建时间') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'创建时间', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 create_time', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'创建时间';
-IF COL_LENGTH(N'dbo.bd_material_out', N'单据状态_bill_status') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'单据状态_bill_status', 'ColumnId') AND ep.name=N'MS_Description')
-  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_status', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'单据状态_bill_status';
-IF COL_LENGTH(N'dbo.bd_material_out', N'dept_id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'dept_id', 'ColumnId') AND ep.name=N'MS_Description')
-  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 dept_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'dept_id';
+IF COL_LENGTH(N'dbo.bd_material_out', N'金蝶单据状态') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'金蝶单据状态', 'ColumnId') AND ep.name=N'MS_Description')
+  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_status', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'金蝶单据状态';
+IF COL_LENGTH(N'dbo.bd_material_out', N'部门id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'部门id', 'ColumnId') AND ep.name=N'MS_Description')
+  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 dept_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'部门id';
 IF COL_LENGTH(N'dbo.bd_material_out', N'部门编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'部门编码', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 dept_number', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'部门编码';
 IF COL_LENGTH(N'dbo.bd_material_out', N'领料类型') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'领料类型', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_type', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'领料类型';
 IF COL_LENGTH(N'dbo.bd_material_out', N'修改时间') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'修改时间', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 modify_time', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'修改时间';
-IF COL_LENGTH(N'dbo.bd_material_out', N'审核时间_audit_time') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'审核时间_audit_time', 'ColumnId') AND ep.name=N'MS_Description')
-  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 audit_time', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'审核时间_audit_time';
-IF COL_LENGTH(N'dbo.bd_material_out', N'creator_id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'creator_id', 'ColumnId') AND ep.name=N'MS_Description')
-  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 creator_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'creator_id';
+IF COL_LENGTH(N'dbo.bd_material_out', N'金蝶审核时间') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'金蝶审核时间', 'ColumnId') AND ep.name=N'MS_Description')
+  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 audit_time', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'金蝶审核时间';
+IF COL_LENGTH(N'dbo.bd_material_out', N'创建人id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'创建人id', 'ColumnId') AND ep.name=N'MS_Description')
+  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 creator_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'创建人id';
 IF COL_LENGTH(N'dbo.bd_material_out', N'创建人') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'创建人', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 creator_name', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'创建人';
 IF COL_LENGTH(N'dbo.bd_material_out', N'创建人编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'创建人编码', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 creator_number', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'创建人编码';
-IF COL_LENGTH(N'dbo.bd_material_out', N'modifier_id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'modifier_id', 'ColumnId') AND ep.name=N'MS_Description')
-  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 modifier_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'modifier_id';
+IF COL_LENGTH(N'dbo.bd_material_out', N'修改人id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'修改人id', 'ColumnId') AND ep.name=N'MS_Description')
+  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 modifier_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'修改人id';
 IF COL_LENGTH(N'dbo.bd_material_out', N'修改人') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'修改人', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 modifier_name', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'修改人';
 IF COL_LENGTH(N'dbo.bd_material_out', N'修改人编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'修改人编码', 'ColumnId') AND ep.name=N'MS_Description')
@@ -571,24 +571,24 @@ IF COL_LENGTH(N'dbo.bd_material_out', N'单据类型名称') IS NOT NULL AND NOT
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_type_name', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'单据类型名称';
 IF COL_LENGTH(N'dbo.bd_material_out', N'单据类型编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'单据类型编码', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_type_number', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'单据类型编码';
-IF COL_LENGTH(N'dbo.bd_material_out', N'bill_type_id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'bill_type_id', 'ColumnId') AND ep.name=N'MS_Description')
-  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_type_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'bill_type_id';
-IF COL_LENGTH(N'dbo.bd_material_out', N'auditor_id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'auditor_id', 'ColumnId') AND ep.name=N'MS_Description')
-  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'auditor_id';
-IF COL_LENGTH(N'dbo.bd_material_out', N'审核人_auditor_name') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'审核人_auditor_name', 'ColumnId') AND ep.name=N'MS_Description')
-  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_name', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'审核人_auditor_name';
+IF COL_LENGTH(N'dbo.bd_material_out', N'单据类型id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'单据类型id', 'ColumnId') AND ep.name=N'MS_Description')
+  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_type_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'单据类型id';
+IF COL_LENGTH(N'dbo.bd_material_out', N'审核人id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'审核人id', 'ColumnId') AND ep.name=N'MS_Description')
+  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'审核人id';
+IF COL_LENGTH(N'dbo.bd_material_out', N'金蝶审核人') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'金蝶审核人', 'ColumnId') AND ep.name=N'MS_Description')
+  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_name', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'金蝶审核人';
 IF COL_LENGTH(N'dbo.bd_material_out', N'审核人编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'审核人编码', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_number', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'审核人编码';
-IF COL_LENGTH(N'dbo.bd_material_out', N'emp_id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'emp_id', 'ColumnId') AND ep.name=N'MS_Description')
-  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 emp_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'emp_id';
+IF COL_LENGTH(N'dbo.bd_material_out', N'经手人id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'经手人id', 'ColumnId') AND ep.name=N'MS_Description')
+  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 emp_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'经手人id';
 IF COL_LENGTH(N'dbo.bd_material_out', N'经手人编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'经手人编码', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 emp_number', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'经手人编码';
 IF COL_LENGTH(N'dbo.bd_material_out', N'单据标签') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'单据标签', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 mul_bill_label', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'单据标签';
 IF COL_LENGTH(N'dbo.bd_material_out', N'领料用途名称') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'领料用途名称', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_use_name', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'领料用途名称';
-IF COL_LENGTH(N'dbo.bd_material_out', N'pick_use_id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'pick_use_id', 'ColumnId') AND ep.name=N'MS_Description')
-  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_use_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'pick_use_id';
+IF COL_LENGTH(N'dbo.bd_material_out', N'领料用途id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'领料用途id', 'ColumnId') AND ep.name=N'MS_Description')
+  EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_use_id', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'领料用途id';
 IF COL_LENGTH(N'dbo.bd_material_out', N'领料用途编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bd_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_material_out'), N'领料用途编码', 'ColumnId') AND ep.name=N'MS_Description')
   EXEC sp_addextendedproperty N'MS_Description', N'材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_use_number', N'SCHEMA', N'dbo', N'TABLE', N'bd_material_out', N'COLUMN', N'领料用途编码';
 IF COL_LENGTH(N'dbo.bl_material_out', N'图片') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.major_id=OBJECT_ID(N'dbo.bl_material_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_material_out'), N'图片', 'ColumnId') AND ep.name=N'MS_Description')

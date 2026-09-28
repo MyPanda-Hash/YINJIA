@@ -1605,3 +1605,20 @@ migrate-material-out-i18n.sql
 #   ⚠ 遗留(未动,需用户定):bs_uom 有 8 行金蝶遗留单位(U01..U08,名称=件/kg/套/升/台/吨/g/2)与 32 行正常行
 #     重名 6 处,选择框会出重复项。bs_uom 是**同步档案**,本地停用会被下次同步覆盖 ⇒ 应在金蝶侧处理(或改同步映射)。
 migrate-material-out-ref-links.sql
+
+# —— 2026-09-28 材料出库单「中英文混杂」字段标签清理(用户口径) ——
+#   现象:表头可见位上挂着 单据状态_bill_status / 审核时间_audit_time / 审核人_auditor_name 这种半英半中标签,
+#   另有 7 个裸英文列名(dept_id/creator_id/modifier_id/bill_type_id/auditor_id/emp_id/pick_use_id)与
+#   同批已成中文的 商品id/仓库id 不一致。成因:接口并集生成器的兜底规则 `<中文标签>_<接口键>`。
+#   本脚本就地改名(与 migrate-spec-unify.sql 的 sp_rename 同款):列名 + yj_field.col_name/label 一起改,
+#   MS_Description 挂在列 id 上随改名保留;旧标签译名**保留**(采购入库/销售出库仍用同名标签),
+#   新标签另补 en/ja(10+10 条)。改名对照:单据状态_bill_status→金蝶单据状态、审核时间_audit_time→金蝶审核时间、
+#   审核人_auditor_name→金蝶审核人、dept_id→部门id、creator_id→创建人id、modifier_id→修改人id、
+#   bill_type_id→单据类型id、auditor_id→审核人id、emp_id→经手人id、pick_use_id→领料用途id。
+#   幂等且**两种顺序都收敛**(实测 HSDZ_MES_TEST 演练):旧名在→改名;新旧并存(有人按清洁名重跑了生成器)
+#   →旧列数据补进新列空值处再删旧列 + yj_field 去重。自检:混杂标签必须为 0(判定=含下划线 或 纯 ASCII;
+#   ⚠ 别用「含小写字母」判,商品id/序列号流转ID 会被误报 25 个)。
+#   源头同步(同提交):生成器 _gen-material-out.mjs 的 LABEL 词表改为清洁名 + EN_OVERRIDE,
+#   并**重跑生成器** ⇒ migrate-material-out-fields.sql 与 deploy/kingdee-extra-fields.mjs 同步改名
+#   (两处已随本提交更新;重跑字段并集对已改名的库是全 skip,已验证幂等)。
+migrate-material-out-label-cleanup.sql

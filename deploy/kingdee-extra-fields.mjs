@@ -2253,12 +2253,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "单据状态_bill_status",
+      "c": "金蝶单据状态",
       "a": "bill_status",
       "t": "str"
     },
     {
-      "c": "dept_id",
+      "c": "部门id",
       "a": "dept_id",
       "t": "str"
     },
@@ -2278,12 +2278,12 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "审核时间_audit_time",
+      "c": "金蝶审核时间",
       "a": "audit_time",
       "t": "str"
     },
     {
-      "c": "creator_id",
+      "c": "创建人id",
       "a": "creator_id",
       "t": "str"
     },
@@ -2298,7 +2298,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "modifier_id",
+      "c": "修改人id",
       "a": "modifier_id",
       "t": "str"
     },
@@ -2323,17 +2323,17 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "bill_type_id",
+      "c": "单据类型id",
       "a": "bill_type_id",
       "t": "str"
     },
     {
-      "c": "auditor_id",
+      "c": "审核人id",
       "a": "auditor_id",
       "t": "str"
     },
     {
-      "c": "审核人_auditor_name",
+      "c": "金蝶审核人",
       "a": "auditor_name",
       "t": "str"
     },
@@ -2343,7 +2343,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "emp_id",
+      "c": "经手人id",
       "a": "emp_id",
       "t": "str"
     },
@@ -2363,7 +2363,7 @@ export const EXTRA = {
       "t": "str"
     },
     {
-      "c": "pick_use_id",
+      "c": "领料用途id",
       "a": "pick_use_id",
       "t": "str"
     },
