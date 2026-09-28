@@ -1622,3 +1622,6 @@ migrate-ext-bind-log.sql
 
 # —— 2026-09-28 修 3 处「面板一打开就 500」的结构缺口(erp_imp_row 审计列 / v_wo_schedule 补 id / v_outsource_issue_detail 补面板字段) ——
 migrate-panel-runtime-cols.sql
+
+# —— 2026-09-28 P1:面板每页行数收敛(doc/flat 按单元格阶梯 ≤1500;archive 死元数据对齐 50) ——
+migrate-panel-page-size.sql
