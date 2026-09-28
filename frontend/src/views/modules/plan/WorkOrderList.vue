@@ -71,9 +71,10 @@
       <el-table-column :label="tt('规格型号')" prop="规格型号" min-width="160" show-overflow-tooltip />
       <el-table-column :label="tt('客户')" prop="客户" min-width="120" show-overflow-tooltip />
       <el-table-column :label="tt('生产线')" prop="生产线" width="110" show-overflow-tooltip />
+      <el-table-column :label="tt('需求数量')" prop="需求数量" width="100" align="right" sortable />
       <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
       <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
-      <el-table-column :label="tt('余量')" prop="余量" width="80" align="right" />
+      <el-table-column :label="tt('余量')" prop="余量" width="90" align="right" />
       <el-table-column :label="tt('领料单号')" prop="领料单号" width="150" show-overflow-tooltip />
       <el-table-column :label="tt('打印人')" prop="打印人" width="90" />
       <el-table-column :label="tt('打印时间')" prop="打印时间" width="140" />
@@ -329,7 +330,7 @@ function openTrace() {
 }
 
 function exportCsv() {
-  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '物料编码', '产品名称', '规格型号', '客户', '生产线', '排产数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
+  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '物料编码', '产品名称', '规格型号', '客户', '生产线', '需求数量', '排产数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
   const csv = '\ufeff' + [head.join(',')]
     .concat(filtered.value.map((r) => head.map((h) => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n')
   const a = document.createElement('a')
