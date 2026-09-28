@@ -47,16 +47,15 @@ async function main() {
     await send('Page.navigate', { url: 'about:blank' }); await sleep(300)
     await send('Page.navigate', { url: `${BASE}/#/dashboard` }); await sleep(3000)
 
-    // 预期列数:用面板配置算出来,作为"这一面板真的渲染完了"的判据
-    // (只看"有没有表格"会读到上一个面板的残留 DOM —— v1 踩过)
+    // 预期列数:路径已由 _calib-config.cjs 标定(browser 真值 SO_ORDER=16/INV=56/PURCHASE_IN=24;
+    // 配置值偶有 ±1 差,故判据用容差 ±2 + 资源静默,而不是等号)
     const tokenH = { Authorization: `Bearer ${token}` }
     const expect = {}
     for (const p of panels) {
       try {
         const j = await fetch(`${API}/api/px/getPanelConfig?panelCode=${encodeURIComponent(p)}`, { headers: tokenH }).then((r) => r.json())
-        const d = j.data || {}
-        const gt = d.tablePages?.[0]?.gridTabs?.[0] || d.gridTabs?.[0] || {}
-        expect[p] = (gt.columns || []).filter((c) => c.visible !== 0).length
+        const tabs = j.data?.metadata?.panelPageDto?.tablePages?.[0]?.gridTabs || []
+        expect[p] = (tabs[0]?.columns || []).length
       } catch { expect[p] = -1 }
     }
 
@@ -67,11 +66,19 @@ async function main() {
       const t0 = Date.now()
       await evaluate(`location.hash='#/panelx/list/${p}'; 'ok'`)
       const exp = expect[p]
-      let ms = -1
-      for (let i = 0; i < 100; i++) {
-        const st = await evaluate(`(()=>{const m=document.querySelector('.el-loading-mask');const th=document.querySelectorAll('.el-table__header th').length;const emp=document.querySelector('.el-empty');return ((th===${exp}&&th>0)||(emp&&th===0))&&!m?'R':'W'})()`)
-        if (st === 'R') { ms = Date.now() - t0; break }
-        await sleep(100)
+      const QUIET = Number(process.env.UX_QUIET_MS || 0)   // 0 = 紧口径(无静默窗口,只用列数容差+loading 消失)
+      const POLL = Number(process.env.UX_POLL_MS || 50)
+      let ms = -1, last = rb, quietSince = Date.now()
+      for (let i = 0; i < 240; i++) {
+        const st = await evaluate(`JSON.stringify((()=>{const m=document.querySelector('.el-loading-mask');
+          const th=document.querySelectorAll('.el-table__header th').length;
+          const emp=document.querySelector('.el-empty');const r=performance.getEntriesByType('resource').length;
+          return {th,emp:!!emp,loading:!!m,res:r};})())`)
+        const s = JSON.parse(st)
+        if (s.res !== last) { last = s.res; quietSince = Date.now() }
+        const colOk = exp <= 0 ? (s.th === 0 && s.emp) : Math.abs(s.th - exp) <= 2
+        if (colOk && !s.loading && Date.now() - quietSince >= QUIET) { ms = Date.now() - t0; break }
+        await sleep(POLL)
       }
       await sleep(150) // 让本轮渲染/长任务落定,再采样
       const info = await evaluate(`JSON.stringify((()=>{const r=performance.getEntriesByType('resource').slice(${rb}).filter(x=>x.name.includes('/api/'));
