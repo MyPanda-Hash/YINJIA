@@ -116,6 +116,18 @@ public class PanelConfigService {
             try { classifyTitle = registry.panel(classifyPanel).name(); } catch (Exception ignored) { }
             if (classifyTitle != null) buttonGroups.add(group("分类管理", List.of("分类管理")));
         }
+        // 字段管理(动态字段/备用列池,规格 §10):紧跟表格调整之后;入口全员下发、前端对非 admin 隐藏,
+        // 写操作的服务端真闸门是 requireAdmin(G5)。archive 面板与 doc 面板各自注入(buildDocConfig 同款)。
+        for (Map<String, Object> g : buttonGroups) {
+            @SuppressWarnings("unchecked")
+            List<String> gActions = (List<String>) g.get("actions");
+            int anchor = gActions.indexOf("表格调整");
+            if (anchor >= 0 && !gActions.contains("字段管理")) {
+                List<String> merged = new ArrayList<>(gActions);
+                merged.add(anchor + 1, "字段管理");
+                g.put("actions", merged);
+            }
+        }
 
         List<Map<String, Object>> panelButtons = new ArrayList<>();
         for (String b : List.of("新增流程", "删除", "刷新", "保存", "放弃")) {
@@ -392,18 +404,16 @@ public class PanelConfigService {
                 g.put("actions", merged);
             }
         }
-        // 字段管理(动态字段/备用列池,规格 §10):仅 doc/archive;紧跟表头调整/表格调整之后。
-        // 入口全员下发、前端对非 admin 隐藏;写操作的服务端真闸门是 requireAdmin(G5)。
-        if (doc || "archive".equals(def.mode())) {
-            for (Map<String, Object> g : buttonGroups) {
-                @SuppressWarnings("unchecked")
-                List<String> gActions = (List<String>) g.get("actions");
-                int anchor = gActions.indexOf("表头调整") >= 0 ? gActions.indexOf("表头调整") : gActions.indexOf("表格调整");
-                if (anchor >= 0 && !gActions.contains("字段管理")) {
-                    List<String> merged = new ArrayList<>(gActions);
-                    merged.add(anchor + 1, "字段管理");
-                    g.put("actions", merged);
-                }
+        // 字段管理(动态字段/备用列池,规格 §10):紧跟表头调整/表格调整之后(buildDocConfig 只服务 doc 面板,
+        // archive 面板在 buildArchiveConfig 里另行注入)。
+        for (Map<String, Object> g : buttonGroups) {
+            @SuppressWarnings("unchecked")
+            List<String> gActions = (List<String>) g.get("actions");
+            int anchor = gActions.indexOf("表头调整") >= 0 ? gActions.indexOf("表头调整") : gActions.indexOf("表格调整");
+            if (anchor >= 0 && !gActions.contains("字段管理")) {
+                List<String> merged = new ArrayList<>(gActions);
+                merged.add(anchor + 1, "字段管理");
+                g.put("actions", merged);
             }
         }
         metadata.put("buttonGroups", buttonGroups);
