@@ -1632,3 +1632,14 @@ migrate-ledger-code-filter.sql
 
 # —— 2026-09-28 QC_RECV 供应商 seq 归位(45,紧跟供应商代码;服务器手工修复固化防环境重建复发;配套表头映射代码改两轮收集+上限12) ——
 migrate-qcrecv-supplier-seq.sql
+# —— 2026-09-28 库位档案增加仓库编码:bs_wh_loc 加列+中文注明+存量行按仓库名称对齐 bs_wh 回填+yj_field 注册(seq15 紧跟仓库,editable=1 参与参照带回同名映射,选仓库自动带入);库位二维码首段 仓库→仓库编码(前端 locationCardQrText 同步);「仓库编码」九语言译名已全局存在不重复插 ——
+migrate-whloc-whcode.sql
+
+# —— 2026-10-14 材料出库单(领料)明细行加行号(参考销售订单 bl_so_order.行号 同口径:int 列+MS_Description+存量按单据编号分组回填 1..N+yj_field 注册 MATERIAL_OUT 明细首列 seq5 只读;译名 field/行号 9 语言全局存量不重插) —— migrate-material-out-line-no.sql
+migrate-material-out-line-no.sql
+
+# —— 2026-09-28 服务器直改对齐第二轮:23:20 bak 对比,真·服务器独有仅 bd_material_out.工单行号(int,注明);30 列同名不同型维持第一轮口径不动 ——
+migrate-server-parity2-20260928.sql
+
+# —— 2026-09-28 服务器结构收敛(本地→服务器方向):金蝶血统同名表欠账——rd_progress_detail 5 列(ButtonService 直写预计完成日期)/rd_asm_bom_detail 7 列(BOM 变更链)/erp_imp_row 审计五件套;守卫式,本地 no-op,服务器补齐 ——
+migrate-server-converge-20260928.sql
