@@ -1613,3 +1613,6 @@ migrate-spec-testlib-replace.sql
 
 # —— 2026-09-28 阶段 2:拼音/英文列名的列补中文注明(引擎字典 + 面板标签 + 遗留空列如实标注) ——
 migrate-db-norm-column-comments.sql
+
+# —— 2026-09-28 动态字段扩展:业务表备用列池(139表x20列,docs/design/动态字段扩展-备用列池-V1.0.md) ——
+migrate-spare-columns.sql
