@@ -40,8 +40,8 @@ if ($okCount -ne $distinct.Count) { [void]$problems.Add("SCRIPT COUNT $okCount <
 Copy-Verified (Join-Path $root 'tools\DbSync.java') (Join-Path $tools 'DbSync.java') | Out-Null
 Copy-Verified (Join-Path $root 'tools\lib\mssql-jdbc.jar') (Join-Path $lib 'mssql-jdbc.jar') | Out-Null
 
-# 4) top-level helpers
-foreach ($f in @('deploy-incremental.bat','apply-migrations.bat','verify-package.ps1','probe-login.ps1','steps.md')) {
+# 4) top-level helpers (to-run list is required by deploy-incremental.bat GO step 4)
+foreach ($f in @('deploy-incremental.bat','apply-migrations.bat','verify-package.ps1','probe-login.ps1','steps.md','to-run-20260928.txt')) {
   Copy-Verified (Join-Path $root "deploy\$f") (Join-Path $pkg $f) | Out-Null
 }
 
