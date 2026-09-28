@@ -452,6 +452,8 @@ export default {
     '打印材料码': 'Print Material QR Labels',
     '打印订单无金额': 'Print PO (No Amounts)',
     '请先勾选要导出的商品': 'Select the items to export first',
+    // 库位档案·二维码标签(2026-09-28):同款 75×100mm 标识卡,卡面=仓库/库位地址/库位编码
+    '请先勾选要打印的库位': 'Select the storage locations to print first',
     '已选 {n} 个商品，导出二维码标签 PDF？': 'Export QR code label PDF for {n} selected item(s)?',
     '正在生成标签…': 'Generating labels...',
     '已导出 {n} 张二维码标签': 'Exported {n} QR code label(s)',
@@ -1259,6 +1261,7 @@ export default {
     '出库日期': 'Issue Date',
     '客户代码': 'Customer Code',
     '仓库': 'Warehouse',
+    '库位': 'Storage Location',
     '领料性质': 'Issue Nature',
     '来源单号': 'Source Order No.',
     '仓库代码': 'Warehouse Code',

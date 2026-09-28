@@ -1,4 +1,4 @@
-﻿// YINJIA-MES 菜单:面板以 HSDZ_MES yj_panel 注册表为准
+// YINJIA-MES 菜单:面板以 HSDZ_MES yj_panel 注册表为准
 // 模块:智能供应链 / 生产制造 / 研发管理 / 基础档案
 export const menuTree = [
   {
@@ -371,6 +371,8 @@ export const menuTree = [
           { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
           { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
           { code: 'warehouse', title: '仓库', path: '/panelx/list/WH', icon: 'House', panelCode: 'WH', operationName: '新增流程' },
+          // 库位(2026-09-28):仓库下货位档案,一仓多库位、一库位一仓;支持与商品同款「二维码标签」勾选即打
+          { code: 'whloc', title: '库位', path: '/panelx/list/WHLOC', icon: 'LocationInformation', panelCode: 'WHLOC', operationName: '新增流程' },
           { code: 'khda', title: '客户', path: '/panelx/list/KHDA', icon: 'User', panelCode: 'KHDA', operationName: '新增流程' },
           { code: 'gfda', title: '供应商', path: '/panelx/list/GFDA', icon: 'OfficeBuilding', panelCode: 'GFDA', operationName: '新增流程' },
           // 客户/供应商分类不占导航:从 客户/供应商 面板工具栏「分类管理」进入(金蝶同款交互)

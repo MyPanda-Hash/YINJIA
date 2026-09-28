@@ -96,13 +96,14 @@ public class PanelConfigService {
         buttonGroups.add(group("删除", List.of("删除", "删除单据")));
         buttonGroups.add(group("查找", List.of("查找", "刷新")));
         buttonGroups.add(group("打印", List.of("打印", "预览")));
-        // 物料二维码标签入口(勾选即打):存货档案工具栏「打印」之后
-        // (原定打印与导入之间;远端已决策档案面板不提供导入,导入组移除后即紧跟打印),
-        // 前端按 qrLabelKey 列勾行(跨页保留)→ POST /report/qr-label 出 80×80mm 标签 PDF(二维码=存货编码)
-        boolean qrLabel = "INV".equals(def.code());
-        // 二维码标签(2026-09-24 改版,用户拍板):80×80 旧版式(物料编码/名称/规格+QR=存货编码)改为
+        // 档案二维码标签入口(勾选即打):工具栏「打印」之后(远端已决策档案面板不提供导入,导入组移除后即紧跟打印),
+        // 前端按 qrLabelKey 列勾行(跨页保留)→ 前端 print-formats 本地生成 75×100mm 标识卡。
+        // INV(2026-09-24 改版,用户拍板):80×80 旧版式(物料编码/名称/规格+QR=存货编码)改为
         // 75×100 七字段版式(订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,后四类手填),
-        // 二维码=物料编码|物料规格|数量|批次;前端 print-formats.printProductCards 本地生成,原 /report/qr-label 暂留可回滚
+        // 二维码=公司代码@物料编码[@批号];printProductCards 本地生成,原 /report/qr-label 暂留可回滚。
+        // WHLOC 库位(2026-09-28):与商品同款勾选即打形态,卡面=库位字段(仓库/库位地址/库位编码,不含商品字段),
+        // 二维码=仓库@库位地址@库位编码(printLocationCards);行键=仓库+库位编码 复合(同码多仓不串选)。
+        boolean qrLabel = "INV".equals(def.code()) || "WHLOC".equals(def.code());
         if (qrLabel) buttonGroups.add(group("二维码标签", List.of("二维码标签")));
         // 导入仅限单据面板(档案面板不提供导入)
         // buttonGroups.add(group("导入", List.of("下载模板", "导入")));
@@ -184,7 +185,16 @@ public class PanelConfigService {
             metadata.put("classifyPanel", classifyPanel);   // 前端「分类管理」跳转目标面板码
             metadata.put("classifyTitle", classifyTitle);   // 页签标题
         }
-        if (qrLabel) metadata.put("qrLabelKey", "存货编码"); // 前端二维码标签勾选列的行键(编码列)
+        if (qrLabel) {
+            // 前端二维码标签勾选列的行键(编码列)
+            metadata.put("qrLabelKey", "INV".equals(def.code()) ? "存货编码" : "库位编码");
+            if ("WHLOC".equals(def.code())) {
+                // 库位标签勾选行键=仓库+库位编码 复合(库位编码按仓内唯一,同码多仓不串选)
+                metadata.put("qrLabelScopeKey", "仓库");
+                // 前端分发:whloc → printLocationCards(库位标识卡,二维码=仓库@库位地址@库位编码)
+                metadata.put("qrLabelKind", "whloc");
+            }
+        }
         metadata.put("panelPageDto", pageDto);
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -784,7 +794,8 @@ public class PanelConfigService {
                     // 打印采购订单(2026-09-23):银嘉固定版式纸质单(前端 print-formats.js,列表选中单打印,无后端处理器)
                     // 打印材料码(2026-09-28):供应商自己打码场景——订单明细行出材料二维码标签
                     // (QrLabelDialog,二维码=物料编码|批号@数量,订单行无批号→编码@数量,收货扫码解析入库与追溯)
-                    new String[]{"打印", "打印", "预览", "导出", "打印采购订单", "打印材料码"},
+                    // 打印订单无金额(2026-09-28):采购订单另一种报表,同版式仅去 单价/小计/总计金额(print-formats.printPuOrderNoAmount)
+                    new String[]{"打印", "打印", "预览", "导出", "打印采购订单", "打印订单无金额", "打印材料码"},
                     new String[]{"导入", "导入"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
             // 采购入库单:选单=送料暂收单(2026-09-22 起;原为采购订单,那条免检直达已被取消);

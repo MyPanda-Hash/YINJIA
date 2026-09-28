@@ -109,3 +109,6 @@ dsh-session-*/
 
 # esbuild 临时目录(前端构建产物,勿入库)
 .esbuild-tmp/
+
+# 前端构建临时目录(勿入库)
+frontend/.build-tmp/

@@ -4,6 +4,7 @@
  *   ① 银嘉采购订单(用户截图,PU_ORDER 打印):头部信息+物料行表+总计+注意事项+供/需方签章框;
  *   ② 退货单(用户截图,QC_RETURN 暂收退料单 打印):公司抬头+供应商/退货日期+行表+说明+签章行;
  *   ③ 二维码标签(2026-09-24,INV 勾选即打):75×100mm 七字段标签;
+ *     ③b 库位标识卡(2026-09-28,WHLOC 勾选即打):同款 75×100mm,卡面=仓库/库位地址/库位编码,二维码=仓库@库位地址@库位编码;
  *   ④ 生产任务单(打印工单,2026-09-24):横向 A4 一表多行+行尾二维码=公司代码@工单号@1000+行号(2026-10-09 规则改版,woQrText)。
  * 打印通道:新窗口 HTML + window.print()(同 QrLabelDialog,绕开 jsPDF §5.5 坑);
  * 版面文字(公司抬头/注意事项/需方联系/生产任务单表头)为固定版式常量,改文案只动本文件。
@@ -184,6 +185,36 @@ export async function printFeedingSheet(orders, opts = {}) {
 }
 
 /**
+ * 银嘉采购单据固定版式公共块(2026-09-28 采购入库单·无金额版与采购订单共用;改文案/版式只动这里):
+ * CSS 与 品牌/注意事项/供/需签章框 两版式逐字相同——抽常量防复制粘贴,纸面事实文案不入 tt()(ADR-0001)。
+ */
+const PU_SHEET_CSS = '<style>'
+  + '.brand{font-size:11px;color:#333;margin-bottom:2px}'
+  + '.brand b{font-size:14px;color:#1e6fb8;margin-right:8px}'
+  + 'h1{font-size:20px;text-align:center;margin:2px 0 10px;letter-spacing:4px;font-weight:700}'
+  + '.info{display:grid;grid-template-columns:1fr 1fr;gap:6px 40px;margin:0 0 10px;font-size:12px}'
+  + '.info .f{white-space:nowrap}.info .f b{font-weight:400}'
+  + '.info .v{display:inline-block;min-width:180px;border-bottom:1px dotted #666;padding:0 6px 1px}'
+  + '.info .v.s{min-width:80px}'
+  + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
+  + 'th,td{border:1px solid #444;padding:4px 5px;font-size:11px;word-break:break-all;vertical-align:middle}'
+  + 'th{background:#f2f2f2;font-weight:600}'
+  + 'td.r{text-align:right}td.c{text-align:center}'
+  + '.sum td{background:#fafafa;font-weight:600}'
+  + '.notes{margin:10px 0 8px;font-size:11px;line-height:1.55}'
+  + '.notes .t{font-weight:700;font-size:12px;margin-bottom:2px}'
+  + '.sign{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px}'
+  + '.sign .box{border:1px solid #444;min-height:110px;padding:6px 10px;font-size:12px;line-height:1.9}'
+  + '.sign .box .t{text-align:center;font-weight:600;letter-spacing:8px;margin-bottom:4px}'
+  + '</style>'
+const PU_BRAND_HTML = `<div class="brand"><b>${esc(COMPANY.brand)}</b>${esc(COMPANY.en)}　${esc(COMPANY.name)}</div>`
+const PU_NOTES_HTML = `<div class="notes"><div class="t">注意事项：</div>${COMPANY.notes.map((n) => `<div>${esc(n)}</div>`).join('')}</div>`
+const PU_SIGN_HTML = '<div class="sign">'
+  + '<div class="box"><div class="t">供　方</div>单位名称：<br/>联 系 人：<br/>联系方式：</div>'
+  + `<div class="box"><div class="t">需　方</div>单位名称：${esc(COMPANY.buyer['单位名称'])}<br/>联 系 人：${esc(COMPANY.buyer['联系人'])}<br/>联系方式：${esc(COMPANY.buyer['联系方式'])}</div>`
+  + '</div>'
+
+/**
  * 银嘉采购订单
  * @param doc  头数据(单据编号/单据日期/供应商编码/供应商/付款方式)
  * @param lines 行数据(物料编码/物料名称/规格型号/单价/单位/数量/金额/预计到货日期/备注/税率%)
@@ -200,26 +231,8 @@ export function printPuOrder(doc, lines) {
     + `<td class="r">${esc(fmtNum(l['金额']))}</td><td>${esc(fmtDate(l['预计到货日期']) || fmtDate(doc['交货日期']))}</td>`
     + `<td>${esc(l['备注'])}</td></tr>`).join('')
     + Array.from({ length: pad }, () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>').join('')
-  const body = '<style>'
-    + '.brand{font-size:11px;color:#333;margin-bottom:2px}'
-    + '.brand b{font-size:14px;color:#1e6fb8;margin-right:8px}'
-    + 'h1{font-size:20px;text-align:center;margin:2px 0 10px;letter-spacing:4px;font-weight:700}'
-    + '.info{display:grid;grid-template-columns:1fr 1fr;gap:6px 40px;margin:0 0 10px;font-size:12px}'
-    + '.info .f{white-space:nowrap}.info .f b{font-weight:400}'
-    + '.info .v{display:inline-block;min-width:180px;border-bottom:1px dotted #666;padding:0 6px 1px}'
-    + '.info .v.s{min-width:80px}'
-    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
-    + 'th,td{border:1px solid #444;padding:4px 5px;font-size:11px;word-break:break-all;vertical-align:middle}'
-    + 'th{background:#f2f2f2;font-weight:600}'
-    + 'td.r{text-align:right}td.c{text-align:center}'
-    + '.sum td{background:#fafafa;font-weight:600}'
-    + '.notes{margin:10px 0 8px;font-size:11px;line-height:1.55}'
-    + '.notes .t{font-weight:700;font-size:12px;margin-bottom:2px}'
-    + '.sign{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:8px}'
-    + '.sign .box{border:1px solid #444;min-height:110px;padding:6px 10px;font-size:12px;line-height:1.9}'
-    + '.sign .box .t{text-align:center;font-weight:600;letter-spacing:8px;margin-bottom:4px}'
-    + '</style>'
-    + `<div class="brand"><b>${esc(COMPANY.brand)}</b>${esc(COMPANY.en)}　${esc(COMPANY.name)}</div>`
+  const body = PU_SHEET_CSS
+    + PU_BRAND_HTML
     + '<h1>银嘉采购订单</h1>'
     + '<div class="info">'
     + `<span class="f">订单编号：<span class="v">${esc(doc['单据编号'])}</span></span>`
@@ -236,12 +249,50 @@ export function printPuOrder(doc, lines) {
     + `<tr class="sum"><td colspan="5" class="c">总　计</td>`
     + `<td class="r">${esc(fmtNum(totalQty))}</td><td class="r">${esc(fmtNum(totalAmt))}</td><td></td><td></td></tr>`
     + '</tbody></table>'
-    + `<div class="notes"><div class="t">注意事项：</div>${COMPANY.notes.map((n) => `<div>${esc(n)}</div>`).join('')}</div>`
-    + '<div class="sign">'
-    + '<div class="box"><div class="t">供　方</div>单位名称：<br/>联 系 人：<br/>联系方式：</div>'
-    + `<div class="box"><div class="t">需　方</div>单位名称：${esc(COMPANY.buyer['单位名称'])}<br/>联 系 人：${esc(COMPANY.buyer['联系人'])}<br/>联系方式：${esc(COMPANY.buyer['联系方式'])}</div>`
-    + '</div>'
+    + PU_NOTES_HTML
+    + PU_SIGN_HTML
   if (!openPrintWindow('银嘉采购订单-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert('浏览器拦截了打印窗口,请允许弹出窗口')
+}
+
+/**
+ * 银嘉采购订单·无金额版(2026-09-28 用户澄清:不是入库单报表,是采购订单的另一种打印版式)——
+ * 与 printPuOrder 同一标题/信息区(含付款方式/是否含税)/注意事项/签章框,仅三处金额内容不打印:
+ * 行表去 单价/小计 两列(交期要求保留),总计行只留数量合计。
+ * @param doc  头数据(同 printPuOrder)
+ * @param lines 行数据(同 printPuOrder:物料编码/物料名称/规格型号/单价/单位/数量/金额/预计到货日期/备注)
+ */
+export function printPuOrderNoAmount(doc, lines) {
+  const rows = (Array.isArray(lines) ? lines : []).filter((l) => l && (l['物料编码'] || l['物料名称']))
+  const pad = Math.max(0, 4 - rows.length)
+  const tax = rows.some((l) => Number(l['税率%']) > 0) ? '是' : '否'
+  const totalQty = rows.reduce((a, l) => a + Number(l['数量'] || 0), 0)
+  const trs = rows.map((l) => '<tr>'
+    + `<td>${esc(l['物料编码'])}</td><td>${esc(l['物料名称'])}</td><td>${esc(l['规格型号'])}</td>`
+    + `<td>${esc(l['单位'])}</td><td class="r">${esc(fmtNum(l['数量']))}</td>`
+    + `<td>${esc(fmtDate(l['预计到货日期']) || fmtDate(doc['交货日期']))}</td>`
+    + `<td>${esc(l['备注'])}</td></tr>`).join('')
+    + Array.from({ length: pad }, () => '<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td></tr>').join('')
+  const body = PU_SHEET_CSS
+    + PU_BRAND_HTML
+    + '<h1>银嘉采购订单</h1>'
+    + '<div class="info">'
+    + `<span class="f">订单编号：<span class="v">${esc(doc['单据编号'])}</span></span>`
+    + `<span class="f">下单日期：<span class="v">${esc(fmtDate(doc['单据日期']))}</span></span>`
+    + `<span class="f">供应商编号：<span class="v">${esc(doc['供应商编码'])}</span></span>`
+    + `<span class="f">供应商名称：<span class="v">${esc(doc['供应商'])}</span></span>`
+    + `<span class="f">付款方式：<span class="v s">${esc(doc['付款方式'])}</span></span>`
+    + `<span class="f">是否含税：<span class="v s">${tax}</span></span>`
+    + '</div>'
+    + '<table><thead><tr>'
+    + ['物料编码', '物料名称', '粉料规格及要求', '单位', '数量', '交期要求', '备注']
+        .map((h) => `<th>${esc(h)}</th>`).join('')
+    + '</tr></thead><tbody>' + trs
+    + `<tr class="sum"><td colspan="4" class="c">总　计</td>`
+    + `<td class="r">${esc(fmtNum(totalQty))}</td><td></td><td></td></tr>`
+    + '</tbody></table>'
+    + PU_NOTES_HTML
+    + PU_SIGN_HTML
+  if (!openPrintWindow('银嘉采购订单(无金额)-' + (doc['单据编号'] || doc['单号'] || doc['编号'] || ''), body)) alert('浏览器拦截了打印窗口,请允许弹出窗口')
 }
 
 /**
@@ -344,6 +395,51 @@ export async function printProductCards(rows) {
   }
   const body = '<style>' + pageCss + cardCss + '</style>' + trs.join('')
   if (!openPrintWindow('产品标识卡', body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
+  return true
+}
+
+/**
+ * 库位标识卡(WHLOC 库位档案「二维码标签」勾选即打,2026-09-28)——与商品标识卡同款 75×100mm 版式,
+ * 卡面只放库位字段(仓库/库位地址/库位编码),不含商品标识卡的 订单编号/供应商/数量/批次/生产日期 等字段
+ * (用户口径:库位卡只服务定位)。二维码=仓库@库位地址@库位编码(固定三段,扫码按 @ 拆段即可定位仓库与库位)。
+ * 卡面 CSS 与 printProductCards 同构:标签恒不折行(.lb),值区过长自动转行,二维码右下角 20×20mm。
+ * @param rows [{仓库, 库位地址, 库位编码}](库位编码=行身份,缺码行跳过)
+ */
+/** 库位标识卡二维码内容:仓库@库位地址@库位编码(三段固定顺序,空段保留占位) */
+export function locationCardQrText(loc) {
+  return [loc?.['仓库'], loc?.['库位地址'], loc?.['库位编码']].map((s) => String(s ?? '').trim()).join('@')
+}
+
+export async function printLocationCards(rows) {
+  const cards = (Array.isArray(rows) ? rows : []).filter((r) => r && r['库位编码'])
+  if (!cards.length) return false
+  const pageCss = '@page{size:75mm 100mm;margin:0}'
+  const cardCss = '.card{width:75mm;height:100mm;box-sizing:border-box;border:0.35mm solid #000;'
+    + 'padding:5mm 5mm 26mm 5mm;position:relative;page-break-after:always;background:#fff;font-family:"Microsoft YaHei",system-ui,sans-serif;color:#111}'
+    + '.card:last-child{page-break-after:auto}'
+    + '.card .f{display:flex;align-items:flex-end;margin:2.2mm 0;line-height:1.3;font-size:10.5pt}'
+    + '.card .f .lb{flex:none;white-space:nowrap}'
+    + '.card .f .v{flex:0 1 auto;min-width:22mm;border-bottom:0.25mm solid #000;padding:0 1mm 0.4mm;font-size:10pt;word-break:break-all;overflow-wrap:anywhere}'
+    + '.card .qr{position:absolute;right:6mm;bottom:6mm;width:20mm;height:20mm}'
+    + '.card .qr img{width:20mm;height:20mm;display:block}'
+    + 'body{margin:0;background:#fff}'
+  const trs = []
+  for (const c of cards) {
+    const qrText = locationCardQrText(c)
+    let qr = ''
+    try {
+      const lib = qrLib()
+      if (!lib) throw new Error('qrcode lib unavailable')
+      qr = await lib.toDataURL(qrText, { margin: 1, errorCorrectionLevel: 'M' })
+    } catch (e) { console.warn('[print-formats] 库位二维码生成失败:', e?.message || e) }
+    const f = (label, value) => `<div class="f"><span class="lb">${label}：</span><span class="v">${esc(value || '')}</span></div>`
+    trs.push('<div class="card">'
+      + f('仓　　库', c['仓库']) + f('库位地址', c['库位地址']) + f('库位编码', c['库位编码'])
+      + `<div class="qr">${qr ? `<img src="${qr}"/>` : ''}</div>`
+      + '</div>')
+  }
+  const body = '<style>' + pageCss + cardCss + '</style>' + trs.join('')
+  if (!openPrintWindow('库位标识卡', body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
   return true
 }
 

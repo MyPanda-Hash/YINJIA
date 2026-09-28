@@ -815,8 +815,8 @@
           @scroll.capture="(e) => onArchScroll(e, b)"
         >
           <el-table-column v-if="delMode && b.isMain" type="selection" width="45" fixed="left" />
-          <!-- 物料二维码标签(勾选即打):自管勾选集(跨页保留),与删除模式的 selection 列互不相干;
-               表头复选框=本页全选。行键=qrLabelKey 列(存货编码),空编码行禁勾 -->
+          <!-- 档案二维码标签(勾选即打,INV 商品/WHLOC 库位):自管勾选集(跨页保留),与删除模式的 selection 列互不相干;
+               表头复选框=本页全选。行键=qrLabelKey 列(存货编码;库位=仓库+库位编码 复合),空编码行禁勾 -->
           <el-table-column v-if="qrKey && b.isMain" width="40" fixed="left" align="center">
             <template #header>
               <el-checkbox
@@ -899,6 +899,7 @@
                   <el-select
                     v-if="isSelectField(c.field)"
                     v-model="row[c.prop]"
+                    v-cell-focus
                     :disabled="c.field.computed"
                     filterable
                     clearable
@@ -910,6 +911,7 @@
                   <el-date-picker
                     v-else-if="isDateField(c.field)"
                     v-model="row[c.prop]"
+                    v-cell-focus
                     :disabled="c.field.computed"
                     type="date"
                     value-format="YYYY-MM-DD"
@@ -917,21 +919,26 @@
                   />
                   <el-input-number
                     v-else-if="isNumberField(c.field)"
-                    v-model="row[c.prop]"
+                    :model-value="activeCellEcho"
+                    v-cell-focus
                     :disabled="c.field.computed"
                     :controls="false"
+                    @update:model-value="(v) => onActiveCellEchoInput(row, c.prop, v)"
                     @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
                   />
                   <el-switch
                     v-else-if="isBooleanField(c.field)"
                     v-model="row[c.prop]"
+                    v-cell-focus
                     :disabled="c.field.computed"
                     @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
                   />
                   <el-input
                     v-else
-                    v-model="row[c.prop]"
+                    :model-value="activeCellEcho"
+                    v-cell-focus
                     :disabled="c.field.computed"
+                    @update:model-value="(v) => onActiveCellEchoInput(row, c.prop, v)"
                     @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
                   />
                 </template>
@@ -1691,7 +1698,7 @@ import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, syncBatchNoWithDocDate, docNoFromDate } from '@core/panel/docDefaults'
-import { printPuOrder, printQcReturn, printProductCards, printProductionTask, woQrText } from '@/business/print-formats'
+import { printPuOrder, printQcReturn, printProductCards, printLocationCards, printProductionTask, printPuOrderNoAmount, woQrText } from '@/business/print-formats'
 import QrLabelDialog from './QrLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import request from '@core/request'
@@ -3473,12 +3480,19 @@ const ARCH_SIZE_OPTS = [50, 100, 200, 500]
 const archPage = ref(1)
 function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首页
 
-// ═══ 物料二维码标签(勾选即打,2026-09-16):存货档案工具栏「二维码标签」按行勾选 → 80×80mm 标签 PDF。
-// 勾选集自管(Set 换新触发响应式),跨页/跨筛选保留;行键 = 后端 metadata.qrLabelKey(存货编码),
-// 同码行勾一个即代表该码(二维码内容相同;库里同码多行由后端查重守卫报错拦截) ═══
+// ═══ 档案二维码标签(勾选即打):工具栏「二维码标签」按行勾选 → 75×100mm 标识卡(print-formats 本地生成)。
+// 勾选集自管(Set 换新触发响应式),跨页/跨筛选保留;行键 = 后端 metadata.qrLabelKey(INV=存货编码),
+// 同码行勾一个即代表该码;WHLOC 库位(2026-09-28)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+库位编码 复合
+// (库位编码按仓内唯一,同码多仓不串选)。 ═══
 const qrSel = ref(new Set())
 const qrKey = computed(() => cfgCache.value?.metadata?.qrLabelKey || '')
-function qrRowKey(row) { return String(row?.[qrKey.value] ?? '').trim() }
+const qrScopeKey = computed(() => cfgCache.value?.metadata?.qrLabelScopeKey || '')
+function qrRowKey(row) {
+  const k = String(row?.[qrKey.value] ?? '').trim()
+  // 复合行键(库位):仓库 + \u0001 + 库位编码 —— \u0001 不出现在业务文本里,避免拼接歧义
+  const scope = qrScopeKey.value ? String(row?.[qrScopeKey.value] ?? '').trim() : ''
+  return scope ? `${scope}\u0001${k}` : k
+}
 function qrToggleRow(row) {
   const k = qrRowKey(row)
   if (!k) return
@@ -4707,18 +4721,48 @@ function isActiveDetailRefRow(row, b, prop) {
 // 动因:数据字典 210 行 × 6 列 = 1260 个常驻编辑器(含 el-select 全部选项 3165 个 option 节点),
 // DOM 达 1.85 万节点、首屏 2.1s,表现为点击后面板长时间白屏。
 const activeCell = ref(null)
+/** 激活格本地回显值(2026-09-28,修"打的字立刻消失"):档案行 markRaw(大表性能优化)后
+ *  v-model 写行属性是静默的——不触发重渲染,el-input 的 modelValue prop 停在旧值;
+ *  而 Element Plus el-input 在 emit 后 nextTick 强制把原生值拨回 props.modelValue
+ *  (input.vue setNativeInputValue),于是每敲一个字都被立刻清掉——库位档案 库位编码/库位地址
+ *  「无法填写」即此(参照列走选择器写入+bump 版本刷新,不受影响)。
+ *  解法:文本/数值激活编辑器改绑本响应式回显——输入即时更新回显(prop 跟上,EP 不再回拨),
+ *  同时把值落进 raw 行(保存/失焦回显用),零表格级重渲染。 */
+const activeCellEcho = ref('')
 function isActiveCell(row, b, prop) {
   const a = activeCell.value
   return !!a && a.row === row && a.tabKey === activeTab(b).key && a.prop === prop
+}
+function syncActiveCellEcho(row, prop) {
+  const v = row?.[prop]
+  activeCellEcho.value = v === undefined || v === null ? '' : v
+}
+function onActiveCellEchoInput(row, prop, v) {
+  activeCellEcho.value = v ?? ''
+  row[prop] = activeCellEcho.value
 }
 function activateCell(row, b, prop) {
   if (!detailEditable(b) || row?._placeholder) return
   const a = activeCell.value
   if (a && a.row === row && a.tabKey === activeTab(b).key && a.prop === prop) return
   activeCell.value = { row, tabKey: activeTab(b).key, prop }
+  syncActiveCellEcho(row, prop)
 }
 function deactivateCell() {
   activeCell.value = null
+  activeCellEcho.value = ''
+}
+/** 激活格编辑器挂载即聚焦(v-cell-focus,2026-09-28):懒激活单元格此前只挂编辑器不聚焦,
+ *  一击后键盘输入落在页面而非输入框,用户表现为「无法填写」(库位档案 库位编码/库位地址;
+ *  对照组=参照列常驻编辑器一击即选,落差感更强)。挂载即 focus ⇒ 一击=可打字;
+ *  el-switch 无 input 聚焦自身(空格可切换),指令挂在组件根元素上取内层 input。 */
+const vCellFocus = {
+  mounted(el) {
+    const target = el.querySelector?.('input') || (el.querySelector?.('[tabindex]') ?? (el.getAttribute?.('role') === 'switch' ? el : null))
+    if (!target || typeof target.focus !== 'function') return
+    // 挂载发生在激活点击的同帧,浏览器默认焦点动作在 click 后已结束;直接聚焦即可稳定生效
+    target.focus()
+  },
 }
 
 function openDetailReference(field, row, b) {
@@ -4766,8 +4810,20 @@ function addInlineDetailRow(b) {
   // 排序激活时先清排序:新行落在数据末尾,避免"插到已排好的中间"的错觉
   const state = blockSortOf(b)
   if (state.order) { state.prop = ''; state.order = '' }
-  rows.push(newDetailRow(tabKey))
+  const row = newDetailRow(tabKey)
+  rows.push(row)
   archPage.value = Math.ceil(rows.length / archPageSize.value) // 档案分页:新行在末尾,跳到末页立即可见
+  // 新行首个可编辑格直接激活并聚焦(2026-09-28):「新增数据」后懒激活格子只显示空文本、
+  // 无任何编辑器视觉痕迹,用户不知道要点它(库位档案 库位编码/库位地址 因此被报"无法填写")。
+  // 这里替用户完成那第一击:跳过参照列(常驻编辑器,一击即选不需要预激活)与图片列,
+  // 找第一个常规可编辑字段(如 库位编码)激活,v-cell-focus 挂载即聚焦 → 点完按钮直接打字。
+  const firstEditable = (detailTabDefOf(tabKey)?.fields || []).find((f) => (
+    !f.hidden && !f.computed && !isReferenceField(f) && f.dataType !== '图片'
+  ))
+  if (firstEditable) {
+    activeCell.value = { row, tabKey, prop: firstEditable.dataName }
+    syncActiveCellEcho(row, firstEditable.dataName)
+  }
   markInlineDirty() // 新增明细行 = 未保存修改
 }
 
@@ -5826,7 +5882,8 @@ async function onButton(action) {
   // 银嘉固定版式纸质单打印(2026-09-23):采购订单/暂收退料单 → print-formats.js;
   // 列表选中单 → getFormDescriptor 取头+明细行(§5.5 D3:头=data,明细=detailData 首页签),新窗口打印
   // (无后端处理器,同 打印工单二维码 本地拦截先例)
-  if (action === '打印采购订单' || action === '打印退货单') {
+  // 打印订单无金额(2026-09-28 用户澄清):采购订单的另一种报表,版式同款仅去 单价/小计/总计金额
+  if (action === '打印采购订单' || action === '打印退货单' || action === '打印订单无金额') {
     const cur = current.value || {}
     const no = cur['单据编号'] || cur['编号'] || ''
     if (!no) return ElMessage.warning(tt('请先选择一张单据'))
@@ -5837,6 +5894,7 @@ async function onButton(action) {
       // 头单号键随面板而异(PU_ORDER=单据编号,QC_RETURN=单号/编号,见 PxController 纸张右上角注释)
       if (!doc['单据编号'] && !doc['单号'] && !doc['编号']) return ElMessage.warning(tt('未取到单据数据'))
       if (action === '打印采购订单') printPuOrder(doc, lines)
+      else if (action === '打印订单无金额') printPuOrderNoAmount(doc, lines)
       else printQcReturn(doc, lines)
     } catch (e) {
       ElMessage.error(engine.errMsg(e) || tt('打印失败'))
@@ -6029,19 +6087,24 @@ async function onButton(action) {
     return
   }
   if (action === '二维码标签') {
-    // 二维码标签(2026-09-24 改版,用户拍板):勾行 → 75×100mm 七字段标签
+    // 二维码标签(INV,2026-09-24 改版,用户拍板):勾行 → 75×100mm 七字段标签
     // (订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,编码·规格取行,其余手填);
-    // 二维码=物料编码|物料规格|数量|批次(print-formats.printProductCards 本地生成;旧 /report/qr-label 暂留可回滚)
+    // 二维码=公司代码@物料编码[@批号](print-formats.printProductCards 本地生成;旧 /report/qr-label 暂留可回滚)
+    // WHLOC 库位(2026-09-28):同款勾选即打,卡面=仓库/库位地址/库位编码(printLocationCards),
+    // 二维码=仓库@库位地址@库位编码;勾选行键=仓库+库位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
+    const whloc = cfgCache.value?.metadata?.qrLabelKind === 'whloc'
     const sel = qrSel.value
     const rows = []
     for (const b of blocks.value) {
       for (const r of archRows(b)) {
         const k = qrRowKey(r)
-        if (k && sel.has(k)) rows.push({ 编码: k, 规格: r['规格型号'] || r['型号'] || '' })
+        if (!k || !sel.has(k)) continue
+        if (whloc) rows.push({ 仓库: r['仓库'], 库位地址: r['库位地址'], 库位编码: r['库位编码'] })
+        else rows.push({ 编码: k, 规格: r['规格型号'] || r['型号'] || '' })
       }
     }
-    if (!rows.length) return ElMessage.warning(tt('请先勾选要导出的商品'))
-    await printProductCards(rows)
+    if (!rows.length) return ElMessage.warning(tt(whloc ? '请先勾选要打印的库位' : '请先勾选要导出的商品'))
+    await (whloc ? printLocationCards(rows) : printProductCards(rows))
     return
   }
   // 文件类面板(文书式):「删除」= 整单删除(草稿直接作废;已归档提交删除申请,管理员审批)
