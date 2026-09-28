@@ -39,8 +39,11 @@ public class DbNormAudit {
 
     static final Map<String, Set<String>> WL = new LinkedHashMap<>();
     static int failCount = 0, warnCount = 0;
+    /** 可选:dump=<路径> —— 把 03 项的完整违规清单(table|col|已有中文标签)写出,供据实补注明。 */
+    static String dumpPath = null;
 
     public static void main(String[] args) throws Exception {
+        for (String a : args) if (a.startsWith("dump=")) dumpPath = a.substring(5);
         Path base = Path.of(System.getProperty("user.dir"));
         Path wlFile = base.resolve("db-legacy-whitelist.txt");
         Path manifest = base.resolve("db-migrations.txt");
@@ -201,25 +204,35 @@ public class DbNormAudit {
         result(true, "02", "表级中文注明(白名单外)", bad.size(), join(bad, 12));
     }
 
-    /** 03 列级中文注明:只对拼音/英文列名的列要求(中文列名即语义,豁免) */
+    /** 03 列级中文注明:只对拼音/英文列名的列要求(中文列名即语义,豁免)
+     *  传 dump=<路径> 时把完整违规清单写成 table|col|已有中文标签(供"据实补注明"使用)。 */
     static void check03ColumnComments(Connection c) throws Exception {
         String sql = """
-            SELECT t.name, c.name FROM sys.columns c JOIN sys.tables t ON t.object_id = c.object_id
+            SELECT t.name, c.name, ISNULL(f.label, '') FROM sys.columns c
+            JOIN sys.tables t ON t.object_id = c.object_id
+            LEFT JOIN (SELECT col_name, MIN(label) AS label FROM yj_field WHERE LEN(label) > 0 GROUP BY col_name) f
+                   ON f.col_name = c.name
             WHERE NOT EXISTS (SELECT 1 FROM sys.extended_properties ep
                               WHERE ep.major_id = c.object_id AND ep.minor_id = c.column_id AND ep.name = 'MS_Description')
             ORDER BY t.name, c.column_id""";
         List<String> bad = new ArrayList<>();
+        List<String> dump = new ArrayList<>();
         int asciiTotal = 0;
         try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
-                String t = rs.getString(1), col = rs.getString(2);
+                String t = rs.getString(1), col = rs.getString(2), label = rs.getString(3);
                 if (isBackup(t) || wl("table").contains(t)) continue;
                 if (col.startsWith("asp_")) continue;          // 审计列:语义由规范统一约定
                 if (col.equalsIgnoreCase("id")) continue;      // 自增主键:语义由规范统一约定
                 if (isCjk(col)) continue;                      // 中文列名即语义
                 asciiTotal++;
                 bad.add(t + "." + col);
+                dump.add(t + "|" + col + "|" + label);
             }
+        }
+        if (dumpPath != null && !dumpPath.isEmpty()) {
+            Files.write(Path.of(dumpPath), dump, StandardCharsets.UTF_8);
+            System.out.println("        (完整清单已写出 " + dumpPath + "," + dump.size() + " 行)");
         }
         ratchet("03", "拼音/英文列名的列注明(共 " + asciiTotal + " 列;存量收敛)", bad.size(), join(bad, 12));
     }

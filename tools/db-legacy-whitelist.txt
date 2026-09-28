@@ -390,8 +390,8 @@ dupkey:WO_PICK.manu_order_no
 dupkey:WO_STAGE.manu_order_no
 dupkey:WO_STAGE.stage
 
-# ---- 存量债棘轮基线(实际值只许降不许升;取两账套实测最大值)—— 降到 0 即 PASS ----
+# ---- 存量债棘轮基线(实际值只许降不许升)—— 降到 0 即 PASS;归零后基线收到 0,新增违规立即 FAIL ----
 #      03 = 拼音/英文列名的列缺注明 | 09 = 缺 en 译名(面板+字段标签) | 10 = 备份/临时表
-count:03=467
+count:03=0
 count:09=1346
 count:10=65

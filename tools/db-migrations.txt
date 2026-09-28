@@ -1610,3 +1610,6 @@ migrate-db-norm-cleanup.sql
 migrate-restore-gfda.sql
 migrate-basedata-query-fields.sql
 migrate-spec-testlib-replace.sql
+
+# —— 2026-09-28 阶段 2:拼音/英文列名的列补中文注明(引擎字典 + 面板标签 + 遗留空列如实标注) ——
+migrate-db-norm-column-comments.sql
