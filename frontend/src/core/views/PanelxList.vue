@@ -5339,6 +5339,18 @@ async function loadCrg() {
     query.pageSize = wantSize
     query.pageNo = 1
   }
+  // 档案面板的显示分页(pagedBlockRows/archSlice)同样取面板配置 —— 2026-09-28 修:
+  //   此前 archPageSize 硬编码 50,而 yj_panel.page_size 对档案面板**完全无效**
+  //   (queryArchive 忽略 pageSize 全量返回,显示走 archPageSize)⇒ 元数据误导,
+  //   且宽表(如商品 55 列 × 50 行 = 2800 单元格 / 1.7 万 DOM)没有"少渲染"的旋钮。
+  //   现在按配置走:宽表把 yj_panel.page_size 调到 25,单页渲染量与切换耗时直接减半。
+  if (singleDocMode.value) {
+    const archWant = Number(tp?.pageSize) || 50
+    if (archPageSize.value !== archWant) {
+      archPageSize.value = archWant
+      archPage.value = 1
+    }
+  }
   gridTabs.value = tp?.gridTabs || []
   groups.value = filterGroups(ensureScanFillAction(
     cfg?.metadata?.buttonGroups,

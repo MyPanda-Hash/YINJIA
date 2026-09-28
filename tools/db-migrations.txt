@@ -1625,3 +1625,6 @@ migrate-panel-runtime-cols.sql
 
 # —— 2026-09-28 P1:面板每页行数收敛(doc/flat 按单元格阶梯 ≤1500;archive 死元数据对齐 50) ——
 migrate-panel-page-size.sql
+
+# —— 2026-09-28 P1:宽表档案面板单页 50→25(配合前端 archPageSize 读配置,渲染量减半) ——
+migrate-panel-page-size-archive.sql
