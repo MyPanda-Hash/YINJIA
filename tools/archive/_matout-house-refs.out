@@ -1,0 +1,64 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:15 字符: 161
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-house-refs.sql ==
+  | FINISH_IN | 存货图片 | 存货图片 | 文本 |  |  |  | detail | 30 | 0 | 
+  | FINISH_IN | 计量单位 | 计量单位 | 下拉框 |  |  |  | detail | 60 | 1 | 
+  | FINISH_IN | 批号 | 批号 | 文本 |  |  |  | query,detail | 27 | 1 | 
+  | FINISH_IN | 生产车间 | 生产车间 | 下拉框 |  |  |  | query,header | 50 | 0 | 
+  | FINISH_IN | 仓库 | 仓库 | 参照 | WH | 仓库名称 | 仓库名称 | query,header,detail | 20 | 0 | 
+  | OTHER_OUT | 存货名称 | 存货名称 | 参照 | INV | 存货名称 | 存货名称 | detail | 20 | 1 | 
+  | OTHER_OUT | 计量单位 | 计量单位 | 下拉框 |  |  |  | detail | 40 | 1 | 
+  | OTHER_OUT | 往来单位 | 往来单位 | 参照 | PARTNER | 往来单位名称 | 往来单位名称 | header | 80 | 0 | 
+  | OTHER_OUT | 仓库 | 仓库 | 参照 | WH | 仓库名称 | 仓库名称 | query,detail | 10 | 1 | 
+  | OTHER_OUT | 存货编码 | 存货编码 | 参照 | INV | 存货编码 | 存货编码 | query,detail | 15 | 1 | 
+  | OTHER_OUT | 批号 | 批号 | 文本 |  |  |  | query,detail | 17 | 1 | 
+  | OUTSOURCE_ISSUE | 材料编码 | 材料编码 | 参照 | INV | 存货编码 | 存货编码 | detail | 10 | 0 | 
+  | OUTSOURCE_ISSUE | 材料名称 | 材料名称 | 参照 | INV | 存货名称 | 存货名称 | detail | 20 | 1 | 
+  | OUTSOURCE_ISSUE | 计量单位 | 计量单位 | 下拉框 |  |  |  | detail | 40 | 1 | 
+  | OUTSOURCE_ISSUE | 仓库 | 仓库 | 参照 | WH | 仓库名称 | 仓库名称 | header,detail | 80 | 0 | 
+  | OUTSOURCE_ISSUE | 批号 | 批号 | 文本 |  |  |  | query,detail | 17 | 1 | 
+  | SALE_OUT | 存货名称 | 存货名称 | 参照 | INV | 存货名称 | 存货名称 | detail | 20 | 1 | 
+  | SALE_OUT | 存货编码 | 存货编码 | 参照 | INV | 存货编码 | 存货名称 | detail | 30 | 1 | 
+  | SALE_OUT | 计量单位 | 计量单位 | 下拉框 |  |  |  | detail | 50 | 1 | 
+  | SALE_OUT | 商品是否多单位 | 商品是否多单位 | 文本 |  |  |  | detail | 210 | 0 | 
+  | SALE_OUT | 商品是否批次 | 商品是否批次 | 文本 |  |  |  | detail | 250 | 0 | 
+  | SALE_OUT | 仓库id | 仓库id | 文本 |  |  |  | detail | 270 | 0 | 
+  | SALE_OUT | 仓库编码 | 仓库编码 | 文本 |  |  |  | detail | 290 | 0 | 
+  | SALE_OUT | 仓库启用仓位管理 | 仓库启用仓位管理 | 文本 |  |  |  | detail | 300 | 0 | 
+  | SALE_OUT | 基本单位id | 基本单位id | 文本 |  |  |  | detail | 540 | 0 | 
+  | SALE_OUT | 基本单位名称 | 基本单位名称 | 文本 |  |  |  | detail | 550 | 0 | 
+  | SALE_OUT | 基本单位编码 | 基本单位编码 | 文本 |  |  |  | detail | 560 | 0 | 
+  | SALE_OUT | 单位id | 单位id | 文本 |  |  |  | detail | 570 | 0 | 
+  | SALE_OUT | 单位编码 | 单位编码 | 文本 |  |  |  | detail | 580 | 0 | 
+  | SALE_OUT | 单位成本 | 单位成本 | 文本 |  |  |  | detail | 710 | 0 | 
+  | SALE_OUT | 辅助单位id | 辅助单位id | 文本 |  |  |  | detail | 840 | 0 | 
+  | SALE_OUT | 辅助单位编码 | 辅助单位编码 | 文本 |  |  |  | detail | 850 | 0 | 
+  | SALE_OUT | 仓库名称_sp_name | 仓库名称_sp_name | 文本 |  |  |  | detail | 970 | 0 | 
+  | SALE_OUT | 收货仓库 | 收货仓库 | 参照 | WH | 仓库名称 | 仓库名称 | header | 220 | 0 | 
+  | SALE_OUT | 批号 | 批号 | 文本 |  |  |  | query,detail | 60 | 0 | 
+  | SALE_OUT | 仓库 | 仓库 | 参照 | WH | 仓库名称 | 仓库名称 | query,header,detail | 10 | 1 | 
+  | EQUIP | 安装车间 | 安装车间 | 参照 | DEPT | 部门编码 | detail | 90 | 
+  | OTHER_IN | 往来单位 | 往来单位 | 参照 | PARTNER | 往来单位名称 | header | 60 | 
+  | OTHER_OUT | 往来单位 | 往来单位 | 参照 | PARTNER | 往来单位名称 | header | 80 | 
+  | QC_INSP | 单位 | 单位 | 参照 | UOM | 计量单位名称 | detail | 70 | 
+  | QC_INSP | 计量单位 | 计量单位 | 参照 | UOM | 计量单位名称 | detail | 90 | 
+  | QC_RETURN | 单位 | 单位 | 参照 | UOM | 计量单位名称 | detail | 60 | 
+  | QC_RETURN | 计量单位 | 计量单位 | 参照 | UOM | 计量单位名称 | detail | 90 | 
+  | RD_MOLD_FORMULA | 生产车间 | 生产车间 | 参照 | DEPT | 部门编码 | header | 140 | 
+  | RD_MOLD_PROC | 生产车间 | 生产车间 | 参照 | DEPT | 部门编码 | header | 140 | 
+  | WO_ORDER | 生产车间 | 生产车间 | 参照 | WC | 工作中心名称 | header | 120 | 
+  | DEPT | 部门 | archive |  | bs_dept | 
+  | EMP | 职员 | archive |  | bs_emp | 
+  | INV | 商品 | archive |  | bs_inv | 
+  | MANU_ORDER | 生产加工单 | doc | bd_manu_order | bl_manu_order | 
+  | PROJ | 项目 | archive |  | bs_proj | 
+  | UOM | 计量单位 | archive |  | bs_uom | 
+  | WH | 仓库 | archive |  | bs_wh | 
+  | WO_ORDER | 生产工单 | doc | wo_order | wo_progress | 
+[OK] _q-matout-house-refs.sql (4 batches)

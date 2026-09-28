@@ -584,6 +584,8 @@ public class PanelConfigService {
         try {
             PanelRegistry.PanelDef refDef = registry.panel(f.refPanel());
             java.util.Set<String> mapped = new java.util.HashSet<>(selfIdentityLabels(def));
+            // 档案/来源单的「落库留痕」不进带回(见 REF_CARRY_EXCLUDE):先占位,两个循环都会跳过它们
+            mapped.addAll(REF_CARRY_EXCLUDE);
             for (PanelRegistry.FieldDef sibling : def.fields()) {
                 if (sibling.label().equals(f.label())) continue;
                 if (mapped.contains(sibling.label())) continue;
@@ -619,6 +621,15 @@ public class PanelConfigService {
         return out;
     }
 
+    /** 参照带回的排除标签:档案/来源单的**落库留痕**不该写到本单上。
+     *  2026-09-28 实测踩到:材料出库单「计量单位」改参照 UOM 后,refMap 里冒出
+     *  创建时间→创建时间 / 修改时间→修改时间 / 创建人→创建人 / 修改人→修改人 ——
+     *  原因是 UOM 面板(计量单位档案)也有这几个同名字段,而同名带回是无条件的;
+     *  照此带过去,选个单位就把**单位档案的**创建/修改留痕写进了单据行。
+     *  这些列一律按本单真实值落库,故纳入带回排除(与 selfIdentityLabels 同一处置)。 */
+    private static final java.util.Set<String> REF_CARRY_EXCLUDE = java.util.Set.of(
+            "创建时间", "修改时间", "创建人", "修改人", "创建人编码", "修改人编码", "创建人id", "修改人id");
+
     /** 参照带回类型闸门:「是否」型不参与带回(任一侧是即禁止)。
      *  同名≠同义——如 往来单位.结算客户(是否,0/1标志) 与 销售订单.结算客户(客户名下拉) 同名异义,
      *  映射会把 0/1 写进名称字段;「停用」等档案标志同理不该串到单据上。
@@ -628,24 +639,35 @@ public class PanelConfigService {
     }
 
     /** 参照带回同义词词典(引用面板字段 → 本面板异名字段候选,命中即映射)。
-     *  选存货整串带回:编码/名称的 材料/产品/物料 异名口径 + 各单位口径 + 参考成本→单价。 */
-    private static final Map<String, List<String>> REF_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
-            "计量单位", List.of("单位", "销售单位", "采购单位", "生产单位"),
-            "参考成本", List.of("单价"),
-            "存货编码", List.of("材料编码", "产品编码", "物料编码"),
-            "存货名称", List.of("材料名称", "产品名称", "物料名称"),
+     *  选存货整串带回:编码/名称的 材料/产品/物料 异名口径 + 各单位口径 + 参考成本→单价。
+     *  ⚠ 条目数已超 10,必须用 Map.ofEntries —— Map.of 最多 10 对,超了编译期即报错
+     *  (2026-09-28 加 员工编码/计量单位编码 两条时实测踩到)。 */
+    private static final Map<String, List<String>> REF_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
+            Map.entry("计量单位", List.of("单位", "销售单位", "采购单位", "生产单位")),
+            Map.entry("参考成本", List.of("单价")),
+            Map.entry("存货编码", List.of("材料编码", "产品编码", "物料编码")),
+            Map.entry("存货名称", List.of("材料名称", "产品名称", "物料名称")),
             // 选客户/供应商整串带回:往来单位的编码/名称 → 单据的客户编码/供应商编码 与 客户/供应商(编码↔名称双向带动)
-            "往来单位编码", List.of("客户编码", "供应商编码"),
-            "往来单位名称", List.of("供应商", "客户"),
+            Map.entry("往来单位编码", List.of("客户编码", "供应商编码")),
+            Map.entry("往来单位名称", List.of("供应商", "客户")),
             // 供应商档案(GFDA)整串带回:编码/名称 ↔ 单据的 供应商代码/供应商 异名字段(编码↔名称双向带动)
-            "供应商编码", List.of("供应商代码"),
-            "供应商名称", List.of("供应商"),
+            Map.entry("供应商编码", List.of("供应商代码")),
+            Map.entry("供应商名称", List.of("供应商")),
             // 产品信息表 炭棒尺寸(整串) → 产品文件面板异名规格字段;三窄格 炭棒规格1/2/3 由前端拆分回填
-            "炭棒尺寸", List.of("炭棒规格", "滤芯尺寸"),
+            Map.entry("炭棒尺寸", List.of("炭棒规格", "滤芯尺寸")),
             // 立项申请 项目等级(审核人定级) → 项目实施计划的 项目定级(异名同义):
             // 计划按「文档编号」参照立项申请时自动把等级带过来 —— 等级因此成为后续立项/进度流程的属性
             // (2026-09-21 用户口径:全链路一/二/三/四级)
-            "项目等级", List.of("项目定级")
+            Map.entry("项目等级", List.of("项目定级")),
+            // 职员档案(EMP)整串带回:员工编码 → 单据的 经手人编码(2026-09-28,材料出库单字段关联)。
+            // 转ERP 要推金蝶 emp_number,而单据头上只有「经手人/领用人」(存名称)+空着的「经手人编码」;
+            // 让选人时把编码一起带出来,省得再按名称回查档案。已存在 经手人编码 文本列的面板
+            // (采购入库/销售出库/材料出库…)一并受益,不会覆盖任何已填值。
+            Map.entry("员工编码", List.of("经手人编码")),
+            // 计量单位档案(UOM)整串带回:计量单位编码 → 单据的 单位编码/基本单位编码(同上)。
+            // 计量单位列改「参照 UOM」后(见 tools/migrate-material-out-ref-links.sql),选单位即带出编码,
+            // 与金蝶单位档案对齐(推送按名称换 unit_id,编码列备查)。
+            Map.entry("计量单位编码", List.of("单位编码", "基本单位编码"))
     )));
 
     /** 委外三单共用按钮组骨架(选单来源各自不同,见下方三常量)。 */

@@ -1,0 +1,50 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:8 字符: 142
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-uom-dup.sql ==
+  | g | 2 | g | 
+  | kg | 2 | kg | 
+  | 吨 | 2 | U06 | 
+  | 件 | 2 | U01 | 
+  | 台 | 2 | U05 | 
+  | 套 | 2 | U03 | 
+  | kg | kg | 0 | N | 
+  | PCS | PCS | 0 | N | 
+  | 个 | 个 | 0 | N | 
+  | 卷 | 卷 | 0 | N | 
+  | 套 | 套 | 0 | N | 
+  | 张 | 张 | 0 | N | 
+  | 支 | 支 | 0 | N | 
+  | 条 | 条 | 0 | N | 
+  | 桶 | 桶 | 0 | N | 
+  | 次 | 次 | 0 | N | 
+  | 片 | 片 | 0 | N | 
+  | 米 | 米 | 0 | N | 
+  | cm | cm | 0 | N | 
+  | g | g | 0 | N | 
+  | l | L | 0 | N | 
+  | ml | ml | 0 | N | 
+  | 件 | 件 | 0 | N | 
+  | 份 | 份 | 0 | N | 
+  | 包 | 包 | 0 | N | 
+  | 只 | 只 | 0 | N | 
+  | 台 | 台 | 0 | N | 
+  | 吨 | 吨 | 0 | N | 
+  | 支（成型前） | 支（成型前） | 0 | N | 
+  | 瓶 | 瓶 | 0 | N | 
+  | 盒 | 盒 | 0 | N | 
+  | 箱 | 箱 | 0 | N | 
+  | U01 | 件 | null | N | 
+  | U02 | kg | null | N | 
+  | U03 | 套 | null | N | 
+  | U04 | 升 | null | N | 
+  | U05 | 台 | null | N | 
+  | U06 | 吨 | null | N | 
+  | U07 | g | null | N | 
+  | U08 | 2 | null | N | 
+[OK] _q-matout-uom-dup.sql (3 batches)

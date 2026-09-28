@@ -1,0 +1,120 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 226
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-refs.sql ==
+  | MATERIAL_OUT | detail | 30 | 材料名称 | 材料名称 | 参照 | INV | 存货名称 | 存货名称 |  | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 40 | 计量单位 | 计量单位 | 下拉框 |  |  |  | SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v) | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 50 | 数量 | 数量 | 小数 |  |  |  |  | 1 | 1 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 60 | 单价 | 单价 | 小数 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 70 | 金额 | 金额 | 小数 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 80 | 规格型号 | 规格型号 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 90 | 手工确定成本 | 手工确定成本 | 是否 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 100 | 明细备注 | 明细备注 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 110 | 现存量 | 现存量 | 小数 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 120 | 现存量说明 | 现存量说明 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 970 | 图片 | 图片 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 971 | 行号 | 行号 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 972 | 商品id | 商品id | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 973 | 商品是否多单位 | 商品是否多单位 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 974 | 商品是否序列号 | 商品是否序列号 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 975 | 商品是否辅助属性 | 商品是否辅助属性 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 976 | 商品是否保质期 | 商品是否保质期 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 977 | 商品是否批次 | 商品是否批次 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 978 | 仓库id | 仓库id | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 979 | 仓库编码 | 仓库编码 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 980 | 仓库启用仓位管理 | 仓库启用仓位管理 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 981 | 仓位id | 仓位id | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 982 | 仓位名称 | 仓位名称 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 983 | 仓位编码 | 仓位编码 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 984 | 辅助属性id | 辅助属性id | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 985 | 辅助属性名称 | 辅助属性名称 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 986 | 辅助属性编码 | 辅助属性编码 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 987 | 辅助属性1id | 辅助属性1id | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 988 | 辅助属性1名称 | 辅助属性1名称 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 989 | 辅助属性1编码 | 辅助属性1编码 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 990 | 辅助属性2id | 辅助属性2id | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 991 | 辅助属性2名称 | 辅助属性2名称 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 992 | 辅助属性2编码 | 辅助属性2编码 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 993 | 辅助属性3id | 辅助属性3id | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 994 | 辅助属性3名称 | 辅助属性3名称 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 995 | 辅助属性3编码 | 辅助属性3编码 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 996 | 条形码 | 条形码 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 997 | 产地 | 产地 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 998 | 注册证号 | 注册证号 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 999 | 生产许可证 | 生产许可证 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 1000 | 保质期到期日 | 保质期到期日 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 1001 | 有效期至 | 有效期至 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 1002 | 保质期类型 | 保质期类型 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 1003 | 保质期 | 保质期 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 1004 | 序列号清单 | 序列号清单 | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 1005 | 序列号流转ID | 序列号流转ID | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 1006 | 基本单位id | 基本单位id | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | MATERIAL_OUT | detail | 1007 | 基本单位名称 | 基本单位名称 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 1008 | 基本单位编码 | 基本单位编码 | 文本 |  |  |  |  | 1 | 0 | 0 | 1 | 
+  | MATERIAL_OUT | detail | 1009 | 单位id | 单位id | 文本 |  |  |  |  | 1 | 0 | 1 | 0 | 
+  | PURCHASE_IN 参照字段 | 存货名称 | 参照 | INV | 存货名称 | 存货名称 | detail | 20 | 
+  | PURCHASE_IN 参照字段 | 仓库 | 参照 | WH | 仓库名称 | 仓库名称 | detail | 200 | 
+  | PURCHASE_IN 参照字段 | 部门 | 参照 | DEPT | 部门名称 | 部门名称 | header | 330 | 
+  | PURCHASE_IN 参照字段 | 部门编码 | 参照 | DEPT | 部门编码 | 部门名称 | header | 340 | 
+  | PURCHASE_IN 参照字段 | 仓库编码 | 参照 | WH | 仓库编码 | 仓库名称 | header | 690 | 
+  | PURCHASE_IN 参照字段 | 存货编码 | 参照 | INV | 存货编码 | 存货名称 | query,detail | 20 | 
+  | PURCHASE_IN 参照字段 | 供应商编码 | 参照 | GFDA | dm | mc | query,header | 60 | 
+  | PURCHASE_IN 参照字段 | 供应商 | 参照 | GFDA | mc | mc | query,header | 70 | 
+  | PURCHASE_IN 参照字段 | 经手人 | 参照 | EMP | 员工名称 | 员工名称 | query,header | 90 | 
+  | PURCHASE_IN 参照字段 | 验货人 | 参照 | EMP | 员工名称 | 员工名称 | query,header | 100 | 
+  | INV 面板字段 | 来料检验 | 来料检验 | 文本 | detail | 44 | 
+  | INV 面板字段 | 来料检验 | 来料检验 | 文本 | detail | 44 | 
+  | INV 面板字段 | 条形码 | 条形码 | 文本 | detail | 45 | 
+  | INV 面板字段 | 计价方式 | 计价方式 | 下拉框 | detail | 50 | 
+  | INV 面板字段 | 品牌 | 品牌 | 文本 | detail | 60 | 
+  | INV 面板字段 | 计量单位 | 计量单位 | 下拉框 | detail | 70 | 
+  | INV 面板字段 | 属性 | 属性 | 下拉框 | detail | 80 | 
+  | INV 面板字段 | 参考成本 | 参考成本 | 小数 | detail | 90 | 
+  | INV 面板字段 | 建档日期 | 建档日期 | 日期 | detail | 110 | 
+  | INV 面板字段 | 停用 | 停用 | 是否 | detail | 120 | 
+  | INV 面板字段 | 备注 | 备注 | 文本 | detail | 900 | 
+  | INV 面板字段 | 助记码 | 助记码 | 文本 | detail | 900 | 
+  | INV 面板字段 | 产地 | 产地 | 文本 | detail | 900 | 
+  | INV 面板字段 | 商品类型 | 商品类型 | 文本 | detail | 900 | 
+  | INV 面板字段 | 是否可销售 | 是否可销售 | 是否 | detail | 900 | 
+  | INV 面板字段 | 是否可采购 | 是否可采购 | 是否 | detail | 900 | 
+  | INV 面板字段 | 是否为子件 | 是否为子件 | 是否 | detail | 900 | 
+  | INV 面板字段 | 是否为组件 | 是否为组件 | 是否 | detail | 900 | 
+  | INV 面板字段 | 是否多单位 | 是否多单位 | 是否 | detail | 900 | 
+  | INV 面板字段 | 辅助单位 | 辅助单位 | 文本 | detail | 900 | 
+  | INV 面板字段 | 是否启用保质期 | 是否启用保质期 | 是否 | detail | 900 | 
+  | INV 面板字段 | 保质期 | 保质期 | 小数 | detail | 900 | 
+  | INV 面板字段 | 保质期单位 | 保质期单位 | 文本 | detail | 900 | 
+  | INV 面板字段 | 预警天数 | 预警天数 | 小数 | detail | 900 | 
+  | INV 面板字段 | 是否启用辅助属性 | 是否启用辅助属性 | 是否 | detail | 900 | 
+  | INV 面板字段 | 库存管理方式 | 库存管理方式 | 文本 | detail | 900 | 
+  | INV 面板字段 | 最低库存 | 最低库存 | 小数 | detail | 900 | 
+  | INV 面板字段 | 最高库存 | 最高库存 | 小数 | detail | 900 | 
+  | INV 面板字段 | 预警库存 | 预警库存 | 小数 | detail | 900 | 
+  | INV 面板字段 | 销项税率 | 销项税率 | 小数 | detail | 900 | 
+  | INV 面板字段 | 进项税率 | 进项税率 | 小数 | detail | 900 | 
+  | INV 面板字段 | 生产许可证 | 生产许可证 | 文本 | detail | 900 | 
+  | INV 面板字段 | 注册证号 | 注册证号 | 文本 | detail | 900 | 
+  | INV 面板字段 | 毛重 | 毛重 | 小数 | detail | 900 | 
+  | INV 面板字段 | 净重 | 净重 | 小数 | detail | 900 | 
+  | INV 面板字段 | 长 | 长 | 小数 | detail | 900 | 
+  | INV 面板字段 | 宽 | 宽 | 小数 | detail | 900 | 
+  | INV 面板字段 | 高 | 高 | 小数 | detail | 900 | 
+  | INV 面板字段 | 体积 | 体积 | 小数 | detail | 900 | 
+  | INV 面板字段 | 可用库存 | 可用库存 | 小数 | detail | 900 | 
+  | INV 面板字段 | 即时库存 | 即时库存 | 小数 | detail | 900 | 
+  | INV 面板字段 | 最小包装量 | 最小包装量 | 小数 | detail | 900 | 
+  | INV 面板字段 | 默认生产车间编码 | 默认生产车间编码 | 文本 | detail | 900 | 
+  | INV 面板字段 | 是否倒冲领料 | 是否倒冲领料 | 是否 | detail | 900 | 
+  | INV 面板字段 | 倒冲仓库名称 | 倒冲仓库名称 | 文本 | detail | 900 | 
+  | INV 面板字段 | 倒冲仓库编码 | 倒冲仓库编码 | 文本 | detail | 900 | 
+  | INV 面板字段 | 倒冲仓位名称 | 倒冲仓位名称 | 文本 | detail | 900 | 
+  | INV 面板字段 | 商品标签 | 商品标签 | 文本 | detail | 900 | 
+  | INV 面板字段 | 采购价 | 采购价 | 小数 | detail | 900 | 
+  | INV 面板字段 | 零售价 | 零售价 | 小数 | detail | 900 | 
+[OK] _q-matout-refs.sql (4 batches)
