@@ -15,7 +15,7 @@ SELECT l.source_panel_code, l.source_form_no, l.target_panel_code, l.target_form
        SUM(COALESCE(l.linked_quantity, 0)) AS qty
 INTO #bm
 FROM form_flow_link l
-WHERE l.link_status = 'ACTIVE' AND l.source_panel_code = 'PU_ORDER' AND l.target_panel_code = 'SL_RECV'
+WHERE l.link_status = 'ACTIVE' AND l.source_panel_code = 'PU_ORDER' AND l.target_panel_code IN ('SL_RECV', 'QC_RECV')  /* 2026-09-24:面板已改名 QC_RECV,双码兼容 */
 GROUP BY l.source_panel_code, l.source_form_no, l.target_panel_code, l.target_form_no;
 
 ALTER TABLE #bm ADD batch_no nvarchar(50) NULL;
@@ -43,7 +43,7 @@ WHERE ISNULL(d.批次号, '') = '';
 GO
 UPDATE l SET l.batch_no = m.batch_no
 FROM form_flow_link l JOIN #bm m ON m.target_form_no = l.target_form_no
-WHERE l.link_status='ACTIVE' AND l.source_panel_code='PU_ORDER' AND l.target_panel_code='SL_RECV'
+WHERE l.link_status='ACTIVE' AND l.source_panel_code='PU_ORDER' AND l.target_panel_code IN ('SL_RECV','QC_RECV')
   AND ISNULL(l.batch_no,'') = '';
 GO
 
@@ -51,7 +51,7 @@ GO
 -- 检验单批次号 = 其来源暂收单的批次号(link SL_RECV→QC_INSP,source_form_no=暂收单号)
 UPDATE i SET i.批次号 = s.批次号
 FROM qc_insp i
-JOIN form_flow_link l ON l.link_status='ACTIVE' AND l.source_panel_code='SL_RECV' AND l.target_panel_code='QC_INSP' AND l.target_form_no = i.单据编号
+JOIN form_flow_link l ON l.link_status='ACTIVE' AND l.source_panel_code IN ('SL_RECV','QC_RECV') AND l.target_panel_code='QC_INSP' AND l.target_form_no = i.单据编号
 JOIN sl_recv s ON s.单据编号 = l.source_form_no
 WHERE ISNULL(i.批次号,'') = '' AND ISNULL(s.批次号,'') <> '';
 GO
@@ -61,7 +61,7 @@ WHERE ISNULL(d.批次号,'') = '' AND ISNULL(i.批次号,'') <> '';
 GO
 UPDATE l SET l.batch_no = s.批次号
 FROM form_flow_link l JOIN sl_recv s ON s.单据编号 = l.source_form_no
-WHERE l.link_status='ACTIVE' AND l.source_panel_code='SL_RECV' AND l.target_panel_code='QC_INSP'
+WHERE l.link_status='ACTIVE' AND l.source_panel_code IN ('SL_RECV','QC_RECV') AND l.target_panel_code='QC_INSP'
   AND ISNULL(l.batch_no,'') = '' AND ISNULL(s.批次号,'') <> '';
 GO
 
