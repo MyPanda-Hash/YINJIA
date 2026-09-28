@@ -388,7 +388,9 @@ const mergeListDetail = (listRow, detail) => {
   }
   return out;
 };
-const nowLocal = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+// 2026-09-28 修:toISOString() 是 UTC,asp_time1 落库少 8 小时(服务器实测 15:52 显示成 07:52,
+// 曾被误读成"上午部署前的旧数据")。改为按本地时区偏移折算后再取 ISO 形状。
+const nowLocal = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' '); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 日志:控制台 + logs/sync-YYYY-MM-DD.log(按日轮转,规范要求保留至少一年)
