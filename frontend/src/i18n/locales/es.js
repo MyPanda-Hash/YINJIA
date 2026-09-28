@@ -199,6 +199,8 @@ export default {
     '已转': 'Enviado',
     '未转': 'No enviado',
     '二维码标签': 'Etiquetas QR',
+    '打印标识卡': 'Imprimir tarjetas de identificación',
+    '当前单据没有可打印的明细行': 'No hay líneas de detalle imprimibles en el documento actual',
     '请先勾选要导出的商品': 'Seleccione primero los artículos a exportar',
     '已选 {n} 个商品，导出二维码标签 PDF？': '¿Exportar etiquetas QR en PDF de los {n} artículo(s) seleccionado(s)?',
     '正在生成标签…': 'Generando etiquetas...',

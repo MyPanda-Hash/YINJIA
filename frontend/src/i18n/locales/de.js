@@ -199,6 +199,8 @@ export default {
     '已转': 'Übertragen',
     '未转': 'Nicht übertragen',
     '二维码标签': 'QR-Etiketten',
+    '打印标识卡': 'Identifikationskarten drucken',
+    '当前单据没有可打印的明细行': 'Keine druckbaren Detailzeilen im aktuellen Beleg',
     '请先勾选要导出的商品': 'Bitte zuerst die zu exportierenden Artikel auswählen',
     '已选 {n} 个商品，导出二维码标签 PDF？': 'QR-Etiketten-PDF für {n} ausgewählte(n) Artikel exportieren?',
     '正在生成标签…': 'Etiketten werden erstellt...',

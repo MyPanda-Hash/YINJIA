@@ -430,6 +430,9 @@ export default {
     '已转': 'Pushed',
     '未转': 'Not pushed',
     '二维码标签': 'QR code labels',
+    // 采购入库单·明细行打印(2026-09-28):复用商品二维码标签的 75×100mm 产品标识卡版式
+    '打印标识卡': 'Print ID Cards',
+    '当前单据没有可打印的明细行': 'No printable detail lines on the current document',
     '请先勾选要导出的商品': 'Select the items to export first',
     '已选 {n} 个商品，导出二维码标签 PDF？': 'Export QR code label PDF for {n} selected item(s)?',
     '正在生成标签…': 'Generating labels...',

@@ -1,4 +1,4 @@
-// YINJIA-MES 菜单:面板以 HSDZ_MES yj_panel 注册表为准
+﻿// YINJIA-MES 菜单:面板以 HSDZ_MES yj_panel 注册表为准
 // 模块:智能供应链 / 生产制造 / 研发管理 / 基础档案
 export const menuTree = [
   {
@@ -133,6 +133,7 @@ export const menuTree = [
         children: [
           {
             code: 'doc', title: '单据', children: [
+              // 送料暂收单:面板编码 QC_RECV(2026-09-20 由 SL_RECV 改名,物理表仍 sl_recv/sl_recv_detail,单据前缀 SL)
               { code: 'slRecv', title: '送料暂收单', path: '/panelx/list/QC_RECV', icon: 'Download', panelCode: 'QC_RECV', operationName: '新增流程' },
               { code: 'qcReturn', title: '暂收退料单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
               { code: 'purchaseIn', title: '采购入库单', path: '/panelx/list/PURCHASE_IN', icon: 'Download', panelCode: 'PURCHASE_IN', operationName: '新增流程' },
@@ -209,8 +210,13 @@ export const menuTree = [
               // 订单结转·发单工作台(方案 V1.0):待结转行(剩余=需求−已排产−已采购)→转工单/转采购单;
               // 防重复=行级占用链,转满自动消失;不改销售订单状态。置首位:发单是排产的上一步。
               { code: 'orderConvert', title: '订单结转', path: '/prod/plan/orderConvert', icon: 'Switch' },
+              // 生产工单(2026-09-24 用户拍板改名:原「生产加工单」MANU_ORDER,面板名/菜单位移自此;
+              // 流程位置=订单结转之后、排产之前:生单→编制审核→排产工作台排线)。
+              // 原生产记录组的「生产加工单」菜单同步下线,单一入口。
+              // 列表样式=工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式:修改/结案/打印工单/打印工单_多个/打印领料单/批量调线+产线筛选+追溯);单据维护从行点修改进表单
+              { code: 'manufactureOrder', title: '生产工单', path: '/prod/plan/workOrderList', icon: 'Document' },
               // 快速排产(原「排产工作台」,2026-09-26 用户拍板改名):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
-              // 排产单一入口(加工单「排产」按钮已下线,表单产线/开工·完工日只读)
+              // 排产单一入口(工单「排产」按钮已下线,表单产线/开工·完工日只读)
               { code: 'scheduleBoard', title: '快速排产', path: '/prod/plan/scheduleBoard', icon: 'AlarmClock' },
               // 2026-09-22 单轨改造(参考库式,用户拍板):生产工单/排单计划菜单下线——
               // 工单=生产加工单(MANU_ORDER),看板职责由「生产排产 MANU_SCHEDULE」承接(含五工序完成/未完成数量);
@@ -259,20 +265,20 @@ export const menuTree = [
           },
           {
             code: 'legacy', title: '经典单据', children: [
-              { code: 'manufactureOrder', title: '生产加工单', path: '/panelx/list/MANU_ORDER', icon: 'Document', panelCode: 'MANU_ORDER', operationName: '新增流程' },
+              // 生产工单已归位「生产计划」组(2026-09-24),此处不再重复入口
               { code: 'dispatch', title: '工序派工单', path: '/panelx/list/DISPATCH', icon: 'AlarmClock', panelCode: 'DISPATCH', operationName: '新增流程' },
               { code: 'outsourceOrder', title: '委外加工单', path: '/panelx/list/OUTSOURCE_ORDER', icon: 'Tickets', panelCode: 'OUTSOURCE_ORDER', operationName: '新增流程' },
             ],
           },
           {
             code: 'detail', title: '明细表', children: [
-              { code: 'manuDetail', title: '生产加工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
+              { code: 'manuDetail', title: '生产工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
               { code: 'dispatchDetail', title: '工序派工单明细表', path: '/panelx/list/DISPATCH_DETAIL', panelCode: 'DISPATCH_DETAIL', icon: 'List' },
             ],
           },
           {
             code: 'stats', title: '统计表', children: [
-              { code: 'manuStats', title: '生产加工单统计表', path: '/panelx/list/MANU_ORDER_STATS', panelCode: 'MANU_ORDER_STATS', icon: 'Histogram' },
+              { code: 'manuStats', title: '生产工单统计表', path: '/panelx/list/MANU_ORDER_STATS', panelCode: 'MANU_ORDER_STATS', icon: 'Histogram' },
               { code: 'dispatchStats', title: '工序派工单统计表', path: '/panelx/list/DISPATCH_STATS', panelCode: 'DISPATCH_STATS', icon: 'Histogram' },
             ],
           },

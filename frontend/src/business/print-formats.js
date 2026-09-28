@@ -4,7 +4,7 @@
  *   ① 银嘉采购订单(用户截图,PU_ORDER 打印):头部信息+物料行表+总计+注意事项+供/需方签章框;
  *   ② 退货单(用户截图,QC_RETURN 暂收退料单 打印):公司抬头+供应商/退货日期+行表+说明+签章行;
  *   ③ 二维码标签(2026-09-24,INV 勾选即打):75×100mm 七字段标签;
- *   ④ 生产任务单(打印工单,2026-09-24):横向 A4 一表多行+行尾二维码(工单排产看板与生产工单面板共用)。
+ *   ④ 生产任务单(打印工单,2026-09-24):横向 A4 一表多行+行尾二维码=公司代码@工单号@1000+行号(2026-10-09 规则改版,woQrText)。
  * 打印通道:新窗口 HTML + window.print()(同 QrLabelDialog,绕开 jsPDF §5.5 坑);
  * 版面文字(公司抬头/注意事项/需方联系/生产任务单表头)为固定版式常量,改文案只动本文件。
  * 业务单据为纸面事实格式,不入 tt() 翻译层(ADR-0001)。
@@ -25,6 +25,9 @@ const COMPANY = {
   fax: '0752-5583930',
   // 银嘉采购订单 抬头行
   brand: 'AGPLUS 银嘉',
+  // 公司代码(2026-09-28 物料二维码口径):取旧系统 plang.comm,全库唯一值 '0';
+  // 标识卡二维码前缀=公司代码@物料编码[@批号],与旧系统扫码解析口径一致
+  companyCode: '0',
   // 需方签章框
   buyer: { 单位名称: '惠州市银嘉环保科技有限公司', 联系人: '孙郝聪', 联系方式: '13718162430' },
   // 生产任务单(打印工单)固定表头文字
@@ -65,10 +68,20 @@ function openPrintWindow(title, bodyHtml) {
 /**
  * 生产任务单三模板(2026-09-27 用户截图版式,生产工单列表/工单排产看板共用):
  *   成型生产任务单——横向 A4,列含 成型折算后数量;组装生产任务单——同列结构无折算列;
- *   行尾二维码 = 工单号|批号|物料编码|排产数量|生产线(与生产任务单同口径)。
+ *   行尾二维码 = 公司代码@工单号@(1000+工单行号)(woQrText,2026-10-09 规则改版;旧 工单号|批号|物料编码|排产数量|生产线 作废)。
  * @param title '成型生产任务单' | '组装生产任务单'
- * @param rows  [{单据编号,是否重点管控产品,商品编码,商品名称,规格型号,订单数量,成型折算后数量,计划完工日期,批号,物料编码,排产数量,生产线}]
+ * @param rows  [{单据编号,公司代码?,工单行号?,是否重点管控产品,商品编码,商品名称,规格型号,订单数量,成型折算后数量,计划完工日期,批号,物料编码,排产数量,生产线}]
  */
+/** 工单二维码内容(2026-10-09 规则改版):公司代码@工单号@(1000+工单行号),行号 3 位不足补 0。
+ *  例:0@GD2608100001@1003 —— 尾段 = '1' + 3位行号补0 = 1000+行号;行号缺省按 1(MANU_ORDER 单行工单),
+ *  公司代码缺省取 COMPANY.companyCode(plang.comm 全库唯一 '0')。扫码报工/领料按本口径解析。 */
+export function woQrText(wo) {
+  const no = String(wo?.['工单号'] ?? wo?.['单据编号'] ?? wo?.['合同号'] ?? wo?.['加工单号'] ?? '').trim()
+  const xc = Number.parseInt(wo?.['工单行号'], 10)
+  const comm = String(wo?.['公司代码'] ?? '').trim() || COMPANY.companyCode
+  return `${comm}@${no}@${1000 + (Number.isFinite(xc) ? xc : 1)}`
+}
+
 const TASK_SHEET_COLUMNS = {
   '成型生产任务单': ['单据编号', '是否重点管控产品', '商品编码', '商品名称', '规格型号', '订单数量', '成型折算后数量', '计划完工日期'],
   '组装生产任务单': ['单据编号', '是否重点管控产品', '商品编码', '商品名称', '规格型号', '订单数量', '计划完工日期'],
@@ -89,8 +102,7 @@ export async function printWorkTaskSheet(title, rows, opts = {}) {
     try {
       const lib = qrLib()
       if (!lib) throw new Error('qrcode lib unavailable')
-      qr = await lib.toDataURL(`${r['单据编号']}|${r['批号'] || ''}|${r['物料编码'] || ''}|${r['排产数量'] ?? ''}|${line}`,
-        { margin: 1, errorCorrectionLevel: 'M' })
+      qr = await lib.toDataURL(woQrText(r), { margin: 1, errorCorrectionLevel: 'M' })
     } catch (e) { console.warn('[print-formats] 工单二维码生成失败:', e?.message || e) }
     trs.push('<tr><td>' + (i + 1) + '</td>'
       + `<td>${esc(r['单据编号'])}</td><td>${esc(r['是否重点管控产品'])}</td>`
@@ -283,10 +295,23 @@ export function printQcReturn(doc, lines) {
 /**
  * 二维码标签·新版式(2026-09-24 用户拍板,替代 80×80 旧版式):商品界面「二维码标签」勾选即打。
  * 75×100mm 标签纸,一品一卡,一卡一页;字段=订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期
- * ——编码·规格取商品行,其余留横线手填;二维码=物料编码|物料规格|数量|批次(空段留空),
+ * ——编码·规格取商品行,其余留横线手填;二维码=公司代码@物料编码[@批号](2026-09-28 口径,见下),
  * 置于右下角,距边框 ≥5mm 不重合。旧服务端版式 /report/qr-label(inv-qr-label.jrxml)暂留可回滚。
- * @param rows [{编码, 规格}] (勾选的商品行)
+ * 2026-09-28 采购入库单「打印标识卡」复用本版式:同一卡面,但行对象可多带可选键
+ * (订单编号/供应商名称/数量/批次/生产日期)——单据上有事实值即打印填充,缺键行为与商品档案完全一致(留空手填)。
+ * 2026-09-28 二次修正(用户实打反馈):供应商名称过长时 nowrap 溢出卡边 → 改 flex 版式——
+ * 标签恒不折行(.lb),值区占剩余宽度、过长自动转行(.v word-break:break-all),空值仍留 22mm 手填横线。
+ * 2026-09-28 三修(用户拍板):二维码内容改旧系统扫码口径——
+ * 带批号=公司代码@物料编码@批号(如 0@XH-SX80250SX@20060908,采购入库单行);
+ * 不带批号=公司代码@物料编码(如 0@XH-SX80250SX,商品档案行/无批次行)。规格·数量不再进码。
+ * 公司代码取旧系统 plang.comm(全库唯一 '0'),常量见 COMPANY.companyCode。
+ * @param rows [{编码, 规格, 数量?, 批次?, 订单编号?, 供应商名称?, 生产日期?}]
  */
+/** 标识卡二维码内容:公司代码@物料编码[@批号](批号空→两段;2026-09-28 旧系统扫码口径) */
+export function productCardQrText(card, companyCode = COMPANY.companyCode) {
+  return [companyCode, card['编码'], card['批次'] || ''].filter((s) => s !== '' && s != null).join('@')
+}
+
 export async function printProductCards(rows) {
   const cards = (Array.isArray(rows) ? rows : []).filter((r) => r && r['编码'])
   if (!cards.length) return false
@@ -294,25 +319,26 @@ export async function printProductCards(rows) {
   const cardCss = '.card{width:75mm;height:100mm;box-sizing:border-box;border:0.35mm solid #000;'
     + 'padding:5mm 5mm 26mm 5mm;position:relative;page-break-after:always;background:#fff;font-family:"Microsoft YaHei",system-ui,sans-serif;color:#111}'
     + '.card:last-child{page-break-after:auto}'
-    + '.card .f{margin:2.8mm 0;font-size:10pt;white-space:nowrap;max-width:44mm}'
-    + '.card .f .v{display:inline-block;border-bottom:0.25mm solid #000;min-width:22mm;padding:0 1mm 0.4mm;font-size:9.5pt}'
+    + '.card .f{display:flex;align-items:flex-end;margin:2.2mm 0;line-height:1.3;font-size:10pt}'
+    + '.card .f .lb{flex:none;white-space:nowrap}'
+    + '.card .f .v{flex:0 1 auto;min-width:22mm;border-bottom:0.25mm solid #000;padding:0 1mm 0.4mm;font-size:9.5pt;word-break:break-all;overflow-wrap:anywhere}'
     + '.card .qr{position:absolute;right:6mm;bottom:6mm;width:20mm;height:20mm}'
     + '.card .qr img{width:20mm;height:20mm;display:block}'
     + 'body{margin:0;background:#fff}'
   const trs = []
   for (const c of cards) {
-    const qrText = [c['编码'], c['规格'] || '', c['数量'] || '', c['批次'] || ''].join('|')
+    const qrText = productCardQrText(c)
     let qr = ''
     try {
       const lib = qrLib()
       if (!lib) throw new Error('qrcode lib unavailable')
       qr = await lib.toDataURL(qrText, { margin: 1, errorCorrectionLevel: 'M' })
     } catch (e) { console.warn('[print-formats] 二维码生成失败:', e?.message || e) }
-    const f = (label, value) => `<div class="f">${label}：<span class="v">${esc(value || '')}</span></div>`
+    const f = (label, value) => `<div class="f"><span class="lb">${label}：</span><span class="v">${esc(value || '')}</span></div>`
     trs.push('<div class="card">'
-      + f('订单编号') + f('供应商名称')
+      + f('订单编号', c['订单编号']) + f('供应商名称', c['供应商名称'])
       + f('物料编码', c['编码']) + f('物料规格', c['规格'])
-      + f('数　　量') + f('批　　次') + f('生产日期')
+      + f('数　　量', c['数量']) + f('批　　次', c['批次']) + f('生产日期', c['生产日期'])
       + `<div class="qr">${qr ? `<img src="${qr}"/>` : ''}</div>`
       + '</div>')
   }
@@ -323,8 +349,8 @@ export async function printProductCards(rows) {
 
 /**
  * 生产任务单(打印工单) — 横向 A4,一行=一张工单,行尾二维码;工单排产看板与生产工单面板共用本实现。
- * 二维码内容=工单号|批号|产品编码|排产数量|生产线(扫码报工/领料入口口径)。
- * @param rows [{加工单号,客户,产品名称,批号,规格型号,重点管控,客户PO,排产数量,每箱数量,箱数,计划完工日期,备注,生产线}]
+ * 二维码内容=公司代码@工单号@(1000+工单行号)(woQrText,2026-10-09 规则改版;扫码报工/领料入口口径)。
+ * @param rows [{加工单号,公司代码?,工单行号?,客户,产品名称,批号,规格型号,重点管控,客户PO,排产数量,每箱数量,箱数,计划完工日期,备注,生产线}]
  * @param opts {line?:string, preparedBy?:string}
  * @return Promise<boolean> true=已送出打印(窗口未被拦截)
  */
@@ -343,8 +369,7 @@ export async function printProductionTask(rows, opts = {}) {
     try {
       const lib = qrLib()
       if (!lib) throw new Error('qrcode lib unavailable')
-      qr = await lib.toDataURL(`${r['加工单号']}|${r['批号'] || ''}|${r['物料编码'] || ''}|${r['排产数量'] ?? ''}|${line}`,
-        { margin: 1, errorCorrectionLevel: 'M' })
+      qr = await lib.toDataURL(woQrText(r), { margin: 1, errorCorrectionLevel: 'M' })
     } catch (e) { console.warn('[print-formats] 工单二维码生成失败:', e?.message || e) }
     trs.push('<tr>'
       + `<td>${i + 1}</td>`

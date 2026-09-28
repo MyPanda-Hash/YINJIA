@@ -327,6 +327,14 @@ public class PanelConfigService {
         tablePage.put("topBarBtn", panelButtons);
         tablePage.put("rowOperationBarBtn", List.of());
         tablePage.put("events", List.of());
+        // 生产加工单(2026-09-24,用户拍板参考旧系统工单列表):主表预览表格=扁平工单列表形态,
+        // 前端 PanelxList 据此渲染 mainGrid + 产线筛选条(产线下拉/未排产·已排产·未完工·已完工/追溯)
+        if ("MANU_ORDER".equals(def.code())) {
+            tablePage.put("mainTable", Map.of(
+                    "label", "生产加工单",
+                    "columns", List.of("合同号", "单据日期", "客户", "生产线", "预开工日", "预完工日",
+                            "需求数量", "排产数量", "入库数量", "余量", "批号", "重点管控")));
+        }
 
         Map<String, Object> pageDto = new LinkedHashMap<>();
         pageDto.put("tablePages", List.of(tablePage));
@@ -766,7 +774,9 @@ public class PanelConfigService {
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成进货单"},
                     new String[]{"转ERP", "转ERP", "批量转ERP"},
-                    new String[]{"打印", "打印", "预览", "导出"},
+                    // 打印标识卡(2026-09-28):明细行打印,复用商品档案「二维码标签」的 75×100mm 产品标识卡版式
+                    // (前端 print-formats.printProductCards,一行一卡,字段/二维码口径同商品,订单编号/供应商等取单据事实填充)
+                    new String[]{"打印", "打印", "预览", "导出", "打印标识卡"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
@@ -1031,14 +1041,18 @@ public class PanelConfigService {
 
     /** 头字段同义词(按链路 source|target 键控;同名映射之外的补充)。 */
     private static final Map<String, String[][]> FLOW_HEAD_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
-            "PU_REQ|PU_ORDER", new String[][]{{"建议供应商", "供应商"}},
+            // 2026-09-24 用户拍板:供应链域以远端实现为准 —— 此处撤回本地新增的
+            // "PU_REQ|PU_ORDER"({建议供应商→供应商})携带映射,回到远端口径。
             // 送料暂收单 → 采购入库单(2026-09-22 新增;原 PU_ORDER|PURCHASE_IN 免检直达已取消,
             // 那条只需 单据编号→采购订单号,本跳的采购订单号随链从采购订单带下来了、同名直通无需登记)。
             // 供应商代码→供应商编码:暂收单头叫「供应商代码」,入库头叫「供应商编码」——异名不带则入库单
             // 供应商编码恒空(与 QC_INSP|PURCHASE_IN 当年同一个坑)。注:批次键由
             // PushGenerateHandler.generateBatch 直接写入,不走映射(头映射 7 条上限会把它挤掉,不影响)。
             "QC_RECV|PURCHASE_IN", new String[][]{{"供应商代码", "供应商编码"}},
-            "PU_ORDER|PURCHASE_IN", new String[][]{{"单据编号", "采购订单号"}},
+            // 2026-09-24 用户拍板:供应链域以远端实现为准 —— 撤回本地新增的
+            // "PU_ORDER|PURCHASE_IN"({单据编号→采购订单号});该免检直达链远端已取消
+            // (采购入库单现在只从「送料暂收单」选单,采购订单号随链带入,见上行注释),
+            // 本地那条属悬空登记,无实际链路生效。
             // 销售订单 → 生产工单:订单号落 销售订单号;交期落 预完工日(2026-09-21 补:
             // 加工单排产要以订单交期为预完工日,缺此条则生单后交期为空)
             "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "预完工日"}},

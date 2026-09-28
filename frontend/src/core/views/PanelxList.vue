@@ -1688,8 +1688,8 @@ import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
-import { applyDocDefaults, todayStr, syncBatchNoWithDocDate } from '@core/panel/docDefaults'
-import { printPuOrder, printQcReturn, printProductCards, printProductionTask } from '@/business/print-formats'
+import { applyDocDefaults, todayStr, syncBatchNoWithDocDate, docNoFromDate } from '@core/panel/docDefaults'
+import { printPuOrder, printQcReturn, printProductCards, printProductionTask, woQrText } from '@/business/print-formats'
 import QrLabelDialog from './QrLabelDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
@@ -5718,7 +5718,7 @@ async function onButton(action) {
         batchSendVisible.value = true
         return
       }
-  // 工单二维码(计划层):单产品工单一张标签,二维码=工单号|批号|产品|数量|产线(扫码报工/领料入口);
+  // 工单二维码(计划层):单产品工单一张标签,二维码=公司代码@工单号@1000+工单行号(woQrText,2026-10-09 规则改版,扫码报工/领料入口);
   // 2026-09-22 面板化:适配生产工单(MANU_ORDER)字段(合同号/排产数量/生产单位/工序交期/生产线)
   // 生产工单:打印工单(生产任务单版式)/排产(本单快捷排线) —— 仅 MANU_ORDER 面板(2026-09-24 用户要求)
   if (action === '打印工单' && panelCode.value === 'MANU_ORDER') {
@@ -5738,9 +5738,42 @@ async function onButton(action) {
     qrLabels.value = [{
       code: no, name: cur['产品名称'] || cur['品名'] || '', lot: cur['批号'] || '', qty, unit,
       doc: `交期 ${due}` + (cur['生产线'] ? ` · ${cur['生产线']}` : ''),
-      qrText: `${no}|${cur['批号'] || ''}|${cur['产品编码'] || ''}|${qty}|${cur['生产线'] || ''}`, qr: '',
+      qrText: woQrText(cur), qr: '',
     }]
     qrVisible.value = true
+    return
+  }
+  // 采购入库单·打印标识卡(2026-09-28 用户需求):当前单据明细行 → 商品档案同款 75×100mm 产品标识卡
+  // (printProductCards 一行一卡);订单编号/供应商名称/数量/批次/生产日期取单据事实填充,缺值留横线手填。
+  // 取数走 getFormDescriptor(已保存的最新行,同 打印采购订单 先例),不读编辑中的草稿。
+  // 批次兜底(2026-09-28 用户反馈"标识卡没有批次号"):批次号口径上线前的老单 头/行批次号均空
+  // (如 PI-2026-09-0013),打印层按既有口径兜底 行批次号→头批次号→单据日期推导(docNoFromDate,
+  // 纯展示出参,不写库;空值才推导,不会覆盖任何人工值);二维码(公司代码@编码@批次)随之带出批号段。
+  if (action === '打印标识卡' && panelCode.value === 'PURCHASE_IN') {
+    const cur = current.value || {}
+    const no = cur['单据编号'] || cur['编号'] || ''
+    if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+    try {
+      const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+      const doc = res?.data || {}
+      const lines = Object.values(res?.detailData || {})[0] || []
+      const headBatch = doc['批次号'] || docNoFromDate(doc['单据日期']) || ''
+      const rows = (lines || [])
+        .filter((l) => l && l['存货编码'])
+        .map((l) => ({
+          编码: l['存货编码'],
+          规格: l['规格型号'] || '',
+          数量: l['实收数量'] ?? l['数量'] ?? '',
+          批次: l['批次号'] || l['批号'] || headBatch,
+          订单编号: doc['采购订单号'] || doc['单据编号'] || no,
+          供应商名称: doc['供应商'] || '',
+          生产日期: l['生产日期'] || '',
+        }))
+      if (!rows.length) return ElMessage.warning(tt('当前单据没有可打印的明细行'))
+      await printProductCards(rows)
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+    }
     return
   }
   // 银嘉固定版式纸质单打印(2026-09-23):采购订单/暂收退料单 → print-formats.js;
