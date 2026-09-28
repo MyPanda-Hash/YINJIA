@@ -185,13 +185,14 @@ public class ScheduleBoardService {
                 sql.append(", asp_user2=?, asp_time2=GETDATE() WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'");
                 args.add(user); args.add(head.get("id"));
                 jdbc.update(sql.toString(), args.toArray());
-                // 同步落排产表 plang_pc(薄记录:排产字段;工单排产看板/调线读它)——幂等:先删后插
-                jdbc.update("DELETE FROM dbo.plang_pc WHERE pl_no=? AND pl_xc=? AND ISNULL([批次号],N'')=?",
-                        no, head.get("pl_xc"), head.get("pc_batch"));
+                // 同步落排产表 plang_pc(薄记录)——幂等:先删后插;锚=plang_id(批次号纯日期化后
+                // 同天多行同批次号,(pl_no,pl_xc,批次号) 不再唯一,必须按行 id 定位)
+                jdbc.update("DELETE FROM dbo.plang_pc WHERE plang_id=?",
+                        head.get("id"));
                 jdbc.update("INSERT INTO plang_pc (comm, pl_no, pl_xc, pl_date, scx, pl_man, lb, st_date, cp_date, jh_date,"
-                                + " od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号])"
+                                + " od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号], plang_id)"
                                 + " SELECT p.comm, p.pl_no, p.pl_xc, p.pl_date, ?, ?, ?, ?, ?, NULL,"
-                                + " p.od_no, p.od_xc, p.ja, N'N', ?, GETDATE(), p.[批次号]"
+                                + " p.od_no, p.od_xc, p.ja, N'N', ?, GETDATE(), p.[批次号], p.id"
                                 + " FROM dbo.plang p WHERE p.id=?",
                         line, user, (team != null && !team.isBlank() && team.length() <= 10) ? team : null,
                         start == null ? null : java.time.LocalDate.parse(start),
@@ -276,7 +277,9 @@ public class ScheduleBoardService {
                         + "      WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, 0 AS 每箱数量, 0 AS 箱数,"
                         + " ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
-                        + " ISNULL(p.xq_sl,0) - ISNULL(p.pl_sl,0) AS 余量,"
+                        // 余量=订单级(同工单号需求−累计排产,2026-09-28 拍板)
+                        + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s"
+                        + "   WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y'), 0) AS 余量,"
                         + " CONVERT(varchar(10), p.st_date, 120) AS 预开工日,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 预完工日"
                         + " FROM dbo.plang p"
@@ -302,7 +305,7 @@ public class ScheduleBoardService {
                         + " COUNT(DISTINCT pc.pl_no) AS 单数"
                         + " FROM dbo.plang_pc pc"
                         + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
-                        + "   AND ISNULL(pc.[批次号],N'') = ISNULL(p.[批次号],N'') AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + "   AND pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + " LEFT JOIN (SELECT gldh AS 单据编号, MAX(s) AS [完成] FROM"
                         + "   (SELECT gldh, SUM(ISNULL(sl,0)) AS s FROM dbo.scjl WHERE ISNULL(asp_cancel,'N')<>'Y'"
                         + "    GROUP BY gldh, gxdm) t GROUP BY gldh) prg ON prg.[单据编号]=p.pl_no"
@@ -356,7 +359,7 @@ public class ScheduleBoardService {
                         + " CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN N'完工'"
                         + "      WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
-                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL(p.pl_sl,0) AS 余量,"
+                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y'), 0) AS 余量,"
                         + " 0 AS 每箱数量, 0 AS 箱数,"
                         // 批号=转单批次号(与生产工单页「批次号」对应;legacy 旧行无批次号回退产品批号 lot_no)
                         + " ISNULL(NULLIF(pc.[批次号],N''), ISNULL(pc.lot_no,N'')) AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
@@ -372,7 +375,7 @@ public class ScheduleBoardService {
                         + " ISNULL(pc.[批次号],N'') AS 批次号"
                         + " FROM dbo.plang_pc pc"
                         + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
-                        + "   AND ISNULL(pc.[批次号],N'') = ISNULL(p.[批次号],N'') AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + "   AND pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + " LEFT JOIN dbo.dm_kh dk ON dk.comm = p.comm AND dk.dm = p.khdm"
                         + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
@@ -404,7 +407,7 @@ public class ScheduleBoardService {
                             + " ISNULL(p.jldw,N'') AS 单位, ISNULL(p.scx,N'') AS 生产线, ISNULL(p.pl_man,N'') AS 操作员,"
                             + " ISNULL(p.lot_no,N'') AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
                             + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
-                            + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL(p.pl_sl,0) AS 余量,"
+                            + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y'), 0) AS 余量,"
                             + " CONVERT(varchar(10), p.st_date, 120) AS 预开工日,"
                             + " CONVERT(varchar(10), p.cp_date, 120) AS 预完工日,"
                             + " CONVERT(varchar(10), p.cp_date2, 120) AS 实际完工日期,"
@@ -444,7 +447,7 @@ public class ScheduleBoardService {
         // 排产数据:plang_pc 各排产行(未排产为空)
         List<Map<String, Object>> sched = jdbc.queryForList(
                 "SELECT pc.scx AS 生产线, ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
-                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL(p.pl_sl,0) AS 余量,"
+                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y'), 0) AS 余量,"
                         + " 0 AS 每箱数量, 0 AS 箱数, 0 AS 开产量,"
                         + " CONVERT(varchar(10), pc.st_date, 120) AS 计划开工日,"
                         + " CONVERT(varchar(10), pc.cp_date, 120) AS 工序交期,"
@@ -454,7 +457,7 @@ public class ScheduleBoardService {
                         + " ISNULL(pc.[批次号],N'') AS 批次号"
                         + " FROM dbo.plang_pc pc"
                         + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
-                        + "   AND ISNULL(pc.[批次号],N'') = ISNULL(p.[批次号],N'') AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + "   AND pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + " WHERE pc.pl_no=? AND ISNULL(pc.asp_cancel,'N')<>'Y' ORDER BY pc.pl_xc, pc.[批次号]", doc);
 
         // 完工数据:报工记录(scjl,参考库口径;按 工序 汇总:完成数量=Σsl,计划数量=排产冗余)

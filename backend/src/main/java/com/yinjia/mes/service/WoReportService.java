@@ -80,11 +80,10 @@ public class WoReportService {
                             + " ISNULL(p.pl_sl,0) AS pl_sl, ISNULL(p.od_no,N'') AS od_no, p.od_xc AS od_xc,"
                             + " ISNULL(p.zl,0) AS zl, ISNULL(p.llxz,N'') AS llxz, ISNULL(p.djlx,N'') AS djlx"
                             + " FROM dbo.plang_pc pc"
-                            + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
-                            + "   AND ISNULL(pc.[批次号],N'') = ISNULL(p.[批次号],N'') AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                            + " JOIN dbo.plang p ON pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
                             + " WHERE pc.pl_no = ? AND ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'')<>N''"
                             + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
-                            + " ORDER BY p.pl_xc, pc.[批次号]", wo);
+                            + " ORDER BY p.pl_xc, pc.[批次号], p.id", wo);
         } catch (org.springframework.dao.EmptyResultDataAccessException e) {
             Integer exists = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, wo);

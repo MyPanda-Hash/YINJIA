@@ -104,8 +104,9 @@ public class QuickScheduleService {
         double qty = qtyOverride != null && qtyOverride > 0 ? Math.min(qtyOverride, residual) : residual;
         if (qty <= 0) throw new IllegalStateException("生单数量必须大于 0");
         if (qty > residual + 0.0001) throw new IllegalStateException("生单数量 " + qty + " 超过剩余可转数量 " + residual);
-        // 工单号/行号/批次号(2026-09-27 终版:每次转单各自成批):同订单共用工单号;行号=订单行号;
-        // 批次号=今日 yyyyMMdd,同日已有该行批次(纯日期或 -N)→ 依次 -2/-3(每日重新起算)。始终 INSERT 新行。
+        // 工单号/行号/批次号(2026-09-28 客户拍板:批次号=纯日期):同订单共用工单号;行号=订单行号;
+        // 批次号=转单当日 yyyyMMdd,**不加尾缀**——同天多笔转单各自成行(plang.id=行身份),
+        // 行级关联锚=plang_pc.plang_id,同批次号互不串;分段区分靠 创建时间+生产线(分段弹窗展示)。
         String plNo;
         try {
             plNo = jdbc.queryForObject(
@@ -116,23 +117,7 @@ public class QuickScheduleService {
         }
         if (plNo == null || plNo.isBlank()) plNo = formNo.next("MO", user);
         Integer lineNo = line.get("行号") instanceof Number n ? n.intValue() : 1;
-        String base = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
-        List<String> todayBatches = jdbc.queryForList(
-                "SELECT [批次号] FROM plang WHERE pl_no=? AND pl_xc=? AND ([批次号]=? OR [批次号] LIKE ?)"
-                        + " AND ISNULL(asp_cancel,'N')<>'Y'",
-                String.class, plNo, lineNo, base, base + "-%");
-        String batch = base;
-        if (!todayBatches.isEmpty()) {
-            int maxSuffix = 0;
-            for (String b : todayBatches) {
-                if (b != null && b.equals(base)) maxSuffix = Math.max(maxSuffix, 1);
-                else if (b != null && b.startsWith(base + "-")) {
-                    try { maxSuffix = Math.max(maxSuffix, Integer.parseInt(b.substring(base.length() + 1))); }
-                    catch (NumberFormatException ignore) { }
-                }
-            }
-            batch = base + "-" + (maxSuffix + 1);
-        }
+        String batch = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
         String due = str(line.get("交货日期"));
         // 余量口径(2026-09-27 用户拍板):余量=需求数量−排产数量(未排产),不再是排产数量
         double remain = demand - qty;

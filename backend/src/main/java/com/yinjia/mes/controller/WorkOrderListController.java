@@ -96,8 +96,11 @@ public class WorkOrderListController {
                         + " p.dm AS 物料编码, ISNULL(p.mc, N'') AS 产品名称, ISNULL(p.gg, N'') AS 规格型号,"
                         + " ISNULL(p.jldw, N'') AS 生产单位,"
                         + " ISNULL(p.pl_sl, 0) AS 排产数量, ISNULL(p.xq_sl, 0) AS 需求数量, ISNULL(p.rk_sl, 0) AS 入库数量,"
-                        + " ISNULL(p.xq_sl, 0) - ISNULL(p.pl_sl, 0) AS 余量,"
                         + " ISNULL(管控.重点管控, N'否') AS 重点管控,"
+                        // 余量(2026-09-28 用户拍板)=订单级:同工单号需求 − 同工单号累计排产(全部批次行);
+                        // 行级口径(本行需求−本行排产)会把同订单多批次行显示成多个独立余量,误导
+                        + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s"
+                        + "   WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y'), 0) AS 余量,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
                         + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
@@ -107,15 +110,59 @@ public class WorkOrderListController {
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
                         + w + " ORDER BY p.pl_date DESC, p.pl_no, p.pl_xc",
                 args.toArray());
-        // 生产状态(与 v_manu_schedule 同口径:完工=入库≥排产;在产=有入库;其余未完工)
+        // 生产状态(与 v_manu_schedule 同口径:完工=入库≥排产;在产=有入库;其余未完工;未排产行=未排产)
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             Map<String, Object> m = new LinkedHashMap<>(r);
             double sched = ((Number) r.getOrDefault("排产数量", 0)).doubleValue();
             double in = ((Number) r.getOrDefault("入库数量", 0)).doubleValue();
-            m.put("生产状态", sched > 0 && in >= sched ? "完工" : (in > 0 ? "在产" : "未完工"));
+            String line = String.valueOf(r.getOrDefault("生产线", ""));
+            m.put("生产状态", line.isBlank() ? "未排产"
+                    : sched > 0 && in >= sched ? "完工" : (in > 0 ? "在产" : "未完工"));
             out.add(m);
         }
+        return ApiResult.ok(out);
+    }
+
+    /**
+     * 分段排产记录(2026-09-28 用户拍板):同工单号(=同销售订单行)下全部批次行的分段明细——
+     * 每行含 生产线/排产数量/入库数量/行级已报工(scjl.gd_id=plang_pc.id 精确到批次行)/生产状态;
+     * 顶部汇总:订单需求/累计排产/累计入库/订单余量/整体进度。生产工单列表「生产状态」列点击弹窗消费。
+     */
+    @PostMapping("/workOrderList/segments")
+    public ApiResult<Map<String, Object>> segments(@RequestBody Map<String, Object> body) {
+        String no = body.get("工单号") == null ? "" : String.valueOf(body.get("工单号")).trim();
+        if (no.isBlank()) throw new IllegalArgumentException("缺少 工单号");
+        Map<String, Object> sum = jdbc.queryForMap(
+                "SELECT COUNT(*) AS 分段行数, MAX(ISNULL(p.xq_sl,0)) AS 需求数量,"
+                        + " SUM(ISNULL(p.pl_sl,0)) AS 累计排产, SUM(ISNULL(p.rk_sl,0)) AS 累计入库,"
+                        + " MAX(ISNULL(p.xq_sl,0)) - SUM(ISNULL(p.pl_sl,0)) AS 订单余量"
+                        + " FROM dbo.plang p WHERE p.pl_no = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'", no);
+        if (((Number) sum.getOrDefault("分段行数", 0)).intValue() == 0)
+            throw new IllegalArgumentException("工单不存在:" + no);
+        List<Map<String, Object>> segs = jdbc.queryForList(
+                "SELECT ISNULL(p.[批次号], N'') AS 批次号, ISNULL(p.scx, N'') AS 生产线,"
+                        + " CONVERT(varchar(10), p.pl_date, 120) AS 转单日期,"
+                        + " CONVERT(varchar(16), p.asp_time1, 120) AS 转单时间,"
+                        + " ISNULL(p.pl_sl, 0) AS 排产数量, ISNULL(p.xq_sl, 0) AS 需求数量,"
+                        + " ISNULL(p.rk_sl, 0) AS 入库数量, ISNULL(p.pl_sl, 0) - ISNULL(p.rk_sl, 0) AS 未交量,"
+                        // 行级已报工:scjl 挂 plang_pc.id(批次排产行,锚 plang_id),未排产行为 0
+                        + " ISNULL((SELECT SUM(ISNULL(j.sl,0)) FROM dbo.scjl j JOIN dbo.plang_pc pc2 ON pc2.id = j.gd_id"
+                        + "   WHERE pc2.plang_id = p.id AND ISNULL(j.asp_cancel,'N') <> 'Y'), 0) AS 已报工,"
+                        + " CONVERT(varchar(10), p.st_date, 120) AS 计划开工日,"
+                        + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日,"
+                        + " ISNULL(p.pl_man, N'') AS 排产人, ISNULL(p.[打印人], N'') AS 打印人,"
+                        + " CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
+                        + " ISNULL(p.asp_user1, N'') AS 转单人,"
+                        + " CASE WHEN ISNULL(p.scx,N'') = N'' THEN N'未排产'"
+                        + "      WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN N'完工'"
+                        + "      WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
+                        + " CASE WHEN p.ja IN (N'T', N'Y') THEN N'Y' ELSE N'N' END AS 结案"
+                        + " FROM dbo.plang p WHERE p.pl_no = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY p.pl_xc, p.[批次号], p.id", no);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("汇总", sum);
+        out.put("分段", segs);
         return ApiResult.ok(out);
     }
 

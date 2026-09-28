@@ -324,6 +324,19 @@ export default {
     '组装生产任务单': 'Assembly Task Sheet',
     '生产投料单': 'Production Feeding Sheet',
     '选择打印模板': 'Select Print Template',
+    // 分段排产记录弹窗(2026-09-28:同工单号批次行分段+订单级汇总)
+    '分段排产记录': 'Batch Schedule Segments',
+    '需求': 'Demand',
+    '累计排产': 'Total Scheduled',
+    '累计入库': 'Total Received',
+    '订单余量': 'Order Remaining',
+    '分段': 'Segments',
+    '转单时间': 'Converted At',
+    '计划完工日': 'Plan Finish',
+    '排产人': 'Scheduled By',
+    '转单人': 'Converted By',
+    '在产': 'In Production',
+    '完工': 'Completed',
     // 固定版式单据打印按钮(2026-09-23:银嘉采购订单/退货单,版式文字为纸面事实不翻译,按钮/提示入翻译层)
     '打印采购订单': 'Print Purchase Order',
     '打印退货单': 'Print Return Note',
@@ -435,6 +448,7 @@ export default {
     '当前单据没有可打印的明细行': 'No printable detail lines on the current document',
     // 采购订单·打印材料码(2026-09-28 供应商贴码场景,标识卡版式,二维码=公司代码@物料编码)
     '打印材料码': 'Print Material QR Labels',
+    '打印订单无金额': 'Print PO (No Amounts)',
     '请先勾选要导出的商品': 'Select the items to export first',
     '已选 {n} 个商品，导出二维码标签 PDF？': 'Export QR code label PDF for {n} selected item(s)?',
     '正在生成标签…': 'Generating labels...',

@@ -78,7 +78,13 @@
       <el-table-column :label="tt('领料单号')" prop="领料单号" width="150" show-overflow-tooltip />
       <el-table-column :label="tt('打印人')" prop="打印人" width="90" />
       <el-table-column :label="tt('打印时间')" prop="打印时间" width="140" />
-      <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" fixed="right" />
+      <el-table-column :label="tt('生产状态')" width="90" fixed="right">
+        <template #default="{ row }">
+          <el-link type="primary" :underline="true" @click.stop="openSegments(row)">
+            {{ tt(row.生产状态) }}
+          </el-link>
+        </template>
+      </el-table-column>
       <el-table-column :label="tt('结案')" width="70" fixed="right">
         <template #default="{ row }">
           <span :class="{ 'wol-closed': row.结案 === 'Y' }">{{ row.结案 === 'Y' ? tt('已结案') : '-' }}</span>
@@ -95,6 +101,35 @@
         <el-table-column :label="tt('规格型号')" prop="规格型号" min-width="140" />
         <el-table-column :label="tt('计量单位')" prop="子件计量单位" width="90" />
         <el-table-column :label="tt('定额数量')" prop="定额数量" width="100" align="right" />
+      </el-table>
+    </el-dialog>
+
+    <!-- 分段排产记录弹窗(2026-09-28):同工单号(=同销售订单行)全部批次行分段明细+订单级汇总 -->
+    <el-dialog v-model="segVisible" :title="tt('分段排产记录') + ' — ' + (segRow?.加工单号 || '')" width="980px" append-to-body>
+      <div v-if="segData" class="wol-segsum">
+        <span>{{ tt('需求') }}: <b>{{ num(segData.汇总.需求数量) }}</b></span>
+        <span>{{ tt('累计排产') }}: <b>{{ num(segData.汇总.累计排产) }}</b></span>
+        <span>{{ tt('累计入库') }}: <b>{{ num(segData.汇总.累计入库) }}</b></span>
+        <span>{{ tt('订单余量') }}: <b>{{ num(segData.汇总.订单余量) }}</b></span>
+        <span>{{ tt('分段') }}: <b>{{ segData.汇总.分段行数 }}</b></span>
+      </div>
+      <el-table :data="segData?.分段 || []" border size="small" max-height="420" v-loading="segLoading">
+        <el-table-column :label="tt('批次号')" prop="批次号" width="100" />
+        <el-table-column :label="tt('生产线')" prop="生产线" width="100" show-overflow-tooltip />
+        <el-table-column :label="tt('转单时间')" prop="转单时间" width="140" />
+        <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
+        <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
+        <el-table-column :label="tt('已报工')" prop="已报工" width="90" align="right" />
+        <el-table-column :label="tt('未交量')" prop="未交量" width="90" align="right" />
+        <el-table-column :label="tt('计划开工日')" prop="计划开工日" width="100" />
+        <el-table-column :label="tt('计划完工日')" prop="计划完工日" width="100" />
+        <el-table-column :label="tt('排产人')" prop="排产人" width="90" />
+        <el-table-column :label="tt('转单人')" prop="转单人" width="90" />
+        <el-table-column :label="tt('生产状态')" prop="生产状态" width="80">
+          <template #default="{ row }">
+            <span :class="{ 'wol-closed': row.生产状态 === '完工' }">{{ tt(row.生产状态) }}</span>
+          </template>
+        </el-table-column>
       </el-table>
     </el-dialog>
   </div>
@@ -119,6 +154,10 @@ const dateFrom = ref('')
 const dateTo = ref('')
 const qText = ref('')
 const bomVisible = ref(false)
+const segVisible = ref(false)
+const segLoading = ref(false)
+const segRow = ref(null)
+const segData = ref(null)
 const bomRow = ref(null)
 const bomRows = ref([])
 const bomLoading = ref(false)
@@ -141,7 +180,7 @@ async function load() {
     if (qText.value.trim()) cond['keyword'] = qText.value.trim()
     if (lineFilter.value) cond['生产线'] = lineFilter.value
     const res = await request.post('/px/workOrderList', cond)
-    rows.value = (res.data || []).map((r) => ({ ...r, rowKey: r.工单号 + '#' + r.工单行号 + '#' + (r.批次号 || '') }))
+    rows.value = (res.data || []).map((r) => ({ ...r, rowKey: String(r.行id ?? (r.工单号 + '#' + r.工单行号)) }))
     applyLineMeta()
   } catch (e) { err(e, '查询失败') }
 }
@@ -267,6 +306,19 @@ async function showBom(row) {
   bomLoading.value = false
 }
 
+/** 分段排产记录(2026-09-28):点击生产状态 → 同工单号全部分段批次行+订单级汇总 */
+async function openSegments(row) {
+  segRow.value = row
+  segVisible.value = true
+  segLoading.value = true
+  segData.value = null
+  try {
+    const res = await request.post('/px/workOrderList/segments', { 工单号: row.工单号 })
+    segData.value = res.data || null
+  } catch (e) { err(e, '查询失败'); segData.value = null }
+  segLoading.value = false
+}
+
 function openTrace() {
   const no = currentRow.value?.工单号 || checked.value[0]?.工单号
   if (!no) return
@@ -303,4 +355,6 @@ onMounted(() => { load(); loadLines() })
 .wol-count { margin-left: auto; font-size: 13px; color: #303133; }
 .wol-table { flex: 1; min-height: 0; }
 .wol-closed { color: #f56c6c; font-weight: 600; }
+.wol-segsum { display: flex; gap: 18px; flex-wrap: wrap; padding: 6px 2px 10px; font-size: 13px; color: #606266; }
+.wol-segsum b { color: #303133; margin-left: 2px; }
 </style>

@@ -1619,3 +1619,5 @@ migrate-spare-columns.sql
 
 # —— 2026-09-28 动态字段扩展:绑定审计表 ——
 migrate-ext-bind-log.sql
+# —— 2026-09-28 批次号纯日期化(客户拍板去尾缀):plang_pc 加 plang_id 行锚(同天多笔转单同批次号互不串;assign 删插/看板 JOIN/报工/分段已报工全改行锚);配套=余量订单级(同工单需求−累计排产)+生产状态点击弹分段排产记录(含转单时间/行级已报工) ——
+migrate-pc-plang-id.sql
