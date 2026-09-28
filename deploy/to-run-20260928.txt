@@ -1,5 +1,5 @@
-# Force-run list for 2026-09-28 deployment (order matters; generated from rehearsal)
-# 84 pending migrations + migrate-rd-prod-sheets (recreate 4 tables renamed away on server 09-11) + parity (no-op on server, logs hash)
+# Force-run list for 2026-09-28 deployment (order matters; regenerated after final commits)
+# 85 pending migrations (incl. server-parity, no-op on server) + migrate-rd-prod-sheets (recreate 4 tables renamed away on server 09-11)
 migrate-po-chain-link.sql
 migrate-erp-close-state.sql
 migrate-qc-return-chain-link.sql
@@ -84,5 +84,5 @@ migrate-scjl-report.sql
 migrate-scjl-single-table.sql
 migrate-prodline-import.sql
 migrate-wh-location.sql
-migrate-rd-prod-sheets.sql
 migrate-server-parity-20260928.sql
+migrate-rd-prod-sheets.sql
