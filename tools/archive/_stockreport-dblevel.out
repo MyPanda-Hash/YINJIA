@@ -1,0 +1,98 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 226
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-stockreport-dblevel.sql ==
+  | HSDZ_MES | 100 | 0 | OFF | 1 | 1 | SIMPLE | Chinese_PRC_CI_AS | 
+  | v_stock_balance | 0 | 0 | 0 | 771 | 
+  | v_stock_ledger | 0 | 0 | 0 | 1167 | 
+  | v_stock_movement | 0 | 0 | 0 | 7740 | 
+  | v_stock_summary | 0 | 0 | 0 | 1556 | 
+  | bd_finish_in | USER_TABLE | 有索引 | 1 | 1 | 
+  | bd_material_out | USER_TABLE | 有索引 | 1 | 2 | 
+  | bd_other_in | USER_TABLE | 有索引 | 1 | 0 | 
+  | bd_other_out | USER_TABLE | 有索引 | 1 | 0 | 
+  | bd_outsource_in | USER_TABLE | 有索引 | 1 | 0 | 
+  | bd_outsource_issue | USER_TABLE | 有索引 | 1 | 0 | 
+  | bd_purchase_in | USER_TABLE | 有索引 | 1 | 204 | 
+  | bd_sale_out | USER_TABLE | 有索引 | 1 | 54 | 
+  | bl_finish_in | USER_TABLE | 有索引 | 1 | 1 | 
+  | bl_material_out | USER_TABLE | 有索引 | 1 | 4 | 
+  | bl_other_in | USER_TABLE | 有索引 | 1 | 0 | 
+  | bl_other_out | USER_TABLE | 有索引 | 1 | 0 | 
+  | bl_outsource_in | USER_TABLE | 有索引 | 1 | 0 | 
+  | bl_outsource_issue | USER_TABLE | 有索引 | 1 | 0 | 
+  | bl_purchase_in | USER_TABLE | 有索引 | 1 | 269 | 
+  | bl_sale_out | USER_TABLE | 有索引 | 1 | 123 | 
+  | bs_wh | USER_TABLE | 有索引 | 2 | 11 | 
+  | inv_cost_ledger | USER_TABLE | 有索引 | 2 | 243 | 
+  | kucun | USER_TABLE | 有索引 | 1 | 36 | 
+  | bs_wh | null | HEAP | 0 | 0 |  | 0 | 
+  | bs_wh | ux_bs_wh_ext_id | NONCLUSTERED | 1 | 0 | ([外部数据ID] IS NOT NULL) | 0 | 
+  | bs_wh | IX_bs_wh_仓库名称 | NONCLUSTERED | 0 | 0 |  | 0 | 
+  | inv_cost_ledger | PK_inv_cost_ledger | CLUSTERED | 1 | 1 |  | 0 | 
+  | inv_cost_ledger | IX_inv_cost_ledger_part | NONCLUSTERED | 0 | 0 |  | 0 | 
+  | kucun | null | HEAP | 0 | 0 |  | 0 | 
+  | kucun | UX_kucun_id | NONCLUSTERED | 1 | 0 |  | 0 | 
+  | bd_finish_in | _WA_Sys_00000002_2AC4455D | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-24 11:08:35.7370000 | 0.0 | 
+  | bd_finish_in | _WA_Sys_00000003_2AC4455D | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-24 10:02:23.2100000 | 0.0 | 
+  | bd_finish_in | _WA_Sys_00000004_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_00000005_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_00000006_2AC4455D | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-28 09:49:10.4800000 | 0.0 | 
+  | bd_finish_in | _WA_Sys_00000007_2AC4455D | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-24 10:03:37.2930000 | 0.0 | 
+  | bd_finish_in | _WA_Sys_00000008_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_00000009_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_0000000A_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_0000000B_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_0000000C_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_0000000D_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_0000000E_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_0000000F_2AC4455D | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-24 11:08:14.9730000 | 0.0 | 
+  | bd_finish_in | _WA_Sys_00000010_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_00000012_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_00000014_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_00000016_2AC4455D | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_finish_in | _WA_Sys_00000018_2AC4455D | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-24 10:02:23.3070000 | 0.0 | 
+  | bd_finish_in | IX_bd_finish_in_单据编号 | 0 | 0 | 1 | 1 | FULLSCAN | 2026-09-24 10:02:23.2100000 | 0.0 | 
+  | bd_finish_in | ST_bd_finish_in_单据状态 | 0 | 1 | 1 | 1 | FULLSCAN | 2026-09-24 11:08:14.9770000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000002_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-14 11:09:29.3070000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000003_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-14 10:49:22.0170000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000004_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4570000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000005_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-15 12:42:46.2400000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000006_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4570000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000007_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4570000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000008_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4530000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000009_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-15 12:42:46.2400000 | 0.0 | 
+  | bd_material_out | _WA_Sys_0000000A_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4530000 | 0.0 | 
+  | bd_material_out | _WA_Sys_0000000B_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4530000 | 0.0 | 
+  | bd_material_out | _WA_Sys_0000000C_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4530000 | 0.0 | 
+  | bd_material_out | _WA_Sys_0000000D_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-16 13:45:48.3470000 | 0.0 | 
+  | bd_material_out | _WA_Sys_0000000E_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 15:19:13.5670000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000010_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4500000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000012_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4500000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000014_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4500000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000016_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-14 10:49:22.0170000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000017_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4500000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000018_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4500000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000019_307D1EB3 | 1 | 0 | 1 | 1 | FULLSCAN | 2026-09-20 17:54:07.4470000 | 0.0 | 
+  | bd_material_out | _WA_Sys_0000001B_307D1EB3 | 1 | 0 | 2 | 2 | FULLSCAN | 2026-09-28 10:02:55.0800000 | 0.0 | 
+  | bd_material_out | _WA_Sys_00000033_307D1EB3 | 1 | 0 | 2 | 2 | FULLSCAN | 2026-09-28 09:39:10.6170000 | 0.0 | 
+  | bd_material_out | IX_bd_material_out_单据编号 | 0 | 0 | 1 | 1 | FULLSCAN | 2026-09-22 17:00:18.6970000 | 0.0 | 
+  | bd_material_out | ST_bd_material_out_单据状态 | 0 | 1 | 1 | 1 | FULLSCAN | 2026-09-22 17:01:20.7830000 | 0.0 | 
+  | bd_other_in | _WA_Sys_00000002_33598B5E | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_other_in | _WA_Sys_00000003_33598B5E | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_other_in | _WA_Sys_00000004_33598B5E | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_other_in | _WA_Sys_00000005_33598B5E | 1 | 0 | null | null | 抽样 | null | null | 
+  | bd_other_in | _WA_Sys_00000006_33598B5E | 1 | 0 | null | null | 抽样 | null | null | 
+  | 86 | 11 | 2 | 
+  | CK04 | CL002 | 11 | 
+  | CK01 | CL002 | 9 | 
+  | CK05 | C-95-14**TB | 7 | 
+  | CK02 | CL002 | 7 | 
+  | CK05 | CL005 | 7 | 
+  | 243 | 243 | 0 | 0 | 
+[OK] _q-stockreport-dblevel.sql (10 batches)
