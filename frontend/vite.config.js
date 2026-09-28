@@ -1,14 +1,34 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
+import Components from 'unplugin-vue-components/vite'
+import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [
+    vue(),
+    // Element Plus 按需引入(模板组件自动注册+按组件带样式;2026-09-28 性能优化,
+    // 全量引入时代主包 2.5MB)。JS API(ElMessage/ElMessageBox/ElNotification)与
+    // v-loading 指令的样式/注册在 main.js 手动补——resolver 只覆盖模板组件。
+    Components({ resolvers: [ElementPlusResolver()], dts: false }),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
       // 通用引擎层（跨项目可复用），业务层用 '@/business/...' 访问
       '@core': fileURLToPath(new URL('./src/core', import.meta.url)),
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // vendor 分包:业务代码迭代不击穿框架库的浏览器长效缓存
+        manualChunks: {
+          'element-plus': ['element-plus'],
+          'element-icons': ['@element-plus/icons-vue'],
+          'vue-vendor': ['vue', 'vue-router', 'pinia'],
+        },
+      },
     },
   },
   server: {

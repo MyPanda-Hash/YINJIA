@@ -290,7 +290,7 @@ import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { pickStages, stageRowState, statusLabel, STATUS_TOKENS, statusTone, summarizeStages } from '@core/progress/stageProgress'
-import * as XLSX from 'xlsx'
+// xlsx 动态引入(~430KB 只在导入/导出时加载)
 import { PROGRESS_COLUMNS, readCell } from '@core/progress/progressColumns'
 
 /**
@@ -620,8 +620,9 @@ function importExcelFile(e) {
   e.target.value = ''
   if (!file) return
   const reader = new FileReader()
-  reader.onload = (ev) => {
+  reader.onload = async (ev) => {
     try {
+      const XLSX = await import('xlsx')
       const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
@@ -656,7 +657,8 @@ function importExcelFile(e) {
   reader.readAsArrayBuffer(file)
 }
 
-/** 导出 Excel:面板块信息 + 全部字段列 + 全部数据行(内容完整,不受列宽/纸张限制) */function exportProgressExcel() {
+/** 导出 Excel:面板块信息 + 全部字段列 + 全部数据行(内容完整,不受列宽/纸张限制) */async function exportProgressExcel() {
+  const XLSX = await import('xlsx')
   const head = props.head || {}
   const rows = (head.detail && Array.isArray(head.detail.items) ? head.detail.items : [])
   const title = '产品开发二三四级项目控制列表'

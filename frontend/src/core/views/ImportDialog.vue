@@ -31,7 +31,7 @@
 import { ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
-import * as XLSX from 'xlsx'
+// xlsx 动态引入(~430KB 只在真正导入时加载;与 PanelxList 同款)
 
 const props = defineProps({
   modelValue: Boolean,
@@ -73,8 +73,9 @@ function onFile(e) {
   fileName.value = file.name
   error.value = ''
   const reader = new FileReader()
-  reader.onload = (ev) => {
+  reader.onload = async (ev) => {
     try {
+      const XLSX = await import('xlsx')
       const wb = XLSX.read(ev.target.result, { type: 'array' })
       const ws = wb.Sheets[wb.SheetNames[0]]
       if (!ws) throw new Error('Excel 无工作表')

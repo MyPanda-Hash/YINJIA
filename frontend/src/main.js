@@ -1,7 +1,14 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
+// Element Plus 按需引入(2026-09-28 性能优化,原先全量 app.use(ElementPlus)+全量 CSS 主包 2.5MB):
+// 模板组件由 vite Components 插件自动注册并按组件带样式;这里只补 resolver 覆盖不到的部分——
+// ① v-loading 指令(全库 24 处使用) ② 命令式 JS API 的样式(ElMessage/ElMessageBox/ElNotification)。
+import { ElLoading } from 'element-plus'
+import 'element-plus/es/components/loading/style/css'
+import 'element-plus/es/components/message/style/css'
+import 'element-plus/es/components/message-box/style/css'
+import 'element-plus/es/components/notification/style/css'
+import 'element-plus/es/components/dialog/style/css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 import App from './App.vue'
 import router from './router'
@@ -22,9 +29,7 @@ for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
 app.use(createPinia())
 app.use(router)
 app.use(i18n)
-// Element Plus 组件 locale 不再静态注入:由 App.vue 的 <el-config-provider>
-// 响应式接管,随语言切换即时生效(顶栏下拉 / Alt+L)。
-app.use(ElementPlus)
+app.use(ElLoading)
 
 // 应用启动时把检测到的 locale 应用到 i18n 与 <html lang>;
 // 拉取动态语言列表(yj_locale 注册表);外语缺失词典(翻译表/机翻)后台补齐
