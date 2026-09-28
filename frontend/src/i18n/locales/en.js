@@ -2649,5 +2649,13 @@ export default {
     '占用列含历史数据': 'Spare column contains legacy data',
     '停用字段「': 'Retire field "',
     '」?已录入数据将保留,重新绑定同名标签即可恢复显示。': '"? Entered data is kept; rebind the same label to restore.',
+    /* ── 工单排产·转领料(2026-10-14,参考旧系统工单排产页同名按钮)。
+       ⚠ 本文件曾有两个顶层 biz 块,JS 语义后者胜出——词条必须落在本块(末个 biz)才生效 ── */
+    '转领料': 'To Picking',
+    '确认为选中的': 'Create pick lists for the selected',
+    '张工单转领料': 'work order(s)?',
+    '按产品默认BOM×排产数量生成材料出库单草稿,审核出库后自动回写领料单号': 'Material issue (pick list) drafts are created by default BOM × scheduled qty; the picking no. is written back to the WO after audit',
+    '已生成领料单': 'Pick lists created',
+    '转领料失败': 'Transfer to picking failed',
   },
 }

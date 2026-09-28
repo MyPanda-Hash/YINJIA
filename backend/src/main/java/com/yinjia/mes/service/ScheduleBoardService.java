@@ -16,7 +16,8 @@ import java.util.Map;
  *       ——**数据源=参考库工单表 plang**(转工单直落 plang,无需审核即入池):待排产池(产线空·未结案)
  *       → 选产线(档案下拉,带当日负荷)→ 单笔/批量排入(写 plang.scx/st_date/cp_date/lb班组)→ 撤销回池;</li>
  *   <li>工单排产看板(WorkOrderBoard.vue):{@link #linesSummary}/{@link #scheduled}/{@link #reassign}
- *       ——暂保留 bd_manu_order 旧口径(legacy 页面,待后续切换);{@link #trace} 追溯同 legacy。</li>
+ *       /{@link #toPicking}——plang 单轨(plang_pc×plang;2026-10-14 起看板可勾行转领料);
+ *       {@link #trace} 追溯同口径。</li>
  * </ul>
  *
  * <p>池口径(2026-09-27 plang 版):**未指派产线(scx 空)·未作废·未结案**的工单行(转工单时已过
@@ -27,9 +28,16 @@ import java.util.Map;
 public class ScheduleBoardService {
 
     private final JdbcTemplate jdbc;
+    private final PanelRegistry registry;
+    private final ButtonService buttonService;
+    private final VoucherFlowService voucherFlow;
 
-    public ScheduleBoardService(JdbcTemplate jdbc) {
+    public ScheduleBoardService(JdbcTemplate jdbc, PanelRegistry registry, ButtonService buttonService,
+                                VoucherFlowService voucherFlow) {
         this.jdbc = jdbc;
+        this.registry = registry;
+        this.buttonService = buttonService;
+        this.voucherFlow = voucherFlow;
     }
 
     /** 待排产池(plang 单轨):产线空·未作废·未结案 的工单行;转工单时已过严格已审核闸门 */
@@ -563,6 +571,126 @@ public class ScheduleBoardService {
         out.put("目标", toLine);
         return out;
     }
+
+    /**
+     * 转领料(工单排产看板 2026-10-14,参考旧系统 ProSchedulingController 同名按钮):
+     * 勾选已排工单 → 按产品默认 BOM × 排产数量 生成 材料出库单(领料单)草稿。
+     * 与 WO_ORDER「生成领料单」({@link com.yinjia.mes.panel.WoPickingHandler})同构:
+     * 头挂 加工单号=工单号、仓库=材料仓、批号留空由扫码补;审核出库后
+     * {@link ManuWritebackService} 重算回写 plang.ll_no2(看板「领料单号」列随之点亮)。
+     * 防重复 = PLANG→MATERIAL_OUT 占用链(删草稿自动释放,与订单结转 PLANG 占用同款自愈)
+     * + 存量领料单兜底(手工建的也拦);行级独立提交(同 toManu 事务口径),失败行进 失败行。
+     *
+     * @return {转领料张数, 单号清单:["工单号→领料单号"], 失败行}
+     */
+    public Map<String, Object> toPicking(List<Map<String, Object>> rows, String user) {
+        if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要转领料的工单");
+        java.util.LinkedHashSet<String> nos = new java.util.LinkedHashSet<>();
+        for (Map<String, Object> r : rows) {
+            String no = str(r.get("加工单号"));
+            if (no != null) nos.add(no);
+        }
+        if (nos.isEmpty()) throw new IllegalArgumentException("转领料行缺少 加工单号");
+        List<String> done = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+        for (String no : nos) {
+            try {
+                done.add(pickOne(no, user));
+            } catch (RuntimeException e) {
+                failed.add(no + ":" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
+            }
+        }
+        if (done.isEmpty()) throw new IllegalStateException("无工单可转领料:" + String.join("; ", failed));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("转领料张数", done.size());
+        out.put("单号清单", done);
+        out.put("失败行", failed);
+        return out;
+    }
+
+    /** 单张工单转领料(守卫→BOM 展开→生成材料出库单草稿→落占用链→留痕;返回 "工单号→领料单号")。
+     *  不加 @Transactional(2026-09-26 toManu 同款教训):外层事务 + 内层 save 事务的组合会在
+     *  某行失败时把共享事务标 rollback-only;这里 save 自带事务,linkLine 单条 INSERT 自提交。 */
+    private String pickOne(String no, String user) {
+        // 1) 工单(plang,可能多批次行)必须存在且未结案;领料量=Σ各批次行排产数量(单据挂工单号)
+        List<Map<String, Object>> heads = jdbc.queryForList(
+                "SELECT ISNULL(p.dm,N'') AS dm, ISNULL(p.scx,N'') AS scx,"
+                        + " ISNULL(p.pl_sl,0) AS pl_sl, ISNULL(p.ja,'N') AS ja"
+                        + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'", no);
+        if (heads.isEmpty()) throw new IllegalStateException("工单不存在");
+        for (Map<String, Object> h : heads) {
+            String ja = String.valueOf(h.get("ja"));
+            if ("T".equals(ja) || "Y".equals(ja)) throw new IllegalStateException("已结案,不能转领料");
+        }
+        String product = str(heads.get(0).get("dm"));
+        String line = str(heads.get(0).get("scx"));
+        double qty = heads.stream().mapToDouble(h -> Num.of(h.get("pl_sl"))).sum();
+        if (qty <= 0) throw new IllegalStateException("排产数量为 0,不能转领料");
+
+        // 2) 防重复:占用链(本按钮生成过)+ 存量领料单兜底(手工建的/ WoPicking 同号单也拦)
+        List<String> linked = jdbc.queryForList(
+                "SELECT target_form_no FROM form_flow_link WHERE source_panel_code='PLANG' AND source_form_no=?"
+                        + " AND target_panel_code='MATERIAL_OUT' AND link_status='ACTIVE'", String.class, no);
+        if (!linked.isEmpty())
+            throw new IllegalStateException("已生成领料单 " + linked.get(0) + ",请先删除该草稿后再重转");
+        List<String> exists = jdbc.queryForList(
+                "SELECT h.[单据编号] FROM bd_material_out h WHERE h.[加工单号]=? AND ISNULL(h.asp_cancel,'N')<>'Y'"
+                        + " AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code='MATERIAL_OUT'"
+                        + " AND s.doc_no=h.[单据编号] AND ISNULL(s.canceled,'N')='Y')", String.class, no);
+        if (!exists.isEmpty())
+            throw new IllegalStateException("已存在领料单 " + exists.get(0) + "(含草稿),不可重复转");
+
+        // 3) 默认 BOM 展开(与 WoPickingHandler/工单追溯同口径:默认BOM·启用·未作废)
+        if (product == null || product.isBlank()) throw new IllegalStateException("工单缺少物料编码,不能按 BOM 展开领料");
+        List<Map<String, Object>> bom = jdbc.queryForList(
+                "SELECT [子件编码], [子件名称], [规格型号], [子件计量单位], [定额数量] FROM bs_bom"
+                        + " WHERE [父件编码] = ? AND ISNULL([默认BOM], 0) = 1 AND ISNULL([状态], N'启用') = N'启用'"
+                        + " AND ISNULL(asp_cancel, 'N') <> 'Y' AND [子件编码] IS NOT NULL ORDER BY id", product);
+        if (bom.isEmpty()) throw new IllegalStateException("产品 " + product + " 未维护默认 BOM,不能生成领料单");
+
+        // 车间=产线档案属性(与 WoPickingHandler 同源)
+        String workshop = null;
+        try {
+            workshop = jdbc.queryForObject(
+                    "SELECT [生产车间] FROM bs_prod_line WHERE [生产线] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    String.class, line);
+        } catch (org.springframework.dao.EmptyResultDataAccessException ignore) { }
+
+        // 4) 组装材料出库单草稿:头 + BOM 行(数量=定额×Σ排产,4 位小数;批号留空由扫码补)
+        Map<String, Object> head = new LinkedHashMap<>();
+        head.put("单据日期", java.time.LocalDate.now().toString());
+        head.put("加工单号", no);
+        head.put("来源单号", no);
+        head.put("业务类型", "材料出库");
+        head.put("出库类别", "直接领料");
+        head.put("生产车间", workshop);
+        head.put("仓库", "材料仓");
+        head.put("领用人", user);
+        head.put("备注", "工单排产转领料(排产 " + round4(qty) + ")");
+        List<Map<String, Object>> items = new ArrayList<>();
+        for (Map<String, Object> b : bom) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("材料编码", str(b.get("子件编码")));
+            row.put("材料名称", str(b.get("子件名称")));
+            row.put("规格型号", str(b.get("规格型号")));
+            row.put("计量单位", str(b.get("子件计量单位")));
+            row.put("数量", round4(Num.of(b.get("定额数量")) * qty));
+            row.put("仓库", "材料仓");
+            row.put("明细备注", "BOM 展开,待扫码补批号");
+            items.add(row);
+        }
+        Map<String, Object> formData = new LinkedHashMap<>(head);
+        formData.put("detail", Map.of("items", items));
+        Map<String, Object> saved = buttonService.save(registry.panel("MATERIAL_OUT"), formData, false);
+        String newNo = String.valueOf(saved.get("编号"));
+
+        // 5) 占用链(PLANG→MATERIAL_OUT;删草稿时 ButtonService 释放)+ 留痕(进工单追溯时间线)
+        voucherFlow.linkLine("PLANG", no, no, product, qty, "MATERIAL_OUT", newNo, null, "");
+        logUsage(user, "转领料", no);
+        return no + "→" + newNo;
+    }
+
+    private static double round4(double v) { return Math.round(v * 10000d) / 10000d; }
 
     /** 按钮留痕(yj_usage_log,real_name 非空:取 yj_user 回落登录名;失败不阻断业务) */
     private void logUsage(String user, String action, String docNo) {

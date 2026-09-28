@@ -89,6 +89,17 @@ public class ScheduleBoardController {
         return ApiResult.ok(service.reassign(rows, str(body.get("目标生产线")), currentUser()));
     }
 
+    /** 转领料:勾选已排工单 → 按默认 BOM×排产数量 生成 材料出库单(领料单)草稿;
+     *  审核出库后 ManuWritebackService 回写工单领料单号(ll_no2)。权限=排入/调线同款(保存词表)。 */
+    @PostMapping("/toPicking")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> toPicking(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        perm.requireButton("MANU_ORDER", "保存");
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
+        return ApiResult.ok(service.toPicking(rows, currentUser()));
+    }
+
     /** 今日已排产(mode=today)/全部已排产(mode=all) */
     @PostMapping("/today")
     public ApiResult<List<Map<String, Object>>> today(@RequestBody(required = false) Map<String, Object> body) {

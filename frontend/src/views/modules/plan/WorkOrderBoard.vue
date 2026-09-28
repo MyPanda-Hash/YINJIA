@@ -1,7 +1,7 @@
 <!-- WorkOrderBoard.vue — 工单排产(2026-09-23 纠偏,替代「生产排产」平铺看板,参考旧系统工单排产页)
      产线骨架:左侧=生产线档案**全部线**(与基础资料对应,停用线标记可查看);选中线 → 右侧正在运行的工单明细
-     (未完工/已完工/全部);勾选已排 → 批量调线(启用线)。无班别维度(用户拍板)。
-     开线管理已按用户拍板去除(2026-09-24):本页只做 按线查看+调线,不含待排产池(排产入口单一=排产工作台)。 -->
+     (未完工/已完工/全部);勾选已排 → 批量调线(启用线)/转领料(默认 BOM×排产数量 生成领料单草稿,2026-10-14)。
+     无班别维度(用户拍板)。开线管理已按用户拍板去除(2026-09-24):本页只做 按线查看+调线+转领料,不含待排产池(排产入口单一=排产工作台)。 -->
 <template>
   <div class="wb-page">
     <!-- 顶部:开工日期 + 汇总条 -->
@@ -67,6 +67,10 @@
               </el-dropdown>
               <el-button size="small" type="warning" plain :disabled="!checkedSched.length" @click="openReassign">
                 {{ tt('批量调线') }}（{{ checkedSched.length }}）
+              </el-button>
+              <!-- 转领料(2026-10-14,参考旧系统工单排产页同名按钮):勾选已排工单 → 默认 BOM×排产数量 生成领料单(材料出库单)草稿 -->
+              <el-button size="small" type="success" :disabled="!checkedSched.length" @click="toPicking">
+                {{ tt('转领料') }}（{{ checkedSched.length }}）
               </el-button>
             </div>
           </div>
@@ -377,6 +381,28 @@ async function doReassign() {
     loadScheduled()
     loadSummary()
   } catch (e) { err(e, '调线失败') }
+}
+
+// ── 转领料(旧系统工单排产页同名按钮):勾选已排工单 → 按默认 BOM×排产数量 生成领料单(材料出库单)草稿;
+//    草稿在 材料出库单 面板扫码补批号后审核出库,回写工单领料单号(看板列随之点亮) ──
+async function toPicking() {
+  const nos = [...new Set(checkedSched.value.map((r) => r.加工单号).filter(Boolean))]
+  if (!nos.length) return
+  try {
+    await ElMessageBox.confirm(
+      `${tt('确认为选中的')} ${nos.length} ${tt('张工单转领料')}？(${tt('按产品默认BOM×排产数量生成材料出库单草稿,审核出库后自动回写领料单号')})`,
+      tt('转领料'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
+  } catch { return }
+  try {
+    const res = await request.post('/px/scheduleBoard/toPicking', { rows: nos.map((n) => ({ 加工单号: n })) })
+    const d = res.data || {}
+    const failed = d['失败行'] || []
+    const list = (d['单号清单'] || []).join('、')
+    ElMessage.success(`${tt('已生成领料单')} ${d['转领料张数'] ?? 0} ${tt('张')}` + (list ? `：${list}` : '')
+      + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''))
+    loadScheduled()
+    loadSummary()
+  } catch (e) { err(e, '转领料失败') }
 }
 
 onMounted(() => {
