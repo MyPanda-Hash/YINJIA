@@ -5743,6 +5743,38 @@ async function onButton(action) {
     qrVisible.value = true
     return
   }
+  // 采购订单·打印材料码(2026-09-28 用户口径:供应商自己打码→在采购单打;版式=产品标识卡
+  // printProductCards 75×100mm 一行一卡,与采购入库单「打印标识卡」/商品档案同款):
+  // 订单编号/供应商名称/物料编码/物料规格/数量取订单事实,批次·生产日期留横线(订单阶段无批号,
+  // 收货入库时由我方在采购入库单打印带批号标识卡);二维码=公司代码@物料编码(productCardQrText,
+  // 批次空即两段,与商品档案扫码口径一致)。
+  // 入口分工:没批号→商品档案「二维码标签」;自己打带批号→采购入库单「打印标识卡」。
+  if (action === '打印材料码' && panelCode.value === 'PU_ORDER') {
+    const cur = current.value || {}
+    const no = cur['单据编号'] || cur['编号'] || ''
+    if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+    try {
+      const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+      const doc = res?.data || {}
+      const lines = Object.values(res?.detailData || {})[0] || []
+      const rows = (lines || [])
+        .filter((l) => l && l['物料编码'])
+        .map((l) => ({
+          编码: l['物料编码'],
+          规格: l['规格型号'] || '',
+          数量: l['数量'] ?? '',
+          批次: '',
+          订单编号: doc['单据编号'] || no,
+          供应商名称: doc['供应商'] || '',
+          生产日期: '',
+        }))
+      if (!rows.length) return ElMessage.warning(tt('当前单据没有可打印的明细行'))
+      await printProductCards(rows)
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+    }
+    return
+  }
   // 采购入库单·打印标识卡(2026-09-28 用户需求):当前单据明细行 → 商品档案同款 75×100mm 产品标识卡
   // (printProductCards 一行一卡);订单编号/供应商名称/数量/批次/生产日期取单据事实填充,缺值留横线手填。
   // 取数走 getFormDescriptor(已保存的最新行,同 打印采购订单 先例),不读编辑中的草稿。

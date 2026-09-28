@@ -433,6 +433,8 @@ export default {
     // 采购入库单·明细行打印(2026-09-28):复用商品二维码标签的 75×100mm 产品标识卡版式
     '打印标识卡': 'Print ID Cards',
     '当前单据没有可打印的明细行': 'No printable detail lines on the current document',
+    // 采购订单·打印材料码(2026-09-28 供应商贴码场景,标识卡版式,二维码=公司代码@物料编码)
+    '打印材料码': 'Print Material QR Labels',
     '请先勾选要导出的商品': 'Select the items to export first',
     '已选 {n} 个商品，导出二维码标签 PDF？': 'Export QR code label PDF for {n} selected item(s)?',
     '正在生成标签…': 'Generating labels...',
@@ -748,7 +750,7 @@ export default {
     '责任人': 'Owner',
     '生成产品批号失败': 'Failed to generate product lot no.',
     '未返回产品批号': 'No product lot no. returned',
-    '二维码 = 物料编码|批号（扫描后可解析出入库与追溯信息），每行物料一张标签': 'QR = Material Code|Lot No. (scan to resolve stock-in & traceability info); one label per material line',
+    '二维码 = 物料编码|批号@数量（扫描后可解析出入库与追溯信息），每行物料一张标签': 'QR = Material Code|Lot No.@Qty (scan to resolve stock-in & traceability info); one label per material line',
     '当前单据没有可打印的明细行（或行缺少批号，请先保存）': 'No printable detail lines (or lines have no lot no. — save first)',
     '当前单据明细行均无批号——请先保存(保存时自动取批号)后再打印': 'No lot numbers on detail lines — save first (lots are auto-assigned on save), then print',
     '预览': 'Preview',
