@@ -12,8 +12,8 @@
       <span v-for="d in data" :key="d.date" class="lx">{{ d.date }}</span>
     </div>
     <div class="line-legend">
-      <span class="lg-k"><i class="lg-dot added"></i>新增</span>
-      <span class="lg-k"><i class="lg-dot done"></i>完工</span>
+      <span class="lg-k"><i class="lg-dot added"></i>{{ legendA }}</span>
+      <span class="lg-k"><i class="lg-dot done"></i>{{ legendB }}</span>
     </div>
   </div>
 </template>
@@ -24,6 +24,9 @@ import { computed } from 'vue'
 const props = defineProps({
   data: { type: Array, default: () => [] },
   compact: { type: Boolean, default: false },
+  // 图例文案(2026-09-28 桌面深度开发:出入库/送检合格等场景复用;默认保持原 新增/完工)
+  legendA: { type: String, default: '新增' },
+  legendB: { type: String, default: '完工' },
 })
 
 const W = 320

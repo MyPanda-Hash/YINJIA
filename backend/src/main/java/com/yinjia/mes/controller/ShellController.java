@@ -3,6 +3,7 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.config.DataSourceRouter;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
+import com.yinjia.mes.service.DashboardStatsService;
 import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.QrBatchService;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -24,18 +25,21 @@ public class ShellController {
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
     private final QrBatchService qrBatch;
+    private final DashboardStatsService dashboardStats;
     private final String factoryName;
     private final String testFactoryName;
     /** 本服务器是否提供"测试账套"(yinjia.enable-test-ledger,默认开)。见 factories() 注释。 */
     private final boolean testLedgerEnabled;
 
     public ShellController(PanelRegistry registry, JdbcTemplate jdbc, QrBatchService qrBatch,
+                           DashboardStatsService dashboardStats,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.factory-name:YINJIA-MES}") String factoryName,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.test-factory-name:YINJIA-MES·测试库}") String testFactoryName,
                            @org.springframework.beans.factory.annotation.Value("${yinjia.enable-test-ledger:true}") boolean testLedgerEnabled) {
         this.registry = registry;
         this.jdbc = jdbc;
         this.qrBatch = qrBatch;
+        this.dashboardStats = dashboardStats;
         this.factoryName = factoryName;
         this.testFactoryName = testFactoryName;
         this.testLedgerEnabled = testLedgerEnabled;
@@ -160,59 +164,9 @@ public class ShellController {
     }
 
     @GetMapping("/dashboard/stats")
-    @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> dashboard() {
-        Map<String, Object> out = new HashMap<>();
-        Map<String, Object> kpis = new HashMap<>();
-        List<Map<String, Object>> docStats = new ArrayList<>();
-        int draftTotal = 0;
-        int auditTotal = 0;
-        try {
-            for (PanelRegistry.PanelDef def : registry.all()) {
-                if (!def.isDoc()) continue;
-                String table = def.hasHeadTable() ? def.headTable() : def.lineTable();
-                Integer docs = jdbc.queryForObject(
-                        "SELECT COUNT(DISTINCT " + def.groupCol() + ") FROM " + table
-                                + " WHERE ISNULL(asp_cancel,'N')<>'Y'", Integer.class);
-                Integer audited = jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM yj_doc_status WHERE panel_code = ? AND shr IS NOT NULL"
-                                + " AND ISNULL(canceled,'N')<>'Y'", Integer.class, def.code());
-                int d = docs == null ? 0 : docs;
-                int a = audited == null ? 0 : audited;
-                draftTotal += d - a;
-                auditTotal += a;
-                Map<String, Object> row = new HashMap<>();
-                row.put("panelName", def.name());
-                row.put("panelCode", def.code());
-                row.put("count", d);
-                Map<String, Object> st = new HashMap<>();
-                st.put("草稿", d - a);
-                st.put("已审核", a);
-                row.put("status", st);
-                docStats.add(row);
-            }
-        } catch (Exception ignored) {
-        }
-        kpis.put("moActive", draftTotal);
-        kpis.put("approvePending", 0);
-        Map<String, Object> archives = new HashMap<>();
-        try {
-            Integer mates = jdbc.queryForObject(
-                    "SELECT COUNT(DISTINCT m_no) FROM mate WHERE ISNULL(asp_cancel,'N')<>'Y'", Integer.class);
-            archives.put("invItems", mates == null ? 0 : mates);
-        } catch (Exception e) {
-            archives.put("invItems", 0);
-        }
-        out.put("kpis", kpis);
-        out.put("archives", archives);
-        out.put("docStats", docStats);
-        out.put("todos", List.of());
-        out.put("latest", List.of());
-        out.put("progress", List.of());
-        out.put("production", Map.of("bomTree", List.of()));
-        out.put("stock", Map.of("panels", List.of()));
-        out.put("sales", Map.of("byStatus", List.of()));
-        out.put("quality", Map.of("total", 0, "pass", 0, "passRate", 0, "byResult", List.of()));
-        return ApiResult.ok(out);
+        // 2026-09-28 聚合下沉 DashboardStatsService(代码规范 A2:SQL 只在 service);
+        // 各模块图表数据(生产/库存/销售/质量/研发)由 service 一次返回,Controller 只转发。
+        return ApiResult.ok(dashboardStats.stats());
     }
 }
