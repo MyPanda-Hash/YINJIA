@@ -471,6 +471,22 @@ public class QueryService {
                 where.append(" AND ").append(alias).append(".[ckdm] = ?");
                 args.add(String.valueOf(ck).trim());
             }
+            // 台账/状况表按编码绑定(2026-09-28,与 _ckdm 同理):查询弹窗选仓库/存货后前端送
+            // _whCode/_itemCode(编码是稳定键:名称会重名/改名/带尾空格,等值匹配名称在这些场景误杀)。
+            // 有码时下方通用循环里的同名条件(仓库/存货)跳过——名称仅作弹窗回显,不参与过滤。
+            // 面板没有对应编码列时不生效(l2c 无该标签),名称条件照常兜底。
+            Object whCode = condition.get("_whCode");
+            boolean byWhCode = whCode != null && !String.valueOf(whCode).isBlank() && l2c.containsKey("仓库编码");
+            if (byWhCode) {
+                where.append(" AND RTRIM(").append(alias).append(".[").append(l2c.get("仓库编码")).append("]) = ?");
+                args.add(String.valueOf(whCode).trim());
+            }
+            Object itemCode = condition.get("_itemCode");
+            boolean byItemCode = itemCode != null && !String.valueOf(itemCode).isBlank() && l2c.containsKey("存货编码");
+            if (byItemCode) {
+                where.append(" AND RTRIM(").append(alias).append(".[").append(l2c.get("存货编码")).append("]) = ?");
+                args.add(String.valueOf(itemCode).trim());
+            }
             // 报表日期段(查询弹窗):开始/结束日期 → 区间过滤。
             // 有 期次 列(收发存汇总)按月(yyyy-MM)闭区间;否则有 单据日期 列(库存台账)按全日期闭区间。
             // 这两个键不进通用 LIKE,下方的 l2c 兜底也会因无列名而跳过。
@@ -493,6 +509,9 @@ public class QueryService {
                 Object v = e.getValue();
                 if (col == null || v == null || String.valueOf(v).isBlank()) continue;
                 if ("开始日期".equals(e.getKey()) || "结束日期".equals(e.getKey())) continue; // 已按期次区间处理
+                // 已按编码过滤的维度跳过其名称条件(前端仍回显名称,但不参与过滤——防改名/重名误杀)
+                if (byWhCode && "仓库".equals(e.getKey())) continue;
+                if (byItemCode && "存货".equals(e.getKey())) continue;
                 // 参照字段(2026-09-24):查询值来自档案参照/联动下拉,是「一个精确实体」而非关键字 → 等值匹配。
                 // LIKE 子串会串仓:仓库「成品仓」会同时命中「半成品仓」、「不良品仓」命中「原料不良品仓」
                 // (库存台账实测:查 成品仓 返回 93 行 = 成品仓 34 + 半成品仓 59,台账按仓分户的口径直接失真)。

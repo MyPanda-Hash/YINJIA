@@ -2142,39 +2142,60 @@ function rqdFieldRequired(field) {
   if (panelCode.value === 'STOCK_LEDGER' && ['仓库', '存货'].includes(headerFieldKey(field))) return true
   return false
 }
-// 台账联动选项:仓库/存货下拉互相约束(选项=后端 v_stock_ledger 真实组合)
-const ledgerWhOptions = ref([])
-const ledgerItemOptions = ref([])
+// 台账联动选项:仓库/存货下拉互相约束(选项=后端 v_stock_ledger 真实组合,按编码匹配)
+// 2026-09-28 起选项为码名对 [{仓库编码,仓库}] / [{存货编码,存货}]——编码是稳定键(名称会重名/
+// 改名/带尾空格),联动收窄与查询条件都绑编码(_whCode/_itemCode),名称仅弹窗回显
+const ledgerWhOptions = ref([])    // [{code,name}] 该存货有流水的仓(或未选存货=全部有流水仓)
+const ledgerItemOptions = ref([])  // [{code,name}] 该仓有流水的存货(或未选仓库=全部有流水的存货)
 const ledgerOptsLoading = ref(false)
 async function loadLedgerRefOptions({ keepWh = true, keepItem = true } = {}) {
   ledgerOptsLoading.value = true
   try {
     const res = await engine.callButton({
       panelCode: panelCode.value, buttonName: '台账联动选项',
-      formData: { 仓库: queryDraft['仓库'] || '', 存货: queryDraft['存货'] || '' }, buttonParam: {},
+      formData: {
+        仓库编码: queryDraft['_whCode'] || '', 存货编码: queryDraft['_itemCode'] || '',
+        仓库: queryDraft['仓库'] || '', 存货: queryDraft['存货'] || '',
+      }, buttonParam: {},
     })
-    ledgerWhOptions.value = res?.仓库列表 || []
-    ledgerItemOptions.value = res?.存货列表 || []
-    // 约束收紧后当前值可能不再合法:清掉无效侧(保持用户已选且仍合法的那侧)
-    if (!keepWh && queryDraft['仓库'] && !ledgerWhOptions.value.includes(queryDraft['仓库'])) delete queryDraft['仓库']
-    if (!keepItem && queryDraft['存货'] && !ledgerItemOptions.value.includes(queryDraft['存货'])) delete queryDraft['存货']
+    const whPairs = (res?.仓库列表 || []).map((o) => ({ code: String(o.仓库编码 ?? '').trim(), name: String(o.仓库 ?? '').trim() }))
+    const itemPairs = (res?.存货列表 || []).map((o) => ({ code: String(o.存货编码 ?? '').trim(), name: String(o.存货 ?? '').trim() }))
+    ledgerWhOptions.value = whPairs
+    ledgerItemOptions.value = itemPairs
+    // 约束收紧后当前值可能不再合法:清掉无效侧(名称与编码成对清理,保持绑定一致)
+    if (!keepWh && queryDraft['仓库'] && !whPairs.some((o) => o.name === queryDraft['仓库'] || o.code === queryDraft['_whCode'])) {
+      delete queryDraft['仓库']; delete queryDraft['_whCode']
+    }
+    if (!keepItem && queryDraft['存货'] && !itemPairs.some((o) => o.name === queryDraft['存货'] || o.code === queryDraft['_itemCode'])) {
+      delete queryDraft['存货']; delete queryDraft['_itemCode']
+    }
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('查询失败'))
   } finally {
     ledgerOptsLoading.value = false
   }
 }
-/** 弹窗参照下拉选中变化:仅台账/库存状况的「仓库」要重拉联动(存货可能因换仓失效被清)。其余参照不联动 */
+/** 弹窗参照选中变化:台账/库存状况的「仓库」要重拉联动(存货可能因换仓失效被清)。其余参照不联动 */
 async function onDialogRefSelectChange(field) {
   if (!isCascadePanel.value || headerFieldKey(field) !== '仓库') return
+  // 编码随行:下拉选项携带档案行(含 仓库编码),选中即绑定编码;清空则码一起清
+  const key = headerFieldKey(field)
+  const opt = (refSelectData[key]?.options || []).find((o) => o.value === queryDraft[key])
+  const rowCode = opt?.row?.['仓库编码']
+  queryDraft['_whCode'] = rowCode ? String(rowCode).trim() : ''
   const hadItem = queryDraft['存货']
   await loadLedgerRefOptions({ keepWh: true, keepItem: false })
   if (hadItem && !queryDraft['存货']) ElMessage.info(tt('该仓无此存货流水，已清空存货'))
 }
-/** 仓库下拉选项置灰(选了存货后):该存货无流水的仓不可选 —— 选项=档案(bs_wh) ∩ 有流水 */
+/** 仓库下拉选项置灰(选了存货后):该存货无流水的仓不可选 —— 按编码比对(选项行无编码时退回名称) */
 function ledgerOptionDisabled(field, option) {
-  return isCascadePanel.value && headerFieldKey(field) === '仓库'
-    && !!queryDraft['存货'] && !ledgerWhOptions.value.includes(option.label)
+  if (!isCascadePanel.value || headerFieldKey(field) !== '仓库') return false
+  if (!queryDraft['存货']) return false
+  const code = option.row?.['仓库编码']
+  if (code !== undefined && code !== null && String(code).trim() !== '') {
+    return !ledgerWhOptions.value.some((o) => o.code === String(code).trim())
+  }
+  return !ledgerWhOptions.value.some((o) => o.name === option.label)
 }
 /** 弹窗字段下方的联动提示行:选仓后存货候选收窄计数 / 选存货后全仓无流水的说明 */
 function dialogFieldHint(field) {
@@ -4902,12 +4923,12 @@ function openQueryDialog() {
 }
 
 function openQueryRef(qr, context = 'page') {
-  // 台账/库存状况(2026-09-21):弹窗里选「存货」且已选仓库 → 候选按「该仓有流水」收窄。
-  // 注入数组型 filter{存货名称:[…]}(engine.queryRefRows 对数组 filter 在展平后的档案行上逐行精确匹配,
-  // 不会误发给后端当查询条件);该仓无任何有流水的档案存货时不收窄(不给空清单)。
+  // 台账/库存状况(2026-09-28):弹窗里选「存货」且已选仓库 → 候选按「该仓有流水」收窄。
+  // 注入数组型 filter{存货编码:[…]}(engine.queryRefRows 对数组 filter 在展平后的档案行上逐行精确匹配,
+  // 不会误发给后端当查询条件);按编码收窄(名称重名/改名不影响);该仓无任何有流水的档案存货时不收窄(不给空清单)。
   if (context === 'dialog' && isCascadePanel.value && headerFieldKey(qr) === '存货' && queryDraft['仓库']) {
-    const names = ledgerItemOptions.value
-    if (names.length) qr = { ...qr, filter: { ...(qr.filter || {}), 存货名称: names } }
+    const codes = ledgerItemOptions.value.map((o) => o.code).filter(Boolean)
+    if (codes.length) qr = { ...qr, filter: { ...(qr.filter || {}), 存货编码: codes } }
   }
   queryRefField.value = qr
   queryRefContext.value = context
@@ -4918,6 +4939,9 @@ function clearQueryRef(qr, context = 'page') {
   const key = headerFieldKey(qr)
   if (context === 'dialog') {
     delete queryDraft[key]
+    // 编码与名称成对清理(台账/状况表绑码)
+    if (isCascadePanel.value && key === '仓库') delete queryDraft['_whCode']
+    if (isCascadePanel.value && key === '存货') delete queryDraft['_itemCode']
     return
   }
   delete condition[key]
@@ -4932,11 +4956,25 @@ function onQueryRefConfirm(rows) {
   const valueField = ref.field || ref.refField || ref.display || ref.displayField || headerFieldKey(field)
   const target = queryRefContext.value === 'dialog' ? queryDraft : condition
   target[headerFieldKey(field)] = row[valueField] ?? ''
+  // 台账/状况表:参照行携带编码,选中即绑码(_whCode/_itemCode)——查询条件按编码过滤,名称仅回显
+  if (queryRefContext.value === 'dialog' && isCascadePanel.value) {
+    const key = headerFieldKey(field)
+    if (key === '仓库') {
+      const c = row['仓库编码']
+      queryDraft['_whCode'] = c ? String(c).trim() : ''
+    }
+    if (key === '存货') {
+      const c = row['存货编码']
+      queryDraft['_itemCode'] = c ? String(c).trim() : ''
+    }
+  }
   queryRefVisible.value = false
   queryRefField.value = null
-  // 台账/库存状况:弹窗选了存货 → 重拉联动(该存货无流水的仓置灰;当前仓无此存货流水则清仓)
-  if (queryRefContext.value === 'dialog' && isCascadePanel.value && headerFieldKey(field) === '存货') {
-    loadLedgerRefOptions({ keepWh: false, keepItem: true })
+  // 台账/库存状况:弹窗选了 仓库 或 存货 都重拉联动——选仓后存货候选按新仓收窄(旧存货失效被清);
+  // 选存货后该存货无流水的仓置灰(当前仓无此存货流水则清仓)。补上了旧版「参照弹窗选仓不联动」的缺口。
+  if (queryRefContext.value === 'dialog' && isCascadePanel.value && ['仓库', '存货'].includes(headerFieldKey(field))) {
+    const isWh = headerFieldKey(field) === '仓库'
+    loadLedgerRefOptions(isWh ? { keepWh: true, keepItem: false } : { keepWh: false, keepItem: true })
   }
   if (queryRefContext.value === 'page') search()
 }

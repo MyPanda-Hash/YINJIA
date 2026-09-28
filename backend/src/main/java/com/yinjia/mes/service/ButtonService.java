@@ -2784,9 +2784,13 @@ public class ButtonService {
     }
     /** 报表弹窗联动选项(台账/库存状况):仓库/存货互相约束——选项=对应视图真实存在的组合,
      *  选了存货→仓库只列该存货有流水的仓;选了仓库→存货只列该仓有流水的存货。
-     *  2026-09-21:「选项以基础资料为准」——两个列表再与 仓库档案(bs_wh)/存货档案(bs_inv)
-     *  按名称取交集,即 档案 ∩ 有流水。未建档的值(台账里 CK01原料仓 等)不再出现在选项里,
-     *  查询弹窗据此把「当前存货在档案仓里没有流水」的仓置灰,并自动清掉换仓后无流水的存货。 */
+     *  2026-09-21:「选项以基础资料为准」——选项再与 仓库档案(bs_wh)/存货档案(bs_inv)取交集,
+     *  即 档案 ∩ 有流水。未建档的值(台账里 CK01原料仓 等)不再出现在选项里,
+     *  查询弹窗据此把「当前存货在档案仓里没有流水」的仓置灰,并自动清掉换仓后无流水的存货。
+     *  2026-09-28:**级联过滤改按编码匹配**(用户指正):名称会重名/改名/带尾空格,编码是稳定键——
+     *  ①收窄入参优先 仓库编码/存货编码(名称兜底,兼容旧调用);②交集按编码对(bs_wh.仓库编码/
+     *  bs_inv.存货编码,比名称对照更稳);③返回码名对 [{仓库编码,仓库}] 供前端按码绑定条件。
+     *  注意:内层 EXISTS 必须用外层别名限定编码列(bs_wh/bs_inv 存在同名 编码 列,否则内层遮蔽外层)。 */
     private Map<String, Object> ledgerRefOptions(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String view = switch (def.code()) {
             case "STOCK_LEDGER" -> "v_stock_ledger";
@@ -2794,31 +2798,39 @@ public class ButtonService {
             default -> null;
         };
         if (view == null) throw new IllegalStateException("仅库存台账/库存状况表支持联动选项");
-        String wh = optionalText(formData, "仓库");
-        String item = optionalText(formData, "存货");
+        String whCode = optionalText(formData, "仓库编码");
+        String itemCode = optionalText(formData, "存货编码");
+        String whName = optionalText(formData, "仓库");     // 名称兜底(旧前端兼容)
+        String itemName = optionalText(formData, "存货");
+        // 收窄谓词(作用于 EXISTS 的内层行 m,编码优先;码空才按名称,兼容旧调用。
+        // 两视图 编码列覆盖率 100%,正常路径都走编码)
+        String itemPred = !itemCode.isBlank() ? "m.存货编码 = N'" + itemCode.replace("'", "''") + "'"
+                : (!itemName.isBlank() ? "RTRIM(m.存货) = N'" + itemName.replace("'", "''") + "'" : null);
+        String whPred = !whCode.isBlank() ? "m.仓库编码 = N'" + whCode.replace("'", "''") + "'"
+                : (!whName.isBlank() ? "RTRIM(m.仓库) = N'" + whName.replace("'", "''") + "'" : null);
         // RTRIM:源列可能带尾随空格(nchar/手工导入),选项须干净值回传才能精确匹配。
-        // 口径:选项只来自 仓库非空 的行——无仓库的行不在任何可查组合内,不进选项
-        // (台账必填仓库+存货;状况表快照本就按仓库聚合,天然非空)。
-        // 排除 '(未填仓库)':v_stock_movement 把空仓库写成该标签以便分组(不再是 NULL/空串),
-        // 若不排除会冒出一个可选的伪仓库。
-        List<String> whs = jdbc.queryForList(
-                "SELECT DISTINCT RTRIM(仓库) AS 仓库 FROM " + view + " WHERE 仓库 IS NOT NULL AND RTRIM(仓库) <> ''"
-                + " AND 仓库 NOT LIKE N'(未填%'"
-                + (item.isBlank() ? "" : " AND RTRIM(存货) = N'" + item.replace("'", "''") + "'")
-                + " AND EXISTS (SELECT 1 FROM bs_wh w WHERE RTRIM(w.仓库名称) = RTRIM(" + view + ".仓库)"
-                + "               AND ISNULL(w.asp_cancel,'N') <> 'Y')"
-                + " ORDER BY 1", String.class);
-        List<String> items = jdbc.queryForList(
-                "SELECT DISTINCT RTRIM(存货) AS 存货 FROM " + view + " WHERE 存货 IS NOT NULL AND RTRIM(存货) <> ''"
-                + " AND 仓库 IS NOT NULL AND RTRIM(仓库) <> ''"
-                + " AND 仓库 NOT LIKE N'(未填%'"
-                + (wh.isBlank() ? "" : " AND RTRIM(仓库) = N'" + wh.replace("'", "''") + "'")
-                + " AND EXISTS (SELECT 1 FROM bs_inv i WHERE RTRIM(i.存货名称) = RTRIM(" + view + ".存货)"
-                + "               AND ISNULL(i.asp_cancel,'N') <> 'Y')"
-                + " ORDER BY 1", String.class);
+        // 口径:选项只来自 编码与名称都非空 的行——无编码的行没法按码绑定,无名称的行没法回显。
+        List<Map<String, Object>> whs = jdbc.queryForList(
+                "SELECT DISTINCT RTRIM(v.仓库编码) AS code, RTRIM(v.仓库) AS name FROM " + view + " v"
+                + " WHERE v.仓库编码 IS NOT NULL AND RTRIM(v.仓库编码) <> N''"
+                + " AND v.仓库 IS NOT NULL AND RTRIM(v.仓库) <> N'' AND v.仓库 NOT LIKE N'(未填%'"
+                + (itemPred == null ? "" : " AND EXISTS (SELECT 1 FROM " + view + " m WHERE m.仓库编码 = v.仓库编码 AND " + itemPred + ")")
+                + " AND EXISTS (SELECT 1 FROM bs_wh w WHERE RTRIM(w.仓库编码) = RTRIM(v.仓库编码)"
+                + "           AND ISNULL(w.asp_cancel,'N') <> 'Y')"
+                + " ORDER BY 1");
+        List<Map<String, Object>> items = jdbc.queryForList(
+                "SELECT DISTINCT RTRIM(v.存货编码) AS code, RTRIM(v.存货) AS name FROM " + view + " v"
+                + " WHERE v.存货编码 IS NOT NULL AND RTRIM(v.存货编码) <> N''"
+                + " AND v.存货 IS NOT NULL AND RTRIM(v.存货) <> N''"
+                + " AND v.仓库编码 IS NOT NULL AND RTRIM(v.仓库编码) <> N''"
+                + " AND v.仓库 NOT LIKE N'(未填%'"
+                + (whPred == null ? "" : " AND EXISTS (SELECT 1 FROM " + view + " m WHERE m.存货编码 = v.存货编码 AND " + whPred + ")")
+                + " AND EXISTS (SELECT 1 FROM bs_inv i WHERE RTRIM(i.存货编码) = RTRIM(v.存货编码)"
+                + "           AND ISNULL(i.asp_cancel,'N') <> 'Y')"
+                + " ORDER BY 1");
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("仓库列表", whs);
-        out.put("存货列表", items);
+        out.put("仓库列表", whs.stream().map(r -> Map.of("仓库编码", r.get("code"), "仓库", r.get("name"))).toList());
+        out.put("存货列表", items.stream().map(r -> Map.of("存货编码", r.get("code"), "存货", r.get("name"))).toList());
         return out;
     }
 
