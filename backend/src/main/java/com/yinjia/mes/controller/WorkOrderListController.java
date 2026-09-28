@@ -89,6 +89,7 @@ public class WorkOrderListController {
                         + " ISNULL(p.[批次号], N'') AS 批次号,"
                         + " p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 行号,"
                         + " CONVERT(varchar(10), p.pl_date, 120) AS 单据日期,"
+                        + " CONVERT(varchar(16), p.asp_time1, 120) AS 转单时间,"
                         + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.khdm, N'') AS 客户代码,"
                         + " ISNULL(p.scx, N'') AS 生产线,"
                         + " ISNULL(p.[打印人], N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
@@ -100,7 +101,7 @@ public class WorkOrderListController {
                         // 余量(2026-09-28 用户拍板)=订单级:同工单号需求 − 同工单号累计排产(全部批次行);
                         // 行级口径(本行需求−本行排产)会把同订单多批次行显示成多个独立余量,误导
                         + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s"
-                        + "   WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y' AND ISNULL(s.scx,N'') <> N''), 0) AS 余量,"
+                        + "   WHERE s.pl_no = p.pl_no AND s.pl_xc = p.pl_xc AND ISNULL(s.asp_cancel,'N') <> 'Y' AND ISNULL(s.scx,N'') <> N''), 0) AS 余量,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
                         + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
@@ -133,15 +134,21 @@ public class WorkOrderListController {
     public ApiResult<Map<String, Object>> segments(@RequestBody Map<String, Object> body) {
         String no = body.get("工单号") == null ? "" : String.valueOf(body.get("工单号")).trim();
         if (no.isBlank()) throw new IllegalArgumentException("缺少 工单号");
-        Map<String, Object> sum = jdbc.queryForMap(
-                "SELECT COUNT(*) AS 分段行数, MAX(ISNULL(p.xq_sl,0)) AS 需求数量,"
-                        + " SUM(ISNULL(p.pl_sl,0)) AS 累计排产, SUM(ISNULL(p.rk_sl,0)) AS 累计入库,"
-                        + " MAX(ISNULL(p.xq_sl,0)) - SUM(CASE WHEN ISNULL(p.scx,N'') <> N'' THEN ISNULL(p.pl_sl,0) ELSE 0 END) AS 订单余量"
-                        + " FROM dbo.plang p WHERE p.pl_no = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'", no);
-        if (((Number) sum.getOrDefault("分段行数", 0)).intValue() == 0)
-            throw new IllegalArgumentException("工单不存在:" + no);
+        // 按工单行号(=订单行,物料不同)分组汇总——工单号按订单共享,一个号下多个行号,
+        // 余量/排产必须分行号算,不能跨物料混算(2026-09-28 用户纠正)
+        List<Map<String, Object>> groups = jdbc.queryForList(
+                "SELECT p.pl_xc AS 工单行号, p.dm AS 物料编码, ISNULL(p.mc,N'') AS 产品名称, ISNULL(p.gg,N'') AS 规格型号,"
+                        + " MAX(ISNULL(p.xq_sl,0)) AS 需求数量, SUM(ISNULL(p.pl_sl,0)) AS 累计转单,"
+                        + " SUM(CASE WHEN ISNULL(p.scx,N'') <> N'' THEN ISNULL(p.pl_sl,0) ELSE 0 END) AS 累计排产,"
+                        + " SUM(ISNULL(p.rk_sl,0)) AS 累计入库,"
+                        + " MAX(ISNULL(p.xq_sl,0)) - SUM(CASE WHEN ISNULL(p.scx,N'') <> N'' THEN ISNULL(p.pl_sl,0) ELSE 0 END) AS 订单余量,"
+                        + " COUNT(*) AS 分段行数"
+                        + " FROM dbo.plang p WHERE p.pl_no = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'"
+                        + " GROUP BY p.pl_xc, p.dm, p.mc, p.gg ORDER BY p.pl_xc", no);
+        if (groups.isEmpty()) throw new IllegalArgumentException("工单不存在:" + no);
         List<Map<String, Object>> segs = jdbc.queryForList(
-                "SELECT ISNULL(p.[批次号], N'') AS 批次号, ISNULL(p.scx, N'') AS 生产线,"
+                "SELECT p.pl_xc AS 工单行号, p.dm AS 物料编码, ISNULL(p.mc,N'') AS 产品名称,"
+                        + " ISNULL(p.[批次号], N'') AS 批次号, ISNULL(p.scx, N'') AS 生产线,"
                         + " CONVERT(varchar(10), p.pl_date, 120) AS 转单日期,"
                         + " CONVERT(varchar(16), p.asp_time1, 120) AS 转单时间,"
                         + " ISNULL(p.pl_sl, 0) AS 排产数量, ISNULL(p.xq_sl, 0) AS 需求数量,"
@@ -161,7 +168,7 @@ public class WorkOrderListController {
                         + " FROM dbo.plang p WHERE p.pl_no = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'"
                         + " ORDER BY p.pl_xc, p.[批次号], p.id", no);
         Map<String, Object> out = new LinkedHashMap<>();
-        out.put("汇总", sum);
+        out.put("分组", groups);
         out.put("分段", segs);
         return ApiResult.ok(out);
     }

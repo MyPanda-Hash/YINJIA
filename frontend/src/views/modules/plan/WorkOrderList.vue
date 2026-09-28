@@ -66,6 +66,7 @@
       <el-table-column :label="tt('工单行号')" prop="行号" width="90" sortable />
       <el-table-column :label="tt('批次号')" prop="批次号" width="100" sortable />
       <el-table-column :label="tt('工单日期')" prop="单据日期" width="100" sortable />
+      <el-table-column :label="tt('转单时间')" prop="转单时间" width="140" sortable show-overflow-tooltip />
       <el-table-column :label="tt('物料编码')" prop="物料编码" width="130" show-overflow-tooltip />
       <el-table-column :label="tt('产品名称')" prop="产品名称" min-width="180" show-overflow-tooltip />
       <el-table-column :label="tt('规格型号')" prop="规格型号" min-width="160" show-overflow-tooltip />
@@ -104,27 +105,30 @@
       </el-table>
     </el-dialog>
 
-    <!-- 分段排产记录弹窗(2026-09-28):同工单号(=同销售订单行)全部批次行分段明细+订单级汇总 -->
-    <el-dialog v-model="segVisible" :title="tt('分段排产记录') + ' — ' + (segRow?.加工单号 || '')" width="980px" append-to-body>
-      <div v-if="segData" class="wol-segsum">
-        <span>{{ tt('需求') }}: <b>{{ num(segData.汇总.需求数量) }}</b></span>
-        <span>{{ tt('累计排产') }}: <b>{{ num(segData.汇总.累计排产) }}</b></span>
-        <span>{{ tt('累计入库') }}: <b>{{ num(segData.汇总.累计入库) }}</b></span>
-        <span>{{ tt('订单余量') }}: <b>{{ num(segData.汇总.订单余量) }}</b></span>
-        <span>{{ tt('分段') }}: <b>{{ segData.汇总.分段行数 }}</b></span>
+    <!-- 分段排产记录弹窗(2026-09-28):按 工单行号(=订单行,物料不同)分组汇总 + 全部批次分段明细 -->
+    <el-dialog v-model="segVisible" :title="tt('分段排产记录') + ' — ' + (segRow?.加工单号 || '')" width="1080px" append-to-body>
+      <div v-for="g in (segData?.分组 || [])" :key="g.工单行号" class="wol-segsum">
+        <span class="ln">{{ tt('工单行号') }}{{ g.工单行号 }} · {{ g.产品名称 }}<template v-if="g.规格型号"> ({{ g.规格型号 }})</template></span>
+        <span>{{ tt('需求') }}: <b>{{ num(g.需求数量) }}</b></span>
+        <span>{{ tt('累计排产') }}: <b>{{ num(g.累计排产) }}</b></span>
+        <span>{{ tt('累计入库') }}: <b>{{ num(g.累计入库) }}</b></span>
+        <span>{{ tt('订单余量') }}: <b>{{ num(g.订单余量) }}</b></span>
+        <span>{{ tt('分段') }}: <b>{{ g.分段行数 }}</b></span>
       </div>
       <el-table :data="segData?.分段 || []" border size="small" max-height="420" v-loading="segLoading">
-        <el-table-column :label="tt('批次号')" prop="批次号" width="100" />
+        <el-table-column :label="tt('工单行号')" prop="工单行号" width="80" />
+        <el-table-column :label="tt('物料编码')" prop="物料编码" width="110" show-overflow-tooltip />
+        <el-table-column :label="tt('产品名称')" prop="产品名称" min-width="150" show-overflow-tooltip />
+        <el-table-column :label="tt('批次号')" prop="批次号" width="95" />
         <el-table-column :label="tt('生产线')" prop="生产线" width="100" show-overflow-tooltip />
         <el-table-column :label="tt('转单时间')" prop="转单时间" width="140" />
-        <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
-        <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
-        <el-table-column :label="tt('已报工')" prop="已报工" width="90" align="right" />
-        <el-table-column :label="tt('未交量')" prop="未交量" width="90" align="right" />
-        <el-table-column :label="tt('计划开工日')" prop="计划开工日" width="100" />
+        <el-table-column :label="tt('排产数量')" prop="排产数量" width="85" align="right" />
+        <el-table-column :label="tt('入库数量')" prop="入库数量" width="85" align="right" />
+        <el-table-column :label="tt('已报工')" prop="已报工" width="85" align="right" />
+        <el-table-column :label="tt('未交量')" prop="未交量" width="85" align="right" />
         <el-table-column :label="tt('计划完工日')" prop="计划完工日" width="100" />
-        <el-table-column :label="tt('排产人')" prop="排产人" width="90" />
-        <el-table-column :label="tt('转单人')" prop="转单人" width="90" />
+        <el-table-column :label="tt('排产人')" prop="排产人" width="85" />
+        <el-table-column :label="tt('转单人')" prop="转单人" width="85" />
         <el-table-column :label="tt('生产状态')" prop="生产状态" width="80">
           <template #default="{ row }">
             <span :class="{ 'wol-closed': row.生产状态 === '完工' }">{{ tt(row.生产状态) }}</span>
@@ -334,7 +338,7 @@ function openTrace() {
 }
 
 function exportCsv() {
-  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '物料编码', '产品名称', '规格型号', '客户', '生产线', '需求数量', '排产数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
+  const head = ['公司代码', '工单号', '工单行号', '批次号', '单据日期', '转单时间', '物料编码', '产品名称', '规格型号', '客户', '生产线', '需求数量', '排产数量', '入库数量', '余量', '领料单号', '打印人', '打印时间', '生产状态', '结案']
   const csv = '\ufeff' + [head.join(',')]
     .concat(filtered.value.map((r) => head.map((h) => `"${String(r[h] ?? '').replace(/"/g, '""')}"`).join(','))).join('\n')
   const a = document.createElement('a')
@@ -355,6 +359,7 @@ onMounted(() => { load(); loadLines() })
 .wol-count { margin-left: auto; font-size: 13px; color: #303133; }
 .wol-table { flex: 1; min-height: 0; }
 .wol-closed { color: #f56c6c; font-weight: 600; }
-.wol-segsum { display: flex; gap: 18px; flex-wrap: wrap; padding: 6px 2px 10px; font-size: 13px; color: #606266; }
+.wol-segsum { display: flex; gap: 18px; flex-wrap: wrap; padding: 6px 2px 10px; font-size: 13px; color: #606266; border-bottom: 1px dashed #e4e7ed; margin-bottom: 2px; }
 .wol-segsum b { color: #303133; margin-left: 2px; }
+.wol-segsum .ln { color: #409eff; font-weight: 600; }
 </style>
