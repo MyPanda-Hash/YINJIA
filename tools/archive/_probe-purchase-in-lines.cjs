@@ -29,6 +29,19 @@ async function main() {
   }).then((r) => r.json())
   const groups = btn?.data?.metadata?.buttonGroups || []
   const printGroup = groups.find((g) => g.name === '打印')
-  console.log('8090 当前(旧jar) 打印组动作 =', JSON.stringify(printGroup?.actions))
+  console.log('PURCHASE_IN 打印组动作 =', JSON.stringify(printGroup?.actions))
+
+  const puBtn = await fetch(`${BASE}/px/getPanelConfig?panelCode=PU_ORDER`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).then((r) => r.json())
+  const puGroups = puBtn?.data?.metadata?.buttonGroups || []
+  console.log('PU_ORDER 打印组动作 =', JSON.stringify(puGroups.find((g) => g.name === '打印')?.actions))
+
+  const fd = await fetch(`${BASE}/px/getFormDescriptor?panelCode=PU_ORDER&code=${encodeURIComponent('YJ-20260915-05')}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  }).then((r) => r.json())
+  const puLines = Object.values(fd?.data?.detailData || {})[0] || []
+  const pl = puLines[0] || {}
+  console.log('PU_ORDER 行[0]: 物料编码 =', JSON.stringify(pl['物料编码']), '| 物料名称 =', JSON.stringify(pl['物料名称']), '| 数量 =', pl['数量'], '| 单位 =', JSON.stringify(pl['单位']))
 }
 main().catch((e) => { console.error(e); process.exit(1) })
