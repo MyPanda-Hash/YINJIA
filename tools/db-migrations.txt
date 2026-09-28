@@ -1616,3 +1616,6 @@ migrate-db-norm-column-comments.sql
 
 # —— 2026-09-28 动态字段扩展:业务表备用列池(139表x20列,docs/design/动态字段扩展-备用列池-V1.0.md) ——
 migrate-spare-columns.sql
+
+# —— 2026-09-28 动态字段扩展:绑定审计表 ——
+migrate-ext-bind-log.sql
