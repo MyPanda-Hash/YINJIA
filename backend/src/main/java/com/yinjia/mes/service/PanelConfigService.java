@@ -1648,10 +1648,17 @@ public class PanelConfigService {
                         + "VALUES (?,?,?,?,?,?,?,?,?,?,?,0,1)",
                 panelCode, chosen, label, labelEn.isEmpty() ? null : labelEn, dataType, dictSql, finalPlace,
                 (maxSeq == null ? 0 : maxSeq) + 10, width, 1, required);
-        // 多语言强制规范(AGENTS):至少 en 译名(manual);label_en 列同写(引擎显示层直读)
-        jdbc.update("IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='field' AND ref_key=? AND locale='en') "
-                        + "INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', ?, 'en', ?, 'manual')",
-                label, label, labelEn.isEmpty() ? label : labelEn);
+        // 多语言强制规范(AGENTS):至少 en 译名;label_en 列同写(引擎显示层直读)。
+        // MERGE 覆盖式(人工 manual 优先于机翻 mt;退绑后换英文名重绑也能更新),
+        // 写完失效译名缓存 —— 显示名优先走 fieldDict(),不失效会用到 30s TTL 内的旧字典(实测踩到)。
+        jdbc.update("MERGE yj_translation AS t USING (SELECT CAST(? AS nvarchar(20)) AS scope, "
+                        + "CAST(? AS nvarchar(200)) AS ref_key, CAST(? AS nvarchar(10)) AS locale, "
+                        + "CAST(? AS nvarchar(500)) AS text) AS s "
+                        + "ON t.scope = s.scope AND t.ref_key = s.ref_key AND t.locale = s.locale "
+                        + "WHEN MATCHED THEN UPDATE SET text = s.text, source = 'manual', updated_at = SYSDATETIME() "
+                        + "WHEN NOT MATCHED THEN INSERT (scope, ref_key, locale, text, source) VALUES (s.scope, s.ref_key, s.locale, s.text, 'manual');",
+                "field", label, "en", labelEn.isEmpty() ? label : labelEn);
+        translations.invalidateLoadedLocales();
         extDescribe(table, chosen, label + "(动态字段,绑定" + chosen + ")");
         extLog(panelCode, label, chosen, "bind", "place=" + finalPlace + ",type=" + dataType);
         registry.reload();
