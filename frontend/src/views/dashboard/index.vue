@@ -293,7 +293,7 @@
       <div class="dash-grid">
         <div class="card col-4">
           <div class="card-title">{{ tt('工单状态分布') }}</div>
-          <div class="chart-box"><SBars :data="prod.statusDist" /></div>
+          <div class="chart-box"><SBars :data="prod.statusDist" show-pct /></div>
         </div>
         <div class="card col-4">
           <div class="card-title">{{ tt('车间生产分布') }}</div>
@@ -352,7 +352,7 @@
         </div>
         <div class="card col-6">
           <div class="card-title">{{ tt('订单状态分布') }}</div>
-          <div class="chart-box"><SBars :data="sales.byStatus" /></div>
+          <div class="chart-box"><SBars :data="sales.byStatus" show-pct /></div>
         </div>
         <div class="card col-6">
           <div class="card-title">{{ tt('近 7 天订单趋势') }}</div>
@@ -406,7 +406,7 @@
         </div>
         <div class="card col-4">
           <div class="card-title">{{ tt('项目阶段进度分布') }}<span class="chart-sub">{{ tt('实施计划口径') }}</span></div>
-          <div class="chart-box"><SBars :data="rd.stageDist" :colors="['#8a9a92', '#116a5b', '#b94d3f', '#3b8978']" /></div>
+          <div class="chart-box"><SBars :data="rd.stageDist" show-pct :colors="['#8a9a92', '#116a5b', '#b94d3f', '#3b8978']" /></div>
         </div>
         <div class="card col-4">
           <div class="card-title">{{ tt('实施计划新增趋势') }}<span class="chart-sub">{{ tt('近 30 天') }}</span></div>
@@ -428,7 +428,7 @@
         </div>
         <div class="card col-6">
           <div class="card-title">{{ tt('检验结果对比') }}</div>
-          <div class="chart-box"><SBars :data="quality.byResult" /></div>
+          <div class="chart-box"><SBars :data="quality.byResult" show-pct /></div>
         </div>
         <div class="card col-6">
           <div class="card-title">{{ tt('近 7 天送检 / 合格') }}</div>

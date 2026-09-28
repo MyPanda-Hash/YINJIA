@@ -1,12 +1,17 @@
 <template>
   <div class="sline" :class="{ compact }">
+    <div v-if="data.length" class="line-context">
+      <span class="ctx-max">{{ tt('峰值') }} {{ peakText }}</span>
+    </div>
     <svg :viewBox="`0 0 ${W} ${H}`" preserveAspectRatio="none" class="line-svg">
       <line v-for="y in [30, 60, 90]" :key="y" x1="12" :y1="y" x2="308" :y2="y" class="grid-line" />
       <polygon :points="areaA" class="line-area" />
       <polyline :points="ptsA" fill="none" stroke="#537786" stroke-width="2" class="series-line" />
       <polyline :points="ptsB" fill="none" stroke="#116a5b" stroke-width="2" stroke-dasharray="5 4" class="series-line series-done" />
-      <circle v-for="(p, i) in xysA" :key="'a' + i" :cx="p.x" :cy="p.y" r="2.5" fill="#537786" />
+      <circle v-for="(p, i) in xysA" :key="'a' + i" :cx="p.x" :cy="p.y" r="2.5" fill="#537786" :class="{ peak: i === peakIdxA }" />
       <circle v-for="(p, i) in xysB" :key="'d' + i" :cx="p.x" :cy="p.y" r="2.5" fill="#116a5b" />
+      <!-- 末点数值标注(at-a-glance:最后一天直接读数,不必追 Y 轴) -->
+      <text v-if="lastA && data.length" :x="Math.min(lastA.x, W - 6)" :y="Math.max(lastA.y - 6, 10)" class="last-val" text-anchor="end">{{ lastText }}</text>
     </svg>
     <div class="line-x">
       <span v-for="d in data" :key="d.date" class="lx">{{ d.date }}</span>
@@ -20,6 +25,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { tt } from '@/i18n'
 
 const props = defineProps({
   data: { type: Array, default: () => [] },
@@ -49,6 +55,21 @@ const areaA = computed(() => {
   if (!xysA.value.length) return ''
   return `${PAD},${H - PAD} ${ptsA.value} ${W - PAD},${H - PAD}`
 })
+// 语境标注(2026-09-28 参考升级):峰值=added 序列最大值;末点=added 最后一天读数
+const peakIdxA = computed(() => {
+  let best = -1, bv = -1
+  props.data.forEach((d, i) => { if ((d.added || 0) > bv) { bv = d.added || 0; best = i } })
+  return best
+})
+const peakText = computed(() => {
+  const d = props.data[peakIdxA.value]
+  return d ? `${d.date} · ${d.added || 0}` : ''
+})
+const lastA = computed(() => xysA.value[xysA.value.length - 1] || null)
+const lastText = computed(() => {
+  const d = props.data[props.data.length - 1]
+  return d ? String(d.added || 0) : ''
+})
 </script>
 
 <style scoped>
@@ -56,9 +77,33 @@ const areaA = computed(() => {
   display: flex;
   flex-direction: column;
 }
+/* 语境标注行(峰值读数,2026-09-28 参考升级) */
+.line-context {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 10px;
+  color: var(--t-text-3);
+  padding: 0 2px 2px;
+}
+.ctx-max {
+  font-variant-numeric: tabular-nums;
+}
 .line-svg {
   width: 100%;
   height: 130px;
+}
+/* 峰值点放大强调 */
+circle.peak {
+  r: 4;
+  stroke: #d79a2b;
+  stroke-width: 1.5;
+}
+/* 末点数值标注 */
+.last-val {
+  font-size: 9px;
+  font-weight: 650;
+  fill: var(--t-text-2);
+  font-variant-numeric: tabular-nums;
 }
 .grid-line {
   stroke: var(--t-border-light);

@@ -1,5 +1,6 @@
 <template>
   <div class="sdonut">
+    <template v-if="data.length">
     <div class="donut-wrap">
       <svg viewBox="0 0 120 120" class="donut-svg">
         <circle cx="60" cy="60" r="48" fill="none" stroke="var(--t-border-light)" stroke-width="16" />
@@ -19,17 +20,24 @@
       </div>
     </div>
     <div class="donut-legend">
-      <div v-for="(seg, i) in segments" :key="i" class="lg-item">
+      <div v-for="(seg, i) in segments" :key="i" class="lg-item" :title="`${seg.name}：${fmt(seg.value)}（${pctOf(seg.value)}%）`">
         <span class="lg-dot" :style="{ background: colorOf(i) }"></span>
-        <span class="lg-name" :title="seg.name">{{ seg.name }}</span>
-        <span class="lg-val">{{ seg.value }}</span>
+        <span class="lg-name">{{ seg.name }}</span>
+        <span class="lg-val">{{ fmt(seg.value) }}</span>
+        <span class="lg-pct">{{ pctOf(seg.value) }}%</span>
       </div>
     </div>
+    </template>
+    <div v-else class="chart-empty">{{ tt('暂无数据') }}</div>
   </div>
 </template>
 
 <script setup>
+// SDonut —— 环形占比(桌面图表族)。
+// 2026-09-28 参考升级:图例带占比百分比 + 数值千分位/万位紧凑(语境化);
+// 空态文案走 tt();数字 tabular-nums。
 import { computed } from 'vue'
+import { tt } from '@/i18n'
 
 const props = defineProps({
   data: { type: Array, default: () => [] },
@@ -50,6 +58,14 @@ const segments = computed(() => {
 })
 function colorOf(i) {
   return props.colors[i % props.colors.length]
+}
+function pctOf(v) {
+  return total.value ? Math.round(((v || 0) / total.value) * 100) : 0
+}
+function fmt(v) {
+  const n = Number(v || 0)
+  if (n >= 10000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+  return n.toLocaleString('zh-CN')
 }
 </script>
 
@@ -116,5 +132,21 @@ function colorOf(i) {
 .lg-val {
   font-weight: 600;
   color: var(--t-text-1);
+  font-variant-numeric: tabular-nums;
+}
+.lg-pct {
+  width: 38px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--t-text-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.chart-empty {
+  color: var(--t-text-3);
+  font-size: 12px;
+  text-align: center;
+  padding: 30px 0;
+  width: 100%;
 }
 </style>

@@ -2652,5 +2652,6 @@ export default {
     '实施计划新增趋势': 'New implementation plans',
     '近 30 天': 'last 30 days',
     '累计内': 'In window',
+    '峰值': 'Peak',
   },
 }
