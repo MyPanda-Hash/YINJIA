@@ -279,7 +279,7 @@ public class ScheduleBoardService {
                         + " ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
                         // 余量=订单级(同工单号需求−累计排产,2026-09-28 拍板)
                         + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s"
-                        + "   WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y'), 0) AS 余量,"
+                        + "   WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y' AND ISNULL(s.scx,N'') <> N''), 0) AS 余量,"
                         + " CONVERT(varchar(10), p.st_date, 120) AS 预开工日,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 预完工日"
                         + " FROM dbo.plang p"
@@ -359,7 +359,7 @@ public class ScheduleBoardService {
                         + " CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN N'完工'"
                         + "      WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
-                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y'), 0) AS 余量,"
+                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y' AND ISNULL(s.scx,N'') <> N''), 0) AS 余量,"
                         + " 0 AS 每箱数量, 0 AS 箱数,"
                         // 批号=转单批次号(与生产工单页「批次号」对应;legacy 旧行无批次号回退产品批号 lot_no)
                         + " ISNULL(NULLIF(pc.[批次号],N''), ISNULL(pc.lot_no,N'')) AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
@@ -407,7 +407,7 @@ public class ScheduleBoardService {
                             + " ISNULL(p.jldw,N'') AS 单位, ISNULL(p.scx,N'') AS 生产线, ISNULL(p.pl_man,N'') AS 操作员,"
                             + " ISNULL(p.lot_no,N'') AS 批号, ISNULL(管控.重点管控, N'否') AS 重点管控,"
                             + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
-                            + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y'), 0) AS 余量,"
+                            + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y' AND ISNULL(s.scx,N'') <> N''), 0) AS 余量,"
                             + " CONVERT(varchar(10), p.st_date, 120) AS 预开工日,"
                             + " CONVERT(varchar(10), p.cp_date, 120) AS 预完工日,"
                             + " CONVERT(varchar(10), p.cp_date2, 120) AS 实际完工日期,"
@@ -447,7 +447,7 @@ public class ScheduleBoardService {
         // 排产数据:plang_pc 各排产行(未排产为空)
         List<Map<String, Object>> sched = jdbc.queryForList(
                 "SELECT pc.scx AS 生产线, ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
-                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y'), 0) AS 余量,"
+                        + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y' AND ISNULL(s.scx,N'') <> N''), 0) AS 余量,"
                         + " 0 AS 每箱数量, 0 AS 箱数, 0 AS 开产量,"
                         + " CONVERT(varchar(10), pc.st_date, 120) AS 计划开工日,"
                         + " CONVERT(varchar(10), pc.cp_date, 120) AS 工序交期,"

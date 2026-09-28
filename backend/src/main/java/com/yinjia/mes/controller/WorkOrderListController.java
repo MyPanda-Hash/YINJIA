@@ -100,7 +100,7 @@ public class WorkOrderListController {
                         // 余量(2026-09-28 用户拍板)=订单级:同工单号需求 − 同工单号累计排产(全部批次行);
                         // 行级口径(本行需求−本行排产)会把同订单多批次行显示成多个独立余量,误导
                         + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(ISNULL(s.pl_sl,0)) FROM dbo.plang s"
-                        + "   WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y'), 0) AS 余量,"
+                        + "   WHERE s.pl_no = p.pl_no AND ISNULL(s.asp_cancel,'N') <> 'Y' AND ISNULL(s.scx,N'') <> N''), 0) AS 余量,"
                         + " ISNULL(p.ll_no2, N'') AS 领料单号, ISNULL(p.lot_no, N'') AS 批号,"
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
                         + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
@@ -136,7 +136,7 @@ public class WorkOrderListController {
         Map<String, Object> sum = jdbc.queryForMap(
                 "SELECT COUNT(*) AS 分段行数, MAX(ISNULL(p.xq_sl,0)) AS 需求数量,"
                         + " SUM(ISNULL(p.pl_sl,0)) AS 累计排产, SUM(ISNULL(p.rk_sl,0)) AS 累计入库,"
-                        + " MAX(ISNULL(p.xq_sl,0)) - SUM(ISNULL(p.pl_sl,0)) AS 订单余量"
+                        + " MAX(ISNULL(p.xq_sl,0)) - SUM(CASE WHEN ISNULL(p.scx,N'') <> N'' THEN ISNULL(p.pl_sl,0) ELSE 0 END) AS 订单余量"
                         + " FROM dbo.plang p WHERE p.pl_no = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'", no);
         if (((Number) sum.getOrDefault("分段行数", 0)).intValue() == 0)
             throw new IllegalArgumentException("工单不存在:" + no);
