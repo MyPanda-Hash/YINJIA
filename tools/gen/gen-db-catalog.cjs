@@ -159,7 +159,7 @@ doc.push('|---|---|');
 doc.push('| 文档类型 | 开发规范·数据库表清单 |');
 doc.push('| 适用场景 | 新增/修改表、查表结构、判断「这张表能不能动」 |');
 doc.push('| 维护状态 | 生效 |');
-doc.push('| 数据口径 | 正式库 `HSDZ_MES`（测试库 `HSDZ_MES_TEST` 结构一致，见 [环境与数据库](环境与数据库.md)） |');
+doc.push('| 数据口径 | 正式库 `HSDZ_MES`（本文档由它生成）；测试库 `HSDZ_MES_TEST` 是它的**快照副本**，可能含实验性额外列 —— 同构判定与陷阱见 [环境与数据库](环境与数据库.md) |');
 doc.push('| 数据来源 | `sys.tables` / `sys.views` + 扩展属性 `MS_Description` + `yj_panel` 面板对照 |');
 doc.push(`| 生成日期 | ${date} |`);
 doc.push(`| 覆盖范围 | ${nTables} 张表 + ${nViews} 个视图（含遗留与备份表，全部列出不留盲区） |`);
