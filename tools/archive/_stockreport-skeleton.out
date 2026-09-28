@@ -1,0 +1,36 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:14 字符: 148
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-stockreport-skeleton.sql ==
+  | STOCK_BALANCE | 库存状况表 | 报表 | flat |  | v_stock_balance | 
+  | STOCK_LEDGER | 库存台账 | 报表 | flat |  | v_stock_ledger | 
+  | STOCK_STATUS | 库存状况 | 报表 | flat |  | kucun | 
+  | STOCK_SUMMARY | 收发存汇总表 | 报表 | flat |  | v_stock_summary | 
+  | WO_LINE | 线边库存 | 报表 | flat |  | wo_line_stock | 
+  | inv_cost_ledger | USER_TABLE | null | 
+  | kucun | USER_TABLE | null | 
+  | v_lot_trace | VIEW | 3313 | 
+  | v_stock_balance | VIEW | 771 | 
+  | v_stock_ledger | VIEW | 1167 | 
+  | v_stock_movement | VIEW | 7740 | 
+  | 1 | src | int | 
+  | 2 | rid | int | 
+  | 3 | 仓库键 | nvarchar | 
+  | 4 | 存货编码 | nvarchar | 
+  | 5 | 批号 | nvarchar | 
+  | 6 | 单据日期 | date | 
+  | 7 | 收入数量 | decimal | 
+  | 8 | 发出数量 | decimal | 
+  | 9 | 收入金额 | decimal | 
+  | 10 | 结存数量 | decimal | 
+  | 11 | 移动加权单价 | decimal | 
+  | 12 | 结存金额 | decimal | 
+  | 13 | 发出成本金额 | decimal | 
+  | 14 | 重算时间 | datetime2 | 
+  | 36 | 
+[OK] _q-stockreport-skeleton.sql (5 batches)

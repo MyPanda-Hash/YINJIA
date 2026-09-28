@@ -1,0 +1,153 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:5 字符: 137
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-vmovement.sql ==
+  | 
+CREATE VIEW dbo.v_stock_movement AS
+WITH mv AS (
+  -- 1 采购入库单(入库 +)
+  -- (2026-09-23 仓库正名:migrate-wh-field-rename 把 bl_purchase_in.仓库名称 改名回了 仓库 —— 单据选仓库
+  --  字段全局统一叫「仓库」,本视图采购段照读 l.仓库;输出列名 仓库名称 是视图对外契约,不改)
+  SELECT 1 AS src, l.id AS rid, h.单据日期, N'采购入库单' AS 单据类型, l.单据编号, N'入库' AS 业务类型,
+         l.仓库 AS 仓库名称, NULLIF(RTRIM(CAST(l.仓库编码 AS nvarchar(200))),N'') AS 自身仓库编码,
+         ISNULL(NULLIF(RTRIM(CAST(l.存货编码 AS nvarchar(200))),N''), N'(未填存货)') AS 存货编码,
+         l.存货名称 AS 存货, l.规格型号, l.计量单位,
+         -- 批号口径(2026-09-24 修):批次号(分批送料链路落的列)优先、批号(金蝶同步列)兜底——
+         -- 旧版只读 批号,115 行批次号有值而批号空的全部显示「(未填批号)」(与 kucun 台账口径对齐)
+         COALESCE(NULLIF(RTRIM(CAST(l.批次号 AS nvarchar(60))),N''), NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''), N'(未填批号)') AS 批号,
+         CAST(l.实收数量 AS decimal(18,4)) AS 收入数量, CAST(0 AS decimal(18,4)) AS 发出数量,
+         CAST(ISNULL(l.金额, l.单价 * l.实收数量) AS decimal(18,4)) AS 收入金额,
+         CAST(0 AS decimal(18,4)) AS 发出单据金额,
+         CAST(l.含税金额 AS decimal(18,4)) AS 含税金额,
+         CAST(l.含税金额 - ISNULL(l.金额, l.单价 * l.实收数量) AS decimal(18,4)) AS 税额,
+         h.供应商 AS 往来单位, NULLIF(RTRIM(CAST(h.供应商编码 AS nvarchar(200))),N'') AS 往来单位编码,
+         h.经手人 AS 经手人
+  FROM bl_purchase_in l JOIN bd_purchase_in h ON l.单据编号=h.单据编号
+  WHERE ISNULL(l.asp_cancel,'N')<>'Y' AND ISNULL(h.asp_cancel,'N')<>'Y'
+    AND (h.单据状态=N'已审核' OR ISNULL(h.单据状态2,'')='C'
+         OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code='PURCHASE_IN' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
+  UNION ALL
+  -- 2 产成品入库单(入库 +)
+  SELECT 2, l.id, h.单据日期, N'产成品入库单', l.单据编号, N'入库',
+         l.仓库, NULL,
+         ISNULL(NULLIF(RTRIM(CAST(l.产品编码 AS nvarchar(200))),N''), N'(未填存货)'),
+         l.产品名称, l.规格型号, l.计量单位,
+         ISNULL(NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''), N'(未填批号)'),
+         CAST(l.实收数量 AS decimal(18,4)), CAST(0 AS decimal(18,4)),
+         CAST(ISNULL(l.金额, l.单价 * l.实收数量) AS decimal(18,4)),
+         CAST(0 AS decimal(18,4)),
+         NULL, NULL,
+         NULL, NULL, h.经手人
+  FROM bl_finish_in l JOIN bd_finish_in h ON l.单据编号=h.单据编号
+  WHERE ISNULL(l.asp_cancel,'N')<>'Y' AND ISNULL(h.asp_cancel,'N')<>'Y'
+    AND (h.单据状态=N'已审核' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code='FINISH_IN' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
+  UNION ALL
+  -- 3 其他入库单(入库 +);bd_other_in 无 经手人 列 → NULL
+  SELECT 3, l.id, h.单据日期, N'其他入库单', l.单据编号, N'入库',
+         l.仓库, NULL,
+         ISNULL(NULLIF(RTRIM(CAST(l.存货编码 AS nvarchar(200))),N''), N'(未填存货)'),
+         l.存货名称, l.规格型号, l.计量单位,
+         ISNULL(NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''), N'(未填批号)'),
+         CAST(l.数量 AS decimal(18,4)), CAST(0 AS decimal(18,4)),
+         CAST(ISNULL(l.金额, l.单价 * l.数量) AS decimal(18,4)),
+         CAST(0 AS decimal(18,4)),
+         NULL, NULL,
+         NULL, NULL, NULL
+  FROM bl_other_in l JOIN bd_other_in h ON l.单据编号=h.单据编号
+  WHERE ISNULL(l.asp_cancel,'N')<>'Y' AND ISNULL(h.asp_cancel,'N')<>'Y'
+    AND (h.单据状态=N'已审核' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code='OTHER_IN' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
+  UNION ALL
+  -- 4 委外入库单(入库 +)
+  SELECT 4, l.id, h.单据日期, N'委外入库单', l.单据编号, N'入库',
+         l.仓库, NULL,
+         ISNULL(NULLIF(RTRIM(CAST(l.产品编码 AS nvarchar(200))),N''), N'(未填存货)'),
+         l.产品名称, l.规格型号, l.计量单位,
+         ISNULL(NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''), N'(未填批号)'),
+         CAST(l.实收数量 AS decimal(18,4)), CAST(0 AS decimal(18,4)),
+         CAST(ISNULL(l.金额, l.单价 * l.实收数量) AS decimal(18,4)),
+         CAST(0 AS decimal(18,4)),
+         NULL, NULL,
+         NULL, NULL, h.经手人
+  FROM bl_outsource_in l JOIN bd_outsource_in h ON l.单据编号=h.单据编号
+  WHERE ISNULL(l.asp_cancel,'N')<>'Y' AND ISNULL(h.asp_cancel,'N')<>'Y'
+    AND (h.单据状态=N'已审核' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code='OUTSOURCE_IN' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
+  UNION ALL
+  -- 5 销售出库单(出库 −):收入金额 0,售价金额单列(成本由物化表给)
+  SELECT 5, l.id, h.单据日期, N'销售出库单', l.单据编号, N'出库',
+         l.仓库, NULLIF(RTRIM(CAST(l.仓库编码 AS nvarchar(200))),N''),
+         ISNULL(NULLIF(RTRIM(CAST(l.存货编码 AS nvarchar(200))),N''), N'(未填存货)'),
+         l.存货名称, l.规格型号, l.计量单位,
+         ISNULL(NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''), N'(未填批号)'),
+         CAST(0 AS decimal(18,4)), CAST(l.数量 AS decimal(18,4)),
+         CAST(0 AS decimal(18,4)),
+         CAST(ISNULL(l.销售金额, l.售价 * l.数量) AS decimal(18,4)),
+         CAST(l.含税销售金额 AS decimal(18,4)), CAST(l.税额 AS decimal(18,4)),
+         h.客户, NULLIF(RTRIM(CAST(h.客户编码 AS nvarchar(200))),N''), h.经手人
+  FROM bl_sale_out l JOIN bd_sale_out h ON l.单据编号=h.单据编号
+  WHERE ISNULL(l.asp_cancel,'N')<>'Y' AND ISNULL(h.asp_cancel,'N')<>'Y'
+    AND (h.单据状态=N'已审核' OR ISNULL(h.单据状态2,'')='C'
+         OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code='SALE_OUT' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
+  UNION ALL
+  -- 6 材料出库单(出库 −);bd_material_out 无 经手人 列(有 领用人,语义不同)→ NULL
+  SELECT 6, l.id, h.单据日期, N'材料出库单', l.单据编号, N'出库',
+         l.仓库, NULL,
+         ISNULL(NULLIF(RTRIM(CAST(l.材料编码 AS nvarchar(200))),N''), N'(未填存货)'),
+         l.材料名称, l.规格型号, l.计量单位,
+         ISNULL(NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''), N'(未填批号)'),
+         CAST(0 AS decimal(18,4)), CAST(l.数量 AS decimal(18,4)),
+         CAST(0 AS decimal(18,4)),
+         CAST(ISNULL(l.金额, l.单价 * l.数量) AS decimal(18,4)),
+         NULL, NULL,
+         NULL, NULL, NULL
+  FROM bl_material_out l JOIN bd_material_out h ON l.单据编号=h.单据编号
+  WHERE ISNULL(l.asp_cancel,'N')<>'Y' AND ISNULL(h.asp_cancel,'N')<>'Y'
+    AND (h.单据状态=N'已审核' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code='MATERIAL_OUT' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
+  UNION ALL
+  -- 7 其他出库单(出库 −)
+  SELECT 7, l.id, h.单据日期, N'其他出库单', l.单据编号, N'出库',
+         l.仓库, NULL,
+         ISNULL(NULLIF(RTRIM(CAST(l.存货编码 AS nvarchar(200))),N''), N'(未填存货)'),
+         l.存货名称, l.规格型号, l.计量单位,
+         ISNULL(NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''), N'(未填批号)'),
+         CAST(0 AS decimal(18,4)), CAST(l.数量 AS decimal(18,4)),
+         CAST(0 AS decimal(18,4)),
+         CAST(ISNULL(l.金额, l.单价 * l.数量) AS decimal(18,4)),
+         NULL, NULL,
+         NULL, NULL, h.经手人
+  FROM bl_other_out l JOIN bd_other_out h ON l.单据编号=h.单据编号
+  WHERE ISNULL(l.asp_cancel,'N')<>'Y' AND ISNULL(h.asp_cancel,'N')<>'Y'
+    AND (h.单据状态=N'已审核' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code='OTHER_OUT' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
+  UNION ALL
+  -- 8 委外发料单(出库 −)
+  SELECT 8, l.id, h.单据日期, N'委外发料单', l.单据编号, N'出库',
+         l.仓库, NULL,
+         ISNULL(NULLIF(RTRIM(CAST(l.材料编码 AS nvarchar(200))),N''), N'(未填存货)'),
+         l.材料名称, l.规格型号, l.计量单位,
+         ISNULL(NULLIF(RTRIM(CAST(l.批号 AS nvarchar(60))),N''), N'(未填批号)'),
+         CAST(0 AS decimal(18,4)), CAST(l.数量 AS decimal(18,4)),
+         CAST(0 AS decimal(18,4)),
+         CAST(ISNULL(l.金额, l.单价 * l.数量) AS decimal(18,4)),
+         NULL, NULL,
+         NULL, NULL, h.经手人
+  FROM bl_outsource_issue l JOIN bd_outsource_issue h ON l.单据编号=h.单据编号
+  WHERE ISNULL(l.asp_cancel,'N')<>'Y' AND ISNULL(h.asp_cancel,'N')<>'Y'
+    AND (h.单据状态=N'已审核' OR EXISTS(SELECT 1 FROM yj_doc_status st WHERE st.panel_code='OUTSOURCE_ISSUE' AND st.doc_no=h.单据编号 AND st.shr IS NOT NULL))
+)
+SELECT m.src, m.rid, m.单据日期, m.单据类型, m.单据编号, m.业务类型,
+       -- 仓库键 = 自身编码 → bs_wh 按名称兜底 → '#'+名称(都无时)
+       -- 兜底是必须的:否则「有编码的行」与「只有名称的行」会落进不同分区,同一仓库被劈成两半
+       -- (实测:不兜底 92 分区,兜底后 78 分区,与按名称分组的 78 一致 → 兜底没有劈开也没有误并)
+       ISNULL(ISNULL(m.自身仓库编码, w.仓库编码), N'#' + ISNULL(m.仓库名称, N'(未填仓库)')) AS 仓库键,
+       ISNULL(m.自身仓库编码, w.仓库编码) AS 仓库编码,
+       ISNULL(m.仓库名称, N'(未填仓库)') AS 仓库,
+       m.存货编码, m.存货, m.规格型号, m.计量单位, m.批号,
+       m.收入数量, m.发出数量, m.收入金额, m.发出单据金额, m.含税金额, m.税额,
+       m.往来单位, m.往来单位编码, m.经手人
+FROM mv m LEFT JOIN dbo.bs_wh w ON w.仓库名称 = m.仓库名称;
+ | 
+[OK] _q-vmovement.sql (2 batches)
