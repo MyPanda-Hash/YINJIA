@@ -1335,7 +1335,9 @@ public class PanelConfigService {
             boolean visible = !Boolean.FALSE.equals(col.get("visible")) && !"false".equals(String.valueOf(col.get("visible")));
             PanelRegistry.FieldDef fd = details.stream().filter(f -> f.label().equals(label)).findFirst().orElse(null);
             if (fd == null) continue;
-            jdbc.update("UPDATE yj_field SET seq = ?, alias = ?, hidden = ?, visible = ? WHERE panel_code = ? AND col_name = ?",
+            // 2026-09-30 补 place 过滤:此前按 col_name 裸 UPDATE,会把同名列的**表头行** seq 一并改写成
+            // 明细网格的位置(QC_INSP 部门/部门名称 表头行 60/70 被写成 290/300 即此故)。
+            jdbc.update("UPDATE yj_field SET seq = ?, alias = ?, hidden = ?, visible = ? WHERE panel_code = ? AND col_name = ? AND place LIKE '%detail%'",
                     (i + 1) * 10, alias.isBlank() ? null : alias, !visible, visible, panelCode, fd.col());
         }
         registry.reload();
