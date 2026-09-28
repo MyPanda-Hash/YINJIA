@@ -3,7 +3,7 @@
 # 依据:docs/development/数据库规范.md §5;读取方:tools/verify/DbNormAudit.java
 # 生成:2026-09-28(自正式库 HSDZ_MES 快照,生成器 tools/gen/gen-legacy-whitelist.sql)
 # 之后由人工维护:进表要冻结就加 table:;新列不得再进 col:(那是冻结清单,不是许可清单)
-# 格式:table:<表名> | panel:<面板码> | col:<表>.<列> | dupkey:<面板>.<列>
+# 格式:table:<表名> | panel:<面板码> | col:<表>.<列> | dupkey:<面板>.<列> | skiplabel:<中文标签> | count:<检查号>=<基线>
 #
 # ---- 冻结表(遗留/拼音缩写:禁新增、禁扩展、禁新代码引用;现有面板引用见「关联面板」列,改动前须评估) ----
 table:Invoice
@@ -393,5 +393,34 @@ dupkey:WO_STAGE.stage
 # ---- 存量债棘轮基线(实际值只许降不许升)—— 降到 0 即 PASS;归零后基线收到 0,新增违规立即 FAIL ----
 #      03 = 拼音/英文列名的列缺注明 | 09 = 缺 en 译名(面板+字段标签) | 10 = 备份/临时表
 count:03=0
-count:09=1346
+count:09=0
 count:10=65
+
+# ---- 免译标签(标签本身即英文/单位/编号,机翻无意义;要求中文键的改造见《数据库规范》阶段 3) ----
+skiplabel:asp_cancel
+skiplabel:asp_time2
+skiplabel:asp_user2
+skiplabel:D1
+skiplabel:D10
+skiplabel:D11
+skiplabel:D12
+skiplabel:D13
+skiplabel:D2
+skiplabel:D3
+skiplabel:D4
+skiplabel:D5
+skiplabel:D6
+skiplabel:D7
+skiplabel:D8
+skiplabel:D9
+skiplabel:delivery_type_id
+skiplabel:delivery_type_number
+skiplabel:group_id
+skiplabel:is_show_aux_barcode
+skiplabel:ivc_status 
+skiplabel:kf_period
+skiplabel:parent_name
+skiplabel:P-E/kg
+skiplabel:PH\n8.5±0.25
+skiplabel:QQ
+skiplabel:TDS（mg/L）200-500mg/L

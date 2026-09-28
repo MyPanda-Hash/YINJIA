@@ -49,11 +49,13 @@ public class DbNormAudit {
         Path manifest = base.resolve("db-migrations.txt");
         if (Files.exists(wlFile)) {
             for (String line : Files.readAllLines(wlFile, StandardCharsets.UTF_8)) {
-                String t = line.trim();
-                if (t.isEmpty() || t.startsWith("#")) continue;
+                // 只剥行尾的 CR(CRLF 检出),**不 trim 值** —— 白名单里存在带尾空格的列名/标签
+                // (如 col:bd_sale_out.ivc_status 、skiplabel:ivc_status ),trim 会让它们永远匹配不上
+                String t = line.endsWith("\r") ? line.substring(0, line.length() - 1) : line;
+                if (t.isBlank() || t.startsWith("#")) continue;
                 int i = t.indexOf(':');
                 if (i <= 0) continue;
-                WL.computeIfAbsent(t.substring(0, i), k -> new LinkedHashSet<>()).add(t.substring(i + 1));
+                WL.computeIfAbsent(t.substring(0, i).trim(), k -> new LinkedHashSet<>()).add(t.substring(i + 1));
             }
         } else {
             System.out.println("[提示] 未找到 db-legacy-whitelist.txt,豁免清单为空");
@@ -338,15 +340,26 @@ public class DbNormAudit {
             SELECT COUNT(*) FROM yj_panel p WHERE NOT EXISTS (
               SELECT 1 FROM yj_translation t WHERE t.scope = 'panel' AND t.ref_key = RTRIM(p.panel_name) AND t.locale = 'en')""";
         String sqlF = """
-            SELECT COUNT(DISTINCT f.label) FROM yj_field f WHERE NOT EXISTS (
-              SELECT 1 FROM yj_translation t WHERE t.scope = 'field' AND t.ref_key = f.label AND t.locale = 'en')""";
-        int q, f;
+            SELECT f.label FROM yj_field f WHERE NOT EXISTS (
+              SELECT 1 FROM yj_translation t WHERE t.scope = 'field' AND t.ref_key = f.label AND t.locale = 'en')
+            GROUP BY f.label""";
+        int q;
+        Set<String> missing = new LinkedHashSet<>();
         try (Statement st = c.createStatement()) {
             q = scalar(st, sqlQ);
-            f = scalar(st, sqlF);
+            try (ResultSet rs = st.executeQuery(sqlF)) {
+                while (rs.next()) {
+                    String label = rs.getString(1);
+                    if (wl("skiplabel").contains(label)) continue;   // 免译标签登记(本身即英文/单位/编号)
+                    missing.add(label);
+                }
+            }
         }
+        int f = missing.size();
         ratchet("09", "缺 en 译名(面板 " + q + " / 字段标签 " + f + ")", q + f,
-                "面板缺: " + q + " 个;字段标签缺: " + f + " 个(机翻补齐:tools/scripts/trigger-mt.ps1)");
+                "面板缺: " + q + " 个;字段标签缺: " + f + " 个"
+                        + (f > 0 ? "\n" + join(new ArrayList<>(missing), 12) : "")
+                        + "\n补齐:tools/scripts/trigger-mt.ps1;免译标签登记见 §5");
     }
 
     /** 10 备份/临时表(收敛指标:应逐步清零) */
