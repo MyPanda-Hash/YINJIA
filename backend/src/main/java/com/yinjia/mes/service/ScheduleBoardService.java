@@ -58,7 +58,9 @@ public class ScheduleBoardService {
                         + "   AND ISNULL(p.scx, N'') = N''"
                         + "   AND (? = '' OR p.pl_no LIKE ? OR p.od_no LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR p.khdm LIKE ? OR ISNULL(dk.mc,'') LIKE ?)"
                         + "   AND (? = '' OR ISNULL(dk.mc, p.khdm) = ?)"
-                        + " ORDER BY p.cp_date, p.pl_no, p.pl_xc, p.[批次号]",
+                        // 2026-10-11 用户拍板:待排产按转单时间倒序——新结转的工单置顶(asp_time1=转单留痕,
+                        // 与生产工单列表"转单时间"同源;NULL 旧数据沉底,次级 pl_date DESC 对齐工单列表口径)
+                        + " ORDER BY p.asp_time1 DESC, p.pl_date DESC, p.pl_no, p.pl_xc",
                 kw, like, like, like, like, like, like, cu, cu);
     }
 

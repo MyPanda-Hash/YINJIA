@@ -132,10 +132,10 @@ async function saveDates() {
 }
 
 async function toManu() {
-  await convert('toManu', '转工单', '/prod/plan/workOrderList')
+  await convert('toManu', '转工单')
 }
 
-async function convert(api, label, gotoPanel) {
+async function convert(api, label) {
   const list = (checked.value || []).filter((r) => Number(r.生单数量) > 0)
   if (!list.length) { ElMessage.warning(tt('请先勾选要结转的订单行')); return }
   const qty = list.reduce((a, r) => a + Number(r.生单数量 || 0), 0)
@@ -156,17 +156,15 @@ async function convert(api, label, gotoPanel) {
     })
     const d = res.data || {}
     const failed = d['失败行'] || []
-    try {
-      await ElMessageBox.confirm(
-        `${tt('已生成')} ${d['生成张数']} ${tt('张')}：${(d['编号清单'] || []).join('、')}`
+    // 2026-10-11 用户拍板:结转只弹首道「确认转工单」框,结果不再弹窗——轻提示带出即可;
+    // 新工单即落 plang 入快速排产待排产池(该池已改新单置顶),本页刷新后转满行自动消失
+    ElMessage({
+      type: 'success',
+      message: `${tt('已生成')} ${d['生成张数']} ${tt('张')}：${(d['编号清单'] || []).join('、')}`
         + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''),
-        tt('订单结转') + '·' + tt(label),
-        { confirmButtonText: tt('前往查看'), cancelButtonText: tt('留在本页') },
-      )
-      // 2026-09-26 单轨:转工单落 plang,前往查看=生产工单列表页(/prod/plan/workOrderList);
-      // 面板类(如 PU_REQ)仍走 /panelx/list/<code>
-      window.location.hash = gotoPanel.startsWith('/') ? `#${gotoPanel}` : `#/panelx/list/${gotoPanel}`
-    } catch { /* 留在本页 */ }
+      duration: 5000,
+      showClose: true,
+    })
     loadAll()
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || tt('转单失败'))
