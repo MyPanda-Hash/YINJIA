@@ -1565,6 +1565,8 @@
     </el-dialog>
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <VoucherFormDialog v-model="formVisible" :panel-code="formPanel || panelCode" :code="formCode" @saved="onFormSaved" />
+    <!-- 字段管理(动态字段/备用列池;仅 admin):绑定/停用自定义字段 -->
+    <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
     <ScanFillDialog
       v-model="scanVisible"
       :panel-code="panelCode"
@@ -1691,6 +1693,7 @@ import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, syncBatchNoWithDocDate, docNoFromDate } from '@core/panel/docDefaults'
 import { printPuOrder, printQcReturn, printProductCards, printProductionTask, woQrText } from '@/business/print-formats'
 import QrLabelDialog from './QrLabelDialog.vue'
+import FieldManagerDialog from './FieldManagerDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
 import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
@@ -1919,6 +1922,8 @@ function applyAdvFilters(rows) {
 
 // ---- 表格列自定义(排序/栏名/显隐) ----
 const colPrefVisible = ref(false)
+// 字段管理(动态字段/备用列池):仅 admin 入口可见,服务端 requireAdmin 把守写操作
+const fieldMgrVisible = ref(false)
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
 
@@ -5339,6 +5344,10 @@ async function loadCrg() {
     cfg?.metadata?.buttonGroups,
     cfg?.metadata,
   ))
+  // 字段管理(动态字段):非 admin 隐藏入口(服务端 requireAdmin 是真闸门;flat 面板后端不注入)
+  if (!user.isAdmin) {
+    groups.value = groups.value.map((g) => ({ ...g, actions: (g.actions || []).filter((a) => a !== '字段管理') }))
+  }
   return cfg
 }
 
@@ -5997,6 +6006,10 @@ async function onButton(action) {
   }
   if (action === '表头调整') {
     openHeadPrefs()
+    return
+  }
+  if (action === '字段管理') {
+    fieldMgrVisible.value = true
     return
   }
   if (action === '分类管理') {

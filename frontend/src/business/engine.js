@@ -363,6 +363,23 @@ export async function saveHeaderPrefs({ panelCode, columns }) {
   return unwrap(await request.post('/px/saveHeaderPrefs', { panelCode, columns }))
 }
 
+// ==================== 动态字段(备用列池;规格 docs/design/动态字段扩展-备用列池-V1.0.md) ====================
+
+/** 字段管理总览:现有动态字段 + 备用列池占用/脏行 */
+export async function extFieldOverview(panelCode) {
+  return unwrap(await request.get('/px/extFields', { params: { panel: panelCode } }))
+}
+
+/** 绑定新字段到空闲备用列(仅管理员;守卫在后端) */
+export async function extFieldAdd(payload) {
+  return unwrap(await request.post('/px/extField/add', payload))
+}
+
+/** 退绑(数据保留,永不 DROP;仅管理员) */
+export async function extFieldRetire(payload) {
+  return unwrap(await request.post('/px/extField/retire', payload))
+}
+
 // ==================== 选单流转(对齐 T+ SelectVoucher;占用跟踪 form_flow_link) ====================
 
 /** 选单来源查询:已审核 + 未被占用行(带 _lineKey/剩余数量) */
