@@ -908,6 +908,8 @@ migrate-qc-insp-drop-pannum.sql
 #   幂等:全新库上为无操作(对象不存在);自检三处无残留。
 migrate-batch-ledger-drop.sql
 
+# —— 2026-09-24 检验/退料明细缺列补齐(规格型号/不合格数量/处置方式;spec-unify 与特采生单依赖,远程库上直改未入链;面板字段 型号→规格型号) ——
+migrate-align-qc-col-fix-20260924.sql
 # —— 2026-09-21 采购链字段流转修复 ①:规格命名统一为「规格型号」 ——
 #   用户口径:「采购订单→来料暂收单→来料检验单→采购入库单/暂收退料单 链路流转时表格部分数据没过去,
 #   如规格型号与规格 —— 把规格统一写成规格型号」。
@@ -1561,8 +1563,6 @@ migrate-align-views-20260924.sql
 migrate-align-fields-20260924.sql
 # —— 2026-09-24 送料暂收供应商参照回正(GFDA)+头重复行清理+计量单位列序245+存量回填;根因=sl-supplier-ref 旧编码 SL_RECV 重放0行命中 ——
 migrate-fix-qc-recv-ref-20260924.sql
-# —— 2026-09-24 检验/退料明细缺列补齐(规格型号/不合格数量/处置方式;spec-unify 与特采生单依赖,远程库上直改未入链;面板字段 型号→规格型号) ——
-migrate-align-qc-col-fix-20260924.sql
 # —— 2026-09-24 kucun.ckdm 扩宽 6→200(7位仓库编码 CK0000x 入库审核截断报错;对齐 bs_wh.仓库编码宽度) ——
 migrate-kucun-ckdm-widen-20260924.sql
 # —— 2026-09-24 智能供应链+品质管理 两模块角色授权补齐(51面板;报表类只读档/单据类全权;授权行 39→282) ——
@@ -1597,3 +1597,6 @@ migrate-scjl-single-table.sql
 migrate-prodline-import.sql
 # —— 2026-09-28 仓库档案(WH)加 库位 字段(bs_wh 加列;detail 可编辑文本;九语言译名;列注明) ——
 migrate-wh-location.sql
+
+# —— 2026-09-28 服务器侧直改结构对齐:服务器 bak 演练发现 106 列"仅服务器存在"(asp_* 审计 3/4 套件、研发板块远端列、bl_dispatch 派工数量组、yj_user 遗留宽表列);守卫式补列,服务器上=全跳过 no-op,开发两账套补齐 → 三库同构 ——
+migrate-server-parity-20260928.sql

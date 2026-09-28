@@ -188,16 +188,16 @@ DECLARE @h int = (SELECT COUNT(*) FROM yj_field WHERE panel_code='QC_RECV' AND p
     AND col_name IN (N'来料性质',N'仓库',N'金额',N'税额',N'总金额',N'审核人',N'审核时间'));
 DECLARE @d int = (SELECT COUNT(*) FROM yj_field WHERE panel_code='QC_RECV' AND place LIKE '%detail%'
     AND col_name IN (N'发货数量',N'剩余数量',N'退料数量',N'报废数量',N'条码',N'制单号',N'折扣金额',N'品质复核人',N'品质复核时间'));
--- 注:yj_translation 历史上有重复 (ref_key,locale) 行(实测 scope='field' 有 22 组重复),故按
---    **去重后的组数**判定而非行数;本脚本只补缺,不删历史重复行。
-DECLARE @tr int = (SELECT COUNT(*) FROM (
-    SELECT DISTINCT ref_key, locale FROM yj_translation WHERE scope='field'
-      AND ref_key IN (N'来料性质',N'仓库',N'金额',N'税额',N'总金额',N'审核人',N'审核时间',N'发货数量',N'剩余数量',N'退料数量',N'制单号',N'折扣金额',N'品质复核人',N'品质复核时间')
-      AND locale IN ('en','ja','ko','de','fr','es','ru','th','vi','zh-TW')) d);
+-- 注:本脚本只补缺,不删历史重复行。译名自检**只验「本脚本自带的种子行全部在库」**——
+--    旧写法硬编码「140 = 14 标签 × 10 语言」把开发机历史上零散补过的 56 条算进基线,
+--    在服务器态库上必假失败(2026-09-28 演练实测 98≠140),故改为对 #rcv_tr 逐行核对缺失数。
+DECLARE @tr int = (SELECT COUNT(*) FROM #rcv_tr t
+    WHERE NOT EXISTS (SELECT 1 FROM yj_translation x
+                  WHERE x.scope = 'field' AND x.ref_key = t.label AND x.locale = t.locale));
 IF @h <> 7 OR @d <> 9
     RAISERROR(N'[qc-recv-fields] 自检失败:表头 %d(应 7)/表体 %d(应 9)', 16, 1, @h, @d);
-IF @tr <> 140
-    RAISERROR(N'[qc-recv-fields] 自检失败:译名 %d 条(应 140 = 14 标签 × 10 语言)', 16, 1, @tr);
-IF @h = 7 AND @d = 9 AND @tr = 140
-    PRINT N'[qc-recv-fields] 自检通过:表头 7 + 表体 9 = 16 字段,译名 14×10=140 条(未新增「批号」列,沿用批次号)';
+IF @tr > 0
+    RAISERROR(N'[qc-recv-fields] 自检失败:自带译名 %d 条缺失', 16, 1, @tr);
+IF @h = 7 AND @d = 9 AND @tr = 0
+    PRINT N'[qc-recv-fields] 自检通过:表头 7 + 表体 9 = 16 字段,自带译名种子全部在库(未新增「批号」列,沿用批次号)';
 GO
