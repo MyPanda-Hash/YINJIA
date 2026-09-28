@@ -1623,3 +1623,5 @@ migrate-ext-bind-log.sql
 migrate-pc-plang-id.sql
 # —— 2026-09-30 来料检验单表头治理:①部门/部门名称 明细行从 header,detail 退回 detail(消表头重复,根因=chain-field-complete §④ 升格未合并);②表头行 seq 归位(业务员30/部门60/部门名称70,表格调整无 place 过滤曾把表头行 seq 连带改写成 290/300);③补登协作机侧 检验员/检验日期/检验方案/总结论 四表头字段(rebuild 清字段+align-merge 只补列未补字段行的欠账);配套 PanelConfigService.saveColumnPrefs 补 place 过滤 ——
 migrate-qcinsp-header-fix.sql
+# —— 2026-09-28 台账/状况表查询弹窗过滤改编码索引(修同名多码歧义):仓库/存货参照 ref_field 改绑 仓库编码/存货编码(display 不变仍显名称;bs_inv 重名实测「端盖」24码/「PP棉」18码,按名称收窄把同名异码整批放进候选且查询按名称并流,单一性破);配套后端联动选项/台账查询改编码精确等值(不走 LIKE,编码互为子串)+前端收窄注入 filter{存货编码:[…]};汇总表非级联不动;两视图本就有编码列无需重建 ——
+migrate-ledger-code-filter.sql

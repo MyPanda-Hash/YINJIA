@@ -2190,8 +2190,8 @@ const reportMode = computed(() => cfgCache.value?.metadata?.report === true || c
 // 字段:单据日期(区间控件,必填) + 仓库/存货(参照;台账必填单一仓库+单一存货,汇总选填)
 // 进入态差异:①未完成过查询就关闭(✕/取消)=退出页面 ②必填项校验(applyHeaderQuery)。
 const reportQueryDialog = computed(() => cfgCache.value?.metadata?.reportQueryDialog === true)
-// 级联查询面板(台账/库存状况):仓库/存货走基础资料参照(WH/INV)+「档案∩有流水」联动收窄;
-// 台账 仓库/存货 必填(单一仓库的一种存货);库存状况表选填(快照,无日期)
+// 级联查询面板(台账/库存状况):仓库/存货走基础资料参照(WH/INV,绑定编码)+「档案∩有流水」联动收窄;
+// 台账 仓库/存货 必填(单一仓库的一种存货=仓库编码+存货编码唯一);库存状况表选填(快照,无日期)
 const isCascadePanel = computed(() => ['STOCK_LEDGER', 'STOCK_BALANCE'].includes(panelCode.value))
 /** 查询条件只进弹窗、无内联查询区的面板(台账/汇总=强制弹窗;状况表=级联)——「查询」按钮统一开弹窗 */
 const queryInDialogOnly = computed(() => reportQueryDialog.value || isCascadePanel.value)
@@ -2209,6 +2209,8 @@ function rqdFieldRequired(field) {
   return false
 }
 // 台账联动选项:仓库/存货下拉互相约束(选项=后端 v_stock_ledger 真实组合)
+// 2026-09-28 起按**编码**联动(仓库编码/存货编码):存货名称重名严重(「端盖」24 码),名称索引破坏单一性;
+// 参照随之绑定编码(ref_field=仓库编码/存货编码,display 仍显示名称),queryDraft 存/传的都是编码
 const ledgerWhOptions = ref([])
 const ledgerItemOptions = ref([])
 const ledgerOptsLoading = ref(false)
@@ -2230,17 +2232,19 @@ async function loadLedgerRefOptions({ keepWh = true, keepItem = true } = {}) {
     ledgerOptsLoading.value = false
   }
 }
-/** 弹窗参照下拉选中变化:仅台账/库存状况的「仓库」要重拉联动(存货可能因换仓失效被清)。其余参照不联动 */
+/** 弹窗参照下拉选中变化:仅台账/库存状况的「仓库」要重拉联动(存货可能因换仓失效被清)。
+ *  v=仓库编码(参照绑定编码),其余参照不联动 */
 async function onDialogRefSelectChange(field) {
   if (!isCascadePanel.value || headerFieldKey(field) !== '仓库') return
   const hadItem = queryDraft['存货']
   await loadLedgerRefOptions({ keepWh: true, keepItem: false })
   if (hadItem && !queryDraft['存货']) ElMessage.info(tt('该仓无此存货流水，已清空存货'))
 }
-/** 仓库下拉选项置灰(选了存货后):该存货无流水的仓不可选 —— 选项=档案(bs_wh) ∩ 有流水 */
+/** 仓库下拉选项置灰(选了存货后):该存货无流水的仓不可选 —— 选项=档案(bs_wh) ∩ 有流水。
+ *  比 option.value(=仓库编码,参照绑定编码):ledgerWhOptions 是编码清单 */
 function ledgerOptionDisabled(field, option) {
   return isCascadePanel.value && headerFieldKey(field) === '仓库'
-    && !!queryDraft['存货'] && !ledgerWhOptions.value.includes(option.label)
+    && !!queryDraft['存货'] && !ledgerWhOptions.value.includes(option.value)
 }
 /** 弹窗字段下方的联动提示行:选仓后存货候选收窄计数 / 选存货后全仓无流水的说明 */
 function dialogFieldHint(field) {
@@ -5066,12 +5070,14 @@ function openQueryDialog() {
 }
 
 function openQueryRef(qr, context = 'page') {
-  // 台账/库存状况(2026-09-21):弹窗里选「存货」且已选仓库 → 候选按「该仓有流水」收窄。
-  // 注入数组型 filter{存货名称:[…]}(engine.queryRefRows 对数组 filter 在展平后的档案行上逐行精确匹配,
+  // 台账/库存状况(2026-09-28):弹窗里选「存货」且已选仓库 → 候选按「该仓有流水」收窄。
+  // 注入数组型 filter{存货编码:[…]}(engine.queryRefRows 对数组 filter 在展平后的档案行上逐行精确匹配,
   // 不会误发给后端当查询条件);该仓无任何有流水的档案存货时不收窄(不给空清单)。
+  // 按**编码**而非名称:存货档案重名严重(「端盖」24 码、「PP棉」18 码),按名称会把
+  // 同名异码整批放进候选,用户分不清哪个有流水 —— 编码唯一,收窄后一码一物(单一性)。
   if (context === 'dialog' && isCascadePanel.value && headerFieldKey(qr) === '存货' && queryDraft['仓库']) {
-    const names = ledgerItemOptions.value
-    if (names.length) qr = { ...qr, filter: { ...(qr.filter || {}), 存货名称: names } }
+    const codes = ledgerItemOptions.value
+    if (codes.length) qr = { ...qr, filter: { ...(qr.filter || {}), 存货编码: codes } }
   }
   queryRefField.value = qr
   queryRefContext.value = context

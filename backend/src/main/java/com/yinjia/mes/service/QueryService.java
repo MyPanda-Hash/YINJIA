@@ -60,7 +60,28 @@ public class QueryService {
         String cols = selectCols(def, def.fields());
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
-        appendDirectFilters(def, def.lineTable(), where, args, keyword, condition, l2c, "t");
+        // 台账/库存状况(级联面板)的 仓库/存货 条件:参照绑定编码(migrate-ledger-code-filter.sql),
+        // 条件值=编码 → 在视图编码列上**精确等值**。不走通用 LIKE:编码互为子串
+        // (YJ-SX-004 / YJ-SX-004-1),LIKE 会把多个存货并进同一张台账,破坏「一仓一存货」单一性。
+        Map<String, Object> cond = condition;
+        if ("STOCK_LEDGER".equals(def.code()) || "STOCK_BALANCE".equals(def.code())) {
+            Object wh = condition == null ? null : condition.get("仓库");
+            Object it = condition == null ? null : condition.get("存货");
+            if ((wh != null && !String.valueOf(wh).isBlank()) || (it != null && !String.valueOf(it).isBlank())) {
+                cond = new LinkedHashMap<>(condition);
+                if (wh != null && !String.valueOf(wh).isBlank()) {
+                    where.append(" AND RTRIM(t.[仓库编码]) = ?");
+                    args.add(String.valueOf(wh).trim());
+                }
+                if (it != null && !String.valueOf(it).isBlank()) {
+                    where.append(" AND RTRIM(t.[存货编码]) = ?");
+                    args.add(String.valueOf(it).trim());
+                }
+                cond.remove("仓库");
+                cond.remove("存货");
+            }
+        }
+        appendDirectFilters(def, def.lineTable(), where, args, keyword, cond, l2c, "t");
         appendAdvFilters(advFilters, where, args, l2c, "t");
 
         Integer total = jdbc.queryForObject(
@@ -90,15 +111,16 @@ public class QueryService {
             String de = strOf(condition.get("结束日期"));
             if (!wh.isBlank() && !item.isBlank() && !ds.isBlank() && !de.isBlank()) {
                 // 期初 = 段起点前累计(视图中限 单据日期<=de 的行,取 <ds 部分;用视图暴露的收入/发出列)
+                // 仓库/存货=编码(参照绑定编码),按编码列精确匹配 —— 名称重名(「端盖」24码)会并流
                 Map<String, Object> opening = jdbc.queryForMap(
                         "SELECT ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入数量 - 发出数量 ELSE 0 END),0) AS q,"
                                 + " ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入金额 - 发出金额 ELSE 0 END),0) AS a"
-                                + " FROM v_stock_ledger WHERE RTRIM(仓库)=? AND RTRIM(存货)=? AND 单据日期 <= ?" + hint,
+                                + " FROM v_stock_ledger WHERE RTRIM(仓库编码)=? AND RTRIM(存货编码)=? AND 单据日期 <= ?" + hint,
                         ds, ds, wh, item, de);
                 double oq = numD(opening.get("q")), oa = numD(opening.get("a"));
                 Map<String, Object> netm = jdbc.queryForMap(
                         "SELECT ISNULL(SUM(收入数量 - 发出数量),0) AS q, ISNULL(SUM(收入金额 - 发出金额),0) AS a"
-                                + " FROM v_stock_ledger WHERE RTRIM(仓库)=? AND RTRIM(存货)=? AND 单据日期 >= ? AND 单据日期 <= ?" + hint,
+                                + " FROM v_stock_ledger WHERE RTRIM(仓库编码)=? AND RTRIM(存货编码)=? AND 单据日期 >= ? AND 单据日期 <= ?" + hint,
                         wh, item, ds, de);
                 double cq = oq + numD(netm.get("q")), ca = oa + numD(netm.get("a"));
                 totalOut += 2;
