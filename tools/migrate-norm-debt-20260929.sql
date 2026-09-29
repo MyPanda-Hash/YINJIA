@@ -7,6 +7,9 @@
 --      全仓无引用,属遗留对齐列)。规范 §2.4:列级必须有中文注明 ⇒ 补注明并如实标注「遗留」。
 --   · 09 缺 en 译名 2 处:字段标签 最新成本(INV 等面板)、预警数量(STOCK_STATUS)。
 --     多语言强制规范:新增字段必须带 en 译名 ⇒ 补 yj_translation(scope='field', source='manual')。
+--   · 09 追加 1 处(2026-09-29 并合 origin/main 后两账套复检发现):字段标签 检验方案(QC_INSP 表头,
+--     由 migrate-qcinsp-header-fix.sql 补登表头字段时引入)。该标签在 scope='panel' 已有全套人工/机翻译名
+--     (en='Inspection plan', source='manual'),但缺 scope='field' 行 ⇒ 按 panel 行逐语言补齐(见文末)。
 -- 幂等:注明按「有则更新、无则新增」;译名按「不存在才插」。
 
 SET NOCOUNT ON;
@@ -45,4 +48,23 @@ IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope = 'field' AND ref_key = 
   INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'最新成本', 'en', N'Latest Cost', 'manual');
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope = 'field' AND ref_key = N'预警数量' AND locale = 'en')
   INSERT INTO yj_translation (scope, ref_key, locale, text, source) VALUES ('field', N'预警数量', 'en', N'Alert Quantity', 'manual');
+GO
+
+-- ── 09(追加,2026-09-29 并合 origin/main 后复检):字段标签 检验方案 补 scope='field' 全套译名 ──
+-- 直接复用同标签 scope='panel' 的既有译名(含人工 en='Inspection plan'),逐语言补缺、已有的跳过。
+IF EXISTS (SELECT 1 FROM yj_translation WHERE scope = 'panel' AND ref_key = N'检验方案')
+  INSERT INTO yj_translation (scope, ref_key, locale, text, source)
+  SELECT 'field', N'检验方案', p.locale, p.text, p.source
+  FROM yj_translation p
+  WHERE p.scope = 'panel' AND p.ref_key = N'检验方案'
+    AND NOT EXISTS (SELECT 1 FROM yj_translation f
+                    WHERE f.scope = 'field' AND f.ref_key = N'检验方案' AND f.locale = p.locale);
+GO
+
+-- 核对:全库应无「字段标签缺 en 译名」(排除白名单免译标签由 DbNormAudit 09 项判)
+SELECT N'字段标签缺 en 译名(预期与本脚本相关项 0)' AS 检查项, CAST(COUNT(*) AS nvarchar(20)) AS 值
+FROM (SELECT f.label FROM yj_field f
+      WHERE NOT EXISTS (SELECT 1 FROM yj_translation t
+                        WHERE t.scope = 'field' AND t.ref_key = f.label AND t.locale = 'en')
+        AND f.label IN (N'最新成本', N'预警数量', N'检验方案')) x;
 GO

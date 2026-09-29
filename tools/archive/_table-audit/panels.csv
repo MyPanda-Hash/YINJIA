@@ -134,6 +134,7 @@ panel_code,panel_name,mode,category,module_group,head_table,line_table
 "WC","工作中心","archive","基础设置","基础设置","","bs_wc"
 "WH","仓库","archive","基础设置","基础设置","","bs_wh"
 "WH_RECORD","无黑处理登记","doc","生产管理","生产制造","wh_record","wh_record_detail"
+"WHLOC","库位","archive","基础档案","基础设置","","bs_wh_loc"
 "WLBOM","物料清单","doc","单据","生产管理","","mate"
 "WO_KIT","工单齐套表","flat","报表","生产制造","","v_wo_kit"
 "WO_ORDER","生产工单(旧版)","doc","生产管理","生产制造","wo_order","wo_progress"

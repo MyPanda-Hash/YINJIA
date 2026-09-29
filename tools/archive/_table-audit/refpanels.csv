@@ -14,6 +14,8 @@ ref_panel,referencing_panels
 "PARTNER",13
 "PROJ",8
 "PU_ORDER",2
+"QC_INSP",1
+"QC_PLAN",1
 "RD_APPROVAL",9
 "RD_PLAN",1
 "RD_PROD_INFO",8
@@ -24,5 +26,5 @@ ref_panel,referencing_panels
 "TEAM",1
 "UOM",2
 "WC",2
-"WH",15
+"WH",16
 "WO_ORDER",1

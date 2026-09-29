@@ -38,7 +38,7 @@ table:yj_translation   # 多语言翻译表(scope=panel|field,ref_key=中文键,
 table:yj_usage_log   # 使用日志(登录与面板操作留痕,使用权限查看页面数据源)
 table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)
 
-# ---- MES 自有业务表(166 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
+# ---- MES 自有业务表(167 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
 table:bd_account   # 会计科目档案
 table:bd_dispatch   # 工序派工单头表(经典遗留面板)
 table:bd_expense_type   # 费用类别档案
@@ -96,6 +96,7 @@ table:bs_team   # 班组档案
 table:bs_uom   # 计量单位档案
 table:bs_wc   # 工作中心档案
 table:bs_wh   # 仓库档案(仓库编码/名称,库存台账仓库真源)
+table:bs_wh_loc   # 库位档案(仓库内货位主数据;面板 WHLOC,2026-09-29 由并行会话新增并登记;含备用1..20)
 table:day_report   # 生产日报表头表(自制物料/成型/切炭/组装四车间合一)
 table:day_report_detail   # 生产日报表行表(姓名/时间/产品/数量/报废等)
 table:equip_check   # 设备点检记录头表
@@ -228,6 +229,6 @@ table:yj_schema_log   # 数据库结构脚本执行日志(script_name+content_ha
 table:erp_imp_row   # ERP导入行明细(逐行导入结果)
 table:dm_key   # 各种软件接口Key值表
 
-# 合计 206 张在册 + 3 张例外保留 = 209 张;
+# 合计 207 张在册 + 3 张例外保留 = 210 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
 # 已清理 244 张(RENAME_*/_bak_*/tmp_*/t1/t2 + pr_* 已下架面板表 + 无引用遗留表),清单见
 # tools/migrate-drop-unused-tables.sql 与 tools/archive/_table-audit/drop-tables.txt。

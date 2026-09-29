@@ -56,6 +56,7 @@ table_name,spare_cols,bound_cols
 "bs_uom",20,0
 "bs_wc",20,0
 "bs_wh",20,0
+"bs_wh_loc",20,0
 "day_report",20,0
 "day_report_detail",20,0
 "dm_ck",20,0
