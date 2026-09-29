@@ -1643,3 +1643,23 @@ migrate-server-parity2-20260928.sql
 
 # —— 2026-09-28 服务器结构收敛(本地→服务器方向):金蝶血统同名表欠账——rd_progress_detail 5 列(ButtonService 直写预计完成日期)/rd_asm_bom_detail 7 列(BOM 变更链)/erp_imp_row 审计五件套;守卫式,本地 no-op,服务器补齐 ——
 migrate-server-converge-20260928.sql
+
+# —— 2026-09-28 修 3 处「面板一打开就 500」的结构缺口(erp_imp_row 审计列 / v_wo_schedule 补 id / v_outsource_issue_detail 补面板字段) ——
+migrate-panel-runtime-cols.sql
+
+# —— 2026-09-28 P1:面板每页行数收敛(doc/flat 按单元格阶梯 ≤1500;archive 死元数据对齐 50) ——
+migrate-panel-page-size.sql
+
+# —— 2026-09-28 P1:宽表档案面板单页 50→25(配合前端 archPageSize 读配置,渲染量减半) ——
+migrate-panel-page-size-archive.sql
+
+# —— 2026-09-29 后台表定册①:未用表清理(244 张)+ 29 个已下架面板的悬空元数据回收;
+#    证据 tools/archive/_table-audit/,执行前已打全库备份 deploy\HSDZ_MES_pre_drop_<ts>.bak ——
+migrate-drop-unused-tables.sql
+
+# —— 2026-09-29 后台表定册②:在用业务表备用列池补全(45 表 x 20 列 nvarchar(500)+中文注明) ——
+migrate-spare-columns-biz.sql
+
+# —— 2026-09-29 存量债修复:yj_user 6 个遗留对齐列补中文注明 + 2 个字段标签补 en 译名
+#    (体检 03/09 项;两账套改动前快照即已 FAIL,与本次清理无关) ——
+migrate-norm-debt-20260929.sql

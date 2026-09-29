@@ -6,14 +6,18 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { extFieldOverview, extFieldAdd, extFieldRetire } from '@/business/engine'
 
-const props = defineProps({ visible: Boolean, panelCode: String })
-const emit = defineEmits(['update:visible', 'done'])
+// 2026-09-28 修「点关闭无反应」:本组件此前声明 visible prop + emit('update:visible'),
+// 而父组件(PanelxList)用 v-model(即 modelValue / update:modelValue)⇒ 页脚「关闭」按钮
+// 发出的 update:visible 没人监听(× 能关是 el-dialog 的 update:modelValue 经透传 attr 落回父级)。
+// 统一为 Vue 标准 v-model 契约:modelValue + update:modelValue。
+const props = defineProps({ modelValue: Boolean, panelCode: String })
+const emit = defineEmits(['update:modelValue', 'done'])
 const loading = ref(false)
 const saving = ref(false)
 const data = ref({ capacity: 20, fields: [], linePool: [] })
 const form = ref({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false })
 
-watch(() => props.visible, (v) => { if (v) load() })
+watch(() => props.modelValue, (v) => { if (v) load() })
 
 async function load() {
   loading.value = true
@@ -21,7 +25,7 @@ async function load() {
     data.value = await extFieldOverview(props.panelCode)
   } catch (e) {
     ElMessage.error(String(e?.message || e))
-    emit('update:visible', false)
+    emit('update:modelValue', false)
   } finally { loading.value = false }
 }
 
@@ -63,7 +67,7 @@ async function retire(f) {
 </script>
 
 <template>
-  <el-dialog :model-value="visible" :title="tt('字段管理')" width="640px" append-to-body :close-on-click-modal="false" @update:model-value="emit('update:visible', $event)">
+  <el-dialog :model-value="modelValue" :title="tt('字段管理')" width="640px" append-to-body :close-on-click-modal="false" @update:model-value="emit('update:modelValue', $event)">
     <div v-loading="loading">
       <div class="fm-summary">
         {{ tt('动态字段') }} {{ data.fields.length }} / {{ data.capacity }}
@@ -103,7 +107,7 @@ async function retire(f) {
       </el-form>
     </div>
     <template #footer>
-      <el-button @click="emit('update:visible', false)">{{ tt('关闭') }}</el-button>
+      <el-button @click="emit('update:modelValue', false)">{{ tt('关闭') }}</el-button>
       <el-button type="primary" :loading="saving" @click="submit">{{ tt('添加') }}</el-button>
     </template>
   </el-dialog>

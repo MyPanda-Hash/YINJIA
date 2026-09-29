@@ -147,6 +147,9 @@ public class PanelConfigService {
 
         Map<String, Object> tablePage = new LinkedHashMap<>();
         tablePage.put("tableName", panelDisplay + (foreign ? " List" : "列表"));
+        // 与 buildDocConfig 同款:下发 yj_panel.page_size(2026-09-28 补)。此前档案分支漏了这个键,
+        // 导致 page_size 对档案面板在配置层"不存在"——前端 archPageSize 只能硬编码 50,元数据旋钮失效。
+        if (def.pageSize() != null) tablePage.put("pageSize", def.pageSize());
         // 查询字段(2026-09-20):档案/单单据面板是"一张虚拟单据 + 全量明细行",表头只剩「备注」,
         // 原来这里硬编码空列表 → 「查询」弹窗没有任何可用条件;改为取元数据里登记了 query 位的常规字段
         // (migrate-basedata-query-fields.sql 给每个基础资料面板挑了 ≤6 个:编码/名称/规格/分类/停用…)

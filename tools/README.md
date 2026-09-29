@@ -45,11 +45,13 @@ tools/
 | 临时查询 | `java -cp lib\mssql-jdbc.jar SqlProbe.java` / `SqlRunner.java` |
 | API 全链路回归 | `powershell -File scripts\verify-api.ps1`(需后端已启动) |
 | 面板配置/条件冒烟 | `scripts\audit-panels.ps1`、`scripts\audit-conditions.ps1` |
-| **数据库规范体检**(12 项:命名/注明/元数据漂移/链卫生) | `set YINJIA_SQL_PASS=<库口令> & java -cp lib\mssql-jdbc.jar verify\DbNormAudit.java`(两个账套;判定口径见 `docs\development\数据库规范.md` §6) |
+| **数据库规范体检**(13 项:命名/注明/元数据漂移/面板对象必备列/链卫生) | `set YINJIA_SQL_PASS=<库口令> & java -cp lib\mssql-jdbc.jar verify\DbNormAudit.java`(两个账套;判定口径见 `docs\development\数据库规范.md` §6) |
 | UI 冒烟(CDP) | `node verify\panels-ui-smoke.cjs`(在 tools/ 下运行,依赖 node_modules) |
 | 热更新包(仅后端 class) | `pwsh -File scripts\build-hot-update.ps1`(在仓库根或见 deploy/部署说明.md) |
 | 生成器重跑 | `node gen\gen-xxx.cjs`(历史迁移数据生成,一般不重跑;重跑前先读脚本内注释) |
 | **刷新数据库表清单**(表结构变更后必跑) | `java -cp lib\mssql-jdbc.jar gen\GenDbCatalogDump.java` → `node gen\gen-db-catalog.cjs`(重写 `docs\development\数据库表清单.md`) |
+| **表使用面审计**(判定「哪些表项目没用」;导入外部数据库包/定期体检时跑) | ① `java -cp lib\mssql-jdbc.jar archive\_TableAudit.java archive\_table-audit HSDZ_MES`(导实库对象/面板/依赖) ② `node archive\_table-refs.cjs`(扫运行期代码 SQL 引用) ③ `node archive\_table-classify.cjs`(四源分类) ④ `node archive\_table-drop-risk.cjs`(待删风险面);产物落 `archive\_table-audit\`,`在册台账 tools\db-inuse-tables.txt` 由 ⑤ `node archive\_gen-inuse-tables.cjs` 生成 |
+| **在册台账刷新**(新表登记/清理后) | `node archive\_gen-inuse-tables.cjs` → `tools\db-inuse-tables.txt`(在册 206 张 + 例外保留 3 张;不在册即脏数据) |
 | **清杂项测试数据**(留演示数据,可重复执行) | `java -cp lib\mssql-jdbc.jar SqlRunner.java "jdbc:sqlserver://127.0.0.1:1433;databaseName=HSDZ_MES;encrypt=false;trustServerCertificate=true" yinjia env migrate-testdata-cleanup.sql` |
 | **灌产品文件演示数据**(两个演示产品+四文件+责任人+一张草稿态变更单+六个部门账号) | 同上,换成 `seed-demo-prodfile.sql` |
 | **上线前清空业务数据**(核弹,部署备份前用) | 同上,换成 `migrate-golive-cleanup.sql`(先做保险备份) |

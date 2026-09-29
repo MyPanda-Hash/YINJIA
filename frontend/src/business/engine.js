@@ -112,11 +112,57 @@ function normRef(r) {
   }
 }
 
+// ===== 参照面板配置 / 行数 记忆化(2026-09-28 性能修复)=====
+// 为什么:参照辅助函数是按**字段**调用的 —— 同一个引用面板会被反复取配置与行数。
+//   实测(生产构建)切换 QC_RECV:getPanelConfig 18 次(自身 1 + GFDA 17)、queryFormDataList 35 次,
+//   而该面板不同的参照面板只有 1 个 ⇒ 纯浪费,且直接拉长切换耗时(网络相位 ~1s)。
+// 失效策略(两级 TTL,不改变"刷新面板即重算"的既有语义):
+//   · 参照面板**配置** 5 分钟(结构很少变,缓存的是 Promise 所以并发也只发一次请求);
+//   · 参照**行数** 30 秒(数据会变,影响 ≤20 弹窗 / >20 下拉的模式判定);
+//   · 需要立即重算时调用 invalidateRefCache()。
+const REF_CFG_TTL = 5 * 60 * 1000
+const REF_CNT_TTL = 30 * 1000
+const REF_ROWS_TTL = 30 * 1000
+const refCfgCache = new Map() // refPanel -> { at, promise }
+const refCntCache = new Map()
+const refRowsCache = new Map() // refPanel|filter|keyword|pageSize -> { at, promise }
+
+function memoRef(map, key, ttl, loader) {
+  const hit = map.get(key)
+  const now = Date.now()
+  if (hit && now - hit.at < ttl) return hit.promise
+  const promise = loader().catch((e) => {
+    map.delete(key) // 失败不缓存,下次重试
+    throw e
+  })
+  map.set(key, { at: now, promise })
+  return promise
+}
+
+/** 引用面板的配置(按 refPanel 记忆化:同一引用面板在一次切换里只发一次请求) */
+export function getRefPanelConfig(refPanel) {
+  if (!refPanel) return Promise.resolve(null)
+  return memoRef(refCfgCache, refPanel, REF_CFG_TTL, () => getPanelConfig(refPanel))
+}
+
+/** 清空参照缓存(不传参清全部;面板刷新/字段变更后需要立即重算时调用) */
+export function invalidateRefCache(refPanel) {
+  if (refPanel) {
+    refCfgCache.delete(refPanel)
+    refCntCache.delete(refPanel)
+    for (const k of [...refRowsCache.keys()]) if (k.startsWith(refPanel + '|')) refRowsCache.delete(k)
+  } else {
+    refCfgCache.clear()
+    refCntCache.clear()
+    refRowsCache.clear()
+  }
+}
+
 // 引用面板名称（弹窗标题）：异步取 SQL 后端面板配置
 export async function refPanelName(field) {
   const r = normRef(field)
   try {
-    const cfg = await getPanelConfig(r.refPanel)
+    const cfg = await getRefPanelConfig(r.refPanel)
     return (cfg && cfg.metadata && cfg.metadata.panelName) || r.refPanel
   } catch (e) {
     return r.refPanel
@@ -129,7 +175,7 @@ export async function refColumns(field) {
   if (r.refColumns && r.refColumns.length) return r.refColumns
   let cols = null
   try {
-    const cfg = await getPanelConfig(r.refPanel)
+    const cfg = await getRefPanelConfig(r.refPanel)
     cols = cfg?.metadata?.panelPageDto?.tablePages?.[0]?.gridTabs?.[0]?.columns
   } catch (e) {
     /* SQL 后端无该面板时使用兜底列 */
@@ -145,7 +191,7 @@ export async function queryRefRows(field, { keyword = '', pageSize = 200 } = {})
   const hasAlternativeFilter = Object.values(filter).some(Array.isArray)
   let refConfig = null
   try {
-    refConfig = await getPanelConfig(r.refPanel)
+    refConfig = await getRefPanelConfig(r.refPanel)
   } catch (e) {
     /* 配置不可得时按普通多单据面板查询 */
   }
@@ -164,7 +210,13 @@ export async function queryRefRows(field, { keyword = '', pageSize = 200 } = {})
     }
   }
   // 单单据面板：keyword 也不传后端（单据行无明细字段，后端匹配不到），前端展平后过滤
-  const res = await queryFormDataList({ panelCode: r.refPanel, condition: cond, keyword: singleDoc ? '' : keyword, pageNo: 1, pageSize })
+  // 2026-09-28:按「参照面板 + 条件 + 关键词 + 页大小」记忆化 —— 同一参照面板的多个字段
+  //   (如 供应商/供应商代码/供应商名称 同指 GFDA)此前各拉一次明细行,现共用一次结果;
+  //   字段之间只是 refField/displayField 映射不同,行数据完全相同。30 秒 TTL。
+  const effKeyword = singleDoc ? '' : keyword
+  const rowsKey = `${r.refPanel}|${JSON.stringify(cond)}|${effKeyword}|${pageSize}`
+  const res = await memoRef(refRowsCache, rowsKey, REF_ROWS_TTL, () =>
+    queryFormDataList({ panelCode: r.refPanel, condition: cond, keyword: effKeyword, pageNo: 1, pageSize }))
   let list = res.list || []
   if (singleDoc && list.some((row) => row?.detail)) {
     const tabKey = refConfig?.detail?.tabs?.[0]?.key || 'items'
@@ -185,12 +237,17 @@ export async function queryRefRows(field, { keyword = '', pageSize = 200 } = {})
   return list
 }
 
-/** 参照面板数据行数(用于动态切换弹窗/下拉模式:≤20 弹窗,>20 下拉) */
+/** 参照面板数据行数(用于动态切换弹窗/下拉模式:≤20 弹窗,>20 下拉)
+ *  2026-09-28:按 **refPanel** 记忆化(此前按字段发请求 ⇒ 68 个参照字段同指一面板会发 35 次);
+ *  30 秒 TTL,过期即重算,保持"刷新面板后自动切换模式"的既有语义。 */
 export async function refRowCount(field) {
   const r = normRef(field)
+  if (!r.refPanel) return 0
   try {
-    const res = await queryFormDataList({ panelCode: r.refPanel, condition: {}, pageNo: 1, pageSize: 1 })
-    return res.totalSize || 0
+    return await memoRef(refCntCache, r.refPanel, REF_CNT_TTL, async () => {
+      const res = await queryFormDataList({ panelCode: r.refPanel, condition: {}, pageNo: 1, pageSize: 1 })
+      return res.totalSize || 0
+    })
   } catch (e) {
     return 0
   }

@@ -2657,6 +2657,35 @@ export default {
     '按产品默认BOM×排产数量生成材料出库单草稿,审核出库后自动回写领料单号': 'Material issue (pick list) drafts are created by default BOM × scheduled qty; the picking no. is written back to the WO after audit',
     '已生成领料单': 'Pick lists created',
     '转领料失败': 'Transfer to picking failed',
+
+    // 桌面深度开发(2026-09-28:各模块图表口径与图例)
+    '五工序报工完成率': 'Five-stage reporting completion',
+    '按报工记录统计（%）': 'By work-report records (%)',
+    '近 7 天出入库趋势': 'In/out stock trend (7 days)',
+    '入库': 'Inbound',
+    '出库': 'Outbound',
+    '现存量 TOP 物料': 'Top items by on-hand qty',
+    '近 7 天订单趋势': 'Sales order trend (7 days)',
+    '新增': 'New',
+    '已审核': 'Audited',
+    'TOP 产品下单量': 'Top products by ordered qty',
+    '近 7 天送检 / 合格': 'Inspection sent / passed (7 days)',
+    '送检': 'Sent',
+    '合格': 'Passed',
+    '不良物料分布': 'Defect distribution by item',
+    '研发面板单据量': 'R&D docs by panel',
+    '项目阶段进度分布': 'Project stage progress',
+    '实施计划口径': 'implementation plans',
+    '实施计划新增趋势': 'New implementation plans',
+    '近 30 天': 'last 30 days',
+    '累计内': 'In window',
+    '峰值': 'Peak',
+
+    // 单天产能对比(2026-09-28:产出/日产能上限)
+    '单天产能对比': 'Daily capacity vs limit',
+    '数据日期': 'Data date',
+    '产出/日产能上限': 'output / daily capacity limit',
+    '未配日产能上限，请在产线档案维护': 'No daily capacity limit set — maintain it in the production line archive',
   },
 
 }

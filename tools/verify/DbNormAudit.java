@@ -82,6 +82,7 @@ public class DbNormAudit {
             check10BackupTables(c);
             check11IndexPolicy(c);
             check12Chain(base, manifest);
+            check13PanelObjectCols(c);
 
             System.out.println();
             System.out.println("=== 汇总: FAIL " + failCount + " / WARN " + warnCount + " ===");
@@ -260,25 +261,64 @@ public class DbNormAudit {
         result(true, "04", "业务表主键与审计四件套", bad.size(), join(bad, 12));
     }
 
-    /** 05 元数据漂移:yj_field 的列在 line_table/head_table(含视图)里都不存在 */
+    /** 05 元数据漂移:字段必须存在于「按 place 决定的那个对象」。
+     *  口径(2026-09-28 修正 —— 此前把 head/line 当"任一命中即通过",漏判明细面板):
+     *    · place 含 header 且 head_table 非空 → 必须存在于 head_table
+     *    · 否则 place 含 detail → 必须存在于 line_table
+     *    · 仅 query(既无 header 也无 detail)→ head_table 或 line_table 任一即可
+     *  为什么较真:明细报表面板的取数 SQL 只 FROM line_table,那里缺列 = 该面板打开即 500。 */
     static void check05MetaDrift(Connection c) throws Exception {
         String sql = """
-            SELECT RTRIM(f.panel_code), f.col_name FROM yj_field f
-            LEFT JOIN yj_panel p ON RTRIM(p.panel_code) = RTRIM(f.panel_code)
+            SELECT RTRIM(f.panel_code), f.col_name, RTRIM(f.place), ISNULL(p.line_table,''), ISNULL(p.head_table,'')
+            FROM yj_field f LEFT JOIN yj_panel p ON RTRIM(p.panel_code) = RTRIM(f.panel_code)
             WHERE f.col_name IS NOT NULL
-              AND NOT EXISTS (SELECT 1 FROM sys.columns c
-                              WHERE c.object_id IN (OBJECT_ID(p.line_table), OBJECT_ID(p.head_table))
-                                AND c.name = f.col_name)
-            ORDER BY 1, 2""";
+            ORDER BY 1, f.seq""";
         List<String> bad = new ArrayList<>();
         try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
-                String panel = rs.getString(1);
+                String panel = rs.getString(1), col = rs.getString(2), place = rs.getString(3);
+                String line = rs.getString(4), head = rs.getString(5);
                 if (wl("panel").contains(panel)) continue;
-                bad.add(panel + "." + rs.getString(2));
+                boolean hasHeader = place.contains("header") && !head.isEmpty();
+                boolean hasDetail = place.contains("detail");
+                boolean ok;
+                if (hasHeader) ok = hasCol(c, head, col);
+                else if (hasDetail) ok = hasCol(c, line, col);
+                else ok = hasCol(c, line, col) || hasCol(c, head, col);
+                if (!ok) bad.add(panel + "." + col + "(" + place + " → " + (hasHeader ? head : line) + ")");
             }
         }
-        result(true, "05", "元数据漂移(字段列不存在)", bad.size(), join(bad, 12));
+        result(true, "05", "元数据漂移(字段不在其所在对象里)", bad.size(), join(bad, 12));
+    }
+
+    /** 对象里是否存在该列(表或视图均可;COL_LENGTH 对两者都有效) */
+    static boolean hasCol(Connection c, String object, String col) {
+        if (object == null || object.isEmpty() || col == null || col.isEmpty()) return false;
+        try (var ps = c.prepareStatement("SELECT 1 AS x WHERE COL_LENGTH(?, ?) IS NOT NULL")) {
+            ps.setString(1, object); ps.setString(2, col);
+            try (ResultSet rs = ps.executeQuery()) { return rs.next(); }
+        } catch (Exception e) { return false; }
+    }
+
+    /** 13 面板引用对象的必备列:引擎统一拼 `SELECT t.<pk_col> AS __id … WHERE ISNULL(t.asp_cancel,'N')<>'Y'`,
+     *  所以 line_table 必须同时具备 pk_col 与 asp_cancel,否则该面板一打开就 500(2026-09-28 实测 4 例)。 */
+    static void check13PanelObjectCols(Connection c) throws Exception {
+        String sql = """
+            SELECT RTRIM(panel_code), line_table, ISNULL(pk_col,'') FROM yj_panel
+            WHERE line_table IS NOT NULL AND OBJECT_ID(line_table) IS NOT NULL
+            ORDER BY 1""";
+        List<String> bad = new ArrayList<>();
+        try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+            while (rs.next()) {
+                String panel = rs.getString(1), line = rs.getString(2), pk = rs.getString(3);
+                if (wl("panel").contains(panel)) continue;
+                List<String> miss = new ArrayList<>();
+                if (!pk.isEmpty() && !hasCol(c, line, pk)) miss.add(pk);
+                if (!hasCol(c, line, "asp_cancel")) miss.add("asp_cancel");
+                if (!miss.isEmpty()) bad.add(panel + " → " + line + " 缺 " + String.join("+", miss));
+            }
+        }
+        result(true, "13", "面板引用对象缺 pk_col / asp_cancel(打开即 500)", bad.size(), join(bad, 12));
     }
 
     /** 06 面板指向不存在对象 */

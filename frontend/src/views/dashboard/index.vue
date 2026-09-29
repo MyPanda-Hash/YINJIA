@@ -293,7 +293,7 @@
       <div class="dash-grid">
         <div class="card col-4">
           <div class="card-title">{{ tt('工单状态分布') }}</div>
-          <div class="chart-box"><SBars :data="prod.statusDist" /></div>
+          <div class="chart-box"><SBars :data="prod.statusDist" show-pct /></div>
         </div>
         <div class="card col-4">
           <div class="card-title">{{ tt('车间生产分布') }}</div>
@@ -302,6 +302,14 @@
         <div class="card col-4">
           <div class="card-title">{{ tt('近 7 天新增 / 完工') }}</div>
           <div class="chart-box"><SLine :data="prod.trend7" /></div>
+        </div>
+        <div class="card col-4">
+          <div class="card-title">{{ tt('五工序报工完成率') }}<span class="chart-sub">{{ tt('按报工记录统计（%）') }}</span></div>
+          <div class="chart-box"><SBars :data="prod.stageRates" :colors="['#116a5b', '#3b8978', '#d79a2b', '#b94d3f', '#537786']" /></div>
+        </div>
+        <div class="card col-8">
+          <div class="card-title">{{ tt('单天产能对比') }}<span class="chart-sub">{{ capacityDateSub }}</span></div>
+          <div class="chart-box"><SCapacity :rows="capacityRows" /></div>
         </div>
         <div class="card col-12">
           <div class="card-title">{{ tt('BOM 物料树（产品 → 材料，来自生产工单真实数据）') }}</div>
@@ -325,6 +333,14 @@
           <div class="card-title">{{ tt('各单据明细行数') }}</div>
           <div class="chart-box"><SBars :data="stockLines" :colors="['#537786', '#116a5b', '#d79a2b', '#7a8b84', '#3b8978', '#9c7650']" /></div>
         </div>
+        <div class="card col-6">
+          <div class="card-title">{{ tt('近 7 天出入库趋势') }}</div>
+          <div class="chart-box"><SLine :data="stock.trend7" :legend-a="tt('入库')" :legend-b="tt('出库')" /></div>
+        </div>
+        <div class="card col-6">
+          <div class="card-title">{{ tt('现存量 TOP 物料') }}</div>
+          <div class="chart-box"><SBars :data="stock.topItems" :colors="['#537786', '#116a5b', '#3b8978', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" /></div>
+        </div>
       </div>
     </template>
 
@@ -340,7 +356,15 @@
         </div>
         <div class="card col-6">
           <div class="card-title">{{ tt('订单状态分布') }}</div>
-          <div class="chart-box"><SBars :data="sales.byStatus" /></div>
+          <div class="chart-box"><SBars :data="sales.byStatus" show-pct /></div>
+        </div>
+        <div class="card col-6">
+          <div class="card-title">{{ tt('近 7 天订单趋势') }}</div>
+          <div class="chart-box"><SLine :data="sales.trend7" :legend-a="tt('新增')" :legend-b="tt('已审核')" /></div>
+        </div>
+        <div class="card col-6">
+          <div class="card-title">{{ tt('TOP 产品下单量') }}</div>
+          <div class="chart-box"><SBars :data="sales.topProducts" :colors="['#116a5b', '#3b8978', '#537786', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" /></div>
         </div>
       </div>
     </template>
@@ -378,6 +402,21 @@
           <div v-if="!rdData.panels.length" class="rd-empty">{{ tt('暂无面板') }}</div>
         </section>
       </div>
+      <!-- 研发图表行(2026-09-28 桌面深度开发:研发模块从纯列表补齐信息展示) -->
+      <div class="dash-grid">
+        <div class="card col-4">
+          <div class="card-title">{{ tt('研发面板单据量') }}</div>
+          <div class="chart-box"><SBars :data="rdDocStats" /></div>
+        </div>
+        <div class="card col-4">
+          <div class="card-title">{{ tt('项目阶段进度分布') }}<span class="chart-sub">{{ tt('实施计划口径') }}</span></div>
+          <div class="chart-box"><SBars :data="rd.stageDist" show-pct :colors="['#8a9a92', '#116a5b', '#b94d3f', '#3b8978']" /></div>
+        </div>
+        <div class="card col-4">
+          <div class="card-title">{{ tt('实施计划新增趋势') }}<span class="chart-sub">{{ tt('近 30 天') }}</span></div>
+          <div class="chart-box"><SLine :data="rd.trend30" :legend-a="tt('新增')" :legend-b="tt('累计内')" /></div>
+        </div>
+      </div>
     </template>
 
     <!-- ===== 质量 ===== -->
@@ -393,7 +432,15 @@
         </div>
         <div class="card col-6">
           <div class="card-title">{{ tt('检验结果对比') }}</div>
-          <div class="chart-box"><SBars :data="quality.byResult" /></div>
+          <div class="chart-box"><SBars :data="quality.byResult" show-pct /></div>
+        </div>
+        <div class="card col-6">
+          <div class="card-title">{{ tt('近 7 天送检 / 合格') }}</div>
+          <div class="chart-box"><SLine :data="quality.trend7" :legend-a="tt('送检')" :legend-b="tt('合格')" /></div>
+        </div>
+        <div class="card col-6">
+          <div class="card-title">{{ tt('不良物料分布') }}</div>
+          <div class="chart-box"><SBars :data="quality.defectItems" :colors="['#b94d3f', '#d79a2b', '#9c7650', '#537786', '#708575', '#8a9a92']" /></div>
         </div>
       </div>
     </template>
@@ -438,6 +485,7 @@ import { ElNotification, ElMessage } from 'element-plus'
 import SBars from './SBars.vue'
 import SDonut from './SDonut.vue'
 import SLine from './SLine.vue'
+import SCapacity from './SCapacity.vue'
 import STree from './STree.vue'
 import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
 import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
@@ -687,6 +735,12 @@ const progress = computed(() => stats.value.progress || [])
 
 // ---------- 生产数据 ----------
 const prod = computed(() => stats.value.production || {})
+// 单天产能比(2026-09-28):产出/日产能上限;标题标注数据日期(今天无报工时回看最近有报工日)
+const capacityRows = computed(() => prod.value.capacityToday || [])
+const capacityDateSub = computed(() => {
+  const d = (capacityRows.value[0] || {}).date
+  return d ? `${tt('数据日期')} ${d} · ${tt('产出/日产能上限')}` : tt('产出/日产能上限')
+})
 const bomTree = computed(() =>
   (prod.value.bomTree || []).map((p) => ({
     label: p['产品'],
@@ -713,6 +767,17 @@ const salesDone = computed(() => {
 
 // ---------- 质量数据 ----------
 const quality = computed(() => stats.value.quality || { total: 0, pass: 0, passRate: 0, byResult: [] })
+
+// ---------- 研发数据(2026-09-28 桌面深度开发:阶段分布/趋势来自 DashboardStatsService;面板单据量复用 docStats 过滤) ----------
+const rd = computed(() => stats.value.rd || {})
+const rdDocStats = computed(() =>
+  docStats.value
+    .filter((d) => String(d.panelCode || '').startsWith('RD_'))
+    .map((d) => ({ name: d.panelName, value: Number(d.count || 0) }))
+    .filter((d) => d.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 8)
+)
 
 // ---------- 实时驾驶舱派生指标 ----------
 const productionTotal = computed(() => Number(stats.value.kpis.moTotal || 0))
@@ -1805,6 +1870,13 @@ function go(path, title) {
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+/* 图表标题右侧的口径小注(2026-09-28 桌面深度开发) */
+.chart-sub {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--t-text-3);
 }
 .tree-box {
   min-height: auto;
