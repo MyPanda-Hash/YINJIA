@@ -656,7 +656,8 @@ public class ScheduleBoardService {
                     String.class, line);
         } catch (org.springframework.dao.EmptyResultDataAccessException ignore) { }
 
-        // 4) 组装材料出库单草稿:头 + BOM 行(数量=定额×Σ排产,4 位小数;批号留空由扫码补)
+        // 4) 组装材料出库单草稿:头 + BOM 行(行号 1..N 按 BOM 展开序,2026-10-14 参考销售订单口径;
+        //    数量=定额×Σ排产,4 位小数;批号留空由扫码补)
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", java.time.LocalDate.now().toString());
         head.put("加工单号", no);
@@ -668,8 +669,10 @@ public class ScheduleBoardService {
         head.put("领用人", user);
         head.put("备注", "工单排产转领料(排产 " + round4(qty) + ")");
         List<Map<String, Object>> items = new ArrayList<>();
-        for (Map<String, Object> b : bom) {
+        for (int i = 0; i < bom.size(); i++) {
+            Map<String, Object> b = bom.get(i);
             Map<String, Object> row = new LinkedHashMap<>();
+            row.put("行号", i + 1);
             row.put("材料编码", str(b.get("子件编码")));
             row.put("材料名称", str(b.get("子件名称")));
             row.put("规格型号", str(b.get("规格型号")));
