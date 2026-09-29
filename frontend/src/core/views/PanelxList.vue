@@ -4854,10 +4854,15 @@ function addInlineDetailRow(b) {
   archPage.value = Math.ceil(rows.length / archPageSize.value) // 档案分页:新行在末尾,跳到末页立即可见
   // 新行首个可编辑格直接激活并聚焦(2026-09-28):「新增数据」后懒激活格子只显示空文本、
   // 无任何编辑器视觉痕迹,用户不知道要点它(库位档案 库位编码/库位地址 因此被报"无法填写")。
-  // 这里替用户完成那第一击:跳过参照列(常驻编辑器,一击即选不需要预激活)与图片列,
+  // 这里替用户完成那第一击:跳过参照列(常驻编辑器,一击即选不需要预激活)、图片列、
+  // 以及参照带回目标字段(如 仓库编码=选仓库时自动带入,不该让光标落进去手敲),
   // 找第一个常规可编辑字段(如 库位编码)激活,v-cell-focus 挂载即聚焦 → 点完按钮直接打字。
+  const carriedNames = new Set()
+  for (const f of detailTabDefOf(tabKey)?.fields || []) {
+    for (const m of f.refMap || f.map || []) if (m?.to) carriedNames.add(m.to)
+  }
   const firstEditable = (detailTabDefOf(tabKey)?.fields || []).find((f) => (
-    !f.hidden && !f.computed && !isReferenceField(f) && f.dataType !== '图片'
+    !f.hidden && !f.computed && !isReferenceField(f) && f.dataType !== '图片' && !carriedNames.has(f.dataName)
   ))
   if (firstEditable) {
     activeCell.value = { row, tabKey, prop: firstEditable.dataName }
@@ -6142,7 +6147,8 @@ async function onButton(action) {
     // (订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,编码·规格取行,其余手填);
     // 二维码=公司代码@物料编码[@批号](print-formats.printProductCards 本地生成;旧 /report/qr-label 暂留可回滚)
     // WHLOC 库位(2026-09-28):同款勾选即打,卡面=仓库/库位地址/库位编码(printLocationCards),
-    // 二维码=仓库@库位地址@库位编码;勾选行键=仓库+库位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
+    // 二维码=仓库编码@库位地址@库位编码(同日改版:首段仓库→仓库编码,行带 仓库编码 值);
+    // 勾选行键=仓库+库位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
     const whloc = cfgCache.value?.metadata?.qrLabelKind === 'whloc'
     const sel = qrSel.value
     const rows = []
@@ -6150,7 +6156,7 @@ async function onButton(action) {
       for (const r of archRows(b)) {
         const k = qrRowKey(r)
         if (!k || !sel.has(k)) continue
-        if (whloc) rows.push({ 仓库: r['仓库'], 库位地址: r['库位地址'], 库位编码: r['库位编码'] })
+        if (whloc) rows.push({ 仓库: r['仓库'], 仓库编码: r['仓库编码'], 库位地址: r['库位地址'], 库位编码: r['库位编码'] })
         else rows.push({ 编码: k, 规格: r['规格型号'] || r['型号'] || '' })
       }
     }
