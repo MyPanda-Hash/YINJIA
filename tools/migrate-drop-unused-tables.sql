@@ -4,11 +4,12 @@
 --   本脚本按四源审计(① yj_panel 面板绑定且面板在运营 ② 在运营视图依赖 ③ backend/src/main/java +
 --   frontend/src 运行期 SQL 引用 ④ 业务数据行)判定「未用」后物理删除,并回收连带悬空的面板元数据。
 -- 证据与清单:tools/archive/_table-audit/(objects|panels|deps|refs|granted|classify|drop-risk|drop-tables|drop-plan)
--- 本次删除 244 张表:
+-- 本次删除 244 张表(分组数字取自 drop-plan.txt,勿手改):
 --   · 仅被已下架面板挂靠 29 张(pr_* 25 + wo_line_stock/wo_material_pick/wo_stage_report + dm_ywy)
---   · 有数据但无任何引用 68 张(老 HSDZ 遗留:area_*/dm_py/s_sys/permission/kjkm… 合计约 2.6 万行)
+--   · 有数据但无任何引用 67 张(老 HSDZ 遗留:area_*/dm_py/s_sys/permission/kjkm… 合计约 2.6 万行)
 --   · 空表未接线 20 张(rd_* 旧单表 19 + wo_report(源码注释「停用为遗留表」))
 --   · 空表遗留未用 62 张 + 备份/临时 66 张(RENAME_*/_bak_*/tmp_*/t1/t2/log)
+--   (29+67+20+62+66 = 244;D 组原始 69 张扣掉例外保留的 dm_key 与 yj_schema_log 得 67)
 -- 例外保留(逐条有据,勿顺手删):
 --   yj_schema_log —— tools/DbSync.java 的迁移登记表;删掉会让整条迁移链按「未执行」全量重跑
 --   erp_imp_row   —— 与在用面板 ERPLG 同属 ERP 导入通道,本仓库无导入代码,可能由外部程序写入(0 行)
@@ -17,8 +18,9 @@
 --   (不回收 ⇒ 面板指向不存在的表,DbNormAudit 06 项直接 FAIL)。
 -- 幂等:每步都有存在性守卫;新库场景 = 迁移链先建后删,历史脚本一律不回改(migrate-line-open-drop.sql 先例)。
 -- 备份:执行前已打全库备份 deploy\HSDZ_MES_pre_drop_<时间戳>.bak(74MB,RESTORE VERIFYONLY 通过)。
--- 注:被删表若有遗留视图(View_llrk*/VIEW_zc 等 14 个,自身已无面板绑定)引用,那些视图会失效——
---   本脚本不动视图,失效清单见执行输出(dump-views),清理另立任务。
+-- 注:被删表被 29 个遗留视图引用(View_llrk01/01A、VIEW_zc、View_BOM、VIEW_inh、View_od_cost*、View_Porder、
+--   VIEW_CK/RK、VIEW_kucun、View_ZZPQTY0-3 等;这些视图自身已无面板绑定、无代码引用),它们会失效——
+--   本脚本不动视图;精确清单由 tools/archive/_view-impact.cjs 从实库视图定义词边界匹配得出,清理另立任务。
 
 SET NOCOUNT ON;
 IF DB_NAME() = N'master' USE HSDZ_MES;
@@ -330,11 +332,13 @@ IF OBJECT_ID(N'dbo.zc', N'U') IS NOT NULL BEGIN DROP TABLE dbo.[zc]; SET @droppe
 PRINT N'未用表删除: ' + CAST(@dropped AS nvarchar(10)) + N' 张';
 GO
 
--- ── 3. 执行后核对(三项都应如注释所示) ──
-SELECT N'剩余表数(预期 210)' AS 检查项, COUNT(*) AS 值 FROM sys.tables;
-SELECT N'指向不存在对象的面板(预期 0)' AS 检查项, COUNT(*) AS 值 FROM yj_panel
+-- ── 3. 执行后核对 ──
+SELECT N'剩余表数(清理当时 210;此后新增表会变大,故不设预期)' AS 检查项, COUNT(*) AS 值 FROM sys.tables;
+SELECT N'指向不存在对象的面板(预期 2:白名单内已下架面板)' AS 检查项, COUNT(*) AS 值 FROM yj_panel
   WHERE (line_table IS NOT NULL AND OBJECT_ID(line_table) IS NULL)
      OR (head_table IS NOT NULL AND OBJECT_ID(head_table) IS NULL);
+  -- 该 2 个是 RD_ASM_BOM / RD_MOLD_FORMULA:实体表 2026-09-11 面板结构调整时已不存在(本次清理前快照
+  -- classify.csv 里也没有这 4 张表),靠 db-legacy-whitelist.txt 的 panel: 登记豁免,不是本次删漏。
 SELECT N'剩余备份/临时表(预期 0;口径同 DbNormAudit.isBackup)' AS 检查项, COUNT(*) AS 值 FROM sys.tables
   WHERE LOWER(name) LIKE '%bak%' OR LOWER(name) LIKE 'rename%' OR LOWER(name) LIKE 'tmp%' OR LOWER(name) LIKE 't[0-9]';
 GO

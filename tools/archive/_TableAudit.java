@@ -153,6 +153,17 @@ public class _TableAudit {
                     while (rs.next()) w.write(csv(rs.getString(1)) + "," + rs.getString(2) + "," + csv(rs.getString(3)) + "\n");
                 }
             }
+            // 9) 视图定义原文(供「哪些视图引用了某表」做词边界精确匹配 ——
+            //    SQL 里 LIKE '%名字%' 会被 dm_wz/dm_wzbacord 这类前缀误配,只有拿定义文本才判得准)
+            try (BufferedWriter w = Files.newBufferedWriter(out.resolve("viewdefs.tsv"), StandardCharsets.UTF_8)) {
+                try (Statement st = c.createStatement(); ResultSet rs = st.executeQuery(
+                        "SELECT o.name, ISNULL(OBJECT_DEFINITION(o.object_id), N'') FROM sys.views o ORDER BY o.name")) {
+                    while (rs.next()) {
+                        w.write(rs.getString(1).replace('\t', ' ') + "\t"
+                              + rs.getString(2).replace('\r', ' ').replace('\n', ' ').replace('\t', ' ') + "\n");
+                    }
+                }
+            }
             System.out.println("[done] " + out.toAbsolutePath());
         }
     }

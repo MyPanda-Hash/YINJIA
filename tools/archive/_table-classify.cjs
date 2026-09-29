@@ -149,9 +149,13 @@ for (const o of objects) {
   const rows = Number(o.row_count), spare = Number(o.spare_cols);
   const mes = PREFIX_MES.test(t) || MES_UNPREFIXED.has(t);
 
+  // 判定顺序:四源证据优先,**名字像备份/临时(BACKUP_RE)只在一点证据都没有时兜底**。
+  // 2026-09-29 代码审查指出:原先把 BACKUP_RE 放在最前短路,任何 `*_bak_*`/`RENAME_*`/`tmp_*`/`t1`/`t2`/`log`
+  // 即使被在运营面板绑定或被运行期 SQL 引用也会被判「未用」→ 直接进待删集合,是可复用的误删陷阱。
+  // 本数据下无此实例(X 组 66 张的 live_panels/used_views/sql_refs_biz 全空),故 classify.csv 结果不变。
   let cls;
-  if (BACKUP_RE.test(t)) cls = 'X_备份临时';
-  else if (live.length || vw.length || code > 0) cls = mes ? 'A_在用_MES自有' : 'B_在用_经典遗留';
+  if (live.length || vw.length || code > 0) cls = mes ? 'A_在用_MES自有' : 'B_在用_经典遗留';
+  else if (BACKUP_RE.test(t)) cls = 'X_备份临时';
   else if (retired.length) cls = 'C_仅下架面板挂靠';
   else if (rows > 0) cls = 'D_有数据无引用';
   else cls = mes ? 'E_空表_MES未接线' : 'F_空表_遗留未用';

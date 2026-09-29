@@ -1663,3 +1663,7 @@ migrate-spare-columns-biz.sql
 # —— 2026-09-29 存量债修复:yj_user 6 个遗留对齐列补中文注明 + 2 个字段标签补 en 译名
 #    (体检 03/09 项;两账套改动前快照即已 FAIL,与本次清理无关) ——
 migrate-norm-debt-20260929.sql
+
+# —— 2026-09-29 备用列注明补漏:守卫漏写 ep.class=1 导致「索引 index_id 撞列 column_id」时
+#    漏写列级注明(实测 kucun.备用1);只追加不回改历史,新库场景本脚本兜底收敛 ——
+migrate-spare-desc-fix.sql
