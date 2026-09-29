@@ -37,7 +37,8 @@ import java.util.*;
  * URI 规范化会被金蝶网关拒签,实测 HttpURLConnection 通过)。
  *
  * 凭证来源(优先级): ① Spring 配置 kingdee.push.*(服务器: jar旁 config/application-*.properties
- * 或环境变量) → ② 兜底 deploy/push/config.json(本地联调,gitignored)。
+ * 或环境变量) → ② 兜底 deploy/push/config.json(本地联调,gitignored;从工作目录逐级向上找,
+ * start-project.bat 与 start-prod.ps1 两种工作目录都能命中)。
  *
  * 授权模式:配置了 outerInstanceId 时走动态授权(真实账套,appSecret 24h 官方轮换,
  * 每次取新 token 前自动刷新 appKey/appSecret/domain,与 deploy/kingdee-client.mjs 同算法);
@@ -82,13 +83,16 @@ public class KingdeePushService {
         this.jdbc = jdbc;
     }
 
-    /** 凭证兜底:Spring 未配置时读 deploy/push/config.json(本地联调用;服务器用外部配置不经过这里) */
+    /**
+     * 凭证兜底:Spring 未配置时读 deploy/push/config.json(本地联调用;服务器用外部配置不经过这里)。
+     * 工作目录不固定:start-project.bat 从仓库根启动,start-prod.ps1 以 backend/ 为工作目录 ——
+     * 故从 user.dir 逐级向上找(最多 5 级),两种启动方式都能命中仓库根的 deploy/push/config.json。
+     */
     private synchronized void ensureCreds() {
         if (clientId != null && !clientId.isBlank()) return;
         try {
-            File f = new File(System.getProperty("user.dir") + File.separator
-                    + "deploy" + File.separator + "push" + File.separator + "config.json");
-            if (!f.isFile()) throw new IllegalStateException(
+            File f = locatePushConfig();
+            if (f == null) throw new IllegalStateException(
                     "金蝶凭证未配置:请设置 kingdee.push.*(Spring配置/环境变量)或提供 deploy/push/config.json");
             JsonNode k = json.readTree(Files.readString(f.toPath(), StandardCharsets.UTF_8)).path("kingdee");
             clientId = k.path("clientId").asText("");
@@ -100,6 +104,17 @@ public class KingdeePushService {
         } catch (Exception e) {
             throw new IllegalStateException("读取金蝶凭证失败: " + e.getMessage(), e);
         }
+    }
+
+    /** 从工作目录逐级向上(最多 5 级)找 deploy/push/config.json,找不到返回 null */
+    private static File locatePushConfig() {
+        File dir = new File(System.getProperty("user.dir")).getAbsoluteFile();
+        for (int i = 0; i < 5 && dir != null; i++) {
+            File f = new File(dir, "deploy" + File.separator + "push" + File.separator + "config.json");
+            if (f.isFile()) return f;
+            dir = dir.getParentFile();
+        }
+        return null;
     }
 
     /**

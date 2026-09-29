@@ -58,3 +58,12 @@ yinjia:
     # 单据头字段附件(yj_attachment):文件本体存此目录(相对=后端工作目录),元数据入库
     dir: "${YINJIA_ATTACHMENT_DIR:uploads/attachments}"
     max-size-mb: "${YINJIA_ATTACHMENT_MAX_MB:20}"
+
+kingdee:
+  push:
+    # 转ERP 账套守卫(2026-09-29 用户口径:转ERP 目标=金蝶真实账套)。
+    # 凭证仍走 deploy/push/config.json(gitignored,不入库):当前=真实账套(clientId 359797+outerInstanceId 动态授权)。
+    # outerInstanceId 非空 ⇒ 真实账套 ⇒ 必须显式开启本开关才放行(防误指正式账套,守卫见 KingdeePushService);
+    # 切回测试沙箱联调时:凭证换回静态密钥(outerInstanceId 留空)即自动走沙箱,本开关不影响沙箱。
+    # ⚠ 键名必须是 allowProd(与 @Value 精确一致;@Value 不做 kebab-case 宽松绑定,写 allow-prod 会静默落回 false)
+    allowProd: true
