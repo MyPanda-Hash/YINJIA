@@ -61,9 +61,10 @@ yinjia:
 
 kingdee:
   push:
-    # 转ERP 账套守卫(2026-09-29 用户口径:转ERP 目标=金蝶真实账套)。
-    # 凭证仍走 deploy/push/config.json(gitignored,不入库):当前=真实账套(clientId 359797+outerInstanceId 动态授权)。
-    # outerInstanceId 非空 ⇒ 真实账套 ⇒ 必须显式开启本开关才放行(防误指正式账套,守卫见 KingdeePushService);
-    # 切回测试沙箱联调时:凭证换回静态密钥(outerInstanceId 留空)即自动走沙箱,本开关不影响沙箱。
+    # 转ERP 账套守卫。当前目标=**测试沙箱**(2026-09-29 用户口径:切回测试账套联调)。
+    # 凭证走 deploy/push/config.json(gitignored,不入库):当前=测试账套静态密钥(clientId 359220,outerInstanceId 留空)。
+    # outerInstanceId 非空 ⇒ 真实账套 ⇒ 必须显式开启本开关才放行;现关闭=false,误配真账套凭证时转ERP 会被守卫拒绝。
+    # 切回真实账套:①凭证换回 deploy/config.json 同款(359797+outerInstanceId,appKey/appSecret 留空)
+    #              ②本开关改 true ③重启后端。
     # ⚠ 键名必须是 allowProd(与 @Value 精确一致;@Value 不做 kebab-case 宽松绑定,写 allow-prod 会静默落回 false)
-    allowProd: true
+    allowProd: false
