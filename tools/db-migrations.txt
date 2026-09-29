@@ -1628,3 +1628,14 @@ migrate-panel-page-size.sql
 
 # —— 2026-09-28 P1:宽表档案面板单页 50→25(配合前端 archPageSize 读配置,渲染量减半) ——
 migrate-panel-page-size-archive.sql
+
+# —— 2026-09-29 后台表定册①:未用表清理(244 张)+ 29 个已下架面板的悬空元数据回收;
+#    证据 tools/archive/_table-audit/,执行前已打全库备份 deploy\HSDZ_MES_pre_drop_<ts>.bak ——
+migrate-drop-unused-tables.sql
+
+# —— 2026-09-29 后台表定册②:在用业务表备用列池补全(45 表 x 20 列 nvarchar(500)+中文注明) ——
+migrate-spare-columns-biz.sql
+
+# —— 2026-09-29 存量债修复:yj_user 6 个遗留对齐列补中文注明 + 2 个字段标签补 en 译名
+#    (体检 03/09 项;两账套改动前快照即已 FAIL,与本次清理无关) ——
+migrate-norm-debt-20260929.sql
