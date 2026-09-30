@@ -235,7 +235,7 @@
                   <!-- 标准库型字段(产品信息表的 产品形态 即此):选项来自**可维护库** yj_std_lib,
                        stdLibOf 取的是后端 fieldSpec 下发的 stdLib 编码(yj_field.dict_sql 存库编码)。
                        故 filterable + allow-create:既能选库里的预设,也能直接敲一个新值;
-                       旁挂「⛙ 标准库维护」入口(StdLibManager:新增/编辑/停用/恢复启用)。
+                       旁挂「⧉ 标准库维护」入口(StdLibManager:新增/编辑/停用/恢复启用)。
                        与上面 row.grid 分支的标准库字段(成型工艺的 烧结炉参数/配料要求等)同一套机制、
                        同一套接口 —— 两个分支各写一遍是因为单元格结构不同,不是两套字典。 -->
                   <el-select v-model="head[pair.key]" size="small" :clearable="false"
@@ -244,7 +244,7 @@
                     <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
                   </el-select>
                   <span v-if="stdLibOf(pair.key)" class="rs-lib-btn no-print"
-                        @click.stop="openStdLib(stdLibOf(pair.key))">⛙ {{ tt('标准库维护') }}</span>
+                        @click.stop="openStdLib(stdLibOf(pair.key))">⧉ {{ tt('标准库维护') }}</span>
                 </template>
                 <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名 -->
                 <FileAttachCell
@@ -662,7 +662,7 @@
                   <!-- 标准库型字段(产品信息表的 产品形态 即此):选项来自**可维护库** yj_std_lib,
                        stdLibOf 取的是后端 fieldSpec 下发的 stdLib 编码(yj_field.dict_sql 存库编码)。
                        故 filterable + allow-create:既能选库里的预设,也能直接敲一个新值;
-                       旁挂「⛙ 标准库维护」入口(StdLibManager:新增/编辑/停用/恢复启用)。
+                       旁挂「⧉ 标准库维护」入口(StdLibManager:新增/编辑/停用/恢复启用)。
                        与上面 row.grid 分支的标准库字段(成型工艺的 烧结炉参数/配料要求等)同一套机制、
                        同一套接口 —— 两个分支各写一遍是因为单元格结构不同,不是两套字典。 -->
                   <el-select v-model="head[pair.key]" size="small" :clearable="false"
@@ -671,7 +671,7 @@
                     <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
                   </el-select>
                   <span v-if="stdLibOf(pair.key)" class="rs-lib-btn no-print"
-                        @click.stop="openStdLib(stdLibOf(pair.key))">⛙ {{ tt('标准库维护') }}</span>
+                        @click.stop="openStdLib(stdLibOf(pair.key))">⧉ {{ tt('标准库维护') }}</span>
                 </template>
                 <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名 -->
                 <FileAttachCell

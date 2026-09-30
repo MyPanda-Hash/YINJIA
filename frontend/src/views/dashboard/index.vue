@@ -690,7 +690,11 @@ async function onDevCell(row, m) {
       panelCode: m.panelCode, condition: {}, pageNo: 1, pageSize: 300,
     })
     const list = res?.data?.list || []
-    const key = m.panelCode === 'RD_SPEC_DOC' ? '编号' : '产品编号'
+    // 按「产品编号」找该产品对应的在审单据。规格书 RD_SPEC_DOC 原先把本面板的字段键特判成
+    // 「编号」—— 那是它当时唯一的产品键;2026-09-30 该字段已改名「产品编号」(旧键名「编号」
+    // 被引擎当单据标识用,值会被单据号覆盖,见 migrate-rd-specdoc-prodno-2026-09-30.sql),
+    // 于是这里不必再特判,与其它面板统一。
+    const key = '产品编号'
     const hit = list.find((r) => String(r[key] ?? '') === String(row['产品编号'] ?? '')
       && String(r['单据状态'] ?? '').includes('审批'))
     const docNo = hit ? (hit['单据编号'] || hit['编号'] || '') : ''

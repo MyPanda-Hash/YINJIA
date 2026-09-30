@@ -1683,3 +1683,15 @@ migrate-rd-test-apply.sql
 #      dict_sql 由硬编码 SQL 改存库编码 prod.form;原 4 项(包布/套网/打端盖/套PP棉)
 #      按原序迁入 yj_std_lib(item_code=默认),界面走共用组件 StdLibManager 增删维护 ——
 migrate-rd-prodinfo-formlib-2026-09-30.sql
+
+# —— 2026-09-30 规格书 RD_SPEC_DOC:「编号」字段改名「产品编号」+ 消除同面板 label 重复 ——
+#    ③ 用户要「产品规格书右上角显示对应的产品编号」,而那格一直显示的是**单据编号**:
+#      业务字段名「编号」与引擎的**单据标识键**同名 —— QueryService.loadDocs 用单据号覆盖它、
+#      ButtonService.save 又把它当单号取走(该字段值因此永远落不了库)。正解是分家:
+#      字段改名 产品编号(rd_spec_doc_head.编号 列 sp_rename + yj_field 两条 header/query),
+#      配套改前端封面 coverDocNoKey/右上角编号格、dashboard 跳转键、后端三处硬编码列名
+#      (PxController.specByProduct、ButtonService.specAssign 盖章、DevTaskService 产品键)。
+#      yj_translation 的「产品编号」译名已存在(10 语言,与产品信息表同键共享),无需新增。
+#    ④ 附带修掉「日期」列 label 被标成「单据日期」造成的同面板 label 重复(既有问题):
+#      后端按 label 建行模型只取首个 ⇒ 该列成死列;fixture 重生成后才被单测抓住 ——
+migrate-rd-specdoc-prodno-2026-09-30.sql

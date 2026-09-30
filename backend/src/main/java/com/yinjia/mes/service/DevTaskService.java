@@ -42,7 +42,9 @@ public class DevTaskService {
     static {
         DEV_PANELS.put("RD_MOLD_PROC", new String[]{"rd_mold_proc_head", "产品编号", "成型工艺清单"});
         DEV_PANELS.put("RD_ASM_PROC", new String[]{"rd_asm_proc_head", "产品编号", "组装工艺清单"});
-        DEV_PANELS.put("RD_SPEC_DOC", new String[]{"rd_spec_doc_head", "编号", "规格书"});
+        // ⚠ 产品键列名逐面板不同:规格书那列 2026-09-30 由「编号」改名「产品编号」
+        //   (旧键名被引擎当单据标识用,值会被单据号覆盖,见 migrate-rd-specdoc-prodno-2026-09-30.sql)
+        DEV_PANELS.put("RD_SPEC_DOC", new String[]{"rd_spec_doc_head", "产品编号", "规格书"});
         DEV_PANELS.put("RD_INSP_PLAN", new String[]{"rd_insp_plan_head", "产品编号", "出货检验计划表"});
         DEV_PANELS.forEach((code, v) -> PRODUCT_KEY.put(code, v[1]));
     }

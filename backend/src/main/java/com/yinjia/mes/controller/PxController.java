@@ -239,15 +239,16 @@ public class PxController {
     /**
      * 「自动填充规格书」数据源:按产品编号取对应规格书的表头 + 检验要求明细行。
      *
-     * <p>【为什么要专门开一个端点】规格书的 编号(=产品键)在通用查询链路里**看不见**——
-     * QueryService.loadDocs 对每个 doc 面板都会执行 doc.put("编号", 单据编号),把真 编号 覆盖成单据号
-     * (那个键在纸张右上角被「编号：」占用)。所以 getFormDescriptor / queryFormDataList 都取不到真值,
-     * 只能像 prodDocList 一样直接读 head 表。
+     * <p>【为什么要专门开一个端点】规格书的产品键在通用查询链路里**看不见**——
+     * QueryService.loadDocs 对每个 doc 面板都会执行 doc.put("编号", 单据编号)。该字段原先就叫
+     * 「编号」,于是真值被覆盖成单据号(2026-09-30 用户报障「封面右上角显示的不是产品编号」);
+     * 现在字段已改名「产品编号」(migrate-rd-specdoc-prodno-2026-09-30.sql),与单据标识键分家,
+     * 但通用链路是**按面板动态出列**的、且列里没有「产品编号」的兜底,故本端点仍直接读 head 表。
      *
      * <p>【产品编号 → 规格书单 的解析顺序】
      * <ol>
      *   <li>rd_spec_assign(产品编号=?)—— 分发写下的正式映射,带 责任人/负责人,是权威源;</li>
-     *   <li>rd_spec_doc_head.编号 = ? —— 分发时盖在产品键列上的章(ButtonService 分发路径写)。</li>
+     *   <li>rd_spec_doc_head.产品编号 = ? —— 分发时盖在产品键列上的章(ButtonService 分发路径写)。</li>
      * </ol>
      * 两条都按 id 倒序取最新。同一产品可能分发了多张规格书(不同规格书种类),
      * 故用 matched 回报命中数,前端提示「按哪一张填的」,不让用户猜。
@@ -264,7 +265,7 @@ public class PxController {
         out.put("found", false);
         out.put("matched", 0);
         out.put("单据编号", "");
-        out.put("编号", "");
+        out.put("产品编号", "");
         out.put("客户项目名称", "");
         out.put("产品类别", "");
         out.put("整体规格参数", "");
@@ -294,14 +295,14 @@ public class PxController {
         }
         out.put("状态", specStatusOf(no));
         List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT 单据编号, ISNULL(编号, N'') AS 编号, ISNULL(客户项目名称, N'') AS 客户项目名称,"
+                "SELECT 单据编号, ISNULL(产品编号, N'') AS 产品编号, ISNULL(客户项目名称, N'') AS 客户项目名称,"
                         + " ISNULL(产品类别, N'') AS 产品类别, ISNULL(整体规格参数, N'') AS 整体规格参数"
                         + " FROM rd_spec_doc_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (heads.isEmpty()) return ApiResult.ok(out);
 
         Map<String, Object> h = heads.get(0);
         out.put("found", true);
-        for (String k : List.of("单据编号", "编号", "客户项目名称", "产品类别", "整体规格参数")) {
+        for (String k : List.of("单据编号", "产品编号", "客户项目名称", "产品类别", "整体规格参数")) {
             Object v = h.get(k);
             out.put(k, v == null ? "" : String.valueOf(v));
         }
@@ -341,12 +342,12 @@ public class PxController {
         }
     }
 
-    /** 产品编号 → 该产品已分发的规格书单号(最新在前,去重);rd_spec_assign 优先,退回 head.编号 盖章 */
+    /** 产品编号 → 该产品已分发的规格书单号(最新在前,去重);rd_spec_assign 优先,退回 head.产品编号 盖章 */
     private List<String> specDocNosOfProduct(String productCode) {
         List<String> nos = new java.util.ArrayList<>();
         String[] sqls = {
                 "SELECT 单据编号 FROM rd_spec_assign WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
-                "SELECT 单据编号 FROM rd_spec_doc_head WHERE 编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
+                "SELECT 单据编号 FROM rd_spec_doc_head WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
         };
         for (String sql : sqls) {
             try {

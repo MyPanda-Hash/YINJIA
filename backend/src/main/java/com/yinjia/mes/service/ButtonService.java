@@ -470,6 +470,8 @@ public class ButtonService {
      *   · 编号:save() 把载荷里的「编号」当**单据标识**取走(body.remove("编号")),
      *     同名列的字段永远无法随保存落库(实测 rd_spec_doc_head.编号 3 张单全为 NULL)
      *     ⇒ 拿它做必填 = 永远填不进去的死结。
+     *     (2026-09-30:规格书那个字段已改名「产品编号」,不再撞名;此条作为通用防线保留 ——
+     *      任一将来又把业务字段命名成「编号」的面板仍会被它兜住。)
      * 命中 col_name 或 label 任一即跳过。
      */
     private static final java.util.Set<String> REQUIRED_SYS_FIELDS =
@@ -3579,8 +3581,8 @@ public class ButtonService {
      * formData = {编号: 产品信息表单据编号, assigns: [{编号: 规格书单据编号, 责任人: 账号}]}。
      * 产品编号/名称/负责人一律服务端自查(不信客户端);分配后仅 责任人∪总负责人∪管理员 可编辑
      * (ensureSpecAssignEditable 在 保存/申请修改/删除 三个入口强制)。
-     * 绑定:单据须存活、未分配过(一单一条活分配,分发过的不再重复分发)、编号为空或属本产品;
-     * 绑定时 rd_spec_doc_head.编号 盖产品编号章(正常运行时唯一写入方,进度匹配依据)。多张同一事务全成或全无。
+     * 绑定:单据须存活、未分配过(一单一条活分配,分发过的不再重复分发)、产品编号为空或属本产品;
+     * 绑定时 rd_spec_doc_head.产品编号 盖产品编号章(正常运行时唯一写入方,进度匹配依据)。多张同一事务全成或全无。
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> specAssign(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -3618,13 +3620,15 @@ public class ButtonService {
         String supervisor = devTaskService.supervisorOf(productCode);
         String supervisorSnapshot = supervisor == null ? user : supervisor; // 挂起产品快照操作人(admin)
         // 绑定 + 写分配(同一事务):单据须存活、未分配过(分发过的不再重复分发)、
-        // 且 编号为空(普通保存从不写该列)或已属于本产品;绑定时给单据盖上产品编号(进度匹配依据)
+        // 且 产品编号为空(普通保存从不写该列)或已属于本产品;绑定时给单据盖上产品编号(进度匹配依据)
+        // ⚠ 列名 2026-09-30 由「编号」改「产品编号」:旧键名与引擎的**单据标识键**同名,值会被
+        //   QueryService.loadDocs 的单据号覆盖(见 migrate-rd-specdoc-prodno-2026-09-30.sql)。
         List<Map<String, Object>> assigned = new ArrayList<>();
         for (Map<String, Object> a : assigns) {
             String docNo = String.valueOf(a.get("编号")).trim();
             String owner = String.valueOf(a.get("责任人")).trim();
             List<Map<String, Object>> docs = jdbc.queryForList(
-                    "SELECT h.编号, h.规格书种类, ISNULL(s.deleting,'N') AS deleting, ISNULL(s.stopped,'N') AS stopped"
+                    "SELECT h.产品编号, h.规格书种类, ISNULL(s.deleting,'N') AS deleting, ISNULL(s.stopped,'N') AS stopped"
                             + " FROM rd_spec_doc_head h LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC'"
                             + " AND s.doc_no = h.单据编号"
                             + " WHERE h.单据编号 = ? AND ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'", docNo);
@@ -3634,7 +3638,7 @@ public class ButtonService {
                 throw new IllegalArgumentException("规格书单据正在删除审批中，不可分发：" + docNo);
             if ("Y".equals(String.valueOf(docs.get(0).get("stopped"))))
                 throw new IllegalArgumentException("规格书单据已中止，不可分发：" + docNo);
-            String docProduct = docs.get(0).get("编号") == null ? "" : String.valueOf(docs.get(0).get("编号")).trim();
+            String docProduct = docs.get(0).get("产品编号") == null ? "" : String.valueOf(docs.get(0).get("产品编号")).trim();
             if (!docProduct.isEmpty() && !docProduct.equals(productCode))
                 throw new IllegalArgumentException("规格书单据「" + docNo + "」已属于其他产品（" + docProduct + "）");
             List<Map<String, Object>> prev = jdbc.queryForList(
@@ -3643,7 +3647,7 @@ public class ButtonService {
                 throw new IllegalArgumentException("该规格书已分发：" + docNo + "（责任人 " + prev.get(0).get("责任人") + "），请勿重复分发");
             String kind = docs.get(0).get("规格书种类") == null ? "" : String.valueOf(docs.get(0).get("规格书种类")).trim();
             // 盖章:产品编号列(正常保存路径从不写,分发是运行时唯一写入方)+ 操作人留痕
-            jdbc.update("UPDATE rd_spec_doc_head SET 编号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE 单据编号 = ?",
+            jdbc.update("UPDATE rd_spec_doc_head SET 产品编号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE 单据编号 = ?",
                     productCode, user, docNo);
             Map<String, Object> asg = new LinkedHashMap<>();
             asg.put("产品编号", productCode);
@@ -3681,8 +3685,10 @@ public class ButtonService {
     }
 
     /** 建单防绕过:保存载荷的「编号」是单据编号——若该号不是已有单据、却命中已下发产品的产品编号,
-     *  说明有人以产品码为单号手工建规格书单(封面编号格输入产品编码保存),要求总负责人/admin。
-     *  (物理 rd_spec_doc_head.编号 产品列正常保存路径从不写,唯一的手动向量就是这个改主键通道。)
+     *  说明有人以产品码为单号手工建规格书单,要求总负责人/admin。
+     *  ⚠ 2026-09-30 后封面右上角那一格绑的是**产品编号字段**(不再占用单据标识键「编号」),
+     *    所以界面上的常规输入已不构成这条向量;本条拦的是**直连接口**把「编号」当单号传进来的情形
+     *    (仍是有效防线,故保留)。
      *  空白 directAdd 草稿编号=NULL 不参与产品匹配,天然无法绕过分发。 */
     private void ensureSpecCreateAllowed(PanelRegistry.PanelDef def, String no, String user) {
         if (!"RD_SPEC_DOC".equals(def.code())) return;
