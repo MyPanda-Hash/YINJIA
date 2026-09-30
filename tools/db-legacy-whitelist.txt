@@ -220,16 +220,13 @@ dupkey:RD_PROGRESS.项目名称
 dupkey:RD_PROGRESS.项目层级
 dupkey:RD_RO_PROTECT.报告编号
 dupkey:RD_RO_PROTECT.测试主题
-dupkey:RD_SAMPLE_NO.备注
-dupkey:RD_SAMPLE_NO.样品编号
-dupkey:RD_SAMPLE_NO.项目名称
 dupkey:RD_SCALE.报告编号
 dupkey:RD_SCALE.测试主题
 dupkey:RD_SOAK.报告编号
 dupkey:RD_SOAK.测试主题
 dupkey:RD_SPEC_DOC.名称
 dupkey:RD_SPEC_DOC.备注
-dupkey:RD_SPEC_DOC.编号
+dupkey:RD_SPEC_DOC.产品编号
 dupkey:RD_SPEC_DOC.规格书种类
 dupkey:RD_SPIKE_WATER.测试项目
 dupkey:STOCK_STATUS.wzdm

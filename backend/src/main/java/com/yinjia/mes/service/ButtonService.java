@@ -337,16 +337,17 @@ public class ButtonService {
         if ("修改申请中".equals(stStatus)) throw new IllegalStateException("修改申请审批期间不可保存，请等待审批完成或撤回申请");
         // 来料检验单数量守恒:每行 合格数量+不良数量 ≤ 数量(送检数量),超限拒绝保存
         if ("QC_INSP".equals(def.code())) validateInspQty(items);
-        // 样品编号表:样品编号 = 客户项目代号 + 项目编号(确定性拼接),同面板内不允许重复
-        if ("RD_SAMPLE_NO".equals(def.code())) ensureSampleNoUnique(no, items);
+        // ⚠ 原「样品编号表(RD_SAMPLE_NO)的样品编号唯一性校验」2026-09-30 随面板下架移除
+        //   (用户口径「样品编号表删掉」,见 tools/migrate-drop-sample-no-panel-2026-09-30.sql);
+        //   连带删掉私有方法 ensureSampleNoUnique —— 面板没了,该分支永不进入。
         // 必填校验(2026-09-20):仅「保存/提交」路径(markSaved=true)执行;
         // 「保存为草稿」「新增」放行 —— 用户口径:草稿不做必填限制,提交审批才做。
         // 补这层的理由:此前必填**只在前端校验**,直连 /px/callButton 就能把缺必填的单提交/归档
         // (实测:文档编号/测试主题为空仍可保存并归档)。前端仍保留校验(即时提示+定位字段),两层各司其职。
         if (markSaved) {
             ensureRequiredFilled(def, head, no);
-            // 明细行必填(2026-09-20):表头之外还有明细级必填(如 RD_SAMPLE_NO 的
-            // 客户项目代号/样品编号/项目编号全在明细),只查表头等于这些面板没校验。
+            // 明细行必填(2026-09-20):表头之外还有明细级必填(如 SO_ORDER 的
+            // 数量/单价全在明细),只查表头等于这些面板没校验。
             ensureDetailRequiredFilled(def, items);
         }
 
@@ -556,32 +557,12 @@ public class ButtonService {
         if (dup != null && dup > 0) throw new IllegalArgumentException("文档编号不允许重复：" + docNo);
     }
 
-    /** 样品编号不允许重复(RD_SAMPLE_NO,2026-09-18)。
-     *  口径:样品编号 = 客户项目代号 + 项目编号(确定性拼接,无计数器 —— 见
-     *  docs/design/研发管理-新面板设计与改动方案.md §14),所以重复必然意味着
-     *  同一 (代号, 项目编号) 被录了两次。此处按明细列查重(与 ensureDocNoUnique 判头表不同,
-     *  它是**明细行**唯一),作废单据不计占用(两侧都排,口径同 ensureDocNoUnique)。 */
-    private void ensureSampleNoUnique(String docNo, List<Map<String, Object>> items) {
-        if (items == null || items.isEmpty()) return;
-        java.util.Set<String> seen = new java.util.LinkedHashSet<>();
-        for (Map<String, Object> it : items) {
-            Object v = it.get("样品编号");
-            if (v == null) continue;
-            String sampleNo = String.valueOf(v).trim();
-            if (sampleNo.isEmpty()) continue;
-            // 同一次提交内部先查重(数据库里还没有这些行)
-            if (!seen.add(sampleNo)) throw new IllegalArgumentException("样品编号不允许重复：" + sampleNo);
-            Integer dup = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM rd_sample_no_detail d "
-                            + "JOIN rd_sample_no_head h ON h.[单据编号] = d.[单据编号] "
-                            + "WHERE d.[样品编号] = ? AND d.[单据编号] <> ? "
-                            + "AND ISNULL(h.asp_cancel,'N') <> 'Y' "
-                            + "AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_SAMPLE_NO' "
-                            + "                AND s.doc_no = h.[单据编号] AND s.canceled = 'Y')",
-                    Integer.class, sampleNo, docNo == null ? "" : docNo);
-            if (dup != null && dup > 0) throw new IllegalArgumentException("样品编号不允许重复：" + sampleNo);
-        }
-    }
+    /** ⚠ 原 ensureSampleNoUnique(样品编号表 RD_SAMPLE_NO 的明细列唯一性校验)已随该面板
+     *  2026-09-30 下架一并删除(用户口径「样品编号表删掉」——
+     *  tools/migrate-drop-sample-no-panel-2026-09-30.sql:元数据/字段/权限已清、两张数据表留档)。
+     *  它当年的口径是:样品编号 = 客户项目代号 + 项目编号(确定性拼接、无计数器),重复即同一
+     *  (代号, 项目编号) 被录两次,故按**明细列**查重(区别于 ensureDocNoUnique 判头表)。
+     *  面板恢复时需从 git 历史取回本方法并重新挂到 save() 的 RD_SAMPLE_NO 分支上。 */
 
     // ==================== 规格书检验项目变更 → 出货检验计划表核对提醒(2026-09-11) ====================
 
@@ -4155,8 +4136,9 @@ public class ButtonService {
             "RD_APPROVAL", "RD_PLAN", "RD_FILTER_EFF",
             "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC",
             "RD_SPIKE_WATER", "RD_DOM_TEST", "RD_EQUIP_USE", "RD_INSTR_USE",
-            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
-            // 2026-09-18 新增:样品编号表 —— 发号台账,改样品编号=改追溯锚点,必须防篡改,故入归档闭环。
+            // ⚠ 样品编号表(RD_SAMPLE_NO)2026-09-30 **下架**,已从本集合移除 —— 用户口径「样品编号表删掉」
+            //   (tools/migrate-drop-sample-no-panel-2026-09-30.sql:面板元数据/字段/权限已清、两张数据表留档)。
+            //   当年登记理由是"发号台账,改样品编号=改追溯锚点,必须防篡改";面板下架后无从归档,故一并撤登记。
             // ⚠ RD_PROD_DOCLIST(产品文件列表)**刻意不入本集合**:它是**只读派生视图**
             //   (4 文件×状态矩阵由 DevTaskService 实时推导,面板本身没有可归档的"纸"),
             //   没有「新增」入口、永远没有单据可归档;登记进来只会让归档/修改闭环指向空集合。
@@ -4166,7 +4148,7 @@ public class ButtonService {
             //   —— 管理员保存即归档会让"提交审批"看起来直接归档,用户口径不认(曾登记后移出)。
             // ⚠ 2026-09-24 下拉生产域时**刻意不采纳**远端把 RD_PROGRESS 登记进来的改动(研发域用户自有,
             //   本地优先级最高):本地口径维持"项目进度查询单独据、永远草稿、刻意排除"。
-            "RD_SAMPLE_NO");
+            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO");
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复)。
      *  ⚠ RD_INSP_PLAN(出货检验计划表)**刻意不入本集合**(2026-09-20 用户口径):
      *   它的文档编号不是"单据号"而是**表单固定值** —— 前端 recordSheetConfigs.js 的
