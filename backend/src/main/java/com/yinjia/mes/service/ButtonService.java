@@ -1515,6 +1515,18 @@ public class ButtonService {
         return v == null ? "" : String.valueOf(v).trim();
     }
 
+    /**
+     * 「申请修改」的修改原因(2026-09-30)。
+     * 需求原文(《产品开发系统需求汇总.xlsx》sheet「数据记录表」第 2 条):「修改:不需要反审核,
+     * 只需填写修改原因」;用户口径:「改完需要再审核」—— 故只在申请环节补这一格,审批闭环不动。
+     * ⚠ 用**独立键**「修改原因」而不是复用「审批意见」:后者是审批人写的话,
+     *   混在同一列(以及 yj_form_approval.opinion)里会分不清是申请人写的还是审批人写的。
+     */
+    private String modifyReasonOf(Map<String, Object> formData) {
+        Object v = formData == null ? null : formData.get("修改原因");
+        return v == null ? "" : String.valueOf(v).trim();
+    }
+
     public List<Map<String, Object>> queryApprovalHistory(String panelCode, String formNo) {
         return jdbc.query("SELECT action, result, node_no, operator, opinion, create_time FROM yj_form_approval"
                         + " WHERE panel_code = ? AND form_no = ? ORDER BY id ASC",
@@ -3708,16 +3720,21 @@ public class ButtonService {
         if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, null, user); // 四文件门禁同口径
         String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
         if (!"已归档".equals(st) && !"已审核".equals(st)) throw new IllegalStateException("仅已归档单据可申请修改");
+        // 修改原因**必填**(2026-09-30 需求:「修改:只需填写修改原因」)—— 空则拒绝,理由同所有必填:
+        // 不留原因的修改等于无从追溯,而这条闭环的全部新增信息就是这一句原因。
+        String reason = modifyReasonOf(formData);
+        if (reason.isEmpty()) throw new IllegalArgumentException("请填写修改原因");
+        if (reason.length() > 500) throw new IllegalArgumentException("修改原因过长（≤500 字）");
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                         + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
-                        + "WHEN MATCHED THEN UPDATE SET modify_state = 'R', modify_req_by = ?, modify_req_at = GETDATE(), update_at = GETDATE() "
-                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, modify_state, modify_req_by, modify_req_at, update_at) "
-                        + "VALUES (s.panel_code, s.doc_no, 'R', ?, GETDATE(), GETDATE());",
-                def.code(), no, user, user);
-        recordApproval(def.code(), no, "MODIFY_REQ", "PENDING", opinionOf(formData));
-        // 消息:申请修改 → 管理员
+                        + "WHEN MATCHED THEN UPDATE SET modify_state = 'R', modify_req_by = ?, modify_req_at = GETDATE(), modify_reason = ?, update_at = GETDATE() "
+                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, modify_state, modify_req_by, modify_req_at, modify_reason, update_at) "
+                        + "VALUES (s.panel_code, s.doc_no, 'R', ?, GETDATE(), ?, GETDATE());",
+                def.code(), no, user, reason, user, reason);
+        recordApproval(def.code(), no, "MODIFY_REQ", "PENDING", reason);
+        // 消息:申请修改 → 管理员(把原因一并带上,管理员不用打开单据就知道要改什么)
         notify(() -> messageService.sendToAdmins(def.code(), no, MessageService.MODIFY_REQUESTED,
-                Map.of("docNo", no, "actor", user, "opinion", opinionOf(formData)), user));
+                Map.of("docNo", no, "actor", user, "opinion", reason), user));
         return result(no, "修改申请中");
     }
 
@@ -3731,10 +3748,13 @@ public class ButtonService {
         Map<String, Object> row = st.get("row") instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
         String applyBy = row == null || row.get("modify_req_by") == null ? user : String.valueOf(row.get("modify_req_by"));
         Object applyAt = row == null ? null : row.get("modify_req_at");
-        jdbc.update("INSERT INTO yj_doc_modify_log (panel_code, doc_no, apply_by, apply_at, approve_by, approve_at, snapshot_head, snapshot_rows) "
-                        + "VALUES (?,?,?,?,?,?,?,?)",
+        // 修改原因随本次修改一起归档(2026-09-30):申请时暂存在 yj_doc_status.modify_reason,
+        // 这里复制进 log 长期可见 —— log 是历史快照,只读状态行的当前值会让历次修改的原因互相覆盖。
+        String reason = row == null || row.get("modify_reason") == null ? "" : String.valueOf(row.get("modify_reason"));
+        jdbc.update("INSERT INTO yj_doc_modify_log (panel_code, doc_no, apply_by, apply_at, approve_by, approve_at, snapshot_head, snapshot_rows, modify_reason) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?)",
                 def.code(), no, applyBy, applyAt, user, LocalDateTime.now(),
-                toJson(headLabelSnapshot(def, no)), toJson(rowSnapshots(def, no)));
+                toJson(headLabelSnapshot(def, no)), toJson(rowSnapshots(def, no)), reason);
         int n = jdbc.update("UPDATE yj_doc_status SET modify_state='Y', modify_appr_by=?, modify_appr_at=GETDATE(), archived='N', update_at=GETDATE()"
                 + " WHERE panel_code=? AND doc_no=? AND modify_state='R'", user, def.code(), no);
         if (n == 0) throw new IllegalStateException("无待审批的修改申请");
@@ -3910,7 +3930,7 @@ public class ButtonService {
         // 修改中/审批中随时打开可见当前已改内容(快照 vs 当前实时 diff)
         refreshModifyDiff(def, no);
         List<Map<String, Object>> records = jdbc.queryForList(
-                "SELECT TOP 3 apply_by, apply_at, approve_by, approve_at, rearchive_by, rearchive_at, changes, change_meta"
+                "SELECT TOP 3 apply_by, apply_at, approve_by, approve_at, rearchive_by, rearchive_at, changes, change_meta, modify_reason"
                         + " FROM yj_doc_modify_log WHERE panel_code=? AND doc_no=? ORDER BY id DESC", def.code(), no);
         List<Map<String, Object>> list = new ArrayList<>();
         for (Map<String, Object> r : records) {
@@ -3921,6 +3941,8 @@ public class ButtonService {
             m.put("approveAt", fmtTime(r.get("approve_at")));
             m.put("rearchiveBy", r.get("rearchive_by"));
             m.put("rearchiveAt", fmtTime(r.get("rearchive_at")));
+            // 修改原因(2026-09-30):申请时必填的那句话,在「修改记录」弹窗里逐条展示
+            m.put("reason", r.get("modify_reason") == null ? "" : String.valueOf(r.get("modify_reason")));
             m.put("changes", r.get("changes"));
             m.put("changeMeta", r.get("change_meta"));
             list.add(m);
@@ -4171,7 +4193,7 @@ public class ButtonService {
      *   另一处在 QueryService.docStatus,管列表行状态) */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at, approve_node, l2_approver, effective, erp_close_state FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at, modify_reason, approve_node, l2_approver, effective, erp_close_state FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
                 panelCode, no);
         Map<String, Object> out = new HashMap<>();
         Map<String, Object> r = rows.isEmpty() ? null : rows.get(0);

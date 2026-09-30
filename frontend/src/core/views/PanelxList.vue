@@ -1389,6 +1389,9 @@
             <span>{{ tt('修改审批') }}：{{ r.approveBy || '-' }} {{ r.approveAt || '' }}</span>
             <span>{{ tt('再归档') }}：{{ r.rearchiveBy || '-' }} {{ r.rearchiveAt || tt('未归档') }}</span>
           </div>
+          <!-- 修改原因(2026-09-30):申请时必填的那句话,逐条展示 —— 需求原文
+               「修改:不需要反审核,只需填写修改原因」,原因就是这条闭环的全部新增信息 -->
+          <div v-if="r.reason" class="mod-log-reason">{{ tt('修改原因') }}：{{ r.reason }}</div>
           <table v-if="(r.changes || []).length" class="mod-log-table">
             <thead><tr><th style="width:70px">{{ tt('类型') }}</th><th style="width:140px">{{ tt('字段') }}</th><th>{{ tt('原内容') }}</th><th>{{ tt('新内容') }}</th></tr></thead>
             <tbody>
@@ -6432,6 +6435,8 @@ async function onButton(action) {
   try {
     // 审批流：提交审批/审批通过（确认+意见）、审批驳回（意见必填）、审批情况（历史弹窗）
     let approvalOpinion = ''
+    // 「申请修改」的修改原因(2026-09-30 需求:数据记录表「修改:只需填写修改原因」)
+    let modifyReason = ''
     if (action === '提交审批' || action === '审批通过') {
       if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
       // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过:审批中(一级)/待二级审批(二级)
@@ -6456,6 +6461,31 @@ async function onButton(action) {
           { confirmButtonText: '确认' + action, cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: action === '审批通过' ? '审批意见（选填）' : '提交说明（选填）' }
         )
         approvalOpinion = value || ''
+      } catch (e) {
+        return
+      }
+    } else if (action === '申请修改') {
+      // 2026-09-30 需求(《产品开发系统需求汇总.xlsx》sheet「数据记录表」第 2 条:
+      //   「修改:不需要反审核,只需填写修改原因」):申请修改**必须填原因**。
+      // 用户口径「改完需要再审核」⇒ 本处只补这一格,后面的
+      //   「申请修改 → 管理员批 → 改 → 提交审批 → 管理员批 → 再归档」闭环原样不动。
+      // 原因随 formData 的「修改原因」键发到后端(PanelxList 此前对申请修改**没有任何输入框**,
+      // 后端 modifyRequest 拿到的原因因此恒为空串)。
+      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+      const noMod = current.value['编号'] || current.value['单据编号'] || ''
+      try {
+        const { value } = await ElMessageBox.prompt(
+          tt('单据：{no}（当前状态：{st}）\n请写明本次要修改什么、为什么改').replace('{no}', noMod).replace('{st}', current.value['单据状态'] || ''),
+          tt('申请修改确认'),
+          {
+            confirmButtonText: tt('提交修改申请'),
+            cancelButtonText: tt('取消'),
+            inputType: 'textarea',
+            inputPlaceholder: tt('修改原因（必填）'),
+            inputValidator: (v) => (v && v.trim() ? true : tt('修改原因不能为空')),
+          }
+        )
+        modifyReason = value || ''
       } catch (e) {
         return
       }
@@ -6513,7 +6543,7 @@ async function onButton(action) {
     const res = await engine.callButton({
       panelCode: panelCode.value,
       buttonName: action,
-      formData: current.value ? { 编号: current.value['编号'], ...(auditOpinion !== '' ? { 审核意见: auditOpinion } : {}), ...(approvalOpinion !== '' ? { 审批意见: approvalOpinion } : {}) } : {},
+      formData: current.value ? { 编号: current.value['编号'], ...(auditOpinion !== '' ? { 审核意见: auditOpinion } : {}), ...(approvalOpinion !== '' ? { 审批意见: approvalOpinion } : {}), ...(modifyReason !== '' ? { 修改原因: modifyReason } : {}) } : {},
       buttonParam: {},
     })
       if (res?.gotoPanel) {
