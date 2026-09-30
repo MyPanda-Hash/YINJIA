@@ -1156,7 +1156,14 @@ public class ButtonService {
         String no = requireNo(formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
         String status = String.valueOf(st.get("status"));
-        if (!"已审核".equals(status) && !"已归档".equals(status)) throw new IllegalStateException("仅已审核或已归档状态可弃审");
+        // 产品变更申请单(2026-09-30 需求《产品开发系统需求汇总.xlsx》sheet「变更」):
+        // **生效后允许反审核**重走流程 —— 依据总原则第 3 条「允许修改编辑」,以及流程图那句
+        // 「项目有变动-**反审核后,重新走流程**」。此前变更单的「已生效」是死态:它不在
+        // DOC_ARCHIVE_PANELS 里(既没有「申请修改」),而本方法又把状态卡在"已审核/已归档",
+        // 于是生效之后整张单再也动不了(调研 2026-09-30 实测确认)。
+        boolean changeEffective = CHANGE_PANEL.equals(def.code()) && "已生效".equals(status);
+        if (!"已审核".equals(status) && !"已归档".equals(status) && !changeEffective)
+            throw new IllegalStateException("仅已审核或已归档状态可弃审");
         // 检验目录守卫(2026-09-22 用户口径):挂靠单据在检验目录中已「已完成检验」时不许反审核 ——
         // 需先在检验目录点「修改」把状态回弹为「正在检验中」,再回来反审核修改
         qcCatalog.assertLinkedRowNotCompleted(def.code(), no);
@@ -1194,9 +1201,14 @@ public class ButtonService {
         // 修改记录完全丢失。弃审时先落一份快照(弃审前的数据),此后再编辑保存/审核/审批通过时
         // 由 finalizeOpenModify 收尾 diff 并盖章再归档——弃审路径与申请修改路径留痕同构。
         if (DOC_ARCHIVE_PANELS.contains(def.code())) snapshotOnUnaudit(def, no, currentUserName());
-        // 弃审同时清归档标记(文件面板审批后=已归档,弃审应回到草稿)
-        jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL, update_at = GETDATE()"
-                + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
+        // 弃审同时清归档标记(文件面板审批后=已归档,弃审应回到草稿);
+        // 产品变更申请单(2026-09-30):生效后反审核必须**连 effective 一起清** ——
+        // 状态推导的优先级是「已生效 > 已归档 > 已审核」,只清 archived 的话
+        // 单据仍被判定成「已生效」,等于没退回(实测会卡在原地)。
+        jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL,"
+                + " effective = CASE WHEN ? = 1 THEN NULL ELSE effective END, update_at = GETDATE()"
+                + " WHERE panel_code = ? AND doc_no = ?",
+                CHANGE_PANEL.equals(def.code()) ? 1 : 0, def.code(), no);
         // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
         if (List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER").contains(def.code())) {
             String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
@@ -3016,6 +3028,13 @@ public class ButtonService {
 
     /** 变更申请单面板编码 */
     private static final String CHANGE_PANEL = "RD_CHANGE";
+    /**
+     * 变更类型取值(2026-09-30 需求《产品开发系统需求汇总.xlsx》sheet「变更」底部两行原文):
+     * 「严格变更 = 按上述流程」(六步 + 会签) / 「快捷变更 = 冯总审批」。
+     * 本常量是**快捷变更**那一档 —— 它禁止提交会签,只需审核人单节点审批。
+     * 字段登记见 tools/migrate-rd-change-kind-2026-09-30.sql。
+     */
+    private static final String CHANGE_KIND_FAST = "快捷变更";
     /** 部门评审行的表区值(与前端纸张配置同名) */
     private static final String CHANGE_DEPT_SECTION = "部门评审意见";
     /** 部门行里可由填写人改的列(其余列一律以库内现值为准) */
@@ -3235,6 +3254,16 @@ public class ButtonService {
         if ("会签中".equals(st)) throw new IllegalStateException("本单会签进行中，无需重复提交");
         if (!"草稿".equals(st)) throw new IllegalStateException("仅草稿状态可提交会签（当前：" + st + "）");
         if (!"是".equals(changeHead(no, "需会签"))) throw new IllegalStateException("本单未勾选「需会签」，直接提交审批即可");
+        // 两种变更(2026-09-30 需求《产品开发系统需求汇总.xlsx》sheet「变更」底部两行原文):
+        //   「严格变更 = 按上述流程」(六步:发起 → 填原因/上传 → 填需修改文件及处理方案
+        //     → 分发给文件负责人修改 → 审核人审批 → 受控关闭;会签是这条链上的多部门确认)
+        //   「快捷变更 = 冯总审批」—— 只需审核人点头,不走走会签。
+        // 故:快捷变更**禁止**提交会签(勾了「需会签」也不放行),直接「提交审批」。
+        // ⚠ changeHead 是按**物理列名**拼 SQL 的(见其实现 `SELECT ISNULL([col] ...)`),
+        //   所以这里要传"备用1"而不是字段 label「变更类型」——该字段走备用列池,label 与列名不同名
+        //   (实测传 label 会 500:列名 '变更类型' 无效)。
+        if (CHANGE_KIND_FAST.equals(changeHead(no, "备用1")))
+            throw new IllegalStateException("本单是「快捷变更」（冯总审批即可），无需会签；请直接「提交审批」");
         List<String> signers = signersOf(no);
         if (signers.isEmpty()) throw new IllegalStateException("请先填写会签人（账号）");
         if (signers.contains(user) && !isAdminUser(user))

@@ -1542,12 +1542,20 @@ export const recordSheetConfigs = {
           { label: '单据编号' },
           { key: '单据编号', span: 2 },
         ]},
+        // 变更类型(2026-09-30 需求 sheet「变更」底部两行:严格变更=按上述六步流程 /
+        // 快捷变更=冯总审批):数据键「变更类型」,落库列走备用列池的 备用1
+        // (见 tools/migrate-rd-change-kind-2026-09-30.sql);快捷变更在后端
+        // **禁止提交会签**(ButtonService.submitSignoff 明确拒绝),直接提交审批即可。
+        { grid: [
+          { label: '变更类型' },
+          { key: '变更类型', type: 'select', span: 2 },
+          { label: '需会签' },
+          { key: '需会签', type: 'checks', single: true, options: ['是', '否'], span: 2 },
+        ]},
         // 会签(用户口径第④条):需会签=是 时「提交会签」把会签人点亮;会签人写账号,多人用逗号/顿号分隔
         { grid: [
-          { label: '需会签' },
-          { key: '需会签', type: 'checks', single: true, options: ['是', '否'] },
           { label: '会签人' },
-          { key: '会签人', span: 3, ph: '多人用逗号分隔（账号）' },
+          { key: '会签人', span: 5, ph: '多人用逗号分隔（账号）' },
         ]},
       ]},
       { bar: '二、变更/新增申请事由', rows: [
