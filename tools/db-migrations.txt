@@ -1667,3 +1667,13 @@ migrate-norm-debt-20260929.sql
 # —— 2026-09-29 备用列注明补漏:守卫漏写 ep.class=1 导致「索引 index_id 撞列 column_id」时
 #    漏写列级注明(实测 kucun.备用1);只追加不回改历史,新库场景本脚本兜底收敛 ——
 migrate-spare-desc-fix.sql
+
+# —— 2026-09-30 研发管理·产品信息表 RD_PROD_INFO 两项修正(用户 2026-09-30 报障):
+#    ①「产品名称不能为空」——「产品名称」「产品类别」在 yj_field 标着 required=1,
+#      而产品信息表纸面(recordSheetConfigs.js 的 RD_PROD_INFO.sections)只渲染 14 格、
+#      不含这两个字段 ⇒ 界面上无处可填,保存必被拦(前端 validateInlineDraft 与后端
+#      ensureRequiredFilled 两层都拦)。用户口径:纸面保持现状,只把这两个字段的必填关掉。
+#    ②「产品形态」下拉要能自定义新增/删除选项 —— data_type 下拉框 → 标准库,
+#      dict_sql 由硬编码 SQL 改存库编码 prod.form;原 4 项(包布/套网/打端盖/套PP棉)
+#      按原序迁入 yj_std_lib(item_code=默认),界面走共用组件 StdLibManager 增删维护 ——
+migrate-rd-prodinfo-formlib-2026-09-30.sql
