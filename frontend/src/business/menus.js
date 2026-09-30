@@ -39,7 +39,10 @@ export const menuTree = [
           {
             code: 'rdLab', title: '实验室使用记录表', icon: 'Flask', children: [
               { code: 'rdSpikeWater', title: '加标水配置记录表', path: '/panelx/list/RD_SPIKE_WATER', panelCode: 'RD_SPIKE_WATER', icon: 'Coin' },
-              { code: 'rdDomTest', title: '内部委托测试申请单', path: '/panelx/list/RD_DOM_TEST', panelCode: 'RD_DOM_TEST', icon: 'DocumentAdd' },
+              // 2026-09-30:「内部委托测试申请单」升级为**一张单三个页签**的「测试申请单」
+              //   (页签 = 内部委托-测试申请单 / 销售端-测试/检测申请表 / 委托测试汇总表,
+              //    按《3.实验室使用记录表\测试申请单.xlsx》3 个 sheet 复刻);面板编码 RD_DOM_TEST 不变。
+              { code: 'rdDomTest', title: '测试申请单', path: '/panelx/list/RD_DOM_TEST', panelCode: 'RD_DOM_TEST', icon: 'DocumentAdd' },
               { code: 'rdEquipUse', title: '设备使用登记表', path: '/panelx/list/RD_EQUIP_USE', panelCode: 'RD_EQUIP_USE', icon: 'Monitor' },
               { code: 'rdInstrUse', title: '仪器使用记录表', path: '/panelx/list/RD_INSTR_USE', panelCode: 'RD_INSTR_USE', icon: 'Odometer' },
             ],

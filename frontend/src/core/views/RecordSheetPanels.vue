@@ -35,6 +35,21 @@
               <!-- 公司名与标题**分带**渲染(top 由常量给出):同带会因水平重叠而互相压字 -->
               <div class="rsp-cover-company"
                    :style="{ top: (COVER_COMPANY_TOP * coverVy) + 'px', height: (COVER_COMPANY_H * coverVy) + 'px' }">惠州市银嘉环保科技有限公司</div>
+              <!-- 编号格(第 ① 带**右端**):设计原文就是「公司左上 + 编号右上」——
+                   此前只渲染了公司名,右上角编号格整个漏了,用户看不到"对应的产品编号"
+                   (2026-09-30 报障)。与公司名同带、右对齐,边距取与左端对称的 44px。
+                   ⚠ 取的是 cfg.coverDocNoKey(= 字段「产品编号」,**不是**「编号」):
+                     旧键名「编号」被引擎当**单据标识**用 —— 后端 QueryService.loadDocs 拿单据编号
+                     覆盖它、ButtonService.save 又把它当单号取走,所以那格一直显示 DEMO-SD-002 这类
+                     单据号而不是产品编号。字段已在 2026-09-30 改名为「产品编号」
+                     (tools/migrate-rd-specdoc-prodno-2026-09-30.sql),旧键从此只表示单据标识。 -->
+              <div v-if="coverDocNoKey" class="rsp-cover-docno"
+                   :style="{ top: (COVER_COMPANY_TOP * coverVy) + 'px', height: (COVER_COMPANY_H * coverVy) + 'px' }">
+                <span class="rsp-cover-docno-lb">{{ tt('编号：') }}</span>
+                <el-input v-if="editable" v-model="head[coverDocNoKey]" size="small" class="rsp-cover-docno-in"
+                          :maxlength="60" @input="emit('dirty')" />
+                <span v-else class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '' }}</span>
+              </div>
               <div class="rsp-cover-title"
                    :style="{ top: (COVER_TITLE_TOP * coverVy) + 'px', height: (COVER_TITLE_H * coverVy) + 'px' }">{{ tt(cfg.staticTitle || '产品规格书') }}</div>
               <!-- 字段表 + 签字栏:外层负责**水平居中**,内层 inline-block 负责**按内容定宽**。
@@ -58,9 +73,13 @@
                     </tbody>
                   </table>
                   <!-- 签字栏:width:100% 跟随 .rsp-cover-blockin ⇒ 与字段表同宽。
-                       margin-top = 签字栏顶 − 字段表底(由常量算出,不写死 85px) -->
+                       margin-top = 签字栏顶 − 字段表底(由常量算出,不写死 85px)。
+                       ⚠ 行数 2026-09-30 由 9 改 **8**:原第一行「编  号」已移到封面右上角渲染
+                         (设计原文本就是「公司左上 + 编号右上」),字段表少了这一行。
+                         此处跟着改,签字栏与字段表的间距(设计 85px)才不会多出一行的空档;
+                         想当然地"上移字段表"会同时顶掉标题带,反而破坏四段相接。 -->
                   <table class="rsp-sign-t"
-                         :style="{ marginTop: ((COVER_SIGN_TOP - COVER_GRID_TOP - 9 * COVER_ROW_H) * coverVy) + 'px' }">
+                         :style="{ marginTop: ((COVER_SIGN_TOP - COVER_GRID_TOP - COVER_ROWS * COVER_ROW_H) * coverVy) + 'px' }">
                     <colgroup>
                       <col v-for="(w, i) in coverSignW" :key="'cw' + i" :style="{ width: w }" />
                     </colgroup>
@@ -102,7 +121,13 @@
               <!-- 文档编号(纸张右上角那一格)。前置标识「编号：」**由 head.docnoPrefix 决定**:
                    设计原表的原值都是裸编号(碱性 N2=" YJ-PD-01"、功能性滤效 K2="YJ-PD-01"…),
                    故缺省 false = 按设计显示裸值;哪个面板要标识(或非纸面场景要提示)就在它的 head 里写 true。 -->
-              <div v-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
+              <!-- 受控表单编号(逐页常量,如测试申请单的 YJ-RIR001 / YJ-XS002):
+                   设计里这一格是**表单固定值**不是单据号 ⇒ 渲染常量文本、不给输入框(见 docNoStatic 注释) -->
+              <div v-if="docNoStatic" class="rs-docno-wrap">
+                <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>
+                <span class="rs-docno-static">{{ docNoStatic }}</span>
+              </div>
+              <div v-else-if="editable && isRefKey('文档编号')" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef('文档编号')">
                 <span v-if="docnoPrefix" class="rs-docno-prefix">{{ tt('编号：') }}</span>
                 <span class="rs-ref-text" :class="{ 'rs-docno-empty': !head['文档编号'] }">{{ head['文档编号'] || tt('点击选择') }}</span>
                 <el-icon class="rs-ref-ico"><Search /></el-icon>
@@ -122,7 +147,11 @@
         <tr>
           <td class="rs-td rs-topic-cell" :colspan="infoSpan ? effHead.title : nCols" :rowspan="infoSpan || 1">
             <el-input v-if="editable && !derivedTitle" v-model="head['测试主题']" size="small" class="rs-topic-input" :placeholder="tt(cfg.titlePlaceholder)" @input="emit('dirty')" />
-            <span v-else class="rs-topic">{{ derivedTitle || head['测试主题'] || tt(cfg.titlePlaceholder) }}</span>
+            <!-- 大标题:静态页标题(pages[i].staticTitle / cfg.staticTitle)**走 tt()** ——
+                 规格书/成型工艺清单/组装/测试申请单这些静态标题在 locales 里都有译名,
+                 而派生标题(titleFromKey 拼出来的如"开发性-测试申请单")是**数据+后缀**,
+                 不能整串丢进 tt()(会机翻出一堆无意义词条),故只翻静态标题这一支。 -->
+            <span v-else class="rs-topic">{{ effStaticTitle ? tt(effStaticTitle) : (derivedTitle || head['测试主题'] || tt(cfg.titlePlaceholder)) }}</span>
           </td>
           <template v-if="infoSpan">
             <td class="rs-td rs-info-label" :colspan="effHead.infoLabel">{{ tt(effInfo[0].label) }}</td>
@@ -202,9 +231,21 @@
                   <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                   <el-icon class="rs-ref-ico"><Search /></el-icon>
                 </div>
-                <el-select v-else-if="editable && pair.type === 'select'" v-model="head[pair.key]" size="small" :clearable="false" @change="emit('dirty')">
-                  <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
-                </el-select>
+                <template v-else-if="editable && pair.type === 'select'">
+                  <!-- 标准库型字段(产品信息表的 产品形态 即此):选项来自**可维护库** yj_std_lib,
+                       stdLibOf 取的是后端 fieldSpec 下发的 stdLib 编码(yj_field.dict_sql 存库编码)。
+                       故 filterable + allow-create:既能选库里的预设,也能直接敲一个新值;
+                       旁挂「⛙ 标准库维护」入口(StdLibManager:新增/编辑/停用/恢复启用)。
+                       与上面 row.grid 分支的标准库字段(成型工艺的 烧结炉参数/配料要求等)同一套机制、
+                       同一套接口 —— 两个分支各写一遍是因为单元格结构不同,不是两套字典。 -->
+                  <el-select v-model="head[pair.key]" size="small" :clearable="false"
+                             :filterable="!!stdLibOf(pair.key)" :allow-create="!!stdLibOf(pair.key)" default-first-option
+                             @change="emit('dirty')">
+                    <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
+                  </el-select>
+                  <span v-if="stdLibOf(pair.key)" class="rs-lib-btn no-print"
+                        @click.stop="openStdLib(stdLibOf(pair.key))">⛙ {{ tt('标准库维护') }}</span>
+                </template>
                 <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名 -->
                 <FileAttachCell
                   v-else-if="editable && pair.type === 'file'"
@@ -414,9 +455,10 @@
             </tr>
             <!-- report 版式带变体时:变体切换行(如 申请单类型)。
                  dt.noVariant 用于「变体字段已在条件区有一格」的表(组装工艺清单:工艺形态 在产品基本信息区),
-                 否则同一字段会在一页里出现两次。 -->
+                 否则同一字段会在一页里出现两次。
+                 占列数见 variantSpan():2 列在 16 列网格里会把「申请单类型：内部委托 ▼」挤成两行。 -->
             <tr v-if="!effPlain && cfg.variantKey && !dt.noVariant">
-              <td :colspan="2" class="rsp-subtitle-row rsp-left">
+              <td :colspan="variantSpan(dt)" class="rsp-subtitle-row rsp-left">
                 <span class="rsp-sub-label">{{ tt(variantLabel) }}</span>
                 <el-select v-if="editable" v-model="head[cfg.variantKey]" size="small" class="rsp-sub-ctl" :clearable="false" filterable allow-create default-first-option @change="emit('dirty')">
                   <el-option v-for="o in variantOptions" :key="o.value" :label="o.label" :value="o.value" />
@@ -424,7 +466,7 @@
                 <span v-if="editable && stdLibOf(cfg.variantKey)" class="rs-lib-btn no-print" @click.stop="openStdLib(stdLibOf(cfg.variantKey))">⧉ {{ tt('标准库维护') }}</span>
                 <span v-else class="rsp-sub-value">{{ head[cfg.variantKey] || '' }}</span>
               </td>
-              <td :colspan="Math.max(1, totalSpan(dt) - 2)" class="rsp-subtitle-row rsp-quiet"></td>
+              <td :colspan="Math.max(1, totalSpan(dt) - variantSpan(dt))" class="rsp-subtitle-row rsp-quiet"></td>
               <td v-if="editable" class="rsp-op-pad"></td>
             </tr>
             <!-- 页面级标题(规格书修订记录:设计图为居中大标题,非格式区条) -->
@@ -616,9 +658,21 @@
                   <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
                   <el-icon class="rs-ref-ico"><Search /></el-icon>
                 </div>
-                <el-select v-else-if="editable && pair.type === 'select'" v-model="head[pair.key]" size="small" :clearable="false" @change="emit('dirty')">
-                  <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
-                </el-select>
+                <template v-else-if="editable && pair.type === 'select'">
+                  <!-- 标准库型字段(产品信息表的 产品形态 即此):选项来自**可维护库** yj_std_lib,
+                       stdLibOf 取的是后端 fieldSpec 下发的 stdLib 编码(yj_field.dict_sql 存库编码)。
+                       故 filterable + allow-create:既能选库里的预设,也能直接敲一个新值;
+                       旁挂「⛙ 标准库维护」入口(StdLibManager:新增/编辑/停用/恢复启用)。
+                       与上面 row.grid 分支的标准库字段(成型工艺的 烧结炉参数/配料要求等)同一套机制、
+                       同一套接口 —— 两个分支各写一遍是因为单元格结构不同,不是两套字典。 -->
+                  <el-select v-model="head[pair.key]" size="small" :clearable="false"
+                             :filterable="!!stdLibOf(pair.key)" :allow-create="!!stdLibOf(pair.key)" default-first-option
+                             @change="emit('dirty')">
+                    <el-option v-for="o in selectOptions(pair.key)" :key="o.value" :label="o.label" :value="o.value" />
+                  </el-select>
+                  <span v-if="stdLibOf(pair.key)" class="rs-lib-btn no-print"
+                        @click.stop="openStdLib(stdLibOf(pair.key))">⛙ {{ tt('标准库维护') }}</span>
+                </template>
                 <!-- 附件字段(如 产品信息表·客户图纸或规格书):上传/点击查看/删除;打印只见文件名 -->
                 <FileAttachCell
                   v-else-if="editable && pair.type === 'file'"
@@ -821,6 +875,61 @@
         </tr>
       </tbody>
     </table>
+
+    <!-- ═══ 表尾静态表(cfg.tailTables:设计纸面上的固定附录,只读、不落库、不进单据) ═══
+         用例 = 测试申请单页 0 的「国标浸泡安全指标可测试列表」(设计 sheet 内部1 第 37 行起 17 行)。
+         单元值**按原文渲染**(国家标准指标 / 仪器型名属事实内容,与 RD_SOAK 明细行同一口径不翻译);
+         标题(bar)与列标签走 tt()。宽度取本表自己的列宽之和并居中(设计里它比整页窄)。 -->
+    <table
+      v-for="(tt2, ti) in tailTablesOfPage"
+      :key="'tt' + ti"
+      class="rs-t rs-tail-table"
+      :style="{ width: tailTableW(tt2) + 'px' }"
+    >
+      <colgroup><col v-for="(c, i) in tt2.cols" :key="'tc2' + i" :style="{ width: (c.w || 120) + 'px' }" /></colgroup>
+      <tbody>
+        <tr v-if="tt2.bar"><td :colspan="tt2.cols.length" class="rs-sectionbar">{{ tt(tt2.bar) }}</td></tr>
+        <tr>
+          <th v-for="c in tt2.cols" :key="'th2' + c.key" class="rs-th">{{ tt(c.label) }}</th>
+        </tr>
+        <tr v-for="(row, ri) in tt2.rows" :key="'tr2' + ri">
+          <td v-for="c in tt2.cols" :key="'td2' + c.key" class="rs-td" :class="{ 'rsp-center': c.align === 'center' }">
+            <span class="rs-txt rsp-cell">{{ row[c.key] || '' }}</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ═══ 只读台账页(pages[i].ledger):把本面板**全部单据**的表头摘要列成一张纸面表格 ═══
+         用例 = 测试申请单页 2「委托测试汇总表」(设计 sheet 汇总表)。
+         数据源 = POST /px/queryFormDataList(面板自身列表接口,与左侧选单栏同一份真源),只读、不落库。
+         ⚠ 口径:它是**派生视图**而非单据的一页 —— 换单/翻页/筛选都不影响它的内容(列的是全量单据)。 -->
+    <div v-if="ledgerCfg" class="rsp-ledger" :style="{ width: ledgerW + 'px' }">
+      <table class="rs-t rs-ledger-t" :style="{ width: ledgerW + 'px' }">
+        <colgroup><col v-for="(c, i) in ledgerCfg.cols" :key="'lc' + i" :style="{ width: (c.w || 120) + 'px' }" /></colgroup>
+        <tbody>
+          <tr v-if="ledgerCfg.title"><td :colspan="ledgerCfg.cols.length" class="rsp-page-title">{{ tt(ledgerCfg.title) }}</td></tr>
+          <tr>
+            <th v-for="c in ledgerCfg.cols" :key="'lh' + c.label" class="rs-th">{{ tt(c.label) }}</th>
+          </tr>
+          <!-- 设计第 8 行:分类/状态 两格写着可选取值(内部/外部、测试中/已完成/已审核) —— 照纸面保留 -->
+          <tr v-if="ledgerCfg.cols.some((c) => c.hint)" class="rsp-ledger-hint">
+            <td v-for="c in ledgerCfg.cols" :key="'lhh' + c.label" class="rs-td">{{ c.hint ? tt(c.hint) : '' }}</td>
+          </tr>
+          <tr v-for="(row, ri) in ledgerRows" :key="'lr' + ri">
+            <td v-for="c in ledgerCfg.cols" :key="'lc' + c.label" class="rs-td" :class="{ 'rsp-center': c.align === 'center' }">
+              <span class="rs-txt rsp-cell">{{ ledgerCell(c, row, ri) }}</span>
+            </td>
+          </tr>
+          <tr v-if="ledgerLoading">
+            <td :colspan="ledgerCfg.cols.length" class="rs-empty">{{ tt('加载中…') }}</td>
+          </tr>
+          <tr v-else-if="!ledgerRows.length">
+            <td :colspan="ledgerCfg.cols.length" class="rs-empty">{{ tt('暂无申请单') }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     <!-- ═══ 结论区(共享网格;Excel 无结论区的表不渲染) ═══ -->
     <table v-if="cfg.conclusion" class="rs-t" :style="{ width: gridW + 'px' }">
@@ -1081,6 +1190,8 @@ import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import StdLibManager from './StdLibManager.vue'
 import RecipeCalcDialog from './RecipeCalcDialog.vue'
+// 只读台账页(委托测试汇总表)的单元格取值:抽成纯函数便于 node --test 直接断言
+import { ledgerCell as ledgerCellOf } from '@/core/panel/ledgerCols'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -1203,6 +1314,17 @@ const gapLeftSpan = computed(() => (sameCellDocno.value ? 0 : noGapSpan.value))
 const gapRightSpan = computed(() => (sameCellDocno.value ? noGapSpan.value : 0))
 const docnoPrefix = computed(() => effHead.value.docnoPrefix !== false)
 
+/**
+ * 本页纸张右上角「编号」格的**受控表单编号常量**(pages[i].docNoStatic)。
+ *
+ * 【为什么需要它】测试申请单的纸面右上角那一格填的是**表单编号**(内部委托 YJ-RIR001 /
+ * 销售端 YJ-XS002,设计原表两侧不同),不是这张单的单据号 —— 单据号由后端「新增」自动发
+ * (DT 前缀),在汇总表页与左侧选单栏出现。两种号混在一个格子里会让人以为 YJ-RIR001 可改。
+ * 声明了它 ⇒ 该格渲染这段常量文本(编辑态与只读态一致),与头字段解耦。
+ * 未声明 pages[i].docNoStatic 的面板逐字不变(仍按 head[docNoKey] || docNoDefault)。
+ */
+const docNoStatic = computed(() => String(activePageMeta.value?.docNoStatic || ''))
+
 /** 右上角编号格占末尾几列:末尾列宽不足时向左并列凑到 ≥160px——
  *  现有最长编号 YJ-AB-SAMPLE-1 实测 98px,加参照图标/间距约 145px;
  *  只并列不改列宽,全页竖线位置不变(并掉的列整列被编号格覆盖)。
@@ -1279,18 +1401,29 @@ const COVER_TITLE_TOP = COVER_COMPANY_TOP + COVER_COMPANY_H
 const COVER_GRID_TOP = 106
 /** 标题带高 = 字段表顶 − 标题带起点(由分区反推,不凭感觉填) */
 const COVER_TITLE_H = COVER_GRID_TOP - COVER_TITLE_TOP
-/** 9 行行高:编号/产品类别/客户名称/客户料号/客户项目名称/应用场景/整体规格参数/产品主要性能/版本 */
+/** 封面字段表**行数**(签字栏间距按它算)。2026-09-30 由 9 改 **8**:
+ *  原第一行「编  号」(设计 B7)已移到封面右上角的编号格(设计原文本就是「公司左上 + 编号右上」),
+ *  字段表剩 B8..B15 = 产品类别/客户名称/客户料号/客户项目名称/应用场景/整体规格参数/产品主要性能/版本。
+ *  ⚠ 改这个数就够,不用动 COVER_GRID_TOP/COVER_SIGN_TOP —— 字段表仍从设计 B7 的 y 起排,
+ *    少的那一行空间由签字栏 margin-top 自动吸收(见模板里那句 marginTop 注释)。 */
+const COVER_ROWS = 8
+/** 字段表行高(设计 B7..B15 等距 46px) */
 const COVER_ROW_H = 46
 /** 签字栏顶(设计 B17);三栏列宽按设计 B17..D17 比例 92.7:97.3:97.3 */
 const COVER_SIGN_TOP = 605
 const coverK = computed(() => gridW.value / COVER_W)
 /** 封面高度 = 真实 A4(210×297mm):设计画布 1173/708≈1.657 比 A4(1.414)长,按画布高等比
  *  会在打印时溢出到第二页;纵向位置/行高用独立缩放 coverVy 压入 A4 高度,横向(字号/列宽)仍用 coverK
- *  −cfg.coverTailReserve:与封面同页、渲染在封面**之下**的章节块(规格书 1-3 章节)预留的高度——
- *  不预扣则整页高度 = A4 + 章节块,打印时章节块被挤到第二个近乎空白的页(实测 794px 宽下 3 行=93px) */
+ *  −cfg.coverTailReserve:与封面**同页**、渲染在封面之下那块的预留高度。
+ *   2026-09-30 规格书第 0 页的下挂三行章节块已按用户要求删除 ⇒ 该值改为 0,整页给封面;
+ *   若日后又在封面下加内容,必须把预留加回来(否则那块会被挤到第二页)。 */
 const coverPageH = computed(() => Math.round(gridW.value * (297 / 210)) - (cfg.value?.coverTailReserve || 0))
 const coverVy = computed(() => coverPageH.value / COVER_H)
-/** 字段行顶部(设计 px):9 行等宽等高,由行号推出(不再手写坐标表 —— 加行不用改这里) */
+/** 封面右上角「编号」格绑哪个数据键(面板声明 cfg.coverDocNoKey;未声明的封面面板不渲染该格)。
+ *  ⚠ 必须是**字段名**(如「产品编号」),不能是引擎的**单据标识键**「编号」——
+ *    后者会被 QueryService.loadDocs 的单据号覆盖(见 recordSheetConfigs.js 的封面注释)。 */
+const coverDocNoKey = computed(() => String(cfg.value?.coverDocNoKey || ''))
+/** 字段行顶部(设计 px):等宽等高,由行号推出(不再手写坐标表 —— 加行不用改这里) */
 function coverLineTop(i) {
   return ((COVER_GRID_TOP + i * COVER_ROW_H) * coverVy.value).toFixed(1) + 'px'
 }
@@ -1389,6 +1522,60 @@ function materialPickAt(sec) {
 }
 
 watch(() => props.panelCode, () => { activePage.value = 0 })
+
+// ── 表尾静态表(cfg.tailTables)与只读台账页(pages[i].ledger) ──
+/** 本页要渲染的静态附表(设计纸面上的固定附录;不落库、不进单据) */
+const tailTablesOfPage = computed(() => (cfg.value?.tailTables || []).filter((t) => pageOf(t) === activePage.value))
+/** 静态附表自己的宽度 = 各列宽之和(设计里它比整页窄,故不铺满网格,由 .rs-tail-table 居中) */
+function tailTableW(t) {
+  return (t.cols || []).reduce((s, c) => s + (c.w || 120), 0)
+}
+
+/** 当前页的台账配置(pages[i].ledger);无则整块不渲染 */
+const ledgerCfg = computed(() => activePageMeta.value?.ledger || null)
+const ledgerW = computed(() => (ledgerCfg.value?.cols || []).reduce((s, c) => s + (c.w || 120), 0))
+const ledgerRows = ref([])
+const ledgerLoading = ref(false)
+
+/**
+ * 台账取数:走面板自身列表接口(与左侧「单据选择」栏 / 列表页同一份真源),
+ * 一次取 pageSize 条表头摘要(默认 200;后端本接口不限 pageSize,见 PxController.queryFormDataList)。
+ * ⚠ request 的响应拦截器已解一层 ⇒ res 是 ApiResult,数据在 res.data。
+ */
+async function loadLedger() {
+  const lg = ledgerCfg.value
+  if (!lg) return
+  ledgerLoading.value = true
+  try {
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: props.panelCode,
+      condition: {},
+      pageNo: 1,
+      pageSize: lg.pageSize || 200,
+    })
+    const data = res?.data || res || {}
+    ledgerRows.value = Array.isArray(data.list) ? data.list : []
+  } catch {
+    ledgerRows.value = [] // 取数失败只留空表(台账是只读附属视图,不该挡住单据本身)
+  } finally {
+    ledgerLoading.value = false
+  }
+}
+
+/**
+ * 台账某一格的显示值 —— 规则见 core/panel/ledgerCols.js(纯函数,单测直接钉住:
+ * seq 行号 / keys 按序回退 / map 显示映射 / 取不到即空串)。
+ */
+const ledgerCell = ledgerCellOf
+
+// 台账只在「切到台账页 / 换面板 / 换单(载入或保存后单据号变化)」时重取 —— 不跟随每一下击键
+watch(
+  [activePage, () => props.panelCode, () => props.head?.['单据编号'], () => props.head?.['编号']],
+  () => {
+    if (ledgerCfg.value) loadLedger()
+    else ledgerRows.value = []
+  },
+)
 
 // ── 复选格(变更申请单):顿号分隔文本 ⇄ 勾选态 ──
 /**
@@ -1924,7 +2111,17 @@ function confirmLib() {
 function dtOwnsWidth(dt) {
   return visCols(dt).some((c) => c.w)
 }
-function dtW(dt) {
+
+/**
+ * 变体切换行(申请单类型)占前几列。
+ * 原来写死 2 列:在 16 列网格里「申请单类型：内部委托 ▼」被挤成两行(页面 0 实测),
+ * 而宽网格前几列本就窄。给到 6 列(不超过总列数-1,右侧留一格静默填充)。
+ * ⚠ 目前只有 测试申请单(RD_DOM_TEST)走 report + variantKey 这条路;
+ *   plain 版式的面板走 subtitle(不受影响)。
+ */
+function variantSpan(dt) {
+  return Math.max(2, Math.min(6, totalSpan(dt) - 1))
+}function dtW(dt) {
   return visCols(dt).reduce((s, c) => s + (c.w || 100), 0)
 }
 
@@ -2815,6 +3012,12 @@ function chartOf(dt) {
 .rs-docno-input {
   width: 90%;
 }
+/* 受控表单编号常量(逐页,如 YJ-RIR001/YJ-XS002):与只读编号同字号,
+   不可编辑 ⇒ 不用输入框的灰底,保持纸面观感 */
+.rs-docno-static {
+  font-style: normal;
+  white-space: nowrap;
+}
 /* 「编号：」前置标识:23 个面板共用的纸张右上角逐格标签。
    用 flex 让标识与输入框/参照控件同排,标识不缩、值区自适应。 */
 .rs-docno-wrap {
@@ -2924,6 +3127,26 @@ function chartOf(dt) {
   font-weight: 600;
   letter-spacing: 6px;
   padding: 16px 0 12px;
+  text-align: center;
+}
+
+/* ═══ 表尾静态附表(cfg.tailTables:纸面固定附录,只读) ═══
+   宽度取自表自己的列宽(比整页窄)⇒ 居中摆放,与设计里它缩进一列的位置观感一致 */
+.rs-tail-table {
+  margin: 10px auto 0;
+}
+
+/* ═══ 只读台账页(pages[i].ledger:委托测试汇总表) ═══ */
+.rsp-ledger {
+  margin: 0 auto;
+}
+.rsp-ledger-hint .rs-td {
+  color: #909399;
+  font-size: 12px;
+  padding: 2px 6px;
+  background: #fafafa;
+}
+.rsp-center {
   text-align: center;
 }
 
@@ -3371,6 +3594,32 @@ function chartOf(dt) {
   line-height: 1;
   color: #000;
   white-space: nowrap;
+}
+/* 编号格(第 ① 带**右端**):位置/高度由模板绑定 COVER_COMPANY_TOP/H 给出(与公司名同带)。
+   设计原文即「公司左上 + 编号右上」,故右端边距取与公司名左端对称的 44px。
+   字号取 15px(公司名 20.7px 的下一档):既比公司名弱一级,又保证「编号：DEMO-B-001」这类
+   10 位编号在一行内看得清。横向只随 coverK 缩放(与字号同一套比例),不做纵向拉伸。 */
+.rsp-cover-docno {
+  position: absolute;
+  right: calc(44px * var(--cok));
+  display: flex;
+  align-items: center;
+  gap: calc(2px * var(--cok));
+  font-family: 'Microsoft YaHei', '微软雅黑', sans-serif;
+  font-size: calc(15px * var(--cok));
+  line-height: 1;
+  color: #000;
+  white-space: nowrap;
+}
+.rsp-cover-docno-lb { flex: none; }
+.rsp-cover-docno-val { font-variant-numeric: tabular-nums; }
+/* 编辑态输入框:宽度按设计 px 缩放,不随内容跳动(避免值长短变化把整格左右晃) */
+.rsp-cover-docno-in { width: calc(170px * var(--cok)); flex: none; }
+.rsp-cover-docno-in :deep(.el-input__wrapper) { padding: 0 calc(4px * var(--cok)); }
+.rsp-cover-docno-in :deep(.el-input__inner) {
+  height: calc(22px * var(--cok));
+  font-size: calc(15px * var(--cok));
+  font-variant-numeric: tabular-nums;
 }
 /* 大标题(第 ② 带):位置/高度由模板绑定 COVER_TITLE_TOP/H 给出。
    设计里公司名与标题是**上下两行**(B5 / B6);早期误把两者放同一条带

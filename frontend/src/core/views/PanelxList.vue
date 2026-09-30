@@ -2651,8 +2651,13 @@ const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(
  * 侧栏是否放出「提交审批 / 审批通过 / 审批驳回 / 弃审 / 审批情况」按钮组:
  * 标准流文书面板(特采单等)照旧;检验数据记录(QC_INSP_REC)虽走归档一族(保存即归档),
  * 但用户口径要求有明确的审批与审批通过按钮,故一并放开。
+ * 测试申请单(RD_DOM_TEST,2026-09-30 用户口径)同 QC_INSP_REC 口径:它也是归档一族
+ * (保存=普通用户自动送审 / 管理员直接归档),此前审批动作只藏在「申请修改」组的下拉里,
+ * 用户要求把动作组直接放出来 —— 归档闭环本身不动(「申请修改/修改记录」照旧保留)。
  */
-const hasApprovalBtns = computed(() => isStandardFlowSheet.value || String(panelCode.value) === 'QC_INSP_REC')
+const hasApprovalBtns = computed(() => isStandardFlowSheet.value
+  || String(panelCode.value) === 'QC_INSP_REC'
+  || String(panelCode.value) === 'RD_DOM_TEST')
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
 // 规格书两级分发(2026-09-12):已分配单仅 责任人∪总负责人∪管理员 可编辑,其他人可见只读

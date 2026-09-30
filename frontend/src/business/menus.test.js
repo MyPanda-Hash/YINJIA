@@ -23,6 +23,12 @@ test('测试记录组下挂数据记录表 8 张与实验室使用记录表 4 �
   const lab = test1.children.find((c) => c.code === 'rdLab')
   assert.equal((data.children || []).length, 8)
   assert.equal((lab.children || []).length, 4)
+  // 2026-09-30:RD_DOM_TEST 由「内部委托测试申请单」升级为**一张单三个页签**的「测试申请单」
+  // (面板编码不变 ⇒ 权限行/单据表/单据编号前缀全沿用);菜单名必须跟着改,否则用户找不到。
+  assert.deepEqual((lab.children || []).map((c) => c.title), [
+    '加标水配置记录表', '测试申请单', '设备使用登记表', '仪器使用记录表',
+  ])
+  assert.ok(!JSON.stringify(menuTree).includes('内部委托测试申请单'), '旧菜单名不应残留')
 })
 
 test('产品文件组 8 张(2026-09-21 新增 产品变更申请单)', () => {
