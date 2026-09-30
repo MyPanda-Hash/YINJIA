@@ -1696,6 +1696,14 @@ migrate-rd-prodinfo-formlib-2026-09-30.sql
 #      后端按 label 建行模型只取首个 ⇒ 该列成死列;fixture 重生成后才被单测抓住 ——
 migrate-rd-specdoc-prodno-2026-09-30.sql
 
+# —— 2026-09-30 功能性滤效(RD_FILTER_EFF)「样品配方」改为**每样品一格**(与 样品信息/测试装置及编号
+#    同列数;设计原表 第10行 merges C10:G10+H10:L10 与 第11行 样品信息 同一分块):
+#    头表加 样品配方1..6 列(含中文注明)+ yj_field 注册 + en 译名 + 存量单字段值兜底搬到 配方1;
+#    前端渲染与「减列清空」见 DataRecordSheet.vue + core/sheet/sampleCols.js ——
+#    ⚠ 本行由 2026-09-30 修复补回:该提交(eeccab29)落库时,本登记行恰好被并行任务的
+#      "只提交自己那一行"操作临时移出工作区,导致脚本已提交而清单漏登记(会让部署漏跑这条迁移)。
+migrate-filter-eff-formula-cols.sql
+
 # —— 2026-09-30 下架「样品编号表」RD_SAMPLE_NO(用户口径「样品编号表删掉」):
 #    删元数据三处(yj_panel / yj_field / yj_role_panel),**保留** rd_sample_no_head 与
 #    rd_sample_no_detail 两张数据表及其中数据(历史单据留档 —— 删表不可逆,而它是发号台账);
