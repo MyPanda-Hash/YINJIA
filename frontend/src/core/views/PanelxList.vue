@@ -2732,10 +2732,12 @@ const l2ApproverNow = computed(() => panelCode.value === 'RD_PROD_INFO' && !!dev
 const devAssignVisible = ref(false)
 const devAssignBusy = ref(false)
 const devAssignUsers = ref([])
+// 顺序与后端 DevTaskService.DEV_PANELS / 设计「文件汇总表」第 9 行一致:
+// 规格书 → 成型工艺清单 → 组装工艺清单 → 出货检验计划表(2026-09-30 用户口径:按设计排)
 const DEV_PANELS = [
+  { code: 'RD_SPEC_DOC', label: '规格书' },
   { code: 'RD_MOLD_PROC', label: '成型工艺清单' },
   { code: 'RD_ASM_PROC', label: '组装工艺清单' },
-  { code: 'RD_SPEC_DOC', label: '规格书' },
   { code: 'RD_INSP_PLAN', label: '出货检验计划表' },
 ]
 const devAssignRows = ref(DEV_PANELS.map((p) => ({ panel: p.code, label: p.label, owner: '' })))

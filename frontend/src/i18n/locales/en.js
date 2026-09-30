@@ -123,6 +123,11 @@ export default {
     '已归档': 'Archived',
     '惠州市银嘉环保科技有限公司': 'Huizhou Yinjia Environmental Protection Technology Co., Ltd.',
     '产品文件列表': 'Product File List',
+    /* 产品文件列表表头:四个文件列一律叫「文件N」(文件名写在数据格里,见设计第 8/9 行) */
+    '文件1': 'File 1',
+    '文件2': 'File 2',
+    '文件3': 'File 3',
+    '文件4': 'File 4',
     '可通过产品编号直接搜索；状态由各文件面板的单据实时推导（未开发 / 开发中 / 开发审核中 / 开发完毕）。': 'It can be directly searched by product number; the status is derived from the documents of each document panel in real time (not developed/under development/under development review/development completed).',
     '产品负责人': 'Product Owner',
     '是否受控': 'Whether controlled',

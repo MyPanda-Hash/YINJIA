@@ -40,12 +40,18 @@ public class DevTaskService {
     private static final Map<String, String> PRODUCT_KEY = new HashMap<>();
 
     static {
+        // ⚠ 顺序 = 设计《产品开发系统需求汇总.xlsx》sheet「文件汇总表」第 9 行的**文件列顺序**:
+        //    规格书 → 成型工艺清单 → 组装工艺清单 → 出货检验计划表
+        //    (2026-09-30 用户口径「产品文件列表的字段排列顺序按设计来」;
+        //     此前是 成型/组装/规格书/出货,与设计第 8/9 行 B8:M8/B9:M9 不符)
+        //    本顺序即矩阵列序(devPanelMeta),产品文件列表与桌面「产品开发」矩阵都按它排;
+        //    计数/受控推导/分发落库都按 panelCode 取值,与顺序无关(受控日期取各文件归档时点的 MAX)。
+        DEV_PANELS.put("RD_SPEC_DOC", new String[]{"rd_spec_doc_head", "产品编号", "规格书"});
         DEV_PANELS.put("RD_MOLD_PROC", new String[]{"rd_mold_proc_head", "产品编号", "成型工艺清单"});
         DEV_PANELS.put("RD_ASM_PROC", new String[]{"rd_asm_proc_head", "产品编号", "组装工艺清单"});
+        DEV_PANELS.put("RD_INSP_PLAN", new String[]{"rd_insp_plan_head", "产品编号", "出货检验计划表"});
         // ⚠ 产品键列名逐面板不同:规格书那列 2026-09-30 由「编号」改名「产品编号」
         //   (旧键名被引擎当单据标识用,值会被单据号覆盖,见 migrate-rd-specdoc-prodno-2026-09-30.sql)
-        DEV_PANELS.put("RD_SPEC_DOC", new String[]{"rd_spec_doc_head", "产品编号", "规格书"});
-        DEV_PANELS.put("RD_INSP_PLAN", new String[]{"rd_insp_plan_head", "产品编号", "出货检验计划表"});
         DEV_PANELS.forEach((code, v) -> PRODUCT_KEY.put(code, v[1]));
     }
 

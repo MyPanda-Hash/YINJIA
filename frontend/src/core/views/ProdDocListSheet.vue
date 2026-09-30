@@ -44,8 +44,11 @@
         <thead>
           <tr>
             <th class="pds-c-no">{{ tt('产品编号') }}</th>
-            <template v-for="c in columns" :key="'h' + c.panelCode">
-              <th class="pds-c-file">{{ tt(c.panelName) }}</th>
+            <!-- 表头一律叫「文件N」(设计第 8 行 C8/D8 = 文件1/状态 …):**文件名写在数据格里**
+                 (设计第 9 行 C9=规格书),不再把面板名放到表头上 —— 这样 4 列的文件名各自可读,
+                 与 状态 列一一成对。文件列顺序由后端 DevTaskService.DEV_PANELS 给出(规格书在前)。 -->
+            <template v-for="(c, ci) in columns" :key="'h' + c.panelCode">
+              <th class="pds-c-file">{{ tt('文件' + (ci + 1)) }}</th>
               <th class="pds-c-status">{{ tt('状态') }}</th>
             </template>
             <th class="pds-c-owner">{{ tt('产品负责人') }}</th>
@@ -69,7 +72,9 @@
             <td class="pds-c-date">{{ row['受控日期'] || '' }}</td>
           </tr>
           <tr v-if="!rows.length">
-            <td :colspan="14" class="pds-empty">
+            <!-- 列数 = 产品编号 1 + 4×(文件+状态) 8 + 产品负责人/是否受控/受控日期 3 = 12
+                 (原写 14 是错的:空态那行会多撑出两格) -->
+            <td :colspan="12" class="pds-empty">
               {{ tt('暂无已下发的产品文件记录（先在产品信息表归档后点「产品开发」下发）') }}
             </td>
           </tr>
