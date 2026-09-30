@@ -153,6 +153,9 @@
           v-else-if="panelCode === 'RD_PROD_DOCLIST'"
           ref="approvalSheetRef"
           :head="cur" :panel-code="panelCode"
+          :filter="prodDocFilter"
+          @rows="onProdDocRows"
+          @clear-filter="clearProdDocFilter"
         />
         <DataRecordSheet
           v-else-if="panelCode === 'RD_FILTER_EFF'"
@@ -216,31 +219,35 @@
                 <span class="as-side-btn primary" @click="runFuzzySearch">{{ tt('查找') }}</span>
               </div>
               <div v-if="fuzzySearched" class="fuzzy-result">
-                <div class="fuzzy-result-head">{{ tt('结果') }}：{{ total }} {{ tt('张') }}<span v-if="total > (list.length || 0)">{{ tt('（清单仅显示前 {m} 张）').replace('{m}', String(list.length)) }}</span></div>
+                <div class="fuzzy-result-head">
+                  {{ tt('结果') }}：
+                  <template v-if="isProdDocMatrix">{{ prodDocFilteredRows.length }} {{ tt('个产品') }}</template>
+                  <template v-else>{{ total }} {{ tt('张') }}<span v-if="total > (list.length || 0)">{{ tt('（清单仅显示前 {m} 张）').replace('{m}', String(list.length)) }}</span></template>
+                </div>
                 <div
                   v-for="r in fuzzyResultRows"
                   :key="r.no"
                   class="fuzzy-result-row"
-                  :class="{ on: r.no === curDocNo }"
+                  :class="{ on: !isProdDocMatrix && r.no === curDocNo }"
                   @click="openFuzzyResult(r)"
                 >
                   <span class="fz-no">{{ r.no }}</span>
-                  <span class="fz-meta">{{ r.date }} {{ tt(r.status) }}</span>
+                  <span class="fz-meta">{{ r.date }} {{ isProdDocMatrix ? r.status : tt(r.status) }}</span>
                 </div>
-                <div v-if="!fuzzyResultRows.length" class="fuzzy-empty">{{ tt('未找到匹配单据') }}</div>
+                <div v-if="!fuzzyResultRows.length" class="fuzzy-empty">{{ tt(isProdDocMatrix ? '未找到匹配的产品' : '未找到匹配单据') }}</div>
               </div>
             </div>
             <!-- ═══ 单据预览查找态:全量单据卡片(编号/状态/日期+关键摘要字段),点击即跳转,档案查看效果 ═══ -->
             <div v-else-if="previewMode" class="fuzzy-panel">
               <div class="fuzzy-head">
-                <span>{{ tt('单据预览查找') }}</span>
+                <span>{{ tt(isProdDocMatrix ? '产品预览查找' : '单据预览查找') }}</span>
                 <span class="fuzzy-back" :title="tt('返回')" @click="closeDocPreview">↩</span>
               </div>
               <el-input
                 v-model="previewKw"
                 size="small"
                 clearable
-                :placeholder="tt('输入编号或任意内容快速筛选')"
+                :placeholder="tt(isProdDocMatrix ? '输入产品编号或文件状态快速筛选' : '输入编号或任意内容快速筛选')"
                 class="preview-kw"
               />
               <div class="preview-cards">
@@ -248,7 +255,7 @@
                   v-for="c in previewCards"
                   :key="c.no"
                   class="preview-card"
-                  :class="{ on: c.no === curDocNo }"
+                  :class="{ on: !isProdDocMatrix && c.no === curDocNo }"
                   @click="openPreviewCard(c)"
                 >
                   <div class="pc-head">
@@ -262,17 +269,20 @@
                   </div>
                   <div v-if="!c.fields.length" class="pc-none">{{ tt('（无摘要字段）') }}</div>
                 </div>
-                <div v-if="!previewCards.length" class="fuzzy-empty">{{ tt('未找到匹配单据') }}</div>
+                <div v-if="!previewCards.length" class="fuzzy-empty">{{ tt(isProdDocMatrix ? '未找到匹配的产品' : '未找到匹配单据') }}</div>
               </div>
             </div>
             <div v-else class="as-side-btns">
               <div class="as-side-section">{{ tt('查找') }}</div>
-              <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板) -->
-              <div class="as-side-btn" @click="docQueryVisible = true">{{ tt('查询单据') }}</div>
-              <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单 -->
+              <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板)
+                   ⚠ 产品文件列表(单单据+矩阵)改叫「查询产品」:按产品编号筛矩阵行 -->
+              <div class="as-side-btn" @click="docQueryVisible = true">{{ tt(isProdDocMatrix ? '查询产品' : '查询单据') }}</div>
+              <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单;
+                   矩阵面板的字段清单换成矩阵列(产品编号/是否受控/受控日期/状态（任一文件）) -->
               <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
-              <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果 -->
-              <div class="as-side-btn" @click="openDocPreview">{{ tt('单据预览') }}</div>
+              <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
+                   矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
+              <div class="as-side-btn" @click="openDocPreview">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
               <div class="as-side-section">{{ tt('单据操作') }}</div>
               <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回);删除申请中出「撤回删除申请」(卡死单据出口) -->
               <div class="as-side-del danger" v-if="isApprovalDoc">
@@ -1501,17 +1511,25 @@
     </el-dialog>
 
     <!-- 查询单据弹窗(文件面板):编号模糊(单据编号/文档编号) + 首次归档时间区间 -->
-    <el-dialog v-model="docQueryVisible" :title="tt('查询单据')" width="480px" append-to-body>
+    <el-dialog v-model="docQueryVisible" :title="tt(isProdDocMatrix ? '查询产品' : '查询单据')" width="480px" append-to-body>
       <div class="dq-form">
         <div class="dq-row">
-          <span class="dq-label">{{ tt('编号') }}</span>
-          <el-input v-model="docQueryNo" clearable :placeholder="tt('单据编号/文档编号模糊匹配')" @keyup.enter="applyDocQuery" />
+          <span class="dq-label">{{ tt(isProdDocMatrix ? '产品编号' : '编号') }}</span>
+          <el-input
+            v-model="docQueryNo"
+            clearable
+            :placeholder="tt(isProdDocMatrix ? '产品编号模糊匹配（筛选下方产品行）' : '单据编号/文档编号模糊匹配')"
+            @keyup.enter="applyDocQuery"
+          />
         </div>
-        <div class="dq-row">
-          <span class="dq-label">{{ tt('归档时间') }}</span>
-          <el-date-picker v-model="docQueryRange" type="daterange" value-format="YYYY-MM-DD" :start-placeholder="tt('起')" :end-placeholder="tt('止')" style="width: 100%" />
-        </div>
-        <div class="dq-tip">{{ tt('按首次归档时间过滤；草稿未归档不计入区间') }}</div>
+        <template v-if="!isProdDocMatrix">
+          <div class="dq-row">
+            <span class="dq-label">{{ tt('归档时间') }}</span>
+            <el-date-picker v-model="docQueryRange" type="daterange" value-format="YYYY-MM-DD" :start-placeholder="tt('起')" :end-placeholder="tt('止')" style="width: 100%" />
+          </div>
+          <div class="dq-tip">{{ tt('按首次归档时间过滤；草稿未归档不计入区间') }}</div>
+        </template>
+        <div v-else class="dq-tip">{{ tt('本面板是产品文件矩阵（库里只有 1 张单据）：按产品编号筛选表格里的产品行') }}</div>
       </div>
       <template #footer>
         <el-button @click="clearDocQuery">{{ tt('清空') }}</el-button>
@@ -1714,6 +1732,8 @@ import FieldManagerDialog from './FieldManagerDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
 import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
+// 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
+import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import RefPickDialog from './RefPickDialog.vue'
@@ -1767,6 +1787,13 @@ const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(S
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
 const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
+/**
+ * 产品文件列表(RD_PROD_DOCLIST)= **单单据 + 矩阵**面板:库里只有 1 张单据(PDL-0001),
+ * 真正的内容是表格里的**产品行**(产品编号 × 4 个文件 × 状态)。
+ * ⇒ 侧栏的「查询产品 / 模糊搜索 / 产品预览」三处在这面板一律改为**筛矩阵行**
+ *   (2026-09-30 用户口径:原先对那 1 张单据做文档查询,用户看到的就是"搜索不可用")。
+ */
+const isProdDocMatrix = computed(() => String(panelCode.value) === 'RD_PROD_DOCLIST')
 // 来料检验要求(品质资料 7 表):档案式特例面板——工具栏/单据卡片/明细表格/页脚全隐,QcInspReqSheet 整体接管
 const isQcInspReq = computed(() => String(panelCode.value) === 'QC_INSP_REQ')
 /** 产品变更申请单:当前账号可填的纸面部门行(后端按 yj_user.dept_id → yj_change_dept 算,metadata 下发)。
@@ -2460,6 +2487,17 @@ async function saveWarnEdit() {
 }
 
 async function applyDocQuery() {
+  // 产品文件列表(单单据 + 矩阵):「查询单据」改成**按产品编号筛矩阵行**(2026-09-30 用户口径)——
+  // 该面板库里只有 1 张单据(PDL-0001),对单据做模糊/归档时间查询必然"查无可查"。
+  if (isProdDocMatrix.value) {
+    if (docQueryNo.value.trim()) setProdDocFilter([{ field: '产品编号', value: docQueryNo.value }])
+    else clearProdDocFilter()
+    docQueryVisible.value = false
+    const n = prodDocFilteredRows.value.length
+    if (n) ElMessage.success(`${tt('筛选到')} ${n} ${tt('个产品')}`)
+    else ElMessage.warning(tt('未筛选到匹配的产品'))
+    return
+  }
   condition['_docNo'] = docQueryNo.value || ''
   const r = docQueryRange.value || []
   condition['_archFrom'] = r[0] || ''
@@ -2484,12 +2522,39 @@ async function applyDocQuery() {
 function clearDocQuery() {
   docQueryNo.value = ''
   docQueryRange.value = null
+  if (isProdDocMatrix.value) {
+    clearProdDocFilter()
+    docQueryVisible.value = false
+    return
+  }
   delete condition['_docNo']
   delete condition['_archFrom']
   delete condition['_archTo']
   docQueryVisible.value = false
   search()
 }
+
+// ---------- 产品文件列表(RD_PROD_DOCLIST)专用:侧栏搜索改为**筛矩阵行** ----------
+// 该面板是「单单据 + 矩阵」:库里只有 1 张单据,内容是表格里的产品行。对单据做文档查询
+// (模糊搜索/查询单据/单据预览)在这面板等于不可用 —— 2026-09-30 用户口径:三个入口都改成对
+// **矩阵里的产品行**筛选;判定在 core/prod/prodDocSearch.js(纯函数 + 单测)。
+const prodDocRows = ref([])
+const prodDocCols = ref([])
+/** 生效中的行筛选({conditions, valid});经 :filter 下发给 ProdDocListSheet */
+const prodDocFilter = ref(null)
+function onProdDocRows(rows, cols) {
+  prodDocRows.value = Array.isArray(rows) ? rows : []
+  prodDocCols.value = Array.isArray(cols) ? cols : []
+}
+function setProdDocFilter(rows) {
+  const built = buildProdDocFilter(rows)
+  prodDocFilter.value = built.valid ? built : null
+  return built
+}
+function clearProdDocFilter() {
+  prodDocFilter.value = null
+}
+const prodDocFilteredRows = computed(() => filterProdDocRows(prodDocRows.value, prodDocCols.value, prodDocFilter.value))
 
 // ---------- 文书侧栏「模糊搜索」:字段+内容(可加多条件 AND) → 查找 → 单条跳转/多条出清单 ----------
 // 复用现有查询:具体字段 → condition[字段](后端 LIKE '%值%';明细字段走 EXISTS 行匹配),
@@ -2501,7 +2566,8 @@ const fuzzyApplied = ref(null) // 生效中的条件 {condition, keyword, valid}
 let fuzzyPrevPageSize = null
 const curDocNo = computed(() => String(cur.value?.['单据编号'] || cur.value?.['编号'] || ''))
 
-/** 字段下拉:全部字段 / 表头字段 / 明细字段(值=字段中文标签,后端按标签映射列) */
+/** 字段下拉:全部字段 / 表头字段 / 明细字段(值=字段中文标签,后端按标签映射列)
+ *  ⚠ 产品文件列表(单单据 + 矩阵)走另一套:字段 = 矩阵列(产品编号/是否受控/受控日期/状态(任一文件)) */
 const fuzzyFieldGroups = computed(() => {
   const cfg = cfgCache.value
   const header = (headerFields.value || []).map((f) => headerFieldKey(f)).filter(Boolean)
@@ -2516,18 +2582,34 @@ const fuzzyFieldGroups = computed(() => {
     }
   }
   const groups = [{ label: tt('全部字段'), options: [{ value: ALL_FIELDS, label: tt('任意字段') }] }]
+  if (isProdDocMatrix.value) {
+    // 矩阵面板:字段清单 = 表格自己的列(+「状态（任一文件）」这个横跨 4 个状态格的检索口径)
+    groups.push({ label: tt('矩阵列'), options: PROD_DOC_FIELD_OPTIONS.map((k) => ({ value: k, label: tt(k) })) })
+    return groups
+  }
   if (header.length) groups.push({ label: tt('表头字段'), options: header.map((k) => ({ value: k, label: tt(k) })) })
   if (detail.length) groups.push({ label: tt('明细字段'), options: detail.map((k) => ({ value: k, label: tt(k) })) })
   return groups
 })
 
-/** 结果清单:直接取当前已加载列表(查找后列表本身就是命中集合) */
-const fuzzyResultRows = computed(() => (list.value || []).map((row) => ({
-  no: String(row['单据编号'] || row['编号'] || ''),
-  date: String(row['单据日期'] || ''),
-  status: String(row['单据状态'] || ''),
-  row,
-})))
+/** 结果清单:直接取当前已加载列表(查找后列表本身就是命中集合)
+ *  ⚠ 矩阵面板的结果 = **产品行**(不是单据行) */
+const fuzzyResultRows = computed(() => {
+  if (isProdDocMatrix.value) {
+    return prodDocFilteredRows.value.map((row) => ({
+      no: String(row['产品编号'] || ''),
+      date: String(row['受控日期'] || ''),
+      status: `${row['doneCount'] ?? 0}/${row['totalCount'] ?? prodDocCols.value.length}`,
+      row,
+    }))
+  }
+  return (list.value || []).map((row) => ({
+    no: String(row['单据编号'] || row['编号'] || ''),
+    date: String(row['单据日期'] || ''),
+    status: String(row['单据状态'] || ''),
+    row,
+  }))
+})
 
 function openFuzzy() {
   fuzzyMode.value = true
@@ -2545,12 +2627,30 @@ async function closeFuzzy() {
   fuzzyRows.value = [{ field: '', value: '' }]
   fuzzySearched.value = false
   fuzzyApplied.value = null
+  // 矩阵面板:关掉搜索面板 = 连行筛选一起清掉(回到全表)
+  if (isProdDocMatrix.value) {
+    clearProdDocFilter()
+    return
+  }
   if (fuzzyPrevPageSize) { query.pageSize = fuzzyPrevPageSize; fuzzyPrevPageSize = null }
   query.pageNo = 1
   curIdx.value = 0
   await load()
 }
 async function runFuzzySearch() {
+  // 产品文件列表:对**矩阵行**筛选(不跑单据查询 —— 该面板只有 1 张单,查单据必然"查无可查")
+  if (isProdDocMatrix.value) {
+    const built = setProdDocFilter(fuzzyRows.value)
+    if (!built.valid) {
+      ElMessage.warning(tt('请先填写字段和内容'))
+      return
+    }
+    fuzzySearched.value = true
+    const n = prodDocFilteredRows.value.length
+    if (!n) ElMessage.warning(tt('未找到匹配的产品'))
+    else ElMessage.success(`${tt('找到')} ${n} ${tt('个产品')}`)
+    return
+  }
   const built = buildFuzzyQuery(fuzzyRows.value)
   if (!built.valid) {
     ElMessage.warning(tt('请先填写字段和内容'))
@@ -2577,8 +2677,13 @@ async function runFuzzySearch() {
   if (total.value > shown) ElMessage.warning(tt('找到 {n} 张单据，清单仅列出前 {m} 张').replace('{n}', total.value).replace('{m}', shown))
   else ElMessage.success(`${tt('找到')} ${total.value} ${tt('张单据')}，${tt('点清单切换查看')}`)
 }
-/** 点结果行 = 切换当前单据(走既有离开守卫:草稿未保存会提示) */
+/** 点结果行 = 切换当前单据(走既有离开守卫:草稿未保存会提示)
+ *  ⚠ 矩阵面板:结果是**产品行**,点它 = 把筛选收窄到该产品(表格随即只剩这一行) */
 async function openFuzzyResult(r) {
+  if (isProdDocMatrix.value) {
+    setProdDocFilter([{ field: '产品编号', value: String(r.no || '') }])
+    return
+  }
   const index = list.value.indexOf(r.row)
   if (index >= 0) await guardDocSwitch(index)
 }
@@ -2603,13 +2708,32 @@ function previewFieldsOf(row) {
   }
   return out
 }
-const previewCards = computed(() => (list.value || []).map((row) => {
-  const no = String(row['单据编号'] || row['编号'] || '')
-  const fields = previewFieldsOf(row)
-  const kw = previewKw.value.trim().toLowerCase()
-  const hit = !kw || no.toLowerCase().includes(kw) || fields.some((x) => x.value.toLowerCase().includes(kw))
-  return { no, date: String(row['单据日期'] || ''), status: String(row['单据状态'] || ''), fields, hit, row }
-}).filter((c) => c.hit))
+const previewCards = computed(() => {
+  // 产品文件列表:卡片 = **产品行**(编号 + 受控 + 4 个文件各自的状态),不是单据卡片
+  if (isProdDocMatrix.value) {
+    const kw = previewKw.value.trim().toLowerCase()
+    return prodDocFilteredRows.value.map((row) => {
+      // 卡片字段 = 4 个文件各自的状态:label 走 tt('文件N'),value = 文件名 + 状态(都过 tt(),
+      // 面板名/状态值本身在翻译表里有词条;拼串不整串丢进 tt(),否则会机翻出无意义词条)
+      const fields = prodDocCols.value.map((c, i) => ({
+        label: `文件${i + 1}`,
+        value: `${tt(c.panelName)}：${tt(String(row?.cells?.[c.panelCode] || '—'))}`,
+      }))
+      const no = String(row['产品编号'] || '')
+      const hit = !kw || no.toLowerCase().includes(kw)
+        || fields.some((x) => x.value.toLowerCase().includes(kw))
+        || prodDocCols.value.some((c) => String(row?.cells?.[c.panelCode] || '').toLowerCase().includes(kw))
+      return { no, date: String(row['受控日期'] || ''), status: String(row['是否受控'] || ''), fields, hit, row }
+    }).filter((c) => c.hit)
+  }
+  return (list.value || []).map((row) => {
+    const no = String(row['单据编号'] || row['编号'] || '')
+    const fields = previewFieldsOf(row)
+    const kw = previewKw.value.trim().toLowerCase()
+    const hit = !kw || no.toLowerCase().includes(kw) || fields.some((x) => x.value.toLowerCase().includes(kw))
+    return { no, date: String(row['单据日期'] || ''), status: String(row['单据状态'] || ''), fields, hit, row }
+  }).filter((c) => c.hit)
+})
 async function openDocPreview() {
   if (fuzzyMode.value) { // 与模糊搜索互斥:模糊条件失效,pageSize 直接接管
     fuzzyMode.value = false
@@ -2619,6 +2743,8 @@ async function openDocPreview() {
   }
   previewMode.value = true
   previewKw.value = ''
+  // 矩阵面板:卡片来自矩阵行,不跑单据查询(该面板只有 1 张单)
+  if (isProdDocMatrix.value) return
   if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize
   query.pageSize = 200
   query.pageNo = 1
@@ -2628,12 +2754,18 @@ async function openDocPreview() {
 async function closeDocPreview() {
   previewMode.value = false
   previewKw.value = ''
+  if (isProdDocMatrix.value) return
   if (previewPrevPageSize !== null) { query.pageSize = previewPrevPageSize; previewPrevPageSize = null }
   query.pageNo = 1
   curIdx.value = 0
   await load()
 }
 async function openPreviewCard(c) {
+  // 矩阵面板:点产品卡 = 把筛选收窄到该产品
+  if (isProdDocMatrix.value) {
+    setProdDocFilter([{ field: '产品编号', value: String(c.no || '') }])
+    return
+  }
   const index = list.value.indexOf(c.row)
   if (index >= 0) await guardDocSwitch(index)
 }

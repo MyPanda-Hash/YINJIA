@@ -38,6 +38,15 @@
       {{ tt('可通过产品编号直接搜索；状态由各文件面板的单据实时推导（未开发 / 开发中 / 开发审核中 / 开发完毕）。') }}
     </div>
 
+    <!-- ③′ 筛选中横幅(侧栏模糊搜索/查询产品/产品预览 → 本表按产品行筛选) -->
+    <div v-if="activeFilter" class="pds-filter">
+      <span class="pds-filter-txt">
+        {{ tt('筛选中') }}：{{ filterText }}
+        <span class="pds-filter-count">{{ shownRows.length }} / {{ rows.length }}</span>
+      </span>
+      <span class="pds-filter-clear" @click="emit('clear-filter')">✕ {{ tt('清除筛选') }}</span>
+    </div>
+
     <!-- ④ 矩阵表 -->
     <div class="pds-scroll">
       <table class="pds-table">
@@ -57,11 +66,18 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, i) in rows" :key="row['产品编号'] || ('r' + i)">
+          <tr v-for="(row, i) in shownRows" :key="row['产品编号'] || ('r' + i)">
             <td class="pds-c-no">{{ row['产品编号'] || '' }}</td>
             <template v-for="c in columns" :key="'c' + c.panelCode + (row['产品编号'] || i)">
               <td class="pds-c-file">{{ tt(c.panelName) }}</td>
-              <td class="pds-c-status">
+              <!-- 点状态 = 跳到该文件面板查看这张单(2026-09-30 用户口径):
+                   无该面板查看权限 → 提示「无查看该面板的权限」,不跳;
+                   该文件还没建单(未开发)→ 仍跳到面板(无 focus),让用户能看到列表/新建。 -->
+              <td
+                class="pds-c-status pds-c-jump"
+                :title="jumpTitle(c, row)"
+                @click="onStatusClick(c, row)"
+              >
                 <span class="pds-badge" :class="toneOf(statusOf(row, c.panelCode))">
                   {{ tt(statusOf(row, c.panelCode)) }}
                 </span>
@@ -71,11 +87,13 @@
             <td class="pds-c-ctrl">{{ tt(row['是否受控'] || '否') }}</td>
             <td class="pds-c-date">{{ row['受控日期'] || '' }}</td>
           </tr>
-          <tr v-if="!rows.length">
+          <tr v-if="!shownRows.length">
             <!-- 列数 = 产品编号 1 + 4×(文件+状态) 8 + 产品负责人/是否受控/受控日期 3 = 12
                  (原写 14 是错的:空态那行会多撑出两格) -->
             <td :colspan="12" class="pds-empty">
-              {{ tt('暂无已下发的产品文件记录（先在产品信息表归档后点「产品开发」下发）') }}
+              {{ activeFilter
+                ? tt('没有符合筛选条件的产品（点上方「清除筛选」看全部）')
+                : tt('暂无已下发的产品文件记录（先在产品信息表归档后点「产品开发」下发）') }}
             </td>
           </tr>
         </tbody>
@@ -85,17 +103,37 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { tt } from '@/i18n'
+import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import request from '@/core/request'
+import { useUserStore } from '@/stores/user'
+import { canViewPanel } from '@/core/auth/panelAccess'
+import { PROD_DOC_FIELD_OPTIONS, filterProdDocRows } from '@/core/prod/prodDocSearch'
 
 const props = defineProps({
   head: { type: Object, default: () => ({}) },
   panelCode: { type: String, default: '' },
+  // 侧栏搜索生效中的矩阵行筛选({conditions, valid});无则整表显示
+  filter: { type: Object, default: null },
 })
+// rows:取到矩阵行后上报(侧栏的结果清单/预览卡片要用同一份数据;本组件自己不存搜索结果)
+const emit = defineEmits(['rows', 'clear-filter'])
+
+const router = useRouter()
+const user = useUserStore()
 
 const columns = ref([])
 const rows = ref([])
+
+/** 生效中的筛选(横幅与"没有符合条件的产品"空态都看它) */
+const activeFilter = computed(() => (props.filter && props.filter.valid ? props.filter : null))
+const shownRows = computed(() => filterProdDocRows(rows.value, columns.value, activeFilter.value))
+/** 横幅文案:字段 包含 "值" [+ …] */
+const filterText = computed(() => (activeFilter.value?.conditions || [])
+  .map((c) => `${tt(c.field)} ${tt('包含')} "${c.value}"`)
+  .join('  '))
 
 /**
  * 一行里某面板的状态。
@@ -115,6 +153,37 @@ function toneOf(st) {
   return 'none'
 }
 
+/** 该产品在该文件面板的单据号(点状态跳转的目标;未开发时为空) */
+function docNoOf(row, panelCode) {
+  const m = row && row.docNos ? row.docNos : null
+  const v = m ? m[panelCode] : ''
+  return v === undefined || v === null ? '' : String(v)
+}
+
+function canView(panelCode) {
+  return canViewPanel({ isAdmin: user.isAdmin, visiblePanels: user.visiblePanels }, panelCode)
+}
+
+/** 状态格的悬停提示:说清点了会发生什么(含"没有查看权限"这一种) */
+function jumpTitle(c, row) {
+  if (!canView(c.panelCode)) return tt('无查看该面板的权限')
+  const no = docNoOf(row, c.panelCode)
+  return no ? `${tt('查看')}：${tt(c.panelName)} ${no}` : `${tt('打开')}：${tt(c.panelName)}`
+}
+
+/**
+ * 点状态 → 跳该文件面板查看(带 ?focus=单据号 直接定位到那张单)。
+ * 权限预检走 core/auth/panelAccess(与导航/桌面入口同一口径),不放行就提示,不跳。
+ */
+function onStatusClick(c, row) {
+  if (!canView(c.panelCode)) {
+    ElMessage.warning(`${tt('无查看该面板的权限')}：${tt(c.panelName)}`)
+    return
+  }
+  const no = docNoOf(row, c.panelCode)
+  router.push({ path: `/panelx/list/${c.panelCode}`, query: no ? { focus: no } : {} })
+}
+
 async function load() {
   try {
     const res = await request.get('/px/prodDocList')
@@ -125,6 +194,7 @@ async function load() {
     columns.value = []
     rows.value = []
   }
+  emit('rows', rows.value, columns.value)
 }
 
 onMounted(load)
@@ -151,6 +221,16 @@ watch(() => [props.panelCode, props.head && props.head['单据编号']], load)
 
 .pds-note { padding: 8px 6px 10px; font-size: 12px; color: #606266; }
 
+/* 筛选中横幅(侧栏搜索 → 本表行筛选) */
+.pds-filter {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 0 6px 8px; padding: 6px 10px; font-size: 12px;
+  background: #eef6ff; border: 1px solid #c8ddf7; border-radius: 3px; color: #2f6fbf;
+}
+.pds-filter-count { margin-left: 8px; color: #909399; }
+.pds-filter-clear { cursor: pointer; color: #2f6fbf; text-decoration: underline; }
+.pds-filter-clear:hover { color: #1f4f8a; }
+
 .pds-scroll { overflow: auto; }
 .pds-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 .pds-table th, .pds-table td { border: 1px solid #d9dee5; padding: 5px 6px; vertical-align: middle; }
@@ -160,6 +240,10 @@ watch(() => [props.panelCode, props.head && props.head['单据编号']], load)
 .pds-c-no { min-width: 110px; font-weight: 600; }
 .pds-c-file { min-width: 108px; white-space: nowrap; }
 .pds-c-status { min-width: 96px; text-align: center; }
+/* 状态格可点:跳该文件面板查看(无权限时给提示) */
+.pds-c-jump { cursor: pointer; }
+.pds-c-jump:hover { background: #eef6ff; }
+.pds-c-jump:hover .pds-badge { box-shadow: 0 0 0 2px #c8ddf7; }
 .pds-c-owner { min-width: 90px; }
 .pds-c-ctrl { min-width: 74px; text-align: center; }
 .pds-c-date { min-width: 120px; }
