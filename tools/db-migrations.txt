@@ -1711,3 +1711,16 @@ migrate-filter-eff-formula-cols.sql
 #    ButtonService 的样品编号唯一性校验(ensureSampleNoUnique)与其归档面板登记;
 #    文档同批更新:数据库表清单(关联面板→已下架)、产品文件流程使用手册(删该行) ——
 migrate-drop-sample-no-panel-2026-09-30.sql
+
+# —— 2026-09-30 数据记录表(实验室 8 张)补「审核人」+ 让陈秀丽**真能审批** ——
+#    需求原文(《产品开发系统需求汇总.xlsx》sheet「数据记录表」第 1 条):「都需要审核人(秀丽)」;
+#    用户口径:「真的能审核」(不只是纸面印字)。现状:8 张表头没有任何审核人字段,
+#    且全库 yj_role_panel.can_approve='Y' = 0 行 ⇒ 所有面板只有 admin 能审。
+#    ① 新建「研发审核」角色(rd_review)并**整份复制**普通用户角色的面板权限(79 行,换角色不缩水),
+#       8 张表 can_approve='Y';cp(陈秀丽)迁入 —— 专用角色而非给 role_code=user 勾选,
+#       避免 6 个演示账号被顺带授予真实单据的审批权;
+#    ② 8 张表登记「表单审核人」动态字段:**走备用列池的 备用1**(零 DDL,依
+#       docs/design/动态字段扩展-备用列池-V1.0.md),同批把该列中文注明改成它的新语义。
+#       列名不叫「审核人」是因为 ButtonService.save() 会 body.remove("审核人")(那是
+#       yj_doc_status.shr 的虚拟字段),QC_INSP_REC 踩过同一个坑 —— 两处同款命名 ——
+migrate-rd-datarec-reviewer-2026-09-30.sql

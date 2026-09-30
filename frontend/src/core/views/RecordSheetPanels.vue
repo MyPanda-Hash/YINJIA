@@ -1435,12 +1435,19 @@ const coverSignW = COVER_SIGN_COLS.map((w, _i, arr) => {
   return ((w / sum) * 100).toFixed(2) + '%'
 })
 
-/** 报告头右侧信息块(数据记录表=密级/适用范围/测试负责人/报告编号;委托单=文件管理人/密级/文件使用范围) */
+/** 报告头右侧信息块(数据记录表=密级/适用范围/测试负责人/报告编号/**审核人**;
+ *  委托单=文件管理人/密级/文件使用范围)。
+ *  ⚠ 2026-09-30 加「审核人」:需求《产品开发系统需求汇总.xlsx》sheet「数据记录表」第 1 条
+ *    ——「都需要审核人(秀丽)」。纸面印「审核人」,**数据键是「表单审核人」**:
+ *    字段名若叫「审核人」会被 ButtonService.save() 的 `body.remove("审核人")` 静默丢弃
+ *    (那是 yj_doc_status.shr 的虚拟字段),QC_INSP_REC 当年踩过同一个坑,故两处同款命名。
+ *    落库列走**备用列池**的 备用1(零 DDL),见 tools/migrate-rd-datarec-reviewer-2026-09-30.sql。 */
 const DEFAULT_INFO = [
   { label: '密级', key: '密级', type: 'select' },
   { label: '适用范围', key: '适用范围', type: 'select' },
   { label: '测试负责人', key: '测试负责人', type: 'text' },
   { label: '报告编号', key: '报告编号', type: 'text' },
+  { label: '审核人', key: '表单审核人', type: 'text' },
 ]
 const effInfo = computed(() => {
   // 多页签面板可按页声明 pages[i].info:被并入的页各有各的信息块(含**空数组=无信息块**,

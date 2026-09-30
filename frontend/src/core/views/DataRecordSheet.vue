@@ -26,7 +26,7 @@
           </td>
         </tr>
         <tr>
-          <td class="rs-td rs-topic-cell" rowspan="4">
+          <td class="rs-td rs-topic-cell" rowspan="5">
             <el-input v-if="editable" v-model="head['测试主题']" size="small" class="rs-topic-input" @input="emit('dirty')" />
             <span v-else class="rs-topic">{{ head['测试主题'] || '' }}</span>
           </td>
@@ -73,6 +73,21 @@
               <span class="rs-ivalue">
                 <el-input v-if="editable" v-model="head['测试编号']" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
                 <template v-else>{{ head['测试编号'] || '' }}</template>
+              </span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <!-- 审核人(2026-09-30 补):需求「数据记录表都需要审核人(秀丽)」。
+               纸面印「审核人」,**数据键是「表单审核人」** —— 叫「审核人」会被
+               ButtonService.save() 的 body.remove("审核人") 静默丢弃(那是 yj_doc_status.shr
+               的虚拟字段);落库列走备用列池的 备用1,见 migrate-rd-datarec-reviewer-2026-09-30.sql。 -->
+          <td class="rs-td rs-info-cell">
+            <div class="rs-irow">
+              <span class="rs-ilabel">{{ tt('审核人') }}</span>
+              <span class="rs-ivalue">
+                <el-input v-if="editable" v-model="head['表单审核人']" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+                <template v-else>{{ head['表单审核人'] || '' }}</template>
               </span>
             </div>
           </td>
