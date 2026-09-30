@@ -1,0 +1,15 @@
+# Force-run list for 2026-09-30 incremental deployment (order per manifest)
+# 10 pending migrations, 0 informed reruns (no byte-changed old scripts since the 09-28 v2 package)
+# Risk note: migrate-drop-unused-tables physically drops 244 unused tables + reclaims 29
+#   retired-panel metadata rows (explicit guarded list, user-approved 09-29; GO step [3]
+#   takes an automatic pre-deploy backup before running it).
+migrate-whloc-whcode.sql
+migrate-material-out-line-no.sql
+migrate-server-parity2-20260928.sql
+migrate-server-converge-20260928.sql
+migrate-panel-runtime-cols.sql
+migrate-panel-page-size.sql
+migrate-panel-page-size-archive.sql
+migrate-drop-unused-tables.sql
+migrate-spare-columns-biz.sql
+migrate-norm-debt-20260929.sql

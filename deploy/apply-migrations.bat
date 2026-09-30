@@ -28,10 +28,10 @@ if not exist "%BAKDIR%\pre-migrate-%TS%.bak" goto fail-backup
 echo RESULT: BACKUP-GATE-PASSED
 
 echo [3] migrations: force-run to-run list, then baseline, then verify sync ...
-if not exist "%PKG%\to-run-20260928.txt" goto fail-norunlist
+if not exist "%PKG%\to-run-20260930.txt" goto fail-norunlist
 pushd "%PKG%\tools"
 set "RUNFAILED=0"
-for /f "usebackq eol=# delims=" %%s in ("%PKG%\to-run-20260928.txt") do (
+for /f "usebackq eol=# delims=" %%s in ("%PKG%\to-run-20260930.txt") do (
   java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp lib\mssql-jdbc.jar DbSync.java run %%s >> "%LOG%" 2>&1
   if errorlevel 1 (
     echo    FAILED: %%s
@@ -51,7 +51,7 @@ exit /b 0
 
 :fail-norunlist
 echo RESULT: FAIL-NO-RUNLIST >> "%LOG%"
-echo RESULT: FAIL-NO-RUNLIST - to-run-20260928.txt missing from package
+echo RESULT: FAIL-NO-RUNLIST - to-run-20260930.txt missing from package
 exit /b 1
 
 :fail-sqlcmd
