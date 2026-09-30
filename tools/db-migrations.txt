@@ -1695,3 +1695,9 @@ migrate-rd-prodinfo-formlib-2026-09-30.sql
 #    ④ 附带修掉「日期」列 label 被标成「单据日期」造成的同面板 label 重复(既有问题):
 #      后端按 label 建行模型只取首个 ⇒ 该列成死列;fixture 重生成后才被单测抓住 ——
 migrate-rd-specdoc-prodno-2026-09-30.sql
+
+# —— 2026-09-30 功能性滤效(RD_FILTER_EFF)「样品配方」改为**每样品一格**(与 样品信息/测试装置及编号
+#    同列数;设计原表 第10行 merges C10:G10+H10:L10 与 第11行 样品信息 同一分块):
+#    头表加 样品配方1..6 列(含中文注明)+ yj_field 注册 + en 译名 + 存量单字段值兜底搬到 配方1;
+#    前端渲染与「减列清空」见 DataRecordSheet.vue + core/sheet/sampleCols.js ——
+migrate-filter-eff-formula-cols.sql
