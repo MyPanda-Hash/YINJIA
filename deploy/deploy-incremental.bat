@@ -125,7 +125,7 @@ REM (refresh stale hashes, no data), then a bare sync must be a clean no-op.
 :migrate
 if "%DOMIG%"=="0" goto swap
 if not exist "%PKG%\to-run-20260930.txt" goto fail-norunlist
-echo [4] migrations: force-run to-run list (10 entries: 10 new + 0 informed rerun) - detailed output in logs\deploy-%TS%.log ...
+echo [4] migrations: force-run to-run list (22 entries: 22 new + 0 informed rerun) - detailed output in logs\deploy-%TS%.log ...
 pushd "%PKG%\tools"
 set "RUNFAILED=0"
 for /f "usebackq eol=# delims=" %%s in ("%PKG%\to-run-20260930.txt") do (
