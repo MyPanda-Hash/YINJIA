@@ -2882,9 +2882,21 @@ async function openDevAssign() {
     if (!devAssignUsers.value.length) devAssignUsers.value = (await engine.rdDevUsers()) || []
     const st = await engine.rdDevAssignState(no)
     const assigns = st?.assigns || {}
-    // 默认带出产品负责人(后端 buttonState.supervisor),四个文件各自可改
+    // 默认责任人 = **按需求逐文件预置**(《产品开发系统需求汇总.xlsx》sheet「文件汇总表」的「产品文件流程」):
+    //   5.1 规格书 = 项目负责人(后端 buttonState.supervisor 下发,动态)
+    //   5.2 成型控制要点 = 刘磊(liulei)
+    //   5.3 组装控制要求 = 柴善银(chaishanyin)
+    //   5.4 出货控制计划 = 冯敏(fengmin)
+    // ⚠ 这三个是**账号名(username)**,不是姓名 —— 载荷「分发责任人={面板编码:账号}」按账号落 rd_dev_task;
+    //   账号由 tools/migrate-rd-file-owner-2026-09-30.sql 建,角色「文件负责人」。
+    // 已分发过的以库里现有分配为准(assigns 优先),四格仍可逐个改。
     const fallback = devDispatch.supervisor || ''
-    devAssignRows.value = DEV_PANELS.map((p) => ({ panel: p.code, label: p.label, owner: assigns[p.code] || fallback }))
+    const FILE_OWNER_DEFAULT = { RD_MOLD_PROC: 'liulei', RD_ASM_PROC: 'chaishanyin', RD_INSP_PLAN: 'fengmin' }
+    devAssignRows.value = DEV_PANELS.map((p) => ({
+      panel: p.code,
+      label: p.label,
+      owner: assigns[p.code] || FILE_OWNER_DEFAULT[p.code] || fallback,
+    }))
     devAssignDocNo.value = no
     devAssignVisible.value = true
   } catch (e) {

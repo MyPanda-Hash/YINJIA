@@ -156,6 +156,14 @@ export default {
     '没有符合筛选条件的产品（点上方「清除筛选」看全部）': 'No product matches the filter (click "Clear filter" to see all)',
     '产品开发二三四级项目控制列表': 'Product Development Level 2, Level 3 Project Control List',
     '项目定级原则': 'Project grading principles',
+    // 2026-09-30 照《产品开发系统需求汇总.xlsx》原文更正的三段定级原则
+    // (原实现的二级口径是「开发性项目」,与需求原文不符)
+    '1.二级项目-A级或B级客户/该产品一年内有重要经济效益或对应技术产品有重大推广价值/部分对客户认同有重要影响的项目；':
+      '1. Level 2 — Grade A or B customer / significant economic benefit within one year, or major promotion value of the corresponding technology/product, or projects with important influence on customer recognition;',
+    '2.三级项目-A级或B级客户/未来（一年后）可能有重要经济效益；':
+      '2. Level 3 — Grade A or B customer / likely significant economic benefit in the future (after one year);',
+    '3.四级项目-简单应对（检测/打样）：如内部简单测试、客户样品测试等':
+      '3. Level 4 — simple response (testing / sampling): e.g. simple internal tests, customer sample tests, etc.',
     '项目编号': 'Project Number',
     '项目发起人': 'Project initiator',
     '项目负责人': 'Project Manager',
