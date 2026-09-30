@@ -164,6 +164,14 @@ export default {
       '2. Level 3 — Grade A or B customer / likely significant economic benefit in the future (after one year);',
     '3.四级项目-简单应对（检测/打样）：如内部简单测试、客户样品测试等':
       '3. Level 4 — simple response (testing / sampling): e.g. simple internal tests, customer sample tests, etc.',
+    // 2026-09-30 本轮新增字段标签(补做):数据库规范体检 09 项要求新增字段必须带 en 译名,
+    // 与 yj_translation(scope='field')成对 —— 见 tools/migrate-rd-newfields-i18n-2026-09-30.sql
+    '是否受控': 'Controlled',
+    '受控日期': 'Control Date',
+    '变更类型': 'Change Type',
+    // 「变更类型」的两个取值(字典项也走显示层翻译):en 界面下下拉里不该是中文
+    '严格变更': 'Strict Change',
+    '快捷变更': 'Quick Change',
     '项目编号': 'Project Number',
     '项目发起人': 'Project initiator',
     '项目负责人': 'Project Manager',
