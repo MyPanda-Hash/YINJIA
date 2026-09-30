@@ -153,43 +153,54 @@ public class PxController {
 
         List<Map<String, Object>> rows = devTaskService.board();
 
-        // 各面板"已归档单据的产品键 → 归档时点"。产品键字段各面板不同(规格书是「编号」,其余是「产品编号」),
-        // 用 DevTaskService.productKeyOf(panel) 取;单据号列用面板自己的 groupCol。
-        Map<String, Map<String, String>> archivedAt = new LinkedHashMap<>();  // 面板 → (产品键 → 归档时点)
+        // 各面板"已受控单据的产品键 → 受控日期"。产品键字段各面板不同(规格书是「产品编号」,其余同名),
+        // 用 DevTaskService.productKeyOf(panel) 取。
+        // ⚠ 2026-09-30 改口径:原先这里取的是 MAX(yj_doc_status.archived_at) —— 那是"归档时点",
+        //   而需求(《产品开发系统需求汇总》5.1)要的是**审批后自动受控**,且用户口径「受控按文件」:
+        //   现在直接读该文件头表备用列池里的 受控标记(备用1=是否受控 / 备用2=受控日期,
+        //   由 ButtonService.markArchived → markFileControlled 写入)。
+        //   历史单(本功能上线前归档的)没有这两个值 ⇒ 回退到 archived_at,不让老单显示成"未受控"。
+        Map<String, Map<String, String>> controlledAt = new LinkedHashMap<>();  // 面板 → (产品键 → 受控日期)
         for (String panel : DevTaskService.devPanelCodes()) {
             Map<String, String> m = new LinkedHashMap<>();
             try {
                 String table = registry.panel(panel).headTable();
                 String keyCol = DevTaskService.productKeyOf(panel);
                 String docCol = pickGroupCol(panel);
-                jdbc.query("SELECT t.[" + keyCol + "] AS k, MAX(s.archived_at) AS at "
+                jdbc.query("SELECT t.[" + keyCol + "] AS k,"
+                                + " MAX(CASE WHEN ISNULL(t.[备用1], N'') = N'是' THEN ISNULL(t.[备用2], '') ELSE '' END) AS ctl,"
+                                + " MAX(s.archived_at) AS at "
                                 + "FROM " + table + " t "
-                                + "JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = t.[" + docCol + "] "
-                                + "WHERE ISNULL(s.archived,'N') = 'Y' AND ISNULL(t.asp_cancel,'N') <> 'Y' "
+                                + "LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = t.[" + docCol + "] "
+                                + "WHERE ISNULL(t.asp_cancel,'N') <> 'Y' "
                                 + "GROUP BY t.[" + keyCol + "]",
                         rs -> {
                             String k = rs.getString("k");
                             if (k != null && !k.isBlank()) {
+                                String ctl = rs.getString("ctl");
                                 Object at = rs.getObject("at");
-                                m.put(k, at == null ? "" : String.valueOf(at));
+                                // 受控标记优先;没有(历史单)才回退归档时点
+                                m.put(k, ctl != null && !ctl.isBlank() ? ctl : (at == null ? "" : String.valueOf(at)));
                             }
                         }, panel);
             } catch (Exception e) {
                 // 某面板表/列缺失时降级:该面板不参与受控推导,矩阵主体仍可用
                 log.warn("[RD_PROD_DOCLIST] 受控推导跳过 panel={}: {}", panel, e.getMessage());
             }
-            archivedAt.put(panel, m);
+            controlledAt.put(panel, m);
         }
 
         for (Map<String, Object> row : rows) {
             String productCode = String.valueOf(row.get("产品编号"));
             @SuppressWarnings("unchecked")
             Map<String, String> cells = (Map<String, String>) row.get("cells");
+            // 四个文件**各自**受控(见上面口径);整产品"是否受控"仍按"四份都开发完毕"判定,
+            // 受控日期取四者中最后一个受控时点 —— 列表只有一组受控列,逐文件的受控值在各文件面板自身。
             boolean allDone = cells != null && !cells.isEmpty()
                     && cells.values().stream().allMatch(DevTaskService.STATUS_DONE::equals);
             String lastAt = "";
             for (String panel : DevTaskService.devPanelCodes()) {
-                String at = archivedAt.getOrDefault(panel, Map.of()).get(productCode);
+                String at = controlledAt.getOrDefault(panel, Map.of()).get(productCode);
                 if (at != null && at.compareTo(lastAt) > 0) lastAt = at;
             }
             row.put("是否受控", allDone ? "是" : "否");

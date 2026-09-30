@@ -769,6 +769,34 @@ public class ButtonService {
                 + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, archived, pending, canceled, shr, shsj, archived_at, update_at) "
                 + "VALUES (s.panel_code, s.doc_no, 'Y', 'N', 'N', ?, GETDATE(), GETDATE(), GETDATE());",
                 panelCode, no, user, user);
+        // 四个受控文件:归档即**本文件受控**(2026-09-30 用户口径「受控按文件」)。
+        // 需求原文(《产品开发系统需求汇总》5.1):「保存/提交 → 提交后审批 → 审批后自动受控」。
+        markFileControlled(panelCode, no, user);
+    }
+
+    /**
+     * 四个受控文件归档时写「是否受控 / 受控日期」(2026-09-30)。
+     * 落点 = 该面板头表**备用列池的 备用1/备用2**(零 DDL,依
+     * docs/design/动态字段扩展-备用列池-V1.0.md;四张表各用各自的两列,互不影响),
+     * 字段登记见 tools/migrate-rd-file-controlled-2026-09-30.sql。
+     *
+     * 为什么按文件而不是按产品:需求流程图里"审批后自动受控"只挂在 5.1 规格书这一步上,
+     * 说的是**这个文件**走完审批就受控;原先产品文件列表那两列是"4 份全归档 ⇒ 整产品受控"
+     * 的产品级派生,一个文件卡住会让另外三个已审批的文件也显示未受控。
+     * 非四文件面板 / 表或列缺失时静默跳过(记 warning),不影响归档主流程。
+     */
+    private void markFileControlled(String panelCode, String no, String user) {
+        if (panelCode == null || !DevTaskService.devPanelCodes().contains(panelCode)) return;
+        try {
+            PanelRegistry.PanelDef def = registry.panel(panelCode);
+            String tbl = def.headTable();
+            if (tbl == null || tbl.isBlank() || !tableCols(tbl).contains("备用1")) return;
+            jdbc.update("UPDATE [" + tbl + "] SET 备用1 = N'是', 备用2 = CONVERT(nvarchar(20), GETDATE(), 120),"
+                            + " asp_user2 = ?, asp_time2 = GETDATE() WHERE [" + def.groupCol() + "] = ?",
+                    user, no);
+        } catch (Exception e) {
+            log.warn("[受控] 写受控标记失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+        }
     }
 
     /** 行表 upsert:有 id 更新,无 id 插入(回填自增 id),缺席行软删(asp_cancel='Y') */
