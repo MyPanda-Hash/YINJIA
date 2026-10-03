@@ -283,6 +283,31 @@ async function main() {
         `记录里打印量 ${PRINT_QTY}、已生单 0(还没生单;实得 ${JSON.stringify(R0)})`)
     }
 
+    // ②b 「重打」:同一张单原样再打一遍 ⇒ 打印次数 +1,**预约不变**(纸卡了/打歪了用这个,不是重新打一张)
+    {
+      const hit = await ev(`(function(){
+        const el = document.querySelector('.mlq-records .el-table')
+        if (!el) return 'no-table'
+        const row = Array.from(el.querySelectorAll('.el-table__body tbody tr')).find(function(r){ return r.textContent.trim() !== '' })
+        const btn = row && Array.from(row.querySelectorAll('button')).find(function(b){ return b.textContent.trim() === '重打' })
+        if (!btn) return 'no-btn'
+        btn.click(); return 'ok' })()`)
+      info(`点记录行「重打」:${hit}`)
+      await sleep(2500)
+      const rp = await one(`SELECT ISNULL([打印次数],0) t FROM bd_pu_label WHERE [单据编号]=N'${made?.no}'`)
+      ok(Number(rp?.t) === 2, `重打后 打印次数 = 2(实得 ${rp?.t})`)
+      const rpQty = await one(`SELECT COUNT(*) n, ISNULL(SUM([打印数量]),0) q FROM bl_pu_label
+        WHERE [单据编号]=N'${made?.no}' AND ISNULL(asp_cancel,'N')<>'Y'`)
+      ok(Number(rpQty?.n) === 1 && Number(rpQty?.q) === PRINT_QTY,
+        `重打**没有**多出打印行、数量不变(${rpQty?.n} 行 / 合计 ${rpQty?.q})`)
+      const rpDlg = await one(`SELECT COUNT(*) n, ISNULL(SUM(l.[打印数量]),0) q FROM bl_pu_label l
+        JOIN bd_pu_label h ON h.[单据编号]=l.[单据编号]
+        WHERE h.[采购订单号]=N'${pick.no}' AND ISNULL(h.asp_cancel,'N')<>'Y' AND ISNULL(l.asp_cancel,'N')<>'Y'
+          AND l.[采购订单行id]=${Number(pick.line.id)}`)
+      ok(Number(rpDlg?.n) === 1 && Number(rpDlg?.q) === PRINT_QTY,
+        `重打**没有**新增预约(该行存活打印行仍 1 条 / 合计 ${PRINT_QTY};实得 ${rpDlg?.n} 条 / ${rpDlg?.q})`)
+    }
+
     // ============ ③ 生单弹窗(上下两层):上层原行数量被切走 + 下层多出一行隔离行 ============
     console.log('\n=== ③ 生单弹窗:上层原行数量扣掉打印量 + 下层「已打印待生单」多出一行 ===')
     await openPanel('PU_ORDER', pick.no)
