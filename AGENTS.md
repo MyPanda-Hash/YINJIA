@@ -93,8 +93,10 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
    - **表单页表头** = `place` 含 `header`,**或恰为 `query`** 的全部字段,按 `seq` 升序
      (同 `seq` 按 `yj_field.id`);`query,detail` 的字段**不进表头**;
    - **列表页明细表格列** = `place` 含 `detail` 且 `visible=1 且 hidden=0`,按 `seq` 升序。
-4. 该文档 **§5** 当前登记着一条未修的显示缺陷(`QC_RECV`/`QC_INSP` 参照源被整体刷成 GFDA),
-   修复前不要据此以为"参照显示是对的"。
+4. 改 `yj_field` 的**参照源**时按该文档 **§5** 核对:`ref_field` 取的是**目标面板的字段名(label)**
+   而不是物理列名(例:参照 `QC_RECV` 写 `单号`,不是 `单据编号`);批量 UPDATE 必须带窄条件 +
+   行数守卫 + 末尾"越界数 = 0"自检 —— 2026-09-24 的 `migrate-sl-supplier-ref.sql` 就是行内注释
+   吞掉同行筛选条件,把两个面板每一行字段的参照源刷成了 GFDA(事故与修复见 §5.3)。
 
 ## 架构速查
 

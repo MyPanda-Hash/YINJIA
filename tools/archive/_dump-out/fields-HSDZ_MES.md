@@ -7,9 +7,9 @@ PANEL	QC_RETURN	暂收退回单	null	采购管理	doc	qc_return	qc_return_detail
 ===== QC_RECV =====
 -- yj_field (place, seq)
 FIELD	detail	10	单号	单据编号	文本	150	---V		GFDA	mc	mc					9364
-FIELD	detail	30	采购单号	采购单号	参照	140	E--V		GFDA	mc	mc					9376
+FIELD	detail	30	采购单号	采购单号	参照	140	E--V		PU_ORDER	单据编号	单据编号					9376
 FIELD	detail	40	采购订单行号	采购订单行号	文本	110	E--V		GFDA	mc	mc					9488
-FIELD	detail	50	物料名称	物料名称	参照	160	E--V		GFDA	mc	mc					9366
+FIELD	detail	50	物料名称	物料名称	参照	160	E--V		INV	存货名称	存货名称					9366
 FIELD	detail	60	规格型号	规格型号	文本	140	E--V		GFDA	mc	mc					9367
 FIELD	detail	70	批次号	批次号	文本	150	---V									11461
 FIELD	detail	80	物料描述	物料描述	文本	200	E--V		GFDA	mc	mc					9368
@@ -33,9 +33,9 @@ FIELD	detail	250	结案	结案	下拉框	80	E-H-		GFDA	mc	mc		SELECT v FROM (VAL
 FIELD	detail	260	税别代码	税别代码	文本	100	E-H-		GFDA	mc	mc					9381
 FIELD	detail	270	税别说明	税别说明	文本	120	E-H-		GFDA	mc	mc					9382
 FIELD	detail	280	总金额	总金额	小数	100	E-H-		GFDA	mc	mc					9384
-FIELD	detail	290	订单号	订单号	参照	140	E-H-		GFDA	mc	mc					9385
+FIELD	detail	290	订单号	订单号	参照	140	E-H-		SO_ORDER	单据编号	单据编号					9385
 FIELD	detail	300	箱数	箱数	小数	80	E-H-		GFDA	mc	mc					9386
-FIELD	detail	310	部门	部门	参照	100	E-H-		GFDA	mc	mc					9387
+FIELD	detail	310	部门	部门	参照	100	E-H-		DEPT	部门名称	部门名称					9387
 FIELD	detail	320	部门名称	部门名称	文本	100	E-H-		GFDA	mc	mc					9388
 FIELD	detail	330	折扣%	折扣%	小数	80	E--V		GFDA	mc	mc					9604
 FIELD	detail	340	预计到货日期	预计到货日期	日期	120	E--V		GFDA	mc	mc					9605
@@ -48,12 +48,12 @@ FIELD	detail	410	剩余数量	剩余数量	小数	100	E-H-		GFDA	mc	mc					9592
 FIELD	detail	420	退料数量	退料数量	小数	100	E-H-		GFDA	mc	mc					9593
 FIELD	detail	430	报废数量	报废数量	小数	100	E-H-		GFDA	mc	mc					9594
 FIELD	detail	440	制单号	制单号	文本	130	E-H-		GFDA	mc	mc					9596
-FIELD	detail	450	品质复核人	品质复核人	参照	100	E-H-		GFDA	mc	mc					9597
+FIELD	detail	450	品质复核人	品质复核人	参照	100	E-H-		EMP	员工名称	员工名称					9597
 FIELD	detail	460	品质复核时间	品质复核时间	文本	140	E-H-		GFDA	mc	mc					9598
 FIELD	header	60	金额	金额	小数	100	E-H-		GFDA	mc	mc					9585
 FIELD	header	70	税额	税额	小数	100	E-H-		GFDA	mc	mc					9586
 FIELD	header	80	总金额	总金额	小数	100	E-H-		GFDA	mc	mc					9587
-FIELD	header	100	部门	部门	参照	120	E--V		GFDA	mc	mc					9355
+FIELD	header	100	部门	部门	参照	120	E--V		DEPT	部门名称	部门名称					9355
 FIELD	header	120	部门名称	部门名称	文本	120	E-H-		GFDA	mc	mc					9356
 FIELD	header	140	数量	数量	小数	100	E-H-		GFDA	mc	mc					9357
 FIELD	header	150	附件1	附件1	附件	220	E--V		GFDA	mc	mc					9358
@@ -62,21 +62,21 @@ FIELD	header	170	附件3	附件3	附件	220	E--V		GFDA	mc	mc					9360
 FIELD	header	180	附件4	附件4	附件	220	E--V		GFDA	mc	mc					9361
 FIELD	header	190	附件5	附件5	附件	220	E--V		GFDA	mc	mc					9362
 FIELD	header	200	附件6	附件6	附件	220	E--V		GFDA	mc	mc					9363
-FIELD	header	220	审核人	审核人	参照	100	---V		GFDA	mc	mc					9588
+FIELD	header	220	审核人	审核人	参照	100	---V		EMP	员工名称	员工名称					9588
 FIELD	header	230	审核时间	审核时间	文本	140	---V		GFDA	mc	mc					9589
 FIELD	header	240	批次键	批次键	整数	80	--H-		GFDA	mc	mc					9609
-FIELD	query,detail	20	物料编码	物料编码	参照	130	ER-V		GFDA	mc	mc					9365
+FIELD	query,detail	20	物料编码	物料编码	参照	130	ER-V		INV	存货编码	存货名称					9365
 FIELD	query,detail	390	条码	条码	文本	140	E-H-		GFDA	mc	mc					9590
 FIELD	query,header	10	单号	单据编号	文本	140	-R-V		GFDA	mc	mc					9350
 FIELD	query,header	20	单据日期	单据日期	日期	120	ER-V		GFDA	mc	mc					9351
-FIELD	query,header	30	业务员	业务员	参照	100	E--V		GFDA	mc	mc					9352
+FIELD	query,header	30	业务员	业务员	参照	100	E--V		EMP	员工名称	员工名称					9352
 FIELD	query,header	40	供应商代码	供应商代码	参照	130	E--V		GFDA	dm	mc					9353
 FIELD	query,header	50	供应商	供应商	参照	180	E--V		GFDA	mc	mc					9354
 FIELD	query,header	90	来料性质	来料性质	文本	110	E--V		GFDA	mc	mc					9583
-FIELD	query,header	110	仓库	仓库	参照	150	E-H-		GFDA	mc	mc					9584
+FIELD	query,header	110	仓库	仓库	参照	150	E-H-		WH	仓库名称	仓库名称					9584
 FIELD	query,header	130	批次号	批次号	文本	160	E--V									11460
 FIELD	query,header	210	采购订单号	采购订单号	文本	150	E--V		GFDA	mc	mc					9487
--- config.json -> QC_RECV.config.json len=0
+-- config.json -> (空;运行时配置由 PanelConfigService 现算)
 COL	sl_recv	id	int(4)	NOT NULL	
 COL	sl_recv	单据编号	nvarchar(120)	NOT NULL	
 COL	sl_recv	单据日期	nvarchar(40)	null	
@@ -206,12 +206,12 @@ COL	sl_recv_detail	备用20	nvarchar(1000)	null	预留扩展字段(未绑定)
 
 ===== QC_INSP =====
 -- yj_field (place, seq)
-FIELD	detail	20	物料名称	物料名称	参照	160	E--V		GFDA	mc	mc			Material Name		1777
+FIELD	detail	20	物料名称	物料名称	参照	160	E--V		INV	存货名称	存货名称			Material Name		1777
 FIELD	detail	30	规格型号	规格型号	文本	140	E--V		GFDA	mc	mc			Specification		1778
 FIELD	detail	40	采购订单行号	采购订单行号	文本	110	E--V		GFDA	mc	mc					7540
-FIELD	detail	50	单位	单位	参照	70	E-H-		GFDA	mc	mc			UOM		1779
+FIELD	detail	50	单位	单位	参照	70	E-H-		UOM	计量单位名称	计量单位名称			UOM		1779
 FIELD	detail	60	单价	单价	小数	100	E--V		GFDA	mc	mc			Unit Price		7543
-FIELD	detail	70	计量单位	计量单位	参照	90	E--V		GFDA	mc	mc			Unit of measurement		7542
+FIELD	detail	70	计量单位	计量单位	参照	90	E--V		UOM	计量单位名称	计量单位名称			Unit of measurement		7542
 FIELD	detail	80	送检数量	送检数量	小数	100	E--V		GFDA	mc	mc					1780
 FIELD	detail	90	合格数量	合格数量	小数	100	ER-V		GFDA	mc	mc					1781
 FIELD	detail	100	不合格数量	不合格数量	小数	100	E--V		GFDA	mc	mc					1782
@@ -226,16 +226,16 @@ FIELD	detail	190	物料描述	物料描述	文本	160	E-H-		GFDA	mc	mc					7436
 FIELD	detail	200	箱数	箱数	小数	80	E-H-		GFDA	mc	mc					7437
 FIELD	detail	210	日期	日期	文本	100	E-H-		GFDA	mc	mc			Date		7438
 FIELD	detail	220	结案	结案	文本	80	E-H-		GFDA	mc	mc					7439
-FIELD	detail	230	部门	部门	参照	100	E-H-		GFDA	mc	mc			Department		7440
+FIELD	detail	230	部门	部门	参照	100	E-H-		DEPT	部门名称	部门名称			Department		7440
 FIELD	detail	250	部门名称	部门名称	文本	100	E-H-		GFDA	mc	mc			Department Name		7441
 FIELD	detail	260	入库单号	入库单号	文本	130	---V		GFDA	mc	mc			Receipt No.		7442
 FIELD	detail	270	仓库代码	仓库代码	文本	120	E-H-		GFDA	mc	mc			Warehouse Code		7694
-FIELD	header	30	业务员	业务员	参照	100	E--V		GFDA	mc	mc			Salesperson		7692
+FIELD	header	30	业务员	业务员	参照	100	E--V		EMP	员工名称	员工名称			Salesperson		7692
 FIELD	header	90	部门	部门	参照	140	E--V		DEPT	部门名称	部门名称					11588
 FIELD	header	100	部门编码	部门编码	参照	140	E--V		DEPT	部门编码	部门名称					11589
-FIELD	header	110	检验员	检验员	参照	100	E--V		GFDA	mc	mc					1768
+FIELD	header	110	检验员	检验员	参照	100	E--V		EMP	员工名称	员工名称					1768
 FIELD	header	120	检验日期	检验日期	日期	120	E--V		GFDA	mc	mc					1769
-FIELD	header	140	检验方案	检验方案	参照	140	E--V		GFDA	mc	mc			Inspection Plan		1770
+FIELD	header	140	检验方案	检验方案	参照	140	E--V		QC_PLAN	方案名称	方案名称			Inspection Plan		1770
 FIELD	header	160	检验类型	检验类型	下拉框	100	E--V		GFDA	mc	mc		SELECT v FROM (VALUES (N'全检'),(N'抽检'),(N'免检')) AS t(v)			7626
 FIELD	header	180	附件1	附件1	附件	220	E--V		GFDA	mc	mc					9531
 FIELD	header	190	附件2	附件2	附件	220	E--V		GFDA	mc	mc					9532
@@ -243,15 +243,15 @@ FIELD	header	200	附件3	附件3	附件	220	E--V		GFDA	mc	mc					9533
 FIELD	header	210	附件4	附件4	附件	220	E--V		GFDA	mc	mc					9534
 FIELD	header	220	附件5	附件5	附件	220	E--V		GFDA	mc	mc					9535
 FIELD	header	230	附件6	附件6	附件	220	E--V		GFDA	mc	mc					9536
-FIELD	header	260	审核人	审核人	参照	90	---V		GFDA	mc	mc			Approved by		1774
+FIELD	header	260	审核人	审核人	参照	90	---V		EMP	员工名称	员工名称			Approved by		1774
 FIELD	header	270	审核时间	审核时间	文本	140	---V		GFDA	mc	mc			Approved at		1775
 FIELD	header	280	批次键	批次键	整数	80	--H-		GFDA	mc	mc					7696
 FIELD	header,detail	240	备注	备注	文本	220	E-H-		GFDA	mc	mc			Remark		1772
-FIELD	query,detail	10	物料编码	物料编码	参照	120	ER-V		GFDA	mc	mc			Material Code		1776
+FIELD	query,detail	10	物料编码	物料编码	参照	120	ER-V		INV	存货编码	存货名称			Material Code		1776
 FIELD	query,detail	170	条码	条码	文本	140	E-H-		GFDA	mc	mc					7630
 FIELD	query,header	10	单据编号	单据编号	文本	140	-R-V		GFDA	mc	mc			Document Number		1764
 FIELD	query,header	20	单据日期	单据日期	日期	120	ER-V		GFDA	mc	mc			Document Date		1765
-FIELD	query,header	40	暂收单号	暂收单号	参照	140	E--V		GFDA	mc	mc					1766
+FIELD	query,header	40	暂收单号	暂收单号	参照	140	E--V		QC_RECV	单号	单号					1766
 FIELD	query,header	50	采购订单号	采购订单号	文本	150	E--V		GFDA	mc	mc			Purchase Order Number		7539
 FIELD	query,header	60	批次号	批次号	文本	160	---V									11462
 FIELD	query,header	70	供应商	供应商	参照	180	E--V		GFDA	mc	mc			Vendor		1767
@@ -260,7 +260,7 @@ FIELD	query,header	130	检验编号	检验编号	文本	130	E--V		GFDA	mc	mc				
 FIELD	query,header	150	执行标准	执行标准	文本	180	E--V		GFDA	mc	mc					7625
 FIELD	query,header	170	总结论	总结论	下拉框	100	E--V		GFDA	mc	mc		SELECT v FROM (VALUES (N'合格'),(N'不合格'),(N'让步接收')) AS t(v)			1771
 FIELD	query,header	240	单据状态	单据状态	文本	90	--H-		GFDA	mc	mc			Doc status		1773
--- config.json -> QC_INSP.config.json len=0
+-- config.json -> (空;运行时配置由 PanelConfigService 现算)
 COL	qc_insp	id	int(4)	NOT NULL	
 COL	qc_insp	单据编号	nvarchar(120)	NOT NULL	单号(面板字段列)
 COL	qc_insp	单据日期	nvarchar(40)	null	
@@ -415,7 +415,7 @@ FIELD	query,header	50	批次号	批次号	文本	160	---V									11464
 FIELD	query,header	60	供应商	供应商	参照	180	E--V		GFDA	mc	mc			Vendor		1788
 FIELD	query,header	80	仓库	仓库	参照	150	E--V		WH	仓库名称	仓库名称			Warehouse		7652
 FIELD	query,header	110	单据状态	单据状态	文本	90	---V							Doc status		1792
--- config.json -> QC_RETURN.config.json len=0
+-- config.json -> (空;运行时配置由 PanelConfigService 现算)
 COL	qc_return	id	int(4)	NOT NULL	
 COL	qc_return	单据编号	nvarchar(120)	NOT NULL	单号(面板字段列)
 COL	qc_return	单据日期	nvarchar(40)	null	
@@ -681,7 +681,7 @@ FIELD	query,header	170	来源单据	来源单据	文本	110	E-H-							Source do
 FIELD	query,header	190	来源单号	来源单号	文本	120	E-H-							Source no.		8814
 FIELD	query,header	210	销售订单号	销售订单号	文本	130	E-H-							Sales order no.		8815
 FIELD	query,header	290	批次号	批次号	文本	160	---V									11466
--- config.json -> PURCHASE_IN.config.json len=0
+-- config.json -> (空;运行时配置由 PanelConfigService 现算)
 COL	bd_purchase_in	id	int(4)	NOT NULL	
 COL	bd_purchase_in	单据日期	date(3)	null	
 COL	bd_purchase_in	单据编号	nvarchar(400)	null	单号(面板字段列)

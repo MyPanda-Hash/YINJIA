@@ -90,10 +90,15 @@ public class _DumpDocFields {
             try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     String cfg = rs.getString(1);
-                    Path f = out.resolve(panel + ".config.json");
-                    Files.writeString(f, cfg == null ? "" : cfg, StandardCharsets.UTF_8);
-                    sb.append("-- config.json -> ").append(f.getFileName()).append(" len=")
-                            .append(cfg == null ? 0 : cfg.length()).append('\n');
+                    // yj_panel.config 在当前库为空(运行时配置由 PanelConfigService 现算),
+                    // 空配置不落文件,免得留一堆 0 字节噪音。
+                    if (cfg != null && !cfg.isBlank()) {
+                        Path f = out.resolve(panel + ".config.json");
+                        Files.writeString(f, cfg, StandardCharsets.UTF_8);
+                        sb.append("-- config.json -> ").append(f.getFileName()).append(" len=").append(cfg.length()).append('\n');
+                    } else {
+                        sb.append("-- config.json -> (空;运行时配置由 PanelConfigService 现算)\n");
+                    }
                 }
             }
         }

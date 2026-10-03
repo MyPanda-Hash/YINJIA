@@ -1,0 +1,26 @@
+# 参照源修复清单(now=HSDZ_MES ← snapshot=HSDZ_MES_RESTORE)
+
+## QC_RECV —— 可在快照找到正确值(10)
+  query,detail     物料编码             | now=GFDA.mc       | snapshot=INV.存货编码 -> 存货名称
+  query,header     业务员              | now=GFDA.mc       | snapshot=EMP.员工名称 -> 员工名称
+  detail           采购单号             | now=GFDA.mc       | snapshot=PU_ORDER.单据编号 -> 单据编号
+  detail           物料名称             | now=GFDA.mc       | snapshot=INV.存货名称 -> 存货名称
+  header           部门               | now=GFDA.mc       | snapshot=DEPT.部门名称 -> 部门名称
+  query,header     仓库               | now=GFDA.mc       | snapshot=WH.仓库名称 -> 仓库名称
+  header           审核人              | now=GFDA.mc       | snapshot=EMP.员工名称 -> 员工名称
+  detail           订单号              | now=GFDA.mc       | snapshot=SO_ORDER.单据编号 -> 单据编号
+  detail           部门               | now=GFDA.mc       | snapshot=DEPT.部门名称 -> 部门名称
+  detail           品质复核人            | now=GFDA.mc       | snapshot=EMP.员工名称 -> 员工名称
+
+## QC_INSP —— 可在快照找到正确值(10)
+  query,detail     物料编码             | now=GFDA.mc       | snapshot=INV.存货编码 -> 存货名称
+  detail           物料名称             | now=GFDA.mc       | snapshot=INV.存货名称 -> 存货名称
+  header           业务员              | now=GFDA.mc       | snapshot=EMP.员工名称 -> 员工名称
+  query,header     暂收单号             | now=GFDA.mc       | snapshot=QC_RECV.单据编号 -> 单据编号
+  detail           单位               | now=GFDA.mc       | snapshot=UOM.计量单位名称 -> 计量单位名称
+  detail           计量单位             | now=GFDA.mc       | snapshot=UOM.计量单位名称 -> 计量单位名称
+  header           检验员              | now=GFDA.mc       | snapshot=EMP.员工名称 -> 员工名称
+  header           检验方案             | now=GFDA.mc       | snapshot=QC_PLAN.方案名称 -> 方案名称
+  detail           部门               | now=GFDA.mc       | snapshot=DEPT.部门名称 -> 部门名称
+  header           审核人              | now=GFDA.mc       | snapshot=EMP.员工名称 -> 员工名称
+

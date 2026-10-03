@@ -294,72 +294,94 @@ for (const k of checks) W(`| \`${k.code}\` | ${k.what} | ${k.ok ? '✅ 一致' :
 W(``)
 
 // ---------- 9. 已知问题 ----------
-W(`## 五、已知字段显示不一致(须先修,否则"显示一致"无从谈起)`)
+W(`## 五、参照字段显示来源核验`)
 W(``)
-W(`> 本节记录**当前库里已存在**、会影响字段显示的缺陷。它不属于"顺序",但同样属于"字段显示一致性",`)
-W(`> 核对本文档时必须一并处理。`)
+W(`> 参照型字段(\`dataType=参照\`)点开弹哪个档案、选中后回填哪个字段,全部由`)
+W(`> \`yj_field.ref_panel\` / \`ref_field\` / \`display_field\` 三列决定 —— 这三列错了,字段名和顺序都对、显示也是错的。`)
+W(`> 本节给出四单参照源的**当前状态**与**越界计数**(越界必须为 0),并留档一次已修事故。`)
 W(``)
-W(`### 5.1 送料暂收单 / 来料检验单:参照源被整体改写成 GFDA(供应商)`)
+W(`### 5.1 参照源状态汇总`)
 W(``)
-W(`**现象**:\`QC_RECV\` 与 \`QC_INSP\` 上**除供应商系列以外**的参照字段,其 \`ref_panel\` 也被写成了 \`GFDA\`(供应商档案)。`)
-W(`后果是点开 物料编码 弹出的是**供应商**列表,点开 业务员/检验员/审核人 也是供应商,点开 仓库/单位 还是供应商;`)
-W(`且 \`buildRefMap\` 会据此把 \`供应商名称/供应商编码\` 带回本字段 ⇒ **选一个物料可能把供应商写进单里**。`)
-W(``)
-W(`**影响面(实测计数)**`)
-W(``)
-W(`| 面板 | 参照型字段总数 | 其中指向 GFDA | 指向异常(非供应商语义却指 GFDA) |`)
+W(`| 面板 | 参照型字段 | 指向 \`GFDA\`(供应商) | **越界**(非供应商语义却指 GFDA) |`)
 W(`|---|---|---|---|`)
 for (const p of PANELS) {
   const rr = refRows(p.code)
   const g = rr.filter((r) => r.refPanel === 'GFDA')
   const s = rr.filter(SUSPECT)
-  W(`| ${rt[p.code].name} \`${p.code}\` | ${rr.length} | ${g.length} | ${s.length ? `**${s.length}**` : '—'} |`)
+  W(`| ${rt[p.code].name} \`${p.code}\` | ${rr.length} | ${g.length} | ${s.length ? `**${s.length}** ❌` : '0 ✅'} |`)
 }
 W(``)
-W(`**异常字段清单(应指向的档案按语义推断,修复时逐条确认)**`)
+W(`### 5.2 四单参照字段一览(逐字段指向)`)
 W(``)
-W(`| 面板 | 位置 | 字段 | 现指向 | 语义上应指向 |`)
-W(`|---|---|---|---|---|`)
-const GUESS = [
-  [/物料编码|存货编码|物料名称|存货名称/, '`INV`(商品档案)'],
-  [/业务员|检验员|经手人|审核人|品质复核人|检验人/, '`EMP`(职员档案)'],
-  [/部门/, '`DEPT`(部门档案)'],
-  [/仓库/, '`WH`(仓库档案)'],
-  [/^单位$|计量单位/, '`UOM`(计量单位)'],
-  [/采购单号|采购订单号/, '`PU_ORDER`(采购订单)'],
-  [/^订单号$/, '`SO_ORDER`(销售订单,原建单口径)'],
-  [/暂收单号/, '`QC_RECV`(送料暂收单)'],
-  [/检验编号|检验方案|执行标准|总结论/, '业务确认(专用检验主数据)'],
-]
+W(`| 面板 | 位置 | 字段 | 参照面板 | 参照字段 | 回填字段 |`)
+W(`|---|---|---|---|---|---|`)
 for (const p of PANELS) {
-  for (const r of refRows(p.code).filter(SUSPECT)) {
-    const g = GUESS.find(([re]) => re.test(r.label))
-    W(`| \`${p.code}\` | ${String(r.place).split(',').map((x) => ({ header: '表头', query: '查询', detail: '明细' })[x] || x).join('+')} | **${r.label}** | \`GFDA\`.${r.refField} → ${r.displayField} | ${g ? g[1] : '待确认'} |`)
+  for (const r of refRows(p.code)) {
+    W(`| \`${p.code}\` | ${String(r.place).split(',').map((x) => ({ header: '表头', query: '查询', detail: '明细' })[x] || x).join('+')} | **${r.label}** | ${r.refPanel || '⚠️ 未配'} | ${r.refField || '—'} | ${r.displayField || '—'} |`)
   }
 }
 W(``)
-W(`**根因(已定位,证据确凿)**`)
+W(`> \`ref_field\` 取的是**目标面板的字段名(label / \`dataName\`)**,不是物理列名 —— 例:参照 \`QC_RECV\` 要写`)
+W(`> \`单号\`(它的 label)而不是 \`单据编号\`(那只是物理列名),否则 \`row[refField]\` 取到 undefined、选择框留空。`)
 W(``)
-W(`\`tools/migrate-sl-supplier-ref.sql\` 在 2026-09-24 被追加了一行内注释,而该注释**把同一行后面原有的筛选条件整段吞掉**了:`)
+W(`### 5.3 事故留档:2026-09-24 参照源越界污染(2026-10-03 已修复)`)
+W(``)
+W(`**现象**:\`QC_RECV\`(送料暂收单)与 \`QC_INSP\`(来料检验单)上**除供应商系列以外**的参照字段,`)
+W(`\`ref_panel/ref_field/display_field\` 被整体刷成 \`GFDA\`(供应商)。点开 物料编码 弹供应商列表,`)
+W(`业务员/检验员/审核人/部门/仓库/单位/暂收单号 同样弹供应商;且 \`buildRefMap\` 会按供应商档案`)
+W(`把 \`供应商名称/供应商编码\` 带回本字段 ⇒ 选一个物料可能把供应商写进单里。`)
+W(``)
+W(`**根因**:\`tools/migrate-sl-supplier-ref.sql\` 在 2026-09-24 追加的行内注释,把该行后面原有的`)
+W(`\`AND label = N'供应商' AND place LIKE '%header%'\` 整段吞掉了:`)
 W(``)
 W('```sql')
-W(`-- 原文(2026-09-17,正确)`)
-W(`WHERE panel_code IN ('SL_RECV', 'QC_INSP') AND label = N'供应商' AND place LIKE '%header%'`)
-W(``)
-W(`-- 现状(2026-09-24 追加注释后,label/place 两个条件被注释吃掉)`)
+W(`-- 事故版(注释吞掉了同行后面的两个筛选条件)`)
 W(`WHERE panel_code IN ('SL_RECV', 'QC_INSP', 'QC_RECV')  -- 2026-09-24 补 QC_RECV(...) AND label = N'供应商' AND place LIKE '%header%'`)
 W(`  AND ISNULL(ref_panel, '') <> 'GFDA';`)
 W('```')
 W(``)
-W(`⇒ 实际执行的 \`WHERE\` 只剩「面板在列表里 且 参照不是 GFDA」,**两个面板的每一行字段都被刷成 GFDA**。`)
-W(`又因迁移链按**内容哈希**判定(DbSync),该文件字节一变就会被判为"未执行"而**重跑**,于是"改文件"和"重放"叠加成了这次污染。`)
+W(`⇒ 实际只剩「面板在列表里 且 参照不是 GFDA」,**两个面板每一行字段都被刷成 GFDA**。`)
+W(`又因迁移链按**内容哈希**判定(DbSync),该文件字节一变就被判为"未执行"而重跑,"改文件 + 重放"叠加成污染。`)
 W(``)
-W(`**修复口径(另立任务,勿混入本文档提交)**`)
+W(`**修复(20 处逐字段回正)**:取自**污染前快照** \`HSDZ_MES_RESTORE\`(2026-09-23 13:23 由`)
+W(`\`C:\\SQLBackup\\HSDZ_MES-for-test.bak\` 还原,早于事故一天),不用语义猜。`)
 W(``)
-W(`1. 先修 \`tools/migrate-sl-supplier-ref.sql\`:把被吞掉的 \`label\` / \`place\` 条件**换行还原**(注释另起一行),保住其幂等语义;`)
-W(`2. 新写 \`tools/migrate-qc-ref-repair.sql\`:按上表逐字段回正 \`ref_panel/ref_field/display_field\`(只动参照源,不动名称与顺序);`)
-W(`3. 两个账套各跑 \`DbSync\`,再重跑本文档生成脚本,确认 §5 清单清零、§四 仍全 ✅;`)
-W(`4. 界面上逐个参照字段点开确认弹的是对的档案。`)
+W(`| 面板 | 位置 | 字段 | 污染值 | 回正值 | 依据 |`)
+W(`|---|---|---|---|---|---|`)
+const FIXES = [
+  ['QC_RECV', 'query,detail', '物料编码', 'INV.存货编码 → 存货名称', '快照'],
+  ['QC_RECV', 'detail', '物料名称', 'INV.存货名称 → 存货名称', '快照'],
+  ['QC_RECV', 'query,header', '业务员', 'EMP.员工名称 → 员工名称', '快照'],
+  ['QC_RECV', 'detail', '采购单号', 'PU_ORDER.单据编号 → 单据编号', '快照'],
+  ['QC_RECV', 'detail', '订单号', 'SO_ORDER.单据编号 → 单据编号', '快照'],
+  ['QC_RECV', 'header + detail', '部门', 'DEPT.部门名称 → 部门名称', '快照'],
+  ['QC_RECV', 'query,header', '仓库', 'WH.仓库名称 → 仓库名称', '快照'],
+  ['QC_RECV', 'header', '审核人', 'EMP.员工名称 → 员工名称', '快照'],
+  ['QC_RECV', 'detail', '品质复核人', 'EMP.员工名称 → 员工名称', '快照'],
+  ['QC_INSP', 'query,detail', '物料编码', 'INV.存货编码 → 存货名称', '快照'],
+  ['QC_INSP', 'detail', '物料名称', 'INV.存货名称 → 存货名称', '快照'],
+  ['QC_INSP', 'header', '业务员', 'EMP.员工名称 → 员工名称', '快照'],
+  ['QC_INSP', 'header', '检验员', 'EMP.员工名称 → 员工名称', '快照'],
+  ['QC_INSP', 'header', '审核人', 'EMP.员工名称 → 员工名称', '快照'],
+  ['QC_INSP', 'header', '检验方案', 'QC_PLAN.方案名称 → 方案名称', '快照'],
+  ['QC_INSP', 'detail', '部门', 'DEPT.部门名称 → 部门名称', '快照'],
+  ['QC_INSP', 'detail', '单位', 'UOM.计量单位名称 → 计量单位名称', '快照'],
+  ['QC_INSP', 'detail', '计量单位', 'UOM.计量单位名称 → 计量单位名称', '快照'],
+  ['QC_INSP', 'query,header', '暂收单号', 'QC_RECV.单号 → 单号', '**修正快照值**:快照写的是 `单据编号`,而 QC_RECV 返回行键是 label「单号」,取不到值'],
+]
+for (const f of FIXES) W(`| \`${f[0]}\` | ${f[1]} | **${f[2]}** | \`GFDA\`.mc → mc | \`${f[3]}\` | ${f[4]} |`)
+W(``)
+W(`**防复发**:\`migrate-sl-supplier-ref.sql\` 已把被吞掉的筛选条件换行还原,并在每条 UPDATE 后加了`)
+W(`**行数守卫**(命中 > 10 行即 \`RAISERROR\` 回滚)—— 同类"WHERE 被截断"事故由静默写坏变为当场失败。`)
+W(``)
+W(`**教训(适用于所有迁移)**:`)
+W(``)
+W(`1. \`--\` 行内注释**永远不要写在 WHERE 条件同一行的中间**;`)
+W(`2. 批量 UPDATE 必须带**窄条件**与**行数守卫/断言**,并在脚本末尾自检"越界数 = 0";`)
+W(`3. 改任何 \`tools/*.sql\` 的字节都会让 DbSync 重跑它 —— 改前先确认脚本在**当前库**上重跑是幂等无害的。`)
+W(``)
+W(`> 取证脚本:\`tools/archive/_RefDiff.java\`(当前库 vs 快照逐字段比对)、`)
+W(`> \`tools/archive/_RefAudit.java\`(全库参照完整性体检)、\`tools/archive/_RefLeft.java\`(越界残留计数)。`)
 W(``)
 
 // ---------- 10. 红线 ----------
@@ -400,7 +422,7 @@ W(`| 后端在跑 | \`tools/scripts/start-prod.ps1\`(http://127.0.0.1:8090,幂�
 W(`| 数据库可连 | \`yinjia@127.0.0.1:1433\`;\`tools/lib/mssql-jdbc.jar\` |`)
 W(`| 迁移已同步 | \`tools/pull-sync.bat\`(git pull + DbSync 增量) |`)
 W(``)
-W(`### 8.2 三步核验命令(仓库根目录)`)
+W(`### 8.2 四步核验命令(仓库根目录)`)
 W(``)
 W('```powershell')
 W(`# ① 取库侧真源(yj_panel/yj_field + 物理列)`)
@@ -413,12 +435,17 @@ W(`powershell -ExecutionPolicy Bypass -File tools\\archive\\_dump-panel-config.p
 W(``)
 W(`# ③ 重新生成本文档(会顺带输出 §四 顺序核验)`)
 W(`node tools\\archive\\_gen-doc-fields-md.mjs`)
+W(``)
+W(`# ④ 参照源抽查(四单配置能取、参照弹对档案;对应 §五)`)
+W(`powershell -ExecutionPolicy Bypass -File tools\\archive\\_verify-ref-fix.ps1`)
 W('```')
 W(``)
 W(`生成后 \`git diff docs/development/采购链四单字段与显示字段.md\`:`)
 W(``)
 W(`- **无 diff** ⇒ 四单字段与显示顺序未变,更新不影响字段一致性;`)
 W(`- **有 diff** ⇒ 逐条核对差异是否是本次更新**有意为之**;是有意则连同迁移脚本一起提交,是意外则回退更新并排查。`)
+W(``)
+W(`第 ④ 步的 6 项参照抽查必须全 \`[PASS]\`;出现 \`[FAIL]\` ⇒ 参照源被改动,按 §五 口径核对。`)
 W(``)
 W(`### 8.3 界面走查清单(生成脚本证不了的部分)`)
 W(``)

@@ -2182,3 +2182,14 @@ migrate-inv-required-off-2026-10-03.sql
 #     ButtonService.syncInspFromSlRecv),生单与暂收保存都不再把仓库部门写进检验单。
 #   幂等(qc_insp 加 部门编码 nvarchar(100) NULL + 两行 header 字段 + 译名兜底),两账套均执行。 ——
 migrate-qcinsp-header-dept.sql
+# —— 2026-10-03 送料暂收单/来料检验单 参照源回正(修 2026-09-24 越界污染)—— 
+#   事故: migrate-sl-supplier-ref.sql 的行内注释吞掉了同行 label/place 筛选条件,
+#     迁移链按内容哈希重放后把 QC_RECV/QC_INSP **每一行字段**的 ref_panel/ref_field/display_field
+#     都刷成 GFDA(供应商) —— 物料编码/业务员/部门/仓库/单位/暂收单号 弹出供应商列表。
+#   本脚本: 按污染前快照 HSDZ_MES_RESTORE(2026-09-23 13:23)逐字段回正 20 处参照源
+#     (19 处照抄快照;「QC_INSP.暂收单号」快照原值 单据编号 取不到值——QC_RECV 返回行键是 label
+#      「单号」,故一并改为 单号)。只动参照源三列,字段名与顺序零变化。
+#     sl-supplier-ref 本身已还原筛选条件并加行数守卫(超 10 行即 RAISERROR)。
+#   取证: tools/archive/_RefDiff.java → _refdiff.out;两账套均需执行。
+#   (sl-supplier-ref 已在链上,见上方原登记处;其内容已改,DbSync 依内容哈希变化自动重跑)
+migrate-qc-ref-repair.sql
