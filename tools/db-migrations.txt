@@ -2149,3 +2149,18 @@ migrate-qc-return-tc-flag.sql
 #   验证:tools/archive/_CalcAudit.java 复跑,「有量有价但金额空」应由 128 归 0。
 #   幂等,两账套均执行。 ——
 migrate-calc-amount-fill-2026-10-05.sql
+
+# —— 2026-10-03 「商品」面板一次保存误删 3873 行的**数据恢复**(事故善后,非结构变更) ——
+#   现象:用户报「商品的数据怎么只剩一行了」。查证(探针 tools/archive/_probe-inv-cancel.sql):
+#     HSDZ_MES.dbo.bs_inv 共 3874 行,3873 行 asp_cancel='Y' 且 asp_user2='admin'、
+#     asp_time2 = 2026-10-03 19:07:10.163(同一批次);yj_archive_change_log id=8 同时刻记录
+#     {"removedRows":3873,"changedRows":1} —— 即「商品」面板带筛选保存时,前端把**子集**当整档提交,
+#     后端 saveArchive 按「缺席行=已删除」把未加载的 3873 行全软删了。
+#     ⚠ jdy-sync 按外部指纹跳过未变更商品 ⇒ **不会自愈**,必须人工恢复。
+#   本脚本:按「批次时间戳 + 操作人 + 当前为作废」三条件把那一批改回 asp_cancel='N';
+#     只动该批次(不连带复活用户此前有意删除的行),留痕(asp_user2/asp_time2)保留。
+#   幂等:恢复后不再满足条件,重跑影响 0 行。两个账套均已执行:
+#     HSDZ_MES 3874/3874 存活、作废 0;HSDZ_MES_TEST 本就 3859 全存活(快照早于事故),影响 0 行。
+#   防再犯(同任务代码侧):档案保存必须由客户端声明「档案全量=已加载整档」才做缺席行软删,
+#     否则只 upsert 提交行并回传「未全量跳过软删」提示 —— 见 ButtonService.saveArchive 方法头。 ——
+migrate-restore-inv-cancel-2026-10-03.sql
