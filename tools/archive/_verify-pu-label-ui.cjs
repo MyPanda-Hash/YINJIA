@@ -5,12 +5,12 @@
  * 并且用它生单后打印弹窗会显示已经生单。」按此重做后的界面行为:
  *   ① 采购订单 →「打印」→「打印材料码」→ 弹窗:批次号按公式预填且**可改**;
  *   ② 改号 + 填量 + 「确定并打印」→ 库里真的登记了那张打印单;
- *   ③ 「生单」→「生成送料暂收单」弹窗:**同一张明细表**里——
- *      · 原行「数量」已扣掉打印量(400→350),批次号列是「—」;
- *      · **多出一行**隔离行:批次号 = 材料码上的号、数量 = 打印量、状态 = 「已打印」;
- *   ④ 勾隔离行 → 顶部「批次号」自动**锁定**为该号(输入框 disabled);
+ *   ③ 「生单」→「生成送料暂收单」弹窗是**上下两层**:
+ *      · 上层 = 采购订单原行,「数量」已扣掉打印量(400→350),**没有**批次号列;
+ *      · 下层(.bsd-printed「已打印待生单」)= 隔离行:批次号 = 材料码上的号、打印数量 = 打印量、状态 = 「已打印」;
+ *   ④ 勾下层隔离行 → 顶部「批次号」自动**锁定**为该号(输入框 disabled);
  *   ⑤ 确定生单 → 暂收单批次号 = 材料码上的号;
- *   ⑥ **重新打开生单弹窗** → 该隔离行状态变「已生单」、剩余 0、**勾选框不可点**。
+ *   ⑥ **重新打开生单弹窗** → 该隔离行**仍在下层表里**,状态变「已生单」、未生单 0、**勾选框不可点**。
  *
  * 跑在**测试账套**(factory=YJ_TEST),自己造数据、跑完清理。
  * 用法:node tools/archive/_verify-pu-label-ui.cjs   (env: YJ_HEADLESS=0 可开有头)
@@ -141,21 +141,41 @@ async function main() {
       }
       return r
     }
-    /** 读生单明细表:列头 + 每行各列文本 + 勾选框是否禁用 */
-    const readSendTable = () => ev(`(function(){
-      const t = document.querySelector('.bsd .el-table')
+    /** 读**一张** el-table:列头 + 每行「列头 → 单元格文本」+ 勾选框是否禁用
+     *  (el-table 渲染成**两张独立 table**:表头一张、表体一张,所以要分开取 thead/tbody) */
+    const readTable = (sel) => ev(`(function(){
+      const t = document.querySelector(${JSON.stringify(sel)})
       if (!t) return null
       const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
-      const ix = function(n){ return ths.findIndex(function(x){ return x.indexOf(n) >= 0 }) }
-      const cols = { 数量: ix('数量'), 批次号: ix('批次号'), 状态: ix('状态'), 剩余: ix('剩余'), 可送上限: ix('可送上限') }
       const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
-      return JSON.stringify({ ths: ths, cols: cols, rows: trs.map(function(tr){
+      return JSON.stringify({ ths: ths, rows: trs.map(function(tr){
         const tds = Array.from(tr.querySelectorAll('td'))
-        const pick = function(i){ return i >= 0 && tds[i] ? tds[i].textContent.trim() : null }
-        return { 数量: pick(cols.数量), 批次号: pick(cols.批次号), 状态: pick(cols.状态),
-                 剩余: pick(cols.剩余), 可送上限: pick(cols.可送上限),
-                 禁勾: !!tr.querySelector('.el-checkbox.is-disabled') }
+        const o = {}
+        ths.forEach(function(h, i){ if (h && tds[i]) o[h] = tds[i].textContent.trim() })
+        o.禁勾 = !!tr.querySelector('.el-checkbox.is-disabled')
+        return o
       }) })
+    })()`)
+    /** 生单弹窗是**上下两层**:上层 .bsd 里的表 = 原行;下层 .bsd-printed 里的表 = 已打印隔离行 */
+    const readSendTable = async () => {
+      const [top, bottom] = await Promise.all([
+        readTable('.bsd > .el-table'),
+        readTable('.bsd-printed .el-table'),
+      ])
+      return JSON.stringify({ top: JSON.parse(top || 'null'), 下: JSON.parse(bottom || 'null') })
+    }
+    /** 在下层「已打印待生单」表里勾选指定批次号那一行 */
+    const checkPrintedRow = (batch) => ev(`(function(){
+      const t = document.querySelector('.bsd-printed .el-table')
+      if (!t) return 'no-table'
+      const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
+      const i = ths.findIndex(function(x){ return x.indexOf('批次号') >= 0 })
+      const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
+      const tr = trs.find(function(r){ const td = r.querySelectorAll('td')[i]; return td && td.textContent.trim() === ${JSON.stringify(batch)} })
+      if (!tr) return 'no-row'
+      const cbx = tr.querySelector('.el-checkbox')
+      if (!cbx) return 'no-checkbox'
+      cbx.click(); return 'checked'
     })()`)
 
     // ============ ① 打印材料码弹窗 ============
@@ -248,42 +268,40 @@ async function main() {
         `记录里打印量 ${PRINT_QTY}、已生单 0(还没生单;实得 ${JSON.stringify(R0)})`)
     }
 
-    // ============ ③ 生单弹窗:原行数量被切走 + 多出一行隔离行 ============
-    console.log('\n=== ③ 生单弹窗:原行数量扣掉打印量(400→350) + **多出一行**隔离行 ===')
+    // ============ ③ 生单弹窗(上下两层):上层原行数量被切走 + 下层多出一行隔离行 ============
+    console.log('\n=== ③ 生单弹窗:上层原行数量扣掉打印量 + 下层「已打印待生单」多出一行 ===')
     await openPanel('PU_ORDER', pick.no)
     info(`点击工具栏「生单」:${await clickToolbar('生单')}`)
     let T = null
     for (let i = 0; i < 40; i++) {
       await sleep(400)
       T = JSON.parse((await readSendTable()) || 'null')
-      if (T && T.rows && T.rows.length >= 2) break
+      if (T && T.top?.rows?.length >= 1 && T.下?.rows?.length >= 1) break
     }
-    ok(!!T && T.rows.length >= 2, `明细表里出现 ${T?.rows?.length} 行(原行 + 隔离行)`)
-    info(`列头:${JSON.stringify(T?.ths)}`)
-    info(`行:${JSON.stringify(T?.rows)}`)
-    const orderRow = (T?.rows || []).find((r) => N(r.批次号) === '—')
-    const isoRow = (T?.rows || []).find((r) => N(r.批次号) === MY_BATCH)
-    ok(!!orderRow, `原行在表里(批次号列 = —,状态列 = —)`)
+    const topRows = T?.top?.rows || []
+    const isoRows = T?.下?.rows || []
+    ok(!!T?.top && topRows.length >= 1, `上层(原行)表渲染出来:${topRows.length} 行`)
+    ok(!!T?.下 && isoRows.length >= 1, `下层(已打印待生单)表渲染出来:${isoRows.length} 行`)
+    info(`上层列头:${JSON.stringify(T?.top?.ths)}`)
+    info(`上层行:${JSON.stringify(topRows)}`)
+    info(`下层列头:${JSON.stringify(T?.下?.ths)}`)
+    info(`下层行:${JSON.stringify(isoRows)}`)
+    const orderRow = topRows[0]
+    const isoRow = isoRows.find((r) => N(r.批次号) === MY_BATCH)
+    ok(!(T?.top?.ths || []).some((h) => h.indexOf('批次号') >= 0),
+      `上层是**纯原行**:没有「批次号」列(列头 ${JSON.stringify(T?.top?.ths)})`)
     ok(Number(orderRow?.数量) === ORDER_QTY - PRINT_QTY,
-      `原行「数量」已扣掉打印量:${ORDER_QTY} → ${orderRow?.数量}(| 隔离出去 ${PRINT_QTY})`)
-    ok(!!isoRow, `**多出一行**隔离行,批次号 = 材料码上的号(${JSON.stringify(isoRow?.批次号)})`)
-    ok(Number(isoRow?.数量) === PRINT_QTY, `隔离行「数量」= 打印量 ${PRINT_QTY}(实得 ${isoRow?.数量})`)
+      `上层原行「数量」已扣掉打印量:${ORDER_QTY} → ${orderRow?.数量}(| 隔离出去 ${PRINT_QTY})`)
+    ok(!!isoRow, `下层**多出一行**隔离行,批次号 = 材料码上的号(${JSON.stringify(isoRow?.批次号)})`)
+    ok(Number(isoRow?.['打印数量']) === PRINT_QTY, `隔离行「打印数量」= ${PRINT_QTY}(实得 ${isoRow?.['打印数量']})`)
+    ok(Number(isoRow?.已生单) === 0 && Number(isoRow?.未生单) === PRINT_QTY,
+      `隔离行「已生单 0 / 未生单 ${PRINT_QTY}」(实得 ${isoRow?.已生单}/${isoRow?.未生单})`)
     ok(N(isoRow?.状态) === '已打印', `隔离行状态 = 「已打印」(实得 ${JSON.stringify(isoRow?.状态)})`)
-    ok(Number(isoRow?.剩余) === PRINT_QTY && Number(isoRow?.可送上限) === PRINT_QTY,
-      `隔离行「剩余/可送上限」= 未生单量 ${PRINT_QTY}(实得 ${isoRow?.剩余}/${isoRow?.可送上限})`)
+    ok(!isoRow?.禁勾, `隔离行此刻**可以勾**(还没生单:禁勾=${isoRow?.禁勾})`)
 
-    // ============ ④ 勾隔离行 → 批次号锁定 ============
-    console.log('\n=== ④ 勾隔离行 → 顶部批次号**锁定**为材料码批次号 ===')
-    await ev(`(function(){
-      const t = document.querySelector('.bsd .el-table')
-      const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
-      const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
-      const i = ths.findIndex(function(x){ return x.indexOf('批次号') >= 0 })
-      const tr = trs.find(function(r){ return r.querySelectorAll('td')[i].textContent.trim() === ${JSON.stringify(MY_BATCH)} })
-      const cbx = tr && tr.querySelector('.el-checkbox')
-      if (cbx) cbx.click()
-      return cbx ? 'checked' : 'no-checkbox'
-    })()`)
+    // ============ ④ 勾下层隔离行 → 顶部批次号锁定 ============
+    console.log('\n=== ④ 勾下层隔离行 → 顶部批次号**锁定**为材料码批次号 ===')
+    info(`勾选下层「${MY_BATCH}」那一行:${await checkPrintedRow(MY_BATCH)}`)
     await sleep(800)
     const locked = JSON.parse(await ev(`(function(){
       const i = document.querySelector('.bsd-batch-inp input')
@@ -304,21 +322,27 @@ async function main() {
     if (after?.no) created.push(['QC_RECV', N(after.no)])
 
     // ============ ⑥ 重新打开生单弹窗:隔离行标「已生单」且不可勾 ============
-    console.log('\n=== ⑥ 重新打开生单弹窗:隔离行标「已生单」、剩余 0、**不可再勾** ===')
+    console.log('\n=== ⑥ 重新打开生单弹窗:下层隔离行标「已生单」、未生单 0、**不可再勾** ===')
     await openPanel('PU_ORDER', pick.no)
     await clickToolbar('生单')
     let T2 = null
     for (let i = 0; i < 40; i++) {
       await sleep(400)
       T2 = JSON.parse((await readSendTable()) || 'null')
-      if (T2 && T2.rows && T2.rows.length >= 2) break
+      if (T2 && T2.下?.rows?.length >= 1) break
     }
-    info(`行:${JSON.stringify(T2?.rows)}`)
-    const iso2 = (T2?.rows || []).find((r) => N(r.批次号) === MY_BATCH)
+    info(`上层行:${JSON.stringify(T2?.top?.rows)}`)
+    info(`下层行:${JSON.stringify(T2?.下?.rows)}`)
+    const iso2 = (T2?.下?.rows || []).find((r) => N(r.批次号) === MY_BATCH)
     ok(!!iso2 && N(iso2.状态) === '已生单', `隔离行状态 = 「已生单」(实得 ${JSON.stringify(iso2?.状态)})`)
-    ok(Number(iso2?.剩余) === 0 && Number(iso2?.可送上限) === 0,
-      `隔离行剩余/可送上限归 0(实得 ${iso2?.剩余}/${iso2?.可送上限})`)
+    ok(Number(iso2?.未生单) === 0 && Number(iso2?.已生单) === PRINT_QTY,
+      `隔离行「已生单 ${PRINT_QTY} / 未生单 0」(实得 ${iso2?.已生单}/${iso2?.未生单})`)
     ok(iso2?.禁勾 === true, `隔离行的**勾选框已禁用**(禁勾=${iso2?.禁勾})`)
+    // 隔离行**仍然留在列表里**(不是消失):用户口径「用它生单后...仍显示,只是标已生单」
+    ok(!!iso2, `隔离行**没有消失**,还在下层表里(共 ${(T2?.下?.rows || []).length} 行)`)
+    // 上层原行数量仍是扣掉打印量后的值(打印量不会因为生单又回到原行)
+    ok(Number((T2?.top?.rows || [])[0]?.数量) === ORDER_QTY - PRINT_QTY,
+      `上层原行数量仍是被切走后的 ${ORDER_QTY - PRINT_QTY}(实得 ${(T2?.top?.rows || [])[0]?.数量})`)
     // 打印弹窗也显示"已经生单"
     await openPanel('PU_ORDER', pick.no)
     await clickToolbar('打印', '打印材料码')
