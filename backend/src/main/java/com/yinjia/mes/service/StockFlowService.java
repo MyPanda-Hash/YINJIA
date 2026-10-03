@@ -62,7 +62,8 @@ public class StockFlowService {
      * 写流水。
      *
      * @param rows 已由 StockLedgerService.loadRows 取好的单据行(键:code/lot/qty/price/金额/
-     *             name/spec/uom/rid/单据类型/单据日期/往来单位/经手人);仓库编码/仓库名称由
+     *             name/spec/uom/rid/单据类型/单据日期/往来单位/经手人/含税金额/税额;后两个键只有
+     *             采购入库·销售出库两段有,其余段落 NULL);仓库编码/仓库名称由
      *             StockLedgerService.resolveWh 解析后回填到行上 —— 流水的三键必须与 kucun 完全一致
      * @param forward true=审核(插入流水) / false=弃审(红冲)
      * @return 影响行数
@@ -159,6 +160,11 @@ public class StockFlowService {
         } else {
             m.put("单据金额", r.get("金额"));
         }
+        // 含税金额/税额(2026-10-03 任务 7):inh 与 outh 都加了这两列(见 migrate-stock-flow-tax-cols-2026-09-30.sql)。
+        // 两表同名同义 ⇒ 不放进上面的 if/else。口径由 loadRows 给:只有 采购入库/销售出库 两段取键,
+        // 其余 6 段与期初没有这两个键 ⇒ r.get 返回 null ⇒ 原样落 NULL(与 v_stock_movement 同口径)。
+        m.put("含税金额", r.get("含税金额"));
+        m.put("税额", r.get("税额"));
         return m;
     }
 

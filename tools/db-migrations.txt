@@ -1895,3 +1895,32 @@ migrate-stock-flow-opening-2026-09-30.sql
 #   成本表 31 行 / 收入金额合计 804,998.1700、无成本行的流水 0。
 #   幂等可重跑(先判后 DROP、列契约不变,下游视图按名解析无需重建),两个账套都执行。
 migrate-stock-movement-from-flow-2026-09-30.sql
+
+# —— 2026-10-03 任务 7:流水表补 含税金额/税额 + v_stock_movement 透传这两列 ——
+#   问题:任务 4 把 v_stock_movement 改成读流水表时,这两列按计划写成 CAST(NULL AS decimal(18,4))
+#   ⇒ 视图查得动但**恒为 NULL**;而库存台账面板 STOCK_LEDGER 这两个字段是 visible=1
+#   ⇒ 用户会看到两列永远空白,以为坏了(数据本来有:旧视图的 采购入库/销售出库 两段取过这两列)。
+#   改动:① inh/outh 各加 [含税金额]/[税额] decimal(18,4) NULL(带列级中文注明);
+#        ② 视图这两列由 NULL 改成**透传**(列契约 23 列的名字与顺序逐字不变,只换了值来源);
+#        ③ Java:StockLedgerService.loadRows 补这两键、StockFlowService.flowCols 写这两列。
+#   口径(逐列照抄旧视图 migrate-inv-report-fields.sql §1):
+#     采购入库 含税金额 = bl_purchase_in.含税金额;税额 = 含税金额 − ISNULL(金额,单价×实收数量)
+#       (**反推** —— 实测 sys.columns:该表只有 税率%/含税单价/金额/含税金额,没有 税额 列);
+#     销售出库 含税金额 = bl_sale_out.含税销售金额(**列名不同**);税额 = bl_sale_out.税额(原样列);
+#     其余 6 段(产成品入库/其他入库/委外入库/材料出库/其他出库/委外发料)与期初:
+#       那 6 张行表本身没有这两列,旧视图这几段也是 NULL ⇒ 保持 NULL,不臆造。
+#   ⚠ 加列走**新文件**:DbSync 按内容哈希判重跑,改动已提交的 migrate-stock-flow-tables-2026-09-30.sql
+#     一个字节就会让它被"重跑"(历史脚本重跑会撞 schema 演进,踩过)。
+#   ⚠ 新视图定义与 migrate-stock-movement-from-flow-2026-09-30.sql 的定义**逐字相同**,只把那 4 处
+#     `CAST(NULL AS decimal(18,4))` 换成透传 ⇒ 两份口径必须一致,改动请同步(双方头部有交叉引用)。
+#     ⚠ 加列必须**先**于视图改动(视图引用新列),且本脚本在 DROP VIEW 前先判四列是否就位
+#       (否则视图删了建不回来,下游三个视图会直接报对象不存在)。
+#   ⚠ inh/outh 上有**过滤索引** ⇒ 脚本首行显式 SET QUOTED_IDENTIFIER ON(否则 ALTER TABLE 报 1934)。
+#   自检:4 个新列就位 + 视图仍 23 列 + **列名顺序逐字**等于契约串 + 视图定义里已无 `NULL AS decimal(18,4)`;
+#   PRINT 走 warning 码 0,**DbSync 看不到**,要看数字用配套探针(先 dry 后 check):
+#     java '-Dstdout.encoding=UTF-8' -Dbefore=<基线文件> -cp tools\lib\mssql-jdbc.jar
+#       tools\archive\_verify-stock-movement-2026-09-30.java <库名> dry tools/migrate-stock-flow-tax-cols-2026-09-30.sql
+#   端到端:e2e 探针 tools\archive\_probe-stock-flow-tax.cjs(测试账套造 采购入库/销售出库 各一张,
+#   审核后查 流水两列/视图/面板口径/勾稽,跑完清理干净)。
+#   幂等可重跑(先判后加列、先判后 DROP VIEW,下游视图按名解析无需重建),两个账套都执行。
+migrate-stock-flow-tax-cols-2026-09-30.sql

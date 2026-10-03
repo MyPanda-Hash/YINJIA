@@ -159,9 +159,16 @@ public class StockLedgerService {
     /**
      * 取单据明细行。返回的键除结存(kucun)要用的 code/lot/lotAlt/qty/price 与仓库三列之外,
      * **还带流水表(inh/outh)要用的键**:rid(来源行 id,幂等键的一半)、金额、name/spec/uom(物料名称/
-     * 规格型号/计量单位)、单据类型、单据日期、往来单位、经手人 —— 取值口径逐列照抄 v_stock_movement
-     * (该视图是这几列的对外契约,任务 4 改它读流水后报表才不会漂)。
+     * 规格型号/计量单位)、单据类型、单据日期、往来单位、经手人、含税金额/税额 —— 取值口径逐列照抄
+     * v_stock_movement(该视图是这几列的对外契约,任务 4 改它读流水后报表才不会漂)。
      * 仓库**不在这里解析**:流水要写的是 kucun 的同款档案编码,由 {@link #resolveWh} 解析后回填。
+     *
+     * 含税金额/税额(2026-10-03,任务 7):**只有采购入库 / 销售出库两段有值**,取值口径与旧视图
+     * (tools/migrate-inv-report-fields.sql §1)逐字相同:
+     *   · 采购入库:含税金额 = bl_purchase_in.含税金额;
+     *              税额 = 含税金额 − ISNULL(金额, 单价×实收数量) —— **反推**(该表没有 税额 列);
+     *   · 销售出库:含税金额 = bl_sale_out.含税销售金额(列名不同);税额 = bl_sale_out.税额;
+     *   · 其余 6 段(那 6 张行表本身没有这两列)与期初:不取键 ⇒ 流水落 NULL(与旧视图同口径,不臆造)。
      */
     private List<Map<String, Object>> loadRows(String panelCode, String no) {
         // 仓库取值口径(2026-09-23):采购入库/销售出库的**明细仓库**由「参照选仓库」写入
@@ -184,6 +191,10 @@ public class StockLedgerService {
                             + " l.[实收数量] AS qty, l.[单价] AS price,"
                             + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
                             + " ISNULL(l.[金额], l.[单价] * l.[实收数量]) AS 金额,"
+                            // 含税金额/税额(2026-10-03 任务 7):口径照抄旧视图采购入库段 ——
+                            // 该段 税额 是**反推**(bl_purchase_in 没有 税额 列,实测 sys.columns)
+                            + " l.[含税金额] AS [含税金额],"
+                            + " CAST(l.[含税金额] - ISNULL(l.[金额], l.[单价] * l.[实收数量]) AS decimal(18,4)) AS [税额],"
                             + " N'采购入库单' AS [单据类型], h.[单据日期] AS [单据日期], h.[供应商] AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_purchase_in l LEFT JOIN bd_purchase_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
@@ -220,6 +231,9 @@ public class StockLedgerService {
                             + " l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
                             + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
                             + " ISNULL(l.[销售金额], l.[售价] * l.[数量]) AS 金额,"
+                            // 含税金额/税额(2026-10-03 任务 7):口径照抄旧视图销售出库段 ——
+                            // 该段的含税列名是 含税销售金额(不是 含税金额),税额是原样列
+                            + " l.[含税销售金额] AS [含税金额], l.[税额] AS [税额],"
                             + " N'销售出库单' AS [单据类型], h.[单据日期] AS [单据日期], h.[客户] AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_sale_out l LEFT JOIN bd_sale_out h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
