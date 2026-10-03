@@ -1,0 +1,46 @@
+== 待删表 244 张 ==
+-- C_仅下架面板挂靠 (29):
+   dm_ywy pr_asm_daily pr_asm_incoming pr_asm_return pr_black_test pr_cut_daily pr_demold_qc pr_efficiency pr_flow_card pr_form_daily pr_form_first pr_maintenance pr_mat_inspect pr_mix_blend pr_mix_check pr_mix_confirm pr_mix_daily pr_mix_feed pr_mix_granule pr_mix_process pr_no_black pr_pack_confirm pr_patrol_qc pr_qc_control pr_scrap pr_sinter_qc wo_line_stock wo_material_pick wo_stage_report
+-- D_有数据无引用 (67):
+   Invoice OdSample_bs OdSample_wl OrderSample area_city area_code area_country area_district area_province bacord bxsq chdcmx chsq chtz computer dh dm_fylb dm_gfjj dm_gx dm_gz dm_jjlb dm_khgjjl dm_khlxr dm_khsj dm_khzl dm_ks dm_langue dm_py dm_style dm_tax dm_wzlb dm_xl dm_yh dm_ywylb dm_zjfl dm_zw flash gscs gzzc kjkm kmye kqewm kqjjr kqyc odprice_bs odprice_bt permission pjjl pzfk qkd s_SelWhere s_commdata s_error s_remoteprint s_repformat s_roles s_rzxz s_screen s_sys s_xtcs s_ycdy setdate sfkcz sfkmx users wbgd xsdh
+-- E_空表_MES未接线 (20):
+   rd_alkaline rd_antibact rd_asm_bom rd_asm_proc rd_dom_test rd_drop_prec rd_equip_use rd_filter_eff rd_insp_plan rd_instr_use rd_mineral rd_mold_formula rd_mold_proc rd_product_info rd_ro_protect rd_scale rd_soak rd_spec_doc rd_spike_water wo_report
+-- F_空表_遗留未用 (62):
+   address cbhs cp_barcode cpfpmx dm_dbzsd dm_myjj dm_sys dm_wz dm_wzbacord dm_wzddw dm_wzsx dorder fgjl fgjl_ls fgjlhz from_excel gdzc gssp gszl gzb gzffjl huiyuan huiyuan_hz jgsd jrhz jrhz_ls jyd jyd_bs khts kjpz kjpz_bs kqbc kqqjd kqsj kqsj_ls mate_jtsh order1 pandian pd_history pd_zzp pd_zzphistory pd_zzprq pjjl_sz s_cookie s_fromexcel s_otherfunc s_phrase s_repbody s_repdraw s_repheader s_repinfo scjd scjd_ls scpc scrb scrb_bs sczxd wlxx xjjl xjjl_sz ysfk zc
+-- X_备份临时 (66):
+   RENAME_20260911_173159_rd_approval_bak_20260911 RENAME_20260911_173159_rd_approval_detail_bak_20260911 RENAME_20260911_173159_rd_dom_test_detail_bak_20260911 RENAME_20260911_173159_rd_dom_test_head_bak_20260911 RENAME_20260911_173159_rd_equip_use_detail_bak_20260911 RENAME_20260911_173159_rd_equip_use_head_bak_20260911 RENAME_20260911_173159_rd_insp_plan_detail_bak_20260911 RENAME_20260911_173159_rd_insp_plan_head_bak_20260911 RENAME_20260911_173159_rd_instr_use_detail_bak_20260911 RENAME_20260911_173159_rd_instr_use_head_bak_20260911 RENAME_20260911_173159_rd_plan_bak_20260911 RENAME_20260911_173159_rd_plan_detail_bak_20260911 RENAME_20260911_173159_rd_prod_info_detail_bak_20260911 RENAME_20260911_173159_rd_prod_info_head_bak_20260911 RENAME_20260911_173159_rd_spike_water_detail_bak_20260911 RENAME_20260911_173159_rd_spike_water_head_bak_20260911 RENAME_20260911_173159_yj_doc_modify_log_bak_20260911 RENAME_20260911_173159_yj_doc_status_bak_20260911 RENAME_20260911_173205_rd_approval_bak_20260911 RENAME_20260911_173205_rd_approval_detail_bak_20260911 RENAME_20260911_173205_rd_dom_test_detail_bak_20260911 RENAME_20260911_173205_rd_dom_test_head_bak_20260911 RENAME_20260911_173205_rd_equip_use_detail_bak_20260911 RENAME_20260911_173205_rd_equip_use_head_bak_20260911 RENAME_20260911_173205_rd_insp_plan_detail_bak_20260911 RENAME_20260911_173205_rd_insp_plan_head_bak_20260911 RENAME_20260911_173205_rd_instr_use_detail_bak_20260911 RENAME_20260911_173205_rd_instr_use_head_bak_20260911 RENAME_20260911_173205_rd_plan_bak_20260911 RENAME_20260911_173205_rd_plan_detail_bak_20260911 RENAME_20260911_173205_rd_prod_info_detail_bak_20260911 RENAME_20260911_173205_rd_prod_info_head_bak_20260911 RENAME_20260911_173205_rd_spike_water_detail_bak_20260911 RENAME_20260911_173205_rd_spike_water_head_bak_20260911 RENAME_20260911_173205_yj_doc_modify_log_bak_20260911 RENAME_20260911_173205_yj_doc_status_bak_20260911 RENAME_20260911_213754_yj_doc_status_bak_20260911 log rd_approval_bak_20260911 rd_approval_detail_bak_20260911 rd_asm_bom_detail_bak_20260911 rd_asm_bom_head_bak_20260911 rd_dom_test_detail_bak_20260911 rd_dom_test_head_bak_20260911 rd_equip_use_detail_bak_20260911 rd_equip_use_head_bak_20260911 rd_insp_plan_detail_bak_20260911 rd_insp_plan_head_bak_20260911 rd_instr_use_detail_bak_20260911 rd_instr_use_head_bak_20260911 rd_mold_formula_detail_bak_20260911 rd_mold_formula_head_bak_20260911 rd_plan_bak_20260911 rd_plan_detail_bak_20260911 rd_prod_info_detail_bak_20260911 rd_prod_info_head_bak_20260911 rd_progress_detail_bak_20260918 rd_spike_water_detail_bak_20260911 rd_spike_water_head_bak_20260911 t1 t2 tmp_excel tmp_report tmp_report_head yj_doc_modify_log_bak_20260911 yj_doc_status_bak_20260911
+
+== 连带清理面板 29 个 ==
+   PR_ASM_DAILY	组装日报表	[doc]	pr_asm_daily+pr_asm_daily
+   PR_ASM_INCOMING	组装来料检查	[doc]	pr_asm_incoming+pr_asm_incoming
+   PR_ASM_RETURN	不良退货记录	[doc]	pr_asm_return+pr_asm_return
+   PR_BLACK_TEST	黑水测试记录	[doc]	pr_black_test+pr_black_test
+   PR_CUT_DAILY	切炭日报表	[doc]	pr_cut_daily+pr_cut_daily
+   PR_DEMOLD_QC	脱模检验记录	[doc]	pr_demold_qc+pr_demold_qc
+   PR_EFFICIENCY	人均效率表	[doc]	pr_efficiency+pr_efficiency
+   PR_FLOW_CARD	产品流动标识卡	[doc]	pr_flow_card+pr_flow_card
+   PR_FORM_DAILY	成型日报表	[doc]	pr_form_daily+pr_form_daily
+   PR_FORM_FIRST	成型首件记录	[doc]	pr_form_first+pr_form_first
+   PR_MAINTENANCE	预防性保养计划	[doc]	pr_maintenance+pr_maintenance
+   PR_MAT_INSPECT	材料进厂检查	[doc]	pr_mat_inspect+pr_mat_inspect
+   PR_MIX_BLEND	物料混合记录	[doc]	pr_mix_blend+pr_mix_blend
+   PR_MIX_CHECK	设备点检表	[doc]	pr_mix_check+pr_mix_check
+   PR_MIX_CONFIRM	投料确认表	[doc]	pr_mix_confirm+pr_mix_confirm
+   PR_MIX_DAILY	混料日报表	[doc]	pr_mix_daily+pr_mix_daily
+   PR_MIX_FEED	阻垢投料单	[doc]	pr_mix_feed+pr_mix_feed
+   PR_MIX_GRANULE	造粒过程控制	[doc]	pr_mix_granule+pr_mix_granule
+   PR_MIX_PROCESS	阻垢工序控制	[doc]	pr_mix_process+pr_mix_process
+   PR_NO_BLACK	无黑处理登记	[doc]	pr_no_black+pr_no_black
+   PR_PACK_CONFIRM	封箱数量确认	[doc]	pr_pack_confirm+pr_pack_confirm
+   PR_PATROL_QC	巡线抽检记录	[doc]	pr_patrol_qc+pr_patrol_qc
+   PR_QC_CONTROL	品质管控点要求	[doc]	pr_qc_control+pr_qc_control
+   PR_SCRAP	物料产品报废单	[doc]	pr_scrap+pr_scrap
+   PR_SINTER_QC	烧结制程检验	[doc]	pr_sinter_qc+pr_sinter_qc
+   WO_LINE	线边库存	[flat]	wo_line_stock
+   WO_PICK	工序领料	[flat]	wo_material_pick
+   WO_STAGE	工序报工	[flat]	wo_stage_report
+   YWYDA	业务员档案	[archive]	dm_ywy
+
+== 例外保留 yj_schema_log, erp_imp_row, dm_key ==
+
+== 保留对象合计 209 张表(其中视图 0) ==

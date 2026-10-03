@@ -1,4 +1,4 @@
-﻿# trigger-mt.ps1
+# trigger-mt.ps1
 # 批量机器翻译:把全部面板名/字段标签(中文)补齐到 en + 8 种语言(yj_translation, source='mt')。
 # 步骤:
 #   1) 查询 yj_panel.panel_name + yj_field.label 的全集(仅含中文者)作为 keys 真源
@@ -29,21 +29,35 @@ foreach ($loc in $locales) {
 }
 
 # ---- scope 拷贝:ui -> field / panel ----
+# ⚠ 2026-09-28 修复:同一中文键可能同时存在于 ui 与 panel 两个 scope 且文本不同,
+#   SELECT DISTINCT 会留下两行 ⇒ 撞 yj_translation 的 uq_translation(scope,ref_key,locale),
+#   整条 INSERT 被回滚(症状:面板名补齐了、字段标签一条没进)。改为按 (ref_key,locale)
+#   用 ROW_NUMBER 取一行,优先级 ui(机翻原文) > field/panel(既有拷贝)。
 $sql = @"
 SET NOCOUNT ON;
 INSERT INTO yj_translation (scope, ref_key, locale, text, source, created_at, updated_at)
-SELECT DISTINCT 'field', s.ref_key, s.locale, s.text, 'mt', SYSDATETIME(), SYSDATETIME()
-FROM yj_translation s
-WHERE s.scope IN ('ui','panel') AND s.locale IN ('en','ja','ko','de','es','fr','ru','th','vi','zh-TW')
-  AND EXISTS (SELECT 1 FROM yj_field f WHERE f.label = s.ref_key)
-  AND NOT EXISTS (SELECT 1 FROM yj_translation f WHERE f.scope='field' AND f.locale=s.locale AND f.ref_key=s.ref_key);
+SELECT 'field', x.ref_key, x.locale, x.text, 'mt', SYSDATETIME(), SYSDATETIME()
+FROM (
+  SELECT s.ref_key, s.locale, s.text,
+         ROW_NUMBER() OVER (PARTITION BY s.ref_key, s.locale
+                            ORDER BY CASE s.scope WHEN 'ui' THEN 0 WHEN 'field' THEN 1 ELSE 2 END, s.id) AS rn
+  FROM yj_translation s
+  WHERE s.scope IN ('ui','panel') AND s.locale IN ('en','ja','ko','de','es','fr','ru','th','vi','zh-TW')
+    AND EXISTS (SELECT 1 FROM yj_field f WHERE f.label = s.ref_key)
+    AND NOT EXISTS (SELECT 1 FROM yj_translation t WHERE t.scope='field' AND t.locale=s.locale AND t.ref_key=s.ref_key)
+) x WHERE x.rn = 1;
 
 INSERT INTO yj_translation (scope, ref_key, locale, text, source, created_at, updated_at)
-SELECT DISTINCT 'panel', s.ref_key, s.locale, s.text, 'mt', SYSDATETIME(), SYSDATETIME()
-FROM yj_translation s
-WHERE s.scope IN ('ui','field') AND s.locale IN ('en','ja','ko','de','es','fr','ru','th','vi','zh-TW')
-  AND EXISTS (SELECT 1 FROM yj_panel p WHERE p.panel_name = s.ref_key)
-  AND NOT EXISTS (SELECT 1 FROM yj_translation f WHERE f.scope='panel' AND f.locale=s.locale AND f.ref_key=s.ref_key);
+SELECT 'panel', x.ref_key, x.locale, x.text, 'mt', SYSDATETIME(), SYSDATETIME()
+FROM (
+  SELECT s.ref_key, s.locale, s.text,
+         ROW_NUMBER() OVER (PARTITION BY s.ref_key, s.locale
+                            ORDER BY CASE s.scope WHEN 'ui' THEN 0 WHEN 'field' THEN 1 ELSE 2 END, s.id) AS rn
+  FROM yj_translation s
+  WHERE s.scope IN ('ui','field') AND s.locale IN ('en','ja','ko','de','es','fr','ru','th','vi','zh-TW')
+    AND EXISTS (SELECT 1 FROM yj_panel p WHERE p.panel_name = s.ref_key)
+    AND NOT EXISTS (SELECT 1 FROM yj_translation t WHERE t.scope='panel' AND t.locale=s.locale AND t.ref_key=s.ref_key)
+) x WHERE x.rn = 1;
 
 SELECT locale,
        SUM(CASE WHEN scope='field' THEN 1 ELSE 0 END) AS field_rows,

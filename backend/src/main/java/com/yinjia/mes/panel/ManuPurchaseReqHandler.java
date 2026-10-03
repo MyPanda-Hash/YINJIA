@@ -19,7 +19,7 @@ import java.util.Map;
  * <p>期望流程:销售下单 → 生产审核(工单排产) → 系统自动计算(订单需求 − 库存)→ 生成采购申请推给采购。
  * 落地:MANU_ORDER「更多→生成采购申请」:按产品默认 BOM × 排产数量 计算需用,
  * 逐子件扣减 kucun 结余(yl,全部仓库),仅对**缺口>0** 的子件生成 采购申请(PU_REQ)草稿行,
- * 写来源(生产加工单/合同号)+ 站内消息推给采购(能看 PU_ORDER 的角色用户 ∪ 管理员)。
+ * 写来源(生产工单/合同号)+ 站内消息推给采购(能看 PU_ORDER 的角色用户 ∪ 管理员)。
  *
  * <p>受限说明(纪要自述):泵的碳棒物料 BOM 不完整(碳棒工艺用料杂)——无默认 BOM 的产品给出明确指引,
  * 不自动计算,请手工建采购申请;BOM 补齐后同按钮即可自动结转。幂等:该工单已有 ACTIVE 结转占用时拒绝,
@@ -64,7 +64,7 @@ public class ManuPurchaseReqHandler implements PanelActionHandler {
                         + " (SELECT TOP 1 l.[排产数量] FROM bl_manu_order l WHERE l.[合同号]=h.[合同号]"
                         + "   AND ISNULL(l.asp_cancel,'N')<>'Y' ORDER BY l.[id]) AS 排产数量"
                         + " FROM bd_manu_order h WHERE h.[合同号]=? AND ISNULL(h.asp_cancel,'N')<>'Y'", no);
-        if (heads.isEmpty()) throw new IllegalStateException("生产加工单不存在:" + no);
+        if (heads.isEmpty()) throw new IllegalStateException("生产工单不存在:" + no);
         Map<String, Object> mo = heads.get(0);
         String item = str(mo.get("产品编码"));
         double qty = num(mo.get("排产数量"));
@@ -116,7 +116,7 @@ public class ManuPurchaseReqHandler implements PanelActionHandler {
             head.put("需求日期", String.valueOf(mo.get("预完工日")).substring(0, 10));
         }
         if (!String.valueOf(mo.get("销售订单号")).isBlank()) head.put("销售订单号", mo.get("销售订单号"));
-        head.put("来源单据", "生产加工单");
+        head.put("来源单据", "生产工单");
         head.put("来源单号", no);
         head.put("备注", "工单结转:" + no + " " + item + " 排产 " + qty + ",按 BOM 需求减库存生成缺口行");
 

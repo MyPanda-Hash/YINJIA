@@ -35,3 +35,11 @@ SELECT panel_code, ref_field, display_field FROM yj_field WHERE label = N'供应
 GO
 PRINT N'migrate-sl-chain-fixes 完成';
 GO
+
+GO
+-- 2026-09-24 对齐:qc_insp_detail 补 [单位] 列(QcCatalogService.loadInspRows 依赖——数量=送检数量+单位,单位缺失退回计量单位)
+-- 远程库已有此列(4ab7039 探针 _q_qcinsp_cols.out 实证)但未入迁移链,本地库缺导致检验目录联动 500(Invalid column name '单位')
+IF COL_LENGTH('dbo.qc_insp_detail', N'单位') IS NULL ALTER TABLE dbo.qc_insp_detail ADD [单位] nvarchar(50) NULL;
+GO
+-- 回填须独立批次:同批编译时 UPDATE 引用未建列会连坐整批拒执行(2026-09-24 实证)
+UPDATE dbo.qc_insp_detail SET [单位] = [计量单位] WHERE [单位] IS NULL AND [计量单位] IS NOT NULL;

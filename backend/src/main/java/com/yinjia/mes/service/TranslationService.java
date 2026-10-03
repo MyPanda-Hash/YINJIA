@@ -146,6 +146,19 @@ public class TranslationService {
     }
 
     /**
+     * 外部直写 yj_translation 后的缓存失效(如动态字段绑定/退绑在 PanelConfigService 里直插译名):
+     * 把已加载语言的缓存全部作废,下次请求按库重读。多失效一个语言的代价只是一次重载,安全。
+     */
+    public void invalidateLoadedLocales() {
+        for (String ck : new ArrayList<>(loadedAtByLocale.keySet())) {
+            Map<String, Map<String, Map<String, String>>> next = new HashMap<>(cache);
+            next.remove(ck);
+            this.cache = next;
+            loadedAtByLocale.remove(ck);
+        }
+    }
+
+    /**
      * 译名缓存键 = **账套 + 语言**。
      * ⚠ 不能只用语言:`yj_translation` 是**分账套**的(ADR-0003 两账套,各库各一份译名),
      * 只按语言做键会让两个账套共用同一份缓存 —— 「谁先刷新谁说了算」,

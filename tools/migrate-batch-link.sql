@@ -134,12 +134,15 @@ GO
 
 -- ══════════════════════ 5. yj_field 注册 批次号 ══════════════════════
 -- 头:place=query,header(紧跟在「采购订单号」之后);行:place=detail(紧跟「采购订单行号」之后)
-DELETE FROM yj_field WHERE col_name = N'批次号' AND panel_code IN ('SL_RECV','QC_INSP','QC_RETURN','PURCHASE_IN')
+-- 2026-09-24 修:面板编码 SL_RECV 已于 2026-09-20 改名 QC_RECV(送料暂收单),原注册挂在**已不存在的
+-- SL_RECV** 上 → 现用面板看不到「批次号」字段(实测 QC_RECV 0 行、SL_RECV 2 行孤儿)。本跳按现用编码
+-- QC_RECV 注册,并在 DELETE 里连孤儿 SL_RECV 一起清掉(死面板编码不再登记)。
+DELETE FROM yj_field WHERE col_name = N'批次号' AND panel_code IN ('SL_RECV', 'QC_RECV','QC_INSP','QC_RETURN','PURCHASE_IN')
   AND (place = N'query,header' OR place = N'detail');
 GO
 INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES
-('SL_RECV',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header', 125, 160, 1, 0, 0, 1),
-('SL_RECV',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       225, 150, 1, 0, 0, 1),
+('QC_RECV',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header', 125, 160, 1, 0, 0, 1),
+('QC_RECV',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       225, 150, 1, 0, 0, 1),
 ('QC_INSP',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header',  36, 160, 1, 0, 0, 1),
 ('QC_INSP',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       210, 150, 1, 0, 0, 1),
 ('QC_RETURN',    N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header',  36, 160, 1, 0, 0, 1),
@@ -162,7 +165,7 @@ SELECT
   (SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME IN ('yj_app_setting','yj_doc_batch')) AS 新表数,
   (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME IN ('sl_recv','sl_recv_detail','qc_insp','qc_insp_detail','bd_purchase_in','bl_purchase_in','qc_return','qc_return_detail') AND COLUMN_NAME=N'批次号') AS 批次号列数,
   (SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='form_flow_link' AND COLUMN_NAME='batch_no') AS link批次列,
-  (SELECT COUNT(*) FROM yj_field WHERE col_name=N'批次号' AND panel_code IN ('SL_RECV','QC_INSP','QC_RETURN','PURCHASE_IN')) AS 字段行数,
+  (SELECT COUNT(*) FROM yj_field WHERE col_name=N'批次号' AND panel_code IN ('SL_RECV', 'QC_RECV','QC_INSP','QC_RETURN','PURCHASE_IN')) AS 字段行数,
   (SELECT COUNT(*) FROM yj_translation WHERE scope='field' AND ref_key=N'批次号') AS 译名数,
   (SELECT setting_value FROM yj_app_setting WHERE setting_key=N'receive_over_ratio') AS 超送比例;
 GO

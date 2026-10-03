@@ -1,0 +1,2 @@
+SET NOCOUNT ON
+SELECT DISTINCT name FROM sys.columns

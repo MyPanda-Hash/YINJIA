@@ -150,6 +150,17 @@ function tableBlock(rows) {
 const date = new Date().toISOString().slice(0, 10);
 const nTables = tables.filter((t) => t.kind === 'TABLE').length;
 const nViews = tables.filter((t) => t.kind === 'VIEW').length;
+// 在册台账(tools/db-inuse-tables.txt):§0.1 的数字与它同源,避免文档与台账漂移
+const inuseFile = path.join(ROOT, 'tools', 'db-inuse-tables.txt');
+let inuseTotal = 0, inuseKept = 0;
+if (fs.existsSync(inuseFile)) {
+  const lines = fs.readFileSync(inuseFile, 'utf8').split(/\r?\n/);
+  const keptIdx = lines.findIndex((l) => l.startsWith('# ---- 例外保留'));
+  lines.forEach((l, i) => {
+    if (!l.startsWith('table:')) return;
+    if (keptIdx >= 0 && i > keptIdx) inuseKept++; else inuseTotal++;
+  });
+}
 
 const doc = [];
 doc.push('# 数据库表清单(YINJIA-MES)');
@@ -159,7 +170,7 @@ doc.push('|---|---|');
 doc.push('| 文档类型 | 开发规范·数据库表清单 |');
 doc.push('| 适用场景 | 新增/修改表、查表结构、判断「这张表能不能动」 |');
 doc.push('| 维护状态 | 生效 |');
-doc.push('| 数据口径 | 正式库 `HSDZ_MES`（测试库 `HSDZ_MES_TEST` 结构一致，见 [环境与数据库](环境与数据库.md)） |');
+doc.push('| 数据口径 | 正式库 `HSDZ_MES`（本文档由它生成）；测试库 `HSDZ_MES_TEST` 是它的**快照副本**，可能含实验性额外列 —— 同构判定与陷阱见 [环境与数据库](环境与数据库.md) |');
 doc.push('| 数据来源 | `sys.tables` / `sys.views` + 扩展属性 `MS_Description` + `yj_panel` 面板对照 |');
 doc.push(`| 生成日期 | ${date} |`);
 doc.push(`| 覆盖范围 | ${nTables} 张表 + ${nViews} 个视图（含遗留与备份表，全部列出不留盲区） |`);
@@ -179,7 +190,20 @@ doc.push('| `rd_` | 研发管理模块单据 | 研发管理 | `*_head`+`*_detail
 doc.push('| `qc_` | 品质管理单据 | 品质管理 | 头行成对 |');
 doc.push('| `wo_` | 生产执行（工单/报工/进度） | 生产管理 | 头行成对 |');
 doc.push('| `dm_` / `s_` / 拼音缩写 | **经典 HSDZ 遗留**，非 MES 自有结构 | 遗留 | 新功能**禁止**使用；面板仍在用的（见下表「关联面板」）改动前须评估 |');
-doc.push('| `RENAME_` / `*_bak_*` / `tmp_*` / `t1` / `t2` | 备份与临时 | 待清理 | 禁止引用；清理走技术债清单 |');
+doc.push('| `RENAME_` / `*_bak_*` / `tmp_*` / `t1` / `t2` | 备份与临时 | **已清零（2026-09-29）** | 禁止引用；体检 10 项棘轮基线已收到 0（再出现即 FAIL） |');
+doc.push('');
+doc.push('### 0.1 在册表登记（「确定下来的后台表」）');
+doc.push('');
+doc.push(`**在册台账 = [\`tools/db-inuse-tables.txt\`](../../tools/db-inuse-tables.txt)**（${inuseTotal} 张在册 + ${inuseKept} 张例外保留）。`);
+doc.push('判定口径 = 四源并集（① `yj_panel` 绑定且面板在运营 ② 在运营视图依赖 ③ `backend/src/main/java` + `frontend/src` 运行期 SQL 引用 ④ 业务数据行），');
+doc.push('逐表证据与探针在 `tools/archive/_table-audit/`（objects/panels/deps/refs/granted/classify/drop-risk）。');
+doc.push('');
+doc.push('- **不在册 = 脏数据**：新表必须先在 `db-inuse-tables.txt` 登记，再进 `db-migrations.txt`，并写 `MS_Description`。');
+doc.push('- 2026-09-29 已按该口径物理删除 **244 张未用表**（`pr_*` 已下架面板表、无引用遗留表、空表、备份/临时表），');
+doc.push('  并回收 29 个已下架面板的 `yj_panel`/`yj_field`/`yj_role_panel` 行与仅它们使用的译名词条；');
+doc.push('  迁移脚本 `tools/migrate-drop-unused-tables.sql`，执行前有全库备份（`deploy/HSDZ_MES_pre_drop_*.bak`）。');
+doc.push('- 在用业务表 **全部备有 `备用1..备用20`（nvarchar(500)）**语义化冗余列池，承载「字段管理」动态字段（零 DDL）；');
+doc.push('  补齐脚本 `tools/migrate-spare-columns-biz.sql`，设计见 [动态字段扩展-备用列池](../design/动态字段扩展-备用列池-V1.0.md)。');
 doc.push('');
 doc.push('**通用硬约束**（表清单之外的「列级」规范见 [代码规范与防臃肿](代码规范与防臃肿.md) §C3 与 [开发与质量](开发与质量.md) §3「列名安全规范」）：');
 doc.push('');
@@ -234,7 +258,8 @@ doc.push('## 维护记录');
 doc.push('');
 doc.push('| 版本 | 日期 | 说明 |');
 doc.push('|---|---|---|');
-doc.push(`| v1.0 | ${date} | 初版:全库 ${nTables} 表 + ${nViews} 视图按十组登记（表名+中文名+列数+关联面板），附分组命名规范 |`);
+doc.push('| v1.0 | 2026-09-28 | 初版:全库 454 表 + 104 视图按十组登记（表名+中文名+列数+关联面板），附分组命名规范 |');
+doc.push('| v1.1 | 2026-09-29 | 后台表定册:按四源审计清掉 244 张未用表（454→209 表）+ 29 个已下架面板的悬空元数据；新增 §0.1 在册台账（tools/db-inuse-tables.txt）；在用业务表补齐 `备用1..20` 列池 |');
 doc.push('');
 
 // 自检：说明里的 `|`（如「模式doc|flat|archive」）必须已转义，否则 Markdown 表格会撑破列

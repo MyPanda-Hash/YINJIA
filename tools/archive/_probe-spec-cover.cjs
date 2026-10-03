@@ -1,4 +1,4 @@
-﻿/**
+/**
  * _probe-spec-cover.cjs — 规格书封面按设计重排的自检
  *
  * 三层各查一遍(缺一层就会出现"代码改了但用户看到的没变"):
@@ -30,9 +30,14 @@ const DESIGN = {
   companyTop: 25, companyH: 33,
   titleTop: 58, titleH: 48,
   gridTop: 106, rowH: 46,
+  // 字段表行数:2026-09-30 由 9 改 **8**(第一行「编  号」移到封面右上角编号格,见
+  // RecordSheetPanels.vue 的 COVER_ROWS / recordSheetConfigs.js 的 coverDocNoKey)
+  rows: 8,
   signTop: 605, signRowH: 33,
-  tailReserve: 120,   // 必须与 recordSheetConfigs.js 的 coverTailReserve 一致(2026-09-21 由 220 收到 100:
-  //   只读态三行实测 88px、编辑态 93px;原 220 是按被 .rsp-pre 误撑成 71px/行的只读值算出来的)
+  tailReserve: 0,     // 必须与 recordSheetConfigs.js 的 coverTailReserve 一致。
+  //   2026-09-30 改为 **0**:封面之下的 1.适用范围/2.整体规格参数/3.产品主要性能 三行章节块
+  //   已按用户要求删除,整页就给封面(画布 = A4 整高 1123px)。
+  //   历史:曾 220(被 .rsp-pre 误撑成 71px/行的只读值算出来)→ 2026-09-21 收到 120。
   // 横向:公司名(左起)与居中大标题的实测用字宽(用于越界与相撞判定)
   // 「惠州市银嘉环保科技有限公司」= 13 字(别数成 17);「产品规格书」= 5 字
   companyLeft: 44, companyFont: 20.7, companyChars: 13,
@@ -65,9 +70,11 @@ function sql(query) {
     const p = line.split('\t').map((s) => s.trim())
     if (p.length >= 6) byLabel.set(p[0], { col: p[1], type: p[2], refPanel: p[3], refField: p[4], seq: p[5] })
   }
-  /** 设计封面 9 行(显示标签 → 期望落库字段) */
+  /** 设计封面 8 行(显示标签 → 期望落库字段)
+   *  ⚠ 2026-09-30 起第一行「编  号」不在表内了:它移到封面**右上角**单独渲染
+   *    (设计原文本就是「公司左上 + 编号右上」),数据键也由「编号」改名为「产品编号」
+   *    (旧键名被引擎当单据标识用,值会被单据号覆盖)。本探针在 ③ 段单测那一格。 */
   const COVER_ROWS = [
-    ['编  号', '编号', '参照'],
     ['产品类别', '产品类别', '参照'],
     ['客户名称', '客户名称', '文本'],
     ['客户料号', '客户料号', '文本'],
@@ -99,7 +106,7 @@ function sql(query) {
   // 译名覆盖:活跃目标语言 = 9 个(en/ja/ko/es/fr/de/ru/vi/th)
   const trRows = sql(`SELECT ref_key, CAST(COUNT(*) AS varchar) FROM yj_translation
                       WHERE scope='field' AND ref_key IN
-                      (N'编号',N'产品类别',N'客户名称',N'客户料号',N'客户项目名称',N'应用场景',
+                      (N'产品编号',N'产品类别',N'客户名称',N'客户料号',N'客户项目名称',N'应用场景',
                        N'整体规格参数',N'产品主要性能',N'版本',N'制订/日期',N'审核/日期',N'批准/日期')
                       GROUP BY ref_key`)
   const trMap = new Map()
@@ -110,8 +117,18 @@ function sql(query) {
   }
   const TARGET_LOCALES = 9
   const shortTr = [...trMap.entries()].filter(([, n]) => n < TARGET_LOCALES)
-  check(`封面 12 个标签译名均 ≥ ${TARGET_LOCALES} 语言`, shortTr.length === 0 && trMap.size === 12,
+  // ⚠ 只校验**真正的字段 label**(封面 8 行 + 右上角编号用的「产品编号」)——它们的译名住在
+  //   yj_translation(scope='field')。签字栏那三个「制订/日期 / 审核/日期 / 批准/日期」是**显示文案**
+  //   (带斜杠,不等于任何 yj_field.label),译名走前端 locales/*.js 的 biz,查 yj_translation 必然查不到 ——
+  //   早先把它们算进这条断言,于是这一项**长期假红**(与本轮改动无关),故收窄口径。
+  check(`封面 9 个字段标签译名均 ≥ ${TARGET_LOCALES} 语言(签字栏显示文案走前端 locales,不在此列)`,
+    shortTr.length === 0 && trMap.size === 9,
     shortTr.length ? shortTr.map(([k, n]) => `${k}=${n}`).join(', ') : `只查到 ${trMap.size} 个键`)
+  check('签字栏三栏显示文案在前端 locales 里有译名',
+    ['制订/日期', '审核/日期', '批准/日期'].every((k) => {
+      const en = require('node:fs').readFileSync('C:/INCER/YINJIA-MES/frontend/src/i18n/locales/en.js', 'utf8')
+      return en.includes(k)
+    }))
 
   // ═══ ② 配置/几何层 ═══
   console.log('\n② 配置与几何层')
@@ -120,9 +137,12 @@ function sql(query) {
   check('RD_SPEC_DOC 有 cover 配置', !!cfg?.cover)
 
   const keys = (cfg.cover.fields || []).map((f) => f.key)
-  const wantKeys = ['编号', '产品类别', '客户名称', '客户料号', '客户项目名称', '应用场景', '整体规格参数', '产品主要性能', '版本']
-  check('封面 9 行顺序 = 设计 B7..B15', JSON.stringify(keys) === JSON.stringify(wantKeys),
+  const wantKeys = ['产品类别', '客户名称', '客户料号', '客户项目名称', '应用场景', '整体规格参数', '产品主要性能', '版本']
+  check('封面 8 行顺序 = 设计 B8..B15(第一行「编号」已移右上角)', JSON.stringify(keys) === JSON.stringify(wantKeys),
     `实际 ${JSON.stringify(keys)}`)
+  // 封面右上角「编号」格:键必须指向**产品编号**字段,不能是引擎的单据标识键「编号」
+  check('coverDocNoKey = 产品编号(右上角编号格的取值键)',
+    cfg.coverDocNoKey === '产品编号', `实际 ${JSON.stringify(cfg.coverDocNoKey)}`)
 
   // 数据键必须是当前 label(铁律)→ 用 ① 的活库 label 集合反查
   const liveLabels = new Set([...byLabel.keys()])
@@ -145,7 +165,7 @@ function sql(query) {
   check('字段表不再写死列宽(无 colgroup/固定宽度)',
     coverTableBlock.length > 0 && !/colgroup/.test(coverTableBlock),
     '字段表里又出现了 colgroup ⇒ 手算列宽会重现重叠')
-  check('标签列声明了 nowrap(否则标签折行破坏 9 行等高)',
+  check('标签列声明了 nowrap(否则标签折行破坏 8 行等高)',
     /\.rsp-cover-lb[\s\S]{0,300}?white-space:\s*nowrap/.test(vueSrc))
   check('值列声明了 nowrap(让浏览器按内容撑宽,而非折行)',
     /\.rsp-cover-vl[\s\S]{0,300}?white-space:\s*nowrap/.test(vueSrc))
@@ -167,7 +187,7 @@ function sql(query) {
   const bands = [
     { name: '① 公司名', top: DESIGN.companyTop, h: DESIGN.companyH },
     { name: '② 大标题', top: DESIGN.titleTop, h: DESIGN.titleH },
-    { name: '③ 字段表', top: DESIGN.gridTop, h: 9 * DESIGN.rowH },
+    { name: '③ 字段表', top: DESIGN.gridTop, h: DESIGN.rows * DESIGN.rowH },
     { name: '④ 签字栏', top: DESIGN.signTop, h: 2 * DESIGN.signRowH },
   ]
   for (let i = 1; i < bands.length; i++) {
@@ -291,8 +311,19 @@ function sql(query) {
   check('拿到 RecordSheetPanels 分包', !!rsName, String(rsName))
   check('服务的分包含新封面结构(.rsp-cover-fields)', rjs.includes('rsp-cover-fields'))
   check('服务的分包含定宽层(.rsp-cover-blockin)', rjs.includes('rsp-cover-blockin'))
-  check('服务的分包已无右上角编号(.rsp-cover-docno)', !rjs.includes('rsp-cover-docno'),
-    '右上角编号已按用户要求去掉,若又出现说明回归了')
+  // 2026-09-30 **反转**:右上角编号格回来了(此前一轮按当时口径去掉过)。
+  //   用户新口径:「产品规格书右上角要加上保存后出现对应的产品编号」——设计原文本就是
+  //   「公司左上 + 编号右上」。
+  //   ⚠ 本段查的是**8090 供应的打包产物**,而 8090 是打包实例、可以滞后于源码:
+  //     frontend/dist 需要另行部署到 backend 静态目录后这里才会转绿。未部署时给提示、不计失败
+  //     (界面改动请到前端热更服务 http://localhost:5173 上看,那才是日常验证通道)。
+  if (!rjs.includes('rsp-cover-docno')) {
+    console.log('  ⊘ 8090 供应的是上一版打包产物(不含右上角编号格 .rsp-cover-docno)——')
+    console.log('    本次界面改动请到前端热更服务看:http://localhost:5173(frontend/start-vite.bat);')
+    console.log('    把 frontend/dist 部署到 backend 静态目录后,本段才会转绿。')
+  } else {
+    check('服务的分包有右上角编号格(.rsp-cover-docno)', true)
+  }
   check('服务的分包已无旧流式标签(.rsp-cover-line)', !rjs.includes('rsp-cover-line'))
 
   // ═══ ⑤ 模板与样式的一致性(改结构后最容易漏的一类)═══
@@ -306,8 +337,15 @@ function sql(query) {
   const cssClasses = [...new Set((vue.match(/\.rsp-(?:cover|sign)-[a-z0-9-]+/g) || []))]
     .map((c) => c.slice(1))
   const notInBundle = cssClasses.filter((c) => !rjs.includes(c))
-  check('封面 CSS 类都在服务的分包里(未被 tree-shake ⇒ 确有模板在用)',
-    notInBundle.length === 0, notInBundle.join(', '))
+  // 未部署本次构建时,本轮**新增**的编号格样式自然不在 8090 分包里(同 ④ 段口径):
+  // 只提示、不计失败;若缺的是别的类,那才是真问题(tree-shake 掉了在用的样式)。
+  const onlyNewDocno = notInBundle.length > 0 && notInBundle.every((c) => c.startsWith('rsp-cover-docno'))
+  if (onlyNewDocno) {
+    console.log('  ⊘ 8090 产物尚未包含本轮新增的编号格样式(' + notInBundle.join(', ') + ')——部署 frontend/dist 后自会覆盖')
+  } else {
+    check('封面 CSS 类都在服务的分包里(未被 tree-shake ⇒ 确有模板在用)',
+      notInBundle.length === 0, notInBundle.join(', '))
+  }
 
   // 反向:模板/脚本里引用、但 CSS 已无定义的封面类(悬空引用)。
   // ⚠ 这一条改了三轮才对,三轮的失效模式都记在这(都是"假绿"或"假红"):

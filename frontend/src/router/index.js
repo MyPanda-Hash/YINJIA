@@ -29,13 +29,15 @@ const routes = [
       // 订单结转·发单工作台(方案 V1.0):待结转行→转工单/转采购单;panelCode 无,按 SO_ORDER 授权,不进 flatMenus 自动路由
       { path: 'prod/plan/orderConvert', component: () => import('@/views/modules/plan/OrderConvert.vue'), meta: { title: '订单结转', code: 'orderConvert' } },
       // 排产工作台(实现总结 V1.0 §5):待排产池→排线→撤销;按 MANU_ORDER 授权,不进 flatMenus 自动路由
-      { path: 'prod/plan/scheduleBoard', component: () => import('@/views/modules/plan/ScheduleBoard.vue'), meta: { title: '排产工作台', code: 'scheduleBoard' } },
+      { path: 'prod/plan/scheduleBoard', component: () => import('@/views/modules/plan/ScheduleBoard.vue'), meta: { title: '快速排产', code: 'scheduleBoard' } },
       // 工单排产(2026-09-23 纠偏,替代「生产排产」平铺看板):产线×班别骨架+按线查看运行中工单;按 MANU_ORDER 授权,不进 flatMenus 自动路由
       { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard' } },
+      // 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式列表页)
+      { path: 'prod/plan/workOrderList', component: () => import('@/views/modules/plan/WorkOrderList.vue'), meta: { title: '工单排产·列表', code: 'workOrderList' } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()
-        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && !m.panelCode)
+        .filter((m) => m.path && m.path !== '/dashboard' && m.code !== 'manufactureOrder' && m.code !== 'manufactureBoard' && m.code !== 'reworkDesk' && m.code !== 'solutionCenter' && m.code !== 'orderConvert' && m.code !== 'scheduleBoard' && m.code !== 'workOrderBoard' && m.code !== 'workOrderList' && !m.panelCode)
         .map((m) => ({
           path: m.path.slice(1),
           component: ModuleView,

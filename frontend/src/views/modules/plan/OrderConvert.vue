@@ -23,7 +23,6 @@
         {{ tt('保存交期') }}（{{ dateChanged.length }}）
       </el-button>
       <el-button type="success" :disabled="!checked.length" @click="toManu">{{ tt('转工单') }}（{{ checked.length }}）</el-button>
-      <el-button type="warning" :disabled="!checked.length" @click="toPurchase">{{ tt('转采购单') }}（{{ checked.length }}）</el-button>
     </el-form>
 
     <!-- 待结转表 -->
@@ -37,6 +36,7 @@
           <div class="oc-dim">{{ row.品名 }}</div>
         </template>
       </el-table-column>
+      <el-table-column :label="tt('行号')" prop="行号" width="70" />
       <el-table-column :label="tt('下单日期')" prop="下单日期" width="100" />
       <el-table-column :label="tt('交货日期')" width="150" fixed="left">
         <template #default="{ row }">
@@ -54,11 +54,6 @@
       <el-table-column :label="tt('已排产数量')" width="105" align="right">
         <template #default="{ row }">
           <span :class="{ 'oc-blue': Number(row.已排产数量) > 0 }">{{ row.已排产数量 }}</span>
-        </template>
-      </el-table-column>
-      <el-table-column :label="tt('已采购数量')" width="105" align="right">
-        <template #default="{ row }">
-          <span :class="{ 'oc-orange': Number(row.已采购数量) > 0 }">{{ row.已采购数量 }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="tt('剩余数量')" width="100" align="right" fixed="right">
@@ -137,13 +132,10 @@ async function saveDates() {
 }
 
 async function toManu() {
-  await convert('toManu', '转工单', 'MANU_ORDER')
-}
-async function toPurchase() {
-  await convert('toPurchase', '转采购单', 'PU_REQ')
+  await convert('toManu', '转工单')
 }
 
-async function convert(api, label, gotoPanel) {
+async function convert(api, label) {
   const list = (checked.value || []).filter((r) => Number(r.生单数量) > 0)
   if (!list.length) { ElMessage.warning(tt('请先勾选要结转的订单行')); return }
   const qty = list.reduce((a, r) => a + Number(r.生单数量 || 0), 0)
@@ -164,15 +156,15 @@ async function convert(api, label, gotoPanel) {
     })
     const d = res.data || {}
     const failed = d['失败行'] || []
-    try {
-      await ElMessageBox.confirm(
-        `${tt('已生成')} ${d['生成张数']} ${tt('张')}：${(d['编号清单'] || []).join('、')}`
+    // 2026-10-11 用户拍板:结转只弹首道「确认转工单」框,结果不再弹窗——轻提示带出即可;
+    // 新工单即落 plang 入快速排产待排产池(该池已改新单置顶),本页刷新后转满行自动消失
+    ElMessage({
+      type: 'success',
+      message: `${tt('已生成')} ${d['生成张数']} ${tt('张')}：${(d['编号清单'] || []).join('、')}`
         + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''),
-        tt('订单结转') + '·' + tt(label),
-        { confirmButtonText: tt('前往查看'), cancelButtonText: tt('留在本页') },
-      )
-      window.location.hash = `#/panelx/list/${gotoPanel}`
-    } catch { /* 留在本页 */ }
+      duration: 5000,
+      showClose: true,
+    })
     loadAll()
   } catch (e) {
     ElMessage.error(e?.response?.data?.message || tt('转单失败'))

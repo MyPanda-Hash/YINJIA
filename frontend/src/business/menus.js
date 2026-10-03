@@ -39,7 +39,10 @@ export const menuTree = [
           {
             code: 'rdLab', title: '实验室使用记录表', icon: 'Flask', children: [
               { code: 'rdSpikeWater', title: '加标水配置记录表', path: '/panelx/list/RD_SPIKE_WATER', panelCode: 'RD_SPIKE_WATER', icon: 'Coin' },
-              { code: 'rdDomTest', title: '内部委托测试申请单', path: '/panelx/list/RD_DOM_TEST', panelCode: 'RD_DOM_TEST', icon: 'DocumentAdd' },
+              // 2026-09-30:「内部委托测试申请单」升级为**一张单三个页签**的「测试申请单」
+              //   (页签 = 内部委托-测试申请单 / 销售端-测试/检测申请表 / 委托测试汇总表,
+              //    按《3.实验室使用记录表\测试申请单.xlsx》3 个 sheet 复刻);面板编码 RD_DOM_TEST 不变。
+              { code: 'rdDomTest', title: '测试申请单', path: '/panelx/list/RD_DOM_TEST', panelCode: 'RD_DOM_TEST', icon: 'DocumentAdd' },
               { code: 'rdEquipUse', title: '设备使用登记表', path: '/panelx/list/RD_EQUIP_USE', panelCode: 'RD_EQUIP_USE', icon: 'Monitor' },
               { code: 'rdInstrUse', title: '仪器使用记录表', path: '/panelx/list/RD_INSTR_USE', panelCode: 'RD_INSTR_USE', icon: 'Odometer' },
             ],
@@ -60,15 +63,15 @@ export const menuTree = [
           // 组装工艺清单 = 页1 关键工序控制清单 + 页2 组装BOM表(物料清单 + 修订记录)
           { code: 'rdAsmProc', title: '组装工艺清单', path: '/panelx/list/RD_ASM_PROC', panelCode: 'RD_ASM_PROC', icon: 'Operation' },
           { code: 'rdInspPlan', title: '出货检验计划表', path: '/panelx/list/RD_INSP_PLAN', panelCode: 'RD_INSP_PLAN', icon: 'CircleCheck' },
-          // 2026-09-18 新增 2 张(研发管理 × 产品开发最新设计):
+          // 2026-09-18 新增(研发管理 × 产品开发最新设计):
           //   · 产品文件列表 —— 设计《产品开发系统需求汇总》sheet「文件汇总表」;
           //     **只读派生视图**(产品×4文件 开发状态矩阵),数据源与产品信息表侧栏「产品开发」同一份
-          //   · 样品编号表 —— 设计《二三级四级项目控制表2026》sheet「产品开发样品编号」。
-          //     它是产品文件的**发号台账**(编号 = 客户代号 + 项目编号,`sampleNo.js` 纯函数生成),
-          //     与「产品文件」同属"按产品编号推进的开发资料"这一族 ⇒ 归本组;
-          //     不为它单开"样品管理"分组 —— 一个分组只挂一张表就是分组噪音。
+          //   · 样品编号表(RD_SAMPLE_NO)于 2026-09-30 **下架**:用户口径「样品编号表删掉」。
+          //     面板元数据/字段/权限已清(tools/migrate-drop-sample-no-panel-2026-09-30.sql),
+          //     rd_sample_no_head / rd_sample_no_detail 两张数据表**保留**留档;
+          //     代码里的样品编号唯一性校验与归档登记同批移除。
+          //     要恢复:反向重跑该脚本(元数据)+ 放开本行 + 恢复那两处代码。
           { code: 'rdProdDocList', title: '产品文件列表', path: '/panelx/list/RD_PROD_DOCLIST', panelCode: 'RD_PROD_DOCLIST', icon: 'Grid' },
-          { code: 'rdSampleNo', title: '样品编号表', path: '/panelx/list/RD_SAMPLE_NO', panelCode: 'RD_SAMPLE_NO', icon: 'Tickets', operationName: '新增流程' },
           // 2026-09-21 新增:产品变更申请单(RD_CHANGE,YJ-QR-130《KPC变更申请通知单》)——
           // 产品变更**走单**的载体:发起人建单 → 各受控文件勾选 → 部门按账号填本部门栏 →(需会签时)会签
           // → 冯总(admin)审批 → 生效即按勾选文件建下一版草稿并通知责任人重走受控审核。
@@ -133,6 +136,7 @@ export const menuTree = [
         children: [
           {
             code: 'doc', title: '单据', children: [
+              // 送料暂收单:面板编码 QC_RECV(2026-09-20 由 SL_RECV 改名,物理表仍 sl_recv/sl_recv_detail,单据前缀 SL)
               { code: 'slRecv', title: '送料暂收单', path: '/panelx/list/QC_RECV', icon: 'Download', panelCode: 'QC_RECV', operationName: '新增流程' },
               { code: 'qcReturn', title: '暂收退料单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
               { code: 'purchaseIn', title: '采购入库单', path: '/panelx/list/PURCHASE_IN', icon: 'Download', panelCode: 'PURCHASE_IN', operationName: '新增流程' },
@@ -209,9 +213,14 @@ export const menuTree = [
               // 订单结转·发单工作台(方案 V1.0):待结转行(剩余=需求−已排产−已采购)→转工单/转采购单;
               // 防重复=行级占用链,转满自动消失;不改销售订单状态。置首位:发单是排产的上一步。
               { code: 'orderConvert', title: '订单结转', path: '/prod/plan/orderConvert', icon: 'Switch' },
-              // 排产工作台(实现总结 V1.0 §5):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
-              // 排产单一入口(加工单「排产」按钮已下线,表单产线/开工·完工日只读)
-              { code: 'scheduleBoard', title: '排产工作台', path: '/prod/plan/scheduleBoard', icon: 'AlarmClock' },
+              // 生产工单(2026-09-24 用户拍板改名:原「生产加工单」MANU_ORDER,面板名/菜单位移自此;
+              // 流程位置=订单结转之后、排产之前:生单→编制审核→排产工作台排线)。
+              // 原生产记录组的「生产加工单」菜单同步下线,单一入口。
+              // 列表样式=工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式:修改/结案/打印工单/打印工单_多个/打印领料单/批量调线+产线筛选+追溯);单据维护从行点修改进表单
+              { code: 'manufactureOrder', title: '生产工单', path: '/prod/plan/workOrderList', icon: 'Document' },
+              // 快速排产(原「排产工作台」,2026-09-26 用户拍板改名):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
+              // 排产单一入口(工单「排产」按钮已下线,表单产线/开工·完工日只读)
+              { code: 'scheduleBoard', title: '快速排产', path: '/prod/plan/scheduleBoard', icon: 'AlarmClock' },
               // 2026-09-22 单轨改造(参考库式,用户拍板):生产工单/排单计划菜单下线——
               // 工单=生产加工单(MANU_ORDER),看板职责由「生产排产 MANU_SCHEDULE」承接(含五工序完成/未完成数量);
               // 面板与权限行保留可回滚(同 组装BOM表 并页签先例)。恢复:取消下两行注释即可。
@@ -259,20 +268,20 @@ export const menuTree = [
           },
           {
             code: 'legacy', title: '经典单据', children: [
-              { code: 'manufactureOrder', title: '生产加工单', path: '/panelx/list/MANU_ORDER', icon: 'Document', panelCode: 'MANU_ORDER', operationName: '新增流程' },
+              // 生产工单已归位「生产计划」组(2026-09-24),此处不再重复入口
               { code: 'dispatch', title: '工序派工单', path: '/panelx/list/DISPATCH', icon: 'AlarmClock', panelCode: 'DISPATCH', operationName: '新增流程' },
               { code: 'outsourceOrder', title: '委外加工单', path: '/panelx/list/OUTSOURCE_ORDER', icon: 'Tickets', panelCode: 'OUTSOURCE_ORDER', operationName: '新增流程' },
             ],
           },
           {
             code: 'detail', title: '明细表', children: [
-              { code: 'manuDetail', title: '生产加工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
+              { code: 'manuDetail', title: '生产工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
               { code: 'dispatchDetail', title: '工序派工单明细表', path: '/panelx/list/DISPATCH_DETAIL', panelCode: 'DISPATCH_DETAIL', icon: 'List' },
             ],
           },
           {
             code: 'stats', title: '统计表', children: [
-              { code: 'manuStats', title: '生产加工单统计表', path: '/panelx/list/MANU_ORDER_STATS', panelCode: 'MANU_ORDER_STATS', icon: 'Histogram' },
+              { code: 'manuStats', title: '生产工单统计表', path: '/panelx/list/MANU_ORDER_STATS', panelCode: 'MANU_ORDER_STATS', icon: 'Histogram' },
               { code: 'dispatchStats', title: '工序派工单统计表', path: '/panelx/list/DISPATCH_STATS', panelCode: 'DISPATCH_STATS', icon: 'Histogram' },
             ],
           },
@@ -365,6 +374,8 @@ export const menuTree = [
           { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
           { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
           { code: 'warehouse', title: '仓库', path: '/panelx/list/WH', icon: 'House', panelCode: 'WH', operationName: '新增流程' },
+          // 库位(2026-09-28):仓库下货位档案,一仓多库位、一库位一仓;支持与商品同款「二维码标签」勾选即打
+          { code: 'whloc', title: '库位', path: '/panelx/list/WHLOC', icon: 'LocationInformation', panelCode: 'WHLOC', operationName: '新增流程' },
           { code: 'khda', title: '客户', path: '/panelx/list/KHDA', icon: 'User', panelCode: 'KHDA', operationName: '新增流程' },
           { code: 'gfda', title: '供应商', path: '/panelx/list/GFDA', icon: 'OfficeBuilding', panelCode: 'GFDA', operationName: '新增流程' },
           // 客户/供应商分类不占导航:从 客户/供应商 面板工具栏「分类管理」进入(金蝶同款交互)

@@ -7,10 +7,16 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 工序报工记账:报工单审核 → wo_progress.完成数量 累计;弃审对称冲回。
- * 与 StockLedgerService 同构(审核即过账,失败整笔回滚)。
- * 守护:工单必须已审核;工单须含该工序行;冲回后完成数量不得为负。
- * 排产视图(完成数=工单报工数求和)由此驱动。
+ * 工序报工记账(2026-09-27 终版:**scjl 单表化**——录入载体与事实账合一)。
+ *
+ * <p>WO_REPORT/WO_REPORT_LIST 两面板数据源已切 scjl(migrate-scjl-single-table.sql):
+ * 新增报工单=直接 INSERT scjl 草稿行(wgzt 空),保存/yj_doc_status 状态机如常;
+ * <ul><li>审核 hook:本单 scjl 行 wgzt='Y'+wgsj(完工)+ 落 jc_no 产成品流水 + 补排产镜像字段
+ *     (gd_id/gldh 锚定 plang_pc;产线/批次/客户/产品等镜像自 plang×plang_pc)——**不再另插新行**;</li>
+ * <li>弃审 hook:wgzt 回空、wgsj 置空、jc_no 保留(历史留痕,不再软删);
+ *     已有入库回写(post_no)的拒绝弃审;</li>
+ * <li>守卫(plang 口径):工单存在·未结案·已排产;工序封顶(本工序已报+本次 ≤ Σ排产)。</li></ul>
+ * wo_report 停用为遗留表。参考库关联:scjl.gd_id=plang_pc.id、gldh=pl_no(docs 盘点 §2.3/§3.2)。
  */
 @Service
 public class WoReportService {
@@ -25,70 +31,102 @@ public class WoReportService {
         return "WO_REPORT".equals(panelCode);
     }
 
-    /** 审核 → 完成数量 += 报工数量。 */
+    /** 审核 → 本单 scjl 行 wgzt='Y'+wgsj,补 jc_no 与排产镜像。 */
     public void post(String panelCode, String no, String user) {
         if (!posts(panelCode)) return;
         for (Map<String, Object> r : rows(no)) {
-            apply(r, +1, user);
+            complete(r, user);
         }
     }
 
-    /** 弃审 → 完成数量 -= 报工数量(负数拒绝)。 */
+    /** 弃审 → wgzt 回空(留痕不软删);已有 post_no 的拒绝。 */
     public void unpost(String panelCode, String no, String user) {
         if (!posts(panelCode)) return;
-        for (Map<String, Object> r : rows(no)) {
-            apply(r, -1, user);
+        Integer n = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo.scjl WHERE [报工单号]=? AND ISNULL(post_no,'')<>'' AND ISNULL(asp_cancel,'N')<>'Y'",
+                Integer.class, no);
+        if (n != null && n > 0) {
+            throw new IllegalStateException("该报工已有完工入库回写(post_no),请先弃审对应入库单");
         }
+        jdbc.update("UPDATE dbo.scjl SET wgzt=NULL, wgsj=NULL, asp_user2=?, asp_time2=GETDATE()"
+                        + " WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                user, no);
     }
 
     private List<Map<String, Object>> rows(String no) {
         return jdbc.queryForList(
-                "SELECT [工单号], [工序], [报工数量] FROM wo_report WHERE [单据编号] = ? AND ISNULL(asp_cancel, 'N') <> 'Y'", no);
+                "SELECT id, ISNULL(gldh,N'') AS gldh, ISNULL(gxdm,N'') AS gxdm, ISNULL(sl,0) AS sl,"
+                        + " ISNULL([直销数量],0) AS dual_qty FROM dbo.scjl"
+                        + " WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
     }
 
-    private void apply(Map<String, Object> r, int sign, String user) {
-        String wo = str(r.get("工单号"));
-        String op = str(r.get("工序"));
-        double qty = num(r.get("报工数量"));
-        if (wo == null || op == null) throw new IllegalStateException("报工单缺少工单号或工序,不能过账");
-        // 工单必须已审核——单轨口径(2026-09-22):工单号=生产加工单(MANU_ORDER.合同号);
-        // 兼容过渡期存量 GD-生产工单(WO_ORDER),两者任一已审核即放行
-        List<String> shr = jdbc.queryForList(
-                "SELECT shr FROM yj_doc_status WHERE panel_code = 'MANU_ORDER' AND doc_no = ?", String.class, wo);
-        if (shr.isEmpty() || shr.get(0) == null) {
-            shr = jdbc.queryForList(
-                    "SELECT shr FROM yj_doc_status WHERE panel_code = 'WO_ORDER' AND doc_no = ?", String.class, wo);
+    /** 审核完成化:守卫 + 镜像补全 + wgzt/jc_no。草稿行由面板保存时已带 gldh/gxdm/sl。 */
+    private void complete(Map<String, Object> r, String user) {
+        Integer rowId = (Integer) r.get("id");
+        String wo = String.valueOf(r.get("gldh")).trim();
+        String op = String.valueOf(r.get("gxdm")).trim();
+        double qty = num(r.get("sl"));
+        if (wo.isEmpty() || op.isEmpty()) throw new IllegalStateException("报工单缺少工单号或工序,不能过账");
+        if (qty <= 0) throw new IllegalStateException("报工数量必须大于 0");
+        double dual = num(r.get("dual_qty"));
+        if (dual > qty + 0.0001) throw new IllegalStateException("直销数量(" + dual + ")不能大于报工数量(" + qty + ")");
+        // 守卫+落点:plang 未结案行 × plang_pc 排产行(FIFO 订单行号→批次)
+        Map<String, Object> t;
+        try {
+            t = jdbc.queryForMap(
+                    "SELECT TOP 1 pc.id AS pc_id, pc.[批次号] AS pc_batch, pc.scx AS pc_scx, pc.lb AS pc_lb,"
+                            + " p.comm AS comm, p.dm AS dm, ISNULL(p.mc,N'') AS mc, ISNULL(p.gg,N'') AS gg,"
+                            + " ISNULL(p.jldw,N'') AS jldw, ISNULL(p.khdm,N'') AS khdm, ISNULL(p.lot_no,N'') AS lot_no,"
+                            + " ISNULL(p.pl_sl,0) AS pl_sl, ISNULL(p.od_no,N'') AS od_no, p.od_xc AS od_xc,"
+                            + " ISNULL(p.zl,0) AS zl, ISNULL(p.llxz,N'') AS llxz, ISNULL(p.djlx,N'') AS djlx"
+                            + " FROM dbo.plang_pc pc"
+                            + " JOIN dbo.plang p ON pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                            + " WHERE pc.pl_no = ? AND ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'')<>N''"
+                            + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                            + " ORDER BY p.pl_xc, pc.[批次号], p.id", wo);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            Integer exists = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, wo);
+            if (exists == null || exists == 0) throw new IllegalStateException("工单不存在:" + wo);
+            Integer closed = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(ja,'N') IN ('T','Y')",
+                    Integer.class, wo);
+            if (closed != null && closed > 0) throw new IllegalStateException("工单 " + wo + " 已结案,不能报工");
+            throw new IllegalStateException("工单 " + wo + " 未排产,不能报工(先在快速排产排入产线)");
         }
-        if (shr.isEmpty() || shr.get(0) == null) {
-            throw new IllegalStateException("工单 " + wo + " 尚未审核,不能报工");
+        // 工序维度封顶:本工序已报(仅计 wgzt='Y' 的完工行,本行草稿未计) + 本次 ≤ Σ排产
+        Double totalPl = jdbc.queryForObject(
+                "SELECT ISNULL(SUM(ISNULL(pl_sl,0)),0) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                Double.class, wo);
+        Double opSum = jdbc.queryForObject(
+                "SELECT ISNULL(SUM(ISNULL(sl,0)),0) FROM dbo.scjl WHERE gldh=? AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " AND ISNULL(wgzt,'N')='Y'",
+                Double.class, wo, op);
+        double opRemain = (totalPl == null ? 0 : totalPl) - (opSum == null ? 0 : opSum);
+        if (qty > opRemain + 0.0001) {
+            throw new IllegalStateException("报工数量 " + qty + " 超过工序[" + op + "]剩余可报数量 " + opRemain
+                    + "(排产总量 " + (totalPl == null ? 0 : totalPl) + " − 本工序已报 " + (opSum == null ? 0 : opSum) + ")");
         }
-        // 过账:有工序行则累计;无行且为报工方向则按参考库口径即时建行(计划数量=工单排产数量)——
-        // 单轨加工单不预填工序行(plang_pc 同款),报工即进度;弃审冲回要求行已存在(负数守卫)
-        int n = jdbc.update("UPDATE wo_progress SET [完成数量] = [完成数量] + ?, asp_user2 = ?, asp_time2 = GETDATE()"
-                        + " WHERE [单据编号] = ? AND [工序] = ?",
-                sign * qty, user, wo, op);
-        if (n == 0) {
-            if (sign < 0) throw new IllegalStateException("工单 " + wo + " 无 [" + op + "] 工序进度行,不可冲回");
-            Double plan = null;
-            List<Double> p = jdbc.queryForList(
-                    "SELECT [排产数量] FROM bd_manu_order WHERE [合同号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
-                    Double.class, wo);
-            if (!p.isEmpty() && p.get(0) != null) plan = p.get(0);
-            jdbc.update("INSERT INTO wo_progress ([单据编号], [工序], [计划数量], [完成数量], [备注], asp_user1, asp_time1, asp_cancel)"
-                            + " VALUES (?,?,?,?, N'报工建行', ?, GETDATE(), 'N')",
-                    wo, op, plan, qty, user);
-        }
-        if (sign < 0) {
-            Double done = jdbc.queryForObject(
-                    "SELECT [完成数量] FROM wo_progress WHERE [单据编号] = ? AND [工序] = ?", Double.class, wo, op);
-            if (done != null && done < -0.0001) {
-                throw new IllegalStateException("冲回将使 " + wo + " [" + op + "] 完成数量为负,不可弃审");
-            }
-        }
-    }
-
-    private static String str(Object o) {
-        return o == null || String.valueOf(o).isBlank() ? null : String.valueOf(o).trim();
+        // jc_no 产成品流水(产线--yyMMdd-8位,按 线+日 递增)
+        String scx = String.valueOf(t.get("pc_scx"));
+        String day = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.ofPattern("yyMMdd"));
+        Integer seq = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo.scjl WHERE scx=? AND jc_no LIKE ?", Integer.class,
+                scx, scx + "--" + day + "-%");
+        String jcNo = scx + "--" + day + "-" + String.format("%08d", (seq == null ? 0 : seq) + 1);
+        // 就地完成化:补镜像 + 锚定 + 完工状态(草稿行本来就在 scjl,不另插行)
+        jdbc.update("UPDATE dbo.scjl SET"
+                        + " comm=?, gd_id=?, tm=?, scx=?, scxmc=?, jbbh=?,"
+                        + " wzdm=?, mc=?, gg=?, jldw=?, khdm=?, lot_no=?, pl_sl=?,"
+                        + " od_no=?, od_xc=?, zl=?, llxz=?, djlx=?, [批次号]=?,"
+                        + " wgzt=N'Y', wgsj=GETDATE(), jc_no=?, ywman=COALESCE(NULLIF(ywman,''),?),"
+                        + " asp_user2=?, asp_time2=GETDATE()"
+                        + " WHERE id=?",
+                t.get("comm"), t.get("pc_id"), wo, scx, scx,
+                t.get("pc_lb"),
+                t.get("dm"), t.get("mc"), t.get("gg"), t.get("jldw"), t.get("khdm"), t.get("lot_no"), t.get("pl_sl"),
+                t.get("od_no"), t.get("od_xc"), t.get("zl"), t.get("llxz"), t.get("djlx"), t.get("pc_batch"),
+                jcNo, user, user, rowId);
     }
 
     private static double num(Object o) {

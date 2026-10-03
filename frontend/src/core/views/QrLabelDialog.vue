@@ -1,7 +1,7 @@
 <template>
   <el-dialog v-model="visibleModel" :title="props.title || tt('材料二维码标签')" width="720px" append-to-body class="qr-label-dlg" @opened="renderQr">
     <div class="qr-label-toolbar">
-      <span class="qr-label-tip">{{ props.tip || tt('二维码 = 物料编码|批号（扫描后可解析出入库与追溯信息），每行物料一张标签') }}</span>
+      <span class="qr-label-tip">{{ props.tip || tt('二维码 = 物料编码|批号@数量（扫描后可解析出入库与追溯信息），每行物料一张标签') }}</span>
       <el-button size="small" type="primary" @click="print">{{ tt('打印') }}</el-button>
     </div>
     <div class="qr-label-grid" ref="gridRef">
@@ -22,7 +22,9 @@
 <script setup>
 /**
  * QrLabelDialog — 材料二维码标签打印(品检分流链 #3)
- * 数据源:暂收单明细行(物料编码/名称/批号/数量/单位);二维码内容 = `物料编码|批号`。
+ * 数据源:暂收单明细行(物料编码/名称/批号/数量/单位)/采购订单明细行(无批号,供应商贴码);
+ * 二维码内容 = `物料编码|批号@数量`(2026-09-28 用户口径加 @数量;批号空→无批号段,数量空→无@段;
+ * 工单/产品二维码经 qrText 覆盖,不受默认拼接影响)。
  * 打印:对话框内打印样式(@media print 只显示标签网格),调用 window.print()。
  */
 import { ref, computed } from 'vue'
@@ -45,7 +47,9 @@ const gridRef = ref(null)
 async function renderQr() {
   for (const lb of props.labels) {
     if (!lb.qr && lb.code) {
-      const text = lb.qrText || (lb.lot ? `${lb.code}|${lb.lot}` : String(lb.code))
+      // @数量段(2026-09-28):数量空则整段省略;批号空则无 |批号 段 —— 供应商在采购订单打码即 编码@数量
+      const qtySuffix = lb.qty == null || lb.qty === '' ? '' : '@' + lb.qty
+      const text = lb.qrText || (lb.lot ? `${lb.code}|${lb.lot}${qtySuffix}` : `${lb.code}${qtySuffix}`)
       try { lb.qr = await QRCode.toDataURL(text, { width: 160, margin: 1, errorCorrectionLevel: 'M' }) }
       catch { /* 单张失败不影响其余 */ }
     }

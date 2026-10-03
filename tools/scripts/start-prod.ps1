@@ -26,14 +26,49 @@ if (Test-Path $envFile) {
 } else {
   Write-Host "提示: 无 backend\.env,OCR 与机翻将降级(功能可用但报未配置)"
 }
-# JDK 探测(按 docs/development/环境与数据库.md「开发机环境」的约定,与 build-appjar.ps1 同一套):
-# 后端 class 是 25(pom java.version=25),用裸 `java` 会撞上 2026-09-22 之前打开的终端 ——
-# 那些 shell 的 PATH 仍是旧 Oracle javapath(JDK 24)⇒ 起进程即抛 UnsupportedClassVersionError(class 69>68)。
-if (-not $env:JAVA_HOME -or -not (Test-Path "$env:JAVA_HOME\bin\java.exe")) {
-  foreach ($cand in @('C:\Program Files\Java\jdk-25', 'D:\Program Files\Java\jdk-25', "$env:USERPROFILE\.jdk\jdk-25\jdk-25.0.2")) {
-    if (Test-Path "$cand\bin\java.exe") { $env:JAVA_HOME = $cand; break }
-  }
+# JDK discovery, VERSION-GATED (2026-09-24). Backend classes are major 69 (pom java.version=25),
+# so ANY JDK < 25 aborts with UnsupportedClassVersionError. Trusting $env:JAVA_HOME blindly is not
+# enough: this machine's machine-level JAVA_HOME points at openjdk-23.0.1 (real failure observed
+# 2026-09-24). We therefore validate each candidate via its `release` file (JAVA_VERSION >= 25) —
+# same policy as start-project.bat :TRYJDK.
+function Test-Jdk25([string]$jdkHome) {
+  if (-not $jdkHome) { return $false }
+  $java = Join-Path $jdkHome 'bin\java.exe'
+  $rel = Join-Path $jdkHome 'release'
+  if (-not (Test-Path $java) -or -not (Test-Path $rel)) { return $false }
+  $line = Select-String -Path $rel -Pattern '^JAVA_VERSION="([0-9]+)' | Select-Object -First 1
+  if (-not $line) { return $false }
+  $maj = [int]$line.Matches[0].Groups[1].Value
+  return ($maj -ge 25)
+}
+$jdkCands = @()
+if ($env:JAVA_HOME) { $jdkCands += $env:JAVA_HOME.TrimEnd('\') }
+foreach ($d in @("$env:USERPROFILE\.jdks", 'C:\Program Files\Java', 'D:\Program Files\Java')) {
+  if (Test-Path $d) { $jdkCands += (Get-ChildItem -Path $d -Directory -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }) }
+}
+$jdk25 = $jdkCands | Where-Object { Test-Jdk25 $_ } | Select-Object -First 1
+if ($jdk25) {
+  if ($jdk25 -ne ($env:JAVA_HOME -replace '\\$', '')) { Write-Host "JDK: 使用 $jdk25 (环境 JAVA_HOME 未达 25 或未设)" }
+  $env:JAVA_HOME = $jdk25
+} else {
+  Write-Host "[WARN] JDK 25+ not found - backend will fail to start (classes are major 69)." -ForegroundColor Yellow
 }
 $javaExe = if ($env:JAVA_HOME -and (Test-Path "$env:JAVA_HOME\bin\java.exe")) { "$env:JAVA_HOME\bin\java.exe" } else { 'java' }
+
+# 2026-09-24 起:启动前先做数据库增量同步(治本"拉了代码没跑 SQL"⇒ 界面与实现不一致)。
+# 只跑 db-migrations.txt 里新增/内容变化的脚本(幂等);失败不阻断启动,但红字告警。
+$root = Split-Path $dir -Parent
+$syncBat = Join-Path $root "tools\sync-db.bat"
+if (Test-Path $syncBat) {
+  Write-Host "数据库增量同步(tools\sync-db.bat) ..."
+  & cmd /c "`"$syncBat`""
+  if ($LASTEXITCODE -ne 0) {
+    Write-Host "============================================================" -ForegroundColor Red
+    Write-Host "[警告] 数据库同步失败:界面/字段可能与代码实现不一致!" -ForegroundColor Red
+    Write-Host "       处理:确认 SQL Server(Docker mssql2019)在跑后重跑 tools\sync-db.bat" -ForegroundColor Red
+    Write-Host "============================================================" -ForegroundColor Red
+  }
+}
+
 Start-Process -FilePath $javaExe -ArgumentList "-jar", "target\yinjia-mes-backend-0.1.0.jar" -WorkingDirectory $dir -WindowStyle Hidden
 Write-Host "正式实例启动中(HSDZ_MES, http://127.0.0.1:8090;$javaExe) ..."

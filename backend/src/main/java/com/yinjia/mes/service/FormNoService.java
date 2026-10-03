@@ -48,8 +48,14 @@ public class FormNoService {
     }
 
     private boolean exists(String no) {
+        // 2026-09-30:原为 `... UNION SELECT TOP 1 inh_no FROM inh WHERE inh_no = ?` —— inh 已由遗留纺织表
+        // 重建为 MES 入库流水表,inh_no 列不存在,该 UNION 使**每次生成单号**都抛
+        // 「列名 'inh_no' 无效」(error 207)⇒ 新增/保存任何单据都 500(实测复现见
+        // tools/archive/_probe-formno-inh-no.cjs)。此处改读重建后的 单据编号,保持"单号不与流水冲突"的原意;
+        // 纺织老数据已导出 tools/archive/_stock-flow-backup-20260930.csv,其单号不再进号池,
+        // 而 s_allno.dh 分支仍是号池内的唯一性判据。
         List<String> rows = jdbc.query(
-                "SELECT TOP 1 dh FROM s_allno WHERE dh = ? UNION SELECT TOP 1 inh_no FROM inh WHERE inh_no = ?",
+                "SELECT TOP 1 dh FROM s_allno WHERE dh = ? UNION SELECT TOP 1 单据编号 FROM inh WHERE 单据编号 = ?",
                 (rs, i) -> rs.getString(1), no, no);
         return !rows.isEmpty();
     }

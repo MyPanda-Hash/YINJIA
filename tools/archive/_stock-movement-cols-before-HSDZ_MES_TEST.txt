@@ -1,0 +1,23 @@
+src | int(10) | NOT NULL
+rid | int(10) | NULL
+单据日期 | date(10) | NULL
+单据类型 | nvarchar(50) | NULL
+单据编号 | nvarchar(100) | NULL
+业务类型 | nvarchar(2) | NOT NULL
+仓库键 | nvarchar(200) | NULL
+仓库编码 | nvarchar(200) | NULL
+仓库 | nvarchar(200) | NOT NULL
+存货编码 | nvarchar(200) | NOT NULL
+存货 | nvarchar(200) | NULL
+规格型号 | nvarchar(200) | NULL
+计量单位 | nvarchar(100) | NULL
+批号 | nvarchar(60) | NOT NULL
+收入数量 | decimal(18,4) | NULL
+发出数量 | decimal(18,4) | NULL
+收入金额 | decimal(18,4) | NULL
+发出单据金额 | decimal(18,4) | NULL
+含税金额 | decimal(18,4) | NULL
+税额 | decimal(18,4) | NULL
+往来单位 | nvarchar(200) | NULL
+往来单位编码 | nvarchar(200) | NULL
+经手人 | nvarchar(200) | NULL

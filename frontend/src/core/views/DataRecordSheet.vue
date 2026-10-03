@@ -26,7 +26,7 @@
           </td>
         </tr>
         <tr>
-          <td class="rs-td rs-topic-cell" rowspan="4">
+          <td class="rs-td rs-topic-cell" rowspan="5">
             <el-input v-if="editable" v-model="head['测试主题']" size="small" class="rs-topic-input" @input="emit('dirty')" />
             <span v-else class="rs-topic">{{ head['测试主题'] || '' }}</span>
           </td>
@@ -77,6 +77,21 @@
             </div>
           </td>
         </tr>
+        <tr>
+          <!-- 审核人(2026-09-30 补):需求「数据记录表都需要审核人(秀丽)」。
+               纸面印「审核人」,**数据键是「表单审核人」** —— 叫「审核人」会被
+               ButtonService.save() 的 body.remove("审核人") 静默丢弃(那是 yj_doc_status.shr
+               的虚拟字段);落库列走备用列池的 备用1,见 migrate-rd-datarec-reviewer-2026-09-30.sql。 -->
+          <td class="rs-td rs-info-cell">
+            <div class="rs-irow">
+              <span class="rs-ilabel">{{ tt('审核人') }}</span>
+              <span class="rs-ivalue">
+                <el-input v-if="editable" v-model="head['表单审核人']" size="small" maxlength="80" class="rs-c-in" @input="emit('dirty')" />
+                <template v-else>{{ head['表单审核人'] || '' }}</template>
+              </span>
+            </div>
+          </td>
+        </tr>
       </tbody>
     </table>
 
@@ -109,9 +124,13 @@
         </tr>
         <tr class="rs-row-mid">
           <td class="rs-td rs-label">{{ tt('样品配方') }}</td>
-          <td class="rs-td" :colspan="sampleCount">
-            <el-input v-if="editable" v-model="head['样品配方']" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" maxlength="300" class="rs-t-in" @input="emit('dirty')" />
-            <span v-else class="rs-txt">{{ head['样品配方'] || '' }}</span>
+          <!-- 样品配方**每样品一格**:设计原表第 10 行 merges C10:G10 + H10:L10,
+               与紧随其后的 样品信息(C11:G11 + H11:L11)分块一一对应。
+               原来这里是一格 :colspan="sampleCount"(整行连成一格),加列不分裂、减列不清空,
+               与设计不符(2026-09-30 用户口径:样品配方列数跟样品信息同步)。 -->
+          <td v-for="n in sampleCount" :key="'sf' + n" class="rs-td">
+            <el-input v-if="editable" v-model="head['样品配方' + n]" type="textarea" :autosize="{ minRows: 3, maxRows: 12 }" size="small" maxlength="300" class="rs-t-in" @input="emit('dirty')" />
+            <span v-else class="rs-txt">{{ head['样品配方' + n] || '' }}</span>
           </td>
         </tr>
         <tr>
@@ -340,6 +359,9 @@ import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import RefPickDialog from './RefPickDialog.vue'
 import { buildColumnPrefsPayload, isColumnHidden, resolveColumnLabel } from '@core/sheet/columnPrefs'
+// 按样品铺开的字段名单(样品信息/测试装置及编号/样品配方 + 明细三组)—— 减列清空走它,
+// 漏登记一处就只在"减列"时才暴露(2026-09-30 样品配方即因此漏掉),故集中成单一真源
+import { clearSampleColumn } from '@core/sheet/sampleCols'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -387,6 +409,9 @@ function onProdRefConfirm(rows) {
 // ── 动态样品列(2026-09-11):默认 2 列,2~6 列可调 ──
 // 计数存头字段「样品数」(物理列 预置到 样品6,见 tools/migrate-filter-eff-samples.sql);
 // 加列即时生效;减列**清空被减列数据**(用户口径,确认弹窗);总表宽恒定——样品组总宽不变,列宽=组总宽÷列数。
+// 1.基本信息 里**按样品铺开**的行 = 样品信息 / 测试装置及编号 / 样品配方(三者列数恒等于 样品数;
+// 样品配方 2026-09-30 由"一格跨全部样品"改为每样品一格,与设计原表 C10:G10+H10:L10 分块一致)。
+// ⚠ 字段名单别在组件里手写:见 core/sheet/sampleCols.js(加/减列都按它走)
 const MIN_SAMPLES = 2
 const MAX_SAMPLES = 6
 const sampleCount = computed(() => {
@@ -404,15 +429,9 @@ async function setSampleCount(n) {
       await ElMessageBox.confirm(tt('减少样品列将清空该列已填数据，确定减少吗？'), tt('减少样品列'),
         { type: 'warning', confirmButtonText: tt('确定'), cancelButtonText: tt('取消') })
     } catch { return /* 取消 */ }
-    const drop = cur
-    props.head[`样品信息${drop}`] = ''
-    props.head[`测试装置及编号${drop}`] = ''
-    for (const row of props.head?.detail?.items || []) {
-      row[`压力（PSI)样品${drop}`] = ''
-      row[`流速（L/min)样品${drop}`] = ''
-      row[`出水含量（ug/L）样品${drop}`] = ''
-      row[`去除率%样品${drop}`] = ''
-    }
+    // 清空被减列:头字段(样品信息/测试装置及编号/样品配方)+ 每行明细(压力/流速/出水含量/去除率)
+    // —— 字段名单在 core/sheet/sampleCols.js(单一真源,单测钉住;别再往这里手写清单)
+    clearSampleColumn(props.head, cur)
   }
   props.head['样品数'] = String(n)
   emit('dirty')

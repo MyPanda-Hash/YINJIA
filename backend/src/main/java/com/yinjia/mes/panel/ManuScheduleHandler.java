@@ -8,7 +8,9 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 生产加工单排产:销售订单 →「生成生产加工单」**按明细行 1:1 生成**(参考库口径)。
+ * 生产工单生单:销售订单 →「生成生产工单」**按明细行 1:1 生成**(参考库口径;按钮 2026-09-24 由
+ * 「生成生产加工单」改名,按钮名是数据键,须与 PanelConfigService.PANDA_BUTTONS/PUSH_TARGETS、
+ * PushGenerateHandler 同步)。
  *
  * <p>依据:参考库 HSDZ_MES_0828 旧系统「工单排产」(plang_pc)实证——25 张工单与 25 条订单行严格 1:1
  * (pl_xc 恒为 1),排产是「勾选订单行 → 批量落表」;docs/design/补充设计-V2.0.md §3.1 亦以 MANU_ORDER 为工单实体。
@@ -27,7 +29,7 @@ public class ManuScheduleHandler implements PanelActionHandler {
 
     @Override
     public boolean supports(String panelCode, String action) {
-        return "SO_ORDER".equals(panelCode) && "生成生产加工单".equals(action);
+        return "SO_ORDER".equals(panelCode) && "生成生产工单".equals(action);
     }
 
     @Override
@@ -43,7 +45,7 @@ public class ManuScheduleHandler implements PanelActionHandler {
         out.put("生成张数", created.size());
         out.put("编号清单", created);
         out.put("单据状态", "草稿");
-        out.put("gotoPanel", "MANU_ORDER");
+        out.put("gotoPanel", "WORK_ORDER_LIST");   // 单轨(2026-09-26):生产工单落 plang,前端跳「生产工单」列表页(非 panelx 面板)
         return out;
     }
 }

@@ -9,12 +9,12 @@ SET NOCOUNT ON;
 GO
 -- SL_RECV / QC_INSP 头"供应商"(名称):改指 GFDA.mc
 UPDATE yj_field SET ref_panel = 'GFDA', ref_field = 'mc', display_field = 'mc'
-WHERE panel_code IN ('SL_RECV', 'QC_INSP') AND label = N'供应商' AND place LIKE '%header%'
+WHERE panel_code IN ('SL_RECV', 'QC_INSP', 'QC_RECV')  -- 2026-09-24 补 QC_RECV(面板 09-20 由 SL_RECV 改名,旧编码重放 0 行命中致参照回退 PARTNER) AND label = N'供应商' AND place LIKE '%header%'
   AND ISNULL(ref_panel, '') <> 'GFDA';
 
 -- SL_RECV / QC_INSP 头"供应商代码"(编码):改指 GFDA.dm,显示名称
 UPDATE yj_field SET ref_panel = 'GFDA', ref_field = 'dm', display_field = 'mc'
-WHERE panel_code IN ('SL_RECV', 'QC_INSP') AND label = N'供应商代码' AND place LIKE '%header%'
+WHERE panel_code IN ('SL_RECV', 'QC_INSP', 'QC_RECV')  -- 2026-09-24 补 QC_RECV(面板 09-20 由 SL_RECV 改名,旧编码重放 0 行命中致参照回退 PARTNER) AND label = N'供应商代码' AND place LIKE '%header%'
   AND ISNULL(ref_panel, '') <> 'GFDA';
 
 -- SL_RECV 明细"供应商"(名称):改指 GFDA.mc
@@ -24,7 +24,7 @@ WHERE panel_code = 'SL_RECV' AND label = N'供应商' AND place LIKE '%detail%'
 GO
 -- 自检:5 行应全部 ref_panel=GFDA
 SELECT panel_code, place, label, ref_panel, ref_field, display_field FROM yj_field
-WHERE panel_code IN ('SL_RECV', 'QC_INSP') AND label IN (N'供应商', N'供应商代码')
+WHERE panel_code IN ('SL_RECV', 'QC_INSP', 'QC_RECV')  -- 2026-09-24 补 QC_RECV(面板 09-20 由 SL_RECV 改名,旧编码重放 0 行命中致参照回退 PARTNER) AND label IN (N'供应商', N'供应商代码')
 ORDER BY panel_code, place;
 GO
 PRINT N'migrate-sl-supplier-ref 完成';

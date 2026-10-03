@@ -337,16 +337,17 @@ public class ButtonService {
         if ("修改申请中".equals(stStatus)) throw new IllegalStateException("修改申请审批期间不可保存，请等待审批完成或撤回申请");
         // 来料检验单数量守恒:每行 合格数量+不良数量 ≤ 数量(送检数量),超限拒绝保存
         if ("QC_INSP".equals(def.code())) validateInspQty(items);
-        // 样品编号表:样品编号 = 客户项目代号 + 项目编号(确定性拼接),同面板内不允许重复
-        if ("RD_SAMPLE_NO".equals(def.code())) ensureSampleNoUnique(no, items);
+        // ⚠ 原「样品编号表(RD_SAMPLE_NO)的样品编号唯一性校验」2026-09-30 随面板下架移除
+        //   (用户口径「样品编号表删掉」,见 tools/migrate-drop-sample-no-panel-2026-09-30.sql);
+        //   连带删掉私有方法 ensureSampleNoUnique —— 面板没了,该分支永不进入。
         // 必填校验(2026-09-20):仅「保存/提交」路径(markSaved=true)执行;
         // 「保存为草稿」「新增」放行 —— 用户口径:草稿不做必填限制,提交审批才做。
         // 补这层的理由:此前必填**只在前端校验**,直连 /px/callButton 就能把缺必填的单提交/归档
         // (实测:文档编号/测试主题为空仍可保存并归档)。前端仍保留校验(即时提示+定位字段),两层各司其职。
         if (markSaved) {
             ensureRequiredFilled(def, head, no);
-            // 明细行必填(2026-09-20):表头之外还有明细级必填(如 RD_SAMPLE_NO 的
-            // 客户项目代号/样品编号/项目编号全在明细),只查表头等于这些面板没校验。
+            // 明细行必填(2026-09-20):表头之外还有明细级必填(如 SO_ORDER 的
+            // 数量/单价全在明细),只查表头等于这些面板没校验。
             ensureDetailRequiredFilled(def, items);
         }
 
@@ -470,6 +471,8 @@ public class ButtonService {
      *   · 编号:save() 把载荷里的「编号」当**单据标识**取走(body.remove("编号")),
      *     同名列的字段永远无法随保存落库(实测 rd_spec_doc_head.编号 3 张单全为 NULL)
      *     ⇒ 拿它做必填 = 永远填不进去的死结。
+     *     (2026-09-30:规格书那个字段已改名「产品编号」,不再撞名;此条作为通用防线保留 ——
+     *      任一将来又把业务字段命名成「编号」的面板仍会被它兜住。)
      * 命中 col_name 或 label 任一即跳过。
      */
     private static final java.util.Set<String> REQUIRED_SYS_FIELDS =
@@ -554,32 +557,12 @@ public class ButtonService {
         if (dup != null && dup > 0) throw new IllegalArgumentException("文档编号不允许重复：" + docNo);
     }
 
-    /** 样品编号不允许重复(RD_SAMPLE_NO,2026-09-18)。
-     *  口径:样品编号 = 客户项目代号 + 项目编号(确定性拼接,无计数器 —— 见
-     *  docs/design/研发管理-新面板设计与改动方案.md §14),所以重复必然意味着
-     *  同一 (代号, 项目编号) 被录了两次。此处按明细列查重(与 ensureDocNoUnique 判头表不同,
-     *  它是**明细行**唯一),作废单据不计占用(两侧都排,口径同 ensureDocNoUnique)。 */
-    private void ensureSampleNoUnique(String docNo, List<Map<String, Object>> items) {
-        if (items == null || items.isEmpty()) return;
-        java.util.Set<String> seen = new java.util.LinkedHashSet<>();
-        for (Map<String, Object> it : items) {
-            Object v = it.get("样品编号");
-            if (v == null) continue;
-            String sampleNo = String.valueOf(v).trim();
-            if (sampleNo.isEmpty()) continue;
-            // 同一次提交内部先查重(数据库里还没有这些行)
-            if (!seen.add(sampleNo)) throw new IllegalArgumentException("样品编号不允许重复：" + sampleNo);
-            Integer dup = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM rd_sample_no_detail d "
-                            + "JOIN rd_sample_no_head h ON h.[单据编号] = d.[单据编号] "
-                            + "WHERE d.[样品编号] = ? AND d.[单据编号] <> ? "
-                            + "AND ISNULL(h.asp_cancel,'N') <> 'Y' "
-                            + "AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_SAMPLE_NO' "
-                            + "                AND s.doc_no = h.[单据编号] AND s.canceled = 'Y')",
-                    Integer.class, sampleNo, docNo == null ? "" : docNo);
-            if (dup != null && dup > 0) throw new IllegalArgumentException("样品编号不允许重复：" + sampleNo);
-        }
-    }
+    /** ⚠ 原 ensureSampleNoUnique(样品编号表 RD_SAMPLE_NO 的明细列唯一性校验)已随该面板
+     *  2026-09-30 下架一并删除(用户口径「样品编号表删掉」——
+     *  tools/migrate-drop-sample-no-panel-2026-09-30.sql:元数据/字段/权限已清、两张数据表留档)。
+     *  它当年的口径是:样品编号 = 客户项目代号 + 项目编号(确定性拼接、无计数器),重复即同一
+     *  (代号, 项目编号) 被录两次,故按**明细列**查重(区别于 ensureDocNoUnique 判头表)。
+     *  面板恢复时需从 git 历史取回本方法并重新挂到 save() 的 RD_SAMPLE_NO 分支上。 */
 
     // ==================== 规格书检验项目变更 → 出货检验计划表核对提醒(2026-09-11) ====================
 
@@ -786,6 +769,34 @@ public class ButtonService {
                 + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, archived, pending, canceled, shr, shsj, archived_at, update_at) "
                 + "VALUES (s.panel_code, s.doc_no, 'Y', 'N', 'N', ?, GETDATE(), GETDATE(), GETDATE());",
                 panelCode, no, user, user);
+        // 四个受控文件:归档即**本文件受控**(2026-09-30 用户口径「受控按文件」)。
+        // 需求原文(《产品开发系统需求汇总》5.1):「保存/提交 → 提交后审批 → 审批后自动受控」。
+        markFileControlled(panelCode, no, user);
+    }
+
+    /**
+     * 四个受控文件归档时写「是否受控 / 受控日期」(2026-09-30)。
+     * 落点 = 该面板头表**备用列池的 备用1/备用2**(零 DDL,依
+     * docs/design/动态字段扩展-备用列池-V1.0.md;四张表各用各自的两列,互不影响),
+     * 字段登记见 tools/migrate-rd-file-controlled-2026-09-30.sql。
+     *
+     * 为什么按文件而不是按产品:需求流程图里"审批后自动受控"只挂在 5.1 规格书这一步上,
+     * 说的是**这个文件**走完审批就受控;原先产品文件列表那两列是"4 份全归档 ⇒ 整产品受控"
+     * 的产品级派生,一个文件卡住会让另外三个已审批的文件也显示未受控。
+     * 非四文件面板 / 表或列缺失时静默跳过(记 warning),不影响归档主流程。
+     */
+    private void markFileControlled(String panelCode, String no, String user) {
+        if (panelCode == null || !DevTaskService.devPanelCodes().contains(panelCode)) return;
+        try {
+            PanelRegistry.PanelDef def = registry.panel(panelCode);
+            String tbl = def.headTable();
+            if (tbl == null || tbl.isBlank() || !tableCols(tbl).contains("备用1")) return;
+            jdbc.update("UPDATE [" + tbl + "] SET 备用1 = N'是', 备用2 = CONVERT(nvarchar(20), GETDATE(), 120),"
+                            + " asp_user2 = ?, asp_time2 = GETDATE() WHERE [" + def.groupCol() + "] = ?",
+                    user, no);
+        } catch (Exception e) {
+            log.warn("[受控] 写受控标记失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+        }
     }
 
     /** 行表 upsert:有 id 更新,无 id 插入(回填自增 id),缺席行软删(asp_cancel='Y') */
@@ -1117,7 +1128,7 @@ public class ButtonService {
         woReport.post(def.code(), no, currentUserName());
         // 切炭双出口(已确认):报工审核后,直销数量自动生成成品入库单并审核入账(成品仓)
         dualOutFinishIn(def.code(), no, currentUserName());
-        // 生产加工单执行回填(参考库 plang_pc:完工入库回写 rk_sl/rk_no、领料回写 ll_no2):
+        // 生产工单执行回填(参考库 plang_pc:完工入库回写 rk_sl/rk_no、领料回写 ll_no2):
         // 重算式(以该工单名下已审核入库/领料单为真源),审核/弃审对称;切炭自动入库经上方同路径已覆盖
         manuWriteback.post(def.code(), no, currentUserName());
         // 不良品处理记账(品质层):处理单审核 → 原仓扣减+目标仓(隔离/不良品)移仓或报废
@@ -1145,7 +1156,14 @@ public class ButtonService {
         String no = requireNo(formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
         String status = String.valueOf(st.get("status"));
-        if (!"已审核".equals(status) && !"已归档".equals(status)) throw new IllegalStateException("仅已审核或已归档状态可弃审");
+        // 产品变更申请单(2026-09-30 需求《产品开发系统需求汇总.xlsx》sheet「变更」):
+        // **生效后允许反审核**重走流程 —— 依据总原则第 3 条「允许修改编辑」,以及流程图那句
+        // 「项目有变动-**反审核后,重新走流程**」。此前变更单的「已生效」是死态:它不在
+        // DOC_ARCHIVE_PANELS 里(既没有「申请修改」),而本方法又把状态卡在"已审核/已归档",
+        // 于是生效之后整张单再也动不了(调研 2026-09-30 实测确认)。
+        boolean changeEffective = CHANGE_PANEL.equals(def.code()) && "已生效".equals(status);
+        if (!"已审核".equals(status) && !"已归档".equals(status) && !changeEffective)
+            throw new IllegalStateException("仅已审核或已归档状态可弃审");
         // 检验目录守卫(2026-09-22 用户口径):挂靠单据在检验目录中已「已完成检验」时不许反审核 ——
         // 需先在检验目录点「修改」把状态回弹为「正在检验中」,再回来反审核修改
         qcCatalog.assertLinkedRowNotCompleted(def.code(), no);
@@ -1183,9 +1201,14 @@ public class ButtonService {
         // 修改记录完全丢失。弃审时先落一份快照(弃审前的数据),此后再编辑保存/审核/审批通过时
         // 由 finalizeOpenModify 收尾 diff 并盖章再归档——弃审路径与申请修改路径留痕同构。
         if (DOC_ARCHIVE_PANELS.contains(def.code())) snapshotOnUnaudit(def, no, currentUserName());
-        // 弃审同时清归档标记(文件面板审批后=已归档,弃审应回到草稿)
-        jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL, update_at = GETDATE()"
-                + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
+        // 弃审同时清归档标记(文件面板审批后=已归档,弃审应回到草稿);
+        // 产品变更申请单(2026-09-30):生效后反审核必须**连 effective 一起清** ——
+        // 状态推导的优先级是「已生效 > 已归档 > 已审核」,只清 archived 的话
+        // 单据仍被判定成「已生效」,等于没退回(实测会卡在原地)。
+        jdbc.update("UPDATE yj_doc_status SET shr = NULL, shsj = NULL, archived = NULL,"
+                + " effective = CASE WHEN ? = 1 THEN NULL ELSE effective END, update_at = GETDATE()"
+                + " WHERE panel_code = ? AND doc_no = ?",
+                CHANGE_PANEL.equals(def.code()) ? 1 : 0, def.code(), no);
         // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
         if (List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT").contains(def.code())) {
             String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
@@ -1194,13 +1217,13 @@ public class ButtonService {
             jdbc.update("UPDATE " + tbl + " SET 是否已转ERP = N'否', ERP单号 = NULL, 转ERP操作人 = NULL, 转ERP时间 = NULL WHERE 单据编号 = ?", no);
         }
         recordApproval(def.code(), no, "UNAUDIT", "PENDING", opinionOf(formData));
-        // 生产加工单执行回填(对称重算):必须在上方 yj_doc_status 置 shr=NULL **之后**执行——
+        // 生产工单执行回填(对称重算):必须在上方 yj_doc_status 置 shr=NULL **之后**执行——
         // 重算以"已审核集合"为真源,挂钩早于状态清除会把弃审单仍按已审核计入,回填回旧值(2026-09-22 实测踩坑)
         manuWriteback.unpost(def.code(), no, currentUserName());
         return result(no, "草稿");
     }
 
-    // ---- 中止(对齐 PANDA/T+ 整单中止、生产加工单中止执行):仅已审核可中止,恢复保留原审核留痕 ----
+    // ---- 中止(对齐 PANDA/T+ 整单中止、生产工单中止执行):仅已审核可中止,恢复保留原审核留痕 ----
 
     /** 中止:已审核 → 已中止(留痕 stop_by/stop_at;shr 保留,取消中止后回到已审核) */
     private Map<String, Object> stop(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -1221,7 +1244,7 @@ public class ButtonService {
         return result(no, "已中止");
     }
 
-    /** 取消中止(生产加工单「草稿」按钮):已中止 → 恢复(shr 保留则已审核,否则草稿) */
+    /** 取消中止(生产工单「草稿」按钮):已中止 → 恢复(shr 保留则已审核,否则草稿) */
     private Map<String, Object> unstop(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
         Map<String, Object> st = docStatusOf(def.code(), no);
@@ -1533,6 +1556,18 @@ public class ButtonService {
         return v == null ? "" : String.valueOf(v).trim();
     }
 
+    /**
+     * 「申请修改」的修改原因(2026-09-30)。
+     * 需求原文(《产品开发系统需求汇总.xlsx》sheet「数据记录表」第 2 条):「修改:不需要反审核,
+     * 只需填写修改原因」;用户口径:「改完需要再审核」—— 故只在申请环节补这一格,审批闭环不动。
+     * ⚠ 用**独立键**「修改原因」而不是复用「审批意见」:后者是审批人写的话,
+     *   混在同一列(以及 yj_form_approval.opinion)里会分不清是申请人写的还是审批人写的。
+     */
+    private String modifyReasonOf(Map<String, Object> formData) {
+        Object v = formData == null ? null : formData.get("修改原因");
+        return v == null ? "" : String.valueOf(v).trim();
+    }
+
     public List<Map<String, Object>> queryApprovalHistory(String panelCode, String formNo) {
         return jdbc.query("SELECT action, result, node_no, operator, opinion, create_time FROM yj_form_approval"
                         + " WHERE panel_code = ? AND form_no = ? ORDER BY id ASC",
@@ -1778,11 +1813,11 @@ public class ButtonService {
     /**
      * 生成产品批号:成型后打印产品二维码的数据源(V1.2 #8)。
      * 批号=入库日期+3位流水(与材料批号同一号池);一次生成终身复用,重复调用返回已有批号。
-     * 单轨口径(2026-09-22):生产加工单(MANU_ORDER→头.批号);兼容过渡期 GD-生产工单(→产品批号列)。
+     * 单轨口径(2026-09-22):生产工单(MANU_ORDER→头.批号);兼容过渡期 GD-生产工单(→产品批号列)。
      */
     private Map<String, Object> genProductLot(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         boolean manu = "MANU_ORDER".equals(def.code());
-        if (!manu && !"WO_ORDER".equals(def.code())) throw new IllegalStateException("仅生产加工单/生产工单支持生成产品批号");
+        if (!manu && !"WO_ORDER".equals(def.code())) throw new IllegalStateException("仅生产工单支持生成产品批号");
         String no = requireNo(formData);
         List<Map<String, Object>> rows = manu
                 ? jdbc.queryForList("SELECT [批号] AS 产品批号 FROM bd_manu_order WHERE [合同号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no)
@@ -1811,8 +1846,11 @@ public class ButtonService {
      */
     private void dualOutFinishIn(String panelCode, String no, String user) {
         if (!"WO_REPORT".equals(panelCode)) return;
+        // 2026-09-27 单表化:报工数据直读 scjl(按 报工单号)
         List<Map<String, Object>> reps = jdbc.queryForList(
-                "SELECT [工单号], [工序], [报工数量], [直销数量] FROM wo_report WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+                "SELECT ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL(sl,0) AS 报工数量,"
+                        + " ISNULL([直销数量],0) AS 直销数量 FROM dbo.scjl"
+                        + " WHERE [报工单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(wgzt,'N')='Y'", no);
         if (reps.isEmpty()) return;
         Map<String, Object> rep = reps.get(0);
         if (!"切炭".equals(String.valueOf(rep.get("工序")))) return;
@@ -1825,12 +1863,11 @@ public class ButtonService {
                         + " AND target_panel_code = 'FINISH_IN' AND link_status = 'ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已生成过直销入库(重审幂等)
         String wo = String.valueOf(rep.get("工单号"));
-        // 单轨口径(2026-09-22):工单号=生产加工单(MANU_ORDER.合同号),产品取其行表;
-        // 兼容过渡期 GD-生产工单(WO_ORDER)——先查加工单,查不到再回退旧工单表
+        // 工单数据源(2026-09-27 切 plang 单轨):工单号=plang.pl_no,产品/单位/批号取 plang 行;
+        // 批号 lot_no 空时现场取号并回写 plang 全部行
         List<Map<String, Object>> ws = jdbc.queryForList(
-                "SELECT TOP 1 l.[产品编码], l.[产品名称], l.[生产单位] AS 单位, h.[批号] AS 产品批号"
-                        + " FROM bd_manu_order h JOIN bl_manu_order l ON l.[合同号] = h.[合同号] AND ISNULL(l.asp_cancel,'N') <> 'Y'"
-                        + " WHERE h.[合同号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'", wo);
+                "SELECT TOP 1 [dm] AS 产品编码, [mc] AS 产品名称, [jldw] AS 单位, [lot_no] AS 产品批号,"
+                        + " ISNULL([dj], 0) AS 单价 FROM plang WHERE [pl_no] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", wo);
         boolean fromManu = !ws.isEmpty();
         if (ws.isEmpty()) {
             ws = jdbc.queryForList(
@@ -1843,7 +1880,7 @@ public class ButtonService {
         if (lot == null) {
             lot = lotSeqService.next();
             jdbc.update(fromManu
-                            ? "UPDATE bd_manu_order SET [批号] = ? WHERE [合同号] = ?"
+                            ? "UPDATE plang SET [lot_no] = ? WHERE [pl_no] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
                             : "UPDATE wo_order SET [产品批号] = ? WHERE [单据编号] = ?",
                     lot, wo);
         }
@@ -1860,6 +1897,7 @@ public class ButtonService {
         line.put("产品编码", w.get("产品编码"));
         line.put("产品名称", w.get("产品名称"));
         line.put("实收数量", dual);
+        line.put("单价", numOr(w.get("单价")));   // 成本台账 收入金额 非空守卫(plang.dj 空则 0)
         line.put("计量单位", w.get("单位"));
         line.put("批号", lot);
         line.put("仓库", finishWh);
@@ -1875,8 +1913,8 @@ public class ButtonService {
         audit(registry.panel("FINISH_IN"), Map.of("编号", (Object) fiNo));
         jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key, target_panel_code, target_form_no, link_status, create_by, create_time)"
                         + " VALUES ('WO_REPORT', ?, '', 'FINISH_IN', ?, 'ACTIVE', ?, GETDATE())", no, fiNo, user);
-        // 报工扣减链路(2026-09-23):直销入库回执回填报工单(参考库 scjl.post_no 对齐)
-        jdbc.update("UPDATE wo_report SET [入库单号] = ? WHERE [单据编号] = ?", fiNo, no);
+        // 直销入库回执回填报工行(参考库 scjl.post_no 对齐;单表化后直接写 scjl)
+        jdbc.update("UPDATE dbo.scjl SET post_no = ? WHERE [报工单号] = ?", fiNo, no);
     }
 
     private static double numOr(Object o) {
@@ -2025,7 +2063,19 @@ public class ButtonService {
      *   ① 数量 → **退货数量**(QC_RETURN 行的数量字段叫退货数量,原先写「数量」→ 退货数量恒空);
      *   ② 型号 → **规格型号**(退回行字段叫规格型号);
      *   ③ 计量单位/单价:退回行原先**没有这两列**(本迁移已补),否则与 ② 同样丢弃。
+     * 2026-09-30 再修正(① 的镜像事故):09-20 的「退货数量」是按旧版 qc-3docs 血统改的;rebuild 血统
+     *   (本地两库及服务器全量恢复后)的退回行数量字段叫「数量」且无「退货数量」列 → 写入再次被静默丢弃,
+     *   TH-2026-09-0002~0004 行数量全空。教训:生单写入的标签必须**按目标面板注册动态解析**,不能写死单侧血统
+     *   的字面量——同因顺手补了 头「检验单号」(rebuild 血统缺字段行,溯源断链,配套 migrate-qcreturn-srcfix)。
      */
+    /** 目标面板明细字段标签解析:按候选顺序取第一个已注册的标签(多血统字段名兼容,如 退货数量/数量) */
+    private static String pickDetailLabel(PanelRegistry.PanelDef def, String... candidates) {
+        java.util.Set<String> labels = new java.util.HashSet<>();
+        for (PanelRegistry.FieldDef f : def.fieldsAt("detail")) labels.add(f.label());
+        for (String c : candidates) if (labels.contains(c)) return c;
+        return null;
+    }
+
     private void inspAutoReturn(String panelCode, String no, String user) {
         if (!"QC_INSP".equals(panelCode)) return;
         Integer linked = jdbc.queryForObject(
@@ -2046,12 +2096,17 @@ public class ButtonService {
         if (heads.isEmpty()) throw new IllegalStateException("检验单头不存在:" + no);
         Map<String, Object> h = heads.get(0);
         List<Map<String, Object>> items = new ArrayList<>();
+        // 2026-09-30 血统兼容:退回行数量字段 rebuild 血统叫「数量」、旧版 qc-3docs 血统叫「退货数量」,
+        // 此前写死「退货数量」在 rebuild 库(列都没有)被保存层静默丢弃 → 自动退回单行数量全空
+        // (实证 TH-2026-09-0002~0004)。按目标面板注册的标签择一写入,两侧血统都能落。
+        PanelRegistry.PanelDef thDef = registry.panel("QC_RETURN");
+        String qtyLabel = pickDetailLabel(thDef, "退货数量", "数量");
         for (Map<String, Object> r : defect) {
             Map<String, Object> line = new LinkedHashMap<>();
             line.put("物料编码", r.get("物料编码"));
             line.put("物料名称", r.get("物料名称"));
             line.put("规格型号", r.get("规格型号"));   // 退回行字段=规格型号(原写「型号」落不下)
-            line.put("退货数量", r.get("不良数量")); // 退回行数量字段=退货数量(原写「数量」落不下)
+            if (qtyLabel != null) line.put(qtyLabel, r.get("不良数量")); // 数量=检验行不良数量(标签按目标注册二择一)
             line.put("计量单位", r.get("计量单位"));
             if (r.get("单位") != null) line.put("单位", r.get("单位")); // 退回行另有「单位」列(2026-09-21 补齐,原先只写计量单位 → 单位全空)
             line.put("单价", r.get("单价"));
@@ -2074,7 +2129,10 @@ public class ButtonService {
             head.put("采购订单号", h.get("采购订单号"));
         }
         if (h.get("批次号") != null && !String.valueOf(h.get("批次号")).isBlank()) head.put("批次号", h.get("批次号"));
-        head.put("检验单号", no); // 头「检验单号」=来源检验单(参照字段存单号)
+        // 头「检验单号」=来源检验单(参照字段存单号)。2026-09-30:按目标注册择标签写入——
+        // rebuild 血统原无该字段行(写入被静默丢弃,溯源断链),配套迁移 migrate-qcreturn-srcfix 已补;
+        // 此处守卫仅为再遇血统缺字段时显式跳过,不再静默碰运气。
+        if (thDef.byLabel("检验单号") != null) head.put("检验单号", no);
         head.put("detail", Map.of("items", items));
         Map<String, Object> saved = save(registry.panel("QC_RETURN"), head, false);
         String thNo = String.valueOf(saved.get("编号"));
@@ -2330,9 +2388,10 @@ public class ButtonService {
      */
     private void dualOutRedReverse(String panelCode, String no, String user) {
         if (!"WO_REPORT".equals(panelCode)) return;
-        // 查报工单是否为切炭且有直销
+        // 查报工行是否为切炭且有直销(2026-09-27 单表化:直读 scjl)
         List<Map<String, Object>> reps = jdbc.queryForList(
-                "SELECT [工单号], [工序], [直销数量] FROM wo_report WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+                "SELECT ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL([直销数量],0) AS 直销数量"
+                        + " FROM dbo.scjl WHERE [报工单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (reps.isEmpty() || !"切炭".equals(String.valueOf(reps.get(0).get("工序")))) return;
         if (numOr(reps.get(0).get("直销数量")) <= 0) return;
         // 查 ACTIVE link → 原入库单号
@@ -2634,6 +2693,90 @@ public class ButtonService {
         out.put("新增行", inserted);
         out.put("更新行", updated);
         out.put("跳过", skipped);
+        // 四级项目(2026-09-30 需求「四级项目要进进度查询」):四级不走实施计划,
+        // 走的是「测试流程 → 简单开发/检测申请单」,同步逻辑同批补在下面。
+        Map<String, Object> four = syncTestDocsToProgress();
+        out.put("四级测试单", four.get("单据数"));
+        out.put("四级新增行", four.get("新增行"));
+        out.put("四级更新行", four.get("更新行"));
+        return out;
+    }
+
+    /**
+     * 四级项目(检测/打样) → 项目进度查询(2026-09-30)。
+     *
+     * 需求(《产品开发系统需求汇总.xlsx》sheet「开发相关流程」):四级支走的是
+     * 「测试流程 → 简单开发/检测申请单(发起人)→ 任务分发 → 打样测试 → 结果输出」,
+     * 即**测试申请单 RD_DOM_TEST**;而上面那条同步只读 rd_plan ⇒ 四级任务
+     * **永远不会**出现在「项目进度查询」里(2026-09-30 调研实测确认)。本方法把它补上。
+     *
+     * 列映射(取该单明细第一条作业务内容;测试申请单的表头基本只有单据标识):
+     *   项目名称 ← 产品名称(缺则测试（检测）内容)
+     *   项目层级 ← 四级        (需求:四级项目 = 简单应对(检测/打样):如内部简单测试、客户样品测试等)
+     *   项目编号 ← 单据编号    (四级没有实施计划,拿它自己当项目编号)
+     *   内容     ← 测试（检测）内容      说明 ← 测试（检测）背景
+     *   项目负责 ← 发起人                里程完成 ← 期望完成日期
+     *   状态     ← 单据状态(草稿/审批中/已归档…)的派生值
+     *   ⚠ 人工列(项目级/实施进度/测试员/谁来批准/谁来检验/未批准原因)一律不碰 —— 与 syncPlanToProgress 同口径。
+     * 幂等:按「项目编号=单据编号」找既有行,有则更新系统列、无则插入。
+     */
+    private Map<String, Object> syncTestDocsToProgress() {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("单据数", 0);
+        out.put("新增行", 0);
+        out.put("更新行", 0);
+        try {
+            List<String> progressNos = jdbc.queryForList(
+                    "SELECT TOP 1 [单据编号] FROM rd_progress WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY [单据编号] DESC", String.class);
+            if (progressNos.isEmpty()) return out;   // 进度查询还没有那张宿主单,先不动
+            String progressNo = progressNos.get(0);
+            List<Map<String, Object>> docs = jdbc.queryForList(
+                    "SELECT h.[单据编号], ISNULL(h.[申请单类型], N'') AS 申请单类型,"
+                            + " ISNULL(d.[产品名称], N'') AS 产品名称, ISNULL(d.[测试（检测）内容], N'') AS 内容,"
+                            + " ISNULL(d.[测试（检测）背景], N'') AS 背景, ISNULL(d.[发起人], N'') AS 发起人,"
+                            + " ISNULL(d.[期望完成日期], N'') AS 期望完成日期"
+                            + " FROM rd_dom_test_head h"
+                            + " LEFT JOIN rd_dom_test_detail d ON d.[单据编号] = h.[单据编号]"
+                            + "   AND d.[序号] = (SELECT MIN(x.[序号]) FROM rd_dom_test_detail x WHERE x.[单据编号] = h.[单据编号])"
+                            + " WHERE ISNULL(h.asp_cancel,'N') <> 'Y'"
+                            + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_DOM_TEST'"
+                            + "                   AND s.doc_no = h.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')"
+                            + " ORDER BY h.[单据编号]");
+            out.put("单据数", docs.size());
+            int ins = 0, upd = 0;
+            for (Map<String, Object> d : docs) {
+                String docNo = String.valueOf(d.get("单据编号"));
+                String name = String.valueOf(d.get("产品名称"));
+                if (name.isBlank()) name = String.valueOf(d.get("内容"));
+                if (name.isBlank()) name = docNo;
+                String status = String.valueOf(docStatusOf("RD_DOM_TEST", docNo).get("status"));
+                Integer exists = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM rd_progress_detail WHERE [单据编号] = ? AND [项目编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                        Integer.class, progressNo, docNo);
+                if (exists != null && exists > 0) {
+                    jdbc.update("UPDATE rd_progress_detail SET [项目名称]=?, [项目层级]=N'四级', [内容]=?, [说明]=?,"
+                                    + " [项目负责]=?, [里程完成]=?, [状态]=?, [预计完成日期]=? WHERE [单据编号]=? AND [项目编号]=?",
+                            name, d.get("内容"), d.get("背景"), d.get("发起人"), d.get("期望完成日期"), status,
+                            d.get("期望完成日期"), progressNo, docNo);
+                    upd++;
+                } else {
+                    jdbc.update("INSERT INTO rd_progress_detail ([单据编号],[项目名称],[项目层级],[项目编号],[内容],[说明],"
+                                    + "[项目负责],[里程完成],[状态],[预计完成日期],asp_user1,asp_time1)"
+                                    + " VALUES (?,?,N'四级',?,?,?,?,?,?,?,N'sync',GETDATE())",
+                            progressNo, name, docNo, d.get("内容"), d.get("背景"),
+                            d.get("发起人"), d.get("期望完成日期"), status, d.get("期望完成日期"));
+                    ins++;
+                }
+            }
+            out.put("新增行", ins);
+            out.put("更新行", upd);
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .info("[RD_DOM_TEST→RD_PROGRESS] 四级同步: 测试单 {} 张, 新增 {} 行, 更新 {} 行", docs.size(), ins, upd);
+        } catch (Exception e) {
+            // 测试申请单表/列缺失(或该面板尚未上线)时降级:不影响实施计划那条主链
+            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
+                    .warn("[RD_DOM_TEST→RD_PROGRESS] 四级同步跳过: {}", e.getMessage());
+        }
         return out;
     }
 
@@ -2790,6 +2933,10 @@ public class ButtonService {
      *  2026-09-28:**级联过滤改按编码匹配**(用户指正):名称会重名/改名/带尾空格,编码是稳定键——
      *  ①收窄入参优先 仓库编码/存货编码(名称兜底,兼容旧调用);②交集按编码对(bs_wh.仓库编码/
      *  bs_inv.存货编码,比名称对照更稳);③返回码名对 [{仓库编码,仓库}] 供前端按码绑定条件。
+     *  补充实测:bs_inv 重名严重(「端盖」24 码 /「PP棉」18 码),按名称收窄会把同名异码整批放进
+     *  候选;弹窗的 仓库/存货 参照同步改绑编码(formData 收发编码)。存货编码的 '(未填存货)'
+     *  哨兵值排除;未建档仓在视图里 仓库编码 为 NULL,天然被 EXISTS 交集滤掉。
+     *  参照绑定编码的**库侧**改动见 migrate-ledger-code-filter.sql(yj_field ref_field 改绑编码)。
      *  注意:内层 EXISTS 必须用外层别名限定编码列(bs_wh/bs_inv 存在同名 编码 列,否则内层遮蔽外层)。 */
     private Map<String, Object> ledgerRefOptions(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String view = switch (def.code()) {
@@ -2986,6 +3133,13 @@ public class ButtonService {
 
     /** 变更申请单面板编码 */
     private static final String CHANGE_PANEL = "RD_CHANGE";
+    /**
+     * 变更类型取值(2026-09-30 需求《产品开发系统需求汇总.xlsx》sheet「变更」底部两行原文):
+     * 「严格变更 = 按上述流程」(六步 + 会签) / 「快捷变更 = 冯总审批」。
+     * 本常量是**快捷变更**那一档 —— 它禁止提交会签,只需审核人单节点审批。
+     * 字段登记见 tools/migrate-rd-change-kind-2026-09-30.sql。
+     */
+    private static final String CHANGE_KIND_FAST = "快捷变更";
     /** 部门评审行的表区值(与前端纸张配置同名) */
     private static final String CHANGE_DEPT_SECTION = "部门评审意见";
     /** 部门行里可由填写人改的列(其余列一律以库内现值为准) */
@@ -3205,6 +3359,16 @@ public class ButtonService {
         if ("会签中".equals(st)) throw new IllegalStateException("本单会签进行中，无需重复提交");
         if (!"草稿".equals(st)) throw new IllegalStateException("仅草稿状态可提交会签（当前：" + st + "）");
         if (!"是".equals(changeHead(no, "需会签"))) throw new IllegalStateException("本单未勾选「需会签」，直接提交审批即可");
+        // 两种变更(2026-09-30 需求《产品开发系统需求汇总.xlsx》sheet「变更」底部两行原文):
+        //   「严格变更 = 按上述流程」(六步:发起 → 填原因/上传 → 填需修改文件及处理方案
+        //     → 分发给文件负责人修改 → 审核人审批 → 受控关闭;会签是这条链上的多部门确认)
+        //   「快捷变更 = 冯总审批」—— 只需审核人点头,不走走会签。
+        // 故:快捷变更**禁止**提交会签(勾了「需会签」也不放行),直接「提交审批」。
+        // ⚠ changeHead 是按**物理列名**拼 SQL 的(见其实现 `SELECT ISNULL([col] ...)`),
+        //   所以这里要传"备用1"而不是字段 label「变更类型」——该字段走备用列池,label 与列名不同名
+        //   (实测传 label 会 500:列名 '变更类型' 无效)。
+        if (CHANGE_KIND_FAST.equals(changeHead(no, "备用1")))
+            throw new IllegalStateException("本单是「快捷变更」（冯总审批即可），无需会签；请直接「提交审批」");
         List<String> signers = signersOf(no);
         if (signers.isEmpty()) throw new IllegalStateException("请先填写会签人（账号）");
         if (signers.contains(user) && !isAdminUser(user))
@@ -3572,8 +3736,8 @@ public class ButtonService {
      * formData = {编号: 产品信息表单据编号, assigns: [{编号: 规格书单据编号, 责任人: 账号}]}。
      * 产品编号/名称/负责人一律服务端自查(不信客户端);分配后仅 责任人∪总负责人∪管理员 可编辑
      * (ensureSpecAssignEditable 在 保存/申请修改/删除 三个入口强制)。
-     * 绑定:单据须存活、未分配过(一单一条活分配,分发过的不再重复分发)、编号为空或属本产品;
-     * 绑定时 rd_spec_doc_head.编号 盖产品编号章(正常运行时唯一写入方,进度匹配依据)。多张同一事务全成或全无。
+     * 绑定:单据须存活、未分配过(一单一条活分配,分发过的不再重复分发)、产品编号为空或属本产品;
+     * 绑定时 rd_spec_doc_head.产品编号 盖产品编号章(正常运行时唯一写入方,进度匹配依据)。多张同一事务全成或全无。
      */
     @SuppressWarnings("unchecked")
     private Map<String, Object> specAssign(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -3611,13 +3775,15 @@ public class ButtonService {
         String supervisor = devTaskService.supervisorOf(productCode);
         String supervisorSnapshot = supervisor == null ? user : supervisor; // 挂起产品快照操作人(admin)
         // 绑定 + 写分配(同一事务):单据须存活、未分配过(分发过的不再重复分发)、
-        // 且 编号为空(普通保存从不写该列)或已属于本产品;绑定时给单据盖上产品编号(进度匹配依据)
+        // 且 产品编号为空(普通保存从不写该列)或已属于本产品;绑定时给单据盖上产品编号(进度匹配依据)
+        // ⚠ 列名 2026-09-30 由「编号」改「产品编号」:旧键名与引擎的**单据标识键**同名,值会被
+        //   QueryService.loadDocs 的单据号覆盖(见 migrate-rd-specdoc-prodno-2026-09-30.sql)。
         List<Map<String, Object>> assigned = new ArrayList<>();
         for (Map<String, Object> a : assigns) {
             String docNo = String.valueOf(a.get("编号")).trim();
             String owner = String.valueOf(a.get("责任人")).trim();
             List<Map<String, Object>> docs = jdbc.queryForList(
-                    "SELECT h.编号, h.规格书种类, ISNULL(s.deleting,'N') AS deleting, ISNULL(s.stopped,'N') AS stopped"
+                    "SELECT h.产品编号, h.规格书种类, ISNULL(s.deleting,'N') AS deleting, ISNULL(s.stopped,'N') AS stopped"
                             + " FROM rd_spec_doc_head h LEFT JOIN yj_doc_status s ON s.panel_code = 'RD_SPEC_DOC'"
                             + " AND s.doc_no = h.单据编号"
                             + " WHERE h.单据编号 = ? AND ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(s.canceled,'N') <> 'Y'", docNo);
@@ -3627,7 +3793,7 @@ public class ButtonService {
                 throw new IllegalArgumentException("规格书单据正在删除审批中，不可分发：" + docNo);
             if ("Y".equals(String.valueOf(docs.get(0).get("stopped"))))
                 throw new IllegalArgumentException("规格书单据已中止，不可分发：" + docNo);
-            String docProduct = docs.get(0).get("编号") == null ? "" : String.valueOf(docs.get(0).get("编号")).trim();
+            String docProduct = docs.get(0).get("产品编号") == null ? "" : String.valueOf(docs.get(0).get("产品编号")).trim();
             if (!docProduct.isEmpty() && !docProduct.equals(productCode))
                 throw new IllegalArgumentException("规格书单据「" + docNo + "」已属于其他产品（" + docProduct + "）");
             List<Map<String, Object>> prev = jdbc.queryForList(
@@ -3636,7 +3802,7 @@ public class ButtonService {
                 throw new IllegalArgumentException("该规格书已分发：" + docNo + "（责任人 " + prev.get(0).get("责任人") + "），请勿重复分发");
             String kind = docs.get(0).get("规格书种类") == null ? "" : String.valueOf(docs.get(0).get("规格书种类")).trim();
             // 盖章:产品编号列(正常保存路径从不写,分发是运行时唯一写入方)+ 操作人留痕
-            jdbc.update("UPDATE rd_spec_doc_head SET 编号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE 单据编号 = ?",
+            jdbc.update("UPDATE rd_spec_doc_head SET 产品编号 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE 单据编号 = ?",
                     productCode, user, docNo);
             Map<String, Object> asg = new LinkedHashMap<>();
             asg.put("产品编号", productCode);
@@ -3674,8 +3840,10 @@ public class ButtonService {
     }
 
     /** 建单防绕过:保存载荷的「编号」是单据编号——若该号不是已有单据、却命中已下发产品的产品编号,
-     *  说明有人以产品码为单号手工建规格书单(封面编号格输入产品编码保存),要求总负责人/admin。
-     *  (物理 rd_spec_doc_head.编号 产品列正常保存路径从不写,唯一的手动向量就是这个改主键通道。)
+     *  说明有人以产品码为单号手工建规格书单,要求总负责人/admin。
+     *  ⚠ 2026-09-30 后封面右上角那一格绑的是**产品编号字段**(不再占用单据标识键「编号」),
+     *    所以界面上的常规输入已不构成这条向量;本条拦的是**直连接口**把「编号」当单号传进来的情形
+     *    (仍是有效防线,故保留)。
      *  空白 directAdd 草稿编号=NULL 不参与产品匹配,天然无法绕过分发。 */
     private void ensureSpecCreateAllowed(PanelRegistry.PanelDef def, String no, String user) {
         if (!"RD_SPEC_DOC".equals(def.code())) return;
@@ -3714,16 +3882,21 @@ public class ButtonService {
         if (DevTaskService.devPanelCodes().contains(def.code())) ensureDevFileEditable(def, no, null, user); // 四文件门禁同口径
         String st = String.valueOf(docStatusOf(def.code(), no).get("status"));
         if (!"已归档".equals(st) && !"已审核".equals(st)) throw new IllegalStateException("仅已归档单据可申请修改");
+        // 修改原因**必填**(2026-09-30 需求:「修改:只需填写修改原因」)—— 空则拒绝,理由同所有必填:
+        // 不留原因的修改等于无从追溯,而这条闭环的全部新增信息就是这一句原因。
+        String reason = modifyReasonOf(formData);
+        if (reason.isEmpty()) throw new IllegalArgumentException("请填写修改原因");
+        if (reason.length() > 500) throw new IllegalArgumentException("修改原因过长（≤500 字）");
         jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                         + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
-                        + "WHEN MATCHED THEN UPDATE SET modify_state = 'R', modify_req_by = ?, modify_req_at = GETDATE(), update_at = GETDATE() "
-                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, modify_state, modify_req_by, modify_req_at, update_at) "
-                        + "VALUES (s.panel_code, s.doc_no, 'R', ?, GETDATE(), GETDATE());",
-                def.code(), no, user, user);
-        recordApproval(def.code(), no, "MODIFY_REQ", "PENDING", opinionOf(formData));
-        // 消息:申请修改 → 管理员
+                        + "WHEN MATCHED THEN UPDATE SET modify_state = 'R', modify_req_by = ?, modify_req_at = GETDATE(), modify_reason = ?, update_at = GETDATE() "
+                        + "WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, modify_state, modify_req_by, modify_req_at, modify_reason, update_at) "
+                        + "VALUES (s.panel_code, s.doc_no, 'R', ?, GETDATE(), ?, GETDATE());",
+                def.code(), no, user, reason, user, reason);
+        recordApproval(def.code(), no, "MODIFY_REQ", "PENDING", reason);
+        // 消息:申请修改 → 管理员(把原因一并带上,管理员不用打开单据就知道要改什么)
         notify(() -> messageService.sendToAdmins(def.code(), no, MessageService.MODIFY_REQUESTED,
-                Map.of("docNo", no, "actor", user, "opinion", opinionOf(formData)), user));
+                Map.of("docNo", no, "actor", user, "opinion", reason), user));
         return result(no, "修改申请中");
     }
 
@@ -3737,10 +3910,13 @@ public class ButtonService {
         Map<String, Object> row = st.get("row") instanceof Map<?, ?> m ? (Map<String, Object>) m : null;
         String applyBy = row == null || row.get("modify_req_by") == null ? user : String.valueOf(row.get("modify_req_by"));
         Object applyAt = row == null ? null : row.get("modify_req_at");
-        jdbc.update("INSERT INTO yj_doc_modify_log (panel_code, doc_no, apply_by, apply_at, approve_by, approve_at, snapshot_head, snapshot_rows) "
-                        + "VALUES (?,?,?,?,?,?,?,?)",
+        // 修改原因随本次修改一起归档(2026-09-30):申请时暂存在 yj_doc_status.modify_reason,
+        // 这里复制进 log 长期可见 —— log 是历史快照,只读状态行的当前值会让历次修改的原因互相覆盖。
+        String reason = row == null || row.get("modify_reason") == null ? "" : String.valueOf(row.get("modify_reason"));
+        jdbc.update("INSERT INTO yj_doc_modify_log (panel_code, doc_no, apply_by, apply_at, approve_by, approve_at, snapshot_head, snapshot_rows, modify_reason) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?)",
                 def.code(), no, applyBy, applyAt, user, LocalDateTime.now(),
-                toJson(headLabelSnapshot(def, no)), toJson(rowSnapshots(def, no)));
+                toJson(headLabelSnapshot(def, no)), toJson(rowSnapshots(def, no)), reason);
         int n = jdbc.update("UPDATE yj_doc_status SET modify_state='Y', modify_appr_by=?, modify_appr_at=GETDATE(), archived='N', update_at=GETDATE()"
                 + " WHERE panel_code=? AND doc_no=? AND modify_state='R'", user, def.code(), no);
         if (n == 0) throw new IllegalStateException("无待审批的修改申请");
@@ -3916,7 +4092,7 @@ public class ButtonService {
         // 修改中/审批中随时打开可见当前已改内容(快照 vs 当前实时 diff)
         refreshModifyDiff(def, no);
         List<Map<String, Object>> records = jdbc.queryForList(
-                "SELECT TOP 3 apply_by, apply_at, approve_by, approve_at, rearchive_by, rearchive_at, changes, change_meta"
+                "SELECT TOP 3 apply_by, apply_at, approve_by, approve_at, rearchive_by, rearchive_at, changes, change_meta, modify_reason"
                         + " FROM yj_doc_modify_log WHERE panel_code=? AND doc_no=? ORDER BY id DESC", def.code(), no);
         List<Map<String, Object>> list = new ArrayList<>();
         for (Map<String, Object> r : records) {
@@ -3927,6 +4103,8 @@ public class ButtonService {
             m.put("approveAt", fmtTime(r.get("approve_at")));
             m.put("rearchiveBy", r.get("rearchive_by"));
             m.put("rearchiveAt", fmtTime(r.get("rearchive_at")));
+            // 修改原因(2026-09-30):申请时必填的那句话,在「修改记录」弹窗里逐条展示
+            m.put("reason", r.get("modify_reason") == null ? "" : String.valueOf(r.get("modify_reason")));
             m.put("changes", r.get("changes"));
             m.put("changeMeta", r.get("change_meta"));
             list.add(m);
@@ -4142,8 +4320,9 @@ public class ButtonService {
             "RD_APPROVAL", "RD_PLAN", "RD_FILTER_EFF",
             "RD_ALKALINE", "RD_MINERAL", "RD_ANTIBACT", "RD_SCALE", "RD_RO_PROTECT", "RD_SOAK", "RD_DROP_PREC",
             "RD_SPIKE_WATER", "RD_DOM_TEST", "RD_EQUIP_USE", "RD_INSTR_USE",
-            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO",
-            // 2026-09-18 新增:样品编号表 —— 发号台账,改样品编号=改追溯锚点,必须防篡改,故入归档闭环。
+            // ⚠ 样品编号表(RD_SAMPLE_NO)2026-09-30 **下架**,已从本集合移除 —— 用户口径「样品编号表删掉」
+            //   (tools/migrate-drop-sample-no-panel-2026-09-30.sql:面板元数据/字段/权限已清、两张数据表留档)。
+            //   当年登记理由是"发号台账,改样品编号=改追溯锚点,必须防篡改";面板下架后无从归档,故一并撤登记。
             // ⚠ RD_PROD_DOCLIST(产品文件列表)**刻意不入本集合**:它是**只读派生视图**
             //   (4 文件×状态矩阵由 DevTaskService 实时推导,面板本身没有可归档的"纸"),
             //   没有「新增」入口、永远没有单据可归档;登记进来只会让归档/修改闭环指向空集合。
@@ -4153,7 +4332,7 @@ public class ButtonService {
             //   —— 管理员保存即归档会让"提交审批"看起来直接归档,用户口径不认(曾登记后移出)。
             // ⚠ 2026-09-24 下拉生产域时**刻意不采纳**远端把 RD_PROGRESS 登记进来的改动(研发域用户自有,
             //   本地优先级最高):本地口径维持"项目进度查询单独据、永远草稿、刻意排除"。
-            "RD_SAMPLE_NO");
+            "RD_MOLD_PROC", "RD_MOLD_FORMULA", "RD_ASM_BOM", "RD_ASM_PROC", "RD_SPEC_DOC", "RD_INSP_PLAN", "RD_PROD_INFO");
     /** 文件类面板(有文档编号列):保存校验文档编号唯一(不允许重复)。
      *  ⚠ RD_INSP_PLAN(出货检验计划表)**刻意不入本集合**(2026-09-20 用户口径):
      *   它的文档编号不是"单据号"而是**表单固定值** —— 前端 recordSheetConfigs.js 的
@@ -4176,7 +4355,7 @@ public class ButtonService {
      *   另一处在 QueryService.docStatus,管列表行状态) */
     private Map<String, Object> docStatusOf(String panelCode, String no) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at, approve_node, l2_approver, effective, erp_close_state FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
+                "SELECT shr, canceled, stopped, pending, pending_by, pending_at, archived, deleting, modify_state, modify_req_by, modify_req_at, modify_appr_by, modify_appr_at, modify_reason, approve_node, l2_approver, effective, erp_close_state FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?",
                 panelCode, no);
         Map<String, Object> out = new HashMap<>();
         Map<String, Object> r = rows.isEmpty() ? null : rows.get(0);

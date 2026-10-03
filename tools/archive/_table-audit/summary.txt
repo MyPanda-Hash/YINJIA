@@ -1,0 +1,99 @@
+在运营面板: 141(菜单 131 / 授权 79 / 代码引用 139 之并集)
+在运营视图: 30
+
+== 分类统计(共 453 张表)==
+  A_在用_MES自有: 191
+  B_在用_经典遗留: 15
+  C_仅下架面板挂靠: 30
+  D_有数据无引用: 69
+  E_空表_MES未接线: 20
+  F_空表_遗留未用: 62
+  X_备份临时: 66
+
+== 在用表合计 206 张(MES 自有 191 / 经典遗留 15)==
+  已有 20 备用列: 136 张;缺: 70 张
+    day_report	spare=0	rows=0	cols=15	panels=[DAY_REPORT]	views=[]
+    day_report_detail	spare=0	rows=0	cols=24	panels=[DAY_REPORT]	views=[]
+    equip_check	spare=0	rows=0	cols=15	panels=[EQUIP_CHECK]	views=[]
+    equip_check_detail	spare=0	rows=0	cols=14	panels=[EQUIP_CHECK]	views=[]
+    erp_imp_log	spare=0	rows=0	cols=17	panels=[ERPLG]	views=[]
+    feed_confirm	spare=0	rows=0	cols=14	panels=[FEED_CONFIRM]	views=[]
+    feed_confirm_detail	spare=0	rows=1	cols=14	panels=[FEED_CONFIRM]	views=[]
+    form_flow_link	spare=0	rows=0	cols=18	panels=[]	views=[]
+    gran_record	spare=0	rows=0	cols=27	panels=[GRAN_RECORD]	views=[]
+    gran_record_detail	spare=0	rows=0	cols=7	panels=[GRAN_RECORD]	views=[]
+    inv_cost_ledger	spare=0	rows=0	cols=14	panels=[]	views=[v_stock_balance v_stock_ledger]
+    maint_plan	spare=0	rows=0	cols=13	panels=[MAINT_PLAN]	views=[]
+    maint_plan_detail	spare=0	rows=10	cols=15	panels=[MAINT_PLAN]	views=[]
+    mix_record	spare=0	rows=0	cols=17	panels=[MIX_RECORD]	views=[]
+    mix_record_detail	spare=0	rows=1	cols=12	panels=[MIX_RECORD]	views=[]
+    pack_confirm	spare=0	rows=0	cols=17	panels=[PACK_CONFIRM]	views=[]
+    pack_confirm_detail	spare=0	rows=0	cols=7	panels=[PACK_CONFIRM]	views=[]
+    qr_batch_registry	spare=0	rows=0	cols=9	panels=[]	views=[]
+    rd_dev_task	spare=0	rows=8	cols=13	panels=[]	views=[]
+    rd_spec_assign	spare=0	rows=0	cols=11	panels=[]	views=[]
+    report_column_settings	spare=0	rows=0	cols=5	panels=[]	views=[]
+    rod_return	spare=0	rows=0	cols=18	panels=[ROD_RETURN]	views=[]
+    rod_return_detail	spare=0	rows=0	cols=7	panels=[ROD_RETURN]	views=[]
+    s_allno	spare=0	rows=572	cols=16	panels=[]	views=[]
+    sample_req	spare=0	rows=0	cols=19	panels=[SAMPLE_REQ]	views=[]
+    sample_req_detail	spare=0	rows=1	cols=14	panels=[SAMPLE_REQ]	views=[]
+    sl_recv	spare=0	rows=0	cols=34	panels=[QC_RECV]	views=[]
+    sl_recv_detail	spare=0	rows=8	cols=52	panels=[QC_RECV]	views=[]
+    wh_record	spare=0	rows=0	cols=19	panels=[WH_RECORD]	views=[]
+    wh_record_detail	spare=0	rows=0	cols=7	panels=[WH_RECORD]	views=[]
+    yj_app_setting	spare=0	rows=1	cols=6	panels=[]	views=[]
+    yj_archive_change_log	spare=0	rows=0	cols=8	panels=[]	views=[]
+    yj_attachment	spare=0	rows=0	cols=12	panels=[]	views=[]
+    yj_change_dept	spare=0	rows=12	cols=8	panels=[]	views=[]
+    yj_dept	spare=0	rows=20	cols=4	panels=[]	views=[]
+    yj_doc_batch	spare=0	rows=0	cols=13	panels=[]	views=[]
+    yj_doc_modify_log	spare=0	rows=0	cols=14	panels=[]	views=[]
+    yj_doc_status	spare=0	rows=24	cols=30	panels=[]	views=[v_dispatch_stats v_finish_in_detail v_finish_in_stats v_lot_trace v_manu_order_stats v_manu_schedule v_material_out_detail v_material_out_stats v_other_in_detail v_other_in_stats v_other_out_detail v_other_out_stats v_purchase_in_detail v_purchase_in_stats v_sale_out_detail v_sale_out_stats v_sales_order_detail v_sales_order_stats v_wo_kit v_wo_schedule]
+    yj_ext_bind_log	spare=0	rows=66	cols=8	panels=[]	views=[]
+    yj_field	spare=0	rows=4213	cols=20	panels=[]	views=[]
+    yj_form_approval	spare=0	rows=44	cols=9	panels=[]	views=[]
+    yj_locale	spare=0	rows=10	cols=5	panels=[]	views=[]
+    yj_lot_seq	spare=0	rows=0	cols=2	panels=[]	views=[]
+    yj_message	spare=0	rows=2	cols=14	panels=[]	views=[]
+    yj_panel	spare=0	rows=172	cols=17	panels=[]	views=[]
+    yj_plan_term	spare=0	rows=0	cols=16	panels=[]	views=[]
+    yj_report_template	spare=0	rows=1	cols=11	panels=[]	views=[]
+    yj_role	spare=0	rows=3	cols=5	panels=[]	views=[]
+    yj_role_panel	spare=0	rows=185	cols=5	panels=[]	views=[]
+    yj_share_file	spare=0	rows=0	cols=17	panels=[RD_SHARE_FILE]	views=[]
+    yj_share_file_cat	spare=0	rows=13	cols=8	panels=[]	views=[]
+    yj_std_lib	spare=0	rows=178	cols=11	panels=[]	views=[]
+    yj_translation	spare=0	rows=41835	cols=8	panels=[]	views=[]
+    yj_usage_log	spare=0	rows=2395	cols=9	panels=[]	views=[]
+    yj_user	spare=0	rows=10	cols=26	panels=[]	views=[]
+    dm_ck	spare=0	rows=22	cols=22	panels=[CKDA]	views=[]
+    dm_gf	spare=0	rows=29	cols=78	panels=[GFDA]	views=[]
+    dm_kh	spare=0	rows=41	cols=127	panels=[KHDA]	views=[]
+    gxgs	spare=0	rows=1	cols=71	panels=[OP_TIME]	views=[]
+    inh	spare=0	rows=145	cols=95	panels=[RKD]	views=[]
+    kucun	spare=0	rows=31	cols=33	panels=[STOCK_STATUS]	views=[v_wo_kit]
+    mate	spare=0	rows=35578	cols=36	panels=[]	views=[]
+    order_bs	spare=0	rows=77	cols=131	panels=[KHDD]	views=[]
+    order_bt	spare=0	rows=13	cols=87	panels=[KHDD]	views=[]
+    outh	spare=0	rows=30	cols=106	panels=[CKD]	views=[]
+    plang	spare=0	rows=25	cols=58	panels=[]	views=[]
+    plang_pc	spare=0	rows=25	cols=56	panels=[]	views=[]
+    Porder	spare=0	rows=12	cols=73	panels=[CGD]	views=[]
+    s_log	spare=0	rows=8220	cols=20	panels=[]	views=[]
+    scjl	spare=0	rows=7	cols=79	panels=[WO_REPORT WO_REPORT_LIST]	views=[]
+
+== C_仅下架面板挂靠 (30) ==
+  dm_ywy(rows=13) erp_imp_row pr_asm_daily pr_asm_incoming pr_asm_return pr_black_test pr_cut_daily pr_demold_qc pr_efficiency pr_flow_card pr_form_daily pr_form_first pr_maintenance pr_mat_inspect pr_mix_blend pr_mix_check pr_mix_confirm pr_mix_daily pr_mix_feed pr_mix_granule pr_mix_process pr_no_black pr_pack_confirm pr_patrol_qc pr_qc_control pr_scrap pr_sinter_qc wo_line_stock wo_material_pick wo_stage_report
+
+== D_有数据无引用 (69) ==
+  area_city(rows=365) area_code(rows=3524) area_country(rows=248) area_district(rows=2927) area_province(rows=34) bacord(rows=20) bxsq(rows=1) chdcmx(rows=3) chsq(rows=2) chtz(rows=1) computer(rows=2) dh(rows=232) dm_fylb(rows=16) dm_gfjj(rows=4) dm_gx(rows=206) dm_gz(rows=38) dm_jjlb(rows=11) dm_key(rows=5) dm_khgjjl(rows=1) dm_khlxr(rows=4) dm_khsj(rows=9) dm_khzl(rows=73) dm_ks(rows=27) dm_langue(rows=15) dm_py(rows=6764) dm_style(rows=2) dm_tax(rows=6) dm_wzlb(rows=5) dm_xl(rows=1) dm_yh(rows=10) dm_ywylb(rows=2) dm_zjfl(rows=1) dm_zw(rows=1) flash(rows=6) gscs(rows=1) gzzc(rows=40) Invoice(rows=4) kjkm(rows=652) kmye(rows=29) kqewm(rows=2) kqjjr(rows=6) kqyc(rows=1) odprice_bs(rows=39) odprice_bt(rows=14) OdSample_bs(rows=4) OdSample_wl(rows=40) OrderSample(rows=2) permission(rows=1529) pjjl(rows=6) pzfk(rows=2) qkd(rows=1) s_commdata(rows=712) s_error(rows=2) s_remoteprint(rows=43) s_repformat(rows=56) s_roles(rows=189) s_rzxz(rows=4) s_screen(rows=113) s_SelWhere(rows=4) s_sys(rows=5660) s_xtcs(rows=14) s_ycdy(rows=23) setdate(rows=1) sfkcz(rows=4) sfkmx(rows=6) users(rows=5) wbgd(rows=4) xsdh(rows=3) yj_schema_log(rows=329)
+
+== E_空表_MES未接线 (20) ==
+  rd_alkaline rd_antibact rd_asm_bom rd_asm_proc rd_dom_test rd_drop_prec rd_equip_use rd_filter_eff rd_insp_plan rd_instr_use rd_mineral rd_mold_formula rd_mold_proc rd_product_info rd_ro_protect rd_scale rd_soak rd_spec_doc rd_spike_water wo_report
+
+== F_空表_遗留未用 (62) ==
+  address cbhs cp_barcode cpfpmx dm_dbzsd dm_myjj dm_sys dm_wz dm_wzbacord dm_wzddw dm_wzsx dorder fgjl fgjl_ls fgjlhz from_excel gdzc gssp gszl gzb gzffjl huiyuan huiyuan_hz jgsd jrhz jrhz_ls jyd jyd_bs khts kjpz kjpz_bs kqbc kqqjd kqsj kqsj_ls mate_jtsh order1 pandian pd_history pd_zzp pd_zzphistory pd_zzprq pjjl_sz s_cookie s_fromexcel s_otherfunc s_phrase s_repbody s_repdraw s_repheader s_repinfo scjd scjd_ls scpc scrb scrb_bs sczxd wlxx xjjl xjjl_sz ysfk zc
+
+== X_备份临时 (66) ==
+  log rd_approval_bak_20260911(rows=20) rd_approval_detail_bak_20260911 rd_asm_bom_detail_bak_20260911(rows=4) rd_asm_bom_head_bak_20260911(rows=3) rd_dom_test_detail_bak_20260911 rd_dom_test_head_bak_20260911(rows=2) rd_equip_use_detail_bak_20260911(rows=5) rd_equip_use_head_bak_20260911(rows=9) rd_insp_plan_detail_bak_20260911 rd_insp_plan_head_bak_20260911(rows=2) rd_instr_use_detail_bak_20260911 rd_instr_use_head_bak_20260911(rows=2) rd_mold_formula_detail_bak_20260911(rows=2) rd_mold_formula_head_bak_20260911(rows=3) rd_plan_bak_20260911(rows=8) rd_plan_detail_bak_20260911 rd_prod_info_detail_bak_20260911 rd_prod_info_head_bak_20260911(rows=8) rd_progress_detail_bak_20260918 rd_spike_water_detail_bak_20260911 rd_spike_water_head_bak_20260911(rows=2) RENAME_20260911_173159_rd_approval_bak_20260911(rows=20) RENAME_20260911_173159_rd_approval_detail_bak_20260911 RENAME_20260911_173159_rd_dom_test_detail_bak_20260911 RENAME_20260911_173159_rd_dom_test_head_bak_20260911(rows=2) RENAME_20260911_173159_rd_equip_use_detail_bak_20260911(rows=5) RENAME_20260911_173159_rd_equip_use_head_bak_20260911(rows=9) RENAME_20260911_173159_rd_insp_plan_detail_bak_20260911 RENAME_20260911_173159_rd_insp_plan_head_bak_20260911(rows=2) RENAME_20260911_173159_rd_instr_use_detail_bak_20260911 RENAME_20260911_173159_rd_instr_use_head_bak_20260911(rows=2) RENAME_20260911_173159_rd_plan_bak_20260911(rows=8) RENAME_20260911_173159_rd_plan_detail_bak_20260911 RENAME_20260911_173159_rd_prod_info_detail_bak_20260911 RENAME_20260911_173159_rd_prod_info_head_bak_20260911(rows=8) RENAME_20260911_173159_rd_spike_water_detail_bak_20260911 RENAME_20260911_173159_rd_spike_water_head_bak_20260911(rows=2) RENAME_20260911_173159_yj_doc_modify_log_bak_20260911(rows=3) RENAME_20260911_173159_yj_doc_status_bak_20260911(rows=53) RENAME_20260911_173205_rd_approval_bak_20260911(rows=20) RENAME_20260911_173205_rd_approval_detail_bak_20260911 RENAME_20260911_173205_rd_dom_test_detail_bak_20260911 RENAME_20260911_173205_rd_dom_test_head_bak_20260911(rows=2) RENAME_20260911_173205_rd_equip_use_detail_bak_20260911(rows=5) RENAME_20260911_173205_rd_equip_use_head_bak_20260911(rows=9) RENAME_20260911_173205_rd_insp_plan_detail_bak_20260911 RENAME_20260911_173205_rd_insp_plan_head_bak_20260911(rows=2) RENAME_20260911_173205_rd_instr_use_detail_bak_20260911 RENAME_20260911_173205_rd_instr_use_head_bak_20260911(rows=2) RENAME_20260911_173205_rd_plan_bak_20260911(rows=8) RENAME_20260911_173205_rd_plan_detail_bak_20260911 RENAME_20260911_173205_rd_prod_info_detail_bak_20260911 RENAME_20260911_173205_rd_prod_info_head_bak_20260911(rows=8) RENAME_20260911_173205_rd_spike_water_detail_bak_20260911 RENAME_20260911_173205_rd_spike_water_head_bak_20260911(rows=2) RENAME_20260911_173205_yj_doc_modify_log_bak_20260911(rows=3) RENAME_20260911_173205_yj_doc_status_bak_20260911(rows=53) RENAME_20260911_213754_yj_doc_status_bak_20260911(rows=53) t1 t2(rows=1) tmp_excel(rows=856) tmp_report(rows=41) tmp_report_head(rows=11) yj_doc_modify_log_bak_20260911(rows=3) yj_doc_status_bak_20260911(rows=2)

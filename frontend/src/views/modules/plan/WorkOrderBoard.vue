@@ -1,7 +1,7 @@
 <!-- WorkOrderBoard.vue — 工单排产(2026-09-23 纠偏,替代「生产排产」平铺看板,参考旧系统工单排产页)
      产线骨架:左侧=生产线档案**全部线**(与基础资料对应,停用线标记可查看);选中线 → 右侧正在运行的工单明细
-     (未完工/已完工/全部);勾选已排 → 批量调线(启用线)。开线=日×线(bs_line_open);无班别维度(用户拍板)。
-     排产入口单一(排产工作台):本页只做 按线查看+开线管理+调线,不含待排产池。 -->
+     (未完工/已完工/全部);勾选已排 → 批量调线(启用线)/转领料(默认 BOM×排产数量 生成领料单草稿,2026-10-14)。
+     无班别维度(用户拍板)。开线管理已按用户拍板去除(2026-09-24):本页只做 按线查看+调线+转领料,不含待排产池(排产入口单一=排产工作台)。 -->
 <template>
   <div class="wb-page">
     <!-- 顶部:开工日期 + 汇总条 -->
@@ -16,7 +16,7 @@
     </div>
 
     <div class="wb-body">
-      <!-- 左:各线 未交量 + 开线(=基础资料生产线档案,含停用) -->
+      <!-- 左:各线 未交量(=基础资料生产线档案,含停用) -->
       <div class="wb-left">
         <div class="wb-left-head">{{ tt('生产线') }}</div>
         <div v-for="l in lineSummary" :key="l.生产线" class="wb-line"
@@ -27,9 +27,6 @@
           </div>
           <div class="wb-line-sub">{{ l.生产车间 }}</div>
           <div class="wb-line-row">
-            <span class="wb-tag" :class="l.开线 ? 'open' : 'closed'"
-                  :title="l.停用 ? tt('停用线不可开线') : tt('点击切换开线/关线')"
-                  @click.stop="toggleOpen(l)">{{ l.开线 ? tt('开线') : tt('未开线') }}</span>
             <span class="wb-qty">{{ num(l.未交量) }}</span>
           </div>
         </div>
@@ -39,7 +36,6 @@
       <div class="wb-main">
         <div class="wb-ctx">
           <span class="wb-ctx-label">{{ tt('生产线') }}：<b>{{ sel.line || tt('（点击左侧选择）') }}</b></span>
-          <span v-if="sel.line" class="wb-tag" :class="selOpen ? 'open' : 'closed'">{{ selOpen ? tt('已开线') : tt('未开线') }}</span>
           <span class="wb-ctx-stats">
             {{ tt('排产数量') }} {{ num(selQty) }}　|　{{ tt('未完工量') }} {{ num(selOutstanding) }}
           </span>
@@ -60,11 +56,21 @@
               <el-button size="small" type="primary" plain :disabled="checkedSched.length !== 1" @click="openTrace">
                 {{ tt('追溯') }}
               </el-button>
-              <el-button size="small" type="success" plain :disabled="!checkedSched.length" @click="printTask">
+              <el-dropdown split-button size="small" type="success" plain :disabled="!checkedSched.length"
+                           @click="printTask('成型生产任务单')" @command="printTask">
                 {{ tt('打印工单') }}（{{ checkedSched.length }}）
-              </el-button>
+                <template #dropdown>
+                  <el-dropdown-item command="成型生产任务单">{{ tt('成型生产任务单') }}</el-dropdown-item>
+                  <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
+                  <el-dropdown-item command="生产投料单" divided>{{ tt('生产投料单') }}</el-dropdown-item>
+                </template>
+              </el-dropdown>
               <el-button size="small" type="warning" plain :disabled="!checkedSched.length" @click="openReassign">
                 {{ tt('批量调线') }}（{{ checkedSched.length }}）
+              </el-button>
+              <!-- 转领料(2026-10-14,参考旧系统工单排产页同名按钮):勾选已排工单 → 默认 BOM×排产数量 生成领料单(材料出库单)草稿 -->
+              <el-button size="small" type="success" :disabled="!checkedSched.length" @click="toPicking">
+                {{ tt('转领料') }}（{{ checkedSched.length }}）
               </el-button>
             </div>
           </div>
@@ -72,6 +78,7 @@
                     @selection-change="(r) => (checkedSched = r)">
             <el-table-column type="selection" width="42" />
             <el-table-column :label="tt('工单号')" prop="加工单号" width="150" fixed />
+            <el-table-column :label="tt('工单行号')" prop="工单行号" width="90" sortable />
             <el-table-column :label="tt('客户')" prop="客户" min-width="130" fixed show-overflow-tooltip />
             <el-table-column :label="tt('排产日期')" prop="排产日期" width="95" />
             <el-table-column :label="tt('客户PO')" prop="客户PO" width="110" show-overflow-tooltip />
@@ -211,9 +218,9 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import QRCode from 'qrcode'
 import request from '@core/request'
 import { callButton } from '@/business/engine'
+import { printWorkTaskSheet, printFeedingSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 
@@ -233,10 +240,6 @@ const raLines = computed(() => lineSummary.value.filter((l) => !l.停用).map((l
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
-const selOpen = computed(() => {
-  const l = lineSummary.value.find((x) => x.生产线 === sel.line)
-  return l ? !!l.开线 : false
-})
 const selQty = computed(() => schedRows.value.reduce((a, r) => a + Number(r.排产数量 || 0), 0))
 // 未完工量=Σ未交量(排产−max(入库,已报工),报工扣减口径);旧数据无未交量字段时回退余量
 const selOutstanding = computed(() => schedRows.value.reduce((a, r) => a + (r.未交量 !== undefined ? Number(r.未交量 || 0) : Number(r.余量 || 0)), 0))
@@ -244,20 +247,6 @@ const selOutstanding = computed(() => schedRows.value.reduce((a, r) => a + (r.�
 function select(l) {
   sel.line = l.生产线
   loadScheduled()
-}
-
-async function toggleOpen(l) {
-  if (l.停用) { ElMessage.warning(tt('停用线不可开线')); return }
-  try {
-    await ElMessageBox.confirm(
-      `${tt('确认将')} ${l.生产线} ${l.开线 ? tt('关闭开线') : tt('设为开线')}？(${day.value})`,
-      tt('开线管理'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
-  } catch { return }
-  try {
-    await request.post('/px/scheduleBoard/setOpen', { 开工日期: day.value, 生产线: l.生产线, 开线: l.开线 ? '否' : '是' })
-    ElMessage.success(tt('开线状态已更新'))
-    loadSummary()
-  } catch (e) { err(e, '保存失败') }
 }
 
 async function loadSummary() {
@@ -319,67 +308,61 @@ async function unclose() {
 const traceVisible = ref(false)
 const trace = ref(null)
 
-async function openTrace() {
-  const row = checkedSched.value[0]
-  if (!row) return
+async function openTrace(noParam) {
+  let no = typeof noParam === 'string' ? noParam : checkedSched.value[0]?.加工单号
+  if (!no) return
   try {
-    const res = await request.post('/px/scheduleBoard/trace', { 工单号: row.加工单号 })
+    const res = await request.post('/px/scheduleBoard/trace', { 工单号: no })
     trace.value = res.data || {}
     traceVisible.value = true
   } catch (e) { err(e, '查询失败') }
 }
 
-// ── 打印工单(生产任务单,参考旧系统打印版式):横向一张表,一行=一张工单,行尾二维码;
-//    打印留痕 printStamp(打印次数+1/打印人/打印时间)。打印走新窗口 HTML(同 QrLabelDialog,绕开 jsPDF 坑 §5.5) ──
-async function printTask() {
+// ── 打印工单(三模板可选,2026-09-27):成型/组装生产任务单 = 行表直打;
+//    生产投料单 = 每工单抓默认 BOM(数量=定额×需求数量)生成投料明细页;打印留痕 printStamp ──
+async function printTask(mode) {
   const rows = checkedSched.value
   if (!rows.length) return
-  const line = sel.line || ''
-  const user = useUserStore().realName
-  const now = new Date()
-  const stamp = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
-  const esc = (v) => String(v ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
-  const trs = []
-  for (let i = 0; i < rows.length; i++) {
-    const r = rows[i]
-    let qr = ''
-    try {
-      qr = await QRCode.toDataURL(`${r.加工单号}|${r.批号 || ''}|${r.物料编码 || ''}|${r.排产数量 ?? ''}|${line}`, { margin: 1, errorCorrectionLevel: 'M' })
-    } catch { /* 单张二维码失败不影响打印 */ }
-    trs.push('<tr>'
-      + `<td>${i + 1}</td>`
-      + `<td>${esc(r.客户)}</td><td>${esc(r.产品名称)}</td><td>${esc(r.批号)}</td>`
-      + `<td>${esc(r.规格型号)}</td><td>${esc(r.重点管控)}</td><td>${esc(r.客户PO)}</td>`
-      + `<td>${esc(num(r.排产数量))}</td><td>${esc(num(r.每箱数量))}</td><td>${esc(num(r.箱数))}</td>`
-      + `<td>${esc(r.计划完工日期)}</td><td>${esc(r.备注)}</td>`
-      + `<td class="qr">${qr ? `<img src="${qr}"/>` : ''}</td></tr>`)
+  let okPrint = false
+  if (mode === '生产投料单') {
+    const orders = []
+    for (const r of rows) {
+      let bom = []
+      try {
+        const res = await request.post('/px/workOrderBom', { 产品编码: r.物料编码 })
+        bom = (res.data || []).map((b) => ({
+          物料编码: b.子件编码, 物料名称: b.子件名称, 规格型号: b.规格型号,
+          数量: Math.round(Number(b.定额数量 || 0) * Number(r.需求数量 || 0) * 10000) / 10000,
+          单位: b.子件计量单位 || '', 行备注: '',
+        }))
+      } catch (e) { bom = [] }
+      orders.push({
+        单据编号: r.加工单号, 产品编码: r.物料编码, 产品名称: r.产品名称,
+        产品规格: r.规格型号 || '', 数量: r.需求数量, 客户名称: r.客户 || '',
+        计划完工日期: r.计划完工日期 || '', 制单人: useUserStore().realName, bom,
+      })
+    }
+    okPrint = await printFeedingSheet(orders)
+  } else {
+    const rowsToPrint = rows.map((r) => ({
+      单据编号: r.加工单号,
+      公司代码: r.公司代码 || '', 工单行号: r.工单行号, // 工单二维码=公司代码@工单号@1000+工单行号(2026-10-09 规则改版)
+      是否重点管控产品: r.重点管控 || '',
+      商品编码: r.物料编码 || '',
+      商品名称: r.产品名称 || '',
+      规格型号: r.规格型号 || '',
+      订单数量: r.需求数量,
+      成型折算后数量: r.排产数量,
+      计划完工日期: r.计划完工日期 || '',
+      批号: r.批号 || '', 物料编码: r.物料编码 || '',
+      排产数量: r.排产数量, 生产线: r.生产线 || sel.line || '',
+    }))
+    okPrint = await printWorkTaskSheet(mode, rowsToPrint, { line: sel.line || '', preparedBy: useUserStore().realName })
   }
-  const html = '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(tt('生产任务单')) + '</title><style>'
-    + '@page{size:A4 landscape;margin:8mm}'
-    + 'body{font-family:system-ui,"Microsoft YaHei",sans-serif;margin:0;color:#111}'
-    + '.hd{display:flex;align-items:baseline;gap:18px;margin-bottom:6px}'
-    + '.hd .t{flex:1;text-align:center;font-size:20px;font-weight:700;letter-spacing:6px}'
-    + '.hd .s{font-size:12px;color:#333;white-space:nowrap}'
-    + 'table{width:100%;border-collapse:collapse;table-layout:fixed}'
-    + 'th,td{border:1px solid #444;padding:4px 5px;font-size:11px;word-break:break-all;vertical-align:middle}'
-    + 'th{background:#f2f2f2;font-weight:600}'
-    + 'td.qr{text-align:center;padding:2px}td.qr img{width:64px;height:64px}'
-    + '</style></head><body>'
-    + '<div class="hd"><span class="s">' + esc(tt('线体')) + ': ' + esc(line) + '</span>'
-    + '<span class="t">' + esc(tt('生产任务单')) + '</span>'
-    + '<span class="s">' + esc(tt('制单')) + ': ' + esc(user) + '　' + esc(stamp) + '</span></div>'
-    + '<table><thead><tr>'
-    + ['序', '客户', '成品品名', '批号', '规格', '重点管控', 'PO单号', '排产数量', '每箱数量', '盘数', '交期', '备注', '二维码']
-        .map((h) => `<th>${esc(h)}</th>`).join('')
-    + '</tr></thead><tbody>' + trs.join('') + '</tbody></table>'
-    + '<scr' + 'ipt>window.onload=function(){setTimeout(function(){window.print()},200)}</scr' + 'ipt></body></html>'
+  if (!okPrint) return
   try {
     await request.post('/px/scheduleBoard/printStamp', { rows: rows.map((r) => ({ 加工单号: r.加工单号 })) })
   } catch (e) { /* 留痕失败不阻断打印 */ }
-  const w = window.open('', '_blank', 'width=1200,height=760')
-  if (!w) { ElMessage.warning(tt('浏览器拦截了打印窗口,请允许弹出窗口')); return }
-  w.document.write(html)
-  w.document.close()
   ElMessage.success(tt('已发送打印') + ' ' + rows.length + ' ' + tt('张'))
   loadScheduled()
 }
@@ -400,7 +383,35 @@ async function doReassign() {
   } catch (e) { err(e, '调线失败') }
 }
 
-onMounted(loadAll)
+// ── 转领料(旧系统工单排产页同名按钮):勾选已排工单 → 按默认 BOM×排产数量 生成领料单(材料出库单)草稿;
+//    草稿在 材料出库单 面板扫码补批号后审核出库,回写工单领料单号(看板列随之点亮) ──
+async function toPicking() {
+  const nos = [...new Set(checkedSched.value.map((r) => r.加工单号).filter(Boolean))]
+  if (!nos.length) return
+  try {
+    await ElMessageBox.confirm(
+      `${tt('确认为选中的')} ${nos.length} ${tt('张工单转领料')}？(${tt('按产品默认BOM×排产数量生成材料出库单草稿,审核出库后自动回写领料单号')})`,
+      tt('转领料'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
+  } catch { return }
+  try {
+    const res = await request.post('/px/scheduleBoard/toPicking', { rows: nos.map((n) => ({ 加工单号: n })) })
+    const d = res.data || {}
+    const failed = d['失败行'] || []
+    const list = (d['单号清单'] || []).join('、')
+    ElMessage.success(`${tt('已生成领料单')} ${d['转领料张数'] ?? 0} ${tt('张')}` + (list ? `：${list}` : '')
+      + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''))
+    loadScheduled()
+    loadSummary()
+  } catch (e) { err(e, '转领料失败') }
+}
+
+onMounted(() => {
+  loadAll()
+  // 外部跳入(生产加工单列表「追溯」):?trace=工单号 直开追溯弹窗
+  const q = new URLSearchParams(location.hash.split('?')[1] || '')
+  const tno = q.get('trace')
+  if (tno) setTimeout(() => openTrace(tno), 600)
+})
 </script>
 
 <style scoped>

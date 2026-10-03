@@ -1,0 +1,10 @@
+SET NOCOUNT ON
+SELECT 'INV|最新成本', CASE WHEN EXISTS(SELECT 1 FROM yj_field WHERE panel_code='INV' AND col_name=N'最新成本') THEN '库有' ELSE '缺' END
+UNION ALL SELECT 'INV|最新成本列', CASE WHEN COL_LENGTH('bs_inv',N'最新成本') IS NULL THEN '缺列' ELSE '有列' END
+UNION ALL SELECT 'UOM|换算率列', CASE WHEN COL_LENGTH('bs_uom',N'换算率') IS NULL THEN '缺列' ELSE '有列' END
+UNION ALL SELECT 'PU_ORDER|数量2列', CASE WHEN COL_LENGTH('bl_pu_order',N'数量2') IS NULL THEN '缺列' ELSE '有列' END
+UNION ALL SELECT 'rd_approval|备注列', CASE WHEN COL_LENGTH('rd_approval',N'备注') IS NULL THEN '缺列' ELSE '有列' END
+UNION ALL SELECT 'STOCK_STATUS|预警数量列', CASE WHEN COL_LENGTH('kucun',N'预警数量') IS NULL THEN '缺列' ELSE '有列' END
+UNION ALL SELECT 'DEPT|电话列', CASE WHEN COL_LENGTH('bs_dept',N'电话') IS NULL THEN '缺列' ELSE '有列' END
+UNION ALL SELECT 'WH|联系人列', CASE WHEN COL_LENGTH('bs_wh',N'联系人') IS NULL THEN '缺列' ELSE '有列' END
+UNION ALL SELECT 'rd_plan|阶段1_计划内容列', CASE WHEN COL_LENGTH('rd_plan',N'阶段1_计划内容') IS NULL THEN '缺列' ELSE '有列' END

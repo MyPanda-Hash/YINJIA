@@ -63,8 +63,14 @@
       </div>
     </div>
 
-    <!-- ③ 项目定级原则说明段(打印/导出保留,原文照设计 B4 逐字照录) -->
-    <div class="ps-principle">{{ tt('项目定级原则') }}：1.二级项目-开发性项目　2.三级项目-A级或B级客户/近期（一年内）可能有重要经济效益；　3.四级项目-简单应对（检测/打样）</div>
+    <!-- ③ 项目定级原则说明段(打印/导出保留)——
+         2026-09-30 **照《产品开发系统需求汇总.xlsx》sheet「开发相关流程」原文更正**:原实现写的是
+         「1.二级项目-开发性项目 2.三级项目-…近期（一年内）…」,与需求原文的二级/三级口径**不符**
+         (需求:二级=一年内有重要经济效益或重大推广价值;三级=未来(一年后)可能有重要经济效益)。
+         三段各自走 tt(),译名见 i18n/locales/en.js。 -->
+    <div class="ps-principle">
+      {{ tt('项目定级原则') }}：{{ tt('1.二级项目-A级或B级客户/该产品一年内有重要经济效益或对应技术产品有重大推广价值/部分对客户认同有重要影响的项目；') }}{{ tt('2.三级项目-A级或B级客户/未来（一年后）可能有重要经济效益；') }}{{ tt('3.四级项目-简单应对（检测/打样）：如内部简单测试、客户样品测试等') }}
+    </div>
 
     <!-- ⑤ 主从控制表 -->
     <div class="ps-scroll">
@@ -290,7 +296,7 @@ import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { pickStages, stageRowState, statusLabel, STATUS_TOKENS, statusTone, summarizeStages } from '@core/progress/stageProgress'
-import * as XLSX from 'xlsx'
+// xlsx 动态引入(~430KB 只在导入/导出时加载)
 import { PROGRESS_COLUMNS, readCell } from '@core/progress/progressColumns'
 
 /**
@@ -620,8 +626,9 @@ function importExcelFile(e) {
   e.target.value = ''
   if (!file) return
   const reader = new FileReader()
-  reader.onload = (ev) => {
+  reader.onload = async (ev) => {
     try {
+      const XLSX = await import('xlsx')
       const wb = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' })
       const ws = wb.Sheets[wb.SheetNames[0]]
       const rows = XLSX.utils.sheet_to_json(ws, { defval: '' })
@@ -656,7 +663,8 @@ function importExcelFile(e) {
   reader.readAsArrayBuffer(file)
 }
 
-/** 导出 Excel:面板块信息 + 全部字段列 + 全部数据行(内容完整,不受列宽/纸张限制) */function exportProgressExcel() {
+/** 导出 Excel:面板块信息 + 全部字段列 + 全部数据行(内容完整,不受列宽/纸张限制) */async function exportProgressExcel() {
+  const XLSX = await import('xlsx')
   const head = props.head || {}
   const rows = (head.detail && Array.isArray(head.detail.items) ? head.detail.items : [])
   const title = '产品开发二三四级项目控制列表'

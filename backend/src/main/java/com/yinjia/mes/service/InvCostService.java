@@ -1,11 +1,14 @@
 package com.yinjia.mes.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +39,13 @@ import java.util.Map;
 public class InvCostService {
 
     private final JdbcTemplate jdbc;
+
+    private static final Logger log = LoggerFactory.getLogger(InvCostService.class);
+
+    /** 结存 vs 流水 的对账容差(两个数量/金额都到 0.01 即视为一致) */
+    private static final double RECONCILE_TOL = 0.01;
+    /** 差异三键最多列出几个(只报警不刷屏) */
+    private static final int RECONCILE_SAMPLE = 10;
 
     public InvCostService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -114,12 +124,28 @@ public class InvCostService {
     }
 
     /**
+     * 启动自检入口({@code MesApplication#invCostReconciler} 调它):
+     * ① 成本物化表 inv_cost_ledger 与流水不一致则全量重算;
+     * ② 结存(kucun) 与库存流水(inh 正 − outh 负) 按三键对账。
+     * 两者各自 try/catch,**任一失败都只记一行日志、不阻断启动**(见各自方法)。
+     *
+     * <p>⚠ 为什么①的方法体被搬进了私有方法:① 里有一句 `if (same) return;`,
+     * 而「成本一致」正是绝大多数启动的情形 ⇒ 若有代码直接追加在本方法**末尾**,
+     * 在正常路径上永远执行不到(自检成摆设)。故①的方法体逐字未改地移入
+     * {@link #reconcileCostOnStartup()},由本方法顺序调用。
+     */
+    public void reconcileOnStartup() {
+        reconcileCostOnStartup();
+        reconcileStockOnStartup();
+    }
+
+    /**
      * 启动自检:物化表与流水不一致则全量重算。
      * 必要性 —— 金蝶同步会把已审核单据直接写进 bl_(行表)与 bd_(头表),这类写入不经过 ButtonService 的
      * 审核动作,钩子不会触发,成本会静默过期。以「行数 + 数量金额合计」双指纹判断,
      * 只有真的不一致才重算(本机 235 行,毫秒级)。
      */
-    public void reconcileOnStartup() {
+    private void reconcileCostOnStartup() {
         try {
             Map<String, Object> r = jdbc.queryForMap(
                     "SELECT (SELECT COUNT(*) FROM dbo.v_stock_movement) AS mv_cnt,"
@@ -135,6 +161,80 @@ public class InvCostService {
             // 自检失败不阻断启动:报表会显示成本为 0,用户可点「重算成本」恢复
             System.err.println("[YINJIA-MES] 库存成本自检失败(不影响启动): " + e.getMessage());
         }
+    }
+
+    /**
+     * 2026-09-30 追加:结存(kucun)必须等于流水(inh 数量 正、outh 数量 负)按三键的净额。
+     *
+     * <p>为什么必须有它 —— 三表化之后**流水是唯一真源**,kucun 只是结存缓存。任何绕开
+     * {@code StockLedgerService} 的写入(历史上出过:金蝶旁路直写的已审核单据"进报表不进台账")
+     * 都会让两者悄悄分叉,而界面上看不出任何异常。启动时喊出来是最后一道防线。
+     *
+     * <p>口径:两边都过滤 ISNULL(asp_cancel,'N') &lt;&gt; 'Y';容差 {@value #RECONCILE_TOL}。
+     * 期初行(src=0)本身就在 inh 里,天然计入正数,无需特判。
+     * 比对是**双向**的:除 kucun 逐行核对外,还核对"有流水净额、kucun 里却没有这一行"——
+     * 只按 kucun 遍历会漏掉"结存行整个缺失"这种分叉。
+     *
+     * <p>失败不阻断启动(与①同风格):异常一律 catch 住记一行 warn。
+     */
+    private void reconcileStockOnStartup() {
+        try {
+            // 一条 UNION ALL 直接算净额(inh 正 / outh 负):串起来比两个单表方法再相减更不容易错
+            List<Map<String, Object>> flow = jdbc.queryForList(
+                    "SELECT 物料编码, 仓库编码, 批号, SUM(净额) AS net FROM ("
+                            + " SELECT 物料编码, 仓库编码, 批号, 数量 AS 净额 FROM dbo.inh"
+                            + "   WHERE ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " UNION ALL"
+                            + " SELECT 物料编码, 仓库编码, 批号, -数量 FROM dbo.outh"
+                            + "   WHERE ISNULL(asp_cancel,'N') <> 'Y'"
+                            + ") t GROUP BY 物料编码, 仓库编码, 批号");
+            Map<String, Double> byFlow = new LinkedHashMap<>();
+            for (Map<String, Object> r : flow) {
+                byFlow.put(key3(r.get("物料编码"), r.get("仓库编码"), r.get("批号")), num(r.get("net")).doubleValue());
+            }
+
+            List<Map<String, Object>> stock = jdbc.queryForList(
+                    "SELECT wzdm, ckdm, lot_no, yl FROM dbo.kucun WHERE ISNULL(asp_cancel,'N') <> 'Y'");
+            Map<String, Double> byStock = new LinkedHashMap<>();
+            for (Map<String, Object> r : stock) {
+                byStock.put(key3(r.get("wzdm"), r.get("ckdm"), r.get("lot_no")), num(r.get("yl")).doubleValue());
+            }
+
+            int bad = 0;
+            StringBuilder sample = new StringBuilder();
+            for (Map.Entry<String, Double> e : byStock.entrySet()) {
+                double expect = byFlow.getOrDefault(e.getKey(), 0d);
+                if (Math.abs(e.getValue() - expect) > RECONCILE_TOL) {
+                    bad++;
+                    if (bad <= RECONCILE_SAMPLE) {
+                        sample.append(e.getKey()).append("(结存=").append(e.getValue())
+                                .append(" 流水=").append(expect).append(") ");
+                    }
+                }
+            }
+            for (Map.Entry<String, Double> e : byFlow.entrySet()) {
+                // kucun 里没有这一行:净额为 0 时两边都对,不算差异
+                if (byStock.containsKey(e.getKey()) || Math.abs(e.getValue()) <= RECONCILE_TOL) continue;
+                bad++;
+                if (bad <= RECONCILE_SAMPLE) {
+                    sample.append(e.getKey()).append("(结存=无此行 流水=").append(e.getValue()).append(") ");
+                }
+            }
+
+            if (bad == 0) {
+                log.info("[库存对账] 结存 == Σ流水,一致({} 个三键)", byStock.size());
+            } else {
+                log.warn("[库存对账] 发现 {} 个三键不一致,前 {} 个:{}", bad, RECONCILE_SAMPLE, sample.toString().trim());
+            }
+        } catch (Exception e) {
+            // 与成本自检同风格:对账本身出错也不能把启动打断
+            log.warn("[库存对账] 跳过:{}", e.getMessage());
+        }
+    }
+
+    /** 对账键:`物料编码|仓库编码|批号`(null 统一成字面量 "null",与流水侧口径一致) */
+    private static String key3(Object a, Object b, Object c) {
+        return String.valueOf(a) + '|' + b + '|' + c;
     }
 
     private static BigDecimal num(Object o) {

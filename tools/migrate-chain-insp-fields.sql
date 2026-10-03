@@ -24,6 +24,11 @@ SET NOCOUNT ON;
 GO
 
 /* ---------- ① 检验单头:暂收单号回填 ---------- */
+-- 开发库历史上有这列但清单链从没建过它(2026-09-28 服务器态演练实测:UPDATE 直报列名无效),
+-- 补守卫式 ADD;列宽对齐开发库实测 nvarchar(120)
+IF COL_LENGTH('dbo.qc_insp', N'暂收单号') IS NULL
+    ALTER TABLE dbo.qc_insp ADD [暂收单号] nvarchar(120) NULL;
+GO
 UPDATE i
    SET i.[暂收单号] = l.source_form_no
   FROM qc_insp i

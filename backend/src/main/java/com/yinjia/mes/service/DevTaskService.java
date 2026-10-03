@@ -40,10 +40,18 @@ public class DevTaskService {
     private static final Map<String, String> PRODUCT_KEY = new HashMap<>();
 
     static {
+        // ⚠ 顺序 = 设计《产品开发系统需求汇总.xlsx》sheet「文件汇总表」第 9 行的**文件列顺序**:
+        //    规格书 → 成型工艺清单 → 组装工艺清单 → 出货检验计划表
+        //    (2026-09-30 用户口径「产品文件列表的字段排列顺序按设计来」;
+        //     此前是 成型/组装/规格书/出货,与设计第 8/9 行 B8:M8/B9:M9 不符)
+        //    本顺序即矩阵列序(devPanelMeta),产品文件列表与桌面「产品开发」矩阵都按它排;
+        //    计数/受控推导/分发落库都按 panelCode 取值,与顺序无关(受控日期取各文件归档时点的 MAX)。
+        DEV_PANELS.put("RD_SPEC_DOC", new String[]{"rd_spec_doc_head", "产品编号", "规格书"});
         DEV_PANELS.put("RD_MOLD_PROC", new String[]{"rd_mold_proc_head", "产品编号", "成型工艺清单"});
         DEV_PANELS.put("RD_ASM_PROC", new String[]{"rd_asm_proc_head", "产品编号", "组装工艺清单"});
-        DEV_PANELS.put("RD_SPEC_DOC", new String[]{"rd_spec_doc_head", "编号", "规格书"});
         DEV_PANELS.put("RD_INSP_PLAN", new String[]{"rd_insp_plan_head", "产品编号", "出货检验计划表"});
+        // ⚠ 产品键列名逐面板不同:规格书那列 2026-09-30 由「编号」改名「产品编号」
+        //   (旧键名被引擎当单据标识用,值会被单据号覆盖,见 migrate-rd-specdoc-prodno-2026-09-30.sql)
         DEV_PANELS.forEach((code, v) -> PRODUCT_KEY.put(code, v[1]));
     }
 
@@ -318,23 +326,52 @@ public class DevTaskService {
 
     /** 单产品 × 单面板的开发状态(实时推导) */
     public String statusOf(String productCode, String panelCode) {
+        return statusTextOf(statusAndDocNo(productCode, panelCode).get("lvl"));
+    }
+
+    /**
+     * 该产品在该文件面板的**状态所对应的那张单**的单据号(空串 = 未建单)。
+     *
+     * 与 {@link #statusOf} **同一取法**(同一排序:归档 > 待审 > 草稿,同级取最新一张)——
+     * 前端产品文件列表点状态要直达的就是这张单,两者取法一分叉就会出现
+     * 「显示开发完毕、点进去却打开另一张单」。
+     */
+    public String docNoOf(String productCode, String panelCode) {
+        return statusAndDocNo(productCode, panelCode).get("docNo");
+    }
+
+    /** 单产品 × 单面板:开发状态级别 + 该状态那张单的单据号(一次查询取两样) */
+    private Map<String, String> statusAndDocNo(String productCode, String panelCode) {
         String[] meta = DEV_PANELS.get(panelCode);
-        if (meta == null || productCode == null || productCode.isBlank()) return STATUS_NONE;
+        if (meta == null || productCode == null || productCode.isBlank()) {
+            return Map.of("lvl", "0", "docNo", "");
+        }
         String table = meta[0];
         String key = meta[1];
-        Integer lvl = jdbc.queryForObject(
-                "SELECT ISNULL(MAX(CASE WHEN ISNULL(s.archived,'N')='Y' THEN 3"
-                        + " WHEN ISNULL(s.pending,'N')='Y' THEN 2 ELSE 1 END), 0) "
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT TOP 1 h.[单据编号] AS no,"
+                        + " ISNULL(s.archived,'N') AS arc, ISNULL(s.pending,'N') AS pend "
                         + "FROM " + table + " h "
-                        + "LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = h.单据编号 "
+                        + "LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = h.[单据编号] "
                         + "WHERE h." + key + " = ? AND ISNULL(h.asp_cancel,'N') <> 'Y' "
-                        + "AND ISNULL(s.canceled,'N') <> 'Y'",
-                Integer.class, panelCode, productCode);
-        int v = lvl == null ? 0 : lvl;
-        return switch (v) {
-            case 3 -> STATUS_DONE;
-            case 2 -> STATUS_REVIEW;
-            case 1 -> STATUS_DOING;
+                        + "AND ISNULL(s.canceled,'N') <> 'Y' "
+                        + "ORDER BY CASE WHEN ISNULL(s.archived,'N')='Y' THEN 3"
+                        + " WHEN ISNULL(s.pending,'N')='Y' THEN 2 ELSE 1 END DESC, h.id DESC",
+                panelCode, productCode);
+        if (rows.isEmpty() || rows.get(0) == null) return Map.of("lvl", "0", "docNo", "");
+        Map<String, Object> r = rows.get(0);
+        String lvl = "Y".equals(String.valueOf(r.get("arc"))) ? "3"
+                : ("Y".equals(String.valueOf(r.get("pend"))) ? "2" : "1");
+        Object no = r.get("no");
+        return Map.of("lvl", lvl, "docNo", no == null ? "" : String.valueOf(no));
+    }
+
+    /** 状态级别 → 文案(口径:已归档 → 开发完毕 | 审批中 → 开发审核中 | 有单 → 开发中 | 无单 → 未开发) */
+    private static String statusTextOf(String lvl) {
+        return switch (lvl == null ? "0" : lvl) {
+            case "3" -> STATUS_DONE;
+            case "2" -> STATUS_REVIEW;
+            case "1" -> STATUS_DOING;
             default -> STATUS_NONE;
         };
     }
@@ -382,15 +419,20 @@ public class DevTaskService {
             String productCode = String.valueOf(t.get("产品编号"));
             Map<String, Object> row = new LinkedHashMap<>(t);
             Map<String, String> cells = new LinkedHashMap<>();
+            // 每格状态对应的单据号(前端点状态直达该单;未开发=空)——与状态同一取法,一次查询取两样
+            Map<String, String> docNos = new LinkedHashMap<>();
             int done = 0;
             int doing = 0;
             for (String panel : DEV_PANELS.keySet()) {
-                String st = statusOf(productCode, panel);
+                Map<String, String> sd = statusAndDocNo(productCode, panel);
+                String st = statusTextOf(sd.get("lvl"));
                 cells.put(panel, st);
+                if (!STATUS_NONE.equals(st) && !sd.get("docNo").isBlank()) docNos.put(panel, sd.get("docNo"));
                 if (STATUS_DONE.equals(st)) done++;
                 else if (!STATUS_NONE.equals(st)) doing++;
             }
             row.put("cells", cells);
+            row.put("docNos", docNos);
             row.put("doneCount", done);
             row.put("totalCount", DEV_PANELS.size());
             row.put("overall", done >= DEV_PANELS.size() ? STATUS_DONE

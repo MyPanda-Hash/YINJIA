@@ -153,43 +153,54 @@ public class PxController {
 
         List<Map<String, Object>> rows = devTaskService.board();
 
-        // 各面板"已归档单据的产品键 → 归档时点"。产品键字段各面板不同(规格书是「编号」,其余是「产品编号」),
-        // 用 DevTaskService.productKeyOf(panel) 取;单据号列用面板自己的 groupCol。
-        Map<String, Map<String, String>> archivedAt = new LinkedHashMap<>();  // 面板 → (产品键 → 归档时点)
+        // 各面板"已受控单据的产品键 → 受控日期"。产品键字段各面板不同(规格书是「产品编号」,其余同名),
+        // 用 DevTaskService.productKeyOf(panel) 取。
+        // ⚠ 2026-09-30 改口径:原先这里取的是 MAX(yj_doc_status.archived_at) —— 那是"归档时点",
+        //   而需求(《产品开发系统需求汇总》5.1)要的是**审批后自动受控**,且用户口径「受控按文件」:
+        //   现在直接读该文件头表备用列池里的 受控标记(备用1=是否受控 / 备用2=受控日期,
+        //   由 ButtonService.markArchived → markFileControlled 写入)。
+        //   历史单(本功能上线前归档的)没有这两个值 ⇒ 回退到 archived_at,不让老单显示成"未受控"。
+        Map<String, Map<String, String>> controlledAt = new LinkedHashMap<>();  // 面板 → (产品键 → 受控日期)
         for (String panel : DevTaskService.devPanelCodes()) {
             Map<String, String> m = new LinkedHashMap<>();
             try {
                 String table = registry.panel(panel).headTable();
                 String keyCol = DevTaskService.productKeyOf(panel);
                 String docCol = pickGroupCol(panel);
-                jdbc.query("SELECT t.[" + keyCol + "] AS k, MAX(s.archived_at) AS at "
+                jdbc.query("SELECT t.[" + keyCol + "] AS k,"
+                                + " MAX(CASE WHEN ISNULL(t.[备用1], N'') = N'是' THEN ISNULL(t.[备用2], '') ELSE '' END) AS ctl,"
+                                + " MAX(s.archived_at) AS at "
                                 + "FROM " + table + " t "
-                                + "JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = t.[" + docCol + "] "
-                                + "WHERE ISNULL(s.archived,'N') = 'Y' AND ISNULL(t.asp_cancel,'N') <> 'Y' "
+                                + "LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = t.[" + docCol + "] "
+                                + "WHERE ISNULL(t.asp_cancel,'N') <> 'Y' "
                                 + "GROUP BY t.[" + keyCol + "]",
                         rs -> {
                             String k = rs.getString("k");
                             if (k != null && !k.isBlank()) {
+                                String ctl = rs.getString("ctl");
                                 Object at = rs.getObject("at");
-                                m.put(k, at == null ? "" : String.valueOf(at));
+                                // 受控标记优先;没有(历史单)才回退归档时点
+                                m.put(k, ctl != null && !ctl.isBlank() ? ctl : (at == null ? "" : String.valueOf(at)));
                             }
                         }, panel);
             } catch (Exception e) {
                 // 某面板表/列缺失时降级:该面板不参与受控推导,矩阵主体仍可用
                 log.warn("[RD_PROD_DOCLIST] 受控推导跳过 panel={}: {}", panel, e.getMessage());
             }
-            archivedAt.put(panel, m);
+            controlledAt.put(panel, m);
         }
 
         for (Map<String, Object> row : rows) {
             String productCode = String.valueOf(row.get("产品编号"));
             @SuppressWarnings("unchecked")
             Map<String, String> cells = (Map<String, String>) row.get("cells");
+            // 四个文件**各自**受控(见上面口径);整产品"是否受控"仍按"四份都开发完毕"判定,
+            // 受控日期取四者中最后一个受控时点 —— 列表只有一组受控列,逐文件的受控值在各文件面板自身。
             boolean allDone = cells != null && !cells.isEmpty()
                     && cells.values().stream().allMatch(DevTaskService.STATUS_DONE::equals);
             String lastAt = "";
             for (String panel : DevTaskService.devPanelCodes()) {
-                String at = archivedAt.getOrDefault(panel, Map.of()).get(productCode);
+                String at = controlledAt.getOrDefault(panel, Map.of()).get(productCode);
                 if (at != null && at.compareTo(lastAt) > 0) lastAt = at;
             }
             row.put("是否受控", allDone ? "是" : "否");
@@ -239,15 +250,16 @@ public class PxController {
     /**
      * 「自动填充规格书」数据源:按产品编号取对应规格书的表头 + 检验要求明细行。
      *
-     * <p>【为什么要专门开一个端点】规格书的 编号(=产品键)在通用查询链路里**看不见**——
-     * QueryService.loadDocs 对每个 doc 面板都会执行 doc.put("编号", 单据编号),把真 编号 覆盖成单据号
-     * (那个键在纸张右上角被「编号：」占用)。所以 getFormDescriptor / queryFormDataList 都取不到真值,
-     * 只能像 prodDocList 一样直接读 head 表。
+     * <p>【为什么要专门开一个端点】规格书的产品键在通用查询链路里**看不见**——
+     * QueryService.loadDocs 对每个 doc 面板都会执行 doc.put("编号", 单据编号)。该字段原先就叫
+     * 「编号」,于是真值被覆盖成单据号(2026-09-30 用户报障「封面右上角显示的不是产品编号」);
+     * 现在字段已改名「产品编号」(migrate-rd-specdoc-prodno-2026-09-30.sql),与单据标识键分家,
+     * 但通用链路是**按面板动态出列**的、且列里没有「产品编号」的兜底,故本端点仍直接读 head 表。
      *
      * <p>【产品编号 → 规格书单 的解析顺序】
      * <ol>
      *   <li>rd_spec_assign(产品编号=?)—— 分发写下的正式映射,带 责任人/负责人,是权威源;</li>
-     *   <li>rd_spec_doc_head.编号 = ? —— 分发时盖在产品键列上的章(ButtonService 分发路径写)。</li>
+     *   <li>rd_spec_doc_head.产品编号 = ? —— 分发时盖在产品键列上的章(ButtonService 分发路径写)。</li>
      * </ol>
      * 两条都按 id 倒序取最新。同一产品可能分发了多张规格书(不同规格书种类),
      * 故用 matched 回报命中数,前端提示「按哪一张填的」,不让用户猜。
@@ -264,7 +276,7 @@ public class PxController {
         out.put("found", false);
         out.put("matched", 0);
         out.put("单据编号", "");
-        out.put("编号", "");
+        out.put("产品编号", "");
         out.put("客户项目名称", "");
         out.put("产品类别", "");
         out.put("整体规格参数", "");
@@ -294,14 +306,14 @@ public class PxController {
         }
         out.put("状态", specStatusOf(no));
         List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT 单据编号, ISNULL(编号, N'') AS 编号, ISNULL(客户项目名称, N'') AS 客户项目名称,"
+                "SELECT 单据编号, ISNULL(产品编号, N'') AS 产品编号, ISNULL(客户项目名称, N'') AS 客户项目名称,"
                         + " ISNULL(产品类别, N'') AS 产品类别, ISNULL(整体规格参数, N'') AS 整体规格参数"
                         + " FROM rd_spec_doc_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         if (heads.isEmpty()) return ApiResult.ok(out);
 
         Map<String, Object> h = heads.get(0);
         out.put("found", true);
-        for (String k : List.of("单据编号", "编号", "客户项目名称", "产品类别", "整体规格参数")) {
+        for (String k : List.of("单据编号", "产品编号", "客户项目名称", "产品类别", "整体规格参数")) {
             Object v = h.get(k);
             out.put(k, v == null ? "" : String.valueOf(v));
         }
@@ -341,12 +353,12 @@ public class PxController {
         }
     }
 
-    /** 产品编号 → 该产品已分发的规格书单号(最新在前,去重);rd_spec_assign 优先,退回 head.编号 盖章 */
+    /** 产品编号 → 该产品已分发的规格书单号(最新在前,去重);rd_spec_assign 优先,退回 head.产品编号 盖章 */
     private List<String> specDocNosOfProduct(String productCode) {
         List<String> nos = new java.util.ArrayList<>();
         String[] sqls = {
                 "SELECT 单据编号 FROM rd_spec_assign WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
-                "SELECT 单据编号 FROM rd_spec_doc_head WHERE 编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
+                "SELECT 单据编号 FROM rd_spec_doc_head WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
         };
         for (String sql : sqls) {
             try {
@@ -638,6 +650,37 @@ public class PxController {
         perm.requirePanelRead(panelCode);
         List<Map<String, Object>> columns = (List<Map<String, Object>>) body.getOrDefault("columns", List.of());
         configService.saveHeaderPrefs(panelCode, columns);
+        return ApiResult.ok(null);
+    }
+
+    // ---------- 动态字段(备用列池;规格 docs/design/动态字段扩展-备用列池-V1.0.md) ----------
+
+    /** 字段管理总览:现有动态字段 + 备用列池占用/脏行 */
+    @GetMapping("/extFields")
+    public ApiResult<Map<String, Object>> extFields(@RequestParam String panel) {
+        perm.requirePanelRead(panel);
+        return ApiResult.ok(configService.extFieldOverview(panel));
+    }
+
+    /** 绑定新字段到空闲备用列(仅管理员;守卫 G1-G4) */
+    @PostMapping("/extField/add")
+    public ApiResult<Map<String, Object>> extFieldAdd(@RequestBody Map<String, Object> body) {
+        perm.requireAdmin();
+        return ApiResult.ok(configService.addExtField(body));
+    }
+
+    /** 退绑(数据保留,永不 DROP;仅管理员;守卫 G6) */
+    @PostMapping("/extField/retire")
+    public ApiResult<Void> extFieldRetire(@RequestBody Map<String, Object> body) {
+        perm.requireAdmin();
+        String panel = String.valueOf(body.getOrDefault("panel", ""));
+        int fieldId;
+        try {
+            fieldId = Integer.parseInt(String.valueOf(body.getOrDefault("fieldId", "0")));
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("fieldId 必须是数字");
+        }
+        configService.retireExtField(panel, fieldId);
         return ApiResult.ok(null);
     }
 }

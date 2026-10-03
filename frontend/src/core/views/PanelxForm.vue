@@ -175,7 +175,7 @@
                       </el-table-column>
                       <el-table-column v-for="sr in tab.subTable.fields" :key="sr.dataName" :label="sr.dataName" min-width="100">
                         <template #default="{ row: sr }">
-                          <el-select v-if="sr.dataType === '下拉框'" v-model="sr[sr.dataName]" :disabled="!editable" filterable allow-create style="width: 100%">
+                          <el-select v-if="sr.dataType === '下拉框' || sr.dataType === '标准库'" v-model="sr[sr.dataName]" :disabled="!editable" filterable allow-create style="width: 100%">
                             <el-option v-for="o in sr.options || []" :key="o" :label="o" :value="o" />
                           </el-select>
                           <el-input-number v-else-if="sr.dataType === '小数' || sr.dataType === '整数'" v-model="sr[sr.dataName]" :controls="false" :disabled="!editable" style="width: 100%" />
@@ -219,6 +219,15 @@
                   <el-select v-else-if="dr.dataType === '下拉框'" v-model="row[dr.dataName]" :disabled="!editable || dr.computed" filterable allow-create style="width: 100%" @change="onDetailChange(dr, row, tab)">
                     <el-option v-for="o in dr.options || []" :key="o" :label="o.label ?? o" :value="o.value ?? o" />
                   </el-select>
+                  <!-- 标准库字段(检验数据记录的「检验项」等):2026-09-24 起单据表单同样支持
+                       —— 此前只有文书式记录表面板支持,单据表单落到普通文本框,导致「取不到检验项目」。
+                       下拉候选=后端下发的 options(yj_std_lib 启用条目);⌄ 标准库=条目增删/停用维护入口。 -->
+                  <span v-else-if="dr.dataType === '标准库'" class="std-lib-cell">
+                    <el-select v-model="row[dr.dataName]" :disabled="!editable || dr.computed" filterable allow-create style="width: 100%" @change="onDetailChange(dr, row, tab)">
+                      <el-option v-for="o in dr.options || []" :key="o" :label="o" :value="o" />
+                    </el-select>
+                    <span v-if="dr.stdLib" class="rsp-lib-pick" :title="tt('标准库')" @click.stop="openStdLib(dr, row)">⌄</span>
+                  </span>
                   <el-switch v-else-if="dr.dataType === '是否'" v-model="row[dr.dataName]" :disabled="!editable || dr.computed" />
                   <el-image
                     v-else-if="dr.dataType === '图片'"
@@ -349,6 +358,10 @@
       :detail-tabs="tabs"
       @apply="onScanApply"
     />
+    <!-- 标准库维护(单据表单:检验项等标准库字段的条目增删/停用;复用文书面板同一组件) -->
+    <el-dialog v-model="stdLibVisible" :title="tt('标准库') + (stdLibCode ? '：' + stdLibCode : '')" width="720px" append-to-body>
+      <StdLibManager :lib="stdLibCode" :add-item="stdLibItem" pickable @pick="onStdLibPick" @changed="refreshStdLibOptions" />
+    </el-dialog>
   </div>
 </template>
 
@@ -379,6 +392,7 @@ import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import ImportDialog from './ImportDialog.vue'
 import SubBomDialog from './SubBomDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
+import StdLibManager from './StdLibManager.vue'
 
 const engine = usePanelRuntime()
 const { SHORTCUTS } = engine
@@ -539,6 +553,44 @@ const impLabel = ref('明细')
 const scanVisible = ref(false)
 const selCfg = ref(null)
 
+// ---------- 标准库字段(检验项等):下拉候选来自 yj_std_lib;⌄ 打开条目维护 ----------
+const stdLibVisible = ref(false)
+const stdLibCode = ref('')
+const stdLibItem = ref('默认')
+const stdLibTarget = ref(null)   // { row, field } —— 「填入」时写回哪一格
+
+function openStdLib(field, row) {
+  if (!field?.stdLib) return
+  stdLibCode.value = field.stdLib
+  stdLibItem.value = field.stdLibItem || '默认'
+  stdLibTarget.value = { row, field }
+  stdLibVisible.value = true
+}
+/** 「填入」:把选中的标准库条目写进当前单元格 */
+function onStdLibPick(text) {
+  const t = stdLibTarget.value
+  if (t?.row && t?.field) t.row[t.field.dataName] = text
+  stdLibVisible.value = false
+}
+/** 条目增删/停用后:重拉面板配置,就地刷新同库字段的 options(不重载单据数据,避免冲掉未保存的编辑) */
+async function refreshStdLibOptions() {
+  const lib = stdLibCode.value
+  if (!lib) return
+  try {
+    const cfg = await engine.getPanelConfig(panelCode.value)
+    const next = (cfg?.detail?.tabs || []).flatMap((t) => t.fields || []).filter((f) => f.stdLib === lib)
+    const apply = (fields) => {
+      for (const f of fields || []) {
+        if (f.stdLib !== lib) continue
+        const hit = next.find((n) => n.dataName === f.dataName)
+        if (hit) f.options = hit.options
+      }
+    }
+    apply(meta.value)
+    for (const t of detailDef.value?.tabs || []) apply(t.fields)
+  } catch { /* 刷新失败不阻断 */ }
+}
+
 // ---------- 拉式选单（配置驱动：selectConfig 定义来源面板/列/字段映射） ----------
 const selectVisible = ref(false)
 const selectList = ref([])
@@ -588,7 +640,7 @@ async function openSelectDialog(cfg = selectConfigFor()) {
       }
       if (flat.length) rows = flat
     }
-    // detailRows 配置时选单粒度=单据（如工序汇报单选生产加工单）：按单据编号去重，避免一张多产品单显示多行
+    // detailRows 配置时选单粒度=单据（如工序汇报单选生产工单）：按单据编号去重，避免一张多产品单显示多行
     if (cfg.detailRows) {
       const seen = new Set()
       rows = rows.filter((r) => {
@@ -621,7 +673,7 @@ function confirmSelect() {
     if (cfg.sourceNoField) form[cfg.sourceNoField] = sourceNos.join('、')
     if (form['来源单据'] === undefined && form['匹配来源单号'] === undefined) form['来源单据'] = cfg.title || '选单'
   }
-  // 明细行来源：默认选中行；配置 detailRows 时（如工序汇报单选生产加工单）对每个选中单据取工序明细合并（对齐 T+ 选单带出工序行）
+  // 明细行来源：默认选中行；配置 detailRows 时（如工序汇报单选生产工单）对每个选中单据取工序明细合并（对齐 T+ 选单带出工序行）
   let srcRows = selectRows.value
   if (cfg.detailRows) {
     const extra = []
@@ -1406,7 +1458,7 @@ async function onButton(action) {
         emit('saved', res)
         return
       }
-      ElMessage.success(`已生成${res.gotoPanel === 'MANU_ORDER' ? '生产加工单' : res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
+      ElMessage.success(`已生成${res.gotoPanel === 'MANU_ORDER' ? '生产工单' : res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
       const targetPath = `/panelx/list/${res.gotoPanel}`
       tabsStore.close(route.path) // 关闭当前源表单页签（页签被目标面板替换）
       router.push(targetPath)
@@ -1843,6 +1895,19 @@ watch(() => [panelCode.value, code.value], () => {
   font-size: 13px;
   border-bottom: 1px solid var(--el-border-color-lighter, #f0f2f5);
   transition: background 0.15s;
+}
+/* 标准库字段单元格:下拉 + ⌄ 条目维护入口(2026-09-24) */
+.std-lib-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.std-lib-cell .rsp-lib-pick {
+  flex: none;
+  color: var(--el-color-primary);
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
 }
 .dict-pick-item:last-child {
   border-bottom: none;

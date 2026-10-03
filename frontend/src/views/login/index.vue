@@ -162,7 +162,8 @@ import {
 import { useUserStore } from '@/stores/user'
 import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
-import manufacturingImage from '@/assets/login-manufacturing.png'
+// 背景图 2026-09-28 转 WebP(1967KB→111KB,q80 视觉无损;原图已删)
+import manufacturingImage from '@/assets/login-manufacturing.webp'
 
 const REMEMBERED_ACCOUNT_KEY = 'mes_login_account'
 const router = useRouter()

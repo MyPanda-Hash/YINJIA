@@ -96,10 +96,14 @@ public class PanelConfigService {
         buttonGroups.add(group("删除", List.of("删除", "删除单据")));
         buttonGroups.add(group("查找", List.of("查找", "刷新")));
         buttonGroups.add(group("打印", List.of("打印", "预览")));
-        // 物料二维码标签入口(勾选即打):存货档案工具栏「打印」之后
-        // (原定打印与导入之间;远端已决策档案面板不提供导入,导入组移除后即紧跟打印),
-        // 前端按 qrLabelKey 列勾行(跨页保留)→ POST /report/qr-label 出 80×80mm 标签 PDF(二维码=存货编码)
-        boolean qrLabel = "INV".equals(def.code());
+        // 档案二维码标签入口(勾选即打):工具栏「打印」之后(远端已决策档案面板不提供导入,导入组移除后即紧跟打印),
+        // 前端按 qrLabelKey 列勾行(跨页保留)→ 前端 print-formats 本地生成 75×100mm 标识卡。
+        // INV(2026-09-24 改版,用户拍板):80×80 旧版式(物料编码/名称/规格+QR=存货编码)改为
+        // 75×100 七字段版式(订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,后四类手填),
+        // 二维码=公司代码@物料编码[@批号];printProductCards 本地生成,原 /report/qr-label 暂留可回滚。
+        // WHLOC 库位(2026-09-28):与商品同款勾选即打形态,卡面=库位字段(仓库/库位地址/库位编码,不含商品字段),
+        // 二维码=仓库@库位地址@库位编码(printLocationCards);行键=仓库+库位编码 复合(同码多仓不串选)。
+        boolean qrLabel = "INV".equals(def.code()) || "WHLOC".equals(def.code());
         if (qrLabel) buttonGroups.add(group("二维码标签", List.of("二维码标签")));
         // 导入仅限单据面板(档案面板不提供导入)
         // buttonGroups.add(group("导入", List.of("下载模板", "导入")));
@@ -112,6 +116,18 @@ public class PanelConfigService {
         if (classifyPanel != null) {
             try { classifyTitle = registry.panel(classifyPanel).name(); } catch (Exception ignored) { }
             if (classifyTitle != null) buttonGroups.add(group("分类管理", List.of("分类管理")));
+        }
+        // 字段管理(动态字段/备用列池,规格 §10):紧跟表格调整之后;入口全员下发、前端对非 admin 隐藏,
+        // 写操作的服务端真闸门是 requireAdmin(G5)。archive 面板与 doc 面板各自注入(buildDocConfig 同款)。
+        for (Map<String, Object> g : buttonGroups) {
+            @SuppressWarnings("unchecked")
+            List<String> gActions = (List<String>) g.get("actions");
+            int anchor = gActions.indexOf("表格调整");
+            if (anchor >= 0 && !gActions.contains("字段管理")) {
+                List<String> merged = new ArrayList<>(gActions);
+                merged.add(anchor + 1, "字段管理");
+                g.put("actions", merged);
+            }
         }
 
         List<Map<String, Object>> panelButtons = new ArrayList<>();
@@ -131,6 +147,9 @@ public class PanelConfigService {
 
         Map<String, Object> tablePage = new LinkedHashMap<>();
         tablePage.put("tableName", panelDisplay + (foreign ? " List" : "列表"));
+        // 与 buildDocConfig 同款:下发 yj_panel.page_size(2026-09-28 补)。此前档案分支漏了这个键,
+        // 导致 page_size 对档案面板在配置层"不存在"——前端 archPageSize 只能硬编码 50,元数据旋钮失效。
+        if (def.pageSize() != null) tablePage.put("pageSize", def.pageSize());
         // 查询字段(2026-09-20):档案/单单据面板是"一张虚拟单据 + 全量明细行",表头只剩「备注」,
         // 原来这里硬编码空列表 → 「查询」弹窗没有任何可用条件;改为取元数据里登记了 query 位的常规字段
         // (migrate-basedata-query-fields.sql 给每个基础资料面板挑了 ≤6 个:编码/名称/规格/分类/停用…)
@@ -169,7 +188,16 @@ public class PanelConfigService {
             metadata.put("classifyPanel", classifyPanel);   // 前端「分类管理」跳转目标面板码
             metadata.put("classifyTitle", classifyTitle);   // 页签标题
         }
-        if (qrLabel) metadata.put("qrLabelKey", "存货编码"); // 前端二维码标签勾选列的行键(编码列)
+        if (qrLabel) {
+            // 前端二维码标签勾选列的行键(编码列)
+            metadata.put("qrLabelKey", "INV".equals(def.code()) ? "存货编码" : "库位编码");
+            if ("WHLOC".equals(def.code())) {
+                // 库位标签勾选行键=仓库+库位编码 复合(库位编码按仓内唯一,同码多仓不串选)
+                metadata.put("qrLabelScopeKey", "仓库");
+                // 前端分发:whloc → printLocationCards(库位标识卡,二维码=仓库@库位地址@库位编码)
+                metadata.put("qrLabelKind", "whloc");
+            }
+        }
         metadata.put("panelPageDto", pageDto);
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -324,6 +352,14 @@ public class PanelConfigService {
         tablePage.put("topBarBtn", panelButtons);
         tablePage.put("rowOperationBarBtn", List.of());
         tablePage.put("events", List.of());
+        // 生产加工单(2026-09-24,用户拍板参考旧系统工单列表):主表预览表格=扁平工单列表形态,
+        // 前端 PanelxList 据此渲染 mainGrid + 产线筛选条(产线下拉/未排产·已排产·未完工·已完工/追溯)
+        if ("MANU_ORDER".equals(def.code())) {
+            tablePage.put("mainTable", Map.of(
+                    "label", "生产加工单",
+                    "columns", List.of("合同号", "单据日期", "客户", "生产线", "预开工日", "预完工日",
+                            "需求数量", "排产数量", "入库数量", "余量", "批号", "重点管控")));
+        }
 
         Map<String, Object> pageDto = new LinkedHashMap<>();
         pageDto.put("tablePages", List.of(tablePage));
@@ -378,6 +414,18 @@ public class PanelConfigService {
             if (at >= 0 && !gActions.contains("表头调整")) {
                 List<String> merged = new ArrayList<>(gActions);
                 merged.add(at + 1, "表头调整");
+                g.put("actions", merged);
+            }
+        }
+        // 字段管理(动态字段/备用列池,规格 §10):紧跟表头调整/表格调整之后(buildDocConfig 只服务 doc 面板,
+        // archive 面板在 buildArchiveConfig 里另行注入)。
+        for (Map<String, Object> g : buttonGroups) {
+            @SuppressWarnings("unchecked")
+            List<String> gActions = (List<String>) g.get("actions");
+            int anchor = gActions.indexOf("表头调整") >= 0 ? gActions.indexOf("表头调整") : gActions.indexOf("表格调整");
+            if (anchor >= 0 && !gActions.contains("字段管理")) {
+                List<String> merged = new ArrayList<>(gActions);
+                merged.add(anchor + 1, "字段管理");
                 g.put("actions", merged);
             }
         }
@@ -589,6 +637,8 @@ public class PanelConfigService {
             for (PanelRegistry.FieldDef sibling : def.fields()) {
                 if (sibling.label().equals(f.label())) continue;
                 if (mapped.contains(sibling.label())) continue;
+                // 只读回执字段(editable=0,如报工单.入库单号)不参与参照带入——它是下游回执,不该被来源单覆盖(2026-09-24)
+                if (!sibling.editable()) continue;
                 PanelRegistry.FieldDef refSide = refDef.byLabel(sibling.label());
                 if (refSide != null && carryTypeAllowed(sibling.dataType(), refSide.dataType())) {
                     out.add(Map.of("from", sibling.label(), "to", sibling.label()));
@@ -730,14 +780,16 @@ public class PanelConfigService {
     private static final List<String> INV_COST_PANELS = List.of("STOCK_LEDGER", "STOCK_SUMMARY", "STOCK_BALANCE");
 
     private static final Map<String, List<String[]>> PANDA_BUTTONS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
-            // 销售订单:选单灰(无上游);生单=生产加工单/销售出库单(已实现)
+            // 销售订单:选单灰(无上游);生单=生产工单/销售出库单(已实现)
             java.util.Map.entry("SO_ORDER", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选单"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审", "审批情况", "提交审批", "审批通过", "审批驳回"},
-                    new String[]{"生单", "生成生产加工单", "生成销售出库单"},
+                    // 生成生产工单(2026-09-24 改名:原名「生成生产加工单」;按钮名是数据键,须与
+                    // ManuScheduleHandler.supports / PUSH_TARGETS / PushGenerateHandler 同步)
+                    new String[]{"生单", "生成生产工单", "生成销售出库单"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "整单中止", "表格调整", "导入", "刷新"})),
             // 请购单:选单灰;生单=采购订单(已实现)
@@ -763,10 +815,12 @@ public class PanelConfigService {
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成送料暂收单"},
-                    // 转ERP(2026-09-23):采购订单直推金蝶 pur_order(测试沙箱联调用;同号已存在会拒)
-                    new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"查找", "查找", "刷新"},
-                    new String[]{"打印", "打印", "预览", "导出"},
+                    // 打印采购订单(2026-09-23):银嘉固定版式纸质单(前端 print-formats.js,列表选中单打印,无后端处理器)
+                    // 打印材料码(2026-09-28):供应商自己打码场景——订单明细行出材料二维码标签
+                    // (QrLabelDialog,二维码=物料编码|批号@数量,订单行无批号→编码@数量,收货扫码解析入库与追溯)
+                    // 打印订单无金额(2026-09-28):采购订单另一种报表,同版式仅去 单价/小计/总计金额(print-formats.printPuOrderNoAmount)
+                    new String[]{"打印", "打印", "预览", "导出", "打印采购订单", "打印订单无金额", "打印材料码"},
                     new String[]{"导入", "导入"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
             // 采购入库单:选单=送料暂收单(2026-09-22 起;原为采购订单,那条免检直达已被取消);
@@ -782,7 +836,9 @@ public class PanelConfigService {
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成进货单"},
                     new String[]{"转ERP", "转ERP", "批量转ERP"},
-                    new String[]{"打印", "打印", "预览", "导出"},
+                    // 打印标识卡(2026-09-28):明细行打印,复用商品档案「二维码标签」的 75×100mm 产品标识卡版式
+                    // (前端 print-formats.printProductCards,一行一卡,字段/二维码口径同商品,订单编号/供应商等取单据事实填充)
+                    new String[]{"打印", "打印", "预览", "导出", "打印标识卡"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
@@ -814,7 +870,8 @@ public class PanelConfigService {
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"查找", "查找", "刷新"},
-                    new String[]{"打印", "打印", "预览", "导出"},
+                    // 打印退货单(2026-09-23):银嘉固定版式纸质单(前端 print-formats.js,列表选中单打印,无后端处理器)
+                    new String[]{"打印", "打印", "预览", "导出", "打印退货单"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
             // 送料暂收单(库存核算,2026-09-20 面板编码 SL_RECV→QC_RECV):选单=采购订单;
             // 生单=来料检验单(主按钮,走品检)/ 采购入库单(2026-09-22 新增,免检直达 —— 采购订单的生单
@@ -846,10 +903,10 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 产成品入库单:选单=生产加工单;生单灰(PANDA:生成产成品入库单（自制退库）)
+            // 产成品入库单:选单=生产工单;生单灰(PANDA:生成产成品入库单（自制退库）)
             java.util.Map.entry("FINISH_IN", List.of(
                     new String[]{"新增", "新增"},
-                    new String[]{"选单", "选单", "选生产加工单"},
+                    new String[]{"选单", "选单", "选生产工单"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
@@ -887,11 +944,11 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 材料出库单:选单=生产加工单;生单灰(PANDA:生成材料出库单（直接退料）)
+            // 材料出库单:选单=生产工单;生单灰(PANDA:生成材料出库单（直接退料）)
             // 转ERP(2026-09-28):材料出库单 → 金蝶「生产领料单」/jdy/v2/scm/inv_pick
             java.util.Map.entry("MATERIAL_OUT", List.of(
                     new String[]{"新增", "新增"},
-                    new String[]{"选单", "选单", "选生产加工单"},
+                    new String[]{"选单", "选单", "选生产工单"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
@@ -921,7 +978,7 @@ public class PanelConfigService {
             java.util.Map.entry("OUTSOURCE_IN", OUTSOURCE_GROUPS_IN),
             java.util.Map.entry("OUTSOURCE_ISSUE", OUTSOURCE_GROUPS_ISSUE),
             java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER),
-            // 生产加工单:选单=销售订单;生单=产成品入库单(已实现)
+            // 生产工单:选单=销售订单;生单=产成品入库单(已实现)
             java.util.Map.entry("MANU_ORDER", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选单", "选销售订单"},
@@ -930,14 +987,13 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审批", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"生单", "生成产成品入库单"},
-                    new String[]{"打印", "打印", "预览", "导出", "打印工单二维码"},
-                    // 拆单(V2.0 §3.2):按数量拆成多张,父子关联(源工单号/拆分序号);由 ManuSplitHandler 接管
-                    // 结案(参考库 plang_pc.ja):已审核人工结案,退出需求统计;由 ManuCloseHandler 接管,可取消结案
-                    // 生成产品批号(V1.2 #8 成型后打印产品二维码数据源;2026-09-22 单轨改造挂到加工单)
-                    // 首件完成通知(生产部纪要 三):置首件标志+站内消息提醒品质取样;由 ManuFirstArticleHandler 接管
-                    // 生成采购申请(生产部纪要 五·订单结转):BOM×排产数量−库存 → PU_REQ 草稿+推送采购;由 ManuPurchaseReqHandler 接管
-                    // 排产单一入口=排产工作台(2026-09-23 实现总结 §5):「排产」按钮下线,表单 产线/开工·完工日已转只读,统一由工作台 assign
-                    new String[]{"更多", "拆单", "结案", "取消结案", "首件完成通知", "生成采购申请", "生成产品批号", "复制", "放弃", "草稿", "中止执行", "取消中止", "表格调整", "刷新"}))
+                    // 2026-09-24 用户拍板(参考旧系统工单列表样式收敛):列表特殊按钮只保留
+                    // 打印工单(生产任务单固定版式)/排产(本单快捷排线,弹窗选产线,复用排产工作台
+                    // assign 守卫守恒留痕)/结案/取消结案(ManuCloseHandler);
+                    // 打印工单二维码(标签机场景)并入更多;拆单/首件通知/生成采购申请/生成产品批号下线出列表
+                    new String[]{"打印", "打印", "预览", "导出", "打印工单"},
+                    new String[]{"排产", "排产", "结案", "取消结案"},
+                    new String[]{"更多", "打印工单二维码", "复制", "放弃", "草稿", "中止执行", "取消中止", "表格调整", "刷新"}))
     )));
 
     /**
@@ -952,7 +1008,7 @@ public class PanelConfigService {
     private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
             java.util.Map.entry("PU_REQ|生成采购订单", "PU_ORDER"),
             java.util.Map.entry("PU_ORDER|生成送料暂收单", "QC_RECV"),
-            java.util.Map.entry("SO_ORDER|生成生产加工单", "MANU_ORDER"),
+            java.util.Map.entry("SO_ORDER|生成生产工单", "MANU_ORDER"),
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
             java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
             java.util.Map.entry("QC_RECV|生成来料检验单", "QC_INSP"),
@@ -988,21 +1044,22 @@ public class PanelConfigService {
     private static final Map<String, String> SELECT_FLOWS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
             java.util.Map.entry("PURCHASE_IN", "QC_RECV"),           // 送料暂收单 → 采购入库单(2026-09-22:原 采购订单,
                                                                      //   免检直达已取消,来源收敛到暂收单;见 PUSH_TARGETS 注释)
-            java.util.Map.entry("MATERIAL_OUT", "MANU_ORDER"),       // 生产加工单 → 材料出库单
-            java.util.Map.entry("FINISH_IN", "MANU_ORDER"),          // 生产加工单 → 产成品入库单
-            java.util.Map.entry("DISPATCH", "MANU_ORDER"),           // 生产加工单 → 工序派工单
+            java.util.Map.entry("MATERIAL_OUT", "MANU_ORDER"),       // 生产工单 → 材料出库单
+            java.util.Map.entry("FINISH_IN", "MANU_ORDER"),          // 生产工单 → 产成品入库单
+            java.util.Map.entry("DISPATCH", "MANU_ORDER"),           // 生产工单 → 工序派工单
             java.util.Map.entry("OUTSOURCE_ORDER", "SO_ORDER"),      // 销售订单 → 委外加工单
             java.util.Map.entry("OUTSOURCE_ISSUE", "OUTSOURCE_ORDER"), // 委外加工单 → 委外发料单
             java.util.Map.entry("OUTSOURCE_IN", "OUTSOURCE_ORDER"),  // 委外加工单 → 委外入库单
             java.util.Map.entry("SALE_OUT", "SO_ORDER"),             // 销售订单 → 销售出库单
-            java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产加工单(销售-生产链)
+            java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产工单(销售-生产链)
             java.util.Map.entry("PU_ORDER", "PU_REQ"),               // 请购单 → 采购订单
             java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15;编码 9-20 由 SL_RECV 改)
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
-            java.util.Map.entry("WO_ORDER", "SO_ORDER"),             // 销售订单 → 生产工单(计划层:选单生单)
-            java.util.Map.entry("RKD", "CGD"),                       // 采购单(旧) → 入库单(旧)
-            java.util.Map.entry("CKD", "KHDD")                       // 客户订单(旧) → 出库单(旧)
+            java.util.Map.entry("WO_ORDER", "SO_ORDER")              // 销售订单 → 生产工单(计划层:选单生单)
+            // 2026-09-30:原最后两条 RKD/CKD(采购单(旧)→入库单(旧) / 客户订单(旧)→出库单(旧))
+            // 随 RKD/CKD 面板元数据一并删除 —— 这两个纺织遗留面板的 yj_field 按旧列名登记,
+            // inh/outh 重建后已永久失效(菜单侧也从未挂载),保留映射只会让「选单」指向不存在的面板。
     )));
 
     /** 头字段映射排除项(状态/审批类不参与选单带入;附件1-6是按单号锚定的文件实体,
@@ -1033,8 +1090,6 @@ public class PanelConfigService {
             {"合格数量", "实收数量"},
             {"不合格数量", "退货数量"},
             // 行级仓库沿链贯通(2026-09-21):采购订单行/暂收行叫「仓库」,检验行叫「仓库代码」,入库行又叫「仓库」
-            // (2026-09-23 正名后单据侧统一叫「仓库」——采购入库明细的 仓库名称 已改名仓库,本对重新覆盖入库链;
-            //  销售出库同理同名直通,无需额外对)
             {"仓库", "仓库代码"}, {"仓库代码", "仓库"},
             // 采购链订单行号(2026-09-20):采购订单行 行号(金蝶 seq)→ 下游各站 采购订单行号,
             // 逐站下传后在 采购入库行 落 源单行号,转ERP 推给金蝶作 src_seq
@@ -1044,29 +1099,27 @@ public class PanelConfigService {
             // 计划层(销售订单 → 生产工单)的产品口径换名
             {"存货编码", "产品编码"}, {"存货名称", "产品名称"},
             {"数量", "订单数量"},
-    };
-
-    /** 明细字段同义词(按链路 source|target 键控;只在**该链路**生效)。
-     *  2026-09-24 随生产域「订单结转/排产工作台」下拉:销售订单 → 生产加工单要按参考库 plang_pc 口径
-     *  落「需求数量」(订单需求)与「批号」(订单批次)。⚠ 刻意**不写进上面的全局表** ——
-     *  全局表对所有链路生效,`批次号→批号` 会连带改写 来料检验→采购入库 等采购/品质链路的行映射
-     *  (QC_INSP 有 批次号、PURCHASE_IN 有 批号),属用户不可接受的越域改动。 */
-    private static final Map<String, String[][]> FLOW_DETAIL_SYNONYMS_SCOPED =
-            java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
-            // 生产加工单排产口径(2026-09-21,对齐参考库 plang_pc):订单数落「需求数量」、批次号落「批号」;
+            // 生产工单排产口径(2026-09-21,对齐参考库 plang_pc):订单数落「需求数量」、批次号落「批号」;
             // 单价/金额与「数量」为同名自动映射,需求数量与数量并存(前者=订单需求,后者=排产数量口径)
-            "SO_ORDER|MANU_ORDER", new String[][]{{"数量", "需求数量"}, {"批次号", "批号"}})));
+            {"数量", "需求数量"}, {"批次号", "批号"},
+    };
 
     /** 头字段同义词(按链路 source|target 键控;同名映射之外的补充)。 */
     private static final Map<String, String[][]> FLOW_HEAD_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
+            // 2026-09-24 用户拍板:供应链域以远端实现为准 —— 此处撤回本地新增的
+            // "PU_REQ|PU_ORDER"({建议供应商→供应商})携带映射,回到远端口径。
             // 送料暂收单 → 采购入库单(2026-09-22 新增;原 PU_ORDER|PURCHASE_IN 免检直达已取消,
             // 那条只需 单据编号→采购订单号,本跳的采购订单号随链从采购订单带下来了、同名直通无需登记)。
             // 供应商代码→供应商编码:暂收单头叫「供应商代码」,入库头叫「供应商编码」——异名不带则入库单
             // 供应商编码恒空(与 QC_INSP|PURCHASE_IN 当年同一个坑)。注:批次键由
             // PushGenerateHandler.generateBatch 直接写入,不走映射(头映射 7 条上限会把它挤掉,不影响)。
             "QC_RECV|PURCHASE_IN", new String[][]{{"供应商代码", "供应商编码"}},
-            // 销售订单 → 生产加工单:订单号落 销售订单号;交期落 预完工日(2026-09-21 补:
-            // 加工单排产要以订单交期为预完工日,缺此条则生单后交期为空;2026-09-24 随生产域下拉)
+            // 2026-09-24 用户拍板:供应链域以远端实现为准 —— 撤回本地新增的
+            // "PU_ORDER|PURCHASE_IN"({单据编号→采购订单号});该免检直达链远端已取消
+            // (采购入库单现在只从「送料暂收单」选单,采购订单号随链带入,见上行注释),
+            // 本地那条属悬空登记,无实际链路生效。
+            // 销售订单 → 生产工单:订单号落 销售订单号;交期落 预完工日(2026-09-21 补:
+            // 加工单排产要以订单交期为预完工日,缺此条则生单后交期为空)
             "SO_ORDER|MANU_ORDER", new String[][]{{"单据编号", "销售订单号"}, {"预计交货日期", "预完工日"}},
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
@@ -1185,12 +1238,18 @@ public class PanelConfigService {
             java.util.Set<String> mappedHeads = new java.util.HashSet<>();
             List<Map<String, String>> hmap = new ArrayList<>();
             hmap.add(Map.of("from", noLabel, "to", "来源单号"));
-            for (PanelRegistry.FieldDef f : src.fieldsAt("header")) {
-                if (hmap.size() >= 7) break;
-                String l = f.label();
-                if (FLOW_HEAD_EXCLUDE.contains(l) || l.equals(noLabel) || !targetHeads.contains(l)) continue;
-                hmap.add(Map.of("from", l, "to", l));
-                mappedHeads.add(l);
+            // 2026-09-28 上限事故修复:旧逻辑单轮按 seq 先到先得、上限 7 且隐藏字段同占坑——
+            // 服务器实测 QC_RECV→QC_INSP 把 seq 靠后的可见字段「供应商」挤出映射窗口(代码能过、名称丢失)。
+            // 改两轮收集:先可见字段、后隐藏字段(保留隐藏字段可映射的旧能力),上限 7→12,seq 不再决定生死。
+            for (boolean visiblePass = true; ; visiblePass = false) {
+                for (PanelRegistry.FieldDef f : src.fieldsAt("header")) {
+                    if (hmap.size() >= 12) break;
+                    String l = f.label();
+                    if ((!f.hidden() && f.visible()) != visiblePass) continue;
+                    if (FLOW_HEAD_EXCLUDE.contains(l) || l.equals(noLabel) || !targetHeads.contains(l)) continue;
+                    if (mappedHeads.add(l)) hmap.add(Map.of("from", l, "to", l));
+                }
+                if (!visiblePass) break;
             }
             String[][] headSyn = FLOW_HEAD_SYNONYMS.get(sourceCode + "|" + def.code());
             if (headSyn != null) {
@@ -1216,15 +1275,6 @@ public class PanelConfigService {
             for (String[] syn : FLOW_DETAIL_SYNONYMS) {
                 if (src.byLabel(syn[0]) != null && targetDets.contains(syn[1]) && mapped.add(syn[1])) {
                     dmap.add(Map.of("from", syn[0], "to", syn[1]));
-                }
-            }
-            // 链路专属明细同义词(仅本链路;见 FLOW_DETAIL_SYNONYMS_SCOPED 注释)
-            String[][] detSyn = FLOW_DETAIL_SYNONYMS_SCOPED.get(sourceCode + "|" + def.code());
-            if (detSyn != null) {
-                for (String[] syn : detSyn) {
-                    if (src.byLabel(syn[0]) != null && targetDets.contains(syn[1]) && mapped.add(syn[1])) {
-                        dmap.add(Map.of("from", syn[0], "to", syn[1]));
-                    }
                 }
             }
             cfg.put("detailMap", dmap);
@@ -1330,7 +1380,9 @@ public class PanelConfigService {
             boolean visible = !Boolean.FALSE.equals(col.get("visible")) && !"false".equals(String.valueOf(col.get("visible")));
             PanelRegistry.FieldDef fd = details.stream().filter(f -> f.label().equals(label)).findFirst().orElse(null);
             if (fd == null) continue;
-            jdbc.update("UPDATE yj_field SET seq = ?, alias = ?, hidden = ?, visible = ? WHERE panel_code = ? AND col_name = ?",
+            // 2026-09-30 补 place 过滤:此前按 col_name 裸 UPDATE,会把同名列的**表头行** seq 一并改写成
+            // 明细网格的位置(QC_INSP 部门/部门名称 表头行 60/70 被写成 290/300 即此故)。
+            jdbc.update("UPDATE yj_field SET seq = ?, alias = ?, hidden = ?, visible = ? WHERE panel_code = ? AND col_name = ? AND place LIKE '%detail%'",
                     (i + 1) * 10, alias.isBlank() ? null : alias, !visible, visible, panelCode, fd.col());
         }
         registry.reload();
@@ -1500,6 +1552,211 @@ public class PanelConfigService {
             org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
                     .warn("[RD_CHANGE] 读取当前账号可填部门失败,界面将整表只读: {}", e.getMessage());
             return List.of();
+        }
+    }
+
+    // ---------- 动态字段(备用列池;规格 docs/design/动态字段扩展-备用列池-V1.0.md) ----------
+
+    private static final java.util.Set<String> EXT_DATA_TYPES = java.util.Set.of("文本", "下拉框", "日期", "是否");
+    private static final int EXT_SPARE_COUNT = 20;
+
+    /** 动态字段总览:现有动态字段 + 各表备用列池占用/脏数据行数(规格 §8 契约 1) */
+    public Map<String, Object> extFieldOverview(String panelCode) {
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
+        List<Map<String, Object>> fields = new ArrayList<>();
+        for (PanelRegistry.FieldDef f : def.fields()) {
+            if (f.col() != null && f.col().matches("备用\\d+")) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("id", extFieldIdOf(panelCode, f.col()));
+                m.put("label", f.label());
+                m.put("col", f.col());
+                m.put("dataType", f.dataType());
+                m.put("place", f.place());
+                fields.add(m);
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("capacity", EXT_SPARE_COUNT);
+        out.put("fields", fields);
+        out.put("linePool", extPoolOf(def.lineTable()));
+        if (def.hasHeadTable()) out.put("headPool", extPoolOf(def.headTable()));
+        return out;
+    }
+
+    /** yj_field 行号(面板+备用列唯一定位) */
+    private Integer extFieldIdOf(String panelCode, String col) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id FROM yj_field WHERE panel_code = ? AND col_name = ?", panelCode, col);
+        return rows.isEmpty() ? null : ((Number) rows.get(0).get("id")).intValue();
+    }
+
+    /** 某表备用列池:占用(G3:任一面板引用即占用,表可跨面板共用)/空闲列脏行数 */
+    private List<Map<String, Object>> extPoolOf(String table) {
+        List<Map<String, Object>> pool = new ArrayList<>();
+        if (table == null || table.isBlank()) return pool;
+        for (int i = 1; i <= EXT_SPARE_COUNT; i++) {
+            String spare = "备用" + i;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("col", spare);
+            List<Map<String, Object>> bound = jdbc.queryForList(
+                    "SELECT TOP 1 f.label FROM yj_field f JOIN yj_panel p ON f.panel_code = p.panel_code "
+                            + "WHERE (p.line_table = ? OR p.head_table = ?) AND f.col_name = ?", table, table, spare);
+            m.put("bound", bound.isEmpty() ? null : bound.get(0).get("label"));
+            if (bound.isEmpty()) { // 仅空闲列算脏行(占用列的脏行无意义)
+                Integer dirty = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM " + bracket(table) + " WHERE " + bracket(spare) + " IS NOT NULL", Integer.class);
+                m.put("dirtyRows", dirty == null ? 0 : dirty);
+            }
+            pool.add(m);
+        }
+        return pool;
+    }
+
+    private static String bracket(String ident) {
+        return "[" + ident.replace("]", "]]") + "]";
+    }
+
+    /** 绑定新动态字段(规格 §4/§5,守卫 G1-G4) */
+    @org.springframework.transaction.annotation.Transactional
+    public Map<String, Object> addExtField(Map<String, Object> body) {
+        String panelCode = String.valueOf(body.getOrDefault("panel", "")).trim();
+        String label = String.valueOf(body.getOrDefault("label", "")).trim();
+        String labelEn = String.valueOf(body.getOrDefault("labelEn", "")).trim();
+        String dataType = String.valueOf(body.getOrDefault("dataType", "文本"));
+        String place = String.valueOf(body.getOrDefault("place", "detail"));
+        boolean inQuery = Boolean.TRUE.equals(body.get("inQuery"));
+        Integer width = body.get("width") instanceof Number n ? n.intValue() : 120;
+        boolean required = Boolean.TRUE.equals(body.get("required"));
+        boolean confirmDirty = Boolean.TRUE.equals(body.get("confirmDirty"));
+        boolean clearFirst = Boolean.TRUE.equals(body.get("clearFirst"));
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
+        // G1 标签守卫(列名安全规范:禁 . % / ( ) 与空格;数据键保持中文)
+        if (label.isEmpty() || label.length() > 60) throw new IllegalArgumentException("字段名必须 1-60 个字符");
+        for (char ch : label.toCharArray())
+            if (".%/() \t\r\n".indexOf(ch) >= 0) throw new IllegalArgumentException("字段名禁止含 . % / ( ) 或空格:" + label);
+        if (!labelEn.isEmpty() && labelEn.length() > 60) throw new IllegalArgumentException("英文名过长(≤60)");
+        if (!EXT_DATA_TYPES.contains(dataType)) throw new IllegalArgumentException("动态字段仅支持:文本/下拉框/日期/是否");
+        // G2 面板内标签唯一 —— 直查 yj_field(注册表快照有 30s TTL 窗口,不能当唯一性凭据)
+        Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM yj_field WHERE panel_code = ? AND label = ?", Integer.class, panelCode, label);
+        if (dup != null && dup > 0) throw new IllegalStateException("字段名已存在:" + label);
+        // place 规则:archive 固定 detail;doc 可 header/detail
+        if ("archive".equals(def.mode())) place = "detail";
+        else if (!"header".equals(place) && !"detail".equals(place)) throw new IllegalArgumentException("位置仅支持 header/detail");
+        if ("header".equals(place) && !def.hasHeadTable()) throw new IllegalArgumentException("该面板没有头表,不能加表头字段");
+        String table = "header".equals(place) ? def.headTable() : def.lineTable();
+        // 下拉框词表 → 引擎 VALUES 格式 dict_sql(dictOptions 是引擎唯一下发通道)
+        String dictSql = null;
+        if ("下拉框".equals(dataType)) {
+            String raw = String.valueOf(body.getOrDefault("dictOptions", "")).trim();
+            if (raw.isEmpty()) throw new IllegalArgumentException("下拉框必须提供词表(逗号分隔)");
+            StringBuilder sb = new StringBuilder("SELECT v FROM (VALUES ");
+            for (String w : raw.split("[,，]")) {
+                String t = w.trim();
+                if (t.isEmpty()) continue;
+                if (sb.charAt(sb.length() - 1) != '(') sb.append(",");
+                sb.append("(N'").append(t.replace("'", "''")).append("')");
+            }
+            sb.append(") AS t(v)");
+            dictSql = sb.toString();
+            if (dictSql.length() > 500) throw new IllegalArgumentException("词表过长(生成 SQL 超 500 字符),请精简");
+        }
+        // G3/G4 分配空闲备用列:优先干净列;脏列需 confirmDirty(+可选清空,规格:全系统唯一写业务数据的动作)
+        String chosen = null, dirtyWarn = null;
+        int dirtyRows = 0;
+        for (int i = 1; i <= EXT_SPARE_COUNT && chosen == null; i++) {
+            String spare = "备用" + i;
+            Integer occ = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_field f JOIN yj_panel p ON f.panel_code = p.panel_code "
+                            + "WHERE (p.line_table = ? OR p.head_table = ?) AND f.col_name = ?", Integer.class, table, table, spare);
+            if (occ != null && occ > 0) continue;
+            Integer dirty = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM " + bracket(table) + " WHERE " + bracket(spare) + " IS NOT NULL", Integer.class);
+            if (dirty != null && dirty > 0) {
+                if (dirtyWarn == null) { dirtyWarn = spare; dirtyRows = dirty; }
+                continue;
+            }
+            chosen = spare;
+        }
+        if (chosen == null && dirtyWarn != null) {
+            if (!confirmDirty) throw new IllegalStateException("备用列 " + dirtyWarn + " 存在历史数据 " + dirtyRows + " 行,需确认后才可绑定");
+            chosen = dirtyWarn;
+            if (clearFirst) {
+                jdbc.update("UPDATE " + bracket(table) + " SET " + bracket(chosen) + " = NULL");
+                extLog(panelCode, label, chosen, "clear", "清空历史数据 " + dirtyRows + " 行后绑定");
+            }
+        }
+        if (chosen == null) throw new IllegalStateException("备用列池已满(" + EXT_SPARE_COUNT + "/" + EXT_SPARE_COUNT + "),请走正式迁移扩展");
+        String finalPlace = (inQuery ? "query," : "") + place;
+        Integer maxSeq = jdbc.queryForObject(
+                "SELECT MAX(seq) FROM yj_field WHERE panel_code = ? AND place LIKE ?", Integer.class, panelCode, "%" + place + "%");
+        jdbc.update("INSERT INTO yj_field (panel_code, col_name, label, label_en, data_type, dict_sql, place, seq, width, editable, required, hidden, visible) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,0,1)",
+                panelCode, chosen, label, labelEn.isEmpty() ? null : labelEn, dataType, dictSql, finalPlace,
+                (maxSeq == null ? 0 : maxSeq) + 10, width, 1, required);
+        // 多语言强制规范(AGENTS):至少 en 译名;label_en 列同写(引擎显示层直读)。
+        // MERGE 覆盖式(人工 manual 优先于机翻 mt;退绑后换英文名重绑也能更新),
+        // 写完失效译名缓存 —— 显示名优先走 fieldDict(),不失效会用到 30s TTL 内的旧字典(实测踩到)。
+        jdbc.update("MERGE yj_translation AS t USING (SELECT CAST(? AS nvarchar(20)) AS scope, "
+                        + "CAST(? AS nvarchar(200)) AS ref_key, CAST(? AS nvarchar(10)) AS locale, "
+                        + "CAST(? AS nvarchar(500)) AS text) AS s "
+                        + "ON t.scope = s.scope AND t.ref_key = s.ref_key AND t.locale = s.locale "
+                        + "WHEN MATCHED THEN UPDATE SET text = s.text, source = 'manual', updated_at = SYSDATETIME() "
+                        + "WHEN NOT MATCHED THEN INSERT (scope, ref_key, locale, text, source) VALUES (s.scope, s.ref_key, s.locale, s.text, 'manual');",
+                "field", label, "en", labelEn.isEmpty() ? label : labelEn);
+        translations.invalidateLoadedLocales();
+        extDescribe(table, chosen, label + "(动态字段,绑定" + chosen + ")");
+        extLog(panelCode, label, chosen, "bind", "place=" + finalPlace + ",type=" + dataType);
+        registry.reload();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("colName", chosen);
+        out.put("fieldId", extFieldIdOf(panelCode, chosen));
+        return out;
+    }
+
+    /** 退绑(规格 §7:数据保留,永不 DROP 物理列;守卫 G6 仅动态字段可退绑) */
+    @org.springframework.transaction.annotation.Transactional
+    public void retireExtField(String panelCode, int fieldId) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT col_name, label, place FROM yj_field WHERE id = ? AND panel_code = ?", fieldId, panelCode);
+        if (rows.isEmpty()) throw new IllegalArgumentException("字段不存在:id=" + fieldId);
+        String col = String.valueOf(rows.get(0).get("col_name"));
+        String label = String.valueOf(rows.get(0).get("label"));
+        String place = String.valueOf(rows.get(0).get("place"));
+        if (col == null || !col.matches("备用\\d+")) throw new IllegalArgumentException("仅动态字段(备用列)可停用:" + label);
+        jdbc.update("DELETE FROM yj_field WHERE id = ?", fieldId);
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def != null) {
+            String table = place.contains("header") && def.hasHeadTable() ? def.headTable() : def.lineTable();
+            extDescribe(table, col, "预留(已停用:原" + label + ")");
+        }
+        extLog(panelCode, label, col, "retire", null);
+        registry.reload();
+    }
+
+    /** MS_Description 幂等更新(先查后改,避免异常控制流) */
+    private void extDescribe(String table, String col, String descr) {
+        Integer has = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sys.extended_properties ep JOIN sys.columns c ON c.object_id = ep.major_id AND c.column_id = ep.minor_id "
+                        + "WHERE ep.major_id = OBJECT_ID(?) AND ep.name = 'MS_Description' AND c.name = ?", Integer.class, table, col);
+        if (has != null && has > 0)
+            jdbc.update("EXEC sp_updateextendedproperty N'MS_Description', ?, N'SCHEMA', N'dbo', N'TABLE', ?, N'COLUMN', ?", descr, table, col);
+        else
+            jdbc.update("EXEC sp_addextendedproperty N'MS_Description', ?, N'SCHEMA', N'dbo', N'TABLE', ?, N'COLUMN', ?", descr, table, col);
+    }
+
+    /** 绑定审计(append-only;审计失败不阻断主流程) */
+    private void extLog(String panelCode, String label, String col, String action, String detail) {
+        try {
+            String user = "system";
+            var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getName() != null && !auth.getName().isBlank()) user = auth.getName();
+            jdbc.update("INSERT INTO yj_ext_bind_log (panel_code, label, col_name, action, op_by, detail) VALUES (?,?,?,?,?,?)",
+                    panelCode, label, col, action, user, detail);
+        } catch (Exception e) {
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[EXT_FIELD] 绑定审计写入失败({} {} {}): {}", action, label, col, e.getMessage());
         }
     }
 }

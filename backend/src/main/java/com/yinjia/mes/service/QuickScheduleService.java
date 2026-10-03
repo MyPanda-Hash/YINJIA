@@ -11,8 +11,8 @@ import java.util.Map;
 
 /**
  * 生产排产域服务(2026-09-22 面板化改造后仅保留跨面板复用的两段核心):
- * ① 销售订单 → 生产加工单({@link #generateFromOrder}/{@link #createFromOrderLine},SO_ORDER「生成生产加工单」按钮);
- * ② 生产加工单排产({@link #scheduleOne},MANU_ORDER「排产」按钮):就地回写产线/车间/开工·完工日/重点管控,
+ * ① 销售订单 → 生产工单({@link #generateFromOrder}/{@link #createFromOrderLine},SO_ORDER「生成生产工单」按钮);
+ * ② 生产工单排产({@link #scheduleOne},MANU_ORDER「排产」按钮):就地回写产线/车间/开工·完工日/重点管控,
  *    数量守恒(排产数量≤本单生单量,form_flow_link.linked_quantity 跟随)、余量=排产−入库(头级优先)、排产留痕。
  * 界面层(待生单/排单计划表/负荷看板)不再走专用页——由 SO_ORDER/MANU_ORDER/MANU_SCHEDULE/LINE_CAP/LINE_LOAD 面板承担,
  * 流转 = 面板按钮生单/跳转(gotoPanel),对齐全系统面板↔面板范式。
@@ -21,26 +21,25 @@ import java.util.Map;
 public class QuickScheduleService {
 
     private final JdbcTemplate jdbc;
+    private final FormNoService formNo;
     private final PanelRegistry registry;
     private final QueryService queryService;
     private final ButtonService buttonService;
     private final VoucherFlowService voucherFlow;
-    private final PanelConfigService configService;
 
-    public QuickScheduleService(JdbcTemplate jdbc, PanelRegistry registry, QueryService queryService,
-                                ButtonService buttonService, VoucherFlowService voucherFlow,
-                                PanelConfigService configService) {
+    public QuickScheduleService(JdbcTemplate jdbc, FormNoService formNo, PanelRegistry registry, QueryService queryService,
+                                ButtonService buttonService, VoucherFlowService voucherFlow) {
         this.jdbc = jdbc;
+        this.formNo = formNo;
         this.registry = registry;
         this.queryService = queryService;
         this.buttonService = buttonService;
         this.voucherFlow = voucherFlow;
-        this.configService = configService;
     }
 
-    // ────────────────────────── ① 销售订单 → 生产加工单(一单可多次生成多张) ──────────────────────────
+    // ────────────────────────── ① 销售订单 → 生产工单(一单可多次生成多张) ──────────────────────────
 
-    /** 整单按行生成加工单草稿(增量:剩余为 0 的行跳过),返回新单号;支持同一行反复点击多次生成 */
+    /** 整单按行生成工单草稿(增量:剩余为 0 的行跳过),返回新单号;支持同一行反复点击多次生成 */
     @Transactional
     @SuppressWarnings("unchecked")
     public List<String> generateFromOrder(String sourceNo, String user) {
@@ -52,7 +51,7 @@ public class QuickScheduleService {
         if (detailObj instanceof Map<?, ?> dm && dm.get("items") instanceof List<?> l) {
             for (Object o : l) if (o instanceof Map<?, ?> m) lines.add(new LinkedHashMap<>((Map<String, Object>) m));
         }
-        if (lines.isEmpty()) throw new IllegalStateException("来源单据无明细行,不能生成生产加工单");
+        if (lines.isEmpty()) throw new IllegalStateException("来源单据无明细行,不能生成生产工单");
         List<String> created = new ArrayList<>();
         for (Map<String, Object> line : lines) {
             String lineId = str(line.get("id"));
@@ -60,80 +59,82 @@ public class QuickScheduleService {
             if (residual(sourceNo, lineId, line) <= 0.0001) continue;   // 剩余为 0:已生成的行跳过
             created.add(createFromOrderLine(sourceNo, lineId, null, user));
         }
-        if (created.isEmpty()) throw new IllegalStateException("该订单明细行均已生成生产加工单,无需重复生成(如需调整请先删除对应加工单草稿)");
+        if (created.isEmpty()) throw new IllegalStateException("该订单明细行均已生成生产工单,无需重复生成(如需调整请先删除对应工单草稿)");
         return created;
     }
 
-    /** 单行 → 一张加工单草稿 + 行级占用;qtyOverride 空=剩余全部 */
+    /**
+     * 单行 → plang 工单行(2026-09-27 定稿 + 批次号终版:每次转单各自成批):
+     * **同一销售订单共用一张工单**(pl_no 沿用该订单首次转单号,首次取新 MO 号);
+     * **工单行号 pl_xc = 销售订单明细行的行号**(bl_so_order.行号,金蝶分录 seq 从 1 连续);
+     * **批次号 = 转单日期 yyyyMMdd,同一天多次转单各自成批依次 -2/-3 后缀**(每日重新起算;
+     * 首转=纯日期,再转=日期-2、日期-3…)——不再累加,每次转单=一条新批次行。
+     * 来源订单行以 od_no/od_xc 回链;占用通道 target_panel_code='PLANG'。
+     * 严格「已审核」闸门;剩余=行数量−各通道占用;qtyOverride 空=剩余全部。
+     * 数据源单轨:不再写 bd_manu_order。SO_ORDER「生成生产工单」按钮与订单结转页共用本实现。
+     */
     @Transactional
-    @SuppressWarnings("unchecked")
     public String createFromOrderLine(String sourceNo, String lineId, Double qtyOverride, String user) {
         requireAudited(sourceNo);
-        PanelRegistry.PanelDef soDef = registry.panel("SO_ORDER");
-        Map<String, Object> src = queryService.loadOneDoc(soDef, sourceNo);
-        Map<String, Object> head = new LinkedHashMap<>(src);
-        Object detailObj = head.remove("detail");
-        Map<String, Object> line = null;
-        if (detailObj instanceof Map<?, ?> dm && dm.get("items") instanceof List<?> l) {
-            for (Object o : l) {
-                if (o instanceof Map<?, ?> m && lineId.equals(str(m.get("id")))) {
-                    line = new LinkedHashMap<>((Map<String, Object>) m);
-                    break;
-                }
-            }
-        }
-        if (line == null) throw new IllegalStateException("订单行不存在:" + sourceNo + "#" + lineId);
-        double residual = residual(sourceNo, lineId, line);
+        // 订单行直查表(不走面板标签映射);来源单头取 客户编码;行号带 id 序兜底(历史行 行号 可能为空)
+        Map<String, Object> line = jdbc.queryForMap(
+                "SELECT l.[存货编码], ISNULL(l.[存货名称],N'') AS 存货名称, ISNULL(l.[规格型号],N'') AS 规格型号,"
+                        + " ISNULL(l.[数量],0) AS 数量, ISNULL(l.[销售单位],N'') AS 销售单位, ISNULL(l.[批次号],N'') AS 批次号,"
+                        + " ISNULL(o.[客户编码],N'') AS 客户编码,"
+                        + " ISNULL(l.[行号], (SELECT COUNT(*) FROM bl_so_order x WHERE x.[单据编号]=l.[单据编号]"
+                        + "   AND ISNULL(x.asp_cancel,'N')<>N'Y' AND x.[id]<=l.[id])) AS 行号,"
+                        + " CONVERT(varchar(10), ISNULL(l.[预计交货日期], o.[预计交货日期]), 120) AS 交货日期"
+                        + " FROM bl_so_order l JOIN bd_so_order o ON o.[单据编号] = l.[单据编号]"
+                        + " WHERE l.[单据编号] = ? AND l.[id] = ?", sourceNo, Integer.parseInt(lineId));
+        Double manu = jdbc.queryForObject(
+                "SELECT ISNULL(SUM(ISNULL(linked_quantity,0)),0) FROM form_flow_link"
+                        + " WHERE source_panel_code='SO_ORDER' AND source_line_key=?"
+                        + " AND target_panel_code IN ('MANU_ORDER','PLANG') AND link_status='ACTIVE'",
+                Double.class, sourceNo + "#" + lineId);
+        Double pu = jdbc.queryForObject(
+                "SELECT ISNULL(SUM(ISNULL(linked_quantity,0)),0) FROM form_flow_link"
+                        + " WHERE source_panel_code='SO_ORDER' AND source_line_key=?"
+                        + " AND target_panel_code='PU_REQ' AND link_status='ACTIVE'",
+                Double.class, sourceNo + "#" + lineId);
+        double demand = Num.of(line.get("数量"));
+        double residual = demand - (manu == null ? 0 : manu) - (pu == null ? 0 : pu);
         if (residual <= 0.0001) {
-            throw new IllegalStateException("该订单行已全部生成生产加工单(剩余可生成数量 0);如需调整请先删除对应加工单草稿");
+            throw new IllegalStateException("该订单行已全部转出(剩余可转数量 0)");
         }
-        double qty = qtyOverride != null && qtyOverride > 0 ? qtyOverride : residual;
+        double qty = qtyOverride != null && qtyOverride > 0 ? Math.min(qtyOverride, residual) : residual;
         if (qty <= 0) throw new IllegalStateException("生单数量必须大于 0");
-        if (qty > residual + 0.0001) throw new IllegalStateException("生单数量 " + qty + " 超过剩余可生成数量 " + residual);
-        double demand = qtyOf(line);   // 需求数量=订单行数量,不随部分生单缩水
-
-        Map<String, Object> maps = configService.flowMaps("SO_ORDER", "MANU_ORDER");
-        if (maps == null) throw new IllegalStateException("目标面板未配置流转来源:MANU_ORDER");
-        List<Map<String, String>> headerMap = (List<Map<String, String>>) maps.get("headerMap");
-        List<Map<String, String>> detailMap = (List<Map<String, String>>) maps.get("detailMap");
-
-        PanelRegistry.PanelDef tgtDef = registry.panel("MANU_ORDER");
-        String dateLabel = "单据日期";
-        if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
-            PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
-            if (df != null) dateLabel = df.label();
+        if (qty > residual + 0.0001) throw new IllegalStateException("生单数量 " + qty + " 超过剩余可转数量 " + residual);
+        // 工单号/行号/批次号(2026-09-28 客户拍板:批次号=纯日期):同订单共用工单号;行号=订单行号;
+        // 批次号=转单当日 yyyyMMdd,**不加尾缀**——同天多笔转单各自成行(plang.id=行身份),
+        // 行级关联锚=plang_pc.plang_id,同批次号互不串;分段区分靠 创建时间+生产线(分段弹窗展示)。
+        String plNo;
+        try {
+            plNo = jdbc.queryForObject(
+                    "SELECT TOP 1 pl_no FROM plang WHERE od_no = ? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY pl_xc DESC",
+                    String.class, sourceNo);
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            plNo = null;   // 该订单尚未转过工单 → 取新号
         }
-
-        Map<String, Object> targetHead = new LinkedHashMap<>();
-        for (Map<String, String> m : headerMap) {
-            Object v = head.get(m.get("from"));
-            if (v != null) targetHead.put(m.get("to"), v);
-        }
-        targetHead.put("来源单据", soDef.name());
-        targetHead.put("来源单号", sourceNo);
-        targetHead.put(dateLabel, java.time.LocalDate.now().toString());
-        targetHead.put("需求数量", demand);
-        targetHead.put("排产数量", qty);
-
-        Map<String, Object> row = new LinkedHashMap<>();
-        for (Map<String, String> m : detailMap) {
-            Object v = line.get(m.get("from"));
-            if (v != null) row.put(m.get("to"), v);
-        }
-        if (row.containsKey("数量")) row.put("数量", qty);
-        row.put("需求数量", demand);
-        row.put("排产数量", qty);
-
-        Map<String, Object> formData = new LinkedHashMap<>(targetHead);
-        formData.put("detail", Map.of("items", List.of(row)));
-        Map<String, Object> saved = buttonService.save(tgtDef, formData, false);
-        String newNo = String.valueOf(saved.get("编号"));
-        voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(row.get("产品编码")), qty,
-                "MANU_ORDER", newNo, newNo + "#0", "");
-        return newNo;
+        if (plNo == null || plNo.isBlank()) plNo = formNo.next("MO", user);
+        Integer lineNo = line.get("行号") instanceof Number n ? n.intValue() : 1;
+        String batch = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+        String due = str(line.get("交货日期"));
+        // 余量口径(2026-09-27 用户拍板):余量=需求数量−排产数量(未排产),不再是排产数量
+        double remain = demand - qty;
+        jdbc.update("INSERT INTO plang (comm, pl_no, pl_xc, pl_date, khdm, dm, mc, gg, jldw,"
+                        + " xq_sl, pl_sl, yl, cp_date, lot_no, od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号])"
+                        + " VALUES (N'0', ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
+                        + " CASE WHEN ? IS NULL OR ? = N'' THEN NULL ELSE CONVERT(datetime, ?, 120) END,"
+                        + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE(), ?)",
+                plNo, lineNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
+                str(line.get("规格型号")), str(line.get("销售单位")), demand, qty, remain, due, due, due,
+                str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user, batch);
+        voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
+                "PLANG", plNo, plNo + "#" + lineNo + "#" + batch, "");
+        return plNo;
     }
 
-    // ────────────────────────── ② 生产加工单排产(排产工作台单一入口,2026-09-23 §5) ──────────────────────────
+    // ────────────────────────── ② 生产工单排产(排产工作台单一入口,2026-09-23 §5) ──────────────────────────
 
     /**
      * 排产(带参数):排产工作台把 生产线/排产班组/预开工日/预完工日/行 排产数量·每箱数量 写入后(生产车间=产线档案属性,2026-09-23 下线),
@@ -189,14 +190,14 @@ public class QuickScheduleService {
                             + "  FROM yj_doc_status s WHERE s.panel_code='MANU_ORDER' AND s.doc_no=h.[合同号]) AS 单据状态"
                             + " FROM bd_manu_order h WHERE h.[合同号] = ?", no);
         } catch (org.springframework.dao.EmptyResultDataAccessException e) {
-            throw new IllegalStateException("生产加工单不存在:" + no);
+            throw new IllegalStateException("生产工单不存在:" + no);
         }
         String status = str(head.get("单据状态"));
         if ("已作废".equals(status)) throw new IllegalStateException("该加工单已作废,不能排产");
         if ("已中止".equals(status)) throw new IllegalStateException("该加工单已中止,不能排产;如需排产请先恢复");
         if ("Y".equals(str(head.get("结案")))) throw new IllegalStateException("该加工单已结案,不能排产");
         if (!"已审核".equals(status)) {
-            throw new IllegalStateException("仅已审核加工单可排产(当前:" + status + ");请先在生产加工单面板审核");
+            throw new IllegalStateException("仅已审核工单可排产(当前:" + status + ");请先在生产工单面板审核");
         }
         String line = str(head.get("生产线"));
         if (line == null) throw new IllegalStateException("请先指定生产线(排产工作台顶部参数或行内选择)");
@@ -232,7 +233,7 @@ public class QuickScheduleService {
         if (!touched) throw new IllegalStateException("排产数量与本单数量均为 0,请先填写排产数量");
         try {
             jdbc.update("INSERT INTO yj_usage_log (user_name, event_type, panel_name, action_name, doc_no, created_at)"
-                            + " VALUES (?, N'排产', N'生产加工单', N'排产', ?, GETDATE())", user, no);
+                            + " VALUES (?, N'排产', N'生产工单', N'排产', ?, GETDATE())", user, no);
         } catch (Exception ignore) { /* 留痕失败不阻断 */ }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("编号", no);
@@ -255,7 +256,7 @@ public class QuickScheduleService {
     private void requireAudited(String sourceNo) {
         Map<String, Object> st = buttonService.docStatus("SO_ORDER", sourceNo);
         String status = String.valueOf(st.get("status"));
-        if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核客户订单可生成生产加工单,当前状态:" + status);
+        if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核客户订单可生成生产工单,当前状态:" + status);
     }
 
     private static double qtyOf(Map<String, Object> line) {

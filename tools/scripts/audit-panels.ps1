@@ -1,4 +1,4 @@
-﻿# audit-panels.ps1 — 全量面板审计:配置生成 + 数据查询(暴露视图/列缺失)+ 元数据静态校验
+# audit-panels.ps1 — 全量面板审计:配置生成 + 数据查询(暴露视图/列缺失)+ 元数据静态校验
 # 用法:& tools\audit-panels.ps1 [输出文件]
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $ErrorActionPreference = 'Continue'
@@ -56,6 +56,10 @@ Write-Output "== 数据查询: ok=$okQry fail=$($failQry.Count) =="
 foreach ($f in $failQry) { Write-Output "  QRY-FAIL $f" }
 
 # ---- DB 静态校验:表/视图存在性 + 字段列存在性 ----
+# 字段列校验按 place 分流(2026-09-28 修):place 含 header 且面板有头表 → 对 head_table 比对,
+# 其余(明细/档案)→ 对 line_table 比对。原版不分 place 全对 line_table 比对,把所有表头字段
+# 误报成 MISSING_COL(如 SALE_OUT.验货人,列在 bd_sale_out 不在 bl_sale_out)。
+# 口径与 DbNormAudit 05 项对齐;目标对象非基表(视图面板,列从视图自动发现)不校验。
 $sql = @"
 SET NOCOUNT ON;
 -- 1) line_table/head_table 指向的对象不存在
@@ -64,12 +68,17 @@ WHERE p.line_table IS NOT NULL AND OBJECT_ID(p.line_table) IS NULL
 UNION ALL
 SELECT 'MISSING_TABLE', p.panel_code, p.head_table FROM yj_panel p
 WHERE p.head_table IS NOT NULL AND OBJECT_ID(p.head_table) IS NULL;
--- 2) 真实表(line_table 为 U 表)上字段引用的列不存在
-SELECT 'MISSING_COL' AS kind, f.panel_code, p.line_table AS tbl, f.label, f.col_name FROM yj_field f
-JOIN yj_panel p ON p.panel_code = f.panel_code
-WHERE p.line_table IS NOT NULL AND OBJECT_ID(p.line_table, 'U') IS NOT NULL
-  AND f.col_name IS NOT NULL
-  AND NOT EXISTS (SELECT 1 FROM sys.columns c WHERE c.object_id = OBJECT_ID(p.line_table) AND c.name = f.col_name);
+-- 2) 字段引用的列不存在(按 place 分流:含 header 或纯 query → 头表,其余 → 行表;仅基表)
+--    纯 query 位字段(如数据记录表的 报告编号/测试主题)物理列在头表——漏判会整批误报。
+SELECT 'MISSING_COL' AS kind, f.panel_code,
+  CASE WHEN (f.place LIKE '%header%' OR f.place = 'query') AND p.head_table IS NOT NULL THEN p.head_table ELSE p.line_table END AS tbl,
+  f.label, f.col_name
+FROM yj_field f JOIN yj_panel p ON p.panel_code = f.panel_code
+WHERE f.col_name IS NOT NULL
+  AND OBJECT_ID(CASE WHEN (f.place LIKE '%header%' OR f.place = 'query') AND p.head_table IS NOT NULL THEN p.head_table ELSE p.line_table END, 'U') IS NOT NULL
+  AND NOT EXISTS (SELECT 1 FROM sys.columns c
+    WHERE c.object_id = OBJECT_ID(CASE WHEN (f.place LIKE '%header%' OR f.place = 'query') AND p.head_table IS NOT NULL THEN p.head_table ELSE p.line_table END)
+      AND c.name = f.col_name);
 "@
 [System.IO.File]::WriteAllText('C:\INCER\YINJIA-MES\tools\_audit-db.sql', $sql, (New-Object System.Text.UTF8Encoding $false))
 sqlcmd -S localhost -E -d HSDZ_MES -i 'C:\INCER\YINJIA-MES\tools\_audit-db.sql' -h -1 -W -u -o 'C:\INCER\YINJIA-MES\tools\_audit-db.txt' | Out-Null

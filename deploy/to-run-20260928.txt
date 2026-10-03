@@ -1,0 +1,16 @@
+# Force-run list v2 for 2026-09-28 local-only deployment (order per manifest)
+# 13 pending migrations + migrate-manu-rename-workorder (registered, bytes fixed for uq_translation collision - informed rerun)
+migrate-db-norm-cleanup.sql
+migrate-restore-gfda.sql
+migrate-basedata-query-fields.sql
+migrate-spec-testlib-replace.sql
+migrate-db-norm-column-comments.sql
+migrate-spare-columns.sql
+migrate-ext-bind-log.sql
+migrate-pc-plang-id.sql
+migrate-qcinsp-header-fix.sql
+migrate-qcreturn-srcfix.sql
+migrate-whloc.sql
+migrate-ledger-code-filter.sql
+migrate-qcrecv-supplier-seq.sql
+migrate-manu-rename-workorder.sql

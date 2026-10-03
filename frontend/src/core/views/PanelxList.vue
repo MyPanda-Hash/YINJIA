@@ -153,6 +153,9 @@
           v-else-if="panelCode === 'RD_PROD_DOCLIST'"
           ref="approvalSheetRef"
           :head="cur" :panel-code="panelCode"
+          :filter="prodDocFilter"
+          @rows="onProdDocRows"
+          @clear-filter="clearProdDocFilter"
         />
         <DataRecordSheet
           v-else-if="panelCode === 'RD_FILTER_EFF'"
@@ -216,31 +219,35 @@
                 <span class="as-side-btn primary" @click="runFuzzySearch">{{ tt('查找') }}</span>
               </div>
               <div v-if="fuzzySearched" class="fuzzy-result">
-                <div class="fuzzy-result-head">{{ tt('结果') }}：{{ total }} {{ tt('张') }}<span v-if="total > (list.length || 0)">{{ tt('（清单仅显示前 {m} 张）').replace('{m}', String(list.length)) }}</span></div>
+                <div class="fuzzy-result-head">
+                  {{ tt('结果') }}：
+                  <template v-if="isProdDocMatrix">{{ prodDocFilteredRows.length }} {{ tt('个产品') }}</template>
+                  <template v-else>{{ total }} {{ tt('张') }}<span v-if="total > (list.length || 0)">{{ tt('（清单仅显示前 {m} 张）').replace('{m}', String(list.length)) }}</span></template>
+                </div>
                 <div
                   v-for="r in fuzzyResultRows"
                   :key="r.no"
                   class="fuzzy-result-row"
-                  :class="{ on: r.no === curDocNo }"
+                  :class="{ on: !isProdDocMatrix && r.no === curDocNo }"
                   @click="openFuzzyResult(r)"
                 >
                   <span class="fz-no">{{ r.no }}</span>
-                  <span class="fz-meta">{{ r.date }} {{ tt(r.status) }}</span>
+                  <span class="fz-meta">{{ r.date }} {{ isProdDocMatrix ? r.status : tt(r.status) }}</span>
                 </div>
-                <div v-if="!fuzzyResultRows.length" class="fuzzy-empty">{{ tt('未找到匹配单据') }}</div>
+                <div v-if="!fuzzyResultRows.length" class="fuzzy-empty">{{ tt(isProdDocMatrix ? '未找到匹配的产品' : '未找到匹配单据') }}</div>
               </div>
             </div>
             <!-- ═══ 单据预览查找态:全量单据卡片(编号/状态/日期+关键摘要字段),点击即跳转,档案查看效果 ═══ -->
             <div v-else-if="previewMode" class="fuzzy-panel">
               <div class="fuzzy-head">
-                <span>{{ tt('单据预览查找') }}</span>
+                <span>{{ tt(isProdDocMatrix ? '产品预览查找' : '单据预览查找') }}</span>
                 <span class="fuzzy-back" :title="tt('返回')" @click="closeDocPreview">↩</span>
               </div>
               <el-input
                 v-model="previewKw"
                 size="small"
                 clearable
-                :placeholder="tt('输入编号或任意内容快速筛选')"
+                :placeholder="tt(isProdDocMatrix ? '输入产品编号或文件状态快速筛选' : '输入编号或任意内容快速筛选')"
                 class="preview-kw"
               />
               <div class="preview-cards">
@@ -248,7 +255,7 @@
                   v-for="c in previewCards"
                   :key="c.no"
                   class="preview-card"
-                  :class="{ on: c.no === curDocNo }"
+                  :class="{ on: !isProdDocMatrix && c.no === curDocNo }"
                   @click="openPreviewCard(c)"
                 >
                   <div class="pc-head">
@@ -262,17 +269,20 @@
                   </div>
                   <div v-if="!c.fields.length" class="pc-none">{{ tt('（无摘要字段）') }}</div>
                 </div>
-                <div v-if="!previewCards.length" class="fuzzy-empty">{{ tt('未找到匹配单据') }}</div>
+                <div v-if="!previewCards.length" class="fuzzy-empty">{{ tt(isProdDocMatrix ? '未找到匹配的产品' : '未找到匹配单据') }}</div>
               </div>
             </div>
             <div v-else class="as-side-btns">
               <div class="as-side-section">{{ tt('查找') }}</div>
-              <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板) -->
-              <div class="as-side-btn" @click="docQueryVisible = true">{{ tt('查询单据') }}</div>
-              <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单 -->
+              <!-- 查询单据:编号模糊(单据编号/文档编号) + 首次归档时间区间(所有文件面板)
+                   ⚠ 产品文件列表(单单据+矩阵)改叫「查询产品」:按产品编号筛矩阵行 -->
+              <div class="as-side-btn" @click="docQueryVisible = true">{{ tt(isProdDocMatrix ? '查询产品' : '查询单据') }}</div>
+              <!-- 模糊搜索:字段+内容(表头/明细/全部字段)多条件 AND,命中一张直接跳转,多张列清单;
+                   矩阵面板的字段清单换成矩阵列(产品编号/是否受控/受控日期/状态（任一文件）) -->
               <div class="as-side-btn" @click="openFuzzy">{{ tt('模糊搜索') }}</div>
-              <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果 -->
-              <div class="as-side-btn" @click="openDocPreview">{{ tt('单据预览') }}</div>
+              <!-- 单据预览:全量单据卡片化预览(关键信息摘要),快速分辨并跳转——文件档案查看效果;
+                   矩阵面板的卡片 = 产品行(编号 + 受控 + 4 个文件状态) -->
+              <div class="as-side-btn" @click="openDocPreview">{{ tt(isProdDocMatrix ? '产品预览' : '单据预览') }}</div>
               <div class="as-side-section">{{ tt('单据操作') }}</div>
               <!-- 删除组:整单删除;下拉含管理员删除审批(通过/驳回);删除申请中出「撤回删除申请」(卡死单据出口) -->
               <div class="as-side-del danger" v-if="isApprovalDoc">
@@ -815,8 +825,8 @@
           @scroll.capture="(e) => onArchScroll(e, b)"
         >
           <el-table-column v-if="delMode && b.isMain" type="selection" width="45" fixed="left" />
-          <!-- 物料二维码标签(勾选即打):自管勾选集(跨页保留),与删除模式的 selection 列互不相干;
-               表头复选框=本页全选。行键=qrLabelKey 列(存货编码),空编码行禁勾 -->
+          <!-- 档案二维码标签(勾选即打,INV 商品/WHLOC 库位):自管勾选集(跨页保留),与删除模式的 selection 列互不相干;
+               表头复选框=本页全选。行键=qrLabelKey 列(存货编码;库位=仓库+库位编码 复合),空编码行禁勾 -->
           <el-table-column v-if="qrKey && b.isMain" width="40" fixed="left" align="center">
             <template #header>
               <el-checkbox
@@ -834,16 +844,28 @@
               />
             </template>
           </el-table-column>
-          <el-table-column
-            v-for="c in archCols(b)"
-            :key="c.prop"
-            :prop="c.prop"
-            :label="c.label"
-            :width="archColW(b, c)"
-            :min-width="archColW(b, c) ? undefined : c.width"
-            :align="c.align"
-            :show-overflow-tooltip="!detailEditable(b)"
-          >
+          <template v-for="c in archGridCols(b)" :key="c.spacer ? 'lazy-' + c.spacer : c.prop">
+            <!-- 列级虚拟化(2026-09-28):视口外的列整列不渲染,以左右占位列撑住总宽 —— 表格总宽、
+                 滚动条、列位置与整列渲染完全一致;滚动时窗口移动,列按需进出。
+                 此前(五期)只懒渲染单元格内容,全部 el-table-column 组件与占位 td 仍在,
+                 el-table 逐列/逐格更新机制仍是宽表挂载长帧的主体(CPU 剖面:update/renderCell/getColumnElIndex)。 -->
+            <el-table-column
+              v-if="c.spacer"
+              :width="c.width"
+              :label="''"
+              column-key="col-lazy-spacer"
+              :resizable="false"
+              class-name="col-lazy-spacer"
+            />
+            <el-table-column
+              v-else
+              :prop="c.prop"
+              :label="c.label"
+              :width="archColW(b, c)"
+              :min-width="archColW(b, c) ? undefined : c.width"
+              :align="c.align"
+              :show-overflow-tooltip="!detailEditable(b)"
+            >
             <template #header>
               <div class="col-hdr" :class="{ filtering: hasColFilter(c.prop) }" @click.stop="toggleColFilter(c.prop)">
                 <span class="col-hdr-text" :class="{ req: c.field?.isRequired }">{{ c.label }}</span>
@@ -869,14 +891,11 @@
               />
             </template>
             <template #default="{ row }">
-              <!-- 列懒渲染:视口外列只出空占位(表头保留撑宽),滚动进入视口再产出内容 -->
-              <span v-if="!archColVisible(b, c)" class="col-lazy-empty"></span>
-              <template v-else>
+              <!-- 列级虚拟化后,走到这里的都是可见列,不再需要单元格级占位(原 col-lazy-empty 分支已随五期机制下线) -->
               <template v-if="archEditable(b) && !row._placeholder">
                 <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
                 <!-- 生产线档案「停用」列:开关形式(同生产加工单表单开关风格)——@change 同步乐观翻转(点击即动画),
-                     POST 落库,失败回滚;停用后从排产工作台消失、排入被后端拦截(2026-09-24 随生产域下拉) -->
-                <span v-else-if="isLineToggleCol(c.prop)" class="line-toggle-cell">
+                     POST 落库,失败回滚;停用后从排产工作台消失、排入被后端拦截(2026-09-24 随生产域下拉) -->                <span v-else-if="isLineToggleCol(c.prop)" class="line-toggle-cell">
                   <el-switch
                     :model-value="toBool(row[c.prop])"
                     @change="(v) => toggleLineDisable(row, v)"
@@ -900,6 +919,7 @@
                   <el-select
                     v-if="isSelectField(c.field)"
                     v-model="row[c.prop]"
+                    v-cell-focus
                     :disabled="c.field.computed"
                     filterable
                     clearable
@@ -911,6 +931,7 @@
                   <el-date-picker
                     v-else-if="isDateField(c.field)"
                     v-model="row[c.prop]"
+                    v-cell-focus
                     :disabled="c.field.computed"
                     type="date"
                     value-format="YYYY-MM-DD"
@@ -918,21 +939,26 @@
                   />
                   <el-input-number
                     v-else-if="isNumberField(c.field)"
-                    v-model="row[c.prop]"
+                    :model-value="activeCellEcho"
+                    v-cell-focus
                     :disabled="c.field.computed"
                     :controls="false"
+                    @update:model-value="(v) => onActiveCellEchoInput(row, c.prop, v)"
                     @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
                   />
                   <el-switch
                     v-else-if="isBooleanField(c.field)"
                     v-model="row[c.prop]"
+                    v-cell-focus
                     :disabled="c.field.computed"
                     @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
                   />
                   <el-input
                     v-else
-                    v-model="row[c.prop]"
+                    :model-value="activeCellEcho"
+                    v-cell-focus
                     :disabled="c.field.computed"
+                    @update:model-value="(v) => onActiveCellEchoInput(row, c.prop, v)"
                     @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
                   />
                 </template>
@@ -943,9 +969,9 @@
                 <span v-if="hasSubBom(row[c.prop])" class="mat-star" :title="tt('该材料有下级子件 BOM，点击行查看')">*</span>
               </span>
               <span v-else>{{ tt(row[c.prop] ?? '') }}</span>
-              </template>
             </template>
           </el-table-column>
+          </template>
         </el-table>
       </div>
       </template>
@@ -969,7 +995,8 @@
         <span>{{ tt('审核意见：') }}{{ cur['审核意见'] || '-' }}</span>
       </div>
     </div>
-        </div>
+
+        </div>
       </div>
     </template>
 
@@ -1116,6 +1143,19 @@
           <el-input v-else v-model="queryDraft[headerFieldKey(field)]" clearable @keyup.enter="applyHeaderQuery" />
           <!-- 台账/库存状况(2026-09-21):「档案∩有流水」联动提示 —— 选仓后存货候选收窄;选存货后无流水仓置灰 -->
           <div v-if="dialogFieldHint(field)" class="query-field-hint">{{ dialogFieldHint(field) }}</div>
+        </div>
+      </div>
+      <!-- 日期范围(2026-09-24):起/止两段,查询时并入高级筛选(ge/le)服务端过滤 -->
+      <div v-if="dateFieldLabel" class="adv-filter-section">
+        <div class="adv-filter-head">
+          <span class="adv-filter-title">{{ tt('日期范围') }}</span>
+          <span class="adv-filter-dim">{{ tt(dateFieldLabel) }}</span>
+        </div>
+        <div class="adv-range-row">
+          <el-date-picker v-model="dateFrom" type="date" value-format="YYYY-MM-DD" size="small" :placeholder="tt('起')" style="width: 150px" />
+          <span class="adv-filter-dash">-</span>
+          <el-date-picker v-model="dateTo" type="date" value-format="YYYY-MM-DD" size="small" :placeholder="tt('止')" style="width: 150px" />
+          <el-button link type="primary" size="small" @click="clearDateRange">{{ tt('清空') }}</el-button>
         </div>
       </div>
       <!-- 高级筛选:字段(全部字段)+ 运算符 + 值。报表=服务端全表过滤(点查询定格条件 POST advFilters,
@@ -1349,6 +1389,9 @@
             <span>{{ tt('修改审批') }}：{{ r.approveBy || '-' }} {{ r.approveAt || '' }}</span>
             <span>{{ tt('再归档') }}：{{ r.rearchiveBy || '-' }} {{ r.rearchiveAt || tt('未归档') }}</span>
           </div>
+          <!-- 修改原因(2026-09-30):申请时必填的那句话,逐条展示 —— 需求原文
+               「修改:不需要反审核,只需填写修改原因」,原因就是这条闭环的全部新增信息 -->
+          <div v-if="r.reason" class="mod-log-reason">{{ tt('修改原因') }}：{{ r.reason }}</div>
           <table v-if="(r.changes || []).length" class="mod-log-table">
             <thead><tr><th style="width:70px">{{ tt('类型') }}</th><th style="width:140px">{{ tt('字段') }}</th><th>{{ tt('原内容') }}</th><th>{{ tt('新内容') }}</th></tr></thead>
             <tbody>
@@ -1471,17 +1514,25 @@
     </el-dialog>
 
     <!-- 查询单据弹窗(文件面板):编号模糊(单据编号/文档编号) + 首次归档时间区间 -->
-    <el-dialog v-model="docQueryVisible" :title="tt('查询单据')" width="480px" append-to-body>
+    <el-dialog v-model="docQueryVisible" :title="tt(isProdDocMatrix ? '查询产品' : '查询单据')" width="480px" append-to-body>
       <div class="dq-form">
         <div class="dq-row">
-          <span class="dq-label">{{ tt('编号') }}</span>
-          <el-input v-model="docQueryNo" clearable :placeholder="tt('单据编号/文档编号模糊匹配')" @keyup.enter="applyDocQuery" />
+          <span class="dq-label">{{ tt(isProdDocMatrix ? '产品编号' : '编号') }}</span>
+          <el-input
+            v-model="docQueryNo"
+            clearable
+            :placeholder="tt(isProdDocMatrix ? '产品编号模糊匹配（筛选下方产品行）' : '单据编号/文档编号模糊匹配')"
+            @keyup.enter="applyDocQuery"
+          />
         </div>
-        <div class="dq-row">
-          <span class="dq-label">{{ tt('归档时间') }}</span>
-          <el-date-picker v-model="docQueryRange" type="daterange" value-format="YYYY-MM-DD" :start-placeholder="tt('起')" :end-placeholder="tt('止')" style="width: 100%" />
-        </div>
-        <div class="dq-tip">{{ tt('按首次归档时间过滤；草稿未归档不计入区间') }}</div>
+        <template v-if="!isProdDocMatrix">
+          <div class="dq-row">
+            <span class="dq-label">{{ tt('归档时间') }}</span>
+            <el-date-picker v-model="docQueryRange" type="daterange" value-format="YYYY-MM-DD" :start-placeholder="tt('起')" :end-placeholder="tt('止')" style="width: 100%" />
+          </div>
+          <div class="dq-tip">{{ tt('按首次归档时间过滤；草稿未归档不计入区间') }}</div>
+        </template>
+        <div v-else class="dq-tip">{{ tt('本面板是产品文件矩阵（库里只有 1 张单据）：按产品编号筛选表格里的产品行') }}</div>
       </div>
       <template #footer>
         <el-button @click="clearDocQuery">{{ tt('清空') }}</el-button>
@@ -1525,8 +1576,35 @@
     </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <QrLabelDialog v-model="qrVisible" :labels="qrLabels" />
+
+    <!-- 生产工单「排产」弹窗(2026-09-24 用户要求):本单快捷排线——选产线/日期/数量,
+         后端复用排产工作台 assign(仅已审核可排/数量守恒/停用线拒绝/留痕),回执含当日负荷与超载提示 -->
+    <el-dialog v-model="moSchVisible" :title="tt('排产')" width="420px" append-to-body>
+      <div class="mo-sch-row">{{ tt('工单号') }}:<b>{{ moSchNo }}</b></div>
+      <div class="mo-sch-row">{{ tt('生产线') }}
+        <el-select v-model="moSchLine" filterable style="width: 240px" :placeholder="tt('选择生产线')">
+          <el-option v-for="l in moSchLines" :key="l['生产线']" :value="l['生产线']"
+                     :label="`${l['生产线']} · ${tt('今日负荷')}${l['今日负荷'] ?? 0}/${tt('日产能')}${l['日产能'] ?? 0}`" />
+        </el-select>
+      </div>
+      <div class="mo-sch-row">{{ tt('预开工日') }}
+        <el-date-picker v-model="moSchStart" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
+      </div>
+      <div class="mo-sch-row">{{ tt('预完工日') }}
+        <el-date-picker v-model="moSchEnd" type="date" value-format="YYYY-MM-DD" style="width: 150px" />
+      </div>
+      <div class="mo-sch-row">{{ tt('排产数量') }}（{{ tt('空=全排') }}）
+        <el-input-number v-model="moSchQty" :min="0" :controls="false" style="width: 130px" />
+      </div>
+      <template #footer>
+        <el-button @click="moSchVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="submitPanelSchedule">{{ tt('确认排产') }}</el-button>
+      </template>
+    </el-dialog>
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <VoucherFormDialog v-model="formVisible" :panel-code="formPanel || panelCode" :code="formCode" @saved="onFormSaved" />
+    <!-- 字段管理(动态字段/备用列池;仅 admin):绑定/停用自定义字段 -->
+    <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
     <ScanFillDialog
       v-model="scanVisible"
       :panel-code="panelCode"
@@ -1650,11 +1728,15 @@ import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
-import { applyDocDefaults, todayStr, syncBatchNoWithDocDate } from '@core/panel/docDefaults'
+import { applyDocDefaults, todayStr, syncBatchNoWithDocDate, docNoFromDate } from '@core/panel/docDefaults'
+import { printPuOrder, printQcReturn, printProductCards, printLocationCards, printProductionTask, printPuOrderNoAmount, woQrText } from '@/business/print-formats'
 import QrLabelDialog from './QrLabelDialog.vue'
+import FieldManagerDialog from './FieldManagerDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
 import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
+// 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
+import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import RefPickDialog from './RefPickDialog.vue'
@@ -1708,6 +1790,13 @@ const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(S
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
 const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
+/**
+ * 产品文件列表(RD_PROD_DOCLIST)= **单单据 + 矩阵**面板:库里只有 1 张单据(PDL-0001),
+ * 真正的内容是表格里的**产品行**(产品编号 × 4 个文件 × 状态)。
+ * ⇒ 侧栏的「查询产品 / 模糊搜索 / 产品预览」三处在这面板一律改为**筛矩阵行**
+ *   (2026-09-30 用户口径:原先对那 1 张单据做文档查询,用户看到的就是"搜索不可用")。
+ */
+const isProdDocMatrix = computed(() => String(panelCode.value) === 'RD_PROD_DOCLIST')
 // 来料检验要求(品质资料 7 表):档案式特例面板——工具栏/单据卡片/明细表格/页脚全隐,QcInspReqSheet 整体接管
 const isQcInspReq = computed(() => String(panelCode.value) === 'QC_INSP_REQ')
 /** 产品变更申请单:当前账号可填的纸面部门行(后端按 yj_user.dept_id → yj_change_dept 算,metadata 下发)。
@@ -1809,6 +1898,28 @@ const ADV_OPS = [
   { value: 'notEmpty', label: '不为空' },
 ]
 const advFilters = ref([])
+// 日期范围(2026-09-24 用户要求,对齐旧系统列表查询区):起/止 → 自动展开为 日期字段 ge/le 两条高级筛选,
+// 随查询一起服务端过滤(单据/报表/档案面板皆可);不入 advFilters 可见行,避免出现"凭空多出的条件行"。
+const dateFrom = ref('')
+const dateTo = ref('')
+/** 面板主日期字段:优先「单据日期」,否则取首个日期型查询字段 */
+const dateFieldLabel = computed(() => {
+  const qs = queryFields.value || []
+  const byName = qs.find((f) => ['单据日期', '日期'].includes(headerFieldKey(f)))
+  if (byName) return headerFieldKey(byName)
+  const anyDate = qs.find((f) => String(f.dataType || f.type || '').includes('日期'))
+  return anyDate ? headerFieldKey(anyDate) : ''
+})
+const dateAdvFilters = computed(() => {
+  const lf = dateFieldLabel.value
+  const out = []
+  if (lf && dateFrom.value) out.push({ field: lf, op: 'ge', value: dateFrom.value })
+  if (lf && dateTo.value) out.push({ field: lf, op: 'le', value: dateTo.value })
+  return out
+})
+/** 生效条件 = 高级筛选行 + 日期范围展开行 */
+const effectiveAdvFilters = computed(() => [...advFilters.value, ...dateAdvFilters.value])
+function clearDateRange() { dateFrom.value = ''; dateTo.value = '' }
 
 /** 可筛选字段:表头 + 查询字段 + 明细各页签字段(中文键去重,选项显示译名)。 */
 const advFilterFields = computed(() => {
@@ -1851,13 +1962,15 @@ function advMatch(row, f) {
 
 /** 应用全部有效高级筛选条件(AND 组合);空条件(未填值)不参与过滤。 */
 function applyAdvFilters(rows) {
-  const active = advFilters.value.filter((f) => f.field && (f.op === 'empty' || f.op === 'notEmpty' || String(f.value ?? '').trim() !== ''))
+  const active = effectiveAdvFilters.value.filter((f) => f.field && (f.op === 'empty' || f.op === 'notEmpty' || String(f.value ?? '').trim() !== ''))
   if (!active.length) return rows
   return rows.filter((row) => active.every((f) => advMatch(row, f)))
 }
 
 // ---- 表格列自定义(排序/栏名/显隐) ----
 const colPrefVisible = ref(false)
+// 字段管理(动态字段/备用列池):仅 admin 入口可见,服务端 requireAdmin 把守写操作
+const fieldMgrVisible = ref(false)
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
 
@@ -2124,8 +2237,8 @@ const reportMode = computed(() => cfgCache.value?.metadata?.report === true || c
 // 字段:单据日期(区间控件,必填) + 仓库/存货(参照;台账必填单一仓库+单一存货,汇总选填)
 // 进入态差异:①未完成过查询就关闭(✕/取消)=退出页面 ②必填项校验(applyHeaderQuery)。
 const reportQueryDialog = computed(() => cfgCache.value?.metadata?.reportQueryDialog === true)
-// 级联查询面板(台账/库存状况):仓库/存货走基础资料参照(WH/INV)+「档案∩有流水」联动收窄;
-// 台账 仓库/存货 必填(单一仓库的一种存货);库存状况表选填(快照,无日期)
+// 级联查询面板(台账/库存状况):仓库/存货走基础资料参照(WH/INV,绑定编码)+「档案∩有流水」联动收窄;
+// 台账 仓库/存货 必填(单一仓库的一种存货=仓库编码+存货编码唯一);库存状况表选填(快照,无日期)
 const isCascadePanel = computed(() => ['STOCK_LEDGER', 'STOCK_BALANCE'].includes(panelCode.value))
 /** 查询条件只进弹窗、无内联查询区的面板(台账/汇总=强制弹窗;状况表=级联)——「查询」按钮统一开弹窗 */
 const queryInDialogOnly = computed(() => reportQueryDialog.value || isCascadePanel.value)
@@ -2144,7 +2257,8 @@ function rqdFieldRequired(field) {
 }
 // 台账联动选项:仓库/存货下拉互相约束(选项=后端 v_stock_ledger 真实组合,按编码匹配)
 // 2026-09-28 起选项为码名对 [{仓库编码,仓库}] / [{存货编码,存货}]——编码是稳定键(名称会重名/
-// 改名/带尾空格),联动收窄与查询条件都绑编码(_whCode/_itemCode),名称仅弹窗回显
+// 改名/带尾空格),联动收窄与查询条件都绑编码(_whCode/_itemCode),名称仅弹窗回显。
+// 参照随之绑定编码(ref_field=仓库编码/存货编码,display 仍显示名称,见 migrate-ledger-code-filter.sql)
 const ledgerWhOptions = ref([])    // [{code,name}] 该存货有流水的仓(或未选存货=全部有流水仓)
 const ledgerItemOptions = ref([])  // [{code,name}] 该仓有流水的存货(或未选仓库=全部有流水的存货)
 const ledgerOptsLoading = ref(false)
@@ -2175,7 +2289,8 @@ async function loadLedgerRefOptions({ keepWh = true, keepItem = true } = {}) {
     ledgerOptsLoading.value = false
   }
 }
-/** 弹窗参照选中变化:台账/库存状况的「仓库」要重拉联动(存货可能因换仓失效被清)。其余参照不联动 */
+/** 弹窗参照选中变化:台账/库存状况的「仓库」要重拉联动(存货可能因换仓失效被清)。其余参照不联动。
+ *  v=仓库编码(参照绑定编码),其余参照不联动 */
 async function onDialogRefSelectChange(field) {
   if (!isCascadePanel.value || headerFieldKey(field) !== '仓库') return
   // 编码随行:下拉选项携带档案行(含 仓库编码),选中即绑定编码;清空则码一起清
@@ -2187,7 +2302,8 @@ async function onDialogRefSelectChange(field) {
   await loadLedgerRefOptions({ keepWh: true, keepItem: false })
   if (hadItem && !queryDraft['存货']) ElMessage.info(tt('该仓无此存货流水，已清空存货'))
 }
-/** 仓库下拉选项置灰(选了存货后):该存货无流水的仓不可选 —— 按编码比对(选项行无编码时退回名称) */
+/** 仓库下拉选项置灰(选了存货后):该存货无流水的仓不可选 —— 按编码比对(选项行无编码时退回名称)。
+ *  选项=档案(bs_wh) ∩ 有流水;ledgerWhOptions 是 [{code,name}] 码名对 */
 function ledgerOptionDisabled(field, option) {
   if (!isCascadePanel.value || headerFieldKey(field) !== '仓库') return false
   if (!queryDraft['存货']) return false
@@ -2217,6 +2333,8 @@ function onQueryDialogClose() {
 }
 // YINJIA 适配:单单据面板(基础档案)只有一张虚拟单,隐藏单据切换按钮(◁◀ 第X/Y张 ▶▷)
 const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === true)
+/** 单据面板(头行/单表单据):既非报表平表、也非档案单单据 → 高级筛选走服务端(2026-09-24) */
+const docPanel = computed(() => !reportMode.value && !singleDocMode.value)
 const reportPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
 const reportPeriod = computed(() => {
   const start = condition['开始日期']
@@ -2392,6 +2510,17 @@ async function saveWarnEdit() {
 }
 
 async function applyDocQuery() {
+  // 产品文件列表(单单据 + 矩阵):「查询单据」改成**按产品编号筛矩阵行**(2026-09-30 用户口径)——
+  // 该面板库里只有 1 张单据(PDL-0001),对单据做模糊/归档时间查询必然"查无可查"。
+  if (isProdDocMatrix.value) {
+    if (docQueryNo.value.trim()) setProdDocFilter([{ field: '产品编号', value: docQueryNo.value }])
+    else clearProdDocFilter()
+    docQueryVisible.value = false
+    const n = prodDocFilteredRows.value.length
+    if (n) ElMessage.success(`${tt('筛选到')} ${n} ${tt('个产品')}`)
+    else ElMessage.warning(tt('未筛选到匹配的产品'))
+    return
+  }
   condition['_docNo'] = docQueryNo.value || ''
   const r = docQueryRange.value || []
   condition['_archFrom'] = r[0] || ''
@@ -2416,12 +2545,39 @@ async function applyDocQuery() {
 function clearDocQuery() {
   docQueryNo.value = ''
   docQueryRange.value = null
+  if (isProdDocMatrix.value) {
+    clearProdDocFilter()
+    docQueryVisible.value = false
+    return
+  }
   delete condition['_docNo']
   delete condition['_archFrom']
   delete condition['_archTo']
   docQueryVisible.value = false
   search()
 }
+
+// ---------- 产品文件列表(RD_PROD_DOCLIST)专用:侧栏搜索改为**筛矩阵行** ----------
+// 该面板是「单单据 + 矩阵」:库里只有 1 张单据,内容是表格里的产品行。对单据做文档查询
+// (模糊搜索/查询单据/单据预览)在这面板等于不可用 —— 2026-09-30 用户口径:三个入口都改成对
+// **矩阵里的产品行**筛选;判定在 core/prod/prodDocSearch.js(纯函数 + 单测)。
+const prodDocRows = ref([])
+const prodDocCols = ref([])
+/** 生效中的行筛选({conditions, valid});经 :filter 下发给 ProdDocListSheet */
+const prodDocFilter = ref(null)
+function onProdDocRows(rows, cols) {
+  prodDocRows.value = Array.isArray(rows) ? rows : []
+  prodDocCols.value = Array.isArray(cols) ? cols : []
+}
+function setProdDocFilter(rows) {
+  const built = buildProdDocFilter(rows)
+  prodDocFilter.value = built.valid ? built : null
+  return built
+}
+function clearProdDocFilter() {
+  prodDocFilter.value = null
+}
+const prodDocFilteredRows = computed(() => filterProdDocRows(prodDocRows.value, prodDocCols.value, prodDocFilter.value))
 
 // ---------- 文书侧栏「模糊搜索」:字段+内容(可加多条件 AND) → 查找 → 单条跳转/多条出清单 ----------
 // 复用现有查询:具体字段 → condition[字段](后端 LIKE '%值%';明细字段走 EXISTS 行匹配),
@@ -2433,7 +2589,8 @@ const fuzzyApplied = ref(null) // 生效中的条件 {condition, keyword, valid}
 let fuzzyPrevPageSize = null
 const curDocNo = computed(() => String(cur.value?.['单据编号'] || cur.value?.['编号'] || ''))
 
-/** 字段下拉:全部字段 / 表头字段 / 明细字段(值=字段中文标签,后端按标签映射列) */
+/** 字段下拉:全部字段 / 表头字段 / 明细字段(值=字段中文标签,后端按标签映射列)
+ *  ⚠ 产品文件列表(单单据 + 矩阵)走另一套:字段 = 矩阵列(产品编号/是否受控/受控日期/状态(任一文件)) */
 const fuzzyFieldGroups = computed(() => {
   const cfg = cfgCache.value
   const header = (headerFields.value || []).map((f) => headerFieldKey(f)).filter(Boolean)
@@ -2448,18 +2605,34 @@ const fuzzyFieldGroups = computed(() => {
     }
   }
   const groups = [{ label: tt('全部字段'), options: [{ value: ALL_FIELDS, label: tt('任意字段') }] }]
+  if (isProdDocMatrix.value) {
+    // 矩阵面板:字段清单 = 表格自己的列(+「状态（任一文件）」这个横跨 4 个状态格的检索口径)
+    groups.push({ label: tt('矩阵列'), options: PROD_DOC_FIELD_OPTIONS.map((k) => ({ value: k, label: tt(k) })) })
+    return groups
+  }
   if (header.length) groups.push({ label: tt('表头字段'), options: header.map((k) => ({ value: k, label: tt(k) })) })
   if (detail.length) groups.push({ label: tt('明细字段'), options: detail.map((k) => ({ value: k, label: tt(k) })) })
   return groups
 })
 
-/** 结果清单:直接取当前已加载列表(查找后列表本身就是命中集合) */
-const fuzzyResultRows = computed(() => (list.value || []).map((row) => ({
-  no: String(row['单据编号'] || row['编号'] || ''),
-  date: String(row['单据日期'] || ''),
-  status: String(row['单据状态'] || ''),
-  row,
-})))
+/** 结果清单:直接取当前已加载列表(查找后列表本身就是命中集合)
+ *  ⚠ 矩阵面板的结果 = **产品行**(不是单据行) */
+const fuzzyResultRows = computed(() => {
+  if (isProdDocMatrix.value) {
+    return prodDocFilteredRows.value.map((row) => ({
+      no: String(row['产品编号'] || ''),
+      date: String(row['受控日期'] || ''),
+      status: `${row['doneCount'] ?? 0}/${row['totalCount'] ?? prodDocCols.value.length}`,
+      row,
+    }))
+  }
+  return (list.value || []).map((row) => ({
+    no: String(row['单据编号'] || row['编号'] || ''),
+    date: String(row['单据日期'] || ''),
+    status: String(row['单据状态'] || ''),
+    row,
+  }))
+})
 
 function openFuzzy() {
   fuzzyMode.value = true
@@ -2477,12 +2650,30 @@ async function closeFuzzy() {
   fuzzyRows.value = [{ field: '', value: '' }]
   fuzzySearched.value = false
   fuzzyApplied.value = null
+  // 矩阵面板:关掉搜索面板 = 连行筛选一起清掉(回到全表)
+  if (isProdDocMatrix.value) {
+    clearProdDocFilter()
+    return
+  }
   if (fuzzyPrevPageSize) { query.pageSize = fuzzyPrevPageSize; fuzzyPrevPageSize = null }
   query.pageNo = 1
   curIdx.value = 0
   await load()
 }
 async function runFuzzySearch() {
+  // 产品文件列表:对**矩阵行**筛选(不跑单据查询 —— 该面板只有 1 张单,查单据必然"查无可查")
+  if (isProdDocMatrix.value) {
+    const built = setProdDocFilter(fuzzyRows.value)
+    if (!built.valid) {
+      ElMessage.warning(tt('请先填写字段和内容'))
+      return
+    }
+    fuzzySearched.value = true
+    const n = prodDocFilteredRows.value.length
+    if (!n) ElMessage.warning(tt('未找到匹配的产品'))
+    else ElMessage.success(`${tt('找到')} ${n} ${tt('个产品')}`)
+    return
+  }
   const built = buildFuzzyQuery(fuzzyRows.value)
   if (!built.valid) {
     ElMessage.warning(tt('请先填写字段和内容'))
@@ -2509,8 +2700,13 @@ async function runFuzzySearch() {
   if (total.value > shown) ElMessage.warning(tt('找到 {n} 张单据，清单仅列出前 {m} 张').replace('{n}', total.value).replace('{m}', shown))
   else ElMessage.success(`${tt('找到')} ${total.value} ${tt('张单据')}，${tt('点清单切换查看')}`)
 }
-/** 点结果行 = 切换当前单据(走既有离开守卫:草稿未保存会提示) */
+/** 点结果行 = 切换当前单据(走既有离开守卫:草稿未保存会提示)
+ *  ⚠ 矩阵面板:结果是**产品行**,点它 = 把筛选收窄到该产品(表格随即只剩这一行) */
 async function openFuzzyResult(r) {
+  if (isProdDocMatrix.value) {
+    setProdDocFilter([{ field: '产品编号', value: String(r.no || '') }])
+    return
+  }
   const index = list.value.indexOf(r.row)
   if (index >= 0) await guardDocSwitch(index)
 }
@@ -2535,13 +2731,32 @@ function previewFieldsOf(row) {
   }
   return out
 }
-const previewCards = computed(() => (list.value || []).map((row) => {
-  const no = String(row['单据编号'] || row['编号'] || '')
-  const fields = previewFieldsOf(row)
-  const kw = previewKw.value.trim().toLowerCase()
-  const hit = !kw || no.toLowerCase().includes(kw) || fields.some((x) => x.value.toLowerCase().includes(kw))
-  return { no, date: String(row['单据日期'] || ''), status: String(row['单据状态'] || ''), fields, hit, row }
-}).filter((c) => c.hit))
+const previewCards = computed(() => {
+  // 产品文件列表:卡片 = **产品行**(编号 + 受控 + 4 个文件各自的状态),不是单据卡片
+  if (isProdDocMatrix.value) {
+    const kw = previewKw.value.trim().toLowerCase()
+    return prodDocFilteredRows.value.map((row) => {
+      // 卡片字段 = 4 个文件各自的状态:label 走 tt('文件N'),value = 文件名 + 状态(都过 tt(),
+      // 面板名/状态值本身在翻译表里有词条;拼串不整串丢进 tt(),否则会机翻出无意义词条)
+      const fields = prodDocCols.value.map((c, i) => ({
+        label: `文件${i + 1}`,
+        value: `${tt(c.panelName)}：${tt(String(row?.cells?.[c.panelCode] || '—'))}`,
+      }))
+      const no = String(row['产品编号'] || '')
+      const hit = !kw || no.toLowerCase().includes(kw)
+        || fields.some((x) => x.value.toLowerCase().includes(kw))
+        || prodDocCols.value.some((c) => String(row?.cells?.[c.panelCode] || '').toLowerCase().includes(kw))
+      return { no, date: String(row['受控日期'] || ''), status: String(row['是否受控'] || ''), fields, hit, row }
+    }).filter((c) => c.hit)
+  }
+  return (list.value || []).map((row) => {
+    const no = String(row['单据编号'] || row['编号'] || '')
+    const fields = previewFieldsOf(row)
+    const kw = previewKw.value.trim().toLowerCase()
+    const hit = !kw || no.toLowerCase().includes(kw) || fields.some((x) => x.value.toLowerCase().includes(kw))
+    return { no, date: String(row['单据日期'] || ''), status: String(row['单据状态'] || ''), fields, hit, row }
+  }).filter((c) => c.hit)
+})
 async function openDocPreview() {
   if (fuzzyMode.value) { // 与模糊搜索互斥:模糊条件失效,pageSize 直接接管
     fuzzyMode.value = false
@@ -2551,6 +2766,8 @@ async function openDocPreview() {
   }
   previewMode.value = true
   previewKw.value = ''
+  // 矩阵面板:卡片来自矩阵行,不跑单据查询(该面板只有 1 张单)
+  if (isProdDocMatrix.value) return
   if (previewPrevPageSize === null) previewPrevPageSize = query.pageSize
   query.pageSize = 200
   query.pageNo = 1
@@ -2560,12 +2777,18 @@ async function openDocPreview() {
 async function closeDocPreview() {
   previewMode.value = false
   previewKw.value = ''
+  if (isProdDocMatrix.value) return
   if (previewPrevPageSize !== null) { query.pageSize = previewPrevPageSize; previewPrevPageSize = null }
   query.pageNo = 1
   curIdx.value = 0
   await load()
 }
 async function openPreviewCard(c) {
+  // 矩阵面板:点产品卡 = 把筛选收窄到该产品
+  if (isProdDocMatrix.value) {
+    setProdDocFilter([{ field: '产品编号', value: String(c.no || '') }])
+    return
+  }
   const index = list.value.indexOf(c.row)
   if (index >= 0) await guardDocSwitch(index)
 }
@@ -2583,8 +2806,13 @@ const isStandardFlowSheet = computed(() => Object.prototype.hasOwnProperty.call(
  * 侧栏是否放出「提交审批 / 审批通过 / 审批驳回 / 弃审 / 审批情况」按钮组:
  * 标准流文书面板(特采单等)照旧;检验数据记录(QC_INSP_REC)虽走归档一族(保存即归档),
  * 但用户口径要求有明确的审批与审批通过按钮,故一并放开。
+ * 测试申请单(RD_DOM_TEST,2026-09-30 用户口径)同 QC_INSP_REC 口径:它也是归档一族
+ * (保存=普通用户自动送审 / 管理员直接归档),此前审批动作只藏在「申请修改」组的下拉里,
+ * 用户要求把动作组直接放出来 —— 归档闭环本身不动(「申请修改/修改记录」照旧保留)。
  */
-const hasApprovalBtns = computed(() => isStandardFlowSheet.value || String(panelCode.value) === 'QC_INSP_REC')
+const hasApprovalBtns = computed(() => isStandardFlowSheet.value
+  || String(panelCode.value) === 'QC_INSP_REC'
+  || String(panelCode.value) === 'RD_DOM_TEST')
 const openModMenu = ref(false)
 const curDocStatus = computed(() => String(cur.value?.['单据状态'] || ''))
 // 规格书两级分发(2026-09-12):已分配单仅 责任人∪总负责人∪管理员 可编辑,其他人可见只读
@@ -2659,10 +2887,12 @@ const l2ApproverNow = computed(() => panelCode.value === 'RD_PROD_INFO' && !!dev
 const devAssignVisible = ref(false)
 const devAssignBusy = ref(false)
 const devAssignUsers = ref([])
+// 顺序与后端 DevTaskService.DEV_PANELS / 设计「文件汇总表」第 9 行一致:
+// 规格书 → 成型工艺清单 → 组装工艺清单 → 出货检验计划表(2026-09-30 用户口径:按设计排)
 const DEV_PANELS = [
+  { code: 'RD_SPEC_DOC', label: '规格书' },
   { code: 'RD_MOLD_PROC', label: '成型工艺清单' },
   { code: 'RD_ASM_PROC', label: '组装工艺清单' },
-  { code: 'RD_SPEC_DOC', label: '规格书' },
   { code: 'RD_INSP_PLAN', label: '出货检验计划表' },
 ]
 const devAssignRows = ref(DEV_PANELS.map((p) => ({ panel: p.code, label: p.label, owner: '' })))
@@ -2675,9 +2905,21 @@ async function openDevAssign() {
     if (!devAssignUsers.value.length) devAssignUsers.value = (await engine.rdDevUsers()) || []
     const st = await engine.rdDevAssignState(no)
     const assigns = st?.assigns || {}
-    // 默认带出产品负责人(后端 buttonState.supervisor),四个文件各自可改
+    // 默认责任人 = **按需求逐文件预置**(《产品开发系统需求汇总.xlsx》sheet「文件汇总表」的「产品文件流程」):
+    //   5.1 规格书 = 项目负责人(后端 buttonState.supervisor 下发,动态)
+    //   5.2 成型控制要点 = 刘磊(liulei)
+    //   5.3 组装控制要求 = 柴善银(chaishanyin)
+    //   5.4 出货控制计划 = 冯敏(fengmin)
+    // ⚠ 这三个是**账号名(username)**,不是姓名 —— 载荷「分发责任人={面板编码:账号}」按账号落 rd_dev_task;
+    //   账号由 tools/migrate-rd-file-owner-2026-09-30.sql 建,角色「文件负责人」。
+    // 已分发过的以库里现有分配为准(assigns 优先),四格仍可逐个改。
     const fallback = devDispatch.supervisor || ''
-    devAssignRows.value = DEV_PANELS.map((p) => ({ panel: p.code, label: p.label, owner: assigns[p.code] || fallback }))
+    const FILE_OWNER_DEFAULT = { RD_MOLD_PROC: 'liulei', RD_ASM_PROC: 'chaishanyin', RD_INSP_PLAN: 'fengmin' }
+    devAssignRows.value = DEV_PANELS.map((p) => ({
+      panel: p.code,
+      label: p.label,
+      owner: assigns[p.code] || FILE_OWNER_DEFAULT[p.code] || fallback,
+    }))
     devAssignDocNo.value = no
     devAssignVisible.value = true
   } catch (e) {
@@ -2856,7 +3098,7 @@ const draftEditable = computed(() => {
 /** 附件上传闸门(2026-09-20):草稿/修改中照旧可传;**凡配了附件列位的单据,已审核/已完成也允许补附件**
  *  (合同/送货单/检验报告等佐证材料,只写附件列与 yj_attachment,不动业务字段;金蝶同步进来的订单
  *  本来就是已审核,沿用"审核即锁定"这些单永远传不了附件)。仅「已作废」单据禁止。
- *  名单 = 已配 6 列位的单据:SALE/采购订单、生产加工单、委外加工单、生产工单、客户订单
+ *  名单 = 已配 6 列位的单据:SALE/采购订单、生产工单、委外加工单、生产工单、客户订单
  *  + 采购链的送料暂收/来料检验/暂收退回/采购入库(见 migrate-order-attach / migrate-attach-restore)。 */
 const ATTACH_EDIT_PANELS = new Set([
   'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
@@ -3206,8 +3448,10 @@ const mainRows = computed(() => {
   if (!l.length) return []
   const filtered = applyAdvFilters(applyColFilters(l.map((r) => r), mainCols.value.map((c) => ({ prop: c }))))
   // 排序在取前 5 行之前:排序后看到的是"本页该字段前 5 条",而不是"前 5 条里再排"
-  const rows = sortViewRows(filtered, mainSort).slice(0, 5)
-  while (rows.length < 5) rows.push({ _placeholder: true })
+  // 生产加工单=工单列表形态(2026-09-24):预览行数放开到 20(其余面板保持 5 行预览)
+  const LIMIT = panelCode.value === 'MANU_ORDER' ? 20 : 5
+  const rows = sortViewRows(filtered, mainSort).slice(0, LIMIT)
+  while (rows.length < LIMIT) rows.push({ _placeholder: true })
   return rows
 })
 async function onMainRowClick(row) {
@@ -3218,6 +3462,7 @@ function mainRowCls({ row }) {
   if (row._placeholder) return 'ph-row'
   return row === cur.value ? 'row-cur' : ''
 }
+
 
 // ═══ 采购订单表头「送料」只读摘要(方案 A 轻量版,2026-09-21)═══════════════════
 // 页面结构一点不动:只在表头字段区末尾多**一行只读文字**,点它弹一个小浮层(批次窄表)。
@@ -3419,12 +3664,19 @@ const ARCH_SIZE_OPTS = [50, 100, 200, 500]
 const archPage = ref(1)
 function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首页
 
-// ═══ 物料二维码标签(勾选即打,2026-09-16):存货档案工具栏「二维码标签」按行勾选 → 80×80mm 标签 PDF。
-// 勾选集自管(Set 换新触发响应式),跨页/跨筛选保留;行键 = 后端 metadata.qrLabelKey(存货编码),
-// 同码行勾一个即代表该码(二维码内容相同;库里同码多行由后端查重守卫报错拦截) ═══
+// ═══ 档案二维码标签(勾选即打):工具栏「二维码标签」按行勾选 → 75×100mm 标识卡(print-formats 本地生成)。
+// 勾选集自管(Set 换新触发响应式),跨页/跨筛选保留;行键 = 后端 metadata.qrLabelKey(INV=存货编码),
+// 同码行勾一个即代表该码;WHLOC 库位(2026-09-28)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+库位编码 复合
+// (库位编码按仓内唯一,同码多仓不串选)。 ═══
 const qrSel = ref(new Set())
 const qrKey = computed(() => cfgCache.value?.metadata?.qrLabelKey || '')
-function qrRowKey(row) { return String(row?.[qrKey.value] ?? '').trim() }
+const qrScopeKey = computed(() => cfgCache.value?.metadata?.qrLabelScopeKey || '')
+function qrRowKey(row) {
+  const k = String(row?.[qrKey.value] ?? '').trim()
+  // 复合行键(库位):仓库 + \u0001 + 库位编码 —— \u0001 不出现在业务文本里,避免拼接歧义
+  const scope = qrScopeKey.value ? String(row?.[qrScopeKey.value] ?? '').trim() : ''
+  return scope ? `${scope}\u0001${k}` : k
+}
 function qrToggleRow(row) {
   const k = qrRowKey(row)
   if (!k) return
@@ -3486,6 +3738,99 @@ async function qrBlobErrMsg(e) {
     try { return JSON.parse(await data.text())?.message || '' } catch { /* 非 JSON 走兜底 */ }
   }
   return e?.response?.data?.message || e?.message || ''
+}
+
+// ═══ 生产工单:打印工单 / 排产(2026-09-24 用户要求,按钮挂 MANU_ORDER 面板) ═══
+// 打印工单=生产任务单固定版式(print-formats.printProductionTask,与工单排产看板同一实现)+ 打印留痕;
+// 排产=本单快捷排线(弹窗选产线/日期/数量 → 复用排产工作台 assign:仅已审核可排/数量守恒/停用线拒绝/留痕)。
+const moSchVisible = ref(false)
+const moSchNo = ref('')
+const moSchLine = ref('')
+const moSchStart = ref('')
+const moSchEnd = ref('')
+const moSchQty = ref(null)
+const moSchLines = ref([])
+
+/** 当前生产工单单号:头键=合同号(list 行/表单一致) */
+function moDocNo(row) {
+  const r = row || current.value || {}
+  return String(r['合同号'] || r['单据编号'] || r['编号'] || '').trim()
+}
+
+async function openPanelPrintWorkOrder() {
+  const no = moDocNo()
+  if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+  try {
+    const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+    const doc = res?.data || {}
+    const lines = Object.values(res?.detailData || {})[0] || []
+    const l = lines[0] || {}
+    const qty = doc['排产数量'] ?? l['排产数量'] ?? ''
+    const perBox = l['每箱数量'] ?? ''
+    const rows = [{
+      加工单号: no,
+      客户: doc['客户'] || '',
+      产品名称: l['产品名称'] || '',
+      批号: doc['批号'] || l['批号'] || '',
+      规格型号: l['规格型号'] || '',
+      重点管控: doc['重点管控'] || '',
+      客户PO: doc['销售订单号'] || '',
+      排产数量: qty,
+      每箱数量: perBox,
+      箱数: Number(perBox) > 0 ? Number(qty) / Number(perBox) : '',
+      计划完工日期: String(doc['预完工日'] || '').slice(0, 10),
+      备注: doc['备注'] || '',
+      生产线: doc['生产线'] || '',
+    }]
+    const sent = await printProductionTask(rows, { line: rows[0].生产线, preparedBy: user.realName })
+    try {
+      await request.post('/px/scheduleBoard/printStamp', { rows: [{ 加工单号: no }] })
+    } catch { /* 留痕失败不阻断打印 */ }
+    if (sent) ElMessage.success(tt('已发送打印'))
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+  }
+}
+
+/** 打开本单排产弹窗:产线源=排产工作台 stats(启用线 + 当日负荷/日产能) */
+async function openPanelSchedule() {
+  const no = moDocNo()
+  if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+  try {
+    const stats = await request.post('/px/scheduleBoard/stats', {})
+    moSchLines.value = (stats.data?.['产线'] || []).filter((l) => !l['停用'])
+  } catch { moSchLines.value = [] }
+  const cur = current.value || {}
+  moSchNo.value = no
+  moSchLine.value = cur['生产线'] || ''
+  moSchStart.value = String(cur['预开工日'] || '').slice(0, 10)
+  moSchEnd.value = String(cur['预完工日'] || '').slice(0, 10)
+  moSchQty.value = Number(cur['排产数量']) || null
+  moSchVisible.value = true
+}
+
+async function submitPanelSchedule() {
+  if (!moSchLine.value) return ElMessage.warning(tt('请选择生产线'))
+  try {
+    const res = await request.post('/px/scheduleBoard/assign', {
+      rows: [{
+        加工单号: moSchNo.value,
+        生产线: moSchLine.value,
+        预开工日: moSchStart.value || undefined,
+        预完工日: moSchEnd.value || undefined,
+        排产数量: moSchQty.value || undefined,
+      }],
+    })
+    const d = res.data || {}
+    const rc = (d['产线回执'] || []).map((l) => `${l['生产线']}:${tt('今日负荷')}${l['今日负荷'] ?? 0}/${tt('日产能')}${l['日产能'] ?? 0}${l['提示'] === '超载' ? ' ⚠' + tt('超载') : ''}`).join('；')
+    const failed = d['失败行'] || []
+    if (failed.length) ElMessage.warning(failed[0])
+    else ElMessage.success(`${tt('已排产')} ${moSchNo.value} → ${moSchLine.value}` + (rc ? `（${rc}）` : ''))
+    moSchVisible.value = false
+    await search()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('排产失败'))
+  }
 }
 /** 档案行非响应化(2026-09-16 四期,入口卡顿主因):几千行×几十列被 Vue 深度代理
  *  (首次全量过滤/排序/快照访问 ≈29 万属性走 proxy get)是"点进页面转圈"的最大开销源(实测单一 4.4s 长任务)。
@@ -3566,19 +3911,23 @@ const archEditableMap = computed(() => {
   return m
 })
 function archEditable(b) { return singleDocMode.value ? (archEditableMap.value[b.id] ?? detailEditable(b)) : detailEditable(b) }
-/** 列懒渲染(2026-09-16 五期):超宽档案(列>16 走横向滚动,如商品 75 列/表宽 7532px vs 视口 1042px)
- *  只渲染视口±半屏内的列内容,视口外列渲染空占位(表头保留撑住列宽与滚动条)——
- *  首渲染从 3750 格降到 ~1000 格,翻页同理;横向滚动时按需补渲染。
- *  响应式行/列缓存已在位,这里只控制 default 插槽是否产出内容。 */
-const archViewport = reactive({ left: -1, w: 1042, expand: false })
+/** 列懒渲染(2026-09-16 五期 → 2026-09-28 升级为列级虚拟化):超宽档案(列>16 走横向滚动,
+ *  如商品 55 列)视口外的列**整列不渲染**,以左右占位列撑住总宽(见 archGridCols)——
+ *  五期只懒渲染单元格内容,56 个 el-table-column 组件与占位 td 仍在,CPU 剖面显示
+ *  el-table 逐列/逐格更新机制(update/renderCell/getColumnElIndex)是宽表挂载长帧的主体。
+ *  响应式行/列缓存与两段渲染(120ms 后扩窗)均在位;横向滚动按需进出列。 */
+const archViewport = reactive({ left: -1, w: 1042, stage: 0 })
 const COL_LAZY_MIN = ARCH_FIT_MAX_COLS + 1
-// 两段渲染:首帧只出窄窗口(视口+0.3屏)快速见内容,120ms 后扩到常规窗口(±半屏)补齐,
-// 把 75 列首渲染的长任务拆成两段短任务,页面更早可交互
+// 三段渲染:首帧窄窗(视口+0.3屏)最快见内容 → 120ms 扩到 0.5+1.5 屏 → 再 300ms 扩到 0.5+2.75 屏
+// (常驻缓冲)。把 55 列首渲染拆成三段短任务,页面更早可交互,单段长帧 <160ms(实测)。
 let colExpandTimer = 0
 function scheduleColExpand() {
-  archViewport.expand = false
+  archViewport.stage = 0
   clearTimeout(colExpandTimer)
-  colExpandTimer = setTimeout(() => { archViewport.expand = true }, 120)
+  colExpandTimer = setTimeout(() => {
+    archViewport.stage = 1
+    colExpandTimer = setTimeout(() => { archViewport.stage = 2 }, 300)
+  }, 120)
 }
 watch(panelCode, scheduleColExpand)
 // 查询弹窗面板(收发存/台账):切换面板重置(重新进入需再过条件弹窗)
@@ -3591,6 +3940,15 @@ watch(panelCode, () => {
 onMounted(scheduleColExpand)
 function archLazyOn(b) { return singleDocMode.value && archCols(b).length >= COL_LAZY_MIN }
 let colLazyRaf = 0
+/** 可见窗口头尾缓冲(屏为单位),三段扩窗:
+ *  stage 0 = 首帧窄窗(0.3+0.3,最快见内容)→ 120ms 后 stage 1(0.5+1.5)→ 再 300ms stage 2(0.5+2.75 常驻缓冲)。
+ *  tail 决定滚动补窗间隔:补窗发生在滚出 (tail-margin-1) 屏之后 ⇒ tail 2.75 时约每 1.5 屏一次;
+ *  一次性扩到 2.75 会让挂载出现 ~220ms 长帧,分两段扩则每段 <160ms。 */
+function archWin() {
+  if (archViewport.stage === 2) return { head: 0.5, tail: 2.75 }
+  if (archViewport.stage === 1) return { head: 0.5, tail: 1.5 }
+  return { head: 0.3, tail: 0.3 }
+}
 function onArchScroll(e, b) {
   if (!archLazyOn(b)) return
   const el = e.target
@@ -3598,27 +3956,43 @@ function onArchScroll(e, b) {
   if (colLazyRaf) return
   colLazyRaf = requestAnimationFrame(() => {
     colLazyRaf = 0
-    archViewport.left = el.scrollLeft
-    archViewport.w = el.clientWidth || 1042
+    const L = el.scrollLeft, W = el.clientWidth || 1042
+    const base = Math.max(0, archViewport.left)
+    const win = archWin()
+    // 列级虚拟化:不做逐帧窗口跟随 —— 每次窗口移动都会增删列组件,el-table 随之整表重排
+    // (实测每 100px 一步就掉 ~130ms 帧)。改为「视口逼近已渲染边缘(0.25 屏内)才补窗」:
+    // 补窗直接进 stage 2 常驻缓冲(前 0.5 后 2.75 屏)⇒ 连续快滚约每 1.5 屏重排一次,缓滚/停住零成本。
+    if (L + W >= base + win.tail * W - 0.25 * W || L <= base - win.head * W + 0.25 * W) {
+      archViewport.left = L
+      archViewport.w = W
+      if (archViewport.stage < 2) archViewport.stage = 2
+    }
   })
 }
-function archColVisible(b, c) {
-  if (!archLazyOn(b)) return true
+/** 列级虚拟化(2026-09-28,取代五期的单元格级占位):返回 [左占位?, …可见列…, 右占位?]。
+ *  占位宽度=被隐藏列宽之和 ⇒ 表格总宽与列位置和整列渲染完全一致(滚动条不跳),
+ *  可见窗口沿用五期的头尾缓冲公式(含两段渲染 expand);窗口由 archViewport 驱动(滚动 rAF 节流)。
+ *  单遍累计列宽,不做逐列 O(n) 重扫。 */
+function archGridCols(b) {
   const cols = archCols(b)
+  if (!archLazyOn(b)) return cols
   const widths = archColsMap.value[b.id]?.widths
-  let x = 0
+  const base = Math.max(0, archViewport.left)
+  const win = archWin()
+  const lo = base - archViewport.w * win.head
+  const hi = base + archViewport.w * win.tail
+  const out = []
+  let x = 0, leftW = 0, rightW = 0, seen = false
   for (const k of cols) {
     const w = widths?.get(k.prop) ?? Number(k.width) ?? 100
-    if (k.prop === c.prop) {
-      const base = Math.max(0, archViewport.left)
-      const head = archViewport.left < 0 ? 0.3 : 0.5
-      const tail = archViewport.left < 0 ? 0.3 : 1
-      const win = archViewport.expand ? { head: 0.5, tail: 1.5 } : { head, tail }
-      return x + w >= base - archViewport.w * win.head && x <= base + archViewport.w * win.tail
-    }
+    if (x + w >= lo && x <= hi) { out.push(k); seen = true }
+    else if (!seen) leftW += w
+    else rightW += w
     x += w
   }
-  return true
+  if (leftW > 0) out.unshift({ spacer: 'L', width: Math.max(1, Math.round(leftW)) })
+  if (rightW > 0) out.push({ spacer: 'R', width: Math.max(1, Math.round(rightW)) })
+  return out
 }
 function archCurPage(b) { return Math.min(archPage.value, Math.max(1, Math.ceil(archTotal(b) / archPageSize.value))) }
 function pagedBlockRows(b) {
@@ -4477,7 +4851,7 @@ async function toggleLineDisable(row, next) {
     row['停用'] = res.data?.['停用'] ?? row['停用']   // 以服务端翻转结果为准
     archVersion.value++
     ElMessage.success(row['停用'] === 1
-      ? tt('已停用') + '：' + row.生产线 + tt('（排产工作台已不可选）')
+      ? tt('已停用') + '：' + row.生产线 + tt('（快速排产已不可选）')
       : tt('已启用') + '：' + row.生产线)
   } catch (e) {
     row['停用'] = old                      // 失败回滚(反向动画退回)
@@ -4560,18 +4934,48 @@ function isActiveDetailRefRow(row, b, prop) {
 // 动因:数据字典 210 行 × 6 列 = 1260 个常驻编辑器(含 el-select 全部选项 3165 个 option 节点),
 // DOM 达 1.85 万节点、首屏 2.1s,表现为点击后面板长时间白屏。
 const activeCell = ref(null)
+/** 激活格本地回显值(2026-09-28,修"打的字立刻消失"):档案行 markRaw(大表性能优化)后
+ *  v-model 写行属性是静默的——不触发重渲染,el-input 的 modelValue prop 停在旧值;
+ *  而 Element Plus el-input 在 emit 后 nextTick 强制把原生值拨回 props.modelValue
+ *  (input.vue setNativeInputValue),于是每敲一个字都被立刻清掉——库位档案 库位编码/库位地址
+ *  「无法填写」即此(参照列走选择器写入+bump 版本刷新,不受影响)。
+ *  解法:文本/数值激活编辑器改绑本响应式回显——输入即时更新回显(prop 跟上,EP 不再回拨),
+ *  同时把值落进 raw 行(保存/失焦回显用),零表格级重渲染。 */
+const activeCellEcho = ref('')
 function isActiveCell(row, b, prop) {
   const a = activeCell.value
   return !!a && a.row === row && a.tabKey === activeTab(b).key && a.prop === prop
+}
+function syncActiveCellEcho(row, prop) {
+  const v = row?.[prop]
+  activeCellEcho.value = v === undefined || v === null ? '' : v
+}
+function onActiveCellEchoInput(row, prop, v) {
+  activeCellEcho.value = v ?? ''
+  row[prop] = activeCellEcho.value
 }
 function activateCell(row, b, prop) {
   if (!detailEditable(b) || row?._placeholder) return
   const a = activeCell.value
   if (a && a.row === row && a.tabKey === activeTab(b).key && a.prop === prop) return
   activeCell.value = { row, tabKey: activeTab(b).key, prop }
+  syncActiveCellEcho(row, prop)
 }
 function deactivateCell() {
   activeCell.value = null
+  activeCellEcho.value = ''
+}
+/** 激活格编辑器挂载即聚焦(v-cell-focus,2026-09-28):懒激活单元格此前只挂编辑器不聚焦,
+ *  一击后键盘输入落在页面而非输入框,用户表现为「无法填写」(库位档案 库位编码/库位地址;
+ *  对照组=参照列常驻编辑器一击即选,落差感更强)。挂载即 focus ⇒ 一击=可打字;
+ *  el-switch 无 input 聚焦自身(空格可切换),指令挂在组件根元素上取内层 input。 */
+const vCellFocus = {
+  mounted(el) {
+    const target = el.querySelector?.('input') || (el.querySelector?.('[tabindex]') ?? (el.getAttribute?.('role') === 'switch' ? el : null))
+    if (!target || typeof target.focus !== 'function') return
+    // 挂载发生在激活点击的同帧,浏览器默认焦点动作在 click 后已结束;直接聚焦即可稳定生效
+    target.focus()
+  },
 }
 
 function openDetailReference(field, row, b) {
@@ -4619,8 +5023,25 @@ function addInlineDetailRow(b) {
   // 排序激活时先清排序:新行落在数据末尾,避免"插到已排好的中间"的错觉
   const state = blockSortOf(b)
   if (state.order) { state.prop = ''; state.order = '' }
-  rows.push(newDetailRow(tabKey))
+  const row = newDetailRow(tabKey)
+  rows.push(row)
   archPage.value = Math.ceil(rows.length / archPageSize.value) // 档案分页:新行在末尾,跳到末页立即可见
+  // 新行首个可编辑格直接激活并聚焦(2026-09-28):「新增数据」后懒激活格子只显示空文本、
+  // 无任何编辑器视觉痕迹,用户不知道要点它(库位档案 库位编码/库位地址 因此被报"无法填写")。
+  // 这里替用户完成那第一击:跳过参照列(常驻编辑器,一击即选不需要预激活)、图片列、
+  // 以及参照带回目标字段(如 仓库编码=选仓库时自动带入,不该让光标落进去手敲),
+  // 找第一个常规可编辑字段(如 库位编码)激活,v-cell-focus 挂载即聚焦 → 点完按钮直接打字。
+  const carriedNames = new Set()
+  for (const f of detailTabDefOf(tabKey)?.fields || []) {
+    for (const m of f.refMap || f.map || []) if (m?.to) carriedNames.add(m.to)
+  }
+  const firstEditable = (detailTabDefOf(tabKey)?.fields || []).find((f) => (
+    !f.hidden && !f.computed && !isReferenceField(f) && f.dataType !== '图片' && !carriedNames.has(f.dataName)
+  ))
+  if (firstEditable) {
+    activeCell.value = { row, tabKey, prop: firstEditable.dataName }
+    syncActiveCellEcho(row, firstEditable.dataName)
+  }
   markInlineDirty() // 新增明细行 = 未保存修改
 }
 
@@ -4926,6 +5347,8 @@ function openQueryRef(qr, context = 'page') {
   // 台账/库存状况(2026-09-28):弹窗里选「存货」且已选仓库 → 候选按「该仓有流水」收窄。
   // 注入数组型 filter{存货编码:[…]}(engine.queryRefRows 对数组 filter 在展平后的档案行上逐行精确匹配,
   // 不会误发给后端当查询条件);按编码收窄(名称重名/改名不影响);该仓无任何有流水的档案存货时不收窄(不给空清单)。
+  // 按**编码**而非名称:存货档案重名严重(「端盖」24 码、「PP棉」18 码),按名称会把
+  // 同名异码整批放进候选,用户分不清哪个有流水 —— 编码唯一,收窄后一码一物(单一性)。
   if (context === 'dialog' && isCascadePanel.value && headerFieldKey(qr) === '存货' && queryDraft['仓库']) {
     const codes = ledgerItemOptions.value.map((o) => o.code).filter(Boolean)
     if (codes.length) qr = { ...qr, filter: { ...(qr.filter || {}), 存货编码: codes } }
@@ -4998,9 +5421,11 @@ function applyHeaderQuery() {
   for (const [key, value] of Object.entries(queryDraft)) {
     if (value !== undefined && value !== null && String(value) !== '') condition[key] = value
   }
-  // 高级筛选定格为「生效中」:报表面板随本次查询 POST 给后端全表过滤(分页/导出口径一致);
-  // 单据/档案面板仍是前端过滤(applyAdvFilters 读的是编辑中的 advFilters,不受此快照影响)
-  activeAdvFilters.value = advFilters.value.filter((f) => f.field && (f.op === 'empty' || f.op === 'notEmpty' || String(f.value ?? '').trim() !== ''))
+  // 高级筛选定格为「生效中」:报表/单据面板随本次查询 POST 给后端全表过滤(分页/导出口径一致;
+  // 单据面板 2026-09-24 起同样服务端化);档案面板仍是前端过滤。
+  // 日期范围(起/止)在此并入(ge/le 两条),不占可见条件行。
+  const act = (list) => list.filter((f) => f.field && (f.op === 'empty' || f.op === 'notEmpty' || String(f.value ?? '').trim() !== ''))
+  activeAdvFilters.value = act(effectiveAdvFilters.value)
   rqdDone.value = true // 已通过弹窗查询(此后关闭弹窗不再退页)
   queryDialogVisible.value = false
   search()
@@ -5041,7 +5466,7 @@ async function saveCurrentPlan() {
     })
     const name = String(value).trim()
     const exists = queryPlans.value.find((p) => p.name === name)
-    const plan = { name, condition: { ...cond }, advFilters: JSON.parse(JSON.stringify(adv)), updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') }
+    const plan = { name, condition: { ...cond }, advFilters: JSON.parse(JSON.stringify(adv)), dateFrom: dateFrom.value, dateTo: dateTo.value, updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' ') }
     if (exists) Object.assign(exists, plan)
     else queryPlans.value.push(plan)
     persistPlans()
@@ -5057,6 +5482,8 @@ function applyPlan(name) {
   Object.keys(queryDraft).forEach((k) => delete queryDraft[k])
   Object.assign(queryDraft, plan.condition || {})
   advFilters.value = JSON.parse(JSON.stringify(plan.advFilters || []))
+  dateFrom.value = plan.dateFrom || ''
+  dateTo.value = plan.dateTo || ''
 }
 
 /** 维护操作:更新(以当前弹窗条件覆盖同名方案)/重命名/删除。 */
@@ -5099,6 +5526,7 @@ function planSummary(plan) {
   const condKeys = Object.keys(plan.condition || {})
   if (condKeys.length) parts.push(condKeys.slice(0, 3).join('、') + (condKeys.length > 3 ? ` …×${condKeys.length}` : ''))
   if ((plan.advFilters || []).length) parts.push(`${tt('高级筛选')}×${plan.advFilters.length}`)
+  if (plan.dateFrom || plan.dateTo) parts.push(`${tt('日期范围')} ${plan.dateFrom || ''}~${plan.dateTo || ''}`)
   return parts.join(' + ') || '-'
 }
 
@@ -5107,6 +5535,8 @@ function resetHeaderQuery() {
   Object.keys(condition).forEach((key) => delete condition[key])
   rqdRange.value = [] // 弹窗面板:单据日期区间一并重置
   advFilters.value = []
+  dateFrom.value = ''
+  dateTo.value = ''
   activeAdvFilters.value = []
   reportKeyword.value = ''
   query.keyword = ''
@@ -5206,11 +5636,27 @@ async function loadCrg() {
     query.pageSize = wantSize
     query.pageNo = 1
   }
+  // 档案面板的显示分页(pagedBlockRows/archSlice)同样取面板配置 —— 2026-09-28 修:
+  //   此前 archPageSize 硬编码 50,而 yj_panel.page_size 对档案面板**完全无效**
+  //   (queryArchive 忽略 pageSize 全量返回,显示走 archPageSize)⇒ 元数据误导,
+  //   且宽表(如商品 55 列 × 50 行 = 2800 单元格 / 1.7 万 DOM)没有"少渲染"的旋钮。
+  //   现在按配置走:宽表把 yj_panel.page_size 调到 25,单页渲染量与切换耗时直接减半。
+  if (singleDocMode.value) {
+    const archWant = Number(tp?.pageSize) || 50
+    if (archPageSize.value !== archWant) {
+      archPageSize.value = archWant
+      archPage.value = 1
+    }
+  }
   gridTabs.value = tp?.gridTabs || []
   groups.value = filterGroups(ensureScanFillAction(
     cfg?.metadata?.buttonGroups,
     cfg?.metadata,
   ))
+  // 字段管理(动态字段):非 admin 隐藏入口(服务端 requireAdmin 是真闸门;flat 面板后端不注入)
+  if (!user.isAdmin) {
+    groups.value = groups.value.map((g) => ({ ...g, actions: (g.actions || []).filter((a) => a !== '字段管理') }))
+  }
   return cfg
 }
 
@@ -5590,9 +6036,17 @@ async function onButton(action) {
         batchSendVisible.value = true
         return
       }
-  // 工单二维码(计划层):单产品工单一张标签,二维码=工单号|批号|产品|数量|产线(扫码报工/领料入口);
-  // 2026-09-24 随生产域下拉:面板化后适配生产加工单(MANU_ORDER)字段(合同号/排产数量/生产单位/工序交期/生产线)
-  if (action === '打印工单二维码') {
+  // 工单二维码(计划层):单产品工单一张标签,二维码=公司代码@工单号@1000+工单行号(woQrText,2026-10-09 规则改版,扫码报工/领料入口);
+  // 2026-09-22 面板化:适配生产工单(MANU_ORDER)字段(合同号/排产数量/生产单位/工序交期/生产线)
+  // 生产工单:打印工单(生产任务单版式)/排产(本单快捷排线) —— 仅 MANU_ORDER 面板(2026-09-24 用户要求)
+  if (action === '打印工单' && panelCode.value === 'MANU_ORDER') {
+    await openPanelPrintWorkOrder()
+    return
+  }
+  if (action === '排产' && panelCode.value === 'MANU_ORDER') {
+    await openPanelSchedule()
+    return
+  }  if (action === '打印工单二维码') {
     const cur = current.value || {}
     const no = cur['单据编号'] || cur['编号'] || cur['合同号'] || cur['加工单号'] || ''
     if (!no) return ElMessage.warning('请先选择一张工单')
@@ -5602,9 +6056,96 @@ async function onButton(action) {
     qrLabels.value = [{
       code: no, name: cur['产品名称'] || cur['品名'] || '', lot: cur['批号'] || '', qty, unit,
       doc: `交期 ${due}` + (cur['生产线'] ? ` · ${cur['生产线']}` : ''),
-      qrText: `${no}|${cur['批号'] || ''}|${cur['产品编码'] || ''}|${qty}|${cur['生产线'] || ''}`, qr: '',
+      qrText: woQrText(cur), qr: '',
     }]
     qrVisible.value = true
+    return
+  }
+  // 采购订单·打印材料码(2026-09-28 用户口径:供应商自己打码→在采购单打;版式=产品标识卡
+  // printProductCards 75×100mm 一行一卡,与采购入库单「打印标识卡」/商品档案同款):
+  // 订单编号/供应商名称/物料编码/物料规格/数量取订单事实,批次·生产日期留横线(订单阶段无批号,
+  // 收货入库时由我方在采购入库单打印带批号标识卡);二维码=公司代码@物料编码(productCardQrText,
+  // 批次空即两段,与商品档案扫码口径一致)。
+  // 入口分工:没批号→商品档案「二维码标签」;自己打带批号→采购入库单「打印标识卡」。
+  if (action === '打印材料码' && panelCode.value === 'PU_ORDER') {
+    const cur = current.value || {}
+    const no = cur['单据编号'] || cur['编号'] || ''
+    if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+    try {
+      const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+      const doc = res?.data || {}
+      const lines = Object.values(res?.detailData || {})[0] || []
+      const rows = (lines || [])
+        .filter((l) => l && l['物料编码'])
+        .map((l) => ({
+          编码: l['物料编码'],
+          规格: l['规格型号'] || '',
+          数量: l['数量'] ?? '',
+          批次: '',
+          订单编号: doc['单据编号'] || no,
+          供应商名称: doc['供应商'] || '',
+          生产日期: '',
+        }))
+      if (!rows.length) return ElMessage.warning(tt('当前单据没有可打印的明细行'))
+      await printProductCards(rows)
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+    }
+    return
+  }
+  // 采购入库单·打印标识卡(2026-09-28 用户需求):当前单据明细行 → 商品档案同款 75×100mm 产品标识卡
+  // (printProductCards 一行一卡);订单编号/供应商名称/数量/批次/生产日期取单据事实填充,缺值留横线手填。
+  // 取数走 getFormDescriptor(已保存的最新行,同 打印采购订单 先例),不读编辑中的草稿。
+  // 批次兜底(2026-09-28 用户反馈"标识卡没有批次号"):批次号口径上线前的老单 头/行批次号均空
+  // (如 PI-2026-09-0013),打印层按既有口径兜底 行批次号→头批次号→单据日期推导(docNoFromDate,
+  // 纯展示出参,不写库;空值才推导,不会覆盖任何人工值);二维码(公司代码@编码@批次)随之带出批号段。
+  if (action === '打印标识卡' && panelCode.value === 'PURCHASE_IN') {
+    const cur = current.value || {}
+    const no = cur['单据编号'] || cur['编号'] || ''
+    if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+    try {
+      const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+      const doc = res?.data || {}
+      const lines = Object.values(res?.detailData || {})[0] || []
+      const headBatch = doc['批次号'] || docNoFromDate(doc['单据日期']) || ''
+      const rows = (lines || [])
+        .filter((l) => l && l['存货编码'])
+        .map((l) => ({
+          编码: l['存货编码'],
+          规格: l['规格型号'] || '',
+          数量: l['实收数量'] ?? l['数量'] ?? '',
+          批次: l['批次号'] || l['批号'] || headBatch,
+          订单编号: doc['采购订单号'] || doc['单据编号'] || no,
+          供应商名称: doc['供应商'] || '',
+          生产日期: l['生产日期'] || '',
+        }))
+      if (!rows.length) return ElMessage.warning(tt('当前单据没有可打印的明细行'))
+      await printProductCards(rows)
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+    }
+    return
+  }
+  // 银嘉固定版式纸质单打印(2026-09-23):采购订单/暂收退料单 → print-formats.js;
+  // 列表选中单 → getFormDescriptor 取头+明细行(§5.5 D3:头=data,明细=detailData 首页签),新窗口打印
+  // (无后端处理器,同 打印工单二维码 本地拦截先例)
+  // 打印订单无金额(2026-09-28 用户澄清):采购订单的另一种报表,版式同款仅去 单价/小计/总计金额
+  if (action === '打印采购订单' || action === '打印退货单' || action === '打印订单无金额') {
+    const cur = current.value || {}
+    const no = cur['单据编号'] || cur['编号'] || ''
+    if (!no) return ElMessage.warning(tt('请先选择一张单据'))
+    try {
+      const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
+      const doc = res?.data || {}
+      const lines = Object.values(res?.detailData || {})[0] || []
+      // 头单号键随面板而异(PU_ORDER=单据编号,QC_RETURN=单号/编号,见 PxController 纸张右上角注释)
+      if (!doc['单据编号'] && !doc['单号'] && !doc['编号']) return ElMessage.warning(tt('未取到单据数据'))
+      if (action === '打印采购订单') printPuOrder(doc, lines)
+      else if (action === '打印订单无金额') printPuOrderNoAmount(doc, lines)
+      else printQcReturn(doc, lines)
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('打印失败'))
+    }
     return
   }
   // 产品二维码(成型后):二维码=产品编码|产品批号;批号由后端按需取号(一次生成终身复用)
@@ -5778,6 +6319,10 @@ async function onButton(action) {
     openHeadPrefs()
     return
   }
+  if (action === '字段管理') {
+    fieldMgrVisible.value = true
+    return
+  }
   if (action === '分类管理') {
     // 客户/供应商档案 → 对应分类面板(金蝶同款:分类不占导航,从档案工具栏进)
     const target = cfgCache.value?.metadata?.classifyPanel
@@ -5789,8 +6334,25 @@ async function onButton(action) {
     return
   }
   if (action === '二维码标签') {
-    // 存货档案勾选即打:勾行→80×80mm 标签 PDF(二维码=存货编码);未勾选只提示,不生成
-    exportQrLabels()
+    // 二维码标签(INV,2026-09-24 改版,用户拍板):勾行 → 75×100mm 七字段标签
+    // (订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,编码·规格取行,其余手填);
+    // 二维码=公司代码@物料编码[@批号](print-formats.printProductCards 本地生成;旧 /report/qr-label 暂留可回滚)
+    // WHLOC 库位(2026-09-28):同款勾选即打,卡面=仓库/库位地址/库位编码(printLocationCards),
+    // 二维码=仓库编码@库位地址@库位编码(同日改版:首段仓库→仓库编码,行带 仓库编码 值);
+    // 勾选行键=仓库+库位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
+    const whloc = cfgCache.value?.metadata?.qrLabelKind === 'whloc'
+    const sel = qrSel.value
+    const rows = []
+    for (const b of blocks.value) {
+      for (const r of archRows(b)) {
+        const k = qrRowKey(r)
+        if (!k || !sel.has(k)) continue
+        if (whloc) rows.push({ 仓库: r['仓库'], 仓库编码: r['仓库编码'], 库位地址: r['库位地址'], 库位编码: r['库位编码'] })
+        else rows.push({ 编码: k, 规格: r['规格型号'] || r['型号'] || '' })
+      }
+    }
+    if (!rows.length) return ElMessage.warning(tt(whloc ? '请先勾选要打印的库位' : '请先勾选要导出的商品'))
+    await (whloc ? printLocationCards(rows) : printProductCards(rows))
     return
   }
   // 文件类面板(文书式):「删除」= 整单删除(草稿直接作废;已归档提交删除申请,管理员审批)
@@ -5910,6 +6472,8 @@ async function onButton(action) {
   try {
     // 审批流：提交审批/审批通过（确认+意见）、审批驳回（意见必填）、审批情况（历史弹窗）
     let approvalOpinion = ''
+    // 「申请修改」的修改原因(2026-09-30 需求:数据记录表「修改:只需填写修改原因」)
+    let modifyReason = ''
     if (action === '提交审批' || action === '审批通过') {
       if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
       // 提交审批:草稿或修改态(文件类申请修改经审批)可提交;审批通过:审批中(一级)/待二级审批(二级)
@@ -5934,6 +6498,31 @@ async function onButton(action) {
           { confirmButtonText: '确认' + action, cancelButtonText: '取消', inputType: 'textarea', inputPlaceholder: action === '审批通过' ? '审批意见（选填）' : '提交说明（选填）' }
         )
         approvalOpinion = value || ''
+      } catch (e) {
+        return
+      }
+    } else if (action === '申请修改') {
+      // 2026-09-30 需求(《产品开发系统需求汇总.xlsx》sheet「数据记录表」第 2 条:
+      //   「修改:不需要反审核,只需填写修改原因」):申请修改**必须填原因**。
+      // 用户口径「改完需要再审核」⇒ 本处只补这一格,后面的
+      //   「申请修改 → 管理员批 → 改 → 提交审批 → 管理员批 → 再归档」闭环原样不动。
+      // 原因随 formData 的「修改原因」键发到后端(PanelxList 此前对申请修改**没有任何输入框**,
+      // 后端 modifyRequest 拿到的原因因此恒为空串)。
+      if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+      const noMod = current.value['编号'] || current.value['单据编号'] || ''
+      try {
+        const { value } = await ElMessageBox.prompt(
+          tt('单据：{no}（当前状态：{st}）\n请写明本次要修改什么、为什么改').replace('{no}', noMod).replace('{st}', current.value['单据状态'] || ''),
+          tt('申请修改确认'),
+          {
+            confirmButtonText: tt('提交修改申请'),
+            cancelButtonText: tt('取消'),
+            inputType: 'textarea',
+            inputPlaceholder: tt('修改原因（必填）'),
+            inputValidator: (v) => (v && v.trim() ? true : tt('修改原因不能为空')),
+          }
+        )
+        modifyReason = value || ''
       } catch (e) {
         return
       }
@@ -5991,12 +6580,20 @@ async function onButton(action) {
     const res = await engine.callButton({
       panelCode: panelCode.value,
       buttonName: action,
-      formData: current.value ? { 编号: current.value['编号'], ...(auditOpinion !== '' ? { 审核意见: auditOpinion } : {}), ...(approvalOpinion !== '' ? { 审批意见: approvalOpinion } : {}) } : {},
+      formData: current.value ? { 编号: current.value['编号'], ...(auditOpinion !== '' ? { 审核意见: auditOpinion } : {}), ...(approvalOpinion !== '' ? { 审批意见: approvalOpinion } : {}), ...(modifyReason !== '' ? { 修改原因: modifyReason } : {}) } : {},
       buttonParam: {},
     })
-    if (res?.gotoPanel) {
+      if (res?.gotoPanel) {
+      if (res.gotoPanel === 'WORK_ORDER_LIST') {
+        // 单轨(2026-09-26):生产工单落 plang,前往生产工单列表页(独立路由,非 panelx 面板)
+        ElMessage.success(`已生成生产工单：${(res['编号清单'] || [res['编号']]).join('、')}`)
+        tabs.close(route.path)
+        router.push('/prod/plan/workOrderList')
+        tabs.open({ path: '/prod/plan/workOrderList', title: '生产工单' })
+        return
+      }
       // 推式生单：直接跳转到目标面板列表页（不新开标签页），新生成的单据按创建时间倒序显示在第一张（草稿内联可编辑）
-      ElMessage.success(`已生成${res.gotoPanel === 'MANU_ORDER' ? '生产加工单' : res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
+      ElMessage.success(`已生成${res.gotoPanel === 'MANU_ORDER' ? '生产工单' : res.gotoPanel}：${res['编号']}，请在列表页继续填写`)
       const targetPath = `/panelx/list/${res.gotoPanel}`
       tabs.close(route.path) // 关闭当前源面板页签（页签被目标面板替换）
       router.push(targetPath)
@@ -6081,13 +6678,14 @@ async function load(clamping = false) {
       if (!query.keyword && fuzzyApplied.value.keyword) params.keyword = fuzzyApplied.value.keyword
     }
     if (query.keyword) params.keyword = query.keyword
-    // 报表面板:高级筛选服务端化(后端 queryFlat 逐条 AND 并入 WHERE,全表过滤 → 分页 totalSize
-    // 与导出一致);台账期初/期末合成行按 仓库+存货+日期段 另算,不受影响。弹窗「模糊搜索」同批发。
-    if (reportMode.value) {
+    // 高级筛选服务端化:报表(平表)与单据(2026-09-24 起)都随查询 POST advFilters,后端逐条 AND 并入
+    // WHERE → 全表过滤,分页 totalSize 与导出一致;单据面板只认头表字段(行级字段后端剔除)。
+    // 台账期初/期末合成行按 仓库+存货+日期段 另算,不受影响。弹窗「模糊搜索」仅报表同批发。
+    if (reportMode.value || docPanel.value) {
       if (activeAdvFilters.value.length) {
         params.advFilters = activeAdvFilters.value.map((f) => ({ field: f.field, op: f.op, value: String(f.value ?? '').trim() }))
       }
-      if (reportKeyword.value.trim()) params.keyword = reportKeyword.value.trim()
+      if (reportMode.value && reportKeyword.value.trim()) params.keyword = reportKeyword.value.trim()
     }
     const res = await engine.queryFormDataList(params)
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
@@ -6302,12 +6900,21 @@ async function selectProduct(code) {
   }
 }
 
+// 切面板拆装分帧(2026-09-28):清空 cfgCache/gridTabs 会同步拆掉旧表格,而参照记忆化后
+// getPanelConfig 瞬时命中缓存(微任务边界)⇒ 拆旧+装新挤进同一个 patch —— 宽表面板实测
+// 233ms 单帧长任务。让出一帧(浏览器先提交"移除旧 DOM")再装新面板,长帧减半;
+// 连续快速切换用 token 只认最后一次,避免过期装载。
+let switchFrameToken = 0
 watch(
   () => [panelCode.value, operationName.value],
-  () => {
+  async () => {
     scanVisible.value = false
     // 2026-08-20：关闭页签/切走时 panelCode 变 undefined——不触发加载（避免「面板编号无效」误报）
     if (!panelCode.value || panelCode.value === 'undefined') return
+    // 拆除顺序(2026-09-28):先清行、再清配置 —— 若在仍挂着旧行数据时清 gridTabs,
+    // el-table 每删一列都会对全部行重渲染一次(O(列×行),宽表拆除的主长帧来源之一)。
+    list.value = []
+    total.value = 0
     cfgCache.value = null
     qrSel.value = new Set() // 二维码标签勾选集随面板清空(行键属于上一个档案)
     resetDictModes()
@@ -6334,6 +6941,11 @@ watch(
     curIdx.value = 0
     // 跨面板跳转(采购订单「送料批次」→暂收单、左栏链路跳转等):同一路由记录换面板时组件被复用,
     // onMounted 不再执行 —— 这里同样消费 ?docNo=,否则会退回「列表第一张」而定位不到目标单据
+    const tok = ++switchFrameToken
+    // 双 rAF:任务里注册的 rAF 在**同一帧**绘制前执行,拆装之间并不会发生绘制;
+    // 嵌套一层才真正等到"旧 DOM 已提交绘制"之后的下一帧(实测单层时 INV→SO_ORDER 仍有 200ms 同帧)。
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
+    if (tok !== switchFrameToken || !panelCode.value || panelCode.value === 'undefined') return
     if (applyDocNoQuery()) load()
     else search()
   }
@@ -7284,6 +7896,24 @@ onUnmounted(() => {
 .adv-no-value {
   height: 24px;
   border-bottom: 1px dashed #d1d5db;
+}
+/* 日期范围行(2026-09-24):起 - 止 + 清空,与高级筛选行区分(独立 flex 布局) */
+.adv-range-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.adv-filter-dash { color: #909399; }
+.adv-filter-dim { font-size: 12px; color: #909399; margin-left: 8px; }
+/* 生产工单排产弹窗行 */
+.mo-sch-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #606266;
 }
 .dark .adv-filter-section { border-color: #3a3b42; }
 .dark .adv-filter-title { color: #bbb; }

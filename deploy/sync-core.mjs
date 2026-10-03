@@ -317,6 +317,9 @@ export const DOCS = [
     mapLines(d) {
       return (d.material_entity || []).map((m) => ({
         单据编号: str(d.bill_no), 品牌: null,
+        // 销售订单行号(2026-09-27,对齐采购订单先例):金蝶分录 seq,从 1 连续——
+        // 订单结转页展示;转工单时作为工单行号 plang.pl_xc 同值下传(bl_so_order.行号)
+        行号: num(m.seq),
         存货名称: str(m.material_name), 存货编码: str(m.material_number), 规格型号: str(m.material_model),
         数量: num(m.qty), 销售单位: str(m.unit_name) || str(m.unit_number),
         单价: num(m.price), '税率%': num(m.cess), 含税单价: num(m.tax_price),
@@ -385,7 +388,9 @@ const mergeListDetail = (listRow, detail) => {
   }
   return out;
 };
-const nowLocal = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+// 2026-09-28 修:toISOString() 是 UTC,asp_time1 落库少 8 小时(服务器实测 15:52 显示成 07:52,
+// 曾被误读成"上午部署前的旧数据")。改为按本地时区偏移折算后再取 ISO 形状。
+const nowLocal = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' '); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 日志:控制台 + logs/sync-YYYY-MM-DD.log(按日轮转,规范要求保留至少一年)

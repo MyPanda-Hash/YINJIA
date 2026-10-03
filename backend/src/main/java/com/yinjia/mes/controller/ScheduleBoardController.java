@@ -63,21 +63,12 @@ public class ScheduleBoardController {
         return ApiResult.ok(service.unassign(rows, currentUser()));
     }
 
-    /** 左侧骨架:生产线档案全部线(含停用)未交量汇总 + 当日开线状态(参考工单排产页,2026-09-23 去班别) */
+    /** 左侧骨架:生产线档案全部线(含停用)未交量汇总(参考工单排产页,2026-09-23 去班别;
+     *  开线状态字段已随开线管理下线移除,2026-09-24 用户拍板) */
     @PostMapping("/linesSummary")
     public ApiResult<List<Map<String, Object>>> linesSummary(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");
         return ApiResult.ok(service.linesSummary(str(body == null ? null : body.get("开工日期"))));
-    }
-
-    /** 开线/关线切换(日期×生产线) */
-    @PostMapping("/setOpen")
-    public ApiResult<Map<String, Object>> setOpen(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
-        boolean open = !"否".equals(String.valueOf(body.get("开线"))) && !"false".equalsIgnoreCase(String.valueOf(body.get("开线")));
-        return ApiResult.ok(service.setOpen(str(body.get("开工日期")), str(body.get("生产线")),
-                open, currentUser()));
     }
 
     /** 选中线 的排产明细(scope=未完工/已完工/全部) */
@@ -96,6 +87,17 @@ public class ScheduleBoardController {
         perm.requireButton("MANU_ORDER", "保存");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(service.reassign(rows, str(body.get("目标生产线")), currentUser()));
+    }
+
+    /** 转领料:勾选已排工单 → 按默认 BOM×排产数量 生成 材料出库单(领料单)草稿;
+     *  审核出库后 ManuWritebackService 回写工单领料单号(ll_no2)。权限=排入/调线同款(保存词表)。 */
+    @PostMapping("/toPicking")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> toPicking(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        perm.requireButton("MANU_ORDER", "保存");
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
+        return ApiResult.ok(service.toPicking(rows, currentUser()));
     }
 
     /** 今日已排产(mode=today)/全部已排产(mode=all) */

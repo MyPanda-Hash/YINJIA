@@ -1,4 +1,4 @@
-# 从合并轮快照还原临时库(供字段丢失时点定位)
+﻿# 从合并轮快照还原临时库(供字段丢失时点定位)
 $ErrorActionPreference = 'Stop'
 function New-AdminConn {
   $conn = New-Object System.Data.SqlClient.SqlConnection("Server=localhost;Integrated Security=True;TrustServerCertificate=True")

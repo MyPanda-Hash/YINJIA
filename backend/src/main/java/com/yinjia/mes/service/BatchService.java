@@ -230,8 +230,16 @@ public class BatchService {
         Integer id = jdbc.queryForObject("SELECT TOP 1 [" + KEY_COL + "] FROM bd_purchase_in WHERE 单据编号 = ?",
                 Integer.class, docNo);
         if (id != null && id > 0) return id;
-        id = jdbc.queryForObject("SELECT TOP 1 batch_id FROM form_flow_link WHERE target_panel_code='PURCHASE_IN'"
+        // 2026-10-03 修 500:这里原来是 queryForObject,而 **手工建的采购入库单**(头表批次键为空、
+        // form_flow_link 里一行都没有)会让它 0 行返回 ⇒ Spring 抛
+        // IncorrectResultSizeDataAccessException("expected 1, actual 0") ⇒ **审核整笔 500**。
+        // 实测(测试账套):保存一张采购入库单 → 审核 = {"code":500,"message":"服务异常：Incorrect result size:
+        // expected 1, actual 0"};Debug 日志里失败前最后一条 SQL 就是本句。
+        // 本方法头部注释写的是"返回 0 = 未找到(如历史单/免检直达且无链路)"⇒ 抛错违背了本意。
+        // 改 queryForList 取首行:命中时与原来**完全等价**(SQL 一字未改,TOP 1),0 行则继续往下兜底。
+        List<Integer> linked = jdbc.queryForList("SELECT TOP 1 batch_id FROM form_flow_link WHERE target_panel_code='PURCHASE_IN'"
                 + " AND target_form_no=? AND batch_id IS NOT NULL ORDER BY id", Integer.class, docNo);
+        id = linked.isEmpty() ? null : linked.get(0);
         if (id != null && id > 0) return id;
         // 来源单头上的批次键(检验单 QC_INSP / 送料暂收单 QC_RECV / 特采单 QC_TC_IN;采购订单免检直达时无此列,跳过)
         List<Map<String, Object>> srces = jdbc.queryForList(

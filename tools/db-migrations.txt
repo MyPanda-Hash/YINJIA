@@ -908,6 +908,8 @@ migrate-qc-insp-drop-pannum.sql
 #   幂等:全新库上为无操作(对象不存在);自检三处无残留。
 migrate-batch-ledger-drop.sql
 
+# —— 2026-09-24 检验/退料明细缺列补齐(规格型号/不合格数量/处置方式;spec-unify 与特采生单依赖,远程库上直改未入链;面板字段 型号→规格型号) ——
+migrate-align-qc-col-fix-20260924.sql
 # —— 2026-09-21 采购链字段流转修复 ①:规格命名统一为「规格型号」 ——
 #   用户口径:「采购订单→来料暂收单→来料检验单→采购入库单/暂收退料单 链路流转时表格部分数据没过去,
 #   如规格型号与规格 —— 把规格统一写成规格型号」。
@@ -1553,8 +1555,375 @@ migrate-line-shift-open.sql
 migrate-manu-prune-legacy.sql
 # —— 2026-09-23 工序报工单升级(对照参考库 scjl 底稿):删旧状态三件套(真源 yj_doc_status)+加 批号/生产线/入库单号;工序下拉五道+生产线=启用档案;v_manu_schedule 加已报工列(五道完成MAX);报工扣减未交量=排产−max(入库,已报工) ——
 migrate-wo-report-upgrade.sql
+# —— 2026-09-24 合并对齐补缺:qc_insp 补 4 列(暂收单号/检验日期/检验方案/总结论,远程建表声明本地老表缺)+暂收单号字段注册(参照 SL_RECV)+en 译名;为被跳过的 chain-insp-fields 等铺依赖 ——
+migrate-align-merge-20260924.sql
+# —— 2026-09-24 合并对齐二:报表视图缺列修复(远程库上直改未入链;前置 panda 三支重放;委外三视图对齐面板字段;lot_trace 补 id) ——
+migrate-align-views-20260924.sql
+# —— 2026-09-24 合并对齐三:字段位缺口 7 项补齐(列在但 yj_field 漏注册=界面少列:INV最新成本/UOM换算率/PU_ORDER双单位2/STOCK_STATUS预警数量/DEPT电话/WH联系人) ——
+migrate-align-fields-20260924.sql
+# —— 2026-09-24 送料暂收供应商参照回正(GFDA)+头重复行清理+计量单位列序245+存量回填;根因=sl-supplier-ref 旧编码 SL_RECV 重放0行命中 ——
+migrate-fix-qc-recv-ref-20260924.sql
+# —— 2026-09-24 kucun.ckdm 扩宽 6→200(7位仓库编码 CK0000x 入库审核截断报错;对齐 bs_wh.仓库编码宽度) ——
+migrate-kucun-ckdm-widen-20260924.sql
+# —— 2026-09-24 智能供应链+品质管理 两模块角色授权补齐(51面板;报表类只读档/单据类全权;授权行 39→282) ——
+migrate-scm-qc-perms-20260924.sql
 # —— 2026-09-23 工单明细留痕四列(旧系统 ProSchedList 对齐):bd_manu_order 补 结案人/结案时间(ManuCloseHandler 结案写入·取消结案清空)/打印人/打印时间(/px/scheduleBoard/printStamp 打印生产任务单写入);展示=工单排产看板明细列+追溯弹窗,不进 MANU_ORDER 表单 ——
 migrate-manu-close-print-stamp.sql
+# —— 2026-09-23 暂收退料单明细幽灵字段清理:yj_field 多登记 明细.规格型号(表列实为 型号)致 getFormDescriptor 500;守卫式删除,共享词条不动 ——
+migrate-qc-return-drop-ghost-spec.sql
+# —— 2026-09-24 开线管理整体下线(用户拍板):工单排产看板去开线标签/切换,setOpen 端点与 linesSummary.开线 字段删除;DROP bs_line_open(原建表脚本 migrate-line-shift-open.sql 保持原样,新库=先建后删) ——
+migrate-line-open-drop.sql
+# —— 2026-09-24 生产加工单→生产工单 改名(用户拍板):yj_panel 面板名+panel_name_en(MANU_ORDER/明细表/统计表)+老 WO_ORDER 让位「生产工单(旧版)」+panel 译名键迁移;不动 panel_code/权限/表结构/占用链 ——
+migrate-manu-rename-workorder.sql
+# —— 2026-09-24 生产工单列表字段对齐(用户清单):列表 16 列定序+非清单字段退表单+补 备注/创建时间+清重复字段行;标签不动(标签=数据键) ——
+migrate-manu-workorder-fields.sql
+# —— 2026-09-24 生产工单列表数据源切参考库 plang(用户拍板:外部系统直接写 plang,键=公司代码+工单号+工单行号):plang 补 打印人/打印时间 两列(打印生产任务单留痕,对齐 bd_manu_order 同名同义);/px/workOrderList 改查 plang+新增 printStamp/close/reassign 三端点;plang 无面板/代码引用,纯增量加列,幂等 ——
+migrate-plang-workorder.sql
+# —— 2026-09-27 bl_so_order补建「仓库名称」行级列(仓库关联改造加映射漏建列,致SO同步50/50失败)+yj_field注册+注明;幂等可重跑 ——
+migrate-so-line-whname.sql
+# —— 2026-09-27 销售订单明细行加「行号」(金蝶分录 seq 从 1 连续,对齐 bl_pu_order.行号 先例;存量回填 ROW_NUMBER;SO_ORDER 明细字段注册):订单结转页展示,转工单时工单行号 pl_xc=订单行号 同值下传 ——
+migrate-so-line-no.sql
+# —— 2026-09-27 plang 加「批次号」(转单日期 yyyyMMdd,分批转单按日期分批:不同日期=不同批次行,同日同批累加不插行;存量回填=pl_date) ——
+migrate-plang-batch.sql
+# —— 2026-09-27 快速排产切 plang 配套:lb 扩宽 nvarchar2→10字符(排产班组名写入);pending/stats/assign/unassign/today 五端点改读 plang(转工单即入池) ——
+migrate-plang-schedule.sql
+# —— 2026-09-27 工单排产看板切 plang_pc(pl_no/lb 扩宽+批次号列+已排五回填;骨架/按线明细/调线读 plang_pc×plang;快速排产排入同步落 plang_pc 薄记录) ——
+migrate-plangpc-board.sql
+# —— 2026-09-27 报工切参考库 scjl 原始口径(scjl.gd_id=plang_pc.id+gldh=pl_no,审核即 wgzt=Y 完工,弃审软删,jc_no 产线-日期-流水;入库回填 plang FIFO+scjl.post_no;已报工读侧弃 wo_progress;切炭双出口工单源改 plang) ——
+migrate-scjl-report.sql
+# —— 2026-09-27 工序报工单表化(scjl 承载 WO_REPORT/WO_REPORT_LIST 两面板:加 报工单号/直销数量 列;字段重定义指 scjl 列;审核=行内 wgzt=Y+jc_no+镜像,弃审=回空留痕;双出口/红字冲回直读 scjl;wo_report 停用为遗留表) ——
+migrate-scjl-single-table.sql
+# —— 2026-09-27 产线数据导入+工序种类(用户截图《新系统产线命名》22条:成型烧结/X烧结/切炭/组装装箱两级;bs_prod_line 加 工序种类 列可维护;PROD_LINE 面板字段注册+en 译名;存量按名称回填) ——
+migrate-prodline-import.sql
+# —— 2026-09-28 仓库档案(WH)加 库位 字段(bs_wh 加列;detail 可编辑文本;九语言译名;列注明) ——
+migrate-wh-location.sql
+
+# —— 2026-09-28 服务器侧直改结构对齐:服务器 bak 演练发现 106 列"仅服务器存在"(asp_* 审计 3/4 套件、研发板块远端列、bl_dispatch 派工数量组、yj_user 遗留宽表列);守卫式补列,服务器上=全跳过 no-op,开发两账套补齐 → 三库同构 ——
+migrate-server-parity-20260928.sql
+
+# —— 2026-09-28 数据库规范化存量清理(qc_/sl_recv 表注明 + 重复字段行 + 重建 v_sales_order_detail + PR_SCRAP 漂移字段) ——
+migrate-db-norm-cleanup.sql
+
+# —— 2026-09-28 回登记:以下脚本当初手工执行、漏登记进链(体检工具 12 号项报「清单↔文件不一致」后补齐);
+#    已核实效果确实落库(探针:GFDA 面板行+42 字段 / 基础资料 query 字段 2~3 个 / spec.test 已是 19 项目 48 行新设计),
+#    因此登记后立即 baseline 记为「已执行」,不重复执行。 ——
+migrate-restore-gfda.sql
+migrate-basedata-query-fields.sql
+migrate-spec-testlib-replace.sql
+
+# —— 2026-09-28 阶段 2:拼音/英文列名的列补中文注明(引擎字典 + 面板标签 + 遗留空列如实标注) ——
+migrate-db-norm-column-comments.sql
+
+# —— 2026-09-28 动态字段扩展:业务表备用列池(139表x20列,docs/design/动态字段扩展-备用列池-V1.0.md) ——
+migrate-spare-columns.sql
+
+# —— 2026-09-28 动态字段扩展:绑定审计表 ——
+migrate-ext-bind-log.sql
+# —— 2026-09-28 批次号纯日期化(客户拍板去尾缀):plang_pc 加 plang_id 行锚(同天多笔转单同批次号互不串;assign 删插/看板 JOIN/报工/分段已报工全改行锚);配套=余量订单级(同工单需求−累计排产)+生产状态点击弹分段排产记录(含转单时间/行级已报工) ——
+migrate-pc-plang-id.sql
+# —— 2026-09-30 来料检验单表头治理:①部门/部门名称 明细行从 header,detail 退回 detail(消表头重复,根因=chain-field-complete §④ 升格未合并);②表头行 seq 归位(业务员30/部门60/部门名称70,表格调整无 place 过滤曾把表头行 seq 连带改写成 290/300);③补登协作机侧 检验员/检验日期/检验方案/总结论 四表头字段(rebuild 清字段+align-merge 只补列未补字段行的欠账);配套 PanelConfigService.saveColumnPrefs 补 place 过滤 ——
+migrate-qcinsp-header-fix.sql
+# —— 2026-09-30 暂收退料单数量丢失修复:①qc_return 补 检验单号 列+头字段行(rebuild 血统原无,inspAutoReturn 写入被静默丢弃致溯源断链);②存量回填 行数量←link.linked_quantity(=检验行不良数量)+头检验单号←link.source_form_no(TH-0002~0004 行数量全空的欠账);配套 ButtonService.inspAutoReturn 按目标面板注册择标签写入(退货数量/数量 两血统兼容) ——
+migrate-qcreturn-srcfix.sql
+# —— 2026-09-28 库位档案面板(WHLOC/bs_wh_loc):一仓多库位一库位一仓(仓库列存仓库名称参照 bs_wh);库位编码/库位地址/停用/备注 字段注册+九语言译名;表级/系统列中文注明+备用列池;全角色默认可查;配套商品同款「二维码标签」勾选即打(二维码=仓库@库位地址@库位编码,PanelConfigService qrLabel 元数据+前端 printLocationCards) ——
+migrate-whloc.sql
+# —— 2026-09-28 台账/状况表查询弹窗过滤改编码索引(修同名多码歧义):仓库/存货参照 ref_field 改绑 仓库编码/存货编码(display 不变仍显名称;bs_inv 重名实测「端盖」24码/「PP棉」18码,按名称收窄把同名异码整批放进候选且查询按名称并流,单一性破);配套后端联动选项/台账查询改编码精确等值(不走 LIKE,编码互为子串)+前端收窄注入 filter{存货编码:[…]};汇总表非级联不动;两视图本就有编码列无需重建 ——
+migrate-ledger-code-filter.sql
+
+# —— 2026-09-28 QC_RECV 供应商 seq 归位(45,紧跟供应商代码;服务器手工修复固化防环境重建复发;配套表头映射代码改两轮收集+上限12) ——
+migrate-qcrecv-supplier-seq.sql
+# —— 2026-09-28 库位档案增加仓库编码:bs_wh_loc 加列+中文注明+存量行按仓库名称对齐 bs_wh 回填+yj_field 注册(seq15 紧跟仓库,editable=1 参与参照带回同名映射,选仓库自动带入);库位二维码首段 仓库→仓库编码(前端 locationCardQrText 同步);「仓库编码」九语言译名已全局存在不重复插 ——
+migrate-whloc-whcode.sql
+
+# —— 2026-10-14 材料出库单(领料)明细行加行号(参考销售订单 bl_so_order.行号 同口径:int 列+MS_Description+存量按单据编号分组回填 1..N+yj_field 注册 MATERIAL_OUT 明细首列 seq5 只读;译名 field/行号 9 语言全局存量不重插) —— migrate-material-out-line-no.sql
+migrate-material-out-line-no.sql
+
+# —— 2026-09-28 服务器直改对齐第二轮:23:20 bak 对比,真·服务器独有仅 bd_material_out.工单行号(int,注明);30 列同名不同型维持第一轮口径不动 ——
+migrate-server-parity2-20260928.sql
+
+# —— 2026-09-28 服务器结构收敛(本地→服务器方向):金蝶血统同名表欠账——rd_progress_detail 5 列(ButtonService 直写预计完成日期)/rd_asm_bom_detail 7 列(BOM 变更链)/erp_imp_row 审计五件套;守卫式,本地 no-op,服务器补齐 ——
+migrate-server-converge-20260928.sql
+
+# —— 2026-09-28 修 3 处「面板一打开就 500」的结构缺口(erp_imp_row 审计列 / v_wo_schedule 补 id / v_outsource_issue_detail 补面板字段) ——
+migrate-panel-runtime-cols.sql
+
+# —— 2026-09-28 P1:面板每页行数收敛(doc/flat 按单元格阶梯 ≤1500;archive 死元数据对齐 50) ——
+migrate-panel-page-size.sql
+
+# —— 2026-09-28 P1:宽表档案面板单页 50→25(配合前端 archPageSize 读配置,渲染量减半) ——
+migrate-panel-page-size-archive.sql
+
+# —— 2026-09-29 后台表定册①:未用表清理(244 张)+ 29 个已下架面板的悬空元数据回收;
+#    证据 tools/archive/_table-audit/,执行前已打全库备份 deploy\HSDZ_MES_pre_drop_<ts>.bak ——
+migrate-drop-unused-tables.sql
+
+# —— 2026-09-29 后台表定册②:在用业务表备用列池补全(45 表 x 20 列 nvarchar(500)+中文注明) ——
+migrate-spare-columns-biz.sql
+
+# —— 2026-09-29 存量债修复:yj_user 6 个遗留对齐列补中文注明 + 2 个字段标签补 en 译名
+#    (体检 03/09 项;两账套改动前快照即已 FAIL,与本次清理无关) ——
+migrate-norm-debt-20260929.sql
+
+# —— 2026-09-29 备用列注明补漏:守卫漏写 ep.class=1 导致「索引 index_id 撞列 column_id」时
+#    漏写列级注明(实测 kucun.备用1);只追加不回改历史,新库场景本脚本兜底收敛 ——
+migrate-spare-desc-fix.sql
+
+# —— 2026-09-30 「测试申请单」RD_DOM_TEST 升级为一张单三个页签(内部委托-测试申请单 /
+#    销售端-测试/检测申请表 / 委托测试汇总表,按《3.实验室使用记录表\测试申请单.xlsx》复刻):
+#    明细表加 [表区] 分块列 + 外部申请表 6 列(含中文注明)、面板改名「测试申请单」、
+#    申请单类型字典改 内部委托/销售端、字段重登记(文档编号不再登记为字段,见脚本注释)、补 en 译名 ——
+migrate-rd-test-apply.sql
+
+# —— 2026-09-30 研发管理·产品信息表 RD_PROD_INFO 两项修正(用户 2026-09-30 报障):
+#    ①「产品名称不能为空」——「产品名称」「产品类别」在 yj_field 标着 required=1,
+#      而产品信息表纸面(recordSheetConfigs.js 的 RD_PROD_INFO.sections)只渲染 14 格、
+#      不含这两个字段 ⇒ 界面上无处可填,保存必被拦(前端 validateInlineDraft 与后端
+#      ensureRequiredFilled 两层都拦)。用户口径:纸面保持现状,只把这两个字段的必填关掉。
+#    ②「产品形态」下拉要能自定义新增/删除选项 —— data_type 下拉框 → 标准库,
+#      dict_sql 由硬编码 SQL 改存库编码 prod.form;原 4 项(包布/套网/打端盖/套PP棉)
+#      按原序迁入 yj_std_lib(item_code=默认),界面走共用组件 StdLibManager 增删维护 ——
+migrate-rd-prodinfo-formlib-2026-09-30.sql
+
+# —— 2026-09-30 规格书 RD_SPEC_DOC:「编号」字段改名「产品编号」+ 消除同面板 label 重复 ——
+#    ③ 用户要「产品规格书右上角显示对应的产品编号」,而那格一直显示的是**单据编号**:
+#      业务字段名「编号」与引擎的**单据标识键**同名 —— QueryService.loadDocs 用单据号覆盖它、
+#      ButtonService.save 又把它当单号取走(该字段值因此永远落不了库)。正解是分家:
+#      字段改名 产品编号(rd_spec_doc_head.编号 列 sp_rename + yj_field 两条 header/query),
+#      配套改前端封面 coverDocNoKey/右上角编号格、dashboard 跳转键、后端三处硬编码列名
+#      (PxController.specByProduct、ButtonService.specAssign 盖章、DevTaskService 产品键)。
+#      yj_translation 的「产品编号」译名已存在(10 语言,与产品信息表同键共享),无需新增。
+#    ④ 附带修掉「日期」列 label 被标成「单据日期」造成的同面板 label 重复(既有问题):
+#      后端按 label 建行模型只取首个 ⇒ 该列成死列;fixture 重生成后才被单测抓住 ——
+migrate-rd-specdoc-prodno-2026-09-30.sql
+
+# —— 2026-09-30 功能性滤效(RD_FILTER_EFF)「样品配方」改为**每样品一格**(与 样品信息/测试装置及编号
+#    同列数;设计原表 第10行 merges C10:G10+H10:L10 与 第11行 样品信息 同一分块):
+#    头表加 样品配方1..6 列(含中文注明)+ yj_field 注册 + en 译名 + 存量单字段值兜底搬到 配方1;
+#    前端渲染与「减列清空」见 DataRecordSheet.vue + core/sheet/sampleCols.js ——
+#    ⚠ 本行由 2026-09-30 修复补回:该提交(eeccab29)落库时,本登记行恰好被并行任务的
+#      "只提交自己那一行"操作临时移出工作区,导致脚本已提交而清单漏登记(会让部署漏跑这条迁移)。
+migrate-filter-eff-formula-cols.sql
+
+# —— 2026-09-30 下架「样品编号表」RD_SAMPLE_NO(用户口径「样品编号表删掉」):
+#    删元数据三处(yj_panel / yj_field / yj_role_panel),**保留** rd_sample_no_head 与
+#    rd_sample_no_detail 两张数据表及其中数据(历史单据留档 —— 删表不可逆,而它是发号台账);
+#    代码同批清理:菜单项 + menus.test 计数(24→23)、docDefaults 默认值条目、
+#    ButtonService 的样品编号唯一性校验(ensureSampleNoUnique)与其归档面板登记;
+#    文档同批更新:数据库表清单(关联面板→已下架)、产品文件流程使用手册(删该行) ——
+migrate-drop-sample-no-panel-2026-09-30.sql
+
+# —— 2026-09-30 新建「文件负责人」角色 + 三个文件责任人账号(刘磊/柴善银/冯敏) ——
+#    需求原文(《产品开发系统需求汇总.xlsx》sheet「文件汇总表」的「产品文件流程」):
+#    5.2 成型控制要点=刘磊 / 5.3 组装控制要求=柴善银 / 5.4 出货控制计划=冯敏 —— **固定责任人**。
+#    现状:yj_user 里没有这三个人(共 10 个账号),分发弹窗候选里根本选不到 ⇒ 需求无从落地。
+#    用户口径:「建账号」(拼音账号名 / 默认初始口令 / 新建「文件负责人」角色)。
+#    ① 角色 rd_file_owner(文件负责人),面板权限由 role_code=user 整份复制;
+#    ② 账号 liulei / chaishanyin / fengmin:初始口令与既有普通账号一致 = 123456
+#       (哈希沿用 cp 的,不新造密文 —— 同 migrate-prodinfo-twolevel.sql 的既有做法) ——
+migrate-rd-file-owner-2026-09-30.sql
+
+# —— 2026-09-30 「申请修改」必填修改原因(需求 sheet「数据记录表」第2条) ——
+#    需求原文:「修改:不需要反审核,只需填写修改原因」;用户口径:「改完需要再审核」
+#    ⇒ 只在申请环节补这一格,现有「申请修改 → 管理员批 → 改 → 提交审批 → 管理员批 → 再归档」闭环不动。
+#    现状:「申请修改」在前端**没有任何输入框**,后端写进 yj_form_approval.opinion 的恒为空串,
+#    yj_doc_modify_log 也没有原因列。
+#    两列都要:yj_doc_status.modify_reason 暂存(申请 → 审批通过之间,那时的操作人是管理员,
+#    申请人填的原因必须先落住);yj_doc_modify_log.modify_reason 归档(历史快照,只读状态行
+#    会让历次修改的原因互相覆盖) ——
+migrate-rd-modify-reason-2026-09-30.sql
+
+# —— 2026-09-30 四个受控文件各加「是否受控/受控日期」(受控**按文件**) ——
+#    需求原文(sheet「文件汇总表」5.1):「规格书:保存/提交 → 提交后审批 → 审批后自动受控」;
+#    用户口径:受控按文件(问的是"按文件还是按产品",答「按文件」)。
+#    现状:四个文件面板没有任何受控字段;产品文件列表那两列是**产品级**派生
+#    (4 格全「开发完毕」⇒ 是,日期取 MAX(archived_at))—— 一个文件卡住会让另外三个
+#    已审批的文件也显示未受控。
+#    做法:四张头表各用**备用列池**的 备用1(是否受控)/备用2(受控日期)(零 DDL),
+#    归档点 ButtonService.markArchived → markFileControlled 写入;
+#    PxController.prodDocList 的受控日期改为读这两列(历史单回退 archived_at) ——
+migrate-rd-file-controlled-2026-09-30.sql
+
+# —— 2026-09-30 产品变更申请单加「变更类型」(严格变更 / 快捷变更) ——
+#    需求原文(sheet「变更」底部两行):「严格变更 = 按上述流程」/「快捷变更 = 冯总审批」。
+#    现状:**零实现**(全仓 grep 严格变更/快捷变更 0 命中;唯一沾边的「性质」字典是 变更/新增,
+#    说的是"改还是加",不是"走哪条流程")。
+#    做法:字段走**备用列池的 备用1**(零 DDL);快捷变更在 ButtonService.submitSignoff
+#    明确拒绝提交会签(直接提交审批即可);存量变更单一律补「严格变更」(它们当年走的都是含会签的流程)。
+#    ⚠ 该字段 label「变更类型」与物理列「备用1」不同名 —— changeHead() 是**按物理列名**拼 SQL 的,
+#      调用处必须传 备用1(实测传 label 会 500:列名 '变更类型' 无效) ——
+migrate-rd-change-kind-2026-09-30.sql
+
+# —— 2026-09-30 本轮新增字段标签的 en 译名(补做) ——
+#    上面那批改动新增了三个字段标签(是否受控 / 受控日期 / 变更类型)却漏了译名,
+#    数据库规范体检第 09 项(缺 en 译名,棘轮只许降不许升)因此在两账套 FAIL。
+#    口径:yj_translation(scope='field')与前端 locales/en.js 的 biz 词条成对交付;
+#    顺带把「变更类型」的两个取值(严格变更/快捷变更)也补上 —— en 界面下下拉里不该是中文 ——
+migrate-rd-newfields-i18n-2026-09-30.sql
+
+# —— 2026-09-30 数据记录表(实验室 8 张)补「审核人」+ 让陈秀丽**真能审批** ——
+#    需求原文(《产品开发系统需求汇总.xlsx》sheet「数据记录表」第 1 条):「都需要审核人(秀丽)」;
+#    用户口径:「真的能审核」(不只是纸面印字)。现状:8 张表头没有任何审核人字段,
+#    且全库 yj_role_panel.can_approve='Y' = 0 行 ⇒ 所有面板只有 admin 能审。
+#    ① 新建「研发审核」角色(rd_review)并**整份复制**普通用户角色的面板权限(79 行,换角色不缩水),
+#       8 张表 can_approve='Y';cp(陈秀丽)迁入 —— 专用角色而非给 role_code=user 勾选,
+#       避免 6 个演示账号被顺带授予真实单据的审批权;
+#    ② 8 张表登记「表单审核人」动态字段:**走备用列池的 备用1**(零 DDL,依
+#       docs/design/动态字段扩展-备用列池-V1.0.md),同批把该列中文注明改成它的新语义。
+#       列名不叫「审核人」是因为 ButtonService.save() 会 body.remove("审核人")(那是
+#       yj_doc_status.shr 的虚拟字段),QC_INSP_REC 踩过同一个坑 —— 两处同款命名 ——
+migrate-rd-datarec-reviewer-2026-09-30.sql
+
+# —— 2026-09-30 库存三表结构①:遗留表 inh/outh 重建为 MES 语义的库存流水表 ——
+#   背景(用户 2026-09-30 拍板):库存原为 kucun 单表(rkl 累计入 / ckl 累计出 / yl 余量),
+#   没有明细 ⇒ 答不出「某天的库存是多少」、结存无法对账、单笔无法更正;改为三表:
+#   inh(入库流水) + outh(出库流水) + kucun(结存缓存,流水为唯一真源),
+#   且**复用遗留表名 inh/outh**(用户明确要求"利用之前留下来的表")。
+#   老 inh/outh 是纺织行业的进货单/出货单(115/126 列、数量单位是「米/公斤」、
+#   条码是「床号-床次-扎号」),与本系统(滤芯制造,按个/支)语义冲突 ⇒ 清空重建列。
+#   ① 备份老数据到 inh_bak_20260930 / outh_bak_20260930(唯一可回退抓手,只备份一次);
+#   ② 按判据 COL_LENGTH('inh','src') IS NULL 认定旧结构 → DROP 后重建为流水表;
+#   ③ 列与 v_stock_movement 对齐:src(0 期初 / 1..4 入 / 5..8 出) + rid(来源行 id);
+#   ④ 列级 MS_Description 中文注明 17 条(逐列幂等:有则更新、无则新增);
+#   ⑤ 自检段输出结构 + 唯一索引齐备度(应为 6/6)。
+#   ⚠ 连带影响(实测):inh/outh 被 36 个纺织遗留视图(VIEW_inh/View_llrk*/View_odqty* 等;
+#     均非 SCHEMABINDING,故 DROP 不被拦)与两个遗留面板 RKD(入库单)/CKD(出库单)引用,重建后
+#     它们按旧列名的查询一律报「列名无效」;首页统计 DashboardStatsService:250-271 也读
+#     inh.inh_no/in_date、outh.outh_no/out_date(该处有 catch ⇒ 库存卡片退化为空,不 500)。
+#     RKD/CKD 菜单未挂、MES 侧不写 —— 正是《库存表清单》§5 待拍板第 3 条悬而未决的那件事,
+#     本轮按计划只重建表,不动面板元数据。
+#   ⚠ 体检后果(两账套实测,处置待拍板):第 05 项 +31(RKD/CKD 的 yj_field 孤儿行)、
+#     第 10 项 +2(两张备份表;该项棘轮 2026-09-29 已由 65 收到 0「再出现即 FAIL」)⇒ FAIL-2。
+#   ⚠ 留给任务 2 的硬约束:UX_inh_src_rid / UX_outh_src_rid 是非过滤唯一索引,而 SQL Server
+#     对唯一索引只允许**一个** NULL ⇒ 期初行(src=0, rid=NULL)只能落 1 行(实测 #temp 表插
+#     第二行 (0,NULL) 报 2601);任务 2 灌多行期初前必须先把该索引改成过滤索引
+#     (WHERE rid IS NOT NULL,实测可灌多行且仍拦得住重复的 (src,rid))。
+#   幂等可重跑(先判后建/先判后注),两个账套都执行 —— 见 db-migrations.txt 用途说明。
+migrate-stock-flow-tables-2026-09-30.sql
+
+# —— 2026-09-30 库存三表结构①b:收口任务 1 的三个副作用(用户拍板"根治,不留豁免") ——
+#   ① 索引 NULL 语义:UX_inh_src_rid / UX_outh_src_rid 由普通唯一索引改**过滤索引**
+#      (WHERE rid IS NOT NULL)。SQL Server 唯一索引只允许一个 NULL,非过滤索引下任务 2 的
+#      多行期初 (src=0, rid=NULL) 插第二行即报 2601 ⇒ 过滤索引是任务 2 的硬前提。
+#      ⚠ 用**新脚本**改,不改 migrate-stock-flow-tables-2026-09-30.sql 的字节(DbSync 按内容哈希判重跑)。
+#   ② 表级 MS_Description 中文注明(任务 1 只写了列级 17 条)。
+#   ③ 删 RKD/CKD 面板元数据:RKD(入库单)/CKD(出库单)是纺织遗留面板,line_table 指 inh/outh,
+#      31 行 yj_field 按旧纺织列名(inh_no/out_date/wzdm/lot_no/sl/ddw…)登记,重建后列不存在
+#      ⇒ 打开即报「列名无效」、体检第 05 项元数据漂移 +31;菜单早已未挂(frontend/src 无引用)
+#      ⇒ 作为孤儿元数据删除,连带清 yj_role_panel / yj_doc_status(6 行)与面板译名 yj_translation
+#      (只删「没有别的活面板还叫这个名字」的译名行,避免误伤同名的活面板)。库内无外键,删除顺序无约束。
+#   ④ 删库内备份表 inh_bak_20260930 / outh_bak_20260930:老数据已导出为
+#      tools/archive/_stock-flow-backup-20260930.csv(inh 145 行/115 列、outh 30 行/126 列,
+#      导出后逐表核对行数一致);体检第 10 项棘轮基线 2026-09-29 已收到 0「再出现即 FAIL」,
+#      留着即永久 FAIL-2。**顺序红线:先导出 CSV 并核对行数,确认无误后才跑本脚本。**
+#   ⑤ 自检段输出 9 项齐备度(索引过滤 2 + 面板/字段/单据状态已清 3 + 备份表已删 2 + 表注明 2)。
+#   幂等可重跑(先判后建/先判后删/EXISTS 兜底),两个账套都执行。
+migrate-stock-flow-index-filter-2026-09-30.sql
+
+# —— 2026-09-30 库存三表结构②:期初建账单 —— 把 kucun 现有余量落成 inh 的期初结存流水(src=0) ——
+#   为什么必须做:老系统有期初建账单(INIT_BALANCE),本系统**从来没有**
+#     (migrate-stock-ledger-open-close.sql:2-3 自述"我们无建账单")。三表结构
+#     (kucun 结存缓存 + inh/outh 流水,流水为唯一真源)一旦生效,不补期初 ⇒ 报表余量凭空为 0。
+#   硬前提:UX_inh_src_rid 必须是过滤索引(WHERE rid IS NOT NULL),已由任务 1b 的
+#     migrate-stock-flow-index-filter-2026-09-30.sql 改好;非过滤唯一索引下期初行 (src=0, rid=NULL)
+#     只能落 1 行,插第二行即报 2601。
+#   ⚠ 实施时实测出**计划原稿的三处问题**并已按实际修正(脚本头注释有详述):
+#     ① 列名:bs_inv **没有**「主计量单位」这一列(145 列实测),实际是「计量单位」;
+#        原稿的 `i.主计量单位` 会直接报「列名无效」。
+#     ② 行数翻倍:bs_wh 里 CK01..CK05 各登记了 2 行(18 行 / 13 个编码,两账套一致,仓库名称·
+#        停用·状态完全相同,id 1-5 与 14-18)。原稿两个 LEFT JOIN 会把 31 行期初灌成
+#        **61 行 / 31848**(实测),而原稿的自检是"**先把脏数据写进 inh,再报 FAIL**"。
+#        改为 OUTER APPLY + TOP 1(ORDER BY id) 一一取行(bs_inv 当前 114 行/114 编码不重复,
+#        但同样一一取行,防止它以后被导入重复编码时重演同一个坑)。
+#     ③ 生成前加**预检**(先算不写):预检不过即 RAISERROR(@msg,16,1) 中止、**不写入 inh**
+#        (INSERT 放在 ELSE 分支 ⇒ 预检不过时不可达),且失败时三组数字随错误消息报出(PRINT 会随异常丢),
+#        DbSync 判本脚本失败、不记入 yj_schema_log,下次 sync 重试;不重演"先写脏数据再报 FAIL"。
+#   自检:① 期初行数 == kucun 有效行数(额外加的闸门:合计可能恰好相等而行数被放大);
+#        ② 期初流水合计 == kucun 余量合计(允许 1 分钱);③ 金额合计同理。
+#        两账套实测:31 行 / 15939.0000 = 15939.0000 / 804998.1700 = 804998.1700(绝对差 0)。
+#   ⚠ 期初是**生成时点的一次性快照**:日后 kucun 被真实业务流水改动后重跑本脚本,自检段会打 [FAIL],
+#     属正常现象(判据是"生成当次是否一致"),不代表期初坏了。
+#   ⚠ 自检数字走 PRINT,而 **DbSync 只回显白名单外非 0 错误码的 warning,看不到 PRINT**;
+#     要看到脚本自检的真实数字,用配套探针(回显全部 warning,含错误码 0):
+#     java '-Dstdout.encoding=UTF-8' -cp tools\lib\mssql-jdbc.jar
+#       tools\archive\_verify-stock-opening-2026-09-30.java <库名> tools\migrate-stock-flow-opening-2026-09-30.sql
+#   幂等可重跑(src=0 且未作废的行已存在即整段跳过),两个账套都执行。
+migrate-stock-flow-opening-2026-09-30.sql
+
+# —— 2026-09-30 库存三表结构④:v_stock_movement 改读流水表 inh/outh(根治报表 65 秒超时) ——
+#   背景:原视图每次查询现场拼 8 路 UNION(16 张单据表 + 按名称 LEFT JOIN bs_wh),
+#   实测缓存计划 65,021 ms(RECOMPILE 42 ms),前端 axios 15s 超时。
+#   改动:视图改为读 inh/outh 两张流水表(由 StockFlowService 在审核动作时同事务写入),
+#   8 路 UNION 从根上消失 ⇒ 坏计划场景不再可能,而不是"今天的报表变快了"。
+#   列契约:23 列的名字与顺序**逐列不变**(src/rid/单据日期/单据类型/单据编号/业务类型/仓库键/
+#   仓库编码/仓库/存货编码/存货/规格型号/计量单位/批号/收入数量/发出数量/收入金额/发出单据金额/
+#   含税金额/税额/往来单位/往来单位编码/经手人),故下游 v_stock_ledger / v_stock_balance /
+#   v_stock_summary 与 InvCostService 的递归 SQL 一行都不用改;类型也刻意对齐改前宽度。
+#   ⚠ 新定义存本文件而**不动 migrate-inv-report-fields.sql**:DbSync 按内容哈希判重跑,
+#     改那个历史大脚本的字节会让它被"重跑"(历史脚本重跑会撞 schema 演进)。两处口径必须一致,
+#     改动请同步(交叉引用已写在两个脚本的头部注释里)。
+#   ⚠ 实施中实测出**计划原稿的两处错**(都是先复现再改,不是推测):
+#     ① rid 原样透传 NULL ⇒ 期初行 (src=0, rid=NULL) 撞 inv_cost_ledger 的 `rid int NOT NULL`
+#        + PK(src,rid),实测 `error 515: 不能将值 NULL 插入列 'rid'` ⇒ **成本重算整段跑不动**。
+#        正解 ISNULL(rid, id):期初没有来源单据行,用流水行自身 id 作合成键(实测插 31 行成功、
+#        (src,rid) 无重复;src 段号 inh 0..4 / outh 5..8 不重叠,两表 id 同值也不撞 PK)。
+#     ② 末尾 `LEFT JOIN bs_wh ON w.仓库名称 = m.仓库名称` ⇒ bs_wh 里「原料仓/辅料仓/成品仓/
+#        半成品仓/不良品仓」各登记 2~3 行同名(18 行仅 11 个不同名称,两账套一致)⇒ 流水行翻倍,
+#        v_stock_balance 的 SUM(数量) 直接翻倍。实测计划原稿 62 行 / 现存量 31,898 vs 流水 31 行 /
+#        15,939(正好 2 倍)。正解 OUTER APPLY(SELECT TOP 1 … ORDER BY id):三级兜底表达式原样不动,
+#        只把"按名称取一行"变成确定的一行(同任务 2 处理 bs_wh/bs_inv 重复行的写法)。
+#   口径变化(语义核心):改前视图认「单据状态='已审核' 或 单据状态2='C' 或 yj_doc_status.shr
+#   非空」三重兜底 ⇒ 金蝶旁路直写的已审核单据**进报表不进 kucun**;改后只认流水表、流水只在
+#   审核动作时写 ⇒ 口径统一为"以流水为准"。代价=流水表诞生前已审核的历史单据不进视图,
+#   两账套实测为 0(且结构性证据更强:8 张 bd_* 头表合计 0 行、库存类 yj_doc_status 0 行,
+#   而旧视图 8 个分支都是 `bl_ JOIN bd_`,故旧视图本来就查不出任何行)。
+#   ⚠ 已知信息损失(需用户拍板):含税金额/税额**恒为 NULL** —— inh/outh 没有这两列
+#     (原视图只有采购入库/销售出库两段有值)。库存台账面板(STOCK_LEDGER)这两列将一直为空;
+#     给流水表补列属任务 1 的表结构范畴,不在本脚本内。
+#   ⚠ 类型差异(两账套实测,均已记录):① 单据类型 nvarchar(6) NOT NULL → nvarchar(50) NULL,
+#     **有意放宽** —— 原宽度来自视图字面量,硬 CAST 回 6 字符会在出现更长单据类型时静默截断;
+#     ② rid int NOT NULL → int NULL,值实测恒非空(CAST 会使 SQL Server 放弃 NOT NULL 推断,
+#     实测 ISNULL(rid,id) 不 CAST 是 bigint NOT NULL、CAST 后是 int NULL,选后者:类型与契约一致);
+#     ③ 测试库 仓库 nvarchar(500) → nvarchar(200):测试库是陈旧快照,原来就与正式库(nvarchar(200))
+#     不同,改后两账套一致(收敛,非破坏)。
+#   自检:23 列 + rid 全非空 + (src,rid) 无重复 + 已不再引用 bl_purchase_in;PRINT 走 warning 码 0,
+#   **DbSync 看不到**,要看数字用配套探针(先 dry 后 check):
+#     java '-Dstdout.encoding=UTF-8' -Dbefore=<基线文件> -cp tools\lib\mssql-jdbc.jar
+#       tools\archive\_verify-stock-movement-2026-09-30.java <库名> dry|check
+#   dry 模式把本脚本跑在**事务内然后 ROLLBACK**(不留任何对象),内含"列契约逐列对比 + 三个下游视图
+#   查询 + 成本重算(递归 SQL 从 InvCostService.java 源码抽取,不手抄)+ 历史单据代价 + 计时";
+#   check 模式只读复验。两账套实测:现存量合计 15,939.0000 = kucun 余量合计 15,939.0000(绝对差 0),
+#   成本表 31 行 / 收入金额合计 804,998.1700、无成本行的流水 0。
+#   幂等可重跑(先判后 DROP、列契约不变,下游视图按名解析无需重建),两个账套都执行。
+migrate-stock-movement-from-flow-2026-09-30.sql
+
+# —— 2026-10-03 任务 7:流水表补 含税金额/税额 + v_stock_movement 透传这两列 ——
+#   问题:任务 4 把 v_stock_movement 改成读流水表时,这两列按计划写成 CAST(NULL AS decimal(18,4))
+#   ⇒ 视图查得动但**恒为 NULL**;而库存台账面板 STOCK_LEDGER 这两个字段是 visible=1
+#   ⇒ 用户会看到两列永远空白,以为坏了(数据本来有:旧视图的 采购入库/销售出库 两段取过这两列)。
+#   改动:① inh/outh 各加 [含税金额]/[税额] decimal(18,4) NULL(带列级中文注明);
+#        ② 视图这两列由 NULL 改成**透传**(列契约 23 列的名字与顺序逐字不变,只换了值来源);
+#        ③ Java:StockLedgerService.loadRows 补这两键、StockFlowService.flowCols 写这两列。
+#   口径(逐列照抄旧视图 migrate-inv-report-fields.sql §1):
+#     采购入库 含税金额 = bl_purchase_in.含税金额;税额 = 含税金额 − ISNULL(金额,单价×实收数量)
+#       (**反推** —— 实测 sys.columns:该表只有 税率%/含税单价/金额/含税金额,没有 税额 列);
+#     销售出库 含税金额 = bl_sale_out.含税销售金额(**列名不同**);税额 = bl_sale_out.税额(原样列);
+#     其余 6 段(产成品入库/其他入库/委外入库/材料出库/其他出库/委外发料)与期初:
+#       那 6 张行表本身没有这两列,旧视图这几段也是 NULL ⇒ 保持 NULL,不臆造。
+#   ⚠ 加列走**新文件**:DbSync 按内容哈希判重跑,改动已提交的 migrate-stock-flow-tables-2026-09-30.sql
+#     一个字节就会让它被"重跑"(历史脚本重跑会撞 schema 演进,踩过)。
+#   ⚠ 新视图定义与 migrate-stock-movement-from-flow-2026-09-30.sql 的定义**逐字相同**,只把那 4 处
+#     `CAST(NULL AS decimal(18,4))` 换成透传 ⇒ 两份口径必须一致,改动请同步(双方头部有交叉引用)。
+#     ⚠ 加列必须**先**于视图改动(视图引用新列),且本脚本在 DROP VIEW 前先判四列是否就位
+#       (否则视图删了建不回来,下游三个视图会直接报对象不存在)。
+#   ⚠ inh/outh 上有**过滤索引** ⇒ 脚本首行显式 SET QUOTED_IDENTIFIER ON(否则 ALTER TABLE 报 1934)。
+#   自检:4 个新列就位 + 视图仍 23 列 + **列名顺序逐字**等于契约串 + 视图定义里已无 `NULL AS decimal(18,4)`;
+#   PRINT 走 warning 码 0,**DbSync 看不到**,要看数字用配套探针(先 dry 后 check):
+#     java '-Dstdout.encoding=UTF-8' -Dbefore=<基线文件> -cp tools\lib\mssql-jdbc.jar
+#       tools\archive\_verify-stock-movement-2026-09-30.java <库名> dry tools/migrate-stock-flow-tax-cols-2026-09-30.sql
+#   端到端:e2e 探针 tools\archive\_probe-stock-flow-tax.cjs(测试账套造 采购入库/销售出库 各一张,
+#   审核后查 流水两列/视图/面板口径/勾稽,跑完清理干净)。
+#   幂等可重跑(先判后加列、先判后 DROP VIEW,下游视图按名解析无需重建),两个账套都执行。
+migrate-stock-flow-tax-cols-2026-09-30.sql
 
 # —— 2026-09-28 材料出库单(MATERIAL_OUT)接口并集补全 + 开通转ERP(对口金蝶「生产领料单」inv_pick) ——
 #   用户口径:「bl_material_out 少了一些字段,这个要转ERP的;ERP 里有哪些字段要转过去这里都要加上,

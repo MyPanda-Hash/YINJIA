@@ -53,6 +53,8 @@
         <el-table-column :label="tt('客户')" prop="客户" min-width="150" fixed show-overflow-tooltip />
         <el-table-column :label="tt('客户订单号')" prop="客户订单号" width="140" show-overflow-tooltip />
         <el-table-column :label="tt('加工单号')" prop="加工单号" width="150" show-overflow-tooltip />
+        <el-table-column :label="tt('工单行号')" prop="工单行号" width="90" sortable />
+        <el-table-column :label="tt('批次号')" prop="批次号" width="100" sortable />
         <el-table-column :label="tt('单据日期')" prop="单据日期" width="100" />
         <el-table-column :label="tt('产品编号')" prop="产品编号" width="110" show-overflow-tooltip />
         <el-table-column :label="tt('品名')" prop="品名" min-width="150" show-overflow-tooltip />
@@ -92,6 +94,8 @@
         <el-table-column :label="tt('生产线')" prop="生产线" width="110" fixed />
         <el-table-column :label="tt('排产班组')" prop="排产班组" width="100" fixed />
         <el-table-column :label="tt('加工单号')" prop="加工单号" width="150" />
+        <el-table-column :label="tt('工单行号')" prop="工单行号" width="90" sortable />
+        <el-table-column :label="tt('批次号')" prop="批次号" width="100" sortable />
         <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" />
         <el-table-column :label="tt('排产数量')" prop="排产数量" width="95" align="right" />
         <el-table-column :label="tt('每箱数量')" prop="每箱数量" width="90" align="right" />
@@ -190,7 +194,7 @@ async function assign(rows) {
   if (!param.line) { ElMessage.warning(tt('请先在顶部选择生产线')); return }
   try {
     await ElMessageBox.confirm(`${tt('确认将选中的')} ${list.length} ${tt('张加工单排入')}「${param.line}」？`,
-      tt('排产工作台'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
+      tt('快速排产'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
   } catch { return }
   try {
     const res = await request.post('/px/scheduleBoard/assign', { rows: list.map(rowParams) })

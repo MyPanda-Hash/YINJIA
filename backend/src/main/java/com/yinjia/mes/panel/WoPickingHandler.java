@@ -88,8 +88,10 @@ public class WoPickingHandler implements PanelActionHandler {
         targetHead.put("仓库", "材料仓");
         targetHead.put("领用人", context.userName());
         List<Map<String, Object>> items = new ArrayList<>();
-        for (Map<String, Object> b : bom) {
+        for (int i = 0; i < bom.size(); i++) {
+            Map<String, Object> b = bom.get(i);
             Map<String, Object> row = new LinkedHashMap<>();
+            row.put("行号", i + 1);
             row.put("材料编码", str(b.get("子件编码")));
             row.put("材料名称", str(b.get("子件名称")));
             row.put("规格型号", str(b.get("规格型号")));

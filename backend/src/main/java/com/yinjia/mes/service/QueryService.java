@@ -46,7 +46,7 @@ public class QueryService {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         Map<String, String> l2c = def.labelToCol();
         if ("flat".equals(def.mode())) return queryFlat(def, keyword, condition, l2c, pageNo, pageSize, advFilters);
-        return def.isDoc() ? queryDocs(def, keyword, condition, l2c, pageNo, pageSize)
+        return def.isDoc() ? queryDocs(def, keyword, condition, l2c, pageNo, pageSize, advFilters)
                 : queryArchive(def, keyword, condition, l2c, pageNo, pageSize);
     }
 
@@ -60,7 +60,28 @@ public class QueryService {
         String cols = selectCols(def, def.fields());
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
-        appendDirectFilters(def, def.lineTable(), where, args, keyword, condition, l2c, "t");
+        // 台账/库存状况(级联面板)的 仓库/存货 条件:参照绑定编码(migrate-ledger-code-filter.sql),
+        // 条件值=编码 → 在视图编码列上**精确等值**。不走通用 LIKE:编码互为子串
+        // (YJ-SX-004 / YJ-SX-004-1),LIKE 会把多个存货并进同一张台账,破坏「一仓一存货」单一性。
+        Map<String, Object> cond = condition;
+        if ("STOCK_LEDGER".equals(def.code()) || "STOCK_BALANCE".equals(def.code())) {
+            Object wh = condition == null ? null : condition.get("仓库");
+            Object it = condition == null ? null : condition.get("存货");
+            if ((wh != null && !String.valueOf(wh).isBlank()) || (it != null && !String.valueOf(it).isBlank())) {
+                cond = new LinkedHashMap<>(condition);
+                if (wh != null && !String.valueOf(wh).isBlank()) {
+                    where.append(" AND RTRIM(t.[仓库编码]) = ?");
+                    args.add(String.valueOf(wh).trim());
+                }
+                if (it != null && !String.valueOf(it).isBlank()) {
+                    where.append(" AND RTRIM(t.[存货编码]) = ?");
+                    args.add(String.valueOf(it).trim());
+                }
+                cond.remove("仓库");
+                cond.remove("存货");
+            }
+        }
+        appendDirectFilters(def, def.lineTable(), where, args, keyword, cond, l2c, "t");
         appendAdvFilters(advFilters, where, args, l2c, "t");
 
         Integer total = jdbc.queryForObject(
@@ -90,15 +111,16 @@ public class QueryService {
             String de = strOf(condition.get("结束日期"));
             if (!wh.isBlank() && !item.isBlank() && !ds.isBlank() && !de.isBlank()) {
                 // 期初 = 段起点前累计(视图中限 单据日期<=de 的行,取 <ds 部分;用视图暴露的收入/发出列)
+                // 仓库/存货=编码(参照绑定编码),按编码列精确匹配 —— 名称重名(「端盖」24码)会并流
                 Map<String, Object> opening = jdbc.queryForMap(
                         "SELECT ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入数量 - 发出数量 ELSE 0 END),0) AS q,"
                                 + " ISNULL(SUM(CASE WHEN 单据日期 < ? THEN 收入金额 - 发出金额 ELSE 0 END),0) AS a"
-                                + " FROM v_stock_ledger WHERE RTRIM(仓库)=? AND RTRIM(存货)=? AND 单据日期 <= ?" + hint,
+                                + " FROM v_stock_ledger WHERE RTRIM(仓库编码)=? AND RTRIM(存货编码)=? AND 单据日期 <= ?" + hint,
                         ds, ds, wh, item, de);
                 double oq = numD(opening.get("q")), oa = numD(opening.get("a"));
                 Map<String, Object> netm = jdbc.queryForMap(
                         "SELECT ISNULL(SUM(收入数量 - 发出数量),0) AS q, ISNULL(SUM(收入金额 - 发出金额),0) AS a"
-                                + " FROM v_stock_ledger WHERE RTRIM(仓库)=? AND RTRIM(存货)=? AND 单据日期 >= ? AND 单据日期 <= ?" + hint,
+                                + " FROM v_stock_ledger WHERE RTRIM(仓库编码)=? AND RTRIM(存货编码)=? AND 单据日期 >= ? AND 单据日期 <= ?" + hint,
                         wh, item, ds, de);
                 double cq = oq + numD(netm.get("q")), ca = oa + numD(netm.get("a"));
                 totalOut += 2;
@@ -206,7 +228,7 @@ public class QueryService {
 
     private Map<String, Object> queryDocs(PanelRegistry.PanelDef def, String keyword,
                                           Map<String, Object> condition, Map<String, String> l2c,
-                                          int pageNo, int pageSize) {
+                                          int pageNo, int pageSize, List<Map<String, Object>> advFilters) {
         boolean split = def.hasHeadTable();
         String docTable = split ? def.headTable() : def.lineTable();
         String g = def.groupCol();
@@ -214,6 +236,10 @@ public class QueryService {
 
         StringBuilder where = new StringBuilder("WHERE ISNULL(t.asp_cancel,'N')<>'Y'");
         List<Object> args = new ArrayList<>();
+        // 高级筛选(2026-09-24 用户要求,对齐旧系统 列表查询):单据面板同样服务端逐条 AND 过滤——
+        // 全表过滤(分页 totalSize 与导出一致),不再只做前端当前页过滤。
+        // 头行单据只认头表字段:行级字段(物料编码/产品名称…)在头表不存在的会被剔除,避免无效列报错。
+        appendAdvFiltersForDocs(def, advFilters, where, args, l2c, split);
         // 文件面板「查询单据」自定义条件:_docNo=编号模糊(单据编号/文档编号),_archFrom/_archTo=首次归档时间区间(含端点)
         Object qDocNo = condition == null ? null : condition.get("_docNo");
         Object qFrom = condition == null ? null : condition.get("_archFrom");
@@ -549,6 +575,27 @@ public class QueryService {
      * 另行聚合,不受这里影响(与 keyword 同款行为)。
      * 字段标签在本面板找不到列(改过名/来自别的面板)→ 跳过该行而非报错,避免旧查询方案打不开面板。
      */
+    /**
+     * 单据面板的高级筛选:头行单据仅放行「头表字段」(place=header/query 的标签),其余剔除;
+     * 非头行单据(单表)全放行。算子/取值语义与平表完全相同(见 {@link #appendAdvFilters})。
+     */
+    private void appendAdvFiltersForDocs(PanelRegistry.PanelDef def, List<Map<String, Object>> advFilters,
+                                         StringBuilder where, List<Object> args, Map<String, String> l2c,
+                                         boolean split) {
+        if (advFilters == null || advFilters.isEmpty()) return;
+        List<Map<String, Object>> allow = advFilters;
+        if (split) {
+            java.util.Set<String> headLabels = new java.util.HashSet<>();
+            for (PanelRegistry.FieldDef f : def.fieldsAt("header")) headLabels.add(f.label());
+            for (PanelRegistry.FieldDef f : def.fieldsAt("query")) headLabels.add(f.label());
+            allow = new ArrayList<>();
+            for (Map<String, Object> f : advFilters) {
+                if (f != null && headLabels.contains(strOf(f.get("field")))) allow.add(f);
+            }
+        }
+        appendAdvFilters(allow, where, args, l2c, "t");
+    }
+
     private void appendAdvFilters(List<Map<String, Object>> advFilters, StringBuilder where,
                                   List<Object> args, Map<String, String> l2c, String alias) {
         if (advFilters == null || advFilters.isEmpty()) return;

@@ -107,9 +107,12 @@ public class QcCatalogService {
                         nv(category), nv(invName), nv(qty), nv(unit), nv(curBatch), nv(recNo), user, existId);
             } else {
                 recNo = createInspRecord(invName, invCode, qty, unit, inspDate, user);
+                // 列序:…,计量单位,检验状态,是否合格,检验单号,检验数据记录单号,asp_user1,asp_time1
+                // ⇒ 检验状态=ST_DOING(正在检验中)、是否合格=NULL(未判定) —— 原实现把 NULL 写在检验状态位、
+                //    且少一个 ?(10 占位 vs 11 参数)致 "index 11 out of range"(2026-09-24 修,口径同存量数据)
                 jdbc.update("INSERT INTO qc_catalog_detail (单据编号, 检测物料类别, 物料名称, 物料编码, 批次号, 数量, 计量单位,"
                         + " 检验状态, 是否合格, 检验单号, 检验数据记录单号, asp_user1, asp_time1)"
-                        + " VALUES (?,?,?,?,?,?,?,NULL,?,?,?,GETDATE())",
+                        + " VALUES (?,?,?,?,?,?,?,?,NULL,?,?,?,GETDATE())",
                         catalogNo, nv(category), nv(invName), nv(invCode), nv(curBatch), nv(qty), nv(unit),
                         ST_DOING, inspNo, nv(recNo), user);
             }
@@ -178,9 +181,11 @@ public class QcCatalogService {
         String no = formNoService.next(REC_PREFIX, user);
         String date = LocalDate.now().toString();
         // 来料数量 = 数量+单位拼合(用户口径:合在一起);计量单位列仅作链路(界面隐藏)
+        // 列序:单据编号,单据日期,物料名称,物料编码,物料批次(NULL),检验日期,来料数量,计量单位,文件编码,检验依据,检验人,表单审核人,asp_user1,asp_time1
+        // ⇒ 12 个 ? 对应 11 个业务参数 + user(asp_user1);原实现少一个 ? 致 "index 12 out of range"(2026-09-24 修)
         jdbc.update("INSERT INTO qc_insp_rec (单据编号, 单据日期, 物料名称, 物料编码, 物料批次, 检验日期, 来料数量, 计量单位,"
                 + " 文件编码, 检验依据, 检验人, 表单审核人, asp_user1, asp_time1)"
-                + " VALUES (?,?,?,?,NULL,?,?,?,?,?,?,?,GETDATE())",
+                + " VALUES (?,?,?,?,NULL,?,?,?,?,?,?,?,?,GETDATE())",
                 no, date, nv(invName), nv(invCode), nv(inspDate.isBlank() ? date : inspDate), nv(qty), nv(unit),
                 REC_DOC_CODE, REC_BASIS, user, REC_REVIEWER, user);
         mergeStatus(REC_PANEL, no, user, true);

@@ -1,4 +1,5 @@
-/* 参照字段双模 UI 验证:KHDA(24 行,超20应出现下拉) vs CKDA(22 行,也超20) */
+/* 参照字段双模 UI 验证:KHDA(24 行,超20应出现下拉) vs CKDA(22 行,也超20)
+   2026-09-30:第三个面板原为 RKD(入库单),该纺织遗留面板元数据已删除 ⇒ 换成 SO_ORDER */
 const { spawn } = require('node:child_process')
 const fs = require('node:fs')
 const os = require('node:os')
@@ -30,7 +31,7 @@ async function main() {
     const navigate = async (url) => { await send('Page.navigate', { url }); for (let i=0;i<40;i++) { await sleep(300); if (await evaluate('document.readyState')==='complete') { await sleep(800); return } } }
     await send('Page.enable'); await send('Runtime.enable')
 
-    for (const panel of ['KHDA', 'CKDA', 'RKD']) {
+    for (const panel of ['KHDA', 'CKDA', 'SO_ORDER']) {
       await navigate('http://localhost:5173/#/login')
       await evaluate(`localStorage.setItem('mes_token', ${JSON.stringify(login.data.token)}); localStorage.setItem('mes_user', ${JSON.stringify(JSON.stringify(user))}); 'ok'`)
       await navigate('about:blank')

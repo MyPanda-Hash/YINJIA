@@ -1,0 +1,32 @@
+[
+ {
+  "col": "供应商编码",
+  "f": "migrate-kingdee-order-align.sql",
+  "stmt": "INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible)\r\n    VALUES ('PU_ORDER', N'供应商编码', N'供应商编码', N'文本', N'header', 45, 110, 1, 0, 0, 1);"
+ },
+ {
+  "col": "备注",
+  "f": "migrate-kingdee-order-align.sql",
+  "stmt": "INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible)\r\n    VALUES ('PU_ORDER', N'备注', N'备注', N'文本', N'detail', 160, 200, 1, 0, 0, 1);"
+ },
+ {
+  "col": "数量2",
+  "f": "migrate-align-fields-20260924.sql",
+  "stmt": "INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible)\n  VALUES ('PU_ORDER', N'数量2', N'数量2', N'小数', NULL, NULL, NULL, NULL, N'detail', 55, 90, 1, 0, 0, 1);"
+ },
+ {
+  "col": "计量单位2",
+  "f": "migrate-align-fields-20260924.sql",
+  "stmt": "INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible)\n  VALUES ('PU_ORDER', N'计量单位2', N'计量单位2', N'文本', NULL, NULL, NULL, NULL, N'detail', 57, 90, 1, 0, 0, 1);"
+ },
+ {
+  "col": "折扣%",
+  "f": "migrate-kingdee-order-align.sql",
+  "stmt": "INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible)\r\n    VALUES ('PU_ORDER', N'折扣%', N'折扣%', N'小数', N'detail', 145, 80, 1, 0, 0, 1);"
+ },
+ {
+  "col": "折扣金额",
+  "f": "migrate-kingdee-order-align.sql",
+  "stmt": "INSERT INTO yj_field (panel_code, col_name, label, data_type, place, seq, width, editable, required, hidden, visible)\r\n    VALUES ('PU_ORDER', N'折扣金额', N'折扣金额', N'小数', N'detail', 147, 90, 1, 0, 0, 1);"
+ }
+]
