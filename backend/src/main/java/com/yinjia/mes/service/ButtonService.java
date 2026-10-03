@@ -93,9 +93,11 @@ public class ButtonService {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         return switch (buttonName == null ? "" : buttonName) {
             case "刷新" -> new HashMap<>();
-            case "保存", "提交", "保存新增" -> save(def, formData == null ? new HashMap<>() : formData, true);
-            case "保存为草稿" -> save(def, formData == null ? new HashMap<>() : formData, false);
-            case "新增流程", "新增" -> save(def, formData == null ? new HashMap<>() : formData, false);
+            // buttonParam 透传:档案面板保存需客户端声明「本次提交是否覆盖整档」——
+            // 见 saveArchive 的误删护栏(2026-10-03:商品面板带筛选保存一次软删 3873 行)。
+            case "保存", "提交", "保存新增" -> save(def, formData == null ? new HashMap<>() : formData, true, buttonParam);
+            case "保存为草稿" -> save(def, formData == null ? new HashMap<>() : formData, false, buttonParam);
+            case "新增流程", "新增" -> save(def, formData == null ? new HashMap<>() : formData, false, buttonParam);
             case "审核" -> audit(def, formData);
             case "弃审" -> unaudit(def, formData);
             // 审批流(照搬 light-mes:草稿→提交审批→审批中→通过/驳回;弃审全留痕)
@@ -222,6 +224,13 @@ public class ButtonService {
     @Transactional
     @SuppressWarnings("unchecked")
     public Map<String, Object> save(PanelRegistry.PanelDef def, Map<String, Object> formData, boolean markSaved) {
+        return save(def, formData, markSaved, null);
+    }
+
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> save(PanelRegistry.PanelDef def, Map<String, Object> formData, boolean markSaved,
+                                    Map<String, Object> buttonParam) {
         String user = currentUserName();
         Map<String, Object> body = new LinkedHashMap<>(formData == null ? Map.of() : formData);
         Object detailObj = body.remove("detail");
@@ -278,7 +287,18 @@ public class ButtonService {
         if (def.isDoc()) {
             return saveDoc(def, body, items, no, user, markSaved);
         }
-        return saveArchive(def, items, user);
+        // 档案面板:客户端声明「内存里就是整档」才允许按缺席行软删(前端仅在无关键字/无字段条件
+        // 且加载行数=后端总数时声明 档案全量=true)。缺声明=保守,只 upsert 不删。
+        boolean archiveFullLoad = buttonParam != null && truthy(buttonParam.get("档案全量"));
+        return saveArchive(def, items, user, archiveFullLoad);
+    }
+
+    /** 宽松布尔:true/"true"/"Y"/1 都算真(前端 boolean 与字符串两种来源都要认) */
+    private static boolean truthy(Object v) {
+        if (v == null) return false;
+        if (v instanceof Boolean b) return b;
+        String s = String.valueOf(v).trim();
+        return "true".equalsIgnoreCase(s) || "Y".equalsIgnoreCase(s) || "1".equals(s);
     }
 
     /** 单据保存:头字段并入每行(单表式)或分别写头表/行表(头行式);无编号=新建 */
@@ -893,8 +913,19 @@ public class ButtonService {
         }
     }
 
-    /** 档案保存:整份明细 upsert(插入回填自增 id),缺席行软删 */
-    private Map<String, Object> saveArchive(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String user) {
+    /**
+     * 档案保存:整份明细 upsert(插入回填自增 id),缺席行软删。
+     *
+     * <p>🔴 误删护栏(2026-10-03 事故):档案面板的列表查询**带条件**(表头查询字段 condition /
+     * 模糊搜索 keyword / 高级筛选)时,后端只返回**符合条件的子集**,而前端把内存里的行当整档提交
+     * ⇒ 缺席行软删会把"没被筛出来"的行全删掉。实测:正式库「商品」面板一次保存软删 3873/3874 行
+     * (yj_archive_change_log id=8 removedRows=3873),金蝶同步按外部指纹跳过未变更商品,
+     * 不会自愈。故:缺席行软删**必须**由客户端显式声明 {@code 档案全量=true}
+     * (前端仅在「无关键字 + 无字段条件 + 加载行数=后端总数」时声明)。
+     * 未声明时只 upsert 提交行,不动其它行,并在返回里带 {@code 未全量跳过软删} 提示前端。
+     */
+    private Map<String, Object> saveArchive(PanelRegistry.PanelDef def, List<Map<String, Object>> items, String user,
+                                            boolean archiveFullLoad) {
         // 数据量护栏(2026-09-16):档案保存=全量 upsert(缺席行=已删除);库里存活行数一旦超出
         // 全量加载上限,前端看到的就是截断数据,此时放行保存会把未加载的行全部误删——直接拒绝
         Integer live = jdbc.queryForObject(
@@ -917,8 +948,10 @@ public class ButtonService {
                 if (newId != null) liveIds.add(newId);
             }
         }
-        // 档案缺席行 = 已删除 -> 全表软删不在 keepIds 的存活行(全部缺席时不清理,防止误清整档)
-        if (!liveIds.isEmpty()) {
+        // 档案缺席行 = 已删除 -> 全表软删不在 keepIds 的存活行(全部缺席时不清理,防止误清整档;
+        // 客户端未声明「档案全量」时不软删,只 upsert —— 见方法头误删护栏)
+        Map<String, Object> out = result(def.name(), "启用");
+        if (archiveFullLoad && !liveIds.isEmpty()) {
             StringBuilder sql = new StringBuilder("UPDATE " + def.lineTable()
                     + " SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE() WHERE ISNULL(asp_cancel,'N')<>'Y'");
             List<Object> args = new ArrayList<>(List.of(user));
@@ -926,9 +959,18 @@ public class ButtonService {
                     .append(String.join(",", liveIds.stream().map(x -> "?").toList())).append(")");
             args.addAll(liveIds);
             jdbc.update(sql.toString(), args.toArray());
+        } else if (!liveIds.isEmpty()) {
+            // 未声明整档:统计"本会被删掉"的行数,交前端提示(不改库)
+            Integer wouldRemove = jdbc.queryForObject("SELECT COUNT(*) FROM " + def.lineTable()
+                    + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND " + def.pkCol() + " NOT IN ("
+                    + String.join(",", liveIds.stream().map(x -> "?").toList()) + ")", Integer.class,
+                    liveIds.toArray());
+            if (wouldRemove != null && wouldRemove > 0) {
+                out.put("未全量跳过软删", wouldRemove);
+            }
         }
-        recordArchiveChange(def, before, items, liveIds, user);
-        return result(def.name(), "启用");
+        recordArchiveChange(def, before, items, liveIds, user, archiveFullLoad);
+        return out;
     }
 
     /** 标签键 -> 列名键(仅取字段定义内的列,忽略 id/__no 等保留键)。
@@ -4376,9 +4418,12 @@ public class ButtonService {
         return out;
     }
 
-    /** 存档后写一条修改记录(无变化不写;字段级变化最多 80 条,超出置 truncated) */
+    /** 存档后写一条修改记录(无变化不写;字段级变化最多 80 条,超出置 truncated)。
+     *  {@code softDeleteApplied=false}(客户端未声明整档)时,缺席行**没有真的被删**——
+     *  留痕里改记 {@code skippedRemovedRows},避免"记录说删了 3873 行、库里其实还在"的错账。 */
     private void recordArchiveChange(PanelRegistry.PanelDef def, Map<Object, Map<String, String>> before,
-                                     List<Map<String, Object>> items, Set<Object> liveIds, String user) {
+                                     List<Map<String, Object>> items, Set<Object> liveIds, String user,
+                                     boolean softDeleteApplied) {
         if (def.isDoc() || def.lineTable() == null) return;
         List<Map<String, Object>> changes = new ArrayList<>();
         List<String> addedSamples = new ArrayList<>(), changedSamples = new ArrayList<>(), removedSamples = new ArrayList<>();
@@ -4428,10 +4473,12 @@ public class ButtonService {
         if (addedRows + changedRows + removedRows == 0) return; // 空存不留痕
         Map<String, Object> meta = new LinkedHashMap<>();
         meta.put("addedRows", addedRows);
-        meta.put("removedRows", removedRows);
+        // 未全量(未声明整档)时缺席行不作软删 ⇒ 留痕记 0,另记 skippedRemovedRows 供追溯
+        meta.put("removedRows", softDeleteApplied ? removedRows : 0);
+        if (!softDeleteApplied && removedRows > 0) meta.put("skippedRemovedRows", removedRows);
         meta.put("changedRows", changedRows);
         meta.put("addedSamples", addedSamples);
-        meta.put("removedSamples", removedSamples);
+        meta.put(softDeleteApplied ? "removedSamples" : "skippedSamples", removedSamples);
         meta.put("changedSamples", changedSamples);
         if (truncated) meta.put("truncated", true);
         jdbc.update("INSERT INTO yj_archive_change_log (panel_code, doc_no, user_name, saved_at, change_meta, changes)"

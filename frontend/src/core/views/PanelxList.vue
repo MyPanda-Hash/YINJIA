@@ -2353,6 +2353,27 @@ function onQueryDialogClose() {
 const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === true)
 /** 单据面板(头行/单表单据):既非报表平表、也非档案单单据 → 高级筛选走服务端(2026-09-24) */
 const docPanel = computed(() => !reportMode.value && !singleDocMode.value)
+/**
+ * 档案「整档已加载」标记(2026-10-03 误删事故护栏)。
+ *
+ * 档案面板保存语义 = 整表 upsert(缺席行=已删除),可列表查询带条件时后端只回**子集**;
+ * 把子集当整档提交就会把没被筛出来的行全删掉 —— 实测:「商品」面板带筛选保存一次软删
+ * 3873/3874 行(yj_archive_change_log id=8)。故:只有「无关键字 + 无字段条件 + 无高级筛选
+ * + 后端返回行数=总数」时才算整档,保存才向后端声明 `档案全量`,
+ * 后端 ButtonService.saveArchive 据此才允许缺席行软删;带筛选保存 = 只更新已加载的行。
+ */
+const archiveFullLoad = ref(false)
+function countArchiveRows(docs) {
+  let n = 0
+  for (const d of docs || []) {
+    for (const v of Object.values(d?.detail || {})) if (Array.isArray(v)) n += v.length
+  }
+  return n
+}
+/** 保存按钮的档案声明参数(非整档时不下发,后端保守只 upsert) */
+function archiveFullParam() {
+  return archiveFullLoad.value ? { 档案全量: true } : {}
+}
 const reportPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
 const reportPeriod = computed(() => {
   const start = condition['开始日期']
@@ -5260,12 +5281,16 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
   inlineSaving.value = true
   const documentNo = cur.value['编号']
   try {
-    await engine.callButton({
+    const res = await engine.callButton({
       panelCode: panelCode.value,
       buttonName,
       formData: currentFormData({ ...(cur.value.detail || {}) }),
-      buttonParam: {},
+      buttonParam: archiveFullParam(),
     })
+    // 档案带筛选保存:后端保守跳过缺席行软删(不会误删未显示的行),此处如实告知
+    if (res && Number(res['未全量跳过软删']) > 0) {
+      ElMessage.warning(tt('当前列表带筛选，本次保存只更新已加载的行，未显示的行不会被删除'))
+    }
     await load()
     const index = list.value.findIndex((item) => item['编号'] === documentNo)
     if (index >= 0) curIdx.value = index
@@ -6486,7 +6511,7 @@ async function onButton(action) {
         panelCode: panelCode.value,
         buttonName: '保存',
         formData: { ...head, 编号: cur.value['编号'], detail: { ...(cur.value.detail || {}), [key]: remain } },
-        buttonParam: {},
+        buttonParam: archiveFullParam(),
       })
       ElMessage.success('已删除 ' + delSel.value.length + ' 行')
       delMode.value = false
@@ -6766,6 +6791,15 @@ async function load(clamping = false) {
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
     list.value = res.list || []
     total.value = res.totalSize || 0
+    // 档案整档判定:见 archiveFullLoad 注释(带筛选/未加载全 = 不声明,保存不做缺席软删)
+    const condBlank = Object.values(condition).every(
+      (v) => v === null || v === undefined || String(v).trim() === '',
+    )
+    archiveFullLoad.value = singleDocMode.value
+      && !params.keyword
+      && !(params.advFilters && params.advFilters.length)
+      && condBlank
+      && countArchiveRows(res.list) >= total.value
     // 页码越界自愈(末页删单/换每页条数/筛选后页码残留):回落到最后一页重取,避免空白页与页码错乱
     const lp = Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize)))
     if (!clamping && query.pageNo > lp) {

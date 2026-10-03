@@ -2811,6 +2811,10 @@ export default {
     '数据日期': 'Data date',
     '产出/日产能上限': 'output / daily capacity limit',
     '未配日产能上限，请在产线档案维护': 'No daily capacity limit set — maintain it in the production line archive',
+
+    // 档案面板保存误删护栏(2026-10-03:商品面板带筛选保存一次软删 3873 行)
+    '当前列表带筛选，本次保存只更新已加载的行，未显示的行不会被删除':
+      'The list is filtered — this save updates the loaded rows only; rows not shown will not be deleted',
   },
 
 }
