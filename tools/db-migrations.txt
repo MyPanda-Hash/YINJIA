@@ -1772,3 +1772,30 @@ migrate-rd-newfields-i18n-2026-09-30.sql
 #       列名不叫「审核人」是因为 ButtonService.save() 会 body.remove("审核人")(那是
 #       yj_doc_status.shr 的虚拟字段),QC_INSP_REC 踩过同一个坑 —— 两处同款命名 ——
 migrate-rd-datarec-reviewer-2026-09-30.sql
+
+# —— 2026-09-30 库存三表结构①:遗留表 inh/outh 重建为 MES 语义的库存流水表 ——
+#   背景(用户 2026-09-30 拍板):库存原为 kucun 单表(rkl 累计入 / ckl 累计出 / yl 余量),
+#   没有明细 ⇒ 答不出「某天的库存是多少」、结存无法对账、单笔无法更正;改为三表:
+#   inh(入库流水) + outh(出库流水) + kucun(结存缓存,流水为唯一真源),
+#   且**复用遗留表名 inh/outh**(用户明确要求"利用之前留下来的表")。
+#   老 inh/outh 是纺织行业的进货单/出货单(115/126 列、数量单位是「米/公斤」、
+#   条码是「床号-床次-扎号」),与本系统(滤芯制造,按个/支)语义冲突 ⇒ 清空重建列。
+#   ① 备份老数据到 inh_bak_20260930 / outh_bak_20260930(唯一可回退抓手,只备份一次);
+#   ② 按判据 COL_LENGTH('inh','src') IS NULL 认定旧结构 → DROP 后重建为流水表;
+#   ③ 列与 v_stock_movement 对齐:src(0 期初 / 1..4 入 / 5..8 出) + rid(来源行 id);
+#   ④ 列级 MS_Description 中文注明 17 条(逐列幂等:有则更新、无则新增);
+#   ⑤ 自检段输出结构 + 唯一索引齐备度(应为 6/6)。
+#   ⚠ 连带影响(实测):inh/outh 被 36 个纺织遗留视图(VIEW_inh/View_llrk*/View_odqty* 等;
+#     均非 SCHEMABINDING,故 DROP 不被拦)与两个遗留面板 RKD(入库单)/CKD(出库单)引用,重建后
+#     它们按旧列名的查询一律报「列名无效」;首页统计 DashboardStatsService:250-271 也读
+#     inh.inh_no/in_date、outh.outh_no/out_date(该处有 catch ⇒ 库存卡片退化为空,不 500)。
+#     RKD/CKD 菜单未挂、MES 侧不写 —— 正是《库存表清单》§5 待拍板第 3 条悬而未决的那件事,
+#     本轮按计划只重建表,不动面板元数据。
+#   ⚠ 体检后果(两账套实测,处置待拍板):第 05 项 +31(RKD/CKD 的 yj_field 孤儿行)、
+#     第 10 项 +2(两张备份表;该项棘轮 2026-09-29 已由 65 收到 0「再出现即 FAIL」)⇒ FAIL-2。
+#   ⚠ 留给任务 2 的硬约束:UX_inh_src_rid / UX_outh_src_rid 是非过滤唯一索引,而 SQL Server
+#     对唯一索引只允许**一个** NULL ⇒ 期初行(src=0, rid=NULL)只能落 1 行(实测 #temp 表插
+#     第二行 (0,NULL) 报 2601);任务 2 灌多行期初前必须先把该索引改成过滤索引
+#     (WHERE rid IS NOT NULL,实测可灌多行且仍拦得住重复的 (src,rid))。
+#   幂等可重跑(先判后建/先判后注),两个账套都执行 —— 见 db-migrations.txt 用途说明。
+migrate-stock-flow-tables-2026-09-30.sql
