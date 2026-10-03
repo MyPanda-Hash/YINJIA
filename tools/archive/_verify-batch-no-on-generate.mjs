@@ -131,6 +131,40 @@ try {
   ok(N(led?.batch_no) === EXPECT, `批次台账 batch_no 生单即写入 = ${EXPECT}(实得 ${JSON.stringify(led?.batch_no)})`);
   ok(N(led?.status) === 'ACTIVE', `批次台账 status=ACTIVE(生单即有号,不再有"待编号 PENDING";实得 ${led?.status})`);
 
+  // ============ ③b 生单时**人工改号**(用户口径「在生单时批次号就可以修改」)============
+  console.log('\n=== ③b 生单时传人工批次号(对话框里改的号) → 按它落库(头+行+台账) ===');
+  const MANUAL = `人工-${TODAY}-乙`;
+  const gen2 = await post('/px/batchFlow/generate', {
+    sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no,
+    lines: [{ lineKey: pick.line.lineKey, qty: 3 }], batchNo: MANUAL,
+  });
+  const recv2 = N(gen2['编号']);
+  created.push(['QC_RECV', recv2]);
+  ok(N(gen2['批次号']) === MANUAL, `生单接口回显人工号 = ${MANUAL}(实得 ${JSON.stringify(gen2['批次号'])})`);
+  const r2 = await one(`SELECT
+    (SELECT [批次号] FROM sl_recv WHERE 单据编号=N'${recv2}') h,
+    (SELECT COUNT(*) FROM sl_recv_detail WHERE 单据编号=N'${recv2}' AND ISNULL(asp_cancel,'N')<>'Y') n,
+    (SELECT COUNT(*) FROM sl_recv_detail WHERE 单据编号=N'${recv2}' AND ISNULL(asp_cancel,'N')<>'Y' AND [批次号]=N'${MANUAL}') hit,
+    (SELECT batch_no FROM yj_doc_batch WHERE id=${Number(gen2['批次键'] || 0)}) led`);
+  ok(N(r2?.h) === MANUAL, `人工号落在**单头**(实得 ${JSON.stringify(r2?.h)})`);
+  ok(Number(r2?.n) > 0 && Number(r2?.hit) === Number(r2?.n), `人工号落在**全部明细行**(${r2?.hit}/${r2?.n})`);
+  ok(N(r2?.led) === MANUAL, `人工号落在**批次台账**(实得 ${JSON.stringify(r2?.led)})`);
+  // 空串/纯空白 = "没改" → 仍按公式取号(不能因为传了空就把号弄丢)
+  const gen3 = await post('/px/batchFlow/generate', {
+    sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no,
+    lines: [{ lineKey: pick.line.lineKey, qty: 2 }], batchNo: '   ',
+  });
+  const recv3 = N(gen3['编号']);
+  created.push(['QC_RECV', recv3]);
+  ok(N(gen3['批次号']) === EXPECT, `传空白批次号 → 退回按公式取号 ${EXPECT}(实得 ${JSON.stringify(gen3['批次号'])})`);
+  // 清掉这两张,不干扰后续链路(占用释放后才能继续送料)
+  for (const no of [recv3, recv2]) {
+    try { await cb('QC_RECV', '删除', { 编号: no }); } catch (e) { info(`清理 ${no} 跳过:${String(e.message).slice(0, 80)}`); }
+    const i = created.findIndex((c) => c[1] === no);
+    if (i >= 0) created.splice(i, 1);
+  }
+  info(`已清理两张人工号测试单(${recv2} / ${recv3}),占用已释放`);
+
   // ============ 草稿态可改:改单头 → 明细行跟着一致 ============
   console.log('\n=== ④ 草稿态可改:改**单头**批次号 → 全部明细行随单头一致 ===');
   const EDITED = `${suffix || 'X'}-${TODAY}-改`;
@@ -164,7 +198,22 @@ try {
   ok(N(afterLock?.h) === EXPECT, `审核后批次号未被改动仍 = ${EXPECT}(保存被拒理由:${lockMsg})`);
 
   // ============ 下游继承:检验单 ============
-  console.log('\n=== ⑥ 送料暂收→来料检验 生单:批次号**继承**(不重新取号) ===');
+  console.log('\n=== ⑥ 送料暂收→来料检验 生单:批次号**继承**(不重新取号,也不接受覆盖) ===');
+  // 6a) 带一个"不该生效"的 batchNo 走同一跳:来源单(暂收单)已有号 ⇒ 必须继承,忽略覆盖
+  const recvLineId = Number((await one(`SELECT TOP 1 id FROM sl_recv_detail
+    WHERE 单据编号=N'${recv}' AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id`))?.id || 0);
+  const genX = await post('/px/batchFlow/generate', {
+    sourcePanel: 'QC_RECV', targetPanel: 'QC_INSP', sourceNo: recv,
+    lines: [{ lineKey: `${recv}#${recvLineId}`, qty: 5 }], batchNo: `不该生效-${TODAY}`,
+  });
+  const inspX = N(genX['编号']);
+  if (inspX) {
+    const bx = await one(`SELECT [批次号] b FROM qc_insp WHERE 单据编号=N'${inspX}'`);
+    ok(N(bx?.b) === EXPECT,
+      `下游跳忽略传入的覆盖号,仍继承上游 ${EXPECT}(实得 ${JSON.stringify(bx?.b)})`);
+    for (const b of ['删除']) { try { await cb('QC_INSP', b, { 编号: inspX }); } catch (e) { info(`清理 ${inspX} 跳过:${String(e.message).slice(0, 80)}`); } }
+  } else { ok(false, '下游跳未生成检验单,无法验证"忽略覆盖"'); }
+  // 6b) 正常走按钮生单
   insp = N((await cb('QC_RECV', '生成来料检验单', { 编号: recv }))['编号']);
   created.push(['QC_INSP', insp]);
   const inspRow = await one(`SELECT [批次号] b, [批次键] k FROM qc_insp WHERE 单据编号=N'${insp}'`);

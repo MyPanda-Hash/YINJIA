@@ -417,7 +417,12 @@ public class PxController {
         return ApiResult.ok(pushGenerateHandler.batchLines(sourcePanel, targetPanel, sourceNo));
     }
 
-    /** 分批送料:按行「本次送料数量」生成一张下游草稿(自动取批次号 + 按量占用 + 写批次台账) */
+    /**
+     * 分批送料:按行「本次送料数量」生成一张下游草稿(生单即取批次号 + 按量占用 + 写批次台账)。
+     * body.batchNo = **生单对话框里人工填/改的批次号**(可选;2026-10-04 用户口径「在生单时批次号就可以修改」)
+     * —— 只在链路头一跳(采购订单→送料暂收单,此时来源单还没有号)生效,留空则按
+     * 「供应商编码去掉 YJ- 前缀 + - + 当天 yyyyMMdd」自动取号;下游各跳一律继承上游的号,忽略该值。
+     */
     @PostMapping("/batchFlow/generate")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> batchFlowGenerate(@RequestBody Map<String, Object> body) {
@@ -442,7 +447,8 @@ public class PxController {
                         : SecurityContextHolder.getContext().getAuthentication().getName(),
                 qtyByLine,
                 body.get("overRatio") == null || String.valueOf(body.get("overRatio")).isBlank() ? null
-                        : Double.parseDouble(String.valueOf(body.get("overRatio"))));
+                        : Double.parseDouble(String.valueOf(body.get("overRatio"))),
+                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")));
         return ApiResult.ok(res);
     }
 

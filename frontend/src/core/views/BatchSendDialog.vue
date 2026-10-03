@@ -6,7 +6,8 @@
        (此前只按数量过滤、勾选形同虚设 → 只勾一行也会全部生单)。
        批次号(2026-10-04 口径):**生单这一刻就定号** —— 供应商编码去掉 YJ- 前缀 + `-` + 当天 yyyyMMdd
        (如 YJ-TX ⇒ TX-20260910),随后沿 暂收 → 检验 → 入库 逐站继承,不再有"入库审核取号回填";
-       服务端 batchFlowLines 已按同一公式预告本批号(nextBatchNo),这里直接显示。 -->
+       服务端 batchFlowLines 已按同一公式预告本批号(nextBatchNo),这里**预填并允许当场修改**
+       (用户口径「在生单时批次号就可以修改」),确定后按输入框里的号落库。 -->
   <el-dialog
     :model-value="modelValue"
     :title="tt('分批送料') + ' · ' + sourceNo"
@@ -19,7 +20,25 @@
     <div v-loading="loading" class="bsd">
       <div class="bsd-bar">
         <span class="bsd-chip">{{ tt('采购订单') }}: {{ sourceNo }}</span>
-        <span class="bsd-chip">{{ tt('批次号') }}: <b>{{ nextBatchNo || tt('生单时按供应商编码与当天日期生成') }}</b></span>
+        <!-- 批次号(2026-10-04 用户口径「在生单时批次号就可以修改」):按「供应商编码去掉 YJ- 前缀 + - + 当天」
+             预填(服务端 batchFlowLines 的 nextBatchNo,与生单同源),**这里就能改**,确定后按此号落库;
+             清空则后端按公式重新取号;「恢复默认」把人工值退回预填值。 -->
+        <span class="bsd-chip bsd-batch">
+          {{ tt('批次号') }}:
+          <el-input
+            v-model="batchNo"
+            size="small"
+            class="bsd-batch-inp"
+            :placeholder="tt('生单时按供应商编码与当天日期生成')"
+            maxlength="100"
+            clearable
+          />
+          <el-button
+            v-if="batchNo !== nextBatchNo"
+            link type="primary" size="small" class="bsd-batch-reset"
+            @click="batchNo = nextBatchNo"
+          >{{ tt('恢复默认') }}</el-button>
+        </span>
         <span class="bsd-chip bsd-ratio">
           {{ tt('超送比例') }}:
           <el-input-number v-model="overRatioPct" :min="0" :max="50" :step="1" :precision="0" size="small"
@@ -90,8 +109,9 @@ const picked = ref([])         // el-table 当前勾选的行(生单只认它 �
 const overRatio = ref(0)       // 系统默认比例(0~1)
 const overRatioPct = ref(5)    // 本次生效比例(%):可调,生单时随请求带给后端
 const batches = ref([])
-/** 本批批次号(服务端按「供应商编码去 YJ- 前缀 + 当天」预告;生单后即为该号) */
+/** 本批批次号:服务端按「供应商编码去 YJ- 前缀 + 当天」预填(与生单同源),**可人工改** */
 const nextBatchNo = ref('')
+const batchNo = ref('')
 const qtyOf = reactive({})
 
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.lineKey)))
@@ -123,6 +143,7 @@ async function load() {
     overRatioPct.value = Math.round(overRatio.value * 100)
     batches.value = res?.batches || []
     nextBatchNo.value = String(res?.nextBatchNo || '')
+    batchNo.value = nextBatchNo.value      // 预填 = 公式算出来的号;用户可在对话框里改
     Object.keys(qtyOf).forEach((k) => delete qtyOf[k])
     for (const r of rows.value) qtyOf[r.lineKey] = Number(r.剩余数量) > 0 ? Number(r.剩余数量) : 0
     // 默认勾选"还有剩余"的行(保留"打开即可全送"的便利);勾选仍是权威:取消勾选即不送
@@ -180,9 +201,10 @@ async function confirm() {
     const res = await engine.batchFlowGenerate({
       sourcePanel: props.sourcePanel, targetPanel: props.targetPanel, sourceNo: props.sourceNo, lines,
       overRatio: ratio.value,
+      batchNo: String(batchNo.value || '').trim(),   // 生单时改的号(空则由后端按公式取号)
     })
     // 批次号已在生单这一刻定稿 —— 提示里回显**真号**(res['批次号']),不再是"以后再取"
-    const no = String(res?.['批次号'] || nextBatchNo.value || '')
+    const no = String(res?.['批次号'] || batchNo.value || nextBatchNo.value || '')
     ElMessage.success(no
       ? `${tt('已生成')} ${res['编号']}（${tt('批次号')} ${no}）`
       : `${tt('已生成')} ${res['编号']}`)
@@ -200,6 +222,10 @@ async function confirm() {
 .bsd { display: flex; flex-direction: column; gap: 8px; }
 .bsd-bar { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12.5px; color: #46586e; }
 .bsd-chip { background: #f2f6fa; border: 1px solid #e1e8f0; border-radius: 4px; padding: 2px 8px; }
+/* 批次号(可在生单时改):输入框与 chip 同高,宽 190 够放 「KBL-20261003」 这类号 */
+.bsd-batch { display: inline-flex; align-items: center; gap: 4px; }
+.bsd-batch-inp { width: 190px; }
+.bsd-batch-reset { padding: 0 2px; }
 .bsd-ratio { display: inline-flex; align-items: center; gap: 4px; }
 .bsd-ratio-tip { color: #8b9893; }
 .bsd-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #46586e; }

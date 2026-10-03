@@ -349,7 +349,9 @@ public class PushGenerateHandler implements PanelActionHandler {
      * - **批次号在生单这一刻就写**(2026-10-04 用户口径,取代"入库审核取号 + 回填全链"):
      *   链路头一跳(采购订单→送料暂收单)= 按「供应商编码去掉 YJ- 前缀 + - + 当天 yyyyMMdd」取号
      *   (如 YJ-TX、2026-09-10 ⇒ TX-20260910,见 BatchService.buildBatchNo);
-     *   下游各跳(暂收→检验、暂收/检验→入库、检验→退回)= **继承来源单头上的号**,不重新取号;
+     *   **这一跳允许在生单对话框里人工改号**(batchNoOverride,用户口径「在生单时批次号就可以修改」);
+     *   下游各跳(暂收→检验、暂收/检验→入库、检验→退回)= **继承来源单头上的号**,不重新取号、
+     *   也不接受覆盖(继承优先,避免下游把上游的号改飘);
      *   单头与**全部明细行**写同一个号(头行一致,下游单据元数据里明细列已置只读);
      * - 失败回滚:台账行随 @Transactional 一并回滚,不再有"回收序号"一说(@Transactional)。
      */
@@ -365,9 +367,26 @@ public class PushGenerateHandler implements PanelActionHandler {
      * 超送最高 50%)。上限按**订单全部数量**算:数量×(1+比例)−已送+已退回(见 overAllowance)。
      */
     @Transactional
-    @SuppressWarnings("unchecked")
     public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
                                              String user, Map<String, Double> qtyByLineKey, Double overRatioOverride) {
+        return generateBatch(sourcePanel, targetPanel, sourceNo, user, qtyByLineKey, overRatioOverride, null);
+    }
+
+    /** 批次号列宽(与 sl_recv/qc_insp/qc_return/bd_purchase_in 的 nvarchar(100) 对齐;超长会在落库时截断报错,故先拦) */
+    private static final int BATCH_NO_MAX = 100;
+
+    /**
+     * 分批生单(再带**批次号覆盖**):batchNoOverride = 生单对话框里人工填/改的批次号(可空)。
+     * 只在**链路头一跳**(来源单头上还没有号 = 本跳负责取号)生效 —— 用户口径
+     * 「在生单时批次号就可以修改」:对话框里的输入框默认按公式预填,想改就改,确定后按这个号落库;
+     * 留空则仍按公式取号。下游各跳一律继承来源单的号,传进来的覆盖值**忽略**(见调用点注释)。
+     * 空串/纯空白视为"没改";超长(> {@value #BATCH_NO_MAX})直接拒绝,免得写到库里被静默截断。
+     */
+    @Transactional
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
+                                             String user, Map<String, Double> qtyByLineKey,
+                                             Double overRatioOverride, String batchNoOverride) {
         PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
         PanelRegistry.PanelDef tgtDef = registry.panel(targetPanel);
         if (!isBatchTarget(targetPanel)) throw new IllegalStateException("目标面板未启用分批送料:" + targetPanel);
@@ -439,11 +458,12 @@ public class PushGenerateHandler implements PanelActionHandler {
         targetHead.put("来源单据", srcDef.name());
         targetHead.put("来源单号", sourceNo);
 
-        // 批次键 + 批次号(2026-10-04 口径:**生单即定号**)
+        // 批次键 + 批次号(2026-10-04 口径:**生单即定号**,且在生单对话框里可当场改)
         // · 批次键:来源单已带「批次键」时**继承**它(键在「采购订单→送料暂收单」这一跳产生),
         //   否则本跳就是链路头一跳 → 新登记一行 ACTIVE 台账,把该行 id 当键逐站带下去;
-        // · 批次号:来源单已有号(下游各跳)→ 原样继承;来源单没号(链路头一跳,或口径上线前的老单)
-        //   → 按「供应商编码去掉 YJ- 前缀 + - + 当天」现取一个。
+        // · 批次号:来源单已有号(下游各跳)→ 原样继承(**忽略**传进来的覆盖值,不让下游把上游的号改飘);
+        //   来源单没号(链路头一跳)→ ① 对话框里人工填的 batchNoOverride(用户口径「生单时就能改」)
+        //   → ② 都空则按「供应商编码去掉 YJ- 前缀 + - + 当天」现取一个(编码为空退回纯日期)。
         //   单头与全部明细行写**同一个号** —— 用户口径「头与下面的明细项目批次号一致」,
         //   且不再需要"入库审核时逆流回填上游"(该机制已删除)。
         // 注:供应商编码要**先看来源单头、再看目标单头**(链路各单异名,映射可能刚把
@@ -452,9 +472,18 @@ public class PushGenerateHandler implements PanelActionHandler {
         Integer inheritKey = srcKeyObj instanceof Number n ? n.intValue()
                 : (srcKeyObj == null || String.valueOf(srcKeyObj).isBlank() ? null
                 : Integer.valueOf(String.valueOf(srcKeyObj).trim()));
-        String batchNo = str(head.get("批次号"));
-        if (batchNo.isBlank()) {
-            batchNo = BatchService.buildBatchNo(supplierCodeOf(head, targetHead), java.time.LocalDate.now());
+        String inherited = str(head.get("批次号"));
+        String batchNo;
+        if (!inherited.isEmpty()) {
+            batchNo = inherited;                       // 下游:继承,不接受覆盖
+        } else {
+            String manual = str(batchNoOverride);      // 头一跳:生单对话框里人工改的号优先
+            if (manual.length() > BATCH_NO_MAX) {
+                throw new IllegalArgumentException("批次号过长(最多 " + BATCH_NO_MAX + " 个字符):" + manual);
+            }
+            batchNo = manual.isEmpty()
+                    ? BatchService.buildBatchNo(supplierCodeOf(head, targetHead), java.time.LocalDate.now())
+                    : manual;
         }
         int batchId = inheritKey != null ? inheritKey
                 : batchService.createBatch(sourcePanel, sourceNo, targetPanel, batchNo, user);

@@ -266,7 +266,65 @@ async function main() {
     const cells4 = dataCells(p4)
     ok(cells4.length > 0 && cells4.every((c) => c.locked && !c.hasInput && c.text === EXPECT),
       `明细行只读且值 = 上游继承的号(${cells4.filter((c) => c.locked).length}/${cells4.length} 行)`)
-    console.log(`\n  留证:暂收单 ${recv} / 检验单 ${insp} / 批次号 ${EXPECT}`)
+
+    // ============ ④ 生单对话框:批次号**当场可改**(用户口径「在生单时批次号就可以修改」)============
+    console.log('\n=== ④ 分批送料对话框:「批次号」是可直接改的输入框,改了就按改的号生单 ===')
+    await openPanel('PU_ORDER', pick.no)
+    // 工具栏「生单」组只有一个动作(生成送料暂收单)⇒ 没有 ▼ 下拉,主按钮点下去就是那个动作
+    // (btnName(g)=actsOf(g)[0] || g.name;标签显示的是组名「生单」)。
+    const openDlg = await ev(`(function(){
+      const groups = Array.from(document.querySelectorAll('.tb-group'))
+      const g = groups.find(function(x){ const n = x.querySelector('.tb-main .act-name'); return n && n.textContent.trim() === '生单' })
+      if (!g) return 'no-group:' + groups.map(function(x){ const n = x.querySelector('.tb-main .act-name'); return n ? n.textContent.trim() : '?' }).join('|')
+      const main = g.querySelector('.tb-main')
+      if (!main) return 'no-main'
+      const caret = g.querySelector('.tb-caret')
+      if (caret) { caret.click(); return 'caret-clicked' }
+      if (main.classList.contains('disabled')) return 'main-disabled'
+      main.click(); return 'main-clicked'
+    })()`)
+    info(`点击工具栏「生单」组:${openDlg}`)
+    await sleep(900)
+    // 若走的是 ▼ 下拉,再点一次菜单项(兼容两种渲染)
+    await ev(`(function(){
+      const it = Array.from(document.querySelectorAll('.tb-menu .ctx-item'))
+        .find(function(x){ return x.textContent.trim() === '生成送料暂收单' })
+      if (it) it.click()
+      return 'ok'
+    })()`)
+    let dlgReady = null
+    for (let i = 0; i < 40; i++) {
+      await sleep(400)
+      dlgReady = await ev(`(function(){ const i = document.querySelector('.bsd-batch-inp input'); return i ? i.value : null })()`)
+      if (dlgReady !== null && dlgReady !== undefined) break
+    }
+    ok(dlgReady !== null && dlgReady !== undefined, `分批送料对话框已弹出且带「批次号」输入框(值 ${JSON.stringify(dlgReady)})`)
+    ok(N(dlgReady) === EXPECT, `输入框**预填**公式号 = ${EXPECT}(实得 ${JSON.stringify(dlgReady)})`)
+    const MY = `对话框改-${dstr()}`
+    const typed = await ev(`(function(){
+      const i = document.querySelector('.bsd-batch-inp input')
+      if (!i) return 'no-input'
+      if (i.disabled || i.readOnly) return 'locked'
+      i.value = ${JSON.stringify(MY)}
+      i.dispatchEvent(new Event('input', { bubbles: true }))
+      i.dispatchEvent(new Event('change', { bubbles: true }))
+      return i.value
+    })()`)
+    ok(N(typed) === MY, `输入框**可编辑**(不是只读/禁用),已改成 ${MY}(实得 ${JSON.stringify(typed)})`)
+    const clicked = await ev(`(function(){
+      const b = Array.from(document.querySelectorAll('.el-dialog button'))
+        .find(function(x){ return x.textContent.trim() === '确定生单' })
+      if (!b) return 'no-btn'
+      b.click(); return 'ok'
+    })()`)
+    info(`点击「确定生单」:${clicked}`)
+    await sleep(3500)
+    const made = await one(`SELECT TOP 1 单据编号 no, 批次号 b FROM sl_recv WHERE 批次号 = N'${MY}' ORDER BY id DESC`)
+    if (made?.no) created.push(['QC_RECV', N(made.no)])
+    ok(N(made?.b) === MY,
+      `界面里改的号真的落到了生成的送料暂收单上(${JSON.stringify(made?.no)} → ${JSON.stringify(made?.b)})`)
+
+    console.log(`\n  留证:暂收单 ${recv} / 检验单 ${insp} / 批次号 ${EXPECT} / 对话框改号单 ${made?.no}(${MY})`)
   } finally {
     try { ws?.close() } catch { /* ignore */ }
     try { edge.kill() } catch { /* ignore */ }
