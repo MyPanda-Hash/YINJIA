@@ -2815,6 +2815,8 @@ export default {
     // 档案面板保存误删护栏(2026-10-03:商品面板带筛选保存一次软删 3873 行)
     '当前列表带筛选，本次保存只更新已加载的行，未显示的行不会被删除':
       'The list is filtered — this save updates the loaded rows only; rows not shown will not be deleted',
+    // 档案面板改「只提交改动行」(2026-10-03 用户口径):没有改动就不再空跑一次保存
+    '没有需要保存的改动': 'Nothing to save — no rows were changed',
   },
 
 }

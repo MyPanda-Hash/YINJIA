@@ -2354,25 +2354,48 @@ const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === tru
 /** 单据面板(头行/单表单据):既非报表平表、也非档案单单据 → 高级筛选走服务端(2026-09-24) */
 const docPanel = computed(() => !reportMode.value && !singleDocMode.value)
 /**
- * 档案「整档已加载」标记(2026-10-03 误删事故护栏)。
+ * 档案「改动行提交」基线(2026-10-03 用户口径「修改提交改动行」+ 同日误删事故护栏)。
  *
- * 档案面板保存语义 = 整表 upsert(缺席行=已删除),可列表查询带条件时后端只回**子集**;
- * 把子集当整档提交就会把没被筛出来的行全删掉 —— 实测:「商品」面板带筛选保存一次软删
- * 3873/3874 行(yj_archive_change_log id=8)。故:只有「无关键字 + 无字段条件 + 无高级筛选
- * + 后端返回行数=总数」时才算整档,保存才向后端声明 `档案全量`,
- * 后端 ButtonService.saveArchive 据此才允许缺席行软删;带筛选保存 = 只更新已加载的行。
+ * 事故:档案面板保存语义曾是「整表 upsert,缺席行=已删除」,而列表查询带条件时后端只回**子集**
+ * ⇒ 一次带筛选的保存把未加载的 3873/3874 行商品档案软删(yj_archive_change_log id=8 removedRows=3873)。
+ * 现在:载入时给每行存一份 JSON 基线,保存**只提交与基线不同的行**(无 id 的新行必然提交),
+ * 并声明 `只提交改动行=true` —— 后端据此逐行 upsert,**绝不做"缺席即删除"推断**;
+ * 删除档案行走「删除」按钮的显式 `作废行id`(见 onButton 的删除分支)。
+ * 判据只看行内容,不依赖"哪些事件算编辑"⇒ 手输/参照带回/粘贴/导入任何编辑路径都不会漏。
  */
-const archiveFullLoad = ref(false)
-function countArchiveRows(docs) {
-  let n = 0
-  for (const d of docs || []) {
-    for (const v of Object.values(d?.detail || {})) if (Array.isArray(v)) n += v.length
-  }
-  return n
+const archiveBaseline = new Map() // 行 id -> 载入时的 JSON 快照
+function archiveRowIdOf(row) {
+  const id = row?.id ?? row?.__id
+  return id === undefined || id === null || String(id).trim() === '' ? null : String(id)
 }
-/** 保存按钮的档案声明参数(非整档时不下发,后端保守只 upsert) */
-function archiveFullParam() {
-  return archiveFullLoad.value ? { 档案全量: true } : {}
+/** 档案整档行(单单据面板:list[0].detail[tabKey] 就是全部行) */
+function allArchiveRows() {
+  const rows = []
+  for (const v of Object.values(cur.value?.detail || {})) if (Array.isArray(v)) rows.push(...v)
+  return rows
+}
+/** 载入/保存成功后重建基线(load 末尾调用) */
+function snapshotArchiveBaseline() {
+  archiveBaseline.clear()
+  if (!singleDocMode.value) return
+  for (const r of allArchiveRows()) {
+    const id = archiveRowIdOf(r)
+    if (id && !archiveBaseline.has(id)) archiveBaseline.set(id, JSON.stringify(r))
+  }
+}
+/** 本次要提交的改动行 = 与基线不同 + 所有新行(无 id) */
+function changedArchiveRows() {
+  const out = []
+  if (!singleDocMode.value) return out
+  for (const r of allArchiveRows()) {
+    const id = archiveRowIdOf(r)
+    if (!id || archiveBaseline.get(id) !== JSON.stringify(r)) out.push(r)
+  }
+  return out
+}
+/** 档案保存的按钮声明:只提交改动行(未声明的老口径由后端保守处理 —— 只 upsert、绝不删行) */
+function archiveSaveParam() {
+  return { 只提交改动行: true }
 }
 const reportPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
 const reportPeriod = computed(() => {
@@ -5281,13 +5304,30 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
   inlineSaving.value = true
   const documentNo = cur.value['编号']
   try {
+    // 档案面板:只提交**改动行**(用户口径 2026-10-03「修改提交改动行」)——
+    // 商品这类几千行的档案不再整表提交,后端也据此不做"缺席即删除"推断(误删护栏)。
+    let payload
+    if (singleDocMode.value) {
+      const changed = changedArchiveRows()
+      if (!changed.length) {
+        inlineDirtyFlag.value = false
+        markSavedSnapshot()
+        if (!silent) ElMessage.success(tt('没有需要保存的改动'))
+        return true
+      }
+      const detail = {}
+      for (const key of Object.keys(cur.value.detail || {})) detail[key] = changed
+      payload = currentFormData(detail)
+    } else {
+      payload = currentFormData({ ...(cur.value.detail || {}) })
+    }
     const res = await engine.callButton({
       panelCode: panelCode.value,
       buttonName,
-      formData: currentFormData({ ...(cur.value.detail || {}) }),
-      buttonParam: archiveFullParam(),
+      formData: payload,
+      buttonParam: archiveSaveParam(),
     })
-    // 档案带筛选保存:后端保守跳过缺席行软删(不会误删未显示的行),此处如实告知
+    // 旧客户端口径的兜底提示:后端在"既没声明改动行、也没声明整档"时会跳过缺席行软删
     if (res && Number(res['未全量跳过软删']) > 0) {
       ElMessage.warning(tt('当前列表带筛选，本次保存只更新已加载的行，未显示的行不会被删除'))
     }
@@ -6499,6 +6539,10 @@ async function onButton(action) {
       const tab = blk ? activeTab(blk) : null
       const key = tab ? tab.key : 'items'
       const items = cur.value.detail && Array.isArray(cur.value.detail[key]) ? cur.value.detail[key] : []
+      // 档案面板:删除走**显式作废行id**(不再靠"缺席即删除"推断)——先取 id 再摘行,
+      // 提交内容仍是"只提交改动行"(其余行原样不动)
+      const removedIds = singleDocMode.value
+        ? delSel.value.map((r) => archiveRowIdOf(r)).filter(Boolean) : []
       const remain = items.filter((it) => !delSel.value.includes(it))
       const head = { ...cur.value }
       delete head.detail
@@ -6507,11 +6551,17 @@ async function onButton(action) {
       delete head['创建时间']
       delete head['更新时间']
       delete head['发起人编号']
+      const detailPayload = singleDocMode.value
+        ? Object.fromEntries(Object.keys(cur.value.detail || {}).map((k) => [k, changedArchiveRows()]))
+        : { ...(cur.value.detail || {}), [key]: remain }
       await engine.callButton({
         panelCode: panelCode.value,
         buttonName: '保存',
-        formData: { ...head, 编号: cur.value['编号'], detail: { ...(cur.value.detail || {}), [key]: remain } },
-        buttonParam: archiveFullParam(),
+        formData: {
+          ...head, 编号: cur.value['编号'], detail: detailPayload,
+          ...(removedIds.length ? { 作废行id: removedIds } : {}),
+        },
+        buttonParam: archiveSaveParam(),
       })
       ElMessage.success('已删除 ' + delSel.value.length + ' 行')
       delMode.value = false
@@ -6791,15 +6841,8 @@ async function load(clamping = false) {
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
     list.value = res.list || []
     total.value = res.totalSize || 0
-    // 档案整档判定:见 archiveFullLoad 注释(带筛选/未加载全 = 不声明,保存不做缺席软删)
-    const condBlank = Object.values(condition).every(
-      (v) => v === null || v === undefined || String(v).trim() === '',
-    )
-    archiveFullLoad.value = singleDocMode.value
-      && !params.keyword
-      && !(params.advFilters && params.advFilters.length)
-      && condBlank
-      && countArchiveRows(res.list) >= total.value
+    // 档案「改动行提交」基线:载入即快照,保存只发改动行(见 archiveBaseline 注释)
+    snapshotArchiveBaseline()
     // 页码越界自愈(末页删单/换每页条数/筛选后页码残留):回落到最后一页重取,避免空白页与页码错乱
     const lp = Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize)))
     if (!clamping && query.pageNo > lp) {
