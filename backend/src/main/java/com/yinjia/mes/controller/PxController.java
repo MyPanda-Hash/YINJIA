@@ -82,7 +82,7 @@ public class PxController {
         return ApiResult.ok(puLabel.dialog(orderNo));
     }
 
-    /** 登记打印(同订单+同批次号复用同一张打印头,重打只累加次数不重复占用) */
+    /** 登记打印(2026-10-04 口径:**一次一行 = 一张打印单**;服务端强制,多行直接拒) */
     @PostMapping("/puLabel/print")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> puLabelPrint(@RequestBody Map<String, Object> body) {
@@ -94,6 +94,13 @@ public class PxController {
             for (Object o : l) if (o instanceof Map<?, ?> m) lines.add(new LinkedHashMap<>((Map<String, Object>) m));
         }
         return ApiResult.ok(puLabel.print(orderNo, batchNo, lines, currentUser()));
+    }
+
+    /** 重打:同一张打印单原样再打一遍(只累加打印次数,不新增预约) */
+    @PostMapping("/puLabel/reprint")
+    public ApiResult<Map<String, Object>> puLabelReprint(@RequestBody Map<String, Object> body) {
+        perm.requireButton("PU_ORDER", "修改");
+        return ApiResult.ok(puLabel.reprint(String.valueOf(body.getOrDefault("docNo", "")), currentUser()));
     }
 
     /** 作废打印记录(软删,预约量立即释放回余量) */

@@ -1,11 +1,13 @@
-﻿<template>
+<template>
   <!-- 打印材料码(2026-10-04 用户口径「在打印材料的时候弹出一个弹窗,可以填写打印的批次号(按之前的格式预填)
        与勾选需要打印的行号和他的数量」):
         批次号默认 = 供应商编码去掉 YJ- 前缀 + - + 当天 yyyyMMdd(服务端算,与生单同一公式),**可改**;
         勾行 + 填本次打印数量(上限 = 该行头寸 − 其它打印记录已预约的量);
+        ⚠ **一次只打一行**(追加口径「打印需要是每次一行,不能多行否则作废就全部作废了」):
+        选行用**单选**、一次一张打印单 ⇒ 作废只影响这一行;要打第二行就再打开一次弹窗。
         确定后**先落库登记**再出纸 —— 这张纸上的批次号从此成为该订单上批次号的权威值,
         生单对话框里它会是**独立的一行**（数量已从原行切走），勾它即按这个号生单。
-       底部「已打印记录」是反查入口(用户不要新加面板,故放在这张弹窗里),可就地作废释放预约。 -->
+       底部「已打印记录」是反查入口(用户不要新加面板,故放在这张弹窗里),可就地**作废**或**重打**。 -->
   <el-dialog
     :model-value="modelValue"
     :title="tt('打印材料码') + (orderNo ? ' · ' + orderNo : '')"
@@ -28,8 +30,18 @@
         <span class="mlq-chip mlq-tip">{{ tt('打印上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回 − 已打印未生单') }}</span>
       </div>
 
-      <el-table ref="tableRef" :data="rows" row-key="id" border size="small" height="330" @selection-change="onPicked">
-        <el-table-column type="selection" width="42" />
+      <!-- 一次一行:选行刻意用**单选**(不是多选勾选框)—— 一张打印单只装一行,
+           作废按单作,多行并单会被一起作废(用户 2026-10-04 口径「不能多行否则作废就全部作废了」) -->
+      <div class="mlq-oneline">{{ tt('一次只打一行（一张打印单只装一行，作废只影响这一行）；要打第二行请再打一次') }}</div>
+
+      <el-table ref="tableRef" :data="rows" row-key="id" border size="small" height="330" @row-click="onRowClick">
+        <el-table-column width="42" align="center">
+          <template #default="{ row }">
+            <el-radio v-model="pickedId" :value="row.id" :disabled="!(capOf(row) > 0)" class="mlq-radio">
+              <span></span>
+            </el-radio>
+          </template>
+        </el-table-column>
         <el-table-column prop="行号" :label="tt('行号')" width="70" />
         <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="130" show-overflow-tooltip />
         <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="130" show-overflow-tooltip />
@@ -41,14 +53,14 @@
         <el-table-column :label="tt('本次打印数量')" width="150">
           <template #default="{ row }">
             <el-input-number v-model="qtyOf[row.id]" :min="0" :max="capOf(row)" :controls="false"
-              :disabled="!(capOf(row) > 0)" :precision="2" style="width: 130px" />
+              :disabled="pickedId !== row.id || !(capOf(row) > 0)" :precision="2" style="width: 130px" />
           </template>
         </el-table-column>
         <el-table-column prop="计量单位" :label="tt('计量单位')" width="85" />
       </el-table>
 
       <div class="mlq-foot">
-        <span>{{ tt('已选') }} <b>{{ picked.length }}</b> {{ tt('行') }} · {{ tt('本次合计') }}: <b>{{ totalQty }}</b></span>
+        <span>{{ tt('本次选中') }}: <b>{{ pickedRow ? pickedRow['行号'] : '—' }}</b> {{ tt('行') }} · {{ tt('本次打印数量') }}: <b>{{ totalQty }}</b></span>
       </div>
 
       <div class="mlq-records">
@@ -62,8 +74,11 @@
           <el-table-column prop="行数" :label="tt('行数')" width="70" align="right" />
           <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" />
           <el-table-column prop="打印次数" :label="tt('打印次数')" width="85" align="right" />
-          <el-table-column :label="tt('操作')" width="80" align="center">
+          <el-table-column :label="tt('操作')" width="130" align="center">
             <template #default="{ row }">
+              <!-- 重打 = 同一张单原样再打一遍(纸卡了/打歪了):只累加 打印次数,**不新增预约**
+                   (用同一行再打一次会被当成新打印而重复占量,所以"再打一遍"必须走这里) -->
+              <el-button link type="primary" :disabled="busy" @click="doReprint(row)">{{ tt('重打') }}</el-button>
               <el-button link type="danger" :disabled="busy" @click="doVoid(row)">{{ tt('作废') }}</el-button>
             </template>
           </el-table-column>
@@ -114,14 +129,15 @@ const head = computed(() => data.value || {})
 const rows = computed(() => data.value.lines || [])
 const batchNo = ref('')
 const tableRef = ref(null)
-const picked = ref([])
+/** **单选**:当前选中的订单行 id(null = 没选)—— 一次只打一行(一张打印单一行) */
+const pickedId = ref(null)
 const qtyOf = reactive({})
 
-const pickedKeys = computed(() => new Set(picked.value.map((r) => r.id)))
+const pickedRow = computed(() => rows.value.find((r) => r.id === pickedId.value) || null)
 const totalQty = computed(() => {
-  let s = 0
-  for (const r of rows.value) if (pickedKeys.value.has(r.id)) s += Number(qtyOf[r.id] || 0) || 0
-  return Math.round(s * 100) / 100
+  const r = pickedRow.value
+  if (!r) return 0
+  return Math.round((Number(qtyOf[r.id] || 0) || 0) * 100) / 100
 })
 /** 该行本次最多能打多少(服务端算好的「剩余可打」;前端只做即时约束,后端还会重算一遍) */
 function capOf(row) {
@@ -137,9 +153,10 @@ async function load() {
     batchNo.value = String(data.value?.prefBatchNo || '')
     Object.keys(qtyOf).forEach((k) => delete qtyOf[k])
     for (const r of rows.value) qtyOf[r.id] = capOf(r) > 0 ? capOf(r) : 0
-    // 默认全选有可打量的行(与分批送料对话框同款便利),勾选仍是权威
+    // 默认选中**第一行有可打量的行**并按剩余量填好(与原先"打开即可打"的便利一致),
+    // 但**只有一行**会被选中 —— 多行并单会让作废连坐
     await Promise.resolve()
-    syncPick(rows.value.filter((r) => capOf(r) > 0).map((r) => r.id))
+    pick(rows.value.find((r) => capOf(r) > 0)?.id ?? null)
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('材料码数据加载失败'))
   } finally {
@@ -147,57 +164,71 @@ async function load() {
   }
 }
 
-function syncPick(ids) {
-  const set = new Set(ids)
-  tableRef.value?.clearSelection()
-  picked.value = []
-  for (const r of rows.value) if (set.has(r.id)) tableRef.value?.toggleRowSelection(r, true)
-  picked.value = rows.value.filter((r) => set.has(r.id))
-  prefill()
+/** 选中一行(单选);选中即按该行剩余可打量预填数量(已填过的不覆盖) */
+function pick(id) {
+  pickedId.value = id
+  const r = rows.value.find((x) => x.id === id)
+  if (r && !(Number(qtyOf[r.id] || 0) > 0)) qtyOf[r.id] = capOf(r)
 }
-function onPicked(list) {
-  picked.value = list || []
-  prefill()
-}
-function prefill() {
-  for (const r of picked.value) if (!(Number(qtyOf[r.id] || 0) > 0)) qtyOf[r.id] = capOf(r)
+function onRowClick(row) {
+  if (capOf(row) > 0) pick(row.id)
 }
 function fillRemaining() {
-  for (const r of rows.value) qtyOf[r.id] = capOf(r)
-  syncPick(rows.value.filter((r) => capOf(r) > 0).map((r) => r.id))
+  const r = pickedRow.value
+  if (!r) { ElMessage.warning(tt('请先选中一行')); return }
+  qtyOf[r.id] = capOf(r)
 }
 function clearAll() {
   for (const r of rows.value) qtyOf[r.id] = 0
-  syncPick([])
+  pickedId.value = null
+}
+
+/** 出纸:纸上的号 = 库里的号(先落库再打印) */
+function cardsOf(res) {
+  return (res?.lines || []).map((l) => ({
+    编码: l['物料编码'],
+    规格: l['规格型号'] || '',
+    数量: l['打印数量'],
+    批次: res['批次号'],
+    订单编号: props.orderNo,
+    供应商名称: head.value['供应商'] || '',
+    生产日期: '',
+  }))
 }
 
 async function confirm() {
-  const lines = rows.value
-    .filter((r) => pickedKeys.value.has(r.id) && Number(qtyOf[r.id] || 0) > 0)
-    .map((r) => ({ 采购订单行id: r.id, 打印数量: Number(qtyOf[r.id]) }))
-  if (!lines.length) { ElMessage.warning(tt('请至少勾选一行并填写本次打印数量')); return }
+  const r = pickedRow.value
+  const qty = Number(qtyOf[r?.id] || 0)
+  if (!r || !(qty > 0)) { ElMessage.warning(tt('请选中一行并填写本次打印数量')); return }
   if (isEmpty(batchNo.value)) { ElMessage.warning(tt('请填写批次号')); return }
   busy.value = true
   try {
+    // 一次一行:只传这一行(服务端也强制,多行直接拒)
     const res = await engine.puLabelPrint({
-      orderNo: props.orderNo, batchNo: String(batchNo.value).trim(), lines,
+      orderNo: props.orderNo, batchNo: String(batchNo.value).trim(),
+      lines: [{ 采购订单行id: r.id, 打印数量: qty }],
     })
-    // 先落库再出纸:纸上的号 = 库里的号
-    const cards = (res?.lines || []).map((l) => ({
-      编码: l['物料编码'],
-      规格: l['规格型号'] || '',
-      数量: l['打印数量'],
-      批次: res['批次号'],
-      订单编号: props.orderNo,
-      供应商名称: head.value['供应商'] || '',
-      生产日期: '',
-    }))
-    await printProductCards(cards)
+    await printProductCards(cardsOf(res))
     ElMessage.success(`${tt('已登记并打印')} ${res['单据编号']}（${tt('批次号')} ${res['批次号']}）`)
-    emit('printed', { orderNo: props.orderNo, docNo: res['单据编号'], batchNo: res['批次号'], count: cards.length })
+    emit('printed', { orderNo: props.orderNo, docNo: res['单据编号'], batchNo: res['批次号'], count: 1 })
     await load()          // 刷新"剩余可打"与"已打印记录"
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('打印登记失败'))
+  } finally {
+    busy.value = false
+  }
+}
+
+/** 重打:同一张打印单原样再打一遍(只累加打印次数,不新增预约) */
+async function doReprint(row) {
+  busy.value = true
+  try {
+    const res = await engine.puLabelReprint(row['单据编号'])
+    await printProductCards(cardsOf(res))
+    ElMessage.success(`${tt('已重打（第 {n} 次）').replace('{n}', res['打印次数'])} ${res['单据编号']}`)
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('重打失败'))
   } finally {
     busy.value = false
   }
@@ -229,6 +260,11 @@ async function doVoid(row) {
 .mlq-batch { display: inline-flex; align-items: center; gap: 4px; }
 .mlq-batch-inp { width: 190px; }
 .mlq-tip { color: #8b9893; }
+/* 一次一行 的提示条(浅黄底,提醒"多行会被并单作废";用户口径不可省) */
+.mlq-oneline { font-size: 12.5px; color: #8a6d3b; background: #fdf6e3; border: 1px solid #f5e3b3; border-radius: 4px; padding: 3px 8px; }
+/* 单选列里的 el-radio 只要那个圈,不要文字(label 里放了空 span) */
+.mlq-radio :deep(.el-radio__label) { display: none; }
+.mlq-radio { margin-right: 0; }
 .mlq-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #46586e; }
 .mlq-records { margin-top: 4px; }
 .mlq-rec-title { font-size: 12.5px; color: #46586e; margin-bottom: 4px; }

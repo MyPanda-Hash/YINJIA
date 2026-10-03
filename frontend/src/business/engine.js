@@ -476,9 +476,14 @@ export async function puLabelDialog(orderNo) {
   return unwrap(await request.get('/px/puLabel/dialog', { params: { orderNo } }))
 }
 
-/** 登记打印:同订单+同批次号复用同一张打印头(重打只累加次数,不重复占用余量) */
+/** 登记打印:**一次一行 = 一张打印单**(多行会被服务端拒绝 —— 作废是按单作的,多行会一起作废) */
 export async function puLabelPrint(payload) {
   return unwrap(await request.post('/px/puLabel/print', payload))
+}
+
+/** 重打:同一张打印单原样再打一遍(只累加 打印次数,不新增预约 —— 一次一行后由它承担"重打不重复占量") */
+export async function puLabelReprint(docNo) {
+  return unwrap(await request.post('/px/puLabel/reprint', { docNo }))
 }
 
 /** 作废打印记录(软删):预约量立即释放回余量 */

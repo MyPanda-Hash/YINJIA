@@ -190,8 +190,8 @@ async function main() {
     }
     ok(N(dlg) === EXPECT_AUTO, `「批次号」按公式**预填** = ${EXPECT_AUTO}(实得 ${JSON.stringify(dlg)})`)
 
-    // ============ ② 改号 + 只勾一行 + 填量 + 确定并打印 ============
-    console.log('\n=== ② 改批次号 → 只勾一行填量 → 确定并打印 → 库里真的登记了 ===')
+    // ============ ② 改号 + 选一行填量 + 确定并打印(2026-10-04 起**单选**:一次只打一行) ============
+    console.log('\n=== ② 改批次号 → 选一行填量 → 确定并打印 → 库里真的登记了 ===')
     const typed = await ev(`(function(){
       const i = document.querySelector('.mlq-batch-inp input')
       if (!i) return 'no-input'
@@ -202,28 +202,43 @@ async function main() {
       return i.value
     })()`)
     ok(N(typed) === MY_BATCH, `「批次号」**可改**,已改成 ${MY_BATCH}`)
-    // ⚠ 弹窗默认**全选**有可打量的行 ⇒ 先「清空」再只勾第一行,否则会把另一行也按默认量打出去
-    //   (2026-10-04 探针首版就栽在这:打印量变成两行合计 470 而不是 50)
-    await ev(`(function(){
-      const b = Array.from(document.querySelectorAll('.el-dialog button')).find(function(x){ return x.textContent.trim() === '清空' })
-      if (b) b.click(); return b ? 'cleared' : 'no-btn' })()`)
-    await sleep(500)
-    const setQty = await ev(`(function(){
+    // ⚠ 打印是**一次一行**(用户口径「不能多行否则作废就全部作废了」):选行是**单选**,
+    //   第二行被选中时第一行必须自动取消 —— 这就是本段的断言,也是"作废只作废一行"的前提
+    const pickRadio = (idx) => ev(`(function(){
       const t = document.querySelector('.mlq .el-table')
-      const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
       const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
-      const first = trs[0]
-      if (!first) return 'no-row'
-      const cbx = first.querySelector('.el-checkbox')
-      if (cbx) cbx.click()
-      return 'checked'
+      const tr = trs[${idx}]
+      if (!tr) return 'no-row'
+      const r = tr.querySelector('.el-radio')
+      if (!r) return 'no-radio'
+      r.click(); return 'clicked'
     })()`)
-    await sleep(600)
+    info(`点第 1 行单选:${await pickRadio(0)}`)
+    await sleep(500)
+    const sel1 = await ev(`(function(){
+      const t = document.querySelector('.mlq .el-table')
+      const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
+      return JSON.stringify(trs.map(function(tr){ return !!tr.querySelector('.el-radio.is-checked') }))
+    })()`)
+    info(`选中态:${sel1}`)
+    ok((JSON.parse(sel1 || '[]')[0] === true), `第 1 行被选中(选中态 ${sel1})`)
+    info(`点第 2 行单选:${await pickRadio(1)}`)
+    await sleep(500)
+    const sel2 = JSON.parse((await ev(`(function(){
+      const t = document.querySelector('.mlq .el-table')
+      const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
+      return JSON.stringify(trs.map(function(tr){ return !!tr.querySelector('.el-radio.is-checked') }))
+    })()`)) || '[]')
+    ok(sel2[1] === true && sel2[0] === false,
+      `**单选**成立:选中第 2 行后第 1 行自动取消(选中态 ${JSON.stringify(sel2)})⇒ 不会两行并进一张单`)
+    info(`改回第 1 行:${await pickRadio(0)}`)
+    await sleep(400)
     const setQty2 = await ev(`(function(){
       const t = document.querySelector('.mlq .el-table')
       const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
       const i = ths.findIndex(function(x){ return x.indexOf('本次打印数量') >= 0 })
-      const tr = Array.from(t.querySelectorAll('.el-table__body tbody tr')).find(function(r){ return r.textContent.trim() !== '' })
+      const tr = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })[0]
+      if (!tr) return 'no-row'
       const inp = tr.querySelectorAll('td')[i].querySelector('input')
       if (!inp) return 'no-input'
       inp.value = ${JSON.stringify(String(PRINT_QTY))}
@@ -231,7 +246,7 @@ async function main() {
       inp.dispatchEvent(new Event('change', { bubbles: true }))
       return inp.value
     })()`)
-    info(`只勾第一行(${setQty})+ 本次打印数量设为 ${setQty2}`)
+    info(`本次打印数量设为 ${setQty2}`)
     info(`点击「确定并打印」:${await ev(`(function(){
       const b = Array.from(document.querySelectorAll('.el-dialog button')).find(function(x){ return x.textContent.trim() === '确定并打印' })
       if (!b) return 'no-btn'; b.click(); return 'ok' })()`)}`)
