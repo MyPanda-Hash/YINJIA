@@ -21,7 +21,7 @@ async function main() {
     const desc = (await new mssql.Request(pool).query(
       `SELECT CAST(ep.value AS nvarchar(400)) AS v FROM sys.extended_properties ep
        WHERE ep.major_id = OBJECT_ID(N'dbo.bd_pu_label') AND ep.minor_id = 0 AND ep.name = 'MS_Description'`)).recordset[0]?.v || ''
-    console.log(`  表级注明含新口径: ${desc.includes('一次打印 = 一行 = 一张单') ? '✔' : '✗'}  「${desc.slice(0, 60)}…」`)
+    console.log(`  表级注明含新口径: ${desc.includes('每行各出一张单') ? '✔' : '✗'}  「${desc.slice(0, 60)}…」`)
     const docs = (await new mssql.Request(pool).query(
       `SELECT h.[单据编号] AS no, h.[批次号] AS b, COUNT(l.id) AS n, SUM(ISNULL(l.[打印数量],0)) AS q
        FROM bd_pu_label h LEFT JOIN bl_pu_label l
