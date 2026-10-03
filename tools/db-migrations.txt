@@ -2094,6 +2094,13 @@ migrate-pu-label.sql
 #   幂等,两账套均执行。 ——
 migrate-pu-label-one-line-per-print.sql
 
+# —— 2026-10-04 材料码打印单:**已生单的量也可以补登打印** ——
+#   用户口径:「还有已经生单的数据也应该可以打印」。补登 = 给**已收(已生单)**的量补打材料码:
+#   不产生隔离行、不扣余量、批次号取该行已生单单据的号(锁定);只为追溯留痕。
+#   bl_pu_label 加两列:补登 nvarchar(1) 默认 N(Y=补登)、去向单据 nvarchar(40)(对应的已生单单号),
+#   两列都带中文注明;老数据按"待生单"回填(N)。幂等,两账套均执行。 ——
+migrate-pu-label-supplement-print.sql
+
 # —— 2026-10-03 商品·来料检验 口径落定:未填写(空)= 否 ——
 #   用户口径:「金蝶自定义字段新增的第 4 个字段 = 来料检验(键 custom_field__1__62tvoyr1j4fa,
 #   已登记进 deploy/sync-core.mjs 的 CF_INSPECTION_KEYS);拉下来后,没有填写是的默认为否」。
