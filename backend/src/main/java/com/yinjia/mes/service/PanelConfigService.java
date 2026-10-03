@@ -860,7 +860,9 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 暂收退回单:选单=来料检验单;生单灰(无下游)
+            // 暂收退回单:选单=来料检验单;**「特采」组(2026-10-04)**——本单审批通过后才可点,
+            // 按明细行生成特采单(QC_TC_IN,一物料一单),特采审批通过再生成采购入库单
+            // (ButtonService.returnAutoSpecialAccept / tcInApprovedGenerate)。生单组仍为灰(无推式目标)。
             java.util.Map.entry("QC_RETURN", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选来料检验单"},
@@ -869,6 +871,10 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    // 「特采」自成一组的用意:生单组里没有 pushTarget 的动作会被后端标成
+                    // metadata.disabledActions 而恒置灰(前端 isDisabled),本按钮走 ButtonService.callButton
+                    // 而不是推式生单,故必须独立成组,否则界面上永远是灰的
+                    new String[]{"特采", "特采"},
                     new String[]{"查找", "查找", "刷新"},
                     // 打印退货单(2026-09-23):银嘉固定版式纸质单(前端 print-formats.js,列表选中单打印,无后端处理器)
                     new String[]{"打印", "打印", "预览", "导出", "打印退货单"},

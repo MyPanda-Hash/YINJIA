@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="panelx-list" @click="closeCtx">
     <!-- ══════════ ① 顶部工具栏（T+ 灰条 + 单据翻页）══════════ -->
     <!-- 来料检验要求(档案特例):7 页签 Excel 复刻整表,工具栏/单据卡片/明细表格/页脚全部不渲染,由组件自带迷你工具栏接管 -->
@@ -6221,6 +6221,21 @@ async function onButton(action) {
     try {
       const res = await engine.callButton({ panelCode: panelCode.value, buttonName: action, formData: {}, buttonParam: {} })
       ElMessage.success(`${tt('重算成本')}${tt('完成')}(${res?.['重算行数'] ?? '?'} ${tt('行')})`)
+      await load()
+    } catch (e) {
+      ElMessage.error(engine.errMsg(e) || tt('按钮执行失败'))
+    }
+    return
+  }
+  // 暂收退料单「特采」(2026-10-04):本单审批通过后,按明细行逐行生成特采单草稿(一物料一单,
+  // 总数量=该行送检数量、不合格品数量=退货数量)。后端按退料行幂等,重复点不会产生第二张。
+  if (action === '特采') {
+    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
+    const no = current.value['编号'] || current.value['单据编号'] || ''
+    try {
+      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '特采', formData: { 编号: no }, buttonParam: {} })
+      const made = res?.['特采单号'] || []
+      ElMessage.success(`${tt('特采单')}${tt('已生成')}：${made.join('、')}`)
       await load()
     } catch (e) {
       ElMessage.error(engine.errMsg(e) || tt('按钮执行失败'))

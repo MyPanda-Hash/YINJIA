@@ -241,6 +241,8 @@ export default {
     '四．改善追踪结果': 'IV. Improvement Follow-up Result',
     '七．成本损失': 'VII. Cost of Loss',
     '特采理由': 'Special Procurement Reason',
+    '特采': 'Aceptación especial',
+    '送检数量': 'Cant. enviada a inspección',
     '材料费用': 'Material Cost',
     '人工费': 'Labor Cost',
     '其他费用': 'Other Cost',

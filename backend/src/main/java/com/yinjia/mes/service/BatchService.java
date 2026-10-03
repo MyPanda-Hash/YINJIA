@@ -327,8 +327,8 @@ public class BatchService {
 
     /**
      * 链路前进站优先级(同一站数有多条 ACTIVE 下游时取前者):主链 采购入库 → 退货 → 特采单 → 检验 → 暂收。
-     * 特采单(QC_TC_IN,2026-09-22 特采闸门)排在入库/退回之后:正常它只是中转站,
-     * 特采审核后生成的入库单站数更深,终点仍是采购入库单。
+     * 特采单(QC_TC_IN)排在入库/退回之后:它只是中转站(2026-10-04 起挂在暂收退料单 QC_RETURN 之下:
+     * 退料单审批通过 →「特采」按钮 → 特采单),特采审批后生成的入库单站数更深,终点仍是采购入库单。
      * 只影响「同一站数」的分支取舍,不改变"站数多者优先"的终点口径。
      */
     private static final List<String> CHAIN_PRIORITY = List.of("PURCHASE_IN", "QC_RETURN", "QC_TC_IN", "QC_INSP", "QC_RECV");

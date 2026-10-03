@@ -136,10 +136,9 @@ public class PushGenerateHandler implements PanelActionHandler {
             }
         }
 
-        // 3c) 特采闸门(2026-09-22):来源=来料检验单时,勾了特采的行不得经此路径生成入库/退料
-        //     (该路径现为灰色占位,此处为防御性闸门 —— 特采行只能经特采单走,见 ButtonService)
-        items = dropSpecialAccept(sourcePanel, items);
-        if (items.isEmpty()) throw new IllegalStateException("该检验单的明细行均已勾选特采:特采=让步接收,需先经特采单审批通过(由特采单生成采购入库单)");
+        // 3c) 特采闸门已拆除(2026-10-04 口径):检验明细的「特采」字段整体下线,特采改由
+        //     「暂收退料单审批通过 → 特采按钮 → 特采单 → 采购入库单」表达。检验行的合格/不良
+        //     照常分流(合格→采购入库、不良→暂收退料单),此路径不再需要按行排除任何东西。
 
         // 4) 头/行映射:与选单共用 buildSelectConfig 生成的 headerMap/detailMap(from=源标签,to=目标标签)
         //    显式传来源(目标面板可有多来源,如 采购入库单 ← 采购订单/来料检验单)
@@ -222,18 +221,16 @@ public class PushGenerateHandler implements PanelActionHandler {
      * - 是否来料检验:来源 = 来料检验单(QC_INSP):该批物料走过检验 → 是
      *   来源 = 送料暂收单(QC_RECV,暂收后人工判免检直达入库)→ 否
      *   2026-09-22 起采购入库单只有这两个来源(采购订单的免检直达出口已取消),判定无需再改。
-     * - 特采(2026-09-23 用户口径「这个字段和来料检验的字段一样,是从来料检验来的」):
-     *   取**来源检验行**的「特采」开关 —— 勾了=是,没勾=否;来源行没有该字段(暂收单等)=否。
-     *   注意本路径看不见特采数据:勾了特采的检验行已被 {@link #dropSpecialAccept} 闸门排除,
-     *   它们的去向是特采单(QC_TC_IN),由 ButtonService.tcInApprovedGenerate 在特采单审批通过时
-     *   生成入库单并写 特采=是。此处仍按来源行取值(而不是硬写「否」),闸门口径若变也不会写错。
+     * - 特采(2026-10-04 口径变更):**本路径恒为「否」**。检验明细的「特采」字段已整体下线,
+     *   特采改由「暂收退料单审批通过 → 特采按钮 → 特采单 → 采购入库单」表达,那条链上的入库行
+     *   由 ButtonService.tcInApprovedGenerate 硬写「是」。本路径(选单/推式)永远产的是普通入库行。
      * 只对目标面板 = 采购入库单(PURCHASE_IN)生效;目标面板未登记该字段时写入会被通用保存静默忽略。
      */
     private void applySourceFlags(String sourcePanel, String targetPanel,
                                   Map<String, Object> srcItem, Map<String, Object> row) {
         if (!"PURCHASE_IN".equals(targetPanel) || row == null) return;
         row.put("是否来料检验", "QC_INSP".equals(sourcePanel) ? "是" : "否");
-        row.put("特采", isSpecialAccept(srcItem) ? "是" : "否");
+        row.put("特采", "否");
     }
 
     private double numOf(Object v) {
@@ -262,26 +259,6 @@ public class PushGenerateHandler implements PanelActionHandler {
      * 故这里能预告 —— 来源单已有号时用它的,否则按同一公式现算(与 generateBatch 完全同源,
      * 前端据此在弹窗里显示"本批批次号",不必等生单完再看)。
      */
-    /** 检验行的「特采」标志为真(bit/Boolean/是/true/1 均认) */
-    private static boolean isSpecialAccept(Map<String, Object> item) {
-        Object v = item == null ? null : item.get("特采");
-        if (v == null) return false;
-        if (v instanceof Boolean b) return b;
-        if (v instanceof Number n) return n.doubleValue() != 0d;
-        String s = String.valueOf(v).trim();
-        return "true".equalsIgnoreCase(s) || "是".equals(s) || "1".equals(s);
-    }
-
-    /**
-     * 特采闸门(2026-09-22):来源=来料检验单(QC_INSP)时,勾了「特采」的明细行**不得**经
-     * 选单/推式路径直接生成 采购入库单/暂收退回单 —— 它们的去向是特采单,特采单审核通过后
-     * 由 ButtonService.tcInApprovedGenerate 整行(合格+不合格)生成入库单(不走退料)。
-     */
-    private static List<Map<String, Object>> dropSpecialAccept(String sourcePanel, List<Map<String, Object>> items) {
-        if (!"QC_INSP".equals(sourcePanel)) return items;
-        return items.stream().filter(it -> !isSpecialAccept(it)).collect(java.util.stream.Collectors.toList());
-    }
-
     /**
      * 隔离行的行键定式:`{采购订单号}#{采购订单行id}@{材料码打印行id}`(2026-10-04)。
      *
@@ -333,9 +310,6 @@ public class PushGenerateHandler implements PanelActionHandler {
         }
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Map<String, Object> it : srcItems) {
-            // 特采行(2026-09-22 闸门):不进选单/生单列表 —— 剩余量已被 QC_INSP→QC_TC_IN 占用吃掉,
-            // 这里再显式排除一道,保证特采行在任何手工路径都不可见
-            if ("QC_INSP".equals(sourcePanel) && isSpecialAccept(it)) continue;
             Object id = it.get("id");
             int lineId = intOf(id);
             String orderKey = sourceNo + "#" + (id == null ? "" : String.valueOf(id));
@@ -522,7 +496,6 @@ public class PushGenerateHandler implements PanelActionHandler {
             // 一次性整送(推式按钮/选单):只走**订单行**的剩余量,不动隔离行
             // (用户口径:隔离行"没有作废之前不会与生单有关联",要它必须显式勾选)
             for (Map<String, Object> m : srcItems) {
-                if ("QC_INSP".equals(sourcePanel) && isSpecialAccept(m)) continue;
                 Map<String, Object> r = byKey.get(sourceNo + "#" + m.get("id"));
                 if (r == null) continue;
                 double qty = numOf(r.get("剩余数量"));
@@ -588,11 +561,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         }
         String printedBatchNo = resvBatches.isEmpty() ? "" : resvBatches.iterator().next();
         if (picked.isEmpty()) {
-            boolean allSpecial = "QC_INSP".equals(sourcePanel) && !srcItems.isEmpty()
-                    && srcItems.stream().allMatch(PushGenerateHandler::isSpecialAccept);
-            throw new IllegalStateException(allSpecial
-                    ? "该检验单的明细行均已勾选特采:特采=让步接收,需先经特采单审批通过(由特采单生成采购入库单,不走此路径)"
-                    : "该单据已无剩余可送(各明细行均已送满)");
+            throw new IllegalStateException("该单据已无剩余可送(各明细行均已送满)");
         }
 
         // 4) 头/行映射(与选单共用 buildSelectConfig),再覆盖 本次数量 + 批次键

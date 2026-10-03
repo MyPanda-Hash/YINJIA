@@ -59,6 +59,9 @@ public class PanelPermissionService {
                 "首件完成通知", "生成采购申请"})
             m.put(b, edit);
         m.put("申请修改", new String[]{"modify"});                       // 词表:modify=申请修改
+        // 暂收退料单「特采」(2026-10-04):把已审批通过的退料单推到特采单 —— 属生单类动作,
+        // 有该面板**编辑权**或**审批权**的账号都能发起(品质/采购文员编制、审批人复核都合理)
+        m.put("特采", new String[]{"add", "modify", "audit"});
         // 删除类(草稿直删需编辑权;归档单删除申请=del)
         m.put("删除", new String[]{"add", "modify", "del"});
         m.put("删除单据", new String[]{"add", "modify", "del"});
