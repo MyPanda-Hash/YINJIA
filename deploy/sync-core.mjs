@@ -68,7 +68,10 @@ const N_SYNC_USER = '金蝶同步'; // 星辰审核人缺失时 yj_doc_status.sh
  *     node sync.mjs --refresh=BD_MATERIAL --yes   (理由见 BD_MATERIAL 条目 cfRefresh 注释)。 */
 const CF_INSPECTION_KEYS = ['custom_field__1__62jiaob3z7yj97', 'custom_field__1__62tvoyr1j4fa'];
 
-/** 从商品详情取来料检验值(custom_field 可能是对象,也可能是 JSON 字符串——列表/详情两种形态都实测见过)。
+/** 从商品详情取来料检验值(值 是/否)。口径(用户 2026-10-03):**没有填写「是」的,一律按「否」**——
+ *  金蝶侧未勾选时接口回空串,故登记键里取不到「是」就写「否」,不再落空值(与迁移
+ *  tools/migrate-inv-inspection-default-no.sql 的存量回填同口径,两侧一致)。
+ *  custom_field 可能是对象,也可能是 JSON 字符串(列表/详情两种形态都实测见过);
  *  多账套共用登记表:取第一个有值的键(沙箱与真实账套的键不会同时出现,互不干扰)。 */
 function cfInspection(d) {
   let cf = (d && d.custom_field) || {};
@@ -77,7 +80,7 @@ function cfInspection(d) {
     const v = String(cf[k] ?? '').trim();
     if (v) return v;
   }
-  return null;
+  return '否';
 }
 
 /** 商品档案「自定义字段复核」时间窗(天)。

@@ -2084,3 +2084,13 @@ migrate-qc-docs-twolevel.sql
 #   **不建面板**(用户明确不要):不插 yj_panel/yj_field、不进菜单、不配权限,只做表级在册登记。
 #   幂等,两账套均执行。 ——
 migrate-pu-label.sql
+
+# —— 2026-10-03 商品·来料检验 口径落定:未填写(空)= 否 ——
+#   用户口径:「金蝶自定义字段新增的第 4 个字段 = 来料检验(键 custom_field__1__62tvoyr1j4fa,
+#   已登记进 deploy/sync-core.mjs 的 CF_INSPECTION_KEYS);拉下来后,没有填写是的默认为否」。
+#   金蝶侧未勾选时接口回空串 ⇒ 同步器原先把空串写成 NULL、界面一片空白;
+#   本脚本把 bs_inv.来料检验 的存量空值统一回填「否」(已填「是」的不动),并给列注明补上该口径;
+#   同步器侧同口径改造(cfInspection:取不到「是」即写「否」,见 deploy/sync-core.mjs)。
+#   执行前:bs_inv 3874 行(金蝶同步 3852 + 本地手录 22),是 9 / 空 3865 / 其它 0。
+#   幂等,两账套均执行。 ——
+migrate-inv-inspection-default-no.sql
