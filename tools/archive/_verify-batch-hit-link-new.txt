@@ -1,0 +1,111 @@
+=== 分批送料链回归(NEW,期望基线=NEW)  api=http://127.0.0.1:8090 factory=YJ_TEST db=HSDZ_MES_TEST ===
+
+=== 0 前置:两账套基线 ===
+         正式 HSDZ_MES: kucun 余量 15939 / 行 31 / inh 31 / outh 0 / 成本表 31 行
+         测试 HSDZ_MES_TEST: kucun 余量 15939 / 行 31 / inh 31 / outh 0 / 成本表 31 行
+  [PASS] 基线口径(测试账套) kucun=15939 inh=31 outh=0 成本=31
+  [PASS] 测试账套 form_flow_link / yj_doc_batch 为空(基线干净)
+         基线最大 id:s_allno=149945 yj_usage_log=5764
+  [PASS] 登录工厂 YJ_TEST(实际账套 YJ_TEST)
+
+靶子: 仓库=原料仓 存货=3-01-16-0012/SP-FX2-X60-RO 供应商=演示供应商 批次戳=MURYUYZF
+
+=== 1 造链起点:采购订单(保存 → 审核) ===
+  采购订单 PO-2026-10-0003
+  [PASS] 采购订单审核成功
+         送料行 lineKey=PO-2026-10-0003#8 剩余=50
+
+=== 2 分批送料真链(采购订单 → 送料暂收单) ===
+         A: 暂收单=SL-2026-10-0005 批次键=11 暂收单头批次键=11 链路行 batch_id=11
+         B1: 暂收单=SL-2026-10-0006 批次键=12 暂收单头批次键=12 链路行 batch_id=12
+         B2: 暂收单=SL-2026-10-0007 批次键=13 暂收单头批次键=13 链路行 batch_id=13
+  [PASS] 三条链都拿到独立批次键(真 form_flow_link.batch_id + yj_doc_batch)
+  [PASS] 三行台账审核前均 PENDING 且批次号空
+
+=== 2b 顺带:暂收单 → 生成来料检验单(当前被别处缺陷挡住,原样留证) ===
+         应答: {"http":500,"code":500,"message":"服务异常：PreparedStatementCallback; uncategorized SQLException for SQL [SELECT id, 物料编码, 物料名称, 批次号, 送检数量, 数量, 单位, 计量单位 FROM qc_insp_detail WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id]; SQL state [S0001]; error code [207]; 列名 '单位' 无效。"}
+         该暂收单是否留下检验单链路行:0
+  [PASS] 「生成来料检验单」当前 500(存量缺陷,已原样留证;不影响本探针后续走免检直达出口)
+
+=== 3 免检直达:暂收单 → 采购入库单(真实出口,系统自己写链路行) ===
+         A: 入库单=PI-2026-10-0013 表头批次键=11 表头批次号="" 链路行=[{"id":133,"pc":"QC_RECV","no":"SL-2026-10-0005","batch_id":11}]
+         B1: 入库单=PI-2026-10-0014 表头批次键=12 表头批次号="" 链路行=[{"id":134,"pc":"QC_RECV","no":"SL-2026-10-0006","batch_id":12}]
+         B2: 入库单=PI-2026-10-0015 表头批次键=13 表头批次号="" 链路行=[{"id":135,"pc":"QC_RECV","no":"SL-2026-10-0007","batch_id":13}]
+  [PASS] 三张入库单都已生成且链路行由系统写出
+
+=== 4 A:免检直达入库单(系统自然状态) ===
+         oracle(A)={"head":11,"link":11,"linkRows":1,"srcKey":11,"branch":1}
+         Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+         DB=HSDZ_MES_TEST  spring-jdbc=6.2.8  (逐字对照:旧=queryForObject / 新=queryForList+首行)
+         doc=PI-2026-10-0013        链路行 1 条(batch_id 非空 1 条), 入库单头批次键=11 | 旧(queryForObject)=11                                                         新(queryForList)=11     | 相同
+         结论:本次全部样本 两实现等价(命中同值;0 行仅旧实现抛异常)
+  A 审核应答: {"http":200,"code":200,"message":"success"}  台账={"id":11,"batch_no":"20261003","status":"ACTIVE","target_form_no":"SL-2026-10-0005"}
+  [PASS] A 采购入库单审核**不 500**
+  [PASS] A 台账状态与 oracle 一致(命中档 1 ⇒ ACTIVE)
+
+=== 5 B1:清空 表头/来源单 批次键,只留 form_flow_link.batch_id(②档) ===
+         B1 入库单=PI-2026-10-0014 清键+补链路 batch_id 后 oracle={"head":null,"link":12,"linkRows":1,"srcKey":null,"branch":2}
+  [PASS] B1 ①档不可用(表头批次键空) / ③档不可用(来源单头批次键空)
+  [PASS] B1 ②档命中且 = 本链批次键
+         Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+         DB=HSDZ_MES_TEST  spring-jdbc=6.2.8  (逐字对照:旧=queryForObject / 新=queryForList+首行)
+         doc=PI-2026-10-0014        链路行 1 条(batch_id 非空 1 条), 入库单头批次键=null | 旧(queryForObject)=12                                                         新(queryForList)=12     | 相同
+         结论:本次全部样本 两实现等价(命中同值;0 行仅旧实现抛异常)
+  B1 审核应答: {"http":200,"code":200,"message":"success"}  台账={"id":12,"batch_no":"20261003","status":"ACTIVE","target_form_no":"SL-2026-10-0006"}
+  [PASS] 🔴 B1(②档命中)审核**不 500** —— 旧实现若在这里抛错即"等价性不成立",必须上报
+  [PASS] 🔴 B1 **②档命中**:本链批次台账翻 ACTIVE 且取到号(跳过的路会保持 PENDING/NULL)
+  [PASS] B1 form_flow_link 该批次 batch_no 已回填(②档取号后走完了回填链)
+  [PASS] B1 未误动其它批次台账
+
+=== 6 B2:同 B1 但 form_flow_link.batch_id=NULL(0 行 ⇒ 跳过 / 旧实现 500) ===
+         B2 入库单=PI-2026-10-0015 链路行(置 NULL 前)[{"id":135,"batch_id":13}] | oracle={"head":null,"link":null,"linkRows":1,"srcKey":null,"branch":0}
+  [PASS] B2 与 B1 只差链路行 batch_id(行还在,只是 batch_id 空) ⇒ oracle=0 行
+         Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+         DB=HSDZ_MES_TEST  spring-jdbc=6.2.8  (逐字对照:旧=queryForObject / 新=queryForList+首行)
+         doc=PI-2026-10-0015        链路行 1 条(batch_id 非空 0 条), 入库单头批次键=null | 旧(queryForObject)=抛异常 EmptyResultDataAccessException: Incorrect result size: expected 1, actual 0 新(queryForList)=0      | 0行:旧抛异常/新返回 0(8cc1648f 的差异面)
+         结论:本次全部样本 两实现等价(命中同值;0 行仅旧实现抛异常)
+  B2 审核应答: {"http":200,"code":200,"message":"success"}  台账={"id":13,"batch_no":null,"status":"PENDING","target_form_no":"SL-2026-10-0007"}
+  [PASS] B2 审核**不 500**(0 行那条路已修)
+  [PASS] B2 **跳过**:台账保持 PENDING + 批次号空
+
+=== 7 C:手工采购入库单(无链路 ⇒ 0 行) ===
+         C 手工入库单=PI-2026-10-0016 链路行 0 条 | oracle={"head":null,"link":null,"linkRows":0,"srcKey":null,"branch":0}
+  [PASS] C 链路行 0 条(手工单形状)
+         Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+         DB=HSDZ_MES_TEST  spring-jdbc=6.2.8  (逐字对照:旧=queryForObject / 新=queryForList+首行)
+         doc=PI-2026-10-0016        链路行 0 条(batch_id 非空 0 条), 入库单头批次键=null | 旧(queryForObject)=抛异常 EmptyResultDataAccessException: Incorrect result size: expected 1, actual 0 新(queryForList)=0      | 0行:旧抛异常/新返回 0(8cc1648f 的差异面)
+         结论:本次全部样本 两实现等价(命中同值;0 行仅旧实现抛异常)
+  C 审核应答: {"http":200,"code":200,"message":"success"}
+  [PASS] C 审核**不 500**(8cc1648f 修的就是这条)
+
+=== 8 弃审 B1:批次号不回收、台账状态不变 ===
+  B1 弃审应答: {"http":200,"code":200,"message":"success"}  台账={"id":12,"batch_no":"20261003","status":"ACTIVE","target_form_no":"SL-2026-10-0006"}
+  [PASS] B1 弃审成功
+  [PASS] B1 弃审后台账号/状态不变(口径:不回收)
+  [PASS] B1 弃审后台账流水红冲(inh 标 Y)
+
+=== 9 「两种实现返回同一个 batch_id」的直接证据 ===
+  [PASS] Java 逐字对照探针:4 个样本,两实现返回值全部等价(命中同值 / 0 行仅旧抛异常)
+
+=== 10 清理 ===
+         PURCHASE_IN PI-2026-10-0014 弃审 未成功:{"http":409,"code":409,"message":"仅已审核或已归档状态可弃审"}
+         kucun 删除新增行 id=715(3-01-16-0012/CK01/20261003)
+         kucun 删除新增行 id=716(3-01-16-0012/CK01/null)
+         kucun 删除新增行 id=717(3-01-16-0012/CK01/HITLINK-MURYUYZF-C)
+         重算成本应答: {"http":200,"code":200,"message":"success"}
+         s_allno 清掉本次新增 8 行(> 149945)
+         yj_usage_log 清掉本次新增 31 行(> 5764)
+
+=== 11 收尾核对 ===
+         测试 HSDZ_MES_TEST: kucun 余量 15939 / 行 31 / inh 31 / outh 0 / 成本表 31 行
+         正式 HSDZ_MES: kucun 余量 15939 / inh 31 / outh 0 / 成本表 31 行
+  [PASS] 测试账套回到基线 kucun=15939 / inh=31 / outh=0 / 成本=31
+  [PASS] 测试账套链路/台账清零(form_flow_link=0, yj_doc_batch=0)
+  [PASS] 正式账套未被改动(与基线一致)
+  [PASS] kucun 逐行回到基线(快照完全相同)
+         全库行数差异: 无
+  [PASS] 全库行数快照与基线完全一致(含发号池与操作留痕 — 本次新增行已清)
+
+观测已写 D:\DSHTemp\yjtool\evidence-new.json
+
+═══ 结果(NEW): 通过 30 / 失败 0 ═══
