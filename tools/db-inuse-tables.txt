@@ -17,7 +17,7 @@ table:yj_archive_change_log   # 档案式面板修改记录(每次存档留一�
 table:yj_attachment   # 单据附件表(panel_code+doc_no+field_key定位,文件名/存储名/大小/类型)
 table:yj_change_dept   # 产品变更申请单部门映射:纸面「部门评审意见」的部门行(YJ-QR-130 的 7 个部门)↔ 系统部门 yj_dept.id —— 账号按 yj_user.dept_id 命中本表即可填写对应部门行(管理员豁免)
 table:yj_dept   # 部门表(多级,parentId)
-table:yj_doc_batch   # 采购订单送料批次台账(每张暂收单一个批次;批次号=订单号+3位序号,序号在草稿删除后回收)
+table:yj_doc_batch   # 采购订单送料批次台账(每张暂收单一个批次键;批次号=供应商编码去 YJ- 前缀 + - + 生单当天 yyyyMMdd,生单即定号、下游逐站继承;2026-10-04 口径,旧的"订单号+3位序号 / 入库审核取号回填"已废)
 table:yj_doc_modify_log   # 归档单修改记录(修改前后差异快照与审批链)
 table:yj_doc_status   # 单据状态表(shr审核/canceled作废/stopped中止/pending审批中/archived归档/modify_state修改态)
 table:yj_ext_bind_log   # 动态字段绑定审计(bind绑定/retire退绑/clear清空;备用列池操作留痕)
@@ -67,6 +67,8 @@ table:bl_outsource_in   # 委外入库单行表
 table:bl_outsource_issue   # 委外发料单行表
 table:bl_outsource_order   # 委外加工单行表
 table:bl_pu_order   # 采购订单行表
+table:bd_pu_label   # 采购订单材料码打印单**头**表(供应商自行打码:打印时登记批次号并预约该行数量,生单只消费不再取号;同订单+同批次号复用一张,重打不重复占用;作废即释放预约。**按用户口径不建面板**,仅服务与接口读写)
+table:bl_pu_label   # 采购订单材料码打印单**行**表(本批次号下每个订单行打印了多少;锚=采购订单行id,与 form_flow_link.source_line_key 同源;已生单量不落本表,由 form_flow_link 按批次号派生)
 table:bl_pu_req   # 请购单行表
 table:bl_purchase_in   # 采购入库单行表(批号三键入库)
 table:bl_sale_out   # 销售出库单行表(批号三键出库)

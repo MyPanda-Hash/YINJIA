@@ -59,6 +59,24 @@ public class BatchService {
     /** 供应商编码前缀:取号时剥掉它(用户口径「YJ-后面的数据」) */
     private static final String SUPPLIER_PREFIX = "YJ-";
 
+    /** 超送比例上限(2026-09-22 用户口径:**最高 50%**)——弹窗覆盖与系统参数一律钳在 0~0.5 */
+    public static final double MAX_OVER_RATIO = 0.5d;
+
+    /**
+     * 行的「可送上限」(2026-09-22 口径:**按全部数量算**)—— 订单数量×(1+超送比例) − 已送 + 已退回,负数归 0。
+     * 旧口径 剩余×(1+比例) 的问题:每批只给"当批剩余"的比例额,分批越多超送额度越算越少,
+     * 累计超送永远到不了订单总量的比例额;正确语义是"整张订单行**累计**最多收 数量×(1+比例)"。
+     * 前端同公式:core/selection/batchSendLines.js 的 overAllowance(纯函数,有单测)。
+     *
+     * <p>2026-10-04 从 PushGenerateHandler 迁入本类:材料码预约(供应商自行打码)也要按同一口径算上限,
+     * 而「送料批次口径」的家本来就在 BatchService —— 两处各写一份迟早对不上。
+     */
+    public static double overAllowance(double orderQty, double sent, double returned, double ratio) {
+        double r = Math.max(0d, Math.min(MAX_OVER_RATIO, ratio));
+        double v = orderQty * (1 + r) - sent + returned;
+        return v > 0 ? v : 0d;
+    }
+
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;
 

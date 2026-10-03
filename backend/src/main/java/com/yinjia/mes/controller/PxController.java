@@ -42,6 +42,7 @@ public class PxController {
     private final PanelPermissionService perm;
     private final com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler;
     private final com.yinjia.mes.service.BatchService batchService;
+    private final com.yinjia.mes.service.PuLabelService puLabel;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -52,7 +53,8 @@ public class PxController {
                         DevTaskService devTaskService, ButtonService buttons,
                         PanelPermissionService perm,
                         com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler,
-                        com.yinjia.mes.service.BatchService batchService) {
+                        com.yinjia.mes.service.BatchService batchService,
+                        com.yinjia.mes.service.PuLabelService puLabel) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -65,6 +67,46 @@ public class PxController {
         this.perm = perm;
         this.pushGenerateHandler = pushGenerateHandler;
         this.batchService = batchService;
+        this.puLabel = puLabel;
+    }
+
+    // ============ 采购订单材料码打印(供应商自行打码,2026-10-04) ============
+    // 口径:批次号在**打印时**登记并预约该行数量;生单只消费预约,不再按公式重算。
+    // 方案:docs/plans/2026-10-04-采购订单材料码批次号方案.md。**不建面板**(用户明确不要),
+    // 故三个端点直接挂既有 /px 运行时,权限按「采购订单」面板的查看/修改权把关。
+
+    /** 打印弹窗取数:订单行(含可打印量)+ 预填批次号 + 本订单已有打印记录 */
+    @GetMapping("/puLabel/dialog")
+    public ApiResult<Map<String, Object>> puLabelDialog(@RequestParam String orderNo) {
+        perm.requirePanelView("PU_ORDER");
+        return ApiResult.ok(puLabel.dialog(orderNo));
+    }
+
+    /** 登记打印(同订单+同批次号复用同一张打印头,重打只累加次数不重复占用) */
+    @PostMapping("/puLabel/print")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> puLabelPrint(@RequestBody Map<String, Object> body) {
+        perm.requireButton("PU_ORDER", "修改");
+        String orderNo = String.valueOf(body.getOrDefault("orderNo", ""));
+        String batchNo = body.get("batchNo") == null ? "" : String.valueOf(body.get("batchNo"));
+        List<Map<String, Object>> lines = new java.util.ArrayList<>();
+        if (body.get("lines") instanceof List<?> l) {
+            for (Object o : l) if (o instanceof Map<?, ?> m) lines.add(new LinkedHashMap<>((Map<String, Object>) m));
+        }
+        return ApiResult.ok(puLabel.print(orderNo, batchNo, lines, currentUser()));
+    }
+
+    /** 作废打印记录(软删,预约量立即释放回余量) */
+    @PostMapping("/puLabel/void")
+    public ApiResult<Map<String, Object>> puLabelVoid(@RequestBody Map<String, Object> body) {
+        perm.requireButton("PU_ORDER", "修改");
+        return ApiResult.ok(puLabel.voidDoc(String.valueOf(body.getOrDefault("docNo", "")), currentUser()));
+    }
+
+    /** 当前操作人(与 batchFlow 各端点同口径:无认证上下文时记 system) */
+    private static String currentUser() {
+        return SecurityContextHolder.getContext().getAuthentication() == null ? "system"
+                : SecurityContextHolder.getContext().getAuthentication().getName();
     }
 
     /** 产品开发:下游面板元数据(矩阵列头) */
@@ -431,6 +473,9 @@ public class PxController {
         String sourceNo = String.valueOf(body.getOrDefault("sourceNo", ""));
         if (!targetPanel.isBlank()) perm.requireButton(targetPanel, "保存");
         Map<String, Double> qtyByLine = null;
+        // 材料码预约(2026-10-04):lines[].batchNo = 该行消费的「已打印批次号」——
+        // 带值的行从"已打印待生单"里勾出来,量受该批次号未生单预约约束,且目标单批次号强制取它。
+        Map<String, String> batchByLine = new java.util.LinkedHashMap<>();
         Object raw = body.get("lines");
         if (raw instanceof List<?> list && !list.isEmpty()) {
             qtyByLine = new java.util.LinkedHashMap<>();
@@ -440,15 +485,17 @@ public class PxController {
                 Object qty = m.get("qty");
                 if (key == null) continue;
                 qtyByLine.put(String.valueOf(key), qty == null ? 0d : Double.parseDouble(String.valueOf(qty)));
+                Object bno = m.get("batchNo");
+                if (bno != null && !String.valueOf(bno).isBlank()) batchByLine.put(String.valueOf(key), String.valueOf(bno).trim());
             }
         }
         Map<String, Object> res = pushGenerateHandler.generateBatch(sourcePanel, targetPanel, sourceNo,
-                SecurityContextHolder.getContext().getAuthentication() == null ? "system"
-                        : SecurityContextHolder.getContext().getAuthentication().getName(),
+                currentUser(),
                 qtyByLine,
                 body.get("overRatio") == null || String.valueOf(body.get("overRatio")).isBlank() ? null
                         : Double.parseDouble(String.valueOf(body.get("overRatio"))),
-                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")));
+                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")),
+                batchByLine.isEmpty() ? null : batchByLine);
         return ApiResult.ok(res);
     }
 

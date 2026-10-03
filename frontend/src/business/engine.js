@@ -469,6 +469,23 @@ export async function batchFlowBatch(batchNo) {
   return unwrap(await request.get('/px/batchFlow/batch', { params: { batchNo } }))
 }
 
+/* ── 采购订单材料码打印(供应商自行打码,2026-10-04):批次号在**打印时**登记并预约该行数量 ── */
+
+/** 打印弹窗取数:订单行(含可打印量)+ 预填批次号(与生单同公式)+ 本订单已有打印记录 */
+export async function puLabelDialog(orderNo) {
+  return unwrap(await request.get('/px/puLabel/dialog', { params: { orderNo } }))
+}
+
+/** 登记打印:同订单+同批次号复用同一张打印头(重打只累加次数,不重复占用余量) */
+export async function puLabelPrint(payload) {
+  return unwrap(await request.post('/px/puLabel/print', payload))
+}
+
+/** 作废打印记录(软删):预约量立即释放回余量 */
+export async function puLabelVoid(docNo) {
+  return unwrap(await request.post('/px/puLabel/void', { docNo }))
+}
+
 
 /**
  * Upload a voucher image to the MES backend. The backend owns the cloud OCR

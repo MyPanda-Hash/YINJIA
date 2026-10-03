@@ -38,12 +38,15 @@ public class PushGenerateHandler implements PanelActionHandler {
     private final PanelConfigService configService;
     private final BatchService batchService;
     private final JdbcTemplate jdbc;
+    /** 材料码打印预约(采购订单自行打码场景):余量扣减与「已打印待生单」取数 */
+    private final com.yinjia.mes.service.PuLabelService puLabel;
     /** 检验目录联动:检验单生成后按明细物料建报告草稿 + 目录行(2026-09-22) */
     private final QcCatalogService qcCatalog;
 
     public PushGenerateHandler(PanelRegistry registry, QueryService queryService, ButtonService buttonService,
                                VoucherFlowService voucherFlow, PanelConfigService configService,
-                               BatchService batchService, JdbcTemplate jdbc, QcCatalogService qcCatalog) {
+                               BatchService batchService, JdbcTemplate jdbc, QcCatalogService qcCatalog,
+                               com.yinjia.mes.service.PuLabelService puLabel) {
         this.registry = registry;
         this.queryService = queryService;
         this.buttonService = buttonService;
@@ -52,6 +55,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         this.batchService = batchService;
         this.jdbc = jdbc;
         this.qcCatalog = qcCatalog;
+        this.puLabel = puLabel;
     }
 
     /** 可分批生单的目标面板:配了「批次号」表头字段(暂收/检验/入库/退回 四张单) */
@@ -268,21 +272,6 @@ public class PushGenerateHandler implements PanelActionHandler {
         return "true".equalsIgnoreCase(s) || "是".equals(s) || "1".equals(s);
     }
 
-    /** 超送比例上限(2026-09-22 用户口径):**最高 50%** —— 弹窗覆盖与系统参数一律钳在 0~0.5 */
-    private static final double MAX_OVER_RATIO = 0.5d;
-
-    /**
-     * 行的「可送上限」(2026-09-22 口径:**按全部数量算**)—— 订单数量×(1+超送比例) − 已送 + 已退回,负数归 0。
-     * 旧口径 剩余×(1+比例) 的问题:每批只给"当批剩余"的比例额,分批越多超送额度越算越少,
-     * 累计超送永远到不了订单总量的比例额;正确语义是"整张订单行**累计**最多收 数量×(1+比例)"。
-     * 前端同公式:core/selection/batchSendLines.js 的 overAllowance(纯函数,有单测)。
-     */
-    private static double overAllowance(double orderQty, double sent, double returned, double ratio) {
-        double r = Math.max(0d, Math.min(MAX_OVER_RATIO, ratio));
-        double v = orderQty * (1 + r) - sent + returned;
-        return v > 0 ? v : 0d;
-    }
-
     /**
      * 特采闸门(2026-09-22):来源=来料检验单(QC_INSP)时,勾了「特采」的明细行**不得**经
      * 选单/推式路径直接生成 采购入库单/暂收退回单 —— 它们的去向是特采单,特采单审核通过后
@@ -299,6 +288,11 @@ public class PushGenerateHandler implements PanelActionHandler {
         Map<String, Double> sent = batchService.sentByLineKey(sourcePanel, sourceNo);
         Map<String, Double> returned = batchService.returnedByOrderLine(sourceNo);
         double ratio = batchService.overRatio();
+        // 材料码预约(2026-10-04):采购订单上「已打印未生单」的量要**从余量里扣掉** ——
+        // 用户的批次号已经印在标签上、量也已经承诺出去了,不能再被当成"还能自由送"的量。
+        // 只有采购订单这条链有材料码打印(其余来源面板没有预约),故按来源面板短路。
+        Map<Integer, List<Map<String, Object>>> reservations = "PU_ORDER".equals(sourcePanel)
+                ? puLabel.reservationsByLine(sourceNo) : Map.of();
         List<Map<String, Object>> rows = new ArrayList<>();
         for (Map<String, Object> it : itemsOf(src)) {
             // 特采行(2026-09-22 闸门):不进选单/生单列表 —— 剩余量已被 QC_INSP→QC_TC_IN 占用吃掉,
@@ -309,7 +303,12 @@ public class PushGenerateHandler implements PanelActionHandler {
             double qty = numOf(it.get("数量"));
             double used = sent.getOrDefault(lineKey, 0d);
             double ret = returned.getOrDefault(lineNoOf(it), 0d);
-            double left = Math.max(0, qty - used + ret);
+            List<Map<String, Object>> mine = id == null ? List.of()
+                    : reservations.getOrDefault(Integer.parseInt(String.valueOf(id)), List.of());
+            double reserved = 0d;
+            for (Map<String, Object> r : mine) reserved += numOf(r.get("未生单量"));
+            reserved = round2(reserved);
+            double left = Math.max(0, qty - used + ret - reserved);
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("lineKey", lineKey);
             row.put("id", id);
@@ -322,8 +321,12 @@ public class PushGenerateHandler implements PanelActionHandler {
             row.put("已送数量", round2(used));
             row.put("已退回数量", round2(ret));
             row.put("剩余数量", round2(left));
-            // 可送上限(2026-09-22 口径):按**订单全部数量**算,不再用 剩余×(1+比例)
-            row.put("可送上限", round2(overAllowance(qty, used, ret, ratio)));
+            // 可送上限(2026-09-22 口径):按**订单全部数量**算,不再用 剩余×(1+比例);
+            // 再扣掉被材料码预约占住的量 —— 它是"还能**自由**送(未打印)多少"的口径,
+            // 预约部分走「打印预约」那几条,不占这个额度(见 generateBatch 的校验口径)。
+            row.put("可送上限", round2(Math.max(0d, BatchService.overAllowance(qty, used, ret, ratio) - reserved)));
+            row.put("未生单预约合计", reserved);
+            row.put("打印预约", mine);       // [{批次号,打印数量,已生单量,未生单量,单据编号,打印时间}]
             rows.add(row);
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -358,7 +361,7 @@ public class PushGenerateHandler implements PanelActionHandler {
     @Transactional
     public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
                                              String user, Map<String, Double> qtyByLineKey) {
-        return generateBatch(sourcePanel, targetPanel, sourceNo, user, qtyByLineKey, null);
+        return generateBatch(sourcePanel, targetPanel, sourceNo, user, qtyByLineKey, null, null, null);
     }
 
     /**
@@ -369,11 +372,21 @@ public class PushGenerateHandler implements PanelActionHandler {
     @Transactional
     public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
                                              String user, Map<String, Double> qtyByLineKey, Double overRatioOverride) {
-        return generateBatch(sourcePanel, targetPanel, sourceNo, user, qtyByLineKey, overRatioOverride, null);
+        return generateBatch(sourcePanel, targetPanel, sourceNo, user, qtyByLineKey, overRatioOverride, null, null);
     }
 
     /** 批次号列宽(与 sl_recv/qc_insp/qc_return/bd_purchase_in 的 nvarchar(100) 对齐;超长会在落库时截断报错,故先拦) */
     private static final int BATCH_NO_MAX = 100;
+
+    /**
+     * 分批生单(带**批次号覆盖**、不带材料码预约):等价于下面那个 8 参版本 + 空预约,保留给既有调用方。
+     */
+    @Transactional
+    public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
+                                             String user, Map<String, Double> qtyByLineKey,
+                                             Double overRatioOverride, String batchNoOverride) {
+        return generateBatch(sourcePanel, targetPanel, sourceNo, user, qtyByLineKey, overRatioOverride, batchNoOverride, null);
+    }
 
     /**
      * 分批生单(再带**批次号覆盖**):batchNoOverride = 生单对话框里人工填/改的批次号(可空)。
@@ -381,12 +394,20 @@ public class PushGenerateHandler implements PanelActionHandler {
      * 「在生单时批次号就可以修改」:对话框里的输入框默认按公式预填,想改就改,确定后按这个号落库;
      * 留空则仍按公式取号。下游各跳一律继承来源单的号,传进来的覆盖值**忽略**(见调用点注释)。
      * 空串/纯空白视为"没改";超长(> {@value #BATCH_NO_MAX})直接拒绝,免得写到库里被静默截断。
+     *
+     * <p>batchByLineKey(2026-10-04 材料码预约)= lineKey → **该行消费的已打印批次号**(可空)。
+     * 带值的行表示"这行是从**已打印待生单**里勾出来的":它的量来自 bl_pu_label 的未生单预约,
+     * 数量上限是**该行该批次号的未生单预约量**(不是"头寸−预约" —— 那部分本来就已占用),
+     * 并且**目标单的批次号强制取该打印批次号**(标签已印在实物上,系统只能服从)。
+     * 一次调用只允许出现**一个**打印批次号:暂收单只有一个单头号,多号必须分开生单
+     * (前端按批次号分组,逐组调用)。
      */
     @Transactional
     @SuppressWarnings("unchecked")
     public Map<String, Object> generateBatch(String sourcePanel, String targetPanel, String sourceNo,
                                              String user, Map<String, Double> qtyByLineKey,
-                                             Double overRatioOverride, String batchNoOverride) {
+                                             Double overRatioOverride, String batchNoOverride,
+                                             Map<String, String> batchByLineKey) {
         PanelRegistry.PanelDef srcDef = registry.panel(sourcePanel);
         PanelRegistry.PanelDef tgtDef = registry.panel(targetPanel);
         if (!isBatchTarget(targetPanel)) throw new IllegalStateException("目标面板未启用分批送料:" + targetPanel);
@@ -409,8 +430,12 @@ public class PushGenerateHandler implements PanelActionHandler {
         // 超送比例:弹窗可临时覆盖(夹 0~**0.5**,2026-09-22 用户口径:超送最高 50%),
         // 未给则用系统参数 receive_over_ratio(BatchService.overRatio 同样钳 0~0.5)
         double ratio = overRatioOverride == null ? batchService.overRatio()
-                : Math.max(0d, Math.min(MAX_OVER_RATIO, overRatioOverride));
-        List<Map<String, Object>> picked = new ArrayList<>();   // {item, qty}
+                : Math.max(0d, Math.min(BatchService.MAX_OVER_RATIO, overRatioOverride));
+        // 材料码预约(2026-10-04):采购订单上「已打印未生单」的量已从余量里扣掉,这里的口径要与
+        // batchLines 完全一致 —— 自由量(未打印)的上限 = 头寸 − 预约;预约量走各自的未生单预约额度。
+        List<Map<String, Object>> labelRows = "PU_ORDER".equals(sourcePanel) ? puLabel.labelRows(sourceNo) : List.of();
+        java.util.Set<String> resvBatches = new java.util.TreeSet<>();
+        List<Map<String, Object>> picked = new ArrayList<>();   // {item, qty, resvBatch}
         for (Map<String, Object> it : srcItems) {
             // 特采行(2026-09-22 闸门):不得经此路径生成入库/退料 —— 走特采单(审核后整行入库)
             if ("QC_INSP".equals(sourcePanel) && isSpecialAccept(it)) continue;
@@ -418,23 +443,47 @@ public class PushGenerateHandler implements PanelActionHandler {
             double orderQty = numOf(it.get("数量"));
             double used = sent.getOrDefault(lineKey, 0d);
             double ret = returned.getOrDefault(lineNoOf(it), 0d);
-            double left = Math.max(0, orderQty - used + ret);
-            // 可送上限(2026-09-22 口径):**按订单全部数量算** = 数量×(1+比例)−已送+已退回 ——
-            // 已送满订单(剩余=0)的行仍可收 订单数量×比例 的超送额度;默认整送=剩余(不主动超送),
-            // 只有"累计到顶后还显式要送"才报具体的上限(而不是笼统的"已无剩余可送")
-            double cap = overAllowance(orderQty, used, ret, ratio);
+            int lineId = (int) numOf(it.get("id"));
+            double reserved = puLabel.pendingTotal(labelRows, lineId);
+            double left = Math.max(0, orderQty - used + ret - reserved);
+            // 可送上限(2026-09-22 口径):**按订单全部数量算** = 数量×(1+比例)−已送+已退回,再扣材料码预约
+            double capFree = Math.max(0d, BatchService.overAllowance(orderQty, used, ret, ratio) - reserved);
             double qty = qtyByLineKey == null ? left : qtyByLineKey.getOrDefault(lineKey, 0d);
+            String resvBatch = batchByLineKey == null ? "" : str(batchByLineKey.get(lineKey));
             if (qty <= 0.000001) continue;                       // 本次不送
-            if (qty > cap + 0.000001) {
+            if (!resvBatch.isEmpty()) {
+                // 预约量:不许超过「该行该批次号」的未生单预约(打印多少就只能按那个号送多少;
+                // 要多送的部分请作为**未打印量**另起一条 payload,即方案里的"混单")
+                double pending = puLabel.pendingOf(sourceNo, lineId, resvBatch);
+                if (!puLabel.hasLabel(sourceNo, lineId, resvBatch)) {
+                    throw new IllegalStateException("第 " + it.get("行号") + " 行没有批次号 " + resvBatch
+                            + " 的材料码打印记录,不能按这个号生单(请先在采购订单打印材料码)");
+                }
+                if (qty > pending + 0.000001) {
+                    throw new IllegalStateException("第 " + it.get("行号") + " 行按打印批次号 " + resvBatch + " 送料量 "
+                            + round2(qty) + " 超出该批次号的未生单预约量 " + round2(pending)
+                            + "(已打印未生单的量才可按该号生单;超出部分请作为未打印量填写)");
+                }
+                resvBatches.add(resvBatch);
+            } else if (qty > capFree + 0.000001) {
                 throw new IllegalStateException("第 " + it.get("行号") + " 行本次送料量 " + round2(qty)
-                        + " 超出允许上限 " + round2(cap) + "(订单数量 " + round2(orderQty) + " ×(1 + 超送比例 "
-                        + Math.round(ratio * 100) + "%)− 已送 " + round2(used) + " + 已退回 " + round2(ret) + ")");
+                        + " 超出允许上限 " + round2(capFree) + "(订单数量 " + round2(orderQty) + " ×(1 + 超送比例 "
+                        + Math.round(ratio * 100) + "%)− 已送 " + round2(used) + " + 已退回 " + round2(ret)
+                        + (reserved > 0 ? " − 已打印未生单 " + round2(reserved) : "") + ")");
             }
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("item", it);
             p.put("qty", qty);
+            p.put("resvBatch", resvBatch);
             picked.add(p);
         }
+        // 一张单只能一个批次号:勾到多个已打印批次时,请按号分开生单(前端按号分组逐组调用)
+        if (resvBatches.size() > 1) {
+            throw new IllegalStateException("一张" + tgtDef.displayName(false) + "只能是一个批次号,"
+                    + "本次勾选的已打印行涉及 " + String.join("、", resvBatches)
+                    + " 共 " + resvBatches.size() + " 个批次号,请按批次号分开生单");
+        }
+        String printedBatchNo = resvBatches.isEmpty() ? "" : resvBatches.iterator().next();
         if (picked.isEmpty()) {
             boolean allSpecial = "QC_INSP".equals(sourcePanel) && !srcItems.isEmpty()
                     && srcItems.stream().allMatch(PushGenerateHandler::isSpecialAccept);
@@ -474,7 +523,19 @@ public class PushGenerateHandler implements PanelActionHandler {
                 : Integer.valueOf(String.valueOf(srcKeyObj).trim()));
         String inherited = str(head.get("批次号"));
         String batchNo;
-        if (!inherited.isEmpty()) {
+        if (!printedBatchNo.isEmpty()) {
+            // ★ 材料码预约(2026-10-04):批次号**以打印记录为准** —— 标签已经印好贴在实物上,
+            //   对话框输入框前端也已锁定,这里再兜一道(输入值若与打印号不同直接拒,不做静默覆盖)。
+            if (!inherited.isEmpty() && !inherited.equals(printedBatchNo)) {
+                throw new IllegalStateException("来源单批次号为 " + inherited + ",与选中的已打印批次号 "
+                        + printedBatchNo + " 不一致,不能生单");
+            }
+            if (!str(batchNoOverride).isEmpty() && !str(batchNoOverride).equals(printedBatchNo)) {
+                throw new IllegalStateException("本次填写的批次号 " + str(batchNoOverride) + " 与选中的已打印批次号 "
+                        + printedBatchNo + " 不一致:勾了已打印行时批次号以材料码为准,不能改");
+            }
+            batchNo = printedBatchNo;
+        } else if (!inherited.isEmpty()) {
             batchNo = inherited;                       // 下游:继承,不接受覆盖
         } else {
             String manual = str(batchNoOverride);      // 头一跳:生单对话框里人工改的号优先

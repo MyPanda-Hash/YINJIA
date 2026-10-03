@@ -1588,6 +1588,8 @@
     </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <QrLabelDialog v-model="qrVisible" :labels="qrLabels" />
+    <!-- 采购订单·打印材料码(2026-10-04):批次号在打印时登记 + 预约该行数量 -->
+    <MaterialLabelDialog v-model="materialLabelVisible" :order-no="materialLabelNo" @printed="onMaterialLabelPrinted" />
 
     <!-- 生产工单「排产」弹窗(2026-09-24 用户要求):本单快捷排线——选产线/日期/数量,
          后端复用排产工作台 assign(仅已审核可排/数量守恒/停用线拒绝/留痕),回执含当日负荷与超载提示 -->
@@ -1743,6 +1745,7 @@ import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
 import { printPuOrder, printQcReturn, printProductCards, printLocationCards, printProductionTask, printPuOrderNoAmount, woQrText } from '@/business/print-formats'
 import QrLabelDialog from './QrLabelDialog.vue'
+import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
@@ -3196,13 +3199,16 @@ async function needBatchDialog(target) {
   return !(await panelHasBatchField(panelCode.value))
 }
 /** 分批生单完成:跳到目标面板继续填写(与推式生单同款:关源页签、开目标页签、新单按创建时间倒序在第一张) */
-function onBatchGenerated({ panel, no, batchNo }) {
+function onBatchGenerated({ panel, no, batchNo, silent }) {
   const targetPanel = panel || batchSend.value?.targetPanel || ''
   if (!targetPanel) return
-  // 批次号在**生单那一刻**已由服务端定稿(供应商编码去 YJ- 前缀 + 当天日期),这里直接把真号回显给用户
-  ElMessage.success(batchNo
-    ? `${tt('已生成')} ${targetPanel} ${no}（${tt('批次号')} ${batchNo}）`
-    : `${tt('已生成')} ${targetPanel} ${no}，请在列表页继续填写`)
+  // 批次号在**生单那一刻**已由服务端定稿(供应商编码去 YJ- 前缀 + 当天日期),这里直接把真号回显给用户。
+  // 分批送料对话框自己会把"生成了几张、各是什么号"说清(silent=true,含按批次号分组的多张情形),此处不重复。
+  if (!silent) {
+    ElMessage.success(batchNo
+      ? `${tt('已生成')} ${targetPanel} ${no}（${tt('批次号')} ${batchNo}）`
+      : `${tt('已生成')} ${targetPanel} ${no}，请在列表页继续填写`)
+  }
   const targetPath = `/panelx/list/${targetPanel}`
   tabs.close(route.path)
   router.push(targetPath)
@@ -3219,6 +3225,13 @@ const scanVisible = ref(false)
 const selCfg = ref(null)
 // 材料二维码标签(品检分流链:暂收单行 打印标签)
 const qrVisible = ref(false)
+/** 采购订单·打印材料码弹窗(2026-10-04):批次号在打印时登记,并预约该行数量 */
+const materialLabelVisible = ref(false)
+const materialLabelNo = ref('')
+/** 打印登记完成后提示一句:预约已生效,去生单对话框会看到「已打印待生单」 */
+function onMaterialLabelPrinted({ docNo, batchNo, count }) {
+  ElMessage.success(`${tt('已登记材料码')} ${docNo}（${tt('批次号')} ${batchNo}，${count} ${tt('张标签')}）——${tt('该批次已预约对应数量，生单时可在「已打印待生单」里直接使用')}`)
+}
 const qrLabels = ref([])
 
 function openQrLabels() {
@@ -6106,36 +6119,18 @@ async function onButton(action) {
     qrVisible.value = true
     return
   }
-  // 采购订单·打印材料码(2026-09-28 用户口径:供应商自己打码→在采购单打;版式=产品标识卡
-  // printProductCards 75×100mm 一行一卡,与采购入库单「打印标识卡」/商品档案同款):
-  // 订单编号/供应商名称/物料编码/物料规格/数量取订单事实,批次·生产日期留横线(订单阶段无批号,
-  // 收货入库时由我方在采购入库单打印带批号标识卡);二维码=公司代码@物料编码(productCardQrText,
-  // 批次空即两段,与商品档案扫码口径一致)。
-  // 入口分工:没批号→商品档案「二维码标签」;自己打带批号→采购入库单「打印标识卡」。
+  // 采购订单·打印材料码(2026-10-04 用户口径:供应商自己打码):
+  // 由"直接出纸"改为**打开打印弹窗** —— 打印时才能确定批次号(它原本要到生单那一刻才有),
+  // 弹窗里按公式预填、可改、勾行填量,确认后**先落库登记**(bd_pu_label/bl_pu_label)再出纸,
+  // 并**预约**该行数量(未生单的预约量从余量里扣减)。该预约随后在生单对话框的
+  // 「已打印待生单」里被消费。方案:docs/plans/2026-10-04-采购订单材料码批次号方案.md
+  // 入口分工不变:没批号→商品档案「二维码标签」;自己打带批号→本弹窗(采购入库单另有「打印标识卡」)。
   if (action === '打印材料码' && panelCode.value === 'PU_ORDER') {
     const cur = current.value || {}
     const no = cur['单据编号'] || cur['编号'] || ''
     if (!no) return ElMessage.warning(tt('请先选择一张单据'))
-    try {
-      const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
-      const doc = res?.data || {}
-      const lines = Object.values(res?.detailData || {})[0] || []
-      const rows = (lines || [])
-        .filter((l) => l && l['物料编码'])
-        .map((l) => ({
-          编码: l['物料编码'],
-          规格: l['规格型号'] || '',
-          数量: l['数量'] ?? '',
-          批次: '',
-          订单编号: doc['单据编号'] || no,
-          供应商名称: doc['供应商'] || '',
-          生产日期: '',
-        }))
-      if (!rows.length) return ElMessage.warning(tt('当前单据没有可打印的明细行'))
-      await printProductCards(rows)
-    } catch (e) {
-      ElMessage.error(engine.errMsg(e) || tt('打印失败'))
-    }
+    materialLabelNo.value = no
+    materialLabelVisible.value = true
     return
   }
   // 采购入库单·打印标识卡(2026-09-28 用户需求):当前单据明细行 → 商品档案同款 75×100mm 产品标识卡
