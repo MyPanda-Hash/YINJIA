@@ -1997,3 +1997,21 @@ migrate-material-out-ref-links.sql
 #   并**重跑生成器** ⇒ migrate-material-out-fields.sql 与 deploy/kingdee-extra-fields.mjs 同步改名
 #   (两处已随本提交更新;重跑字段并集对已改名的库是全 skip,已验证幂等)。
 migrate-material-out-label-cleanup.sql
+
+# —— 2026-10-03 库存三表重构漏项收口:补写「迁移前已审核」的历史单据流水 + 撤 kucun 快照期初 ——
+#   现象:库存台账/库存状况表/收发存汇总 三个面板只剩期初行,期间单据全丢;收发存汇总查 2026 年期次为空。
+#   根因:v_stock_movement 改读流水表后,迁移前已审核的单据从未写过流水(远端判定代价为 0,
+#     依据「8 张 bd_* 头表合计 0 行」;本机实测为 119 采购入库 + 123 销售出库,覆盖 86 个仓库×存货键)。
+#   本脚本按迁移前旧视图(migrate-inv-report-fields.sql)的 8 段逐列口径补写,含 src/rid 一一对应
+#     (弃审红冲与 InvCostService 成本递归都靠它);并撤掉由 kucun 快照生成的期初行(否则与补进来的
+#     历史单据双计 —— 实测 YJ-SX-031 期初 4500 + 单据 4600)。幂等,两账套均执行。 ——
+migrate-stock-flow-history-backfill.sql
+
+# —— 2026-10-03 承上:按库存流水重建 kucun 结存缓存(把启动自检「结存 == Σ流水」修回一致) ——
+#   补写历史流水后流水才是完整真源,而 kucun 只剩 7 条非零余量(遗留残缺,7,011),与流水净额 38,087
+#   差 31,076 ⇒ 启动自检实测报 227 个三键不一致。按本项目「流水是唯一真源,kucun 只是结存缓存」的
+#   设计口径,由流水派生 kucun:①NULL 仓库编码按 bs_wh 名称解析;②已有键改 yl;③多余键归 0;
+#   ④流水有而 kucun 无的键补插。三键严格照 InvCostService.key3(原样拼接,NULL 与空串不等价)。
+#   影响:kucun 供 库存状况表(STOCK_STATUS) 与首页库存卡片读取,现存量由 7,011 → 38,087(单据口径),
+#   与库存台账/收发存汇总一致。幂等,两账套均执行。 ——
+migrate-stock-flow-kucun-resync.sql
