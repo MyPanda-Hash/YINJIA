@@ -1745,6 +1745,7 @@ import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
+import { applyCalcRules } from '@core/panel/calcRules'
 import { printPuOrder, printQcReturn, printProductCards, printLocationCards, printProductionTask, printPuOrderNoAmount, woQrText } from '@/business/print-formats'
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
@@ -5184,20 +5185,9 @@ function applyDetailReference(target, field, source) {
 function calculateDetailRow(tabKey, row) {
   const tab = detailTabDefOf(tabKey)
   if (!tab?.calc?.length) return
-  const numeric = (value) => Number.isFinite(Number(value)) ? Number(value) : 0
-  for (const rule of tab.calc) {
-    let expression = String(rule.formula || '')
-    const names = [...new Set(expression.match(/[^\s+\-*/()]+/g) || [])]
-      .filter((name) => !/^\d+(?:\.\d+)?$/.test(name))
-      .sort((a, b) => b.length - a.length)
-    for (const name of names) expression = expression.split(name).join(String(numeric(row[name])))
-    if (!/^[\d.\s+\-*/()]+$/.test(expression)) continue
-    let value
-    try { value = Function(`"use strict"; return (${expression})`)() } catch (error) { value = 0 }
-    if (!Number.isFinite(value)) value = 0
-    if (rule.round != null) value = engine.roundDecimal(value, rule.round)
-    row[rule.target] = value
-  }
+  // 求值口径统一在 @core/panel/calcRules(与后端 CalcRuleService 同一份规则、同一个守卫):
+  // 入参全空则不写入,避免"单价/数量都没填"的行因改别的格子把手工金额抹成 0。
+  applyCalcRules(tab.calc, row)
 }
 
 function currentFormData(detail) {

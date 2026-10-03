@@ -25,11 +25,14 @@ public class PanelConfigService {
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
     private final TranslationService translations;
+    private final CalcRuleService calcRules;
 
-    public PanelConfigService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations) {
+    public PanelConfigService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations,
+                              CalcRuleService calcRules) {
         this.registry = registry;
         this.jdbc = jdbc;
         this.translations = translations;
+        this.calcRules = calcRules;
     }
 
     /** 当前请求的目标语言键(en/ja/ko/...;zh 系=zh)。 */
@@ -520,31 +523,15 @@ public class PanelConfigService {
         return new ArrayList<>(out);
     }
 
-    /** 明细自动计算规则:按字段组合推导常见公式(字段名=行键,引擎按中文名取值求值)。
-     *  兼容两套命名:标准(单价/金额/含税单价/含税金额)与销售(售价/销售金额/含税售价/含税销售金额)。 */
+    /**
+     * 明细自动计算规则,下发给前端 detail.tabs[].calc(浏览器改一格即时算)。
+     *
+     * ⚠ 规则本体与求值口径已收敛到 {@link CalcRuleService} —— 服务端保存时用**同一份规则**
+     * 重算(ButtonService.upsertLineRows),两边不会各写一套(2026-10-05「采购入库单金额要
+     * 自动计算」:改前只有这里下发、只有前端算,生单/保存路径从来没算过)。
+     */
     private List<Map<String, Object>> buildCalcRules(List<PanelRegistry.FieldDef> detailFields) {
-        java.util.Set<String> labels = new java.util.HashSet<>();
-        for (PanelRegistry.FieldDef f : detailFields) labels.add(f.label());
-        List<Map<String, Object>> out = new ArrayList<>();
-        // 数量列:优先"数量",退而"实收数量"
-        String qty = labels.contains("数量") ? "数量" : labels.contains("实收数量") ? "实收数量" : null;
-        // 单价/金额列:标准 或 销售命名(SALE_OUT 用 售价/销售金额/含税售价/含税销售金额)
-        String price = labels.contains("单价") ? "单价" : labels.contains("售价") ? "售价" : null;
-        String amount = labels.contains("金额") ? "金额" : labels.contains("销售金额") ? "销售金额" : null;
-        String taxPrice = labels.contains("含税单价") ? "含税单价" : labels.contains("含税售价") ? "含税售价" : null;
-        String taxAmount = labels.contains("含税金额") ? "含税金额" : labels.contains("含税销售金额") ? "含税销售金额" : null;
-        boolean hasPrice = price != null;
-        if (qty != null && hasPrice && amount != null) calcRule(out, amount, qty + "*" + price, 2);
-        if (hasPrice && labels.contains("税率%") && taxPrice != null) calcRule(out, taxPrice, price + "*(1+税率%/100)", 4);
-        if (qty != null && taxPrice != null && taxAmount != null) calcRule(out, taxAmount, qty + "*" + taxPrice, 2);
-        if (amount != null && labels.contains("税率%") && labels.contains("税额")) calcRule(out, "税额", amount + "*税率%/100", 2);
-        if (qty != null && hasPrice && labels.contains("折扣%") && labels.contains("折扣金额")) calcRule(out, "折扣金额", qty + "*" + price + "*折扣%/100", 2);
-        if (qty != null && labels.contains("单重") && labels.contains("总重")) calcRule(out, "总重", "单重*" + qty, 4);
-        return out;
-    }
-
-    private void calcRule(List<Map<String, Object>> out, String target, String formula, int round) {
-        out.add(Map.of("target", target, "formula", formula, "round", round));
+        return calcRules.asContract(calcRules.rulesFor(detailFields));
     }
 
     /** 单号字段标签(供 autoCodeField 展示) */

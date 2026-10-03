@@ -48,6 +48,8 @@ public class ButtonService {
     private final QcCatalogService qcCatalog;
     /** 生产加工单执行回填(2026-09-24 随生产域下拉;参考库 plang_pc 完工入库/领料回写口径) */
     private final ManuWritebackService manuWriteback;
+    /** 明细派生列重算引擎(与前端下发的 detail.tabs[].calc 同一份规则) */
+    private final CalcRuleService calcRuleService;
 
     public ButtonService(PanelRegistry registry, QueryService queryService,
                          FormNoService formNoService, JdbcTemplate jdbc,
@@ -56,7 +58,7 @@ public class ButtonService {
                          WoReportService woReport, QcDisposalService qcDisposal,
                          KingdeePushService kingdeePush, BatchService batchService,
                          InvCostService invCost, QcCatalogService qcCatalog,
-                         ManuWritebackService manuWriteback) {
+                         ManuWritebackService manuWriteback, CalcRuleService calcRuleService) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -72,6 +74,7 @@ public class ButtonService {
         this.invCost = invCost;
         this.qcCatalog = qcCatalog;
         this.manuWriteback = manuWriteback;
+        this.calcRuleService = calcRuleService;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -836,7 +839,13 @@ public class ButtonService {
     private void upsertLineRows(PanelRegistry.PanelDef def, List<Map<String, Object>> items,
                                 String no, Map<String, String> l2c, String user) {
         Set<Object> liveIds = new HashSet<>();
+        // 明细派生列(金额/含税单价/含税金额/税额/折扣金额/总重/损耗率…)在**落库前**由服务端重算一遍。
+        // 改前只有前端在改单元格时算 ⇒ 生单(来料检验单审核自动生成采购入库单等)与保存两条路径
+        // 写进去的都是源单原值或空值,库里长期存在"有量有价、金额为空"的行(2026-10-05 实测
+        // bl_purchase_in 128/269 行)。规则与前端同一份(见 CalcRuleService)。
+        List<CalcRuleService.Rule> calcRules = calcRuleService.rulesFor(def);
         for (Map<String, Object> item : items) {
+            calcRuleService.applyRules(calcRules, item);
             Object id = item.get("id");
             Map<String, Object> cols = labelsToCols(def.fields(), item);
             // 行表没有的列不参与行 upsert:参照带回按同名标签回填(如表头 place 的 数据来源 被
