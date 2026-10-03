@@ -1032,9 +1032,10 @@ public class PanelConfigService {
             java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15;编码 9-20 由 SL_RECV 改)
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
-            java.util.Map.entry("WO_ORDER", "SO_ORDER"),             // 销售订单 → 生产工单(计划层:选单生单)
-            java.util.Map.entry("RKD", "CGD"),                       // 采购单(旧) → 入库单(旧)
-            java.util.Map.entry("CKD", "KHDD")                       // 客户订单(旧) → 出库单(旧)
+            java.util.Map.entry("WO_ORDER", "SO_ORDER")              // 销售订单 → 生产工单(计划层:选单生单)
+            // 2026-09-30:原最后两条 RKD/CKD(采购单(旧)→入库单(旧) / 客户订单(旧)→出库单(旧))
+            // 随 RKD/CKD 面板元数据一并删除 —— 这两个纺织遗留面板的 yj_field 按旧列名登记,
+            // inh/outh 重建后已永久失效(菜单侧也从未挂载),保留映射只会让「选单」指向不存在的面板。
     )));
 
     /** 头字段映射排除项(状态/审批类不参与选单带入;附件1-6是按单号锚定的文件实体,

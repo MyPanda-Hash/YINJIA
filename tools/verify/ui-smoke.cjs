@@ -6,7 +6,9 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 
-const PANEL = process.argv[2] || 'RKD'
+// 2026-09-30:默认面板原为 RKD(入库单),该纺织遗留面板的元数据已删除(其字段按旧列名登记,
+// inh 重建后失效)⇒ 默认改为 SO_ORDER(销售订单,在用单据面板,带审批组,冒烟语义不变)。
+const PANEL = process.argv[2] || 'SO_ORDER'
 // 参数以 # 开头时视为完整路由(如 #/sys/org),否则按面板代码拼 /panelx/list/<code>
 const HASH = PANEL.startsWith('#') ? PANEL : `#/panelx/list/${PANEL}`
 const FRONT = 'http://localhost:5173'

@@ -247,8 +247,11 @@ public class DashboardStatsService {
     private Map<String, Object> stock() {
         Map<String, Object> stock = new HashMap<>();
         try {
-            int inDocs = count("SELECT COUNT(DISTINCT inh_no) FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y'");
-            int outDocs = count("SELECT COUNT(DISTINCT outh_no) FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y'");
+            // 2026-09-30:inh/outh 已由遗留纺织表重建为 MES 库存流水表,旧列名(inh_no/in_date/outh_no/out_date)
+            // 不存在了 —— 继续读旧列名会抛「列名无效」被下面 catch 吞掉,库存卡片因此静默退化为空。
+            // 语义完全一致,只是列名中文化:单数=COUNT(DISTINCT 单据编号),行数=COUNT(*),趋势按 单据日期。
+            int inDocs = count("SELECT COUNT(DISTINCT 单据编号) FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y'");
+            int outDocs = count("SELECT COUNT(DISTINCT 单据编号) FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y'");
             int inLines = count("SELECT COUNT(*) FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y'");
             int outLines = count("SELECT COUNT(*) FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y'");
             stock.put("totalIn", inDocs);
@@ -262,13 +265,13 @@ public class DashboardStatsService {
             Map<String, int[]> byDay = new LinkedHashMap<>();
             List<String> days = lastDays(7);
             for (String d : days) byDay.put(d, new int[2]);
-            for (Map<String, Object> r : jdbc.queryForList("SELECT CONVERT(varchar(10), in_date, 23) AS d, COUNT(*) AS v"
-                    + " FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y' AND in_date >= DATEADD(day,-6,CONVERT(date,GETDATE())) GROUP BY CONVERT(varchar(10), in_date, 23)")) {
+            for (Map<String, Object> r : jdbc.queryForList("SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v"
+                    + " FROM inh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= DATEADD(day,-6,CONVERT(date,GETDATE())) GROUP BY CONVERT(varchar(10), 单据日期, 23)")) {
                 int[] slot = byDay.get(String.valueOf(r.get("d")));
                 if (slot != null) slot[0] = toInt(r.get("v"));
             }
-            for (Map<String, Object> r : jdbc.queryForList("SELECT CONVERT(varchar(10), out_date, 23) AS d, COUNT(*) AS v"
-                    + " FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y' AND out_date >= DATEADD(day,-6,CONVERT(date,GETDATE())) GROUP BY CONVERT(varchar(10), out_date, 23)")) {
+            for (Map<String, Object> r : jdbc.queryForList("SELECT CONVERT(varchar(10), 单据日期, 23) AS d, COUNT(*) AS v"
+                    + " FROM outh WHERE ISNULL(asp_cancel,'N')<>'Y' AND 单据日期 >= DATEADD(day,-6,CONVERT(date,GETDATE())) GROUP BY CONVERT(varchar(10), 单据日期, 23)")) {
                 int[] slot = byDay.get(String.valueOf(r.get("d")));
                 if (slot != null) slot[1] = toInt(r.get("v"));
             }

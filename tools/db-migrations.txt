@@ -1799,3 +1799,22 @@ migrate-rd-datarec-reviewer-2026-09-30.sql
 #     (WHERE rid IS NOT NULL,实测可灌多行且仍拦得住重复的 (src,rid))。
 #   幂等可重跑(先判后建/先判后注),两个账套都执行 —— 见 db-migrations.txt 用途说明。
 migrate-stock-flow-tables-2026-09-30.sql
+
+# —— 2026-09-30 库存三表结构①b:收口任务 1 的三个副作用(用户拍板"根治,不留豁免") ——
+#   ① 索引 NULL 语义:UX_inh_src_rid / UX_outh_src_rid 由普通唯一索引改**过滤索引**
+#      (WHERE rid IS NOT NULL)。SQL Server 唯一索引只允许一个 NULL,非过滤索引下任务 2 的
+#      多行期初 (src=0, rid=NULL) 插第二行即报 2601 ⇒ 过滤索引是任务 2 的硬前提。
+#      ⚠ 用**新脚本**改,不改 migrate-stock-flow-tables-2026-09-30.sql 的字节(DbSync 按内容哈希判重跑)。
+#   ② 表级 MS_Description 中文注明(任务 1 只写了列级 17 条)。
+#   ③ 删 RKD/CKD 面板元数据:RKD(入库单)/CKD(出库单)是纺织遗留面板,line_table 指 inh/outh,
+#      31 行 yj_field 按旧纺织列名(inh_no/out_date/wzdm/lot_no/sl/ddw…)登记,重建后列不存在
+#      ⇒ 打开即报「列名无效」、体检第 05 项元数据漂移 +31;菜单早已未挂(frontend/src 无引用)
+#      ⇒ 作为孤儿元数据删除,连带清 yj_role_panel / yj_doc_status(6 行)与面板译名 yj_translation
+#      (只删「没有别的活面板还叫这个名字」的译名行,避免误伤同名的活面板)。库内无外键,删除顺序无约束。
+#   ④ 删库内备份表 inh_bak_20260930 / outh_bak_20260930:老数据已导出为
+#      tools/archive/_stock-flow-backup-20260930.csv(inh 145 行/115 列、outh 30 行/126 列,
+#      导出后逐表核对行数一致);体检第 10 项棘轮基线 2026-09-29 已收到 0「再出现即 FAIL」,
+#      留着即永久 FAIL-2。**顺序红线:先导出 CSV 并核对行数,确认无误后才跑本脚本。**
+#   ⑤ 自检段输出 9 项齐备度(索引过滤 2 + 面板/字段/单据状态已清 3 + 备份表已删 2 + 表注明 2)。
+#   幂等可重跑(先判后建/先判后删/EXISTS 兜底),两个账套都执行。
+migrate-stock-flow-index-filter-2026-09-30.sql
