@@ -30,8 +30,9 @@ const T = {
   '未生单': ['Not yet received', '未生單'],
   '该订单还没有打印过材料码': ['This order has no material QR labels printed yet', '該訂單還沒有列印過材料碼'],
   '确定并打印': ['Confirm & Print', '確定並列印'],
-  // ⚠ 这条**已废**(打印弹窗改"一次一行"后不再出现,见下方 OBSOLETE)——
-  //    同名同时挂在 T 与 OBSOLETE 会被"先删后写回",脚本的回读自检就是为它加的
+  // ⚠ 这条**在用**(打印弹窗"可一次勾多行"的口径)——
+  //    它曾经因为改成"一次一行"被移进 OBSOLETE,后来又改回来,别再动它
+  '请至少勾选一行并填写本次打印数量': ['Check at least one line and enter the print qty', '請至少勾選一行並填寫本次列印數量'],
   '已登记并打印': ['Registered and printed', '已登記並列印'],
   '打印登记失败': ['Failed to register the print', '列印登記失敗'],
   '材料码数据加载失败': ['Failed to load material QR label data', '材料碼資料載入失敗'],
@@ -75,16 +76,30 @@ const T = {
       '該批數量已從訂單數量隔離出來，生單時在明細裡直接勾選它'],
   '状态': ['Status', '狀態'],
   '已退回': ['Returned', '已退回'],
-  // ── 一次打印 = 一行 = 一张单(2026-10-04 追加口径):打印弹窗改单选 + 重打按钮 ──
-  '一次只打一行（一张打印单只装一行，作废只影响这一行）；要打第二行请再打一次':
-    ['One line per print (a print document holds a single line, so voiding affects only that line); print again for the next line',
-      '一次只打一行（一張列印單只裝一行，作廢只影響這一行）；要打第二行請再打一次'],
-  '本次选中': ['Selected line', '本次選中'],
-  '请选中一行并填写本次打印数量': ['Select one line and enter the print qty', '請選中一行並填寫本次列印數量'],
-  '请先选中一行': ['Select a line first', '請先選中一行'],
+  // ── 「一次一行(单选)」那一版的提示语**已废**(口径改成"一次可勾多行,每行各一张单") ──
+  //    ⚠ 它们已进下方 OBSOLETE:**绝不能**再留在 T 里(同名会先删后写回,脚本回读自检就是为这个加的)
   '重打': ['Reprint', '重打'],
   '已重打（第 {n} 次）': ['Reprinted (time {n})', '已重打（第 {n} 次）'],
   '重打失败': ['Reprint failed', '重打失敗'],
+  // ── 一次可勾多行(每行各一张单)+ 已生单可补打(2026-10-04 追加口径) ──
+  '可一次勾选多行；每行各自出一张打印单（作废只影响对应那一行）':
+    ['You may check several lines; each line becomes its own print document (voiding affects only that line)',
+      '可一次勾選多行；每行各自出一張列印單（作廢只影響對應那一行）'],
+  '将生成': ['will create', '將產生'],
+  '张打印单': ['print document(s)', '張列印單'],
+  '已登记并打印 {n} 张打印单': ['Registered and printed {n} print document(s): ', '已登記並列印 {n} 張列印單：'],
+  '已生单可补打（已经收了的量还没打码）':
+    ['Already received, printable now (received qty without labels)', '已生單可補打（已經收了的量還沒打碼）'],
+  '补打只为留痕：不占用余量、不会在生单弹窗里多出一行；批次号取该批货单据上的号，不可改':
+    ['Supplement printing is for the record only: it reserves no quota and adds no line in the generate dialog; the batch No. comes from that shipment document and cannot be changed',
+      '補打只為留痕：不佔用餘量、不會在生單彈窗裡多出一行；批次號取該批貨單據上的號，不可改'],
+  '去向单据': ['Target doc', '去向單據'],
+  '已收': ['Received', '已收'],
+  '已补打': ['Supplement-printed', '已補打'],
+  '可补打': ['Printable now', '可補打'],
+  '用途': ['Purpose', '用途'],
+  '已生单补登': ['Supplement for received qty', '已生單補登'],
+  '待生单': ['Awaiting receipt', '待生單'],
   // 生单弹窗上下两层的列头(此前只有 en/zh-TW 之一有译名,补齐免得切语言漏中文)
   '剩余': ['Remaining', '剩餘'],
   '打印时间': ['Printed at', '列印時間'],
@@ -97,8 +112,11 @@ const OBSOLETE = [
   '该批次已预约对应数量，生单时可在「已打印待生单」里直接使用',
   '勾选了多个已打印批次号时不能同时送未打印量：请先按「已打印待生单」生单，或把未打印量分开操作',
   '勾选的已打印行涉及多个批次号，将按批次号分成多张单据生成：',
-  // 打印弹窗改成"一次一行"后,多选口径的提示语不再出现
-  '请至少勾选一行并填写本次打印数量',
+  // 「一次一行」那一版(单选)的提示语:口径已改成"一次可勾多行,每行各一张单",这些不再出现
+  '一次只打一行（一张打印单只装一行，作废只影响这一行）；要打第二行请再打一次',
+  '本次选中',
+  '请选中一行并填写本次打印数量',
+  '请先选中一行',
 ]
 
 const ANCHOR = /(\n\s*\/\*\s*─+\s*特采单两级审批)|\n}\s*$/m

@@ -306,6 +306,10 @@ public class PushGenerateHandler implements PanelActionHandler {
         List<Map<String, Object>> labels = "PU_ORDER".equals(sourcePanel) ? puLabel.labelRows(sourceNo) : List.of();
         Map<Integer, List<Map<String, Object>>> byLine = new LinkedHashMap<>();
         for (Map<String, Object> lb : labels) {
+            // ★「已生单补登」的打印(给已收的量补打码)**不参与**这里的两件事:
+            //   ① 不切走原行数量(量早就送过了,再切一遍等于把同一批货算两次);
+            //   ② 不出隔离行(没有"待生单"的量,出了会让人以为还能再生一次单)。
+            if (isSupplement(lb)) continue;
             byLine.computeIfAbsent(intOf(lb.get("采购订单行id")), k -> new ArrayList<>()).add(lb);
         }
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -387,6 +391,13 @@ public class PushGenerateHandler implements PanelActionHandler {
         if (o instanceof Number n) return n.intValue();
         if (o == null || String.valueOf(o).trim().isEmpty()) return 0;
         try { return (int) Double.parseDouble(String.valueOf(o).trim()); } catch (NumberFormatException e) { return 0; }
+    }
+
+    /** 该打印行是否「已生单补登」(Y=给已收的量补打码:不切量、不出隔离行、不参与生单) */
+    private static boolean isSupplement(Map<String, Object> labelRow) {
+        Object v = labelRow == null ? null : labelRow.get("补登");
+        if (v instanceof Boolean b) return b;
+        return "Y".equalsIgnoreCase(str(v));
     }
 
     public Map<String, Object> batchLines(String sourcePanel, String targetPanel, String sourceNo) {
@@ -631,15 +642,32 @@ public class PushGenerateHandler implements PanelActionHandler {
         targetHead.put(dateLabel, java.time.LocalDate.now().toString());
 
         boolean rowHasBatch = tgtDef.fieldsAt("detail").stream().anyMatch(f -> "批次号".equals(f.label()));
-        List<Map<String, Object>> targetItems = new ArrayList<>();
+        // ★ 合并成一行明细(2026-10-04 用户口径「与打印的明细组合生单是需要合并的」):
+        //   同一个采购订单行上,"已打印那一行(隔离行)"与"原行未打印量"如果被一起勾上,
+        //   生成的单据里**只出现一行、数量相加**(400 = 350 + 50),不再出现同一物料两行。
+        //   但**占用(link)仍按各自的行键各记一笔** —— 已生单量/已送量分账不变(见下面 links 那段),
+        //   所以隔离行照样能显示"已生单 50",原行的已送也照样只算 350。
+        //   分组键 = 行键去掉 `@...` 的订单行键(同一订单行的所有勾选合并;只勾一行时分组里就一条,行为不变)。
+        Map<String, List<Map<String, Object>>> groups = new LinkedHashMap<>();
+        Map<String, Integer> groupIndex = new LinkedHashMap<>();
+        List<String> groupKeys = new ArrayList<>();
         for (Map<String, Object> p : picked) {
-            Map<String, Object> item = (Map<String, Object>) p.get("item");
+            String gk = orderKeyOf(str(p.get("lineKey")));
+            if (!groups.containsKey(gk)) { groups.put(gk, new ArrayList<>()); groupKeys.add(gk); groupIndex.put(gk, groupKeys.size() - 1); }
+            groups.get(gk).add(p);
+        }
+        List<Map<String, Object>> targetItems = new ArrayList<>();
+        for (String gk : groupKeys) {
+            List<Map<String, Object>> members = groups.get(gk);
+            Map<String, Object> item = (Map<String, Object>) members.get(0).get("item");
+            double qty = 0d;
+            for (Map<String, Object> p : members) qty += (double) p.get("qty");
             Map<String, Object> row = new LinkedHashMap<>();
             for (Map<String, String> m : detailMap) {
                 Object v = item.get(m.get("from"));
                 if (v != null) row.put(m.get("to"), v);
             }
-            row.put(tgtQtyLabel, p.get("qty"));   // 本次送料数量
+            row.put(tgtQtyLabel, round2(qty));      // 合并后的本次送料数量(打印量 + 未打印量)
             if (rowHasBatch) row.put("批次号", batchNo);   // 行随单头(同一批次号,头行一致)
             applySourceFlags(sourcePanel, targetPanel, item, row);
             targetItems.add(row);
@@ -659,8 +687,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                 Integer.class, newNo);
         List<VoucherFlowService.BatchLine> links = new ArrayList<>();
         double sum = 0;
-        for (int i = 0; i < picked.size(); i++) {
-            Map<String, Object> pk = picked.get(i);
+        for (Map<String, Object> pk : picked) {
             Map<String, Object> item = (Map<String, Object>) pk.get("item");
             Map<String, Object> srcRow = (Map<String, Object>) pk.get("row");
             double qty = (double) pk.get("qty");
@@ -668,9 +695,13 @@ public class PushGenerateHandler implements PanelActionHandler {
             // ★ 占用写在**本次勾选那一行自己的 lineKey** 上:隔离行有专属键(`...#行id@打印行id`),
             //   于是"从已打印那部分送的"与"从原行送的"各记各的 —— 隔离行能准确显示已生单/未生单,
             //   原行的已送也不会把打印量算进去(见 isolatedLineKey 注释)。
+            //   明细行被合并成一行的场合(同一订单行的隔离行 + 原行),两条 link **指向同一行**:
+            //   单据上是一行 400,账上仍是 350 + 50 两笔,两边都不失真。
+            Integer gi = groupIndex.get(orderKeyOf(str(pk.get("lineKey"))));
+            Integer tgtId = (gi != null && gi < tgtIds.size()) ? tgtIds.get(gi) : null;
             links.add(new VoucherFlowService.BatchLine(
                     str(pk.get("lineKey")),
-                    i < tgtIds.size() ? newNo + "#" + tgtIds.get(i) : null,
+                    tgtId == null ? null : newNo + "#" + tgtId,
                     item.get("物料编码") == null ? null : String.valueOf(item.get("物料编码")),
                     numOf(srcRow == null ? item.get("数量") : srcRow.get("数量")), qty));
         }

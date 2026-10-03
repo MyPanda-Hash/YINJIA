@@ -202,37 +202,28 @@ async function main() {
       return i.value
     })()`)
     ok(N(typed) === MY_BATCH, `「批次号」**可改**,已改成 ${MY_BATCH}`)
-    // ⚠ 打印是**一次一行**(用户口径「不能多行否则作废就全部作废了」):选行是**单选**,
-    //   第二行被选中时第一行必须自动取消 —— 这就是本段的断言,也是"作废只作废一行"的前提
-    const pickRadio = (idx) => ev(`(function(){
+    // ⚠ 打印弹窗**默认全选**有可打量的行 ⇒ 先「清空」再只勾第一行(2026-10-04 探针首版就栽在这)
+    await ev(`(function(){
+      const b = Array.from(document.querySelectorAll('.el-dialog button')).find(function(x){ return x.textContent.trim() === '清空' })
+      if (b) b.click(); return b ? 'cleared' : 'no-btn' })()`)
+    await sleep(500)
+    const pickRow = (idx) => ev(`(function(){
       const t = document.querySelector('.mlq .el-table')
       const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
       const tr = trs[${idx}]
       if (!tr) return 'no-row'
-      const r = tr.querySelector('.el-radio')
-      if (!r) return 'no-radio'
-      r.click(); return 'clicked'
+      const cbx = tr.querySelector('.el-checkbox')
+      if (!cbx) return 'no-checkbox'
+      cbx.click(); return 'clicked'
     })()`)
-    info(`点第 1 行单选:${await pickRadio(0)}`)
+    info(`勾第 1 行:${await pickRow(0)}`)
     await sleep(500)
-    const sel1 = await ev(`(function(){
+    const checkedState = () => ev(`(function(){
       const t = document.querySelector('.mlq .el-table')
       const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
-      return JSON.stringify(trs.map(function(tr){ return !!tr.querySelector('.el-radio.is-checked') }))
+      return JSON.stringify(trs.map(function(tr){ return !!tr.querySelector('.el-checkbox.is-checked') }))
     })()`)
-    info(`选中态:${sel1}`)
-    ok((JSON.parse(sel1 || '[]')[0] === true), `第 1 行被选中(选中态 ${sel1})`)
-    info(`点第 2 行单选:${await pickRadio(1)}`)
-    await sleep(500)
-    const sel2 = JSON.parse((await ev(`(function(){
-      const t = document.querySelector('.mlq .el-table')
-      const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
-      return JSON.stringify(trs.map(function(tr){ return !!tr.querySelector('.el-radio.is-checked') }))
-    })()`)) || '[]')
-    ok(sel2[1] === true && sel2[0] === false,
-      `**单选**成立:选中第 2 行后第 1 行自动取消(选中态 ${JSON.stringify(sel2)})⇒ 不会两行并进一张单`)
-    info(`改回第 1 行:${await pickRadio(0)}`)
-    await sleep(400)
+    info(`勾选态:${await checkedState()}`)
     const setQty2 = await ev(`(function(){
       const t = document.querySelector('.mlq .el-table')
       const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
@@ -254,6 +245,8 @@ async function main() {
     const made = await one(`SELECT TOP 1 单据编号 no, 批次号 b FROM bd_pu_label
       WHERE 采购订单号=N'${pick.no}' AND 批次号=N'${MY_BATCH}' AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id DESC`)
     ok(N(made?.b) === MY_BATCH, `界面上改的号登记成了打印单(${JSON.stringify(made?.no)} → ${JSON.stringify(made?.b)})`)
+    ok(Number((await one(`SELECT COUNT(*) n FROM bd_pu_label WHERE 采购订单号=N'${pick.no}' AND ISNULL(asp_cancel,'N')<>'Y'`))?.n) === 1,
+      `只勾一行 ⇒ **只出 1 张打印单**`)
     const madeQty = await one(`SELECT ISNULL(SUM(打印数量),0) q, COUNT(*) n FROM bl_pu_label WHERE 单据编号=N'${made?.no}' AND ISNULL(asp_cancel,'N')<>'Y'`)
     ok(Number(madeQty?.q) === PRINT_QTY && Number(madeQty?.n) === 1,
       `只登记了这一行、打印量 = ${PRINT_QTY}(实得 合计 ${madeQty?.q} / ${madeQty?.n} 行)`)
@@ -361,17 +354,22 @@ async function main() {
     ok(N(after?.b) === MY_BATCH, `新生成的暂收单批次号 = ${MY_BATCH}(${JSON.stringify(after?.no)})`)
     if (after?.no) created.push(['QC_RECV', N(after.no)])
     // ⑤b 勾了下层隔离行时,上层**默认勾选的原行**并进同一张单(用户拍板第 4 条:已打印量 + 未打印量整单同一个号)
+    //     ⑤c **合并成一行明细**(2026-10-04 五次修订):同一条订单行的「隔离行 + 原行」在单据里只有一行、数量相加
     {
       const dl = await q(`SELECT [批次号] b, [数量] q FROM sl_recv_detail
         WHERE 单据编号=N'${after?.no}' AND ISNULL(asp_cancel,'N')<>'Y'`)
       const sameBatch = dl.length > 0 && dl.every((r) => N(r.b) === MY_BATCH)
       ok(sameBatch, `同一张单的 ${dl.length} 行**全部同号** ${MY_BATCH}(实得 ${JSON.stringify(dl.map((r) => N(r.b)))})`)
-      // 上层默认勾了**所有有剩余的原行**(本单 2 行) + 本次显式勾的 1 行隔离行 ⇒ 一张单装下两层
-      const expectRows = topRows.filter((r) => Number(r.剩余) > 0).length + 1
-      const expectQty = topRows.reduce((s, r) => s + (Number(r.剩余) > 0 ? Number(r.剩余) : 0), 0) + PRINT_QTY
+      const pickedOrderRows = topRows.filter((r) => Number(r.剩余) > 0)
+      const expectQty = pickedOrderRows.reduce((s, r) => s + Number(r.剩余), 0) + PRINT_QTY
       const gotQty = dl.reduce((s, r) => s + Number(r.q ?? 0), 0)
-      ok(dl.length === expectRows && gotQty === expectQty,
-        `上层原行的未打印量**并进了这张单**:${dl.length} 行 / 合计 ${gotQty}(期望 ${expectRows} 行 / ${expectQty} = 原行剩余之和 + 隔离行 ${PRINT_QTY})`)
+      ok(gotQty === expectQty,
+        `上层原行的未打印量**并进了这张单**:合计 ${gotQty}(期望 ${expectQty} = 原行剩余之和 + 隔离行 ${PRINT_QTY})`)
+      // 合并:单据行数 = 勾中的订单行数(隔离行的量并进它本行,不再多出一行)
+      ok(dl.length === pickedOrderRows.length,
+        `**合并成一行明细**:单据 ${dl.length} 行 = 勾中的订单行数 ${pickedOrderRows.length}(隔离行 ${PRINT_QTY} 并进本行,不多出一行)`)
+      const target = dl.find((r) => Number(r.q) === Number(topRows[0]?.剩余) + PRINT_QTY)
+      ok(!!target, `该行的单据数量 = 原行剩余 ${topRows[0]?.剩余} + 已打印 ${PRINT_QTY}(实得 ${JSON.stringify(target?.q)})`)
     }
 
     // ============ ⑥ 重新打开生单弹窗:隔离行标「已生单」且不可勾 ============
@@ -419,6 +417,101 @@ async function main() {
     info(`打印弹窗「已打印记录」首行:${recTxt}`)
     const R = JSON.parse(recTxt || '{}')
     ok(Number(R.已生单) === PRINT_QTY, `打印弹窗记录里显示**已生单 ${PRINT_QTY}**(实得 ${JSON.stringify(R.已生单)})`)
+
+    // ============ ⑦ 撤回一口径:一次可勾多行(每行各一张单) + 已生单可补打层 + 单头批次号锁定 ============
+    console.log('\n=== ⑦ 一次可勾多行(每行一张单)/「已生单可补打」层/打印单生出来的单据批次号**只读** ===')
+    // ⑦.1 单头批次号:这张暂收单是**由材料码明细生成的** ⇒ 草稿态也必须只读(带锁定角标)
+    await openPanel('QC_RECV', after?.no)
+    let lockUi = null
+    for (let i = 0; i < 40; i++) {
+      await sleep(400)
+      lockUi = await ev(`(function(){
+        const fields = Array.from(document.querySelectorAll('.header-fields .field'))
+        const f = fields.find(function(x){
+          const l = x.querySelector('label'); return l && l.textContent.trim().indexOf('批次号') === 0 })
+        if (!f) return null
+        const inp = f.querySelector('input')
+        const ro = f.querySelector('.field-readonly')
+        // 草稿态渲染的是**输入框**(只是 disabled);审核后才是只读文本 —— 两种都算"锁住"
+        if (!inp && !ro) return null
+        return JSON.stringify({
+          hasInput: !!inp, disabled: inp ? !!inp.disabled : null, inputValue: inp ? inp.value : null,
+          readonlyText: ro ? ro.textContent.trim() : '',
+          badge: !!f.querySelector('.field-lock-badge'),
+        })
+      })()`)
+      if (lockUi) break
+    }
+    const L = JSON.parse(lockUi || '{}')
+    info(`暂收单单头「批次号」:${lockUi}`)
+    const lockedShape = (L.hasInput === true && L.disabled === true) || (!L.hasInput && L.readonlyText.indexOf(MY_BATCH) >= 0)
+    ok(lockedShape, `由材料码生成的暂收单:草稿态单头批次号就**改不了**(实得 ${lockUi})`)
+    ok(N(L.inputValue) === MY_BATCH || L.readonlyText.indexOf(MY_BATCH) >= 0,
+      `且值就是材料码上的号 ${MY_BATCH}(输入框值 ${JSON.stringify(L.inputValue)} / 只读文本 ${JSON.stringify(L.readonlyText)})`)
+    ok(L.badge === true, `并带「已按材料码批次号锁定」角标(badge=${L.badge})`)
+
+    // ⑦.2 打印弹窗:一次勾两行 ⇒ 两张打印单;且下层出现「已生单可补打」
+    await openPanel('PU_ORDER', pick.no)
+    await clickToolbar('打印', '打印材料码')
+    for (let i = 0; i < 40; i++) { await sleep(400); if (await ev(`!!document.querySelector('.mlq .el-table')`)) break }
+    await ev(`(function(){
+      const b = Array.from(document.querySelectorAll('.el-dialog button')).find(function(x){ return x.textContent.trim() === '清空' })
+      if (b) b.click(); return 'ok' })()`)
+    await sleep(500)
+    const SUP_LAYER = await ev(`(function(){
+      const t = document.querySelector('.mlq-supp .el-table')
+      if (!t) return null
+      const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
+      const tr = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })[0]
+      const tds = tr ? Array.from(tr.querySelectorAll('td')).map(function(x){ return x.textContent.trim() }) : []
+      return JSON.stringify({ ths: ths, first: tds })
+    })()`)
+    info(`下层「已生单可补打」:${SUP_LAYER}`)
+    ok(!!SUP_LAYER, `打印弹窗出现下层「已生单可补打」表(已收但没打码的量)`)
+
+    // 勾两行 ⇒ 服务端按行各建一张单
+    const mvBefore = N((await one(`SELECT COUNT(*) n FROM bd_pu_label WHERE 采购订单号=N'${pick.no}' AND ISNULL(asp_cancel,'N')<>'Y'`))?.n)
+    for (const idx of [0, 1]) {
+      await ev(`(function(){
+        const t = document.querySelector('.mlq .el-table')
+        const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
+        const tr = trs[${idx}]
+        if (!tr) return 'no-row'
+        const cbx = tr.querySelector('.el-checkbox')
+        if (cbx) cbx.click()
+        return 'ok' })()`)
+      await sleep(400)
+    }
+    const mkQty = async (idx) => ev(`(function(){
+      const t = document.querySelector('.mlq .el-table')
+      const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
+      const i = ths.findIndex(function(x){ return x.indexOf('本次打印数量') >= 0 })
+      const tr = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })[${idx}]
+      const inp = tr && tr.querySelectorAll('td')[i].querySelector('input')
+      if (!inp) return 'no-input'
+      inp.value = '5'
+      inp.dispatchEvent(new Event('input', { bubbles: true }))
+      inp.dispatchEvent(new Event('change', { bubbles: true }))
+      return inp.value })()`)
+    info(`两行各设 5:${await mkQty(0)} / ${await mkQty(1)}`)
+    await ev(`(function(){
+      const b = Array.from(document.querySelectorAll('.el-dialog button')).find(function(x){ return x.textContent.trim() === '确定并打印' })
+      if (b) b.click(); return 'ok' })()`)
+    await sleep(3500)
+    const mvAfter = N((await one(`SELECT COUNT(*) n FROM bd_pu_label WHERE 采购订单号=N'${pick.no}' AND ISNULL(asp_cancel,'N')<>'Y'`))?.n)
+    ok(Number(mvAfter) - Number(mvBefore) === 2,
+      `一次勾两行 ⇒ **新增 2 张打印单**(打印单数 ${mvBefore} → ${mvAfter})—— 每行各一张,作废才不会连坐`)
+    const mvDocs = await q(`SELECT 单据编号 no, (SELECT COUNT(*) FROM bl_pu_label l WHERE l.[单据编号]=h.[单据编号] AND ISNULL(l.asp_cancel,'N')<>'Y') n
+      FROM bd_pu_label h WHERE h.[采购订单号]=N'${pick.no}' AND ISNULL(h.asp_cancel,'N')<>'Y' ORDER BY h.id`)
+    ok(mvDocs.every((r) => Number(r.n) <= 1), `每张打印单**最多一行**(实得 ${JSON.stringify(mvDocs.map((r) => `${r.no}:${r.n}`))})`)
+    // 打印弹窗记录里应能看出「用途」
+    const recThs = await ev(`(function(){
+      const el = document.querySelector('.mlq-records .el-table')
+      if (!el) return null
+      return JSON.stringify(Array.from(el.querySelectorAll('.el-table__header thead th')).map(function(x){ return x.textContent.trim() }))
+    })()`)
+    info(`记录表列头:${recThs}`)
+    ok(String(recThs).indexOf('用途') >= 0, `「已打印记录」加了「用途」列区分 待生单 / 已生单补登`)
     console.log(`\n  留证:采购订单 ${pick.no} / 打印单 ${made?.no}(${MY_BATCH}) / 暂收单 ${after?.no}`)
   } finally {
     try { ws?.close() } catch { /* ignore */ }
@@ -434,6 +527,11 @@ async function main() {
     if (pd?.no) {
       try { await post('/px/puLabel/void', { docNo: N(pd.no) }); console.log(`  ${pd.no} 打印记录作废 ✓`) }
       catch (e) { console.log(`  ${pd.no} 打印记录作废 跳过:${String(e.message).slice(0, 80)}`) }
+    }
+    // ⑦ 段可能又打了几张(多行打印),一并清掉,别在库里留预约
+    for (const r of await q(`SELECT 单据编号 no FROM bd_pu_label WHERE 采购订单号=N'${pick.no}' AND ISNULL(asp_cancel,'N')<>'Y'`)) {
+      try { await post('/px/puLabel/void', { docNo: N(r.no) }); console.log(`  ${N(r.no)} 打印记录作废 ✓`) }
+      catch (e) { console.log(`  ${N(r.no)} 作废 跳过:${String(e.message).slice(0, 60)}`) }
     }
     await pool.close()
   }

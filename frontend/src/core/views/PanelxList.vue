@@ -554,7 +554,9 @@
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
       <div class="field" v-for="field in headerEditFields" :key="headerFieldKey(field)">
-        <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}</label>
+        <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}<span
+          v-if="printBatchLockReason(field)" class="field-lock-badge" :title="printBatchLockReason(field)"
+        >{{ tt('已按材料码批次号锁定') }}</span></label>
         <template v-if="draftEditable">
           <div v-if="isRefSelect(field)" class="query-ref-select">
             <el-select
@@ -646,7 +648,7 @@
             @change="markInlineDirty"
           />
         </template>
-        <div v-else class="field-readonly" :title="String(cur[headerFieldKey(field)] ?? '')">
+        <div v-else class="field-readonly" :title="printBatchLockReason(field) || String(cur[headerFieldKey(field)] ?? '')">
           {{ formatFieldValue(field, cur[headerFieldKey(field)]) }}
         </div>
       </div>
@@ -3302,6 +3304,21 @@ const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, 
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
 watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate() }, { immediate: true })
 
+/* 批次号「材料码锁定」(2026-10-04 用户口径:凡**有关打印明细生成的单据**都不可以修改批次号)。
+   判定在服务端:该单的来源链里有没有**隔离行键**(`{订单号}#{行id}@{打印行id}`)的 ACTIVE link ——
+   有 ⇒ 它是由材料码(打印明细)生出来的,标签上已印那个号,草稿态也不许改。
+   只对**批次链路单据**(表头有「批次号」字段)问,别的面板一次多余请求都不发。 */
+const printBatchLock = ref({ 锁定: false, 批次号: '', 依据: '' })
+watch(() => [panelCode.value, curDocNo.value], async () => {
+  printBatchLock.value = { 锁定: false, 批次号: '', 依据: '' }
+  const no = String(curDocNo.value || '')
+  if (!no || !batchChainPanel.value) return
+  try {
+    const r = await engine.puLabelBatchLock(panelCode.value, no)
+    if (r && String(curDocNo.value) === no) printBatchLock.value = r
+  } catch { /* 端点不可用(旧后端)时按"不锁"处理,不阻断打开单据 */ }
+}, { immediate: true })
+
 // 文书默认值:文书面板的「新增」= directAdd 建一张空白草稿(库端 saved='N'),此时 draftEditable 为真,
 // 本 watch 生效。锁定字段(申请立项人/负责人)只在「本次新增且尚未保存过」时带出——用 isFreshAddedDoc()
 // 判定(跨刷新可靠),绝不在打开既有单据时改它,否则弃审后再打开会把申请人改成操作人(冒名)。
@@ -4940,9 +4957,19 @@ function formatFieldValue(field, value) {
 
 function headerFieldLocked(field) {
   const key = headerFieldKey(field)
+  // 材料码打印明细生成的单据:**批次号锁死**(草稿态也不给改)——
+  // 用户口径「只要有关打印明细生成的单据都不可以修改批次号」。依据见 printBatchLock。
+  if (key === '批次号' && printBatchLock.value?.锁定) return true
   // readonly:元数据 editable=0 → buildMeta 下发 readonly(文书锁定字段 申请立项人/负责人 在此列)
   return !!field.computed || !!field.autoCode || !!field.readonly
     || ['编号', '单据状态', '创建时间', '更新时间', '发起人编号'].includes(key)
+}
+
+/** 批次号被"材料码"锁定的原因(没锁则空串;给只读格当 title 用) */
+function printBatchLockReason(field) {
+  return headerFieldKey(field) === '批次号' && printBatchLock.value?.锁定
+    ? String(printBatchLock.value?.依据 || tt('已按材料码批次号锁定'))
+    : ''
 }
 
 function headerRefText(field) {
@@ -8176,6 +8203,8 @@ onUnmounted(() => {
   background: #f7f9fb;
   cursor: not-allowed;
 }
+/* 单头「批次号」被材料码锁定时的小角标(2026-10-04:来自打印明细生成的单据,批次号不可改) */
+.field-lock-badge { margin-left: 6px; font-size: 11.5px; color: #b88230; }
 .inline-ref-editor.active :deep(.el-input__wrapper) {
   padding-right: 24px;
   box-shadow: 0 0 0 1px #4b74a6 inset;

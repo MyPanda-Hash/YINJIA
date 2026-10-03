@@ -82,7 +82,7 @@ public class PxController {
         return ApiResult.ok(puLabel.dialog(orderNo));
     }
 
-    /** 登记打印(2026-10-04 口径:**一次一行 = 一张打印单**;服务端强制,多行直接拒) */
+    /** 登记打印(2026-10-04 口径:**一次可勾多行,但每行各出一张打印单**;服务端按行取号建头) */
     @PostMapping("/puLabel/print")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> puLabelPrint(@RequestBody Map<String, Object> body) {
@@ -101,6 +101,15 @@ public class PxController {
     public ApiResult<Map<String, Object>> puLabelReprint(@RequestBody Map<String, Object> body) {
         perm.requireButton("PU_ORDER", "修改");
         return ApiResult.ok(puLabel.reprint(String.valueOf(body.getOrDefault("docNo", "")), currentUser()));
+    }
+
+    /**
+     * 该单据的批次号是否因"来自材料码打印明细"而**不可修改**(用户口径:凡有关打印明细生成的单据
+     * 都不可以改批次号)—— 前端打开单据时问一次,是则把单头「批次号」当只读渲染(草稿态也不给改)。
+     */
+    @GetMapping("/puLabel/batchLock")
+    public ApiResult<Map<String, Object>> puLabelBatchLock(@RequestParam String panelCode, @RequestParam String docNo) {
+        return ApiResult.ok(puLabel.batchLock(panelCode, docNo));
     }
 
     /** 作废打印记录(软删,预约量立即释放回余量) */

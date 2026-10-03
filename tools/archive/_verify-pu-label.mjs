@@ -12,8 +12,11 @@
  *   ⑥ 消费后:该行未生单预约归 0、已生单量 = 送料量(全部由 form_flow_link 派生);
  *   ⑦ **删除暂收单 → 预约自动回落**(link 置 RELEASED,无需任何回滚代码);
  *   ⑧ 作废打印记录 → 预约释放,行回到"未打印"状态;
- *   ⑨ **一次打印 = 一行 = 一张单**(追加口径「不能多行否则作废就全部作废了」):
- *      多行入参被拒、同号打两行是**两张单**、作废其中一张另一张纹丝不动、重打只累加次数不新增预约。
+ *   ⑨ **一次可勾多行、但每行一张单**(「不能多行否则作废就全部作废了」+「一次是可以打印多行的」):
+ *      两行 ⇒ 两张单;作废其中一张另一张纹丝不动;重打只累加次数不新增预约;
+ *   ⑩ **组合生单合并成一行明细**:隔离行 + 原行未打印量一起勾 ⇒ 单据里一行(数量相加),账上仍两笔;
+ *   ⑪ 材料码生出来的单据**批次号锁定**(纯未打印量生成的不锁);
+ *   ⑫ 已生单的量可**补登打印**:不扣余量、不出隔离行、批次号取该批货单据的号。
  *
  * 跑在**测试账套**(factory=YJ_TEST)。用法:node tools/archive/_verify-pu-label.mjs
  */
@@ -218,44 +221,35 @@ try {
   console.log(`\n  留证:采购订单 ${pick.no} / 批次号 ${EXPECT_BATCH} / 打印单 ${printDoc} / 暂收单 ${recv}(已删)`);
 
   // ============ ⑨ 一次打印 = 一行 = 一张单(2026-10-04 追加口径) ============
-  // 用户口径「打印需要是每次一行,不能多行否则作废就全部作废了」:
-  // 作废按**单据编号**整张作,多行挤一张单 ⇒ 作废一行连累其余行。故:一次只收一行、每次都新建头。
-  console.log('\n=== ⑨ 一次打印 = 一行 = 一张单:多行被拒 / 两次两张单 / 作废互不牵连 / 重打不重复占量 ===');
+  // 用户口径「打印需要是每次一行,不能多行否则作废就全部作废了」+「一次是可以打印多行的」:
+  // 弹窗可以一次勾多行,但**每行各出一张单**(作废按单作,多行并单会连坐)。
+  console.log('\n=== ⑨ 一次可勾多行、但每行一张单:多行是 N 张单 / 作废互不牵连 / 重打不重复占量 ===');
   const lineB = (pick.lines?.lines || []).find((x) => x.rowKind === 'order'
     && Number(x.id) !== LINE_ID && Number(x.剩余数量) > 0 && Number(x.可送上限) > 0);
   ok(!!lineB, `另找到一行可打的订单行(行 ${lineB?.行号} 剩余 ${lineB?.剩余数量})`);
   const LINE_B_ID = Number(lineB?.id);
   const QTY_B = Math.min(20, Number(lineB?.可送上限 || 0));
 
-  // ⑨.1 一次传两行 ⇒ 必须被拒(否则多行并单,作废连坐)
-  const twoMsg = await expectFail('/px/puLabel/print', {
+  // ⑨.1 一次传两行 ⇒ **接受**,且落成两张单(不再拒)
+  const two = await post('/px/puLabel/print', {
     orderNo: pick.no, batchNo: EXPECT_BATCH,
-    lines: [{ 采购订单行id: LINE_ID, 打印数量: 10 }, { 采购订单行id: LINE_B_ID, 打印数量: 10 }],
+    lines: [{ 采购订单行id: LINE_ID, 打印数量: PRINT_QTY }, { 采购订单行id: LINE_B_ID, 打印数量: QTY_B }],
   });
-  ok(twoMsg.includes('一次只能打印一行'), `一次传两行被拒:${twoMsg.slice(0, 130)}`);
-  ok(Number((await one(`SELECT COUNT(*) n FROM bd_pu_label WHERE 采购订单号=N'${pick.no}' AND ISNULL(asp_cancel,'N')<>'Y'`))?.n) === 0,
-    `被拒后**没有**留下半张打印单(事务回滚)`);
-
-  // ⑨.2 分两次各打一行,同一个批次号 ⇒ **两张不同的打印单**
-  const prA = await post('/px/puLabel/print', {
-    orderNo: pick.no, batchNo: EXPECT_BATCH, lines: [{ 采购订单行id: LINE_ID, 打印数量: PRINT_QTY }],
-  });
-  const prB = await post('/px/puLabel/print', {
-    orderNo: pick.no, batchNo: EXPECT_BATCH, lines: [{ 采购订单行id: LINE_B_ID, 打印数量: QTY_B }],
-  });
-  ok(N(prA['单据编号']) !== N(prB['单据编号']),
-    `同一个批次号打两行 ⇒ **两张单**(${prA['单据编号']} / ${prB['单据编号']};旧口径会复用同一张)`);
+  const prA = { 单据编号: (two['单据编号列表'] || [])[0] };
+  const prB = { 单据编号: (two['单据编号列表'] || [])[1] };
+  ok(Number(two['张数']) === 2 && (two['单据编号列表'] || []).length === 2,
+    `一次勾两行 ⇒ **两张打印单**(${(two['单据编号列表'] || []).join(' / ')})`);
   const eachOne = await q(`SELECT h.[单据编号] no, COUNT(l.id) n FROM bd_pu_label h JOIN bl_pu_label l
     ON l.[单据编号]=h.[单据编号] AND ISNULL(l.asp_cancel,'N')<>'Y'
     WHERE h.[单据编号] IN (N'${prA['单据编号']}', N'${prB['单据编号']}') GROUP BY h.[单据编号]`);
   ok(eachOne.length === 2 && eachOne.every((r) => Number(r.n) === 1),
-    `两张单**各只有一行**(实得 ${JSON.stringify(eachOne.map((r) => `${r.no}:${r.n}`))})`);
+    `两张单**各只有一行**(实得 ${JSON.stringify(eachOne.map((r) => `${r.no}:${r.n}`))})—— 这是"作废不连坐"的前提`);
   const lsIso = await post('/px/batchFlow/lines', { sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no });
   const isos = (lsIso?.lines || []).filter((x) => x.rowKind === 'printed');
   ok(isos.length === 2 && new Set(isos.map((x) => N(x.lineKey))).size === 2,
     `生单明细里**两行各自成一行隔离行**(${isos.map((x) => x.lineKey).join(' / ')})—— 互不牵连的行键`);
 
-  // ⑨.3 作废其中一张 ⇒ 另一张的预约**纹丝不动**(这就是用户要的"作废只作废一行")
+  // ⑨.2 作废其中一张 ⇒ 另一张的预约**纹丝不动**
   await post('/px/puLabel/void', { docNo: prA['单据编号'] });
   await sleep(500);
   const lsAfterVoid = await post('/px/batchFlow/lines', { sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no });
@@ -268,7 +262,7 @@ try {
   ok((dlgRec?.records || []).length === 1 && N(dlgRec.records[0]['单据编号']) === N(prB['单据编号']),
     `打印记录里只剩乙行那张(实得 ${JSON.stringify((dlgRec?.records || []).map((r) => r['单据编号']))})`);
 
-  // ⑨.4 重打:同一张单原样再打一遍 ⇒ 打印次数 +1、**不新增预约**
+  // ⑨.3 重打:同一张单原样再打一遍 ⇒ 打印次数 +1、**不新增预约**
   const beforeReprint = await one(`SELECT ISNULL([打印次数],0) t FROM bd_pu_label WHERE [单据编号]=N'${prB['单据编号']}'`);
   const rp = await post('/px/puLabel/reprint', { docNo: prB['单据编号'] });
   ok(Number(beforeReprint?.t) === 1 && Number(rp['打印次数']) === 2,
@@ -278,9 +272,88 @@ try {
   ok((lsAfterReprint?.lines || []).filter((x) => x.rowKind === 'printed').length === 1
     && Number(isoB2?.数量) === QTY_B && N(isoB2?.lineKey) === N(isoB?.lineKey),
     `重打**没有**新增预约/没有多出隔离行(仍是 ${QTY_B}、行键不变)`);
-  await post('/px/puLabel/void', { docNo: prB['单据编号'] });
+
+  // ============ ⑩ 组合生单:**合并成一行明细**(打印量 + 未打印量相加,账仍各记各的) ============
+  console.log('\n=== ⑩ 组合生单:隔离行 + 原行未打印量 ⇒ 单据里**一行**、账上两笔 ===');
+  const lsBefore = await post('/px/batchFlow/lines', { sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no });
+  const orderRow = (lsBefore?.lines || []).find((x) => x.rowKind === 'order' && Number(x.id) === LINE_B_ID);
+  const isoPrint = (lsBefore?.lines || []).find((x) => x.rowKind === 'printed' && Number(x.id) === LINE_B_ID);
+  const QTY_UNPRINTED = Math.min(30, Number(orderRow?.可送上限 || 0));
+  ok(!!orderRow && !!isoPrint && QTY_UNPRINTED > 0,
+    `乙行同时有「原行未打印量 ${orderRow?.剩余数量}(可送 ${orderRow?.可送上限})」与「已打印隔离行 ${isoPrint?.剩余数量}」`);
+  const gen2 = await post('/px/batchFlow/generate', {
+    sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no, overRatio: 0.05,
+    lines: [
+      { lineKey: orderRow.lineKey, qty: QTY_UNPRINTED },
+      { lineKey: isoPrint.lineKey, qty: QTY_B },
+    ],
+  });
+  const recvNo = N(gen2['编号']);
+  created.push(['QC_RECV', recvNo]);
+  const merged = await q(`SELECT [采购订单行号] ln, [数量] q FROM sl_recv_detail
+    WHERE [单据编号]=N'${recvNo}' AND ISNULL(asp_cancel,'N')<>'Y'`);
+  const expectLine = QTY_UNPRINTED + QTY_B;
+  ok(merged.length === 1 && Number(merged[0].q) === expectLine,
+    `单据明细**合并成一行**、数量相加 = ${QTY_UNPRINTED} + ${QTY_B} = ${expectLine}(实得 ${merged.length} 行 / ${merged.map((r) => r.q).join('、')})`);
+  const twoLinks = await q(`SELECT source_line_key k, linked_quantity q FROM form_flow_link
+    WHERE target_panel_code='QC_RECV' AND target_form_no=N'${recvNo}' AND link_status='ACTIVE' ORDER BY source_line_key`);
+  ok(twoLinks.length === 2 && twoLinks.every((r) => N(r.k).indexOf('@') >= 0 || true)
+    && twoLinks.some((r) => N(r.k).indexOf('@') >= 0) && twoLinks.some((r) => N(r.k).indexOf('@') < 0),
+    `账上仍是**两笔**(原行键 ${twoLinks.find((r) => N(r.k).indexOf('@') < 0)?.q} + 隔离行键 ${twoLinks.find((r) => N(r.k).indexOf('@') >= 0)?.q})`);
+
+  // ============ ⑪ 打印明细生成的单据:**批次号不可改**(单头锁定的服务端依据) ============
+  console.log('\n=== ⑪ 材料码生出来的单据:批次号锁定(含草稿态) ===');
+  const lock = await get(`/px/puLabel/batchLock?panelCode=QC_RECV&docNo=${encodeURIComponent(recvNo)}`);
+  ok(lock?.['锁定'] === true && N(lock['批次号']) === EXPECT_BATCH,
+    `该暂收单批次号**锁定** = ${EXPECT_BATCH}(实得 ${JSON.stringify(lock)})`);
+  // 反例:纯未打印量的暂收单不该被锁(否则普通单据也改不了号)
+  const plain = await post('/px/batchFlow/generate', {
+    sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no, overRatio: 0.05,
+    lines: [{ lineKey: (lsBefore?.lines || []).find((x) => x.rowKind === 'order' && Number(x.id) === LINE_ID)?.lineKey, qty: 1 }],
+  });
+  if (plain?.['编号']) {
+    created.push(['QC_RECV', N(plain['编号'])]);
+    const lock2 = await get(`/px/puLabel/batchLock?panelCode=QC_RECV&docNo=${encodeURIComponent(N(plain['编号']))}`);
+    ok(lock2?.['锁定'] === false, `纯未打印量生成的暂收单**不锁**(实得 ${JSON.stringify(lock2)})`);
+  }
+
+  // ============ ⑫ 已生单的量:**补登打印**(不预约、不出隔离行、批次号取已生单的号) ============
+  console.log('\n=== ⑫ 已生单的量也能打码:补登(不扣余量、不生隔离行) ===');
+  const dlg3 = await get(`/px/puLabel/dialog?orderNo=${encodeURIComponent(pick.no)}`);
+  const sup = (dlg3?.['补登行'] || []).find((r) => Number(r['采购订单行id']) === LINE_ID);
+  ok(!!sup, `弹窗给出「已生单可补打」行:行 ${sup?.行号} 批次号 ${sup?.批次号} 已收 ${sup?.['已收数量']} 可补打 ${sup?.['可补登数量']}`);
+  const beforeSup = await get(`/px/puLabel/dialog?orderNo=${encodeURIComponent(pick.no)}`);
+  const beforeRow = (beforeSup?.lines || []).find((x) => Number(x.id) === LINE_ID);
+  const SUP_QTY = Math.min(10, Number(sup?.['可补登数量'] || 0));
+  if (SUP_QTY > 0) {
+    const sr = await post('/px/puLabel/print', {
+      orderNo: pick.no, batchNo: '',
+      lines: [{ 采购订单行id: LINE_ID, 打印数量: SUP_QTY, 批次号: N(sup['批次号']), 补登: true }],
+    });
+    const supDoc = N((sr['单据编号列表'] || [sr['单据编号']])[0]);
+    const supRow = await one(`SELECT [补登] s, [去向单据] t, [打印数量] q FROM bl_pu_label WHERE [单据编号]=N'${supDoc}'`);
+    ok(N(supRow?.s) === 'Y' && Number(supRow?.q) === SUP_QTY,
+      `补登打印落库:补登=${JSON.stringify(supRow?.s)} / 数量 ${supRow?.q}(期望 ${SUP_QTY}) / 去向单据 ${JSON.stringify(supRow?.t)}`);
+    const afterSup = await get(`/px/puLabel/dialog?orderNo=${encodeURIComponent(pick.no)}`);
+    const afterRow = (afterSup?.lines || []).find((x) => Number(x.id) === LINE_ID);
+    ok(Math.abs(Number(afterRow?.剩余可打) - Number(beforeRow?.剩余可打)) < 0.01,
+      `补登**不扣余量**:剩余可打 ${beforeRow?.剩余可打} → ${afterRow?.剩余可打}`);
+    const lsSup = await post('/px/batchFlow/lines', { sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no });
+    const supIso = (lsSup?.lines || []).find((x) => x.rowKind === 'printed' && N(x.批次号) === N(sup['批次号']) && Number(x.数量) === SUP_QTY);
+    ok(!supIso, `补登**不产生隔离行**(生单弹窗里没有多出一行 ${SUP_QTY})`);
+    const supAfter = (afterSup?.['补登行'] || []).find((r) => Number(r['采购订单行id']) === LINE_ID);
+    ok(Math.abs(Number(supAfter?.['已补登数量']) - (Number(sup?.['已补登数量']) + SUP_QTY)) < 0.01,
+      `该批次「已补打」累加为 ${supAfter?.['已补登数量']}(可补打降到 ${supAfter?.['可补登数量']})`);
+    await post('/px/puLabel/void', { docNo: supDoc });
+  } else {
+    ok(false, '该行没有可补登的量,⑫ 未能验证(前置数据不足)');
+  }
+  // 收尾作废(已被前面某步作废过也算正常,故容错)
+  for (const d of [prB['单据编号']]) {
+    try { await post('/px/puLabel/void', { docNo: d }); } catch (e) { info(`  ${d} 收尾作废跳过:${String(e.message).slice(0, 80)}`); }
+  }
   await sleep(400);
-  console.log(`  留证(⑨):${prA['单据编号']} / ${prB['单据编号']}(均已作废)`);
+  console.log(`  留证(⑨~⑫):${prA['单据编号']} / ${prB['单据编号']} / 暂收单 ${recvNo}`);
 } finally {
   console.log('\n=== 清理测试单据 ===');
   for (const [p, no] of created.slice().reverse()) {
