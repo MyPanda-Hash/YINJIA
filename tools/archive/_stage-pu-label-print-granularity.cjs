@@ -32,20 +32,26 @@ const SHARED = {
   'frontend/src/i18n/locales/en.js': [
     /已生单可补打/, /可一次勾选多行/, /已生单补登/, /可补打/, /去向单据/, /张打印单/, /将生成/,
     /已补打/, /'用途'/, /'待生单'/, /重打/, /一次只打一行/, /本次选中/, /请选中一行/, /请先选中一行/,
+    // 超送比例"改完自动保存"那一版文案(含删掉旧提示语的那条 hunk)
+    /自动保存为系统默认/, /保存中…/, /已自动保存/, /超送比例保存失败/, /额度按订单数量算/,
   ],
   'frontend/src/i18n/locales/zh-TW.js': [
     /已生單可補打/, /可一次勾選多行/, /已生單補登/, /可補打/, /去向單據/, /張列印單/, /將產生/,
     /已補打/, /'用途'/, /'待生單'/, /重打/, /一次只打一行/, /本次選中/, /請選中一行/, /請先選中一行/,
     /已生单可补打/, /可一次勾选多行/, /已生单补登/, /去向单据/, /张打印单/, /将生成/,
+    /自動儲存為系統預設/, /儲存中…/, /已自動儲存/, /超送比例儲存失敗/, /額度按訂單數量算/, /额度按订单数量算/,
   ],
 }
 
 /** 本任务专有(整文件暂存) */
 const MINE_ONLY = [
+  'backend/src/main/java/com/yinjia/mes/service/BatchService.java',
   'backend/src/main/java/com/yinjia/mes/service/PuLabelService.java',
   'backend/src/main/java/com/yinjia/mes/controller/PxController.java',
   'frontend/src/business/engine.js',
+  'frontend/src/core/views/BatchSendDialog.vue',
   'frontend/src/core/views/MaterialLabelDialog.vue',
+  'tools/archive/_verify-over-ratio-save.cjs',
   'tools/migrate-pu-label-one-line-per-print.sql',
   'tools/migrate-pu-label-supplement-print.sql',
   'tools/archive/_i18n-material-label-2026-10-04.cjs',

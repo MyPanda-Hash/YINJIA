@@ -112,6 +112,38 @@ public class BatchService {
         return v;
     }
 
+    /**
+     * 保存收料超送比例(0~0.5;**改完立即生效**)。
+     *
+     * 用户口径(2026-10-04):「超送应该更改后会自动保存」—— 生单对话框里改的比例要**落库**,
+     * 下次打开(以及打印材料码的可打上限)都按这个新比例算,而不是每次都退回系统默认 5%。
+     *
+     * 落库位置就是 {@link #overRatio()} 的**同一个参数**(`yj_app_setting.receive_over_ratio`),
+     * 存字符串小数(如 `0.08`);参数行不在时补插一行(带 remark,便于后来人知道这行是干什么的)。
+     * 存完**立刻刷新缓存**:overRatio() 有 30 秒缓存,不刷的话刚改完还按旧值校验(用户体验像"没保存")。
+     *
+     * @param ratio 比例(0~1 的小数;超出 50% 夹到 0.5,负数归 0 —— 与 overRatio() 同一钳制口径)
+     * @return 真正生效的比例
+     */
+    @Transactional
+    public double saveOverRatio(double ratio, String user) {
+        double v = ratio;
+        if (Double.isNaN(v) || v < 0d) v = 0d;
+        if (v > MAX_OVER_RATIO) v = MAX_OVER_RATIO;
+        String val = v == Math.rint(v) ? String.valueOf((long) Math.rint(v)) : String.valueOf(v);
+        int n = jdbc.update("UPDATE yj_app_setting SET setting_value = ?, asp_user1 = COALESCE(?, asp_user1),"
+                + " asp_time2 = SYSDATETIME() WHERE setting_key = ?", val, user, KEY_OVER_RATIO);
+        if (n == 0) {
+            jdbc.update("INSERT INTO yj_app_setting (setting_key, setting_value, remark, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,SYSDATETIME())", KEY_OVER_RATIO, val,
+                    "收料允许超送比例(0~1;0=不允许)。分批送料/材料码打印校验:本次量 ≤ 剩余量 ×(1+比例)。"
+                            + "由生单对话框「超送比例」改动自动保存(2026-10-04)", user);
+        }
+        ratioCache = v;                          // 立刻生效(不吃 30s 缓存)
+        ratioAt = System.currentTimeMillis();
+        return v;
+    }
+
     // ==================== 分批送料:登记已编号台账 ====================
 
     /**

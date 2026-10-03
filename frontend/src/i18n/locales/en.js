@@ -103,6 +103,10 @@ export default {
     '用途': 'Purpose',
     '已生单补登': 'Supplement for received qty',
     '待生单': 'Awaiting receipt',
+    '（0 = 不允许；最高 50%，额度按订单数量算；改完自动保存为系统默认）': '(0 = not allowed; max 50%, allowance is based on the ordered qty; changes are saved automatically as the system default)',
+    '保存中…': 'Saving…',
+    '已自动保存': 'Saved automatically',
+    '超送比例保存失败': 'Failed to save the over-delivery ratio',
     '子件': 'Subcomponent',
     '物料规格(外径/内径/长度)': 'Material specification (outer diameter/inner diameter/length)',
     '测试编号': 'Test No.',
@@ -2723,7 +2727,6 @@ export default {
     '生单时按供应商编码与当天日期生成': 'Generated from the supplier code and the current date when the document is created',
     '随单头批次号一致,不可修改': 'Follows the header batch no.; not editable',
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Only checked lines are generated; max deliverable = ordered qty × (1 + over-delivery ratio) − sent + returned (over-delivery capped at 50%)',
-    '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = none; max 50%, allowance based on ordered qty)',
     '请至少勾选一行并填写本次送料数量': 'Check at least one line and enter the delivery qty',
 
     // 检验数据记录·按物料编码查看来料检验要求(2026-09-23;弹窗只读复用 QC_INSP_REQ 表)

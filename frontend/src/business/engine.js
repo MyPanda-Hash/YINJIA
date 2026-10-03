@@ -491,6 +491,11 @@ export async function puLabelVoid(docNo) {
   return unwrap(await request.post('/px/puLabel/void', { docNo }))
 }
 
+/** 保存「收料超送比例」(生单对话框改动即自动保存):落系统参数 receive_over_ratio,传 0~1 小数 */
+export async function batchFlowSaveOverRatio(overRatio) {
+  return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))
+}
+
 
 /**
  * Upload a voucher image to the MES backend. The backend owns the cloud OCR

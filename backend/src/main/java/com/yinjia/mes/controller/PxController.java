@@ -476,6 +476,24 @@ public class PxController {
     }
 
     /**
+     * 保存「收料超送比例」(生单对话框里改动即自动保存,用户 2026-10-04 口径)。
+     *
+     * 存的是**系统参数** `yj_app_setting.receive_over_ratio`(与批量校验、材料码打印上限同一个参数),
+     * 所以改一次之后:下次打开生单对话框按新比例预填、后端校验与打印上限也按新比例算。
+     * body.overRatio 传 **0~1 的小数**(前端把输入框的百分数 ÷100);超 50% 服务端夹到 0.5。
+     */
+    @PostMapping("/batchFlow/overRatio")
+    public ApiResult<Map<String, Object>> batchFlowSaveOverRatio(@RequestBody Map<String, Object> body) {
+        perm.requireButton("PU_ORDER", "修改");
+        double v = body.get("overRatio") instanceof Number n ? n.doubleValue() : 0d;
+        double saved = batchService.saveOverRatio(v, currentUser());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("overRatio", saved);
+        out.put("超送比例", Math.round(saved * 100));
+        return ApiResult.ok(out);
+    }
+
+    /**
      * 分批送料:按行「本次送料数量」生成一张下游草稿(生单即取批次号 + 按量占用 + 写批次台账)。
      * body.batchNo = **生单对话框里人工填/改的批次号**(可选;2026-10-04 用户口径「在生单时批次号就可以修改」)
      * —— 只在链路头一跳(采购订单→送料暂收单,此时来源单还没有号)生效,留空则按

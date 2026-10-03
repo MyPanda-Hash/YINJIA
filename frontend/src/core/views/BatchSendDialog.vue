@@ -43,9 +43,13 @@
         </span>
         <span class="bsd-chip bsd-ratio">
           {{ tt('超送比例') }}:
+          <!-- 改完**自动保存**(用户 2026-10-04 口径):落 yj_app_setting.receive_over_ratio,
+               下次打开按它预填,后端校验与材料码可打上限也按它算 —— 不用再单独点"保存" -->
           <el-input-number v-model="overRatioPct" :min="0" :max="50" :step="1" :precision="0" size="small"
-            :controls="false" style="width: 62px" @change="recompute" />
-          %<span class="bsd-ratio-tip">{{ tt('（0 = 不允许；最高 50%，额度按订单数量算）') }}</span>
+            :controls="false" style="width: 62px" @change="onRatioChange" />
+          %<span class="bsd-ratio-tip">{{ tt('（0 = 不允许；最高 50%，额度按订单数量算；改完自动保存为系统默认）') }}</span>
+          <span v-if="ratioSaving" class="bsd-ratio-tip">{{ tt('保存中…') }}</span>
+          <span v-else-if="ratioSaved" class="bsd-ratio-saved">{{ tt('已自动保存') }}</span>
         </span>
         <span v-if="(batches || []).length" class="bsd-chip">{{
           tt('已有批次') }}: {{ batches.map((b) => b.batchNo || tt('待编号')).join('、') }}</span>
@@ -126,7 +130,7 @@
 </template>
 
 <script setup>
-import { computed, nextTick, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
@@ -209,6 +213,33 @@ function recompute() {
     if (Number(qtyOf[r.lineKey] || 0) > cap) qtyOf[r.lineKey] = cap
   }
 }
+
+/* ── 超送比例**改完自动保存**(2026-10-04 用户口径「超送应该更改后会自动保存」)─────────────
+   存的是**系统参数**(yj_app_setting.receive_over_ratio),所以下次打开按新比例预填、
+   后端校验与材料码打印的可打上限也按新比例算 —— 不再是"每次打开都退回 5%"。
+   防抖 600ms:数字框敲一下会连着触发几次 change,别把请求打成一串。 */
+const ratioSaving = ref(false)
+const ratioSaved = ref(false)
+let ratioTimer = null
+function onRatioChange() {
+  recompute()
+  ratioSaved.value = false
+  clearTimeout(ratioTimer)
+  ratioTimer = setTimeout(saveRatio, 600)
+}
+async function saveRatio() {
+  ratioSaving.value = true
+  try {
+    const res = await engine.batchFlowSaveOverRatio(ratio.value)
+    overRatio.value = Number(res?.overRatio ?? ratio.value)
+    ratioSaved.value = true
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('超送比例保存失败'))
+  } finally {
+    ratioSaving.value = false
+  }
+}
+onUnmounted(() => clearTimeout(ratioTimer))
 
 async function load() {
   if (!props.sourceNo) return
@@ -377,6 +408,8 @@ async function confirm() {
 .bsd-printed-title { font-size: 12.5px; color: #46586e; display: flex; gap: 8px; align-items: baseline; }
 .bsd-ratio { display: inline-flex; align-items: center; gap: 4px; }
 .bsd-ratio-tip { color: #8b9893; }
+/* 超送比例"已自动保存"回执(改动落库后的即时反馈,免得用户以为没保存) */
+.bsd-ratio-saved { color: #3f8f5b; }
 .bsd-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #46586e; }
 .bsd-tip { color: #8b9893; }
 </style>

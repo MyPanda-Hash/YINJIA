@@ -100,6 +100,13 @@ const T = {
   '用途': ['Purpose', '用途'],
   '已生单补登': ['Supplement for received qty', '已生單補登'],
   '待生单': ['Awaiting receipt', '待生單'],
+  // ── 生单对话框:超送比例改完自动保存(2026-10-04) ──
+  '（0 = 不允许；最高 50%，额度按订单数量算；改完自动保存为系统默认）':
+    ['(0 = not allowed; max 50%, allowance is based on the ordered qty; changes are saved automatically as the system default)',
+      '（0 = 不允許；最高 50%，額度按訂單數量算；改完自動儲存為系統預設）'],
+  '保存中…': ['Saving…', '儲存中…'],
+  '已自动保存': ['Saved automatically', '已自動儲存'],
+  '超送比例保存失败': ['Failed to save the over-delivery ratio', '超送比例儲存失敗'],
   // 生单弹窗上下两层的列头(此前只有 en/zh-TW 之一有译名,补齐免得切语言漏中文)
   '剩余': ['Remaining', '剩餘'],
   '打印时间': ['Printed at', '列印時間'],
@@ -117,6 +124,8 @@ const OBSOLETE = [
   '本次选中',
   '请选中一行并填写本次打印数量',
   '请先选中一行',
+  // 超送比例提示语改成"改完自动保存"版,旧文案不再出现
+  '（0 = 不允许；最高 50%，额度按订单数量算）',
 ]
 
 const ANCHOR = /(\n\s*\/\*\s*─+\s*特采单两级审批)|\n}\s*$/m
