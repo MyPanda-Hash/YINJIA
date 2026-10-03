@@ -1185,6 +1185,7 @@ import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
+import { sumKeepScale } from '@/core/panel/sumTotals'
 import { specCarryFailure, specDrift } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
@@ -2210,12 +2211,11 @@ function stageSpan(sec, ri) {
 }
 
 // ── 合计行(成型配方):对指定列求数值和 ──
+// 位数跟本列明细走(2026-10-03 口径,见 @core/panel/sumTotals):原先固定收敛到 4 位,
+// 明细若写 5~6 位(库内确有 scale=6 的列)合计仍会少位。
 function totalOf(dt, key) {
-  const sum = rowsOf(dt).reduce((s, r) => {
-    const v = parseFloat(r[key])
-    return Number.isFinite(v) ? s + v : s
-  }, 0)
-  return sum ? String(Math.round(sum * 10000) / 10000) : ''
+  const sum = sumKeepScale(rowsOf(dt).map((r) => r[key]))
+  return sum ? String(sum) : ''
 }
 
 const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f.code, f])))

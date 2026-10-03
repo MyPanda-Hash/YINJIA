@@ -9,8 +9,11 @@
  * 打印通道:新窗口 HTML + window.print()(同 QrLabelDialog,绕开 jsPDF §5.5 坑);
  * 版面文字(公司抬头/注意事项/需方联系/生产任务单表头)为固定版式常量,改文案只动本文件。
  * 业务单据为纸面事实格式,不入 tt() 翻译层(ADR-0001)。
+ * 纸面「总　计」的位数与明细一致(2026-10-03 用户口径,见 @core/panel/sumTotals):
+ * 明细 decimal(18,4) 的 4 位不再被 2 位截断,也不出现 0.30000000000000004 这类浮点尾巴。
  */
 import * as QRCodeMod from 'qrcode'
+import { sumKeepScale } from '@core/panel/sumTotals'
 
 /** qrcode 库兼容取用:CJS 互操作下 toDataURL 可能挂在 .default 上 */
 function qrLib() {
@@ -223,8 +226,8 @@ export function printPuOrder(doc, lines) {
   const rows = (Array.isArray(lines) ? lines : []).filter((l) => l && (l['物料编码'] || l['物料名称']))
   const pad = Math.max(0, 4 - rows.length)
   const tax = rows.some((l) => Number(l['税率%']) > 0) ? '是' : '否'
-  const totalQty = rows.reduce((a, l) => a + Number(l['数量'] || 0), 0)
-  const totalAmt = rows.reduce((a, l) => a + Number(l['金额'] || 0), 0)
+  const totalQty = sumKeepScale(rows.map((l) => l['数量'])) ?? 0
+  const totalAmt = sumKeepScale(rows.map((l) => l['金额'])) ?? 0
   const trs = rows.map((l) => '<tr>'
     + `<td>${esc(l['物料编码'])}</td><td>${esc(l['物料名称'])}</td><td>${esc(l['规格型号'])}</td>`
     + `<td class="r">${esc(fmtNum(l['单价']))}</td><td>${esc(l['单位'])}</td><td class="r">${esc(fmtNum(l['数量']))}</td>`
@@ -265,7 +268,7 @@ export function printPuOrderNoAmount(doc, lines) {
   const rows = (Array.isArray(lines) ? lines : []).filter((l) => l && (l['物料编码'] || l['物料名称']))
   const pad = Math.max(0, 4 - rows.length)
   const tax = rows.some((l) => Number(l['税率%']) > 0) ? '是' : '否'
-  const totalQty = rows.reduce((a, l) => a + Number(l['数量'] || 0), 0)
+  const totalQty = sumKeepScale(rows.map((l) => l['数量'])) ?? 0
   const trs = rows.map((l) => '<tr>'
     + `<td>${esc(l['物料编码'])}</td><td>${esc(l['物料名称'])}</td><td>${esc(l['规格型号'])}</td>`
     + `<td>${esc(l['单位'])}</td><td class="r">${esc(fmtNum(l['数量']))}</td>`

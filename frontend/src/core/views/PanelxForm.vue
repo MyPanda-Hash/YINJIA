@@ -386,6 +386,7 @@ import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import { applyCalcRules } from '@core/panel/calcRules'
+import { sumKeepScale } from '@core/panel/sumTotals'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
@@ -1162,8 +1163,9 @@ function summaryRows(tab) {
   const items = tab.summaryItems || []
   const rows = detailData[tab.key] || []
   return items.map((it) => {
-    const v = rows.reduce((s, r) => s + num(r[it.field]), 0)
-    return { label: it.label, value: Math.round(v * 100) / 100 }
+    // 汇总值位数跟明细走(2026-10-03:原先恒 2 位,明细 decimal(18,4) 的 4 位被砍)
+    const v = sumKeepScale(rows.map((r) => r[it.field])) ?? 0
+    return { label: it.label, value: v }
   })
 }
 
@@ -1181,7 +1183,8 @@ function summarize({ columns }, tab) {
     }
     const field = (tab.fields || []).find((r) => r.dataName === label)
     if (field && (field.dataType === '小数' || field.dataType === '整数')) {
-      sums.push(Math.round(rows.reduce((s, r) => s + num(r[label]), 0) * 100) / 100)
+      // 位数跟本列明细走(decimal(18,4) 的明细不再被合计砍成 2 位,见 @core/panel/sumTotals)
+      sums.push(sumKeepScale(rows.map((r) => r[label])) ?? 0)
     } else {
       sums.push('')
     }

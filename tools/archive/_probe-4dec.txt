@@ -1,0 +1,17 @@
+﻿
+  | bl_pu_order.含税单价 ×549 | 
+  | bl_pu_order.单价 ×549 | 
+  | bl_sale_out.税额 ×101 | 
+  | sl_recv_detail.含税单价 ×23 | 
+  | sl_recv_detail.单价 ×23 | 
+  | bl_purchase_in.含税单价 ×16 | 
+  | bl_purchase_in.单价 ×16 | 
+  | qc_insp_detail.单价 ×14 | 
+  | bl_pu_order.数量2 ×9 | 
+  | bl_pu_order.现存量 ×7 | 
+  | bl_purchase_in.金额 ×2 | 
+  | bl_purchase_in.含税金额 ×2 | 
+  | sl_recv_detail.数量2 ×1 | 
+  | qc_return_detail.单价 ×1 | 
+
+

@@ -1746,6 +1746,7 @@ import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
 import { applyCalcRules } from '@core/panel/calcRules'
+import { sumKeepScale } from '@core/panel/sumTotals'
 import { printPuOrder, printQcReturn, printProductCards, printLocationCards, printProductionTask, printPuOrderNoAmount, woQrText } from '@/business/print-formats'
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
@@ -3606,9 +3607,10 @@ async function loadBatchTab(docNo, force = false) {
       batches: batchTab.rows.length,
       // 待编号批次数(台账 status='PENDING',批次号留空 —— 采购入库单审核时才取号)
       pending: batchTab.rows.filter((r) => r.status === 'PENDING').length,
-      sent: lines.reduce((a, l) => a + Number(l.已送数量 || 0), 0),
-      left: lines.reduce((a, l) => a + Number(l.剩余数量 || 0), 0),
-      ret: lines.reduce((a, l) => a + Number(l.已退回数量 || 0), 0),
+      // 明细行数量合计(位数跟明细走,见 @core/panel/sumTotals)
+      sent: sumKeepScale(lines.map((l) => l.已送数量)) ?? 0,
+      left: sumKeepScale(lines.map((l) => l.剩余数量)) ?? 0,
+      ret: sumKeepScale(lines.map((l) => l.已退回数量)) ?? 0,
     }
   } catch { batchTab.rows = []; batchTab.sum = { batches: 0, pending: 0, sent: 0, left: 0, ret: 0 } } finally { batchTab.loading = false }
 }
@@ -3722,25 +3724,33 @@ function groupKeyOf(b) {
 }
 
 // 汇总：按 编码/名称 分组 + 合计行（对齐 T+ 汇总页签）
+// 位数口径(2026-10-03 用户报「明细与合计小数点后位数有差距」):分组小计与合计行都走
+// sumKeepScale —— 位数跟本列明细走，顺带吃掉裸加的浮点尾差(1.1+2.2 曾显示 3.3000000000000003)
 function summaryRows(rows, b) {
   if (!rows.length) return []
   const keyField = groupKeyOf(b)
   const numeric = numericCols(rows, b)
-  const group = new Map()
+  const group = new Map()   // 组键 → 组基础行(已剔除汇总列，避免分组行把首行原值又累加一次)
+  const cells = new Map()   // 组键 → { 列: [该组明细值...] }
   for (const r of rows) {
     const k = r[keyField] || '(空)'
     if (!group.has(k)) {
-      // 先剔除汇总字段再复制首行，避免分组行把首行原值又累加一次（翻倍 bug）
       const base = { ...r }
       for (const c of numeric) delete base[c]
       group.set(k, base)
+      cells.set(k, Object.fromEntries(numeric.map((c) => [c, []])))
     }
-    const g = group.get(k)
-    for (const c of numeric) g[c] = (g[c] || 0) + num(r[c])
+    const bucket = cells.get(k)
+    for (const c of numeric) bucket[c].push(r[c])
   }
-  const out = [...group.values()]
+  const out = []
+  for (const [k, base] of group) {
+    const bucket = cells.get(k)
+    for (const c of numeric) base[c] = sumKeepScale(bucket[c]) ?? 0
+    out.push(base)
+  }
   const total = {}
-  for (const c of numeric) total[c] = Math.round(rows.reduce((a, r) => a + num(r[c]), 0) * 100) / 100
+  for (const c of numeric) total[c] = sumKeepScale(rows.map((r) => r[c])) ?? 0
   out.push({ [keyField]: '合计', ...total })
   return out
 }
@@ -4133,14 +4143,14 @@ const archSumsMap = computed(() => {
     for (const c of archCols(b)) {
       const f = c.field
       if (f && (f.dataType === '小数' || f.dataType === '整数')) {
-        let acc = 0
-        let has = false
+        const vals = []
         for (const r of archRows(b)) {
           if (r._placeholder) continue
           const v = Number(r[c.prop])
-          if (Number.isFinite(v)) { acc += v; has = true }
+          if (Number.isFinite(v)) vals.push(v)
         }
-        sums[c.prop] = has ? Math.round(acc * 100) / 100 : ''
+        // 位数跟明细走(decimal(18,4) 不再被砍成 2 位),见 @core/panel/sumTotals
+        sums[c.prop] = vals.length ? sumKeepScale(vals) : ''
       }
     }
     m[b.id] = sums
@@ -4250,7 +4260,8 @@ function sumMethod({ columns, data }) {
       sums[i] = vals[vals.length - 1]
       return
     }
-    sums[i] = Math.round(vals.reduce((a, b) => a + b, 0) * 100) / 100
+    // 位数跟本列明细走(2026-10-03:合计原先恒 2 位,明细是 decimal(18,4) ⇒ 1.2345 被显示成 1.23)
+    sums[i] = sumKeepScale(vals)
   })
   return sums
 }
