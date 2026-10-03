@@ -83,20 +83,33 @@ public class PanelPermissionService {
      * 只有制单人 ∪ 管理员能提交/撤回,别人即使有编辑权也点不动)。
      * 会签类按钮同理:会签人是被指定的普通人(按账号指定即授权),身份校验在方法内。
      *
-     * 2026-10-04 特采单(QC_TC_IN)两级审批:用户口径「编制 = 提交审批的人,审核 = 一级审批通过的人」——
-     * 两者**必须是两个人**,而全局表让「提交审批」也吃 audit 词,于是只有审核人能提交,
-     * 编制人恒等于审核人,且非管理员提交后会被「编制审批分离」挡在审批这一步(死路)。
-     * 故本面板「提交审批/撤回」同产品变更申请单口径改判 add/modify:有该面板新增/申请修改权的人
-     * (采购/品质文员)负责编制并提交;「审批通过/审批驳回」仍归 audit(组织架构勾了
-     * 「特采单·审核反审核」的角色 ∪ 管理员),第二级再由超级管理员批准。
+     * 2026-10-04 质量单据一族(QC_TC_IN / QC_BHG / QC_BHC / QC_BHZ / QC_JJF / QC_SCP / QC_LYB / QC_SCY)
+     * 两级审批:用户口径「编制 = 提交审批的人,审核 = 一级审批通过的人」—— 两者**必须是两个人**,
+     * 而全局表让「提交审批」也吃 audit 词,于是只有审核人能提交,编制人恒等于审核人,
+     * 且非管理员提交后会被「编制审批分离」挡在审批这一步(死路)。
+     * 故这些面板的「提交审批」同产品变更申请单口径改判 add/modify:有该面板新增/申请修改权的人
+     * (品质/生产文员)负责编制并提交;「审批通过/审批驳回」仍归 audit(组织架构勾了
+     * 「该面板·审核反审核」的角色 ∪ 管理员),第二级再由超级管理员批准。
      */
-    private static final Map<String, String[]> BUTTON_PERMS_OVERRIDE = Map.of(
-            "RD_CHANGE|提交审批", new String[]{"add", "modify"},
-            "RD_CHANGE|提交会签", new String[]{"add", "modify"},
-            "RD_CHANGE|撤回会签", new String[]{"add", "modify", "audit"},
-            "RD_CHANGE|会签通过", new String[]{"view"},
-            "RD_CHANGE|会签驳回", new String[]{"view"},
-            "QC_TC_IN|提交审批", new String[]{"add", "modify", "audit"});
+    private static final Map<String, String[]> BUTTON_PERMS_OVERRIDE;
+
+    /** 「提交审批」在质量单据上的授权词(新增保存 / 申请修改 / 审批 —— 有编辑权就能编制并提交) */
+    private static final String[] SUBMIT_WORDS = {"add", "modify", "audit"};
+
+    static {
+        Map<String, String[]> m = new HashMap<>();
+        m.put("RD_CHANGE|提交审批", new String[]{"add", "modify"});
+        m.put("RD_CHANGE|提交会签", new String[]{"add", "modify"});
+        m.put("RD_CHANGE|撤回会签", new String[]{"add", "modify", "audit"});
+        m.put("RD_CHANGE|会签通过", new String[]{"view"});
+        m.put("RD_CHANGE|会签驳回", new String[]{"view"});
+        // 质量单据一族(2026-10-04 两级审批):提交审批不再吃 audit 词,见上方注释
+        for (String p : new String[]{"QC_TC_IN", "QC_BHG", "QC_BHC", "QC_BHZ",
+                "QC_JJF", "QC_SCP", "QC_LYB", "QC_SCY"}) {
+            m.put(p + "|提交审批", SUBMIT_WORDS);
+        }
+        BUTTON_PERMS_OVERRIDE = Map.copyOf(m);
+    }
 
     /** 按钮权限校验:未映射的按钮放行(由 ButtonService「未定义按钮规则」兜底拦截) */
     public void requireButton(String panelCode, String buttonName) {

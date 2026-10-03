@@ -50,6 +50,8 @@ public class BatchService {
 
     /** 批次号列名(链路四单同名同列) */
     private static final String BATCH_COL = "批次号";
+    /** 链路身份列:有它才算批次号链路成员(见 syncBatchNo 的取号判定与缺列守卫) */
+    private static final String BATCH_KEY_COL = "批次键";
 
     /** 供应商编码字段候选(链路各单异名:暂收/检验/退回叫「供应商代码」,采购入库叫「供应商编码」) */
     private static final String[] SUPPLIER_CODE_LABELS = {"供应商编码", "供应商代码"};
@@ -196,8 +198,15 @@ public class BatchService {
         if (!isBatchPanel(def.code())) return "";
         String head = def.headTable(), gc = def.groupCol();
         if (head == null || gc == null || colMissing(head, BATCH_COL)) return "";
+        // 「批次键」= 链路身份列(form_flow_link / yj_doc_batch 都按它挂台账),**有它才算链路成员**。
+        // ⚠ 只注册了「批次号」而没有它的面板必须整段跳过取号(2026-10-04 修):
+        //   · QC_JJF 紧急放行申请单的「批次号」是业务值(来料批次),被自动盖成 '20261003' 是写坏数据;
+        //   · QC_JJF / QC_RETURN 也没有该物理列 —— 本方法下面那句台账查询此前**未加 colMissing 守卫**,
+        //     于是这两张单一保存就 500(列名 '批次键' 无效。实测:JJF-2026-10-0003 / TH-2026-10-0001)。
+        //   本方法自述的契约是"缺列跳过、不抛错不阻断保存",这两处以它为准。
+        boolean chainMember = !colMissing(head, BATCH_KEY_COL);
         String no = str(firstValue("SELECT TOP 1 [" + BATCH_COL + "] FROM " + head + " WHERE [" + gc + "] = ?", docNo));
-        if (no.isEmpty()) {
+        if (no.isEmpty() && chainMember) {
             no = buildBatchNo(supplierCodeOf(def, docNo), java.time.LocalDate.now());
             jdbc.update("UPDATE " + head + " SET [" + BATCH_COL + "] = ? WHERE [" + gc + "] = ?", no, docNo);
         }
@@ -207,7 +216,9 @@ public class BatchService {
             jdbc.update("UPDATE " + line + " SET [" + BATCH_COL + "] = ? WHERE [" + gc + "] = ?", no, docNo);
         }
         // ③ 台账补齐(顺批次键;只补没号的行,不动已有号)
-        Integer key = intValue(firstValue("SELECT TOP 1 [批次键] FROM " + head + " WHERE [" + gc + "] = ?", docNo));
+        Integer key = chainMember
+                ? intValue(firstValue("SELECT TOP 1 [" + BATCH_KEY_COL + "] FROM " + head + " WHERE [" + gc + "] = ?", docNo))
+                : null;
         if (key != null && key > 0) {
             jdbc.update("UPDATE yj_doc_batch SET batch_no = ?, status = 'ACTIVE', release_time = NULL,"
                             + " remark = N'分批送料 · 批次号自洽(' + ISNULL(?, N'system') + N')'"

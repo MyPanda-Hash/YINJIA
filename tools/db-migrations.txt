@@ -2047,3 +2047,27 @@ migrate-batch-no-on-generate.sql
 #   本脚本只改元数据(表列早已存在):审批人/审批时间字段登记 + 三格 editable=0 + 列注明 + 译名补齐。
 #   幂等,两账套均执行。 ——
 migrate-qc-tcin-twolevel.sql
+# —— 2026-10-04 承上:质量单据(品质管理·质量单据 7 张)同样改两级审批 ——
+#   用户口径:「所有品质管理下的质量单据都采用这个二级审批的形式」。7 张 =
+#   QC_BHG 不合格报告(制程)/ QC_BHC 不合格品处理单(制程)/ QC_BHZ 不合格品处理单(自制物料)/
+#   QC_JJF 紧急放行申请单 / QC_SCP 试产材料使用申请单 / QC_LYB 来料异常分析报告 /
+#   QC_SCY 生产异常分析报告(与特采单 QC_TC_IN 合起来正好是前端 qcSheetCfgs 全套 8 张)。
+#   口径与特采单逐字一致:编制=提交审批的人、审核=一级审批通过的人(勾了该面板「审核反审核」
+#   的角色∪管理员)、批准=超级管理员;一级通过不生单、批准通过才通过;两级必须各点一次;
+#   任一级驳回回草稿并通知提交人(二级驳回另通知一级审核人)。
+#   ⚠「编制」那格各表绑的列不同,逐面板登记(后端 ButtonService.QC_DOC_PREPARER 同一份口径):
+#     QC_BHG=填写人 QC_BHC=责任人 QC_BHZ=责任人 QC_JJF=检测人 QC_SCP=责任人
+#     QC_LYB=编制人 QC_SCY=编制人 QC_TC_IN=编制人。
+#     其中 QC_BHC/QC_BHZ/QC_SCP 的「责任人」列**同时是表头业务格**(产品负责人)—— 该列被
+#     自动落值后表头与落款两处都显示提交人且只读,这是用户明确确认过的口径。
+#   后端:ButtonService.QC_DOC_PREPARER(编制格字段表,ADMIN_L2_PANELS = 其键集)、
+#     TWO_LEVEL_PANELS 由它派生;writeBackSignCell / clearAuditSignCells 取代原特采单专用件
+#     (表名改取 def.headTable(),故 8 张共用一套);audit() 直审拦截、save() 剥离签名格入参
+#     一并铺开;assess QueryService.loadDocs 的「审核人」虚拟字段例外同步铺开;
+#     PanelPermissionService 的 提交审批 授权词覆盖从 1 张铺到 8 张。
+#   消息码标题去「特采单」专用化:待超级管理员批准 / 单据已批准(10 语言包同步改名)。
+#   本脚本只改元数据(七张表的 审核人/审核时间/审批人/审批时间 四列早已存在):
+#     审批人/审批时间字段登记(7×2)+ 审计四格 editable=0 + 7 张「编制」格 editable=0
+#     + 关键列中文注明改写(原注明是 2026-09-28 体检批量打的「历史遗留英文列…清理候选」,已过时)。
+#     幂等,两账套均执行。 ——
+migrate-qc-docs-twolevel.sql

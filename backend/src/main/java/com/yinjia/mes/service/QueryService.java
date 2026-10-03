@@ -21,11 +21,14 @@ import java.util.Map;
 public class QueryService {
 
     /**
-     * 两级审批面板(2026-10-04 特采单 QC_TC_IN):纸面「审核」= 一级审批通过的人、「批准」= 超级管理员,
-     * 两个值分别写进表内 审核人 / 审批人 列 —— 与 {@link ButtonService#TWO_LEVEL_PANELS} 同一份口径。
+     * 两级审批面板(2026-10-04):纸面「审核」= 一级审批通过的人、「批准」= 超级管理员,
+     * 两个值分别写进表内的 审核人 / 审批人 列 —— 与 ButtonService 同一份口径
+     * (直接引用 {@code ButtonService.ADMIN_L2_PANELS}:二级固定超级管理员的那一族 = 全部质量单据)。
      * 见 {@link #loadDocs} 里对虚拟字段「审核人」覆盖的例外。
      */
-    private static final String TC_IN_TWO_LEVEL_PANEL = "QC_TC_IN";
+    private static boolean isTwoLevelSignPanel(String panelCode) {
+        return panelCode != null && ButtonService.ADMIN_L2_PANELS.contains(panelCode);
+    }
 
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
@@ -372,12 +375,12 @@ public class QueryService {
             doc.put("saved", st != null ? st.get("saved") : null);
             doc.put("detail", Map.of("items", items));
             if (st != null && st.get("shr") != null) {
-                // 特采单(QC_TC_IN,2026-10-04 两级审批)例外:它的「审核人/审核时间」是**表内真值** ——
+                // 质量单据(2026-10-04 两级审批)例外:它的「审核人/审核时间」是**表内真值** ——
                 // 一级审批通过时写纸面「审核」格(一级审核人),「批准」另落 审批人。
                 // 本虚拟字段覆盖会把两者都换成 yj_doc_status.shr(最终审批人 = 超级管理员**账号**),
                 // 既抹掉一级审核人、又把账号名当人名显示(实测界面「审核」格变成 "admin")。
-                // 故特采单跳过覆盖;存量单(两级口径上线前审的)表内为空时才退回 shr 兜底。
-                if (TC_IN_TWO_LEVEL_PANEL.equals(def.code())) {
+                // 故这些面板跳过覆盖;存量单(两级口径上线前审的)表内为空时才退回 shr 兜底。
+                if (isTwoLevelSignPanel(def.code())) {
                     Object cellAuditor = doc.get("审核人");
                     if (cellAuditor == null || String.valueOf(cellAuditor).isBlank()) {
                         doc.put("审核人", st.get("shr"));

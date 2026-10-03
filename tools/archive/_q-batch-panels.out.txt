@@ -1,0 +1,16 @@
+seg|panel_code|yj_批次号|yj_批次键|yj_供应商编码|yj_供应商代码
+1-BATCH-PANELS|PROD_ABN|1|0|0|0
+1-BATCH-PANELS|PURCHASE_IN|1|1|1|0
+1-BATCH-PANELS|QC_INSP|1|1|0|1
+1-BATCH-PANELS|QC_JJF|1|0|0|0
+1-BATCH-PANELS|QC_RECV|1|1|0|1
+1-BATCH-PANELS|QC_RETURN|1|0|0|0
+1-BATCH-PANELS|QC_TC_IN|1|1|0|0
+seg|panel_code|head_table|len_批次号|len_批次键
+2-PHYS|PROD_ABN|null|null|null
+2-PHYS|PURCHASE_IN|bd_purchase_in|100|4
+2-PHYS|QC_INSP|qc_insp|100|4
+2-PHYS|QC_JJF|qc_jjf|120|null
+2-PHYS|QC_RECV|sl_recv|100|4
+2-PHYS|QC_RETURN|qc_return|100|null
+2-PHYS|QC_TC_IN|qc_tc_in|100|4

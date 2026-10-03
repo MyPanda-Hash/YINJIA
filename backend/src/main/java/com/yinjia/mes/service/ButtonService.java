@@ -228,11 +228,12 @@ public class ButtonService {
         body.remove("更新时间");
         body.remove("审核人");
         body.remove("审核时间");
-        // 特采单(QC_TC_IN,2026-10-04):纸面「编制/审核/批准」三格由审批流自动落值
+        // 质量单据(2026-10-04,特采单 + 质量单据一族):纸面「编制/审核/批准」三格由审批流自动落值
         // (提交审批写编制、一级通过写审核、超级管理员批准写批准),保存不接收前端改值 ——
         // 否则"手改编制人"就能绕过"编制=提交人"的口径。字段在 yj_field 里已 editable=0(前端只读)。
-        if (TC_IN_PANEL.equals(def.code())) {
-            body.remove("编制人");
+        String prepCol = preparerColOf(def.code());
+        if (!prepCol.isBlank()) {
+            body.remove(prepCol);
             body.remove("审批人");
             body.remove("审批时间");
         }
@@ -1112,10 +1113,10 @@ public class ButtonService {
         if ("已审核".equals(st.get("status"))) throw new IllegalStateException("单据已是已审核状态");
         // 两级审批(远端 2026-09-20):「待二级审批」同样不可直审,与「审批中」同口径拦截
         if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
-        // 特采单(QC_TC_IN,2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审核 → 超级管理员批准,
+        // 质量单据(2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审核 → 超级管理员批准,
         // 直审会让二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
-        if (TC_IN_PANEL.equals(def.code()))
-            throw new IllegalStateException("特采单走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核");
+        if (ADMIN_L2_PANELS.contains(def.code()))
+            throw new IllegalStateException(def.name() + "走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核");
         // 编制审核分离(2026-09-12):审核人不得是制单人本人——此前有审批权的用户可自审自己制的单;
         // 管理员豁免(管理员保存即归档本就是等价权力,堵死反而制造死路)
         if (!isAdminUser(auditor) && auditor.equals(authorOfDoc(def, no)))
@@ -1226,12 +1227,12 @@ public class ButtonService {
                 + " effective = CASE WHEN ? = 1 THEN NULL ELSE effective END, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?",
                 CHANGE_PANEL.equals(def.code()) ? 1 : 0, def.code(), no);
-        // 特采单:弃审回草稿,纸面「审核/批准」两格随审批作废清空 + 两级节点标记复位
-        // (编制人保留 —— 谁编的单没变;重新提交时会按新的提交人刷新)
-        if (TC_IN_PANEL.equals(def.code())) {
+        // 质量单据:弃审回草稿,纸面「审核/批准」两格随审批作废清空 + 两级节点标记复位
+        // (编制格保留 —— 谁编的单没变;重新提交时会按新的提交人刷新)
+        if (ADMIN_L2_PANELS.contains(def.code())) {
             jdbc.update("UPDATE yj_doc_status SET approve_node = NULL, l2_approver = NULL, update_at = GETDATE()"
                     + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
-            clearTcInSign(def.code(), no, 0);
+            clearAuditSignCells(def, no);
         }
         // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
         if (List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT").contains(def.code())) {
@@ -1314,10 +1315,11 @@ public class ButtonService {
                         + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), 'N', 1, GETDATE());",
                 def.code(), no, operator, operator);
         recordApproval(def.code(), no, "SUBMIT", "PENDING", opinion);
-        // 特采单(QC_TC_IN):纸面「编制」格 = **提交审批的人**(2026-10-04 用户口径)。
-        // 落点在提交这一刻而非保存 —— 自动生成的特采单(检验单审核产出)编制人本就是空的,
+        // 质量单据:纸面「编制」格 = **提交审批的人**(2026-10-04 用户口径)。
+        // 落点在提交这一刻而非保存 —— 编制格各表绑的列不同(编制人/填写人/责任人/检测人,见 QC_DOC_PREPARER);
         // 谁提交谁就是编制人;驳回后换人重提也随之更新。
-        if (TC_IN_PANEL.equals(def.code())) writeBackTcInSign(def.code(), no, "编制人", null, operator);
+        String prep = preparerColOf(def.code());
+        if (!prep.isBlank()) writeBackSignCell(def, no, prep, null, operator);
         // 消息:提交审批 → 该面板审批人
         notify(() -> messageService.sendToApprovers(def.code(), MessageService.APPROVAL_SUBMITTED, no,
                 Map.of("docNo", no, "actor", operator), operator));
@@ -1372,9 +1374,9 @@ public class ButtonService {
                     fixedAdminL2 ? null : l2, def.code(), no);
             if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
             if (fixedAdminL2) {
-                // 特采单:纸面「审核」格 = 一级审批通过的人(与制定二级审核人的 RD_PROD_INFO 不同——
-                // 那一栏对特采单无意义,真源是 yj_doc_status.approve_node/l2 口径)
-                writeBackTcInSign(def.code(), no, "审核人", "审核时间", operator);
+                // 质量单据:纸面「审核」格 = 一级审批通过的人(与「一级选二级审核人」的 RD_PROD_INFO 不同 ——
+                // 那一栏对质量单据无意义,真源是 yj_doc_status.approve_node)
+                writeBackSignCell(def, no, "审核人", "审核时间", operator);
             } else {
                 writeBackL2Approver(def.code(), no, l2);
             }
@@ -1459,9 +1461,10 @@ public class ButtonService {
         inspAutoPurchaseIn(def.code(), no, operator);
         inspAutoReturn(def.code(), no, operator);
         if (ADMIN_L2_PANELS.contains(def.code())) {
-            // 特采单:纸面「批准」格 = 超级管理员;二级批准通过才算真正通过,
-            // 故「生成采购入库单」的生单钩子挂在这里(一级通过时**不**生单,见 approveApproval)。
-            writeBackTcInSign(def.code(), no, "审批人", "审批时间", operator);
+            // 质量单据:纸面「批准」格 = 超级管理员;二级批准通过才算真正通过,
+            // 故「生成采购入库单」的生单钩子挂在这里(一级通过时**不**生单,见 approveApproval;
+            // 对特采单以外的质量单据该钩子内部直接返回,无副作用)。
+            writeBackSignCell(def, no, "审批人", "审批时间", operator);
             tcInApprovedGenerate(def.code(), no, operator);
             // 消息:批准通过 → 提交人(编制人) + 一级审核人,两端都知情
             final String opA = operator;
@@ -1524,9 +1527,9 @@ public class ButtonService {
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "REJECT", "REJECTED", opinion, node);
         String rejectBy = currentUserName();
-        // 特采单:驳回即回草稿 —— 纸面「审核/批准」两格随审批作废清空(编制人保留,人是没变的)
+        // 质量单据:驳回即回草稿 —— 纸面「审核/批准」两格随审批作废清空(编制格保留,人没变)
         if (ADMIN_L2_PANELS.contains(def.code())) {
-            clearTcInSign(def.code(), no, node);
+            clearAuditSignCells(def, no);
             final String l1f = l1Before;
             final String sub = submitterOf(def, no);
             notify(() -> {
@@ -1599,25 +1602,55 @@ public class ButtonService {
     }
 
     // ---- 两级审批公共件(2026-09-20)----
+    //
+    // ⚠ 下面三个常量的**声明顺序即初始化顺序**(静态字段按文本顺序初始化):QC_DOC_PREPARER →
+    //   ADMIN_L2_PANELS → TWO_LEVEL_PANELS。若把 TWO_LEVEL_PANELS 提到前面,它的初始化器会读到
+    //   尚未赋值的 ADMIN_L2_PANELS(null),启动时直接 ExceptionInInitializerError(2026-10-04 实测踩到)。
+
+    /**
+     * 质量单据(品质管理·质量单据一族 + 来料品质·特采单)**纸面底部落款第一格「编制」绑的字段名**。
+     *
+     * 这些纸面(YJ-QR-11/59/60/64/92/118/119/120)底部都是「编制 / 审核 / 批准」三格,
+     * 但「编制」那一格各表绑的列不同 —— 有的是 编制人、有的是 责任人 / 填写人 / 检测人,
+     * 故逐面板登记;不在此表内的面板 = 不走「编制 = 提交人」的自动落值,两级也退化为单节点。
+     *
+     * ⚠ 登记前先确认该列在纸面上**只作落款**用:QC_BHC/QC_BHZ/QC_SCP 的「责任人」列同时是
+     *   表头业务格(产品负责人)与底部署名格 —— 同一列两处显示,自动落值后两处都是提交人
+     *   (2026-10-04 用户明确确认过的口径)。
+     */
+    private static final Map<String, String> QC_DOC_PREPARER = Map.of(
+            "QC_TC_IN", "编制人",   // YJ-QR-60 特采申请单
+            "QC_LYB", "编制人",     // YJ-QR-119 来料异常分析报告
+            "QC_SCY", "编制人",     // YJ-QR-120 生产异常分析报告
+            "QC_BHG", "填写人",     // YJ-QR-11  不合格报告(制程)
+            "QC_BHC", "责任人",     // YJ-QR-59  不合格品处理单(制程)
+            "QC_BHZ", "责任人",     // YJ-QR-64  不合格品处理单(自制物料)
+            "QC_JJF", "检测人",     // YJ-QR-92  紧急放行申请单
+            "QC_SCP", "责任人");    // YJ-QR-118 试产材料使用申请单
+
+    /**
+     * 两级审批的第二种形态:第二级**固定为超级管理员**(不选人)= 质量单据一族。
+     * 判据是 yj_user.is_admin='Y',存量的 l2_approver 列对这些面板保持 NULL(前后端都按 is_admin 判)。
+     * 与 RD_PROD_INFO 的「一级选人、被选中即授权」并列。
+     * public:QueryService 的「审核人」虚拟字段例外共用这一份清单(避免两处各写一套名单)。
+     */
+    public static final java.util.Set<String> ADMIN_L2_PANELS = QC_DOC_PREPARER.keySet();
 
     /**
      * 走两级审批的面板(其余面板单节点路径逐字不变)。
      * - RD_PROD_INFO(2026-09-20):一级通过时必须**选取**二级审核人(候选=全部启用账号);
-     * - QC_TC_IN 特采单(2026-10-04):第二级**固定为超级管理员**(见 {@link #ADMIN_L2_PANELS}),
-     *   一级通过无需选人 —— 纸面 YJ-QR-60 底部就是「编制 / 审核 / 批准」三格:
-     *   编制=提交审批的人、审核=一级审批通过的人、批准=超级管理员。
+     * - 质量单据一族(2026-10-04,{@link #ADMIN_L2_PANELS}):第二级**固定为超级管理员**,一级不选人。
+     *   纸面(YJ-QR 体系)底部都是「编制 / 审核 / 批准」三格:编制=提交审批的人、
+     *   审核=一级审批通过的人、批准=超级管理员。
      */
-    private static final java.util.Set<String> TWO_LEVEL_PANELS = java.util.Set.of("RD_PROD_INFO", "QC_TC_IN");
+    private static final java.util.Set<String> TWO_LEVEL_PANELS = twoLevelPanels();
 
-    /** 特采单面板码(两级审批 + 编制/审核/批准三格自动落值的唯一面板) */
-    private static final String TC_IN_PANEL = "QC_TC_IN";
-
-    /**
-     * 两级审批的第二种形态:第二级**固定为超级管理员**(不选人)。
-     * 与 RD_PROD_INFO 的「一级选人、被选中即授权」并列 —— 判据是 yj_user.is_admin='Y',
-     * 存量的 l2_approver 列对这些面板保持 NULL(前端与后端都按 is_admin 判)。
-     */
-    private static final java.util.Set<String> ADMIN_L2_PANELS = java.util.Set.of(TC_IN_PANEL);
+    /** 两级面板集合 = RD_PROD_INFO(一级选人)+ 质量单据一族(二级固定超级管理员) */
+    private static java.util.Set<String> twoLevelPanels() {
+        java.util.Set<String> s = new java.util.LinkedHashSet<>(ADMIN_L2_PANELS);
+        s.add("RD_PROD_INFO");
+        return java.util.Set.copyOf(s);
+    }
 
     /** 当前待审批节点:1=待一级(缺省)/2=待二级;不在审批中返回 1 */
     private int pendingNodeOf(String panelCode, String no) {
@@ -1672,47 +1705,54 @@ public class ButtonService {
         }
     }
 
-    // ---- 特采单(QC_TC_IN)纸面「编制 / 审核 / 批准」三格自动落值(2026-10-04) ----
+    // ---- 质量单据纸面「编制 / 审核 / 批准」三格自动落值(2026-10-04) ----
     //
-    // 口径(用户 2026-10-04):三格**全自动、不可手改** ——
+    // 口径(用户 2026-10-04,适用于品质管理·质量单据一族 + 特采单):
     //   编制 = 提交审批的人;审核 = 一级审批通过的人;批准 = 超级管理员(二级审批通过的人)。
     // 三格在 yj_field 里 editable=0(readonly),前端 DocSheet 按字段只读渲染成纯文本;
-    // 且 save() 对特采单剥离这三个键的入参 —— 真源只有审批流动作一个。
+    // 且 save() 剥离这些键的入参 —— 真源只有审批流动作一个。
+
+    /** 该面板纸面「编制」格绑的字段(非质量单据返回空串) */
+    private String preparerColOf(String panelCode) {
+        return panelCode == null ? "" : QC_DOC_PREPARER.getOrDefault(panelCode, "");
+    }
 
     /** 账号 → 姓名(复用 {@link #realNameOf};写纸面签名格统一走这里) */
     private String signNameOf(String account) {
         return account == null || account.isBlank() ? "" : realNameOf(account);
     }
 
-    /** 写特采单纸面签名格(姓名 + 时间;timeCol 传 null 则只写姓名 —— 如「编制人」那格)。
-     *  面板不符或列缺失时静默跳过,不阻断审批 */
-    private void writeBackTcInSign(String panelCode, String no, String whoCol, String timeCol, String account) {
-        if (!TC_IN_PANEL.equals(panelCode)) return;
+    /**
+     * 写纸面签名格(姓名 [+ 时间];timeCol 传 null 则只写姓名 —— 如「编制」那格只落人)。
+     * 表名取面板头表;列缺失/面板不对时静默跳过,不阻断审批。
+     */
+    private void writeBackSignCell(PanelRegistry.PanelDef def, String no, String whoCol, String timeCol, String account) {
+        if (def == null || whoCol == null || whoCol.isBlank() || !QC_DOC_PREPARER.containsKey(def.code())) return;
         try {
             String sets = "[" + whoCol + "] = ?" + (timeCol == null ? "" : ", [" + timeCol + "] = ?");
             Object[] args = timeCol == null
                     ? new Object[]{signNameOf(account), currentUserName(), no}
                     : new Object[]{signNameOf(account), LocalDateTime.now().format(TS_FMT), currentUserName(), no};
-            jdbc.update("UPDATE qc_tc_in SET " + sets + ", asp_user2 = ?, asp_time2 = SYSDATETIME()"
+            jdbc.update("UPDATE " + def.headTable() + " SET " + sets + ", asp_user2 = ?, asp_time2 = SYSDATETIME()"
                     + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", args);
         } catch (Exception e) {
-            log.warn("[特采单] 写回 {} 失败 no={}: {}", whoCol, no, e.getMessage());
+            log.warn("[两级审批] 写回 {} 签名格 {} 失败 no={}: {}", def.code(), whoCol, no, e.getMessage());
         }
     }
 
     /**
-     * 特采单签名格清空:驳回(回草稿)清「审核+批准」;一级驳回时审核尚未落值,一并清也无害。
-     * 弃审(已审核 → 草稿)同口径,node 传 0 = 两格都清。**编制人不清** —— 人没变。
+     * 清「审核 / 批准」两格(驳回或弃审 → 回草稿:签名随审批作废)。
+     * **编制格不清** —— 谁编的单没变;重新提交时会按新的提交人刷新。
      */
-    private void clearTcInSign(String panelCode, String no, int node) {
-        if (!TC_IN_PANEL.equals(panelCode)) return;
+    private void clearAuditSignCells(PanelRegistry.PanelDef def, String no) {
+        if (def == null || !QC_DOC_PREPARER.containsKey(def.code())) return;
         try {
-            jdbc.update("UPDATE qc_tc_in SET 审核人 = NULL, 审核时间 = NULL, 审批人 = NULL, 审批时间 = NULL,"
+            jdbc.update("UPDATE " + def.headTable() + " SET 审核人 = NULL, 审核时间 = NULL, 审批人 = NULL, 审批时间 = NULL,"
                             + " asp_user2 = ?, asp_time2 = SYSDATETIME()"
                             + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
                     currentUserName(), no);
         } catch (Exception e) {
-            log.warn("[特采单] 清空签名格失败 no={} node={}: {}", no, node, e.getMessage());
+            log.warn("[两级审批] 清空 {} 签名格失败 no={}: {}", def.code(), no, e.getMessage());
         }
     }
 

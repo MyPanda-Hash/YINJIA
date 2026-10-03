@@ -1,12 +1,12 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '待超级管理员批准': 'Chờ quản trị viên cấp cao phê duyệt',
+    '单据已批准': 'Chứng từ đã được phê duyệt',
     /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
     '批准通过': 'Phê duyệt',
     '批准驳回': 'Từ chối',
-    '特采单待超级管理员批准': 'Phiếu chấp nhận đặc biệt chờ quản trị viên cấp cao phê duyệt',
     '「{panelName} {docNo}」已由 {actor} 一级审核通过，等待您批准。意见：{opinion}': '"{panelName} {docNo}" đã qua kiểm tra cấp một bởi {actor}; đang chờ bạn phê duyệt. Ý kiến: {opinion}',
-    '特采单已批准': 'Phiếu chấp nhận đặc biệt đã được phê duyệt',
     '您一级审核通过的「{panelName} {docNo}」已由 {actor} 批准通过。': '"{panelName} {docNo}" mà bạn kiểm tra cấp một đã được {actor} phê duyệt.',
     '二级审批被驳回': 'Phê duyệt cấp hai bị từ chối',
     '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': '"{panelName} {docNo}" mà bạn kiểm tra cấp một đã bị {actor} từ chối và trả về bản nháp. Ý kiến: {opinion}',

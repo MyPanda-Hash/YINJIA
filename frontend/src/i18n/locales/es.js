@@ -1,12 +1,12 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '待超级管理员批准': 'Pendiente de aprobación del superadministrador',
+    '单据已批准': 'Documento aprobado',
     /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
     '批准通过': 'Aprobar',
     '批准驳回': 'Rechazar',
-    '特采单待超级管理员批准': 'Aceptación especial pendiente de aprobación del superadministrador',
     '「{panelName} {docNo}」已由 {actor} 一级审核通过，等待您批准。意见：{opinion}': '"{panelName} {docNo}" pasó la revisión de primer nivel por {actor}; pendiente de su aprobación. Comentario: {opinion}',
-    '特采单已批准': 'Aceptación especial aprobada',
     '您一级审核通过的「{panelName} {docNo}」已由 {actor} 批准通过。': 'El "{panelName} {docNo}" que revisó en primer nivel fue aprobado por {actor}.',
     '二级审批被驳回': 'Aprobación de segundo nivel rechazada',
     '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': 'El "{panelName} {docNo}" que revisó en primer nivel fue rechazado por {actor} y devuelto a borrador. Comentario: {opinion}',
