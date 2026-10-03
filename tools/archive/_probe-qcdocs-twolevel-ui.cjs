@@ -30,6 +30,8 @@ const PREP = {
   QC_TC_IN: '编制人', QC_LYB: '编制人', QC_SCY: '编制人', QC_BHG: '填写人',
   QC_BHC: '责任人', QC_BHZ: '责任人', QC_JJF: '检测人', QC_SCP: '责任人',
 }
+/** 「编制」格是**预填型(可手改)**的面板 —— 与后端 ButtonService.PREPARER_EDITABLE_PANELS 一致 */
+const PREP_EDITABLE = ['QC_BHC', 'QC_BHZ', 'QC_SCP']
 const ALL = Object.keys(PREP)
 const argv = process.argv.slice(2).filter((a) => ALL.includes(a))
 const LIST = argv.length ? argv : ['QC_TC_IN', 'QC_BHC', 'QC_LYB', 'QC_JJF']
@@ -37,6 +39,25 @@ const LIST = argv.length ? argv : ['QC_TC_IN', 'QC_BHC', 'QC_LYB', 'QC_JJF']
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let pass = 0, fail = 0
 const chk = (cond, m) => { if (cond) { pass++ } else { fail++; console.log(`  [FAIL] ${m}`) } }
+
+/** 抓底部落款三格 + 侧栏按钮 + 状态(草稿/待二级审批两处都复用) */
+async function readSigns(ev) {
+  return await ev(`(() => {
+    const signItems = [...document.querySelectorAll('.q-signrow .q-signitem')].map(e => {
+      const inp = e.querySelector('input')
+      return {
+        label: ((e.querySelector('.q-signitem-label')||{}).textContent||'').replace(/[：:]/g,''),
+        input: !!inp,
+        val: ((e.querySelector('.q-signitem-val')||{}).textContent||'').trim(),
+        inputVal: inp ? inp.value : '',
+      }
+    })
+    return { side: [...document.querySelectorAll('.as-side-btns .as-side-btn')].map(e => e.textContent.trim()),
+             signItems, signInputs: document.querySelectorAll('.q-signrow input').length,
+             status: (document.querySelector('.doc-status')||{}).textContent || '',
+             errs: [...document.querySelectorAll('.el-message--error')].map(e => e.textContent.trim()) }
+  })()`)
+}
 
 async function login(user, pwd) {
   const j = await (await fetch(API + '/auth/login', {
@@ -91,14 +112,13 @@ localStorage.setItem('mes_login_date','2026-10-04'); 'ok'`)
     await send('Page.navigate', { url: 'about:blank' }); await sleep(600)
 
     for (const P of LIST) {
+      const editablePrep = PREP_EDITABLE.includes(P)
       const mk = await cb(adminS, P, '新增流程', {})
       if (!okc(mk)) { chk(false, `${P} 建单失败 ${JSON.stringify(mk).slice(0, 140)}`); continue }
       const no = String(mk.data['编号']); created.push([P, no])
-      await cb(adminS, P, '提交审批', { 编号: no })
-      const r1 = await cb(cpS, P, '审批通过', { 编号: no, 审批意见: '一级:同意' })
-      if (!okc(r1)) { chk(false, `${P} 一级通过失败 ${JSON.stringify(r1).slice(0, 160)}`); continue }
-      console.log(`\n═══ ${P} ${no}(编制格=${PREP[P]},当前 待二级审批)═══`)
+      console.log(`\n═══ ${P} ${no}(编制格=${PREP[P]}${editablePrep ? ',预填可改' : ',只读落款'})═══`)
 
+      // ── 第一段:**草稿**态(可编辑窗口)—— 这里才看得出"哪些格是输入框" ──
       await send('Page.navigate', { url: `${FRONT}/#/panelx/list/${P}` }); await sleep(4000)
       await ev(`(() => { const s=document.querySelector('.wz-skip'); if (s) s.click(); return 1 })()`)
       let rows = 0
@@ -107,30 +127,52 @@ localStorage.setItem('mes_login_date','2026-10-04'); 'ok'`)
       let signs = 0
       for (let i = 0; i < 20 && !signs; i++) { await sleep(800); signs = await ev(`document.querySelectorAll('.q-signrow .q-signitem').length`) || 0 }
       await sleep(600)
-      const info = await ev(`(() => {
-        const signItems = [...document.querySelectorAll('.q-signrow .q-signitem')].map(e => ({
-          label: ((e.querySelector('.q-signitem-label')||{}).textContent||'').replace(/[：:]/g,''),
-          input: !!e.querySelector('input'),
-          val: ((e.querySelector('.q-signitem-val')||{}).textContent||'').trim(),
-        }))
-        return { side: [...document.querySelectorAll('.as-side-btns .as-side-btn')].map(e => e.textContent.trim()),
-                 signItems, signInputs: document.querySelectorAll('.q-signrow input').length,
-                 status: (document.querySelector('.doc-status')||{}).textContent || '',
-                 errs: [...document.querySelectorAll('.el-message--error')].map(e => e.textContent.trim()) }
-      })()`)
+      const info = await readSigns(ev)
       const byLabel = Object.fromEntries(info.signItems.map((x) => [x.label, x.val]))
-      chk(info.side.includes('提交审批'), `${P} ① 侧栏有「提交审批」`)
-      chk(!info.side.includes('审核'), `${P} ① 侧栏无「审核」直审入口(实际:${info.side.join('/')})`)
-      chk(info.side.includes('批准通过') && info.side.includes('批准驳回'), `${P} ① 待二级审批出「批准通过/批准驳回」`)
-      chk(!info.side.includes('审批通过'), `${P} ① 二级节点不再出现「审批通过」`)
-      chk(info.status.includes('待二级审批'), `${P} ① 列表状态=待二级审批(实际 "${info.status}")`)
-      chk(info.signInputs === 0 && info.signItems.length === 3, `${P} ② 落款三格为纯文本(输入框 ${info.signInputs} 个 / 格数 ${info.signItems.length})`)
-      chk(byLabel['审核'] === '陈秀丽', `${P} ③ 「审核」格 = 一级审核人 陈秀丽(实际 "${byLabel['审核']}")`)
-      chk(!byLabel['批准'], `${P} ③ 「批准」格仍空(实际 "${byLabel['批准']}")`)
+      chk(info.status.includes('草稿'), `${P} ⓪ 草稿态(实际 "${info.status}")`)
+      chk(info.signItems.length === 3, `${P} ② 底部落款是三格(实测 ${info.signItems.length})`)
+      if (!editablePrep) {
+        chk(info.signInputs === 0, `${P} ② 草稿态下编制/审核/批准仍全为纯文本(输入框 ${info.signInputs} 个)`)
+        chk(!byLabel['编制'], `${P} ② 落款型「编制」格草稿态为空(实际 "${byLabel['编制']}")`)
+      } else {
+        chk(info.signInputs === 1 && info.signItems[0].input === true,
+          `${P} ② 草稿态下「编制(=责任人)」是可编辑输入框(输入框 ${info.signInputs} 个)`)
+        chk(info.signItems[0].inputVal === '系统管理员',
+          `${P} ② 「编制(=责任人)」预填建单人 系统管理员(实际 "${info.signItems[0].inputVal}")`)
+        chk(!info.signItems[1].input && !info.signItems[2].input, `${P} ② 审核/批准两格仍只读(纯文本)`)
+      }
       chk(!info.errs.length, `${P} 无前端报错(${info.errs.join('|')})`)
-      const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, fromSurface: true })
-      const f = path.join(OUT, `qcdocs-${P}-${no}.png`)
-      if (shot.result && shot.result.data) fs.writeFileSync(f, Buffer.from(shot.result.data, 'base64'))
+      const shot0 = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, fromSurface: true })
+      if (shot0.result && shot0.result.data) fs.writeFileSync(path.join(OUT, `qcdocs-draft-${P}-${no}.png`), Buffer.from(shot0.result.data, 'base64'))
+
+      // ── 第二段:提交 → 一级通过 → **待二级审批**(整张纸只读,验证按钮与落款值)──
+      // ⚠ 同一 hash 再 navigate 不会让 SPA 重新加载:必须先走 about:blank 再进面板
+      //   (否则读到的是上一段草稿态的旧 DOM —— 2026-10-04 实测踩到)
+      await cb(adminS, P, '提交审批', { 编号: no })
+      const r1 = await cb(cpS, P, '审批通过', { 编号: no, 审批意见: '一级:同意' })
+      if (!okc(r1)) { chk(false, `${P} 一级通过失败 ${JSON.stringify(r1).slice(0, 160)}`); continue }
+      await send('Page.navigate', { url: 'about:blank' }); await sleep(600)
+      await send('Page.navigate', { url: `${FRONT}/#/panelx/list/${P}` }); await sleep(4000)
+      rows = 0
+      for (let i = 0; i < 20 && !rows; i++) { await sleep(900); rows = await ev(`document.querySelectorAll('.el-table__row').length`) || 0 }
+      await ev(`(() => { const r=[...document.querySelectorAll('.el-table__row')].find(x=>x.innerText.includes(${JSON.stringify(no)})); if(r) r.click(); return 1 })()`)
+      signs = 0
+      for (let i = 0; i < 20 && !signs; i++) { await sleep(800); signs = await ev(`document.querySelectorAll('.q-signrow .q-signitem').length`) || 0 }
+      await sleep(600)
+      const info2 = await readSigns(ev)
+      const byLabel2 = Object.fromEntries(info2.signItems.map((x) => [x.label, x.val]))
+      chk(info2.side.includes('提交审批'), `${P} ① 侧栏有「提交审批」`)
+      chk(!info2.side.includes('审核'), `${P} ① 侧栏无「审核」直审入口(实际:${info2.side.join('/')})`)
+      chk(info2.side.includes('批准通过') && info2.side.includes('批准驳回'), `${P} ① 待二级审批出「批准通过/批准驳回」`)
+      chk(!info2.side.includes('审批通过'), `${P} ① 二级节点不再出现「审批通过」`)
+      chk(info2.status.includes('待二级审批'), `${P} ① 列表状态=待二级审批(实际 "${info2.status}")`)
+      chk(info2.signInputs === 0, `${P} ② 待二级审批时整张纸只读(输入框 ${info2.signInputs} 个)`)
+      chk(byLabel2['审核'] === '陈秀丽', `${P} ③ 「审核」格 = 一级审核人 陈秀丽(实际 "${byLabel2['审核']}")`)
+      chk(!byLabel2['批准'], `${P} ③ 「批准」格仍空(实际 "${byLabel2['批准']}")`)
+      chk(!info2.errs.length, `${P} 无前端报错(${info2.errs.join('|')})`)
+      const shot2 = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true, fromSurface: true })
+      const f2 = path.join(OUT, `qcdocs-${P}-${no}.png`)
+      if (shot2.result && shot2.result.data) fs.writeFileSync(f2, Buffer.from(shot2.result.data, 'base64'))
 
       // 超级管理员点「批准通过」→ 已审核 + 批准格落名,审核格保持一级审核人
       await ev(`(() => { const b=[...document.querySelectorAll('.as-side-btns .as-side-btn')].find(e=>e.textContent.trim()==='批准通过'); if(b) b.click(); return 1 })()`)
@@ -150,7 +192,7 @@ localStorage.setItem('mes_login_date','2026-10-04'); 'ok'`)
       chk(after.status.includes('已审核'), `${P} ④ 批准后界面状态=已审核(实际 "${after.status}")`)
       chk(after.byLabel['批准'] === '系统管理员', `${P} ④ 「批准」格 = 超级管理员(实际 "${after.byLabel['批准']}")`)
       chk(after.byLabel['审核'] === '陈秀丽', `${P} ④ 「审核」格保持一级审核人(实际 "${after.byLabel['审核']}")`)
-      console.log(`   └ 9 + 3 项断言 · shot → ${path.basename(f)}`)
+      console.log(`   └ 草稿 9 项 + 待批 9 项 + 批准后 3 项 · shot → ${path.basename(f2)}`)
     }
     ws.close()
   } finally {

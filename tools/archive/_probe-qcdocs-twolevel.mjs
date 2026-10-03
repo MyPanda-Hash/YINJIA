@@ -40,6 +40,12 @@ const PREP = {
   QC_TC_IN: '编制人', QC_LYB: '编制人', QC_SCY: '编制人', QC_BHG: '填写人',
   QC_BHC: '责任人', QC_BHZ: '责任人', QC_JJF: '检测人', QC_SCP: '责任人',
 }
+/**
+ * 「编制」格是**预填型**(可手改)的面板 —— 与 ButtonService.PREPARER_EDITABLE_PANELS 一致。
+ * 这三张的「责任人」同时是表头「产品负责人」业务格,口径是:新增预填当前用户、用户可改、
+ * 提交审批只在为空时兜底 —— 故它们**不走** A1/A2/A5 那三条"空 → 剥离 → 等于提交人"的断言。
+ */
+const PREP_EDITABLE = ['QC_BHC', 'QC_BHZ', 'QC_SCP']
 const ALL = Object.keys(TABLE)
 const PANELS = process.argv.slice(2).filter((a) => ALL.includes(a))
 const LIST = PANELS.length ? PANELS : ALL
@@ -113,24 +119,50 @@ for (const P of LIST) {
     if (!okCall(mk1)) throw new Error('建单失败: ' + errMsg(mk1))
     no = S(mk1.data['编号'])
 
-    // ① / ② 编制格:建单为空、save 载荷带值被剥离
-    const s0 = await sign(P, no)
-    chk(!S(s0.prep), `${P} A1 新建草稿「${prep}」(编制格)为空(实际 "${S(s0.prep)}")`)
-    const jsave = await A.cb(P, '保存', { 编号: no, [prep]: '黑客', 审批人: '黑客' })
-    const sHack = await sign(P, no)
-    chk(okCall(jsave) && !S(sHack.prep) && !S(sHack.审批人),
-      `${P} A2 保存载荷里的「${prep}」「审批人」被剥离(实际 "${S(sHack.prep)}" / "${S(sHack.审批人)}";保存返回 ${okCall(jsave) ? 'OK' : errMsg(jsave)})`)
+    // ① / ② 编制格:落款型(自动只读,载荷带值被剥离)/ 预填型(建单预填、可手改、载荷收下)
+    const editablePrep = PREP_EDITABLE.includes(P)
+    if (!editablePrep) {
+      const s0 = await sign(P, no)
+      chk(!S(s0.prep), `${P} A1 新建草稿「${prep}」(编制格)为空(实际 "${S(s0.prep)}")`)
+      const jsave = await A.cb(P, '保存', { 编号: no, [prep]: '黑客', 审批人: '黑客' })
+      const sHack = await sign(P, no)
+      chk(okCall(jsave) && !S(sHack.prep) && !S(sHack.审批人),
+        `${P} A2 保存载荷里的「${prep}」「审批人」被剥离(实际 "${S(sHack.prep)}" / "${S(sHack.审批人)}";保存返回 ${okCall(jsave) ? 'OK' : errMsg(jsave)})`)
+    } else {
+      // 预填型:建单即带出当前用户姓名(admin),且**可以改成别人并存下来**
+      const s0 = await sign(P, no)
+      chk(S(s0.prep) === S(admin.realName || 'admin'),
+        `${P} A1 新建草稿「${prep}」预填当前用户 ${admin.realName}(实际 "${S(s0.prep)}")`)
+      const jset = await A.cb(P, '保存', { 编号: no, [prep]: '李四(改过)' })
+      const sSet = await sign(P, no)
+      chk(okCall(jset) && S(sSet.prep) === '李四(改过)',
+        `${P} A2 预填型「${prep}」可手改且存得下(实际 "${S(sSet.prep)}";保存返回 ${okCall(jset) ? 'OK' : errMsg(jset)})`)
+    }
 
     // ⑥ 直审拒绝
     const ja = await A.cb(P, '审核', { 编号: no })
     chk(!okCall(ja) && /两级审批/.test(errMsg(ja)), `${P} A3 直审(「审核」)被拒:${errMsg(ja)}`)
 
-    // ③ 编制格 = 提交人;提交给一级审批人
+    // ③ 编制格:落款型 = 提交人;预填型 = 保留用户值(不覆盖),清空后才兜底填提交人
     const jsub = await H.cb(P, '提交审批', { 编号: no })
     chk(okCall(jsub), `${P} A4 编制人(chaishanyin,无审核权)可提交审批:${okCall(jsub) ? resStatus(jsub) : errMsg(jsub)}`)
-    const s1 = await sign(P, no)
-    chk(S(s1.prep) === S(chai.realName || 'chaishanyin'),
-      `${P} A5 提交后「${prep}」= 提交人 ${chai.realName}(实际 "${S(s1.prep)}")`)
+    if (!editablePrep) {
+      const s1 = await sign(P, no)
+      chk(S(s1.prep) === S(chai.realName || 'chaishanyin'),
+        `${P} A5 提交后「${prep}」= 提交人 ${chai.realName}(实际 "${S(s1.prep)}")`)
+    } else {
+      const s1 = await sign(P, no)
+      chk(S(s1.prep) === '李四(改过)', `${P} A5 提交审批不覆盖用户已填的「${prep}」(实际 "${S(s1.prep)}")`)
+      // 空值兜底:驳回回草稿 → 把该列置空(模拟两级口径上线前建的老草稿 ——
+      // ⚠ 界面是**清不掉**已填值的:labelsToCols 把空串归一成 null 并跳过,全系统口径如此)→
+      // 再提交 → 应兜底填提交人
+      await A.cb(P, '审批驳回', { 编号: no, 审批意见: '探针:验证空值兜底' })
+      await q(`UPDATE ${TABLE[P]} SET ${prep} = NULL WHERE 单据编号 = N'${no}'`)
+      const jsub2 = await H.cb(P, '提交审批', { 编号: no })
+      const sFb = await sign(P, no)
+      chk(okCall(jsub2) && S(sFb.prep) === S(chai.realName || 'chaishanyin'),
+        `${P} A5b 「${prep}」为空时提交,兜底填提交人 ${chai.realName}(实际 "${S(sFb.prep)}")`)
+    }
     const st1 = await stat(P, no)
     chk(S(st1.pending) === 'Y' && S(st1.approve_node) === '1', `${P} A6 状态=审批中(节点1)`)
     chk((await msgs('cp', no)).includes('APPROVAL_SUBMITTED'), `${P} A7 一级审批人(cp)收到提交通知`)

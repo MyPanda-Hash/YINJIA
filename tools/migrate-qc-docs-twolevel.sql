@@ -23,6 +23,10 @@
 --   §3 关键列中文注明(旧注明是 2026-09-28 体检批量打的「历史遗留英文列…清理候选」,对这些列已经过时);
 --   §4 译名:审批人 / 审批时间 由 migrate-qc-tcin-twolevel.sql 统一补齐(标签级共享),本脚本只自检。
 --
+-- 口径补记(2026-10-04 同日追加):QC_BHC / QC_BHZ / QC_SCP 的「责任人」格**预填但可改**
+-- (用户口径「责任人预填,让他自己修改」)—— 它是表头「产品负责人」业务格,未必是提交人,
+-- 故 §2b 把它保持 editable=1,由后端在新增时预填当前用户、提交审批时仅在为空时兜底。
+--
 -- 幂等(IF NOT EXISTS / 无条件 UPDATE 到目标值),两账套均须执行。
 
 SET NOCOUNT ON;
@@ -62,12 +66,18 @@ GO
 -- ═════════════ 2. 「编制」格只读(各表绑的列不同,逐面板置 editable=0) ═════════════
 -- 与 ButtonService.QC_DOC_PREPARER 一一对应;save() 同口径剥离入参 ⇒ 只能由「提交审批」写。
 UPDATE yj_field SET editable = 0, required = 0 WHERE panel_code = 'QC_BHG' AND col_name = N'填写人';
-UPDATE yj_field SET editable = 0, required = 0 WHERE panel_code = 'QC_BHC' AND col_name = N'责任人';
-UPDATE yj_field SET editable = 0, required = 0 WHERE panel_code = 'QC_BHZ' AND col_name = N'责任人';
 UPDATE yj_field SET editable = 0, required = 0 WHERE panel_code = 'QC_JJF' AND col_name = N'检测人';
-UPDATE yj_field SET editable = 0, required = 0 WHERE panel_code = 'QC_SCP' AND col_name = N'责任人';
 UPDATE yj_field SET editable = 0, required = 0 WHERE panel_code = 'QC_LYB' AND col_name = N'编制人';
 UPDATE yj_field SET editable = 0, required = 0 WHERE panel_code = 'QC_SCY' AND col_name = N'编制人';
+GO
+
+-- ═════════════ 2b. 「责任人」格 = **预填但可改**(2026-10-04 用户口径「责任人预填,让他自己修改」) ═════════════
+-- QC_BHC / QC_BHZ / QC_SCP 的「责任人」列同时是表头业务格(产品负责人)与底部「编制」落款格:
+-- 业务上它未必是提交人,故这三张**保持 editable=1**(前端可编辑),由
+-- ButtonService.PREPARER_EDITABLE_PANELS 负责"新增时预填当前用户 + save 不剥离 + 提交审批仅在为空时兜底"。
+-- 本段是幂等兜底:若前面的版本(或任何脚本)把它置成只读,这里改回可编辑。
+UPDATE yj_field SET editable = 1
+WHERE col_name = N'责任人' AND panel_code IN ('QC_BHC', N'QC_BHZ', N'QC_SCP');
 GO
 
 -- ═════════════ 3. 关键列中文注明(旧注明已过时,改为两级审批口径) ═════════════
@@ -101,13 +111,13 @@ GO
 DECLARE @t2 sysname, @c2 sysname, @d2 nvarchar(400);
 DECLARE cur2 CURSOR LOCAL FAST_FORWARD FOR
   SELECT v.t, v.c, v.d FROM (VALUES
-    (N'qc_bhc', N'责任人',  N'责任人(历史名):纸面底部落款①「编制」=提交审批的人(⚠该列同时是表头「责任人」业务格,两级审批后两处都显示提交人,只读)'),
+    (N'qc_bhc', N'责任人',  N'责任人(产品负责人):**新增时预填当前用户、可手改**(用户口径「责任人预填,让他自己修改」);同时是纸面底部落款①「编制」格,故此处显示的人即编制人'),
     (N'qc_bhc', N'审核人',  N'审核人(流程):纸面落款②「审核」=一级审批通过的人(勾了该面板「审核反审核」的角色账号∪管理员;驳回/弃审清空)'),
     (N'qc_bhc', N'审核时间', N'审核时间:一级审批通过的时间(驳回/弃审清空)'),
     (N'qc_bhc', N'审批人',  N'审批人:纸面落款③「批准」=超级管理员(二级审批通过时才落值;驳回/弃审清空)'),
     (N'qc_bhc', N'审批时间', N'审批时间:超级管理员批准的时间'),
 
-    (N'qc_bhz', N'责任人',  N'责任人(历史名):纸面底部落款①「编制」=提交审批的人(⚠该列同时是表头「责任人」业务格,只读)'),
+    (N'qc_bhz', N'责任人',  N'责任人(产品负责人):**新增时预填当前用户、可手改**;同时是纸面底部落款①「编制」格'),
     (N'qc_bhz', N'审核人',  N'审核人(流程):纸面落款②「审核」=一级审批通过的人(驳回/弃审清空)'),
     (N'qc_bhz', N'审核时间', N'审核时间:一级审批通过的时间(驳回/弃审清空)'),
     (N'qc_bhz', N'审批人',  N'审批人:纸面落款③「批准」=超级管理员(驳回/弃审清空)'),
@@ -119,7 +129,7 @@ DECLARE cur2 CURSOR LOCAL FAST_FORWARD FOR
     (N'qc_jjf', N'审批人',  N'审批人:纸面落款③「批准」=超级管理员(驳回/弃审清空)'),
     (N'qc_jjf', N'审批时间', N'审批时间:超级管理员批准的时间'),
 
-    (N'qc_scp', N'责任人',  N'责任人(历史名):纸面底部落款①「编制」=提交审批的人(⚠该列同时是表头「责任人」业务格,只读)'),
+    (N'qc_scp', N'责任人',  N'责任人(产品负责人):**新增时预填当前用户、可手改**;同时是纸面底部落款①「编制」格'),
     (N'qc_scp', N'审核人',  N'审核人(流程):纸面落款②「审核」=一级审批通过的人(驳回/弃审清空)'),
     (N'qc_scp', N'审核时间', N'审核时间:一级审批通过的时间(驳回/弃审清空)'),
     (N'qc_scp', N'审批人',  N'审批人:纸面落款③「批准」=超级管理员(驳回/弃审清空)'),
@@ -164,17 +174,21 @@ DECLARE @ap int = (SELECT COUNT(*) FROM yj_field
 DECLARE @prep int = (SELECT COUNT(*) FROM yj_field f
                      WHERE f.editable = 0 AND (
                        (f.panel_code = 'QC_BHG' AND f.col_name = N'填写人') OR
-                       (f.panel_code IN ('QC_BHC','QC_BHZ','QC_SCP') AND f.col_name = N'责任人') OR
                        (f.panel_code = 'QC_JJF' AND f.col_name = N'检测人') OR
                        (f.panel_code IN ('QC_LYB','QC_SCY') AND f.col_name = N'编制人')));
+DECLARE @resp int = (SELECT COUNT(*) FROM yj_field f
+                     WHERE f.editable = 1 AND f.col_name = N'责任人'
+                       AND f.panel_code IN ('QC_BHC','QC_BHZ','QC_SCP'));
 DECLARE @tr int = (SELECT COUNT(*) FROM yj_translation
                    WHERE scope = 'field' AND ref_key IN (N'审批人', N'审批时间'));
 IF @f <> 28 RAISERROR(N'7 张质量单据的 审核人/审核时间/审批人/审批时间 应全部只读(4×7=28),实测 %d', 16, 1, @f);
 IF @ap <> 14 RAISERROR(N'7 张质量单据的 审批人/审批时间 字段未登记齐(应 14,实测 %d)', 16, 1, @ap);
-IF @prep <> 7 RAISERROR(N'7 张质量单据的「编制」格应全部只读(应 7,实测 %d)', 16, 1, @prep);
+IF @prep <> 4 RAISERROR(N'「编制」落款格应只读:QC_BHG 填写人 + QC_JJF 检测人 + QC_LYB/QC_SCY 编制人 = 4,实测 %d', 16, 1, @prep);
+IF @resp <> 3 RAISERROR(N'QC_BHC/QC_BHZ/QC_SCP 的「责任人」应保持可改(预填型,editable=1)= 3,实测 %d', 16, 1, @resp);
 IF @tr < 20 RAISERROR(N'审批人/审批时间 字段译名不足(应 ≥20 条,实测 %d)', 16, 1, @tr);
 PRINT N'migrate-qc-docs-twolevel 完成:7 张质量单据两级审批元数据就绪('
       + CAST(@f AS varchar(4)) + N' 个只读审计格 / '
       + CAST(@ap AS varchar(4)) + N' 个新登记字段 / '
-      + CAST(@prep AS varchar(4)) + N' 个只读编制格)';
+      + CAST(@prep AS varchar(4)) + N' 个只读编制落款格 / '
+      + CAST(@resp AS varchar(4)) + N' 个预填可改责任人格)';
 GO

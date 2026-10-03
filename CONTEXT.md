@@ -388,6 +388,13 @@ DevTaskService 实时推导,没有可归档的"纸");`RD_CHANGE`(产品变更申
   逐面板登记**(各表绑的列不同),`ADMIN_L2_PANELS` = 它的键集,`TWO_LEVEL_PANELS` 由它派生 ——
   三处一份真源,别各写一套名单。三格在 `yj_field` 里 `editable=0`(前端只读),
   后端 `save()` **剥离**这些键的入参 —— 真源只有审批流动作一个。
+  - **例外:「责任人」格 = 预填但可改**(`ButtonService.PREPARER_EDITABLE_PANELS` =
+    QC_BHC / QC_BHZ / QC_SCP,2026-10-04 用户口径「责任人预填,让他自己修改」)。
+    这三张的「责任人」同时是表头「产品负责人」**业务格**,业务上未必是提交人 —— 故该列
+    **保持 `editable=1`**(前端是可编辑输入框)、`save()` **不剥离**该键,
+    后端在**新增草稿时预填当前用户姓名**,提交审批时**只在为空时**兜底填提交人。
+    用户填/改过的值**永不**被审批动作覆盖。⚠ 界面**清不掉**已填值
+    (`labelsToCols` 把空串归一成 null 并跳过,全系统口径如此)。
 - **二级** = **超级管理员**(不选人;非超级管理员在二级节点审批/驳回一律 403)。
   **两级必须各点一次** —— 同一个人(管理员)也要点两次,没有一次动作跨两级的入口。
 - **生单时机**:`tcInApprovedGenerate`(生成采购入库单,仅特采单有效)从「一级通过」**挪到二级批准通过**;
@@ -411,8 +418,11 @@ DevTaskService 实时推导,没有可归档的"纸");`RD_CHANGE`(产品变更申
   `DocSheet` 的签名格**按字段元数据只读**渲染(此前 `signKey` 格子不认 `editable=0`,
   元数据设了只读界面照样能打字)。
 - ⚠ **QC_BHC/QC_BHZ/QC_SCP 的「责任人」列同时是表头业务格**(产品负责人)与底部署名格 ——
-  自动落值后两处都显示提交人且只读。这是用户明确确认过的口径;若要这三张保留手填,改
-  `QC_DOC_PREPARER` 把它们移出即可(移出后该面板退回单节点审批)。
+  按用户口径它是**预填可改**(见上一级的「例外」条目),不是只读落款;
+  若要退回"编制=提交人且只读",把这三张从 `PREPARER_EDITABLE_PANELS` 移出即可。
+- **验收**:`tools/archive/_probe-qcdocs-twolevel.mjs`(8 张 × 21 项 = 243 断言)与
+  `tools/archive/_probe-qcdocs-twolevel-ui.cjs`(5 张 × 21 项 = 88 断言,含**草稿态**下
+  「责任人=可编辑输入框且预填建单人 / 其余格纯文本」的对照);截图 `tools/archive/_shots/qcdocs-*.png`。
 - 迁移:`tools/migrate-qc-tcin-twolevel.sql`(特采单)+ `tools/migrate-qc-docs-twolevel.sql`
   (7 张:审批人/审批时间字段登记 + 审计四格与编制格 `editable=0` + 列注明改写);
   验收探针 `tools/archive/_probe-qcdocs-twolevel.mjs`(8 张 × 21 项)与

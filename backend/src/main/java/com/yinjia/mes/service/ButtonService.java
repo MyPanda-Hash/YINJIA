@@ -231,9 +231,13 @@ public class ButtonService {
         // 质量单据(2026-10-04,特采单 + 质量单据一族):纸面「编制/审核/批准」三格由审批流自动落值
         // (提交审批写编制、一级通过写审核、超级管理员批准写批准),保存不接收前端改值 ——
         // 否则"手改编制人"就能绕过"编制=提交人"的口径。字段在 yj_field 里已 editable=0(前端只读)。
+        // ⚠ 例外:QC_BHC/QC_BHZ/QC_SCP 的「责任人」格是**预填型**(用户口径「预填,让他自己修改」)
+        //   —— 该键照常收下,不然用户改的值存不进去。
         String prepCol = preparerColOf(def.code());
-        if (!prepCol.isBlank()) {
+        if (!prepCol.isBlank() && preparerEditableColOf(def.code()).isBlank()) {
             body.remove(prepCol);
+        }
+        if (!prepCol.isBlank()) {
             body.remove("审批人");
             body.remove("审批时间");
         }
@@ -294,6 +298,13 @@ public class ButtonService {
                 }
                 // 空白草稿同口径:存在"创建时间"列即填入(新建时刻)
                 if (tableCols(table).contains("创建时间")) cols.put("创建时间", LocalDateTime.now().format(TS_FMT));
+                // 质量单据「责任人」预填(2026-10-04 用户口径「预填,让他自己修改」):
+                // 建单即带出当前用户姓名当默认值 —— 只在此处(新单、且该列还没有值)写,
+                // 之后一律由用户自己改,save 不再回写覆盖。见 PREPARER_EDITABLE_PANELS。
+                String preCol = preparerEditableColOf(def.code());
+                if (!preCol.isBlank() && !cols.containsKey(preCol) && tableCols(table).contains(preCol)) {
+                    cols.put(preCol, realNameOf(user));
+                }
                 clearStaleDocStatus(def, no);
                 insertRow(table, cols, user);
                 // 产品变更申请单:建单即铺部门评审行(照 YJ-QR-130 纸面 7 个部门)
@@ -313,6 +324,12 @@ public class ButtonService {
             // save() 已剥离前端传入值,此处是唯一填入点;修改已有单不覆盖)
             if (def.byLabel("创建时间") != null && head.get("创建时间") == null) {
                 head.put("创建时间", LocalDateTime.now().format(TS_FMT));
+            }
+            // 质量单据「责任人」预填:新单且用户没填时带出当前用户姓名(同空白草稿分支口径)
+            String preCol2 = preparerEditableColOf(def.code());
+            if (!preCol2.isBlank() && def.byLabel(preCol2) != null
+                    && (head.get(preCol2) == null || String.valueOf(head.get(preCol2)).isBlank())) {
+                head.put(preCol2, realNameOf(user));
             }
         }
         // 规格书两级分发封锁(2026-09-12):①防绕过——载荷编号命中的是已下发产品(而非已有单据)
@@ -1318,8 +1335,15 @@ public class ButtonService {
         // 质量单据:纸面「编制」格 = **提交审批的人**(2026-10-04 用户口径)。
         // 落点在提交这一刻而非保存 —— 编制格各表绑的列不同(编制人/填写人/责任人/检测人,见 QC_DOC_PREPARER);
         // 谁提交谁就是编制人;驳回后换人重提也随之更新。
+        // ⚠ 预填型(QC_BHC/QC_BHZ/QC_SCP 的责任人)例外:**只在为空时**兜底填提交人 ——
+        //   用户已经自己填/改过的值不许被审批动作抹掉(那些是"产品负责人"业务值)。
         String prep = preparerColOf(def.code());
-        if (!prep.isBlank()) writeBackSignCell(def, no, prep, null, operator);
+        if (!prep.isBlank()) {
+            boolean editable = !preparerEditableColOf(def.code()).isBlank();
+            if (!editable || signCellOf(def, no, prep).isBlank()) {
+                writeBackSignCell(def, no, prep, null, operator);
+            }
+        }
         // 消息:提交审批 → 该面板审批人
         notify(() -> messageService.sendToApprovers(def.code(), MessageService.APPROVAL_SUBMITTED, no,
                 Map.of("docNo", no, "actor", operator), operator));
@@ -1629,6 +1653,25 @@ public class ButtonService {
             "QC_SCP", "责任人");    // YJ-QR-118 试产材料使用申请单
 
     /**
+     * {@link #ADMIN_L2_PANELS} 里「编制」格**不是**纯落款、同时充当业务格的那几张 ——
+     * QC_BHC / QC_BHZ / QC_SCP 的「责任人」(= 表头「产品负责人」格)。
+     *
+     * 用户口径(2026-10-04):「责任人预填,让他自己修改」。故这几张与其余质量单据不同:
+     *   · 字段保持 **editable=1**(前端是可编辑输入框,DocSheet 按 yj_field 元数据判只读);
+     *   · `save()` **不剥离**该键 —— 用户改的值要存得下;
+     *   · **新增草稿时预填**当前用户姓名(只在没有值时写,永不覆盖用户已填/已改的值);
+     *   · 提交审批时同样**只在为空时**兜底填提交人(覆盖两级口径上线前建的老草稿)。
+     * 其余面板的「编制」格(编制人 / 填写人 / 检测人)= 纯落款,仍为「提交审批时自动写 + 只读」。
+     */
+    private static final java.util.Set<String> PREPARER_EDITABLE_PANELS = java.util.Set.of("QC_BHC", "QC_BHZ", "QC_SCP");
+
+    /** 该面板的「编制」格是否可手改(= 预填型);非此类返回空串 */
+    private String preparerEditableColOf(String panelCode) {
+        return panelCode != null && PREPARER_EDITABLE_PANELS.contains(panelCode)
+                ? QC_DOC_PREPARER.getOrDefault(panelCode, "") : "";
+    }
+
+    /**
      * 两级审批的第二种形态:第二级**固定为超级管理员**(不选人)= 质量单据一族。
      * 判据是 yj_user.is_admin='Y',存量的 l2_approver 列对这些面板保持 NULL(前后端都按 is_admin 判)。
      * 与 RD_PROD_INFO 的「一级选人、被选中即授权」并列。
@@ -1715,6 +1758,18 @@ public class ButtonService {
     /** 该面板纸面「编制」格绑的字段(非质量单据返回空串) */
     private String preparerColOf(String panelCode) {
         return panelCode == null ? "" : QC_DOC_PREPARER.getOrDefault(panelCode, "");
+    }
+
+    /** 读纸面签名格当前值(表/列缺失或单据不存在时返回空串;用于"只在为空时才兜底填"的判断) */
+    private String signCellOf(PanelRegistry.PanelDef def, String no, String col) {
+        if (def == null || col == null || col.isBlank()) return "";
+        try {
+            String v = jdbc.queryForObject(
+                    "SELECT TOP 1 [" + col + "] FROM " + def.headTable() + " WHERE 单据编号 = ?", String.class, no);
+            return v == null ? "" : v.trim();
+        } catch (Exception e) {
+            return "";
+        }
     }
 
     /** 账号 → 姓名(复用 {@link #realNameOf};写纸面签名格统一走这里) */
