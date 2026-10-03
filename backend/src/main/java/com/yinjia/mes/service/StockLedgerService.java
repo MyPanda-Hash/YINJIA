@@ -210,8 +210,13 @@ public class StockLedgerService {
                             + " FROM bl_outsource_in l LEFT JOIN bd_outsource_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "SALE_OUT" -> jdbc.queryForList(
+                    // 2026-09-30:**列名不许回退** —— 销售出库明细的仓库名称列早在 41a683aa
+                    // (2026-09-23「仓库字段正名」)就已改名 仓库,采购分支当时同步改了、销售分支漏改,
+                    // 于是本段一度引用不存在的 l.[仓库名称] ⇒ 销售出库单审核/弃审一律 500(error 207)。
+                    // 名称源就是 l.[仓库](与其余出库段同形),不要再加 行仓库名称 —— apply 读它的两处
+                    // (守卫的 null 判定、firstNonBlank 兜底)本就是 null 安全,多一列只会多一个改名断点。
                     "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库],"
-                            + " l.[仓库名称] AS [行仓库名称], l.[仓库编码] AS [行仓库编码],"
+                            + " l.[仓库编码] AS [行仓库编码],"
                             + " l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
                             + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
                             + " ISNULL(l.[销售金额], l.[售价] * l.[数量]) AS 金额,"
