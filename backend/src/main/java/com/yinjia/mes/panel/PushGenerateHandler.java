@@ -72,7 +72,10 @@ public class PushGenerateHandler implements PanelActionHandler {
     private static final java.util.Set<String> CUSTOM_OWNED = java.util.Set.of(
             "WO_ORDER|生成领料单",
             // 生产工单生单:按订单行 1:1 生成(参考库口径),由 ManuScheduleHandler 接管
-            "SO_ORDER|生成生产工单");
+            "SO_ORDER|生成生产工单",
+            // 送料暂收单生单(2026-10-05):**一条动作两个去向** —— 按商品基本档案「来料检验」逐行分流到
+            // 来料检验单 / 采购入库单(PUSH_TARGETS 里登记的 QC_INSP 只是路由标记),由 QcRecvGenerateHandler 接管
+            "QC_RECV|生成检验或入库单");
 
     @Override
     public boolean supports(String panelCode, String action) {

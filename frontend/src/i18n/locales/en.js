@@ -632,6 +632,8 @@ export default {
     '生成送料暂收单': 'Generate Temporary Material Receipt',
     '生成来料检验单': 'Generate Incoming Inspection Sheet',
     '生成采购入库单': 'Generate Purchase Receipt',
+    '请在列表页继续填写': 'Continue filling in on the list page',
+    '商品档案未登记的商品按免检（否）处理': 'Items not registered in the item master are treated as inspection-free (No)',
     '品质追溯': 'Quality Traceability',
     '不良处理': 'Defect Handling',
     '制程品质': 'Process Quality',

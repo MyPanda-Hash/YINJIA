@@ -284,6 +284,8 @@ export default {
     '生成送料暂收单': 'Générer réception temporaire de matière',
     '生成来料检验单': 'Générer fiche d\'inspection à réception',
     '生成采购入库单': 'Générer réception \'achat',
+    '请在列表页继续填写': 'Continuez la saisie dans la liste',
+    '商品档案未登记的商品按免检（否）处理': 'Les articles non enregistrés dans le référentiel sont traités comme dispensés de contrôle (Non)',
     '品质追溯': 'Traçabilité qualité',
     '不良处理': 'Traitement des défauts',
     '制程品质': 'Qualité processus',

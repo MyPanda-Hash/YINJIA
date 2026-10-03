@@ -284,6 +284,8 @@ export default {
     '生成送料暂收单': 'Generar recepción temporal de material',
     '生成来料检验单': 'Generar hoja de inspección de entrada',
     '生成采购入库单': 'Generar entrada de compra',
+    '请在列表页继续填写': 'Continúe rellenando en la lista',
+    '商品档案未登记的商品按免检（否）处理': 'Los artículos no registrados en el maestro se tratan como exentos de inspección (No)',
     '品质追溯': 'Trazabilidad de calidad',
     '不良处理': 'Gestión de defectos',
     '制程品质': 'Calidad de proceso',

@@ -877,8 +877,11 @@ public class PanelConfigService {
                     new String[]{"打印", "打印", "预览", "导出", "打印退货单"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
             // 送料暂收单(库存核算,2026-09-20 面板编码 SL_RECV→QC_RECV):选单=采购订单;
-            // 生单=来料检验单(主按钮,走品检)/ 采购入库单(2026-09-22 新增,免检直达 —— 采购订单的生单
-            // 出口已收敛到本单,去向由暂收这一个人工判定);两条都走分批生单(本单头有批次号 → 一键整单、不弹框)。
+            // 生单=**一个按钮**(2026-10-05 用户口径),去向由**商品基本档案(bs_inv)的「来料检验」**
+            // 逐行决定 —— 是 → 来料检验单(QC_INSP)、否则 → 采购入库单(PURCHASE_IN,免检直达);
+            // 同一张暂收单两种行都有时**分别生成两张**(见 QcRecvGenerateHandler)。
+            // 此前是两个按钮(生成来料检验单/生成采购入库单)由人工判,现收为一个,不再依赖人为选择。
+            // 本单头有批次号 → 不进分批对话框,点一下即整单按行分流生单。
             // 修改保存后由 ButtonService.syncInspFromSlRecv 同步修改已生成的来料检验单
             java.util.Map.entry("QC_RECV", List.of(
                     new String[]{"新增", "新增"},
@@ -888,7 +891,7 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生成来料检验单", "生成采购入库单"},
+                    new String[]{"生单", "生成检验或入库单"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
@@ -1004,9 +1007,12 @@ public class PanelConfigService {
      * Handler 经 {@link #pushTarget} 查询;按钮生成据此区分可执行动作与灰色占位。
      *
      * 2026-09-22 用户口径:**所有采购订单都必须先生成送料暂收单** —— 取消「采购订单→采购入库单」
-     * 免检直达(该跳原为 PU_ORDER|生成采购入库单),改由送料暂收单去向分流的两个按钮承接:
-     * 暂收单人工判:走检验 → QC_RECV|生成来料检验单;免检直达 → QC_RECV|生成采购入库单。
-     * 两条出口必须同时关(PUSH_TARGETS 这一条 + SELECT_FLOWS 的 PURCHASE_IN 来源),否则选单路径仍可绕过。
+     * 免检直达(该跳原为 PU_ORDER|生成采购入库单),改由送料暂收单去向分流承接。
+     * 2026-10-05 用户口径:暂收单的分流**不再由人工点两个按钮**,改为**一个「生单」按商品基本档案
+     * (bs_inv)的「来料检验」逐行判定**(是→QC_INSP,否则→PURCHASE_IN;同一单可各出一张)。
+     * 故 QC_RECV 这条**一条动作两个去向**,这里登记的 QC_INSP 只作**路由标记**(按钮据此不置灰),
+     * 真正的分流在 QcRecvGenerateHandler —— 该动作同时登记在 PushGenerateHandler.CUSTOM_OWNED,
+     * 通用推式生单处理器不认领它(一个动作只能有一个处理器)。
      */
     private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
             java.util.Map.entry("PU_REQ|生成采购订单", "PU_ORDER"),
@@ -1014,8 +1020,8 @@ public class PanelConfigService {
             java.util.Map.entry("SO_ORDER|生成生产工单", "MANU_ORDER"),
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
             java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
-            java.util.Map.entry("QC_RECV|生成来料检验单", "QC_INSP"),
-            java.util.Map.entry("QC_RECV|生成采购入库单", "PURCHASE_IN"),
+            // 暂收单生单(2026-10-05):按行分流到 来料检验单 / 采购入库单 —— 见上方注释(值仅为路由标记)
+            java.util.Map.entry("QC_RECV|生成检验或入库单", "QC_INSP"),
             java.util.Map.entry("WO_ORDER|生成领料单", "MATERIAL_OUT")
     )));
 

@@ -284,6 +284,8 @@ export default {
     '生成送料暂收单': 'Vorübergehenden Materialeingang erzeugen',
     '生成来料检验单': 'Wareneingangsprüfung erzeugen',
     '生成采购入库单': 'Wareneingang erzeugen',
+    '请在列表页继续填写': 'Bitte auf der Listenansicht weiter ausfüllen',
+    '商品档案未登记的商品按免检（否）处理': 'Nicht im Artikelstamm geführte Artikel gelten als prüffrei (Nein)',
     '品质追溯': 'Qualitätsrückverfolgung',
     '不良处理': 'Fehlerbehandlung',
     '制程品质': 'Prozessqualität',

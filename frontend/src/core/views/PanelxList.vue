@@ -6650,6 +6650,24 @@ async function onButton(action) {
       formData: current.value ? { 编号: current.value['编号'], ...(auditOpinion !== '' ? { 审核意见: auditOpinion } : {}), ...(approvalOpinion !== '' ? { 审批意见: approvalOpinion } : {}), ...(modifyReason !== '' ? { 修改原因: modifyReason } : {}) } : {},
       buttonParam: {},
     })
+    // 送料暂收单「生单」按商品基本档案「来料检验」**逐行分流**(2026-10-05 用户口径):
+    // 一张暂收单可能同时产出 来料检验单 + 采购入库单,后端把实际生成的清单放在 res['生成清单'] —— 这里逐张说清,
+    // 再跳到第一张(通用 gotoPanel 分支只会报一张,会把"其实还生成了另一张"瞒掉)。
+    if (Array.isArray(res?.['生成清单']) && res['生成清单'].length) {
+      const made = res['生成清单']
+      const parts = made.map((m) => `${tt(m['面板名称'])} ${m['编号']}（${m['行数']} ${tt('行')}）`).join('、')
+      ElMessage.success(`${tt('已生成')} ${parts}，${tt('请在列表页继续填写')}`)
+      const missing = res['未登记商品']
+      if (Array.isArray(missing) && missing.length) {
+        ElMessage.warning(`${tt('商品档案未登记的商品按免检（否）处理')}：${missing.join('、')}`)
+      }
+      const targetPanel = made[0]['面板']
+      const targetPath = `/panelx/list/${targetPanel}`
+      tabs.close(route.path)
+      router.push(targetPath)
+      tabs.open({ path: targetPath, title: targetPanel })
+      return
+    }
       if (res?.gotoPanel) {
       if (res.gotoPanel === 'WORK_ORDER_LIST') {
         // 单轨(2026-09-26):生产工单落 plang,前往生产工单列表页(独立路由,非 panelx 面板)

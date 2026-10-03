@@ -274,6 +274,8 @@ export default {
     '生成送料暂收单': 'Tạo phiếu tạm nhận vật tư',
     '生成来料检验单': 'Tạo phiếu kiểm nghiệm đầu vào',
     '生成采购入库单': 'Tạo phiếu nhập mua',
+    '请在列表页继续填写': 'Tiếp tục nhập ở trang danh sách',
+    '商品档案未登记的商品按免检（否）处理': 'Mặt hàng chưa đăng ký trong danh mục được xử lý là miễn kiểm (Không)',
     '品质追溯': 'Truy xuất chất lượng',
     '不良处理': 'Xử lý bất lợi',
     '制程品质': 'Chất lượng quá trình',
