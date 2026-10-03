@@ -9,6 +9,10 @@
 //   node init-sync.mjs                全量初始化/复核(状态范围:config.sync.initBillStatus,默认已审核C)
 //   node init-sync.mjs --dry-run      只看会写什么,不落库
 //   node init-sync.mjs --yes          跳过批量写入确认(超阈值时;确认无人值守场景)
+//   node init-sync.mjs --refresh=BD_MATERIAL --yes
+//                                     强制刷新指定类型(忽略库内指纹,全量重取详情再 upsert);
+//                                     注:档案在 init 模式下本就"清污+全量重建",补拉新接字段用
+//                                     `node sync.mjs --refresh=BD_MATERIAL --yes` 即可(不删行、id 不变)
 //   node init-sync.mjs --config=D:\path\config.json
 // 安全规范:写入前自动备份全部已同步单据前像(backup/*.jsonl);超阈值(默认200条)要求人工确认;
 //           日志按日写 logs/sync-YYYY-MM-DD.log 并保留至少一年。
@@ -24,6 +28,7 @@ try {
     configPath: argOf('config'),
     dryRun: has('dry-run'),
     assumeYes: has('yes'),
+    refresh: (argOf('refresh') || '').split(',').map((x) => x.trim()).filter(Boolean),
   });
 } catch (e) {
   const line = `[${new Date().toISOString().replace('T', ' ').slice(0, 19)}] ✗ 初始化失败: ${e.message}`;
