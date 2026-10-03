@@ -134,9 +134,6 @@ public class ButtonService {
             case "新增库存" -> addStock(def, formData);
             // 库存状况:修改预警数量(行内编辑,空值回退全局阈值100)
             case "更新预警数量" -> updateStockWarn(def, formData);
-            // 暂收退料单「特采」(2026-10-04 口径):退料单**审批通过后**逐行(一物料一单)生成特采单草稿,
-            // 特采单「总数量」= 本行「送检数量」(来料检验单送检数据),「不合格品数量」= 本行「退货数量」
-            case "特采" -> returnAutoSpecialAccept(def, formData);
             // 转ERP:已审核+未转过的采购入库/销售出库 → 推送金蝶星辰(账套由 kingdee.push.* 凭证决定),回写ERP单号
             case "转ERP" -> pushToErp(def, formData);
             // 批量转ERP:查询所有已审核+未转的单据列表(前端弹窗勾选后逐张调 转ERP)
@@ -1175,9 +1172,11 @@ public class ButtonService {
         // 不良数量>0 的行生成暂收退回单草稿(此前暂收退回单为手工按钮,现改为审核自动创建)
         inspAutoPurchaseIn(def.code(), no, currentUserName());
         inspAutoReturn(def.code(), no, currentUserName());
+        // 暂收退料单审核 → 把**勾了明细行「特采」开关**的行逐行生成特采单(2026-10-04 口径:
+        // 「暂收退料单审批后才进入特采」)—— 这就是特采的唯一发起时机,没有手工按钮
+        returnAutoSpecialAccept(def.code(), no, currentUserName());
         // 特采单审核=审批通过 → 自动生成采购入库单(全部数量,不走退料)。
-        // 注:2026-10-04 起**特采不再由检验单审核产生** —— 检验不良行只生成暂收退料单,
-        // 特采由退料单审批通过后的「特采」按钮发起(见 returnAutoSpecialAccept)。
+        // 注:2026-10-04 起**特采不再由检验单审核产生** —— 检验不良行只生成暂收退料单。
         tcInApprovedGenerate(def.code(), no, currentUserName());
         // 项目实施计划归档 → 自动同步项目进度查询(研发管理)
         if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
@@ -1446,7 +1445,10 @@ public class ButtonService {
         // 用户只好点手工生单按钮,而手工路径实收数量映射错误且退回单被死过滤器挡住)
         inspAutoPurchaseIn(def.code(), no, operator);
         inspAutoReturn(def.code(), no, operator);
-        // 特采单审批通过 → 生成采购入库单(2026-10-04 起特采由暂收退料单按钮发起,检验审核不再产特采单)
+        // 暂收退料单审批通过 → 同「审核」口径:勾了「特采」的行生成特采单
+        // (2026-10-04 口径「暂收退料单审批后才进入特采」:审核与审批通过两条路都要触发)
+        returnAutoSpecialAccept(def.code(), no, operator);
+        // 特采单审批通过 → 生成采购入库单(2026-10-04 起特采由暂收退料单发起,检验审核不再产特采单)
         tcInApprovedGenerate(def.code(), no, operator);
         // 批次号自洽(与「审核」钩子同口径):生单时已写号,此处兜"手工新建/口径上线前的老单"
         batchService.syncBatchNo(def, no, operator);
@@ -2511,38 +2513,52 @@ public class ButtonService {
     // ==================== 特采:暂收退料单 → 特采单 → 采购入库单(2026-10-04) ====================
 
     /**
-     * 暂收退料单(QC_RETURN)的「特采」按钮 —— 2026-10-04 用户口径:
+     * 暂收退料单审核/审批通过 → 把**勾了明细行「特采」开关**的行,逐行生成特采单(QC_TC_IN,一物料一单)。
+     *
+     * <p>用户口径(2026-10-04,含同日修订):
      * 「特采由暂收退料单发起,**退料单审批通过后**才进入特采;退料单要记录来料检验单送检数据的数量,
      *   后面才可以填入到特采单;特采通过后再到采购入库单。」
+     * 修订:「应该是**一个明细的 bool 字段**不是按钮,删除按钮。」—— 故发起方式是**退料单明细行上的
+     * 「特采」勾选开关**,生单时机是**本单审核/审批通过**那一刻(不再有工具栏按钮、不再有手工触发)。
      *
      * <p>行为:
      * <ol>
-     *   <li><b>闸门</b>:本单状态必须是 已审核/已归档(即「审核」或「审批通过」之后),否则拒绝;</li>
-     *   <li><b>行级生成</b>:本单每条有效明细行生成**一张**特采单(QC_TC_IN,一物料一单),
-     *       头带出 供应商/采购单号(=采购订单号)/产品名称(=物料名称)/
+     *   <li>只处理 <b>特采 = 1</b>(勾选)且未作废的明细行;没勾任何行 ⇒ 本方法什么都不做;</li>
+     *   <li>每个勾选行生成**一张**特采单,头带出 供应商 / 采购单号(=采购订单号) / 产品名称(=物料名称) /
      *       <b>总数量 = 本行「送检数量」</b>(数值 + 计量单位拼合,2026-09-24 口径)/
-     *       <b>不合格品数量 = 本行「退货数量」</b>/不合格品比例(自动算)/检验单号/暂收退料单号/批次键;
+     *       <b>不合格品数量 = 本行「退货数量」</b> / 不合格品比例(自动算) / 检验单号 / 暂收退料单号 / 批次键;
      *       物料编码与规格型号写进「备注」供编制人参考(特采单纸面 YJ-QR-60 无物料编码栏);</li>
      *   <li>行级占用写 form_flow_link(QC_RETURN→QC_TC_IN,linked_quantity=送检数量):
-     *       幂等 —— 同一退料行已有 ACTIVE 特采单占用时跳过,重复点按钮不会产生第二张;</li>
-     *   <li>生成的都留草稿,业务补 特采理由/各部门意见 后走两级审批;
+     *       幂等 —— 同一退料行已有 ACTIVE 特采单占用时跳过(弃审后重审会先作废下游、占用释放,故可重生);</li>
+     *   <li>特采单留草稿,业务补 特采理由/各部门意见 后走两级审批;
      *       批准通过时由 {@link #tcInApprovedGenerate} 生成采购入库单。</li>
      * </ol>
      *
-     * <p>数量口径的兜底:退料行的「送检数量」为空(2026-10-04 之前的老单、或检验单本身没填送检数量)时,
-     * 退回按「退货数量」作特采单总数量 —— 不让老单因为缺一个历史字段就点不动按钮(此时比例=100%)。
+     * <p>数量兜底:退料行的「送检数量」为空时(2026-10-04 之前的老单,或检验单本身没填送检数量),
+     * 按「退货数量」作特采单总数量 —— 不让老单因为缺一个历史字段就特采不了(此时比例=100%)。
      */
-    private Map<String, Object> returnAutoSpecialAccept(PanelRegistry.PanelDef def, Map<String, Object> formData) {
-        if (!"QC_RETURN".equals(def.code())) throw new IllegalStateException("「特采」按钮仅暂收退料单可用");
-        String no = requireNo(formData);
-        String status = String.valueOf(docStatusOf("QC_RETURN", no).get("status"));
-        if (!"已审核".equals(status) && !"已归档".equals(status)) {
-            throw new IllegalStateException("暂收退料单需先审核(或审批通过)后才能特采，当前状态：" + status);
+    private void returnAutoSpecialAccept(String panelCode, String no, String user) {
+        if (!"QC_RETURN".equals(panelCode)) return;
+        PanelRegistry.PanelDef def = registry.panel("QC_RETURN");
+        // 退料行数量列按目标面板注册择标签(inspAutoReturn 同款血统兼容:退货数量 / 数量 二择一)
+        String qtyLabel = pickDetailLabel(def, "退货数量", "数量");
+        if (qtyLabel == null) return;                                   // 该血统没有数量列:无可特采
+        // 只取**勾了特采**的行(列存在性由迁移脚本保证;列不在时本方法整体不生效)
+        List<Map<String, Object>> rows;
+        try {
+            rows = jdbc.queryForList(
+                    "SELECT id, 物料编码, 物料名称, ISNULL(规格型号, N'') AS 规格型号, 计量单位, 单位,"
+                            + " 送检数量, " + qtyLabel + " AS 退货数量"
+                            + " FROM qc_return_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                            + " AND ISNULL(特采, 0) = 1 ORDER BY id", no);
+        } catch (org.springframework.dao.DataAccessException e) {
+            return;                                                     // 列未建(迁移未跑):静默跳过,不阻断审核
         }
+        if (rows.isEmpty()) return;                                     // 没勾任何行:不进特采
         List<Map<String, Object>> heads = jdbc.queryForList(
                 "SELECT 检验单号, 供应商, 采购订单号, 批次号 FROM qc_return"
                         + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
-        if (heads.isEmpty()) throw new IllegalStateException("暂收退料单不存在:" + no);
+        if (heads.isEmpty()) return;
         Map<String, Object> h = heads.get(0);
         String inspNo = str(h.get("检验单号"));
         // 来源检验单头:批次键 / 供应商代码 / 采购订单号 的真源(退料单头没有这几列),
@@ -2554,15 +2570,6 @@ public class ButtonService {
                             + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", inspNo);
             if (!l.isEmpty()) ih = l.get(0);
         }
-        // 退料行数量列按目标面板注册择标签(inspAutoReturn 同款血统兼容:退货数量 / 数量 二择一)
-        String qtyLabel = pickDetailLabel(def, "退货数量", "数量");
-        if (qtyLabel == null) throw new IllegalStateException("暂收退料单明细没有数量列,无法特采");
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 物料编码, 物料名称, ISNULL(规格型号, N'') AS 规格型号, 计量单位, 单位,"
-                        + " 送检数量, " + qtyLabel + " AS 退货数量"
-                        + " FROM qc_return_detail WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id", no);
-        if (rows.isEmpty()) throw new IllegalStateException("暂收退料单没有明细行,无法特采");
-        List<String> made = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             double send = numOr(r.get("送检数量"));
             double bad = numOr(r.get("退货数量"));
@@ -2588,28 +2595,20 @@ public class ButtonService {
             Object uom = r.get("计量单位") != null ? r.get("计量单位") : r.get("单位");
             head.put("总数量", trimZero(tot) + (uom == null ? "" : String.valueOf(uom)));
             if (inspNo != null) head.put("检验单号", inspNo);           // 隐藏链路列:再上一站,采购入库单取数靠它
-            head.put("暂收退料单号", no);                                // 隐藏链路列:本按钮的来源
+            head.put("暂收退料单号", no);                                // 隐藏链路列:本行的来源单据
             if (ih.get("批次键") != null) head.put("批次键", ih.get("批次键"));
             if (ih.get("批次号") != null) head.put("批次号", ih.get("批次号"));
             head.put("备注", "特采行:物料编码=" + r.get("物料编码") + ",规格型号=" + r.get("规格型号")
                     + ";送检 " + trimZero(send) + " / 退货(不合格) " + trimZero(bad));
             Map<String, Object> saved = save(registry.panel("QC_TC_IN"), head, false);
             String tcNo = String.valueOf(saved.get("编号"));
-            made.add(tcNo);
             jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
                             + " target_panel_code, target_form_no, target_line_key, inventory_code,"
                             + " source_quantity, linked_quantity, batch_no, batch_id, link_status, create_by)"
                             + " VALUES ('QC_RETURN', ?, ?, 'QC_TC_IN', ?, NULL, ?, ?, ?, ?, ?, 'ACTIVE', ?)",
                     no, lineKey, tcNo, r.get("物料编码"),
-                    r.get("送检数量"), tot, ih.get("批次号"), ih.get("批次键"), currentUserName());
+                    r.get("送检数量"), tot, ih.get("批次号"), ih.get("批次键"), user);
         }
-        if (made.isEmpty()) throw new IllegalStateException("本单明细行都已生成过特采单(或数量为空),无需重复特采");
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("编号", made.get(0));
-        out.put("单据状态", "已生成特采单");
-        out.put("特采单号", made);
-        out.put("张数", made.size());
-        return out;
     }
 
     /**

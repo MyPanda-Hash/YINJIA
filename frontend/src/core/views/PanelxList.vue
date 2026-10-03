@@ -6227,21 +6227,6 @@ async function onButton(action) {
     }
     return
   }
-  // 暂收退料单「特采」(2026-10-04):本单审批通过后,按明细行逐行生成特采单草稿(一物料一单,
-  // 总数量=该行送检数量、不合格品数量=退货数量)。后端按退料行幂等,重复点不会产生第二张。
-  if (action === '特采') {
-    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
-    const no = current.value['编号'] || current.value['单据编号'] || ''
-    try {
-      const res = await engine.callButton({ panelCode: panelCode.value, buttonName: '特采', formData: { 编号: no }, buttonParam: {} })
-      const made = res?.['特采单号'] || []
-      ElMessage.success(`${tt('特采单')}${tt('已生成')}：${made.join('、')}`)
-      await load()
-    } catch (e) {
-      ElMessage.error(engine.errMsg(e) || tt('按钮执行失败'))
-    }
-    return
-  }
   if (action === '导出') {
     // 报表=整表 CSV;单据=当前明细页签 CSV(PANDA 打印组/委外更多 的导出)
     if (reportMode.value) exportReport()
