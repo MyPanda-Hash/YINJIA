@@ -1818,3 +1818,33 @@ migrate-stock-flow-tables-2026-09-30.sql
 #   ⑤ 自检段输出 9 项齐备度(索引过滤 2 + 面板/字段/单据状态已清 3 + 备份表已删 2 + 表注明 2)。
 #   幂等可重跑(先判后建/先判后删/EXISTS 兜底),两个账套都执行。
 migrate-stock-flow-index-filter-2026-09-30.sql
+
+# —— 2026-09-30 库存三表结构②:期初建账单 —— 把 kucun 现有余量落成 inh 的期初结存流水(src=0) ——
+#   为什么必须做:老系统有期初建账单(INIT_BALANCE),本系统**从来没有**
+#     (migrate-stock-ledger-open-close.sql:2-3 自述"我们无建账单")。三表结构
+#     (kucun 结存缓存 + inh/outh 流水,流水为唯一真源)一旦生效,不补期初 ⇒ 报表余量凭空为 0。
+#   硬前提:UX_inh_src_rid 必须是过滤索引(WHERE rid IS NOT NULL),已由任务 1b 的
+#     migrate-stock-flow-index-filter-2026-09-30.sql 改好;非过滤唯一索引下期初行 (src=0, rid=NULL)
+#     只能落 1 行,插第二行即报 2601。
+#   ⚠ 实施时实测出**计划原稿的三处问题**并已按实际修正(脚本头注释有详述):
+#     ① 列名:bs_inv **没有**「主计量单位」这一列(145 列实测),实际是「计量单位」;
+#        原稿的 `i.主计量单位` 会直接报「列名无效」。
+#     ② 行数翻倍:bs_wh 里 CK01..CK05 各登记了 2 行(18 行 / 13 个编码,两账套一致,仓库名称·
+#        停用·状态完全相同,id 1-5 与 14-18)。原稿两个 LEFT JOIN 会把 31 行期初灌成
+#        **61 行 / 31848**(实测),而原稿的自检是"**先把脏数据写进 inh,再报 FAIL**"。
+#        改为 OUTER APPLY + TOP 1(ORDER BY id) 一一取行(bs_inv 当前 114 行/114 编码不重复,
+#        但同样一一取行,防止它以后被导入重复编码时重演同一个坑)。
+#     ③ 生成前加**预检**(先算不写):预检不过即 RAISERROR(@msg,16,1) 中止、**不写入 inh**
+#        (INSERT 放在 ELSE 分支 ⇒ 预检不过时不可达),且失败时三组数字随错误消息报出(PRINT 会随异常丢),
+#        DbSync 判本脚本失败、不记入 yj_schema_log,下次 sync 重试;不重演"先写脏数据再报 FAIL"。
+#   自检:① 期初行数 == kucun 有效行数(额外加的闸门:合计可能恰好相等而行数被放大);
+#        ② 期初流水合计 == kucun 余量合计(允许 1 分钱);③ 金额合计同理。
+#        两账套实测:31 行 / 15939.0000 = 15939.0000 / 804998.1700 = 804998.1700(绝对差 0)。
+#   ⚠ 期初是**生成时点的一次性快照**:日后 kucun 被真实业务流水改动后重跑本脚本,自检段会打 [FAIL],
+#     属正常现象(判据是"生成当次是否一致"),不代表期初坏了。
+#   ⚠ 自检数字走 PRINT,而 **DbSync 只回显白名单外非 0 错误码的 warning,看不到 PRINT**;
+#     要看到脚本自检的真实数字,用配套探针(回显全部 warning,含错误码 0):
+#     java '-Dstdout.encoding=UTF-8' -cp tools\lib\mssql-jdbc.jar
+#       tools\archive\_verify-stock-opening-2026-09-30.java <库名> tools\migrate-stock-flow-opening-2026-09-30.sql
+#   幂等可重跑(src=0 且未作废的行已存在即整段跳过),两个账套都执行。
+migrate-stock-flow-opening-2026-09-30.sql
