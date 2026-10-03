@@ -1577,6 +1577,12 @@ migrate-line-open-drop.sql
 migrate-manu-rename-workorder.sql
 # —— 2026-09-24 生产工单列表字段对齐(用户清单):列表 16 列定序+非清单字段退表单+补 备注/创建时间+清重复字段行;标签不动(标签=数据键) ——
 migrate-manu-workorder-fields.sql
+# —— 2026-10-03 补建本机缺失的三张在册遗留表(plang 工单 / plang_pc 工单排产 / scjl 生产记录) ——
+#   本机两账套从未有过这三张参考库遗留表(五库扫描确认),而下面的一系列 plang/scjl 迁移直接依赖它们,
+#   链跑到 migrate-plang-workorder.sql 就报「找不到对象 dbo.plang」而中止,排在后面的库存三表/表定册/
+#   备用列池整批跑不到。结构按 tools/archive/_ref-dump/01-table-structure.txt 生成(生成器
+#   tools/archive/_gen-legacy-tables.mjs);**必须排在本组 plang/scjl 迁移之前**(故就地插入而非追加到链尾)。 ——
+migrate-legacy-plang-scjl-tables.sql
 # —— 2026-09-24 生产工单列表数据源切参考库 plang(用户拍板:外部系统直接写 plang,键=公司代码+工单号+工单行号):plang 补 打印人/打印时间 两列(打印生产任务单留痕,对齐 bd_manu_order 同名同义);/px/workOrderList 改查 plang+新增 printStamp/close/reassign 三端点;plang 无面板/代码引用,纯增量加列,幂等 ——
 migrate-plang-workorder.sql
 # —— 2026-09-27 bl_so_order补建「仓库名称」行级列(仓库关联改造加映射漏建列,致SO同步50/50失败)+yj_field注册+注明;幂等可重跑 ——

@@ -1,0 +1,56 @@
+db: 迁移链本机可跑性修复 + 补建缺失遗留表(两账套已跑到「执行 0、失败 0」)
+
+背景:拉取远端 167 提交(含库存三表重构/后台表定册/备用列池)后,本机两账套仍是重构前状态。
+按迁移链跑时逐关受阻,本提交修掉全部阻塞点,使远端重构能在本机落地。
+
+一、补建本机缺失的三张在册遗留表(新脚本 + 生成器)
+  · migrate-legacy-plang-scjl-tables.sql(新):plang 工单 / plang_pc 工单排产 / scjl 生产记录。
+    全库扫描确认本机五个库都没有这三张表(远端有,源自参考库),而它们是**在册**表且被
+    migrate-plang-* / migrate-scjl-* / migrate-spare-columns-biz 直接依赖 —— 链跑到
+    migrate-plang-workorder.sql 即报「找不到对象 dbo.plang」中止,排在后面的库存三表整批跑不到。
+  · 结构按 tools/archive/_ref-dump/01-table-structure.txt 生成
+    (生成器 tools/archive/_gen-legacy-tables.mjs;含表级/列级 MS_Description 中文注明)。
+  · db-migrations.txt:该脚本**插在** migrate-plang-workorder.sql 之前(依赖顺序,非追加到链尾)。
+
+二、三处「在别处能跑、在本机必炸」的脚本修复(均实测复现后再改)
+  · migrate-align-qc-col-fix-20260924.sql:
+    ① qc_return_detail 本机只有 规格型号、没有 型号 ⇒ 直写 [型号] 让**整批编译失败**
+       (SQL Server 对已存在表的缺列在编译期即报「列名 '型号' 无效」,同批合法语句一起不执行)
+       → 改动态 SQL + COL_LENGTH 守卫;
+    ② qc_insp_detail.[不良数量] 是**计算列** = ([不合格数量]) ⇒ 「不良数量 ← 不合格数量」必报
+       「不能修改列…因为它是计算列」,反向则是死语句(两账套实测 0 行)→ 该批不再搬这两列。
+  · migrate-qcreturn-srcfix.sql:数量列名按**血统二择一**(本机是「退货数量」,远端是「数量」),
+    与 ButtonService.inspAutoReturn「按目标面板注册择一写入」同款口径;硬写任一名字都会在另一
+    血统上编译失败。
+  · migrate-spec-testlib-replace.sql:去掉**裸 `USE HSDZ_MES;`**,改 `IF DB_NAME() = N'master' USE …`
+    守卫形式(DbSync 明令拦截裸 USE:连测试库跑时会静默把会话切到正式库,改错库且不报错)。
+
+三、迁移前置人肉步骤补做(顺序红线,DbSync 无法自动插入)
+  · 链上 migrate-stock-flow-index-filter 会 DROP 掉 inh_bak_20260930/outh_bak_20260930,
+    而该脚本要求「先导出 CSV 并核对行数」才可跑。DbSync 串行跑完整条链不会给插入导出的机会 ——
+    测试库演练时即因此丢了老纺织 inh/outh 数据(库内已无任何 *_bak_* 表)。
+  · 本提交新增探针 archive/_export-legacy-inh-outh.java,正式库跑链**之前**先导出
+    (实测 HSDZ_MES 遗留 inh 仅 1 行、outh 0 行;CSV 见 archive/_legacy-*-backup-HSDZ_MES.csv)。
+
+四、新增预检/核查探针(避免被 DbSync 一条条撞出来)
+  · archive/_pending-migrations.java —— 跑链前算清「新增/内容已变/文件缺失」的爆炸半径
+    (实测 62 新增 + 7 内容已变)。
+  · archive/_missing-tables.java —— 在册台账(tools/db-inuse-tables.txt)与实际库账实核对,
+    一次看清缺口全貌(实测缺 6 张:plang/plang_pc/scjl/dm_key/yj_ext_bind_log/bs_wh_loc,
+    后三张由本轮迁移自动补齐)。
+
+执行结果(两账套)
+  · HSDZ_MES      : 执行 70,跳过 287,失败 0;复跑 0/357/0
+  · HSDZ_MES_TEST : 执行 31,跳过 326,失败 0;复跑 0/357/0
+  · 库存三表核验(archive/_verify-stock-movement-2026-09-30.java check):
+    23 列契约 PASS;v_stock_movement 依赖对象从 8 路 UNION 收敛为 bs_wh/inh/outh 三个;
+    勾稽一致 —— HSDZ_MES 7010.0000 = 7010.0000 = 7010.0000(绝对差 0),
+    TEST 6810.0000 = 6810.0000 = 6810.0000;报表查询 65,021ms → 4~10ms。
+  · 启动自检:「[库存对账] 结存 == Σ流水,一致(36 个三键)」通过。
+  · 体检(DbNormAudit 13 项):HSDZ_MES FAIL-6 / TEST FAIL-7;
+    对照**迁移前快照** HSDZ_MES_RESTORE 的 FAIL-9,债务显著下降
+    (03 列注明 481→3、09 缺 en 译名 332→243、05 元数据漂移 155→1、07 重复字段 46→0、10 备份表 1→0),
+    余下 6 项(02/03/04/05/09/13)为存量遗留债,非本次迁移引入。
+
+数据清单:docs/development/数据库表清单.md 补 v1.8(材料出库单 54/85 列订正)与
+v1.9(记明本清单描述「重构后」目标态,与本机实库的系统性差距来自迁移未跑)。

@@ -1,0 +1,276 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ java -cp "lib\mssql-jdbc.jar" DbSync.java 2>&1 | Out-File -Encoding U ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+[变更] migrate-sl-chain-fixes.sql(内容与上次执行时不同,重新执行)
+== migrate-sl-chain-fixes.sql ==
+  [OK] 6 batches
+[变更] migrate-sl-supplier-ref.sql(内容与上次执行时不同,重新执行)
+== migrate-sl-supplier-ref.sql ==
+  [OK] 4 batches
+[变更] migrate-batch-link.sql(内容与上次执行时不同,重新执行)
+== migrate-batch-link.sql ==
+  (0 rows)
+  [OK] 21 batches
+[变更] migrate-batch-backfill.sql(内容与上次执行时不同,重新执行)
+== migrate-batch-backfill.sql ==
+  (0 rows)
+  [OK] 17 batches
+[变更] migrate-qc-recv-fields.sql(内容与上次执行时不同,重新执行)
+== migrate-qc-recv-fields.sql ==
+  (0 rows)
+  [OK] 7 batches
+[新增] migrate-align-qc-col-fix-20260924.sql
+== migrate-align-qc-col-fix-20260924.sql ==
+  [OK] 7 batches
+[变更] migrate-chain-insp-fields.sql(内容与上次执行时不同,重新执行)
+== migrate-chain-insp-fields.sql ==
+  [OK] 8 batches
+[变更] migrate-wo-report-upgrade.sql(内容与上次执行时不同,重新执行)
+== migrate-wo-report-upgrade.sql ==
+  (0 rows)
+  (0 rows)
+  [OK] 12 batches
+[新增] migrate-align-merge-20260924.sql
+== migrate-align-merge-20260924.sql ==
+  [OK] 7 batches
+[新增] migrate-align-views-20260924.sql
+== migrate-align-views-20260924.sql ==
+  [OK] 5 batches
+[新增] migrate-align-fields-20260924.sql
+== migrate-align-fields-20260924.sql ==
+  [OK] 3 batches
+[新增] migrate-fix-qc-recv-ref-20260924.sql
+== migrate-fix-qc-recv-ref-20260924.sql ==
+  [OK] 5 batches
+[新增] migrate-kucun-ckdm-widen-20260924.sql
+== migrate-kucun-ckdm-widen-20260924.sql ==
+  (0 rows)
+  [OK] 3 batches
+[新增] migrate-scm-qc-perms-20260924.sql
+== migrate-scm-qc-perms-20260924.sql ==
+  [OK] 1 batches
+[新增] migrate-qc-return-drop-ghost-spec.sql
+== migrate-qc-return-drop-ghost-spec.sql ==
+  [OK] 1 batches
+[新增] migrate-line-open-drop.sql
+== migrate-line-open-drop.sql ==
+  (0 rows)
+  [OK] 1 batches
+[新增] migrate-manu-rename-workorder.sql
+== migrate-manu-rename-workorder.sql ==
+  [OK] 1 batches
+[新增] migrate-manu-workorder-fields.sql
+== migrate-manu-workorder-fields.sql ==
+  [OK] 1 batches
+[新增] migrate-legacy-plang-scjl-tables.sql
+== migrate-legacy-plang-scjl-tables.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  [OK] 12 batches
+[新增] migrate-plang-workorder.sql
+== migrate-plang-workorder.sql ==
+  (0 rows)
+  (0 rows)
+  [OK] 6 batches
+[新增] migrate-so-line-whname.sql
+== migrate-so-line-whname.sql ==
+  (0 rows)
+  [OK] 4 batches
+[新增] migrate-so-line-no.sql
+== migrate-so-line-no.sql ==
+  (0 rows)
+  [OK] 6 batches
+[新增] migrate-plang-batch.sql
+== migrate-plang-batch.sql ==
+  (0 rows)
+  [OK] 6 batches
+[新增] migrate-plang-schedule.sql
+== migrate-plang-schedule.sql ==
+  (0 rows)
+  [OK] 4 batches
+[新增] migrate-plangpc-board.sql
+== migrate-plangpc-board.sql ==
+  (0 rows)
+  [OK] 8 batches
+[新增] migrate-scjl-report.sql
+== migrate-scjl-report.sql ==
+  (0 rows)
+  [OK] 4 batches
+[新增] migrate-scjl-single-table.sql
+== migrate-scjl-single-table.sql ==
+  (0 rows)
+  [OK] 7 batches
+[新增] migrate-prodline-import.sql
+== migrate-prodline-import.sql ==
+  (0 rows)
+  [OK] 8 batches
+[新增] migrate-wh-location.sql
+== migrate-wh-location.sql ==
+  (0 rows)
+  [OK] 6 batches
+[新增] migrate-server-parity-20260928.sql
+== migrate-server-parity-20260928.sql ==
+  (0 rows)
+  [OK] 3 batches
+[新增] migrate-db-norm-cleanup.sql
+== migrate-db-norm-cleanup.sql ==
+  [OK] 6 batches
+[新增] migrate-restore-gfda.sql
+== migrate-restore-gfda.sql ==
+  [OK] 3 batches
+[新增] migrate-basedata-query-fields.sql
+== migrate-basedata-query-fields.sql ==
+  [OK] 6 batches
+[新增] migrate-spec-testlib-replace.sql
+== migrate-spec-testlib-replace.sql ==
+  [OK] 4 batches
+[新增] migrate-db-norm-column-comments.sql
+== migrate-db-norm-column-comments.sql ==
+  [OK] 2 batches
+[新增] migrate-spare-columns.sql
+== migrate-spare-columns.sql ==
+  [OK] 2 batches
+[新增] migrate-ext-bind-log.sql
+== migrate-ext-bind-log.sql ==
+  (0 rows)
+  [OK] 2 batches
+[新增] migrate-pc-plang-id.sql
+== migrate-pc-plang-id.sql ==
+  (0 rows)
+  [OK] 5 batches
+[新增] migrate-qcinsp-header-fix.sql
+== migrate-qcinsp-header-fix.sql ==
+  [OK] 8 batches
+[新增] migrate-qcreturn-srcfix.sql
+== migrate-qcreturn-srcfix.sql ==
+  [OK] 8 batches
+[新增] migrate-whloc.sql
+== migrate-whloc.sql ==
+  (0 rows)
+  [OK] 10 batches
+[新增] migrate-ledger-code-filter.sql
+== migrate-ledger-code-filter.sql ==
+  [OK] 5 batches
+[新增] migrate-qcrecv-supplier-seq.sql
+== migrate-qcrecv-supplier-seq.sql ==
+  [OK] 2 batches
+[新增] migrate-whloc-whcode.sql
+== migrate-whloc-whcode.sql ==
+  (0 rows)
+  [OK] 6 batches
+[新增] migrate-material-out-line-no.sql
+== migrate-material-out-line-no.sql ==
+  [OK] 6 batches
+[新增] migrate-server-parity2-20260928.sql
+== migrate-server-parity2-20260928.sql ==
+  (0 rows)
+  [OK] 4 batches
+[新增] migrate-server-converge-20260928.sql
+== migrate-server-converge-20260928.sql ==
+  (0 rows)
+  (0 rows)
+  [OK] 5 batches
+[新增] migrate-panel-runtime-cols.sql
+== migrate-panel-runtime-cols.sql ==
+  [OK] 7 batches
+[新增] migrate-panel-page-size.sql
+== migrate-panel-page-size.sql ==
+  [OK] 3 batches
+[新增] migrate-panel-page-size-archive.sql
+== migrate-panel-page-size-archive.sql ==
+  [OK] 2 batches
+[新增] migrate-drop-unused-tables.sql
+== migrate-drop-unused-tables.sql ==
+  (0 rows)
+  [OK] 4 batches
+[新增] migrate-spare-columns-biz.sql
+== migrate-spare-columns-biz.sql ==
+  [OK] 3 batches
+[新增] migrate-norm-debt-20260929.sql
+== migrate-norm-debt-20260929.sql ==
+  [OK] 5 batches
+[新增] migrate-spare-desc-fix.sql
+== migrate-spare-desc-fix.sql ==
+  [OK] 3 batches
+[新增] migrate-rd-test-apply.sql
+== migrate-rd-test-apply.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  [OK] 38 batches
+[新增] migrate-rd-prodinfo-formlib-2026-09-30.sql
+== migrate-rd-prodinfo-formlib-2026-09-30.sql ==
+  [OK] 5 batches
+[新增] migrate-rd-specdoc-prodno-2026-09-30.sql
+== migrate-rd-specdoc-prodno-2026-09-30.sql ==
+  [print] 注意: 更改对象名的任一部分都可能会破坏脚本和存储过程。
+  [OK] 6 batches
+[新增] migrate-filter-eff-formula-cols.sql
+== migrate-filter-eff-formula-cols.sql ==
+  (0 rows)
+  [OK] 12 batches
+[新增] migrate-drop-sample-no-panel-2026-09-30.sql
+== migrate-drop-sample-no-panel-2026-09-30.sql ==
+  [OK] 5 batches
+[新增] migrate-rd-file-owner-2026-09-30.sql
+== migrate-rd-file-owner-2026-09-30.sql ==
+  [OK] 5 batches
+[新增] migrate-rd-modify-reason-2026-09-30.sql
+== migrate-rd-modify-reason-2026-09-30.sql ==
+  (0 rows)
+  (0 rows)
+  [OK] 5 batches
+[新增] migrate-rd-file-controlled-2026-09-30.sql
+== migrate-rd-file-controlled-2026-09-30.sql ==
+  [OK] 4 batches
+[新增] migrate-rd-change-kind-2026-09-30.sql
+== migrate-rd-change-kind-2026-09-30.sql ==
+  [OK] 5 batches
+[新增] migrate-rd-newfields-i18n-2026-09-30.sql
+== migrate-rd-newfields-i18n-2026-09-30.sql ==
+  [OK] 4 batches
+[新增] migrate-rd-datarec-reviewer-2026-09-30.sql
+== migrate-rd-datarec-reviewer-2026-09-30.sql ==
+  [OK] 7 batches
+[新增] migrate-stock-flow-tables-2026-09-30.sql
+== migrate-stock-flow-tables-2026-09-30.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  [OK] 8 batches
+[新增] migrate-stock-flow-index-filter-2026-09-30.sql
+== migrate-stock-flow-index-filter-2026-09-30.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  [OK] 7 batches
+[新增] migrate-stock-flow-opening-2026-09-30.sql
+== migrate-stock-flow-opening-2026-09-30.sql ==
+  (0 rows)
+  [OK] 5 batches
+[新增] migrate-stock-movement-from-flow-2026-09-30.sql
+== migrate-stock-movement-from-flow-2026-09-30.sql ==
+  (0 rows)
+  (0 rows)
+  [OK] 6 batches
+[新增] migrate-stock-flow-tax-cols-2026-09-30.sql
+== migrate-stock-flow-tax-cols-2026-09-30.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  [OK] 13 batches
+=== 同步完成: 执行 70, 跳过 287, 失败 0 ===

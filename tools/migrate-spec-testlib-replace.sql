@@ -19,8 +19,11 @@
 -- 幂等:先按 lib_code 删除全部 spec.test 行,再从 JSON 重建 ⇒ 可重复执行、结果一致。
 --   ⚠ 删除是**物理删除**:标准库弹窗里的"停用(enabled=0)"条目也会一并清掉,符合"全删重建"口径。
 --
--- 用法:sqlcmd -S localhost -d HSDZ_MES -U yinjia -P '***' -b -f 65001 -i tools/migrate-spec-testlib-replace.sql
-USE HSDZ_MES;
+-- 用法:java -cp tools/lib/mssql-jdbc.jar tools/DbSync.java（走链，连哪个库就改哪个库）
+-- ⚠ 2026-10-03 修:此处原为**裸 `USE HSDZ_MES;`** —— DbSync 明令拦截(连测试库跑时它会静默把会话切到正式库，
+--   于是「给测试账套补迁移」实际改的是正式库且不报错)。按仓库既有 98 例同款改守卫形式:
+--   只在 master 上下文才切库，已连到目标库时不切(改哪个库由连接串决定，两账套各自生效)。
+IF DB_NAME() = N'master' USE HSDZ_MES;
 SET NOCOUNT ON;
 SET QUOTED_IDENTIFIER ON;
 GO
