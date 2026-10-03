@@ -13,14 +13,19 @@ import java.util.Map;
  *   PURCHASE_IN 采购入库单(入库,+,行可无批号) — 材料入库链
  *   MATERIAL_OUT 材料出库单(出库,-,行必须扫码带批号,台账行必须已存在) — 生产过程层·扫码领料
  * 守卫:仓库档案必须存在(名称→bs_wh 编码);出库现存量不足拒绝;冲回为负拒绝;整笔回滚。
+ *
+ * 2026-09-30(库存三表):除 kucun 结存之外,同一事务内还写**流水**(inh/outh,见 {@link StockFlowService}),
+ * 流水为唯一真源、kucun 退为结存缓存 —— 两者必须同键同量,否则静态检查「结存 == Σ流水」会报差。
  */
 @Service
 public class StockLedgerService {
 
     private final JdbcTemplate jdbc;
+    private final StockFlowService stockFlow;
 
-    public StockLedgerService(JdbcTemplate jdbc) {
+    public StockLedgerService(JdbcTemplate jdbc, StockFlowService stockFlow) {
         this.jdbc = jdbc;
+        this.stockFlow = stockFlow;
     }
 
     /** 是否参与记账的面板。 */
@@ -80,7 +85,7 @@ public class StockLedgerService {
             if (qty == 0) continue; // 零行跳过;负数=红字冲回,正常过账(applyIn 内含负库存守卫)
             // 弃审时该行仓库为空 → 跳过该行(审核时可能没填仓库就没过账)
             if (!forward && whName == null && whCode == null) continue;
-            String ckdm = resolveWh(whCode, whName);
+            String ckdm = resolveWh(whCode, whName, r);
             if (ckdm == null) throw new IllegalStateException(
                     "仓库档案不存在:[" + (whName != null ? whName : whCode) + "],请先在基础档案-仓库中建立");
             if (inbound) {
@@ -93,6 +98,10 @@ public class StockLedgerService {
                 applyOut(code, ckdm, lot, qty, user, forward);
             }
         }
+        // 2026-09-30:结存(kucun)之外**同事务写流水**(inh/outh) —— 流水为唯一真源,kucun 退为结存缓存。
+        // 放在 kucun 之后:业务守卫(仓库档案存在/现存量不足)若抛错,流水不会先落库,整笔一起回滚。
+        // 弃审的"无明细行/仓库三列全空 ⇒ 静默跳过冲回"在方法开头已 return ⇒ 流水同样不冲,两边口径一致。
+        stockFlow.postFlow(panelCode, no, rows, forward, user);
     }
 
     /** @return 冲回时命中的台账行数(0=没冲到,供备选批号兜底);过账(前进)时无意义 */
@@ -147,11 +156,21 @@ public class StockLedgerService {
         return l.isEmpty() ? null : l.get(0);
     }
 
+    /**
+     * 取单据明细行。返回的键除结存(kucun)要用的 code/lot/lotAlt/qty/price 与仓库三列之外,
+     * **还带流水表(inh/outh)要用的键**:rid(来源行 id,幂等键的一半)、金额、name/spec/uom(物料名称/
+     * 规格型号/计量单位)、单据类型、单据日期、往来单位、经手人 —— 取值口径逐列照抄 v_stock_movement
+     * (该视图是这几列的对外契约,任务 4 改它读流水后报表才不会漂)。
+     * 仓库**不在这里解析**:流水要写的是 kucun 的同款档案编码,由 {@link #resolveWh} 解析后回填。
+     */
     private List<Map<String, Object>> loadRows(String panelCode, String no) {
         // 仓库取值口径(2026-09-23):采购入库/销售出库的**明细仓库**由「参照选仓库」写入
         // `仓库名称`+`仓库编码` 两列(界面必填的是 仓库名称),旧列 `仓库` 可能为空 ——
         // 故这两张单的查询把三列一起取出,由 resolveWh 做「编码优先、名称兜底」解析;
         // 其余行表没有这两列(已核实),保持原样。
+        // 往来单位/经手人(2026-09-30):**照抄 v_stock_movement 的口径** —— 只有 1 采购入库(供应商)、
+        // 5 销售出库(客户)两段有往来单位;3 其他入库、6 材料出库两段连经手人都是 NULL
+        // (前者 bd_other_in 无 经手人 列、其 往来单位 列视图也没取;后者只有 领用人,语义不同)。
         return switch (panelCode) {
             case "PURCHASE_IN" -> jdbc.queryForList(
                     // 批号口径(2026-09-22):**批次号优先、(供应商)批号兜底** —— 采购链按「只用批次号」
@@ -162,39 +181,63 @@ public class StockLedgerService {
                     // 名称源回到标准形态 l.[仓库] AS 行仓库;头表 [仓库] 已删,头侧只剩 仓库编码 兜底。
                     "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], l.[仓库编码] AS [行仓库编码], h.[仓库编码] AS [头仓库编码],"
                             + " ISNULL(NULLIF(l.[批次号], N''), l.[批号]) AS lot, l.[批号] AS lotAlt,"
-                            + " l.[实收数量] AS qty, l.[单价] AS price"
+                            + " l.[实收数量] AS qty, l.[单价] AS price,"
+                            + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            + " ISNULL(l.[金额], l.[单价] * l.[实收数量]) AS 金额,"
+                            + " N'采购入库单' AS [单据类型], h.[单据日期] AS [单据日期], h.[供应商] AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_purchase_in l LEFT JOIN bd_purchase_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "FINISH_IN" -> jdbc.queryForList(
-                    "SELECT l.[产品编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[实收数量] AS qty, l.[单价] AS price"
+                    "SELECT l.[产品编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[实收数量] AS qty, l.[单价] AS price,"
+                            + " l.id AS rid, l.[产品名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            + " ISNULL(l.[金额], l.[单价] * l.[实收数量]) AS 金额,"
+                            + " N'产成品入库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_finish_in l LEFT JOIN bd_finish_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "OTHER_IN" -> jdbc.queryForList(
-                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, l.[单价] AS price"
+                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, l.[单价] AS price,"
+                            + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            + " ISNULL(l.[金额], l.[单价] * l.[数量]) AS 金额,"
+                            + " N'其他入库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], NULL AS [经手人]"
                             + " FROM bl_other_in l LEFT JOIN bd_other_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "OUTSOURCE_IN" -> jdbc.queryForList(
                     // 行仓库优先,缺失时回退头仓库
-                    "SELECT l.[产品编码] AS code, l.[仓库] AS [行仓库], ISNULL(l.[仓库], h.[仓库]) AS [头仓库], l.[批号] AS lot, l.[实收数量] AS qty, l.[单价] AS price"
+                    "SELECT l.[产品编码] AS code, l.[仓库] AS [行仓库], ISNULL(l.[仓库], h.[仓库]) AS [头仓库], l.[批号] AS lot, l.[实收数量] AS qty, l.[单价] AS price,"
+                            + " l.id AS rid, l.[产品名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            + " ISNULL(l.[金额], l.[单价] * l.[实收数量]) AS 金额,"
+                            + " N'委外入库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_outsource_in l LEFT JOIN bd_outsource_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "SALE_OUT" -> jdbc.queryForList(
                     "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库],"
                             + " l.[仓库名称] AS [行仓库名称], l.[仓库编码] AS [行仓库编码],"
-                            + " l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
+                            + " l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
+                            + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            + " ISNULL(l.[销售金额], l.[售价] * l.[数量]) AS 金额,"
+                            + " N'销售出库单' AS [单据类型], h.[单据日期] AS [单据日期], h.[客户] AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_sale_out l LEFT JOIN bd_sale_out h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "OTHER_OUT" -> jdbc.queryForList(
-                    // 头表无仓库列,仓库取行表
-                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], l.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
-                            + " FROM bl_other_out l"
+                    // 头表无仓库列,仓库取行表;2026-09-30 起挂头表只为取 单据日期/经手人(流水表要用)
+                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], l.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
+                            + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            + " ISNULL(l.[金额], l.[单价] * l.[数量]) AS 金额,"
+                            + " N'其他出库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], h.[经手人] AS [经手人]"
+                            + " FROM bl_other_out l LEFT JOIN bd_other_out h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             case "OUTSOURCE_ISSUE" -> jdbc.queryForList(
-                    "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
+                    "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
+                            + " l.id AS rid, l.[材料名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            + " ISNULL(l.[金额], l.[单价] * l.[数量]) AS 金额,"
+                            + " N'委外发料单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_outsource_issue l LEFT JOIN bd_outsource_issue h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
             default -> jdbc.queryForList( // MATERIAL_OUT
-                    "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price"
+                    "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
+                            + " l.id AS rid, l.[材料名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
+                            + " ISNULL(l.[金额], l.[单价] * l.[数量]) AS 金额,"
+                            + " N'材料出库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], NULL AS [经手人]"
                             + " FROM bl_material_out l LEFT JOIN bd_material_out h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
         };
@@ -203,15 +246,26 @@ public class StockLedgerService {
     /** 仓库解析(2026-09-23):**编码优先、名称兜底**。
      *  为什么编码优先:编码是稳定标识(仓库改名不会断链),且采购入库/销售出库的明细仓库
      *  由参照录入写的是 `仓库编码`+`仓库名称`;编码必须在 bs_wh 里存在(启用)才采用,
-     *  否则回退按名称解析。两者都取不到返回 null(调用方抛"仓库档案不存在")。 */
-    private String resolveWh(String whCode, String whName) {
+     *  否则回退按名称解析。两者都取不到返回 null(调用方抛"仓库档案不存在")。
+     *  2026-09-30:解析结果**回填到行上**(仓库编码/仓库名称),供流水表(inh/outh)写入 ——
+     *  流水与 kucun 必须同键,而单据行上的仓库列只是解析输入(可能是别名、可能只有名称没编码)。 */
+    private String resolveWh(String whCode, String whName, Map<String, Object> row) {
         if (whCode != null && !whCode.isBlank()) {
-            List<String> hit = jdbc.queryForList(
-                    "SELECT [仓库编码] FROM bs_wh WHERE [仓库编码] = ? AND ISNULL([状态], N'启用') = N'启用'",
-                    String.class, whCode.trim());
-            if (!hit.isEmpty()) return hit.get(0);
+            List<Map<String, Object>> hit = jdbc.queryForList(
+                    "SELECT [仓库编码] AS ckdm, [仓库名称] AS ckmc FROM bs_wh WHERE [仓库编码] = ? AND ISNULL([状态], N'启用') = N'启用'",
+                    whCode.trim());
+            if (!hit.isEmpty()) {
+                row.put("仓库编码", firstNonBlank(str(hit.get(0).get("ckdm")), whCode.trim()));
+                row.put("仓库名称", str(hit.get(0).get("ckmc")));
+                return String.valueOf(row.get("仓库编码"));
+            }
         }
-        return resolveCkdm(whName);
+        String byName = resolveCkdm(whName);
+        if (byName != null) {
+            row.put("仓库编码", byName);
+            row.put("仓库名称", str(whName));
+        }
+        return byName;
     }
 
     /** 仓库名称 → 编码(bs_wh)。 */
