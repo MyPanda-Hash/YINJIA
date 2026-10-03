@@ -4,9 +4,9 @@
        超送受系统比例约束。
        勾选口径(2026-09-21 修复):**勾选是权威** —— 只生成"已勾选 且 本次送料数量 > 0"的行
        (此前只按数量过滤、勾选形同虚设 → 只勾一行也会全部生单)。
-       批次号(2026-09-21 二次口径):暂收单**不带**批次号,只登记一行"待编号"批次台账;
-       批次号 = **采购入库单「单据日期」**(纯 yyyyMMdd,同一日期同一批次),入库单填单时预设、可人工改,
-       审核时以表头值为准回填全链 —— 详见 tools/migrate-batch-no-date-only.sql。 -->
+       批次号(2026-10-04 口径):**生单这一刻就定号** —— 供应商编码去掉 YJ- 前缀 + `-` + 当天 yyyyMMdd
+       (如 YJ-TX ⇒ TX-20260910),随后沿 暂收 → 检验 → 入库 逐站继承,不再有"入库审核取号回填";
+       服务端 batchFlowLines 已按同一公式预告本批号(nextBatchNo),这里直接显示。 -->
   <el-dialog
     :model-value="modelValue"
     :title="tt('分批送料') + ' · ' + sourceNo"
@@ -19,7 +19,7 @@
     <div v-loading="loading" class="bsd">
       <div class="bsd-bar">
         <span class="bsd-chip">{{ tt('采购订单') }}: {{ sourceNo }}</span>
-        <span class="bsd-chip">{{ tt('批次号') }}: <b>{{ tt('采购入库单填单时按入库日期预设,可修改') }}</b></span>
+        <span class="bsd-chip">{{ tt('批次号') }}: <b>{{ nextBatchNo || tt('生单时按供应商编码与当天日期生成') }}</b></span>
         <span class="bsd-chip bsd-ratio">
           {{ tt('超送比例') }}:
           <el-input-number v-model="overRatioPct" :min="0" :max="50" :step="1" :precision="0" size="small"
@@ -90,6 +90,8 @@ const picked = ref([])         // el-table 当前勾选的行(生单只认它 �
 const overRatio = ref(0)       // 系统默认比例(0~1)
 const overRatioPct = ref(5)    // 本次生效比例(%):可调,生单时随请求带给后端
 const batches = ref([])
+/** 本批批次号(服务端按「供应商编码去 YJ- 前缀 + 当天」预告;生单后即为该号) */
+const nextBatchNo = ref('')
 const qtyOf = reactive({})
 
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.lineKey)))
@@ -120,6 +122,7 @@ async function load() {
     overRatio.value = Number(res?.overRatio || 0)
     overRatioPct.value = Math.round(overRatio.value * 100)
     batches.value = res?.batches || []
+    nextBatchNo.value = String(res?.nextBatchNo || '')
     Object.keys(qtyOf).forEach((k) => delete qtyOf[k])
     for (const r of rows.value) qtyOf[r.lineKey] = Number(r.剩余数量) > 0 ? Number(r.剩余数量) : 0
     // 默认勾选"还有剩余"的行(保留"打开即可全送"的便利);勾选仍是权威:取消勾选即不送
@@ -178,8 +181,12 @@ async function confirm() {
       sourcePanel: props.sourcePanel, targetPanel: props.targetPanel, sourceNo: props.sourceNo, lines,
       overRatio: ratio.value,
     })
-    ElMessage.success(`${tt('已生成')} ${res['编号']}（${tt('批次号')} ${tt('采购入库单填单时按入库日期预设,可修改')}）`)
-    emit('generated', { panel: res.gotoPanel || props.targetPanel, no: res['编号'], batchNo: res['批次号'] })
+    // 批次号已在生单这一刻定稿 —— 提示里回显**真号**(res['批次号']),不再是"以后再取"
+    const no = String(res?.['批次号'] || nextBatchNo.value || '')
+    ElMessage.success(no
+      ? `${tt('已生成')} ${res['编号']}（${tt('批次号')} ${no}）`
+      : `${tt('已生成')} ${res['编号']}`)
+    emit('generated', { panel: res.gotoPanel || props.targetPanel, no: res['编号'], batchNo: no })
     emit('update:modelValue', false)
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('生单失败'))

@@ -373,6 +373,13 @@ public class ButtonService {
             }
             upsertLineRows(def, items, no, l2c, user);
         }
+        // 批次号自洽(2026-10-04 口径:生单即定号,不再有入库审核回填):
+        // 链路四单(送料暂收/来料检验/暂收退回/采购入库)保存后立刻把**单头**批次号同步到全部明细行,
+        // 并在缺号时按「供应商编码去掉 YJ- 前缀 + - + 当天」取号 —— 用户口径:
+        // 「单头可改(暂收单草稿态),下面的明细项目与单头一致,审批后一律不可改」。
+        // 明细列在 yj_field 里是 editable=0(见 tools/migrate-batch-no-on-generate.sql),
+        // 行上的号只由这一处维护;非批次面板/无该列时内部直接返回,不做任何写入。
+        batchService.syncBatchNo(def, no, user);
         // 主保存路径落库成功才写 saved:markSaved=true「保存/提交/保存新增」,false「保存为草稿/新增」。
         // saved='Y' 只表示"这张单存过一次"(不表示已审核),前端 isFreshAddedDoc() 用 'N' 界定"本次新增"窗口。
         markDocSaved(def.code(), no, markSaved);
@@ -1113,12 +1120,10 @@ public class ButtonService {
         if (!auditor.equals(shrAfter == null ? "" : String.valueOf(shrAfter))) {
             throw new IllegalStateException("单据已被他人审核，请刷新后查看");
         }
-        // 分批送料批次号(2026-09-21 取号时机迁移):**采购入库单审核时**确认批次号并回填全链 ——
-        // 送料暂收单/来料检验单/采购入库单(头+行)、批次台账、form_flow_link.batch_no。
-        // 顺序(2026-09-22 调整):**先**确认批次号再库存过账 —— 否则 kucun.lot_no 落的是确认前的
-        // 空值(台账批号口径=批次号优先,见 StockLedgerService.loadRows)。整体同一事务,任一步失败一并回滚。
-        // 之后转ERP(转ERP 是独立按钮,天然在其之后,故不需要"补推批号")。幂等(台账行已有号则沿用)。
-        assignBatchNoOnInbound(def.code(), no, auditor);
+        // 批次号自洽(2026-10-04 口径:批次号在**生单那一刻**就写在单头+全部明细行,不再有"入库审核取号回填"):
+        // 保存后把单头值同步到全部明细行、缺号则按「供应商编码 + 当天」取号、顺批次键补齐历史台账。
+        // 位置在库存过账**之前** —— kucun.lot_no 的口径是"批次号优先、批号兜底"(见 StockLedgerService.loadRows)。
+        batchService.syncBatchNo(def, no, currentUserName());
         // 库存记账(材料入库链):采购入库单审核 → kucun 入账(失败抛错整笔回滚)
         stockLedger.postIn(def.code(), no, currentUserName());
         // 库存成本重算(移动加权):本单已进入 v_stock_movement(仅已审核单据进视图),成本物化表随之作废。
@@ -1368,11 +1373,11 @@ public class ButtonService {
         // 特采行(2026-09-22):与「审核」同口径 —— 审批通过同样生成特采单;特采单审批通过则生成入库单
         inspAutoSpecialAccept(def.code(), no, operator);
         tcInApprovedGenerate(def.code(), no, operator);
-        // 采购入库单走审批通过的同样取号回填(与「审核」钩子同口径,防走审批流时批次号取不到)
-        assignBatchNoOnInbound(def.code(), no, operator);
+        // 批次号自洽(与「审核」钩子同口径):生单时已写号,此处兜"手工新建/口径上线前的老单"
+        batchService.syncBatchNo(def, no, operator);
         // 库存记账(2026-09-22 补):「审批通过」与「审核」同效为已审核,但此前只在审核路径过账 ——
         // 走 提交审批→审批通过 的库存单据(采购入库/产成品入库/材料出库等)漏记台账。
-        // 与 audit() 同序:先确认批次号再过账;非记账面板 postIn 内部直接跳过。
+        // 与 audit() 同序:批次号自洽在前、过账在后;非记账面板 postIn 内部直接跳过。
         stockLedger.postIn(def.code(), no, operator);
         // 消息:审批通过 → 制单人
         notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
@@ -1924,30 +1929,6 @@ public class ButtonService {
 
     // ==================== 来料检验单审核 → 自动生成采购入库单(2026-09-15) ====================
 
-    // ============ 分批送料批次号:入库审核取号回填(2026-09-21 取号时机迁移) ============
-
-    /**
-     * 采购入库单审核(或审批通过)时:顺「批次键」找到批次台账行 → 取号并回填全链。
-     *
-     * 口径(用户定稿):批次号 = yyyyMMdd + 两位序号(日期取**送料当天**);唯一性范围 =
-     * 采购订单号 + 批次号;取号 = 同订单同送料日「已用最大序号 + 1」;弃审/作废**不回收**。
-     * 审核之前链路上所有单据的批次号留空 —— 空值由本钩子一次性补齐,不是"漏填"。
-     * 无「批次键」的入库单(历史单/手工单)直接跳过,不动其批次号(历史 YJ- 格式号原样保留)。
-     */
-    private void assignBatchNoOnInbound(String panelCode, String no, String user) {
-        if (!"PURCHASE_IN".equals(panelCode)) return;
-        int batchId = batchService.findPendingBatchId(panelCode, no);
-        if (batchId <= 0) return;
-        batchService.assignNoAndBackfill(batchId, user);
-        // 批次号回填全链后,把检验目录里挂靠该检验单的空批次号补齐(2026-09-22 用户口径:批次号靠回填得到)
-        try {
-            qcCatalog.refreshBatchNosFromInsp();
-        } catch (Exception e) {
-            org.slf4j.LoggerFactory.getLogger(ButtonService.class)
-                    .warn("[QC目录] 批次号回填目录失败(不影响入库审核): {}", e.getMessage());
-        }
-    }
-
     /**
      * 来料检验单(QC_INSP)审核后,把 合格数量>0 的明细行自动生成采购入库单(PURCHASE_IN)草稿:
      * 实收数量=合格数量;存货编码/存货名称/规格型号 ← 物料编码/物料名称/型号;行仓库 ← 仓库代码;
@@ -2022,9 +2003,10 @@ public class ButtonService {
         if (h.get("采购订单号") != null && !String.valueOf(h.get("采购订单号")).isBlank()) {
             head.put("采购订单号", h.get("采购订单号"));
         }
+        // 批次号随链带入(2026-10-04 口径:号在生单那一刻就写好了,逐站继承,不再有"审核时回填");
+        // 老单(口径上线前)此处仍可能是空 —— 由 saveDoc→BatchService.syncBatchNo 兜底取号,不会留空。
         if (h.get("批次号") != null && !String.valueOf(h.get("批次号")).isBlank()) head.put("批次号", h.get("批次号"));
-        // 批次键随链带入(2026-09-21 取号时机迁移):入库审核时凭它取号并回填全链。
-        // 批次号此时**一律留空**(检验单审核时还没取号),故上面那行对新单不写值、只兼容历史单。
+        // 批次键随链带入:链路身份(按批次反查/链路终点解析用),与批次号各司其职。
         if (h.get("批次键") != null) head.put("批次键", h.get("批次键"));
         head.put("外部单据号", no);
         head.put("来源单据", "来料检验单");
@@ -2265,11 +2247,12 @@ public class ButtonService {
      * - 仅对「由检验行生成」的特采单生效(链路上有 QC_INSP→QC_TC_IN 的 ACTIVE 占用);
      *   纯手工新建的特采单不自动生成(无检验行/采购订单上下文,避免凭空入库);
      * - 数量 = 特采单「总数量」(审批人可在特采单上改数后批准,按批准值入库);
-     * - 头/行对齐 inspAutoPurchaseIn(供应商/供应商编码/采购订单号/批次键/外部单据号=检验单号),
+     * - 头/行对齐 inspAutoPurchaseIn(供应商/供应商编码/采购订单号/批次号/批次键,外部单据号已下线),
      *   行上 是否来料检验=是,特采=是(2026-09-23:按来源检验行「特采」开关带下,与来料检验字段同源);
      * - 行级占用写 form_flow_link(QC_TC_IN→PURCHASE_IN)并回填检验行「入库单号」;
-     * - 入库单留草稿由仓库确认审核;审核时凭批次键回填批次号,回填范围含特采单头
-     *   (BatchService.KEY_PANELS)。幂等:该特采单已有 ACTIVE 入库单占用(重审)跳过。
+     * - **批次号在生单时随链带入**(2026-10-04 口径:号在「采购订单→送料暂收单」那一跳就定稿、逐站继承,
+     *   不再有"入库审核取号 + 回填全链";入库单上没有号时由 BatchService.syncBatchNo 兜底取号)。
+     *   幂等:该特采单已有 ACTIVE 入库单占用(重审)跳过。
      */
     private void tcInApprovedGenerate(String panelCode, String no, String user) {
         if (!"QC_TC_IN".equals(panelCode)) return;
@@ -2290,7 +2273,7 @@ public class ButtonService {
         if (tcs.isEmpty()) throw new IllegalStateException("特采单不存在:" + no);
         Map<String, Object> tc = tcs.get(0);
         List<Map<String, Object>> iheads = jdbc.queryForList(
-                "SELECT 业务员, 供应商代码, 供应商, 部门, 部门名称, 采购订单号, 批次键 FROM qc_insp"
+                "SELECT 业务员, 供应商代码, 供应商, 部门, 部门名称, 采购订单号, 批次号, 批次键 FROM qc_insp"
                         + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N') <> 'Y'", inspNo);
         if (iheads.isEmpty()) throw new IllegalStateException("来源检验单不存在:" + inspNo);
         Map<String, Object> ih = iheads.get(0);
@@ -2332,6 +2315,10 @@ public class ButtonService {
         if (r.get("生产日期") != null) line.put("生产日期", r.get("生产日期"));
         if (r.get("备注") != null && !String.valueOf(r.get("备注")).isBlank()) line.put("备注", r.get("备注"));
         if (r.get("采购订单行号") != null) line.put("采购订单行号", r.get("采购订单行号"));
+        // 批次号随链带入入库行(2026-10-04 口径:号在生单那一刻就有,逐站继承,不再逆流回填)
+        if (ih.get("批次号") != null && !String.valueOf(ih.get("批次号")).isBlank()) {
+            line.put("批次号", ih.get("批次号"));
+        }
         // 行仓库(2026-09-23 正名):同 inspAutoPurchaseIn —— 落「仓库」(字段已全局正名)
         Object wh = r.get("仓库代码");
         if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
@@ -2342,7 +2329,12 @@ public class ButtonService {
         String poNo = tc.get("采购单号") != null && !String.valueOf(tc.get("采购单号")).isBlank()
                 ? String.valueOf(tc.get("采购单号")) : String.valueOf(ih.get("采购订单号") == null ? "" : ih.get("采购订单号"));
         if (!poNo.isBlank()) head.put("采购订单号", poNo);
-        if (ih.get("批次键") != null) head.put("批次键", ih.get("批次键"));
+        head.put("批次键", ih.get("批次键"));
+        // 批次号:继承来源检验单/特采链的号(2026-10-04 口径);为空时由 saveDoc→BatchService.syncBatchNo
+        // 按「供应商编码 + 当天」兜底取号,保证入库单绝不会没有批次号。
+        if (ih.get("批次号") != null && !String.valueOf(ih.get("批次号")).isBlank()) {
+            head.put("批次号", ih.get("批次号"));
+        }
         // 注:不写 外部单据号/来源单据/来源单号 —— 采购入库单已按 2026-09-21 用户口径
         // 「入库单用采购订单号就够了」下线这三列;追溯走 form_flow_link 与检验行「入库单号」
         head.put("detail", Map.of("items", List.of(line)));

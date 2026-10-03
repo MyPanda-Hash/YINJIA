@@ -1111,8 +1111,9 @@ public class PanelConfigService {
             // 送料暂收单 → 采购入库单(2026-09-22 新增;原 PU_ORDER|PURCHASE_IN 免检直达已取消,
             // 那条只需 单据编号→采购订单号,本跳的采购订单号随链从采购订单带下来了、同名直通无需登记)。
             // 供应商代码→供应商编码:暂收单头叫「供应商代码」,入库头叫「供应商编码」——异名不带则入库单
-            // 供应商编码恒空(与 QC_INSP|PURCHASE_IN 当年同一个坑)。注:批次键由
-            // PushGenerateHandler.generateBatch 直接写入,不走映射(头映射 7 条上限会把它挤掉,不影响)。
+            // 供应商编码恒空(与 QC_INSP|PURCHASE_IN 当年同一个坑)。注:批次键与**批次号**由
+            // PushGenerateHandler.generateBatch 直接写入(生单即定号),不走映射
+            // (头映射 7 条上限会把它挤掉,不影响)。
             "QC_RECV|PURCHASE_IN", new String[][]{{"供应商代码", "供应商编码"}},
             // 2026-09-24 用户拍板:供应链域以远端实现为准 —— 撤回本地新增的
             // "PU_ORDER|PURCHASE_IN"({单据编号→采购订单号});该免检直达链远端已取消
@@ -1124,7 +1125,8 @@ public class PanelConfigService {
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
             // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoPurchaseIn 同步补列)
-            // + 批次号(2026-09-20 分批送料 P0:批次号沿 暂收→检验→入库 贯通,同一批次可反查四单)
+            // + 批次号(2026-10-04 口径:号在生单那一刻定稿,逐站继承 —— 这里是同名直通的兜底登记,
+            // 真正的写入在 PushGenerateHandler.generateBatch / ButtonService.inspAutoPurchaseIn)
             "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}, {"采购订单号", "采购订单号"}, {"批次号", "批次号"}, {"批次键", "批次键"},
                     // 供应商编码(2026-09-21):检验单头字段叫「供应商代码」,入库头叫「供应商编码」——
                     // 异名不带则入库单供应商编码恒空(实测 0/13,并连带影响下游)

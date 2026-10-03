@@ -181,8 +181,10 @@ public class StockLedgerService {
         return switch (panelCode) {
             case "PURCHASE_IN" -> jdbc.queryForList(
                     // 批号口径(2026-09-22):**批次号优先、(供应商)批号兜底** —— 采购链按「只用批次号」
-                    // 口径标识批次(纯入库日期),且批次号在**入库审核时**才确认,故调用顺序必须
-                    // 先确认批次号(ButtonService.assignBatchNoOnInbound)再过账,台账 lot_no 才有值。
+                    // 口径标识批次(供应商编码去 YJ- 前缀 + - + 生单当天 yyyyMMdd)。
+                    // 2026-10-04 口径:批次号在**生单那一刻**就写在单头+全部明细行(不再有入库审核取号回填),
+                    // 故过账时行上必有值;审核钩子仍先跑 BatchService.syncBatchNo 做头行自洽兜底
+                    // (手工新建/口径上线前的老单)。
                     // lotAlt=备选批号(旧值):冲回时主批号没冲到按它兜底(历史单据按旧口径记的账)。
                     // 2026-09-23 仓库正名:采购入库明细 仓库名称 已改名 仓库(migrate-wh-field-rename),
                     // 名称源回到标准形态 l.[仓库] AS 行仓库;头表 [仓库] 已删,头侧只剩 仓库编码 兜底。

@@ -894,6 +894,8 @@
               <!-- 列级虚拟化后,走到这里的都是可见列,不再需要单元格级占位(原 col-lazy-empty 分支已随五期机制下线) -->
               <template v-if="archEditable(b) && !row._placeholder">
                 <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <!-- 批次号(分批链路单据):只由生单/随链写入、行随单头一致 —— 明细格只读,要改请在单头改 -->
+                <span v-else-if="detailBatchLocked(c.prop)" class="cell-locked" :title="tt('随单头批次号一致,不可修改')">{{ row[c.prop] ?? '' }}</span>
                 <!-- 生产线档案「停用」列:开关形式(同生产加工单表单开关风格)——@change 同步乐观翻转(点击即动画),
                      POST 落库,失败回滚;停用后从排产工作台消失、排入被后端拦截(2026-09-24 随生产域下拉) -->                <span v-else-if="isLineToggleCol(c.prop)" class="line-toggle-cell">
                   <el-switch
@@ -1728,7 +1730,7 @@ import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
-import { applyDocDefaults, todayStr, syncBatchNoWithDocDate, docNoFromDate } from '@core/panel/docDefaults'
+import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
 import { printPuOrder, printQcReturn, printProductCards, printLocationCards, printProductionTask, printPuOrderNoAmount, woQrText } from '@/business/print-formats'
 import QrLabelDialog from './QrLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
@@ -3116,6 +3118,30 @@ const attachEditable = computed(() => {
 const batchSendVisible = ref(false)
 const batchSend = ref(null) // {sourcePanel, targetPanel, sourceNo}
 const batchTargetCache = new Map()
+/**
+ * 本面板是否「分批链路单据」(表头配了「批次号」字段)—— 与后端
+ * PanelConfigService.buildSelectConfig 的 batchFlow、PushGenerateHandler.isBatchTarget
+ * 同一判据(同一个元数据事实:表头有批次号即链路单据)。
+ */
+const batchChainPanel = computed(() => (cfgCache.value?.dataSchema?.fields || [])
+  .some((f) => (f.dataName || f.label) === '批次号'))
+/**
+ * 明细行「批次号」是否锁定(2026-10-04 批次号口径):
+ * 批次号在**生单那一刻**由服务端定稿(供应商编码去掉 YJ- 前缀 + `-` + 生单当天 yyyyMMdd,
+ * 如 YJ-TX ⇒ TX-20260910),并沿 暂收 → 检验 → 入库 逐站继承;明细行一律**随单头一致**
+ * (后端 BatchService.syncBatchNo 每次保存/审核都按单头覆盖写全部明细行)。
+ * 因此明细格只读:可改的只有送料暂收单草稿态的**单头**批次号。
+ *
+ * 为什么按"列名 + 链路单据"判定、而不是直接用元数据 `editable=0` 下发的 `readonly`:
+ * 明细单元格的内联编辑器只读 `field.computed`(全库从未被赋值),**不读 `readonly`**;
+ * 若为此全局放开"明细列尊重 readonly",会连带锁死 MANU_SCHEDULE(21 列)、
+ * PURCHASE_IN 的 送检数量/备注 等一批与本次需求无关的列 —— 影响面不可控,
+ * 故这里只对本需求的批次号列做定向锁定(链路判定仍是元数据驱动的)。
+ */
+function detailBatchLocked(prop) {
+  return prop === '批次号' && batchChainPanel.value
+}
+
 /** 面板是否配了「批次号」字段(= 分批链路上的单据) */
 async function panelHasBatchField(panel) {
   if (!panel) return false
@@ -3139,12 +3165,13 @@ async function needBatchDialog(target) {
   return !(await panelHasBatchField(panelCode.value))
 }
 /** 分批生单完成:跳到目标面板继续填写(与推式生单同款:关源页签、开目标页签、新单按创建时间倒序在第一张) */
-function onBatchGenerated({ panel, no }) {
+function onBatchGenerated({ panel, no, batchNo }) {
   const targetPanel = panel || batchSend.value?.targetPanel || ''
   if (!targetPanel) return
-  // 批次号在采购入库单填单时按入库日期预设(2026-09-21 二次口径:纯 yyyyMMdd,同一日期同一批次),
-  // 故生成暂收单阶段没有号可显示
-  ElMessage.success(`已生成 ${targetPanel} ${no}（批次号在采购入库单填单时按入库日期预设），请在列表页继续填写`)
+  // 批次号在**生单那一刻**已由服务端定稿(供应商编码去 YJ- 前缀 + 当天日期),这里直接把真号回显给用户
+  ElMessage.success(batchNo
+    ? `${tt('已生成')} ${targetPanel} ${no}（${tt('批次号')} ${batchNo}）`
+    : `${tt('已生成')} ${targetPanel} ${no}，请在列表页继续填写`)
   const targetPath = `/panelx/list/${targetPanel}`
   tabs.close(route.path)
   router.push(targetPath)
@@ -3244,25 +3271,11 @@ watch(
   },
 )
 
-// 采购入库单批次号(2026-09-21 二次口径):批次号 = **入库日期**(纯 yyyyMMdd,同一日期算同一批次),
-// 填单时就预设好、用户**可人工改**;审核时以表头值为准回填全链(BatchService.assignNoAndBackfill)。
-//  · 预设/补空:applyDocDefaults 的 PURCHASE_IN 项(仅空值带出 → 已审核单的历史号/人工号不会被碰);
-//  · 「单据日期」联动:日期改了就跟着走 —— 但只当批次号是空的、或仍是上一次自动带出的值(人工优先)。
-//    跨单据/跨次打开要可靠 → prevAuto 在单据切换(单据编号变化)时按当前值重新取一次。
-const lastAutoBatchNo = ref('')
-const autoBatchDocNo = ref('')
-watch(
-  () => [panelCode.value, cur.value?.['单据编号'], cur.value?.['单据日期']],
-  () => {
-    if (panelCode.value !== 'PURCHASE_IN' || !cur.value) return
-    if (!draftEditable.value) { lastAutoBatchNo.value = ''; autoBatchDocNo.value = ''; return }  // 只读态(已审核/作废)不碰
-    const docNo = String(cur.value?.['单据编号'] ?? '')
-    if (docNo !== autoBatchDocNo.value) { lastAutoBatchNo.value = ''; autoBatchDocNo.value = docNo }  // 换单:自动值基线重置
-    applyDocDefaults('PURCHASE_IN', cur.value, user, { isNew: isFreshAddedDoc(), today: todayStr() })
-    lastAutoBatchNo.value = syncBatchNoWithDocDate(cur.value, lastAutoBatchNo.value, todayStr())
-  },
-  { immediate: true },
-)
+// 采购入库单批次号(2026-10-04 口径变更):批次号不再由前端「按单据日期预设」——
+// 它由**服务端在生单那一刻**定稿(供应商编码去掉 YJ- 前缀 + `-` + 生单当天 yyyyMMdd,如 YJ-TX ⇒ TX-20260910),
+// 并沿 暂收 → 检验 → 入库 逐站继承;BatchService.syncBatchNo 在每次保存/审核时把单头值同步到全部明细行。
+// 因此这里**不再需要**「单据日期 → 批次号」联动(旧的 applyDocDefaults/syncBatchNoWithDocDate 调用已删除):
+// 前端再预设一个纯日期的号,只会与生单继承来的号打架(格式也不同)。
 
 watch(cur, (v) => {
   current.value = v
@@ -4956,6 +4969,7 @@ function onActiveCellEchoInput(row, prop, v) {
 }
 function activateCell(row, b, prop) {
   if (!detailEditable(b) || row?._placeholder) return
+  if (detailBatchLocked(prop)) return    // 批次号(链路单据):行随单头,明细格不进入编辑(2026-10-04 口径)
   const a = activeCell.value
   if (a && a.row === row && a.tabKey === activeTab(b).key && a.prop === prop) return
   activeCell.value = { row, tabKey: activeTab(b).key, prop }
@@ -8121,6 +8135,20 @@ onUnmounted(() => {
   line-height: 18px;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+/* 只读明细格(批次号:行随单头一致,不可手改)—— 与 inline-computed-value 同款纯文本呈现,
+   底色略灰以示"这格不由你填",避免用户点了没反应以为坏了 */
+.cell-locked {
+  display: block;
+  min-height: 30px;
+  padding: 6px 8px;
+  overflow: hidden;
+  color: #556171;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #f7f9fb;
+  cursor: not-allowed;
 }
 .inline-ref-editor.active :deep(.el-input__wrapper) {
   padding-right: 24px;

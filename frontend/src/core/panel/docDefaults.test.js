@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  lockedPersonLabel, applyDocDefaults, todayStr, docNoFromDate, syncBatchNoWithDocDate,
+  lockedPersonLabel, applyDocDefaults, todayStr, docNoFromDate,
 } from './docDefaults.js'
 
 /**
@@ -137,13 +137,30 @@ test('todayStr:按本地时区给 YYYY-MM-DD(不能因 UTC 偏移差一天)', ()
   assert.match(todayStr(new Date(2026, 8, 11, 23, 30, 0)), /^2026-09-11$/)
 })
 
-/* ────────── 采购入库单批次号(2026-09-21 二次口径:纯入库日期,同一日期同一批次) ──────────
- * 用户报的原始问题:「批次号只要日期并且按入库日期算,并且在填入库订单时有预设,也可以人工修改」。
- * 这组断言守三件事:①预设=入库日期(8 位纯数字,无序号);②改了单据日期,号跟着走;
- * ③人工改过的号不被日期联动覆盖(人工优先)。
+/* ────────── 批次号(2026-10-04 口径变更:由服务端在生单时取号,前端不再预设) ──────────
+ * 用户口径:「在采购入库生单的时候就要有批次号,不需要之前的回填机制;
+ *   生单时预填一个由供应商编码(YJ- 后面的数据)+ 当天日期构成的批次号,
+ *   如 YJ-TX + 2026.9.10 = TX-20260910」。
+ *
+ * 因此:
+ *  · 采购入库单的**前端预设已删除** —— 号由服务端在生单那一刻按同一公式写进单头与全部明细行
+ *    (后端 BatchService.buildBatchNo / PushGenerateHandler.generateBatch;有后端单测);
+ *  · 「单据日期 → 批次号」联动(syncBatchNoWithDocDate)随之删除 —— 该导出不再存在;
+ *  · docNoFromDate 保留,但只服务**打印层对口径上线前老单的批次兜底展示**(纯出参,不写库)。
  */
 
-test('docNoFromDate:各种日期写法都归一为 8 位,不足 8 位给空串', () => {
+test('采购入库单不再由前端预设批次号(号归服务端在生单时取)', () => {
+  const form = { 单据日期: '2026-09-25' }
+  applyDocDefaults('PURCHASE_IN', form, USER, { isNew: true, today: T })
+  assert.equal('批次号' in form, false, '前端不应再写批次号:那是生单那一跳的职责,预设会与继承来的号打架')
+})
+
+test('「单据日期 → 批次号」联动已下线:模块不再导出 syncBatchNoWithDocDate', async () => {
+  const mod = await import('./docDefaults.js')
+  assert.equal(mod.syncBatchNoWithDocDate, undefined, '该联动随 2026-10-04 口径一并删除')
+})
+
+test('docNoFromDate:各种日期写法都归一为 8 位,不足 8 位给空串(打印层老单兜底仍在用)', () => {
   assert.equal(docNoFromDate('2026-09-21'), '20260921')
   assert.equal(docNoFromDate('2026/09/21'), '20260921')
   assert.equal(docNoFromDate('20260921'), '20260921')
@@ -151,55 +168,6 @@ test('docNoFromDate:各种日期写法都归一为 8 位,不足 8 位给空串',
   assert.equal(docNoFromDate(''), '')
   assert.equal(docNoFromDate(null), '')
   assert.equal(docNoFromDate('2026-09'), '')
-})
-
-test('新增采购入库单:批次号预设 = 该单「单据日期」(不是当天、也不是送料当天)', () => {
-  const form = { 单据日期: '2026-09-25' }
-  applyDocDefaults('PURCHASE_IN', form, USER, { isNew: true, today: T })
-  assert.equal(form['批次号'], '20260925')
-})
-
-test('新增采购入库单且单据日期未填:批次号预设 = 当天', () => {
-  const form = {}
-  applyDocDefaults('PURCHASE_IN', form, USER, { isNew: true, today: T })
-  assert.equal(form['批次号'], '20260911')
-})
-
-test('采购入库单:已有批次号(含人工改过的)不被预设覆盖', () => {
-  const form = { 单据日期: '2026-09-25', 批次号: 'YJ-20260915-11-003' }
-  applyDocDefaults('PURCHASE_IN', form, USER, { isNew: true, today: T })
-  assert.equal(form['批次号'], 'YJ-20260915-11-003')
-})
-
-test('采购入库单:不因预设批次号而多带出别的字段', () => {
-  const form = { 单据日期: '2026-09-25' }
-  applyDocDefaults('PURCHASE_IN', form, USER, { isNew: true, today: T })
-  assert.deepEqual(Object.keys(form).sort(), ['单据日期', '批次号'].sort())
-})
-
-test('联动:单据日期改了 → 批次号跟走(原值是上一次自动带出的)', () => {
-  const form = { 单据日期: '2026-09-25', 批次号: '20260925' }
-  const next = syncBatchNoWithDocDate(form, '20260925', T)
-  form['单据日期'] = '2026-09-26'
-  assert.equal(syncBatchNoWithDocDate(form, next, T), '20260926')
-  assert.equal(form['批次号'], '20260926')
-})
-
-test('联动:人工改过批次号 → 改日期不动它(人工优先)', () => {
-  const form = { 单据日期: '2026-09-25', 批次号: 'RK-自定义-01' }
-  assert.equal(syncBatchNoWithDocDate(form, '20260925', T), 'RK-自定义-01')
-  assert.equal(form['批次号'], 'RK-自定义-01')
-})
-
-test('联动:批次号被清空 → 按当前单据日期重新带出', () => {
-  const form = { 单据日期: '2026-09-27', 批次号: '' }
-  assert.equal(syncBatchNoWithDocDate(form, '20260925', T), '20260927')
-  assert.equal(form['批次号'], '20260927')
-})
-
-test('联动:没有单据日期时退回当天', () => {
-  const form = { 批次号: '' }
-  assert.equal(syncBatchNoWithDocDate(form, '', T), '20260911')
 })
 
 /**

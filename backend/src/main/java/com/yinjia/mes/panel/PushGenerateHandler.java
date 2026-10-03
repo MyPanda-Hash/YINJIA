@@ -253,9 +253,10 @@ public class PushGenerateHandler implements PanelActionHandler {
 
     /**
      * 分批送料对话框的行状态:每行 订单量 / 已送 / 已退回(回冲) / 剩余 / 可送上限,
-     * 并附 该订单已有批次清单(含"待编号"批次)。前端「生成送料暂收单」据此弹出分批对话框。
-     * 注:2026-09-21 二次口径 —— 批次号 = 采购入库单「单据日期」(纯 yyyyMMdd,同一日期同一批次),
-     * 填单时预设、可人工改,审核时确认并回填;生单这一跳(暂收/检验)不做预告,故不返回"下一批次号"。
+     * 并附 该订单已有批次清单(含历史"待编号"批次)与**本次将写入的批次号**。
+     * 2026-10-04 口径:批次号在**生单那一刻**定稿(供应商编码去 YJ- 前缀 + - + 当天 yyyyMMdd),
+     * 故这里能预告 —— 来源单已有号时用它的,否则按同一公式现算(与 generateBatch 完全同源,
+     * 前端据此在弹窗里显示"本批批次号",不必等生单完再看)。
      */
     /** 检验行的「特采」标志为真(bit/Boolean/是/true/1 均认) */
     private static boolean isSpecialAccept(Map<String, Object> item) {
@@ -330,19 +331,26 @@ public class PushGenerateHandler implements PanelActionHandler {
         out.put("sourceNo", sourceNo);
         out.put("targetPanel", targetPanel);
         out.put("overRatio", ratio);
-        out.put("batches", batchService.batches(sourcePanel, sourceNo)); // 有效批次(ACTIVE 已编号 + PENDING 待编号)
+        // 本批批次号(生单即定号;与 generateBatch 同一公式 —— 来源单已有号则继承)
+        String srcBatch = str(src.get("批次号"));
+        out.put("nextBatchNo", srcBatch.isEmpty()
+                ? BatchService.buildBatchNo(supplierCodeOf(src, Map.of()), java.time.LocalDate.now())
+                : srcBatch);
+        out.put("batches", batchService.batches(sourcePanel, sourceNo)); // 有效批次(ACTIVE 已编号 + 历史 PENDING)
         out.put("lines", rows);
         return out;
     }
 
     /**
-     * 分批生单:按行指定「本次送料量」生成一张目标草稿(送料暂收单),写**待编号**批次台账 + 按量占用。
+     * 分批生单:按行指定「本次送料量」生成一张目标草稿(目标为分批链路面板),写批次台账 + 按量占用。
      * - qtyByLineKey 为空 = 所有"还有剩余"的行按剩余量全部送出(推式按钮直接点、或选单一次性送完);
      * - 校验:来源已审核 / 目标为分批面板 / 每行 0 < 本次 ≤ 可送上限(= 订单数量×(1+超送比例)−已送+已退回,
      *   **按全部数量算**,2026-09-22 口径;超送比例最高 50%) / 至少一行;
-     * - **暂收单批次号留空**(2026-09-21 二次口径):本跳只登记一行 status='PENDING'、batch_no=NULL 的台账
-     *   (create_time=送料当天),把该行 id 作「批次键」逐站带下去;批次号到**采购入库单**填单时预设
-     *   (=入库单「单据日期」,前端 docDefaults)并可人工改,审核时由 BatchService.assignNoAndBackfill 确认并回填全链;
+     * - **批次号在生单这一刻就写**(2026-10-04 用户口径,取代"入库审核取号 + 回填全链"):
+     *   链路头一跳(采购订单→送料暂收单)= 按「供应商编码去掉 YJ- 前缀 + - + 当天 yyyyMMdd」取号
+     *   (如 YJ-TX、2026-09-10 ⇒ TX-20260910,见 BatchService.buildBatchNo);
+     *   下游各跳(暂收→检验、暂收/检验→入库、检验→退回)= **继承来源单头上的号**,不重新取号;
+     *   单头与**全部明细行**写同一个号(头行一致,下游单据元数据里明细列已置只读);
      * - 失败回滚:台账行随 @Transactional 一并回滚,不再有"回收序号"一说(@Transactional)。
      */
     @Transactional
@@ -423,18 +431,6 @@ public class PushGenerateHandler implements PanelActionHandler {
         List<Map<String, String>> detailMap = (List<Map<String, String>>) maps.get("detailMap");
         String tgtQtyLabel = qtyLabelOf(tgtDef, "detail");
 
-        // 批次键来源(2026-09-21):**来源单已带「批次键」时继承,不再新登记台账** ——
-        // 键在「采购订单→送料暂收单」这一跳产生(该跳台账行属那张采购订单),下游(暂收→检验→入库/退回)
-        // 一律继承同一个键;本跳目标(暂收/检验/退料)的批次号**留空** —— 采购入库单的号在填单时预设
-        // (=入库单「单据日期」,前端 docDefaults)、可人工改,审核时由 BatchService.assignNoAndBackfill
-        // 确认后再顺键回填全链(否则每跳都会给上游单再发一个批次键,批次追溯断链)。
-        Object srcKeyObj = head.get("批次键");
-        Integer inheritKey = srcKeyObj instanceof Number n ? n.intValue()
-                : (srcKeyObj == null || String.valueOf(srcKeyObj).isBlank() ? null
-                : Integer.valueOf(String.valueOf(srcKeyObj).trim()));
-        int batchId = inheritKey != null ? inheritKey
-                : batchService.createPending(sourcePanel, sourceNo, targetPanel, user);
-
         Map<String, Object> targetHead = new LinkedHashMap<>();
         for (Map<String, String> m : headerMap) {
             Object v = head.get(m.get("from"));
@@ -442,8 +438,29 @@ public class PushGenerateHandler implements PanelActionHandler {
         }
         targetHead.put("来源单据", srcDef.name());
         targetHead.put("来源单号", sourceNo);
-        targetHead.put("批次键", batchId);      // 链路键:审核时顺它回填(目标面板未登记该字段时被通用保存忽略)
-        targetHead.remove("批次号");            // 本跳(暂收/检验/退料)批次号留空;入库单的号在填单时预设、审核时确认
+
+        // 批次键 + 批次号(2026-10-04 口径:**生单即定号**)
+        // · 批次键:来源单已带「批次键」时**继承**它(键在「采购订单→送料暂收单」这一跳产生),
+        //   否则本跳就是链路头一跳 → 新登记一行 ACTIVE 台账,把该行 id 当键逐站带下去;
+        // · 批次号:来源单已有号(下游各跳)→ 原样继承;来源单没号(链路头一跳,或口径上线前的老单)
+        //   → 按「供应商编码去掉 YJ- 前缀 + - + 当天」现取一个。
+        //   单头与全部明细行写**同一个号** —— 用户口径「头与下面的明细项目批次号一致」,
+        //   且不再需要"入库审核时逆流回填上游"(该机制已删除)。
+        // 注:供应商编码要**先看来源单头、再看目标单头**(链路各单异名,映射可能刚把
+        //     供应商编码→供应商代码 写进 targetHead),故这段必须排在 targetHead 之后。
+        Object srcKeyObj = head.get("批次键");
+        Integer inheritKey = srcKeyObj instanceof Number n ? n.intValue()
+                : (srcKeyObj == null || String.valueOf(srcKeyObj).isBlank() ? null
+                : Integer.valueOf(String.valueOf(srcKeyObj).trim()));
+        String batchNo = str(head.get("批次号"));
+        if (batchNo.isBlank()) {
+            batchNo = BatchService.buildBatchNo(supplierCodeOf(head, targetHead), java.time.LocalDate.now());
+        }
+        int batchId = inheritKey != null ? inheritKey
+                : batchService.createBatch(sourcePanel, sourceNo, targetPanel, batchNo, user);
+
+        targetHead.put("批次键", batchId);      // 链路键:逐站继承(目标面板未登记该字段时被通用保存忽略)
+        setIfRegistered(targetHead, tgtDef, "header", "批次号", batchNo);   // 生单即定号(头)
         String dateLabel = "单据日期";
         if (tgtDef.dateCol() != null && !tgtDef.dateCol().isBlank()) {
             PanelRegistry.FieldDef df = tgtDef.byCol(tgtDef.dateCol());
@@ -451,6 +468,7 @@ public class PushGenerateHandler implements PanelActionHandler {
         }
         targetHead.put(dateLabel, java.time.LocalDate.now().toString());
 
+        boolean rowHasBatch = tgtDef.fieldsAt("detail").stream().anyMatch(f -> "批次号".equals(f.label()));
         List<Map<String, Object>> targetItems = new ArrayList<>();
         for (Map<String, Object> p : picked) {
             Map<String, Object> item = (Map<String, Object>) p.get("item");
@@ -460,7 +478,7 @@ public class PushGenerateHandler implements PanelActionHandler {
                 if (v != null) row.put(m.get("to"), v);
             }
             row.put(tgtQtyLabel, p.get("qty"));   // 本次送料数量
-            row.remove("批次号");                  // 行批次号同样留空(入库审核确认批次号时按批次键回填)
+            if (rowHasBatch) row.put("批次号", batchNo);   // 行随单头(同一批次号,头行一致)
             applySourceFlags(sourcePanel, targetPanel, item, row);
             targetItems.add(row);
         }
@@ -490,15 +508,45 @@ public class PushGenerateHandler implements PanelActionHandler {
                     numOf(item.get("数量")), qty));
         }
         voucherFlow.linkBatch(sourcePanel, sourceNo, targetPanel, newNo, null, batchId, links);
+        // 报账占用链路上的批号:form_flow_link.batch_no 一直留空会让「按批次反查链路」少一条线索
+        jdbc.update("UPDATE form_flow_link SET batch_no = ? WHERE batch_id = ? AND ISNULL(batch_no, N'') = N''",
+                batchNo, batchId);
         if (inheritKey == null) batchService.bind(batchId, targetPanel, newNo, round2(sum)); // 继承批次键时不改台账(归订单那一跳)
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("编号", newNo);
-        out.put("批次号", "");                  // 本跳不预告批次号(入库单填单时按单据日期预设)
+        out.put("批次号", batchNo);             // 生单即定号:前端直接显示,不再是"以后再取"
         out.put("批次键", batchId);
         out.put("单据状态", "草稿");
         out.put("gotoPanel", targetPanel);
         out.put("本次送料合计", round2(sum));
         return out;
+    }
+
+    /** 非空字符串(去空白);null → 空串 */
+    private static String str(Object o) { return o == null ? "" : String.valueOf(o).trim(); }
+
+    /**
+     * 供应商编码:来源单头优先(链路上游已带),退回**目标单头映射后的值** ——
+     * 链路各单异名(暂收/检验/退回叫「供应商代码」,采购入库叫「供应商编码」),
+     * 而 PU_ORDER→QC_RECV 的映射正是 供应商编码 → 供应商代码,故两处都要看。
+     */
+    private static String supplierCodeOf(Map<String, Object> srcHead, Map<String, Object> tgtHead) {
+        for (Map<String, Object> m : List.of(srcHead, tgtHead)) {
+            for (String k : List.of("供应商编码", "供应商代码")) {
+                String v = str(m.get(k));
+                if (!v.isEmpty()) return v;
+            }
+        }
+        return "";
+    }
+
+    /**
+     * 只在目标面板**注册了该字段**时才写入(未注册的键会被通用保存静默丢弃,先判一下更直观)。
+     * 链路四单都注册了表头「批次号」,此处是防御性写法(将来某站取消该字段也不会写入垃圾键)。
+     */
+    private static void setIfRegistered(Map<String, Object> target, PanelRegistry.PanelDef def,
+                                       String place, String label, Object value) {
+        if (def.fieldsAt(place).stream().anyMatch(f -> label.equals(f.label()))) target.put(label, value);
     }
 }
