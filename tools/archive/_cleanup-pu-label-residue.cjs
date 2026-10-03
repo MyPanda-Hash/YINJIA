@@ -20,7 +20,6 @@ async function main() {
   const rows = (await new mssql.Request(pool).query(
     `SELECT r.单据编号 no FROM sl_recv r LEFT JOIN yj_doc_status s ON s.panel_code='QC_RECV' AND s.doc_no=r.单据编号
      WHERE (${like}) AND ISNULL(s.canceled,'N')<>'Y' AND ISNULL(s.deleting,'N')<>'Y'`)).recordset
-  if (!rows.length) { console.log('无残留暂收单'); await pool.close(); return }
 
   const lj = await (await fetch(API + '/auth/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' },
@@ -34,9 +33,24 @@ async function main() {
     })).json()
     return `${j.code} ${j.message || ''}`.trim()
   }
+  // ⚠ 两类残留**各自判断**:暂收单没有不等于打印记录没有(2026-10-04 探针被打断就是这么留下一张
+  //   MQ 打印单压着余量的),所以这里不能"没暂收单就 return"
+  if (!rows.length) console.log('无残留暂收单')
   for (const r of rows) {
     const no = N(r.no)
     for (const b of ['弃审', '删除']) console.log(`  QC_RECV ${no} ${b} → ${await cb('QC_RECV', b, no)}`)
+  }
+
+  // 探针被打断时**打印记录**也会留下(预约压着余量):把带探针前缀批次号的存活打印单一并作废
+  const docs = (await new mssql.Request(pool).query(
+    `SELECT 单据编号 no, 批次号 b FROM bd_pu_label
+     WHERE (${PREFIXES.map((p) => `批次号 LIKE N'${p}'`).join(' OR ')}) AND ISNULL(asp_cancel,'N')<>'Y'`)).recordset
+  if (!docs.length) console.log('无残留打印单')
+  for (const d of docs) {
+    const j = await (await fetch(API + '/px/puLabel/void', {
+      method: 'POST', headers: H, body: JSON.stringify({ docNo: N(d.no) }),
+    })).json()
+    console.log(`  材料码打印单 ${N(d.no)}(${N(d.b)}) 作废 → ${j.code} ${j.message || 'ok'}`)
   }
   await pool.close()
 }
