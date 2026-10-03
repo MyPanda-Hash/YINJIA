@@ -2172,3 +2172,13 @@ migrate-restore-inv-cancel-2026-10-03.sql
 #   (报「明细第 N 行X不能为空」)。本脚本把 INV 必填全部置 0(其它面板不动),末尾自检
 #   必填数必须为 0(否则 RAISERROR)。幂等,两账套均已执行(111 字段 / 必填 3 → 0)。 ——
 migrate-inv-required-off-2026-10-03.sql
+# —— 2026-10-05 来料检验单(QC_INSP)表头补「部门 + 部门编码」(用户口径:「来料检验单的表头
+#   缺少部门与部门编码」) ——
+#   背景:2026-09-30 migrate-qcinsp-header-fix.sql 消表头重复时把 部门/部门名称 退回 detail 位,
+#     表头从此没有部门(明细网格里仍在)。口径同采购入库单/材料出库单:部门=参照部门档案(存名称)、
+#     部门编码=参照部门档案(存编码,转 ERP 取 dept_number);两个都上表头、人工选。
+#     ⚠ 不随链带入:用户口径「生单不用带入部门,这个生单是跨部门的」—— QC_RECV→QC_INSP 这一跳
+#     不带 部门/部门名称/部门编码(代码侧 PanelConfigService.FLOW_LINK_EXCLUDE +
+#     ButtonService.syncInspFromSlRecv),生单与暂收保存都不再把仓库部门写进检验单。
+#   幂等(qc_insp 加 部门编码 nvarchar(100) NULL + 两行 header 字段 + 译名兜底),两账套均执行。 ——
+migrate-qcinsp-header-dept.sql

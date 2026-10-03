@@ -1064,6 +1064,26 @@ public class PanelConfigService {
             "编号", "单据状态", "审核人", "审核时间", "审批人", "审批时间", "创建时间", "更新时间",
             "附件1", "附件2", "附件3", "附件4", "附件5", "附件6");
 
+    /**
+     * **按链路**排除的字段(头/行映射都不带;键 = {@code 来源面板|目标面板})。
+     *
+     * <p>2026-10-05 用户口径:「生单不用带入部门,这个生单是跨部门的」—— 送料暂收单是**仓库口**的单
+     * (部门 = 收货仓库),来料检验单由**品质口**做,两者不是同一个部门,把暂收单的部门带过去只会
+     * 让检验单头一开始就挂着错的部门(用户报「来料检验单表头缺少部门与部门编码」,补上后必须由
+     * 检验口自己选)。故这一跳的 部门/部门名称/部门编码 一律不带(生单与暂收保存后的镜像都不带,
+     * 后者见 {@code ButtonService.syncInspFromSlRecv});检验单上人工选部门,编码由参照带回。
+     *
+     * <p>与 {@link #FLOW_HEAD_EXCLUDE} 的区别:那个是**全局**排除(状态/审批/附件类,任何链路都不带),
+     * 这个是**单条链路**的语义差异(别的链路该带还得带)。</p>
+     */
+    private static final Map<String, java.util.Set<String>> FLOW_LINK_EXCLUDE = java.util.Collections.unmodifiableMap(
+            Map.of("QC_RECV|QC_INSP", java.util.Set.of("部门", "部门名称", "部门编码")));
+
+    /** 该链路排除的字段(无登记 → 空集,行为与改造前逐字等价) */
+    private static java.util.Set<String> flowLinkExclude(String sourceCode, String targetCode) {
+        return FLOW_LINK_EXCLUDE.getOrDefault(sourceCode + "|" + targetCode, java.util.Set.of());
+    }
+
     /** 明细字段同义词(来源字段 → 目标字段;同名映射之外的补充)。 */
     private static final String[][] FLOW_DETAIL_SYNONYMS = {
             {"存货名称", "产品名称"}, {"存货名称", "材料名称"},
@@ -1234,6 +1254,7 @@ public class PanelConfigService {
             java.util.Set<String> targetHeads = new java.util.HashSet<>();
             for (PanelRegistry.FieldDef f : def.fieldsAt("header")) targetHeads.add(f.label());
             java.util.Set<String> mappedHeads = new java.util.HashSet<>();
+            java.util.Set<String> linkExcl = flowLinkExclude(sourceCode, def.code());
             List<Map<String, String>> hmap = new ArrayList<>();
             hmap.add(Map.of("from", noLabel, "to", "来源单号"));
             // 2026-09-28 上限事故修复:旧逻辑单轮按 seq 先到先得、上限 7 且隐藏字段同占坑——
@@ -1245,6 +1266,7 @@ public class PanelConfigService {
                     String l = f.label();
                     if ((!f.hidden() && f.visible()) != visiblePass) continue;
                     if (FLOW_HEAD_EXCLUDE.contains(l) || l.equals(noLabel) || !targetHeads.contains(l)) continue;
+                    if (linkExcl.contains(l)) continue;      // 单链路语义排除(如 QC_RECV→QC_INSP 的 部门,见 FLOW_LINK_EXCLUDE)
                     if (mappedHeads.add(l)) hmap.add(Map.of("from", l, "to", l));
                 }
                 if (!visiblePass) break;
@@ -1252,6 +1274,7 @@ public class PanelConfigService {
             String[][] headSyn = FLOW_HEAD_SYNONYMS.get(sourceCode + "|" + def.code());
             if (headSyn != null) {
                 for (String[] s : headSyn) {
+                    if (linkExcl.contains(s[1])) continue;
                     if (src.byLabel(s[0]) != null && targetHeads.contains(s[1]) && mappedHeads.add(s[0])) {
                         hmap.add(Map.of("from", s[0], "to", s[1]));
                     }
@@ -1266,11 +1289,13 @@ public class PanelConfigService {
             java.util.Set<String> mapped = new java.util.HashSet<>();
             for (PanelRegistry.FieldDef f : src.fieldsAt("detail")) {
                 if (dmap.size() >= 14) break;
+                if (linkExcl.contains(f.label())) continue;  // 同上:排除字段连行也不带(头行口径一致)
                 if (targetDets.contains(f.label()) && mapped.add(f.label())) {
                     dmap.add(Map.of("from", f.label(), "to", f.label()));
                 }
             }
             for (String[] syn : FLOW_DETAIL_SYNONYMS) {
+                if (linkExcl.contains(syn[1])) continue;
                 if (src.byLabel(syn[0]) != null && targetDets.contains(syn[1]) && mapped.add(syn[1])) {
                     dmap.add(Map.of("from", syn[0], "to", syn[1]));
                 }

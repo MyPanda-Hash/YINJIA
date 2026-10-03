@@ -1,0 +1,15 @@
+﻿=== 目标单据:IJ-2026-10-0001(草稿 — 草稿,可编辑) ===
+  [表头标签] ["单据编号","单据日期","业务员","暂收单号","采购订单号","批次号","供应商","供应商代码","部门","部门编码","检验员","检验日期","检验编号","检验方案","执行标准","检验类型","总结论","审核人","审核时间"]
+  [PASS] 表头卡片渲染出了字段(选择器命中)
+  [PASS] 表头出现「部门」
+  [PASS] 表头出现「部门编码」
+  [PASS] 位置:供应商代码 → 部门 → 部门编码 → 检验员  供应商代码@7 部门@8 部门编码@9 检验员@10
+  [控件形态] {"部门":{"input":true,"readonly":true,"disabled":false,"value":"","placeholder":"请选择"},"部门编码":{"input":true,"readonly":true,"disabled":false,"value":"","placeholder":"请选择"}}
+  [PASS] 部门 有输入控件
+  [PASS] 部门 在草稿单上可编辑(未置灰)
+  [PASS] 部门编码 有输入控件
+  [PASS] 部门编码 在草稿单上可编辑(未置灰)
+  [部门编码 当前值] ""
+  [截图] D:\YINJIA-main\tools\archive\_verify-qcinsp-header-dept-ui.png
+
+=== RESULT: PASS ===

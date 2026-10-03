@@ -743,8 +743,12 @@ public class ButtonService {
      * 送料暂收单(QC_RECV,原名 SL_RECV,2026-09-20 改面板编码)保存后,同步修改由它生成的来料检验单(QC_INSP):
      * - 关联 = form_flow_link(QC_RECV→QC_INSP,ACTIVE,生单时写入;行键=单号#行表id,行 id 跨保存稳定);
      * - 仅当检验单仍可编辑(草稿/修改中)时同步——已审核/审批中/已作废等不越权改动;
-     * - 表头镜像 业务员/供应商代码/供应商/部门/部门名称/数量(单据日期不镜像——
+     * - 表头镜像 业务员/供应商代码/供应商/数量(单据日期不镜像——
      *   检验单保持自己的创建日期,2026-09-17 口径:被生单据日期=创建当日);
+     * - **部门/部门名称不镜像**(2026-10-05 用户口径:「生单不用带入部门,这个生单是跨部门的」)——
+     *   暂收单是仓库口(部门=收货仓库),检验单由品质口做,检验单上的部门由检验口自己选;
+     *   生单侧同一口径见 {@code PanelConfigService.FLOW_LINK_EXCLUDE}(本类是"暂收保存后再镜像"第二道,
+     *   两道都不带才不会把仓库部门悄悄写进检验单);
      * - 明细按行键对行镜像共享列;暂收行已删(软删)时对应检验行一并软删
      *   (检验单为草稿才同步,未生过下游单,删除安全);
      * - 检验单自有字段(合格数量/不良数量/抽样方案等)与附件不动:附件实体锚定
@@ -761,7 +765,7 @@ public class ButtonService {
             // JOIN 锚定源暂收单号(单号两式 SL-xxx/IJ-xxx 不同,2026-09-17 修复:
             // 原写 s.单据编号 = t.单据编号 恒不匹配,表头镜像从未生效)
             jdbc.update("UPDATE t SET t.业务员 = s.业务员, t.供应商代码 = s.供应商代码,"
-                            + " t.供应商 = s.供应商, t.部门 = s.部门, t.部门名称 = s.部门名称, t.数量 = s.数量,"
+                            + " t.供应商 = s.供应商, t.数量 = s.数量,"
                             + " t.暂收单号 = s.单据编号,"
                             + " t.asp_user2 = ?, t.asp_time2 = GETDATE()"
                             + " FROM qc_insp t JOIN sl_recv s ON s.单据编号 = ?"
@@ -781,10 +785,11 @@ public class ButtonService {
                                 + " FROM sl_recv_detail WHERE id = ?", Boolean.class, srcId);
                 if (srcAlive == null) continue;
                 if (srcAlive) {
+                    // 行镜像同样不含 部门/部门名称(与表头同口径,2026-10-05 跨部门)
                     jdbc.update("UPDATE d SET d.物料编码 = s.物料编码, d.物料名称 = s.物料名称, d.规格型号 = s.规格型号,"
                                     + " d.物料描述 = s.物料描述, d.数量 = s.数量, d.箱数 = s.箱数, d.日期 = s.日期,"
                                     + " d.计量单位 = s.计量单位, d.单价 = s.单价, d.采购订单行号 = s.采购订单行号,"
-                                    + " d.备注 = s.备注, d.结案 = s.结案, d.部门 = s.部门, d.部门名称 = s.部门名称,"
+                                    + " d.备注 = s.备注, d.结案 = s.结案,"
                                     + " d.asp_user2 = ?, d.asp_time2 = GETDATE()"
                                     + " FROM qc_insp_detail d JOIN sl_recv_detail s ON s.id = ?"
                                     + " WHERE d.id = ? AND d.单据编号 = ? AND ISNULL(d.asp_cancel, 'N') <> 'Y'",

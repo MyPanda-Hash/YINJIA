@@ -1,0 +1,84 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-qcinsp-dept.sql ==
+  | 1777 | detail | 20 | 物料名称 | 物料名称 | 参照 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 1778 | detail | 30 | 规格型号 | 规格型号 | 文本 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7540 | detail | 40 | 采购订单行号 | 采购订单行号 | 文本 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 1779 | detail | 50 | 单位 | 单位 | 参照 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 1780 | detail | 60 | 送检数量 | 送检数量 | 小数 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7542 | detail | 70 | 计量单位 | 计量单位 | 参照 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7543 | detail | 80 | 单价 | 单价 | 小数 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 1781 | detail | 90 | 合格数量 | 合格数量 | 小数 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 1782 | detail | 100 | 不合格数量 | 不合格数量 | 小数 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7627 | detail | 110 | 报废数量 | 报废数量 | 小数 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 7628 | detail | 120 | 损耗 | 损耗 | 小数 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7629 | detail | 130 | 损耗率 | 损耗率 | 小数 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7632 | detail | 140 | 生产日期 | 生产日期 | 日期 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 11463 | detail | 150 | 批次号 | 批次号 | 文本 | 0 | 1 | 0 | null | null | null | 
+  | 1783 | detail | 160 | 处置方式 | 处置方式 | 下拉框 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 7631 | detail | 180 | 成品编号 | 成品编号 | 文本 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 7436 | detail | 190 | 物料描述 | 物料描述 | 文本 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 7437 | detail | 200 | 箱数 | 箱数 | 小数 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 7438 | detail | 210 | 日期 | 日期 | 文本 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 7439 | detail | 220 | 结案 | 结案 | 文本 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 7440 | detail | 240 | 部门 | 部门 | 参照 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 7441 | detail | 250 | 部门名称 | 部门名称 | 文本 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7442 | detail | 260 | 入库单号 | 入库单号 | 文本 | 0 | 1 | 0 | GFDA | mc | mc | 
+  | 7694 | detail | 270 | 仓库代码 | 仓库代码 | 文本 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 7692 | header | 30 | 业务员 | 业务员 | 参照 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 11588 | header | 85 | 部门 | 部门 | 参照 | 0 | 1 | 1 | DEPT | 部门名称 | 部门名称 | 
+  | 11589 | header | 88 | 部门编码 | 部门编码 | 参照 | 0 | 1 | 1 | DEPT | 部门编码 | 部门名称 | 
+  | 1768 | header | 90 | 检验员 | 检验员 | 参照 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 1769 | header | 100 | 检验日期 | 检验日期 | 日期 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 1770 | header | 120 | 检验方案 | 检验方案 | 参照 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7626 | header | 140 | 检验类型 | 检验类型 | 下拉框 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 9531 | header | 160 | 附件1 | 附件1 | 附件 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 9532 | header | 170 | 附件2 | 附件2 | 附件 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 9533 | header | 180 | 附件3 | 附件3 | 附件 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 9534 | header | 190 | 附件4 | 附件4 | 附件 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 9535 | header | 200 | 附件5 | 附件5 | 附件 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 9536 | header | 210 | 附件6 | 附件6 | 附件 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 1774 | header | 230 | 审核人 | 审核人 | 参照 | 0 | 1 | 0 | GFDA | mc | mc | 
+  | 1775 | header | 240 | 审核时间 | 审核时间 | 文本 | 0 | 1 | 0 | GFDA | mc | mc | 
+  | 7696 | header | 260 | 批次键 | 批次键 | 整数 | 1 | 0 | 0 | GFDA | mc | mc | 
+  | 1772 | header,detail | 230 | 备注 | 备注 | 文本 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 1776 | query,detail | 10 | 物料编码 | 物料编码 | 参照 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7630 | query,detail | 170 | 条码 | 条码 | 文本 | 1 | 0 | 1 | GFDA | mc | mc | 
+  | 1764 | query,header | 10 | 单据编号 | 单据编号 | 文本 | 0 | 1 | 0 | GFDA | mc | mc | 
+  | 1765 | query,header | 20 | 单据日期 | 单据日期 | 日期 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 1766 | query,header | 40 | 暂收单号 | 暂收单号 | 参照 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7539 | query,header | 50 | 采购订单号 | 采购订单号 | 文本 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 11462 | query,header | 60 | 批次号 | 批次号 | 文本 | 0 | 1 | 0 | null | null | null | 
+  | 1767 | query,header | 70 | 供应商 | 供应商 | 参照 | 0 | 1 | 1 | GFDA | mc | mc | 
+  | 7691 | query,header | 80 | 供应商代码 | 供应商代码 | 文本 | 0 | 1 | 1 | GFDA | dm | mc | 
+  | 部门 | nvarchar | 100 | 1 | 
+  | 部门名称 | nvarchar | 100 | 1 | 
+  | 部门编码 | nvarchar | 200 | 1 | 
+  | DISPATCH | 部门 | 部门 | header | 11 | 文本 | null | null | null | 0 | 
+  | OTHER_OUT | 部门 | 部门 | header | 50 | 参照 | DEPT | 部门名称 | 部门名称 | 0 | 
+  | OUTSOURCE_ISSUE | 部门 | 部门 | header | 70 | 参照 | DEPT | 部门名称 | 部门名称 | 0 | 
+  | OUTSOURCE_ORDER | 部门 | 部门 | header | 60 | 参照 | DEPT | 部门名称 | 部门名称 | 0 | 
+  | PU_REQ | 部门 | 部门 | query,header | 30 | 参照 | DEPT | 部门名称 | 部门名称 | 0 | 
+  | PURCHASE_IN | 部门 | 部门 | header | 370 | 参照 | DEPT | 部门名称 | 部门名称 | 1 | 
+  | QC_INSP | 部门 | 部门 | header | 85 | 参照 | DEPT | 部门名称 | 部门名称 | 0 | 
+  | QC_RECV | 部门 | 部门 | header | 100 | 参照 | GFDA | mc | mc | 0 | 
+  | SALE_OUT | 部门 | 部门 | header | 170 | 参照 | DEPT | 部门名称 | 部门名称 | 1 | 
+  | SO_ORDER | 部门 | 部门 | query,header | 60 | 参照 | DEPT | 部门名称 | 部门名称 | 0 | 
+  | MATERIAL_OUT | 部门编码 | 部门编码 | header | 973 | 参照 | DEPT | 部门编码 | 部门名称 | 0 | 
+  | PU_ORDER | 部门编码 | 部门编码 | header | 390 | 文本 | null | null | null | 1 | 
+  | PURCHASE_IN | 部门编码 | 部门编码 | header | 380 | 参照 | DEPT | 部门编码 | 部门名称 | 1 | 
+  | QC_INSP | 部门编码 | 部门编码 | header | 88 | 参照 | DEPT | 部门编码 | 部门名称 | 0 | 
+  | SALE_OUT | 部门编码 | 部门编码 | header | 540 | 文本 | null | null | null | 1 | 
+  | SO_ORDER | 部门编码 | 部门编码 | header | 950 | 文本 | null | null | null | 1 | 
+  | PU_ORDER | 部门名称 | 部门名称 | header | 380 | 文本 | null | null | null | 1 | 
+  | QC_RECV | 部门名称 | 部门名称 | header | 120 | 文本 | GFDA | mc | mc | 1 | 
+  | PURCHASE_IN | 创建人编码 | 2 | 
+  | PURCHASE_IN | 付款方式编码 | 2 | 
+  | PURCHASE_IN | 付款账户编码 | 2 | 
+  | PURCHASE_IN | 审核人编码 | 2 | 
+  | PURCHASE_IN | 未结算金额本位币 | 2 | 
+  | PURCHASE_IN | 修改人编码 | 2 | 
+  | SALE_OUT | 创建人编码 | 2 | 
+  | SALE_OUT | 附件 | 2 | 
+  | SALE_OUT | 审核人编码 | 2 | 
+  | SALE_OUT | 修改人编码 | 2 | 
+[OK] _probe-qcinsp-dept.sql (5 batches)
