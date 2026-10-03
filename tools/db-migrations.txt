@@ -1848,3 +1848,50 @@ migrate-stock-flow-index-filter-2026-09-30.sql
 #       tools\archive\_verify-stock-opening-2026-09-30.java <库名> tools\migrate-stock-flow-opening-2026-09-30.sql
 #   幂等可重跑(src=0 且未作废的行已存在即整段跳过),两个账套都执行。
 migrate-stock-flow-opening-2026-09-30.sql
+
+# —— 2026-09-30 库存三表结构④:v_stock_movement 改读流水表 inh/outh(根治报表 65 秒超时) ——
+#   背景:原视图每次查询现场拼 8 路 UNION(16 张单据表 + 按名称 LEFT JOIN bs_wh),
+#   实测缓存计划 65,021 ms(RECOMPILE 42 ms),前端 axios 15s 超时。
+#   改动:视图改为读 inh/outh 两张流水表(由 StockFlowService 在审核动作时同事务写入),
+#   8 路 UNION 从根上消失 ⇒ 坏计划场景不再可能,而不是"今天的报表变快了"。
+#   列契约:23 列的名字与顺序**逐列不变**(src/rid/单据日期/单据类型/单据编号/业务类型/仓库键/
+#   仓库编码/仓库/存货编码/存货/规格型号/计量单位/批号/收入数量/发出数量/收入金额/发出单据金额/
+#   含税金额/税额/往来单位/往来单位编码/经手人),故下游 v_stock_ledger / v_stock_balance /
+#   v_stock_summary 与 InvCostService 的递归 SQL 一行都不用改;类型也刻意对齐改前宽度。
+#   ⚠ 新定义存本文件而**不动 migrate-inv-report-fields.sql**:DbSync 按内容哈希判重跑,
+#     改那个历史大脚本的字节会让它被"重跑"(历史脚本重跑会撞 schema 演进)。两处口径必须一致,
+#     改动请同步(交叉引用已写在两个脚本的头部注释里)。
+#   ⚠ 实施中实测出**计划原稿的两处错**(都是先复现再改,不是推测):
+#     ① rid 原样透传 NULL ⇒ 期初行 (src=0, rid=NULL) 撞 inv_cost_ledger 的 `rid int NOT NULL`
+#        + PK(src,rid),实测 `error 515: 不能将值 NULL 插入列 'rid'` ⇒ **成本重算整段跑不动**。
+#        正解 ISNULL(rid, id):期初没有来源单据行,用流水行自身 id 作合成键(实测插 31 行成功、
+#        (src,rid) 无重复;src 段号 inh 0..4 / outh 5..8 不重叠,两表 id 同值也不撞 PK)。
+#     ② 末尾 `LEFT JOIN bs_wh ON w.仓库名称 = m.仓库名称` ⇒ bs_wh 里「原料仓/辅料仓/成品仓/
+#        半成品仓/不良品仓」各登记 2~3 行同名(18 行仅 11 个不同名称,两账套一致)⇒ 流水行翻倍,
+#        v_stock_balance 的 SUM(数量) 直接翻倍。实测计划原稿 62 行 / 现存量 31,898 vs 流水 31 行 /
+#        15,939(正好 2 倍)。正解 OUTER APPLY(SELECT TOP 1 … ORDER BY id):三级兜底表达式原样不动,
+#        只把"按名称取一行"变成确定的一行(同任务 2 处理 bs_wh/bs_inv 重复行的写法)。
+#   口径变化(语义核心):改前视图认「单据状态='已审核' 或 单据状态2='C' 或 yj_doc_status.shr
+#   非空」三重兜底 ⇒ 金蝶旁路直写的已审核单据**进报表不进 kucun**;改后只认流水表、流水只在
+#   审核动作时写 ⇒ 口径统一为"以流水为准"。代价=流水表诞生前已审核的历史单据不进视图,
+#   两账套实测为 0(且结构性证据更强:8 张 bd_* 头表合计 0 行、库存类 yj_doc_status 0 行,
+#   而旧视图 8 个分支都是 `bl_ JOIN bd_`,故旧视图本来就查不出任何行)。
+#   ⚠ 已知信息损失(需用户拍板):含税金额/税额**恒为 NULL** —— inh/outh 没有这两列
+#     (原视图只有采购入库/销售出库两段有值)。库存台账面板(STOCK_LEDGER)这两列将一直为空;
+#     给流水表补列属任务 1 的表结构范畴,不在本脚本内。
+#   ⚠ 类型差异(两账套实测,均已记录):① 单据类型 nvarchar(6) NOT NULL → nvarchar(50) NULL,
+#     **有意放宽** —— 原宽度来自视图字面量,硬 CAST 回 6 字符会在出现更长单据类型时静默截断;
+#     ② rid int NOT NULL → int NULL,值实测恒非空(CAST 会使 SQL Server 放弃 NOT NULL 推断,
+#     实测 ISNULL(rid,id) 不 CAST 是 bigint NOT NULL、CAST 后是 int NULL,选后者:类型与契约一致);
+#     ③ 测试库 仓库 nvarchar(500) → nvarchar(200):测试库是陈旧快照,原来就与正式库(nvarchar(200))
+#     不同,改后两账套一致(收敛,非破坏)。
+#   自检:23 列 + rid 全非空 + (src,rid) 无重复 + 已不再引用 bl_purchase_in;PRINT 走 warning 码 0,
+#   **DbSync 看不到**,要看数字用配套探针(先 dry 后 check):
+#     java '-Dstdout.encoding=UTF-8' -Dbefore=<基线文件> -cp tools\lib\mssql-jdbc.jar
+#       tools\archive\_verify-stock-movement-2026-09-30.java <库名> dry|check
+#   dry 模式把本脚本跑在**事务内然后 ROLLBACK**(不留任何对象),内含"列契约逐列对比 + 三个下游视图
+#   查询 + 成本重算(递归 SQL 从 InvCostService.java 源码抽取,不手抄)+ 历史单据代价 + 计时";
+#   check 模式只读复验。两账套实测:现存量合计 15,939.0000 = kucun 余量合计 15,939.0000(绝对差 0),
+#   成本表 31 行 / 收入金额合计 804,998.1700、无成本行的流水 0。
+#   幂等可重跑(先判后 DROP、列契约不变,下游视图按名解析无需重建),两个账套都执行。
+migrate-stock-movement-from-flow-2026-09-30.sql
