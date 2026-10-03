@@ -1,7 +1,7 @@
-# Force-run list for 2026-09-30 incremental deployment (order per manifest)
-# 22 pending migrations, 0 informed reruns (v2 manifest 324 -> current 346 exact diff)
-# Risk notes: migrate-drop-unused-tables physically drops 244 unused tables (explicit guarded
-#   list; GO step [3] takes an automatic pre-deploy backup before running it).
+# Force-run list for 2026-10-04 incremental deployment (order per manifest)
+# 27 pending migrations vs the deployed 09-28 v2 package (324->351), 0 informed reruns.
+# Risk notes: migrate-drop-unused-tables physically drops 244 unused tables (GO auto-backup gate);
+#   migrate-stock-flow-* rebuilds inh/outh as MES stock-flow tables, old data backed up to *_bak_20260930.
 migrate-whloc-whcode.sql
 migrate-material-out-line-no.sql
 migrate-server-parity2-20260928.sql
@@ -24,3 +24,8 @@ migrate-rd-file-controlled-2026-09-30.sql
 migrate-rd-change-kind-2026-09-30.sql
 migrate-rd-newfields-i18n-2026-09-30.sql
 migrate-rd-datarec-reviewer-2026-09-30.sql
+migrate-stock-flow-tables-2026-09-30.sql
+migrate-stock-flow-index-filter-2026-09-30.sql
+migrate-stock-flow-opening-2026-09-30.sql
+migrate-stock-movement-from-flow-2026-09-30.sql
+migrate-stock-flow-tax-cols-2026-09-30.sql
