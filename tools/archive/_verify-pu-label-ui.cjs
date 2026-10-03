@@ -320,6 +320,19 @@ async function main() {
     const after = await one(`SELECT TOP 1 单据编号 no, 批次号 b FROM sl_recv WHERE 批次号=N'${MY_BATCH}' ORDER BY id DESC`)
     ok(N(after?.b) === MY_BATCH, `新生成的暂收单批次号 = ${MY_BATCH}(${JSON.stringify(after?.no)})`)
     if (after?.no) created.push(['QC_RECV', N(after.no)])
+    // ⑤b 勾了下层隔离行时,上层**默认勾选的原行**并进同一张单(用户拍板第 4 条:已打印量 + 未打印量整单同一个号)
+    {
+      const dl = await q(`SELECT [批次号] b, [数量] q FROM sl_recv_detail
+        WHERE 单据编号=N'${after?.no}' AND ISNULL(asp_cancel,'N')<>'Y'`)
+      const sameBatch = dl.length > 0 && dl.every((r) => N(r.b) === MY_BATCH)
+      ok(sameBatch, `同一张单的 ${dl.length} 行**全部同号** ${MY_BATCH}(实得 ${JSON.stringify(dl.map((r) => N(r.b)))})`)
+      // 上层默认勾了**所有有剩余的原行**(本单 2 行) + 本次显式勾的 1 行隔离行 ⇒ 一张单装下两层
+      const expectRows = topRows.filter((r) => Number(r.剩余) > 0).length + 1
+      const expectQty = topRows.reduce((s, r) => s + (Number(r.剩余) > 0 ? Number(r.剩余) : 0), 0) + PRINT_QTY
+      const gotQty = dl.reduce((s, r) => s + Number(r.q ?? 0), 0)
+      ok(dl.length === expectRows && gotQty === expectQty,
+        `上层原行的未打印量**并进了这张单**:${dl.length} 行 / 合计 ${gotQty}(期望 ${expectRows} 行 / ${expectQty} = 原行剩余之和 + 隔离行 ${PRINT_QTY})`)
+    }
 
     // ============ ⑥ 重新打开生单弹窗:隔离行标「已生单」且不可勾 ============
     console.log('\n=== ⑥ 重新打开生单弹窗:下层隔离行标「已生单」、未生单 0、**不可再勾** ===')
