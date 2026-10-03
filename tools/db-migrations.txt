@@ -2024,3 +2024,26 @@ migrate-stock-flow-kucun-resync.sql
 #   实测 2026-10-03 14:39 抹掉了 2026-09-23 的只读意图),改为"只在缺失时插入"。
 #   幂等,两账套均执行。 ——
 migrate-batch-no-on-generate.sql
+# —— 2026-10-04 特采单(QC_TC_IN)改两级审批:编制 / 审核 / 批准 三格自动落值 ——
+#   用户口径:编制 = **提交审批的人**;「审核」= 一级审批通过的人(组织架构勾了「特采单·审核反审核」
+#   的角色账号 ∪ 管理员);「批准」= **超级管理员**(一级通过后由他批准才真正通过)。与产品信息表
+#   (RD_PROD_INFO)同机制:一级通过 → 「待二级审批」→ 二级通过;任一级驳回一律回草稿并通知提交人
+#   (二级驳回另通知一级审核人);两级**必须各点一次**(同一人也要两次)。
+#   后端:ButtonService.TWO_LEVEL_PANELS 加 QC_TC_IN + ADMIN_L2_PANELS(二级固定超级管理员、
+#     不选人);doSubmitApproval 写编制人;approveApproval 一级写审核人/审核时间并通知管理员;
+#     approveSecond 写审批人/审批时间 + 生成采购入库单(生单钩子从一级挪到**批准通过**)+ 通知
+#     提交人/一级审核人;rejectApproval 清签名格并通知;unaudit 清签名格 + 节点复位;
+#     audit() 对特采单直审一律拒绝(「取消直审」);save() 剥离编制人/审核人/审批人/审批时间入参。
+#     QueryService.loadDocs:「审核人/审核时间」的虚拟字段覆盖(取 yj_doc_status.shr = 最终审批人**账号**)
+#     对特采单**跳过** —— 否则界面「审核」格从一级审核人变成 "admin"(UI 走查实测到,已修);
+#     存量单表内为空时才退回 shr 兜底。
+#     PanelPermissionService.BUTTON_PERMS_OVERRIDE:新增 `QC_TC_IN|提交审批` → add/modify/audit ——
+#     全局表把「提交审批」归 audit,只有审核人能提交则「编制人恒等于审核人」,且非管理员提交后
+#     被「编制审批分离」挡死在审批这一步(同 RD_CHANGE 的既有先例)。
+#   消息码:APPROVAL_L2_PENDING(→超级管理员)/ APPROVAL_L2_DONE(→一级审核人)/
+#     APPROVAL_L2_REJECTED(二级驳回→一级审核人),不含既有 APPROVAL_SUBMITTED/APPROVED/REJECTED。
+#   前端:PanelxList 节点感知审批按钮(一级「审批通过」/二级「批准通过·批准驳回」,二级仅超级管理员);
+#     DocSheet 签名格按字段元数据只读渲染(此前 signKey 格不认 editable=0);10 语言包补 8 条词条。
+#   本脚本只改元数据(表列早已存在):审批人/审批时间字段登记 + 三格 editable=0 + 列注明 + 译名补齐。
+#   幂等,两账套均执行。 ——
+migrate-qc-tcin-twolevel.sql

@@ -152,6 +152,11 @@ const MSG_TPL = {
   SIGNOFF_REJECTED: { title: '会签被驳回', body: '「{panelName} {docNo}」的会签被 {actor} 驳回，已退回草稿。意见：{opinion}' },
   CHANGE_EFFECTIVE: { title: '变更已生效：本文件要出新版', body: '变更单 {changeNo} 已生效，已为「{panelName} {docNo}」生成下一版草稿，请据此修改后重新走受控审核。' },
   CHANGE_REJECTED: { title: '变更单被驳回', body: '变更单「{panelName} {docNo}」被 {actor} 驳回，请按意见修改后重新提交。意见：{opinion}' },
+  // 特采单两级审批(2026-10-04):编制=提交审批的人、审核=一级审批通过的人、批准=超级管理员。
+  // 一级通过 → 超级管理员待批准;批准通过/二级驳回 → 提交人(编制人)与一级审核人各收一条。
+  APPROVAL_L2_PENDING: { title: '特采单待超级管理员批准', body: '「{panelName} {docNo}」已由 {actor} 一级审核通过，等待您批准。意见：{opinion}' },
+  APPROVAL_L2_DONE: { title: '特采单已批准', body: '您一级审核通过的「{panelName} {docNo}」已由 {actor} 批准通过。' },
+  APPROVAL_L2_REJECTED: { title: '二级审批被驳回', body: '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}' },
 }
 
 function fillTpl(text, params) {

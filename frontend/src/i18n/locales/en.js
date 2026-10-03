@@ -45,6 +45,15 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
+    '批准通过': 'Approve',
+    '批准驳回': 'Reject',
+    '特采单待超级管理员批准': 'Special acceptance awaiting super-admin approval',
+    '「{panelName} {docNo}」已由 {actor} 一级审核通过，等待您批准。意见：{opinion}': '"{panelName} {docNo}" passed first-level review by {actor}; awaiting your approval. Comment: {opinion}',
+    '特采单已批准': 'Special acceptance approved',
+    '您一级审核通过的「{panelName} {docNo}」已由 {actor} 批准通过。': 'The "{panelName} {docNo}" you reviewed at level 1 was approved by {actor}.',
+    '二级审批被驳回': 'Second-level approval rejected',
+    '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': 'The "{panelName} {docNo}" you reviewed at level 1 was rejected by {actor} and returned to draft. Comment: {opinion}',
     '已选 {n} 个商品，预览二维码标签？': '{n} item(s) selected. Preview QR code labels?',
     '子件': 'Subcomponent',
     '物料规格(外径/内径/长度)': 'Material specification (outer diameter/inner diameter/length)',

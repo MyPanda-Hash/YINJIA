@@ -1,6 +1,15 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
+    '批准通过': 'Approuver',
+    '批准驳回': 'Rejeter',
+    '特采单待超级管理员批准': 'Acceptation spéciale en attente d\'approbation du super-administrateur',
+    '「{panelName} {docNo}」已由 {actor} 一级审核通过，等待您批准。意见：{opinion}': '« {panelName} {docNo} » a passé la revue de premier niveau par {actor} ; en attente de votre approbation. Commentaire : {opinion}',
+    '特采单已批准': 'Acceptation spéciale approuvée',
+    '您一级审核通过的「{panelName} {docNo}」已由 {actor} 批准通过。': 'Le « {panelName} {docNo} » que vous avez validé au premier niveau a été approuvé par {actor}.',
+    '二级审批被驳回': 'Approbation de deuxième niveau rejetée',
+    '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': 'Le « {panelName} {docNo} » que vous avez validé au premier niveau a été rejeté par {actor} et renvoyé en brouillon. Commentaire : {opinion}',
     '分发成功，已分配 {n} 张规格书': 'Distribution réussie ; {n} fiche(s) de spécification attribuée(s)',
     '已选 {n} 个商品，预览二维码标签？': '{n} article(s) sélectionné(s). Prévisualiser les étiquettes QR ?',
     '该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批': 'La fiche de spécification {no} de ce produit n\'a pas terminé sa soumission/approbation (actuel : {st}) ; le remplissage automatique est impossible. Complétez d\'abord la fiche et terminez la soumission/approbation.',

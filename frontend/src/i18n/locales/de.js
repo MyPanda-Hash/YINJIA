@@ -1,6 +1,15 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
+    '批准通过': 'Genehmigen',
+    '批准驳回': 'Ablehnen',
+    '特采单待超级管理员批准': 'Sonderfreigabe wartet auf Genehmigung des Superadministrators',
+    '「{panelName} {docNo}」已由 {actor} 一级审核通过，等待您批准。意见：{opinion}': '"{panelName} {docNo}" hat die Erstprüfung durch {actor} bestanden; wartet auf Ihre Genehmigung. Kommentar: {opinion}',
+    '特采单已批准': 'Sonderfreigabe genehmigt',
+    '您一级审核通过的「{panelName} {docNo}」已由 {actor} 批准通过。': 'Die von Ihnen erstgeprüfte "{panelName} {docNo}" wurde von {actor} genehmigt.',
+    '二级审批被驳回': 'Genehmigung der zweiten Ebene abgelehnt',
+    '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': 'Die von Ihnen erstgeprüfte "{panelName} {docNo}" wurde von {actor} abgelehnt und in den Entwurf zurückgegeben. Kommentar: {opinion}',
     '分发成功，已分配 {n} 张规格书': 'Erfolgreich verteilt; {n} Spezifikationsblatt/-blätter zugewiesen',
     '已选 {n} 个商品，预览二维码标签？': '{n} Artikel ausgewählt. QR-Code-Etiketten als Vorschau anzeigen?',
     '该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批': 'Das Spezifikationsblatt {no} für dieses Produkt ist noch nicht eingereicht/genehmigt (aktuell: {st}); automatisches Übernehmen ist nicht möglich. Bitte zuerst das Blatt ausfüllen und Einreichung/Genehmigung abschließen.',

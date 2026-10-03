@@ -130,7 +130,7 @@
                       <span class="q-sign-label">{{ tt(c.sign) }}：</span>
                       <span class="q-sign-val">
                         <el-input
-                          v-if="editable" v-model="head[c.signKey || '填写人']" size="small"
+                          v-if="editable && !signKeyLocked(c)" v-model="head[c.signKey || '填写人']" size="small"
                           maxlength="50" class="as-cell-input q-sign-input" @input="emit('dirty')"
                         />
                         <span v-else>{{ head[c.signKey || '填写人'] || '' }}</span>
@@ -201,7 +201,7 @@
                   <span class="q-sign-label">{{ tt(c.sign) }}：</span>
                   <span class="q-sign-val">
                     <el-input
-                      v-if="editable" v-model="head[c.signKey || '填写人']" size="small"
+                      v-if="editable && !signKeyLocked(c)" v-model="head[c.signKey || '填写人']" size="small"
                       maxlength="50" class="as-cell-input q-sign-input" @input="emit('dirty')"
                     />
                     <span v-else>{{ head[c.signKey || '填写人'] || '' }}</span>
@@ -276,7 +276,7 @@
               <span class="q-sign-label">{{ tt(row.sign) }}：</span>
               <span class="q-sign-val">
                 <el-input
-                  v-if="editable" v-model="head[row.signKey || '填写人']" size="small"
+                  v-if="editable && !signKeyLocked(row)" v-model="head[row.signKey || '填写人']" size="small"
                   maxlength="50" class="as-cell-input q-sign-input" @input="emit('dirty')"
                 />
                 <span v-else>{{ head[row.signKey || '填写人'] || '' }}</span>
@@ -315,7 +315,7 @@
                 <template v-if="row.signKey">
                   {{ tt('签名') }}：
                   <el-input
-                    v-if="editable" v-model="head[row.signKey]" size="small"
+                    v-if="editable && !signKeyLocked(row)" v-model="head[row.signKey]" size="small"
                     maxlength="50" class="as-cell-input q-sign-input q-sign-name" @input="emit('dirty')"
                   />
                   <span v-else class="q-sign-name">{{ head[row.signKey] || '' }}</span>
@@ -533,12 +533,14 @@
         </template>
       </template>
 
-      <!-- ④ 底部签名:signKind='plain'=纸面简单行(编制/审核/批准);默认=蓝格签名区 -->
+      <!-- ④ 底部签名:signKind='plain'=纸面简单行(编制/审核/批准);默认=蓝格签名区
+           2026-10-04:同「蓝格签名区」口径 —— 字段元数据 readonly(editable=0)的签名格渲染成纯文本。
+           特采单(QC_TC_IN)的编制/审核/批准三格由审批流自动落值,故三格全部只读。 -->
       <div v-if="config.signKind === 'plain'" class="q-signrow">
         <div v-for="c in config.signCells" :key="c.key" class="q-signitem" :style="{ flex: c.flex || 1 }">
           <span class="q-signitem-label">{{ tt(c.label) }}：</span>
           <el-input
-            v-if="editable" v-model="head[c.key]" size="small"
+            v-if="editable && !signLocked(c)" v-model="head[c.key]" size="small"
             maxlength="50" class="as-cell-input q-signitem-input" @input="emit('dirty')"
           />
           <span v-else class="q-signitem-val">{{ head[c.key] || '' }}</span>
@@ -761,6 +763,16 @@ const fieldMap = computed(() => new Map(props.fields.map((f) => [f.dataName || f
 /** 字段级只读(元数据 editable=0 → readonly):文书锁定字段(申请立项人/负责人)按纯文本显示,不可改 */
 function signLocked(c) {
   return !!(fieldMap.value.get(c.key) || {}).readonly
+}
+/**
+ * 签名格同口径只读(2026-10-04):签名格绑的是 signKey(可能不是 c.key 本身 —— 如特采理由行的
+ * 「申请人」绑 编制人、底部落款「批准」绑 审批人),此前这些格子**不认**字段只读,于是
+ * 元数据把字段设成只读、界面上却照样能打字。特采单两级审批要求「编制/审核/批准」三格全自动
+ * 不可改,故统一按 signKey 的字段元数据判只读(不给 signKey 时按历史缺省 '填写人')。
+ */
+function signKeyLocked(c) {
+  const key = (c && c.signKey) || '填写人'
+  return !!(fieldMap.value.get(key) || {}).readonly
 }
 
 // 右上信息表:未配置 config.info 时保持 文件管理人/密级/文件使用范围 三行(立项申请/实施计划原样)

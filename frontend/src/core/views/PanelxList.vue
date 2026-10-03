@@ -316,7 +316,17 @@
               <!-- 审批组:标准流文书面板(品质单据等)+ 检验数据记录(QC_INSP_REC,用户口径要求有审批按钮) -->
               <template v-if="hasApprovalBtns">
                 <div class="as-side-btn" :class="{ disabled: isDisabled('提交审批') }" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
-                <template v-if="canApproveHere()">
+                <!-- 特采单两级审批(2026-10-04):一级「审核」(有该面板审核反审核权的角色∪管理员)、
+                     二级「批准」(超级管理员);两级各点一次,按钮按节点显隐。均调后端「审批通过」按钮,
+                     节点由后端 approve_node 判定 —— 前端只负责显隐与文案 -->
+                <template v-if="isTcInTwoLevel">
+                  <template v-if="canApproveTcInHere">
+                    <div class="as-side-btn" :class="{ disabled: isDisabled('审批通过') }" @click="onSideAction('审批通过')">{{ tcInApproveLabel() }}</div>
+                    <div class="as-side-btn" :class="{ disabled: isDisabled('审批驳回') }" @click="onSideAction('审批驳回')">{{ tcInRejectLabel() }}</div>
+                  </template>
+                  <div v-if="canApproveHere()" class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
+                </template>
+                <template v-else-if="canApproveHere()">
                   <div class="as-side-btn" :class="{ disabled: isDisabled('审批通过') }" @click="onSideAction('审批通过')">{{ tt('审批通过') }}</div>
                   <div class="as-side-btn" :class="{ disabled: isDisabled('审批驳回') }" @click="onSideAction('审批驳回')">{{ tt('审批驳回') }}</div>
                   <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
@@ -2884,6 +2894,27 @@ async function onDevDispatch() {
 
 /** 本单据一级选定的二级审核人 = 当前登录人(二级节点才由他审批;被选中即授权) */
 const l2ApproverNow = computed(() => panelCode.value === 'RD_PROD_INFO' && !!devDispatch.isL2)
+
+// ── 特采单(QC_TC_IN)两级审批(2026-10-04 用户口径)──
+// 纸面 YJ-QR-60 底部就是「编制 / 审核 / 批准」三格,系统口径与之一一对应:
+//   编制 = 提交审批的人(提交时后端自动落值);审核 = 一级审批通过的人;批准 = 超级管理员。
+// 一级 = 有该面板「审核反审核」权的角色 ∪ 管理员(yj_role_panel.can_approve,即 canApproveHere);
+// 二级 = **超级管理员**(yj_user.is_admin='Y'),不选人、不是角色。
+// ⚠ 两级**必须各点一次**(同一个人也要两次),故按钮分节点显隐,不给"一次动作跨两级"的入口。
+const isTcInTwoLevel = computed(() => String(panelCode.value) === 'QC_TC_IN')
+/** 一级审核节点(节点 1):状态还是「审批中」 */
+const tcInL1Node = computed(() => isTcInTwoLevel.value && curDocStatus.value === '审批中')
+/** 批准节点(节点 2):一级已通过、等超级管理员批准 */
+const tcInL2Node = computed(() => isTcInTwoLevel.value && curDocStatus.value === '待二级审批')
+/** 本节点我能不能批:一级看面板审批权,二级只有超级管理员 */
+const canApproveTcInHere = computed(() => (tcInL2Node.value ? user.isAdmin === true : canApproveHere()))
+/** 侧栏点「审批通过/批准通过」都打到后端的「审批通过」按钮(节点由后端 approve_node 判,前端只管显隐与文案) */
+function tcInApproveLabel() {
+  return tcInL2Node.value ? tt('批准通过') : tt('审批通过')
+}
+function tcInRejectLabel() {
+  return tcInL2Node.value ? tt('批准驳回') : tt('审批驳回')
+}
 
 // ── 分发责任人弹窗(2026-09-20):四个下游文件各选一个责任人 ──
 const devAssignVisible = ref(false)

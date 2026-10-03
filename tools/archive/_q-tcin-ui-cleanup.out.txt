@@ -1,0 +1,7 @@
+seg|单据编号|编制人|审核人|审批人|cancel
+1-LEFT|TCI-2026-10-0001|系统管理员|null|null|Y
+1-LEFT|TCI-2026-10-0002|柴善银|null|null|Y
+1-LEFT|TCI-2026-10-0003|系统管理员|null|null|Y
+1-LEFT|TCI-2026-10-0004|柴善银|null|null|Y
+1-LEFT|TCI-2026-10-0005|系统管理员|陈秀丽|null|Y
+1-LEFT|TCI-2026-10-0006|系统管理员|null|null|Y

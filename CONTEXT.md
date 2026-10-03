@@ -342,18 +342,60 @@ DevTaskService 实时推导,没有可归档的"纸");`RD_CHANGE`(产品变更申
 
 ### 两级审批(产品信息表)(Two-level Approval)
 
-**只有产品信息表(RD_PROD_INFO)走两级**(`ButtonService.TWO_LEVEL_PANELS`;其余面板单节点路径逐字不变):
+**走两级的面板** = `ButtonService.TWO_LEVEL_PANELS`(**RD_PROD_INFO** 与 **QC_TC_IN 特采单**;
+其余面板单节点路径逐字不变)。两型共用状态机(一级 `approve_node=1` → 二级 `=2`),差别在**第二级怎么定**:
 
-- **一级** = 现有审批权口径(管理员 ∪ 角色 `yj_role_panel.can_approve`;产品信息表当前实际只有 admin=冯总)。
-  一级「审批通过」**必须选取二级审核人**(载荷「二级审批人」= 账号,**候选 = 全部启用账号**),
-  定下的人写回纸面「审核人(二级审批人)」,单据转 **「待二级审批」**(`yj_doc_status.approve_node=2`
-  + `l2_approver`),**不归档**;被选人收 `APPROVAL_L2_ASSIGNED` 消息。
+- **RD_PROD_INFO 型(一级选人)→ 本节的四段**:一级「审批通过」**必须选取二级审核人**
+  (载荷「二级审批人」= 账号,**候选 = 全部启用账号**),定下的人写回纸面「审核人(二级审批人)」,
+  单据转 **「待二级审批」**(`yj_doc_status.approve_node=2` + `l2_approver`),**不归档**;
+  被选人收 `APPROVAL_L2_ASSIGNED` 消息。
 - **二级** = **被选定的二级审核人本人 ∪ 管理员**(选取本身即授权,不要求其角色有 `audit` 词 ——
   `PanelPermissionService.isL2ApproverOf` 就是为此开的例外,否则 cp 这类普通账号点不动第二级)。
   二级通过 **即归档**;任一级驳回都**一律回草稿**并通知制单人(不退回上一级)。
+- **一级** = 现有审批权口径(管理员 ∪ 角色 `yj_role_panel.can_approve`;产品信息表当前实际只有 admin=冯总)。
 - 审批中 / 待二级审批期间单据不可保存、不可直接审核;两处状态推导
   (`ButtonService.docStatusOf` 与 `QueryService.docStatus`)**必须同改**加「待二级审批」
   (一处管按钮与保存门禁、一处管列表行状态)。
+
+### 两级审批(特采单)(Two-level Approval — Special Acceptance, 2026-10-04)
+
+**特采单(QC_TC_IN)= 第二种两级形态:第二级固定为超级管理员**(`ButtonService.ADMIN_L2_PANELS`,
+判据 `yj_user.is_admin='Y'`,不走「一级选人」)。纸面 YJ-QR-60 底部本来就是
+**编制 / 审核 / 批准** 三格,系统口径与之一一对应:
+
+| 纸面格 | 值 | 何时落 | 字段 |
+|---|---|---|---|
+| 编制 | **提交审批的人** | 点「提交审批」时后端写 | `qc_tc_in.编制人` |
+| 审核 | **一级审批通过的人** | 一级「审批通过」时 | `qc_tc_in.审核人` + `审核时间` |
+| 批准 | **超级管理员** | 二级「批准通过」时 | `qc_tc_in.审批人` + `审批时间` |
+
+- **一级** = 现有审批权口径:**组织架构里给该角色勾了「特采单·审核反审核」(= `perms` 含 `audit`
+  ⇒ `can_approve='Y'`)的账号 ∪ 管理员**。三格在 `yj_field` 里 `editable=0`(前端只读),
+  后端 `save()` 对特采单**剥离**这三个键的入参 —— 真源只有审批流动作一个。
+- **二级** = **超级管理员**(不选人;非超级管理员在二级节点审批/驳回一律 403)。
+  **两级必须各点一次** —— 同一个人(管理员)也要点两次,没有一次动作跨两级的入口。
+- **生单时机**:`tcInApprovedGenerate`(生成采购入库单)从「一级通过」**挪到二级批准通过**;
+  一级通过只转「待二级审批」,不生单。
+- **「审核」直审对特采单一律拒绝**(`audit()` 内拦截)—— 取消直审,否则二级形同虚设。
+- **「提交审批」的权限不走 `audit`**:全局表把「提交审批」归到 `audit`,而本面板要求
+  **编制人 ≠ 审核人**,故 `PanelPermissionService.BUTTON_PERMS_OVERRIDE` 对
+  `QC_TC_IN|提交审批` 改判 `add/modify`(同 RD_CHANGE 的先例)—— 否则只有审核人能提交,
+  编制人恒等于审核人,且非管理员提交后会被「编制审批分离」挡死在审批这一步。
+- **虚拟字段「审核人」的例外**:`QueryService.loadDocs` 对已审核单据会用 `yj_doc_status.shr`
+  (最终审批人**账号**)覆盖「审核人/审核时间」;特采单跳过该覆盖,用表内真值
+  (存量单表内为空时才兜底)—— 否则界面「审核」格会变成 "admin"。
+- **消息**(任一级驳回都有通知):
+  提交 → `APPROVAL_SUBMITTED`(一级审批人);一级通过 → `APPROVAL_L2_PENDING`(**超级管理员**);
+  批准通过 → `APPROVAL_APPROVED`(提交人)+ `APPROVAL_L2_DONE`(**一级审核人**);
+  驳回 → `APPROVAL_REJECTED`(提交人),二级驳回另发 `APPROVAL_L2_REJECTED`(一级审核人)。
+- **驳回/弃审清格**:回草稿时清 `审核人/审核时间/审批人/审批时间`(编制人**保留** —— 人没变),
+  并把 `approve_node`/`l2_approver` 复位。
+- **前端**:`PanelxList` 侧栏按节点显隐(一级「审批通过/审批驳回」、二级「批准通过/批准驳回」,
+  二级仅超级管理员);`DocSheet` 的签名格**按字段元数据只读**渲染(此前 `signKey` 格子不认
+  `editable=0`,元数据设了只读界面照样能打字)。
+- 迁移:`tools/migrate-qc-tcin-twolevel.sql`(审批人/审批时间字段登记 + 三格 `editable=0`
+  + 列注明 + 译名);验收探针 `tools/archive/_probe-tcin-twolevel.mjs`(41 项)与
+  `tools/archive/_probe-tcin-twolevel-ui.cjs`(13 项界面断言)。
 
 ### 分发责任人(Development Task Assignment)
 

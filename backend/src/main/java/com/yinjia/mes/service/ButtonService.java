@@ -228,6 +228,14 @@ public class ButtonService {
         body.remove("更新时间");
         body.remove("审核人");
         body.remove("审核时间");
+        // 特采单(QC_TC_IN,2026-10-04):纸面「编制/审核/批准」三格由审批流自动落值
+        // (提交审批写编制、一级通过写审核、超级管理员批准写批准),保存不接收前端改值 ——
+        // 否则"手改编制人"就能绕过"编制=提交人"的口径。字段在 yj_field 里已 editable=0(前端只读)。
+        if (TC_IN_PANEL.equals(def.code())) {
+            body.remove("编制人");
+            body.remove("审批人");
+            body.remove("审批时间");
+        }
         Map<String, Object> detail = detailObj instanceof Map<?, ?> m ? new LinkedHashMap<>((Map<String, Object>) m) : new HashMap<>();
         // 明细键 = 面板 detail.tabs[].key(基础档案为业务键,单据为 items);兜底取首个数组值
         List<Map<String, Object>> items = detail.get(def.tabKey()) instanceof List<?> tabRows
@@ -1104,6 +1112,10 @@ public class ButtonService {
         if ("已审核".equals(st.get("status"))) throw new IllegalStateException("单据已是已审核状态");
         // 两级审批(远端 2026-09-20):「待二级审批」同样不可直审,与「审批中」同口径拦截
         if ("审批中".equals(st.get("status")) || "待二级审批".equals(st.get("status"))) throw new IllegalStateException("审批中单据不可直接审核，请走审批流");
+        // 特采单(QC_TC_IN,2026-10-04 用户口径「取消直审」):一律走 提交审批 → 一级审核 → 超级管理员批准,
+        // 直审会让二级形同虚设(纸面「审核/批准」两格也就没了两级留痕)。接口层同口径拒绝。
+        if (TC_IN_PANEL.equals(def.code()))
+            throw new IllegalStateException("特采单走两级审批：请用「提交审批」→ 一级「审批通过」→ 超级管理员「批准」，不支持直接审核");
         // 编制审核分离(2026-09-12):审核人不得是制单人本人——此前有审批权的用户可自审自己制的单;
         // 管理员豁免(管理员保存即归档本就是等价权力,堵死反而制造死路)
         if (!isAdminUser(auditor) && auditor.equals(authorOfDoc(def, no)))
@@ -1214,6 +1226,13 @@ public class ButtonService {
                 + " effective = CASE WHEN ? = 1 THEN NULL ELSE effective END, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?",
                 CHANGE_PANEL.equals(def.code()) ? 1 : 0, def.code(), no);
+        // 特采单:弃审回草稿,纸面「审核/批准」两格随审批作废清空 + 两级节点标记复位
+        // (编制人保留 —— 谁编的单没变;重新提交时会按新的提交人刷新)
+        if (TC_IN_PANEL.equals(def.code())) {
+            jdbc.update("UPDATE yj_doc_status SET approve_node = NULL, l2_approver = NULL, update_at = GETDATE()"
+                    + " WHERE panel_code = ? AND doc_no = ?", def.code(), no);
+            clearTcInSign(def.code(), no, 0);
+        }
         // 转ERP联动:弃审清 是否已转ERP/ERP单号/转ERP操作人/转ERP时间(重新审核后可再转)
         if (List.of("PURCHASE_IN", "SALE_OUT", "PU_ORDER", "MATERIAL_OUT").contains(def.code())) {
             String tbl = "PURCHASE_IN".equals(def.code()) ? "bd_purchase_in"
@@ -1295,6 +1314,10 @@ public class ButtonService {
                         + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), 'N', 1, GETDATE());",
                 def.code(), no, operator, operator);
         recordApproval(def.code(), no, "SUBMIT", "PENDING", opinion);
+        // 特采单(QC_TC_IN):纸面「编制」格 = **提交审批的人**(2026-10-04 用户口径)。
+        // 落点在提交这一刻而非保存 —— 自动生成的特采单(检验单审核产出)编制人本就是空的,
+        // 谁提交谁就是编制人;驳回后换人重提也随之更新。
+        if (TC_IN_PANEL.equals(def.code())) writeBackTcInSign(def.code(), no, "编制人", null, operator);
         // 消息:提交审批 → 该面板审批人
         notify(() -> messageService.sendToApprovers(def.code(), MessageService.APPROVAL_SUBMITTED, no,
                 Map.of("docNo", no, "actor", operator), operator));
@@ -1304,12 +1327,15 @@ public class ButtonService {
     /**
      * 审批通过(2026-09-20 起支持两级:见 TWO_LEVEL_PANELS)。
      *
-     * 一级(节点 1):现有审批权口径(管理员 ∪ 角色 can_approve)通过 → **必须选取二级审核人**
-     *   (载荷 key「二级审批人」= 账号,候选=全部启用账号;被选中即授权,不要求角色审批权),
-     *   写回纸面「审核人（二级审批人）」,单据转「待二级审批」(pending 仍为 'Y',approve_node=2),
-     *   **不归档**;被选人收 APPROVAL_L2_ASSIGNED 消息。
-     * 二级(节点 2):**被选定的二级审核人本人 ∪ 管理员**通过 → 归档(归档面板)/已审核。
-     *   二级节点不再要求 requireApprover:选取本身就是授权(cp 这类普通账号也因此能签核)。
+     * 一级(节点 1):现有审批权口径(管理员 ∪ 角色 can_approve,即权限界面勾了「审核反审核」的角色)
+     *   通过 → 转「待二级审批」(pending 仍为 'Y',approve_node=2),**不归档**。
+     *   · RD_PROD_INFO:**必须选取二级审核人**(载荷 key「二级审批人」= 账号,候选=全部启用账号;
+     *     被选中即授权,不要求角色审批权),写回纸面「审核人（二级审批人）」,被选人收 APPROVAL_L2_ASSIGNED。
+     *   · QC_TC_IN(特采单):第二级**固定为超级管理员**,一级不选人;写回纸面「审核」格 = 一级通过人,
+     *     超级管理员收 APPROVAL_L2_PENDING。
+     * 二级(节点 2):RD_PROD_INFO = **被选定的二级审核人本人 ∪ 管理员**;QC_TC_IN = **仅超级管理员**。
+     *   通过 → 已审核(归档面板则归档)。RD_PROD_INFO 的二级节点不再要求 requireApprover(选取即授权);
+     *   特采单则要求 is_admin —— 两级**必须各点一次**(同一人也要两次)。
      * 非两级面板(其余全部面板)走原单节点路径,逐字不变。
      */
     private Map<String, Object> approveApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
@@ -1329,23 +1355,41 @@ public class ButtonService {
         if (!isAdminUser(operator) && operator.equals(submitter))
             throw new org.springframework.security.access.AccessDeniedException("审批人不能与提交人相同（编制与审批分离）");
         String opinion = opinionOf(formData);
-        // ── 两级面板:一级通过 = 选二级审核人 + 转「待二级审批」,不归档 ──
+        // ── 两级面板:一级通过 = 转「待二级审批」,不归档 ──
         if (TWO_LEVEL_PANELS.contains(def.code())) {
-            String l2 = pickOf(formData, "二级审批人");
-            if (l2.isEmpty()) throw new IllegalStateException("一级审批通过前必须选取二级审核人");
-            if (!isEnabledUser(l2)) throw new IllegalStateException("二级审核人账号不存在或已停用：" + l2);
-            if (!isAdminUser(operator) && l2.equals(submitter))
-                throw new IllegalStateException("二级审核人不能是提交人本人（编制与审批分离）");
+            // 固定二级面板(特采单):第二级恒为超级管理员,一级不选人;其余两级面板仍须选人
+            boolean fixedAdminL2 = ADMIN_L2_PANELS.contains(def.code());
+            String l2 = fixedAdminL2 ? "" : pickOf(formData, "二级审批人");
+            if (!fixedAdminL2) {
+                if (l2.isEmpty()) throw new IllegalStateException("一级审批通过前必须选取二级审核人");
+                if (!isEnabledUser(l2)) throw new IllegalStateException("二级审核人账号不存在或已停用：" + l2);
+                if (!isAdminUser(operator) && l2.equals(submitter))
+                    throw new IllegalStateException("二级审核人不能是提交人本人（编制与审批分离）");
+            }
             // 竞态守卫:WHERE 带 pending='Y' 且节点=1,双击/并发只有一次生效
             int n = jdbc.update("UPDATE yj_doc_status SET approve_node = 2, l2_approver = ?, update_at = GETDATE()"
                             + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND ISNULL(approve_node,1) = 1",
-                    l2, def.code(), no);
+                    fixedAdminL2 ? null : l2, def.code(), no);
             if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
-            writeBackL2Approver(def.code(), no, l2);
+            if (fixedAdminL2) {
+                // 特采单:纸面「审核」格 = 一级审批通过的人(与制定二级审核人的 RD_PROD_INFO 不同——
+                // 那一栏对特采单无意义,真源是 yj_doc_status.approve_node/l2 口径)
+                writeBackTcInSign(def.code(), no, "审核人", "审核时间", operator);
+            } else {
+                writeBackL2Approver(def.code(), no, l2);
+            }
             recordApproval(def.code(), no, "APPROVE_L1", "L1_PASSED", opinion, 1);
             final String l2f = l2;
-            notify(() -> messageService.send(List.of(l2f), MessageService.APPROVAL_L2_ASSIGNED, def.code(), no,
-                    Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion), operator));
+            final String op1 = operator;
+            // 消息:一级通过 → 二级审核人(选定的那位 / 固定超级管理员)
+            notify(() -> {
+                List<String> targets = fixedAdminL2
+                        ? messageService.admins().stream().filter((a) -> !a.equals(op1)).toList()
+                        : List.of(l2f);
+                String code = fixedAdminL2 ? MessageService.APPROVAL_L2_PENDING : MessageService.APPROVAL_L2_ASSIGNED;
+                return messageService.send(targets, code, def.code(), no,
+                        Map.of("docNo", no, "actor", op1, "opinion", opinion == null ? "" : opinion), op1);
+            });
             return result(no, "待二级审批");
         }
         // 竞态守卫(2026-09-12):WHERE 带 pending='Y',双击/两审批人并发只有一次生效,不再重复留痕
@@ -1392,11 +1436,21 @@ public class ButtonService {
         return result(no, "已审核");
     }
 
-    /** 二级审批通过:被选定的二级审核人 ∪ 管理员 → 归档(归档面板)/已审核 */
+    /**
+     * 二级审批通过:被选定的二级审核人 ∪ 管理员 → 归档(归档面板)/已审核。
+     * 固定二级面板(特采单,{@link #ADMIN_L2_PANELS})的第二级 = **超级管理员**(即管理员本人),
+     * 故不查 l2_approver;且**必须真真切切点满两次**(一级一次、二级一次)——
+     * 同一个人(管理员)也要两次,不允许一次动作跨越两级(2026-10-04 用户口径)。
+     */
     private Map<String, Object> approveSecond(PanelRegistry.PanelDef def, String no, String operator, Map<String, Object> formData) {
-        String l2 = l2ApproverOf(def.code(), no);
-        if (!isAdminUser(operator) && (l2 == null || !l2.equals(operator)))
-            throw new org.springframework.security.access.AccessDeniedException("仅被选定的二级审核人（或管理员）可完成二级审批");
+        if (ADMIN_L2_PANELS.contains(def.code())) {
+            if (!isAdminUser(operator))
+                throw new org.springframework.security.access.AccessDeniedException("特采单的批准（二级审批）仅超级管理员可执行");
+        } else {
+            String l2 = l2ApproverOf(def.code(), no);
+            if (!isAdminUser(operator) && (l2 == null || !l2.equals(operator)))
+                throw new org.springframework.security.access.AccessDeniedException("仅被选定的二级审核人（或管理员）可完成二级审批");
+        }
         String opinion = opinionOf(formData);
         int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', shr = ?, shsj = GETDATE(), approve_node = NULL, update_at = GETDATE()"
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND approve_node = 2", operator, def.code(), no);
@@ -1404,6 +1458,27 @@ public class ButtonService {
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion, 2);
         inspAutoPurchaseIn(def.code(), no, operator);
         inspAutoReturn(def.code(), no, operator);
+        if (ADMIN_L2_PANELS.contains(def.code())) {
+            // 特采单:纸面「批准」格 = 超级管理员;二级批准通过才算真正通过,
+            // 故「生成采购入库单」的生单钩子挂在这里(一级通过时**不**生单,见 approveApproval)。
+            writeBackTcInSign(def.code(), no, "审批人", "审批时间", operator);
+            tcInApprovedGenerate(def.code(), no, operator);
+            // 消息:批准通过 → 提交人(编制人) + 一级审核人,两端都知情
+            final String opA = operator;
+            final String sub = submitterOf(def, no);
+            final String l1 = l1ApproverOf(def.code(), no);
+            final boolean l1Distinct = !l1.isBlank() && !l1.equals(opA) && !l1.equals(sub);
+            notify(() -> {
+                Map<String, Object> ps = Map.of("docNo", no, "actor", opA, "opinion", opinion == null ? "" : opinion);
+                int sent = 0;
+                if (!sub.isBlank() && !sub.equals(opA))
+                    sent += messageService.send(List.of(sub), MessageService.APPROVAL_APPROVED, def.code(), no, ps, opA);
+                if (l1Distinct)
+                    sent += messageService.send(List.of(l1), MessageService.APPROVAL_L2_DONE, def.code(), no, ps, opA);
+                return sent;
+            });
+            return result(no, "已审核");
+        }
         notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
                 def.code(), no, MessageService.APPROVAL_APPROVED,
                 Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion), operator));
@@ -1416,16 +1491,23 @@ public class ButtonService {
     }
 
     /** 审批驳回:仅审批中/待二级审批 → 草稿(意见必填,驳回后修改可重新提交)
-     *  2026-09-20:两级面板任一级驳回都直接回草稿并通知制单人(口径:不退回上一级),节点标记一并清空。 */
+     *  2026-09-20:两级面板任一级驳回都直接回草稿并通知制单人(口径:不退回上一级),节点标记一并清空。
+     *  2026-10-04 特采单(QC_TC_IN):驳回同样回草稿,并清空纸面「审核/批准」两格;
+     *    通知面扩为 提交人(编制人) + (二级驳回时)一级审核人 —— 两端都知道这张单被退了。 */
     private Map<String, Object> rejectApproval(PanelRegistry.PanelDef def, Map<String, Object> formData) {
         String no = requireNo(formData);
         int node = pendingNodeOf(def.code(), no);
         if (node == 2) {
-            // 二级节点:被选定的二级审核人 ∪ 管理员(不要求角色审批权,选取即授权)
-            String l2 = l2ApproverOf(def.code(), no);
+            // 二级节点:固定二级面板(特采单)= 超级管理员;其余 = 被选定的二级审核人 ∪ 管理员(不要求角色审批权,选取即授权)
             String who = currentUserName();
-            if (!isAdminUser(who) && (l2 == null || !l2.equals(who)))
-                throw new org.springframework.security.access.AccessDeniedException("仅被选定的二级审核人（或管理员）可驳回二级审批");
+            if (ADMIN_L2_PANELS.contains(def.code())) {
+                if (!isAdminUser(who))
+                    throw new org.springframework.security.access.AccessDeniedException("特采单的批准（二级审批）仅超级管理员可驳回");
+            } else {
+                String l2 = l2ApproverOf(def.code(), no);
+                if (!isAdminUser(who) && (l2 == null || !l2.equals(who)))
+                    throw new org.springframework.security.access.AccessDeniedException("仅被选定的二级审核人（或管理员）可驳回二级审批");
+            }
         } else {
             requirePendingSubmission(def.code(), no);
             requireApprover(def.code());
@@ -1435,13 +1517,31 @@ public class ButtonService {
             throw new IllegalStateException("仅审批中或待二级审批状态可审批驳回");
         String opinion = opinionOf(formData);
         if (opinion.isEmpty()) throw new IllegalStateException("审批驳回必须填写审批意见");
+        String l1Before = ADMIN_L2_PANELS.contains(def.code()) ? l1ApproverOf(def.code(), no) : "";
         // 竞态守卫(2026-09-12):WHERE 带 pending='Y',并发驳回/通过只有一次生效
         int n = jdbc.update("UPDATE yj_doc_status SET pending = 'N', approve_node = NULL, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "REJECT", "REJECTED", opinion, node);
-        // 消息:审批驳回 → 制单人(驳回意见随消息带上)
         String rejectBy = currentUserName();
+        // 特采单:驳回即回草稿 —— 纸面「审核/批准」两格随审批作废清空(编制人保留,人是没变的)
+        if (ADMIN_L2_PANELS.contains(def.code())) {
+            clearTcInSign(def.code(), no, node);
+            final String l1f = l1Before;
+            final String sub = submitterOf(def, no);
+            notify(() -> {
+                Map<String, Object> ps = Map.of("docNo", no, "actor", rejectBy, "opinion", opinion, "node", String.valueOf(node));
+                int sent = 0;
+                if (!sub.isBlank() && !sub.equals(rejectBy))
+                    sent += messageService.send(List.of(sub), MessageService.APPROVAL_REJECTED, def.code(), no, ps, rejectBy);
+                // 二级驳回还要让一级审核人知道(他签过的那张被退了)
+                if (node == 2 && !l1f.isBlank() && !l1f.equals(rejectBy) && !l1f.equals(sub))
+                    sent += messageService.send(List.of(l1f), MessageService.APPROVAL_L2_REJECTED, def.code(), no, ps, rejectBy);
+                return sent;
+            });
+            return result(no, "草稿");
+        }
+        // 消息:审批驳回 → 制单人(驳回意见随消息带上)
         notify(() -> messageService.sendToAuthor(def.hasHeadTable() ? def.headTable() : def.lineTable(),
                 def.code(), no, MessageService.APPROVAL_REJECTED,
                 Map.of("docNo", no, "actor", rejectBy, "opinion", opinion), rejectBy));
@@ -1500,8 +1600,24 @@ public class ButtonService {
 
     // ---- 两级审批公共件(2026-09-20)----
 
-    /** 走两级审批的面板(当前试点只有产品信息表;其余面板单节点路径逐字不变) */
-    private static final java.util.Set<String> TWO_LEVEL_PANELS = java.util.Set.of("RD_PROD_INFO");
+    /**
+     * 走两级审批的面板(其余面板单节点路径逐字不变)。
+     * - RD_PROD_INFO(2026-09-20):一级通过时必须**选取**二级审核人(候选=全部启用账号);
+     * - QC_TC_IN 特采单(2026-10-04):第二级**固定为超级管理员**(见 {@link #ADMIN_L2_PANELS}),
+     *   一级通过无需选人 —— 纸面 YJ-QR-60 底部就是「编制 / 审核 / 批准」三格:
+     *   编制=提交审批的人、审核=一级审批通过的人、批准=超级管理员。
+     */
+    private static final java.util.Set<String> TWO_LEVEL_PANELS = java.util.Set.of("RD_PROD_INFO", "QC_TC_IN");
+
+    /** 特采单面板码(两级审批 + 编制/审核/批准三格自动落值的唯一面板) */
+    private static final String TC_IN_PANEL = "QC_TC_IN";
+
+    /**
+     * 两级审批的第二种形态:第二级**固定为超级管理员**(不选人)。
+     * 与 RD_PROD_INFO 的「一级选人、被选中即授权」并列 —— 判据是 yj_user.is_admin='Y',
+     * 存量的 l2_approver 列对这些面板保持 NULL(前端与后端都按 is_admin 判)。
+     */
+    private static final java.util.Set<String> ADMIN_L2_PANELS = java.util.Set.of(TC_IN_PANEL);
 
     /** 当前待审批节点:1=待一级(缺省)/2=待二级;不在审批中返回 1 */
     private int pendingNodeOf(String panelCode, String no) {
@@ -1553,6 +1669,77 @@ public class ButtonService {
                     name, no);
         } catch (Exception e) {
             log.warn("[两级审批] 写回审核人二级失败 panel={} no={}: {}", panelCode, no, e.getMessage());
+        }
+    }
+
+    // ---- 特采单(QC_TC_IN)纸面「编制 / 审核 / 批准」三格自动落值(2026-10-04) ----
+    //
+    // 口径(用户 2026-10-04):三格**全自动、不可手改** ——
+    //   编制 = 提交审批的人;审核 = 一级审批通过的人;批准 = 超级管理员(二级审批通过的人)。
+    // 三格在 yj_field 里 editable=0(readonly),前端 DocSheet 按字段只读渲染成纯文本;
+    // 且 save() 对特采单剥离这三个键的入参 —— 真源只有审批流动作一个。
+
+    /** 账号 → 姓名(复用 {@link #realNameOf};写纸面签名格统一走这里) */
+    private String signNameOf(String account) {
+        return account == null || account.isBlank() ? "" : realNameOf(account);
+    }
+
+    /** 写特采单纸面签名格(姓名 + 时间;timeCol 传 null 则只写姓名 —— 如「编制人」那格)。
+     *  面板不符或列缺失时静默跳过,不阻断审批 */
+    private void writeBackTcInSign(String panelCode, String no, String whoCol, String timeCol, String account) {
+        if (!TC_IN_PANEL.equals(panelCode)) return;
+        try {
+            String sets = "[" + whoCol + "] = ?" + (timeCol == null ? "" : ", [" + timeCol + "] = ?");
+            Object[] args = timeCol == null
+                    ? new Object[]{signNameOf(account), currentUserName(), no}
+                    : new Object[]{signNameOf(account), LocalDateTime.now().format(TS_FMT), currentUserName(), no};
+            jdbc.update("UPDATE qc_tc_in SET " + sets + ", asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", args);
+        } catch (Exception e) {
+            log.warn("[特采单] 写回 {} 失败 no={}: {}", whoCol, no, e.getMessage());
+        }
+    }
+
+    /**
+     * 特采单签名格清空:驳回(回草稿)清「审核+批准」;一级驳回时审核尚未落值,一并清也无害。
+     * 弃审(已审核 → 草稿)同口径,node 传 0 = 两格都清。**编制人不清** —— 人没变。
+     */
+    private void clearTcInSign(String panelCode, String no, int node) {
+        if (!TC_IN_PANEL.equals(panelCode)) return;
+        try {
+            jdbc.update("UPDATE qc_tc_in SET 审核人 = NULL, 审核时间 = NULL, 审批人 = NULL, 审批时间 = NULL,"
+                            + " asp_user2 = ?, asp_time2 = SYSDATETIME()"
+                            + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    currentUserName(), no);
+        } catch (Exception e) {
+            log.warn("[特采单] 清空签名格失败 no={} node={}: {}", no, node, e.getMessage());
+        }
+    }
+
+    /** 提交审批的人(= 特采单的「编制人」):取 yj_doc_status.pending_by,历史单退回制单人 */
+    private String submitterOf(PanelRegistry.PanelDef def, String no) {
+        try {
+            List<String> rows = jdbc.queryForList(
+                    "SELECT TOP 1 pending_by FROM yj_doc_status WHERE panel_code = ? AND doc_no = ?", String.class,
+                    def.code(), no);
+            if (!rows.isEmpty() && rows.get(0) != null && !String.valueOf(rows.get(0)).isBlank()) {
+                return String.valueOf(rows.get(0)).trim();
+            }
+        } catch (Exception e) {
+            log.warn("[两级审批] 取提交人失败 panel={} no={}: {}", def.code(), no, e.getMessage());
+        }
+        return authorOfDoc(def, no);
+    }
+
+    /** 一级审批的通过人账号(取最近一条 APPROVE_L1 留痕);没批过返回空串 */
+    private String l1ApproverOf(String panelCode, String no) {
+        try {
+            List<String> rows = jdbc.queryForList(
+                    "SELECT TOP 1 operator FROM yj_form_approval WHERE panel_code = ? AND form_no = ?"
+                            + " AND node_no = 1 AND action = 'APPROVE_L1' ORDER BY id DESC", String.class, panelCode, no);
+            return rows.isEmpty() || rows.get(0) == null ? "" : String.valueOf(rows.get(0)).trim();
+        } catch (Exception e) {
+            return "";
         }
     }
 

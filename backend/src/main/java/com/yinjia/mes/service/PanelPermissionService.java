@@ -82,13 +82,21 @@ public class PanelPermissionService {
      * 故本面板改判 add/modify(真正的身份门禁在 ButtonService.requireChangeInitiator:
      * 只有制单人 ∪ 管理员能提交/撤回,别人即使有编辑权也点不动)。
      * 会签类按钮同理:会签人是被指定的普通人(按账号指定即授权),身份校验在方法内。
+     *
+     * 2026-10-04 特采单(QC_TC_IN)两级审批:用户口径「编制 = 提交审批的人,审核 = 一级审批通过的人」——
+     * 两者**必须是两个人**,而全局表让「提交审批」也吃 audit 词,于是只有审核人能提交,
+     * 编制人恒等于审核人,且非管理员提交后会被「编制审批分离」挡在审批这一步(死路)。
+     * 故本面板「提交审批/撤回」同产品变更申请单口径改判 add/modify:有该面板新增/申请修改权的人
+     * (采购/品质文员)负责编制并提交;「审批通过/审批驳回」仍归 audit(组织架构勾了
+     * 「特采单·审核反审核」的角色 ∪ 管理员),第二级再由超级管理员批准。
      */
     private static final Map<String, String[]> BUTTON_PERMS_OVERRIDE = Map.of(
             "RD_CHANGE|提交审批", new String[]{"add", "modify"},
             "RD_CHANGE|提交会签", new String[]{"add", "modify"},
             "RD_CHANGE|撤回会签", new String[]{"add", "modify", "audit"},
             "RD_CHANGE|会签通过", new String[]{"view"},
-            "RD_CHANGE|会签驳回", new String[]{"view"});
+            "RD_CHANGE|会签驳回", new String[]{"view"},
+            "QC_TC_IN|提交审批", new String[]{"add", "modify", "audit"});
 
     /** 按钮权限校验:未映射的按钮放行(由 ButtonService「未定义按钮规则」兜底拦截) */
     public void requireButton(String panelCode, String buttonName) {
