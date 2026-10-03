@@ -473,9 +473,6 @@ public class PxController {
         String sourceNo = String.valueOf(body.getOrDefault("sourceNo", ""));
         if (!targetPanel.isBlank()) perm.requireButton(targetPanel, "保存");
         Map<String, Double> qtyByLine = null;
-        // 材料码预约(2026-10-04):lines[].batchNo = 该行消费的「已打印批次号」——
-        // 带值的行从"已打印待生单"里勾出来,量受该批次号未生单预约约束,且目标单批次号强制取它。
-        Map<String, String> batchByLine = new java.util.LinkedHashMap<>();
         Object raw = body.get("lines");
         if (raw instanceof List<?> list && !list.isEmpty()) {
             qtyByLine = new java.util.LinkedHashMap<>();
@@ -485,17 +482,15 @@ public class PxController {
                 Object qty = m.get("qty");
                 if (key == null) continue;
                 qtyByLine.put(String.valueOf(key), qty == null ? 0d : Double.parseDouble(String.valueOf(qty)));
-                Object bno = m.get("batchNo");
-                if (bno != null && !String.valueOf(bno).isBlank()) batchByLine.put(String.valueOf(key), String.valueOf(bno).trim());
             }
         }
+        // 材料码隔离行(行键 `...#行id@打印行id`)的批次号由后端按行自取,前端不需要另传
         Map<String, Object> res = pushGenerateHandler.generateBatch(sourcePanel, targetPanel, sourceNo,
                 currentUser(),
                 qtyByLine,
                 body.get("overRatio") == null || String.valueOf(body.get("overRatio")).isBlank() ? null
                         : Double.parseDouble(String.valueOf(body.get("overRatio"))),
-                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")),
-                batchByLine.isEmpty() ? null : batchByLine);
+                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")));
         return ApiResult.ok(res);
     }
 

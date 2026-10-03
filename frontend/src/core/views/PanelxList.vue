@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="panelx-list" @click="closeCtx">
     <!-- ══════════ ① 顶部工具栏（T+ 灰条 + 单据翻页）══════════ -->
     <!-- 来料检验要求(档案特例):7 页签 Excel 复刻整表,工具栏/单据卡片/明细表格/页脚全部不渲染,由组件自带迷你工具栏接管 -->
@@ -3228,9 +3228,9 @@ const qrVisible = ref(false)
 /** 采购订单·打印材料码弹窗(2026-10-04):批次号在打印时登记,并预约该行数量 */
 const materialLabelVisible = ref(false)
 const materialLabelNo = ref('')
-/** 打印登记完成后提示一句:预约已生效,去生单对话框会看到「已打印待生单」 */
+/** 打印登记完成后提示一句:这批量已从订单数量隔离成独立一行,去生单对话框勾它即可 */
 function onMaterialLabelPrinted({ docNo, batchNo, count }) {
-  ElMessage.success(`${tt('已登记材料码')} ${docNo}（${tt('批次号')} ${batchNo}，${count} ${tt('张标签')}）——${tt('该批次已预约对应数量，生单时可在「已打印待生单」里直接使用')}`)
+  ElMessage.success(`${tt('已登记材料码')} ${docNo}（${tt('批次号')} ${batchNo}，${count} ${tt('张标签')}）——${tt('该批数量已从订单数量隔离出来，生单时在明细里直接勾选它')}`)
 }
 const qrLabels = ref([])
 
@@ -6123,7 +6123,7 @@ async function onButton(action) {
   // 由"直接出纸"改为**打开打印弹窗** —— 打印时才能确定批次号(它原本要到生单那一刻才有),
   // 弹窗里按公式预填、可改、勾行填量,确认后**先落库登记**(bd_pu_label/bl_pu_label)再出纸,
   // 并**预约**该行数量(未生单的预约量从余量里扣减)。该预约随后在生单对话框的
-  // 「已打印待生单」里被消费。方案:docs/plans/2026-10-04-采购订单材料码批次号方案.md
+  // 作为**独立的一行**被消费。方案:docs/plans/2026-10-04-采购订单材料码批次号方案.md
   // 入口分工不变:没批号→商品档案「二维码标签」;自己打带批号→本弹窗(采购入库单另有「打印标识卡」)。
   if (action === '打印材料码' && panelCode.value === 'PU_ORDER') {
     const cur = current.value || {}

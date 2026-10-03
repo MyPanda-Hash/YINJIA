@@ -302,22 +302,29 @@ public class PuLabelService {
      * 该订单**全部存活打印行**,每行带派生出来的 已生单量 / 未生单量。
      * 字段:单据编号 / 批次号 / 采购订单行id / 采购订单行号 / 物料编码 / 物料名称 / 规格型号 / 计量单位 /
      * 打印数量 / 已生单量 / 未生单量 / 打印时间 / 打印次数。
+     *
+     * <p>⚠ **已生单量按「隔离行的专属 lineKey」派生**({@code {采购订单号}#{行id}@{本行id}}):
+     * 生单时那一行走的是自己的键(见 PushGenerateHandler.isolatedLineKey 的注释 —— 否则用同一个
+     * 批次号混单时会把"原行送的"也算进"已打印行送的")。所以这里必须用同一个键去数 link,
+     * 两处口径必须一致,改一处就得改另一处。
      */
     public List<Map<String, Object>> labelRows(String orderNo) {
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT l.[采购订单行id] AS 采购订单行id, l.[采购订单行号] AS 采购订单行号, l.[物料编码] AS 物料编码,"
-                        + " l.[物料名称] AS 物料名称, l.[规格型号] AS 规格型号, l.[计量单位] AS 计量单位,"
-                        + " ISNULL(l.[打印数量],0) AS 打印数量, h.[单据编号] AS 单据编号, h.[批次号] AS 批次号,"
+                "SELECT l.id AS 行id, l.[采购订单行id] AS 采购订单行id, l.[采购订单行号] AS 采购订单行号,"
+                        + " l.[物料编码] AS 物料编码, l.[物料名称] AS 物料名称, l.[规格型号] AS 规格型号,"
+                        + " l.[计量单位] AS 计量单位, ISNULL(l.[打印数量],0) AS 打印数量,"
+                        + " h.[单据编号] AS 单据编号, h.[批次号] AS 批次号,"
                         + " h.[打印人] AS 打印人, CONVERT(varchar(19), h.[打印时间], 120) AS 打印时间,"
                         + " ISNULL(h.[打印次数],0) AS 打印次数,"
                         // 已生单量:**派生**,不落表 —— 下游单作废/删除时 link 置 RELEASED,这里自动回落
                         + " ISNULL((SELECT SUM(COALESCE(f.linked_quantity,0)) FROM form_flow_link f"
                         + "         WHERE f.source_panel_code = 'PU_ORDER'"
                         + "           AND f.source_line_key = h.[采购订单号] + N'#' + CAST(l.[采购订单行id] AS nvarchar(20))"
-                        + "           AND f.batch_no = h.[批次号] AND f.link_status = 'ACTIVE'), 0) AS 已生单量"
+                        + "                                 + N'@' + CAST(l.id AS nvarchar(20))"
+                        + "           AND f.link_status = 'ACTIVE'), 0) AS 已生单量"
                         + " FROM bl_pu_label l JOIN bd_pu_label h ON h.[单据编号] = l.[单据编号]"
                         + " WHERE h.[采购订单号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y' AND ISNULL(l.asp_cancel,'N') <> 'Y'"
-                        + " ORDER BY h.[批次号], l.[采购订单行号]", orderNo);
+                        + " ORDER BY h.[批次号], l.[采购订单行号], l.id", orderNo);
         for (Map<String, Object> r : rows) {
             double printed = num(r.get("打印数量"));
             double generated = num(r.get("已生单量"));
@@ -328,34 +335,6 @@ public class PuLabelService {
         return rows;
     }
 
-    /** 按「采购订单行id」分组的预约明细(生单对话框按行展示"已打印待生单"用) */
-    public Map<Integer, List<Map<String, Object>>> reservationsByLine(String orderNo) {
-        return groupByLine(labelRows(orderNo));
-    }
-
-    /** 该行**未生单预约合计**(跨批次号;余量扣减用的就是它) */
-    public double pendingTotal(List<Map<String, Object>> labelRows, int lineId) {
-        double v = 0d;
-        for (Map<String, Object> r : labelRows) if ((int) num(r.get("采购订单行id")) == lineId) v += num(r.get("未生单量"));
-        return round2(v);
-    }
-
-    /** 该行「某批次号」的未生单预约量(= 本次最多能按这个号生单多少) */
-    public double pendingOf(String orderNo, int lineId, String batchNo) {
-        for (Map<String, Object> r : labelRows(orderNo)) {
-            if ((int) num(r.get("采购订单行id")) == lineId && str(batchNo).equals(str(r.get("批次号")))) return num(r.get("未生单量"));
-        }
-        return 0d;
-    }
-
-    /** 该行「某批次号」是否存在**存活打印记录**(生单校验用:不许凭空编一个批次号来生单) */
-    public boolean hasLabel(String orderNo, int lineId, String batchNo) {
-        for (Map<String, Object> r : labelRows(orderNo)) {
-            if ((int) num(r.get("采购订单行id")) == lineId && str(batchNo).equals(str(r.get("批次号")))) return true;
-        }
-        return false;
-    }
-
     // ==================== 小工具 ====================
 
     private static Map<Integer, List<Map<String, Object>>> groupByLine(List<Map<String, Object>> rows) {
@@ -364,6 +343,7 @@ public class PuLabelService {
         return out;
     }
 
+    /** 若干打印行的未生单量合计(打印弹窗按行展示"还压着多少"用) */
     private static double sumPending(List<Map<String, Object>> rows) {
         double v = 0d;
         for (Map<String, Object> r : rows) v += num(r.get("未生单量"));

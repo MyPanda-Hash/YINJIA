@@ -51,16 +51,37 @@
           tt('已有批次') }}: {{ batches.map((b) => b.batchNo || tt('待编号')).join('、') }}</span>
       </div>
       <el-table ref="tableRef" :data="rows" row-key="lineKey" border size="small" height="380" @selection-change="onPicked">
-        <el-table-column type="selection" width="42" />
-        <el-table-column prop="行号" :label="tt('行号')" width="60" />
-        <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="130" show-overflow-tooltip />
-        <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="130" show-overflow-tooltip />
-        <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="110" show-overflow-tooltip />
-        <el-table-column prop="数量" :label="tt('订单数量')" width="100" align="right" />
-        <el-table-column prop="已送数量" :label="tt('已送')" width="90" align="right" />
-        <el-table-column prop="已退回数量" :label="tt('已退回')" width="90" align="right" />
-        <el-table-column prop="剩余数量" :label="tt('剩余')" width="90" align="right" />
-        <el-table-column :label="tt('可送上限')" width="100" align="right">
+        <el-table-column type="selection" width="42" :selectable="rowSelectable" />
+        <el-table-column prop="行号" :label="tt('行号')" width="55" />
+        <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="100" show-overflow-tooltip />
+        <!-- 批次号:已打印的隔离行有自己的号(材料码上的号);原行由顶部输入框决定,留空 -->
+        <el-table-column :label="tt('批次号')" width="150" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span v-if="row.rowKind === 'printed'" class="bsd-rowbatch">{{ row['批次号'] }}</span>
+            <span v-else class="bsd-dim">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column :label="tt('状态')" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.rowKind === 'printed'" :type="row.已生单 ? 'info' : 'warning'" size="small">
+              {{ tt(row.已生单 ? '已生单' : '已打印') }}
+            </el-tag>
+            <span v-else class="bsd-dim">—</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="数量" :label="tt('数量')" width="90" align="right">
+          <template #default="{ row }">
+            <span :title="row.rowKind === 'order'
+              ? `${tt('订单数量')} ${row['订单数量']} − ${tt('已打印')} ${row['已打印数量']}`
+              : `${tt('已打印')}`">{{ row['数量'] }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="已送数量" :label="tt('已送')" width="80" align="right" />
+        <el-table-column prop="已退回数量" :label="tt('已退回')" width="80" align="right" />
+        <el-table-column prop="剩余数量" :label="tt('剩余')" width="80" align="right" />
+        <el-table-column :label="tt('可送上限')" width="95" align="right">
           <template #default="{ row }">{{ capOf(row) }}</template>
         </el-table-column>
         <el-table-column :label="tt('本次送料数量')" width="150">
@@ -69,36 +90,16 @@
               :disabled="!(capOf(row) > 0)" :precision="2" style="width: 130px" />
           </template>
         </el-table-column>
-        <el-table-column prop="计量单位" :label="tt('计量单位')" width="90" />
+        <el-table-column prop="计量单位" :label="tt('计量单位')" width="85" />
       </el-table>
-      <!-- 已打印待生单(2026-10-04):材料码打印时登记并预约的量 —— 勾选即按**材料码上的批次号**生单。
-           可直接用这一行生单,也可与其他行组合;勾到多个批次号时前端按号分组、逐组各出一张单
-           (一张暂收单只有一个单头号)。这批量已从上面主表的「剩余数量/可送上限」里扣掉。 -->
-      <div v-if="printedRows.length" class="bsd-printed">
-        <div class="bsd-printed-title">
-          {{ tt('已打印待生单') }}
-          <span class="bsd-tip">{{ tt('勾选即按该批次号生单；勾到多个批次号会按号分成多张单据') }}</span>
-        </div>
-        <el-table ref="printedRef" :data="printedRows" row-key="key" border size="small" max-height="220"
-          @selection-change="onPrintedPicked">
-          <el-table-column type="selection" width="42" />
-          <el-table-column prop="批次号" :label="tt('批次号')" min-width="160" />
-          <el-table-column prop="行号" :label="tt('行号')" width="60" />
-          <el-table-column prop="物料编码" :label="tt('物料编码')" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="物料名称" :label="tt('物料名称')" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="打印数量" :label="tt('打印数量')" width="90" align="right" />
-          <el-table-column prop="已生单量" :label="tt('已生单')" width="85" align="right" />
-          <el-table-column prop="未生单量" :label="tt('未生单')" width="85" align="right" />
-          <el-table-column :label="tt('本次送料数量')" width="150">
-            <template #default="{ row }">
-              <el-input-number v-model="printedQtyOf[row.key]" :min="0" :max="Number(row.未生单量)"
-                :controls="false" :precision="2" style="width: 130px" />
-            </template>
-          </el-table-column>
-          <el-table-column prop="单据编号" :label="tt('打印单号')" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="打印时间" :label="tt('打印时间')" width="150" show-overflow-tooltip />
-        </el-table>
+      <div class="bsd-foot">
+        <span>{{ tt('已选') }} <b>{{ picked.length }}</b> {{ tt('行') }} · {{ tt('本次合计') }}: <b>{{ totalQty }}</b></span>
+        <span class="bsd-tip">{{ tt('只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）') }}</span>
       </div>
+      <!-- 已打印待生单(2026-10-04 用户口径「打印后的那一行是已经从原来数量隔离出来的」):
+           已打印的量已从原行**切走**,在本表里作为**独立一行**出现(行号/物料相同,批次号=材料码上的号,
+           数量=打印数量,已送=已生单量,剩余=未生单量);用它生单后该行标「已生单」且不可再勾。
+           勾到多个批次号时前端按号分组、逐组各出一张单(一张暂收单只有一个单头号)。 -->
       <div class="bsd-foot">
         <span>{{ tt('已选') }} <b>{{ picked.length }}</b> {{ tt('行') }} · {{ tt('本次合计') }}: <b>{{ totalQty }}</b></span>
         <span class="bsd-tip">{{ tt('只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）') }}</span>
@@ -144,17 +145,21 @@ const nextBatchNo = ref('')
 const batchNo = ref('')
 const qtyOf = reactive({})
 
-/* ── 已打印待生单(2026-10-04 材料码预约):勾选即按材料码上的批次号生单 ── */
-const printedRef = ref(null)
-/** 扁平行:[{key, lineKey, 批次号, 行号, 物料编码, 物料名称, 打印数量, 已生单量, 未生单量, 单据编号, 打印时间}] */
-const printedRows = ref([])
-const printedPicked = ref([])
-const printedQtyOf = reactive({})
-/** 勾选行涉及的批次号(1 个 ⇒ 顶部批次号锁死为该号;>1 个 ⇒ 按号分组各出一张单) */
-const printedBatches = computed(() => [...new Set(printedPicked.value.map((r) => r.批次号).filter(Boolean))])
+/* ── 已打印隔离行(2026-10-04 材料码):行来自服务端,与原行并列在同一张明细表里 ──
+   用户口径「打印后的那一行是已经从原来数量隔离出来的,没有作废之前不会与生单有关联」:
+   原行的「数量」已扣掉打印量,已打印的量是**自己那一行**,只能显式勾它才能生单;
+   用它生单后该行标「已生单」(剩余=0)且不可再勾。 */
+/** 勾选的隔离行涉及的批次号(1 个 ⇒ 顶部批次号锁死为该号;>1 个 ⇒ 按号分组各出一张单) */
+const printedBatches = computed(() => [...new Set(
+  picked.value.filter((r) => r.rowKind === 'printed' && r['批次号']).map((r) => r['批次号']),
+)])
 const batchLocked = computed(() => printedBatches.value.length === 1)
 // 勾了已打印行 ⇒ 批次号以材料码为准(标签已印在实物上,系统只能服从)
 watch(printedBatches, (bs) => { if (bs.length === 1) batchNo.value = bs[0] })
+/** 隔离行已生单(剩余=0)不允许再勾;其余行照旧 */
+function rowSelectable(row) {
+  return capOf(row) > 0
+}
 
 const pickedKeys = computed(() => new Set(picked.value.map((r) => r.lineKey)))
 /** 本次合计:只算**已勾选**的行(未勾选行即使填了量也不送,合计必须与生单结果一致) */
@@ -162,7 +167,16 @@ const totalQty = computed(() => sumPickedQty(rows.value, pickedKeys.value, qtyOf
 /** 本次生效超送比例(0~1;**最高 50%** —— 2026-09-22 用户口径,超出按 50 算) */
 const ratio = computed(() => Math.max(0, Math.min(50, Number(overRatioPct.value) || 0)) / 100)
 /** 行的可送上限 = 订单数量×(1+本次比例)−已送+已退回(按**全部数量**算;比例一改即时重算,后端同口径再校验) */
+/**
+ * 该行「本次送料数量」的上限。
+ * · **隔离行**(rowKind='printed'):数量就是**印在标签实物上的定量**,不参与超送 ⇒ 直接用服务端给的
+ *   可送上限(= 未生单量)。用本地 overAllowance 会算出 数量×(1+超送比例),比真实上限大,
+ *   用户按它填就会被后端拒(实测 50 会显示成 52.5)。
+ * · **原行**:数量已由服务端扣掉打印量,本地同公式 overAllowance 与后端逐字一致,
+ *   保留本地算法是为了"超送比例输入框一改就即时重算"的预览体验。
+ */
 function capOf(row) {
+  if (row?.rowKind === 'printed') return Math.max(0, Number(row.可送上限 || 0))
   return overAllowance(row.数量, row.已送数量, row.已退回数量, overRatioPct.value)
 }
 function recompute() {
@@ -186,32 +200,11 @@ async function load() {
     batches.value = res?.batches || []
     nextBatchNo.value = String(res?.nextBatchNo || '')
     batchNo.value = nextBatchNo.value      // 预填 = 公式算出来的号;用户可在对话框里改
-    // 已打印待生单:把每行的「打印预约」摊平成表格行(只留有未生单量的,已送完的不用再显示)
-    const pr = []
-    for (const r of rows.value) {
-      for (const b of (r.打印预约 || [])) {
-        const pending = Number(b.未生单量 || 0)
-        if (!(pending > 0)) continue
-        pr.push({
-          key: `${r.lineKey}|${b.批次号}`,
-          lineKey: r.lineKey,
-          批次号: b.批次号, 行号: r.行号, 物料编码: r.物料编码, 物料名称: r.物料名称,
-          打印数量: b.打印数量, 已生单量: b.已生单量, 未生单量: pending,
-          单据编号: b.单据编号, 打印时间: b.打印时间,
-        })
-      }
-    }
-    printedRows.value = pr
-    Object.keys(printedQtyOf).forEach((k) => delete printedQtyOf[k])
-    for (const r of pr) printedQtyOf[r.key] = Number(r.未生单量) || 0
-    await nextTick()
-    printedRef.value?.clearSelection()
-    printedPicked.value = []
     Object.keys(qtyOf).forEach((k) => delete qtyOf[k])
     for (const r of rows.value) qtyOf[r.lineKey] = Number(r.剩余数量) > 0 ? Number(r.剩余数量) : 0
     // 默认勾选"还有剩余"的行(保留"打开即可全送"的便利);勾选仍是权威:取消勾选即不送
     await nextTick()
-    syncPick(defaultPickKeys(rows.value))
+    syncPick(defaultSendKeys())
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('分批送料数据加载失败'))
   } finally {
@@ -237,14 +230,6 @@ function onPicked(list) {
   picked.value = list || []
   prefillNewlyPicked()
 }
-
-/** 已打印待生单勾选:未填数量的按"未生单量"预填 */
-function onPrintedPicked(list) {
-  printedPicked.value = list || []
-  for (const r of printedPicked.value) {
-    if (!(Number(printedQtyOf[r.key] || 0) > 0)) printedQtyOf[r.key] = Number(r.未生单量) || 0
-  }
-}
 function prefillNewlyPicked() {
   for (const r of picked.value) {
     if (Number(qtyOf[r.lineKey] || 0) > 0) continue
@@ -252,10 +237,19 @@ function prefillNewlyPicked() {
   }
 }
 
-/** 全送:勾选所有有剩余的行 + 数量按剩余量填满 */
+/**
+ * 默认勾选的行:**只勾原行**(有剩余的),不勾隔离行。
+ * 用户口径「打印后的那一行…没有作废之前是不会与生单有关联的」⇒ 隔离行必须由用户**显式勾选**才会被生单,
+ * 不能因为"打开对话框默认全选"就把已打印批次顺手送掉。
+ */
+function defaultSendKeys() {
+  return defaultPickKeys(rows.value.filter((r) => r.rowKind !== 'printed'))
+}
+
+/** 全送:勾选所有有剩余的**原行** + 数量按剩余量填满(隔离行仍需单独勾) */
 function fillRemaining() {
   for (const r of rows.value) qtyOf[r.lineKey] = Number(r.剩余数量) > 0 ? Number(r.剩余数量) : 0
-  syncPick(defaultPickKeys(rows.value))
+  syncPick(defaultSendKeys())
 }
 /** 全不送:取消全部勾选 + 数量清零 */
 function clearAll() {
@@ -265,29 +259,31 @@ function clearAll() {
 
 async function confirm() {
   // 只有"已勾选 且 数量 > 0"的行才生单(2026-09-21 修复:此前只按数量过滤、勾选形同虚设)
-  // ① 未打印(自由)量:来自主表勾选,按顶部批次号(或对话框里改的号)落库
+  // 勾选行 → 生单条目:行键自带身份(`...#行id@打印行id` 就是隔离行),批次号由后端按行自取,
+  // 前端**不需要**逐行传 batchNo —— 少一处口径就少一处能对不上的地方。
   const lines = buildBatchSendLines(rows.value, pickedKeys.value, qtyOf)
-  // ② 已打印待生单:来自下方小表勾选,数量受"该批次号未生单量"约束,批次号取自材料码
-  const resv = printedPicked.value
-    .map((r) => ({ lineKey: r.lineKey, qty: Number(printedQtyOf[r.key] || 0), batchNo: r.批次号 }))
-    .filter((l) => l.qty > 0)
-  if (!lines.length && !resv.length) { ElMessage.warning(tt('请至少勾选一行并填写本次送料数量')); return }
-  // 按批次号分组:一组一张单(暂收单只有一个单头号)
-  const groups = new Map()
-  for (const r of resv) {
-    if (!groups.has(r.batchNo)) groups.set(r.batchNo, [])
-    groups.get(r.batchNo).push(r)
-  }
-  if (groups.size > 1 && lines.length) {
-    ElMessage.warning(tt('勾选了多个已打印批次号时不能同时送未打印量：请先按「已打印待生单」生单，或把未打印量分开操作'))
+  if (!lines.length) { ElMessage.warning(tt('请至少勾选一行并填写本次送料数量')); return }
+  const rowOf = (lineKey) => rows.value.find((r) => r.lineKey === lineKey) || {}
+  const isPrinted = (l) => rowOf(l.lineKey).rowKind === 'printed'
+  const resvKeys = [...new Set(lines.filter(isPrinted).map((l) => String(rowOf(l.lineKey)['批次号'] || '')).filter(Boolean))]
+  if (resvKeys.length > 1 && lines.some((l) => !isPrinted(l))) {
+    ElMessage.warning(tt('勾选了多个已打印批次号时不能同时送未打印量：请先按已打印行生单，或把未打印量分开操作'))
     return
   }
-  if (groups.size > 1) {
+  if (resvKeys.length > 1) {
     try {
       await ElMessageBox.confirm(
-        `${tt('勾选的已打印行涉及多个批次号，将按批次号分成多张单据生成：')}\n${[...groups.keys()].join('、')}`,
+        `${tt('已打印隔离行涉及多个批次号，将按批次号分成多张单据生成：')}\n${resvKeys.join('、')}`,
         tt('分批生单'), { type: 'info' })
     } catch { return }
+  }
+  // 目标批次号分组:隔离行取**它自己的号**;原行取顶部输入框的号 ——
+  // 勾了隔离行时顶部已被锁定为该号,于是"未打印量"自然并进同一张单(整单同一个号)。
+  const byBatch = new Map()
+  for (const l of lines) {
+    const target = (isPrinted(l) ? String(rowOf(l.lineKey)['批次号'] || '') : '') || String(batchNo.value || '').trim()
+    if (!byBatch.has(target)) byBatch.set(target, [])
+    byBatch.get(target).push(l)
   }
   saving.value = true
   try {
@@ -296,13 +292,8 @@ async function confirm() {
       overRatio: ratio.value, ...payload,
     })
     const made = []
-    if (!groups.size) {
-      made.push(await post({ lines, batchNo: String(batchNo.value || '').trim() }))
-    } else {
-      for (const [bno, g] of groups) {
-        // 单组:未打印量并进同一张(混单,整单同一个号);多组时上面已拦住混单
-        made.push(await post({ lines: groups.size === 1 ? [...g, ...lines] : g, batchNo: bno }))
-      }
+    for (const [target, g] of byBatch) {
+      made.push(await post({ lines: g, batchNo: target }))
     }
     // 批次号已在生单这一刻定稿 —— 提示里回显**真号**(res['批次号']),不再是"以后再取"
     if (made.length === 1) {
@@ -342,9 +333,9 @@ async function confirm() {
 .bsd-batch-reset { padding: 0 2px; }
 /* 勾了已打印行 ⇒ 批次号以材料码为准(输入框禁用 + 说明) */
 .bsd-batch-lock { color: #b88230; }
-/* 已打印待生单小表(材料码预约的量在这消费) */
-.bsd-printed { display: flex; flex-direction: column; gap: 4px; margin-top: 2px; }
-.bsd-printed-title { font-size: 12.5px; color: #46586e; display: flex; gap: 8px; align-items: baseline; }
+/* 隔离行(已打印)的批次号与原行的占位符 */
+.bsd-rowbatch { color: #b88230; font-weight: 600; }
+.bsd-dim { color: #b6c0cc; }
 .bsd-ratio { display: inline-flex; align-items: center; gap: 4px; }
 .bsd-ratio-tip { color: #8b9893; }
 .bsd-foot { display: flex; justify-content: space-between; align-items: center; font-size: 12.5px; color: #46586e; }

@@ -108,8 +108,8 @@ try {
   ok(Number(lRow?.打印数量) === PRINT_QTY && Number(lRow?.['采购订单行id']) === LINE_ID,
     `行落库:行id ${lRow?.['采购订单行id']} / 行号 ${lRow?.采购订单行号} / 打印数量 ${lRow?.打印数量}`);
 
-  // ============ ③ 打印即预约 ============
-  console.log('\n=== ③ 打印即预约:弹窗「剩余可打」与生单「剩余/可送上限」都被扣掉 ===');
+  // ============ ③ 打印即**隔离**:打印量从原行数量里切走,成为独立一行 ============
+  console.log('\n=== ③ 打印即隔离:原行数量切走打印量,并多出一行「已打印」隔离行 ===');
   const dlg1 = await get(`/px/puLabel/dialog?orderNo=${encodeURIComponent(pick.no)}`);
   const row1 = (dlg1?.lines || []).find((x) => Number(x.id) === LINE_ID);
   ok(Number(row1?.未生单预约) === PRINT_QTY, `弹窗:未生单预约 = ${PRINT_QTY}(实得 ${row1?.未生单预约})`);
@@ -119,34 +119,42 @@ try {
     `弹窗:已打印记录 1 条,未生单合计 = ${PRINT_QTY}(实得 ${dlg1?.records?.[0]?.['未生单合计']})`);
 
   const ls1 = await post('/px/batchFlow/lines', { sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no });
-  const bl1 = (ls1?.lines || []).find((x) => Number(x.id) === LINE_ID);
-  info(`batchFlow 行:数量 ${bl1?.数量} 已送 ${bl1?.已送数量} 剩余 ${bl1?.剩余数量} 可送上限 ${bl1?.可送上限} 未生单预约合计 ${bl1?.未生单预约合计}`);
-  ok(Math.abs(Number(bl1?.剩余数量) - (Number(LINE.剩余数量) - PRINT_QTY)) < 0.01,
-    `剩余数量 ${LINE.剩余数量} → ${bl1?.剩余数量}(被预约扣掉)`);
-  ok(Math.abs(Number(bl1?.可送上限) - (Number(LINE.可送上限) - PRINT_QTY)) < 0.01,
-    `可送上限 ${LINE.可送上限} → ${bl1?.可送上限}(被预约扣掉)`);
-  const pr1 = (bl1?.打印预约 || [])[0];
-  ok(pr1 && N(pr1['批次号']) === EXPECT_BATCH && Number(pr1['未生单量']) === PRINT_QTY,
-    `回传「打印预约」:${JSON.stringify(pr1 && { 批次号: pr1['批次号'], 打印数量: pr1['打印数量'], 已生单量: pr1['已生单量'], 未生单量: pr1['未生单量'] })}`);
+  const bl1 = (ls1?.lines || []).find((x) => Number(x.id) === LINE_ID && x.rowKind === 'order');
+  const iso1 = (ls1?.lines || []).find((x) => x.rowKind === 'printed');
+  info(`原行(batchFlow):数量 ${bl1?.数量}(订单数量 ${bl1?.订单数量} 已切走已打印 ${bl1?.已打印数量}) 已送 ${bl1?.已送数量} 剩余 ${bl1?.剩余数量} 可送上限 ${bl1?.可送上限}`);
+  info(`隔离行(batchFlow):lineKey ${iso1?.lineKey} 批次号 ${iso1?.批次号} 数量 ${iso1?.数量} 已送 ${iso1?.已送数量} 剩余 ${iso1?.剩余数量} 已生单 ${iso1?.已生单}`);
+  ok(Math.abs(Number(bl1?.数量) - (Number(LINE.数量) - PRINT_QTY)) < 0.01,
+    `原行数量 = 订单数量 − 已打印 = ${LINE.数量} − ${PRINT_QTY} = ${bl1?.数量}(**打印量已从原数量隔离出去**)`);
+  ok(Math.abs(Number(bl1?.剩余数量) - (Number(LINE.数量) - PRINT_QTY)) < 0.01,
+    `原行剩余 = ${bl1?.剩余数量}(原行不再含被切走的那部分)`);
+  ok(!!iso1 && Number(iso1.数量) === PRINT_QTY && N(iso1.批次号) === EXPECT_BATCH,
+    `**多出一行**隔离行:批次号 ${iso1?.批次号} 数量 ${iso1?.数量} —— 就是"已经隔离出来的那一行"`);
+  ok(String(iso1?.lineKey || '').indexOf('@') > 0,
+    `隔离行的行键自带身份(${iso1?.lineKey})⇒ 它自己的已送量与 原行 各记各的`);
+  ok(Number(iso1?.剩余数量) === PRINT_QTY && iso1?.已生单 === false,
+    `隔离行未生单:剩余 ${iso1?.剩余数量} / 已生单标记 ${iso1?.已生单}`);
+  // 一张单一行:原行与隔离行分别只认自己的 link(lineKey 不同)
+  ok(N(bl1?.lineKey) !== N(iso1?.lineKey), `两行 lineKey 不同(${bl1?.lineKey} ≠ ${iso1?.lineKey})`);
 
-  // ============ ④ 约束:超预约量 / 凭空批次号 都要被拒 ============
-  console.log('\n=== ④ 生单约束:超未生单预约量、无打印记录的批次号 —— 都要被拒 ===');
+  // ============ ④ 约束:超隔离行数量、重复生单已生单的行 都要被拒 ============
+  console.log('\n=== ④ 生单约束:超隔离行数量、重复生单 —— 都要被拒 ===');
   const overMsg = await expectFail('/px/batchFlow/generate', {
     sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no,
-    lines: [{ lineKey: bl1.lineKey, qty: PRINT_QTY + 10, batchNo: EXPECT_BATCH }],
+    lines: [{ lineKey: iso1.lineKey, qty: PRINT_QTY + 10 }],
+    batchNo: EXPECT_BATCH,
   });
-  ok(overMsg.includes('超出该批次号的未生单预约量'), `按该号超出预约量被拒:${overMsg.slice(0, 110)}`);
-  const fakeMsg = await expectFail('/px/batchFlow/generate', {
+  ok(overMsg.includes('超出该批次号的未生单量'), `按隔离行超出其数量被拒:${overMsg.slice(0, 120)}`);
+  const origOverMsg = await expectFail('/px/batchFlow/generate', {
     sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no,
-    lines: [{ lineKey: bl1.lineKey, qty: 10, batchNo: `凭空-${TODAY}` }],
+    lines: [{ lineKey: bl1.lineKey, qty: Number(bl1.数量) + Number(bl1.可送上限) }],
   });
-  ok(fakeMsg.includes('没有批次号') && fakeMsg.includes('材料码打印记录'), `凭空批次号被拒:${fakeMsg.slice(0, 110)}`);
+  ok(origOverMsg.includes('超出允许上限'), `原行超出其扣后上限被拒:${origOverMsg.slice(0, 120)}`);
 
-  // ============ ⑤ 生单消费:按材料码批次号生成暂收单 ============
-  console.log('\n=== ⑤ 生单消费:暂收单 单头/明细行/批次台账 都是材料码上的那个号 ===');
+  // ============ ⑤ 生单消费:按隔离行生单 → 暂收单批次号 = 材料码上的号 ============
+  console.log('\n=== ⑤ 用隔离行生单:暂收单 单头/明细行/台账 都是材料码上的那个号 ===');
   const gen = await post('/px/batchFlow/generate', {
     sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no,
-    lines: [{ lineKey: bl1.lineKey, qty: PRINT_QTY, batchNo: EXPECT_BATCH }],
+    lines: [{ lineKey: iso1.lineKey, qty: PRINT_QTY }],
     batchNo: EXPECT_BATCH,
   });
   const recv = N(gen['编号']);
@@ -161,32 +169,35 @@ try {
     `明细行全部同号(${recvLine?.hit}/${recvLine?.n})`);
   ok(N(led?.batch_no) === EXPECT_BATCH && N(led?.status) === 'ACTIVE', `批次台账 ${led?.batch_no}/${led?.status}`);
 
-  // ============ ⑥ 消费后:未生单归 0、已生单 = 送料量(全部派生) ============
-  console.log('\n=== ⑥ 消费后:未生单预约归 0,已生单量 = 送料量(由 form_flow_link 派生) ===');
+  // ============ ⑥ 消费后:隔离行标「已生单」不可再勾;原行不受影响 ============
+  console.log('\n=== ⑥ 消费后:隔离行 已送=数量、剩余=0、标已生单;原行数字不动 ===');
   const ls2 = await post('/px/batchFlow/lines', { sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no });
-  const bl2 = (ls2?.lines || []).find((x) => Number(x.id) === LINE_ID);
-  const pr2 = (bl2?.打印预约 || [])[0];
-  ok(Number(pr2?.['未生单量']) === 0 && Number(pr2?.['已生单量']) === PRINT_QTY,
-    `打印预约:已生单 ${pr2?.['已生单量']} / 未生单 ${pr2?.['未生单量']}`);
-  ok(Math.abs(Number(bl2?.剩余数量) - (Number(LINE.剩余数量) - PRINT_QTY)) < 0.01,
-    `剩余数量仍是被真实送掉后的值 ${bl2?.剩余数量}(预约已转成占用,不重复扣)`);
+  const bl2 = (ls2?.lines || []).find((x) => Number(x.id) === LINE_ID && x.rowKind === 'order');
+  const iso2 = (ls2?.lines || []).find((x) => x.rowKind === 'printed' && N(x.lineKey) === N(iso1.lineKey));
+  ok(Number(iso2?.已送数量) === PRINT_QTY && Number(iso2?.剩余数量) === 0 && iso2?.已生单 === true,
+    `隔离行:已送 ${iso2?.已送数量} / 剩余 ${iso2?.剩余数量} / 已生单 ${iso2?.已生单}(列表里仍在,只是不能再勾)`);
+  ok(Number(iso2?.可送上限) === 0, `隔离行可送上限归 0(${iso2?.可送上限})⇒ 前端不给勾`);
+  ok(Number(bl2?.已送数量) === 0 && Math.abs(Number(bl2?.数量) - (Number(LINE.数量) - PRINT_QTY)) < 0.01,
+    `原行不受影响:数量 ${bl2?.数量} / 已送 ${bl2?.已送数量}(隔离行送的量**不**记到原行)`) ;
+  const reMsg = await expectFail('/px/batchFlow/generate', {
+    sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no,
+    lines: [{ lineKey: iso1.lineKey, qty: PRINT_QTY }], batchNo: EXPECT_BATCH,
+  });
+  ok(reMsg.includes('已经生过单'), `重复生单同一隔离行被拒:${reMsg.slice(0, 120)}`);
 
-  // ============ ⑦ 删除暂收单 → 预约自动回落(零回滚代码) ============
-  console.log('\n=== ⑦ 删除暂收单:link 置 RELEASED ⇒ 预约**自动回落** ===');
+  // ============ ⑦ 删除暂收单 → 隔离行自动回到"未生单"(零回滚代码) ============
+  console.log('\n=== ⑦ 删除暂收单:link 置 RELEASED ⇒ 隔离行**自动回到未生单** ===');
   await cb('QC_RECV', '删除', { 编号: recv });
   await sleep(700);
   const ls3 = await post('/px/batchFlow/lines', { sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no });
-  const bl3 = (ls3?.lines || []).find((x) => Number(x.id) === LINE_ID);
-  const pr3 = (bl3?.打印预约 || [])[0];
-  ok(Number(pr3?.['已生单量']) === 0 && Number(pr3?.['未生单量']) === PRINT_QTY,
-    `预约自动回落:已生单 ${pr3?.['已生单量']} → 未生单 ${pr3?.['未生单量']}(无需任何回滚代码)`);
-  ok(Math.abs(Number(bl3?.剩余数量) - (Number(LINE.剩余数量) - PRINT_QTY)) < 0.01,
-    `剩余数量回到"只被预约占住"的 ${bl3?.剩余数量}`);
+  const iso3 = (ls3?.lines || []).find((x) => x.rowKind === 'printed' && N(x.lineKey) === N(iso1.lineKey));
+  ok(Number(iso3?.已送数量) === 0 && Number(iso3?.剩余数量) === PRINT_QTY && iso3?.已生单 === false,
+    `隔离行自动回落:已送 ${iso3?.已送数量} → 剩余 ${iso3?.剩余数量}(无需任何回滚代码)`);
   const i = created.findIndex((c) => c[1] === recv);
   if (i >= 0) created.splice(i, 1);
 
-  // ============ ⑧ 作废打印记录 → 预约彻底释放 ============
-  console.log('\n=== ⑧ 作废打印记录:预约释放,该行回到"未打印" ===');
+  // ============ ⑧ 作废打印记录 → 隔离行消失,数量回到原行 ============
+  console.log('\n=== ⑧ 作废打印记录:隔离行消失,数量回到原行 ===');
   const vd = await post('/px/puLabel/void', { docNo: printDoc });
   ok(Number(vd['作废行数']) >= 1, `作废行数 = ${vd['作废行数']}`);
   const dlg2 = await get(`/px/puLabel/dialog?orderNo=${encodeURIComponent(pick.no)}`);
@@ -197,9 +208,10 @@ try {
     `剩余可打回到 ${row2?.剩余可打}(与打印前 ${row0.剩余可打} 一致)`);
   ok((dlg2?.records || []).length === 0, `已打印记录清空(实得 ${(dlg2?.records || []).length} 条)`);
   const ls4 = await post('/px/batchFlow/lines', { sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: pick.no });
-  const bl4 = (ls4?.lines || []).find((x) => Number(x.id) === LINE_ID);
-  ok(Math.abs(Number(bl4?.剩余数量) - Number(LINE.剩余数量)) < 0.01,
-    `生单余量回到打印前 ${bl4?.剩余数量}(预约完全释放)`);
+  const bl4 = (ls4?.lines || []).find((x) => Number(x.id) === LINE_ID && x.rowKind === 'order');
+  ok(!(ls4?.lines || []).some((x) => x.rowKind === 'printed'), `生单明细里不再有隔离行`);
+  ok(Math.abs(Number(bl4?.数量) - Number(LINE.数量)) < 0.01 && Number(bl4?.剩余数量) === Number(LINE.剩余数量),
+    `原行数量/剩余回到打印前(${bl4?.数量} / ${bl4?.剩余数量})`);
 
   console.log(`\n  留证:采购订单 ${pick.no} / 批次号 ${EXPECT_BATCH} / 打印单 ${printDoc} / 暂收单 ${recv}(已删)`);
 } finally {

@@ -1,13 +1,16 @@
 /**
- * _verify-pu-label-ui.cjs — 材料码打印 + 「已打印待生单」的**界面**验证(2026-10-04)
+ * _verify-pu-label-ui.cjs — 材料码打印 + **隔离行**的界面验证(2026-10-04 二次口径)
  *
- * 走的就是用户描述的那条路(Edge + CDP 真浏览器,零外部依赖):
- *   ① 采购订单 → 工具栏「打印」→「打印材料码」→ 弹窗;
- *   ② 弹窗里「批次号」按公式预填且**可改**;明细有勾选列与「剩余可打」;
- *   ③ 改个号 + 填量 + 「确定并打印」→ 库里真的登记了那张打印单(批次号=改的号);
- *   ④ 回到采购订单 → 「生单」→「生成送料暂收单」→ 弹窗底部出现**「已打印待生单」**小表,
- *      勾上它 → 顶部「批次号」**自动锁定**为该材料码批次号(输入框 disabled);
- *   ⑤ 点「确定生单」→ 生成的送料暂收单 批次号 = 材料码上的那个号。
+ * 用户口径:「打印后的那一行是**已经从原来数量隔离出来的**,没有作废之前是不会与生单有关联的,
+ * 并且用它生单后打印弹窗会显示已经生单。」按此重做后的界面行为:
+ *   ① 采购订单 →「打印」→「打印材料码」→ 弹窗:批次号按公式预填且**可改**;
+ *   ② 改号 + 填量 + 「确定并打印」→ 库里真的登记了那张打印单;
+ *   ③ 「生单」→「生成送料暂收单」弹窗:**同一张明细表**里——
+ *      · 原行「数量」已扣掉打印量(400→350),批次号列是「—」;
+ *      · **多出一行**隔离行:批次号 = 材料码上的号、数量 = 打印量、状态 = 「已打印」;
+ *   ④ 勾隔离行 → 顶部「批次号」自动**锁定**为该号(输入框 disabled);
+ *   ⑤ 确定生单 → 暂收单批次号 = 材料码上的号;
+ *   ⑥ **重新打开生单弹窗** → 该隔离行状态变「已生单」、剩余 0、**勾选框不可点**。
  *
  * 跑在**测试账套**(factory=YJ_TEST),自己造数据、跑完清理。
  * 用法:node tools/archive/_verify-pu-label-ui.cjs   (env: YJ_HEADLESS=0 可开有头)
@@ -21,7 +24,7 @@ const mssql = createRequire('D:/jdy-sync/package.json')('mssql')
 const API = process.env.YJ_API || 'http://127.0.0.1:8090/api'
 const BASE = API.replace(/\/api$/, '')
 const DB = process.env.YJ_DB || 'HSDZ_MES_TEST'
-const PORT = Number(process.env.YJ_CDP_PORT || 9371)
+const PORT = Number(process.env.YJ_CDP_PORT || 9372)
 const EDGE = ['C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe',
   'C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe'].find((p) => fs.existsSync(p))
 const HEADLESS = process.env.YJ_HEADLESS !== '0'
@@ -42,7 +45,6 @@ async function main() {
   const dstr = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' })
     .format(d || new Date()).replace(/-/g, '')
 
-  // ---------- 选一张已审核、余量够的采购订单 ----------
   const lj = await (await fetch(API + '/auth/login', {
     method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8' },
     body: JSON.stringify({ userName: 'admin', password: '123456', factory: 'YJ_TEST' }),
@@ -61,18 +63,20 @@ async function main() {
     if (N(r['单据状态']) !== '已审核') continue
     const no = N(r['单据编号'])
     let ls; try { ls = await post('/px/batchFlow/lines', { sourcePanel: 'PU_ORDER', targetPanel: 'QC_RECV', sourceNo: no }) } catch { continue }
-    const line = (ls?.lines || []).find((x) => Number(x.剩余数量) >= 20 && Number(x.可送上限) >= 20 && Number(x.未生单预约合计 || 0) === 0)
+    const line = (ls?.lines || []).find((x) => x.rowKind === 'order' && Number(x.剩余数量) >= 20 && Number(x.可送上限) >= 20)
     if (line) { pick = { no, line, supplier: N(r['供应商编码']) }; break }
   }
   if (!pick) { console.error('找不到合适的采购订单'); await pool.close(); process.exit(1) }
   const EXPECT_AUTO = `${String(pick.supplier || '').replace(/^YJ-/i, '')}-${dstr()}`
-  const MY_BATCH = `弹窗改-${dstr()}`
-  console.log(`=== 采购订单 ${pick.no}(供应商 ${pick.supplier})行 ${pick.line.行号} 剩余 ${pick.line.剩余数量} ===`)
-  console.log(`    公式预填号 ${EXPECT_AUTO} / 本探针改用的号 ${MY_BATCH}`)
+  const MY_BATCH = `隔离-${dstr()}`
+  const ORDER_QTY = Number(pick.line.订单数量 ?? pick.line.数量)
+  const PRINT_QTY = Math.min(50, Number(pick.line.可送上限))
+  console.log(`=== 采购订单 ${pick.no}(供应商 ${pick.supplier})行 ${pick.line.行号} 订单数量 ${ORDER_QTY} ===`)
+  console.log(`    公式预填号 ${EXPECT_AUTO} / 本探针改用的号 ${MY_BATCH} / 打印量 ${PRINT_QTY}`)
 
-  const created = []          // [panel, no] 清理用
+  const created = []
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yj-mlq-'))
-  const args = ['--no-first-run', '--window-size=1500,980', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank']
+  const args = ['--no-first-run', '--window-size=1560,980', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, 'about:blank']
   if (HEADLESS) args.unshift('--headless=new')
   const edge = spawn(EDGE, args, { stdio: 'ignore' })
   let ws
@@ -85,7 +89,7 @@ async function main() {
     let seq = 0; const pending = new Map()
     ws.onmessage = (d) => {
       let m; try { m = JSON.parse(typeof d.data === 'string' ? d.data : d.data.toString()) } catch { return }
-      // 打印会开新窗口,headless 下可能被拦 → alert 会**阻塞页面**,这里自动关掉,免得探针挂死
+      // 打印会开新窗口,headless 下可能被拦 → alert 会**阻塞页面**,自动关掉免得探针挂死
       if (m.method === 'Page.javascriptDialogOpening') { send('Page.handleJavaScriptDialog', { accept: true }); return }
       if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) }
     }
@@ -104,7 +108,6 @@ async function main() {
       localStorage.setItem('mes_factory', '"YJ_TEST"'); return 'ok' })()`)
 
     let bootSeq = 0
-    /** 整页重载打开面板(pinia 的 user store 只在启动时读一次 localStorage,换 hash 不重载会被守卫踢回登录页) */
     const openPanel = async (panel, docNo) => {
       const url = `${BASE}/?_boot=${++bootSeq}#/panelx/list/${panel}?docNo=${encodeURIComponent(docNo)}`
       await send('Page.navigate', { url })
@@ -116,7 +119,6 @@ async function main() {
       }
       return 0
     }
-    /** 点工具栏某个组:单动作组直接点主按钮,多动作组先开 ▼ 再点菜单项 */
     const clickToolbar = async (group, item) => {
       const r = await ev(`(function(){
         const g = Array.from(document.querySelectorAll('.tb-group'))
@@ -131,7 +133,7 @@ async function main() {
         const r2 = await ev(`(function(){
           const it = Array.from(document.querySelectorAll('.tb-menu .ctx-item'))
             .find(function(x){ return x.textContent.trim() === ${JSON.stringify(item)} })
-          if (!it) return 'no-item:' + Array.from(document.querySelectorAll('.tb-menu .ctx-item')).map(function(x){return x.textContent.trim()}).join('|')
+          if (!it) return 'no-item'
           it.click(); return 'ok'
         })()`)
         await sleep(900)
@@ -139,36 +141,37 @@ async function main() {
       }
       return r
     }
+    /** 读生单明细表:列头 + 每行各列文本 + 勾选框是否禁用 */
+    const readSendTable = () => ev(`(function(){
+      const t = document.querySelector('.bsd .el-table')
+      if (!t) return null
+      const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
+      const ix = function(n){ return ths.findIndex(function(x){ return x.indexOf(n) >= 0 }) }
+      const cols = { 数量: ix('数量'), 批次号: ix('批次号'), 状态: ix('状态'), 剩余: ix('剩余'), 可送上限: ix('可送上限') }
+      const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
+      return JSON.stringify({ ths: ths, cols: cols, rows: trs.map(function(tr){
+        const tds = Array.from(tr.querySelectorAll('td'))
+        const pick = function(i){ return i >= 0 && tds[i] ? tds[i].textContent.trim() : null }
+        return { 数量: pick(cols.数量), 批次号: pick(cols.批次号), 状态: pick(cols.状态),
+                 剩余: pick(cols.剩余), 可送上限: pick(cols.可送上限),
+                 禁勾: !!tr.querySelector('.el-checkbox.is-disabled') }
+      }) })
+    })()`)
 
     // ============ ① 打印材料码弹窗 ============
     console.log('\n=== ① 采购订单 →「打印」→「打印材料码」→ 弹窗 ===')
     await openPanel('PU_ORDER', pick.no)
-    const clicked = await clickToolbar('打印', '打印材料码')
-    info(`点击工具栏:${clicked}`)
+    info(`点击工具栏:${await clickToolbar('打印', '打印材料码')}`)
     let dlg = null
     for (let i = 0; i < 40; i++) {
       await sleep(400)
       dlg = await ev(`(function(){ const i = document.querySelector('.mlq-batch-inp input'); return i ? i.value : null })()`)
       if (dlg !== null && dlg !== undefined) break
     }
-    ok(dlg !== null && dlg !== undefined, `材料码打印弹窗已弹出(批次号输入框值 ${JSON.stringify(dlg)})`)
     ok(N(dlg) === EXPECT_AUTO, `「批次号」按公式**预填** = ${EXPECT_AUTO}(实得 ${JSON.stringify(dlg)})`)
-    const tbl = await ev(`(function(){
-      const t = document.querySelector('.mlq .el-table')
-      if (!t) return null
-      const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
-      const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
-      const idx = ths.findIndex(function(x){ return x.indexOf('剩余可打') >= 0 })
-      return JSON.stringify({ ths: ths, rows: trs.length, capIdx: idx,
-        cap: idx >= 0 && trs[0] ? (trs[0].querySelectorAll('td')[idx] || {}).textContent : null })
-    })()`)
-    info(`打印表:${tbl}`)
-    const T = JSON.parse(tbl || '{}')
-    ok((T.rows || 0) > 0, `明细表有 ${T.rows} 行可勾选`)
-    ok(T.capIdx >= 0 && Number(String(T.cap).trim()) > 0, `有「剩余可打」列且首行有额度(${String(T.cap).trim()})`)
 
-    // ============ ② 改号 + 填量 + 确定并打印 ============
-    console.log('\n=== ② 改批次号 → 确定并打印 → 库里真的登记了 ===')
+    // ============ ② 改号 + 只勾一行 + 填量 + 确定并打印 ============
+    console.log('\n=== ② 改批次号 → 只勾一行填量 → 确定并打印 → 库里真的登记了 ===')
     const typed = await ev(`(function(){
       const i = document.querySelector('.mlq-batch-inp input')
       if (!i) return 'no-input'
@@ -178,77 +181,167 @@ async function main() {
       i.dispatchEvent(new Event('change', { bubbles: true }))
       return i.value
     })()`)
-    ok(N(typed) === MY_BATCH, `「批次号」**可改**,已改成 ${MY_BATCH}(实得 ${JSON.stringify(typed)})`)
-    const pressed = await ev(`(function(){
-      const b = Array.from(document.querySelectorAll('.el-dialog__footer button, .el-dialog button'))
-        .find(function(x){ return x.textContent.trim() === '确定并打印' })
-      if (!b) return 'no-btn'
-      b.click(); return 'ok'
+    ok(N(typed) === MY_BATCH, `「批次号」**可改**,已改成 ${MY_BATCH}`)
+    // ⚠ 弹窗默认**全选**有可打量的行 ⇒ 先「清空」再只勾第一行,否则会把另一行也按默认量打出去
+    //   (2026-10-04 探针首版就栽在这:打印量变成两行合计 470 而不是 50)
+    await ev(`(function(){
+      const b = Array.from(document.querySelectorAll('.el-dialog button')).find(function(x){ return x.textContent.trim() === '清空' })
+      if (b) b.click(); return b ? 'cleared' : 'no-btn' })()`)
+    await sleep(500)
+    const setQty = await ev(`(function(){
+      const t = document.querySelector('.mlq .el-table')
+      const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
+      const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
+      const first = trs[0]
+      if (!first) return 'no-row'
+      const cbx = first.querySelector('.el-checkbox')
+      if (cbx) cbx.click()
+      return 'checked'
     })()`)
-    info(`点击「确定并打印」:${pressed}`)
+    await sleep(600)
+    const setQty2 = await ev(`(function(){
+      const t = document.querySelector('.mlq .el-table')
+      const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
+      const i = ths.findIndex(function(x){ return x.indexOf('本次打印数量') >= 0 })
+      const tr = Array.from(t.querySelectorAll('.el-table__body tbody tr')).find(function(r){ return r.textContent.trim() !== '' })
+      const inp = tr.querySelectorAll('td')[i].querySelector('input')
+      if (!inp) return 'no-input'
+      inp.value = ${JSON.stringify(String(PRINT_QTY))}
+      inp.dispatchEvent(new Event('input', { bubbles: true }))
+      inp.dispatchEvent(new Event('change', { bubbles: true }))
+      return inp.value
+    })()`)
+    info(`只勾第一行(${setQty})+ 本次打印数量设为 ${setQty2}`)
+    info(`点击「确定并打印」:${await ev(`(function(){
+      const b = Array.from(document.querySelectorAll('.el-dialog button')).find(function(x){ return x.textContent.trim() === '确定并打印' })
+      if (!b) return 'no-btn'; b.click(); return 'ok' })()`)}`)
     await sleep(3000)
     const made = await one(`SELECT TOP 1 单据编号 no, 批次号 b FROM bd_pu_label
       WHERE 采购订单号=N'${pick.no}' AND 批次号=N'${MY_BATCH}' AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id DESC`)
     ok(N(made?.b) === MY_BATCH, `界面上改的号登记成了打印单(${JSON.stringify(made?.no)} → ${JSON.stringify(made?.b)})`)
-    const madeQty = await one(`SELECT ISNULL(SUM(打印数量),0) q FROM bl_pu_label
-      WHERE 单据编号=N'${makeSqlStr(made?.no)}' AND ISNULL(asp_cancel,'N')<>'Y'`)
-    ok(Number(madeQty?.q) > 0, `打印数量已落库(${madeQty?.q})`)
+    const madeQty = await one(`SELECT ISNULL(SUM(打印数量),0) q, COUNT(*) n FROM bl_pu_label WHERE 单据编号=N'${made?.no}' AND ISNULL(asp_cancel,'N')<>'Y'`)
+    ok(Number(madeQty?.q) === PRINT_QTY && Number(madeQty?.n) === 1,
+      `只登记了这一行、打印量 = ${PRINT_QTY}(实得 合计 ${madeQty?.q} / ${madeQty?.n} 行)`)
+    ok(!(await one(`SELECT TOP 1 单据编号 no FROM bl_pu_label WHERE 单据编号=N'${made?.no}' AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL([采购订单行id],0) <> ${Number(pick.line.id)}`)),
+      `另一行**没有**被顺手打出去(只打印勾选的那一行)`)
+    // ⑧ 打印弹窗记录里应显示「未生单 = 打印量」(此刻还没生单)
+    {
+      let rec = null
+      for (let i = 0; i < 30; i++) {
+        await sleep(400)
+        rec = await ev(`(function(){
+          const el = document.querySelector('.mlq-records .el-table')
+          if (!el) return null
+          const ths = Array.from(el.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
+          const iP = ths.findIndex(function(x){ return x.indexOf('打印量') >= 0 })
+          const iG = ths.findIndex(function(x){ return x.indexOf('已生单') >= 0 })
+          const tr = Array.from(el.querySelectorAll('.el-table__body tbody tr')).find(function(r){ return r.textContent.trim() !== '' })
+          if (!tr) return null
+          const tds = Array.from(tr.querySelectorAll('td'))
+          return JSON.stringify({ 打印量: tds[iP] && tds[iP].textContent.trim(), 已生单: tds[iG] && tds[iG].textContent.trim() })
+        })()`)
+        if (rec) break
+      }
+      const R0 = JSON.parse(rec || '{}')
+      info(`打印弹窗「已打印记录」:${rec}`)
+      ok(Number(R0.打印量) === PRINT_QTY && Number(R0.已生单) === 0,
+        `记录里打印量 ${PRINT_QTY}、已生单 0(还没生单;实得 ${JSON.stringify(R0)})`)
+    }
 
-    // ============ ③ 生单弹窗出现「已打印待生单」并锁定批次号 ============
-    console.log('\n=== ③ 生单弹窗:出现「已打印待生单」,勾选后批次号**锁定**为该号 ===')
+    // ============ ③ 生单弹窗:原行数量被切走 + 多出一行隔离行 ============
+    console.log('\n=== ③ 生单弹窗:原行数量扣掉打印量(400→350) + **多出一行**隔离行 ===')
     await openPanel('PU_ORDER', pick.no)
-    const clicked2 = await clickToolbar('生单')
-    info(`点击工具栏「生单」:${clicked2}`)
-    let prReady = null
+    info(`点击工具栏「生单」:${await clickToolbar('生单')}`)
+    let T = null
     for (let i = 0; i < 40; i++) {
       await sleep(400)
-      prReady = await ev(`(function(){
-        const t = document.querySelector('.bsd-printed .el-table')
-        if (!t) return null
-        const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
-        const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
-        const i = ths.findIndex(function(x){ return x.indexOf('批次号') >= 0 })
-        return JSON.stringify({ ths: ths, rows: trs.length, batch: (i >= 0 && trs[0]) ? trs[0].querySelectorAll('td')[i].textContent.trim() : null })
-      })()`)
-      if (prReady) break
+      T = JSON.parse((await readSendTable()) || 'null')
+      if (T && T.rows && T.rows.length >= 2) break
     }
-    const P = JSON.parse(prReady || '{}')
-    info(`已打印待生单表:${prReady}`)
-    ok((P.rows || 0) > 0, `「已打印待生单」小表出现且有 ${P.rows} 行`)
-    ok(N(P.batch) === MY_BATCH, `小表里的批次号 = 材料码上的号(${JSON.stringify(P.batch)})`)
-    // 勾选第一行
+    ok(!!T && T.rows.length >= 2, `明细表里出现 ${T?.rows?.length} 行(原行 + 隔离行)`)
+    info(`列头:${JSON.stringify(T?.ths)}`)
+    info(`行:${JSON.stringify(T?.rows)}`)
+    const orderRow = (T?.rows || []).find((r) => N(r.批次号) === '—')
+    const isoRow = (T?.rows || []).find((r) => N(r.批次号) === MY_BATCH)
+    ok(!!orderRow, `原行在表里(批次号列 = —,状态列 = —)`)
+    ok(Number(orderRow?.数量) === ORDER_QTY - PRINT_QTY,
+      `原行「数量」已扣掉打印量:${ORDER_QTY} → ${orderRow?.数量}(| 隔离出去 ${PRINT_QTY})`)
+    ok(!!isoRow, `**多出一行**隔离行,批次号 = 材料码上的号(${JSON.stringify(isoRow?.批次号)})`)
+    ok(Number(isoRow?.数量) === PRINT_QTY, `隔离行「数量」= 打印量 ${PRINT_QTY}(实得 ${isoRow?.数量})`)
+    ok(N(isoRow?.状态) === '已打印', `隔离行状态 = 「已打印」(实得 ${JSON.stringify(isoRow?.状态)})`)
+    ok(Number(isoRow?.剩余) === PRINT_QTY && Number(isoRow?.可送上限) === PRINT_QTY,
+      `隔离行「剩余/可送上限」= 未生单量 ${PRINT_QTY}(实得 ${isoRow?.剩余}/${isoRow?.可送上限})`)
+
+    // ============ ④ 勾隔离行 → 批次号锁定 ============
+    console.log('\n=== ④ 勾隔离行 → 顶部批次号**锁定**为材料码批次号 ===')
     await ev(`(function(){
-      const t = document.querySelector('.bsd-printed .el-table')
-      const tr = Array.from(t.querySelectorAll('.el-table__body tbody tr')).find(function(r){ return r.textContent.trim() !== '' })
-      const cb = tr && tr.querySelector('.el-checkbox')
-      if (cb) cb.click()
-      return cb ? 'checked' : 'no-checkbox'
+      const t = document.querySelector('.bsd .el-table')
+      const trs = Array.from(t.querySelectorAll('.el-table__body tbody tr')).filter(function(r){ return r.textContent.trim() !== '' })
+      const ths = Array.from(t.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
+      const i = ths.findIndex(function(x){ return x.indexOf('批次号') >= 0 })
+      const tr = trs.find(function(r){ return r.querySelectorAll('td')[i].textContent.trim() === ${JSON.stringify(MY_BATCH)} })
+      const cbx = tr && tr.querySelector('.el-checkbox')
+      if (cbx) cbx.click()
+      return cbx ? 'checked' : 'no-checkbox'
     })()`)
-    await sleep(700)
-    const locked = await ev(`(function(){
+    await sleep(800)
+    const locked = JSON.parse(await ev(`(function(){
       const i = document.querySelector('.bsd-batch-inp input')
       return JSON.stringify({ disabled: i ? !!i.disabled : null, value: i ? i.value : null })
-    })()`)
-    info(`顶部批次号:${locked}`)
-    const L = JSON.parse(locked || '{}')
-    ok(L.disabled === true, `勾了已打印行 ⇒ 顶部「批次号」输入框被**锁定**(disabled)`)
-    ok(N(L.value) === MY_BATCH, `锁定后的号 = 材料码批次号 ${MY_BATCH}(实得 ${JSON.stringify(L.value)})`)
+    })()`) || '{}')
+    info(`顶部批次号:${JSON.stringify(locked)}`)
+    ok(locked.disabled === true && N(locked.value) === MY_BATCH,
+      `勾了隔离行 ⇒ 顶部批次号锁定为 ${MY_BATCH}(disabled=${locked.disabled},值=${JSON.stringify(locked.value)})`)
 
-    // ============ ④ 确定生单 → 暂收单批次号 = 材料码批次号 ============
-    console.log('\n=== ④ 确定生单:生成的送料暂收单批次号 = 材料码上的号 ===')
-    const before = Number((await one(`SELECT COUNT(*) n FROM sl_recv WHERE 批次号=N'${MY_BATCH}'`))?.n || 0)
-    const pressed2 = await ev(`(function(){
-      const b = Array.from(document.querySelectorAll('.el-dialog button'))
-        .find(function(x){ return x.textContent.trim() === '确定生单' })
-      if (!b) return 'no-btn'
-      b.click(); return 'ok'
-    })()`)
-    info(`点击「确定生单」:${pressed2}`)
+    // ============ ⑤ 确定生单 ============
+    console.log('\n=== ⑤ 确定生单:暂收单批次号 = 材料码上的号 ===')
+    info(`点击「确定生单」:${await ev(`(function(){
+      const b = Array.from(document.querySelectorAll('.el-dialog button')).find(function(x){ return x.textContent.trim() === '确定生单' })
+      if (!b) return 'no-btn'; b.click(); return 'ok' })()`)}`)
     await sleep(3500)
     const after = await one(`SELECT TOP 1 单据编号 no, 批次号 b FROM sl_recv WHERE 批次号=N'${MY_BATCH}' ORDER BY id DESC`)
-    ok(Number((await one(`SELECT COUNT(*) n FROM sl_recv WHERE 批次号=N'${MY_BATCH}'`))?.n || 0) > before,
-      `新生成了一张暂收单:${JSON.stringify(after?.no)} 批次号 ${JSON.stringify(after?.b)}`)
+    ok(N(after?.b) === MY_BATCH, `新生成的暂收单批次号 = ${MY_BATCH}(${JSON.stringify(after?.no)})`)
     if (after?.no) created.push(['QC_RECV', N(after.no)])
+
+    // ============ ⑥ 重新打开生单弹窗:隔离行标「已生单」且不可勾 ============
+    console.log('\n=== ⑥ 重新打开生单弹窗:隔离行标「已生单」、剩余 0、**不可再勾** ===')
+    await openPanel('PU_ORDER', pick.no)
+    await clickToolbar('生单')
+    let T2 = null
+    for (let i = 0; i < 40; i++) {
+      await sleep(400)
+      T2 = JSON.parse((await readSendTable()) || 'null')
+      if (T2 && T2.rows && T2.rows.length >= 2) break
+    }
+    info(`行:${JSON.stringify(T2?.rows)}`)
+    const iso2 = (T2?.rows || []).find((r) => N(r.批次号) === MY_BATCH)
+    ok(!!iso2 && N(iso2.状态) === '已生单', `隔离行状态 = 「已生单」(实得 ${JSON.stringify(iso2?.状态)})`)
+    ok(Number(iso2?.剩余) === 0 && Number(iso2?.可送上限) === 0,
+      `隔离行剩余/可送上限归 0(实得 ${iso2?.剩余}/${iso2?.可送上限})`)
+    ok(iso2?.禁勾 === true, `隔离行的**勾选框已禁用**(禁勾=${iso2?.禁勾})`)
+    // 打印弹窗也显示"已经生单"
+    await openPanel('PU_ORDER', pick.no)
+    await clickToolbar('打印', '打印材料码')
+    let recTxt = null
+    for (let i = 0; i < 40; i++) {
+      await sleep(400)
+      recTxt = await ev(`(function(){
+        const t = document.querySelectorAll('.mlq-records .el-table')
+        const el = t && t[0]
+        if (!el) return null
+        const ths = Array.from(el.querySelectorAll('.el-table__header thead th')).map(function(x){return x.textContent.trim()})
+        const iAll = ths.findIndex(function(x){ return x.indexOf('已生单') >= 0 })
+        const iP = ths.findIndex(function(x){ return x.indexOf('打印量') >= 0 })
+        const tr = Array.from(el.querySelectorAll('.el-table__body tbody tr')).find(function(r){ return r.textContent.trim() !== '' })
+        if (!tr) return null
+        const tds = Array.from(tr.querySelectorAll('td'))
+        return JSON.stringify({ ths: ths, 打印量: tds[iP] && tds[iP].textContent.trim(), 已生单: tds[iAll] && tds[iAll].textContent.trim() })
+      })()`)
+      if (recTxt) break
+    }
+    info(`打印弹窗「已打印记录」首行:${recTxt}`)
+    const R = JSON.parse(recTxt || '{}')
+    ok(Number(R.已生单) === PRINT_QTY, `打印弹窗记录里显示**已生单 ${PRINT_QTY}**(实得 ${JSON.stringify(R.已生单)})`)
     console.log(`\n  留证:采购订单 ${pick.no} / 打印单 ${made?.no}(${MY_BATCH}) / 暂收单 ${after?.no}`)
   } finally {
     try { ws?.close() } catch { /* ignore */ }
@@ -270,8 +363,5 @@ async function main() {
   console.log(`\n${fails ? `❌ 失败 ${fails} 项` : '✅ 全部通过'}`)
   process.exit(fails ? 1 : 0)
 }
-
-/** SQL 字面量转义(单引号加倍);null → 空串,让查询自然查不到 */
-function makeSqlStr(s) { return String(s ?? '').replace(/'/g, "''") }
 
 main().catch((e) => { console.error('探针异常:' + (e && e.stack || e)); process.exit(1) })
