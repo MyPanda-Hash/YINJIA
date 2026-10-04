@@ -1,0 +1,111 @@
+[
+ {
+  "id": "a4ac65e275dc11ed86f73955516d5135",
+  "title": "查询模拟BOM详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/getdetail?access_token=xxxxx",
+  "context": [
+   "|data.Head.FRoutingID|int32|工艺路线|\r"
+  ]
+ },
+ {
+  "id": "9aebe26375f911ed86f72515f0d4f894",
+  "title": "批量查询生产领料单",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/list?access_token=xxxxx",
+  "context": [
+   "|description|string|返回描述|data.List.Head.FWBINTERID|decimal|工序计划单内码|\t\t",
+   "|data.List.Entry.FOperSN|int32|工序号|\t\t",
+   "|data.List.Entry.FOperID|int32|工序|\t"
+  ]
+ },
+ {
+  "id": "a4bb811475dc11ed86f70b4e0ee2b671",
+  "title": "新增模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/create?access_token=xxxxx",
+  "context": [
+   "|Object.Head.FRoutingID|int32|false|工艺路线|\t\t\r"
+  ]
+ },
+ {
+  "id": "9ae63d1275f911ed86f7379e1f5d17f3",
+  "title": "查询生产领料单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/getdetail?access_token=xxxxx",
+  "context": [
+   "|data.Head.FWBINTERID|decimal|工序计划单内码|",
+   "|data.Entry.FOperSN|int32|工序号|",
+   "|data.Entry.FOperID|int32|工序|"
+  ]
+ },
+ {
+  "id": "9af1aec475f911ed86f71fa0197cd475",
+  "title": "新增生产领料单",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/create?access_token=xxxxx",
+  "context": [
+   "|Object.Head.FWBINTERID|decimal|false|工序计划单内码|\t\t",
+   "|Object.Entry.FOperSN|int32|false|工序号|\t\t",
+   "|Object.Entry.FOperID|int32|false|工序|\t\t"
+  ]
+ },
+ {
+  "id": "81948a89769a11ed85826767b6baf211",
+  "title": "查询检验单详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/qualitycheck/getdetail?access_token=xxxxx",
+  "context": [
+   "|data.Entry.FProcedureCode|int32|工序代码|\r",
+   "|data.Entry.ProcedurePlanNo|string|工序计划单号|\r"
+  ]
+ },
+ {
+  "id": "a4c1c2a575dc11ed86f7ad05b360b96b",
+  "title": "修改模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/update?access_token=xxxxx",
+  "context": [
+   "|Object.Head.FRoutingID|int32|false|工艺路线|\t\t\r"
+  ]
+ },
+ {
+  "id": "a4b47c3375dc11ed86f759bb43e95c06",
+  "title": "批量查询模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/list?access_token=xxxxx",
+  "context": [
+   "|data.List.Head.FRoutingID|int32|工艺路线|\t\t\r"
+  ]
+ },
+ {
+  "id": "9af976f575f911ed86f75d29068345ae",
+  "title": "修改生产领料单",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/update?access_token=xxxxx",
+  "context": [
+   "|Object.Head.FWBINTERID|decimal|false|工序计划单内码|\t\t",
+   "|Object.Entry.FOperSN|int32|false|工序号|\t\t",
+   "|Object.Entry.FOperID|int32|false|工序|\t\t"
+  ]
+ },
+ {
+  "id": "81a441fa769a11ed85825fc4b8bb8c8a",
+  "title": "批量查询检验单",
+  "path": "https://api.kingdee.com/koas/app007140/api/qualitycheck/list?access_token=xxxxx",
+  "context": [
+   "|data.List.Entry.FProcedureCode|int32|工序代码|     \r",
+   "|data.List.Entry.ProcedurePlanNo|string|工序计划单号|     \r"
+  ]
+ },
+ {
+  "id": "15a9b098691311eca26bfba14cf0473c",
+  "title": "模拟BOM",
+  "path": "",
+  "context": [
+   "|data.Head.FRoutingID|int32|工艺路线|",
+   "|data.List.Head.FRoutingID|int32|工艺路线|\t\t",
+   "|Object.Head.FRoutingID|int32|false|工艺路线|\t\t",
+   "|Object.Head.FRoutingID|int32|false|工艺路线|\t\t"
+  ]
+ },
+ {
+  "id": "5f8ac65e23a911efa261b94562987cd6",
+  "title": "隐私中心",
+  "path": "",
+  "context": [
+   "​\t在对数据加密进行时，一般会遇到三种操作场景：1、字段加密；2、算法替换；3、秘钥替换。此时会对数据库中数据进行数据加密或者数据解密、再加密这些复杂的工序，为了保证系统的稳定，平台将此复杂工序做成后台异步任务，并且支持实时监控任务处理情况。"
+  ]
+ }
+]
