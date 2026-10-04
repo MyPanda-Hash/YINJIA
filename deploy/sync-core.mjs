@@ -168,9 +168,6 @@ export const DOCS = [
     code: 'BD_UOM', label: '计量单位', archive: true,
     listPath: '/jdy/v2/bd/measure_unit', detailPath: '/jdy/v2/bd/measure_unit_detail',
     table: 'bs_uom', codeCol: '计量单位编码',
-    // 登记 id→名称:BOM单(BD_BOM)分录只给 material_unit_id / material_baseunit_id(内码,无名称孪生),
-    // 靠本映射把内码解析成单位名称(2026-10-04,见 BD_BOM.mapLines)。
-    afterList(rows, ctx) { ctx.uomNameById = new Map(rows.map((r) => [String(r.id), r.name])); },
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.precision].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d) {
       return { 计量单位编码: str(d.number), 计量单位名称: str(d.name),
@@ -318,71 +315,6 @@ export const DOCS = [
         增值税税率: num(d.rate), 开票名称: str(d.invoice_name), 开户地址: dec(d.account_open_addr),
         采购员部门: str(d.sale_dept_name), 自动抵扣预收款: d.deduct === true,
         __cancel: d.enable === '1' ? 'N' : 'Y' };
-    },
-  },
-  {
-    // ══════════ BOM单(基础资料,表头+子料分录;与「商品」同一套全量机制) ══════════
-    // 与其它档案的区别:金蝶 BOM 是「表头 + material_entity 子料分录」两层,且**没有详情接口**
-    //   (/jdy/v2/bd/bom_detail → HTTP 400、/jdy/v2/bd/bom_list → HTTP 519;2026-10-04 实测),
-    //   列表接口本身就带分录 ⇒ detailPath=null,细节靠 lineTable 承载(引擎的 archive+行表 分支)。
-    // 全量口径与商品一致:无时间窗、无状态过滤,列表级指纹跳过(指纹里带上分录签名,
-    //   因为分录改动同样只体现在列表行里 —— 与「商品自定义字段」同一类坑,见 CF_INSPECTION_KEYS 注释)。
-    code: 'BD_BOM', label: 'BOM单', archive: true,
-    listPath: '/jdy/v2/bd/bom', detailPath: null,
-    table: 'bs_bom_head', lineTable: 'bs_bom_detail', codeCol: '单据编号',
-    fingerprintOf: (r) => [
-      r.number, r.product_number, r.product_name, r.version, r.yield, r.status, r.enable, r.isskip,
-      r.bom_remark, r.modify_time,
-      // 分录签名:表头字段没变但子料增删改时也必须重写(列表行自带 material_entity)
-      (r.material_entity || []).map((m) => [m.seq, m.material_number, m.dosage_numerator, m.dosage_denominator,
-        m.unitqty, m.scrap, m.fixed_loss, m.issue_pattern, m.stock_number, m.sp_number].join(',')).join(';'),
-    ].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
-    mapArchive(d) {
-      const en = Number(d.enable);
-      const st = String(d.status || '').toUpperCase();
-      return {
-        单据编号: str(d.number), 产品编码: str(d.product_number), 产品名称: str(d.product_name),
-        版本号: str(d.version), 成品率: num(d.yield), BOM备注: str(d.bom_remark),
-        跳过该层级领用下级物料: d.isskip === '1' || d.isskip === true,
-        审核状态: st === 'C' ? '已审核' : st === 'Z' ? '未审核' : null,
-        是否启用: (d.enable === undefined || d.enable === null) ? null : en === 1,
-        状态: en === 0 ? '停用' : '启用', 停用: en === 0,
-        数据来源: str(d.billsource),
-        产品单位: str(d.product_unit_name), 产品单位编码: str(d.product_unit_number),
-        基本单位: str(d.product_baseunit_name), 基本单位编码: str(d.product_baseunit_number),
-        辅助属性: str(d.product_auxprop_name), 辅助属性编码: str(d.product_auxprop_number),
-        属性组1: str(d.product_aux1_name), 属性组2: str(d.product_aux2_name), 属性组3: str(d.product_aux3_name),
-        属性组4: str(d.product_aux4_name), 属性组5: str(d.product_aux5_name),
-        审核人: str(d.auditor_name), 审核时间: str(d.audit_time),
-        创建人: str(d.creator_name), 创建时间: str(d.create_time),
-        修改人: str(d.modifier_name), 修改时间: str(d.modify_time),
-        // ⚠ 不能用 enable=0 判作废:金蝶「禁用」≠ MES「作废」,作废的行会从面板整体消失
-        //   (upsertArchive 把 __cancel 写进 asp_cancel)。禁用只写 停用/状态 两列。
-        __cancel: 'N',
-      };
-    },
-    mapLines(d, ctx) {
-      // 分录只给「单位内码」:material_unit_id / material_baseunit_id → 用 BD_UOM 登记的 id→名称 解析
-      const uom = (id) => (ctx && ctx.uomNameById && ctx.uomNameById.get(String(id))) || null;
-      // 发料方式取值:D 直接领料 / A 倒冲领料 / B 不领料(接口未列枚举说明时原样落库)
-      const ISSUE = { D: '直接领料', A: '倒冲领料', B: '不领料' };
-      return (d.material_entity || []).map((m) => ({
-        单据编号: str(d.number),
-        行号: num(m.seq),
-        子料编码: str(m.material_number), 子料名称: str(m.material_name),
-        子料单位: uom(m.material_unit_id), 子料基本单位: uom(m.material_baseunit_id),
-        材料用量: num(m.dosage_numerator), 产品产量: num(m.dosage_denominator), 单位用量: num(m.unitqty),
-        损耗率: num(m.scrap), 固定损耗: num(m.fixed_loss),
-        发料方式: ISSUE[String(m.issue_pattern || '').toUpperCase()] || str(m.issue_pattern),
-        关键件: m.iskeypieces === '1' || m.iskeypieces === true,
-        替代件: m.isrepitem === '1' || m.isrepitem === true,
-        工位: str(m.machinepos),
-        发料仓库: str(m.stock_name), 发料仓库编码: str(m.stock_number),
-        发料仓位: str(m.sp_name), 发料仓位编码: str(m.sp_number),
-        物料备注: str(m.material_remark),
-        物料备注1: str(m.custom_txt1), 物料备注2: str(m.custom_txt2), 物料备注3: str(m.custom_txt3),
-        外部分录ID: str(m.id),
-      }));
     },
   },
 
@@ -641,60 +573,6 @@ export async function upsertArchive(doc, mssql, pool, mapped, fp) {
   }
 }
 
-/**
- * 档案+行表落库(2026-10-04,BOM单引入):对象是「基础资料」但形态为 表头+分录 ——
- * 头表按外部锚点 upsert(与 upsertArchive 同口径),分录先删后插(与 upsertDoc 同口径),
- * 并镜像审核状态到 yj_doc_status(面板是 doc 模式,列表状态列/作废过滤都读它)。
- * 仍属档案语义:无时间窗、无 yj_doc_status 的 pending/archived 流程,只借状态列显示「已审核/草稿」。
- */
-export async function upsertArchiveDoc(doc, mssql, pool, mapped, lines, fp) {
-  const tx = new mssql.Transaction(pool);
-  await tx.begin();
-  try {
-    const r = new mssql.Request(tx);
-    const entries = Object.entries(mapped)
-      .filter(([col]) => !col.startsWith('__') && !['外部数据ID', '外部单据号', '外部指纹'].includes(col))
-      .map(([col, val]) => [`[${col}]`, val]);
-    const setPairs = entries.map(([col], i) => `${col}=@p${i}`).join(', ');
-    const base = entries.length;
-    entries.push(['@__cancel', mapped.__cancel || 'N'], ['@__ctime', mapped.__创建时间], ['@__extid', mapped.外部数据ID],
-      ['@__no', mapped.外部单据号], ['@__fp', fp], ['@__now', nowLocal()]);
-    const { names } = paramify(r, mssql, entries);
-    await r.query(`
-      UPDATE ${doc.table} SET
-        ${setPairs},
-        asp_user1=N'jdy-sync', asp_time1=COALESCE(@p${base + 1}, asp_time1), asp_cancel=@p${base},
-        外部数据ID=@p${base + 2}, 外部单据号=@p${base + 3}, 外部指纹=@p${base + 4}
-      WHERE 外部数据ID=@p${base + 2} OR (外部数据ID IS NULL AND [${doc.codeCol}]=@p${base + 3});
-      IF @@ROWCOUNT = 0
-        INSERT INTO ${doc.table} (${entries.slice(0, base).map(([col]) => col).join(', ')}, asp_user1, asp_time1, asp_cancel, 外部数据ID, 外部单据号, 外部指纹)
-        VALUES (${names.slice(0, base).join(', ')}, N'jdy-sync', COALESCE(@p${base + 1}, @p${base + 5}), @p${base}, @p${base + 2}, @p${base + 3}, @p${base + 4});
-      DELETE FROM ${doc.lineTable} WHERE [${doc.codeCol}]=@p${base + 3};`);
-    // 审核状态镜像:d['审核状态'] 为「已审核」时落审核人/审核时间(与订单 upsertDoc 同表同口径)
-    r.input('m_shr', mssql.NVarChar(50), mapped.审核状态 === '已审核' ? (mapped.审核人 || N_SYNC_USER) : null);
-    r.input('m_shsj', mssql.NVarChar(30), mapped.审核状态 === '已审核' ? mapped.审核时间 : null);
-    await r.query(`
-      MERGE yj_doc_status AS t USING (VALUES (N'${doc.code}', @p${base + 3})) AS s(panel_code, doc_no)
-      ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no
-      WHEN MATCHED THEN UPDATE SET
-        shr = @m_shr, shsj = @m_shsj, canceled = N'N', pending = N'N', update_at = GETDATE()
-      WHEN NOT MATCHED THEN INSERT (panel_code, doc_no, shr, shsj, canceled, stopped, pending, update_at)
-        VALUES (s.panel_code, s.doc_no, @m_shr, @m_shsj, N'N', N'N', N'N', GETDATE());`);
-    for (const l of lines) {
-      const lr = new mssql.Request(tx);
-      const lEntries = Object.entries(l).map(([col, val]) => [`[${col}]`, val]);
-      lEntries.push(['@__lnow', nowLocal()]);
-      const { names: ln } = paramify(lr, mssql, lEntries);
-      await lr.query(`INSERT INTO ${doc.lineTable} (${lEntries.slice(0, -1).map(([c]) => c).join(', ')}, asp_user1, asp_time1, asp_cancel)
-        VALUES (${ln.slice(0, -1).join(', ')}, N'jdy-sync', @p${lEntries.length - 1}, N'N');`);
-    }
-    await tx.commit();
-  } catch (e) {
-    await tx.rollback();
-    throw e;
-  }
-}
-
 // ---------- 主流程 ----------
 export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false, refresh = [] }) {
   configPath = configPath || join(HERE, 'config.json');
@@ -817,17 +695,9 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
         if (!ok) { log(`【${doc.label}】未确认,整类跳过`); continue; }
         await backupBeforeWrite({
           mssql, pool, baseDir: HERE, panel: doc.code,
-          headTable: doc.table, lineTable: doc.lineTable || null, docNos: null, // 全量前像(清污前)
+          headTable: doc.table, lineTable: null, docNos: null, // 全量前像(清污前)
           retentionDays: opt.backupRetentionDays, log,
         });
-        // 先删行表再删头表(BOM单这类「档案+行表」对象;行表只有单据编号,没有外部数据ID)
-        if (doc.lineTable) {
-          const dl = await new mssql.Request(pool).query(
-            `DELETE FROM ${doc.lineTable} WHERE [${doc.codeCol}] IN (
-               SELECT [${doc.codeCol}] FROM ${doc.table} WHERE 外部数据ID IS NOT NULL OR asp_user1 = N'jdy-sync');
-             SELECT @@ROWCOUNT AS n;`);
-          log(`【${doc.label}】初始化清污:删除同步器旧分录 ${dl.recordset[0].n} 行`);
-        }
         const del = await new mssql.Request(pool).query(
           `DELETE FROM ${doc.table} WHERE 外部数据ID IS NOT NULL OR asp_user1 = N'jdy-sync'; SELECT @@ROWCOUNT AS n;`);
         log(`【${doc.label}】初始化清污:删除同步器旧数据 ${del.recordset[0].n} 行(手录行保留),开始全量重建`);
@@ -887,14 +757,9 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
         await backupBeforeWrite({
           mssql, pool, baseDir: HERE, panel: doc.code,
           headTable: doc.archive ? doc.table : doc.headTable,
-          lineTable: doc.archive ? (doc.lineTable || null) : doc.lineTable,
-          // 档案以外部锚点定位受影响行;档案+行表(BOM单)改用单据编号 —— 行表只有单据编号列,没有外部数据ID
-          keyCol: doc.archive && !doc.lineTable ? '外部数据ID' : '单据编号',
-          docNos: mode === 'init' ? null : (doc.archive && !doc.lineTable
-            ? changedRows.map((r) => String(r.id))
-            : doc.archive
-              ? changedRows.map((r) => str(r.number)).filter(Boolean)
-              : changedRows.map((r) => r.bill_no).filter(Boolean)),
+          lineTable: doc.archive ? null : doc.lineTable,
+          keyCol: doc.archive ? '外部数据ID' : '单据编号', // 档案以外部锚点定位受影响行
+          docNos: mode === 'init' ? null : (doc.archive ? changedRows.map((r) => String(r.id)) : changedRows.map((r) => r.bill_no).filter(Boolean)),
           retentionDays: opt.backupRetentionDays, log,
         });
       }
@@ -922,19 +787,15 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
               log(`⚠ 【${doc.label}】${d.name || d.id} 缺编码列「${doc.codeCol}」,跳过(MES 该列必填)`);
               continue;
             }
-            const lines = doc.lineTable && doc.mapLines
-              ? doc.mapLines(d, ctx).map((l, i) => ({ ...l, ...autoExtraLines(doc.code, (d.material_entity || [])[i]) }))
-              : null;
             if (dryRun) {
-              console.log(`—— 【${doc.label}】${d.number || ''} ${d.name || ''}${mapped.__cancel === 'Y' ? '(停用)' : ''}${lines ? ` 分录=${lines.length}` : ''}`);
+              console.log(`—— 【${doc.label}】${d.number || ''} ${d.name || ''}${mapped.__cancel === 'Y' ? '(停用)' : ''}`);
               continue;
             }
-            if (lines) await upsertArchiveDoc(doc, mssql, pool, mapped, lines, fp);
-            else await upsertArchive(doc, mssql, pool, mapped, fp);
+            await upsertArchive(doc, mssql, pool, mapped, fp);
             knownFps.set(String(row.id).trim(), fp);
             known ? updated++ : inserted++;
             if (inserted + updated <= 10 || (inserted + updated) % 100 === 0) {
-              log(`【${doc.label}】${known ? '更新' : '新增'} ${d.number || d.id} ${d.name || ''}${lines ? `(${lines.length} 行)` : ''}`);
+              log(`【${doc.label}】${known ? '更新' : '新增'} ${d.number || d.id} ${d.name || ''}`);
             }
           } else {
             const head = {

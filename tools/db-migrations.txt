@@ -2203,11 +2203,3 @@ migrate-qcinsp-header-dept.sql
 #   取证: tools/archive/_RefDiff.java → _refdiff.out;两账套均需执行。
 #   (sl-supplier-ref 已在链上,见上方原登记处;其内容已改,DbSync 依内容哈希变化自动重跑)
 migrate-qc-ref-repair.sql
-# migrate-bom-kingdee.sql(2026-10-04):「BOM单」基础资料(面板 BOM_KD)——建 bs_bom_head + bs_bom_detail
-#   两张表(表头 38 列 / 分录 30 列,均带中文注明与审计四件套)、写面板元数据(yj_panel mode=doc +
-#   head/line 两层、45 个只读字段)与 en 译名;字段逐条对齐金蝶云·星辰 /jdy/v2/bd/bom(表头 40 键 +
-#   material_entity 33 键,官方文档响应示例作夹具)。幂等;两账套都要执行。
-#   配套:deploy/sync-core.mjs 新增 BD_BOM 类型(archive+行表全量拉取,与商品同机制)、
-#   deploy/_verify-bom-map.mjs(映射自检)、deploy/_verify-bom-write.mjs(落库/幂等自检)、
-#   tools/archive/_verify-bom-panel.mjs(面板 API 端到端)。
-migrate-bom-kingdee.sql

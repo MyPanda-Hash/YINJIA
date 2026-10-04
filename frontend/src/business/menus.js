@@ -396,10 +396,6 @@ export const menuTree = [
           // 商品分类不占导航:从 商品 面板工具栏「分类管理」进入(与 客户/供应商 同款交互)
           { code: 'inventory', title: '商品', path: '/panelx/list/INV', icon: 'Grid', panelCode: 'INV', operationName: '新增流程' },
           { code: 'bom', title: '物料清单', path: '/panelx/list/BOM', icon: 'Files', panelCode: 'BOM', operationName: '新增流程' },
-          // BOM单(2026-10-04):金蝶云·星辰 /jdy/v2/bd/bom 同步来的表头+子料分录(基础资料,字段与接口一致,只读)。
-          // 与上面的「物料清单」是**两个对象**:物料清单(bs_bom)是 MES 自己的父件-子件维护模型(齐套/领料在用),
-          // BOM 单(bs_bom_head/bs_bom_detail)是 ERP 镜像。详见 tools/migrate-bom-kingdee.sql 头注。
-          { code: 'bomKd', title: 'BOM单', path: '/panelx/list/BOM_KD', icon: 'Tickets', panelCode: 'BOM_KD' },
           { code: 'invPrice', title: '存货价格本', path: '/panelx/list/INV_PRICE', icon: 'PriceTag', panelCode: 'INV_PRICE', operationName: '新增流程' },
         ],
       },

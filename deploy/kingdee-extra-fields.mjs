@@ -3,8 +3,6 @@
 //   EXTRA_LINES: 单据行级(键取自 material_entity 元素)
 //   注意:PURCHASE_IN/SALE_OUT/MATERIAL_OUT 的条目已备好但 sync-core 尚未接入(待同步脚本特殊要求)
 export const EXTRA = {
-  // BD_BOM(2026-10-04 手工登记):表头键已在 sync-core.mjs 的 BD_BOM.mapArchive 逐条显式映射,补差为空。
-  "BD_BOM": [],
   "BD_SETTLE": [],
   "BD_CUSGRP": [],
   "BD_SUPGRP": [],
@@ -2378,9 +2376,6 @@ export const EXTRA = {
 };
 
 export const EXTRA_LINES = {
-  // BD_BOM(2026-10-04 手工登记):接口键已在 sync-core.mjs 的 BD_BOM.mapArchive/mapLines 里逐条显式映射
-  //   (表头 40 键 / material_entity 33 键,取自官方《BOM单列表》响应示例),故并集补差为空。
-  "BD_BOM": [],
   "SO_ORDER": [
     {
       "c": "图片url",
