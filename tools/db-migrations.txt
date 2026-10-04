@@ -1073,6 +1073,16 @@ migrate-balance-ref-fields.sql
 #      yj_panel 泛化;不进 DOC_ARCHIVE_PANELS/DOC_NO_PANELS —— 那两个集合只含 RD_* 文件类面板)。
 #   验证:tools/archive/_v-tcin.sql(元数据/表列/注明/译名逐项核对,已跑通且幂等)。
 migrate-qc-tc-in.sql
+# migrate-qc-insp-req-custom-tab.sql(2026-10-04):来料检验要求(QC_INSP_REQ)新增页签「自定义检验要求」
+#   用户口径:「加一个 tab 表,这个表可以自定义字段,这样的表能不能也带入到检验数据记录」—— 能:
+#   页签 = 物料类别 的一个字典值,行仍存同一张宽表 ⇒ 天然按物料编号参与匹配,报告的「带入检验要求」原样复用;
+#   该页签的列 = 绑定到本面板的**动态字段**(备用1..20,管理员在「自定义字段」里加,零 DDL;备用列池已在位);
+#   带入规则同现有 7 张表:列名 → 检验项,命中行该列数据 → 检测标准,空值不带。
+#   本脚本仅整串幂等重建 物料类别 词表(加第 8 个值);备用列与动态字段不在此建(池已就位)。
+#   配套:后端 PanelConfigService.addExtField 对本面板的动态字段同批登记进「检验项」标准库 qc.insp_item;
+#        前端 qcInspReqConfig.js 的自定义页签 + QcInspReqSheet 动态列渲染 + 「自定义字段」入口。
+#   验证:tools/archive/_probe-qc-insp-carry/_v-custom-tab.cjs(测试库端到端)。两账套都执行。
+migrate-qc-insp-req-custom-tab.sql
 
 # —— 2026-09-21 特采申请单(QC_TC):「最终处理结果」字典补第三值「管控使用」 ——
 #   纸面 YJ-QR-60 原图「二．最终处理结果」印的是三个勾选框(正常使用/管控使用/挑选使用),
