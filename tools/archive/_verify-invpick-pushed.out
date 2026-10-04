@@ -1,0 +1,28 @@
+金蝶测试沙箱 生产领料单 count=1,本页 1 张
+命中单据:SCLL-20261004-00001(remark=2026-10-04 转ERP 端到端验证(测试账套造数) [MES:CL-2026-10-0001])
+
+【头字段(非空)】
+  id = 2582901891348468736
+  bill_no = SCLL-20261004-00001
+  bill_date = 2026-10-04
+  bill_status = Z
+  create_time = 2026-10-04 17:24:59
+  modify_time = 2026-10-04 17:25:00
+  creator_id = 430224911
+  creator_name = 13682894247
+  creator_number = u13682894247
+  modifier_id = 430224911
+  modifier_name = 13682894247
+  modifier_number = u13682894247
+  bill_type_name = 生产领料单
+  bill_type_number = inv_pick_bill
+  bill_type_id = inv_pick_bill
+  remark = 2026-10-04 转ERP 端到端验证(测试账套造数) [MES:CL-2026-10-0001]
+  emp_id = 2569801442089090048
+  emp_name = 白兴发
+  emp_number = ZY00059
+  custom_field = {}
+  pick_type = 1
+
+【material_entity 行】
+  {"seq":1,"id":"2582901892455764992","material_id":"2569796698868037632","material_name":"端盖","material_number":"YJ-SX-031","stock_id":"2569796687375644672","stock_name":"华北工控仓","stock_number":"CK00006","sn_list_id":"0","base_unit_id":"1","base_unit_name":"个","base_unit_number":"个","unit_id":"1","unit_name":"个","unit_number":"个","qty":10,"inv_qty":18210,"base_qty":10,"coefficient":1,"comment":"转ERP 验证行","src_inter_id":"0","src_seq":"0","src_entry_id":"0","custom_entity_field":{},"src_product_entry_id":"0"}

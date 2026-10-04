@@ -1,0 +1,142 @@
+**MaterialEntity**
+| 参数名称                 | 参数类型         | 是否必填  | 参数说明                                                                                                 |
+| --- | --- | --- | --- |
+| material_id          | string       | true  | 商品id                                                                                                 
+| qty                  | number       | true  | 数量                                                                                                   
+| stock_id             | string       | true  | 仓库id                                                                                                 
+| unit_id              | string       | true  | 单位id                                                                                                 
+| aux_id1              | string       | false | 辅助属性1id                                                                                              
+| aux_id2              | string       | false | 辅助属性2id                                                                                              
+| aux_id3              | string       | false | 辅助属性3id                                                                                              
+| aux_id4              | string       | false | 辅助属性3id                                                                                              
+| aux_id5              | string       | false | 辅助属性3id                                                                                              
+| aux_prop_id          | string       | false | 辅助属性(辅助属性商品必填)                                                                                       
+| aux_qty              | number       | false | 辅助数量（多单位商品，需要使用辅助单位时必填）                                                                              
+| aux_unit_id          | string       | false | 辅助单位（多单位商品，需要使用辅助单位时必填）                                                                              
+| batch_no             | string       | false | 批次号（批次商品必填）                                                                                          
+| comment              | string       | false | 行备注                                                                                                  
+| cost                 | number       | false | 出库成本                                                                                                 
+| custom_entity_field  | Map <string> | false | 自定义字段[使用指南](https://open.jdy.com/#/files/api/detail?id=76567ff2a06311edaa4b3d71bf0fce53&noside=true) 
+| id                   | string       | false | 商品分录id，新增不传，更新时必传                                                                                    
+| is_con_sum_able      | string       | false | 共耗材料，0：否，1：是                                                                                         
+| kf_date              | string       | false | 生产日期（保质期商品必填，示例：2022-01-12）                                                                          
+| kf_period            | integer      | false | 保质期天数（保质期商品必填）                                                                                       
+| kf_type              | string       | false | 保质期类型：1/天，2/月，3/年（保质期商品必填）                                                                           
+| pro_license          | string       | false | 生产许可证号                                                                                               
+| pro_place            | string       | false | 产地                                                                                                   
+| pro_reg_no           | string       | false | 注册证号                                                                                                 
+| sp_id                | string       | false | 仓位id,启用了仓位管理则必填                                                                                      
+| src_bill_type_id     | string       | false | 源单类型：生产任务单mo_task_bill                                                                               
+| src_entry_id         | string       | false | 源单物料分录id,源单为生产任务单时对应于商品分录中的材料分录id                                                                    
+| src_inter_id         | string       | false | 源单id                                                                                                 
+| src_order_bill_no    | string       | false | 销售订单单号                                                                                               
+| src_order_seq        | integer      | false | 销售订单行号                                                                                               
+| src_product_entry_id | string       | false | 源单产品分录id,源单为生产任务单时对应于商品分录id                                                                          
+| unit_cost            | number       | false | 出库单位成本                                                                                               
+| valid_date           | string       | false | 有效日期                                                                                                 
+
+#### 请求示例
+```txt
+curl --location --request  post 'https://api.kingdee.com/jdy/v2/scm/inv_pick' \
+--header 'Content-Type: application/json' \
+--header 'X-Api-ClientID: 205022' \
+--header 'X-Api-Auth-Version: 2.0' \
+--header 'X-Api-TimeStamp: 1655775240000' \
+--header 'X-Api-Nonce: 1655775240000' \
+--header 'X-Api-SignHeaders: X-Api-TimeStamp,X-Api-Nonce' \
+--header 'X-Api-Signature: xxx' \
+--header 'app-token: xxx' \
+--header 'X-GW-Router-Addr: https://tf.jdy.com' \
+--data-row '
+{
+	"acceptor_id":"123",
+	"attachments_url":[],
+	"bill_date":"2022-01-01",
+	"bill_no":"001",
+	"bill_sp_id":"1",
+	"bill_stock_id":"1",
+	"currency_id":"1",
+	"custom_field":{},
+	"dept_id":"1",
+	"emp_id":"1",
+	"id":"1",
+	"material_entity":[
+		{
+			"aux_id1":"1",
+			"aux_id2":"2",
+			"aux_id3":"3",
+			"aux_id4":"3",
+			"aux_id5":"3",
+			"aux_prop_id":"1",
+			"aux_qty":50,
+			"aux_unit_id":"1",
+			"batch_no":"0045",
+			"comment":"备注XXX",
+			"cost":50,
+			"custom_entity_field":{},
+			"id":"1",
+			"is_con_sum_able":"1",
+			"kf_date":"2022-08-08",
+			"kf_period":180,
+			"kf_type":"1",
+			"material_id":"843913969650383872",
+			"pro_license":"333",
+			"pro_place":"",
+			"pro_reg_no":"333",
+			"qty":50,
+			"sp_id":"1",
+			"src_bill_type_id":"1",
+			"src_entry_id":"1",
+			"src_inter_id":"10",
+			"src_order_bill_no":"11",
+			"src_order_seq":11,
+			"src_product_entry_id":"1",
+			"stock_id":"1",
+			"unit_cost":50,
+			"unit_id":"1",
+			"valid_date":"2022-08-08"
+		}
+	],
+	"mul_bill_label":[
+		{
+			"id":"2147483647",
+			"number":"BQ2147483647"
+		}
+	],
+	"operation_key":"audit",
+	"pick_type":"1",
+	"pick_use_id":"工作需要",
+	"remark":"备注A"
+}'
+```
+### 响应参数
+| 参数名称        | 参数类型    | 参数说明                      |
+| --- | --- | --- |
+| errcode     | integer | 返回码，成功时为0                 |
+| description | string  | 返回信息，成功时为success，失败时为具体信息 |
+| data        | Data    | 业务返回具体对象                  |
+
+**Data**
+| 参数名称          | 参数类型          | 参数说明     |
+| --- | --- | --- |
+| id_number_map | Map <string>  | id与编码map 
+| ids           | List <string> | 单据id数组对象 
+
+#### 响应示例
+```json
+{
+	"data":{
+		"id_number_map":{},
+		"ids":[
+			"1"
+		]
+	},
+	"description":"success",
+	"errcode":0
+}
+```
+#### 返回码
+| 返回码                                                                                                                                      | 描述               | 解决方案                                                        |
+| --- | --- | --- |
+| [公告返回码](https://open.jdy.com/#/files/api/detail?index=2&categrayId=1f51c576013945e2af68ef15d4245a48&id=525e704824d24b178ab466530456c037) | 公告返回码            |                                                             |
+| 2000002000                                                                                                                               | 系统错误,请到开发者社区提单反馈 | [开发者社区](https://vip.kingdee.com/developer?productLineId=29) |

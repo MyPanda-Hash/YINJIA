@@ -1,0 +1,909 @@
+{
+  "at": "2026-10-04T09:12:58.982Z",
+  "kingdee": {
+    "count": 4828,
+    "headerKeys": [
+      "id",
+      "bill_no",
+      "bill_date",
+      "bill_status",
+      "create_time",
+      "modify_time",
+      "audit_time",
+      "creator_id",
+      "creator_name",
+      "creator_number",
+      "modifier_id",
+      "modifier_name",
+      "modifier_number",
+      "bill_type_name",
+      "bill_type_number",
+      "bill_type_id",
+      "auditor_id",
+      "auditor_name",
+      "auditor_number",
+      "remark",
+      "dept_id",
+      "dept_name",
+      "dept_number",
+      "emp_id",
+      "emp_name",
+      "emp_number",
+      "custom_field",
+      "pick_use_name",
+      "pick_use_id",
+      "pick_use_number",
+      "pick_type"
+    ],
+    "lineKeys": [
+      "picture",
+      "seq",
+      "id",
+      "material_id",
+      "material_name",
+      "material_number",
+      "material_is_multi_unit",
+      "material_is_serial",
+      "material_is_asst_attr",
+      "material_is_kf_period",
+      "material_is_batch",
+      "material_model",
+      "stock_id",
+      "stock_name",
+      "stock_number",
+      "stock_is_allow_freight",
+      "sp_id",
+      "sp_name",
+      "sp_number",
+      "aux_prop_id",
+      "aux_prop_name",
+      "aux_prop_number",
+      "aux1_id",
+      "aux1_name",
+      "aux1_number",
+      "aux2_id",
+      "aux2_name",
+      "aux2_number",
+      "aux3_id",
+      "aux3_name",
+      "aux3_number",
+      "barcode",
+      "batch_no",
+      "pro_place",
+      "pro_reg_no",
+      "pro_license",
+      "kf_date",
+      "valid_date",
+      "kf_type",
+      "kf_period",
+      "sn_list",
+      "sn_list_id",
+      "base_unit_id",
+      "base_unit_name",
+      "base_unit_number",
+      "unit_id",
+      "unit_name",
+      "unit_number",
+      "aux_unit_id",
+      "aux_unit_name",
+      "aux_unit_number",
+      "conversion_rate",
+      "qty",
+      "inv_qty",
+      "base_qty",
+      "inv_base_qty",
+      "aux_qty",
+      "def_float_qty",
+      "aux_coefficient",
+      "coefficient",
+      "price",
+      "cost",
+      "unit_cost",
+      "comment",
+      "src_bill_no",
+      "src_bill_type_id",
+      "src_bill_type_name",
+      "src_bill_type_number",
+      "src_inter_id",
+      "src_bill_date",
+      "src_seq",
+      "src_entry_id",
+      "custom_entity_field",
+      "src_product_entry_id"
+    ],
+    "source": "live(真实账套 2026-10-04, count=4828)",
+    "sandboxToken": "获取app-token失败 errcode=1030002006 授权密钥校验失败，请获取最新密钥加密"
+  },
+  "mes": {
+    "HSDZ_MES": {
+      "columns": 190,
+      "mappedCols": 87,
+      "map": {
+        "header": {
+          "create_time": [
+            "创建时间"
+          ],
+          "bill_status": [
+            "金蝶单据状态"
+          ],
+          "dept_id": [
+            "部门id"
+          ],
+          "dept_number": [
+            "部门编码"
+          ],
+          "pick_type": [
+            "领料类型"
+          ],
+          "modify_time": [
+            "修改时间"
+          ],
+          "audit_time": [
+            "金蝶审核时间"
+          ],
+          "creator_id": [
+            "创建人id"
+          ],
+          "creator_name": [
+            "创建人"
+          ],
+          "creator_number": [
+            "创建人编码"
+          ],
+          "modifier_id": [
+            "修改人id"
+          ],
+          "modifier_name": [
+            "修改人"
+          ],
+          "modifier_number": [
+            "修改人编码"
+          ],
+          "bill_type_name": [
+            "单据类型名称"
+          ],
+          "bill_type_number": [
+            "单据类型编码"
+          ],
+          "bill_type_id": [
+            "单据类型id"
+          ],
+          "auditor_id": [
+            "审核人id"
+          ],
+          "auditor_name": [
+            "金蝶审核人"
+          ],
+          "auditor_number": [
+            "审核人编码"
+          ],
+          "emp_id": [
+            "经手人id"
+          ],
+          "emp_number": [
+            "经手人编码"
+          ],
+          "mul_bill_label": [
+            "单据标签"
+          ],
+          "pick_use_name": [
+            "领料用途名称"
+          ],
+          "pick_use_id": [
+            "领料用途id"
+          ],
+          "pick_use_number": [
+            "领料用途编码"
+          ]
+        },
+        "line": {
+          "picture": [
+            "图片"
+          ],
+          "material_id": [
+            "商品id"
+          ],
+          "material_is_multi_unit": [
+            "商品是否多单位"
+          ],
+          "material_is_serial": [
+            "商品是否序列号"
+          ],
+          "material_is_asst_attr": [
+            "商品是否辅助属性"
+          ],
+          "material_is_kf_period": [
+            "商品是否保质期"
+          ],
+          "material_is_batch": [
+            "商品是否批次"
+          ],
+          "stock_id": [
+            "仓库id"
+          ],
+          "stock_number": [
+            "仓库编码"
+          ],
+          "stock_is_allow_freight": [
+            "仓库启用仓位管理"
+          ],
+          "sp_id": [
+            "仓位id"
+          ],
+          "sp_name": [
+            "仓位名称"
+          ],
+          "sp_number": [
+            "仓位编码"
+          ],
+          "aux_prop_id": [
+            "辅助属性id"
+          ],
+          "aux_prop_name": [
+            "辅助属性名称"
+          ],
+          "aux_prop_number": [
+            "辅助属性编码"
+          ],
+          "aux1_id": [
+            "辅助属性1id"
+          ],
+          "aux1_name": [
+            "辅助属性1名称"
+          ],
+          "aux1_number": [
+            "辅助属性1编码"
+          ],
+          "aux2_id": [
+            "辅助属性2id"
+          ],
+          "aux2_name": [
+            "辅助属性2名称"
+          ],
+          "aux2_number": [
+            "辅助属性2编码"
+          ],
+          "aux3_id": [
+            "辅助属性3id"
+          ],
+          "aux3_name": [
+            "辅助属性3名称"
+          ],
+          "aux3_number": [
+            "辅助属性3编码"
+          ],
+          "barcode": [
+            "条形码"
+          ],
+          "pro_place": [
+            "产地"
+          ],
+          "pro_reg_no": [
+            "注册证号"
+          ],
+          "pro_license": [
+            "生产许可证"
+          ],
+          "kf_date": [
+            "保质期到期日"
+          ],
+          "valid_date": [
+            "有效期至"
+          ],
+          "kf_type": [
+            "保质期类型"
+          ],
+          "kf_period": [
+            "保质期"
+          ],
+          "sn_list": [
+            "序列号清单"
+          ],
+          "sn_list_id": [
+            "序列号流转ID"
+          ],
+          "base_unit_id": [
+            "基本单位id"
+          ],
+          "base_unit_name": [
+            "基本单位名称"
+          ],
+          "base_unit_number": [
+            "基本单位编码"
+          ],
+          "unit_id": [
+            "单位id"
+          ],
+          "unit_number": [
+            "单位编码"
+          ],
+          "aux_unit_id": [
+            "辅助单位id"
+          ],
+          "aux_unit_name": [
+            "辅助单位名称"
+          ],
+          "aux_unit_number": [
+            "辅助单位编码"
+          ],
+          "conversion_rate": [
+            "换算率"
+          ],
+          "inv_qty": [
+            "库存数量"
+          ],
+          "base_qty": [
+            "基本数量"
+          ],
+          "inv_base_qty": [
+            "库存基本数量"
+          ],
+          "aux_qty": [
+            "辅助数量"
+          ],
+          "def_float_qty": [
+            "默认浮动数量"
+          ],
+          "aux_coefficient": [
+            "辅助换算系数"
+          ],
+          "coefficient": [
+            "换算系数"
+          ],
+          "cost": [
+            "成本"
+          ],
+          "unit_cost": [
+            "单位成本"
+          ],
+          "src_bill_no": [
+            "源单编号"
+          ],
+          "src_bill_type_id": [
+            "源单类型id"
+          ],
+          "src_bill_type_name": [
+            "源单类型名称"
+          ],
+          "src_bill_type_number": [
+            "源单类型编码"
+          ],
+          "src_inter_id": [
+            "源单内部id"
+          ],
+          "src_bill_date": [
+            "源单日期"
+          ],
+          "src_seq": [
+            "源单行号"
+          ],
+          "src_entry_id": [
+            "源单分录id"
+          ],
+          "src_product_entry_id": [
+            "源单产品分录id"
+          ]
+        },
+        "unmappedCols": [
+          "bd_material_out.id",
+          "bd_material_out.单据日期",
+          "bd_material_out.单据编号",
+          "bd_material_out.业务类型",
+          "bd_material_out.生产车间",
+          "bd_material_out.出库类别",
+          "bd_material_out.领用人",
+          "bd_material_out.项目",
+          "bd_material_out.仓库",
+          "bd_material_out.来源单号",
+          "bd_material_out.加工单号",
+          "bd_material_out.备注",
+          "bd_material_out.单据状态",
+          "bd_material_out.审核人",
+          "bd_material_out.审核时间",
+          "bd_material_out.审批人",
+          "bd_material_out.审批时间",
+          "bd_material_out.asp_user1",
+          "bd_material_out.asp_time1",
+          "bd_material_out.asp_user2",
+          "bd_material_out.asp_time2",
+          "bd_material_out.asp_cancel",
+          "bd_material_out.来源单据",
+          "bd_material_out.销售订单号",
+          "bd_material_out.匹配来源单号",
+          "bd_material_out.是否已转ERP",
+          "bd_material_out.ERP单号",
+          "bd_material_out.转ERP操作人",
+          "bd_material_out.转ERP时间",
+          "bd_material_out.asp_print",
+          "bd_material_out.asp_time3",
+          "bd_material_out.asp_time4",
+          "bd_material_out.asp_user3",
+          "bd_material_out.asp_user4",
+          "bd_material_out.备用1",
+          "bd_material_out.备用2",
+          "bd_material_out.备用3",
+          "bd_material_out.备用4",
+          "bd_material_out.备用5",
+          "bd_material_out.备用6",
+          "bd_material_out.备用7",
+          "bd_material_out.备用8",
+          "bd_material_out.备用9",
+          "bd_material_out.备用10",
+          "bd_material_out.备用11",
+          "bd_material_out.备用12",
+          "bd_material_out.备用13",
+          "bd_material_out.备用14",
+          "bd_material_out.备用15",
+          "bd_material_out.备用16",
+          "bd_material_out.备用17",
+          "bd_material_out.备用18",
+          "bd_material_out.备用19",
+          "bd_material_out.备用20",
+          "bd_material_out.工单行号",
+          "bl_material_out.id",
+          "bl_material_out.单据编号",
+          "bl_material_out.仓库",
+          "bl_material_out.加工单号",
+          "bl_material_out.材料名称",
+          "bl_material_out.计量单位",
+          "bl_material_out.数量",
+          "bl_material_out.单价",
+          "bl_material_out.金额",
+          "bl_material_out.规格型号",
+          "bl_material_out.手工确定成本",
+          "bl_material_out.明细备注",
+          "bl_material_out.现存量",
+          "bl_material_out.现存量说明",
+          "bl_material_out.备注",
+          "bl_material_out.asp_user1",
+          "bl_material_out.asp_time1",
+          "bl_material_out.asp_cancel",
+          "bl_material_out.asp_user2",
+          "bl_material_out.asp_time2",
+          "bl_material_out.材料编码",
+          "bl_material_out.批号",
+          "bl_material_out.行号",
+          "bl_material_out.asp_print",
+          "bl_material_out.asp_time3",
+          "bl_material_out.asp_time4",
+          "bl_material_out.asp_user3",
+          "bl_material_out.asp_user4",
+          "bl_material_out.备用1",
+          "bl_material_out.备用2",
+          "bl_material_out.备用3",
+          "bl_material_out.备用4",
+          "bl_material_out.备用5",
+          "bl_material_out.备用6",
+          "bl_material_out.备用7",
+          "bl_material_out.备用8",
+          "bl_material_out.备用9",
+          "bl_material_out.备用10",
+          "bl_material_out.备用11",
+          "bl_material_out.备用12",
+          "bl_material_out.备用13",
+          "bl_material_out.备用14",
+          "bl_material_out.备用15",
+          "bl_material_out.备用16",
+          "bl_material_out.备用17",
+          "bl_material_out.备用18",
+          "bl_material_out.备用19",
+          "bl_material_out.备用20"
+        ]
+      },
+      "fields": 118,
+      "visible": 56,
+      "docs": 2
+    },
+    "HSDZ_MES_TEST": {
+      "columns": 190,
+      "mappedCols": 87,
+      "map": {
+        "header": {
+          "create_time": [
+            "创建时间"
+          ],
+          "dept_number": [
+            "部门编码"
+          ],
+          "pick_type": [
+            "领料类型"
+          ],
+          "modify_time": [
+            "修改时间"
+          ],
+          "creator_name": [
+            "创建人"
+          ],
+          "creator_number": [
+            "创建人编码"
+          ],
+          "modifier_name": [
+            "修改人"
+          ],
+          "modifier_number": [
+            "修改人编码"
+          ],
+          "bill_type_name": [
+            "单据类型名称"
+          ],
+          "bill_type_number": [
+            "单据类型编码"
+          ],
+          "auditor_number": [
+            "审核人编码"
+          ],
+          "emp_number": [
+            "经手人编码"
+          ],
+          "mul_bill_label": [
+            "单据标签"
+          ],
+          "pick_use_name": [
+            "领料用途名称"
+          ],
+          "pick_use_number": [
+            "领料用途编码"
+          ],
+          "bill_status": [
+            "金蝶单据状态"
+          ],
+          "dept_id": [
+            "部门id"
+          ],
+          "audit_time": [
+            "金蝶审核时间"
+          ],
+          "creator_id": [
+            "创建人id"
+          ],
+          "modifier_id": [
+            "修改人id"
+          ],
+          "bill_type_id": [
+            "单据类型id"
+          ],
+          "auditor_id": [
+            "审核人id"
+          ],
+          "auditor_name": [
+            "金蝶审核人"
+          ],
+          "emp_id": [
+            "经手人id"
+          ],
+          "pick_use_id": [
+            "领料用途id"
+          ]
+        },
+        "line": {
+          "picture": [
+            "图片"
+          ],
+          "material_id": [
+            "商品id"
+          ],
+          "material_is_multi_unit": [
+            "商品是否多单位"
+          ],
+          "material_is_serial": [
+            "商品是否序列号"
+          ],
+          "material_is_asst_attr": [
+            "商品是否辅助属性"
+          ],
+          "material_is_kf_period": [
+            "商品是否保质期"
+          ],
+          "material_is_batch": [
+            "商品是否批次"
+          ],
+          "stock_id": [
+            "仓库id"
+          ],
+          "stock_number": [
+            "仓库编码"
+          ],
+          "stock_is_allow_freight": [
+            "仓库启用仓位管理"
+          ],
+          "sp_id": [
+            "仓位id"
+          ],
+          "sp_name": [
+            "仓位名称"
+          ],
+          "sp_number": [
+            "仓位编码"
+          ],
+          "aux_prop_id": [
+            "辅助属性id"
+          ],
+          "aux_prop_name": [
+            "辅助属性名称"
+          ],
+          "aux_prop_number": [
+            "辅助属性编码"
+          ],
+          "aux1_id": [
+            "辅助属性1id"
+          ],
+          "aux1_name": [
+            "辅助属性1名称"
+          ],
+          "aux1_number": [
+            "辅助属性1编码"
+          ],
+          "aux2_id": [
+            "辅助属性2id"
+          ],
+          "aux2_name": [
+            "辅助属性2名称"
+          ],
+          "aux2_number": [
+            "辅助属性2编码"
+          ],
+          "aux3_id": [
+            "辅助属性3id"
+          ],
+          "aux3_name": [
+            "辅助属性3名称"
+          ],
+          "aux3_number": [
+            "辅助属性3编码"
+          ],
+          "barcode": [
+            "条形码"
+          ],
+          "pro_place": [
+            "产地"
+          ],
+          "pro_reg_no": [
+            "注册证号"
+          ],
+          "pro_license": [
+            "生产许可证"
+          ],
+          "kf_date": [
+            "保质期到期日"
+          ],
+          "valid_date": [
+            "有效期至"
+          ],
+          "kf_type": [
+            "保质期类型"
+          ],
+          "kf_period": [
+            "保质期"
+          ],
+          "sn_list": [
+            "序列号清单"
+          ],
+          "sn_list_id": [
+            "序列号流转ID"
+          ],
+          "base_unit_id": [
+            "基本单位id"
+          ],
+          "base_unit_name": [
+            "基本单位名称"
+          ],
+          "base_unit_number": [
+            "基本单位编码"
+          ],
+          "unit_id": [
+            "单位id"
+          ],
+          "unit_number": [
+            "单位编码"
+          ],
+          "aux_unit_id": [
+            "辅助单位id"
+          ],
+          "aux_unit_name": [
+            "辅助单位名称"
+          ],
+          "aux_unit_number": [
+            "辅助单位编码"
+          ],
+          "conversion_rate": [
+            "换算率"
+          ],
+          "inv_qty": [
+            "库存数量"
+          ],
+          "base_qty": [
+            "基本数量"
+          ],
+          "inv_base_qty": [
+            "库存基本数量"
+          ],
+          "aux_qty": [
+            "辅助数量"
+          ],
+          "def_float_qty": [
+            "默认浮动数量"
+          ],
+          "aux_coefficient": [
+            "辅助换算系数"
+          ],
+          "coefficient": [
+            "换算系数"
+          ],
+          "cost": [
+            "成本"
+          ],
+          "unit_cost": [
+            "单位成本"
+          ],
+          "src_bill_no": [
+            "源单编号"
+          ],
+          "src_bill_type_id": [
+            "源单类型id"
+          ],
+          "src_bill_type_name": [
+            "源单类型名称"
+          ],
+          "src_bill_type_number": [
+            "源单类型编码"
+          ],
+          "src_inter_id": [
+            "源单内部id"
+          ],
+          "src_bill_date": [
+            "源单日期"
+          ],
+          "src_seq": [
+            "源单行号"
+          ],
+          "src_entry_id": [
+            "源单分录id"
+          ],
+          "src_product_entry_id": [
+            "源单产品分录id"
+          ]
+        },
+        "unmappedCols": [
+          "bd_material_out.id",
+          "bd_material_out.单据日期",
+          "bd_material_out.单据编号",
+          "bd_material_out.业务类型",
+          "bd_material_out.生产车间",
+          "bd_material_out.出库类别",
+          "bd_material_out.领用人",
+          "bd_material_out.项目",
+          "bd_material_out.仓库",
+          "bd_material_out.来源单号",
+          "bd_material_out.加工单号",
+          "bd_material_out.备注",
+          "bd_material_out.单据状态",
+          "bd_material_out.审核人",
+          "bd_material_out.审核时间",
+          "bd_material_out.审批人",
+          "bd_material_out.审批时间",
+          "bd_material_out.asp_user1",
+          "bd_material_out.asp_time1",
+          "bd_material_out.asp_user2",
+          "bd_material_out.asp_time2",
+          "bd_material_out.asp_cancel",
+          "bd_material_out.来源单据",
+          "bd_material_out.销售订单号",
+          "bd_material_out.匹配来源单号",
+          "bd_material_out.是否已转ERP",
+          "bd_material_out.ERP单号",
+          "bd_material_out.转ERP操作人",
+          "bd_material_out.转ERP时间",
+          "bd_material_out.asp_print",
+          "bd_material_out.asp_time3",
+          "bd_material_out.asp_time4",
+          "bd_material_out.asp_user3",
+          "bd_material_out.asp_user4",
+          "bd_material_out.备用1",
+          "bd_material_out.备用2",
+          "bd_material_out.备用3",
+          "bd_material_out.备用4",
+          "bd_material_out.备用5",
+          "bd_material_out.备用6",
+          "bd_material_out.备用7",
+          "bd_material_out.备用8",
+          "bd_material_out.备用9",
+          "bd_material_out.备用10",
+          "bd_material_out.备用11",
+          "bd_material_out.备用12",
+          "bd_material_out.备用13",
+          "bd_material_out.备用14",
+          "bd_material_out.备用15",
+          "bd_material_out.备用16",
+          "bd_material_out.备用17",
+          "bd_material_out.备用18",
+          "bd_material_out.备用19",
+          "bd_material_out.备用20",
+          "bd_material_out.工单行号",
+          "bl_material_out.id",
+          "bl_material_out.单据编号",
+          "bl_material_out.仓库",
+          "bl_material_out.加工单号",
+          "bl_material_out.材料名称",
+          "bl_material_out.计量单位",
+          "bl_material_out.数量",
+          "bl_material_out.单价",
+          "bl_material_out.金额",
+          "bl_material_out.规格型号",
+          "bl_material_out.手工确定成本",
+          "bl_material_out.明细备注",
+          "bl_material_out.现存量",
+          "bl_material_out.现存量说明",
+          "bl_material_out.备注",
+          "bl_material_out.asp_user1",
+          "bl_material_out.asp_time1",
+          "bl_material_out.asp_cancel",
+          "bl_material_out.asp_user2",
+          "bl_material_out.asp_time2",
+          "bl_material_out.材料编码",
+          "bl_material_out.批号",
+          "bl_material_out.行号",
+          "bl_material_out.asp_print",
+          "bl_material_out.asp_time3",
+          "bl_material_out.asp_time4",
+          "bl_material_out.asp_user3",
+          "bl_material_out.asp_user4",
+          "bl_material_out.备用1",
+          "bl_material_out.备用2",
+          "bl_material_out.备用3",
+          "bl_material_out.备用4",
+          "bl_material_out.备用5",
+          "bl_material_out.备用6",
+          "bl_material_out.备用7",
+          "bl_material_out.备用8",
+          "bl_material_out.备用9",
+          "bl_material_out.备用10",
+          "bl_material_out.备用11",
+          "bl_material_out.备用12",
+          "bl_material_out.备用13",
+          "bl_material_out.备用14",
+          "bl_material_out.备用15",
+          "bl_material_out.备用16",
+          "bl_material_out.备用17",
+          "bl_material_out.备用18",
+          "bl_material_out.备用19",
+          "bl_material_out.备用20"
+        ]
+      },
+      "fields": 118,
+      "visible": 56,
+      "docs": 4
+    }
+  },
+  "diff": {
+    "kingdeeKeys": 105,
+    "container": [
+      "material_entity",
+      "custom_field",
+      "custom_entity_field"
+    ],
+    "gaps": [
+      "头.id",
+      "头.bill_no",
+      "头.bill_date",
+      "头.remark",
+      "头.dept_name",
+      "头.emp_name",
+      "行.seq",
+      "行.id",
+      "行.material_name",
+      "行.material_number",
+      "行.material_model",
+      "行.stock_name",
+      "行.batch_no",
+      "行.unit_name",
+      "行.qty",
+      "行.price",
+      "行.comment"
+    ],
+    "extras": [
+      "mul_bill_label"
+    ],
+    "mappedHeaderKeys": 25,
+    "mappedLineKeys": 62
+  }
+}

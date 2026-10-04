@@ -1,0 +1,6 @@
+① 登录 http://127.0.0.1:8091 factory=YJ_TEST
+② 目标单据:CL-2026-10-0001
+③ 查询可转ERP: code=200 count=1 → CL-2026-10-0001
+④ 转ERP: code=200 msg=success
+   data={"是否已转ERP":"是","ERP单号":"SCLL-20261004-00001","转ERP操作人":"admin","转ERP时间":"2026-10-04 17:25:00","message":"已成功转入金蝶ERP，ERP单号: SCLL-20261004-00001（请在金蝶界面审核）"}
+DOCNO=CL-2026-10-0001

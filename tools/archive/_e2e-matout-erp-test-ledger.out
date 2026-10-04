@@ -1,0 +1,8 @@
+① 登录: factory=YJ_TEST user=admin
+② 保存: code=200 编号=CL-2026-10-0001 success
+③ 提交审批 : code=200 success
+③ 审批通过 : code=200 success
+④ 查询可转ERP: code=200 count=1 → CL-2026-10-0001
+⑤ 转ERP: code=500 msg=服务异常：转ERP失败: 获取app-token失败: 授权密钥校验失败，请获取最新密钥加密
+   data=
+DOCNO=CL-2026-10-0001

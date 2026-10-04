@@ -1,0 +1,6 @@
+① 登录 http://127.0.0.1:8092 factory=YJ_TEST
+② 目标单据:CL-2026-10-0001
+③ 查询可转ERP: code=200 count=0 → 
+④ 转ERP: code=500 msg=服务异常：转ERP失败: 已拒绝转ERP:当前金蝶凭证指向**真实账套**(outerInstanceId=580147…),本功能默认只允许推测试沙箱,以免测试单据写进正式账。确认要推真实账套时,请显式配置 kingdee.push.allowProd=true 后重试
+   data=
+DOCNO=CL-2026-10-0001

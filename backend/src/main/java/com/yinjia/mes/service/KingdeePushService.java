@@ -61,6 +61,15 @@ public class KingdeePushService {
     private String clientSecret;
     @Value("${kingdee.push.outerInstanceId:}")
     private String outerInstanceId;
+    /**
+     * **沙箱(测试账套)** 的第三方实例id。金蝶的 appKey/appSecret **含沙箱在内都按 24h 轮换**,
+     * 写死静态密钥必然隔天失效 —— 2026-09-24 写死的沙箱密钥到 2026-10-04 实测已失效
+     * (errcode 1030002006「授权密钥校验失败」),转ERP 直接卡在取 token。
+     * 故沙箱同样走动态授权:本项非空 ⇒ 用 它与 clientId/clientSecret 取最新 appKey/appSecret;
+     * ⚠ 它**不代表真实账套**,不触发 allowProd 守卫(判定见 assertPushTargetAllowed)。
+     */
+    @Value("${kingdee.push.sandboxInstanceId:}")
+    private String sandboxInstanceId;
     @Value("${kingdee.push.appKey:}")
     private String appKey;
     @Value("${kingdee.push.appSecret:}")
@@ -98,6 +107,7 @@ public class KingdeePushService {
             clientId = k.path("clientId").asText("");
             clientSecret = k.path("clientSecret").asText("");
             outerInstanceId = k.path("outerInstanceId").asText("");
+            if (k.hasNonNull("sandboxInstanceId")) sandboxInstanceId = k.path("sandboxInstanceId").asText("");
             appKey = k.path("appKey").asText("");
             appSecret = k.path("appSecret").asText("");
             if (k.hasNonNull("domain") && !k.path("domain").asText("").isBlank()) domain = k.path("domain").asText();
@@ -126,8 +136,9 @@ public class KingdeePushService {
         ensureCreds(); // 只读本地配置,不联网
         boolean realAccount = outerInstanceId != null && !outerInstanceId.isBlank();
         // 每次转ERP 都留一条目标账套日志(可审计:哪次推送打到了哪个账套)
-        log.info("转ERP 目标账套 = {}(clientId={}, domain={})",
-                realAccount ? "真实账套" : "测试沙箱", maskId(clientId), domain);
+        log.info("转ERP 目标账套 = {}(clientId={}, domain={}, 实例id={})",
+                realAccount ? "真实账套" : "测试沙箱", maskId(clientId), domain,
+                realAccount ? maskId(outerInstanceId) : (dynamicInstanceId().isEmpty() ? "静态密钥" : maskId(dynamicInstanceId())));
         if (realAccount && !allowProd) {
             throw new IllegalStateException("已拒绝转ERP:当前金蝶凭证指向**真实账套**(outerInstanceId="
                     + maskId(outerInstanceId) + "),本功能默认只允许推测试沙箱,以免测试单据写进正式账。"
@@ -140,6 +151,15 @@ public class KingdeePushService {
         if (s == null || s.isBlank()) return "(空)";
         String t = s.trim();
         return t.length() <= 6 ? t.charAt(0) + "***" : t.substring(0, 6) + "…";
+    }
+
+    /**
+     * 动态授权用的第三方实例id:真实账套优先(outerInstanceId),否则沙箱实例(sandboxInstanceId);
+     * 两者都空 ⇒ 静态 appKey/appSecret 模式(会随 24h 轮换失效,仅特殊联调)。
+     */
+    private String dynamicInstanceId() {
+        if (outerInstanceId != null && !outerInstanceId.isBlank()) return outerInstanceId.trim();
+        return sandboxInstanceId == null ? "" : sandboxInstanceId.trim();
     }
 
     // ══════════ 业务入口 ══════════
@@ -231,7 +251,13 @@ public class KingdeePushService {
             if (!deptNo.isEmpty()) body.put("dept_number", deptNo);
             String empNo = str(head.get("经手人编码"));
             if (empNo.isEmpty()) empNo = archiveCode("bs_emp", "员工名称", "员工编码", str(head.get("领用人")));
-            if (!empNo.isEmpty()) body.put("emp_number", empNo);
+            if (!empNo.isEmpty()) {
+                body.put("emp_number", empNo);
+                // 金蝶 inv_pick 保存收的是 emp_id(职员内部id),emp_number 不在接口字段表里(静默忽略)
+                String empId = str(safeIdMap(EMP_LIST_PATH, "职员").get(empNo));
+                if (!empId.isEmpty()) body.put("emp_id", empId);
+                else log.warn("材料出库单[{}]经手人编码[{}]在金蝶职员档案中无对应id:本次只带 emp_number", docNo, empNo);
+            }
             String pickType = str(head.get("领料类型")); // 金蝶 inv_pick.pick_type(真实账套恒 "1")
             if (!pickType.isEmpty()) body.put("pick_type", pickType);
         }
@@ -276,6 +302,8 @@ public class KingdeePushService {
         String qtyKey = isPur ? "实收数量" : "数量";
         String priceKey = isPur || isOrder || isMatOut ? "单价" : "售价";
         String unitKey = isOrder ? "单位" : "计量单位";
+        // 行仓库编号 → 金蝶仓库id(采购订单不推仓库,不必拉)
+        Map<String, String> storeIds = isOrder ? Map.of() : safeIdMap(STORE_LIST_PATH, "仓库");
         int rowNo = 0;
         for (Map<String, Object> line : lines) {
             rowNo++;
@@ -334,9 +362,11 @@ public class KingdeePushService {
                     "第" + rowNo + "行计量单位[" + unit + "]在当前账套金蝶单位档案中无对应ID,无法转ERP"
                             + (unit.isEmpty() ? "(行上未填计量单位)" : ""));
             e.put("unit_id", unitId);
-            // 仓库编码:行级 > 头级 > 默认正品仓(金蝶要求非服务商品必须录入仓库);
+            // 仓库:行级 > 头级 > 默认正品仓(金蝶要求非服务商品必须录入仓库);
             // 落到默认仓时打日志 —— 否则"单据没录仓库"会被静默推成 CK00001,账面上看不出来。
             // 采购订单不推仓库(订单无入库语义)
+            // 2026-10-04 沙箱实测:金蝶保存接口**只认 stock_id**(stock_number 不在 inv_pick 行字段表里,
+            // 传了被静默忽略 → 整单被拒「请填写"材料分录"第1行:"仓库"」),故按编号再解析一次 id 带上。
             if (!isOrder) {
                 String stock = str(line.get("仓库编码")); if (stock.isEmpty()) stock = str(head.get("仓库编码"));
                 if (stock.isEmpty()) {
@@ -344,6 +374,13 @@ public class KingdeePushService {
                     log.warn("单据[{}]第{}行无行级/头级仓库编码,已按默认正品仓 CK00001 推送,请核对单据仓库", docNo, rowNo);
                 }
                 e.put("stock_number", stock);
+                String stockId = str(storeIds.get(stock));
+                if (!stockId.isEmpty()) {
+                    e.put("stock_id", stockId);
+                } else {
+                    log.warn("单据[{}]第{}行仓库编码[{}]在当前账套金蝶仓库档案中无对应id:本次不带 stock_id"
+                            + "(金蝶 inv_pick 收 stock_id,缺了会报「请填写仓库」)", docNo, rowNo, stock);
+                }
             }
             String batch = str(line.get("批号")); if (!batch.isEmpty() && !isOrder) e.put("batch_no", batch);
             // 来源单:行级 src_bill_no=采购订单号(同单全部行带同一订单号;订单号与采购订单号同义)
@@ -593,6 +630,56 @@ public class KingdeePushService {
     private static final String MATERIAL_LIST_PATH = "/jdy/v2/bd/material";
     /** 商品档案分页上限(真实账套约数千商品,200/页 → 30 页足够;超出仅告警不阻塞) */
     private static final int MATERIAL_MAX_PAGES = 30;
+
+    /** 基础资料:仓库 / 职员(与商品\|计量单位同款 number→id;金蝶保存接口收的是 *_id) */
+    private static final String STORE_LIST_PATH = "/jdy/v2/bd/store";
+    private static final String EMP_LIST_PATH = "/jdy/v2/bd/emp";
+    /** path → {Map<编号,金蝶id>, 加载时刻};按当前账套 22h 缓存 */
+    private final Map<String, Object[]> basedataCache = new HashMap<>();
+
+    /**
+     * 基础资料 编号 → 金蝶内部id(按当前账套实时拉取)。
+     *
+     * 为什么必须换成 id:金蝶保存接口(inv_pick/pur_inbound/sal_out_bound)收的是
+     * material_id/stock_id/unit_id/emp_id,**不认** *_number —— 未知键被**静默忽略**。
+     * 2026-10-04 沙箱实测实锤:材料出库转ERP 行上只推了 stock_number(=CK00006,仓库档案里确实存在),
+     * 金蝶仍报「请填写"材料分录"第1行:"仓库"」;补 stock_id 后才收单。
+     */
+    private synchronized Map<String, String> basedataIdMap(String path, String label) throws Exception {
+        ensureCreds();
+        Object[] c = basedataCache.get(path);
+        if (c != null && System.currentTimeMillis() - (long) c[1] < 22 * 3600_000L) {
+            @SuppressWarnings("unchecked") Map<String, String> hit = (Map<String, String>) c[0];
+            return hit;
+        }
+        Map<String, String> m = new HashMap<>();
+        for (int page = 1; page <= MATERIAL_MAX_PAGES; page++) {
+            JsonNode rows = kingdeeGet(path, Map.of("page", String.valueOf(page), "page_size", "200")).path("rows");
+            int n = 0;
+            if (rows.isArray()) {
+                for (JsonNode r : rows) {
+                    String no = r.path("number").asText("");
+                    if (!no.isBlank()) m.put(no, r.path("id").asText(""));
+                    n++;
+                }
+            }
+            if (n < 200) break;
+        }
+        if (m.isEmpty()) throw new RuntimeException("金蝶" + label + "档案为空(账套无该基础资料?)");
+        basedataCache.put(path, new Object[]{m, System.currentTimeMillis()});
+        log.info("金蝶{}档案已加载({}个,按当前账套,缓存22h)", label, m.size());
+        return m;
+    }
+
+    /** basedataIdMap 的"绝不阻断转ERP"包装:拉不到只告警,返回空表(调用方按"不带该id"处理) */
+    private Map<String, String> safeIdMap(String path, String label) {
+        try {
+            return basedataIdMap(path, label);
+        } catch (Exception e) {
+            log.warn("金蝶{}档案加载失败({}):本次不带对应 id 字段", label, e.getMessage());
+            return Map.of();
+        }
+    }
     private Map<String, String> materialIdByNumber;
     private long materialCacheAt;
 
@@ -633,7 +720,7 @@ public class KingdeePushService {
     private synchronized String getToken() throws Exception {
         ensureCreds();
         if (cachedToken != null && System.currentTimeMillis() < tokenExpiresAt) return cachedToken;
-        boolean dyn = outerInstanceId != null && !outerInstanceId.isBlank();
+        boolean dyn = !dynamicInstanceId().isEmpty();
         if (dyn) fetchAuthorization();
         JsonNode body = requestToken();
         if (body.path("errcode").asLong(-1) != 0) {
@@ -670,13 +757,13 @@ public class KingdeePushService {
 
     /**
      * 动态授权(与 deploy/kingdee-client.mjs fetchAuthorization 同算法):
-     * 凭 outerInstanceId 调 push_app_authorize 取当前 appKey/appSecret/domain。
-     * 真实账套 appSecret 官方 24h 轮换,不能写死,须每次取新 token 前刷新;
+     * 凭第三方实例id 调 push_app_authorize 取当前 appKey/appSecret/domain。
+     * appKey/appSecret 官方 24h 轮换(沙箱同样轮换),不能写死,须每次取新 token 前刷新;
      * 响应 data 为数组,取 status=1 的授权记录(无则首条),兼容 errcode/code 两种格式。
      */
     private void fetchAuthorization() throws Exception {
         Map<String, String> params = new TreeMap<>();
-        params.put("outerInstanceId", outerInstanceId);
+        params.put("outerInstanceId", dynamicInstanceId());
         String[] tn = timestampNonce();
         String url = API_BASE + AUTH_PATH + "?" + qs(params, false);
         Map<String, String> headers = baseHeaders(tn);
