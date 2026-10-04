@@ -106,6 +106,35 @@ test('配置外物料类别不静默丢数据:兜底按行键序带入(排掉 id
   assert.deepEqual(entries, [{ 检验项: '规格X', 检测标准: '1.5' }, { 检验项: '备注X', 检测标准: 'ok' }])
 })
 
+/* ── 「自定义检验要求」页签(2026-10-04):列由动态字段(备用列池)定义 ──
+   后端 QueryService.rowToLabels 按 label 下发 ⇒ 行键就是列名(动态字段=备用列上绑的中文名),
+   故带入口径与固定 7 张表**完全一致**;该页签 cols 为空,列序取行自身键序(=yj_field 的 seq 序)。 */
+test('自定义页签:列名就是检验项(行键=label),顺序=字段登记顺序', () => {
+  const rows = [{
+    id: 12,
+    物料类别: '自定义检验要求',
+    物料编号: 'YJ-YCYX-006',
+    平整度: '无毛刺',
+    盐雾时长: '48h',
+  }]
+  const entries = carryEntriesOf(lookupReqGroups(rows, 'YJ-YCYX-006'))
+  assert.deepEqual(entries, [
+    { 检验项: '平整度', 检测标准: '无毛刺' },
+    { 检验项: '盐雾时长', 检测标准: '48h' },
+  ])
+  // 标识列照旧不成项
+  assert.ok(!entries.some((e) => e.检验项 === '物料编号' || e.检验项 === '物料类别'))
+})
+
+test('自定义页签 + 固定页签同时命中:按页签配置序(固定 7 张在前,自定义殿后)', () => {
+  const rows = [
+    { id: 12, 物料类别: '自定义检验要求', 物料编号: 'YJ-YCYX-006', 平整度: '无毛刺' },
+    { id: 1, 物料类别: '折叠棉', 物料编号: 'YJ-YCYX-006', 折叠棉: '47*34*154-1' },
+  ]
+  const plan = carryPlan(rows, 'YJ-YCYX-006', [])
+  assert.deepEqual(plan.entries.map((e) => e.检验项), ['折叠棉', '平整度'], '折叠棉页签在前、自定义页签在最后')
+})
+
 /** 源码级回归:检验报告必须挂带入入口,且带入算法只此一份(不各写一遍合并逻辑) */
 test('页面接线:检验报告有「带入检验要求」入口,且走 qcInspReqCarry', () => {
   const src = readFileSync(new URL('../views/QcInspRecSheet.vue', import.meta.url), 'utf8')

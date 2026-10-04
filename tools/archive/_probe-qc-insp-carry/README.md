@@ -12,7 +12,12 @@
 | 文件 | 用途 |
 |---|---|
 | `_v-qc-insp-carry.cjs` | **主探针**(22 条断言全通过):面板渲染 → 自动带入 → 只补缺失项 → 幂等 → 无要求物料拦下 → 弹窗找行 → 中/英/繁三语显示 |
+| `_v-custom-tab.cjs` | **第 8 张表探针**(17 条断言全通过):「自定义检验要求」页签 → 管理员加列(动态字段)→ 录数据保存 → 落库核对 → 列名进检验项标准库 → **带入检验数据记录** → 弹窗可见。⚠ 只打测试账套(factory=YJ_TEST) |
 | `_v-recon.cjs` | 排查探针:改前/改后对照来料检验要求面板与「检验要求」弹窗**能不能看到行**(detail 键回归的证据) |
+| `_q-served-build.mjs` | 取证:某实例(8090 打包版 / 5173 热更)下发的 chunk 关键字 + 接口 detail 键/行数 —— 判断"用户看的是哪一版" |
+| `QcReqDb.java` | 只读查 qc_insp_req 存活/作废行数 + `yj_archive_change_log` 保存留痕(判断"数据是不是真丢了") |
+| `QcReqMeta.java` | 只读查 qc_insp_req 列/备用列池、QC_INSP_REQ 字段元数据 |
+| `QcCustomTabDb.java` | 只读查 物料类别词表 / 各页签行数 / 动态字段绑定 / 标准库条目(两账套对照) |
 | `_q-req-raw.mjs` | 最小证据:接口 `detail` 的键是 `qc_insp_req` 而非 `items` |
 | `_q-req-rows.mjs` | 地面真值:79 行要求数据按页签分布 + 抽查物料的"有数据列" |
 | `_d-carry-debug.cjs` | 踩坑留证:新增报告后立刻写「物料编码」会被草稿替换窗口冲掉(写入需自愈重试) |
@@ -20,10 +25,14 @@
 
 ## 运行
 
-需 5173(vite)+ 8090(后端)已起;探针自己起 headless Edge 走 CDP,不碰真实数据(只建草稿、不保存):
+需 5173(vite)/ 8090(后端)已起;探针自己起 headless Edge 走 CDP:
 
 ```powershell
-node tools/archive/_probe-qc-insp-carry/_v-qc-insp-carry.cjs
+# 带入功能(正式账套,只建草稿不保存)
+node tools/archive/_probe-qc-insp-carry/_v-qc-insp-carry.cjs http://127.0.0.1:8090
+
+# 自定义页签(测试账套,会真加字段与数据行 —— 演示数据)
+node tools/archive/_probe-qc-insp-carry/_v-custom-tab.cjs
 ```
 
 ## 顺带修掉的回归(本次实测发现)

@@ -1582,6 +1582,10 @@ public class PanelConfigService {
 
     private static final java.util.Set<String> EXT_DATA_TYPES = java.util.Set.of("文本", "下拉框", "日期", "是否");
     private static final int EXT_SPARE_COUNT = 20;
+    /** 来料检验要求面板码:其列名 = 检验项(动态字段绑定需同批登记进 qc.insp_item,见 addExtField) */
+    private static final String QC_INSP_REQ_PANEL = "QC_INSP_REQ";
+    /** 检验项标准库编码(检验数据记录 QC_INSP_REC 的「检验项」字段 dict_sql 就是它) */
+    private static final String QC_INSP_ITEM_LIB = "qc.insp_item";
 
     /** 动态字段总览:现有动态字段 + 各表备用列池占用/脏数据行数(规格 §8 契约 1) */
     public Map<String, Object> extFieldOverview(String panelCode) {
@@ -1731,6 +1735,11 @@ public class PanelConfigService {
         translations.invalidateLoadedLocales();
         extDescribe(table, chosen, label + "(动态字段,绑定" + chosen + ")");
         extLog(panelCode, label, chosen, "bind", "place=" + finalPlace + ",type=" + dataType);
+        // 来料检验要求(QC_INSP_REQ):本面板的**列名就是检验项** —— 检验数据记录按
+        // 「表头列名 → 检验项、命中行该列数据 → 检测标准」带入(见 core/qc/qcInspReqCarry.js),
+        // 而该面板新增的「自定义检验要求」页签的列就是这里绑定的动态字段,故绑定即同批登记进
+        // 「检验项」标准库 qc.insp_item —— 报告里那个下拉直接选得到(用户口径 2026-10-04)。
+        if (QC_INSP_REQ_PANEL.equals(panelCode)) registerInspItem(label);
         registry.reload();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("colName", chosen);
@@ -1738,8 +1747,7 @@ public class PanelConfigService {
         return out;
     }
 
-    /** 退绑(规格 §7:数据保留,永不 DROP 物理列;守卫 G6 仅动态字段可退绑) */
-    @org.springframework.transaction.annotation.Transactional
+    /** 退绑(规格 §7:数据保留,永不 DROP 物理列;守卫 G6 仅动态字段可退绑) */    @org.springframework.transaction.annotation.Transactional
     public void retireExtField(String panelCode, int fieldId) {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT col_name, label, place FROM yj_field WHERE id = ? AND panel_code = ?", fieldId, panelCode);
@@ -1756,6 +1764,31 @@ public class PanelConfigService {
         }
         extLog(panelCode, label, col, "retire", null);
         registry.reload();
+    }
+
+    /**
+     * 「检验项」标准库(qc.insp_item)幂等登记 —— 来料检验要求的列名就是检验项
+     * (2026-10-04 用户口径:「自定义检验要求」页签的列名要能在检验报告的检验项下拉里选到)。
+     *
+     * 只由 QC_INSP_REQ 的动态字段绑定调用(见 {@link #addExtField});同名条目已存在则不动。
+     * 退绑(retire)**不**删条目:标准库是供人维护的候选词表,条目可能已被别处引用/人工编辑过,
+     * 要撤就去「检验项标准库维护」里停用(StdLibController /api/stdlib/remove)。
+     */
+    private void registerInspItem(String label) {
+        try {
+            Integer dup = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_std_lib WHERE lib_code = ? AND content = ?", Integer.class, QC_INSP_ITEM_LIB, label);
+            if (dup != null && dup > 0) return;
+            Integer maxSeq = jdbc.queryForObject(
+                    "SELECT MAX(seq) FROM yj_std_lib WHERE lib_code = ?", Integer.class, QC_INSP_ITEM_LIB);
+            jdbc.update("INSERT INTO yj_std_lib (lib_code, item_code, content, seq, enabled) VALUES (?,?,?,?,1)",
+                    QC_INSP_ITEM_LIB, "默认", label, (maxSeq == null ? 0 : maxSeq) + 10);
+        } catch (Exception e) {
+            // 标准库只是候选词表:登记失败不该把"字段绑定成功"整体回滚(绑定是主动作),
+            // 但要留痕,免得下拉里选不到还查不出原因。
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[EXT_FIELD] 检验项标准库登记失败({}): {}", label, e.getMessage());
+        }
     }
 
     /** MS_Description 幂等更新(先查后改,避免异常控制流) */

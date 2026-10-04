@@ -1021,10 +1021,11 @@
     <template v-else-if="isQcInspReq">
       <div class="qc-insp-wrap" v-loading="loading">
         <QcInspReqSheet
-          :head="cur" :editable="draftEditable" :panel-code="panelCode"
+          :head="cur" :editable="draftEditable" :panel-code="panelCode" :fields="sheetAllFields"
           @dirty="markInlineDirty"
           @save="saveInlineDraft('保存')"
           @refresh="load()"
+          @refresh-config="onFieldEditRefresh"
         />
       </div>
     </template>

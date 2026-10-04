@@ -57,6 +57,10 @@ export function carryEntriesOf(groups) {
   const out = []
   const seen = new Set()
   for (const g of Array.isArray(groups) ? groups : []) {
+    // 列序来源:固定 7 张表取页签配置的 cols(Excel 原列序);
+    // 「自定义检验要求」页签(dynamicCols,cols 为空)与配置外类别取**行自身的键序** ——
+    // 后端 rowToLabels 按 yj_field 顺序下发,而行键就是列名(label,动态字段=备用列上绑定的中文名),
+    // 所以"列名→检验项"这条口径对自定义页签同样成立,不需要为它写特例。
     const cols = Array.isArray(g?.tab?.cols) && g.tab.cols.length
       ? g.tab.cols.map((c) => c.key)
       : fallbackColsOf(g?.rows)

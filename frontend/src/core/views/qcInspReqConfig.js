@@ -99,6 +99,18 @@ export const qcInspReqTabs = [
       { key: '破损、变形', w: 119, group: '外观' },
     ],
   },
+  {
+    // ═══ 第 8 张表:自定义检验要求(2026-10-04 用户口径)═══
+    // 「加一个 tab 表,这个表可以自定义字段,这样的表能不能也带入到检验数据记录」——
+    // 列由**动态字段(备用列池)**定义:管理员在本页签的「⚙ 自定义字段」里加(中文名=列名/类型/词表/列宽),
+    // 存的是 qc_insp_req.备用N(yj_field 的 label 才是列名,行数据按 label 取 —— 见 QueryService.rowToLabels)。
+    // 故本页签 cols 留空、由 dynamicCols 标记驱动 QcInspReqSheet 从字段元数据现取;
+    // 带入检验数据记录的规则与上面 7 张**完全一致**(列名→检验项、命中行该列数据→检测标准,空值不带)。
+    key: '自定义检验要求',
+    sheetTitle: '自定义检验要求',
+    dynamicCols: true,
+    cols: [],
+  },
 ]
 
 /** 页签 key → 配置 */

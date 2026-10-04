@@ -2747,6 +2747,15 @@ export default {
     '已按来料检验要求带入 {n} 项检验项': 'Loaded {n} inspection item(s) from the incoming inspection requirements',
     '带入检验要求失败': 'Failed to load the inspection requirements',
 
+    /* 来料检验要求·第 8 张表「自定义检验要求」(2026-10-04 用户口径):
+       页签的列 = 动态字段(备用列池),列名就是检验项;带入口径与前 7 张完全一致 */
+    '自定义检验要求': 'Custom Inspection Requirements',
+    '自定义字段': 'Custom Fields',
+    '给「自定义检验要求」页签增删列(动态字段/备用列池,仅管理员)':
+      'Add or retire columns of the Custom Inspection Requirements tab (dynamic fields / spare pool; admins only)',
+    '该页签的列由「自定义字段」维护，当前还没有列 —— 先加一列再录数据':
+      'This tab\'s columns are maintained through Custom Fields; none defined yet — add a column before entering data',
+
     // 库存报表三面板(2026-09-21):重算成本按钮 + 查询弹窗「档案∩有流水」联动提示 + 模糊搜索
     '重算成本': 'Recalculate cost',
     '该仓无此存货流水，已清空存货': 'No stock movement for this item in the selected warehouse; item cleared',
