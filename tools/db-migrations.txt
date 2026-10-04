@@ -1083,6 +1083,15 @@ migrate-qc-tc-in.sql
 #        前端 qcInspReqConfig.js 的自定义页签 + QcInspReqSheet 动态列渲染 + 「自定义字段」入口。
 #   验证:tools/archive/_probe-qc-insp-carry/_v-custom-tab.cjs(测试库端到端)。两账套都执行。
 migrate-qc-insp-req-custom-tab.sql
+# migrate-yjfield-tab-key.sql(2026-10-04):yj_field 加 tab_key(字段所属明细页签)
+#   用户口径:「检验数据要求的自定义字段,是单独针对每个表的」—— 来料检验要求每张表(页签)各有各的自定义列。
+#   承载=字段元数据本身:tab_key = 该面板页签名(来料检验要求取 物料类别 字典值);NULL=不区分页签(其余面板零变化)。
+#   没复用 col_group(那是「父表头分组」,档案面板配置也读它生成 gridTabs.groups,拿来存页签会造出假分组)。
+#   同脚本回填:改动前绑定的动态字段(备用列)一律归「自定义检验要求」页签(= 它们当时的显示位置,行为不变)。
+#   配套:后端 PanelConfigService(绑定收 tab + 唯一性改为「同页签内唯一」+ 总览下发 tab)、
+#       前端 qcInspReqCols.js(页签列的唯一判据,渲染与带入同源)、FieldManagerDialog 的「所属页签」。
+#   验证:tools/archive/_probe-qc-insp-carry/_v-custom-tab.cjs(每表各加列 + 重名 + 带入)。两账套都执行。
+migrate-yjfield-tab-key.sql
 
 # —— 2026-09-21 特采申请单(QC_TC):「最终处理结果」字典补第三值「管控使用」 ——
 #   纸面 YJ-QR-60 原图「二．最终处理结果」印的是三个勾选框(正常使用/管控使用/挑选使用),
@@ -2211,3 +2220,9 @@ migrate-qc-ref-repair.sql
 #   最后 DROP bs_bom_detail / bs_bom_head;幂等,两账套均已执行。
 #   建表/同步/自检那一整套保留在 git 历史 commit d6998ebd,金蝶开通接口后一条 revert 即可恢复。
 migrate-drop-bom-kingdee.sql
+
+# migrate-drop-bom-panels.sql(2026-10-04):下架 MES 自建「物料清单(BOM)」面板族 —— 用户追加要求「要删」。
+#   删面板元数据 BOM(物料清单,17 字段)+ WO_KIT(工单齐套表,26 字段),删视图 v_wo_kit(唯一数据源是 bs_bom),
+#   删表 bs_bom(48 列/81 行);译名按「仍被其它面板引用则保留」处理(面板名「物料清单」WLBOM 还在用 ⇒ 保留)。
+#   附:后端 5 处读 bs_bom 的代码与前端 BOM 专属 UI/菜单同批移除。幂等,两账套均已执行。
+migrate-drop-bom-panels.sql
