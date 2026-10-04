@@ -59,8 +59,17 @@
       </tbody>
     </table>
 
-    <!-- ③ 分区标题:检验结果 -->
-    <div class="qr-section">{{ tt('检验结果') }}</div>
+    <!-- ③ 分区标题:检验结果(右侧「带入检验要求」= 按本单物料编码从品质管理 > 来料检验要求
+         把「检验项(上方的列名) / 检测标准(下方该列的数据)」补进表体;只补缺失项,已填内容不动) -->
+    <div class="qr-section">
+      {{ tt('检验结果') }}
+      <span
+        v-if="editable"
+        class="qr-lib-btn no-print qr-carry-btn"
+        :title="tt('按物料编码从来料检验要求带入检验项与检测标准（只补缺失项，已填的检测结果不动）')"
+        @click="carryFromReq()"
+      >⧉ {{ carrying ? tt('带入中…') : tt('带入检验要求') }}</span>
+    </div>
 
     <!-- ④ 表体:检验项 | 检测标准 | 检测结果 | 单项判定 -->
     <table class="qr-table">
@@ -205,12 +214,15 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { tt } from '@/i18n'
+import { errMsg } from '@/business/engine'
 import StdLibManager from './StdLibManager.vue'
 import QcInspReqViewDialog from './QcInspReqViewDialog.vue'
+import { fetchReqRows } from '@core/qc/qcInspReqApi'
+import { carryPlan } from '@core/qc/qcInspReqCarry'
 import {
   QC_INSP_REC_HEAD_ROWS,
   QC_INSP_REC_FOOT_FULL,
@@ -312,6 +324,71 @@ function openReqView() {
   }
   reqViewVisible.value = true
 }
+
+/**
+ * 按物料编码把「来料检验要求」的检验项与检测标准带进表体(2026-10-04 用户口径):
+ *   「根据物料编码能够在来料检验要求找到对应的行;检验项就是上面的检验项目,
+ *     检验标准就是下面对应的数据。」
+ * 即:要求表里**列名(表头)= 检验项目**、**该列在命中行里的数据 = 检测标准**,
+ * 逐列拆成本报告的两列(算法在 @core/qc/qcInspReqCarry,纯函数有单测)。
+ * 合并口径:只补缺失项 —— 已有的检验项一律保留,检测结果/单项判定绝不覆盖,重复点击幂等。
+ * @param {{silent?: boolean}} opts silent=true 时(自动带入)不弹「无需带入」这类打扰提示
+ * @returns {Promise<number>} 实际补进来的行数
+ */
+const carrying = ref(false)
+async function carryFromReq(opts = {}) {
+  const code = materialCode.value
+  if (!code) {
+    if (!opts.silent) ElMessage.warning(tt('请先填写物料编码'))
+    return 0
+  }
+  if (carrying.value) return 0
+  carrying.value = true
+  try {
+    const rows = await fetchReqRows(code)
+    const plan = carryPlan(rows, code, items.value)
+    if (!plan.entries.length) {
+      if (!opts.silent) ElMessage.warning(tt('来料检验要求里没有该物料的检验数据，无法带入'))
+      return 0
+    }
+    if (!plan.add.length) {
+      if (!opts.silent) ElMessage.info(tt('检验项已与来料检验要求一致，无需带入'))
+      return 0
+    }
+    const d = props.head.detail || (props.head.detail = {})
+    if (!Array.isArray(d.items)) d.items = []
+    // 逐列落成行:检验项=表头列名,检测标准=该列数据;结果/判定留空等人填
+    for (const e of plan.add) d.items.push({ [K.ITEM]: e.检验项, [K.STD]: e.检测标准 })
+    emit('dirty')
+    ElMessage.success(tt('已按来料检验要求带入 {n} 项检验项').replace('{n}', String(plan.add.length)))
+    return plan.add.length
+  } catch (e) {
+    if (!opts.silent) ElMessage.error(errMsg(e) || tt('带入检验要求失败'))
+    return 0
+  } finally {
+    carrying.value = false
+  }
+}
+
+/**
+ * 物料编码填好后自动带入(2026-10-04):仅当**报告表体还没有检验项行**时触发;
+ * 已有行(哪怕只有一行)一律不自动改 —— 想补走「带入检验要求」按钮,口径一致(只补缺失项)。
+ * 去抖 600ms:物料编码是逐字符输入的,没必要也不能每敲一下就去查一次;
+ * 半截编码不精确匹配任何物料(见 matchReqRowsByMaterial),所以中途不会带错内容。
+ */
+const AUTO_CARRY_DELAY = 600
+let autoCarryTimer = 0
+watch(materialCode, (code) => {
+  if (autoCarryTimer) { clearTimeout(autoCarryTimer); autoCarryTimer = 0 }
+  if (!props.editable || !code) return
+  autoCarryTimer = setTimeout(() => {
+    autoCarryTimer = 0
+    // 到点了再确认一次:这 600ms 里可能已经手工加了行 / 单据被切走成了只读
+    if (!props.editable || items.value.length) return
+    void carryFromReq({ silent: true })
+  }, AUTO_CARRY_DELAY)
+})
+onBeforeUnmount(() => { if (autoCarryTimer) clearTimeout(autoCarryTimer) })
 
 /**
  * 从检验目录「新增检验」跳进来时,把批次/物料预填到**新建的空报告**上
@@ -445,6 +522,7 @@ watch(
 
 /* ═══ 分区标题 ═══ */
 .qr-section {
+  position: relative;
   border-top: 1px solid #8a8a8a;
   border-bottom: 1px solid #8a8a8a;
   background: #d9ecfb;
@@ -453,6 +531,16 @@ watch(
   text-align: center;
   padding: 4px 0;
   letter-spacing: 2px;
+}
+/* 「带入检验要求」挂在分区条右端(标题仍居中:按钮绝对定位不参与居中计算);
+   纸面打印不出现(no-print) */
+.qr-carry-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  letter-spacing: 0;
+  font-weight: 400;
 }
 
 /* ═══ 表体 ═══ */

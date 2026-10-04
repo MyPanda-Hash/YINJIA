@@ -2736,6 +2736,17 @@ export default {
     '共 {n} 行': '{n} row(s) in total',
     '另有 {n} 行物料类别不在检验要求模板中': '{n} more row(s) whose material category is not in the requirement template',
 
+    /* 检验报告·按物料编码从「来料检验要求」带入检验项/检测标准(2026-10-04 用户口径:
+       检验项=要求表里上方的列名,检测标准=该列在命中行里的数据;只补缺失项) */
+    '带入检验要求': 'Load from Requirements',
+    '带入中…': 'Loading…',
+    '按物料编码从来料检验要求带入检验项与检测标准（只补缺失项，已填的检测结果不动）':
+      'Load the inspection items and test standards for this material code from the incoming inspection requirements (only missing items are added; existing entries are never overwritten)',
+    '来料检验要求里没有该物料的检验数据，无法带入': 'The incoming inspection requirements have no data for this material, so nothing can be loaded',
+    '检验项已与来料检验要求一致，无需带入': 'The inspection items already match the incoming inspection requirements; nothing to load',
+    '已按来料检验要求带入 {n} 项检验项': 'Loaded {n} inspection item(s) from the incoming inspection requirements',
+    '带入检验要求失败': 'Failed to load the inspection requirements',
+
     // 库存报表三面板(2026-09-21):重算成本按钮 + 查询弹窗「档案∩有流水」联动提示 + 模糊搜索
     '重算成本': 'Recalculate cost',
     '该仓无此存货流水，已清空存货': 'No stock movement for this item in the selected warehouse; item cleared',
