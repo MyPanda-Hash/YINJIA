@@ -10,14 +10,24 @@ import { extFieldOverview, extFieldAdd, extFieldRetire } from '@/business/engine
 // 而父组件(PanelxList)用 v-model(即 modelValue / update:modelValue)⇒ 页脚「关闭」按钮
 // 发出的 update:visible 没人监听(× 能关是 el-dialog 的 update:modelValue 经透传 attr 落回父级)。
 // 统一为 Vue 标准 v-model 契约:modelValue + update:modelValue。
-const props = defineProps({ modelValue: Boolean, panelCode: String })
+const props = defineProps({
+  modelValue: Boolean,
+  panelCode: String,
+  /** 分页签面板(来料检验要求)才传:该面板的页签清单 [{value,label}] —— 自定义列必须指明住哪张表 */
+  tabs: { type: Array, default: () => [] },
+  /** 打开时默认选中的页签(一般是当前正在看的那张表) */
+  defaultTab: { type: String, default: '' },
+})
 const emit = defineEmits(['update:modelValue', 'done'])
 const loading = ref(false)
 const saving = ref(false)
 const data = ref({ capacity: 20, fields: [], linePool: [] })
-const form = ref({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false })
+const form = ref({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: '' })
+/** 需要指定「所属页签」的面板:传了 tabs 就是 */
+const needTab = () => Array.isArray(props.tabs) && props.tabs.length > 0
+const blankForm = () => ({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: needTab() ? (props.defaultTab || props.tabs[0].value) : '' })
 
-watch(() => props.modelValue, (v) => { if (v) load() })
+watch(() => props.modelValue, (v) => { if (v) { form.value = blankForm(); load() } })
 
 async function load() {
   loading.value = true
@@ -37,7 +47,7 @@ async function submit() {
     const payload = { ...form.value, panel: props.panelCode }
     const res = await extFieldAdd(payload)
     ElMessage.success(tt('字段已添加') + ':' + res.colName)
-    form.value = { label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false }
+    form.value = blankForm()
     await load()
     emit('done')
   } catch (e) {
@@ -76,6 +86,7 @@ async function retire(f) {
       </div>
       <el-table :data="data.fields" size="small" max-height="200">
         <el-table-column prop="label" :label="tt('字段名')" min-width="140" />
+        <el-table-column v-if="needTab()" prop="tab" :label="tt('所属页签')" width="130" />
         <el-table-column prop="col" :label="tt('承载列')" width="90" />
         <el-table-column prop="dataType" :label="tt('类型')" width="80" />
         <el-table-column prop="place" :label="tt('位置')" width="120" />
@@ -87,6 +98,13 @@ async function retire(f) {
       </el-table>
       <el-divider content-position="left">{{ tt('新增字段') }}</el-divider>
       <el-form :model="form" label-width="90px" size="small" @submit.prevent>
+        <!-- 分页签面板:自定义列必须指明住哪张表(默认=当前页签) -->
+        <el-form-item v-if="needTab()" :label="tt('所属页签')">
+          <el-select v-model="form.tab" style="width: 220px">
+            <el-option v-for="t in tabs" :key="t.value" :label="tt(t.label)" :value="t.value" />
+          </el-select>
+          <el-tooltip :content="tt('该列只出现在这张表里;检验数据记录带入时也按这张表的列走')" placement="top"><span class="fm-help">?</span></el-tooltip>
+        </el-form-item>
         <el-form-item :label="tt('字段名')"><el-input v-model="form.label" :placeholder="tt('中文,禁 . % / ( ) 空格')" maxlength="60" /></el-form-item>
         <el-form-item :label="tt('英文名')"><el-input v-model="form.labelEn" maxlength="60" /></el-form-item>
         <el-form-item :label="tt('类型')">

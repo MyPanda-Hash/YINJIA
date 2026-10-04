@@ -135,6 +135,38 @@ test('自定义页签 + 固定页签同时命中:按页签配置序(固定 7 张
   assert.deepEqual(plan.entries.map((e) => e.检验项), ['折叠棉', '平整度'], '折叠棉页签在前、自定义页签在最后')
 })
 
+/* ── 每张表各自的自定义列(2026-10-04 用户口径:「自定义字段单独针对每个表」)──
+   列 = 该表的固定列(Excel 原列序) + 属于该表的动态字段(追加在后);别的表的自定义列不串入。 */
+test('固定表也带自定义列:固定列在前、该表自定义列追加在后', () => {
+  const rows = [{
+    id: 1, 物料类别: '折叠棉', 物料编号: 'YJ-YCYX-006',
+    折叠棉: '47*34*154-1', 炭棒: '34*12*154', 折数: '75±5', 折高: '6--7',
+    炭棒直径: '34.2',            // 折叠棉表的自定义列
+    外观: '无脏污',              // 垫片表的自定义列(串进来就是 bug)
+  }]
+  const ext = [
+    { label: '炭棒直径', col: '备用1', tab: '折叠棉' },
+    { label: '外观', col: '备用2', tab: '垫片' },
+  ]
+  const entries = carryEntriesOf(lookupReqGroups(rows, 'YJ-YCYX-006'), ext)
+  assert.deepEqual(entries.map((e) => e.检验项), ['折叠棉', '炭棒', '折数', '折高', '炭棒直径'], '自定义列追加在固定列之后')
+  assert.ok(!entries.some((e) => e.检验项 === '外观'), '别的表的自定义列不带进来')
+})
+
+test('同一列名可以在不同表各有一列(同名互不影响)', () => {
+  const rows = [
+    { id: 1, 物料类别: '折叠棉', 物料编号: 'M-C', 外观: '无毛刺' },
+    { id: 2, 物料类别: '垫片', 物料编号: 'M-C', 外观: '无划痕' },
+  ]
+  const ext = [
+    { label: '外观', col: '备用1', tab: '折叠棉' },
+    { label: '外观', col: '备用2', tab: '垫片' },
+  ]
+  const entries = carryEntriesOf(lookupReqGroups(rows, 'M-C'), ext)
+  assert.deepEqual(entries, [{ 检验项: '外观', 检测标准: '无毛刺' }],
+    '同名项去重:取首个非空数据(两表同名同物料时只带一条,不重复)')
+})
+
 /** 源码级回归:检验报告必须挂带入入口,且带入算法只此一份(不各写一遍合并逻辑) */
 test('页面接线:检验报告有「带入检验要求」入口,且走 qcInspReqCarry', () => {
   const src = readFileSync(new URL('../views/QcInspRecSheet.vue', import.meta.url), 'utf8')

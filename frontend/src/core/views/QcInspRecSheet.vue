@@ -221,7 +221,7 @@ import { tt } from '@/i18n'
 import { errMsg } from '@/business/engine'
 import StdLibManager from './StdLibManager.vue'
 import QcInspReqViewDialog from './QcInspReqViewDialog.vue'
-import { fetchReqRows } from '@core/qc/qcInspReqApi'
+import { fetchReqRows, fetchExtFields } from '@core/qc/qcInspReqApi'
 import { carryPlan } from '@core/qc/qcInspReqCarry'
 import {
   QC_INSP_REC_HEAD_ROWS,
@@ -345,8 +345,10 @@ async function carryFromReq(opts = {}) {
   if (carrying.value) return 0
   carrying.value = true
   try {
-    const rows = await fetchReqRows(code)
-    const plan = carryPlan(rows, code, items.value)
+    // 动态字段:来料检验要求每张表各自的自定义列(用户口径 2026-10-04)——不带上它,
+    // 界面上看得到的自定义列就会"带不进报告"
+    const [rows, extFields] = await Promise.all([fetchReqRows(code), fetchExtFields()])
+    const plan = carryPlan(rows, code, items.value, extFields)
     if (!plan.entries.length) {
       if (!opts.silent) ElMessage.warning(tt('来料检验要求里没有该物料的检验数据，无法带入'))
       return 0

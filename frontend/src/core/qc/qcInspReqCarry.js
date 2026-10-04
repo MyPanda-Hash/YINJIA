@@ -19,6 +19,7 @@
  *   同名检验项只带一次,取**首个非空数据**那一行(实测同一编号跨页签的列名基本不重叠)。
  */
 import { lookupReqGroups } from './qcInspReqLookup.js'
+import { colsOfTab } from './qcInspReqCols.js'
 
 /** 要求表的标识列:不进检验项(物料编号=匹配键;物料类别=页签分流键) */
 const ID_COLS = Object.freeze(['物料编号', '物料类别'])
@@ -50,20 +51,22 @@ function fallbackColsOf(rows) {
 
 /**
  * 命中分组 → 检验报告的「检验项 / 检测标准」条目(已去重、已剔除空数据列)。
- * @param {Array<{key: string, tab: object|null, rows: Array<object>}>} groups lookupReqGroups 的结果
+ * @param {Array} groups lookupReqGroups 的结果
+ * @param {Array<{label:string, tab?:string}>} [extFields] 来料检验要求的动态字段(/px/extFields 的 fields):
+ *        每张表各自的自定义列也在这张表里带入(用户口径 2026-10-04「自定义字段单独针对每个表」)。
+ *        不传 = 只带固定列(与改动前等价)。
  * @returns {Array<{检验项: string, 检测标准: string}>}
  */
-export function carryEntriesOf(groups) {
+export function carryEntriesOf(groups, extFields) {
   const out = []
   const seen = new Set()
   for (const g of Array.isArray(groups) ? groups : []) {
-    // 列序来源:固定 7 张表取页签配置的 cols(Excel 原列序);
-    // 「自定义检验要求」页签(dynamicCols,cols 为空)与配置外类别取**行自身的键序** ——
-    // 后端 rowToLabels 按 yj_field 顺序下发,而行键就是列名(label,动态字段=备用列上绑定的中文名),
-    // 所以"列名→检验项"这条口径对自定义页签同样成立,不需要为它写特例。
-    const cols = Array.isArray(g?.tab?.cols) && g.tab.cols.length
-      ? g.tab.cols.map((c) => c.key)
-      : fallbackColsOf(g?.rows)
+    // 列序与界面**同源**(colsOfTab):固定列在前(Excel 原列序)、该表的自定义列追加在后;
+    // 配置外物料类别(理论上不会有)没有页签配置,退回按行自身的键序(后端按 yj_field 顺序下发)。
+    let cols = g?.tab ? colsOfTab(g.tab, extFields).map((c) => c.key) : fallbackColsOf(g?.rows)
+    // 兜底:全自定义页签的列全在动态字段里 —— 字段清单取不到(接口失败/调用方没传)时,
+    // 退回按行自身键序,否则那张表会**一条都带不出来**(静默丢数据,比列序不理想严重得多)。
+    if (g?.tab?.dynamicCols && cols.length <= 1) cols = fallbackColsOf(g?.rows)
     for (const row of Array.isArray(g?.rows) ? g.rows : []) {
       for (const key of cols) {
         if (ID_COLS.includes(key) || isNonBiz(key)) continue
@@ -99,7 +102,7 @@ export function missingCarryRows(existingItems, entries) {
  * 一行到位:来料检验要求全量行 + 物料编码 + 报告现有行 → 该补进来的行。
  * @returns {{entries: Array<object>, add: Array<object>}} entries=该物料的全部可带入项;add=其中缺的
  */
-export function carryPlan(reqRows, materialCode, existingItems) {
-  const entries = carryEntriesOf(lookupReqGroups(reqRows, materialCode))
+export function carryPlan(reqRows, materialCode, existingItems, extFields) {
+  const entries = carryEntriesOf(lookupReqGroups(reqRows, materialCode), extFields)
   return { entries, add: missingCarryRows(existingItems, entries) }
 }

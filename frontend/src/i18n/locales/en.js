@@ -2755,6 +2755,16 @@ export default {
       'Add or retire columns of the Custom Inspection Requirements tab (dynamic fields / spare pool; admins only)',
     '该页签的列由「自定义字段」维护，当前还没有列 —— 先加一列再录数据':
       'This tab\'s columns are maintained through Custom Fields; none defined yet — add a column before entering data',
+    /* 每张表各自的自定义列(2026-10-04 用户口径:「自定义字段单独针对每个表」) */
+    '所属页签': 'Table (Tab)',
+    '该列只出现在这张表里;检验数据记录带入时也按这张表的列走':
+      'This column appears only in this table; the inspection data record loads it as part of this table',
+    '给某张表增删自定义列(动态字段/备用列池,仅管理员;弹窗里选所属页签)':
+      'Add or retire custom columns for a table (dynamic fields / spare pool, admins only; pick the table in the dialog)',
+    '请选择所属页签(自定义列住哪张表)': 'Please pick the table this custom column belongs to',
+    '所属页签不存在:': 'Unknown table: ',
+    '该页签已有同名字段:': 'This table already has a column with that name: ',
+    '所属页签仅分页签面板支持:': 'Per-table columns are only supported on tabbed panels: ',
 
     // 库存报表三面板(2026-09-21):重算成本按钮 + 查询弹窗「档案∩有流水」联动提示 + 模糊搜索
     '重算成本': 'Recalculate cost',

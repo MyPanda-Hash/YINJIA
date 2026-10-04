@@ -36,3 +36,29 @@ export async function fetchReqRows(materialCode) {
   //   照 detail.items 取会恒空,报表现象就是「该物料未维护来料检验要求」(见 detailRows.js 说明)
   return detailRowsOf(doc, QC_INSP_REQ_DETAIL_KEY)
 }
+
+/* ── 动态字段(每张表各自的自定义列) ──
+ * 检验要求表自己的字段清单:QcInspReqSheet(渲染)与检验报告(带入)都要它 ——
+ * 同一份数据两处各拉一次是浪费,更怕两处口径不一致,故在此统一取,并做短缓存。
+ * /px/extFields 任何登录用户可读(写操作服务端 requireAdmin)。 */
+let extCache = { at: 0, fields: [] }
+const EXT_TTL_MS = 30_000
+
+/** 取来料检验要求的动态字段([{id,label,col,dataType,place,tab}];tab=所属页签) */
+export async function fetchExtFields({ force = false } = {}) {
+  const now = Date.now()
+  if (!force && extCache.fields.length && now - extCache.at < EXT_TTL_MS) return extCache.fields
+  try {
+    const res = await request.get('/px/extFields', { params: { panel: QC_INSP_REQ_PANEL } })
+    const fields = Array.isArray(res?.data?.fields) ? res.data.fields : []
+    extCache = { at: now, fields }
+    return fields
+  } catch {
+    return extCache.fields || []
+  }
+}
+
+/** 让缓存失效(管理员加/停列之后调,避免 30s 内还按旧字段表渲染) */
+export function invalidateExtFields() {
+  extCache = { at: 0, fields: [] }
+}

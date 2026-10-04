@@ -28,12 +28,12 @@
     <div v-if="showToolbar" class="qc-bar qc-bar2">
       <span class="qc-bar-btn" :title="tt('按字段+内容多条件查找(可跨页签,点结果跳到该行)')" @click="toggleFuzzy">🔍 {{ tt('模糊搜索') }}</span>
       <span class="qc-bar-btn" :title="tt('查看本表的修改记录(每次保存留痕,近 3 次)')" @click="openModifyLog">🕘 {{ tt('修改记录') }}</span>
-      <!-- 自定义字段(仅管理员):「自定义检验要求」页签的列 = 动态字段(备用列池),
-           在这里加/停用列,加完该页签立刻多一列,检验报告里带入的检验项也跟着多一项 -->
+      <!-- 自定义字段(仅管理员):每张表各有各的自定义列(动态字段/备用列池),
+           在弹窗里选「所属页签」;加完该表立刻多一列,检验报告里带入的检验项也跟着多一项 -->
       <span
         v-if="showToolbar && user.isAdmin"
         class="qc-bar-btn"
-        :title="tt('给「自定义检验要求」页签增删列(动态字段/备用列池,仅管理员)')"
+        :title="tt('给某张表增删自定义列(动态字段/备用列池,仅管理员;弹窗里选所属页签)')"
         @click="extMgrVisible = true"
       >⚙ {{ tt('自定义字段') }}</span>
     </div>
@@ -152,8 +152,15 @@
       </div>
     </div>
 
-    <!-- 自定义字段(动态字段/备用列池):本面板的动态字段 = 「自定义检验要求」页签的列 -->
-    <FieldManagerDialog v-model="extMgrVisible" :panel-code="panelCode" @done="onExtFieldDone" />
+    <!-- 自定义字段(仅管理员):**每张表各有各的自定义列** —— 在弹窗里选「所属页签」,
+         加完只有那张表多一列,检验报告带入时也按那张表的列走 -->
+    <FieldManagerDialog
+      v-model="extMgrVisible"
+      :panel-code="panelCode"
+      :tabs="tabOptions"
+      :default-tab="tab?.key || ''"
+      @done="onExtFieldDone"
+    />
 
     <!-- 修改记录(2026-09-22):每次保存留痕——操作人/时间 + 行变化摘要 + 字段级 原值→新值(近 3 次) -->
     <el-dialog v-model="modLogVisible" :title="tt('修改记录') + (modLogNo ? ' · ' + modLogNo : '')" width="760px" append-to-body>
@@ -200,9 +207,11 @@
 import { computed, nextTick, ref, toRaw, watch } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { callButton, errMsg, extFieldOverview } from '@/business/engine'
+import { callButton, errMsg } from '@/business/engine'
 import { useUserStore } from '@/stores/user'
 import { detailRowsOf, ensureDetailRows } from '@core/panel/detailRows'
+import { fetchExtFields, invalidateExtFields } from '@core/qc/qcInspReqApi'
+import { DEFAULT_EXT_COL_W, colsOfTab } from '@core/qc/qcInspReqCols'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import { qcInspReqTabs } from './qcInspReqConfig'
 
@@ -222,19 +231,13 @@ const props = defineProps({
 const emit = defineEmits(['dirty', 'save', 'refresh', 'refresh-config'])
 const user = useUserStore()
 
-/* ── 自定义检验要求页签的列 = 本面板的动态字段(备用列池,「自定义字段」里维护) ──
- * 取数走 /px/extFields(任何登录用户可读;写操作服务端 requireAdmin 把守):
- * 字段的 label 就是列名(=检验项名),行数据也按 label 取(后端 QueryService.rowToLabels 以 label 为键),
- * 与固定 7 张表的列口径**完全一致**,所以带入检验数据记录的算法不用为它写特例。 */
+/* ── 每张表各自的自定义列(动态字段/备用列池,「自定义字段」里维护) ──
+ * 2026-10-04 用户口径:「检验数据要求的自定义字段,是单独针对每个表的」——
+ * 字段的归属页签 = /px/extFields 的 fields[].tab(= yj_field.tab_key);
+ * 列的解析统一走 @core/qc/qcInspReqCols(渲染与带入同源,避免"界面看得到、报告带不进来")。 */
 const extFields = ref([])
-const DEFAULT_EXT_COL_W = 140
 async function loadExtFields() {
-  try {
-    const res = await extFieldOverview(props.panelCode)
-    extFields.value = Array.isArray(res?.fields) ? res.fields : []
-  } catch {
-    extFields.value = []   // 取不到就当作没有自定义列(页签仍在,提示加列)
-  }
+  extFields.value = await fetchExtFields({ force: true })
 }
 watch(() => props.panelCode, () => { void loadExtFields() }, { immediate: true })
 
@@ -244,20 +247,16 @@ function extColWidth(label) {
   const w = Number(f?.width)
   return Number.isFinite(w) && w > 0 ? w : DEFAULT_EXT_COL_W
 }
-/** 自定义页签**必有**的匹配键列:与固定 7 张表一样,物料编号在最左 —— 检验报告正是按它找行的 */
-const EXT_KEY_COL = Object.freeze({ key: '物料编号', w: 140 })
-/** 页签的列:固定页签=配置里的 cols;自定义页签=物料编号 + 动态字段(label→列名) */
+/** 页签的列:固定列(Excel 原列序) + 该页签自己的自定义列(追加在后) */
 function colsOf(t) {
-  if (!t) return []
-  if (!t.dynamicCols) return t.cols
-  return [EXT_KEY_COL, ...extFields.value
-    .filter((f) => f && f.label)
-    .map((f) => ({ key: f.label, w: extColWidth(f.label) }))]
+  return colsOfTab(t, extFields.value, extColWidth)
 }
-/** 是否有分组表头行(自定义页签的列没有 group ⇒ 单行表头) */
+/** 是否有分组表头行(列上没有 group ⇒ 单行表头,如全自定义页签) */
 function hasGroupRow(t) {
   return groupCols(t).length > 0
 }
+/** 「自定义字段」弹窗的「所属页签」候选 = 本面板全部页签 */
+const tabOptions = computed(() => tabs.value.map((t) => ({ value: t.key, label: t.key })))
 /** 自定义页签还没定义任何列(只有匹配键列,没得可填)—— 界面提示先去加列 */
 const tabDynamicEmpty = computed(() => !!tab.value?.dynamicCols && !extFields.value.length)
 
@@ -517,11 +516,12 @@ function gridW(cols) {
   return (cols || []).reduce((s, c) => s + (c.w || 0), 0)
 }
 
-/* ── 自定义字段(动态字段/备用列池):「自定义检验要求」页签的列在这里增删 ──
- * 加完必须重新取面板配置(PanelxList 的 onFieldEditRefresh 会清 cfgCache)——
+/* ── 自定义字段(动态字段/备用列池):**每张表各有各的自定义列**,在这里增删 ──
+ * 加完必须重新取动态字段 + 面板配置(PanelxList 的 onFieldEditRefresh 会清 cfgCache)——
  * 引擎那边 registry.reload() 已刷新,不清前端缓存就还是旧字段表。 */
 const extMgrVisible = ref(false)
 async function onExtFieldDone() {
+  invalidateExtFields()
   await loadExtFields()
   emit('refresh-config')
   emit('refresh')

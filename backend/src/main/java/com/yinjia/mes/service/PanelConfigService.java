@@ -1600,6 +1600,8 @@ public class PanelConfigService {
                 m.put("col", f.col());
                 m.put("dataType", f.dataType());
                 m.put("place", f.place());
+                // 所属页签(分页签面板):前端按它把自定义列渲染到对应那张表里,并随该表带入检验数据记录
+                if (f.tabKey() != null && !f.tabKey().isBlank()) m.put("tab", f.tabKey());
                 fields.add(m);
             }
         }
@@ -1657,17 +1659,32 @@ public class PanelConfigService {
         boolean required = Boolean.TRUE.equals(body.get("required"));
         boolean confirmDirty = Boolean.TRUE.equals(body.get("confirmDirty"));
         boolean clearFirst = Boolean.TRUE.equals(body.get("clearFirst"));
+        // 所属明细页签(2026-10-04 用户口径「自定义字段单独针对每个表」):
+        // 分页签面板(来料检验要求 QC_INSP_REQ:一张表一个页签)加列时必须指明住哪张表;
+        // 其余面板不传 = NULL(不区分页签),行为与改动前逐字一致。
+        String tab = String.valueOf(body.getOrDefault("tab", "")).trim();
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
+        if (!tab.isEmpty() && !QC_INSP_REQ_PANEL.equals(panelCode))
+            throw new IllegalArgumentException("所属页签仅分页签面板支持:" + panelCode);
+        if (QC_INSP_REQ_PANEL.equals(panelCode)) {
+            if (tab.isEmpty()) throw new IllegalArgumentException("请选择所属页签(自定义列住哪张表)");
+            if (!qcInspReqTabKeys().contains(tab)) throw new IllegalArgumentException("所属页签不存在:" + tab);
+        } else {
+            tab = null;
+        }
         // G1 标签守卫(列名安全规范:禁 . % / ( ) 与空格;数据键保持中文)
         if (label.isEmpty() || label.length() > 60) throw new IllegalArgumentException("字段名必须 1-60 个字符");
         for (char ch : label.toCharArray())
             if (".%/() \t\r\n".indexOf(ch) >= 0) throw new IllegalArgumentException("字段名禁止含 . % / ( ) 或空格:" + label);
         if (!labelEn.isEmpty() && labelEn.length() > 60) throw new IllegalArgumentException("英文名过长(≤60)");
         if (!EXT_DATA_TYPES.contains(dataType)) throw new IllegalArgumentException("动态字段仅支持:文本/下拉框/日期/是否");
-        // G2 面板内标签唯一 —— 直查 yj_field(注册表快照有 30s TTL 窗口,不能当唯一性凭据)
-        Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM yj_field WHERE panel_code = ? AND label = ?", Integer.class, panelCode, label);
-        if (dup != null && dup > 0) throw new IllegalStateException("字段名已存在:" + label);
+        // G2 标签唯一 —— 直查 yj_field(注册表快照有 30s TTL 窗口,不能当唯一性凭据)。
+        // 分页签面板改为「**同一页签内**唯一」:不同表可以有同名自定义列(用户口径 2026-10-04),
+        // 物理列各占一个备用列、显示名相同互不影响;其余面板 tab 为 NULL,与改动前等价。
+        Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM yj_field WHERE panel_code = ? AND label = ? "
+                + "AND ISNULL(tab_key, N'') = ISNULL(?, N'')", Integer.class, panelCode, label, tab);
+        if (dup != null && dup > 0) throw new IllegalStateException("该页签已有同名字段:" + label);
         // place 规则:archive 固定 detail;doc 可 header/detail
         if ("archive".equals(def.mode())) place = "detail";
         else if (!"header".equals(place) && !"detail".equals(place)) throw new IllegalArgumentException("位置仅支持 header/detail");
@@ -1718,10 +1735,10 @@ public class PanelConfigService {
         String finalPlace = (inQuery ? "query," : "") + place;
         Integer maxSeq = jdbc.queryForObject(
                 "SELECT MAX(seq) FROM yj_field WHERE panel_code = ? AND place LIKE ?", Integer.class, panelCode, "%" + place + "%");
-        jdbc.update("INSERT INTO yj_field (panel_code, col_name, label, label_en, data_type, dict_sql, place, seq, width, editable, required, hidden, visible) "
-                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,0,1)",
+        jdbc.update("INSERT INTO yj_field (panel_code, col_name, label, label_en, data_type, dict_sql, place, seq, width, editable, required, hidden, visible, tab_key) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,0,1,?)",
                 panelCode, chosen, label, labelEn.isEmpty() ? null : labelEn, dataType, dictSql, finalPlace,
-                (maxSeq == null ? 0 : maxSeq) + 10, width, 1, required);
+                (maxSeq == null ? 0 : maxSeq) + 10, width, 1, required, tab);
         // 多语言强制规范(AGENTS):至少 en 译名;label_en 列同写(引擎显示层直读)。
         // MERGE 覆盖式(人工 manual 优先于机翻 mt;退绑后换英文名重绑也能更新),
         // 写完失效译名缓存 —— 显示名优先走 fieldDict(),不失效会用到 30s TTL 内的旧字典(实测踩到)。
@@ -1764,6 +1781,21 @@ public class PanelConfigService {
         }
         extLog(panelCode, label, col, "retire", null);
         registry.reload();
+    }
+
+    /**
+     * 来料检验要求(QC_INSP_REQ)的页签集 = 物料类别 字段的字典值(数据键即页签名)。
+     * 前端页签条由 qcInspReqConfig.js 定义,这里只作"绑定自定义列时校验页签名"的权威来源
+     * (两者必须一致:词表加值 = 前端配置加页签,见 migrate-qc-insp-req-custom-tab.sql)。
+     */
+    private List<String> qcInspReqTabKeys() {
+        PanelRegistry.PanelDef def = registry.panel(QC_INSP_REQ_PANEL);
+        if (def == null) return List.of();
+        PanelRegistry.FieldDef f = def.byCol("物料类别");
+        if (f == null || f.dictSql() == null) return List.of();
+        List<String> out = new ArrayList<>();
+        for (String opt : dictOptions(f.dictSql())) if (!out.contains(opt)) out.add(opt);
+        return out;
     }
 
     /**
