@@ -42,13 +42,10 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import request from '@/core/request'
 import { tt } from '@/i18n'
 import QcInspReqSheet from './QcInspReqSheet.vue'
+import { fetchReqRows } from '@core/qc/qcInspReqApi'
 import { lookupReqGroups, normCode, reqTabKeysOf } from '@core/qc/qcInspReqLookup'
-
-/** 来料检验要求面板码(档案式:整表一张虚拟单,行在 detail.items) */
-const REQ_PANEL = 'QC_INSP_REQ'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -74,7 +71,8 @@ const unknownRows = computed(() => groups.value.filter((g) => !g.tab).reduce((n,
 /** 命中行总数(含配置外类别,如实计数) */
 const totalRows = computed(() => groups.value.reduce((n, g) => n + g.rows.length, 0))
 
-/** 打开即取数(档案面板一次全量,量小:实测 78 行;取回后按物料编号精确过滤) */
+/** 打开即取数(档案面板一次全量,量小:实测 78 行;取回后按物料编号精确过滤)
+ *  取数走 @core/qc/qcInspReqApi(与检验报告的「带入检验要求」同一入口,两处所见必须一致) */
 watch(
   () => [props.modelValue, code.value],
   async ([open]) => {
@@ -83,14 +81,7 @@ watch(
     loading.value = true
     loadError.value = ''
     try {
-      const res = await request.post('/px/queryFormDataList', {
-        panelCode: REQ_PANEL,
-        condition: { 物料编号: code.value },
-        pageNo: 1,
-        pageSize: 1,
-      })
-      const doc = res?.data?.list?.[0]
-      rows.value = Array.isArray(doc?.detail?.items) ? doc.detail.items : []
+      rows.value = await fetchReqRows(code.value)
     } catch (e) {
       rows.value = []
       loadError.value = e?.response?.data?.msg || e?.message || String(e)

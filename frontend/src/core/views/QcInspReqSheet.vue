@@ -2,7 +2,9 @@
   <!-- ═══════════════════════════════════════════════════════════════════
        来料检验要求(QC_INSP_REQ,档案式)——品质资料 7 张检验要求表一面板 7 页签
        页签条=规格书式 rsp-pages;每页=Excel 一比一复刻(大标题行+两行分组表头+原列宽数据行)。
-       非翻页单据:整表一张虚拟单(head.detail.items 全量行),行按 [物料类别]=页签 key 分流;
+       非翻页单据:整表一张虚拟单(行在 head.detail[detail_key] 全量行),行按 [物料类别]=页签 key 分流;
+       ⚠ 明细键 = yj_panel.detail_key:档案面板为 LOWER(panel_code) = **qc_insp_req**,不是 items
+       (2026-10-04 实测修正:原先写死「items 键」⇒ 7 个页签全「暂无数据」;判据见 @core/panel/detailRows)。
        保存走父级 saveInlineDraft(saveArchive 整表 upsert,缺席行=删除)。
        行操作(2026-09-22 按用户口径):默认**整表只读**,点某行「修改」该行才转输入框(防随意改),
        改完点「完成」收起;「删除」先弹确认;新增走表尾「＋ 新增数据记录行」(新行自动进入可编辑)。
@@ -10,7 +12,7 @@
        点结果跳到该页签并高亮该行;原先表头那个「关键字过滤本页」的输入框与其「其他页签命中」提示已删。
        「🕘 修改记录」看本表每次保存的留痕(后端 ButtonService.archiveChangeHistory)。
        注意:档案明细行被 markArchListRaw 预打 raw 标记(无响应式),本组件用 rows 镜像数组
-       驱动界面,行对象与 detail.items 同引用——镜像增删同步双写,保存数据不失真。
+       驱动界面,行对象与明细行数组同引用——镜像增删同步双写,保存数据不失真。
        编辑态输入框**不能**直接 v-model 到 row[c.key](行不响应式 → 敲进去的字会被 el-input
        的 setNativeInputValue 刷回去,看着就是"不可编辑"),一律绑 editDraft 响应式草稿,
        由 watch 即时回写原行 —— 详见 editDraft 处注释。
@@ -183,6 +185,7 @@ import { computed, nextTick, ref, toRaw, watch } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { callButton, errMsg } from '@/business/engine'
+import { detailRowsOf, ensureDetailRows } from '@core/panel/detailRows'
 import { qcInspReqTabs } from './qcInspReqConfig'
 
 const props = defineProps({
@@ -208,7 +211,7 @@ const tabs = computed(() => {
 const activeTab = ref(0)
 const tab = computed(() => tabs.value[activeTab.value] || tabs.value[0] || qcInspReqTabs[0])
 
-// ── 行数据:与 head.detail.items 同引用的工作镜像(raw 数组无响应式,镜像驱动界面) ──
+// ── 行数据:与明细行数组(head.detail[detail_key])同引用的工作镜像(raw 数组无响应式,镜像驱动界面) ──
 const rows = ref([])
 const dirty = ref(false)
 /** 当前处于编辑态的行(按对象引用比):默认 null=整表只读,防止随手改到数据 */
@@ -232,18 +235,22 @@ watch(
   { deep: true },
 )
 function sourceItems() {
-  if (!props.head?.detail) props.head.detail = {}
-  if (!Array.isArray(props.head.detail.items)) props.head.detail.items = []
-  return props.head.detail.items
+  // ⚠ 明细键 = yj_panel.detail_key(档案面板 = LOWER(panelCode) = 'qc_insp_req'),不是 items ——
+  //   原先写死「items 键」建键,界面恒「暂无数据」、新行也不在提交内容里(见 detailRows.js)
+  return ensureDetailRows(props.head, detailKeyFallback())
 }
-// 镜像同步(2026-09-23 修):本 watch 只在 detail.items **引用变化**时触发 —— 即载入/切单/刷新,
-// 以及 addRow 里 sourceItems() 首次创建 detail.items 的那一次。原实现无条件清 editRow,于是
+/** 兜底键:本组件只服务档案式 QC_INSP_REQ,键 = 面板码小写 */
+function detailKeyFallback() {
+  return String(props.panelCode || '').toLowerCase()
+}
+// 镜像同步(2026-09-23 修):本 watch 只在明细行数组 **引用变化**时触发 —— 即载入/切单/刷新,
+// 以及 addRow 里 sourceItems() 首次创建那个键的那一次。原实现无条件清 editRow,于是
 // 「＋新增数据记录行」加出来的那一行(排在表格最下面)刚进入可填状态就被清成只读文本
 // (填写时看不见),再点「修改」也会被同一批重置冲掉(还是不肯修改)。
 // 故:编辑进行中**保留编辑态与脏标记**(只同步镜像,新行不丢);
 //     非编辑态(载入/切单/保存后刷新)照旧重置镜像并清脏标记。
 watch(
-  () => props.head?.detail?.items,
+  () => detailRowsOf(props.head, detailKeyFallback()),
   (arr) => {
     const next = Array.isArray(arr) ? arr : []
     if (editRow.value !== null) {
