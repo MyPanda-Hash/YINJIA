@@ -2203,3 +2203,11 @@ migrate-qcinsp-header-dept.sql
 #   取证: tools/archive/_RefDiff.java → _refdiff.out;两账套均需执行。
 #   (sl-supplier-ref 已在链上,见上方原登记处;其内容已改,DbSync 依内容哈希变化自动重跑)
 migrate-qc-ref-repair.sql
+
+# migrate-drop-bom-kingdee.sql(2026-10-04):下架「BOM单」面板(BOM_KD)与其两张表 —— 用户要求
+#   「删除本地基础资料的 bom 单面板,包括数据库」。当天建、当天删:金蝶账套实测一条 BOM 都没有
+#   (bd/bom 列表 0、bd/bom_query 抽样 306 商品全 0、pm/bom 接口 API not found),页面永远是空表。
+#   脚本删 yj_panel/yj_field(BOM_KD)、panel 译名「BOM单」、以及本功能新增且已无其它面板引用的 field 译名,
+#   最后 DROP bs_bom_detail / bs_bom_head;幂等,两账套均已执行。
+#   建表/同步/自检那一整套保留在 git 历史 commit d6998ebd,金蝶开通接口后一条 revert 即可恢复。
+migrate-drop-bom-kingdee.sql
