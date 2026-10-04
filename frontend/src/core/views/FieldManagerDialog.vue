@@ -1,7 +1,7 @@
 <script setup>
 // 字段管理(动态字段/备用列池):仅管理员;列表/表单/查询/导出由元数据引擎自动获得新字段。
 // 规格见 docs/design/动态字段扩展-备用列池-V1.0.md §10;入口由 PanelxList「更多 ▼」注入。
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { extFieldOverview, extFieldAdd, extFieldRetire } from '@/business/engine'
@@ -17,15 +17,25 @@ const props = defineProps({
   tabs: { type: Array, default: () => [] },
   /** 打开时默认选中的页签(一般是当前正在看的那张表) */
   defaultTab: { type: String, default: '' },
+  /** 父字段候选:(tabKey) => string[] —— 固定列已有的分组 + 该页签已用的父(仍可自己新建) */
+  parentOptionsOf: { type: Function, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'done'])
 const loading = ref(false)
 const saving = ref(false)
 const data = ref({ capacity: 20, fields: [], linePool: [] })
-const form = ref({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: '' })
+const form = ref({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: '', parent: '' })
 /** 需要指定「所属页签」的面板:传了 tabs 就是 */
 const needTab = () => Array.isArray(props.tabs) && props.tabs.length > 0
-const blankForm = () => ({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: needTab() ? (props.defaultTab || props.tabs[0].value) : '' })
+const blankForm = () => ({ label: '', labelEn: '', dataType: '文本', dictOptions: '', place: 'detail', inQuery: false, width: 120, required: false, confirmDirty: false, tab: needTab() ? (props.defaultTab || props.tabs[0].value) : '', parent: '' })
+/** 当前所选页签的父字段候选 */
+const parentOptions = computed(() => (needTab() && props.parentOptionsOf ? props.parentOptionsOf(form.value.tab) || [] : []))
+/** 当前所选页签的扩展池用量(每表 20 个:后端 tabPools 按页签给账) */
+const tabPool = computed(() => {
+  const tp = data.value?.tabPools
+  if (!tp || !needTab()) return null
+  return tp[form.value.tab] || null
+})
 
 watch(() => props.modelValue, (v) => { if (v) { form.value = blankForm(); load() } })
 
@@ -80,13 +90,17 @@ async function retire(f) {
   <el-dialog :model-value="modelValue" :title="tt('字段管理')" width="640px" append-to-body :close-on-click-modal="false" @update:model-value="emit('update:modelValue', $event)">
     <div v-loading="loading">
       <div class="fm-summary">
-        {{ tt('动态字段') }} {{ data.fields.length }} / {{ data.capacity }}
-        <template v-if="data.headPool"> · {{ tt('表头池') }} {{ usedOf(data.headPool) }}/{{ (data.headPool || []).length }} · {{ tt('明细池') }} {{ usedOf(data.linePool) }}/{{ (data.linePool || []).length }}</template>
-        <template v-else> · {{ tt('池') }} {{ usedOf(data.linePool) }}/{{ (data.linePool || []).length }}</template>
+        {{ tt('动态字段') }} {{ data.fields.length }}
+        <template v-if="data.tabPools">
+          · {{ tt('每张表各 20 个扩展位') }} · {{ tt('本表已用') }} <b>{{ tabPool ? tabPool.used : 0 }}</b>/{{ data.capacity }}
+        </template>
+        <template v-else-if="data.headPool"> / {{ data.capacity }} · {{ tt('表头池') }} {{ usedOf(data.headPool) }}/{{ (data.headPool || []).length }} · {{ tt('明细池') }} {{ usedOf(data.linePool) }}/{{ (data.linePool || []).length }}</template>
+        <template v-else> / {{ data.capacity }} · {{ tt('池') }} {{ usedOf(data.linePool) }}/{{ (data.linePool || []).length }}</template>
       </div>
       <el-table :data="data.fields" size="small" max-height="200">
         <el-table-column prop="label" :label="tt('字段名')" min-width="140" />
         <el-table-column v-if="needTab()" prop="tab" :label="tt('所属页签')" width="130" />
+        <el-table-column v-if="needTab()" prop="parent" :label="tt('父字段(分组)')" width="120" />
         <el-table-column prop="col" :label="tt('承载列')" width="90" />
         <el-table-column prop="dataType" :label="tt('类型')" width="80" />
         <el-table-column prop="place" :label="tt('位置')" width="120" />
@@ -106,6 +120,14 @@ async function retire(f) {
           <el-tooltip :content="tt('该列只出现在这张表里;检验数据记录带入时也按这张表的列走')" placement="top"><span class="fm-help">?</span></el-tooltip>
         </el-form-item>
         <el-form-item :label="tt('字段名')"><el-input v-model="form.label" :placeholder="tt('中文,禁 . % / ( ) 空格')" maxlength="60" /></el-form-item>
+        <!-- 父字段(分组表头):选了父,这一列就并到那个分组标题下;父只是标题、没有数据格,
+             检验数据记录只带入子字段(用户口径 2026-10-04) -->
+        <el-form-item v-if="needTab()" :label="tt('父字段(分组)')">
+          <el-select v-model="form.parent" style="width: 220px" filterable clearable allow-create default-first-option :placeholder="tt('可留空;也可新建一个分组名')">
+            <el-option v-for="p in parentOptions" :key="p" :label="tt(p)" :value="p" />
+          </el-select>
+          <el-tooltip :content="tt('父只做表头分组、没有数据格;检验数据记录只带入子字段')" placement="top"><span class="fm-help">?</span></el-tooltip>
+        </el-form-item>
         <el-form-item :label="tt('英文名')"><el-input v-model="form.labelEn" maxlength="60" /></el-form-item>
         <el-form-item :label="tt('类型')">
           <el-select v-model="form.dataType" style="width: 160px">

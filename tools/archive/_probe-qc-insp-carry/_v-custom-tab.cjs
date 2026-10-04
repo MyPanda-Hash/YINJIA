@@ -29,6 +29,7 @@ const TAB_CUSTOM = '自定义检验要求'
 const TAB_FOLD = '折叠棉'
 const TAB_GASKET = '垫片'
 const F_FOLD = '炭棒直径'          // 固定表(折叠棉)的自定义列
+const F_CHILD = '炭棒内径'         // 带父字段(规格)的子字段 —— 带入只带子字段
 const F_CUSTOM = '平整度'          // 全自定义表(自定义检验要求)的自定义列
 const F_DUP = '外观'               // 与别的表同名的自定义列(垫片)
 const CODE_FOLD = 'YJ-TEST-CUSTOM-002'   // 折叠棉表:带自定义列的数据行
@@ -84,8 +85,8 @@ const HELPERS = `
     },
     msgs() { return [...document.querySelectorAll('.el-message')].map(e => e.innerText.replace(/\\s+/g, ' ').trim()) },
     clearMsgs() { document.querySelectorAll('.el-message').forEach(e => e.remove()); return 1 },
-    /** 打开「自定义字段」并给指定页签加一列(走弹窗表单:所属页签 + 字段名 + 英文名 → 添加) */
-    async addField(tabName, label, labelEn) {
+    /** 打开「自定义字段」并给指定页签加一列(走弹窗表单:所属页签 [+父字段] + 字段名 + 英文名 → 添加) */
+    async addField(tabName, label, labelEn, parentName) {
       const btn = [...document.querySelectorAll('.qc-insp-sheet .qc-bar-btn')].find(e => e.innerText.includes('自定义字段'))
       btn?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       await new Promise(r => setTimeout(r, 1200))
@@ -97,15 +98,18 @@ const HELPERS = `
       }
       const items = [...d.querySelectorAll('.el-form-item')]
       const byLabel = (t) => items.find(i => (i.querySelector('.el-form-item__label')?.innerText || '').trim().startsWith(t))
-      // 所属页签(分页签面板才有这个表单项)
-      const tabItem = byLabel('所属页签')
-      if (tabItem) {
-        tabItem.querySelector('.el-select__wrapper')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        await new Promise(r => setTimeout(r, 600))
-        const opt = [...document.querySelectorAll('.el-select-dropdown__item')].find(o => o.innerText.trim() === tabName)
+      const pick = async (item, text) => {
+        if (!item) return false
+        item.querySelector('.el-select__wrapper')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        await new Promise(r => setTimeout(r, 700))
+        const opt = [...document.querySelectorAll('.el-select-dropdown__item')].filter(o => o.offsetParent !== null)
+          .find(o => o.innerText.trim() === text)
         opt?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
         await new Promise(r => setTimeout(r, 300))
+        return !!opt
       }
+      await pick(byLabel('所属页签'), tabName)              // 所属页签(分页签面板才有)
+      if (parentName) await pick(byLabel('父字段'), parentName)   // 父字段(留空=独立列)
       window.__ct.setV(byLabel('字段名')?.querySelector('input'), label)
       window.__ct.setV(byLabel('英文名')?.querySelector('input'), labelEn)
       const add = [...d.querySelectorAll('.el-dialog__footer button')].find(b => b.innerText.trim() === '添加')
@@ -115,7 +119,7 @@ const HELPERS = `
       const state = d2 && d2.innerText.includes(label) ? 'ADDED' : 'FAILED'
       d2?.querySelector('.el-dialog__headerbtn')?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       await new Promise(r => setTimeout(r, 800))
-      return state + '|tab=' + (tabItem ? '有' : '无')
+      return state
     },
   };
 `
@@ -200,6 +204,40 @@ async function main() {
       String(gasketCols).includes(F_DUP) && !String(gasketCols).includes(F_FOLD), String(gasketCols))
     ok('③ 两表同名列各自独立(列名不冲突)',
       foldColList.includes(F_FOLD) && String(gasketCols).includes(F_DUP))
+
+    // ── ③b 父字段(分组表头):给折叠棉加一列带父「规格」的子字段;只带子字段 ──
+    const r3b = await evalY(`window.__ct.addField(${JSON.stringify(TAB_FOLD)}, ${JSON.stringify(F_CHILD)}, 'RodID', '规格')`)
+    ok(`③b 折叠棉加带父子字段「${F_CHILD}」(父=规格)`, /ADDED|EXISTS/.test(String(r3b)), String(r3b))
+    await sleep(1500)
+    await evalY(`window.__ct.tab(${JSON.stringify(TAB_FOLD)})`)   // 上一步在看垫片,读列前先切回折叠棉
+    await sleep(900)
+    const foldCols2 = await evalY(`JSON.stringify(window.__ct.cols())`)
+    const fc2 = JSON.parse(foldCols2 || '[]')
+    ok('③b 子字段插到「规格」组末尾(不是甩到表尾)',
+      fc2.join(',') === ['物料编号', '折叠棉', '炭棒', '实配炭棒后外径', F_CHILD, '折数', '折高', F_FOLD].join(','), String(foldCols2))
+    // 表头结构:规格 这一组的 colspan 应随子字段 +1(固定 3 列 → 4 列)
+    const specSpan = await evalY(`(() => {
+      const th = [...document.querySelectorAll('.qc-insp-sheet .qc-paper tr.rs-grp th.rs-th')].find(e => e.innerText.trim() === '规格')
+      return th ? Number(th.getAttribute('colspan') || 1) : 0
+    })()`)
+    ok('③b 「规格」分组标题把它罩住了(colspan 4)', specSpan === 4, String(specSpan))
+    // 扩展池:每张表 20 个 —— 折叠棉的列必须落在 备用1..20
+    const extApi = await apiGet('/px/extFields?panel=QC_INSP_REQ')
+    const extAll = extApi?.data?.fields || []
+    const foldField = extAll.find((f) => f.label === F_CHILD) || {}
+    const foldNum = Number(String(foldField.col || '').replace('备用', ''))
+    ok('③b 折叠棉的列落在它自己的 20 个扩展位里(备用1..20)', foldNum >= 1 && foldNum <= 20, `承载列=${foldField.col}`)
+    ok('③b 字段带上了父字段(parent=规格)', String(foldField.parent || '') === '规格', JSON.stringify(foldField))
+    const tabPools = extApi?.data?.tabPools || {}
+    ok('③b 总览按页签给 20 个扩展位(8 张表各 20)',
+      Object.keys(tabPools).length === 8 && Object.values(tabPools).every((p) => p.capacity === 20),
+      JSON.stringify(Object.fromEntries(Object.entries(tabPools).map(([k, v]) => [k, `${v.used}/${v.capacity}`]))))
+    ok('③b 自定义检验要求的列落在它自己的段(备用141..160)',
+      (() => { const f = extAll.find((x) => x.label === F_CUSTOM); const n = Number(String(f?.col || '').replace('备用', '')); return n >= 141 && n <= 160 })(),
+      JSON.stringify(extAll.find((x) => x.label === F_CUSTOM)))
+    ok('③b 垫片的列落在它自己的段(备用21..40)',
+      (() => { const f = extAll.find((x) => x.label === F_DUP); const n = Number(String(f?.col || '').replace('备用', '')); return n >= 21 && n <= 40 })(),
+      JSON.stringify(extAll.find((x) => x.label === F_DUP)))
 
     // ── ④ 全自定义表照旧 ──
     await evalY(`window.__ct.tab(${JSON.stringify(TAB_CUSTOM)})`)
@@ -304,6 +342,8 @@ async function main() {
     ok(`⑧ 检验项「${F_FOLD}」的检测标准 = ${STD_FOLD}`,
       repRows.some((r) => r.item === F_FOLD && r.std === STD_FOLD), JSON.stringify(repRows))
     ok(`⑧ 别的表的自定义列「${F_DUP}」没被带进来`, !repRows.some((r) => r.item === F_DUP), JSON.stringify(repRows.map((r) => r.item)))
+    ok('⑧ 父字段名「规格」没有被当成检验项带进来(只带子字段)',
+      !repRows.some((r) => r.item === '规格' || r.item === '外观'), JSON.stringify(repRows.map((r) => r.item)))
 
     // ── ⑨ 检验要求弹窗:该表 + 该列可见 ──
     await evalY(`(() => { const s = [...document.querySelectorAll('.qr-lib-btn')].find(e => e.innerText.includes('检验要求')); s?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return !!s })()`)

@@ -153,12 +153,14 @@
     </div>
 
     <!-- 自定义字段(仅管理员):**每张表各有各的自定义列** —— 在弹窗里选「所属页签」,
-         加完只有那张表多一列,检验报告带入时也按那张表的列走 -->
+         加完只有那张表多一列,检验报告带入时也按那张表的列走;
+         可再指定「父字段」并到某个分组标题下(父只做表头分组、没有数据格,带入只带子字段) -->
     <FieldManagerDialog
       v-model="extMgrVisible"
       :panel-code="panelCode"
       :tabs="tabOptions"
       :default-tab="tab?.key || ''"
+      :parent-options-of="parentOptions"
       @done="onExtFieldDone"
     />
 
@@ -211,7 +213,7 @@ import { callButton, errMsg } from '@/business/engine'
 import { useUserStore } from '@/stores/user'
 import { detailRowsOf, ensureDetailRows } from '@core/panel/detailRows'
 import { fetchExtFields, invalidateExtFields } from '@core/qc/qcInspReqApi'
-import { DEFAULT_EXT_COL_W, colsOfTab } from '@core/qc/qcInspReqCols'
+import { DEFAULT_EXT_COL_W, colsOfTab, parentOptionsOfTab } from '@core/qc/qcInspReqCols'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import { qcInspReqTabs } from './qcInspReqConfig'
 
@@ -257,8 +259,12 @@ function hasGroupRow(t) {
 }
 /** 「自定义字段」弹窗的「所属页签」候选 = 本面板全部页签 */
 const tabOptions = computed(() => tabs.value.map((t) => ({ value: t.key, label: t.key })))
+/** 「自定义字段」弹窗的「父字段」候选:该页签固定列已有的分组 + 该页签已用的父 */
+function parentOptions(tabKey) {
+  return parentOptionsOfTab(qcInspReqTabs.find((t) => t.key === tabKey) || null, extFields.value)
+}
 /** 自定义页签还没定义任何列(只有匹配键列,没得可填)—— 界面提示先去加列 */
-const tabDynamicEmpty = computed(() => !!tab.value?.dynamicCols && !extFields.value.length)
+const tabDynamicEmpty = computed(() => !!tab.value?.dynamicCols && colsOf(tab.value).length <= 1)
 
 /** 页签集:tabKeys 为空时=全部 7 页签(维护面板);弹窗按命中的物料类别收窄 */
 const tabs = computed(() => {

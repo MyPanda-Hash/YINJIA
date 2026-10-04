@@ -1590,7 +1590,8 @@ public class PanelConfigService {
     /** 检验项标准库编码(检验数据记录 QC_INSP_REC 的「检验项」字段 dict_sql 就是它) */
     private static final String QC_INSP_ITEM_LIB = "qc.insp_item";
 
-    /** 动态字段总览:现有动态字段 + 各表备用列池占用/脏数据行数(规格 §8 契约 1) */
+    /** 动态字段总览:现有动态字段 + 各表备用列池占用/脏数据行数(规格 §8 契约 1)。
+     *  分页签面板(来料检验要求)额外下发 **tabPools**:每个页签 20 个扩展位各自算账(用户口径 2026-10-04)。 */
     public Map<String, Object> extFieldOverview(String panelCode) {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
@@ -1605,15 +1606,57 @@ public class PanelConfigService {
                 m.put("place", f.place());
                 // 所属页签(分页签面板):前端按它把自定义列渲染到对应那张表里,并随该表带入检验数据记录
                 if (f.tabKey() != null && !f.tabKey().isBlank()) m.put("tab", f.tabKey());
+                // 父字段(分组表头):只做表头分组、没有数据格 ⇒ 检验数据记录只带入子字段(label)
+                if (f.colGroup() != null && !f.colGroup().isBlank()) m.put("parent", f.colGroup());
                 fields.add(m);
             }
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("capacity", EXT_SPARE_COUNT);
         out.put("fields", fields);
-        out.put("linePool", extPoolOf(def.lineTable()));
-        if (def.hasHeadTable()) out.put("headPool", extPoolOf(def.headTable()));
+        if (QC_INSP_REQ_PANEL.equals(panelCode)) {
+            // 每张表各 20 个:按页签顺序分段给账(段 = 备用[(i-1)*20+1 .. i*20])
+            Map<String, Object> tabPools = new LinkedHashMap<>();
+            for (String tabKey : qcInspReqTabKeys()) {
+                int[] range = extTabRangeOf(tabKey);
+                if (range == null) continue;
+                int used = 0;
+                for (int i = range[0]; i <= range[1]; i++) {
+                    if (extLabelOf(panelCode, "备用" + i) != null) used++;
+                }
+                Map<String, Object> tp = new LinkedHashMap<>();
+                tp.put("capacity", EXT_SPARE_COUNT);
+                tp.put("used", used);
+                tp.put("free", EXT_SPARE_COUNT - used);
+                tp.put("from", range[0]);
+                tp.put("to", range[1]);
+                tabPools.put(tabKey, tp);
+            }
+            out.put("tabPools", tabPools);
+            out.put("tabs", qcInspReqTabKeys());
+        } else {
+            out.put("linePool", extPoolOf(def.lineTable()));
+            if (def.hasHeadTable()) out.put("headPool", extPoolOf(def.headTable()));
+        }
         return out;
+    }
+
+    /** 该面板某承载列上的动态字段标签(没有=该列空闲) */
+    private String extLabelOf(String panelCode, String col) {
+        List<String> rows = jdbc.queryForList(
+                "SELECT label FROM yj_field WHERE panel_code = ? AND col_name = ?", String.class, panelCode, col);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /**
+     * 分页签面板每个页签的扩展池区间 [start, end](1-based 备用列序号)。
+     * 段序 = 物料类别 词表顺序(= 前端页签顺序),第 i 个页签 = 备用[(i-1)*20+1 .. i*20],
+     * 与 migrate-qc-insp-req-tab-pools.sql 的分段口径必须一致(词表加值 = 迁移加段)。
+     */
+    private int[] extTabRangeOf(String tabKey) {
+        int idx = qcInspReqTabKeys().indexOf(tabKey);
+        if (idx < 0) return null;
+        return new int[]{ idx * EXT_SPARE_COUNT + 1, (idx + 1) * EXT_SPARE_COUNT };
     }
 
     /** yj_field 行号(面板+备用列唯一定位) */
@@ -1676,6 +1719,20 @@ public class PanelConfigService {
         } else {
             tab = null;
         }
+        // 父字段(分组表头,2026-10-04 用户口径「自定义字段能不能实现父子字段」):
+        // 父只做表头分组(**没有数据格、不占数据列**),子才是数据列 —— 检验数据记录只带入子字段。
+        // 承载 = yj_field.col_group(其固有语义就是「父表头分组」,见 migrate-col-group.sql),
+        // 与固定 7 张表的 规格/外观 是同一种东西:前端两行表头算法直接复用,不用另写一套。
+        String parent = String.valueOf(body.getOrDefault("parent", "")).trim();
+        if (!parent.isEmpty()) {
+            if (!QC_INSP_REQ_PANEL.equals(panelCode)) throw new IllegalArgumentException("父字段仅分页签面板支持:" + panelCode);
+            if (parent.length() > 50) throw new IllegalArgumentException("父字段名过长(≤50):" + parent);
+            for (char ch : parent.toCharArray())
+                if (".%/() \t\r\n".indexOf(ch) >= 0) throw new IllegalArgumentException("父字段名禁止含 . % / ( ) 或空格:" + parent);
+            if (parent.equals(label)) throw new IllegalArgumentException("父字段名不能与字段名相同:" + parent);
+        } else {
+            parent = null;
+        }
         // G1 标签守卫(列名安全规范:禁 . % / ( ) 与空格;数据键保持中文)
         if (label.isEmpty() || label.length() > 60) throw new IllegalArgumentException("字段名必须 1-60 个字符");
         for (char ch : label.toCharArray())
@@ -1709,10 +1766,19 @@ public class PanelConfigService {
             dictSql = sb.toString();
             if (dictSql.length() > 500) throw new IllegalArgumentException("词表过长(生成 SQL 超 500 字符),请精简");
         }
-        // G3/G4 分配空闲备用列:优先干净列;脏列需 confirmDirty(+可选清空,规格:全系统唯一写业务数据的动作)
+        // G3/G4 分配空闲备用列:优先干净列;脏列需 confirmDirty(+可选清空,规格:全系统唯一写业务数据的动作)。
+        // 分页签面板(来料检验要求):**每张表各 20 个扩展位** —— 只在本页签那一段里找(用户口径 2026-10-04),
+        // 段序 = 物料类别 词表顺序,第 i 个页签 = 备用[(i-1)*20+1 .. i*20](见 migrate-qc-insp-req-tab-pools.sql)。
         String chosen = null, dirtyWarn = null;
         int dirtyRows = 0;
-        for (int i = 1; i <= EXT_SPARE_COUNT && chosen == null; i++) {
+        int poolFrom = 1, poolTo = EXT_SPARE_COUNT;
+        if (QC_INSP_REQ_PANEL.equals(panelCode)) {
+            int[] range = extTabRangeOf(tab);
+            if (range == null) throw new IllegalArgumentException("所属页签不存在:" + tab);
+            poolFrom = range[0];
+            poolTo = range[1];
+        }
+        for (int i = poolFrom; i <= poolTo && chosen == null; i++) {
             String spare = "备用" + i;
             Integer occ = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM yj_field f JOIN yj_panel p ON f.panel_code = p.panel_code "
@@ -1734,14 +1800,18 @@ public class PanelConfigService {
                 extLog(panelCode, label, chosen, "clear", "清空历史数据 " + dirtyRows + " 行后绑定");
             }
         }
-        if (chosen == null) throw new IllegalStateException("备用列池已满(" + EXT_SPARE_COUNT + "/" + EXT_SPARE_COUNT + "),请走正式迁移扩展");
+        if (chosen == null) {
+            if (QC_INSP_REQ_PANEL.equals(panelCode))
+                throw new IllegalStateException("「" + tab + "」的扩展池已满(" + EXT_SPARE_COUNT + "/" + EXT_SPARE_COUNT + "),请走正式迁移扩展");
+            throw new IllegalStateException("备用列池已满(" + EXT_SPARE_COUNT + "/" + EXT_SPARE_COUNT + "),请走正式迁移扩展");
+        }
         String finalPlace = (inQuery ? "query," : "") + place;
         Integer maxSeq = jdbc.queryForObject(
                 "SELECT MAX(seq) FROM yj_field WHERE panel_code = ? AND place LIKE ?", Integer.class, panelCode, "%" + place + "%");
-        jdbc.update("INSERT INTO yj_field (panel_code, col_name, label, label_en, data_type, dict_sql, place, seq, width, editable, required, hidden, visible, tab_key) "
-                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,0,1,?)",
+        jdbc.update("INSERT INTO yj_field (panel_code, col_name, label, label_en, data_type, dict_sql, place, seq, width, editable, required, hidden, visible, tab_key, col_group) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,0,1,?,?)",
                 panelCode, chosen, label, labelEn.isEmpty() ? null : labelEn, dataType, dictSql, finalPlace,
-                (maxSeq == null ? 0 : maxSeq) + 10, width, 1, required, tab);
+                (maxSeq == null ? 0 : maxSeq) + 10, width, 1, required, tab, parent);
         // 多语言强制规范(AGENTS):至少 en 译名;label_en 列同写(引擎显示层直读)。
         // MERGE 覆盖式(人工 manual 优先于机翻 mt;退绑后换英文名重绑也能更新),
         // 写完失效译名缓存 —— 显示名优先走 fieldDict(),不失效会用到 30s TTL 内的旧字典(实测踩到)。

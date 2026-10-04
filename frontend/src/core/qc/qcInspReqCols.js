@@ -38,14 +38,44 @@ export function extFieldsOfTab(extFields, tabKey) {
 /**
  * 某页签的列(渲染与带入共用)。
  * @param {{key:string, dynamicCols?:boolean, cols?:Array}|null} tab 页签配置(qcInspReqTabs 的一项)
- * @param {Array<{label:string, tab?:string}>} extFields 动态字段(/px/extFields 的 fields)
+ * @param {Array<{label:string, tab?:string, parent?:string}>} extFields 动态字段(/px/extFields 的 fields)
  * @param {(label:string)=>number} [widthOf] 动态列取宽(缺省 DEFAULT_EXT_COL_W)
  * @returns {Array<{key:string, w:number, group?:string}>} 列定义(key = 数据键 = 后端下发的 label)
+ *
+ * 【父字段(分组表头)】动态字段可以带 parent(= yj_field.col_group):父**只做表头分组、没有数据格**,
+ *   与固定表的 规格/外观 是同一套东西,所以:
+ *   · 有父 ⇒ 插到该父分组**最后一个成员之后**(保持同组相邻,表头才会合并成一个跨列标题);
+ *   · 父在表头里还没有 ⇒ 追加到末尾,自成一组(表格自己会画出一个新的分组标题);
+ *   · 无父 ⇒ 追加到末尾(独立列,占满两行)。
+ *   返回的列里**只有子字段**(每个 key 都是子字段的 label)—— 带入检验数据记录时天然只带子字段。
  */
 export function colsOfTab(tab, extFields, widthOf) {
   if (!tab) return []
   const w = typeof widthOf === 'function' ? widthOf : () => DEFAULT_EXT_COL_W
-  const dyn = extFieldsOfTab(extFields, tab.key).map((f) => ({ key: f.label, w: w(f.label) || DEFAULT_EXT_COL_W }))
-  if (tab.dynamicCols) return [EXT_KEY_COL, ...dyn]   // 全自定义表:只有匹配键 + 自定义列
-  return [...(tab.cols || []), ...dyn]                // 固定表:Excel 原列序 + 追加自定义列
+  const dyn = extFieldsOfTab(extFields, tab.key).map((f) => {
+    const parent = normCode(f.parent)
+    return { key: f.label, w: w(f.label) || DEFAULT_EXT_COL_W, ...(parent ? { group: parent } : {}) }
+  })
+  const out = tab.dynamicCols ? [{ ...EXT_KEY_COL }] : (tab.cols || []).map((c) => ({ ...c }))
+  for (const d of dyn) {
+    let at = out.length
+    if (d.group) {
+      for (let i = out.length - 1; i >= 0; i--) {
+        if (out[i].group === d.group) { at = i + 1; break }
+      }
+    }
+    out.splice(at, 0, d)
+  }
+  return out
+}
+
+/** 该页签可供选择的父字段名(分组表头候选):固定列已有的分组 + 本页签动态字段已用的父。
+ *  供「自定义字段」弹窗的「父字段」下拉做候选(仍可自己新建一个父名)。 */
+export function parentOptionsOfTab(tab, extFields) {
+  if (!tab) return []
+  const out = []
+  const push = (v) => { const s = String(v ?? '').trim(); if (s && !out.includes(s)) out.push(s) }
+  if (!tab.dynamicCols) for (const c of tab.cols || []) push(c.group)
+  for (const f of extFieldsOfTab(extFields, tab.key)) push(f.parent)
+  return out
 }

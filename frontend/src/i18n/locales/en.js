@@ -2765,6 +2765,17 @@ export default {
     '所属页签不存在:': 'Unknown table: ',
     '该页签已有同名字段:': 'This table already has a column with that name: ',
     '所属页签仅分页签面板支持:': 'Per-table columns are only supported on tabbed panels: ',
+    /* 父字段(分组表头)+ 每表 20 个扩展位(2026-10-04 用户口径「父子字段」「扩展池每表 20 个」) */
+    '父字段(分组)': 'Parent (group)',
+    '可留空;也可新建一个分组名': 'Optional — or type a new group name',
+    '父只做表头分组、没有数据格;检验数据记录只带入子字段':
+      'The parent is only a header group with no data cell; the inspection data record loads child fields only',
+    '父字段仅分页签面板支持:': 'Parent fields are only supported on tabbed panels: ',
+    '父字段名过长(≤50):': 'Parent name too long (≤50 chars): ',
+    '父字段名禁止含 . % / ( ) 或空格:': 'Parent name must not contain . % / ( ) or spaces: ',
+    '父字段名不能与字段名相同:': 'Parent name must differ from the field name: ',
+    '每张表各 20 个扩展位': '20 extension slots per table',
+    '本表已用': 'Used in this table',
 
     // 库存报表三面板(2026-09-21):重算成本按钮 + 查询弹窗「档案∩有流水」联动提示 + 模糊搜索
     '重算成本': 'Recalculate cost',
