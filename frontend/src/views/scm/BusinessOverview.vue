@@ -138,7 +138,6 @@ const modules = [
       { code: 'INV', label: '商品' }, { code: 'UOM', label: '计量单位' }, { code: 'DEPT', label: '部门' },
       { code: 'EMP', label: '职员' }, { code: 'WH', label: '仓库' }, { code: 'PROJ', label: '项目' },
       { code: 'TEAM', label: '班组' }, { code: 'OP', label: '工序' }, { code: 'ROUTE', label: '工艺路线' },
-      { code: 'BOM', label: '物料清单' },
     ],
     reports: [
       { code: 'MANU_ORDER_EXEC', label: '生产工单执行表' }, { code: 'MANU_ORDER_TRACKER', label: '生产工单跟踪工具' },

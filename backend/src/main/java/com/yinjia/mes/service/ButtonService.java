@@ -546,8 +546,8 @@ public class ButtonService {
      *   · items 为空(未带明细页签)时整体跳过——与表头"取不到就回退查库、不误报"同口径。
      * 刻意**不做**页签级"至少添加一行"(前端 tab.isRequired 那条):后端拿不到"明细页签是空的"
      * 与"这次根本没提交明细"的区别(singleDoc/局部提交路径都只发页签子集),由前端把关。
-     * 内部调用方(送料暂收单同步来料检验单、WoPickingHandler、PushGenerateHandler)走的都是
-     * markSaved=false,不经此处。
+     * 内部调用方(送料暂收单同步来料检验单、PushGenerateHandler)走的都是
+     * markSaved=false,不经此处(原列的 WoPickingHandler 已随 BOM 下架移除,2026-10-04)。
      */
     private void ensureDetailRequiredFilled(PanelRegistry.PanelDef def, List<Map<String, Object>> items) {
         if (items == null || items.isEmpty()) return;

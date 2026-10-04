@@ -100,7 +100,7 @@ async function submit() {
     await user.switchFactory(props.target, password.value)
     ElMessage.success(tt('已切换账套，正在重新加载') + ' ' + targetName.value)
     // 落地页也要随账套换:当前路由可能是目标账套里这个账号**没有权限**的面板
-    // (2026-09-22 实测:切到权限更窄的账套后仍停在 #/panelx/list/BOM,数据被服务端挡住但整排
+    // (2026-09-22 实测:切到权限更窄的账套后仍停在 #/panelx/list/INV,数据被服务端挡住但整排
     //  "新增/修改/保存"工具栏照旧渲染,点了只会全线报错)。交回桌面:
     //  路由守卫会给"无 DASHBOARD 权限"的账号落到第一个可见面板(见 router/index.js)。
     window.location.hash = '#/dashboard'

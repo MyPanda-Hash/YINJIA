@@ -232,7 +232,8 @@ export const menuTree = [
               { code: 'workOrderBoard', title: '工单排产', path: '/prod/plan/workOrderBoard', icon: 'Histogram' },
               // 生产线档案在 基础资料→生产(PROD_LINE,2026-09-23 归位);此处负荷看板按 生产线档案日产能 判超载
               { code: 'lineLoad', title: '产线排产负荷', path: '/panelx/list/LINE_LOAD', panelCode: 'LINE_LOAD', icon: 'DataLine' },
-              { code: 'woKit', title: '工单齐套表', path: '/panelx/list/WO_KIT', panelCode: 'WO_KIT', icon: 'Box' },
+              // 2026-10-14 工单齐套表 WO_KIT 菜单下线:唯一数据源 v_wo_kit(基于自建物料的齐套视图)已随
+              // MES 自建「物料清单(BOM)」功能整体删除(表 bs_bom / 视图 v_wo_kit / 面板 BOM、WO_KIT 同批下架)。
             ],
           },
           {
@@ -395,7 +396,8 @@ export const menuTree = [
           { code: 'uom', title: '计量单位', path: '/panelx/list/UOM', icon: 'ScaleToOriginal', panelCode: 'UOM', operationName: '新增流程' },
           // 商品分类不占导航:从 商品 面板工具栏「分类管理」进入(与 客户/供应商 同款交互)
           { code: 'inventory', title: '商品', path: '/panelx/list/INV', icon: 'Grid', panelCode: 'INV', operationName: '新增流程' },
-          { code: 'bom', title: '物料清单', path: '/panelx/list/BOM', icon: 'Files', panelCode: 'BOM', operationName: '新增流程' },
+          // 2026-10-14 物料清单(BOM)菜单下线:MES 自建 BOM 功能整体删除
+          // (表 bs_bom / 面板 BOM 及其正反向查询 BOM_FWD、BOM_REV 同批下架)。
           { code: 'invPrice', title: '存货价格本', path: '/panelx/list/INV_PRICE', icon: 'PriceTag', panelCode: 'INV_PRICE', operationName: '新增流程' },
         ],
       },

@@ -891,7 +891,8 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生成领料单"},
+                    // 生单组已随 BOM 下架移除(2026-10-04):原「生成领料单」按默认 BOM 展开生成材料出库单草稿
+                    // (WoPickingHandler,已删),本面板现无任何推式生单链路,不再登记生单按钮
                     new String[]{"标签", "打印工单二维码", "打印产品二维码"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
@@ -983,7 +984,8 @@ public class PanelConfigService {
                     // 2026-09-24 用户拍板(参考旧系统工单列表样式收敛):列表特殊按钮只保留
                     // 打印工单(生产任务单固定版式)/排产(本单快捷排线,弹窗选产线,复用排产工作台
                     // assign 守卫守恒留痕)/结案/取消结案(ManuCloseHandler);
-                    // 打印工单二维码(标签机场景)并入更多;拆单/首件通知/生成采购申请/生成产品批号下线出列表
+                    // 打印工单二维码(标签机场景)并入更多;拆单/首件通知/生成产品批号下线出列表;
+                    // 「生成采购申请」(原 ManuPurchaseReqHandler 按 BOM×排产−库存结转)已随 BOM 下架移除(2026-10-04)
                     new String[]{"打印", "打印", "预览", "导出", "打印工单"},
                     new String[]{"排产", "排产", "结案", "取消结案"},
                     new String[]{"更多", "打印工单二维码", "复制", "放弃", "草稿", "中止执行", "取消中止", "表格调整", "刷新"}))
@@ -1008,8 +1010,9 @@ public class PanelConfigService {
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
             java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
             // 暂收单生单(2026-10-05):按行分流到 来料检验单 / 采购入库单 —— 见上方注释(值仅为路由标记)
-            java.util.Map.entry("QC_RECV|生成检验或入库单", "QC_INSP"),
-            java.util.Map.entry("WO_ORDER|生成领料单", "MATERIAL_OUT")
+            java.util.Map.entry("QC_RECV|生成检验或入库单", "QC_INSP")
+            // 「WO_ORDER|生成领料单」→ MATERIAL_OUT 已随 BOM 下架移除(2026-10-04):
+            // 处理器 WoPickingHandler 已删,该动作在 WO_ORDER 按钮组里也已撤销,不再登记推式生单
     )));
 
     /** 推式生单目标面板(无实现返回 null)。 */

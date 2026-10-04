@@ -1,6 +1,6 @@
 <!-- WorkOrderList.vue — 生产工单(2026-09-26 用户拍板:纯查询页,数据=参考库工单表 plang)
      顶部 日期范围 + 单框模糊搜索(工单号/物料/客户/产品 多列 OR);按钮条 结案/取消结案/打印工单(勾选多个=批量)/打印领料单/导出/刷新;
-     产线筛选 + 未完工/已完工/追溯;明细大表(勾选+操作列 BOM明细)。打印工单=勾选行直打+留痕;结案走 plang 专属端点。 -->
+     产线筛选 + 未完工/已完工/追溯;明细大表(勾选)。打印工单=勾选行直打+留痕;结案走 plang 专属端点。 -->
 <template>
   <div class="wol-page">
     <!-- 查询行:日期范围 + 单框模糊搜索 -->
@@ -26,7 +26,6 @@
         <template #dropdown>
           <el-dropdown-item command="成型生产任务单">{{ tt('成型生产任务单') }}</el-dropdown-item>
           <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
-          <el-dropdown-item command="生产投料单" divided>{{ tt('生产投料单') }}</el-dropdown-item>
         </template>
       </el-dropdown>
       <el-button size="small" @click="printPick" :disabled="!checked.length">{{ tt('打印领料单') }}</el-button>
@@ -56,11 +55,6 @@
               @selection-change="(r) => (checked = r)" @current-change="(r) => (currentRow = r)"
               highlight-current-row row-key="rowKey">
       <el-table-column type="selection" width="40" fixed="left" reserve-selection />
-      <el-table-column :label="tt('操作')" width="90" fixed="left">
-        <template #default="{ row }">
-          <el-link type="primary" :underline="false" @click.stop="showBom(row)">{{ tt('BOM明细') }}</el-link>
-        </template>
-      </el-table-column>
       <el-table-column :label="tt('公司代码')" prop="公司代码" width="90" show-overflow-tooltip />
       <el-table-column :label="tt('工单号')" prop="加工单号" width="150" sortable show-overflow-tooltip />
       <el-table-column :label="tt('工单行号')" prop="行号" width="90" sortable />
@@ -90,18 +84,6 @@
         </template>
       </el-table-column>
     </el-table>
-
-    <!-- BOM明细弹窗 -->
-    <el-dialog v-model="bomVisible" :title="tt('BOM明细') + ' — ' + (bomRow?.加工单号 || '')" width="760px" append-to-body>
-      <el-table :data="bomRows" border size="small" max-height="420" v-loading="bomLoading">
-        <el-table-column :label="tt('层级')" prop="层级" width="70" />
-        <el-table-column :label="tt('子件编码')" prop="子件编码" width="130" />
-        <el-table-column :label="tt('子件名称')" prop="子件名称" min-width="160" />
-        <el-table-column :label="tt('规格型号')" prop="规格型号" min-width="140" />
-        <el-table-column :label="tt('计量单位')" prop="子件计量单位" width="90" />
-        <el-table-column :label="tt('定额数量')" prop="定额数量" width="100" align="right" />
-      </el-table>
-    </el-dialog>
   </div>
 </template>
 
@@ -110,7 +92,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
-import { printWorkTaskSheet, printFeedingSheet } from '@/business/print-formats'
+import { printWorkTaskSheet } from '@/business/print-formats'
 import { useUserStore } from '@/stores/user'
 
 const rows = ref([])
@@ -123,10 +105,6 @@ const stateFilter = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
 const qText = ref('')
-const bomVisible = ref(false)
-const bomRow = ref(null)
-const bomRows = ref([])
-const bomLoading = ref(false)
 
 const filtered = computed(() => rows.value.filter((r) => {
   if (stateFilter.value === '未完工' && r.生产状态 === '完工') return false
@@ -186,50 +164,29 @@ async function onClose(close) {
 }
 
 /**
- * 打印工单(三模板可选,2026-09-27):勾选行直打,打印留痕回写 plang。
- *   成型生产任务单/组装生产任务单 = 行表任务单(横版,列见截图版式);
- *   生产投料单 = 每工单一页,物料行 = 默认 BOM × 需求数量(/px/workOrderBom)。
+ * 打印工单(两模板可选,2026-09-27):勾选行直打,打印留痕回写 plang。
+ *   成型生产任务单/组装生产任务单 = 行表任务单(横版,列见截图版式)。
+ * ⚠ 2026-10-14 「生产投料单」模板下线:它的物料行全部来自自建 BOM
+ *   (/px/workOrderBom → bs_bom),随 MES 自建 BOM 功能整体删除,前端已无替代数据源。
  */
 async function doPrintTask(mode) {
   const src = checked.value.length ? checked.value : (currentRow.value ? [currentRow.value] : [])
   if (!src.length) { ElMessage.warning(tt('请先勾选要打印的工单')); return }
   try {
-    let okPrint = false
-    if (mode === '生产投料单') {
-      const orders = []
-      for (const r of src) {
-        let bom = []
-        try {
-          const res = await request.post('/px/workOrderBom', { 产品编码: r.物料编码 })
-          bom = (res.data || []).map((b) => ({
-            物料编码: b.子件编码, 物料名称: b.子件名称, 规格型号: b.规格型号,
-            数量: Math.round(Number(b.定额数量 || 0) * Number(r.需求数量 || 0) * 10000) / 10000,
-            单位: b.子件计量单位 || '', 行备注: '',
-          }))
-        } catch (e) { bom = [] }
-        orders.push({
-          单据编号: r.工单号, 产品编码: r.物料编码, 产品名称: r.产品名称,
-          产品规格: r.规格型号 || '', 数量: r.需求数量, 客户名称: r.客户 || '',
-          计划完工日期: r.计划完工日期 || '', 制单人: useUserStore().realName, bom,
-        })
-      }
-      okPrint = await printFeedingSheet(orders)
-    } else {
-      const rowsToPrint = src.map((r) => ({
-        单据编号: r.工单号,
-        公司代码: r.公司代码 || '', 工单行号: r.工单行号, // 工单二维码=公司代码@工单号@1000+工单行号(2026-10-09 规则改版)
-        是否重点管控产品: r.重点管控 || '',
-        商品编码: r.物料编码 || '',
-        商品名称: r.产品名称 || '',
-        规格型号: r.规格型号 || '',
-        订单数量: r.需求数量,
-        成型折算后数量: r.排产数量,
-        计划完工日期: r.计划完工日期 || '',
-        批号: r.批号 || '', 物料编码: r.物料编码 || '',
-        排产数量: r.排产数量, 生产线: r.生产线 || lineFilter.value || '',
-      }))
-      okPrint = await printWorkTaskSheet(mode, rowsToPrint, { line: lineFilter.value || '', preparedBy: useUserStore().realName })
-    }
+    const rowsToPrint = src.map((r) => ({
+      单据编号: r.工单号,
+      公司代码: r.公司代码 || '', 工单行号: r.工单行号, // 工单二维码=公司代码@工单号@1000+工单行号(2026-10-09 规则改版)
+      是否重点管控产品: r.重点管控 || '',
+      商品编码: r.物料编码 || '',
+      商品名称: r.产品名称 || '',
+      规格型号: r.规格型号 || '',
+      订单数量: r.需求数量,
+      成型折算后数量: r.排产数量,
+      计划完工日期: r.计划完工日期 || '',
+      批号: r.批号 || '', 物料编码: r.物料编码 || '',
+      排产数量: r.排产数量, 生产线: r.生产线 || lineFilter.value || '',
+    }))
+    const okPrint = await printWorkTaskSheet(mode, rowsToPrint, { line: lineFilter.value || '', preparedBy: useUserStore().realName })
     if (okPrint) {
       await request.post('/px/workOrderList/printStamp', {
         rows: src.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号, 批次号: r.批次号 })),
@@ -259,17 +216,6 @@ async function printPick() {
     win.focus()
     win.print()
   } catch (e) { err(e, '打印失败') }
-}
-
-async function showBom(row) {
-  bomRow.value = row
-  bomVisible.value = true
-  bomLoading.value = true
-  try {
-    const res = await request.post('/px/workOrderBom', { 产品编码: row.物料编码 })
-    bomRows.value = res.data || []
-  } catch (e) { err(e, '查询失败'); bomRows.value = [] }
-  bomLoading.value = false
 }
 
 function openTrace() {

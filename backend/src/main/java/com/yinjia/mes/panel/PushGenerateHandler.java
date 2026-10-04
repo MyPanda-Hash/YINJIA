@@ -70,7 +70,7 @@ public class PushGenerateHandler implements PanelActionHandler {
 
     /** 已由专用处理器接管的生单动作(仍登记 PUSH_TARGETS 供前端亮钮,但通用映射不认领)。 */
     private static final java.util.Set<String> CUSTOM_OWNED = java.util.Set.of(
-            "WO_ORDER|生成领料单",
+            // 「WO_ORDER|生成领料单」(WoPickingHandler 按默认 BOM 展开生成领料单草稿)已随 BOM 下架移除(2026-10-04)
             // 生产工单生单:按订单行 1:1 生成(参考库口径),由 ManuScheduleHandler 接管
             "SO_ORDER|生成生产工单",
             // 送料暂收单生单(2026-10-05):**一条动作两个去向** —— 按商品基本档案「来料检验」逐行分流到
