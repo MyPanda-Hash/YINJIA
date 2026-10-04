@@ -8,13 +8,17 @@
      ④ 只补缺失项:已填的检测结果不被覆盖;缺的按来料检验要求顺序补进来
      ⑤ 幂等:再点「带入检验要求」一行都不加
      ⑥ 要求表里没有的物料 → 提示无法带入,表体不动
-   用法:node tools/archive/_probe-qc-insp-carry/_v-qc-insp-carry.cjs(需 5173 + 8090 已起)
+   用法:node tools/archive/_probe-qc-insp-carry/_v-qc-insp-carry.cjs [前端地址]
+        前端地址默认 http://localhost:5173(vite 热更);传 http://127.0.0.1:8090 即测**打包版**
+        (jar 内 BOOT-INF/classes/static —— 用户实际在看的那个实例,改前端后必测它一遍)
    口径真值(库实测):YJ-YCYX-006 折叠棉 → 折叠棉/炭棒/折数/折高(实配炭棒后外径为空 → 不带) */
 const { spawn } = require('node:child_process')
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path')
 const PORT = 9362
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
 const BASE = 'http://127.0.0.1:8090/api'
+/** 被测前端:默认 vite 热更(5173);传 http://127.0.0.1:8090 即测**打包版**(jar 内 static,用户实际在看的那个) */
+const APP = (process.argv.find((a) => a.startsWith('http')) || 'http://localhost:5173').replace(/\/$/, '')
 const CODE = 'YJ-YCYX-006'
 const EXPECT = [
   ['折叠棉', '47*34*154-1'],
@@ -106,14 +110,14 @@ async function main() {
     }
     await send('Page.enable'); await send('Runtime.enable')
 
-    await navigate('http://localhost:5173/#/login')
+    await navigate(`${APP}/#/login`)
     await evaluate(`localStorage.setItem('mes_token', ${JSON.stringify(token)}); localStorage.setItem('mes_user', ${JSON.stringify(JSON.stringify(login.data.user))}); 'ok'`)
 
     // ── ① 来料检验要求面板:能渲染出行(detail 键回归) ──
     let rowsShown = 0
     for (let i = 0; i < 3 && !rowsShown; i++) {
       await navigate('about:blank')
-      await navigate('http://localhost:5173/#/panelx/list/QC_INSP_REQ')
+      await navigate(`${APP}/#/panelx/list/QC_INSP_REQ`)
       rowsShown = await waitForY(`(() => {
         const tabs = document.querySelectorAll('.qc-insp-sheet .rsp-page-tab').length
         const rows = [...document.querySelectorAll('.qc-insp-sheet .qc-paper tbody tr')].filter(r => r.querySelector('.rs-td')).length
@@ -126,7 +130,7 @@ async function main() {
     let ready = null
     for (let attempt = 1; attempt <= 5 && !ready; attempt++) {
       await navigate('about:blank')
-      await navigate('http://localhost:5173/#/panelx/list/QC_INSP_REC')
+      await navigate(`${APP}/#/panelx/list/QC_INSP_REC`)
       await sleep(3000)
       await evaluate(`(() => { const wz = document.querySelector('.wizard-mask'); if (wz) (wz.querySelector('.wz-close') || wz.querySelector('.wz-skip'))?.click(); return 1 })()`)
       ready = await raw(`(() => {
@@ -236,7 +240,7 @@ async function main() {
     for (const [loc, want] of [['en', 'Load from Requirements'], ['zh-TW', '帶入檢驗要求']]) {
       await evaluate(`localStorage.setItem('mes_locale', ${JSON.stringify(loc)}); 'ok'`)
       await navigate('about:blank')
-      await navigate('http://localhost:5173/#/panelx/list/QC_INSP_REC')
+      await navigate(`${APP}/#/panelx/list/QC_INSP_REC`)
       const txt = await waitForY(`(() => {
         const b = document.querySelector('.qr-carry-btn')
         return b ? b.innerText.replace(/\\s+/g, ' ').trim() : ''

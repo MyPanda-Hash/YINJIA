@@ -144,6 +144,18 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 - **收尾时服务保持运行,不要停**(用户常要立刻看效果);汇报里给出 URL 并注明「服务是我起的」。
 - 起长驻进程**别阻塞当前流程**(后台起);**不要重启已在跑的服务**(会打断用户正在看的会话)。
 - 只跑了构建/单测 ≠ 验证过界面:渲染/版式类改动要落到真实服务上看过再说(或明确声明未做像素级验证)。
+- 🔴 **前端改动「在哪个地址生效」要分清(2026-10-04 用户报障踩坑)**:
+  - **5173(vite)= 源码即时生效**;源码一改就是它新。
+  - **8090 是 `java -jar target\yinjia-mes-backend-0.1.0.jar`,前端是打包进 jar 的
+    `BOOT-INF/classes/static`** —— 源码改了它**不会**变,仍是上次 packaging 那次的前端。
+    用户报「面板数据是空的 / 保存后还是空的」而库里有数据时,**先查他看的是哪一版**:
+    `node tools/archive/_probe-qc-insp-carry/_q-served-build.mjs http://127.0.0.1:8090 --api`
+    (列该实例首页 chunk 关键字 + 接口 detail 键/行数)。
+  - 要让 8090 用上新前端:`npm run build` → 同步 `backend/src/main/resources/static`
+    → 停 8090 → `jar uf target\yinjia-mes-backend-0.1.0.jar -C <stage> BOOT-INF`(stage 内放
+    `BOOT-INF/classes/static`)→ 重启 `tools/scripts/start-prod.ps1`;完事再跑一次上面的取证脚本复核。
+    纯前端改动**同时要提交** `backend/src/main/resources/static`(仓库跟踪它,是部署包的前端来源,
+    按习惯单独一个 `chore: 前端静态产物同步(...)` 提交)。
 
 ## 🔴 两账套(正式库 / 测试库)纪律(2026-09-22 起生效,不可豁免)
 
