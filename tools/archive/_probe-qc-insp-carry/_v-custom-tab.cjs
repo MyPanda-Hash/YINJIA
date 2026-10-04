@@ -30,6 +30,8 @@ const TAB_FOLD = '折叠棉'
 const TAB_GASKET = '垫片'
 const F_FOLD = '炭棒直径'          // 固定表(折叠棉)的自定义列
 const F_CHILD = '炭棒内径'         // 带父字段(规格)的子字段 —— 带入只带子字段
+const F_NEWPARENT = '可靠性'       // 新建的父分组(该表本来没有分组名)
+const F_NEWPARENT_CHILD = '盐雾时长'
 const F_CUSTOM = '平整度'          // 全自定义表(自定义检验要求)的自定义列
 const F_DUP = '外观'               // 与别的表同名的自定义列(垫片)
 const CODE_FOLD = 'YJ-TEST-CUSTOM-002'   // 折叠棉表:带自定义列的数据行
@@ -59,20 +61,22 @@ const HELPERS = `
       return !!t
     },
     activeTab() { return document.querySelector('.qc-insp-sheet .rsp-page-tab.active')?.innerText.trim() || '' },
-    /** 表头列序(按 DOM 真实列序):两行表头里第一行的分组格 colspan=N 要展开成下面 N 个叶子列名。
-     *  ⚠ 直接 row1 文本 + row2 文本拼接会错位(分组格里是"规格",叶子在第二行)——
-     *    按拼接结果取列下标就会把值填进隔壁列(实测踩过:34.2 填进了「折数」)。 */
+    /** 表头列序(按 DOM 真实列序):两行表头里 第一行=独立列(rowspan)+ 分组格(colspan);
+     *  分组格要展开成第二行的叶子列名。
+     *  ⚠ 判断"是分组格"必须看 rowspan(独立列才有 rowspan),不能只看 colspan ——
+     *    只有一个子列的分组 colspan 也是 1,只看 colspan 会把分组标题当成列名(实测踩过两次)。 */
     cols() {
       const paper = document.querySelector('.qc-insp-sheet .qc-paper')
       if (!paper) return []
       const r1 = [...(paper.querySelector('tr.rs-grp')?.querySelectorAll('th.rs-th') || [])]
       const r2 = [...(paper.querySelector('tr.rs-grp2')?.querySelectorAll('th.rs-th') || [])]
+      if (!r2.length) return r1.map((th) => th.innerText.trim())
       const out = []
       let g = 0
       for (const th of r1) {
         const span = Number(th.getAttribute('colspan') || 1)
-        if (span > 1) { for (let i = 0; i < span; i++) out.push((r2[g++]?.innerText || '').trim()) }
-        else out.push(th.innerText.trim())
+        if (th.hasAttribute('rowspan')) { out.push(th.innerText.trim()); continue }
+        for (let i = 0; i < span; i++) out.push((r2[g++]?.innerText || '').trim())
       }
       return out
     },
@@ -104,9 +108,20 @@ const HELPERS = `
         await new Promise(r => setTimeout(r, 700))
         const opt = [...document.querySelectorAll('.el-select-dropdown__item')].filter(o => o.offsetParent !== null)
           .find(o => o.innerText.trim() === text)
-        opt?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
-        await new Promise(r => setTimeout(r, 300))
-        return !!opt
+        if (opt) { opt.dispatchEvent(new MouseEvent('click', { bubbles: true })); await new Promise(r => setTimeout(r, 300)); return true }
+        // 候选项里没有 ⇒ 走 allow-create:往下拉输入框敲字 + 回车新建(用户在这种表上就是这条路)
+        const input = item.querySelector('.el-select__input') || item.querySelector('input')
+        if (!input) return false
+        window.__ct.setV(input, text)
+        await new Promise(r => setTimeout(r, 400))
+        const created = [...document.querySelectorAll('.el-select-dropdown__item')].filter(o => o.offsetParent !== null)
+          .find(o => o.innerText.trim() === text)
+        if (created) { created.dispatchEvent(new MouseEvent('click', { bubbles: true })) }
+        else {
+          input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true }))
+        }
+        await new Promise(r => setTimeout(r, 400))
+        return true
       }
       await pick(byLabel('所属页签'), tabName)              // 所属页签(分页签面板才有)
       if (parentName) await pick(byLabel('父字段'), parentName)   // 父字段(留空=独立列)
@@ -238,6 +253,31 @@ async function main() {
     ok('③b 垫片的列落在它自己的段(备用21..40)',
       (() => { const f = extAll.find((x) => x.label === F_DUP); const n = Number(String(f?.col || '').replace('备用', '')); return n >= 21 && n <= 40 })(),
       JSON.stringify(extAll.find((x) => x.label === F_DUP)))
+
+    // ── ③c 父字段下拉在「没有现成分组名」的表上也要能用(用户报「父子字段不能选」)──
+    await evalY(`window.__ct.tab(${JSON.stringify(TAB_CUSTOM)})`)
+    await sleep(800)
+    const hint = await evalY(`(() => {
+      const d = [...document.querySelectorAll('.el-dialog')].find(x => x.innerText.includes('字段管理'))
+      return d ? 'open' : 'closed'
+    })()`)
+    void hint
+    const r3c = await evalY(`window.__ct.addField(${JSON.stringify(TAB_CUSTOM)}, ${JSON.stringify(F_NEWPARENT_CHILD)}, 'SaltSpray', ${JSON.stringify(F_NEWPARENT)})`)
+    ok(`③c 自定义检验要求表:新建父分组「${F_NEWPARENT}」+ 子字段「${F_NEWPARENT_CHILD}」`, /ADDED|EXISTS/.test(String(r3c)), String(r3c))
+    await sleep(1200)
+    const customCols2 = await evalY(`JSON.stringify(window.__ct.cols())`)
+    ok('③c 该表出现子字段(首个数据列仍是 物料编号)',
+      String(customCols2).includes('物料编号') && String(customCols2).includes(F_NEWPARENT_CHILD), String(customCols2))
+    // 表头分组标题应出现新建的父名
+    const newGroup = await evalY(`(() => {
+      const th = [...document.querySelectorAll('.qc-insp-sheet .qc-paper tr.rs-grp th.rs-th')].find(e => e.innerText.trim() === ${JSON.stringify(F_NEWPARENT)})
+      return th ? Number(th.getAttribute('colspan') || 1) : 0
+    })()`)
+    ok(`③c 表头出现新建的分组标题「${F_NEWPARENT}」`, newGroup >= 1, `colspan=${newGroup}`)
+    const customPool = await evalY(`(async () => { const r = await fetch('http://127.0.0.1:8090/api/px/extFields?panel=QC_INSP_REQ', { headers: { Authorization: 'Bearer ' + localStorage.getItem('mes_token') } }); const j = await r.json(); const f = (j.data.fields||[]).find(x => x.label === ${JSON.stringify(F_NEWPARENT_CHILD)}); return JSON.stringify(f || {}) })()`)
+    ok('③c 新子字段落在自定义检验要求自己的段(备用141..160)且带父名',
+      (() => { const f = JSON.parse(String(customPool) || '{}'); const n = Number(String(f.col || '').replace('备用', '')); return n >= 141 && n <= 160 && f.parent === F_NEWPARENT })(),
+      String(customPool))
 
     // ── ④ 全自定义表照旧 ──
     await evalY(`window.__ct.tab(${JSON.stringify(TAB_CUSTOM)})`)

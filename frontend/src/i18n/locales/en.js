@@ -2776,6 +2776,9 @@ export default {
     '父字段名不能与字段名相同:': 'Parent name must differ from the field name: ',
     '每张表各 20 个扩展位': '20 extension slots per table',
     '本表已用': 'Used in this table',
+    '留空=独立列;可直接输入新分组名': 'Leave empty for a standalone column; type a new group name to create one',
+    '该表还没有分组名：直接输入一个名字（回车）即可新建': 'This table has no group yet — type a new name and press Enter to create one',
+    '这张表还没有自定义列': 'No custom columns in this table yet',
 
     // 库存报表三面板(2026-09-21):重算成本按钮 + 查询弹窗「档案∩有流水」联动提示 + 模糊搜索
     '重算成本': 'Recalculate cost',
