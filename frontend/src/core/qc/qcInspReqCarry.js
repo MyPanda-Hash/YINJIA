@@ -100,9 +100,14 @@ export function missingCarryRows(existingItems, entries) {
 
 /**
  * 一行到位:来料检验要求全量行 + 物料编码 + 报告现有行 → 该补进来的行。
+ * @param {Array} reqRows 两个面板的要求行(已合并)
+ * @param {string} materialCode 物料编码
+ * @param {Array} existingItems 报告表体现有行
+ * @param {Array} [extFields] 两个面板的动态字段(合并传)
+ * @param {Array} [tabs] 两个面板的页签全集(默认只有固定 7 张)
  * @returns {{entries: Array<object>, add: Array<object>}} entries=该物料的全部可带入项;add=其中缺的
  */
-export function carryPlan(reqRows, materialCode, existingItems, extFields) {
-  const entries = carryEntriesOf(lookupReqGroups(reqRows, materialCode), extFields)
+export function carryPlan(reqRows, materialCode, existingItems, extFields, tabs) {
+  const entries = carryEntriesOf(lookupReqGroups(reqRows, materialCode, tabs), extFields)
   return { entries, add: missingCarryRows(existingItems, entries) }
 }

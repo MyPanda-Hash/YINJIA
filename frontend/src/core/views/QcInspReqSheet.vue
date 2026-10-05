@@ -83,7 +83,7 @@
     </div>
 
     <!-- 页签条(规格书式) -->
-    <div class="rsp-pages">
+    <div v-if="tabsReady" class="rsp-pages">
       <div
         v-for="(t, ti) in tabs"
         :key="'qt' + ti"
@@ -92,9 +92,11 @@
         @click="activeTab = ti"
       >{{ tt(t.key) }}</div>
     </div>
+    <!-- 页签集还没就绪(全自定义面板:物料类别词典未取回) -->
+    <div v-else class="qc-tabs-loading">{{ tt('加载中…') }}</div>
 
     <!-- 当前页签的 Excel 复刻表 -->
-    <div class="qc-paper" :style="{ width: gridW(colsOf(tab)) + 'px' }">
+    <div v-if="tabsReady" class="qc-paper" :style="{ width: gridW(colsOf(tab)) + 'px' }">
       <table class="rs-t" :style="{ width: gridW(colsOf(tab)) + 'px' }">
         <colgroup>
           <col v-for="(c, ci) in colsOf(tab)" :key="'qc' + ci" :style="{ width: c.w + 'px' }" />
@@ -212,10 +214,10 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { callButton, errMsg } from '@/business/engine'
 import { useUserStore } from '@/stores/user'
 import { detailRowsOf, ensureDetailRows } from '@core/panel/detailRows'
-import { fetchExtFields, invalidateExtFields } from '@core/qc/qcInspReqApi'
+import { fetchExtOverview, invalidateExtFields } from '@core/qc/qcInspReqApi'
 import { DEFAULT_EXT_COL_W, colsOfTab, parentOptionsOfTab } from '@core/qc/qcInspReqCols'
 import FieldManagerDialog from './FieldManagerDialog.vue'
-import { qcInspReqTabs } from './qcInspReqConfig'
+import { tabsOfPanel } from './qcInspReqConfig'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -234,12 +236,16 @@ const emit = defineEmits(['dirty', 'save', 'refresh', 'refresh-config'])
 const user = useUserStore()
 
 /* ── 每张表各自的自定义列(动态字段/备用列池,「自定义字段」里维护) ──
- * 2026-10-04 用户口径:「检验数据要求的自定义字段,是单独针对每个表的」——
+ * 2026-10-04 用户口径:「自定义字段单独针对每个表」——
  * 字段的归属页签 = /px/extFields 的 fields[].tab(= yj_field.tab_key);
- * 列的解析统一走 @core/qc/qcInspReqCols(渲染与带入同源,避免"界面看得到、报告带不进来")。 */
+ * 列的解析统一走 @core/qc/qcInspReqCols(渲染与带入同源,避免"界面看得到、报告带不进来")。
+ * 总览同时下发 **tabs**(该面板页签集):全自定义面板(QC_INSP_REQ_SERIES)的页签条就由它决定。 */
 const extFields = ref([])
+const apiTabs = ref([])
 async function loadExtFields() {
-  extFields.value = await fetchExtFields({ force: true })
+  const ov = await fetchExtOverview(props.panelCode, { force: true })
+  extFields.value = ov.fields
+  apiTabs.value = ov.tabs
 }
 watch(() => props.panelCode, () => { void loadExtFields() }, { immediate: true })
 
@@ -249,7 +255,7 @@ function extColWidth(label) {
   const w = Number(f?.width)
   return Number.isFinite(w) && w > 0 ? w : DEFAULT_EXT_COL_W
 }
-/** 页签的列:固定列(Excel 原列序) + 该页签自己的自定义列(追加在后) */
+/** 页签的列:固定列(Excel 原列序) + 该页签自己的自定义列(有父字段的插到该分组末尾) */
 function colsOf(t) {
   return colsOfTab(t, extFields.value, extColWidth)
 }
@@ -261,20 +267,26 @@ function hasGroupRow(t) {
 const tabOptions = computed(() => tabs.value.map((t) => ({ value: t.key, label: t.key })))
 /** 「自定义字段」弹窗的「父字段」候选:该页签固定列已有的分组 + 该页签已用的父 */
 function parentOptions(tabKey) {
-  return parentOptionsOfTab(qcInspReqTabs.find((t) => t.key === tabKey) || null, extFields.value)
+  return parentOptionsOfTab(tabs.value.find((t) => t.key === tabKey) || null, extFields.value)
 }
 /** 自定义页签还没定义任何列(只有匹配键列,没得可填)—— 界面提示先去加列 */
 const tabDynamicEmpty = computed(() => !!tab.value?.dynamicCols && colsOf(tab.value).length <= 1)
 
-/** 页签集:tabKeys 为空时=全部 7 页签(维护面板);弹窗按命中的物料类别收窄 */
+/** 页签集:面板决定(固定表=配置;全自定义=物料类别词典);tabKeys 非空时按命中页签收窄(只读弹窗用) */
 const tabs = computed(() => {
+  const all = tabsOfPanel(props.panelCode, apiTabs.value)
   const keys = props.tabKeys
-  if (!Array.isArray(keys) || !keys.length) return qcInspReqTabs
-  const filtered = qcInspReqTabs.filter((t) => keys.includes(t.key))
-  return filtered.length ? filtered : qcInspReqTabs
+  if (!Array.isArray(keys) || !keys.length) return all
+  const filtered = all.filter((t) => keys.includes(t.key))
+  return filtered.length ? filtered : all
 })
 const activeTab = ref(0)
-const tab = computed(() => tabs.value[activeTab.value] || tabs.value[0] || qcInspReqTabs[0])
+/** 当前页签;**全自定义面板的页签集来自接口**,首帧还没回来时给个空页签兜底 ——
+ *  否则模板里 tt(tab.sheetTitle) 会读 null 抛错,整个面板白屏(2026-10-04 实测踩到)。 */
+const EMPTY_TAB = Object.freeze({ key: '', sheetTitle: '', cols: [], dynamicCols: false })
+const tab = computed(() => tabs.value[activeTab.value] || tabs.value[0] || EMPTY_TAB)
+/** 页签集还没就绪(全自定义面板:物料类别词典未取回)—— 表格区显示提示而不是渲染空表 */
+const tabsReady = computed(() => tabs.value.length > 0)
 
 // ── 行数据:与明细行数组(head.detail[detail_key])同引用的工作镜像(raw 数组无响应式,镜像驱动界面) ──
 const rows = ref([])
@@ -527,7 +539,7 @@ function gridW(cols) {
  * 引擎那边 registry.reload() 已刷新,不清前端缓存就还是旧字段表。 */
 const extMgrVisible = ref(false)
 async function onExtFieldDone() {
-  invalidateExtFields()
+  invalidateExtFields(props.panelCode)
   await loadExtFields()
   emit('refresh-config')
   emit('refresh')
@@ -795,6 +807,13 @@ async function onExtFieldDone() {
   color: #1c4f8a;
   font-weight: 700;
   border-color: #8fb4e0;
+}
+/* 页签集未就绪(全自定义面板首次进入,词典还在路上) */
+.qc-tabs-loading {
+  padding: 22px 0;
+  text-align: center;
+  color: #98a4b3;
+  font-size: 13px;
 }
 
 /* ── Excel 复刻网格(同 RecordSheetPanels rs-* 版式) ── */

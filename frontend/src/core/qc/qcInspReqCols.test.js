@@ -7,23 +7,26 @@ import {
   extFieldInTab,
   parentOptionsOfTab,
   EXT_KEY_COL,
-  CUSTOM_TAB_KEY,
   DEFAULT_EXT_COL_W,
 } from './qcInspReqCols.js'
-import { qcInspReqTabs } from '../views/qcInspReqConfig.js'
+import { qcInspReqTabs, tabsOfPanel, QC_INSP_REQ_SERIES_PANEL } from '../views/qcInspReqConfig.js'
 
 const TAB = (key) => qcInspReqTabs.find((t) => t.key === key)
-/** 三张表各自的自定义列:折叠棉 → 炭棒直径;垫片 → 外观;自定义表 → 平整度 */
+/** 系列面板(10 张全自定义表)的页签:由物料类别词典决定 —— 这里模拟接口下发的 3 张 */
+const SERIES_TABS = tabsOfPanel(QC_INSP_REQ_SERIES_PANEL, ['阻垢系列', 'BK材料系列', '炭粉'])
+const TAB_S = (key) => SERIES_TABS.find((t) => t.key === key)
+/** 各表各自的自定义列:折叠棉 → 炭棒直径;垫片 → 外观;阻垢系列 → 平整度 */
 const EXT = [
   { id: 1, label: '炭棒直径', col: '备用1', tab: '折叠棉' },
-  { id: 2, label: '外观', col: '备用2', tab: '垫片' },
-  { id: 3, label: '平整度', col: '备用3', tab: CUSTOM_TAB_KEY },
+  { id: 2, label: '外观', col: '备用21', tab: '垫片' },
+  { id: 3, label: '平整度', col: '备用141', tab: '阻垢系列' },
 ]
 
-test('归属判据:按 tab 认页签;未标注归属的老数据归「自定义检验要求」(改动前行为)', () => {
+test('归属判据:严格按 tab 认页签(没标 tab 的不属于任何页签)', () => {
   assert.equal(extFieldInTab({ label: 'x', tab: '折叠棉' }, '折叠棉'), true)
   assert.equal(extFieldInTab({ label: 'x', tab: '折叠棉' }, '垫片'), false)
-  assert.equal(extFieldInTab({ label: 'x' }, CUSTOM_TAB_KEY), true, '没有 tab → 自定义表')
+  assert.equal(extFieldInTab({ label: 'x' }, '折叠棉'), false, '没有 tab ⇒ 不属于任何页签(迁移会清)')
+  assert.equal(extFieldInTab({ label: 'x', tab: '折叠棉' }, ''), false)
   assert.equal(extFieldInTab({ label: 'x', tab: ' 折叠棉 ' }, '折叠棉'), true, '两侧 trim')
   assert.deepEqual(extFieldsOfTab(EXT, '折叠棉').map((f) => f.label), ['炭棒直径'])
 })
@@ -44,10 +47,11 @@ test('每张表各有各的自定义列(用户口径:单独针对每个表)', ()
     '没加自定义列的表保持原样')
 })
 
-test('全自定义表:匹配键 物料编号 在最左 + 本表的自定义列', () => {
-  const cols = colsOfTab(TAB(CUSTOM_TAB_KEY), EXT)
+test('全自定义表(系列面板):匹配键 物料编号 在最左 + 本表的自定义列', () => {
+  const cols = colsOfTab(TAB_S('阻垢系列'), EXT)
   assert.equal(cols[0].key, EXT_KEY_COL.key, '物料编号是最左的匹配键列')
   assert.deepEqual(cols.map((c) => c.key), ['物料编号', '平整度'])
+  assert.deepEqual(colsOfTab(TAB_S('炭粉'), EXT).map((c) => c.key), ['物料编号'], '没加列的表只剩匹配键列')
 })
 
 test('列宽:自定义列走 widthOf 回调(缺省默认宽)', () => {
@@ -61,7 +65,15 @@ test('列宽:自定义列走 widthOf 回调(缺省默认宽)', () => {
 test('没有动态字段 / 空页签:不报错', () => {
   assert.deepEqual(colsOfTab(TAB('折叠棉'), []).map((c) => c.key), TAB('折叠棉').cols.map((c) => c.key))
   assert.deepEqual(colsOfTab(null, EXT), [])
-  assert.deepEqual(colsOfTab(TAB(CUSTOM_TAB_KEY), null).map((c) => c.key), ['物料编号'])
+  assert.deepEqual(colsOfTab(TAB_S('炭粉'), null).map((c) => c.key), ['物料编号'])
+})
+
+test('tabsOfPanel:固定面板用静态配置;系列面板完全由物料类别词典决定(全自定义)', () => {
+  assert.deepEqual(tabsOfPanel('QC_INSP_REQ', ['忽略']).map((t) => t.key), qcInspReqTabs.map((t) => t.key))
+  const s = tabsOfPanel(QC_INSP_REQ_SERIES_PANEL, ['阻垢系列', '原料来料'])
+  assert.deepEqual(s.map((t) => t.key), ['阻垢系列', '原料来料'], '顺序即词典顺序(扩展池分段序)')
+  assert.ok(s.every((t) => t.dynamicCols && t.cols.length === 0), '每张表都是全自定义表')
+  assert.deepEqual(tabsOfPanel(QC_INSP_REQ_SERIES_PANEL, []), [], '词典取不到就没页签(不报错)')
 })
 
 /* ── 父字段(分组表头,2026-10-04「父子字段」口径):父只分组、没有数据格 ── */

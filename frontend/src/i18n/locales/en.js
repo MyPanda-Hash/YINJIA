@@ -2747,6 +2747,19 @@ export default {
     '已按来料检验要求带入 {n} 项检验项': 'Loaded {n} inspection item(s) from the incoming inspection requirements',
     '带入检验要求失败': 'Failed to load the inspection requirements',
 
+    /* 来料检验要求(系列)面板 + 10 张全自定义表(2026-10-04:表太多,从「来料检验要求」拆出来独立成一个面板) */
+    '来料检验要求(系列)': 'Incoming Inspection Requirements (Series)',
+    '阻垢系列': 'Scale Inhibition Series',
+    'BK材料系列': 'BK Material Series',
+    '除重金属系列': 'Heavy Metal Removal Series',
+    '矿化（碱性）系列': 'Mineralization (Alkaline) Series',
+    '抑菌系列': 'Antibacterial Series',
+    '载银系列': 'Silver-Loaded Series',
+    '炭粉': 'Carbon Powder',
+    '胶粉': 'Binder Powder',
+    '矿化料': 'Mineralizing Material',
+    '原料来料': 'Raw Material Incoming',
+
     /* 来料检验要求·第 8 张表「自定义检验要求」(2026-10-04 用户口径):
        页签的列 = 动态字段(备用列池),列名就是检验项;带入口径与前 7 张完全一致 */
     '自定义检验要求': 'Custom Inspection Requirements',

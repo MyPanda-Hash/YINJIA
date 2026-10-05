@@ -33,12 +33,12 @@ const parentOptions = computed(() => (needTab() && props.parentOptionsOf ? props
 /** 父字段下拉没有候选(该表还没任何分组名)—— 提示"直接输入一个新名字即可新建" */
 const parentEmptyHint = computed(() => needTab() && parentOptions.value.length === 0)
 /** 字段列表**只显示当前所选页签自己的**自定义字段(用户口径 2026-10-04:切页签要显示他自己的页面的自定义字段)。
- *  老数据(没有 tab)按「自定义检验要求」算 —— 与 @core/qc/qcInspReqCols 的归属判据同一口径。 */
+ *  归属判据与 @core/qc/qcInspReqCols 同一口径:严格按 tab 比(分页签面板绑定必填所属页签)。 */
 const visibleFields = computed(() => {
   const all = Array.isArray(data.value?.fields) ? data.value.fields : []
   if (!needTab()) return all
-  const cur = form.value.tab
-  return all.filter((f) => (String(f.tab || '').trim() || '自定义检验要求') === cur)
+  const cur = String(form.value.tab || '').trim()
+  return all.filter((f) => String(f.tab || '').trim() === cur)
 })
 /** 各页签用量一览(切页签前也能看到别的表用了多少) */
 const tabUsage = computed(() => {

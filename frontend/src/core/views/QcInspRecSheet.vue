@@ -221,8 +221,9 @@ import { tt } from '@/i18n'
 import { errMsg } from '@/business/engine'
 import StdLibManager from './StdLibManager.vue'
 import QcInspReqViewDialog from './QcInspReqViewDialog.vue'
-import { fetchReqRows, fetchExtFields } from '@core/qc/qcInspReqApi'
+import { fetchReqRows, fetchExtOverview, QC_INSP_REQ_PANEL, QC_INSP_REQ_SERIES_PANEL } from '@core/qc/qcInspReqApi'
 import { carryPlan } from '@core/qc/qcInspReqCarry'
+import { qcInspReqTabs, tabsOfPanel } from './qcInspReqConfig'
 import {
   QC_INSP_REC_HEAD_ROWS,
   QC_INSP_REC_FOOT_FULL,
@@ -345,10 +346,16 @@ async function carryFromReq(opts = {}) {
   if (carrying.value) return 0
   carrying.value = true
   try {
-    // 动态字段:来料检验要求每张表各自的自定义列(用户口径 2026-10-04)——不带上它,
-    // 界面上看得到的自定义列就会"带不进报告"
-    const [rows, extFields] = await Promise.all([fetchReqRows(code), fetchExtFields()])
-    const plan = carryPlan(rows, code, items.value, extFields)
+    // 两个面板一起带:要求可能维护在 QC_INSP_REQ(7 张固定表)或 QC_INSP_REQ_SERIES(10 张系列表);
+    // 动态字段(每张表各自的自定义列)与页签全集一并取,否则界面上看得到的自定义列带不进来。
+    const [rows, ovA, ovB] = await Promise.all([
+      fetchReqRows(code),
+      fetchExtOverview(QC_INSP_REQ_PANEL),
+      fetchExtOverview(QC_INSP_REQ_SERIES_PANEL),
+    ])
+    const extFields = [...ovA.fields, ...ovB.fields]
+    const tabs = [...qcInspReqTabs, ...tabsOfPanel(QC_INSP_REQ_SERIES_PANEL, ovB.tabs)]
+    const plan = carryPlan(rows, code, items.value, extFields, tabs)
     if (!plan.entries.length) {
       if (!opts.silent) ElMessage.warning(tt('来料检验要求里没有该物料的检验数据，无法带入'))
       return 0

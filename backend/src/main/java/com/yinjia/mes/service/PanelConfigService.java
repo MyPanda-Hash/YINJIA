@@ -1585,10 +1585,22 @@ public class PanelConfigService {
 
     private static final java.util.Set<String> EXT_DATA_TYPES = java.util.Set.of("文本", "下拉框", "日期", "是否");
     private static final int EXT_SPARE_COUNT = 20;
+    /**
+     * 分页签的来料检验要求面板(一张宽表当多张表用,行按 物料类别 分流):
+     * · QC_INSP_REQ —— 7 张**固定**表(Excel 一比一复刻)+ 每表可加自定义列;
+     * · QC_INSP_REQ_SERIES —— 10 张**全自定义**表(阻垢系列…原料来料),列全由动态字段承载。
+     * 只有这两个面板:①页签 = 物料类别 字典值;②扩展池**每张表各 20 位**;③自定义列要指明所属页签;
+     * ④父字段(分组表头,父无数据格)可用。(2026-10-04 用户口径:表太多挤在一个面板,拆成两个)
+     */
+    private static final java.util.Set<String> TABBED_PANELS = java.util.Set.of("QC_INSP_REQ", "QC_INSP_REQ_SERIES");
     /** 来料检验要求面板码:其列名 = 检验项(动态字段绑定需同批登记进 qc.insp_item,见 addExtField) */
     private static final String QC_INSP_REQ_PANEL = "QC_INSP_REQ";
     /** 检验项标准库编码(检验数据记录 QC_INSP_REC 的「检验项」字段 dict_sql 就是它) */
     private static final String QC_INSP_ITEM_LIB = "qc.insp_item";
+
+    private static boolean isTabbed(String panelCode) {
+        return panelCode != null && TABBED_PANELS.contains(panelCode);
+    }
 
     /** 动态字段总览:现有动态字段 + 各表备用列池占用/脏数据行数(规格 §8 契约 1)。
      *  分页签面板(来料检验要求)额外下发 **tabPools**:每个页签 20 个扩展位各自算账(用户口径 2026-10-04)。 */
@@ -1614,11 +1626,13 @@ public class PanelConfigService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("capacity", EXT_SPARE_COUNT);
         out.put("fields", fields);
-        if (QC_INSP_REQ_PANEL.equals(panelCode)) {
-            // 每张表各 20 个:按页签顺序分段给账(段 = 备用[(i-1)*20+1 .. i*20])
+        if (isTabbed(panelCode)) {
+            // 每张表各 20 个:按页签顺序分段给账(段 = 备用[(i-1)*20+1 .. i*20]);tabs 一并下发,
+            // 前端凭它渲染页签条(全自定义面板的页签集完全由词典决定,加页签不用改前端)
             Map<String, Object> tabPools = new LinkedHashMap<>();
-            for (String tabKey : qcInspReqTabKeys()) {
-                int[] range = extTabRangeOf(tabKey);
+            List<String> tabs = tabKeysOf(panelCode);
+            for (String tabKey : tabs) {
+                int[] range = extTabRangeOf(panelCode, tabKey);
                 if (range == null) continue;
                 int used = 0;
                 for (int i = range[0]; i <= range[1]; i++) {
@@ -1633,7 +1647,7 @@ public class PanelConfigService {
                 tabPools.put(tabKey, tp);
             }
             out.put("tabPools", tabPools);
-            out.put("tabs", qcInspReqTabKeys());
+            out.put("tabs", tabs);
         } else {
             out.put("linePool", extPoolOf(def.lineTable()));
             if (def.hasHeadTable()) out.put("headPool", extPoolOf(def.headTable()));
@@ -1649,12 +1663,27 @@ public class PanelConfigService {
     }
 
     /**
-     * 分页签面板每个页签的扩展池区间 [start, end](1-based 备用列序号)。
-     * 段序 = 物料类别 词表顺序(= 前端页签顺序),第 i 个页签 = 备用[(i-1)*20+1 .. i*20],
-     * 与 migrate-qc-insp-req-tab-pools.sql 的分段口径必须一致(词表加值 = 迁移加段)。
+     * 分页签来料检验要求面板的页签集 = 该面板 物料类别 字段的字典值(数据键即页签名,顺序即扩展池分段序)。
+     * 前端页签条也由它决定(全自定义面板加页签只改词典,不用改前端);
+     * ⚠ QC_INSP_REQ 的 Excel 复刻页签配置(qcInspReqConfig.js)必须与词典顺序一致。
      */
-    private int[] extTabRangeOf(String tabKey) {
-        int idx = qcInspReqTabKeys().indexOf(tabKey);
+    private List<String> tabKeysOf(String panelCode) {
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) return List.of();
+        PanelRegistry.FieldDef f = def.byCol("物料类别");
+        if (f == null || f.dictSql() == null) return List.of();
+        List<String> out = new ArrayList<>();
+        for (String opt : dictOptions(f.dictSql())) if (!out.contains(opt)) out.add(opt);
+        return out;
+    }
+
+    /**
+     * 分页签面板每个页签的扩展池区间 [start, end](1-based 备用列序号)。
+     * 段序 = 物料类别 词表顺序,第 i 个页签 = 备用[(i-1)*20+1 .. i*20],
+     * 与 migrate-qc-insp-req-tab-pools.sql / migrate-qc-insp-req-series.sql 的分段口径必须一致。
+     */
+    private int[] extTabRangeOf(String panelCode, String tabKey) {
+        int idx = tabKeysOf(panelCode).indexOf(tabKey);
         if (idx < 0) return null;
         return new int[]{ idx * EXT_SPARE_COUNT + 1, (idx + 1) * EXT_SPARE_COUNT };
     }
@@ -1711,11 +1740,11 @@ public class PanelConfigService {
         String tab = String.valueOf(body.getOrDefault("tab", "")).trim();
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
-        if (!tab.isEmpty() && !QC_INSP_REQ_PANEL.equals(panelCode))
+        if (!tab.isEmpty() && !isTabbed(panelCode))
             throw new IllegalArgumentException("所属页签仅分页签面板支持:" + panelCode);
-        if (QC_INSP_REQ_PANEL.equals(panelCode)) {
+        if (isTabbed(panelCode)) {
             if (tab.isEmpty()) throw new IllegalArgumentException("请选择所属页签(自定义列住哪张表)");
-            if (!qcInspReqTabKeys().contains(tab)) throw new IllegalArgumentException("所属页签不存在:" + tab);
+            if (!tabKeysOf(panelCode).contains(tab)) throw new IllegalArgumentException("所属页签不存在:" + tab);
         } else {
             tab = null;
         }
@@ -1725,7 +1754,7 @@ public class PanelConfigService {
         // 与固定 7 张表的 规格/外观 是同一种东西:前端两行表头算法直接复用,不用另写一套。
         String parent = String.valueOf(body.getOrDefault("parent", "")).trim();
         if (!parent.isEmpty()) {
-            if (!QC_INSP_REQ_PANEL.equals(panelCode)) throw new IllegalArgumentException("父字段仅分页签面板支持:" + panelCode);
+            if (!isTabbed(panelCode)) throw new IllegalArgumentException("父字段仅分页签面板支持:" + panelCode);
             if (parent.length() > 50) throw new IllegalArgumentException("父字段名过长(≤50):" + parent);
             for (char ch : parent.toCharArray())
                 if (".%/() \t\r\n".indexOf(ch) >= 0) throw new IllegalArgumentException("父字段名禁止含 . % / ( ) 或空格:" + parent);
@@ -1772,8 +1801,8 @@ public class PanelConfigService {
         String chosen = null, dirtyWarn = null;
         int dirtyRows = 0;
         int poolFrom = 1, poolTo = EXT_SPARE_COUNT;
-        if (QC_INSP_REQ_PANEL.equals(panelCode)) {
-            int[] range = extTabRangeOf(tab);
+        if (isTabbed(panelCode)) {
+            int[] range = extTabRangeOf(panelCode, tab);
             if (range == null) throw new IllegalArgumentException("所属页签不存在:" + tab);
             poolFrom = range[0];
             poolTo = range[1];
@@ -1801,7 +1830,7 @@ public class PanelConfigService {
             }
         }
         if (chosen == null) {
-            if (QC_INSP_REQ_PANEL.equals(panelCode))
+            if (isTabbed(panelCode))
                 throw new IllegalStateException("「" + tab + "」的扩展池已满(" + EXT_SPARE_COUNT + "/" + EXT_SPARE_COUNT + "),请走正式迁移扩展");
             throw new IllegalStateException("备用列池已满(" + EXT_SPARE_COUNT + "/" + EXT_SPARE_COUNT + "),请走正式迁移扩展");
         }
@@ -1829,7 +1858,7 @@ public class PanelConfigService {
         // 「表头列名 → 检验项、命中行该列数据 → 检测标准」带入(见 core/qc/qcInspReqCarry.js),
         // 而该面板新增的「自定义检验要求」页签的列就是这里绑定的动态字段,故绑定即同批登记进
         // 「检验项」标准库 qc.insp_item —— 报告里那个下拉直接选得到(用户口径 2026-10-04)。
-        if (QC_INSP_REQ_PANEL.equals(panelCode)) registerInspItem(label);
+        if (isTabbed(panelCode)) registerInspItem(label);
         registry.reload();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("colName", chosen);
@@ -1854,21 +1883,6 @@ public class PanelConfigService {
         }
         extLog(panelCode, label, col, "retire", null);
         registry.reload();
-    }
-
-    /**
-     * 来料检验要求(QC_INSP_REQ)的页签集 = 物料类别 字段的字典值(数据键即页签名)。
-     * 前端页签条由 qcInspReqConfig.js 定义,这里只作"绑定自定义列时校验页签名"的权威来源
-     * (两者必须一致:词表加值 = 前端配置加页签,见 migrate-qc-insp-req-custom-tab.sql)。
-     */
-    private List<String> qcInspReqTabKeys() {
-        PanelRegistry.PanelDef def = registry.panel(QC_INSP_REQ_PANEL);
-        if (def == null) return List.of();
-        PanelRegistry.FieldDef f = def.byCol("物料类别");
-        if (f == null || f.dictSql() == null) return List.of();
-        List<String> out = new ArrayList<>();
-        for (String opt : dictOptions(f.dictSql())) if (!out.contains(opt)) out.add(opt);
-        return out;
     }
 
     /**

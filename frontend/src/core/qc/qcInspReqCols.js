@@ -21,13 +21,13 @@ import { normCode } from './qcInspReqLookup.js'
 export const EXT_KEY_COL = Object.freeze({ key: '物料编号', w: 140 })
 /** 动态列取不到元数据列宽时的默认宽 */
 export const DEFAULT_EXT_COL_W = 140
-/** 没有归属页签的动态字段(改动前的数据)归这张表 */
-export const CUSTOM_TAB_KEY = '自定义检验要求'
-
-/** 动态字段是否属于该页签(未标注归属的按「自定义检验要求」算,与改动前行为一致) */
+/** 动态字段是否属于该页签(严格按 tab 比)。
+ *  原先那条"没标 tab 就归「自定义检验要求」"的兜底已随该页签下线一并取消 ——
+ *  分页签面板绑定自定义列时**必须**指明所属页签(后端强制),故正常数据都有 tab;
+ *  真没标的(历史脏数据)不属于任何页签,由迁移清理(retire)。 */
 export function extFieldInTab(f, tabKey) {
-  const tab = normCode(f?.tab) || CUSTOM_TAB_KEY
-  return tab === normCode(tabKey)
+  const want = normCode(tabKey)
+  return !!want && normCode(f?.tab) === want
 }
 
 /** 该页签的动态字段(按接口给的顺序 = yj_field.seq 序) */

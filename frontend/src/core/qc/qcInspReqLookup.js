@@ -40,13 +40,18 @@ export function matchReqRowsByMaterial(rows, materialCode) {
 
 /**
  * 匹配行 → 按页签分组(配置序;配置外类别作为 tab=null 的组殿后)。
+ * @param {Array<object>} matched 命中行
+ * @param {Array<object>} [tabs] 页签配置全集 —— **默认** QC_INSP_REQ 的 7 张固定表;
+ *        检验数据记录要同时看两个面板(固定表 + 10 张系列表)⇒ 调用方传全集
+ *        ([...qcInspReqTabs, ...系列面板的 10 个页签])。
  * @returns {Array<{key: string, tab: object|null, rows: Array<object>}>}
  */
-export function reqGroupsOf(matched) {
+export function reqGroupsOf(matched, tabs) {
   const list = Array.isArray(matched) ? matched : []
+  const all = Array.isArray(tabs) && tabs.length ? tabs : qcInspReqTabs
   const groups = []
   const used = new Set()
-  for (const tab of qcInspReqTabs) {
+  for (const tab of all) {
     const rows = list.filter((r) => r && normCode(r['物料类别']) === tab.key).slice().sort(byIdAsc)
     if (rows.length) {
       groups.push({ key: tab.key, tab, rows })
@@ -67,6 +72,6 @@ export function reqTabKeysOf(groups) {
  * 一行到位:全量行 + 物料编码 → 分组结果
  * @returns {Array<{key: string, tab: object|null, rows: Array<object>}>}
  */
-export function lookupReqGroups(rows, materialCode) {
-  return reqGroupsOf(matchReqRowsByMaterial(rows, materialCode))
+export function lookupReqGroups(rows, materialCode, tabs) {
+  return reqGroupsOf(matchReqRowsByMaterial(rows, materialCode), tabs)
 }

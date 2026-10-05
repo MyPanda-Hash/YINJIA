@@ -1756,6 +1756,7 @@ import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import QcInspReqSheet from './QcInspReqSheet.vue'
+import { isQcInspReqPanel } from './qcInspReqConfig'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
@@ -1795,7 +1796,7 @@ const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(pa
  */
 const isProdDocMatrix = computed(() => String(panelCode.value) === 'RD_PROD_DOCLIST')
 // 来料检验要求(品质资料 7 表):档案式特例面板——工具栏/单据卡片/明细表格/页脚全隐,QcInspReqSheet 整体接管
-const isQcInspReq = computed(() => String(panelCode.value) === 'QC_INSP_REQ')
+const isQcInspReq = computed(() => isQcInspReqPanel(panelCode.value))
 /** 产品变更申请单:当前账号可填的纸面部门行(后端按 yj_user.dept_id → yj_change_dept 算,metadata 下发)。
  *  仅 RD_CHANGE 有该键;其它面板拿到空数组也无害(没有 lockKey 的表根本不看它)。 */
 const changeDeptRows = computed(() => cfgCache.value?.metadata?.changeDepts || [])
@@ -5281,8 +5282,7 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
       buttonName,
       formData: payload,
       buttonParam: archiveSaveParam(),
-    })
-    // 旧客户端口径的兜底提示:后端在"既没声明改动行、也没声明整档"时会跳过缺席行软删
+    })    // 旧客户端口径的兜底提示:后端在"既没声明改动行、也没声明整档"时会跳过缺席行软删
     if (res && Number(res['未全量跳过软删']) > 0) {
       ElMessage.warning(tt('当前列表带筛选，本次保存只更新已加载的行，未显示的行不会被删除'))
     }

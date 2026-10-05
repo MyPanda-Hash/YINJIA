@@ -310,6 +310,11 @@ export const menuTree = [
           // 来料检验要求(2026-09-22):《品质资料 2026.09.19.xlsx》折叠棉~PP棉 7 张检验要求表,
           // 档案式整表面板(规格书式页签+Excel 复刻表格,非翻页单据),行按物料类别分流 7 页签
           { code: 'qcInspReq', title: '来料检验要求', path: '/panelx/list/QC_INSP_REQ', icon: 'Grid', panelCode: 'QC_INSP_REQ' },
+          // 来料检验要求(系列)(2026-10-04 用户口径):表太多不再挤在一个面板 ⇒ 拆出 10 张**全自定义**表
+          // (阻垢系列/BK材料系列/除重金属系列/矿化(碱性)系列/抑菌系列/载银系列/炭粉/胶粉/矿化料/原料来料);
+          // 与「来料检验要求」同构:每张表各自加自定义列(每表 20 个扩展位)、可带父字段(分组表头)、
+          // 检验数据记录按物料编码一起带入(只带子字段)。页签集由 物料类别 词典决定,加页签只改词典。
+          { code: 'qcInspReqSeries', title: '来料检验要求(系列)', path: '/panelx/list/QC_INSP_REQ_SERIES', icon: 'Grid', panelCode: 'QC_INSP_REQ_SERIES' },
         ],
       },
       {
