@@ -2341,8 +2341,7 @@ migrate-route-kingdee-fields.sql
 #   (有条件才改);并补这批新字段的 en 译名(多语言强制规范)。幂等;两账套均执行。
 migrate-route-fields-ref.sql
 
-# migrate-route-status-switch.sql(2026-10-05):回退「状态按钮化」,状态改「是否」开关、审核状态回明细列
-#   用户修正口径:上文的"按钮"指**是否连续委外那种开关**;状态字段要保留、审核状态放到**明细**里。
-#   前向回退 migrate-route-status-as-button.sql(未用 git revert:db-migrations.txt 里有另一条任务未提交的登记)。
-#   幂等;两账套均执行。
-migrate-route-status-switch.sql
+# migrate-route-status-restore.sql(2026-10-05):撤回「状态按钮化/开关化」两轮改动(回到 96201e68 字段口径)
+#   用户口径「撤回上面两条对话的修改先」= 撤回 53e9507b 与 715a0c21。目标:状态=文本+表头、审核状态=文本+表头。
+#   前向撤回,未用 git revert(db-migrations.txt 内有另一条任务未提交的登记)。幂等;两账套均执行。
+migrate-route-status-restore.sql
