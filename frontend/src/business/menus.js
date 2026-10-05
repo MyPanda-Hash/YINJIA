@@ -322,6 +322,10 @@ export const menuTree = [
         code: 'process', title: '制程品质', children: [
           { code: 'qcOp', title: '工序质检单', path: '/panelx/list/QC_OP', icon: 'CircleCheck', panelCode: 'QC_OP', operationName: '新增流程' },
           { code: 'qcRecord', title: '检验记录单', path: '/panelx/list/QC_RECORD', icon: 'Document', panelCode: 'QC_RECORD', operationName: '新增流程' },
+          // 三类工序检验单(9.29 批次④,2026-10-05):报工审核自动出单;成型/切炭先按通用模板,组装成品含合格转库存/不合格待处理
+          { code: 'qcMoldInsp', title: '成型检验单', path: '/panelx/list/QC_MOLD_INSP', icon: 'Checked', panelCode: 'QC_MOLD_INSP', operationName: '新增流程' },
+          { code: 'qcCutInsp', title: '切炭检验单', path: '/panelx/list/QC_CUT_INSP', icon: 'Checked', panelCode: 'QC_CUT_INSP', operationName: '新增流程' },
+          { code: 'qcAsmInsp', title: '组装成品检验单', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
         ],
       },
       {

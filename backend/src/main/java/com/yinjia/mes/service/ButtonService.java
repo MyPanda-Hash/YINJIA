@@ -1264,6 +1264,11 @@ public class ButtonService {
         recalcInvCostIfStockDoc(def.code());
         // 工序报工记账(生产过程层):报工单审核 → wo_progress.完成数量 累计
         woReport.post(def.code(), no, currentUserName());
+        // 三类工序检验单(9.29 批次④,2026-10-05):成型/切炭/组装 报工审核 → 各自动生成一张检验单草稿
+        // (三张独立不合并;幂等=同一报工单同一工序只出一张;后续品质填写判定/数量)
+        woInspGenerate(def.code(), no, currentUserName());
+        // 组装成品检验单审核 → 合格数转产成品入库单草稿、不合格数转不良品处理单草稿(待处理)
+        asmInspToStock(def.code(), no, currentUserName());
         // 切炭双出口(已确认):报工审核后,直销数量自动生成成品入库单并审核入账(成品仓)
         dualOutFinishIn(def.code(), no, currentUserName());
         // 生产工单执行回填(参考库 plang_pc:完工入库回写 rk_sl/rk_no、领料回写 ll_no2):
@@ -1323,6 +1328,9 @@ public class ButtonService {
         recalcInvCostIfStockDoc(def.code());
         // 报工冲回(生产过程层):完成数量对称扣减,为负则拒绝
         woReport.unpost(def.code(), no, currentUserName());
+        // 三类工序检验单弃审联动(9.29 批次④):报工弃审 → 关联合格的**草稿**检验单作废+释放占用;
+        // 检验单已审核则拒绝弃审(先弃审检验单),防「报工撤了、检验单还算数」的错位
+        woInspUnauditCascade(def.code(), no, currentUserName());
         // 切炭双出口冲回:弃审报工 → 自动生成红字(负数量)成品入库单冲回台账
         dualOutRedReverse(def.code(), no, currentUserName());
         // 不良品处理冲回(品质层):移仓/报废对称冲回,目标仓被消耗则拒绝
@@ -2317,6 +2325,243 @@ public class ButtonService {
     private static double numOr(Object o) {
         if (o == null || String.valueOf(o).isBlank()) return 0;
         try { return Double.parseDouble(String.valueOf(o)); } catch (NumberFormatException e) { return 0; }
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════════════
+    // 三类工序检验单(9.29 生产管理批次 ④,2026-10-05)
+    //   会议口径:「成型、切断(切炭)、组装报工时各自自动生成一张检验单(三张独立,不合并——格式都不一样)」;
+    //   组装成品检验单功能最全(合格/不合格各一行,合格数转库存、不合格数留系统待处理);
+    //   成型/切炭先按通用模板做触发和流转(品质给格式后替换模板:只改 yj_field/版式,触发链不动)。
+    //   放在 ButtonService 里(private)是沿用本类既有的自动生单范式(dualOutFinishIn / inspAutoPurchaseIn …):
+    //   这些钩子要在**同一次审核事务**里再造单,独立 Service 会与 ButtonService 形成构造器循环依赖。
+    // ══════════════════════════════════════════════════════════════════════════════════
+
+    /** 工序 → 检验单面板(混料/装箱不在本批口径内,不出单) */
+    private static final java.util.Map<String, String> WO_INSP_PANEL = java.util.Map.of(
+            "成型", "QC_MOLD_INSP", "切炭", "QC_CUT_INSP", "组装", "QC_ASM_INSP");
+
+    /** 检验单面板 → 头表名(作废/幂等查重用;取值全是本类常量,无拼接注入面) */
+    private static final java.util.Map<String, String> WO_INSP_HEAD = java.util.Map.of(
+            "QC_MOLD_INSP", "qc_mold_insp_head", "QC_CUT_INSP", "qc_cut_insp_head", "QC_ASM_INSP", "qc_asm_insp_head");
+
+    /**
+     * 报工单审核 → 按工序自动生成检验单草稿(成型/切炭/组装),并写 WO_REPORT→检验单 的占用链。
+     * 幂等:同一报工单 + 同一工序已有存活检验单则跳过(弃审作废后释放,可再次生成)。
+     */
+    private void woInspGenerate(String panelCode, String repNo, String user) {
+        if (!"WO_REPORT".equals(panelCode)) return;
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL(sl,0) AS 报工数量,"
+                        + " ISNULL(scx,N'') AS 生产线, ISNULL([批次号],N'') AS 批次号, ISNULL(wzdm,N'') AS 产品编码,"
+                        + " ISNULL(mc,N'') AS 产品名称, ISNULL(gg,N'') AS 规格型号 FROM dbo.scjl"
+                        + " WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", repNo);
+        for (Map<String, Object> r : rows) {
+            String op = String.valueOf(r.get("工序")).trim();
+            String target = WO_INSP_PANEL.get(op);
+            if (target == null) continue;                                     // 混料/装箱:本批不出检验单
+            Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM " + WO_INSP_HEAD.get(target)
+                    + " WHERE 报工单号=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, repNo);
+            if (dup != null && dup > 0) continue;                              // 幂等
+
+            String line = String.valueOf(r.get("生产线"));
+            String shop = lineShop(line);
+            Map<String, Object> head = new LinkedHashMap<>();
+            head.put("单据日期", LocalDate.now().toString());
+            head.put("工单号", r.get("工单号"));
+            head.put("报工单号", repNo);
+            head.put("工序", op);
+            if (!String.valueOf(r.get("批次号")).isBlank()) head.put("批次号", r.get("批次号"));
+            head.put("产品编码", r.get("产品编码"));
+            head.put("产品名称", r.get("产品名称"));
+            head.put("规格型号", r.get("规格型号"));
+            if (!line.isBlank()) head.put("生产线", line);
+            if (shop != null) head.put("生产车间", shop);
+            head.put("报工数量", r.get("报工数量"));
+            head.put("检验日期", LocalDate.now().toString());
+            head.put("检验员", user);
+
+            List<Map<String, Object>> items = new ArrayList<>();
+            if ("QC_ASM_INSP".equals(target)) {
+                // 组装成品:合格/不合格各一行(会议「录入合格/不合格数量(各一行)」);数量留空由品质填,
+                // 处理方式预置默认(合格→入库、不合格→待处理),人可改
+                items.add(inspLine("成品检验", "合格", "入库"));
+                items.add(inspLine("成品检验", "不合格", "待处理"));
+            } else {
+                // 成型/切炭:通用模板一行(检验项目/标准/实测/判定 由品质填;格式到位后替换模板)
+                items.add(inspLine("外观", null, null));
+            }
+            head.put("detail", Map.of("items", items));
+            Map<String, Object> saved = save(registry.panel(target), head, false);
+            String no = String.valueOf(saved.get("编号"));
+            // 占用链:报工单 → 检验单(源行键=报工单号#scjl.id;弃审时据此作废+释放)
+            jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
+                            + " target_panel_code, target_form_no, link_status, create_by, create_time)"
+                            + " VALUES ('WO_REPORT', ?, ?, ?, ?, 'ACTIVE', ?, GETDATE())",
+                    repNo, repNo + "#" + r.get("id"), target, no, user);
+        }
+    }
+
+    /** 检验单明细行(只放非空键,避免把 null 写进明细) */
+    private Map<String, Object> inspLine(String item, String judge, String disposition) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        if (item != null) m.put("检验项目", item);
+        if (judge != null) m.put("判定", judge);
+        if (disposition != null) m.put("处理方式", disposition);
+        return m;
+    }
+
+    /**
+     * 报工单弃审联动:把该报工生成的检验单**草稿**作废(软删)+ 释放占用链;
+     * 检验单已审核/审批中则拒绝弃审(先弃审检验单)。这就是检验单链路的「可撤回」。
+     */
+    private void woInspUnauditCascade(String panelCode, String repNo, String user) {
+        if (!"WO_REPORT".equals(panelCode)) return;
+        List<Map<String, Object>> links = jdbc.queryForList(
+                "SELECT target_panel_code, target_form_no FROM form_flow_link"
+                        + " WHERE source_panel_code='WO_REPORT' AND source_form_no=?"
+                        + "   AND target_panel_code IN ('QC_MOLD_INSP','QC_CUT_INSP','QC_ASM_INSP')"
+                        + "   AND link_status='ACTIVE'", repNo);
+        for (Map<String, Object> l : links) {
+            String p = String.valueOf(l.get("target_panel_code"));
+            String no = String.valueOf(l.get("target_form_no"));
+            String tbl = WO_INSP_HEAD.get(p);
+            if (tbl == null) continue;
+            String st = String.valueOf(docStatusOf(p, no).get("status"));
+            if (!"草稿".equals(st) && !"修改中".equals(st))
+                throw new IllegalStateException("该报工已生成检验单 " + no + "(" + st + "),不能弃审报工;"
+                        + "请先弃审/作废该检验单");
+            jdbc.update("UPDATE " + tbl + " SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE()"
+                    + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", user, no);
+            jdbc.update("UPDATE " + tbl.replace("_head", "_detail")
+                    + " SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE()"
+                    + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", user, no);
+            jdbc.update("UPDATE form_flow_link SET link_status='RELEASED', release_time=SYSDATETIME()"
+                    + " WHERE target_panel_code=? AND target_form_no=? AND link_status='ACTIVE'", p, no);
+        }
+    }
+
+    /**
+     * 组装成品检验单审核 → 数量分流(会议「合格数转库存、不合格数留系统待处理」):
+     * <ul><li>合格行(判定=合格 或 处理方式=入库)数量 &gt; 0 → 生成**产成品入库单草稿**(FINISH_IN,
+     *   与切炭直销同一落点,留草稿由仓库审核,不自动记账);</li>
+     * <li>不合格行数量 &gt; 0 → 生成**不良品处理单草稿**(QC_DISPOSAL,处置方式=隔离,待品质/仓库处置)。</li></ul>
+     * 幂等:按 form_flow_link(源=检验单号) 判重,下游作废释放后可重新生成。
+     */
+    private void asmInspToStock(String panelCode, String inspNo, String user) {
+        if (!"QC_ASM_INSP".equals(panelCode)) return;
+        Integer linked = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM form_flow_link WHERE source_panel_code='QC_ASM_INSP' AND source_form_no=?"
+                        + " AND target_panel_code='FINISH_IN' AND link_status='ACTIVE'", Integer.class, inspNo);
+        if (linked != null && linked > 0) return;   // 已生成过(重审幂等)
+        List<Map<String, Object>> heads = jdbc.queryForList(
+                "SELECT ISNULL(工单号,N'') AS 工单号, ISNULL(批次号,N'') AS 批次号, ISNULL(产品编码,N'') AS 产品编码,"
+                        + " ISNULL(产品名称,N'') AS 产品名称, ISNULL(规格型号,N'') AS 规格型号,"
+                        + " ISNULL(生产线,N'') AS 生产线 FROM qc_asm_insp_head"
+                        + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", inspNo);
+        if (heads.isEmpty()) throw new IllegalStateException("组装成品检验单不存在:" + inspNo);
+        Map<String, Object> h = heads.get(0);
+        List<Map<String, Object>> lines = jdbc.queryForList(
+                "SELECT ISNULL(判定,N'') AS 判定, ISNULL(数量,0) AS 数量, ISNULL(处理方式,N'') AS 处理方式"
+                        + " FROM qc_asm_insp_detail WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", inspNo);
+        double pass = 0, ng = 0;
+        for (Map<String, Object> r : lines) {
+            double q = numOr(r.get("数量"));
+            if (q <= 0) continue;                                  // 数量空=品质还没填,不生成下游
+            boolean okLine = "合格".equals(String.valueOf(r.get("判定")).trim())
+                    || "入库".equals(String.valueOf(r.get("处理方式")).trim());
+            if (okLine) pass += q; else ng += q;
+        }
+        if (pass <= 0 && ng <= 0) return;                          // 品质没填数量:单据走过而已,不产生下游
+        // 工单侧数据(单位/单价/批号;保留 dualOutFinishIn 的 inline 取仓口径,后续可抽公共方法)
+        String wo = String.valueOf(h.get("工单号"));
+        String unit = null, lot = null;
+        double price = 0;
+        if (!wo.isBlank()) {
+            List<Map<String, Object>> ws = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL(jldw,N'') AS 单位, lot_no AS 批号, ISNULL(dj,0) AS 单价"
+                            + " FROM plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", wo);
+            if (!ws.isEmpty()) {
+                unit = String.valueOf(ws.get(0).get("单位"));
+                lot = ws.get(0).get("批号") == null ? null : String.valueOf(ws.get(0).get("批号"));
+                price = numOr(ws.get(0).get("单价"));
+            }
+        }
+        String batch = String.valueOf(h.get("批次号"));
+        String wh = finishWarehouse();
+        if (pass > 0) {
+            Map<String, Object> line = new LinkedHashMap<>();
+            line.put("产品编码", h.get("产品编码"));
+            line.put("产品名称", h.get("产品名称"));
+            line.put("规格型号", h.get("规格型号"));
+            line.put("实收数量", pass);
+            line.put("单价", price);
+            if (unit != null && !unit.isBlank()) line.put("计量单位", unit);
+            if (lot != null && !lot.isBlank()) line.put("批号", lot);
+            if (!batch.isBlank()) line.put("批次号", batch);
+            line.put("仓库", wh);
+            Map<String, Object> head = new LinkedHashMap<>();
+            head.put("单据日期", LocalDate.now().toString());
+            head.put("仓库", wh);
+            head.put("加工单号", wo);
+            head.put("经手人", user);
+            head.put("备注", "组装成品检验单 " + inspNo + " 合格数转库存");
+            head.put("detail", Map.of("items", List.of(line)));
+            Map<String, Object> saved = save(registry.panel("FINISH_IN"), head, false);
+            String fiNo = String.valueOf(saved.get("编号"));
+            jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
+                            + " target_panel_code, target_form_no, link_status, create_by, create_time)"
+                            + " VALUES ('QC_ASM_INSP', ?, '', 'FINISH_IN', ?, 'ACTIVE', ?, GETDATE())",
+                    inspNo, fiNo, user);
+            // 回执:检验单头记入库单号(列表可直接看到货去哪了)
+            jdbc.update("UPDATE qc_asm_insp_head SET 处理方式=?, asp_user2=?, asp_time2=GETDATE()"
+                    + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", "合格转库存(" + fiNo + ")", user, inspNo);
+        }
+        if (ng > 0) {
+            Map<String, Object> head = new LinkedHashMap<>();
+            head.put("单据日期", LocalDate.now().toString());
+            head.put("来源单号", inspNo);
+            head.put("物料编码", h.get("产品编码"));
+            head.put("物料名称", h.get("产品名称"));
+            if (lot != null && !lot.isBlank()) head.put("批号", lot);
+            head.put("数量", ng);
+            head.put("原仓库", wh);
+            head.put("处置方式", "隔离");                       // 留系统待处理:先进隔离仓,由品质/仓库处置
+            head.put("处置原因", "组装成品检验不合格(检验单 " + inspNo + ")");
+            head.put("经手人", user);
+            Map<String, Object> saved = save(registry.panel("QC_DISPOSAL"), head, false);
+            String blNo = String.valueOf(saved.get("编号"));
+            jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
+                            + " target_panel_code, target_form_no, link_status, create_by, create_time)"
+                            + " VALUES ('QC_ASM_INSP', ?, '', 'QC_DISPOSAL', ?, 'ACTIVE', ?, GETDATE())",
+                    inspNo, blNo, user);
+            jdbc.update("UPDATE qc_asm_insp_head SET 处理方式=?, asp_user2=?, asp_time2=GETDATE()"
+                    + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", "不合格待处理(" + blNo + ")", user, inspNo);
+        }
+    }
+
+    /** 产线 → 所属车间(bs_prod_line.生产车间;线不存在返回 null) */
+    private String lineShop(String line) {
+        if (line == null || line.isBlank()) return null;
+        List<String> s = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL(生产车间,N'') FROM bs_prod_line WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                String.class, line);
+        return s.isEmpty() || s.get(0).isBlank() ? null : s.get(0);
+    }
+
+    /**
+     * 成品仓解析(优先成品类启用仓,无则首个启用仓)—— 口径与 {@link #dualOutFinishIn} 内联实现一致;
+     * 该内联实现保留原样(切炭直销链已在跑,不为重构动它),新代码统一走本方法。
+     */
+    private String finishWarehouse() {
+        List<String> whs = jdbc.queryForList(
+                "SELECT TOP 1 仓库名称 FROM bs_wh WHERE ISNULL(停用,0) = 0 AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " AND (仓库名称 LIKE N'%成品%' OR 仓库分类 LIKE N'%成品%') ORDER BY id", String.class);
+        if (whs.isEmpty()) {
+            whs = jdbc.queryForList(
+                    "SELECT TOP 1 仓库名称 FROM bs_wh WHERE ISNULL(停用,0) = 0 AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id",
+                    String.class);
+        }
+        return whs.isEmpty() ? "成品仓" : whs.get(0);
     }
 
     // ==================== 来料检验单审核 → 自动生成采购入库单(2026-09-15) ====================
