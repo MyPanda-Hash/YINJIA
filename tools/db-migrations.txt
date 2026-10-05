@@ -1101,6 +1101,17 @@ migrate-yjfield-tab-key.sql
 #   ⚠ 2026-10-04 补登记(体检 12 项发现漏登;本脚本已用 DbSync run 在两账套执行并留痕,补登记后 sync 不会重跑)。
 migrate-qc-insp-req-tab-pools.sql
 
+# migrate-qc-insp-req-filecode-basis.sql(2026-10-04):要求表增「文件编码/检验依据」两列 + 检验报告这两项改为不可修改
+#   用户口径:①「检验报告里面的文件编码与检验依据,要靠物料编码来对应填入,并且不可以修改」;
+#            ②「为每个表格(两个面板)都增加这两列在物料编码后面」。
+#   两张要求表(qc_insp_req / qc_insp_req_series)各加 2 列 nvarchar(100) + 列级注明;
+#   yj_field 为两个要求面板各登记这两字段(seq 25/28,紧跟 物料编号);前端两张表的列序也放 物料编号 之后
+#   (固定表在 qcInspReqConfig.js、全自定义表在 qcInspReqCols.js 的 LEAD_COLS)。
+#   检验报告(QC_INSP_REC)的这两项 editable 1→0(纸面只读),值由报告按物料编码带入
+#   (core/qc/qcInspReqCarry.js 的 carryHeadOf:命中行首个非空;要求表没填则保留报告默认 YJ-QR-96 / YJ-Q-30)。
+#   两账套都执行。
+migrate-qc-insp-req-filecode-basis.sql
+
 # —— 2026-09-21 特采申请单(QC_TC):「最终处理结果」字典补第三值「管控使用」 ——
 #   纸面 YJ-QR-60 原图「二．最终处理结果」印的是三个勾选框(正常使用/管控使用/挑选使用),
 #   而 QC_TC 该字段字典只有两值(实测 seq=170)。前端版式随同一提交改为三值
