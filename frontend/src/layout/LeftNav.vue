@@ -313,11 +313,9 @@ const cardColumns = computed(() => {
   const m = cardModule.value
   if (!m) return []
   if (!m.children || !m.children.length) return [{ title: m.title, items: [m] }]
-  if (m.code === 'mfg') {
-    // 生产制造(一级悬停):与生产管理一致的三列——单据 / 明细表 / 统计表
-    const prod = (m.children || []).find((c) => c.code === 'prod')
-    return (prod?.children || []).map((cat) => ({ title: cat.title, items: flattenCardItems(cat.children || [cat]) }))
-  }
+  // 2026-10-14 删除 `m.code === 'mfg'` 特判:生产制造原多包一层空壳二级目录「生产管理」,
+  // 只好在这里"穿"一层才展开出 生产计划/生产执行/… 的分列。该层已在 business/menus.js 拍平
+  // (业务域直接挂在「生产制造」下),生产制造现与 智能供应链/品质管理/基础档案 走同一条通用分支。
   if (m.code === 'rd') {
     // 研发管理:二级目录全是分组 → 以「直接含面板的分组」为列(项目管理/数据记录表/实验室使用记录表/产品文件),
     // 不再像旧结构那样额外拼一列「研发管理」直属叶子(改版后直属叶子为空,会多出一个空列)
