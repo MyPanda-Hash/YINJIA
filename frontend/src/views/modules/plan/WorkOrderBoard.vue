@@ -18,10 +18,10 @@
     <div class="wb-body">
       <!-- 左:各线 未交量(=基础资料生产线档案,含停用) -->
       <div class="wb-left">
-        <div class="wb-left-head">{{ tt('生产车间') }} / {{ tt('生产线') }}</div>
-        <!-- 按车间分组(2026-10-05):分发维度=生产线,但车间是它的归属 —— 分组后"先找车间再找线" -->
+        <div class="wb-left-head">{{ tt('工序/工艺') }} / {{ tt('生产线') }}</div>
+        <!-- 按工序/工艺分组(2026-10-05,依《新系统产线命名.xlsx》):分发维度=生产线,功能分组=成型/切炭/组装 -->
         <template v-for="g in lineGroups" :key="g.车间">
-          <div class="wb-shop-group">{{ g.车间 }}<span class="wb-shop-cnt">{{ g.lines.length }}</span></div>
+          <div class="wb-shop-group">{{ tt(g.车间) }}<span class="wb-shop-cnt">{{ g.lines.length }}</span></div>
           <div v-for="l in g.lines" :key="l.生产线" class="wb-line"
                :class="{ active: sel.line === l.生产线, off: l.停用 }" @click="select(l)">
             <div class="wb-line-name">

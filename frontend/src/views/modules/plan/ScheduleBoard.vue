@@ -7,9 +7,10 @@
     <!-- 顶部参数区 -->
     <div class="sb-params">
       <span class="sb-title">{{ tt('排产参数') }}</span>
-      <!-- 车间优先(2026-10-05):分发维度仍是生产线,但先按车间收敛候选线 —— 车间是产线的属性 -->
-      <span class="sb-p">{{ tt('生产车间') }}
-        <el-select v-model="param.shop" filterable clearable style="width: 160px" :placeholder="tt('全部车间')" @change="param.line = ''">
+      <!-- 工序/工艺优先(2026-10-05,依《新系统产线命名.xlsx》):分发维度仍是生产线,但先按功能(成型/切炭/组装)
+           收敛候选线 —— 装箱归「组装」功能(文件口径),不再按旧的 13 种车间写法 -->
+      <span class="sb-p">{{ tt('工序/工艺') }}
+        <el-select v-model="param.shop" filterable clearable style="width: 160px" :placeholder="tt('全部工序')" @change="param.line = ''">
           <el-option v-for="w in shops" :key="w" :label="w" :value="w" />
         </el-select>
       </span>
@@ -52,7 +53,7 @@
 
     <!-- 车间账号:待排产池仅计划组可见(池内工单未指派产线 ⇒ 无车间判据),此处给出口径提示 -->
     <el-alert v-if="s['待排产池受限']" type="info" :closable="false" show-icon
-              :title="tt('本账号按车间过滤：待排产池仅计划组可见，下方只显示本车间产线的已排工单')" />
+              :title="tt('本账号按工序/工艺过滤：待排产池仅计划组可见，下方只显示本工序产线的已排工单')" />
 
     <!-- ① 待排产池 -->
     <div class="sb-block">
