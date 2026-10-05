@@ -406,7 +406,7 @@ public class ScheduleBoardService {
         Map<String, Object> head;
         try {
             head = jdbc.queryForMap(
-                    "SELECT p.pl_no AS 加工单号, CONVERT(varchar(10), p.pl_date, 120) AS 工单日期,"
+                    "SELECT TOP 1 p.pl_no AS 加工单号, CONVERT(varchar(10), p.pl_date, 120) AS 工单日期,"
                             + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.od_no,N'') AS 客户订单号,"
                             + " p.dm AS 产品编码, ISNULL(p.mc,N'') AS 产品名称, ISNULL(p.gg,N'') AS 规格型号,"
                             + " ISNULL(p.jldw,N'') AS 单位, ISNULL(p.scx,N'') AS 生产线, ISNULL(p.pl_man,N'') AS 操作员,"
@@ -428,10 +428,36 @@ public class ScheduleBoardService {
                             + " LEFT JOIN dbo.dm_kh dk ON dk.comm = p.comm AND dk.dm = p.khdm"
                             + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                             + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
-                            + " WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'", doc);
+                            + " WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                            + " ORDER BY p.pl_xc, p.id", doc);
         } catch (org.springframework.dao.EmptyResultDataAccessException e) {
             throw new IllegalArgumentException("生产工单不存在:" + doc);
         }
+        // 多行工单(同一 pl_no 多订单行/多批次)必须走**汇总口径**(2026-10-05 修):原 queryForMap 在
+        // 多行时抛 "Incorrect result size: expected 1, actual N"(实测 MO-2026-09-0136 = 7 行 → 追溯 500,
+        // 生产工单页「追溯」按钮对多行工单全废)。现:头取首行做产品/客户/日期锚,数量改合计,产线多值时标注。
+        Map<String, Object> agg = jdbc.queryForMap(
+                "SELECT COUNT(*) AS 行数, ISNULL(SUM(ISNULL(pl_sl,0)),0) AS 排产数量,"
+                        + " ISNULL(SUM(ISNULL(xq_sl,0)),0) AS 需求数量, ISNULL(SUM(ISNULL(rk_sl,0)),0) AS 入库数量,"
+                        + " COUNT(DISTINCT NULLIF(ISNULL(scx,N''), N'')) AS 产线数,"
+                        + " MAX(NULLIF(ISNULL(scx,N''), N'')) AS 任一产线,"
+                        + " SUM(CASE WHEN ISNULL(ja,'N') IN (N'T',N'Y') THEN 1 ELSE 0 END) AS 结案行数"
+                        + " FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", doc);
+        head.put("行数", agg.get("行数"));
+        head.put("排产数量", agg.get("排产数量"));
+        head.put("需求数量", agg.get("需求数量"));
+        head.put("入库数量", agg.get("入库数量"));
+        head.put("余量", Num.of(agg.get("需求数量")) - Num.of(agg.get("排产数量")));
+        long lineCnt = (long) Num.of(agg.get("产线数"));
+        if ("".equals(String.valueOf(head.get("生产线"))) && lineCnt > 0) {
+            head.put("生产线", agg.get("任一产线"));   // 首行未排产但同工单其它行已排产:别显示成"未排产"
+        }
+        if (lineCnt > 1) {
+            head.put("生产线", "多产线(" + lineCnt + ")");
+        }
+        boolean allClosed = Num.of(agg.get("结案行数")) >= Num.of(agg.get("行数"));
+        head.put("单据状态", allClosed ? "已结案"
+                : ("".equals(String.valueOf(head.get("生产线"))) ? "未排产" : "已排产"));
 
         // 流转时间线:创建(plang 系统戳) + 按钮留痕(排产/撤销/调线/结案…;面板名含 快速排产/生产工单 两代)
         List<Map<String, Object>> timeline = new ArrayList<>();
@@ -489,6 +515,19 @@ public class ScheduleBoardService {
                         + " WHERE m.[加工单号]=? AND ISNULL(m.asp_cancel,'N')<>'Y'"
                         + " ORDER BY h.[单据编号], m.[id]", doc);
 
+        // 父子工单(切单,9.29 批次① 2026-10-05):本单切出的子单 + 本单的来源父单 —— 追溯「同一产品」
+        List<Map<String, Object>> children = jdbc.queryForList(
+                "SELECT pl_no AS 工单号, pl_xc AS 工单行号, ISNULL([批次号],N'') AS 批次号,"
+                        + " ISNULL(pl_sl,0) AS 排产数量, [拆分序号] AS 拆分序号,"
+                        + " CASE WHEN ISNULL(ja,'N') IN (N'T',N'Y') THEN N'已结案' ELSE N'在产' END AS 状态"
+                        + " FROM dbo.plang WHERE [源工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " ORDER BY ISNULL([拆分序号],0), pl_no", doc);
+        List<Map<String, Object>> parentsOf = jdbc.queryForList(
+                "SELECT TOP 1 p.pl_no AS 工单号, p.pl_xc AS 工单行号, ISNULL(p.pl_sl,0) AS 排产数量,"
+                        + " c.[拆分序号] AS 拆分序号"
+                        + " FROM dbo.plang c JOIN dbo.plang p ON p.id = c.[源工单行id] AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + " WHERE c.pl_no=? AND ISNULL(c.asp_cancel,'N')<>'Y' ORDER BY c.id", doc);
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("头", head);
         out.put("时间线", timeline);
@@ -496,6 +535,8 @@ public class ScheduleBoardService {
         out.put("完工数据", done);
         out.put("入库单据", fins);
         out.put("领料数据", picks);
+        out.put("子工单", children);
+        out.put("父工单", parentsOf);
         return out;
     }
 

@@ -20,6 +20,10 @@
     <div class="wol-btns">
       <el-button size="small" type="success" plain @click="onClose(true)" :disabled="!checked.length">{{ tt('结案') }}</el-button>
       <el-button size="small" type="success" plain @click="onClose(false)" :disabled="!checked.length">{{ tt('取消结案') }}</el-button>
+      <!-- 切单(9.29 生产管理批次①,2026-10-05):勾选一张在产工单 → 输入切出数量 → 子工单(新工单号);
+           撤回切单 = 子单无报工/入库/领料时可还原父单数量(WorkOrderSplitService.split/unsplit) -->
+      <el-button size="small" type="warning" plain @click="openSplit" :disabled="!checked.length && !currentRow">{{ tt('切单') }}</el-button>
+      <el-button size="small" plain @click="onUnsplit" :disabled="!checked.length && !currentRow">{{ tt('撤回切单') }}</el-button>
       <el-dropdown split-button size="small" type="primary" @click="doPrintTask('成型生产任务单')" @command="doPrintTask"
                    :disabled="!checked.length && !currentRow">
         {{ tt('打印工单') }}
@@ -59,6 +63,12 @@
       <el-table-column :label="tt('工单号')" prop="加工单号" width="150" sortable show-overflow-tooltip />
       <el-table-column :label="tt('工单行号')" prop="行号" width="90" sortable />
       <el-table-column :label="tt('批次号')" prop="批次号" width="100" sortable />
+      <el-table-column :label="tt('源工单号')" prop="源工单号" width="140" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.源工单号 || '-' }}</template>
+      </el-table-column>
+      <el-table-column :label="tt('拆分序号')" prop="拆分序号" width="85" align="right">
+        <template #default="{ row }">{{ row.拆分序号 ?? '-' }}</template>
+      </el-table-column>
       <el-table-column :label="tt('工单日期')" prop="单据日期" width="100" sortable />
       <el-table-column :label="tt('转单时间')" prop="转单时间" width="140" sortable show-overflow-tooltip />
       <el-table-column :label="tt('物料编码')" prop="物料编码" width="130" show-overflow-tooltip />
@@ -84,6 +94,30 @@
         </template>
       </el-table-column>
     </el-table>
+
+    <!-- 切单弹窗:可切上限 = 排产数量 − max(已入库, 各工序已完工报工最大值);子单取新工单号 -->
+    <el-dialog v-model="splitVisible" :title="tt('切单')" width="440px" append-to-body>
+      <div v-if="splitInfo" class="wol-split">
+        <div class="wol-split-row"><span>{{ tt('工单号') }}</span><b>{{ splitInfo['工单号'] }}#{{ splitInfo['工单行号'] }}</b></div>
+        <div class="wol-split-row"><span>{{ tt('产品名称') }}</span><span>{{ splitInfo['产品名称'] }} {{ splitInfo['规格型号'] }}</span></div>
+        <div class="wol-split-row"><span>{{ tt('生产线') }}</span><span>{{ splitInfo['生产线'] || '-' }}</span></div>
+        <div class="wol-split-row"><span>{{ tt('排产数量') }}</span><b>{{ num(splitInfo['排产数量']) }}</b></div>
+        <div class="wol-split-row"><span>{{ tt('入库数量') }}</span><span>{{ num(splitInfo['入库数量']) }}</span></div>
+        <div class="wol-split-row"><span>{{ tt('已完工报工') }}</span><span>{{ num(splitInfo['已完工报工']) }}</span></div>
+        <div class="wol-split-row"><span>{{ tt('已切出') }}</span><span>{{ num(splitInfo['已切出数量']) }}</span></div>
+        <div class="wol-split-row hl"><span>{{ tt('可切上限') }}</span><b>{{ num(splitInfo['可切上限']) }}</b></div>
+        <div class="wol-split-row"><span>{{ tt('切出数量') }}</span>
+          <el-input-number v-model="splitQty" :min="0" :max="Number(splitInfo['可切上限']) || 0"
+                           :controls="false" size="small" style="width: 140px" />
+        </div>
+        <el-checkbox v-model="splitInherit">{{ tt('继承产线/班组/交期') }}</el-checkbox>
+        <div class="wol-split-tip">{{ tt('子工单取新工单号,可独立报工、打印;撤回切单可还原父单数量(子单无报工/入库/领料时)') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="splitVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="splitLoading" @click="doSplit">{{ tt('确认切单') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -105,6 +139,12 @@ const stateFilter = ref('')
 const dateFrom = ref('')
 const dateTo = ref('')
 const qText = ref('')
+// 切单(9.29 批次①):弹窗状态 + 预览(可切上限)
+const splitVisible = ref(false)
+const splitLoading = ref(false)
+const splitInfo = ref(null)
+const splitQty = ref(0)
+const splitInherit = ref(true)
 
 const filtered = computed(() => rows.value.filter((r) => {
   if (stateFilter.value === '未完工' && r.生产状态 === '完工') return false
@@ -218,16 +258,85 @@ async function printPick() {
   } catch (e) { err(e, '打印失败') }
 }
 
+/** 切单(9.29 批次①):勾选/当前行必须恰为一张工单 → 后端预览可切上限 → 弹窗输入切出数量 */
+function splitTarget() {
+  const src = checked.value.length ? checked.value : (currentRow.value ? [currentRow.value] : [])
+  if (src.length !== 1) { ElMessage.warning(tt('请先勾选一张工单')); return null }
+  return src[0]
+}
+
+async function openSplit() {
+  const r = splitTarget()
+  if (!r) return
+  try {
+    const res = await request.post('/px/workOrderList/splitPreview', {
+      行id: r.行id, 工单号: r.工单号, 工单行号: r.工单行号, 批次号: r.批次号,
+    })
+    splitInfo.value = res.data || {}
+    splitQty.value = 0
+    splitVisible.value = true
+  } catch (e) { err(e, '切单失败') }
+}
+
+async function doSplit() {
+  if (!splitInfo.value) return
+  const q = Number(splitQty.value) || 0
+  if (q <= 0) { ElMessage.warning(tt('请输入切出数量')); return }
+  try {
+    await ElMessageBox.confirm(
+      `${tt('确认从')} ${splitInfo.value['工单号']} ${tt('切出')} ${num(q)} ${tt('生成子工单')}?`,
+      tt('切单'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
+  } catch { return }
+  splitLoading.value = true
+  try {
+    const res = await request.post('/px/workOrderList/split', {
+      行id: splitInfo.value['行id'], 工单号: splitInfo.value['工单号'], 工单行号: splitInfo.value['工单行号'],
+      批次号: splitInfo.value['批次号'], 切出数量: q, 继承排产: splitInherit.value,
+    })
+    const d = res.data || {}
+    splitVisible.value = false
+    ElMessage.success(`${tt('已生成子工单')} ${d['子工单号']}（${tt('切出')} ${num(d['切出数量'])}）`)
+    load()
+  } catch (e) { err(e, '切单失败') } finally { splitLoading.value = false }
+}
+
+/** 撤回切单:仅「切出来的子工单」可撤回;后端再校验无报工/入库/领料/结案/再切分 */
+async function onUnsplit() {
+  const r = splitTarget()
+  if (!r) return
+  if (!r.源工单号) { ElMessage.warning(tt('该工单不是切出的子工单,无需撤回')); return }
+  try {
+    await ElMessageBox.confirm(
+      `${tt('撤回切单')} ${r.工单号}?${tt('将还原父工单')} ${r.源工单号} ${tt('的数量')}`,
+      tt('撤回切单'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
+  } catch { return }
+  try {
+    const res = await request.post('/px/workOrderList/unsplit', { 行id: r.行id, 工单号: r.工单号 })
+    const d = res.data || {}
+    ElMessage.success(`${tt('已撤回')} ${d['子工单号']}，${tt('父工单')} ${d['父工单号']} ${tt('还原')} ${num(d['还原数量'])}`)
+    load()
+  } catch (e) { err(e, '撤回切单失败') }
+}
+
 function openTrace() {
   const no = currentRow.value?.工单号 || checked.value[0]?.工单号
   if (!no) return
   request.post('/px/scheduleBoard/trace', { 工单号: no }).then((res) => {
+    const d = res.data || {}
+    const h = d['头'] || {}
+    const tl = (d['时间线'] || []).map((x) => `<div>· ${x['时间'] || ''} ${tt(x['步骤'] || '')} ${x['操作人'] || ''}</div>`).join('')
+    const done = (d['完工数据'] || []).map((x) => `<div>· ${x['工序'] || '-'}：${num(x['完成数量'])}</div>`).join('')
+    const kids = (d['子工单'] || []).map((x) => `<div>· ${x['工单号']}#${x['工单行号']}（${tt('切出')} ${num(x['排产数量'])}，${tt(x['状态'])}）</div>`).join('')
+    const par = (d['父工单'] || []).map((x) => `<div>· ${x['工单号']}#${x['工单行号']}（${tt('数量')} ${num(x['排产数量'])}，${tt('拆分序号')} ${x['拆分序号'] ?? '-'}）</div>`).join('')
     ElMessageBox.alert(
       `<b>${tt('工单')}</b> ${no}<br/>
-       <b>${tt('生产线')}</b> ${res.data?.头信息?.生产线 || '-'}<br/>
-       <b>${tt('生产状态')}</b> ${res.data?.头信息?.生产状态 || '-'}<br/>
-       <b>${tt('排产数量')}</b> ${num(res.data?.排产数据?.排产数量)} ｜ <b>${tt('已报工')}</b> ${num(res.data?.完工数据?.已报工)} ｜ <b>${tt('入库数量')}</b> ${num(res.data?.完工数据?.入库数量)}
-       ${res.data?.流转时间线 ? `<hr/><div style="max-height:220px;overflow:auto">${res.data.流转时间线.map((x) => `<div>· ${x.时间 || ''} ${x.事件 || ''}</div>`).join('')}</div>` : ''}`,
+       <b>${tt('生产线')}</b> ${h['生产线'] || '-'}<br/>
+       <b>${tt('单据状态')}</b> ${tt(h['单据状态'] || '') || '-'}<br/>
+       <b>${tt('排产数量')}</b> ${num(h['排产数量'])} ｜ <b>${tt('入库数量')}</b> ${num(h['入库数量'])} ｜ <b>${tt('余量')}</b> ${num(h['余量'])}
+       ${par ? `<hr/><b>${tt('父工单')}</b>${par}` : ''}
+       ${kids ? `<hr/><b>${tt('子工单')}</b>${kids}` : ''}
+       ${done ? `<hr/><b>${tt('完工数据')}</b>${done}` : ''}
+       ${tl ? `<hr/><div style="max-height:200px;overflow:auto">${tl}</div>` : ''}`,
       tt('追溯') + ' — ' + no, { dangerouslyUseHTMLString: true, confirmButtonText: tt('知道了') })
   }).catch((e) => err(e, '查询失败'))
 }
@@ -254,4 +363,9 @@ onMounted(() => { load(); loadLines() })
 .wol-count { margin-left: auto; font-size: 13px; color: #303133; }
 .wol-table { flex: 1; min-height: 0; }
 .wol-closed { color: #f56c6c; font-weight: 600; }
+.wol-split { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.wol-split-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.wol-split-row > span:first-child { color: #909399; }
+.wol-split-row.hl b { color: #e6a23c; font-size: 15px; }
+.wol-split-tip { color: #909399; font-size: 12px; line-height: 1.5; border-top: 1px dashed #ebeef5; padding-top: 8px; }
 </style>

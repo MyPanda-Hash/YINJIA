@@ -2,6 +2,7 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PanelPermissionService;
+import com.yinjia.mes.service.WorkOrderSplitService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,10 +32,12 @@ public class WorkOrderListController {
 
     private final JdbcTemplate jdbc;
     private final PanelPermissionService perm;
+    private final WorkOrderSplitService splitService;
 
-    public WorkOrderListController(JdbcTemplate jdbc, PanelPermissionService perm) {
+    public WorkOrderListController(JdbcTemplate jdbc, PanelPermissionService perm, WorkOrderSplitService splitService) {
         this.jdbc = jdbc;
         this.perm = perm;
+        this.splitService = splitService;
     }
 
     /** 工单行键:公司代码+工单号+工单行号+批次号(plang 行键;批次号=转单日期 yyyyMMdd,同日同批累加) */
@@ -92,6 +95,9 @@ public class WorkOrderListController {
                         + " ISNULL(dk.mc, p.khdm) AS 客户, ISNULL(p.khdm, N'') AS 客户代码,"
                         + " ISNULL(p.scx, N'') AS 生产线,"
                         + " ISNULL(p.[打印人], N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
+                        // 切单父子关联(9.29 批次①,2026-10-05):子单带 源工单号/拆分序号,列表直接可见「由谁切出」
+                        + " ISNULL(p.[源工单号], N'') AS 源工单号, p.[拆分序号] AS 拆分序号,"
+                        + " ISNULL(p.[源工单行id], 0) AS 源工单行id,"
                         + " CASE WHEN p.ja IN (N'T', N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
                         + " p.dm AS 物料编码, ISNULL(p.mc, N'') AS 产品名称, ISNULL(p.gg, N'') AS 规格型号,"
                         + " ISNULL(p.jldw, N'') AS 生产单位,"
@@ -188,6 +194,33 @@ public class WorkOrderListController {
     }
 
     /** 批量调线端点已移除(2026-09-26 用户拍板:生产工单=纯查询+打印,不作为快速排产任务) */
+
+    // ══════════ 工单切单(9.29 生产管理批次 ①,2026-10-05):切出子工单 / 撤回切单 ══════════
+    // 入口=生产工单列表(生产线界面)勾选在产工单;口径与守卫见 WorkOrderSplitService。
+    // 权限:查看+保存词表(与 结案/打印留痕 同级,不新增权限词条)。
+
+    /** 切单预览:返回 可切上限 / 已入库 / 已完工报工 / 已切出,供弹窗限制输入范围 */
+    @PostMapping("/workOrderList/splitPreview")
+    public ApiResult<Map<String, Object>> splitPreview(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        return ApiResult.ok(splitService.preview(body == null ? Map.of() : body));
+    }
+
+    /** 切单:父单核减 + 子单新建(+ 继承排产)+ 占用链拆账 + 双向留痕 */
+    @PostMapping("/workOrderList/split")
+    public ApiResult<Map<String, Object>> split(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        perm.requireButton("MANU_ORDER", "保存");
+        return ApiResult.ok(splitService.split(body == null ? Map.of() : body, currentUser()));
+    }
+
+    /** 撤回切单:子单无下游(无报工/无入库/无领料/未结案/未再切分)才可撤回 */
+    @PostMapping("/workOrderList/unsplit")
+    public ApiResult<Map<String, Object>> unsplit(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        perm.requireButton("MANU_ORDER", "保存");
+        return ApiResult.ok(splitService.unsplit(body == null ? Map.of() : body, currentUser()));
+    }
 
     @SuppressWarnings("unchecked")
     private static List<Map<String, Object>> castRows(Object o) {

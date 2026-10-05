@@ -2255,3 +2255,10 @@ migrate-drop-bom-panels.sql
 #   ⚠ 顺序:先 series 后 drop。两账套都执行。
 migrate-qc-insp-req-series.sql
 migrate-qc-insp-req-drop-custom-tab.sql
+
+# migrate-plang-split-cols.sql(2026-10-05):工单切单(9.29 生产管理批次 ①)——plang 补父子关联三列
+#   源工单号/源工单行id/拆分序号。口径沿用 bd_manu_order 拆单写法(tools/migrate-manu-order-schedule.sql);
+#   增补 源工单行id(=父行 plang.id):同一 pl_no 可有多行(多批次/多订单行),(pl_no+行号+批次号) 不再唯一,
+#   撤回切单必须精确还原到父行。实现 = WorkOrderSplitService(split / unsplit);子单取**新工单号**
+#   (报工工序封顶按 SUM(pl_sl) WHERE pl_no 计算,同号做不到「两单分别报工」验收)。幂等;两账套均执行。
+migrate-plang-split-cols.sql
