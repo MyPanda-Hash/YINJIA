@@ -1,7 +1,7 @@
-# Force-run list for 2026-09-30 incremental deployment (order per manifest)
-# 22 pending migrations, 0 informed reruns (v2 manifest 324 -> current 346 exact diff)
-# Risk notes: migrate-drop-unused-tables physically drops 244 unused tables (explicit guarded
-#   list; GO step [3] takes an automatic pre-deploy backup before running it).
+# Force-run list for 2026-10-04 incremental deployment (order per manifest@346)
+# 22 pending migrations vs the deployed 09-28 v2 package (324->346), 0 informed reruns.
+# NOTE: the stock-flow batch (inh/outh rebuild, 5 scripts) is EXCLUDED by user decision -
+#   this jar (built at 5dda3a34) contains no StockFlowService and pairs with the 346-manifest schema.
 migrate-whloc-whcode.sql
 migrate-material-out-line-no.sql
 migrate-server-parity2-20260928.sql
