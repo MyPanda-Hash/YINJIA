@@ -18,18 +18,21 @@
     <div class="wb-body">
       <!-- 左:各线 未交量(=基础资料生产线档案,含停用) -->
       <div class="wb-left">
-        <div class="wb-left-head">{{ tt('生产线') }}</div>
-        <div v-for="l in lineSummary" :key="l.生产线" class="wb-line"
-             :class="{ active: sel.line === l.生产线, off: l.停用 }" @click="select(l)">
-          <div class="wb-line-name">
-            {{ l.生产线 }}
-            <span v-if="l.停用" class="wb-tag off-line">{{ tt('停用') }}</span>
+        <div class="wb-left-head">{{ tt('生产车间') }} / {{ tt('生产线') }}</div>
+        <!-- 按车间分组(2026-10-05):分发维度=生产线,但车间是它的归属 —— 分组后"先找车间再找线" -->
+        <template v-for="g in lineGroups" :key="g.车间">
+          <div class="wb-shop-group">{{ g.车间 }}<span class="wb-shop-cnt">{{ g.lines.length }}</span></div>
+          <div v-for="l in g.lines" :key="l.生产线" class="wb-line"
+               :class="{ active: sel.line === l.生产线, off: l.停用 }" @click="select(l)">
+            <div class="wb-line-name">
+              {{ l.生产线 }}
+              <span v-if="l.停用" class="wb-tag off-line">{{ tt('停用') }}</span>
+            </div>
+            <div class="wb-line-row">
+              <span class="wb-qty">{{ num(l.未交量) }}</span>
+            </div>
           </div>
-          <div class="wb-line-sub">{{ l.生产车间 }}</div>
-          <div class="wb-line-row">
-            <span class="wb-qty">{{ num(l.未交量) }}</span>
-          </div>
-        </div>
+        </template>
       </div>
 
       <!-- 右:选中线正在运行的工单明细 -->
@@ -287,6 +290,16 @@ function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
 const selQty = computed(() => schedRows.value.reduce((a, r) => a + Number(r.排产数量 || 0), 0))
+/** 左侧按车间分组(2026-10-05):分发维度=生产线,车间是它的归属;未归类的线单独一组 */
+const lineGroups = computed(() => {
+  const m = new Map()
+  for (const l of lineSummary.value) {
+    const k = l.生产车间 || '未归类'
+    if (!m.has(k)) m.set(k, [])
+    m.get(k).push(l)
+  }
+  return [...m.entries()].map(([车间, lines]) => ({ 车间, lines }))
+})
 // 当前账号的车间(9.29 批次③):由 linesSummary 的产线车间反推(账号车间 = 其可见线的车间;不受限账号为多值 → 不显示)
 const shop = computed(() => {
   const set = [...new Set(lineSummary.value.map((l) => l.生产车间).filter(Boolean))]
@@ -479,6 +492,8 @@ onMounted(() => {
 .wb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .wb-ctx { display: flex; align-items: center; gap: 14px; padding: 8px 10px; background: #eef6ff; border: 1px solid #b3d4f5; border-radius: 4px; flex-wrap: wrap; }
 .wb-ctx-label { font-size: 13px; color: #606266; }
+.wb-shop-group { padding: 6px 10px 2px; font-size: 12px; font-weight: 600; color: #116a5b; background: #f5f7fa; display: flex; justify-content: space-between; }
+.wb-shop-cnt { color: #909399; font-weight: 400; }
 .wb-shop { margin-left: 12px; font-size: 12px; color: #e6a23c; font-weight: 600; }
 .wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; }
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }

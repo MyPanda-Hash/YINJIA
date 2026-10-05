@@ -7,9 +7,15 @@
     <!-- 顶部参数区 -->
     <div class="sb-params">
       <span class="sb-title">{{ tt('排产参数') }}</span>
+      <!-- 车间优先(2026-10-05):分发维度仍是生产线,但先按车间收敛候选线 —— 车间是产线的属性 -->
+      <span class="sb-p">{{ tt('生产车间') }}
+        <el-select v-model="param.shop" filterable clearable style="width: 160px" :placeholder="tt('全部车间')" @change="param.line = ''">
+          <el-option v-for="w in shops" :key="w" :label="w" :value="w" />
+        </el-select>
+      </span>
       <span class="sb-p">{{ tt('生产线') }}
         <el-select v-model="param.line" filterable style="width: 220px" :placeholder="tt('选择生产线')">
-          <el-option v-for="l in lines" :key="l.生产线" :value="l.生产线"
+          <el-option v-for="l in pickLines" :key="l.生产线" :value="l.生产线"
                      :label="`${l.生产线} · ${tt('今日负荷')}${num(l.今日负荷)}/${tt('日产能')}${num(l.日产能)}`" />
         </el-select>
       </span>
@@ -133,9 +139,13 @@ const allMode = ref(false)
 const s = ref({})
 const lines = ref([])
 const teams = ref([])
-const param = reactive({ line: '', team: '', start: '', due: new Date().toISOString().slice(0, 10), qty: null })
+const param = reactive({ line: '', team: '', start: '', due: new Date().toISOString().slice(0, 10), qty: null, shop: '' })
 const mode = computed(() => (allMode.value ? 'all' : 'today'))
 const customers = computed(() => [...new Set(pool.value.map((r) => r.客户).filter(Boolean))].sort())
+/** 车间下拉:产线档案里出现过的车间(去重;未归一的取值原样列出,便于现场看清有哪些写法) */
+const shops = computed(() => [...new Set(lines.value.map((l) => l.生产车间).filter(Boolean))].sort())
+/** 车间优先的候选产线:选了车间就只列本车间的线 */
+const pickLines = computed(() => (param.shop ? lines.value.filter((l) => l.生产车间 === param.shop) : lines.value))
 
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '' }
 function urgent(v) {

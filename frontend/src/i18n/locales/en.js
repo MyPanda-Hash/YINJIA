@@ -458,6 +458,9 @@ export default {
     '请选择目标生产线': 'Select a target line',
     // 当前工序/工序进度(9.29 批次① B 项,2026-10-05):工单贯穿制下按报工派生「这单走到哪道工序」
     '当前工序': 'Current Process',
+    // 车间优先派工(2026-10-05):分发维度=生产线,车间是它的归属
+    '全部车间': 'All Workshops',
+    '未归类': 'Unassigned',
     '工序进度': 'Process Progress',
     '混料': 'Mixing',
     '成型': 'Molding',
