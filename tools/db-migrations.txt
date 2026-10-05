@@ -2333,3 +2333,10 @@ migrate-route-head-detail.sql
 #   能对上的沿用现列只改标签(加工方式→工序控制、加工顺序→工序序列、换算率→计划数量换算率、备注→备注1),补 19 列;
 #   旧字段退出表单/明细位(place 改 query)+ 默认路线按图补示例值。幂等;两账套均执行。
 migrate-route-kingdee-fields.sql
+
+# migrate-route-fields-ref.sql(2026-10-05):工艺路线明细行的工序字段改为只能从工序档案(OP)选
+#   用户口径「明细行只能选择工序内的数据」;根因:ROUTE 的 ref_panel/ref_field 本就指向 OP,但上一版迁移把
+#   data_type 统一写成文本 ⇒ 参照退化成手填(对照 DISPATCH.工序编码 = 参照+OP+工序编码/工序名称)。
+#   处置:工序编码/工序名称→参照 OP;工序控制→下拉框(自制/委外);班组→参照 OP.默认车间、操作工→参照 EMP
+#   (有条件才改);并补这批新字段的 en 译名(多语言强制规范)。幂等;两账套均执行。
+migrate-route-fields-ref.sql
