@@ -83,6 +83,17 @@
       <el-table-column :label="tt('领料单号')" prop="领料单号" width="150" show-overflow-tooltip />
       <el-table-column :label="tt('打印人')" prop="打印人" width="90" />
       <el-table-column :label="tt('打印时间')" prop="打印时间" width="140" />
+      <el-table-column :label="tt('当前工序')" width="100" sortable prop="当前工序">
+        <template #default="{ row }">
+          <span :class="{ 'wol-closed': row.当前工序 === '组装' }">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column :label="tt('工序进度')" width="120" align="right">
+        <template #default="{ row }">
+          <span v-if="row.当前工序">{{ num(row.当前工序完工量) }}/{{ num(row.排产数量) }}</span>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" fixed="right">
         <template #default="{ row }">
           <span :class="{ 'wol-closed': row.生产状态 === '完工' }">{{ tt(row.生产状态) }}</span>

@@ -105,6 +105,12 @@ public class WorkOrderListController {
                         + " ISNULL(p.jldw, N'') AS 生产单位,"
                         + " ISNULL(p.pl_sl, 0) AS 排产数量, ISNULL(p.xq_sl, 0) AS 需求数量, ISNULL(p.rk_sl, 0) AS 入库数量,"
                         + " ISNULL(管控.重点管控, N'否') AS 重点管控,"
+                        // 当前工序/工序进度(9.29 批次① B 项,2026-10-05):工单贯穿制下 plang 无工序列,
+                        // 「这单走到哪道工序」由报工派生(视图 v_wo_process_progress) —— 现场问的
+                        // 「这是组装单还是成型单」= 当前工序指针,前端直接显示
+                        + " ISNULL(prg.当前工序, N'') AS 当前工序,"
+                        + " ISNULL(prg.当前工序完工量, 0) AS 当前工序完工量,"
+                        + " ISNULL(prg.完工合计, 0) AS 完工合计,"
                         // 余量(2026-09-28 用户定稿)=订单结转的剩余数量:订单行需求 − 已转出占用
                         // (form_flow_link ACTIVE 占用,与订单结转页「剩余可转」同源;转工单/转采购都占)
                         + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l"
@@ -118,6 +124,8 @@ public class WorkOrderListController {
                         + " LEFT JOIN dbo.dm_kh dk ON dk.comm = p.comm AND dk.dm = p.khdm"
                         + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
+                        // 当前工序/工序进度(视图:按报工派生;见 tools/migrate-wo-process-progress-view.sql)
+                        + " LEFT JOIN dbo.v_wo_process_progress prg ON prg.单号 = p.pl_no"
                         + w + " ORDER BY p.pl_date DESC, p.pl_no, p.pl_xc",
                 args.toArray());
         // 生产状态(与 v_manu_schedule 同口径:完工=入库≥排产;在产=有入库;其余未完工;未排产行=未排产)

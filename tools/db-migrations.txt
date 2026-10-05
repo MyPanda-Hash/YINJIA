@@ -2289,3 +2289,9 @@ migrate-qc-process-insp.sql
 #   谁/何时/从哪单切出多少/生成哪张子单/是否撤回);子单号规则改「原工单号-序号」。
 #   英文列名(parent_wo_id/root_wo_id/wo_seq/split_flag)按 ADR-0001 落成中文列名。幂等;两账套均执行。
 migrate-plang-split-lineage.sql
+
+# migrate-wo-process-progress-view.sql(2026-10-05):工单工序进度视图 v_wo_process_progress
+#   「当前工序/工序进度」派生口径(工单贯穿制:plang 无工序列,工序只存在于报工 scjl.gxdm):
+#   当前工序 = 已完工报工里最靠后的一道(混料→成型→切炭→组装→装箱);工单列表/排产页共用。
+#   幂等(CREATE OR ALTER);两账套均执行。
+migrate-wo-process-progress-view.sql

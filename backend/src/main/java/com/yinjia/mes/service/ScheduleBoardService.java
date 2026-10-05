@@ -444,6 +444,9 @@ public class ScheduleBoardService {
                         + " ISNULL(p.[打印人],N'') AS 打印人, CONVERT(varchar(16), p.[打印时间], 120) AS 打印时间,"
                         + " ISNULL(p.asp_print,0) AS 打印次数,"
                         + " ISNULL(prg.[完成],0) AS 已报工,"
+                        // 当前工序(9.29 批次① B 项):按报工派生 —— 现场问的「这是组装单还是成型单」
+                        + " ISNULL(wpp.当前工序,N'') AS 当前工序,"
+                        + " ISNULL(wpp.当前工序完工量,0) AS 当前工序完工量,"
                         + " ISNULL(p.pl_sl,0) - CASE WHEN ISNULL(p.rk_sl,0) >= ISNULL(prg.[完成],0)"
                         + " THEN ISNULL(p.rk_sl,0) ELSE ISNULL(prg.[完成],0) END AS 未交量,"
                         + " ISNULL(pc.[批次号],N'') AS 批次号"
@@ -456,6 +459,7 @@ public class ScheduleBoardService {
                         + " LEFT JOIN (SELECT gldh AS 单据编号, MAX(s) AS [完成] FROM"
                         + "   (SELECT gldh, SUM(ISNULL(sl,0)) AS s FROM dbo.scjl WHERE ISNULL(asp_cancel,'N')<>'Y'"
                         + "    GROUP BY gldh, gxdm) t GROUP BY gldh) prg ON prg.[单据编号]=p.pl_no"
+                        + " LEFT JOIN dbo.v_wo_process_progress wpp ON wpp.单号 = p.pl_no"
                         + " CROSS APPLY (SELECT CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0)"
                         + "   THEN N'完工' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS [生产状态]) st"
                         + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'') = ?"

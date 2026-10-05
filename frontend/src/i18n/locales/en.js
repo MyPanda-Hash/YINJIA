@@ -456,6 +456,14 @@ export default {
     '已调线': 'Moved',
     '调线失败': 'Move failed',
     '请选择目标生产线': 'Select a target line',
+    // 当前工序/工序进度(9.29 批次① B 项,2026-10-05):工单贯穿制下按报工派生「这单走到哪道工序」
+    '当前工序': 'Current Process',
+    '工序进度': 'Process Progress',
+    '混料': 'Mixing',
+    '成型': 'Molding',
+    '切炭': 'Carbon Cutting',
+    '组装': 'Assembly',
+    '装箱': 'Packing',
     // 排产界面按车间过滤(9.29 生产管理批次③,2026-10-05)
     '当前车间': 'Current Workshop',
     '生产车间': 'Workshop',

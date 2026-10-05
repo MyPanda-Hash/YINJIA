@@ -96,6 +96,9 @@
             <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
             <el-table-column :label="tt('需求数量')" prop="需求数量" width="90" align="right" />
             <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
+            <el-table-column :label="tt('当前工序')" prop="当前工序" width="95" sortable>
+              <template #default="{ row }">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</template>
+            </el-table-column>
             <el-table-column :label="tt('已报工')" prop="已报工" width="85" align="right" />
             <el-table-column :label="tt('未交量')" prop="未交量" width="85" align="right" />
             <el-table-column :label="tt('每箱数量')" prop="每箱数量" width="85" align="right" />
