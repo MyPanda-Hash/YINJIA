@@ -2345,3 +2345,9 @@ migrate-route-fields-ref.sql
 #   用户口径「撤回上面两条对话的修改先」= 撤回 53e9507b 与 715a0c21。目标:状态=文本+表头、审核状态=文本+表头。
 #   前向撤回,未用 git revert(db-migrations.txt 内有另一条任务未提交的登记)。幂等;两账套均执行。
 migrate-route-status-restore.sql
+# migrate-route-status-switch-audit.sql(2026-10-05):工艺路线「状态」=开关(默认开)、「审核状态」=与单据状态联动
+#   用户口径:「当前状态的启用与关闭设置为开关,默认为开」;审核状态是否关联单据状态由我判断 ⇒ 判断为**关联**:
+#   字段保留但只读(yj_field.editable=0 → 前端 readonly)+ 触发器 trg_yj_doc_status_route_audit 跟随
+#   yj_doc_status(shr/archived)同步(纯 SQL,不动 Java;依据:审核按钮=MERGE yj_doc_status 写 shr,弃审清 shr)。
+#   幂等;两账套均执行。
+migrate-route-status-switch-audit.sql
