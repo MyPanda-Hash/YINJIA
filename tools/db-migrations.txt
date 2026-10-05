@@ -2300,3 +2300,9 @@ migrate-wo-process-progress-view.sql
 #   面板不存在的 yj_field 登记一律删除(实测:正式库 1 行 SL_RECV.计量单位 —— 面板已改名 QC_RECV;
 #   测试库另 3 行同类遗留);不动现役面板登记/译名/物理表。幂等;两账套均执行。
 migrate-clean-orphan-sl-recv-field.sql
+
+# migrate-prod-line-function-group.sql(2026-10-05):产线按《新系统产线命名.xlsx》归功能分类
+#   文件口径 = 「工序/工艺 | 生产线」(功能分类,非车间):成型(1~4号车间/自动线1~3 + 1~7号机)、
+#   切炭(切炭1~4)、组装(组装1~2 + 装箱1~2 —— 装箱归组装)。把既有分组列「生产车间」对齐为这三个值
+#   (排产过滤/调拨校验/当前工序都读它);文件未列的 8 条线按同名功能归入。幂等;两账套均执行。
+migrate-prod-line-function-group.sql
