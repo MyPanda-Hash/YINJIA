@@ -34,6 +34,8 @@ const routes = [
       { path: 'prod/plan/workOrderBoard', component: () => import('@/views/modules/plan/WorkOrderBoard.vue'), meta: { title: '工单排产', code: 'workOrderBoard' } },
       // 工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式列表页)
       { path: 'prod/plan/workOrderList', component: () => import('@/views/modules/plan/WorkOrderList.vue'), meta: { title: '工单排产·列表', code: 'workOrderList' } },
+      // 工序任务(路线驱动,A 项 2026-10-05):一道工序一份待加工队列(急单→交期→排序号),可派工;报工回写完成量
+      { path: 'prod/plan/processQueue', component: () => import('@/views/modules/plan/ProcessQueue.vue'), meta: { title: '工序任务', code: 'processQueue' } },
       { path: 'panelx/list/:panelCode', component: PanelxList, meta: { title: '单据', operationName: '新增流程' } },
       { path: 'panelx/form/:panelCode', component: PanelxForm, meta: { title: '表单' } },
       ...flatMenus()

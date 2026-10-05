@@ -26,15 +26,19 @@ public class QuickScheduleService {
     private final QueryService queryService;
     private final ButtonService buttonService;
     private final VoucherFlowService voucherFlow;
+    /** 工序任务(路线驱动,A 项):转工单即按工艺路线生成各工序任务 */
+    private final ProcessTaskService processTask;
 
     public QuickScheduleService(JdbcTemplate jdbc, FormNoService formNo, PanelRegistry registry, QueryService queryService,
-                                ButtonService buttonService, VoucherFlowService voucherFlow) {
+                                ButtonService buttonService, VoucherFlowService voucherFlow,
+                                ProcessTaskService processTask) {
         this.jdbc = jdbc;
         this.formNo = formNo;
         this.registry = registry;
         this.queryService = queryService;
         this.buttonService = buttonService;
         this.voucherFlow = voucherFlow;
+        this.processTask = processTask;
     }
 
     // ────────────────────────── ① 销售订单 → 生产工单(一单可多次生成多张) ──────────────────────────
@@ -131,6 +135,13 @@ public class QuickScheduleService {
                 str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user, batch);
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
                 "PLANG", plNo, plNo + "#" + lineNo + "#" + batch, "");
+        // 工序任务(路线驱动,A 项):按产品的工艺路线(未绑定→默认 GY-CB-STD)生成各工序任务;
+        // 幂等(同工单行同工序已有任务则跳过),失败不阻断转单(任务可事后补生成)
+        try {
+            processTask.generateForWorkOrder(plNo, user);
+        } catch (Exception ignore) {
+            // 生成失败不阻断转工单:可在工序任务页按工单补生成
+        }
         return plNo;
     }
 

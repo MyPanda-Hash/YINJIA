@@ -41,6 +41,8 @@ public class ButtonService {
     private final LotSeqService lotSeqService;
     private final StockLedgerService stockLedger;
     private final WoReportService woReport;
+    /** 工序任务(路线驱动,A 项):报工审核/弃审回写任务完成量与状态 */
+    private final ProcessTaskService processTask;
     private final QcDisposalService qcDisposal;
     private final KingdeePushService kingdeePush;
     private final BatchService batchService;
@@ -59,7 +61,8 @@ public class ButtonService {
                          WoReportService woReport, QcDisposalService qcDisposal,
                          KingdeePushService kingdeePush, BatchService batchService,
                          InvCostService invCost, QcCatalogService qcCatalog,
-                         ManuWritebackService manuWriteback, CalcRuleService calcRuleService) {
+                         ManuWritebackService manuWriteback, CalcRuleService calcRuleService,
+                         ProcessTaskService processTask) {
         this.registry = registry;
         this.queryService = queryService;
         this.formNoService = formNoService;
@@ -76,6 +79,7 @@ public class ButtonService {
         this.qcCatalog = qcCatalog;
         this.manuWriteback = manuWriteback;
         this.calcRuleService = calcRuleService;
+        this.processTask = processTask;
     }
 
     /** 发送业务事件消息(失败不影响业务操作) */
@@ -1264,6 +1268,8 @@ public class ButtonService {
         recalcInvCostIfStockDoc(def.code());
         // 工序报工记账(生产过程层):报工单审核 → wo_progress.完成数量 累计
         woReport.post(def.code(), no, currentUserName());
+        // 工序任务回写(A 项,2026-10-05):报工审核 → 该工单该工序任务的完成量累计 + 状态推进
+        processTask.onReport(def.code(), no, currentUserName());
         // 三类工序检验单(9.29 批次④,2026-10-05):成型/切炭/组装 报工审核 → 各自动生成一张检验单草稿
         // (三张独立不合并;幂等=同一报工单同一工序只出一张;后续品质填写判定/数量)
         woInspGenerate(def.code(), no, currentUserName());
@@ -1328,6 +1334,8 @@ public class ButtonService {
         recalcInvCostIfStockDoc(def.code());
         // 报工冲回(生产过程层):完成数量对称扣减,为负则拒绝
         woReport.unpost(def.code(), no, currentUserName());
+        // 工序任务回退(A 项):报工弃审 → 任务完成量对称回退
+        processTask.onUnreport(def.code(), no, currentUserName());
         // 三类工序检验单弃审联动(9.29 批次④):报工弃审 → 关联合格的**草稿**检验单作废+释放占用;
         // 检验单已审核则拒绝弃审(先弃审检验单),防「报工撤了、检验单还算数」的错位
         woInspUnauditCascade(def.code(), no, currentUserName());
