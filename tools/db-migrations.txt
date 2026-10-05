@@ -2306,3 +2306,8 @@ migrate-clean-orphan-sl-recv-field.sql
 #   切炭(切炭1~4)、组装(组装1~2 + 装箱1~2 —— 装箱归组装)。把既有分组列「生产车间」对齐为这三个值
 #   (排产过滤/调拨校验/当前工序都读它);文件未列的 8 条线按同名功能归入。幂等;两账套均执行。
 migrate-prod-line-function-group.sql
+
+# migrate-prod-line-subgroup.sql(2026-10-05):产线补「产线分组」(还原文件两级分类:成型→烧结/X烧结)
+#   用户指出成型在文件里还分 烧结 / X烧结;上一版只落第 1 级把子组压平。补列 bs_prod_line.产线分组:
+#   烧结=1~4号车间+自动线1~3(7 条)、X烧结=1~7号机(7 条);切炭/组装及文件未列的 8 条线留空。幂等;两账套均执行。
+migrate-prod-line-subgroup.sql
