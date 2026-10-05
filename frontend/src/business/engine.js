@@ -4,18 +4,13 @@ import { unwrap, unwrapStrict, errMsg } from '@core/panel-engine'
 // 通用层函数继续对外导出（保持既有调用方兼容）
 export { unwrap, unwrapStrict, errMsg }
 
-/** 财务字段十进制四舍五入，修正 15.5 * 1.13 = 17.514999... 一类二进制浮点边界。 */
-export function roundDecimal(value, digits = 2) {
-  const number = Number(value)
-  if (!Number.isFinite(number)) return 0
-  const factor = 10 ** digits
-  const scaled = number * factor
-  const tolerance = Number.EPSILON * Math.max(1, Math.abs(scaled)) * 4
-  const rounded = scaled >= 0
-    ? Math.floor(scaled + 0.5 + tolerance)
-    : Math.ceil(scaled - 0.5 - tolerance)
-  return rounded / factor
-}
+/**
+ * 财务字段十进制四舍五入，修正 15.5 * 1.13 = 17.514999... 一类二进制浮点边界。
+ *
+ * 实现落在 `@core/panel/calcRules`(与明细自动计算求值器同处,后端 CalcRuleService.round 逐位对齐);
+ * 这里只是运行时契约(panel-runtime REQUIRED_METHODS)的一站式再导出,不再留第二份实现。
+ */
+export { roundDecimal } from '@core/panel/calcRules'
 
 // 数据访问固定为 SQL 后端：/api/px/* -> Spring Boot -> SQL Server HSDZ_MES（YINJIA-MES）。
 
@@ -467,6 +462,38 @@ export async function batchFlowGenerate(payload) {
 /** 分批送料:按批次号反查(台账 + 上下游 link) */
 export async function batchFlowBatch(batchNo) {
   return unwrap(await request.get('/px/batchFlow/batch', { params: { batchNo } }))
+}
+
+/* ── 采购订单材料码打印(供应商自行打码,2026-10-04):批次号在**打印时**登记并预约该行数量 ── */
+
+/** 打印弹窗取数:订单行(含可打印量)+ 预填批次号(与生单同公式)+ 本订单已有打印记录 */
+export async function puLabelDialog(orderNo) {
+  return unwrap(await request.get('/px/puLabel/dialog', { params: { orderNo } }))
+}
+
+/** 登记打印:**一次可勾多行,服务端每行各出一张打印单**(单号列表见 单据编号列表) */
+export async function puLabelPrint(payload) {
+  return unwrap(await request.post('/px/puLabel/print', payload))
+}
+
+/** 重打:同一张打印单原样再打一遍(只累加 打印次数,不新增预约 —— 一次一行后由它承担"重打不重复占量") */
+export async function puLabelReprint(docNo) {
+  return unwrap(await request.post('/px/puLabel/reprint', { docNo }))
+}
+
+/** 该单据的批次号是否因"来自材料码打印明细"而**不可修改**(含草稿态;前端据此把单头批次号渲染成只读) */
+export async function puLabelBatchLock(panelCode, docNo) {
+  return unwrap(await request.get('/px/puLabel/batchLock', { params: { panelCode, docNo } }))
+}
+
+/** 作废打印记录(软删):预约量立即释放回余量 */
+export async function puLabelVoid(docNo) {
+  return unwrap(await request.post('/px/puLabel/void', { docNo }))
+}
+
+/** 保存「收料超送比例」(生单对话框改动即自动保存):落系统参数 receive_over_ratio,传 0~1 小数 */
+export async function batchFlowSaveOverRatio(overRatio) {
+  return unwrap(await request.post('/px/batchFlow/overRatio', { overRatio }))
 }
 
 

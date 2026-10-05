@@ -1,0 +1,779 @@
+[
+ {
+  "id": "5d1ba24b645c4877a0ce6a22b88c5d5f",
+  "title": "客户详情",
+  "path": "http://api.kingdee.com/jdy/basedata/customer_detail",
+  "ctx": [
+   "| bomentity          | array&lt;[bomentity](# 联系人对象 bomentity)&gt;  | 联系人列表               |",
+   "**联系人对象 bomentity**",
+   "        bomentity: ["
+  ]
+ },
+ {
+  "id": "148823012104453fa9641c8e019044f9",
+  "title": "销售订单详情",
+  "path": "http://api.kingdee.com/jdy/sal/sal_order_detail",
+  "ctx": [
+   "                materialid_bomprice: 0,"
+  ]
+ },
+ {
+  "id": "a6c8ddea37c044838e2c5a662c89519a",
+  "title": "销售退货单详情",
+  "path": "http://api.kingdee.com/jdy/sal/sal_inbound_detail",
+  "ctx": [
+   "                materialid_bomprice: 0,"
+  ]
+ },
+ {
+  "id": "f25dfa25011e4a688a573370bba8295f",
+  "title": "采购申请单详情",
+  "path": "http://api.kingdee.com/jdy/pur/pur_request_detail",
+  "ctx": [
+   "\t\t\t\tbomentity: [],",
+   "\t\t\t\tbomprice: 0,"
+  ]
+ },
+ {
+  "id": "dd7ee492712611eda0b375f5553347df",
+  "title": "基础资料及单据类型",
+  "path": "",
+  "ctx": [
+   "|其他收入单|ar_othercreditbill|Bom单|pmbd_bom||"
+  ]
+ },
+ {
+  "id": "1fecc3b6c2d44d939e158ed14aae7249",
+  "title": "客户列表",
+  "path": "http://api.kingdee.com/jdy/basedata/customer_list",
+  "ctx": [
+   "    bomentity.contactperson:联系人",
+   "    bomentity.mobile:联系电话",
+   "    bomentity.phone:座机",
+   "    bomentity.isdefault_linkman:是否首要联系人"
+  ]
+ },
+ {
+  "id": "8e579dc17d904551a645cf972ecd2a5e",
+  "title": "盘盈单详情",
+  "path": "http://api.kingdee.com/jdy/inv/inv_check_gain_bill_detail",
+  "ctx": [
+   "                materialid_bomprice: 0,"
+  ]
+ },
+ {
+  "id": "2f0f344abb004238a0205da6c7150935",
+  "title": "盘亏单详情",
+  "path": "http://api.kingdee.com/jdy/inv/inv_check_loss_bill_detail",
+  "ctx": [
+   "                materialid_bomprice: 0,"
+  ]
+ },
+ {
+  "id": "5130cf07018845ee99131722227e28c6",
+  "title": "调拨出库单详情",
+  "path": "http://api.kingdee.com/jdy/inv/inv_tfout_detail",
+  "ctx": [
+   "                materialid_bomprice: 0,"
+  ]
+ },
+ {
+  "id": "aca1a92ed257455f8ccd7490c5106445",
+  "title": "采购订单详情",
+  "path": "http://api.kingdee.com/jdy/pur/pur_order_detail",
+  "ctx": [
+   "\t\t\t\tbomentity: [],",
+   "\t\t\t\tbomprice: 0,"
+  ]
+ },
+ {
+  "id": "de66b5e2601b445fab589d9505322360",
+  "title": "盘点单详情",
+  "path": "http://api.kingdee.com/jdy/inv/inv_check_bill_detail",
+  "ctx": [
+   "                materialid_bomprice: 0,"
+  ]
+ },
+ {
+  "id": "aacd5834bd7911ed83eab7f2d9920a51",
+  "title": "销售报价单详情",
+  "path": "https://api.kingdee.com/jdy/sal/sal_quota_detail?access_token=xxx",
+  "ctx": [
+   "                \"materialid_bomprice\": \"0\","
+  ]
+ },
+ {
+  "id": "715ec95ee6e34875b93482512df83fb6",
+  "title": "供应商列表",
+  "path": "http://api.kingdee.com/jdy/basedata/supplier_list",
+  "ctx": [
+   "| bomentity    | Array[bomentity]    | 联系人信息           |",
+   "**bomentity的结构**",
+   "| bomentity    | Array[bomentity]    | 联系人信息           |",
+   "                bomentity: [",
+   "                bomentity: [],",
+   "                bomentity: [],"
+  ]
+ },
+ {
+  "id": "ea388c39daa4446cbace80a6edfc0102",
+  "title": "供应商保存",
+  "path": "http://api.kingdee.com/jdy/basedata/supplier_save",
+  "ctx": [
+   "| bomentity | array&lt;[bomentity](# 联系人对象 bomentity)&gt; | false | 联系人 |",
+   "**联系人对象 bomentity**",
+   "      \tbomentity: [{"
+  ]
+ },
+ {
+  "id": "df369e55a9e34ea0ab28742d3afc6adf",
+  "title": "调拨入库单详情",
+  "path": "http://api.kingdee.com/jdy/inv/inv_tfin_detail",
+  "ctx": [
+   "                materialid_bomprice: 0,"
+  ]
+ },
+ {
+  "id": "ca3a58b1da50455eae2b2aad948b10bb",
+  "title": "供应商详情",
+  "path": "http://api.kingdee.com/jdy/basedata/supplier_detail",
+  "ctx": [
+   "| bomentity | JsonArray    | 联系人     |",
+   "**联系人对象 bomentity**",
+   "        bomentity: [],"
+  ]
+ },
+ {
+  "id": "22e2a373c5f141c196fbdecbd0efeb1f",
+  "title": "移仓单详情",
+  "path": "http://api.kingdee.com/jdy/inv/inv_tfmove_detail",
+  "ctx": [
+   "                materialid_bomprice: 0,"
+  ]
+ },
+ {
+  "id": "a8cf398275d511ed86f75f9d9e0ebadc",
+  "title": "新增发货通知",
+  "path": "https://api.kingdee.com/koas/app007099/api/deliverynotice/create?access_token=xxxxx",
+  "ctx": [
+   "                \"FBatchNo\": \"CustBOM000002\",\r"
+  ]
+ },
+ {
+  "id": "b434666375d511ed86f73588b072beea",
+  "title": "修改发货通知",
+  "path": "https://api.kingdee.com/koas/app007099/api/deliverynotice/update?access_token=xxxxx",
+  "ctx": [
+   "                \"FBatchNo\": \"CustBOM000002\",\r"
+  ]
+ },
+ {
+  "id": "3b3b4b7775dc11ed86f7b90b54725ccc",
+  "title": "查询销售发票(专用)详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesvatinvoice/getdetail?access_token=xxxxx",
+  "ctx": [
+   "                \"FBatchNo\": \"CustBOM000002\",\r",
+   "                \"FBatchNo\": \"CustBOM000002\",\r",
+   "                \"FBatchNo\": \"CustBOM000002\",\r"
+  ]
+ },
+ {
+  "id": "3b42c58875dc11ed86f76f84c746ccca",
+  "title": "批量查询销售发票(专用)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesvatinvoice/list?access_token=xxxxx",
+  "ctx": [
+   "                        \"FBatchNo\": \"CustBOM000002\",\r",
+   "                        \"FBatchNo\": \"CustBOM000002\",\r",
+   "                        \"FBatchNo\": \"CustBOM000002\",\r"
+  ]
+ },
+ {
+  "id": "4d30c49c75dc11ed86f77d5b525b283f",
+  "title": "查询模拟报价单详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedquotation/getdetail?access_token=xxxxx",
+  "ctx": [
+   "|data.Head.FBOMNumber|string|BOM编号|\r",
+   "|data.Head.FCustBOMNo|string|客户物料图号|\r",
+   "            \"FBOMNumber\": \"MNBOM0001\",\r",
+   "            \"FCustBOMNo\": \"\",\r"
+  ]
+ },
+ {
+  "id": "a4ac65e275dc11ed86f73955516d5135",
+  "title": "查询模拟BOM详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/getdetail?access_token=xxxxx",
+  "ctx": [
+   "- 用途说明：查询模拟BOM详情\r",
+   "- 请求地址：https://api.kingdee.com/koas/app007099/api/simulatedbom/getdetail?access_token=xxxxx\r",
+   "POST https://api.kingdee.com/koas/app007099/api/simulatedbom/getdetail?access_token=xxxxx  HTTP/1.1\r",
+   "|data.Head.FBOMNumber|string|BOM编号|\r",
+   "|data.Head.FCustBOMNo|string|客户物料图号|\r",
+   "            \"FBOMNumber\": \"MNBOM0001-0\",\r"
+  ]
+ },
+ {
+  "id": "4d3865bd75dc11ed86f7a7a23ad55580",
+  "title": "批量查询模拟报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedquotation/list?access_token=xxxxx",
+  "ctx": [
+   "|data.List.Head.FBOMNumber|string|BOM编号|\t\t\r",
+   "|data.List.Head.FCustBOMNo|string|客户物料图号|\t\t\r",
+   "                    \"FBOMNumber\": \"MNBOM0001\",\r",
+   "                    \"FCustBOMNo\": \"\",\r"
+  ]
+ },
+ {
+  "id": "88aed8ed75f911ed86f7410b7c36938c",
+  "title": "查询产品入库单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/productreceipt/getdetail?access_token=xxxxx",
+  "ctx": [
+   "|data.Entry.FPPBomEntryID|int32|投料单分录|",
+   "                \"FPPBomEntryID\": 0,"
+  ]
+ },
+ {
+  "id": "88c3c08075f911ed86f72fb9dc769f04",
+  "title": "修改产品入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/productreceipt/update?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FPPBomEntryID|int32|false|投料单分录|\t\t",
+   "                \"FPPBomEntryID\": 0,"
+  ]
+ },
+ {
+  "id": "9aebe26375f911ed86f72515f0d4f894",
+  "title": "批量查询生产领料单",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/list?access_token=xxxxx",
+  "ctx": [
+   "|data.List.Entry.FBomInterID|int32|客户BOM|\t\t",
+   "|data.List.Entry.FPPBomEntryID|int32|投料单分录|\t\t",
+   "                        \"FBomInterID\": 0,",
+   "                        \"FPPBomEntryID\": 1,"
+  ]
+ },
+ {
+  "id": "b194835775f911ed86f7e7a5f5bac78c",
+  "title": "查询调拨单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/stocktransfer/getdetail?access_token=xxxxx",
+  "ctx": [
+   "|data.Entry.FPPBomEntryID|int32|投料单分录|\r",
+   "                FPPBomEntryID: 0,\r"
+  ]
+ },
+ {
+  "id": "3fafa51075fb11ed86f7ad4d1999e6dd",
+  "title": "修改委外订单",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractorder/update?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FBOMInterID|int32|false|BOM编号|\t\t"
+  ]
+ },
+ {
+  "id": "bdecf48c769911ed8582bf67007dda45",
+  "title": "批量查询采购申请单",
+  "path": "https://api.kingdee.com/koas/app007140/api/porequest/list?access_token=xxxxx",
+  "ctx": [
+   "|data.List.Entry.FBomInterID|int32|客户BOM|\t\t\r",
+   "                        \"FBomInterID\": 0,\r"
+  ]
+ },
+ {
+  "id": "211a9c8775d111ed86f76b2ea9765ff4",
+  "title": "新增销售订单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesorder/create?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FBomInterID|int32|false|客户BOM|\t\t",
+   "                \"FBomInterID\": 0,"
+  ]
+ },
+ {
+  "id": "29bd751875d111ed86f713e79e32ae23",
+  "title": "修改销售订单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesorder/update?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FBomInterID|int32|false|客户BOM|\t\t",
+   "                \"FBomInterID\": 0,"
+  ]
+ },
+ {
+  "id": "3b51447a75dc11ed86f77b7692d0cbc3",
+  "title": "修改销售发票(专用)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesvatinvoice/update?access_token=xxxxx",
+  "ctx": [
+   "                \"FBatchNo\": \"CustBOM000002\",\r"
+  ]
+ },
+ {
+  "id": "4d3f6a9e75dc11ed86f755e901dc1393",
+  "title": "新增模拟报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedquotation/create?access_token=xxxxx",
+  "ctx": [
+   "|Object.Head.FBOMNumber|string|false|BOM编号|\t\t\r",
+   "|Object.Head.FCustBOMNo|string|false|客户物料图号|\t\t\r",
+   "            \"FBOMNumber\": \"MNBOM0001\",\r",
+   "            \"FCustBOMNo\": \"\",\r"
+  ]
+ },
+ {
+  "id": "4d46486f75dc11ed86f7c730e8a858d4",
+  "title": "修改模拟报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedquotation/update?access_token=xxxxx",
+  "ctx": [
+   "|Object.Head.FBOMNumber|string|false|BOM编号|\t\t\r",
+   "|Object.Head.FCustBOMNo|string|false|客户物料图号|\t\t\r",
+   "            \"FBOMNumber\": \"MNBOM0001\",\r",
+   "            \"FCustBOMNo\": \"\",\r"
+  ]
+ },
+ {
+  "id": "a4bb811475dc11ed86f70b4e0ee2b671",
+  "title": "新增模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/create?access_token=xxxxx",
+  "ctx": [
+   "- 用途说明：新增模拟BOM单据\r",
+   "- 请求地址：https://api.kingdee.com/koas/app007099/api/simulatedbom/create?access_token=xxxxx\r",
+   "|Object.Head.FBOMNumber|string|true|BOM编号|\t\t\r",
+   "|Object.Head.FCustBOMNo|string|false|客户物料图号|\t\t\r",
+   "POST https://api.kingdee.com/koas/app007099/api/simulatedbom/add?access_token=xxxxx  HTTP/1.1\r",
+   "            \"FBOMNumber\": \"MNBOM0001-0\",\r"
+  ]
+ },
+ {
+  "id": "a4c963c675dc11ed86f769f71858c833",
+  "title": "删除模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/delete?access_token=xxxxx",
+  "ctx": [
+   "- 用途说明：删除模拟BOM单据\r",
+   "- 请求地址：https://api.kingdee.com/koas/app007099/api/simulatedbom/delete?access_token=xxxxx\r",
+   "POST https://api.kingdee.com/koas/app007099/api/simulatedbom/delete?access_token=xxxxx  HTTP/1.1\r"
+  ]
+ },
+ {
+  "id": "9ae63d1275f911ed86f7379e1f5d17f3",
+  "title": "查询生产领料单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/getdetail?access_token=xxxxx",
+  "ctx": [
+   "|data.Entry.FBomInterID|int32|客户BOM|",
+   "|data.Entry.FPPBomEntryID|int32|投料单分录|",
+   "                \"FBomInterID\": 0,",
+   "                \"FPPBomEntryID\": 1,"
+  ]
+ },
+ {
+  "id": "9af1aec475f911ed86f71fa0197cd475",
+  "title": "新增生产领料单",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/create?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FBomInterID|int32|false|客户BOM|\t\t",
+   "|Object.Entry.FPPBomEntryID|int32|false|投料单分录|\t\t",
+   "                \"FBomInterID\": 0,",
+   "                \"FPPBomEntryID\": 1,"
+  ]
+ },
+ {
+  "id": "b19a9dd875f911ed86f755aa7c7ca584",
+  "title": "批量查询调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/stocktransfer/list?access_token=xxxxx",
+  "ctx": [
+   "|data.List.Entry.FPPBomEntryID|int32|投料单分录|     \r",
+   "                        FPPBomEntryID: 0,\r"
+  ]
+ },
+ {
+  "id": "b1a7bd3a75f911ed86f7311fc0d36fe2",
+  "title": "修改调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/stocktransfer/update?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FPPBomEntryID|int32|false|投料单分录|\t\t",
+   "                \"FPPBomEntryID\": 0,"
+  ]
+ },
+ {
+  "id": "b1a0df6975f911ed86f77d59b920b0b0",
+  "title": "新增调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/stocktransfer/create?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FPPBomEntryID|int32|false|投料单分录|\t\t",
+   "                \"FPPBomEntryID\": 0,"
+  ]
+ },
+ {
+  "id": "dd1a85d475fa11ed86f7572abc93d6c1",
+  "title": "查询委外加工入库单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractreceipt/getdetail?access_token=xxxxx",
+  "ctx": [
+   "|data.Entry.FPPBomEntryID|int32|投料单分录|\r",
+   "                FPPBomEntryID: 0,\r"
+  ]
+ },
+ {
+  "id": "dd22c33575fa11ed86f7fd5a8cd337ef",
+  "title": "批量查询委外加工入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractreceipt/list?access_token=xxxxx",
+  "ctx": [
+   "|data.List.Entry.FPPBomEntryID|int32|投料单分录|     \r",
+   "                        FPPBomEntryID: 0,\r"
+  ]
+ },
+ {
+  "id": "bddeeacb769911ed8582ebb26818302d",
+  "title": "查询采购申请单详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/porequest/getdetail?access_token=xxxxx",
+  "ctx": [
+   "|data.Entry.FBomInterID|int32|客户BOM|\r",
+   "                \"FBomInterID\": 0,\r"
+  ]
+ },
+ {
+  "id": "bdf9027e769911ed85825d22920a0a92",
+  "title": "修改采购申请单",
+  "path": "https://api.kingdee.com/koas/app007140/api/porequest/update?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FBomInterID|int32|false|客户BOM|\t\t\r",
+   "                \"FBomInterID\": 0,\r"
+  ]
+ },
+ {
+  "id": "f7b69a6575d011ed86f7ef49934a9073",
+  "title": "查询销售订单详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesorder/getdetail?access_token=xxxxx",
+  "ctx": [
+   "|data.Entry.FBomInterID|int32|客户BOM|\r",
+   "                \"FBomInterID\": 0,\r",
+   "                \"FBomInterID\": 0,\r"
+  ]
+ },
+ {
+  "id": "0467f65675d111ed86f7bf863f481375",
+  "title": "批量查询销售订单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesorder/list?access_token=xxxxx",
+  "ctx": [
+   "|data.List.Entry.FBomInterID|int32|客户BOM|\t\t\r",
+   "                        \"FBomInterID\": 0,\r",
+   "                        \"FBomInterID\": 0,\r"
+  ]
+ },
+ {
+  "id": "3b4a66a975dc11ed86f74784b7df8bc7",
+  "title": "新增销售发票(专用)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesvatinvoice/create?access_token=xxxxx",
+  "ctx": [
+   "                \"FBatchNo\": \"CustBOM000002\",\r"
+  ]
+ },
+ {
+  "id": "a4c1c2a575dc11ed86f7ad05b360b96b",
+  "title": "修改模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/update?access_token=xxxxx",
+  "ctx": [
+   "- 用途说明：修改模拟BOM单据\r",
+   "- 请求地址：https://api.kingdee.com/koas/app007099/api/simulatedbom/update?access_token=xxxxx\r",
+   "|Object.Head.FBOMNumber|string|false|BOM编号|\t\t\r",
+   "|Object.Head.FCustBOMNo|string|false|客户物料图号|\t\t\r",
+   "POST https://api.kingdee.com/koas/app007099/api/simulatedbom/update?access_token=xxxxx  HTTP/1.1\r",
+   "            \"FBOMNumber\": \"MNBOM0001-0\",\r"
+  ]
+ },
+ {
+  "id": "a4b47c3375dc11ed86f759bb43e95c06",
+  "title": "批量查询模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/list?access_token=xxxxx",
+  "ctx": [
+   "- 用途说明：批量查询模拟BOM详情\r",
+   "- 请求地址：https://api.kingdee.com/koas/app007099/api/simulatedbom/list?access_token=xxxxx\r",
+   "POST https://api.kingdee.com/koas/app007099/api/simulatedbom/list?access_token=xxxxx  HTTP/1.1\r",
+   "|data.List.Head.FBOMNumber|string|BOM编号|\t\t\r",
+   "|data.List.Head.FCustBOMNo|string|客户物料图号|\t\t\r",
+   "                    \"FBOMNumber\": \"MNBOM0001-0\",\r"
+  ]
+ },
+ {
+  "id": "88b5b6be75f911ed86f705a7b3fa17db",
+  "title": "批量查询产品入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/productreceipt/list?access_token=xxxxx",
+  "ctx": [
+   "|data.List.Entry.FPPBomEntryID|int32|投料单分录|\t\t",
+   "                        \"FPPBomEntryID\": 0,"
+  ]
+ },
+ {
+  "id": "88bcbb9f75f911ed86f701a489ca01af",
+  "title": "新增产品入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/productreceipt/create?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FPPBomEntryID|int32|false|投料单分录|\t\t",
+   "                \"FPPBomEntryID\": 0,"
+  ]
+ },
+ {
+  "id": "9af976f575f911ed86f75d29068345ae",
+  "title": "修改生产领料单",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/update?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FBomInterID|int32|false|客户BOM|\t\t",
+   "|Object.Entry.FPPBomEntryID|int32|false|投料单分录|\t\t",
+   "                \"FBomInterID\": 0,",
+   "                \"FPPBomEntryID\": 1,"
+  ]
+ },
+ {
+  "id": "3fa2378e75fb11ed86f77b830a388e9c",
+  "title": "批量查询委外订单",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractorder/list?access_token=xxxxx",
+  "ctx": [
+   "|data.List.Entry.FBOMInterID|int32|BOM编号|       \r",
+   "                        FBOMInterID: 1169,\r"
+  ]
+ },
+ {
+  "id": "3fa9b19f75fb11ed86f7e7fd884bf980",
+  "title": "新增委外订单",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractorder/create?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FBOMInterID|int32|false|BOM编号|\t\t"
+  ]
+ },
+ {
+  "id": "bdf2e7fd769911ed85826fc9f8bb94bc",
+  "title": "新增采购申请单",
+  "path": "https://api.kingdee.com/koas/app007140/api/porequest/create?access_token=xxxxx",
+  "ctx": [
+   "|Object.Entry.FBomInterID|int32|false|客户BOM|\t\t\r",
+   "                \"FBomInterID\": 0,\r"
+  ]
+ },
+ {
+  "id": "455317736b5744b4b861ba01b2206032",
+  "title": "商品资料详情",
+  "path": "http://api.kingdee.com/jdy/basedata/material_detail",
+  "ctx": [
+   "**套装明细对象 bomentity**",
+   "| bomaux_id           | String     | 辅助属性id |",
+   "| bomaux_name         | String     | 辅助属性名称                       |",
+   "| bomaux_number      | String     | 辅助属性编码                         |",
+   "        bomentity: [],",
+   "        bomprice: 0,"
+  ]
+ },
+ {
+  "id": "3f9ba7dd75fb11ed86f7db41653c1429",
+  "title": "查询委外订单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractorder/getdetail?access_token=xxxxx",
+  "ctx": [
+   "|data.Entry.FBOMInterID|int32|BOM编号|\r",
+   "                FBOMInterID: 1169,\r"
+  ]
+ },
+ {
+  "id": "774dac6eb08211eeaee3b95748117ca8",
+  "title": "产品查询BOM",
+  "path": "https://api.kingdee.com/jdy/v2/bd/bom_query",
+  "ctx": [
+   "- 用途说明：查询BOM",
+   "- 请求地址：https://api.kingdee.com/jdy/v2/bd/bom_query",
+   "curl --location --request  get 'https://api.kingdee.com/jdy/v2/bd/bom_query?material_id=10&aux_prop_id=10&page=1&page_size=100&search=BOM001' \\",
+   "| id     | string | BOM单ID ",
+   "| number | string | BOM单编号 ",
+   "\t\t\t\t\"number\":\"BOM123\""
+  ]
+ },
+ {
+  "id": "67fd31e275ab11f18fd1eff7c05e0e50",
+  "title": "根据产品查询BOM",
+  "path": "https://api.kingdee.com/jdy/v2/pm/bom",
+  "ctx": [
+   "- 用途说明：根据产品查询BOM",
+   "- 请求地址：https://api.kingdee.com/jdy/v2/pm/bom",
+   "curl --location --request  post 'https://api.kingdee.com/jdy/v2/pm/bom' \\",
+   "| bom_list    | List <bomList> | BOM集合  ",
+   "**bomList**",
+   "| id   | string | BOM集合  "
+  ]
+ },
+ {
+  "id": "78535c9fb08211eeaee31bf4436932c6",
+  "title": "材料分录联动查询",
+  "path": "https://api.kingdee.com/jdy/v2/pm/bom_material",
+  "ctx": [
+   "- 请求地址：https://api.kingdee.com/jdy/v2/pm/bom_material",
+   "| bom_id              | string                   | false | 如果没有值,且材料分录没有值,如果产品配置了BOM会自动带出 ",
+   "| bom_user_define1   | string | false | BOM行备注1                 ",
+   "| bom_user_define2   | string | false | BOM行备注2                 ",
+   "| bom_user_define3   | string | false | BOM行备注3                 ",
+   "curl --location --request  post 'https://api.kingdee.com/jdy/v2/pm/bom_material' \\"
+  ]
+ },
+ {
+  "id": "9c2a2676712511eda0b34535ad178f07",
+  "title": "BOM单详情",
+  "path": "https://api.kingdee.com/jdy/v2/bd/bom_detail",
+  "ctx": [
+   "- 用途说明：获取BOM单详情",
+   "- 请求地址：https://api.kingdee.com/jdy/v2/bd/bom_detail",
+   "curl --location --request  get 'https://api.kingdee.com/jdy/v2/bd/bom_detail?id=1&number=001' \\",
+   "| bom_remark              | string                | BOM备注                                                                                                ",
+   "| id                      | string                | BOM单ID                                                                                               ",
+   "| number                  | string                | BOM单编号                                                                                               "
+  ]
+ },
+ {
+  "id": "9c2c4958712511eda0b361e90d734914",
+  "title": "BOM单列表",
+  "path": "https://api.kingdee.com/jdy/v2/bd/bom",
+  "ctx": [
+   "- 用途说明：获取BOM列表",
+   "- 请求地址：https://api.kingdee.com/jdy/v2/bd/bom",
+   "curl --location --request  get 'https://api.kingdee.com/jdy/v2/bd/bom?end_date=2022-01-01&start_date=2022-01-01&begin_date=2022-02-12&expire_date=2022-02-12&page=1&page_size=100&search=BOM001&un_page=1' \\",
+   "| bom_remark              | string                | BOM备注                       ",
+   "| id                      | string                | BOM单ID                      ",
+   "| number                  | string                | BOM单编号                      "
+  ]
+ },
+ {
+  "id": "9c75ae89712511eda0b36d011d99d638",
+  "title": "商品详情",
+  "path": "https://api.kingdee.com/jdy/v2/bd/material_detail",
+  "ctx": [
+   "| bom_entity                | List <BomEntity>            | 套装信息对象                                                                                               ",
+   "**BomEntity**",
+   "| bom_aux_id       | string                 |  辅助属性id  ",
+   "| bom_aux_name     | string                 |  辅助属性名称  ",
+   "| bom_aux_number   | string                 |  辅助属性编码  ",
+   "\t\t\"bom_entity\":["
+  ]
+ },
+ {
+  "id": "9c76bffa712511eda0b3975a648d9bfe",
+  "title": "商品保存",
+  "path": "https://api.kingdee.com/jdy/v2/bd/material",
+  "ctx": [
+   "| bomentity                 | List <Bomentity>         | false | 套装信息对象                                                                                               ",
+   "**Bomentity**",
+   "\t\"bomentity\":["
+  ]
+ },
+ {
+  "id": "9d9bde86712511eda0b31b0a0f74345b",
+  "title": "生产任务单详情",
+  "path": "https://api.kingdee.com/jdy/v2/pm/mo_taskbill_detail",
+  "ctx": [
+   "| bom_id                | string                   | bomid                                                                                                ",
+   "| bom_number            | string                   | BOM编码                                                                                                ",
+   "| bom_user_define1         | string  | BOM行备注1                        ",
+   "| bom_user_define2         | string  | BOM行备注2                        ",
+   "| bom_user_define3         | string  | BOM行备注3                        ",
+   "\t\t\t\t\"auto_close_time\":\"BOM001\","
+  ]
+ },
+ {
+  "id": "e0bbc1c6a5ec11ee81bfdb1379dbc77d",
+  "title": "生产任务单保存",
+  "path": "https://api.kingdee.com/jdy/v2/pm/mo_task_bill",
+  "ctx": [
+   "| bom_id              | string                   | false | BOM的id，如果sub_material_entity没有值，会根据BOM会自动带出                                                          ",
+   "| bom_user_define1   | string | false | BOM行备注1    ",
+   "| bom_user_define2   | string | false | BOM行备注2    ",
+   "| bom_user_define3   | string | false | BOM行备注3    ",
+   "\t\t\t\"bom_id\":\"1\",",
+   "\t\t\t\t\t\"bom_user_define1\":\"1\","
+  ]
+ },
+ {
+  "id": "8662431ace8a11ef8aeda16428db4d85",
+  "title": "委外加工单保存",
+  "path": "https://api.kingdee.com/jdy/v2/pm/subm_workorder",
+  "ctx": [
+   "| bom_id              | string                    | false | 商品BOM单id,如果没有值,且材料分录没有值,如果产品配置了BOM会自动带出                                                              ",
+   "| bom_user_define1     | string  | false | 物料行备注1                   ",
+   "| bom_user_define2     | string  | false | 物料行备注2                   ",
+   "| bom_user_define3     | string  | false | 物料行备注3                   ",
+   "\t\t\t\"bom_id\":\"1\",",
+   "\t\t\t\t\t\"bom_user_define1\":\"1\","
+  ]
+ },
+ {
+  "id": "9c2b5ef7712511eda0b383902424790b",
+  "title": "BOM单保存",
+  "path": "https://api.kingdee.com/jdy/v2/bd/bom",
+  "ctx": [
+   "- 用途说明：BOM单列表新增及修改。审核、删除等详见[通用操作接口](https://open.jdy.com/#/files/api/detail?index=2&categrayId=3cc8ee9a663e11eda5c84b5d383a2b93&id=9e804b8c712511eda0b39f724d124b07)",
+   "- 请求地址：https://api.kingdee.com/jdy/v2/bd/bom",
+   "| number              | string                | true  | BOM单编号,不传递则由后台生成（不设置有编码规则和更新时必传）                                                                     ",
+   "| bom_remark          | string                | false | BOM备注                                                                                                ",
+   "curl --location --request  post 'https://api.kingdee.com/jdy/v2/bd/bom' \\",
+   "\t\"bom_remark\":\"备注\","
+  ]
+ },
+ {
+  "id": "16a76687d9de11ed8e36e510300a0135",
+  "title": "使用API授权服务",
+  "path": "",
+  "ctx": [
+   "![image.png](https://v7-oss.oss-cn-hangzhou.aliyuncs.com/jdyattachmentimage/10001/picture/banner/77712799-bced-11ef-b1ad-8774890c45cf.png?Expires=1791648005&OSSAccessKeyId=LTAIS4GEFAHOaSdj&Signature=JM712MDZTpyQBOm58gjw1Eg%2Bx5E%3D)"
+  ]
+ },
+ {
+  "id": "575ff859308b11f09806f98400cc9e6a",
+  "title": "委外加工单详情",
+  "path": "https://api.kingdee.com/jdy/v2/pm/subm_workorder_detail",
+  "ctx": [
+   "| bom_id                 | string                    | BOM ID                                                                                               ",
+   "| bom_number             | string                    | BOM 编码                                                                                               ",
+   "\t\t\t\t\"bom_id\":\"1\",",
+   "\t\t\t\t\"bom_number\":\"1\","
+  ]
+ },
+ {
+  "id": "15a9b098691311eca26bfba14cf0473c",
+  "title": "模拟BOM",
+  "path": "",
+  "ctx": [
+   "## 1 查询模拟BOM详情",
+   ">https://api.kingdee.com/koas/app007099/api/simulatedbom/getdetail?access_token=xxxxx",
+   ">查询模拟BOM详情",
+   ">查询模拟BOM详情",
+   "POST https://api.kingdee.com/koas/app007099/api/simulatedbom/getdetail?access_token=xxxxx  HTTP/1.1",
+   "|data.Head.FBOMNumber|string|BOM编号|"
+  ]
+ },
+ {
+  "id": "9c3e23b1712511eda0b389b6992086dd",
+  "title": "客户详情",
+  "path": "https://api.kingdee.com/jdy/v2/bd/customer_detail",
+  "ctx": [
+   "| bomentity              | List <Bomentity> | 联系人对象,联系人列表                                                                                            ",
+   "**Bomentity**",
+   "\t\t\"bomentity\":["
+  ]
+ },
+ {
+  "id": "9ce7353e712511eda0b33789f7afc5d1",
+  "title": "供应商保存",
+  "path": "https://api.kingdee.com/jdy/v2/bd/supplier",
+  "ctx": [
+   "| bom_entity              | List <Bomentity> | false | 联系人对象联系人                                                                                             ",
+   "**Bomentity**",
+   "\t\"bom_entity\":["
+  ]
+ },
+ {
+  "id": "9ce64add712511eda0b35b65ecdbbb68",
+  "title": "供应商详情",
+  "path": "https://api.kingdee.com/jdy/v2/bd/supplier_detail",
+  "ctx": [
+   "| bom_entity          | List <Bomentity>     | 联系人信息                                                                                                ",
+   "**Bomentity**",
+   "\t\t\"bom_entity\":["
+  ]
+ },
+ {
+  "id": "9ce7f88f712511eda0b313592b350ebd",
+  "title": "供应商列表",
+  "path": "https://api.kingdee.com/jdy/v2/bd/supplier",
+  "ctx": [
+   "| bom_entity        | List <Bomentity> | 联系人信息                                                                                                  ",
+   "**Bomentity**",
+   "\t\t\t\t\"bom_entity\":["
+  ]
+ }
+]

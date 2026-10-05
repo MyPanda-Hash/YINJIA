@@ -1,0 +1,14 @@
+﻿=== 迁移预检 @HSDZ_MES_TEST ===
+清单条数        : 372
+库内已登记      : 379
+哈希一致(跳过) : 369
+未登记(新增)   : 3
+内容已变(重跑) : 0
+文件缺失        : 0
+
+--- 未登记,将按新增执行 ---
+  + migrate-restore-inv-cancel-2026-10-03.sql
+  + migrate-inv-required-off-2026-10-03.sql
+  + migrate-qcinsp-header-dept.sql
+
+--- 内容已变,将被重跑(需确认远端是否有意修订) ---

@@ -1,0 +1,12 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-dbs.sql ==
+  | HSDZ_MES | ONLINE | 
+  | HSDZ_MES_CHAIN | ONLINE | 
+  | HSDZ_MES_inspect | ONLINE | 
+  | HSDZ_MES_RESTORE | ONLINE | 
+  | HSDZ_MES_TEST | ONLINE | 
+  | master | ONLINE | 
+  | model | ONLINE | 
+  | msdb | ONLINE | 
+  | tempdb | ONLINE | 
+[OK] _probe-dbs.sql (1 batches)

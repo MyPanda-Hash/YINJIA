@@ -203,12 +203,7 @@
               >
                 <template #default="{ row }">
                   <template v-if="dr.dataType === '参照'">
-                    <span v-if="dr.dataName === '材料编码' && tab.key === 'materials'" class="mat-cell">
-                      <span class="ref-cell" :class="{ disabled: !detailRefEnabled(dr) }" @click="openDetailRef(dr, row, tab, 'click')">{{ drRefText(dr, row) }}</span>
-                      <span v-if="hasSubBom(row[dr.dataName])" class="mat-star" title="该材料有下级子件 BOM，点击行查看">*</span>
-                    </span>
                     <span
-                      v-else
                       class="ref-cell"
                       :class="{ disabled: !detailRefEnabled(dr), 'dblclick-ref': detailRefTrigger(dr) === 'dblclick' }"
                       :title="detailRefTrigger(dr) === 'dblclick' && detailRefEnabled(dr) ? '双击选择存货' : ''"
@@ -349,7 +344,6 @@
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
-    <SubBomDialog v-model="subBomVisible" :material="subBomMaterial" :bom="subBomBom" />
     <ScanFillDialog
       v-model="scanVisible"
       :panel-code="panelCode"
@@ -385,12 +379,13 @@ import { Back, Plus, Delete, ArrowDown, Search } from '@element-plus/icons-vue'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
+import { applyCalcRules } from '@core/panel/calcRules'
+import { sumKeepScale } from '@core/panel/sumTotals'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import ImportDialog from './ImportDialog.vue'
-import SubBomDialog from './SubBomDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 import StdLibManager from './StdLibManager.vue'
 
@@ -430,15 +425,8 @@ const detailDef = ref(null)
 const detailData = reactive({})
 const activeTab = ref('')
 const subActive = reactive({})
-// 产成品明细选中行 → 材料明细联动过滤（显示该产品的 BOM 子件）
+// 产成品明细选中行 → 材料明细联动过滤（材料行按自身 子件BOM 存储值归属，纯本地数据）
 const selectedProduct = ref(null)
-const selectedBomCodes = ref([])
-
-// 材料下级 BOM（红 * + 弹窗）：存货编码 → 物料清单 BOM 面板 children 子件行
-const subBomMap = ref({})
-const subBomVisible = ref(false)
-const subBomMaterial = ref(null)
-const subBomBom = ref([])
 const groups = ref([])
 // ---- 参照字段双模:仅表头(≤20 弹窗,>20 下拉);明细单元格恒为弹窗(参照字段在表格内不走此逻辑) ----
 const refModeMap = reactive({})
@@ -703,13 +691,6 @@ function confirmSelect() {
   if (rows.length && detailDef.value?.tabs?.[0]) {
     const targetTab = detailDef.value.tabs[0]
     detailData[targetTab.key] = rows
-    // BOM 展开：目标单含 materials 明细且带入的是产成品明细 → 逐产品带出 BOM 材料（对齐 T+ 选单/生单联动）
-    if (targetTab.key === 'products' && detailDef.value.tabs.some((t) => t.key === 'materials')) {
-      for (const r of rows) {
-        const code = r['产品编码'] || r['存货编码'] || ''
-        if (code) loadBomFor(code)
-      }
-    }
   }
   selectVisible.value = false
   ElMessage.success('已带入 ' + rows.length + ' 行明细')
@@ -889,9 +870,6 @@ async function onRefConfirm(rows) {
         rillRow(nr, rows[i])
       }
     }
-    if (tab?.key === 'products' && r.dataName === '产品编码') {
-      for (const selected of rows) loadBomFor(selected[refField])
-    }
     await engine.fillCurrentStock(changedRows)
   }
   refVisible.value = false
@@ -906,16 +884,12 @@ function rmtTime(t) {
   return s.length > 10 ? s.slice(0, 19).replace('T', ' ') : s
 }
 
-// 明细数据：材料明细在选中产成品时只显示其 BOM 子件（子件BOM=产品编码）
+// 明细数据：材料明细在选中产成品时只显示归属于该产成品的行（按材料行自身 子件BOM=产品编码 的存储值）
 function tabData(tab) {
   const rows = detailData[tab.key] || []
   if (tab.key === 'materials' && selectedProduct.value) {
-    // 优先按 子件BOM 标记精确过滤（回填/自动带出的材料行带 子件BOM=产品编码）；
-    // 兜底按该产品存货 BOM 的材料编码过滤（旧手工行无标记时）
     const byBom = rows.filter((m) => m['子件BOM'] === selectedProduct.value)
     if (byBom.length) return byBom
-    const byCode = rows.filter((m) => selectedBomCodes.value.includes(m['材料编码']))
-    if (byCode.length) return byCode
     return rows
   }
   return rows
@@ -925,7 +899,7 @@ function prodRowCls({ row }) {
   return selectedProduct.value && row['产品编码'] === selectedProduct.value ? 'prod-selected' : ''
 }
 
-// 捕获阶段监听：点产成品明细行触发联动；点材料明细行（该材料有下级 BOM）弹出子件 BOM
+// 捕获阶段监听：点产成品明细行触发联动（材料明细按 子件BOM 存储值过滤）
 async function onTableClickCapture(tab, e) {
   if (!e || !e.target || !e.target.closest) return
   const tr = e.target.closest('tr')
@@ -934,56 +908,10 @@ async function onTableClickCapture(tab, e) {
   const body = tr.closest('.el-table__body-wrapper') || tr.closest('.el-table__fixed-body-wrapper')
   const rows = body ? [...body.querySelectorAll('tbody tr')] : []
   const idx = rows.indexOf(tr)
-  // 材料明细：点材料行 → 该材料有下级 BOM 则弹窗展示（拦截参照/其他点击），无下级放行
-  if (tab.key === 'materials') {
-    const row = (detailData['materials'] || [])[idx]
-    if (row && row['材料编码'] && hasSubBom(row['材料编码'])) {
-      openSubBom(row)
-      if (e.stopPropagation) e.stopPropagation()
-    }
-    return
-  }
   if (tab.key !== 'products') return
   const row = (detailData['products'] || [])[idx]
   if (!row || !row['产品编码']) return
   selectProduct(row['产品编码'])
-}
-
-// 材料下级 BOM 映射（BOM 面板 children：父件编码 → 子件行）；加载后材料编码行右上角显示红 *，点击行弹窗查看
-async function loadSubBomMap() {
-  try {
-    const res = await engine.queryFormDataList({ panelCode: 'BOM', condition: {}, pageNo: 1, pageSize: 100 })
-    const map = {}
-    for (const d of res.list || []) {
-      for (const it of (d.detail && d.detail.children) || []) {
-        if (!String(it['子件编码'] || '').trim()) continue // 锚点行不参与
-        const parent = it['父件编码']
-        if (!parent) continue
-        if (!map[parent]) map[parent] = []
-        map[parent].push({
-          材料编码: it['子件编码'],
-          材料名称: it['子件名称'],
-          规格型号: it['规格型号'] || '',
-          计量单位: it['子件计量单位'] || '件',
-          定额需用数量: it['定额数量'] ?? 0,
-          '损耗率%': it['损耗率%'] ?? 0,
-        })
-      }
-    }
-    subBomMap.value = map
-  } catch (err) {}
-}
-
-function hasSubBom(code) {
-  const b = subBomMap.value[code]
-  return Array.isArray(b) && b.length > 0
-}
-
-function openSubBom(row) {
-  const code = row['材料编码']
-  subBomMaterial.value = row
-  subBomBom.value = (subBomMap.value[code] || []).map((r) => ({ ...r }))
-  subBomVisible.value = true
 }
 
 // row-click 兜底：普通单元格点击走此路径（控件内点击被 el-select 等吞掉时由捕获阶段补上）
@@ -993,23 +921,9 @@ function onRowClickDetail(tab, row) {
   }
 }
 
-// 选中产成品：行高亮 + 材料明细只显示该产品的 BOM 子件（物料清单 BOM 面板 children → 子件编码集合；2026-08-25 原 INV _bom 已迁移）
-async function selectProduct(code) {
+// 选中产成品：行高亮 + 材料明细按自身 子件BOM=产品编码 的存储值过滤（纯本地数据,无外部取数）
+function selectProduct(code) {
   selectedProduct.value = code
-  selectedBomCodes.value = []
-  try {
-    const res = await engine.queryFormDataList({ panelCode: 'BOM', condition: {}, pageNo: 1, pageSize: 200 })
-    const codes = []
-    for (const d of res.list || []) {
-      for (const it of (d.detail && d.detail.children) || []) {
-        if (String(it['父件编码']) !== code) continue
-        if (it['子件编码']) codes.push(String(it['子件编码']))
-      }
-    }
-    selectedBomCodes.value = codes
-  } catch (err) {
-    // 查询失败按 子件BOM 标记兜底
-  }
 }
 
 function tabHint(tab) {
@@ -1051,42 +965,6 @@ function num(v) {
   return Number.isFinite(n) ? n : 0
 }
 
-function evaluateExpr(expr, vars) {
-  const tokens = String(expr).match(/\d+(?:\.\d+)?|[+\-*/()]|[^\s+\-*/()]+/g) || []
-  const output = []
-  const ops = []
-  const prec = { '+': 1, '-': 1, '*': 2, '/': 2 }
-  for (const tk of tokens) {
-    if (/^[\d.]+$/.test(tk)) {
-      output.push(parseFloat(tk))
-    } else if (tk in prec) {
-      while (ops.length && ops[ops.length - 1] !== '(' && prec[ops[ops.length - 1]] >= prec[tk]) output.push(ops.pop())
-      ops.push(tk)
-    } else if (tk === '(') {
-      ops.push(tk)
-    } else if (tk === ')') {
-      while (ops.length && ops[ops.length - 1] !== '(') output.push(ops.pop())
-      if (ops[ops.length - 1] === '(') ops.pop()
-    } else {
-      const v = vars[tk]
-      if (v === undefined) throw new Error('未知变量: ' + tk)
-      output.push(num(v))
-    }
-  }
-  while (ops.length) output.push(ops.pop())
-  const stack = []
-  for (const t of output) {
-    if (typeof t === 'number') stack.push(t)
-    else {
-      const b = stack.pop()
-      const a = stack.pop()
-      if (a === undefined || b === undefined) return 0
-      stack.push(t === '+' ? a + b : t === '-' ? a - b : t === '*' ? a * b : b === 0 ? 0 : a / b)
-    }
-  }
-  return stack[0] ?? 0
-}
-
 function productQty(data = detailData) {
   const rows = data.products || []
   return rows.reduce((s, r) => s + num(r['数量']), 0)
@@ -1095,35 +973,23 @@ function productQty(data = detailData) {
 function applyCalc(data = detailData) {
   for (const tab of tabs.value) {
     const rows = data[tab.key] || []
+    // 「产品数量」= 产成品明细的合计数量,是这些公式的额外变量(不写回行)
+    const extraVars = { 产品数量: productQty(data) }
     for (const row of rows) {
       if (tab.key === 'processes') {
         row['工序行码'] = `GX${String(num(row['加工顺序']) || rows.indexOf(row) + 1).padStart(3, '0')}`
       }
-      const vars = { ...row, 产品数量: productQty(data) }
-      for (const rule of tab.calc || []) {
-        let v
-        try {
-          v = evaluateExpr(rule.formula, vars)
-        } catch (e) {
-          v = 0
-        }
-        if (rule.round != null) v = engine.roundDecimal(v, rule.round)
-        if (row[rule.target] !== v) row[rule.target] = v
-        vars[rule.target] = v
-      }
+      // 求值口径统一在 @core/panel/calcRules(与后端 CalcRuleService 同一份规则、同一个守卫)
+      applyCalcRules(tab.calc, row, extraVars)
     }
   }
 }
 
 watch(detailData, applyCalc, { deep: true })
 
-// ---------- BOM 联动：产成品明细选产品 → 从存货面板（INV）BOM 子表带出材料明细 ----------
-const bomLoaded = new Set()
+// ---------- 明细字段联动 ----------
 
 async function onDetailChange(dr, row, tab) {
-  if (tab && tab.key === 'products' && dr.dataName === '产品编码') {
-    loadBomFor(row[dr.dataName])
-  }
   if (['存货编码', '存货名称', '产品编码', '产品名称', '材料编码', '材料名称', '仓库', '预出仓库', '出库仓库'].includes(dr.dataName)) {
     try { await engine.fillCurrentStock(row) } catch (error) { ElMessage.error(engine.errMsg(error) || '现存量刷新失败') }
   }
@@ -1138,75 +1004,15 @@ async function refreshTabCurrentStock(tab) {
   }
 }
 
-function bomRowFrom(b, code) {
-  const matTab = tabs.value.find((t) => t.key === 'materials')
-  const row = {}
-  for (const dr of (matTab ? matTab.fields : [])) {
-    if (dr.dataType === '小数' || dr.dataType === '整数') row[dr.dataName] = dr.defaultValue ?? 0
-    else if (dr.dataType === '是否') row[dr.dataName] = dr.defaultValue ?? false
-    else row[dr.dataName] = dr.defaultValue ?? ''
-  }
-  row['材料编码'] = b['材料编码'] || ''
-  row['材料名称'] = b['材料名称'] || ''
-  row['规格型号'] = b['规格型号'] || ''
-  row['计量单位'] = b['计量单位'] || 'kg'
-  row['定额需用数量'] = b['定额需用数量'] ?? 0
-  row['损耗率%'] = b['损耗率%'] ?? 0
-  row['子件BOM'] = code // BOM 关系：本材料属于哪个产成品
-  return row
-}
-
-/** BOM 自动展开：面板含 products+materials 明细、产品明细有行而材料明细为空时，按产品 BOM 带出材料 */
-async function autoExpandBom() {
-  const tabsDef = tabs.value || []
-  if (!tabsDef.some((t) => t.key === 'products') || !tabsDef.some((t) => t.key === 'materials')) return
-  const products = detailData['products'] || []
-  const mats = detailData['materials'] || []
-  if (!products.length || mats.length) return
-  for (const p of products) {
-    const code = p['产品编码'] || p['存货编码'] || ''
-    if (code) await loadBomFor(code)
-  }
-}
-
-async function loadBomFor(code) {
-  if (!code || bomLoaded.has(code)) return
-  bomLoaded.add(code)
-  try {
-    // BOM 数据源：物料清单 BOM 面板 children（父件编码 → 子件行；2026-08-25 原 INV 物品行 _bom 已迁移废弃）
-    const res = await engine.queryFormDataList({ panelCode: 'BOM', condition: {}, pageNo: 1, pageSize: 100 })
-    const bom = []
-    for (const d of res.list || []) {
-      for (const it of (d.detail && d.detail.children) || []) {
-        if (!String(it['子件编码'] || '').trim()) continue // 锚点行不参与
-        if (String(it['父件编码']) !== code) continue
-        bom.push({
-          材料编码: it['子件编码'],
-          材料名称: it['子件名称'],
-          规格型号: it['规格型号'] || '',
-          计量单位: it['子件计量单位'] || '件',
-          定额需用数量: it['定额数量'] ?? 0,
-          '损耗率%': it['损耗率%'] ?? 0,
-        })
-      }
-    }
-    if (!bom.length) return
-    const mats = detailData['materials'] || (detailData['materials'] = [])
-    for (const b of bom) mats.push(bomRowFrom(b, code))
-    ElMessage.success('已按 BOM 带入 ' + bom.length + ' 行材料（' + code + '）')
-  } catch (e) {
-    // 无 BOM 或查询失败不阻塞录入
-  }
-}
-
 // ---------- 汇总 ----------
 
 function summaryRows(tab) {
   const items = tab.summaryItems || []
   const rows = detailData[tab.key] || []
   return items.map((it) => {
-    const v = rows.reduce((s, r) => s + num(r[it.field]), 0)
-    return { label: it.label, value: Math.round(v * 100) / 100 }
+    // 汇总值位数跟明细走(2026-10-03:原先恒 2 位,明细 decimal(18,4) 的 4 位被砍)
+    const v = sumKeepScale(rows.map((r) => r[it.field])) ?? 0
+    return { label: it.label, value: v }
   })
 }
 
@@ -1224,7 +1030,8 @@ function summarize({ columns }, tab) {
     }
     const field = (tab.fields || []).find((r) => r.dataName === label)
     if (field && (field.dataType === '小数' || field.dataType === '整数')) {
-      sums.push(Math.round(rows.reduce((s, r) => s + num(r[label]), 0) * 100) / 100)
+      // 位数跟本列明细走(decimal(18,4) 的明细不再被合计砍成 2 位,见 @core/panel/sumTotals)
+      sums.push(sumKeepScale(rows.map((r) => r[label])) ?? 0)
     } else {
       sums.push('')
     }
@@ -1282,10 +1089,6 @@ async function load() {
     applyCalc()
     // 产成品→材料联动：默认不选中（点击产成品明细行才过滤材料明细），加载后重置
     selectedProduct.value = null
-    selectedBomCodes.value = []
-    // BOM 自动展开：草稿单已有产品明细但材料明细为空时，按产品 BOM 带出材料
-    // （覆盖列表页选单生成、推式生单、历史草稿等所有入口；材料非空不重复展开）
-    autoExpandBom()
     // 页签标题 = 面板名-单据号（新单显示 面板名-新增），便于多单据区分（弹窗嵌入模式跳过）
     if (!props.embedded) {
       const no = isEdit.value ? (form['单据编号'] || form['锭号'] || form['编号'] || '') : '新增'
@@ -1599,8 +1402,6 @@ function onSelGenerated(generated) {
 
 onMounted(() => {
   load()
-  // 材料下级 BOM 映射（红 * 标记 + 点击行弹窗）
-  loadSubBomMap()
 })
 
 // keep-alive 切离时关闭所有弹窗（防止 append-to-body 弹窗在路由切换后残留）
@@ -1793,22 +1594,6 @@ watch(() => [panelCode.value, code.value], () => {
 }
 .prod-selected {
   background: #eef4ff !important;
-}
-.mat-cell {
-  position: relative;
-  display: inline-block;
-  width: 100%;
-}
-.mat-star {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  color: #e60000;
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  user-select: none;
 }
 .filter-hint {
   font-size: 12px;

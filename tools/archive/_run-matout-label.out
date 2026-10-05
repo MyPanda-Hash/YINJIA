@@ -1,0 +1,35 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 226
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== migrate-material-out-label-cleanup.sql ==
+  | 转ERP操作人 | 转ERP操作人 | 0 | 
+  | 转ERP时间 | 转ERP时间 | 0 | 
+  | 是否已转ERP | 是否已转ERP | 0 | 
+  | 部门id | 部门id | 1 | 
+  | 商品id | 商品id | 1 | 
+  | 创建人id | 创建人id | 1 | 
+  | 仓库id | 仓库id | 1 | 
+  | 修改人id | 修改人id | 1 | 
+  | 仓位id | 仓位id | 1 | 
+  | 辅助属性id | 辅助属性id | 1 | 
+  | 单据类型id | 单据类型id | 1 | 
+  | 审核人id | 审核人id | 1 | 
+  | 辅助属性1id | 辅助属性1id | 1 | 
+  | 经手人id | 经手人id | 1 | 
+  | 辅助属性2id | 辅助属性2id | 1 | 
+  | 领料用途id | 领料用途id | 1 | 
+  | 辅助属性3id | 辅助属性3id | 1 | 
+  | 序列号流转ID | 序列号流转ID | 1 | 
+  | 基本单位id | 基本单位id | 1 | 
+  | 单位id | 单位id | 1 | 
+  | 辅助单位id | 辅助单位id | 1 | 
+  | 源单类型id | 源单类型id | 1 | 
+  | 源单内部id | 源单内部id | 1 | 
+  | 源单分录id | 源单分录id | 1 | 
+  | 源单产品分录id | 源单产品分录id | 1 | 
+[SQL FAIL] [matout-label] �Լ�ʧ��:���� 25 ����Ӣ���ӱ�ǩ(Ӧ 0)

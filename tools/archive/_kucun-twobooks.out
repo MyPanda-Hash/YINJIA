@@ -1,0 +1,22 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:32 字符: 142
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-kucun-twobooks.sql ==
+  | 7010.0 | 38076.0000 | 36 | 92 | 2 | 10 | 
+  | 9 | 16 | 77 | 
+  | CK04 | 半成品仓 | 13540.0000 | 15 | 
+  | CK00005 | 原料不良品仓 | 6000.0000 | 1 | 
+  | CK03 | 成品仓 | 5438.0000 | 14 | 
+  | CK02 | 辅料仓 | 3708.0000 | 14 | 
+  | CK00001 | 正品仓 | 130.0000 | 2 | 
+  | CK05 | 不良品仓 | -1604.0000 | 14 | 
+  | CK01 | 原料仓 | -4019.0000 | 12 | 
+  | CP-02 | 成品B仓 | -4927.0000 | 8 | 
+  | STOCK_STATUS | 库存状况 | 报表 | null | 
+  | 0 | 
+[SQL FAIL] ���� 'can_view' ��Ч��

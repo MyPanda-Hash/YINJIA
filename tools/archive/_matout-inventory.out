@@ -1,0 +1,60 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 211
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-inventory.sql ==
+  | C | bd_material_out | asp_cancel | 
+  | C | bd_material_out | asp_time1 | 
+  | C | bd_material_out | asp_time2 | 
+  | C | bd_material_out | asp_user1 | 
+  | C | bd_material_out | asp_user2 | 
+  | C | bd_material_out | id | 
+  | C | bd_material_out | 备注 | 
+  | C | bd_material_out | 仓库 | 
+  | C | bd_material_out | 出库类别 | 
+  | C | bd_material_out | 单据编号 | 
+  | C | bd_material_out | 单据日期 | 
+  | C | bd_material_out | 单据状态 | 
+  | C | bd_material_out | 加工单号 | 
+  | C | bd_material_out | 来源单号 | 
+  | C | bd_material_out | 来源单据 | 
+  | C | bd_material_out | 领用人 | 
+  | C | bd_material_out | 匹配来源单号 | 
+  | C | bd_material_out | 审核人 | 
+  | C | bd_material_out | 审核时间 | 
+  | C | bd_material_out | 审批人 | 
+  | C | bd_material_out | 审批时间 | 
+  | C | bd_material_out | 生产车间 | 
+  | C | bd_material_out | 项目 | 
+  | C | bd_material_out | 销售订单号 | 
+  | C | bd_material_out | 业务类型 | 
+  | C | bl_material_out | asp_cancel | 
+  | C | bl_material_out | asp_time1 | 
+  | C | bl_material_out | asp_time2 | 
+  | C | bl_material_out | asp_user1 | 
+  | C | bl_material_out | asp_user2 | 
+  | C | bl_material_out | id | 
+  | C | bl_material_out | 备注 | 
+  | C | bl_material_out | 材料编码 | 
+  | C | bl_material_out | 材料名称 | 
+  | C | bl_material_out | 仓库 | 
+  | C | bl_material_out | 单价 | 
+  | C | bl_material_out | 单据编号 | 
+  | C | bl_material_out | 规格型号 | 
+  | C | bl_material_out | 计量单位 | 
+  | C | bl_material_out | 加工单号 | 
+  | C | bl_material_out | 金额 | 
+  | C | bl_material_out | 明细备注 | 
+  | C | bl_material_out | 批号 | 
+  | C | bl_material_out | 手工确定成本 | 
+  | C | bl_material_out | 数量 | 
+  | C | bl_material_out | 现存量 | 
+  | C | bl_material_out | 现存量说明 | 
+  | F | MATERIAL_OUT | 材料编码 | 
+  | F | MATERIAL_OUT | 材料名称 | 
+  | F | MATERIAL_OUT | 仓库 | 
+[OK] _q-matout-inventory.sql (2 batches)

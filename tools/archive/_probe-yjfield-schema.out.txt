@@ -1,0 +1,70 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-yjfield-schema.sql ==
+  | 1 | id | int | 4 | 0 | 1 | 
+  | 2 | panel_code | varchar | 40 | 0 | 0 | 
+  | 3 | col_name | sysname | 256 | 0 | 0 | 
+  | 4 | label | nvarchar | 120 | 0 | 0 | 
+  | 5 | data_type | nvarchar | 40 | 0 | 0 | 
+  | 6 | dict_sql | nvarchar | 1000 | 1 | 0 | 
+  | 7 | ref_panel | varchar | 40 | 1 | 0 | 
+  | 8 | ref_field | sysname | 256 | 1 | 0 | 
+  | 9 | display_field | sysname | 256 | 1 | 0 | 
+  | 10 | place | varchar | 60 | 0 | 0 | 
+  | 11 | seq | int | 4 | 0 | 0 | 
+  | 12 | width | int | 4 | 1 | 0 | 
+  | 13 | editable | bit | 1 | 0 | 0 | 
+  | 14 | required | bit | 1 | 0 | 0 | 
+  | 15 | hidden | bit | 1 | 0 | 0 | 
+  | 16 | alias | nvarchar | 120 | 1 | 0 | 
+  | 17 | visible | bit | 1 | 0 | 0 | 
+  | 18 | label_en | nvarchar | 400 | 1 | 0 | 
+  | 19 | col_group | nvarchar | 100 | 1 | 0 | 
+  | 20 | ref_filter | nvarchar | 400 | 1 | 0 | 
+  | field | 部门 | de | Abteilung | manual | 
+  | field | 部门 | en | Department | manual | 
+  | field | 部门 | es | Departamento | manual | 
+  | field | 部门 | fr | Département | manual | 
+  | field | 部门 | ja | 部門 | manual | 
+  | field | 部门 | ko | 부서 | manual | 
+  | field | 部门 | ru | Отдел | manual | 
+  | field | 部门 | th | แผนก | manual | 
+  | field | 部门 | vi | Phòng ban | manual | 
+  | panel | 部门 | de | Abteilung | manual | 
+  | panel | 部门 | en | Department | manual | 
+  | panel | 部门 | es | Departamento | manual | 
+  | panel | 部门 | fr | Département | manual | 
+  | panel | 部门 | ja | 部門 | manual | 
+  | panel | 部门 | ko | 부서 | manual | 
+  | panel | 部门 | ru | Отдел | manual | 
+  | panel | 部门 | th | แผนก | manual | 
+  | panel | 部门 | vi | Phòng ban | manual | 
+  | field | 部门编码 | de | Abteilungs codierung | manual | 
+  | field | 部门编码 | en | Department Code | manual | 
+  | field | 部门编码 | es | Codificación del departamento | manual | 
+  | field | 部门编码 | fr | Codage du secteur | manual | 
+  | field | 部门编码 | ja | 部門コード | manual | 
+  | field | 部门编码 | ko | 부서 코드 | manual | 
+  | field | 部门编码 | ru | Секторальные коды | manual | 
+  | field | 部门编码 | th | รหัสแผนก | manual | 
+  | field | 部门编码 | vi | Mã bộ phận | manual | 
+  | field | 部门名称 | de | Abteilungs name | manual | 
+  | field | 部门名称 | en | Department Name | manual | 
+  | field | 部门名称 | es | Nombre del departamento | manual | 
+  | field | 部门名称 | fr | Nom du département | manual | 
+  | field | 部门名称 | ja | 部門名 | manual | 
+  | field | 部门名称 | ko | 부서명 | manual | 
+  | field | 部门名称 | ru | Название отдела | manual | 
+  | field | 部门名称 | th | ชื่อแผนก | manual | 
+  | field | 部门名称 | vi | Tên bộ phận | manual | 
+  | 业务员 | nvarchar | 100 | 1 | null | 
+  | 供应商代码 | nvarchar | 100 | 1 | null | 
+  | 部门 | nvarchar | 100 | 1 | null | 
+  | 部门名称 | nvarchar | 100 | 1 | null | 
+  | DEPT | 部门 | archive | null | bs_dept | null | null | 
+  | 36 | 
+  | 100000 | 惠州市银嘉环保科技有限公司 | 0 | 
+  | BM00001 | 销售部 | 0 | 
+  | BM00002 | 采购部 | 0 | 
+  | BM00003 | 生产管理中心 | 0 | 
+  | BM00004 | 惠州市银嘉环保科技有限公司本部 | 0 | 
+[OK] _probe-yjfield-schema.sql (7 batches)

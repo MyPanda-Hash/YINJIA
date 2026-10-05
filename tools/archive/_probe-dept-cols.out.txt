@@ -1,0 +1,17 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-dept-cols.sql ==
+  | 部门编码 | nvarchar | 200 | 
+  | 部门名称 | nvarchar | 200 | 
+  | bd_purchase_in | 部门 | nvarchar | 500 | 
+  | bd_purchase_in | 部门编码 | nvarchar | 500 | 
+  | bl_purchase_in | 部门名称 | nvarchar | 200 | 
+  | qc_insp | 部门 | nvarchar | 50 | 
+  | qc_insp | 部门编码 | nvarchar | 100 | 
+  | qc_insp | 部门名称 | nvarchar | 50 | 
+  | qc_insp_detail | 部门 | nvarchar | 200 | 
+  | qc_insp_detail | 部门名称 | nvarchar | 200 | 
+  | sl_recv | 部门 | nvarchar | 100 | 
+  | sl_recv | 部门名称 | nvarchar | 100 | 
+  | sl_recv_detail | 部门 | nvarchar | 100 | 
+  | sl_recv_detail | 部门名称 | nvarchar | 100 | 
+[OK] _probe-dept-cols.sql (3 batches)

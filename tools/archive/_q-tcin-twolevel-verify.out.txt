@@ -1,0 +1,53 @@
+seg|col_name|label|data_type|place|seq|editable|hidden|visible
+1-FIELDS|审核人|审核人|参照|header|200|0|0|1
+1-FIELDS|审核时间|审核时间|文本|header|210|0|0|1
+1-FIELDS|审批人|审批人|文本|header|212|0|0|1
+1-FIELDS|审批时间|审批时间|文本|header|213|0|0|1
+1-FIELDS|编制人|编制人|文本|header|220|0|0|1
+seg|ref_key|locale|text
+2-TRANSLATIONS|编制人|de|Erstellt von
+2-TRANSLATIONS|编制人|en|Prepared by
+2-TRANSLATIONS|编制人|es|Elaborado por
+2-TRANSLATIONS|编制人|fr|Établi par
+2-TRANSLATIONS|编制人|ja|作成者
+2-TRANSLATIONS|编制人|ko|작성자
+2-TRANSLATIONS|编制人|ru|Составил
+2-TRANSLATIONS|编制人|th|ผู้จัดทำ
+2-TRANSLATIONS|编制人|vi|Người lập
+2-TRANSLATIONS|编制人|zh-TW|編製人
+2-TRANSLATIONS|审核人|de|Genehmigt von
+2-TRANSLATIONS|审核人|en|Approved by
+2-TRANSLATIONS|审核人|es|Aprobado por
+2-TRANSLATIONS|审核人|fr|Approuvé par
+2-TRANSLATIONS|审核人|ja|承認者
+2-TRANSLATIONS|审核人|ko|승인자
+2-TRANSLATIONS|审核人|ru|Утвердил
+2-TRANSLATIONS|审核人|th|ผู้อนุมัติ
+2-TRANSLATIONS|审核人|vi|Người duyệt
+2-TRANSLATIONS|审核人|zh-TW|審核人
+2-TRANSLATIONS|审批人|de|Freigeber
+2-TRANSLATIONS|审批人|en|Approved by (workflow)
+2-TRANSLATIONS|审批人|es|Aprobador
+2-TRANSLATIONS|审批人|fr|Approbateur
+2-TRANSLATIONS|审批人|ja|決裁者
+2-TRANSLATIONS|审批人|ko|결재자
+2-TRANSLATIONS|审批人|ru|Согласовал
+2-TRANSLATIONS|审批人|th|ผู้พิจารณา
+2-TRANSLATIONS|审批人|vi|Người phê duyệt
+2-TRANSLATIONS|审批人|zh-TW|審批人
+2-TRANSLATIONS|审批时间|de|Freigabezeit
+2-TRANSLATIONS|审批时间|en|Approved at (workflow)
+2-TRANSLATIONS|审批时间|es|Hora de aprobación
+2-TRANSLATIONS|审批时间|fr|Heure d'approbation
+2-TRANSLATIONS|审批时间|ja|決裁時間
+2-TRANSLATIONS|审批时间|ko|결재 시간
+2-TRANSLATIONS|审批时间|ru|Время согласования
+2-TRANSLATIONS|审批时间|th|เวลาพิจารณา
+2-TRANSLATIONS|审批时间|vi|Thời gian phê duyệt
+2-TRANSLATIONS|审批时间|zh-TW|審批時間
+seg|col|descr
+3-COLCOMMENTS|编制人|编制人:纸面底部落款①=提交审批的人(特采单两级审批,提交时后端自动写,只读不可手改)
+3-COLCOMMENTS|审核人|审核人:纸面底部落款②=一级审批通过的人(组织架构勾了「特采单·审核反审核」的账号∪管理员;驳回/弃审时清空)
+3-COLCOMMENTS|审核时间|审核时间:一级审批通过的时间(与审批人同进同退,驳回/弃审清空)
+3-COLCOMMENTS|审批人|审批人:纸面底部落款③「批准」=超级管理员(yj_user.is_admin=Y;二级审批通过时才落值,驳回/弃审清空)
+3-COLCOMMENTS|审批时间|审批时间:超级管理员批准的时间(二级审批通过时刻;驳回/弃审清空)

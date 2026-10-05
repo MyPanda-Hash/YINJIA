@@ -316,7 +316,17 @@
               <!-- 审批组:标准流文书面板(品质单据等)+ 检验数据记录(QC_INSP_REC,用户口径要求有审批按钮) -->
               <template v-if="hasApprovalBtns">
                 <div class="as-side-btn" :class="{ disabled: isDisabled('提交审批') }" @click="onSideAction('提交审批')">{{ tt('提交审批') }}</div>
-                <template v-if="canApproveHere()">
+                <!-- 质量单据两级审批(2026-10-04):一级「审批通过」(有该面板审核反审核权的角色∪管理员)、
+                     二级「批准通过」(超级管理员);两级各点一次,按钮按节点显隐。均调后端「审批通过」按钮,
+                     节点由后端 approve_node 判定 —— 前端只负责显隐与文案 -->
+                <template v-if="isQcL2Panel">
+                  <template v-if="canApproveQcL2Here">
+                    <div class="as-side-btn" :class="{ disabled: isDisabled('审批通过') }" @click="onSideAction('审批通过')">{{ qcL2ApproveLabel() }}</div>
+                    <div class="as-side-btn" :class="{ disabled: isDisabled('审批驳回') }" @click="onSideAction('审批驳回')">{{ qcL2RejectLabel() }}</div>
+                  </template>
+                  <div v-if="canApproveHere()" class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
+                </template>
+                <template v-else-if="canApproveHere()">
                   <div class="as-side-btn" :class="{ disabled: isDisabled('审批通过') }" @click="onSideAction('审批通过')">{{ tt('审批通过') }}</div>
                   <div class="as-side-btn" :class="{ disabled: isDisabled('审批驳回') }" @click="onSideAction('审批驳回')">{{ tt('审批驳回') }}</div>
                   <div class="as-side-btn" :class="{ disabled: isDisabled('弃审') }" @click="onSideAction('弃审')">{{ tt('弃审') }}</div>
@@ -544,7 +554,9 @@
         <div class="doc-rail-main">
           <div class="fields header-fields udl-fields" :class="{ 'is-draft': draftEditable }">
       <div class="field" v-for="field in headerEditFields" :key="headerFieldKey(field)">
-        <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}</label>
+        <label :class="{ req: field.isRequired }">{{ headerFieldLabel(field) }}<span
+          v-if="printBatchLockReason(field)" class="field-lock-badge" :title="printBatchLockReason(field)"
+        >{{ tt('已按材料码批次号锁定') }}</span></label>
         <template v-if="draftEditable">
           <div v-if="isRefSelect(field)" class="query-ref-select">
             <el-select
@@ -636,7 +648,7 @@
             @change="markInlineDirty"
           />
         </template>
-        <div v-else class="field-readonly" :title="String(cur[headerFieldKey(field)] ?? '')">
+        <div v-else class="field-readonly" :title="printBatchLockReason(field) || String(cur[headerFieldKey(field)] ?? '')">
           {{ formatFieldValue(field, cur[headerFieldKey(field)]) }}
         </div>
       </div>
@@ -741,20 +753,7 @@
       </table>
     </div>
 
-    <div v-if="!isApprovalDoc && !isQcInspReq" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading && !isBomMasterPanel">
-      <!-- ══════════ 物料清单专用：父件表格 + 子件表格联动（BOM/BOM_FWD/BOM_REV） ══════════ -->
-      <BomMasterDetail
-        v-if="isBomMasterPanel"
-        ref="bomMasterRef"
-        :rows="bomMasterRows"
-        :fields="bomMasterFields"
-        :document-no="cur['编号'] || ''"
-        :reverse="panelCode === 'BOM_REV'"
-        :editable="panelCode === 'BOM' && draftEditable"
-        :loading="loading"
-        @update:rows="onBomRowsUpdate"
-      />
-      <template v-else>
+    <div v-if="!isApprovalDoc && !isQcInspReq" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading">
       <!-- ══════════ ③b 主表预览表格（配置 mainTable 时显示：主表字段列，点行切换当前单据，明细联动） -->
       <div v-if="mainGrid" class="main-grid">
         <div class="dt-head">
@@ -894,6 +893,8 @@
               <!-- 列级虚拟化后,走到这里的都是可见列,不再需要单元格级占位(原 col-lazy-empty 分支已随五期机制下线) -->
               <template v-if="archEditable(b) && !row._placeholder">
                 <span v-if="c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <!-- 批次号(分批链路单据):只由生单/随链写入、行随单头一致 —— 明细格只读,要改请在单头改 -->
+                <span v-else-if="detailBatchLocked(c.prop)" class="cell-locked" :title="tt('随单头批次号一致,不可修改')">{{ row[c.prop] ?? '' }}</span>
                 <!-- 生产线档案「停用」列:开关形式(同生产加工单表单开关风格)——@change 同步乐观翻转(点击即动画),
                      POST 落库,失败回滚;停用后从排产工作台消失、排入被后端拦截(2026-09-24 随生产域下拉) -->                <span v-else-if="isLineToggleCol(c.prop)" class="line-toggle-cell">
                   <el-switch
@@ -964,17 +965,12 @@
                 </template>
                 <span v-else class="cell-lazy" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
               </template>
-              <span v-else-if="c.prop === '材料编码' && activeTab(b).key === 'materials'" class="mat-cell">
-                <span>{{ tt(row[c.prop] ?? '') }}</span>
-                <span v-if="hasSubBom(row[c.prop])" class="mat-star" :title="tt('该材料有下级子件 BOM，点击行查看')">*</span>
-              </span>
               <span v-else>{{ tt(row[c.prop] ?? '') }}</span>
             </template>
           </el-table-column>
           </template>
         </el-table>
       </div>
-      </template>
 
     </div>
 
@@ -1007,10 +1003,11 @@
     <template v-else-if="isQcInspReq">
       <div class="qc-insp-wrap" v-loading="loading">
         <QcInspReqSheet
-          :head="cur" :editable="draftEditable" :panel-code="panelCode"
+          :head="cur" :editable="draftEditable" :panel-code="panelCode" :fields="sheetAllFields"
           @dirty="markInlineDirty"
           @save="saveInlineDraft('保存')"
           @refresh="load()"
+          @refresh-config="onFieldEditRefresh"
         />
       </div>
     </template>
@@ -1209,7 +1206,6 @@
       </div>
     </el-dialog>
     <NewVoucherDialog v-model:visible="newVisible" :panelCode="panelCode" :panel-name="panelName" @saved="onNewSaved" />
-    <SubBomDialog v-model="subBomVisible" :material="subBomMaterial" :bom="subBomBom" />
     <ImportDialog v-model="impVisible" :fields="impFields" :target-label="impLabel" @imported="onImported" />
     <ApprovalHistoryDialog v-model="approvalVisible" :panelCode="panelCode" :formNo="approvalNo" />
     <!-- 修改记录弹窗:滚动3条(字段变化/补充/清空 + 明细变化摘要) -->
@@ -1576,6 +1572,8 @@
     </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <QrLabelDialog v-model="qrVisible" :labels="qrLabels" />
+    <!-- 采购订单·打印材料码(2026-10-04):批次号在打印时登记 + 预约该行数量 -->
+    <MaterialLabelDialog v-model="materialLabelVisible" :order-no="materialLabelNo" @printed="onMaterialLabelPrinted" />
 
     <!-- 生产工单「排产」弹窗(2026-09-24 用户要求):本单快捷排线——选产线/日期/数量,
          后端复用排产工作台 assign(仅已审核可排/数量守恒/停用线拒绝/留痕),回执含当日负荷与超载提示 -->
@@ -1728,9 +1726,12 @@ import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
-import { applyDocDefaults, todayStr, syncBatchNoWithDocDate, docNoFromDate } from '@core/panel/docDefaults'
+import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
+import { applyCalcRules } from '@core/panel/calcRules'
+import { sumKeepScale } from '@core/panel/sumTotals'
 import { printPuOrder, printQcReturn, printProductCards, printLocationCards, printProductionTask, printPuOrderNoAmount, woQrText } from '@/business/print-formats'
 import QrLabelDialog from './QrLabelDialog.vue'
+import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
@@ -1745,8 +1746,6 @@ import NewVoucherDialog from './NewVoucherDialog.vue'
 import ApprovalHistoryDialog from './ApprovalHistoryDialog.vue'
 import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import DocSelectRail from './DocSelectRail.vue'
-import SubBomDialog from './SubBomDialog.vue'
-import BomMasterDetail from './BomMasterDetail.vue'
 import DocSheet from './DocSheet.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import ProgressControlSheet from './ProgressControlSheet.vue'
@@ -1757,6 +1756,7 @@ import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
 import QcInspReqSheet from './QcInspReqSheet.vue'
+import { isQcInspReqPanel } from './qcInspReqConfig'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
@@ -1784,8 +1784,6 @@ const panelCode = computed(() => route.params.panelCode)
 const operationName = computed(() => route.meta.operationName || route.query.operationName || '新增流程')
 const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'undefined')
 
-// 物料清单维护和正反向查询统一使用父件/子件主从视图；仅 BOM 草稿开放编辑。
-const isBomMasterPanel = computed(() => ['BOM', 'BOM_FWD', 'BOM_REV'].includes(String(panelCode.value)))
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
 const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
@@ -1798,7 +1796,7 @@ const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(pa
  */
 const isProdDocMatrix = computed(() => String(panelCode.value) === 'RD_PROD_DOCLIST')
 // 来料检验要求(品质资料 7 表):档案式特例面板——工具栏/单据卡片/明细表格/页脚全隐,QcInspReqSheet 整体接管
-const isQcInspReq = computed(() => String(panelCode.value) === 'QC_INSP_REQ')
+const isQcInspReq = computed(() => isQcInspReqPanel(panelCode.value))
 /** 产品变更申请单:当前账号可填的纸面部门行(后端按 yj_user.dept_id → yj_change_dept 算,metadata 下发)。
  *  仅 RD_CHANGE 有该键;其它面板拿到空数组也无害(没有 lockKey 的表根本不看它)。 */
 const changeDeptRows = computed(() => cfgCache.value?.metadata?.changeDepts || [])
@@ -1813,20 +1811,6 @@ const iAmChangeSigner = computed(() => changeSigners.value.includes(String(user.
 const isChangeInitiator = computed(() => user.isAdmin === true
   || (!!user.realName && String(cur.value?.['申请人'] ?? '') === String(user.realName)))
 const docSheetConfig = computed(() => qcSheetCfgs[panelCode.value] || (panelCode.value === 'RD_PLAN' ? planSheetCfg : approvalSheetCfg))
-const bomMasterRows = computed(() => {
-  if (panelCode.value === 'BOM') return cur.value?.detail?.['children'] || []
-  return list.value || [] // BOM_FWD/BOM_REV：后端返回的展平行（父件-子件对）
-})
-const bomMasterFields = computed(() => (
-  (cfgCache.value?.detail?.tabs || []).find((tab) => tab.key === 'children')?.fields || []
-))
-const bomMasterRef = ref(null)
-
-function onBomRowsUpdate(rows) {
-  if (panelCode.value !== 'BOM' || !draftEditable.value) return
-  if (!cur.value.detail) cur.value.detail = {}
-  cur.value.detail.children = rows
-}
 
 const query = reactive({ keyword: '', pageNo: 1, pageSize: 20 })
 const condition = reactive({})
@@ -2255,43 +2239,63 @@ function rqdFieldRequired(field) {
   if (panelCode.value === 'STOCK_LEDGER' && ['仓库', '存货'].includes(headerFieldKey(field))) return true
   return false
 }
-// 台账联动选项:仓库/存货下拉互相约束(选项=后端 v_stock_ledger 真实组合)
-// 2026-09-28 起按**编码**联动(仓库编码/存货编码):存货名称重名严重(「端盖」24 码),名称索引破坏单一性;
-// 参照随之绑定编码(ref_field=仓库编码/存货编码,display 仍显示名称),queryDraft 存/传的都是编码
-const ledgerWhOptions = ref([])
-const ledgerItemOptions = ref([])
+// 台账联动选项:仓库/存货下拉互相约束(选项=后端 v_stock_ledger 真实组合,按编码匹配)
+// 2026-09-28 起选项为码名对 [{仓库编码,仓库}] / [{存货编码,存货}]——编码是稳定键(名称会重名/
+// 改名/带尾空格),联动收窄与查询条件都绑编码(_whCode/_itemCode),名称仅弹窗回显。
+// 参照随之绑定编码(ref_field=仓库编码/存货编码,display 仍显示名称,见 migrate-ledger-code-filter.sql)
+const ledgerWhOptions = ref([])    // [{code,name}] 该存货有流水的仓(或未选存货=全部有流水仓)
+const ledgerItemOptions = ref([])  // [{code,name}] 该仓有流水的存货(或未选仓库=全部有流水的存货)
 const ledgerOptsLoading = ref(false)
 async function loadLedgerRefOptions({ keepWh = true, keepItem = true } = {}) {
   ledgerOptsLoading.value = true
   try {
     const res = await engine.callButton({
       panelCode: panelCode.value, buttonName: '台账联动选项',
-      formData: { 仓库: queryDraft['仓库'] || '', 存货: queryDraft['存货'] || '' }, buttonParam: {},
+      formData: {
+        仓库编码: queryDraft['_whCode'] || '', 存货编码: queryDraft['_itemCode'] || '',
+        仓库: queryDraft['仓库'] || '', 存货: queryDraft['存货'] || '',
+      }, buttonParam: {},
     })
-    ledgerWhOptions.value = res?.仓库列表 || []
-    ledgerItemOptions.value = res?.存货列表 || []
-    // 约束收紧后当前值可能不再合法:清掉无效侧(保持用户已选且仍合法的那侧)
-    if (!keepWh && queryDraft['仓库'] && !ledgerWhOptions.value.includes(queryDraft['仓库'])) delete queryDraft['仓库']
-    if (!keepItem && queryDraft['存货'] && !ledgerItemOptions.value.includes(queryDraft['存货'])) delete queryDraft['存货']
+    const whPairs = (res?.仓库列表 || []).map((o) => ({ code: String(o.仓库编码 ?? '').trim(), name: String(o.仓库 ?? '').trim() }))
+    const itemPairs = (res?.存货列表 || []).map((o) => ({ code: String(o.存货编码 ?? '').trim(), name: String(o.存货 ?? '').trim() }))
+    ledgerWhOptions.value = whPairs
+    ledgerItemOptions.value = itemPairs
+    // 约束收紧后当前值可能不再合法:清掉无效侧(名称与编码成对清理,保持绑定一致)
+    if (!keepWh && queryDraft['仓库'] && !whPairs.some((o) => o.name === queryDraft['仓库'] || o.code === queryDraft['_whCode'])) {
+      delete queryDraft['仓库']; delete queryDraft['_whCode']
+    }
+    if (!keepItem && queryDraft['存货'] && !itemPairs.some((o) => o.name === queryDraft['存货'] || o.code === queryDraft['_itemCode'])) {
+      delete queryDraft['存货']; delete queryDraft['_itemCode']
+    }
   } catch (e) {
     ElMessage.error(engine.errMsg(e) || tt('查询失败'))
   } finally {
     ledgerOptsLoading.value = false
   }
 }
-/** 弹窗参照下拉选中变化:仅台账/库存状况的「仓库」要重拉联动(存货可能因换仓失效被清)。
+/** 弹窗参照选中变化:台账/库存状况的「仓库」要重拉联动(存货可能因换仓失效被清)。其余参照不联动。
  *  v=仓库编码(参照绑定编码),其余参照不联动 */
 async function onDialogRefSelectChange(field) {
   if (!isCascadePanel.value || headerFieldKey(field) !== '仓库') return
+  // 编码随行:下拉选项携带档案行(含 仓库编码),选中即绑定编码;清空则码一起清
+  const key = headerFieldKey(field)
+  const opt = (refSelectData[key]?.options || []).find((o) => o.value === queryDraft[key])
+  const rowCode = opt?.row?.['仓库编码']
+  queryDraft['_whCode'] = rowCode ? String(rowCode).trim() : ''
   const hadItem = queryDraft['存货']
   await loadLedgerRefOptions({ keepWh: true, keepItem: false })
   if (hadItem && !queryDraft['存货']) ElMessage.info(tt('该仓无此存货流水，已清空存货'))
 }
-/** 仓库下拉选项置灰(选了存货后):该存货无流水的仓不可选 —— 选项=档案(bs_wh) ∩ 有流水。
- *  比 option.value(=仓库编码,参照绑定编码):ledgerWhOptions 是编码清单 */
+/** 仓库下拉选项置灰(选了存货后):该存货无流水的仓不可选 —— 按编码比对(选项行无编码时退回名称)。
+ *  选项=档案(bs_wh) ∩ 有流水;ledgerWhOptions 是 [{code,name}] 码名对 */
 function ledgerOptionDisabled(field, option) {
-  return isCascadePanel.value && headerFieldKey(field) === '仓库'
-    && !!queryDraft['存货'] && !ledgerWhOptions.value.includes(option.value)
+  if (!isCascadePanel.value || headerFieldKey(field) !== '仓库') return false
+  if (!queryDraft['存货']) return false
+  const code = option.row?.['仓库编码']
+  if (code !== undefined && code !== null && String(code).trim() !== '') {
+    return !ledgerWhOptions.value.some((o) => o.code === String(code).trim())
+  }
+  return !ledgerWhOptions.value.some((o) => o.name === option.label)
 }
 /** 弹窗字段下方的联动提示行:选仓后存货候选收窄计数 / 选存货后全仓无流水的说明 */
 function dialogFieldHint(field) {
@@ -2315,6 +2319,50 @@ function onQueryDialogClose() {
 const singleDocMode = computed(() => cfgCache.value?.metadata?.singleDoc === true)
 /** 单据面板(头行/单表单据):既非报表平表、也非档案单单据 → 高级筛选走服务端(2026-09-24) */
 const docPanel = computed(() => !reportMode.value && !singleDocMode.value)
+/**
+ * 档案「改动行提交」基线(2026-10-03 用户口径「修改提交改动行」+ 同日误删事故护栏)。
+ *
+ * 事故:档案面板保存语义曾是「整表 upsert,缺席行=已删除」,而列表查询带条件时后端只回**子集**
+ * ⇒ 一次带筛选的保存把未加载的 3873/3874 行商品档案软删(yj_archive_change_log id=8 removedRows=3873)。
+ * 现在:载入时给每行存一份 JSON 基线,保存**只提交与基线不同的行**(无 id 的新行必然提交),
+ * 并声明 `只提交改动行=true` —— 后端据此逐行 upsert,**绝不做"缺席即删除"推断**;
+ * 删除档案行走「删除」按钮的显式 `作废行id`(见 onButton 的删除分支)。
+ * 判据只看行内容,不依赖"哪些事件算编辑"⇒ 手输/参照带回/粘贴/导入任何编辑路径都不会漏。
+ */
+const archiveBaseline = new Map() // 行 id -> 载入时的 JSON 快照
+function archiveRowIdOf(row) {
+  const id = row?.id ?? row?.__id
+  return id === undefined || id === null || String(id).trim() === '' ? null : String(id)
+}
+/** 档案整档行(单单据面板:list[0].detail[tabKey] 就是全部行) */
+function allArchiveRows() {
+  const rows = []
+  for (const v of Object.values(cur.value?.detail || {})) if (Array.isArray(v)) rows.push(...v)
+  return rows
+}
+/** 载入/保存成功后重建基线(load 末尾调用) */
+function snapshotArchiveBaseline() {
+  archiveBaseline.clear()
+  if (!singleDocMode.value) return
+  for (const r of allArchiveRows()) {
+    const id = archiveRowIdOf(r)
+    if (id && !archiveBaseline.has(id)) archiveBaseline.set(id, JSON.stringify(r))
+  }
+}
+/** 本次要提交的改动行 = 与基线不同 + 所有新行(无 id) */
+function changedArchiveRows() {
+  const out = []
+  if (!singleDocMode.value) return out
+  for (const r of allArchiveRows()) {
+    const id = archiveRowIdOf(r)
+    if (!id || archiveBaseline.get(id) !== JSON.stringify(r)) out.push(r)
+  }
+  return out
+}
+/** 档案保存的按钮声明:只提交改动行(未声明的老口径由后端保守处理 —— 只 upsert、绝不删行) */
+function archiveSaveParam() {
+  return { 只提交改动行: true }
+}
 const reportPageCount = computed(() => Math.max(1, Math.ceil(total.value / query.pageSize)))
 const reportPeriod = computed(() => {
   const start = condition['开始日期']
@@ -2863,6 +2911,27 @@ async function onDevDispatch() {
 /** 本单据一级选定的二级审核人 = 当前登录人(二级节点才由他审批;被选中即授权) */
 const l2ApproverNow = computed(() => panelCode.value === 'RD_PROD_INFO' && !!devDispatch.isL2)
 
+// ── 质量单据两级审批(2026-10-04 用户口径:品质管理·质量单据一族 + 来料品质·特采单)──
+// 纸面(YJ-QR 体系)底部都是「编制 / 审核 / 批准」三格,系统口径与之一一对应:
+//   编制 = 提交审批的人(提交时后端自动落值);审核 = 一级审批通过的人;批准 = 超级管理员。
+// 一级 = 有该面板「审核反审核」权的角色 ∪ 管理员(yj_role_panel.can_approve,即 canApproveHere);
+// 二级 = **超级管理员**(yj_user.is_admin='Y'),不选人、不是角色。
+// ⚠ 两级**必须各点一次**(同一个人也要两次),故按钮分节点显隐,不给"一次动作跨两级"的入口。
+// ⚠ 清单必须与后端 ButtonService.ADMIN_L2_PANELS 一致(那边是 QC_DOC_PREPARER 的键集)。
+const L2_DOC_PANELS = ['QC_TC_IN', 'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY']
+const isQcL2Panel = computed(() => L2_DOC_PANELS.includes(String(panelCode.value)))
+/** 一级审核节点(节点 1):状态还是「审批中」 */
+const qcL2Node = computed(() => isQcL2Panel.value && curDocStatus.value === '待二级审批')
+/** 本节点我能不能批:一级看面板审批权,二级只有超级管理员 */
+const canApproveQcL2Here = computed(() => (qcL2Node.value ? user.isAdmin === true : canApproveHere()))
+/** 侧栏点「审批通过/批准通过」都打到后端的「审批通过」按钮(节点由后端 approve_node 判,前端只管显隐与文案) */
+function qcL2ApproveLabel() {
+  return qcL2Node.value ? tt('批准通过') : tt('审批通过')
+}
+function qcL2RejectLabel() {
+  return qcL2Node.value ? tt('批准驳回') : tt('审批驳回')
+}
+
 // ── 分发责任人弹窗(2026-09-20):四个下游文件各选一个责任人 ──
 const devAssignVisible = ref(false)
 const devAssignBusy = ref(false)
@@ -3061,7 +3130,7 @@ const queryDialogFields = computed(() => {
     // 台账/库存状况的 仓库/存货 也走通用渲染:参照双模(仓库 6 行下拉/存货 3838 行弹窗)+ 联动收窄提示
 })
 const draftEditable = computed(() => {
-  if (reportMode.value || ['BOM_FWD', 'BOM_REV'].includes(String(panelCode.value))) return false
+  if (reportMode.value) return false
   // 规格书已分配:非 责任人∪总负责人∪管理员 只读(服务端三个入口同口径强制,这里提前置灰)
   if (specAssignBlocked.value) return false
   // 四个受控文件:非该文件责任人只读(判定来自服务端,与保存门禁同一真源)
@@ -3096,6 +3165,30 @@ const attachEditable = computed(() => {
 const batchSendVisible = ref(false)
 const batchSend = ref(null) // {sourcePanel, targetPanel, sourceNo}
 const batchTargetCache = new Map()
+/**
+ * 本面板是否「分批链路单据」(表头配了「批次号」字段)—— 与后端
+ * PanelConfigService.buildSelectConfig 的 batchFlow、PushGenerateHandler.isBatchTarget
+ * 同一判据(同一个元数据事实:表头有批次号即链路单据)。
+ */
+const batchChainPanel = computed(() => (cfgCache.value?.dataSchema?.fields || [])
+  .some((f) => (f.dataName || f.label) === '批次号'))
+/**
+ * 明细行「批次号」是否锁定(2026-10-04 批次号口径):
+ * 批次号在**生单那一刻**由服务端定稿(供应商编码去掉 YJ- 前缀 + `-` + 生单当天 yyyyMMdd,
+ * 如 YJ-TX ⇒ TX-20260910),并沿 暂收 → 检验 → 入库 逐站继承;明细行一律**随单头一致**
+ * (后端 BatchService.syncBatchNo 每次保存/审核都按单头覆盖写全部明细行)。
+ * 因此明细格只读:可改的只有送料暂收单草稿态的**单头**批次号。
+ *
+ * 为什么按"列名 + 链路单据"判定、而不是直接用元数据 `editable=0` 下发的 `readonly`:
+ * 明细单元格的内联编辑器只读 `field.computed`(全库从未被赋值),**不读 `readonly`**;
+ * 若为此全局放开"明细列尊重 readonly",会连带锁死 MANU_SCHEDULE(21 列)、
+ * PURCHASE_IN 的 送检数量/备注 等一批与本次需求无关的列 —— 影响面不可控,
+ * 故这里只对本需求的批次号列做定向锁定(链路判定仍是元数据驱动的)。
+ */
+function detailBatchLocked(prop) {
+  return prop === '批次号' && batchChainPanel.value
+}
+
 /** 面板是否配了「批次号」字段(= 分批链路上的单据) */
 async function panelHasBatchField(panel) {
   if (!panel) return false
@@ -3119,12 +3212,16 @@ async function needBatchDialog(target) {
   return !(await panelHasBatchField(panelCode.value))
 }
 /** 分批生单完成:跳到目标面板继续填写(与推式生单同款:关源页签、开目标页签、新单按创建时间倒序在第一张) */
-function onBatchGenerated({ panel, no }) {
+function onBatchGenerated({ panel, no, batchNo, silent }) {
   const targetPanel = panel || batchSend.value?.targetPanel || ''
   if (!targetPanel) return
-  // 批次号在采购入库单填单时按入库日期预设(2026-09-21 二次口径:纯 yyyyMMdd,同一日期同一批次),
-  // 故生成暂收单阶段没有号可显示
-  ElMessage.success(`已生成 ${targetPanel} ${no}（批次号在采购入库单填单时按入库日期预设），请在列表页继续填写`)
+  // 批次号在**生单那一刻**已由服务端定稿(供应商编码去 YJ- 前缀 + 当天日期),这里直接把真号回显给用户。
+  // 分批送料对话框自己会把"生成了几张、各是什么号"说清(silent=true,含按批次号分组的多张情形),此处不重复。
+  if (!silent) {
+    ElMessage.success(batchNo
+      ? `${tt('已生成')} ${targetPanel} ${no}（${tt('批次号')} ${batchNo}）`
+      : `${tt('已生成')} ${targetPanel} ${no}，请在列表页继续填写`)
+  }
   const targetPath = `/panelx/list/${targetPanel}`
   tabs.close(route.path)
   router.push(targetPath)
@@ -3141,6 +3238,13 @@ const scanVisible = ref(false)
 const selCfg = ref(null)
 // 材料二维码标签(品检分流链:暂收单行 打印标签)
 const qrVisible = ref(false)
+/** 采购订单·打印材料码弹窗(2026-10-04):批次号在打印时登记,并预约该行数量 */
+const materialLabelVisible = ref(false)
+const materialLabelNo = ref('')
+/** 打印登记完成后提示一句:这批量已从订单数量隔离成独立一行,去生单对话框勾它即可 */
+function onMaterialLabelPrinted({ docNo, batchNo, count }) {
+  ElMessage.success(`${tt('已登记材料码')} ${docNo}（${tt('批次号')} ${batchNo}，${count} ${tt('张标签')}）——${tt('该批数量已从订单数量隔离出来，生单时在明细里直接勾选它')}`)
+}
 const qrLabels = ref([])
 
 function openQrLabels() {
@@ -3168,15 +3272,8 @@ function selectConfigFor(action = '选单') {
 const delMode = ref(false)
 const delSel = ref([])
 
-// 产成品→材料联动：当前选中产成品（列表页单据流览内点击产成品明细行）
+// 产成品→材料联动：当前选中产成品（列表页单据流览内点击产成品明细行）；材料明细按其 子件BOM 存储值过滤
 const selectedProduct = ref(null)
-const selectedBomCodes = ref([])
-
-// 材料下级 BOM（红 * + 弹窗）：存货编码 → 物料清单 BOM 面板 children 子件行
-const subBomMap = ref({})
-const subBomVisible = ref(false)
-const subBomMaterial = ref(null)
-const subBomBom = ref([])
 
 // ---------- 明细维护弹窗（主表双击行打开：在弹窗内维护该单明细，新增/删除/保存） ----------
 const maintainVisible = ref(false)
@@ -3211,6 +3308,21 @@ const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, 
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
 watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate() }, { immediate: true })
 
+/* 批次号「材料码锁定」(2026-10-04 用户口径:凡**有关打印明细生成的单据**都不可以修改批次号)。
+   判定在服务端:该单的来源链里有没有**隔离行键**(`{订单号}#{行id}@{打印行id}`)的 ACTIVE link ——
+   有 ⇒ 它是由材料码(打印明细)生出来的,标签上已印那个号,草稿态也不许改。
+   只对**批次链路单据**(表头有「批次号」字段)问,别的面板一次多余请求都不发。 */
+const printBatchLock = ref({ 锁定: false, 批次号: '', 依据: '' })
+watch(() => [panelCode.value, curDocNo.value], async () => {
+  printBatchLock.value = { 锁定: false, 批次号: '', 依据: '' }
+  const no = String(curDocNo.value || '')
+  if (!no || !batchChainPanel.value) return
+  try {
+    const r = await engine.puLabelBatchLock(panelCode.value, no)
+    if (r && String(curDocNo.value) === no) printBatchLock.value = r
+  } catch { /* 端点不可用(旧后端)时按"不锁"处理,不阻断打开单据 */ }
+}, { immediate: true })
+
 // 文书默认值:文书面板的「新增」= directAdd 建一张空白草稿(库端 saved='N'),此时 draftEditable 为真,
 // 本 watch 生效。锁定字段(申请立项人/负责人)只在「本次新增且尚未保存过」时带出——用 isFreshAddedDoc()
 // 判定(跨刷新可靠),绝不在打开既有单据时改它,否则弃审后再打开会把申请人改成操作人(冒名)。
@@ -3224,25 +3336,11 @@ watch(
   },
 )
 
-// 采购入库单批次号(2026-09-21 二次口径):批次号 = **入库日期**(纯 yyyyMMdd,同一日期算同一批次),
-// 填单时就预设好、用户**可人工改**;审核时以表头值为准回填全链(BatchService.assignNoAndBackfill)。
-//  · 预设/补空:applyDocDefaults 的 PURCHASE_IN 项(仅空值带出 → 已审核单的历史号/人工号不会被碰);
-//  · 「单据日期」联动:日期改了就跟着走 —— 但只当批次号是空的、或仍是上一次自动带出的值(人工优先)。
-//    跨单据/跨次打开要可靠 → prevAuto 在单据切换(单据编号变化)时按当前值重新取一次。
-const lastAutoBatchNo = ref('')
-const autoBatchDocNo = ref('')
-watch(
-  () => [panelCode.value, cur.value?.['单据编号'], cur.value?.['单据日期']],
-  () => {
-    if (panelCode.value !== 'PURCHASE_IN' || !cur.value) return
-    if (!draftEditable.value) { lastAutoBatchNo.value = ''; autoBatchDocNo.value = ''; return }  // 只读态(已审核/作废)不碰
-    const docNo = String(cur.value?.['单据编号'] ?? '')
-    if (docNo !== autoBatchDocNo.value) { lastAutoBatchNo.value = ''; autoBatchDocNo.value = docNo }  // 换单:自动值基线重置
-    applyDocDefaults('PURCHASE_IN', cur.value, user, { isNew: isFreshAddedDoc(), today: todayStr() })
-    lastAutoBatchNo.value = syncBatchNoWithDocDate(cur.value, lastAutoBatchNo.value, todayStr())
-  },
-  { immediate: true },
-)
+// 采购入库单批次号(2026-10-04 口径变更):批次号不再由前端「按单据日期预设」——
+// 它由**服务端在生单那一刻**定稿(供应商编码去掉 YJ- 前缀 + `-` + 生单当天 yyyyMMdd,如 YJ-TX ⇒ TX-20260910),
+// 并沿 暂收 → 检验 → 入库 逐站继承;BatchService.syncBatchNo 在每次保存/审核时把单头值同步到全部明细行。
+// 因此这里**不再需要**「单据日期 → 批次号」联动(旧的 applyDocDefaults/syncBatchNoWithDocDate 调用已删除):
+// 前端再预设一个纯日期的号,只会与生单继承来的号打架(格式也不同)。
 
 watch(cur, (v) => {
   current.value = v
@@ -3250,10 +3348,7 @@ watch(cur, (v) => {
   detailRefVisible.value = false
   detailRefPick.value = null
   // 产成品→材料联动：默认不选中（点击产成品明细行才过滤材料明细），切换单据时重置
-  if (selectedProduct.value) {
-    selectedProduct.value = null
-    selectedBomCodes.value = []
-  }
+  if (selectedProduct.value) selectedProduct.value = null
 })
 
 /** 面板内切单守卫(翻页/点行):当前单有未保存修改时弹三态窗,干净则直切 */
@@ -3467,9 +3562,10 @@ async function loadBatchTab(docNo, force = false) {
       batches: batchTab.rows.length,
       // 待编号批次数(台账 status='PENDING',批次号留空 —— 采购入库单审核时才取号)
       pending: batchTab.rows.filter((r) => r.status === 'PENDING').length,
-      sent: lines.reduce((a, l) => a + Number(l.已送数量 || 0), 0),
-      left: lines.reduce((a, l) => a + Number(l.剩余数量 || 0), 0),
-      ret: lines.reduce((a, l) => a + Number(l.已退回数量 || 0), 0),
+      // 明细行数量合计(位数跟明细走,见 @core/panel/sumTotals)
+      sent: sumKeepScale(lines.map((l) => l.已送数量)) ?? 0,
+      left: sumKeepScale(lines.map((l) => l.剩余数量)) ?? 0,
+      ret: sumKeepScale(lines.map((l) => l.已退回数量)) ?? 0,
     }
   } catch { batchTab.rows = []; batchTab.sum = { batches: 0, pending: 0, sent: 0, left: 0, ret: 0 } } finally { batchTab.loading = false }
 }
@@ -3583,25 +3679,33 @@ function groupKeyOf(b) {
 }
 
 // 汇总：按 编码/名称 分组 + 合计行（对齐 T+ 汇总页签）
+// 位数口径(2026-10-03 用户报「明细与合计小数点后位数有差距」):分组小计与合计行都走
+// sumKeepScale —— 位数跟本列明细走，顺带吃掉裸加的浮点尾差(1.1+2.2 曾显示 3.3000000000000003)
 function summaryRows(rows, b) {
   if (!rows.length) return []
   const keyField = groupKeyOf(b)
   const numeric = numericCols(rows, b)
-  const group = new Map()
+  const group = new Map()   // 组键 → 组基础行(已剔除汇总列，避免分组行把首行原值又累加一次)
+  const cells = new Map()   // 组键 → { 列: [该组明细值...] }
   for (const r of rows) {
     const k = r[keyField] || '(空)'
     if (!group.has(k)) {
-      // 先剔除汇总字段再复制首行，避免分组行把首行原值又累加一次（翻倍 bug）
       const base = { ...r }
       for (const c of numeric) delete base[c]
       group.set(k, base)
+      cells.set(k, Object.fromEntries(numeric.map((c) => [c, []])))
     }
-    const g = group.get(k)
-    for (const c of numeric) g[c] = (g[c] || 0) + num(r[c])
+    const bucket = cells.get(k)
+    for (const c of numeric) bucket[c].push(r[c])
   }
-  const out = [...group.values()]
+  const out = []
+  for (const [k, base] of group) {
+    const bucket = cells.get(k)
+    for (const c of numeric) base[c] = sumKeepScale(bucket[c]) ?? 0
+    out.push(base)
+  }
   const total = {}
-  for (const c of numeric) total[c] = Math.round(rows.reduce((a, r) => a + num(r[c]), 0) * 100) / 100
+  for (const c of numeric) total[c] = sumKeepScale(rows.map((r) => r[c])) ?? 0
   out.push({ [keyField]: '合计', ...total })
   return out
 }
@@ -3615,14 +3719,10 @@ const FOOT_H = 32
 function blockData(b) {
   const t = activeTab(b)
   let rows = detailRows(t)
-  // 产成品→材料联动过滤：点产成品行后，材料明细只显示该产品的 BOM 子件（子件BOM 优先，材料编码兜底）
+  // 产成品→材料联动过滤：点产成品行后，材料明细只显示该产品的 BOM 子件（按材料行自身 子件BOM 存储值）
   if (t.key === 'materials' && selectedProduct.value) {
     const byBom = rows.filter((m) => m['子件BOM'] === selectedProduct.value)
     if (byBom.length) rows = byBom
-    else {
-      const byCode = rows.filter((m) => selectedBomCodes.value.includes(m['材料编码']))
-      if (byCode.length) rows = byCode
-    }
   }
   return tabView(b, t) === 'summary' ? summaryRows(rows, t) : rows
 }
@@ -3994,14 +4094,14 @@ const archSumsMap = computed(() => {
     for (const c of archCols(b)) {
       const f = c.field
       if (f && (f.dataType === '小数' || f.dataType === '整数')) {
-        let acc = 0
-        let has = false
+        const vals = []
         for (const r of archRows(b)) {
           if (r._placeholder) continue
           const v = Number(r[c.prop])
-          if (Number.isFinite(v)) { acc += v; has = true }
+          if (Number.isFinite(v)) vals.push(v)
         }
-        sums[c.prop] = has ? Math.round(acc * 100) / 100 : ''
+        // 位数跟明细走(decimal(18,4) 不再被砍成 2 位),见 @core/panel/sumTotals
+        sums[c.prop] = vals.length ? sumKeepScale(vals) : ''
       }
     }
     m[b.id] = sums
@@ -4111,7 +4211,8 @@ function sumMethod({ columns, data }) {
       sums[i] = vals[vals.length - 1]
       return
     }
-    sums[i] = Math.round(vals.reduce((a, b) => a + b, 0) * 100) / 100
+    // 位数跟本列明细走(2026-10-03:合计原先恒 2 位,明细是 decimal(18,4) ⇒ 1.2345 被显示成 1.23)
+    sums[i] = sumKeepScale(vals)
   })
   return sums
 }
@@ -4447,7 +4548,7 @@ async function printApprovalSheet() {
 // 标准单据面板打印不再直出屏幕 DOM(el-table 固定列宽,字段一多打印必然横向截断),
 // 改走 .doc-print 纯表格打印层:数据与 A 区同源(同 tab/同过滤排序),仅版式为打印优化。
 const docPrintEnabled = computed(() => {
-  if (isApprovalDoc.value || reportMode.value || isBomMasterPanel.value) return false
+  if (isApprovalDoc.value || reportMode.value) return false
   return (cfgCache.value?.detail?.tabs || []).length > 0
 })
 const docPrintBlock = computed(() => blocks.value.find((b) => b.isMain) || blocks.value[0] || null)
@@ -4863,9 +4964,19 @@ function formatFieldValue(field, value) {
 
 function headerFieldLocked(field) {
   const key = headerFieldKey(field)
+  // 材料码打印明细生成的单据:**批次号锁死**(草稿态也不给改)——
+  // 用户口径「只要有关打印明细生成的单据都不可以修改批次号」。依据见 printBatchLock。
+  if (key === '批次号' && printBatchLock.value?.锁定) return true
   // readonly:元数据 editable=0 → buildMeta 下发 readonly(文书锁定字段 申请立项人/负责人 在此列)
   return !!field.computed || !!field.autoCode || !!field.readonly
     || ['编号', '单据状态', '创建时间', '更新时间', '发起人编号'].includes(key)
+}
+
+/** 批次号被"材料码"锁定的原因(没锁则空串;给只读格当 title 用) */
+function printBatchLockReason(field) {
+  return headerFieldKey(field) === '批次号' && printBatchLock.value?.锁定
+    ? String(printBatchLock.value?.依据 || tt('已按材料码批次号锁定'))
+    : ''
 }
 
 function headerRefText(field) {
@@ -4936,6 +5047,7 @@ function onActiveCellEchoInput(row, prop, v) {
 }
 function activateCell(row, b, prop) {
   if (!detailEditable(b) || row?._placeholder) return
+  if (detailBatchLocked(prop)) return    // 批次号(链路单据):行随单头,明细格不进入编辑(2026-10-04 口径)
   const a = activeCell.value
   if (a && a.row === row && a.tabKey === activeTab(b).key && a.prop === prop) return
   activeCell.value = { row, tabKey: activeTab(b).key, prop }
@@ -5079,20 +5191,9 @@ function applyDetailReference(target, field, source) {
 function calculateDetailRow(tabKey, row) {
   const tab = detailTabDefOf(tabKey)
   if (!tab?.calc?.length) return
-  const numeric = (value) => Number.isFinite(Number(value)) ? Number(value) : 0
-  for (const rule of tab.calc) {
-    let expression = String(rule.formula || '')
-    const names = [...new Set(expression.match(/[^\s+\-*/()]+/g) || [])]
-      .filter((name) => !/^\d+(?:\.\d+)?$/.test(name))
-      .sort((a, b) => b.length - a.length)
-    for (const name of names) expression = expression.split(name).join(String(numeric(row[name])))
-    if (!/^[\d.\s+\-*/()]+$/.test(expression)) continue
-    let value
-    try { value = Function(`"use strict"; return (${expression})`)() } catch (error) { value = 0 }
-    if (!Number.isFinite(value)) value = 0
-    if (rule.round != null) value = engine.roundDecimal(value, rule.round)
-    row[rule.target] = value
-  }
+  // 求值口径统一在 @core/panel/calcRules(与后端 CalcRuleService 同一份规则、同一个守卫):
+  // 入参全空则不写入,避免"单价/数量都没填"的行因改别的格子把手工金额抹成 0。
+  applyCalcRules(tab.calc, row)
 }
 
 function currentFormData(detail) {
@@ -5111,10 +5212,6 @@ function emptyFieldValue(value) {
 }
 
 function validateInlineDraft() {
-  if (panelCode.value === 'BOM' && bomMasterRef.value) {
-    const validation = bomMasterRef.value.validate()
-    if (validation) return validation
-  }
   for (const field of headerFields.value) {
     const key = headerFieldKey(field)
     if (field.isRequired && emptyFieldValue(cur.value[key])) {
@@ -5128,8 +5225,6 @@ function validateInlineDraft() {
     }
   }
   for (const tab of cfgCache.value?.detail?.tabs || []) {
-    // BOM 面板:子件关系由 BomMasterDetail.validate 校验(锚点行 子件编码='' 合法),跳过通用逐行校验
-    if (panelCode.value === 'BOM' && tab.key === 'children') continue
     const rows = cur.value.detail?.[tab.key] || []
     if (tab.isRequired && !rows.length) return `请至少添加一行${tab.label || '明细'}`
     for (let index = 0; index < rows.length; index++) {
@@ -5165,12 +5260,32 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
   inlineSaving.value = true
   const documentNo = cur.value['编号']
   try {
-    await engine.callButton({
+    // 档案面板:只提交**改动行**(用户口径 2026-10-03「修改提交改动行」)——
+    // 商品这类几千行的档案不再整表提交,后端也据此不做"缺席即删除"推断(误删护栏)。
+    let payload
+    if (singleDocMode.value) {
+      const changed = changedArchiveRows()
+      if (!changed.length) {
+        inlineDirtyFlag.value = false
+        markSavedSnapshot()
+        if (!silent) ElMessage.success(tt('没有需要保存的改动'))
+        return true
+      }
+      const detail = {}
+      for (const key of Object.keys(cur.value.detail || {})) detail[key] = changed
+      payload = currentFormData(detail)
+    } else {
+      payload = currentFormData({ ...(cur.value.detail || {}) })
+    }
+    const res = await engine.callButton({
       panelCode: panelCode.value,
       buttonName,
-      formData: currentFormData({ ...(cur.value.detail || {}) }),
-      buttonParam: {},
-    })
+      formData: payload,
+      buttonParam: archiveSaveParam(),
+    })    // 旧客户端口径的兜底提示:后端在"既没声明改动行、也没声明整档"时会跳过缺席行软删
+    if (res && Number(res['未全量跳过软删']) > 0) {
+      ElMessage.warning(tt('当前列表带筛选，本次保存只更新已加载的行，未显示的行不会被删除'))
+    }
     await load()
     const index = list.value.findIndex((item) => item['编号'] === documentNo)
     if (index >= 0) curIdx.value = index
@@ -5185,51 +5300,6 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
     return false
   } finally {
     inlineSaving.value = false
-  }
-}
-
-/** BOM 展开：产品明细行带出材料明细（从 BOM 面板 children 按父件编码取子件，对齐表单页 loadBomFor） */
-async function expandBomMaterials(detail, productRows) {
-  const matTab = (cfgCache.value?.detail?.tabs || []).find((t) => t.key === 'materials')
-  if (!matTab) return
-  try {
-    const res = await engine.queryFormDataList({ panelCode: 'BOM', condition: {}, pageNo: 1, pageSize: 100 })
-    const bom = []
-    for (const d of res.list || []) {
-      for (const it of (d.detail && d.detail.children) || []) {
-        if (!String(it['子件编码'] || '').trim()) continue // 锚点行(暂无子件的父件占位)不参与展开
-        const parent = String(it['父件编码'] || '')
-        if (!parent || !productRows.some((r) => String(r['产品编码'] || '') === parent)) continue
-        bom.push({
-          材料编码: it['子件编码'],
-          材料名称: it['子件名称'],
-          规格型号: it['规格型号'] || '',
-          计量单位: it['子件计量单位'] || '件',
-          定额需用数量: it['定额数量'] ?? 0,
-          '损耗率%': it['损耗率%'] ?? 0,
-          parent,
-        })
-      }
-    }
-    if (!bom.length) return
-    const mats = detail.materials || (detail.materials = [])
-    const existing = new Set(mats.map((m) => m['材料编码'] + ':' + m['子件BOM']))
-    for (const b of bom) {
-      const key = b['材料编码'] + ':' + b.parent
-      if (existing.has(key)) continue
-      const row = newDetailRow('materials')
-      row['材料编码'] = b['材料编码']
-      row['材料名称'] = b['材料名称']
-      row['规格型号'] = b['规格型号']
-      row['计量单位'] = b['计量单位']
-      row['定额需用数量'] = b['定额需用数量']
-      row['损耗率%'] = b['损耗率%']
-      row['子件BOM'] = b.parent
-      mats.push(row)
-      existing.add(key)
-    }
-  } catch (e) {
-    // BOM 查询失败不阻塞参照导入
   }
 }
 
@@ -5269,11 +5339,6 @@ async function onDetailRefConfirm(selectedRows) {
   }
 
   await engine.fillCurrentStock(changedRows)
-
-  // BOM 展开：产品明细选产品 → 从 BOM 面板 children 带出材料明细（与表单页 loadBomFor 一致）
-  if (pick.tabKey === 'products' && pick.field.dataName === '产品编码') {
-    await expandBomMaterials(detail, targetRows)
-  }
 
   detailRefSaving.value = true
   try {
@@ -5326,11 +5391,11 @@ function openQueryDialog() {
 function openQueryRef(qr, context = 'page') {
   // 台账/库存状况(2026-09-28):弹窗里选「存货」且已选仓库 → 候选按「该仓有流水」收窄。
   // 注入数组型 filter{存货编码:[…]}(engine.queryRefRows 对数组 filter 在展平后的档案行上逐行精确匹配,
-  // 不会误发给后端当查询条件);该仓无任何有流水的档案存货时不收窄(不给空清单)。
+  // 不会误发给后端当查询条件);按编码收窄(名称重名/改名不影响);该仓无任何有流水的档案存货时不收窄(不给空清单)。
   // 按**编码**而非名称:存货档案重名严重(「端盖」24 码、「PP棉」18 码),按名称会把
   // 同名异码整批放进候选,用户分不清哪个有流水 —— 编码唯一,收窄后一码一物(单一性)。
   if (context === 'dialog' && isCascadePanel.value && headerFieldKey(qr) === '存货' && queryDraft['仓库']) {
-    const codes = ledgerItemOptions.value
+    const codes = ledgerItemOptions.value.map((o) => o.code).filter(Boolean)
     if (codes.length) qr = { ...qr, filter: { ...(qr.filter || {}), 存货编码: codes } }
   }
   queryRefField.value = qr
@@ -5342,6 +5407,9 @@ function clearQueryRef(qr, context = 'page') {
   const key = headerFieldKey(qr)
   if (context === 'dialog') {
     delete queryDraft[key]
+    // 编码与名称成对清理(台账/状况表绑码)
+    if (isCascadePanel.value && key === '仓库') delete queryDraft['_whCode']
+    if (isCascadePanel.value && key === '存货') delete queryDraft['_itemCode']
     return
   }
   delete condition[key]
@@ -5356,11 +5424,25 @@ function onQueryRefConfirm(rows) {
   const valueField = ref.field || ref.refField || ref.display || ref.displayField || headerFieldKey(field)
   const target = queryRefContext.value === 'dialog' ? queryDraft : condition
   target[headerFieldKey(field)] = row[valueField] ?? ''
+  // 台账/状况表:参照行携带编码,选中即绑码(_whCode/_itemCode)——查询条件按编码过滤,名称仅回显
+  if (queryRefContext.value === 'dialog' && isCascadePanel.value) {
+    const key = headerFieldKey(field)
+    if (key === '仓库') {
+      const c = row['仓库编码']
+      queryDraft['_whCode'] = c ? String(c).trim() : ''
+    }
+    if (key === '存货') {
+      const c = row['存货编码']
+      queryDraft['_itemCode'] = c ? String(c).trim() : ''
+    }
+  }
   queryRefVisible.value = false
   queryRefField.value = null
-  // 台账/库存状况:弹窗选了存货 → 重拉联动(该存货无流水的仓置灰;当前仓无此存货流水则清仓)
-  if (queryRefContext.value === 'dialog' && isCascadePanel.value && headerFieldKey(field) === '存货') {
-    loadLedgerRefOptions({ keepWh: false, keepItem: true })
+  // 台账/库存状况:弹窗选了 仓库 或 存货 都重拉联动——选仓后存货候选按新仓收窄(旧存货失效被清);
+  // 选存货后该存货无流水的仓置灰(当前仓无此存货流水则清仓)。补上了旧版「参照弹窗选仓不联动」的缺口。
+  if (queryRefContext.value === 'dialog' && isCascadePanel.value && ['仓库', '存货'].includes(headerFieldKey(field))) {
+    const isWh = headerFieldKey(field) === '仓库'
+    loadLedgerRefOptions(isWh ? { keepWh: true, keepItem: false } : { keepWh: false, keepItem: true })
   }
   if (queryRefContext.value === 'page') search()
 }
@@ -6024,36 +6106,18 @@ async function onButton(action) {
     qrVisible.value = true
     return
   }
-  // 采购订单·打印材料码(2026-09-28 用户口径:供应商自己打码→在采购单打;版式=产品标识卡
-  // printProductCards 75×100mm 一行一卡,与采购入库单「打印标识卡」/商品档案同款):
-  // 订单编号/供应商名称/物料编码/物料规格/数量取订单事实,批次·生产日期留横线(订单阶段无批号,
-  // 收货入库时由我方在采购入库单打印带批号标识卡);二维码=公司代码@物料编码(productCardQrText,
-  // 批次空即两段,与商品档案扫码口径一致)。
-  // 入口分工:没批号→商品档案「二维码标签」;自己打带批号→采购入库单「打印标识卡」。
+  // 采购订单·打印材料码(2026-10-04 用户口径:供应商自己打码):
+  // 由"直接出纸"改为**打开打印弹窗** —— 打印时才能确定批次号(它原本要到生单那一刻才有),
+  // 弹窗里按公式预填、可改、勾行填量,确认后**先落库登记**(bd_pu_label/bl_pu_label)再出纸,
+  // 并**预约**该行数量(未生单的预约量从余量里扣减)。该预约随后在生单对话框的
+  // 作为**独立的一行**被消费。方案:docs/plans/2026-10-04-采购订单材料码批次号方案.md
+  // 入口分工不变:没批号→商品档案「二维码标签」;自己打带批号→本弹窗(采购入库单另有「打印标识卡」)。
   if (action === '打印材料码' && panelCode.value === 'PU_ORDER') {
     const cur = current.value || {}
     const no = cur['单据编号'] || cur['编号'] || ''
     if (!no) return ElMessage.warning(tt('请先选择一张单据'))
-    try {
-      const res = await engine.getFormDescriptor({ panelCode: panelCode.value, code: no })
-      const doc = res?.data || {}
-      const lines = Object.values(res?.detailData || {})[0] || []
-      const rows = (lines || [])
-        .filter((l) => l && l['物料编码'])
-        .map((l) => ({
-          编码: l['物料编码'],
-          规格: l['规格型号'] || '',
-          数量: l['数量'] ?? '',
-          批次: '',
-          订单编号: doc['单据编号'] || no,
-          供应商名称: doc['供应商'] || '',
-          生产日期: '',
-        }))
-      if (!rows.length) return ElMessage.warning(tt('当前单据没有可打印的明细行'))
-      await printProductCards(rows)
-    } catch (e) {
-      ElMessage.error(engine.errMsg(e) || tt('打印失败'))
-    }
+    materialLabelNo.value = no
+    materialLabelVisible.value = true
     return
   }
   // 采购入库单·打印标识卡(2026-09-28 用户需求):当前单据明细行 → 商品档案同款 75×100mm 产品标识卡
@@ -6380,6 +6444,10 @@ async function onButton(action) {
       const tab = blk ? activeTab(blk) : null
       const key = tab ? tab.key : 'items'
       const items = cur.value.detail && Array.isArray(cur.value.detail[key]) ? cur.value.detail[key] : []
+      // 档案面板:删除走**显式作废行id**(不再靠"缺席即删除"推断)——先取 id 再摘行,
+      // 提交内容仍是"只提交改动行"(其余行原样不动)
+      const removedIds = singleDocMode.value
+        ? delSel.value.map((r) => archiveRowIdOf(r)).filter(Boolean) : []
       const remain = items.filter((it) => !delSel.value.includes(it))
       const head = { ...cur.value }
       delete head.detail
@@ -6388,11 +6456,17 @@ async function onButton(action) {
       delete head['创建时间']
       delete head['更新时间']
       delete head['发起人编号']
+      const detailPayload = singleDocMode.value
+        ? Object.fromEntries(Object.keys(cur.value.detail || {}).map((k) => [k, changedArchiveRows()]))
+        : { ...(cur.value.detail || {}), [key]: remain }
       await engine.callButton({
         panelCode: panelCode.value,
         buttonName: '保存',
-        formData: { ...head, 编号: cur.value['编号'], detail: { ...(cur.value.detail || {}), [key]: remain } },
-        buttonParam: {},
+        formData: {
+          ...head, 编号: cur.value['编号'], detail: detailPayload,
+          ...(removedIds.length ? { 作废行id: removedIds } : {}),
+        },
+        buttonParam: archiveSaveParam(),
       })
       ElMessage.success('已删除 ' + delSel.value.length + ' 行')
       delMode.value = false
@@ -6546,6 +6620,24 @@ async function onButton(action) {
       formData: current.value ? { 编号: current.value['编号'], ...(auditOpinion !== '' ? { 审核意见: auditOpinion } : {}), ...(approvalOpinion !== '' ? { 审批意见: approvalOpinion } : {}), ...(modifyReason !== '' ? { 修改原因: modifyReason } : {}) } : {},
       buttonParam: {},
     })
+    // 送料暂收单「生单」按商品基本档案「来料检验」**逐行分流**(2026-10-05 用户口径):
+    // 一张暂收单可能同时产出 来料检验单 + 采购入库单,后端把实际生成的清单放在 res['生成清单'] —— 这里逐张说清,
+    // 再跳到第一张(通用 gotoPanel 分支只会报一张,会把"其实还生成了另一张"瞒掉)。
+    if (Array.isArray(res?.['生成清单']) && res['生成清单'].length) {
+      const made = res['生成清单']
+      const parts = made.map((m) => `${tt(m['面板名称'])} ${m['编号']}（${m['行数']} ${tt('行')}）`).join('、')
+      ElMessage.success(`${tt('已生成')} ${parts}，${tt('请在列表页继续填写')}`)
+      const missing = res['未登记商品']
+      if (Array.isArray(missing) && missing.length) {
+        ElMessage.warning(`${tt('商品档案未登记的商品按免检（否）处理')}：${missing.join('、')}`)
+      }
+      const targetPanel = made[0]['面板']
+      const targetPath = `/panelx/list/${targetPanel}`
+      tabs.close(route.path)
+      router.push(targetPath)
+      tabs.open({ path: targetPath, title: targetPanel })
+      return
+    }
       if (res?.gotoPanel) {
       if (res.gotoPanel === 'WORK_ORDER_LIST') {
         // 单轨(2026-09-26):生产工单落 plang,前往生产工单列表页(独立路由,非 panelx 面板)
@@ -6654,6 +6746,8 @@ async function load(clamping = false) {
     markArchListRaw(res.list) // 档案:进入响应式系统前 markRaw 明细行(赋值后打在代理上无效)
     list.value = res.list || []
     total.value = res.totalSize || 0
+    // 档案「改动行提交」基线:载入即快照,保存只发改动行(见 archiveBaseline 注释)
+    snapshotArchiveBaseline()
     // 页码越界自愈(末页删单/换每页条数/筛选后页码残留):回落到最后一页重取,避免空白页与页码错乱
     const lp = Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize)))
     if (!clamping && query.pageNo > lp) {
@@ -6760,15 +6854,10 @@ async function onImported(rows) {
   }
 }
 
-// 存货（INV）面板：单击行 → 打开 BOM 管理弹窗（勾选存货添加子件、可多级下钻）
+// 明细行单击：占位行 → 新增行；产成品明细行 → 联动过滤材料明细（存货 INV 面板为纯存货管理,行点击不做额外处理）
 function onRowClick(row, b) {
   if (row?._placeholder && detailEditable(b)) {
     openBlankDetailRow(b)
-    return
-  }
-  // 材料明细：点材料行 → 该材料有下级 BOM 则弹窗展示其子件
-  if (b && b.id === 'B' && activeTab(b).key === 'materials' && row && row['材料编码'] && hasSubBom(row['材料编码'])) {
-    openSubBom(row)
     return
   }
   // 产成品→材料联动：MANU_ORDER 等单据点产成品明细行 → 材料明细只显示其 BOM 子件
@@ -6776,7 +6865,7 @@ function onRowClick(row, b) {
     selectProduct(row['产品编码'])
     return
   }
-  // 存货（INV）面板为纯存货管理（2026-08-25：BOM 关系维护已迁移至物料清单面板，存货行点击不再弹 BOM 管理）
+  // 存货（INV）面板为纯存货管理,存货行点击不再做任何额外处理
   if (panelCode.value === 'INV') return
 }
 
@@ -6784,17 +6873,6 @@ function onRowClick(row, b) {
 async function onTableClick(b, e) {
   if (!b || !e || !e.target || !e.target.closest) return
   const t = activeTab(b)
-  // 材料明细：点材料行 → 该材料有下级 BOM 则弹窗展示其子件
-  if (b.id === 'B' && t.key === 'materials') {
-    const tr = e.target.closest('tr')
-    if (!tr) return
-    const body = tr.closest('.el-table__body-wrapper') || tr.closest('.el-table__fixed-body-wrapper')
-    const rows = body ? [...body.querySelectorAll('tbody tr')] : []
-    const idx = rows.indexOf(tr)
-    const row = detailRows(t)[idx]
-    if (row && row['材料编码'] && hasSubBom(row['材料编码'])) openSubBom(row)
-    return
-  }
   if (b.id !== 'A') return
   if (t.key !== 'products') return
   const tr = e.target.closest('tr')
@@ -6807,60 +6885,9 @@ async function onTableClick(b, e) {
   selectProduct(row['产品编码'])
 }
 
-// 材料下级 BOM 映射（BOM 面板 children：父件编码 → 子件行）；材料编码行右上角显示红 *，点击行弹窗查看
-async function loadSubBomMap() {
-  try {
-    const res = await engine.queryFormDataList({ panelCode: 'BOM', condition: {}, pageNo: 1, pageSize: 100 })
-    const map = {}
-    for (const d of res.list || []) {
-      for (const it of (d.detail && d.detail.children) || []) {
-        if (!String(it['子件编码'] || '').trim()) continue // 锚点行不参与
-        const parent = it['父件编码']
-        if (!parent) continue
-        if (!map[parent]) map[parent] = []
-        map[parent].push({
-          材料编码: it['子件编码'],
-          材料名称: it['子件名称'],
-          规格型号: it['规格型号'] || '',
-          计量单位: it['子件计量单位'] || '件',
-          定额需用数量: it['定额数量'] ?? 0,
-          '损耗率%': it['损耗率%'] ?? 0,
-        })
-      }
-    }
-    subBomMap.value = map
-  } catch (err) {}
-}
-
-function hasSubBom(code) {
-  const b = subBomMap.value[code]
-  return Array.isArray(b) && b.length > 0
-}
-
-function openSubBom(row) {
-  const code = row['材料编码']
-  subBomMaterial.value = row
-  subBomBom.value = (subBomMap.value[code] || []).map((r) => ({ ...r }))
-  subBomVisible.value = true
-}
-
-// 选中产成品：行高亮 + 材料明细联动（物料清单 BOM 面板 children → 子件编码集合；2026-08-25 原 INV _bom 已迁移）
-async function selectProduct(code) {
+// 选中产成品：行高亮 + 材料明细联动（材料行按自身 子件BOM=产品编码 的存储值过滤，纯本地数据，无外部取数）
+function selectProduct(code) {
   selectedProduct.value = code
-  selectedBomCodes.value = []
-  try {
-    const res = await engine.queryFormDataList({ panelCode: 'BOM', condition: {}, pageNo: 1, pageSize: 200 })
-    const codes = []
-    for (const d of res.list || []) {
-      for (const it of (d.detail && d.detail.children) || []) {
-        if (String(it['父件编码']) !== code) continue
-        if (it['子件编码']) codes.push(String(it['子件编码']))
-      }
-    }
-    selectedBomCodes.value = codes
-  } catch (err) {
-    // 查询失败按 子件BOM 标记兜底
-  }
 }
 
 // 切面板拆装分帧(2026-09-28):清空 cfgCache/gridTabs 会同步拆掉旧表格,而参照记忆化后
@@ -6983,7 +7010,6 @@ onMounted(() => {
   // 单据打印版式:Ctrl+P 直打印同样走 .doc-print 层;打印结束还原屏幕
   window.addEventListener('beforeprint', onBeforePrintDoc)
   window.addEventListener('afterprint', onAfterPrintDoc)
-  loadSubBomMap() // 材料下级 BOM 映射（红 * 标记 + 点击行弹窗）
   if (invalidPanel.value) {
     router.replace('/panelx/list/MANU_ORDER')
     return
@@ -8061,11 +8087,6 @@ onUnmounted(() => {
 .dt-ic:hover {
   color: #2f4d75;
 }
-.mat-cell {
-  position: relative;
-  display: inline-block;
-  width: 100%;
-}
 .inline-ref-editor {
   position: relative;
   display: flex;
@@ -8085,6 +8106,22 @@ onUnmounted(() => {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 只读明细格(批次号:行随单头一致,不可手改)—— 与 inline-computed-value 同款纯文本呈现,
+   底色略灰以示"这格不由你填",避免用户点了没反应以为坏了 */
+.cell-locked {
+  display: block;
+  min-height: 30px;
+  padding: 6px 8px;
+  overflow: hidden;
+  color: #556171;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #f7f9fb;
+  cursor: not-allowed;
+}
+/* 单头「批次号」被材料码锁定时的小角标(2026-10-04:来自打印明细生成的单据,批次号不可改) */
+.field-lock-badge { margin-left: 6px; font-size: 11.5px; color: #b88230; }
 .inline-ref-editor.active :deep(.el-input__wrapper) {
   padding-right: 24px;
   box-shadow: 0 0 0 1px #4b74a6 inset;
@@ -8162,17 +8199,6 @@ onUnmounted(() => {
 }
 .detail :deep(.el-table td .el-switch) {
   margin-left: 8px;
-}
-.mat-star {
-  position: absolute;
-  top: 2px;
-  right: 2px;
-  color: #e60000;
-  font-weight: 700;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  user-select: none;
 }
 .filter-hint {
   font-size: 12px;

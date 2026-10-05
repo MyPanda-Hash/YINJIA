@@ -1,6 +1,15 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '待超级管理员批准': 'En attente d\'approbation du super-administrateur',
+    '单据已批准': 'Document approuvé',
+    /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
+    '批准通过': 'Approuver',
+    '批准驳回': 'Rejeter',
+    '「{panelName} {docNo}」已由 {actor} 一级审核通过，等待您批准。意见：{opinion}': '« {panelName} {docNo} » a passé la revue de premier niveau par {actor} ; en attente de votre approbation. Commentaire : {opinion}',
+    '您一级审核通过的「{panelName} {docNo}」已由 {actor} 批准通过。': 'Le « {panelName} {docNo} » que vous avez validé au premier niveau a été approuvé par {actor}.',
+    '二级审批被驳回': 'Approbation de deuxième niveau rejetée',
+    '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': 'Le « {panelName} {docNo} » que vous avez validé au premier niveau a été rejeté par {actor} et renvoyé en brouillon. Commentaire : {opinion}',
     '分发成功，已分配 {n} 张规格书': 'Distribution réussie ; {n} fiche(s) de spécification attribuée(s)',
     '已选 {n} 个商品，预览二维码标签？': '{n} article(s) sélectionné(s). Prévisualiser les étiquettes QR ?',
     '该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批': 'La fiche de spécification {no} de ce produit n\'a pas terminé sa soumission/approbation (actuel : {st}) ; le remplissage automatique est impossible. Complétez d\'abord la fiche et terminez la soumission/approbation.',
@@ -232,6 +241,8 @@ export default {
     '四．改善追踪结果': 'IV. Improvement Follow-up Result',
     '七．成本损失': 'VII. Cost of Loss',
     '特采理由': 'Special Procurement Reason',
+    '特采': 'Acceptation particulière',
+    '送检数量': 'Qté envoyée au contrôle',
     '材料费用': 'Material Cost',
     '人工费': 'Labor Cost',
     '其他费用': 'Other Cost',
@@ -273,6 +284,8 @@ export default {
     '生成送料暂收单': 'Générer réception temporaire de matière',
     '生成来料检验单': 'Générer fiche d\'inspection à réception',
     '生成采购入库单': 'Générer réception \'achat',
+    '请在列表页继续填写': 'Continuez la saisie dans la liste',
+    '商品档案未登记的商品按免检（否）处理': 'Les articles non enregistrés dans le référentiel sont traités comme dispensés de contrôle (Non)',
     '品质追溯': 'Traçabilité qualité',
     '不良处理': 'Traitement des défauts',
     '制程品质': 'Qualité processus',
@@ -2088,7 +2101,8 @@ export default {
     '已送合计': 'Total livré',
     '待编号': 'N° en attente',
     '{n} 批待编号': '{n} lot(s) sans n°',
-    '采购入库单填单时按入库日期预设,可修改': 'Le lot est prédéfini depuis la date de réception lors de la saisie du bon de réception; modifiable',
+    '生单时按供应商编码与当天日期生成': 'Généré depuis le code fournisseur et la date du jour à la création du document',
+    '随单头批次号一致,不可修改': "Identique au numéro de lot de l'en-tête ; non modifiable",
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Seules les lignes cochées sont générées ; max = qté commandée × (1 + taux) − livré + retourné (sur-livraison max 50 %)',
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = interdit ; max 50 %, quota basé sur la quantité commandée)',
     '请至少勾选一行并填写本次送料数量': 'Cochez au moins une ligne et saisissez la quantité à livrer',

@@ -1,0 +1,10 @@
+seg|tbl|len_批次号|len_批次键
+1-DETAIL-COLS|qc_insp_detail|100|null
+1-DETAIL-COLS|qc_jjf_detail|null|null
+1-DETAIL-COLS|qc_return_detail|100|null
+1-DETAIL-COLS|qc_tc_in_detail|null|null
+1-DETAIL-COLS|sl_recv_detail|100|null
+seg|panel_code|col_name|place|editable
+2-YJFIELD|QC_JJF|批次号|query,header|0
+2-YJFIELD|QC_RETURN|批次号|query,header|0
+2-YJFIELD|QC_RETURN|批次号|detail|0

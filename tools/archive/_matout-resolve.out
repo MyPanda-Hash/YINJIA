@@ -1,0 +1,15 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:14 字符: 142
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-resolve.sql ==
+  | 生产车间→部门编码 | 烧结车间 | BM00006 | 
+  | 生产车间→部门编码 | 精整车间 | D07 | 
+  | 领用人→员工编码 | 白兴发 | ZY00059 | 
+  | 仓库→仓库编码 | 原料仓 | CK01 | 
+  | 计量单位→UOM命中 | 支 | 支 | 
+[OK] _q-matout-resolve.sql (2 batches)

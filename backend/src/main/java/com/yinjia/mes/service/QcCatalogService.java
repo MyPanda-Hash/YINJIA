@@ -21,10 +21,12 @@ import java.util.Map;
  *       <b>各建一张检验数据记录草稿</b>,并在检验目录写入对应行(幂等:同一检验单号+物料编码只有一行)。</li>
  *   <li><b>目录不可手工编辑</b>:目录行只由生单与「完成/修改」按钮驱动;检测物料类别由
  *       商品档案 {@code bs_inv.所属类别} 按物料编码带出(为空则不填,前端亦不归纳)。</li>
- *   <li><b>数量</b>=检验单明细「送检数量 + 单位」;<b>批次号</b>靠回填(先留空,回填时补齐)。</li>
+ *   <li><b>数量</b>=检验单明细「送检数量 + 单位」;<b>批次号</b>随检验单带入(2026-10-04 口径:
+ *       批次号在「采购订单→送料暂收单」生单那一刻定稿、逐站继承到检验单,报告与目录行**建单即带号**,
+ *       不再有"等采购入库审核回填")。</li>
  *   <li><b>检验状态</b>开局「正在检验中」;「完成」按钮校验关联的检验单与检验数据记录都已审批
  *       (检验单=已审核;检验数据记录=已归档/已审核),通过后置「已完成检验」并可同时给出「是否合格」。</li>
- *   <li><b>两个单号</b>:检验单号(查看详情/跳转)+ 检验数据记录单号(数据挂靠键 —— 批次号可能尚未回填)。</li>
+ *   <li><b>两个单号</b>:检验单号(查看详情/跳转)+ 检验数据记录单号(数据挂靠键)。</li>
  *   <li><b>「修改」按钮</b>:把「已完成检验」回弹为「正在检验中」(目录移出完成态后,才可反审核挂靠单据),
  *       并写一条修改记录(复用 yj_doc_modify_log,由既有「修改记录」按钮展示)。</li>
  *   <li><b>守卫</b>:挂靠单据反审核时若目录行已完成 → 拒绝并提示先在目录点「修改」;
@@ -101,12 +103,12 @@ public class QcCatalogService {
             if (existId != null) {
                 // 已生成过:复用其检验数据记录单号(仍存活才复用,否则新建)
                 String oldRec = str(firstValue("SELECT 检验数据记录单号 FROM qc_catalog_detail WHERE id=?", existId));
-                recNo = recExists(oldRec) ? oldRec : createInspRecord(invName, invCode, qty, unit, inspDate, user);
+                recNo = recExists(oldRec) ? oldRec : createInspRecord(invName, invCode, qty, unit, inspDate, curBatch, user);
                 jdbc.update("UPDATE qc_catalog_detail SET 检测物料类别=?, 物料名称=?, 数量=?, 计量单位=?, 批次号=?, 检验数据记录单号=?,"
                         + " asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                         nv(category), nv(invName), nv(qty), nv(unit), nv(curBatch), nv(recNo), user, existId);
             } else {
-                recNo = createInspRecord(invName, invCode, qty, unit, inspDate, user);
+                recNo = createInspRecord(invName, invCode, qty, unit, inspDate, curBatch, user);
                 // 列序:…,计量单位,检验状态,是否合格,检验单号,检验数据记录单号,asp_user1,asp_time1
                 // ⇒ 检验状态=ST_DOING(正在检验中)、是否合格=NULL(未判定) —— 原实现把 NULL 写在检验状态位、
                 //    且少一个 ?(10 占位 vs 11 参数)致 "index 11 out of range"(2026-09-24 修,口径同存量数据)
@@ -174,19 +176,23 @@ public class QcCatalogService {
 
     /**
      * 建检验数据记录(检验报告):抬头带出物料/数量等,**建出来就是已保存态**(用户口径:报告数据要已经保存好的);
-     * **物料批次号不在此处写** —— 批次号由采购入库单审核取号后回填,故留空,
-     * 待入库后经 {@link #refreshBatchNosFromInsp()} 自动回填(用户口径:物料批次号是后面入库后自动回填的)。
+     * **物料批次随建单写入**(2026-10-04 口径):批次号在「采购订单→送料暂收单」生单那一刻就定稿、
+     * 逐站继承到检验单,故本报告建出来就带号 —— 不再有"等采购入库审核回填"这一说
+     * (旧 {@code refreshBatchNosFromInsp} 收尾已删除)。
+     *
+     * @param batchNo 检验单头上的批次号(为空则落 NULL,不写空串)
      */
-    private String createInspRecord(String invName, String invCode, String qty, String unit, String inspDate, String user) {
+    private String createInspRecord(String invName, String invCode, String qty, String unit,
+                                    String inspDate, String batchNo, String user) {
         String no = formNoService.next(REC_PREFIX, user);
         String date = LocalDate.now().toString();
         // 来料数量 = 数量+单位拼合(用户口径:合在一起);计量单位列仅作链路(界面隐藏)
-        // 列序:单据编号,单据日期,物料名称,物料编码,物料批次(NULL),检验日期,来料数量,计量单位,文件编码,检验依据,检验人,表单审核人,asp_user1,asp_time1
+        // 列序:单据编号,单据日期,物料名称,物料编码,物料批次,检验日期,来料数量,计量单位,文件编码,检验依据,检验人,表单审核人,asp_user1,asp_time1
         // ⇒ 12 个 ? 对应 11 个业务参数 + user(asp_user1);原实现少一个 ? 致 "index 12 out of range"(2026-09-24 修)
         jdbc.update("INSERT INTO qc_insp_rec (单据编号, 单据日期, 物料名称, 物料编码, 物料批次, 检验日期, 来料数量, 计量单位,"
                 + " 文件编码, 检验依据, 检验人, 表单审核人, asp_user1, asp_time1)"
-                + " VALUES (?,?,?,?,NULL,?,?,?,?,?,?,?,?,GETDATE())",
-                no, date, nv(invName), nv(invCode), nv(inspDate.isBlank() ? date : inspDate), nv(qty), nv(unit),
+                + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,GETDATE())",
+                no, date, nv(invName), nv(invCode), nv(batchNo), nv(inspDate.isBlank() ? date : inspDate), nv(qty), nv(unit),
                 REC_DOC_CODE, REC_BASIS, user, REC_REVIEWER, user);
         mergeStatus(REC_PANEL, no, user, true);
         return no;
@@ -309,35 +315,6 @@ public class QcCatalogService {
         assertNoLinkedDocs(rowId);
         return jdbc.update("UPDATE qc_catalog_detail SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                 user, rowId);
-    }
-
-    /** 批次号回填:把检验单(或报告)上的批次号补进对应目录行(目录行批次号可能尚未回填) */
-    @Transactional
-    public int backfillBatchNo(String paneCode, String docNo, String batchNo) {
-        if (docNo == null || docNo.isBlank() || batchNo == null || batchNo.isBlank()) return 0;
-        String col = INSP_PANEL.equals(paneCode) ? "检验单号" : (REC_PANEL.equals(paneCode) ? "检验数据记录单号" : null);
-        if (col == null) return 0;
-        return jdbc.update("UPDATE qc_catalog_detail SET 批次号=?, asp_user2='system', asp_time2=GETDATE()"
-                + " WHERE " + col + "=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(批次号,N'')=''", batchNo, docNo);
-    }
-
-    /**
-     * 批次号回填收尾(采购入库单审核取号回填全链之后调用):
-     * 目录行批次号为空、而挂靠检验单已有批次号时补齐 —— 用户口径「批次号是通过回填得到的」。
-     */
-    @Transactional
-    public int refreshBatchNosFromInsp() {
-        // ① 目录行:挂靠检验单已有批次号时补齐空批次号
-        int n = jdbc.update("UPDATE d SET d.批次号 = h.批次号, d.asp_user2 = 'system', d.asp_time2 = GETDATE()"
-                + " FROM qc_catalog_detail d INNER JOIN qc_insp h ON h.单据编号 = d.检验单号"
-                + " WHERE ISNULL(d.asp_cancel,'N') <> 'Y' AND ISNULL(d.批次号, N'') = '' AND ISNULL(h.批次号, N'') <> ''");
-        // ② 检验数据记录(检验报告):物料批次号同样靠入库回填 —— 报告建单时留空,此处按挂靠关系自动补上
-        n += jdbc.update("UPDATE r SET r.物料批次 = h.批次号, r.asp_user2 = 'system', r.asp_time2 = GETDATE()"
-                + " FROM qc_insp_rec r"
-                + " INNER JOIN qc_catalog_detail d ON d.检验数据记录单号 = r.单据编号 AND ISNULL(d.asp_cancel,'N') <> 'Y'"
-                + " INNER JOIN qc_insp h ON h.单据编号 = d.检验单号"
-                + " WHERE ISNULL(r.asp_cancel,'N') <> 'Y' AND ISNULL(r.物料批次, N'') = '' AND ISNULL(h.批次号, N'') <> ''");
-        return n;
     }
 
     // ==================== 小工具 ====================

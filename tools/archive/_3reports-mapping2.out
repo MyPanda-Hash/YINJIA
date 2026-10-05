@@ -1,0 +1,44 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:20 字符: 145
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-3reports-mapping2.sql ==
+  | 243 | 243 | 243 | 
+  | id | 
+  | 开始日期 | 
+  | 结束日期 | 
+  | 仓库编码 | 
+  | 仓库 | 
+  | 存货编码 | 
+  | 存货 | 
+  | 规格型号 | 
+  | 计量单位 | 
+  | 批号 | 
+  | 单据日期 | 
+  | 单据类型 | 
+  | 单据编号 | 
+  | 业务类型 | 
+  | 往来单位 | 
+  | 往来单位编码 | 
+  | 经手人 | 
+  | 期初数量 | 
+  | 期初平均单价 | 
+  | 期初金额 | 
+  | 收入数量 | 
+  | 收入单价 | 
+  | 收入金额 | 
+  | 含税金额 | 
+  | 税额 | 
+  | 发出数量 | 
+  | 发出单价 | 
+  | 发出金额 | 
+  | 发出单据金额 | 
+  | 期末数量 | 
+  | 期末平均单价 | 
+  | 期末金额 | 
+  | asp_cancel | 
+[SQL FAIL] ���� '�ֿ��' ��Ч��

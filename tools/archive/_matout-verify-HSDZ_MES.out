@@ -1,0 +1,68 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 296
++ ...  ########"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-verify.sql ==
+  | 列数 | bd_material_out | 54 | 
+  | 列数 | bl_material_out | 85 | 
+  | 面板字段数 | MATERIAL_OUT | 117 | 
+  | 面板字段·显示 | MATERIAL_OUT | 55 | 
+  | 面板字段·隐藏 | MATERIAL_OUT | 62 | 
+  | 中文注明(新列) | 合计 | 88 | 
+  | 译名(en) | field | 117 | 
+  | 转ERP四列 | bd_material_out | 4 | 
+  | detail | 材料名称 | 材料名称 | 1 | 0 | 30 | 
+  | detail | 计量单位 | 计量单位 | 1 | 0 | 40 | 
+  | detail | 数量 | 数量 | 1 | 0 | 50 | 
+  | detail | 单价 | 单价 | 1 | 0 | 60 | 
+  | detail | 金额 | 金额 | 1 | 0 | 70 | 
+  | detail | 规格型号 | 规格型号 | 1 | 0 | 80 | 
+  | detail | 手工确定成本 | 手工确定成本 | 1 | 0 | 90 | 
+  | detail | 明细备注 | 明细备注 | 1 | 0 | 100 | 
+  | detail | 现存量 | 现存量 | 1 | 0 | 110 | 
+  | detail | 现存量说明 | 现存量说明 | 1 | 0 | 120 | 
+  | detail | 图片 | 图片 | 0 | 1 | 970 | 
+  | detail | 行号 | 行号 | 1 | 0 | 971 | 
+  | detail | 商品id | 商品id | 0 | 1 | 972 | 
+  | detail | 商品是否多单位 | 商品是否多单位 | 1 | 0 | 973 | 
+  | detail | 商品是否序列号 | 商品是否序列号 | 1 | 0 | 974 | 
+  | detail | 商品是否辅助属性 | 商品是否辅助属性 | 1 | 0 | 975 | 
+  | detail | 商品是否保质期 | 商品是否保质期 | 1 | 0 | 976 | 
+  | detail | 商品是否批次 | 商品是否批次 | 1 | 0 | 977 | 
+  | detail | 仓库id | 仓库id | 0 | 1 | 978 | 
+  | detail | 仓库编码 | 仓库编码 | 1 | 0 | 979 | 
+  | detail | 仓库启用仓位管理 | 仓库启用仓位管理 | 1 | 0 | 980 | 
+  | detail | 仓位id | 仓位id | 0 | 1 | 981 | 
+  | detail | 仓位名称 | 仓位名称 | 0 | 1 | 982 | 
+  | detail | 仓位编码 | 仓位编码 | 0 | 1 | 983 | 
+  | detail | 辅助属性id | 辅助属性id | 0 | 1 | 984 | 
+  | detail | 辅助属性名称 | 辅助属性名称 | 0 | 1 | 985 | 
+  | detail | 辅助属性编码 | 辅助属性编码 | 0 | 1 | 986 | 
+  | detail | 辅助属性1id | 辅助属性1id | 0 | 1 | 987 | 
+  | detail | 辅助属性1名称 | 辅助属性1名称 | 0 | 1 | 988 | 
+  | detail | 辅助属性1编码 | 辅助属性1编码 | 0 | 1 | 989 | 
+  | detail | 辅助属性2id | 辅助属性2id | 0 | 1 | 990 | 
+  | detail | 辅助属性2名称 | 辅助属性2名称 | 0 | 1 | 991 | 
+  | detail | 辅助属性2编码 | 辅助属性2编码 | 0 | 1 | 992 | 
+  | detail | 辅助属性3id | 辅助属性3id | 0 | 1 | 993 | 
+  | detail | 辅助属性3名称 | 辅助属性3名称 | 0 | 1 | 994 | 
+  | detail | 辅助属性3编码 | 辅助属性3编码 | 0 | 1 | 995 | 
+  | detail | 条形码 | 条形码 | 0 | 1 | 996 | 
+  | detail | 产地 | 产地 | 0 | 1 | 997 | 
+  | detail | 注册证号 | 注册证号 | 0 | 1 | 998 | 
+  | detail | 生产许可证 | 生产许可证 | 0 | 1 | 999 | 
+  | detail | 保质期到期日 | 保质期到期日 | 0 | 1 | 1000 | 
+  | detail | 有效期至 | 有效期至 | 0 | 1 | 1001 | 
+  | detail | 保质期类型 | 保质期类型 | 0 | 1 | 1002 | 
+  | detail | 保质期 | 保质期 | 0 | 1 | 1003 | 
+  | detail | 序列号清单 | 序列号清单 | 0 | 1 | 1004 | 
+  | detail | 序列号流转ID | 序列号流转ID | 0 | 1 | 1005 | 
+  | detail | 基本单位id | 基本单位id | 0 | 1 | 1006 | 
+  | detail | 基本单位名称 | 基本单位名称 | 1 | 0 | 1007 | 
+  | detail | 基本单位编码 | 基本单位编码 | 1 | 0 | 1008 | 
+  | detail | 单位id | 单位id | 0 | 1 | 1009 | 
+[OK] _q-matout-verify.sql (2 batches)

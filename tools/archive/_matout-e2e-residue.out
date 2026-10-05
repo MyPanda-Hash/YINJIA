@@ -1,0 +1,16 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:8 字符: 146
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-e2e-residue.sql ==
+  | CL-2026-08-2501 | 有效 | null | 
+  | CL-2026-08-2501 | 有效 | null | 
+  | CL-2026-09-0001 | 有效 | null | 
+  | CL-2026-09-0002 | 有效 | null | 
+  | 有效头 | 4 | 
+  | 有效行 | 6 | 
+[OK] _q-matout-e2e-residue.sql (3 batches)

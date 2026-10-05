@@ -65,6 +65,12 @@ public class MessageService {
     public static final String SPEC_ASSIGNED = "SPEC_ASSIGNED";
     /** 消息码:一级通过并选定二级审核人 → 被选人(2026-09-20 两级审批) */
     public static final String APPROVAL_L2_ASSIGNED = "APPROVAL_L2_ASSIGNED";
+    /** 消息码:一级审核通过、待超级管理员批准 → 超级管理员(2026-10-04 特采单两级审批) */
+    public static final String APPROVAL_L2_PENDING = "APPROVAL_L2_PENDING";
+    /** 消息码:超级管理员已批准 → 一级审核人(2026-10-04 特采单) */
+    public static final String APPROVAL_L2_DONE = "APPROVAL_L2_DONE";
+    /** 消息码:二级审批(批准)被驳回 → 一级审核人(2026-10-04 特采单) */
+    public static final String APPROVAL_L2_REJECTED = "APPROVAL_L2_REJECTED";
     /** 消息码:产品开发已分发责任人 → 四个下游文件的责任人(2026-09-20 分发责任人) */
     public static final String TASK_ASSIGNED = "TASK_ASSIGNED";
     /** 消息码:产品变更申请单提交会签 → 各会签人(2026-09-21 变更线上流程④) */

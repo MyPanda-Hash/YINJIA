@@ -1,6 +1,15 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '待超级管理员批准': 'Chờ quản trị viên cấp cao phê duyệt',
+    '单据已批准': 'Chứng từ đã được phê duyệt',
+    /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
+    '批准通过': 'Phê duyệt',
+    '批准驳回': 'Từ chối',
+    '「{panelName} {docNo}」已由 {actor} 一级审核通过，等待您批准。意见：{opinion}': '"{panelName} {docNo}" đã qua kiểm tra cấp một bởi {actor}; đang chờ bạn phê duyệt. Ý kiến: {opinion}',
+    '您一级审核通过的「{panelName} {docNo}」已由 {actor} 批准通过。': '"{panelName} {docNo}" mà bạn kiểm tra cấp một đã được {actor} phê duyệt.',
+    '二级审批被驳回': 'Phê duyệt cấp hai bị từ chối',
+    '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': '"{panelName} {docNo}" mà bạn kiểm tra cấp một đã bị {actor} từ chối và trả về bản nháp. Ý kiến: {opinion}',
     '分发成功，已分配 {n} 张规格书': 'Phân phối thành công, đã gán {n} bản đặc tả',
     '已选 {n} 个商品，预览二维码标签？': 'Đã chọn {n} sản phẩm. Xem trước nhãn mã QR?',
     '该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批': 'Bản đặc tả {no} của sản phẩm này chưa hoàn tất gửi/duyệt (hiện tại: {st}), nên chưa thể tự động điền — vui lòng hoàn thành bản đặc tả và duyệt xong trước.',
@@ -222,6 +231,8 @@ export default {
     '四．改善追踪结果': 'IV. Improvement Follow-up Result',
     '七．成本损失': 'VII. Cost of Loss',
     '特采理由': 'Special Procurement Reason',
+    '特采': 'Chấp nhận đặc biệt',
+    '送检数量': 'SL gửi kiểm tra',
     '材料费用': 'Material Cost',
     '人工费': 'Labor Cost',
     '其他费用': 'Other Cost',
@@ -263,6 +274,8 @@ export default {
     '生成送料暂收单': 'Tạo phiếu tạm nhận vật tư',
     '生成来料检验单': 'Tạo phiếu kiểm nghiệm đầu vào',
     '生成采购入库单': 'Tạo phiếu nhập mua',
+    '请在列表页继续填写': 'Tiếp tục nhập ở trang danh sách',
+    '商品档案未登记的商品按免检（否）处理': 'Mặt hàng chưa đăng ký trong danh mục được xử lý là miễn kiểm (Không)',
     '品质追溯': 'Truy xuất chất lượng',
     '不良处理': 'Xử lý bất lợi',
     '制程品质': 'Chất lượng quá trình',
@@ -2093,7 +2106,8 @@ export default {
     '已送合计': 'Tổng đã giao',
     '待编号': 'Chờ số',
     '{n} 批待编号': '{n} lô chờ số',
-    '采购入库单填单时按入库日期预设,可修改': 'Số lô được đặt trước theo ngày nhập khi lập phiếu nhập mua; có thể sửa',
+    '生单时按供应商编码与当天日期生成': 'Được tạo từ mã nhà cung cấp và ngày hiện tại khi lập chứng từ',
+    '随单头批次号一致,不可修改': 'Trùng số lô của phần đầu; không sửa được',
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Chỉ tạo các dòng đã chọn; mức tối đa = số lượng đặt × (1 + tỷ lệ) − đã giao + đã trả (tối đa 50%)',
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = không cho phép; tối đa 50%, hạn mức theo số lượng đặt)',
     '请至少勾选一行并填写本次送料数量': 'Chọn ít nhất một dòng và nhập số lượng giao lần này',

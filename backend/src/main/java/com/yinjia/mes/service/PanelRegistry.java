@@ -27,7 +27,8 @@ public class PanelRegistry {
                            String refPanel, String refField, String displayField,
                            String refFilter,
                            String place, int seq, boolean editable, boolean required,
-                           boolean hidden, Integer width, String alias, boolean visible, String colGroup) {
+                           boolean hidden, Integer width, String alias, boolean visible, String colGroup,
+                           String tabKey) {
         /** 显示名:别名优先,缺省用原标签 */
         public String displayName() { return alias != null && !alias.isBlank() ? alias : label; }
         /** 按 locale 的显示名:用户自定义别名最优先,其次译名(label_en),缺省原中文标签 */
@@ -89,7 +90,7 @@ public class PanelRegistry {
 
     public synchronized void reload() {
         Map<String, List<FieldDef>> byPanel = new HashMap<>();
-        jdbc.query("SELECT panel_code, col_name, label, label_en, data_type, dict_sql, ref_panel, ref_field, display_field, ref_filter, place, seq, width, editable, required, hidden, alias, visible, col_group FROM yj_field ORDER BY panel_code, seq, id",
+        jdbc.query("SELECT panel_code, col_name, label, label_en, data_type, dict_sql, ref_panel, ref_field, display_field, ref_filter, place, seq, width, editable, required, hidden, alias, visible, col_group, tab_key FROM yj_field ORDER BY panel_code, seq, id",
                 rs -> {
                     String pc = rs.getString("panel_code");
                     byPanel.computeIfAbsent(pc, k -> new ArrayList<>()).add(new FieldDef(
@@ -98,7 +99,8 @@ public class PanelRegistry {
                             rs.getString("display_field"), rs.getString("ref_filter"), rs.getString("place"), rs.getInt("seq"),
                             rs.getBoolean("editable"), rs.getBoolean("required"),
                             rs.getBoolean("hidden"), (Integer) rs.getObject("width"),
-                            rs.getString("alias"), rs.getBoolean("visible"), rs.getString("col_group")));
+                            rs.getString("alias"), rs.getBoolean("visible"), rs.getString("col_group"),
+                            rs.getString("tab_key")));
                 });
         Map<String, PanelDef> out = new HashMap<>();
         jdbc.query("SELECT panel_code, panel_name, panel_name_en, category, mode, line_table, head_table, group_col, pk_col, code_col, prefix, date_col, page_size, detail_key, module_group FROM yj_panel",

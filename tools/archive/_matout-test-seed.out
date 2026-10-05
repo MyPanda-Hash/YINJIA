@@ -1,0 +1,19 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 226
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-test-seed.sql ==
+  | bd_material_out | 2 | 
+  | bl_material_out | 4 | 
+  | yj_doc_status(MATERIAL_OUT) | 0 | 
+  | CL-2026-08-2501 | 2026-08-25 | 材料出库 | 精整车间 | null |  | 草稿 | 
+  | CL-2026-08-2501 | 2026-08-25 | 材料出库 | 精整车间 | null |  | 草稿 | 
+  | CL-2026-08-2501 | null | 6063铝棒 | kg | 411.4000 | 0.0000 | 原料仓 | null | 
+  | CL-2026-08-2501 | null | 包装木箱 | 件 | 6.8000 | 0.0000 | 辅料仓 | null | 
+  | CL-2026-08-2501 | null | 6063铝棒 | kg | 411.4000 | 0.0000 | 原料仓 | null | 
+  | CL-2026-08-2501 | null | 包装木箱 | 件 | 6.8000 | 0.0000 | 辅料仓 | null | 
+[SQL FAIL] ���� 'status' ��Ч��

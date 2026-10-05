@@ -59,6 +59,19 @@ test('二级目录里不再出现"叶子项与分组混排"', () => {
 })
 
 /**
+ * 2026-10-14 用户拍板:MES 自建「物料清单(BOM)」功能整体删除
+ * (数据库 DROP TABLE bs_bom / DROP VIEW v_wo_kit,面板 BOM、BOM_FWD、BOM_REV、WO_KIT 同批下架)。
+ * 菜单是被删的第一层入口 —— 这里钉住"不得从别处溜回导航",否则用户点进去就是空表/报错。
+ */
+test('自建 BOM 下线:菜单树里不得再有 物料清单(BOM)/工单齐套表(WO_KIT) 入口', () => {
+  const all = JSON.stringify(menuTree)
+  assert.ok(!all.includes('/panelx/list/BOM'), '菜单树里不应再有 物料清单 入口(或 BOM_FWD/BOM_REV 变体)')
+  assert.ok(!all.includes('WO_KIT'), '菜单树里不应再有 工单齐套表 入口(v_wo_kit 已删)')
+  assert.ok(!all.includes('物料清单'), '菜单树里不应再有「物料清单」标题')
+  assert.ok(!all.includes('工单齐套表'), '菜单树里不应再有「工单齐套表」标题')
+})
+
+/**
  * 2026-09-18:新增 产品文件列表 与 样品编号表(设计对照的 2 张新面板)⇒ 21 → 23 张。
  * 2026-09-21:新增 产品变更申请单 RD_CHANGE ⇒ 23 → 24 张。
  * 2026-09-30:下架 样品编号表 RD_SAMPLE_NO(用户口径「样品编号表删掉」)⇒ 24 → 23 张。

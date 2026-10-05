@@ -9,8 +9,11 @@
  * 打印通道:新窗口 HTML + window.print()(同 QrLabelDialog,绕开 jsPDF §5.5 坑);
  * 版面文字(公司抬头/注意事项/需方联系/生产任务单表头)为固定版式常量,改文案只动本文件。
  * 业务单据为纸面事实格式,不入 tt() 翻译层(ADR-0001)。
+ * 纸面「总　计」的位数与明细一致(2026-10-03 用户口径,见 @core/panel/sumTotals):
+ * 明细 decimal(18,4) 的 4 位不再被 2 位截断,也不出现 0.30000000000000004 这类浮点尾巴。
  */
 import * as QRCodeMod from 'qrcode'
+import { sumKeepScale } from '@core/panel/sumTotals'
 
 /** qrcode 库兼容取用:CJS 互操作下 toDataURL 可能挂在 .default 上 */
 function qrLib() {
@@ -135,54 +138,11 @@ export async function printWorkTaskSheet(title, rows, opts = {}) {
 }
 
 /**
- * 生产投料单(2026-09-27 用户截图版式):纵向 A4,每工单一页——
- * 公司抬头 + 单据信息块(单据编号/产品编码/产品名称/产品规格/数量/客户名称/计划完工日期)
- * + 物料投料明细表(数量=定额数量×需求数量,由调用方算好传入) + 制单人落款。
- * @param orders [{单据编号,产品编码,产品名称,产品规格,数量,客户名称,计划完工日期,制单人,bom:[{物料编码,物料名称,规格型号,数量,单位,行备注}]}]
+ * ⚠ 2026-10-14 已删除 `printFeedingSheet`(生产投料单版式):它的物料明细行全部来自
+ *   自建 BOM(/px/workOrderBom → bs_bom),随 MES 自建「物料清单(BOM)」功能整体下线,
+ *   两个调用点(工单列表 / 工单排产看板)的「生产投料单」打印项同步移除。若将来有了新的
+ *   投料数据源,按原截图版式重新实现即可(纵向 A4、每工单一页、物料表=定额×需求数量)。
  */
-export async function printFeedingSheet(orders, opts = {}) {
-  const list = (Array.isArray(orders) ? orders : []).filter((o) => o && o['单据编号'])
-  if (!list.length) return false
-  const blocks = []
-  for (let i = 0; i < list.length; i++) {
-    const o = list[i]
-    const bom = Array.isArray(o.bom) ? o.bom : []
-    const trs = bom.map((b, bi) => '<tr><td>' + (bi + 1) + '</td>'
-      + `<td>${esc(b['物料编码'])}</td><td>${esc(b['物料名称'])}</td><td>${esc(b['规格型号'])}</td>`
-      + `<td class="r">${esc(fmtNum(b['数量']))}</td><td>${esc(b['单位'])}</td><td>${esc(b['行备注'])}</td></tr>`).join('')
-    blocks.push(
-      '<div class="fs-company">' + esc(COMPANY.name) + '</div>'
-      + '<div class="fs-en">' + esc(COMPANY.en) + '</div>'
-      + '<div class="fs-tel">电话：' + esc(COMPANY.tel) + ' / 传真：' + esc(COMPANY.fax) + '</div>'
-      + '<div class="fs-title">生产投料单</div>'
-      + '<table class="fs-info">'
-      + '<tr><td class="k">单据编号：</td><td>' + esc(o['单据编号']) + '</td><td class="k">产品编码：</td><td>' + esc(o['产品编码']) + '</td><td class="k">产品名称：</td><td>' + esc(o['产品名称']) + '</td></tr>'
-      + '<tr><td class="k">产品规格：</td><td>' + esc(o['产品规格']) + '</td><td class="k">数　　量：</td><td>' + esc(fmtNum(o['数量'])) + '</td><td class="k">客户名称：</td><td>' + esc(o['客户名称']) + '</td></tr>'
-      + '</table>'
-      + '<table class="fs-bom"><thead><tr><th style="width:36px">序号</th><th>物料编码</th><th>物料名称</th><th>规格型号</th><th style="width:90px">数量</th><th style="width:60px">单位</th><th>行备注</th></tr></thead><tbody>'
-      + (trs || '<tr><td colspan="7" style="text-align:center;color:#888">（无 BOM 明细）</td></tr>') + '</tbody></table>'
-      + '<div class="fs-foot">制单人：' + esc(o['制单人'] || '') + '　　　计划完工日期：' + esc(o['计划完工日期'] || '') + '</div>'
-      + (i < list.length - 1 ? '<div style="page-break-after:always"></div>' : ''))
-  }
-  const body = '<style>'
-    + '@page{size:A4 portrait;margin:12mm}'
-    + 'body{font-family:"Microsoft YaHei",system-ui,sans-serif;margin:0;color:#111;font-size:12px}'
-    + '.fs-company{text-align:center;font-size:20px;font-weight:700;letter-spacing:2px}'
-    + '.fs-en{text-align:center;font-size:11px;color:#444}'
-    + '.fs-tel{text-align:center;font-size:11px;color:#444;margin-bottom:4px}'
-    + '.fs-title{text-align:center;font-size:18px;font-weight:700;margin:8px 0 10px;letter-spacing:6px}'
-    + '.fs-info{width:100%;border-collapse:collapse;margin-bottom:8px}'
-    + '.fs-info td{padding:3px 4px;font-size:12px;vertical-align:top}'
-    + '.fs-info .k{color:#555;white-space:nowrap}'
-    + '.fs-bom{width:100%;border-collapse:collapse}'
-    + '.fs-bom th,.fs-bom td{border:1px solid #444;padding:5px 6px;font-size:12px;word-break:break-all}'
-    + '.fs-bom th{background:#f2f2f2;font-weight:600}'
-    + '.fs-bom .r{text-align:right}'
-    + '.fs-foot{margin-top:12px;font-size:12px;text-align:right}'
-    + '</style>' + blocks.join('')
-  if (!openPrintWindow('生产投料单', body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
-  return true
-}
 
 /**
  * 银嘉采购单据固定版式公共块(2026-09-28 采购入库单·无金额版与采购订单共用;改文案/版式只动这里):
@@ -223,8 +183,8 @@ export function printPuOrder(doc, lines) {
   const rows = (Array.isArray(lines) ? lines : []).filter((l) => l && (l['物料编码'] || l['物料名称']))
   const pad = Math.max(0, 4 - rows.length)
   const tax = rows.some((l) => Number(l['税率%']) > 0) ? '是' : '否'
-  const totalQty = rows.reduce((a, l) => a + Number(l['数量'] || 0), 0)
-  const totalAmt = rows.reduce((a, l) => a + Number(l['金额'] || 0), 0)
+  const totalQty = sumKeepScale(rows.map((l) => l['数量'])) ?? 0
+  const totalAmt = sumKeepScale(rows.map((l) => l['金额'])) ?? 0
   const trs = rows.map((l) => '<tr>'
     + `<td>${esc(l['物料编码'])}</td><td>${esc(l['物料名称'])}</td><td>${esc(l['规格型号'])}</td>`
     + `<td class="r">${esc(fmtNum(l['单价']))}</td><td>${esc(l['单位'])}</td><td class="r">${esc(fmtNum(l['数量']))}</td>`
@@ -265,7 +225,7 @@ export function printPuOrderNoAmount(doc, lines) {
   const rows = (Array.isArray(lines) ? lines : []).filter((l) => l && (l['物料编码'] || l['物料名称']))
   const pad = Math.max(0, 4 - rows.length)
   const tax = rows.some((l) => Number(l['税率%']) > 0) ? '是' : '否'
-  const totalQty = rows.reduce((a, l) => a + Number(l['数量'] || 0), 0)
+  const totalQty = sumKeepScale(rows.map((l) => l['数量'])) ?? 0
   const trs = rows.map((l) => '<tr>'
     + `<td>${esc(l['物料编码'])}</td><td>${esc(l['物料名称'])}</td><td>${esc(l['规格型号'])}</td>`
     + `<td>${esc(l['单位'])}</td><td class="r">${esc(fmtNum(l['数量']))}</td>`

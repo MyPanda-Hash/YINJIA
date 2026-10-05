@@ -1,0 +1,183 @@
+{
+  "head": {
+    "pick_type": [
+      "1"
+    ],
+    "bill_type_name": [
+      "生产领料单"
+    ],
+    "bill_type_number": [
+      "inv_pick_bill"
+    ],
+    "mul_bill_label": [
+      ""
+    ],
+    "dept_name": [
+      "仓库",
+      "烧结车间",
+      "原料车间",
+      "X烧结车间",
+      "组装车间",
+      "生产管理中心"
+    ],
+    "dept_number": [
+      "BM00008",
+      "BM00006",
+      "BM00007",
+      "BM00015",
+      "BM00005",
+      "BM00003"
+    ],
+    "emp_name": [
+      "蒋小刚",
+      "段国军",
+      "王德",
+      "李建昆",
+      "周荣香",
+      "余均亚",
+      "邹审华2",
+      "黄永品"
+    ],
+    "emp_number": [
+      "ZY00013",
+      "ZY00117",
+      "ZY00088",
+      "ZY00034",
+      "ZY00049",
+      "ZY00022",
+      "ZY00121",
+      "ZY00018"
+    ],
+    "bill_status": [
+      "C"
+    ]
+  },
+  "line": {
+    "src_seq": [
+      "0"
+    ],
+    "src_product_entry_id": [
+      "0"
+    ],
+    "stock_name": [
+      "恒亿仓",
+      "华北工控仓"
+    ],
+    "stock_number": [
+      "YCL-01",
+      "CK00006"
+    ],
+    "kf_period": [
+      "0"
+    ]
+  },
+  "firstLine": {
+    "picture": "",
+    "seq": 1,
+    "id": "2578307506614990848",
+    "material_id": "2194340578664131584",
+    "material_name": "整机（外壳+机头）",
+    "material_number": "YJ-DGM-003",
+    "material_is_multi_unit": false,
+    "material_is_serial": false,
+    "material_is_asst_attr": false,
+    "material_is_kf_period": false,
+    "material_is_batch": false,
+    "material_model": "4分",
+    "stock_id": "2243772584451731456",
+    "stock_name": "恒亿仓",
+    "stock_number": "YCL-01",
+    "stock_is_allow_freight": false,
+    "sp_id": "",
+    "sp_name": "",
+    "sp_number": "",
+    "aux_prop_id": "",
+    "aux_prop_name": "",
+    "aux_prop_number": "",
+    "aux1_id": "",
+    "aux1_name": "",
+    "aux1_number": "",
+    "aux2_id": "",
+    "aux2_name": "",
+    "aux2_number": "",
+    "aux3_id": "",
+    "aux3_name": "",
+    "aux3_number": "",
+    "barcode": "",
+    "batch_no": "",
+    "pro_place": "",
+    "pro_reg_no": "",
+    "pro_license": "",
+    "kf_date": "",
+    "valid_date": "",
+    "kf_type": "",
+    "kf_period": 0,
+    "sn_list": "",
+    "sn_list_id": "0",
+    "base_unit_id": "2167741700229872640",
+    "base_unit_name": "套",
+    "base_unit_number": "套",
+    "unit_id": "2167741700229872640",
+    "unit_name": "套",
+    "unit_number": "套",
+    "aux_unit_id": "",
+    "aux_unit_name": "",
+    "aux_unit_number": "",
+    "conversion_rate": "",
+    "qty": 1020,
+    "inv_qty": 1020,
+    "base_qty": 1020,
+    "inv_base_qty": 0,
+    "aux_qty": 0,
+    "def_float_qty": 0,
+    "aux_coefficient": 0,
+    "coefficient": 1,
+    "price": 0,
+    "cost": 0,
+    "unit_cost": 0,
+    "comment": "",
+    "src_bill_no": "",
+    "src_bill_type_id": "",
+    "src_bill_type_name": "",
+    "src_bill_type_number": "",
+    "src_inter_id": "0",
+    "src_bill_date": "",
+    "src_seq": "0",
+    "src_entry_id": "0",
+    "custom_entity_field": {},
+    "src_product_entry_id": "0"
+  },
+  "firstHead": {
+    "id": "2578307506614991872",
+    "bill_no": "SCLL-20260927-00015",
+    "bill_date": "2026-09-27",
+    "bill_status": "C",
+    "create_time": "2026-09-28 09:14:00",
+    "modify_time": "2026-09-28 09:17:45",
+    "audit_time": "2026-09-28 09:17:45",
+    "creator_id": "425692977",
+    "creator_name": "蒋小刚",
+    "creator_number": "multicorp_6171610_-952599178",
+    "modifier_id": "425692977",
+    "modifier_name": "蒋小刚",
+    "modifier_number": "multicorp_6171610_-952599178",
+    "bill_type_name": "生产领料单",
+    "bill_type_number": "inv_pick_bill",
+    "bill_type_id": "inv_pick_bill",
+    "auditor_id": "425692977",
+    "auditor_name": "蒋小刚",
+    "auditor_number": "multicorp_6171610_-952599178",
+    "remark": "",
+    "dept_id": "2170470230466328579",
+    "dept_name": "仓库",
+    "dept_number": "BM00008",
+    "emp_id": "2174838713450851328",
+    "emp_name": "蒋小刚",
+    "emp_number": "ZY00013",
+    "mul_bill_label": [],
+    "pick_use_name": "",
+    "pick_use_id": "",
+    "pick_use_number": "",
+    "pick_type": "1"
+  }
+}

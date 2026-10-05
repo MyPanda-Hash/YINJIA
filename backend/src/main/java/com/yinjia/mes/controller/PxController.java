@@ -42,6 +42,7 @@ public class PxController {
     private final PanelPermissionService perm;
     private final com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler;
     private final com.yinjia.mes.service.BatchService batchService;
+    private final com.yinjia.mes.service.PuLabelService puLabel;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PxController.class);
 
@@ -52,7 +53,8 @@ public class PxController {
                         DevTaskService devTaskService, ButtonService buttons,
                         PanelPermissionService perm,
                         com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler,
-                        com.yinjia.mes.service.BatchService batchService) {
+                        com.yinjia.mes.service.BatchService batchService,
+                        com.yinjia.mes.service.PuLabelService puLabel) {
         this.service = service;
         this.configService = configService;
         this.reportColumnSettingsService = reportColumnSettingsService;
@@ -65,6 +67,62 @@ public class PxController {
         this.perm = perm;
         this.pushGenerateHandler = pushGenerateHandler;
         this.batchService = batchService;
+        this.puLabel = puLabel;
+    }
+
+    // ============ 采购订单材料码打印(供应商自行打码,2026-10-04) ============
+    // 口径:批次号在**打印时**登记并预约该行数量;生单只消费预约,不再按公式重算。
+    // 方案:docs/plans/2026-10-04-采购订单材料码批次号方案.md。**不建面板**(用户明确不要),
+    // 故三个端点直接挂既有 /px 运行时,权限按「采购订单」面板的查看/修改权把关。
+
+    /** 打印弹窗取数:订单行(含可打印量)+ 预填批次号 + 本订单已有打印记录 */
+    @GetMapping("/puLabel/dialog")
+    public ApiResult<Map<String, Object>> puLabelDialog(@RequestParam String orderNo) {
+        perm.requirePanelView("PU_ORDER");
+        return ApiResult.ok(puLabel.dialog(orderNo));
+    }
+
+    /** 登记打印(2026-10-04 口径:**一次可勾多行,但每行各出一张打印单**;服务端按行取号建头) */
+    @PostMapping("/puLabel/print")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> puLabelPrint(@RequestBody Map<String, Object> body) {
+        perm.requireButton("PU_ORDER", "修改");
+        String orderNo = String.valueOf(body.getOrDefault("orderNo", ""));
+        String batchNo = body.get("batchNo") == null ? "" : String.valueOf(body.get("batchNo"));
+        List<Map<String, Object>> lines = new java.util.ArrayList<>();
+        if (body.get("lines") instanceof List<?> l) {
+            for (Object o : l) if (o instanceof Map<?, ?> m) lines.add(new LinkedHashMap<>((Map<String, Object>) m));
+        }
+        return ApiResult.ok(puLabel.print(orderNo, batchNo, lines, currentUser()));
+    }
+
+    /** 重打:同一张打印单原样再打一遍(只累加打印次数,不新增预约) */
+    @PostMapping("/puLabel/reprint")
+    public ApiResult<Map<String, Object>> puLabelReprint(@RequestBody Map<String, Object> body) {
+        perm.requireButton("PU_ORDER", "修改");
+        return ApiResult.ok(puLabel.reprint(String.valueOf(body.getOrDefault("docNo", "")), currentUser()));
+    }
+
+    /**
+     * 该单据的批次号是否因"来自材料码打印明细"而**不可修改**(用户口径:凡有关打印明细生成的单据
+     * 都不可以改批次号)—— 前端打开单据时问一次,是则把单头「批次号」当只读渲染(草稿态也不给改)。
+     */
+    @GetMapping("/puLabel/batchLock")
+    public ApiResult<Map<String, Object>> puLabelBatchLock(@RequestParam String panelCode, @RequestParam String docNo) {
+        return ApiResult.ok(puLabel.batchLock(panelCode, docNo));
+    }
+
+    /** 作废打印记录(软删,预约量立即释放回余量) */
+    @PostMapping("/puLabel/void")
+    public ApiResult<Map<String, Object>> puLabelVoid(@RequestBody Map<String, Object> body) {
+        perm.requireButton("PU_ORDER", "修改");
+        return ApiResult.ok(puLabel.voidDoc(String.valueOf(body.getOrDefault("docNo", "")), currentUser()));
+    }
+
+    /** 当前操作人(与 batchFlow 各端点同口径:无认证上下文时记 system) */
+    private static String currentUser() {
+        return SecurityContextHolder.getContext().getAuthentication() == null ? "system"
+                : SecurityContextHolder.getContext().getAuthentication().getName();
     }
 
     /** 产品开发:下游面板元数据(矩阵列头) */
@@ -417,7 +475,30 @@ public class PxController {
         return ApiResult.ok(pushGenerateHandler.batchLines(sourcePanel, targetPanel, sourceNo));
     }
 
-    /** 分批送料:按行「本次送料数量」生成一张下游草稿(自动取批次号 + 按量占用 + 写批次台账) */
+    /**
+     * 保存「收料超送比例」(生单对话框里改动即自动保存,用户 2026-10-04 口径)。
+     *
+     * 存的是**系统参数** `yj_app_setting.receive_over_ratio`(与批量校验、材料码打印上限同一个参数),
+     * 所以改一次之后:下次打开生单对话框按新比例预填、后端校验与打印上限也按新比例算。
+     * body.overRatio 传 **0~1 的小数**(前端把输入框的百分数 ÷100);超 50% 服务端夹到 0.5。
+     */
+    @PostMapping("/batchFlow/overRatio")
+    public ApiResult<Map<String, Object>> batchFlowSaveOverRatio(@RequestBody Map<String, Object> body) {
+        perm.requireButton("PU_ORDER", "修改");
+        double v = body.get("overRatio") instanceof Number n ? n.doubleValue() : 0d;
+        double saved = batchService.saveOverRatio(v, currentUser());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("overRatio", saved);
+        out.put("超送比例", Math.round(saved * 100));
+        return ApiResult.ok(out);
+    }
+
+    /**
+     * 分批送料:按行「本次送料数量」生成一张下游草稿(生单即取批次号 + 按量占用 + 写批次台账)。
+     * body.batchNo = **生单对话框里人工填/改的批次号**(可选;2026-10-04 用户口径「在生单时批次号就可以修改」)
+     * —— 只在链路头一跳(采购订单→送料暂收单,此时来源单还没有号)生效,留空则按
+     * 「供应商编码去掉 YJ- 前缀 + - + 当天 yyyyMMdd」自动取号;下游各跳一律继承上游的号,忽略该值。
+     */
     @PostMapping("/batchFlow/generate")
     @SuppressWarnings("unchecked")
     public ApiResult<Map<String, Object>> batchFlowGenerate(@RequestBody Map<String, Object> body) {
@@ -437,12 +518,13 @@ public class PxController {
                 qtyByLine.put(String.valueOf(key), qty == null ? 0d : Double.parseDouble(String.valueOf(qty)));
             }
         }
+        // 材料码隔离行(行键 `...#行id@打印行id`)的批次号由后端按行自取,前端不需要另传
         Map<String, Object> res = pushGenerateHandler.generateBatch(sourcePanel, targetPanel, sourceNo,
-                SecurityContextHolder.getContext().getAuthentication() == null ? "system"
-                        : SecurityContextHolder.getContext().getAuthentication().getName(),
+                currentUser(),
                 qtyByLine,
                 body.get("overRatio") == null || String.valueOf(body.get("overRatio")).isBlank() ? null
-                        : Double.parseDouble(String.valueOf(body.get("overRatio"))));
+                        : Double.parseDouble(String.valueOf(body.get("overRatio"))),
+                body.get("batchNo") == null ? null : String.valueOf(body.get("batchNo")));
         return ApiResult.ok(res);
     }
 

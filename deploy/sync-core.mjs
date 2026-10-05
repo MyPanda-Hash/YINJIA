@@ -57,18 +57,41 @@ function autoExtraLines(code, lineElem) {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const N_SYNC_USER = '金蝶同步'; // 星辰审核人缺失时 yj_doc_status.shr 的兜底留痕
 
-/** 来料检验自定义字段键登记表:各账套在金蝶界面定义后,把键ID加进来(值 是/否)。
- *  测试沙箱(Wyaf4sPe): custom_field__1__62jiaob3z7yj97 (2026-09-18 定义);
- *  真实账套(359797): 待定义后登记。 */
-const CF_INSPECTION_KEYS = ['custom_field__1__62jiaob3z7yj97'];
+/** 来料检验自定义字段键登记表:各账套在金蝶界面定义后,把键 ID 加进来(值 是/否)。
+ *  测试沙箱(Wyaf4sPe): custom_field__1__62jiaob3z7yj97(2026-09-18 定义,CL004 实测全链路通);
+ *  真实账套(359797): custom_field__1__62tvoyr1j4fa —— 商品档案**新增的第 4 个自定义字段**
+ *    (2026-10-03 实测:该账套商品 custom_field 恰好 4 键,前三键为老字段(规格/装箱量,长期有值),
+ *     此键最新且取值只有「是」,命中 YJ-XH-001/002、YJ-TJHZ-001/006、YJ-YKRS-007/008/009/014 共 8 个商品;
+ *     接口不返回自定义字段的显示名,键↔字段名的对照凭据见
+ *     tools/archive/_probe-material-cf.mjs 与 tools/archive/_material-cf-probe.json)。
+ *  ⚠ 登记表一变,商品档案存量行的值必须补拉一次全量:
+ *     node sync.mjs --refresh=BD_MATERIAL --yes   (理由见 BD_MATERIAL 条目 cfRefresh 注释)。 */
+const CF_INSPECTION_KEYS = ['custom_field__1__62jiaob3z7yj97', 'custom_field__1__62tvoyr1j4fa'];
+
+/** 从商品详情取来料检验值(值 是/否)。口径(用户 2026-10-03):**没有填写「是」的,一律按「否」**——
+ *  金蝶侧未勾选时接口回空串,故登记键里取不到「是」就写「否」,不再落空值(与迁移
+ *  tools/migrate-inv-inspection-default-no.sql 的存量回填同口径,两侧一致)。
+ *  custom_field 可能是对象,也可能是 JSON 字符串(列表/详情两种形态都实测见过);
+ *  多账套共用登记表:取第一个有值的键(沙箱与真实账套的键不会同时出现,互不干扰)。 */
 function cfInspection(d) {
-  const cf = (d && d.custom_field) || {};
+  let cf = (d && d.custom_field) || {};
+  if (typeof cf === 'string') { try { cf = JSON.parse(cf); } catch { cf = {}; } }
   for (const k of CF_INSPECTION_KEYS) {
     const v = String(cf[k] ?? '').trim();
     if (v) return v;
   }
-  return null;
+  return '否';
 }
+
+/** 商品档案「自定义字段复核」时间窗(天)。
+ *  为什么需要:金蝶**商品列表**接口只回 35 个标准键——既没有 custom_field 也没有 modify_time(2026-10-03
+ *  实测),而本同步器的「指纹跳过」用的就是列表行 ⇒ 来料检验这类自定义字段在商品上**改了什么都看不出来**,
+ *  不主动重取详情就永远同步不到(存量 3837 行里 来料检验 只有 1 行有值即为证)。
+ *  办法:列表接口支持 modify_start_time/modify_end_time 过滤(实测近7天16条/31天110条/60天781条),
+ *  自定义字段编辑**会**推进商品的 modify_time(那 8 个 来料检验=是 的商品正落在近 7 天窗口内)⇒
+ *  把窗内商品圈出来,给它们的指纹追加一个**当日戳**:同一天至多重取一次详情,之后指纹一致即跳过,
+ *  成本有界(每天 ≤ 窗内条数),且不必每 5 分钟把 3852 个商品详情重拉一遍。 */
+const CF_REFRESH_WINDOW_DAYS = 31;
 
 // ---------- 类型注册表 ----------
 // 订单条目:{ code,label,listPath,detailPath,headTable,lineTable,fingerprintOf,mapHead,mapLines }
@@ -203,6 +226,9 @@ export const DOCS = [
     code: 'BD_MATERIAL', label: '商品', archive: true,
     listPath: '/jdy/v2/bd/material', detailPath: '/jdy/v2/bd/material_detail',
     table: 'bs_inv', codeCol: '存货编码',
+    // cfRefresh:商品带金蝶自定义字段(来料检验,见 CF_INSPECTION_KEYS),而列表行看不出自定义字段改动
+    //   ⇒ 每轮额外做一次「近 CF_REFRESH_WINDOW_DAYS 天改动」的窗口复核(指纹加当日戳,每天至多重取一次)
+    cfRefresh: true,
     fingerprintOf: (r) => [r.number, r.name, r.enable, r.model, r.parent_number, r.modify_time].map((v) => (v === undefined || v === null ? '' : String(v))).join('|'),
     mapArchive(d, ctx) {
       const costWay = { 1: '移动平均', 2: '加权平均', 3: '先进先出' }[String(d.cost_method || '')] || '移动平均';
@@ -548,7 +574,7 @@ export async function upsertArchive(doc, mssql, pool, mapped, fp) {
 }
 
 // ---------- 主流程 ----------
-export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false }) {
+export async function runCore({ mode, configPath, dryRun = false, probe = false, assumeYes = false, refresh = [] }) {
   configPath = configPath || join(HERE, 'config.json');
   if (!existsSync(configPath)) {
     console.error(`✗ 未找到配置文件 ${configPath}\n  请复制 config.example.json 为 config.json 并填入凭证/数据库信息`);
@@ -573,6 +599,10 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
   };
   logger = makeLogger({ baseDir: HERE, retentionDays: opt.logRetentionDays });
   const docs = DOCS.filter((d) => opt.types.includes(d.code));
+  // --refresh=CODE[,CODE…](或 =* / =ALL):忽略库内已有指纹,对这些类型全量重取详情再 upsert。
+  // 用途:新接一个金蝶字段(如商品·来料检验)后给存量行补拉一次;指纹永远感知不到的改动也靠它兜底。
+  const forceCodes = new Set(refresh.map((x) => String(x).trim().toUpperCase()).filter(Boolean));
+  const forceEverything = forceCodes.has('*') || forceCodes.has('ALL');
   const statePath = join(HERE, 'state.json');
   const state = existsSync(statePath) ? JSON.parse(readText(statePath)) : {};
   const saveState = () => writeFileSync(statePath, JSON.stringify(state, null, 2), 'utf8');
@@ -674,6 +704,29 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
         archiveInitHandled = true; // 后续指纹为空=全量插入;确认与备份不再重复执行
       }
 
+      // 自定义字段复核窗(仅 cfRefresh 的类型=商品):列表行既无 custom_field 也无 modify_time,
+      // 指纹对自定义字段永久免疫 ⇒ 把「近 N 天改动过」的商品圈出来,给它们的指纹加当日戳,每天各重取一次详情。
+      let cfRecentIds = null, cfStampSuffix = '';
+      if (doc.cfRefresh && !probe && doc.archive) {
+        const since = Date.now() - CF_REFRESH_WINDOW_DAYS * 86400000;
+        const until = Date.now() + opt.endBiasMinutes * 60000;
+        cfRecentIds = new Set();
+        for (let page = 1; page <= opt.maxPages; page++) {
+          const w = await kingdeeGet(cfg.kingdee, token, doc.listPath, {
+            page: String(page), page_size: String(opt.pageSize),
+            modify_start_time: String(since), modify_end_time: String(until),
+          });
+          for (const r of w.rows || []) cfRecentIds.add(String(r.id).trim());
+          if (page >= Number(w.total_page || 1)) break;
+        }
+        cfStampSuffix = '|CF' + nowLocal().slice(0, 10); // 当日戳:同日第二次跑即命中同一指纹而跳过
+        log(`【${doc.label}】自定义字段复核:近 ${CF_REFRESH_WINDOW_DAYS} 天改动 ${cfRecentIds.size} 条 → 今日各重取一次详情`);
+      }
+      const forced = forceEverything || forceCodes.has(doc.code);
+      if (forced) log(`【${doc.label}】强制刷新(--refresh):忽略库内指纹,全部重取详情`);
+      const fpOf = (row) => doc.fingerprintOf(row)
+        + (cfRecentIds && cfRecentIds.has(String(row.id).trim()) ? cfStampSuffix : '');
+
       // 指纹比对先行:算出真正要写的单(新增/有变化)——提示、备份、写入都只针对它们
       let knownFps = new Map();
       if (!dryRun) {
@@ -684,7 +737,8 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
       }
       const changedRows = rows.filter((row) => {
         const id = String(row.id).trim();
-        return !(knownFps.has(id) && knownFps.get(id) === doc.fingerprintOf(row));
+        if (forced) return true; // --refresh:无条件重取(存量补拉新接字段)
+        return !(knownFps.has(id) && knownFps.get(id) === fpOf(row));
       });
       const skipped = rows.length - changedRows.length;
       log(`【${doc.label}】共 ${rows.length} 条,待写入 ${changedRows.length} 条${skipped ? `,无变化跳过 ${skipped}` : ''}`);
@@ -714,7 +768,7 @@ export async function runCore({ mode, configPath, dryRun = false, probe = false,
       for (const row of changedRows) {
         done++;
         if (changedRows.length > 200 && done % 500 === 0) log(`【${doc.label}】进度 ${done}/${changedRows.length}(新增${inserted} 更新${updated})`);
-        const fp = doc.fingerprintOf(row);
+        const fp = fpOf(row); // 与上方比对同源(含商品自定义字段复核的当日戳)
         const known = knownFps.has(String(row.id).trim());
         try {
           const raw = doc.detailPath ? await kingdeeGet(cfg.kingdee, token, doc.detailPath, { id: row.id }) : row;

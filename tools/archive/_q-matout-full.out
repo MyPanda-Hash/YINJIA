@@ -1,0 +1,83 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 211
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-full.sql ==
+  | 1 | id | int | 4 | 0 | 
+  | 2 | 单据日期 | date | 3 | 1 | 
+  | 3 | 单据编号 | nvarchar | 400 | 1 | 
+  | 4 | 业务类型 | nvarchar | 200 | 1 | 
+  | 5 | 生产车间 | nvarchar | 200 | 1 | 
+  | 6 | 出库类别 | nvarchar | 200 | 1 | 
+  | 7 | 领用人 | nvarchar | 400 | 1 | 
+  | 8 | 项目 | nvarchar | 400 | 1 | 
+  | 9 | 仓库 | nvarchar | 400 | 1 | 
+  | 10 | 来源单号 | nvarchar | 400 | 1 | 
+  | 11 | 加工单号 | nvarchar | 400 | 1 | 
+  | 12 | 备注 | nvarchar | 1000 | 1 | 
+  | 13 | 单据状态 | nvarchar | 20 | 0 | 
+  | 14 | 审核人 | nvarchar | 100 | 1 | 
+  | 15 | 审核时间 | datetime2 | 8 | 1 | 
+  | 16 | 审批人 | nvarchar | 100 | 1 | 
+  | 17 | 审批时间 | datetime2 | 8 | 1 | 
+  | 18 | asp_user1 | nvarchar | 100 | 1 | 
+  | 19 | asp_time1 | datetime2 | 8 | 1 | 
+  | 20 | asp_user2 | nvarchar | 100 | 1 | 
+  | 21 | asp_time2 | datetime2 | 8 | 1 | 
+  | 22 | asp_cancel | char | 1 | 1 | 
+  | 23 | 来源单据 | nvarchar | 200 | 1 | 
+  | 24 | 销售订单号 | nvarchar | 200 | 1 | 
+  | 25 | 匹配来源单号 | nvarchar | 200 | 1 | 
+  | 1 | id | int | 4 | 0 | 
+  | 2 | 单据编号 | nvarchar | 200 | 1 | 
+  | 3 | 仓库 | nvarchar | 200 | 1 | 
+  | 4 | 加工单号 | nvarchar | 400 | 1 | 
+  | 5 | 材料名称 | nvarchar | 200 | 1 | 
+  | 6 | 计量单位 | nvarchar | 200 | 1 | 
+  | 7 | 数量 | decimal | 9 | 1 | 
+  | 8 | 单价 | decimal | 9 | 1 | 
+  | 9 | 金额 | decimal | 9 | 1 | 
+  | 10 | 规格型号 | nvarchar | 400 | 1 | 
+  | 11 | 手工确定成本 | bit | 1 | 1 | 
+  | 12 | 明细备注 | nvarchar | 400 | 1 | 
+  | 13 | 现存量 | decimal | 9 | 1 | 
+  | 14 | 现存量说明 | nvarchar | 400 | 1 | 
+  | 15 | 备注 | nvarchar | 1000 | 1 | 
+  | 16 | asp_user1 | nvarchar | 100 | 1 | 
+  | 17 | asp_time1 | datetime2 | 8 | 1 | 
+  | 18 | asp_cancel | char | 1 | 1 | 
+  | 19 | asp_user2 | nvarchar | 100 | 1 | 
+  | 20 | asp_time2 | datetime2 | 8 | 1 | 
+  | 21 | 材料编码 | nvarchar | 200 | 1 | 
+  | 22 | 批号 | nvarchar | 60 | 1 | 
+  | 2 | 4 | 
+  | 30 | 材料名称 | 材料名称 | 参照 | detail | 1 | 1 | 0 | 1 | 
+  | 40 | 计量单位 | 计量单位 | 下拉框 | detail | 1 | 1 | 0 | 1 | 
+  | 50 | 数量 | 数量 | 小数 | detail | 1 | 1 | 0 | 1 | 
+  | 60 | 单价 | 单价 | 小数 | detail | 1 | 0 | 0 | 1 | 
+  | 70 | 金额 | 金额 | 小数 | detail | 1 | 0 | 0 | 1 | 
+  | 80 | 规格型号 | 规格型号 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | 90 | 手工确定成本 | 手工确定成本 | 是否 | detail | 1 | 0 | 0 | 1 | 
+  | 100 | 明细备注 | 明细备注 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | 110 | 现存量 | 现存量 | 小数 | detail | 1 | 0 | 0 | 1 | 
+  | 120 | 现存量说明 | 现存量说明 | 文本 | detail | 1 | 0 | 0 | 1 | 
+  | 70 | 项目 | 项目 | 参照 | header | 1 | 0 | 0 | 1 | 
+  | 90 | 来源单号 | 来源单号 | 文本 | header | 1 | 0 | 0 | 1 | 
+  | 20 | 加工单号 | 加工单号 | 文本 | header,detail | 1 | 0 | 0 | 1 | 
+  | 25 | 材料编码 | 材料编码 | 参照 | query,detail | 1 | 1 | 0 | 1 | 
+  | 27 | 批号 | 批号 | 文本 | query,detail | 1 | 1 | 0 | 1 | 
+  | 10 | 单据日期 | 单据日期 | 日期 | query,header | 1 | 1 | 0 | 1 | 
+  | 20 | 单据编号 | 单据编号 | 文本 | query,header | 1 | 1 | 0 | 1 | 
+  | 30 | 业务类型 | 业务类型 | 下拉框 | query,header | 1 | 1 | 0 | 1 | 
+  | 40 | 生产车间 | 生产车间 | 下拉框 | query,header | 1 | 0 | 0 | 1 | 
+  | 50 | 出库类别 | 出库类别 | 下拉框 | query,header | 1 | 0 | 0 | 1 | 
+  | 60 | 领用人 | 领用人 | 参照 | query,header | 1 | 0 | 0 | 1 | 
+  | 80 | 来源单据 | 来源单据 | 文本 | query,header | 1 | 0 | 0 | 1 | 
+  | 90 | 销售订单号 | 销售订单号 | 文本 | query,header | 1 | 0 | 0 | 1 | 
+  | 100 | 匹配来源单号 | 匹配来源单号 | 文本 | query,header | 1 | 0 | 0 | 1 | 
+  | 10 | 仓库 | 仓库 | 参照 | query,header,detail | 1 | 0 | 0 | 1 | 
+[SQL FAIL] ������ 'yj_button' ��Ч��

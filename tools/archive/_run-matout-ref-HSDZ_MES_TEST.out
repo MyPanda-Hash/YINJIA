@@ -1,0 +1,20 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 311
++ ...  ########"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== migrate-material-out-ref-links.sql ==
+  | 材料名称 | 材料名称 | detail | 30 | INV | 存货名称 | 存货名称 | 0 | 
+  | 计量单位 | 计量单位 | detail | 40 | UOM | 计量单位名称 | 计量单位名称 | 0 | 
+  | 仓库编码 | 仓库编码 | detail | 979 | WH | 仓库编码 | 仓库名称 | 0 | 
+  | 项目 | 项目 | header | 70 | PROJ | 项目名称 | 项目名称 | 0 | 
+  | 部门编码 | 部门编码 | header | 973 | DEPT | 部门编码 | 部门名称 | 0 | 
+  | 经手人编码 | 经手人编码 | header | 990 | EMP | 员工编码 | 员工名称 | 0 | 
+  | 材料编码 | 材料编码 | query,detail | 25 | INV | 存货编码 | 存货名称 | 0 | 
+  | 生产车间 | 生产车间 | query,header | 40 | DEPT | 部门名称 | 部门名称 | 0 | 
+  | 领用人 | 领用人 | query,header | 60 | EMP | 员工名称 | 员工名称 | 0 | 
+  | 仓库 | 仓库 | query,header,detail | 10 | WH | 仓库名称 | 仓库名称 | 0 | 
+[OK] migrate-material-out-ref-links.sql (6 batches)
