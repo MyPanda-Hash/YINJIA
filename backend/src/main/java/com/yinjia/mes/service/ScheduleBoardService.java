@@ -527,6 +527,14 @@ public class ScheduleBoardService {
                         + " c.[拆分序号] AS 拆分序号"
                         + " FROM dbo.plang c JOIN dbo.plang p ON p.id = c.[源工单行id] AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + " WHERE c.pl_no=? AND ISNULL(c.asp_cancel,'N')<>'Y' ORDER BY c.id", doc);
+        // 调拨轨迹(9.29 批次②):每次调拨一行,撤销的也留痕(状态列区分)
+        List<Map<String, Object>> transfers = jdbc.queryForList(
+                "SELECT CONVERT(varchar(16), asp_time1, 120) AS 时间, ISNULL(从生产线,N'') AS 从生产线,"
+                        + " ISNULL(从车间,N'') AS 从车间, ISNULL(到生产线,N'') AS 到生产线, ISNULL(到车间,N'') AS 到车间,"
+                        + " ISNULL(数量,0) AS 数量, ISNULL(原因,N'') AS 原因, ISNULL(asp_user1,N'') AS 操作人,"
+                        + " CASE WHEN ISNULL(asp_cancel,'N')='Y' THEN N'已撤销' ELSE N'生效' END AS 状态,"
+                        + " CONVERT(varchar(16), asp_time2, 120) AS 撤销时间, ISNULL(asp_user2,N'') AS 撤销人"
+                        + " FROM dbo.wo_transfer_log WHERE pl_no=? ORDER BY id", doc);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("头", head);
@@ -537,6 +545,7 @@ public class ScheduleBoardService {
         out.put("领料数据", picks);
         out.put("子工单", children);
         out.put("父工单", parentsOf);
+        out.put("调拨轨迹", transfers);
         return out;
     }
 

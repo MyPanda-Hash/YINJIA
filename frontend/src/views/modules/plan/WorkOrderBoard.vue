@@ -65,7 +65,10 @@
                 </template>
               </el-dropdown>
               <el-button size="small" type="warning" plain :disabled="!checkedSched.length" @click="openReassign">
-                {{ tt('批量调线') }}（{{ checkedSched.length }}）
+                {{ tt('调拨') }}（{{ checkedSched.length }}）
+              </el-button>
+              <el-button size="small" plain :disabled="!checkedSched.length" @click="doTransferRevoke">
+                {{ tt('撤回调拨') }}
               </el-button>
               <!-- 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04):它按 默认BOM×排产数量 生成领料单草稿,
                    数据源 bs_bom 与后端 /px/scheduleBoard/toPicking 端点同期删除 ⇒ 按钮一并撤掉 -->
@@ -116,16 +119,26 @@
       </div>
     </div>
 
-    <!-- 批量调线弹窗(目标=启用线;停用线由后端守卫拒绝) -->
-    <el-dialog v-model="raVisible" :title="tt('批量调线')" width="360px" append-to-body>
-      <div class="wb-p">{{ tt('目标生产线') }}
-        <el-select v-model="raLine" filterable style="width: 200px">
-          <el-option v-for="x in raLines" :key="x" :label="x" :value="x" />
+    <!-- 调拨弹窗(9.29 批次②):车间 → 产线 两级目标;写 wo_transfer_log 轨迹,可撤回(调回原线、轨迹留痕) -->
+    <el-dialog v-model="raVisible" :title="tt('工单调拨')" width="430px" append-to-body>
+      <div class="wb-p">{{ tt('目标车间') }}
+        <el-select v-model="raShop" filterable clearable style="width: 210px" @change="raLine = ''">
+          <el-option v-for="x in shops" :key="x.车间" :label="x.车间 + '（' + x.产线数 + '）'" :value="x.车间" />
         </el-select>
       </div>
+      <div class="wb-p">{{ tt('目标生产线') }}
+        <el-select v-model="raLine" filterable style="width: 210px">
+          <el-option v-for="x in raLines" :key="x.生产线"
+                     :label="x.生产线 + (x.生产车间 ? '·' + x.生产车间 : '')" :value="x.生产线" />
+        </el-select>
+      </div>
+      <div class="wb-p">{{ tt('调拨原因') }}
+        <el-input v-model="raReason" size="small" style="width: 210px" :placeholder="tt('选填')" />
+      </div>
+      <div class="wb-p wb-dim">{{ tt('调拨写入轨迹(工单追溯可见);「撤回调拨」可把产线调回原线') }}</div>
       <template #footer>
         <el-button @click="raVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="doReassign">{{ tt('确认调线') }}</el-button>
+        <el-button type="primary" @click="doTransfer">{{ tt('确认调拨') }}</el-button>
       </template>
     </el-dialog>
 
@@ -155,6 +168,24 @@
             <el-table-column :label="tt('步骤')" prop="步骤" width="140" />
             <el-table-column :label="tt('操作人')" prop="操作人" width="140" />
             <el-table-column :label="tt('时间')" prop="时间" min-width="160" />
+          </el-table>
+        </div>
+
+        <!-- 调拨轨迹(9.29 批次②):每次调拨一行,撤销的也留痕(状态列区分) -->
+        <div v-if="(trace['调拨轨迹'] || []).length" class="wb-trace-block">
+          <div class="wb-block-title">{{ tt('调拨轨迹') }}</div>
+          <el-table :data="trace['调拨轨迹']" size="small" border max-height="180">
+            <el-table-column :label="tt('时间')" prop="时间" width="140" />
+            <el-table-column :label="tt('从生产线')" prop="从生产线" width="110" />
+            <el-table-column :label="tt('从车间')" prop="从车间" width="110" />
+            <el-table-column :label="tt('到生产线')" prop="到生产线" width="110" />
+            <el-table-column :label="tt('到车间')" prop="到车间" width="110" />
+            <el-table-column :label="tt('数量')" prop="数量" width="85" align="right" />
+            <el-table-column :label="tt('原因')" prop="原因" min-width="120" show-overflow-tooltip />
+            <el-table-column :label="tt('操作人')" prop="操作人" width="90" />
+            <el-table-column :label="tt('状态')" prop="状态" width="80" />
+            <el-table-column :label="tt('撤销人')" prop="撤销人" width="90" />
+            <el-table-column :label="tt('撤销时间')" prop="撤销时间" width="140" />
           </el-table>
         </div>
 
@@ -231,8 +262,21 @@ const s = ref({})
 
 const raVisible = ref(false)
 const raLine = ref('')
-// 调线目标=启用线(停用线不可再排/调入)
-const raLines = computed(() => lineSummary.value.filter((l) => !l.停用).map((l) => l.生产线))
+const raShop = ref('')
+const raReason = ref('')
+const shops = ref([])
+// 调拨目标=启用线(停用线不可再排/调入);选了车间则只看该车间的线(车间是产线的属性)
+const raLines = computed(() => lineSummary.value
+  .filter((l) => !l.停用 && (!raShop.value || l.生产车间 === raShop.value))
+  .map((l) => ({ 生产线: l.生产线, 生产车间: l.生产车间 })))
+
+/** 车间下拉(启用产线的车间去重 + 该车间产线数) */
+async function loadShops() {
+  try {
+    const res = await request.post('/px/scheduleBoard/workshops', {})
+    shops.value = res.data || []
+  } catch { /* 不阻断 */ }
+}
 
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
@@ -276,6 +320,9 @@ function loadAll() { loadSummary(); loadScheduled(); loadStats() }
 function openReassign() {
   if (!checkedSched.value.length) return
   raLine.value = sel.line
+  raShop.value = lineSummary.value.find((l) => l.生产线 === sel.line)?.生产车间 || ''
+  raReason.value = ''
+  loadShops()
   raVisible.value = true
 }
 
@@ -343,20 +390,45 @@ async function printTask(mode) {
   loadScheduled()
 }
 
-async function doReassign() {
+/** 调拨(9.29 批次②):勾选已排工单 → 目标产线(可按车间收敛)+ 原因 → 写 `wo_transfer_log` 轨迹 */
+async function doTransfer() {
   if (!raLine.value) { ElMessage.warning(tt('请选择目标生产线')); return }
+  const rows = checkedSched.value.map((r) => ({ 工单号: r.加工单号, 工单行号: r.工单行号, 批次号: r.批次号 }))
   try {
-    const res = await request.post('/px/scheduleBoard/reassign', {
-      rows: checkedSched.value.map((r) => ({ 加工单号: r.加工单号 })),
-      目标生产线: raLine.value,
+    await ElMessageBox.confirm(`${tt('确认调拨')} ${rows.length} ${tt('张工单')} → ${raLine.value}？`, tt('工单调拨'),
+      { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
+  } catch { return }
+  try {
+    const res = await request.post('/px/scheduleBoard/transfer', {
+      rows, 目标生产线: raLine.value, 目标车间: raShop.value || undefined, 原因: raReason.value || undefined,
     })
     const d = res.data || {}
     const failed = d['失败行'] || []
-    ElMessage.success(`${tt('已调线')} ${d['调线张数']} ${tt('张')} → ${d['目标']}` + (failed.length ? `（${tt('跳过')} ${failed.length}）` : ''))
+    ElMessage.success(`${tt('已调拨')} ${d['调拨张数']} ${tt('张')} → ${d['目标']}`
+      + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''))
     raVisible.value = false
     loadScheduled()
     loadSummary()
-  } catch (e) { err(e, '调线失败') }
+  } catch (e) { err(e, '调拨失败') }
+}
+
+/** 撤回调拨:按工单最后一条生效轨迹把产线调回原线(轨迹标撤销,留痕不删) */
+async function doTransferRevoke() {
+  const rows = checkedSched.value.map((r) => ({ 工单号: r.加工单号, 工单行号: r.工单行号, 批次号: r.批次号 }))
+  if (!rows.length) return
+  try {
+    await ElMessageBox.confirm(`${tt('撤回调拨')} ${rows.length} ${tt('张工单')}？(${tt('调回原产线,轨迹留痕')})`,
+      tt('撤回调拨'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
+  } catch { return }
+  try {
+    const res = await request.post('/px/scheduleBoard/transferRevoke', { rows })
+    const d = res.data || {}
+    const failed = d['失败行'] || []
+    ElMessage.success(`${tt('已撤回')} ${d['撤回张数']} ${tt('张')}`
+      + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''))
+    loadScheduled()
+    loadSummary()
+  } catch (e) { err(e, '撤回调拨失败') }
 }
 
 // ── 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04) ──

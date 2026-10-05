@@ -2262,3 +2262,10 @@ migrate-qc-insp-req-drop-custom-tab.sql
 #   撤回切单必须精确还原到父行。实现 = WorkOrderSplitService(split / unsplit);子单取**新工单号**
 #   (报工工序封顶按 SUM(pl_sl) WHERE pl_no 计算,同号做不到「两单分别报工」验收)。幂等;两账套均执行。
 migrate-plang-split-cols.sql
+
+# migrate-wo-transfer-log.sql(2026-10-05):工单调拨轨迹表(9.29 生产管理批次 ②「工单调拨」)
+#   会议口径「选中工单 → 调拨到目标产线/车间;待加工列表与报工记录跟随转移,保留调拨轨迹」。
+#   新表 wo_transfer_log:每次调拨一行(从/到 生产线·车间 + 数量 + 原因 + 调拨人),撤销=asp_cancel Y 留痕不删
+#   + 产线调回 从生产线(「创建即可撤回」)。车间由 bs_prod_line.生产车间 派生,不另建车间主数据。
+#   表带 MS_Description + 14 列注明 + ix_wo_transfer_log_pl_no;已在 tools/db-inuse-tables.txt 登记。幂等;两账套均执行。
+migrate-wo-transfer-log.sql

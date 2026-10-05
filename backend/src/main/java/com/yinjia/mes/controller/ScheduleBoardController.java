@@ -3,6 +3,7 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.ScheduleBoardService;
+import com.yinjia.mes.service.WorkOrderTransferService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -22,10 +23,13 @@ public class ScheduleBoardController {
 
     private final ScheduleBoardService service;
     private final PanelPermissionService perm;
+    private final WorkOrderTransferService transferService;
 
-    public ScheduleBoardController(ScheduleBoardService service, PanelPermissionService perm) {
+    public ScheduleBoardController(ScheduleBoardService service, PanelPermissionService perm,
+                                   WorkOrderTransferService transferService) {
         this.service = service;
         this.perm = perm;
+        this.transferService = transferService;
     }
 
     /** 待排产池(已审核·未指派产线) */
@@ -87,6 +91,38 @@ public class ScheduleBoardController {
         perm.requireButton("MANU_ORDER", "保存");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
         return ApiResult.ok(service.reassign(rows, str(body.get("目标生产线")), currentUser()));
+    }
+
+    // ══════════ 工单调拨(9.29 生产管理批次 ②,2026-10-05):产线/车间两级目标 + 轨迹 + 可撤回 ══════════
+    // 与 /reassign(只改产线、无轨迹)的区别:本组写 wo_transfer_log 轨迹并支持按轨迹撤回。
+    // 权限:面板查看 + MANU_ORDER「保存」词表。
+
+    /** 车间下拉(启用产线的车间 + 该车间产线数;调拨弹窗用) */
+    @PostMapping("/workshops")
+    public ApiResult<List<Map<String, Object>>> workshops() {
+        perm.requirePanelView("MANU_ORDER");
+        return ApiResult.ok(transferService.workshops());
+    }
+
+    /** 调拨:勾选工单 → 目标产线(+ 可选目标车间校验)+ 原因;写轨迹、留痕 */
+    @PostMapping("/transfer")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> transfer(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        perm.requireButton("MANU_ORDER", "保存");
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
+        return ApiResult.ok(transferService.transfer(rows, str(body.get("目标生产线")), str(body.get("目标车间")),
+                str(body.get("原因")), currentUser()));
+    }
+
+    /** 撤回调拨:按工单最后一条生效轨迹把产线调回原线(轨迹标撤销,留痕不删) */
+    @PostMapping("/transferRevoke")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> transferRevoke(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        perm.requireButton("MANU_ORDER", "保存");
+        List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
+        return ApiResult.ok(transferService.revoke(rows, currentUser()));
     }
 
     /** 今日已排产(mode=today)/全部已排产(mode=all) */
