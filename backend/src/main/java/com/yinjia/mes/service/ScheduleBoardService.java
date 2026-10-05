@@ -473,6 +473,14 @@ public class ScheduleBoardService {
      * (plang 工单的入库/领料回写链未接通前为空)。质量段暂缺。
      */
     public Map<String, Object> trace(String no) {
+        return trace(no, null);
+    }
+
+    /**
+     * 工单追溯(重载:可带**工单行id**,让「家族/切单血缘」按行精确聚合 —— 同一 pl_no 可有多行)。
+     * 家族=根行 + 全部子孙(递归 CTE);不传行id 时取该单号首行。
+     */
+    public Map<String, Object> trace(String no, Long rowId) {
         String doc = no == null ? "" : no.trim();
         Map<String, Object> head;
         try {
@@ -607,6 +615,36 @@ public class ScheduleBoardService {
                         + " CONVERT(varchar(16), asp_time2, 120) AS 撤销时间, ISNULL(asp_user2,N'') AS 撤销人"
                         + " FROM dbo.wo_transfer_log WHERE pl_no=? ORDER BY id", doc);
 
+        // 家族(切单血缘,9.29 批次① 会议口径:多级切分一律按根单聚合)。
+        // ⚠ 聚合单元=**工单行**(plang.id):同一 pl_no 可有多行(多订单行/多批次),按单号聚合会把整单
+        //   无关行也算进来(实测 MO-2026-09-0136 有 8 行 → Σ计划 虚高)。故按 行id 走精确血缘:
+        //   先沿 源工单行id 上溯到根行,再从根行下溯全部子孙(递归 CTE)。
+        Long famRowId = rowId == null ? null : rowId;
+        if (famRowId == null) {
+            List<Map<String, Object>> first = jdbc.queryForList(
+                    "SELECT TOP 1 id FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", doc);
+            if (!first.isEmpty()) famRowId = ((Number) first.get(0).get("id")).longValue();
+        }
+        List<Map<String, Object>> family = famRowId == null ? List.of() : jdbc.queryForList(
+                "WITH fam AS ("
+                        + "  SELECT p.* FROM dbo.plang p WHERE p.id=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + "  UNION ALL"
+                        + "  SELECT p.* FROM dbo.plang p JOIN fam f ON p.[源工单行id] = f.id WHERE ISNULL(p.asp_cancel,'N')<>'Y')"
+                        + " SELECT pl_no AS 工单号, pl_xc AS 工单行号, ISNULL([批次号],N'') AS 批次号,"
+                        + "   ISNULL([是否切单],N'N') AS 是否切单, [拆分序号] AS 拆分序号,"
+                        + "   ISNULL([源工单号],N'') AS 源工单号, ISNULL([根工单号],N'') AS 根工单号,"
+                        + "   ISNULL(pl_sl,0) AS 计划数量, ISNULL(rk_sl,0) AS 入库数量, ISNULL(scx,N'') AS 生产线,"
+                        + "   CASE WHEN ISNULL(ja,'N') IN (N'T',N'Y') THEN N'已结案' ELSE N'在产' END AS 状态"
+                        + " FROM fam ORDER BY ISNULL([是否切单],N'N'), pl_no, pl_xc", famRowId);
+        String rootNo = family.isEmpty() ? doc : String.valueOf(
+                family.stream().filter(x -> "N".equals(String.valueOf(x.get("是否切单")))).findFirst()
+                        .map(x -> x.get("工单号")).orElse(doc));
+        Map<String, Object> famSum = new LinkedHashMap<>();
+        famSum.put("根工单号", rootNo);
+        famSum.put("张数", family.size());
+        famSum.put("计划数量合计", Math.round(family.stream().mapToDouble(x -> Num.of(x.get("计划数量"))).sum() * 10000d) / 10000d);
+        famSum.put("入库数量合计", Math.round(family.stream().mapToDouble(x -> Num.of(x.get("入库数量"))).sum() * 10000d) / 10000d);
+
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("头", head);
         out.put("时间线", timeline);
@@ -617,6 +655,8 @@ public class ScheduleBoardService {
         out.put("子工单", children);
         out.put("父工单", parentsOf);
         out.put("调拨轨迹", transfers);
+        out.put("家族汇总", famSum);
+        out.put("家族清单", family);
         return out;
     }
 

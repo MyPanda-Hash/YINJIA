@@ -98,6 +98,8 @@ public class WorkOrderListController {
                         // 切单父子关联(9.29 批次①,2026-10-05):子单带 源工单号/拆分序号,列表直接可见「由谁切出」
                         + " ISNULL(p.[源工单号], N'') AS 源工单号, p.[拆分序号] AS 拆分序号,"
                         + " ISNULL(p.[源工单行id], 0) AS 源工单行id,"
+                        // 血缘(会议口径第二版):根工单号(多级按根聚合)+ 是否切单(一眼区分原单/子单)
+                        + " ISNULL(p.[根工单号], N'') AS 根工单号, ISNULL(p.[是否切单], N'N') AS 是否切单,"
                         + " CASE WHEN p.ja IN (N'T', N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
                         + " p.dm AS 物料编码, ISNULL(p.mc, N'') AS 产品名称, ISNULL(p.gg, N'') AS 规格型号,"
                         + " ISNULL(p.jldw, N'') AS 生产单位,"

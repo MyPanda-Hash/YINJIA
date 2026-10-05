@@ -2283,3 +2283,9 @@ migrate-yjuser-workshop.sql
 #   新建 6 表 + 3 面板 + 字段/译名/授权;并修 WO_REPORT.code_col(2026-09-27 单表化漏改,指向 scjl 不存在的
 #   「单据编号」,导致报工单保存报错、检验单触发链不通)。幂等;两账套均执行。
 migrate-qc-process-insp.sql
+
+# migrate-plang-split-lineage.sql(2026-10-05):切单血缘补全(9.29 批次① 会议口径第二版)
+#   补 plang.根工单号/是否切单(多级按根单聚合 + 一眼区分原单/子单)、新表 wo_split_log(切单操作日志:
+#   谁/何时/从哪单切出多少/生成哪张子单/是否撤回);子单号规则改「原工单号-序号」。
+#   英文列名(parent_wo_id/root_wo_id/wo_seq/split_flag)按 ADR-0001 落成中文列名。幂等;两账套均执行。
+migrate-plang-split-lineage.sql

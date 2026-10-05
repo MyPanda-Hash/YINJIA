@@ -133,11 +133,17 @@ public class ScheduleBoardController {
                 str(body == null ? null : body.get("keyword")), workshop()));
     }
 
-    /** 工单追溯:头+时间线+排产/完工/入库/领料(质检段待生产质检面板接入后补) */
+    /** 工单追溯:头+时间线+排产/完工/入库/领料+父子/调拨/家族(质检段见三类工序检验单) */
     @PostMapping("/trace")
     public ApiResult<Map<String, Object>> trace(@RequestBody Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");
-        return ApiResult.ok(service.trace(str(body.get("工单号"))));
+        return ApiResult.ok(service.trace(str(body.get("工单号")), longOf(body.get("工单行id") != null ? body.get("工单行id") : body.get("行id"))));
+    }
+
+    private static Long longOf(Object o) {
+        if (o == null || String.valueOf(o).isBlank() || "null".equals(String.valueOf(o))) return null;
+        if (o instanceof Number n) return n.longValue();
+        try { return Long.valueOf(String.valueOf(o).trim()); } catch (NumberFormatException e) { return null; }
     }
 
     /** 打印生产任务单留痕:打印次数+1、打印人/打印时间(权限=MANU_ORDER 打印) */

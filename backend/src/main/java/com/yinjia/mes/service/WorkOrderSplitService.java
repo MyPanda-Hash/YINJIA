@@ -67,6 +67,12 @@ public class WorkOrderSplitService {
         out.put("已完工报工", round(maxCompleted(String.valueOf(p.get("pl_no")))));
         out.put("已切出数量", round(sumChildren(((Number) p.get("id")).longValue())));
         out.put("可切上限", round(cutLimit(p)));
+        // 血缘与家族(会议口径:多级切分一律按根单聚合 —— 计划员看整体进度用)
+        String root = familyRoot(p);
+        out.put("是否切单", "Y".equals(String.valueOf(p.get("是否切单"))) ? "Y" : "N");
+        out.put("根工单号", root);
+        out.put("家族汇总", familySummary(root));
+        out.put("父单交期", p.get("交期"));
         return out;
     }
 
@@ -103,8 +109,14 @@ public class WorkOrderSplitService {
         String plMan = inherit ? str(p.get("pl_man")) : null;
         String lb = inherit ? str(p.get("lb")) : null;
 
-        String childNo = formNo.next("MO", user);
         int seq = nextSplitSeq(parentId, parentNo);
+        // 子单号规则(会议口径「现场一眼看出同源」)= 原工单号-序号;不再占用 MO 号池
+        String childNo = parentNo + "-" + seq;
+        // 血缘根:父单本身是子单则继承其根,否则父单自己就是根(多级切分按根聚合)
+        String root = familyRoot(p);
+        // 子单交期/备注(会议:可修改子单交期 + 备注 急单/分波)
+        String dueDate = str(req.get("子单交期"));
+        String remark = str(req.get("备注"));
 
         // ① 父单核减(排产数量、余量=需求−排产)
         double newParentSl = round(num(p.get("pl_sl")) - qty);
@@ -117,14 +129,20 @@ public class WorkOrderSplitService {
                         + " pl_sl, xq_sl, rk_sl, yl, dj, jine, cp_date, st_date, cp_date2, bz, ja,"
                         + " od_no, od_xc, lot_no, color, siz, lb, mjlx, ll_no, wb_no, ypl_sl, ll_no2, remark,"
                         + " llxz, cgrkdh, lldh, djlx, zl, [批次号], [源工单号], [源工单行id], [拆分序号],"
+                        + " [根工单号], [是否切单],"
                         + " asp_cancel, asp_user1, asp_time1)"
                         + " SELECT comm, ?, 1, GETDATE(), ?, ?, khdm, dm, mc, gg, gg2, jldw,"
-                        + "   ?, ?, 0, 0, dj, jine, cp_date, st_date, cp_date2, bz, N'N',"
+                        + "   ?, ?, 0, 0, dj, jine,"
+                        + "   COALESCE(?, cp_date), st_date, cp_date2,"          // 交期可改,默认继承父单
+                        + "   COALESCE(?, bz), N'N',"                           // 备注可填(急单/分波),默认继承
                         + "   od_no, od_xc, lot_no, color, siz, ?, mjlx, NULL, NULL, ypl_sl, NULL, remark,"
                         + "   llxz, cgrkdh, lldh, djlx, zl, [批次号], ?, ?, ?,"
+                        + "   ?, N'Y',"
                         + "   N'N', ?, GETDATE()"
                         + " FROM dbo.plang WHERE id=?",
-                childNo, scx, plMan, qty, qty, lb, parentNo, parentId, seq, user, parentId);
+                childNo, scx, plMan, qty, qty,
+                dueDate == null ? null : java.time.LocalDate.parse(dueDate), remark,
+                lb, parentNo, parentId, seq, root, user, parentId);
         if (ins == 0) throw new IllegalStateException("子工单创建失败(父行已不存在)");
         Long childId = jdbc.queryForObject(
                 "SELECT TOP 1 id FROM dbo.plang WHERE pl_no=? AND [源工单行id]=? ORDER BY id DESC", Long.class,
@@ -145,18 +163,25 @@ public class WorkOrderSplitService {
         // ④ 占用链拆账(SO 行 → 父/子两张工单,合计不变)
         boolean linkAdjusted = splitLink(parentNo, parentXc, batch, childNo, childId, qty);
 
-        // ⑤ 留痕(两侧各一条,工单追溯时间线直接可见)
+        // ⑤ 留痕(两侧各一条,工单追溯时间线直接可见)+ 切单操作日志(谁/何时/从哪单切出多少/生成哪张子单)
         logUsage(user, "切单", childNo);
         logUsage(user, "切出子工单", parentNo);
+        logSplit("切单", parentNo, parentId, childNo, root, seq, qty, newParentSl, dueDate, remark, user);
+        logUsage(user, "打印子工单", childNo);   // 会议口径:切完即打子工单码(扫码领料/报工绑到子单)
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("父工单号", parentNo);
         out.put("子工单号", childNo);
         out.put("子工单行id", childId);
+        out.put("根工单号", root);
+        out.put("切单序号", seq);
         out.put("切出数量", trim(qty));
         out.put("父单剩余数量", trim(newParentSl));
+        out.put("子单交期", dueDate == null ? p.get("交期") : dueDate);
         out.put("继承排产", scheduled);
         out.put("占用链已拆账", linkAdjusted);
+        out.put("打印提示", "子工单 " + childNo + " 已生成:请在生产工单页勾选该单打印子工单码(扫码领料/报工将绑定到子单)");
+        out.put("家族汇总", familySummary(root));
         return out;
     }
 
@@ -220,6 +245,13 @@ public class WorkOrderSplitService {
 
         logUsage(user, "撤回切单", childNo);
         logUsage(user, "撤回子工单", parentNo);
+        // 日志:对应「切单」行标已撤回(留痕不删) + 记一行撤回操作
+        try {
+            jdbc.update("UPDATE dbo.wo_split_log SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE()"
+                    + " WHERE 操作类型=N'切单' AND 子工单号=? AND ISNULL(asp_cancel,'N')<>'Y'", user, childNo);
+        } catch (Exception ignore) { /* 日志失败不阻断 */ }
+        logSplit("撤回切单", parentNo, parentId, childNo, familyRoot(parent), c.get("拆分序号") == null ? null : ((Number) c.get("拆分序号")).intValue(),
+                childSl, newParentSl, null, "撤回子单,数量还原到原单", user);
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("子工单号", childNo);
@@ -241,7 +273,11 @@ public class WorkOrderSplitService {
                         "SELECT id, comm, pl_no, pl_xc, ISNULL(scx,N'') AS scx, ISNULL(pl_man,N'') AS pl_man,"
                                 + " ISNULL(lb,N'') AS lb, ISNULL([批次号],N'') AS 批次号, ISNULL(dm,N'') AS dm,"
                                 + " ISNULL(mc,N'') AS mc, ISNULL(gg,N'') AS gg, ISNULL(pl_sl,0) AS pl_sl,"
-                                + " ISNULL(xq_sl,0) AS xq_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja"
+                                + " ISNULL(xq_sl,0) AS xq_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja,"
+                                + " ISNULL([源工单号],N'') AS 源工单号, ISNULL([根工单号],N'') AS 根工单号,"
+                                + " ISNULL([是否切单],N'N') AS 是否切单,"
+                                + " CAST(CONVERT(varchar(10), cp_date, 120) AS nvarchar(20)) AS 交期,"
+                                + " CAST(ISNULL(CAST(bz AS nvarchar(500)),N'') AS nvarchar(500)) AS 父备注"
                                 + " FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'",
                         Long.parseLong(String.valueOf(rid).trim()));
             String no = str(req.get("工单号"));
@@ -252,7 +288,11 @@ public class WorkOrderSplitService {
                     "SELECT TOP 1 id, comm, pl_no, pl_xc, ISNULL(scx,N'') AS scx, ISNULL(pl_man,N'') AS pl_man,"
                             + " ISNULL(lb,N'') AS lb, ISNULL([批次号],N'') AS 批次号, ISNULL(dm,N'') AS dm,"
                             + " ISNULL(mc,N'') AS mc, ISNULL(gg,N'') AS gg, ISNULL(pl_sl,0) AS pl_sl,"
-                            + " ISNULL(xq_sl,0) AS xq_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja"
+                            + " ISNULL(xq_sl,0) AS xq_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja,"
+                            + " ISNULL([源工单号],N'') AS 源工单号, ISNULL([根工单号],N'') AS 根工单号,"
+                            + " ISNULL([是否切单],N'N') AS 是否切单,"
+                            + " CAST(CONVERT(varchar(10), cp_date, 120) AS nvarchar(20)) AS 交期,"
+                            + " CAST(ISNULL(CAST(bz AS nvarchar(500)),N'') AS nvarchar(500)) AS 父备注"
                             + " FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'"
                             + "   AND (? IS NULL OR pl_xc=?) AND (? = N'' OR ISNULL([批次号],N'')=?)"
                             + " ORDER BY id",
@@ -309,13 +349,56 @@ public class WorkOrderSplitService {
         return v == null ? 0 : v;
     }
 
-    /** 下一个拆分序号(同父行已有子单数 + 1;撤回后再切不会与存量重号)。 */
+    /** 下一个拆分序号(同父行**含已撤回行**取最大 +1:撤回后再切不复用旧号,子单号不重号) */
     private int nextSplitSeq(long parentId, String parentNo) {
         Integer max = jdbc.queryForObject(
-                "SELECT ISNULL(MAX(ISNULL([拆分序号],0)),0) FROM dbo.plang"
-                        + " WHERE [源工单行id]=? OR (pl_no=? AND [源工单号] IS NULL AND ISNULL([拆分序号],0)>0)",
-                Integer.class, parentId, parentNo);
+                "SELECT ISNULL(MAX(ISNULL([拆分序号],0)),0) FROM dbo.plang WHERE [源工单行id]=?",
+                Integer.class, parentId);
         return (max == null ? 0 : max) + 1;
+    }
+
+    /** 血缘根:父单本身是子单则继承其根;否则父单自己就是根(顶级原单聚合时用自身单号兜底) */
+    private String familyRoot(Map<String, Object> p) {
+        String root = str(p.get("根工单号"));
+        return root != null ? root : String.valueOf(p.get("pl_no"));
+    }
+
+    /**
+     * 家族汇总(按**根**聚合,会议口径:多级切分一律按根单):张数 + Σ计划数量 + Σ入库数量 + Σ已完工报工。
+     * 计划员看整体进度 / 订单跟踪表数量闭合用(原单 + 全部子孙之和)。
+     */
+    public Map<String, Object> familySummary(String root) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (root == null || root.isBlank()) return out;
+        Map<String, Object> agg = jdbc.queryForMap(
+                "SELECT COUNT(*) AS 张数, ISNULL(SUM(ISNULL(pl_sl,0)),0) AS 计划数量,"
+                        + " ISNULL(SUM(ISNULL(rk_sl,0)),0) AS 入库数量 FROM dbo.plang"
+                        + " WHERE ISNULL(asp_cancel,'N')<>'Y' AND (pl_no=? OR ISNULL([根工单号],N'')=?)", root, root);
+        out.put("根工单号", root);
+        out.put("张数", agg.get("张数"));
+        out.put("计划数量", round(num(agg.get("计划数量"))));
+        out.put("入库数量", round(num(agg.get("入库数量"))));
+        Double done = jdbc.queryForObject(
+                "SELECT ISNULL(SUM(s),0) FROM (SELECT gldh, MAX(s) AS s FROM"
+                        + " (SELECT gldh, SUM(ISNULL(sl,0)) AS s FROM dbo.scjl"
+                        + "   WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y' AND gldh IN"
+                        + "     (SELECT pl_no FROM dbo.plang WHERE ISNULL(asp_cancel,'N')<>'Y'"
+                        + "       AND (pl_no=? OR ISNULL([根工单号],N'')=?))"
+                        + "   GROUP BY gldh, gxdm) t GROUP BY gldh) u", Double.class, root, root);
+        out.put("已完工报工", done == null ? 0 : round(done));
+        return out;
+    }
+
+    /** 切单操作日志(谁/何时/从哪单切出多少/生成哪张子单/是否撤回);失败不阻断业务 */
+    private void logSplit(String op, String parentNo, long parentId, String childNo, String root, Integer seq,
+                          double qty, double parentLeft, String due, String remark, String user) {
+        try {
+            jdbc.update("INSERT INTO dbo.wo_split_log (操作类型, 父工单号, 父工单行id, 子工单号, 根工单号, 切单序号,"
+                            + " 切出数量, 父单剩余量, 子单交期, 原因备注, asp_cancel, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,?,?,?,?,?,?,N'N',?,GETDATE())",
+                    op, parentNo, parentId, childNo, root, seq, qty, parentLeft,
+                    due == null ? null : java.time.LocalDate.parse(due), remark, user);
+        } catch (Exception ignore) { /* 日志失败不阻断业务 */ }
     }
 
     /**
