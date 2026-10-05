@@ -2340,3 +2340,10 @@ migrate-route-kingdee-fields.sql
 #   处置:工序编码/工序名称→参照 OP;工序控制→下拉框(自制/委外);班组→参照 OP.默认车间、操作工→参照 EMP
 #   (有条件才改);并补这批新字段的 en 译名(多语言强制规范)。幂等;两账套均执行。
 migrate-route-fields-ref.sql
+
+# migrate-route-status-as-button.sql(2026-10-05):工艺路线「状态」改按钮驱动、「审核状态」并入单据状态
+#   用户口径「状态应该是按钮,审批状态应该和当前单据状态相同」;本引擎无按钮型字段/按钮配置表(YJ_PANEL.config 空),
+#   单据状态由状态机派生(ButtonService 对提交上来的 单据状态 直接 remove),只能由审核/弃审按钮驱动。
+#   处置:①「状态」退出表单位(place=query) ②删除自造的「审核状态」字段登记并 drop 该列 ⇒ 只留引擎单据状态。
+#   幂等;两账套均执行。
+migrate-route-status-as-button.sql
