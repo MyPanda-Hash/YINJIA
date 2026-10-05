@@ -290,11 +290,11 @@ function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
 const selQty = computed(() => schedRows.value.reduce((a, r) => a + Number(r.排产数量 || 0), 0))
-/** 左侧按车间分组(2026-10-05):分发维度=生产线,车间是它的归属;未归类的线单独一组 */
+/** 左侧按工序/工艺两级分组(2026-10-05):第1级=成型/切炭/组装,第2级=产线分组(成型下 烧结/X烧结) */
 const lineGroups = computed(() => {
   const m = new Map()
   for (const l of lineSummary.value) {
-    const k = l.生产车间 || '未归类'
+    const k = l.产线分组 ? `${l.生产车间}·${l.产线分组}` : (l.生产车间 || '未归类')
     if (!m.has(k)) m.set(k, [])
     m.get(k).push(l)
   }

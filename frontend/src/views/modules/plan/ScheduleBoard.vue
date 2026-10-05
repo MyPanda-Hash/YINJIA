@@ -14,6 +14,11 @@
           <el-option v-for="w in shops" :key="w" :label="w" :value="w" />
         </el-select>
       </span>
+      <span class="sb-p" v-if="subGroups.length">{{ tt('产线分组') }}
+        <el-select v-model="param.group" clearable style="width: 140px" :placeholder="tt('全部')" @change="param.line = ''">
+          <el-option v-for="g in subGroups" :key="g" :label="g" :value="g" />
+        </el-select>
+      </span>
       <span class="sb-p">{{ tt('生产线') }}
         <el-select v-model="param.line" filterable style="width: 220px" :placeholder="tt('选择生产线')">
           <el-option v-for="l in pickLines" :key="l.生产线" :value="l.生产线"
@@ -140,13 +145,18 @@ const allMode = ref(false)
 const s = ref({})
 const lines = ref([])
 const teams = ref([])
-const param = reactive({ line: '', team: '', start: '', due: new Date().toISOString().slice(0, 10), qty: null, shop: '' })
+const param = reactive({ line: '', team: '', start: '', due: new Date().toISOString().slice(0, 10), qty: null, shop: '', group: '' })
 const mode = computed(() => (allMode.value ? 'all' : 'today'))
 const customers = computed(() => [...new Set(pool.value.map((r) => r.客户).filter(Boolean))].sort())
-/** 车间下拉:产线档案里出现过的车间(去重;未归一的取值原样列出,便于现场看清有哪些写法) */
+/** 工序/工艺(第1级):产线档案里出现过的功能值 */
 const shops = computed(() => [...new Set(lines.value.map((l) => l.生产车间).filter(Boolean))].sort())
-/** 车间优先的候选产线:选了车间就只列本车间的线 */
-const pickLines = computed(() => (param.shop ? lines.value.filter((l) => l.生产车间 === param.shop) : lines.value))
+/** 产线分组(第2级,仅成型有:烧结/X烧结):随所选功能收敛 */
+const subGroups = computed(() => [...new Set(lines.value
+  .filter((l) => !param.shop || l.生产车间 === param.shop)
+  .map((l) => l.产线分组).filter(Boolean))].sort())
+/** 两级收敛后的候选产线 */
+const pickLines = computed(() => lines.value.filter((l) => (!param.shop || l.生产车间 === param.shop)
+  && (!param.group || l.产线分组 === param.group)))
 
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '' }
 function urgent(v) {

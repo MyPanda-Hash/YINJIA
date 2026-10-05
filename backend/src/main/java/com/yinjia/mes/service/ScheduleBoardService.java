@@ -385,6 +385,7 @@ public class ScheduleBoardService {
         }
         List<Map<String, Object>> lines = jdbc.queryForList(
                 "SELECT [生产线] AS 生产线, ISNULL([生产车间],N'') AS 生产车间,"
+                        + " ISNULL([产线分组],N'') AS 产线分组,"   // 第 2 级分类(成型→烧结/X烧结;依《新系统产线命名.xlsx》)
                         + " CASE WHEN ISNULL([停用],0) = 1 THEN 1 ELSE 0 END AS 停用"
                         + " FROM bs_prod_line"
                         + " WHERE ISNULL([asp_cancel],'N') <> 'Y' AND (? = N'' OR ISNULL([生产车间],N'') = ?)"

@@ -472,6 +472,10 @@ export default {
     '生产车间': 'Workshop',
     '留空=不受限(计划组/管理员)': 'Blank = unrestricted (planning / admin)',
     '工序/工艺': 'Process',
+    '产线分组': 'Line Group',
+    '全部': 'All',
+    '烧结': 'Sintering',
+    'X烧结': 'X Sintering',
     '全部工序': 'All Processes',
     '本账号按工序/工艺过滤：待排产池仅计划组可见，下方只显示本工序产线的已排工单':
       'Filtered by process: the pending pool is visible to the planning group only; below are scheduled WOs on lines of this process',
