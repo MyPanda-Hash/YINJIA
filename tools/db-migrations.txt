@@ -2311,3 +2311,9 @@ migrate-prod-line-function-group.sql
 #   用户指出成型在文件里还分 烧结 / X烧结;上一版只落第 1 级把子组压平。补列 bs_prod_line.产线分组:
 #   烧结=1~4号车间+自动线1~3(7 条)、X烧结=1~7号机(7 条);切炭/组装及文件未列的 8 条线留空。幂等;两账套均执行。
 migrate-prod-line-subgroup.sql
+
+# migrate-process-routing-tasks.sql(2026-10-05):A 路线驱动工序任务(数据层)
+#   ① bs_inv.工艺路线(产品→路线绑定;空=默认路线) ② 复用 wo_progress(0 行)扩 12 列当工序任务
+#   (工单行id/批次号/工序序/生产车间/生产线/状态/优先级/排序号/计划完工日期/产品编码/产品名称/规格型号 + 两索引)
+#   ③ 种默认路线 GY-CB-STD「炭棒标准路线」成型(1)→切炭(2)→组装(3),按《新系统产线命名.xlsx》功能口径。幂等;两账套均执行。
+migrate-process-routing-tasks.sql
