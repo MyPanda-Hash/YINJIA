@@ -2295,3 +2295,8 @@ migrate-plang-split-lineage.sql
 #   当前工序 = 已完工报工里最靠后的一道(混料→成型→切炭→组装→装箱);工单列表/排产页共用。
 #   幂等(CREATE OR ALTER);两账套均执行。
 migrate-wo-process-progress-view.sql
+
+# migrate-clean-orphan-sl-recv-field.sql(2026-10-05):清理孤立字段登记(体检 05 元数据漂移归零)
+#   面板不存在的 yj_field 登记一律删除(实测:正式库 1 行 SL_RECV.计量单位 —— 面板已改名 QC_RECV;
+#   测试库另 3 行同类遗留);不动现役面板登记/译名/物理表。幂等;两账套均执行。
+migrate-clean-orphan-sl-recv-field.sql
