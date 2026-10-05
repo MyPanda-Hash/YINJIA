@@ -2760,6 +2760,10 @@ export default {
     '矿化料': 'Mineralizing Material',
     '原料来料': 'Raw Material Incoming',
 
+    /* 文件编码/检验依据:按物料编码带入检验报告且不可修改(2026-10-04 用户口径) */
+    '文件编码': 'Document No.',
+    '已按来料检验要求更新文件编码与检验依据': 'Document No. and inspection basis updated from the incoming inspection requirements',
+
     /* 来料检验要求·第 8 张表「自定义检验要求」(2026-10-04 用户口径):
        页签的列 = 动态字段(备用列池),列名就是检验项;带入口径与前 7 张完全一致 */
     '自定义检验要求': 'Custom Inspection Requirements',

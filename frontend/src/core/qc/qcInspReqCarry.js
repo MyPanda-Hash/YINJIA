@@ -23,6 +23,11 @@ import { colsOfTab } from './qcInspReqCols.js'
 
 /** 要求表的标识列:不进检验项(物料编号=匹配键;物料类别=页签分流键) */
 const ID_COLS = Object.freeze(['物料编号', '物料类别'])
+/** 只进报告**抬头**、不进表体的列:文件编码/检验依据 按物料编码带进报告的抬头两格
+ *  (用户口径 2026-10-04:「检验报告里面的文件编码与检验依据,要靠物料编码来对应填入」),
+ *  它们**不是检验项** —— 表体里不该出现「检验项=文件编码」这种行。 */
+const HEAD_ONLY_COLS = Object.freeze(['文件编码', '检验依据'])
+
 /** 非业务列(主键/审计列):配置外类别的兜底列名推导时要排掉 */
 const NON_BIZ_COLS = Object.freeze(['id'])
 const isNonBiz = (k) => NON_BIZ_COLS.includes(k) || String(k).startsWith('asp_')
@@ -69,7 +74,7 @@ export function carryEntriesOf(groups, extFields) {
     if (g?.tab?.dynamicCols && cols.length <= 1) cols = fallbackColsOf(g?.rows)
     for (const row of Array.isArray(g?.rows) ? g.rows : []) {
       for (const key of cols) {
-        if (ID_COLS.includes(key) || isNonBiz(key)) continue
+        if (ID_COLS.includes(key) || HEAD_ONLY_COLS.includes(key) || isNonBiz(key)) continue
         const std = String(row?.[key] ?? '').trim()
         // 该列数据为空 ⇒ 这条要求没有可填的检测标准,不成一项(带走一行空标准只会添乱)
         if (!std) continue
@@ -99,15 +104,40 @@ export function missingCarryRows(existingItems, entries) {
 }
 
 /**
- * 一行到位:来料检验要求全量行 + 物料编码 + 报告现有行 → 该补进来的行。
+ * 从命中分组里取**报告抬头**要带入的两项:文件编码 / 检验依据(2026-10-04 用户口径:
+ * 「检验报告里面的文件编码与检验依据,要靠物料编码来对应填入,并且不可以修改」)。
+ * 口径:按页签配置序取**首个非空值**(与「检验项」的取法同源,不另立一套);
+ * 要求表没填的项**不返回**(调用方保留报告原值/默认 YJ-QR-96 / YJ-Q-30)。
+ * @param {Array} groups lookupReqGroups 的结果
+ * @returns {{文件编码?: string, 检验依据?: string}}
+ */
+export const CARRY_HEAD_KEYS = Object.freeze(['文件编码', '检验依据'])
+export function carryHeadOf(groups) {
+  const out = {}
+  for (const key of CARRY_HEAD_KEYS) {
+    for (const g of Array.isArray(groups) ? groups : []) {
+      for (const row of Array.isArray(g?.rows) ? g.rows : []) {
+        const v = String(row?.[key] ?? '').trim()
+        if (v) { out[key] = v; break }
+      }
+      if (out[key]) break
+    }
+  }
+  return out
+}
+
+/**
+ * 一行到位:来料检验要求全量行 + 物料编码 + 报告现有行 → 该补进来的行 + 抬头该带入的两项。
  * @param {Array} reqRows 两个面板的要求行(已合并)
  * @param {string} materialCode 物料编码
  * @param {Array} existingItems 报告表体现有行
  * @param {Array} [extFields] 两个面板的动态字段(合并传)
  * @param {Array} [tabs] 两个面板的页签全集(默认只有固定 7 张)
- * @returns {{entries: Array<object>, add: Array<object>}} entries=该物料的全部可带入项;add=其中缺的
+ * @returns {{entries: Array<object>, add: Array<object>, head: object}}
+ *          entries=该物料的全部可带入项;add=其中缺的;head=报告抬头要写入的 文件编码/检验依据
  */
 export function carryPlan(reqRows, materialCode, existingItems, extFields, tabs) {
-  const entries = carryEntriesOf(lookupReqGroups(reqRows, materialCode, tabs), extFields)
-  return { entries, add: missingCarryRows(existingItems, entries) }
+  const groups = lookupReqGroups(reqRows, materialCode, tabs)
+  const entries = carryEntriesOf(groups, extFields)
+  return { entries, add: missingCarryRows(existingItems, entries), head: carryHeadOf(groups) }
 }

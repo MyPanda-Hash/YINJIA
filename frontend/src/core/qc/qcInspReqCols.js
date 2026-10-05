@@ -17,8 +17,15 @@
  */
 import { normCode } from './qcInspReqLookup.js'
 
-/** 自定义页签**必有**的匹配键列:与固定表一样,物料编号在最左 —— 检验报告正是按它找行的 */
+/** 每张表**必有**的固定前置列:物料编号(匹配键)+ 文件编码/检验依据(按物料带入检验报告,报告内不可改)。
+ *  固定 7 张表的这三列写在 qcInspReqConfig.js 的 cols 里;全自定义表(系列面板)用这里兜底 ——
+ *  两边列序必须一致:物料编号 在前,文件编码/检验依据 紧随其后(用户口径 2026-10-04)。 */
 export const EXT_KEY_COL = Object.freeze({ key: '物料编号', w: 140 })
+export const LEAD_COLS = Object.freeze([
+  { key: '物料编号', w: 140 },
+  { key: '文件编码', w: 120 },
+  { key: '检验依据', w: 130 },
+])
 /** 动态列取不到元数据列宽时的默认宽 */
 export const DEFAULT_EXT_COL_W = 140
 /** 动态字段是否属于该页签(严格按 tab 比)。
@@ -56,7 +63,7 @@ export function colsOfTab(tab, extFields, widthOf) {
     const parent = normCode(f.parent)
     return { key: f.label, w: w(f.label) || DEFAULT_EXT_COL_W, ...(parent ? { group: parent } : {}) }
   })
-  const out = tab.dynamicCols ? [{ ...EXT_KEY_COL }] : (tab.cols || []).map((c) => ({ ...c }))
+  const out = tab.dynamicCols ? LEAD_COLS.map((c) => ({ ...c })) : (tab.cols || []).map((c) => ({ ...c }))
   for (const d of dyn) {
     let at = out.length
     if (d.group) {

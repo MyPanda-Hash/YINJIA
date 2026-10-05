@@ -12,6 +12,8 @@ export const qcInspReqTabs = [
     sheetTitle: '折叠棉检验要求',
     cols: [
       { key: '物料编号', w: 140, rowspan: 2 },
+      { key: '文件编码', w: 120, rowspan: 2 },
+      { key: '检验依据', w: 130, rowspan: 2 },
       { key: '折叠棉', w: 140, group: '规格' },
       { key: '炭棒', w: 140, group: '规格' },
       { key: '实配炭棒后外径', w: 140, group: '规格' },
@@ -24,6 +26,8 @@ export const qcInspReqTabs = [
     sheetTitle: '垫片/密封圈检验要求',
     cols: [
       { key: '物料编号', w: 102, rowspan: 2 },
+      { key: '文件编码', w: 120, rowspan: 2 },
+      { key: '检验依据', w: 130, rowspan: 2 },
       { key: '外径', w: 101, group: '规格' },
       { key: '内径', w: 123, group: '规格' },
       { key: '厚度', w: 81, group: '规格' },
@@ -37,6 +41,8 @@ export const qcInspReqTabs = [
     sheetTitle: '无纺布检验要求',
     cols: [
       { key: '物料编号', w: 102, rowspan: 2 },
+      { key: '文件编码', w: 120, rowspan: 2 },
+      { key: '检验依据', w: 130, rowspan: 2 },
       { key: '长', w: 101, group: '规格（片布）' },
       { key: '宽', w: 123, group: '规格（片布）' },
       { key: '克数', w: 81, group: '规格（片布）' },
@@ -51,6 +57,8 @@ export const qcInspReqTabs = [
     sheetTitle: '网套检验要求',
     cols: [
       { key: '物料编号', w: 102, rowspan: 2 },
+      { key: '文件编码', w: 120, rowspan: 2 },
+      { key: '检验依据', w: 130, rowspan: 2 },
       { key: '尺寸', w: 118, group: '规格' },
       { key: '实配炭棒后外径', w: 118, group: '规格' },
       { key: '实配端盖', w: 118, group: '规格' },
@@ -65,6 +73,8 @@ export const qcInspReqTabs = [
     sheetTitle: 'PP胶管检验要求',
     cols: [
       { key: '物料编号', w: 102, rowspan: 2 },
+      { key: '文件编码', w: 120, rowspan: 2 },
+      { key: '检验依据', w: 130, rowspan: 2 },
       { key: '长', w: 101, group: '规格' },
       { key: '内径', w: 92, group: '规格' },
       { key: '外径', w: 81, group: '规格' },
@@ -77,6 +87,8 @@ export const qcInspReqTabs = [
     sheetTitle: '端盖检验要求',
     cols: [
       { key: '物料编号', w: 102, rowspan: 2 },
+      { key: '文件编码', w: 120, rowspan: 2 },
+      { key: '检验依据', w: 130, rowspan: 2 },
       { key: '外径1', w: 101, group: '规格' },
       { key: '外径2', w: 123, group: '规格' },
       { key: '高度', w: 81, group: '规格' },
@@ -91,6 +103,8 @@ export const qcInspReqTabs = [
     sheetTitle: 'PP棉检验要求',
     cols: [
       { key: '物料编号', w: 102, rowspan: 2 },
+      { key: '文件编码', w: 120, rowspan: 2 },
+      { key: '检验依据', w: 130, rowspan: 2 },
       { key: '尺寸', w: 146, group: '规格' },
       { key: '实配炭棒', w: 146, group: '规格' },
       { key: '实配端盖', w: 146, group: '规格' },

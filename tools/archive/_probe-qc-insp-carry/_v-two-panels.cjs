@@ -34,6 +34,9 @@ const CODE_FOLD = 'YJ-TEST-CUSTOM-002'
 const STD_FOLD = '34.2'
 const CODE_SERIES = 'YJ-TEST-SERIES-001'
 const STD_SERIES = '合格'
+/** 要求表里该物料的「文件编码/检验依据」——报告要按物料编码带入这两项,且不可修改 */
+const DOC_NO = 'YJ-QR-SERIES-96'
+const BASIS = 'YJ-Q-SERIES-30'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let fails = 0
 const ok = (name, cond, detail) => {
@@ -133,6 +136,21 @@ const HELPERS = `
       window.__tp.setV(iVal, value)
       return 'FILLED'
     },
+    /** 填多个格:{列名:值}(同样只填,点完成另调 doneEdit) */
+    async fillCells(map) {
+      const tr = [...document.querySelectorAll('.qc-insp-sheet .qc-paper tbody tr')].find(t => t.getAttribute('data-edit') === '1')
+      if (!tr) return 'NO-EDIT-ROW'
+      const cols = window.__tp.cols()
+      const tds = [...tr.querySelectorAll('td.rs-td')]
+      const done = []
+      for (const [name, v] of Object.entries(map)) {
+        const i = tds[cols.indexOf(name)]?.querySelector('input')
+        if (!i) return 'NO-INPUT:' + name + ' / ' + cols.join(',')
+        window.__tp.setV(i, v)
+        done.push(name)
+      }
+      return 'FILLED:' + done.join(',')
+    },
     async startRow() {
       const b = [...document.querySelectorAll('.qc-insp-sheet .rs-add')].find(e => e.innerText.includes('新增数据记录行'))
       b?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
@@ -168,6 +186,14 @@ const HELPERS = `
       const th = [...document.querySelectorAll('.qc-rec-sheet .qr-head-table th')].find(t => t.innerText.trim() === '物料编码')
       const inp = th?.nextElementSibling?.querySelector('input')
       return inp ? window.__tp.setV(inp, code) : 'NO-INPUT'
+    },
+    /** 报告抬头某格:输入框值 or 只读文本(判断"可不可修改") */
+    reportHead(label) {
+      const th = [...document.querySelectorAll('.qc-rec-sheet .qr-head-table th')].find(t => t.innerText.trim() === label)
+      const td = th?.nextElementSibling
+      if (!td) return null
+      const inp = td.querySelector('input')
+      return { editable: !!inp, value: inp ? inp.value : td.innerText.trim() }
     },
   };
 `
@@ -228,6 +254,8 @@ async function main() {
     const foldCols = await evalY(`JSON.stringify(window.__tp.cols())`)
     ok('A② 折叠棉表的自定义列与父字段分组都还在',
       String(foldCols).includes(F_FOLD) && String(foldCols).includes(F_CHILD), String(foldCols))
+    ok('A② 「文件编码/检验依据」在 物料编号 之后(每张表都有)',
+      JSON.parse(String(foldCols)).slice(0, 3).join(',') === '物料编号,文件编码,检验依据', String(foldCols))
     ok('A② 「规格」分组仍罩住子字段(colspan=4)', (await evalY(`window.__tp.groupSpan('规格')`)) === 4)
     const foldField = (extA?.data?.fields || []).find((f) => f.label === F_FOLD) || {}
     const foldNum = Number(String(foldField.col || '').replace('备用', ''))
@@ -243,15 +271,22 @@ async function main() {
     await sleep(800)
     const extB0 = await apiGet(`/px/extFields?panel=${PANEL_B}`)
     const seriesCols0 = await evalY(`JSON.stringify(window.__tp.cols())`)
-    ok('B③ 全自定义表:列只有「物料编号」+ 本表已有的自定义列(没有固定列)', 
-      JSON.parse(String(seriesCols0) || '[]')[0] === '物料编号'
-      && JSON.parse(String(seriesCols0) || '[]').every((c) => c === '物料编号' || (extB0?.data?.fields || []).some((f) => f.label === c && f.tab === '阻垢系列')),
+    const seriesCols0List = JSON.parse(String(seriesCols0) || '[]')
+    /** 固定 7 张表用到的列名(全自定义表里不该出现它们) */
+    const FIXED_TAB_COLS = ['折叠棉', '炭棒', '实配炭棒后外径', '折数', '折高', '外径', '内径', '厚度', '实配端盖效果', '材质',
+      '长', '宽', '克数', '宽度', '克重', '颜色（白/黑）', '尺寸', '实配端盖', '接口牢固度', '破损、切斜',
+      '外径1', '外径2', '高度', '外径（+密封圈）', '出水口堵孔、批锋', '变形、破损', '实配炭棒', '切面（平整、无歪斜）']
+    ok('B③ 全自定义表:前置列 = 物料编号/文件编码/检验依据,且不含固定表的列',
+      seriesCols0List.slice(0, 3).join(',') === '物料编号,文件编码,检验依据'
+      && !seriesCols0List.some((c) => FIXED_TAB_COLS.includes(c)),
       String(seriesCols0))
     const r4 = await evalY(`window.__tp.addField('阻垢系列', ${JSON.stringify(F_NEWTAB)}, 'Flatness', ${JSON.stringify(F_NEWPARENT)})`)
     ok(`B④ 阻垢系列加列「${F_NEWTAB}」并新建父分组「${F_NEWPARENT}」`, /ADDED|EXISTS/.test(String(r4)), String(r4))
     await sleep(1500)
     const seriesCols1 = await evalY(`JSON.stringify(window.__tp.cols())`)
-    ok('B④ 该表出现该列(物料编号仍在最左)', String(seriesCols1).includes('物料编号') && String(seriesCols1).includes(F_NEWTAB), String(seriesCols1))
+    ok('B④ 该表出现该列(物料编号仍在最左,文件编码/检验依据紧随其后)',
+      JSON.parse(String(seriesCols1)).slice(0, 3).join(',') === '物料编号,文件编码,检验依据'
+      && String(seriesCols1).includes(F_NEWTAB), String(seriesCols1))
     ok(`B④ 表头出现新建分组「${F_NEWPARENT}」`, (await evalY(`window.__tp.groupSpan(${JSON.stringify(F_NEWPARENT)})`)) >= 1)
     const extB = await apiGet(`/px/extFields?panel=${PANEL_B}`)
     const newField = (extB?.data?.fields || []).find((f) => f.label === F_NEWTAB) || {}
@@ -269,10 +304,10 @@ async function main() {
       ok('B⑤ 阻垢系列已有一行正确记录(跳过新增,探针幂等)', true, JSON.stringify(pre[0]).slice(0, 160))
     } else {
       const started = await evalY(`window.__tp.startRow()`)
-      const r5 = await evalY(`window.__tp.fillRow(${JSON.stringify(CODE_SERIES)}, ${JSON.stringify(F_NEWTAB)}, ${JSON.stringify(STD_SERIES)})`)
+      const r5 = await evalY(`window.__tp.fillCells(${JSON.stringify({ 物料编号: CODE_SERIES, [F_NEWTAB]: STD_SERIES, 文件编码: DOC_NO, 检验依据: BASIS })})`)
       await sleep(400)   // 让编辑草稿回写原行(deep watcher 的 microtask flush)
       const done = await evalY(`window.__tp.doneEdit()`)
-      ok('B⑤ 新行可填(物料编号 + 自定义列)', started && String(r5) === 'FILLED' && done, `${r5} / done=${done}`)
+      ok('B⑤ 新行可填(物料编号 + 自定义列 + 文件编码/检验依据)', started && String(r5).startsWith('FILLED') && done, `${r5} / done=${done}`)
       await evalY(`window.__tp.save()`)
       const saved = await waitY(`(() => { const m = window.__tp.msgs().join(' | '); return /成功|保存/.test(m) ? m : '' })()`, 25000)
       ok('B⑤ 保存提示出现', /成功|保存/.test(String(saved)), String(saved))
@@ -317,6 +352,15 @@ async function main() {
     const rowsSeries = await carryOf(CODE_SERIES, F_NEWTAB, { auto: false })
     ok('C⑥ 系列面板(阻垢系列)的自定义列也带进来了', rowsSeries.some((r) => r.item === F_NEWTAB && r.std === STD_SERIES), JSON.stringify(rowsSeries))
     ok('C⑦ 系列面板的父字段名「理化」没有被当成检验项', !rowsSeries.some((r) => r.item === F_NEWPARENT))
+
+    // C⑨ 抬头两项:按物料编码带入 + **不可修改**(纸面是文本,不是输入框)
+    const headDoc = await evalY(`JSON.stringify(window.__tp.reportHead('文件编码'))`)
+    const headBasis = await evalY(`JSON.stringify(window.__tp.reportHead('检验依据'))`)
+    ok('C⑨ 文件编码 按物料编码带入', String(headDoc).includes(DOC_NO), String(headDoc))
+    ok('C⑨ 检验依据 按物料编码带入', String(headBasis).includes(BASIS), String(headBasis))
+    ok('C⑨ 这两项不可修改(纸面为只读文本,不给输入框)',
+      JSON.parse(String(headDoc) || '{}').editable === false && JSON.parse(String(headBasis) || '{}').editable === false,
+      `文件编码=${headDoc} / 检验依据=${headBasis}`)
 
     // C⑧ 检验要求弹窗:按面板分段
     await evalY(`window.__tp.setReportCode(${JSON.stringify(CODE_SERIES)})`)

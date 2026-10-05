@@ -50,6 +50,14 @@ const HELPERS = `
       const th = [...document.querySelectorAll('.qc-rec-sheet .qr-head-table th')].find(t => t.innerText.trim() === label)
       return th ? th.nextElementSibling?.querySelector('input') : null
     },
+    /** 抬头格取值:输入框里的值,或**只读文本**(文件编码/检验依据/物料批次 这类回填字段纸面不给输入框) */
+    headVal(label) {
+      const th = [...document.querySelectorAll('.qc-rec-sheet .qr-head-table th')].find(t => t.innerText.trim() === label)
+      const td = th?.nextElementSibling
+      if (!td) return ''
+      const inp = td.querySelector('input')
+      return inp ? inp.value : td.innerText.trim()
+    },
     /** 检验项取值:el-select 里**第一个** .el-select__selected-item 是 filterable 的输入外壳(innerText 恒空),
      *  选中值在下一個 .el-select__placeholder 里 —— 踩过,别再用 .el-select__selected-item.innerText */
     itemOf(td) {
@@ -147,8 +155,8 @@ async function main() {
     const isFresh = `(() => {
       const sheet = document.querySelector('.qc-rec-sheet')
       if (!sheet) return ''
-      const inputs = [...sheet.querySelectorAll('input')].map(e => e.value)
-      return (inputs.includes('YJ-QR-96') && window.__yj.rows().length === 0) ? 'FRESH' : ''
+      // 文件编码 现为**只读文本**(按物料编码带入、不可修改)⇒ 取值要走 headVal(输入框或文本)
+      return (window.__yj.headVal('文件编码') === 'YJ-QR-96' && window.__yj.rows().length === 0) ? 'FRESH' : ''
     })()`
     const fresh = await waitForY(isFresh, 25000)
     ok('② 纸面切到一张空报告(表体 0 行)', fresh === 'FRESH', fresh)

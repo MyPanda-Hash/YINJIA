@@ -356,13 +356,25 @@ async function carryFromReq(opts = {}) {
     const extFields = [...ovA.fields, ...ovB.fields]
     const tabs = [...qcInspReqTabs, ...tabsOfPanel(QC_INSP_REQ_SERIES_PANEL, ovB.tabs)]
     const plan = carryPlan(rows, code, items.value, extFields, tabs)
+    // 抬头两项(文件编码/检验依据):按物料编码带入,纸面不可修改 ——
+    // 要求表没填的项**不动**(保留报告原值/默认 YJ-QR-96 / YJ-Q-30)
+    let headChanged = 0
+    for (const [k, v] of Object.entries(plan.head || {})) {
+      if (v && String(props.head[k] ?? '') !== String(v)) { props.head[k] = v; headChanged++ }
+    }
     if (!plan.entries.length) {
-      if (!opts.silent) ElMessage.warning(tt('来料检验要求里没有该物料的检验数据，无法带入'))
-      return 0
+      if (headChanged) emit('dirty')
+      else if (!opts.silent) ElMessage.warning(tt('来料检验要求里没有该物料的检验数据，无法带入'))
+      return headChanged
     }
     if (!plan.add.length) {
-      if (!opts.silent) ElMessage.info(tt('检验项已与来料检验要求一致，无需带入'))
-      return 0
+      if (headChanged) emit('dirty')
+      if (!opts.silent) {
+        ElMessage.info(headChanged
+          ? tt('已按来料检验要求更新文件编码与检验依据')
+          : tt('检验项已与来料检验要求一致，无需带入'))
+      }
+      return headChanged
     }
     const d = props.head.detail || (props.head.detail = {})
     if (!Array.isArray(d.items)) d.items = []

@@ -33,9 +33,10 @@ test('归属判据:严格按 tab 认页签(没标 tab 的不属于任何页签)'
 
 test('固定表:Excel 原列序在前,该表的自定义列追加在后', () => {
   const cols = colsOfTab(TAB('折叠棉'), EXT)
-  assert.deepEqual(cols.slice(0, 6).map((c) => c.key),
-    ['物料编号', '折叠棉', '炭棒', '实配炭棒后外径', '折数', '折高'], '固定列保持原序')
-  assert.deepEqual(cols.slice(6).map((c) => c.key), ['炭棒直径'], '自定义列在最后')
+  assert.deepEqual(cols.slice(0, 8).map((c) => c.key),
+    ['物料编号', '文件编码', '检验依据', '折叠棉', '炭棒', '实配炭棒后外径', '折数', '折高'],
+    '固定列保持原序(文件编码/检验依据 紧跟 物料编号)')
+  assert.deepEqual(cols.slice(8).map((c) => c.key), ['炭棒直径'], '自定义列在最后')
   // 别的表的自定义列不许串进来
   assert.ok(!cols.some((c) => c.key === '外观' || c.key === '平整度'))
 })
@@ -50,8 +51,9 @@ test('每张表各有各的自定义列(用户口径:单独针对每个表)', ()
 test('全自定义表(系列面板):匹配键 物料编号 在最左 + 本表的自定义列', () => {
   const cols = colsOfTab(TAB_S('阻垢系列'), EXT)
   assert.equal(cols[0].key, EXT_KEY_COL.key, '物料编号是最左的匹配键列')
-  assert.deepEqual(cols.map((c) => c.key), ['物料编号', '平整度'])
-  assert.deepEqual(colsOfTab(TAB_S('炭粉'), EXT).map((c) => c.key), ['物料编号'], '没加列的表只剩匹配键列')
+  assert.deepEqual(cols.slice(1, 3).map((c) => c.key), ['文件编码', '检验依据'], '文件编码/检验依据 紧随其后')
+  assert.deepEqual(cols.map((c) => c.key), ['物料编号', '文件编码', '检验依据', '平整度'])
+  assert.deepEqual(colsOfTab(TAB_S('炭粉'), EXT).map((c) => c.key), ['物料编号', '文件编码', '检验依据'], '没加列的表只剩前置列')
 })
 
 test('列宽:自定义列走 widthOf 回调(缺省默认宽)', () => {
@@ -59,13 +61,13 @@ test('列宽:自定义列走 widthOf 回调(缺省默认宽)', () => {
   assert.equal(cols[cols.length - 1].w, 200, 'widthOf 给的宽生效')
   const cols2 = colsOfTab(TAB('折叠棉'), EXT, () => 0)
   assert.equal(cols2[cols2.length - 1].w, DEFAULT_EXT_COL_W, '给 0 → 回落默认宽')
-  assert.equal(colsOfTab(TAB('折叠棉'), EXT).length, 7, '不传 widthOf 也能算列')
+  assert.equal(colsOfTab(TAB('折叠棉'), EXT).length, 9, '不传 widthOf 也能算列(7 固定列 + 2 前置列 + 1 自定义)')
 })
 
 test('没有动态字段 / 空页签:不报错', () => {
   assert.deepEqual(colsOfTab(TAB('折叠棉'), []).map((c) => c.key), TAB('折叠棉').cols.map((c) => c.key))
   assert.deepEqual(colsOfTab(null, EXT), [])
-  assert.deepEqual(colsOfTab(TAB_S('炭粉'), null).map((c) => c.key), ['物料编号'])
+  assert.deepEqual(colsOfTab(TAB_S('炭粉'), null).map((c) => c.key), ['物料编号', '文件编码', '检验依据'])
 })
 
 test('tabsOfPanel:固定面板用静态配置;系列面板完全由物料类别词典决定(全自定义)', () => {
@@ -80,7 +82,7 @@ test('tabsOfPanel:固定面板用静态配置;系列面板完全由物料类别�
 test('带父字段的动态列插到该分组最后一个成员之后(表头才合并得起来)', () => {
   const cols = colsOfTab(TAB('折叠棉'), [{ label: '炭棒内径', col: '备用1', tab: '折叠棉', parent: '规格' }])
   const keys = cols.map((c) => c.key)
-  assert.deepEqual(keys, ['物料编号', '折叠棉', '炭棒', '实配炭棒后外径', '炭棒内径', '折数', '折高'],
+  assert.deepEqual(keys, ['物料编号', '文件编码', '检验依据', '折叠棉', '炭棒', '实配炭棒后外径', '炭棒内径', '折数', '折高'],
     '插在「规格」组末尾(实配炭棒后外径之后),不是甩到最后')
   assert.equal(cols.find((c) => c.key === '炭棒内径').group, '规格', '带上 group ⇒ 表头并入该分组')
 })

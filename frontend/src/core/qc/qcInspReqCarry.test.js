@@ -6,8 +6,11 @@ import {
   carryEntriesOf,
   missingCarryRows,
   carryPlan,
+  carryHeadOf,
+  CARRY_HEAD_KEYS,
 } from './qcInspReqCarry.js'
 import { lookupReqGroups } from './qcInspReqLookup.js'
+import { qcInspReqTabs } from '../views/qcInspReqConfig.js'
 
 /** PP管 YJ-JB-001(库里真行的形状:只有 长/内径/外径 三列有数据,其余列全空) */
 const JB_ROW = {
@@ -41,6 +44,16 @@ test('检验项=表头列名;检测标准=命中行的数据(空数据列不成�
     { 检验项: '内径', 检测标准: '6±0.2' },
     { 检验项: '外径', 检测标准: '8.1±0.1' },
   ], '空着的 脏污、头发丝 / 破损、切斜 不带进来')
+})
+
+test('文件编码/检验依据只进抬头,不成检验项(表体里不该有「检验项=文件编码」)', () => {
+  const rows = [{
+    id: 1, 物料类别: '折叠棉', 物料编号: 'M-4',
+    文件编码: 'YJ-QR-96', 检验依据: 'YJ-Q-30', 折叠棉: '47*34*154-1',
+  }]
+  const plan = carryPlan(rows, 'M-4', [])
+  assert.deepEqual(plan.entries.map((e) => e.检验项), ['折叠棉'], '只带真正的检验项')
+  assert.deepEqual(plan.head, { 文件编码: 'YJ-QR-96', 检验依据: 'YJ-Q-30' }, '这两项进抬头')
 })
 
 test('顺序 = 页签配置的列序(Excel 原列序),不是数据的键序', () => {
@@ -82,6 +95,40 @@ test('幂等:补过一遍之后再点带入,一行都不加', () => {
   const plan2 = carryPlan([JB_ROW], 'YJ-JB-001', after)
   assert.deepEqual(plan2.add, [])
   assert.equal(plan2.entries.length, 3, '条目本身照旧全量给出(供界面提示用)')
+})
+
+/* ── 抬头两项:文件编码/检验依据(2026-10-04 用户口径「靠物料编码对应填入,并且不可以修改」)── */
+test('抬头带入键就是这两项', () => {
+  assert.deepEqual([...CARRY_HEAD_KEYS], ['文件编码', '检验依据'])
+})
+
+test('抬头带入:取命中行首个非空值;没填的项不返回(调用方保留报告原值/默认)', () => {
+  const rows = [
+    { id: 2, 物料类别: '折叠棉', 物料编号: 'M-1', 文件编码: '', 检验依据: 'YJ-Q-30' },
+    { id: 9, 物料类别: '折叠棉', 物料编号: 'M-1', 文件编码: 'YJ-QR-96', 检验依据: 'YJ-Q-31' },
+  ]
+  const groups = lookupReqGroups(rows, 'M-1')
+  assert.deepEqual(carryHeadOf(groups), { 检验依据: 'YJ-Q-30', 文件编码: 'YJ-QR-96' },
+    '按 id 升序逐行取首个非空:文件编码跳过空值取 YJ-QR-96,检验依据取第一行')
+  const plan = carryPlan(rows, 'M-1', [])
+  assert.deepEqual(plan.head, { 检验依据: 'YJ-Q-30', 文件编码: 'YJ-QR-96' })
+})
+
+test('抬头带入:两个面板都有命中时,按页签全集顺序取首个非空', () => {
+  const rows = [
+    { id: 1, 物料类别: '阻垢系列', 物料编号: 'M-2', 文件编码: 'SER-01' },
+    { id: 2, 物料类别: '折叠棉', 物料编号: 'M-2', 检验依据: 'YJ-Q-30' },
+  ]
+  const tabs = [...qcInspReqTabs, { key: '阻垢系列', sheetTitle: '阻垢系列', dynamicCols: true, cols: [] }]
+  const plan = carryPlan(rows, 'M-2', [], [], tabs)
+  assert.deepEqual(plan.head, { 文件编码: 'SER-01', 检验依据: 'YJ-Q-30' })
+})
+
+test('抬头带入:要求表两列全空 ⇒ 不返回任何键(报告保留默认 YJ-QR-96 / YJ-Q-30)', () => {
+  const rows = [{ id: 1, 物料类别: '折叠棉', 物料编号: 'M-3', 折叠棉: '47*34*154-1' }]
+  const plan = carryPlan(rows, 'M-3', [])
+  assert.deepEqual(plan.head, {})
+  assert.equal(plan.entries.length, 1, '检验项照常带')
 })
 
 test('同名项去重:空格差异只带一次,取首个非空数据', () => {
