@@ -2226,3 +2226,13 @@ migrate-drop-bom-kingdee.sql
 #   删表 bs_bom(48 列/81 行);译名按「仍被其它面板引用则保留」处理(面板名「物料清单」WLBOM 还在用 ⇒ 保留)。
 #   附:后端 5 处读 bs_bom 的代码与前端 BOM 专属 UI/菜单同批移除。幂等,两账套均已执行。
 migrate-drop-bom-panels.sql
+
+# migrate-qc-insp-req-series.sql + migrate-qc-insp-req-drop-custom-tab.sql(2026-10-04):来料检验要求拆成两个面板
+#   用户口径:「现在将那个自定义的表删除,然后多增加一个来料检验要求的面版,下面有这几个切换表(而且都是自定义的):
+#   阻垢系列/BK材料系列/除重金属系列/矿化(碱性)系列/抑菌系列/载银系列/炭粉/胶粉/矿化料/原料来料,
+#   实现和之前一致,只是为了不要太多的表都集中在一个面版才拆成两个」。
+#   series = 新面板 QC_INSP_REQ_SERIES + 表 qc_insp_req_series(10 张全自定义表,备用1..备用200 每表 20 位);
+#   drop   = 旧「自定义检验要求」页签下线(词表回 7 值 + 该页签字段退绑 + 数据行软删 + 备用141..160 注明改预留)。
+#   ⚠ 顺序:先 series 后 drop。两账套都执行。
+migrate-qc-insp-req-series.sql
+migrate-qc-insp-req-drop-custom-tab.sql
