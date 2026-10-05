@@ -32,19 +32,19 @@ public class ScheduleBoardController {
         this.transferService = transferService;
     }
 
-    /** 待排产池(已审核·未指派产线) */
+    /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据) */
     @PostMapping("/pending")
     public ApiResult<List<Map<String, Object>>> pending(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");
         return ApiResult.ok(service.pending(str(body == null ? null : body.get("keyword")),
-                str(body == null ? null : body.get("客户"))));
+                str(body == null ? null : body.get("客户")), workshop()));
     }
 
-    /** 统计:待排产/今日排产/总未完成 + 产线下拉(带当日负荷/日产能) + 班组下拉 */
+    /** 统计:待排产/今日排产/总未完成 + 产线下拉(带当日负荷/日产能) + 班组下拉;按登录账号车间收敛 */
     @PostMapping("/stats")
     public ApiResult<Map<String, Object>> stats() {
         perm.requirePanelView("MANU_ORDER");
-        return ApiResult.ok(service.stats());
+        return ApiResult.ok(service.stats(workshop()));
     }
 
     /** 批量排入:逐张 scheduleOne(守卫/守恒/留痕);回执含产线当日负荷/超载提示 */
@@ -68,19 +68,19 @@ public class ScheduleBoardController {
     }
 
     /** 左侧骨架:生产线档案全部线(含停用)未交量汇总(参考工单排产页,2026-09-23 去班别;
-     *  开线状态字段已随开线管理下线移除,2026-09-24 用户拍板) */
+     *  开线状态字段已随开线管理下线移除,2026-09-24 用户拍板);9.29 批次③:车间账号只出本车间的线 */
     @PostMapping("/linesSummary")
     public ApiResult<List<Map<String, Object>>> linesSummary(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");
-        return ApiResult.ok(service.linesSummary(str(body == null ? null : body.get("开工日期"))));
+        return ApiResult.ok(service.linesSummary(str(body == null ? null : body.get("开工日期")), workshop()));
     }
 
-    /** 选中线 的排产明细(scope=未完工/已完工/全部) */
+    /** 选中线 的排产明细(scope=未完工/已完工/全部);9.29 批次③:车间账号只认本车间的产线 */
     @PostMapping("/scheduled")
     public ApiResult<List<Map<String, Object>>> scheduled(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");
         return ApiResult.ok(service.scheduled(str(body == null ? null : body.get("生产线")),
-                str(body == null ? null : body.get("scope"))));
+                str(body == null ? null : body.get("scope")), workshop()));
     }
 
     /** 批量调线:勾选已排工单 → 目标生产线(停用线拒绝) */
@@ -125,12 +125,12 @@ public class ScheduleBoardController {
         return ApiResult.ok(transferService.revoke(rows, currentUser()));
     }
 
-    /** 今日已排产(mode=today)/全部已排产(mode=all) */
+    /** 今日已排产(mode=today)/全部已排产(mode=all);9.29 批次③:按登录账号车间收敛 */
     @PostMapping("/today")
     public ApiResult<List<Map<String, Object>>> today(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");
         return ApiResult.ok(service.today(str(body == null ? null : body.get("mode")),
-                str(body == null ? null : body.get("keyword"))));
+                str(body == null ? null : body.get("keyword")), workshop()));
     }
 
     /** 工单追溯:头+时间线+排产/完工/入库/领料(质检段待生产质检面板接入后补) */
@@ -153,6 +153,14 @@ public class ScheduleBoardController {
     private static String currentUser() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         return auth == null ? "system" : auth.getName();
+    }
+
+    /**
+     * 登录账号的生产车间(9.29 批次③「排产界面按车间过滤」):yj_user.生产车间;空 = 不受限
+     * (管理员/计划组照旧看到全部产线与待排产池)。
+     */
+    private String workshop() {
+        return service.workshopOf(currentUser());
     }
 
     private static String str(Object o) {

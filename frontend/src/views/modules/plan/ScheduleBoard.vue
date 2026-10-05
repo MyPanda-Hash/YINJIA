@@ -39,9 +39,14 @@
       <el-button :loading="loading" @click="loadAll">{{ tt('刷新') }}</el-button>
       <el-button type="success" :disabled="!checked.length" @click="assign(checked)">{{ tt('批量排入勾选') }}（{{ checked.length }}）</el-button>
       <span class="sb-stats">
+        <b v-if="s['车间']" class="sb-shop">{{ tt('当前车间') }}：{{ s['车间'] }}</b>
         {{ tt('待排产') }}（{{ s['待排产笔数'] ?? 0 }}{{ tt('笔') }}）；{{ tt('今日排产') }}（{{ s['今日排产']?.张数 ?? 0 }}{{ tt('张') }}/{{ num(s['今日排产']?.数量) }}{{ tt('件') }}）；{{ tt('总未完成量') }} {{ num(s['总未完成量']) }}
       </span>
     </el-form>
+
+    <!-- 车间账号:待排产池仅计划组可见(池内工单未指派产线 ⇒ 无车间判据),此处给出口径提示 -->
+    <el-alert v-if="s['待排产池受限']" type="info" :closable="false" show-icon
+              :title="tt('本账号按车间过滤：待排产池仅计划组可见，下方只显示本车间产线的已排工单')" />
 
     <!-- ① 待排产池 -->
     <div class="sb-block">
@@ -240,6 +245,7 @@ onMounted(loadAll)
 .sb-p { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #606266; }
 .sb-bar { margin: 0; background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; padding: 6px 10px 0; }
 .sb-stats { margin-left: auto; font-size: 12px; color: #116a5b; font-weight: 600; }
+.sb-shop { color: #e6a23c; margin-right: 10px; }
 .sb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; }
 .sb-head { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-bottom: 1px solid #e4e7ed; }
 .sb-block-title { font-weight: 600; font-size: 13px; color: #303133; }

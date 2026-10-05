@@ -456,6 +456,12 @@ export default {
     '已调线': 'Moved',
     '调线失败': 'Move failed',
     '请选择目标生产线': 'Select a target line',
+    // 排产界面按车间过滤(9.29 生产管理批次③,2026-10-05)
+    '当前车间': 'Current Workshop',
+    '生产车间': 'Workshop',
+    '留空=不受限(计划组/管理员)': 'Blank = unrestricted (planning / admin)',
+    '本账号按车间过滤：待排产池仅计划组可见，下方只显示本车间产线的已排工单':
+      'Filtered by workshop: the pending pool is visible to the planning group only; below are scheduled WOs on this workshop\u2019s lines',
     // 工单调拨 / 撤回调拨(9.29 生产管理批次②,2026-10-05)
     '调拨': 'Transfer',
     '工单调拨': 'Work Order Transfer',

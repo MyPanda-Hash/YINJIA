@@ -35,6 +35,28 @@ public class ScheduleBoardService {
 
     /** 待排产池(plang 单轨):产线空·未作废·未结案 的工单行;转工单时已过严格已审核闸门 */
     public List<Map<String, Object>> pending(String keyword, String customer) {
+        return pending(keyword, customer, null);
+    }
+
+    /**
+     * 登录账号的生产车间({@code yj_user.生产车间};空 = 不受限,如管理员/计划组)。
+     * 9.29 批次③「排产界面按车间过滤」的判据来源 —— 车间是**产线**的属性(bs_prod_line.生产车间),
+     * 工单本身没有车间字段(五工序共用工单)。
+     */
+    public String workshopOf(String user) {
+        if (user == null || user.isBlank()) return null;
+        List<String> w = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL(生产车间,N'') FROM yj_user WHERE username=?", String.class, user.trim());
+        return w.isEmpty() || w.get(0).isBlank() ? null : w.get(0).trim();
+    }
+
+    /**
+     * 待排产池(按车间收敛版):产线空的行**没有车间属性**,故车间账号(workshop 非空)看不到待排产池
+     * —— 池只给不受限账号(管理员/计划组);车间账号在本车间产线范围内看/操作已排工单。
+     * 这是 2026-10-05 与用户确认的口径(另一条路线「按产品默认生产车间过滤」需先补 338 个商品的主数据)。
+     */
+    public List<Map<String, Object>> pending(String keyword, String customer, String workshop) {
+        if (workshop != null && !workshop.isBlank()) return List.of();
         String kw = keyword == null ? "" : keyword.trim();
         String like = "%" + kw + "%";
         String cu = customer == null ? "" : customer.trim();
@@ -70,16 +92,31 @@ public class ScheduleBoardService {
      * 产线下拉=档案启用线+当日负荷(plang 在制分摊,替代 bd 版 v_line_load);班组下拉=bs_team。
      */
     public Map<String, Object> stats() {
-        List<Map<String, Object>> pool = pending("", "");
+        return stats(null);
+    }
+
+    /**
+     * 统计(按车间收敛版):车间账号(workshop 非空)只看本车间产线的 负荷/今日排产/总未完成量,
+     * 且看不到待排产池(池内行无产线 ⇒ 无车间判据)。
+     */
+    public Map<String, Object> stats(String workshop) {
+        String ws = (workshop == null || workshop.isBlank()) ? "" : workshop.trim();
+        List<Map<String, Object>> pool = pending("", "", ws);
         Map<String, Object> today = jdbc.queryForMap(
                 "SELECT COUNT(DISTINCT p.pl_no) AS cnt, ISNULL(SUM(p.pl_sl),0) AS qty"
                         + " FROM dbo.plang p WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''"
-                        + "   AND CONVERT(varchar(10), p.asp_time2, 120) = CONVERT(varchar(10), GETDATE(), 120)");
+                        + "   AND CONVERT(varchar(10), p.asp_time2, 120) = CONVERT(varchar(10), GETDATE(), 120)"
+                        + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = p.scx"
+                        + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))",
+                ws, ws);
         Double undone = jdbc.queryForObject(
                 "SELECT ISNULL(SUM(ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0)),0)"
                         + " FROM dbo.plang p WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''"
-                        + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')", Double.class);
-        List<Map<String, Object>> lines = lineLoads(null);
+                        + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = p.scx"
+                        + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))",
+                Double.class, ws, ws);
+        List<Map<String, Object>> lines = lineLoads(null, ws);
         List<String> teams = jdbc.queryForList(
                 "SELECT 班组名称 FROM bs_team WHERE ISNULL(asp_cancel,'N') <> 'Y' ORDER BY 班组编码", String.class);
 
@@ -92,6 +129,8 @@ public class ScheduleBoardService {
         out.put("总未完成量", undone == null ? 0 : Math.round(undone * 10000d) / 10000d);
         out.put("产线", lines);
         out.put("班组", teams);
+        out.put("车间", ws);                                  // 前端「当前车间」标识
+        out.put("待排产池受限", !ws.isEmpty());                // 前端提示:池仅计划组可见
         return out;
     }
 
@@ -101,9 +140,18 @@ public class ScheduleBoardService {
      * only 空=全部启用档案线;非空=只查指定线(排产回执用)。
      */
     private List<Map<String, Object>> lineLoads(List<String> only) {
+        return lineLoads(only, null);
+    }
+
+    /** 产线当日负荷(同上;workshop 非空时只算该车间的线 —— 9.29 批次③ 按车间收敛) */
+    private List<Map<String, Object>> lineLoads(List<String> only, String workshop) {
         StringBuilder f = new StringBuilder(
                 " WHERE ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.停用,0)=0");
         List<Object> args = new ArrayList<>();
+        if (workshop != null && !workshop.isBlank()) {
+            f.append(" AND ISNULL(pl.生产车间,N'') = ?");
+            args.add(workshop.trim());
+        }
         if (only != null && !only.isEmpty()) {
             f.append(" AND pl.生产线 IN (").append(String.join(",", only.stream()
                     .map(l -> "N'" + l.replace("'", "''") + "'").toList())).append(")");
@@ -270,6 +318,12 @@ public class ScheduleBoardService {
 
     /** 今日已排产(mode=today,按排产留痕 asp_time1)/全部已排产(mode=all)——plang 单轨;含 工单行号/批次号 */
     public List<Map<String, Object>> today(String mode, String keyword) {
+        return today(mode, keyword, null);
+    }
+
+    /** 今日/全部已排产(按车间收敛版:workshop 非空时只出本车间产线的行) */
+    public List<Map<String, Object>> today(String mode, String keyword, String workshop) {
+        String ws = (workshop == null || workshop.isBlank()) ? "" : workshop.trim();
         String kw = keyword == null ? "" : keyword.trim();
         String like = "%" + kw + "%";
         boolean all = "all".equalsIgnoreCase(mode);
@@ -292,8 +346,10 @@ public class ScheduleBoardService {
                         + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
                         + (all ? "" : " AND CONVERT(varchar(10), p.asp_time2, 120) = CONVERT(varchar(10), GETDATE(), 120)")
                         + "   AND (? = '' OR p.pl_no LIKE ? OR p.scx LIKE ? OR p.dm LIKE ?)"
+                        + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = p.scx"
+                        + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))"
                         + " ORDER BY p.scx, p.pl_no, p.pl_xc, p.[批次号]",
-                kw, like, like, like);
+                kw, like, like, like, ws, ws);
     }
 
     /**
@@ -302,7 +358,13 @@ public class ScheduleBoardService {
      * 数量/状态=plang 活数据;已报工=wo_progress 按工单号完成数最大值。
      */
     public List<Map<String, Object>> linesSummary(String date) {
+        return linesSummary(date, null);
+    }
+
+    /** 左侧骨架(同上;workshop 非空时只出本车间的线 —— 9.29 批次③ 按车间收敛) */
+    public List<Map<String, Object>> linesSummary(String date, String workshop) {
         String d = (date == null || date.isBlank()) ? java.time.LocalDate.now().toString() : date.trim();
+        String ws = (workshop == null || workshop.isBlank()) ? "" : workshop.trim();
         List<Map<String, Object>> backlog = jdbc.queryForList(
                 "SELECT ISNULL(pc.scx,N'') AS 生产线,"
                         + " SUM(ISNULL(p.pl_sl,0) - CASE WHEN ISNULL(p.rk_sl,0) >= ISNULL(prg.[完成],0)"
@@ -325,7 +387,8 @@ public class ScheduleBoardService {
                 "SELECT [生产线] AS 生产线, ISNULL([生产车间],N'') AS 生产车间,"
                         + " CASE WHEN ISNULL([停用],0) = 1 THEN 1 ELSE 0 END AS 停用"
                         + " FROM bs_prod_line"
-                        + " WHERE ISNULL([asp_cancel],'N') <> 'Y' ORDER BY ISNULL([排序],999), [生产线]");
+                        + " WHERE ISNULL([asp_cancel],'N') <> 'Y' AND (? = N'' OR ISNULL([生产车间],N'') = ?)"
+                        + " ORDER BY ISNULL([排序],999), [生产线]", ws, ws);
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> line : lines) {
             String ln = String.valueOf(line.get("生产线"));
@@ -347,6 +410,12 @@ public class ScheduleBoardService {
      * 数量/结案/打印等活数据取 plang(与生产工单列表页一致);列口径对齐 WorkOrderBoard 表格。
      */
     public List<Map<String, Object>> scheduled(String line, String scope) {
+        return scheduled(line, scope, null);
+    }
+
+    /** 选中线 的排产明细(按车间收敛版:workshop 非空时只认本车间的产线,跨车间查询返回空) */
+    public List<Map<String, Object>> scheduled(String line, String scope, String workshop) {
+        String ws = (workshop == null || workshop.isBlank()) ? "" : workshop.trim();
         String complete;
         if ("已完工".equals(scope)) complete = " AND st.[生产状态] = N'完工'";
         else if ("全部".equals(scope)) complete = "";
@@ -389,9 +458,11 @@ public class ScheduleBoardService {
                         + "    GROUP BY gldh, gxdm) t GROUP BY gldh) prg ON prg.[单据编号]=p.pl_no"
                         + " CROSS APPLY (SELECT CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0)"
                         + "   THEN N'完工' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS [生产状态]) st"
-                        + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'') = ?" + complete
+                        + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'') = ?"
+                        + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = pc.scx"
+                        + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))" + complete
                         + " ORDER BY pc.cp_date, pc.pl_no, pc.pl_xc",
-                line == null ? "" : line);
+                line == null ? "" : line, ws, ws);
     }
 
     /**

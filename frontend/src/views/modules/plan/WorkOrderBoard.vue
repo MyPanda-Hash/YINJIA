@@ -35,7 +35,9 @@
       <!-- 右:选中线正在运行的工单明细 -->
       <div class="wb-main">
         <div class="wb-ctx">
-          <span class="wb-ctx-label">{{ tt('生产线') }}：<b>{{ sel.line || tt('（点击左侧选择）') }}</b></span>
+          <span class="wb-ctx-label">{{ tt('生产线') }}：<b>{{ sel.line || tt('（点击左侧选择）') }}</b>
+            <span v-if="shop" class="wb-shop">{{ tt('当前车间') }}：{{ shop }}</span>
+          </span>
           <span class="wb-ctx-stats">
             {{ tt('排产数量') }} {{ num(selQty) }}　|　{{ tt('未完工量') }} {{ num(selOutstanding) }}
           </span>
@@ -282,6 +284,11 @@ function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
 const selQty = computed(() => schedRows.value.reduce((a, r) => a + Number(r.排产数量 || 0), 0))
+// 当前账号的车间(9.29 批次③):由 linesSummary 的产线车间反推(账号车间 = 其可见线的车间;不受限账号为多值 → 不显示)
+const shop = computed(() => {
+  const set = [...new Set(lineSummary.value.map((l) => l.生产车间).filter(Boolean))]
+  return set.length === 1 ? set[0] : ''
+})
 // 未完工量=Σ未交量(排产−max(入库,已报工),报工扣减口径);旧数据无未交量字段时回退余量
 const selOutstanding = computed(() => schedRows.value.reduce((a, r) => a + (r.未交量 !== undefined ? Number(r.未交量 || 0) : Number(r.余量 || 0)), 0))
 
@@ -469,6 +476,7 @@ onMounted(() => {
 .wb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .wb-ctx { display: flex; align-items: center; gap: 14px; padding: 8px 10px; background: #eef6ff; border: 1px solid #b3d4f5; border-radius: 4px; flex-wrap: wrap; }
 .wb-ctx-label { font-size: 13px; color: #606266; }
+.wb-shop { margin-left: 12px; font-size: 12px; color: #e6a23c; font-weight: 600; }
 .wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; }
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .wb-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid #e4e7ed; flex-wrap: wrap; }

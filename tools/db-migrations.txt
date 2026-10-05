@@ -2269,3 +2269,10 @@ migrate-plang-split-cols.sql
 #   + 产线调回 从生产线(「创建即可撤回」)。车间由 bs_prod_line.生产车间 派生,不另建车间主数据。
 #   表带 MS_Description + 14 列注明 + ix_wo_transfer_log_pl_no;已在 tools/db-inuse-tables.txt 登记。幂等;两账套均执行。
 migrate-wo-transfer-log.sql
+
+# migrate-yjuser-workshop.sql(2026-10-05):账号挂「生产车间」—— 9.29 生产管理批次 ③「排产界面按车间过滤」
+#   会议口径「排产界面按登录车间过滤,组装账号只见组装相关工单」;落地 = 按**产线**收敛(五工序共用工单,
+#   待排产池的行没有车间属性):工单/排产的车间 = 其产线的 bs_prod_line.生产车间;账号车间 = yj_user.生产车间
+#   (空=不受限,如管理员/计划组);待排产池只对不受限账号可见。依据:bs_inv.默认生产车间编码 实测 338 个商品
+#   一个都没维护,做不了「按产品判车间」。幂等;两账套均执行。
+migrate-yjuser-workshop.sql
