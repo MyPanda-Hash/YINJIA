@@ -7,6 +7,13 @@
 --   本脚本补齐这 85 条的 ja(人工译名,source='manual';不覆盖任何已有译名)。
 --   · 其余 7 个语言(ko/zh-TW/es/fr/de/ru/vi/th)仍由 TranslationService 机翻兜底(source='mt'),
 --     与采购入库/销售出库那批并集字段同口径;要人工校对可另开脚本。
+--   ⚠ 2026-10-05 修正:本清单原按 migrate-material-out-fields.sql 旧版(英文列名 auditor_id/dept_id/…)写,
+--     而现行版已改中文名(审核人id/部门id/金蝶审核人…)——全新库上防呆①必炸、ja 仍缺 10 条(本地实测)。
+--     10 条旧名按 fields 脚本「← 金蝶键」注释逐一改写为现用名(译名不变,金蝶键一一对应);
+--     远程库下次 sync 会因内容变化重跑本脚本,幂等(仅补缺失),旧译名残留为死键无害。
+--   ⚠ 2026-10-05 补②:测试库(陈旧快照)自检③实测 17 个共享标签缺 ja(材料编码/单据编号/现存量/加工单号…,
+--     正式库上由其它面板脚本历史补齐)——把正式库现成的 manual 译名逐字补入清单(共 102 条),
+--     保证任意账套/全新库一次跑完即 100% 覆盖。
 -- 幂等:仅当 (scope='field', ref_key=标签, locale='ja') 不存在时插入;复跑插入 0 行。
 -- 自检:MATERIAL_OUT 全部字段标签的 ja 覆盖应为 100%(缺 0),且本文件列出的标签必须真实存在。
 SET NOCOUNT ON;
@@ -14,14 +21,14 @@ SET QUOTED_IDENTIFIER ON;
 GO
 DECLARE @ja TABLE (k nvarchar(200), t nvarchar(400));
 INSERT INTO @ja (k, t) VALUES
-  (N'auditor_id',            N'監査者ID'),
-  (N'bill_type_id',          N'伝票タイプID'),
-  (N'creator_id',            N'作成者ID'),
-  (N'dept_id',               N'部門ID'),
-  (N'emp_id',                N'従業員ID'),
+  (N'审核人id',              N'監査者ID'),
+  (N'单据类型id',            N'伝票タイプID'),
+  (N'创建人id',              N'作成者ID'),
+  (N'部门id',                N'部門ID'),
+  (N'经手人id',              N'従業員ID'),
   (N'ERP单号',               N'ERP伝票番号'),
-  (N'modifier_id',           N'更新者ID'),
-  (N'pick_use_id',           N'出庫用途ID'),
+  (N'修改人id',              N'更新者ID'),
+  (N'领料用途id',            N'出庫用途ID'),
   (N'保质期',                N'品質保持期間'),
   (N'保质期到期日',          N'品質保持期限'),
   (N'保质期类型',            N'品質保持期間タイプ'),
@@ -37,7 +44,7 @@ INSERT INTO @ja (k, t) VALUES
   (N'单据标签',              N'伝票ラベル'),
   (N'单据类型编码',          N'伝票タイプコード'),
   (N'单据类型名称',          N'伝票タイプ名'),
-  (N'单据状态_bill_status',  N'伝票ステータス(ERP)'),
+  (N'金蝶单据状态',          N'伝票ステータス(ERP)'),
   (N'单位id',                N'単位ID'),
   (N'单位编码',              N'単位コード'),
   (N'单位成本',              N'単位原価'),
@@ -74,9 +81,9 @@ INSERT INTO @ja (k, t) VALUES
   (N'商品是否辅助属性',      N'補助属性対象'),
   (N'商品是否批次',          N'ロット管理対象'),
   (N'商品是否序列号',        N'シリアル管理対象'),
-  (N'审核人_auditor_name',   N'監査者名'),
+  (N'金蝶审核人',            N'監査者名'),
   (N'审核人编码',            N'監査者コード'),
-  (N'审核时间_audit_time',   N'監査日時'),
+  (N'金蝶审核时间',          N'監査日時'),
   (N'生产许可证',            N'生産許可証'),
   (N'是否已转ERP',           N'ERP転送済み'),
   (N'条形码',                N'バーコード'),
@@ -98,7 +105,25 @@ INSERT INTO @ja (k, t) VALUES
   (N'源单行号',              N'起源行番号'),
   (N'注册证号',              N'登録証番号'),
   (N'转ERP操作人',           N'ERP転送担当者'),
-  (N'转ERP时间',             N'ERP転送日時');
+  (N'转ERP时间',             N'ERP転送日時'),
+  -- 共享标签 17 条(2026-10-05 补:正式库已有 manual ja,测试库快照缺;译名与正式库逐字一致)
+  (N'材料编码',              N'材料コード'),
+  (N'材料名称',              N'材料名'),
+  (N'出库类别',              N'出庫カテゴリ'),
+  (N'创建时间',              N'作成時間'),
+  (N'单据编号',              N'伝票番号'),
+  (N'单据日期',              N'伝票日付'),
+  (N'加工单号',              N'加工票番号'),
+  (N'经手人编码',            N'担当者コード'),
+  (N'来源单据',              N'元帳伝票'),
+  (N'领用人',                N'使用者'),
+  (N'明细备注',              N'明細備考'),
+  (N'匹配来源单号',          N'ソース番号マッチ'),
+  (N'手工确定成本',          N'コストを手動で決定する'),
+  (N'现存量',                N'現存量'),
+  (N'现存量说明',            N'在庫説明'),
+  (N'销售订单号',            N'販売注文番号'),
+  (N'业务类型',              N'業務の種類');
 
 -- ① 防呆:清单里的标签必须在 MATERIAL_OUT 真实存在(拼错会静默无效,这里直接报错)
 DECLARE @bad nvarchar(400) = (
@@ -113,7 +138,7 @@ SELECT 'field', j.k, 'ja', j.t, 'manual'
 FROM @ja j
 WHERE NOT EXISTS (SELECT 1 FROM yj_translation t
                   WHERE t.scope='field' AND t.ref_key = j.k AND t.locale='ja');
-PRINT N'[matout-i18n] ja 新增: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行(首次 85,复跑 0)';
+PRINT N'[matout-i18n] ja 新增: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行(首次 102,复跑 0)';
 GO
 -- ③ 自检:MATERIAL_OUT 所有字段标签的 ja 覆盖率必须 100%
 DECLARE @miss int = (
