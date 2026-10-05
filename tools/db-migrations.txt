@@ -2317,3 +2317,11 @@ migrate-prod-line-subgroup.sql
 #   (工单行id/批次号/工序序/生产车间/生产线/状态/优先级/排序号/计划完工日期/产品编码/产品名称/规格型号 + 两索引)
 #   ③ 种默认路线 GY-CB-STD「炭棒标准路线」成型(1)→切炭(2)→组装(3),按《新系统产线命名.xlsx》功能口径。幂等;两账套均执行。
 migrate-process-routing-tasks.sql
+
+# migrate-route-head-detail.sql(2026-10-05):工艺路线面板 ROUTE 改「表头 + 工序明细」单据形态
+#   用户口径:工艺路线要能「一个编码对应多道工序」;原 ROUTE 是 archive 档案式(整表一网格、一行一记录)。
+#   处置:**不换底表**(仍 bs_route),改 doc + **单表式**(head_table=NULL:头字段并入每行),
+#   code_col=group_col=工艺路线编码、prefix=GY:表头=路线编码/名称/停用/状态/备注,明细=加工顺序/工序编码/工序名称/...
+#   ⚠ 不用 head_table=line_table 那种头行同表:引擎对 lineTable==headTable 有降级/短路,头字段不会并入行;
+#   单表式 doc 才是正解(先例 工序报工单 WO_REPORT)。数据零变化,只改元数据位序。幂等;两账套均执行。
+migrate-route-head-detail.sql
