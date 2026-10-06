@@ -2363,3 +2363,7 @@ migrate-plang-void-legacy-dirty.sql
 #   用户口径「转工单的时候需要选择工序路线」→ 定案:**在订单结转处选择**;回填=产品绑定(bs_inv.工艺路线)优先,
 #   否则默认 GY-CB-STD。撤回:ALTER TABLE plang DROP COLUMN [工艺路线]。幂等;两账套均执行。
 migrate-plang-route.sql
+# migrate-wo-next-process-view.sql(2026-10-05):工单「下一道工序」视图 v_wo_next_process
+#   定义:该工单路线里第一个尚无已审核报工的工序(全做完则该单不在视图中);供**排产/调拨/详情共用**同一口径
+#   (此前产线口径各写一套导致分叉)。撤回:DROP VIEW。幂等;两账套均执行。
+migrate-wo-next-process-view.sql
