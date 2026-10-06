@@ -2367,3 +2367,7 @@ migrate-plang-route.sql
 #   定义:该工单路线里第一个尚无已审核报工的工序(全做完则该单不在视图中);供**排产/调拨/详情共用**同一口径
 #   (此前产线口径各写一套导致分叉)。撤回:DROP VIEW。幂等;两账套均执行。
 migrate-wo-next-process-view.sql
+# migrate-wo-next-process-view-nodefault.sql(2026-10-05):「下一道工序」去掉默认路线兜底
+#   用户口径「不需要实现默认选择」:空路线不再当 GY-CB-STD(该单不出现,不替用户猜)。
+#   撤回:重跑 migrate-wo-next-process-view.sql。幂等;两账套均执行。
+migrate-wo-next-process-view-nodefault.sql
