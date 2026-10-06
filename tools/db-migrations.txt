@@ -2379,3 +2379,7 @@ migrate-manu-order-prefix-gd.sql
 #   用户口径「报工需要能影响当前的工单情况」:报工审核/弃审回写工单状态(生产完工=路线末道完工量≥Σ计划量);
 #   弃审自动回退。撤回:DROP COLUMN 四列。幂等;两账套均执行。
 migrate-plang-report-state.sql
+# migrate-plang-split-demand-fix.sql(2026-10-05):切单需求核减补正(存量)
+#   用户口径「切单之后需求数量应该会改变才对…生产工单页面没有改变」;根因=split 只减 pl_sl 未减 xq_sl,
+#   子单又各带一份需求 ⇒ 家族需求重复计。按判据补正存量;幂等;两账套均执行。
+migrate-plang-split-demand-fix.sql

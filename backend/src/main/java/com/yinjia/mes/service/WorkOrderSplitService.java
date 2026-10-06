@@ -118,10 +118,13 @@ public class WorkOrderSplitService {
         String dueDate = str(req.get("子单交期"));
         String remark = str(req.get("备注"));
 
-        // ① 父单核减(排产数量、余量=需求−排产)
+        // ① 父单核减(**需求数量也要减**,2026-10-05 用户口径「切单之后需求数量应该会改变才对」;
+        //   此前只减了排产数量 ⇒ 生产工单列表的「需求数量」不变、子单又各带一份 → 家族需求被重复计。
+        //   余量口径保持 需求−排产 不变:yl = (旧需求−切出) − 新排产)
         double newParentSl = round(num(p.get("pl_sl")) - qty);
-        jdbc.update("UPDATE dbo.plang SET pl_sl=?, yl=ISNULL(xq_sl,0)-?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
-                newParentSl, newParentSl, user, parentId);
+        jdbc.update("UPDATE dbo.plang SET pl_sl=?, xq_sl=ISNULL(xq_sl,0)-?,"
+                        + " yl=ISNULL(xq_sl,0)-?-?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                newParentSl, qty, qty, newParentSl, user, parentId);
 
         // ② 子单新建:复制产品/规格/单位/价格/交期/批次/来源订单;领料·入库单号不带(那是父单回执)
         int ins = jdbc.update(
@@ -239,8 +242,11 @@ public class WorkOrderSplitService {
         jdbc.update("DELETE FROM dbo.plang_pc WHERE plang_id=?", childId);
         jdbc.update("UPDATE dbo.plang SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE() WHERE id=?", user, childId);
         double newParentSl = round(num(parent.get("pl_sl")) + childSl);
-        jdbc.update("UPDATE dbo.plang SET pl_sl=?, yl=ISNULL(xq_sl,0)-?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
-                newParentSl, newParentSl, user, parentId);
+        // 撤回时**需求数量一并还原**(与切单核减对称,2026-10-05):新需求=旧需求+子单需求;余量仍=需求−排产
+        double childXq = round(num(c.get("xq_sl")));
+        jdbc.update("UPDATE dbo.plang SET pl_sl=?, xq_sl=ISNULL(xq_sl,0)+?,"
+                        + " yl=ISNULL(xq_sl,0)+?-?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                newParentSl, childXq, childXq, newParentSl, user, parentId);
         boolean linkRestored = mergeLink(parentNo, parentXc, str(parent.get("批次号")), childNo, childSl);
 
         logUsage(user, "撤回切单", childNo);
@@ -308,14 +314,14 @@ public class WorkOrderSplitService {
         try {
             if (rid != null && !String.valueOf(rid).isBlank() && !"null".equals(String.valueOf(rid)))
                 return jdbc.queryForMap(
-                        "SELECT id, pl_no, pl_xc, ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja,"
+                        "SELECT id, pl_no, pl_xc, ISNULL(pl_sl,0) AS pl_sl, ISNULL(xq_sl,0) AS xq_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja,"
                                 + " [源工单号], [源工单行id], [拆分序号] FROM dbo.plang"
                                 + " WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'",
                         Long.parseLong(String.valueOf(rid).trim()));
             String no = str(req.get("工单号"));
             if (no == null) throw new IllegalArgumentException("撤回切单缺少 工单号/行id");
             Map<String, Object> row = jdbc.queryForMap(
-                    "SELECT TOP 1 id, pl_no, pl_xc, ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja,"
+                    "SELECT TOP 1 id, pl_no, pl_xc, ISNULL(pl_sl,0) AS pl_sl, ISNULL(xq_sl,0) AS xq_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja,"
                             + " [源工单号], [源工单行id], [拆分序号] FROM dbo.plang"
                             + " WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id",
                     no);
