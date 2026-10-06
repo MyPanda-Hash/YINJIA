@@ -128,7 +128,9 @@ public class QuickScheduleService {
         } catch (org.springframework.dao.EmptyResultDataAccessException e) {
             plNo = null;   // 该订单尚未转过工单 → 取新号
         }
-        if (plNo == null || plNo.isBlank()) plNo = formNo.next("MO", user);
+        // 生产工单前缀 MO → GD(2026-10-05 用户口径「修改生产工单」):只影响新单号,历史单号不变;
+        // 取号流水在 s_allno(按 前缀+年月 独立序列),不与旧前缀混号。
+        if (plNo == null || plNo.isBlank()) plNo = formNo.next("GD", user);
         Integer lineNo = line.get("行号") instanceof Number n ? n.intValue() : 1;
         String batch = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
         String due = str(line.get("交货日期"));
