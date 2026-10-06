@@ -193,7 +193,8 @@ async function load() {  try {
     // 造成切单/撤回切单永久提示「请先勾选一张工单」。
     checked.value = []
     currentRow.value = null
-    tableRef.value?.clearSelection?.()    applyLineMeta()
+    tableRef.value?.clearSelection?.()
+    applyLineMeta()
   } catch (e) { err(e, '查询失败') }
 }
 
