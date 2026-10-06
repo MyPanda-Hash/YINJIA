@@ -66,9 +66,13 @@ public class OrderConvertService {
                         + " ISNULL(备注_管控.重点管控, N'否') AS 重点管控,"
                         + " ISNULL(l.[数量], 0) AS 需求数量,"
                         + " ISNULL(m.linked, 0) AS 已排产数量, ISNULL(p.linked, 0) AS 已采购数量,"
-                        + " ISNULL(l.[数量], 0) - ISNULL(m.linked, 0) - ISNULL(p.linked, 0) AS 剩余数量"
+                        + " ISNULL(l.[数量], 0) - ISNULL(m.linked, 0) - ISNULL(p.linked, 0) AS 剩余数量,"
+                        // 工单关联工艺路线(2026-10-05,用户口径「在订单结转处选择工序路线」):
+                        // 预填 = 产品档案绑定(bs_inv.工艺路线) → 未绑定默认 GY-CB-STD;前端可逐行改,转单时原样带入工单
+                        + " ISNULL(NULLIF(rv.[工艺路线], N''), N'GY-CB-STD') AS 工艺路线"
                         + " FROM bd_so_order o"
                         + " JOIN bl_so_order l ON l.[单据编号] = o.[单据编号] AND ISNULL(l.asp_cancel,'N') <> 'Y'"
+                        + " LEFT JOIN bs_inv rv ON rv.[存货编码] = l.[存货编码] AND ISNULL(rv.asp_cancel,'N') <> 'Y'"
                         + " JOIN yj_doc_status s ON s.panel_code = 'SO_ORDER' AND s.doc_no = o.[单据编号]"
                         + "   AND s.shr IS NOT NULL"
                         // 严格「已审核」(2026-09-26 用户要求:结转页不出现已审核以外流程的数据)——
@@ -145,7 +149,7 @@ public class OrderConvertService {
             try {
                 applyDateEdit(r, user);   // 交期修正先回写订单行 → createFromOrderLine 读行交期即为修正值(cp_date)
                 Double qty = num2(str(r.get("生单数量")) == null ? null : r.get("生单数量"));
-                created.add(quickSchedule.createFromOrderLine(soNo, lineId, qty, user));
+                created.add(quickSchedule.createFromOrderLine(soNo, lineId, qty, user, str(r.get("工艺路线"))));
             } catch (RuntimeException e) {
                 failed.add(soNo + "#" + lineId + ":" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             }

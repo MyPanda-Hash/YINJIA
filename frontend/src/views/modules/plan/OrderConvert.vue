@@ -61,6 +61,15 @@
           <span class="oc-strong">{{ row.剩余数量 }}</span>
         </template>
       </el-table-column>
+      <el-table-column :label="tt('工艺路线')" width="180" fixed="right">
+        <template #default="{ row }">
+          <!-- 用户口径(2026-10-05):**在订单结转处选择工序路线** —— 预填产品绑定(否则默认 GY-CB-STD),可逐行改;
+               转单时原样带入工单(plang.工艺路线),之后排产/详情一律按这条路线解释"走到哪一步"。 -->
+          <el-select v-model="row.工艺路线" size="small" filterable style="width: 100%" :placeholder="tt('默认 GY-CB-STD')">
+            <el-option v-for="rt in routeOptions" :key="rt.编码" :label="rt.名称 ? `${rt.编码}·${rt.名称}` : rt.编码" :value="rt.编码" />
+          </el-select>
+        </template>
+      </el-table-column>
       <el-table-column :label="tt('本次转单数量')" width="125" fixed="right">
         <template #default="{ row }">
           <el-input-number v-model="row.生单数量" :min="0" :max="Number(row.剩余数量)" :controls="false" size="small" style="width: 100%" />
@@ -78,6 +87,15 @@ import { tt } from '@/i18n'
 
 const keyword = ref('')
 const loading = ref(false)
+/** 可选工艺路线(订单结转处选择,2026-10-05):选项来自 bs_route 启用路线 */
+const routeOptions = ref([])
+async function loadRoutes() {
+  try {
+    const res = await request.post('/px/processTask/meta', {})
+    const list = (res.data || {})['路线'] || []
+    routeOptions.value = list.map((x) => (typeof x === 'string' ? { 编码: x, 名称: '' } : { 编码: x.编码 || x, 名称: x.名称 || '' }))
+  } catch { routeOptions.value = [{ 编码: 'GY-CB-STD', 名称: '炭棒标准路线' }] }
+}
 const rows = ref([])
 const checked = ref([])
 const tableRef = ref(null)
@@ -171,7 +189,7 @@ async function convert(api, label) {
   }
 }
 
-onMounted(loadAll)
+onMounted(() => { loadAll(); loadRoutes() })
 </script>
 
 <style scoped>

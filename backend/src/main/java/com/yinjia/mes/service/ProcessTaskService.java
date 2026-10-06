@@ -307,6 +307,7 @@ public class ProcessTaskService {
                         + " (SELECT COUNT(*) FROM dbo.plang g WHERE g.pl_no=p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y') AS 工单行数,"
                         + " (SELECT ISNULL(SUM(g.pl_sl),0) FROM dbo.plang g WHERE g.pl_no=p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y' AND ISNULL(g.pl_sl,0)>100000) AS 异常计划量,"
                         + " (SELECT TOP 1 ISNULL(g.[批次号],N'') FROM dbo.plang g WHERE g.pl_no=p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y' ORDER BY g.id) AS 批次号,"
+                        + " ISNULL(p.[工艺路线],N'') AS 工艺路线,"
                         + " ISNULL(p.scx,N'') AS 排产产线"
                         + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id", no);
         // 报工口径:每道工序的完工量(只算已审核报工)
@@ -323,10 +324,20 @@ public class ProcessTaskService {
             cnt.put(op, (int) num(r.get("报工单数")));
         }
         List<Map<String, Object>> steps = new ArrayList<>();
+        // 步骤口径(2026-10-05):**按该工单关联的工艺路线**(plang.工艺路线 → bs_route 明细,按工序序列)渲染;
+        // 未绑路线 / 路线无明细 → 回退标准五步(混料/成型/切炭/组装/装箱),兼容存量单。
+        String route = String.valueOf(headObject(heads).getOrDefault("工艺路线", ""));
+        List<String> order = new ArrayList<>();
+        if (route != null && !route.isBlank() && !"null".equals(route)) {
+            order.addAll(jdbc.queryForList("SELECT 工序名称 FROM dbo.bs_route WHERE 工艺路线编码=?"
+                    + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999)",
+                    String.class, route.trim()));
+        }
+        if (order.isEmpty()) order.addAll(List.of(PROCESS_ORDER));
         String cur = "";
-        for (String op : PROCESS_ORDER) if (qty.getOrDefault(op, 0d) > 0) cur = op;
-        for (int i = 0; i < PROCESS_ORDER.length; i++) {
-            String op = PROCESS_ORDER[i];
+        for (String op : order) if (qty.getOrDefault(op, 0d) > 0) cur = op;
+        for (int i = 0; i < order.size(); i++) {
+            String op = order.get(i);
             double q = qty.getOrDefault(op, 0d);
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("序", i + 1);
@@ -338,8 +349,8 @@ public class ProcessTaskService {
             steps.add(s);
         }
         double outQty = 0;
-        for (int i = PROCESS_ORDER.length - 1; i >= 0; i--) {
-            double q = qty.getOrDefault(PROCESS_ORDER[i], 0d);
+        for (int i = order.size() - 1; i >= 0; i--) {
+            double q = qty.getOrDefault(order.get(i), 0d);
             if (q > 0) { outQty = q; break; }
         }
         Map<String, Object> head = new LinkedHashMap<>();
@@ -359,8 +370,13 @@ public class ProcessTaskService {
         return out;
     }
 
-    /** 标准工序顺序(与《新系统产线命名.xlsx》的功能口径一致);详情步骤条/当前工序都按它判定 */
+    /** 标准工序顺序(与《新系统产线命名.xlsx》的功能口径一致);工单未绑工艺路线时回退用它 */
     private static final String[] PROCESS_ORDER = {"混料", "成型", "切炭", "组装", "装箱"};
+
+    /** 取表头行(工单级查询结果的第一行);查不到时给空 Map,避免 NPE */
+    private static Map<String, Object> headObject(List<Map<String, Object>> heads) {
+        return heads == null || heads.isEmpty() ? Map.of() : heads.get(0);
+    }
 
     private static int indexOfProcess(String op) {
         for (int i = 0; i < PROCESS_ORDER.length; i++) if (PROCESS_ORDER[i].equals(op)) return i + 1;
