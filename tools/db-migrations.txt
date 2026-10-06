@@ -2394,3 +2394,6 @@ migrate-wo-process-line.sql
 #   用户报障「明细第 2 行工序控制不能为空」「填明细提示表头未填写」;根因=照金蝶截图设了必填。
 #   保留 编码/名称/工序编码/工序序列 必填;幂等;两账套均执行。
 migrate-route-relax-required.sql
+# migrate-route-restore-required.sql(2026-10-05):撤回首条必填收敛,恢复 工序控制/生效日期/失效日期 必填
+#   用户口径「必填保留,但不在填写明细表时校验」⇒ 必填恢复,校验时机改前端(保存时)。两账套均执行。
+migrate-route-restore-required.sql
