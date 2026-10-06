@@ -116,7 +116,7 @@ public class OrderConvertService {
                         + " ISNULL(l.[数量], 0) - ISNULL(m.linked, 0) - ISNULL(p.linked, 0) AS 剩余数量,"
                         // 工单关联工艺路线(2026-10-05,用户口径「在订单结转处选择工序路线」):
                         // 预填 = 产品档案绑定(bs_inv.工艺路线) → 未绑定默认 GY-CB-STD;前端可逐行改,转单时原样带入工单
-                        + " ISNULL(NULLIF(rv.[工艺路线], N''), N'GY-CB-STD') AS 工艺路线"
+                        + " ISNULL(rv.[工艺路线], N'') AS 工艺路线"
                         + PENDING_FROM + PENDING_DATE_RANGE + PENDING_KEYWORD
                         + " ORDER BY o.[单据日期], o.[单据编号], l.[id]",
                         // ⚠ 日期参数必须显式给空串:JDBC null 会让 `? = ''` 求值成 NULL(既非真也非假)

@@ -142,8 +142,9 @@ public class QuickScheduleService {
                 plNo, lineNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
                 str(line.get("规格型号")), str(line.get("销售单位")), demand, qty, remain, due, due, due,
                 str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user, batch,
-                // 工单关联工艺路线(2026-10-05):**订单结转所选优先** → 产品档案绑定 → 默认 GY-CB-STD
-                (route != null && !route.isBlank()) ? route.trim() : resolveRoute(str(line.get("存货编码"))));
+                // 工单关联工艺路线(2026-10-05):**用订单结转所选,不兜底默认**(用户口径「不需要实现默认选择」);
+                // 未选 = NULL,后续不推导"下一道工序",由经办人补选后再排产
+                (route != null && !route.isBlank()) ? route.trim() : null);
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
                 "PLANG", plNo, plNo + "#" + lineNo + "#" + batch, "");
         return plNo;
