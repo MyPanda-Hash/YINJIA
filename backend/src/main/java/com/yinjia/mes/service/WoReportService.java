@@ -67,6 +67,33 @@ public class WoReportService {
         String op = String.valueOf(r.get("gxdm")).trim();
         double qty = num(r.get("sl"));
         if (wo.isEmpty() || op.isEmpty()) throw new IllegalStateException("报工单缺少工单号或工序,不能过账");
+        // ── 工序报工必须跟随工单的**工艺路线**(2026-10-05 用户口径:报工按当前工单路线执行,选错工序会报错)──
+        //   ① 报工的工序必须在 plang.工艺路线 的工序明细内;
+        //   ② 不得跳序:路线中排在该工序之前的工序若尚无**已审核**报工 → 拦截(提示先报前道)。
+        // 工单未关联路线时不校验(兼容历史单);校验在**写入之前**,失败不落任何数据。
+        List<String> rtRows = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " AND ISNULL([工艺路线],N'')<>N''", String.class, wo);
+        String route = rtRows.isEmpty() ? "" : rtRows.get(0);
+        if (!route.isBlank()) {
+            List<String> ops = jdbc.queryForList(
+                    "SELECT 工序名称 FROM dbo.bs_route WHERE 工艺路线编码=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + " AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999)", String.class, route);
+            int idx = ops.indexOf(op);
+            if (idx < 0) {
+                throw new IllegalStateException("工序「" + op + "」不在工单 " + wo + " 的工艺路线「" + route + "」内("
+                        + String.join("→", ops) + "),不能报工");
+            }
+            for (int i = 0; i < idx; i++) {
+                Integer done = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM dbo.scjl WHERE gldh=? AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                                + " AND ISNULL(wgzt,'N')='Y'", Integer.class, wo, ops.get(i));
+                if (done == null || done == 0) {
+                    throw new IllegalStateException("前道工序「" + ops.get(i) + "」尚未报工,不能跳到「" + op
+                            + "」(工单路线:" + String.join("→", ops) + ")");
+                }
+            }
+        }
         if (qty <= 0) throw new IllegalStateException("报工数量必须大于 0");
         double dual = num(r.get("dual_qty"));
         if (dual > qty + 0.0001) throw new IllegalStateException("直销数量(" + dual + ")不能大于报工数量(" + qty + ")");
