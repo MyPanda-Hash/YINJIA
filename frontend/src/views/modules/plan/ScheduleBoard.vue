@@ -134,6 +134,12 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 
+/** 内嵌/筛选(2026-10-05 用户口径):生产工单页把"快速排产页面本身"弹出来,并只筛当前工单 */
+const props = defineProps({
+  '工单号': { type: String, default: '' },
+  embedded: { type: Boolean, default: false },
+})
+
 const keyword = ref('')
 const customer = ref('')
 const loading = ref(false)
@@ -294,7 +300,11 @@ async function unassign() {
 
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
-onMounted(loadAll)
+onMounted(() => {
+  // 内嵌模式(2026-10-05 用户口径):生产工单页弹出"快速排产页面本身",用**工单号**预置单框搜索 ⇒ 只显示当前工单
+  if (props['工单号']) keyword.value = props['工单号']
+  loadAll()
+})
 </script>
 
 <style scoped>

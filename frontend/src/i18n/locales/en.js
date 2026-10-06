@@ -505,7 +505,8 @@ export default {
     '默认 GY-CB-STD': 'default GY-CB-STD',
     // 工单详情第二版(2026-10-05):按工序聚合 + 产出/进度 + 异常计划量
     '产出': 'Output',
-    // 单工单排产弹窗(2026-10-05)
+    // 单工单排产弹窗(2026-10-05;内嵌快速排产页面本身,用工单号筛选)
+    '工单排产（快速排产）': 'Schedule Work Order (Quick Scheduling)',
     '工单排产': 'Schedule Work Order',
     '确认排产': 'Confirm Schedule',
     '下一道工序': 'Next Process',

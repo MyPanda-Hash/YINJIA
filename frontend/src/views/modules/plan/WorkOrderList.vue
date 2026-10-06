@@ -113,8 +113,13 @@
       </el-table-column>
     </el-table>
 
-    <!-- 工单排产弹窗(2026-10-05):经过唯一工单号筛选的"快速排产",只显示当前工单 -->
-    <WorkOrderScheduleDialog v-model="schedVisible" :row="schedRow" @done="load" />
+    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**,用工单号筛选 ⇒ 只显示当前工单 -->
+    <el-dialog v-model="schedVisible" :title="tt('工单排产（快速排产）')" width="94%" top="4vh" append-to-body destroy-on-close
+               @closed="load">
+      <div style="height: 76vh; overflow: hidden">
+        <ScheduleBoard :工单号="schedNo" embedded />
+      </div>
+    </el-dialog>
 
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" />
@@ -152,7 +157,7 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
-import WorkOrderScheduleDialog from './WorkOrderScheduleDialog.vue'
+import ScheduleBoard from './ScheduleBoard.vue'
 import { useUserStore } from '@/stores/user'
 
 const rows = ref([])
@@ -178,12 +183,12 @@ const traceVisible = ref(false)
 const traceNo = ref('')
 /** 工单排产弹窗(2026-10-05 用户口径):只带当前这一张工单的快速排产 */
 const schedVisible = ref(false)
-const schedRow = ref({})
+const schedNo = ref('')
 function openSchedule() {
   const r = (checked.value.length === 1 ? checked.value[0] : currentRow.value) || checked.value[0]
   if (!r) { ElMessage.warning(tt('请先勾选一张工单')); return }
   if (r['生产线']) { ElMessage.warning(`${tt('该工单已排产')}(${r['生产线']})，${tt('不能重复排入;换线请先撤销排产')}`); return }
-  schedRow.value = r
+  schedNo.value = r['工单号']
   schedVisible.value = true
 }
 
