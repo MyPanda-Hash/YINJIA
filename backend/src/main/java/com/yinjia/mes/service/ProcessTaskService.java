@@ -513,28 +513,30 @@ public class ProcessTaskService {
         if (!notBlank(plNo)) return out;
         String no = plNo.trim();
         List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, 工序, ISNULL(计划生产线,N'') AS 计划生产线, ISNULL(状态,N'计划') AS 状态"
+                "SELECT id, 工序, ISNULL(计划生产线,N'') AS 计划生产线, ISNULL(状态,N'计划') AS 状态, ISNULL(计划数量,0) AS 计划数量"
                         + " FROM dbo.wo_process_line WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
                         + " ORDER BY ISNULL(工序序,999), id", no);
         if (rows.isEmpty()) {
             // 懒预排:该工单还没预排过(排产早于预排触发) → 以当前线为首道线补一次,再读台账
             preplanLines(no, cs0(no), user);
             rows = jdbc.queryForList(
-                    "SELECT id, 工序, ISNULL(计划生产线,N'') AS 计划生产线, ISNULL(状态,N'计划') AS 状态"
+                    "SELECT id, 工序, ISNULL(计划生产线,N'') AS 计划生产线, ISNULL(状态,N'计划') AS 状态, ISNULL(计划数量,0) AS 计划数量"
                             + " FROM dbo.wo_process_line WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
                             + " ORDER BY ISNULL(工序序,999), id", no);
         }
         // 选"下一道**待开工**"的行(2026-10-05 修正:此前取第一行"计划"态,第一道就是当前道 ⇒ 永远停在第 1 道):
         //   跳过已开工/已完工的道,取**第一个报工量为 0**的道,且要求其**前一道已开工**(生产确已走到它)。
         Map<String, Object> next = null;
-        double prevDone = -1;
+        double prevDone = -1, prevPlan = -1;
         for (Map<String, Object> r : rows) {
             String rop = String.valueOf(r.get("工序")).trim();
             Double rDone = jdbc.queryForObject("SELECT ISNULL(SUM(ISNULL(sl,0)),0) FROM dbo.scjl WHERE gldh=?"
                     + " AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'", Double.class, no, rop);
             double d = rDone == null ? 0 : rDone;
-            if ("计划".equals(String.valueOf(r.get("状态"))) && d <= 0 && (prevDone < 0 || prevDone > 0)) { next = r; break; }
-            prevDone = d;
+            // 转序条件(2026-10-05 修正):**前一道已完工**(报工量 ≥ 换算后计划量) 且 本道尚未开工
+            if ("计划".equals(String.valueOf(r.get("状态"))) && d <= 0
+                    && (prevDone < 0 || (prevPlan > 0 && prevDone + 0.0001 >= prevPlan))) { next = r; break; }
+            prevDone = d; prevPlan = num(r.get("计划数量"));
         }
         if (next == null) return out;
         String op = String.valueOf(next.get("工序")).trim();
