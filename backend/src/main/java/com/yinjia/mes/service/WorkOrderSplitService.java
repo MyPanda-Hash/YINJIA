@@ -132,7 +132,7 @@ public class WorkOrderSplitService {
                         + " pl_sl, xq_sl, rk_sl, yl, dj, jine, cp_date, st_date, cp_date2, bz, ja,"
                         + " od_no, od_xc, lot_no, color, siz, lb, mjlx, ll_no, wb_no, ypl_sl, ll_no2, remark,"
                         + " llxz, cgrkdh, lldh, djlx, zl, [批次号], [源工单号], [源工单行id], [拆分序号],"
-                        + " [根工单号], [是否切单],"
+                        + " [根工单号], [是否切单], [工艺路线],"
                         + " asp_cancel, asp_user1, asp_time1)"
                         + " SELECT comm, ?, 1, GETDATE(), ?, ?, khdm, dm, mc, gg, gg2, jldw,"
                         + "   ?, ?, 0, 0, dj, jine,"
@@ -141,7 +141,7 @@ public class WorkOrderSplitService {
                         + "   od_no, od_xc, lot_no, color, siz, ?, mjlx, NULL, NULL, ypl_sl, NULL, remark,"
                         + "   llxz, cgrkdh, lldh, djlx, zl, [批次号], ?, ?, ?,"
                         + "   ?, N'Y',"
-                        + "   N'N', ?, GETDATE()"
+                        + "   N'N', ?, GETDATE(), [工艺路线]"
                         + " FROM dbo.plang WHERE id=?",
                 childNo, scx, plMan, qty, qty,
                 dueDate == null ? null : java.time.LocalDate.parse(dueDate), remark,
