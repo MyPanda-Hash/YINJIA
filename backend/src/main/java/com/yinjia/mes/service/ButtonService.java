@@ -30,6 +30,14 @@ import java.util.Set;
 @Service
 public class ButtonService {
 
+    /**
+     * 「单表式:表头值优先」白名单(2026-10-05):这些面板保存时,**头字段最后覆盖行内同名值**。
+     * 背景:单表式面板的明细行会携带头字段列(如工艺路线的 工艺路线名称/生效日期/失效日期),
+     *   前端提交的行内旧值会把表头刚改的新值盖回去 ⇒ 表现为"表头改了保存不下来"。
+     * 只放行用户明确要求的面板(当前仅工艺路线 ROUTE),其余单表式面板行为保持不变。
+     */
+    private static final java.util.Set<String> SINGLE_HEAD_WINS_PANELS = java.util.Set.of("ROUTE");
+
     private static final Logger log = LoggerFactory.getLogger(ButtonService.class);
 
     private final PanelRegistry registry;
@@ -420,8 +428,14 @@ public class ButtonService {
         } else {
             // 单表式:头字段并入每行
             for (Map<String, Object> item : items) {
-                Map<String, Object> merged = new LinkedHashMap<>(head);
-                merged.putAll(item);
+                boolean headWins = SINGLE_HEAD_WINS_PANELS.contains(def.code());
+                Map<String, Object> merged = new LinkedHashMap<>(headWins ? item : head);
+                if (headWins) {
+                    for (Map.Entry<String, Object> e : head.entrySet()) {
+                        Object v = e.getValue();
+                        if (v != null && !String.valueOf(v).isBlank()) merged.put(e.getKey(), v);
+                    }
+                } else { merged.putAll(item); }
                 item.putAll(merged);
             }
             upsertLineRows(def, items, no, l2c, user);
