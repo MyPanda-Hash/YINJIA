@@ -5233,7 +5233,17 @@ function validateInlineDraft() {
     let nonEmpty = 0
     for (let index = 0; index < rows.length; index++) {
       const row = rows[index] || {}
-      const rowEmpty = (tab.fields || []).every((f) => emptyFieldValue(row[f.dataName]))
+      // 空行判定(2026-10-05 二次修正):预置空行的布尔开关默认 false、数值默认 0/null 都会被
+      // String() 变成 "false"/"0" 而**看起来"有值"** ⇒ 空行被判成有数据的行,继续跑必填校验
+      // (用户报障:第 2 行没录任何东西也报"明细第 2 行工序控制不能为空")。
+      // 口径:boolean、以及 "false"/"true"/"0"/"Y"/"N"/"是"/"否" 一律视为**未录入**。
+      const rowEmpty = (tab.fields || []).every((f) => {
+        const v = row[f.dataName]
+        if (emptyFieldValue(v)) return true
+        if (typeof v === 'boolean') return true
+        const s = String(v).trim().toLowerCase()
+        return s === 'false' || s === 'true' || s === '0' || s === 'y' || s === 'n' || s === '是' || s === '否'
+      })
       if (rowEmpty) continue
       nonEmpty++
       for (const field of tab.fields || []) {
