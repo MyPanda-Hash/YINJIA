@@ -62,8 +62,8 @@
       <el-table-column :label="tt('公司代码')" prop="公司代码" width="90" show-overflow-tooltip />
       <el-table-column :label="tt('工单号')" prop="加工单号" width="150" sortable show-overflow-tooltip>
         <template #default="{ row }">
-          <!-- 点工单号看"走到哪一步"(2026-10-05,用户口径):按报工统计的标准五道工序步骤条 -->
-          <el-link type="primary" :underline="false" @click="openDetail(row)">{{ row['工单号'] }}</el-link>
+          <!-- 点工单号 = 打开工单排产的追溯(=工单详情:工序进度+时间线+血缘) -->
+          <el-link type="primary" :underline="false" @click="openTrace(row)">{{ row['工单号'] }}</el-link>
         </template>
       </el-table-column>
       <el-table-column :label="tt('工单行号')" prop="行号" width="90" sortable />
@@ -111,8 +111,7 @@
       </el-table-column>
     </el-table>
 
-    <!-- 工单详情抽屉(点工单号打开:这单走到哪一步;只读) -->
-    <WorkOrderDetailDrawer v-model="dtVisible" :code="dtCode" />
+    <!-- 追溯/工单详情统一在 工单排产 页(2026-10-05 合并):本页两个入口都跳过去,不再各自渲染一套 -->
 
     <!-- 切单弹窗:可切上限 = 排产数量 − max(已入库, 各工序已完工报工最大值);子单取新工单号 -->
     <el-dialog v-model="splitVisible" :title="tt('切单')" width="440px" append-to-body>
@@ -142,11 +141,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
-import WorkOrderDetailDrawer from './WorkOrderDetailDrawer.vue'
 import { useUserStore } from '@/stores/user'
 
 const rows = ref([])
@@ -165,10 +164,8 @@ const splitLoading = ref(false)
 const splitInfo = ref(null)
 const splitQty = ref(0)
 const splitInherit = ref(true)
-/** 工单详情抽屉(2026-10-05):点工单号看"走到哪一步" */
-const dtVisible = ref(false)
-const dtCode = ref('')
-function openDetail(row) { dtCode.value = row?.['工单号'] || ''; if (dtCode.value) dtVisible.value = true }
+/** 追溯统一入口(2026-10-05):跳转到工单排产的追溯弹窗;本页不再单独渲染详情抽屉 */
+const router = useRouter()
 
 const filtered = computed(() => rows.value.filter((r) => {
   if (stateFilter.value === '未完工' && r.生产状态 === '完工') return false
@@ -342,27 +339,13 @@ async function onUnsplit() {
   } catch (e) { err(e, '撤回切单失败') }
 }
 
-function openTrace() {
-  const no = currentRow.value?.工单号 || checked.value[0]?.工单号
+function openTrace(row) {
+  // 合并口径(2026-10-05,用户口径「工单详情和追溯放在一起,以工单排产的追溯为基座」):
+  // 本页不再自己渲染一套 —— 跳转到工单排产的追溯弹窗(?trace=工单号),那里是唯一实现
+  // (头 + 工序进度 + 流转时间线 + 调拨轨迹 + 排产/完工/入库/领料)。
+  const no = row?.['工单号'] || currentRow.value?.工单号 || checked.value[0]?.工单号
   if (!no) return
-  request.post('/px/scheduleBoard/trace', { 工单号: no }).then((res) => {
-    const d = res.data || {}
-    const h = d['头'] || {}
-    const tl = (d['时间线'] || []).map((x) => `<div>· ${x['时间'] || ''} ${tt(x['步骤'] || '')} ${x['操作人'] || ''}</div>`).join('')
-    const done = (d['完工数据'] || []).map((x) => `<div>· ${x['工序'] || '-'}：${num(x['完成数量'])}</div>`).join('')
-    const kids = (d['子工单'] || []).map((x) => `<div>· ${x['工单号']}#${x['工单行号']}（${tt('切出')} ${num(x['排产数量'])}，${tt(x['状态'])}）</div>`).join('')
-    const par = (d['父工单'] || []).map((x) => `<div>· ${x['工单号']}#${x['工单行号']}（${tt('数量')} ${num(x['排产数量'])}，${tt('拆分序号')} ${x['拆分序号'] ?? '-'}）</div>`).join('')
-    ElMessageBox.alert(
-      `<b>${tt('工单')}</b> ${no}<br/>
-       <b>${tt('生产线')}</b> ${h['生产线'] || '-'}<br/>
-       <b>${tt('单据状态')}</b> ${tt(h['单据状态'] || '') || '-'}<br/>
-       <b>${tt('排产数量')}</b> ${num(h['排产数量'])} ｜ <b>${tt('入库数量')}</b> ${num(h['入库数量'])} ｜ <b>${tt('余量')}</b> ${num(h['余量'])}
-       ${par ? `<hr/><b>${tt('父工单')}</b>${par}` : ''}
-       ${kids ? `<hr/><b>${tt('子工单')}</b>${kids}` : ''}
-       ${done ? `<hr/><b>${tt('完工数据')}</b>${done}` : ''}
-       ${tl ? `<hr/><div style="max-height:200px;overflow:auto">${tl}</div>` : ''}`,
-      tt('追溯') + ' — ' + no, { dangerouslyUseHTMLString: true, confirmButtonText: tt('知道了') })
-  }).catch((e) => err(e, '查询失败'))
+  router.push({ path: '/prod/plan/workOrderBoard', query: { trace: no } })
 }
 
 function exportCsv() {

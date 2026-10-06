@@ -151,7 +151,7 @@
     </el-dialog>
 
     <!-- 追溯弹窗(参考旧系统 品质追溯):头+时间线+排产/完工/入库/领料;质检段待品质面板接入后补 -->
-    <el-dialog v-model="traceVisible" :title="tt('工单追溯')" width="92%" top="4vh" append-to-body>
+    <el-dialog v-model="traceVisible" :title="tt('工单详情 · 追溯')" width="92%" top="4vh" append-to-body>
       <template v-if="trace">
         <div class="wb-trace-head">
           <span class="wb-trace-no">{{ trace['头']?.['加工单号'] }}</span>
@@ -168,6 +168,25 @@
           <span>{{ tt('排产数量') }}: {{ num(trace['头']?.['排产数量']) }}</span>
           <span>{{ tt('入库数量') }}: {{ num(trace['头']?.['入库数量']) }}</span>
           <span>{{ tt('余量') }}: {{ num(trace['头']?.['余量']) }}</span>
+        </div>
+
+        <!-- 工序进度(2026-10-05 合并):按该工单**工艺路线**渲染的步骤条 —— 原独立"工单详情"抽屉的内容并入本追溯 -->
+        <div v-if="prog" class="wb-trace-block">
+          <div class="wb-block-title">
+            {{ tt('工序进度') }}
+            <span class="wb-trace-sub" style="display: inline; margin-left: 8px">
+              {{ tt('工艺路线') }}: {{ prog['表头']?.['工艺路线'] || '-' }}
+              ｜ {{ tt('计划数量') }}: {{ num(prog['计划合计']) }}
+              ｜ {{ tt('产出') }}: {{ num(prog['产出']) }}（{{ num(prog['表头']?.['进度']) }}%）
+              <span v-if="prog['当前工序']">｜ {{ tt('当前工序') }}: {{ tt(prog['当前工序']) }}</span>
+              <span v-else>｜ {{ tt('未开工') }}</span>
+            </span>
+          </div>
+          <el-steps :active="Number(prog['当前工序序'] || 0)" align-center finish-status="success">
+            <el-step v-for="s in (prog['工序步骤'] || [])" :key="s['工序']" :title="tt(s['工序'])"
+                     :description="num(s['完工量']) + (s['报工单数'] ? `（${s['报工单数']}${tt('单')}）` : '')" />
+          </el-steps>
+          <div v-if="!(prog['工序步骤'] || []).length" class="wb-trace-sub">{{ tt('该工单还没有工序进度') }}</div>
         </div>
 
         <div class="wb-trace-block">
@@ -371,16 +390,23 @@ async function unclose() {
   loadSummary()
 }
 
-// ── 追溯:单张工单的流转到哪一步(头+时间线+排产/完工/入库/领料;质检段待品质面板接入后补) ──
+// ── 追溯(= 工单详情,2026-10-05 合并口径):**本弹窗是唯一实现** —— 头 + 工序进度(按该单工艺路线的步骤条)
+//    + 流转时间线 + 调拨轨迹 + 排产/完工/入库/领料。工单列表的「追溯」按钮与点工单号都跳到这里(?trace=工单号)。
 const traceVisible = ref(false)
 const trace = ref(null)
+/** 工序进度(按工单工艺路线;来自 /px/processTask/detail,只读) */
+const prog = ref(null)
 
 async function openTrace(noParam) {
-  let no = typeof noParam === 'string' ? noParam : checkedSched.value[0]?.加工单号
+  let no = typeof noParam === 'string' ? noParam : (noParam?.['工单号'] || checkedSched.value[0]?.加工单号)
   if (!no) return
   try {
-    const res = await request.post('/px/scheduleBoard/trace', { 工单号: no })
-    trace.value = res.data || {}
+    const [t, p] = await Promise.all([
+      request.post('/px/scheduleBoard/trace', { 工单号: no }),
+      request.post('/px/processTask/detail', { 工单号: no }).catch(() => ({ data: null })),
+    ])
+    trace.value = t.data || {}
+    prog.value = p?.data || null
     traceVisible.value = true
   } catch (e) { err(e, '查询失败') }
 }
