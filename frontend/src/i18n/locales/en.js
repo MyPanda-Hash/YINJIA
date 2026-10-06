@@ -474,6 +474,15 @@ export default {
     '工序/工艺': 'Process',
     // 工序总览 + 工单详情 + 撤回派工(2026-10-05)
     '工序总览': 'Process Overview',
+    // 工单详情第二版(2026-10-05):按工序聚合 + 产出/进度 + 异常计划量
+    '产出': 'Output',
+    '进度': 'Progress',
+    '任务数': 'Tasks',
+    '派工产线': 'Dispatched Lines',
+    '最早计划完工': 'Earliest Finish',
+    '异常计划量': 'Abnormal Planned Qty',
+    '存在异常大的计划量(遗留数据),会让汇总失真': 'An abnormally large planned qty exists (legacy data) and distorts the totals',
+    '任务id': 'Task ID',
     '撤回派工': 'Withdraw Dispatch',
     '已撤回': 'Withdrawn',
     '撤回失败': 'Withdraw failed',

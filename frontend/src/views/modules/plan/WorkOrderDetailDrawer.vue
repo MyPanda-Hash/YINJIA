@@ -23,11 +23,34 @@
         <el-descriptions-item :label="tt('排产产线')">{{ head['排产产线'] || '-' }}</el-descriptions-item>
         <el-descriptions-item :label="tt('批次号')">{{ head['批次号'] || '-' }}</el-descriptions-item>
         <el-descriptions-item :label="tt('工单行数')">{{ head['工单行数'] || 1 }}</el-descriptions-item>
-        <el-descriptions-item :label="tt('完工合计')">{{ num(sum['完工合计']) }} / {{ num(sum['计划合计']) }}</el-descriptions-item>
+        <el-descriptions-item :label="tt('产出')">{{ num(head['产出']) }} / {{ num(sum['计划合计']) }}</el-descriptions-item>
+        <el-descriptions-item :label="tt('进度')">{{ num(head['进度']) }}%</el-descriptions-item>
+        <el-descriptions-item v-if="num(head['异常计划量']) > 0" :label="tt('异常计划量')">
+          <el-tag size="small" type="danger">{{ num(head['异常计划量']) }}</el-tag>
+          <span class="wod-warn">{{ tt('存在异常大的计划量(遗留数据),会让汇总失真') }}</span>
+        </el-descriptions-item>
       </el-descriptions>
 
       <div class="wod-sec">{{ tt('工序进度') }}（{{ tt('按工序序列') }}）</div>
-      <el-table :data="tasks" size="small" border empty-text="">
+      <el-table :data="ops" size="small" border empty-text="" row-key="工序序">
+        <el-table-column type="expand">
+          <template #default="{ row }">
+            <el-table :data="tasksOf(row['工序序'])" size="small" border>
+              <el-table-column :label="tt('任务id')" prop="任务id" width="80" align="right" />
+              <el-table-column :label="tt('产品编码')" prop="产品编码" width="110" />
+              <el-table-column :label="tt('批次号')" prop="批次号" width="100" />
+              <el-table-column :label="tt('计划数量')" prop="计划数量" width="95" align="right" />
+              <el-table-column :label="tt('完成数量')" prop="完成数量" width="95" align="right" />
+              <el-table-column :label="tt('未完成')" prop="未完成量" width="90" align="right" />
+              <el-table-column :label="tt('生产线')" width="110">
+                <template #default="{ row: r }">{{ r['生产线'] || '-' }}</template>
+              </el-table-column>
+              <el-table-column :label="tt('状态')" width="90">
+                <template #default="{ row: r }">{{ tt(r['状态']) }}</template>
+              </el-table-column>
+            </el-table>
+          </template>
+        </el-table-column>
         <el-table-column :label="tt('序')" prop="工序序" width="50" align="right" />
         <el-table-column :label="tt('工序')" width="90">
           <template #default="{ row }">
@@ -41,20 +64,16 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column :label="tt('任务数')" prop="任务数" width="75" align="right" />
         <el-table-column :label="tt('计划数量')" prop="计划数量" width="95" align="right" />
         <el-table-column :label="tt('完成数量')" prop="完成数量" width="95" align="right" />
         <el-table-column :label="tt('未完成')" prop="未完成量" width="90" align="right" />
-        <el-table-column :label="tt('生产线')" width="110">
-          <template #default="{ row }">{{ row['生产线'] || '-' }}</template>
+        <el-table-column :label="tt('派工产线')" width="130">
+          <template #default="{ row }">{{ row['派工产线'] || '-' }}</template>
         </el-table-column>
-        <el-table-column :label="tt('优先级')" width="80">
-          <template #default="{ row }">
-            <span :class="{ 'wod-urgent': row['优先级'] === '急单' }">{{ tt(row['优先级']) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column :label="tt('计划完工日期')" prop="计划完工日期" width="115" />
+        <el-table-column :label="tt('最早计划完工')" prop="最早计划完工" width="120" />
       </el-table>
-      <div v-if="!tasks.length" class="wod-tip">{{ tt('该工单还没有工序任务(转工单时按工艺路线自动生成,可在工序任务页补生成)') }}</div>
+      <div v-if="!ops.length" class="wod-tip">{{ tt('该工单还没有工序任务(转工单时按工艺路线自动生成,可在工序任务页补生成)') }}</div>
     </div>
   </el-drawer>
 </template>
@@ -70,7 +89,11 @@ const visible = computed({ get: () => props.modelValue, set: (v) => emit('update
 const loading = ref(false)
 const head = ref({})
 const tasks = ref([])
+/** 工序汇总(每道工序一行;2026-10-05 第二版:按工序聚合 + 展开看按行明细) */
+const ops = ref([])
 const sum = ref({})
+/** 展开某道工序的按行明细 */
+const tasksOf = (seq) => tasks.value.filter((t) => Number(t['工序序'] || 0) === Number(seq || 0))
 const curOp = computed(() => sum.value['当前工序'] || head.value['当前工序'] || '')
 const num = (v) => { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 
@@ -82,6 +105,7 @@ async function load() {
     const d = res.data || {}
     head.value = d['表头'] || {}
     tasks.value = d['工序任务'] || []
+    ops.value = d['工序汇总'] || []
     sum.value = d
   } catch { head.value = {}; tasks.value = [] } finally { loading.value = false }
 }
