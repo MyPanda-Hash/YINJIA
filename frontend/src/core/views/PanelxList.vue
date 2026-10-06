@@ -5339,7 +5339,18 @@ async function onDetailRefConfirm(selectedRows) {
     detail[key] = Array.isArray(value) ? value.map((row) => ({ ...row })) : value
   }
   const sourceRows = cur.value.detail?.[pick.tabKey] || []
-  const targetRows = detail[pick.tabKey] || (detail[pick.tabKey] = [])
+  // ⚠ 2026-10-05 根因(修「提示已带入 N 条、那一行仍是空白」):上面 detail 是 cur.value.detail 的
+  //   **深拷贝快照**,它只为「参照确认后顺带保存整单」而存在(保存时把这个快照交给后端)。
+  //   ROUTE 分支已定口径「参照确认不落库」,快照在 return 前整份丢弃 ⇒ 写进快照的带入值
+  //   跟着一起丢;而表格渲染的是 cur.value.detail[pick.tabKey] 里的**活行**(buildBlocks→blockRows→
+  //   detailRows 一路都是同一批对象) —— 于是绿色提示照发、行里什么都没有。
+  //   (换数组引用 slice() / 激活单元格都救不回来:值根本不在渲染用的那个数组里,故上一版无效。)
+  //   修法:ROUTE 直接写活数组/活行;其余面板仍写快照,保存语义与行为逐字不变。
+  const writeLiveRows = panelCode.value === 'ROUTE'
+  if (writeLiveRows && !cur.value.detail) cur.value.detail = {}
+  const targetRows = writeLiveRows
+    ? (Array.isArray(cur.value.detail[pick.tabKey]) ? cur.value.detail[pick.tabKey] : (cur.value.detail[pick.tabKey] = []))
+    : (detail[pick.tabKey] || (detail[pick.tabKey] = []))
   const targetIndex = pick.row ? sourceRows.indexOf(pick.row) : -1
   const changedRows = []
   let offset = 0
@@ -5367,18 +5378,11 @@ async function onDetailRefConfirm(selectedRows) {
     //   ⇒ 表现为"先选工序就加不进去"。改为只写**本地草稿**并标脏(不落库、不 load 避免刷掉草稿),
     //   于是必填校验只发生在点「保存 / 提交 / 审核」时。其它面板(存货导入等)保持原行为。
     if (panelCode.value === 'ROUTE') {
-      // ⚠ 2026-10-05 修"提示已带入但界面没数据":明细行对象是 **markRaw**(大表性能优化),
-      //   applyDetailReference 改写行属性**不触发重渲染** —— 以前靠紧随其后的 load() 从服务端
-      //   重新取数才显示出来;改成不落库/不 load 之后,值写进了数据但界面不刷新。
-      //   这里两手刷新显示:① 换一次数组引用(reactive 依赖变化) ② 激活刚带入的那一格(懒编辑器挂载)。
-      const tabArr = cur.value.detail?.[pick.tabKey] || []
-      if (cur.value.detail) cur.value.detail[pick.tabKey] = tabArr.slice()
-      const targetRow = pick.row || tabArr[tabArr.length - 1]
-      const propName = pick.field?.dataName || ''
-      if (targetRow && propName) {
-        activeCell.value = { row: targetRow, tabKey: pick.tabKey, prop: propName }
-        syncActiveCellEcho(targetRow, propName)
-      }
+      // 带入值已写进**活行**(见上方 writeLiveRows),不再是写进快照后被丢弃。
+      // ROUTE 不是档案式面板(config 里无 singleDoc,md.singleDoc=false),行是普通 reactive 对象:
+      // 写属性即触发该单元格重渲染 —— 无需换数组引用,也无需激活单元格
+      //(上一版按"行是 markRaw、需换引用"去刷新,方向不对,所以修不好)。
+      // 这里只按平台既有口径置脏:未保存离开守卫 + 档案行版本号兜底都走它。
       markInlineDirty()
       detailRefVisible.value = false
       ElMessage.success(`已带入 ${selectedRows.length} 条工序，请点「保存」提交`)
