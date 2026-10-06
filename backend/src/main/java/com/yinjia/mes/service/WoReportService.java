@@ -22,9 +22,12 @@ import java.util.Map;
 public class WoReportService {
 
     private final JdbcTemplate jdbc;
+    /** 工序量换算(与工单详情同一口径):报工封顶按**换算后的工序量**,见 processPlanQty */
+    private final ProcessTaskService processTask;
 
-    public WoReportService(JdbcTemplate jdbc) {
+    public WoReportService(JdbcTemplate jdbc, ProcessTaskService processTask) {
         this.jdbc = jdbc;
+        this.processTask = processTask;
     }
 
     public static boolean posts(String panelCode) {
@@ -121,18 +124,22 @@ public class WoReportService {
             if (closed != null && closed > 0) throw new IllegalStateException("工单 " + wo + " 已结案,不能报工");
             throw new IllegalStateException("工单 " + wo + " 未排产,不能报工(先在快速排产排入产线)");
         }
-        // 工序维度封顶:本工序已报(仅计 wgzt='Y' 的完工行,本行草稿未计) + 本次 ≤ Σ排产
+        // 工序维度封顶(2026-10-05 改为**按工艺路线换算后的工序量**):与工单详情的工序步骤同一口径
+        //   (ProcessTaskService.processPlanQty:首道 = Σ排产 × 首道换算率,其后逐道乘,留空=沿用);
+        //   **允许超产**:现场会多生产,超出的部分是真实产出 ⇒ 不再硬拦,只在明显误输(> 换算量 10 倍)时拒绝。
         Double totalPl = jdbc.queryForObject(
                 "SELECT ISNULL(SUM(ISNULL(pl_sl,0)),0) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
                 Double.class, wo);
+        double cap = processTask.processPlanQty(wo, op);
+        if (cap <= 0) cap = totalPl == null ? 0 : totalPl;
         Double opSum = jdbc.queryForObject(
                 "SELECT ISNULL(SUM(ISNULL(sl,0)),0) FROM dbo.scjl WHERE gldh=? AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y'"
                         + " AND ISNULL(wgzt,'N')='Y'",
                 Double.class, wo, op);
-        double opRemain = (totalPl == null ? 0 : totalPl) - (opSum == null ? 0 : opSum);
-        if (qty > opRemain + 0.0001) {
-            throw new IllegalStateException("报工数量 " + qty + " 超过工序[" + op + "]剩余可报数量 " + opRemain
-                    + "(排产总量 " + (totalPl == null ? 0 : totalPl) + " − 本工序已报 " + (opSum == null ? 0 : opSum) + ")");
+        double opRemain = cap - (opSum == null ? 0 : opSum);
+        if (qty > cap * 10 + 0.0001) {
+            throw new IllegalStateException("报工数量 " + qty + " 明显异常(工序[" + op + "]换算后计划量 " + cap
+                    + ",已报 " + (opSum == null ? 0 : opSum) + ");如属超产请核对后分批报工");
         }
         // jc_no 产成品流水(产线--yyMMdd-8位,按 线+日 递增)
         String scx = String.valueOf(t.get("pc_scx"));

@@ -443,6 +443,36 @@ public class ProcessTaskService {
     /** 标准工序顺序(与《新系统产线命名.xlsx》的功能口径一致);工单未绑工艺路线时回退用它 */
     private static final String[] PROCESS_ORDER = {"混料", "成型", "切炭", "组装", "装箱"};
 
+    /**
+     * 某道工序的**换算后计划量**(报工封顶用,与工单详情的工序步骤同一口径 —— 一处实现,避免两套):
+     *   首道 = Σ排产 × 首道换算率;其后 = 上一道量 × 本道换算率;换算率留空/=1 = 沿用。
+     * 未绑路线 / 路线无明细 → 返回 Σ排产(等价于全部率=1)。
+     */
+    public double processPlanQty(String plNo, String op) {
+        if (!notBlank(plNo) || !notBlank(op)) return 0;
+        Double total = jdbc.queryForObject(
+                "SELECT ISNULL(SUM(ISNULL(pl_sl,0)),0) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                Double.class, plNo.trim());
+        double base = total == null ? 0 : total;
+        List<String> route = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id",
+                String.class, plNo.trim());
+        String r = route.isEmpty() ? "" : route.get(0).trim();
+        if (r.isEmpty()) return base;
+        List<Map<String, Object>> lines = jdbc.queryForList(
+                "SELECT 工序名称, ISNULL(换算率,1) AS 换算率 FROM dbo.bs_route WHERE 工艺路线编码=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999)", r);
+        if (lines.isEmpty()) return base;
+        double cum = base;
+        for (Map<String, Object> l : lines) {
+            double rate = num(l.get("换算率"));
+            if (rate <= 0) rate = 1;
+            cum = round(cum * rate);
+            if (op.trim().equals(String.valueOf(l.get("工序名称")).trim())) return cum;
+        }
+        return base;
+    }
+
     /** 取表头行(工单级查询结果的第一行);查不到时给空 Map,避免 NPE */
     private static Map<String, Object> headObject(List<Map<String, Object>> heads) {
         return heads == null || heads.isEmpty() ? Map.of() : heads.get(0);
