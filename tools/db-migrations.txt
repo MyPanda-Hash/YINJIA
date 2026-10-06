@@ -2404,3 +2404,6 @@ migrate-route-header-detail-place.sql
 # migrate-route-header-hide-in-detail.sql(2026-10-05):表头字段(名称/生效/失效)不在明细行默认显示
 #   保留 place=header,detail(单表式必须) + visible=0 隐藏列;两账套已执行。
 migrate-route-header-hide-in-detail.sql
+# migrate-route-name-not-required.sql(2026-10-05):工艺路线 名称/生效日期/失效日期 取消必填
+#   口径:描述性字段可空,标识性字段(编码/工序编码/工序控制/工序序列)保持必填;两账套已执行。
+migrate-route-name-not-required.sql
