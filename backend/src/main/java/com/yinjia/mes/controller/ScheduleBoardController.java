@@ -3,6 +3,7 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.ScheduleBoardService;
+import com.yinjia.mes.service.ProcessTaskService;
 import com.yinjia.mes.service.WorkOrderTransferService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -24,12 +25,15 @@ public class ScheduleBoardController {
     private final ScheduleBoardService service;
     private final PanelPermissionService perm;
     private final WorkOrderTransferService transferService;
+    /** 工序—产线预排(2026-10-05):排产即按路线预排全程计划线 */
+    private final ProcessTaskService processTask;
 
     public ScheduleBoardController(ScheduleBoardService service, PanelPermissionService perm,
-                                   WorkOrderTransferService transferService) {
+                                   WorkOrderTransferService transferService, ProcessTaskService processTask) {
         this.service = service;
         this.perm = perm;
         this.transferService = transferService;
+        this.processTask = processTask;
     }
 
     /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据) */
@@ -54,7 +58,18 @@ public class ScheduleBoardController {
         perm.requirePanelView("MANU_ORDER");
         perm.requireButton("MANU_ORDER", "保存");
         List<Map<String, Object>> rows = (List<Map<String, Object>>) body.getOrDefault("rows", List.of());
-        return ApiResult.ok(service.assign(rows, currentUser()));
+        Map<String, Object> out = service.assign(rows, currentUser());
+        // 排产成功即**预排全程线**(2026-10-05 用户口径「开始排线时定好整个工单的线」):
+        //   首道 = 本次排入的线;其后各道 = 该工序功能下当时最闲的线(只写台账计划,不动 plang.scx)
+        String u = currentUser();
+        for (Map<String, Object> r : rows) {
+            String no = str(r.get("加工单号"));
+            String line = str(r.get("生产线")) != null ? str(r.get("生产线")) : str(r.get("顶部生产线"));
+            if (no != null && line != null) {
+                try { processTask.preplanLines(no, line, u); } catch (Exception ignore) { }
+            }
+        }
+        return ApiResult.ok(out);
     }
 
     /** 撤销排产回池(换线=撤销+重排);有报工/入库不可撤销 */

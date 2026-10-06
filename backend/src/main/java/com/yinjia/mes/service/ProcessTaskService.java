@@ -454,6 +454,8 @@ public class ProcessTaskService {
                 + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", String.class, no);
         String route = rs.isEmpty() || rs.get(0) == null ? "" : rs.get(0).trim();
         if (route.isEmpty()) return 0;
+        // 未排产不预排(无当前线 ⇒ 还没排入产线),避免给池里的工单留无效计划行
+        if (!notBlank(firstLine) && cs0(no).isEmpty()) return 0;
         List<Map<String, Object>> lines = jdbc.queryForList("SELECT 工序名称, 加工顺序, ISNULL(生产车间,N'') AS 生产车间"
                 + " FROM dbo.bs_route WHERE 工艺路线编码=? AND ISNULL(asp_cancel,'N')<>'Y'"
                 + " AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999)", route);
@@ -535,10 +537,14 @@ public class ProcessTaskService {
         jdbc.update("UPDATE dbo.wo_process_line SET 实际生产线=?, 状态=N'已落实', 落实时间=GETDATE(),"
                 + " asp_user2=?, asp_time2=GETDATE() WHERE id=?", plan, user, next.get("id"));
         try {
-            jdbc.update("INSERT INTO dbo.wo_transfer_log (工单号, 从生产线, 到生产线, 数量, 原因, 状态,"
-                            + " asp_cancel, asp_user1, asp_time1) VALUES (?,?,?,?,N'转序自动派线',N'生效',N'N',?,GETDATE())",
-                    no, cur, plan, done, user);
-        } catch (Exception ignore) { /* 轨迹表结构差异不阻断转序 */ }
+            // 列名对齐 wo_transfer_log 实际结构:pl_no / 数量 / 从生产线 / 从车间 / 到生产线 / 到车间 / 原因
+            jdbc.update("INSERT INTO dbo.wo_transfer_log (pl_no, 数量, 从生产线, 从车间, 到生产线, 到车间, 原因,"
+                            + " asp_cancel, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,(SELECT TOP 1 ISNULL(生产车间,N'') FROM dbo.bs_prod_line WHERE 生产线=?),"
+                            + " ?,(SELECT TOP 1 ISNULL(生产车间,N'') FROM dbo.bs_prod_line WHERE 生产线=?),"
+                            + " N'转序自动派线',N'N',?,GETDATE())",
+                    no, done, cur, cur, plan, plan, user);
+        } catch (Exception ignore) { /* 轨迹写入失败不阻断转序 */ }
         out.put("从生产线", cur);
         out.put("到生产线", plan);
         return out;
