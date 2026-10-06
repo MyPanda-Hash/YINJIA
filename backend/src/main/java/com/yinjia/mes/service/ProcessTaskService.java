@@ -237,6 +237,8 @@ public class ProcessTaskService {
             String op = String.valueOf(r.get("工序")).trim();
             double qty = num(r.get("报工数量")) * sign;
             if (wo.isEmpty() || op.isEmpty() || qty == 0) continue;
+            // 报工审核/弃审 → **回写工单状态**(2026-10-05 用户口径「报工需要能影响当前的工单情况」),幂等重算
+            syncWorkOrderState(wo, user);
             List<Map<String, Object>> tasks = jdbc.queryForList(
                     "SELECT id, ISNULL(计划数量,0) AS 计划数量, ISNULL(完成数量,0) AS 完成数量, ISNULL(状态,N'') AS 状态"
                             + " FROM dbo.wo_progress WHERE 单据编号=? AND 工序=? AND ISNULL(asp_cancel,'N')<>'Y'"
@@ -347,7 +349,7 @@ public class ProcessTaskService {
                         + " (SELECT COUNT(*) FROM dbo.plang g WHERE g.pl_no=p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y') AS 工单行数,"
                         + " (SELECT ISNULL(SUM(g.pl_sl),0) FROM dbo.plang g WHERE g.pl_no=p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y' AND ISNULL(g.pl_sl,0)>100000) AS 异常计划量,"
                         + " (SELECT TOP 1 ISNULL(g.[批次号],N'') FROM dbo.plang g WHERE g.pl_no=p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y' ORDER BY g.id) AS 批次号,"
-                        + " ISNULL(p.[工艺路线],N'') AS 工艺路线,"
+                        + " ISNULL(p.[工艺路线],N'') AS 工艺路线, ISNULL(p.[完工状态],N'') AS 完工状态, ISNULL(p.[当前工序],N'') AS 表头当前工序,"
                         + " ISNULL(p.scx,N'') AS 排产产线"
                         + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id", no);
         // 报工口径:每道工序的完工量(只算已审核报工)
@@ -459,6 +461,47 @@ public class ProcessTaskService {
         out.put("任务清单", done);
         out.put("失败行", failed);
         return out;
+    }
+
+    /**
+     * 报工审核/弃审 → **回写工单状态**(2026-10-05 用户口径「报工需要能影响当前的工单情况」)。
+     * 按该工单**工艺路线** + 已审核报工重算,落 plang 四列:
+     * 当前工序 / 当前工序完工量 / 完工状态(未开工·在制·**生产完工**) / 完工时间。
+     * 生产完工口径:路线**末道**工序完工量 ≥ Σ计划量(pl_sl);弃审后重算会自动退回并清完工时间。
+     */
+    @Transactional
+    public void syncWorkOrderState(String plNo, String user) {
+        if (!notBlank(plNo)) return;
+        String no = plNo.trim();
+        List<String> rt = jdbc.queryForList("SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE pl_no=?"
+                + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL([工艺路线],N'')<>N''", String.class, no);
+        List<String> ops = new ArrayList<>();
+        if (!rt.isEmpty()) {
+            ops.addAll(jdbc.queryForList("SELECT 工序名称 FROM dbo.bs_route WHERE 工艺路线编码=?"
+                    + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(工序名称,N'')<>N''"
+                    + " ORDER BY ISNULL(加工顺序,999)", String.class, rt.get(0)));
+        }
+        if (ops.isEmpty()) ops.addAll(List.of(PROCESS_ORDER));
+        Map<String, Double> qty = new LinkedHashMap<>();
+        for (Map<String, Object> r : jdbc.queryForList("SELECT ISNULL(gxdm,N'') AS 工序, SUM(ISNULL(sl,0)) AS 完工量"
+                + " FROM dbo.scjl WHERE gldh=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'"
+                + " GROUP BY gxdm", no)) {
+            String op = String.valueOf(r.get("工序")).trim();
+            if (!op.isEmpty()) qty.put(op, num(r.get("完工量")));
+        }
+        String cur = "";
+        for (String op : ops) if (qty.getOrDefault(op, 0d) > 0) cur = op;
+        double curQty = cur.isEmpty() ? 0 : qty.getOrDefault(cur, 0d);
+        Double plan = jdbc.queryForObject("SELECT ISNULL(SUM(pl_sl),0) FROM dbo.plang WHERE pl_no=?"
+                + " AND ISNULL(asp_cancel,'N')<>'Y'", Double.class, no);
+        double planQty = plan == null ? 0 : plan;
+        double lastQty = qty.getOrDefault(ops.get(ops.size() - 1), 0d);
+        String state = (planQty > 0 && lastQty >= planQty - 0.0001) ? "生产完工"
+                : (cur.isEmpty() ? "未开工" : "在制");
+        jdbc.update("UPDATE dbo.plang SET 当前工序=?, 当前工序完工量=?, 完工状态=?,"
+                        + " 完工时间 = CASE WHEN ? = N'生产完工' THEN ISNULL(完工时间, GETDATE()) ELSE NULL END,"
+                        + " asp_user2=?, asp_time2=GETDATE() WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                cur.isEmpty() ? null : cur, round(curQty), state, state, user, no);
     }
 
     private static boolean notBlank(String s) { return s != null && !s.isBlank(); }
