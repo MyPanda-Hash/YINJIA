@@ -366,40 +366,60 @@ public class ProcessTaskService {
             cnt.put(op, (int) num(r.get("报工单数")));
         }
         List<Map<String, Object>> steps = new ArrayList<>();
-        // 步骤口径(2026-10-05):**按该工单关联的工艺路线**(plang.工艺路线 → bs_route 明细,按工序序列)渲染;
-        // 未绑路线 / 路线无明细 → 回退标准五步(混料/成型/切炭/组装/装箱),兼容存量单。
+        // 步骤口径(2026-10-05 第二版,用户口径「根据换算率换算即可;不做成品收口」):
+        //   · 按该工单**工艺路线**逐道算**工序计划量**:首道 = 工单量 × 首道换算率;其后 = 上一道量 × 本道换算率;
+        //     换算率留空 / =1 = **沿用**(不乘) —— 只在真的发生倍数变化的工序填率(如 碳棒 1 切 3 → 填 3);
+        //   · 未绑路线 / 路线无明细 → 回退标准五步(全部率=1);
+        //   · **不做成品收口**:成品量 = 路线**最后一道**的实际完工量(报工多生产就是多,允许超产);
+        //   · 状态四态:已完工(=) / 超产(>) / 进行中(0<完工<计划) / 未开始(0)。
         String route = String.valueOf(headObject(heads).getOrDefault("工艺路线", ""));
-        List<String> order = new ArrayList<>();
+        List<Map<String, Object>> lines = new ArrayList<>();
         if (route != null && !route.isBlank() && !"null".equals(route)) {
-            order.addAll(jdbc.queryForList("SELECT 工序名称 FROM dbo.bs_route WHERE 工艺路线编码=?"
-                    + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999)",
-                    String.class, route.trim()));
+            lines.addAll(jdbc.queryForList("SELECT 工序名称, ISNULL(换算率,1) AS 换算率 FROM dbo.bs_route"
+                    + " WHERE 工艺路线编码=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(工序名称,N'')<>N''"
+                    + " ORDER BY ISNULL(加工顺序,999)", route.trim()));
         }
-        if (order.isEmpty()) order.addAll(List.of(PROCESS_ORDER));
+        if (lines.isEmpty()) {
+            for (String op : PROCESS_ORDER) {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("工序名称", op);
+                m.put("换算率", 1);
+                lines.add(m);
+            }
+        }
         String cur = "";
-        for (String op : order) if (qty.getOrDefault(op, 0d) > 0) cur = op;
-        // 每道工序的完成度(2026-10-05 用户口径「未完成的和已完成的颜色不该一样」):
-        //   已完工 = 完工量 ≥ 计划量 ; 进行中 = 0 < 完工量 < 计划量 ; 未开始 = 完工量 0
-        double planQty0 = num(headObject(heads).get("计划数量"));
+        for (Map<String, Object> l : lines) {
+            String op = String.valueOf(l.get("工序名称")).trim();
+            if (qty.getOrDefault(op, 0d) > 0) cur = op;
+        }
+        double cumPlan = num(headObject(heads).get("计划数量"));
         int doneSteps = 0;
-        for (int i = 0; i < order.size(); i++) {
-            String op = order.get(i);
+        double overQty = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            String op = String.valueOf(lines.get(i).get("工序名称")).trim();
+            double rate = num(lines.get(i).get("换算率"));
+            if (rate <= 0) rate = 1;
+            cumPlan = round(cumPlan * rate);          // 填了才乘;留空/1 = 沿用
             double q = qty.getOrDefault(op, 0d);
-            String st = (planQty0 > 0 && q >= planQty0) ? "已完工" : (q > 0 ? "进行中" : "未开始");
-            if ("已完工".equals(st)) doneSteps++;
+            String st = (cumPlan > 0 && q > cumPlan) ? "超产"
+                    : (cumPlan > 0 && q >= cumPlan) ? "已完工"
+                    : (q > 0 ? "进行中" : "未开始");
+            if ("已完工".equals(st) || "超产".equals(st)) doneSteps++;
+            if (q > cumPlan) overQty = round(overQty + (q - cumPlan));
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("序", i + 1);
             s.put("工序", op);
+            s.put("换算率", round(rate));
             s.put("完工量", round(q));
-            s.put("计划量", round(planQty0));
+            s.put("计划量", cumPlan);                  // 该道**换算后**的工序计划量
             s.put("报工单数", cnt.getOrDefault(op, 0));
             s.put("当前", op.equals(cur));
             s.put("状态", st);
             steps.add(s);
         }
         double outQty = 0;
-        for (int i = order.size() - 1; i >= 0; i--) {
-            double q = qty.getOrDefault(order.get(i), 0d);
+        for (int i = lines.size() - 1; i >= 0; i--) {
+            double q = qty.getOrDefault(String.valueOf(lines.get(i).get("工序名称")).trim(), 0d);
             if (q > 0) { outQty = q; break; }
         }
         Map<String, Object> head = new LinkedHashMap<>();
