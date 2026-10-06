@@ -505,6 +505,17 @@ export default {
     '默认 GY-CB-STD': 'default GY-CB-STD',
     // 工单详情第二版(2026-10-05):按工序聚合 + 产出/进度 + 异常计划量
     '产出': 'Output',
+    // 单工单排产弹窗(2026-10-05)
+    '工单排产': 'Schedule Work Order',
+    '确认排产': 'Confirm Schedule',
+    '下一道工序': 'Next Process',
+    '按下一道工序': 'by next process',
+    '只列': 'Only lines of',
+    '的产线': 'are listed',
+    '该工单已排产,不能重复排入;换线请先在「快速排产」撤销排产,再重新排入':
+      'This work order is already scheduled and cannot be scheduled again; to change the line, cancel the schedule in Quick Scheduling first',
+    '该工单已排产,不能重复排入': 'This work order is already scheduled and cannot be scheduled again',
+    '不能重复排入;换线请先撤销排产': 'cannot be scheduled again; cancel the schedule first to change the line',
     // 切单/排产提示(2026-10-05)
     '请只勾选一张工单': 'Please select exactly one work order',
     '当前已勾选': 'currently selected',

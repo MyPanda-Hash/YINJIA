@@ -23,6 +23,8 @@
       <!-- 切单(9.29 生产管理批次①,2026-10-05):勾选一张在产工单 → 输入切出数量 → 子工单(新工单号);
            撤回切单 = 子单无报工/入库/领料时可还原父单数量(WorkOrderSplitService.split/unsplit) -->
       <el-button size="small" type="warning" plain @click="openSplit" :disabled="!checked.length && !currentRow">{{ tt('切单') }}</el-button>
+      <!-- 工单排产弹窗(2026-10-05 用户口径):只带当前这一张工单的快速排产 -->
+      <el-button size="small" type="success" plain :disabled="(!checked.length && !currentRow) || Number((checked[0] || currentRow || {})['生产线'] ? 1 : 0) === 1" @click="openSchedule">{{ tt('排产') }}</el-button>
       <el-button size="small" plain @click="onUnsplit" :disabled="!checked.length && !currentRow">{{ tt('撤回切单') }}</el-button>
       <el-dropdown split-button size="small" type="primary" @click="doPrintTask('成型生产任务单')" @command="doPrintTask"
                    :disabled="!checked.length && !currentRow">
@@ -111,6 +113,9 @@
       </el-table-column>
     </el-table>
 
+    <!-- 工单排产弹窗(2026-10-05):经过唯一工单号筛选的"快速排产",只显示当前工单 -->
+    <WorkOrderScheduleDialog v-model="schedVisible" :row="schedRow" @done="load" />
+
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
     <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" />
 
@@ -147,6 +152,7 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
+import WorkOrderScheduleDialog from './WorkOrderScheduleDialog.vue'
 import { useUserStore } from '@/stores/user'
 
 const rows = ref([])
@@ -170,6 +176,16 @@ const splitInherit = ref(true)
 /** 工单详情·追溯(2026-10-05):与工单排产同一组件,本页原地打开 */
 const traceVisible = ref(false)
 const traceNo = ref('')
+/** 工单排产弹窗(2026-10-05 用户口径):只带当前这一张工单的快速排产 */
+const schedVisible = ref(false)
+const schedRow = ref({})
+function openSchedule() {
+  const r = (checked.value.length === 1 ? checked.value[0] : currentRow.value) || checked.value[0]
+  if (!r) { ElMessage.warning(tt('请先勾选一张工单')); return }
+  if (r['生产线']) { ElMessage.warning(`${tt('该工单已排产')}(${r['生产线']})，${tt('不能重复排入;换线请先撤销排产')}`); return }
+  schedRow.value = r
+  schedVisible.value = true
+}
 
 const filtered = computed(() => rows.value.filter((r) => {
   if (stateFilter.value === '未完工' && r.生产状态 === '完工') return false
