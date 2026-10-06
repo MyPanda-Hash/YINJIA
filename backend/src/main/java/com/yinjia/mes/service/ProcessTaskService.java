@@ -517,15 +517,22 @@ public class ProcessTaskService {
                             + " FROM dbo.wo_process_line WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
                             + " ORDER BY ISNULL(工序序,999), id", no);
         }
+        // 选"下一道**待开工**"的行(2026-10-05 修正:此前取第一行"计划"态,第一道就是当前道 ⇒ 永远停在第 1 道):
+        //   跳过已开工/已完工的道,取**第一个报工量为 0**的道,且要求其**前一道已开工**(生产确已走到它)。
         Map<String, Object> next = null;
-        for (Map<String, Object> r : rows) if ("计划".equals(String.valueOf(r.get("状态")))) { next = r; break; }
+        double prevDone = -1;
+        for (Map<String, Object> r : rows) {
+            String rop = String.valueOf(r.get("工序")).trim();
+            Double rDone = jdbc.queryForObject("SELECT ISNULL(SUM(ISNULL(sl,0)),0) FROM dbo.scjl WHERE gldh=?"
+                    + " AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'", Double.class, no, rop);
+            double d = rDone == null ? 0 : rDone;
+            if ("计划".equals(String.valueOf(r.get("状态"))) && d <= 0 && (prevDone < 0 || prevDone > 0)) { next = r; break; }
+            prevDone = d;
+        }
         if (next == null) return out;
         String op = String.valueOf(next.get("工序")).trim();
         String plan = String.valueOf(next.get("计划生产线")).trim();
-        Double doneD = jdbc.queryForObject("SELECT ISNULL(SUM(ISNULL(sl,0)),0) FROM dbo.scjl WHERE gldh=? AND gxdm=?"
-                + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'", Double.class, no, op);
-        double done = doneD == null ? 0 : doneD;
-        if (done <= 0) return out;                               // 该道尚未开工 → 不转序
+        double done = prevDone < 0 ? 0 : prevDone;               // 转序可流转量 = 前一道完工量
         List<String> cs = jdbc.queryForList("SELECT TOP 1 ISNULL(scx,N'') FROM dbo.plang WHERE pl_no=?"
                 + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", String.class, no);
         String cur = cs.isEmpty() || cs.get(0) == null ? "" : cs.get(0).trim();
