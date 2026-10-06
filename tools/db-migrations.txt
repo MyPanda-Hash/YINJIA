@@ -2355,3 +2355,7 @@ migrate-route-status-switch-audit.sql
 #   用户口径:工单要能点开看工序阶段 + 要工序维度总览,且新增物**可撤回**。本脚本只加一个**只读视图**
 #   (不改表结构/不写业务数据);回滚 = DROP VIEW dbo.v_wo_process_board。幂等;两账套均执行。
 migrate-wo-process-board-view.sql
+# migrate-plang-void-legacy-dirty.sql(2026-10-05):作废遗留异常工单行(MO-2026-09-0136 计划量 16,019,480)
+#   用户口径「遗留工单行可以作废」;该行让工单进度/工序队列/工序总览/详情汇总全部失真。
+#   **软删**(asp_cancel='Y' + 留痕)⇒ 可改回 'N' 撤回;幂等;两账套均执行。
+migrate-plang-void-legacy-dirty.sql
