@@ -5227,13 +5227,22 @@ function validateInlineDraft() {
   for (const tab of cfgCache.value?.detail?.tabs || []) {
     const rows = cur.value.detail?.[tab.key] || []
     if (tab.isRequired && !rows.length) return `请至少添加一行${tab.label || '明细'}`
+    // 2026-10-05 修复(用户报障「明细第 2 行工序控制不能为空」,而第 2 行根本没录入数据):
+    //   编辑器会给明细**预置空白行**,原实现逐行逐格校必填 ⇒ 空白行被判缺必填、拦在保存上。
+    //   口径:**空行视为"未录入"**,不参与必填校验;若整张明细全是空行,按"请至少添加一行"处理。
+    let nonEmpty = 0
     for (let index = 0; index < rows.length; index++) {
+      const row = rows[index] || {}
+      const rowEmpty = (tab.fields || []).every((f) => emptyFieldValue(row[f.dataName]))
+      if (rowEmpty) continue
+      nonEmpty++
       for (const field of tab.fields || []) {
-        if (field.isRequired && emptyFieldValue(rows[index][field.dataName])) {
+        if (field.isRequired && emptyFieldValue(row[field.dataName])) {
           return `${tab.label || '明细'}第 ${index + 1} 行${field.dataName}不能为空`
         }
       }
     }
+    if (tab.isRequired && nonEmpty === 0) return `请至少添加一行${tab.label || '明细'}`
   }
   return ''
 }
