@@ -289,11 +289,11 @@ public class ProcessTaskService {
     }
 
     /**
-     * 工单详情(2026-10-05 第二版,用户口径):表头(**计划数量 = Σ 计划量 pl_sl**)+ **按工序汇总的进度** + 产出。
-     *   · 表头取**工单级**:计划数量/交期/工单行数在 SQL 里按整单汇总(不再取第一行);
-     *   · 工序汇总:每道工序一行(SUM 计划/完成、聚合状态、去重产线、最早计划完工),展开看按行明细;
-     *   · **产出 = 末道工序完工量** —— 不能把各工序完工量相加(旧版 0/48074940 就是三重计算);
-     *   · 异常计划量(单行 > 10 万)单列,便于识别遗留脏数据。
+     * 工单详情(2026-10-05 **第三版**,用户口径修正):点开一张单**只看它走到哪一步**。
+     *   · 表头 = 工单级(计划数量 = Σ 计划量 pl_sl;用户确认口径);
+     *   · **工序步骤** = 按**报工**(scjl 已审核)统计标准五道工序(混料/成型/切炭/组装/装箱)的完工量,
+     *     标出当前走到哪一步 —— 不再依赖工序任务(用户口径「把工序任务删除掉」);
+     *   · 产出 = 最后一道有完工量的工序的完工量;进度 = 产出 / 计划数量。
      * 只读,不改任何数据。
      */
     public Map<String, Object> detail(String plNo) {
@@ -307,56 +307,64 @@ public class ProcessTaskService {
                         + " (SELECT COUNT(*) FROM dbo.plang g WHERE g.pl_no=p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y') AS 工单行数,"
                         + " (SELECT ISNULL(SUM(g.pl_sl),0) FROM dbo.plang g WHERE g.pl_no=p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y' AND ISNULL(g.pl_sl,0)>100000) AS 异常计划量,"
                         + " (SELECT TOP 1 ISNULL(g.[批次号],N'') FROM dbo.plang g WHERE g.pl_no=p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y' ORDER BY g.id) AS 批次号,"
-                        + " ISNULL(p.scx,N'') AS 排产产线, ISNULL(prg.当前工序,N'') AS 当前工序,"
-                        + " ISNULL(prg.当前工序完工量,0) AS 当前工序完工量"
-                        + " FROM dbo.plang p LEFT JOIN dbo.v_wo_process_progress prg ON prg.单号 = p.pl_no"
-                        + " WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id", no);
-        List<Map<String, Object>> ops = jdbc.queryForList(
-                "SELECT ISNULL(w.工序序,0) AS 工序序, w.工序, COUNT(*) AS 任务数,"
-                        + " SUM(ISNULL(w.计划数量,0)) AS 计划数量, SUM(ISNULL(w.完成数量,0)) AS 完成数量,"
-                        + " SUM(ISNULL(w.计划数量,0)-ISNULL(w.完成数量,0)) AS 未完成量,"
-                        + " CONVERT(varchar(10), MIN(w.计划完工日期), 120) AS 最早计划完工,"
-                        + " CASE WHEN SUM(CASE WHEN ISNULL(w.状态,N'')=N'已完工' THEN 1 ELSE 0 END) = COUNT(*) THEN N'已完工'"
-                        + "      WHEN SUM(ISNULL(w.完成数量,0)) > 0"
-                        + "        OR SUM(CASE WHEN ISNULL(w.状态,N'')=N'在加工' THEN 1 ELSE 0 END) > 0 THEN N'在加工'"
-                        + "      ELSE N'待加工' END AS 状态,"
-                        + " STUFF((SELECT DISTINCT N'、' + x.生产线 FROM dbo.wo_progress x"
-                        + "         WHERE x.单据编号 = w.单据编号 AND ISNULL(x.工序序,0) = ISNULL(w.工序序,0)"
-                        + "           AND ISNULL(x.asp_cancel,'N')<>'Y' AND ISNULL(x.生产线,N'')<>N'' FOR XML PATH('')),1,1,N'') AS 派工产线"
-                        + " FROM dbo.wo_progress w WHERE w.单据编号=? AND ISNULL(w.asp_cancel,'N')<>'Y'"
-                        + " GROUP BY w.工序序, w.工序, w.单据编号 ORDER BY ISNULL(w.工序序,0)", no);
-        List<Map<String, Object>> tasks = jdbc.queryForList(
-                "SELECT p.id AS 任务id, p.工序, ISNULL(p.工序序,0) AS 工序序, ISNULL(p.状态,N'') AS 状态,"
-                        + " ISNULL(p.生产线,N'') AS 生产线, ISNULL(p.优先级,N'普通') AS 优先级,"
-                        + " ISNULL(p.计划数量,0) AS 计划数量, ISNULL(p.完成数量,0) AS 完成数量,"
-                        + " ISNULL(p.计划数量,0) - ISNULL(p.完成数量,0) AS 未完成量,"
-                        + " ISNULL(p.[批次号],N'') AS 批次号, ISNULL(p.产品编码,N'') AS 产品编码,"
-                        + " CONVERT(varchar(10), p.计划完工日期, 120) AS 计划完工日期"
-                        + " FROM dbo.wo_progress p WHERE p.单据编号=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                        + " ORDER BY ISNULL(p.工序序,0), p.id", no);
-        Double lastDone = jdbc.queryForObject(
-                "SELECT ISNULL(SUM(完成数量),0) FROM dbo.wo_progress WHERE 单据编号=?"
-                        + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(工序序,0) ="
-                        + " (SELECT ISNULL(MAX(ISNULL(工序序,0)),0) FROM dbo.wo_progress WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y')",
-                Double.class, no, no);
+                        + " ISNULL(p.scx,N'') AS 排产产线"
+                        + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id", no);
+        // 报工口径:每道工序的完工量(只算已审核报工)
+        List<Map<String, Object>> reps = jdbc.queryForList(
+                "SELECT ISNULL(gxdm,N'') AS 工序, SUM(ISNULL(sl,0)) AS 完工量, COUNT(*) AS 报工单数"
+                        + " FROM dbo.scjl WHERE gldh=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'"
+                        + " GROUP BY gxdm", no);
+        Map<String, Double> qty = new LinkedHashMap<>();
+        Map<String, Integer> cnt = new LinkedHashMap<>();
+        for (Map<String, Object> r : reps) {
+            String op = String.valueOf(r.get("工序")).trim();
+            if (op.isEmpty()) continue;
+            qty.put(op, num(r.get("完工量")));
+            cnt.put(op, (int) num(r.get("报工单数")));
+        }
+        List<Map<String, Object>> steps = new ArrayList<>();
+        String cur = "";
+        for (String op : PROCESS_ORDER) if (qty.getOrDefault(op, 0d) > 0) cur = op;
+        for (int i = 0; i < PROCESS_ORDER.length; i++) {
+            String op = PROCESS_ORDER[i];
+            double q = qty.getOrDefault(op, 0d);
+            Map<String, Object> s = new LinkedHashMap<>();
+            s.put("序", i + 1);
+            s.put("工序", op);
+            s.put("完工量", round(q));
+            s.put("报工单数", cnt.getOrDefault(op, 0));
+            s.put("当前", op.equals(cur));
+            s.put("状态", q > 0 ? "已完工" : "未开始");
+            steps.add(s);
+        }
+        double outQty = 0;
+        for (int i = PROCESS_ORDER.length - 1; i >= 0; i--) {
+            double q = qty.getOrDefault(PROCESS_ORDER[i], 0d);
+            if (q > 0) { outQty = q; break; }
+        }
         Map<String, Object> head = new LinkedHashMap<>();
         if (!heads.isEmpty()) head.putAll(heads.get(0));
         double planQty = num(head.get("计划数量"));
-        double outQty = lastDone == null ? 0 : lastDone;
+        head.put("当前工序", cur);
         head.put("产出", round(outQty));
         head.put("进度", planQty <= 0 ? 0 : Math.round(outQty / planQty * 10000d) / 100d);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("表头", head);
-        out.put("工序汇总", ops);
-        out.put("工序任务", tasks);
-        out.put("工序数", ops.size());
+        out.put("工序步骤", steps);
+        out.put("当前工序", cur);
+        out.put("当前工序序", indexOfProcess(cur));
         out.put("计划合计", round(planQty));
         out.put("产出", round(outQty));
-        out.put("完工合计", round(outQty));
         out.put("未完成合计", round(Math.max(planQty - outQty, 0)));
-        String cur = String.valueOf(head.getOrDefault("当前工序", ""));
-        out.put("当前工序", cur == null || "null".equals(cur) ? "" : cur);
         return out;
+    }
+
+    /** 标准工序顺序(与《新系统产线命名.xlsx》的功能口径一致);详情步骤条/当前工序都按它判定 */
+    private static final String[] PROCESS_ORDER = {"混料", "成型", "切炭", "组装", "装箱"};
+
+    private static int indexOfProcess(String op) {
+        for (int i = 0; i < PROCESS_ORDER.length; i++) if (PROCESS_ORDER[i].equals(op)) return i + 1;
+        return 0;
     }
 
     /**

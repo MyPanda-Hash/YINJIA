@@ -135,13 +135,6 @@ public class QuickScheduleService {
                 str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user, batch);
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
                 "PLANG", plNo, plNo + "#" + lineNo + "#" + batch, "");
-        // 工序任务(路线驱动,A 项):按产品的工艺路线(未绑定→默认 GY-CB-STD)生成各工序任务;
-        // 幂等(同工单行同工序已有任务则跳过),失败不阻断转单(任务可事后补生成)
-        try {
-            processTask.generateForWorkOrder(plNo, user);
-        } catch (Exception ignore) {
-            // 生成失败不阻断转工单:可在工序任务页按工单补生成
-        }
         return plNo;
     }
 

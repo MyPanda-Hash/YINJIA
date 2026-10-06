@@ -60,7 +60,12 @@
               highlight-current-row row-key="rowKey">
       <el-table-column type="selection" width="40" fixed="left" reserve-selection />
       <el-table-column :label="tt('公司代码')" prop="公司代码" width="90" show-overflow-tooltip />
-      <el-table-column :label="tt('工单号')" prop="加工单号" width="150" sortable show-overflow-tooltip />
+      <el-table-column :label="tt('工单号')" prop="加工单号" width="150" sortable show-overflow-tooltip>
+        <template #default="{ row }">
+          <!-- 点工单号看"走到哪一步"(2026-10-05,用户口径):按报工统计的标准五道工序步骤条 -->
+          <el-link type="primary" :underline="false" @click="openDetail(row)">{{ row['工单号'] }}</el-link>
+        </template>
+      </el-table-column>
       <el-table-column :label="tt('工单行号')" prop="行号" width="90" sortable />
       <el-table-column :label="tt('批次号')" prop="批次号" width="100" sortable />
       <el-table-column :label="tt('源工单号')" prop="源工单号" width="140" show-overflow-tooltip>
@@ -106,6 +111,9 @@
       </el-table-column>
     </el-table>
 
+    <!-- 工单详情抽屉(点工单号打开:这单走到哪一步;只读) -->
+    <WorkOrderDetailDrawer v-model="dtVisible" :code="dtCode" />
+
     <!-- 切单弹窗:可切上限 = 排产数量 − max(已入库, 各工序已完工报工最大值);子单取新工单号 -->
     <el-dialog v-model="splitVisible" :title="tt('切单')" width="440px" append-to-body>
       <div v-if="splitInfo" class="wol-split">
@@ -138,6 +146,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
+import WorkOrderDetailDrawer from './WorkOrderDetailDrawer.vue'
 import { useUserStore } from '@/stores/user'
 
 const rows = ref([])
@@ -156,6 +165,10 @@ const splitLoading = ref(false)
 const splitInfo = ref(null)
 const splitQty = ref(0)
 const splitInherit = ref(true)
+/** 工单详情抽屉(2026-10-05):点工单号看"走到哪一步" */
+const dtVisible = ref(false)
+const dtCode = ref('')
+function openDetail(row) { dtCode.value = row?.['工单号'] || ''; if (dtCode.value) dtVisible.value = true }
 
 const filtered = computed(() => rows.value.filter((r) => {
   if (stateFilter.value === '未完工' && r.生产状态 === '完工') return false
