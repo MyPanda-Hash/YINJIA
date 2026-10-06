@@ -437,6 +437,13 @@ public class ProcessTaskService {
         out.put("计划合计", round(planQty));
         out.put("产出", round(outQty));
         out.put("未完成合计", round(Math.max(planQty - outQty, 0)));
+        // 工序—产线预排(2026-10-05):该工单各道工序的**计划线/实际线** —— 排产时预排,转序时落实;界面据此显示/核对
+        out.put("工序产线计划", jdbc.queryForList(
+                "SELECT ISNULL(工序序,0) AS 工序序, 工序, ISNULL(计划生产线,N'') AS 计划生产线,"
+                        + " ISNULL(实际生产线,N'') AS 实际生产线, ISNULL(状态,N'') AS 状态,"
+                        + " ISNULL(计划数量,0) AS 计划数量, CONVERT(varchar(16), 落实时间, 120) AS 落实时间"
+                        + " FROM dbo.wo_process_line WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " ORDER BY ISNULL(工序序,999), id", no));
         return out;
     }
 

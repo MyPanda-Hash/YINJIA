@@ -50,6 +50,22 @@
         <div v-if="!(prog['工序步骤'] || []).length" class="wb-trace-sub">{{ tt('该工单还没有工序进度') }}</div>
       </div>
 
+      <!-- 工序—产线预排(2026-10-05):每道工序的计划线/实际线 —— 排产时预排,转序时落实 -->
+      <div v-if="(prog?.['工序产线计划'] || []).length" class="wb-trace-block">
+        <div class="wb-block-title">{{ tt('工序产线计划') }}</div>
+        <el-table :data="prog['工序产线计划']" size="small" border>
+          <el-table-column :label="tt('序')" prop="工序序" width="50" align="right" />
+          <el-table-column :label="tt('工序')" prop="工序" width="100" />
+          <el-table-column :label="tt('计划生产线')" prop="计划生产线" width="130" />
+          <el-table-column :label="tt('实际生产线')" width="130">
+            <template #default="{ row }">{{ row['实际生产线'] || '-' }}</template>
+          </el-table-column>
+          <el-table-column :label="tt('状态')" prop="状态" width="90" />
+          <el-table-column :label="tt('计划数量')" prop="计划数量" width="100" align="right" />
+          <el-table-column :label="tt('落实时间')" prop="落实时间" width="140" />
+        </el-table>
+      </div>
+
       <div class="wb-trace-block">
         <div class="wb-block-title">{{ tt('流转时间线') }}</div>
         <el-table :data="trace['时间线']" size="small" border max-height="180">
