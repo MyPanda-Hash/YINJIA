@@ -2407,3 +2407,6 @@ migrate-route-header-hide-in-detail.sql
 # migrate-route-name-not-required.sql(2026-10-05):工艺路线 名称/生效日期/失效日期 取消必填
 #   口径:描述性字段可空,标识性字段(编码/工序编码/工序控制/工序序列)保持必填;两账套已执行。
 migrate-route-name-not-required.sql
+# migrate-route-required-original.sql(2026-10-05):工艺路线必填恢复原本模式(7 字段)
+#   用户口径「必填按照原本的模式实现即可」;撤回 d1f6a2c9。两账套已执行。
+migrate-route-required-original.sql
