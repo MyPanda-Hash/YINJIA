@@ -2401,3 +2401,6 @@ migrate-route-restore-required.sql
 #   实测:单表式单据保存把头字段写到只含头字段的一行,而表头按第一行回显 ⇒ 名称看似消失。
 #   处置:名称/生效日期/失效日期 place=header,detail;幂等;两账套均执行。
 migrate-route-header-detail-place.sql
+# migrate-route-header-hide-in-detail.sql(2026-10-05):表头字段(名称/生效/失效)不在明细行默认显示
+#   保留 place=header,detail(单表式必须) + visible=0 隐藏列;两账套已执行。
+migrate-route-header-hide-in-detail.sql
