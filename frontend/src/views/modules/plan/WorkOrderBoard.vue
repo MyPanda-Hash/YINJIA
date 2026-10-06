@@ -150,123 +150,8 @@
       </template>
     </el-dialog>
 
-    <!-- 追溯弹窗(参考旧系统 品质追溯):头+时间线+排产/完工/入库/领料;质检段待品质面板接入后补 -->
-    <el-dialog v-model="traceVisible" :title="tt('工单详情 · 追溯')" width="92%" top="4vh" append-to-body>
-      <template v-if="trace">
-        <div class="wb-trace-head">
-          <span class="wb-trace-no">{{ trace['头']?.['加工单号'] }}</span>
-          <span class="wb-tag" :class="trace['头']?.['单据状态'] === '已审核' ? 'open' : 'closed'">{{ trace['头']?.['单据状态'] }}</span>
-          <span v-if="trace['头']?.['结案'] === 'Y'" class="wb-tag off-line">{{ tt('已结案') }}</span>
-        </div>
-        <div class="wb-trace-desc">
-          <span>{{ tt('产品') }}: {{ trace['头']?.['产品编码'] }} {{ trace['头']?.['产品名称'] }}</span>
-          <span>{{ tt('规格型号') }}: {{ trace['头']?.['规格型号'] || '-' }}</span>
-          <span>{{ tt('客户') }}: {{ trace['头']?.['客户'] || '-' }}</span>
-          <span>{{ tt('客户订单号') }}: {{ trace['头']?.['客户订单号'] || '-' }}</span>
-          <span>{{ tt('批号') }}: {{ trace['头']?.['批号'] || '-' }}</span>
-          <span>{{ tt('生产线') }}: {{ trace['头']?.['生产线'] || tt('未排产') }}</span>
-          <span>{{ tt('排产数量') }}: {{ num(trace['头']?.['排产数量']) }}</span>
-          <span>{{ tt('入库数量') }}: {{ num(trace['头']?.['入库数量']) }}</span>
-          <span>{{ tt('余量') }}: {{ num(trace['头']?.['余量']) }}</span>
-        </div>
-
-        <!-- 工序进度(2026-10-05 合并):按该工单**工艺路线**渲染的步骤条 —— 原独立"工单详情"抽屉的内容并入本追溯 -->
-        <div v-if="prog" class="wb-trace-block">
-          <div class="wb-block-title">
-            {{ tt('工序进度') }}
-            <span class="wb-trace-sub" style="display: inline; margin-left: 8px">
-              {{ tt('工艺路线') }}: {{ prog['表头']?.['工艺路线'] || '-' }}
-              ｜ {{ tt('计划数量') }}: {{ num(prog['计划合计']) }}
-              ｜ {{ tt('产出') }}: {{ num(prog['产出']) }}（{{ num(prog['表头']?.['进度']) }}%）
-              <span v-if="prog['当前工序']">｜ {{ tt('当前工序') }}: {{ tt(prog['当前工序']) }}</span>
-              <span v-else>｜ {{ tt('未开工') }}</span>
-            </span>
-          </div>
-          <el-steps :active="Number(prog['当前工序序'] || 0)" align-center finish-status="success">
-            <el-step v-for="s in (prog['工序步骤'] || [])" :key="s['工序']" :title="tt(s['工序'])"
-                     :description="num(s['完工量']) + (s['报工单数'] ? `（${s['报工单数']}${tt('单')}）` : '')" />
-          </el-steps>
-          <div v-if="!(prog['工序步骤'] || []).length" class="wb-trace-sub">{{ tt('该工单还没有工序进度') }}</div>
-        </div>
-
-        <div class="wb-trace-block">
-          <div class="wb-block-title">{{ tt('流转时间线') }}</div>
-          <el-table :data="trace['时间线']" size="small" border max-height="180">
-            <el-table-column :label="tt('步骤')" prop="步骤" width="140" />
-            <el-table-column :label="tt('操作人')" prop="操作人" width="140" />
-            <el-table-column :label="tt('时间')" prop="时间" min-width="160" />
-          </el-table>
-        </div>
-
-        <!-- 调拨轨迹(9.29 批次②):每次调拨一行,撤销的也留痕(状态列区分) -->
-        <div v-if="(trace['调拨轨迹'] || []).length" class="wb-trace-block">
-          <div class="wb-block-title">{{ tt('调拨轨迹') }}</div>
-          <el-table :data="trace['调拨轨迹']" size="small" border max-height="180">
-            <el-table-column :label="tt('时间')" prop="时间" width="140" />
-            <el-table-column :label="tt('从生产线')" prop="从生产线" width="110" />
-            <el-table-column :label="tt('从车间')" prop="从车间" width="110" />
-            <el-table-column :label="tt('到生产线')" prop="到生产线" width="110" />
-            <el-table-column :label="tt('到车间')" prop="到车间" width="110" />
-            <el-table-column :label="tt('数量')" prop="数量" width="85" align="right" />
-            <el-table-column :label="tt('原因')" prop="原因" min-width="120" show-overflow-tooltip />
-            <el-table-column :label="tt('操作人')" prop="操作人" width="90" />
-            <el-table-column :label="tt('状态')" prop="状态" width="80" />
-            <el-table-column :label="tt('撤销人')" prop="撤销人" width="90" />
-            <el-table-column :label="tt('撤销时间')" prop="撤销时间" width="140" />
-          </el-table>
-        </div>
-
-        <div class="wb-trace-block">
-          <div class="wb-block-title">{{ tt('排产数据') }}</div>
-          <el-table :data="trace['排产数据']" size="small" border max-height="180">
-            <el-table-column :label="tt('生产线')" prop="生产线" width="110" />
-            <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
-            <el-table-column :label="tt('需求数量')" prop="需求数量" width="90" align="right" />
-            <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
-            <el-table-column :label="tt('余量')" prop="余量" width="80" align="right" />
-            <el-table-column :label="tt('每箱数量')" prop="每箱数量" width="85" align="right" />
-            <el-table-column :label="tt('箱数')" prop="箱数" width="75" align="right" />
-            <el-table-column :label="tt('开产量')" prop="开产量" width="85" align="right" />
-            <el-table-column :label="tt('计划开工日')" prop="计划开工日" width="100" />
-            <el-table-column :label="tt('工序交期')" prop="工序交期" width="100" />
-            <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" />
-          </el-table>
-        </div>
-
-        <div class="wb-trace-block">
-          <div class="wb-block-title">{{ tt('完工数据') }}</div>
-          <el-table :data="trace['完工数据']" size="small" border max-height="160" :empty-text="tt('暂无报工')">
-            <el-table-column :label="tt('工序')" prop="工序" min-width="120" />
-            <el-table-column :label="tt('计划数量')" prop="计划数量" width="100" align="right" />
-            <el-table-column :label="tt('完成数量')" prop="完成数量" width="100" align="right" />
-            <el-table-column :label="tt('报工人')" prop="报工人" width="120" />
-            <el-table-column :label="tt('报工时间')" prop="报工时间" width="150" />
-          </el-table>
-          <div class="wb-trace-sub">{{ tt('入库单据') }}（{{ (trace['入库单据'] || []).length }}）</div>
-          <el-table :data="trace['入库单据']" size="small" border max-height="140" :empty-text="tt('暂无入库')">
-            <el-table-column :label="tt('入库单号')" prop="单据编号" width="170" />
-            <el-table-column :label="tt('单据日期')" prop="单据日期" width="100" />
-            <el-table-column :label="tt('入库类别')" prop="入库类别" width="110" />
-            <el-table-column :label="tt('经手人')" prop="经手人" width="110" />
-            <el-table-column :label="tt('备注')" prop="备注" min-width="120" />
-          </el-table>
-        </div>
-
-        <div class="wb-trace-block">
-          <div class="wb-block-title">{{ tt('领料数据') }}</div>
-          <el-table :data="trace['领料数据']" size="small" border max-height="180" :empty-text="tt('暂无领料')">
-            <el-table-column :label="tt('领料单号')" prop="领料单号" width="170" />
-            <el-table-column :label="tt('领料日期')" prop="领料日期" width="100" />
-            <el-table-column :label="tt('材料编码')" prop="材料编码" width="120" show-overflow-tooltip />
-            <el-table-column :label="tt('材料名称')" prop="材料名称" min-width="140" show-overflow-tooltip />
-            <el-table-column :label="tt('规格型号')" prop="规格型号" width="110" show-overflow-tooltip />
-            <el-table-column :label="tt('单位')" prop="单位" width="55" />
-            <el-table-column :label="tt('数量')" prop="数量" width="90" align="right" />
-            <el-table-column :label="tt('批号')" prop="批号" width="110" />
-          </el-table>
-        </div>
-      </template>
-    </el-dialog>
+    <!-- 工单详情·追溯:共用组件 WorkOrderTraceDialog(2026-10-05;生产工单页也原地挂同一个) -->
+    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" />
   </div>
 </template>
 
@@ -277,6 +162,7 @@ import request from '@core/request'
 import { callButton } from '@/business/engine'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
+import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import { useUserStore } from '@/stores/user'
 
 const day = ref(new Date().toISOString().slice(0, 10))
@@ -390,25 +276,16 @@ async function unclose() {
   loadSummary()
 }
 
-// ── 追溯(= 工单详情,2026-10-05 合并口径):**本弹窗是唯一实现** —— 头 + 工序进度(按该单工艺路线的步骤条)
-//    + 流转时间线 + 调拨轨迹 + 排产/完工/入库/领料。工单列表的「追溯」按钮与点工单号都跳到这里(?trace=工单号)。
+// ── 追溯(= 工单详情,2026-10-05):**弹窗抽成共用组件 WorkOrderTraceDialog**(生产工单页也原地挂同一个,
+//    用户口径「在生产工单也可以这样查看,不是跳转到工单排产」)。本页只负责:置单号 + 打开。
 const traceVisible = ref(false)
-const trace = ref(null)
-/** 工序进度(按工单工艺路线;来自 /px/processTask/detail,只读) */
-const prog = ref(null)
+const traceNo = ref('')
 
-async function openTrace(noParam) {
-  let no = typeof noParam === 'string' ? noParam : (noParam?.['工单号'] || checkedSched.value[0]?.加工单号)
+function openTrace(noParam) {
+  const no = typeof noParam === 'string' ? noParam : (noParam?.['工单号'] || checkedSched.value[0]?.加工单号)
   if (!no) return
-  try {
-    const [t, p] = await Promise.all([
-      request.post('/px/scheduleBoard/trace', { 工单号: no }),
-      request.post('/px/processTask/detail', { 工单号: no }).catch(() => ({ data: null })),
-    ])
-    trace.value = t.data || {}
-    prog.value = p?.data || null
-    traceVisible.value = true
-  } catch (e) { err(e, '查询失败') }
+  traceNo.value = no
+  traceVisible.value = true
 }
 
 // ── 打印工单(两模板可选,2026-09-27):成型/组装生产任务单 = 行表直打;打印留痕 printStamp ──

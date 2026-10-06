@@ -111,7 +111,8 @@
       </el-table-column>
     </el-table>
 
-    <!-- 追溯/工单详情统一在 工单排产 页(2026-10-05 合并):本页两个入口都跳过去,不再各自渲染一套 -->
+    <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
+    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" />
 
     <!-- 切单弹窗:可切上限 = 排产数量 − max(已入库, 各工序已完工报工最大值);子单取新工单号 -->
     <el-dialog v-model="splitVisible" :title="tt('切单')" width="440px" append-to-body>
@@ -141,11 +142,11 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
 import { printWorkTaskSheet } from '@/business/print-formats'
+import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import { useUserStore } from '@/stores/user'
 
 const rows = ref([])
@@ -164,8 +165,9 @@ const splitLoading = ref(false)
 const splitInfo = ref(null)
 const splitQty = ref(0)
 const splitInherit = ref(true)
-/** 追溯统一入口(2026-10-05):跳转到工单排产的追溯弹窗;本页不再单独渲染详情抽屉 */
-const router = useRouter()
+/** 工单详情·追溯(2026-10-05):与工单排产同一组件,本页原地打开 */
+const traceVisible = ref(false)
+const traceNo = ref('')
 
 const filtered = computed(() => rows.value.filter((r) => {
   if (stateFilter.value === '未完工' && r.生产状态 === '完工') return false
@@ -340,12 +342,11 @@ async function onUnsplit() {
 }
 
 function openTrace(row) {
-  // 合并口径(2026-10-05,用户口径「工单详情和追溯放在一起,以工单排产的追溯为基座」):
-  // 本页不再自己渲染一套 —— 跳转到工单排产的追溯弹窗(?trace=工单号),那里是唯一实现
-  // (头 + 工序进度 + 流转时间线 + 调拨轨迹 + 排产/完工/入库/领料)。
+  // 工单详情·追溯(2026-10-05):与工单排产**同一个弹窗组件**,本页原地打开(用户口径「不是跳转到工单排产」)。
   const no = row?.['工单号'] || currentRow.value?.工单号 || checked.value[0]?.工单号
   if (!no) return
-  router.push({ path: '/prod/plan/workOrderBoard', query: { trace: no } })
+  traceNo.value = no
+  traceVisible.value = true
 }
 
 function exportCsv() {
