@@ -303,6 +303,8 @@ async function convert(api, label) {
         订单号: r.订单号,
         行id: r['行id'],
         生单数量: Number(r.生单数量) || undefined,
+        // 转单必须带工艺路线(2026-10-05:后端硬校验;此前漏传被拦「未选择工艺路线」)
+        工艺路线: r['工艺路线'] || undefined,
         交货日期: r.交货日期 && r.交货日期 !== r.交货日期原始 ? r.交货日期 : undefined,
       })),
     })
