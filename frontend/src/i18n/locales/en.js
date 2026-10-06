@@ -350,6 +350,12 @@ export default {
     '前往查看': 'Go to Panel',
     '留在本页': 'Stay Here',
     '转单失败': 'Convert failed',
+    // 左上角日期查询(2026-10-06 用户口径:默认单日=最近有数据的一天,可切近3/7/14/30天)
+    '单日': 'Single day',
+    '截止日期': 'End date',
+    '单日只看一天;近几日=以所选日期为截止日往前数': 'Single day = that day only; recent days = count back from the selected end date',
+    '该日期范围没有待结转数据': 'No pending orders in this date range',
+    '看近7天': 'View last 7 days',
 
     // 排产工作台·线班骨架(参考工单排产页,2026-09-23)
     '排产明细': 'Scheduled Detail',
@@ -1313,6 +1319,7 @@ export default {
     '上周': 'Last week',
     '近7天': 'Last 7 days',
     '近14天': 'Last 14 days',
+    '近30天': 'Last 30 days',
     '本月': 'This month',
     '上月': 'Last month',
     '本季': 'This quarter',

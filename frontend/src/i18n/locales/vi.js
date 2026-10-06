@@ -1144,6 +1144,7 @@ export default {
     '上周': 'Tuần trước',
     '近7天': '7 ngày',
     '近14天': '14 ngày',
+    '近30天': '30 ngày',
     '本月': 'Tháng này',
     '上月': 'Tháng trước',
     '本季': 'Quý này',

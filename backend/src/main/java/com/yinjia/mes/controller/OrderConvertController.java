@@ -30,18 +30,22 @@ public class OrderConvertController {
         this.perm = perm;
     }
 
-    /** 待结转订单行(剩余>0;已转满自动消失,删下游草稿自动回现) */
+    /**
+     * 待结转订单行(剩余>0;已转满自动消失,删下游草稿自动回现)。
+     * 2026-10-06 用户口径:body 增加 dateFrom/dateTo(下单日期范围,含端点),
+     * 前端左上角日期查询默认只传「单日」—— 此前无条件限制,一进页面拉全量历史会卡死。
+     */
     @PostMapping("/pending")
     public ApiResult<List<Map<String, Object>>> pending(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView("SO_ORDER");
-        return ApiResult.ok(service.pending(body == null ? null : str(body.get("keyword"))));
+        return ApiResult.ok(service.pending(str(body, "keyword"), str(body, "dateFrom"), str(body, "dateTo")));
     }
 
-    /** 顶部汇总条:未结转/今日结转(笔数/款数/数量) + 当前数据笔数 */
+    /** 顶部汇总条:未结转(全量)/今日结转(笔数/款数/数量) + 当前数据笔数(当前日期口径) + 最新下单日期(默认锚点) */
     @PostMapping("/stats")
-    public ApiResult<Map<String, Object>> stats() {
+    public ApiResult<Map<String, Object>> stats(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView("SO_ORDER");
-        return ApiResult.ok(service.stats());
+        return ApiResult.ok(service.stats(str(body, "keyword"), str(body, "dateFrom"), str(body, "dateTo")));
     }
 
     /** 保存交期(行内编辑):修正 预计交货日期 回写订单行(同步侧历史数据与创建日期雷同,结转处就地修正) */
@@ -71,5 +75,11 @@ public class OrderConvertController {
 
     private static String str(Object o) {
         return o == null ? null : String.valueOf(o);
+    }
+
+    /** 取 body 里的字符串参数(body 可为 null;键名保持中文数据键口径,日期键用驼峰 dateFrom/dateTo) */
+    private static String str(Map<String, Object> body, String key) {
+        Object v = body == null ? null : body.get(key);
+        return v == null ? null : String.valueOf(v);
     }
 }

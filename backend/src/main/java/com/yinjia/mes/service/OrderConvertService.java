@@ -45,13 +45,60 @@ public class OrderConvertService {
         this.message = message;
     }
 
+    /* ── 待结转行集公共段(2026-10-06 抽取)────────────────────────────────────────
+     * 列表查询 pending() 与汇总聚合 pendingAgg() **共用同一段 FROM…WHERE**:
+     * 「剩余>0」「下单日期范围」「关键字」三类条件都挂在它后面,两处口径不会走偏
+     * (代码规范 D:反复制粘贴;此前 stats() 直接复用 pending("") 把整表拉进内存再数数)。
+     * 行级占用链仍是两处 OUTER APPLY(m=加工单/工单通道,p=采购申请通道)。 */
+    private static final String PENDING_FROM =
+            " FROM bd_so_order o"
+                    + " JOIN bl_so_order l ON l.[单据编号] = o.[单据编号] AND ISNULL(l.asp_cancel,'N') <> 'Y'"
+                    + " LEFT JOIN bs_inv rv ON rv.[存货编码] = l.[存货编码] AND ISNULL(rv.asp_cancel,'N') <> 'Y'"
+                    + " JOIN yj_doc_status s ON s.panel_code = 'SO_ORDER' AND s.doc_no = o.[单据编号]"
+                    + "   AND s.shr IS NOT NULL"
+                    // 严格「已审核」(2026-09-26 用户要求:结转页不出现已审核以外流程的数据)——
+                    // 排除 作废/中止(含金蝶手动关闭 H)/删除申请/修改申请·修改中/会签/审批中/已生效/已归档/已完成(S)
+                    + "   AND ISNULL(s.canceled,'N') <> 'Y' AND ISNULL(s.stopped,'N') <> 'Y'"
+                    + "   AND ISNULL(s.erp_close_state,'') NOT IN ('H','S')"
+                    + "   AND ISNULL(s.deleting,'N') <> 'Y' AND ISNULL(s.modify_state,'') NOT IN ('R','Y')"
+                    + "   AND ISNULL(s.pending,'N') <> 'Y'"
+                    + "   AND ISNULL(s.effective,'N') <> 'Y' AND ISNULL(s.archived,'N') <> 'Y'"
+                    + " LEFT JOIN bs_partner pt ON pt.[往来单位编码] = o.[客户编码]"
+                    + "   OR (ISNULL(o.[客户编码],N'') = N'' AND pt.[往来单位名称] = o.[客户])"
+                    + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
+                    + "            FROM bs_inv iv GROUP BY iv.存货编码) 备注_管控 ON 备注_管控.存货编码 = l.[存货编码]"
+                    + " LEFT JOIN dm_kh dk ON dk.dm = o.[客户编码]"
+                    + " OUTER APPLY (SELECT SUM(ISNULL(linked_quantity,0)) AS linked FROM form_flow_link f"
+                    + "   WHERE f.source_panel_code='SO_ORDER' AND f.source_line_key = o.[单据编号]+N'#'+CAST(l.[id] AS nvarchar(20))"
+                    + "     AND f.target_panel_code IN ('MANU_ORDER','PLANG') AND f.link_status='ACTIVE') m"
+                    + " OUTER APPLY (SELECT SUM(ISNULL(linked_quantity,0)) AS linked FROM form_flow_link f"
+                    + "   WHERE f.source_panel_code='SO_ORDER' AND f.source_line_key = o.[单据编号]+N'#'+CAST(l.[id] AS nvarchar(20))"
+                    + "     AND f.target_panel_code='PU_REQ' AND f.link_status='ACTIVE') p"
+                    + " WHERE ISNULL(o.asp_cancel,'N') <> 'Y'"
+                    + "   AND ISNULL(l.[数量],0) - ISNULL(m.linked,0) - ISNULL(p.linked,0) > 0.0001";
+
+    /** 下单日期范围(前两参=起,后两参=止;空串=不限)。止日取 `< 次日`,含当日整天时间戳。 */
+    private static final String PENDING_DATE_RANGE =
+            " AND (? = '' OR o.[单据日期] >= CONVERT(datetime, ?, 120))"
+                    + " AND (? = '' OR o.[单据日期] < DATEADD(day, 1, CONVERT(datetime, ?, 120)))";
+
+    /** 关键字模糊(订单号/客户/物料编码/品名 任一命中) */
+    private static final String PENDING_KEYWORD =
+            " AND (? = '' OR o.[单据编号] LIKE ? OR o.[客户] LIKE ? OR l.[存货编码] LIKE ? OR l.[存货名称] LIKE ?)";
+
     /**
      * 待结转行:已审核(未作废/未中止)订单行,剩余数量 = 数量 − SO→加工单占用 − SO→采购申请占用 > 0。
      * 已排产/已采购为两通道并列占用;转满自动消失,删下游草稿释放占用自动回现(自愈)。
+     *
+     * @param dateFrom/dateTo 下单日期范围(含端点,yyyy-MM-dd;null/空=不限)。
+     *   2026-10-06 用户口径:左上角日期查询默认「单日」= 最近有数据的一天,可切近 3/7/14/30 天 ——
+     *   此前无日期条件,一进页面把**全部历史**待结转行一次拉回,数据一多页面就卡死。
      */
-    public List<Map<String, Object>> pending(String keyword) {
+    public List<Map<String, Object>> pending(String keyword, String dateFrom, String dateTo) {
         String kw = keyword == null ? "" : keyword.trim();
         String like = "%" + kw + "%";
+        String from = normDate(dateFrom);
+        String to = normDate(dateTo);
         return jdbc.queryForList(
                 "SELECT o.[单据编号] AS 订单号, l.[id] AS 行id,"
                         + " ISNULL(l.[行号], (SELECT COUNT(*) FROM bl_so_order x WHERE x.[单据编号]=l.[单据编号]"
@@ -70,46 +117,54 @@ public class OrderConvertService {
                         // 工单关联工艺路线(2026-10-05,用户口径「在订单结转处选择工序路线」):
                         // 预填 = 产品档案绑定(bs_inv.工艺路线) → 未绑定默认 GY-CB-STD;前端可逐行改,转单时原样带入工单
                         + " ISNULL(NULLIF(rv.[工艺路线], N''), N'GY-CB-STD') AS 工艺路线"
-                        + " FROM bd_so_order o"
-                        + " JOIN bl_so_order l ON l.[单据编号] = o.[单据编号] AND ISNULL(l.asp_cancel,'N') <> 'Y'"
-                        + " LEFT JOIN bs_inv rv ON rv.[存货编码] = l.[存货编码] AND ISNULL(rv.asp_cancel,'N') <> 'Y'"
-                        + " JOIN yj_doc_status s ON s.panel_code = 'SO_ORDER' AND s.doc_no = o.[单据编号]"
-                        + "   AND s.shr IS NOT NULL"
-                        // 严格「已审核」(2026-09-26 用户要求:结转页不出现已审核以外流程的数据)——
-                        // 排除 作废/中止(含金蝶手动关闭 H)/删除申请/修改申请·修改中/会签/审批中/已生效/已归档/已完成(S)
-                        + "   AND ISNULL(s.canceled,'N') <> 'Y' AND ISNULL(s.stopped,'N') <> 'Y'"
-                        + "   AND ISNULL(s.erp_close_state,'') NOT IN ('H','S')"
-                        + "   AND ISNULL(s.deleting,'N') <> 'Y' AND ISNULL(s.modify_state,'') NOT IN ('R','Y')"
-                        + "   AND ISNULL(s.pending,'N') <> 'Y'"
-                        + "   AND ISNULL(s.effective,'N') <> 'Y' AND ISNULL(s.archived,'N') <> 'Y'"
-                        + " LEFT JOIN bs_partner pt ON pt.[往来单位编码] = o.[客户编码]"
-                        + "   OR (ISNULL(o.[客户编码],N'') = N'' AND pt.[往来单位名称] = o.[客户])"
-                        + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
-                        + "            FROM bs_inv iv GROUP BY iv.存货编码) 备注_管控 ON 备注_管控.存货编码 = l.[存货编码]"
-                        + " LEFT JOIN dm_kh dk ON dk.dm = o.[客户编码]"
-                        + " OUTER APPLY (SELECT SUM(ISNULL(linked_quantity,0)) AS linked FROM form_flow_link f"
-                        + "   WHERE f.source_panel_code='SO_ORDER' AND f.source_line_key = o.[单据编号]+N'#'+CAST(l.[id] AS nvarchar(20))"
-                        + "     AND f.target_panel_code IN ('MANU_ORDER','PLANG') AND f.link_status='ACTIVE') m"
-                        + " OUTER APPLY (SELECT SUM(ISNULL(linked_quantity,0)) AS linked FROM form_flow_link f"
-                        + "   WHERE f.source_panel_code='SO_ORDER' AND f.source_line_key = o.[单据编号]+N'#'+CAST(l.[id] AS nvarchar(20))"
-                        + "     AND f.target_panel_code='PU_REQ' AND f.link_status='ACTIVE') p"
-                        + " WHERE ISNULL(o.asp_cancel,'N') <> 'Y'"
-                        + "   AND ISNULL(l.[数量],0) - ISNULL(m.linked,0) - ISNULL(p.linked,0) > 0.0001"
-                        + "   AND (? = '' OR o.[单据编号] LIKE ? OR o.[客户] LIKE ? OR l.[存货编码] LIKE ? OR l.[存货名称] LIKE ?)"
+                        + PENDING_FROM + PENDING_DATE_RANGE + PENDING_KEYWORD
                         + " ORDER BY o.[单据日期], o.[单据编号], l.[id]",
-                kw, like, like, like, like);
+                        // ⚠ 日期参数必须显式给空串:JDBC null 会让 `? = ''` 求值成 NULL(既非真也非假)
+                        //   ⇒ 整个 WHERE 不成立 ⇒ **一行都查不出来**。2026-10-06 探针实测踩到并修正。
+                        arg(from), arg(from), arg(to), arg(to), kw, like, like, like, like);
     }
 
     /**
-     * 汇总条:未结转(剩余>0 行:笔数/款数/下单数量) + 今日结转(当日 SO→加工单|采购申请 占用:笔数/款数/数量)
-     * + 当前数据笔数。
+     * 待结转行的聚合(一趟扫描出 行数/款数/下单数量 + 最近下单日期),条件与 {@link #pending} 同源。
+     * 2026-10-06:取代原先「pending("") 拉全表再在内存里数数」的写法 —— 那等于每次开页
+     * 把整份待结转明细查两遍(列表一遍、汇总一遍),行数一多就卡。
      */
-    public Map<String, Object> stats() {
-        List<Map<String, Object>> rows = pending("");
+    private Map<String, Object> pendingAgg(String keyword, String dateFrom, String dateTo) {
+        String kw = keyword == null ? "" : keyword.trim();
+        String like = "%" + kw + "%";
+        String from = normDate(dateFrom);
+        String to = normDate(dateTo);
+        return jdbc.queryForMap(
+                "SELECT COUNT(*) AS cnt, COUNT(DISTINCT l.[存货编码]) AS styles,"
+                        + " SUM(ISNULL(l.[数量],0)) AS qty, MAX(o.[单据日期]) AS latest"
+                        + PENDING_FROM + PENDING_DATE_RANGE + PENDING_KEYWORD,
+                arg(from), arg(from), arg(to), arg(to), kw, like, like, like, like);
+    }
+
+    /**
+     * 汇总条:未结转(剩余>0 行:笔数/款数/下单数量,<b>全量口径</b>,与设计文档 §2.1 一致)
+     * + 今日结转(当日 SO→加工单|采购申请 占用:笔数/款数/数量) + 当前数据笔数。
+     *
+     * <p>2026-10-06(用户口径「一进页面只显示单日数据」):
+     * <ul>
+     *   <li>「当前数据笔数」= **当前日期范围/关键字**口径,与列表条数逐行对得上;
+     *       「未结转订单汇总」仍是全量积压(标题没变,口径也没变)。</li>
+     *   <li>新增「最新下单日期」= 全体待结转行里最近的下单日,前端拿它当默认锚点
+     *       (打开页面即定位到最近有数据的那一天,而不是空表)。</li>
+     * </ul>
+     */
+    public Map<String, Object> stats(String keyword, String dateFrom, String dateTo) {
+        Map<String, Object> all = pendingAgg(null, null, null);
+        String kw = keyword == null ? "" : keyword.trim();
+        String from = normDate(dateFrom);
+        String to = normDate(dateTo);
+        boolean scoped = !kw.isEmpty() || from != null || to != null;
+        Map<String, Object> cur = scoped ? pendingAgg(kw, from, to) : all;
+
         Map<String, Object> undone = new LinkedHashMap<>();
-        undone.put("总订单笔数", rows.size());
-        undone.put("总款数", rows.stream().map(r -> String.valueOf(r.get("物料编码"))).distinct().count());
-        undone.put("总下单数量", round(rows.stream().mapToDouble(r -> num(r.get("需求数量"))).sum()));
+        undone.put("总订单笔数", num(all.get("cnt")));
+        undone.put("总款数", num(all.get("styles")));
+        undone.put("总下单数量", round(num(all.get("qty"))));
 
         Map<String, Object> today = jdbc.queryForMap(
                 "SELECT COUNT(DISTINCT source_line_key) AS cnt, COUNT(DISTINCT ISNULL(inventory_code,N'')) AS styles,"
@@ -124,7 +179,8 @@ public class OrderConvertService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("未结转", undone);
         out.put("今日结转", done);
-        out.put("当前数据笔数", rows.size());
+        out.put("当前数据笔数", num(cur.get("cnt")));
+        out.put("最新下单日期", fmtDate(all.get("latest")));
         return out;
     }
 
@@ -207,6 +263,31 @@ public class OrderConvertService {
         try { java.time.LocalDate.parse(d); } catch (Exception e) {
             throw new IllegalStateException("交货日期格式错误(应为 yyyy-MM-dd):" + d);
         }
+    }
+
+    /** 日期条件规范化:null/空白 → null(=该端不限);格式不合法直接 400(前端传错要立刻看得见,别静默变成"不限") */
+    private static String normDate(String d) {
+        if (d == null || d.isBlank()) return null;
+        String s = d.trim();
+        try { java.time.LocalDate.parse(s); } catch (Exception e) {
+            throw new IllegalArgumentException("查询日期格式错误(应为 yyyy-MM-dd):" + s);
+        }
+        return s;
+    }
+
+    /** SQL 参数化:null → 空串(`? = '' OR …` 的哨兵判据;null 会让整个条件变 NULL ⇒ 全表被过滤) */
+    private static String arg(String d) {
+        return d == null ? "" : d;
+    }
+
+    /** SQL 日期值 → yyyy-MM-dd(null 原样返回,前端按"无数据"处理) */
+    private static String fmtDate(Object o) {
+        if (o == null) return null;
+        if (o instanceof java.sql.Timestamp ts) return ts.toLocalDateTime().toLocalDate().toString();
+        if (o instanceof java.sql.Date d) return d.toLocalDate().toString();
+        if (o instanceof java.time.LocalDate d) return d.toString();
+        String s = String.valueOf(o).trim();
+        return s.length() >= 10 ? s.substring(0, 10) : s;
     }
 
     private static double num(Object o) {

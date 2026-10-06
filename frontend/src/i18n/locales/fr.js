@@ -1154,6 +1154,7 @@ export default {
     '上周': 'Semaine dernière',
     '近7天': '7 jours',
     '近14天': '14 jours',
+    '近30天': '30 jours',
     '本月': 'Ce mois-ci',
     '上月': 'Mois dernier',
     '本季': 'Ce trimestre',
