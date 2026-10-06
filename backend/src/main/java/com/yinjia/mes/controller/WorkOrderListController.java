@@ -184,6 +184,21 @@ public class WorkOrderListController {
             Key k = Key.of(r);
             if (!k.valid()) continue;
             try {
+                if (close) {
+                    // 结案口径(2026-10-05 用户口径「入库了才是结案,没入库只是完工」):
+                    // 结案必须**入库完成**(入库量 ≥ 排产量);未入库点结案直接被拦并说明差额
+                    Map<String, Object> q = jdbc.queryForMap("SELECT ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl"
+                                    + " FROM dbo.plang WHERE comm=? AND pl_no=? AND pl_xc=?"
+                                    + " AND ((? = N'' AND [批次号] IS NULL) OR [批次号] = ?)"
+                                    + " AND ISNULL(asp_cancel,'N')<>'Y'",
+                            k.comm(), k.no(), k.xc(), k.batch(), k.batch());
+                    double plQty = ((Number) q.get("pl_sl")).doubleValue();
+                    double rkQty = ((Number) q.get("rk_sl")).doubleValue();
+                    if (rkQty + 0.0001 < plQty) {
+                        throw new IllegalStateException("未入库完成,不能结案(入库 " + rkQty + " / 排产 " + plQty
+                                + ";入库完成后系统自动/手工结案)");
+                    }
+                }
                 int n = jdbc.update("UPDATE dbo.plang SET ja = ? WHERE comm=? AND pl_no=? AND pl_xc=?"
                                 + " AND ((? = N'' AND [批次号] IS NULL) OR [批次号] = ?)"
                                 + " AND ISNULL(asp_cancel,'N')<>'Y'",
