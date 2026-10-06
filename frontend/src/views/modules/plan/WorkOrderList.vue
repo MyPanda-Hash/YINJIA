@@ -56,7 +56,7 @@
 
     <!-- 明细大表 -->
     <el-table :data="paged" border size="small" class="wol-table" height="100%"
-              @selection-change="(r) => (checked = r)" @current-change="(r) => (currentRow = r)"
+              @selection-change="(r) => (checked = r)" @current-change="(r) => (currentRow = r)" ref="tableRef"
               highlight-current-row row-key="rowKey">
       <el-table-column type="selection" width="40" fixed="left" reserve-selection />
       <el-table-column :label="tt('公司代码')" prop="公司代码" width="90" show-overflow-tooltip />
@@ -152,6 +152,8 @@ import { useUserStore } from '@/stores/user'
 const rows = ref([])
 const checked = ref([])
 const currentRow = ref(null)
+/** 表格引用:刷新后清勾选用(2026-10-05 修「撤回切单后卡在请先勾选」的 bug) */
+const tableRef = ref(null)
 const lines = ref([])
 const lineFilter = ref('')
 const lineCode = ref('')
@@ -179,8 +181,7 @@ const paged = computed(() => filtered.value)
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
-async function load() {
-  try {
+async function load() {  try {
     const cond = {}
     if (dateFrom.value) cond['日期从'] = dateFrom.value
     if (dateTo.value) cond['日期到'] = dateTo.value
@@ -188,7 +189,11 @@ async function load() {
     if (lineFilter.value) cond['生产线'] = lineFilter.value
     const res = await request.post('/px/workOrderList', cond)
     rows.value = (res.data || []).map((r) => ({ ...r, rowKey: String(r.行id ?? (r.工单号 + '#' + r.工单行号)) }))
-    applyLineMeta()
+    // 2026-10-05 修复:刷新后清掉旧勾选 —— reserve-selection 会保留"已从列表消失的行"的勾选(且无法手动取消),
+    // 造成切单/撤回切单永久提示「请先勾选一张工单」。
+    checked.value = []
+    currentRow.value = null
+    tableRef.value?.clearSelection?.()    applyLineMeta()
   } catch (e) { err(e, '查询失败') }
 }
 
@@ -283,9 +288,19 @@ async function printPick() {
 
 /** 切单(9.29 批次①):勾选/当前行必须恰为一张工单 → 后端预览可切上限 → 弹窗输入切出数量 */
 function splitTarget() {
-  const src = checked.value.length ? checked.value : (currentRow.value ? [currentRow.value] : [])
-  if (src.length !== 1) { ElMessage.warning(tt('请先勾选一张工单')); return null }
-  return src[0]
+function splitTarget() {
+  // 2026-10-05 修复「撤回切单后一直提示请勾选一个工单」:表格开了 reserve-selection,
+  // 被撤回的子单行已从列表消失、但勾选状态仍留在 checked 里(且无法取消)→ checked.length≠1 永久卡死。
+  // 口径:只认**当前列表里还在的**选中行(按 行id);没有则退回当前行(currentRow)。
+  const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
+  const cur = currentRow.value && rows.value.some((r) => String(r.行id) === String(currentRow.value.行id)) ? currentRow.value : null
+  const list = alive.length ? alive : (cur ? [cur] : [])
+  if (list.length !== 1) {
+    ElMessage.warning(list.length === 0 ? tt('请先勾选一张工单')
+      : `${tt('请只勾选一张工单')}（${tt('当前已勾选')} ${list.length} ${tt('张')}）`)
+    return null
+  }
+  return list[0]
 }
 
 async function openSplit() {

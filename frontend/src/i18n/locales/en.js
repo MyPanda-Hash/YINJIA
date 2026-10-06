@@ -505,6 +505,10 @@ export default {
     '默认 GY-CB-STD': 'default GY-CB-STD',
     // 工单详情第二版(2026-10-05):按工序聚合 + 产出/进度 + 异常计划量
     '产出': 'Output',
+    // 切单/排产提示(2026-10-05)
+    '请只勾选一张工单': 'Please select exactly one work order',
+    '当前已勾选': 'currently selected',
+    '以下工单已排产,不能重复排入': 'The following work orders are already scheduled and cannot be scheduled again',
     '进度': 'Progress',
     '任务数': 'Tasks',
     '派工产线': 'Dispatched Lines',

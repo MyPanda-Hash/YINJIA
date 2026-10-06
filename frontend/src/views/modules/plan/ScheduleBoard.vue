@@ -248,6 +248,13 @@ function rowParams(r) {
 
 async function assign(rows) {
   const list = rows || []
+  // 2026-10-05 用户口径「同个工单不能重复排产,已排产的内容要出现提示」:
+  // 前端先拦一道(后端 assign 另有守卫「已排产(产线=x),不能重复排入;换线请先撤销」)
+  const dup = list.filter((r) => r['生产线'] || r['排产产线'])
+  if (dup.length) {
+    ElMessage.warning(`${tt('以下工单已排产,不能重复排入')}：${dup.map((r) => r['加工单号'] || r['工单号']).join('、')}`)
+    return
+  }
   if (!param.line) { ElMessage.warning(tt('请先在顶部选择生产线')); return }
   try {
     await ElMessageBox.confirm(`${tt('确认将选中的')} ${list.length} ${tt('张加工单排入')}「${param.line}」？`,
