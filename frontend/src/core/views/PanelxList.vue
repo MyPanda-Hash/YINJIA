@@ -3731,7 +3731,13 @@ function blockRows(b) {
   const filtered = applyAdvFilters(applyColFilters(blockData(b).map((r) => r), blockCols(b)))
   // 视图排序(不改行数据):占位行在排序之后补,不参与比较
   const out = sortViewRows(filtered, blockSortOf(b))
-  while (out.length < MIN_ROWS) out.push({ _placeholder: true })
+  // 工艺路线(ROUTE)口径(2026-10-06 用户口径「直接选工序就能带进来并新增一行,不必先点新增数据」):
+  //   末行之后**恒留一个空占位行** —— 点它即 onRowClick → openBlankDetailRow(推一行 + 直接开「工序编码」参照),
+  //   确认后新行带着工序落在末尾。原因是原规则(不足 MIN_ROWS 才补空行)在行数 ≥5 时一个空行都不补,
+  //   用户眼里"没有可点的空行",只能先点「新增数据」再点新行的工序格 —— 正是被报的那条路径。
+  //   占位行只是显示物(_placeholder):进出都不落库、不参与合计/校验,对其它面板零影响。
+  const minRows = panelCode.value === 'ROUTE' ? Math.max(MIN_ROWS, out.length + 1) : MIN_ROWS
+  while (out.length < minRows) out.push({ _placeholder: true })
   return out
 }
 
@@ -5333,6 +5339,19 @@ async function onDetailRefConfirm(selectedRows) {
     ElMessage.warning('当前单据已切换或不再是草稿，请重新选择')
     return
   }
+
+  // ⚠ 2026-10-06 根因(修「直接点空行选工序 → 一行都没多出来」):下面 `await engine.fillCurrentStock(...)`
+  //   之前**不**置位 detailRefSaving 时,存在一个丢行的竞态 —— RefPickDialog.confirm() 在 emit('confirm')
+  //   之后立刻 emit('update:modelValue', false) 关弹窗,而 watch(detailRefVisible)(见文件下方)看到
+  //   「已关闭 && !detailRefSaving」就判定为"用户取消",把 openBlankDetailRow 刚推的 pick.created 行
+  //   **原地 splice 掉**;本函数此刻正停在那个 await 上,恢复后照样把带入值写进**已被摘掉的行对象**、
+  //   照样弹绿色提示 ⇒ 用户看到「已带入 1 条工序」却一行都没多(浏览器实测:点空行后行数 2→3,
+  //   确认后立刻回到 2,期间 0 个 /api 请求 —— 纯客户端摘行,不是保存失败/回滚)。
+  //   为什么只给 ROUTE 提前置位:其它面板确认后走「顺带保存整单 + load() 重取」,服务端数据会把这一行
+  //   原样取回来(那一摘只是瞬时闪烁,自愈);ROUTE 已定口径「参照确认不落库、不 load」,摘掉就再也回不来。
+  //   置位点仍在本函数第一个 await 之前、且在所有早退分支之后(早退不动它,避免卡住后续参照确认);
+  //   本函数末尾的 finally 负责复位,取消(不确认)路径不经过这里 ⇒ 取消仍会正确撤掉那行空行。
+  if (panelCode.value === 'ROUTE') detailRefSaving.value = true
 
   const detail = {}
   for (const [key, value] of Object.entries(cur.value.detail || {})) {
