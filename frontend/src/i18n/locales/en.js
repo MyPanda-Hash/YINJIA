@@ -505,6 +505,7 @@ export default {
     '默认 GY-CB-STD': 'default GY-CB-STD',
     // 工单详情第二版(2026-10-05):按工序聚合 + 产出/进度 + 异常计划量
     '产出': 'Output',
+    '计划线(各工序)': 'Plan Lines (by process)',
     '工序产线计划': 'Process Line Plan',
     '计划生产线': 'Planned Line',
     '实际生产线': 'Actual Line',

@@ -109,6 +109,7 @@
       <el-table ref="todayTable" :data="todayRows" size="small" border height="240" empty-text="" row-key="加工单号"
                 @selection-change="onCheckToday">
         <el-table-column type="selection" width="42" />
+      <el-table-column :label="tt('计划线(各工序)')" prop="计划线" min-width="240" show-overflow-tooltip />
         <el-table-column :label="tt('生产线')" prop="生产线" width="110" fixed />
         <el-table-column :label="tt('排产班组')" prop="排产班组" width="100" fixed />
         <el-table-column :label="tt('加工单号')" prop="加工单号" width="150" />
