@@ -152,17 +152,26 @@ public class ProcessTaskService {
         Integer dis = jdbc.queryForObject("SELECT CASE WHEN ISNULL(停用,0)=1 THEN 1 ELSE 0 END FROM dbo.bs_prod_line"
                 + " WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, line.trim());
         if (dis != null && dis == 1) throw new IllegalArgumentException("生产线「" + line + "」已停用,不可派工");
+        // 工序↔产线挂钩的**服务端硬约束**(2026-10-05):产线的「生产车间」= 工序/工艺(成型/切炭/组装),
+        // 必须与任务的工序一致 —— 前端下拉只是便利,接口层不能靠它兜底
+        String lineShop = jdbc.queryForObject("SELECT ISNULL(生产车间,N'') FROM dbo.bs_prod_line"
+                + " WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'", String.class, line.trim());
         List<String> done = new ArrayList<>();
         List<String> failed = new ArrayList<>();
         for (Object idObj : ids) {
             long id = ((Number) idObj).longValue();
             try {
                 List<Map<String, Object>> rows = jdbc.queryForList(
-                        "SELECT 单据编号, 工序, ISNULL(状态,N'') AS 状态 FROM dbo.wo_progress"
-                                + " WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", id);
+                        "SELECT 单据编号, 工序, ISNULL(生产车间,N'') AS 生产车间, ISNULL(状态,N'') AS 状态"
+                                + " FROM dbo.wo_progress WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", id);
                 if (rows.isEmpty()) throw new IllegalStateException("任务不存在或已作废");
                 String st = String.valueOf(rows.get(0).get("状态"));
                 if ("已完工".equals(st)) throw new IllegalStateException("已完工,无需派工");
+                String taskShop = String.valueOf(rows.get(0).get("生产车间"));
+                if (!taskShop.isBlank() && !taskShop.equals(lineShop == null ? "" : lineShop)) {
+                    throw new IllegalStateException("生产线「" + line.trim() + "」属于「" + lineShop + "」,"
+                            + "与任务的工序「" + taskShop + "」不一致");
+                }
                 jdbc.update("UPDATE dbo.wo_progress SET 生产线=?, 状态=N'在加工', asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                         line.trim(), user, id);
                 done.add(String.valueOf(rows.get(0).get("单据编号")) + "/" + rows.get(0).get("工序"));
@@ -269,6 +278,87 @@ public class ProcessTaskService {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("重算工序数", ops.size());
         out.put("更新行数", n);
+        return out;
+    }
+
+    /** 工序总览:按 工序/工艺(成型/切炭/组装) 汇总(只读视图 v_wo_process_board) */
+    public List<Map<String, Object>> board() {
+        return jdbc.queryForList("SELECT 工序, 任务数, 待加工数, 在加工数, 已完工数, 计划量, 完成量, 未完成量,"
+                + " 急单数, 涉及产线, ISNULL(最早计划完工,N'') AS 最早计划完工"
+                + " FROM dbo.v_wo_process_board ORDER BY 工序");
+    }
+
+    /**
+     * 工单详情(用户口径「点开一张单就看到它处在哪个阶段」):表头 + 工序时间轴 + 汇总。只读,不改任何数据。
+     */
+    public Map<String, Object> detail(String plNo) {
+        if (!notBlank(plNo)) throw new IllegalArgumentException("请提供工单号");
+        List<Map<String, Object>> heads = jdbc.queryForList(
+                "SELECT TOP 1 p.pl_no AS 工单号, ISNULL(p.dm,N'') AS 产品编码, ISNULL(p.mc,N'') AS 产品名称,"
+                        + " ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.khdm,N'') AS 客户, ISNULL(p.pl_sl,0) AS 计划数量,"
+                        + " CONVERT(varchar(10), p.cp_date, 120) AS 交期, ISNULL(p.scx,N'') AS 排产产线,"
+                        + " ISNULL(p.[批次号],N'') AS 批次号, ISNULL(prg.当前工序,N'') AS 当前工序,"
+                        + " ISNULL(prg.当前工序完工量,0) AS 当前工序完工量, ISNULL(prg.完工合计,0) AS 完工合计,"
+                        + " (SELECT COUNT(*) FROM dbo.plang g WHERE g.pl_no = p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y') AS 工单行数"
+                        + " FROM dbo.plang p LEFT JOIN dbo.v_wo_process_progress prg ON prg.单号 = p.pl_no"
+                        + " WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id", plNo.trim());
+        List<Map<String, Object>> tasks = jdbc.queryForList(
+                "SELECT p.id AS 任务id, p.工序, ISNULL(p.工序序,0) AS 工序序, ISNULL(p.状态,N'') AS 状态,"
+                        + " ISNULL(p.生产线,N'') AS 生产线, ISNULL(p.优先级,N'普通') AS 优先级,"
+                        + " ISNULL(p.计划数量,0) AS 计划数量, ISNULL(p.完成数量,0) AS 完成数量,"
+                        + " ISNULL(p.计划数量,0) - ISNULL(p.完成数量,0) AS 未完成量,"
+                        + " CONVERT(varchar(10), p.计划完工日期, 120) AS 计划完工日期"
+                        + " FROM dbo.wo_progress p WHERE p.单据编号=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + " ORDER BY ISNULL(p.工序序,0), p.id", plNo.trim());
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("表头", heads.isEmpty() ? Map.of() : heads.get(0));
+        out.put("工序任务", tasks);
+        double plan = tasks.stream().mapToDouble(t -> num(t.get("计划数量"))).sum();
+        double doneQty = tasks.stream().mapToDouble(t -> num(t.get("完成数量"))).sum();
+        out.put("工序数", tasks.size());
+        out.put("计划合计", round(plan));
+        out.put("完工合计", round(doneQty));
+        out.put("未完成合计", round(plan - doneQty));
+        String cur = heads.isEmpty() ? "" : String.valueOf(heads.get(0).get("当前工序"));
+        out.put("当前工序", cur == null || "null".equals(cur) ? "" : cur);
+        return out;
+    }
+
+    /**
+     * **撤回派工**(用户口径「要求实现可撤回」):任务退回「待加工」并清空生产线。
+     * 已完工的任务不可撤回(需先弃审对应报工);可批量。
+     */
+    @Transactional
+    public Map<String, Object> unassign(List<Object> ids, String user) {
+        if (ids == null || ids.isEmpty()) throw new IllegalArgumentException("请先勾选要撤回派工的工序任务");
+        List<String> done = new ArrayList<>();
+        List<String> failed = new ArrayList<>();
+        for (Object idObj : ids) {
+            long id = ((Number) idObj).longValue();
+            try {
+                List<Map<String, Object>> rows = jdbc.queryForList(
+                        "SELECT 单据编号, 工序, ISNULL(状态,N'') AS 状态, ISNULL(生产线,N'') AS 生产线"
+                                + " FROM dbo.wo_progress WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", id);
+                if (rows.isEmpty()) throw new IllegalStateException("任务不存在或已作废");
+                Map<String, Object> r0 = rows.get(0);
+                if ("已完工".equals(String.valueOf(r0.get("状态")))) {
+                    throw new IllegalStateException("已完工,撤回需先弃审对应报工");
+                }
+                if (String.valueOf(r0.get("生产线")).isBlank()) {
+                    throw new IllegalStateException("尚未派工,无需撤回");
+                }
+                jdbc.update("UPDATE dbo.wo_progress SET 生产线=NULL, 状态=N'待加工', asp_user2=?, asp_time2=GETDATE()"
+                        + " WHERE id=?", user, id);
+                done.add(String.valueOf(r0.get("单据编号")) + "/" + r0.get("工序"));
+            } catch (IllegalStateException e) {
+                failed.add(id + ":" + e.getMessage());
+            }
+        }
+        if (done.isEmpty()) throw new IllegalStateException("无任务可撤回:" + String.join("; ", failed));
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("撤回行数", done.size());
+        out.put("任务清单", done);
+        out.put("失败行", failed);
         return out;
     }
 

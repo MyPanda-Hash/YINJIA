@@ -85,6 +85,29 @@ public class ProcessTaskController {
         return ApiResult.ok(service.rebuild(str(body.get("工单号")), currentUser()));
     }
 
+    /** 工序总览:按工序(成型/切炭/组装)汇总待加工/在加工/已完工/未完成量(只读视图) */
+    @PostMapping("/board")
+    public ApiResult<List<Map<String, Object>>> board() {
+        perm.requirePanelView("MANU_ORDER");
+        return ApiResult.ok(service.board());
+    }
+
+    /** 工单详情:表头 + 工序时间轴(这单处在哪个阶段)+ 汇总 —— 点工单号即看 */
+    @PostMapping("/detail")
+    public ApiResult<Map<String, Object>> detail(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        return ApiResult.ok(service.detail(str(body.get("工单号"))));
+    }
+
+    /** **撤回派工**:任务退回待加工、清空生产线(可批量) */
+    @PostMapping("/unassign")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> unassign(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        perm.requireButton("MANU_ORDER", "保存");
+        return ApiResult.ok(service.unassign((List<Object>) body.getOrDefault("ids", List.of()), currentUser()));
+    }
+
     private static String currentUser() {
         var auth = SecurityContextHolder.getContext().getAuthentication();
         return auth == null || auth.getName() == null || auth.getName().isBlank() ? "system" : auth.getName();

@@ -472,6 +472,22 @@ export default {
     '生产车间': 'Workshop',
     '留空=不受限(计划组/管理员)': 'Blank = unrestricted (planning / admin)',
     '工序/工艺': 'Process',
+    // 工序总览 + 工单详情 + 撤回派工(2026-10-05)
+    '工序总览': 'Process Overview',
+    '撤回派工': 'Withdraw Dispatch',
+    '已撤回': 'Withdrawn',
+    '撤回失败': 'Withdraw failed',
+    '条任务撤回派工(退回待加工)?': 'task(s) withdrawn back to Pending?',
+    '工单详情': 'Work Order Detail',
+    '未开工': 'Not Started',
+    '工单行数': 'WO Lines',
+    '交期': 'Due Date',
+    '排产产线': 'Scheduled Line',
+    '暂无工序任务': 'No process tasks',
+    '涉及产线': 'Lines Involved',
+    '按工序序列': 'By process sequence',
+    '该工单还没有工序任务(转工单时按工艺路线自动生成,可在工序任务页补生成)':
+      'No process tasks yet (generated from the routing when the WO is created; can be regenerated on the Process Tasks page)',
     // 工序任务(路线驱动,A 项,2026-10-05)
     '工序任务': 'Process Tasks',
     '派工到产线': 'Dispatch to Line',

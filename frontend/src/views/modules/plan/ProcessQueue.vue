@@ -24,10 +24,26 @@
         <el-button size="small" type="warning" plain :disabled="!checked.length" @click="openAssign">
           {{ tt('派工到产线') }}（{{ checked.length }}）
         </el-button>
+        <el-button size="small" plain :disabled="!checked.length" @click="doUnassign">{{ tt('撤回派工') }}</el-button>
         <el-button size="small" plain :disabled="!checked.length" @click="doPriority('急单')">{{ tt('标急单') }}</el-button>
         <el-button size="small" plain :disabled="!checked.length" @click="doPriority('普通')">{{ tt('取消急单') }}</el-button>
         <span class="pq-cnt">{{ tt('共') }} {{ rows.length }} {{ tt('条') }} ｜ {{ tt('未完成') }} {{ num(sumLeft) }}</span>
       </span>
+    </div>
+
+    <!-- 工序总览(2026-10-05):按 工序/工艺 汇总待加工/在加工/已完工/未完成量;点卡片即筛选该工序 -->
+    <div class="pq-board">
+      <div v-for="b in board" :key="b.工序" class="pq-card" :class="{ active: f.工序 === b.工序 }" @click="pickShop(b.工序)">
+        <div class="pq-card-t">{{ tt(b.工序) }}</div>
+        <div class="pq-card-n">
+          {{ tt('待加工') }} <b>{{ b.待加工数 }}</b> ｜ {{ tt('在加工') }} <b>{{ b.在加工数 }}</b> ｜ {{ tt('已完工') }} <b>{{ b.已完工数 }}</b>
+        </div>
+        <div class="pq-card-q">
+          {{ tt('未完成') }} {{ num(b.未完成量) }} ｜ {{ tt('急单') }} {{ b.急单数 }} ｜ {{ tt('涉及产线') }} {{ b.涉及产线 }}
+          <span v-if="b.最早计划完工">｜{{ b.最早计划完工 }}</span>
+        </div>
+      </div>
+      <div v-if="!board.length" class="pq-card-empty">{{ tt('暂无工序任务') }}</div>
     </div>
 
     <el-table :data="rows" size="small" border height="100%" empty-text="" row-key="任务id" @selection-change="(r) => (checked = r)">
@@ -41,7 +57,11 @@
           <span :class="{ 'pq-urgent': row.优先级 === '急单' }">{{ tt(row.优先级) }}</span>
         </template>
       </el-table-column>
-      <el-table-column :label="tt('工单号')" prop="工单号" width="150" sortable show-overflow-tooltip />
+      <el-table-column :label="tt('工单号')" prop="工单号" width="150" sortable show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-link type="primary" :underline="false" @click="openDetail(row.工单号)">{{ row.工单号 }}</el-link>
+        </template>
+      </el-table-column>
       <el-table-column :label="tt('工单行号')" prop="工单行号" width="85" align="right" />
       <el-table-column :label="tt('批次号')" prop="批次号" width="100" />
       <el-table-column :label="tt('产品编码')" prop="产品编码" width="110" show-overflow-tooltip />
@@ -61,6 +81,9 @@
         <template #default="{ row }">{{ row.生产线 || '-' }}</template>
       </el-table-column>
     </el-table>
+
+    <!-- 工单详情抽屉(点工单号打开:处于哪个阶段/各工序进度) -->
+    <WorkOrderDetailDrawer v-model="dtVisible" :code="dtCode" />
 
     <!-- 派工弹窗:目标产线(按工序/工艺收敛:该工序 = 该功能,只列本功能的线) -->
     <el-dialog v-model="asVisible" :title="tt('派工到产线')" width="380px" append-to-body>
@@ -83,6 +106,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
+import WorkOrderDetailDrawer from './WorkOrderDetailDrawer.vue'
 
 const f = reactive({ 工序: '', 状态: '待加工', 生产线: '', keyword: '' })
 const rows = ref([])
@@ -90,6 +114,32 @@ const checked = ref([])
 const meta = ref({ 工序: [], 状态: [], 产线: [] })
 const asVisible = ref(false)
 const asLine = ref('')
+/** 工序总览 + 工单详情抽屉(2026-10-05) */
+const board = ref([])
+const dtVisible = ref(false)
+const dtCode = ref('')
+
+async function loadBoard() {
+  try { board.value = (await request.post('/px/processTask/board', {})).data || [] } catch { board.value = [] }
+}
+/** 点总览卡片 = 按该工序筛选队列 */
+function pickShop(op) { f.工序 = f.工序 === op ? '' : op; load() }
+/** 点工单号 = 打开详情抽屉(看这单处在哪个阶段) */
+function openDetail(no) { dtCode.value = no; dtVisible.value = true }
+/** 撤回派工:任务退回待加工、清空生产线(可撤回要求,2026-10-05) */
+async function doUnassign() {
+  try {
+    await ElMessageBox.confirm(`${tt('将选中的')} ${checked.value.length} ${tt('条任务撤回派工(退回待加工)?')}`, tt('撤回派工'),
+      { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
+  } catch { return }
+  try {
+    const res = await request.post('/px/processTask/unassign', { ids: checked.value.map((r) => r.任务id) })
+    const d = res.data || {}
+    const failed = d['失败行'] || []
+    ElMessage.success(`${tt('已撤回')} ${d['撤回行数']} ${tt('条')}` + (failed.length ? `（${tt('跳过')} ${failed.length}）` : ''))
+    load(); loadBoard()
+  } catch (e) { ElMessage.error(e?.response?.data?.message || tt('撤回失败')) }
+}
 
 const num = (v) => { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 const sumLeft = computed(() => rows.value.reduce((a, r) => a + Number(r.未完成量 || 0), 0))
@@ -150,7 +200,7 @@ async function doPriority(p) {
   } catch (e) { ElMessage.error(e?.response?.data?.message || tt('更新失败')) }
 }
 
-onMounted(() => { loadMeta(); load() })
+onMounted(() => { loadMeta(); load(); loadBoard() })
 </script>
 
 <style scoped>
@@ -160,6 +210,14 @@ onMounted(() => { loadMeta(); load() })
 .pq-actions { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 .pq-cnt { font-size: 12px; color: #116a5b; font-weight: 600; }
 .pq-urgent { color: #f56c6c; font-weight: 700; }
+/* 工序总览卡片条(2026-10-05) */
+.pq-board { display: flex; gap: 10px; flex-wrap: wrap; }
+.pq-card { flex: 1 1 200px; border: 1px solid #e4e7ed; border-radius: 6px; padding: 8px 10px; cursor: pointer; background: #fafcff; }
+.pq-card.active { border-color: #116a5b; background: #f0f9f7; }
+.pq-card-t { font-size: 14px; font-weight: 700; color: #116a5b; margin-bottom: 4px; }
+.pq-card-n { font-size: 12px; color: #303133; }
+.pq-card-q { font-size: 12px; color: #909399; margin-top: 2px; }
+.pq-card-empty { font-size: 12px; color: #909399; }
 .pq-p { padding: 6px 0; }
 .pq-tip { color: #909399; font-size: 12px; }
 </style>
