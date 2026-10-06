@@ -1,6 +1,7 @@
 <!-- WorkOrderList.vue — 生产工单(2026-09-26 用户拍板:纯查询页,数据=参考库工单表 plang)
      顶部 日期范围 + 单框模糊搜索(工单号/物料/客户/产品 多列 OR);按钮条 结案/取消结案/打印工单(勾选多个=批量)/打印领料单/导出/刷新;
-     产线筛选 + 未完工/已完工/追溯;明细大表(勾选)。打印工单=勾选行直打+留痕;结案走 plang 专属端点。 -->
+     产线筛选 + 未完工/已完工/追溯;明细大表(勾选)。打印工单=勾选行直打+留痕;结案走 plang 专属端点。
+     取数窗口:默认预填最近 15 天(2026-10-05 用户口径,防单据累积后卡),清空日期框=查全量。 -->
 <template>
   <div class="wol-page">
     <!-- 查询行:日期范围 + 单框模糊搜索 -->
@@ -169,6 +170,12 @@ const lines = ref([])
 const lineFilter = ref('')
 const lineCode = ref('')
 const stateFilter = ref('')
+/**
+ * 默认取数窗口 = 最近 15 天(2026-10-05 用户口径:单据一多就卡,默认不拉全量)。
+ * 进页面时预填「今天-14 ~ 今天」(含今天共 15 天);**清空两个日期即查全量**。
+ * 注意:日期串按本机时区拼(不用 toISOString —— UTC 下东八区 00:00~08:00 会退一天)。
+ */
+const DEFAULT_WINDOW_DAYS = 15
 const dateFrom = ref('')
 const dateTo = ref('')
 const qText = ref('')
@@ -412,7 +419,21 @@ function exportCsv() {
   a.click()
 }
 
-onMounted(() => { load(); loadLines() })
+/** 本机时区的 yyyy-MM-dd(偏移 n 天;n=0 为今天) */
+function dayStr(n) {
+  const d = new Date()
+  d.setDate(d.getDate() + n)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+onMounted(() => {
+  // 默认只取最近 15 天(可在日期框上清空 → 全量);已填过值(如热更重挂)不覆盖用户输入
+  if (!dateFrom.value && !dateTo.value) {
+    dateFrom.value = dayStr(-(DEFAULT_WINDOW_DAYS - 1))
+    dateTo.value = dayStr(0)
+  }
+  load(); loadLines()
+})
 </script>
 
 <style scoped>
