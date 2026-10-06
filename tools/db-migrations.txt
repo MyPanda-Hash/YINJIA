@@ -2397,3 +2397,7 @@ migrate-route-relax-required.sql
 # migrate-route-restore-required.sql(2026-10-05):撤回首条必填收敛,恢复 工序控制/生效日期/失效日期 必填
 #   用户口径「必填保留,但不在填写明细表时校验」⇒ 必填恢复,校验时机改前端(保存时)。两账套均执行。
 migrate-route-restore-required.sql
+# migrate-route-header-detail-place.sql(2026-10-05):工艺路线表头字段同时挂明细位(修「保存后名称消失」)
+#   实测:单表式单据保存把头字段写到只含头字段的一行,而表头按第一行回显 ⇒ 名称看似消失。
+#   处置:名称/生效日期/失效日期 place=header,detail;幂等;两账套均执行。
+migrate-route-header-detail-place.sql
