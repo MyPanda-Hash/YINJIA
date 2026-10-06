@@ -288,7 +288,6 @@ async function printPick() {
 
 /** 切单(9.29 批次①):勾选/当前行必须恰为一张工单 → 后端预览可切上限 → 弹窗输入切出数量 */
 function splitTarget() {
-function splitTarget() {
   // 2026-10-05 修复「撤回切单后一直提示请勾选一个工单」:表格开了 reserve-selection,
   // 被撤回的子单行已从列表消失、但勾选状态仍留在 checked 里(且无法取消)→ checked.length≠1 永久卡死。
   // 口径:只认**当前列表里还在的**选中行(按 行id);没有则退回当前行(currentRow)。
