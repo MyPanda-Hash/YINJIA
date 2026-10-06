@@ -5367,6 +5367,18 @@ async function onDetailRefConfirm(selectedRows) {
     //   ⇒ 表现为"先选工序就加不进去"。改为只写**本地草稿**并标脏(不落库、不 load 避免刷掉草稿),
     //   于是必填校验只发生在点「保存 / 提交 / 审核」时。其它面板(存货导入等)保持原行为。
     if (panelCode.value === 'ROUTE') {
+      // ⚠ 2026-10-05 修"提示已带入但界面没数据":明细行对象是 **markRaw**(大表性能优化),
+      //   applyDetailReference 改写行属性**不触发重渲染** —— 以前靠紧随其后的 load() 从服务端
+      //   重新取数才显示出来;改成不落库/不 load 之后,值写进了数据但界面不刷新。
+      //   这里两手刷新显示:① 换一次数组引用(reactive 依赖变化) ② 激活刚带入的那一格(懒编辑器挂载)。
+      const tabArr = cur.value.detail?.[pick.tabKey] || []
+      if (cur.value.detail) cur.value.detail[pick.tabKey] = tabArr.slice()
+      const targetRow = pick.row || tabArr[tabArr.length - 1]
+      const propName = pick.field?.dataName || ''
+      if (targetRow && propName) {
+        activeCell.value = { row: targetRow, tabKey: pick.tabKey, prop: propName }
+        syncActiveCellEcho(targetRow, propName)
+      }
       markInlineDirty()
       detailRefVisible.value = false
       ElMessage.success(`已带入 ${selectedRows.length} 条工序，请点「保存」提交`)
