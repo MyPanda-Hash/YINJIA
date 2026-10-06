@@ -2359,3 +2359,7 @@ migrate-wo-process-board-view.sql
 #   用户口径「遗留工单行可以作废」;该行让工单进度/工序队列/工序总览/详情汇总全部失真。
 #   **软删**(asp_cancel='Y' + 留痕)⇒ 可改回 'N' 撤回;幂等;两账套均执行。
 migrate-plang-void-legacy-dirty.sql
+# migrate-plang-route.sql(2026-10-05):工单关联工艺路线(plang.工艺路线)
+#   用户口径「转工单的时候需要选择工序路线」→ 定案:**在订单结转处选择**;回填=产品绑定(bs_inv.工艺路线)优先,
+#   否则默认 GY-CB-STD。撤回:ALTER TABLE plang DROP COLUMN [工艺路线]。幂等;两账套均执行。
+migrate-plang-route.sql
