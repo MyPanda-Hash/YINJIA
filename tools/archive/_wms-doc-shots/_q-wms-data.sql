@@ -1,0 +1,25 @@
+SET NOCOUNT ON;
+PRINT '=== A) bs_wh 列名 ===';
+GO
+SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='bs_wh' ORDER BY ORDINAL_POSITION;
+GO
+PRINT '=== B) 仓库档案(前 20) ===';
+GO
+SELECT TOP 20 * FROM bs_wh ORDER BY 1;
+GO
+PRINT '=== C) bs_dict 列名 ===';
+GO
+SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='bs_dict' ORDER BY ORDINAL_POSITION;
+GO
+PRINT '=== D) 存量数据 ===';
+GO
+SELECT N'采购入库单' AS 表, COUNT(*) AS 行数 FROM bl_purchase_in
+UNION ALL SELECT N'产成品入库单', COUNT(*) FROM bl_finish_in
+UNION ALL SELECT N'材料出库单', COUNT(*) FROM bl_material_out
+UNION ALL SELECT N'销售出库单', COUNT(*) FROM bl_sale_out
+UNION ALL SELECT N'库存台账', COUNT(*) FROM v_stock_ledger
+UNION ALL SELECT N'库存状况表', COUNT(*) FROM v_stock_balance
+UNION ALL SELECT N'商品档案', COUNT(*) FROM bs_inv
+UNION ALL SELECT N'仓库档案', COUNT(*) FROM bs_wh
+UNION ALL SELECT N'库位档案', COUNT(*) FROM bs_wh_loc;
+GO
