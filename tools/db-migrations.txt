@@ -2375,3 +2375,7 @@ migrate-wo-next-process-view-nodefault.sql
 #   用户口径「行当前就修改生产工单即可」;代码取号与面板元数据同步改,只影响新单号,历史单号不变。
 #   撤回:面板 prefix 改回 MO + 代码 formNo.next("MO")。幂等;两账套均执行。
 migrate-manu-order-prefix-gd.sql
+# migrate-plang-report-state.sql(2026-10-05):工单状态字段(当前工序/当前工序完工量/完工状态/完工时间)
+#   用户口径「报工需要能影响当前的工单情况」:报工审核/弃审回写工单状态(生产完工=路线末道完工量≥Σ计划量);
+#   弃审自动回退。撤回:DROP COLUMN 四列。幂等;两账套均执行。
+migrate-plang-report-state.sql
