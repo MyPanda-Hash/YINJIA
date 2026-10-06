@@ -263,6 +263,22 @@ async function doPrintTask(mode) {
   const src = checked.value.length ? checked.value : (currentRow.value ? [currentRow.value] : [])
   if (!src.length) { ElMessage.warning(tt('请先勾选要打印的工单')); return }
   try {
+    // 成型任务单的数量 = **按工艺路线换算后的成型工序量**(2026-10-05 用户口径:
+    // 「成型打印的任务单就是需要根据换算进行的…不需要显示换算率,显示换算后的数量即可」)。
+    // 换算因子 = 该工单成型工序的计划量 ÷ 工单计划合计(即累计换算率),再按**行**的排产数量摊算;
+    // 取不到(未绑路线/无换算)时退回排产数量,不影响既有打印。
+    const factor = {}
+    if (mode === '成型生产任务单') {
+      await Promise.all([...new Set(src.map((r) => r.工单号))].map(async (no) => {
+        try {
+          const d = (await request.post('/px/processTask/detail', { 工单号: no })).data || {}
+          const total = Number(d['计划合计'] || 0)
+          const st = (d['工序步骤'] || []).find((x) => x['工序'] === '成型')
+          const q = Number(st?.['计划量'] || 0)
+          if (total > 0 && q > 0) factor[no] = q / total
+        } catch { /* 取不到就退回排产数量 */ }
+      }))
+    }
     const rowsToPrint = src.map((r) => ({
       单据编号: r.工单号,
       公司代码: r.公司代码 || '', 工单行号: r.工单行号, // 工单二维码=公司代码@工单号@1000+工单行号(2026-10-09 规则改版)
@@ -271,7 +287,8 @@ async function doPrintTask(mode) {
       商品名称: r.产品名称 || '',
       规格型号: r.规格型号 || '',
       订单数量: r.需求数量,
-      成型折算后数量: r.排产数量,
+      // 成型任务单:换算后的数量(出货口 = 该行排产数量 × 累计换算率,如 3 倍 → 80 变 240)
+      成型折算后数量: factor[r.工单号] ? Math.round(Number(r.排产数量 || 0) * factor[r.工单号] * 10000) / 10000 : r.排产数量,
       计划完工日期: r.计划完工日期 || '',
       批号: r.批号 || '', 物料编码: r.物料编码 || '',
       排产数量: r.排产数量, 生产线: r.生产线 || lineFilter.value || '',
