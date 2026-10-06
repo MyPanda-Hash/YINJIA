@@ -289,6 +289,19 @@ public class ProcessTaskService {
     }
 
     /**
+     * 可选工艺路线列表(**含工序序列**,供弹窗选择;2026-10-05 用户口径:路线多时下拉不现实 → 改弹窗)。
+     */
+    public List<Map<String, Object>> routes() {
+        return jdbc.queryForList(
+                "SELECT r.工艺路线编码 AS 编码, MAX(ISNULL(r.工艺路线名称, N'')) AS 名称, COUNT(*) AS 工序数,"
+                        + " STUFF((SELECT N'→' + x.工序名称 FROM dbo.bs_route x WHERE x.工艺路线编码 = r.工艺路线编码"
+                        + "         AND ISNULL(x.asp_cancel,'N')<>'Y' AND ISNULL(x.工序名称,N'')<>N''"
+                        + "         ORDER BY ISNULL(x.加工顺序,999) FOR XML PATH('')),1,1,N'') AS 工序序列"
+                        + " FROM dbo.bs_route r WHERE ISNULL(r.asp_cancel,'N')<>'Y' AND ISNULL(r.工序名称,N'')<>N''"
+                        + " GROUP BY r.工艺路线编码 ORDER BY r.工艺路线编码");
+    }
+
+    /**
      * **下一道工序 + 候选产线**(2026-10-05,方案第 2 步的统一口径):
      * 读视图 {@code v_wo_next_process}(= 该工单路线里第一个尚无已审核报工的工序),再取该工序功能下的启用产线。
      * 排产/调拨/工单详情共用这一处,避免再次出现"产线口径各写一套"。
@@ -303,9 +316,14 @@ public class ProcessTaskService {
                         + " FROM dbo.v_wo_next_process WHERE 单号 IN (" + in + ")", nos.toArray());
         for (Map<String, Object> r : rows) {
             String shop = String.valueOf(r.get("生产车间"));
+            String rt = String.valueOf(r.get("工艺路线"));
             r.put("候选产线", shop.isBlank() ? List.of() : jdbc.queryForList(
                     "SELECT 生产线 FROM dbo.bs_prod_line WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(停用,0)=0"
                             + " AND ISNULL(生产车间,N'')=? ORDER BY ISNULL(排序,999), 生产线", String.class, shop));
+            // 该路线的完整工序序列(按加工顺序):前端「工序/工艺」下拉直接按它出选项与顺序
+            r.put("路线工序", rt.isBlank() || "null".equals(rt) ? List.of() : jdbc.queryForList(
+                    "SELECT 工序名称 FROM dbo.bs_route WHERE 工艺路线编码=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + " AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999)", String.class, rt));
         }
         return rows;
     }

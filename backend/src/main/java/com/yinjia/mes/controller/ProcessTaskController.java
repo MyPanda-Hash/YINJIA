@@ -85,6 +85,13 @@ public class ProcessTaskController {
         return ApiResult.ok(service.rebuild(str(body.get("工单号")), currentUser()));
     }
 
+    /** 可选工艺路线列表(含工序序列;订单结转/排产弹窗选择用) */
+    @PostMapping("/routes")
+    public ApiResult<List<Map<String, Object>>> routes() {
+        perm.requirePanelView("SO_ORDER");
+        return ApiResult.ok(service.routes());
+    }
+
     /** 下一道工序 + 候选产线(排产/详情共用口径;入参 {工单号列表:[...]}) */
     @PostMapping("/nextProcess")
     @SuppressWarnings("unchecked")

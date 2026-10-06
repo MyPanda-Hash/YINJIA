@@ -481,6 +481,15 @@ export default {
     // 工序总览 + 工单详情 + 撤回派工(2026-10-05)
     '工序总览': 'Process Overview',
     // 订单结转选路线 + 下一道工序收敛(2026-10-05)
+    // 路线弹窗 + 工序按路线(2026-10-05)
+    '选择工艺路线': 'Select Routing',
+    '编码 / 名称': 'Code / Name',
+    '工序序列': 'Process Sequence',
+    '工序数': 'Processes',
+    '将对勾选的': 'Apply this routing to the selected',
+    '行应用该路线(双击行亦可)': 'row(s) (double-click a row too)',
+    '已为': 'Set routing for',
+    '行设置工艺路线': 'row(s):',
     '下一道工序': 'Next Process',
     '按勾选工单': 'per selected work order',
     '默认 GY-CB-STD': 'default GY-CB-STD',

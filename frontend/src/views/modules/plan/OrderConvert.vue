@@ -38,6 +38,7 @@
       <el-button type="danger" plain :disabled="!dateChanged.length" @click="saveDates">
         {{ tt('保存交期') }}（{{ dateChanged.length }}）
       </el-button>
+      <el-button :disabled="!checked.length" @click="openRouteDialog">{{ tt('选择工艺路线') }}（{{ checked.length }}）</el-button>
       <el-button type="success" :disabled="!checked.length" @click="toManu">{{ tt('转工单') }}（{{ checked.length }}）</el-button>
       <span class="oc-count">{{ tt('共有数据') }}: <b>{{ rows.length }}</b> {{ tt('条') }}</span>
     </el-form>
@@ -83,9 +84,7 @@
           <template #default="{ row }">
             <!-- 用户口径(2026-10-05):**在订单结转处选择工序路线** —— 预填产品绑定(否则默认 GY-CB-STD),可逐行改;
                  转单时原样带入工单(plang.工艺路线),之后排产/详情一律按这条路线解释"走到哪一步"。 -->
-            <el-select v-model="row.工艺路线" size="small" filterable style="width: 100%" :placeholder="tt('默认 GY-CB-STD')">
-              <el-option v-for="rt in routeOptions" :key="rt.编码" :label="rt.名称 ? `${rt.编码}·${rt.名称}` : rt.编码" :value="rt.编码" />
-            </el-select>
+            <span :class="{ 'oc-blue': !!row.工艺路线 }" :title="row.工艺路线">{{ row.工艺路线 || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column :label="tt('本次转单数量')" width="125" fixed="right">
@@ -101,6 +100,23 @@
           </div>
         </template>
       </el-table>
+
+    <!-- 工艺路线选择弹窗(2026-10-05 用户口径:路线多时下拉不现实 ⇒ 弹窗;支持编码/名称过滤,列出工序序列) -->
+    <el-dialog v-model="routeDialog" :title="tt('选择工艺路线')" width="660px" append-to-body>
+      <el-input v-model="routeKw" :placeholder="tt('编码 / 名称')" clearable style="width: 220px; margin-bottom: 8px" />
+      <el-table :data="routeFiltered" size="small" border height="330" highlight-current-row
+                @current-change="(r) => (routePick = r)" @row-dblclick="applyRoute">
+        <el-table-column :label="tt('编码')" prop="编码" width="140" />
+        <el-table-column :label="tt('名称')" prop="名称" width="170" show-overflow-tooltip />
+        <el-table-column :label="tt('工序序列')" prop="工序序列" min-width="220" show-overflow-tooltip />
+        <el-table-column :label="tt('工序数')" prop="工序数" width="80" align="right" />
+      </el-table>
+      <template #footer>
+        <span class="oc-route-tip">{{ tt('将对勾选的') }} {{ checked.length }} {{ tt('行应用该路线(双击行亦可)') }}</span>
+        <el-button @click="routeDialog = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :disabled="!routePick" @click="applyRoute">{{ tt('确定') }}</el-button>
+      </template>
+    </el-dialog>
     </div>
 
     <div class="oc-pager">
@@ -126,14 +142,24 @@ const dateMode = ref('day')   // 'day'=单日;'3'/'7'/'14'/'30'=近N天(anchor �
 const anchor = ref('')        // 单日=查询的那一天;近N天=截止日;空=按今天兜底
 const pageNo = ref(1)
 const pageSize = ref(100)
-/** 可选工艺路线(订单结转处选择,2026-10-05):选项来自 bs_route 启用路线 */
+/** 可选工艺路线(弹窗选择,2026-10-05):来自 bs_route,含工序序列 */
 const routeOptions = ref([])
+const routeDialog = ref(false)
+const routeKw = ref('')
+const routePick = ref(null)
+const routeFiltered = computed(() => routeOptions.value.filter((r) =>
+  !routeKw.value || String(r.编码 || '').includes(routeKw.value) || String(r.名称 || '').includes(routeKw.value)))
 async function loadRoutes() {
-  try {
-    const res = await request.post('/px/processTask/meta', {})
-    const list = (res.data || {})['路线'] || []
-    routeOptions.value = list.map((x) => (typeof x === 'string' ? { 编码: x, 名称: '' } : { 编码: x.编码 || x, 名称: x.名称 || '' }))
-  } catch { routeOptions.value = [{ 编码: 'GY-CB-STD', 名称: '炭棒标准路线' }] }
+  try { routeOptions.value = (await request.post('/px/processTask/routes', {})).data || [] } catch { routeOptions.value = [] }
+}
+function openRouteDialog() { routePick.value = null; routeKw.value = ''; routeDialog.value = true }
+/** 把弹窗里选中的路线应用到**勾选行**(批量;未勾选则不动) */
+function applyRoute() {
+  const rt = routePick.value
+  if (!rt) return
+  for (const r of checked.value) r.工艺路线 = rt.编码
+  ElMessage.success(`${tt('已为')} ${checked.value.length} ${tt('行设置工艺路线')} ${rt.编码}`)
+  routeDialog.value = false
 }
 const rows = ref([])
 const checked = ref([])

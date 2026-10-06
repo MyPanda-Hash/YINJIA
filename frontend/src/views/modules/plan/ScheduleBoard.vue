@@ -11,7 +11,7 @@
            收敛候选线 —— 装箱归「组装」功能(文件口径),不再按旧的 13 种车间写法 -->
       <span class="sb-p">{{ tt('工序/工艺') }}
         <el-select v-model="param.shop" filterable clearable style="width: 160px" :placeholder="tt('全部工序')" @change="param.line = ''">
-          <el-option v-for="w in shops" :key="w" :label="w" :value="w" />
+          <el-option v-for="w in processOptions" :key="w" :label="tt(w)" :value="w" />
         </el-select>
       </span>
       <span class="sb-p" v-if="subGroups.length">{{ tt('产线分组') }}
@@ -149,8 +149,15 @@ const teams = ref([])
 const param = reactive({ line: '', team: '', start: '', due: new Date().toISOString().slice(0, 10), qty: null, shop: '', group: '' })
 const mode = computed(() => (allMode.value ? 'all' : 'today'))
 const customers = computed(() => [...new Set(pool.value.map((r) => r.客户).filter(Boolean))].sort())
-/** 工序/工艺(第1级):产线档案里出现过的功能值 */
+/** 工序/工艺(第1级)兜底:产线档案里出现过的功能值 */
 const shops = computed(() => [...new Set(lines.value.map((l) => l.生产车间).filter(Boolean))].sort())
+/** 工序/工艺下拉:勾选工单时 = **该工单工艺路线的工序序列(按路线顺序)**;未勾选 = 产线档案里出现过的功能值 */
+const processOptions = computed(() => {
+  const seqs = [...new Set(checked.value
+    .map((r) => ((nextInfo.value[r['加工单号']] || {})['路线工序'] || []).join('→'))
+    .filter(Boolean))]
+  return seqs.length === 1 ? seqs[0].split('→') : shops.value
+})
 /** 产线分组(第2级,仅成型有:烧结/X烧结):随所选功能收敛 */
 const subGroups = computed(() => [...new Set(lines.value
   .filter((l) => !param.shop || l.生产车间 === param.shop)
