@@ -5361,6 +5361,17 @@ async function onDetailRefConfirm(selectedRows) {
 
   detailRefSaving.value = true
   try {
+    // 2026-10-05 用户口径「我想先填工序」+「能不能选择审核或者保存的时候才校验?」:
+    //   工艺路线(ROUTE)的「工序编码」参照 —— 确认后**不再连带保存整单**。原先这里顺带保存,
+    //   新行还没填 工序控制/工序序列 就被后端**明细必填**拦下(HTTP 400),随即回滚刚带入的行
+    //   ⇒ 表现为"先选工序就加不进去"。改为只写**本地草稿**并标脏(不落库、不 load 避免刷掉草稿),
+    //   于是必填校验只发生在点「保存 / 提交 / 审核」时。其它面板(存货导入等)保持原行为。
+    if (panelCode.value === 'ROUTE') {
+      markInlineDirty()
+      detailRefVisible.value = false
+      ElMessage.success(`已带入 ${selectedRows.length} 条工序，请点「保存」提交`)
+      return
+    }
     await engine.callButton({
       panelCode: panelCode.value,
       buttonName: '保存',
