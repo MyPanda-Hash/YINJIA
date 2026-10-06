@@ -440,6 +440,110 @@ public class ProcessTaskService {
         return out;
     }
 
+    /**
+     * **预排全程线**(2026-10-05 用户口径「开始排线时根据当前工序排线,整个工单定好线」):
+     * 按该工单的工艺路线,给每道工序登记一条**计划线** —— 首道 = 刚排入的线;
+     * 其后各道 = 该工序功能(生产车间)下**当时负荷最闲**的线(日产能−今日已排 最大者;无产能数据按 排序/线名)。
+     * 一行 = 一(工单 × 工序);幂等(先清该工单"计划"态旧行)。只写计划,不动 plang.scx。
+     */
+    @Transactional
+    public int preplanLines(String plNo, String firstLine, String user) {
+        if (!notBlank(plNo)) return 0;
+        String no = plNo.trim();
+        List<String> rs = jdbc.queryForList("SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE pl_no=?"
+                + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", String.class, no);
+        String route = rs.isEmpty() || rs.get(0) == null ? "" : rs.get(0).trim();
+        if (route.isEmpty()) return 0;
+        List<Map<String, Object>> lines = jdbc.queryForList("SELECT 工序名称, 加工顺序, ISNULL(生产车间,N'') AS 生产车间"
+                + " FROM dbo.bs_route WHERE 工艺路线编码=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                + " AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999)", route);
+        if (lines.isEmpty()) return 0;
+        jdbc.update("DELETE FROM dbo.wo_process_line WHERE 工单号=? AND ISNULL(状态,N'计划')=N'计划'", no);
+        int n = 0;
+        for (int i = 0; i < lines.size(); i++) {
+            String op = String.valueOf(lines.get(i).get("工序名称")).trim();
+            String shop = String.valueOf(lines.get(i).get("生产车间")).trim();
+            String plan = (i == 0 && notBlank(firstLine)) ? firstLine.trim() : idleLineOf(shop);
+            n += jdbc.update("INSERT INTO dbo.wo_process_line (工单号, 工序, 工序序, 计划生产线, 计划数量, 状态,"
+                            + " asp_cancel, asp_user1, asp_time1) VALUES (?,?,?,?,?,N'计划',N'N',?,GETDATE())",
+                    no, op, lines.get(i).get("加工顺序"), plan, round(processPlanQty(no, op)), user);
+        }
+        return n;
+    }
+
+    /** 工单当前线(scx);取不到返回空 */
+    private String cs0(String no) {
+        List<String> cs = jdbc.queryForList("SELECT TOP 1 ISNULL(scx,N'') FROM dbo.plang WHERE pl_no=?"
+                + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", String.class, no);
+        return cs.isEmpty() || cs.get(0) == null ? "" : cs.get(0).trim();
+    }
+    /** 该功能(生产车间)下当时负荷最闲的启用线:日产能−今日已排 最大者;无产能数据时按 排序/线名 取第一条 */
+    private String idleLineOf(String shop) {
+        if (!notBlank(shop)) return null;
+        List<Map<String, Object>> ls = jdbc.queryForList(
+                "SELECT l.生产线, ISNULL(l.日产能,0) AS 日产能, ISNULL(x.今日已排,0) AS 今日已排"
+                        + " FROM dbo.bs_prod_line l"
+                        + " OUTER APPLY (SELECT SUM(ISNULL(p.pl_sl,0)) AS 今日已排 FROM dbo.plang p"
+                        + "   WHERE p.scx=l.生产线 AND ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        + "     AND CONVERT(varchar(10), p.asp_time2, 120)=CONVERT(varchar(10), GETDATE(), 120)) x"
+                        + " WHERE ISNULL(l.asp_cancel,'N')<>'Y' AND ISNULL(l.停用,0)=0 AND ISNULL(l.生产车间,N'')=?"
+                        + " ORDER BY (ISNULL(l.日产能,0)-ISNULL(x.今日已排,0)) DESC, ISNULL(l.排序,999), l.生产线", shop);
+        return ls.isEmpty() ? null : String.valueOf(ls.get(0).get("生产线"));
+    }
+
+    /**
+     * **转序落实**(2026-10-05 用户口径「完成一个步骤后为下一步派新的生产线」,默认**沿用预排线**):
+     * 报工审核后调用 —— 找台账里状态=计划的**下一道**;该道已开工(报工>0)且预排线非空、与当前线不同时:
+     * 写 plang.scx + 台账(实际生产线/已落实/落实时间) + 轨迹 wo_transfer_log。
+     * 计划线为空 → 只提示"请人工派线",不动作。
+     */
+    @Transactional
+    public Map<String, Object> applyNextProcess(String plNo, String user) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("工序", "");
+        if (!notBlank(plNo)) return out;
+        String no = plNo.trim();
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, 工序, ISNULL(计划生产线,N'') AS 计划生产线, ISNULL(状态,N'计划') AS 状态"
+                        + " FROM dbo.wo_process_line WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " ORDER BY ISNULL(工序序,999), id", no);
+        if (rows.isEmpty()) {
+            // 懒预排:该工单还没预排过(排产早于预排触发) → 以当前线为首道线补一次,再读台账
+            preplanLines(no, cs0(no), user);
+            rows = jdbc.queryForList(
+                    "SELECT id, 工序, ISNULL(计划生产线,N'') AS 计划生产线, ISNULL(状态,N'计划') AS 状态"
+                            + " FROM dbo.wo_process_line WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + " ORDER BY ISNULL(工序序,999), id", no);
+        }
+        Map<String, Object> next = null;
+        for (Map<String, Object> r : rows) if ("计划".equals(String.valueOf(r.get("状态")))) { next = r; break; }
+        if (next == null) return out;
+        String op = String.valueOf(next.get("工序")).trim();
+        String plan = String.valueOf(next.get("计划生产线")).trim();
+        Double doneD = jdbc.queryForObject("SELECT ISNULL(SUM(ISNULL(sl,0)),0) FROM dbo.scjl WHERE gldh=? AND gxdm=?"
+                + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'", Double.class, no, op);
+        double done = doneD == null ? 0 : doneD;
+        if (done <= 0) return out;                               // 该道尚未开工 → 不转序
+        List<String> cs = jdbc.queryForList("SELECT TOP 1 ISNULL(scx,N'') FROM dbo.plang WHERE pl_no=?"
+                + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", String.class, no);
+        String cur = cs.isEmpty() || cs.get(0) == null ? "" : cs.get(0).trim();
+        out.put("工序", op);
+        if (plan.isEmpty()) { out.put("提示", "下一道未预排线,请人工派线"); return out; }
+        if (plan.equals(cur)) { out.put("提示", "下一道沿用当前线"); return out; }
+        jdbc.update("UPDATE dbo.plang SET scx=?, asp_user2=?, asp_time2=GETDATE()"
+                + " WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", plan, user, no);
+        jdbc.update("UPDATE dbo.wo_process_line SET 实际生产线=?, 状态=N'已落实', 落实时间=GETDATE(),"
+                + " asp_user2=?, asp_time2=GETDATE() WHERE id=?", plan, user, next.get("id"));
+        try {
+            jdbc.update("INSERT INTO dbo.wo_transfer_log (工单号, 从生产线, 到生产线, 数量, 原因, 状态,"
+                            + " asp_cancel, asp_user1, asp_time1) VALUES (?,?,?,?,N'转序自动派线',N'生效',N'N',?,GETDATE())",
+                    no, cur, plan, done, user);
+        } catch (Exception ignore) { /* 轨迹表结构差异不阻断转序 */ }
+        out.put("从生产线", cur);
+        out.put("到生产线", plan);
+        return out;
+    }
+
     /** 标准工序顺序(与《新系统产线命名.xlsx》的功能口径一致);工单未绑工艺路线时回退用它 */
     private static final String[] PROCESS_ORDER = {"混料", "成型", "切炭", "组装", "装箱"};
 
