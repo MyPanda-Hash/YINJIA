@@ -85,6 +85,17 @@ public class ProcessTaskController {
         return ApiResult.ok(service.rebuild(str(body.get("工单号")), currentUser()));
     }
 
+    /** 下一道工序 + 候选产线(排产/详情共用口径;入参 {工单号列表:[...]}) */
+    @PostMapping("/nextProcess")
+    @SuppressWarnings("unchecked")
+    public ApiResult<List<Map<String, Object>>> nextProcess(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        Object nos = b.get("工单号列表");
+        List<String> list = nos instanceof List<?> l ? l.stream().map(String::valueOf).toList() : List.of();
+        return ApiResult.ok(service.nextProcess(list));
+    }
+
     /** 工序总览:按工序(成型/切炭/组装)汇总待加工/在加工/已完工/未完成量(只读视图) */
     @PostMapping("/board")
     public ApiResult<List<Map<String, Object>>> board() {

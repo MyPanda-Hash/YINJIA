@@ -25,6 +25,7 @@
                      :label="`${l.生产线} · ${tt('今日负荷')}${num(l.今日负荷)}/${tt('日产能')}${num(l.日产能)}`" />
         </el-select>
       </span>
+      <el-tag v-if="nextOp" size="small" type="warning" effect="plain">{{ tt('下一道工序') }}：{{ tt(nextOp) }}（{{ tt('按勾选工单') }}）</el-tag>
       <span class="sb-p">{{ tt('排产班组') }}
         <el-select v-model="param.team" clearable filterable style="width: 130px">
           <el-option v-for="t in teams" :key="t" :label="t" :value="t" />
@@ -154,9 +155,21 @@ const shops = computed(() => [...new Set(lines.value.map((l) => l.生产车间).
 const subGroups = computed(() => [...new Set(lines.value
   .filter((l) => !param.shop || l.生产车间 === param.shop)
   .map((l) => l.产线分组).filter(Boolean))].sort())
-/** 两级收敛后的候选产线 */
-const pickLines = computed(() => lines.value.filter((l) => (!param.shop || l.生产车间 === param.shop)
-  && (!param.group || l.产线分组 === param.group)))
+/** 勾选工单的「下一道工序」信息(2026-10-05,后端统一口径 v_wo_next_process) */
+const nextInfo = ref({})
+const nextShop = computed(() => {
+  const s = [...new Set(checked.value.map((r) => (nextInfo.value[r['加工单号']] || {})['生产车间']).filter(Boolean))]
+  return s.length === 1 ? s[0] : ''
+})
+const nextOp = computed(() => {
+  const o = [...new Set(checked.value.map((r) => (nextInfo.value[r['加工单号']] || {})['下一道工序']).filter(Boolean))]
+  return o.length === 1 ? o[0] : ''
+})
+/** 两级收敛后的候选产线:勾选了工单则**先按该工单下一道工序的功能收敛**(工序/工艺下拉仍可手动覆盖) */
+const pickLines = computed(() => {
+  const shop = param.shop || nextShop.value
+  return lines.value.filter((l) => (!shop || l.生产车间 === shop) && (!param.group || l.产线分组 === param.group))
+})
 
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '' }
 function urgent(v) {
@@ -199,7 +212,18 @@ async function loadToday() {
 }
 
 function loadAll() { loadPool(); loadStats(); loadToday() }
-function onCheck(r) { checked.value = r }
+function onCheck(r) { checked.value = r; loadNextProcess() }
+/** 拉取勾选工单的「下一道工序 + 候选产线」(后端统一口径,排产/调拨/详情共用) */
+async function loadNextProcess() {
+  const nos = [...new Set(checked.value.map((x) => x['加工单号']).filter(Boolean))]
+  if (!nos.length) { nextInfo.value = {}; return }
+  try {
+    const res = await request.post('/px/processTask/nextProcess', { 工单号列表: nos })
+    const m = {}
+    for (const x of (res.data || [])) m[x['单号']] = x
+    nextInfo.value = m
+  } catch { nextInfo.value = {} }
+}
 function onCheckToday(r) { checkedToday.value = r }
 
 /** 行参数 = 顶部参数 + 行内覆盖(生产线/本次数量) */

@@ -474,6 +474,10 @@ export default {
     '工序/工艺': 'Process',
     // 工序总览 + 工单详情 + 撤回派工(2026-10-05)
     '工序总览': 'Process Overview',
+    // 订单结转选路线 + 下一道工序收敛(2026-10-05)
+    '下一道工序': 'Next Process',
+    '按勾选工单': 'per selected work order',
+    '默认 GY-CB-STD': 'default GY-CB-STD',
     // 工单详情第二版(2026-10-05):按工序聚合 + 产出/进度 + 异常计划量
     '产出': 'Output',
     '进度': 'Progress',

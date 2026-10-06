@@ -281,11 +281,33 @@ public class ProcessTaskService {
         return out;
     }
 
-    /** 工序总览:按 工序/工艺(成型/切炭/组装) 汇总(只读视图 v_wo_process_board) */
+    /** 工单总览:按 工序/工艺(成型/切炭/组装) 汇总(只读视图 v_wo_process_board) */
     public List<Map<String, Object>> board() {
-        return jdbc.queryForList("SELECT 工序, 任务数, 待加工数, 在加工数, 已完工数, 计划量, 完成量, 未完成量,"
+        return jdbc.queryForList("SELECT 工序, 任务数, 待加工数, 在加工数, 已加工数, 计划量, 完成量, 未完成量,"
                 + " 急单数, 涉及产线, ISNULL(最早计划完工,N'') AS 最早计划完工"
                 + " FROM dbo.v_wo_process_board ORDER BY 工序");
+    }
+
+    /**
+     * **下一道工序 + 候选产线**(2026-10-05,方案第 2 步的统一口径):
+     * 读视图 {@code v_wo_next_process}(= 该工单路线里第一个尚无已审核报工的工序),再取该工序功能下的启用产线。
+     * 排产/调拨/工单详情共用这一处,避免再次出现"产线口径各写一套"。
+     */
+    public List<Map<String, Object>> nextProcess(List<String> plNos) {
+        if (plNos == null || plNos.isEmpty()) return List.of();
+        List<String> nos = plNos.stream().filter(x -> x != null && !x.isBlank()).map(String::trim).distinct().limit(200).toList();
+        if (nos.isEmpty()) return List.of();
+        String in = String.join(",", java.util.Collections.nCopies(nos.size(), "?"));
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT 单号, 工艺路线, ISNULL(下一道工序,N'') AS 下一道工序, ISNULL(生产车间,N'') AS 生产车间"
+                        + " FROM dbo.v_wo_next_process WHERE 单号 IN (" + in + ")", nos.toArray());
+        for (Map<String, Object> r : rows) {
+            String shop = String.valueOf(r.get("生产车间"));
+            r.put("候选产线", shop.isBlank() ? List.of() : jdbc.queryForList(
+                    "SELECT 生产线 FROM dbo.bs_prod_line WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(停用,0)=0"
+                            + " AND ISNULL(生产车间,N'')=? ORDER BY ISNULL(排序,999), 生产线", String.class, shop));
+        }
+        return rows;
     }
 
     /**
