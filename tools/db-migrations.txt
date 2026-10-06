@@ -2383,3 +2383,7 @@ migrate-plang-report-state.sql
 #   用户口径「切单之后需求数量应该会改变才对…生产工单页面没有改变」;根因=split 只减 pl_sl 未减 xq_sl,
 #   子单又各带一份需求 ⇒ 家族需求重复计。按判据补正存量;幂等;两账套均执行。
 migrate-plang-split-demand-fix.sql
+# migrate-unit-chain.sql(2026-10-05):单位链(商品档案 生产单位/单位换算率 + 工单 单位换算率/生产数量)
+#   用户口径「全部都先加入单位,成品库存单位记账待定」⇒ 只加列+登记元数据,不碰入库/报工/成品收口。
+#   撤回:DROP COLUMN;幂等;两账套均执行。
+migrate-unit-chain.sql
