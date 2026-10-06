@@ -331,7 +331,7 @@ public class ScheduleBoardService {
                 "SELECT ISNULL(p.scx,N'') AS 生产线, p.pl_no AS 加工单号, p.pl_xc AS 工单行号,"
                         + " ISNULL(p.[批次号],N'') AS 批次号, ISNULL(p.lb,N'') AS 排产班组,"
                         + " CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN N'完工'"
-                        + "      WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
+                        + "      WHEN ISNULL(p.ja,'N') IN (N'T',N'Y') THEN N'已结案' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, 0 AS 每箱数量, 0 AS 箱数,"
                         + " ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
                         // 余量(2026-09-28 定稿)=订单结转剩余数量(需求−已转出占用,与订单结转页同源)
@@ -418,9 +418,9 @@ public class ScheduleBoardService {
     public List<Map<String, Object>> scheduled(String line, String scope, String workshop) {
         String ws = (workshop == null || workshop.isBlank()) ? "" : workshop.trim();
         String complete;
-        if ("已完工".equals(scope)) complete = " AND st.[生产状态] = N'完工'";
+        if ("已完工".equals(scope)) complete = " AND st.[生产状态] IN (N'完工', N'已结案')";
         else if ("全部".equals(scope)) complete = "";
-        else complete = " AND st.[生产状态] <> N'完工'";
+        else complete = " AND st.[生产状态] <> N'完工' AND st.[生产状态] <> N'已结案'";
         return jdbc.queryForList(
                 "SELECT pc.pl_no AS 加工单号, pc.pl_xc AS 工单行号, ISNULL(p.comm,N'') AS 公司代码, ISNULL(dk.mc, p.khdm) AS 客户,"
                         // 排产日期=实际排入时间(plang_pc.asp_time1,排入即写);asp_time2 仅调线/改动时才有
@@ -432,7 +432,7 @@ public class ScheduleBoardService {
                         + " ISNULL(p.mc,N'') AS 产品名称, ISNULL(p.gg,N'') AS 规格型号,"
                         + " ISNULL(p.jldw,N'') AS 单位,"
                         + " CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN N'完工'"
-                        + "      WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
+                        + "      WHEN ISNULL(p.ja,'N') IN (N'T',N'Y') THEN N'已结案' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
                         + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc)) AND l.link_status = 'ACTIVE'), 0) AS 余量,"
                         + " 0 AS 每箱数量, 0 AS 箱数,"
@@ -567,7 +567,7 @@ public class ScheduleBoardService {
                         + " CONVERT(varchar(10), pc.st_date, 120) AS 计划开工日,"
                         + " CONVERT(varchar(10), pc.cp_date, 120) AS 工序交期,"
                         + " CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0) THEN N'完工'"
-                        + "      WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
+                        + "      WHEN ISNULL(p.ja,'N') IN (N'T',N'Y') THEN N'已结案' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
                         + " ISNULL(pc.lb,N'') AS 排产班组, ISNULL(pc.pl_man,N'') AS 操作员,"
                         + " ISNULL(pc.[批次号],N'') AS 批次号"
                         + " FROM dbo.plang_pc pc"
