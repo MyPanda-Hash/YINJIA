@@ -25,26 +25,36 @@
 ## 一之二、写进用户那份《MES管理系统-界面截图.docx》
 
 用户文档 `MES管理系统-界面截图.docx`(仓库根)已含 MES 六个模块 18 张图(一．系统管理平台 … 六．可视化管理),
-本次按其版式续写 **「七．WMS 管理系统」** 一节(5 个子模块 + 8 张图),产出:
+本次按其版式写 **「WMS 管理系统」** 一节(5 个子模块 + 8 张图),输出两份:
 
 ```
-MES管理系统-界面截图-含WMS.docx        ← 新文件,原文件不动
+MES管理系统-界面截图-含WMS.docx   ← 原 MES 18 图 + 七．WMS 管理系统 一节(26 图 / 13 页)
+WMS管理系统-界面截图.docx         ← 只含 WMS 一节(标题不带"七．",8 图 / 4 页,3MB)
 ```
+
+两份都由 Word 打开验证过(图片数、页数、标题文字),**原文件始终不动**。
 
 版式对齐原文:顶级标题加粗(段前 12pt / 段后 4pt)、子标题缩进 21pt(段后 2pt)、
-图片居中、宽 **14.63cm**(与原图同宽 5267325 EMU,高度按各自比例 2000/3200 → 9.14cm),节前分页。
+图片居中、宽 **14.63cm**(与原图同宽 5267325 EMU,高度按各自比例 2000/3200 → 9.14cm),合并版节前分页。
+独立版还把原 MES 的 18 张图及其关系一并剔除(否则会留 3MB 死图 + 悬空关系)。
 
 ```powershell
 # 生成(直接改 OOXML 包:拷包 → 加 word/media/wms*.png → 补 rels → 在 <w:sectPr> 前插段落)
 powershell -ExecutionPolicy Bypass -File tools\archive\_wms-doc-shots\_pack-docx.ps1
+
+# 原文档/产物正开在 Word 里时会被锁:可指定 -From 从副本读(被锁的那份会自动跳过并告警)
+powershell -ExecutionPolicy Bypass -File tools\archive\_wms-doc-shots\_pack-docx.ps1 -From <docx 副本>
 ```
 
-- `sections.json` = 这一节的标题/子标题/图片清单(**中文都放这里**;`.ps1` 保持纯 ASCII,
-  因为 Windows PowerShell 5.1 对无 BOM 的 UTF-8 脚本按 ANSI 读,中文会乱码报语法错)。
+- `sections.json` = 这一节的标题/子标题/图片清单(**中文都放这里**)。
+- 🔴 **`.ps1` 必须保持纯 ASCII**(已用脚本核对非 ASCII 字节 = 0)。Windows PowerShell 5.1 对无 BOM 的
+  UTF-8 脚本按 ANSI 读 —— 2026-10-05 实测:中途加了一句中文注释,`$docXml.IndexOf('<w:body>')` 那段
+  静默算错,生成的 docx 缺了 XML 声明与 `<w:body>`,**Word 直接报"打开文件遇到错误"**。改脚本时别写中文注释。
 - `_make-docx.ps1` 是**用 Word COM 的等价实现**(版式最准),但本机 agent 会话里跑会**卡住**
   (WINWORD 常驻无输出),所以正式用的是 `_pack-docx.ps1`;要改版式可人工跑 `_make-docx.ps1`。
-- 校验:`Expand-Archive` 后 `document.xml` 良构、`w:drawing` 26 张、rels `rId901-908` 无冲突、
-  `[Content_Types].xml` 有 `<Default Extension="png"/>`、`System.IO.Packaging.Package` 能打开整包。
+- 校验:`Expand-Archive` 后 `document.xml` 良构且含 `<w:body>`、`w:drawing` 数对得上、
+  rels `rId901-908` 无冲突、`[Content_Types].xml` 有 `<Default Extension="png"/>`、
+  `System.IO.Packaging.Package` 能打开整包,最后**用 Word COM 真开一遍**(图片数/页数)。
 
 ## 二、复现 / 换页
 

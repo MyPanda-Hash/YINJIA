@@ -1,7 +1,9 @@
 {
   "source": "MES管理系统-界面截图.docx",
   "output": "MES管理系统-界面截图-含WMS.docx",
+  "outputStandalone": "WMS管理系统-界面截图.docx",
   "imageWidthPt": 414.7,
+  "titleStandalone": "WMS 管理系统",
   "sections": [
     {
       "title": "七．WMS 管理系统",
