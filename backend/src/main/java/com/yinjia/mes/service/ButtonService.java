@@ -1284,8 +1284,6 @@ public class ButtonService {
         woReport.post(def.code(), no, currentUserName());
         // 工序任务回写(A 项,2026-10-05):报工审核 → 该工单该工序任务的完成量累计 + 状态推进
         processTask.onReport(def.code(), no, currentUserName());
-        // 转序落实产线(2026-10-05):本道已开工/完工 → 按**预排线**把工单切到下一道的线(留痕,可撤回)
-        processTask.applyNextProcess(no, currentUserName());
         // 三类工序检验单(9.29 批次④,2026-10-05):成型/切炭/组装 报工审核 → 各自动生成一张检验单草稿
         // (三张独立不合并;幂等=同一报工单同一工序只出一张;后续品质填写判定/数量)
         woInspGenerate(def.code(), no, currentUserName());
