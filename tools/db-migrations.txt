@@ -2387,3 +2387,6 @@ migrate-plang-split-demand-fix.sql
 #   用户口径「全部都先加入单位,成品库存单位记账待定」⇒ 只加列+登记元数据,不碰入库/报工/成品收口。
 #   撤回:DROP COLUMN;幂等;两账套均执行。
 migrate-unit-chain.sql
+# migrate-wo-process-line.sql(2026-10-05):工序—产线预排台账 wo_process_line
+#   预排(排产时定全程线) + 转序落实(默认沿用预排线,写 plang.scx 并留痕可撤回);撤回:DROP TABLE;两账套均执行。
+migrate-wo-process-line.sql
