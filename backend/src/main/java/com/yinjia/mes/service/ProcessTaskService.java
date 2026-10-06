@@ -378,16 +378,23 @@ public class ProcessTaskService {
         if (order.isEmpty()) order.addAll(List.of(PROCESS_ORDER));
         String cur = "";
         for (String op : order) if (qty.getOrDefault(op, 0d) > 0) cur = op;
+        // 每道工序的完成度(2026-10-05 用户口径「未完成的和已完成的颜色不该一样」):
+        //   已完工 = 完工量 ≥ 计划量 ; 进行中 = 0 < 完工量 < 计划量 ; 未开始 = 完工量 0
+        double planQty0 = num(headObject(heads).get("计划数量"));
+        int doneSteps = 0;
         for (int i = 0; i < order.size(); i++) {
             String op = order.get(i);
             double q = qty.getOrDefault(op, 0d);
+            String st = (planQty0 > 0 && q >= planQty0) ? "已完工" : (q > 0 ? "进行中" : "未开始");
+            if ("已完工".equals(st)) doneSteps++;
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("序", i + 1);
             s.put("工序", op);
             s.put("完工量", round(q));
+            s.put("计划量", round(planQty0));
             s.put("报工单数", cnt.getOrDefault(op, 0));
             s.put("当前", op.equals(cur));
-            s.put("状态", q > 0 ? "已完工" : "未开始");
+            s.put("状态", st);
             steps.add(s);
         }
         double outQty = 0;
@@ -406,6 +413,7 @@ public class ProcessTaskService {
         out.put("工序步骤", steps);
         out.put("当前工序", cur);
         out.put("当前工序序", indexOfProcess(cur));
+        out.put("已完成步骤数", doneSteps);
         out.put("计划合计", round(planQty));
         out.put("产出", round(outQty));
         out.put("未完成合计", round(Math.max(planQty - outQty, 0)));

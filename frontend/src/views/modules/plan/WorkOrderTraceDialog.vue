@@ -37,10 +37,16 @@
             <span v-else>｜ {{ tt('未开工') }}</span>
           </span>
         </div>
-        <el-steps :active="Number(prog['当前工序序'] || 0)" align-center finish-status="success">
+        <!-- 步骤状态按**每道工序自己的完成度**着色(2026-10-05 用户口径:未完成/已完成不能同色):
+             已完工=绿(success) / 进行中=蓝(process) / 未开始=灰(wait);完成量同时显示 x/计划量 -->
+        <el-steps :active="Number(prog['已完成步骤数'] || 0)" align-center finish-status="success">
           <el-step v-for="s in (prog['工序步骤'] || [])" :key="s['工序']" :title="tt(s['工序'])"
-                   :description="num(s['完工量']) + (s['报工单数'] ? `（${s['报工单数']}${tt('单')}）` : '')" />
+                   :status="s['状态'] === '已完工' ? 'success' : (s['状态'] === '进行中' ? 'process' : 'wait')"
+                   :description="`${num(s['完工量'])}/${num(s['计划量'])}` + (s['报工单数'] ? `（${s['报工单数']}${tt('单')}）` : '')" />
         </el-steps>
+        <div class="wb-trace-sub">
+          {{ tt('绿=已完工') }} ｜ {{ tt('蓝=进行中') }} ｜ {{ tt('灰=未开始') }}（{{ tt('工序进度') }}）
+        </div>
         <div v-if="!(prog['工序步骤'] || []).length" class="wb-trace-sub">{{ tt('该工单还没有工序进度') }}</div>
       </div>
 
