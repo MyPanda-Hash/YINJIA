@@ -2351,3 +2351,7 @@ migrate-route-status-restore.sql
 #   yj_doc_status(shr/archived)同步(纯 SQL,不动 Java;依据:审核按钮=MERGE yj_doc_status 写 shr,弃审清 shr)。
 #   幂等;两账套均执行。
 migrate-route-status-switch-audit.sql
+# migrate-wo-process-board-view.sql(2026-10-05):工序总览视图 v_wo_process_board(按工序汇总工序任务)
+#   用户口径:工单要能点开看工序阶段 + 要工序维度总览,且新增物**可撤回**。本脚本只加一个**只读视图**
+#   (不改表结构/不写业务数据);回滚 = DROP VIEW dbo.v_wo_process_board。幂等;两账套均执行。
+migrate-wo-process-board-view.sql
