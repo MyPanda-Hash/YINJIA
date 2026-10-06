@@ -350,12 +350,18 @@ export default {
     '前往查看': 'Go to Panel',
     '留在本页': 'Stay Here',
     '转单失败': 'Convert failed',
-    // 左上角日期查询(2026-10-06 用户口径:默认单日=最近有数据的一天,可切近3/7/14/30天)
+    // 左上角日期查询(2026-10-06 用户口径:默认单日=今天,可切近3/7/14/30天)
     '单日': 'Single day',
     '截止日期': 'End date',
     '单日只看一天;近几日=以所选日期为截止日往前数': 'Single day = that day only; recent days = count back from the selected end date',
     '该日期范围没有待结转数据': 'No pending orders in this date range',
     '看近7天': 'View last 7 days',
+    // 当天没数据 → 弹窗询问是否跳到最近有数据的一天(2026-10-06 用户口径:不静默跳转)
+    '没有数据': 'No data',
+    '没有待结转数据': 'has no pending orders',
+    '跳到最近有数据的一天': 'Jump to the latest day with data',
+    '跳转': 'Go',
+    '留在本日': 'Stay on this day',
 
     // 排产工作台·线班骨架(参考工单排产页,2026-09-23)
     '排产明细': 'Scheduled Detail',
@@ -482,6 +488,10 @@ export default {
     '工序总览': 'Process Overview',
     // 订单结转选路线 + 下一道工序收敛(2026-10-05)
     // 路线弹窗 + 工序按路线(2026-10-05)
+    '工艺路线未填写': 'Routing not selected',
+    '行未选择工艺路线,不能转工单;请先点工具栏「选择工艺路线」指定:': 'row(s) have no routing and cannot be converted; use "Select Routing" on the toolbar first:',
+    '知道了': 'Got it',
+    '以下': 'The following',
     '选择工艺路线': 'Select Routing',
     '编码 / 名称': 'Code / Name',
     '工序序列': 'Process Sequence',

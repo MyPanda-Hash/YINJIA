@@ -205,7 +205,13 @@ public class OrderConvertService {
             try {
                 applyDateEdit(r, user);   // 交期修正先回写订单行 → createFromOrderLine 读行交期即为修正值(cp_date)
                 Double qty = num2(str(r.get("生单数量")) == null ? null : r.get("生单数量"));
-                created.add(quickSchedule.createFromOrderLine(soNo, lineId, qty, user, str(r.get("工艺路线"))));
+                // 未选工艺路线 = **不能转工单**(2026-10-05 用户口径:没有填写工艺路线应该提示并且不能转工单)
+                String route = str(r.get("工艺路线"));
+                if (route == null || route.isBlank()) {
+                    failed.add(soNo + "#" + lineId + ":未选择工艺路线,不能转工单");
+                    continue;
+                }
+                created.add(quickSchedule.createFromOrderLine(soNo, lineId, qty, user, route));
             } catch (RuntimeException e) {
                 failed.add(soNo + "#" + lineId + ":" + (e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage()));
             }

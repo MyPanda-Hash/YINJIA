@@ -3,10 +3,11 @@
      防重复:行级占用链(剩余=需求−已排产−已采购),转满自动消失,删下游草稿自动回现;不改销售订单状态。
 
      2026-10-06 用户口径(显示问题修复):
-       ①左上角加**日期查询**:默认「单日」= 最近有数据的那一天(后端 stats.最新下单日期),可切 近3/7/14/30 天;
+       ①左上角加**日期查询**:默认「单日 = 今天」,可切 近3/7/14/30 天;
          —— 此前无日期条件,一进页面就把**全部历史**待结转行拉回来,数据一多页面卡死(用户报障原文);
-       ②列表**分页**(默认 100/页),几千行也不会一次全渲染;勾选跨页保留(row-key + reserve-selection);
-       ③汇总条「当前数据笔数」随日期/关键字口径联动(未结转汇总仍是全量积压,口径不变)。 -->
+       ②**今天没有待结转数据时弹窗询问**是否跳到最近有数据的一天(不静默跳转;取消则停在当天,空表给近路按钮);
+       ③列表**分页**(默认 100/页),几千行也不会一次全渲染;勾选跨页保留(row-key + reserve-selection);
+       ④汇总条「当前数据笔数」随日期/关键字口径联动(未结转汇总仍是全量积压,口径不变)。 -->
 <template>
   <div class="oc-page">
     <!-- 汇总条(蓝底白字,同参考) -->
@@ -92,10 +93,14 @@
             <el-input-number v-model="row.生单数量" :min="0" :max="Number(row.剩余数量)" :controls="false" size="small" style="width: 100%" />
           </template>
         </el-table-column>
-        <!-- 空表提示:默认单日,该日可能确实没有待结转单 —— 给一条"切近7天"的近路 -->
+        <!-- 空表提示:所选日期确实没有待结转单 —— 给"跳到最近有数据的一天"/"切近7天"两条近路
+             (打开页面时的跳转是**弹窗询问**,用户点了「留在本日」才落到这里) -->
         <template #empty>
           <div class="oc-empty">
             <span>{{ tt('该日期范围没有待结转数据') }}</span>
+            <el-button v-if="latestDay && !latestInRange" link type="primary" @click="jumpToLatest">
+              {{ tt('跳到最近有数据的一天') }} {{ latestDay }}
+            </el-button>
             <el-button v-if="dateMode === 'day'" link type="primary" @click="quickNear(7)">{{ tt('看近7天') }}</el-button>
           </div>
         </template>
@@ -216,7 +221,7 @@ async function loadPending() {
   }
 }
 
-/** 汇总条:body 缺省=当前日期/关键字口径;onMounted 首帧传 {} 拿全量口径(含「最新下单日期」锚点) */
+/** 汇总条:body 缺省=当前日期/关键字口径(「最新下单日期」无论带不带条件都返回 = 全体待结转行里最近的下单日) */
 async function loadStats(body) {
   try {
     const res = await request.post('/px/orderConvert/stats', body || queryBody())
@@ -224,10 +229,37 @@ async function loadStats(body) {
   } catch { /* 汇总失败不阻断列表 */ }
 }
 
-function loadAll() { loadPending(); loadStats() }
+/** 最近有数据的一天(后端 stats.最新下单日期;空=一条待结转都没有) */
+const latestDay = computed(() => String(s.value['最新下单日期'] || '').slice(0, 10))
+/** 最近有数据的一天是否已落在当前查询区间内(在窗口里就不必再提示跳转) */
+const latestInRange = computed(() => !!latestDay.value && latestDay.value >= range.value.from && latestDay.value <= range.value.to)
+
+async function loadAll() { await Promise.all([loadPending(), loadStats()]) }
 /** 日期档位/锚点/关键字变动:回第一页重查(2026-10-06 起页面默认只查一天,切档即查) */
 function onQuery() { pageNo.value = 1; loadAll() }
 function quickNear(n) { dateMode.value = String(n); onQuery() }
+/** 跳到最近有数据的一天(空表近路按钮;与打开页面时的弹窗同一个动作) */
+function jumpToLatest() { if (!latestDay.value) return; anchor.value = latestDay.value; onQuery() }
+
+/**
+ * 打开页面时当天没有待结转数据 → **弹窗询问**是否跳到最近有数据的一天
+ * (2026-10-06 用户口径:不要静默跳转;用户点「留在本日」就停在当天,空表里另给近路按钮)。
+ * 只在首帧调用一次;用户后续自己切日期/刷新不再打扰。
+ */
+async function askJumpToLatest() {
+  if (rows.value.length) return
+  const latest = latestDay.value
+  if (!latest || latest === range.value.to) return
+  try {
+    await ElMessageBox.confirm(
+      // 标点用半角(与仓库既有组合文案一致:`${tt('生成子工单')}?`),否则英语界面会出现全角「，？」
+      `${range.value.to} ${tt('没有待结转数据')}, ${tt('跳到最近有数据的一天')} ${latest}?`,
+      tt('没有数据'), { confirmButtonText: tt('跳转'), cancelButtonText: tt('留在本日'), type: 'info' },
+    )
+  } catch { return }   // 取消:停在所选日期(空表 + 近路按钮)
+  anchor.value = latest
+  await loadAll()
+}
 function onCheck(r) { checked.value = r }
 
 /** 保存交期:把行内修正的预计交货日期回写销售订单行 */
@@ -252,6 +284,12 @@ async function toManu() {
 async function convert(api, label) {
   const list = (checked.value || []).filter((r) => Number(r.生单数量) > 0)
   if (!list.length) { ElMessage.warning(tt('请先勾选要结转的订单行')); return }
+  // 未选择工艺路线 = 不能转工单(2026-10-05 用户口径):先提示缺失行,直接拦住
+  const noRoute = list.filter((r) => !r['工艺路线'])
+  if (noRoute.length) {
+    ElMessage.warning(tt('有') + ' ' + noRoute.length + ' ' + tt('行未选择工艺路线,不能转工单;请先点工具栏「选择工艺路线」指定') + '：' + noRoute.slice(0, 5).map((r) => r['订单号'] + '#' + r['行号']).join('、'))
+    return
+  }
   const qty = list.reduce((a, r) => a + Number(r.生单数量 || 0), 0)
   try {
     await ElMessageBox.confirm(
@@ -287,11 +325,12 @@ async function convert(api, label) {
 
 onMounted(async () => {
   loadRoutes()
-  // 首帧:不带日期条件问一次汇总 → 用「最新下单日期」当默认锚点(最近有数据的那一天),
-  // 再按单日拉列表。以前是无条件全量:数据一多,进页面就卡死(2026-10-06 用户报障)。
-  await loadStats({})
-  anchor.value = s.value['最新下单日期'] || todayStr()
-  loadAll()
+  // 首帧:默认「单日 = 今天」并直接查;今天没有待结转数据时**弹窗询问**是否跳到最近有数据的一天
+  // (2026-10-06 用户口径:以前是静默跳转,现在必须先问;取消就停在今天)。
+  // 之前更早的写法是"不带条件拉全量":数据一多,进页面就卡死(同日用户报障)。
+  anchor.value = todayStr()
+  await loadAll()
+  await askJumpToLatest()
 })
 </script>
 
