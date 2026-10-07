@@ -1924,3 +1924,18 @@ migrate-stock-movement-from-flow-2026-09-30.sql
 #   审核后查 流水两列/视图/面板口径/勾稽,跑完清理干净)。
 #   幂等可重跑(先判后加列、先判后 DROP VIEW,下游视图按名解析无需重建),两个账套都执行。
 migrate-stock-flow-tax-cols-2026-09-30.sql
+
+# ── 2026-10-07 实验室记录表日期/时间格改「选取填写」(用户报错 241 的根治) ──
+#   起因:RD_INSTR_USE 保存报 S0001/241「从字符串转换日期和/或时间时,转换失败」——
+#   面板字段登记成「文本」(界面给手填框),而服务器上 rd_instr_use_detail.使用日期 等列是 datetime
+#   (服务器直改存量,见 migrate-server-parity-20260928.sql:102);接口把 datetime 按 Jackson 下发成
+#   '2026-10-06T16:00:00.000+00:00'(带时区偏移),界面原样回传 ⇒ datetime 列拒收(本地实测 datetime 报 241,
+#   datetime2/date 不报)。
+#   动作(只改 yj_field.data_type,无 DDL):真正的日期格(使用日期/测试日期/日期/期望完成日期/预计完成日期)
+#   →「日期」;仪器使用记录表 起止时间 →「时间区间」(一格区间控件,落库仍是 'HH:mm-HH:mm' 文本);
+#   四个「测试时间」格(碱性表头/数据行、抗菌表头、浸泡表头、压降精度数据行)**不动**(值为日期段/Excel 序列
+#   混杂,2026-10-07 用户口径保持文本)。
+#   配套代码:RecordSheetPanels.vue 按 data_type 出控件 + core/panel/sheetDateCells.js 取值归一
+#   (归一失败不回写,历史值不丢);后端 normalizeByType 同时把 ISO 归一成 yyyy-MM-dd,两头收口。
+#   自检:日期 8 条 + 时间区间 1 条;幂等可重跑;两个账套都执行。
+migrate-lab-sheets-date-fields-2026-10-07.sql

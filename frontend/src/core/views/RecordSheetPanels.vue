@@ -558,8 +558,58 @@
                 >
                   <el-option v-for="o in (c.options || [])" :key="o" :label="tt(o)" :value="o" />
                 </el-select>
+                <!-- 日期/时间列:控件种类由 **yj_field.data_type** 决定(不在这里写死列名),
+                     口径见 core/panel/sheetDateCells.js —— 2026-10-07 起实验室 11 张记录表的
+                     使用日期/测试日期/日期/期望完成日期/预计完成日期 都是「日期」,起止时间是「时间区间」。
+                     ⚠ 绑定用 :model-value + @update:model-value(不是 v-model):历史值认不出来时
+                     (如「待定」「333」)控件空着但**不回写**,库里原值不会被清掉。 -->
+                <el-date-picker
+                  v-else-if="cellEditable(dt, row, c) && cellKind(c) === 'date'"
+                  :model-value="controlValue('date', row[c.key])"
+                  type="date"
+                  value-format="YYYY-MM-DD"
+                  size="small"
+                  class="rs-c-in rs-date-in"
+                  :style="designInputStyle(dt)"
+                  :placeholder="tt('选择日期')"
+                  @update:model-value="(v) => setCellValue(row, c, v)"
+                />
+                <el-date-picker
+                  v-else-if="cellEditable(dt, row, c) && cellKind(c) === 'datetime'"
+                  :model-value="controlValue('datetime', row[c.key])"
+                  type="datetime"
+                  value-format="YYYY-MM-DD HH:mm:ss"
+                  size="small"
+                  class="rs-c-in rs-date-in"
+                  :style="designInputStyle(dt)"
+                  @update:model-value="(v) => setCellValue(row, c, v)"
+                />
+                <el-time-picker
+                  v-else-if="cellEditable(dt, row, c) && cellKind(c) === 'time'"
+                  :model-value="controlValue('time', row[c.key])"
+                  value-format="HH:mm"
+                  format="HH:mm"
+                  size="small"
+                  class="rs-c-in rs-date-in"
+                  :style="designInputStyle(dt)"
+                  @update:model-value="(v) => setCellValue(row, c, v)"
+                />
+                <!-- 起止时间:一格区间控件,落库仍是 'HH:mm-HH:mm' 文本(纸面版式与旧值格式不变)。
+                     开始/结束占位符交给 Element 的 locale(应用切语言时同步),不新增词条 -->
+                <el-time-picker
+                  v-else-if="cellEditable(dt, row, c) && cellKind(c) === 'time-range'"
+                  :model-value="controlValue('time-range', row[c.key])"
+                  is-range
+                  range-separator="-"
+                  value-format="HH:mm"
+                  format="HH:mm"
+                  size="small"
+                  class="rs-c-in rs-range-in"
+                  :style="designInputStyle(dt)"
+                  @update:model-value="(v) => setCellValue(row, c, v)"
+                />
                 <el-input v-else-if="cellEditable(dt, row, c)" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
-                <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ row[c.key] || ' / ' }}</span>
+                <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ cellText(cellKind(c), row[c.key]) || ' / ' }}</span>
               </td>
               <td v-if="editable && !dt.fixedRows" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
             </tr>
@@ -1192,6 +1242,8 @@ import StdLibManager from './StdLibManager.vue'
 import RecipeCalcDialog from './RecipeCalcDialog.vue'
 // 只读台账页(委托测试汇总表)的单元格取值:抽成纯函数便于 node --test 直接断言
 import { ledgerCell as ledgerCellOf } from '@/core/panel/ledgerCols'
+// 日期/时间格:控件种类按 yj_field.data_type 决定,取值归一同上(纯函数 + 单测)
+import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/panel/sheetDateCells'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -1234,6 +1286,19 @@ const variantLabel = computed(() => (cfg.value?.variantKey || '') + (cfg.value?.
 function stdLibOf(key) {
   const f = (props.fields || []).find((x) => (x.dataName || x.code) === key)
   return f && f.dataType === '标准库' ? (f.stdLib || '') : ''
+}
+
+/** 列的控件种类('date'/'datetime'/'time'/'time-range'/'text'):查该列在 yj_field 里的 data_type
+ *  ⇒ 加日期下拉**只改元数据**,不必回这张 1600 行的版式文件逐列写 type */
+function cellKind(c) {
+  const f = (props.fields || []).find((x) => (x.dataName || x.code) === c?.key)
+  return cellKindOf(f?.dataType)
+}
+
+/** 日期/时间控件回值 → 写回行(区间合成文本),并置脏交给父级保存 */
+function setCellValue(row, c, picked) {
+  row[c.key] = controlToStored(cellKind(c), picked)
+  emit('dirty')
 }
 
 /** 副标题下拉的选项:优先取字段元数据的 options(标准库字段即标准库条目),退回变体选项 */
@@ -2957,6 +3022,32 @@ function chartOf(dt) {
 .rs-t-in,
 .rs-c-in {
   width: 100%;
+}
+/**
+ * 日期/时间控件:纸面单元格常见只有 90~120px,Element 默认 11px 左右内边距 +
+ * 前缀/清除图标会把 '2026-10-07' 挤成省略号 ⇒ 这里压紧内边距、居中,字号随设计表缩放。
+ */
+.rs-date-in {
+  width: 100%;
+}
+.rs-date-in :deep(.el-input__wrapper) {
+  padding: 0 4px;
+}
+.rs-date-in :deep(.el-input__inner) {
+  padding: 0;
+  text-align: center;
+}
+.rs-range-in {
+  width: 100%;
+}
+.rs-range-in :deep(.el-range-input) {
+  width: 38%;
+  font-size: inherit;
+  text-align: center;
+}
+.rs-range-in :deep(.el-range-separator) {
+  padding: 0 2px;
+  font-size: inherit;
 }
 /* 参照单元格(产品编号 -> 产品信息表):拟态输入框,点击弹参照 */
 .rs-ref-ctl {
