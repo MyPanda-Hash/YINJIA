@@ -85,9 +85,6 @@
           <el-table-column :label="tt('需求数量')" prop="需求数量" width="90" align="right" />
           <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
           <el-table-column :label="tt('余量')" prop="余量" width="80" align="right" />
-          <el-table-column :label="tt('每箱数量')" prop="每箱数量" width="85" align="right" />
-          <el-table-column :label="tt('箱数')" prop="箱数" width="75" align="right" />
-          <el-table-column :label="tt('开产量')" prop="开产量" width="85" align="right" />
           <el-table-column :label="tt('计划开工日')" prop="计划开工日" width="100" />
           <el-table-column :label="tt('工序交期')" prop="工序交期" width="100" />
           <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" />
