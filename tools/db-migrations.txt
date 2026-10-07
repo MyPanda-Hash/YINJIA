@@ -1110,6 +1110,9 @@ migrate-qc-insp-req-tab-pools.sql
 #   检验报告(QC_INSP_REC)的这两项 editable 1→0(纸面只读),值由报告按物料编码带入
 #   (core/qc/qcInspReqCarry.js 的 carryHeadOf:命中行首个非空;要求表没填则保留报告默认 YJ-QR-96 / YJ-Q-30)。
 #   两账套都执行。
+#   ⚠ 前置**必须**先建表 qc_insp_req_series(末段 migrate-qc-insp-req-series.sql 会建,故那一条已提到本行之前):
+#     2026-10-07 实测:在落后库上按原顺序跑到这里会报「找不到对象 qc_insp_req_series」而整链失败。
+migrate-qc-insp-req-series.sql
 migrate-qc-insp-req-filecode-basis.sql
 
 # —— 2026-09-21 特采申请单(QC_TC):「最终处理结果」字典补第三值「管控使用」 ——
@@ -2253,7 +2256,9 @@ migrate-drop-bom-panels.sql
 #   series = 新面板 QC_INSP_REQ_SERIES + 表 qc_insp_req_series(10 张全自定义表,备用1..备用200 每表 20 位);
 #   drop   = 旧「自定义检验要求」页签下线(词表回 7 值 + 该页签字段退绑 + 数据行软删 + 备用141..160 注明改预留)。
 #   ⚠ 顺序:先 series 后 drop。两账套都执行。
-migrate-qc-insp-req-series.sql
+#   ⚠ 注意:series 建表 qc_insp_req_series 的那一行已**提前**到 migrate-qc-insp-req-filecode-basis.sql 之前
+#     (2026-10-07 实测:数据库落后时按原顺序跑到 filecode-basis 会报「找不到对象 qc_insp_req_series」,
+#      因为 filecode-basis 要给这张表加列;先建后加,链才可从落后库一路跑通)。
 migrate-qc-insp-req-drop-custom-tab.sql
 
 # ── 2026-10-07 实验室记录表日期/时间格改「选取填写」(用户报错 241 的根治) ──
