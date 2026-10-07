@@ -2,6 +2,7 @@ package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PanelPermissionService;
+import com.yinjia.mes.service.WorkOrderPickingService;
 import com.yinjia.mes.service.WorkOrderSplitService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -22,9 +23,11 @@ import java.util.Map;
  *   条件:日期从/到(pl_date) + 单框模糊搜索(keyword,工单号/物料编码/产品名称/客户代码/客户名称 多列 OR);
  * ②/printStamp 打印生产任务单留痕(plang.asp_print+1、打印人/打印时间;修复原版从 scheduled('') 取数
  *   永远匹配不到已排产工单的缺陷——现直接打印列表勾选行,不再回查排产明细);
- * ③/close 结案/取消结案(plang.ja,参考库 T/Y 归一为 Y/N)。
+ * ③/close 结案/取消结案(plang.ja,参考库 T/Y 归一为 Y/N);
+ * ④/toPicking 转领料单(2026-10-07:原「打印领料单」改为转单)——按工单号生成「材料出库单(领料单)」
+ *   草稿,业务规则见 {@link WorkOrderPickingService}。
  * 定位(2026-09-26 用户拍板):生产工单=**纯查询+打印**,不作为快速排产任务——/reassign 批量调线已移除。
- * 权限:查看=登录即可(列表只读);写操作挂 MANU_ORDER(打印=打印按钮,结案=保存词表)。
+ * 权限:查看=登录即可(列表只读);写操作挂 MANU_ORDER(打印=打印按钮,结案/转领料单=保存词表)。
  */
 @RestController
 @RequestMapping("/api/px")
@@ -33,11 +36,15 @@ public class WorkOrderListController {
     private final JdbcTemplate jdbc;
     private final PanelPermissionService perm;
     private final WorkOrderSplitService splitService;
+    /** 转领料单(业务规则在 service,Controller 只做参数校验与转发 —— 代码规范 A2) */
+    private final WorkOrderPickingService pickingService;
 
-    public WorkOrderListController(JdbcTemplate jdbc, PanelPermissionService perm, WorkOrderSplitService splitService) {
+    public WorkOrderListController(JdbcTemplate jdbc, PanelPermissionService perm, WorkOrderSplitService splitService,
+                                   WorkOrderPickingService pickingService) {
         this.jdbc = jdbc;
         this.perm = perm;
         this.splitService = splitService;
+        this.pickingService = pickingService;
     }
 
     /** 工单行键:公司代码+工单号+工单行号+批次号(plang 行键;批次号=转单日期 yyyyMMdd,同日同批累加) */
@@ -266,6 +273,19 @@ public class WorkOrderListController {
         perm.requirePanelView("MANU_ORDER");
         perm.requireButton("MANU_ORDER", "保存");
         return ApiResult.ok(splitService.unsplit(body == null ? Map.of() : body, currentUser()));
+    }
+
+    // ══════════ 转领料单(2026-10-07:列表按钮由「打印领料单」改来)══════════
+    // 勾选工单 → 生成「材料出库单(领料单)」草稿(加工单号=工单号,明细留空由仓库补);
+    // 审核出库后 ManuWritebackService 自动回写工单「领料单号」。口径与守卫见 WorkOrderPickingService。
+
+    /** 转领料单:按工单号去重逐张生成草稿;回执含 单号清单/失败行,前端据此提示并可跳材料出库单 */
+    @PostMapping("/workOrderList/toPicking")
+    public ApiResult<Map<String, Object>> toPicking(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        perm.requireButton("MANU_ORDER", "保存");
+        Map<String, Object> b = body == null ? Map.of() : body;
+        return ApiResult.ok(pickingService.toPicking(castRows(b.get("rows")), currentUser()));
     }
 
     @SuppressWarnings("unchecked")

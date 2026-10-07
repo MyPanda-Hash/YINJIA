@@ -375,13 +375,11 @@ export default {
     '输入查询条件...': 'Enter conditions...',
     'BOM明细': 'BOM Detail',
     '打印工单_多个': 'Print WOs (Multi)',
-    '打印领料单': 'Print Pick List',
     '工单行号': 'WO Line',
     '公司代码': 'Company Code',
     '产线代号': 'Line Code',
     '层级': 'Level',
     '无排产数据,不能打印': 'No scheduling data; cannot print',
-    '该工单暂无领料单': 'No pick list for this WO',
     '张工单': 'work order(s)',
     '全部产线': 'All lines',
     '共': 'Total',
@@ -3009,15 +3007,20 @@ export default {
     '占用列含历史数据': 'Spare column contains legacy data',
     '停用字段「': 'Retire field "',
     '」?已录入数据将保留,重新绑定同名标签即可恢复显示。': '"? Entered data is kept; rebind the same label to restore.',
-    /* ── 工单排产·转领料(2026-10-14,参考旧系统工单排产页同名按钮)。
+    /* ── 生产工单·转领料单(2026-10-07:列表按钮由「打印领料单」改为转单 ——
+       按工单号生成「材料出库单(领料单)」草稿,加工单号=工单号,明细留空由仓库补,审核后回写工单领料单号)。
        2026-10-14 双顶层 biz 块已合并(tools/archive/_merge-dup-biz-blocks.cjs):
        原第二块条目拼接在本块末尾,latter-wins 语义不变;本块为唯一 biz 块 ── */
-    '转领料': 'To Picking',
+    '转领料单': 'To Pick List',
     '确认为选中的': 'Create pick lists for the selected',
     '张工单转领料': 'work order(s)?',
-    '按产品默认BOM×排产数量生成材料出库单草稿,审核出库后自动回写领料单号': 'Material issue (pick list) drafts are created by default BOM × scheduled qty; the picking no. is written back to the WO after audit',
     '已生成领料单': 'Pick lists created',
-    '转领料失败': 'Transfer to picking failed',
+    '材料明细请在材料出库单里补填,审核后自动回写工单领料单号': 'Add the material lines in the material issue slip; the picking no. is written back to the WO after audit',
+    '未转成功': 'Not converted',
+    '领料单已生成,现在去「材料出库单」补材料明细吗?': 'Pick list(s) created. Open the material issue slip to add material lines now?',
+    '去补明细': 'Add lines',
+    '稍后': 'Later',
+    '转领料单失败': 'Transfer to pick list failed',
 
     // 桌面深度开发(2026-09-28:各模块图表口径与图例)
     '五工序报工完成率': 'Five-stage reporting completion',

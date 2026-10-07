@@ -1,6 +1,8 @@
 <!-- WorkOrderList.vue — 生产工单(2026-09-26 用户拍板:纯查询页,数据=参考库工单表 plang)
-     顶部 日期范围 + 单框模糊搜索(工单号/物料/客户/产品 多列 OR);按钮条 结案/取消结案/打印工单(勾选多个=批量)/打印领料单/导出/刷新;
+     顶部 日期范围 + 单框模糊搜索(工单号/物料/客户/产品 多列 OR);按钮条 结案/取消结案/切单/排产/撤回切单/打印工单(勾选多个=批量)/转领料单/导出/刷新;
      产线筛选 + 未完工/已完工/追溯;明细大表(勾选)。打印工单=勾选行直打+留痕;结案走 plang 专属端点。
+     转领料单(2026-10-07 用户拍板:原「打印领料单」改为转单)=勾选工单 → 按工单号生成「材料出库单(领料单)」
+     草稿(加工单号=工单号;**明细留空由仓库补**,系统内已无 BOM/配方数据可自动展开),审核出库后自动回写工单领料单号。
      取数窗口:默认预填最近 15 天(2026-10-05 用户口径,防单据累积后卡),清空日期框=查全量。 -->
 <template>
   <div class="wol-page">
@@ -35,7 +37,7 @@
           <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
         </template>
       </el-dropdown>
-      <el-button size="small" @click="printPick" :disabled="!checked.length">{{ tt('打印领料单') }}</el-button>
+      <el-button size="small" @click="toPicking" :disabled="!checked.length">{{ tt('转领料单') }}</el-button>
       <el-button size="small" type="primary" @click="exportCsv">{{ tt('导出') }}</el-button>
       <el-button size="small" @click="load">{{ tt('刷新') }}</el-button>
     </div>
@@ -153,6 +155,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
@@ -160,6 +163,11 @@ import { printWorkTaskSheet } from '@/business/print-formats'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import ScheduleBoard from './ScheduleBoard.vue'
 import { useUserStore } from '@/stores/user'
+import { useTabsStore } from '@/stores/tabs'
+
+/** 转领料单生成后跳「材料出库单」用(与其它页 gotoPanel 同一范式:tabs.open + router.push) */
+const router = useRouter()
+const tabs = useTabsStore()
 
 const rows = ref([])
 const checked = ref([])
@@ -310,26 +318,45 @@ async function doPrintTask(mode) {
   } catch (e) { err(e, '打印失败') }
 }
 
-async function printPick() {
-  const no = currentRow.value?.工单号 || checked.value[0]?.工单号
-  if (!no) return
+/**
+ * 转领料单(2026-10-07 用户拍板:原「打印领料单」改为转单,打印入口不再保留)。
+ * 勾选工单 → 按**工单号去重**逐张生成「材料出库单(领料单)」草稿:单据头挂 加工单号=工单号
+ * (审核出库后后端 ManuWritebackService 自动回写工单「领料单号」,本页该列随之点亮)。
+ * ⚠ **明细留空**:MES 自建 BOM 已下架(2026-10-04),配方/工艺清单表全空、遗留 mate 是光缆旧数据,
+ *   系统内没有可自动展开的材料来源 ⇒ 材料行由仓库在材料出库单面板按实发补填。
+ * 后端守卫:未排产(排产数量 0)/已结案 不给转;已有未审核领料单或占用链未释放时拒绝(见 WorkOrderPickingService)。
+ */
+async function toPicking() {
+  // 只认**当前列表里还在的**勾选行(表格开了 reserve-selection,已消失的行会留在 checked 里,同切单口径)
+  const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
+  if (!alive.length) { ElMessage.warning(tt('请先勾选一张工单')); return }
+  const nos = [...new Set(alive.map((r) => r.工单号))]
   try {
-    const res = await request.post('/px/scheduleBoard/trace', { 工单号: no })
-    const pick = res.data?.领料数据 || []
-    if (!pick.length) { ElMessage.warning(tt('该工单暂无领料单')); return }
-    const win = window.open('', '_blank')
-    win.document.write(`<html><head><title>${tt('打印领料单')} ${no}</title>
-      <style>body{font-family:Microsoft YaHei,sans-serif;padding:24px}h2{margin:0 0 12px}
-      table{border-collapse:collapse;width:100%}td,th{border:1px solid #333;padding:6px 10px;font-size:13px}
-      th{background:#f0f0f0}</style></head><body>
-      <h2>${tt('打印领料单')} — ${no}</h2>
-      <table><tr><th>${tt('领料单号')}</th><th>${tt('日期')}</th></tr>
-      ${pick.map((p) => `<tr><td>${p.单据编号 || ''}</td><td>${(p.单据日期 || '').slice(0, 10)}</td></tr>`).join('')}
-      </table></body></html>`)
-    win.document.close()
-    win.focus()
-    win.print()
-  } catch (e) { err(e, '打印失败') }
+    await ElMessageBox.confirm(
+      `${tt('确认为选中的')} ${nos.length} ${tt('张工单转领料')}?`,
+      tt('转领料单'),
+      { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
+  } catch { return }
+  try {
+    const res = await request.post('/px/workOrderList/toPicking', {
+      rows: alive.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号, 批次号: r.批次号 })),
+    })
+    const d = res.data || {}
+    const list = d['单号清单'] || []
+    ElMessage.success(`${tt('已生成领料单')} ${list.join('、')}（${tt('材料明细请在材料出库单里补填,审核后自动回写工单领料单号')}）`)
+    if ((d['失败行'] || []).length) ElMessage.warning(`${tt('未转成功')}：${d['失败行'].join('; ')}`)
+    load()
+    // 生成后可直接去材料出库单补材料明细(不强制:也可稍后自己进面板)
+    try {
+      await ElMessageBox.confirm(
+        tt('领料单已生成,现在去「材料出库单」补材料明细吗?'),
+        tt('转领料单'),
+        { confirmButtonText: tt('去补明细'), cancelButtonText: tt('稍后'), type: 'success' })
+    } catch { return }
+    const path = '/panelx/list/MATERIAL_OUT'
+    router.push(path)
+    tabs.open({ path, title: '材料出库单' })
+  } catch (e) { err(e, '转领料单失败') }
 }
 
 /** 切单(9.29 批次①):勾选/当前行必须恰为一张工单 → 后端预览可切上限 → 弹窗输入切出数量 */

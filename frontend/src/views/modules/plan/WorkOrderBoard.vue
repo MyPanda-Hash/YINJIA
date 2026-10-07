@@ -367,6 +367,8 @@ async function doTransferRevoke() {
 //    原实现:勾选已排工单 → 按默认 BOM×排产数量 生成材料出库单草稿(后端 /px/scheduleBoard/toPicking
 //    + ScheduleBoardService.toPicking + BOM 表 bs_bom,均已同期删除)。领料单改为在「材料出库单」面板手工
 //    新增/选单;若日后要恢复自动带料,需先有新的用料来源(如金蝶 BOM 接口)。
+//    **2026-10-07 补**:生产工单列表页新增「转领料单」(WorkOrderList.vue + /px/workOrderList/toPicking,
+//    由原「打印领料单」改来)——只转单头(加工单号=工单号)、明细仍由仓库在材料出库单里补,故本页不重复造入口。
 
 onMounted(() => {
   loadAll()
