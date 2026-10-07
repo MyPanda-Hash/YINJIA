@@ -13,7 +13,12 @@
  * 明细 decimal(18,4) 的 4 位不再被 2 位截断,也不出现 0.30000000000000004 这类浮点尾巴。
  */
 import * as QRCodeMod from 'qrcode'
-import { sumKeepScale } from '@core/panel/sumTotals'
+// ⚠ 这里写**相对路径**而不是 Vite 别名 `@core/panel/sumTotals`(2026-10-07):
+//   本文件被 `node --test` 直接加载(print-formats.test.js / wo-qr.test.js),
+//   而 node 不认 Vite 的 resolve.alias ⇒ 用别名会 ERR_MODULE_NOT_FOUND 把两条测试打挂。
+//   测试可见的模块一律用相对路径;只走打包链路的模块才用别名。
+//   另外 node ESM 必须写**扩展名**(Vite 可省),所以是 '../core/panel/sumTotals.js'。
+import { sumKeepScale } from '../core/panel/sumTotals.js'
 
 /** qrcode 库兼容取用:CJS 互操作下 toDataURL 可能挂在 .default 上 */
 function qrLib() {
