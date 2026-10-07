@@ -481,10 +481,68 @@ public class QueryService {
         if (withId && row.get("__id") != null) out.put("id", row.get("__id"));
         for (PanelRegistry.FieldDef f : def.fields()) {
             Object v = row.get(f.label());
-            if (v != null) out.put(f.label(), v);
+            if (v != null) out.put(f.label(), dateWallText(f.dataType(), v));
         }
         return out;
     }
+
+    /**
+     * 日期类字段(日期/日期时间/时间)的值 → **本地墙钟文本**,再下发前端。
+     *
+     * 为什么必须在这一层转(2026-10-07 用户报错取证):
+     *   服务器上不少日期列是 datetime/date(旧系统直改存量,如 rd_instr_use_detail.使用日期),
+     *   JDBC 取回 java.sql.Timestamp/Date,Jackson 按 UTC 序列化成
+     *   `2026-10-05T16:00:00.000+00:00` —— 而库里存的是**本地墙钟** 2026-10-06 00:00。
+     *   前端按字面取日期就成了前一天(用户口径:「我写的6号,实际保存变成了5号」),
+     *   原样回传还会把值再往前挪一天(日期选择器同样按前 10 字符解析)。
+     *   ⇒ 在这里转成 'yyyy-MM-dd'(与 dev/测试库 nvarchar 文本列的口径**完全一致**)后,
+     *   列表、表单、打印、回写四条路都对得上。
+     *
+     * 只认 data_type 精确等于 日期/日期时间/时间;文本/下拉框/参照/时间区间等一律原样返回
+     * (dev 库里日期字段本来就是文本,走到这里已是 String,不做任何加工)。
+     */
+    static Object dateWallText(String dataType, Object v) {
+        if (v == null) return null;
+        String t = dataType == null ? "" : dataType.trim();
+        boolean dateOnly = "日期".equals(t);
+        boolean dateTime = "日期时间".equals(t);
+        boolean timeOnly = "时间".equals(t);
+        if (!dateOnly && !dateTime && !timeOnly) return v;
+        try {
+            if (v instanceof java.sql.Timestamp ts) {
+                java.time.LocalDateTime d = ts.toLocalDateTime();
+                return dateTime ? d.format(DT_FMT) : dateOnly ? d.format(D_FMT) : d.format(T_FMT);
+            }
+            if (v instanceof java.sql.Date d) {
+                java.time.LocalDate ld = d.toLocalDate();
+                return dateTime ? ld.atStartOfDay().format(DT_FMT) : dateOnly ? ld.format(D_FMT) : ld.atStartOfDay().format(T_FMT);
+            }
+            if (v instanceof java.sql.Time tm) {
+                java.time.LocalTime lt = tm.toLocalTime();
+                return dateTime ? java.time.LocalDate.now() + " " + lt.format(T_FMT) : dateOnly ? lt.format(D_FMT) : lt.format(T_FMT);
+            }
+            if (v instanceof java.time.LocalDateTime d) {
+                return dateTime ? d.format(DT_FMT) : dateOnly ? d.format(D_FMT) : d.format(T_FMT);
+            }
+            if (v instanceof java.time.LocalDate d) {
+                return dateTime ? d.atStartOfDay().format(DT_FMT) : dateOnly ? d.format(D_FMT) : d.atStartOfDay().format(T_FMT);
+            }
+            if (v instanceof java.time.LocalTime t2) {
+                return t2.format(T_FMT);
+            }
+        } catch (RuntimeException e) {
+            // 取不出来(异常日期)就原样下发:宁可前端显示怪值,也不能把整张列表打挂
+            return v;
+        }
+        return v;
+    }
+
+    private static final java.time.format.DateTimeFormatter D_FMT =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private static final java.time.format.DateTimeFormatter DT_FMT =
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final java.time.format.DateTimeFormatter T_FMT =
+            java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss");
 
     /** 直接列过滤(档案模式) */
     private void appendDirectFilters(PanelRegistry.PanelDef def, String table, StringBuilder where,
