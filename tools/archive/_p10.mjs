@@ -1,0 +1,14 @@
+﻿import mssql from 'mssql';
+const pool = await new mssql.ConnectionPool({server:'127.0.0.1',port:1433,database:'HSDZ_MES',user:'yinjia',password:'Yinjia@2026',options:{encrypt:false,trustServerCertificate:true}}).connect();
+const q = async (s) => (await new mssql.Request(pool).query(s)).recordset;
+console.log('=== 新口径 RTRIM(仓库)=N\'成品仓\' ===');
+const nw = await q(`SELECT COUNT(*) n FROM v_stock_ledger WHERE ISNULL(asp_cancel,'N')<>'Y' AND RTRIM([仓库]) = N'成品仓'`);
+console.log(`  返回 ${nw[0].n} 行(旧 LIKE 口径 93 行)`);
+console.log('=== 不良品仓(旧 LIKE 会带出 原料不良品仓)===');
+const old = await q(`SELECT COUNT(*) n FROM v_stock_ledger WHERE ISNULL(asp_cancel,'N')<>'Y' AND [仓库] LIKE N'%不良品仓%'`);
+const neu = await q(`SELECT COUNT(*) n FROM v_stock_ledger WHERE ISNULL(asp_cancel,'N')<>'Y' AND RTRIM([仓库]) = N'不良品仓'`);
+console.log(`  旧=${old[0].n} 行(含原料不良品仓) → 新=${neu[0].n} 行`);
+console.log('=== 文本字段不受影响(仓库编码 LIKE 仍模糊)===');
+const like2 = await q(`SELECT COUNT(*) n FROM v_stock_ledger WHERE ISNULL(asp_cancel,'N')<>'Y' AND [仓库编码] LIKE N'%CK0%'`);
+console.log(`  仓库编码 LIKE '%CK0%' → ${like2[0].n} 行(保持模糊)`);
+await pool.close();

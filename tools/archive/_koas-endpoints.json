@@ -1,0 +1,1477 @@
+[
+ {
+  "id": "5d8b62da326711eea7df935c8d15f55f",
+  "title": "公有云开发体验",
+  "path": ""
+ },
+ {
+  "id": "246351b06be711eebcbf9b1da0ca5700",
+  "title": "查询联系人详情",
+  "path": ""
+ },
+ {
+  "id": "62273d436be711eebcbf6b10145f5bf4",
+  "title": "删除联系人",
+  "path": ""
+ },
+ {
+  "id": "3a1906a06be711eea5e451d0eff3888f",
+  "title": "批量查询联系人",
+  "path": ""
+ },
+ {
+  "id": "55c476826be711eebcbf11d43803407b",
+  "title": "修改联系人",
+  "path": ""
+ },
+ {
+  "id": "4833de216be711eebcbfbdc2b0050794",
+  "title": "新增联系人",
+  "path": ""
+ },
+ {
+  "id": "c6435914170d11ee8c0195ceed66c5df",
+  "title": "私有云开发流程",
+  "path": ""
+ },
+ {
+  "id": "15a9b098691311eca26bfba14cf0473c",
+  "title": "模拟BOM",
+  "path": ""
+ },
+ {
+  "id": "803eea2946bd4090a083ea6afed313be",
+  "title": "获取商品批号列表",
+  "path": "https://api.kingdee.com/koas/APP002112/uereport/UEStockController/GetItemStockInfors?access_token=xxxxx"
+ },
+ {
+  "id": "7578ebe336764844a40b270a4a7c1b98",
+  "title": "获取仓库列表信息",
+  "path": "https://api.kingdee.com/koas/APP002112/uereport/UEStockController/GetStockInfors?access_token=xxxxx"
+ },
+ {
+  "id": "0a5355e9079d4b39ad5a8b46c8173614",
+  "title": "查询商品库存",
+  "path": "https://api.kingdee.com/koas/APP002112/uereport/UEStockController/SearchItemInfors?access_token=xxxxx"
+ },
+ {
+  "id": "ddfc2b12754411ed86f715a6179bbbc0",
+  "title": "查询科目资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Account/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "eac564b4b44211ee8bbaa935e3351297",
+  "title": "查询多个科目资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Account/GetListDetails?access_token=xxxxx"
+ },
+ {
+  "id": "f20e1b93754411ed86f7cd9be24e977c",
+  "title": "批量查询科目基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Account/List?access_token=xxxxx"
+ },
+ {
+  "id": "b4896ec7753711ed86f7fde4feaeac8e",
+  "title": "新增核算项目",
+  "path": "https://api.kingdee.com/koas/APP006992/api/AccountingItem/Create?access_token=xxxxx"
+ },
+ {
+  "id": "cd765a69753711ed86f75b5e4922e948",
+  "title": "删除核算项目信息",
+  "path": "https://api.kingdee.com/koas/APP006992/api/AccountingItem/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "9c659f85753711ed86f7bf61fe6ac60e",
+  "title": "查询核算项目信息详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/AccountingItem/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "a75638a6753711ed86f7f51a4d6b3fcf",
+  "title": "批量查询核算项目信息详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/AccountingItem/List?access_token=xxxxx"
+ },
+ {
+  "id": "c2691188753711ed86f7dbac2661ad72",
+  "title": "修改核算项目信息",
+  "path": "https://api.kingdee.com/koas/APP006992/api/AccountingItem/Update?access_token=xxxxx"
+ },
+ {
+  "id": "931f0dc3752c11ed86f7759a3031d9f3",
+  "title": "新增币别资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Currency/Create?access_token=xxxxx"
+ },
+ {
+  "id": "b51ada35752c11ed86f77780018f3dde",
+  "title": " 删除币别资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Currency/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "4ec3d111752c11ed86f733ef3f4850b5",
+  "title": "查询币别资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Currency/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "2ea601deb43d11ee8bba4da44bd8d01c",
+  "title": "查询多个币别资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Currency/GetListDetails?access_token=xxxxx"
+ },
+ {
+  "id": "71371772752c11ed86f78b91d2169ef7",
+  "title": "批量查询币别资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Currency/List?access_token=xxxxx"
+ },
+ {
+  "id": "a31cd594752c11ed86f7218aa0b6a0b7",
+  "title": "修改币别资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Currency/Update?access_token=xxxxx"
+ },
+ {
+  "id": "2258f038752f11ed86f7ebc16c40bf65",
+  "title": " 新增客户资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Customer/Create?access_token=xxxxx"
+ },
+ {
+  "id": "3bf8d82a752f11ed86f773d0c1060051",
+  "title": "删除客户资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Customer/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "f08e5b36752e11ed86f7bdace2112f0a",
+  "title": "查询客户基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Customer/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "97fbfdafb43e11ee8bba27defdcd7f49",
+  "title": "查询多个客户基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Customer/GetListDetails?access_token=xxxxx"
+ },
+ {
+  "id": "1847e1a7752f11ed86f783ea7abec6c1",
+  "title": "批量查询客户基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Customer/List?access_token=xxxxx"
+ },
+ {
+  "id": "2f48dbc9752f11ed86f751b9091c7cc5",
+  "title": "修改客户资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Customer/Update?access_token=xxxxx"
+ },
+ {
+  "id": "ce6af7b2753011ed86f7cfd7ebc40de4",
+  "title": "新增部门资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Department/Create?access_token=xxxxx"
+ },
+ {
+  "id": "b1766680753011ed86f77bfc8e7bdba4",
+  "title": "删除部门资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Department/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "f77986d4753011ed86f7b1e03fccf4e7",
+  "title": "查询部门基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Department/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "5e4942b0b44011ee8bbaa14f43edf8e8",
+  "title": "查询多个部门基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Department/GetListDetails?access_token=xxxxx"
+ },
+ {
+  "id": "e48bcb03753011ed86f7cffb065065e5",
+  "title": "批量查询部门基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Department/List?access_token=xxxxx"
+ },
+ {
+  "id": "c29778a1753011ed86f72b534c55af96",
+  "title": "修改部门资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Department/Update?access_token=xxxxx"
+ },
+ {
+  "id": "05df7b27753211ed86f7afeb3533ba73",
+  "title": "新增职员资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Employee/Create?access_token=xxxxx"
+ },
+ {
+  "id": "227152e9753211ed86f71ddaa9298104",
+  "title": "删除职员资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Employee/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "eabf82e5753111ed86f729aee85fa21c",
+  "title": "查询职员基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Employee/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "a96acfc1b44011ee8bba43aff733cd2e",
+  "title": "查询多个职员基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Employee/GetListDetails?access_token=xxxxx"
+ },
+ {
+  "id": "fa051e46753111ed86f7a5f91c861e59",
+  "title": "批量查询职员基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Employee/List?access_token=xxxxx"
+ },
+ {
+  "id": "13aeca38753211ed86f75da07999a3d3",
+  "title": "修改职员资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Employee/Update?access_token=xxxxx"
+ },
+ {
+  "id": "1ad84d0cbf1711ee8bbaafa121bf3ca9",
+  "title": "自定义核算项目明细",
+  "path": "https://api.kingdee.com/koas/APP006992/api/item/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "0d308359bf1711eeaee3677ffce32054",
+  "title": "自定义核算项目明细列表",
+  "path": "https://api.kingdee.com/koas/APP006992/api/item/list?access_token=xxxxx"
+ },
+ {
+  "id": "070dcc8c753311ed86f73d4423e279d0",
+  "title": "新增物料资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Material/Create?access_token=xxxxx"
+ },
+ {
+  "id": "22451d5e753311ed86f75daed1b2ca01",
+  "title": "删除物料资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Material/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "eb309eca753211ed86f751c2b3c87072",
+  "title": "查询物料基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Material/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "28a882f2b44111ee8bba05738d64ba46",
+  "title": "查询多个物料基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Material/GetListDetails?access_token=xxxxx"
+ },
+ {
+  "id": "fbbdfc6b753211ed86f797682d5b57e1",
+  "title": "批量查询物料基础资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Material/List?access_token=xxxxx"
+ },
+ {
+  "id": "1594f9ed753311ed86f7910e3cee0f28",
+  "title": "修改物料资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Material/Update?access_token=xxxxx"
+ },
+ {
+  "id": "1e2b0bcf753411ed86f71d5408562982",
+  "title": "批量获取物料分类",
+  "path": "https://api.kingdee.com/koas/APP006992/api/MaterialCategory/List?access_token=xxxxx"
+ },
+ {
+  "id": "d77828fb754611ed86f7b1e390a7358f",
+  "title": "新增计量单位",
+  "path": "https://api.kingdee.com/koas/APP006992/api/MeasureUnit/Create?access_token=xxxxx"
+ },
+ {
+  "id": "f7e6c5bd754611ed86f7ebb97c80079d",
+  "title": "删除计量单位",
+  "path": "https://api.kingdee.com/koas/APP006992/api/MeasureUnit/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "c2aa628a754611ed86f7c1a5e8d90bba",
+  "title": "获取计量单位详细",
+  "path": "https://api.kingdee.com/koas/APP006992/api/MeasureUnit/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "a4999c01b44411eeaee3afbfef4cef36",
+  "title": "获取多个计量单位详细",
+  "path": "https://api.kingdee.com/koas/APP006992/api/MeasureUnit/GetListDetails?access_token=xxxxx"
+ },
+ {
+  "id": "b7ebaed9754611ed86f7ed68ab812b15",
+  "title": "批量获取计量单位",
+  "path": "https://api.kingdee.com/koas/APP006992/api/MeasureUnit/List?access_token=xxxxx"
+ },
+ {
+  "id": "01f9a90e754711ed86f71178ee959214",
+  "title": "批量获取计量单位组",
+  "path": "https://api.kingdee.com/koas/APP006992/api/MeasureUnit/UnitGroupList?access_token=xxxxx"
+ },
+ {
+  "id": "e9e9d6fc754611ed86f7c9bc35680a10",
+  "title": "更新计量单位",
+  "path": "https://api.kingdee.com/koas/APP006992/api/MeasureUnit/Update?access_token=xxxxx"
+ },
+ {
+  "id": "aec9d47c754111ed86f7a11444a5bfdb",
+  "title": "新增结算方式",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Settle/Create?access_token=xxxxx"
+ },
+ {
+  "id": "97b922ea754111ed86f779b7cde1b7ff",
+  "title": "查询结算方式信息详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Settle/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "4b8bbda6b44b11ee8bba4522d91a3ddf",
+  "title": "查询多个结算方式信息详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Settle/GetListDetails?access_token=xxxxx"
+ },
+ {
+  "id": "a2a48beb754111ed86f701eaf456f716",
+  "title": "批量查询结算方式信息详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Settle/List?access_token=xxxxx"
+ },
+ {
+  "id": "c11fe42d754111ed86f7c7b9cebb91ff",
+  "title": "修改结算方式信息",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Settle/Update?access_token=xxxxx"
+ },
+ {
+  "id": "dc2d6916754511ed86f771c9c17d7ecc",
+  "title": "新增仓库资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Stock/Create?access_token=xxxxx"
+ },
+ {
+  "id": "f4e9ced8754511ed86f73d620c858680",
+  "title": "删除仓库资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Stock/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "c5ee8674754511ed86f7214506c16839",
+  "title": "查询仓库基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Stock/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "2ec62fe5b44411ee8bbae1b3178a1ee6",
+  "title": "查询多个仓库基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Stock/GetListDetails?access_token=xxxxx"
+ },
+ {
+  "id": "d1ef08f5754511ed86f7896a6d308d38",
+  "title": "批量查询仓库基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Stock/List?access_token=xxxxx"
+ },
+ {
+  "id": "e9834267754511ed86f7bba0b8d44bae",
+  "title": "修改仓库资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Stock/Update?access_token=xxxxx"
+ },
+ {
+  "id": "be4eea976bcb11eea5e497e053a7122d",
+  "title": "新增",
+  "path": "https://api.kingdee.com/koas/APP006992/api/StockPlace/Create?access_token=xxxxx"
+ },
+ {
+  "id": "b41349966bcb11eea5e4473be75ba358",
+  "title": "删除",
+  "path": "https://api.kingdee.com/koas/APP006992/api/StockPlace/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "561e838b6bca11eebcbf27ca0a41dd15",
+  "title": "查询详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/StockPlace/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "8bf5a01c6bca11eebcbfa72a97ee6b09",
+  "title": "批量查询仓位",
+  "path": "https://api.kingdee.com/koas/APP006992/api/StockPlace/List?access_token=xxxxx"
+ },
+ {
+  "id": "c82820486bcb11eea5e4cb5d93e6bbed",
+  "title": "修改",
+  "path": "https://api.kingdee.com/koas/APP006992/api/StockPlace/Update?access_token=xxxxx"
+ },
+ {
+  "id": "85a3d18e6bcc11eebcbfbb804937f993",
+  "title": "新增",
+  "path": "https://api.kingdee.com/koas/APP006992/api/StockPlaceGroup/Create?access_token=xxxxx"
+ },
+ {
+  "id": "7a8f5c3b6bcc11eea5e42f90b35d2e5b",
+  "title": "删除",
+  "path": "https://api.kingdee.com/koas/APP006992/api/StockPlaceGroup/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "66ef8e7a6bcc11eea5e49f9db141d4b8",
+  "title": "查询",
+  "path": "https://api.kingdee.com/koas/APP006992/api/StockPlaceGroup/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "6f63dd7d6bcc11eebcbf811472798890",
+  "title": "批量查询",
+  "path": "https://api.kingdee.com/koas/APP006992/api/StockPlaceGroup/List?access_token=xxxxx"
+ },
+ {
+  "id": "8e2df17c6bcc11eea5e4f77ab845c756",
+  "title": "修改",
+  "path": "https://api.kingdee.com/koas/APP006992/api/StockPlaceGroup/Update?access_token=xxxxx"
+ },
+ {
+  "id": "5bf68cdabb5611ee8bba95f934affc56",
+  "title": "辅助资料列表",
+  "path": "https://api.kingdee.com/koas/APP006992/api/submes/list?access_token=xxxxx"
+ },
+ {
+  "id": "49a1b5d2bb5611eeaee3a3d710f4f851",
+  "title": "辅助资料类型",
+  "path": "https://api.kingdee.com/koas/APP006992/api/submestype/list?access_token=xxxxx"
+ },
+ {
+  "id": "da5973be754211ed86f7cfa07425bf5d",
+  "title": "批量查询用户",
+  "path": "https://api.kingdee.com/koas/APP006992/api/User/List?access_token=xxxxx"
+ },
+ {
+  "id": "0c348bd2753511ed86f7f95342ebc409",
+  "title": "新增供应商资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Vendor/Create?access_token=xxxxx"
+ },
+ {
+  "id": "244484f4753511ed86f7c5664ef8241d",
+  "title": "删除供应商资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Vendor/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "f3123850753411ed86f7f565f24c5506",
+  "title": "查询供应商基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Vendor/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "48f9b733b44211ee8bba1514770ffbe4",
+  "title": "查询多个供应商基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Vendor/GetListDetails?access_token=xxxxx"
+ },
+ {
+  "id": "ffa55de1753411ed86f7570341a6002b",
+  "title": "批量查询供应商基础资料详情",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Vendor/List?access_token=xxxxx"
+ },
+ {
+  "id": "1979c353753511ed86f75f51c6465353",
+  "title": "修改供应商资料",
+  "path": "https://api.kingdee.com/koas/APP006992/api/Vendor/Update?access_token=xxxxx"
+ },
+ {
+  "id": "6a84d790754411ed86f793bb9a21cd46",
+  "title": "批量查询凭证字",
+  "path": "https://api.kingdee.com/koas/APP006992/api/VoucherGroup/List?access_token=xxxxx"
+ },
+ {
+  "id": "42a99333755611ed86f705c49066d110",
+  "title": "新增其他应付单",
+  "path": "https://api.kingdee.com/koas/APP007020/api/OtherApBill/Create?access_token=xxxxx"
+ },
+ {
+  "id": "596260c5755611ed86f7854755b6dfaf",
+  "title": " 删除其他应付单",
+  "path": "https://api.kingdee.com/koas/APP007020/api/OtherApBill/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "24fa1671755611ed86f7c9a5bf91565c",
+  "title": "查询其他应付单详情",
+  "path": "https://api.kingdee.com/koas/APP007020/api/OtherApBill/Get?access_token=xxxxx"
+ },
+ {
+  "id": "347c6cb2755611ed86f7eb216f4a3f8d",
+  "title": "批量查询其他应付单",
+  "path": "https://api.kingdee.com/koas/APP007020/api/OtherApBill/List?access_token=xxxxx"
+ },
+ {
+  "id": "4d4618e4755611ed86f733f8c0e4e7a9",
+  "title": "更新其他应付单",
+  "path": "https://api.kingdee.com/koas/APP007020/api/OtherApBill/Update?access_token=xxxxx"
+ },
+ {
+  "id": "abd5f188755811ed86f78bf3ca294b1b",
+  "title": "新增付款单",
+  "path": "https://api.kingdee.com/koas/APP007020/api/PaymentNote/Create?access_token=xxxxx"
+ },
+ {
+  "id": "bcebb90a755811ed86f725b83761be8e",
+  "title": "删除付款单",
+  "path": "https://api.kingdee.com/koas/APP007020/api/PaymentNote/Delete?access_token=xxxxx"
+ },
+ {
+  "id": "987e2946755811ed86f7e3e6d2c4e670",
+  "title": "查询付款单详情",
+  "path": "https://api.kingdee.com/koas/APP007020/api/PaymentNote/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "a1cc35f7755811ed86f7b54ad841c271",
+  "title": "批量查询付款单",
+  "path": "https://api.kingdee.com/koas/APP007020/api/PaymentNote/List?access_token=xxxxx"
+ },
+ {
+  "id": "b3b33029755811ed86f7176547ed42f3",
+  "title": "更新付款单",
+  "path": "https://api.kingdee.com/koas/APP007020/api/PaymentNote/Update?access_token=xxxxx"
+ },
+ {
+  "id": "a8cf398275d511ed86f75f9d9e0ebadc",
+  "title": "新增发货通知",
+  "path": "https://api.kingdee.com/koas/app007099/api/deliverynotice/create?access_token=xxxxx"
+ },
+ {
+  "id": "c0017cd475d511ed86f7bfc663542998",
+  "title": "删除发货通知",
+  "path": "https://api.kingdee.com/koas/app007099/api/deliverynotice/delete?access_token=xxxxx"
+ },
+ {
+  "id": "812df60075d511ed86f737ed0a788cef",
+  "title": "查询发货通知详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/deliverynotice/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "8e9c395175d511ed86f76340071544d6",
+  "title": "批量查询发货通知",
+  "path": "https://api.kingdee.com/koas/app007099/api/deliverynotice/list?access_token=xxxxx"
+ },
+ {
+  "id": "b434666375d511ed86f73588b072beea",
+  "title": "修改发货通知",
+  "path": "https://api.kingdee.com/koas/app007099/api/deliverynotice/update?access_token=xxxxx"
+ },
+ {
+  "id": "8377d76075db11ed86f7951797cca6de",
+  "title": "新增退货通知",
+  "path": "https://api.kingdee.com/koas/app007099/api/goodsreturnnotice/create?access_token=xxxxx"
+ },
+ {
+  "id": "8383702275db11ed86f76ffded730729",
+  "title": "删除退货通知",
+  "path": "https://api.kingdee.com/koas/app007099/api/goodsreturnnotice/delete?access_token=xxxxx"
+ },
+ {
+  "id": "836c8cbe75db11ed86f7898635d53c99",
+  "title": "查询退货通知详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/goodsreturnnotice/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "8372591f75db11ed86f74fc7bb4efaf7",
+  "title": "批量查询退货通知",
+  "path": "https://api.kingdee.com/koas/app007099/api/goodsreturnnotice/list?access_token=xxxxx"
+ },
+ {
+  "id": "837dcad175db11ed86f741e59d8adbe7",
+  "title": "修改退货通知",
+  "path": "https://api.kingdee.com/koas/app007099/api/goodsreturnnotice/update?access_token=xxxxx"
+ },
+ {
+  "id": "a4ee202575db11ed86f71166b2f662c7",
+  "title": "新增价格明细",
+  "path": "https://api.kingdee.com/koas/app007099/api/maintainpricedetails/create?access_token=xxxxx"
+ },
+ {
+  "id": "a4fbdbc775db11ed86f7dd00302ec6bf",
+  "title": "删除价格明细",
+  "path": "https://api.kingdee.com/koas/app007099/api/maintainpricedetails/delete?access_token=xxxxx"
+ },
+ {
+  "id": "a4df04f375db11ed86f7bb0db57973d8",
+  "title": "查询价格明细详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/maintainpricedetails/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "a4e594a475db11ed86f72d739e728667",
+  "title": "批量查询价格明细",
+  "path": "https://api.kingdee.com/koas/app007099/api/maintainpricedetails/list?access_token=xxxxx"
+ },
+ {
+  "id": "a4f4fdf675db11ed86f7e3c150860c47",
+  "title": "修改价格明细",
+  "path": "https://api.kingdee.com/koas/app007099/api/maintainpricedetails/update?access_token=xxxxx"
+ },
+ {
+  "id": "c78d317a75db11ed86f79bd5af95ff3a",
+  "title": "新增销售发票(普通)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salescommoninvoice/create?access_token=xxxxx"
+ },
+ {
+  "id": "c79bd77c75db11ed86f7d1ff7d126b74",
+  "title": "删除销售发票(普通)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salescommoninvoice/delete?access_token=xxxxx"
+ },
+ {
+  "id": "c78198b875db11ed86f7d33ea339905a",
+  "title": "查询销售发票(普通)详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/salescommoninvoice/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "c787651975db11ed86f755cc2ce6d2a1",
+  "title": "批量查询销售发票(普通)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salescommoninvoice/list?access_token=xxxxx"
+ },
+ {
+  "id": "c794847b75db11ed86f7d7a4cebd9756",
+  "title": "修改销售发票(普通)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salescommoninvoice/update?access_token=xxxxx"
+ },
+ {
+  "id": "130fa33f75dc11ed86f77b2d2fe3d499",
+  "title": "新增销售费用发票",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesexpenseinvoice/create?access_token=xxxxx"
+ },
+ {
+  "id": "131d36d175dc11ed86f737fdadff8531",
+  "title": "删除销售费用发票",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesexpenseinvoice/delete?access_token=xxxxx"
+ },
+ {
+  "id": "12fe3e1d75dc11ed86f7bbaac230ef93",
+  "title": "查询销售费用发票详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesexpenseinvoice/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "1308ec7e75dc11ed86f7134193d90108",
+  "title": "批量查询销售费用发票",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesexpenseinvoice/list?access_token=xxxxx"
+ },
+ {
+  "id": "1316ce3075dc11ed86f71ddb70955139",
+  "title": "修改销售费用发票",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesexpenseinvoice/update?access_token=xxxxx"
+ },
+ {
+  "id": "211a9c8775d111ed86f76b2ea9765ff4",
+  "title": "新增销售订单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesorder/create?access_token=xxxxx"
+ },
+ {
+  "id": "330937d975d111ed86f7efb9a2185dc6",
+  "title": "删除销售订单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesorder/delete?access_token=xxxxx"
+ },
+ {
+  "id": "f7b69a6575d011ed86f7ef49934a9073",
+  "title": "查询销售订单详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesorder/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "0467f65675d111ed86f7bf863f481375",
+  "title": "批量查询销售订单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesorder/list?access_token=xxxxx"
+ },
+ {
+  "id": "29bd751875d111ed86f713e79e32ae23",
+  "title": "修改销售订单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesorder/update?access_token=xxxxx"
+ },
+ {
+  "id": "293de31475dc11ed86f7e55636e61951",
+  "title": "新增销售报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesquotation/create?access_token=xxxxx"
+ },
+ {
+  "id": "294becd675dc11ed86f7c9cecf99a4fe",
+  "title": "删除销售报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesquotation/delete?access_token=xxxxx"
+ },
+ {
+  "id": "293138e275dc11ed86f7bf0aedb23360",
+  "title": "查询销售报价单详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesquotation/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "29377a7375dc11ed86f72bf798bb8ea6",
+  "title": "批量查询销售报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesquotation/list?access_token=xxxxx"
+ },
+ {
+  "id": "29455d2575dc11ed86f717c8a240f20c",
+  "title": "修改销售报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesquotation/update?access_token=xxxxx"
+ },
+ {
+  "id": "3b4a66a975dc11ed86f74784b7df8bc7",
+  "title": "新增销售发票(专用)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesvatinvoice/create?access_token=xxxxx"
+ },
+ {
+  "id": "3b5a934b75dc11ed86f79b2e213f35c7",
+  "title": "删除销售发票(专用)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesvatinvoice/delete?access_token=xxxxx"
+ },
+ {
+  "id": "3b3b4b7775dc11ed86f7b90b54725ccc",
+  "title": "查询销售发票(专用)详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesvatinvoice/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "3b42c58875dc11ed86f76f84c746ccca",
+  "title": "批量查询销售发票(专用)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesvatinvoice/list?access_token=xxxxx"
+ },
+ {
+  "id": "3b51447a75dc11ed86f77b7692d0cbc3",
+  "title": "修改销售发票(专用)",
+  "path": "https://api.kingdee.com/koas/app007099/api/salesvatinvoice/update?access_token=xxxxx"
+ },
+ {
+  "id": "a4bb811475dc11ed86f70b4e0ee2b671",
+  "title": "新增模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/create?access_token=xxxxx"
+ },
+ {
+  "id": "a4c963c675dc11ed86f769f71858c833",
+  "title": "删除模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/delete?access_token=xxxxx"
+ },
+ {
+  "id": "a4ac65e275dc11ed86f73955516d5135",
+  "title": "查询模拟BOM详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "a4b47c3375dc11ed86f759bb43e95c06",
+  "title": "批量查询模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/list?access_token=xxxxx"
+ },
+ {
+  "id": "a4c1c2a575dc11ed86f7ad05b360b96b",
+  "title": "修改模拟BOM",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedbom/update?access_token=xxxxx"
+ },
+ {
+  "id": "4d3f6a9e75dc11ed86f755e901dc1393",
+  "title": "新增模拟报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedquotation/create?access_token=xxxxx"
+ },
+ {
+  "id": "4d4c8a0075dc11ed86f76dea2518c5f5",
+  "title": "删除模拟报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedquotation/delete?access_token=xxxxx"
+ },
+ {
+  "id": "4d30c49c75dc11ed86f77d5b525b283f",
+  "title": "查询模拟报价单详情",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedquotation/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "4d3865bd75dc11ed86f7a7a23ad55580",
+  "title": "批量查询模拟报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedquotation/list?access_token=xxxxx"
+ },
+ {
+  "id": "4d46486f75dc11ed86f7c730e8a858d4",
+  "title": "修改模拟报价单",
+  "path": "https://api.kingdee.com/koas/app007099/api/simulatedquotation/update?access_token=xxxxx"
+ },
+ {
+  "id": "e7e3680d75f911ed86f78d4edbbe939d",
+  "title": "新增组装单",
+  "path": "https://api.kingdee.com/koas/app007104/api/assemblyorder/create?access_token=xxxxx"
+ },
+ {
+  "id": "e7f20e0f75f911ed86f7b3d5314a6fa2",
+  "title": "删除组装单",
+  "path": "https://api.kingdee.com/koas/app007104/api/assemblyorder/delete?access_token=xxxxx"
+ },
+ {
+  "id": "e7d5d37b75f911ed86f7e71602fe8127",
+  "title": "查询组装单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/assemblyorder/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "e7dcb14c75f911ed86f7814f04698887",
+  "title": "批量查询组装单",
+  "path": "https://api.kingdee.com/koas/app007104/api/assemblyorder/list?access_token=xxxxx"
+ },
+ {
+  "id": "e7eb092e75f911ed86f76d5f5a12c6e2",
+  "title": "修改组装单",
+  "path": "https://api.kingdee.com/koas/app007104/api/assemblyorder/update?access_token=xxxxx"
+ },
+ {
+  "id": "52a1317475fb11ed86f7c545e53c9093",
+  "title": "新增联系人",
+  "path": "https://api.kingdee.com/koas/app007104/api/contact/create?access_token=xxxxx"
+ },
+ {
+  "id": "52ac550675fb11ed86f7c751b7402e83",
+  "title": "删除联系人",
+  "path": "https://api.kingdee.com/koas/app007104/api/contact/delete?access_token=xxxxx"
+ },
+ {
+  "id": "5292d99275fb11ed86f78900a12ecdf8",
+  "title": "查询联系人详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/contact/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "529ac8d375fb11ed86f77fb7b7dbf2c1",
+  "title": "批量查询联系人",
+  "path": "https://api.kingdee.com/koas/app007104/api/contact/list?access_token=xxxxx"
+ },
+ {
+  "id": "52a6afb575fb11ed86f7dfa820b73641",
+  "title": "修改联系人",
+  "path": "https://api.kingdee.com/koas/app007104/api/contact/update?access_token=xxxxx"
+ },
+ {
+  "id": "f98bf9b075f911ed86f78714da3f9ca6",
+  "title": "查询拆卸单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/disassemblyorder/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "f99373c175f911ed86f7ad60e310fe43",
+  "title": "批量查询拆卸单",
+  "path": "https://api.kingdee.com/koas/app007104/api/disassemblyorder/list?access_token=xxxxx"
+ },
+ {
+  "id": "08f314de6bcd11eea5e48770b53cbaeb",
+  "title": "批量查询",
+  "path": "https://api.kingdee.com/koas/APP007104/api/ICInventory/List?access_token=xxxxx"
+ },
+ {
+  "id": "24dc5db9760c11ed8582035690dd9c04",
+  "title": "新增其他出库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/miscellaneousdelivery/create?access_token=xxxxx"
+ },
+ {
+  "id": "24e92efb760c11ed8582db06ad83a239",
+  "title": "删除其他出库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/miscellaneousdelivery/delete?access_token=xxxxx"
+ },
+ {
+  "id": "24ccf467760c11ed858241127c0c4e0b",
+  "title": "查询其他出库单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/miscellaneousdelivery/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "24d49588760c11ed8582ff733982cdfd",
+  "title": "批量查询其他出库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/miscellaneousdelivery/list?access_token=xxxxx"
+ },
+ {
+  "id": "24e2ed6a760c11ed858239e426cd8585",
+  "title": "修改其他出库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/miscellaneousdelivery/update?access_token=xxxxx"
+ },
+ {
+  "id": "55076d9a75f911ed86f745d6b154817f",
+  "title": "新增其他入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/miscellaneousreceipt/create?access_token=xxxxx"
+ },
+ {
+  "id": "5514db1c75f911ed86f7a143ee01e367",
+  "title": "删除其他入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/miscellaneousreceipt/delete?access_token=xxxxx"
+ },
+ {
+  "id": "54f915b875f911ed86f73be56b3cae50",
+  "title": "查询其他入库单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/miscellaneousreceipt/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "54ffa56975f911ed86f7db04f160ecef",
+  "title": "批量查询其他入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/miscellaneousreceipt/list?access_token=xxxxx"
+ },
+ {
+  "id": "550dd63b75f911ed86f755bd96bdd0b7",
+  "title": "修改其他入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/miscellaneousreceipt/update?access_token=xxxxx"
+ },
+ {
+  "id": "9af1aec475f911ed86f71fa0197cd475",
+  "title": "新增生产领料单",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/create?access_token=xxxxx"
+ },
+ {
+  "id": "9b0054c675f911ed86f7a7097bf10431",
+  "title": "删除生产领料单",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/delete?access_token=xxxxx"
+ },
+ {
+  "id": "9ae63d1275f911ed86f7379e1f5d17f3",
+  "title": "查询生产领料单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "9aebe26375f911ed86f72515f0d4f894",
+  "title": "批量查询生产领料单",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/list?access_token=xxxxx"
+ },
+ {
+  "id": "9af976f575f911ed86f75d29068345ae",
+  "title": "修改生产领料单",
+  "path": "https://api.kingdee.com/koas/app007104/api/pickinglist/update?access_token=xxxxx"
+ },
+ {
+  "id": "88bcbb9f75f911ed86f701a489ca01af",
+  "title": "新增产品入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/productreceipt/create?access_token=xxxxx"
+ },
+ {
+  "id": "88c9db0175f911ed86f717ace9707251",
+  "title": "删除产品入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/productreceipt/delete?access_token=xxxxx"
+ },
+ {
+  "id": "88aed8ed75f911ed86f7410b7c36938c",
+  "title": "查询产品入库单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/productreceipt/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "88b5b6be75f911ed86f705a7b3fa17db",
+  "title": "批量查询产品入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/productreceipt/list?access_token=xxxxx"
+ },
+ {
+  "id": "88c3c08075f911ed86f72fb9dc769f04",
+  "title": "修改产品入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/productreceipt/update?access_token=xxxxx"
+ },
+ {
+  "id": "37af5fa575f911ed86f72deb1d3fab16",
+  "title": "新增外购入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/purchasereceipt/create?access_token=xxxxx"
+ },
+ {
+  "id": "37bd1b4775f911ed86f77f9379f346f8",
+  "title": "删除外购入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/purchasereceipt/delete?access_token=xxxxx"
+ },
+ {
+  "id": "37a1f22375f911ed86f75385e5b94674",
+  "title": "查询外购入库单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/purchasereceipt/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "37a881d475f911ed86f7ebfc8bb98904",
+  "title": "批量查询外购入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/purchasereceipt/list?access_token=xxxxx"
+ },
+ {
+  "id": "37b6166675f911ed86f779edbbc64330",
+  "title": "修改外购入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/purchasereceipt/update?access_token=xxxxx"
+ },
+ {
+  "id": "bea16cce75f911ed86f7292125b41e6c",
+  "title": "新增异地调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/remotetransferstock/create?access_token=xxxxx"
+ },
+ {
+  "id": "beaeb34075f911ed86f7a95832121efb",
+  "title": "删除异地调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/remotetransferstock/delete?access_token=xxxxx"
+ },
+ {
+  "id": "be9510bc75f911ed86f777a07d77cf65",
+  "title": "查询异地调拨单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/remotetransferstock/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "be9b524d75f911ed86f739154c0edcbb",
+  "title": "批量查询异地调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/remotetransferstock/list?access_token=xxxxx"
+ },
+ {
+  "id": "bea7d56f75f911ed86f735a0e4762d8e",
+  "title": "修改异地调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/remotetransferstock/update?access_token=xxxxx"
+ },
+ {
+  "id": "112fb8c275f911ed86f7b5979e23757f",
+  "title": "删除销售出库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/salesdelivery/delete?access_token=xxxxx"
+ },
+ {
+  "id": "b1a0df6975f911ed86f77d59b920b0b0",
+  "title": "新增调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/stocktransfer/create?access_token=xxxxx"
+ },
+ {
+  "id": "b1ae4ceb75f911ed86f7ff0bc41fefa7",
+  "title": "删除调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/stocktransfer/delete?access_token=xxxxx"
+ },
+ {
+  "id": "b194835775f911ed86f7e7a5f5bac78c",
+  "title": "查询调拨单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/stocktransfer/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "b19a9dd875f911ed86f755aa7c7ca584",
+  "title": "批量查询调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/stocktransfer/list?access_token=xxxxx"
+ },
+ {
+  "id": "b1a7bd3a75f911ed86f7311fc0d36fe2",
+  "title": "修改调拨单",
+  "path": "https://api.kingdee.com/koas/app007104/api/stocktransfer/update?access_token=xxxxx"
+ },
+ {
+  "id": "3fa9b19f75fb11ed86f7e7fd884bf980",
+  "title": "新增委外订单",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractorder/create?access_token=xxxxx"
+ },
+ {
+  "id": "3fb5717175fb11ed86f713ff0d091180",
+  "title": "删除委外订单",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractorder/delete?access_token=xxxxx"
+ },
+ {
+  "id": "3f9ba7dd75fb11ed86f7db41653c1429",
+  "title": "查询委外订单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractorder/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "3fa2378e75fb11ed86f77b830a388e9c",
+  "title": "批量查询委外订单",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractorder/list?access_token=xxxxx"
+ },
+ {
+  "id": "3fafa51075fb11ed86f7ad4d1999e6dd",
+  "title": "修改委外订单",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractorder/update?access_token=xxxxx"
+ },
+ {
+  "id": "dd1a85d475fa11ed86f7572abc93d6c1",
+  "title": "查询委外加工入库单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractreceipt/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "dd22c33575fa11ed86f7fd5a8cd337ef",
+  "title": "批量查询委外加工入库单",
+  "path": "https://api.kingdee.com/koas/app007104/api/subcontractreceipt/list?access_token=xxxxx"
+ },
+ {
+  "id": "1567f9a075fb11ed86f72f041b2cf5ca",
+  "title": "新增仓储入库通知单",
+  "path": "https://api.kingdee.com/koas/app007104/api/tplinstockinform/create?access_token=xxxxx"
+ },
+ {
+  "id": "1574a3d275fb11ed86f7cb0735ce7c75",
+  "title": "删除仓储入库通知单",
+  "path": "https://api.kingdee.com/koas/app007104/api/tplinstockinform/delete?access_token=xxxxx"
+ },
+ {
+  "id": "155a3dfe75fb11ed86f7235a7df09f9d",
+  "title": "查询仓储入库通知单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/tplinstockinform/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "1561df1f75fb11ed86f7cdd52f495c0c",
+  "title": "批量查询仓储入库通知单",
+  "path": "https://api.kingdee.com/koas/app007104/api/tplinstockinform/list?access_token=xxxxx"
+ },
+ {
+  "id": "156dc60175fb11ed86f7b7e470dd32d0",
+  "title": "修改仓储入库通知单",
+  "path": "https://api.kingdee.com/koas/app007104/api/tplinstockinform/update?access_token=xxxxx"
+ },
+ {
+  "id": "23ca60f575fb11ed86f77bee51ec890d",
+  "title": "新增仓储出库通知单",
+  "path": "https://api.kingdee.com/koas/app007104/api/tploutstockinform/create?access_token=xxxxx"
+ },
+ {
+  "id": "23d5d2a775fb11ed86f7bfa03960f04b",
+  "title": "删除仓储出库通知单",
+  "path": "https://api.kingdee.com/koas/app007104/api/tploutstockinform/delete?access_token=xxxxx"
+ },
+ {
+  "id": "23bd419375fb11ed86f79f08a18d1a81",
+  "title": "查询仓储出库通知单详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/tploutstockinform/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "23c3aa3475fb11ed86f7512d37969d52",
+  "title": "批量查询仓储出库通知单",
+  "path": "https://api.kingdee.com/koas/app007104/api/tploutstockinform/list?access_token=xxxxx"
+ },
+ {
+  "id": "23d0546675fb11ed86f773c11df4bd0d",
+  "title": "修改仓储出库通知单",
+  "path": "https://api.kingdee.com/koas/app007104/api/tploutstockinform/update?access_token=xxxxx"
+ },
+ {
+  "id": "db0ef3b875f911ed86f7add44e0f294c",
+  "title": "新增虚仓出库",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwdelivery/create?access_token=xxxxx"
+ },
+ {
+  "id": "db197b0a75f911ed86f751830d70f499",
+  "title": "删除虚仓出库",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwdelivery/delete?access_token=xxxxx"
+ },
+ {
+  "id": "dafdb5a675f911ed86f7c9994d43e39a",
+  "title": "查询虚仓出库详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwdelivery/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "db08b22775f911ed86f7210d8455157f",
+  "title": "批量查询虚仓出库",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwdelivery/list?access_token=xxxxx"
+ },
+ {
+  "id": "db1471f975f911ed86f7bfef4ad3aa78",
+  "title": "修改虚仓出库",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwdelivery/update?access_token=xxxxx"
+ },
+ {
+  "id": "cb9c7bf375f911ed86f7f11a7f8748c9",
+  "title": "新增虚仓入库",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwreceipt/create?access_token=xxxxx"
+ },
+ {
+  "id": "cbaa85b575f911ed86f7f3346968e671",
+  "title": "删除虚仓入库",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwreceipt/delete?access_token=xxxxx"
+ },
+ {
+  "id": "cb8aefc175f911ed86f7cbaa9c16b511",
+  "title": "查询虚仓入库详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwreceipt/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "cb94178275f911ed86f7e58840d98106",
+  "title": "批量查询虚仓入库",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwreceipt/list?access_token=xxxxx"
+ },
+ {
+  "id": "cba2967475f911ed86f70186f27b674d",
+  "title": "修改虚仓入库",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwreceipt/update?access_token=xxxxx"
+ },
+ {
+  "id": "31749bda75fb11ed86f71bb9d83a8d21",
+  "title": "新增虚仓调拨",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwtransfer/create?access_token=xxxxx"
+ },
+ {
+  "id": "3181942c75fb11ed86f7793d6626ebf2",
+  "title": "删除虚仓调拨",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwtransfer/delete?access_token=xxxxx"
+ },
+ {
+  "id": "316643f875fb11ed86f723e36f840f30",
+  "title": "查询虚仓调拨详情",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwtransfer/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "316de51975fb11ed86f7fd7ded9277b9",
+  "title": "批量查询虚仓调拨",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwtransfer/list?access_token=xxxxx"
+ },
+ {
+  "id": "317b2b8b75fb11ed86f7e33b9e2da7f6",
+  "title": "修改虚仓调拨",
+  "path": "https://api.kingdee.com/koas/app007104/api/vwtransfer/update?access_token=xxxxx"
+ },
+ {
+  "id": "e60256a0769911ed8582596c3675e8fd",
+  "title": "查询费用发票详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/expenseinvoice/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "e631cb11769911ed858283bc7dc21b9e",
+  "title": "批量查询费用发票",
+  "path": "https://api.kingdee.com/koas/app007140/api/expenseinvoice/list?access_token=xxxxx"
+ },
+ {
+  "id": "facebd87769911ed858205c7f9c1b74a",
+  "title": "新增收料通知单",
+  "path": "https://api.kingdee.com/koas/app007140/api/materialreceiptnotice/create?access_token=xxxxx"
+ },
+ {
+  "id": "fadd1569769911ed8582217fe156a91e",
+  "title": "删除收料通知单",
+  "path": "https://api.kingdee.com/koas/app007140/api/materialreceiptnotice/delete?access_token=xxxxx"
+ },
+ {
+  "id": "faba4b25769911ed858239514ff0d42f",
+  "title": "查询收料通知单详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/materialreceiptnotice/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "fac806c6769911ed8582976763644755",
+  "title": "批量查询收料通知单",
+  "path": "https://api.kingdee.com/koas/app007140/api/materialreceiptnotice/list?access_token=xxxxx"
+ },
+ {
+  "id": "fad65ea8769911ed8582e54c41430e6d",
+  "title": "修改收料通知单",
+  "path": "https://api.kingdee.com/koas/app007140/api/materialreceiptnotice/update?access_token=xxxxx"
+ },
+ {
+  "id": "3534ff2c769a11ed8582e5efd2b0a7b5",
+  "title": "新增退料通知单",
+  "path": "https://api.kingdee.com/koas/app007140/api/materialreturnnotice/create?access_token=xxxxx"
+ },
+ {
+  "id": "3541824e769a11ed8582d7eaa52abdad",
+  "title": "删除退料通知单",
+  "path": "https://api.kingdee.com/koas/app007140/api/materialreturnnotice/delete?access_token=xxxxx"
+ },
+ {
+  "id": "35256eca769a11ed85823571b80f1aef",
+  "title": "查询退料通知单详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/materialreturnnotice/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "352c4c9b769a11ed8582ad5dde2a01d2",
+  "title": "批量查询退料通知单",
+  "path": "https://api.kingdee.com/koas/app007140/api/materialreturnnotice/list?access_token=xxxxx"
+ },
+ {
+  "id": "353b40bd769a11ed85827f68bf77dad3",
+  "title": "修改退料通知单",
+  "path": "https://api.kingdee.com/koas/app007140/api/materialreturnnotice/update?access_token=xxxxx"
+ },
+ {
+  "id": "97b74ef8769911ed85823f0d14e8ef5b",
+  "title": "新增采购订单",
+  "path": "https://api.kingdee.com/koas/app007140/api/poorder/create?access_token=xxxxx"
+ },
+ {
+  "id": "97c6431a769911ed8582bdf84ae18515",
+  "title": "删除采购订单",
+  "path": "https://api.kingdee.com/koas/app007140/api/poorder/delete?access_token=xxxxx"
+ },
+ {
+  "id": "97a28e76769911ed85826fbd479509ba",
+  "title": "查询采购订单详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/poorder/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "97affbf7769911ed858239b0f246c76c",
+  "title": "批量查询采购订单",
+  "path": "https://api.kingdee.com/koas/app007140/api/poorder/list?access_token=xxxxx"
+ },
+ {
+  "id": "97be7ae9769911ed8582ef90dfe79cbe",
+  "title": "修改采购订单",
+  "path": "https://api.kingdee.com/koas/app007140/api/poorder/update?access_token=xxxxx"
+ },
+ {
+  "id": "bdf2e7fd769911ed85826fc9f8bb94bc",
+  "title": "新增采购申请单",
+  "path": "https://api.kingdee.com/koas/app007140/api/porequest/create?access_token=xxxxx"
+ },
+ {
+  "id": "bdffb93f769911ed85827d63f205fafd",
+  "title": "删除采购申请单",
+  "path": "https://api.kingdee.com/koas/app007140/api/porequest/delete?access_token=xxxxx"
+ },
+ {
+  "id": "bddeeacb769911ed8582ebb26818302d",
+  "title": "查询采购申请单详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/porequest/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "bdecf48c769911ed8582bf67007dda45",
+  "title": "批量查询采购申请单",
+  "path": "https://api.kingdee.com/koas/app007140/api/porequest/list?access_token=xxxxx"
+ },
+ {
+  "id": "bdf9027e769911ed85825d22920a0a92",
+  "title": "修改采购申请单",
+  "path": "https://api.kingdee.com/koas/app007140/api/porequest/update?access_token=xxxxx"
+ },
+ {
+  "id": "60629dbf769a11ed8582ed6431869139",
+  "title": "查询购货发票（普通）详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/purchaseinvoicecommon/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "60697b90769a11ed85824b666df7556f",
+  "title": "批量查询购货发票（普通）",
+  "path": "https://api.kingdee.com/koas/app007140/api/purchaseinvoicecommon/list?access_token=xxxxx"
+ },
+ {
+  "id": "72a8cef4769a11ed8582fb96e2eb6c1f",
+  "title": "查询购货发票（专用）详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/purchaseinvoicevat/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "72b467b5769a11ed8582bdf0376a63d9",
+  "title": "批量查询购货发票（专用）",
+  "path": "https://api.kingdee.com/koas/app007140/api/purchaseinvoicevat/list?access_token=xxxxx"
+ },
+ {
+  "id": "81948a89769a11ed85826767b6baf211",
+  "title": "查询检验单详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/qualitycheck/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "81a441fa769a11ed85825fc4b8bb8c8a",
+  "title": "批量查询检验单",
+  "path": "https://api.kingdee.com/koas/app007140/api/qualitycheck/list?access_token=xxxxx"
+ },
+ {
+  "id": "93315c5e769a11ed8582a15b148f4eb5",
+  "title": "查询不良原因详情",
+  "path": "https://api.kingdee.com/koas/app007140/api/qualitydefect/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "93383a2f769a11ed8582bd412ba9233b",
+  "title": "批量查询不良原因",
+  "path": "https://api.kingdee.com/koas/app007140/api/qualitydefect/list?access_token=xxxxx"
+ },
+ {
+  "id": "f62cdb607ab411ed8e809dc32376ad57",
+  "title": "凭证新增",
+  "path": "https://api.kingdee.com/koas/APP007155/api/Voucher/Create?access_token=xxxxx"
+ },
+ {
+  "id": "fe640b878b2a11eda7526dcf2e007194",
+  "title": "新增凭证",
+  "path": "https://api.kingdee.com/koas/APP007155/api/Voucher/Create?access_token=xxxxx"
+ },
+ {
+  "id": "e48a8b3e990b4fc48f69db5d74e3e74d",
+  "title": "凭证查询",
+  "path": "https://api.kingdee.com/koas/APP007155/api/Voucher/GetDetail?access_token=xxxx"
+ },
+ {
+  "id": "b5663d9576c311ed8582ef13ab45934f",
+  "title": "查询凭证资料详情",
+  "path": "https://api.kingdee.com/koas/APP007155/api/Voucher/GetDetail?access_token=xxxxx"
+ },
+ {
+  "id": "c071ffd676c311ed8582a93e80d97309",
+  "title": "批量查询凭证",
+  "path": "https://api.kingdee.com/koas/APP007155/api/Voucher/List?access_token=xxxxx"
+ },
+ {
+  "id": "55e9a29c7ab411ed8e8077ee73f24692",
+  "title": "凭证批量查询",
+  "path": "https://api.kingdee.com/koas/APP007155/api/Voucher/List?access_token=xxxxx"
+ },
+ {
+  "id": "f2e9813b76c411ed858247c6d4ecbf02",
+  "title": "新增费用报销单",
+  "path": "https://api.kingdee.com/koas/app007455/api/expensereimbursement/create?access_token=xxxxx"
+ },
+ {
+  "id": "f2f6a09d76c411ed8582a931d35b6659",
+  "title": "删除费用报销单",
+  "path": "https://api.kingdee.com/koas/app007455/api/expensereimbursement/delete?access_token=xxxxx"
+ },
+ {
+  "id": "f2da660976c411ed85821f065039d042",
+  "title": "查询费用报销单详情",
+  "path": "https://api.kingdee.com/koas/app007455/api/expensereimbursement/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "f2e3dbea76c411ed858263ef9421eaa1",
+  "title": "批量查询费用报销单",
+  "path": "https://api.kingdee.com/koas/app007455/api/expensereimbursement/list?access_token=xxxxx"
+ },
+ {
+  "id": "f2f0861c76c411ed8582c130403c320e",
+  "title": "修改费用报销单",
+  "path": "https://api.kingdee.com/koas/app007455/api/expensereimbursement/update?access_token=xxxxx"
+ },
+ {
+  "id": "247ed57076c511ed858233ac09ca0235",
+  "title": "新增差旅费报销单",
+  "path": "https://api.kingdee.com/koas/app007455/api/travelexpensereimbursement/create?access_token=xxxxx"
+ },
+ {
+  "id": "248a954276c511ed8582796eed7ea16c",
+  "title": "删除差旅费报销单",
+  "path": "https://api.kingdee.com/koas/app007455/api/travelexpensereimbursement/delete?access_token=xxxxx"
+ },
+ {
+  "id": "2463d35e76c511ed8582e15407570576",
+  "title": "查询差旅费报销单详情",
+  "path": "https://api.kingdee.com/koas/app007455/api/travelexpensereimbursement/getdetail?access_token=xxxxx"
+ },
+ {
+  "id": "2476980f76c511ed85822566fb54c01c",
+  "title": "批量查询差旅费报销单",
+  "path": "https://api.kingdee.com/koas/app007455/api/travelexpensereimbursement/list?access_token=xxxxx"
+ },
+ {
+  "id": "248453b176c511ed8582af6caecf9f71",
+  "title": "修改差旅费报销单",
+  "path": "https://api.kingdee.com/koas/app007455/api/travelexpensereimbursement/update?access_token=xxxxx"
+ },
+ {
+  "id": "a54c5405d51b11ee8bba6f7c01b32b2b",
+  "title": "单据审核",
+  "path": "https://api.kingdee.com/koas/APP007720/api/approve/submit?access_token=xxxxx"
+ },
+ {
+  "id": "d109977d65d347ea8ad5ad1695fa04a9",
+  "title": "authorize(Oauth2)授权认证",
+  "path": "https://api.kingdee.com/koas/oauth2/authorize?client_id=xxxxxx&client_secret=xxxxx&response_type=coce&redirect_uri=回调地址"
+ },
+ {
+  "id": "f850fe030e5f4299aac87cd513cabc22",
+  "title": "结算方式",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "23dd12e8bbd44649b88eaf30d998d8ae",
+  "title": "币别",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "de64107343d447719a55dab613a61e6c",
+  "title": "会计科目",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "1fd0d8e5c6084f73a9d8488210c3d02e",
+  "title": "核算项目_客户",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "e6f267d2db704acb807848e7535b900b",
+  "title": "核算项目_物料",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "cce117827c8349bcbd9089494142907a",
+  "title": "辅助资料",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "6eb9d233889245beb5f2ac0723cf957f",
+  "title": "核算项目_单位",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "817f00e1a5334062a6a164e0f44f4197",
+  "title": "核算项目_现金流量项目",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "9473b6a7b45c4652b499a2d383401f47",
+  "title": "核算项目_部门",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "ec09c11ec3564f4498ebc6dc65075463",
+  "title": "核算项目_职员",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "9d60e8ec335f4125ac9b2609e1e896d2",
+  "title": "核算项目_仓库",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "8800eca47eda49dfb82b19f7770f54c4",
+  "title": "核算项目_供应商",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "e65b48ccce1942d0966d1e0bb619bf10",
+  "title": "核算项目_物流公司",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/ItemInfo/GetBaseInfo?access_token=xxxxxx"
+ },
+ {
+  "id": "ec80e8150a994fd59e4f86ad09826d1b",
+  "title": "权限校验",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/SecurityInfo/AccessCheck?access_token=xxxxxx"
+ },
+ {
+  "id": "be7ca5b8219e4f2f91c88b50cca3184e",
+  "title": "权限字典",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/SecurityInfo/GetAccessHead?access_token=xxxxxx"
+ },
+ {
+  "id": "acb2478bcdfc4cac92b9a8e3bb3afc63",
+  "title": "权限字典列表",
+  "path": "https://api.kingdee.com/koas/SVC200000/goodsmanage/SecurityInfo/GetAccessHeads?access_token=xxxxxx"
+ }
+]

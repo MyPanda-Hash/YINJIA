@@ -1,0 +1,61 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 226
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-i18n-gap.sql ==
+  | 92 | 92 | 7 | 0 | 
+  | auditor_id | Auditor Id | 
+  | bill_type_id | Bill Type Id | 
+  | creator_id | Creator Id | 
+  | dept_id | Dept Id | 
+  | emp_id | Emp Id | 
+  | ERP单号 | ERP Bill No | 
+  | modifier_id | Modifier Id | 
+  | pick_use_id | Pick Use Id | 
+  | 保质期 | Shelf Life | 
+  | 保质期到期日 | Kf Date | 
+  | 保质期类型 | Kf Type | 
+  | 仓库id | Stock Id | 
+  | 仓库启用仓位管理 | Stock Is Allow Freight | 
+  | 仓位id | Sp Id | 
+  | 仓位编码 | Sp Number | 
+  | 仓位名称 | Sp Name | 
+  | 产地 | Origin | 
+  | 成本 | Cost | 
+  | 创建人 | Created By | 
+  | 创建人编码 | Creator Number | 
+  | 单据标签 | Mulbill Label | 
+  | 单据类型编码 | Bill Type Number | 
+  | 单据类型名称 | Bill Type Name | 
+  | 单据状态_bill_status | Bill Status | 
+  | 单位id | Unit Id | 
+  | 单位编码 | Unit Number | 
+  | 单位成本 | Unit Cost | 
+  | 辅助单位id | Aux Unit Id | 
+  | 辅助单位编码 | Aux. UOM Code | 
+  | 辅助单位名称 | Aux Unit Name | 
+  | 辅助换算系数 | Aux Coefficient | 
+  | 辅助属性1id | Aux Id1 | 
+  | 辅助属性1编码 | Aux Number1 | 
+  | 辅助属性1名称 | Aux Name1 | 
+  | 辅助属性2id | Aux Id2 | 
+  | 辅助属性2编码 | Aux Number2 | 
+  | 辅助属性2名称 | Aux Name2 | 
+  | 辅助属性3id | Aux Id3 | 
+  | 辅助属性3编码 | Aux Number3 | 
+  | 辅助属性3名称 | Aux Name3 | 
+  | 辅助属性id | Aux Prop Id | 
+  | 辅助属性编码 | Aux Prop Number | 
+  | 辅助属性名称 | Aux Prop Name | 
+  | 换算系数 | Coefficient | 
+  | 基本单位id | Base Unit Id | 
+  | 基本单位编码 | Base UOM Code | 
+  | 基本单位名称 | Base Unit Name | 
+  | 基本数量 | Base Qty | 
+  | 库存基本数量 | Inv Base Qty | 
+  | 库存数量 | Inv Qty | 
+[OK] _q-matout-i18n-gap.sql (3 batches)

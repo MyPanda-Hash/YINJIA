@@ -1,0 +1,47 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:9 字符: 138
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-kucun-cols.sql ==
+  | 1 | comm | 
+  | 2 | id | 
+  | 3 | kucun_no | 
+  | 4 | khdm | 
+  | 5 | wzdm | 
+  | 6 | update_date | 
+  | 7 | ckdm | 
+  | 8 | lot_no | 
+  | 9 | color | 
+  | 10 | siz | 
+  | 11 | in_date | 
+  | 12 | rkl | 
+  | 13 | rkl2 | 
+  | 14 | out_date | 
+  | 15 | ckl | 
+  | 16 | ckl2 | 
+  | 17 | yl | 
+  | 18 | yl2 | 
+  | 19 | price | 
+  | 20 | price2 | 
+  | 21 | bz | 
+  | 22 | total_je | 
+  | 23 | asp_user1 | 
+  | 24 | asp_time1 | 
+  | 25 | asp_user2 | 
+  | 26 | asp_time2 | 
+  | 27 | asp_user3 | 
+  | 28 | asp_time3 | 
+  | 29 | asp_cancel | 
+  | 30 | asp_user4 | 
+  | 31 | asp_time4 | 
+  | 32 | asp_print | 
+  | 33 | 预警数量 | 
+  | 35 | 
+  | 0 | 638 | null | null | YJ-XWR-003 | 2026-09-16 21:29:16.48 | CK00006 | PC0000 | null | null | 2026-09-16 21:17:51.5170000 | 0.0 | 0.0 | null | 0.0 | 0.0 | 0.0 | 0.0 | 0.39 | 0.0 | null | 0.0 | stock:admin | 2026-09-16 21:17:51.5170000 | admin | 2026-09-16 21:29:16.4800000 | null | null | N | null | null | 0 | null | 
+  | 0 | 639 | null | null | YJ-SX-031 | 2026-09-17 13:08:30.547 | CK00006 | PC0000 | null | null | 2026-09-17 12:11:47.9230000 | 4500.0 | 0.0 | null | 0.0 | 0.0 | 4500.0 | 0.0 | 0.33 | 0.0 | null | 0.0 | stock:admin | 2026-09-17 12:11:47.9230000 | admin | 2026-09-17 13:08:30.5470000 | null | null | N | null | null | 0 | null | 
+  | 0 | 640 | null | null | YJ-SX-035 | 2026-09-17 13:08:30.547 | CK00006 | PC0000 | null | null | 2026-09-17 12:11:47.9270000 | 1800.0 | 0.0 | null | 0.0 | 0.0 | 1800.0 | 0.0 | 0.55 | 0.0 | null | 0.0 | stock:admin | 2026-09-17 12:11:47.9270000 | admin | 2026-09-17 13:08:30.5470000 | null | null | N | null | null | 0 | null | 
+[OK] _q-kucun-cols.sql (4 batches)

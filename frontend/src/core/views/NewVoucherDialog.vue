@@ -121,6 +121,7 @@ import RefPickDialog from './RefPickDialog.vue'
 import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 import { applyDocDefaults } from '@core/panel/docDefaults'
+import { applyCalcRules } from '@core/panel/calcRules'
 
 const engine = usePanelRuntime()
 const user = useUserStore()
@@ -236,53 +237,13 @@ function visibleFields(tab) { return (tab.fields || []).filter((r) => !r.hidden)
 
 function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0 }
 
-// 表达式计算链（与 PanelxForm 一致）
-function evaluateExpr(expr, vars) {
-  const tokens = String(expr).match(/\d+(?:\.\d+)?|[+\-*/()]|[^\s+\-*/()]+/g) || []
-  const output = []
-  const ops = []
-  const prec = { '+': 1, '-': 1, '*': 2, '/': 2 }
-  for (const tk of tokens) {
-    if (/^[\d.]+$/.test(tk)) output.push(parseFloat(tk))
-    else if (tk in prec) {
-      while (ops.length && ops[ops.length - 1] !== '(' && prec[ops[ops.length - 1]] >= prec[tk]) output.push(ops.pop())
-      ops.push(tk)
-    } else if (tk === '(') ops.push(tk)
-    else if (tk === ')') {
-      while (ops.length && ops[ops.length - 1] !== '(') output.push(ops.pop())
-      if (ops[ops.length - 1] === '(') ops.pop()
-    } else {
-      const v = vars[tk]
-      if (v === undefined) throw new Error('未知变量: ' + tk)
-      output.push(num(v))
-    }
-  }
-  while (ops.length) output.push(ops.pop())
-  const stack = []
-  for (const t of output) {
-    if (typeof t === 'number') stack.push(t)
-    else {
-      const b = stack.pop(); const a = stack.pop()
-      if (a === undefined || b === undefined) return 0
-      stack.push(t === '+' ? a + b : t === '-' ? a - b : t === '*' ? a * b : b === 0 ? 0 : a / b)
-    }
-  }
-  return stack[0] ?? 0
-}
-
+// 表达式计算链(求值口径统一在 @core/panel/calcRules,与 PanelxForm/PanelxList 及后端 CalcRuleService 同一份)
 function applyCalc() {
   for (const tab of tabs.value) {
     const rows = detailData[tab.key] || []
-    const productQty = (detailData.products || []).reduce((s, r) => s + num(r['数量']), 0)
-    for (const row of rows) {
-      const vars = { ...row, 产品数量: productQty }
-      for (const rule of tab.calc || []) {
-        let v
-        try { v = evaluateExpr(rule.formula, vars) } catch (e) { v = 0 }
-      if (rule.round != null) v = engine.roundDecimal(v, rule.round)
-        if (row[rule.target] !== v) row[rule.target] = v
-      }
-    }
+    // 「产品数量」= 产成品明细的合计数量,是这些公式的额外变量(不写回行)
+    const extraVars = { 产品数量: (detailData.products || []).reduce((s, r) => s + num(r['数量']), 0) }
+    for (const row of rows) applyCalcRules(tab.calc, row, extraVars)
   }
 }
 

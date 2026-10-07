@@ -311,10 +311,6 @@
           <div class="card-title">{{ tt('单天产能对比') }}<span class="chart-sub">{{ capacityDateSub }}</span></div>
           <div class="chart-box"><SCapacity :rows="capacityRows" /></div>
         </div>
-        <div class="card col-12">
-          <div class="card-title">{{ tt('BOM 物料树（产品 → 材料，来自生产工单真实数据）') }}</div>
-          <div class="chart-box tree-box"><STree :data="bomTree" /></div>
-        </div>
       </div>
     </template>
 
@@ -486,7 +482,6 @@ import SBars from './SBars.vue'
 import SDonut from './SDonut.vue'
 import SLine from './SLine.vue'
 import SCapacity from './SCapacity.vue'
-import STree from './STree.vue'
 import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
 import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
 import { pickQuickEntries } from '@core/dashboard/deskQuick'
@@ -745,16 +740,6 @@ const capacityDateSub = computed(() => {
   const d = (capacityRows.value[0] || {}).date
   return d ? `${tt('数据日期')} ${d} · ${tt('产出/日产能上限')}` : tt('产出/日产能上限')
 })
-const bomTree = computed(() =>
-  (prod.value.bomTree || []).map((p) => ({
-    label: p['产品'],
-    meta: p['规格型号'] ? `规格：${p['规格型号']}` : '',
-    children: (p.materials || []).map((m) => ({
-      label: m['名称'],
-      meta: `${m['数量']} ${m['单位']}`.trim(),
-    })),
-  }))
-)
 
 // ---------- 库存数据 ----------
 const stock = computed(() => stats.value.stock || {})
@@ -814,7 +799,6 @@ const resourceStats = computed(() => [
   { label: '存货', value: archives.value.invItems ?? 0, icon: 'Grid' },
   { label: '部门', value: archives.value.deptCount ?? 0, icon: 'OfficeBuilding' },
   { label: '仓库', value: archives.value.whCount ?? 0, icon: 'House' },
-  { label: 'BOM 产品', value: bomTree.value.length, icon: 'Connection' },
 ])
 const lastUpdatedText = computed(() => (
   lastUpdated.value ? lastUpdated.value.toLocaleTimeString('zh-CN', { hour12: false }).slice(0, 8) : '等待同步'
@@ -1881,9 +1865,6 @@ function go(path, title) {
   font-size: 11px;
   font-weight: 400;
   color: var(--t-text-3);
-}
-.tree-box {
-  min-height: auto;
 }
 .kpi-title {
   font-size: 12px;

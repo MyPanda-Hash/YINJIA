@@ -1,0 +1,93 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:9 字符: 154
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-emp.sql ==
+  | EMP | 证件号码 | 证件号码 | 文本 | detail | 60 | 
+  | EMP | 手机 | 手机 | 文本 | detail | 100 | 
+  | EMP | 离职日期 | 离职日期 | 日期 | detail | 900 | 
+  | EMP | 邮箱 | 邮箱 | 文本 | detail | 900 | 
+  | EMP | 生日 | 生日 | 文本 | detail | 900 | 
+  | EMP | 微信 | 微信 | 文本 | detail | 900 | 
+  | EMP | 性别 | 性别 | 文本 | detail | 900 | 
+  | EMP | 部门id | 部门id | 文本 | detail | 950 | 
+  | EMP | 结算账户id | 结算账户id | 文本 | detail | 950 | 
+  | EMP | 结算类型id | 结算类型id | 文本 | detail | 950 | 
+  | EMP | 员工编码 | 员工编码 | 文本 | query,detail | 10 | 
+  | EMP | 员工名称 | 员工名称 | 文本 | query,detail | 20 | 
+  | EMP | 所属部门 | 所属部门 | 下拉框 | query,detail | 30 | 
+  | EMP | 停用 | 停用 | 是否 | query,detail | 110 | 
+  | EMP | 部门编码 | 部门编码 | 文本 | query,detail | 900 | 
+  | EMP | 入职日期 | 入职日期 | 日期 | query,detail | 900 | 
+  | WH | 仓库地址 | 仓库地址 | 文本 | detail | 30 | 
+  | WH | 负责人 | 负责人 | 文本 | detail | 40 | 
+  | WH | 允许零库存出库 | 允许负库存 | 是否 | detail | 60 | 
+  | WH | 联系电话 | 联系电话 | 文本 | detail | 100 | 
+  | WH | 国家 | 国家 | 文本 | detail | 900 | 
+  | WH | 省 | 省 | 文本 | detail | 900 | 
+  | WH | 市 | 市 | 文本 | detail | 900 | 
+  | WH | 区 | 区 | 文本 | detail | 900 | 
+  | WH | 启用仓位管理 | 启用仓位管理 | 是否 | detail | 900 | 
+  | WH | 分类id | 分类id | 文本 | detail | 950 | 
+  | WH | 仓库管理员id | 仓库管理员id | 文本 | detail | 950 | 
+  | WH | 仓库编码 | 仓库编码 | 文本 | query,detail | 10 | 
+  | WH | 仓库名称 | 仓库名称 | 文本 | query,detail | 20 | 
+  | WH | 停用 | 停用 | 是否 | query,detail | 50 | 
+  | WH | 仓库管理员编码 | 仓库管理员编码 | 文本 | query,detail | 900 | 
+  | WH | 仓库分类 | 仓库分类 | 文本 | query,detail | 900 | 
+  | WH | 仓库分类编码 | 仓库分类编码 | 文本 | query,detail | 900 | 
+  | MANU_ORDER 行 | 产品编码 | 产品编码 | 下拉框 |  |  | detail | 20 | 
+  | MANU_ORDER 行 | 存货图片 | 存货图片 | 文本 |  |  | detail | 30 | 
+  | MANU_ORDER 行 | 产品名称 | 产品名称 | 参照 | INV | 存货名称 | detail | 40 | 
+  | MANU_ORDER 行 | 规格型号 | 规格型号 | 文本 |  |  | detail | 50 | 
+  | MANU_ORDER 行 | 型号 | 型号 | 文本 |  |  | detail | 60 | 
+  | MANU_ORDER 行 | 生产单位 | 生产单位 | 下拉框 |  |  | detail | 90 | 
+  | MANU_ORDER 行 | 数量 | 数量 | 小数 |  |  | detail | 100 | 
+  | MANU_ORDER 行 | 齐套数量(主) | 齐套数量(主) | 小数 |  |  | detail | 110 | 
+  | MANU_ORDER 行 | 累计汇报套数(工序单位) | 累计汇报套数(工序单位) | 小数 |  |  | detail | 120 | 
+  | MANU_ORDER 行 | 可用量 | 可用量 | 小数 |  |  | detail | 130 | 
+  | MANU_ORDER 行 | 现存量 | 现存量 | 小数 |  |  | detail | 150 | 
+  | MANU_ORDER 行 | 图号 | 图号 | 文本 |  |  | detail | 180 | 
+  | MANU_ORDER 行 | 单重 | 单重 | 小数 |  |  | detail | 190 | 
+  | MANU_ORDER 行 | 总重 | 总重 | 小数 |  |  | detail | 200 | 
+  | MANU_ORDER 行 | 需求令号 | 需求令号 | 文本 |  |  | detail | 210 | 
+  | MANU_ORDER 行 | 批号 | 批号 | 文本 |  |  | detail | 300 | 
+  | MANU_ORDER 行 | 需求数量 | 需求数量 | 小数 |  |  | detail | 310 | 
+  | MANU_ORDER 行 | 排产数量 | 排产数量 | 小数 |  |  | detail | 320 | 
+  | MANU_ORDER 行 | 入库数量 | 入库数量 | 小数 |  |  | detail | 330 | 
+  | MANU_ORDER 行 | 余量 | 余量 | 小数 |  |  | detail | 340 | 
+  | MANU_ORDER 行 | 单价 | 单价 | 小数 |  |  | detail | 350 | 
+  | MANU_ORDER 行 | 金额 | 金额 | 小数 |  |  | detail | 360 | 
+  | MANU_ORDER 行 | 首件完成时间 | 首件完成时间 | 日期 |  |  | header | 68 | 
+  | MANU_ORDER 行 | 首件通知人 | 首件通知人 | 文本 |  |  | header | 69 | 
+  | MANU_ORDER 行 | 附件1 | 附件1 | 附件 |  |  | header | 91 | 
+  | MANU_ORDER 行 | 附件2 | 附件2 | 附件 |  |  | header | 92 | 
+  | MANU_ORDER 行 | 附件3 | 附件3 | 附件 |  |  | header | 93 | 
+  | MANU_ORDER 行 | 附件4 | 附件4 | 附件 |  |  | header | 94 | 
+  | MANU_ORDER 行 | 附件5 | 附件5 | 附件 |  |  | header | 95 | 
+  | MANU_ORDER 行 | 附件6 | 附件6 | 附件 |  |  | header | 96 | 
+  | MANU_ORDER 行 | 机构 | 机构 | 下拉框 |  |  | header | 120 | 
+  | MANU_ORDER 行 | 重量 | 重量 | 小数 |  |  | header | 130 | 
+  | MANU_ORDER 行 | 开工日期 | 开工日期 | 日期 |  |  | header | 140 | 
+  | MANU_ORDER 行 | 完工日期 | 完工日期 | 日期 |  |  | header | 150 | 
+  | MANU_ORDER 行 | 是否手工修改单据编码 | 是否手工修改单据编码 | 是否 |  |  | header | 190 | 
+  | MANU_ORDER 行 | 负责人 | 负责人 | 下拉框 |  |  | header | 210 | 
+  | MANU_ORDER 行 | 操作员 | 操作员 | 文本 |  |  | header | 320 | 
+  | MANU_ORDER 行 | 入库单号 | 入库单号 | 文本 |  |  | header | 370 | 
+  | MANU_ORDER 行 | 领料单号 | 领料单号 | 文本 |  |  | header | 380 | 
+  | MANU_ORDER 行 | 外包单号 | 外包单号 | 文本 |  |  | header | 390 | 
+  | MANU_ORDER 行 | 单据类型 | 单据类型 | 文本 |  |  | header | 410 | 
+  | MANU_ORDER 行 | 来料性质 | 来料性质 | 文本 |  |  | header | 420 | 
+  | MANU_ORDER 行 | 来料单号 | 来料单号 | 文本 |  |  | header | 430 | 
+  | MANU_ORDER 行 | 采购入库单号 | 采购入库单号 | 文本 |  |  | header | 440 | 
+  | MANU_ORDER 行 | 单价 | 单价 | 小数 |  |  | header | 450 | 
+  | MANU_ORDER 行 | 金额 | 金额 | 小数 |  |  | header | 460 | 
+  | MANU_ORDER 行 | 拆分序号 | 拆分序号 | 整数 |  |  | header | 480 | 
+  | MANU_ORDER 行 | 单据日期 | 单据日期 | 日期 |  |  | query,header | 5 | 
+  | MANU_ORDER 行 | 合同号 | 合同号 | 日期 |  |  | query,header | 10 | 
+  | MANU_ORDER 行 | 批号 | 批号 | 下拉框 |  |  | query,header | 30 | 
+[OK] _q-matout-emp.sql (4 batches)

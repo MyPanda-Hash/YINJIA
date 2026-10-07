@@ -20,6 +20,16 @@ import java.util.Map;
 @Service
 public class QueryService {
 
+    /**
+     * 两级审批面板(2026-10-04):纸面「审核」= 一级审批通过的人、「批准」= 超级管理员,
+     * 两个值分别写进表内的 审核人 / 审批人 列 —— 与 ButtonService 同一份口径
+     * (直接引用 {@code ButtonService.ADMIN_L2_PANELS}:二级固定超级管理员的那一族 = 全部质量单据)。
+     * 见 {@link #loadDocs} 里对虚拟字段「审核人」覆盖的例外。
+     */
+    private static boolean isTwoLevelSignPanel(String panelCode) {
+        return panelCode != null && ButtonService.ADMIN_L2_PANELS.contains(panelCode);
+    }
+
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
     private final TranslationService translations;
@@ -365,8 +375,21 @@ public class QueryService {
             doc.put("saved", st != null ? st.get("saved") : null);
             doc.put("detail", Map.of("items", items));
             if (st != null && st.get("shr") != null) {
-                doc.put("审核人", st.get("shr"));
-                doc.put("审核时间", st.get("shsj"));
+                // 质量单据(2026-10-04 两级审批)例外:它的「审核人/审核时间」是**表内真值** ——
+                // 一级审批通过时写纸面「审核」格(一级审核人),「批准」另落 审批人。
+                // 本虚拟字段覆盖会把两者都换成 yj_doc_status.shr(最终审批人 = 超级管理员**账号**),
+                // 既抹掉一级审核人、又把账号名当人名显示(实测界面「审核」格变成 "admin")。
+                // 故这些面板跳过覆盖;存量单(两级口径上线前审的)表内为空时才退回 shr 兜底。
+                if (isTwoLevelSignPanel(def.code())) {
+                    Object cellAuditor = doc.get("审核人");
+                    if (cellAuditor == null || String.valueOf(cellAuditor).isBlank()) {
+                        doc.put("审核人", st.get("shr"));
+                        doc.put("审核时间", st.get("shsj"));
+                    }
+                } else {
+                    doc.put("审核人", st.get("shr"));
+                    doc.put("审核时间", st.get("shsj"));
+                }
                 doc.put("审批状态", "已通过");
             } else if ("审批中".equals(statusText)) {
                 doc.put("审批状态", "审批中");
@@ -555,6 +578,22 @@ public class QueryService {
                 where.append(" AND ").append(alias).append(".[ckdm] = ?");
                 args.add(String.valueOf(ck).trim());
             }
+            // 台账/状况表按编码绑定(2026-09-28,与 _ckdm 同理):查询弹窗选仓库/存货后前端送
+            // _whCode/_itemCode(编码是稳定键:名称会重名/改名/带尾空格,等值匹配名称在这些场景误杀)。
+            // 有码时下方通用循环里的同名条件(仓库/存货)跳过——名称仅作弹窗回显,不参与过滤。
+            // 面板没有对应编码列时不生效(l2c 无该标签),名称条件照常兜底。
+            Object whCode = condition.get("_whCode");
+            boolean byWhCode = whCode != null && !String.valueOf(whCode).isBlank() && l2c.containsKey("仓库编码");
+            if (byWhCode) {
+                where.append(" AND RTRIM(").append(alias).append(".[").append(l2c.get("仓库编码")).append("]) = ?");
+                args.add(String.valueOf(whCode).trim());
+            }
+            Object itemCode = condition.get("_itemCode");
+            boolean byItemCode = itemCode != null && !String.valueOf(itemCode).isBlank() && l2c.containsKey("存货编码");
+            if (byItemCode) {
+                where.append(" AND RTRIM(").append(alias).append(".[").append(l2c.get("存货编码")).append("]) = ?");
+                args.add(String.valueOf(itemCode).trim());
+            }
             // 报表日期段(查询弹窗):开始/结束日期 → 区间过滤。
             // 有 期次 列(收发存汇总)按月(yyyy-MM)闭区间;否则有 单据日期 列(库存台账)按全日期闭区间。
             // 这两个键不进通用 LIKE,下方的 l2c 兜底也会因无列名而跳过。
@@ -577,8 +616,21 @@ public class QueryService {
                 Object v = e.getValue();
                 if (col == null || v == null || String.valueOf(v).isBlank()) continue;
                 if ("开始日期".equals(e.getKey()) || "结束日期".equals(e.getKey())) continue; // 已按期次区间处理
-                where.append(" AND ").append(alias).append(".[").append(col).append("] LIKE ?");
-                args.add("%" + v + "%");
+                // 已按编码过滤的维度跳过其名称条件(前端仍回显名称,但不参与过滤——防改名/重名误杀)
+                if (byWhCode && "仓库".equals(e.getKey())) continue;
+                if (byItemCode && "存货".equals(e.getKey())) continue;
+                // 参照字段(2026-09-24):查询值来自档案参照/联动下拉,是「一个精确实体」而非关键字 → 等值匹配。
+                // LIKE 子串会串仓:仓库「成品仓」会同时命中「半成品仓」、「不良品仓」命中「原料不良品仓」
+                // (库存台账实测:查 成品仓 返回 93 行 = 成品仓 34 + 半成品仓 59,台账按仓分户的口径直接失真)。
+                // 文本字段保持模糊;RTRIM 防 nchar/手工导入尾随空格(与台账联动选项同款口径)。
+                PanelRegistry.FieldDef fd = def.byLabel(e.getKey());
+                if (fd != null && "参照".equals(fd.dataType())) {
+                    where.append(" AND RTRIM(").append(alias).append(".[").append(col).append("]) = ?");
+                    args.add(String.valueOf(v).trim());
+                } else {
+                    where.append(" AND ").append(alias).append(".[").append(col).append("] LIKE ?");
+                    args.add("%" + v + "%");
+                }
             }
         }
         if (keyword != null && !keyword.isBlank()) {

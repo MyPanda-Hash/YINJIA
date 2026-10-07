@@ -1,0 +1,135 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ java -cp "lib\mssql-jdbc.jar" DbSync.java 2>&1 | Out-File -Encoding U ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server @ HSDZ_MES_TEST as yinjia
+[新增] migrate-qcreturn-srcfix.sql
+== migrate-qcreturn-srcfix.sql ==
+  [OK] 8 batches
+[新增] migrate-whloc.sql
+== migrate-whloc.sql ==
+  (0 rows)
+  [OK] 10 batches
+[新增] migrate-ledger-code-filter.sql
+== migrate-ledger-code-filter.sql ==
+  [OK] 5 batches
+[新增] migrate-qcrecv-supplier-seq.sql
+== migrate-qcrecv-supplier-seq.sql ==
+  [OK] 2 batches
+[新增] migrate-whloc-whcode.sql
+== migrate-whloc-whcode.sql ==
+  (0 rows)
+  [OK] 6 batches
+[新增] migrate-material-out-line-no.sql
+== migrate-material-out-line-no.sql ==
+  [OK] 6 batches
+[新增] migrate-server-parity2-20260928.sql
+== migrate-server-parity2-20260928.sql ==
+  (0 rows)
+  [OK] 4 batches
+[新增] migrate-server-converge-20260928.sql
+== migrate-server-converge-20260928.sql ==
+  (0 rows)
+  (0 rows)
+  [OK] 5 batches
+[新增] migrate-panel-runtime-cols.sql
+== migrate-panel-runtime-cols.sql ==
+  [OK] 7 batches
+[新增] migrate-panel-page-size.sql
+== migrate-panel-page-size.sql ==
+  [OK] 3 batches
+[新增] migrate-panel-page-size-archive.sql
+== migrate-panel-page-size-archive.sql ==
+  [OK] 2 batches
+[新增] migrate-drop-unused-tables.sql
+== migrate-drop-unused-tables.sql ==
+  (0 rows)
+  [OK] 4 batches
+[新增] migrate-spare-columns-biz.sql
+== migrate-spare-columns-biz.sql ==
+  [OK] 3 batches
+[新增] migrate-norm-debt-20260929.sql
+== migrate-norm-debt-20260929.sql ==
+  [OK] 5 batches
+[新增] migrate-spare-desc-fix.sql
+== migrate-spare-desc-fix.sql ==
+  [OK] 3 batches
+[新增] migrate-rd-test-apply.sql
+== migrate-rd-test-apply.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  [OK] 38 batches
+[新增] migrate-rd-prodinfo-formlib-2026-09-30.sql
+== migrate-rd-prodinfo-formlib-2026-09-30.sql ==
+  [OK] 5 batches
+[新增] migrate-rd-specdoc-prodno-2026-09-30.sql
+== migrate-rd-specdoc-prodno-2026-09-30.sql ==
+  [print] 注意: 更改对象名的任一部分都可能会破坏脚本和存储过程。
+  [OK] 6 batches
+[新增] migrate-filter-eff-formula-cols.sql
+== migrate-filter-eff-formula-cols.sql ==
+  (0 rows)
+  [OK] 12 batches
+[新增] migrate-drop-sample-no-panel-2026-09-30.sql
+== migrate-drop-sample-no-panel-2026-09-30.sql ==
+  [OK] 5 batches
+[新增] migrate-rd-file-owner-2026-09-30.sql
+== migrate-rd-file-owner-2026-09-30.sql ==
+  [OK] 5 batches
+[新增] migrate-rd-modify-reason-2026-09-30.sql
+== migrate-rd-modify-reason-2026-09-30.sql ==
+  (0 rows)
+  (0 rows)
+  [OK] 5 batches
+[新增] migrate-rd-file-controlled-2026-09-30.sql
+== migrate-rd-file-controlled-2026-09-30.sql ==
+  [OK] 4 batches
+[新增] migrate-rd-change-kind-2026-09-30.sql
+== migrate-rd-change-kind-2026-09-30.sql ==
+  [OK] 5 batches
+[新增] migrate-rd-newfields-i18n-2026-09-30.sql
+== migrate-rd-newfields-i18n-2026-09-30.sql ==
+  [OK] 4 batches
+[新增] migrate-rd-datarec-reviewer-2026-09-30.sql
+== migrate-rd-datarec-reviewer-2026-09-30.sql ==
+  [OK] 7 batches
+[新增] migrate-stock-flow-tables-2026-09-30.sql
+== migrate-stock-flow-tables-2026-09-30.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  [OK] 8 batches
+[新增] migrate-stock-flow-index-filter-2026-09-30.sql
+== migrate-stock-flow-index-filter-2026-09-30.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  [OK] 7 batches
+[新增] migrate-stock-flow-opening-2026-09-30.sql
+== migrate-stock-flow-opening-2026-09-30.sql ==
+  (0 rows)
+  [OK] 5 batches
+[新增] migrate-stock-movement-from-flow-2026-09-30.sql
+== migrate-stock-movement-from-flow-2026-09-30.sql ==
+  (0 rows)
+  (0 rows)
+  [OK] 6 batches
+[新增] migrate-stock-flow-tax-cols-2026-09-30.sql
+== migrate-stock-flow-tax-cols-2026-09-30.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  [OK] 13 batches
+=== 同步完成: 执行 31, 跳过 326, 失败 0 ===

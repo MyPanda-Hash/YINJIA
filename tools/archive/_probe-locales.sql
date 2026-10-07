@@ -1,0 +1,3 @@
+﻿SET NOCOUNT ON;
+SELECT * FROM yj_locale ORDER BY sort;
+GO

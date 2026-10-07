@@ -1,0 +1,31 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-qcinsp-header-now.sql ==
+  | 1764 | query,header | 10 | 单据编号 | 0 | 1 | null | 
+  | 1765 | query,header | 20 | 单据日期 | 0 | 1 | null | 
+  | 7692 | header | 30 | 业务员 | 0 | 1 | null | 
+  | 1766 | query,header | 40 | 暂收单号 | 0 | 1 | null | 
+  | 7539 | query,header | 50 | 采购订单号 | 0 | 1 | null | 
+  | 11462 | query,header | 60 | 批次号 | 0 | 1 | null | 
+  | 1767 | query,header | 70 | 供应商 | 0 | 1 | null | 
+  | 7691 | query,header | 80 | 供应商代码 | 0 | 1 | null | 
+  | 11588 | header | 90 | 部门 | 1 | 0 | null | 
+  | 11589 | header | 100 | 部门编码 | 1 | 0 | null | 
+  | 1768 | header | 110 | 检验员 | 0 | 1 | null | 
+  | 1769 | header | 120 | 检验日期 | 0 | 1 | null | 
+  | 7624 | query,header | 130 | 检验编号 | 0 | 1 | null | 
+  | 1770 | header | 140 | 检验方案 | 0 | 1 | null | 
+  | 7625 | query,header | 150 | 执行标准 | 0 | 1 | null | 
+  | 7626 | header | 160 | 检验类型 | 0 | 1 | null | 
+  | 1771 | query,header | 170 | 总结论 | 0 | 1 | null | 
+  | 9531 | header | 180 | 附件1 | 0 | 1 | null | 
+  | 9532 | header | 190 | 附件2 | 0 | 1 | null | 
+  | 9533 | header | 200 | 附件3 | 0 | 1 | null | 
+  | 9534 | header | 210 | 附件4 | 0 | 1 | null | 
+  | 9535 | header | 220 | 附件5 | 0 | 1 | null | 
+  | 9536 | header | 230 | 附件6 | 0 | 1 | null | 
+  | 1772 | header,detail | 240 | 备注 | 1 | 0 | null | 
+  | 1773 | query,header | 240 | 单据状态 | 1 | 0 | null | 
+  | 1774 | header | 260 | 审核人 | 0 | 1 | null | 
+  | 1775 | header | 270 | 审核时间 | 0 | 1 | null | 
+  | 7696 | header | 280 | 批次键 | 1 | 0 | null | 
+[OK] _probe-qcinsp-header-now.sql (2 batches)

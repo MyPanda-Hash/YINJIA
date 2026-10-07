@@ -1,0 +1,11 @@
+﻿SET NOCOUNT ON;
+PRINT '--- bl_material_out 列 ---';
+SELECT c.column_id, c.name, TYPE_NAME(c.system_type_id) AS typ, c.max_length, c.is_nullable FROM sys.columns c WHERE c.object_id = OBJECT_ID('dbo.bl_material_out') ORDER BY c.column_id;
+PRINT '--- bd_material_out(头表)列 ---';
+SELECT c.column_id, c.name, TYPE_NAME(c.system_type_id) AS typ FROM sys.columns c WHERE c.object_id = OBJECT_ID('dbo.bd_material_out') ORDER BY c.column_id;
+PRINT '--- 行数 ---';
+SELECT (SELECT COUNT(*) FROM bl_material_out) AS 行表行数, (SELECT COUNT(*) FROM bd_material_out) AS 头表行数;
+PRINT '--- 样例行 ---';
+SELECT TOP 3 * FROM bl_material_out;
+PRINT '--- 面板注册 ---';
+SELECT panel_code, panel_name, mode, ISNULL(head_table,'') AS head_table, ISNULL(line_table,'') AS line_table FROM yj_panel WHERE panel_code = 'MATERIAL_OUT' OR line_table = 'bl_material_out' OR head_table = 'bd_material_out';

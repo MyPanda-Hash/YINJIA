@@ -71,12 +71,12 @@ public class QrBatchService {
 
     /** 按日期区间查批号(打印界面) */
     public List<Map<String, Object>> findByDateRange(String fromDate, String toDate) {
+        // item_name 只按 存货档案(bs_inv)取名(BOM 名称兜底已随 BOM 下架移除,2026-10-04)
         return jdbc.queryForList(
                 "SELECT r.batch_no, r.item_code, r.source_type, r.source_no, r.created_by, r.created_at,"
-                        + " ISNULL(i.[存货名称], ISNULL(b.[父件名称], '')) AS item_name"
+                        + " ISNULL(i.[存货名称], '') AS item_name"
                         + " FROM qr_batch_registry r"
                         + " LEFT JOIN bs_inv i ON r.item_code = i.[存货编码]"
-                        + " LEFT JOIN bs_bom b ON r.item_code = b.[父件编码] AND ISNULL(b.asp_cancel,'N')<>'Y'"
                         + " WHERE r.biz_date BETWEEN ? AND ?"
                         + " ORDER BY r.biz_date, r.seq",
                 fromDate, toDate);

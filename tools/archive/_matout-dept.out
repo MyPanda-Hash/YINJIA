@@ -1,0 +1,21 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 416
++ ... $null 2>&1; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-dept.sql ==
+  | bs_dept | 部门编码 | 
+  | bs_dept | 部门名称 | 
+  | bs_dept | 长编码 | 
+  | bs_dept | 上级编码 | 
+  | bs_emp | 部门编码 | 
+  | bs_emp | 员工编码 | 
+  | bs_emp | 员工名称 | 
+  | bs_wh | 仓库编码 | 
+  | bs_wh | 仓库分类编码 | 
+  | bs_wh | 仓库管理员编码 | 
+  | bs_wh | 仓库名称 | 
+[SQL FAIL] �ؼ��� 'TOP' �������﷨����

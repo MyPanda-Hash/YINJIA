@@ -1,0 +1,22 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 226
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-stockreport-recursion-timing.sql ==
+  | 0 | 0 | 
+  | 243 | 10 | 
+  | 530 | 语句被终止。完成执行语句前已用完最大递归 5。 | 
+  | 243 | 12 | 
+  | v_stock_balance | RECOMPILE | 74 | 87 | 92 | 
+  | v_stock_balance | 无hint | 5 | 12 | 92 | 
+  | v_stock_ledger | RECOMPILE | 60 | 82 | 243 | 
+  | v_stock_ledger | 无hint | 7 | 9 | 243 | 
+  | v_stock_movement | RECOMPILE | 62 | 95 | 243 | 
+  | v_stock_movement | 无hint | 5 | 10 | 243 | 
+  | v_stock_summary | RECOMPILE | 98 | 118 | 145 | 
+  | v_stock_summary | 无hint | 8 | 9 | 145 | 
+[OK] _q-stockreport-recursion-timing.sql (6 batches)

@@ -1,0 +1,21 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:36 字符: 141
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-view-vs-table.sql ==
+  | 表 inv_cost_ledger | 1 | 243 | 
+  | 表 kucun | 1 | 36 | 
+  | 视图 v_stock_ledger | 0 | 0 | 
+  | 视图 v_stock_movement | 0 | 0 | 
+  | inv_cost_ledger | (无定义文本,表) | 
+  | kucun | (无定义文本,表) | 
+  | v_stock_ledger | 1167 字符 SQL 文本 | 
+  | v_stock_ledger | null | null | null | 0 KB | 0 KB | 
+  | v_stock_ledger | 0 | 0 | 
+  | inv_cost_ledger | 2 | 9 | 
+  | 页面统计DMV | 无权访问(需 VIEW DATABASE STATE) | 
+[OK] _q-view-vs-table.sql (6 batches)

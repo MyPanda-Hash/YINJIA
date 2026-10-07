@@ -1,0 +1,40 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:11 字符: 145
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-mixedlabel.sql ==
+  | 商品id | 商品id | detail | 972 | 1 | 0 | 标签=列名 | 
+  | 仓库id | 仓库id | detail | 978 | 1 | 0 | 标签=列名 | 
+  | 仓位id | 仓位id | detail | 981 | 1 | 0 | 标签=列名 | 
+  | 辅助属性id | 辅助属性id | detail | 984 | 1 | 0 | 标签=列名 | 
+  | 辅助属性1id | 辅助属性1id | detail | 987 | 1 | 0 | 标签=列名 | 
+  | 辅助属性2id | 辅助属性2id | detail | 990 | 1 | 0 | 标签=列名 | 
+  | 辅助属性3id | 辅助属性3id | detail | 993 | 1 | 0 | 标签=列名 | 
+  | 序列号流转ID | 序列号流转ID | detail | 1005 | 1 | 0 | 标签=列名 | 
+  | 基本单位id | 基本单位id | detail | 1006 | 1 | 0 | 标签=列名 | 
+  | 单位id | 单位id | detail | 1009 | 1 | 0 | 标签=列名 | 
+  | 辅助单位id | 辅助单位id | detail | 1011 | 1 | 0 | 标签=列名 | 
+  | 源单类型id | 源单类型id | detail | 1025 | 1 | 0 | 标签=列名 | 
+  | 源单内部id | 源单内部id | detail | 1028 | 1 | 0 | 标签=列名 | 
+  | 源单分录id | 源单分录id | detail | 1031 | 1 | 0 | 标签=列名 | 
+  | 源单产品分录id | 源单产品分录id | detail | 1032 | 1 | 0 | 标签=列名 | 
+  | ERP单号 | ERP单号 | header | 270 | 0 | 1 | 标签=列名 | 
+  | 转ERP操作人 | 转ERP操作人 | header | 280 | 0 | 1 | 标签=列名 | 
+  | 转ERP时间 | 转ERP时间 | header | 290 | 0 | 1 | 标签=列名 | 
+  | 是否已转ERP | 是否已转ERP | header | 300 | 0 | 1 | 标签=列名 | 
+  | 单据状态_bill_status | 单据状态_bill_status | header | 971 | 0 | 1 | 标签=列名 | 
+  | dept_id | dept_id | header | 972 | 1 | 0 | 标签=列名 | 
+  | 审核时间_audit_time | 审核时间_audit_time | header | 976 | 0 | 1 | 标签=列名 | 
+  | creator_id | creator_id | header | 977 | 1 | 0 | 标签=列名 | 
+  | modifier_id | modifier_id | header | 980 | 1 | 0 | 标签=列名 | 
+  | bill_type_id | bill_type_id | header | 985 | 1 | 0 | 标签=列名 | 
+  | auditor_id | auditor_id | header | 986 | 1 | 0 | 标签=列名 | 
+  | 审核人_auditor_name | 审核人_auditor_name | header | 987 | 0 | 1 | 标签=列名 | 
+  | emp_id | emp_id | header | 989 | 1 | 0 | 标签=列名 | 
+  | pick_use_id | pick_use_id | header | 993 | 1 | 0 | 标签=列名 | 
+  | 含下划线/英文的标签去重 | 29 | 
+[OK] _q-matout-mixedlabel.sql (3 batches)

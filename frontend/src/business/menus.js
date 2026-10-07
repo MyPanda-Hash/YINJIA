@@ -232,7 +232,8 @@ export const menuTree = [
               { code: 'workOrderBoard', title: '工单排产', path: '/prod/plan/workOrderBoard', icon: 'Histogram' },
               // 生产线档案在 基础资料→生产(PROD_LINE,2026-09-23 归位);此处负荷看板按 生产线档案日产能 判超载
               { code: 'lineLoad', title: '产线排产负荷', path: '/panelx/list/LINE_LOAD', panelCode: 'LINE_LOAD', icon: 'DataLine' },
-              { code: 'woKit', title: '工单齐套表', path: '/panelx/list/WO_KIT', panelCode: 'WO_KIT', icon: 'Box' },
+              // 2026-10-14 工单齐套表 WO_KIT 菜单下线:唯一数据源 v_wo_kit(基于自建物料的齐套视图)已随
+              // MES 自建「物料清单(BOM)」功能整体删除(表 bs_bom / 视图 v_wo_kit / 面板 BOM、WO_KIT 同批下架)。
             ],
           },
           {
@@ -309,6 +310,11 @@ export const menuTree = [
           // 来料检验要求(2026-09-22):《品质资料 2026.09.19.xlsx》折叠棉~PP棉 7 张检验要求表,
           // 档案式整表面板(规格书式页签+Excel 复刻表格,非翻页单据),行按物料类别分流 7 页签
           { code: 'qcInspReq', title: '来料检验要求', path: '/panelx/list/QC_INSP_REQ', icon: 'Grid', panelCode: 'QC_INSP_REQ' },
+          // 来料检验要求(系列)(2026-10-04 用户口径):表太多不再挤在一个面板 ⇒ 拆出 10 张**全自定义**表
+          // (阻垢系列/BK材料系列/除重金属系列/矿化(碱性)系列/抑菌系列/载银系列/炭粉/胶粉/矿化料/原料来料);
+          // 与「来料检验要求」同构:每张表各自加自定义列(每表 20 个扩展位)、可带父字段(分组表头)、
+          // 检验数据记录按物料编码一起带入(只带子字段)。页签集由 物料类别 词典决定,加页签只改词典。
+          { code: 'qcInspReqSeries', title: '来料检验要求(系列)', path: '/panelx/list/QC_INSP_REQ_SERIES', icon: 'Grid', panelCode: 'QC_INSP_REQ_SERIES' },
         ],
       },
       {
@@ -395,7 +401,8 @@ export const menuTree = [
           { code: 'uom', title: '计量单位', path: '/panelx/list/UOM', icon: 'ScaleToOriginal', panelCode: 'UOM', operationName: '新增流程' },
           // 商品分类不占导航:从 商品 面板工具栏「分类管理」进入(与 客户/供应商 同款交互)
           { code: 'inventory', title: '商品', path: '/panelx/list/INV', icon: 'Grid', panelCode: 'INV', operationName: '新增流程' },
-          { code: 'bom', title: '物料清单', path: '/panelx/list/BOM', icon: 'Files', panelCode: 'BOM', operationName: '新增流程' },
+          // 2026-10-14 物料清单(BOM)菜单下线:MES 自建 BOM 功能整体删除
+          // (表 bs_bom / 面板 BOM 及其正反向查询 BOM_FWD、BOM_REV 同批下架)。
           { code: 'invPrice', title: '存货价格本', path: '/panelx/list/INV_PRICE', icon: 'PriceTag', panelCode: 'INV_PRICE', operationName: '新增流程' },
         ],
       },

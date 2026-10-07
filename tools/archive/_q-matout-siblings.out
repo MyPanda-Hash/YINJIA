@@ -1,0 +1,186 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 211
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-siblings.sql ==
+  | bl_finish_in | 计量单位 | nvarchar | 0 | 0 | 
+  | bl_finish_in | 金额 | decimal | 18 | 4 | 
+  | bl_finish_in | 单价 | decimal | 18 | 4 | 
+  | bl_material_out | 计量单位 | nvarchar | 0 | 0 | 
+  | bl_material_out | 单价 | decimal | 18 | 4 | 
+  | bl_material_out | 金额 | decimal | 18 | 4 | 
+  | bl_material_out | 手工确定成本 | bit | 1 | 0 | 
+  | bl_other_in | 计量单位 | nvarchar | 0 | 0 | 
+  | bl_other_in | 计量单位2 | nvarchar | 0 | 0 | 
+  | bl_other_in | 单价 | decimal | 18 | 4 | 
+  | bl_other_in | 金额 | decimal | 18 | 4 | 
+  | bl_other_out | 计量单位 | nvarchar | 0 | 0 | 
+  | bl_other_out | 单价 | decimal | 18 | 4 | 
+  | bl_other_out | 金额 | decimal | 18 | 4 | 
+  | bl_outsource_in | 计量单位 | nvarchar | 0 | 0 | 
+  | bl_outsource_in | 单价 | decimal | 18 | 4 | 
+  | bl_outsource_in | 金额 | decimal | 18 | 4 | 
+  | bl_outsource_issue | 计量单位 | nvarchar | 0 | 0 | 
+  | bl_outsource_issue | 单价 | decimal | 18 | 4 | 
+  | bl_outsource_issue | 金额 | decimal | 18 | 4 | 
+  | bl_purchase_in | 计量单位 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 计量单位2 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 计量单位组合 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 单价 | decimal | 18 | 4 | 
+  | bl_purchase_in | 税率% | decimal | 18 | 4 | 
+  | bl_purchase_in | 单价2 | decimal | 18 | 4 | 
+  | bl_purchase_in | 含税单价2 | decimal | 18 | 4 | 
+  | bl_purchase_in | 含税单价 | decimal | 18 | 4 | 
+  | bl_purchase_in | 金额 | decimal | 18 | 4 | 
+  | bl_purchase_in | 含税金额 | decimal | 18 | 4 | 
+  | bl_purchase_in | 费用金额 | decimal | 18 | 4 | 
+  | bl_purchase_in | 商品是否多单位 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 基本单位id | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 基本单位名称 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 基本单位编码 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 单位id | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 单位编码 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 辅助单位id | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 辅助单位编码 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 折扣额 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 本次结算金额本位币 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 折扣率% | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 成本视图 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 单位成本视图 | nvarchar | 0 | 0 | 
+  | bl_purchase_in | 价税合计本位币 | nvarchar | 0 | 0 | 
+  | bl_sale_out | 计量单位 | nvarchar | 0 | 0 | 
+  | bl_sale_out | 成本价 | decimal | 18 | 4 | 
+  | bl_sale_out | 税率% | decimal | 18 | 4 | 
+  | bl_sale_out | 售价 | decimal | 18 | 4 | 
+  | bl_sale_out | 含税售价 | decimal | 18 | 4 | 
+  | 1 | id | 
+  | 2 | 单据编号 | 
+  | 4 | 存货名称 | 
+  | 5 | 存货图片 | 
+  | 6 | 规格型号 | 
+  | 7 | 实收数量 | 
+  | 8 | 计量单位 | 
+  | 9 | 实收数量2 | 
+  | 10 | 计量单位2 | 
+  | 11 | 计量单位组合 | 
+  | 12 | 换算率 | 
+  | 13 | 单价 | 
+  | 14 | 税率% | 
+  | 15 | 单价2 | 
+  | 16 | 含税单价2 | 
+  | 17 | 含税单价 | 
+  | 18 | 金额 | 
+  | 19 | 含税金额 | 
+  | 20 | 费用调整 | 
+  | 21 | 费用金额 | 
+  | 22 | 现存量 | 
+  | 23 | 现存量说明 | 
+  | 24 | 产成品图片 | 
+  | 25 | 备注 | 
+  | 26 | asp_user1 | 
+  | 27 | asp_time1 | 
+  | 28 | asp_cancel | 
+  | 29 | asp_user2 | 
+  | 30 | asp_time2 | 
+  | 31 | 批号 | 
+  | 32 | 存货编码 | 
+  | 99 | 行号 | 
+  | 100 | 商品id | 
+  | 101 | 商品是否多单位 | 
+  | 102 | 商品是否序列号 | 
+  | 103 | 商品是否辅助属性 | 
+  | 104 | 商品是否保质期 | 
+  | 105 | 商品是否批次 | 
+  | 106 | 仓库id | 
+  | 108 | 仓库编码 | 
+  | 109 | 仓库启用仓位管理 | 
+  | 110 | 仓位id | 
+  | 111 | 仓库名称_sp_name | 
+  | 112 | 仓位编码 | 
+  | 113 | 辅助属性id | 
+  | 114 | 辅助属性名称 | 
+  | 115 | 辅助属性编码 | 
+  | 116 | 辅助属性1id | 
+  | 117 | 辅助属性1名称 | 
+  | 118 | 辅助属性1编码 | 
+  | 1 | id | 
+  | 2 | 单据日期 | 
+  | 3 | 单据编号 | 
+  | 4 | 业务类型 | 
+  | 5 | 币种 | 
+  | 6 | 汇率 | 
+  | 7 | 供应商编码 | 
+  | 8 | 供应商 | 
+  | 9 | 供应商简称 | 
+  | 10 | 经手人 | 
+  | 11 | 项目 | 
+  | 13 | 外部单据号 | 
+  | 14 | 采购订单号 | 
+  | 15 | 合同号 | 
+  | 16 | 资金批次 | 
+  | 17 | 采购类型 | 
+  | 18 | 合同号最新 | 
+  | 19 | 备注 | 
+  | 20 | 单据状态 | 
+  | 21 | 审核人 | 
+  | 22 | 审核时间 | 
+  | 23 | 审批人 | 
+  | 24 | 审批时间 | 
+  | 25 | asp_user1 | 
+  | 26 | asp_time1 | 
+  | 27 | asp_user2 | 
+  | 28 | asp_time2 | 
+  | 29 | asp_cancel | 
+  | 30 | 验货人 | 
+  | 31 | 匹配来源单号 | 
+  | 32 | 来源单据 | 
+  | 33 | 来源单号 | 
+  | 34 | 销售订单号 | 
+  | 35 | 入库类别 | 
+  | 42 | 金额 | 
+  | 122 | 创建时间 | 
+  | 123 | 单据状态2 | 
+  | 124 | 单据关闭状态 | 
+  | 125 | 供应商id | 
+  | 126 | 经手人id | 
+  | 127 | 经手人编码 | 
+  | 128 | 交货方式id | 
+  | 129 | 交货方式 | 
+  | 130 | 交货方式编码 | 
+  | 131 | 结算状态 | 
+  | 132 | 修改时间 | 
+  | 133 | 审核时间2 | 
+  | 134 | 创建人id | 
+  | 135 | 创建人 | 
+  | 136 | 创建人编码 | 
+  | 2 | 4 | 
+  | yj_app_setting | 
+  | yj_archive_change_log | 
+  | yj_attachment | 
+  | yj_change_dept | 
+  | yj_dept | 
+  | yj_doc_batch | 
+  | yj_doc_modify_log | 
+  | yj_doc_status | 
+  | yj_field | 
+  | yj_form_approval | 
+  | yj_locale | 
+  | yj_lot_seq | 
+  | yj_message | 
+  | yj_panel | 
+  | yj_plan_term | 
+  | yj_report_template | 
+  | yj_role | 
+  | yj_role_panel | 
+  | yj_schema_log | 
+  | yj_share_file | 
+  | yj_share_file_cat | 
+  | yj_std_lib | 
+  | yj_translation | 
+  | yj_usage_log | 
+  | yj_user | 
+[OK] _q-matout-siblings.sql (2 batches)

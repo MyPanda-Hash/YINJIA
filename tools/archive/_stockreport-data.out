@@ -1,0 +1,21 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:18 字符: 144
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-stockreport-data.sql ==
+  | inv_cost_ledger 行数 | 243 | 
+  | inv_cost_ledger 重算时间种类 | 1 | 
+  | v_stock_movement 行数 | 243 | 
+  | v_stock_ledger 行数 | 243 | 
+  | v_stock_summary 行数 | 145 | 
+  | v_stock_balance 行数 | 92 | 
+  | kucun 行数 | 36 | 
+  | 1 | 7 | CK00006 | YJ-XWR-003 | PC0000 | 2026-09-16 | 10000.0000 | 0.0000 | 3900.0000 | 10000.0000 | 0.390000 | 3900.0000 | 0.0000 | 2026-09-24 15:13:50 | 
+  | 1 | 8 | CK00006 | YJ-SX-031 | PC0000 | 2026-09-15 | 4500.0000 | 0.0000 | 1485.0000 | 4500.0000 | 0.330000 | 1485.0000 | 0.0000 | 2026-09-24 15:13:50 | 
+  | 1 | 9 | CK00006 | YJ-SX-035 | PC0000 | 2026-09-15 | 1222.0000 | 0.0000 | 672.1000 | 1222.0000 | 0.550000 | 672.1000 | 0.0000 | 2026-09-24 15:13:50 | 
+  | 2026-09-24 15:13:50 | 2026-09-24 15:13:50 | 
+[SQL FAIL] ���� '�������' ��Ч��

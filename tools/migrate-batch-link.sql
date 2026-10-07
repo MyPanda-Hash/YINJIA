@@ -136,19 +136,50 @@ GO
 -- 头:place=query,header(紧跟在「采购订单号」之后);行:place=detail(紧跟「采购订单行号」之后)
 -- 2026-09-24 修:面板编码 SL_RECV 已于 2026-09-20 改名 QC_RECV(送料暂收单),原注册挂在**已不存在的
 -- SL_RECV** 上 → 现用面板看不到「批次号」字段(实测 QC_RECV 0 行、SL_RECV 2 行孤儿)。本跳按现用编码
--- QC_RECV 注册,并在 DELETE 里连孤儿 SL_RECV 一起清掉(死面板编码不再登记)。
-DELETE FROM yj_field WHERE col_name = N'批次号' AND panel_code IN ('SL_RECV', 'QC_RECV','QC_INSP','QC_RETURN','PURCHASE_IN')
+-- QC_RECV 注册,并在下面清掉死面板编码 SL_RECV 的孤儿行。
+--
+-- ⚠ 2026-10-04 修(迁移回退事故,勿退回 DELETE+INSERT):
+--   本段原为「无条件 DELETE + INSERT(editable 写死 1)」。DbSync 按**内容哈希**判定脚本是否已执行,
+--   任何一次对本文件的字节改动都会让它整体重跑 —— 而重跑就会把 editable 重新写成 1,
+--   静默抹掉 tools/migrate-qc-backfill-batch-readonly.sql(2026-09-23)置下的只读意图。
+--   实测:该脚本 2026-10-03 14:39 重跑后,QC_RECV/QC_INSP/QC_RETURN 的 批次号 editable 又从 0 变回 1,
+--   「回填批次号不可编辑」在库里凭空失效(两账套一致)。
+--   现改为**只在缺失时插入**:已存在的行一律不碰 —— 批次号可编辑口径的唯一权威是
+--   tools/migrate-batch-no-on-generate.sql(2026-10-04 口径:生单即定号)。
+DELETE FROM yj_field WHERE col_name = N'批次号' AND panel_code = 'SL_RECV'
   AND (place = N'query,header' OR place = N'detail');
 GO
-INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES
-('QC_RECV',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header', 125, 160, 1, 0, 0, 1),
-('QC_RECV',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       225, 150, 1, 0, 0, 1),
-('QC_INSP',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header',  36, 160, 1, 0, 0, 1),
-('QC_INSP',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       210, 150, 1, 0, 0, 1),
-('QC_RETURN',    N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header',  36, 160, 1, 0, 0, 1),
-('QC_RETURN',    N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       206, 150, 1, 0, 0, 1),
-('PURCHASE_IN',  N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header', 255, 160, 1, 0, 0, 1),
-('PURCHASE_IN',  N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       310, 150, 1, 0, 0, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = 'QC_RECV' AND place = N'query,header' AND label = N'批次号')
+  INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES
+  ('QC_RECV',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header', 125, 160, 1, 0, 0, 1);
+GO
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = 'QC_RECV' AND place = N'detail' AND label = N'批次号')
+  INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES
+  ('QC_RECV',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       225, 150, 1, 0, 0, 1);
+GO
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = 'QC_INSP' AND place = N'query,header' AND label = N'批次号')
+  INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES
+  ('QC_INSP',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header',  36, 160, 1, 0, 0, 1);
+GO
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = 'QC_INSP' AND place = N'detail' AND label = N'批次号')
+  INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES
+  ('QC_INSP',      N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       210, 150, 1, 0, 0, 1);
+GO
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = 'QC_RETURN' AND place = N'query,header' AND label = N'批次号')
+  INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES
+  ('QC_RETURN',    N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header',  36, 160, 1, 0, 0, 1);
+GO
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = 'QC_RETURN' AND place = N'detail' AND label = N'批次号')
+  INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES
+  ('QC_RETURN',    N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       206, 150, 1, 0, 0, 1);
+GO
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = 'PURCHASE_IN' AND place = N'query,header' AND label = N'批次号')
+  INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES
+  ('PURCHASE_IN',  N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'query,header', 255, 160, 1, 0, 0, 1);
+GO
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code = 'PURCHASE_IN' AND place = N'detail' AND label = N'批次号')
+  INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, visible) VALUES
+  ('PURCHASE_IN',  N'批次号', N'批次号', N'文本', NULL,NULL,NULL,NULL, N'detail',       310, 150, 1, 0, 0, 1);
 GO
 
 -- ══════════════════════ 6. 译名 批次号 × 10 语言 ══════════════════════

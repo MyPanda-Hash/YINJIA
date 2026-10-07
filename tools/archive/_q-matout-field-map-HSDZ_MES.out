@@ -1,0 +1,322 @@
+﻿## A. 两表列 ? 金蝶 inv_pick 接口键(取自列 MS_Description 中文注明)
+bd_material_out|id|
+bd_material_out|单据日期|
+bd_material_out|单据编号|单号(面板字段列)
+bd_material_out|业务类型|
+bd_material_out|生产车间|
+bd_material_out|出库类别|
+bd_material_out|领用人|
+bd_material_out|项目|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_material_out|仓库|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_material_out|来源单号|
+bd_material_out|加工单号|
+bd_material_out|备注|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_material_out|单据状态|
+bd_material_out|审核人|审核人(流程)(面板字段列)
+bd_material_out|审核时间|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_material_out|审批人|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_material_out|审批时间|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_material_out|asp_user1|
+bd_material_out|asp_time1|
+bd_material_out|asp_user2|
+bd_material_out|asp_time2|
+bd_material_out|asp_cancel|材料出库单头表连接键(v_stock_movement 第6路)
+bd_material_out|来源单据|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_material_out|销售订单号|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_material_out|匹配来源单号|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_material_out|创建时间|材料出库单↔金蝶生产领料单(inv_pick)接口键 create_time
+bd_material_out|金蝶单据状态|材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_status
+bd_material_out|部门id|材料出库单↔金蝶生产领料单(inv_pick)接口键 dept_id
+bd_material_out|部门编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 dept_number
+bd_material_out|领料类型|材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_type
+bd_material_out|修改时间|材料出库单↔金蝶生产领料单(inv_pick)接口键 modify_time
+bd_material_out|金蝶审核时间|材料出库单↔金蝶生产领料单(inv_pick)接口键 audit_time
+bd_material_out|创建人id|材料出库单↔金蝶生产领料单(inv_pick)接口键 creator_id
+bd_material_out|创建人|材料出库单↔金蝶生产领料单(inv_pick)接口键 creator_name
+bd_material_out|创建人编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 creator_number
+bd_material_out|修改人id|材料出库单↔金蝶生产领料单(inv_pick)接口键 modifier_id
+bd_material_out|修改人|材料出库单↔金蝶生产领料单(inv_pick)接口键 modifier_name
+bd_material_out|修改人编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 modifier_number
+bd_material_out|单据类型名称|材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_type_name
+bd_material_out|单据类型编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_type_number
+bd_material_out|单据类型id|材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_type_id
+bd_material_out|审核人id|材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_id
+bd_material_out|金蝶审核人|材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_name
+bd_material_out|审核人编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_number
+bd_material_out|经手人id|材料出库单↔金蝶生产领料单(inv_pick)接口键 emp_id
+bd_material_out|经手人编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 emp_number
+bd_material_out|单据标签|材料出库单↔金蝶生产领料单(inv_pick)接口键 mul_bill_label
+bd_material_out|领料用途名称|材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_use_name
+bd_material_out|领料用途id|材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_use_id
+bd_material_out|领料用途编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_use_number
+bd_material_out|是否已转ERP|转ERP回写:是/否(空=否);弃审自动清
+bd_material_out|ERP单号|转ERP回写:金蝶生成的生产领料单号(SCLL-…)
+bd_material_out|转ERP操作人|转ERP回写:操作人账号
+bd_material_out|转ERP时间|转ERP回写:时间(YYYY-MM-DD HH:mm:ss)
+bd_material_out|asp_print|
+bd_material_out|asp_time3|
+bd_material_out|asp_time4|
+bd_material_out|asp_user3|
+bd_material_out|asp_user4|
+bd_material_out|备用1|预留扩展字段(未绑定)
+bd_material_out|备用2|预留扩展字段(未绑定)
+bd_material_out|备用3|预留扩展字段(未绑定)
+bd_material_out|备用4|预留扩展字段(未绑定)
+bd_material_out|备用5|预留扩展字段(未绑定)
+bd_material_out|备用6|预留扩展字段(未绑定)
+bd_material_out|备用7|预留扩展字段(未绑定)
+bd_material_out|备用8|预留扩展字段(未绑定)
+bd_material_out|备用9|预留扩展字段(未绑定)
+bd_material_out|备用10|预留扩展字段(未绑定)
+bd_material_out|备用11|预留扩展字段(未绑定)
+bd_material_out|备用12|预留扩展字段(未绑定)
+bd_material_out|备用13|预留扩展字段(未绑定)
+bd_material_out|备用14|预留扩展字段(未绑定)
+bd_material_out|备用15|预留扩展字段(未绑定)
+bd_material_out|备用16|预留扩展字段(未绑定)
+bd_material_out|备用17|预留扩展字段(未绑定)
+bd_material_out|备用18|预留扩展字段(未绑定)
+bd_material_out|备用19|预留扩展字段(未绑定)
+bd_material_out|备用20|预留扩展字段(未绑定)
+bd_material_out|工单行号|工单行号(2026-09-28 服务器侧直加,随第一轮 parity 对齐入链;领料出库关联生产工单行,与 plang.pl_xc 同义)
+bl_material_out|id|
+bl_material_out|单据编号|单号(面板字段列)
+bl_material_out|仓库|
+bl_material_out|加工单号|
+bl_material_out|材料名称|材料(面板字段列)
+bl_material_out|计量单位|
+bl_material_out|数量|
+bl_material_out|单价|
+bl_material_out|金额|
+bl_material_out|规格型号|
+bl_material_out|手工确定成本|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bl_material_out|明细备注|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bl_material_out|现存量|
+bl_material_out|现存量说明|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bl_material_out|备注|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bl_material_out|asp_user1|
+bl_material_out|asp_time1|
+bl_material_out|asp_cancel|
+bl_material_out|asp_user2|
+bl_material_out|asp_time2|材料出库单行→头表连接键(v_stock_movement 第6路)
+bl_material_out|材料编码|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bl_material_out|批号|历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bl_material_out|图片|材料出库单↔金蝶生产领料单(inv_pick)接口键 picture
+bl_material_out|行号|行号(材料出库单·领料明细行序,从 1 连续;转领料/生成领料单按默认 BOM 展开顺序写入,面板明细首列展示)
+bl_material_out|商品id|材料出库单↔金蝶生产领料单(inv_pick)接口键 material_id
+bl_material_out|商品是否多单位|材料出库单↔金蝶生产领料单(inv_pick)接口键 material_is_multi_unit
+bl_material_out|商品是否序列号|材料出库单↔金蝶生产领料单(inv_pick)接口键 material_is_serial
+bl_material_out|商品是否辅助属性|材料出库单↔金蝶生产领料单(inv_pick)接口键 material_is_asst_attr
+bl_material_out|商品是否保质期|材料出库单↔金蝶生产领料单(inv_pick)接口键 material_is_kf_period
+bl_material_out|商品是否批次|材料出库单↔金蝶生产领料单(inv_pick)接口键 material_is_batch
+bl_material_out|仓库id|材料出库单↔金蝶生产领料单(inv_pick)接口键 stock_id
+bl_material_out|仓库编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 stock_number
+bl_material_out|仓库启用仓位管理|材料出库单↔金蝶生产领料单(inv_pick)接口键 stock_is_allow_freight
+bl_material_out|仓位id|材料出库单↔金蝶生产领料单(inv_pick)接口键 sp_id
+bl_material_out|仓位名称|材料出库单↔金蝶生产领料单(inv_pick)接口键 sp_name
+bl_material_out|仓位编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 sp_number
+bl_material_out|辅助属性id|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_prop_id
+bl_material_out|辅助属性名称|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_prop_name
+bl_material_out|辅助属性编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_prop_number
+bl_material_out|辅助属性1id|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux1_id
+bl_material_out|辅助属性1名称|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux1_name
+bl_material_out|辅助属性1编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux1_number
+bl_material_out|辅助属性2id|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux2_id
+bl_material_out|辅助属性2名称|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux2_name
+bl_material_out|辅助属性2编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux2_number
+bl_material_out|辅助属性3id|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux3_id
+bl_material_out|辅助属性3名称|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux3_name
+bl_material_out|辅助属性3编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux3_number
+bl_material_out|条形码|材料出库单↔金蝶生产领料单(inv_pick)接口键 barcode
+bl_material_out|产地|材料出库单↔金蝶生产领料单(inv_pick)接口键 pro_place
+bl_material_out|注册证号|材料出库单↔金蝶生产领料单(inv_pick)接口键 pro_reg_no
+bl_material_out|生产许可证|材料出库单↔金蝶生产领料单(inv_pick)接口键 pro_license
+bl_material_out|保质期到期日|材料出库单↔金蝶生产领料单(inv_pick)接口键 kf_date
+bl_material_out|有效期至|材料出库单↔金蝶生产领料单(inv_pick)接口键 valid_date
+bl_material_out|保质期类型|材料出库单↔金蝶生产领料单(inv_pick)接口键 kf_type
+bl_material_out|保质期|材料出库单↔金蝶生产领料单(inv_pick)接口键 kf_period
+bl_material_out|序列号清单|材料出库单↔金蝶生产领料单(inv_pick)接口键 sn_list
+bl_material_out|序列号流转ID|材料出库单↔金蝶生产领料单(inv_pick)接口键 sn_list_id
+bl_material_out|基本单位id|材料出库单↔金蝶生产领料单(inv_pick)接口键 base_unit_id
+bl_material_out|基本单位名称|材料出库单↔金蝶生产领料单(inv_pick)接口键 base_unit_name
+bl_material_out|基本单位编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 base_unit_number
+bl_material_out|单位id|材料出库单↔金蝶生产领料单(inv_pick)接口键 unit_id
+bl_material_out|单位编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 unit_number
+bl_material_out|辅助单位id|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_unit_id
+bl_material_out|辅助单位名称|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_unit_name
+bl_material_out|辅助单位编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_unit_number
+bl_material_out|换算率|材料出库单↔金蝶生产领料单(inv_pick)接口键 conversion_rate
+bl_material_out|库存数量|材料出库单↔金蝶生产领料单(inv_pick)接口键 inv_qty
+bl_material_out|基本数量|材料出库单↔金蝶生产领料单(inv_pick)接口键 base_qty
+bl_material_out|库存基本数量|材料出库单↔金蝶生产领料单(inv_pick)接口键 inv_base_qty
+bl_material_out|辅助数量|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_qty
+bl_material_out|默认浮动数量|材料出库单↔金蝶生产领料单(inv_pick)接口键 def_float_qty
+bl_material_out|辅助换算系数|材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_coefficient
+bl_material_out|换算系数|材料出库单↔金蝶生产领料单(inv_pick)接口键 coefficient
+bl_material_out|成本|材料出库单↔金蝶生产领料单(inv_pick)接口键 cost
+bl_material_out|单位成本|材料出库单↔金蝶生产领料单(inv_pick)接口键 unit_cost
+bl_material_out|源单编号|材料出库单↔金蝶生产领料单(inv_pick)接口键 src_bill_no
+bl_material_out|源单类型id|材料出库单↔金蝶生产领料单(inv_pick)接口键 src_bill_type_id
+bl_material_out|源单类型名称|材料出库单↔金蝶生产领料单(inv_pick)接口键 src_bill_type_name
+bl_material_out|源单类型编码|材料出库单↔金蝶生产领料单(inv_pick)接口键 src_bill_type_number
+bl_material_out|源单内部id|材料出库单↔金蝶生产领料单(inv_pick)接口键 src_inter_id
+bl_material_out|源单日期|材料出库单↔金蝶生产领料单(inv_pick)接口键 src_bill_date
+bl_material_out|源单行号|材料出库单↔金蝶生产领料单(inv_pick)接口键 src_seq
+bl_material_out|源单分录id|材料出库单↔金蝶生产领料单(inv_pick)接口键 src_entry_id
+bl_material_out|源单产品分录id|材料出库单↔金蝶生产领料单(inv_pick)接口键 src_product_entry_id
+bl_material_out|asp_print|
+bl_material_out|asp_time3|
+bl_material_out|asp_time4|
+bl_material_out|asp_user3|
+bl_material_out|asp_user4|
+bl_material_out|备用1|预留扩展字段(未绑定)
+bl_material_out|备用2|预留扩展字段(未绑定)
+bl_material_out|备用3|预留扩展字段(未绑定)
+bl_material_out|备用4|预留扩展字段(未绑定)
+bl_material_out|备用5|预留扩展字段(未绑定)
+bl_material_out|备用6|预留扩展字段(未绑定)
+bl_material_out|备用7|预留扩展字段(未绑定)
+bl_material_out|备用8|预留扩展字段(未绑定)
+bl_material_out|备用9|预留扩展字段(未绑定)
+bl_material_out|备用10|预留扩展字段(未绑定)
+bl_material_out|备用11|预留扩展字段(未绑定)
+bl_material_out|备用12|预留扩展字段(未绑定)
+bl_material_out|备用13|预留扩展字段(未绑定)
+bl_material_out|备用14|预留扩展字段(未绑定)
+bl_material_out|备用15|预留扩展字段(未绑定)
+bl_material_out|备用16|预留扩展字段(未绑定)
+bl_material_out|备用17|预留扩展字段(未绑定)
+bl_material_out|备用18|预留扩展字段(未绑定)
+bl_material_out|备用19|预留扩展字段(未绑定)
+bl_material_out|备用20|预留扩展字段(未绑定)
+## B. yj_field 注册(MATERIAL_OUT):col_name|label|place|visible|hidden|seq|ref_panel|ref_field
+仓库|仓库|query,header,detail|1|0|10|WH|仓库名称
+单据日期|单据日期|query,header|1|0|10||
+加工单号|加工单号|header,detail|1|0|20||
+单据编号|单据编号|query,header|1|0|20||
+业务类型|业务类型|query,header|1|0|30||
+生产车间|生产车间|query,header|1|0|40|DEPT|部门名称
+出库类别|出库类别|query,header|1|0|50||
+领用人|领用人|query,header|1|0|60|EMP|员工名称
+项目|项目|header|1|0|70|PROJ|项目名称
+来源单据|来源单据|query,header|1|0|80||
+销售订单号|销售订单号|query,header|1|0|90||
+来源单号|来源单号|header|1|0|90||
+匹配来源单号|匹配来源单号|query,header|1|0|100||
+ERP单号|ERP单号|header|1|0|270||
+转ERP操作人|转ERP操作人|header|1|0|280||
+转ERP时间|转ERP时间|header|1|0|290||
+是否已转ERP|是否已转ERP|header|1|0|300||
+备注|备注|header|1|0|900||
+创建时间|创建时间|header|1|0|970||
+金蝶单据状态|金蝶单据状态|header|1|0|971||
+部门id|部门id|header|0|1|972||
+部门编码|部门编码|header|1|0|973|DEPT|部门编码
+领料类型|领料类型|header|1|0|974||
+修改时间|修改时间|header|1|0|975||
+金蝶审核时间|金蝶审核时间|header|1|0|976||
+创建人id|创建人id|header|0|1|977||
+创建人|创建人|header|0|1|978||
+创建人编码|创建人编码|header|0|1|979||
+修改人id|修改人id|header|0|1|980||
+修改人|修改人|header|0|1|981||
+修改人编码|修改人编码|header|0|1|982||
+单据类型名称|单据类型名称|header|1|0|983||
+单据类型编码|单据类型编码|header|1|0|984||
+单据类型id|单据类型id|header|0|1|985||
+审核人id|审核人id|header|0|1|986||
+金蝶审核人|金蝶审核人|header|1|0|987||
+审核人编码|审核人编码|header|0|1|988||
+经手人id|经手人id|header|0|1|989||
+经手人编码|经手人编码|header|1|0|990|EMP|员工编码
+单据标签|单据标签|header|0|1|991||
+领料用途名称|领料用途名称|header|0|1|992||
+领料用途id|领料用途id|header|0|1|993||
+领料用途编码|领料用途编码|header|0|1|994||
+材料编码|材料编码|query,detail|1|0|25|INV|存货编码
+批号|批号|query,detail|1|0|27||
+材料名称|材料名称|detail|1|0|30|INV|存货名称
+计量单位|计量单位|detail|1|0|40|UOM|计量单位名称
+数量|数量|detail|1|0|50||
+单价|单价|detail|1|0|60||
+金额|金额|detail|1|0|70||
+规格型号|规格型号|detail|1|0|80||
+手工确定成本|手工确定成本|detail|1|0|90||
+明细备注|明细备注|detail|1|0|100||
+现存量|现存量|detail|1|0|110||
+现存量说明|现存量说明|detail|1|0|120||
+图片|图片|detail|0|1|970||
+行号|行号|detail|1|0|971||
+商品id|商品id|detail|0|1|972||
+商品是否多单位|商品是否多单位|detail|1|0|973||
+商品是否序列号|商品是否序列号|detail|1|0|974||
+商品是否辅助属性|商品是否辅助属性|detail|1|0|975||
+商品是否保质期|商品是否保质期|detail|1|0|976||
+商品是否批次|商品是否批次|detail|1|0|977||
+仓库id|仓库id|detail|0|1|978||
+仓库编码|仓库编码|detail|1|0|979|WH|仓库编码
+仓库启用仓位管理|仓库启用仓位管理|detail|1|0|980||
+仓位id|仓位id|detail|0|1|981||
+仓位名称|仓位名称|detail|0|1|982||
+仓位编码|仓位编码|detail|0|1|983||
+辅助属性id|辅助属性id|detail|0|1|984||
+辅助属性名称|辅助属性名称|detail|0|1|985||
+辅助属性编码|辅助属性编码|detail|0|1|986||
+辅助属性1id|辅助属性1id|detail|0|1|987||
+辅助属性1名称|辅助属性1名称|detail|0|1|988||
+辅助属性1编码|辅助属性1编码|detail|0|1|989||
+辅助属性2id|辅助属性2id|detail|0|1|990||
+辅助属性2名称|辅助属性2名称|detail|0|1|991||
+辅助属性2编码|辅助属性2编码|detail|0|1|992||
+辅助属性3id|辅助属性3id|detail|0|1|993||
+辅助属性3名称|辅助属性3名称|detail|0|1|994||
+辅助属性3编码|辅助属性3编码|detail|0|1|995||
+条形码|条形码|detail|0|1|996||
+产地|产地|detail|0|1|997||
+注册证号|注册证号|detail|0|1|998||
+生产许可证|生产许可证|detail|0|1|999||
+保质期到期日|保质期到期日|detail|0|1|1000||
+有效期至|有效期至|detail|0|1|1001||
+保质期类型|保质期类型|detail|0|1|1002||
+保质期|保质期|detail|0|1|1003||
+序列号清单|序列号清单|detail|0|1|1004||
+序列号流转ID|序列号流转ID|detail|0|1|1005||
+基本单位id|基本单位id|detail|0|1|1006||
+基本单位名称|基本单位名称|detail|1|0|1007||
+基本单位编码|基本单位编码|detail|1|0|1008||
+单位id|单位id|detail|0|1|1009||
+单位编码|单位编码|detail|1|0|1010||
+辅助单位id|辅助单位id|detail|0|1|1011||
+辅助单位名称|辅助单位名称|detail|0|1|1012||
+辅助单位编码|辅助单位编码|detail|0|1|1013||
+换算率|换算率|detail|0|1|1014||
+库存数量|库存数量|detail|1|0|1015||
+基本数量|基本数量|detail|1|0|1016||
+库存基本数量|库存基本数量|detail|0|1|1017||
+辅助数量|辅助数量|detail|0|1|1018||
+默认浮动数量|默认浮动数量|detail|0|1|1019||
+辅助换算系数|辅助换算系数|detail|0|1|1020||
+换算系数|换算系数|detail|1|0|1021||
+成本|成本|detail|1|0|1022||
+单位成本|单位成本|detail|1|0|1023||
+源单编号|源单编号|detail|0|1|1024||
+源单类型id|源单类型id|detail|0|1|1025||
+源单类型名称|源单类型名称|detail|0|1|1026||
+源单类型编码|源单类型编码|detail|0|1|1027||
+源单内部id|源单内部id|detail|0|1|1028||
+源单日期|源单日期|detail|0|1|1029||
+源单行号|源单行号|detail|0|1|1030||
+源单分录id|源单分录id|detail|0|1|1031||
+源单产品分录id|源单产品分录id|detail|0|1|1032||
+## C. 计数汇总
+列数 bd_material_out|80
+列数 bl_material_out|110
+带 inv_pick 注明的列|87
+yj_field 总数|118
+yj_field 显示中|56
+yj_field 隐藏|62
+转ERP 四列|4
+单据数 头/行|2/4
+已审核|0
+已审核未转ERP|0
+已转ERP|0

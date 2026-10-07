@@ -1,0 +1,6 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-qcinsp-dept-rows.sql ==
+  | 7440 | detail | 230 | 部门 | 1 | 0 | null | 1 | 
+  | 11588 | header | 90 | 部门 | 1 | 0 | null | 1 | 
+  | 11589 | header | 100 | 部门编码 | 1 | 0 | null | 1 | 
+[OK] _probe-qcinsp-dept-rows.sql (2 batches)

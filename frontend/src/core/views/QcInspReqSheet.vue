@@ -2,7 +2,9 @@
   <!-- ═══════════════════════════════════════════════════════════════════
        来料检验要求(QC_INSP_REQ,档案式)——品质资料 7 张检验要求表一面板 7 页签
        页签条=规格书式 rsp-pages;每页=Excel 一比一复刻(大标题行+两行分组表头+原列宽数据行)。
-       非翻页单据:整表一张虚拟单(head.detail.items 全量行),行按 [物料类别]=页签 key 分流;
+       非翻页单据:整表一张虚拟单(行在 head.detail[detail_key] 全量行),行按 [物料类别]=页签 key 分流;
+       ⚠ 明细键 = yj_panel.detail_key:档案面板为 LOWER(panel_code) = **qc_insp_req**,不是 items
+       (2026-10-04 实测修正:原先写死「items 键」⇒ 7 个页签全「暂无数据」;判据见 @core/panel/detailRows)。
        保存走父级 saveInlineDraft(saveArchive 整表 upsert,缺席行=删除)。
        行操作(2026-09-22 按用户口径):默认**整表只读**,点某行「修改」该行才转输入框(防随意改),
        改完点「完成」收起;「删除」先弹确认;新增走表尾「＋ 新增数据记录行」(新行自动进入可编辑)。
@@ -10,7 +12,7 @@
        点结果跳到该页签并高亮该行;原先表头那个「关键字过滤本页」的输入框与其「其他页签命中」提示已删。
        「🕘 修改记录」看本表每次保存的留痕(后端 ButtonService.archiveChangeHistory)。
        注意:档案明细行被 markArchListRaw 预打 raw 标记(无响应式),本组件用 rows 镜像数组
-       驱动界面,行对象与 detail.items 同引用——镜像增删同步双写,保存数据不失真。
+       驱动界面,行对象与明细行数组同引用——镜像增删同步双写,保存数据不失真。
        编辑态输入框**不能**直接 v-model 到 row[c.key](行不响应式 → 敲进去的字会被 el-input
        的 setNativeInputValue 刷回去,看着就是"不可编辑"),一律绑 editDraft 响应式草稿,
        由 watch 即时回写原行 —— 详见 editDraft 处注释。
@@ -26,6 +28,14 @@
     <div v-if="showToolbar" class="qc-bar qc-bar2">
       <span class="qc-bar-btn" :title="tt('按字段+内容多条件查找(可跨页签,点结果跳到该行)')" @click="toggleFuzzy">🔍 {{ tt('模糊搜索') }}</span>
       <span class="qc-bar-btn" :title="tt('查看本表的修改记录(每次保存留痕,近 3 次)')" @click="openModifyLog">🕘 {{ tt('修改记录') }}</span>
+      <!-- 自定义字段(仅管理员):每张表各有各的自定义列(动态字段/备用列池),
+           在弹窗里选「所属页签」;加完该表立刻多一列,检验报告里带入的检验项也跟着多一项 -->
+      <span
+        v-if="showToolbar && user.isAdmin"
+        class="qc-bar-btn"
+        :title="tt('给某张表增删自定义列(动态字段/备用列池,仅管理员;弹窗里选所属页签)')"
+        @click="extMgrVisible = true"
+      >⚙ {{ tt('自定义字段') }}</span>
     </div>
 
     <!-- 模糊搜索态:字段+内容条件行 → 查找 → 结果清单(点行跳到对应页签并高亮) -->
@@ -73,7 +83,7 @@
     </div>
 
     <!-- 页签条(规格书式) -->
-    <div class="rsp-pages">
+    <div v-if="tabsReady" class="rsp-pages">
       <div
         v-for="(t, ti) in tabs"
         :key="'qt' + ti"
@@ -82,26 +92,29 @@
         @click="activeTab = ti"
       >{{ tt(t.key) }}</div>
     </div>
+    <!-- 页签集还没就绪(全自定义面板:物料类别词典未取回) -->
+    <div v-else class="qc-tabs-loading">{{ tt('加载中…') }}</div>
 
     <!-- 当前页签的 Excel 复刻表 -->
-    <div class="qc-paper" :style="{ width: gridW(tab) + 'px' }">
-      <table class="rs-t" :style="{ width: gridW(tab) + 'px' }">
+    <div v-if="tabsReady" class="qc-paper" :style="{ width: gridW(colsOf(tab)) + 'px' }">
+      <table class="rs-t" :style="{ width: gridW(colsOf(tab)) + 'px' }">
         <colgroup>
-          <col v-for="(c, ci) in tab.cols" :key="'qc' + ci" :style="{ width: c.w + 'px' }" />
+          <col v-for="(c, ci) in colsOf(tab)" :key="'qc' + ci" :style="{ width: c.w + 'px' }" />
           <col v-if="editable" class="qc-op-col" />
         </colgroup>
         <tbody>
           <!-- 大标题行(Excel 第 1 行) -->
-          <tr><td :colspan="tab.cols.length" class="qc-title">{{ tt(tab.sheetTitle) }}</td></tr>
-          <!-- 两行分组表头:独立列纵向合并(rowspan=2),分组列上=组名下=子列 -->
+          <tr><td :colspan="colsOf(tab).length" class="qc-title">{{ tt(tab.sheetTitle) }}</td></tr>
+          <!-- 两行分组表头:独立列纵向合并(rowspan=2),分组列上=组名下=子列。
+               自定义页签的列没有分组 ⇒ 只有一行表头(见 hasGroupRow) -->
           <tr class="rs-grp">
             <template v-for="(g, gi) in headerRow1(tab)" :key="'qh1' + gi">
-              <th v-if="g.kind === 'plain'" class="rs-th" rowspan="2">{{ tt(g.key) }}</th>
+              <th v-if="g.kind === 'plain'" class="rs-th" :rowspan="hasGroupRow(tab) ? 2 : 1">{{ tt(g.key) }}</th>
               <th v-else class="rs-th" :colspan="g.span">{{ tt(g.label) }}</th>
             </template>
             <th v-if="editable" class="rs-th-op"></th>
           </tr>
-          <tr class="rs-grp2">
+          <tr v-if="hasGroupRow(tab)" class="rs-grp2">
             <th v-for="c in groupCols(tab)" :key="'qh2' + c.key" class="rs-th">{{ tt(c.key) }}</th>
           </tr>
           <!-- 数据行:值列全部文本(±公差/区间是文本),物料类别由页签隐式携带不显示。
@@ -112,7 +125,7 @@
             :class="{ 'qc-flash': isFlash(row) }"
             :data-edit="isEditing(row) ? '1' : null"
           >
-            <td v-for="c in tab.cols" :key="c.key" class="rs-td">
+            <td v-for="c in colsOf(tab)" :key="c.key" class="rs-td">
               <el-input
                 v-if="editable && isEditing(row)"
                 v-model="editDraft[c.key]"
@@ -129,13 +142,29 @@
             </td>
           </tr>
           <tr v-if="!rowsOf(tab).length">
-            <td :colspan="tab.cols.length" class="rs-empty">{{ tt('暂无数据') }}</td>
+            <td :colspan="colsOf(tab).length" class="rs-empty">{{ tt('暂无数据') }}</td>
             <td v-if="editable" class="rsp-op-pad"></td>
           </tr>
         </tbody>
       </table>
-      <div v-if="editable" class="rs-add" :style="{ width: gridW(tab) + 'px' }" @click="addRow(tab)">＋ {{ tt('新增数据记录行') }}</div>
+      <div v-if="editable" class="rs-add" :style="{ width: gridW(colsOf(tab)) + 'px' }" @click="addRow(tab)">＋ {{ tt('新增数据记录行') }}</div>
+      <!-- 自定义页签还没定义任何列时的提示(空表头没法填) -->
+      <div v-if="tabDynamicEmpty" class="qc-ext-empty">
+        {{ tt('该页签的列由「自定义字段」维护，当前还没有列 —— 先加一列再录数据') }}
+      </div>
     </div>
+
+    <!-- 自定义字段(仅管理员):**每张表各有各的自定义列** —— 在弹窗里选「所属页签」,
+         加完只有那张表多一列,检验报告带入时也按那张表的列走;
+         可再指定「父字段」并到某个分组标题下(父只做表头分组、没有数据格,带入只带子字段) -->
+    <FieldManagerDialog
+      v-model="extMgrVisible"
+      :panel-code="panelCode"
+      :tabs="tabOptions"
+      :default-tab="tab?.key || ''"
+      :parent-options-of="parentOptions"
+      @done="onExtFieldDone"
+    />
 
     <!-- 修改记录(2026-09-22):每次保存留痕——操作人/时间 + 行变化摘要 + 字段级 原值→新值(近 3 次) -->
     <el-dialog v-model="modLogVisible" :title="tt('修改记录') + (modLogNo ? ' · ' + modLogNo : '')" width="760px" append-to-body>
@@ -183,32 +212,83 @@ import { computed, nextTick, ref, toRaw, watch } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { callButton, errMsg } from '@/business/engine'
-import { qcInspReqTabs } from './qcInspReqConfig'
+import { useUserStore } from '@/stores/user'
+import { detailRowsOf, ensureDetailRows } from '@core/panel/detailRows'
+import { fetchExtOverview, invalidateExtFields } from '@core/qc/qcInspReqApi'
+import { DEFAULT_EXT_COL_W, colsOfTab, parentOptionsOfTab } from '@core/qc/qcInspReqCols'
+import FieldManagerDialog from './FieldManagerDialog.vue'
+import { tabsOfPanel } from './qcInspReqConfig'
 
 const props = defineProps({
   head: { type: Object, required: true },
   editable: { type: Boolean, default: false },
   panelCode: { type: String, required: true },
+  /** 面板字段元数据(可选):自定义页签的列宽从这里取(label→width),取不到用默认宽 */
+  fields: { type: Array, default: () => [] },
   /** 只读嵌入模式(检验数据记录的「检验要求」弹窗用):隐藏本面板自带的迷你工具栏与
    *  模糊搜索/修改记录入口,并收掉为浮动行操作按钮预留的右侧 84px 留白。
    *  只影响"外壳",表格本体(页签 + Excel 一比一表)完全复用 —— 一处维护两处显示。 */
   showToolbar: { type: Boolean, default: true },
-  /** 只渲染指定页签(数组;空=全部 7 页签)。弹窗里只显示命中该物料的那几个页签。 */
+  /** 只渲染指定页签(数组;空=全部页签)。弹窗里只显示命中该物料的那几个页签。 */
   tabKeys: { type: Array, default: () => [] },
 })
-const emit = defineEmits(['dirty', 'save', 'refresh'])
+const emit = defineEmits(['dirty', 'save', 'refresh', 'refresh-config'])
+const user = useUserStore()
 
-/** 页签集:tabKeys 为空时=全部 7 页签(维护面板);弹窗按命中的物料类别收窄 */
+/* ── 每张表各自的自定义列(动态字段/备用列池,「自定义字段」里维护) ──
+ * 2026-10-04 用户口径:「自定义字段单独针对每个表」——
+ * 字段的归属页签 = /px/extFields 的 fields[].tab(= yj_field.tab_key);
+ * 列的解析统一走 @core/qc/qcInspReqCols(渲染与带入同源,避免"界面看得到、报告带不进来")。
+ * 总览同时下发 **tabs**(该面板页签集):全自定义面板(QC_INSP_REQ_SERIES)的页签条就由它决定。 */
+const extFields = ref([])
+const apiTabs = ref([])
+async function loadExtFields() {
+  const ov = await fetchExtOverview(props.panelCode, { force: true })
+  extFields.value = ov.fields
+  apiTabs.value = ov.tabs
+}
+watch(() => props.panelCode, () => { void loadExtFields() }, { immediate: true })
+
+/** 面板字段元数据里该标签的列宽(取不到给默认宽) */
+function extColWidth(label) {
+  const f = (props.fields || []).find((x) => (x.dataName || x.code) === label)
+  const w = Number(f?.width)
+  return Number.isFinite(w) && w > 0 ? w : DEFAULT_EXT_COL_W
+}
+/** 页签的列:固定列(Excel 原列序) + 该页签自己的自定义列(有父字段的插到该分组末尾) */
+function colsOf(t) {
+  return colsOfTab(t, extFields.value, extColWidth)
+}
+/** 是否有分组表头行(列上没有 group ⇒ 单行表头,如全自定义页签) */
+function hasGroupRow(t) {
+  return groupCols(t).length > 0
+}
+/** 「自定义字段」弹窗的「所属页签」候选 = 本面板全部页签 */
+const tabOptions = computed(() => tabs.value.map((t) => ({ value: t.key, label: t.key })))
+/** 「自定义字段」弹窗的「父字段」候选:该页签固定列已有的分组 + 该页签已用的父 */
+function parentOptions(tabKey) {
+  return parentOptionsOfTab(tabs.value.find((t) => t.key === tabKey) || null, extFields.value)
+}
+/** 自定义页签还没定义任何列(只有匹配键列,没得可填)—— 界面提示先去加列 */
+const tabDynamicEmpty = computed(() => !!tab.value?.dynamicCols && colsOf(tab.value).length <= 1)
+
+/** 页签集:面板决定(固定表=配置;全自定义=物料类别词典);tabKeys 非空时按命中页签收窄(只读弹窗用) */
 const tabs = computed(() => {
+  const all = tabsOfPanel(props.panelCode, apiTabs.value)
   const keys = props.tabKeys
-  if (!Array.isArray(keys) || !keys.length) return qcInspReqTabs
-  const filtered = qcInspReqTabs.filter((t) => keys.includes(t.key))
-  return filtered.length ? filtered : qcInspReqTabs
+  if (!Array.isArray(keys) || !keys.length) return all
+  const filtered = all.filter((t) => keys.includes(t.key))
+  return filtered.length ? filtered : all
 })
 const activeTab = ref(0)
-const tab = computed(() => tabs.value[activeTab.value] || tabs.value[0] || qcInspReqTabs[0])
+/** 当前页签;**全自定义面板的页签集来自接口**,首帧还没回来时给个空页签兜底 ——
+ *  否则模板里 tt(tab.sheetTitle) 会读 null 抛错,整个面板白屏(2026-10-04 实测踩到)。 */
+const EMPTY_TAB = Object.freeze({ key: '', sheetTitle: '', cols: [], dynamicCols: false })
+const tab = computed(() => tabs.value[activeTab.value] || tabs.value[0] || EMPTY_TAB)
+/** 页签集还没就绪(全自定义面板:物料类别词典未取回)—— 表格区显示提示而不是渲染空表 */
+const tabsReady = computed(() => tabs.value.length > 0)
 
-// ── 行数据:与 head.detail.items 同引用的工作镜像(raw 数组无响应式,镜像驱动界面) ──
+// ── 行数据:与明细行数组(head.detail[detail_key])同引用的工作镜像(raw 数组无响应式,镜像驱动界面) ──
 const rows = ref([])
 const dirty = ref(false)
 /** 当前处于编辑态的行(按对象引用比):默认 null=整表只读,防止随手改到数据 */
@@ -232,18 +312,22 @@ watch(
   { deep: true },
 )
 function sourceItems() {
-  if (!props.head?.detail) props.head.detail = {}
-  if (!Array.isArray(props.head.detail.items)) props.head.detail.items = []
-  return props.head.detail.items
+  // ⚠ 明细键 = yj_panel.detail_key(档案面板 = LOWER(panelCode) = 'qc_insp_req'),不是 items ——
+  //   原先写死「items 键」建键,界面恒「暂无数据」、新行也不在提交内容里(见 detailRows.js)
+  return ensureDetailRows(props.head, detailKeyFallback())
 }
-// 镜像同步(2026-09-23 修):本 watch 只在 detail.items **引用变化**时触发 —— 即载入/切单/刷新,
-// 以及 addRow 里 sourceItems() 首次创建 detail.items 的那一次。原实现无条件清 editRow,于是
+/** 兜底键:本组件只服务档案式 QC_INSP_REQ,键 = 面板码小写 */
+function detailKeyFallback() {
+  return String(props.panelCode || '').toLowerCase()
+}
+// 镜像同步(2026-09-23 修):本 watch 只在明细行数组 **引用变化**时触发 —— 即载入/切单/刷新,
+// 以及 addRow 里 sourceItems() 首次创建那个键的那一次。原实现无条件清 editRow,于是
 // 「＋新增数据记录行」加出来的那一行(排在表格最下面)刚进入可填状态就被清成只读文本
 // (填写时看不见),再点「修改」也会被同一批重置冲掉(还是不肯修改)。
 // 故:编辑进行中**保留编辑态与脏标记**(只同步镜像,新行不丢);
 //     非编辑态(载入/切单/保存后刷新)照旧重置镜像并清脏标记。
 watch(
-  () => props.head?.detail?.items,
+  () => detailRowsOf(props.head, detailKeyFallback()),
   (arr) => {
     const next = Array.isArray(arr) ? arr : []
     if (editRow.value !== null) {
@@ -346,7 +430,7 @@ const fuzzyRows = ref([{ field: '', value: '' }])
 /** 条件字段下拉:按页签分组列全部叶子列(同一列出现在多个页签时各自成项,匹配跨页签生效) */
 const fuzzyFieldGroups = computed(() => tabs.value.map((t) => ({
   label: t.key,
-  options: t.cols.map((c) => ({ value: c.key, label: c.key })),
+  options: colsOf(t).map((c) => ({ value: c.key, label: c.key })),
 })))
 function toggleFuzzy() {
   fuzzyOpen.value = !fuzzyOpen.value
@@ -374,16 +458,19 @@ const fuzzyResults = computed(() => {
   if (!conds.length) return []
   const out = []
   tabs.value.forEach((t, ti) => {
+    const colsOfTab = colsOf(t)
     for (const row of tabRows(t)) {
       const hits = []
       let ok = true
       for (const c of conds) {
-        const cols = c.field ? [c.field] : t.cols.map((x) => x.key)
+        const cols = c.field ? [c.field] : colsOfTab.map((x) => x.key)
         const hitCol = cols.find((k) => String(row[k] ?? '').toLowerCase().includes(c.value))
         if (!hitCol) { ok = false; break }
         hits.push(`${hitCol}=${String(row[hitCol] ?? '').trim()}`)
       }
-      if (ok) out.push({ tabIndex: ti, tabKey: t.key, row, no: row[t.cols[0].key] || row['物料编号'] || '#' + (row.id ?? ''), hit: hits.join('；') })
+      // 行标识:首列(通常是 物料编号)取不到就退到 物料编号/行号 —— 自定义页签首列可能还没定义
+      const no = row[colsOfTab[0]?.key] || row['物料编号'] || '#' + (row.id ?? '')
+      if (ok) out.push({ tabIndex: ti, tabKey: t.key, row, no, hit: hits.join('；') })
     }
   })
   return out
@@ -428,11 +515,11 @@ function safeParseJson(s) {
 
 // ── 表头(同 RecordSheetPanels 两行分组表头算法,配置源=页签 cols) ──
 function groupCols(t) {
-  return t.cols.filter((c) => c.group)
+  return colsOf(t).filter((c) => c.group)
 }
 function headerRow1(t) {
   const out = []
-  for (const c of t.cols) {
+  for (const c of colsOf(t)) {
     if (!c.group) {
       out.push({ kind: 'plain', key: c.key, span: 1 })
     } else if (!out.length || out[out.length - 1].kind !== 'group' || out[out.length - 1].label !== c.group) {
@@ -443,8 +530,19 @@ function headerRow1(t) {
   }
   return out
 }
-function gridW(t) {
-  return t.cols.reduce((s, c) => s + c.w, 0)
+function gridW(cols) {
+  return (cols || []).reduce((s, c) => s + (c.w || 0), 0)
+}
+
+/* ── 自定义字段(动态字段/备用列池):**每张表各有各的自定义列**,在这里增删 ──
+ * 加完必须重新取动态字段 + 面板配置(PanelxList 的 onFieldEditRefresh 会清 cfgCache)——
+ * 引擎那边 registry.reload() 已刷新,不清前端缓存就还是旧字段表。 */
+const extMgrVisible = ref(false)
+async function onExtFieldDone() {
+  invalidateExtFields(props.panelCode)
+  await loadExtFields()
+  emit('refresh-config')
+  emit('refresh')
 }
 </script>
 
@@ -710,6 +808,13 @@ function gridW(t) {
   font-weight: 700;
   border-color: #8fb4e0;
 }
+/* 页签集未就绪(全自定义面板首次进入,词典还在路上) */
+.qc-tabs-loading {
+  padding: 22px 0;
+  text-align: center;
+  color: #98a4b3;
+  font-size: 13px;
+}
 
 /* ── Excel 复刻网格(同 RecordSheetPanels rs-* 版式) ── */
 .qc-paper {
@@ -843,5 +948,15 @@ function gridW(t) {
 .rs-add:hover {
   background: #e8f2ff;
   border-style: solid;
+}
+/* 自定义页签尚无列时的提示 */
+.qc-ext-empty {
+  margin: 8px 2px 2px;
+  padding: 10px 12px;
+  border: 1px dashed #e0c98f;
+  border-radius: 4px;
+  background: #fffaf0;
+  color: #a8760a;
+  font-size: 12.5px;
 }
 </style>

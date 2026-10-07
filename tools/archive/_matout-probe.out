@@ -1,0 +1,22 @@
+﻿账套: 真实账套(动态授权)
+✅ 生产领料单 /jdy/v2/scm/inv_pick → count=4801 rows=2
+❌ 生产领料单 /jdy/v2/pm/inv_pick → HTTP 519 status code 519
+❌ 生产领料单 /jdy/v2/pm/pick_material → HTTP 519 status code 519
+❌ 生产领料单 /jdy/v2/scm/pick_material → HTTP 519 status code 519
+❌ 生产领料单 /jdy/v2/pm/prod_pick → HTTP 519 status code 519
+❌ 生产领料单 /jdy/v2/scm/prod_pick → HTTP 519 status code 519
+❌ 生产领料单 /jdy/v2/pm/production_pick → HTTP 519 status code 519
+❌ 材料出库单 /jdy/v2/scm/material_out → HTTP 519 status code 519
+❌ 材料出库单 /jdy/v2/scm/inv_material_out → HTTP 519 status code 519
+❌ 材料出库单 /jdy/v2/pm/material_out → HTTP 519 status code 519
+✅ 其他出库单 /jdy/v2/scm/inv_other_out → count=1130 rows=2
+❌ 其他出库单 /jdy/v2/scm/other_out → HTTP 519 status code 519
+❌ 出库单 /jdy/v2/scm/inv_out → HTTP 519 status code 519
+❌ 领料退料 /jdy/v2/pm/pick_return → HTTP 519 status code 519
+❌ 生产退料 /jdy/v2/pm/prod_return → HTTP 519 status code 519
+✅ 对照:采购入库 /jdy/v2/scm/pur_inbound → count=3266 rows=2
+✅ 对照:销售出库 /jdy/v2/scm/sal_out_bound → count=5084 rows=2
+❌ 对照:产品入库 /jdy/v2/pm/prod_inbound → HTTP 519 status code 519
+❌ 对照:生产任务 /jdy/v2/pm/prod_task → HTTP 519 status code 519
+
+已写出 tools/archive/_matout-probe.json;命中 4 个

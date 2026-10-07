@@ -1,0 +1,34 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8
+所在位置 行:1 字符: 226
++ ... ing=UTF-8"; java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlser ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-matout-test-refs.sql ==
+  | YJ-SX-011-6 | 032端盖 | 个 | 
+  | YJ-SX-011-9 | 036S/032S端盖 | 个 | 
+  | YJ-SX-011-10 | 036S/032S端盖 | 个 | 
+  | YJ-SX-011-7 | 036S端盖 | 个 | 
+  | YJ-SX-011-1 | 036端盖 | 个 | 
+  | YJ-SX-011-2 | 036端盖 | 个 | 
+  | YJ-08 | 车间仓 | 
+  | CP-02 | 成品B仓 | 
+  | CK00003 | 成品不良品区 | 
+  | YCL-01 | 恒亿仓 | 
+  | CK00006 | 华北工控仓 | 
+  | CK00005 | 原料不良品仓 | 
+  | BM00016 | 1号车间  | 
+  | BM00015 | X烧结车间 | 
+  | BM00017 | 材料自制车间 | 
+  | BM00006 | 烧结车间 | 
+  | BM00007 | 原料车间 | 
+  | BM00005 | 组装车间 | 
+  | ZY00099 | LGH | 
+  | ZY00059 | 白兴发 | 
+  | ZY00111 | 白自学 | 
+  | ZY00036 | 曹飞平 | 
+  | ZY00106 | 曾小玲 | 
+  | ZY00027 | 柴善银 | 
+[OK] _q-matout-test-refs.sql (5 batches)

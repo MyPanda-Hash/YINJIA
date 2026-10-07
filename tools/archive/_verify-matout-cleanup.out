@@ -1,0 +1,11 @@
+== 清理 E2E 造数(测试账套)==
+  弃审 CL-2026-09-0001 : code=409 仅已审核或已归档状态可弃审
+  删除 CL-2026-09-0001 : code=409 仅草稿状态可删除（已审核请先弃审）
+  弃审 CL-2026-09-0002 : code=200 success
+  删除 CL-2026-09-0002 : code=200 success
+== 回归:其它三个面板的 查询可转ERP ==
+  PURCHASE_IN : code=200 count=54 success
+  SALE_OUT : code=200 count=53 success
+  PU_ORDER : code=200 count=2137 success
+== 回归:材料出库单面板仍可列表查询(新列不破坏取数)==
+  MATERIAL_OUT 转ERP候选: code=200 count=0

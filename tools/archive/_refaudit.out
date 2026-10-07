@@ -1,0 +1,4 @@
+# 参照完整性体检 db=HSDZ_MES
+
+
+合计参照字段 217 条;异常:面板 0、ref_field 0、display_field 0

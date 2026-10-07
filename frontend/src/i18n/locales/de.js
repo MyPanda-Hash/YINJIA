@@ -1,6 +1,15 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    '待超级管理员批准': 'Wartet auf Genehmigung des Superadministrators',
+    '单据已批准': 'Dokument genehmigt',
+    /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
+    '批准通过': 'Genehmigen',
+    '批准驳回': 'Ablehnen',
+    '「{panelName} {docNo}」已由 {actor} 一级审核通过，等待您批准。意见：{opinion}': '"{panelName} {docNo}" hat die Erstprüfung durch {actor} bestanden; wartet auf Ihre Genehmigung. Kommentar: {opinion}',
+    '您一级审核通过的「{panelName} {docNo}」已由 {actor} 批准通过。': 'Die von Ihnen erstgeprüfte "{panelName} {docNo}" wurde von {actor} genehmigt.',
+    '二级审批被驳回': 'Genehmigung der zweiten Ebene abgelehnt',
+    '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}': 'Die von Ihnen erstgeprüfte "{panelName} {docNo}" wurde von {actor} abgelehnt und in den Entwurf zurückgegeben. Kommentar: {opinion}',
     '分发成功，已分配 {n} 张规格书': 'Erfolgreich verteilt; {n} Spezifikationsblatt/-blätter zugewiesen',
     '已选 {n} 个商品，预览二维码标签？': '{n} Artikel ausgewählt. QR-Code-Etiketten als Vorschau anzeigen?',
     '该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批': 'Das Spezifikationsblatt {no} für dieses Produkt ist noch nicht eingereicht/genehmigt (aktuell: {st}); automatisches Übernehmen ist nicht möglich. Bitte zuerst das Blatt ausfüllen und Einreichung/Genehmigung abschließen.',
@@ -232,6 +241,8 @@ export default {
     '四．改善追踪结果': 'IV. Improvement Follow-up Result',
     '七．成本损失': 'VII. Cost of Loss',
     '特采理由': 'Special Procurement Reason',
+    '特采': 'Sonderabnahme',
+    '送检数量': 'Zur Prüfung gesendete Menge',
     '材料费用': 'Material Cost',
     '人工费': 'Labor Cost',
     '其他费用': 'Other Cost',
@@ -273,6 +284,8 @@ export default {
     '生成送料暂收单': 'Vorübergehenden Materialeingang erzeugen',
     '生成来料检验单': 'Wareneingangsprüfung erzeugen',
     '生成采购入库单': 'Wareneingang erzeugen',
+    '请在列表页继续填写': 'Bitte auf der Listenansicht weiter ausfüllen',
+    '商品档案未登记的商品按免检（否）处理': 'Nicht im Artikelstamm geführte Artikel gelten als prüffrei (Nein)',
     '品质追溯': 'Qualitätsrückverfolgung',
     '不良处理': 'Fehlerbehandlung',
     '制程品质': 'Prozessqualität',
@@ -2088,7 +2101,8 @@ export default {
     '已送合计': 'Geliefert gesamt',
     '待编号': 'Nr. ausstehend',
     '{n} 批待编号': '{n} Charge(n) ohne Nr.',
-    '采购入库单填单时按入库日期预设,可修改': 'Chargennummer wird beim Erfassen des Wareneingangs aus dem Wareneingangsdatum vorbelegt; änderbar',
+    '生单时按供应商编码与当天日期生成': 'Beim Belegerstellen aus Lieferantencode und Tagesdatum erzeugt',
+    '随单头批次号一致,不可修改': 'Folgt der Chargennummer des Kopfes; nicht änderbar',
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Nur angehakte Zeilen werden erzeugt; Maximum = Bestellmenge × (1 + Quote) − geliefert + retourniert (Überlieferung max. 50 %)',
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = nicht erlaubt; max. 50 %, Spielraum nach Bestellmenge)',
     '请至少勾选一行并填写本次送料数量': 'Mindestens eine Zeile anhaken und Liefermenge eingeben',

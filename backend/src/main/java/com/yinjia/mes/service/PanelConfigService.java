@@ -25,11 +25,14 @@ public class PanelConfigService {
     private final PanelRegistry registry;
     private final JdbcTemplate jdbc;
     private final TranslationService translations;
+    private final CalcRuleService calcRules;
 
-    public PanelConfigService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations) {
+    public PanelConfigService(PanelRegistry registry, JdbcTemplate jdbc, TranslationService translations,
+                              CalcRuleService calcRules) {
         this.registry = registry;
         this.jdbc = jdbc;
         this.translations = translations;
+        this.calcRules = calcRules;
     }
 
     /** 当前请求的目标语言键(en/ja/ko/...;zh 系=zh)。 */
@@ -520,31 +523,15 @@ public class PanelConfigService {
         return new ArrayList<>(out);
     }
 
-    /** 明细自动计算规则:按字段组合推导常见公式(字段名=行键,引擎按中文名取值求值)。
-     *  兼容两套命名:标准(单价/金额/含税单价/含税金额)与销售(售价/销售金额/含税售价/含税销售金额)。 */
+    /**
+     * 明细自动计算规则,下发给前端 detail.tabs[].calc(浏览器改一格即时算)。
+     *
+     * ⚠ 规则本体与求值口径已收敛到 {@link CalcRuleService} —— 服务端保存时用**同一份规则**
+     * 重算(ButtonService.upsertLineRows),两边不会各写一套(2026-10-05「采购入库单金额要
+     * 自动计算」:改前只有这里下发、只有前端算,生单/保存路径从来没算过)。
+     */
     private List<Map<String, Object>> buildCalcRules(List<PanelRegistry.FieldDef> detailFields) {
-        java.util.Set<String> labels = new java.util.HashSet<>();
-        for (PanelRegistry.FieldDef f : detailFields) labels.add(f.label());
-        List<Map<String, Object>> out = new ArrayList<>();
-        // 数量列:优先"数量",退而"实收数量"
-        String qty = labels.contains("数量") ? "数量" : labels.contains("实收数量") ? "实收数量" : null;
-        // 单价/金额列:标准 或 销售命名(SALE_OUT 用 售价/销售金额/含税售价/含税销售金额)
-        String price = labels.contains("单价") ? "单价" : labels.contains("售价") ? "售价" : null;
-        String amount = labels.contains("金额") ? "金额" : labels.contains("销售金额") ? "销售金额" : null;
-        String taxPrice = labels.contains("含税单价") ? "含税单价" : labels.contains("含税售价") ? "含税售价" : null;
-        String taxAmount = labels.contains("含税金额") ? "含税金额" : labels.contains("含税销售金额") ? "含税销售金额" : null;
-        boolean hasPrice = price != null;
-        if (qty != null && hasPrice && amount != null) calcRule(out, amount, qty + "*" + price, 2);
-        if (hasPrice && labels.contains("税率%") && taxPrice != null) calcRule(out, taxPrice, price + "*(1+税率%/100)", 4);
-        if (qty != null && taxPrice != null && taxAmount != null) calcRule(out, taxAmount, qty + "*" + taxPrice, 2);
-        if (amount != null && labels.contains("税率%") && labels.contains("税额")) calcRule(out, "税额", amount + "*税率%/100", 2);
-        if (qty != null && hasPrice && labels.contains("折扣%") && labels.contains("折扣金额")) calcRule(out, "折扣金额", qty + "*" + price + "*折扣%/100", 2);
-        if (qty != null && labels.contains("单重") && labels.contains("总重")) calcRule(out, "总重", "单重*" + qty, 4);
-        return out;
-    }
-
-    private void calcRule(List<Map<String, Object>> out, String target, String formula, int round) {
-        out.add(Map.of("target", target, "formula", formula, "round", round));
+        return calcRules.asContract(calcRules.rulesFor(detailFields));
     }
 
     /** 单号字段标签(供 autoCodeField 展示) */
@@ -632,6 +619,8 @@ public class PanelConfigService {
         try {
             PanelRegistry.PanelDef refDef = registry.panel(f.refPanel());
             java.util.Set<String> mapped = new java.util.HashSet<>(selfIdentityLabels(def));
+            // 档案/来源单的「落库留痕」不进带回(见 REF_CARRY_EXCLUDE):先占位,两个循环都会跳过它们
+            mapped.addAll(REF_CARRY_EXCLUDE);
             for (PanelRegistry.FieldDef sibling : def.fields()) {
                 if (sibling.label().equals(f.label())) continue;
                 if (mapped.contains(sibling.label())) continue;
@@ -669,6 +658,15 @@ public class PanelConfigService {
         return out;
     }
 
+    /** 参照带回的排除标签:档案/来源单的**落库留痕**不该写到本单上。
+     *  2026-09-28 实测踩到:材料出库单「计量单位」改参照 UOM 后,refMap 里冒出
+     *  创建时间→创建时间 / 修改时间→修改时间 / 创建人→创建人 / 修改人→修改人 ——
+     *  原因是 UOM 面板(计量单位档案)也有这几个同名字段,而同名带回是无条件的;
+     *  照此带过去,选个单位就把**单位档案的**创建/修改留痕写进了单据行。
+     *  这些列一律按本单真实值落库,故纳入带回排除(与 selfIdentityLabels 同一处置)。 */
+    private static final java.util.Set<String> REF_CARRY_EXCLUDE = java.util.Set.of(
+            "创建时间", "修改时间", "创建人", "修改人", "创建人编码", "修改人编码", "创建人id", "修改人id");
+
     /** 参照带回类型闸门:「是否」型不参与带回(任一侧是即禁止)。
      *  同名≠同义——如 往来单位.结算客户(是否,0/1标志) 与 销售订单.结算客户(客户名下拉) 同名异义,
      *  映射会把 0/1 写进名称字段;「停用」等档案标志同理不该串到单据上。
@@ -678,24 +676,35 @@ public class PanelConfigService {
     }
 
     /** 参照带回同义词词典(引用面板字段 → 本面板异名字段候选,命中即映射)。
-     *  选存货整串带回:编码/名称的 材料/产品/物料 异名口径 + 各单位口径 + 参考成本→单价。 */
-    private static final Map<String, List<String>> REF_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
-            "计量单位", List.of("单位", "销售单位", "采购单位", "生产单位"),
-            "参考成本", List.of("单价"),
-            "存货编码", List.of("材料编码", "产品编码", "物料编码"),
-            "存货名称", List.of("材料名称", "产品名称", "物料名称"),
+     *  选存货整串带回:编码/名称的 材料/产品/物料 异名口径 + 各单位口径 + 参考成本→单价。
+     *  ⚠ 条目数已超 10,必须用 Map.ofEntries —— Map.of 最多 10 对,超了编译期即报错
+     *  (2026-09-28 加 员工编码/计量单位编码 两条时实测踩到)。 */
+    private static final Map<String, List<String>> REF_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.ofEntries(
+            Map.entry("计量单位", List.of("单位", "销售单位", "采购单位", "生产单位")),
+            Map.entry("参考成本", List.of("单价")),
+            Map.entry("存货编码", List.of("材料编码", "产品编码", "物料编码")),
+            Map.entry("存货名称", List.of("材料名称", "产品名称", "物料名称")),
             // 选客户/供应商整串带回:往来单位的编码/名称 → 单据的客户编码/供应商编码 与 客户/供应商(编码↔名称双向带动)
-            "往来单位编码", List.of("客户编码", "供应商编码"),
-            "往来单位名称", List.of("供应商", "客户"),
+            Map.entry("往来单位编码", List.of("客户编码", "供应商编码")),
+            Map.entry("往来单位名称", List.of("供应商", "客户")),
             // 供应商档案(GFDA)整串带回:编码/名称 ↔ 单据的 供应商代码/供应商 异名字段(编码↔名称双向带动)
-            "供应商编码", List.of("供应商代码"),
-            "供应商名称", List.of("供应商"),
+            Map.entry("供应商编码", List.of("供应商代码")),
+            Map.entry("供应商名称", List.of("供应商")),
             // 产品信息表 炭棒尺寸(整串) → 产品文件面板异名规格字段;三窄格 炭棒规格1/2/3 由前端拆分回填
-            "炭棒尺寸", List.of("炭棒规格", "滤芯尺寸"),
+            Map.entry("炭棒尺寸", List.of("炭棒规格", "滤芯尺寸")),
             // 立项申请 项目等级(审核人定级) → 项目实施计划的 项目定级(异名同义):
             // 计划按「文档编号」参照立项申请时自动把等级带过来 —— 等级因此成为后续立项/进度流程的属性
             // (2026-09-21 用户口径:全链路一/二/三/四级)
-            "项目等级", List.of("项目定级")
+            Map.entry("项目等级", List.of("项目定级")),
+            // 职员档案(EMP)整串带回:员工编码 → 单据的 经手人编码(2026-09-28,材料出库单字段关联)。
+            // 转ERP 要推金蝶 emp_number,而单据头上只有「经手人/领用人」(存名称)+空着的「经手人编码」;
+            // 让选人时把编码一起带出来,省得再按名称回查档案。已存在 经手人编码 文本列的面板
+            // (采购入库/销售出库/材料出库…)一并受益,不会覆盖任何已填值。
+            Map.entry("员工编码", List.of("经手人编码")),
+            // 计量单位档案(UOM)整串带回:计量单位编码 → 单据的 单位编码/基本单位编码(同上)。
+            // 计量单位列改「参照 UOM」后(见 tools/migrate-material-out-ref-links.sql),选单位即带出编码,
+            // 与金蝶单位档案对齐(推送按名称换 unit_id,编码列备查)。
+            Map.entry("计量单位编码", List.of("单位编码", "基本单位编码"))
     )));
 
     /** 委外三单共用按钮组骨架(选单来源各自不同,见下方三常量)。 */
@@ -838,7 +847,10 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 暂收退回单:选单=来料检验单;生单灰(无下游)
+            // 暂收退回单:选单=来料检验单;生单灰(无下游)。
+            // 2026-10-04:**不放「特采」按钮** —— 用户口径「应该是**一个明细的 bool 字段**不是按钮,删除按钮」,
+            // 特采发起 = 明细行勾「特采」(QC_RETURN 明细是否字段),本单审核/审批通过时自动逐行生成特采单
+            // (ButtonService.returnAutoSpecialAccept)。
             java.util.Map.entry("QC_RETURN", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选来料检验单"},
@@ -852,8 +864,11 @@ public class PanelConfigService {
                     new String[]{"打印", "打印", "预览", "导出", "打印退货单"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
             // 送料暂收单(库存核算,2026-09-20 面板编码 SL_RECV→QC_RECV):选单=采购订单;
-            // 生单=来料检验单(主按钮,走品检)/ 采购入库单(2026-09-22 新增,免检直达 —— 采购订单的生单
-            // 出口已收敛到本单,去向由暂收这一个人工判定);两条都走分批生单(本单头有批次号 → 一键整单、不弹框)。
+            // 生单=**一个按钮**(2026-10-05 用户口径),去向由**商品基本档案(bs_inv)的「来料检验」**
+            // 逐行决定 —— 是 → 来料检验单(QC_INSP)、否则 → 采购入库单(PURCHASE_IN,免检直达);
+            // 同一张暂收单两种行都有时**分别生成两张**(见 QcRecvGenerateHandler)。
+            // 此前是两个按钮(生成来料检验单/生成采购入库单)由人工判,现收为一个,不再依赖人为选择。
+            // 本单头有批次号 → 不进分批对话框,点一下即整单按行分流生单。
             // 修改保存后由 ButtonService.syncInspFromSlRecv 同步修改已生成的来料检验单
             java.util.Map.entry("QC_RECV", List.of(
                     new String[]{"新增", "新增"},
@@ -863,7 +878,7 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生成来料检验单", "生成采购入库单"},
+                    new String[]{"生单", "生成检验或入库单"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
@@ -876,7 +891,8 @@ public class PanelConfigService {
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "审核", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生成领料单"},
+                    // 生单组已随 BOM 下架移除(2026-10-04):原「生成领料单」按默认 BOM 展开生成材料出库单草稿
+                    // (WoPickingHandler,已删),本面板现无任何推式生单链路,不再登记生单按钮
                     new String[]{"标签", "打印工单二维码", "打印产品二维码"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"打印", "打印", "预览", "导出"},
@@ -923,6 +939,7 @@ public class PanelConfigService {
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
             // 材料出库单:选单=生产工单;生单灰(PANDA:生成材料出库单（直接退料）)
+            // 转ERP(2026-09-28):材料出库单 → 金蝶「生产领料单」/jdy/v2/scm/inv_pick
             java.util.Map.entry("MATERIAL_OUT", List.of(
                     new String[]{"新增", "新增"},
                     new String[]{"选单", "选单", "选生产工单"},
@@ -931,6 +948,7 @@ public class PanelConfigService {
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成材料出库单（直接退料）"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"修改", "修改"},
@@ -966,7 +984,8 @@ public class PanelConfigService {
                     // 2026-09-24 用户拍板(参考旧系统工单列表样式收敛):列表特殊按钮只保留
                     // 打印工单(生产任务单固定版式)/排产(本单快捷排线,弹窗选产线,复用排产工作台
                     // assign 守卫守恒留痕)/结案/取消结案(ManuCloseHandler);
-                    // 打印工单二维码(标签机场景)并入更多;拆单/首件通知/生成采购申请/生成产品批号下线出列表
+                    // 打印工单二维码(标签机场景)并入更多;拆单/首件通知/生成产品批号下线出列表;
+                    // 「生成采购申请」(原 ManuPurchaseReqHandler 按 BOM×排产−库存结转)已随 BOM 下架移除(2026-10-04)
                     new String[]{"打印", "打印", "预览", "导出", "打印工单"},
                     new String[]{"排产", "排产", "结案", "取消结案"},
                     new String[]{"更多", "打印工单二维码", "复制", "放弃", "草稿", "中止执行", "取消中止", "表格调整", "刷新"}))
@@ -977,9 +996,12 @@ public class PanelConfigService {
      * Handler 经 {@link #pushTarget} 查询;按钮生成据此区分可执行动作与灰色占位。
      *
      * 2026-09-22 用户口径:**所有采购订单都必须先生成送料暂收单** —— 取消「采购订单→采购入库单」
-     * 免检直达(该跳原为 PU_ORDER|生成采购入库单),改由送料暂收单去向分流的两个按钮承接:
-     * 暂收单人工判:走检验 → QC_RECV|生成来料检验单;免检直达 → QC_RECV|生成采购入库单。
-     * 两条出口必须同时关(PUSH_TARGETS 这一条 + SELECT_FLOWS 的 PURCHASE_IN 来源),否则选单路径仍可绕过。
+     * 免检直达(该跳原为 PU_ORDER|生成采购入库单),改由送料暂收单去向分流承接。
+     * 2026-10-05 用户口径:暂收单的分流**不再由人工点两个按钮**,改为**一个「生单」按商品基本档案
+     * (bs_inv)的「来料检验」逐行判定**(是→QC_INSP,否则→PURCHASE_IN;同一单可各出一张)。
+     * 故 QC_RECV 这条**一条动作两个去向**,这里登记的 QC_INSP 只作**路由标记**(按钮据此不置灰),
+     * 真正的分流在 QcRecvGenerateHandler —— 该动作同时登记在 PushGenerateHandler.CUSTOM_OWNED,
+     * 通用推式生单处理器不认领它(一个动作只能有一个处理器)。
      */
     private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
             java.util.Map.entry("PU_REQ|生成采购订单", "PU_ORDER"),
@@ -987,9 +1009,10 @@ public class PanelConfigService {
             java.util.Map.entry("SO_ORDER|生成生产工单", "MANU_ORDER"),
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
             java.util.Map.entry("MANU_ORDER|生成产成品入库单", "FINISH_IN"),
-            java.util.Map.entry("QC_RECV|生成来料检验单", "QC_INSP"),
-            java.util.Map.entry("QC_RECV|生成采购入库单", "PURCHASE_IN"),
-            java.util.Map.entry("WO_ORDER|生成领料单", "MATERIAL_OUT")
+            // 暂收单生单(2026-10-05):按行分流到 来料检验单 / 采购入库单 —— 见上方注释(值仅为路由标记)
+            java.util.Map.entry("QC_RECV|生成检验或入库单", "QC_INSP")
+            // 「WO_ORDER|生成领料单」→ MATERIAL_OUT 已随 BOM 下架移除(2026-10-04):
+            // 处理器 WoPickingHandler 已删,该动作在 WO_ORDER 按钮组里也已撤销,不再登记推式生单
     )));
 
     /** 推式生单目标面板(无实现返回 null)。 */
@@ -1044,6 +1067,26 @@ public class PanelConfigService {
             "编号", "单据状态", "审核人", "审核时间", "审批人", "审批时间", "创建时间", "更新时间",
             "附件1", "附件2", "附件3", "附件4", "附件5", "附件6");
 
+    /**
+     * **按链路**排除的字段(头/行映射都不带;键 = {@code 来源面板|目标面板})。
+     *
+     * <p>2026-10-05 用户口径:「生单不用带入部门,这个生单是跨部门的」—— 送料暂收单是**仓库口**的单
+     * (部门 = 收货仓库),来料检验单由**品质口**做,两者不是同一个部门,把暂收单的部门带过去只会
+     * 让检验单头一开始就挂着错的部门(用户报「来料检验单表头缺少部门与部门编码」,补上后必须由
+     * 检验口自己选)。故这一跳的 部门/部门名称/部门编码 一律不带(生单与暂收保存后的镜像都不带,
+     * 后者见 {@code ButtonService.syncInspFromSlRecv});检验单上人工选部门,编码由参照带回。
+     *
+     * <p>与 {@link #FLOW_HEAD_EXCLUDE} 的区别:那个是**全局**排除(状态/审批/附件类,任何链路都不带),
+     * 这个是**单条链路**的语义差异(别的链路该带还得带)。</p>
+     */
+    private static final Map<String, java.util.Set<String>> FLOW_LINK_EXCLUDE = java.util.Collections.unmodifiableMap(
+            Map.of("QC_RECV|QC_INSP", java.util.Set.of("部门", "部门名称", "部门编码")));
+
+    /** 该链路排除的字段(无登记 → 空集,行为与改造前逐字等价) */
+    private static java.util.Set<String> flowLinkExclude(String sourceCode, String targetCode) {
+        return FLOW_LINK_EXCLUDE.getOrDefault(sourceCode + "|" + targetCode, java.util.Set.of());
+    }
+
     /** 明细字段同义词(来源字段 → 目标字段;同名映射之外的补充)。 */
     private static final String[][] FLOW_DETAIL_SYNONYMS = {
             {"存货名称", "产品名称"}, {"存货名称", "材料名称"},
@@ -1087,8 +1130,9 @@ public class PanelConfigService {
             // 送料暂收单 → 采购入库单(2026-09-22 新增;原 PU_ORDER|PURCHASE_IN 免检直达已取消,
             // 那条只需 单据编号→采购订单号,本跳的采购订单号随链从采购订单带下来了、同名直通无需登记)。
             // 供应商代码→供应商编码:暂收单头叫「供应商代码」,入库头叫「供应商编码」——异名不带则入库单
-            // 供应商编码恒空(与 QC_INSP|PURCHASE_IN 当年同一个坑)。注:批次键由
-            // PushGenerateHandler.generateBatch 直接写入,不走映射(头映射 7 条上限会把它挤掉,不影响)。
+            // 供应商编码恒空(与 QC_INSP|PURCHASE_IN 当年同一个坑)。注:批次键与**批次号**由
+            // PushGenerateHandler.generateBatch 直接写入(生单即定号),不走映射
+            // (头映射 7 条上限会把它挤掉,不影响)。
             "QC_RECV|PURCHASE_IN", new String[][]{{"供应商代码", "供应商编码"}},
             // 2026-09-24 用户拍板:供应链域以远端实现为准 —— 撤回本地新增的
             // "PU_ORDER|PURCHASE_IN"({单据编号→采购订单号});该免检直达链远端已取消
@@ -1100,7 +1144,8 @@ public class PanelConfigService {
             "MANU_ORDER|FINISH_IN", new String[][]{{"合同号", "加工单号"}},
             // 来料检验单 → 采购入库单:检验单号落外部单据号;采购订单号随链带入(2026-09-20,
             // 选单路径走本表;审核自动生单路径见 ButtonService.inspAutoPurchaseIn 同步补列)
-            // + 批次号(2026-09-20 分批送料 P0:批次号沿 暂收→检验→入库 贯通,同一批次可反查四单)
+            // + 批次号(2026-10-04 口径:号在生单那一刻定稿,逐站继承 —— 这里是同名直通的兜底登记,
+            // 真正的写入在 PushGenerateHandler.generateBatch / ButtonService.inspAutoPurchaseIn)
             "QC_INSP|PURCHASE_IN", new String[][]{{"单号", "外部单据号"}, {"采购订单号", "采购订单号"}, {"批次号", "批次号"}, {"批次键", "批次键"},
                     // 供应商编码(2026-09-21):检验单头字段叫「供应商代码」,入库头叫「供应商编码」——
                     // 异名不带则入库单供应商编码恒空(实测 0/13,并连带影响下游)
@@ -1212,6 +1257,7 @@ public class PanelConfigService {
             java.util.Set<String> targetHeads = new java.util.HashSet<>();
             for (PanelRegistry.FieldDef f : def.fieldsAt("header")) targetHeads.add(f.label());
             java.util.Set<String> mappedHeads = new java.util.HashSet<>();
+            java.util.Set<String> linkExcl = flowLinkExclude(sourceCode, def.code());
             List<Map<String, String>> hmap = new ArrayList<>();
             hmap.add(Map.of("from", noLabel, "to", "来源单号"));
             // 2026-09-28 上限事故修复:旧逻辑单轮按 seq 先到先得、上限 7 且隐藏字段同占坑——
@@ -1223,6 +1269,7 @@ public class PanelConfigService {
                     String l = f.label();
                     if ((!f.hidden() && f.visible()) != visiblePass) continue;
                     if (FLOW_HEAD_EXCLUDE.contains(l) || l.equals(noLabel) || !targetHeads.contains(l)) continue;
+                    if (linkExcl.contains(l)) continue;      // 单链路语义排除(如 QC_RECV→QC_INSP 的 部门,见 FLOW_LINK_EXCLUDE)
                     if (mappedHeads.add(l)) hmap.add(Map.of("from", l, "to", l));
                 }
                 if (!visiblePass) break;
@@ -1230,6 +1277,7 @@ public class PanelConfigService {
             String[][] headSyn = FLOW_HEAD_SYNONYMS.get(sourceCode + "|" + def.code());
             if (headSyn != null) {
                 for (String[] s : headSyn) {
+                    if (linkExcl.contains(s[1])) continue;
                     if (src.byLabel(s[0]) != null && targetHeads.contains(s[1]) && mappedHeads.add(s[0])) {
                         hmap.add(Map.of("from", s[0], "to", s[1]));
                     }
@@ -1244,11 +1292,13 @@ public class PanelConfigService {
             java.util.Set<String> mapped = new java.util.HashSet<>();
             for (PanelRegistry.FieldDef f : src.fieldsAt("detail")) {
                 if (dmap.size() >= 14) break;
+                if (linkExcl.contains(f.label())) continue;  // 同上:排除字段连行也不带(头行口径一致)
                 if (targetDets.contains(f.label()) && mapped.add(f.label())) {
                     dmap.add(Map.of("from", f.label(), "to", f.label()));
                 }
             }
             for (String[] syn : FLOW_DETAIL_SYNONYMS) {
+                if (linkExcl.contains(syn[1])) continue;
                 if (src.byLabel(syn[0]) != null && targetDets.contains(syn[1]) && mapped.add(syn[1])) {
                     dmap.add(Map.of("from", syn[0], "to", syn[1]));
                 }
@@ -1535,8 +1585,25 @@ public class PanelConfigService {
 
     private static final java.util.Set<String> EXT_DATA_TYPES = java.util.Set.of("文本", "下拉框", "日期", "是否");
     private static final int EXT_SPARE_COUNT = 20;
+    /**
+     * 分页签的来料检验要求面板(一张宽表当多张表用,行按 物料类别 分流):
+     * · QC_INSP_REQ —— 7 张**固定**表(Excel 一比一复刻)+ 每表可加自定义列;
+     * · QC_INSP_REQ_SERIES —— 10 张**全自定义**表(阻垢系列…原料来料),列全由动态字段承载。
+     * 只有这两个面板:①页签 = 物料类别 字典值;②扩展池**每张表各 20 位**;③自定义列要指明所属页签;
+     * ④父字段(分组表头,父无数据格)可用。(2026-10-04 用户口径:表太多挤在一个面板,拆成两个)
+     */
+    private static final java.util.Set<String> TABBED_PANELS = java.util.Set.of("QC_INSP_REQ", "QC_INSP_REQ_SERIES");
+    /** 来料检验要求面板码:其列名 = 检验项(动态字段绑定需同批登记进 qc.insp_item,见 addExtField) */
+    private static final String QC_INSP_REQ_PANEL = "QC_INSP_REQ";
+    /** 检验项标准库编码(检验数据记录 QC_INSP_REC 的「检验项」字段 dict_sql 就是它) */
+    private static final String QC_INSP_ITEM_LIB = "qc.insp_item";
 
-    /** 动态字段总览:现有动态字段 + 各表备用列池占用/脏数据行数(规格 §8 契约 1) */
+    private static boolean isTabbed(String panelCode) {
+        return panelCode != null && TABBED_PANELS.contains(panelCode);
+    }
+
+    /** 动态字段总览:现有动态字段 + 各表备用列池占用/脏数据行数(规格 §8 契约 1)。
+     *  分页签面板(来料检验要求)额外下发 **tabPools**:每个页签 20 个扩展位各自算账(用户口径 2026-10-04)。 */
     public Map<String, Object> extFieldOverview(String panelCode) {
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
@@ -1549,15 +1616,76 @@ public class PanelConfigService {
                 m.put("col", f.col());
                 m.put("dataType", f.dataType());
                 m.put("place", f.place());
+                // 所属页签(分页签面板):前端按它把自定义列渲染到对应那张表里,并随该表带入检验数据记录
+                if (f.tabKey() != null && !f.tabKey().isBlank()) m.put("tab", f.tabKey());
+                // 父字段(分组表头):只做表头分组、没有数据格 ⇒ 检验数据记录只带入子字段(label)
+                if (f.colGroup() != null && !f.colGroup().isBlank()) m.put("parent", f.colGroup());
                 fields.add(m);
             }
         }
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("capacity", EXT_SPARE_COUNT);
         out.put("fields", fields);
-        out.put("linePool", extPoolOf(def.lineTable()));
-        if (def.hasHeadTable()) out.put("headPool", extPoolOf(def.headTable()));
+        if (isTabbed(panelCode)) {
+            // 每张表各 20 个:按页签顺序分段给账(段 = 备用[(i-1)*20+1 .. i*20]);tabs 一并下发,
+            // 前端凭它渲染页签条(全自定义面板的页签集完全由词典决定,加页签不用改前端)
+            Map<String, Object> tabPools = new LinkedHashMap<>();
+            List<String> tabs = tabKeysOf(panelCode);
+            for (String tabKey : tabs) {
+                int[] range = extTabRangeOf(panelCode, tabKey);
+                if (range == null) continue;
+                int used = 0;
+                for (int i = range[0]; i <= range[1]; i++) {
+                    if (extLabelOf(panelCode, "备用" + i) != null) used++;
+                }
+                Map<String, Object> tp = new LinkedHashMap<>();
+                tp.put("capacity", EXT_SPARE_COUNT);
+                tp.put("used", used);
+                tp.put("free", EXT_SPARE_COUNT - used);
+                tp.put("from", range[0]);
+                tp.put("to", range[1]);
+                tabPools.put(tabKey, tp);
+            }
+            out.put("tabPools", tabPools);
+            out.put("tabs", tabs);
+        } else {
+            out.put("linePool", extPoolOf(def.lineTable()));
+            if (def.hasHeadTable()) out.put("headPool", extPoolOf(def.headTable()));
+        }
         return out;
+    }
+
+    /** 该面板某承载列上的动态字段标签(没有=该列空闲) */
+    private String extLabelOf(String panelCode, String col) {
+        List<String> rows = jdbc.queryForList(
+                "SELECT label FROM yj_field WHERE panel_code = ? AND col_name = ?", String.class, panelCode, col);
+        return rows.isEmpty() ? null : rows.get(0);
+    }
+
+    /**
+     * 分页签来料检验要求面板的页签集 = 该面板 物料类别 字段的字典值(数据键即页签名,顺序即扩展池分段序)。
+     * 前端页签条也由它决定(全自定义面板加页签只改词典,不用改前端);
+     * ⚠ QC_INSP_REQ 的 Excel 复刻页签配置(qcInspReqConfig.js)必须与词典顺序一致。
+     */
+    private List<String> tabKeysOf(String panelCode) {
+        PanelRegistry.PanelDef def = registry.panel(panelCode);
+        if (def == null) return List.of();
+        PanelRegistry.FieldDef f = def.byCol("物料类别");
+        if (f == null || f.dictSql() == null) return List.of();
+        List<String> out = new ArrayList<>();
+        for (String opt : dictOptions(f.dictSql())) if (!out.contains(opt)) out.add(opt);
+        return out;
+    }
+
+    /**
+     * 分页签面板每个页签的扩展池区间 [start, end](1-based 备用列序号)。
+     * 段序 = 物料类别 词表顺序,第 i 个页签 = 备用[(i-1)*20+1 .. i*20],
+     * 与 migrate-qc-insp-req-tab-pools.sql / migrate-qc-insp-req-series.sql 的分段口径必须一致。
+     */
+    private int[] extTabRangeOf(String panelCode, String tabKey) {
+        int idx = tabKeysOf(panelCode).indexOf(tabKey);
+        if (idx < 0) return null;
+        return new int[]{ idx * EXT_SPARE_COUNT + 1, (idx + 1) * EXT_SPARE_COUNT };
     }
 
     /** yj_field 行号(面板+备用列唯一定位) */
@@ -1606,17 +1734,46 @@ public class PanelConfigService {
         boolean required = Boolean.TRUE.equals(body.get("required"));
         boolean confirmDirty = Boolean.TRUE.equals(body.get("confirmDirty"));
         boolean clearFirst = Boolean.TRUE.equals(body.get("clearFirst"));
+        // 所属明细页签(2026-10-04 用户口径「自定义字段单独针对每个表」):
+        // 分页签面板(来料检验要求 QC_INSP_REQ:一张表一个页签)加列时必须指明住哪张表;
+        // 其余面板不传 = NULL(不区分页签),行为与改动前逐字一致。
+        String tab = String.valueOf(body.getOrDefault("tab", "")).trim();
         PanelRegistry.PanelDef def = registry.panel(panelCode);
         if (def == null) throw new IllegalArgumentException("面板不存在：" + panelCode);
+        if (!tab.isEmpty() && !isTabbed(panelCode))
+            throw new IllegalArgumentException("所属页签仅分页签面板支持:" + panelCode);
+        if (isTabbed(panelCode)) {
+            if (tab.isEmpty()) throw new IllegalArgumentException("请选择所属页签(自定义列住哪张表)");
+            if (!tabKeysOf(panelCode).contains(tab)) throw new IllegalArgumentException("所属页签不存在:" + tab);
+        } else {
+            tab = null;
+        }
+        // 父字段(分组表头,2026-10-04 用户口径「自定义字段能不能实现父子字段」):
+        // 父只做表头分组(**没有数据格、不占数据列**),子才是数据列 —— 检验数据记录只带入子字段。
+        // 承载 = yj_field.col_group(其固有语义就是「父表头分组」,见 migrate-col-group.sql),
+        // 与固定 7 张表的 规格/外观 是同一种东西:前端两行表头算法直接复用,不用另写一套。
+        String parent = String.valueOf(body.getOrDefault("parent", "")).trim();
+        if (!parent.isEmpty()) {
+            if (!isTabbed(panelCode)) throw new IllegalArgumentException("父字段仅分页签面板支持:" + panelCode);
+            if (parent.length() > 50) throw new IllegalArgumentException("父字段名过长(≤50):" + parent);
+            for (char ch : parent.toCharArray())
+                if (".%/() \t\r\n".indexOf(ch) >= 0) throw new IllegalArgumentException("父字段名禁止含 . % / ( ) 或空格:" + parent);
+            if (parent.equals(label)) throw new IllegalArgumentException("父字段名不能与字段名相同:" + parent);
+        } else {
+            parent = null;
+        }
         // G1 标签守卫(列名安全规范:禁 . % / ( ) 与空格;数据键保持中文)
         if (label.isEmpty() || label.length() > 60) throw new IllegalArgumentException("字段名必须 1-60 个字符");
         for (char ch : label.toCharArray())
             if (".%/() \t\r\n".indexOf(ch) >= 0) throw new IllegalArgumentException("字段名禁止含 . % / ( ) 或空格:" + label);
         if (!labelEn.isEmpty() && labelEn.length() > 60) throw new IllegalArgumentException("英文名过长(≤60)");
         if (!EXT_DATA_TYPES.contains(dataType)) throw new IllegalArgumentException("动态字段仅支持:文本/下拉框/日期/是否");
-        // G2 面板内标签唯一 —— 直查 yj_field(注册表快照有 30s TTL 窗口,不能当唯一性凭据)
-        Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM yj_field WHERE panel_code = ? AND label = ?", Integer.class, panelCode, label);
-        if (dup != null && dup > 0) throw new IllegalStateException("字段名已存在:" + label);
+        // G2 标签唯一 —— 直查 yj_field(注册表快照有 30s TTL 窗口,不能当唯一性凭据)。
+        // 分页签面板改为「**同一页签内**唯一」:不同表可以有同名自定义列(用户口径 2026-10-04),
+        // 物理列各占一个备用列、显示名相同互不影响;其余面板 tab 为 NULL,与改动前等价。
+        Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM yj_field WHERE panel_code = ? AND label = ? "
+                + "AND ISNULL(tab_key, N'') = ISNULL(?, N'')", Integer.class, panelCode, label, tab);
+        if (dup != null && dup > 0) throw new IllegalStateException("该页签已有同名字段:" + label);
         // place 规则:archive 固定 detail;doc 可 header/detail
         if ("archive".equals(def.mode())) place = "detail";
         else if (!"header".equals(place) && !"detail".equals(place)) throw new IllegalArgumentException("位置仅支持 header/detail");
@@ -1638,10 +1795,19 @@ public class PanelConfigService {
             dictSql = sb.toString();
             if (dictSql.length() > 500) throw new IllegalArgumentException("词表过长(生成 SQL 超 500 字符),请精简");
         }
-        // G3/G4 分配空闲备用列:优先干净列;脏列需 confirmDirty(+可选清空,规格:全系统唯一写业务数据的动作)
+        // G3/G4 分配空闲备用列:优先干净列;脏列需 confirmDirty(+可选清空,规格:全系统唯一写业务数据的动作)。
+        // 分页签面板(来料检验要求):**每张表各 20 个扩展位** —— 只在本页签那一段里找(用户口径 2026-10-04),
+        // 段序 = 物料类别 词表顺序,第 i 个页签 = 备用[(i-1)*20+1 .. i*20](见 migrate-qc-insp-req-tab-pools.sql)。
         String chosen = null, dirtyWarn = null;
         int dirtyRows = 0;
-        for (int i = 1; i <= EXT_SPARE_COUNT && chosen == null; i++) {
+        int poolFrom = 1, poolTo = EXT_SPARE_COUNT;
+        if (isTabbed(panelCode)) {
+            int[] range = extTabRangeOf(panelCode, tab);
+            if (range == null) throw new IllegalArgumentException("所属页签不存在:" + tab);
+            poolFrom = range[0];
+            poolTo = range[1];
+        }
+        for (int i = poolFrom; i <= poolTo && chosen == null; i++) {
             String spare = "备用" + i;
             Integer occ = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM yj_field f JOIN yj_panel p ON f.panel_code = p.panel_code "
@@ -1663,14 +1829,18 @@ public class PanelConfigService {
                 extLog(panelCode, label, chosen, "clear", "清空历史数据 " + dirtyRows + " 行后绑定");
             }
         }
-        if (chosen == null) throw new IllegalStateException("备用列池已满(" + EXT_SPARE_COUNT + "/" + EXT_SPARE_COUNT + "),请走正式迁移扩展");
+        if (chosen == null) {
+            if (isTabbed(panelCode))
+                throw new IllegalStateException("「" + tab + "」的扩展池已满(" + EXT_SPARE_COUNT + "/" + EXT_SPARE_COUNT + "),请走正式迁移扩展");
+            throw new IllegalStateException("备用列池已满(" + EXT_SPARE_COUNT + "/" + EXT_SPARE_COUNT + "),请走正式迁移扩展");
+        }
         String finalPlace = (inQuery ? "query," : "") + place;
         Integer maxSeq = jdbc.queryForObject(
                 "SELECT MAX(seq) FROM yj_field WHERE panel_code = ? AND place LIKE ?", Integer.class, panelCode, "%" + place + "%");
-        jdbc.update("INSERT INTO yj_field (panel_code, col_name, label, label_en, data_type, dict_sql, place, seq, width, editable, required, hidden, visible) "
-                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,0,1)",
+        jdbc.update("INSERT INTO yj_field (panel_code, col_name, label, label_en, data_type, dict_sql, place, seq, width, editable, required, hidden, visible, tab_key, col_group) "
+                        + "VALUES (?,?,?,?,?,?,?,?,?,?,?,0,1,?,?)",
                 panelCode, chosen, label, labelEn.isEmpty() ? null : labelEn, dataType, dictSql, finalPlace,
-                (maxSeq == null ? 0 : maxSeq) + 10, width, 1, required);
+                (maxSeq == null ? 0 : maxSeq) + 10, width, 1, required, tab, parent);
         // 多语言强制规范(AGENTS):至少 en 译名;label_en 列同写(引擎显示层直读)。
         // MERGE 覆盖式(人工 manual 优先于机翻 mt;退绑后换英文名重绑也能更新),
         // 写完失效译名缓存 —— 显示名优先走 fieldDict(),不失效会用到 30s TTL 内的旧字典(实测踩到)。
@@ -1684,6 +1854,11 @@ public class PanelConfigService {
         translations.invalidateLoadedLocales();
         extDescribe(table, chosen, label + "(动态字段,绑定" + chosen + ")");
         extLog(panelCode, label, chosen, "bind", "place=" + finalPlace + ",type=" + dataType);
+        // 来料检验要求(QC_INSP_REQ):本面板的**列名就是检验项** —— 检验数据记录按
+        // 「表头列名 → 检验项、命中行该列数据 → 检测标准」带入(见 core/qc/qcInspReqCarry.js),
+        // 而该面板新增的「自定义检验要求」页签的列就是这里绑定的动态字段,故绑定即同批登记进
+        // 「检验项」标准库 qc.insp_item —— 报告里那个下拉直接选得到(用户口径 2026-10-04)。
+        if (isTabbed(panelCode)) registerInspItem(label);
         registry.reload();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("colName", chosen);
@@ -1691,8 +1866,7 @@ public class PanelConfigService {
         return out;
     }
 
-    /** 退绑(规格 §7:数据保留,永不 DROP 物理列;守卫 G6 仅动态字段可退绑) */
-    @org.springframework.transaction.annotation.Transactional
+    /** 退绑(规格 §7:数据保留,永不 DROP 物理列;守卫 G6 仅动态字段可退绑) */    @org.springframework.transaction.annotation.Transactional
     public void retireExtField(String panelCode, int fieldId) {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT col_name, label, place FROM yj_field WHERE id = ? AND panel_code = ?", fieldId, panelCode);
@@ -1709,6 +1883,31 @@ public class PanelConfigService {
         }
         extLog(panelCode, label, col, "retire", null);
         registry.reload();
+    }
+
+    /**
+     * 「检验项」标准库(qc.insp_item)幂等登记 —— 来料检验要求的列名就是检验项
+     * (2026-10-04 用户口径:「自定义检验要求」页签的列名要能在检验报告的检验项下拉里选到)。
+     *
+     * 只由 QC_INSP_REQ 的动态字段绑定调用(见 {@link #addExtField});同名条目已存在则不动。
+     * 退绑(retire)**不**删条目:标准库是供人维护的候选词表,条目可能已被别处引用/人工编辑过,
+     * 要撤就去「检验项标准库维护」里停用(StdLibController /api/stdlib/remove)。
+     */
+    private void registerInspItem(String label) {
+        try {
+            Integer dup = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM yj_std_lib WHERE lib_code = ? AND content = ?", Integer.class, QC_INSP_ITEM_LIB, label);
+            if (dup != null && dup > 0) return;
+            Integer maxSeq = jdbc.queryForObject(
+                    "SELECT MAX(seq) FROM yj_std_lib WHERE lib_code = ?", Integer.class, QC_INSP_ITEM_LIB);
+            jdbc.update("INSERT INTO yj_std_lib (lib_code, item_code, content, seq, enabled) VALUES (?,?,?,?,1)",
+                    QC_INSP_ITEM_LIB, "默认", label, (maxSeq == null ? 0 : maxSeq) + 10);
+        } catch (Exception e) {
+            // 标准库只是候选词表:登记失败不该把"字段绑定成功"整体回滚(绑定是主动作),
+            // 但要留痕,免得下拉里选不到还查不出原因。
+            org.slf4j.LoggerFactory.getLogger(PanelConfigService.class)
+                    .warn("[EXT_FIELD] 检验项标准库登记失败({}): {}", label, e.getMessage());
+        }
     }
 
     /** MS_Description 幂等更新(先查后改,避免异常控制流) */

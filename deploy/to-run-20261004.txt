@@ -1,0 +1,26 @@
+# Force-run list for 2026-10-04 incremental deployment (order per manifest@346)
+# 22 pending migrations vs the deployed 09-28 v2 package (324->346), 0 informed reruns.
+# NOTE: the stock-flow batch (inh/outh rebuild, 5 scripts) is EXCLUDED by user decision -
+#   this jar (built at 5dda3a34) contains no StockFlowService and pairs with the 346-manifest schema.
+migrate-whloc-whcode.sql
+migrate-material-out-line-no.sql
+migrate-server-parity2-20260928.sql
+migrate-server-converge-20260928.sql
+migrate-panel-runtime-cols.sql
+migrate-panel-page-size.sql
+migrate-panel-page-size-archive.sql
+migrate-drop-unused-tables.sql
+migrate-spare-columns-biz.sql
+migrate-norm-debt-20260929.sql
+migrate-spare-desc-fix.sql
+migrate-rd-test-apply.sql
+migrate-rd-prodinfo-formlib-2026-09-30.sql
+migrate-rd-specdoc-prodno-2026-09-30.sql
+migrate-filter-eff-formula-cols.sql
+migrate-drop-sample-no-panel-2026-09-30.sql
+migrate-rd-file-owner-2026-09-30.sql
+migrate-rd-modify-reason-2026-09-30.sql
+migrate-rd-file-controlled-2026-09-30.sql
+migrate-rd-change-kind-2026-09-30.sql
+migrate-rd-newfields-i18n-2026-09-30.sql
+migrate-rd-datarec-reviewer-2026-09-30.sql

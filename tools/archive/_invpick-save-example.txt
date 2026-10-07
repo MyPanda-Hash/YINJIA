@@ -1,0 +1,105 @@
+### 请求示例
+```txt
+curl --location --request  post 'https://api.kingdee.com/jdy/v2/scm/inv_pick' \
+--header 'Content-Type: application/json' \
+--header 'X-Api-ClientID: 205022' \
+--header 'X-Api-Auth-Version: 2.0' \
+--header 'X-Api-TimeStamp: 1655775240000' \
+--header 'X-Api-Nonce: 1655775240000' \
+--header 'X-Api-SignHeaders: X-Api-TimeStamp,X-Api-Nonce' \
+--header 'X-Api-Signature: xxx' \
+--header 'app-token: xxx' \
+--header 'X-GW-Router-Addr: https://tf.jdy.com' \
+--data-row '
+{
+	"acceptor_id":"123",
+	"attachments_url":[],
+	"bill_date":"2022-01-01",
+	"bill_no":"001",
+	"bill_sp_id":"1",
+	"bill_stock_id":"1",
+	"currency_id":"1",
+	"custom_field":{},
+	"dept_id":"1",
+	"emp_id":"1",
+	"id":"1",
+	"material_entity":[
+		{
+			"aux_id1":"1",
+			"aux_id2":"2",
+			"aux_id3":"3",
+			"aux_id4":"3",
+			"aux_id5":"3",
+			"aux_prop_id":"1",
+			"aux_qty":50,
+			"aux_unit_id":"1",
+			"batch_no":"0045",
+			"comment":"备注XXX",
+			"cost":50,
+			"custom_entity_field":{},
+			"id":"1",
+			"is_con_sum_able":"1",
+			"kf_date":"2022-08-08",
+			"kf_period":180,
+			"kf_type":"1",
+			"material_id":"843913969650383872",
+			"pro_license":"333",
+			"pro_place":"",
+			"pro_reg_no":"333",
+			"qty":50,
+			"sp_id":"1",
+			"src_bill_type_id":"1",
+			"src_entry_id":"1",
+			"src_inter_id":"10",
+			"src_order_bill_no":"11",
+			"src_order_seq":11,
+			"src_product_entry_id":"1",
+			"stock_id":"1",
+			"unit_cost":50,
+			"unit_id":"1",
+			"valid_date":"2022-08-08"
+		}
+	],
+	"mul_bill_label":[
+		{
+			"id":"2147483647",
+			"number":"BQ2147483647"
+		}
+	],
+	"operation_key":"audit",
+	"pick_type":"1",
+	"pick_use_id":"工作需要",
+	"remark":"备注A"
+}'
+```
+### 响应参数
+| 参数名称        | 参数类型    | 参数说明                      |
+| --- | --- | --- |
+| errcode     | integer | 返回码，成功时为0                 |
+| description | string  | 返回信息，成功时为success，失败时为具体信息 |
+| data        | Data    | 业务返回具体对象                  |
+
+**Data**
+| 参数名称          | 参数类型          | 参数说明     |
+| --- | --- | --- |
+| id_number_map | Map <string>  | id与编码map 
+| ids           | List <string> | 单据id数组对象 
+
+#### 响应示例
+```json
+{
+	"data":{
+		"id_number_map":{},
+		"ids":[
+			"1"
+		]
+	},
+	"description":"success",
+	"errcode":0
+}
+```
+#### 返回码
+| 返回码                                                                                                                                      | 描述               | 解决方案                                                        |
+| --- | --- | --- |
+| [公告返回码](https://open.jdy.com/#/files/api/detail?index=2&categrayId=1f51c576013945e2af68ef15d4245a48&id=525e704824d24b178ab466530456c037) | 公告返回码            |                                                             |
+| 2000002000                                                                                                                               | 系统错误,请到开发者社区提单反馈 | [开发者社区](https://vip.kingdee.com/developer?productLineId=29) |

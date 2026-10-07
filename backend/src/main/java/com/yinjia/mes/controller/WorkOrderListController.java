@@ -19,10 +19,9 @@ import java.util.Map;
  * ①/workOrderList 生产工单按**参考库 plang 表**展开(2026-09-24 用户拍板切源:外部系统直接写 plang,
  *   键=公司代码 comm + 工单号 pl_no + 工单行号 pl_xc;一单一行=一行,多行工单按 pl_xc 多行);
  *   条件:日期从/到(pl_date) + 单框模糊搜索(keyword,工单号/物料编码/产品名称/客户代码/客户名称 多列 OR);
- * ②/workOrderBom 产品的默认 BOM 明细(操作列「BOM明细」弹窗,参照 bs_bom 与 WoPickingHandler 同口径);
- * ③/printStamp 打印生产任务单留痕(plang.asp_print+1、打印人/打印时间;修复原版从 scheduled('') 取数
+ * ②/printStamp 打印生产任务单留痕(plang.asp_print+1、打印人/打印时间;修复原版从 scheduled('') 取数
  *   永远匹配不到已排产工单的缺陷——现直接打印列表勾选行,不再回查排产明细);
- * ④/close 结案/取消结案(plang.ja,参考库 T/Y 归一为 Y/N)。
+ * ③/close 结案/取消结案(plang.ja,参考库 T/Y 归一为 Y/N)。
  * 定位(2026-09-26 用户拍板):生产工单=**纯查询+打印**,不作为快速排产任务——/reassign 批量调线已移除。
  * 权限:查看=登录即可(列表只读);写操作挂 MANU_ORDER(打印=打印按钮,结案=保存词表)。
  */
@@ -125,17 +124,6 @@ public class WorkOrderListController {
             out.add(m);
         }
         return ApiResult.ok(out);
-    }
-
-    @PostMapping("/workOrderBom")
-    public ApiResult<List<Map<String, Object>>> bom(@RequestBody Map<String, Object> body) {
-        String product = body.get("产品编码") == null ? "" : String.valueOf(body.get("产品编码")).trim();
-        if (product.isBlank()) return ApiResult.ok(List.of());
-        return ApiResult.ok(jdbc.queryForList(
-                "SELECT [子件编码], [子件名称], [规格型号], [子件计量单位], [定额数量], 1 AS [层级]"
-                        + " FROM bs_bom WHERE [父件编码] = ? AND ISNULL([默认BOM],0) = 1"
-                        + " AND ISNULL([状态], N'启用') = N'启用' AND ISNULL(asp_cancel,'N') <> 'Y'"
-                        + " AND [子件编码] IS NOT NULL ORDER BY id", product));
     }
 
     /** 打印生产任务单留痕:plang.asp_print+1、打印人/打印时间(权限=MANU_ORDER 打印) */

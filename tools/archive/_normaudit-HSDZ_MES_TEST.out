@@ -1,0 +1,86 @@
+﻿java : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:6 字符: 3
++   java -cp "lib\mssql-jdbc.jar" verify\DbNormAudit.java 2>&1 | Out-Fi ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+=== 数据库规范体检 @ HSDZ_MES_TEST ===
+(豁免登记:table 46, panel 2, col 69, dupkey 97, count 3, skiplabel 27)
+
+[PASS] 01 表命名合规(白名单外)
+[FAIL] 02 表级中文注明(白名单外) —— 5 处
+        yj_attachment
+        yj_form_approval
+        yj_message
+        yj_plan_term
+        yj_std_lib
+[FAIL] 03 拼音/英文列名的列注明(共 3 列;存量收敛) —— 实际 3,超过存量基线 0(棘轮:只许降不许升)
+        bl_pu_order.kf_period
+        bs_inv.parent_name
+        bs_inv.is_show_aux_barcode
+[FAIL] 04 业务表主键与审计四件套 —— 49 处
+        bd_account
+        bd_dispatch
+        bd_expense_type
+        bd_finish_in
+        bd_manu_order
+        bd_material_out
+        bd_other_in
+        bd_other_out
+        bd_outsource_in
+        bd_outsource_issue
+        bd_outsource_order
+        bd_pu_order
+        …(还有 37 项)
+[FAIL] 05 元数据漂移(字段不在其所在对象里) —— 7 处
+        LINE_CAP.生产线(query,header → bs_line_capacity)
+        LINE_CAP.生产车间(query,header → bs_line_capacity)
+        LINE_CAP.日产能(query,header → bs_line_capacity)
+        LINE_CAP.小时产能(query,header → bs_line_capacity)
+        LINE_CAP.排序(query,header → bs_line_capacity)
+        LINE_CAP.备注(query,header → bs_line_capacity)
+        SL_RECV.计量单位(detail → )
+[FAIL] 06 面板指向不存在的表/视图 —— 1 处
+        LINE_CAP → bs_line_capacity / 
+[PASS] 07 完全重复的字段登记行
+[WARN] 08 同一列多标签(数据键不唯一;已登记 87 组) —— 24 处
+        LOT_TRACE.单据编号
+        LOT_TRACE.单据日期
+        LOT_TRACE.批号
+        LOT_TRACE.事件
+        LOT_TRACE.物料编码
+        LOT_TRACE.状态
+        MANU_ORDER_DETAIL.产品名称
+        PU_ORDER.备注
+        SO_ORDER.备注
+        WO_KIT.产品编码
+        WO_KIT.工单号
+        WO_KIT.工单状态
+        …(还有 12 项)
+[FAIL] 09 缺 en 译名(面板 25 / 字段标签 218) —— 实际 243,超过存量基线 0(棘轮:只许降不许升)
+        面板缺: 25 个;字段标签缺: 218 个
+        Z-G-C批次
+        Z-HP-C批次
+        安装车间
+        保养内容
+        保养情况
+        保养人
+        保养责任人
+        保养周期
+        保养周期(天)
+        报工人
+        报工数量
+        币别符号
+        …(还有 206 项)
+        补齐:tools/scripts/trigger-mt.ps1;免译标签登记见 §5
+[PASS] 10 备份/临时表(应清零)
+[PASS] 11 ≥10 万行且无非聚集索引的表(现存 0 张大表)
+[PASS] 12 迁移链清单 ↔ 文件一致(清单 357 / 文件 370)
+[FAIL] 13 面板引用对象缺 pk_col / asp_cancel(打开即 500) —— 3 处
+        FINISH_IN_DETAIL → v_finish_in_detail 缺 id+asp_cancel
+        FINISH_IN_STATS → v_finish_in_stats 缺 id+asp_cancel
+        MANU_ORDER_STATS → v_manu_order_stats 缺 id+asp_cancel
+
+=== 汇总: FAIL 7 / WARN 1 ===
+RESULT: FAIL-7

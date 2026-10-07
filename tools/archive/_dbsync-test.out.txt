@@ -1,0 +1,12 @@
+﻿[connected] Microsoft SQL Server @ HSDZ_MES_TEST as yinjia
+[新增] migrate-restore-inv-cancel-2026-10-03.sql
+== migrate-restore-inv-cancel-2026-10-03.sql ==
+  [OK] 1 batches
+[新增] migrate-inv-required-off-2026-10-03.sql
+== migrate-inv-required-off-2026-10-03.sql ==
+  [OK] 1 batches
+[新增] migrate-qcinsp-header-dept.sql
+== migrate-qcinsp-header-dept.sql ==
+  (0 rows)
+  [OK] 9 batches
+=== 同步完成: 执行 3, 跳过 369, 失败 0 ===

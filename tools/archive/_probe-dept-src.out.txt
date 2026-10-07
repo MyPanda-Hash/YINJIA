@@ -1,0 +1,63 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-dept-src.sql ==
+  | DEPT | 部门编码 | 部门编码 | query,detail | 10 | 文本 | null | null | null | 0 | 1 | 
+  | DEPT | 部门名称 | 部门名称 | query,detail | 20 | 文本 | null | null | null | 0 | 1 | 
+  | DEPT | 停用 | 停用 | query,detail | 40 | 是否 | null | null | null | 0 | 1 | 
+  | DEPT | 上级部门 | 上级部门 | detail | 50 | 参照 | DEPT | 部门编码 | 部门名称 | 0 | 1 | 
+  | DEPT | 电话 | 电话 | query,detail | 70 | 文本 | null | null | null | 0 | 1 | 
+  | DEPT | 备注 | 备注 | detail | 80 | 文本 | null | null | null | 0 | 1 | 
+  | DEPT | 级次 | 级次 | detail | 900 | 文本 | null | null | null | 0 | 1 | 
+  | DEPT | 长编码 | 长编码 | query,detail | 900 | 文本 | null | null | null | 0 | 1 | 
+  | DEPT | 部门全称 | 部门全称 | detail | 900 | 文本 | null | null | null | 0 | 1 | 
+  | DEPT | 上级编码 | 上级编码 | query,detail | 900 | 文本 | null | null | null | 0 | 1 | 
+  | DEPT | 是否叶子节点 | 是否叶子节点 | detail | 900 | 是否 | null | null | null | 0 | 1 | 
+  | DEPT | 上级id | 上级id | detail | 950 | 文本 | null | null | null | 1 | 0 | 
+  | id | 
+  | 部门编码 | 
+  | 部门名称 | 
+  | 负责人 | 
+  | 停用 | 
+  | 备注 | 
+  | 状态 | 
+  | asp_user1 | 
+  | asp_time1 | 
+  | asp_user2 | 
+  | asp_time2 | 
+  | asp_cancel | 
+  | 上级部门 | 
+  | 部门类型 | 
+  | 电话 | 
+  | 外部数据ID | 
+  | 外部单据号 | 
+  | 外部指纹 | 
+  | 级次 | 
+  | 长编码 | 
+  | 部门全称 | 
+  | 上级编码 | 
+  | 是否叶子节点 | 
+  | 上级id | 
+  | 备用1 | 
+  | 备用2 | 
+  | 备用3 | 
+  | 备用4 | 
+  | 备用5 | 
+  | 备用6 | 
+  | 备用7 | 
+  | 备用8 | 
+  | 备用9 | 
+  | 备用10 | 
+  | 备用11 | 
+  | 备用12 | 
+  | 备用13 | 
+  | 备用14 | 
+  | 备用15 | 
+  | 备用16 | 
+  | 备用17 | 
+  | 备用18 | 
+  | 备用19 | 
+  | 备用20 | 
+  | id | 
+  | parent_id | 
+  | dept_name | 
+  | sort | 
+[OK] _probe-dept-src.sql (4 batches)

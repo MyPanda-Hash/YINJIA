@@ -77,6 +77,27 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
    - `tools/db-migrations.txt` 与 `deploy/push-migrations.bat` 清单仍需同步更新,
      供测试库(HSDZ_MES_TEST)与增量场景使用。
 
+## 🔴 采购链四单字段与显示字段基线(2026-10-03 起生效,不可豁免)
+
+**唯一基线 = `docs/development/采购链四单字段与显示字段.md`** —— 登记
+**送料暂收单 `QC_RECV`(来料暂收单)/ 来料检验单 `QC_INSP` / 暂收退回单 `QC_RETURN` /
+采购入库单 `PURCHASE_IN`** 的「字段名 · 显示名 · 顺序 · 参照源 · 可见性」。
+
+1. **拉取云端仓库更新后必看这一份**:每次 `tools/pull-sync.bat`(git pull + DbSync)或服务器
+   部署落地后,按该文档 **§8** 重跑三条取证命令并 `git diff` 本文档 ——
+   **无 diff** = 四单字段与顺序未变,可放心;**有 diff** = 逐条确认是有意改动还是回归,
+   有意则连同迁移脚本提交,意外则回退更新并排查。
+2. **改动这四单任何字段的任务,先读该文档,改完必须回写**(重跑生成脚本,不得手改文档),
+   并单独一个 commit;`§四 顺序核验汇总` 必须 12/12 全 ✅。
+3. 顺序口径(别凭印象推):
+   - **表单页表头** = `place` 含 `header`,**或恰为 `query`** 的全部字段,按 `seq` 升序
+     (同 `seq` 按 `yj_field.id`);`query,detail` 的字段**不进表头**;
+   - **列表页明细表格列** = `place` 含 `detail` 且 `visible=1 且 hidden=0`,按 `seq` 升序。
+4. 改 `yj_field` 的**参照源**时按该文档 **§5** 核对:`ref_field` 取的是**目标面板的字段名(label)**
+   而不是物理列名(例:参照 `QC_RECV` 写 `单号`,不是 `单据编号`);批量 UPDATE 必须带窄条件 +
+   行数守卫 + 末尾"越界数 = 0"自检 —— 2026-09-24 的 `migrate-sl-supplier-ref.sql` 就是行内注释
+   吞掉同行筛选条件,把两个面板每一行字段的参照源刷成了 GFDA(事故与修复见 §5.3)。
+
 ## 架构速查
 
 - 术语表:`CONTEXT.md`(翻译表/翻译分层/字典翻事实不翻)
@@ -123,6 +144,18 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 - **收尾时服务保持运行,不要停**(用户常要立刻看效果);汇报里给出 URL 并注明「服务是我起的」。
 - 起长驻进程**别阻塞当前流程**(后台起);**不要重启已在跑的服务**(会打断用户正在看的会话)。
 - 只跑了构建/单测 ≠ 验证过界面:渲染/版式类改动要落到真实服务上看过再说(或明确声明未做像素级验证)。
+- 🔴 **前端改动「在哪个地址生效」要分清(2026-10-04 用户报障踩坑)**:
+  - **5173(vite)= 源码即时生效**;源码一改就是它新。
+  - **8090 是 `java -jar target\yinjia-mes-backend-0.1.0.jar`,前端是打包进 jar 的
+    `BOOT-INF/classes/static`** —— 源码改了它**不会**变,仍是上次 packaging 那次的前端。
+    用户报「面板数据是空的 / 保存后还是空的」而库里有数据时,**先查他看的是哪一版**:
+    `node tools/archive/_probe-qc-insp-carry/_q-served-build.mjs http://127.0.0.1:8090 --api`
+    (列该实例首页 chunk 关键字 + 接口 detail 键/行数)。
+  - 要让 8090 用上新前端:`npm run build` → 同步 `backend/src/main/resources/static`
+    → 停 8090 → `jar uf target\yinjia-mes-backend-0.1.0.jar -C <stage> BOOT-INF`(stage 内放
+    `BOOT-INF/classes/static`)→ 重启 `tools/scripts/start-prod.ps1`;完事再跑一次上面的取证脚本复核。
+    纯前端改动**同时要提交** `backend/src/main/resources/static`(仓库跟踪它,是部署包的前端来源,
+    按习惯单独一个 `chore: 前端静态产物同步(...)` 提交)。
 
 ## 🔴 两账套(正式库 / 测试库)纪律(2026-09-22 起生效,不可豁免)
 

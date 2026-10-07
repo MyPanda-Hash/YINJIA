@@ -1,0 +1,13 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-locales.sql ==
+  | zh-TW | 繁体中文 | 繁體中文 | 1 | 0 | 
+  | en | 英语 | English | 1 | 10 | 
+  | ja | 日语 | 日本語 | 1 | 20 | 
+  | ko | 韩语 | 한국어 | 1 | 30 | 
+  | es | 西班牙语 | Español | 1 | 40 | 
+  | fr | 法语 | Français | 1 | 50 | 
+  | de | 德语 | Deutsch | 1 | 60 | 
+  | ru | 俄语 | Русский | 1 | 70 | 
+  | vi | 越南语 | Tiếng Việt | 1 | 80 | 
+  | th | 泰语 | ไทย | 1 | 90 | 
+[OK] _probe-locales.sql (2 batches)

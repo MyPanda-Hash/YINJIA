@@ -52,10 +52,11 @@ const DOC_DEFAULTS = {
   // 检验数据记录(YJ-QR-96 检验报告):原表固定项——文件编码 YJ-QR-96 / 检验依据 YJ-Q-30 / 审核人 固定:冯敏
   // (签名行落库列名是「表单审核人」:叫「审核人」会被 ButtonService 保存时显式丢弃,见该面板迁移注释)
   QC_INSP_REC: [['文件编码', 'YJ-QR-96'], ['检验依据', 'YJ-Q-30'], ['表单审核人', '冯敏'], ['检验日期', '@today']],
-  // 采购入库单(2026-09-21 二次口径):批次号 = **入库日期**(纯 yyyyMMdd,不带序号),
-  // 填单时就预设好、用户可人工改;审核时以表头值为准回填全链(见 BatchService.assignNoAndBackfill)。
-  // 旧口径是"审核时才取号、之前留空"—— 那个口径下用户填单时看不到号,已废弃。
-  PURCHASE_IN: [['批次号', (form, ctx) => docNoFromDate(form['单据日期'] || ctx.today)]],
+  // 采购入库单的「批次号」预设已于 2026-10-04 **移除** —— 批次号现由**生单那一刻**在服务端定稿
+  // (供应商编码去掉 YJ- 前缀 + `-` + 生单当天 yyyyMMdd,如 YJ-TX ⇒ TX-20260910),
+  // 并沿 暂收 → 检验 → 入库 逐站继承;前端再"按单据日期预设"会与继承值打架(旧值是纯日期,格式也不同)。
+  // 真源:BatchService.buildBatchNo / PushGenerateHandler.generateBatch;
+  // 手工新建的链路单由 BatchService.syncBatchNo 在保存时按同一公式兜底取号。
   // 2026-09-18 新增(研发管理 × 产品开发最新设计)
   // ⚠ 同批新增的「样品编号表」(RD_SAMPLE_NO)已于 2026-09-30 下架(用户口径「样品编号表删掉」),
   //   它的默认值条目随之移除 —— 见 tools/migrate-drop-sample-no-panel-2026-09-30.sql。
@@ -99,33 +100,16 @@ function isEmpty(v) {
 }
 
 /**
- * 日期 → 批次号:取前 8 位数字('2026-09-21' / '2026/09/21' / '20260921' → '20260921')。
- * 采购入库单的批次号就是入库日期(「同一日期算同一批次」),所以没有序号、也没有分隔符。
+ * 日期 → yyyyMMdd(取前 8 位数字:'2026-09-21' / '2026/09/21' / '20260921' → '20260921')。
+ *
+ * ⚠ 与批次号已**无生成关系**(2026-10-04 起批次号由服务端在生单时取:
+ * 供应商编码去 YJ- 前缀 + `-` + 当天 yyyyMMdd,见 BatchService.buildBatchNo)。
+ * 现存唯一用途 = 打印层对**口径上线前的老单**做批次兜底展示
+ * (PanelxList「打印标识卡」:头批次号空时退回单据日期推导),纯出参、不写库。
  */
 export function docNoFromDate(dateStr) {
   const digits = String(dateStr ?? '').replace(/\D/g, '')
   return digits.length >= 8 ? digits.slice(0, 8) : ''
-}
-
-/**
- * 「单据日期 → 批次号」联动(采购入库单,2026-09-21 口径):
- * 改了「单据日期」时,批次号跟着走 —— 但**只当**批次号为空、或仍是上一次自动带出的值(prevAuto)时;
- * 用户人工改过(≠ prevAuto)则一律不动,人工优先。
- *
- * @param {object} form     表单(键=字段标签,就地改)
- * @param {string} prevAuto 上一次自动带出的批次号(调用方在单据打开/上次联动后存下的)
- * @param {string} today    当天 YYYY-MM-DD(单据日期为空时的兜底)
- * @returns {string} 本次生效的批次号(调用方存为下一次的 prevAuto)
- */
-export function syncBatchNoWithDocDate(form, prevAuto = '', today = todayStr()) {
-  if (!form || typeof form !== 'object') return ''
-  const auto = docNoFromDate(form['单据日期'] || today)
-  const cur = String(form['批次号'] ?? '').trim()
-  if (!cur || cur === String(prevAuto ?? '').trim()) {
-    if (auto) form['批次号'] = auto
-    return auto
-  }
-  return cur
 }
 
 /** 展开值里的 '@today'(整串或内嵌:「V@today」⇒ V2026-09-20);没有占位就原样返回 */

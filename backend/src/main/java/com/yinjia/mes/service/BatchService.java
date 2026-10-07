@@ -12,26 +12,28 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 采购订单分批送料:批次台账 / 送料量统计 / **采购入库单审核时确认批次号并回填**(P0,2026-09-20;
- * 取号时机迁移 2026-09-21;格式与唯一性**二次变更** 2026-09-21 —— 见 tools/migrate-batch-no-date-only.sql)。
+ * 采购订单分批送料:批次台账 / 送料量统计 / **批次号取号与自洽**(P0,2026-09-20)。
  *
- * 口径(用户定稿,**以二次变更为准**):
- * - 批次号 = **纯入库日期 yyyyMMdd**(如 20260921),**不带序号**;
- * - 日期取**采购入库单的「单据日期」**(不是送料当天,也不是审核当天);
- * - 「同一日期算同一批次」:同一天多批**共号**(允许重复)—— 旧的筛选唯一索引
- *   UX_yj_doc_batch_no_active(唯一键 = 采购订单号 + 批次号)已由迁移删除,改非唯一索引;
- * - **预设 + 人工修改**:入库单填单/生单时预设(前端 docDefaults 取「单据日期」),用户可改;
- *   审核时**以入库单表头「批次号」为准**,为空才按「单据日期」补;
- * - 回填时机 = **采购入库单审核**;审核之前暂收/检验单的批次号留空(入库单自身带预设值);
- * - 一单一单(暂收 = 检验 = 入库),批次号挂**单头**(行上另冗余一份,保持现状);
- * - 历史批次号(YJ-…. / 10 位旧号)原样保留,只对新单生效。
+ * 口径(2026-10-04 用户定稿,**取代此前"入库审核取号 + 回填全链"**):
+ * - 批次号 = **供应商编码去掉 `YJ-` 前缀 + `-` + 生单当天 yyyyMMdd**
+ *   (如 供应商 `YJ-TX`、生单日 2026-09-10 ⇒ `TX-20260910`);不带序号,同一天同供应商共号;
+ * - **取号时机 = 生单那一刻**(采购订单 → 送料暂收单,见 PushGenerateHandler.generateBatch):
+ *   跳过整条「暂收 → 检验 → 入库/退回」链,各站单据带的是同一个号(下游继承,不重新取号);
+ * - **不再有回填机制**:批次号在链路头一跳就写进单头 + 全部明细行,下游照搬,
+ *   因此没有"入库审核时逆流回填上游"这一说(旧 assignNoAndBackfill 已删除);
+ * - **可编辑窗口**:只有送料暂收单草稿态的**单头**批次号可人工改(元数据 editable=1);
+ *   「送料暂收单审核」之后整链一律只读(下游四单的批次号元数据 editable=0,
+ *   整单编辑闸门另按单据状态把非草稿单锁死,见 PanelxList.draftEditable / ButtonService.saveDoc);
+ * - **头行一致**:任何一次保存/审核都调 {@link #syncBatchNo} 把单头值同步到全部明细行,
+ *   并把台账补齐 —— 界面改单头就够了,行上的号永远跟着走;
+ * - 历史批次号(YJ-…. / 20260921 / 10 位旧号)原样保留,只对新单生效。
  *
  * 台账生命周期:
- *   createPending(分批送料时插一行 **PENDING、batch_no=NULL** 的台账,返回行 id 作「批次键」)
+ *   createBatch(链路头一跳生单时插一行 **ACTIVE 且已带批次号** 的台账,返回行 id 作「批次键」)
  *     → bind(生成成功:绑定目标单与本次送料量;失败由外层事务整体回滚)
- *     → assignNoAndBackfill(采购入库单审核:确认批次号 → 回填台账/链路/三单头行)。
+ *   (旧的 PENDING/待编号中间态已取消:号在生单时就有,不存在"待编号"批次。)
  * 「批次键」= yj_doc_batch.id,写进 sl_recv/qc_insp/bd_purchase_in 的 [批次键] 列与
- * form_flow_link.batch_id:审核时**顺着键**回填,不按单号字符串匹配(单号复用/改号不会回填错单)。
+ * form_flow_link.batch_id —— 逐站继承同一个键,按批次反查/链路终点解析都用它,不靠单号字符串匹配。
  */
 @Service
 public class BatchService {
@@ -40,24 +42,40 @@ public class BatchService {
     public static final String KEY_OVER_RATIO = "receive_over_ratio";
 
     /**
-     * 作废/弃审是否回收批次号:**否**(2026-09-21 用户口径)。
-     * 旧口径序号可回收(释放后序号回到可用池),新口径**不回收** —— 因此会跳号,但绝不重号。
+     * 作废/弃审是否回收批次号:**否**(2026-09-21 用户口径,2026-10-04 口径下依然成立)。
+     * 批次号在**生单**那一刻就定了,回收会让"已编号批次"重号(用户口径:作废不回收,会跳号但绝不重号)。
      * 保留开关(而非直接删旧 SQL)是为了口径需要回退时一处可切。
      */
     public static final boolean RECYCLE_ON_RELEASE = false;
 
-    /** 批次号列名(链路三单同名同列) */
+    /** 批次号列名(链路四单同名同列) */
     private static final String BATCH_COL = "批次号";
+    /** 链路身份列:有它才算批次号链路成员(见 syncBatchNo 的取号判定与缺列守卫) */
+    private static final String BATCH_KEY_COL = "批次键";
 
-    /** 批次键列名(链路三单同名同列;form_flow_link 用 batch_id) */
-    private static final String KEY_COL = "批次键";
+    /** 供应商编码字段候选(链路各单异名:暂收/检验/退回叫「供应商代码」,采购入库叫「供应商编码」) */
+    private static final String[] SUPPLIER_CODE_LABELS = {"供应商编码", "供应商代码"};
+
+    /** 供应商编码前缀:取号时剥掉它(用户口径「YJ-后面的数据」) */
+    private static final String SUPPLIER_PREFIX = "YJ-";
+
+    /** 超送比例上限(2026-09-22 用户口径:**最高 50%**)——弹窗覆盖与系统参数一律钳在 0~0.5 */
+    public static final double MAX_OVER_RATIO = 0.5d;
 
     /**
-     * 批次键所在的单(面板码 → 单头表;行表与分组列由 PanelRegistry 提供)。
-     * 含特采单(QC_TC_IN,2026-09-22 特采闸门):入库审核回填批次号时把特采单头一并带上
-     * (其明细表 qc_tc_in_detail 是 doc 模式要求的恒空表、无 批次号 列 —— backfill 会先探列再决定跳过行更新)。
+     * 行的「可送上限」(2026-09-22 口径:**按全部数量算**)—— 订单数量×(1+超送比例) − 已送 + 已退回,负数归 0。
+     * 旧口径 剩余×(1+比例) 的问题:每批只给"当批剩余"的比例额,分批越多超送额度越算越少,
+     * 累计超送永远到不了订单总量的比例额;正确语义是"整张订单行**累计**最多收 数量×(1+比例)"。
+     * 前端同公式:core/selection/batchSendLines.js 的 overAllowance(纯函数,有单测)。
+     *
+     * <p>2026-10-04 从 PushGenerateHandler 迁入本类:材料码预约(供应商自行打码)也要按同一口径算上限,
+     * 而「送料批次口径」的家本来就在 BatchService —— 两处各写一份迟早对不上。
      */
-    private static final String[] KEY_PANELS = {"QC_RECV", "QC_INSP", "PURCHASE_IN", "QC_TC_IN"};
+    public static double overAllowance(double orderQty, double sent, double returned, double ratio) {
+        double r = Math.max(0d, Math.min(MAX_OVER_RATIO, ratio));
+        double v = orderQty * (1 + r) - sent + returned;
+        return v > 0 ? v : 0d;
+    }
 
     private final JdbcTemplate jdbc;
     private final PanelRegistry registry;
@@ -94,26 +112,71 @@ public class BatchService {
         return v;
     }
 
-    // ==================== 分批送料:登记待编号台账 ====================
-
     /**
-     * 分批送料生成下游单时登记一行**未编号**台账(status='PENDING'、batch_no=NULL),
-     * 返回该行 id 作为「批次键」写入目标单头。
-     * create_time = 送料当天 —— 取号时日期部分取它(不是审核当天,用户口径②)。
-     * 生成失败不需要"回收":本方法随调用方事务回滚(@Transactional 由 generateBatch 承担)。
+     * 保存收料超送比例(0~0.5;**改完立即生效**)。
+     *
+     * 用户口径(2026-10-04):「超送应该更改后会自动保存」—— 生单对话框里改的比例要**落库**,
+     * 下次打开(以及打印材料码的可打上限)都按这个新比例算,而不是每次都退回系统默认 5%。
+     *
+     * 落库位置就是 {@link #overRatio()} 的**同一个参数**(`yj_app_setting.receive_over_ratio`),
+     * 存字符串小数(如 `0.08`);参数行不在时补插一行(带 remark,便于后来人知道这行是干什么的)。
+     * 存完**立刻刷新缓存**:overRatio() 有 30 秒缓存,不刷的话刚改完还按旧值校验(用户体验像"没保存")。
+     *
+     * @param ratio 比例(0~1 的小数;超出 50% 夹到 0.5,负数归 0 —— 与 overRatio() 同一钳制口径)
+     * @return 真正生效的比例
      */
     @Transactional
-    public int createPending(String srcPanel, String srcNo, String targetPanel, String user) {
+    public double saveOverRatio(double ratio, String user) {
+        double v = ratio;
+        if (Double.isNaN(v) || v < 0d) v = 0d;
+        if (v > MAX_OVER_RATIO) v = MAX_OVER_RATIO;
+        String val = v == Math.rint(v) ? String.valueOf((long) Math.rint(v)) : String.valueOf(v);
+        int n = jdbc.update("UPDATE yj_app_setting SET setting_value = ?, asp_user1 = COALESCE(?, asp_user1),"
+                + " asp_time2 = SYSDATETIME() WHERE setting_key = ?", val, user, KEY_OVER_RATIO);
+        if (n == 0) {
+            jdbc.update("INSERT INTO yj_app_setting (setting_key, setting_value, remark, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,SYSDATETIME())", KEY_OVER_RATIO, val,
+                    "收料允许超送比例(0~1;0=不允许)。分批送料/材料码打印校验:本次量 ≤ 剩余量 ×(1+比例)。"
+                            + "由生单对话框「超送比例」改动自动保存(2026-10-04)", user);
+        }
+        ratioCache = v;                          // 立刻生效(不吃 30s 缓存)
+        ratioAt = System.currentTimeMillis();
+        return v;
+    }
+
+    // ==================== 分批送料:登记已编号台账 ====================
+
+    /**
+     * 分批送料**头一跳**生单时登记一行台账(status='ACTIVE'、batch_no 已在生单时定稿),
+     * 返回该行 id 作为「批次键」写入目标单头。
+     * batch_seq = 该**来源单**名下第几批(**内部计数**,不拼进号里)。
+     * ⚠ 必须按「来源单」整体取下一个序号,**不能**再按 batch_no 过滤:筛选唯一索引
+     * `UX_yj_doc_batch_active` 的键是 (source_panel_code, source_form_no, batch_seq) WHERE status='ACTIVE' ——
+     * 按 batch_no 过滤时新号查不到历史行 ⇒ seq 从 1 重来 ⇒ 与同订单已有的 ACTIVE 行撞唯一键
+     * (实测报「不能在具有唯一索引 UX_yj_doc_batch_active 的对象中插入重复键的行」)。
+     * 生成失败不需要"回收":本方法随调用方事务回滚(@Transactional 由 generateBatch 承担)。
+     *
+     * @param batchNo 生单时按「供应商编码 + 当天」取好的批次号(非空)
+     */
+    @Transactional
+    public int createBatch(String srcPanel, String srcNo, String targetPanel, String batchNo, String user) {
+        String no = str(batchNo);
+        if (no.isEmpty()) throw new IllegalStateException("生单批次号为空:" + srcPanel + " " + srcNo);
+        Integer seq = jdbc.queryForObject(
+                "SELECT ISNULL(MAX(batch_seq), 0) + 1 FROM yj_doc_batch WITH (UPDLOCK, HOLDLOCK)"
+                        + " WHERE source_panel_code = ? AND source_form_no = ?", Integer.class, srcPanel, srcNo);
         String sql = "INSERT INTO yj_doc_batch (source_panel_code, source_form_no, batch_seq, batch_no, batch_qty,"
                 + " status, target_panel_code, create_by, create_time, remark)"
-                + " VALUES (?,?,0,NULL,0,'PENDING',?,?,SYSDATETIME(),N'分批送料待编号')";
+                + " VALUES (?,?,?,?,0,'ACTIVE',?,?,SYSDATETIME(),N'分批送料 · 生单取号')";
         org.springframework.jdbc.support.GeneratedKeyHolder kh = new org.springframework.jdbc.support.GeneratedKeyHolder();
         jdbc.update(con -> {
             java.sql.PreparedStatement ps = con.prepareStatement(sql, java.sql.Statement.RETURN_GENERATED_KEYS);
             ps.setString(1, srcPanel);
             ps.setString(2, srcNo);
-            ps.setString(3, targetPanel);
-            ps.setString(4, user);
+            ps.setInt(3, seq == null ? 1 : seq);
+            ps.setString(4, no);
+            ps.setString(5, targetPanel);
+            ps.setString(6, user);
             return ps;
         }, kh);
         for (Map<String, Object> keys : kh.getKeyList()) {
@@ -122,153 +185,138 @@ public class BatchService {
         throw new IllegalStateException("批次台账登记失败(未取得行 id):" + srcPanel + " " + srcNo);
     }
 
-    /** 生成成功:绑定目标单据与本次送料数量合计(只更新本次 PENDING 行,历史行不动) */
+    /** 生成成功:绑定目标单据与本次送料数量合计(只更新本次行,历史行不动) */
     public void bind(int batchId, String targetPanel, String targetFormNo, double qty) {
-        jdbc.update("UPDATE yj_doc_batch SET target_panel_code=?, target_form_no=?, batch_qty=? WHERE id=? AND status='PENDING'",
+        jdbc.update("UPDATE yj_doc_batch SET target_panel_code=?, target_form_no=?, batch_qty=? WHERE id=?",
                 targetPanel, targetFormNo, qty, batchId);
     }
 
-    // ==================== 采购入库单审核:确认批次号并回填全链 ====================
+    // ==================== 批次号取号 / 自洽(2026-10-04 口径) ====================
 
     /**
-     * 采购入库单审核时**确认批次号并回填全链**(2026-09-21 二次口径,取代原先的"算序号取号")。
+     * 取号:批次号 = **供应商编码去掉 {@value #SUPPLIER_PREFIX} 前缀 + `-` + 当天 yyyyMMdd**。
+     * 例:供应商 `YJ-TX`、2026-09-10 ⇒ `TX-20260910`。
      *
-     * 取值优先级:
-     *   ① 入库单表头「批次号」—— 填单/生单时的预设值,或用户**人工修改**的值(最高优先);
-     *   ② 台账已有的批次号 —— 弃审后重新审核沿用,幂等不换号;
-     *   ③ 入库单「单据日期」的 yyyyMMdd —— 表头与台账都空时兜底;
-     *   ④ 系统当天 —— 连单据日期都没有(历史脏数据)时的最后兜底。
-     * **不再计算序号**:「同一日期算同一批次」,同一天多批共号,唯一性已由迁移取消。
+     * 用户口径(2026-10-04):
+     * - 编码**没有** `YJ-` 前缀时**整串照用**(不截断、不猜测),如 `KH005` ⇒ `KH005-20260910`;
+     * - 编码为空(历史脏单/未选供应商)时退回**纯日期**(`20260910`)—— 永不空号、不阻断生单,
+     *   异常在数据上看得见,人工可改(暂收单草稿态单头可编辑);
+     * - 不带序号:同一天同一供应商的多批**共号**。
      *
-     * @param batchId 批次键(台账行 id)
-     * @param user    操作人(写入台账 remark 留痕)
-     * @return 最终批次号
+     * @param supplierCode 供应商编码(可带 `YJ-` 前缀)
+     * @param date         取号日期(生单当天)
+     */
+    public static String buildBatchNo(String supplierCode, java.time.LocalDate date) {
+        String code = str(supplierCode);
+        if (code.regionMatches(true, 0, SUPPLIER_PREFIX, 0, SUPPLIER_PREFIX.length())) code = code.substring(SUPPLIER_PREFIX.length());
+        code = code.trim();
+        String ymd = (date == null ? java.time.LocalDate.now() : date)
+                .format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+        return code.isEmpty() ? ymd : code + "-" + ymd;
+    }
+
+    /**
+     * 该面板是否属「批次号链路」(= 表头注册了「批次号」字段,与 PanelConfigService.batchFlow /
+     * PushGenerateHandler.isBatchTarget 同一判据;送料暂收单/来料检验单/暂收退回单/采购入库单四张)。
+     */
+    public boolean isBatchPanel(String panelCode) {
+        if (panelCode == null || panelCode.isBlank()) return false;
+        try {
+            return registry.panel(panelCode).fieldsAt("header").stream()
+                    .anyMatch(f -> BATCH_COL.equals(f.label()));
+        } catch (Exception ignore) { /* 面板不存在等场景不阻断 */ return false; }
+    }
+
+    /**
+     * 批次号自洽(保存/审核收尾,**取代旧的入库审核回填**):
+     * <ol>
+     *   <li><b>空则取号</b>:单头批次号为空(手工新建的链路单、口径上线前的老单)时,
+     *       按该单「供应商编码/供应商代码 + 当天」取号写回 —— 与生单同一条公式;</li>
+     *   <li><b>头行一致</b>:把单头批次号**覆盖写进全部明细行** —— 用户口径
+     *       「一旦审批,包括下面的明细项目也需要做到批次号一致」。明细列元数据为只读
+     *       (migrate-batch-no-on-generate.sql),行上的值只由这一处维护;</li>
+     *   <li><b>台账补齐</b>:该单挂的批次键(yj_doc_batch.id)若还没号(口径上线前的 PENDING 行),
+     *       补上同一个号并置 ACTIVE —— 老单顺链自愈,不必跑历史数据订正。</li>
+     * </ol>
+     * 非批次链路面板 / 无单头表 / 单头无「批次号」列的,直接返回,不做任何写入。
+     *
+     * @return 该单最终生效的批次号(未接管时返回空串)
      */
     @Transactional
-    public String assignNoAndBackfill(int batchId, String user) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT source_form_no AS srcNo, batch_no AS batchNo FROM yj_doc_batch WHERE id = ?", batchId);
-        if (rows.isEmpty()) throw new IllegalStateException("批次台账行不存在:" + batchId);
-        Map<String, Object> row = rows.get(0);
-        String ledgerNo = row.get("batchNo") == null ? "" : String.valueOf(row.get("batchNo")).trim();
-        String srcNo = row.get("srcNo") == null ? "" : String.valueOf(row.get("srcNo"));
-
-        // ① 入库单表头(带该批次键的那张):预设值/人工修改值优先;顺带取「单据日期」作兜底
-        String headNo = "";
-        String docDate = "";
-        try {
-            List<Map<String, Object>> pi = jdbc.queryForList(
-                    "SELECT ISNULL([" + BATCH_COL + "], N'') AS b,"
-                            + " CONVERT(varchar(10), [单据日期], 120) AS d"
-                            + " FROM bd_purchase_in WHERE [" + KEY_COL + "] = ?", batchId);
-            if (!pi.isEmpty()) {
-                headNo = str(pi.get(0).get("b"));
-                docDate = str(pi.get(0).get("d"));
-            }
-        } catch (Exception ignore) { /* 列/表缺失:退回台账与当天 */ }
-
-        String no = headNo;
-        String from = "入库单表头";
-        if (no.isEmpty()) { no = ledgerNo; from = "台账沿用"; }
-        if (no.isEmpty()) { no = ymd8(docDate); from = "入库单单据日期"; }
-        if (no.isEmpty()) { no = ymd8(java.time.LocalDate.now().toString()); from = "系统当天"; }
-
-        // ② 台账:确认批次号 + PENDING → ACTIVE。batch_seq 退化为**内部计数**(同订单同号第几批,
-        //    不再拼进号里):同一天共号时它只是"当天第几批"的痕迹,便于排查。
-        Integer seq = jdbc.queryForObject(
-                "SELECT ISNULL(MAX(batch_seq), 0) + 1 FROM yj_doc_batch WITH (UPDLOCK, HOLDLOCK)"
-                        + " WHERE source_form_no = ? AND batch_no = ?", Integer.class, srcNo, no);
-        jdbc.update("UPDATE yj_doc_batch SET batch_no=?, batch_seq=?, status='ACTIVE', release_time=NULL,"
-                        + " remark = N'分批送料 · 入库审核确认批次号(' + ISNULL(?, N'system') + N',取自' + ? + N')'"
-                        + " WHERE id=?",
-                no, seq == null ? 1 : seq, user, from, batchId);
-        // ③ 表头为空(既没预设也没人工填)时,把确认下来的号写回入库单,保证单据自洽、转ERP有号可推
-        if (headNo.isEmpty()) {
-            jdbc.update("UPDATE bd_purchase_in SET [" + BATCH_COL + "] = ? WHERE [" + KEY_COL + "] = ?", no, batchId);
+    public String syncBatchNo(PanelRegistry.PanelDef def, String docNo, String user) {
+        if (def == null || docNo == null || docNo.isBlank() || !def.hasHeadTable()) return "";
+        if (!isBatchPanel(def.code())) return "";
+        String head = def.headTable(), gc = def.groupCol();
+        if (head == null || gc == null || colMissing(head, BATCH_COL)) return "";
+        // 「批次键」= 链路身份列(form_flow_link / yj_doc_batch 都按它挂台账),**有它才算链路成员**。
+        // ⚠ 只注册了「批次号」而没有它的面板必须整段跳过取号(2026-10-04 修):
+        //   · QC_JJF 紧急放行申请单的「批次号」是业务值(来料批次),被自动盖成 '20261003' 是写坏数据;
+        //   · QC_JJF / QC_RETURN 也没有该物理列 —— 本方法下面那句台账查询此前**未加 colMissing 守卫**,
+        //     于是这两张单一保存就 500(列名 '批次键' 无效。实测:JJF-2026-10-0003 / TH-2026-10-0001)。
+        //   本方法自述的契约是"缺列跳过、不抛错不阻断保存",这两处以它为准。
+        boolean chainMember = !colMissing(head, BATCH_KEY_COL);
+        String no = str(firstValue("SELECT TOP 1 [" + BATCH_COL + "] FROM " + head + " WHERE [" + gc + "] = ?", docNo));
+        if (no.isEmpty() && chainMember) {
+            no = buildBatchNo(supplierCodeOf(def, docNo), java.time.LocalDate.now());
+            jdbc.update("UPDATE " + head + " SET [" + BATCH_COL + "] = ? WHERE [" + gc + "] = ?", no, docNo);
         }
-        // ④ 链路台账:该批次 id 关联的所有跳(含 QC_INSP→QC_RETURN 等旁支)
-        jdbc.update("UPDATE form_flow_link SET batch_no=? WHERE batch_id=?", no, batchId);
-        // ⑤ 三单头 + 行(按「批次键」定位,不按单号字符串)
-        for (String panel : KEY_PANELS) backfill(panel, batchId, no);
-        // 留痕说明:未写 yj_doc_modify_log —— 该表是「申请修改/弃审留痕」闭环(snapshot_head/snapshot_rows
-        // + apply_by/approve_by,create_at NOT NULL),塞一条确认批次号事件会污染「修改记录」界面语义;
-        // 留痕落在 yj_doc_batch(create_by/create_time/remark/release_time)+ form_flow_link.batch_no。
+        // ② 头行一致:明细行一律随单头
+        String line = def.lineTable();
+        if (line != null && !line.isBlank() && !colMissing(line, BATCH_COL) && !colMissing(line, gc)) {
+            jdbc.update("UPDATE " + line + " SET [" + BATCH_COL + "] = ? WHERE [" + gc + "] = ?", no, docNo);
+        }
+        // ③ 台账补齐(顺批次键;只补没号的行,不动已有号)
+        Integer key = chainMember
+                ? intValue(firstValue("SELECT TOP 1 [" + BATCH_KEY_COL + "] FROM " + head + " WHERE [" + gc + "] = ?", docNo))
+                : null;
+        if (key != null && key > 0) {
+            jdbc.update("UPDATE yj_doc_batch SET batch_no = ?, status = 'ACTIVE', release_time = NULL,"
+                            + " remark = N'分批送料 · 批次号自洽(' + ISNULL(?, N'system') + N')'"
+                            + " WHERE id = ? AND ISNULL(batch_no, N'') = N''",
+                    no, user, key);
+        }
         return no;
     }
 
-    /** 'yyyy-MM-dd' / '2026/09/21' / '2026092101' → 'yyyyMMdd'(取前 8 位数字;不足 8 位返回空串) */
-    private static String ymd8(String s) {
-        String digits = str(s).replaceAll("\\D", "");
-        return digits.length() >= 8 ? digits.substring(0, 8) : "";
+    /** 该单的供应商编码(链路各单异名:先「供应商编码」后「供应商代码」;都没有 → 空串) */
+    private String supplierCodeOf(PanelRegistry.PanelDef def, String docNo) {
+        String head = def.headTable(), gc = def.groupCol();
+        for (String label : SUPPLIER_CODE_LABELS) {
+            PanelRegistry.FieldDef f = def.byLabel(label);
+            String col = f == null ? label : f.col();
+            if (colMissing(head, col)) continue;
+            String v = str(firstValue("SELECT TOP 1 [" + col + "] FROM " + head + " WHERE [" + gc + "] = ?", docNo));
+            if (!v.isEmpty()) return v;
+        }
+        return "";
     }
 
-    /** 按「批次键」把批次号回填到某单的头与行(头列/行表/分组列都取自面板元数据) */
-    private void backfill(String panelCode, int batchId, String batchNo) {
-        PanelRegistry.PanelDef def = registry.panel(panelCode);
-        String head = def.headTable();
-        String line = def.lineTable();
-        String g = def.groupCol();
-        // 行:按其所属单头(批次键命中)定位,写**批次号**列;头:按批次键命中写批次号。
-        // 行表没有 批次号 列时跳过行更新(特采单明细表 qc_tc_in_detail 是 doc 模式恒空表,无该列)。
-        Integer lineCol = line == null ? null : jdbc.queryForObject(
-                "SELECT COL_LENGTH(?, N'批次号')", Integer.class, "dbo." + line);
-        if (lineCol != null && lineCol != 0) {
-            jdbc.update("UPDATE " + line + " SET [" + BATCH_COL + "] = ? WHERE [" + g + "] IN"
-                    + " (SELECT [" + g + "] FROM " + head + " WHERE [" + KEY_COL + "] = ?)", batchNo, batchId);
-        }
-        jdbc.update("UPDATE " + head + " SET [" + BATCH_COL + "] = ? WHERE [" + KEY_COL + "] = ?", batchNo, batchId);
+    /** 表/列存在性(缺失返回 true = 当"没有该列"处理,调用方跳过;不抛错不阻断保存) */
+    private boolean colMissing(String table, String col) {
+        if (table == null || table.isBlank() || col == null || col.isBlank()) return true;
+        try {
+            Integer n = jdbc.queryForObject("SELECT COL_LENGTH(?, ?)", Integer.class, "dbo." + table, col);
+            return n == null || n == 0;
+        } catch (Exception ignore) { return true; }
     }
+
+    private Object firstValue(String sql, Object... args) {
+        List<Map<String, Object>> rows = jdbc.queryForList(sql, args);
+        return rows.isEmpty() ? null : rows.get(0).values().iterator().next();
+    }
+
+    private static Integer intValue(Object o) {
+        if (o instanceof Number n) return n.intValue();
+        if (o == null || String.valueOf(o).isBlank()) return null;
+        try { return Integer.valueOf(String.valueOf(o).trim()); } catch (NumberFormatException e) { return null; }
+    }
+
+    // ==================== 释放(口径:不回收) ====================
 
     /**
-     * 按入库单号找「批次键」:① 入库单头自带的 [批次键];
-     * ② 退回 form_flow_link(batch_id)→ 该入库单的链路键;
-     * ③ 再退回「该入库单的来源单(检验单/暂收单)头上的批次键」。
-     * 返回 0 = 未找到(该入库单不走分批送料,如历史单/免检直达且无链路)。
-     */
-    public int findPendingBatchId(String panelCode, String docNo) {
-        if (!"PURCHASE_IN".equals(panelCode) || docNo == null || docNo.isBlank()) return 0;
-        Integer id = jdbc.queryForObject("SELECT TOP 1 [" + KEY_COL + "] FROM bd_purchase_in WHERE 单据编号 = ?",
-                Integer.class, docNo);
-        if (id != null && id > 0) return id;
-        // 2026-10-03 修 500:这里原来是 queryForObject,而 **手工建的采购入库单**(头表批次键为空、
-        // form_flow_link 里一行都没有)会让它 0 行返回 ⇒ Spring 抛
-        // IncorrectResultSizeDataAccessException("expected 1, actual 0") ⇒ **审核整笔 500**。
-        // 实测(测试账套):保存一张采购入库单 → 审核 = {"code":500,"message":"服务异常：Incorrect result size:
-        // expected 1, actual 0"};Debug 日志里失败前最后一条 SQL 就是本句。
-        // 本方法头部注释写的是"返回 0 = 未找到(如历史单/免检直达且无链路)"⇒ 抛错违背了本意。
-        // 改 queryForList 取首行:命中时与原来**完全等价**(SQL 一字未改,TOP 1),0 行则继续往下兜底。
-        List<Integer> linked = jdbc.queryForList("SELECT TOP 1 batch_id FROM form_flow_link WHERE target_panel_code='PURCHASE_IN'"
-                + " AND target_form_no=? AND batch_id IS NOT NULL ORDER BY id", Integer.class, docNo);
-        id = linked.isEmpty() ? null : linked.get(0);
-        if (id != null && id > 0) return id;
-        // 来源单头上的批次键(检验单 QC_INSP / 送料暂收单 QC_RECV / 特采单 QC_TC_IN;采购订单免检直达时无此列,跳过)
-        List<Map<String, Object>> srces = jdbc.queryForList(
-                "SELECT DISTINCT source_panel_code AS pc, source_form_no AS no FROM form_flow_link"
-                        + " WHERE target_panel_code='PURCHASE_IN' AND target_form_no=?", docNo);
-        for (Map<String, Object> s : srces) {
-            String pc = String.valueOf(s.get("pc"));
-            String table = switch (pc) {
-                case "QC_INSP" -> "qc_insp";
-                case "QC_RECV" -> "sl_recv";
-                case "QC_TC_IN" -> "qc_tc_in";   // 特采闸门(2026-09-22):特采单审核生成的入库单
-                default -> null;
-            };
-            if (table == null) continue;
-            try {
-                List<Map<String, Object>> r = jdbc.queryForList(
-                        "SELECT TOP 1 [" + KEY_COL + "] AS k FROM " + table + " WHERE 单据编号 = ?", s.get("no"));
-                if (!r.isEmpty() && r.get(0).get("k") instanceof Number n && n.intValue() > 0) return n.intValue();
-            } catch (Exception ignore) { /* 列未加(未跑迁移)等场景不阻断审核 */ }
-        }
-        return 0;
-    }
-
-    // ==================== 释放(新口径:不回收) ====================
-
-    /**
-     * 下游单作废/删除时的台账释放。**新口径(2026-09-21):不回收** —— 批次号与台账 status 一律保留,
-     * 因为批次号在采购入库单审核时已经确定,回收会让"已编号批次"重号(用户口径④:
-     * 弃审/作废不回收批次号,因此会跳号,但绝不重号)。
+     * 下游单作废/删除时的台账释放。**口径:不回收** —— 批次号与台账 status 一律保留,
+     * 因为批次号在**生单那一刻**就定了,回收会让"已编号批次"重号(用户口径:弃审/作废不回收批次号,
+     * 因此会跳号,但绝不重号)。
      * 保留本方法(而非删掉调用点)是为了让"作废不回收"这一口径集中在一处可查、可回退(见 RECYCLE_ON_RELEASE)。
      */
     public void releaseByTarget(String targetPanel, String targetFormNo) {
@@ -281,13 +329,15 @@ public class BatchService {
 
     // ==================== 查询 ====================
 
-    /** 某来源单的批次清单(默认只列有效批次:已编号 ACTIVE + 待编号 PENDING;含历史释放行见 includeReleased) */
+    /** 某来源单的批次清单(默认只列有效批次:ACTIVE 已编号 + 历史 PENDING 待编号;含历史释放行见 includeReleased) */
     public List<Map<String, Object>> batches(String srcPanel, String srcNo) {
         return batches(srcPanel, srcNo, false);
     }
 
     /**
-     * 批次清单:activeOnly=true 只列 ACTIVE/PENDING;false 连历史释放行一起列(反查/审计用)。
+     * 批次清单:只列 ACTIVE/PENDING;includeReleased=true 连历史释放行一起列(反查/审计用)。
+     * PENDING 是**口径上线前**的遗留态(那时号在入库审核才取),新单一律生单即 ACTIVE;
+     * 这些历史行由 {@link #syncBatchNo} 在该单再次保存/审核时顺键补号并转 ACTIVE。
      * 每行的 targetPanel/targetFormNo = **链路终点单据**(由 resolveEndTarget 解析,见其注释);
      * 台账登记时的原始目标单另存在 firstTargetPanel/firstTargetFormNo,不丢信息。
      */
@@ -309,8 +359,8 @@ public class BatchService {
 
     /**
      * 链路前进站优先级(同一站数有多条 ACTIVE 下游时取前者):主链 采购入库 → 退货 → 特采单 → 检验 → 暂收。
-     * 特采单(QC_TC_IN,2026-09-22 特采闸门)排在入库/退回之后:正常它只是中转站,
-     * 特采审核后生成的入库单站数更深,终点仍是采购入库单。
+     * 特采单(QC_TC_IN)排在入库/退回之后:它只是中转站(2026-10-04 起挂在暂收退料单 QC_RETURN 之下:
+     * 退料单审批通过 →「特采」按钮 → 特采单),特采审批后生成的入库单站数更深,终点仍是采购入库单。
      * 只影响「同一站数」的分支取舍,不改变"站数多者优先"的终点口径。
      */
     private static final List<String> CHAIN_PRIORITY = List.of("PURCHASE_IN", "QC_RETURN", "QC_TC_IN", "QC_INSP", "QC_RECV");

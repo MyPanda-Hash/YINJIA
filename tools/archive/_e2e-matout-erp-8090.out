@@ -1,0 +1,8 @@
+① 登录: factory=YJ_TEST user=admin
+② 保存: code=200 编号=CL-2026-10-0002 success
+③ 提交审批 : code=200 success
+③ 审批通过 : code=200 success
+④ 查询可转ERP: code=200 count=1 → CL-2026-10-0002
+⑤ 转ERP: code=200 msg=success
+   data={"是否已转ERP":"是","ERP单号":"SCLL-20261004-00002","转ERP操作人":"admin","转ERP时间":"2026-10-04 17:31:59","message":"已成功转入金蝶ERP，ERP单号: SCLL-20261004-00002（请在金蝶界面审核）"}
+DOCNO=CL-2026-10-0002

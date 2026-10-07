@@ -124,11 +124,11 @@ REM rehearsal that passed 84/84: force-run the curated to-run list, then baselin
 REM (refresh stale hashes, no data), then a bare sync must be a clean no-op.
 :migrate
 if "%DOMIG%"=="0" goto swap
-if not exist "%PKG%\to-run-20260930.txt" goto fail-norunlist
+if not exist "%PKG%\to-run-20261004.txt" goto fail-norunlist
 echo [4] migrations: force-run to-run list (22 entries: 22 new + 0 informed rerun) - detailed output in logs\deploy-%TS%.log ...
 pushd "%PKG%\tools"
 set "RUNFAILED=0"
-for /f "usebackq eol=# delims=" %%s in ("%PKG%\to-run-20260930.txt") do (
+for /f "usebackq eol=# delims=" %%s in ("%PKG%\to-run-20261004.txt") do (
   java -Dfile.encoding=UTF-8 -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8 -cp lib\mssql-jdbc.jar DbSync.java run %%s >> "%LOG%" 2>&1
   if errorlevel 1 (
     echo    FAILED: %%s
@@ -235,7 +235,7 @@ echo RESULT: FAIL-BACKUP - no rollback point, nothing else was touched
 exit /b 1
 :fail-norunlist
 echo RESULT: FAIL-NO-RUNLIST >> "%LOG%"
-echo RESULT: FAIL-NO-RUNLIST - to-run-20260930.txt missing from package
+echo RESULT: FAIL-NO-RUNLIST - to-run-20261004.txt missing from package
 exit /b 1
 :fail-migrations
 echo RESULT: FAIL-MIGRATIONS >> "%LOG%"

@@ -62,9 +62,15 @@ yinjia:
 kingdee:
   push:
     # 转ERP 账套守卫。当前目标=**测试沙箱**(2026-09-29 用户口径:切回测试账套联调)。
-    # 凭证走 deploy/push/config.json(gitignored,不入库):当前=测试账套静态密钥(clientId 359220,outerInstanceId 留空)。
-    # outerInstanceId 非空 ⇒ 真实账套 ⇒ 必须显式开启本开关才放行;现关闭=false,误配真账套凭证时转ERP 会被守卫拒绝。
-    # 切回真实账套:①凭证换回 deploy/config.json 同款(359797+outerInstanceId,appKey/appSecret 留空)
+    # 凭证走 deploy/push/config.json(gitignored,不入库):当前=测试沙箱**动态授权**
+    #   (clientId 359220 + clientSecret + sandboxInstanceId <测试账套第三方实例id>,appKey/appSecret 留空)。
+    # 为什么沙箱也走动态授权(2026-10-04):金蝶的 appKey/appSecret **含沙箱同样 24h 轮换**,
+    #   写死静态密钥隔天就失效 —— 2026-09-24 写死的沙箱密钥在 2026-10-04 实测已报
+    #   errcode 1030002006「授权密钥校验失败」,转ERP 卡在取 token(单据推不出去)。
+    #   sandboxInstanceId 非空 ⇒ 沙箱也先取最新授权信息;**它不代表真实账套**,不触发下面的 allowProd 守卫。
+    # outerInstanceId 非空 ⇒ 真实账套 ⇒ 必须显式开启本开关才放行;现关闭=false,误配真账套凭证时转ERP 会被守卫拒绝
+    #   (2026-10-04 回归实测:真实凭证下转ERP 被拒,文案含"真实账套"+allowProd)。
+    # 切回真实账套:①凭证换回 deploy/config.json 同款(359797+outerInstanceId,sandboxInstanceId 留空)
     #              ②本开关改 true ③重启后端。
-    # ⚠ 键名必须是 allowProd(与 @Value 精确一致;@Value 不做 kebab-case 宽松绑定,写 allow-prod 会静默落回 false)
+    # ⚠ 键名必须是 allowProd / sandboxInstanceId(与 @Value 精确一致;@Value 不做 kebab-case 宽松绑定,写错会静默落回空/false)
     allowProd: false

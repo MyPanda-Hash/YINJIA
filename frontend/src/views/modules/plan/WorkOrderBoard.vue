@@ -62,16 +62,13 @@
                 <template #dropdown>
                   <el-dropdown-item command="成型生产任务单">{{ tt('成型生产任务单') }}</el-dropdown-item>
                   <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
-                  <el-dropdown-item command="生产投料单" divided>{{ tt('生产投料单') }}</el-dropdown-item>
                 </template>
               </el-dropdown>
               <el-button size="small" type="warning" plain :disabled="!checkedSched.length" @click="openReassign">
                 {{ tt('批量调线') }}（{{ checkedSched.length }}）
               </el-button>
-              <!-- 转领料(2026-10-14,参考旧系统工单排产页同名按钮):勾选已排工单 → 默认 BOM×排产数量 生成领料单(材料出库单)草稿 -->
-              <el-button size="small" type="success" :disabled="!checkedSched.length" @click="toPicking">
-                {{ tt('转领料') }}（{{ checkedSched.length }}）
-              </el-button>
+              <!-- 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04):它按 默认BOM×排产数量 生成领料单草稿,
+                   数据源 bs_bom 与后端 /px/scheduleBoard/toPicking 端点同期删除 ⇒ 按钮一并撤掉 -->
             </div>
           </div>
           <el-table :data="schedRows" size="small" border height="100%" empty-text=""
@@ -220,7 +217,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { callButton } from '@/business/engine'
-import { printWorkTaskSheet, printFeedingSheet } from '@/business/print-formats'
+import { printWorkTaskSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import { useUserStore } from '@/stores/user'
 
@@ -318,47 +315,26 @@ async function openTrace(noParam) {
   } catch (e) { err(e, '查询失败') }
 }
 
-// ── 打印工单(三模板可选,2026-09-27):成型/组装生产任务单 = 行表直打;
-//    生产投料单 = 每工单抓默认 BOM(数量=定额×需求数量)生成投料明细页;打印留痕 printStamp ──
+// ── 打印工单(两模板可选,2026-09-27):成型/组装生产任务单 = 行表直打;打印留痕 printStamp ──
+//    ⚠ 2026-10-14 「生产投料单」模板下线:物料行全部来自自建 BOM(/px/workOrderBom → bs_bom),
+//      随 MES 自建 BOM 功能整体删除,前端已无替代数据源。
 async function printTask(mode) {
   const rows = checkedSched.value
   if (!rows.length) return
-  let okPrint = false
-  if (mode === '生产投料单') {
-    const orders = []
-    for (const r of rows) {
-      let bom = []
-      try {
-        const res = await request.post('/px/workOrderBom', { 产品编码: r.物料编码 })
-        bom = (res.data || []).map((b) => ({
-          物料编码: b.子件编码, 物料名称: b.子件名称, 规格型号: b.规格型号,
-          数量: Math.round(Number(b.定额数量 || 0) * Number(r.需求数量 || 0) * 10000) / 10000,
-          单位: b.子件计量单位 || '', 行备注: '',
-        }))
-      } catch (e) { bom = [] }
-      orders.push({
-        单据编号: r.加工单号, 产品编码: r.物料编码, 产品名称: r.产品名称,
-        产品规格: r.规格型号 || '', 数量: r.需求数量, 客户名称: r.客户 || '',
-        计划完工日期: r.计划完工日期 || '', 制单人: useUserStore().realName, bom,
-      })
-    }
-    okPrint = await printFeedingSheet(orders)
-  } else {
-    const rowsToPrint = rows.map((r) => ({
-      单据编号: r.加工单号,
-      公司代码: r.公司代码 || '', 工单行号: r.工单行号, // 工单二维码=公司代码@工单号@1000+工单行号(2026-10-09 规则改版)
-      是否重点管控产品: r.重点管控 || '',
-      商品编码: r.物料编码 || '',
-      商品名称: r.产品名称 || '',
-      规格型号: r.规格型号 || '',
-      订单数量: r.需求数量,
-      成型折算后数量: r.排产数量,
-      计划完工日期: r.计划完工日期 || '',
-      批号: r.批号 || '', 物料编码: r.物料编码 || '',
-      排产数量: r.排产数量, 生产线: r.生产线 || sel.line || '',
-    }))
-    okPrint = await printWorkTaskSheet(mode, rowsToPrint, { line: sel.line || '', preparedBy: useUserStore().realName })
-  }
+  const rowsToPrint = rows.map((r) => ({
+    单据编号: r.加工单号,
+    公司代码: r.公司代码 || '', 工单行号: r.工单行号, // 工单二维码=公司代码@工单号@1000+工单行号(2026-10-09 规则改版)
+    是否重点管控产品: r.重点管控 || '',
+    商品编码: r.物料编码 || '',
+    商品名称: r.产品名称 || '',
+    规格型号: r.规格型号 || '',
+    订单数量: r.需求数量,
+    成型折算后数量: r.排产数量,
+    计划完工日期: r.计划完工日期 || '',
+    批号: r.批号 || '', 物料编码: r.物料编码 || '',
+    排产数量: r.排产数量, 生产线: r.生产线 || sel.line || '',
+  }))
+  const okPrint = await printWorkTaskSheet(mode, rowsToPrint, { line: sel.line || '', preparedBy: useUserStore().realName })
   if (!okPrint) return
   try {
     await request.post('/px/scheduleBoard/printStamp', { rows: rows.map((r) => ({ 加工单号: r.加工单号 })) })
@@ -383,27 +359,10 @@ async function doReassign() {
   } catch (e) { err(e, '调线失败') }
 }
 
-// ── 转领料(旧系统工单排产页同名按钮):勾选已排工单 → 按默认 BOM×排产数量 生成领料单(材料出库单)草稿;
-//    草稿在 材料出库单 面板扫码补批号后审核出库,回写工单领料单号(看板列随之点亮) ──
-async function toPicking() {
-  const nos = [...new Set(checkedSched.value.map((r) => r.加工单号).filter(Boolean))]
-  if (!nos.length) return
-  try {
-    await ElMessageBox.confirm(
-      `${tt('确认为选中的')} ${nos.length} ${tt('张工单转领料')}？(${tt('按产品默认BOM×排产数量生成材料出库单草稿,审核出库后自动回写领料单号')})`,
-      tt('转领料'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
-  } catch { return }
-  try {
-    const res = await request.post('/px/scheduleBoard/toPicking', { rows: nos.map((n) => ({ 加工单号: n })) })
-    const d = res.data || {}
-    const failed = d['失败行'] || []
-    const list = (d['单号清单'] || []).join('、')
-    ElMessage.success(`${tt('已生成领料单')} ${d['转领料张数'] ?? 0} ${tt('张')}` + (list ? `：${list}` : '')
-      + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''))
-    loadScheduled()
-    loadSummary()
-  } catch (e) { err(e, '转领料失败') }
-}
+// ── 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04) ──
+//    原实现:勾选已排工单 → 按默认 BOM×排产数量 生成材料出库单草稿(后端 /px/scheduleBoard/toPicking
+//    + ScheduleBoardService.toPicking + BOM 表 bs_bom,均已同期删除)。领料单改为在「材料出库单」面板手工
+//    新增/选单;若日后要恢复自动带料,需先有新的用料来源(如金蝶 BOM 接口)。
 
 onMounted(() => {
   loadAll()

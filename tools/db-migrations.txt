@@ -1073,6 +1073,44 @@ migrate-balance-ref-fields.sql
 #      yj_panel 泛化;不进 DOC_ARCHIVE_PANELS/DOC_NO_PANELS —— 那两个集合只含 RD_* 文件类面板)。
 #   验证:tools/archive/_v-tcin.sql(元数据/表列/注明/译名逐项核对,已跑通且幂等)。
 migrate-qc-tc-in.sql
+# migrate-qc-insp-req-custom-tab.sql(2026-10-04):来料检验要求(QC_INSP_REQ)新增页签「自定义检验要求」
+#   用户口径:「加一个 tab 表,这个表可以自定义字段,这样的表能不能也带入到检验数据记录」—— 能:
+#   页签 = 物料类别 的一个字典值,行仍存同一张宽表 ⇒ 天然按物料编号参与匹配,报告的「带入检验要求」原样复用;
+#   该页签的列 = 绑定到本面板的**动态字段**(备用1..20,管理员在「自定义字段」里加,零 DDL;备用列池已在位);
+#   带入规则同现有 7 张表:列名 → 检验项,命中行该列数据 → 检测标准,空值不带。
+#   本脚本仅整串幂等重建 物料类别 词表(加第 8 个值);备用列与动态字段不在此建(池已就位)。
+#   配套:后端 PanelConfigService.addExtField 对本面板的动态字段同批登记进「检验项」标准库 qc.insp_item;
+#        前端 qcInspReqConfig.js 的自定义页签 + QcInspReqSheet 动态列渲染 + 「自定义字段」入口。
+#   验证:tools/archive/_probe-qc-insp-carry/_v-custom-tab.cjs(测试库端到端)。两账套都执行。
+migrate-qc-insp-req-custom-tab.sql
+# migrate-yjfield-tab-key.sql(2026-10-04):yj_field 加 tab_key(字段所属明细页签)
+#   用户口径:「检验数据要求的自定义字段,是单独针对每个表的」—— 来料检验要求每张表(页签)各有各的自定义列。
+#   承载=字段元数据本身:tab_key = 该面板页签名(来料检验要求取 物料类别 字典值);NULL=不区分页签(其余面板零变化)。
+#   没复用 col_group(那是「父表头分组」,档案面板配置也读它生成 gridTabs.groups,拿来存页签会造出假分组)。
+#   同脚本回填:改动前绑定的动态字段(备用列)一律归「自定义检验要求」页签(= 它们当时的显示位置,行为不变)。
+#   配套:后端 PanelConfigService(绑定收 tab + 唯一性改为「同页签内唯一」+ 总览下发 tab)、
+#       前端 qcInspReqCols.js(页签列的唯一判据,渲染与带入同源)、FieldManagerDialog 的「所属页签」。
+#   验证:tools/archive/_probe-qc-insp-carry/_v-custom-tab.cjs(每表各加列 + 重名 + 带入)。两账套都执行。
+migrate-yjfield-tab-key.sql
+
+# migrate-qc-insp-req-tab-pools.sql(2026-10-04):来料检验要求扩展池改「每张表(页签)各 20 个」
+#   用户口径:「字段的扩展池应该是每个表 20 个」——本面板一张宽表当 7 张表用,共用 20 个备用列不够。
+#   qc_insp_req 备用列 20 → **160**(按页签顺序分段:折叠棉 1-20 / 垫片 21-40 / … / 自定义检验要求 141-160),
+#   160 个列级 MS_Description 按「<页签>扩展池 i/20」写;已绑定字段若落在别的页签区间则**搬列**(数据一起搬)。
+#   配套:后端绑定只在本页签段内分配、总览按页签给账(tabPools);设计文档 §3.2 记分页签变体。两账套都执行。
+#   ⚠ 2026-10-04 补登记(体检 12 项发现漏登;本脚本已用 DbSync run 在两账套执行并留痕,补登记后 sync 不会重跑)。
+migrate-qc-insp-req-tab-pools.sql
+
+# migrate-qc-insp-req-filecode-basis.sql(2026-10-04):要求表增「文件编码/检验依据」两列 + 检验报告这两项改为不可修改
+#   用户口径:①「检验报告里面的文件编码与检验依据,要靠物料编码来对应填入,并且不可以修改」;
+#            ②「为每个表格(两个面板)都增加这两列在物料编码后面」。
+#   两张要求表(qc_insp_req / qc_insp_req_series)各加 2 列 nvarchar(100) + 列级注明;
+#   yj_field 为两个要求面板各登记这两字段(seq 25/28,紧跟 物料编号);前端两张表的列序也放 物料编号 之后
+#   (固定表在 qcInspReqConfig.js、全自定义表在 qcInspReqCols.js 的 LEAD_COLS)。
+#   检验报告(QC_INSP_REC)的这两项 editable 1→0(纸面只读),值由报告按物料编码带入
+#   (core/qc/qcInspReqCarry.js 的 carryHeadOf:命中行首个非空;要求表没填则保留报告默认 YJ-QR-96 / YJ-Q-30)。
+#   两账套都执行。
+migrate-qc-insp-req-filecode-basis.sql
 
 # —— 2026-09-21 特采申请单(QC_TC):「最终处理结果」字典补第三值「管控使用」 ——
 #   纸面 YJ-QR-60 原图「二．最终处理结果」印的是三个勾选框(正常使用/管控使用/挑选使用),
@@ -1577,6 +1615,12 @@ migrate-line-open-drop.sql
 migrate-manu-rename-workorder.sql
 # —— 2026-09-24 生产工单列表字段对齐(用户清单):列表 16 列定序+非清单字段退表单+补 备注/创建时间+清重复字段行;标签不动(标签=数据键) ——
 migrate-manu-workorder-fields.sql
+# —— 2026-10-03 补建本机缺失的三张在册遗留表(plang 工单 / plang_pc 工单排产 / scjl 生产记录) ——
+#   本机两账套从未有过这三张参考库遗留表(五库扫描确认),而下面的一系列 plang/scjl 迁移直接依赖它们,
+#   链跑到 migrate-plang-workorder.sql 就报「找不到对象 dbo.plang」而中止,排在后面的库存三表/表定册/
+#   备用列池整批跑不到。结构按 tools/archive/_ref-dump/01-table-structure.txt 生成(生成器
+#   tools/archive/_gen-legacy-tables.mjs);**必须排在本组 plang/scjl 迁移之前**(故就地插入而非追加到链尾)。 ——
+migrate-legacy-plang-scjl-tables.sql
 # —— 2026-09-24 生产工单列表数据源切参考库 plang(用户拍板:外部系统直接写 plang,键=公司代码+工单号+工单行号):plang 补 打印人/打印时间 两列(打印生产任务单留痕,对齐 bd_manu_order 同名同义);/px/workOrderList 改查 plang+新增 printStamp/close/reassign 三端点;plang 无面板/代码引用,纯增量加列,幂等 ——
 migrate-plang-workorder.sql
 # —— 2026-09-27 bl_so_order补建「仓库名称」行级列(仓库关联改造加映射漏建列,致SO同步50/50失败)+yj_field注册+注明;幂等可重跑 ——
@@ -1925,6 +1969,293 @@ migrate-stock-movement-from-flow-2026-09-30.sql
 #   幂等可重跑(先判后加列、先判后 DROP VIEW,下游视图按名解析无需重建),两个账套都执行。
 migrate-stock-flow-tax-cols-2026-09-30.sql
 
+# —— 2026-09-28 材料出库单(MATERIAL_OUT)接口并集补全 + 开通转ERP(对口金蝶「生产领料单」inv_pick) ——
+#   用户口径:「bl_material_out 少了一些字段,这个要转ERP的;ERP 里有哪些字段要转过去这里都要加上,
+#   尤其关注价格、税金;先查金蝶真实账套有没有用到这张单、表里有没有数据;没有就按采购入库单的方式
+#   把接口字段并集全部写入,显示常见字段」。
+#   实测(金蝶真实账套只读,deploy/_probe-matout.mjs 与 _probe-invpick-fields.mjs):
+#     · 对表单 = **生产领料单** /jdy/v2/scm/inv_pick,**4801 张**(真实在用);
+#       对照 pur_inbound 3266 / sal_out_bound 5084 / inv_other_out 1130;其余候选路径 519 无此接口。
+#     · 头 33 键 + 行 74 键(采样 40 张/156 行);⚠ **无税金族**:没有 税率%/税额/含税单价/金额/价税合计
+#       (与采购入库/销售出库本质不同);价格族只有 price/cost/unit_cost 三键,且真实账套 244 行实测全为 0。
+#     · MES 侧 bl_material_out 仅 22 列(2 张/4 行数据),故按「接口并集全量写入」口径补齐。
+#   ① migrate-material-out-fields.sql(生成器 tools/archive/_gen-material-out.mjs):
+#      bd_material_out 补 25 列、bl_material_out 补 63 列(并集减去已由现有列代表的键),
+#      同脚本注册 yj_field(常见字段显示、id/创建修改/图片/空值族隐藏;价格族「成本/单位成本」强制显示)
+#      + en 译名 + 每列 MS_Description 中文注明。按用户口径**不建税金列**。
+#   ② migrate-material-out-erp.sql:bd_material_out 补 是否已转ERP/ERP单号/转ERP操作人/转ERP时间 四列 + 字段注册。
+#      配套代码(同提交):KingdeePushService 增 MATERIAL_OUT 分支(推 /jdy/v2/scm/inv_pick;不推 trans_type/
+#      供应商/客户/税金,头带 dept_number→部门编码·emp_number→经手人编码·pick_type,行带 price/cost/unit_cost/comment)、
+#      ButtonService 三处放行(转ERP/查询可转ERP/弃审清标记)、PanelConfigService MATERIAL_OUT 工具栏加 转ERP 组。
+#   ③ ⚠ 本脚本刻意**不写** `USE HSDZ_MES;`(采购入库那份生成器写了,对测试库跑会被切回正式库)—— 两账套各自生效。
+migrate-material-out-fields.sql
+migrate-material-out-erp.sql
+
+# —— 2026-09-28 材料出库单接口并集新字段的**日语**译名补齐(多语言强制规范·判定标准) ——
+#   实测:migrate-material-out-fields 按采购入库同款只写了 en,92 个新标签里仅 7 个(部门编码/仓库编码/
+#   创建时间/辅助数量/换算率/经手人编码/行号,均为跨面板共享标签)带 ja,其余 85 个切日语回落中文 ⇒ 判定不通过。
+#   本脚本补 85 条人工 ja(source='manual';仅插缺失、不覆盖已有),并把「MATERIAL_OUT 全部字段标签 ja 覆盖 100%」
+#   写成自检(缺一即 RAISERROR)。其余 7 语言仍走 TranslationService 机翻兜底(与采购入库那批同口径)。
+#   两个账套均已执行:117 标签 / 缺 en 0 / 缺 ja 0 / ja 人工译名 117。幂等(复跑插入 0 行)。
+migrate-material-out-i18n.sql
+
+# —— 2026-09-28 材料出库单(MATERIAL_OUT)字段关联基础资料(参照)—— 沿 2026-09-20「七单据」同款口径 ——
+#   用户口径:「把这个表格的字段关联做好」。项目里「字段关联」的唯一先例是 migrate-query-ref-links.sql
+#   (采购订单/送料暂收单/暂收退回单/来料检验单/采购入库单/销售订单/销售出库单),**材料出库单正是当时漏掉的**,
+#   且本次刚补进来的接口字段(部门编码/经手人编码/仓库编码)同为文本无关联 ⇒ 按同款口径补齐。
+#   改前实测:① 明细「计量单位」是硬编码下拉(只有 件/kg/套/升),真实单位 个/支/张/PCS/卷/条 选不出来
+#   (转ERP 按名称换金蝶 unit_id 直接受影响);② 表头「生产车间」硬编码下拉(熔铸/轧制/精整/测试车间)
+#   与部门档案不符(转ERP 推 dept_number 靠它换编码);③ 新加三列(部门编码/经手人编码/仓库编码)为文本。
+#   本脚本:计量单位→UOM.计量单位名称(清 dict_sql)、仓库编码→WH.仓库编码(显示仓库名称)、
+#   生产车间→DEPT.部门名称(清 dict_sql)、部门编码→DEPT.部门编码、经手人编码→EMP.员工编码;
+#   材料编码 显示列 存货编码→存货名称(与七单据「物料编码」同款)。三条自检:非参照 0 / 指错档案 0 / 硬编码残 0。
+#   档案命中率前置实测:商品档案在用单位 19 种全部命中 bs_uom;材料出库值 精整车间 命中 bs_dept、
+#   原料仓/辅料仓 命中 bs_wh ⇒ 改参照不会被「选不出来」卡住。
+#   配套代码(同提交)PanelConfigService:REF_SYNONYMS 增 员工编码→经手人编码、计量单位编码→单位编码/基本单位编码
+#   (选人/选单位时把编码一起带回,转ERP 推 emp_number 用);并把条目表 Map.of → Map.ofEntries(超 10 对必编译失败);
+#   新增 REF_CARRY_EXCLUDE 排除 创建时间/修改时间/创建人/修改人 —— 实测 UOM 面板也有这四个同名字段,
+#   不排除则选个计量单位就把**单位档案的**留痕写进单据行。
+#   ⚠ 遗留(未动,需用户定):bs_uom 有 8 行金蝶遗留单位(U01..U08,名称=件/kg/套/升/台/吨/g/2)与 32 行正常行
+#     重名 6 处,选择框会出重复项。bs_uom 是**同步档案**,本地停用会被下次同步覆盖 ⇒ 应在金蝶侧处理(或改同步映射)。
+migrate-material-out-ref-links.sql
+
+# —— 2026-09-28 材料出库单「中英文混杂」字段标签清理(用户口径) ——
+#   现象:表头可见位上挂着 单据状态_bill_status / 审核时间_audit_time / 审核人_auditor_name 这种半英半中标签,
+#   另有 7 个裸英文列名(dept_id/creator_id/modifier_id/bill_type_id/auditor_id/emp_id/pick_use_id)与
+#   同批已成中文的 商品id/仓库id 不一致。成因:接口并集生成器的兜底规则 `<中文标签>_<接口键>`。
+#   本脚本就地改名(与 migrate-spec-unify.sql 的 sp_rename 同款):列名 + yj_field.col_name/label 一起改,
+#   MS_Description 挂在列 id 上随改名保留;旧标签译名**保留**(采购入库/销售出库仍用同名标签),
+#   新标签另补 en/ja(10+10 条)。改名对照:单据状态_bill_status→金蝶单据状态、审核时间_audit_time→金蝶审核时间、
+#   审核人_auditor_name→金蝶审核人、dept_id→部门id、creator_id→创建人id、modifier_id→修改人id、
+#   bill_type_id→单据类型id、auditor_id→审核人id、emp_id→经手人id、pick_use_id→领料用途id。
+#   幂等且**两种顺序都收敛**(实测 HSDZ_MES_TEST 演练):旧名在→改名;新旧并存(有人按清洁名重跑了生成器)
+#   →旧列数据补进新列空值处再删旧列 + yj_field 去重。自检:混杂标签必须为 0(判定=含下划线 或 纯 ASCII;
+#   ⚠ 别用「含小写字母」判,商品id/序列号流转ID 会被误报 25 个)。
+#   源头同步(同提交):生成器 _gen-material-out.mjs 的 LABEL 词表改为清洁名 + EN_OVERRIDE,
+#   并**重跑生成器** ⇒ migrate-material-out-fields.sql 与 deploy/kingdee-extra-fields.mjs 同步改名
+#   (两处已随本提交更新;重跑字段并集对已改名的库是全 skip,已验证幂等)。
+migrate-material-out-label-cleanup.sql
+
+# —— 2026-10-03 库存三表重构漏项收口:补写「迁移前已审核」的历史单据流水 + 撤 kucun 快照期初 ——
+#   现象:库存台账/库存状况表/收发存汇总 三个面板只剩期初行,期间单据全丢;收发存汇总查 2026 年期次为空。
+#   根因:v_stock_movement 改读流水表后,迁移前已审核的单据从未写过流水(远端判定代价为 0,
+#     依据「8 张 bd_* 头表合计 0 行」;本机实测为 119 采购入库 + 123 销售出库,覆盖 86 个仓库×存货键)。
+#   本脚本按迁移前旧视图(migrate-inv-report-fields.sql)的 8 段逐列口径补写,含 src/rid 一一对应
+#     (弃审红冲与 InvCostService 成本递归都靠它);并撤掉由 kucun 快照生成的期初行(否则与补进来的
+#     历史单据双计 —— 实测 YJ-SX-031 期初 4500 + 单据 4600)。幂等,两账套均执行。 ——
+migrate-stock-flow-history-backfill.sql
+
+# —— 2026-10-03 承上:按库存流水重建 kucun 结存缓存(把启动自检「结存 == Σ流水」修回一致) ——
+#   补写历史流水后流水才是完整真源,而 kucun 只剩 7 条非零余量(遗留残缺,7,011),与流水净额 38,087
+#   差 31,076 ⇒ 启动自检实测报 227 个三键不一致。按本项目「流水是唯一真源,kucun 只是结存缓存」的
+#   设计口径,由流水派生 kucun:①NULL 仓库编码按 bs_wh 名称解析;②已有键改 yl;③多余键归 0;
+#   ④流水有而 kucun 无的键补插。三键严格照 InvCostService.key3(原样拼接,NULL 与空串不等价)。
+#   影响:kucun 供 库存状况表(STOCK_STATUS) 与首页库存卡片读取,现存量由 7,011 → 38,087(单据口径),
+#   与库存台账/收发存汇总一致。幂等,两账套均执行。 ——
+migrate-stock-flow-kucun-resync.sql
+# —— 2026-10-04 批次号口径变更:入库审核取号回填 → 生单即定号 ——
+#   用户口径:批次号 = 供应商编码去掉 YJ- 前缀 + - + 生单当天 yyyyMMdd(如 YJ-TX、2026-09-10 ⇒ TX-20260910);
+#   采购订单→送料暂收单**生单那一刻**写入,下游(检验/入库/退回)逐站继承同一个号;不再有回填机制。
+#   可编辑窗口:只有送料暂收单**草稿态单头**可改,审核后整链只读;明细行随单头一致(后端每次保存/审核
+#   按单头覆盖写全部明细行)。本脚本只改元数据:批次号字段可编辑口径 + 各表批次号列中文注明 + 自检。
+#   同批修复 migrate-batch-link.sql 的无条件 DELETE+INSERT(它重跑会把批次号 editable 抹回 1,
+#   实测 2026-10-03 14:39 抹掉了 2026-09-23 的只读意图),改为"只在缺失时插入"。
+#   幂等,两账套均执行。 ——
+migrate-batch-no-on-generate.sql
+# —— 2026-10-04 特采单(QC_TC_IN)改两级审批:编制 / 审核 / 批准 三格自动落值 ——
+#   用户口径:编制 = **提交审批的人**;「审核」= 一级审批通过的人(组织架构勾了「特采单·审核反审核」
+#   的角色账号 ∪ 管理员);「批准」= **超级管理员**(一级通过后由他批准才真正通过)。与产品信息表
+#   (RD_PROD_INFO)同机制:一级通过 → 「待二级审批」→ 二级通过;任一级驳回一律回草稿并通知提交人
+#   (二级驳回另通知一级审核人);两级**必须各点一次**(同一人也要两次)。
+#   后端:ButtonService.TWO_LEVEL_PANELS 加 QC_TC_IN + ADMIN_L2_PANELS(二级固定超级管理员、
+#     不选人);doSubmitApproval 写编制人;approveApproval 一级写审核人/审核时间并通知管理员;
+#     approveSecond 写审批人/审批时间 + 生成采购入库单(生单钩子从一级挪到**批准通过**)+ 通知
+#     提交人/一级审核人;rejectApproval 清签名格并通知;unaudit 清签名格 + 节点复位;
+#     audit() 对特采单直审一律拒绝(「取消直审」);save() 剥离编制人/审核人/审批人/审批时间入参。
+#     QueryService.loadDocs:「审核人/审核时间」的虚拟字段覆盖(取 yj_doc_status.shr = 最终审批人**账号**)
+#     对特采单**跳过** —— 否则界面「审核」格从一级审核人变成 "admin"(UI 走查实测到,已修);
+#     存量单表内为空时才退回 shr 兜底。
+#     PanelPermissionService.BUTTON_PERMS_OVERRIDE:新增 `QC_TC_IN|提交审批` → add/modify/audit ——
+#     全局表把「提交审批」归 audit,只有审核人能提交则「编制人恒等于审核人」,且非管理员提交后
+#     被「编制审批分离」挡死在审批这一步(同 RD_CHANGE 的既有先例)。
+#   消息码:APPROVAL_L2_PENDING(→超级管理员)/ APPROVAL_L2_DONE(→一级审核人)/
+#     APPROVAL_L2_REJECTED(二级驳回→一级审核人),不含既有 APPROVAL_SUBMITTED/APPROVED/REJECTED。
+#   前端:PanelxList 节点感知审批按钮(一级「审批通过」/二级「批准通过·批准驳回」,二级仅超级管理员);
+#     DocSheet 签名格按字段元数据只读渲染(此前 signKey 格不认 editable=0);10 语言包补 8 条词条。
+#   本脚本只改元数据(表列早已存在):审批人/审批时间字段登记 + 三格 editable=0 + 列注明 + 译名补齐。
+#   幂等,两账套均执行。 ——
+migrate-qc-tcin-twolevel.sql
+# —— 2026-10-04 承上:质量单据(品质管理·质量单据 7 张)同样改两级审批 ——
+#   用户口径:「所有品质管理下的质量单据都采用这个二级审批的形式」。7 张 =
+#   QC_BHG 不合格报告(制程)/ QC_BHC 不合格品处理单(制程)/ QC_BHZ 不合格品处理单(自制物料)/
+#   QC_JJF 紧急放行申请单 / QC_SCP 试产材料使用申请单 / QC_LYB 来料异常分析报告 /
+#   QC_SCY 生产异常分析报告(与特采单 QC_TC_IN 合起来正好是前端 qcSheetCfgs 全套 8 张)。
+#   口径与特采单逐字一致:编制=提交审批的人、审核=一级审批通过的人(勾了该面板「审核反审核」
+#   的角色∪管理员)、批准=超级管理员;一级通过不生单、批准通过才通过;两级必须各点一次;
+#   任一级驳回回草稿并通知提交人(二级驳回另通知一级审核人)。
+#   ⚠「编制」那格各表绑的列不同,逐面板登记(后端 ButtonService.QC_DOC_PREPARER 同一份口径):
+#     QC_BHG=填写人 QC_BHC=责任人 QC_BHZ=责任人 QC_JJF=检测人 QC_SCP=责任人
+#     QC_LYB=编制人 QC_SCY=编制人 QC_TC_IN=编制人。
+#     其中 QC_BHC/QC_BHZ/QC_SCP 的「责任人」列**同时是表头业务格**(产品负责人)—— 该列被
+#     自动落值后表头与落款两处都显示提交人且只读,这是用户明确确认过的口径。
+#   后端:ButtonService.QC_DOC_PREPARER(编制格字段表,ADMIN_L2_PANELS = 其键集)、
+#     TWO_LEVEL_PANELS 由它派生;writeBackSignCell / clearAuditSignCells 取代原特采单专用件
+#     (表名改取 def.headTable(),故 8 张共用一套);audit() 直审拦截、save() 剥离签名格入参
+#     一并铺开;assess QueryService.loadDocs 的「审核人」虚拟字段例外同步铺开;
+#     PanelPermissionService 的 提交审批 授权词覆盖从 1 张铺到 8 张。
+#   消息码标题去「特采单」专用化:待超级管理员批准 / 单据已批准(10 语言包同步改名)。
+#   本脚本只改元数据(七张表的 审核人/审核时间/审批人/审批时间 四列早已存在):
+#     审批人/审批时间字段登记(7×2)+ 审计四格 editable=0 + 7 张「编制」格 editable=0
+#     + 关键列中文注明改写(原注明是 2026-09-28 体检批量打的「历史遗留英文列…清理候选」,已过时)。
+#     幂等,两账套均执行。 ——
+migrate-qc-docs-twolevel.sql
+
+# —— 2026-10-04 采购订单材料码打印单:供应商自行打码时批次号的登记与预约 ——
+#   用户口径(拍板见 docs/plans/2026-10-04-采购订单材料码批次号方案.md):批次号**前移到打印时**——
+#   供应商自己打码要在标签上印批次号,而批次号原本到"生单那一刻"才有。打印记录即该订单上批次号的
+#   **权威登记处**,生单只**消费**它不再按公式重算;打印即**预约**余量,作废即释放。
+#   两张表(规范 §1.1:bills 必须 bd_ 头 + bl_ 行成对,中文列名 + asp_user1/2 + asp_time1/2 + asp_cancel):
+#     bd_pu_label 头 —— 一批次号一张(同订单+同号复用,重打只累加打印次数不重复占用),单据号 MQ-yyyy-MM-nnnn;
+#     bl_pu_label 行 —— 本批次号下每个采购订单行打印了多少(锚=采购订单行id,与 form_flow_link 同源)。
+#   刻意不写「已生单数量」列:由 form_flow_link(batch_no + source_line_key + ACTIVE)派生 ⇒
+#   下游单作废/删除时 link 置 RELEASED,预约自动回落,零回滚代码。
+#   **不建面板**(用户明确不要):不插 yj_panel/yj_field、不进菜单、不配权限,只做表级在册登记。
+#   幂等,两账套均执行。 ——
+migrate-pu-label.sql
+
+# —— 2026-10-04 材料码打印单:**一次打印 = 一行 = 一张单**(追加口径) ——
+#   用户口径:「打印需要是每次一行,不能多行否则作废就全部作废了」——作废按**单据编号**整张作,
+#   多行挤一张单 ⇒ 作废一行连累其余行。故:服务端强制一次只收一行、每次都新建头;
+#   原来那条「同订单+同批次号一张存活头」的唯一索引 uq_bd_pu_label_order_batch **废掉**
+#   (否则同号打第二行会被唯一键顶掉);"同一张纸再打一遍"改由显式「重打」承担
+#   (PuLabelService.reprint 只累加打印次数、不新增预约)。顺带把表/列中文注明改成新口径。
+#   幂等,两账套均执行。 ——
+migrate-pu-label-one-line-per-print.sql
+
+# —— 2026-10-04 材料码打印单:**已生单的量也可以补登打印** ——
+#   用户口径:「还有已经生单的数据也应该可以打印」。补登 = 给**已收(已生单)**的量补打材料码:
+#   不产生隔离行、不扣余量、批次号取该行已生单单据的号(锁定);只为追溯留痕。
+#   bl_pu_label 加两列:补登 nvarchar(1) 默认 N(Y=补登)、去向单据 nvarchar(40)(对应的已生单单号),
+#   两列都带中文注明;老数据按"待生单"回填(N)。幂等,两账套均执行。 ——
+migrate-pu-label-supplement-print.sql
+
+# —— 2026-10-03 商品·来料检验 口径落定:未填写(空)= 否 ——
+#   用户口径:「金蝶自定义字段新增的第 4 个字段 = 来料检验(键 custom_field__1__62tvoyr1j4fa,
+#   已登记进 deploy/sync-core.mjs 的 CF_INSPECTION_KEYS);拉下来后,没有填写是的默认为否」。
+#   金蝶侧未勾选时接口回空串 ⇒ 同步器原先把空串写成 NULL、界面一片空白;
+#   本脚本把 bs_inv.来料检验 的存量空值统一回填「否」(已填「是」的不动),并给列注明补上该口径;
+#   同步器侧同口径改造(cfInspection:取不到「是」即写「否」,见 deploy/sync-core.mjs)。
+#   执行前:bs_inv 3874 行(金蝶同步 3852 + 本地手录 22),是 9 / 空 3865 / 其它 0。
+#   幂等,两账套均执行。 ——
+migrate-inv-inspection-default-no.sql
+
+# —— 2026-10-04 特采改由「暂收退料单」发起(检验 → 退料单 → 特采单 → 采购入库) ——
+#   用户口径:①来料检验单明细的「特采」字段下线;②「特采」改到暂收退料单 —— **明细行的 bool 字段
+#   (勾选)**;同日修订:「应该是一个明细的 bool 字段不是按钮,删除按钮」⇒ 工具栏按钮那版已废弃;
+#   ③暂收退料单**审核/审批通过时**,勾了的行逐行生成特采单;④退料单记录来料检验单的「送检数量」,
+#   由它填特采单(总数量=送检数量、不合格品数量=退货数量);⑤特采单审批通过 → 采购入库单。
+#   两个脚本合起来 = 当前口径:
+#     migrate-qc-tc-via-return.sql —— 检验端下线 + 退料单记送检数量 + 链路列 + 译名 + 存量回填;
+#     migrate-qc-return-tc-flag.sql —— 退料单明细的「特采」bool 开关(修订后新增的那一件)。
+#   非破坏性:qc_insp_detail.[特采] 列与存量数据、旧 QC_INSP→QC_TC_IN 链路与那批特采单全部保留,
+#   配套代码同时认新旧两种特采来源,老单不会卡死。
+#   幂等,两账套均执行。 ——
+migrate-qc-tc-via-return.sql
+migrate-qc-return-tc-flag.sql
+
+# —— 2026-10-05 采购链/销售链「明细自动计算列」历史空值回填(用户口径:**只补空,不动已有值**) ——
+#   用户原话:「采购入库单的金额要自动计算。并且整个链路有关自动计算的字段都要检验,是否有自动计算」。
+#   体检结论(探针 tools/archive/_CalcAudit.java,报告 tools/archive/_calc-audit.md):
+#     **规则本来就有,但半个机制是断的** —— 后端 PanelConfigService.buildCalcRules 按字段组合推导出
+#     「金额=数量×单价 / 含税单价=单价×(1+税率%/100) / 含税金额=数量×含税单价 / 税额=金额×税率%/100 /
+#     折扣金额=数量×单价×折扣%/100 / 总重=单重×数量」并下发给前端 detail.tabs[].calc,而**只有浏览器**
+#     在改单元格(@change)时算;**生单与保存两条落库路径从来不重算**:
+#       · 来料检验单审核自动生成采购入库单(ButtonService.inspAutoPurchaseIn)只写 实收数量/单价
+#         ⇒ 实测 bl_purchase_in 269 行有量有价,**128 行金额为空**;
+#       · 分批送料把上游采购订单的**整单金额**原样带到暂收行 ⇒ sl_recv_detail 226 行有量有价,
+#         160 行 金额 ≠ 数量×单价;销售出库 123 行 1 空 / 4 不符;采购订单、销售订单 0 不符。
+#   代码侧修(同提交):新增 CalcRuleService(规则生成 + 公式求值 + 前端同款守卫)
+#     + PanelConfigService 改调它(删掉原来的私有规则副本)
+#     + **ButtonService.upsertLineRows 在写行表前对每行调 applyRules** —— 生单/保存/选单全部覆盖,
+#       今后不再产生新的空值。另:来料检验单「损耗率=损耗/送检数量」(列注释既有口径)纳入规则;
+#     「损耗」是现场实测值,保持手工填写(用户 2026-10-05 拍板)。
+#   本脚本只负责把**已经躺在库里**的空值补上:
+#     ★ 只补空 —— 仅当目标列 IS NULL 且入参齐备时才写;任何**已有值一律不动**,
+#       包括 sl_recv_detail 那 160 行「金额≠数量×单价」(整体重算不在本次授权内)。
+#     ★ 逐列 COL_LENGTH 守卫 + 表达式自带"入参齐备"条件 ⇒ 幂等,重跑影响 0 行;测试库结构陈旧也不报错。
+#     范围:采购入库单/送料暂收单/采购订单/请购单/销售出库单/销售订单/库存出入库一族/生产工单/来料检验单。
+#   验证:tools/archive/_CalcAudit.java 复跑,「有量有价但金额空」应由 128 归 0。
+#   幂等,两账套均执行。 ——
+migrate-calc-amount-fill-2026-10-05.sql
+
+# —— 2026-10-03 「商品」面板一次保存误删 3873 行的**数据恢复**(事故善后,非结构变更) ——
+#   现象:用户报「商品的数据怎么只剩一行了」。查证(探针 tools/archive/_probe-inv-cancel.sql):
+#     HSDZ_MES.dbo.bs_inv 共 3874 行,3873 行 asp_cancel='Y' 且 asp_user2='admin'、
+#     asp_time2 = 2026-10-03 19:07:10.163(同一批次);yj_archive_change_log id=8 同时刻记录
+#     {"removedRows":3873,"changedRows":1} —— 即「商品」面板带筛选保存时,前端把**子集**当整档提交,
+#     后端 saveArchive 按「缺席行=已删除」把未加载的 3873 行全软删了。
+#     ⚠ jdy-sync 按外部指纹跳过未变更商品 ⇒ **不会自愈**,必须人工恢复。
+#   本脚本:按「批次时间戳 + 操作人 + 当前为作废」三条件把那一批改回 asp_cancel='N';
+#     只动该批次(不连带复活用户此前有意删除的行),留痕(asp_user2/asp_time2)保留。
+#   幂等:恢复后不再满足条件,重跑影响 0 行。两个账套均已执行:
+#     HSDZ_MES 3874/3874 存活、作废 0;HSDZ_MES_TEST 本就 3859 全存活(快照早于事故),影响 0 行。
+#   防再犯(同任务代码侧):档案保存必须由客户端声明「档案全量=已加载整档」才做缺席行软删,
+#     否则只 upsert 提交行并回传「未全量跳过软删」提示 —— 见 ButtonService.saveArchive 方法头。 ——
+migrate-restore-inv-cancel-2026-10-03.sql
+
+# —— 2026-10-03 「商品」面板必填清零(用户口径:「商品不要任意设置字段为必填」) ——
+#   背景:yj_field 里 INV 有 3 个必填(所属类别/存货编码/存货名称,最初种子 db/HSDZ_MES.sql 带的),
+#   而商品档案是金蝶同步来的 3874 行、「所属类别」等常有空值;前端 validateInlineDraft 对档案面板
+#   是**逐行 × 逐必填字段**全量校验 ⇒ 任意一行缺这几个字段,整个面板"改一行也存不下去"
+#   (报「明细第 N 行X不能为空」)。本脚本把 INV 必填全部置 0(其它面板不动),末尾自检
+#   必填数必须为 0(否则 RAISERROR)。幂等,两账套均已执行(111 字段 / 必填 3 → 0)。 ——
+migrate-inv-required-off-2026-10-03.sql
+# —— 2026-10-05 来料检验单(QC_INSP)表头补「部门 + 部门编码」(用户口径:「来料检验单的表头
+#   缺少部门与部门编码」) ——
+#   背景:2026-09-30 migrate-qcinsp-header-fix.sql 消表头重复时把 部门/部门名称 退回 detail 位,
+#     表头从此没有部门(明细网格里仍在)。口径同采购入库单/材料出库单:部门=参照部门档案(存名称)、
+#     部门编码=参照部门档案(存编码,转 ERP 取 dept_number);两个都上表头、人工选。
+#     ⚠ 不随链带入:用户口径「生单不用带入部门,这个生单是跨部门的」—— QC_RECV→QC_INSP 这一跳
+#     不带 部门/部门名称/部门编码(代码侧 PanelConfigService.FLOW_LINK_EXCLUDE +
+#     ButtonService.syncInspFromSlRecv),生单与暂收保存都不再把仓库部门写进检验单。
+#   幂等(qc_insp 加 部门编码 nvarchar(100) NULL + 两行 header 字段 + 译名兜底),两账套均执行。 ——
+migrate-qcinsp-header-dept.sql
+# —— 2026-10-03 送料暂收单/来料检验单 参照源回正(修 2026-09-24 越界污染)—— 
+#   事故: migrate-sl-supplier-ref.sql 的行内注释吞掉了同行 label/place 筛选条件,
+#     迁移链按内容哈希重放后把 QC_RECV/QC_INSP **每一行字段**的 ref_panel/ref_field/display_field
+#     都刷成 GFDA(供应商) —— 物料编码/业务员/部门/仓库/单位/暂收单号 弹出供应商列表。
+#   本脚本: 按污染前快照 HSDZ_MES_RESTORE(2026-09-23 13:23)逐字段回正 20 处参照源
+#     (19 处照抄快照;「QC_INSP.暂收单号」快照原值 单据编号 取不到值——QC_RECV 返回行键是 label
+#      「单号」,故一并改为 单号)。只动参照源三列,字段名与顺序零变化。
+#     sl-supplier-ref 本身已还原筛选条件并加行数守卫(超 10 行即 RAISERROR)。
+#   取证: tools/archive/_RefDiff.java → _refdiff.out;两账套均需执行。
+#   (sl-supplier-ref 已在链上,见上方原登记处;其内容已改,DbSync 依内容哈希变化自动重跑)
+migrate-qc-ref-repair.sql
+
+# migrate-drop-bom-kingdee.sql(2026-10-04):下架「BOM单」面板(BOM_KD)与其两张表 —— 用户要求
+#   「删除本地基础资料的 bom 单面板,包括数据库」。当天建、当天删:金蝶账套实测一条 BOM 都没有
+#   (bd/bom 列表 0、bd/bom_query 抽样 306 商品全 0、pm/bom 接口 API not found),页面永远是空表。
+#   脚本删 yj_panel/yj_field(BOM_KD)、panel 译名「BOM单」、以及本功能新增且已无其它面板引用的 field 译名,
+#   最后 DROP bs_bom_detail / bs_bom_head;幂等,两账套均已执行。
+#   建表/同步/自检那一整套保留在 git 历史 commit d6998ebd,金蝶开通接口后一条 revert 即可恢复。
+migrate-drop-bom-kingdee.sql
+
+# migrate-drop-bom-panels.sql(2026-10-04):下架 MES 自建「物料清单(BOM)」面板族 —— 用户追加要求「要删」。
+#   删面板元数据 BOM(物料清单,17 字段)+ WO_KIT(工单齐套表,26 字段),删视图 v_wo_kit(唯一数据源是 bs_bom),
+#   删表 bs_bom(48 列/81 行);译名按「仍被其它面板引用则保留」处理(面板名「物料清单」WLBOM 还在用 ⇒ 保留)。
+#   附:后端 5 处读 bs_bom 的代码与前端 BOM 专属 UI/菜单同批移除。幂等,两账套均已执行。
+migrate-drop-bom-panels.sql
+
+# migrate-qc-insp-req-series.sql + migrate-qc-insp-req-drop-custom-tab.sql(2026-10-04):来料检验要求拆成两个面板
+#   用户口径:「现在将那个自定义的表删除,然后多增加一个来料检验要求的面版,下面有这几个切换表(而且都是自定义的):
+#   阻垢系列/BK材料系列/除重金属系列/矿化(碱性)系列/抑菌系列/载银系列/炭粉/胶粉/矿化料/原料来料,
+#   实现和之前一致,只是为了不要太多的表都集中在一个面版才拆成两个」。
+#   series = 新面板 QC_INSP_REQ_SERIES + 表 qc_insp_req_series(10 张全自定义表,备用1..备用200 每表 20 位);
+#   drop   = 旧「自定义检验要求」页签下线(词表回 7 值 + 该页签字段退绑 + 数据行软删 + 备用141..160 注明改预留)。
+#   ⚠ 顺序:先 series 后 drop。两账套都执行。
+migrate-qc-insp-req-series.sql
+migrate-qc-insp-req-drop-custom-tab.sql
+
 # ── 2026-10-07 实验室记录表日期/时间格改「选取填写」(用户报错 241 的根治) ──
 #   起因:RD_INSTR_USE 保存报 S0001/241「从字符串转换日期和/或时间时,转换失败」——
 #   面板字段登记成「文本」(界面给手填框),而服务器上 rd_instr_use_detail.使用日期 等列是 datetime
@@ -1936,6 +2267,7 @@ migrate-stock-flow-tax-cols-2026-09-30.sql
 #   四个「测试时间」格(碱性表头/数据行、抗菌表头、浸泡表头、压降精度数据行)**不动**(值为日期段/Excel 序列
 #   混杂,2026-10-07 用户口径保持文本)。
 #   配套代码:RecordSheetPanels.vue 按 data_type 出控件 + core/panel/sheetDateCells.js 取值归一
-#   (归一失败不回写,历史值不丢);后端 normalizeByType 同时把 ISO 归一成 yyyy-MM-dd,两头收口。
+#   (归一失败不回写,历史值不丢);后端 QueryService 把日期类字段按本地墙钟文本下发、
+#   normalizeByType 把 ISO 归一成 yyyy-MM-dd,两头收口。
 #   自检:日期 8 条 + 时间区间 1 条;幂等可重跑;两个账套都执行。
 migrate-lab-sheets-date-fields-2026-10-07.sql

@@ -152,7 +152,6 @@ const RD_ASM_PROC_DT_BOM = {
   page: 1,
   bar: 'BOM表',
   filterKey: '表区', filterVal: '物料清单',
-  materialPick: true,   // 从基础档案 BOM 面板引用物料
   // 本页有「产品基本信息」区且其中已有 工艺形态 一格 ⇒ 表头不再重复一条变体切换行
   // (实测:不写这行时同页会出现两个「工艺形态」下拉,一个在信息区、一个在表格表头上)
   noVariant: true,
@@ -1328,10 +1327,11 @@ export const recordSheetConfigs = {
       // 第 4 页 1.关键物料列表:表头照设计 B6 = 序号|物料编码|物料名称|规格参数|数量|备注。
       // ⚠ **不要给这张表加 bar**:它的标题已由上面 page:3 那个 sections 块出(为了排在表格之前),
       //    两者都有 = 同一标题渲染两遍(用户报「空余行重复了」)。
-      // materialPick = 设计 [E4]「由材料库引用：输入物料编号自动引入」的落地(编辑态出「从物料清单引用」按钮)。
       // ⚠ filterKey/filterVal 保留:规格书全部明细共用一张 rd_spec_doc_detail,靠 [表区]='物料清单'
       //    把物料行与修订记录/检验项目行分开;删掉会把整张明细当物料显示(踩过)。
-      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
+      // ⚠ 2026-10-14:MES 自建「物料清单(BOM)」功能整体删除(表 bs_bom / 面板 BOM 下架),
+      //    原先挂在表上的 materialPick「从物料清单引用」按钮随之去掉;[表区]='物料清单' 只是分区值,保留。
+      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },
           { key: '物料编码', label: '物料编码' },
