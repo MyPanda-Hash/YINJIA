@@ -36,17 +36,14 @@ const NON_FIELD_KEYS = new Set([
 /**
  * ⚠ 已知的**既有**缺陷白名单(本次任务范围外的面板,登记在案待单独修)
  *
- * 症状:以下三列的配置 key 写的是 **col_name**,而该字段的 label 含「\n+括注」,
- * 两者不同 ⇒ 该列 **取不到值(显示空白)且保存时被 labelsToCols 丢掉**。
+ * 症状:配置 key 写的是 **col_name**,而该字段的 label 含「\n+括注」,两者不同
+ * ⇒ 该列 **取不到值(显示空白)且保存时被 labelsToCols 丢掉**。
  * 修法:把配置 key 改成对应 label(或把 label 收敛为纯名称 + 用 alias 放长说明)。
- * 归属:RD_EQUIP_USE / RD_INSTR_USE 两张实验室登记表,2026-09-18 发现,与本次
- *       研发管理设计对齐无关,故**不在本任务内修**,以免夹带无关改动。
+ *
+ * 2026-10-07:原登记的三列已修(用户实测「填了异常情况,保存后变成 "/"」——
+ * 就是 RD_EQUIP_USE.设备状态 这一格丢了值),白名单清空,**从此由本测试硬守**。
  */
-const KNOWN_PREEXISTING = new Set([
-  'RD_EQUIP_USE|设备状态',
-  'RD_INSTR_USE|仪器状态',
-  'RD_INSTR_USE|是否内校',
-])
+const KNOWN_PREEXISTING = new Set([])
 
 /** 面板当前 label 集合 / col_name→label 映射 */
 function fxOf(panel) {

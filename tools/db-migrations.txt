@@ -1101,17 +1101,6 @@ migrate-yjfield-tab-key.sql
 #   ⚠ 2026-10-04 补登记(体检 12 项发现漏登;本脚本已用 DbSync run 在两账套执行并留痕,补登记后 sync 不会重跑)。
 migrate-qc-insp-req-tab-pools.sql
 
-# migrate-qc-insp-req-series.sql + migrate-qc-insp-req-drop-custom-tab.sql(2026-10-04):来料检验要求拆成两个面板
-#   用户口径:「现在将那个自定义的表删除,然后多增加一个来料检验要求的面版,下面有这几个切换表(而且都是自定义的):
-#   阻垢系列/BK材料系列/除重金属系列/矿化(碱性)系列/抑菌系列/载银系列/炭粉/胶粉/矿化料/原料来料,
-#   实现和之前一致,只是为了不要太多的表都集中在一个面版才拆成两个」。
-#   series = 新面板 QC_INSP_REQ_SERIES + 表 qc_insp_req_series(10 张全自定义表,备用1..备用200 每表 20 位);
-#   drop   = 旧「自定义检验要求」页签下线(词表回 7 值 + 该页签字段退绑 + 数据行软删 + 备用141..160 注明改预留)。
-#   ⚠ 顺序:先 series 后 drop;且本块必须排在 migrate-qc-insp-req-filecode-basis.sql 之前
-#   (filecode 要给 qc_insp_req_series 加列,表须先由 series 建出——2026-10-05 实测:顺序颠倒时全新库在 filecode 上报
-#   「Extended properties are not permitted on 'dbo.qc_insp_req_series.文件编码'」而中止)。两账套都执行。
-migrate-qc-insp-req-series.sql
-migrate-qc-insp-req-drop-custom-tab.sql
 
 # migrate-qc-insp-req-filecode-basis.sql(2026-10-04):要求表增「文件编码/检验依据」两列 + 检验报告这两项改为不可修改
 #   用户口径:①「检验报告里面的文件编码与检验依据,要靠物料编码来对应填入,并且不可以修改」;
@@ -1122,6 +1111,9 @@ migrate-qc-insp-req-drop-custom-tab.sql
 #   检验报告(QC_INSP_REC)的这两项 editable 1→0(纸面只读),值由报告按物料编码带入
 #   (core/qc/qcInspReqCarry.js 的 carryHeadOf:命中行首个非空;要求表没填则保留报告默认 YJ-QR-96 / YJ-Q-30)。
 #   两账套都执行。
+#   ⚠ 前置**必须**先建表 qc_insp_req_series(末段 migrate-qc-insp-req-series.sql 会建,故那一条已提到本行之前):
+#     2026-10-07 实测:在落后库上按原顺序跑到这里会报「找不到对象 qc_insp_req_series」而整链失败。
+migrate-qc-insp-req-series.sql
 migrate-qc-insp-req-filecode-basis.sql
 
 # —— 2026-09-21 特采申请单(QC_TC):「最终处理结果」字典补第三值「管控使用」 ——
@@ -2447,3 +2439,30 @@ migrate-wo-process-line-qty-recalc.sql
 #   本地独有保留;inh/outh 表级两行豁免(本地已重建为流水语义);已知错位 bd_material_out.工单行号=「打印次数」按原样落库。
 #   证据 tools/archive/_srv-bak-compare-20261007/。幂等;两账套均执行。
 migrate-server-comment-parity3-20261007.sql
+# migrate-qc-insp-req-series.sql + migrate-qc-insp-req-drop-custom-tab.sql(2026-10-04):来料检验要求拆成两个面板
+#   用户口径:「现在将那个自定义的表删除,然后多增加一个来料检验要求的面版,下面有这几个切换表(而且都是自定义的):
+#   阻垢系列/BK材料系列/除重金属系列/矿化(碱性)系列/抑菌系列/载银系列/炭粉/胶粉/矿化料/原料来料,
+#   实现和之前一致,只是为了不要太多的表都集中在一个面版才拆成两个」。
+#   series = 新面板 QC_INSP_REQ_SERIES + 表 qc_insp_req_series(10 张全自定义表,备用1..备用200 每表 20 位);
+#   drop   = 旧「自定义检验要求」页签下线(词表回 7 值 + 该页签字段退绑 + 数据行软删 + 备用141..160 注明改预留)。
+#   ⚠ 顺序:先 series 后 drop。两账套都执行。
+#   ⚠ 注意:series 建表 qc_insp_req_series 的那一行已**提前**到 migrate-qc-insp-req-filecode-basis.sql 之前
+#     (2026-10-07 实测:数据库落后时按原顺序跑到 filecode-basis 会报「找不到对象 qc_insp_req_series」,
+#      因为 filecode-basis 要给这张表加列;先建后加,链才可从落后库一路跑通)。
+migrate-qc-insp-req-drop-custom-tab.sql
+
+# ── 2026-10-07 实验室记录表日期/时间格改「选取填写」(用户报错 241 的根治) ──
+#   起因:RD_INSTR_USE 保存报 S0001/241「从字符串转换日期和/或时间时,转换失败」——
+#   面板字段登记成「文本」(界面给手填框),而服务器上 rd_instr_use_detail.使用日期 等列是 datetime
+#   (服务器直改存量,见 migrate-server-parity-20260928.sql:102);接口把 datetime 按 Jackson 下发成
+#   '2026-10-06T16:00:00.000+00:00'(带时区偏移),界面原样回传 ⇒ datetime 列拒收(本地实测 datetime 报 241,
+#   datetime2/date 不报)。
+#   动作(只改 yj_field.data_type,无 DDL):真正的日期格(使用日期/测试日期/日期/期望完成日期/预计完成日期)
+#   →「日期」;仪器使用记录表 起止时间 →「时间区间」(一格区间控件,落库仍是 'HH:mm-HH:mm' 文本);
+#   四个「测试时间」格(碱性表头/数据行、抗菌表头、浸泡表头、压降精度数据行)**不动**(值为日期段/Excel 序列
+#   混杂,2026-10-07 用户口径保持文本)。
+#   配套代码:RecordSheetPanels.vue 按 data_type 出控件 + core/panel/sheetDateCells.js 取值归一
+#   (归一失败不回写,历史值不丢);后端 QueryService 把日期类字段按本地墙钟文本下发、
+#   normalizeByType 把 ISO 归一成 yyyy-MM-dd,两头收口。
+#   自检:日期 8 条 + 时间区间 1 条;幂等可重跑;两个账套都执行。
+migrate-lab-sheets-date-fields-2026-10-07.sql
