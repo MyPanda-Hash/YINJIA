@@ -2387,8 +2387,13 @@ migrate-plang-split-demand-fix.sql
 #   用户口径「全部都先加入单位,成品库存单位记账待定」⇒ 只加列+登记元数据,不碰入库/报工/成品收口。
 #   撤回:DROP COLUMN;幂等;两账套均执行。
 migrate-unit-chain.sql
-# migrate-wo-process-line.sql(2026-10-05):工序—产线预排台账 wo_process_line
-#   预排(排产时定全程线) + 转序落实(默认沿用预排线,写 plang.scx 并留痕可撤回);撤回:DROP TABLE;两账套均执行。
+# migrate-wo-process-line.sql(2026-10-07 恢复/升级版):工序—产线预排台账 wo_process_line
+#   用户口径「在快速排产内,一开始就对当前工单的工序路线**全部排产** —— 把好几道工序的生产线一次选好
+#   (和现在选线的方式一样,**人工选**);完成一个工序就进入下一个工序的生产线」。
+#   ⚠ 与 2026-10-05 首版(后被 migrate-wo-process-line-drop.sql 以「不应该预排产」DROP)的区别:
+#     计划线由**人工在排产时逐道选定**,不再由系统按"最闲线"自动预排;表新增 计划完工日期 列。
+#   排产提交 = 首道线写 plang.scx/plang_pc(复用排产口径) + 全路线写本台账;前道报工完工审核后自动转序;
+#   **撤销排产同时作废台账**(用户强调:否则出现"没排产却有计划线")。撤回:DROP TABLE;幂等;两账套均执行。
 migrate-wo-process-line.sql
 # migrate-route-relax-required.sql(2026-10-05):工艺路线必填收敛(放开工序控制/生效日期/失效日期)
 #   用户报障「明细第 2 行工序控制不能为空」「填明细提示表头未填写」;根因=照金蝶截图设了必填。
@@ -2410,3 +2415,19 @@ migrate-route-name-not-required.sql
 # migrate-route-required-original.sql(2026-10-05):工艺路线必填恢复原本模式(7 字段)
 #   用户口径「必填按照原本的模式实现即可」;撤回 d1f6a2c9。两账套已执行。
 migrate-route-required-original.sql
+
+# migrate-line-load-on-plang.sql(2026-10-07):产线排产负荷 v_line_load 改挂 plang(弃用旧 MANU_ORDER 体系)
+#   背景:原视图数据源 = v_manu_schedule → 读已废弃的 bd_manu_order/bl_manu_order(单轨 plang 后仅剩 13 行、
+#   且全部"已作废"被过滤)⇒ 面板 今日负荷/D1..D13/合计负荷 **恒为 0**(实测)。
+#   用户口径「行修改,不要使用旧体系」。本脚本:① 视图改挂 plang(未作废·未结案·已指派产线·排产数量>0,
+#   按[计划开工日..交期]均摊,区间夹今天..今天+13),列与顺序不变 ⇒ 面板元数据无需改;
+#   ② LINE_LOAD 面板重复字段去重(每列曾被登记两份:小数 place=query,detail + 文本 place=detail ⇒ 渲染 36 列),
+#   保留前者、删掉 detail-only 重复份;③ 视图中文注明 + 自检。幂等;两账套均执行。
+migrate-line-load-on-plang.sql
+
+# migrate-wo-process-line-qty-recalc.sql(2026-10-07):按新口径校正预排台账「计划数量」
+#   用户口径「后面的计划数量不该顺延下去,各个工序的换算率要分开算」+「完成对应排产数量的报工后进下一个产线」。
+#   旧值 = 逐道累乘(且基数曾用整单合计)⇒ 转序判据虚高、报工完成也不转序;本脚本按
+#   「所排工单行排产数量 × 该工序自己的换算率」重算全部未作废台账行。幂等;两账套均执行。
+migrate-wo-process-line-qty-recalc.sql
+
