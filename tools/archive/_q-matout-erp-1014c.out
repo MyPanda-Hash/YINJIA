@@ -1,0 +1,52 @@
+s
+--- yj_doc_status 列 ---
+col
+id
+panel_code
+doc_no
+shr
+shsj
+canceled
+cancel_by
+cancel_at
+pending
+pending_by
+pending_at
+update_at
+stopped
+stop_by
+stop_at
+saved
+archived
+deleting
+delete_req_by
+delete_req_at
+modify_state
+modify_req_by
+modify_req_at
+modify_appr_by
+modify_appr_at
+archived_at
+erp_close_state
+approve_node
+l2_approver
+effective
+modify_reason
+s
+--- MATERIAL_OUT 单据状态 ---
+id|panel_code|doc_no|shr|shsj|canceled|cancel_by|cancel_at|pending|pending_by|pending_at|update_at|stopped|stop_by|stop_at|saved|archived|deleting|delete_req_by|delete_req_at|modify_state|modify_req_by|modify_req_at|modify_appr_by|modify_appr_at|archived_at|erp_close_state|approve_node|l2_approver|effective|modify_reason
+13101|MATERIAL_OUT|CL-2026-10-0001|admin|2026-10-07 11:49:01.51|N|null|null|N|admin|2026-10-07 11:48:58.567|2026-10-07 11:49:01.51|null|null|null|Y|N|N|null|null|null|null|null|null|null|null|null|1|null|null|null
+13109|MATERIAL_OUT|CL-2026-10-0002|null|null|Y|admin|2026-10-07 11:48:53.84|N|null|null|2026-10-07 11:48:53.84|null|null|null|Y|N|N|null|null|null|null|null|null|null|null|null|null|null|null|null
+s
+--- bl_material_out 全列(CL-2026-10-0001) ---
+id|单据编号|仓库|加工单号|材料名称|计量单位|数量|单价|金额|规格型号|手工确定成本|明细备注|现存量|现存量说明|备注|asp_user1|asp_time1|asp_cancel|asp_user2|asp_time2|材料编码|批号|asp_print|asp_time3|asp_time4|asp_user3|asp_user4|备用1|备用2|备用3|备用4|备用5|备用6|备用7|备用8|备用9|备用10|备用11|备用12|备用13|备用14|备用15|备用16|备用17|备用18|备用19|备用20|行号|图片|商品id|商品是否多单位|商品是否序列号|商品是否辅助属性|商品是否保质期|商品是否批次|仓库id|仓库编码|仓库启用仓位管理|仓位id|仓位名称|仓位编码|辅助属性id|辅助属性名称|辅助属性编码|辅助属性1id|辅助属性1名称|辅助属性1编码|辅助属性2id|辅助属性2名称|辅助属性2编码|辅助属性3id|辅助属性3名称|辅助属性3编码|条形码|产地|注册证号|生产许可证|保质期到期日|有效期至|保质期类型|保质期|序列号清单|序列号流转ID|基本单位id|基本单位名称|基本单位编码|单位id|单位编码|辅助单位id|辅助单位名称|辅助单位编码|换算率|库存数量|基本数量|库存基本数量|辅助数量|默认浮动数量|辅助换算系数|换算系数|成本|单位成本|源单编号|源单类型id|源单类型名称|源单类型编码|源单内部id|源单日期|源单行号|源单分录id|源单产品分录id
+6|CL-2026-10-0001||null|阻垢烧结炭棒/滤芯|支|0.0000|0.0000|0.0000|34*12*80|0|null|0.0000|库存状况表（全部仓库）|null|admin|2026-10-07 19:48:50.2608408|N|admin|2026-10-07 19:48:58.3702065|B-47-29|20261007|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|0|null|null|null|null|支|null|null|null|null|支|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null
+s
+--- 材料编码 原文核对 ---
+单据编号|id|材料编码原文|长度|字节数|计量单位原文|单位id原文|批号原文
+CL-2026-10-0001|6|[B-47-29]|7|14|[支]|[<NULL>]|[20261007]
+s
+--- 头表全列(两张单) ---
+id|单据日期|单据编号|业务类型|生产车间|出库类别|领用人|项目|仓库|来源单号|加工单号|备注|单据状态|审核人|审核时间|审批人|审批时间|asp_user1|asp_time1|asp_user2|asp_time2|asp_cancel|来源单据|销售订单号|匹配来源单号|asp_print|asp_time3|asp_time4|asp_user3|asp_user4|备用1|备用2|备用3|备用4|备用5|备用6|备用7|备用8|备用9|备用10|备用11|备用12|备用13|备用14|备用15|备用16|备用17|备用18|备用19|备用20|工单行号|创建时间|金蝶单据状态|部门id|部门编码|领料类型|修改时间|金蝶审核时间|创建人id|创建人|创建人编码|修改人id|修改人|修改人编码|单据类型名称|单据类型编码|单据类型id|审核人id|金蝶审核人|审核人编码|经手人id|经手人编码|单据标签|领料用途名称|领料用途id|领料用途编码|是否已转ERP|ERP单号|转ERP操作人|转ERP时间
+5|2026-10-07|CL-2026-10-0001|销售出库|null|直接领料|null|null|null|null|null|null|草稿|null|null|null|null|admin|2026-10-07 00:03:58.8240780|admin|2026-10-07 19:48:58.3686305|N|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|2026-10-07 00:03:58|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null
+6|2026-10-07|CL-2026-10-0002||null|null|null|null|null|null|null|null|草稿|null|null|null|null|admin|2026-10-07 19:48:50.4937915|null|null|N|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|2026-10-07 19:48:50|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null|null
