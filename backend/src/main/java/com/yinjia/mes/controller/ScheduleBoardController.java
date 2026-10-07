@@ -61,6 +61,36 @@ public class ScheduleBoardController {
         return ApiResult.ok(service.assign(rows, currentUser()));
     }
 
+    /**
+     * 工序路线排线弹窗数据(2026-10-07):该工单行要走的每道工序 + 换算后计划量 + 默认计划完工日 + 已有台账。
+     * 排产前用它把整条工艺路线的线**一次选好**(人工选,不再是系统自动预排)。
+     */
+    @PostMapping("/routeSteps")
+    public ApiResult<Map<String, Object>> routeSteps(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        String no = str(body.get("加工单号"));
+        Object id = body.get("行id");
+        Long lineId = id == null || String.valueOf(id).isBlank() ? null : Long.valueOf(String.valueOf(id));
+        return ApiResult.ok(processTask.routeSteps(no, lineId));
+    }
+
+    /**
+     * 工序路线排线提交(2026-10-07):**排产 + 预排全程线** —— 首道线写 plang.scx / plang_pc(复用现有排产口径),
+     * 全路线写台账 wo_process_line;前道报工完工后自动转序到下一道的计划线。
+     * 撤销排产会**同时作废台账**(避免"没排产却有计划线")。
+     */
+    @PostMapping("/preplan")
+    @SuppressWarnings("unchecked")
+    public ApiResult<Map<String, Object>> preplan(@RequestBody Map<String, Object> body) {
+        perm.requirePanelView("MANU_ORDER");
+        perm.requireButton("MANU_ORDER", "保存");
+        String no = str(body.get("加工单号"));
+        Object id = body.get("行id");
+        Long lineId = id == null || String.valueOf(id).isBlank() ? null : Long.valueOf(String.valueOf(id));
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) body.getOrDefault("步骤", List.of());
+        return ApiResult.ok(processTask.preplanManual(no, lineId, steps, str(body.get("排产班组")), currentUser()));
+    }
+
     /** 撤销排产回池(换线=撤销+重排);有报工/入库不可撤销 */
     @PostMapping("/unassign")
     @SuppressWarnings("unchecked")

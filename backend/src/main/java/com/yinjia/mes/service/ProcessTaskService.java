@@ -37,9 +37,12 @@ public class ProcessTaskService {
     private static final String LOG_PANEL = "工序任务";
 
     private final JdbcTemplate jdbc;
+    /** 工单级排产(工序—产线预排:首道线要写 plang.scx + plang_pc,复用现有排产口径) */
+    private final ScheduleBoardService scheduleBoard;
 
-    public ProcessTaskService(JdbcTemplate jdbc) {
+    public ProcessTaskService(JdbcTemplate jdbc, ScheduleBoardService scheduleBoard) {
         this.jdbc = jdbc;
+        this.scheduleBoard = scheduleBoard;
     }
 
     // ────────────────────────── 生成 ──────────────────────────
@@ -476,6 +479,293 @@ public class ProcessTaskService {
     /** 取表头行(工单级查询结果的第一行);查不到时给空 Map,避免 NPE */
     private static Map<String, Object> headObject(List<Map<String, Object>> heads) {
         return heads == null || heads.isEmpty() ? Map.of() : heads.get(0);
+    }
+
+    // ────────────────────── 工序—产线预排(2026-10-07:排产时**人工**一次选好全程线) ──────────────────────
+
+    /**
+     * **工序路线排线弹窗的数据**:该工单行要走的每一道工序 + 该道的换算后计划量 + 默认计划完工日期,
+     * 外加**已有台账**(改线时回填)。
+     *
+     * <p>口径(2026-10-07 用户口径:唯一键 = **工单号 + 工单行号**):
+     *   先定位到**具体工单行**(入参行id → 台账里的工单行id → 该工单首行),表头/路线/当前线/基数都取这一行;
+     *   计划量 = 该行排产数量 × **该工序自己的换算率**(各道分开算,不累乘)。
+     */
+    public Map<String, Object> routeSteps(String plNo, Long lineId) {
+        if (!notBlank(plNo)) throw new IllegalArgumentException("请提供工单号");
+        String no = plNo.trim();
+        // ① 定位工单行:行id → 台账已登记的工单行id → 该工单首行(唯一键 = 工单号 + 工单行)
+        Long rowId = lineId;
+        if (rowId == null) {
+            List<Long> fromLedger = jdbc.queryForList("SELECT TOP 1 工单行id FROM dbo.wo_process_line"
+                    + " WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y' AND 工单行id IS NOT NULL"
+                    + " ORDER BY ISNULL(工序序,999), id", Long.class, no);
+            if (!fromLedger.isEmpty()) rowId = fromLedger.get(0);
+        }
+        Map<String, Object> head = rowId != null
+                ? (jdbc.queryForList("SELECT id, pl_no, pl_xc, ISNULL([批次号],N'') AS 批次号, ISNULL(dm,N'') AS 产品编码,"
+                        + " ISNULL(mc,N'') AS 产品名称, ISNULL(gg,N'') AS 规格型号, ISNULL(jldw,N'') AS 生产单位,"
+                        + " ISNULL(pl_sl,0) AS 排产数量, ISNULL(xq_sl,0) AS 需求数量, CONVERT(varchar(10), cp_date, 120) AS 交期,"
+                        + " ISNULL([工艺路线],N'') AS 工艺路线, ISNULL(scx,N'') AS 当前线"
+                        + " FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", rowId)
+                        .stream().findFirst().orElse(Map.of()))
+                : Map.of();
+        if (head.isEmpty()) {
+            head = jdbc.queryForMap("SELECT TOP 1 id, pl_no, pl_xc, ISNULL([批次号],N'') AS 批次号, ISNULL(dm,N'') AS 产品编码,"
+                    + " ISNULL(mc,N'') AS 产品名称, ISNULL(gg,N'') AS 规格型号, ISNULL(jldw,N'') AS 生产单位,"
+                    + " ISNULL(pl_sl,0) AS 排产数量, ISNULL(xq_sl,0) AS 需求数量, CONVERT(varchar(10), cp_date, 120) AS 交期,"
+                    + " ISNULL([工艺路线],N'') AS 工艺路线, ISNULL(scx,N'') AS 当前线"
+                    + " FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", no);
+            rowId = ((Number) head.get("id")).longValue();
+        }
+        String route = String.valueOf(head.get("工艺路线")).trim();
+        // 计划数量的基数 = **所排工单行自己的排产数量**
+        //   ⚠ 不能用整单合计:一个工单可能多行、且**各行的工艺路线可能不同**(实测 GD-2026-10-0002:
+        //     行1/5/6/7 = GY-CB-STD、行2/3/4 = GY-2026-10-0003)⇒ 整单合计会把别的路线的量算进来。
+        double baseQty = num(head.get("排产数量"));
+        Map<String, Object> headOut = new LinkedHashMap<>(head);
+        headOut.put("基数行", rowId);
+        headOut.put("基数数量", baseQty);
+        headOut.put("整单行数", jdbc.queryForObject("SELECT COUNT(*) FROM dbo.plang"
+                + " WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, no));
+        // 路线工序(加工顺序)+ 候选产线(该工序车间的启用线,带 今日负荷/日产能)
+        List<Map<String, Object>> steps = new ArrayList<>();
+        if (!route.isEmpty()) {
+            for (Map<String, Object> r : jdbc.queryForList(
+                    "SELECT ISNULL(工序名称,N'') AS 工序, ISNULL(生产车间,N'') AS 生产车间,"
+                            + " ISNULL(换算率,1) AS 换算率, ISNULL(加工顺序,999) AS 工序序, ISNULL(工序编码,N'') AS 工序编码"
+                            + " FROM dbo.bs_route WHERE 工艺路线编码=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + " AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999), id", route)) {
+                double rate = num(r.get("换算率"));
+                if (rate <= 0) rate = 1;
+                // **各工序独立按自己的换算率折算**(2026-10-07 用户口径「各个工序的换算率分开算」):
+                //   计划数量(工序 i) = 本行排产数量 × 该工序换算率;
+                //   ❌ 不逐道累乘(否则 成型7×切炭2 会把切炭算成 14 倍,转序门槛也跟着虚高,完成报工也不转序)。
+                Map<String, Object> s = new LinkedHashMap<>(r);
+                s.put("计划数量", round(baseQty * rate));
+                s.put("计划完工日期", head.get("交期"));
+                steps.add(s);
+            }
+        }
+        // 已有台账(未作废):改线时回填
+        List<Map<String, Object>> planned = jdbc.queryForList(
+                "SELECT id, 工序, ISNULL(工序序,0) AS 工序序, ISNULL(计划生产线,N'') AS 计划生产线,"
+                        + " ISNULL(实际生产线,N'') AS 实际生产线, ISNULL(计划数量,0) AS 计划数量,"
+                        + " CONVERT(varchar(10), 计划完工日期, 120) AS 计划完工日期, ISNULL(状态,N'') AS 状态"
+                        + " FROM dbo.wo_process_line WHERE 工单号=? AND (? IS NULL OR 工单行id=?)"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY ISNULL(工序序,999), id", no, lineId, lineId);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("表头", headOut);
+        out.put("工序步骤", steps);
+        out.put("已排台账", planned);
+        return out;
+    }
+
+    /**
+     * **排产 + 预排全程线**(2026-10-07 用户口径):排产时把整条工艺路线的每道工序**人工选好线**一次提交 ——
+     *   · 首道线 = 工单级排产线(写 plang.scx + plang_pc 薄记录,复用 {@code ScheduleBoardService.assign});
+     *   · 全路线写台账 {@code wo_process_line}:首道置「已落实」,其余「计划」,等前道报工完工后自动转序;
+     *   · 幂等:先作废该工单旧台账再重写(改线 = 重新提交)。
+     *
+     * <p>守卫:每道都必须选线 · 线存在且未停用 · **线的生产车间必须等于该工序的车间**(与选线口径一致)·
+     * 工单未结案 · 未排产(scx 空;已排产的换线请先撤销排产)。
+     *
+     * @param steps [{工序, 生产线, 计划完工日期?(yyyy-MM-dd), 计划数量?(忽略,一律按换算率算)}]
+     * @param team  排产班组(可空;写 plang.lb / plang_pc.lb)
+     */
+    @Transactional
+    public Map<String, Object> preplanManual(String plNo, Long lineId, List<Map<String, Object>> steps, String team, String user) {
+        if (!notBlank(plNo)) throw new IllegalArgumentException("请提供工单号");
+        String no = plNo.trim();
+        Map<String, Object> steps0 = routeSteps(no, lineId);
+        Map<String, Object> head = steps0.get("表头") instanceof Map<?, ?> m ? castMap(m) : Map.of();
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> route = (List<Map<String, Object>>) steps0.get("工序步骤");
+        if (route.isEmpty()) throw new IllegalStateException("该工单未绑定工艺路线(或路线无工序明细),不能排线");
+        if (steps == null || steps.size() != route.size())
+            throw new IllegalArgumentException("必须为路线的每一道工序选好生产线(共 " + route.size() + " 道)");
+        // 逐道校验(按工序序对齐)
+        List<Map<String, Object>> plan = new ArrayList<>();
+        for (int i = 0; i < route.size(); i++) {
+            Map<String, Object> rt = route.get(i);
+            String op = String.valueOf(rt.get("工序")).trim();
+            String shop = String.valueOf(rt.get("生产车间")).trim();
+            Map<String, Object> given = null;
+            for (Map<String, Object> s : steps) {
+                if (op.equals(String.valueOf(s.get("工序")).trim())) { given = s; break; }
+            }
+            if (given == null) throw new IllegalArgumentException("工序「" + op + "」没有选生产线");
+            String line = str(given.get("生产线"));
+            if (line == null) throw new IllegalArgumentException("工序「" + op + "」没有选生产线");
+            List<Map<String, Object>> ls = jdbc.queryForList(
+                    "SELECT ISNULL(生产车间,N'') AS 生产车间, ISNULL(停用,0) AS 停用 FROM dbo.bs_prod_line"
+                            + " WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'", line);
+            if (ls.isEmpty()) throw new IllegalArgumentException("生产线「" + line + "」不存在");
+            if (num(ls.get(0).get("停用")) == 1) throw new IllegalArgumentException("生产线「" + line + "」已停用");
+            String lineShop = String.valueOf(ls.get(0).get("生产车间"));
+            if (!shop.isBlank() && !shop.equals(lineShop))
+                throw new IllegalArgumentException("生产线「" + line + "」属于「" + lineShop + "」,与工序「" + op + "」(" + shop + ")不一致");
+            Map<String, Object> p = new LinkedHashMap<>();
+            p.put("工序", op);
+            p.put("工序序", rt.get("工序序"));
+            p.put("生产线", line);
+            p.put("计划数量", rt.get("计划数量"));
+            p.put("计划完工日期", str(given.get("计划完工日期")) != null ? str(given.get("计划完工日期")) : rt.get("计划完工日期"));
+            plan.add(p);
+        }
+        // ① 工单级排产:首道线(复用现有排产口径;该行未排产才可排;该行已排产=改线,首道线必须仍是该行当前线)
+        //   ⚠ 唯一键 = **工单号 + 工单行号**(2026-10-07 用户口径):排产/改线/转序都只作用这一行,
+        //     同一工单其它行不受影响(实测踩过:用 DISTINCT scx 判整单 ⇒ 部分行已排产时误拦)。
+        Object rowId = head.get("id");
+        String curLine = head.get("当前线") == null ? "" : String.valueOf(head.get("当前线")).trim();
+        String firstPlan = String.valueOf(plan.get(0).get("生产线"));
+        if (curLine.isEmpty()) {
+            Map<String, Object> assignRow = new LinkedHashMap<>();
+            assignRow.put("加工单号", no);
+            if (rowId != null) assignRow.put("行id", rowId);
+            assignRow.put("生产线", firstPlan);
+            if (str(team) != null) assignRow.put("排产班组", str(team));
+            if (plan.get(0).get("计划完工日期") != null) assignRow.put("预完工日", plan.get(0).get("计划完工日期"));
+            Map<String, Object> assigned = scheduleBoard.assign(List.of(assignRow), user);
+            List<String> headFailed = castList(assigned.get("失败行"));
+            if (!headFailed.isEmpty()) throw new IllegalStateException("工单排产失败:" + String.join("; ", headFailed));
+        } else if (!curLine.equals(firstPlan)) {
+            throw new IllegalStateException("首道线 = 该工单行当前排产线「" + curLine + "」;换线请先撤销该行排产再重排");
+        }
+        // ② 写台账(先作废**本工单行**的旧行;唯一键 = 工单号 + 工单行,不动同工单其它行)
+        jdbc.update("UPDATE dbo.wo_process_line SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE()"
+                + " WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                + "   AND ((? IS NULL AND 工单行id IS NULL) OR 工单行id=?)",
+                user, no, rowId == null ? null : ((Number) rowId).longValue(),
+                rowId == null ? null : ((Number) rowId).longValue());
+        for (int i = 0; i < plan.size(); i++) {
+            Map<String, Object> p = plan.get(i);
+            boolean first = i == 0;
+            jdbc.update("INSERT INTO dbo.wo_process_line (工单号, 工单行id, 工序, 工序序, 计划生产线, 实际生产线,"
+                            + " 计划数量, 计划完工日期, 状态, 落实时间, asp_cancel, asp_user1, asp_time1)"
+                            + " VALUES (?,?,?,?,?,?,?,?,?,?,N'N',?,GETDATE())",
+                    no, rowId == null ? null : ((Number) rowId).longValue(), p.get("工序"),
+                    p.get("工序序") == null ? null : ((Number) p.get("工序序")).intValue(),
+                    p.get("生产线"), first ? p.get("生产线") : null,
+                    p.get("计划数量"), p.get("计划完工日期") == null ? null : java.time.LocalDate.parse(String.valueOf(p.get("计划完工日期"))),
+                    first ? "已落实" : "计划", first ? new java.util.Date() : null, user);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("工单号", no);
+        out.put("排产产线", plan.get(0).get("生产线"));
+        out.put("预排道数", plan.size());
+        out.put("计划线", plan.stream().map(x -> x.get("工序") + ":" + x.get("生产线")).toList());
+        return out;
+    }
+
+    /**
+     * **转序落实**(报工**审核**后调用;2026-10-07 恢复 2026-10-05 口径):找台账里状态=**计划**的第一道:
+     *   · 转序条件 = **前一道已完工**(该道已审核报工量 ≥ 换算后计划量)**且本道尚未开工**(报工量=0);
+     *   · 计划线为空 → 只提示"请人工派线",不动作;
+     *   · 计划线 = 当前线 → 只提示"沿用当前线";
+     *   · 否则写 plang.scx = 计划线 + 台账置「已落实/实际线/落实时间」+ 轨迹 wo_transfer_log(原因「转序自动派线」)。
+     *
+     * <p>未预排的工单行(台账为空)不做任何自动补线 —— 人工排线口径下由使用者重新排产(回执里给提示)。
+     *
+     * <p>⚠ 唯一键 = **工单号 + 工单行号**(2026-10-07 用户口径):转序只切**被报工的那一行**的线,
+     * 同工单其它行原样不动;报工量也按该行统计(锚 scjl.gd_id → plang_pc.plang_id)。
+     */
+    @Transactional
+    public Map<String, Object> applyNextProcess(String plNo, Long lineId, String user) {
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("工序", "");
+        if (!notBlank(plNo)) return out;
+        String no = plNo.trim();
+        Long rowId = lineId;
+        if (rowId == null) {   // 兜底:只给工单号时取该工单**已排产**的行(旧调用方兼容)
+            List<Long> rs = jdbc.queryForList("SELECT TOP 1 id FROM dbo.plang WHERE pl_no=?"
+                    + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(scx,N'')<>N'' ORDER BY id", Long.class, no);
+            if (rs.isEmpty()) { out.put("提示", "该工单没有已排产的行"); return out; }
+            rowId = rs.get(0);
+        }
+        final Long row = rowId;
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, 工序, ISNULL(工序序,0) AS 工序序, ISNULL(计划生产线,N'') AS 计划生产线,"
+                        + " ISNULL(计划数量,0) AS 计划数量, ISNULL(状态,N'计划') AS 状态"
+                        + " FROM dbo.wo_process_line WHERE 工单号=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + "   AND (工单行id=? OR 工单行id IS NULL)"
+                        + " ORDER BY ISNULL(工序序,999), id", no, row);
+        if (rows.isEmpty()) { out.put("提示", "该工单行没有预排线(请在快速排产里排线)"); return out; }
+        Map<String, Object> next = null;
+        double prevDone = -1, prevPlan = -1;
+        for (Map<String, Object> r : rows) {
+            String op = String.valueOf(r.get("工序")).trim();
+            double d = reportedQty(no, row, op);
+            // 转序条件:本道尚未开工,且(首道 或 前一道已完工)
+            if ("计划".equals(String.valueOf(r.get("状态"))) && d <= 0
+                    && (prevDone < 0 || (prevPlan > 0 && prevDone + 0.0001 >= prevPlan))) { next = r; break; }
+            prevDone = d;
+            prevPlan = num(r.get("计划数量"));
+        }
+        if (next == null) return out;
+        String op = String.valueOf(next.get("工序")).trim();
+        String plan = String.valueOf(next.get("计划生产线")).trim();
+        out.put("工序", op);
+        if (plan.isEmpty()) { out.put("提示", "下一道(" + op + ")未预排线,请人工派线"); return out; }
+        List<String> cs = jdbc.queryForList("SELECT TOP 1 ISNULL(scx,N'') FROM dbo.plang WHERE id=?", String.class, row);
+        String cur = cs.isEmpty() || cs.get(0) == null ? "" : cs.get(0).trim();
+        if (plan.equals(cur)) { out.put("提示", "下一道(" + op + ")沿用当前线"); return out; }
+        // 只切**这一行**的线(plang + 排产镜像 plang_pc;同工单其它行不动)
+        jdbc.update("UPDATE dbo.plang SET scx=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?", plan, user, row);
+        jdbc.update("UPDATE dbo.plang_pc SET scx=?, asp_user2=?, asp_time2=GETDATE() WHERE plang_id=?", plan, user, row);
+        jdbc.update("UPDATE dbo.wo_process_line SET 实际生产线=?, 状态=N'已落实', 落实时间=GETDATE(),"
+                + " asp_user2=?, asp_time2=GETDATE() WHERE id=?", plan, user, next.get("id"));
+        // 轨迹(列名对齐 wo_transfer_log):转序=自动派线,可查可撤;plang_id 锚到具体工单行
+        try {
+            jdbc.update("INSERT INTO dbo.wo_transfer_log (pl_no, plang_id, 从生产线, 从车间, 到生产线, 到车间, 数量, 原因,"
+                            + " asp_cancel, asp_user1, asp_time1, asp_time2)"
+                            + " VALUES (?,?,?,?,?,?,?,N'转序自动派线',N'N',?,GETDATE(),GETDATE())",
+                    no, row, cur, shopOfLine(cur), plan, shopOfLine(plan), num(next.get("计划数量")), user);
+        } catch (Exception ignore) { /* 轨迹写入失败不阻断转序 */ }
+        out.put("工单行id", row);
+        out.put("从生产线", cur);
+        out.put("到生产线", plan);
+        return out;
+    }
+
+    /**
+     * 该**工单行**该道工序的已审核报工量(转序判据):
+     *   优先按 scjl.gd_id → plang_pc.plang_id 锚到行;老数据没有 gd_id 时退回按(工单号+批次号)匹配该行。
+     */
+    private double reportedQty(String plNo, Long rowId, String op) {
+        Double d = jdbc.queryForObject(
+                "SELECT ISNULL(SUM(ISNULL(s.sl,0)),0) FROM dbo.scjl s"
+                        + " LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
+                        + " WHERE s.gldh=? AND s.gxdm=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "   AND (pc.plang_id=? OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'')="
+                        + "        ISNULL((SELECT TOP 1 ISNULL(p.[批次号],N'') FROM dbo.plang p WHERE p.id=?), N'')))",
+                Double.class, plNo, op, rowId, rowId);
+        return d == null ? 0 : d;
+    }
+
+    /** 产线所属车间(取不到返回 null) */
+    private String shopOfLine(String line) {
+        if (!notBlank(line)) return null;
+        List<String> s = jdbc.queryForList("SELECT TOP 1 ISNULL(生产车间,N'') FROM dbo.bs_prod_line"
+                + " WHERE 生产线=? AND ISNULL(asp_cancel,'N')<>'Y'", String.class, line);
+        return s.isEmpty() || s.get(0).isBlank() ? null : s.get(0);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> castMap(Map<?, ?> m) { return (Map<String, Object>) m; }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> castList(Object o) {
+        if (!(o instanceof List<?> l)) return List.of();
+        List<String> out = new ArrayList<>();
+        for (Object x : l) if (x != null) out.add(String.valueOf(x));
+        return out;
+    }
+
+    private static String str(Object o) {
+        if (o == null) return null;
+        String s = String.valueOf(o).trim();
+        return s.isBlank() || "null".equals(s) ? null : s;
     }
 
     private static int indexOfProcess(String op) {

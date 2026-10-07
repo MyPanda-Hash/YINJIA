@@ -98,7 +98,7 @@
       </el-table-column>
       <el-table-column :label="tt('工序进度')" width="120" align="right">
         <template #default="{ row }">
-          <span v-if="row.当前工序">{{ num(row.当前工序完工量) }}/{{ num(row.排产数量) }}</span>
+          <span v-if="row.当前工序">{{ num(row.当前工序完工量) }}/{{ num(row.当前工序计划量) }}</span>
           <span v-else>-</span>
         </template>
       </el-table-column>

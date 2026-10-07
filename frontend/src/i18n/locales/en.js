@@ -3052,6 +3052,38 @@ export default {
       'The list is filtered — this save updates the loaded rows only; rows not shown will not be deleted',
     // 档案面板改「只提交改动行」(2026-10-03 用户口径):没有改动就不再空跑一次保存
     '没有需要保存的改动': 'Nothing to save — no rows were changed',
+
+    // 工序路线排线(2026-10-07:排产时一次把整条工艺路线的线选好,人工选;首道线 = 工单排产线)
+    '工序路线排线': 'Operation Route Line Planning',
+    '勾选一张工单 → 点「排产」→ 按工艺路线逐道选线(双击行同效)':
+      'Select one work order → click "Schedule" → pick a line for each operation on the route (double-click the row works too)',
+    '请先勾选一张工单': 'Select one work order first',
+    '该工单未绑定工艺路线(或路线无工序明细),不能排线 —— 请先在订单结转/工单上选择工艺路线':
+      'This work order has no process route (or the route has no operations), so lines cannot be planned — pick a route at order conversion / on the work order first',
+    '请选择生产线': 'Select a line',
+    '负荷': 'load',
+    '首道线 = 当前排产线;换线请先撤销排产': 'First line = the currently scheduled line; revoke the schedule before changing lines',
+    '说明': 'Note',
+    '首道工序的线 = 该工单的排产线(报工闸门按它判已排产);其余各道为预排线,前道报工完工审核后自动转序到下一道的线':
+      "The first operation's line is the work order's scheduled line (the reporting gate uses it); the remaining operations are planned lines — once the previous operation is reported and approved, the order moves to the next operation's line automatically",
+    '保存预排线': 'Save planned lines',
+    '预排线': 'Planned lines',
+    '计划线': 'Planned lines',
+    '预排': 'Pre-planned',
+    '道': 'operation(s)',
+    '读取工艺路线失败': 'Failed to load the process route',
+    '还有工序未选生产线': 'Some operations still have no line selected',
+    '排线失败': 'Line planning failed',
+    '计划数量 = 本工单行排产数量 × 该工序自己的换算率(各道分开算,不累乘)':
+      "Planned qty = this work-order line's scheduled qty × the operation's own conversion rate (each operation is computed separately, not compounded)",
+    '行排产': "work-order line('s) schedule",
+    '撤销后回到待排产池;换线=撤销+重排;该行预排线同时作废':
+      'It returns to the pending pool; changing lines = revoke + re-schedule; this line\'s planned lines are voided as well',
+    // 口径拆分(2026-10-07):成品口径(需求/排产/入库/未交量)与工序口径(各道计划量/报工)分开显示
+    '当前工序计划量': "Current operation's planned qty",
+    '当前工序完工量': "Current operation's completed qty",
+    '上道工序': 'Previous operation',
+    '上道完工量': "Previous operation's completed qty",
   },
 
 }

@@ -99,13 +99,19 @@
             <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
             <el-table-column :label="tt('需求数量')" prop="需求数量" width="90" align="right" />
             <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
+            <!-- 工序口径:当前工序 = 该行**现在该做的工序**(预排台账位置;在切炭线就显示切炭),
+                 旁边给「上道工序 + 上道完工量」= 来料量(上一道已审报工量) -->
             <el-table-column :label="tt('当前工序')" prop="当前工序" width="95" sortable>
               <template #default="{ row }">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</template>
             </el-table-column>
-            <el-table-column :label="tt('已报工')" prop="已报工" width="85" align="right" />
+            <el-table-column :label="tt('当前工序计划量')" prop="当前工序计划量" width="120" align="right" />
+            <el-table-column :label="tt('当前工序完工量')" prop="当前工序完工量" width="120" align="right" />
+            <el-table-column :label="tt('上道工序')" prop="上道工序" width="95">
+              <template #default="{ row }">{{ row.上道工序 ? tt(row.上道工序) : '-' }}</template>
+            </el-table-column>
+            <el-table-column :label="tt('上道完工量')" prop="上道完工量" width="110" align="right" />
+            <!-- 成品口径:未交量 = 排产数量 − 入库数量(此前误减工序口径报工量 ⇒ 换算率 >1 时出负数) -->
             <el-table-column :label="tt('未交量')" prop="未交量" width="85" align="right" />
-            <el-table-column :label="tt('每箱数量')" prop="每箱数量" width="85" align="right" />
-            <el-table-column :label="tt('箱数')" prop="箱数" width="75" align="right" />
             <el-table-column :label="tt('余量')" prop="余量" width="80" align="right" />
             <el-table-column :label="tt('操作员')" prop="操作员" width="80" />
             <el-table-column :label="tt('备注')" prop="备注" min-width="100" show-overflow-tooltip />
@@ -210,7 +216,7 @@ const shop = computed(() => {
   const set = [...new Set(lineSummary.value.map((l) => l.生产车间).filter(Boolean))]
   return set.length === 1 ? set[0] : ''
 })
-// 未完工量=Σ未交量(排产−max(入库,已报工),报工扣减口径);旧数据无未交量字段时回退余量
+// 未完工量=Σ未交量(**成品口径**:排产−入库,2026-10-07 起);旧数据无未交量字段时回退余量
 const selOutstanding = computed(() => schedRows.value.reduce((a, r) => a + (r.未交量 !== undefined ? Number(r.未交量 || 0) : Number(r.余量 || 0)), 0))
 
 function select(l) {

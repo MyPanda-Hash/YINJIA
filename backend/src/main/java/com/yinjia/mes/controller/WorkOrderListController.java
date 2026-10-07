@@ -108,9 +108,25 @@ public class WorkOrderListController {
                         // 当前工序/工序进度(9.29 批次① B 项,2026-10-05):工单贯穿制下 plang 无工序列,
                         // 「这单走到哪道工序」由报工派生(视图 v_wo_process_progress) —— 现场问的
                         // 「这是组装单还是成型单」= 当前工序指针,前端直接显示
-                        + " ISNULL(prg.当前工序, N'') AS 当前工序,"
-                        + " ISNULL(prg.当前工序完工量, 0) AS 当前工序完工量,"
-                        + " ISNULL(prg.完工合计, 0) AS 完工合计,"
+                        // 「当前工序」= 该工单行**现在该做的工序**(2026-10-07 用户口径修正):
+                        //   预排台账里最后一道「已落实」优先(在切炭线就该显示切炭),台账缺失时回落报工派生值。
+                        //   ⚠ 原来直接用报工派生值 ⇒ 到了切炭线还显示成型(用户截图为证)。
+                        + " ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
+                        + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
+                        + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
+                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(prg.当前工序, N'')) AS 当前工序,"
+                        // 当前工序完工量 = **该工单行**该道的已审报工量(2026-10-07:视图按单号聚合=整单口径,
+                        //   与单行计划量配对会出现作用域错配「整单 56000 / 单行 75」⇒ 按行锚定)
+                        + " ISNULL((SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s"
+                        + "   WHERE s.gldh = p.pl_no AND s.gxdm = cop.当前工序"
+                        + "     AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "     AND (EXISTS (SELECT 1 FROM dbo.plang_pc pcx WHERE pcx.id = s.gd_id AND pcx.plang_id = p.id)"
+                        + "          OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'') = ISNULL(p.[批次号],N'')))), 0) AS 当前工序完工量,"
+                        // 当前工序**计划量**(2026-10-07):= 本行排产数量 × 该工序自己的换算率(工序口径)。
+                        //   前端原来显示「当前工序完工量 / 排产数量」是跨口径(成型 56000 / 成品 8000)⇒ 改与它配对
+                        + " ISNULL((SELECT TOP 1 ISNULL(p.pl_sl,0) * ISNULL(r.换算率,1) FROM dbo.bs_route r"
+                        + "   WHERE r.工艺路线编码 = ISNULL(p.[工艺路线],N'') AND r.工序名称 = cop.当前工序"
+                        + "     AND ISNULL(r.asp_cancel,'N')<>'Y'), 0) AS 当前工序计划量,"
                         // 余量(2026-09-28 用户定稿)=订单结转的剩余数量:订单行需求 − 已转出占用
                         // (form_flow_link ACTIVE 占用,与订单结转页「剩余可转」同源;转工单/转采购都占)
                         + " ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l"
@@ -121,11 +137,16 @@ public class WorkOrderListController {
                         + " CONVERT(varchar(10), p.cp_date, 120) AS 计划完工日期,"
                         + " CAST(ISNULL(CAST(p.bz AS nvarchar(500)), N'') AS nvarchar(500)) AS 备注"
                         + " FROM dbo.plang p"
-                        + " LEFT JOIN dbo.dm_kh dk ON dk.comm = p.comm AND dk.dm = p.khdm"
+                        + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
                         + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
                         // 当前工序/工序进度(视图:按报工派生;见 tools/migrate-wo-process-progress-view.sql)
                         + " LEFT JOIN dbo.v_wo_process_progress prg ON prg.单号 = p.pl_no"
+                        // 当前工序 = 预排台账最后一道「已落实」(该行现在该做的工序),缺台账回落报工派生值
+                        + " CROSS APPLY (SELECT ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
+                        + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
+                        + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
+                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(prg.当前工序, N'')) AS 当前工序) cop"
                         + w + " ORDER BY p.pl_date DESC, p.pl_no, p.pl_xc",
                 args.toArray());
         // 生产状态(与 v_manu_schedule 同口径:完工=入库≥排产;在产=有入库;其余未完工;未排产行=未排产)

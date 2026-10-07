@@ -1,42 +1,11 @@
 <!-- ScheduleBoard.vue — 排产工作台(实现总结 V1.0 §5 三段式;2026-09-23 纠偏还原,用户拍板:
      「产线×班别骨架」范式移步 工单排产 WorkOrderBoard.vue,本页回归 调度台=判断+排入+撤销。
-     池=已审核·未指派产线;双击行=单笔排入,勾选+顶部参数=批量同线;撤销回池(换线=撤销+重排);
-     回执含产线 当日负荷/日产能/超载提示——只提示不拦截(排产人工拍板)。 -->
+     2026-10-07 用户口径:排产改为**工序路线排线** —— 勾选一张工单 → 「排产」→ 弹窗里按工艺路线
+     逐道选线(人工选,一次选好全程线;计划数量只读)→ 首道线写 plang.scx/plang_pc,全路线写预排台账
+     wo_process_line;前道报工完工审核后自动转序到下一道的线。撤销排产会同时作废台账。
+     (原「顶部选线 + 批量排入」入口与 排产班组/预开工/预完工/排产数量 参数随之移除:班组移入弹窗。) -->
 <template>
   <div class="sb-page">
-    <!-- 顶部参数区 -->
-    <div class="sb-params">
-      <span class="sb-title">{{ tt('排产参数') }}</span>
-      <!-- 工序/工艺优先(2026-10-05,依《新系统产线命名.xlsx》):分发维度仍是生产线,但先按功能(成型/切炭/组装)
-           收敛候选线 —— 装箱归「组装」功能(文件口径),不再按旧的 13 种车间写法 -->
-      <span class="sb-p">{{ tt('工序/工艺') }}
-        <el-select v-model="param.shop" filterable clearable style="width: 160px" :placeholder="tt('全部工序')" @change="param.line = ''">
-          <el-option v-for="w in processOptions" :key="w" :label="tt(w)" :value="w" />
-        </el-select>
-      </span>
-      <span class="sb-p" v-if="subGroups.length">{{ tt('产线分组') }}
-        <el-select v-model="param.group" clearable style="width: 140px" :placeholder="tt('全部')" @change="param.line = ''">
-          <el-option v-for="g in subGroups" :key="g" :label="g" :value="g" />
-        </el-select>
-      </span>
-      <span class="sb-p">{{ tt('生产线') }}
-        <el-select v-model="param.line" filterable style="width: 220px" :placeholder="tt('选择生产线')">
-          <el-option v-for="l in pickLines" :key="l.生产线" :value="l.生产线"
-                     :label="`${l.生产线} · ${tt('今日负荷')}${num(l.今日负荷)}/${tt('日产能')}${num(l.日产能)}`" />
-        </el-select>
-      </span>
-      <el-tag v-if="nextOp" size="small" type="warning" effect="plain">{{ tt('下一道工序') }}：{{ tt(nextOp) }}（{{ tt('按勾选工单') }}）</el-tag>
-      <span class="sb-p">{{ tt('排产班组') }}
-        <el-select v-model="param.team" clearable filterable style="width: 130px">
-          <el-option v-for="t in teams" :key="t" :label="t" :value="t" />
-        </el-select>
-      </span>
-      <span class="sb-p">{{ tt('预开工日') }}<el-date-picker v-model="param.start" type="date" value-format="YYYY-MM-DD" style="width: 135px" /></span>
-      <span class="sb-p">{{ tt('预完工日') }}<el-date-picker v-model="param.due" type="date" value-format="YYYY-MM-DD" style="width: 135px" /></span>
-      <span class="sb-p">{{ tt('排产数量') }}（{{ tt('空=全排') }}）
-        <el-input-number v-model="param.qty" :min="0" :controls="false" size="small" style="width: 110px" />
-      </span>
-    </div>
 
     <!-- 过滤区 + 统计条 -->
     <el-form inline class="sb-bar" @submit.prevent>
@@ -50,7 +19,10 @@
       </el-form-item>
       <el-button type="primary" @click="loadAll">{{ tt('查询') }}</el-button>
       <el-button :loading="loading" @click="loadAll">{{ tt('刷新') }}</el-button>
-      <el-button type="success" :disabled="!checked.length" @click="assign(checked)">{{ tt('批量排入勾选') }}（{{ checked.length }}）</el-button>
+      <!-- 2026-10-07 用户口径:排产时**一次把整条工艺路线的线选好**(弹窗逐道选线,人工选) -->
+      <el-button type="success" :disabled="checked.length !== 1" @click="openPlan(checked[0])">
+        {{ tt('排产') }}
+      </el-button>
       <span class="sb-stats">
         <b v-if="s['车间']" class="sb-shop">{{ tt('当前车间') }}：{{ s['车间'] }}</b>
         {{ tt('待排产') }}（{{ s['待排产笔数'] ?? 0 }}{{ tt('笔') }}）；{{ tt('今日排产') }}（{{ s['今日排产']?.张数 ?? 0 }}{{ tt('张') }}/{{ num(s['今日排产']?.数量) }}{{ tt('件') }}）；{{ tt('总未完成量') }} {{ num(s['总未完成量']) }}
@@ -63,11 +35,10 @@
 
     <!-- ① 待排产池 -->
     <div class="sb-block">
-      <div class="sb-head"><span class="sb-block-title">① {{ tt('待排产') }}</span><span class="sb-dim">{{ tt('双击行即排入该单') }}</span></div>
+      <div class="sb-head"><span class="sb-block-title">① {{ tt('待排产') }}</span><span class="sb-dim">{{ tt('勾选一张工单 → 点「排产」→ 按工艺路线逐道选线(双击行同效)') }}</span></div>
       <el-table ref="poolTable" :data="pool" size="small" border height="300" empty-text="" row-key="rowKey"
-                @selection-change="onCheck" @row-dblclick="assignOne">
+                @selection-change="onCheck" @row-dblclick="planOne">
         <el-table-column type="selection" width="42" reserve-selection />
-        <el-table-column :label="tt('客户等级')" prop="客户等级" width="90" fixed />
         <el-table-column :label="tt('客户')" prop="客户" min-width="150" fixed show-overflow-tooltip />
         <el-table-column :label="tt('客户订单号')" prop="客户订单号" width="140" show-overflow-tooltip />
         <el-table-column :label="tt('加工单号')" prop="加工单号" width="150" show-overflow-tooltip />
@@ -78,19 +49,12 @@
         <el-table-column :label="tt('品名')" prop="品名" min-width="150" show-overflow-tooltip />
         <el-table-column :label="tt('型号')" prop="型号" width="120" show-overflow-tooltip />
         <el-table-column :label="tt('单位')" prop="单位" width="60" />
-        <el-table-column :label="tt('混料批次号')" prop="混料批次号" width="110" show-overflow-tooltip />
         <el-table-column :label="tt('重点管控')" prop="重点管控" width="85" />
         <el-table-column :label="tt('需求数量')" prop="需求数量" width="95" align="right" />
         <el-table-column :label="tt('排产数量')" prop="排产数量" width="95" align="right" />
-        <el-table-column :label="tt('每箱数量')" prop="每箱数量" width="90" align="right" />
         <el-table-column :label="tt('工序交期')" prop="工序交期" width="100" />
         <el-table-column :label="tt('交期紧迫度')" width="100" align="right">
           <template #default="{ row }"><span :class="urgent(row.交期紧迫度)">{{ row.交期紧迫度 ?? '-' }}</span></template>
-        </el-table-column>
-        <el-table-column :label="tt('本次排产数量')" width="130" fixed="right">
-          <template #default="{ row }">
-            <el-input-number v-model="row.本次数量" :min="0" :controls="false" size="small" style="width: 100%" />
-          </template>
         </el-table-column>
       </el-table>
     </div>
@@ -101,12 +65,17 @@
         <span class="sb-block-title">② {{ mode === 'today' ? tt('今日已排产') : tt('全部已排产') }}</span>
         <el-switch v-model="allMode" :active-text="tt('全部')" @change="loadToday" />
         <div class="sb-actions">
+          <!-- 改线(2026-10-07):已排产工单重开排线弹窗改后续各道的预排线(首道线锁定) -->
+          <el-button size="small" type="primary" plain :disabled="checkedToday.length !== 1" @click="openPlan(checkedToday[0], true)">
+            {{ tt('预排线') }}
+          </el-button>
           <el-button size="small" type="danger" plain :disabled="!checkedToday.length" @click="unassign">
             {{ tt('撤销排产') }}（{{ checkedToday.length }}）
           </el-button>
         </div>
       </div>
-      <el-table ref="todayTable" :data="todayRows" size="small" border height="240" empty-text="" row-key="加工单号"
+      <!-- row-key 必须**唯一到行**(2026-10-07 修:此前用 加工单号 ⇒ 同一工单多行时勾一条会全勾) -->
+      <el-table ref="todayTable" :data="todayRows" size="small" border height="240" empty-text="" row-key="rowKey"
                 @selection-change="onCheckToday">
         <el-table-column type="selection" width="42" />
         <el-table-column :label="tt('生产线')" prop="生产线" width="110" fixed />
@@ -116,23 +85,28 @@
         <el-table-column :label="tt('批次号')" prop="批次号" width="100" sortable />
         <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" />
         <el-table-column :label="tt('排产数量')" prop="排产数量" width="95" align="right" />
-        <el-table-column :label="tt('每箱数量')" prop="每箱数量" width="90" align="right" />
-        <el-table-column :label="tt('箱数')" prop="箱数" width="80" align="right" />
         <el-table-column :label="tt('需求数量')" prop="需求数量" width="95" align="right" />
         <el-table-column :label="tt('入库数量')" prop="入库数量" width="95" align="right" />
         <el-table-column :label="tt('余量')" prop="余量" width="85" align="right" />
         <el-table-column :label="tt('预开工日')" prop="预开工日" width="105" />
         <el-table-column :label="tt('预完工日')" prop="预完工日" width="105" />
+        <el-table-column :label="tt('计划线')" prop="计划线" min-width="240" show-overflow-tooltip />
       </el-table>
     </div>
+
+    <!-- 工序路线排线弹窗(2026-10-07):排产时一次选好整条路线的线 -->
+    <ProcessRoutePlanDialog v-model="planVisible" :加工单号="planRow['加工单号'] || ''"
+                            :行id="planRow['行id'] ?? null" :工单行号="planRow['工单行号'] || ''"
+                            :批次号="planRow['批次号'] || ''" :已排产="planLocked" @changed="loadAll" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
+import ProcessRoutePlanDialog from './ProcessRoutePlanDialog.vue'
 
 /** 内嵌/筛选(2026-10-05 用户口径):生产工单页把"快速排产页面本身"弹出来,并只筛当前工单 */
 const props = defineProps({
@@ -150,39 +124,8 @@ const todayRows = ref([])
 const checkedToday = ref([])
 const allMode = ref(false)
 const s = ref({})
-const lines = ref([])
-const teams = ref([])
-const param = reactive({ line: '', team: '', start: '', due: new Date().toISOString().slice(0, 10), qty: null, shop: '', group: '' })
 const mode = computed(() => (allMode.value ? 'all' : 'today'))
 const customers = computed(() => [...new Set(pool.value.map((r) => r.客户).filter(Boolean))].sort())
-/** 工序/工艺(第1级)兜底:产线档案里出现过的功能值 */
-const shops = computed(() => [...new Set(lines.value.map((l) => l.生产车间).filter(Boolean))].sort())
-/** 工序/工艺下拉:勾选工单时 = **该工单工艺路线的工序序列(按路线顺序)**;未勾选 = 产线档案里出现过的功能值 */
-const processOptions = computed(() => {
-  const seqs = [...new Set(checked.value
-    .map((r) => ((nextInfo.value[r['加工单号']] || {})['路线工序'] || []).join('→'))
-    .filter(Boolean))]
-  return seqs.length === 1 ? seqs[0].split('→') : shops.value
-})
-/** 产线分组(第2级,仅成型有:烧结/X烧结):随所选功能收敛 */
-const subGroups = computed(() => [...new Set(lines.value
-  .filter((l) => !param.shop || l.生产车间 === param.shop)
-  .map((l) => l.产线分组).filter(Boolean))].sort())
-/** 勾选工单的「下一道工序」信息(2026-10-05,后端统一口径 v_wo_next_process) */
-const nextInfo = ref({})
-const nextShop = computed(() => {
-  const s = [...new Set(checked.value.map((r) => (nextInfo.value[r['加工单号']] || {})['生产车间']).filter(Boolean))]
-  return s.length === 1 ? s[0] : ''
-})
-const nextOp = computed(() => {
-  const o = [...new Set(checked.value.map((r) => (nextInfo.value[r['加工单号']] || {})['下一道工序']).filter(Boolean))]
-  return o.length === 1 ? o[0] : ''
-})
-/** 两级收敛后的候选产线:勾选了工单则**先按该工单下一道工序的功能收敛**(工序/工艺下拉仍可手动覆盖) */
-const pickLines = computed(() => {
-  const shop = param.shop || nextShop.value
-  return lines.value.filter((l) => (!shop || l.生产车间 === shop) && (!param.group || l.产线分组 === param.group))
-})
 
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '' }
 function urgent(v) {
@@ -199,7 +142,6 @@ async function loadPool() {
     const res = await request.post('/px/scheduleBoard/pending', { keyword: keyword.value, 客户: customer.value })
     pool.value = (res.data || []).map((r) => ({
       ...r,
-      本次数量: null,
       rowKey: `${r.加工单号}#${r['行id']}`,
     }))
     checked.value = []
@@ -211,89 +153,55 @@ async function loadStats() {
   try {
     const res = await request.post('/px/scheduleBoard/stats', {})
     s.value = res.data || {}
-    lines.value = s.value['产线'] || []
-    teams.value = s.value['班组'] || []
   } catch { /* 统计失败不阻断 */ }
 }
 
 async function loadToday() {
   try {
     const res = await request.post('/px/scheduleBoard/today', { mode: mode.value, keyword: keyword.value })
-    todayRows.value = res.data || []
+    // 行唯一键:同一工单可能有多行(多工单行/多批次)⇒ 用 加工单号#工单行号#批次号(否则勾一条会全勾)
+    todayRows.value = (res.data || []).map((r, i) => ({
+      ...r,
+      rowKey: `${r['加工单号']}#${r['工单行号'] ?? ''}#${r['批次号'] ?? ''}#${i}`,
+    }))
     checkedToday.value = []
   } catch (e) { err(e, '查询失败') }
 }
 
 function loadAll() { loadPool(); loadStats(); loadToday() }
-function onCheck(r) { checked.value = r; loadNextProcess() }
-/** 拉取勾选工单的「下一道工序 + 候选产线」(后端统一口径,排产/调拨/详情共用) */
-async function loadNextProcess() {
-  const nos = [...new Set(checked.value.map((x) => x['加工单号']).filter(Boolean))]
-  if (!nos.length) { nextInfo.value = {}; return }
-  try {
-    const res = await request.post('/px/processTask/nextProcess', { 工单号列表: nos })
-    const m = {}
-    for (const x of (res.data || [])) m[x['单号']] = x
-    nextInfo.value = m
-  } catch { nextInfo.value = {} }
-}
+function onCheck(r) { checked.value = r }
 function onCheckToday(r) { checkedToday.value = r }
 
-/** 行参数 = 顶部参数 + 行内覆盖(生产线/本次数量) */
-function rowParams(r) {
-  return {
-    加工单号: r.加工单号, 行id: r['行id'],
-    生产线: param.line || undefined,
-    排产班组: param.team || undefined,
-    预开工日: param.start || undefined,
-    预完工日: param.due || undefined,
-    排产数量: Number(r.本次数量) || param.qty || undefined,
-    顶部生产线: param.line || undefined,
-  }
-}
 
-async function assign(rows) {
-  const list = rows || []
-  // 2026-10-05 用户口径「同个工单不能重复排产,已排产的内容要出现提示」:
-  // 前端先拦一道(后端 assign 另有守卫「已排产(产线=x),不能重复排入;换线请先撤销」)
-  const dup = list.filter((r) => r['生产线'] || r['排产产线'])
-  if (dup.length) {
-    ElMessage.warning(`${tt('以下工单已排产,不能重复排入')}：${dup.map((r) => r['加工单号'] || r['工单号']).join('、')}`)
-    return
-  }
-  if (!param.line) { ElMessage.warning(tt('请先在顶部选择生产线')); return }
-  try {
-    await ElMessageBox.confirm(`${tt('确认将选中的')} ${list.length} ${tt('张加工单排入')}「${param.line}」？`,
-      tt('快速排产'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
-  } catch { return }
-  try {
-    const res = await request.post('/px/scheduleBoard/assign', { rows: list.map(rowParams) })
-    const d = res.data || {}
-    const rc = (d['产线回执'] || []).map((l) => `${l.生产线}:${tt('今日负荷')}${num(l.今日负荷)}/${tt('日产能')}${num(l.日产能)}${l.提示 === '超载' ? ' ⚠' + tt('超载') : ''}`).join('；')
-    const failed = d['失败行'] || []
-    try {
-      await ElMessageBox.alert(
-        `${tt('已排产')} ${d['排产张数']} ${tt('张')}${failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''}${rc ? `<br/><b>${rc}</b>` : ''}`,
-        tt('排产回执'), { dangerouslyUseHTMLString: true, confirmButtonText: tt('知道了') })
-    } catch { /* 回执关闭 */ }
-    loadAll()
-  } catch (e) { err(e, '排产失败') }
+// ───────── 工序路线排线(2026-10-07):排产 = 一次把整条工艺路线的线选好 ─────────
+const planVisible = ref(false)
+const planRow = ref({})
+const planLocked = ref(false)
+/** 打开排线弹窗:锁定时=改线(已排产,首道线锁定) */
+function openPlan(row, locked) {
+  if (!row) { ElMessage.warning(tt('请先勾选一张工单')); return }
+  planRow.value = { ...row }
+  planLocked.value = !!locked || !!row['生产线']
+  planVisible.value = true
 }
-
-function assignOne(row) { assign([row]) }
+function planOne(row) { openPlan(row, false) }
 
 async function unassign() {
   const list = checkedToday.value
   if (!list.length) return
+  // 撤销**按工单行**(唯一键 = 工单号 + 工单行号,2026-10-07 用户口径):勾哪一行撤销哪一行,
+  //   同工单其它行不动;该行预排线同时作废
+  const targets = list.map((r) => ({ 加工单号: r['加工单号'], 行id: r['行id'] })).filter((x) => x['加工单号'])
+  const labels = list.map((r) => `${r['加工单号']}${r['工单行号'] != null ? ' 行' + r['工单行号'] : ''}`)
   try {
-    await ElMessageBox.confirm(`${tt('确认撤销选中的')} ${list.length} ${tt('张加工单的排产')}(撤销后回到待排产池;换线=撤销+重排)？`,
+    await ElMessageBox.confirm(`${tt('确认撤销选中的')} ${targets.length} ${tt('行排产')}(${tt('撤销后回到待排产池;换线=撤销+重排;该行预排线同时作废')})？\n${labels.join('、')}`,
       tt('撤销排产'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
   } catch { return }
   try {
-    const res = await request.post('/px/scheduleBoard/unassign', { rows: list.map((r) => ({ 加工单号: r.加工单号 })) })
+    const res = await request.post('/px/scheduleBoard/unassign', { rows: targets })
     const d = res.data || {}
     const failed = d['失败行'] || []
-    ElMessage.success(`${tt('已撤销')} ${d['撤销张数']} ${tt('张')}` + (failed.length ? `（${tt('跳过')} ${failed.length}）` : ''))
+    ElMessage.success(`${tt('已撤销')} ${d['撤销张数']} ${tt('行')}` + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''))
     loadAll()
   } catch (e) { err(e, '撤销失败') }
 }
@@ -309,7 +217,6 @@ onMounted(() => {
 
 <style scoped>
 .sb-page { padding: 10px 14px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; background: #f9f9f9; overflow: auto; }
-.sb-params { display: flex; align-items: center; gap: 14px; padding: 8px 10px; background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex-wrap: wrap; }
 .sb-title { font-weight: 600; color: #116a5b; }
 .sb-p { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #606266; }
 .sb-bar { margin: 0; background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; padding: 6px 10px 0; }

@@ -1284,6 +1284,23 @@ public class ButtonService {
         woReport.post(def.code(), no, currentUserName());
         // 工序任务回写(A 项,2026-10-05):报工审核 → 该工单该工序任务的完成量累计 + 状态推进
         processTask.onReport(def.code(), no, currentUserName());
+        // 转序派线(2026-10-07 预排全程线):报工**审核**后,若前道已完工 → 自动把工单切到下一道工序的**预排线**
+        // (计划线 = 排产时人工逐道选定,台账 wo_process_line;留痕 wo_transfer_log 原因「转序自动派线」)。
+        // 只对报工单生效;失败不阻断审核(回执在排产页/追溯里可见)。
+        if ("WO_REPORT".equals(def.code())) {
+            // ⚠ 转序按**工单号 + 工单行号**定位(2026-10-07 用户口径:只切被报工那一行的线;
+            //   no 是报工单号,不能当工单号用;一个报工单可能涉及多行 ⇒ 逐行处理)
+            for (Map<String, Object> rr : woReport.reportRows(def.code(), no)) {
+                String wo = rr.get("工单号") == null ? "" : String.valueOf(rr.get("工单号")).trim();
+                Object rid = rr.get("工单行id");
+                if (wo.isEmpty() || rid == null) continue;
+                try {
+                    processTask.applyNextProcess(wo, ((Number) rid).longValue(), currentUserName());
+                } catch (Exception e) {
+                    log.warn("转序派线失败(不阻断报工审核): 工单={} 行={} 报工单={} {}", wo, rid, no, e.getMessage());
+                }
+            }
+        }
         // 三类工序检验单(9.29 批次④,2026-10-05):成型/切炭/组装 报工审核 → 各自动生成一张检验单草稿
         // (三张独立不合并;幂等=同一报工单同一工序只出一张;后续品质填写判定/数量)
         woInspGenerate(def.code(), no, currentUserName());
