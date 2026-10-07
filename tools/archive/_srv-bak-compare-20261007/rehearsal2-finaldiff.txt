@@ -1,0 +1,75 @@
+==T1 表:SRVBAK有本地无==
+name
+----
+==T2 表:本地有SRVBAK无==
+name
+----
+==V1 视图:SRVBAK有本地无==
+name
+----
+==V2 视图:本地有SRVBAK无==
+name
+----
+==C1 列:共表但本地有SRVBAK无==
+tbl col
+--- ---
+NULL attachments
+NULL auditor_id
+NULL auditor_id
+NULL auditor_number
+NULL auditor_number
+NULL bill_sp_id
+NULL bill_stock_id
+NULL contact_city_id
+NULL contact_city_id
+NULL contact_country_id
+NULL contact_country_id
+NULL contact_district_id
+NULL contact_district_id
+NULL contact_province_id
+NULL contact_province_id
+NULL creator_id
+NULL creator_id
+NULL creator_number
+NULL creator_number
+NULL cur_settle_amount_for
+NULL customer_id
+NULL customer_id
+NULL delivery_type_id
+NULL delivery_type_id
+NULL dept_id
+NULL dept_id
+NULL dispatcher_city_id
+NULL dispatcher_city_id
+NULL dispatcher_country_id
+NULL dispatcher_country_id
+NULL dispatcher_district_id
+NULL dispatcher_district_id
+NULL dispatcher_province_id
+NULL dispatcher_province_id
+NULL edit_pay_account_id
+NULL edit_pay_account_number
+NULL edit_pay_type_id
+NULL edit_pay_type_number
+NULL emp_id
+NULL emp_id
+NULL f_logistics_id
+NULL modifier_id
+NULL modifier_id
+NULL modifier_number
+NULL modifier_number
+NULL setting_term_id
+NULL setting_term_id
+NULL supplier_id
+NULL total_unsettle_amount_for
+NULL 产品编号
+NULL 产品名称
+NULL 产品名称
+NULL 产品种类
+NULL 成品重量
+NULL 项目.合同号
+NULL 整体规格长度
+NULL 整体规格外径
+==C2 列:共表但SRVBAK有本地无==
+tbl col
+--- ---

@@ -1,0 +1,24 @@
+==A 新结构==
+inh_cols outh_cols inh_rows outh_rows kucun_rows
+-------- --------- -------- --------- ----------
+47 48 39 0 42
+==B 流水来源分布==
+src 单据类型 n qty
+--- ---- - ---
+0 期初结存 32 19939.0000
+1 采购入库单 7 5910.0000
+==C 破损视图检测==
+可查 37 / 破损 69
+VIEW_barcord; View_BOM; VIEW_CK; View_CRK; View_FKZE; View_GX; VIEW_inh; VIEW_kucun; View_llrk00; View_llrk01; View_llrk01A; View_llrk02; View_llrk02A; View_llrk03; View_llrk03A; View_llrk04; View_llrk04A; View_llrk05; View_llrk05A; View_llrk06; View_llrk06A; View_llrk07; View_llrk07A; View_od_cost; View_od_cost2; View_od_cost3; View_od_cost4; View_od_sqdchl; View_OD_WLQTY1; View_OD_WLQTY3; View_OD_WLQTY4; View_OD_WLQTY41; View_OD_WLQTY5; View_OD_WLQTY6; View_OD_WLQTY7; View_OD_WLQTY9; VIEW_odqty; View_odqty1; View_odqty2; View_odqty3; VIEW_order; VIEW_outh; VIEW_pandian; VIEW_podyl; VIEW_podyl1; View_Porder; VIEW_QTY; VIEW_QTY1; VIEW_QTY2; VIEW_QTY3; VIEW_RK; View_SCGD; View_SCX; View_SKZE; View_WB_WLQTY1; View_WB_WLQTY2; View_WB_WLQTY3; View_WB_WLQTY9; VIEW_zc; View_ZZPQTY; View_ZZPQTY0; View_ZZPQTY1; View_ZZPQTY2; View_ZZPQTY3; View_ZZPQTY4; View_ZZPQTY5; View_ZZPQTY6; View_ZZPQTY7; View_ZZPQTY8; 
+==D kucun vs 流水==
+kucun_rows nonzero flow_keys
+---------- ------- ---------
+42 39 39
+对比键数 不一致键数
+---- -----
+42 3
+k kucun flow
+- ----- ----
+YCL-01|B-47-28**TB .0000 4000.0000
+YCL-01|YJ-SX-012 .0000 90.0000
+YCL-01|YJ-SX-038 .0000 100.0000
