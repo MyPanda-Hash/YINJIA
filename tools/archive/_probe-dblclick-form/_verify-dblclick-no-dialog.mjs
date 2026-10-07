@@ -111,34 +111,36 @@ try {
   const shot1 = SHOTS ? await send('Page.captureScreenshot', { format: 'png' }) : null
   if (shot1?.result?.data) fs.writeFileSync(path.join(OUT, `dblclick-${PANEL}-无弹窗.png`), Buffer.from(shot1.result.data, 'base64'))
 
-  // ② 工具栏「修改」→ 卡片仍应能打开(草稿单该按钮本就禁用,此时跳过该断言)
-  console.log('[点「修改」]', await ev(`(function(){
-    const el = [...document.querySelectorAll('.tools .tb-main, .tools button')]
-      .find((e) => (e.innerText || '').trim() === '修改');
-    if (!el) return 'not-found';
-    const disabled = String(el.className).includes('disabled');
-    el.dispatchEvent(new MouseEvent('click', { bubbles: true, view: window }));
-    return 'clicked' + (disabled ? '(按钮为灰:当前单据可原地编辑,按设计不弹卡片)' : '');
-  })()`))
-  await sleep(5500)
-  const viaBtn = await ev(`JSON.stringify({
-    dialogs: document.querySelectorAll('.el-dialog').length,
-    title: document.querySelector('.el-dialog__title')?.innerText || '',
-    fields: document.querySelectorAll('.el-dialog .panelx-form .fields .field').length,
-    doubled: [...document.querySelectorAll('.el-dialog .panelx-form .fields .field')]
-      .filter((f) => f.querySelectorAll('input, textarea').length > 1).length,
+  // ② 工具栏不应再有「修改」(2026-10-15:卡片删除后「修改」成了死按钮,一并摘掉)
+  const toolbar = await ev(`JSON.stringify({
+    mainBtns: [...document.querySelectorAll('.tools .tb-main')].map((e) => (e.innerText || '').trim()).filter(Boolean),
+    dlg: document.querySelectorAll('.el-dialog').length,
   })`)
-  console.log('[「修改」后]', viaBtn)
-  const b = JSON.parse(viaBtn)
-  if (b.dialogs > 0 && b.fields > 0) console.log('② 工具栏「修改」仍能打开卡片 ✅')
-  else if (String(await ev(`(() => { const el = [...document.querySelectorAll('.tools .tb-main')].find((e) => (e.innerText || '').trim() === '修改'); return el ? el.className : 'not-found' })()`)).includes('disabled')) {
-    console.log('② 「修改」按钮为灰(草稿单原地编辑),本单不适用——跳过该断言')
-  } else { console.log('② 「修改」打不开卡片 ❌'); failed = true }
+  console.log('[工具栏]', toolbar)
+  const tb = JSON.parse(toolbar)
+  const hasModify = tb.mainBtns.includes('修改')
+  // 下拉菜单里也不能藏一个「修改」
+  const dropHas = await ev(`(function(){
+    const heads = [...document.querySelectorAll('.tools .tb-group')];
+    return heads.some((g) => [...g.querySelectorAll('.ctx-item')].some((i) => (i.innerText || '').trim() === '修改'));
+  })()`)
+  console.log(hasModify || dropHas ? '② 工具栏仍有「修改」入口 ❌' : '② 工具栏「修改」入口已删除 ✅')
+  if (hasModify || dropHas) failed = true
   const shot2 = SHOTS ? await send('Page.captureScreenshot', { format: 'png' }) : null
-  if (shot2?.result?.data) fs.writeFileSync(path.join(OUT, `modify-${PANEL}-仍可打开.png`), Buffer.from(shot2.result.data, 'base64'))
+  if (shot2?.result?.data) fs.writeFileSync(path.join(OUT, `toolbar-${PANEL}.png`), Buffer.from(shot2.result.data, 'base64'))
+
+  // ③ 表单页签路由仍应正常(卡片删了,但 PanelxForm 页面没动)
+  await send('Page.navigate', { url: `${SITE}/#/panelx/form/${PANEL}?code=${encodeURIComponent(DOC)}` })
+  await sleep(7000)
+  const formPage = await ev(`JSON.stringify({
+    fields: document.querySelectorAll('.panelx-form .fields .field').length,
+    title: document.querySelector('.panelx-form .head .no')?.innerText || '',
+  })`)
+  console.log('[表单页签路由]', formPage)
+  if (JSON.parse(formPage).fields === 0) { console.log('③ 表单页签打不开 ❌'); failed = true } else { console.log('③ 表单页签仍正常 ✅') }
 
   console.log('[控制台错误]', errors.length, errors.slice(0, 4))
-  console.log(`\n=== ${failed ? '未通过 ❌' : '通过 ✅'}:${PANEL} ${DOC} 双击明细行不弹卡片、修改按钮仍可打开 ===`)
+  console.log(`\n=== ${failed ? '未通过 ❌' : '通过 ✅'}:${PANEL} ${DOC} 无卡片入口(双击/修改均无)、表单页签正常 ===`)
   if (failed) process.exitCode = 1
 } finally {
   try { edge.kill() } catch {}

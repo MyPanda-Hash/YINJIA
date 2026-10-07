@@ -1600,7 +1600,6 @@
       </template>
     </el-dialog>
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
-    <VoucherFormDialog v-model="formVisible" :panel-code="formPanel || panelCode" :code="formCode" @saved="onFormSaved" />
     <!-- 字段管理(动态字段/备用列池;仅 admin):绑定/停用自定义字段 -->
     <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
     <ScanFillDialog
@@ -1760,7 +1759,6 @@ import { isQcInspReqPanel } from './qcInspReqConfig'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
-import VoucherFormDialog from './VoucherFormDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 
 const engine = usePanelRuntime()
@@ -2427,7 +2425,9 @@ const reportColumnTree = computed(() => {
   return out
 })
 const toolbarGroups = computed(() => (groups.value || []).map((group) => {
-  const actions = actsOf(group).filter((action) => action !== '查询' && action !== '查找')
+  // 2026-10-15 用户口径:列表页不再提供「能打开整单卡片(VoucherFormDialog)」的入口 ——
+  //   「修改」动作唯一的作用就是弹那张卡片,卡片删除后它成了死按钮,故与 查询/查找 一样从工具栏摘掉。
+  const actions = actsOf(group).filter((action) => !['查询', '查找', '修改'].includes(action))
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
@@ -5096,8 +5096,8 @@ function onDetailCellDblclick(row, column, event, b) {
   const field = fieldDefOf(column?.property)
   // 明细行双击**只**服务「参照触发=双击」的字段(如存货:双击弹参照选择器);其余情况什么都不做。
   // 🔴 2026-10-15 用户口径:原实现在非草稿态还会 `openForm(cur.value)` —— 即双击明细行弹出整单卡片
-  //    (VoucherFormDialog),采购入库单/材料出库单…所有单据面板都一样,用户明确要求双击不要再弹这个弹窗。
-  //    需要看整单卡片请走工具栏「修改」按钮(同一函数 openForm)。
+  //    (VoucherFormDialog),采购入库单/材料出库单…所有单据面板都一样,用户明确要求双击不要再弹。
+  //    随后用户进一步确认「不需要能打开这个卡片」⇒ 卡片与工具栏「修改」入口**全部删除**(见 openForm 处注释)。
   if (detailEditable(b) && isReferenceField(field) && detailRefTrigger(field) === 'dblclick') {
     event?.stopPropagation?.()
     if (!row?._placeholder) openDetailReference(field, row, b)
@@ -5795,29 +5795,9 @@ function isDisabled(action) {
   return map[action] === true
 }
 
-// 2026-08-20：双击明细行/修改按钮改为面板弹窗打开表单（不再跳新页签）；无编号（新增兜底）仍走页签
-const formVisible = ref(false)
-const formCode = ref('')
-// 弹窗面板：双击=当前面板；选单生成=生成的目标面板（可跨面板）
-const formPanel = ref('')
-function openForm(row) {
-  if (row && row['编号']) {
-    formCode.value = row['编号']
-    formVisible.value = true
-    return
-  }
-  const q = { operationName: operationName.value }
-  if (row && row['编号']) q.code = row['编号']
-  const no = row ? row['单据编号'] || row['锭号'] || row['编号'] : ''
-  const title = row ? `${panelName.value}-${no}` : `${panelName.value}-新增`
-  router.push({ path: `/panelx/form/${panelCode.value}`, query: q })
-  tabs.open({ path: `/panelx/form/${panelCode.value}`, title, query: q })
-}
-function onFormSaved() {
-  formVisible.value = false
-  formPanel.value = ''
-  load()
-}
+// 2026-10-15 用户口径:列表页**不再有**任何打开「整单卡片」的入口 ——
+//   双击明细行(见 onDetailCellDblclick)与工具栏「修改」都曾走这里的 openForm() 弹 VoucherFormDialog,
+//   两者连同 VoucherFormDialog 组件一并删除;单据数据一律在列表页原地内联编辑(草稿态)。
 
 // 直接新增：调后端保存（空表头）创建最新草稿单（autoCode 编号 + 单据日期=当天自动填入），
 // 刷新列表并定位到新单，在列表页直接内联填写（不跳转表单页/不弹新增弹窗）。
@@ -6361,11 +6341,8 @@ async function onButton(action) {
     await directAdd()
     return
   }
-  if (action === '修改') {
-    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
-    openForm(current.value)
-    return
-  }
+  // 2026-10-15:「修改」原=打开整单卡片(VoucherFormDialog),卡片已按用户口径删除,
+  //   该动作也一并从工具栏摘掉(toolbarGroups 过滤),此处不再处理。
   if (['保存', '保存为草稿', '保存新增'].includes(action) && draftEditable.value) {
     if (action === '保存为草稿') {
       // 暂存:不校验(未完成的数据也可落库)
