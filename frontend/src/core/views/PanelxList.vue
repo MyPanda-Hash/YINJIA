@@ -5094,13 +5094,14 @@ function openClickDetailRef(field, row, b) {
 
 function onDetailCellDblclick(row, column, event, b) {
   const field = fieldDefOf(column?.property)
+  // 明细行双击**只**服务「参照触发=双击」的字段(如存货:双击弹参照选择器);其余情况什么都不做。
+  // 🔴 2026-10-15 用户口径:原实现在非草稿态还会 `openForm(cur.value)` —— 即双击明细行弹出整单卡片
+  //    (VoucherFormDialog),采购入库单/材料出库单…所有单据面板都一样,用户明确要求双击不要再弹这个弹窗。
+  //    需要看整单卡片请走工具栏「修改」按钮(同一函数 openForm)。
   if (detailEditable(b) && isReferenceField(field) && detailRefTrigger(field) === 'dblclick') {
     event?.stopPropagation?.()
     if (!row?._placeholder) openDetailReference(field, row, b)
-    return
   }
-  if (draftEditable.value) return
-  if (!row?._placeholder) openForm(cur.value)
 }
 
 function newDetailRow(tabKey) {
