@@ -38,7 +38,7 @@ table:yj_translation   # 多语言翻译表(scope=panel|field,ref_key=中文键,
 table:yj_usage_log   # 使用日志(登录与面板操作留痕,使用权限查看页面数据源)
 table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)
 
-# ---- MES 自有业务表(175 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
+# ---- MES 自有业务表(181 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
 table:bd_account   # 会计科目档案
 table:bd_dispatch   # 工序派工单头表(经典遗留面板)
 table:bd_expense_type   # 费用类别档案
@@ -157,6 +157,8 @@ table:rd_alkaline_detail   # 碱性测试行表
 table:rd_alkaline_head   # 碱性测试头表
 table:rd_antibact_detail   # 抑菌测试行表
 table:rd_antibact_head   # 抑菌测试头表
+table:rd_asm_bom_detail   # 组装BOM表行表(面板 RD_ASM_BOM;2026-09-11 并入组装工艺清单第2页签、菜单下线;当前空表)
+table:rd_asm_bom_head   # 组装BOM表头表(面板 RD_ASM_BOM;后端文书归档集合与 DevTaskService 仍引用,历史 rd_dev_task 行留审计;当前空表)
 table:rd_approval   # 立项申请表(文件类,管理员保存即归档)
 table:rd_approval_detail   # 立项申请表占位行表(恒空,doc模式要求)
 table:rd_asm_proc_detail   # 组装工艺清单行表
@@ -180,6 +182,8 @@ table:rd_mineral_detail   # 矿化测试行表
 table:rd_mineral_head   # 矿化测试头表
 table:rd_mold_proc_detail   # 成型工艺清单行表
 table:rd_mold_proc_head   # 成型工艺清单头表
+table:rd_mold_formula_detail   # 成型配方行表(面板 RD_MOLD_FORMULA;2026-09-11 并入成型工艺清单第2页签、菜单下线;当前空表)
+table:rd_mold_formula_head   # 成型配方头表(面板 RD_MOLD_FORMULA;后端文书归档集合与 DevTaskService 仍引用,历史 rd_dev_task 行留审计;当前空表)
 table:rd_plan   # 项目实施计划(10阶段×五字段:计划内容/计划开始/计划完成/实际完成/责任人,项目定级必填下拉)
 table:rd_plan_detail   # 项目实施计划占位行表(恒空,doc模式要求)
 table:rd_prod_doclist_detail   # 产品文件列表明细表(占位,doc 模式要求):产品×4文件状态矩阵不落库,由 DevTaskService.board() 现算;是否受控/受控日期为派生值(4 份文件全归档 ⇒ 是)
@@ -239,6 +243,8 @@ table:yj_schema_log   # 数据库结构脚本执行日志(script_name+content_ha
 table:erp_imp_row   # ERP导入行明细(逐行导入结果)
 table:dm_key   # 各种软件接口Key值表
 
-# 合计 215 张在册 + 3 张例外保留 = 218 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
+# 合计 221 张在册 + 3 张例外保留 = 224 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
+# 2026-10-07 补登:rd_asm_bom_head/_detail、rd_mold_formula_head/_detail(2026-09-11 菜单并入后审计漏网);
+#   wo_process_line(2026-10-07 被并行会话「预排全流程线与转序」在制品重建)暂缓登记,定稿后随其迁移补登。
 # 已清理 244 张(RENAME_*/_bak_*/tmp_*/t1/t2 + pr_* 已下架面板表 + 无引用遗留表),清单见
 # tools/migrate-drop-unused-tables.sql 与 tools/archive/_table-audit/drop-tables.txt。
