@@ -2466,3 +2466,10 @@ migrate-qc-insp-req-drop-custom-tab.sql
 #   normalizeByType 把 ISO 归一成 yyyy-MM-dd,两头收口。
 #   自检:日期 8 条 + 时间区间 1 条;幂等可重跑;两个账套都执行。
 migrate-lab-sheets-date-fields-2026-10-07.sql
+
+# migrate-server-converge-20261007.sql(2026-10-07):服务器收敛(第四轮 parity)——结构+元数据对齐到本地
+#   背景:服务器 yj_schema_log 有 09-30 22:03 批量 baseline 虚账(同毫秒登记,未真实执行),部分脚本效果缺失;
+#   演练(服务器 bak+全链 76)后与本地全对账残差=57 列 + yj_field 缺513/多353 + yj_panel 缺1(RD_SHARE_FILE)
+#   + yj_role 缺4 + yj_role_panel 缺202 + yj_translation 缺3396。本脚本全部守卫式补齐/删除。
+#   业务数据(yj_doc_status/yj_user/yj_doc_batch 等)不碰。证据 tools/archive/_srv-bak-compare-20261007/。幂等;两账套均执行。
+migrate-server-converge-20261007.sql
