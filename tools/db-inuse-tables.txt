@@ -220,6 +220,7 @@ table:wo_order   # 生产工单(五工序计划预填,产品批号取号)
 table:wo_progress   # 工单工序进度(报工审核按工序累计完成数量)
 table:wo_transfer_log   # 工单调拨轨迹(9.29 批次②:从/到 生产线·车间 + 数量 + 原因 + 撤销标记)
 table:wo_split_log   # 切单操作日志(9.29 批次①:谁/何时/从哪单切出多少/生成哪张子单/是否撤回)
+table:wo_process_line   # 工序—产线预排台账(2026-10-07:一行=一工单行×一工序;计划生产线=排产时人工按工艺路线逐道选定,实际生产线=报工完工转序时落实;撤销排产按行作废)
 
 # ---- 经典 HSDZ 遗留但仍在用(15 张;改动前须评估面板影响,新功能禁止再用) ----
 table:dm_ck   # 仓库代码
@@ -243,8 +244,7 @@ table:yj_schema_log   # 数据库结构脚本执行日志(script_name+content_ha
 table:erp_imp_row   # ERP导入行明细(逐行导入结果)
 table:dm_key   # 各种软件接口Key值表
 
-# 合计 221 张在册 + 3 张例外保留 = 224 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
+# 合计 222 张在册 + 3 张例外保留 = 225 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
 # 2026-10-07 补登:rd_asm_bom_head/_detail、rd_mold_formula_head/_detail(2026-09-11 菜单并入后审计漏网);
-#   wo_process_line(2026-10-07 被并行会话「预排全流程线与转序」在制品重建)暂缓登记,定稿后随其迁移补登。
 # 已清理 244 张(RENAME_*/_bak_*/tmp_*/t1/t2 + pr_* 已下架面板表 + 无引用遗留表),清单见
 # tools/migrate-drop-unused-tables.sql 与 tools/archive/_table-audit/drop-tables.txt。
