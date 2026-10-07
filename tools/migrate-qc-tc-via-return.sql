@@ -129,9 +129,11 @@ JOIN dbo.qc_insp_detail src
 WHERE d.[送检数量] IS NULL AND src.[送检数量] IS NOT NULL;
 PRINT N'[qc-tc-via-return] ⑤-1 链路溯源回填 送检数量: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行';
 GO
--- ⑤-2 兜底:链路缺失的老单,按「头 检验单号 + 物料编码 + 不良数量 = 本行退货数量」找检验行,
+-- ⑤-2 兜底:链路缺失的老单,按「头 检验单号 + 物料编码 + 不良数量 = 本行数量」找检验行,
 --      **且必须唯一命中**才回填 —— 一张检验单可以有同一物料的多行(送检量各不相同),多命中时
---      取最大/最小都是编数据,宁可留空(留空由前端/生单侧按 退货数量 兜底,不阻断业务)。
+--      取最大/最小都是编数据,宁可留空(留空由前端/生单侧按 数量 兜底,不阻断业务)。
+--      ⚠ 2026-10-05 修正:原稿写 d.[退货数量],那是另一台机器上的旧列名;现行链建的
+--      qc_return_detail 退料数量列叫 [数量](本机实测无 退货数量 列)——按现用列名修正。
 UPDATE d SET d.[送检数量] = x.qty
 FROM dbo.qc_return_detail d
 JOIN dbo.qc_return h ON h.单据编号 = d.单据编号
@@ -139,7 +141,7 @@ CROSS APPLY (SELECT MIN(i.[送检数量]) AS qty
                FROM dbo.qc_insp_detail i
               WHERE i.单据编号 = h.检验单号 AND ISNULL(i.asp_cancel, 'N') <> 'Y'
                 AND i.物料编码 = d.物料编码
-                AND ABS(ISNULL(i.[不良数量], 0) - ISNULL(d.[退货数量], 0)) < 0.0001
+                AND ABS(ISNULL(i.[不良数量], 0) - ISNULL(d.[数量], 0)) < 0.0001
              HAVING COUNT(*) = 1) x
 WHERE d.[送检数量] IS NULL AND x.qty IS NOT NULL;
 PRINT N'[qc-tc-via-return] ⑤-2 检验单号+物料编码+不良数量 唯一命中兜底回填: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行';
