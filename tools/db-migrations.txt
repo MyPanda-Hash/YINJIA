@@ -1101,6 +1101,18 @@ migrate-yjfield-tab-key.sql
 #   ⚠ 2026-10-04 补登记(体检 12 项发现漏登;本脚本已用 DbSync run 在两账套执行并留痕,补登记后 sync 不会重跑)。
 migrate-qc-insp-req-tab-pools.sql
 
+# migrate-qc-insp-req-series.sql + migrate-qc-insp-req-drop-custom-tab.sql(2026-10-04):来料检验要求拆成两个面板
+#   用户口径:「现在将那个自定义的表删除,然后多增加一个来料检验要求的面版,下面有这几个切换表(而且都是自定义的):
+#   阻垢系列/BK材料系列/除重金属系列/矿化(碱性)系列/抑菌系列/载银系列/炭粉/胶粉/矿化料/原料来料,
+#   实现和之前一致,只是为了不要太多的表都集中在一个面版才拆成两个」。
+#   series = 新面板 QC_INSP_REQ_SERIES + 表 qc_insp_req_series(10 张全自定义表,备用1..备用200 每表 20 位);
+#   drop   = 旧「自定义检验要求」页签下线(词表回 7 值 + 该页签字段退绑 + 数据行软删 + 备用141..160 注明改预留)。
+#   ⚠ 顺序:先 series 后 drop;且本块必须排在 migrate-qc-insp-req-filecode-basis.sql 之前
+#   (filecode 要给 qc_insp_req_series 加列,表须先由 series 建出——2026-10-05 实测:顺序颠倒时全新库在 filecode 上报
+#   「Extended properties are not permitted on 'dbo.qc_insp_req_series.文件编码'」而中止)。两账套都执行。
+migrate-qc-insp-req-series.sql
+migrate-qc-insp-req-drop-custom-tab.sql
+
 # migrate-qc-insp-req-filecode-basis.sql(2026-10-04):要求表增「文件编码/检验依据」两列 + 检验报告这两项改为不可修改
 #   用户口径:①「检验报告里面的文件编码与检验依据,要靠物料编码来对应填入,并且不可以修改」;
 #            ②「为每个表格(两个面板)都增加这两列在物料编码后面」。
@@ -2246,16 +2258,6 @@ migrate-drop-bom-kingdee.sql
 #   附:后端 5 处读 bs_bom 的代码与前端 BOM 专属 UI/菜单同批移除。幂等,两账套均已执行。
 migrate-drop-bom-panels.sql
 
-# migrate-qc-insp-req-series.sql + migrate-qc-insp-req-drop-custom-tab.sql(2026-10-04):来料检验要求拆成两个面板
-#   用户口径:「现在将那个自定义的表删除,然后多增加一个来料检验要求的面版,下面有这几个切换表(而且都是自定义的):
-#   阻垢系列/BK材料系列/除重金属系列/矿化(碱性)系列/抑菌系列/载银系列/炭粉/胶粉/矿化料/原料来料,
-#   实现和之前一致,只是为了不要太多的表都集中在一个面版才拆成两个」。
-#   series = 新面板 QC_INSP_REQ_SERIES + 表 qc_insp_req_series(10 张全自定义表,备用1..备用200 每表 20 位);
-#   drop   = 旧「自定义检验要求」页签下线(词表回 7 值 + 该页签字段退绑 + 数据行软删 + 备用141..160 注明改预留)。
-#   ⚠ 顺序:先 series 后 drop。两账套都执行。
-migrate-qc-insp-req-series.sql
-migrate-qc-insp-req-drop-custom-tab.sql
-
 # migrate-plang-split-cols.sql(2026-10-05):工单切单(9.29 生产管理批次 ①)——plang 补父子关联三列
 #   源工单号/源工单行id/拆分序号。口径沿用 bd_manu_order 拆单写法(tools/migrate-manu-order-schedule.sql);
 #   增补 源工单行id(=父行 plang.id):同一 pl_no 可有多行(多批次/多订单行),(pl_no+行号+批次号) 不再唯一,
@@ -2409,6 +2411,14 @@ migrate-route-header-detail-place.sql
 # migrate-route-header-hide-in-detail.sql(2026-10-05):表头字段(名称/生效/失效)不在明细行默认显示
 #   保留 place=header,detail(单表式必须) + visible=0 隐藏列;两账套已执行。
 migrate-route-header-hide-in-detail.sql
+# migrate-route-header-place.sql(2026-10-05):工艺路线 名称/生效日期/失效日期 位置 query,header → header
+#   用户报障「工艺路线名称无法保存」(服务端 400 名称不能为空,接口带名称即成功 ⇒ 前端没把查询区字段送出去);
+#   注意与下一条的顺序:先 place=header,再 only-place 退出明细位,最终态 = header(表单头录入)。两账套已执行。
+migrate-route-header-place.sql
+# migrate-route-header-only-place.sql(2026-10-05):表头字段退出明细位(修「表头修改后无法保存」)
+#   根因:ButtonService 单表式保存 merged 行优先 ⇒ 头字段挂明细位时被明细行旧值覆盖;
+#   改 place=header(退出明细位):保存不再被覆盖、回读取首行、必填只在表头校验一次。两账套已执行。
+migrate-route-header-only-place.sql
 # migrate-route-name-not-required.sql(2026-10-05):工艺路线 名称/生效日期/失效日期 取消必填
 #   口径:描述性字段可空,标识性字段(编码/工序编码/工序控制/工序序列)保持必填;两账套已执行。
 migrate-route-name-not-required.sql
@@ -2431,3 +2441,9 @@ migrate-line-load-on-plang.sql
 #   「所排工单行排产数量 × 该工序自己的换算率」重算全部未作废台账行。幂等;两账套均执行。
 migrate-wo-process-line-qty-recalc.sql
 
+# migrate-server-comment-parity3-20261007.sql(2026-10-07):注释层对齐(第三轮 parity)——库表 MS_Description 以服务器为准回写本地
+#   来源:2026-10-07 12:22 服务器最新 bak 还原分身后与正式库逐列注释对比(四分类:一致 5137/分歧 2501/服务器独有 388/本地独有 1747)。
+#   用户口径「当前库表的注释以服务器端的为准」:分歧与服务器独有且本地列存在者共 2887 条,先清后写(兼容 USER 级重复);
+#   本地独有保留;inh/outh 表级两行豁免(本地已重建为流水语义);已知错位 bd_material_out.工单行号=「打印次数」按原样落库。
+#   证据 tools/archive/_srv-bak-compare-20261007/。幂等;两账套均执行。
+migrate-server-comment-parity3-20261007.sql
