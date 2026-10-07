@@ -18,6 +18,7 @@ export default {
     '父件 {n}': 'Article parent {n}',
     '子件 {n}': 'Article enfant {n}',
     '已导入 {n} 行': '{n} ligne(s) importée(s)',
+    '已带入 {n} 行，请点「保存」提交': '{n} ligne(s) importée(s) — cliquez sur « Enregistrer » pour valider',
     'TDS': 'TDS',
     'PH': 'PH',
     '子件': 'Sous-pièces',

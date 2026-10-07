@@ -18,6 +18,7 @@ export default {
     '父件 {n}': 'Übergeordneter Artikel {n}',
     '子件 {n}': 'Untergeordneter Artikel {n}',
     '已导入 {n} 行': '{n} Zeile(n) importiert',
+    '已带入 {n} 行，请点「保存」提交': '{n} Zeile(n) übernommen – zum Speichern auf „Speichern“ klicken',
     'TDS': 'TDS',
     'PH': 'PH',
     '子件': 'Teil',

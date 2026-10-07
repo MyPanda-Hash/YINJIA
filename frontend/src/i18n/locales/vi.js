@@ -18,6 +18,7 @@ export default {
     '父件 {n}': 'Mặt hàng cha {n}',
     '子件 {n}': 'Mặt hàng con {n}',
     '已导入 {n} 行': 'Đã nhập {n} dòng',
+    '已带入 {n} 行，请点「保存」提交': 'Đã nhập {n} dòng — nhấn «Lưu» để gửi',
     'TDS': 'TDS',
     'PH': 'PH',
     '子件': 'Phụ kiện',

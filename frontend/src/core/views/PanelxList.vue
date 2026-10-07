@@ -5347,81 +5347,61 @@ async function onDetailRefConfirm(selectedRows) {
   //   **原地 splice 掉**;本函数此刻正停在那个 await 上,恢复后照样把带入值写进**已被摘掉的行对象**、
   //   照样弹绿色提示 ⇒ 用户看到「已带入 1 条工序」却一行都没多(浏览器实测:点空行后行数 2→3,
   //   确认后立刻回到 2,期间 0 个 /api 请求 —— 纯客户端摘行,不是保存失败/回滚)。
-  //   为什么只给 ROUTE 提前置位:其它面板确认后走「顺带保存整单 + load() 重取」,服务端数据会把这一行
-  //   原样取回来(那一摘只是瞬时闪烁,自愈);ROUTE 已定口径「参照确认不落库、不 load」,摘掉就再也回不来。
+  //   2026-10-06 只给 ROUTE 提前置位(其它面板当时还走「顺带保存整单 + load() 重取」,服务端数据会把
+  //   那一行取回来,那摘只是瞬时闪烁);2026-10-14 起**所有面板**都不再落库、不 load,行只活在前端,
+  //   摘掉就再也回不来 ⇒ 置位推广到全部面板(取舍见 docs/development/明细参照确认与必填校验-成因与处理方案.md)。
   //   置位点仍在本函数第一个 await 之前、且在所有早退分支之后(早退不动它,避免卡住后续参照确认);
   //   本函数末尾的 finally 负责复位,取消(不确认)路径不经过这里 ⇒ 取消仍会正确撤掉那行空行。
-  if (panelCode.value === 'ROUTE') detailRefSaving.value = true
-
-  const detail = {}
-  for (const [key, value] of Object.entries(cur.value.detail || {})) {
-    detail[key] = Array.isArray(value) ? value.map((row) => ({ ...row })) : value
-  }
-  const sourceRows = cur.value.detail?.[pick.tabKey] || []
-  // ⚠ 2026-10-05 根因(修「提示已带入 N 条、那一行仍是空白」):上面 detail 是 cur.value.detail 的
-  //   **深拷贝快照**,它只为「参照确认后顺带保存整单」而存在(保存时把这个快照交给后端)。
-  //   ROUTE 分支已定口径「参照确认不落库」,快照在 return 前整份丢弃 ⇒ 写进快照的带入值
-  //   跟着一起丢;而表格渲染的是 cur.value.detail[pick.tabKey] 里的**活行**(buildBlocks→blockRows→
-  //   detailRows 一路都是同一批对象) —— 于是绿色提示照发、行里什么都没有。
-  //   (换数组引用 slice() / 激活单元格都救不回来:值根本不在渲染用的那个数组里,故上一版无效。)
-  //   修法:ROUTE 直接写活数组/活行;其余面板仍写快照,保存语义与行为逐字不变。
-  const writeLiveRows = panelCode.value === 'ROUTE'
-  if (writeLiveRows && !cur.value.detail) cur.value.detail = {}
-  const targetRows = writeLiveRows
-    ? (Array.isArray(cur.value.detail[pick.tabKey]) ? cur.value.detail[pick.tabKey] : (cur.value.detail[pick.tabKey] = []))
-    : (detail[pick.tabKey] || (detail[pick.tabKey] = []))
-  const targetIndex = pick.row ? sourceRows.indexOf(pick.row) : -1
-  const changedRows = []
-  let offset = 0
-  if (targetIndex >= 0) {
-    applyDetailReference(targetRows[targetIndex], pick.field, selectedRows[0])
-    calculateDetailRow(pick.tabKey, targetRows[targetIndex])
-    changedRows.push(targetRows[targetIndex])
-    offset = 1
-  }
-  for (let index = offset; index < selectedRows.length; index++) {
-    const row = newDetailRow(pick.tabKey)
-    applyDetailReference(row, pick.field, selectedRows[index])
-    calculateDetailRow(pick.tabKey, row)
-    targetRows.push(row)
-    changedRows.push(row)
-  }
-
-  await engine.fillCurrentStock(changedRows)
-
   detailRefSaving.value = true
+
+  // ── 带入值写**活行**(cur.value.detail[pick.tabKey],就是表格渲染的那批对象) ──
+  // 2026-10-14 口径(方案 A,用户拍板「全都按方案 A 实现」):参照确认 = 只写本地草稿 + 标脏,
+  //   **不再顺带保存整单**。原实现的三个后果(用户报障「选商品就报 明细第 1 行批号不能为空」
+  //   「填明细却提示表头未填写」):
+  //     ① 那次隐式「保存」走后端全量必填校验(ButtonService ensureRequiredFilled +
+  //        ensureDetailRequiredFilled)⇒ 录明细中途必然缺必填,必然弹错;
+  //     ② 带入值只写进 cur.value.detail 的深拷贝快照,失败时快照整份丢弃 ⇒ 界面上那一行始终是空的
+  //        (像"选了商品没反应"),新推的空行还会被摘掉;
+  //     ③ 文书类面板「保存即归档/自动送审」会被这种隐式保存触发(ButtonService DOC_ARCHIVE_PANELS)。
+  //   必填校验因此只剩显式「保存 / 保存新增 / 提交审批 / 审核」两处(前端 validateInlineDraft +
+  //   后端 ensureRequiredFilled/ensureDetailRequiredFilled),与工艺路线 2026-10-06 口径一致。
+  let targetRows = null
+  const pushedRows = []
   try {
-    // 2026-10-05 用户口径「我想先填工序」+「能不能选择审核或者保存的时候才校验?」:
-    //   工艺路线(ROUTE)的「工序编码」参照 —— 确认后**不再连带保存整单**。原先这里顺带保存,
-    //   新行还没填 工序控制/工序序列 就被后端**明细必填**拦下(HTTP 400),随即回滚刚带入的行
-    //   ⇒ 表现为"先选工序就加不进去"。改为只写**本地草稿**并标脏(不落库、不 load 避免刷掉草稿),
-    //   于是必填校验只发生在点「保存 / 提交 / 审核」时。其它面板(存货导入等)保持原行为。
-    if (panelCode.value === 'ROUTE') {
-      // 带入值已写进**活行**(见上方 writeLiveRows),不再是写进快照后被丢弃。
-      // ROUTE 不是档案式面板(config 里无 singleDoc,md.singleDoc=false),行是普通 reactive 对象:
-      // 写属性即触发该单元格重渲染 —— 无需换数组引用,也无需激活单元格
-      //(上一版按"行是 markRaw、需换引用"去刷新,方向不对,所以修不好)。
-      // 这里只按平台既有口径置脏:未保存离开守卫 + 档案行版本号兜底都走它。
-      markInlineDirty()
-      detailRefVisible.value = false
-      ElMessage.success(`已带入 ${selectedRows.length} 条工序，请点「保存」提交`)
-      return
+    if (!cur.value.detail) cur.value.detail = {}
+    targetRows = Array.isArray(cur.value.detail[pick.tabKey])
+      ? cur.value.detail[pick.tabKey]
+      : (cur.value.detail[pick.tabKey] = [])
+    const targetIndex = pick.row ? targetRows.indexOf(pick.row) : -1
+    const changedRows = []
+    let offset = 0
+    if (targetIndex >= 0) {
+      applyDetailReference(targetRows[targetIndex], pick.field, selectedRows[0])
+      calculateDetailRow(pick.tabKey, targetRows[targetIndex])
+      changedRows.push(targetRows[targetIndex])
+      offset = 1
     }
-    await engine.callButton({
-      panelCode: panelCode.value,
-      buttonName: '保存',
-      formData: currentFormData(detail),
-      buttonParam: {},
-    })
+    for (let index = offset; index < selectedRows.length; index++) {
+      const row = newDetailRow(pick.tabKey)
+      applyDetailReference(row, pick.field, selectedRows[index])
+      calculateDetailRow(pick.tabKey, row)
+      targetRows.push(row)
+      pushedRows.push(row)
+      changedRows.push(row)
+    }
+    // 现存量仍是本地刷新(按库存状况表口径算),失败不拦带入
+    try { await engine.fillCurrentStock(changedRows) } catch (error) { ElMessage.error(engine.errMsg(error) || '现存量刷新失败') }
+    markInlineDirty() // 未保存离开守卫;档案行(markRaw)靠它 bump archVersion 驱动重渲染
     detailRefVisible.value = false
-    const documentNo = pick.documentNo
-    await load()
-    const currentIndex = list.value.findIndex((item) => item['编号'] === documentNo)
-    if (currentIndex >= 0) curIdx.value = currentIndex
-    ElMessage.success(`已导入 ${selectedRows.length} 条存货并保存`)
+    ElMessage.success(tt('已带入 {n} 行，请点「保存」提交').replace('{n}', String(selectedRows.length)))
   } catch (error) {
+    // 带入过程本身出错(非必填拦截——那个已不在本路径):撤掉本次推入的行,不留半截行
+    for (const row of pushedRows) {
+      const index = targetRows ? targetRows.indexOf(row) : -1
+      if (index >= 0) targetRows.splice(index, 1)
+    }
     discardCreatedDetailRefRow(pick)
-    ElMessage.error(engine.errMsg(error) || '存货导入保存失败')
+    ElMessage.error(engine.errMsg(error) || '参照带入失败')
   } finally {
     detailRefSaving.value = false
     detailRefPick.value = null

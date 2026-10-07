@@ -1877,6 +1877,7 @@ export default {
     '父件规格': 'Parent spec',
     '导入': 'Import',
     '已导入 {n} 行': 'Imported {n} row(s)',
+    '已带入 {n} 行，请点「保存」提交': 'Imported {n} row(s) — click "Save" to submit',
     '父件 {n}': '{n} parent item(s)',
     '子件 {n}': '{n} child item(s)',
     '只导入勾选的父件本身(规格取该父件自己在物料清单里的那一行,没有则留空)': "Imports only the checked parents (spec taken from the parent's own row in the material list; blank if none)",
