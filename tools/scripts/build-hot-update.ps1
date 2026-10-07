@@ -9,7 +9,7 @@ if (Get-Variable -Name PSNativeCommandUseErrorActionPreference -Scope Global -Er
     $Global:PSNativeCommandUseErrorActionPreference = $false
 }
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$root     = 'C:\INCER\YINJIA-MES'
+$root     = 'D:\workspace\yinjia'
 $frontend = "$root\frontend"
 $backend  = "$root\backend"
 $static   = "$backend\src\main\resources\static"

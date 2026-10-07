@@ -10,7 +10,7 @@
 #   usage: powershell -File tools\archive\_assemble-incr-pkg.ps1 -PkgName pkg-incr-20260922
 param([string]$PkgName = 'pkg-incr-20260921')
 $ErrorActionPreference = 'Stop'
-$root  = 'C:\INCER\YINJIA-MES'
+$root  = 'D:\workspace\yinjia'
 $pkg   = Join-Path $root "deploy\$PkgName"
 $tools = Join-Path $pkg 'tools'
 $lib   = Join-Path $tools 'lib'
@@ -100,7 +100,7 @@ foreach ($c in $carry) {
   $srcC = Join-Path $root "deploy\pkg-incr-20260921\$c"
   if (Test-Path $srcC) { Copy-Item -LiteralPath $srcC -Destination $dstC -Force; Write-Host "   carried over: $c" }
 }
-foreach ($batName in @('deploy-incremental.bat','apply-migrations.bat','check-migrations.bat')) {
+foreach ($batName in @('deploy-incremental.bat','apply-migrations.bat')) {
   $bp = Join-Path $pkg $batName
   if (-not (Test-Path $bp)) { [void]$problems.Add("BAT MISSING: $batName"); continue }
   $raw = [System.IO.File]::ReadAllText($bp)
