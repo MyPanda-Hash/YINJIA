@@ -1,0 +1,18 @@
+﻿登录用户 isAdmin = true
+
+########## WH ##########
+actionPrivileges: undefined
+metadata 顶层键  : panelCode / panelName / panelCategory / singleDoc / panelState / panelButtons / buttonGroups / panelPageDto
+新增默认数据     : {"状态":"启用"}
+
+########## WHLOC ##########
+actionPrivileges: undefined
+metadata 顶层键  : panelCode / panelName / panelCategory / singleDoc / panelState / panelButtons / buttonGroups / qrLabelKey / qrLabelScopeKey / qrLabelKind / panelPageDto
+  qrLabelKind    = whloc
+  qrLabelKey     = 仓位编码
+  qrLabelScopeKey= 仓库
+新增默认数据     : {"状态":"启用"}
+
+callButton WH / 刷新 -> ok=(无 ok 字段) keys=
+
+callButton WHLOC / 刷新 -> ok=(无 ok 字段) keys=

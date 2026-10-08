@@ -949,10 +949,10 @@
                   />
                   <el-switch
                     v-else-if="isBooleanField(c.field)"
-                    v-model="row[c.prop]"
+                    :model-value="toBool(row[c.prop])"
                     v-cell-focus
                     :disabled="c.field.computed"
-                    @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+                    @update:model-value="(v) => onInlineBoolInput(activeTab(b).key, row, c.field, v)"
                   />
                   <el-input
                     v-else
@@ -2425,8 +2425,10 @@ const reportColumnTree = computed(() => {
   return out
 })
 const toolbarGroups = computed(() => (groups.value || []).map((group) => {
-  // 2026-10-15 用户口径:列表页不再提供「能打开整单卡片(VoucherFormDialog)」的入口 ——
-  //   「修改」动作唯一的作用就是弹那张卡片,卡片删除后它成了死按钮,故与 查询/查找 一样从工具栏摘掉。
+  // 2026-10-07 用户口径(提交 3dd7dbb0「删除整单卡片入口」):列表页不再提供「能打开整单卡片
+  //   (VoucherFormDialog)」的入口 —— 「修改」动作唯一的作用就是弹那张卡片,卡片删除后它成了死按钮,
+  //   故与 查询/查找 一样从工具栏摘掉。(档案面板本就内联可编辑:单据状态=启用/停用 ⇒ draftEditable
+  //   为真,单元格直接点即可编辑,不依赖本动作。原文注释误记为 2026-10-15,2026-10-08 更正。)
   const actions = actsOf(group).filter((action) => !['查询', '查找', '修改'].includes(action))
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   return { ...group, name, actions }
@@ -5189,10 +5191,27 @@ function discardCreatedDetailRefRow(pick) {
 
 async function onInlineDetailChange(tabKey, row, field) {
   markInlineDirty() // 明细单元格任何值变更 → 未保存离开守卫置脏
+  // ⚠ 档案行是 markRaw 的(去响应式优化,见 normalizeArchRaw):明细里的
+  //   el-select / el-date-picker / el-switch 都用 `v-model="row[c.prop]"` 直写行对象,
+  //   而 markRaw 行的写入**不产生响应依赖** ⇒ 控件自身的 modelValue 不更新,
+  //   表现就是「点完没反应 / 选中项弹回」,但值其实已经写进行对象、并会被保存提交
+  //   (2026-10-08 用户报障:仓库/仓位面板的「停用」开关点击后无视觉反馈,实际已改)。
+  //   markInlineDirty → normalizeArchRaw 只在「新行/新数组需要打 raw 标记」时才 bump,
+  //   已 raw 的行永远不触发 ⇒ 这里在**提交点**(@change / update:model-value)显式补一次版本号,
+  //   驱动重渲染让控件回显跟上。文本/数值编辑器走 activeCellEcho 回显,刻意不在每次击键 bump
+  //   (以免打断输入),故本行只影响选择器/日期/开关三类。
+  archVersion.value++
   calculateDetailRow(tabKey, row)
   if (['存货编码', '存货名称', '产品编码', '产品名称', '材料编码', '材料名称', '仓库', '预出仓库', '出库仓库'].includes(field?.dataName)) {
     try { await engine.fillCurrentStock(row) } catch (error) { ElMessage.error(engine.errMsg(error) || '现存量刷新失败') }
   }
+}
+
+/** 档案「是否」行内开关的受控写入口(2026-10-08):不能用 v-model 直绑 markRaw 的 row ——
+ *  见 onInlineDetailChange 的说明;写值后交由它统一置脏 + bump 版本号驱动回显。 */
+function onInlineBoolInput(tabKey, row, field, next) {
+  row[field.dataName] = !!next
+  onInlineDetailChange(tabKey, row, field)
 }
 
 function applyDetailReference(target, field, source) {
