@@ -1,0 +1,30 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:33 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-20-mess2.sql ==
+  | A1 | 48 | 胶粉区 | 炭粉区 | 
+  | AH10 | 9 | 货架区 | 货架区 | 
+  | AH11 | 9 | 货架区 | 货架区 | 
+  | AH12 | 9 | 货架区 | 货架区 | 
+  | AH13 | 9 | 货架区 | 货架区 | 
+  | AH14 | 9 | 货架区 | 货架区 | 
+  | AH15 | 9 | 货架区 | 货架区 | 
+  | AH16 | 9 | 货架区 | 货架区 | 
+  | AH5 | 9 | 货架区 | 货架区 | 
+  | AH6 | 9 | 货架区 | 货架区 | 
+  | AH7 | 9 | 货架区 | 货架区 | 
+  | AH8 | 9 | 货架区 | 货架区 | 
+  | AH9 | 9 | 货架区 | 货架区 | 
+  | 0 | 0 | 4 | 5 | 161 | 
+  | CK00005 | 原料不良品仓 | 原料不良品仓 | 一致 | 
+  | CK00006 | 华北工控仓 | 华北工控仓 | 一致 | 
+  | CK-A | 原材料区A仓 | 原材料区A仓 | 一致 | 
+  | YCL-01 | 恒亿仓 | 恒亿仓 | 一致 | 
+  | YJ-08 | 车间仓 | 车间仓 | 一致 | 
+  | 3 | 156 | A1-09-1 | AH9-3-3 | 
+[OK] q-20-mess2.sql (5 batches)

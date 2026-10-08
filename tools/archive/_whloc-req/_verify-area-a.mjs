@@ -35,25 +35,25 @@ console.log(`明细行数  : ${items.length}`)
 console.log('\n== 3. 键名核对(物理列改名 + 新增层次列是否都取到) ==')
 const keys = Object.keys(items[0] || {})
 console.log(`第1行键   : ${keys.join(' / ')}`)
-const need = ['仓库', '仓库编码', '仓位编码', '仓位地址', '厂区', '库区', '排号', '位号', '层号']
+const need = ['仓库', '仓库编码', '仓位编码', '仓位地址', '厂区', '区码', '存储分区', '排号', '位号', '层号']
 for (const k of need) console.log(`  ${k.padEnd(6)} ${keys.includes(k) ? '✓' : '★缺'}`)
-const stale = items.filter((r) => '库位编码' in r || '库位地址' in r)
+const stale = items.filter((r) => '库位编码' in r || '库位地址' in r || '库区' in r)
 console.log(`残留 库位* 键的行数: ${stale.length}  (期望 0)`)
 
-console.log('\n== 4. 按 仓库 / 库区 汇总 ==')
+console.log('\n== 4. 按 仓库 / 存储分区 汇总 ==')
 const byWh = {}
 for (const r of items) byWh[r.仓库] = (byWh[r.仓库] || 0) + 1
 for (const [k, v] of Object.entries(byWh).sort()) console.log(`  仓库 ${String(k).padEnd(14)} ${String(v).padStart(4)} 个`)
 const aRows = items.filter((r) => r.仓库 === '原材料区A仓')
 const byArea = {}
-for (const r of aRows) byArea[r.库区] = (byArea[r.库区] || 0) + 1
-for (const [k, v] of Object.entries(byArea).sort()) console.log(`    库区 ${String(k).padEnd(9)} ${String(v).padStart(4)} 个`)
+for (const r of aRows) byArea[r.存储分区] = (byArea[r.存储分区] || 0) + 1
+for (const [k, v] of Object.entries(byArea).sort()) console.log(`    存储分区 ${String(k).padEnd(9)} ${String(v).padStart(4)} 个`)
 
-console.log('\n== 5. 抽样(每库区首尾各 2 条) ==')
+console.log('\n== 5. 抽样(每存储分区首尾各 2 条) ==')
 for (const area of ['炭粉区', '胶粉区', '货架区']) {
-  const rows = aRows.filter((r) => r.库区 === area).sort((a, b) => a.仓位编码.localeCompare(b.仓位编码))
+  const rows = aRows.filter((r) => r.存储分区 === area).sort((a, b) => a.仓位编码.localeCompare(b.仓位编码))
   if (!rows.length) continue
-  console.log(`  [${area}] 共 ${rows.length} 条`)
+  console.log(`  [存储分区=${area}] 共 ${rows.length} 条`)
   for (const r of [rows[0], rows[1], rows[rows.length - 2], rows[rows.length - 1]]) {
     console.log(`    编码=${String(r.仓位编码).padEnd(10)} 排号=${String(r.排号).padEnd(5)} 位号=${String(r.位号).padEnd(3)} 层号=${String(r.层号 ?? '').padEnd(3)} 厂区=${r.厂区} 地址=${r.仓位地址}`)
   }
