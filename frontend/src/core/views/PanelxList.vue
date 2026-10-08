@@ -824,8 +824,8 @@
           @scroll.capture="(e) => onArchScroll(e, b)"
         >
           <el-table-column v-if="delMode && b.isMain" type="selection" width="45" fixed="left" />
-          <!-- 档案二维码标签(勾选即打,INV 商品/WHLOC 库位):自管勾选集(跨页保留),与删除模式的 selection 列互不相干;
-               表头复选框=本页全选。行键=qrLabelKey 列(存货编码;库位=仓库+库位编码 复合),空编码行禁勾 -->
+          <!-- 档案二维码标签(勾选即打,INV 商品/WHLOC 仓位):自管勾选集(跨页保留),与删除模式的 selection 列互不相干;
+               表头复选框=本页全选。行键=qrLabelKey 列(存货编码;仓位=仓库+仓位编码 复合),空编码行禁勾 -->
           <el-table-column v-if="qrKey && b.isMain" width="40" fixed="left" align="center">
             <template #header>
               <el-checkbox
@@ -3752,14 +3752,14 @@ function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首�
 
 // ═══ 档案二维码标签(勾选即打):工具栏「二维码标签」按行勾选 → 75×100mm 标识卡(print-formats 本地生成)。
 // 勾选集自管(Set 换新触发响应式),跨页/跨筛选保留;行键 = 后端 metadata.qrLabelKey(INV=存货编码),
-// 同码行勾一个即代表该码;WHLOC 库位(2026-09-28)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+库位编码 复合
-// (库位编码按仓内唯一,同码多仓不串选)。 ═══
+// 同码行勾一个即代表该码;WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+仓位编码 复合
+// (仓位编码按仓内唯一,同码多仓不串选)。 ═══
 const qrSel = ref(new Set())
 const qrKey = computed(() => cfgCache.value?.metadata?.qrLabelKey || '')
 const qrScopeKey = computed(() => cfgCache.value?.metadata?.qrLabelScopeKey || '')
 function qrRowKey(row) {
   const k = String(row?.[qrKey.value] ?? '').trim()
-  // 复合行键(库位):仓库 + \u0001 + 库位编码 —— \u0001 不出现在业务文本里,避免拼接歧义
+  // 复合行键(仓位):仓库 + \u0001 + 仓位编码 —— \u0001 不出现在业务文本里,避免拼接歧义
   const scope = qrScopeKey.value ? String(row?.[qrScopeKey.value] ?? '').trim() : ''
   return scope ? `${scope}\u0001${k}` : k
 }
@@ -5034,7 +5034,7 @@ const activeCell = ref(null)
 /** 激活格本地回显值(2026-09-28,修"打的字立刻消失"):档案行 markRaw(大表性能优化)后
  *  v-model 写行属性是静默的——不触发重渲染,el-input 的 modelValue prop 停在旧值;
  *  而 Element Plus el-input 在 emit 后 nextTick 强制把原生值拨回 props.modelValue
- *  (input.vue setNativeInputValue),于是每敲一个字都被立刻清掉——库位档案 库位编码/库位地址
+ *  (input.vue setNativeInputValue),于是每敲一个字都被立刻清掉——仓位档案 仓位编码/仓位地址
  *  「无法填写」即此(参照列走选择器写入+bump 版本刷新,不受影响)。
  *  解法:文本/数值激活编辑器改绑本响应式回显——输入即时更新回显(prop 跟上,EP 不再回拨),
  *  同时把值落进 raw 行(保存/失焦回显用),零表格级重渲染。 */
@@ -5064,7 +5064,7 @@ function deactivateCell() {
   activeCellEcho.value = ''
 }
 /** 激活格编辑器挂载即聚焦(v-cell-focus,2026-09-28):懒激活单元格此前只挂编辑器不聚焦,
- *  一击后键盘输入落在页面而非输入框,用户表现为「无法填写」(库位档案 库位编码/库位地址;
+ *  一击后键盘输入落在页面而非输入框,用户表现为「无法填写」(仓位档案 仓位编码/仓位地址;
  *  对照组=参照列常驻编辑器一击即选,落差感更强)。挂载即 focus ⇒ 一击=可打字;
  *  el-switch 无 input 聚焦自身(空格可切换),指令挂在组件根元素上取内层 input。 */
 const vCellFocus = {
@@ -5126,10 +5126,10 @@ function addInlineDetailRow(b) {
   rows.push(row)
   archPage.value = Math.ceil(rows.length / archPageSize.value) // 档案分页:新行在末尾,跳到末页立即可见
   // 新行首个可编辑格直接激活并聚焦(2026-09-28):「新增数据」后懒激活格子只显示空文本、
-  // 无任何编辑器视觉痕迹,用户不知道要点它(库位档案 库位编码/库位地址 因此被报"无法填写")。
+  // 无任何编辑器视觉痕迹,用户不知道要点它(仓位档案 仓位编码/仓位地址 因此被报"无法填写")。
   // 这里替用户完成那第一击:跳过参照列(常驻编辑器,一击即选不需要预激活)、图片列、
   // 以及参照带回目标字段(如 仓库编码=选仓库时自动带入,不该让光标落进去手敲),
-  // 找第一个常规可编辑字段(如 库位编码)激活,v-cell-focus 挂载即聚焦 → 点完按钮直接打字。
+  // 找第一个常规可编辑字段(如 仓位编码)激活,v-cell-focus 挂载即聚焦 → 点完按钮直接打字。
   const carriedNames = new Set()
   for (const f of detailTabDefOf(tabKey)?.fields || []) {
     for (const m of f.refMap || f.map || []) if (m?.to) carriedNames.add(m.to)
@@ -6387,9 +6387,9 @@ async function onButton(action) {
     // 二维码标签(INV,2026-09-24 改版,用户拍板):勾行 → 75×100mm 七字段标签
     // (订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,编码·规格取行,其余手填);
     // 二维码=公司代码@物料编码[@批号](print-formats.printProductCards 本地生成;旧 /report/qr-label 暂留可回滚)
-    // WHLOC 库位(2026-09-28):同款勾选即打,卡面=仓库/库位地址/库位编码(printLocationCards),
-    // 二维码=仓库编码@库位地址@库位编码(同日改版:首段仓库→仓库编码,行带 仓库编码 值);
-    // 勾选行键=仓库+库位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
+    // WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位术语统一):同款勾选即打,
+    // 卡面=仓库/仓位地址/仓位编码(printLocationCards),二维码=仓库编码@仓位地址@仓位编码;
+    // 勾选行键=仓库+仓位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
     const whloc = cfgCache.value?.metadata?.qrLabelKind === 'whloc'
     const sel = qrSel.value
     const rows = []
@@ -6397,11 +6397,11 @@ async function onButton(action) {
       for (const r of archRows(b)) {
         const k = qrRowKey(r)
         if (!k || !sel.has(k)) continue
-        if (whloc) rows.push({ 仓库: r['仓库'], 仓库编码: r['仓库编码'], 库位地址: r['库位地址'], 库位编码: r['库位编码'] })
+        if (whloc) rows.push({ 仓库: r['仓库'], 仓库编码: r['仓库编码'], 仓位地址: r['仓位地址'], 仓位编码: r['仓位编码'] })
         else rows.push({ 编码: k, 规格: r['规格型号'] || r['型号'] || '' })
       }
     }
-    if (!rows.length) return ElMessage.warning(tt(whloc ? '请先勾选要打印的库位' : '请先勾选要导出的商品'))
+    if (!rows.length) return ElMessage.warning(tt(whloc ? '请先勾选要打印的仓位' : '请先勾选要导出的商品'))
     await (whloc ? printLocationCards(rows) : printProductCards(rows))
     return
   }

@@ -97,7 +97,7 @@ table:bs_team   # 班组档案
 table:bs_uom   # 计量单位档案
 table:bs_wc   # 工作中心档案
 table:bs_wh   # 仓库档案(仓库编码/名称,库存台账仓库真源)
-table:bs_wh_loc   # 库位档案(仓库内货位主数据;面板 WHLOC,2026-09-29 由并行会话新增并登记;含备用1..20)
+table:bs_wh_loc   # 仓位档案(仓库内货位主数据;面板 WHLOC,2026-09-29 由并行会话新增并登记;含备用1..20;2026-10-08 库位→仓位正名:列 仓位编码/仓位地址)
 table:day_report   # 生产日报表头表(自制物料/成型/切炭/组装四车间合一)
 table:day_report_detail   # 生产日报表行表(姓名/时间/产品/数量/报废等)
 table:equip_check   # 设备点检记录头表

@@ -104,8 +104,9 @@ public class PanelConfigService {
         // INV(2026-09-24 改版,用户拍板):80×80 旧版式(物料编码/名称/规格+QR=存货编码)改为
         // 75×100 七字段版式(订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,后四类手填),
         // 二维码=公司代码@物料编码[@批号];printProductCards 本地生成,原 /report/qr-label 暂留可回滚。
-        // WHLOC 库位(2026-09-28):与商品同款勾选即打形态,卡面=库位字段(仓库/库位地址/库位编码,不含商品字段),
-        // 二维码=仓库@库位地址@库位编码(printLocationCards);行键=仓库+库位编码 复合(同码多仓不串选)。
+        // WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位术语统一):与商品同款勾选即打形态,
+        // 卡面=仓位字段(仓库/仓位地址/仓位编码,不含商品字段),
+        // 二维码=仓库编码@仓位地址@仓位编码(printLocationCards);行键=仓库+仓位编码 复合(同码多仓不串选)。
         boolean qrLabel = "INV".equals(def.code()) || "WHLOC".equals(def.code());
         if (qrLabel) buttonGroups.add(group("二维码标签", List.of("二维码标签")));
         // 导入仅限单据面板(档案面板不提供导入)
@@ -193,11 +194,13 @@ public class PanelConfigService {
         }
         if (qrLabel) {
             // 前端二维码标签勾选列的行键(编码列)
-            metadata.put("qrLabelKey", "INV".equals(def.code()) ? "存货编码" : "库位编码");
+            // 2026-10-08:WHLOC 的编码列随库位→仓位术语统一改名(库位编码→仓位编码),此处数据键同步;
+            //   面板码 WHLOC 不变(菜单/权限/URL 都按 panel_code 走),故判断条件无需改。
+            metadata.put("qrLabelKey", "INV".equals(def.code()) ? "存货编码" : "仓位编码");
             if ("WHLOC".equals(def.code())) {
-                // 库位标签勾选行键=仓库+库位编码 复合(库位编码按仓内唯一,同码多仓不串选)
+                // 仓位标签勾选行键=仓库+仓位编码 复合(仓位编码按仓内唯一,同码多仓不串选)
                 metadata.put("qrLabelScopeKey", "仓库");
-                // 前端分发:whloc → printLocationCards(库位标识卡,二维码=仓库@库位地址@库位编码)
+                // 前端分发:whloc → printLocationCards(仓位标识卡,二维码=仓库编码@仓位地址@仓位编码)
                 metadata.put("qrLabelKind", "whloc");
             }
         }

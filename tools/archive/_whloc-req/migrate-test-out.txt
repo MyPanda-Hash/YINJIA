@@ -1,0 +1,25 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:7 字符: 1
++ & $java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlserver://loc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== migrate-whloc-rename-bin-20261008.sql ==
+  | 物理列 库位编码 残留(应 NULL) | null | 
+  | 物理列 库位地址 残留(应 NULL) | null | 
+  | 物理列 bs_wh.库位 残留(应 NULL) | null | 
+  | 物理列 仓位编码 存在(应 200) | 200 | 
+  | 物理列 仓位地址 存在(应 400) | 400 | 
+  | 物理列 bs_wh.仓位 存在(应 400) | 400 | 
+  | yj_panel 名为库位(应 0) | 0 | 
+  | yj_field 含库位(应 0) | 0 | 
+  | yj_translation 含库位(应 0) | 0 | 
+  | MS_Description 含库位(排除正名说明,应 0) | 0 | 
+  | WHLOC 面板字段数(应 6) | 6 | 
+  | 仓位编码 译名语言数(应 9) | 9 | 
+  | 仓位地址 译名语言数(应 9) | 9 | 
+  | panel/仓位 译名语言数(应 9) | 9 | 
+  | bs_wh_loc 行数(应 5,数据无损) | 4 | 
+[OK] migrate-whloc-rename-bin-20261008.sql (9 batches)
