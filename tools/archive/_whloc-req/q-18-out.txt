@@ -1,0 +1,16 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:18 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-18-testdup.sql ==
+  |  | 2 |  | admin | 
+  | 1 |  | null |  |  | admin | Y | 
+  | 2 | 恒亿仓 | YCL-01 | 12312 | 123123 | admin | N | 
+  | 3 |  | null |  |  | admin | Y | 
+  | 4 | 原料不良品仓 | CK00005 | 45 | 45 | admin | N | 
+  | 160 | 156 | 
+[OK] q-18-testdup.sql (4 batches)

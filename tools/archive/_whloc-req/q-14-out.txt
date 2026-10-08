@@ -1,0 +1,59 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-14-bswh.sql ==
+  | bs_wh 现存 | CK00003 | 1 | 
+  | bs_wh 现存 | CK00005 | 1 | 
+  | bs_wh 现存 | CK00006 | 1 | 
+  | bs_wh 现存 | CP-02 | 1 | 
+  | bs_wh 现存 | YCL-01 | 1 | 
+  | bs_wh 现存 | YJ-08 | 1 | 
+  | inh.仓库编码 | CK00005 | 3 | 
+  | inh.仓库编码 | CK00006 | 2 | 
+  | inh.仓库编码 | CK01 | 8 | 
+  | inh.仓库编码 | CK02 | 3 | 
+  | inh.仓库编码 | CK03 | 4 | 
+  | inh.仓库编码 | CK04 | 5 | 
+  | inh.仓库编码 | CK05 | 12 | 
+  | inh.仓库编码 | CP-02 | 1 | 
+  | inh.仓库编码 | YCL-01 | 15 | 
+  | inh.仓库编码 | YJ-08 | 1 | 
+  | kucun.ckdm | CK00005 | 4 | 
+  | kucun.ckdm | CK00006 | 4 | 
+  | kucun.ckdm | CK01 | 9 | 
+  | kucun.ckdm | CK02 | 3 | 
+  | kucun.ckdm | CK03 | 5 | 
+  | kucun.ckdm | CK04 | 5 | 
+  | kucun.ckdm | CK05 | 12 | 
+  | kucun.ckdm | CP-02 | 68 | 
+  | kucun.ckdm | YCL-01 | 16 | 
+  | kucun.ckdm | YJ-08 | 1 | 
+  | outh.仓库编码 | CP-02 | 125 | 
+  | outh.仓库编码 | YCL-01 | 3 | 
+  | 10009 | WHLOC | 库位 | admin | 2026-09-28 12:46:16 | {"addedRows":1,"removedRows":5,"changedRows":5,"addedSamples":["原料不良品仓"],"removedSamples":["恒亿仓","恒亿仓","原料不良品仓","华北工控仓","车间仓"],"changedSamples":["车间仓","华北工控仓","原料不良品仓","恒亿仓","恒亿仓"]} | 
+  | 10008 | WHLOC | 库位 | admin | 2026-09-28 12:44:08 | {"addedRows":1,"removedRows":5,"changedRows":5,"addedSamples":["原料不良品仓"],"removedSamples":["恒亿仓","恒亿仓","原料不良品仓","华北工控仓","车间仓"],"changedSamples":["车间仓","华北工控仓","原料不良品仓","恒亿仓","恒亿仓"]} | 
+  | 11 | WHLOC | 库位 | admin | 2026-09-28 09:45:54 | {"addedRows":0,"removedRows":5,"changedRows":5,"addedSamples":[],"removedSamples":["恒亿仓","恒亿仓","原料不良品仓","e","车间仓"],"changedSamples":["车间仓","华北工控仓","原料不良品仓","恒亿仓","恒亿仓"]} | 
+  | 10 | WHLOC | 库位 | admin | 2026-09-28 09:45:50 | {"addedRows":0,"removedRows":5,"changedRows":5,"addedSamples":[],"removedSamples":["恒亿仓","恒亿仓","原料不良品仓","false","成品B仓"],"changedSamples":["车间仓","e","原料不良品仓","恒亿仓","恒亿仓"]} | 
+  | 9 | WHLOC | 库位 | admin | 2026-09-28 09:40:49 | {"addedRows":2,"removedRows":3,"changedRows":3,"addedSamples":["false","成品B仓"],"removedSamples":["恒亿仓","恒亿仓","原料不良品仓"],"changedSamples":["原料不良品仓","恒亿仓","恒亿仓"]} | 
+  | 8 | WHLOC | 库位 | admin | 2026-09-28 09:36:45 | {"addedRows":1,"removedRows":2,"changedRows":2,"addedSamples":["原料不良品仓"],"removedSamples":["恒亿仓","恒亿仓"],"changedSamples":["恒亿仓","恒亿仓"]} | 
+  | 7 | WHLOC | 库位 | admin | 2026-09-28 08:57:30 | {"addedRows":0,"removedRows":2,"changedRows":2,"addedSamples":[],"removedSamples":["恒亿仓","成品不良品区"],"changedSamples":["恒亿仓","恒亿仓"]} | 
+  | 6 | WHLOC | 库位 | admin | 2026-09-28 08:57:21 | {"addedRows":0,"removedRows":2,"changedRows":2,"addedSamples":[],"removedSamples":["恒亿仓","false"],"changedSamples":["成品不良品区","恒亿仓"]} | 
+  | 5 | WHLOC | 库位 | admin | 2026-09-28 08:56:21 | {"addedRows":2,"removedRows":0,"changedRows":0,"addedSamples":["恒亿仓","false"],"removedSamples":[],"changedSamples":[]} | 
+  | 104 | YJ-08 | 车间仓 | 
+  | 105 | CP-02 | 成品B仓 | 
+  | 106 | CK00003 | 成品不良品区 | 
+  | 107 | YCL-01 | 恒亿仓 | 
+  | 108 | CK00006 | 华北工控仓 | 
+  | 109 | CK00005 | 原料不良品仓 | 
+  | id=87..91 存在行数 | 0 | 
+  | 4 | 恒亿仓 | YCL-01 | da5x | 在 | 
+  | 5 | 恒亿仓 | YCL-01 | d2 | 在 | 
+  | 6 | 原料不良品仓 | CK00005 | s | 在 | 
+  | 7 | 华北工控仓 | CK00006 | e | 在 | 
+  | 8 | 车间仓 | YJ-08 | d | 在 | 
+[SQL FAIL] Invalid column name 'status'.
