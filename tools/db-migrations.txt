@@ -2263,3 +2263,17 @@ migrate-qc-insp-req-drop-custom-tab.sql
 migrate-align-ledger-fields-20261008.sql
 #   第二轮(同上对齐,补「同字段多行」盲区漏掉的 4 处:两处 seq、一处 hidden/visible、一处重复行;见脚本头)
 migrate-align-ledger-fields2-20261008.sql
+
+
+# —— 2026-10-08 仓库档案对齐金蝶真实账套:只保留金蝶有的仓库 ——
+#   用户口径:「现在只保留金蝶有的仓库」。取证 tools/archive/_kingdee-stores.out.txt:金蝶真实账套
+#   (clientId=359797 + outerInstanceId=580147507460444160)/jdy/v2/bd/store 共 6 个仓(YJ-08 车间仓/
+#   CP-02 成品B仓/CK00003 成品不良品区/YCL-01 恒亿仓/CK00006 华北工控仓/CK00005 原料不良品仓,全启用);
+#   本库 bs_wh 11 行里另有 5 行本地自建(asp_user1='migration'、无 外部数据ID ⇒ 金蝶账套不存在):
+#   CK01 原料仓/CK02 辅料仓/CK03 成品仓/CK04 半成品仓/CK05 不良品仓。
+#   做法:软删这 5 行(asp_cancel='Y' + 停用=1 + 状态='停用';WHERE 带 外部数据ID IS NULL 窄条件,
+#   金蝶同步行与日后金蝶新增仓不受影响),带行数守卫 + 两条自检(启用中非金蝶来源=0、金蝶 6 仓缺失=0)。
+#   引用这些仓的存量演示单据(TCGRK-*/TXSCK-*/TEST-* 等)与库存/流水本次不动(用户口径:只改仓档);
+#   CK00001 正品仓与「转ERP 无仓默认推 CK00001」同样本次不动。
+#   幂等重跑影响 0 行;两账套均已执行并复核(启用中恰 6 行、全为金蝶来源)。
+migrate-wh-kingdee-only-20261008.sql

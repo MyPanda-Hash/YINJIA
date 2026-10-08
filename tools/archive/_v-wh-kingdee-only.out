@@ -1,0 +1,11 @@
+﻿  WH 面板返回 6 个仓: CK00003, CK00005, CK00006, CP-02, YCL-01, YJ-08
+PASS  WH 面板 = 恰 6 个金蝶仓  · rows=6, totalSize=6
+PASS  软删的 5 个本地仓不再出现在面板里
+PASS  参照搜索「CK01」搜不出来  · totalSize=0
+PASS  参照搜索「CK02」搜不出来  · totalSize=0
+PASS  参照搜索「CK03」搜不出来  · totalSize=0
+PASS  参照搜索「CK04」搜不出来  · totalSize=0
+PASS  参照搜索「CK05」搜不出来  · totalSize=0
+PASS  参照搜索「华北工控」仍能搜到金蝶仓  · totalSize=1
+PASS  库存状况表仍可查(流水未动)  · totalSize=93
+PASS  库存台账仍可查  · totalSize=245

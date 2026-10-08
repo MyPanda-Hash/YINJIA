@@ -1,0 +1,20 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _wh-verify-after.sql ==
+  | CK01 | 原料仓 | 停用 | 1 | Y | wh-kingdee-only | 2026-10-08 14:02:29 | 
+  | CK02 | 辅料仓 | 停用 | 1 | Y | wh-kingdee-only | 2026-10-08 14:02:29 | 
+  | CK03 | 成品仓 | 停用 | 1 | Y | wh-kingdee-only | 2026-10-08 14:02:29 | 
+  | CK04 | 半成品仓 | 停用 | 1 | Y | wh-kingdee-only | 2026-10-08 14:02:29 | 
+  | CK05 | 不良品仓 | 停用 | 1 | Y | wh-kingdee-only | 2026-10-08 14:02:29 | 
+  | CK00003 | 成品不良品区 | 2199600261708772352 | 启用 | 0 | N | jdy-sync | 
+  | CK00005 | 原料不良品仓 | 2211729941102442496 | 启用 | 0 | N | jdy-sync | 
+  | CK00006 | 华北工控仓 | 2436465656128978944 | 启用 | 0 | N | jdy-sync | 
+  | CP-02 | 成品B仓 | 2220441270411712512 | 启用 | 0 | N | jdy-sync | 
+  | YCL-01 | 恒亿仓 | 2243772584451731456 | 启用 | 0 | N | jdy-sync | 
+  | YJ-08 | 车间仓 | 2174067714627325952 | 启用 | 0 | N | jdy-sync | 
+  | CK01 | 原料仓 |  | 停用 | 1 | Y | migration | 
+  | CK02 | 辅料仓 |  | 停用 | 1 | Y | migration | 
+  | CK03 | 成品仓 |  | 停用 | 1 | Y | migration | 
+  | CK04 | 半成品仓 |  | 停用 | 1 | Y | migration | 
+  | CK05 | 不良品仓 |  | 停用 | 1 | Y | migration | 
+  | 0 | 6 | 0 | 
+[OK] _wh-verify-after.sql (1 batches)

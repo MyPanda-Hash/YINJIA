@@ -1,0 +1,26 @@
+# 凭证来源 deploy/config.json
+clientId=359797 outerInstanceId=580147507460444160 domain=https://tf.jdy.com
+数据库目标=HSDZ_MES
+
+app-token 获取成功,doman=https://tf.jdy.com
+仓库档案条数 = 6(接口 count=6, total_page=1)
+
+## 金蝶真实账套 · 仓库档案
+序号 | 编码 | 名称 | 分类 | 启用 | 停用标记 | 地址 | 负责人 | 仓管员编码 | id
+1 | YJ-08 | 车间仓 |  | 1 |  |  |  |  | 2174067714627325952
+2 | CP-02 | 成品B仓 |  | 1 |  |  |  |  | 2220441270411712512
+3 | CK00003 | 成品不良品区 |  | 1 |  |  |  |  | 2199600261708772352
+4 | YCL-01 | 恒亿仓 |  | 1 |  |  |  |  | 2243772584451731456
+5 | CK00006 | 华北工控仓 |  | 1 |  |  |  |  | 2436465656128978944
+6 | CK00005 | 原料不良品仓 |  | 1 |  |  |  |  | 2211729941102442496
+
+## 列表接口返回的全部键(首行)
+["id","number","name","group_name","group_id","group_number","is_allow_freight","is_allow_neg","enable"]
+
+## 详情接口 /jdy/v2/bd/store_detail(逐仓)
+--- YJ-08 车间仓 → {"id":"2174067714627325952","number":"YJ-08","name":"车间仓","group_id":"","is_allow_freight":false,"enable":"1","mobile":"","country_name":"中国","province_name":"","city_name":"","district_name":"","address":"","storekeeper_id":"","storekeeper_number":"","storekeeper_name":"","allow_negative":"false"}
+--- CP-02 成品B仓 → {"id":"2220441270411712512","number":"CP-02","name":"成品B仓","group_id":"","is_allow_freight":false,"enable":"1","mobile":"","country_name":"中国","province_name":"","city_name":"","district_name":"","address":"","storekeeper_id":"","storekeeper_number":"","storekeeper_name":"","allow_negative":"true"}
+--- CK00003 成品不良品区 → {"id":"2199600261708772352","number":"CK00003","name":"成品不良品区","group_id":"","is_allow_freight":false,"enable":"1","mobile":"","country_name":"中国","province_name":"","city_name":"","district_name":"","address":"","storekeeper_id":"","storekeeper_number":"","storekeeper_name":"","allow_negative":"false"}
+--- YCL-01 恒亿仓 → {"id":"2243772584451731456","number":"YCL-01","name":"恒亿仓","group_id":"","is_allow_freight":false,"enable":"1","mobile":"","country_name":"中国","province_name":"","city_name":"","district_name":"","address":"","storekeeper_id":"","storekeeper_number":"","storekeeper_name":"","allow_negative":"false"}
+--- CK00006 华北工控仓 → {"id":"2436465656128978944","number":"CK00006","name":"华北工控仓","group_id":"","is_allow_freight":false,"enable":"1","mobile":"","country_name":"中国","province_name":"","city_name":"","district_name":"","address":"","storekeeper_id":"","storekeeper_number":"","storekeeper_name":"","allow_negative":"false"}
+--- CK00005 原料不良品仓 → {"id":"2211729941102442496","number":"CK00005","name":"原料不良品仓","group_id":"","is_allow_freight":false,"enable":"1","mobile":"","country_name":"中国","province_name":"","city_name":"","district_name":"","address":"","storekeeper_id":"","storekeeper_number":"","storekeeper_name":"","allow_negative":"false"}
