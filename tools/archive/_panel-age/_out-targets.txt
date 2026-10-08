@@ -1,0 +1,37 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-targets.sql ==
+  | BY_MODULE | 智能供应链 | 8 | 
+  | BY_MODULE | 研发管理 | 25 | 
+  | BY_MODULE | 系统管理 | 3 | 
+  | BY_MODULE | 委外加工 | 3 | 
+  | BY_MODULE | 生产制造 | 29 | 
+  | BY_MODULE | 生产管理 | 1 | 
+  | BY_MODULE | 品质管理 | 12 | 
+  | BY_MODULE | 库存核算 | 20 | 
+  | BY_MODULE | 基础资料 | 5 | 
+  | BY_MODULE | 基础设置 | 25 | 
+  | BY_MODULE | 基础档案 | 5 | 
+  | BY_MODULE | 订单管理 | 2 | 
+  | BY_MODULE | 采购管理 | 2 | 
+  | BY_MODULE | null | 1 | 
+  | TARGET_PANELS | QC_BHC | 不合格品处理单(制程) | 品质管理 | 单据 | doc | qc_bhc_detail | 29 | 
+  | TARGET_PANELS | QC_BHG | 不合格报告(制程) | 品质管理 | 单据 | doc | qc_bhg_detail | 24 | 
+  | TARGET_PANELS | QC_BHZ | 不合格品处理单(自制物料) | 品质管理 | 单据 | doc | qc_bhz_detail | 25 | 
+  | TARGET_PANELS | QC_CATALOG | 检验目录 | 品质管理 | 单据 | doc | qc_catalog_detail | 21 | 
+  | TARGET_PANELS | QC_INSP_REC | 检验数据记录 | 品质管理 | 单据 | doc | qc_insp_rec_detail | 26 | 
+  | TARGET_PANELS | QC_INSP_REQ | 来料检验要求 | 品质管理 | 基础档案 | archive | qc_insp_req | 35 | 
+  | TARGET_PANELS | QC_INSP_REQ_SERIES | 来料检验要求(系列) | 品质管理 | 基础档案 | archive | qc_insp_req_series | 4 | 
+  | TARGET_PANELS | QC_JJF | 紧急放行申请单 | 品质管理 | 单据 | doc | qc_jjf_detail | 21 | 
+  | TARGET_PANELS | QC_LYB | 来料异常分析报告 | 品质管理 | 单据 | doc | qc_lyb_detail | 21 | 
+  | TARGET_PANELS | QC_SCP | 试产材料使用申请单 | 品质管理 | 单据 | doc | qc_scp_detail | 19 | 
+  | TARGET_PANELS | QC_SCY | 生产异常分析报告 | 品质管理 | 单据 | doc | qc_scy_detail | 19 | 
+  | TARGET_PANELS | QC_TC_IN | 特采单 | 品质管理 | 单据 | doc | qc_tc_in_detail | 39 | 
+  | TARGET_PANELS | OUTSOURCE_IN_DETAIL | 委外入库单明细表 | 智能供应链 | 报表 | flat | v_outsource_in_detail | 18 | 
+  | TARGET_PANELS | OUTSOURCE_IN_STATS | 委外入库单统计表 | 智能供应链 | 报表 | flat | v_outsource_in_stats | 10 | 
+  | TARGET_PANELS | OUTSOURCE_ISSUE_DETAIL | 委外发料单明细表 | 智能供应链 | 报表 | flat | v_outsource_issue_detail | 19 | 
+  | TARGET_PANELS | OUTSOURCE_ISSUE_STATS | 委外发料单统计表 | 智能供应链 | 报表 | flat | v_outsource_issue_stats | 10 | 
+  | TARGET_PANELS | QC_INSP | 来料检验单 | 智能供应链 | 采购管理 | doc | qc_insp_detail | 54 | 
+  | TARGET_PANELS | SALES_ORDER_DETAIL | 销售订单明细表 | 智能供应链 | 报表 | flat | v_sales_order_detail | 24 | 
+  | TARGET_PANELS | SALES_ORDER_STATS | 销售订单统计表 | 智能供应链 | 报表 | flat | v_sales_order_stats | 15 | 
+  | TARGET_PANELS | SO_ORDER | 销售订单 | 智能供应链 | 智能供应链 | doc | bl_so_order | 210 | 
+[OK] _q-targets.sql (2 batches)

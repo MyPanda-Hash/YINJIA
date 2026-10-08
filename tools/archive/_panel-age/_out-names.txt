@@ -1,0 +1,28 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-names.sql ==
+  | FINISH_IN_DETAIL | 产成品入库单明细表 | 报表 | flat | v_finish_in_detail |  | 
+  | FINISH_IN_STATS | 产成品入库单统计表 | 报表 | flat | v_finish_in_stats |  | 
+  | LOT_TRACE | 批号追溯 | 报表 | flat | v_lot_trace |  | 
+  | MATERIAL_OUT_DETAIL | 材料出库单明细表 | 报表 | flat | v_material_out_detail |  | 
+  | MATERIAL_OUT_STATS | 材料出库单统计表 | 报表 | flat | v_material_out_stats |  | 
+  | OTHER_IN_DETAIL | 其他入库单明细表 | 报表 | flat | v_other_in_detail |  | 
+  | OTHER_IN_STATS | 其他入库单统计表 | 报表 | flat | v_other_in_stats |  | 
+  | OTHER_OUT_DETAIL | 其他出库单明细表 | 报表 | flat | v_other_out_detail |  | 
+  | OTHER_OUT_STATS | 其他出库单统计表 | 报表 | flat | v_other_out_stats |  | 
+  | OUTSOURCE_IN_DETAIL | 委外入库单明细表 | 报表 | flat | v_outsource_in_detail |  | 
+  | OUTSOURCE_IN_STATS | 委外入库单统计表 | 报表 | flat | v_outsource_in_stats |  | 
+  | OUTSOURCE_ISSUE_DETAIL | 委外发料单明细表 | 报表 | flat | v_outsource_issue_detail |  | 
+  | OUTSOURCE_ISSUE_STATS | 委外发料单统计表 | 报表 | flat | v_outsource_issue_stats |  | 
+  | PURCHASE_IN_DETAIL | 采购入库单明细表 | 报表 | flat | v_purchase_in_detail |  | 
+  | PURCHASE_IN_STATS | 采购入库单统计表 | 报表 | flat | v_purchase_in_stats |  | 
+  | QC_DISPOSAL | 不良品处理单 | 生产管理 | doc | qc_disposal |  | 
+  | QC_OP | 工序质检单 | 生产管理 | doc | qc_op_detail | qc_op | 
+  | QC_RECORD | 检验记录单 | 生产管理 | doc | qc_record_detail | qc_record | 
+  | ROD_RETURN | 炭棒不良退货登记 | 生产管理 | doc | rod_return_detail | rod_return | 
+  | SALE_OUT_DETAIL | 销售出库单明细表 | 报表 | flat | v_sale_out_detail |  | 
+  | SALE_OUT_STATS | 销售出库单统计表 | 报表 | flat | v_sale_out_stats |  | 
+  | SALES_ORDER_DETAIL | 销售订单明细表 | 报表 | flat | v_sales_order_detail |  | 
+  | SALES_ORDER_STATS | 销售订单统计表 | 报表 | flat | v_sales_order_stats |  | 
+  | STOCK_BALANCE | 库存状况表 | 报表 | flat | v_stock_balance |  | 
+  | STOCK_SUMMARY | 收发存汇总表 | 报表 | flat | v_stock_summary |  | 
+[OK] _q-names.sql (2 batches)

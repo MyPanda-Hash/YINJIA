@@ -1,0 +1,29 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-doc-rows.sql ==
+  (0 rows)
+  | bd_finish_in | 1 | 
+  | bd_material_out | 2 | 
+  | bd_other_in | 0 | 
+  | bd_other_out | 0 | 
+  | bd_outsource_in | 0 | 
+  | bd_outsource_issue | 0 | 
+  | bd_pu_order | 2139 | 
+  | bd_pu_req | 0 | 
+  | bd_purchase_in | 208 | 
+  | bd_sale_out | 54 | 
+  | bd_so_order | 63 | 
+  | qc_bhc | 14 | 
+  | qc_bhg | 0 | 
+  | qc_bhz | 0 | 
+  | qc_catalog | 2 | 
+  | qc_insp | 154 | 
+  | qc_insp_rec | 45 | 
+  | qc_insp_req | 85 | 
+  | qc_jjf | 0 | 
+  | qc_lyb | 0 | 
+  | qc_recv | MISSING | 
+  | qc_return | 25 | 
+  | qc_scp | 0 | 
+  | qc_scy | 0 | 
+  | qc_tc_in | 25 | 
+[OK] _q-doc-rows.sql (2 batches)
