@@ -1,0 +1,4 @@
+﻿[ok] tools/migrate-fourdoc-baseline-restore-20261008.sql
+[ok] tools/fourdoc-baseline.tsv(329 行;四单回正后应逐行一致,由 tools/verify/FourDocAudit.java 核对)
+     回正行数 329: QC_RECV=70 QC_INSP=54 QC_RETURN=34 PURCHASE_IN=171
+     源 tools/archive/_dump-out/_head-fields-HSDZ_MES.md sha256=7bc9419c93484f8f…  git HEAD=3b6e0fe7e40c

@@ -1,0 +1,20 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:7 字符: 3
++   & $java -cp "lib\mssql-jdbc.jar" verify\FourDocAudit.java $db 2>&1  ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[库] HSDZ_MES_TEST  基线快照 fourdoc-baseline.tsv(329 行)
+  QC_RECV      现役  70 行 / 基线  70 行  | 多出 0 · 缺失 0 · 内容变 0 · 名次不符 0  ✅
+  QC_INSP      现役  54 行 / 基线  54 行  | 多出 0 · 缺失 0 · 内容变 0 · 名次不符 0  ✅
+  QC_RETURN    现役  34 行 / 基线  34 行  | 多出 0 · 缺失 0 · 内容变 0 · 名次不符 0  ✅
+  PURCHASE_IN  现役 171 行 / 基线 171 行  | 多出 0 · 缺失 0 · 内容变 0 · 名次不符 0  ✅
+  越界污染(非供应商语义却指 GFDA,§5.3 应 0): 0 ✅
+  物理列对账(文档认定的表列 vs 本库):
+    qc_insp_detail       文档 59 列 / 现库 63 列  ℹ 多出 4 列(未登记即不显示)
+    qc_return            文档 48 列 / 现库 53 列  ℹ 多出 5 列(未登记即不显示)
+    qc_return_detail     文档 43 列 / 现库 62 列  ℹ 多出 19 列(未登记即不显示)
+    bd_purchase_in       文档 182 列 / 现库 183 列  ℹ 多出 1 列(未登记即不显示)
+    结论: 文档认定列缺失 0 个 ✅;本库多出 29 列(rebuild 血统,未登记即不显示,不判 FAIL)
+[PASS] 四单 yj_field 与基线一致(§四 12/12 需另跑文档生成器的核验段)
