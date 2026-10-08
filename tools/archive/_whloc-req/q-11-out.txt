@@ -1,0 +1,33 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-11-i18n.sql ==
+  | 仓库 | en | Warehouse | 
+  | 仓库 | en | Warehouse | 
+  | 仓库 | ja | 倉庫 | 
+  | 仓库 | ja | 倉庫 | 
+  | 仓库 | zh-TW | 倉庫 | 
+  | 仓库编码 | en | Warehouse code | 
+  | 仓库编码 | ja | 倉庫コード | 
+  | 仓位 | en | Bill Sp Name | 
+  | 仓位 | en | Storage Location | 
+  | 仓位 | ja | ロケーション | 
+  | 仓位 | ja | ロケーション | 
+  | 仓位编码 | en | Sp Number | 
+  | 仓位编码 | ja | ロケーションコード | 
+  | 仓位地址 | en | Location Address | 
+  | 仓位地址 | ja | ロケーション住所 | 
+  | 仓库 | 仓库 | Warehouse | 
+  | 仓库编码 | 仓库编码 | Warehouse code | 
+  | 仓位编码 | 仓位编码 | Sp Number | 
+  | 仓位地址 | 仓位地址 | Location Address | 
+  | 停用 | 停用 | Disable | 
+  | 备注 | 备注 | Remark | 
+  | 仓位 | 仓位 | Bill Sp Name | 
+  | 启用仓位管理 | 启用仓位管理 | Bin Management | 
+[OK] q-11-i18n.sql (4 batches)
