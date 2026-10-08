@@ -1,0 +1,88 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & $java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlserver://loc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-07-rename.sql ==
+  | bs_wh | 库位 | nvarchar | 400 | 
+  | bs_wh_loc | 库位编码 | nvarchar | 200 | 
+  | bs_wh_loc | 库位地址 | nvarchar | 400 | 
+  | WHLOC | 库位 | Storage Location | 基础档案 | archive | bs_wh_loc | locations | 基础设置 | 
+  | 13284 | WH | 库位 | 库位 | 文本 | null | null | null | detail | 35 | 0 | 1 | 
+  | 13307 | WHLOC | 库位编码 | 库位编码 | 文本 | null | null | null | query,detail | 20 | 0 | 1 | 
+  | 13308 | WHLOC | 库位地址 | 库位地址 | 文本 | null | null | null | query,detail | 30 | 0 | 1 | 
+  | field | 库位 | de | Lagerplatz | manual | 
+  | field | 库位 | en | Storage Location | manual | 
+  | field | 库位 | es | Ubicación de almacenamiento | manual | 
+  | field | 库位 | fr | Emplacement de stockage | manual | 
+  | field | 库位 | ja | ロケーション | manual | 
+  | field | 库位 | ko | 저장 위치 | manual | 
+  | field | 库位 | ru | Место хранения | manual | 
+  | field | 库位 | th | ตำแหน่งจัดเก็บ | manual | 
+  | field | 库位 | vi | Vị trí lưu trữ | manual | 
+  | field | 库位编码 | de | Lagerortcode | manual | 
+  | field | 库位编码 | en | Location Code | manual | 
+  | field | 库位编码 | es | Código de ubicación | manual | 
+  | field | 库位编码 | fr | Code d'emplacement | manual | 
+  | field | 库位编码 | ja | ロケーションコード | manual | 
+  | field | 库位编码 | ko | 위치 코드 | manual | 
+  | field | 库位编码 | ru | Код места хранения | manual | 
+  | field | 库位编码 | th | รหัสตำแหน่ง | manual | 
+  | field | 库位编码 | vi | Mã vị trí | manual | 
+  | field | 库位地址 | de | Lagerortadresse | manual | 
+  | field | 库位地址 | en | Location Address | manual | 
+  | field | 库位地址 | es | Dirección de ubicación | manual | 
+  | field | 库位地址 | fr | Adresse d'emplacement | manual | 
+  | field | 库位地址 | ja | ロケーション住所 | manual | 
+  | field | 库位地址 | ko | 위치 주소 | manual | 
+  | field | 库位地址 | ru | Адрес места хранения | manual | 
+  | field | 库位地址 | th | ที่อยู่ตำแหน่ง | manual | 
+  | field | 库位地址 | vi | Địa chỉ vị trí | manual | 
+  | panel | 库位 | de | Lagerplatz | manual | 
+  | panel | 库位 | en | Storage Location | manual | 
+  | panel | 库位 | es | Ubicación de almacenamiento | manual | 
+  | panel | 库位 | fr | Emplacement de stockage | manual | 
+  | panel | 库位 | ja | ロケーション | manual | 
+  | panel | 库位 | ko | 저장 위치 | manual | 
+  | panel | 库位 | ru | Место хранения | manual | 
+  | panel | 库位 | th | ตำแหน่งจัดเก็บ | manual | 
+  | panel | 库位 | vi | Vị trí lưu trữ | manual | 
+  | 列 | bs_wh | 库位 | 库位(仓库内货位编号,手工录入文本;2026-09-28 仓库档案新增) | 
+  | 表 | bs_wh_loc |  | 库位档案(仓库内货位主数据:仓库/库位编码/库位地址;一仓多库位、一库位一仓;仓库列存仓库名称参照 bs_wh;库位二维码标签内容=仓库@库位地址@库位编码) | 
+  | 列 | bs_wh_loc | 仓库编码 | 仓库编码(所属仓库的业务编码,选择仓库时参照带回自 bs_wh.仓库编码;库位二维码首段;2026-09-28 库位档案新增) | 
+  | bs_wh | 库位 | 
+  | bs_wh_loc | 库位编码 | 
+  | bs_wh_loc | 库位地址 | 
+  | 28 | 启用仓位管理 | bit | 
+  | 32 | 库位 | nvarchar | 
+  | bd_purchase_in | 仓位id | 
+  | bd_purchase_in | 仓位 | 
+  | bd_purchase_in | 仓位编码 | 
+  | bl_material_out | 仓库启用仓位管理 | 
+  | bl_material_out | 仓位id | 
+  | bl_material_out | 仓位名称 | 
+  | bl_material_out | 仓位编码 | 
+  | bl_pu_order | 仓库启用仓位管理 | 
+  | bl_pu_order | 仓位id | 
+  | bl_pu_order | 仓位名称 | 
+  | bl_pu_order | 仓位编码 | 
+  | bl_purchase_in | 仓库启用仓位管理 | 
+  | bl_purchase_in | 仓位id | 
+  | bl_purchase_in | 仓位编码 | 
+  | bl_purchase_in | 仓位名称 | 
+  | bl_sale_out | 仓库启用仓位管理 | 
+  | bl_sale_out | 仓位id | 
+  | bl_sale_out | 仓位编码 | 
+  | bl_so_order | 仓库启用仓位管理 | 
+  | bl_so_order | 仓位id | 
+  | bl_so_order | 仓位名称 | 
+  | bl_so_order | 仓位编码 | 
+  | bs_inv | 倒冲仓位名称 | 
+  | bs_inv | 默认仓位 | 
+  | bs_inv | 倒冲仓位id | 
+  | bs_inv | 倒冲仓位编码 | 
+  | bs_wh | 启用仓位管理 | 
+[OK] q-07-rename.sql (11 batches)
