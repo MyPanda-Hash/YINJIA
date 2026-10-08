@@ -1,0 +1,23 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== migrate-whloc-zone-dict-20261008.sql ==
+  | 标签区 | 
+  | 端盖区 | 
+  | 货架区 | 
+  | 胶粉区 | 
+  | 炭粉区 | 
+  | 网套区 | 
+  | 无纺布区 | 
+  | 纸箱区 | 
+  | 成品仓区 | 
+  | 辅料及配件区 | 
+  | 原料区 | 
+  | 大区 | 下拉框 | ✓有字典(101字符) | query,detail | 34 | 1 | 0 | 
+  | 存储分区 | 下拉框 | ✓有字典(107字符) | query,detail | 36 | 1 | 0 | 
+[OK] migrate-whloc-zone-dict-20261008.sql (6 batches)

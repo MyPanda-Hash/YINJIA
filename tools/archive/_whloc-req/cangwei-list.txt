@@ -1,0 +1,105 @@
+﻿
+### D:\workspace\yinjia\frontend\src\business\menus.js  (2 处)
+    388: // 仓位(2026-09-28 建为「库位」,2026-10-08 正名「仓位」对齐金蝶):仓库下货位档案,一仓多仓位、一仓位一仓;
+    390: { code: 'whloc', title: '仓位', path: '/panelx/list/WHLOC', icon: 'LocationInformation', panelCode: 'WHLOC', operationName: '新增流程' },
+
+### D:\workspace\yinjia\frontend\src\business\print-formats.js  (12 处)
+      7: *     ③b 仓位标识卡(2026-09-28 建为「库位标识卡」,2026-10-08 正名):同款 75×100mm,
+      8: *        卡面=仓库/仓位地址/仓位编码,二维码=仓库编码@仓位地址@仓位编码;
+    368: * 仓位标识卡(WHLOC 仓位档案「二维码标签」勾选即打,2026-09-28;2026-10-08 库位→仓位术语统一)
+    370: * 卡面只放仓位字段(仓库/仓位地址/仓位编码),不含商品标识卡的 订单编号/供应商/数量/批次/生产日期 等字段
+    371: * (用户口径:仓位卡只服务定位)。二维码=仓库编码@仓位地址@仓位编码(固定三段,空段保留占位;
+    374: * @param rows [{仓库, 仓库编码, 仓位地址, 仓位编码}](仓位编码=行身份,缺码行跳过)
+    376: /** 仓位标识卡二维码内容:仓库编码@仓位地址@仓位编码(三段固定顺序,空段保留占位) */
+    378: return [loc?.['仓库编码'], loc?.['仓位地址'], loc?.['仓位编码']].map((s) => String(s ?? '').trim()).join('@')
+    382: const cards = (Array.isArray(rows) ? rows : []).filter((r) => r && r['仓位编码'])
+    402: } catch (e) { console.warn('[print-formats] 仓位二维码生成失败:', e?.message || e) }
+    405: + f('仓　　库', c['仓库']) + f('仓位地址', c['仓位地址']) + f('仓位编码', c['仓位编码'])
+    410: if (!openPrintWindow('仓位标识卡', body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
+
+### D:\workspace\yinjia\frontend\src\business\print-formats.test.js  (16 处)
+      9: *  ⑤ 仓位标识卡(printLocationCards;2026-09-28 建为库位卡,2026-10-08 库位→仓位术语统一):
+     10: *     同款 75×100mm,卡面=仓库/仓位地址/仓位编码(不含商品字段),
+     11: *     二维码=仓库编码@仓位地址@仓位编码 固定三段(locationCardQrText 直接断言)。
+     77: // ═══ 仓位标识卡(WHLOC 仓位档案「二维码标签」,2026-09-28 建为库位卡,2026-10-08 库位→仓位):同款 75×100mm,卡面只放仓位字段 ═══
+     79: test('仓位标识卡:卡面=仓库/仓位地址/仓位编码,二维码=仓库编码@仓位地址@仓位编码(固定三段)', async () => {
+     80: const sent = await printLocationCards([{ 仓库: '原料仓', 仓库编码: 'CK01', 仓位地址: 'A区3排2层', 仓位编码: 'KW-0001' }])
+     85: assert.ok(/仓位地址：<\/span><span class="v">A区3排2层/.test(html), '仓位地址填充')
+     86: assert.ok(/仓位编码：<\/span><span class="v">KW-0001/.test(html), '仓位编码填充')
+     88: // 卡面不含商品标识卡字段(用户口径:仓位卡只服务定位)
+     91: // 二维码内容:固定三段,顺序 仓库编码@仓位地址@仓位编码(2026-09-28 改版:首段 仓库→仓库编码)
+     92: assert.equal(locationCardQrText({ 仓库: '原料仓', 仓库编码: 'CK01', 仓位地址: 'A区3排2层', 仓位编码: 'KW-0001' }),
+     94: assert.equal(locationCardQrText({ 仓库: '原料仓', 仓位地址: 'A区3排2层', 仓位编码: 'KW-0001' }),
+     98: test('仓位二维码:空段保留占位(缺地址=编码@@仓位码),不静默丢段', () => {
+     99: assert.equal(locationCardQrText({ 仓库编码: 'CK02', 仓位编码: 'KW-09' }), 'CK02@@KW-09')
+    102: test('仓位标识卡:空行/无编码行 直接返回 false', async () => {
+    104: assert.equal(await printLocationCards([{ 仓库: '原料仓', 仓位地址: '无编码行' }]), false)
+
+### D:\workspace\yinjia\frontend\src\core\views\PanelxList.vue  (15 处)
+    827: <!-- 档案二维码标签(勾选即打,INV 商品/WHLOC 仓位):自管勾选集(跨页保留),与删除模式的 selection 列互不相干;
+    828: 表头复选框=本页全选。行键=qrLabelKey 列(存货编码;仓位=仓库+仓位编码 复合),空编码行禁勾 -->
+   3757: // 同码行勾一个即代表该码;WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+仓位编码 复合
+   3758: // (仓位编码按仓内唯一,同码多仓不串选)。 ═══
+   3770: //   `库位编码`,而库侧字段已正名为 `仓位编码`)⇒ k 恒为空。此处判空后,那种情况下所有行都
+   5047: *  (input.vue setNativeInputValue),于是每敲一个字都被立刻清掉——仓位档案 仓位编码/仓位地址
+   5077: *  一击后键盘输入落在页面而非输入框,用户表现为「无法填写」(仓位档案 仓位编码/仓位地址;
+   5139: // 无任何编辑器视觉痕迹,用户不知道要点它(仓位档案 仓位编码/仓位地址 因此被报"无法填写")。
+   5142: // 找第一个常规可编辑字段(如 仓位编码)激活,v-cell-focus 挂载即聚焦 → 点完按钮直接打字。
+   5198: //   (2026-10-08 用户报障:仓库/仓位面板的「停用」开关点击后无视觉反馈,实际已改)。
+   6417: // WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位术语统一):同款勾选即打,
+   6418: // 卡面=仓库/仓位地址/仓位编码(printLocationCards),二维码=仓库编码@仓位地址@仓位编码;
+   6419: // 勾选行键=仓库+仓位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
+   6427: if (whloc) rows.push({ 仓库: r['仓库'], 仓库编码: r['仓库编码'], 仓位地址: r['仓位地址'], 仓位编码: r['仓位编码'] })
+   6431: if (!rows.length) return ElMessage.warning(tt(whloc ? '请先勾选要打印的仓位' : '请先勾选要导出的商品'))
+
+### D:\workspace\yinjia\frontend\src\i18n\locales\de.js  (2 处)
+    217: '请先勾选要打印的仓位': 'Bitte zuerst die zu druckenden Lagerplätze auswählen',
+    680: '仓位': 'Lagerplatz',
+
+### D:\workspace\yinjia\frontend\src\i18n\locales\en.js  (3 处)
+    729: // 仓位档案·二维码标签(2026-09-28):同款 75×100mm 标识卡,卡面=仓库/仓位地址/仓位编码
+    730: '请先勾选要打印的仓位': 'Select the storage locations to print first',
+   1543: '仓位': 'Storage Location',
+
+### D:\workspace\yinjia\frontend\src\i18n\locales\es.js  (2 处)
+    217: '请先勾选要打印的仓位': 'Seleccione primero las ubicaciones a imprimir',
+    788: '仓位': 'Ubicación de almacenamiento',
+
+### D:\workspace\yinjia\frontend\src\i18n\locales\fr.js  (2 处)
+    217: '请先勾选要打印的仓位': "Cochez d'abord les emplacements à imprimer",
+    906: '仓位': 'Emplacement de stockage',
+
+### D:\workspace\yinjia\frontend\src\i18n\locales\ja.js  (2 处)
+    217: '请先勾选要打印的仓位': '先に印刷するロケーションにチェックを入れてください',
+    788: '仓位': 'ロケーション',
+
+### D:\workspace\yinjia\frontend\src\i18n\locales\ko.js  (2 处)
+    217: '请先勾选要打印的仓位': '먼저 인쇄할 저장 위치를 선택하세요',
+    788: '仓位': '저장 위치',
+
+### D:\workspace\yinjia\frontend\src\i18n\locales\ru.js  (2 处)
+    217: '请先勾选要打印的仓位': 'Сначала отметьте места хранения для печати',
+    795: '仓位': 'Место хранения',
+
+### D:\workspace\yinjia\frontend\src\i18n\locales\th.js  (2 处)
+    217: '请先勾选要打印的仓位': 'โปรดเลือกตำแหน่งที่ต้องการพิมพ์ก่อน',
+    795: '仓位': 'ตำแหน่งจัดเก็บ',
+
+### D:\workspace\yinjia\frontend\src\i18n\locales\vi.js  (2 处)
+    207: '请先勾选要打印的仓位': 'Hãy chọn trước các vị trí cần in',
+    896: '仓位': 'Vị trí lưu trữ',
+
+### D:\workspace\yinjia\frontend\src\i18n\locales\zh-TW.js  (2 处)
+    343: '请先勾选要打印的仓位': '請先勾選要列印的倉位',
+    882: '仓位': '倉位',
+
+### D:\workspace\yinjia\backend\src\main\java\com\yinjia\mes\service\PanelConfigService.java  (7 处)
+    107: // WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位术语统一):与商品同款勾选即打形态,
+    108: // 卡面=仓位字段(仓库/仓位地址/仓位编码,不含商品字段),
+    109: // 二维码=仓库编码@仓位地址@仓位编码(printLocationCards);行键=仓库+仓位编码 复合(同码多仓不串选)。
+    197: // 2026-10-08:WHLOC 的编码列随库位→仓位术语统一改名(库位编码→仓位编码),此处数据键同步;
+    199: metadata.put("qrLabelKey", "INV".equals(def.code()) ? "存货编码" : "仓位编码");
+    201: // 仓位标签勾选行键=仓库+仓位编码 复合(仓位编码按仓内唯一,同码多仓不串选)
+    203: // 前端分发:whloc → printLocationCards(仓位标识卡,二维码=仓库编码@仓位地址@仓位编码)
+
+合计 73 处

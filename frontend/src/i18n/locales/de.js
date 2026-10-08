@@ -2108,6 +2108,24 @@ export default {
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Nur angehakte Zeilen werden erzeugt; Maximum = Bestellmenge × (1 + Quote) − geliefert + retourniert (Überlieferung max. 50 %)',
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = nicht erlaubt; max. 50 %, Spielraum nach Bestellmenge)',
     '请至少勾选一行并填写本次送料数量': 'Mindestens eine Zeile anhaken und Liefermenge eingeben',
+  
+    '仓位分区': 'Lagerzonen',
+    '分区跟随仓位存在：候选自动来自仓位的实际数据，不需要单独登记；仓位没了，分区就没了。': 'Zonen existieren nur über Lagerplätze: Die Liste wird aus den tatsächlichen Daten abgeleitet, ohne separate Registrierung. Keine Lagerplätze, keine Zone.',
+    '填一个新名字即可新增分区（保存后进入候选）': 'Neuen Namen eingeben, um eine Zone anzulegen (erscheint nach dem Speichern in der Liste)',
+    '填入本格': 'In diese Zelle übernehmen',
+    '清空本格': 'Diese Zelle leeren',
+    '点击选择分区': 'Klicken, um eine Zone zu wählen',
+    '仓位数': 'Lagerplätze',
+    '(不分区)': '(kein Bereich)',
+    '(不细分)': '(keine Unterzone)',
+    '无法删除': 'Löschen nicht möglich',
+    '个仓位仍在使用该分区，无法删除。分区跟随仓位存在：请先把这些仓位改到别的分区或删除它们；当最后一个仓位离开后，本分区会自动从候选里消失。': 'Lagerplätze nutzen diese Zone noch, daher kann sie nicht gelöscht werden. Zonen existieren nur über Lagerplätze: Verschieben Sie diese Lagerplätze zuerst in eine andere Zone (oder löschen Sie sie); sobald der letzte sie verlässt, verschwindet diese Zone automatisch aus der Liste.',
+    '该分区已没有仓位，它已经随仓位一起从候选里消失了。': 'Diese Zone hat keine Lagerplätze mehr – sie ist bereits mit ihnen aus der Liste verschwunden.',
+    '分区已消失': 'Zone existiert nicht mehr',
+    '大区': 'Bereich',
+    '存储分区': 'Unterzone',
+  
+    '选择时会同时填入「大区」和「存储分区」（它们是一个组合）': 'Beim Auswählen werden Bereich und Unterzone gemeinsam eingetragen (sie bilden eine Kombination)',
   },
 
 }

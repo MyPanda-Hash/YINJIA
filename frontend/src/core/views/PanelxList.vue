@@ -914,6 +914,9 @@
                   <el-icon v-if="detailRefTrigger(c.field) === 'dblclick' && isActiveDetailRefRow(row, b, c.prop)" class="list-ref-icon"><Search /></el-icon>
                 </div>
                 <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <!-- 分区选择(2026-10-08):候选 = 本表 (大区,存储分区) 的实际数据去重并集,不落任何存储
+                     ⇒ 点格**直接开**「仓位分区」弹窗(不进"激活编辑器"那一套),与参照列的交互形态一致 -->
+                <span v-else-if="isZonePickField(c.field)" class="cell-lazy zone-pick-cell" :title="tt('点击选择分区')" @click="openZonePick(row, b, c.field)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
                 <!-- 编辑器懒渲染:仅激活单元格挂载编辑控件,其余单元格显示纯文本,
                      避免大数据量面板(如数据字典 210 行)每格常驻编辑器导致 DOM 膨胀 -->
                 <template v-else-if="isActiveCell(row, b, c.prop)">
@@ -1602,6 +1605,9 @@
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <!-- 字段管理(动态字段/备用列池;仅 admin):绑定/停用自定义字段 -->
     <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
+    <!-- 仓位分区弹窗(2026-10-08):候选来自本面板已加载的仓位行,不落存储 ⇒ 分区随仓位存在;
+         选中时「大区 + 存储分区」**一起回填**(用户口径:它们是一个组合) -->
+    <ZonePickDialog v-model="zonePickVisible" :rows="zonePickRows" :area-key="ZONE_PAIR.area" :zone-key="ZONE_PAIR.zone" @pick="onZonePick" />
     <ScanFillDialog
       v-model="scanVisible"
       :panel-code="panelCode"
@@ -1732,6 +1738,7 @@ import { printPuOrder, printQcReturn, printProductCards, printLocationCards, pri
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
+import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
 import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
@@ -5214,6 +5221,44 @@ function onInlineBoolInput(tabKey, row, field, next) {
   onInlineDetailChange(tabKey, row, field)
 }
 
+/**
+ * 分区选择(2026-10-08,字段 data_type='分区选择'):
+ * 单元格点击**直接开**「仓位分区」弹窗,候选 = 本面板已加载的仓位行里 (大区,存储分区) 的去重并集,
+ * **不落任何存储** ⇒ 分区随仓位存在(用户口径:「没有这个仓位就没有这个分区…仓位删除完后
+ * 分区也一起没了」)。因此弹窗里的「删除」是**带保护的指引**,任何操作都不触碰仓位数据。
+ * 元数据驱动:不在前端硬编码面板名/列名,只认 data_type。
+ * ⚠ 回填口径(2026-10-08 追加「让当前大区和存储分区被选择的时候一起填入」):
+ *   「大区 + 存储分区」是一个组合 ⇒ 选中后**两列一起写**,不留"只填了一半"的中间状态。
+ *   所以这里定义一次列名、同时传给弹窗(弹窗只管展示与发值,不各自硬编码)。
+ */
+const ZONE_PAIR = { area: '大区', zone: '存储分区' }
+function isZonePickField(field) {
+  return fieldType(field) === '分区选择'
+}
+const zonePickVisible = ref(false)
+const zonePickRows = ref([])
+let zonePickCtx = null
+function openZonePick(row, b, field) {
+  if (!row || row._placeholder) return
+  zonePickCtx = { row, b, field }
+  zonePickRows.value = archRows(b)
+  zonePickVisible.value = true
+}
+/** 回填:两列一起写,再走既有 onInlineDetailChange —— markRaw 行的 archVersion bump 在其中,不会"选完弹回" */
+function onZonePick(pair) {
+  const ctx = zonePickCtx
+  zonePickVisible.value = false
+  zonePickCtx = null
+  if (!ctx) return
+  const { row, b } = ctx
+  const a = String(pair?.[ZONE_PAIR.area] ?? '').trim()
+  const z = String(pair?.[ZONE_PAIR.zone] ?? '').trim()
+  if (String(row[ZONE_PAIR.area] ?? '').trim() === a && String(row[ZONE_PAIR.zone] ?? '').trim() === z) return
+  row[ZONE_PAIR.area] = a
+  row[ZONE_PAIR.zone] = z
+  onInlineDetailChange(activeTab(b).key, row, { dataName: ZONE_PAIR.zone })
+}
+
 function applyDetailReference(target, field, source) {
   const refField = field.refField || field.field
   target[field.dataName] = source[refField]
@@ -8191,6 +8236,13 @@ onUnmounted(() => {
 .detail :deep(.el-table td .cell-lazy:hover) {
   background: #f2f6ff;
   box-shadow: inset 0 0 0 1px #c7d8f5;
+}
+/* 分区选择格(2026-10-08):点击开弹窗而非行内输入 —— 用 pointer + 虚线下划线把"可点选"显出来,
+   与参照列(readonly input + 点击选择)的观感区分开 */
+.detail :deep(.el-table td .cell-lazy.zone-pick-cell) {
+  cursor: pointer;
+  border-bottom: 1px dashed #c7d8f5;
+  border-radius: 0;
 }
 .list-ref-icon {
   position: absolute;

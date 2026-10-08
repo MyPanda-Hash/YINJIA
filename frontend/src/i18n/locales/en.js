@@ -3088,6 +3088,24 @@ export default {
     '当前工序完工量': "Current operation's completed qty",
     '上道工序': 'Previous operation',
     '上道完工量': "Previous operation's completed qty",
+  
+    '仓位分区': 'Location Zones',
+    '分区跟随仓位存在：候选自动来自仓位的实际数据，不需要单独登记；仓位没了，分区就没了。': 'Zones exist only through locations: the list is derived from actual location data, with no separate registration. No locations, no zone.',
+    '填一个新名字即可新增分区（保存后进入候选）': 'Type a new name to add a zone (it joins the list after saving)',
+    '填入本格': 'Fill this cell',
+    '清空本格': 'Clear this cell',
+    '点击选择分区': 'Click to choose a zone',
+    '仓位数': 'Locations',
+    '(不分区)': '(no area)',
+    '(不细分)': '(no sub-zone)',
+    '无法删除': 'Cannot delete',
+    '个仓位仍在使用该分区，无法删除。分区跟随仓位存在：请先把这些仓位改到别的分区或删除它们；当最后一个仓位离开后，本分区会自动从候选里消失。': 'locations still use this zone, so it cannot be deleted. Zones exist only through locations: move those locations to another zone (or delete them) first; once the last one leaves, this zone disappears from the list automatically.',
+    '该分区已没有仓位，它已经随仓位一起从候选里消失了。': 'This zone has no locations left — it has already disappeared from the list along with them.',
+    '分区已消失': 'Zone no longer exists',
+    '大区': 'Area',
+    '存储分区': 'Sub-zone',
+  
+    '选择时会同时填入「大区」和「存储分区」（它们是一个组合）': 'Selecting a row fills both Area and Sub-zone (they form one combination)',
   },
 
 }

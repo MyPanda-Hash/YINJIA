@@ -2108,6 +2108,24 @@ export default {
     '只生成已勾选的行；可送上限 = 订单数量 ×（1 + 超送比例）− 已送 + 已退回（超送最高 50%）': 'Solo se generan las líneas marcadas; máximo = cantidad pedida × (1 + ratio) − entregado + devuelto (sobreentrega máx. 50 %)',
     '（0 = 不允许；最高 50%，额度按订单数量算）': '(0 = no permitido; máx. 50 %, cupo según cantidad pedida)',
     '请至少勾选一行并填写本次送料数量': 'Marque al menos una línea e introduzca la cantidad a entregar',
+  
+    '仓位分区': 'Zonas de ubicación',
+    '分区跟随仓位存在：候选自动来自仓位的实际数据，不需要单独登记；仓位没了，分区就没了。': 'Las zonas existen solo a través de las ubicaciones: la lista se deriva de los datos reales, sin registro aparte. Sin ubicaciones, no hay zona.',
+    '填一个新名字即可新增分区（保存后进入候选）': 'Escriba un nombre nuevo para añadir una zona (entra en la lista al guardar)',
+    '填入本格': 'Rellenar esta celda',
+    '清空本格': 'Vaciar esta celda',
+    '点击选择分区': 'Clic para elegir una zona',
+    '仓位数': 'Ubicaciones',
+    '(不分区)': '(sin área)',
+    '(不细分)': '(sin subzona)',
+    '无法删除': 'No se puede eliminar',
+    '个仓位仍在使用该分区，无法删除。分区跟随仓位存在：请先把这些仓位改到别的分区或删除它们；当最后一个仓位离开后，本分区会自动从候选里消失。': 'ubicaciones siguen usando esta zona, por lo que no se puede eliminar. Las zonas existen solo a través de las ubicaciones: mueva primero esas ubicaciones a otra zona (o elimínelas); cuando la última salga, esta zona desaparecerá automáticamente de la lista.',
+    '该分区已没有仓位，它已经随仓位一起从候选里消失了。': 'Esta zona ya no tiene ubicaciones: ya ha desaparecido de la lista junto con ellas.',
+    '分区已消失': 'La zona ya no existe',
+    '大区': 'Área',
+    '存储分区': 'Subzona',
+  
+    '选择时会同时填入「大区」和「存储分区」（它们是一个组合）': 'Al seleccionar se rellenan Área y Subzona a la vez (forman una combinación)',
   },
 
 }
