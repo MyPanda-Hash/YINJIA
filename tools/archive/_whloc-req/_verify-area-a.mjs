@@ -44,14 +44,14 @@ console.log('\n== 4. 按 仓库 / 存储分区 汇总 ==')
 const byWh = {}
 for (const r of items) byWh[r.仓库] = (byWh[r.仓库] || 0) + 1
 for (const [k, v] of Object.entries(byWh).sort()) console.log(`  仓库 ${String(k).padEnd(14)} ${String(v).padStart(4)} 个`)
-const aRows = items.filter((r) => r.仓库 === '原材料区A仓')
+const aRows = items
 const byArea = {}
 for (const r of aRows) byArea[r.存储分区] = (byArea[r.存储分区] || 0) + 1
 for (const [k, v] of Object.entries(byArea).sort()) console.log(`    存储分区 ${String(k).padEnd(9)} ${String(v).padStart(4)} 个`)
 
 console.log('\n== 5. 抽样(每存储分区首尾各 2 条) ==')
-for (const area of ['炭粉区', '胶粉区', '货架区']) {
-  const rows = aRows.filter((r) => r.存储分区 === area).sort((a, b) => a.仓位编码.localeCompare(b.仓位编码))
+for (const area of ['炭粉区','胶粉区','货架区','纸箱区','端盖区','无纺布区','网套区','标签区','成品区']) {
+  const rows = items.filter((r) => r.存储分区 === area).sort((a, b) => a.仓位编码.localeCompare(b.仓位编码))
   if (!rows.length) continue
   console.log(`  [存储分区=${area}] 共 ${rows.length} 条`)
   for (const r of [rows[0], rows[1], rows[rows.length - 2], rows[rows.length - 1]]) {
@@ -60,8 +60,8 @@ for (const area of ['炭粉区', '胶粉区', '货架区']) {
 }
 
 console.log('\n== 6. 二维码三段内容预演(仓库编码@仓位地址@仓位编码) ==')
-for (const code of ['A1-09-1', 'A1-20-3', 'A1-21-1', 'A1-24-3', 'AH5-1-1', 'AH16-3-3']) {
-  const r = aRows.find((x) => x.仓位编码 === code)
+for (const code of ['A1-09-1','AH5-1-1','A1-8-3','A2-6-5','AH1-2-3','AH18-1-1','B1-18-3','B4-24-2','C2-16-3','D4-01-1','D11-08-2']) {
+  const r = items.find((x) => x.仓位编码 === code)
   console.log(r ? `  ${code.padEnd(10)} ->  ${r.仓库编码}@${r.仓位地址}@${r.仓位编码}` : `  ${code.padEnd(10)} ->  ★未找到`)
 }
 

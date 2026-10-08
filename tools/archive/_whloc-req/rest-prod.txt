@@ -1,0 +1,31 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== migrate-whloc-rest-20261008.sql ==
+  | 新增仓库 3 个(应 3) | 3 | 
+  | 有效仓位总数(应 156+523=679) | 679 | 
+  |   原材料区A仓 CK-A(应 156) | 156 | 
+  |   成品B仓 CP-02(应 180) | 180 | 
+  |   成品C仓 CK-C(应 72) | 72 | 
+  |   辅料及配件区A仓 CK-A2(应 103) | 103 | 
+  |   成品D仓 CK-D(应 168) | 168 | 
+  | 仓位编码重复组(应 0) | 0 | 
+  | 坐标列有空(应 0) | 0 | 
+  | 仓位地址仍为空(应 0) | 0 | 
+  | CK-A | 原材料区A仓 | 老厂区 | 货架区 | 108 | 
+  | CK-A | 原材料区A仓 | 老厂区 | 胶粉区 | 12 | 
+  | CK-A | 原材料区A仓 | 老厂区 | 炭粉区 | 36 | 
+  | CK-A2 | 辅料及配件区A仓 | 老厂区 | 标签区 | 30 | 
+  | CK-A2 | 辅料及配件区A仓 | 老厂区 | 端盖区 | 25 | 
+  | CK-A2 | 辅料及配件区A仓 | 老厂区 | 网套区 | 12 | 
+  | CK-A2 | 辅料及配件区A仓 | 老厂区 | 无纺布区 | 12 | 
+  | CK-A2 | 辅料及配件区A仓 | 老厂区 | 纸箱区 | 24 | 
+  | CK-C | 成品C仓 | 老厂区 | 成品区 | 72 | 
+  | CK-D | 成品D仓 | 新厂区 | 成品区 | 168 | 
+  | CP-02 | 成品B仓 | 老厂区 | 成品区 | 180 | 
+[OK] migrate-whloc-rest-20261008.sql (7 batches)
