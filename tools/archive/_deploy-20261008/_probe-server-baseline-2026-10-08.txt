@@ -1,0 +1,9 @@
+=== 服务器部署前基线 http://36.140.66.163:8090 (2026-10-08T16:09:49.354Z) ===
+① 首页 HTTP 200 引用 assets/index-DnqlJAw-.js
+② 登录 HTTP 200 token=172 字符 realName=系统管理员
+③ GET /api/dashboard/capacity -> HTTP 404(404 = 服务器还是旧 jar,与预期相符)
+④ 服务器仓库档案(WH 面板)total=30: ?=?
+⑤ WHLOC 面板 -> 200 totalSize=2(服务器竟已有仓位数据,需人工确认)
+⑥ 结论:
+   · 服务器前端 = assets/index-DnqlJAw-.js
+   · 本次目标前端 = assets/index-CtZ3s6Hm.js(合并后构建)

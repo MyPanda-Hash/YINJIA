@@ -78,6 +78,26 @@ copyFileSync(join(TOOLS, 'archive', '_registry-audit-20261008', '_cleanup-stray-
 
 writeFileSync(join(PKG, `to-run-${TAG}.txt`), toRun.join('\n') + '\n');
 
+// 变体清单(2026-10-08 部署前只读探针发现「服务器四单与基线不同代」后加的):
+//   只跑仓位 8 条、把四单 3 条留待人工确认 —— 四单回正脚本会 DELETE 后按基线重建,
+//   而服务器上采购入库单仍带着种子脚本登记的宽版字段(合同号/项目/外部单据号/资金批次/…),
+//   跑下去这些登记会消失(本机就是这么被 10-08 回正删掉的)。
+// ⚠ 只改 to-run 不够:GO 第 4c 步的裸 sync 按**清单**执行,清单里有、台账没记的照样会被补跑
+//   ⇒ 必须同时把清单里那 3 条注掉,两件一起换才自洽。故本变体给出两个文件:
+//     to-run-20261008-whloc-only.txt   (强制清单:8 条)
+//     tools/db-migrations-whloc8.txt   (清单:3 条四单被 # 注掉,裸 sync 便不会补跑)
+const FOURDOC = toRun.filter((s) => s.startsWith('migrate-fourdoc-'));
+const WHLOC_ONLY = toRun.filter((s) => !s.startsWith('migrate-fourdoc-'));
+writeFileSync(join(PKG, `to-run-${TAG}-whloc-only.txt`), WHLOC_ONLY.join('\n') + '\n');
+const manifestRaw = readFileSync(join(TOOLS, 'db-migrations.txt'), 'utf8');
+const manifest8 = manifestRaw.split('\n').map((l) => {
+  const t = l.trim();
+  return FOURDOC.includes(t) ? `# 【本次 8 条口径:四单批暂缓,故注掉这一行不让裸 sync 补跑】${l}` : l;
+}).join('\n');
+writeFileSync(join(PKG, 'tools', `db-migrations-whloc8.txt`), manifest8);
+const stillActive = manifest8.split('\n').map((l) => l.trim()).filter((t) => t && !t.startsWith('#'));
+console.log(`  · 变体 to-run-${TAG}-whloc-only.txt(${WHLOC_ONLY.length} 条) + tools/db-migrations-whloc8.txt(清单 ${stillActive.length} 条,四单 ${FOURDOC.length} 条已注掉)`);
+
 // bat:把仓库版里的旧 to-run 名/条数描述改写为本次(GO 流程本身不变)
 const subBat = (src, dst, desc) => {
   let t = readFileSync(join(DEPLOY, src), 'utf8');
