@@ -1,0 +1,37 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:5 字符: 1
++ & $java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlserver://loc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== migrate-whloc-newplant-drop-20261008.sql ==
+  | 本次将删(应 622) | 622 | 
+  | D仓 成品保留(应 168) | 168 | 
+  | 其它仓不受影响(应 413) | 511 | 
+  | 辅料及配件区 | PP棉区 | PP棉区-01 | 12 | 
+  | 辅料及配件区 | 端盖区 | 端盖区-01 | 12 | 
+  | 辅料及配件区 | 货架区 | H10-1 | 44 | 
+  | 辅料及配件区 | 网套&布区 | 网套布区-01 | 12 | 
+  | 辅料及配件区 | 折叠棉 | 折叠棉-01 | 24 | 
+  | 辅料及配件区 | 纸箱区 | 纸箱区-01 | 14 | 
+  | 原料区 | 胶粉区 | 胶粉1区-01 | 180 | 
+  | 原料区 | 炭粉区 | 炭1区-01 | 324 | 
+  | 总仓位(应 1301-622=679) | 679 | 
+  | D仓(应 168,只剩成品仓区) | 168 | 
+  | D仓 大区=成品仓区(应 168) | 168 | 
+  | 仓位地址为空(应 0) | 0 | 
+  | 仓位编码重复组(应 0) | 0 | 
+  | 新厂区 | D仓 | 成品仓区 | (—) | 168 | 
+  | 老厂区 | A仓 | 辅料及配件区 | 标签区 | 30 | 
+  | 老厂区 | A仓 | 辅料及配件区 | 端盖区 | 25 | 
+  | 老厂区 | A仓 | 辅料及配件区 | 网套区 | 12 | 
+  | 老厂区 | A仓 | 辅料及配件区 | 无纺布区 | 12 | 
+  | 老厂区 | A仓 | 辅料及配件区 | 纸箱区 | 24 | 
+  | 老厂区 | A仓 | 原料区 | 货架区 | 108 | 
+  | 老厂区 | A仓 | 原料区 | 胶粉区 | 12 | 
+  | 老厂区 | A仓 | 原料区 | 炭粉区 | 36 | 
+  | 老厂区 | B仓 | (不分区) | (—) | 180 | 
+  | 老厂区 | C仓 | (不分区) | (—) | 72 | 
+[OK] migrate-whloc-newplant-drop-20261008.sql (8 batches)
