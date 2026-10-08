@@ -2480,17 +2480,6 @@ migrate-lab-sheets-date-fields-2026-10-07.sql
 #   业务数据(yj_doc_status/yj_user/yj_doc_batch 等)不碰。证据 tools/archive/_srv-bak-compare-20261007/。幂等;两账套均执行。
 migrate-server-converge-20261007.sql
 
-# migrate-fourdoc-baseline-restore-20261008.sql(2026-10-08):采购链四单 yj_field 回正到 2026-10-03 基线
-#   背景:10-05 07:42 起本地库迁移链整链重放(79 条,首条 migrate-sl-supplier-ref.sql),四单 yj_field 行
-#   被整批换成另一代登记 —— 参照源越界回落(§5.3 同款)、QC_RECV 明细少 10 行(数量2/计量单位2/税率%/
-#   含税单价/含税金额/折扣%/预计到货日期/现存量/仓库/批次键)、表头「单据日期」被改名「日期」、业务员
-#   由参照掉回文本、QC_INSP 明细「单位」整行消失、hidden 位被翻开(明细可见列 QC_RECV 22→37 /
-#   QC_INSP 14→30 / QC_RETURN 12→33)。
-#   按 docs/development/采购链四单字段与显示字段.md §8 复跑取证:§四 12/12 ✅,§五 参照抽查 4/6(两项 FAIL)。
-#   本脚本把四单 yj_field 逐字段回正到基线 dump(tools/archive/_dump-out/fields-HSDZ_MES.md @ 10-03,329 行)。
-#   幂等:差异行数=0 的面板跳过;有差异则整面板重建(单事务 + 重建后复核,非 0 回滚 RAISERROR)。两账套均执行。
-migrate-fourdoc-baseline-restore-20261008.sql
-
 # migrate-fourdoc-bloodline-cols-20261008.sql(2026-10-08):补回基线档登记、本机表已无的 5 个物理列
 #   背景:文档 §3.3/§3.4 登记了 QC_RETURN 头「退货原因/经手人」、QC_RETURN 明细「单位」、
 #   PURCHASE_IN 明细「仓位名称/换算率2」,而本机两账套同名物理列已不存在(查证:yj_schema_log 无任何
@@ -2510,6 +2499,19 @@ migrate-fourdoc-bloodline-cols-20261008.sql
 #   幂等(sp_rename 双向守卫 + COL_LENGTH);两账套均执行;必须排在回正脚本之前。
 #   ⚠ 遗留:migrate-qc-tc-via-return.sql:144 硬写 d.[数量],该文件字节不变即不会重跑;将来要改它须先改成血统二择一。
 migrate-fourdoc-missing-cols-20261008.sql
+
+# migrate-fourdoc-baseline-restore-20261008.sql(2026-10-08):采购链四单 yj_field 回正到 2026-10-03 基线
+#   背景:10-05 07:42 起本地库迁移链整链重放(79 条,首条 migrate-sl-supplier-ref.sql),四单 yj_field 行
+#   被整批换成另一代登记 —— 参照源越界回落(§5.3 同款)、QC_RECV 明细少 10 行(数量2/计量单位2/税率%/
+#   含税单价/含税金额/折扣%/预计到货日期/现存量/仓库/批次键)、表头「单据日期」被改名「日期」、业务员
+#   由参照掉回文本、QC_INSP 明细「单位」整行消失、hidden 位被翻开(明细可见列 QC_RECV 22→37 /
+#   QC_INSP 14→30 / QC_RETURN 12→33)。
+#   按 docs/development/采购链四单字段与显示字段.md §8 复跑取证:§四 12/12 ✅,§五 参照抽查 4/6(两项 FAIL)。
+#   本脚本把四单 yj_field 逐字段回正到基线 dump(tools/archive/_dump-out/fields-HSDZ_MES.md @ 10-03,329 行)。
+#   幂等:差异行数=0 的面板跳过;有差异则整面板重建(单事务 + 重建后复核,非 0 回滚 RAISERROR)。两账套均执行。
+#   ⚠ 顺序(2026-10-08 打包前修正):本脚本必须在上面两条补列脚本**之后** —— 它按基线 dump 重建
+#     yj_field,会为基线档登记但物理列尚不存在的字段插行;先补列再回正才不会留下「字段指向不存在的列」的中间态。
+migrate-fourdoc-baseline-restore-20261008.sql
 
 # migrate-whloc-rename-bin-20261008.sql(2026-10-08):库位 → 仓位 术语统一(对齐金蝶仓位三件套 sp_id/sp_name/sp_number)
 #   动机:库位档案 2026-09-28 落地用了「库位」,而全系统(金蝶接口血统)一直是「仓位」
