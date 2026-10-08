@@ -1,0 +1,157 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & $java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlserver://loc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-05-selfref.sql ==
+  | DEPT | 上级部门 | 上级部门 | 参照 | DEPT | 部门编码 | 部门名称 | detail | 50 | 0 | 1 | archive | bs_dept | 
+  | FIN_ACC | 上级科目 | 上级科目 | 参照 | FIN_ACC | 科目编码 | 科目名称 | query,detail | 50 | 0 | 1 | archive | bd_account | 
+  | FIN_EXP | 上级类别 | 上级类别 | 参照 | FIN_EXP | 费用类别编码 | 费用类别名称 | query,detail | 40 | 0 | 1 | archive | bd_expense_type | 
+  | REGION | 上级地区 | 上级地区 | 参照 | REGION | 地区编码 | 地区名称 | query,detail | 30 | 0 | 1 | archive | bs_region | 
+  | EMP | 46 | 36 | 
+  | INV | 46 | 30 | 
+  | DEPT | 23 | 16 | 
+  | WH | 19 | 16 | 
+  | RD_PROD_INFO | 16 | 8 | 
+  | PARTNER | 12 | 12 | 
+  | GFDA | 10 | 7 | 
+  | RD_APPROVAL | 9 | 9 | 
+  | KHDA | 9 | 6 | 
+  | PROJ | 7 | 7 | 
+  | OP | 6 | 4 | 
+  | UOM | 6 | 4 | 
+  | EQUIP | 3 | 3 | 
+  | RD_PLAN | 2 | 1 | 
+  | PU_ORDER | 2 | 2 | 
+  | WC | 2 | 2 | 
+  | SO_ORDER | 2 | 2 | 
+  | TEAM | 1 | 1 | 
+  | REGION | 1 | 1 | 
+  | REJECT | 1 | 1 | 
+  | WO_ORDER | 1 | 1 | 
+  | QC_INSP | 1 | 1 | 
+  | QC_PLAN | 1 | 1 | 
+  | QC_RECV | 1 | 1 | 
+  | FIN_ACC | 1 | 1 | 
+  | FIN_EXP | 1 | 1 | 
+  | MANU_ORDER | 1 | 1 | 
+  | CUR | 1 | 1 | 
+  | 149 | 部门编码 | 部门编码 | 文本 | null | null | null | query,detail | 10 | 1 | 0 | 1 | 
+  | 150 | 部门名称 | 部门名称 | 文本 | null | null | null | query,detail | 20 | 1 | 0 | 1 | 
+  | 151 | 负责人 | 负责人 | 文本 | null | null | null | detail | 30 | 1 | 0 | 1 | 
+  | 152 | 停用 | 停用 | 是否 | null | null | null | query,detail | 40 | 1 | 0 | 1 | 
+  | 3073 | 上级部门 | 上级部门 | 参照 | DEPT | 部门编码 | 部门名称 | detail | 50 | 1 | 0 | 1 | 
+  | 12892 | 电话 | 电话 | 文本 | null | null | null | query,detail | 70 | 1 | 0 | 1 | 
+  | 3076 | 备注 | 备注 | 文本 | null | null | null | detail | 80 | 1 | 0 | 1 | 
+  | 7939 | 级次 | 级次 | 文本 | null | null | null | detail | 900 | 1 | 0 | 1 | 
+  | 7940 | 长编码 | 长编码 | 文本 | null | null | null | query,detail | 900 | 1 | 0 | 1 | 
+  | 7941 | 部门全称 | 部门全称 | 文本 | null | null | null | detail | 900 | 1 | 0 | 1 | 
+  | 7942 | 上级编码 | 上级编码 | 文本 | null | null | null | query,detail | 900 | 1 | 0 | 1 | 
+  | 7943 | 是否叶子节点 | 是否叶子节点 | 是否 | null | null | null | detail | 900 | 1 | 0 | 1 | 
+  | 8077 | 上级id | 上级id | 文本 | null | null | null | detail | 950 | 1 | 1 | 0 | 
+  | id | int | 
+  | 部门编码 | nvarchar | 
+  | 部门名称 | nvarchar | 
+  | 负责人 | nvarchar | 
+  | 停用 | bit | 
+  | 备注 | nvarchar | 
+  | 状态 | nvarchar | 
+  | asp_user1 | nvarchar | 
+  | asp_time1 | datetime2 | 
+  | asp_user2 | nvarchar | 
+  | asp_time2 | datetime2 | 
+  | asp_cancel | char | 
+  | 上级部门 | nvarchar | 
+  | 部门类型 | nvarchar | 
+  | 电话 | nvarchar | 
+  | 外部数据ID | nvarchar | 
+  | 外部单据号 | nvarchar | 
+  | 外部指纹 | nvarchar | 
+  | 级次 | nvarchar | 
+  | 长编码 | nvarchar | 
+  | 部门全称 | nvarchar | 
+  | 上级编码 | nvarchar | 
+  | 是否叶子节点 | bit | 
+  | 上级id | nvarchar | 
+  | 备用1 | nvarchar | 
+  | 备用2 | nvarchar | 
+  | 备用3 | nvarchar | 
+  | 备用4 | nvarchar | 
+  | 备用5 | nvarchar | 
+  | 备用6 | nvarchar | 
+  | 备用7 | nvarchar | 
+  | 备用8 | nvarchar | 
+  | 备用9 | nvarchar | 
+  | 备用10 | nvarchar | 
+  | 备用11 | nvarchar | 
+  | 备用12 | nvarchar | 
+  | 备用13 | nvarchar | 
+  | 备用14 | nvarchar | 
+  | 备用15 | nvarchar | 
+  | 备用16 | nvarchar | 
+  | 备用17 | nvarchar | 
+  | 备用18 | nvarchar | 
+  | 备用19 | nvarchar | 
+  | 备用20 | nvarchar | 
+  | 46 | 
+  | id | int | 
+  | panel_code | varchar | 
+  | col_name | sysname | 
+  | label | nvarchar | 
+  | data_type | nvarchar | 
+  | dict_sql | nvarchar | 
+  | ref_panel | varchar | 
+  | ref_field | sysname | 
+  | display_field | sysname | 
+  | place | varchar | 
+  | seq | int | 
+  | width | int | 
+  | editable | bit | 
+  | required | bit | 
+  | hidden | bit | 
+  | alias | nvarchar | 
+  | visible | bit | 
+  | label_en | nvarchar | 
+  | col_group | nvarchar | 
+  | ref_filter | nvarchar | 
+  | tab_key | nvarchar | 
+  | CUR | 币别 | 基础档案 | archive | bs_currency | 50 | cur | 
+  | CUSGRP | 客户分类 | 基础档案 | archive | bs_customer_group | 50 | cusgrp | 
+  | DEPT | 部门 | 基础档案 | archive | bs_dept | 50 | dept | 
+  | EMP | 职员 | 基础档案 | archive | bs_emp | 50 | emp | 
+  | EQUIP | 设备 | 基础档案 | archive | bs_equip | 50 | equip | 
+  | ERPLG | ERP导入日志 | 基础档案 | archive | erp_imp_log | 50 | erplg | 
+  | FIN_ACC | 会计科目 | 基础档案 | archive | bd_account | 50 | fin_acc | 
+  | FIN_EXP | 费用类别 | 基础档案 | archive | bd_expense_type | 50 | fin_exp | 
+  | FIN_TAX | 税别资料 | 基础档案 | archive | bd_tax_type | 50 | fin_tax | 
+  | GFDA | 供应商 | 基础档案 | archive | dm_gf | 50 | gfda | 
+  | INV | 商品 | 基础档案 | archive | bs_inv | 25 | inv | 
+  | INV_PRICE | 存货价格本 | 基础档案 | archive | bs_inv_price | 50 | inv_price | 
+  | KHDA | 客户 | 基础档案 | archive | dm_kh | 25 | khda | 
+  | MATGRP | 商品分类 | 基础档案 | archive | bs_material_group | 50 | matgrp | 
+  | OP | 工序 | 基础档案 | archive | bs_op | 50 | op | 
+  | OP_TIME | 工序工时 | 基础档案 | archive | gxgs | 50 | op_time | 
+  | PARTNER | 往来单位 | 基础档案 | archive | bs_partner | 50 | partner | 
+  | PROD_ABN | 生产异常处理单 | 基础档案 | archive | bd_prod_abn | 50 | prod_abn | 
+  | PROD_LINE | 生产线 | 基础档案 | archive | bs_prod_line | 50 | prod_line | 
+  | PROJ | 项目 | 基础档案 | archive | bs_proj | 50 | proj | 
+  | QC_INSP_REQ | 来料检验要求 | 档案 | archive | qc_insp_req | 50 | items | 
+  | QC_INSP_REQ_SERIES | 来料检验要求(系列) | 基础档案 | archive | qc_insp_req_series | 100 | qc_insp_req_series | 
+  | QC_ITEM | 检验项目 | 基础档案 | archive | bs_qc_item | 50 | qc_item | 
+  | QC_PLAN | 检验方案 | 基础档案 | archive | bs_qc_plan | 50 | qc_plan | 
+  | RD_SHARE_FILE | 共享文件库 | 基础档案 | archive | yj_share_file | 20 | rd_share_file | 
+  | RD_SINTER_TOL | 烧结尺寸表 | 基础设置 | archive | rd_sinter_tolerance | 25 | items | 
+  | REGION | 地区 | 基础档案 | archive | bs_region | 50 | region | 
+  | REJECT | 不合格原因 | 基础档案 | archive | bs_reject | 50 | reject | 
+  | SETTLE | 结算方式 | 基础档案 | archive | bs_settle_type | 50 | settle | 
+  | SUPGRP | 供应商分类 | 基础档案 | archive | bs_supplier_group | 50 | supgrp | 
+  | TEAM | 班组 | 基础档案 | archive | bs_team | 50 | team | 
+  | UOM | 计量单位 | 基础档案 | archive | bs_uom | 50 | uom | 
+  | WC | 工作中心 | 基础档案 | archive | bs_wc | 25 | wc | 
+  | WH | 仓库 | 基础档案 | archive | bs_wh | 50 | wh | 
+  | WHLOC | 库位 | 基础档案 | archive | bs_wh_loc | 50 | locations | 
+  | ZDGL | 数据字典 | 基础档案 | archive | bs_dict | 25 | zdgl | 
+[OK] q-05-selfref.sql (8 batches)
