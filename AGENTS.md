@@ -83,11 +83,18 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 **送料暂收单 `QC_RECV`(来料暂收单)/ 来料检验单 `QC_INSP` / 暂收退回单 `QC_RETURN` /
 采购入库单 `PURCHASE_IN`** 的「字段名 · 显示名 · 顺序 · 参照源 · 可见性」。
 
-1. **拉取云端仓库更新后必看这一份**:每次 `tools/pull-sync.bat`(git pull + DbSync)或服务器
-   部署落地后,按该文档 **§8** 重跑三条取证命令并 `git diff` 本文档 ——
+1. **拉取云端仓库更新后必看这一份**:先跑一条命令的回归闸
+   `cd tools && java -cp lib\mssql-jdbc.jar verify\FourDocAudit.java HSDZ_MES`(测试账套传 `HSDZ_MES_TEST`)——
+   它逐面板比对现役 `yj_field` 与基线快照 `tools/fourdoc-baseline.tsv`,全 0 才 `[PASS]`;
+   `[FAIL]` 或 `DbSync` 重放过历史脚本后,再按该文档 **§8** 重跑取证并 `git diff` 本文档 ——
    **无 diff** = 四单字段与顺序未变,可放心;**有 diff** = 逐条确认是有意改动还是回归,
    有意则连同迁移脚本提交,意外则回退更新并排查。
+   ⚠ 2026-10-05 就是"整链重放 79 条历史脚本"把四单盖回上一代登记(参照源越界、QC_RECV 少 10 行、
+   隐藏列全被翻开),当时 §四 仍 12/12 ✅ —— **只有基线比对/文档 diff 抓得住**;回正脚本
+   `tools/migrate-fourdoc-baseline-restore-20261008.sql`(配套 `migrate-fourdoc-bloodline-cols-20261008.sql`
+   补回被链外操作弄丢的物理列),事故经过见两个脚本头部注释。
 2. **改动这四单任何字段的任务,先读该文档,改完必须回写**(重跑生成脚本,不得手改文档),
+   同批重跑 `node tools/archive/_gen-fourdoc-restore.mjs` 刷新 ①回正脚本 ②`tools/fourdoc-baseline.tsv`,
    并单独一个 commit;`§四 顺序核验汇总` 必须 12/12 全 ✅。
 3. 顺序口径(别凭印象推):
    - **表单页表头** = `place` 含 `header`,**或恰为 `query`** 的全部字段,按 `seq` 升序
