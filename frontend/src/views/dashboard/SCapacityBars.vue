@@ -211,7 +211,9 @@ onMounted(load)
 }
 .cap-plot {
   position: relative;
-  height: 190px;
+  /* 柱区 = 300 - 18(轴) - 78(标签带) - 4(gap) ≈ 200px;标签带加高是因为产线全量上图后
+     (2026-10-08:30 条启用产线)横向文字放不下,改**竖排**。 */
+  height: 300px;
   margin-top: 2px;
   padding-left: 40px;
   padding-bottom: 18px;
@@ -297,16 +299,27 @@ onMounted(load)
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
-  top: -14px;
+  bottom: 100%;
+  margin-bottom: 2px;
+  /* 竖排:产线全量上图后每组只有 ~27px 宽,横排数字(如「730万」)会互相压到一起 */
+  writing-mode: vertical-rl;
+  text-orientation: upright;
   font-size: 10px;
   font-weight: 600;
+  line-height: 1;
   color: var(--t-text-2);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   pointer-events: none;
 }
 .cap-name {
+  /* 88px ≈ 最长产线名「切炭1(老厂)」7 字 × 11px,留一点余量不截断 */
+  height: 88px;
+  /* 竖排中文:横向放不下 30 个产线名(每组 ~27px),竖排是唯一既不重叠又不截断的排法 */
+  writing-mode: vertical-rl;
+  text-orientation: upright;
   font-size: 11px;
+  line-height: 1;
   color: var(--t-text-2);
   text-align: center;
   overflow: hidden;

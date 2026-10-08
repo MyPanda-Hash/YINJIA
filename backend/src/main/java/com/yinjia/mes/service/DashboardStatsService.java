@@ -153,7 +153,8 @@ public class DashboardStatsService {
      *    否则切到周/月/年会一片空白(2026-10-08 实测正式库报工数据止于 2026-08-26);
      *  - 周期区间在 Java 侧用 java.time 推导(不写 DATEFIRST 依赖的 DATEPART(weekday)),
      *    月/年天数按自然日算(28~31 / 365~366),不做「×30」这类估算;
-     *  - 产线清单 = **产线档案**:启用(非 停用=是、非 asp_cancel=Y)且配了日产能(>0)的产线;
+     *  - 产线清单 = **产线档案里启用(非 停用=是、非 asp_cancel=Y)的全部产线**,不看是否配了日产能;
+     *    未配日产能的只画实际柱、上限留空(前端提示去档案维护)。
      *    档案加一行就多一组柱、停用/删除就少一组(用户 2026-10-08 口径:「产线要根据真实的产线里面的来,
      *    做到后续能新增产线,删除产线也能跟着变化」);报工表里的历史产线名(scjl 旧电镀线)不再补进清单。
      */
@@ -208,7 +209,7 @@ public class DashboardStatsService {
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT RTRIM(生产线) AS line, 日产能 FROM bs_prod_line"
                             + " WHERE ISNULL(停用,'N') <> '是' AND ISNULL(asp_cancel,'N') <> 'Y'"
-                            + " AND ISNULL(日产能,0) > 0 AND ISNULL(生产线,'') <> ''")) {
+                            + " AND ISNULL(生产线,'') <> '' ORDER BY 生产线")) {
                 limitByLine.put(String.valueOf(r.get("line")), toD(r.get("日产能")) * days);
             }
             List<Map<String, Object>> rows = new ArrayList<>();
@@ -218,15 +219,18 @@ public class DashboardStatsService {
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("name", e.getKey());
                 m.put("actual", Math.round(actual));
-                m.put("limit", Math.round(limit));
+                // 未配日产能(0/空)= 只画实际柱,上限留空 —— 与「停用」不是一回事:
+                // 停用是**不上图**,未配是**上图但没有比较基准**(前端提示去产线档案维护)
+                m.put("limit", limit > 0 ? Math.round(limit) : null);
                 m.put("pct", limit > 0 ? (int) Math.round(actual * 100.0 / limit) : null);
                 rows.add(m);
             }
-            // 产线清单**只由产线档案决定**(2026-10-08 用户口径:「产线要根据真实的产线里面的来,
-            // 后续能新增产线、删除产线也能跟着变化」)——
-            // 故不再把「有报工但档案里没有」的历史产线名补进来(scjl 里还有 挂镀_自动线/亮锡E线/
-            // 铜板线/雾锡A线 这类旧电镀线,掺进来会多出几根没有上限、也没人维护的柱子)。
-            // 档案侧新增一行(且配了日产能)= 图上多一组柱;停用(停用=是)或删除(asp_cancel=Y)= 立即消失。
+            // 产线清单**只由产线档案决定**(2026-10-08 用户口径:「所有产线都要能有图表显示,
+            // 根据生产线里面的产线的是否停用来决定柱状图是否显示,后续新加入的产线也能适配,
+            // 删除的产线也能适配去掉」)——
+            //   · 档案里**启用**(非 停用=是、非 asp_cancel=Y)的产线**全部上图**,含未配日产能的;
+            //   · 报工表里的历史产线名(scjl 的旧电镀线:挂镀_自动线/亮锡E线/铜板线/雾锡A线)不掺进来;
+            //   · 新增一行 = 多一组柱;置 停用=是 或删除 = 立即消失。
             out.put("rows", rows);
         } catch (Exception ex) {
             out.put("rows", List.of());

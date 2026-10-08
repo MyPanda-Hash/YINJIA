@@ -46,6 +46,23 @@ async function main() {
   if (!login) throw new Error('登录失败(等了 60s,后端未就绪?)')
   console.log(`[login] ok admin=${login.data.user.isAdmin}`)
 
+  // 期望清单 = 产线档案(PROD_LINE 面板)里**启用**的行 —— 用户口径(2026-10-08):
+  // 「所有产线都要能有图表显示,根据生产线里面的产线的是否停用来决定柱状图是否显示」。
+  // 从档案接口取期望值而不是写死条数:以后新增/停用产线,这条断言不用改也继续成立。
+  const archRes = await fetch(`${API}/api/px/queryFormDataList`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${login.data.token}` },
+    body: JSON.stringify({ panelCode: 'PROD_LINE', condition: {}, pageNo: 1, pageSize: 500 }),
+  })
+  const archBody = await archRes.json()
+  // 档案式面板(archive)= 单单据 + 明细行:真实产线清单在 list[0].detail.items 里,不是 list 本身
+  const archItems = archBody?.data?.list?.[0]?.detail?.items || []
+  const expectedLines = archItems
+    .filter((r) => String(r['停用'] ?? '') !== '是')
+    .map((r) => String(r['生产线'] ?? '').trim())
+    .filter(Boolean)
+  console.log(`[archive] 产线档案启用 ${expectedLines.length} 条 / 明细 ${archItems.length} 行`)
+
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yj-edge-cap-'))
   const edge = spawn(EDGE, [
     '--headless=new', '--disable-gpu', '--no-first-run', '--no-default-browser-check',
@@ -217,6 +234,20 @@ localStorage.setItem('mes_login_date', '2026-10-08'); 'ok'`)
     check('产线名未被截断', layout.clippedNames === 0, `截断 ${layout.clippedNames} 个`)
     check('页面无横向滚动', layout.hScroll <= 1, `scrollWidth-clientWidth=${layout.hScroll}`)
     check('卡片内容未被裁切', layout.cardClipped <= 1, `scrollHeight-clientHeight=${layout.cardClipped}`)
+
+    // ① 图上的产线必须与产线档案**启用行**一一对应(多一条、少一条都算失败)
+    const shown = day.groups.map((g) => String(g.name || '').trim())
+    const miss = expectedLines.filter((n) => !shown.includes(n))
+    const extra = shown.filter((n) => !expectedLines.includes(n))
+    check(
+      '图上产线 == 产线档案启用行(逐一对应)',
+      miss.length === 0 && extra.length === 0,
+      `档案 ${expectedLines.length} / 图上 ${shown.length};缺[${miss.join(',')}] 多[${extra.join(',')}]`,
+    )
+    // ② 未配日产能的产线也要上图(只是没有上限柱)
+    const noLimit = day.groups.filter((g) => g.title && g.title.includes('未配'))
+    check('未配日产能的产线也上图(上限留空)', noLimit.length > 0, `${noLimit.length} 条未配: ${noLimit.slice(0, 3).map((g) => g.name).join(',')}`)
+    check('未配上限的行不参与达成率配色(灰)', day.groups.filter((g) => g.title.includes('未配')).every((g) => g.tone === 'tone-na'))
     await shot('capacity-bars-day.png')
 
     // 切周产能
