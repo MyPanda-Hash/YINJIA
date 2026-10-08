@@ -1,0 +1,14 @@
+_probe-report-rollout-sample.sql
+check-migrations.sql
+deploy-all.sql
+dump-schema-log.sql
+dump-server-views.sql
+fix-db-logins.sql
+migrate-golive-cleanup.sql
+migrate-inv-inspection-default-no.sql
+migrate-rd-cleanup.sql
+migrate-table-comments.sql
+migrate-testdata-cleanup.sql
+restore-from-backup.sql
+restore-local-bak.sql
+seed-demo-prodfile.sql
