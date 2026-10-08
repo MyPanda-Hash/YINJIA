@@ -26,6 +26,8 @@
 --   以及 H1-1/2/3/4…H11-*)—— 这些是**纯顺序号或两段式**,没有「区码-排-位」语法,不能按本例推导。
 --
 -- 【幂等】仓库按编码判存在;仓位按编码 NOT EXISTS;地址刷写是确定性赋值。可重复执行。
+--   ⚠ 2026-10-08 修:「§3 地址统一」原式对 存储分区 不是 NULL 安全,首次应用不暴露、**重跑必炸**
+--     (zone-logic 清空 B/C 仓存储分区之后)。已按 ISNULL 修好,详见 §3 头上注释;两账套已重跑验证。
 -- 【执行】两个账套都要跑(先正式 HSDZ_MES、后测试 HSDZ_MES_TEST)。
 SET NOCOUNT ON;
 IF DB_NAME() = N'master' USE HSDZ_MES;
@@ -591,13 +593,19 @@ INSERT INTO @loc (仓库编码, 仓库名称, 厂区, 存储分区, 区码, 排�
   (N'CP-02',N'成品B仓',N'老厂区',N'成品区',N'B4',N'24',N'2',NULL,N'B4-24-2');
 
 DECLARE @ins int;
-INSERT INTO dbo.bs_wh_loc (仓库, 仓库编码, 仓位编码, 仓位地址, 厂区, 区码, 存储分区, 排号, 位号, 层号,
+-- ⚠ 2026-10-08 修(同 §3 的演练发现):目标列清单里的 `厂区` 已摘掉 —— 本脚本写完后,
+--   migrate-whloc-zone-logic 会 `ALTER TABLE bs_wh_loc DROP COLUMN [厂区]`(用户口径「厂区应该
+--   在仓库表而不是仓位表」),列一旦没了,这条 INSERT 就是**编译期**错误(Invalid column name '厂区'),
+--   整脚本在任何重跑路径上必挂。首次应用不受影响(那时列还在);厂区 归 bs_wh 承载,
+--   7~8 之间无人读 bs_wh_loc.厂区 ⇒ 摘掉后首次应用的最终态一字不变(该列随后被 DROP)。
+--   注:migrate-whloc-area-a-raw 有同样的列引用,但它开头会「缺则补建 厂区」自愈,故不动它。
+INSERT INTO dbo.bs_wh_loc (仓库, 仓库编码, 仓位编码, 仓位地址, 区码, 存储分区, 排号, 位号, 层号,
                            停用, asp_user1, asp_time1, asp_cancel)
 SELECT l.仓库名称, l.仓库编码, l.仓位编码,
        l.存储分区 + l.区码 + N'-' + l.排号 + N'排' + l.位号 + N'位'
          + ISNULL(l.层号 + N'层', N'')                  -- 地址=存储分区+区码-排+排+位+位[+层+层];无层则不加
          ,
-       l.厂区, l.区码, l.存储分区, l.排号, l.位号, l.层号, 0, N'migration', SYSDATETIME(), N'N'
+       l.区码, l.存储分区, l.排号, l.位号, l.层号, 0, N'migration', SYSDATETIME(), N'N'
 FROM @loc l
 WHERE NOT EXISTS (SELECT 1 FROM dbo.bs_wh_loc x
                   WHERE x.仓位编码 = l.仓位编码 AND ISNULL(x.asp_cancel,'N') <> 'Y');
@@ -605,9 +613,17 @@ SET @ins = @@ROWCOUNT;
 PRINT N'  ✓ 新增仓位 ' + CAST(@ins AS nvarchar(10)) + N' 行';
 
 -- ══════════ 3. 仓位地址统一口径(含上一批 156 行,一次性刷成同一写法) ══════════
+-- ⚠ 2026-10-08 修(由「包内脚本强制重跑」演练暴露):原式写作 `存储分区 + 区码 + …`,而 WHERE 只守了
+--   区码/排号/位号 —— 存储分区 为 NULL 时 T-SQL 的 `+` 会把整段算成 NULL ⇒ 撞 bs_wh_loc.仓位地址 的
+--   NOT NULL,整条 UPDATE 失败(HSDZ_MES_TEST 实测:Cannot insert the value NULL into column '仓位地址')。
+--   本脚本自己插入的 522 行都带存储分区,所以**首次应用不会暴露**;但后续 migrate-whloc-zone-logic
+--   会把 B仓/C仓 的存储分区清空(用户口径「B/C 仓不再分区」),此后任何一次重跑(字节变更被 DbSync
+--   判为重跑、或部署 GO 重试)都会在这里炸。
+--   修法:与 zone-logic/newplant 的 NULL 安全公式对齐 —— 存储分区 一律 ISNULL(…,N'')。
+--   (存储分区为空时地址退化为「区码-排排位位」,与 zone-logic 重算的结果一字不差,故最终态不变。)
 DECLARE @upd int;
 UPDATE dbo.bs_wh_loc SET
-  仓位地址 = 存储分区 + 区码 + N'-' + 排号 + N'排' + 位号 + N'位' + ISNULL(层号 + N'层', N'')
+  仓位地址 = ISNULL(存储分区,N'') + 区码 + N'-' + 排号 + N'排' + 位号 + N'位' + ISNULL(层号 + N'层', N'')
 WHERE ISNULL(asp_cancel,'N') <> 'Y'
   AND ISNULL(区码,N'') <> N'' AND ISNULL(排号,N'') <> N'' AND ISNULL(位号,N'') <> N'';
 SET @upd = @@ROWCOUNT;
@@ -625,14 +641,17 @@ UNION ALL SELECT N'  辅料及配件区A仓 CK-A2(应 103)', CAST(COUNT(*) AS nv
 UNION ALL SELECT N'  成品D仓 CK-D(应 168)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE 仓库编码=N'CK-D' AND ISNULL(asp_cancel,'N')<>'Y'
 UNION ALL SELECT N'仓位编码重复组(应 0)', CAST(COUNT(*) AS nvarchar(10)) FROM (
     SELECT 仓位编码 FROM dbo.bs_wh_loc WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY 仓位编码 HAVING COUNT(*)>1) d
-UNION ALL SELECT N'坐标列有空(应 0)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc
-    WHERE ISNULL(asp_cancel,'N')<>'Y' AND (ISNULL(区码,N'')=N'' OR ISNULL(存储分区,N'')=N'' OR ISNULL(排号,N'')=N'' OR ISNULL(位号,N'')=N'')
+UNION ALL SELECT N'坐标列有空(应 0;存储分区 可空,后由 zone-logic 清 B/C 仓)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc
+    WHERE ISNULL(asp_cancel,'N')<>'Y' AND (ISNULL(区码,N'')=N'' OR ISNULL(排号,N'')=N'' OR ISNULL(位号,N'')=N'')
 UNION ALL SELECT N'仓位地址仍为空(应 0)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(仓位地址,N'')=N'';
 GO
 PRINT N'=== 各仓/分区计数 ===';
-SELECT 仓库编码, 仓库, 厂区, 存储分区, COUNT(*) AS 仓位数
+-- ⚠ 2026-10-08:本报表原来还选 `厂区` —— 同 §2/§3 的原因,该列在 zone-logic 之后不复存在,
+--   重跑到这里会报 Invalid column name。改走「不用 厂区」的等价计数(厂区 属仓库表,
+--   由 zone-logic 之后建好的 bs_wh.厂区 承载;此处报表只需仓/分区维度即可核对)。
+SELECT 仓库编码, 仓库, 存储分区, COUNT(*) AS 仓位数
 FROM dbo.bs_wh_loc WHERE ISNULL(asp_cancel,'N')<>'Y'
-GROUP BY 仓库编码, 仓库, 厂区, 存储分区 ORDER BY 仓库编码, 存储分区;
+GROUP BY 仓库编码, 仓库, 存储分区 ORDER BY 仓库编码, 存储分区;
 GO
 PRINT N'migrate-whloc-rest-20261008 完成';
 GO
