@@ -3051,6 +3051,22 @@ export default {
     '产出/日产能上限': 'output / daily capacity limit',
     '未配日产能上限，请在产线档案维护': 'No daily capacity limit set — maintain it in the production line archive',
 
+    // 产能对比·周期切换与竖向双柱(2026-10-08:日/周/月/年 tab + 实际 vs 上限)
+    '产能对比': 'Capacity vs limit',
+    '产能统计周期': 'Capacity period',
+    '周产能': 'Weekly capacity',
+    '月产能': 'Monthly capacity',
+    '年产能': 'Yearly capacity',
+    '实际产出': 'Actual output',
+    '产能上限': 'Capacity limit',
+    '数据区间': 'Range',
+    '上限 = 日产能 ×': 'Limit = daily capacity ×',
+    '上限 = 日产能 × 当月自然日': 'Limit = daily capacity × calendar days of the month',
+    '天': 'days',
+    '加载中': 'Loading',
+    '加载失败': 'Failed to load',
+    '重试': 'Retry',
+
     // 档案面板保存误删护栏(2026-10-03:商品面板带筛选保存一次软删 3873 行)
     '当前列表带筛选，本次保存只更新已加载的行，未显示的行不会被删除':
       'The list is filtered — this save updates the loaded rows only; rows not shown will not be deleted',

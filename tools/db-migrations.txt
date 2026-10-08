@@ -2151,7 +2151,13 @@ migrate-pu-label-supplement-print.sql
 #   同步器侧同口径改造(cfInspection:取不到「是」即写「否」,见 deploy/sync-core.mjs)。
 #   执行前:bs_inv 3874 行(金蝶同步 3852 + 本地手录 22),是 9 / 空 3865 / 其它 0。
 #   幂等,两账套均执行。 ——
-migrate-inv-inspection-default-no.sql
+# ↑ migrate-inv-inspection-default-no.sql 已于 2026-10-08 移出清单并归档 tools/archive/ ——
+#   原因:它写的物理列「来料检验」2026-09-28 已改名「是否来料检验」,而改名后的这一列是**计算列**
+#   (migrate-po-inbound-fields.sql:20 由「检验方式」派生)⇒ 不可 UPDATE、不可挂 DEFAULT,值恒为
+#   是/否、永不为 NULL,本脚本要治的「空值」不可能出现。实测 DbSync 在该脚本上连报两次失败
+#   (列名无效 → 不能修改计算列)并中止整条链;陈旧的登记必须退场,别留在链上冒充「真跑过」。
+#   原文与证据见 git 历史及 tools/archive/migrate-inv-inspection-default-no.sql。
+#   遗留(不阻塞):服务器侧若仍为旧结构,按《部署说明》全量恢复路线会被本地库覆盖。
 
 # —— 2026-10-04 特采改由「暂收退料单」发起(检验 → 退料单 → 特采单 → 采购入库) ——
 #   用户口径:①来料检验单明细的「特采」字段下线;②「特采」改到暂收退料单 —— **明细行的 bool 字段
