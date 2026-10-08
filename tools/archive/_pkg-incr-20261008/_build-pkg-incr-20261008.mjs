@@ -99,16 +99,29 @@ const stillActive = manifest8.split('\n').map((l) => l.trim()).filter((t) => t &
 console.log(`  · 变体 to-run-${TAG}-whloc-only.txt(${WHLOC_ONLY.length} 条) + tools/db-migrations-whloc8.txt(清单 ${stillActive.length} 条,四单 ${FOURDOC.length} 条已注掉)`);
 
 // bat:把仓库版里的旧 to-run 名/条数描述改写为本次(GO 流程本身不变)
+// ⚠ 2026-10-08 修(服务器实测踩到,两个都是我打包器造的):
+//   ① 行尾必须 **CRLF**:仓库里 deploy/*.bat 在工作区是纯 LF(0 CRLF/256 LF),而 cmd 读纯 LF 的批处理
+//      会逐行撕碎 —— 服务器上表现为 `'Extensions' 不是内部或外部命令`、`'et' …`、`'ckage' …` 一串乱报,
+//      并最终误报 RESULT: FAIL-NO-SQLCMD。10-07 包内那份是 CRLF 才没事(打包时被归一过),我这次没归一。
+//   ② 内容必须 **纯 ASCII**:我第一版把「11 新增 + 0 哈希重跑」这种中文替换进了 bat —— zh-CN 的 cmd
+//      按 GBK 解析,UTF-8 中文会吞掉后随的 \r 造成错行(AGENTS.md / 部署说明 §七.5 ① 的红线)。
+//      故描述一律用 ASCII;并在此加硬闸,任何非 ASCII 字节直接让打包失败。
+const toCrlf = (s) => s.replace(/\r\n/g, '\n').replace(/\n/g, '\r\n');
 const subBat = (src, dst, desc) => {
   let t = readFileSync(join(DEPLOY, src), 'utf8');
   const before = t;
   t = t.replaceAll('to-run-20261004.txt', `to-run-${TAG}.txt`).replaceAll('to-run-20261007.txt', `to-run-${TAG}.txt`);
   t = t.replace(/force-run to-run list \((\d+) entries:[^)]*\)/, `force-run to-run list (${toRun.length} entries: ${desc})`);
   if (t === before) throw new Error(`${src}: 没有发生替换,to-run 名可能已变,请人工检查`);
+  t = toCrlf(t);
+  const bad = [...t].filter((c) => c.charCodeAt(0) > 0x7e || (c.charCodeAt(0) < 0x20 && c !== '\r' && c !== '\n'));
+  if (bad.length) throw new Error(`${dst}: 含 ${bad.length} 个非 ASCII 字节(${[...new Set(bad)].slice(0, 8).join(' ')}) —— .bat 必须纯 ASCII,否则 cmd 会撕碎`);
+  if (!/\r\n/.test(t) || /(?<!\r)\n/.test(t)) throw new Error(`${dst}: 仍有裸 LF,行尾未归一`);
   writeFileSync(join(PKG, dst), t);
+  console.log(`  · ${dst}: CRLF 归一 + 纯 ASCII 校验通过(${t.split('\r\n').length - 1} 行)`);
 };
-subBat('deploy-incremental.bat', 'deploy-incremental.bat', `${toRun.length} 新增 + 0 哈希重跑 + 0 虚账补跑`);
-subBat('apply-migrations.bat', 'apply-migrations.bat', `${toRun.length} 新增`);
+subBat('deploy-incremental.bat', 'deploy-incremental.bat', `${toRun.length} new + 0 hash rerun + 0 ledger backfill`);
+subBat('apply-migrations.bat', 'apply-migrations.bat', `${toRun.length} new`);
 
 copyFileSync(STEPS_SRC, join(PKG, 'steps.md'));
 if (!existsSync(join(PKG, 'steps.md'))) throw new Error('steps.md 未能拷入包内');
