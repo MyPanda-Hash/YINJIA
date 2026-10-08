@@ -153,7 +153,9 @@ public class DashboardStatsService {
      *    否则切到周/月/年会一片空白(2026-10-08 实测正式库报工数据止于 2026-08-26);
      *  - 周期区间在 Java 侧用 java.time 推导(不写 DATEFIRST 依赖的 DATEPART(weekday)),
      *    月/年天数按自然日算(28~31 / 365~366),不做「×30」这类估算;
-     *  - 未配日产能(0/空)的产线不出行;有报工但未配上限的也露面(limit=null,前端提示去配)。
+     *  - 产线清单 = **产线档案**:启用(非 停用=是、非 asp_cancel=Y)且配了日产能(>0)的产线;
+     *    档案加一行就多一组柱、停用/删除就少一组(用户 2026-10-08 口径:「产线要根据真实的产线里面的来,
+     *    做到后续能新增产线,删除产线也能跟着变化」);报工表里的历史产线名(scjl 旧电镀线)不再补进清单。
      */
     public Map<String, Object> capacity(String period) {
         String p = (period == null) ? "day" : period.trim().toLowerCase();
@@ -220,16 +222,11 @@ public class DashboardStatsService {
                 m.put("pct", limit > 0 ? (int) Math.round(actual * 100.0 / limit) : null);
                 rows.add(m);
             }
-            // 有报工但未配上限的产线也露面(limit=null,前端提示去配)
-            for (Map.Entry<String, Double> e : actualByLine.entrySet()) {
-                if (limitByLine.containsKey(e.getKey())) continue;
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("name", e.getKey());
-                m.put("actual", Math.round(e.getValue()));
-                m.put("limit", null);
-                m.put("pct", null);
-                rows.add(m);
-            }
+            // 产线清单**只由产线档案决定**(2026-10-08 用户口径:「产线要根据真实的产线里面的来,
+            // 后续能新增产线、删除产线也能跟着变化」)——
+            // 故不再把「有报工但档案里没有」的历史产线名补进来(scjl 里还有 挂镀_自动线/亮锡E线/
+            // 铜板线/雾锡A线 这类旧电镀线,掺进来会多出几根没有上限、也没人维护的柱子)。
+            // 档案侧新增一行(且配了日产能)= 图上多一组柱;停用(停用=是)或删除(asp_cancel=Y)= 立即消失。
             out.put("rows", rows);
         } catch (Exception ex) {
             out.put("rows", List.of());
