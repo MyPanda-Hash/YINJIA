@@ -2255,3 +2255,11 @@ migrate-drop-bom-panels.sql
 #   ⚠ 顺序:先 series 后 drop。两账套都执行。
 migrate-qc-insp-req-series.sql
 migrate-qc-insp-req-drop-custom-tab.sql
+
+# ── 2026-10-08 测试库字段对齐正式库(以《采购链四单字段与显示字段.md》为基线) ──
+#   取证:DbSchemaDiff → DIFF-22(bs_line_capacity 缺备用1-20、bl_sale_out.仓库 宽度、缺视图 v_manu_schedule、
+#         yj_field 多 10 行);_YjFieldAlign(ALL) → DIFF-244(多 10 / 改 234,四单 seq 顺序为主 + 27 行 hidden/visible)。
+#   做法:补齐列/视图 + 删测试库多出的 yj_field 行 + 按正式库取值 UPDATE;全部带守卫,正式库上为 no-op。
+migrate-align-ledger-fields-20261008.sql
+#   第二轮(同上对齐,补「同字段多行」盲区漏掉的 4 处:两处 seq、一处 hidden/visible、一处重复行;见脚本头)
+migrate-align-ledger-fields2-20261008.sql
