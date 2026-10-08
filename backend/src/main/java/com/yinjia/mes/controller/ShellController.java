@@ -169,4 +169,17 @@ public class ShellController {
         // 各模块图表数据(生产/库存/销售/质量/研发)由 service 一次返回,Controller 只转发。
         return ApiResult.ok(dashboardStats.stats());
     }
+
+    /**
+     * 产能对比(2026-10-08):桌面「产能对比」卡片按产线做竖向双柱(实际 vs 上限)。
+     * 单独一个端点而不是塞进 /dashboard/stats —— 切 tab 只重算这一块,
+     * 不用把整桌面的 KPI/库存/研发聚合全部重跑一遍。
+     *
+     * @param period day|week|month|year(缺省/非法值按 day 处理,见 DashboardStatsService.capacity)
+     */
+    @GetMapping("/dashboard/capacity")
+    public ApiResult<Map<String, Object>> dashboardCapacity(
+            @RequestParam(name = "period", defaultValue = "day") String period) {
+        return ApiResult.ok(dashboardStats.capacity(period));
+    }
 }

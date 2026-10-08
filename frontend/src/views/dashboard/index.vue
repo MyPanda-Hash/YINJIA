@@ -308,8 +308,10 @@
           <div class="chart-box"><SBars :data="prod.stageRates" :colors="['#116a5b', '#3b8978', '#d79a2b', '#b94d3f', '#537786']" /></div>
         </div>
         <div class="card col-8">
-          <div class="card-title">{{ tt('单天产能对比') }}<span class="chart-sub">{{ capacityDateSub }}</span></div>
-          <div class="chart-box"><SCapacity :rows="capacityRows" /></div>
+          <!-- 产能对比:周期(日/周/月/年)切换与竖向双柱都在组件内,标题只写卡片名 ——
+               数据区间与上限折算口径由组件按当前周期自己标(2026-10-08) -->
+          <div class="card-title">{{ tt('产能对比') }}</div>
+          <div class="chart-box"><SCapacityBars /></div>
         </div>
       </div>
     </template>
@@ -481,7 +483,7 @@ import { ElNotification, ElMessage } from 'element-plus'
 import SBars from './SBars.vue'
 import SDonut from './SDonut.vue'
 import SLine from './SLine.vue'
-import SCapacity from './SCapacity.vue'
+import SCapacityBars from './SCapacityBars.vue'
 import RecordSheetPanels from '@core/views/RecordSheetPanels.vue'
 import { recordSheetConfigs } from '@core/views/recordSheetConfigs'
 import { pickQuickEntries } from '@core/dashboard/deskQuick'
@@ -734,12 +736,8 @@ const progress = computed(() => stats.value.progress || [])
 
 // ---------- 生产数据 ----------
 const prod = computed(() => stats.value.production || {})
-// 单天产能比(2026-09-28):产出/日产能上限;标题标注数据日期(今天无报工时回看最近有报工日)
-const capacityRows = computed(() => prod.value.capacityToday || [])
-const capacityDateSub = computed(() => {
-  const d = (capacityRows.value[0] || {}).date
-  return d ? `${tt('数据日期')} ${d} · ${tt('产出/日产能上限')}` : tt('产出/日产能上限')
-})
+// 产能对比(2026-10-08 起)自带周期 tab 与取数,见 SCapacityBars.vue / @core/dashboard/capacityBars;
+// 此处不再从 /dashboard/stats 取 capacityToday(该键与「单天产能子弹条」一并退场)。
 
 // ---------- 库存数据 ----------
 const stock = computed(() => stats.value.stock || {})

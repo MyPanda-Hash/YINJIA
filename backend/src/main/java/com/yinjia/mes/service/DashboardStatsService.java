@@ -133,45 +133,73 @@ public class DashboardStatsService {
                     + " WHERE ISNULL(scx,'') <> '' GROUP BY scx ORDER BY COUNT(*) DESC"));
             prod.put("trend7", dateTrend("plang", "pl_date", "cp_date"));
             prod.put("stageRates", stageRates());
-            prod.put("capacityToday", capacityToday());
             prod.put("bomTree", List.of());
         } catch (Exception e) {
             prod.put("statusDist", List.of());
             prod.put("workshopDist", List.of());
             prod.put("trend7", List.of());
             prod.put("stageRates", List.of());
-            prod.put("capacityToday", List.of());
             prod.put("bomTree", List.of());
         }
         return prod;
     }
 
     /**
-     * 单天产能比(2026-09-28 用户需求:产线当日产能 ÷ 产能上限的直观对照):
-     *  - 上限 = bs_prod_line.日产能(PROD_LINE 面板可维护,按 生产线 名称关联);
-     *  - 产出 = scjl 当日报工 SUM(sl) 按 scxmc(产线名)分组,ISNULL(delmark,0)=0;
-     *  - 日期口径 = 今天;今天无报工则回看最近一个有报工的日期(date 字段随行下发,
-     *    标题展示数据日期 —— 节后首日/演示库不会一片空白);
-     *  - 未配日产能(0/空)的产线不出行(无基准的比较没有意义,配了就出现)。
+     * 产能对比(2026-10-08 用户需求:日产能对比可以切周/月/年,按产线做竖向双柱对比):
+     *  - 上限 = bs_prod_line.日产能 × 周期天数(PROD_LINE 面板可维护;周=7、月=当月自然日、年=年自然日);
+     *  - 产出 = scjl 周期内报工 SUM(sl) 按 scxmc(产线名)分组,ISNULL(delmark,0)=0;
+     *  - 周期口径 = **最近有报工的那个周期**:锚点日取今天(今天有报工)否则最近一个有报工日,
+     *    再取该日所在的自然周(周一起)/自然月/自然年。与既有「日」的回看口径一致 ——
+     *    否则切到周/月/年会一片空白(2026-10-08 实测正式库报工数据止于 2026-08-26);
+     *  - 周期区间在 Java 侧用 java.time 推导(不写 DATEFIRST 依赖的 DATEPART(weekday)),
+     *    月/年天数按自然日算(28~31 / 365~366),不做「×30」这类估算;
+     *  - 未配日产能(0/空)的产线不出行;有报工但未配上限的也露面(limit=null,前端提示去配)。
      */
-    private List<Map<String, Object>> capacityToday() {
+    public Map<String, Object> capacity(String period) {
+        String p = (period == null) ? "day" : period.trim().toLowerCase();
+        if (!List.of("day", "week", "month", "year").contains(p)) p = "day";
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("period", p);
         try {
-            // 取数据日期:今天有报工用今天,否则最近有报工的一天
-            String day = jdbc.queryForObject(
+            // 锚点日:今天有报工用今天,否则最近一个有报工的一天
+            String anchorStr = jdbc.queryForObject(
                     "SELECT CONVERT(varchar(10), MAX(CASE WHEN CONVERT(date, sc_date) = CONVERT(date, GETDATE()) THEN sc_date END), 23)"
                             + " FROM scjl WHERE ISNULL(delmark,0)=0", String.class);
-            if (day == null) {
+            if (anchorStr == null || anchorStr.isBlank()) {
                 List<Map<String, Object>> last = jdbc.queryForList(
                         "SELECT TOP 1 CONVERT(varchar(10), sc_date, 23) AS d FROM scjl"
                                 + " WHERE ISNULL(delmark,0)=0 AND sc_date IS NOT NULL ORDER BY sc_date DESC");
-                if (last.isEmpty()) return List.of();
-                day = String.valueOf(last.get(0).get("d"));
+                if (!last.isEmpty()) anchorStr = String.valueOf(last.get(0).get("d"));
             }
+            if (anchorStr == null || anchorStr.isBlank()) {
+                out.put("rows", List.of());
+                return out;
+            }
+            LocalDate anchor = LocalDate.parse(anchorStr);
+            LocalDate from = switch (p) {
+                case "week" -> anchor.minusDays(anchor.getDayOfWeek().getValue() - 1L); // 周一起
+                case "month" -> anchor.withDayOfMonth(1);
+                case "year" -> anchor.withDayOfYear(1);
+                default -> anchor;
+            };
+            int days = (int) java.time.temporal.ChronoUnit.DAYS.between(from, switch (p) {
+                case "week" -> from.plusWeeks(1);
+                case "month" -> from.plusMonths(1);
+                case "year" -> from.plusYears(1);
+                default -> from.plusDays(1);
+            });
+            String fromStr = from.format(DateTimeFormatter.ISO_LOCAL_DATE);
+            String toStr = from.plusDays(days - 1L).format(DateTimeFormatter.ISO_LOCAL_DATE);
+            out.put("from", fromStr);
+            out.put("to", toStr);
+            out.put("days", days);
+            out.put("anchor", anchorStr);
+
             Map<String, Double> actualByLine = new LinkedHashMap<>();
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT RTRIM(scxmc) AS line, SUM(ISNULL(sl,0)) AS q FROM scjl"
-                            + " WHERE ISNULL(delmark,0)=0 AND CONVERT(varchar(10), sc_date, 23) = ?"
-                            + " AND ISNULL(scxmc,'') <> '' GROUP BY RTRIM(scxmc)", day)) {
+                            + " WHERE ISNULL(delmark,0)=0 AND sc_date >= ? AND sc_date < DATEADD(day, 1, ?)"
+                            + " AND ISNULL(scxmc,'') <> '' GROUP BY RTRIM(scxmc)", fromStr, toStr)) {
                 actualByLine.put(String.valueOf(r.get("line")), toD(r.get("q")));
             }
             Map<String, Double> limitByLine = new LinkedHashMap<>();
@@ -179,9 +207,9 @@ public class DashboardStatsService {
                     "SELECT RTRIM(生产线) AS line, 日产能 FROM bs_prod_line"
                             + " WHERE ISNULL(停用,'N') <> '是' AND ISNULL(asp_cancel,'N') <> 'Y'"
                             + " AND ISNULL(日产能,0) > 0 AND ISNULL(生产线,'') <> ''")) {
-                limitByLine.put(String.valueOf(r.get("line")), toD(r.get("日产能")));
+                limitByLine.put(String.valueOf(r.get("line")), toD(r.get("日产能")) * days);
             }
-            List<Map<String, Object>> out = new ArrayList<>();
+            List<Map<String, Object>> rows = new ArrayList<>();
             for (Map.Entry<String, Double> e : limitByLine.entrySet()) {
                 double actual = actualByLine.getOrDefault(e.getKey(), 0.0);
                 double limit = e.getValue();
@@ -189,9 +217,8 @@ public class DashboardStatsService {
                 m.put("name", e.getKey());
                 m.put("actual", Math.round(actual));
                 m.put("limit", Math.round(limit));
-                m.put("pct", (int) Math.round(actual * 100.0 / limit));
-                m.put("date", day);
-                out.add(m);
+                m.put("pct", limit > 0 ? (int) Math.round(actual * 100.0 / limit) : null);
+                rows.add(m);
             }
             // 有报工但未配上限的产线也露面(limit=null,前端提示去配)
             for (Map.Entry<String, Double> e : actualByLine.entrySet()) {
@@ -201,13 +228,13 @@ public class DashboardStatsService {
                 m.put("actual", Math.round(e.getValue()));
                 m.put("limit", null);
                 m.put("pct", null);
-                m.put("date", day);
-                out.add(m);
+                rows.add(m);
             }
-            return out;
+            out.put("rows", rows);
         } catch (Exception ex) {
-            return List.of();
+            out.put("rows", List.of());
         }
+        return out;
     }
 
     private static double toD(Object v) {
