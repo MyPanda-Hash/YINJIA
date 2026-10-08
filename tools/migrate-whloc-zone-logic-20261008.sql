@@ -109,9 +109,12 @@ UPDATE dbo.bs_wh_loc SET 大区=NULL, 存储分区=NULL
 WHERE 仓库编码 IN (N'CP-02', N'CK-C') AND ISNULL(asp_cancel,'N')<>'Y';
 SET @n3 = @@ROWCOUNT;
 
--- 4.4 D仓:底下分区为 成品仓区/原料区/辅料及配料区;现存的是成品 ⇒ 大区=成品仓区,存储分区清空
+-- 4.4 D仓:底下分区为 成品仓区/原料区/辅料及配件区。本脚本执行时 D仓 只有成品仓位 ⇒ 大区=成品仓区,存储分区清空。
+-- ⚠ **必须只圈成品仓位**(编码形如 D1-01-1 / D11-08-2,即 D+数字 开头),不能写成 `WHERE 仓库编码=N'CK-D'` 全表刷 ——
+--   否则后续批次补进的 原料区/辅料及配件区 会被一并刷掉。2026-10-08 实测就踩到了:
+--   DbSync 因本脚本字节变更重跑一次,把已补的 504(原料区)+118(辅料及配件区) 行 大区 全刷成了 成品仓区。
 UPDATE dbo.bs_wh_loc SET 大区=N'成品仓区', 存储分区=NULL
-WHERE 仓库编码=N'CK-D' AND ISNULL(asp_cancel,'N')<>'Y';
+WHERE 仓库编码=N'CK-D' AND 仓位编码 LIKE N'D[0-9]%-%' AND ISNULL(asp_cancel,'N')<>'Y';
 SET @n4 = @@ROWCOUNT;
 
 PRINT N'  ✓ 大区回填:原料区 ' + CAST(@n1 AS nvarchar(10)) + N' 行 / 辅料及配件区 ' + CAST(@n2 AS nvarchar(10))
@@ -129,10 +132,21 @@ WHERE ISNULL(l.asp_cancel,'N')<>'Y' AND w.仓库名称 IS NOT NULL
   AND ISNULL(l.仓库,N'') <> ISNULL(w.仓库名称,N'');
 SET @n5b = @@ROWCOUNT;
 
+-- ⚠ 地址公式必须 NULL 安全:新厂区那批「只有序号、没有排」的仓位 排号 为 NULL,
+--   而 T-SQL 的 `+` 遇 NULL 会把整条结果算成 NULL ⇒ 地址会整批变空。故 排号 段改成 CASE 显式判断。
 UPDATE dbo.bs_wh_loc SET
-  仓位地址 = ISNULL(大区,N'') + ISNULL(存储分区,N'') + 区码 + N'-' + 排号 + N'排' + 位号 + N'位' + ISNULL(层号 + N'层', N'')
+  仓位地址 = ISNULL(大区,N'') + ISNULL(存储分区,N'')
+             -- 区码 与 存储分区 同义时(如 纸箱区/纸箱区、网套布区/网套&布区)不重复写一遍
+             + CASE WHEN REPLACE(ISNULL(区码,N''),N'&','') <> REPLACE(ISNULL(存储分区,N''),N'&','')
+                    THEN ISNULL(区码,N'') ELSE N'' END
+             -- 有排号 = 老厂区式「<区码>-<排>排<位>位」;无排号 = 新厂区序号式「<区码>-<位>位」
+             -- (无排号时那一横必须有:否则 炭粉区3 + 36位 会黏成 炭粉区336位 产生歧义)
+             + CASE WHEN 排号 IS NOT NULL AND 排号 <> N''
+                    THEN N'-' + 排号 + N'排' + 位号 + N'位'
+                    ELSE N'-' + 位号 + N'位' END
+             + ISNULL(层号 + N'层', N'')
 WHERE ISNULL(asp_cancel,'N')<>'Y'
-  AND ISNULL(区码,N'')<>N'' AND ISNULL(排号,N'')<>N'' AND ISNULL(位号,N'')<>N'';
+  AND ISNULL(区码,N'')<>N'' AND ISNULL(位号,N'')<>N'';
 SET @n6 = @@ROWCOUNT;
 PRINT N'  ✓ 仓库名对齐 ' + CAST(@n5b AS nvarchar(10)) + N' 行 / 仓位地址重算 ' + CAST(@n6 AS nvarchar(10)) + N' 行';
 GO
@@ -200,12 +214,12 @@ UNION ALL SELECT N'成品仓分类兜底(应 3)', CAST(COUNT(*) AS nvarchar(10))
     WHERE 仓库分类=N'成品' AND ISNULL(停用,0)=0 AND ISNULL(asp_cancel,'N')<>'Y'
 UNION ALL SELECT N'CK-A2 已停用(应 1)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh WHERE 仓库编码=N'CK-A2' AND 停用=1
 UNION ALL SELECT N'遗留 CK-A2 仓位(应 0)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE 仓库编码=N'CK-A2' AND ISNULL(asp_cancel,'N')<>'Y'
-UNION ALL SELECT N'有效仓位总数(应 679)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE ISNULL(asp_cancel,'N')<>'Y'
+UNION ALL SELECT N'有效仓位总数(本脚本执行时应 679;后续批次会增)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE ISNULL(asp_cancel,'N')<>'Y'
 UNION ALL SELECT N'A仓 大区=原料区(应 156)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE 仓库编码=N'CK-A' AND 大区=N'原料区' AND ISNULL(asp_cancel,'N')<>'Y'
 UNION ALL SELECT N'A仓 大区=辅料及配件区(应 103)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE 仓库编码=N'CK-A' AND 大区=N'辅料及配件区' AND ISNULL(asp_cancel,'N')<>'Y'
 UNION ALL SELECT N'B仓 已去分区(应 180)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE 仓库编码=N'CP-02' AND 大区 IS NULL AND 存储分区 IS NULL AND ISNULL(asp_cancel,'N')<>'Y'
 UNION ALL SELECT N'C仓 已去分区(应 72)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE 仓库编码=N'CK-C' AND 大区 IS NULL AND 存储分区 IS NULL AND ISNULL(asp_cancel,'N')<>'Y'
-UNION ALL SELECT N'D仓 大区=成品仓区(应 168)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE 仓库编码=N'CK-D' AND 大区=N'成品仓区' AND ISNULL(asp_cancel,'N')<>'Y'
+UNION ALL SELECT N'D仓 成品仓位 大区=成品仓区(应 168;只数 D+数字 开头的成品编码)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE 仓库编码=N'CK-D' AND 仓位编码 LIKE N'D[0-9]%-%' AND 大区=N'成品仓区' AND ISNULL(asp_cancel,'N')<>'Y'
 UNION ALL SELECT N'仓位地址仍为空(应 0)', CAST(COUNT(*) AS nvarchar(10)) FROM dbo.bs_wh_loc WHERE ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(仓位地址,N'')=N''
 UNION ALL SELECT N'WHLOC 字段数(应 12)', CAST(COUNT(*) AS nvarchar(10)) FROM yj_field WHERE panel_code='WHLOC'
 UNION ALL SELECT N'  大区 译名(应 9)', CAST(COUNT(*) AS nvarchar(10)) FROM yj_translation WHERE scope='field' AND ref_key=N'大区'
