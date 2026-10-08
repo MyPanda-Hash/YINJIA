@@ -259,6 +259,9 @@ onMounted(load)
   height: 100%;
   display: flex;
   flex-direction: column;
+  /* 竖排文字(产线名)在交叉轴上默认拉伸 → 会贴住组框右缘、看着"字没对齐柱子";
+     align-items:center 让标签按内容宽居中,柱组再用 align-self:stretch 占满整宽 */
+  align-items: center;
   justify-content: flex-end;
   gap: 4px;
   border-radius: 4px;
@@ -269,6 +272,7 @@ onMounted(load)
   background: var(--t-fill-hover, rgba(0, 0, 0, 0.04));
 }
 .cap-pair {
+  align-self: stretch;
   flex: 1 1 auto;
   display: flex;
   align-items: flex-end;
@@ -321,7 +325,9 @@ onMounted(load)
   font-size: 11px;
   line-height: 1;
   color: var(--t-text-2);
-  text-align: center;
+  /* ⚠ 竖排时 text-align 管的是**竖直方向**:写 center 会把长短不一的名字竖直居中,
+     顶端参差 24px(2026-10-08 用户报「字与图没有对齐」)——必须 start(顶端齐平) */
+  text-align: start;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

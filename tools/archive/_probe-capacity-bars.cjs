@@ -235,6 +235,76 @@ localStorage.setItem('mes_login_date', '2026-10-08'); 'ok'`)
     check('页面无横向滚动', layout.hScroll <= 1, `scrollWidth-clientWidth=${layout.hScroll}`)
     check('卡片内容未被裁切', layout.cardClipped <= 1, `scrollHeight-clientHeight=${layout.cardClipped}`)
 
+    // ③ 对齐:产线名必须**居中于本组柱**、柱顶数值必须居中于所在柱
+    //    (2026-10-08 用户报「字与图没有对齐」——竖排文字时 text-align 管的是竖直方向,
+    //     横向居中得靠父容器;这条断言用文字实际渲染盒(Range)量偏移,不靠肉眼)
+    const align = await evaluate(`(() => {
+      const groups = [...document.querySelectorAll('.cap-group')]
+      const nameOff = []
+      const clip = []
+      const nameTops = []
+      for (const g of groups) {
+        const pair = g.querySelector('.cap-pair')
+        const name = g.querySelector('.cap-name')
+        if (!pair || !name) continue
+        const pr = pair.getBoundingClientRect()
+        const rg = document.createRange(); rg.selectNodeContents(name)
+        const tr = rg.getBoundingClientRect()
+        nameOff.push(Math.round(tr.left + tr.width / 2 - (pr.left + pr.width / 2)))
+        nameTops.push(Math.round(tr.top))
+        if (Math.round(tr.height) > Math.round(name.getBoundingClientRect().height) + 1) clip.push(name.textContent.trim())
+      }
+      const numOff = []
+      for (const b of document.querySelectorAll('.cap-bar.actual')) {
+        const n = b.querySelector('.bar-num')
+        if (!n) continue
+        const br = b.getBoundingClientRect(); const nr = n.getBoundingClientRect()
+        numOff.push(Math.round(nr.left + nr.width / 2 - (br.left + br.width / 2)))
+      }
+      const worst = (a) => (a.length ? Math.max(...a.map(Math.abs)) : 0)
+      // 纵轴刻度数字的**垂直中心**应落在对应网格线上
+      const axisOff = [...document.querySelectorAll('.cap-grid .grid-line')].map((line) => {
+        const num = line.querySelector('.grid-num')
+        if (!num) return 0
+        const lr = line.getBoundingClientRect(); const nr = num.getBoundingClientRect()
+        return Math.round(nr.top + nr.height / 2 - lr.top)
+      })
+      // 柱顶与网格线的一致性:取「上限=40%」那类整数比例难找,改为校验柱高比例与轴刻度同量程
+      const scale = (() => {
+        const plot = document.querySelector('.cap-plot'); const pair = document.querySelector('.cap-pair')
+        if (!plot || !pair) return null
+        return Math.round(pair.getBoundingClientRect().height)
+      })()
+      // 柱高必须与刻度同量程:渲染高度 ≈ 百分比 × 柱区高度(否则「柱子看着高/刻度写着低」)
+      const heightErr = []
+      const pairH = (() => {
+        const p = document.querySelector('.cap-pair')
+        return p ? p.getBoundingClientRect().height : 0
+      })()
+      for (const b of document.querySelectorAll('.cap-bar')) {
+        const pct = parseFloat(b.style.height || '0')
+        const px = b.getBoundingClientRect().height
+        heightErr.push(Math.abs(px - (pct / 100) * pairH))
+      }
+      return {
+        groups: groups.length,
+        nameMaxOff: worst(nameOff), nameSamples: nameOff.slice(0, 5),
+        numMaxOff: worst(numOff),
+        axisMaxOff: worst(axisOff), axisSamples: axisOff,
+        barHeightErr: Math.round(worst(heightErr) * 10) / 10,
+        nameTopSpread: nameTops.length ? Math.max(...nameTops) - Math.min(...nameTops) : 0,
+        pairH: Math.round(pairH),
+        clipped: clip.slice(0, 5),
+      }
+    })()`)
+    console.log('  [align]', JSON.stringify(align))
+    check('产线名居中于本组柱', align.nameMaxOff <= 2, `最大偏移 ${align.nameMaxOff}px,样本 ${align.nameSamples.join('/')}`)
+    check('产线名顶端齐平(长名不居中下沉)', align.nameTopSpread <= 2, `顶端最大差 ${align.nameTopSpread}px`)
+    check('柱顶数值居中于所在柱', align.numMaxOff <= 2, `最大偏移 ${align.numMaxOff}px`)
+    check('纵轴刻度数字对齐网格线', align.axisMaxOff <= 2, `最大偏移 ${align.axisMaxOff}px,样本 ${align.axisSamples.join('/')}`)
+    check('柱高与刻度同量程', align.barHeightErr <= 2, `柱区 ${align.pairH}px,最大误差 ${align.barHeightErr}px`)
+    check('竖排标签未被裁切', align.clipped.length === 0, align.clipped.join(','))
+
     // ① 图上的产线必须与产线档案**启用行**一一对应(多一条、少一条都算失败)
     const shown = day.groups.map((g) => String(g.name || '').trim())
     const miss = expectedLines.filter((n) => !shown.includes(n))
