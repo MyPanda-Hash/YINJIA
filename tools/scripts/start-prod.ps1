@@ -3,12 +3,39 @@
 param([switch]$Stop)
 $ErrorActionPreference = "Stop"
 $dir = Split-Path $PSScriptRoot -Parent | Split-Path -Parent | Join-Path -ChildPath "backend"
-if ($Stop) {
-  Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
-  Write-Host "正式实例(8090)已停止"; exit 0
+
+# 实例探测(2026-10-08 修):本机实测 Get-NetTCPConnection -LocalPort 8090 返回 **0 条**,
+# netstat 里 8090 也只剩 TIME_WAIT 行(拿不到 LISTENING 行)—— 两条路**都看不见**正在跑的实例,
+# 于是 -Stop 空转不杀进程,进程继续占着 jar 文件 ⇒ mvn package 的 repackage 改名失败,
+# 磁盘上留下**瘦 jar**(无 BOOT-INF/lib),下次重启直接起不来(一天内踩了两次)。
+# 改按**命令行**认实例:本服务启动命令固定含 yinjia-mes-backend,最可靠;
+# 端口探测降级为兜底,只用于「命令行认不出但端口确实被占」的场景。
+function Get-AppPid {
+  $cmd = @(Get-CimInstance Win32_Process -Filter "Name='java.exe'" -ErrorAction SilentlyContinue |
+           Where-Object { $_.CommandLine -and $_.CommandLine -match 'yinjia-mes-backend' } |
+           Select-Object -ExpandProperty ProcessId)
+  if ($cmd) { return @($cmd | ForEach-Object { [int]$_ } | Sort-Object -Unique) }
+  $pids = @()
+  try {
+    $pids += @(Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue |
+               Select-Object -ExpandProperty OwningProcess)
+  } catch { }
+  if (-not ($pids | Where-Object { $_ })) {
+    $pids += @(netstat -ano | Select-String 'LISTENING' | Select-String ':8090' |
+               ForEach-Object { ($_.Line -split '\s+')[-1] })
+  }
+  @($pids | Where-Object { $_ -and [int]$_ -gt 0 } | ForEach-Object { [int]$_ } | Sort-Object -Unique)
 }
-$c = Get-NetTCPConnection -LocalPort 8090 -State Listen -ErrorAction SilentlyContinue
-if ($c) { Write-Host "正式实例已在运行: http://127.0.0.1:8090"; exit 0 }
+
+if ($Stop) {
+  $kill = Get-AppPid
+  if (-not $kill) { Write-Host "正式实例(8090)本来就没在运行"; exit 0 }
+  foreach ($procId in $kill) { Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue }
+  Write-Host "正式实例(8090)已停止(pid $($kill -join ', '))"
+  exit 0
+}
+$c = Get-AppPid
+if ($c) { Write-Host "正式实例已在运行: http://127.0.0.1:8090 (pid $($c -join ', '))"; exit 0 }
 # 阿里云密钥(OCR + 机翻)从 backend\.env 注入 —— 与 start-project.bat 同一口径。
 # ⚠ 不注入的后果是**静默降级**:OCR 报「未配置」、/api/locale/dict 返回空词典(机翻兜底失效)。
 #   2026-09-23 实测就因此以为机翻不可用。缺失只提示,不阻断启动。
