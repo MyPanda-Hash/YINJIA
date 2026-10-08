@@ -1,0 +1,40 @@
+
+.prp-body[data-v-cd6ba74a] { min-height: 120px;
+}
+.prp-head[data-v-cd6ba74a] { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: #303133; margin-bottom: 8px;
+}
+.prp-route[data-v-cd6ba74a] { color: #116a5b; font-weight: 600;
+}
+.prp-team[data-v-cd6ba74a] { display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
+}
+.prp-dim[data-v-cd6ba74a] { margin-top: 8px; font-size: 12px; color: #909399; line-height: 1.6;
+}
+.prp-lock[data-v-cd6ba74a] { font-size: 12px; color: #e6a23c; margin-top: 2px;
+}
+
+.sb-page[data-v-d6dcd364] { padding: 10px 14px; height: 100%; box-sizing: border-box; display: flex; flex-direction: column; gap: 8px; background: #f9f9f9; overflow: auto;
+}
+.sb-title[data-v-d6dcd364] { font-weight: 600; color: #116a5b;
+}
+.sb-p[data-v-d6dcd364] { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: #606266;
+}
+.sb-bar[data-v-d6dcd364] { margin: 0; background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; padding: 6px 10px 0;
+}
+.sb-stats[data-v-d6dcd364] { margin-left: auto; font-size: 12px; color: #116a5b; font-weight: 600;
+}
+.sb-shop[data-v-d6dcd364] { color: #e6a23c; margin-right: 10px;
+}
+.sb-block[data-v-d6dcd364] { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px;
+}
+.sb-head[data-v-d6dcd364] { display: flex; align-items: center; gap: 12px; padding: 6px 10px; border-bottom: 1px solid #e4e7ed;
+}
+.sb-block-title[data-v-d6dcd364] { font-weight: 600; font-size: 13px; color: #303133;
+}
+.sb-dim[data-v-d6dcd364] { font-size: 12px; color: #909399;
+}
+.sb-actions[data-v-d6dcd364] { margin-left: auto;
+}
+.sb-late[data-v-d6dcd364] { color: #f56c6c; font-weight: 600;
+}
+.sb-near[data-v-d6dcd364] { color: #e6a23c; font-weight: 600;
+}
