@@ -15,6 +15,10 @@ const path = require('node:path')
 
 const FRONT = process.argv[2] || 'http://localhost:5173'
 const API = 'http://localhost:8090'
+/** 账套:默认正式库 YJ;传 YJ_TEST 可验演示账套(产能对比真实链路造数后的界面表现) */
+const FACTORY = process.env.FACTORY || 'YJ'
+/** EXPECT_NONZERO=1 时要求图上至少有一根非零的柱子(测试账套报过工后验用) */
+const EXPECT_NONZERO = process.env.EXPECT_NONZERO === '1'
 const PORT = 9337
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
 const SHOT_DIR = path.join(__dirname, '_shots')
@@ -36,7 +40,7 @@ async function main() {
       const r = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userName: 'admin', password: '123456' }),
+        body: JSON.stringify({ userName: 'admin', password: '123456', factory: FACTORY }),
       })
       const j = await r.json()
       if (j.data?.token) { login = j; break }
@@ -318,6 +322,30 @@ localStorage.setItem('mes_login_date', '2026-10-08'); 'ok'`)
     const noLimit = day.groups.filter((g) => g.title && g.title.includes('未配'))
     check('未配日产能的产线也上图(上限留空)', noLimit.length > 0, `${noLimit.length} 条未配: ${noLimit.slice(0, 3).map((g) => g.name).join(',')}`)
     check('未配上限的行不参与达成率配色(灰)', day.groups.filter((g) => g.title.includes('未配')).every((g) => g.tone === 'tone-na'))
+    // ④ 报工数据真的画成了柱子(测试账套走完真实链路后验:EXPECT_NONZERO=1)
+    if (EXPECT_NONZERO) {
+      // ⚠ 柱顶数字是**紧凑格式**(6,300 / 1.2万),不能直接 Number() —— 否则恒为 NaN、误判成"没画出来"
+      const parseNum = (s) => {
+        const t = String(s ?? '').replace(/[,\s]/g, '')
+        if (!t) return NaN
+        if (t.endsWith('万')) return parseFloat(t) * 10000
+        return Number(t)
+      }
+      const drawn = day.groups.filter((g) => parseNum(g.num) > 0 && g.actualPx > 2)
+      check('报工数据画成了可见的柱子', drawn.length > 0, `${drawn.length} 根非零柱:${drawn.slice(0, 3).map((g) => `${g.name}=${g.num}(${g.actualPx}px)`).join(' / ')}`)
+      if (drawn.length === 0) {
+        const diag2 = await evaluate(`(async () => {
+          const tok = localStorage.getItem('mes_token') || ''
+          const payload = tok ? JSON.parse(atob(tok.split('.')[1] || '')) : {}
+          const r = await fetch('/api/dashboard/capacity?period=day', { headers: { Authorization: 'Bearer ' + tok } })
+          const j = await r.json()
+          const rows = j?.data?.rows || []
+          const hit = rows.filter((x) => Number(x.actual) > 0)
+          return { factory: payload.factory || payload.f || '(无)', status: r.status, anchor: j?.data?.anchor, nonZero: hit.length, sample: hit.slice(0, 3) }
+        })()`)
+        console.log('  [diag2] 页面自己拿到的数据:', JSON.stringify(diag2))
+      }
+    }
     await shot('capacity-bars-day.png')
 
     // 切周产能
