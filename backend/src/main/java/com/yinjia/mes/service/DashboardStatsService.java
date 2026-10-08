@@ -199,9 +199,15 @@ public class DashboardStatsService {
             out.put("anchor", anchorStr);
 
             Map<String, Double> actualByLine = new LinkedHashMap<>();
+            // 实际产出 = **报工数据**(scjl 是报工单的录入载体与事实账,2026-09-27 单表化):
+            //   行上的产线名 scxmc 由「报工审核」从排产台账 plang_pc.scx 镜像写入
+            //   (见 WoReportService.complete():审核时 UPDATE scjl SET scx=?, scxmc=?... wgzt='Y'),
+            //   而排产选线又取自产线档案(bs_prod_line.生产线)⇒ 与图上的产线清单**同源同名**。
+            //   口径:只算**已审核**(wgzt='Y')的报工 —— 草稿报工还没过账,数字可改可撤,不应进产能对比。
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT RTRIM(scxmc) AS line, SUM(ISNULL(sl,0)) AS q FROM scjl"
-                            + " WHERE ISNULL(delmark,0)=0 AND sc_date >= ? AND sc_date < DATEADD(day, 1, ?)"
+                            + " WHERE ISNULL(delmark,0)=0 AND ISNULL(wgzt,'N')='Y'"
+                            + " AND sc_date >= ? AND sc_date < DATEADD(day, 1, ?)"
                             + " AND ISNULL(scxmc,'') <> '' GROUP BY RTRIM(scxmc)", fromStr, toStr)) {
                 actualByLine.put(String.valueOf(r.get("line")), toD(r.get("q")));
             }
