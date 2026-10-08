@@ -3759,7 +3759,15 @@ const qrKey = computed(() => cfgCache.value?.metadata?.qrLabelKey || '')
 const qrScopeKey = computed(() => cfgCache.value?.metadata?.qrLabelScopeKey || '')
 function qrRowKey(row) {
   const k = String(row?.[qrKey.value] ?? '').trim()
-  // 复合行键(仓位):仓库 + \u0001 + 仓位编码 —— \u0001 不出现在业务文本里,避免拼接歧义
+  // ⚠ 必须先判「编码为空」再拼 scope(2026-10-08 修):
+  //   原先直接 `scope ? scope+\u0001+k : k`,而 scope(仓库)非空 ⇒ 空编码行也会得到
+  //   `'A仓\u0001'` 这种**非空键**,于是
+  //     ① `:disabled="!qrRowKey(row)"` 的空码禁勾失效;
+  //     ② 同一仓内所有行共用一个键 ⇒ 点任意一行 = 勾中整仓(当页恰好整仓时看着就是"全页全选")。
+  //   触发场景:后端 metadata.qrLabelKey 指向了本面板不存在的列(如 8090 跑旧 jar 时仍返回
+  //   `库位编码`,而库侧字段已正名为 `仓位编码`)⇒ k 恒为空。此处判空后,那种情况下所有行都
+  //   正确地"禁勾",不再出现误勾;待后端元数据正确时每行各得其键。
+  if (!k) return ''
   const scope = qrScopeKey.value ? String(row?.[qrScopeKey.value] ?? '').trim() : ''
   return scope ? `${scope}\u0001${k}` : k
 }
