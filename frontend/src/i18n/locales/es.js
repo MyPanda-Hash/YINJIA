@@ -2125,7 +2125,6 @@ export default {
     '大区': 'Área',
     '存储分区': 'Subzona',
   
-    '选择时会同时填入「大区」和「存储分区」（它们是一个组合）': 'Al seleccionar se rellenan Área y Subzona a la vez (forman una combinación)',
   },
 
 }

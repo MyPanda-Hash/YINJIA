@@ -11,9 +11,6 @@
       <div class="zpd-tip">
         {{ tt('分区跟随仓位存在：候选自动来自仓位的实际数据，不需要单独登记；仓位没了，分区就没了。') }}
       </div>
-      <div class="zpd-tip zpd-tip2">
-        {{ tt('选择时会同时填入「大区」和「存储分区」（它们是一个组合）') }}
-      </div>
 
       <!-- 新增:直接填一对新值 → 一起写进当前行;保存后它自然进入候选(候选就是数据) -->
       <div class="zpd-add">
@@ -136,10 +133,6 @@ function askRemove(row) {
   padding: 6px 10px;
   background: var(--t-bg-2, #f7f8fa);
   border-radius: 4px;
-}
-.zpd-tip2 {
-  color: #b26a00;
-  background: #fff7e6;
 }
 .zpd-add {
   display: flex;

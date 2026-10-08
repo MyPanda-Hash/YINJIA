@@ -3105,7 +3105,6 @@ export default {
     '大区': 'Area',
     '存储分区': 'Sub-zone',
   
-    '选择时会同时填入「大区」和「存储分区」（它们是一个组合）': 'Selecting a row fills both Area and Sub-zone (they form one combination)',
   },
 
 }

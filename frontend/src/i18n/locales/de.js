@@ -2125,7 +2125,6 @@ export default {
     '大区': 'Bereich',
     '存储分区': 'Unterzone',
   
-    '选择时会同时填入「大区」和「存储分区」（它们是一个组合）': 'Beim Auswählen werden Bereich und Unterzone gemeinsam eingetragen (sie bilden eine Kombination)',
   },
 
 }

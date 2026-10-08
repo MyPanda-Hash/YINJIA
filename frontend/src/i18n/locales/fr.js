@@ -2125,7 +2125,6 @@ export default {
     '大区': 'Zone fonctionnelle',
     '存储分区': 'Sous-zone',
   
-    '选择时会同时填入「大区」和「存储分区」（它们是一个组合）': 'La sélection remplit à la fois la zone fonctionnelle et la sous-zone (elles forment une combinaison)',
   },
 
 }
