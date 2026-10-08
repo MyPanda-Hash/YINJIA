@@ -3064,6 +3064,8 @@ export default {
     '上限 = 日产能 × 当月自然日': 'Limit = daily capacity × calendar days of the month',
     '天': 'days',
     '加载中': 'Loading',
+    '加载失败': 'Failed to load',
+    '重试': 'Retry',
 
     // 档案面板保存误删护栏(2026-10-03:商品面板带筛选保存一次软删 3873 行)
     '当前列表带筛选，本次保存只更新已加载的行，未显示的行不会被删除':

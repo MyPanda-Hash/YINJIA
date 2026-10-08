@@ -1,5 +1,10 @@
 <template>
-  <div class="scapbars">
+  <div
+    class="scapbars"
+    :data-period="payload.period || ''"
+    :data-loading="loading ? '1' : '0'"
+    :data-err="err ? '1' : '0'"
+  >
     <div class="cap-head">
       <div class="cap-tabs" role="tablist" :aria-label="tt('产能统计周期')">
         <button
@@ -18,11 +23,15 @@
       <span class="cap-sub" :title="subText">{{ subText }}</span>
     </div>
 
-    <div v-if="loading" class="chart-empty">{{ tt('加载中') }}…</div>
+    <div v-if="loading && !scaled.rows.length" class="chart-empty">{{ tt('加载中') }}…</div>
+    <div v-else-if="err" class="chart-empty">
+      {{ tt('加载失败') }}
+      <button type="button" class="cap-retry" @click="load">{{ tt('重试') }}</button>
+    </div>
     <div v-else-if="!scaled.rows.length" class="chart-empty">{{ tt('暂无数据') }}</div>
     <template v-else>
       <!-- 竖向双柱:每产线一组(实际 + 上限),共用同一条刻度轴 -->
-      <div class="cap-plot">
+      <div class="cap-plot" :class="{ busy: loading }">
         <div class="cap-grid" aria-hidden="true">
           <span v-for="t in ticks" :key="t.pct" class="grid-line" :style="{ bottom: t.pct + '%' }">
             <em class="grid-num">{{ fmtCompact(t.value) }}</em>
@@ -78,12 +87,13 @@
 import { computed, onMounted, ref } from 'vue'
 import request from '@core/request'
 import { tt } from '@/i18n'
-import { CAPACITY_PERIODS, fmtCompact, scaleCapacity } from '@core/dashboard/capacityBars'
+import { CAPACITY_PERIODS, capacitySubText, fmtCompact, scaleCapacity } from '@core/dashboard/capacityBars'
 
 const periods = CAPACITY_PERIODS
 const period = ref(periods[0].key)
 const payload = ref({ rows: [] })
 const loading = ref(false)
+const err = ref(false)
 /** 连点 tab 时丢弃过期响应(慢的那个后到会把新周期的数据画上去) */
 let seq = 0
 
@@ -94,15 +104,7 @@ const ticks = computed(() =>
   [0, 25, 50, 75, 100].map((pct) => ({ pct, value: Math.round((scaled.value.max * pct) / 100) })),
 )
 
-const subText = computed(() => {
-  const d = payload.value
-  const p = periods.find((x) => x.key === period.value) || periods[0]
-  const span = d.from ? `${d.from}${d.to && d.to !== d.from ? ' ~ ' + d.to : ''}` : ''
-  const rule = p.days
-    ? `${tt('上限 = 日产能 ×')} ${p.days} ${tt('天')}`
-    : tt('上限 = 日产能 × 当月自然日')
-  return [span ? `${tt('数据区间')} ${span}` : '', rule].filter(Boolean).join(' · ')
-})
+const subText = computed(() => capacitySubText(payload.value, period.value, tt))
 
 function select(key) {
   if (key === period.value) return
@@ -119,15 +121,35 @@ function rowTitle(r) {
 async function load() {
   const mine = ++seq
   loading.value = true
+  err.value = false
   try {
-    const r = await request.get('/dashboard/capacity', { params: { period: period.value } })
-    if (mine !== seq) return
-    payload.value = r?.data || { rows: [] }
-  } catch {
-    if (mine === seq) payload.value = { rows: [] }
+    payload.value = await fetchCapacity(mine)
+  } catch (e) {
+    // 后端冷启动时首次请求会超时(2026-10-08 实测:AxiosError timeout of 15000ms,
+    // 而同端点在热态只要 4~32ms)—— 桌面卡片不该为这一下就摆出失败态,自动重试一次再说。
+    console.warn('[SCapacityBars] 首次请求失败,1.5s 后重试一次', e)
+    await new Promise((r) => setTimeout(r, 1500))
+    try {
+      payload.value = await fetchCapacity(mine)
+    } catch (e2) {
+      // 重试仍失败必须**说出来**:原先一律退化成「暂无数据」,把「请求挂了」伪装成「本来就没数据」,
+      // 用户看到空图、排查时也看不到原因(2026-10-08 界面探针正是这么被误导的)
+      console.error('[SCapacityBars] 产能接口请求失败', e2)
+      if (mine === seq) {
+        err.value = true
+        payload.value = { rows: [] }
+      }
+    }
   } finally {
     if (mine === seq) loading.value = false
   }
+}
+
+/** 取一个周期的数据;并发过期(连点 tab)时返回 undefined 由调用方丢弃 */
+async function fetchCapacity(mine) {
+  const r = await request.get('/dashboard/capacity', { params: { period: period.value } })
+  if (mine !== seq) return undefined
+  return r?.data || { rows: [] }
 }
 
 onMounted(load)
@@ -193,7 +215,10 @@ onMounted(load)
   margin-top: 2px;
   padding-left: 40px;
   padding-bottom: 18px;
+  transition: opacity 0.15s ease;
 }
+/* 切周期时旧图淡下去、不闪成空态(空态只在首次加载/真没数据时出现) */
+.cap-plot.busy { opacity: 0.5; }
 .cap-grid {
   position: absolute;
   inset: 0 0 18px 40px;
@@ -312,4 +337,16 @@ onMounted(load)
   text-align: center;
   padding: 40px 0;
 }
+.cap-retry {
+  margin-left: 6px;
+  border: 1px solid var(--t-border-light);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--t-text-2);
+  font-size: 11px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.cap-retry:hover { background: var(--t-fill-hover, rgba(0, 0, 0, 0.04)); color: var(--t-text-1); }
+.cap-retry:focus-visible { outline: 2px solid #116a5b; outline-offset: 1px; }
 </style>

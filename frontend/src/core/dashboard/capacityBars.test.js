@@ -1,6 +1,13 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { niceMax, scaleCapacity, toneOf, fmtCompact, CAPACITY_PERIODS } from './capacityBars.js'
+import {
+  niceMax,
+  scaleCapacity,
+  toneOf,
+  fmtCompact,
+  capacitySubText,
+  CAPACITY_PERIODS,
+} from './capacityBars.js'
 
 /**
  * 这组断言守的是 2026-10-08 用户需求:
@@ -99,4 +106,24 @@ test('fmtCompact: 柱顶数值 ≤4 字符宽度,过万缩「x.x万」', () => {
   assert.equal(fmtCompact(1200), '1,200')
   assert.equal(fmtCompact(12000), '1.2万')
   assert.equal(fmtCompact(20000), '2万')
+})
+
+test('capacitySubText: 区间与口径同源 —— 口径取「数据自己的周期」而不是当前选中的 tab', () => {
+  // 切换瞬间的混搭:点了「周产能」但数据还是日档的 —— 必须按数据(日)标注,
+  // 否则标题会写成「数据区间 2026-08-26 · 上限 = 日产能 × 7 天」这种自相矛盾的组合
+  const stale = { period: 'day', from: '2026-08-26', to: '2026-08-26' }
+  assert.equal(capacitySubText(stale, 'week'), '数据区间 2026-08-26 · 上限 = 日产能 × 1 天')
+  // 数据到位后:区间与折算天数配套
+  assert.equal(
+    capacitySubText({ period: 'week', from: '2026-08-24', to: '2026-08-30' }, 'week'),
+    '数据区间 2026-08-24 ~ 2026-08-30 · 上限 = 日产能 × 7 天',
+  )
+  // 月档折算不写死 ×30,而是「按当月自然日」
+  assert.equal(
+    capacitySubText({ period: 'month', from: '2026-08-01', to: '2026-08-31' }, 'month'),
+    '数据区间 2026-08-01 ~ 2026-08-31 · 上限 = 日产能 × 当月自然日',
+  )
+  // 没有数据(首屏/失败)时只留口径,不编造区间
+  assert.equal(capacitySubText({ rows: [] }, 'day'), '上限 = 日产能 × 1 天')
+  assert.equal(capacitySubText(null, 'year'), '上限 = 日产能 × 365 天')
 })

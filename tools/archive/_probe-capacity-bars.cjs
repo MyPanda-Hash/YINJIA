@@ -29,13 +29,21 @@ function check(name, ok, detail) {
 
 async function main() {
   fs.mkdirSync(SHOT_DIR, { recursive: true })
-  const loginRes = await fetch(`${API}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ userName: 'admin', password: '123456' }),
-  })
-  const login = await loginRes.json()
-  if (!login.data?.token) throw new Error('登录失败: ' + JSON.stringify(login))
+  // 后端可能刚重启(冷启动要几秒到几十秒)—— 登录重试,别让探针因为「没等后端」而假失败
+  let login = null
+  for (let i = 0; i < 30; i++) {
+    try {
+      const r = await fetch(`${API}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userName: 'admin', password: '123456' }),
+      })
+      const j = await r.json()
+      if (j.data?.token) { login = j; break }
+    } catch { /* 后端还没起来,继续等 */ }
+    await sleep(2000)
+  }
+  if (!login) throw new Error('登录失败(等了 60s,后端未就绪?)')
   console.log(`[login] ok admin=${login.data.user.isAdmin}`)
 
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'yj-edge-cap-'))
@@ -52,9 +60,14 @@ async function main() {
     await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej })
     let seq = 0
     const pending = new Map()
+    const consoleLogs = []
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data)
-      if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id) }
+      if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); return }
+      // 收页面 console(组件里 catch 到请求失败会 console.error —— 空图时说清是「失败」还是「没数据」)
+      if (m.method === 'Runtime.consoleAPICalled') {
+        consoleLogs.push((m.params.args || []).map((a) => a.value ?? a.description ?? a.type).join(' '))
+      }
     }
     const send = (method, params = {}) => new Promise((res) => {
       const id = ++seq
@@ -79,6 +92,14 @@ async function main() {
       fs.writeFileSync(p, Buffer.from(r.result.data, 'base64'))
       console.log(`  📷 ${p}`)
     }
+    /** 轮询等条件成立(固定 sleep 会漂:切到生产 tab 时组件才挂载、才发请求) */
+    const waitFor = async (expr, ms = 20000) => {
+      for (let i = 0; i < Math.ceil(ms / 400); i++) {
+        if (await evaluate(expr)) return true
+        await sleep(400)
+      }
+      return false
+    }
 
     await send('Page.enable')
     await send('Runtime.enable')
@@ -96,7 +117,28 @@ localStorage.setItem('mes_login_date', '2026-10-08'); 'ok'`)
       const t = [...document.querySelectorAll('.mod-tab')].find(b => b.textContent.includes('生产'))
       t?.click(); return !!t
     })()`)
-    await sleep(1500)
+    // 等**数据**到位,不是等标签:载荷带自己的 period,组件把它挂在 data-period/data-loading 上,
+    // 否则「点完 tab 标签立刻变、数据还没回来」的那一瞬间会被当成结果读走
+    const settled = (p) => `(() => { const e = document.querySelector('.scapbars'); return !!e && e.dataset.period === '${p}' && e.dataset.loading === '0' && e.dataset.err === '0' })()`
+    const barsShown = await waitFor(`${settled('day')} && document.querySelectorAll('.cap-group').length > 0`)
+    if (!barsShown) {
+      console.log('  ⚠ 等了 20s 仍未出现柱组,自诊断:')
+      const diag = await evaluate(`(async () => {
+        const tok = localStorage.getItem('mes_token') || ''
+        let out = { tokenLen: tok.length, hasUser: !!localStorage.getItem('mes_user') }
+        try {
+          const r = await fetch('/api/dashboard/capacity?period=day', { headers: { Authorization: 'Bearer ' + tok } })
+          out.status = r.status
+          out.body = (await r.text()).slice(0, 200)
+        } catch (e) { out.fetchError = String(e) }
+        out.emptyText = document.querySelector('.scapbars .chart-empty')?.textContent?.trim()
+        out.sub = document.querySelector('.cap-sub')?.textContent?.trim()
+        out.cardCount = document.querySelectorAll('.cap-head').length
+        return out
+      })()`)
+      console.log('  [diag]', JSON.stringify(diag))
+      console.log('  [console]', JSON.stringify(consoleLogs.slice(-6)))
+    }
 
     const readState = () => evaluate(`(() => {
       const tabs = [...document.querySelectorAll('.cap-tab')].map(b => ({
@@ -182,7 +224,7 @@ localStorage.setItem('mes_login_date', '2026-10-08'); 'ok'`)
       const t = [...document.querySelectorAll('.cap-tab')].find(b => b.textContent.includes('周产能'))
       t?.click(); return !!t
     })()`)
-    await sleep(1800)
+    await waitFor(settled('week'))
     const week = await readState()
     console.log('\n[周产能]')
     check('周档被选中', week.tabs.find(t => t.label === '周产能')?.on === true)
@@ -196,7 +238,7 @@ localStorage.setItem('mes_login_date', '2026-10-08'); 'ok'`)
       const t = [...document.querySelectorAll('.cap-tab')].find(b => b.textContent.includes('年产能'))
       t?.click(); return !!t
     })()`)
-    await sleep(1800)
+    await waitFor(settled('year'))
     const year = await readState()
     console.log('\n[年产能]')
     check('年档有数据(非空态)', year.empty === false && year.groups.length > 0, `${year.groups.length} 组`)

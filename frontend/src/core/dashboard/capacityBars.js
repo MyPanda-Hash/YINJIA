@@ -81,3 +81,21 @@ export function fmtCompact(v) {
   }
   return n.toLocaleString('zh-CN')
 }
+
+/**
+ * 标题副行:数据区间 + 上限折算口径。
+ * ⚠ 口径按**数据自己的周期**(payload.period)取,不按当前选中的 tab ——
+ *   点「周产能」的一瞬间新周期规则就绪、数据还没回来,若按选中的 tab 标注,
+ *   标题会写成「数据区间 2026-08-26 · 上限 = 日产能 × 7 天」这种自相矛盾的组合
+ *   (2026-10-08 界面探针在切换瞬间读到过这个混搭态)。
+ * @param {{period?:string, from?:string, to?:string}|null} payload 后端载荷
+ * @param {string} selectedKey 当前选中的周期(载荷还没有 period 时的兜底)
+ * @param {(s:string)=>string} t 翻译函数(默认原样返回,便于单测)
+ */
+export function capacitySubText(payload, selectedKey, t = (s) => s) {
+  const d = payload || {}
+  const p = CAPACITY_PERIODS.find((x) => x.key === (d.period || selectedKey)) || CAPACITY_PERIODS[0]
+  const span = d.from ? `${d.from}${d.to && d.to !== d.from ? ' ~ ' + d.to : ''}` : ''
+  const rule = p.days ? `${t('上限 = 日产能 ×')} ${p.days} ${t('天')}` : t('上限 = 日产能 × 当月自然日')
+  return [span ? `${t('数据区间')} ${span}` : '', rule].filter(Boolean).join(' · ')
+}
