@@ -35,6 +35,10 @@ export default defineConfig({
     // 局域网可访问（同事浏览器访问 http://<本机IP>:5173；Windows 防火墙需放行 5173）
     host: true,
     port: 5173,
+    // 端口钉死:5173 被占用时直接报错,不要静默漂到 5174 ——
+    // 后端 8090 / 前端 5173 是约定端口,漂了之后本机代理、同事书签、
+    // 探针脚本(写死 5173)会全部指向一个没人监听的地址。
+    strictPort: true,
     // 忽略第三方程序(如 DSH Desktop)在源码目录创建的临时文件,避免 chokidar EBUSY 崩溃
     watch: {
       ignored: ['**/*.tmpdir/**', '**/*.tmp'],
