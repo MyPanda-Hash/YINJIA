@@ -427,8 +427,9 @@ export const menuTree = [
           // 工序工时:参考库 gxgs——按 客户×物料×工序 维护 换线/标准·最快·最慢·平均时间与加工单价(排产产能/计件依据)
           { code: 'opTime', title: '工序工时', path: '/panelx/list/OP_TIME', icon: 'Timer', panelCode: 'OP_TIME', operationName: '新增流程' },
           { code: 'reject', title: '不合格原因', path: '/panelx/list/REJECT', icon: 'CircleClose', panelCode: 'REJECT', operationName: '新增流程' },
-          { code: 'qcItem', title: '检验项目', path: '/panelx/list/QC_ITEM', icon: 'List', panelCode: 'QC_ITEM', operationName: '新增流程' },
-          { code: 'qcPlan', title: '检验方案', path: '/panelx/list/QC_PLAN', icon: 'DocumentChecked', panelCode: 'QC_PLAN', operationName: '新增流程' },
+          // 2026-10-09 摘除「检验项目 QC_ITEM」「检验方案 QC_PLAN」两个菜单入口(用户口径:维护入口收敛到
+          // 检验单工具栏那一个按钮,弹窗两用=勾选带入 + 就地维护)。⚠ 只摘菜单:**面板与数据表保留不动**
+          // (bs_qc_plan/bs_qc_item 仍被维护弹窗读写,面板元数据留作历史/备份),放开注释即可恢复入口。
         ],
       },
       {

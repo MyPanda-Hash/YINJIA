@@ -8,10 +8,10 @@
      入口:组装成品检验单(以及成型/切炭检验单)工具栏「更多」组里的「检验项目维护」按钮。
      可撤回:删本组件 + PanelxList 的挂载与 action 分支 + PanelConfigService 的按钮注入。 -->
 <template>
-  <el-dialog :model-value="modelValue" :title="tt('检验项目/检验方案维护')" width="1200px" top="4vh" append-to-body
+  <el-dialog :model-value="modelValue" :title="tt('检验项目/检验方案')" width="1200px" top="4vh" append-to-body
              destroy-on-close @update:model-value="(v) => emit('update:modelValue', v)" @open="load">
     <div class="qcplan-tip">
-      {{ tt('这里维护的是检验标准本身（项目/接受标准/检验方法/取样要求/处置方式），不会改动任何已录入的检验单。') }}
+      {{ tt('上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用标准本身。维护动作不会改动任何已录入的检验单。') }}
     </div>
 
     <!-- ═══ ① 检验方案(主表) ═══ -->
@@ -68,9 +68,11 @@
           {{ curItem?.['停用'] ? tt('恢复启用') : tt('停用') }}
         </el-button>
       </div>
-      <el-table :data="items" size="small" border height="240" highlight-current-row row-key="id"
+      <el-table ref="itemTable" :data="items" size="small" border height="240" highlight-current-row row-key="id"
                 :empty-text="curPlan ? tt('该方案下还没有检验项目，点右上角「新增项目」') : tt('请先在上方选择一个检验方案')"
-                @current-change="(r) => (curItem = r)">
+                @current-change="(r) => (curItem = r)" @selection-change="(r) => (picked = r)">
+        <!-- 勾选列(2026-10-09 合并口径):同一个弹窗既维护标准,也把勾选的项目带入当前检验单 -->
+        <el-table-column type="selection" width="42" reserve-selection />
         <el-table-column :label="tt('序号')" prop="序号" width="60" />
         <el-table-column :label="tt('项目编码')" prop="项目编码" width="130" show-overflow-tooltip />
         <el-table-column :label="tt('项目名称')" prop="项目名称" width="150" show-overflow-tooltip />
@@ -89,6 +91,13 @@
         </el-table-column>
       </el-table>
     </div>
+
+    <!-- 合并口径(2026-10-09):勾选 → 带入明细;不带入也能当维护弹窗用 -->
+    <template #footer>
+      <span class="qcplan-count">{{ tt('已选') }} {{ picked.length }} {{ tt('项') }}</span>
+      <el-button size="small" @click="emit('update:modelValue', false)">{{ tt('取消') }}</el-button>
+      <el-button size="small" type="primary" :disabled="!picked.length" @click="confirmPick">{{ tt('带入明细') }}</el-button>
+    </template>
 
     <!-- ═══ 方案表单 ═══ -->
     <el-dialog v-model="planFormVisible" :title="planForm.id ? tt('编辑检验方案') : tt('新增检验方案')"
@@ -205,7 +214,15 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 
 defineProps({ modelValue: { type: Boolean, default: false } })
-const emit = defineEmits(['update:modelValue', 'changed'])
+const emit = defineEmits(['update:modelValue', 'changed', 'pick'])
+/** 勾选的项目行(带入当前单据用) */
+const picked = ref([])
+const itemTable = ref(null)
+function confirmPick() {
+  if (!picked.value.length) return
+  emit('pick', picked.value.slice())
+  emit('update:modelValue', false)
+}
 
 const API = '/qc/inspPlan'
 const plans = ref([])
@@ -329,6 +346,7 @@ async function toggleItem() {
 <style scoped>
 .qcplan-tip { font-size: 12px; color: #909399; background: #f4f4f5; border-radius: 4px; padding: 6px 10px; margin-bottom: 10px; }
 .qcplan-sec { margin-bottom: 14px; }
+.qcplan-count { float: left; font-size: 12px; color: #909399; line-height: 32px; }
 /* 主从层级(2026-10-09 用户口径「上方为检验方案的表,下方为检验项目的表」):
    两块长得一样就看不出从属关系 ⇒ 用序号徽章 + 桥接条 + 未选方案时把从表压暗来表明层级。 */
 .qcplan-sec.is-dim { opacity: .55; }

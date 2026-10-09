@@ -447,8 +447,10 @@ public class PanelConfigService {
                 int anchor = gActions.indexOf("字段管理");
                 if (anchor >= 0) {
                     List<String> merged = new ArrayList<>(gActions);
-                    if (!merged.contains("检验项目维护")) merged.add(anchor + 1, "检验项目维护");
-                    if (!merged.contains("选检验项目")) merged.add(anchor + 1, "选检验项目");
+                    // 2026-10-09 **合并口径**(用户拍板):原来两个按钮(选检验项目 / 检验项目维护)收敛成同一个
+                    // 入口 —— 弹窗两用:上=方案表、下=该项目表(可勾选),勾选后「带入明细」写入本单;
+                    // 表头的新增/编辑/停用就地维护标准本身。基础档案里的 QC_ITEM/QC_PLAN 菜单已摘,维护只此一处。
+                    if (!merged.contains("检验项目/检验方案")) merged.add(anchor + 1, "检验项目/检验方案");
                     g.put("actions", merged);
                 }
             }

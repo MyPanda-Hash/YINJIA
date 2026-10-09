@@ -1605,12 +1605,11 @@
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <!-- 字段管理(动态字段/备用列池;仅 admin):绑定/停用自定义字段 -->
     <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
-    <!-- 检验项目/检验方案维护(2026-10-09):三类工序检验单(成型/切炭/组装成品)工具栏入口;
-         维护的是**标准本身**(bs_qc_plan + bs_qc_item),不往检验单写数据 -->
-    <QcInspPlanDialog v-model="qcInspPlanVisible" />
-    <!-- 选检验项目(2026-10-09):从标准里勾选 → 带入当前单据明细(表区=检验项目),再按现有模板填写 -->
-    <QcInspItemPickDialog v-model="qcInspPickVisible" :product-code="String(cur['产品编码'] || '')"
-                          :product-name="String(cur['产品名称'] || '')" @pick="applyInspItems" />
+    <!-- 检验项目/检验方案(2026-10-09 **合并口径**):三类工序检验单(成型/切炭/组装成品)工具栏**唯一**入口 ——
+         同一个弹窗两用:上=方案表、下=该方案的项目表(可勾选);①勾选后「带入明细」把项目写进当前单据
+         (表区=检验项目,再按现有模板填实测/判定);②表头的新增/编辑/停用就地维护标准本身
+         (bs_qc_plan + bs_qc_item),维护动作不往检验单写数据。 -->
+    <QcInspPlanDialog v-model="qcInspPlanVisible" @pick="applyInspItems" />
     <!-- 仓位分区弹窗(2026-10-08):候选来自本面板已加载的仓位行,不落存储 ⇒ 分区随仓位存在;
          选中时「大区 + 存储分区」**一起回填**(用户口径:它们是一个组合) -->
     <ZonePickDialog v-model="zonePickVisible" :rows="zonePickRows" :area-key="ZONE_PAIR.area" :zone-key="ZONE_PAIR.zone" @pick="onZonePick" />
@@ -1745,7 +1744,6 @@ import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
-import QcInspItemPickDialog from '@core/qc/QcInspItemPickDialog.vue'
 import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
@@ -1968,10 +1966,9 @@ function applyAdvFilters(rows) {
 const colPrefVisible = ref(false)
 // 字段管理(动态字段/备用列池):仅 admin 入口可见,服务端 requireAdmin 把守写操作
 const fieldMgrVisible = ref(false)
-// 检验项目/检验方案维护(2026-10-09):三类工序检验单工具栏「更多」组入口(服务端把守 QC_ASM_INSP 可见性)
+// 检验项目/检验方案(2026-10-09 合并口径):三类工序检验单工具栏「更多」组的**唯一**入口
+// (服务端把守 QC_ASM_INSP 可见性);弹窗两用:勾选「带入明细」+ 就地维护标准本身。
 const qcInspPlanVisible = ref(false)
-// 选检验项目(2026-10-09):勾选标准里的检验项目 → 追加到当前单据明细(表区=检验项目)
-const qcInspPickVisible = ref(false)
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
 
@@ -6433,15 +6430,16 @@ async function onButton(action) {
     impVisible.value = true
     return
   }
-  // 选检验项目(2026-10-09 用户口径):在当前单据页把**检验标准**里的项目勾选带入明细(表区=检验项目),
-  // 再按现有模板填实测数值/判定(不自动保存)。
-  // ⚠ 必须排在下面「选X」通用分支(catch-all)之前:它取 `action.startsWith('选')`,会把本动作截走
-  //   并提示「演示环境暂未实现选单」(2026-10-09 实测踩到)。
-  if (action === '选检验项目') {
-    if (!cur.value || !(cur.value['单据编号'] || cur.value['编号'] || cur.value['合同号'])) {
+  // 检验项目/检验方案(2026-10-09 **合并口径**):选项目带入 + 就地维护合并成同一个弹窗。
+  // ⚠ 「选检验项目」这个旧动作名以「选」开头,必须排在下面「选X」通用分支(catch-all)之前 ——
+  //   它取 `action.startsWith('选')`,会把本动作截走并提示「演示环境暂未实现选单」(2026-10-09 实测踩到)。
+  //   三个名字都收(旧按钮名保留兼容:已配可见性的库/缓存里可能还留着)。
+  if (['检验项目/检验方案', '检验项目维护', '选检验项目'].includes(action)) {
+    const needDoc = action === '选检验项目'
+    if (needDoc && (!cur.value || !(cur.value['单据编号'] || cur.value['编号'] || cur.value['合同号']))) {
       return ElMessage.warning(tt('请先打开一张检验单，再选检验项目'))
     }
-    qcInspPickVisible.value = true
+    qcInspPlanVisible.value = true
     return
   }
   // 选单通用化：任意 选X 动作且配置有 selectConfig 即走选单（对齐 PanelxForm 的通用分支）
@@ -6500,12 +6498,7 @@ async function onButton(action) {
     fieldMgrVisible.value = true
     return
   }
-  if (action === '检验项目维护') {
-    // 检验项目/检验方案维护(2026-10-09 用户口径):三类工序检验单(成型/切炭/组装成品)就地维护
-    // 受控文件里的检验项目/标准/方法/取样/处置 —— 只维护标准本身,不往检验单写数据。
-    qcInspPlanVisible.value = true
-    return
-  }
+  // 「检验项目维护」分支已并入上面的合并分支(2026-10-09):三个动作名走同一个弹窗,此处不再重复处理。
   if (action === '分类管理') {
     // 客户/供应商档案 → 对应分类面板(金蝶同款:分类不占导航,从档案工具栏进)
     const target = cfgCache.value?.metadata?.classifyPanel
