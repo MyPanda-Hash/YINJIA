@@ -15,6 +15,13 @@ const DROPPED = ['PU_REQ',
   'OUTSOURCE_IN', 'OUTSOURCE_IN_DETAIL', 'OUTSOURCE_IN_STATS',
   'OUTSOURCE_ISSUE', 'OUTSOURCE_ISSUE_DETAIL', 'OUTSOURCE_ISSUE_STATS'];
 
+// 第二批(2026-10-09):品质管理 制程品质/不良处理/品质追溯 5 张,同样应取不到配置
+const DROPPED_QC = ['QC_OP', 'QC_RECORD', 'QC_DISPOSAL', 'ROD_RETURN', 'LOT_TRACE'];
+
+// 品质管理菜单里保留的 13 张:配置 + 取数都应 200
+const KEPT_QC = ['QC_INSP', 'QC_TC_IN', 'QC_CATALOG', 'QC_INSP_REC', 'QC_INSP_REQ', 'QC_INSP_REQ_SERIES',
+  'QC_BHG', 'QC_BHC', 'QC_BHZ', 'QC_JJF', 'QC_SCP', 'QC_LYB', 'QC_SCY'];
+
 const KEPT = ['PURCHASE_IN', 'PURCHASE_IN_DETAIL', 'PURCHASE_IN_STATS',
   'SALE_OUT', 'SALE_OUT_DETAIL', 'SALE_OUT_STATS',
   'MATERIAL_OUT', 'MATERIAL_OUT_DETAIL', 'MATERIAL_OUT_STATS',
@@ -47,7 +54,7 @@ const post = async (path, body, token) => {
 
   let pass = 0, fail = 0;
   console.log('\n===== ① 已下架面板:应取不到配置 =====');
-  for (const pc of DROPPED) {
+  for (const pc of DROPPED.concat(DROPPED_QC)) {
     const cfg = await get('/px/getPanelConfig?panelCode=' + pc, token);
     const gone = cfg.json?.code !== 200;
     console.log(`  ${gone ? 'PASS' : 'FAIL'}  ${pc.padEnd(22)} http=${cfg.status} code=${cfg.json?.code} ${gone ? '' : '(!! 仍能取到配置)'}`);
@@ -55,7 +62,7 @@ const post = async (path, body, token) => {
   }
 
   console.log('\n===== ② 保留面板:配置 + 取数都应 200 =====');
-  for (const pc of KEPT) {
+  for (const pc of KEPT.concat(KEPT_QC)) {
     const cfg = await get('/px/getPanelConfig?panelCode=' + pc, token);
     if (cfg.status !== 200 || cfg.json?.code !== 200) {
       console.log(`  FAIL  ${pc.padEnd(22)} 配置失败 http=${cfg.status} ${(cfg.json?.message || cfg.text || '').slice(0, 100)}`);

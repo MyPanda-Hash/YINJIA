@@ -2299,3 +2299,15 @@ migrate-drop-extra-docs-pu-req-20261008.sql
 #      所需表列已逐列核对存在;v_manu_order_stats 顺带把 5 个恒 NULL 列恢复为真实聚合。
 #   幂等:CREATE OR ALTER VIEW;两账套均已执行,复核「仍缺 id/asp_cancel 的 flat 面板视图 = 0」。
 migrate-fix-report-views-id-aspcancel-20261009.sql
+
+# —— 2026-10-09 下架品质管理「制程品质 / 不良处理 / 品质追溯」5 张从未使用的面板 ——
+#   用户口径:「品质管理下的制程品质、不良处理与品质追溯都是没有用到的吧」→ 确认后连批号追溯一起删。
+#   删:QC_OP 工序质检单 / QC_RECORD 检验记录单 / QC_DISPOSAL 不良品处理单 / ROD_RETURN 炭棒不良退货登记
+#      / LOT_TRACE 批号追溯 —— yj_panel 5 + yj_field 77 + yj_role_panel 20 + 视图 v_lot_trace + 物理表 7 张
+#      (qc_op/qc_op_detail/qc_record/qc_record_detail/qc_disposal/rod_return/rod_return_detail,全部 0 行);
+#      这 5 张面板名本来无译名(0 行),字段标签侧无孤儿标签。
+#   依据:yj_usage_log(3437 行、按面板记动作)里这 5 张**操作留痕 = 0**,7 张表 0 行、单据状态 0 行⇒建好即没用过;
+#      无外键/无 ref_panel 引用/无生单链路/无附件审批列设置(全 0);唯一引用被删表的是 v_lot_trace 自己(同批删)。
+#   配套代码:删 QcDisposalService(111 行)+ ButtonService 两处钩子 + menus.js 5 个入口。
+#   回退抓手 tools/archive/_panel-age/_backup-20261009-qc/;⚠ 批号追溯的「工序质检/不良处置」两段随之消失。
+migrate-drop-qc-unused-panels-20261009.sql

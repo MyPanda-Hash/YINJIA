@@ -1,0 +1,19 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-usage-events.sql ==
+  | 采购入库单 | action | 弃审 | 130 | 
+  | 采购入库单 | action | 删除 | 121 | 
+  | 采购入库单 | action | 审核 | 121 | 
+  | 采购入库单 | action | 转ERP | 113 | 
+  | 采购入库单 | action | 提交 | 38 | 
+  | 采购入库单 | action | 提交审批 | 18 | 
+  | 采购入库单 | action | 审批通过 | 17 | 
+  | 采购入库单 | action | 保存 | 12 | 
+  | 采购入库单 | action | 查询可转ERP | 11 | 
+  | 采购入库单 | action | 审批驳回 | 1 | 
+  | 库存台账 | action | 台账联动选项 | 177 | 
+  | 库存台账 | action | 重算成本 | 3 | 
+  | 库存状况表 | action | 台账联动选项 | 34 | 
+  | 库存状况表 | action | 重算成本 | 13 | 
+  | 生产工单 | action | 删除 | 1 | 
+  | 生产工单 | action | 提交 | 1 | 
+[OK] _q-usage-events.sql (1 batches)

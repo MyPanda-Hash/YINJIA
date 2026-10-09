@@ -41,7 +41,6 @@ public class ButtonService {
     private final LotSeqService lotSeqService;
     private final StockLedgerService stockLedger;
     private final WoReportService woReport;
-    private final QcDisposalService qcDisposal;
     private final KingdeePushService kingdeePush;
     private final BatchService batchService;
     private final InvCostService invCost;
@@ -56,7 +55,7 @@ public class ButtonService {
                          FormNoService formNoService, JdbcTemplate jdbc,
                          DevTaskService devTaskService, MessageService messageService,
                          LotSeqService lotSeqService, StockLedgerService stockLedger,
-                         WoReportService woReport, QcDisposalService qcDisposal,
+                         WoReportService woReport,
                          KingdeePushService kingdeePush, BatchService batchService,
                          InvCostService invCost, QcCatalogService qcCatalog,
                          ManuWritebackService manuWriteback, CalcRuleService calcRuleService) {
@@ -69,7 +68,6 @@ public class ButtonService {
         this.lotSeqService = lotSeqService;
         this.stockLedger = stockLedger;
         this.woReport = woReport;
-        this.qcDisposal = qcDisposal;
         this.kingdeePush = kingdeePush;
         this.batchService = batchService;
         this.invCost = invCost;
@@ -1269,8 +1267,8 @@ public class ButtonService {
         // 生产工单执行回填(参考库 plang_pc:完工入库回写 rk_sl/rk_no、领料回写 ll_no2):
         // 重算式(以该工单名下已审核入库/领料单为真源),审核/弃审对称;切炭自动入库经上方同路径已覆盖
         manuWriteback.post(def.code(), no, currentUserName());
-        // 不良品处理记账(品质层):处理单审核 → 原仓扣减+目标仓(隔离/不良品)移仓或报废
-        qcDisposal.post(def.code(), no, currentUserName());
+        // 不良品处理记账钩子已随「不良品处理单 QC_DISPOSAL」下架移除(2026-10-09):该面板 0 单据、0 操作留痕,
+        // 用户确认不要;对应的 QcDisposalService(原仓扣减 + 隔离/不良品仓移仓 / 报废只扣不入)整文件删除。
         // 来料检验单审核 → 自动生单(2026-09-16 双出口口径):合格数量>0 的行生成采购入库单草稿,
         // 不良数量>0 的行生成暂收退回单草稿(此前暂收退回单为手工按钮,现改为审核自动创建)
         inspAutoPurchaseIn(def.code(), no, currentUserName());
@@ -1325,8 +1323,7 @@ public class ButtonService {
         woReport.unpost(def.code(), no, currentUserName());
         // 切炭双出口冲回:弃审报工 → 自动生成红字(负数量)成品入库单冲回台账
         dualOutRedReverse(def.code(), no, currentUserName());
-        // 不良品处理冲回(品质层):移仓/报废对称冲回,目标仓被消耗则拒绝
-        qcDisposal.unpost(def.code(), no, currentUserName());
+        // 不良品处理冲回钩子同样随 QC_DISPOSAL 下架移除(见审核侧注释,2026-10-09)
         // 来料检验单弃审联动:自动生成的采购入库单为草稿则作废+释放占用+清入库单号回填;
         // 已审核(可能已记台账)则拒绝,提示先弃审入库单——防止"检验弃审了、库存已入账"的错位
         inspUnauditCascade(def.code(), no, currentUserName());

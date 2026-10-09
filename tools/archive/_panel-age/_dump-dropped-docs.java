@@ -49,6 +49,16 @@ public class DropDump {
             "v_outsource_in_detail", "v_outsource_in_stats",
             "v_outsource_issue_detail", "v_outsource_issue_stats");
 
+    // ── 第二批(2026-10-09):品质管理 制程品质/不良处理/品质追溯 5 张 ──
+    static final List<String> QC_PANELS = List.of("QC_OP", "QC_RECORD", "QC_DISPOSAL", "ROD_RETURN", "LOT_TRACE");
+    static final List<String> QC_TABLES = List.of(
+            "qc_op", "qc_op_detail", "qc_record", "qc_record_detail",
+            "qc_disposal", "rod_return", "rod_return_detail");
+    static final List<String> QC_VIEWS = List.of("v_lot_trace");
+
+    // 运行期生效的那一组(命令行参数选:docs[默认] / qc)
+    static List<String> panels = PANELS, tables = TABLES, views = VIEWS;
+
     static String esc(String s) {
         if (s == null) return "";
         if (s.indexOf(',') >= 0 || s.indexOf('"') >= 0 || s.indexOf('\n') >= 0 || s.indexOf('\r') >= 0)
@@ -101,7 +111,7 @@ public class DropDump {
            .append("-- 用法:两账套分别执行;脚本幂等(先删后插,只针对这 13 个面板编码与其面板名译名)\n")
            .append("SET NOCOUNT ON;\nGO\n")
            .append("IF DB_NAME() = N'master' USE HSDZ_MES;   -- 仅在未选定库时切正式库\nGO\n\n");
-        String panelList = "'" + String.join("','", PANELS) + "'";
+        String panelList = "'" + String.join("','", panels) + "'";
 
         for (String tbl : List.of("yj_panel", "yj_field", "yj_role_panel")) {
             List<String> cols = new ArrayList<>();
@@ -148,7 +158,7 @@ public class DropDump {
     static void dumpViews(Connection c, Path out) throws Exception {
         StringBuilder sql = new StringBuilder("-- views.sql — 8 个待删视图的原始定义(回退用:去掉 IF 守卫直接建)\nUSE " +
                 c.getCatalog() + ";\nGO\n\n");
-        for (String v : VIEWS) {
+        for (String v : views) {
             try (PreparedStatement ps = c.prepareStatement("SELECT m.definition FROM sys.sql_modules m WHERE m.object_id = OBJECT_ID(?)")) {
                 ps.setString(1, "dbo." + v);
                 try (ResultSet rs = ps.executeQuery()) {
@@ -167,7 +177,7 @@ public class DropDump {
     static void dumpTableDdl(Connection c, Path out) throws Exception {
         StringBuilder sql = new StringBuilder("-- tables-ddl.sql — 10 张待删表的列定义 + 索引 + 中文注明(重建骨架)\nUSE " +
                 c.getCatalog() + ";\nGO\n\n");
-        for (String t : TABLES) {
+        for (String t : tables) {
             if (c.getMetaData().getColumns(null, "dbo", t, null).next() == false) {
                 sql.append("-- ").append(t).append(" (不存在)\n\n");
                 continue;
@@ -230,12 +240,20 @@ public class DropDump {
 
     public static void main(String[] args) throws Exception {
         String db = System.getenv().getOrDefault("YINJIA_SQL_DB", "HSDZ_MES");
-        Path dir = Paths.get("archive/_panel-age/_backup-20261008");
-        if (args.length > 0) dir = Paths.get(args[0]);
+        // 参数: [set] [outdir]   set ∈ docs(默认,2026-10-08 那批 13 面板) / qc(2026-10-09 品质 5 面板)
+        String set = args.length > 0 ? args[0] : "docs";
+        if (set.equals("qc")) {
+            panels = QC_PANELS; tables = QC_TABLES; views = QC_VIEWS;
+        } else {
+            panels = PANELS; tables = TABLES; views = VIEWS;
+        }
+        Path dir = Paths.get(set.equals("qc") ? "archive/_panel-age/_backup-20261009-qc" : "archive/_panel-age/_backup-20261008");
+        if (args.length > 1) dir = Paths.get(args[1]);
         Files.createDirectories(dir);
+        System.out.println("[set] " + set + " 面板 " + panels.size() + " / 表 " + tables.size() + " / 视图 " + views.size());
         System.out.println("[db] " + db + "  [out] " + dir.toAbsolutePath());
         try (Connection c = DriverManager.getConnection(url(), USER, PASS)) {
-            String panelList = "'" + String.join("','", PANELS) + "'";
+            String panelList = "'" + String.join("','", panels) + "'";
             dumpCsv(c, "yj_panel", "panel_code IN (" + panelList + ")", dir.resolve("yj_panel.csv"));
             dumpCsv(c, "yj_field", "panel_code IN (" + panelList + ")", dir.resolve("yj_field.csv"));
             dumpCsv(c, "yj_role_panel", "panel_code IN (" + panelList + ")", dir.resolve("yj_role_panel.csv"));

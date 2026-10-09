@@ -1,4 +1,4 @@
-# tools/db-inuse-tables.txt — 「确定下来的后台表」在册登记
+﻿# tools/db-inuse-tables.txt — 「确定下来的后台表」在册登记
 #
 # 依据:2026-09-29 四源审计(①) yj_panel 面板绑定且面板在运营 ② 在运营视图依赖 ③ backend/src/main/java
 #   + frontend/src 运行期 SQL 引用 ④ 业务数据行)。判定口径与逐表证据:tools/archive/_table-audit/
@@ -113,7 +113,6 @@ table:qc_bhz   # 不合格品处理单(自制物料)头表——面板 QC_BHZ
 table:qc_bhz_detail   # 不合格品处理单(自制物料)行表——面板 QC_BHZ 明细
 table:qc_catalog   # 来料品质检验目录头表(单单据面板:全部检验批次记录进同一张目录单,单据号前缀 JYML,方式对照项目进度查询 RD_PROGRESS)
 table:qc_catalog_detail   # 来料品质检验目录行表(检验记录目录,每行=一个物料批次;由检验单生单自动生成、不可手工编辑;检测物料类别来自商品档案所属类别)
-table:qc_disposal   # 不良品处理单(转隔离仓/报废,审核即移仓过账)
 table:qc_insp   # 检验单头表——面板 QC_INSP;暂收单号/采购订单号/批次号/供应商口径
 table:qc_insp_detail   # 检验单行表——面板 QC_INSP 明细(检验项目与判定)
 table:qc_insp_rec   # 来料品质检验数据记录头表(检验报告 YJ-QR-96:抬头/结论/处理意见/签名;一张报告一单,单据号前缀 JYSJ)
@@ -124,10 +123,6 @@ table:qc_jjf   # 紧急放行申请单头表——面板 QC_JJF
 table:qc_jjf_detail   # 紧急放行申请单行表——面板 QC_JJF 明细
 table:qc_lyb   # 来料异常分析报告头表——面板 QC_LYB;供应商/物料批次/不良率
 table:qc_lyb_detail   # 来料异常分析报告行表——面板 QC_LYB 明细
-table:qc_op   # 工序质检单头表(制程检验,首件/巡检语义)
-table:qc_op_detail   # 工序质检单行表(检验项目/标准/实测值)
-table:qc_record   # 检验记录单头表(八类合一:首件/烧结制程/脱模/来料/材料进厂/黑水/巡线/管控点)
-table:qc_record_detail   # 检验记录单行表(检验项目/标准要求/结果/品序号)
 table:qc_return   # 暂收退料单头表——面板 QC_RETURN;退货类型/仓库/供应商代码
 table:qc_return_detail   # 暂收退料单行表——面板 QC_RETURN 明细
 table:qc_scp   # 试产材料使用申请单头表——面板 QC_SCP
@@ -187,8 +182,6 @@ table:rd_spec_doc_head   # 规格书头表(按规格书种类页签)
 table:rd_spike_water_detail   # 加标水配置记录表行表
 table:rd_spike_water_head   # 加标水配置记录表头表
 table:report_column_settings   # 报表列设置(用户自定义列布局,按panel_code存JSON)
-table:rod_return   # 炭棒不良退货登记头表
-table:rod_return_detail   # 炭棒不良退货登记占位行表(恒空,doc模式要求)
 table:s_allno   # 单据编号
 table:sample_req   # 样品申请单头表(录入/审核/执行三级)
 table:sample_req_detail   # 样品申请单行表(样品种类/规格/打样背景/交期)

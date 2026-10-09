@@ -312,25 +312,13 @@ export const menuTree = [
           { code: 'qcInspReqSeries', title: '来料检验要求(系列)', path: '/panelx/list/QC_INSP_REQ_SERIES', icon: 'Grid', panelCode: 'QC_INSP_REQ_SERIES' },
         ],
       },
-      {
-        // 制程品质(流程图·品质泳道:工序质检数据)
-        code: 'process', title: '制程品质', children: [
-          { code: 'qcOp', title: '工序质检单', path: '/panelx/list/QC_OP', icon: 'CircleCheck', panelCode: 'QC_OP', operationName: '新增流程' },
-          { code: 'qcRecord', title: '检验记录单', path: '/panelx/list/QC_RECORD', icon: 'Document', panelCode: 'QC_RECORD', operationName: '新增流程' },
-        ],
-      },
-      {
-        // 不良处理(隔离仓/不良品仓/报废/退货)
-        code: 'defect', title: '不良处理', children: [
-          { code: 'qcDisposal', title: '不良品处理单', path: '/panelx/list/QC_DISPOSAL', icon: 'Warning', panelCode: 'QC_DISPOSAL', operationName: '新增流程' },
-          { code: 'rodReturn', title: '炭棒不良退货登记', path: '/panelx/list/ROD_RETURN', icon: 'RefreshLeft', panelCode: 'ROD_RETURN', operationName: '新增流程' },
-        ],
-      },
-      {
-        code: 'trace', title: '品质追溯', children: [
-          { code: 'lotTrace', title: '批号追溯', path: '/panelx/list/LOT_TRACE', panelCode: 'LOT_TRACE', icon: 'Search' },
-        ],
-      },
+      // 2026-10-09 下架:「制程品质」整组(工序质检单 QC_OP / 检验记录单 QC_RECORD)、
+      // 「不良处理」整组(不良品处理单 QC_DISPOSAL / 炭棒不良退货登记 ROD_RETURN)、
+      // 「品质追溯」组(批号追溯 LOT_TRACE)—— 用户口径「都是没有用到的吧」,
+      // 实测:yj_usage_log 操作留痕 0、7 张业务表 0 行、单据状态 0 行 ⇒ 建好之后一张单都没录过。
+      // 面板/字段/授权/视图 v_lot_trace/7 张物理表 已整体删除
+      // (tools/migrate-drop-qc-unused-panels-20261009.sql),不是摘菜单,放开注释也恢复不了;
+      // 回退:跑 tools/archive/_panel-age/_backup-20261009-qc/restore-metadata.sql + 重建 7 张表与 v_lot_trace。
       {
         // 质量单据(YJ-QR 体系;2026-09-22 起为七表 —— 特采申请单已整体下线)
         // 2026-09-22 下线:特采申请单(QC_TC)—— 与「来料品质·特采单」QC_TC_IN 同表同版式、重复,
