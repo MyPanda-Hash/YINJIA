@@ -45,7 +45,9 @@ IF OBJECT_ID('rd_plan_detail') IS NOT NULL
   DELETE FROM rd_plan_detail WHERE 单据编号 IN (SELECT no FROM @docs);
 DELETE FROM rd_approval WHERE 单据编号 IN (SELECT no FROM @docs);
 DELETE FROM rd_plan     WHERE 单据编号 IN (SELECT no FROM @docs);
-DELETE FROM s_allno     WHERE 单据编号 IN (SELECT no FROM @docs);
+-- ⚠ 不碰号池 s_allno:项目约定「号池只增不删」(_cleanup-probe-junk-20260911.sql 明写"绝不触碰,
+--   删了会重发号")。本探针消耗的 2 个号留在台账里,不回收。
+--   (另注:该表单据号列名是 dh 而不是 单据编号,写错了只会静默报"列名无效"、删除部分不执行。)
 
 SELECT N'[删除后] 残留单据数' AS 项, CAST(COUNT(*) AS nvarchar) AS 值 FROM (
   SELECT 单据编号 AS no FROM rd_approval WHERE 单据编号 IN (SELECT no FROM @docs)
