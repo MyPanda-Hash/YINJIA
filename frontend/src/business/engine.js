@@ -12,6 +12,15 @@ export { unwrap, unwrapStrict, errMsg }
  */
 export { roundDecimal } from '@core/panel/calcRules'
 
+/**
+ * 纸质单据/标签打印(固定版式)——面板 runtime 契约的一站式再导出。
+ * core 视图不再直接 import `@/business/print-formats`,统一经 usePanelRuntime() 取。
+ */
+export {
+  printPuOrder, printPuOrderNoAmount, printQcReturn,
+  printProductCards, printLocationCards, printProductionTask, woQrText,
+} from './print-formats'
+
 // 数据访问固定为 SQL 后端：/api/px/* -> Spring Boot -> SQL Server HSDZ_MES（YINJIA-MES）。
 
 const APPROVAL_WORKFLOW_ACTIONS = ['提交审批', '审批通过', '审批驳回', '审批情况', '弃审']

@@ -1718,17 +1718,14 @@ import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, 
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search } from '@element-plus/icons-vue'
-import { useTabsStore } from '@/stores/tabs'
-import { useUserStore } from '@/stores/user'
-import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
-import { usePanelRuntime } from '@core/panel-runtime'
+import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
-import { printPuOrder, printQcReturn, printProductCards, printLocationCards, printProductionTask, printPuOrderNoAmount, woQrText } from '@/business/print-formats'
+
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
@@ -1762,11 +1759,15 @@ import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 
 const engine = usePanelRuntime()
+const { user, tabs, locale: localeStore } = useAppContext()
 const route = useRoute()
 const router = useRouter()
-const tabs = useTabsStore()
-const user = useUserStore()
-const localeStore = useLocaleStore()
+
+// ── 纸质单据/标签打印:统一由面板 runtime 下发,本组件不直接依赖 business/print-formats ──
+const {
+  printPuOrder, printQcReturn, printProductCards, printLocationCards,
+  printProductionTask, printPuOrderNoAmount, woQrText,
+} = engine
 
 // 语言热切换:仅重拉面板配置(字段标签/面板名/列别名随 Accept-Language 更新),
 // 不重拉数据——分页、滚动、弹窗、筛选、展开状态全部保留。

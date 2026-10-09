@@ -4,7 +4,7 @@
 import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
-import { extFieldOverview, extFieldAdd, extFieldRetire } from '@/business/engine'
+import { usePanelRuntime } from '@core/panel-runtime'
 
 // 2026-09-28 修「点关闭无反应」:本组件此前声明 visible prop + emit('update:visible'),
 // 而父组件(PanelxList)用 v-model(即 modelValue / update:modelValue)⇒ 页脚「关闭」按钮
@@ -21,6 +21,10 @@ const props = defineProps({
   parentOptionsOf: { type: Function, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'done'])
+const engine = usePanelRuntime()
+const extFieldOverview = (panelCode) => engine.extFieldOverview(panelCode)
+const extFieldAdd = (payload) => engine.extFieldAdd(payload)
+const extFieldRetire = (payload) => engine.extFieldRetire(payload)
 const loading = ref(false)
 const saving = ref(false)
 const data = ref({ capacity: 20, fields: [], linePool: [] })
