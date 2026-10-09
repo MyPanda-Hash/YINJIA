@@ -1608,6 +1608,9 @@
     <!-- 检验项目/检验方案维护(2026-10-09):三类工序检验单(成型/切炭/组装成品)工具栏入口;
          维护的是**标准本身**(bs_qc_plan + bs_qc_item),不往检验单写数据 -->
     <QcInspPlanDialog v-model="qcInspPlanVisible" />
+    <!-- 选检验项目(2026-10-09):从标准里勾选 → 带入当前单据明细(表区=检验项目),再按现有模板填写 -->
+    <QcInspItemPickDialog v-model="qcInspPickVisible" :product-code="String(cur['产品编码'] || '')"
+                          :product-name="String(cur['产品名称'] || '')" @pick="applyInspItems" />
     <!-- 仓位分区弹窗(2026-10-08):候选来自本面板已加载的仓位行,不落存储 ⇒ 分区随仓位存在;
          选中时「大区 + 存储分区」**一起回填**(用户口径:它们是一个组合) -->
     <ZonePickDialog v-model="zonePickVisible" :rows="zonePickRows" :area-key="ZONE_PAIR.area" :zone-key="ZONE_PAIR.zone" @pick="onZonePick" />
@@ -1742,6 +1745,7 @@ import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
+import QcInspItemPickDialog from '@core/qc/QcInspItemPickDialog.vue'
 import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
@@ -1966,6 +1970,8 @@ const colPrefVisible = ref(false)
 const fieldMgrVisible = ref(false)
 // 检验项目/检验方案维护(2026-10-09):三类工序检验单工具栏「更多」组入口(服务端把守 QC_ASM_INSP 可见性)
 const qcInspPlanVisible = ref(false)
+// 选检验项目(2026-10-09):勾选标准里的检验项目 → 追加到当前单据明细(表区=检验项目)
+const qcInspPickVisible = ref(false)
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
 
@@ -5167,6 +5173,38 @@ function addInlineDetailRow(b) {
   markInlineDirty() // 新增明细行 = 未保存修改
 }
 
+/**
+ * 选检验项目 → 带入当前单据明细(2026-10-09 用户口径:「在组装成品检验处看到对应的检验项目,
+ * 选择填写检验单的数据」)。
+ *
+ * 行为:把勾选的检验项目**追加**到当前明细页签行尾,每行只填 表区=检验项目 + 项目/标准要求/检验方法,
+ * 实测数值与判定留空,由品质按**现有模板**逐格填;不自动保存(保存仍由用户点「保存」)。
+ * 行由 newDetailRow(tabKey) 构造(带齐该页签各字段默认值),与「新增数据」完全同构
+ * ⇒ 保存链路(labelsToCols/行表 upsert)一行都不用改。
+ */
+function applyInspItems(items) {
+  const b = blocks.value[0]
+  const tabKey = b ? activeTab(b).key : 'items'
+  if (!cur.value.detail) cur.value.detail = {}
+  const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
+  let n = 0
+  for (const it of items || []) {
+    const row = newDetailRow(tabKey)
+    row['表区'] = '检验项目'
+    row['检验项目'] = it['项目名称'] || ''
+    row['标准要求'] = it['检验标准'] || ''
+    if (it['检验方法']) row['检验方法'] = it['检验方法']
+    rows.push(row)
+    n++
+  }
+  if (n) {
+    archPage.value = Math.ceil(rows.length / archPageSize.value)
+    markInlineDirty()
+    ElMessage.success(`${tt('已带入')} ${n} ${tt('行检验项目，请填写实测数值与判定')}`)
+  }
+  return n
+}
+
 function primaryDetailRefField(b) {
   if (!detailEditable(b)) return null
   const columns = new Set(activeTab(b).cols || [])
@@ -6393,6 +6431,17 @@ async function onButton(action) {
     impFields.value = (fields || []).filter((f) => !f.hidden)
     impLabel.value = tab.label || '明细'
     impVisible.value = true
+    return
+  }
+  // 选检验项目(2026-10-09 用户口径):在当前单据页把**检验标准**里的项目勾选带入明细(表区=检验项目),
+  // 再按现有模板填实测数值/判定(不自动保存)。
+  // ⚠ 必须排在下面「选X」通用分支(catch-all)之前:它取 `action.startsWith('选')`,会把本动作截走
+  //   并提示「演示环境暂未实现选单」(2026-10-09 实测踩到)。
+  if (action === '选检验项目') {
+    if (!cur.value || !(cur.value['单据编号'] || cur.value['编号'] || cur.value['合同号'])) {
+      return ElMessage.warning(tt('请先打开一张检验单，再选检验项目'))
+    }
+    qcInspPickVisible.value = true
     return
   }
   // 选单通用化：任意 选X 动作且配置有 selectConfig 即走选单（对齐 PanelxForm 的通用分支）

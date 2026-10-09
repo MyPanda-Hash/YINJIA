@@ -438,14 +438,17 @@ public class PanelConfigService {
         // 检验项目/检验方案维护(2026-10-09 用户口径):三类工序检验单就地维护检验标准(受控文件的
         // 项目/标准/方法/取样/处置),入口只下发到 QC_MOLD_INSP / QC_CUT_INSP / QC_ASM_INSP 三张单,
         // 紧跟「字段管理」之后;真正的写操作由 QcInspPlanController 以 QC_ASM_INSP 可见性把守。
+        // 同日追加「选检验项目」:在单据页把标准里的项目**勾选带入**当前明细(表区=检验项目)——
+        // 它排在「检验项目维护」之前(先用、后维护)。
         if (WO_INSP_PANELS.contains(def.code())) {
             for (Map<String, Object> g : buttonGroups) {
                 @SuppressWarnings("unchecked")
                 List<String> gActions = (List<String>) g.get("actions");
                 int anchor = gActions.indexOf("字段管理");
-                if (anchor >= 0 && !gActions.contains("检验项目维护")) {
+                if (anchor >= 0) {
                     List<String> merged = new ArrayList<>(gActions);
-                    merged.add(anchor + 1, "检验项目维护");
+                    if (!merged.contains("检验项目维护")) merged.add(anchor + 1, "检验项目维护");
+                    if (!merged.contains("选检验项目")) merged.add(anchor + 1, "选检验项目");
                     g.put("actions", merged);
                 }
             }
