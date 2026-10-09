@@ -14,6 +14,9 @@
         <el-button size="small" type="primary" :icon="Search" @click="open">查询</el-button>
         <span class="rpd-tip">{{ tipText }} · 共 {{ total }} 条</span>
       </div>
+      <!-- 级联字段的空态说明(2026-10-09):仓位这类「按本行仓库收窄」的参照,候选为空时
+           光一句「暂无数据」说不清是没选上级还是上级真的没有数据 —— 这里把原因讲明。 -->
+      <div v-if="!loading && cascadeHint" class="rpd-cascade-hint">{{ cascadeHint }}</div>
       <el-table
         ref="tableRef"
         :data="pagedRows"
@@ -112,6 +115,24 @@ function devTone(status) {
 
 const title = ref('参照选择')
 const multi = computed(() => !!props.field?.refMulti || !!props.field?.multi)
+
+/** 级联空态说明:字段的过滤值带 `$字段` 占位(= 候选按本行某字段收窄,如 仓位 ← 仓库)时,
+ *  提示「先选上级」或「上级下暂无数据」——否则用户只看到「暂无数据」,分不清是漏填还是真没有。 */
+const cascadeHint = computed(() => {
+  const filter = props.field?.filter || {}
+  const pairs = Object.entries(filter).filter(([, v]) => typeof v === 'string' && v.startsWith('$'))
+  if (!pairs.length) return ''
+  for (const [, v] of pairs) {
+    const parent = String(v).slice(1)
+    const val = props.row?.[parent]
+    if (val === undefined || val === null || String(val).trim() === '') return '请先选择「' + tt(parent) + '」'
+  }
+  // 上级有值却查不到候选:多半是上级档案下还没建下级数据(如该仓库尚未维护仓位档案)
+  if (rows.value.length === 0 && !keyword.value.trim()) {
+    return '该「' + tt(String(pairs[0][1]).slice(1)) + '」下暂无候选数据(请先在对应档案里维护)'
+  }
+  return ''
+})
 const tipText = computed(() => {
   if (props.mode === 'detail') return '可勾选多行，确定后每行生成一条明细'
   if (multi.value) return '可勾选多行，确定后一次导入（多值顿号连接）'
@@ -170,6 +191,16 @@ function confirm() {
   font-size: 12px;
   color: var(--t-text-3);
   margin-left: 4px;
+}
+/* 级联空态说明(仓位 ← 仓库 这类) */
+.rpd-cascade-hint {
+  font-size: 12px;
+  color: #b26a00;
+  background: #fff7e6;
+  border: 1px solid #ffe0a3;
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin-bottom: 6px;
 }
 /* 大数据参照分页器:贴在表格下沿右对齐(形态对齐档案页 arch-pager) */
 .rpd-pager {

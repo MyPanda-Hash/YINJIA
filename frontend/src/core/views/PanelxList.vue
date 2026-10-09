@@ -4894,12 +4894,17 @@ async function onCtxItem(it) {
 // ---------- 查询区 ----------
 function fieldDefOf(col) {
   const cfg = cfgCache.value
-  const r = (cfg?.dataSchema?.fields || []).find((x) => x.dataName === col)
-  if (r) return r
+  // ⚠ 明细列**先取明细页签的登记**:表头与明细可能同名字段,而两条的 dataType/参照源可以不同 ——
+  //   表头那条是 header 位,只有明细那条才是本列的渲染依据。
+  //   2026-10-09 实测踩到:采购入库单表头有一条历史遗留的隐藏字段也叫「仓位」(文本),
+  //   而明细「仓位」是参照(WHLOC) —— 按旧顺序(先查 dataSchema=表头)取到表头那条文本元数据,
+  //   于是该格不被认作参照格、渲染成普通「懒激活格」,点一下只激活不弹选择器(用户报「仓位选不了」)。
   for (const tab of cfg?.detail?.tabs || []) {
     const dr = (tab.fields || []).find((x) => x.dataName === col)
     if (dr) return dr
   }
+  const r = (cfg?.dataSchema?.fields || []).find((x) => x.dataName === col)
+  if (r) return r
   return { dataName: col, dataType: '文本', options: [] }
 }
 
