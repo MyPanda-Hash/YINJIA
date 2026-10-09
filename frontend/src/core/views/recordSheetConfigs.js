@@ -1694,11 +1694,13 @@ export const recordSheetConfigs = {
         ]},
       ]},
       { page: 1, bar: '正文', rows: [
-        { pairs: [{ label: '1 目的', key: '目的' }] },
-        { pairs: [{ label: '2 范围', key: '范围' }] },
-        { pairs: [{ label: '3 职责和权限', key: '职责和权限' }] },
-        { pairs: [{ label: '4 取样要求', key: '取样要求' }] },
-        { pairs: [{ label: '5 工作程序', key: '工作程序' }] },
+        // ⚠ vspan=3:键值对行的值格默认只占 **1 列**,4 列版式下右边会空一半(2026-10-09 用户实测报
+        //   「表格为什么不填满右边」)⇒ 值格跨满 label 之外的 3 列。
+        { pairs: [{ label: '1 目的', key: '目的', vspan: 3 }] },
+        { pairs: [{ label: '2 范围', key: '范围', vspan: 3 }] },
+        { pairs: [{ label: '3 职责和权限', key: '职责和权限', vspan: 3 }] },
+        { pairs: [{ label: '4 取样要求', key: '取样要求', vspan: 3 }] },
+        { pairs: [{ label: '5 工作程序', key: '工作程序', vspan: 3 }] },
       ]},
       // ⚠ 本页 grid 是 4 列 ⇒ 签字栏拆两行,别写成 6 格(会把「核准」挤出纸面)
       { page: 1, bar: '签署', rows: [
