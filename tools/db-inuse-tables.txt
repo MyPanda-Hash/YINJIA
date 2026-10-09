@@ -45,14 +45,9 @@ table:bd_expense_type   # 费用类别档案
 table:bd_finish_in   # 产成品入库单头表(切炭双出口直销自动生成并审核)
 table:bd_manu_order   # 生产加工单头表(经典遗留面板)
 table:bd_material_out   # 材料出库单(领料)头表
-table:bd_other_in   # 其他入库单头表
-table:bd_other_out   # 其他出库单头表
-table:bd_outsource_in   # 委外入库单头表
-table:bd_outsource_issue   # 委外发料单头表
 table:bd_outsource_order   # 委外加工单头表
 table:bd_prod_abn   # 生产异常处理单(闭环:异常提出→原因分析→处理措施→结案;挂 工单号/批次号(碳棒)/混料批次号,所有不良异常按批次号展开)
 table:bd_pu_order   # 采购订单头表
-table:bd_pu_req   # 请购单头表
 table:bd_purchase_in   # 采购入库单头表(审核过账kucun入库)
 table:bd_sale_out   # 销售出库单头表(审核过账kucun出库)
 table:bd_so_order   # 销售订单头表(星辰ERP同步)
@@ -61,15 +56,10 @@ table:bl_dispatch   # 工序派工单行表(中文列,服务器口径;含生产�
 table:bl_finish_in   # 产成品入库单行表(负数量=红字冲回)
 table:bl_manu_order   # 生产加工单行表(经典遗留面板)
 table:bl_material_out   # 材料出库单(领料)行表(BOM展开生成)
-table:bl_other_in   # 其他入库单行表
-table:bl_other_out   # 其他出库单行表
-table:bl_outsource_in   # 委外入库单行表
-table:bl_outsource_issue   # 委外发料单行表
 table:bl_outsource_order   # 委外加工单行表
 table:bl_pu_order   # 采购订单行表
 table:bd_pu_label   # 采购订单材料码打印单**头**表(供应商自行打码:打印时登记批次号并预约该行数量,生单只消费不再取号;同订单+同批次号复用一张,重打不重复占用;作废即释放预约。**按用户口径不建面板**,仅服务与接口读写)
 table:bl_pu_label   # 采购订单材料码打印单**行**表(本批次号下每个订单行打印了多少;锚=采购订单行id,与 form_flow_link.source_line_key 同源;已生单量不落本表,由 form_flow_link 按批次号派生)
-table:bl_pu_req   # 请购单行表
 table:bl_purchase_in   # 采购入库单行表(批号三键入库)
 table:bl_sale_out   # 销售出库单行表(批号三键出库)
 table:bl_so_order   # 销售订单行表(星辰ERP同步)

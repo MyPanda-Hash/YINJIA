@@ -1,0 +1,4 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-ref-check.sql ==
+  | DOC_BATCH | 0 | 
+[SQL FAIL] 必须声明表变量 "@names"。

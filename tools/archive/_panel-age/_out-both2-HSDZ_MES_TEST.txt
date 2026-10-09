@@ -1,0 +1,4 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-both2.sql ==
+  | HSDZ_MES_TEST | 258 | 52 | 
+[OK] _q-both2.sql (1 batches)

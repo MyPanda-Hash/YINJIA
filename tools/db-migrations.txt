@@ -2277,3 +2277,14 @@ migrate-align-ledger-fields2-20261008.sql
 #   CK00001 正品仓与「转ERP 无仓默认推 CK00001」同样本次不动。
 #   幂等重跑影响 0 行;两账套均已执行并复核(启用中恰 6 行、全为金蝶来源)。
 migrate-wh-kingdee-only-20261008.sql
+
+# —— 2026-10-08 下架「请购单 + 其他入库/其他出库/委外入库/委外发料」13 个面板(用户口径:这些单据不需要) ——
+#   保留:采购入库单 PURCHASE_IN / 销售出库单 SALE_OUT / 材料出库单 MATERIAL_OUT / 产成品入库单 FINISH_IN
+#   (后者是「工单完工入库」的唯一载体 —— 报工自动生单 + plang/scjl 回写 + 排产看板入库区都挂它,用户明确保留)。
+#   删:yj_panel 13 行 + yj_field 258 行 + yj_role_panel 52 行 + 译名(面板名 117 行 + 22 个孤儿字段标签)
+#      + 视图 8 个(v_other_*_detail/stats、v_outsource_*_detail/stats)+ 物理表 10 张(bd_/bl_ 各 5 对);
+#   依据:这 5 类单据全部 0 张、库存流水 inh/outh 无其一;DB 侧无视图/存储过程/外键引用;13 面板「9 月后零更新」
+#      (详见 docs/development/面板老化盘点-品质管理与智能供应链.md);脚本头逐个列明删了什么。
+#   安全:脚本自带「10 张待删表必须全空」闸(非空即 RAISERROR 中止)+ 越界自检(保留面板/库存三表仍在);
+#      回退抓手 tools/archive/_panel-age/_backup-20261008/。
+migrate-drop-extra-docs-pu-req-20261008.sql

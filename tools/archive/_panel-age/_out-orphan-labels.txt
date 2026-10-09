@@ -1,0 +1,38 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-orphan-labels.sql ==
+  (0 rows)
+  | PANEL_NAMES | 其他出库单 | 
+  | PANEL_NAMES | 其他出库单明细表 | 
+  | PANEL_NAMES | 其他出库单统计表 | 
+  | PANEL_NAMES | 其他入库单 | 
+  | PANEL_NAMES | 其他入库单明细表 | 
+  | PANEL_NAMES | 其他入库单统计表 | 
+  | PANEL_NAMES | 请购单 | 
+  | PANEL_NAMES | 委外发料单 | 
+  | PANEL_NAMES | 委外发料单明细表 | 
+  | PANEL_NAMES | 委外发料单统计表 | 
+  | PANEL_NAMES | 委外入库单 | 
+  | PANEL_NAMES | 委外入库单明细表 | 
+  | PANEL_NAMES | 委外入库单统计表 | 
+  | ORPHAN_LABELS | 报价 | 1 | 
+  | ORPHAN_LABELS | 到货地址 | 1 | 
+  | ORPHAN_LABELS | 发料仓库 | 1 | 
+  | ORPHAN_LABELS | 发料单数 | 1 | 
+  | ORPHAN_LABELS | 含税总金额 | 1 | 
+  | ORPHAN_LABELS | 合理损耗数量 | 1 | 
+  | ORPHAN_LABELS | 合理损耗数量(主单位) | 1 | 
+  | ORPHAN_LABELS | 建议供应商 | 1 | 
+  | ORPHAN_LABELS | 建议供应商编码 | 1 | 
+  | ORPHAN_LABELS | 建议供应商简称 | 1 | 
+  | ORPHAN_LABELS | 来料客户 | 2 | 
+  | ORPHAN_LABELS | 累计调拨入库量 | 1 | 
+  | ORPHAN_LABELS | 累计调拨入库量(主单位) | 1 | 
+  | ORPHAN_LABELS | 请购人 | 1 | 
+  | ORPHAN_LABELS | 入库单数 | 1 | 
+  | ORPHAN_LABELS | 是否带票 | 1 | 
+  | ORPHAN_LABELS | 收货人 | 1 | 
+  | ORPHAN_LABELS | 外部单据号 | 2 | 
+  | ORPHAN_LABELS | 委外加工单号 | 4 | 
+  | ORPHAN_LABELS | 需求日期 | 1 | 
+  | ORPHAN_LABELS | 自动生入库单 | 1 | 
+[OK] _q-orphan-labels.sql (4 batches)

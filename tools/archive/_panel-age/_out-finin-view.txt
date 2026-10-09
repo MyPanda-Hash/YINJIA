@@ -1,0 +1,5 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-finin-view.sql ==
+  | v_finish_in_detail 是否含 asp_cancel | null | null | 
+  | CREATE   VIEW v_finish_in_detail AS SELECT h.[单据日期], NULL AS [创建时间], h.[单据编号], h.[业务类型], NULL AS [仓库编码], h.[仓库], h.[入库类别], NULL AS [生产车间编码], h.[生产车间], NULL AS [经手人编码], h.[经手人], NULL AS [备注], NULL AS [制单人], NULL AS [审核人], NULL AS [存货编码], NULL AS [存货], l.[规格型号], l.[计量单位], l.[实收数量], l.[单价], l.[金额], NULL AS [计量单位2], NULL AS [实收数量2] FROM bd_finish_in h LEFT JOIN bl_finish_in l ON h.[单据编号] = l.[单据编号]; | 
+[OK] _q-finin-view.sql (2 batches)

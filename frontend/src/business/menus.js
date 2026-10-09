@@ -122,7 +122,10 @@ export const menuTree = [
         children: [
           {
             code: 'doc', title: '单据', children: [
-              { code: 'puReq', title: '请购单', path: '/panelx/list/PU_REQ', icon: 'Tickets', panelCode: 'PU_REQ', operationName: '新增流程' },
+              // 2026-10-08 下架:请购单(PU_REQ)—— 用户口径「请购单不需要」。
+              // 面板/字段/授权/译名与 bd_pu_req+bl_pu_req 两张表已整体删除
+              // (tools/migrate-drop-extra-docs-pu-req-20261008.sql),不是摘菜单,放开注释也恢复不了;
+              // 回退:跑 tools/archive/_panel-age/_backup-20261008/restore-metadata.sql + 重建两张表。
               { code: 'puOrder', title: '采购订单', path: '/panelx/list/PU_ORDER', icon: 'Tickets', panelCode: 'PU_ORDER', operationName: '新增流程' },
             ],
           },
@@ -141,12 +144,10 @@ export const menuTree = [
               { code: 'qcReturn', title: '暂收退料单', path: '/panelx/list/QC_RETURN', icon: 'RefreshLeft', panelCode: 'QC_RETURN', operationName: '新增流程' },
               { code: 'purchaseIn', title: '采购入库单', path: '/panelx/list/PURCHASE_IN', icon: 'Download', panelCode: 'PURCHASE_IN', operationName: '新增流程' },
               { code: 'finishIn', title: '产成品入库单', path: '/panelx/list/FINISH_IN', icon: 'Download', panelCode: 'FINISH_IN', operationName: '新增流程' },
-              { code: 'otherIn', title: '其他入库单', path: '/panelx/list/OTHER_IN', icon: 'Download', panelCode: 'OTHER_IN', operationName: '新增流程' },
-              { code: 'outsourceIn', title: '委外入库单', path: '/panelx/list/OUTSOURCE_IN', icon: 'Download', panelCode: 'OUTSOURCE_IN', operationName: '新增流程' },
+              // 2026-10-08 下架:其他入库单(OTHER_IN)/委外入库单(OUTSOURCE_IN)—— 面板+表+视图整体删除,
+              // 与下方 其他出库单/委外发料单 同批(tools/migrate-drop-extra-docs-pu-req-20261008.sql)。
               { code: 'saleOut', title: '销售出库单', path: '/panelx/list/SALE_OUT', icon: 'Upload', panelCode: 'SALE_OUT', operationName: '新增流程' },
               { code: 'materialOut', title: '材料出库单', path: '/panelx/list/MATERIAL_OUT', icon: 'Upload', panelCode: 'MATERIAL_OUT', operationName: '新增流程' },
-              { code: 'otherOut', title: '其他出库单', path: '/panelx/list/OTHER_OUT', icon: 'Upload', panelCode: 'OTHER_OUT', operationName: '新增流程' },
-              { code: 'outsourceIssue', title: '委外发料单', path: '/panelx/list/OUTSOURCE_ISSUE', icon: 'Upload', panelCode: 'OUTSOURCE_ISSUE', operationName: '新增流程' },
             ],
           },
         ],
@@ -158,12 +159,9 @@ export const menuTree = [
         children: [
           { code: 'purchaseInDetail', title: '采购入库单明细表', path: '/panelx/list/PURCHASE_IN_DETAIL', panelCode: 'PURCHASE_IN_DETAIL', icon: 'List' },
           { code: 'finishInDetail', title: '产成品入库单明细表', path: '/panelx/list/FINISH_IN_DETAIL', panelCode: 'FINISH_IN_DETAIL', icon: 'List' },
-          { code: 'otherInDetail', title: '其他入库单明细表', path: '/panelx/list/OTHER_IN_DETAIL', panelCode: 'OTHER_IN_DETAIL', icon: 'List' },
-          { code: 'outsourceInDetail', title: '委外入库单明细表', path: '/panelx/list/OUTSOURCE_IN_DETAIL', panelCode: 'OUTSOURCE_IN_DETAIL', icon: 'List' },
+          // 2026-10-08 下架:其他入库单/委外入库单/其他出库单/委外发料单 4 张明细表(面板+视图整体删除)
           { code: 'saleOutDetail', title: '销售出库单明细表', path: '/panelx/list/SALE_OUT_DETAIL', panelCode: 'SALE_OUT_DETAIL', icon: 'List' },
           { code: 'materialOutDetail', title: '材料出库单明细表', path: '/panelx/list/MATERIAL_OUT_DETAIL', panelCode: 'MATERIAL_OUT_DETAIL', icon: 'List' },
-          { code: 'otherOutDetail', title: '其他出库单明细表', path: '/panelx/list/OTHER_OUT_DETAIL', panelCode: 'OTHER_OUT_DETAIL', icon: 'List' },
-          { code: 'outsourceIssueDetail', title: '委外发料单明细表', path: '/panelx/list/OUTSOURCE_ISSUE_DETAIL', panelCode: 'OUTSOURCE_ISSUE_DETAIL', icon: 'List' },
         ],
       },
       {
@@ -173,12 +171,9 @@ export const menuTree = [
         children: [
           { code: 'purchaseInStats', title: '采购入库单统计表', path: '/panelx/list/PURCHASE_IN_STATS', panelCode: 'PURCHASE_IN_STATS', icon: 'Histogram' },
           { code: 'finishInStats', title: '产成品入库单统计表', path: '/panelx/list/FINISH_IN_STATS', panelCode: 'FINISH_IN_STATS', icon: 'Histogram' },
-          { code: 'otherInStats', title: '其他入库单统计表', path: '/panelx/list/OTHER_IN_STATS', panelCode: 'OTHER_IN_STATS', icon: 'Histogram' },
-          { code: 'outsourceInStats', title: '委外入库单统计表', path: '/panelx/list/OUTSOURCE_IN_STATS', panelCode: 'OUTSOURCE_IN_STATS', icon: 'Histogram' },
+          // 2026-10-08 下架:其他入库单/委外入库单/其他出库单/委外发料单 4 张统计表(面板+视图整体删除)
           { code: 'saleOutStats', title: '销售出库单统计表', path: '/panelx/list/SALE_OUT_STATS', panelCode: 'SALE_OUT_STATS', icon: 'Histogram' },
           { code: 'materialOutStats', title: '材料出库单统计表', path: '/panelx/list/MATERIAL_OUT_STATS', panelCode: 'MATERIAL_OUT_STATS', icon: 'Histogram' },
-          { code: 'otherOutStats', title: '其他出库单统计表', path: '/panelx/list/OTHER_OUT_STATS', panelCode: 'OTHER_OUT_STATS', icon: 'Histogram' },
-          { code: 'outsourceIssueStats', title: '委外发料单统计表', path: '/panelx/list/OUTSOURCE_ISSUE_STATS', panelCode: 'OUTSOURCE_ISSUE_STATS', icon: 'Histogram' },
         ],
       },
       {

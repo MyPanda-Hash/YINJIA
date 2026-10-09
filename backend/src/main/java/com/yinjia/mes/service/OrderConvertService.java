@@ -86,11 +86,10 @@ public class OrderConvertService {
                         + " OUTER APPLY (SELECT SUM(ISNULL(linked_quantity,0)) AS linked FROM form_flow_link f"
                         + "   WHERE f.source_panel_code='SO_ORDER' AND f.source_line_key = o.[单据编号]+N'#'+CAST(l.[id] AS nvarchar(20))"
                         + "     AND f.target_panel_code IN ('MANU_ORDER','PLANG') AND f.link_status='ACTIVE') m"
-                        + " OUTER APPLY (SELECT SUM(ISNULL(linked_quantity,0)) AS linked FROM form_flow_link f"
-                        + "   WHERE f.source_panel_code='SO_ORDER' AND f.source_line_key = o.[单据编号]+N'#'+CAST(l.[id] AS nvarchar(20))"
-                        + "     AND f.target_panel_code='PU_REQ' AND f.link_status='ACTIVE') p"
+                        // 2026-10-08:原「SO_ORDER → PU_REQ(请购单)」占用通道随请购单下架整体移除 ——
+                        // 结转只剩转工单一条出口(转采购走采购订单/金蝶,不在此处占用)
                         + " WHERE ISNULL(o.asp_cancel,'N') <> 'Y'"
-                        + "   AND ISNULL(l.[数量],0) - ISNULL(m.linked,0) - ISNULL(p.linked,0) > 0.0001"
+                        + "   AND ISNULL(l.[数量],0) - ISNULL(m.linked,0) > 0.0001"
                         + "   AND (? = '' OR o.[单据编号] LIKE ? OR o.[客户] LIKE ? OR l.[存货编码] LIKE ? OR l.[存货名称] LIKE ?)"
                         + " ORDER BY o.[单据日期], o.[单据编号], l.[id]",
                 kw, like, like, like, like);
@@ -110,7 +109,8 @@ public class OrderConvertService {
         Map<String, Object> today = jdbc.queryForMap(
                 "SELECT COUNT(DISTINCT source_line_key) AS cnt, COUNT(DISTINCT ISNULL(inventory_code,N'')) AS styles,"
                         + " SUM(ISNULL(linked_quantity,0)) AS qty FROM form_flow_link"
-                        + " WHERE source_panel_code='SO_ORDER' AND target_panel_code IN ('MANU_ORDER','PU_REQ','PLANG')"
+                        // 2026-10-08:原含 'PU_REQ' 的计入口径随请购单下架收敛为 工单/排产 两目标
+                        + " WHERE source_panel_code='SO_ORDER' AND target_panel_code IN ('MANU_ORDER','PLANG')"
                         + "   AND link_status='ACTIVE' AND CONVERT(varchar(10), create_time, 120) = CONVERT(varchar(10), GETDATE(), 120)");
         Map<String, Object> done = new LinkedHashMap<>();
         done.put("总订单笔数", num(today.get("cnt")));
