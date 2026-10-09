@@ -73,6 +73,9 @@ const props = defineProps({
   mode: { type: String, default: 'header' },
   // 调用方所属面板(用于「产品开发」状态标注:仅下游文件面板显示;2026-09-11 起 4 个)
   ownerPanel: { type: String, default: '' },
+  // 本行数据(2026-10-09):供参照过滤里的 `$字段` 占位取值 —— 仓位(ref_filter=`仓库=$仓库`)
+  // 之类级联字段据此把候选收窄到本行仓库;非级联字段传不传都一样。
+  row: { type: Object, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'update:visible', 'confirm'])
 
@@ -124,7 +127,7 @@ async function open() {
   rows.value = []
   try {
     columns.value = await engine.refColumns(props.field)
-    const list = await engine.queryRefRows(props.field, { keyword: keyword.value })
+    const list = await engine.queryRefRows(props.field, { keyword: keyword.value, row: props.row })
     if (showDevStatus.value) {
       const codes = list.map((r) => r['产品编号']).filter((v) => v !== undefined && v !== null && v !== '')
       try {

@@ -157,10 +157,13 @@ const ORDER = `(SELECT COUNT(*) FROM (
       WHERE x.dup = 1 AND x.rn <> y.rn)`
 const GAP_EXPR = `${EXTRA}\n     + ${MISSING}\n     + ${ORDER}`
 
-const sql = `/* migrate-fourdoc-baseline-restore-20261008.sql — 采购链四单 yj_field 回正到 2026-10-03 基线
+const sql = `/* migrate-fourdoc-baseline-restore-20261008.sql — 采购链四单 yj_field 回正到**冻结基线 dump**
  *
  * 【为什么有这条】
- *   docs/development/采购链四单字段与显示字段.md 是四单字段/显示名/顺序的唯一基线(2026-10-03 冻结)。
+ *   docs/development/采购链四单字段与显示字段.md 是四单字段/显示名/顺序的唯一基线。
+ *   ⚠ 基线的**真源是下面第【本脚本做什么】节里那份冻结 dump 的 sha256**,不是某个写死的日期 ——
+ *     2026-10-03 首次冻结(事故复盘用),2026-10-09 因「采购入库明细启用仓位」刷新过一次
+ *     (冻结副本 tools/archive/_dump-out/_head-fields-HSDZ_MES.md ← 当时的现库 dump)。
  *   2026-10-05 07:42 起本地库发生**迁移链整链重放**(79 条脚本因字节变更被 DbSync 判为"未执行"而重跑,
  *   首条即 migrate-sl-supplier-ref.sql),四单的 yj_field 行被整批换成另一代登记:
  *     · 参照源回落:非供应商字段又挂 ref_panel='GFDA'(§5.3 同款越界形态,QC_INSP.部门 = 1 行越界);

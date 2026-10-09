@@ -325,7 +325,7 @@
         </template>
       </el-dialog>
     </div>
-    <RefPickDialog v-model="refVisible" :field="refPick?.field" :mode="refPick?.mode" @confirm="onRefConfirm" />
+    <RefPickDialog v-model="refVisible" :field="refPick?.field" :row="refPick?.row" :mode="refPick?.mode" @confirm="onRefConfirm" />
 
     <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
     <el-dialog v-model="dictPickVisible" :title="tt('选择') + '：' + (dictPickField ? tt(dictPickField.name) : '')" width="440px" append-to-body :close-on-click-modal="false">

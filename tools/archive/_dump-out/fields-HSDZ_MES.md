@@ -528,6 +528,7 @@ FIELD	detail	160	行号	行号	文本	120	E-H-							Line No.		12118
 FIELD	detail	170	现存量	现存量	小数	110	E--V							Current inventory		12120
 FIELD	detail	180	商品id	商品id	文本	120	E-H-									12123
 FIELD	detail	190	仓库	仓库	参照	140	ER-V		WH	仓库名称	仓库名称					12125
+FIELD	detail	195	仓位	仓位编码	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库		Bin		12143
 FIELD	detail	200	商品是否多单位	商品是否多单位	文本	120	E-H-									12127
 FIELD	detail	210	商品是否序列号	商品是否序列号	文本	120	E-H-									12128
 FIELD	detail	220	商品是否辅助属性	商品是否辅助属性	文本	120	E-H-									12131
@@ -536,7 +537,6 @@ FIELD	detail	240	商品是否批次	商品是否批次	文本	120	E-H-									1
 FIELD	detail	250	仓库id	仓库id	文本	120	E-H-									12137
 FIELD	detail	260	仓库启用仓位管理	仓库启用仓位管理	文本	120	E-H-									12139
 FIELD	detail	270	仓位id	仓位id	文本	120	E-H-									12141
-FIELD	detail	280	仓位名称	仓位名称	文本	120	E-H-									12143
 FIELD	detail	290	采购订单行号	源单行号	文本	110	E--V									12144
 FIELD	detail	300	辅助属性id	辅助属性id	文本	120	E-H-									12146
 FIELD	detail	310	批次号	批次号	文本	150	---V									12149

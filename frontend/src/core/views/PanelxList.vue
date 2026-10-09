@@ -1033,7 +1033,7 @@
 
     <RefPickDialog v-model="queryRefVisible" :field="queryRefField" mode="query" @confirm="onQueryRefConfirm" />
     <RefPickDialog v-model="headerRefVisible" :field="headerRefField" mode="header" @confirm="onHeaderRefConfirm" />
-    <RefPickDialog v-model="detailRefVisible" :field="detailRefPick?.field" mode="detail" @confirm="onDetailRefConfirm" />
+    <RefPickDialog v-model="detailRefVisible" :field="detailRefPick?.field" :row="detailRefPick?.row" mode="detail" @confirm="onDetailRefConfirm" />
     <!-- 分批送料对话框(2026-09-20 P0):采购订单「生成送料暂收单」逐行填本次送料数量 -->
     <BatchSendDialog
       v-model="batchSendVisible"

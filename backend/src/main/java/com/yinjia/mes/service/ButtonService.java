@@ -582,6 +582,93 @@ public class ButtonService {
                 throw new IllegalArgumentException("明细第 " + (i + 1) + " 行" + f.displayName() + "不能为空");
             }
         }
+        ensureBinRequiredFilled(def, items);
+    }
+
+    /**
+     * 仓位「逐仓必填」(2026-10-09 用户口径「启用仓位管理逐仓开启,开了才必填」)。
+     *
+     * <p>为什么不做成 yj_field.required=1:它是**条件性**必填 —— 依赖本行「仓库」在
+     * {@code bs_wh.启用仓位管理} 上是否勾了。`required` 是全局静态位,表达不了"这个仓要、那个仓不要"。
+     *
+     * <p>口径与 {@link #ensureDetailRequiredFilled} 逐条对齐:只对**登记了明细「仓位」字段**的面板生效;
+     * 只校验**载荷里明确带了该键**的行(键缺失=局部提交,不误报);取不到仓库/仓库档案查不到 ⇒ 按"不要求",
+     * 宁可少拦也不误报(用户还能在仓档上把开关关掉)。
+     */
+    private void ensureBinRequiredFilled(PanelRegistry.PanelDef def, List<Map<String, Object>> items) {
+        PanelRegistry.FieldDef bin = def.fieldsAt("detail").stream()
+                .filter(f -> "仓位".equals(f.label())).findFirst().orElse(null);
+        if (bin == null) return;                       // 该面板明细没有仓位字段:整段跳过
+        for (int i = 0; i < items.size(); i++) {
+            Map<String, Object> row = items.get(i);
+            if (row == null || !row.containsKey(bin.label())) continue;
+            Object v = row.get(bin.label());
+            if (v != null && !String.valueOf(v).isBlank()) continue;
+            if (!warehouseNeedsBin(str(row.get("仓库")))) continue;
+            throw new IllegalArgumentException("明细第 " + (i + 1) + " 行" + bin.displayName() + "不能为空(该仓库已启用仓位管理)");
+        }
+    }
+
+    /** 该仓库是否启用了仓位管理(bs_wh.启用仓位管理;按 名称/编码 两路匹配)。
+     *  查不到仓库、取不到值、异常 ⇒ 一律按「不要求」返回 false(不因脏数据把保存堵死)。 */
+    private boolean warehouseNeedsBin(String wh) {
+        if (wh == null || wh.isBlank()) return false;
+        try {
+            Boolean need = jdbc.queryForObject(
+                    "SELECT TOP 1 CONVERT(bit, ISNULL([启用仓位管理], 0)) FROM bs_wh"
+                            + " WHERE (RTRIM([仓库名称]) = RTRIM(?) OR RTRIM([仓库编码]) = RTRIM(?))"
+                            + "   AND ISNULL(asp_cancel, 'N') <> 'Y'",
+                    Boolean.class, wh.trim(), wh.trim());
+            return Boolean.TRUE.equals(need);
+        } catch (Exception e) {
+            log.debug("仓位必填判定回退(视为不要求) wh={} : {}", wh, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 生单预设仓位(2026-10-09 用户口径「物料默认 ⇢ 仓位默认兜底」)。
+     *
+     * <p>取值顺序:
+     * <ol>
+     *   <li>商品基本档案 {@code bs_inv.默认仓位}(按 存货编码;两侧 TRIM,防档案尾空格)—— 物料级,最精确;</li>
+     *   <li>该仓在仓位档案 {@code bs_wh_loc} 里勾了「是否默认」的仓位(同仓多个时取仓位编码最小者)—— 仓库级兜底。</li>
+     * </ol>
+     *
+     * <p><b>只在该仓启用了仓位管理时预设</b>({@code bs_wh.启用仓位管理=1}):没开仓位管理的仓
+     * 本来就不管仓位,凭空塞一个位只会让仓库核单时要删它。取不到返回 null —— 调用方**不写该键**,
+     * 界面留空由人工选(配合必填校验:开了仓位管理的仓,人工必须补上)。
+     *
+     * <p>public 供 {@code PushGenerateHandler.applySourceFlags} 复用 —— 免检直达/选单/分批那条生单
+     * 路径不经过本类(inspAutoPurchaseIn),但预设口径必须是同一份实现(代码规范 D:反复制粘贴)。
+     */
+    public String presetBinFor(String invCode, String whName) {
+        String wh = whName == null ? "" : whName.trim();
+        if (wh.isEmpty() || !warehouseNeedsBin(wh)) return null;
+        String code = invCode == null ? "" : invCode.trim();
+        if (!code.isEmpty()) {
+            try {
+                List<String> own = jdbc.queryForList(
+                        "SELECT TOP 1 RTRIM([默认仓位]) FROM bs_inv"
+                                + " WHERE RTRIM([存货编码]) = ? AND ISNULL([默认仓位], N'') <> N''"
+                                + "   AND ISNULL(asp_cancel, 'N') <> 'Y'", String.class, code);
+                if (!own.isEmpty() && own.get(0) != null && !own.get(0).isBlank()) return own.get(0).trim();
+            } catch (Exception e) {
+                log.debug("物料默认仓位取数失败,回退仓库默认 inv={} : {}", code, e.getMessage());
+            }
+        }
+        try {
+            // 仓位档案的「仓库」存的是仓库名称快照(随仓改名同步);编码列另一路兜底
+            List<String> whDef = jdbc.queryForList(
+                    "SELECT TOP 1 RTRIM(l.[仓位编码]) FROM bs_wh_loc l"
+                            + " WHERE (RTRIM(l.[仓库]) = ? OR RTRIM(l.[仓库编码]) = ?)"
+                            + "   AND ISNULL(l.[是否默认], 0) = 1 AND ISNULL(l.[停用], 0) = 0"
+                            + "   AND ISNULL(l.asp_cancel, 'N') <> 'Y' ORDER BY l.[仓位编码]", String.class, wh, wh);
+            return whDef.isEmpty() || whDef.get(0) == null || whDef.get(0).isBlank() ? null : whDef.get(0).trim();
+        } catch (Exception e) {
+            log.debug("仓库默认仓位取数失败 wh={} : {}", wh, e.getMessage());
+            return null;
+        }
     }
 
     /** 库中该列是否为空(列不存在 / 取不到时按"空"处理,不因缺列或异常而报错) */
@@ -2665,6 +2752,9 @@ public class ButtonService {
             // 单据选仓库字段已全局统一叫「仓库」(migrate-wh-field-rename),参照/必填/推送兜底同列
             Object wh = r.get("仓库代码");
             if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
+            // 仓位预设(2026-10-09 用户口径「物料默认 ⇢ 仓位默认兜底」):该仓启用仓位管理才预设
+            Object binA = presetBinFor(str(r.get("物料编码")), str(wh));
+            if (binA != null) line.put("仓位", binA);
             items.add(line);
         }
         Map<String, Object> head = new LinkedHashMap<>();
@@ -3113,6 +3203,9 @@ public class ButtonService {
         // 行仓库(2026-09-23 正名):同 inspAutoPurchaseIn —— 落「仓库」(字段已全局正名)
         Object wh = r.get("仓库代码");
         if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
+        // 仓位预设(2026-10-09):同 inspAutoPurchaseIn —— 物料默认 ⇢ 该仓默认,该仓启用仓位管理才预设
+        Object binT = presetBinFor(str(r.get("物料编码")), str(wh));
+        if (binT != null) line.put("仓位", binT);
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", LocalDate.now().toString());
         head.put("供应商", ih.get("供应商"));
