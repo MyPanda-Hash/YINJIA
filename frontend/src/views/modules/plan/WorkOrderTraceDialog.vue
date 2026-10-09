@@ -110,6 +110,41 @@
         </el-table>
       </div>
 
+      <!-- 质检段(2026-10-14 用户口径「工单结束要能对上成品检验单」):三类工序检验单 + 应检/已检/缺检汇总。
+           成型 CX / 切炭 QT / 组装成品 ZJ 由**报工审核**自动出单;混料/装箱不出单 ⇒ 应检只看这三道。
+           单据状态/结论等值:状态是数据键(中文原样),结论是显示值(走 tt)。 -->
+      <div class="wb-trace-block">
+        <div class="wb-block-title">
+          {{ tt('质检数据') }}
+          <span class="wb-trace-sub" style="display: inline; margin-left: 8px">
+            {{ tt('应检工序') }}: {{ ops(trace['质检汇总']?.['应检工序']) }}
+            ｜ {{ tt('已检工序') }}: {{ ops(trace['质检汇总']?.['已检工序']) }}
+            ｜ {{ tt('缺检工序') }}: {{ ops(trace['质检汇总']?.['缺检工序']) }}
+            ｜ {{ tt('检验单数') }}: {{ trace['质检汇总']?.['检验单数'] ?? 0 }}
+            ｜ {{ tt('结论') }}: {{ tt(trace['质检汇总']?.['结论'] || '-') }}
+          </span>
+        </div>
+        <el-table :data="trace['质检数据'] || []" size="small" border max-height="200" :empty-text="tt('暂无检验单')">
+          <el-table-column :label="tt('检验单号')" prop="检验单号" width="150" />
+          <el-table-column :label="tt('工序')" prop="工序" width="80" />
+          <el-table-column :label="tt('单据状态')" prop="单据状态" width="90" />
+          <el-table-column :label="tt('总结论')" prop="总结论" width="90" />
+          <el-table-column :label="tt('送检数量')" prop="送检数量" width="95" align="right" />
+          <el-table-column :label="tt('检验数量')" prop="检验数量" width="95" align="right" />
+          <el-table-column :label="tt('合格数量')" prop="合格数量" width="95" align="right" />
+          <el-table-column :label="tt('不合格数量')" prop="不合格数量" width="100" align="right" />
+          <el-table-column :label="tt('检验员')" prop="检验员" width="90" />
+          <el-table-column :label="tt('检验日期')" prop="检验日期" width="100" />
+          <el-table-column :label="tt('批次号')" prop="批次号" width="120" show-overflow-tooltip />
+          <el-table-column :label="tt('报工单号')" prop="报工单号" width="140" show-overflow-tooltip />
+          <el-table-column :label="tt('处理方式')" prop="处理方式" min-width="140" show-overflow-tooltip />
+          <el-table-column :label="tt('下游单号')" prop="下游单号" width="140" show-overflow-tooltip />
+        </el-table>
+        <div class="wb-trace-sub">
+          {{ tt('三类工序检验单由报工审核自动生成；混料/装箱不出检验单') }}
+        </div>
+      </div>
+
       <div class="wb-trace-block">
         <div class="wb-block-title">{{ tt('领料数据') }}</div>
         <el-table :data="trace['领料数据']" size="small" border max-height="180" :empty-text="tt('暂无领料')">
@@ -158,6 +193,8 @@ const emit = defineEmits(['update:modelValue'])
 const trace = ref(null)
 const prog = ref(null)
 const num = (v) => { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
+/** 工序名数组 → 显示串(逐项过 tt,空则 '-'):成型/切炭/组装 三个工序名在词典里,英文界面随语言切换 */
+const ops = (arr) => (arr || []).map((x) => tt(x)).join(' / ') || '-'
 
 async function load() {
   const no = props.code

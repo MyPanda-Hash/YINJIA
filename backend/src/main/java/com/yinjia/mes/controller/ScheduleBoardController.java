@@ -167,7 +167,7 @@ public class ScheduleBoardController {
                 str(body == null ? null : body.get("keyword")), workshop()));
     }
 
-    /** 工单追溯:头+时间线+排产/完工/入库/领料+父子/调拨/家族(质检段见三类工序检验单) */
+    /** 工单追溯:头+时间线+排产/完工/入库+**质检段(三类工序检验单 + 应检/已检/缺检/结论汇总)**+领料+父子/调拨/家族 */
     @PostMapping("/trace")
     public ApiResult<Map<String, Object>> trace(@RequestBody Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");

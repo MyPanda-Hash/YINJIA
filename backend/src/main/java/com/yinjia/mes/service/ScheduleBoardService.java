@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +29,20 @@ import java.util.Map;
 public class ScheduleBoardService {
 
     private final JdbcTemplate jdbc;
+
+    /**
+     * 三类工序检验单:面板 → 头表(工单追溯「质检段」用)。
+     * 三组表**同构**(头 27 列 / 行 15 列,建表见 {@code tools/migrate-qc-process-insp.sql}),
+     * 故同一段 SQL 换表名即可全查;出单口径见 {@code ButtonService.WO_INSP_PANEL}(成型/切炭/组装
+     * 报工审核各自动出单,混料/装箱不出单)。取值全部来自本类常量,无拼接注入面。
+     */
+    private static final Map<String, String> INSP_HEAD = Map.of(
+            "QC_MOLD_INSP", "qc_mold_insp_head",
+            "QC_CUT_INSP", "qc_cut_insp_head",
+            "QC_ASM_INSP", "qc_asm_insp_head");
+
+    /** 应检工序(2026-10-14):成型/切炭/组装 三道 —— 与 {@code ButtonService.WO_INSP_PANEL} 同源 */
+    private static final List<String> INSP_OPS = List.of("成型", "切炭", "组装");
 
     public ScheduleBoardService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -554,7 +569,10 @@ public class ScheduleBoardService {
      * "Incorrect result size: expected 1, actual 0"——旧版查 bd_manu_order 必空):
      * 头=plang(数量/结案/打印活数据) + 首个排产行的产线/日期;时间线=创建+按钮留痕(yj_usage_log)+
      * 结案;排产数据=plang_pc 各排产行;完工=wo_progress(单据编号=工单号);入库/领料按 加工单号 关联
-     * (plang 工单的入库/领料回写链未接通前为空)。质量段暂缺。
+     * (plang 工单的入库/领料回写链未接通前为空)。
+     * <p><b>质检段(2026-10-14 补)</b>:三类工序检验单(成型 CX/切炭 QT/组装成品 ZJ,报工审核自动出单)
+     * + 工单维度汇总(应检/已检/缺检/结论),让「工单结束」在界面上能直接对上成品检验单;
+     * 明细/汇总键见 {@code 质检数据} / {@code 质检汇总}。
      */
     public Map<String, Object> trace(String no) {
         return trace(no, null);
@@ -681,6 +699,71 @@ public class ScheduleBoardService {
                         + " WHERE m.[加工单号]=? AND ISNULL(m.asp_cancel,'N')<>'Y'"
                         + " ORDER BY h.[单据编号], m.[id]", doc);
 
+        // ══ 质检段(2026-10-14 用户口径「工单结束要能对上成品检验单」)══════════════════════════
+        // 三类工序检验单:成型 CX / 切炭 QT / 组装成品 ZJ —— 报工**审核**时按工序自动生成
+        // (ButtonService.woInspGenerate;混料/装箱按 9.29 会议口径不出单)。三表同构 ⇒ 换表名同段 SQL 全查。
+        //  · 工单号是检验单头上唯一的工单维度键(头表暂无「工单行号」,分批报工会出多张,靠批次号/报工单号区分);
+        //  · **单据状态必须走 yj_doc_status 推导**:这三张表的物理「单据状态」列实测全为 NULL(引擎不写),
+        //    口径与面板列表 QueryService.docStatus 一致(canceled→stopped→pending→shr→草稿);
+        //  · 合格/不合格数量按明细「判定」汇总(组装固定合格/不合格两行;成型/切炭现为通用模板,通常皆为 0);
+        //  · 下游单号 = 该检验单审核后自动生成的下游(产成品入库单 FINISH_IN / 不良品处理单 QC_DISPOSAL)。
+        List<Map<String, Object>> qc = new ArrayList<>();
+        for (Map.Entry<String, String> e : INSP_HEAD.entrySet()) {
+            String panel = e.getKey();
+            String tbl = e.getValue();                       // 本类常量取值,无注入面
+            qc.addAll(jdbc.queryForList(
+                    "SELECT h.单据编号 AS 检验单号, ISNULL(h.工序,N'') AS 工序,"
+                            + " CONVERT(varchar(10), h.单据日期, 120) AS 检验日期,"
+                            + " CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废'"
+                            + "      WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
+                            + "      WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中'"
+                            + "      WHEN s.shr IS NOT NULL THEN N'已审核' ELSE N'草稿' END AS 单据状态,"
+                            + " ISNULL(h.总结论,N'') AS 总结论,"
+                            + " ISNULL(h.报工数量,0) AS 送检数量, ISNULL(h.检验数量,0) AS 检验数量,"
+                            + " ISNULL(d.合格数量,0) AS 合格数量, ISNULL(d.不合格数量,0) AS 不合格数量,"
+                            + " ISNULL(h.检验员,N'') AS 检验员, ISNULL(h.批次号,N'') AS 批次号,"
+                            + " ISNULL(h.报工单号,N'') AS 报工单号, ISNULL(h.处理方式,N'') AS 处理方式,"
+                            + " ISNULL((SELECT TOP 1 l.target_form_no FROM dbo.form_flow_link l"
+                            + "          WHERE l.source_panel_code=? AND l.source_form_no=h.单据编号"
+                            + "            AND l.link_status='ACTIVE' ORDER BY l.id), N'') AS 下游单号"
+                            + " FROM dbo." + tbl + " h"
+                            + " LEFT JOIN dbo.yj_doc_status s ON s.panel_code=? AND s.doc_no=h.单据编号"
+                            + " LEFT JOIN (SELECT 单据编号,"
+                            + "      SUM(CASE WHEN 判定=N'合格' THEN ISNULL(数量,0) ELSE 0 END) AS 合格数量,"
+                            + "      SUM(CASE WHEN 判定=N'不合格' THEN ISNULL(数量,0) ELSE 0 END) AS 不合格数量"
+                            + "    FROM dbo." + tbl.replace("_head", "_detail")
+                            + "   WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY 单据编号) d"
+                            + "   ON d.单据编号 = h.单据编号"
+                            + " WHERE ISNULL(h.asp_cancel,'N')<>'Y' AND h.工单号=?", panel, panel, doc));
+        }
+        qc.sort((a, b) -> String.valueOf(a.get("检验单号")).compareTo(String.valueOf(b.get("检验单号"))));
+        // 汇总(「对上」用):应检 = 成型/切炭/组装(与出单口径同源);已检 = 存活检验单上出现的工序;
+        // 缺检 = 应检 − 已检;结论按"有不合格 > 缺检 > 全合格 > 未判定"优先级给一句话。
+        LinkedHashSet<String> doneOps = new LinkedHashSet<>();
+        double passQty = 0, ngQty = 0, inspQty = 0;
+        int auditedCnt = 0;
+        for (Map<String, Object> m : qc) {
+            String op = String.valueOf(m.get("工序")).trim();
+            if (!op.isEmpty()) doneOps.add(op);
+            passQty += Num.of(m.get("合格数量"));
+            ngQty += Num.of(m.get("不合格数量"));
+            inspQty += Num.of(m.get("检验数量"));
+            if ("已审核".equals(String.valueOf(m.get("单据状态")))) auditedCnt++;
+        }
+        List<String> missOps = new ArrayList<>();
+        for (String op : INSP_OPS) if (!doneOps.contains(op)) missOps.add(op);
+        Map<String, Object> qcSum = new LinkedHashMap<>();
+        qcSum.put("应检工序", INSP_OPS);
+        qcSum.put("已检工序", new ArrayList<>(doneOps));
+        qcSum.put("缺检工序", missOps);
+        qcSum.put("检验单数", qc.size());
+        qcSum.put("已审核数", auditedCnt);
+        qcSum.put("检验数量合计", Math.round(inspQty * 10000d) / 10000d);
+        qcSum.put("合格数量合计", Math.round(passQty * 10000d) / 10000d);
+        qcSum.put("不合格数量合计", Math.round(ngQty * 10000d) / 10000d);
+        qcSum.put("结论", ngQty > 0 ? "存在不合格"
+                : (!missOps.isEmpty() ? "缺检" : (passQty > 0 ? "全部合格" : "未判定")));
+
         // 父子工单(切单,9.29 批次① 2026-10-05):本单切出的子单 + 本单的来源父单 —— 追溯「同一产品」
         List<Map<String, Object>> children = jdbc.queryForList(
                 "SELECT pl_no AS 工单号, pl_xc AS 工单行号, ISNULL([批次号],N'') AS 批次号,"
@@ -738,6 +821,8 @@ public class ScheduleBoardService {
         out.put("排产数据", sched);
         out.put("完工数据", done);
         out.put("入库单据", fins);
+        out.put("质检数据", qc);
+        out.put("质检汇总", qcSum);
         out.put("领料数据", picks);
         out.put("子工单", children);
         out.put("父工单", parentsOf);
