@@ -2716,3 +2716,10 @@ migrate-drop-qc-insp-spec.sql
 #   播种:CPJY-2026-10-0001 格式示例(修订 1 行 / 检验项目 3 行 2 对象 / 处理方式 2 行)。
 #   幂等(OBJECT_ID 守卫 + 按单据编号判重);两账套均执行。
 migrate-qc-fin-spec.sql
+
+# migrate-qc-fin-spec-seed-rename.sql(2026-10-09):修播种示例与自动生成单的**编号冲突**
+#   实测:示例占用了正式号池 CPJY-2026-10-0001,自动编号不知道示例的存在 ⇒ 组装报工审核生成的
+#     第一张规范**也取到同号**,而明细按 单据编号 关联,导致生成单显示示例的检验项目/处理方式行。
+#   修法:只把 asp_user1='migration' 的播种行改名为 CPJY-DEMO-0001(移出正式号池),真实单据不碰;
+#     此后自动编号从 0002 继续。幂等(已改名 0 行);两账套均执行。
+migrate-qc-fin-spec-seed-rename.sql
