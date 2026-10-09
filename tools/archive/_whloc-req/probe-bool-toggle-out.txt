@@ -1,0 +1,14 @@
+﻿[login] ok admin=true
+[title] 仓位 · YINJIA-MES
+[表头] ["","仓库⇅","仓位编码⇅","大区⇅","存储分区⇅","区码⇅","排号⇅","位号⇅","层号⇅","仓位地址⇅","停用⇅","备注⇅"]
+[停用列下标] 10
+[工具栏文本] ["SPAN.tb-main=新增","SPAN.act-name=新增","SPAN.tb-main=保存","SPAN.act-name=保存","SPAN.tb-main=删除","SPAN.act-name=删除","SPAN.tb-main=刷新","SPAN.act-name=刷新","SPAN.tb-main=打印","SPAN.act-name=打印","SPAN.tb-main=二维码标签","SPAN.act-name=二维码标签","SPAN.tb-main=更多","SPAN.act-name=更多","SPAN.tb-main=导出报表","SPAN.act-name=导出报表"]
+[点「修改」] not-found; 现有=新增,保存,删除,刷新,打印,二维码标签,更多,导出报表 (档案面板按 单据状态=启用 本就内联可编辑;此处仅尽力而为)
+[修改后] 行数=50
+[激活前] {"textBefore":"否","clickedOn":"SPAN.cell-lazy"}
+[切换前开关态] {"checked":false,"cls":"el-switch","aria":null}
+[切换后开关态] {"hasSwitch":true,"checked":true,"cls":"el-switch is-checked","aria":null,"textAfter":""}
+>>> ✓ 开关视觉态已翻转(修复生效:点击后界面有反馈)
+[再点一次] false ✓ 回到初值(可反复切换)
+
+⚠ 全程未点「保存」,草稿随浏览器关闭丢弃,库内数据未变。

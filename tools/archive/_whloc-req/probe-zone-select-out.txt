@@ -1,0 +1,15 @@
+﻿[title] 仓位 · YINJIA-MES
+
+########## 大区 (列下标 3) ##########
+  激活: {"textBefore":"","editorBefore":"无编辑器"}
+  编辑器: {"hasSelect":true,"hasInput":false,"filterable":false,"inputEditable":true,"placeholder":"","cellHTML":"<div class=\"cell\" style=\"\"><!----><div data-v-87624a36=\"\" class=\"el-select\"><div class=\"el-select__wrapper is-filterable el-tooltip__trigger el-tooltip__trigger\" tabindex=\"-1\"><!--"}
+  候选(提示列表): ["50条/页","100条/页","200条/页","500条/页","成品仓区","辅料及配件区","原料区"]
+  输入新值后候选: ["50条/页","100条/页","200条/页","500条/页","__测试新分区__","成品仓区","辅料及配件区","原料区"] ✓ allow-create 生效(可自填)
+
+########## 存储分区 (列下标 4) ##########
+  激活: {"textBefore":"","editorBefore":"无编辑器"}
+  编辑器: {"hasSelect":true,"hasInput":false,"filterable":false,"inputEditable":true,"placeholder":"","cellHTML":"<div class=\"cell\" style=\"\"><!----><div data-v-87624a36=\"\" class=\"el-select\"><div class=\"el-select__wrapper is-filterable el-tooltip__trigger el-tooltip__trigger\" tabindex=\"-1\"><!--"}
+  候选(提示列表): ["50条/页","100条/页","200条/页","500条/页","标签区","端盖区","货架区","胶粉区","炭粉区","网套区","无纺布区","纸箱区"]
+  输入新值后候选: ["50条/页","100条/页","200条/页","500条/页","__测试新分区__","标签区","端盖区","货架区","胶粉区","炭粉区","网套区","无纺布区","纸箱区"] ✓ allow-create 生效(可自填)
+
+⚠ 全程未点「保存」,库内数据未变。

@@ -1,0 +1,144 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:31 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-43-inventory.sql ==
+  | INV | 倒冲仓位名称 | 倒冲仓位名称 | detail | 900 | 
+  | INV | 默认仓位 | 默认仓位 | detail | 950 | 
+  | INV | 倒冲仓位id | 倒冲仓位id | detail | 950 | 
+  | INV | 倒冲仓位编码 | 倒冲仓位编码 | detail | 950 | 
+  | MATERIAL_OUT | 仓库启用仓位管理 | 仓库启用仓位管理 | detail | 980 | 
+  | MATERIAL_OUT | 仓位id | 仓位id | detail | 981 | 
+  | MATERIAL_OUT | 仓位名称 | 仓位名称 | detail | 982 | 
+  | MATERIAL_OUT | 仓位编码 | 仓位编码 | detail | 983 | 
+  | PU_ORDER | 仓库启用仓位管理 | 仓库启用仓位管理 | detail | 960 | 
+  | PU_ORDER | 仓位id | 仓位id | detail | 960 | 
+  | PU_ORDER | 仓位名称 | 仓位名称 | detail | 960 | 
+  | PU_ORDER | 仓位编码 | 仓位编码 | detail | 960 | 
+  | PURCHASE_IN | 仓库启用仓位管理 | 仓库启用仓位管理 | detail | 260 | 
+  | PURCHASE_IN | 仓位id | 仓位id | detail | 270 | 
+  | PURCHASE_IN | 仓位名称 | 仓位名称 | detail | 280 | 
+  | PURCHASE_IN | 仓位 | 仓位 | header | 670 | 
+  | PURCHASE_IN | 仓位编码 | 仓位编码 | header | 680 | 
+  | SALE_OUT | 仓库启用仓位管理 | 仓库启用仓位管理 | detail | 970 | 
+  | SALE_OUT | 仓位id | 仓位id | detail | 970 | 
+  | SALE_OUT | 仓位编码 | 仓位编码 | detail | 970 | 
+  | SO_ORDER | 仓库启用仓位管理 | 仓库启用仓位管理 | detail | 280 | 
+  | SO_ORDER | 仓位id | 仓位id | detail | 290 | 
+  | SO_ORDER | 仓位名称 | 仓位名称 | detail | 300 | 
+  | SO_ORDER | 仓位编码 | 仓位编码 | detail | 310 | 
+  | WH | 仓位 | 仓位 | detail | 40 | 
+  | WH | 启用仓位管理 | 启用仓位管理 | detail | 160 | 
+  | WHLOC | 仓位编码 | 仓位编码 | query,detail | 30 | 
+  | WHLOC | 仓位地址 | 仓位地址 | query,detail | 50 | 
+  | PURCHASE_IN | 仓位 | 仓位 | 
+  | WH | 仓位 | 仓位 | 
+  | field | 仓库启用仓位管理 | en | Stock Is Allow Freight | 
+  | field | 仓库启用仓位管理 | ja | 倉庫ロケーション管理有効 | 
+  | field | 仓位 | de | Lagerplatz | 
+  | panel | 仓位 | de | Lagerplatz | 
+  | panel | 仓位 | en | Storage Location | 
+  | field | 仓位 | en | Bill Sp Name | 
+  | field | 仓位 | es | Ubicación de almacenamiento | 
+  | panel | 仓位 | es | Ubicación de almacenamiento | 
+  | panel | 仓位 | fr | Emplacement de stockage | 
+  | field | 仓位 | fr | Emplacement de stockage | 
+  | field | 仓位 | ja | ロケーション | 
+  | panel | 仓位 | ja | ロケーション | 
+  | panel | 仓位 | ko | 저장 위치 | 
+  | field | 仓位 | ko | 저장 위치 | 
+  | field | 仓位 | ru | Место хранения | 
+  | panel | 仓位 | ru | Место хранения | 
+  | panel | 仓位 | th | ตำแหน่งจัดเก็บ | 
+  | field | 仓位 | th | ตำแหน่งจัดเก็บ | 
+  | field | 仓位 | vi | Vị trí lưu trữ | 
+  | panel | 仓位 | vi | Vị trí lưu trữ | 
+  | field | 仓位id | en | Sp Id | 
+  | field | 仓位id | ja | ロケーションID | 
+  | field | 仓位编码 | de | Lagerortcode | 
+  | field | 仓位编码 | en | Sp Number | 
+  | field | 仓位编码 | es | Código de ubicación | 
+  | field | 仓位编码 | fr | Code d'emplacement | 
+  | field | 仓位编码 | ja | ロケーションコード | 
+  | field | 仓位编码 | ko | 위치 코드 | 
+  | field | 仓位编码 | ru | Код места хранения | 
+  | field | 仓位编码 | th | รหัสตำแหน่ง | 
+  | field | 仓位编码 | vi | Mã vị trí | 
+  | field | 仓位地址 | de | Lagerortadresse | 
+  | field | 仓位地址 | en | Location Address | 
+  | field | 仓位地址 | es | Dirección de ubicación | 
+  | field | 仓位地址 | fr | Adresse d'emplacement | 
+  | field | 仓位地址 | ja | ロケーション住所 | 
+  | field | 仓位地址 | ko | 위치 주소 | 
+  | field | 仓位地址 | ru | Адрес места хранения | 
+  | field | 仓位地址 | th | ที่อยู่ตำแหน่ง | 
+  | field | 仓位地址 | vi | Địa chỉ vị trí | 
+  | field | 仓位名称 | en | Sp Name | 
+  | field | 仓位名称 | ja | ロケーション名 | 
+  | field | 倒冲仓位id | en | Backflushed Space Id | 
+  | field | 倒冲仓位编码 | en | Backflushed Space Number | 
+  | field | 倒冲仓位名称 | en | Backflush Bin | 
+  | field | 默认仓位 | en | Space Id | 
+  | field | 启用仓位管理 | en | Bin Management | 
+  | FINISH_IN | 产成品入库单 | Finished Goods Receipt Form | doc | bl_finish_in | 
+  | FINISH_IN_DETAIL | 产成品入库单明细表 | Details of Finished Goods Warehouse-in Doc | flat | v_finish_in_detail | 
+  | FINISH_IN_STATS | 产成品入库单统计表 | Finished Goods Receipt Statistics Table | flat | v_finish_in_stats | 
+  | MATERIAL_OUT | 材料出库单 | Material Issue Slip | doc | bl_material_out | 
+  | MATERIAL_OUT_DETAIL | 材料出库单明细表 | Material Warehouse-out Doc Details | flat | v_material_out_detail | 
+  | MATERIAL_OUT_STATS | 材料出库单统计表 | Materials Issue Form Statistics Table | flat | v_material_out_stats | 
+  | OTHER_IN | 其他入库单 | Other inbound delivery notes | doc | bl_other_in | 
+  | OTHER_IN_DETAIL | 其他入库单明细表 | Miscellaneous receipt Doc Details | flat | v_other_in_detail | 
+  | OTHER_IN_STATS | 其他入库单统计表 | Other In-Stock Order Summary Tables | flat | v_other_in_stats | 
+  | OTHER_OUT | 其他出库单 | Other delivery notes | doc | bl_other_out | 
+  | OTHER_OUT_DETAIL | 其他出库单明细表 | Other issue Doc Details | flat | v_other_out_detail | 
+  | OTHER_OUT_STATS | 其他出库单统计表 | Other Outbound Order Summary Table | flat | v_other_out_stats | 
+  | OUTSOURCE_IN | 委外入库单 | subcontracting receipt document | doc | bl_outsource_in | 
+  | OUTSOURCE_IN_DETAIL | 委外入库单明细表 | Outsourcing Receipt Details | flat | v_outsource_in_detail | 
+  | OUTSOURCE_IN_STATS | 委外入库单统计表 | Outsourcing Receipt Statistics | flat | v_outsource_in_stats | 
+  | PURCHASE_IN | 采购入库单 | Purchase Receiving Order | doc | bl_purchase_in | 
+  | PURCHASE_IN_DETAIL | 采购入库单明细表 | Purchase receipt document details | flat | v_purchase_in_detail | 
+  | PURCHASE_IN_STATS | 采购入库单统计表 | Purchase receipt document statistics | flat | v_purchase_in_stats | 
+  | RD_SHARE_FILE | 共享文件库 | Shared Files | archive | yj_share_file | 
+  | SALE_OUT | 销售出库单 | Sales Delivery Note | doc | bl_sale_out | 
+  | SALE_OUT_DETAIL | 销售出库单明细表 | Sales issue document details | flat | v_sale_out_detail | 
+  | SALE_OUT_STATS | 销售出库单统计表 | Sales issue document statistics | flat | v_sale_out_stats | 
+  | STOCK_BALANCE | 库存状况表 | Stock Balance | flat | v_stock_balance | 
+  | STOCK_LEDGER | 库存台账 | Stock Ledger | flat | v_stock_ledger | 
+  | STOCK_STATUS | 库存状况 | null | flat | kucun | 
+  | WH | 仓库 | Warehouse | archive | bs_wh | 
+  | WHLOC | 仓位 | Storage Location | archive | bs_wh_loc | 
+  | bd_purchase_in | 仓位id | nvarchar | 
+  | bd_purchase_in | 仓位 | nvarchar | 
+  | bd_purchase_in | 仓位编码 | nvarchar | 
+  | bl_material_out | 仓库启用仓位管理 | nvarchar | 
+  | bl_material_out | 仓位id | nvarchar | 
+  | bl_material_out | 仓位名称 | nvarchar | 
+  | bl_material_out | 仓位编码 | nvarchar | 
+  | bl_pu_order | 仓库启用仓位管理 | nvarchar | 
+  | bl_pu_order | 仓位id | nvarchar | 
+  | bl_pu_order | 仓位名称 | nvarchar | 
+  | bl_pu_order | 仓位编码 | nvarchar | 
+  | bl_purchase_in | 仓库启用仓位管理 | nvarchar | 
+  | bl_purchase_in | 仓位id | nvarchar | 
+  | bl_purchase_in | 仓位编码 | nvarchar | 
+  | bl_purchase_in | 仓位名称 | nvarchar | 
+  | bl_sale_out | 仓库启用仓位管理 | nvarchar | 
+  | bl_sale_out | 仓位id | nvarchar | 
+  | bl_sale_out | 仓位编码 | nvarchar | 
+  | bl_so_order | 仓库启用仓位管理 | nvarchar | 
+  | bl_so_order | 仓位id | nvarchar | 
+  | bl_so_order | 仓位名称 | nvarchar | 
+  | bl_so_order | 仓位编码 | nvarchar | 
+  | bs_inv | 倒冲仓位名称 | nvarchar | 
+  | bs_inv | 默认仓位 | nvarchar | 
+  | bs_inv | 倒冲仓位id | nvarchar | 
+  | bs_inv | 倒冲仓位编码 | nvarchar | 
+  | bs_wh | 启用仓位管理 | bit | 
+  | bs_wh | 仓位 | nvarchar | 
+  | bs_wh_loc | 仓位编码 | nvarchar | 
+  | bs_wh_loc | 仓位地址 | nvarchar | 
+[OK] q-43-inventory.sql (7 batches)

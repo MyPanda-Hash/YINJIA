@@ -28,8 +28,9 @@ import java.util.regex.Pattern;
  * 注意:脚本按批(GO)自动提交,中途失败可能部分生效——此时不写记录,修复后重跑即可(脚本幂等)。
  */
 public class DbSync {
-    /** SQL Server 提示类消息码(0=PRINT,5701=库上下文,5703/5704=语言,15477=sp_rename 注意事项),不算错误 */
-    static final java.util.Set<Integer> INFO_CODES = java.util.Set.of(0, 5701, 5703, 5704, 15477);
+    /** SQL Server 提示类消息码(0=PRINT,5701=库上下文,5703/5704=语言,15477=sp_rename 注意事项,
+     *  8153=聚合/SET 操作忽略 NULL 的信息性警告——SQL Server 自己都只发警告不中断,脚本自检把关结果),不算错误 */
+    static final java.util.Set<Integer> INFO_CODES = java.util.Set.of(0, 5701, 5703, 5704, 15477, 8153);
 
     /**
      * 目标库可用环境变量 YINJIA_SQL_DB 覆盖(默认 HSDZ_MES)。

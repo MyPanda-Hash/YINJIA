@@ -1,0 +1,7 @@
+﻿qrLabelKey      : "仓位编码"   (期望 "仓位编码")
+qrLabelScopeKey : "仓库"
+qrLabelKind     : "whloc"
+仓位总数        : 679
+空行键(应 0)    : 0
+唯一行键(应 679) : 679
+样例行键        : B仓|B4-24-2  ,  B仓|B4-24-1  ,  B仓|B4-23-2

@@ -1,0 +1,33 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-12-plan-a.sql ==
+  | 106 | CK00003 | 成品不良品区 | 
+  | 109 | CK00005 | 原料不良品仓 | 
+  | 108 | CK00006 | 华北工控仓 | 
+  | 105 | CP-02 | 成品B仓 | 
+  | 107 | YCL-01 | 恒亿仓 | 
+  | 104 | YJ-08 | 车间仓 | 
+  | 13306 | 仓库 | 仓库 | 参照 | query,detail | 10 | 140 | 1 | 1 | 0 | 1 | 
+  | 13311 | 仓库编码 | 仓库编码 | 文本 | detail | 20 | 120 | 1 | 0 | 1 | 0 | 
+  | 13307 | 仓位编码 | 仓位编码 | 文本 | query,detail | 30 | 140 | 1 | 1 | 0 | 1 | 
+  | 13308 | 仓位地址 | 仓位地址 | 文本 | query,detail | 40 | 200 | 1 | 1 | 0 | 1 | 
+  | 13309 | 停用 | 停用 | 是否 | query,detail | 50 | 90 | 1 | 0 | 0 | 1 | 
+  | 13310 | 备注 | 备注 | 文本 | detail | 60 | 220 | 1 | 0 | 0 | 1 | 
+  | 仓位名称 | field | en | Sp Name | 
+  | 仓位名称 | field | ja | ロケーション名 | 
+  | MATERIAL_OUT | 仓位名称 | 仓位名称 | 
+  | PU_ORDER | 仓位名称 | 仓位名称 | 
+  | PURCHASE_IN | 仓位名称 | 仓位名称 | 
+  | SO_ORDER | 仓位名称 | 仓位名称 | 
+  | 4 | 恒亿仓 | YCL-01 | da5x |  | 
+  | 5 | 恒亿仓 | YCL-01 | d2 |  | 
+  | 6 | 原料不良品仓 | CK00005 | s | d | 
+  | 7 | 华北工控仓 | CK00006 | e |  | 
+  | 8 | 车间仓 | YJ-08 | d |  | 
+[SQL FAIL] Invalid column name 'code'.

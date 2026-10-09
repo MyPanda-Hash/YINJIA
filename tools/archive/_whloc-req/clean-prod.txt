@@ -1,0 +1,34 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== migrate-whloc-clean-coord-20261008.sql ==
+  (0 rows)
+  | 区码 列存在(应 40) | 40 | 
+  | 旧列 库区 残留(应 NULL) | null | 
+  | 新列 存储分区 存在(应 60) | 60 | 
+  | yj_field 仍叫库区(应 0) | 0 | 
+  | yj_translation 仍有库区(应 0) | 0 | 
+  | WHLOC 字段数(应 12) | 12 | 
+  | 有效行(应 CK-A 156 + 他仓 0 = 156) | 156 | 
+  | 已软删垃圾(应 ≥5) | 5 | 
+  | 排号含非数字(应 0) | 0 | 
+  | 区码为空(应 0) | 0 | 
+  | 坐标组合重复组(应 0) | 0 | 
+  | 货架区 | AH10 | 1 | 1 | (空) | AH10-1-1 | 货架区AH10排1位1层 | 
+  | 货架区 | AH10 | 1 | 2 | (空) | AH10-1-2 | 货架区AH10排1位2层 | 
+  | 货架区 | AH9 | 3 | 2 | (空) | AH9-3-2 | 货架区AH9排3位2层 | 
+  | 货架区 | AH9 | 3 | 3 | (空) | AH9-3-3 | 货架区AH9排3位3层 | 
+  | 胶粉区 | A1 | 21 | 1 | (空) | A1-21-1 | 胶粉区21排1位 | 
+  | 胶粉区 | A1 | 21 | 2 | (空) | A1-21-2 | 胶粉区21排2位 | 
+  | 胶粉区 | A1 | 24 | 2 | (空) | A1-24-2 | 胶粉区24排2位 | 
+  | 胶粉区 | A1 | 24 | 3 | (空) | A1-24-3 | 胶粉区24排3位 | 
+  | 炭粉区 | A1 | 09 | 1 | (空) | A1-09-1 | 炭粉区09排1位 | 
+  | 炭粉区 | A1 | 09 | 2 | (空) | A1-09-2 | 炭粉区09排2位 | 
+  | 炭粉区 | A1 | 20 | 2 | (空) | A1-20-2 | 炭粉区20排2位 | 
+  | 炭粉区 | A1 | 20 | 3 | (空) | A1-20-3 | 炭粉区20排3位 | 
+[OK] migrate-whloc-clean-coord-20261008.sql (10 batches)

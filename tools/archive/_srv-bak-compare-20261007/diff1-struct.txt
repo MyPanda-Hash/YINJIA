@@ -1,0 +1,157 @@
+==A TABLES ONLY ON SERVER==
+name
+----
+bs_bom
+dm_langue
+gscs
+permission
+s_sys
+s_xtcs
+==B TABLES ONLY ON LOCAL==
+name
+----
+bd_pu_label
+bl_pu_label
+qc_asm_insp_detail
+qc_asm_insp_head
+qc_cut_insp_detail
+qc_cut_insp_head
+qc_insp_req_series
+qc_mold_insp_detail
+qc_mold_insp_head
+wo_process_line
+wo_split_log
+wo_transfer_log
+==C VIEWS ONLY ON SERVER==
+name
+----
+v_wo_kit
+==D VIEWS ONLY ON LOCAL==
+name
+----
+v_wo_next_process
+v_wo_process_board
+v_wo_process_progress
+==E COMMON TABLES COLUMN COUNT DIFF==
+name loc_cols srv_cols
+---- -------- --------
+bd_material_out 80 51
+bd_other_out 50 49
+bd_purchase_in 181 154
+bd_sale_out 176 155
+bl_dispatch 49 48
+bl_material_out 110 48
+bl_purchase_in 124 123
+bs_inv 148 145
+bs_prod_line 35 34
+bs_route 64 45
+inh 47 115
+outh 48 126
+plang 90 78
+qc_insp 58 57
+qc_insp_req 201 59
+qc_return_detail 60 58
+qc_tc_in 65 64
+rd_asm_bom_head 35 29
+wo_progress 43 31
+yj_field 21 20
+yj_user 27 26
+==F SCHEMA LOG ONLY ON SERVER==
+script_name
+-----------
+==G SCHEMA LOG ONLY ON LOCAL==
+script_name
+-----------
+_cleanup_common_fields_20260914.sql
+_restore_views_20260914.sql
+archive/_del_phantom_fields_20260914.sql
+fix-basic-ref-name-display.sql
+fix-basic-ref-name-display-revert.sql
+migrate-batch-no-on-generate.sql
+migrate-calc-amount-fill-2026-10-05.sql
+migrate-clean-orphan-sl-recv-field.sql
+migrate-drop-bom-kingdee.sql
+migrate-drop-bom-panels.sql
+migrate-inv-inspection-default-no.sql
+migrate-inv-required-off-2026-10-03.sql
+migrate-legacy-plang-scjl-tables.sql
+migrate-line-load-on-plang.sql
+migrate-manu-order-prefix-gd.sql
+migrate-material-out-erp.sql
+migrate-material-out-fields.sql
+migrate-material-out-i18n.sql
+migrate-material-out-label-cleanup.sql
+migrate-material-out-ref-links.sql
+migrate-plang-report-state.sql
+migrate-plang-route.sql
+migrate-plang-split-cols.sql
+migrate-plang-split-demand-fix.sql
+migrate-plang-split-lineage.sql
+migrate-plang-void-legacy-dirty.sql
+migrate-process-routing-tasks.sql
+migrate-prod-line-function-group.sql
+migrate-prod-line-subgroup.sql
+migrate-pu-label.sql
+migrate-pu-label-one-line-per-print.sql
+migrate-pu-label-supplement-print.sql
+migrate-qc-docs-twolevel.sql
+migrate-qcinsp-header-dept.sql
+migrate-qc-insp-req-custom-tab.sql
+migrate-qc-insp-req-drop-custom-tab.sql
+migrate-qc-insp-req-filecode-basis.sql
+migrate-qc-insp-req-series.sql
+migrate-qc-insp-req-tab-pools.sql
+migrate-qc-process-insp.sql
+migrate-qc-ref-repair.sql
+migrate-qc-return-tc-flag.sql
+migrate-qc-tcin-twolevel.sql
+migrate-qc-tc-via-return.sql
+migrate-restore-inv-cancel-2026-10-03.sql
+migrate-route-fields-ref.sql
+migrate-route-head-detail.sql
+migrate-route-header-detail-place.sql
+migrate-route-header-hide-in-detail.sql
+migrate-route-header-only-place.sql
+migrate-route-kingdee-fields.sql
+migrate-route-name-not-required.sql
+migrate-route-relax-required.sql
+migrate-route-required-original.sql
+migrate-route-restore-required.sql
+migrate-route-status-as-button.sql
+migrate-route-status-restore.sql
+migrate-route-status-switch.sql
+migrate-route-status-switch-audit.sql
+migrate-stock-flow-history-backfill.sql
+migrate-stock-flow-index-filter-2026-09-30.sql
+migrate-stock-flow-kucun-resync.sql
+migrate-stock-flow-opening-2026-09-30.sql
+migrate-stock-flow-tables-2026-09-30.sql
+migrate-stock-flow-tax-cols-2026-09-30.sql
+migrate-stock-movement-from-flow-2026-09-30.sql
+migrate-unit-chain.sql
+migrate-wo-next-process-view.sql
+migrate-wo-next-process-view-nodefault.sql
+migrate-wo-process-board-view.sql
+migrate-wo-process-line.sql
+migrate-wo-process-line-drop.sql
+migrate-wo-process-line-qty-recalc.sql
+migrate-wo-process-progress-view.sql
+migrate-wo-progress-fields.sql
+migrate-wo-transfer-log.sql
+migrate-wo-transfer-log-process.sql
+migrate-wo-transfer-log-process-rollback.sql
+migrate-yjfield-tab-key.sql
+migrate-yjuser-workshop.sql
+tools/../tools/migrate-qc-3docs-rebuild.sql
+==H SCHEMA LOG HASH MISMATCH (same script diff hash, srv vs loc)==
+script_name
+-----------
+migrate-align-qc-col-fix-20260924.sql
+migrate-batch-link.sql
+migrate-qcreturn-srcfix.sql
+migrate-sl-supplier-ref.sql
+migrate-spec-testlib-replace.sql
+==I COUNTS==
+loc_tables srv_tables loc_views srv_views
+---------- ---------- --------- ---------
+226 220 106 104

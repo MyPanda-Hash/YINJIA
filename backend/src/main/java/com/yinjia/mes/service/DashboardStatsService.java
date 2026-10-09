@@ -133,81 +133,115 @@ public class DashboardStatsService {
                     + " WHERE ISNULL(scx,'') <> '' GROUP BY scx ORDER BY COUNT(*) DESC"));
             prod.put("trend7", dateTrend("plang", "pl_date", "cp_date"));
             prod.put("stageRates", stageRates());
-            prod.put("capacityToday", capacityToday());
             prod.put("bomTree", List.of());
         } catch (Exception e) {
             prod.put("statusDist", List.of());
             prod.put("workshopDist", List.of());
             prod.put("trend7", List.of());
             prod.put("stageRates", List.of());
-            prod.put("capacityToday", List.of());
             prod.put("bomTree", List.of());
         }
         return prod;
     }
 
     /**
-     * 单天产能比(2026-09-28 用户需求:产线当日产能 ÷ 产能上限的直观对照):
-     *  - 上限 = bs_prod_line.日产能(PROD_LINE 面板可维护,按 生产线 名称关联);
-     *  - 产出 = scjl 当日报工 SUM(sl) 按 scxmc(产线名)分组,ISNULL(delmark,0)=0;
-     *  - 日期口径 = 今天;今天无报工则回看最近一个有报工的日期(date 字段随行下发,
-     *    标题展示数据日期 —— 节后首日/演示库不会一片空白);
-     *  - 未配日产能(0/空)的产线不出行(无基准的比较没有意义,配了就出现)。
+     * 产能对比(2026-10-08 用户需求:日产能对比可以切周/月/年,按产线做竖向双柱对比):
+     *  - 上限 = bs_prod_line.日产能 × 周期天数(PROD_LINE 面板可维护;周=7、月=当月自然日、年=年自然日);
+     *  - 产出 = scjl 周期内报工 SUM(sl) 按 scxmc(产线名)分组,ISNULL(delmark,0)=0;
+     *  - 周期口径 = **最近有报工的那个周期**:锚点日取今天(今天有报工)否则最近一个有报工日,
+     *    再取该日所在的自然周(周一起)/自然月/自然年。与既有「日」的回看口径一致 ——
+     *    否则切到周/月/年会一片空白(2026-10-08 实测正式库报工数据止于 2026-08-26);
+     *  - 周期区间在 Java 侧用 java.time 推导(不写 DATEFIRST 依赖的 DATEPART(weekday)),
+     *    月/年天数按自然日算(28~31 / 365~366),不做「×30」这类估算;
+     *  - 产线清单 = **产线档案里启用(非 停用=是、非 asp_cancel=Y)的全部产线**,不看是否配了日产能;
+     *    未配日产能的只画实际柱、上限留空(前端提示去档案维护)。
+     *    档案加一行就多一组柱、停用/删除就少一组(用户 2026-10-08 口径:「产线要根据真实的产线里面的来,
+     *    做到后续能新增产线,删除产线也能跟着变化」);报工表里的历史产线名(scjl 旧电镀线)不再补进清单。
      */
-    private List<Map<String, Object>> capacityToday() {
+    public Map<String, Object> capacity(String period) {
+        String p = (period == null) ? "day" : period.trim().toLowerCase();
+        if (!List.of("day", "week", "month", "year").contains(p)) p = "day";
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("period", p);
         try {
-            // 取数据日期:今天有报工用今天,否则最近有报工的一天
-            String day = jdbc.queryForObject(
+            // 锚点日:今天有报工用今天,否则最近一个有报工的一天
+            String anchorStr = jdbc.queryForObject(
                     "SELECT CONVERT(varchar(10), MAX(CASE WHEN CONVERT(date, sc_date) = CONVERT(date, GETDATE()) THEN sc_date END), 23)"
                             + " FROM scjl WHERE ISNULL(delmark,0)=0", String.class);
-            if (day == null) {
+            if (anchorStr == null || anchorStr.isBlank()) {
                 List<Map<String, Object>> last = jdbc.queryForList(
                         "SELECT TOP 1 CONVERT(varchar(10), sc_date, 23) AS d FROM scjl"
                                 + " WHERE ISNULL(delmark,0)=0 AND sc_date IS NOT NULL ORDER BY sc_date DESC");
-                if (last.isEmpty()) return List.of();
-                day = String.valueOf(last.get(0).get("d"));
+                if (!last.isEmpty()) anchorStr = String.valueOf(last.get(0).get("d"));
             }
+            if (anchorStr == null || anchorStr.isBlank()) {
+                out.put("rows", List.of());
+                return out;
+            }
+            LocalDate anchor = LocalDate.parse(anchorStr);
+            LocalDate from = switch (p) {
+                case "week" -> anchor.minusDays(anchor.getDayOfWeek().getValue() - 1L); // 周一起
+                case "month" -> anchor.withDayOfMonth(1);
+                case "year" -> anchor.withDayOfYear(1);
+                default -> anchor;
+            };
+            int days = (int) java.time.temporal.ChronoUnit.DAYS.between(from, switch (p) {
+                case "week" -> from.plusWeeks(1);
+                case "month" -> from.plusMonths(1);
+                case "year" -> from.plusYears(1);
+                default -> from.plusDays(1);
+            });
+            String fromStr = from.format(DateTimeFormatter.ISO_LOCAL_DATE);
+            String toStr = from.plusDays(days - 1L).format(DateTimeFormatter.ISO_LOCAL_DATE);
+            out.put("from", fromStr);
+            out.put("to", toStr);
+            out.put("days", days);
+            out.put("anchor", anchorStr);
+
             Map<String, Double> actualByLine = new LinkedHashMap<>();
+            // 实际产出 = **报工数据**(scjl 是报工单的录入载体与事实账,2026-09-27 单表化):
+            //   行上的产线名 scxmc 由「报工审核」从排产台账 plang_pc.scx 镜像写入
+            //   (见 WoReportService.complete():审核时 UPDATE scjl SET scx=?, scxmc=?... wgzt='Y'),
+            //   而排产选线又取自产线档案(bs_prod_line.生产线)⇒ 与图上的产线清单**同源同名**。
+            //   口径:只算**已审核**(wgzt='Y')的报工 —— 草稿报工还没过账,数字可改可撤,不应进产能对比。
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT RTRIM(scxmc) AS line, SUM(ISNULL(sl,0)) AS q FROM scjl"
-                            + " WHERE ISNULL(delmark,0)=0 AND CONVERT(varchar(10), sc_date, 23) = ?"
-                            + " AND ISNULL(scxmc,'') <> '' GROUP BY RTRIM(scxmc)", day)) {
+                            + " WHERE ISNULL(delmark,0)=0 AND ISNULL(wgzt,'N')='Y'"
+                            + " AND sc_date >= ? AND sc_date < DATEADD(day, 1, ?)"
+                            + " AND ISNULL(scxmc,'') <> '' GROUP BY RTRIM(scxmc)", fromStr, toStr)) {
                 actualByLine.put(String.valueOf(r.get("line")), toD(r.get("q")));
             }
             Map<String, Double> limitByLine = new LinkedHashMap<>();
             for (Map<String, Object> r : jdbc.queryForList(
                     "SELECT RTRIM(生产线) AS line, 日产能 FROM bs_prod_line"
                             + " WHERE ISNULL(停用,'N') <> '是' AND ISNULL(asp_cancel,'N') <> 'Y'"
-                            + " AND ISNULL(日产能,0) > 0 AND ISNULL(生产线,'') <> ''")) {
-                limitByLine.put(String.valueOf(r.get("line")), toD(r.get("日产能")));
+                            + " AND ISNULL(生产线,'') <> '' ORDER BY 生产线")) {
+                limitByLine.put(String.valueOf(r.get("line")), toD(r.get("日产能")) * days);
             }
-            List<Map<String, Object>> out = new ArrayList<>();
+            List<Map<String, Object>> rows = new ArrayList<>();
             for (Map.Entry<String, Double> e : limitByLine.entrySet()) {
                 double actual = actualByLine.getOrDefault(e.getKey(), 0.0);
                 double limit = e.getValue();
                 Map<String, Object> m = new LinkedHashMap<>();
                 m.put("name", e.getKey());
                 m.put("actual", Math.round(actual));
-                m.put("limit", Math.round(limit));
-                m.put("pct", (int) Math.round(actual * 100.0 / limit));
-                m.put("date", day);
-                out.add(m);
+                // 未配日产能(0/空)= 只画实际柱,上限留空 —— 与「停用」不是一回事:
+                // 停用是**不上图**,未配是**上图但没有比较基准**(前端提示去产线档案维护)
+                m.put("limit", limit > 0 ? Math.round(limit) : null);
+                m.put("pct", limit > 0 ? (int) Math.round(actual * 100.0 / limit) : null);
+                rows.add(m);
             }
-            // 有报工但未配上限的产线也露面(limit=null,前端提示去配)
-            for (Map.Entry<String, Double> e : actualByLine.entrySet()) {
-                if (limitByLine.containsKey(e.getKey())) continue;
-                Map<String, Object> m = new LinkedHashMap<>();
-                m.put("name", e.getKey());
-                m.put("actual", Math.round(e.getValue()));
-                m.put("limit", null);
-                m.put("pct", null);
-                m.put("date", day);
-                out.add(m);
-            }
-            return out;
+            // 产线清单**只由产线档案决定**(2026-10-08 用户口径:「所有产线都要能有图表显示,
+            // 根据生产线里面的产线的是否停用来决定柱状图是否显示,后续新加入的产线也能适配,
+            // 删除的产线也能适配去掉」)——
+            //   · 档案里**启用**(非 停用=是、非 asp_cancel=Y)的产线**全部上图**,含未配日产能的;
+            //   · 报工表里的历史产线名(scjl 的旧电镀线:挂镀_自动线/亮锡E线/铜板线/雾锡A线)不掺进来;
+            //   · 新增一行 = 多一组柱;置 停用=是 或删除 = 立即消失。
+            out.put("rows", rows);
         } catch (Exception ex) {
-            return List.of();
+            out.put("rows", List.of());
         }
+        return out;
     }
 
     private static double toD(Object v) {

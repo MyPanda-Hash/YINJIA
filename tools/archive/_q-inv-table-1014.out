@@ -1,0 +1,4 @@
+s
+--- INV 面板表 ---
+panel_code|panel_name|mode|line_table|head_table
+INV|商品|archive|bs_inv|null

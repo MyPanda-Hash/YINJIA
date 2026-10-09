@@ -72,13 +72,14 @@ CLOSE cur; DEALLOCATE cur;
 GO
 
 -- ═════════════ 4. 译名补齐(新字段标签 + 落款标签) ═════════════
+-- 2026-10-05 扩为三标签 10 语言全集(30 条,与正式库逐字一致):原稿只补 11 条差量,
+--   依赖正式库历史已有 19 条(其它脚本/manual 补的共享标签译名)——陈旧快照(测试库)上
+--   自检「≥29」必炸(实测 11)。改为全集 + NOT EXISTS 守卫后,任意账套一次补齐且幂等。
 INSERT INTO yj_translation (scope, ref_key, locale, text, source)
 SELECT v.scope, v.ref_key, v.locale, v.text, 'manual'
 FROM (VALUES
-  -- 新登记字段:审批人 / 审批时间(此前已有 9 语言,差 zh-TW)
-  ('field', N'审批人', 'zh-TW', N'審批人'),
-  ('field', N'审批时间', 'zh-TW', N'審批時間'),
-  -- 编制人(此前只有 en;三格自动落值后是纸面固定落款,10 语言补齐)
+  -- 编制人(10 语言)
+  ('field', N'编制人', 'en', N'Prepared by'),
   ('field', N'编制人', 'ja', N'作成者'),
   ('field', N'编制人', 'ko', N'작성자'),
   ('field', N'编制人', 'es', N'Elaborado por'),
@@ -87,7 +88,29 @@ FROM (VALUES
   ('field', N'编制人', 'ru', N'Составил'),
   ('field', N'编制人', 'vi', N'Người lập'),
   ('field', N'编制人', 'th', N'ผู้จัดทำ'),
-  ('field', N'编制人', 'zh-TW', N'編製人')
+  ('field', N'编制人', 'zh-TW', N'編製人'),
+  -- 审批人(10 语言)
+  ('field', N'审批人', 'en', N'Approved by (workflow)'),
+  ('field', N'审批人', 'ja', N'決裁者'),
+  ('field', N'审批人', 'ko', N'결재자'),
+  ('field', N'审批人', 'es', N'Aprobador'),
+  ('field', N'审批人', 'fr', N'Approbateur'),
+  ('field', N'审批人', 'de', N'Freigeber'),
+  ('field', N'审批人', 'ru', N'Согласовал'),
+  ('field', N'审批人', 'vi', N'Người phê duyệt'),
+  ('field', N'审批人', 'th', N'ผู้พิจารณา'),
+  ('field', N'审批人', 'zh-TW', N'審批人'),
+  -- 审批时间(10 语言)
+  ('field', N'审批时间', 'en', N'Approved at (workflow)'),
+  ('field', N'审批时间', 'ja', N'決裁時間'),
+  ('field', N'审批时间', 'ko', N'결재 시간'),
+  ('field', N'审批时间', 'es', N'Hora de aprobación'),
+  ('field', N'审批时间', 'fr', N'Heure d''approbation'),
+  ('field', N'审批时间', 'de', N'Freigabezeit'),
+  ('field', N'审批时间', 'ru', N'Время согласования'),
+  ('field', N'审批时间', 'vi', N'Thời gian phê duyệt'),
+  ('field', N'审批时间', 'th', N'เวลาพิจารณา'),
+  ('field', N'审批时间', 'zh-TW', N'審批時間')
 ) AS v(scope, ref_key, locale, text)
 WHERE NOT EXISTS (SELECT 1 FROM yj_translation t
                   WHERE t.scope = v.scope AND t.ref_key = v.ref_key AND t.locale = v.locale);

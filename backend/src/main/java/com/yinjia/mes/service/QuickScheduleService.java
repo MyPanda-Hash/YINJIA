@@ -26,15 +26,19 @@ public class QuickScheduleService {
     private final QueryService queryService;
     private final ButtonService buttonService;
     private final VoucherFlowService voucherFlow;
+    /** 工序任务(路线驱动,A 项):转工单即按工艺路线生成各工序任务 */
+    private final ProcessTaskService processTask;
 
     public QuickScheduleService(JdbcTemplate jdbc, FormNoService formNo, PanelRegistry registry, QueryService queryService,
-                                ButtonService buttonService, VoucherFlowService voucherFlow) {
+                                ButtonService buttonService, VoucherFlowService voucherFlow,
+                                ProcessTaskService processTask) {
         this.jdbc = jdbc;
         this.formNo = formNo;
         this.registry = registry;
         this.queryService = queryService;
         this.buttonService = buttonService;
         this.voucherFlow = voucherFlow;
+        this.processTask = processTask;
     }
 
     // ────────────────────────── ① 销售订单 → 生产工单(一单可多次生成多张) ──────────────────────────
@@ -74,7 +78,16 @@ public class QuickScheduleService {
      * 数据源单轨:不再写 bd_manu_order。SO_ORDER「生成生产工单」按钮与订单结转页共用本实现。
      */
     @Transactional
+    /** 4 参重载(不指定路线):路线取产品绑定 → 否则默认 GY-CB-STD */
     public String createFromOrderLine(String sourceNo, String lineId, Double qtyOverride, String user) {
+        return createFromOrderLine(sourceNo, lineId, qtyOverride, user, null);
+    }
+
+    /**
+     * @param route 订单结转时选择的工艺路线(2026-10-05 用户口径:在**订单结转**处选路线);
+     *              空 = 回退产品档案绑定(bs_inv.工艺路线)→ 否则默认 GY-CB-STD
+     */
+    public String createFromOrderLine(String sourceNo, String lineId, Double qtyOverride, String user, String route) {
         requireAudited(sourceNo);
         // 订单行直查表(不走面板标签映射);来源单头取 客户编码;行号带 id 序兜底(历史行 行号 可能为空)
         Map<String, Object> line = jdbc.queryForMap(
@@ -112,23 +125,43 @@ public class QuickScheduleService {
         } catch (org.springframework.dao.EmptyResultDataAccessException e) {
             plNo = null;   // 该订单尚未转过工单 → 取新号
         }
-        if (plNo == null || plNo.isBlank()) plNo = formNo.next("MO", user);
+        // 生产工单前缀 MO → GD(2026-10-05 用户口径「修改生产工单」):只影响新单号,历史单号不变;
+        // 取号流水在 s_allno(按 前缀+年月 独立序列),不与旧前缀混号。
+        if (plNo == null || plNo.isBlank()) plNo = formNo.next("GD", user);
         Integer lineNo = line.get("行号") instanceof Number n ? n.intValue() : 1;
         String batch = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
         String due = str(line.get("交货日期"));
         // 余量口径(2026-09-27 用户拍板):余量=需求数量−排产数量(未排产),不再是排产数量
         double remain = demand - qty;
         jdbc.update("INSERT INTO plang (comm, pl_no, pl_xc, pl_date, khdm, dm, mc, gg, jldw,"
-                        + " xq_sl, pl_sl, yl, cp_date, lot_no, od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号])"
+                        + " xq_sl, pl_sl, yl, cp_date, lot_no, od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号], [工艺路线])"
                         + " VALUES (N'0', ?, ?, GETDATE(), ?, ?, ?, ?, ?, ?, ?, ?,"
                         + " CASE WHEN ? IS NULL OR ? = N'' THEN NULL ELSE CONVERT(datetime, ?, 120) END,"
-                        + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE(), ?)",
+                        + " ?, ?, CONVERT(float, ?), 'N', 'N', ?, GETDATE(), ?, ?)",
                 plNo, lineNo, str(line.get("客户编码")), str(line.get("存货编码")), str(line.get("存货名称")),
                 str(line.get("规格型号")), str(line.get("销售单位")), demand, qty, remain, due, due, due,
-                str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user, batch);
+                str(line.get("批次号")), sourceNo, Integer.parseInt(lineId), user, batch,
+                // 工单关联工艺路线(2026-10-05):**用订单结转所选,不兜底默认**(用户口径「不需要实现默认选择」);
+                // 未选 = NULL,后续不推导"下一道工序",由经办人补选后再排产
+                (route != null && !route.isBlank()) ? route.trim() : null);
         voucherFlow.linkLine("SO_ORDER", sourceNo, sourceNo + "#" + lineId, str(line.get("存货编码")), qty,
                 "PLANG", plNo, plNo + "#" + lineNo + "#" + batch, "");
         return plNo;
+    }
+
+    /**
+     * 工单采用的工艺路线(2026-10-05,用户口径「转工单的时候需要选择工序路线」的兜底口径):
+     * 产品档案 {@code bs_inv.工艺路线} 优先 → 未绑定则默认 {@code GY-CB-STD}(炭棒标准路线)。
+     */
+    public String resolveRoute(String dm) {
+        String route = "";
+        if (dm != null && !dm.isBlank()) {
+            List<String> r = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.bs_inv WHERE 存货编码=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                    String.class, dm);
+            if (!r.isEmpty() && r.get(0) != null) route = r.get(0).trim();
+        }
+        return route.isEmpty() ? "GY-CB-STD" : route;
     }
 
     // ────────────────────────── ② 生产工单排产(排产工作台单一入口,2026-09-23 §5) ──────────────────────────

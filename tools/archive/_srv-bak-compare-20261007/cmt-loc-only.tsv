@@ -1,0 +1,1747 @@
+rd_soak_detail	序号		序号
+rd_soak_detail	项目		项目
+rd_soak_detail	卫生要求		卫生要求
+bs_route	工艺路线编码		工艺路线编码
+bs_route	工艺路线名称		工艺路线名称
+bs_route	停用		停用
+bs_route	加工顺序		加工顺序
+bs_route	工序编码		工序编码
+bs_route	工序名称		工序名称
+bs_route	加工方式		加工方式
+bs_route	生产车间		生产车间
+bs_route	工资类型		工资类型
+bs_route	计件依据		计件依据
+bs_route	委外供应商		委外供应商
+bs_route	按辅单位计价		按辅单位计价
+bs_route	辅单位		辅单位
+bs_route	换算率		换算率
+bs_route	默认报工数量		默认报工数量
+bs_route	关键工序		关键工序
+bs_route	标准合格率%		标准合格率%
+bs_route	状态		状态
+bs_route	工艺路线分组		工艺路线分组(金蝶「工艺路线分组」)
+bs_route	生效日期		生效日期(金蝶「生效日期」)
+bs_route	失效日期		失效日期(金蝶「失效日期」)
+bs_route	工艺类型		工艺类型(金蝶「工艺类型」,如 通用工序集)
+bs_route	备注2		备注2(金蝶「备注2」)
+bs_route	备注3		备注3(金蝶「备注3」)
+bs_route	生产单据类型		生产单据类型(金蝶「生产单据类型」)
+bs_route	是否连续委外		是否连续委外 Y/N(金蝶「是否连续委外」)
+bs_route	工序图片		工序图片(金蝶明细「工序图片」;存文件路径/URL)
+bs_route	工序说明		工序说明(金蝶明细「工序说明」)
+bs_route	工序组		工序组(金蝶明细「工序组」)
+bs_route	班组		班组(金蝶明细「班组」;本厂按功能填 成型/切炭/组装)
+bs_route	操作工		操作工(金蝶明细「操作工」)
+bs_route	工序单位		工序单位(金蝶明细「工序单位」)
+bs_route	是否末道工序		是否末道工序 Y/N(金蝶明细「是否末道工序」)
+bs_route	允许超额		允许超额 Y/N(金蝶明细「允许超额」)
+bs_route	是否质检		是否质检 Y/N(金蝶明细「是否质检」)
+bs_route	是否首检		是否首检 Y/N(金蝶明细「是否首检」)
+bs_route	审核状态		审核状态:未审核/已审核(金蝶工艺路线口径;引擎单据状态由状态机派生,本列为其业务快照)
+equip_check_detail	单据编号		单据编号
+equip_check_detail	检查内容		检查内容
+equip_check_detail	点检方法		点检方法及工具
+equip_check_detail	检查标准		检查标准
+equip_check_detail	点检日期		点检日期
+equip_check_detail	结果		结果
+equip_check_detail	解决措施		解决措施
+equip_check_detail	备注		备注
+rd_drop_prec_head	文档编号		文档编号
+rd_drop_prec_head	密级		密级
+rd_drop_prec_head	适用范围		适用范围
+rd_drop_prec_head	测试负责人		测试负责人
+rd_drop_prec_head	报告编号		报告编号
+rd_drop_prec_head	测试主题		测试主题
+rd_drop_prec_head	测试目的/背景		测试目的/背景
+rd_drop_prec_head	炭棒尺寸		炭棒尺寸
+rd_drop_prec_head	测试要求		测试要求
+rd_drop_prec_head	测试装置及编号		测试装置及编号
+rd_drop_prec_head	测试方法		测试方法
+rd_drop_prec_head	测试用仪器/检出限		测试用仪器/检出限
+bs_team	班组编码		班组编码
+bs_team	班组名称		班组名称
+bs_team	所属部门		所属部门
+bs_team	是否停用		是否停用
+bs_team	备注		备注
+bs_team	状态		状态
+maint_plan	单据编号		单据编号
+maint_plan	使用范围		使用范围
+maint_plan	管理人		管理人
+maint_plan	备注		备注
+maint_plan	单据状态		单据状态
+maint_plan	审核人		审核人
+maint_plan	审核时间		审核时间
+rd_drop_prec_detail	测试时间		测试时间
+rd_drop_prec_detail	配方		配方
+rd_drop_prec_detail	样品编号		样品编号
+rd_drop_prec_detail	密度		密度
+rd_drop_prec_detail	备注		备注
+bs_uom	计量单位编码		计量单位编码
+bs_uom	计量单位名称		计量单位名称
+bs_uom	主单位		主单位
+bs_uom	换算率		换算率
+bs_uom	状态		状态
+bs_uom	asp_user1		asp_user1
+bs_uom	asp_time1		asp_time1
+bs_uom	asp_user2		asp_user2
+bs_uom	asp_time2		asp_time2
+bs_uom	asp_cancel		asp_cancel
+bs_uom	停用		停用
+bs_uom	外部单据号		外部单据号
+bs_uom	精度处理		精度处理
+bs_uom	是否叶子节点		是否叶子节点
+bs_uom	级次		级次
+bs_uom	创建时间		创建时间
+bs_uom	修改时间		修改时间
+bs_uom	创建人		创建人
+bs_uom	修改人		修改人
+maint_plan_detail	单据编号		单据编号
+maint_plan_detail	设备名称		设备名称
+maint_plan_detail	保养项目		保养项目
+maint_plan_detail	保养内容		保养内容
+maint_plan_detail	具体方法		具体方法
+maint_plan_detail	保养周期		保养周期
+maint_plan_detail	计划保养时间		计划保养时间
+maint_plan_detail	保养人		保养人
+maint_plan_detail	保养情况		保养情况
+qc_return	单据日期		日期(面板字段列)
+rd_spike_water_head	单据日期		单据日期
+rd_spike_water_head	测试项目		测试项目
+rd_spike_water_head	备注		备注
+qc_insp_detail	物料编码		物料编码
+qc_insp_detail	物料名称		物料名称
+qc_insp_detail	数量		数量
+qc_insp_detail	合格数量		合格数量
+qc_insp_detail	asp_user1		asp_user1
+qc_insp_detail	asp_time1		asp_time1
+qc_insp_detail	asp_user2		asp_user2
+qc_insp_detail	asp_time2		asp_time2
+qc_insp_detail	asp_cancel		asp_cancel
+qc_insp_detail	计量单位		计量单位
+qc_insp_detail	单价		单价
+sample_req	单据编号		单据编号
+sample_req	申请编码		申请编码
+sample_req	客户名		客户名
+sample_req	费用		费用
+sample_req	下单日期		下单日期
+sample_req	录入人		录入人
+sample_req	审核人2		审核人(业务)
+sample_req	执行人		执行人
+sample_req	进度描述		进度描述
+sample_req	备注		备注
+sample_req	单据状态		单据状态
+sample_req	审核人		审核人
+sample_req	审核时间		审核时间
+bs_wc	工作中心编码		工作中心编码
+bs_wc	工作中心名称		工作中心名称
+bs_wc	简称		简称
+bs_wc	所属分类		所属分类
+bs_wc	所属部门		所属部门
+bs_wc	负责人		负责人
+bs_wc	班组		班组
+bs_wc	工人		工人
+bs_wc	设备		设备
+bs_wc	产量/小时		产量/小时
+bs_wc	工作时间取值		工作时间取值
+bs_wc	工作时间（小时）		工作时间（小时）
+bs_wc	加班时间（小时）		加班时间（小时）
+bs_wc	停用		停用
+bs_wc	备注		备注
+bs_wc	状态		状态
+rd_spike_water_detail	测试日期		测试日期
+rd_spike_water_detail	项目名称		项目名称
+rd_spike_water_detail	测试装置		测试装置
+rd_spike_water_detail	测试工位		测试工位
+rd_spike_water_detail	配置用水		配置用水
+rd_spike_water_detail	硫酸镁		硫酸镁
+rd_spike_water_detail	二水氯化钙		二水氯化钙
+rd_spike_water_detail	碳酸氢钠		碳酸氢钠
+rd_spike_water_detail	4%次氯酸钠		4%次氯酸钠
+rd_spike_water_detail	盐酸或氢氧化钠		盐酸或氢氧化钠
+rd_spike_water_detail	可溶性铅		可溶性铅
+rd_spike_water_detail	不可溶性铅		不可溶性铅
+rd_spike_water_detail	负责人		负责人
+qc_return_detail	送检数量		送检数量:来料检验单明细的送检数量(检验单审核自动生成本退料单时随链带入,只读);特采按钮按它填特采单「总数量」
+qc_return_detail	特采		特采:勾选=该行做特采(让步接收)。本退料单**审核/审批通过**时,勾了的行逐行生成特采单(总数量=本行送检数量、不合格品数量=本行退货数量);特采单审批通过后全部数量进采购入库单(不走退料)
+inh	src		来源段号:0 期初结存 / 1 采购入库 / 2 产成品入库 / 3 其他入库 / 4 委外入库(与 v_stock_movement 的 src 同口径)
+inh	rid		来源单据行 id(bl_*.id);与 src 组成唯一键,保证同一单据行只记一次流水。期初行为 NULL
+inh	单据编号		来源单据编号
+inh	单据类型		采购入库单/产成品入库单/其他入库单/委外入库单/期初结存
+inh	单据日期		来源单据日期(时点还原余量靠它)
+inh	物料编码		存货编码(对应 bs_inv)
+inh	仓库编码		仓库编码(对应 bs_wh,写入前必须能解析到档案)
+inh	批号		批号(台账三键之一:物料编码+仓库编码+批号)
+inh	数量		入库数量(正数入库,负数=红字冲回)
+inh	金额		入库金额 = 单据金额 或 单价×数量
+inh	含税金额		含税金额(采购入库 = bl_purchase_in.含税金额 原样;其余入库段为 NULL)。由 StockLedgerService.loadRows 取值、StockFlowService.postFlow 写入;v_stock_movement 透传
+inh	税额		税额(采购入库 = 含税金额 − ISNULL(金额, 单价×实收数量) **反推** —— bl_purchase_in 没有税额列;其余入库段为 NULL)
+sl_recv	单据编号		单据编号
+sl_recv	单据日期		单据日期
+sl_recv	业务员		业务员
+sl_recv	供应商代码		供应商代码
+sl_recv	供应商		供应商
+sl_recv	部门		部门
+sl_recv	部门名称		部门名称
+sl_recv	数量		数量
+sl_recv	附件1		附件1
+sl_recv	附件2		附件2
+sl_recv	附件3		附件3
+sl_recv	附件4		附件4
+sl_recv	附件5		附件5
+sl_recv	附件6		附件6
+sl_recv	备注		备注
+sl_recv	单据状态		单据状态
+sl_recv	审核人		审核人
+sl_recv	审核时间		审核时间
+sl_recv	审批人		审批人
+sl_recv	审批时间		审批时间
+sl_recv	asp_user1		asp_user1
+sl_recv	asp_time1		asp_time1
+sl_recv	asp_user2		asp_user2
+sl_recv	asp_time2		asp_time2
+sl_recv	asp_cancel		asp_cancel
+rd_dom_test_head	单据日期		单据日期
+rd_dom_test_head	文档编号		文档编号
+rd_dom_test_head	文件管理人		文件管理人
+rd_dom_test_head	备注		备注
+sample_req_detail	单据编号		单据编号
+sample_req_detail	样品种类		样品种类
+sample_req_detail	产品整体规格		产品整体规格
+sample_req_detail	数量		数量
+sample_req_detail	打样背景		打样背景
+sample_req_detail	相关要求		相关要求
+sample_req_detail	交期		交期
+sample_req_detail	特殊要点		特殊要点
+bs_wh	仓库编码		仓库编码
+bs_wh	仓库名称		仓库名称
+bs_wh	仓库地址		仓库地址
+bs_wh	负责人		负责人
+bs_wh	停用		停用
+bs_wh	备注		备注
+bs_wh	状态		状态
+bs_wh	asp_user1		asp_user1
+bs_wh	asp_time1		asp_time1
+bs_wh	asp_user2		asp_user2
+bs_wh	asp_time2		asp_time2
+bs_wh	asp_cancel		asp_cancel
+bs_wh	外部单据号		外部单据号
+bs_wh	国家		国家
+bs_wh	启用仓位管理		启用仓位管理
+outh	src		来源段号:5 销售出库 / 6 材料出库 / 7 其他出库 / 8 委外发料(与 v_stock_movement 的 src 同口径)
+outh	rid		来源单据行 id(bl_*.id);与 src 组成唯一键
+outh	批号		批号(台账三键之一;出库必须带批号)
+outh	数量		出库数量(正数出库;弃审时写负数红冲行)
+outh	单据金额		单据上的售价金额(不参与成本,仅留档,避免信息丢失)
+outh	成本单价		移动加权出库单价,由 inv_cost_ledger 回填
+outh	成本金额		出库成本金额 = 成本单价×数量,由 inv_cost_ledger 回填
+outh	含税金额		含税金额(销售出库 = bl_sale_out.含税销售金额 原样;其余出库段为 NULL)
+outh	税额		税额(销售出库 = bl_sale_out.税额 原样;其余出库段为 NULL)
+sl_recv_detail	单据编号		单据编号
+sl_recv_detail	物料编码		物料编码
+sl_recv_detail	物料名称		物料名称
+sl_recv_detail	物料描述		物料描述
+sl_recv_detail	数量		数量
+sl_recv_detail	日期		日期
+sl_recv_detail	供应商		供应商
+sl_recv_detail	单价		单价
+sl_recv_detail	折扣		折扣
+sl_recv_detail	金额		金额
+sl_recv_detail	备注		备注
+sl_recv_detail	采购单号		采购单号
+sl_recv_detail	入库数量		入库数量
+sl_recv_detail	入库单号		入库单号
+sl_recv_detail	领料单号		领料单号
+sl_recv_detail	结案		结案
+sl_recv_detail	税别代码		税别代码
+sl_recv_detail	税别说明		税别说明
+sl_recv_detail	税额		税额
+sl_recv_detail	总金额		总金额
+sl_recv_detail	订单号		订单号
+sl_recv_detail	箱数		箱数
+sl_recv_detail	部门		部门
+sl_recv_detail	部门名称		部门名称
+sl_recv_detail	asp_user1		asp_user1
+sl_recv_detail	asp_time1		asp_time1
+sl_recv_detail	asp_user2		asp_user2
+sl_recv_detail	asp_time2		asp_time2
+sl_recv_detail	asp_cancel		asp_cancel
+sl_recv_detail	计量单位		计量单位
+rod_return	单据编号		单据编号
+rod_return	产品编号		产品编号
+rod_return	规格		规格
+rod_return	生产数量		生产数量
+rod_return	不良数量		不良数量
+rod_return	不良现象		不良现象
+rod_return	责任部门		责任部门
+rod_return	备注		备注
+rod_return	单据状态		单据状态
+rod_return	审核人		审核人
+rod_return	审核时间		审核时间
+rd_dom_test_detail	序号		序号
+rd_dom_test_detail	日期		日期
+rd_dom_test_detail	申请人		申请人
+rd_dom_test_detail	尺寸		尺寸
+rd_dom_test_detail	配方		配方
+rd_dom_test_detail	密度		密度
+rd_dom_test_detail	产品编号		产品编号
+rd_dom_test_detail	产品名称		产品名称
+rd_dom_test_detail	生产批次		生产批次
+rd_dom_test_detail	组装方式		组装方式
+rd_dom_test_detail	紧急程度		紧急程度
+rd_dom_test_detail	期望完成日期		期望完成日期
+rd_dom_test_detail	预计完成日期		预计完成日期
+rd_dom_test_detail	备注		备注
+rd_equip_use_head	单据日期		单据日期
+rd_equip_use_head	设备名称		设备名称
+rd_equip_use_head	备注		备注
+gran_record_detail	单据编号		单据编号
+Porder	asp_user1		asp_user1
+Porder	asp_time1		asp_time1
+Porder	asp_user2		asp_user2
+Porder	asp_time2		asp_time2
+Porder	asp_cancel		asp_cancel
+qc_tc_in	暂收退料单号		暂收退料单号:生成本特采单的暂收退料单(2026-10-04 新链路 QC_RETURN→QC_TC_IN 的来源单号;旧口径由检验单直接生成的特采单此列为空)
+bl_dispatch	产品名称		产品名称
+rd_equip_use_detail	使用日期		使用日期
+rd_equip_use_detail	测试项目		测试项目
+rd_equip_use_detail	测试标准		测试标准
+rd_equip_use_detail	使用工位		使用工位
+rd_equip_use_detail	使用人		使用人
+rd_equip_use_detail	备注		备注
+rd_equip_use_detail	设备名称		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+wh_record_detail	单据编号		单据编号
+bs_dict	字典类别		字典类别
+bs_dict	代码		代码
+bs_dict	名称		名称
+bs_dict	备注		备注
+bs_dict	状态		状态
+bs_dict	排序		排序
+bs_dict	停用		停用
+bd_finish_in	加工单号		加工单号
+bd_finish_in	asp_user1		asp_user1
+bd_finish_in	asp_time1		asp_time1
+bd_finish_in	asp_user2		asp_user2
+bd_finish_in	asp_time2		asp_time2
+bd_finish_in	asp_cancel		asp_cancel
+yj_field	tab_key		所属明细页签(分页签面板用:来料检验要求 QC_INSP_REQ 的字段=所属表/页签,值取 物料类别 字典值;NULL=不区分页签)
+rd_instr_use_head	单据日期		单据日期
+rd_instr_use_head	仪器名称/型号		仪器名称/型号
+rd_instr_use_head	备注		备注
+pack_confirm_detail	单据编号		单据编号
+bl_finish_in	实收数量		实收数量
+bl_finish_in	asp_user1		asp_user1
+bl_finish_in	asp_time1		asp_time1
+bl_finish_in	asp_cancel		asp_cancel
+bl_finish_in	asp_user2		asp_user2
+bl_finish_in	asp_time2		asp_time2
+rd_instr_use_detail	使用日期		使用日期
+rd_instr_use_detail	起止时间		起止时间
+rd_instr_use_detail	项目名称/内容		项目名称/内容
+rd_instr_use_detail	用途		用途
+rd_instr_use_detail	样品数量		样品数量
+rd_instr_use_detail	使用人		使用人
+rd_instr_use_detail	备注		备注
+rd_instr_use_detail	仪器名称/型号		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rod_return_detail	单据编号		单据编号
+rd_change_head	申请部门		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	性质		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	产品编号		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	产品名称		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	申请人		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	申请日期		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	变更事由		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	验证数据		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	变更文件		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	需会签		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	会签人		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	原料数量		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	原料处理方式		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	半成品数量		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	半成品处理方式		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	成品数量		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	成品处理方式		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	备注		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	密级		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	文件管理人		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_head	文件使用范围		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_detail	签字		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_change_detail	日期		单据日期(面板字段列)
+bd_manu_order	合同号		合同号
+bd_manu_order	批号		批号
+bd_manu_order	销售订单号		销售订单号
+bd_manu_order	客户编码		客户编码
+bd_manu_order	客户		客户
+bd_manu_order	测试程序		测试程序
+bd_manu_order	机构		机构
+bd_manu_order	asp_user1		asp_user1
+bd_manu_order	asp_time1		asp_time1
+bd_manu_order	asp_user2		asp_user2
+bd_manu_order	asp_time2		asp_time2
+bd_manu_order	asp_cancel		asp_cancel
+bd_manu_order	单据日期		单据日期
+rd_mold_proc_head	单据日期		单据日期
+rd_mold_proc_head	产品编号		产品编号
+rd_mold_proc_head	产品名称		产品名称
+rd_mold_proc_head	asp_user1		asp_user1
+rd_mold_proc_head	asp_time1		asp_time1
+rd_mold_proc_head	asp_user2		asp_user2
+rd_mold_proc_head	asp_time2		asp_time2
+rd_mold_proc_head	asp_cancel		asp_cancel
+bs_settle_type	名称		名称
+bs_settle_type	是否默认		是否默认
+bs_settle_type	停用		停用
+bs_settle_type	状态		状态
+rd_mold_proc_detail	asp_user1		asp_user1
+rd_mold_proc_detail	asp_time1		asp_time1
+rd_mold_proc_detail	asp_user2		asp_user2
+rd_mold_proc_detail	asp_time2		asp_time2
+rd_mold_proc_detail	asp_cancel		asp_cancel
+rd_mold_proc_detail	表区		表区
+rd_mold_proc_detail	序号		序号
+rd_mold_proc_detail	物料种类		物料种类
+rd_mold_proc_detail	物料名称		物料名称
+rd_mold_proc_detail	实际添加比例		实际添加比例
+rd_mold_proc_detail	单支物料含量		单支物料含量
+bl_manu_order	合同号		合同号
+bl_manu_order	产品编码		产品编码
+bl_manu_order	产品名称		产品名称
+bl_manu_order	规格型号		规格型号
+bl_manu_order	型号		型号
+bl_manu_order	生产单位		生产单位
+bl_manu_order	数量		数量
+bl_manu_order	现存量		现存量
+bl_manu_order	总重		总重
+bl_manu_order	asp_user1		asp_user1
+bl_manu_order	asp_time1		asp_time1
+bl_manu_order	asp_cancel		asp_cancel
+bl_manu_order	asp_user2		asp_user2
+bl_manu_order	asp_time2		asp_time2
+bs_customer_group	编码		编码
+bs_customer_group	名称		名称
+bs_customer_group	级次		级次
+bs_customer_group	是否叶子节点		是否叶子节点
+bs_customer_group	停用		停用
+bs_customer_group	状态		状态
+bs_customer_group	外部单据号		外部单据号
+bd_material_out	单据日期		单据日期
+bd_material_out	仓库		仓库
+bd_material_out	单据状态		单据状态
+bd_material_out	创建时间		材料出库单↔金蝶生产领料单(inv_pick)接口键 create_time
+bd_material_out	金蝶单据状态		材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_status
+bd_material_out	部门id		材料出库单↔金蝶生产领料单(inv_pick)接口键 dept_id
+bd_material_out	部门编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 dept_number
+bd_material_out	领料类型		材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_type
+bd_material_out	修改时间		材料出库单↔金蝶生产领料单(inv_pick)接口键 modify_time
+bd_material_out	金蝶审核时间		材料出库单↔金蝶生产领料单(inv_pick)接口键 audit_time
+bd_material_out	创建人id		材料出库单↔金蝶生产领料单(inv_pick)接口键 creator_id
+bd_material_out	创建人		材料出库单↔金蝶生产领料单(inv_pick)接口键 creator_name
+bd_material_out	创建人编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 creator_number
+bd_material_out	修改人id		材料出库单↔金蝶生产领料单(inv_pick)接口键 modifier_id
+bd_material_out	修改人		材料出库单↔金蝶生产领料单(inv_pick)接口键 modifier_name
+bd_material_out	修改人编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 modifier_number
+bd_material_out	单据类型名称		材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_type_name
+bd_material_out	单据类型编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_type_number
+bd_material_out	单据类型id		材料出库单↔金蝶生产领料单(inv_pick)接口键 bill_type_id
+bd_material_out	审核人id		材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_id
+bd_material_out	金蝶审核人		材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_name
+bd_material_out	审核人编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 auditor_number
+bd_material_out	经手人id		材料出库单↔金蝶生产领料单(inv_pick)接口键 emp_id
+bd_material_out	经手人编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 emp_number
+bd_material_out	单据标签		材料出库单↔金蝶生产领料单(inv_pick)接口键 mul_bill_label
+bd_material_out	领料用途名称		材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_use_name
+bd_material_out	领料用途id		材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_use_id
+bd_material_out	领料用途编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 pick_use_number
+bd_material_out	是否已转ERP		转ERP回写:是/否(空=否);弃审自动清
+bd_material_out	ERP单号		转ERP回写:金蝶生成的生产领料单号(SCLL-…)
+bd_material_out	转ERP操作人		转ERP回写:操作人账号
+bd_material_out	转ERP时间		转ERP回写:时间(YYYY-MM-DD HH:mm:ss)
+bs_supplier_group	编码		编码
+bs_supplier_group	名称		名称
+bs_supplier_group	级次		级次
+bs_supplier_group	是否叶子节点		是否叶子节点
+bs_supplier_group	停用		停用
+bs_supplier_group	状态		状态
+bs_supplier_group	外部单据号		外部单据号
+qc_insp_req	备用21		垫片扩展池 1/20(未绑定)
+qc_insp_req	备用22		垫片扩展池 2/20(未绑定)
+qc_insp_req	备用23		垫片扩展池 3/20(未绑定)
+qc_insp_req	备用24		垫片扩展池 4/20(未绑定)
+qc_insp_req	备用25		垫片扩展池 5/20(未绑定)
+qc_insp_req	备用26		垫片扩展池 6/20(未绑定)
+qc_insp_req	备用27		垫片扩展池 7/20(未绑定)
+qc_insp_req	备用28		垫片扩展池 8/20(未绑定)
+qc_insp_req	备用29		垫片扩展池 9/20(未绑定)
+qc_insp_req	备用30		垫片扩展池 10/20(未绑定)
+qc_insp_req	备用31		垫片扩展池 11/20(未绑定)
+qc_insp_req	备用32		垫片扩展池 12/20(未绑定)
+qc_insp_req	备用33		垫片扩展池 13/20(未绑定)
+qc_insp_req	备用34		垫片扩展池 14/20(未绑定)
+qc_insp_req	备用35		垫片扩展池 15/20(未绑定)
+qc_insp_req	备用36		垫片扩展池 16/20(未绑定)
+qc_insp_req	备用37		垫片扩展池 17/20(未绑定)
+qc_insp_req	备用38		垫片扩展池 18/20(未绑定)
+qc_insp_req	备用39		垫片扩展池 19/20(未绑定)
+qc_insp_req	备用40		垫片扩展池 20/20(未绑定)
+qc_insp_req	备用41		无纺布扩展池 1/20(未绑定)
+qc_insp_req	备用42		无纺布扩展池 2/20(未绑定)
+qc_insp_req	备用43		无纺布扩展池 3/20(未绑定)
+qc_insp_req	备用44		无纺布扩展池 4/20(未绑定)
+qc_insp_req	备用45		无纺布扩展池 5/20(未绑定)
+qc_insp_req	备用46		无纺布扩展池 6/20(未绑定)
+qc_insp_req	备用47		无纺布扩展池 7/20(未绑定)
+qc_insp_req	备用48		无纺布扩展池 8/20(未绑定)
+qc_insp_req	备用49		无纺布扩展池 9/20(未绑定)
+qc_insp_req	备用50		无纺布扩展池 10/20(未绑定)
+qc_insp_req	备用51		无纺布扩展池 11/20(未绑定)
+qc_insp_req	备用52		无纺布扩展池 12/20(未绑定)
+qc_insp_req	备用53		无纺布扩展池 13/20(未绑定)
+qc_insp_req	备用54		无纺布扩展池 14/20(未绑定)
+qc_insp_req	备用55		无纺布扩展池 15/20(未绑定)
+qc_insp_req	备用56		无纺布扩展池 16/20(未绑定)
+qc_insp_req	备用57		无纺布扩展池 17/20(未绑定)
+qc_insp_req	备用58		无纺布扩展池 18/20(未绑定)
+qc_insp_req	备用59		无纺布扩展池 19/20(未绑定)
+qc_insp_req	备用60		无纺布扩展池 20/20(未绑定)
+qc_insp_req	备用61		网套扩展池 1/20(未绑定)
+qc_insp_req	备用62		网套扩展池 2/20(未绑定)
+qc_insp_req	备用63		网套扩展池 3/20(未绑定)
+qc_insp_req	备用64		网套扩展池 4/20(未绑定)
+qc_insp_req	备用65		网套扩展池 5/20(未绑定)
+qc_insp_req	备用66		网套扩展池 6/20(未绑定)
+qc_insp_req	备用67		网套扩展池 7/20(未绑定)
+qc_insp_req	备用68		网套扩展池 8/20(未绑定)
+qc_insp_req	备用69		网套扩展池 9/20(未绑定)
+qc_insp_req	备用70		网套扩展池 10/20(未绑定)
+qc_insp_req	备用71		网套扩展池 11/20(未绑定)
+qc_insp_req	备用72		网套扩展池 12/20(未绑定)
+qc_insp_req	备用73		网套扩展池 13/20(未绑定)
+qc_insp_req	备用74		网套扩展池 14/20(未绑定)
+qc_insp_req	备用75		网套扩展池 15/20(未绑定)
+qc_insp_req	备用76		网套扩展池 16/20(未绑定)
+qc_insp_req	备用77		网套扩展池 17/20(未绑定)
+qc_insp_req	备用78		网套扩展池 18/20(未绑定)
+qc_insp_req	备用79		网套扩展池 19/20(未绑定)
+qc_insp_req	备用80		网套扩展池 20/20(未绑定)
+qc_insp_req	备用81		PP管扩展池 1/20(未绑定)
+qc_insp_req	备用82		PP管扩展池 2/20(未绑定)
+qc_insp_req	备用83		PP管扩展池 3/20(未绑定)
+qc_insp_req	备用84		PP管扩展池 4/20(未绑定)
+qc_insp_req	备用85		PP管扩展池 5/20(未绑定)
+qc_insp_req	备用86		PP管扩展池 6/20(未绑定)
+qc_insp_req	备用87		PP管扩展池 7/20(未绑定)
+qc_insp_req	备用88		PP管扩展池 8/20(未绑定)
+qc_insp_req	备用89		PP管扩展池 9/20(未绑定)
+qc_insp_req	备用90		PP管扩展池 10/20(未绑定)
+qc_insp_req	备用91		PP管扩展池 11/20(未绑定)
+qc_insp_req	备用92		PP管扩展池 12/20(未绑定)
+qc_insp_req	备用93		PP管扩展池 13/20(未绑定)
+qc_insp_req	备用94		PP管扩展池 14/20(未绑定)
+qc_insp_req	备用95		PP管扩展池 15/20(未绑定)
+qc_insp_req	备用96		PP管扩展池 16/20(未绑定)
+qc_insp_req	备用97		PP管扩展池 17/20(未绑定)
+qc_insp_req	备用98		PP管扩展池 18/20(未绑定)
+qc_insp_req	备用99		PP管扩展池 19/20(未绑定)
+qc_insp_req	备用100		PP管扩展池 20/20(未绑定)
+qc_insp_req	备用101		端盖扩展池 1/20(未绑定)
+qc_insp_req	备用102		端盖扩展池 2/20(未绑定)
+qc_insp_req	备用103		端盖扩展池 3/20(未绑定)
+qc_insp_req	备用104		端盖扩展池 4/20(未绑定)
+qc_insp_req	备用105		端盖扩展池 5/20(未绑定)
+qc_insp_req	备用106		端盖扩展池 6/20(未绑定)
+qc_insp_req	备用107		端盖扩展池 7/20(未绑定)
+qc_insp_req	备用108		端盖扩展池 8/20(未绑定)
+qc_insp_req	备用109		端盖扩展池 9/20(未绑定)
+qc_insp_req	备用110		端盖扩展池 10/20(未绑定)
+qc_insp_req	备用111		端盖扩展池 11/20(未绑定)
+qc_insp_req	备用112		端盖扩展池 12/20(未绑定)
+qc_insp_req	备用113		端盖扩展池 13/20(未绑定)
+qc_insp_req	备用114		端盖扩展池 14/20(未绑定)
+qc_insp_req	备用115		端盖扩展池 15/20(未绑定)
+qc_insp_req	备用116		端盖扩展池 16/20(未绑定)
+qc_insp_req	备用117		端盖扩展池 17/20(未绑定)
+qc_insp_req	备用118		端盖扩展池 18/20(未绑定)
+qc_insp_req	备用119		端盖扩展池 19/20(未绑定)
+qc_insp_req	备用120		端盖扩展池 20/20(未绑定)
+qc_insp_req	备用121		PP棉扩展池 1/20(未绑定)
+qc_insp_req	备用122		PP棉扩展池 2/20(未绑定)
+qc_insp_req	备用123		PP棉扩展池 3/20(未绑定)
+qc_insp_req	备用124		PP棉扩展池 4/20(未绑定)
+qc_insp_req	备用125		PP棉扩展池 5/20(未绑定)
+qc_insp_req	备用126		PP棉扩展池 6/20(未绑定)
+qc_insp_req	备用127		PP棉扩展池 7/20(未绑定)
+qc_insp_req	备用128		PP棉扩展池 8/20(未绑定)
+qc_insp_req	备用129		PP棉扩展池 9/20(未绑定)
+qc_insp_req	备用130		PP棉扩展池 10/20(未绑定)
+qc_insp_req	备用131		PP棉扩展池 11/20(未绑定)
+qc_insp_req	备用132		PP棉扩展池 12/20(未绑定)
+qc_insp_req	备用133		PP棉扩展池 13/20(未绑定)
+qc_insp_req	备用134		PP棉扩展池 14/20(未绑定)
+qc_insp_req	备用135		PP棉扩展池 15/20(未绑定)
+qc_insp_req	备用136		PP棉扩展池 16/20(未绑定)
+qc_insp_req	备用137		PP棉扩展池 17/20(未绑定)
+qc_insp_req	备用138		PP棉扩展池 18/20(未绑定)
+qc_insp_req	备用139		PP棉扩展池 19/20(未绑定)
+qc_insp_req	备用140		PP棉扩展池 20/20(未绑定)
+qc_insp_req	备用141		预留(原自定义检验要求扩展池 1/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用142		预留(原自定义检验要求扩展池 2/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用143		预留(原自定义检验要求扩展池 3/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用144		预留(原自定义检验要求扩展池 4/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用145		预留(原自定义检验要求扩展池 5/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用146		预留(原自定义检验要求扩展池 6/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用147		预留(原自定义检验要求扩展池 7/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用148		预留(原自定义检验要求扩展池 8/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用149		预留(原自定义检验要求扩展池 9/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用150		预留(原自定义检验要求扩展池 10/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用151		预留(原自定义检验要求扩展池 11/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用152		预留(原自定义检验要求扩展池 12/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用153		预留(原自定义检验要求扩展池 13/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用154		预留(原自定义检验要求扩展池 14/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用155		预留(原自定义检验要求扩展池 15/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用156		预留(原自定义检验要求扩展池 16/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用157		预留(原自定义检验要求扩展池 17/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用158		预留(原自定义检验要求扩展池 18/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用159		预留(原自定义检验要求扩展池 19/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	备用160		预留(原自定义检验要求扩展池 20/20;该页签已拆成独立面板 QC_INSP_REQ_SERIES)
+qc_insp_req	文件编码		文件编码(该物料的检验文件编号;检验报告按物料编码带入,报告内不可修改)
+qc_insp_req	检验依据		检验依据(该物料的检验依据文件号;检验报告按物料编码带入,报告内不可修改)
+bl_material_out	手工确定成本		手工确定成本
+bl_material_out	图片		材料出库单↔金蝶生产领料单(inv_pick)接口键 picture
+bl_material_out	商品id		材料出库单↔金蝶生产领料单(inv_pick)接口键 material_id
+bl_material_out	商品是否多单位		材料出库单↔金蝶生产领料单(inv_pick)接口键 material_is_multi_unit
+bl_material_out	商品是否序列号		材料出库单↔金蝶生产领料单(inv_pick)接口键 material_is_serial
+bl_material_out	商品是否辅助属性		材料出库单↔金蝶生产领料单(inv_pick)接口键 material_is_asst_attr
+bl_material_out	商品是否保质期		材料出库单↔金蝶生产领料单(inv_pick)接口键 material_is_kf_period
+bl_material_out	商品是否批次		材料出库单↔金蝶生产领料单(inv_pick)接口键 material_is_batch
+bl_material_out	仓库id		材料出库单↔金蝶生产领料单(inv_pick)接口键 stock_id
+bl_material_out	仓库编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 stock_number
+bl_material_out	仓库启用仓位管理		材料出库单↔金蝶生产领料单(inv_pick)接口键 stock_is_allow_freight
+bl_material_out	仓位id		材料出库单↔金蝶生产领料单(inv_pick)接口键 sp_id
+bl_material_out	仓位名称		材料出库单↔金蝶生产领料单(inv_pick)接口键 sp_name
+bl_material_out	仓位编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 sp_number
+bl_material_out	辅助属性id		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_prop_id
+bl_material_out	辅助属性名称		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_prop_name
+bl_material_out	辅助属性编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_prop_number
+bl_material_out	辅助属性1id		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux1_id
+bl_material_out	辅助属性1名称		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux1_name
+bl_material_out	辅助属性1编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux1_number
+bl_material_out	辅助属性2id		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux2_id
+bl_material_out	辅助属性2名称		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux2_name
+bl_material_out	辅助属性2编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux2_number
+bl_material_out	辅助属性3id		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux3_id
+bl_material_out	辅助属性3名称		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux3_name
+bl_material_out	辅助属性3编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux3_number
+bl_material_out	条形码		材料出库单↔金蝶生产领料单(inv_pick)接口键 barcode
+bl_material_out	产地		材料出库单↔金蝶生产领料单(inv_pick)接口键 pro_place
+bl_material_out	注册证号		材料出库单↔金蝶生产领料单(inv_pick)接口键 pro_reg_no
+bl_material_out	生产许可证		材料出库单↔金蝶生产领料单(inv_pick)接口键 pro_license
+bl_material_out	保质期到期日		材料出库单↔金蝶生产领料单(inv_pick)接口键 kf_date
+bl_material_out	有效期至		材料出库单↔金蝶生产领料单(inv_pick)接口键 valid_date
+bl_material_out	保质期类型		材料出库单↔金蝶生产领料单(inv_pick)接口键 kf_type
+bl_material_out	保质期		材料出库单↔金蝶生产领料单(inv_pick)接口键 kf_period
+bl_material_out	序列号清单		材料出库单↔金蝶生产领料单(inv_pick)接口键 sn_list
+bl_material_out	序列号流转ID		材料出库单↔金蝶生产领料单(inv_pick)接口键 sn_list_id
+bl_material_out	基本单位id		材料出库单↔金蝶生产领料单(inv_pick)接口键 base_unit_id
+bl_material_out	基本单位名称		材料出库单↔金蝶生产领料单(inv_pick)接口键 base_unit_name
+bl_material_out	基本单位编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 base_unit_number
+bl_material_out	单位id		材料出库单↔金蝶生产领料单(inv_pick)接口键 unit_id
+bl_material_out	单位编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 unit_number
+bl_material_out	辅助单位id		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_unit_id
+bl_material_out	辅助单位名称		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_unit_name
+bl_material_out	辅助单位编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_unit_number
+bl_material_out	换算率		材料出库单↔金蝶生产领料单(inv_pick)接口键 conversion_rate
+bl_material_out	库存数量		材料出库单↔金蝶生产领料单(inv_pick)接口键 inv_qty
+bl_material_out	基本数量		材料出库单↔金蝶生产领料单(inv_pick)接口键 base_qty
+bl_material_out	库存基本数量		材料出库单↔金蝶生产领料单(inv_pick)接口键 inv_base_qty
+bl_material_out	辅助数量		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_qty
+bl_material_out	默认浮动数量		材料出库单↔金蝶生产领料单(inv_pick)接口键 def_float_qty
+bl_material_out	辅助换算系数		材料出库单↔金蝶生产领料单(inv_pick)接口键 aux_coefficient
+bl_material_out	换算系数		材料出库单↔金蝶生产领料单(inv_pick)接口键 coefficient
+bl_material_out	成本		材料出库单↔金蝶生产领料单(inv_pick)接口键 cost
+bl_material_out	单位成本		材料出库单↔金蝶生产领料单(inv_pick)接口键 unit_cost
+bl_material_out	源单编号		材料出库单↔金蝶生产领料单(inv_pick)接口键 src_bill_no
+bl_material_out	源单类型id		材料出库单↔金蝶生产领料单(inv_pick)接口键 src_bill_type_id
+bl_material_out	源单类型名称		材料出库单↔金蝶生产领料单(inv_pick)接口键 src_bill_type_name
+bl_material_out	源单类型编码		材料出库单↔金蝶生产领料单(inv_pick)接口键 src_bill_type_number
+bl_material_out	源单内部id		材料出库单↔金蝶生产领料单(inv_pick)接口键 src_inter_id
+bl_material_out	源单日期		材料出库单↔金蝶生产领料单(inv_pick)接口键 src_bill_date
+bl_material_out	源单行号		材料出库单↔金蝶生产领料单(inv_pick)接口键 src_seq
+bl_material_out	源单分录id		材料出库单↔金蝶生产领料单(inv_pick)接口键 src_entry_id
+bl_material_out	源单产品分录id		材料出库单↔金蝶生产领料单(inv_pick)接口键 src_product_entry_id
+rd_asm_bom_head	产品编号		产品编号
+rd_asm_bom_head	产品名称		产品名称
+rd_asm_bom_head	产品种类		产品种类
+rd_asm_bom_head	整体规格外径		整体规格（外径）
+rd_asm_bom_head	整体规格长度		整体规格（长度）
+rd_asm_bom_head	成品重量		成品重量
+bs_material_group	编码		编码
+bs_material_group	名称		名称
+bs_material_group	级次		级次
+bs_material_group	是否叶子节点		是否叶子节点
+bs_material_group	上级编码		上级编码
+bs_material_group	停用		停用
+bs_material_group	状态		状态
+bs_material_group	外部单据号		外部单据号
+bs_material_group	创建时间		创建时间
+bs_material_group	修改时间		修改时间
+bs_material_group	备注		备注
+bs_material_group	创建人		创建人
+bs_material_group	修改人		修改人
+rd_asm_bom_detail	表区		表区
+rd_asm_bom_detail	序号		序号
+rd_asm_bom_detail	更改内容		更改内容
+rd_asm_bom_detail	更改原因		更改原因
+rd_asm_bom_detail	更改时间		更改时间
+rd_asm_bom_detail	责任人		责任人
+rd_asm_bom_detail	备注		备注
+bd_other_in	仓库		仓库
+bd_other_in	asp_user1		asp_user1
+bd_other_in	asp_time1		asp_time1
+bd_other_in	asp_user2		asp_user2
+bd_other_in	asp_time2		asp_time2
+bd_other_in	asp_cancel		asp_cancel
+bs_currency	编码		编码
+bs_currency	名称		名称
+bs_currency	币别符号		币别符号
+bs_currency	汇率		汇率
+bs_currency	汇率类型		汇率类型
+bs_currency	金额小数位		金额小数位
+bs_currency	单价小数位		单价小数位
+bs_currency	停用		停用
+bs_currency	状态		状态
+bs_currency	外部单据号		外部单据号
+bs_currency	创建人		创建人
+bs_currency	创建时间		创建时间
+bs_currency	修改人		修改人
+bs_currency	修改时间		修改时间
+bs_currency	创建人id		创建人id
+bs_currency	修改人id		修改人id
+rd_asm_proc_head	单据日期		单据日期
+rd_asm_proc_head	asp_user1		asp_user1
+rd_asm_proc_head	asp_time1		asp_time1
+rd_asm_proc_head	asp_user2		asp_user2
+rd_asm_proc_head	asp_time2		asp_time2
+rd_asm_proc_head	asp_cancel		asp_cancel
+rd_asm_proc_head	产品编号		产品编号
+rd_asm_proc_head	产品名称		产品名称
+bl_other_in	单价		单价
+bl_other_in	asp_user1		asp_user1
+bl_other_in	asp_time1		asp_time1
+bl_other_in	asp_cancel		asp_cancel
+bl_other_in	asp_user2		asp_user2
+bl_other_in	asp_time2		asp_time2
+rd_asm_proc_detail	表区		表区
+rd_asm_proc_detail	物料名		物料名
+rd_asm_proc_detail	用量		用量
+rd_asm_proc_detail	备注		备注
+bd_other_out	部门		部门
+bd_other_out	项目.合同号		项目.合同号
+bd_other_out	asp_user1		asp_user1
+bd_other_out	asp_time1		asp_time1
+bd_other_out	asp_user2		asp_user2
+bd_other_out	asp_time2		asp_time2
+bd_other_out	asp_cancel		asp_cancel
+rd_spec_doc_head	单据日期		单据日期
+rd_spec_doc_head	名称		名称
+rd_spec_doc_head	asp_user1		asp_user1
+rd_spec_doc_head	asp_time1		asp_time1
+rd_spec_doc_head	asp_user2		asp_user2
+rd_spec_doc_head	asp_time2		asp_time2
+rd_spec_doc_head	asp_cancel		asp_cancel
+rd_spec_doc_head	规格书种类		规格书种类
+rd_spec_doc_head	整体规格参数		整体规格参数
+rd_approval	单据日期		单据日期
+rd_approval	密级		密级
+rd_approval	文件使用范围		文件使用范围
+rd_approval	文档编号		文档编号
+rd_approval	asp_user1		asp_user1
+rd_approval	asp_time1		asp_time1
+rd_approval	asp_user2		asp_user2
+rd_approval	asp_time2		asp_time2
+rd_approval	asp_cancel		asp_cancel
+bs_prod_line	产线分组		产线分组(第 2 级分类):成型下分 烧结 / X烧结(依《新系统产线命名.xlsx》);切炭/组装未分子组,留空
+bl_other_out	现存量说明		现存量说明
+bl_other_out	asp_user1		asp_user1
+bl_other_out	asp_time1		asp_time1
+bl_other_out	asp_cancel		asp_cancel
+bl_other_out	asp_user2		asp_user2
+bl_other_out	asp_time2		asp_time2
+rd_insp_plan_head	单据日期		单据日期
+rd_insp_plan_head	文档编号		文档编号
+rd_insp_plan_head	标题		标题
+rd_insp_plan_head	产品编号		产品编号
+rd_insp_plan_head	asp_user1		asp_user1
+rd_insp_plan_head	asp_time1		asp_time1
+rd_insp_plan_head	asp_user2		asp_user2
+rd_insp_plan_head	asp_time2		asp_time2
+rd_insp_plan_head	asp_cancel		asp_cancel
+dm_ck	dm		供应商编码
+dm_ck	mc		供应商名称
+dm_ck	bz		备注
+bd_outsource_in	仓库		仓库
+bd_outsource_in	asp_user1		asp_user1
+bd_outsource_in	asp_time1		asp_time1
+bd_outsource_in	asp_user2		asp_user2
+bd_outsource_in	asp_time2		asp_time2
+bd_outsource_in	asp_cancel		asp_cancel
+yj_user	生产车间		账号所属生产车间(=bs_prod_line.生产车间 取值域;空=不受限,排产界面看到全部产线)
+rd_insp_plan_detail	控制项目		控制项目
+rd_insp_plan_detail	控制标准及要求		控制标准及要求
+rd_insp_plan_detail	控制方法		控制方法
+rd_insp_plan_detail	检验类别		检验类别
+rd_insp_plan_detail	序号		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_insp_plan_detail	备注		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bl_outsource_in	行中止		行中止
+bl_outsource_in	asp_user1		asp_user1
+bl_outsource_in	asp_time1		asp_time1
+bl_outsource_in	asp_cancel		asp_cancel
+bl_outsource_in	asp_user2		asp_user2
+bl_outsource_in	asp_time2		asp_time2
+rd_plan	密级		密级
+rd_plan	文件使用范围		文件使用范围
+rd_plan	文档编号		文档编号
+rd_prod_info_head	产品编号		产品编号
+rd_prod_info_head	产品名称		产品名称
+rd_prod_info_head	产品类别		产品类别
+rd_prod_info_head	产品整体尺寸		产品整体尺寸
+rd_prod_info_head	客户料号		客户料号
+rd_prod_info_head	产品形态		产品形态
+rd_prod_info_head	备注		备注
+rd_prod_info_head	客户项目名称		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_prod_info_head	产品管控等级		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_prod_info_head	产品功能类别		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_prod_info_head	编辑人		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_prod_info_head	炭棒内径		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_outsource_issue	仓库		仓库
+bd_outsource_issue	asp_user1		asp_user1
+bd_outsource_issue	asp_time1		asp_time1
+bd_outsource_issue	asp_user2		asp_user2
+bd_outsource_issue	asp_time2		asp_time2
+bd_outsource_issue	asp_cancel		asp_cancel
+erp_imp_log	导入类型		导入类型
+erp_imp_log	文件名		文件名
+erp_imp_log	总行数		总行数
+erp_imp_log	成功数		成功数
+erp_imp_log	失败数		失败数
+erp_imp_log	跳过数		跳过数
+erp_imp_log	状态		状态
+erp_imp_log	操作人		操作人
+erp_imp_log	导入时间		导入时间
+erp_imp_log	备注		备注
+bl_outsource_issue	行中止		行中止
+bl_outsource_issue	asp_user1		asp_user1
+bl_outsource_issue	asp_time1		asp_time1
+bl_outsource_issue	asp_cancel		asp_cancel
+bl_outsource_issue	asp_user2		asp_user2
+bl_outsource_issue	asp_time2		asp_time2
+bd_outsource_order	asp_user1		asp_user1
+bd_outsource_order	asp_time1		asp_time1
+bd_outsource_order	asp_user2		asp_user2
+bd_outsource_order	asp_time2		asp_time2
+bd_outsource_order	asp_cancel		asp_cancel
+erp_imp_row	行号		行号
+erp_imp_row	源单号		源单号
+erp_imp_row	解析状态		解析状态
+erp_imp_row	错误信息		错误信息
+erp_imp_row	目标表		目标表
+erp_imp_row	目标键		目标键
+erp_imp_row	处理状态		处理状态
+bd_purchase_in	单据日期		单据日期
+bd_purchase_in	供应商编码		供应商编码
+bd_purchase_in	供应商		供应商
+bd_purchase_in	供应商简称		供应商简称
+bd_purchase_in	外部单据号		外部单据号
+bd_purchase_in	采购订单号		采购订单号
+bd_purchase_in	单据状态		单据状态
+bd_purchase_in	asp_user1		asp_user1
+bd_purchase_in	asp_time1		asp_time1
+bd_purchase_in	asp_user2		asp_user2
+bd_purchase_in	asp_time2		asp_time2
+bd_purchase_in	asp_cancel		asp_cancel
+bd_purchase_in	来源单据		来源单据
+bd_purchase_in	来源单号		来源单号
+bd_purchase_in	创建时间		创建时间
+bd_purchase_in	supplier_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	emp_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	delivery_type_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	creator_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	creator_number		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	modifier_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	modifier_number		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	auditor_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	auditor_number		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	dept_id		所属部门(关联 yj_dept.id)
+bd_purchase_in	customer_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	contact_country_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	contact_province_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	contact_city_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	contact_district_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	total_unsettle_amount_for		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	edit_pay_type_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	edit_pay_type_number		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	edit_pay_account_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	edit_pay_account_number		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	setting_term_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	dispatcher_country_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	dispatcher_province_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	dispatcher_city_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	dispatcher_district_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	bill_stock_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_purchase_in	bill_sp_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_progress_detail	项目发起人		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_progress_detail	测试情况		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bs_dept	部门编码		部门编码
+bs_dept	部门名称		部门名称
+bs_dept	负责人		负责人
+bs_dept	停用		停用
+bs_dept	备注		备注
+bs_dept	状态		状态
+bs_dept	asp_user1		asp_user1
+bs_dept	asp_time1		asp_time1
+bs_dept	asp_user2		asp_user2
+bs_dept	asp_time2		asp_time2
+bs_dept	asp_cancel		asp_cancel
+bs_dept	上级部门		上级部门
+bs_dept	外部单据号		外部单据号
+bs_dept	级次		级次
+bs_dept	长编码		长编码
+bs_dept	部门全称		部门全称
+bs_dept	上级编码		上级编码
+bs_dept	是否叶子节点		是否叶子节点
+bs_dept	上级id		上级id
+yj_lot_seq	日期		日期
+rd_filter_eff_head	文档编号		文档编号
+rd_filter_eff_head	密级		密级
+rd_filter_eff_head	适用范围		适用范围
+rd_filter_eff_head	测试负责人		测试负责人
+rd_filter_eff_head	测试编号		测试编号
+rd_filter_eff_head	测试主题		测试主题
+rd_filter_eff_head	规格		规格
+rd_filter_eff_head	测试标准		测试标准
+rd_filter_eff_head	原水自来水		原水自来水
+rd_filter_eff_head	原水纯水		原水纯水
+rd_filter_eff_head	原水超纯水		原水超纯水
+rd_filter_eff_head	原水PH		原水PH
+rd_filter_eff_head	缸内自来水VOC浓度		缸内自来水VOC浓度
+rd_filter_eff_head	自来水加氯浓度		自来水加氯浓度
+rd_filter_eff_head	样品数		样品数
+rd_filter_eff_head	样品信息3		样品信息3
+bl_purchase_in	存货名称		存货名称
+bl_purchase_in	规格型号		规格型号
+bl_purchase_in	实收数量		实收数量
+bl_purchase_in	计量单位		计量单位
+bl_purchase_in	单价		单价
+bl_purchase_in	税率%		税率%
+bl_purchase_in	含税单价		含税单价
+bl_purchase_in	金额		金额
+bl_purchase_in	含税金额		含税金额
+bl_purchase_in	现存量		现存量
+bl_purchase_in	asp_user1		asp_user1
+bl_purchase_in	asp_time1		asp_time1
+bl_purchase_in	asp_cancel		asp_cancel
+bl_purchase_in	asp_user2		asp_user2
+bl_purchase_in	asp_time2		asp_time2
+bl_purchase_in	存货编码		存货编码
+bl_purchase_in	仓库		仓库名称
+bl_purchase_in	仓库编码		仓库编码
+bl_purchase_in	cur_settle_amount_for		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+qr_batch_registry	batch_no		批号
+qr_batch_registry	item_code		物料/产品编码
+bs_emp	员工编码		员工编码
+bs_emp	员工名称		员工名称
+bs_emp	所属部门		所属部门
+bs_emp	业务员		业务员
+bs_emp	证件号码		证件号码
+bs_emp	手机		手机
+bs_emp	停用		停用
+bs_emp	状态		状态
+bs_emp	asp_user1		asp_user1
+bs_emp	asp_time1		asp_time1
+bs_emp	asp_user2		asp_user2
+bs_emp	asp_time2		asp_time2
+bs_emp	asp_cancel		asp_cancel
+bs_emp	外部单据号		外部单据号
+bs_emp	性别		性别
+bs_emp	部门编码		部门编码
+bs_emp	部门id		部门id
+rd_filter_eff_detail	冲水时间		冲水时间
+rd_filter_eff_detail	压力（PSI)样品3		压力（PSI)样品3
+rd_filter_eff_detail	出水含量（ug/L）样品3		出水含量（ug/L）样品3
+day_report	单据编号		单据编号
+day_report	车间		车间
+day_report	出勤人数		出勤人数
+day_report	填表人		填表人
+day_report	备注		备注
+day_report	单据状态		单据状态
+day_report	审核人		审核人
+day_report	审核时间		审核时间
+bd_pu_order	单据日期		单据日期
+bd_pu_order	供应商		供应商
+bd_pu_order	供应商编码		供应商编码
+bd_pu_order	币种		币种
+bd_pu_order	汇率		汇率
+bd_pu_order	交货日期		交货日期
+bd_pu_order	数据来源		数据来源
+bd_pu_order	单据状态		单据状态
+bd_pu_order	审核时间		审核时间
+bd_pu_order	asp_user1		asp_user1
+bd_pu_order	asp_time1		asp_time1
+bd_pu_order	asp_user2		asp_user2
+bd_pu_order	asp_time2		asp_time2
+bd_pu_order	asp_cancel		asp_cancel
+bd_pu_order	外部单据号		外部单据号
+bd_pu_order	创建时间		创建时间
+bd_pu_order	关闭状态		关闭状态
+bd_pu_order	供应商id		供应商id
+bd_pu_order	业务员id		业务员id
+bd_pu_order	业务员名称		业务员名称
+bd_pu_order	业务员编码		业务员编码
+bd_pu_order	修改时间		修改时间
+bd_pu_order	创建人id		创建人id
+bd_pu_order	创建人名称		创建人名称
+bd_pu_order	创建人编码		创建人编码
+bd_pu_order	修改人id		修改人id
+bd_pu_order	修改人名称		修改人名称
+bd_pu_order	修改人编码		修改人编码
+bd_pu_order	审核人id		审核人id
+bd_pu_order	审核人编码		审核人编码
+bd_pu_order	业务类型		业务类型
+bd_pu_order	部门id		部门id
+bd_pu_order	部门名称		部门名称
+bd_pu_order	部门编码		部门编码
+bd_pu_order	联系信息-联系方式		联系信息-联系方式
+bd_pu_order	供应商发货地址国家id		供应商发货地址国家id
+bd_pu_order	供应商发货地址国家名称		供应商发货地址国家名称
+bd_pu_order	供应商发货地址国家编码		供应商发货地址国家编码
+bd_pu_order	发送状态		发送状态
+bd_pu_order	附件个数		附件个数
+bd_pu_order	附件地址		附件地址
+bd_pu_order	结算日期		结算日期
+bd_pu_order	收货地址国家id		收货地址国家id
+bd_pu_order	收货地址国家名称		收货地址国家名称
+bd_pu_order	收货地址国家编码		收货地址国家编码
+bd_pu_order	累计预付		累计预付
+bd_pu_order	累计预付本位币		累计预付本位币
+yj_message	创建时间		创建时间
+bs_equip	设备编码		设备编码
+bs_equip	设备名称		设备名称
+bs_equip	所属部门		所属部门
+bs_equip	负责人		负责人
+bs_equip	产量/小时		产量/小时
+bs_equip	停用		停用
+bs_equip	备注		备注
+bs_equip	状态		状态
+rd_alkaline_head	文档编号		文档编号
+rd_alkaline_head	测试主题		测试主题
+day_report_detail	单据编号		单据编号
+day_report_detail	姓名		姓名
+day_report_detail	时间		时间
+day_report_detail	产品编码		产品编码
+day_report_detail	产品名称		产品名称
+day_report_detail	规格		规格
+day_report_detail	单位		单位
+day_report_detail	数量		数量
+day_report_detail	工作内容		工作内容
+day_report_detail	灌料重每支		灌料重/支
+day_report_detail	物料总用量		物料总用量
+day_report_detail	报废		报废
+day_report_detail	料头料尾重量		料头料尾重量
+day_report_detail	工序内容		工序内容(组装)
+day_report_detail	合格数量		合格数量
+day_report_detail	损失时间		损失时间
+day_report_detail	原因		原因
+day_report_detail	备注		备注
+bl_pu_order	物料编码		物料编码
+bl_pu_order	物料名称		物料名称
+bl_pu_order	规格型号		规格型号
+bl_pu_order	单位		单位
+bl_pu_order	数量		数量
+bl_pu_order	单价		单价
+bl_pu_order	金额		金额
+bl_pu_order	税率%		税率%
+bl_pu_order	含税单价		含税单价
+bl_pu_order	含税金额		含税金额
+bl_pu_order	数量2		数量2
+bl_pu_order	计量单位2		计量单位2
+bl_pu_order	折扣%		折扣%
+bl_pu_order	折扣金额		折扣金额
+bl_pu_order	预计到货日期		预计到货日期
+bl_pu_order	现存量		现存量
+bl_pu_order	备注		备注
+bl_pu_order	asp_user1		asp_user1
+bl_pu_order	asp_time1		asp_time1
+bl_pu_order	asp_cancel		asp_cancel
+bl_pu_order	asp_user2		asp_user2
+bl_pu_order	asp_time2		asp_time2
+bl_pu_order	商品id		商品id
+bl_pu_order	商品是否多单位		商品是否多单位
+bl_pu_order	商品是否序列号		商品是否序列号
+bl_pu_order	商品是否启用辅助属性		商品是否启用辅助属性
+bl_pu_order	商品是否开启批次		商品是否开启批次
+bl_pu_order	仓库启用仓位管理		仓库启用仓位管理
+bl_pu_order	实际含税单价		实际含税单价
+bl_pu_order	基本单位id		基本单位id
+bl_pu_order	基本单位名称		基本单位名称
+bl_pu_order	基本单位编码		基本单位编码
+bl_pu_order	单位id		单位id
+bl_pu_order	单位编码		单位编码
+bl_pu_order	换算率		换算率
+bl_pu_order	换算公式		换算公式
+bl_pu_order	基本库存数量		基本库存数量
+bl_pu_order	退货数量		退货数量
+bl_pu_order	退货基本数量		退货基本数量
+bl_pu_order	税额		税额
+bl_pu_order	整单折扣分配额		整单折扣分配额
+bl_pu_order	折扣		折扣
+bl_pu_order	销售费用分摊		销售费用分摊
+bl_pu_order	优惠分摊金额		优惠分摊金额
+bl_pu_order	折前金额		折前金额
+bl_pu_order	实际不含税金额		实际不含税金额
+bl_pu_order	单位成本		单位成本
+bl_pu_order	成本		成本
+bl_pu_order	本次核销金额		本次核销金额
+bl_pu_order	折扣单价		折扣单价
+bl_pu_order	辅助单位id		辅助单位id
+bl_pu_order	辅助单位编码		辅助单位编码
+bl_pu_order	辅助换算率		辅助换算率
+bl_pu_order	分录序号		分录序号
+bl_pu_order	分录核销状态，未收款		分录核销状态，未收款
+bl_pu_order	是否赠品		是否赠品
+bl_pu_order	源单id_src_inter_id		源单id_src_inter_id
+bl_pu_order	源单分录id		源单分录id
+bl_pu_order	行已执行数量		行已执行数量
+bl_pu_order	行关闭状态		行关闭状态
+bl_pu_order	基本数量		基本数量
+bl_pu_order	行入库状态		行入库状态
+bl_pu_order	行执行状态		行执行状态
+bl_pu_order	应付金额本位币		应付金额本位币
+bl_pu_order	含税折扣额		含税折扣额
+bl_pu_order	行未执行数量		行未执行数量
+bl_pu_order	kf_period		kf_period
+bs_inv	所属类别		所属类别
+bs_inv	存货编码		存货编码
+bs_inv	存货名称		存货名称
+bs_inv	规格型号		规格型号
+bs_inv	计价方式		计价方式
+bs_inv	品牌		品牌
+bs_inv	计量单位		计量单位
+bs_inv	属性		属性
+bs_inv	参考成本		参考成本
+bs_inv	建档日期		建档日期
+bs_inv	停用		停用
+bs_inv	备注		备注
+bs_inv	状态		状态
+bs_inv	asp_user1		asp_user1
+bs_inv	asp_time1		asp_time1
+bs_inv	asp_user2		asp_user2
+bs_inv	asp_time2		asp_time2
+bs_inv	asp_cancel		asp_cancel
+bs_inv	数据来源		数据来源
+bs_inv	外部单据号		外部单据号
+bs_inv	助记码		助记码
+bs_inv	商品类型		商品类型
+bs_inv	是否可销售		是否可销售
+bs_inv	是否可采购		是否可采购
+bs_inv	是否为子件		是否为子件
+bs_inv	是否为组件		是否为组件
+bs_inv	是否多单位		是否多单位
+bs_inv	辅助单位		辅助单位
+bs_inv	辅助单位编码		辅助单位编码
+bs_inv	是否启用保质期		是否启用保质期
+bs_inv	保质期		保质期
+bs_inv	预警天数		预警天数
+bs_inv	是否启用辅助属性		是否启用辅助属性
+bs_inv	库存管理方式		库存管理方式
+bs_inv	最低库存		最低库存
+bs_inv	最高库存		最高库存
+bs_inv	预警库存		预警库存
+bs_inv	销项税率		销项税率
+bs_inv	进项税率		进项税率
+bs_inv	毛重		毛重
+bs_inv	净重		净重
+bs_inv	长		长
+bs_inv	宽		宽
+bs_inv	高		高
+bs_inv	体积		体积
+bs_inv	可用库存		可用库存
+bs_inv	即时库存		即时库存
+bs_inv	最小包装量		最小包装量
+bs_inv	是否倒冲领料		是否倒冲领料
+bs_inv	商品标签		商品标签
+bs_inv	基本单位编码		基本单位编码
+bs_inv	是否自制		是否自制
+bs_inv	是否启用称重		是否启用称重
+bs_inv	是否序列号管理		是否序列号管理
+bs_inv	是否批次管理		是否批次管理
+bs_inv	图片链接		图片链接
+bs_inv	采购价		采购价
+bs_inv	零售价		零售价
+bs_inv	批发价		批发价
+bs_inv	配送价		配送价
+bs_inv	最低销售价		最低销售价
+bs_inv	最高采购价		最高采购价
+bs_inv	最近采购价		最近采购价
+bs_inv	最近销售价		最近销售价
+bs_inv	最近含税采购价		最近含税采购价
+bs_inv	最近含税销售价		最近含税销售价
+bs_inv	最近采购入库成本		最近采购入库成本
+bs_inv	委外价		委外价
+bs_inv	价格单位		价格单位
+bs_inv	parent_name		parent_name
+bs_inv	商品类别编码		商品类别编码
+bs_inv	is_show_aux_barcode		is_show_aux_barcode
+bs_inv	商品计量单位id		商品计量单位id
+bs_inv	采购单位		采购单位
+bs_inv	辅助单位1,启动多单位，才需要传递		辅助单位1,启动多单位，才需要传递
+bs_inv	换算率1		换算率1
+bs_inv	换算单位1		换算单位1
+bs_inv	换算率2		换算率2
+bs_inv	换算率3		换算率3
+bs_inv	销售单位		销售单位
+bs_inv	库存单位		库存单位
+bs_inv	报表辅助单位		报表辅助单位
+bs_inv	辅助属性		辅助属性
+bs_inv	商品条码		商品条码
+bs_inv	默认供应商		默认供应商
+bs_inv	采购员		采购员
+bs_inv	商品图片		商品图片
+bs_inv	套装信息对象		套装信息对象
+bs_inv	附件地址		附件地址
+bs_inv	工艺路线		产品的工艺路线编码(→bs_route.工艺路线编码;空=走默认路线 GY-CB-STD)
+bs_inv	生产单位		生产单位:生产/工序口径单位(如 支/个);销售单位见 存货单位
+bs_inv	单位换算率		单位换算率:1 销售单位 = N 生产单位(默认 1;如 3支装一盒 = 3)
+yj_share_file	版本号		版本号
+yj_share_file	备注		备注
+yj_share_file	文件		文件
+feed_confirm	单据编号		单据编号
+feed_confirm	物料名称		物料名称
+feed_confirm	批号		批号
+feed_confirm	备注		备注
+feed_confirm	单据状态		单据状态
+feed_confirm	审核人		审核人
+feed_confirm	审核时间		审核时间
+dm_gf	外部单据号		外部单据号
+dm_gf	供应商分类编码		供应商分类编码
+dm_gf	增值税税率		增值税税率
+dm_gf	开票名称		开票名称
+dm_gf	开户地址		开户地址
+dm_gf	采购员部门		采购员部门
+dm_gf	自动抵扣预收款		自动抵扣预收款
+dm_gf	联系人		联系人
+dm_gf	供应商联系人手机		供应商联系人手机
+dm_gf	供应商联系人座机		供应商联系人座机
+dm_gf	供应商联系人邮箱		供应商联系人邮箱
+dm_gf	供应商联系人地址		供应商联系人地址
+dm_gf	group_id		group_id
+dm_gf	生日		生日
+dm_gf	QQ		QQ
+dm_gf	国家-id		国家-id
+dm_gf	国家-名称		国家-名称
+dm_gf	国家-编码		国家-编码
+dm_gf	省-id		省-id
+dm_gf	省-名称		省-名称
+dm_gf	省-编码		省-编码
+dm_gf	市-id		市-id
+dm_gf	市-名称		市-名称
+dm_gf	市-编码		市-编码
+dm_gf	区-id		区-id
+dm_gf	区-名称		区-名称
+dm_gf	区-编码		区-编码
+dm_gf	性别1-男2-女		性别1-男2-女
+dm_gf	微信		微信
+dm_gf	是否首要联系人		是否首要联系人
+dm_gf	联系人序号		联系人序号
+dm_gf	分类编码		分类编码
+dm_gf	税率		税率
+kucun	wzdm		物料代码
+kucun	ckdm		仓库
+bs_inv_price	存货编码		存货编码
+bs_inv_price	存货名称		存货名称
+bs_inv_price	规格型号		规格型号
+bs_inv_price	品牌		品牌
+bs_inv_price	计量单位		计量单位
+bs_inv_price	采购价		采购价
+bs_inv_price	委外价		委外价
+bs_inv_price	零售价		零售价
+bs_inv_price	普通客户价		普通客户价
+bs_inv_price	一级批发价		一级批发价
+bs_inv_price	二级批发价		二级批发价
+bs_inv_price	三级批发价		三级批发价
+bs_inv_price	四级批发价		四级批发价
+bs_inv_price	五级批发价		五级批发价
+bs_inv_price	最新售价		最新售价
+bs_inv_price	最低售价		最低售价
+bs_inv_price	最新进价		最新进价
+bs_inv_price	最高进价		最高进价
+bs_inv_price	加价率%		加价率%
+bs_inv_price	最近修改日期		最近修改日期
+bs_inv_price	最高委外价		最高委外价
+bs_inv_price	扣率%		扣率%
+bs_inv_price	操作员		操作员
+bs_inv_price	建档人		建档人
+bs_inv_price	备注		备注
+bs_inv_price	状态		状态
+feed_confirm_detail	单据编号		单据编号
+feed_confirm_detail	投料成分		投料成分
+feed_confirm_detail	阶段		阶段
+feed_confirm_detail	理论数量		理论数量/kg
+feed_confirm_detail	实际重量		最终投料重量/kg
+feed_confirm_detail	投料人		投料人
+feed_confirm_detail	是否确认		是否确认
+feed_confirm_detail	确认人		确认人
+bd_sale_out	客户编码		客户编码
+bd_sale_out	asp_user1		asp_user1
+bd_sale_out	asp_time1		asp_time1
+bd_sale_out	asp_user2		asp_user2
+bd_sale_out	asp_time2		asp_time2
+bd_sale_out	asp_cancel		asp_cancel
+bd_sale_out	contact_province_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_sale_out	contact_city_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_sale_out	contact_district_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_sale_out	dispatcher_province_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_sale_out	dispatcher_city_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_sale_out	dispatcher_district_id		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_sale_out	attachments		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_sale_out	auditor_number		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_sale_out	dept_id		所属部门(关联 yj_dept.id)
+bd_sale_out	creator_number		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+bd_sale_out	modifier_number		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+plang	源工单号		切单源工单号(空=原始工单;9.29 批次①工单切单,父子关联)
+plang	源工单行id		切单源工单行id(=父行 plang.id;撤回切单按此精确还原)
+plang	拆分序号		切单序号(源工单的第几拆,从 1 起;空=原始工单)
+plang	根工单号		切单血缘根(多级切分时聚合用;顶级原单为空)
+plang	是否切单		是否由切单产生 Y/N(Y=子工单)
+plang	工艺路线		工艺路线:工单采用的工艺路线编码(→bs_route.工艺路线编码),转工单时选择;空=未指定(按默认 GY-CB-STD 处理)
+plang	当前工序		当前工序:按工单工艺路线+已审核报工推导(末道有完工量的那道);报工审核回写、弃审回退
+plang	当前工序完工量		当前工序完工量:该工序已审核报工数量合计
+plang	完工状态		完工状态:未开工/在制/生产完工(路线末道工序完工量≥Σ计划量);报工审核回写、弃审回退
+plang	完工时间		完工时间:首次达到"生产完工"的时刻;弃审回退时清空
+plang	单位换算率		单位换算率:转单时从商品档案带入(可覆盖);1 销售单位 = N 生产单位
+plang	生产数量		生产数量:成品数量(排产数量)× 单位换算率;工序层再按工艺路线的计划数量换算率逐道累计
+rd_dev_task	产品编号		产品编号
+rd_dev_task	产品名称		产品名称
+rd_dev_task	源单据号		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_dev_task	目标面板		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_dev_task	下发人		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_dev_task	下发时间		历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选
+rd_dev_task	负责人		负责人
+mix_record	单据编号		单据编号
+mix_record	物料编码		物料编码
+mix_record	物料名称		物料名称
+mix_record	生产批次		生产批次
+mix_record	操作人		操作人
+mix_record	核对人		核对人
+mix_record	备注		备注
+mix_record	单据状态		单据状态
+mix_record	审核人		审核人
+mix_record	审核时间		审核时间
+bs_op	工序编码		工序编码
+bs_op	工序名称		工序名称
+bs_op	默认车间		默认车间
+bs_op	关键工序		关键工序
+bs_op	加工方式		加工方式
+bs_op	标准合格率%		标准合格率%
+bs_op	按辅单位计价		按辅单位计价
+bs_op	辅单位		辅单位
+bs_op	换算率		换算率
+bs_op	默认工资类型		默认工资类型
+bs_op	计件依据		计件依据
+bs_op	是否停用		是否停用
+bs_op	备注		备注
+bs_op	状态		状态
+qc_insp	单据日期		单据日期
+qc_insp	供应商代码		供应商代码
+qc_insp	供应商		供应商
+qc_insp	单据状态		单据状态
+qc_insp	asp_user1		asp_user1
+qc_insp	asp_time1		asp_time1
+qc_insp	asp_user2		asp_user2
+qc_insp	asp_time2		asp_time2
+qc_insp	asp_cancel		asp_cancel
+qc_insp	部门编码		部门编码(表头,2026-10-05 补:参照部门档案 bs_dept 的 部门编码,选部门时随参照带回;转 ERP 取 dept_number 用)
+bl_sale_out	售价		售价
+bl_sale_out	asp_user1		asp_user1
+bl_sale_out	asp_time1		asp_time1
+bl_sale_out	asp_cancel		asp_cancel
+bl_sale_out	asp_user2		asp_user2
+bl_sale_out	asp_time2		asp_time2
+rd_antibact_head	文档编号		文档编号
+rd_antibact_head	密级		密级
+rd_antibact_head	适用范围		适用范围
+rd_antibact_head	测试负责人		测试负责人
+rd_antibact_head	报告编号		报告编号
+rd_antibact_head	测试主题		测试主题
+rd_antibact_head	测试目的/背景		测试目的/背景
+rd_antibact_head	测试标准		测试标准
+rd_antibact_head	测试时间		测试时间
+rd_antibact_head	本次实验目的		本次实验目的
+rd_antibact_head	试验用水		试验用水
+rd_antibact_head	测试装置/设备		测试装置/设备
+rd_antibact_head	冲水方式		冲水方式
+rd_antibact_head	测试方法		测试方法
+rd_antibact_head	数据结论		数据结论
+mix_record_detail	单据编号		单据编号
+mix_record_detail	混合次序		混合次序
+mix_record_detail	投料时间		投料时间
+mix_record_detail	物料单批次		物料单批次
+mix_record_detail	重量		重量
+mix_record_detail	混合时间		混合时间/min
+bs_partner	往来单位编码		往来单位编码
+bs_partner	往来单位名称		往来单位名称
+bs_partner	性质		性质
+bs_partner	结算客户		结算客户
+bs_partner	客户价格等级		客户价格等级
+bs_partner	分管部门		分管部门
+bs_partner	分管人员		分管人员
+bs_partner	建档日期		建档日期
+bs_partner	应收余额		应收余额
+bs_partner	应付余额		应付余额
+bs_partner	预收余额		预收余额
+bs_partner	预付余额		预付余额
+bs_partner	往来余额		往来余额
+bs_partner	停用		停用
+bs_partner	职位		职位
+bs_partner	状态		状态
+bs_partner	地址		地址
+bs_partner	电话		电话
+bs_partner	税号		税号
+bs_partner	开户行		开户行
+bs_partner	银行账号		银行账号
+bs_partner	收货地址		收货地址
+bd_so_order	单据日期		单据日期
+bd_so_order	客户		客户
+bd_so_order	客户编码		客户编码
+bd_so_order	结算客户		结算客户
+bd_so_order	部门		部门
+bd_so_order	部门负责人		部门负责人
+bd_so_order	业务员		业务员
+bd_so_order	项目		项目
+bd_so_order	预计交货日期		预计交货日期
+bd_so_order	联系人		联系人
+bd_so_order	单据状态		单据状态
+bd_so_order	审核时间		审核时间
+bd_so_order	asp_user1		asp_user1
+bd_so_order	asp_time1		asp_time1
+bd_so_order	asp_cancel		asp_cancel
+bd_so_order	asp_user2		asp_user2
+bd_so_order	asp_time2		asp_time2
+bd_so_order	外部单据号		外部单据号
+bd_so_order	整单折扣额		整单折扣额
+bd_so_order	创建时间		创建时间
+bd_so_order	客户id		客户id
+bd_so_order	业务员id		业务员id
+bd_so_order	业务员编码		业务员编码
+bd_so_order	应收金额		应收金额
+bd_so_order	出入库状态		出入库状态
+bd_so_order	单据关闭状态		单据关闭状态
+bd_so_order	部门id		部门id
+bd_so_order	部门编码		部门编码
+bd_so_order	客户联系电话		客户联系电话
+bd_so_order	客户国家id		客户国家id
+bd_so_order	客户国家名称		客户国家名称
+bd_so_order	客户国家编码		客户国家编码
+bd_so_order	客户省份id		客户省份id
+bd_so_order	客户省份名称		客户省份名称
+bd_so_order	客户省份编码		客户省份编码
+bd_so_order	客户市区id		客户市区id
+bd_so_order	客户市区名称		客户市区名称
+bd_so_order	客户市区编码		客户市区编码
+bd_so_order	客户区县id		客户区县id
+bd_so_order	客户区县名称		客户区县名称
+bd_so_order	客户区县编码		客户区县编码
+bd_so_order	联系地址		联系地址
+bd_so_order	发货国家id		发货国家id
+bd_so_order	发货国家名称		发货国家名称
+bd_so_order	发货国家编码		发货国家编码
+bd_so_order	付款信息单据体		付款信息单据体
+bd_so_order	未核销金额		未核销金额
+bd_so_order	附件个数		附件个数
+bd_so_order	附件地址		附件地址
+bd_so_order	审核人id		审核人id
+bd_so_order	审核人编码		审核人编码
+bd_so_order	应收款余额		应收款余额
+bd_so_order	物流公司id		物流公司id
+bd_so_order	销售费用		销售费用
+bd_so_order	预收款金额		预收款金额
+bd_so_order	上次欠款		上次欠款
+bd_so_order	折扣率		折扣率
+bd_so_order	修改时间		修改时间
+bd_so_order	创建人id		创建人id
+bd_so_order	创建人名称		创建人名称
+bd_so_order	创建人编码		创建人编码
+bd_so_order	修改人id		修改人id
+bd_so_order	修改人名称		修改人名称
+bd_so_order	修改人编码		修改人编码
+bd_so_order	单据标签		单据标签
+bd_so_order	结算日期		结算日期
+bd_so_order	结算期限id		结算期限id
+bd_so_order	结算期限编码		结算期限编码
+bd_so_order	本次定金		本次定金
+bd_so_order	累计预收		累计预收
+bd_so_order	客户承担费用单据体		客户承担费用单据体
+bd_so_order	结算客户id		结算客户id
+bd_so_order	开票状态		开票状态
+bd_so_order	已执行金额		已执行金额
+bd_so_order	未执行金额		未执行金额
+bd_so_order	累计预收状态		累计预收状态
+rd_antibact_detail	测试日期		测试日期
+rd_antibact_detail	样品信息		样品信息
+gran_record	单据编号		单据编号
+gran_record	物料名称		物料名称
+gran_record	生产批次		生产批次
+gran_record	ZHP_C批次		Z-HP-C批次
+gran_record	ZG_C批次		Z-G-C批次
+gran_record	活性粉		活性粉
+gran_record	温度		温度/℃
+gran_record	湿度		湿度/%
+gran_record	PE用量		P-E/kg
+gran_record	纯水用量		纯水/kg
+gran_record	捏合时间		捏合时间
+gran_record	吹扫时间		吹扫时间
+gran_record	测试时间		测试时间
+gran_record	水分含量		水分含量/%
+gran_record	取样测试人		取样测试人
+gran_record	操作员		操作员
+gran_record	备注		备注
+gran_record	单据状态		单据状态
+gran_record	审核人		审核人
+gran_record	审核时间		审核时间
+bs_proj	项目编码		项目编码
+bs_proj	项目名称		项目名称
+bs_proj	停用		停用
+bs_proj	所属类别		所属类别
+bs_proj	状态		状态
+dm_kh	外部单据号		外部单据号
+dm_kh	客户分类编码		客户分类编码
+dm_kh	价格等级编码		价格等级编码
+dm_kh	业务员编码		业务员编码
+dm_kh	结算客户		结算客户
+dm_kh	结算客户编码		结算客户编码
+dm_kh	部门		部门
+dm_kh	部门编码		部门编码
+dm_kh	增值税税率		增值税税率
+dm_kh	开票名称		开票名称
+dm_kh	发票类型		发票类型
+dm_kh	国家编码		国家编码
+dm_kh	省份编码		省份编码
+dm_kh	城市编码		城市编码
+dm_kh	区县编码		区县编码
+dm_kh	结算期限		结算期限
+dm_kh	结算期限编码		结算期限编码
+dm_kh	自动抵扣预收款		自动抵扣预收款
+dm_kh	信用额度		信用额度
+dm_kh	创建人		创建人
+dm_kh	创建时间		创建时间
+dm_kh	修改时间		修改时间
+dm_kh	收票邮箱		收票邮箱
+dm_kh	收票手机号		收票手机号
+dm_kh	开户地址		开户地址
+dm_kh	联系人性别		联系人性别
+dm_kh	首要联系人		首要联系人
+dm_kh	联系人手机		联系人手机
+dm_kh	联系人座机		联系人座机
+dm_kh	联系人邮箱		联系人邮箱
+dm_kh	联系人生日		联系人生日
+dm_kh	联系人QQ		联系人QQ
+dm_kh	联系人微信		联系人微信
+dm_kh	联系人地址		联系人地址
+dm_kh	价格等级-id		价格等级-id
+dm_kh	国家-id		国家-id
+dm_kh	省-id		省-id
+dm_kh	市-id		市-id
+dm_kh	区-id		区-id
+dm_kh	部门-id		部门-id
+dm_kh	类别-id		类别-id
+dm_kh	业务员-id		业务员-id
+dm_kh	结算期限id		结算期限id
+dm_kh	结算客户id		结算客户id
+dm_kh	联系人创建时间		联系人创建时间
+dm_kh	联系人国家-id		联系人国家-id
+dm_kh	国家-名称		国家-名称
+dm_kh	国家-编码		国家-编码
+dm_kh	联系人省-id		联系人省-id
+dm_kh	省-名称		省-名称
+dm_kh	省-编码		省-编码
+dm_kh	联系人市-id		联系人市-id
+dm_kh	市-名称		市-名称
+dm_kh	市-编码		市-编码
+dm_kh	联系人区-id		联系人区-id
+dm_kh	区-名称		区-名称
+dm_kh	区-编码		区-编码
+dm_kh	联系人序号		联系人序号
+rd_scale_head	文档编号		文档编号
+rd_scale_head	密级		密级
+rd_scale_head	适用范围		适用范围
+rd_scale_head	测试负责人		测试负责人
+rd_scale_head	报告编号		报告编号
+rd_scale_head	测试主题		测试主题
+rd_scale_head	测试目的/背景		测试目的/背景
+rd_scale_head	炭棒尺寸		炭棒尺寸
+rd_scale_head	特殊配方1		特殊配方1
+rd_scale_head	特殊配方2		特殊配方2
+rd_scale_head	特殊配方3		特殊配方3
+rd_scale_head	本次实验目的		本次实验目的
+rd_scale_head	加标水配置		加标水配置
+rd_scale_head	测试方法		测试方法
+bl_so_order	品牌		品牌
+bl_so_order	存货名称		存货名称
+bl_so_order	存货编码		存货编码
+bl_so_order	规格型号		规格型号
+bl_so_order	数量		数量
+bl_so_order	销售单位		销售单位
+bl_so_order	单价		单价
+bl_so_order	税率%		税率%
+bl_so_order	含税单价		含税单价
+bl_so_order	金额		金额
+bl_so_order	含税金额		含税金额
+bl_so_order	折扣金额		折扣金额
+bl_so_order	预计交货日期		预计交货日期
+bl_so_order	现存量		现存量
+bl_so_order	备注		备注
+bl_so_order	asp_user1		asp_user1
+bl_so_order	asp_cancel		asp_cancel
+bl_so_order	asp_time1		asp_time1
+bl_so_order	asp_user2		asp_user2
+bl_so_order	asp_time2		asp_time2
+bl_so_order	商品id		商品id
+bl_so_order	商品是否多单位		商品是否多单位
+bl_so_order	商品是否序列号		商品是否序列号
+bl_so_order	商品是否启用辅助属性		商品是否启用辅助属性
+bl_so_order	商品是否开启保质期		商品是否开启保质期
+bl_so_order	商品是否开启批次		商品是否开启批次
+bl_so_order	仓库启用仓位管理		仓库启用仓位管理
+bl_so_order	实际含税单价		实际含税单价
+bl_so_order	基本单位id		基本单位id
+bl_so_order	基本单位名称		基本单位名称
+bl_so_order	基本单位编码		基本单位编码
+bl_so_order	单位id		单位id
+bl_so_order	单位编码		单位编码
+bl_so_order	换算率		换算率
+bl_so_order	基本库存数量		基本库存数量
+bl_so_order	退货数量		退货数量
+bl_so_order	退货基本数量		退货基本数量
+bl_so_order	税额		税额
+bl_so_order	整单折扣分配额		整单折扣分配额
+bl_so_order	折扣		折扣
+bl_so_order	销售费用分摊		销售费用分摊
+bl_so_order	优惠分摊金额		优惠分摊金额
+bl_so_order	折算率		折算率
+bl_so_order	折前金额		折前金额
+bl_so_order	实际不含税金额		实际不含税金额
+bl_so_order	单位成本		单位成本
+bl_so_order	成本		成本
+bl_so_order	本次核销金额		本次核销金额
+bl_so_order	折扣单价		折扣单价
+bl_so_order	保质期天数		保质期天数
+bl_so_order	序列号流转ID		序列号流转ID
+bl_so_order	辅助换算率		辅助换算率
+bl_so_order	辅助单位数量		辅助单位数量
+bl_so_order	分录序号		分录序号
+bl_so_order	分录核销状态，未收款		分录核销状态，未收款
+bl_so_order	是否赠品		是否赠品
+bl_so_order	源单id_src_inter_id		源单id_src_inter_id
+bl_so_order	源单分录id		源单分录id
+bl_so_order	单据整单折前价税合计_bill_dis_before_amount		单据整单折前价税合计_bill_dis_before_amount
+bl_so_order	基本数量		基本数量
+bl_so_order	已执行基本单位数量		已执行基本单位数量
+bl_so_order	行已执行数量		行已执行数量
+bl_so_order	行未执行数量		行未执行数量
+bl_so_order	行执行已出库数量		行执行已出库数量
+bl_so_order	行执行未出库数量		行执行未出库数量
+bl_so_order	含税折扣额		含税折扣额
+rd_scale_detail	测试日期		测试日期
+rd_scale_detail	加标水硬度H0		加标水硬度H0
+rd_scale_detail	加标水烧开后硬度H1		加标水烧开后硬度H1
+rd_ro_protect_head	文档编号		文档编号
+rd_ro_protect_head	密级		密级
+rd_ro_protect_head	适用范围		适用范围
+rd_ro_protect_head	测试负责人		测试负责人
+rd_ro_protect_head	报告编号		报告编号
+rd_ro_protect_head	测试主题		测试主题
+rd_ro_protect_head	测试背景/目的		测试背景/目的
+rd_ro_protect_head	项目名称		项目名称
+rd_ro_protect_head	本次实验目的		本次实验目的
+rd_ro_protect_head	试验用水		试验用水
+rd_ro_protect_head	测试装置/设备		测试装置/设备
+rd_ro_protect_head	测试方法		测试方法
+rd_ro_protect_head	冲水方式		冲水方式
+rd_ro_protect_head	产品名/规格		产品名/规格
+rd_ro_protect_head	配方/工艺		配方/工艺
+rd_ro_protect_head	测试结论		测试结论
+wh_record	单据编号		单据编号
+wh_record	成型日期		成型日期
+wh_record	产品编号		产品编号
+wh_record	尺寸		尺寸
+wh_record	加湿前重量		加湿前重量
+wh_record	加湿后重量		加湿后重量
+wh_record	无黑时间		无黑时间
+wh_record	取样时间		取样时间
+wh_record	备注		备注
+wh_record	单据状态		单据状态
+wh_record	审核人		审核人
+wh_record	审核时间		审核时间
+wo_order	asp_user1		asp_user1
+wo_order	asp_time1		asp_time1
+wo_order	asp_user2		asp_user2
+wo_order	asp_time2		asp_time2
+wo_order	asp_cancel		asp_cancel
+bs_region	地区编码		地区编码
+bs_region	地区名称		地区名称
+bs_region	状态		状态
+rd_ro_protect_detail	样品		样品
+rd_ro_protect_detail	测试日期		测试日期
+rd_ro_protect_detail	衰减率		衰减率
+rd_ro_protect_detail	脱盐率		脱盐率
+pack_confirm	单据编号		单据编号
+pack_confirm	装箱日期		装箱日期
+pack_confirm	产品编号		产品编号
+pack_confirm	装箱数量		装箱数量
+pack_confirm	装箱人		装箱人
+pack_confirm	确认人		确认人
+pack_confirm	主管签名		主管签名
+pack_confirm	备注		备注
+pack_confirm	单据状态		单据状态
+pack_confirm	审核人		审核人
+pack_confirm	审核时间		审核时间
+wo_progress	工序		工序
+wo_progress	计划数量		计划数量
+wo_progress	完成数量		完成数量
+wo_progress	工单行id		工序任务所属工单行(=plang.id)
+wo_progress	批次号		工序任务所属批次(=plang.批次号)
+wo_progress	工序序		工序顺序号(取工艺路线 加工顺序;1=第一道)
+wo_progress	生产车间		该工序所属功能(成型/切炭/组装 —— 依《新系统产线命名.xlsx》)
+wo_progress	生产线		派工到的产线(空=未派工)
+wo_progress	状态		工序任务状态:待加工/在加工/已完工
+wo_progress	优先级		优先级(普通/急单;急单排在普通之前)
+wo_progress	排序号		同工序队列内的顺序号(人工排序用;空=按 优先级→交期 自动排)
+wo_progress	计划完工日期		该工序的计划完工日(默认取工单交期)
+wo_progress	产品编码		产品编码(冗余,列表直接显示免联表)
+wo_progress	产品名称		产品名称(冗余)
+wo_progress	规格型号		规格型号(冗余)
+rd_soak_head	文档编号		文档编号
+rd_soak_head	密级		密级
+rd_soak_head	适用范围		适用范围
+rd_soak_head	测试负责人		测试负责人
+rd_soak_head	报告编号		报告编号
+rd_soak_head	测试主题		测试主题
+rd_soak_head	测试目的/背景		测试目的/背景
+rd_soak_head	测试标准		测试标准
+rd_soak_head	测试时间		测试时间
+rd_soak_head	本次实验目的		本次实验目的
+rd_soak_head	浸泡水配置		浸泡水配置
+rd_soak_head	测试方法		测试方法
+rd_soak_head	实验结论		实验结论
+rd_soak_head	备注		备注
+bs_reject	不合格原因编码		不合格原因编码
+bs_reject	不合格原因		不合格原因
+bs_reject	停用		停用
+bs_reject	备注		备注
+bs_reject	状态		状态
+equip_check	单据编号		单据编号
+equip_check	年月		年月
+equip_check	车间		车间
+equip_check	设备名称		设备名称
+equip_check	点检人		点检人
+equip_check	备注		备注
+equip_check	单据状态		单据状态
+equip_check	审核人		审核人
+equip_check	审核时间		审核时间

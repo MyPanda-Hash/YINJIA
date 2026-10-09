@@ -73,6 +73,8 @@ deploy/backup/
 deploy/sync.lock
 # make-deploy-package.ps1 产出的部署包(含 app.jar 与 .bak,不入库)
 deploy/pkg-*/
+# 增量工具更新包(如金蝶拉取同步器脚本包;2026-10-07 增,内容与 deploy/ 根同源,无需入库)
+deploy/jdy-sync-update-*/
 *.deploy.zip
 yinjia-mes-deploy.zip
 

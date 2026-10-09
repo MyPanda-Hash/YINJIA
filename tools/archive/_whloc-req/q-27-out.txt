@@ -1,0 +1,82 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-27-zone-model.sql ==
+  | 10 | 仓库 | 仓库 | 参照 | query,detail | 1 | 0 | 1 | WH | 仓库名称 |  |  | 
+  | 20 | 仓库编码 | 仓库编码 | 文本 | detail | 0 | 1 | 1 |  |  |  |  | 
+  | 30 | 仓位编码 | 仓位编码 | 文本 | query,detail | 1 | 0 | 1 |  |  |  |  | 
+  | 34 | 大区 | 大区 | 文本 | query,detail | 1 | 0 | 1 |  |  |  |  | 
+  | 36 | 存储分区 | 存储分区 | 文本 | query,detail | 1 | 0 | 1 |  |  |  |  | 
+  | 38 | 区码 | 区码 | 文本 | query,detail | 1 | 0 | 1 |  |  |  |  | 
+  | 40 | 排号 | 排号 | 文本 | detail | 1 | 0 | 1 |  |  |  |  | 
+  | 42 | 位号 | 位号 | 文本 | detail | 1 | 0 | 1 |  |  |  |  | 
+  | 44 | 层号 | 层号 | 文本 | detail | 1 | 0 | 1 |  |  |  |  | 
+  | 50 | 仓位地址 | 仓位地址 | 文本 | query,detail | 1 | 0 | 1 |  |  |  |  | 
+  | 60 | 停用 | 停用 | 是否 | query,detail | 1 | 0 | 1 |  |  |  |  | 
+  | 70 | 备注 | 备注 | 文本 | detail | 1 | 0 | 1 |  |  |  |  | 
+  | 218 | 80 | 
+  | CGD | 验收方式 | SELECT mc FROM dm_gx WHERE lb='YSFS' AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY dm | 
+  | CUR | 汇率类型 | SELECT v FROM (VALUES (N'固定汇率'),(N'浮动汇率')) AS t(v) | 
+  | DAY_REPORT | 车间 | SELECT v FROM (VALUES (N'自制物料车间'),(N'成型车间'),(N'切炭车间'),(N'组装车间'),(N'装箱车间')) AS t(v) | 
+  | DISPATCH | 业务类型 | SELECT v FROM (VALUES (N'工序派工'),(N'委外派工')) AS t(v) | 
+  | DISPATCH | 加工类型 | SELECT v FROM (VALUES (N'自制'),(N'委外')) AS t(v) | 
+  | DISPATCH | 计量单位 | SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v) | 
+  | DISPATCH | 派工加工状态 | SELECT v FROM (VALUES (N'未派工'),(N'已派工'),(N'完工')) AS t(v) | 
+  | EMP | 所属部门 | SELECT v FROM (VALUES (N'总经办'),(N'销售一部'),(N'销售二部'),(N'国际部'),(N'熔铸车间'),(N'轧制车间'),(N'精整车间'),(N'测试车间'),(N'质检部'),( | 
+  | EQUIP | 所属部门 | SELECT v FROM (VALUES (N'熔铸车间'),(N'轧制车间'),(N'精整车间'),(N'测试车间')) AS t(v) | 
+  | EQUIP | 设备状态 | SELECT 名称 FROM bs_dict WHERE 字典类别='EQUIP_STATUS' AND ISNULL(停用,0)=0 ORDER BY 代码 | 
+  | EQUIP_CHECK | 结果 | SELECT v FROM (VALUES (N'正常'),(N'异常')) AS t(v) | 
+  | ERPLG | 导入类型 | SELECT mc FROM dm_gx WHERE lb='IMPTYP' AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY dm | 
+  | CGD | 厂商代码 | GFDA | dm |  | 
+  | DAY_REPORT | 审核人 | EMP | 员工名称 |  | 
+  | DEPT | 上级部门 | DEPT | 部门编码 |  | 
+  | DISPATCH | 工序编码 | OP | 工序编码 |  | 
+  | DISPATCH | 生产车间 | DEPT | 部门名称 |  | 
+  | DISPATCH | 工作中心 | WC | 工作中心名称 |  | 
+  | DISPATCH | 产品名称 | INV | 存货名称 |  | 
+  | DISPATCH | 设备 | EQUIP | 设备名称 |  | 
+  | DISPATCH | 班组 | TEAM | 班组名称 |  | 
+  | DISPATCH | 工人 | EMP | 员工名称 |  | 
+  | DISPATCH | 经手人 | EMP | 员工名称 |  | 
+  | DISPATCH | 项目 | PROJ | 项目名称 |  | 
+  | 10 | 仓库编码 | 仓库编码 | query,detail | 1 | 0 |  |  |  | 
+  | 20 | 仓库名称 | 仓库名称 | query,detail | 1 | 0 |  |  |  | 
+  | 30 | 仓库地址 | 仓库地址 | detail | 1 | 0 |  |  |  | 
+  | 36 | 厂区 | 厂区 | query,detail | 1 | 0 |  |  |  | 
+  | 40 | 仓位 | 仓位 | detail | 0 | 1 |  |  |  | 
+  | 50 | 负责人 | 负责人 | detail | 1 | 0 |  |  |  | 
+  | 60 | 停用 | 停用 | query,detail | 1 | 0 |  |  |  | 
+  | 70 | 允许负库存 | 允许零库存出库 | detail | 1 | 0 |  |  |  | 
+  | 80 | 联系人 | 联系人 | detail | 1 | 0 |  |  |  | 
+  | 90 | 联系电话 | 联系电话 | detail | 1 | 0 |  |  |  | 
+  | 100 | 仓库分类 | 仓库分类 | query,detail | 1 | 0 |  |  |  | 
+  | 110 | 仓库分类编码 | 仓库分类编码 | query,detail | 1 | 0 |  |  |  | 
+  | 120 | 国家 | 国家 | detail | 1 | 0 |  |  |  | 
+  | 130 | 省 | 省 | detail | 1 | 0 |  |  |  | 
+  | 140 | 市 | 市 | detail | 1 | 0 |  |  |  | 
+  | 150 | 区 | 区 | detail | 1 | 0 |  |  |  | 
+  | 160 | 启用仓位管理 | 启用仓位管理 | detail | 1 | 0 |  |  |  | 
+  | 170 | 仓库管理员编码 | 仓库管理员编码 | query,detail | 1 | 0 |  |  |  | 
+  | 180 | 分类id | 分类id | detail | 0 | 1 |  |  |  | 
+  | 190 | 仓库管理员id | 仓库管理员id | detail | 0 | 1 |  |  |  | 
+  | bs_dict | 数据字典 | 
+  | bs_region | 地区档案 | 
+  | CUSGRP | 客户分类 | 基础档案 | archive | bs_customer_group | 
+  | MATGRP | 商品分类 | 基础档案 | archive | bs_material_group | 
+  | REGION | 地区 | 基础档案 | archive | bs_region | 
+  | SUPGRP | 供应商分类 | 基础档案 | archive | bs_supplier_group | 
+  | ZDGL | 数据字典 | 基础档案 | archive | bs_dict | 
+  | 8 | 259 | 32 | 
+  | 仓位编码 | nvarchar | 100 | 0 | 仓位编码(仓位的业务标识;对齐金蝶 sp_number;二维码第三段;原「库位编码」2026-10-08 正名) | 
+  | 存储分区 | nvarchar | 30 | 1 | 存储分区(用途标签 = 《仓库总体规划》列头:炭粉区/胶粉区/货架区/纸箱区/端盖区/PP棉区/无纺布区/网套区/标签区;按(区码,排号区间)切,不是物理层级;2026-10-08 由「库区」正名) | 
+  | 排号 | nvarchar | 10 | 1 | 排号(货架排,存编码里的排段原文:09~24 或 AH5~AH16;2026-10-08 新增) | 
+  | 位号 | nvarchar | 10 | 1 | 位号(一排货架的第几格/第几侧,1/2/3;2026-10-08 新增) | 
+  | 层号 | nvarchar | 10 | 1 | 层号(货架层,目前仅货架区 AH 系列用:1/2/3;炭粉/胶粉区为空;2026-10-08 新增) | 
+  | 区码 | nvarchar | 20 | 1 | 区码(仓位编码第一段的物理区:A1/A2/AH/B1~B4/C1/C2;与「存储分区」是两个维度——同一个 A1 区可同时承载炭粉区与胶粉区;2026-10-08 新增) | 
+  | 大区 | nvarchar | 30 | 1 | 大区(仓内的大功能分区,层次:厂区 > 仓 > 大区 > 分区;取值 原料区/辅料及配件区/成品仓区;B仓/C仓 不分区故为空;2026-10-08 按用户口径新增) | 
+[OK] q-27-zone-model.sql (10 batches)

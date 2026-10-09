@@ -1,0 +1,388 @@
+rod_return_detail		炭棒不良退货登记占位行表(恒空,doc模式要求)	
+qc_return	部门名称	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+yj_form_approval		审批记录表（提交/通过/驳回/弃审全留痕）	
+bd_prod_abn	asp_user1	创建人	
+bd_prod_abn	asp_time1	创建时间	
+bd_prod_abn	asp_user2	最后修改人	
+bd_prod_abn	asp_time2	最后修改时间	
+bd_prod_abn	asp_cancel	删除标记	
+inh	comm	公司	
+inh	in_date	日期	
+inh	ywman	业务员	
+inh	inh_no	单号	
+inh	gfdm	厂商代码	
+inh	wzdm	货品代码	
+inh	ckdm	仓库代码	
+inh	lot_no	批号	
+inh	color	颜色	
+inh	siz	尺寸	
+inh	sl	数量(米，公斤)	
+inh	ddw	多单位	
+inh	ddwsl	数量(米，公斤)	
+inh	in_danj	单价	
+inh	i_zk	折扣	
+inh	i_zke	折后金额	
+inh	jsfk	即时付款	
+inh	jz	记账	
+inh	yf	预付额	
+inh	bz	备注	
+inh	bz1	类型	
+inh	od_no	采购单号	
+inh	od_xc	采购单项次	
+inh	tax_dm	税别代码	
+inh	tax_sm	税别说明	
+inh	tax	税额	
+inh	total_m	总金额	
+inh	od_no2	订单号	
+inh	od_xc2	订单项次	
+inh	sh_no	送货单号	
+inh	bom_qty	BOM用量	
+inh	fk_no	付款单号	
+inh	fk_date	付款时间	
+inh	cust_po	制单号	
+inh	ch	付款申请单号	
+inh	zh	扎号	
+inh	barcode	条码(床号-床次-扎号-3位流水)	
+inh	qr	审核	
+inh	od_id	订单ID	
+inh	cg_id	采购单ID	
+inh	dep_no	部门	
+inh	dep_na	部门名称	
+inh	next_no	经销商入库单号	
+inh	yd_id	原单ID	
+inh	js_sl	结算数量	
+inh	js_danj	结算单价	
+inh	js_je	结算金额	
+inh	size_order	尺码排序	
+inh	type	类型(面料，线材，其他)	
+inh	cwsh	财务审核	
+inh	box_no	装箱单号	
+inh	fj1	附件1	
+inh	fj2	附件2	
+inh	fj3	附件3	
+inh	fj4	附件4	
+inh	fj5	附件5	
+inh	fj6	附件6	
+inh	fj_na1	附件1	
+inh	fj_na2	附件1	
+inh	fj_na3	附件1	
+inh	fj_na4	附件1	
+inh	fj_na5	附件1	
+inh	fj_na6	附件1	
+inh	fh_sl	发货数量	
+inh	tl_sl	退料数量	
+inh	bf_sl	报废数量	
+inh	sy_sl	剩余数量	
+inh	thyd_no	退货原单单号	
+inh	thyd_id	退货原单ID	
+inh	erp_no	ERP单号	
+inh	erp_id	ERPID	
+inh	erp_user	转单人	
+inh	erp_error	ERP转单错误信息	
+inh	erp_time	转单时间	
+inh	llxz	来料性质	
+inh	cgrkdh	采购入库单号	
+inh	lldh	来料单号	
+inh	djlx	单据类型	
+inh	zl	重量	
+inh	sl3	每盘数量	
+inh	asp_user1	创建人	
+inh	asp_time1	创建时间	
+inh	asp_user2	最后修改人	
+inh	asp_time2	最后修改时间	
+inh	asp_user3	审核人	
+inh	asp_time3	审核时间	
+inh	asp_cancel	删除标记	
+inh	asp_user4	删除人	
+inh	asp_time4	删除时间	
+inh	asp_print	打印次数	
+inh	备用1	预留扩展字段(未绑定)	
+inh	备用2	预留扩展字段(未绑定)	
+inh	备用3	预留扩展字段(未绑定)	
+inh	备用4	预留扩展字段(未绑定)	
+inh	备用5	预留扩展字段(未绑定)	
+inh	备用6	预留扩展字段(未绑定)	
+inh	备用7	预留扩展字段(未绑定)	
+inh	备用8	预留扩展字段(未绑定)	
+inh	备用9	预留扩展字段(未绑定)	
+inh	备用10	预留扩展字段(未绑定)	
+inh	备用11	预留扩展字段(未绑定)	
+inh	备用12	预留扩展字段(未绑定)	
+inh	备用13	预留扩展字段(未绑定)	
+inh	备用14	预留扩展字段(未绑定)	
+inh	备用15	预留扩展字段(未绑定)	
+inh	备用16	预留扩展字段(未绑定)	
+inh	备用17	预留扩展字段(未绑定)	
+inh	备用18	预留扩展字段(未绑定)	
+inh	备用19	预留扩展字段(未绑定)	
+inh	备用20	预留扩展字段(未绑定)	
+yj_lot_seq		批号流水表(批号=yyyymmdd+3位流水,材料/产品批号统一取号)	
+qc_insp_detail	批号	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+qc_insp_detail	不合格数量	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+qc_insp_detail	单位	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+yj_user		用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)	
+yj_user	asp_user1	创建人	
+yj_user	asp_time1	创建时间	
+yj_user	asp_user2	最后修改人	
+yj_user	asp_time2	最后修改时间	
+yj_user	asp_user3	审核人	
+yj_user	asp_time3	审核时间	
+yj_user	asp_cancel	删除标记	
+yj_user	asp_user4	删除人	
+yj_user	asp_time4	删除时间	
+yj_user	asp_print	打印次数	
+yj_schema_log		数据库结构脚本执行日志(script_name+content_hash 幂等记录)	
+yj_panel		面板注册表(元数据核心:面板编码/模式doc|flat|archive/头行表/前缀/日期列/模块分组)	
+yj_field		面板字段注册表(列名/中文标签/类型/字典SQL/参照面板/位置query|header|detail/必填)	
+yj_doc_status		单据状态表(shr审核/canceled作废/stopped中止/pending审批中/archived归档/modify_state修改态)	
+bd_material_out	asp_user3	审核人	
+bd_material_out	asp_time3	审核时间	
+bd_material_out	asp_user4	删除人	
+bd_material_out	asp_time4	删除时间	
+bd_material_out	asp_print	打印次数	
+rd_equip_use_head	asp_user3	审核人	
+rd_equip_use_head	asp_time3	审核时间	
+rd_equip_use_head	asp_user4	删除人	
+rd_equip_use_head	asp_time4	删除时间	
+rd_equip_use_head	asp_print	打印次数	
+rd_equip_use_detail	asp_user3	审核人	
+rd_equip_use_detail	asp_time3	审核时间	
+rd_equip_use_detail	asp_user4	删除人	
+rd_equip_use_detail	asp_time4	删除时间	
+rd_equip_use_detail	asp_print	打印次数	
+bl_material_out	asp_user3	审核人	
+bl_material_out	asp_time3	审核时间	
+bl_material_out	asp_user4	删除人	
+bl_material_out	asp_time4	删除时间	
+bl_material_out	asp_print	打印次数	
+rd_instr_use_detail	asp_user3	审核人	
+rd_instr_use_detail	asp_time3	审核时间	
+rd_instr_use_detail	asp_user4	删除人	
+rd_instr_use_detail	asp_time4	删除时间	
+rd_instr_use_detail	asp_print	打印次数	
+yj_plan_term		计划条款表(阶段中止/恢复申请:stage/reason/state)	
+yj_usage_log		使用日志(登录与面板操作留痕,使用权限查看页面数据源)	
+form_flow_link		单据流链接表(上游生单→下游单据占用,link_status=ACTIVE|RELEASED)	
+rd_spec_assign		规格书分派(产品编号+种类→责任人)	
+rd_instr_use_head	asp_user3	审核人	
+rd_instr_use_head	asp_time3	审核时间	
+rd_instr_use_head	asp_user4	删除人	
+rd_instr_use_head	asp_time4	删除时间	
+rd_instr_use_head	asp_print	打印次数	
+rd_dom_test_detail	asp_user3	审核人	
+rd_dom_test_detail	asp_time3	审核时间	
+rd_dom_test_detail	asp_user4	删除人	
+rd_dom_test_detail	asp_time4	删除时间	
+rd_dom_test_detail	asp_print	打印次数	
+rd_dom_test_head	asp_user3	审核人	
+rd_dom_test_head	asp_time3	审核时间	
+rd_dom_test_head	asp_user4	删除人	
+rd_dom_test_head	asp_time4	删除时间	
+rd_dom_test_head	asp_print	打印次数	
+outh	comm	公司	
+outh	out_date	日期	
+outh	ywman	业务员	
+outh	outh_no	单号	
+outh	khdm	客户代码	
+outh	wzdm	货品代码	
+outh	ckdm	仓库代码	
+outh	lot_no	批号	
+outh	color	颜色	
+outh	siz	尺寸	
+outh	sl	数量(米，公斤)	
+outh	ddw	多单位	
+outh	ddwsl	数量(米，公斤)	
+outh	out_danj	单价	
+outh	o_zk	折扣	
+outh	o_zke	折后额	
+outh	o_cost	成本	
+outh	jsfk	即时付款	
+outh	jz	记账	
+outh	yf	预付额	
+outh	od_no	订单号	
+outh	od_xc	订单项次	
+outh	bz	备注(启用条码管理时，存放入库的条码)	
+outh	bz1	类型	
+outh	bombz	bom备注	
+outh	tax_dm	税别代码	
+outh	tax_sm	税别说明	
+outh	tax	税额	
+outh	total_m	总金额	
+outh	bom_qty	BOM用量	
+outh	pl_no	工单号	
+outh	pl_xc	工单项次	
+outh	dj	等级	
+outh	xs	线索	
+outh	zkje	折扣金额	
+outh	sk_no	收款单号	
+outh	sk_date	收款时间	
+outh	qr	审核	
+outh	yd_id	原单ID	
+outh	gfdm	供应商	
+outh	od_id	订单ID	
+outh	cg_id	采购单ID	
+outh	dep_no	部门	
+outh	dep_na	部门名称	
+outh	sj	送货司机	
+outh	sjqhsj	司机签核时间	
+outh	js_sl	结算数量	
+outh	js_danj	结算单价	
+outh	js_je	结算金额	
+outh	id2	原ID	
+outh	cust_po	客户PO	
+outh	box_no	装箱单号	
+outh	box_no2	入库单对应的箱号	
+outh	ch	收款申请单号	
+outh	zh	扎号	
+outh	barcode	条码(床号-床次-扎号-3位流水)	
+outh	fhr	发货人	
+outh	fhsj	发货时间	
+outh	fhdh	发货单号	
+outh	qsr	客户签收人	
+outh	qssj	签收时间	
+outh	size_order	尺码排序	
+outh	type	类型(面料，线材，其他)	
+outh	cwsh	财务审核	
+outh	wl_fy	物流费用	
+outh	hbdh	合并单号	
+outh	fj1	附件1	
+outh	fj2	附件2	
+outh	fj3	附件3	
+outh	fj4	附件4	
+outh	fj5	附件5	
+outh	fj6	附件6	
+outh	fj_na1	附件1	
+outh	fj_na2	附件1	
+outh	fj_na3	附件1	
+outh	fj_na4	附件1	
+outh	fj_na5	附件1	
+outh	fj_na6	附件1	
+outh	thyd_no	退货原单单号	
+outh	thyd_id	退货原单ID	
+outh	print_user	最后打印人	
+outh	print_time	最后打印时间	
+outh	erp_no	ERP单号	
+outh	erp_id	ERPID	
+outh	erp_user	转单人	
+outh	erp_error	ERP转单错误信息	
+outh	llxz	来料性质	
+outh	cgrkdh	采购入库单号	
+outh	lldh	来料单号	
+outh	djlx	单据类型	
+outh	zl	重量	
+outh	sl3	每盘数量	
+outh	erp_time	转单时间	
+outh	asp_user1	创建人	
+outh	asp_time1	创建时间	
+outh	asp_user2	最后修改人	
+outh	asp_time2	最后修改时间	
+outh	asp_user3	审核人	
+outh	asp_time3	审核时间	
+outh	asp_cancel	删除标记	
+outh	asp_user4	删除人	
+outh	asp_time4	删除时间	
+outh	asp_print	打印次数	
+outh	备用1	预留扩展字段(未绑定)	
+outh	备用2	预留扩展字段(未绑定)	
+outh	备用3	预留扩展字段(未绑定)	
+outh	备用4	预留扩展字段(未绑定)	
+outh	备用5	预留扩展字段(未绑定)	
+outh	备用6	预留扩展字段(未绑定)	
+outh	备用7	预留扩展字段(未绑定)	
+outh	备用8	预留扩展字段(未绑定)	
+outh	备用9	预留扩展字段(未绑定)	
+outh	备用10	预留扩展字段(未绑定)	
+outh	备用11	预留扩展字段(未绑定)	
+outh	备用12	预留扩展字段(未绑定)	
+outh	备用13	预留扩展字段(未绑定)	
+outh	备用14	预留扩展字段(未绑定)	
+outh	备用15	预留扩展字段(未绑定)	
+outh	备用16	预留扩展字段(未绑定)	
+outh	备用17	预留扩展字段(未绑定)	
+outh	备用18	预留扩展字段(未绑定)	
+outh	备用19	预留扩展字段(未绑定)	
+outh	备用20	预留扩展字段(未绑定)	
+yj_dept		部门表(多级,parentId)	
+report_column_settings		报表列设置(用户自定义列布局,按panel_code存JSON)	
+qr_batch_registry		二维码批号登记表(批号=日期+流水取号留痕)	
+yj_role		角色表(角色编码/名称/is_admin)	
+rd_spike_water_detail	asp_user3	审核人	
+rd_spike_water_detail	asp_time3	审核时间	
+rd_spike_water_detail	asp_user4	删除人	
+rd_spike_water_detail	asp_time4	删除时间	
+rd_spike_water_detail	asp_print	打印次数	
+yj_role_panel		角色-面板授权表(perms动作词表含view等,can_approve=审批权)	
+rd_spike_water_head	asp_user3	审核人	
+rd_spike_water_head	asp_time3	审核时间	
+rd_spike_water_head	asp_user4	删除人	
+rd_spike_water_head	asp_time4	删除时间	
+rd_spike_water_head	asp_print	打印次数	
+yj_std_lib		标准库(lib_code+item_code 内容片段,供文书面板引用)	
+inv_cost_ledger	单据日期	单据日期(空白草稿自动填当天)	
+bl_dispatch	asp_print	打印次数	
+rd_progress_detail	项目编号	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+yj_doc_modify_log		归档单修改记录(修改前后差异快照与审批链)	
+rd_sample_no_head	asp_user1	创建人	
+rd_sample_no_head	asp_time1	创建时间	
+rd_sample_no_head	asp_user2	最后修改人	
+rd_sample_no_head	asp_time2	最后修改时间	
+rd_sample_no_head	asp_cancel	删除标记	
+rd_dev_task		研发任务下发记录(产品开发按钮分发留痕)	
+bs_settle_type	外部数据ID	金蝶星辰单据/档案 id(jdy-sync 幂等锚点)	
+rd_sample_no_detail	asp_cancel	删除标记	
+rd_sample_no_detail	asp_user1	创建人	
+rd_sample_no_detail	asp_time1	创建时间	
+rd_sample_no_detail	asp_user2	最后修改人	
+rd_sample_no_detail	asp_time2	最后修改时间	
+rd_prod_doclist_head	asp_user1	创建人	
+rd_prod_doclist_head	asp_time1	创建时间	
+rd_prod_doclist_head	asp_user2	最后修改人	
+rd_prod_doclist_head	asp_time2	最后修改时间	
+rd_prod_doclist_head	asp_cancel	删除标记	
+bs_customer_group	外部数据ID	金蝶星辰单据/档案 id(jdy-sync 幂等锚点)	
+yj_translation		多语言翻译表(scope=panel|field,ref_key=中文键,source=mt机翻|manual人工)	
+yj_message		站内消息表(收件人/消息码/关联面板与单据/已读)	
+rd_prod_doclist_detail	asp_cancel	删除标记	
+rd_prod_doclist_detail	asp_user1	创建人	
+rd_prod_doclist_detail	asp_time1	创建时间	
+rd_prod_doclist_detail	asp_user2	最后修改人	
+rd_prod_doclist_detail	asp_time2	最后修改时间	
+bd_purchase_in	商品分录	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_purchase_in	是否已转ERP	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bs_supplier_group	外部数据ID	金蝶星辰单据/档案 id(jdy-sync 幂等锚点)	
+qc_tc_in_detail	asp_cancel	删除标记	
+qc_tc_in_detail	asp_user1	创建人	
+qc_tc_in_detail	asp_user2	最后修改人	
+qc_tc_in_detail	asp_time1	创建时间	
+qc_tc_in_detail	asp_time2	最后修改时间	
+yj_locale		语言表(启用语言清单,插行即出现语言切换器)	
+bs_material_group	外部数据ID	金蝶星辰单据/档案 id(jdy-sync 幂等锚点)	
+bs_currency	外部数据ID	金蝶星辰单据/档案 id(jdy-sync 幂等锚点)	
+gran_record_detail		造粒记录占位行表(恒空,doc模式要求)	
+rd_change_head	asp_user1	创建人	
+rd_change_head	asp_time1	创建时间	
+rd_change_head	asp_user2	最后修改人	
+rd_change_head	asp_time2	最后修改时间	
+rd_change_head	asp_cancel	删除标记	
+rd_change_detail	asp_user1	创建人	
+rd_change_detail	asp_time1	创建时间	
+rd_change_detail	asp_user2	最后修改人	
+rd_change_detail	asp_time2	最后修改时间	
+rd_change_detail	asp_cancel	删除标记	
+wh_record_detail		无黑处理登记占位行表(恒空,doc模式要求)	
+bd_sale_out	发货状态	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	商品分录	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	物流信息分录	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	付款信息分录	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	抵扣余额	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	未结算金额	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	采购费用	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	费用分摊信息	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	交易类型	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	整单折扣率%	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	客户承担费用分录	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	币种id	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	配送路线分录	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+bd_sale_out	单据状态2	历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选	
+yj_attachment		单据附件表(panel_code+doc_no+field_key定位,文件名/存储名/大小/类型)	
+pack_confirm_detail		封箱确认占位行表(恒空,doc模式要求)	

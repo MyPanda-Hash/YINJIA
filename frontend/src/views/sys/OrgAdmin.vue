@@ -202,6 +202,12 @@
         <el-form-item :label="tt('部门')">
           <el-tree-select v-model="userForm.deptId" :data="deptSelectData" check-strictly clearable style="width: 100%" />
         </el-form-item>
+        <!-- 生产车间(9.29 批次③「排产界面按车间过滤」):账号车间 → 排产界面只出本车间产线;留空=不受限 -->
+        <el-form-item :label="tt('生产车间')">
+          <el-select v-model="userForm.workshop" :placeholder="tt('留空=不受限(计划组/管理员)')" clearable filterable style="width: 100%">
+            <el-option v-for="w in workshops" :key="w" :label="w" :value="w" />
+          </el-select>
+        </el-form-item>
         <el-form-item :label="tt('角色')">
           <el-select v-model="userForm.roleId" :placeholder="tt('选择角色')" clearable style="width: 100%">
             <el-option v-for="r in roles" :key="r.id" :label="r.roleName" :value="r.id" />
@@ -742,7 +748,8 @@ const savingRole = ref(false)
 
 const userVisible = ref(false)
 const editingUser = ref(null)
-const userForm = reactive({ userName: '', realName: '', password: '', deptId: null, roleId: null, enabled: 1 })
+const userForm = reactive({ userName: '', realName: '', password: '', deptId: null, roleId: null, workshop: '', enabled: 1 })
+const workshops = ref([])
 const newRoleVisible = ref(false)
 const roleForm = reactive({ roleCode: '', roleName: '', remark: '' })
 
@@ -878,8 +885,19 @@ function openUser(row) {
   userForm.password = ''
   userForm.deptId = row?.deptId ?? null
   userForm.roleId = row?.roleId ?? null
+  userForm.workshop = row?.workshop || ''
   userForm.enabled = row?.enabled ?? 1
+  loadWorkshops()
   userVisible.value = true
+}
+
+/** 车间下拉 = 生产线档案里出现过的车间(取值域同 bs_prod_line.生产车间) */
+async function loadWorkshops() {
+  if (workshops.value.length) return
+  try {
+    const res = await request.post('/px/scheduleBoard/workshops', {})
+    workshops.value = (res.data || []).map((x) => x['车间']).filter(Boolean)
+  } catch { /* 不阻断 */ }
 }
 
 async function saveUser() {

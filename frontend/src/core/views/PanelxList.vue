@@ -824,8 +824,8 @@
           @scroll.capture="(e) => onArchScroll(e, b)"
         >
           <el-table-column v-if="delMode && b.isMain" type="selection" width="45" fixed="left" />
-          <!-- 档案二维码标签(勾选即打,INV 商品/WHLOC 库位):自管勾选集(跨页保留),与删除模式的 selection 列互不相干;
-               表头复选框=本页全选。行键=qrLabelKey 列(存货编码;库位=仓库+库位编码 复合),空编码行禁勾 -->
+          <!-- 档案二维码标签(勾选即打,INV 商品/WHLOC 仓位):自管勾选集(跨页保留),与删除模式的 selection 列互不相干;
+               表头复选框=本页全选。行键=qrLabelKey 列(存货编码;仓位=仓库+仓位编码 复合),空编码行禁勾 -->
           <el-table-column v-if="qrKey && b.isMain" width="40" fixed="left" align="center">
             <template #header>
               <el-checkbox
@@ -914,6 +914,9 @@
                   <el-icon v-if="detailRefTrigger(c.field) === 'dblclick' && isActiveDetailRefRow(row, b, c.prop)" class="list-ref-icon"><Search /></el-icon>
                 </div>
                 <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <!-- 分区选择(2026-10-08):候选 = 本表 (大区,存储分区) 的实际数据去重并集,不落任何存储
+                     ⇒ 点格**直接开**「仓位分区」弹窗(不进"激活编辑器"那一套),与参照列的交互形态一致 -->
+                <span v-else-if="isZonePickField(c.field)" class="cell-lazy zone-pick-cell" :title="tt('点击选择分区')" @click="openZonePick(row, b, c.field)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
                 <!-- 编辑器懒渲染:仅激活单元格挂载编辑控件,其余单元格显示纯文本,
                      避免大数据量面板(如数据字典 210 行)每格常驻编辑器导致 DOM 膨胀 -->
                 <template v-else-if="isActiveCell(row, b, c.prop)">
@@ -949,10 +952,10 @@
                   />
                   <el-switch
                     v-else-if="isBooleanField(c.field)"
-                    v-model="row[c.prop]"
+                    :model-value="toBool(row[c.prop])"
                     v-cell-focus
                     :disabled="c.field.computed"
-                    @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+                    @update:model-value="(v) => onInlineBoolInput(activeTab(b).key, row, c.field, v)"
                   />
                   <el-input
                     v-else
@@ -1600,9 +1603,11 @@
       </template>
     </el-dialog>
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
-    <VoucherFormDialog v-model="formVisible" :panel-code="formPanel || panelCode" :code="formCode" @saved="onFormSaved" />
     <!-- 字段管理(动态字段/备用列池;仅 admin):绑定/停用自定义字段 -->
     <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
+    <!-- 仓位分区弹窗(2026-10-08):候选来自本面板已加载的仓位行,不落存储 ⇒ 分区随仓位存在;
+         选中时「大区 + 存储分区」**一起回填**(用户口径:它们是一个组合) -->
+    <ZonePickDialog v-model="zonePickVisible" :rows="zonePickRows" :area-key="ZONE_PAIR.area" :zone-key="ZONE_PAIR.zone" @pick="onZonePick" />
     <ScanFillDialog
       v-model="scanVisible"
       :panel-code="panelCode"
@@ -1733,6 +1738,7 @@ import { printPuOrder, printQcReturn, printProductCards, printLocationCards, pri
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
+import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
 import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
@@ -1760,7 +1766,6 @@ import { isQcInspReqPanel } from './qcInspReqConfig'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
 import ImportDialog from './ImportDialog.vue'
 import DetailMaintainDialog from './DetailMaintainDialog.vue'
-import VoucherFormDialog from './VoucherFormDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 
 const engine = usePanelRuntime()
@@ -2427,7 +2432,11 @@ const reportColumnTree = computed(() => {
   return out
 })
 const toolbarGroups = computed(() => (groups.value || []).map((group) => {
-  const actions = actsOf(group).filter((action) => action !== '查询' && action !== '查找')
+  // 2026-10-07 用户口径(提交 3dd7dbb0「删除整单卡片入口」):列表页不再提供「能打开整单卡片
+  //   (VoucherFormDialog)」的入口 —— 「修改」动作唯一的作用就是弹那张卡片,卡片删除后它成了死按钮,
+  //   故与 查询/查找 一样从工具栏摘掉。(档案面板本就内联可编辑:单据状态=启用/停用 ⇒ draftEditable
+  //   为真,单元格直接点即可编辑,不依赖本动作。原文注释误记为 2026-10-15,2026-10-08 更正。)
+  const actions = actsOf(group).filter((action) => !['查询', '查找', '修改'].includes(action))
   const name = ['查询', '查找'].includes(group.name) ? (actions[0] || group.name) : group.name
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
@@ -3731,7 +3740,13 @@ function blockRows(b) {
   const filtered = applyAdvFilters(applyColFilters(blockData(b).map((r) => r), blockCols(b)))
   // 视图排序(不改行数据):占位行在排序之后补,不参与比较
   const out = sortViewRows(filtered, blockSortOf(b))
-  while (out.length < MIN_ROWS) out.push({ _placeholder: true })
+  // 工艺路线(ROUTE)口径(2026-10-06 用户口径「直接选工序就能带进来并新增一行,不必先点新增数据」):
+  //   末行之后**恒留一个空占位行** —— 点它即 onRowClick → openBlankDetailRow(推一行 + 直接开「工序编码」参照),
+  //   确认后新行带着工序落在末尾。原因是原规则(不足 MIN_ROWS 才补空行)在行数 ≥5 时一个空行都不补,
+  //   用户眼里"没有可点的空行",只能先点「新增数据」再点新行的工序格 —— 正是被报的那条路径。
+  //   占位行只是显示物(_placeholder):进出都不落库、不参与合计/校验,对其它面板零影响。
+  const minRows = panelCode.value === 'ROUTE' ? Math.max(MIN_ROWS, out.length + 1) : MIN_ROWS
+  while (out.length < minRows) out.push({ _placeholder: true })
   return out
 }
 
@@ -3746,14 +3761,22 @@ function onArchSizeChange() { archPage.value = 1 } // 换每页条数后回首�
 
 // ═══ 档案二维码标签(勾选即打):工具栏「二维码标签」按行勾选 → 75×100mm 标识卡(print-formats 本地生成)。
 // 勾选集自管(Set 换新触发响应式),跨页/跨筛选保留;行键 = 后端 metadata.qrLabelKey(INV=存货编码),
-// 同码行勾一个即代表该码;WHLOC 库位(2026-09-28)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+库位编码 复合
-// (库位编码按仓内唯一,同码多仓不串选)。 ═══
+// 同码行勾一个即代表该码;WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位)另带 qrLabelScopeKey=仓库 ⇒ 行键=仓库+仓位编码 复合
+// (仓位编码按仓内唯一,同码多仓不串选)。 ═══
 const qrSel = ref(new Set())
 const qrKey = computed(() => cfgCache.value?.metadata?.qrLabelKey || '')
 const qrScopeKey = computed(() => cfgCache.value?.metadata?.qrLabelScopeKey || '')
 function qrRowKey(row) {
   const k = String(row?.[qrKey.value] ?? '').trim()
-  // 复合行键(库位):仓库 + \u0001 + 库位编码 —— \u0001 不出现在业务文本里,避免拼接歧义
+  // ⚠ 必须先判「编码为空」再拼 scope(2026-10-08 修):
+  //   原先直接 `scope ? scope+\u0001+k : k`,而 scope(仓库)非空 ⇒ 空编码行也会得到
+  //   `'A仓\u0001'` 这种**非空键**,于是
+  //     ① `:disabled="!qrRowKey(row)"` 的空码禁勾失效;
+  //     ② 同一仓内所有行共用一个键 ⇒ 点任意一行 = 勾中整仓(当页恰好整仓时看着就是"全页全选")。
+  //   触发场景:后端 metadata.qrLabelKey 指向了本面板不存在的列(如 8090 跑旧 jar 时仍返回
+  //   `库位编码`,而库侧字段已正名为 `仓位编码`)⇒ k 恒为空。此处判空后,那种情况下所有行都
+  //   正确地"禁勾",不再出现误勾;待后端元数据正确时每行各得其键。
+  if (!k) return ''
   const scope = qrScopeKey.value ? String(row?.[qrScopeKey.value] ?? '').trim() : ''
   return scope ? `${scope}\u0001${k}` : k
 }
@@ -5028,7 +5051,7 @@ const activeCell = ref(null)
 /** 激活格本地回显值(2026-09-28,修"打的字立刻消失"):档案行 markRaw(大表性能优化)后
  *  v-model 写行属性是静默的——不触发重渲染,el-input 的 modelValue prop 停在旧值;
  *  而 Element Plus el-input 在 emit 后 nextTick 强制把原生值拨回 props.modelValue
- *  (input.vue setNativeInputValue),于是每敲一个字都被立刻清掉——库位档案 库位编码/库位地址
+ *  (input.vue setNativeInputValue),于是每敲一个字都被立刻清掉——仓位档案 仓位编码/仓位地址
  *  「无法填写」即此(参照列走选择器写入+bump 版本刷新,不受影响)。
  *  解法:文本/数值激活编辑器改绑本响应式回显——输入即时更新回显(prop 跟上,EP 不再回拨),
  *  同时把值落进 raw 行(保存/失焦回显用),零表格级重渲染。 */
@@ -5058,7 +5081,7 @@ function deactivateCell() {
   activeCellEcho.value = ''
 }
 /** 激活格编辑器挂载即聚焦(v-cell-focus,2026-09-28):懒激活单元格此前只挂编辑器不聚焦,
- *  一击后键盘输入落在页面而非输入框,用户表现为「无法填写」(库位档案 库位编码/库位地址;
+ *  一击后键盘输入落在页面而非输入框,用户表现为「无法填写」(仓位档案 仓位编码/仓位地址;
  *  对照组=参照列常驻编辑器一击即选,落差感更强)。挂载即 focus ⇒ 一击=可打字;
  *  el-switch 无 input 聚焦自身(空格可切换),指令挂在组件根元素上取内层 input。 */
 const vCellFocus = {
@@ -5088,13 +5111,14 @@ function openClickDetailRef(field, row, b) {
 
 function onDetailCellDblclick(row, column, event, b) {
   const field = fieldDefOf(column?.property)
+  // 明细行双击**只**服务「参照触发=双击」的字段(如存货:双击弹参照选择器);其余情况什么都不做。
+  // 🔴 2026-10-15 用户口径:原实现在非草稿态还会 `openForm(cur.value)` —— 即双击明细行弹出整单卡片
+  //    (VoucherFormDialog),采购入库单/材料出库单…所有单据面板都一样,用户明确要求双击不要再弹。
+  //    随后用户进一步确认「不需要能打开这个卡片」⇒ 卡片与工具栏「修改」入口**全部删除**(见 openForm 处注释)。
   if (detailEditable(b) && isReferenceField(field) && detailRefTrigger(field) === 'dblclick') {
     event?.stopPropagation?.()
     if (!row?._placeholder) openDetailReference(field, row, b)
-    return
   }
-  if (draftEditable.value) return
-  if (!row?._placeholder) openForm(cur.value)
 }
 
 function newDetailRow(tabKey) {
@@ -5119,10 +5143,10 @@ function addInlineDetailRow(b) {
   rows.push(row)
   archPage.value = Math.ceil(rows.length / archPageSize.value) // 档案分页:新行在末尾,跳到末页立即可见
   // 新行首个可编辑格直接激活并聚焦(2026-09-28):「新增数据」后懒激活格子只显示空文本、
-  // 无任何编辑器视觉痕迹,用户不知道要点它(库位档案 库位编码/库位地址 因此被报"无法填写")。
+  // 无任何编辑器视觉痕迹,用户不知道要点它(仓位档案 仓位编码/仓位地址 因此被报"无法填写")。
   // 这里替用户完成那第一击:跳过参照列(常驻编辑器,一击即选不需要预激活)、图片列、
   // 以及参照带回目标字段(如 仓库编码=选仓库时自动带入,不该让光标落进去手敲),
-  // 找第一个常规可编辑字段(如 库位编码)激活,v-cell-focus 挂载即聚焦 → 点完按钮直接打字。
+  // 找第一个常规可编辑字段(如 仓位编码)激活,v-cell-focus 挂载即聚焦 → 点完按钮直接打字。
   const carriedNames = new Set()
   for (const f of detailTabDefOf(tabKey)?.fields || []) {
     for (const m of f.refMap || f.map || []) if (m?.to) carriedNames.add(m.to)
@@ -5174,10 +5198,65 @@ function discardCreatedDetailRefRow(pick) {
 
 async function onInlineDetailChange(tabKey, row, field) {
   markInlineDirty() // 明细单元格任何值变更 → 未保存离开守卫置脏
+  // ⚠ 档案行是 markRaw 的(去响应式优化,见 normalizeArchRaw):明细里的
+  //   el-select / el-date-picker / el-switch 都用 `v-model="row[c.prop]"` 直写行对象,
+  //   而 markRaw 行的写入**不产生响应依赖** ⇒ 控件自身的 modelValue 不更新,
+  //   表现就是「点完没反应 / 选中项弹回」,但值其实已经写进行对象、并会被保存提交
+  //   (2026-10-08 用户报障:仓库/仓位面板的「停用」开关点击后无视觉反馈,实际已改)。
+  //   markInlineDirty → normalizeArchRaw 只在「新行/新数组需要打 raw 标记」时才 bump,
+  //   已 raw 的行永远不触发 ⇒ 这里在**提交点**(@change / update:model-value)显式补一次版本号,
+  //   驱动重渲染让控件回显跟上。文本/数值编辑器走 activeCellEcho 回显,刻意不在每次击键 bump
+  //   (以免打断输入),故本行只影响选择器/日期/开关三类。
+  archVersion.value++
   calculateDetailRow(tabKey, row)
   if (['存货编码', '存货名称', '产品编码', '产品名称', '材料编码', '材料名称', '仓库', '预出仓库', '出库仓库'].includes(field?.dataName)) {
     try { await engine.fillCurrentStock(row) } catch (error) { ElMessage.error(engine.errMsg(error) || '现存量刷新失败') }
   }
+}
+
+/** 档案「是否」行内开关的受控写入口(2026-10-08):不能用 v-model 直绑 markRaw 的 row ——
+ *  见 onInlineDetailChange 的说明;写值后交由它统一置脏 + bump 版本号驱动回显。 */
+function onInlineBoolInput(tabKey, row, field, next) {
+  row[field.dataName] = !!next
+  onInlineDetailChange(tabKey, row, field)
+}
+
+/**
+ * 分区选择(2026-10-08,字段 data_type='分区选择'):
+ * 单元格点击**直接开**「仓位分区」弹窗,候选 = 本面板已加载的仓位行里 (大区,存储分区) 的去重并集,
+ * **不落任何存储** ⇒ 分区随仓位存在(用户口径:「没有这个仓位就没有这个分区…仓位删除完后
+ * 分区也一起没了」)。因此弹窗里的「删除」是**带保护的指引**,任何操作都不触碰仓位数据。
+ * 元数据驱动:不在前端硬编码面板名/列名,只认 data_type。
+ * ⚠ 回填口径(2026-10-08 追加「让当前大区和存储分区被选择的时候一起填入」):
+ *   「大区 + 存储分区」是一个组合 ⇒ 选中后**两列一起写**,不留"只填了一半"的中间状态。
+ *   所以这里定义一次列名、同时传给弹窗(弹窗只管展示与发值,不各自硬编码)。
+ */
+const ZONE_PAIR = { area: '大区', zone: '存储分区' }
+function isZonePickField(field) {
+  return fieldType(field) === '分区选择'
+}
+const zonePickVisible = ref(false)
+const zonePickRows = ref([])
+let zonePickCtx = null
+function openZonePick(row, b, field) {
+  if (!row || row._placeholder) return
+  zonePickCtx = { row, b, field }
+  zonePickRows.value = archRows(b)
+  zonePickVisible.value = true
+}
+/** 回填:两列一起写,再走既有 onInlineDetailChange —— markRaw 行的 archVersion bump 在其中,不会"选完弹回" */
+function onZonePick(pair) {
+  const ctx = zonePickCtx
+  zonePickVisible.value = false
+  zonePickCtx = null
+  if (!ctx) return
+  const { row, b } = ctx
+  const a = String(pair?.[ZONE_PAIR.area] ?? '').trim()
+  const z = String(pair?.[ZONE_PAIR.zone] ?? '').trim()
+  if (String(row[ZONE_PAIR.area] ?? '').trim() === a && String(row[ZONE_PAIR.zone] ?? '').trim() === z) return
+  row[ZONE_PAIR.area] = a
+  row[ZONE_PAIR.zone] = z
+  onInlineDetailChange(activeTab(b).key, row, { dataName: ZONE_PAIR.zone })
 }
 
 function applyDetailReference(target, field, source) {
@@ -5227,13 +5306,32 @@ function validateInlineDraft() {
   for (const tab of cfgCache.value?.detail?.tabs || []) {
     const rows = cur.value.detail?.[tab.key] || []
     if (tab.isRequired && !rows.length) return `请至少添加一行${tab.label || '明细'}`
+    // 2026-10-05 修复(用户报障「明细第 2 行工序控制不能为空」,而第 2 行根本没录入数据):
+    //   编辑器会给明细**预置空白行**,原实现逐行逐格校必填 ⇒ 空白行被判缺必填、拦在保存上。
+    //   口径:**空行视为"未录入"**,不参与必填校验;若整张明细全是空行,按"请至少添加一行"处理。
+    let nonEmpty = 0
     for (let index = 0; index < rows.length; index++) {
+      const row = rows[index] || {}
+      // 空行判定(2026-10-05 二次修正):预置空行的布尔开关默认 false、数值默认 0/null 都会被
+      // String() 变成 "false"/"0" 而**看起来"有值"** ⇒ 空行被判成有数据的行,继续跑必填校验
+      // (用户报障:第 2 行没录任何东西也报"明细第 2 行工序控制不能为空")。
+      // 口径:boolean、以及 "false"/"true"/"0"/"Y"/"N"/"是"/"否" 一律视为**未录入**。
+      const rowEmpty = (tab.fields || []).every((f) => {
+        const v = row[f.dataName]
+        if (emptyFieldValue(v)) return true
+        if (typeof v === 'boolean') return true
+        const s = String(v).trim().toLowerCase()
+        return s === 'false' || s === 'true' || s === '0' || s === 'y' || s === 'n' || s === '是' || s === '否'
+      })
+      if (rowEmpty) continue
+      nonEmpty++
       for (const field of tab.fields || []) {
-        if (field.isRequired && emptyFieldValue(rows[index][field.dataName])) {
+        if (field.isRequired && emptyFieldValue(row[field.dataName])) {
           return `${tab.label || '明细'}第 ${index + 1} 行${field.dataName}不能为空`
         }
       }
     }
+    if (tab.isRequired && nonEmpty === 0) return `请至少添加一行${tab.label || '明细'}`
   }
   return ''
 }
@@ -5315,48 +5413,68 @@ async function onDetailRefConfirm(selectedRows) {
     return
   }
 
-  const detail = {}
-  for (const [key, value] of Object.entries(cur.value.detail || {})) {
-    detail[key] = Array.isArray(value) ? value.map((row) => ({ ...row })) : value
-  }
-  const sourceRows = cur.value.detail?.[pick.tabKey] || []
-  const targetRows = detail[pick.tabKey] || (detail[pick.tabKey] = [])
-  const targetIndex = pick.row ? sourceRows.indexOf(pick.row) : -1
-  const changedRows = []
-  let offset = 0
-  if (targetIndex >= 0) {
-    applyDetailReference(targetRows[targetIndex], pick.field, selectedRows[0])
-    calculateDetailRow(pick.tabKey, targetRows[targetIndex])
-    changedRows.push(targetRows[targetIndex])
-    offset = 1
-  }
-  for (let index = offset; index < selectedRows.length; index++) {
-    const row = newDetailRow(pick.tabKey)
-    applyDetailReference(row, pick.field, selectedRows[index])
-    calculateDetailRow(pick.tabKey, row)
-    targetRows.push(row)
-    changedRows.push(row)
-  }
-
-  await engine.fillCurrentStock(changedRows)
-
+  // ⚠ 2026-10-06 根因(修「直接点空行选工序 → 一行都没多出来」):下面 `await engine.fillCurrentStock(...)`
+  //   之前**不**置位 detailRefSaving 时,存在一个丢行的竞态 —— RefPickDialog.confirm() 在 emit('confirm')
+  //   之后立刻 emit('update:modelValue', false) 关弹窗,而 watch(detailRefVisible)(见文件下方)看到
+  //   「已关闭 && !detailRefSaving」就判定为"用户取消",把 openBlankDetailRow 刚推的 pick.created 行
+  //   **原地 splice 掉**;本函数此刻正停在那个 await 上,恢复后照样把带入值写进**已被摘掉的行对象**、
+  //   照样弹绿色提示 ⇒ 用户看到「已带入 1 条工序」却一行都没多(浏览器实测:点空行后行数 2→3,
+  //   确认后立刻回到 2,期间 0 个 /api 请求 —— 纯客户端摘行,不是保存失败/回滚)。
+  //   2026-10-06 只给 ROUTE 提前置位(其它面板当时还走「顺带保存整单 + load() 重取」,服务端数据会把
+  //   那一行取回来,那摘只是瞬时闪烁);2026-10-14 起**所有面板**都不再落库、不 load,行只活在前端,
+  //   摘掉就再也回不来 ⇒ 置位推广到全部面板(取舍见 docs/development/明细参照确认与必填校验-成因与处理方案.md)。
+  //   置位点仍在本函数第一个 await 之前、且在所有早退分支之后(早退不动它,避免卡住后续参照确认);
+  //   本函数末尾的 finally 负责复位,取消(不确认)路径不经过这里 ⇒ 取消仍会正确撤掉那行空行。
   detailRefSaving.value = true
+
+  // ── 带入值写**活行**(cur.value.detail[pick.tabKey],就是表格渲染的那批对象) ──
+  // 2026-10-14 口径(方案 A,用户拍板「全都按方案 A 实现」):参照确认 = 只写本地草稿 + 标脏,
+  //   **不再顺带保存整单**。原实现的三个后果(用户报障「选商品就报 明细第 1 行批号不能为空」
+  //   「填明细却提示表头未填写」):
+  //     ① 那次隐式「保存」走后端全量必填校验(ButtonService ensureRequiredFilled +
+  //        ensureDetailRequiredFilled)⇒ 录明细中途必然缺必填,必然弹错;
+  //     ② 带入值只写进 cur.value.detail 的深拷贝快照,失败时快照整份丢弃 ⇒ 界面上那一行始终是空的
+  //        (像"选了商品没反应"),新推的空行还会被摘掉;
+  //     ③ 文书类面板「保存即归档/自动送审」会被这种隐式保存触发(ButtonService DOC_ARCHIVE_PANELS)。
+  //   必填校验因此只剩显式「保存 / 保存新增 / 提交审批 / 审核」两处(前端 validateInlineDraft +
+  //   后端 ensureRequiredFilled/ensureDetailRequiredFilled),与工艺路线 2026-10-06 口径一致。
+  let targetRows = null
+  const pushedRows = []
   try {
-    await engine.callButton({
-      panelCode: panelCode.value,
-      buttonName: '保存',
-      formData: currentFormData(detail),
-      buttonParam: {},
-    })
+    if (!cur.value.detail) cur.value.detail = {}
+    targetRows = Array.isArray(cur.value.detail[pick.tabKey])
+      ? cur.value.detail[pick.tabKey]
+      : (cur.value.detail[pick.tabKey] = [])
+    const targetIndex = pick.row ? targetRows.indexOf(pick.row) : -1
+    const changedRows = []
+    let offset = 0
+    if (targetIndex >= 0) {
+      applyDetailReference(targetRows[targetIndex], pick.field, selectedRows[0])
+      calculateDetailRow(pick.tabKey, targetRows[targetIndex])
+      changedRows.push(targetRows[targetIndex])
+      offset = 1
+    }
+    for (let index = offset; index < selectedRows.length; index++) {
+      const row = newDetailRow(pick.tabKey)
+      applyDetailReference(row, pick.field, selectedRows[index])
+      calculateDetailRow(pick.tabKey, row)
+      targetRows.push(row)
+      pushedRows.push(row)
+      changedRows.push(row)
+    }
+    // 现存量仍是本地刷新(按库存状况表口径算),失败不拦带入
+    try { await engine.fillCurrentStock(changedRows) } catch (error) { ElMessage.error(engine.errMsg(error) || '现存量刷新失败') }
+    markInlineDirty() // 未保存离开守卫;档案行(markRaw)靠它 bump archVersion 驱动重渲染
     detailRefVisible.value = false
-    const documentNo = pick.documentNo
-    await load()
-    const currentIndex = list.value.findIndex((item) => item['编号'] === documentNo)
-    if (currentIndex >= 0) curIdx.value = currentIndex
-    ElMessage.success(`已导入 ${selectedRows.length} 条存货并保存`)
+    ElMessage.success(tt('已带入 {n} 行，请点「保存」提交').replace('{n}', String(selectedRows.length)))
   } catch (error) {
+    // 带入过程本身出错(非必填拦截——那个已不在本路径):撤掉本次推入的行,不留半截行
+    for (const row of pushedRows) {
+      const index = targetRows ? targetRows.indexOf(row) : -1
+      if (index >= 0) targetRows.splice(index, 1)
+    }
     discardCreatedDetailRefRow(pick)
-    ElMessage.error(engine.errMsg(error) || '存货导入保存失败')
+    ElMessage.error(engine.errMsg(error) || '参照带入失败')
   } finally {
     detailRefSaving.value = false
     detailRefPick.value = null
@@ -5749,29 +5867,9 @@ function isDisabled(action) {
   return map[action] === true
 }
 
-// 2026-08-20：双击明细行/修改按钮改为面板弹窗打开表单（不再跳新页签）；无编号（新增兜底）仍走页签
-const formVisible = ref(false)
-const formCode = ref('')
-// 弹窗面板：双击=当前面板；选单生成=生成的目标面板（可跨面板）
-const formPanel = ref('')
-function openForm(row) {
-  if (row && row['编号']) {
-    formCode.value = row['编号']
-    formVisible.value = true
-    return
-  }
-  const q = { operationName: operationName.value }
-  if (row && row['编号']) q.code = row['编号']
-  const no = row ? row['单据编号'] || row['锭号'] || row['编号'] : ''
-  const title = row ? `${panelName.value}-${no}` : `${panelName.value}-新增`
-  router.push({ path: `/panelx/form/${panelCode.value}`, query: q })
-  tabs.open({ path: `/panelx/form/${panelCode.value}`, title, query: q })
-}
-function onFormSaved() {
-  formVisible.value = false
-  formPanel.value = ''
-  load()
-}
+// 2026-10-15 用户口径:列表页**不再有**任何打开「整单卡片」的入口 ——
+//   双击明细行(见 onDetailCellDblclick)与工具栏「修改」都曾走这里的 openForm() 弹 VoucherFormDialog,
+//   两者连同 VoucherFormDialog 组件一并删除;单据数据一律在列表页原地内联编辑(草稿态)。
 
 // 直接新增：调后端保存（空表头）创建最新草稿单（autoCode 编号 + 单据日期=当天自动填入），
 // 刷新列表并定位到新单，在列表页直接内联填写（不跳转表单页/不弹新增弹窗）。
@@ -6315,11 +6413,8 @@ async function onButton(action) {
     await directAdd()
     return
   }
-  if (action === '修改') {
-    if (!current.value) return ElMessage.warning(tt('请先选择一行数据'))
-    openForm(current.value)
-    return
-  }
+  // 2026-10-15:「修改」原=打开整单卡片(VoucherFormDialog),卡片已按用户口径删除,
+  //   该动作也一并从工具栏摘掉(toolbarGroups 过滤),此处不再处理。
   if (['保存', '保存为草稿', '保存新增'].includes(action) && draftEditable.value) {
     if (action === '保存为草稿') {
       // 暂存:不校验(未完成的数据也可落库)
@@ -6364,9 +6459,9 @@ async function onButton(action) {
     // 二维码标签(INV,2026-09-24 改版,用户拍板):勾行 → 75×100mm 七字段标签
     // (订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,编码·规格取行,其余手填);
     // 二维码=公司代码@物料编码[@批号](print-formats.printProductCards 本地生成;旧 /report/qr-label 暂留可回滚)
-    // WHLOC 库位(2026-09-28):同款勾选即打,卡面=仓库/库位地址/库位编码(printLocationCards),
-    // 二维码=仓库编码@库位地址@库位编码(同日改版:首段仓库→仓库编码,行带 仓库编码 值);
-    // 勾选行键=仓库+库位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
+    // WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位术语统一):同款勾选即打,
+    // 卡面=仓库/仓位地址/仓位编码(printLocationCards),二维码=仓库编码@仓位地址@仓位编码;
+    // 勾选行键=仓库+仓位编码 复合(后端 qrLabelKind/qrLabelScopeKey 分发)
     const whloc = cfgCache.value?.metadata?.qrLabelKind === 'whloc'
     const sel = qrSel.value
     const rows = []
@@ -6374,11 +6469,11 @@ async function onButton(action) {
       for (const r of archRows(b)) {
         const k = qrRowKey(r)
         if (!k || !sel.has(k)) continue
-        if (whloc) rows.push({ 仓库: r['仓库'], 仓库编码: r['仓库编码'], 库位地址: r['库位地址'], 库位编码: r['库位编码'] })
+        if (whloc) rows.push({ 仓库: r['仓库'], 仓库编码: r['仓库编码'], 仓位地址: r['仓位地址'], 仓位编码: r['仓位编码'] })
         else rows.push({ 编码: k, 规格: r['规格型号'] || r['型号'] || '' })
       }
     }
-    if (!rows.length) return ElMessage.warning(tt(whloc ? '请先勾选要打印的库位' : '请先勾选要导出的商品'))
+    if (!rows.length) return ElMessage.warning(tt(whloc ? '请先勾选要打印的仓位' : '请先勾选要导出的商品'))
     await (whloc ? printLocationCards(rows) : printProductCards(rows))
     return
   }
@@ -8141,6 +8236,13 @@ onUnmounted(() => {
 .detail :deep(.el-table td .cell-lazy:hover) {
   background: #f2f6ff;
   box-shadow: inset 0 0 0 1px #c7d8f5;
+}
+/* 分区选择格(2026-10-08):点击开弹窗而非行内输入 —— 用 pointer + 虚线下划线把"可点选"显出来,
+   与参照列(readonly input + 点击选择)的观感区分开 */
+.detail :deep(.el-table td .cell-lazy.zone-pick-cell) {
+  cursor: pointer;
+  border-bottom: 1px dashed #c7d8f5;
+  border-radius: 0;
 }
 .list-ref-icon {
   position: absolute;

@@ -1,4 +1,4 @@
-﻿# tools/db-inuse-tables.txt — 「确定下来的后台表」在册登记
+# tools/db-inuse-tables.txt — 「确定下来的后台表」在册登记
 #
 # 依据:2026-09-29 四源审计(①) yj_panel 面板绑定且面板在运营 ② 在运营视图依赖 ③ backend/src/main/java
 #   + frontend/src 运行期 SQL 引用 ④ 业务数据行)。判定口径与逐表证据:tools/archive/_table-audit/
@@ -38,7 +38,7 @@ table:yj_translation   # 多语言翻译表(scope=panel|field,ref_key=中文键,
 table:yj_usage_log   # 使用日志(登录与面板操作留痕,使用权限查看页面数据源)
 table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)
 
-# ---- MES 自有业务表(167 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
+# ---- MES 自有业务表(165 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
 table:bd_account   # 会计科目档案
 table:bd_dispatch   # 工序派工单头表(经典遗留面板)
 table:bd_expense_type   # 费用类别档案
@@ -87,7 +87,7 @@ table:bs_team   # 班组档案
 table:bs_uom   # 计量单位档案
 table:bs_wc   # 工作中心档案
 table:bs_wh   # 仓库档案(仓库编码/名称,库存台账仓库真源)
-table:bs_wh_loc   # 库位档案(仓库内货位主数据;面板 WHLOC,2026-09-29 由并行会话新增并登记;含备用1..20)
+table:bs_wh_loc   # 仓位档案(仓库内货位主数据;面板 WHLOC,2026-09-29 由并行会话新增并登记;含备用1..20;2026-10-08 库位→仓位正名:列 仓位编码/仓位地址)
 table:day_report   # 生产日报表头表(自制物料/成型/切炭/组装四车间合一)
 table:day_report_detail   # 生产日报表行表(姓名/时间/产品/数量/报废等)
 table:equip_check   # 设备点检记录头表
@@ -121,8 +121,14 @@ table:qc_insp_req   # 来料检验要求表(品质资料 7 张检验要求表并
 table:qc_insp_req_series   # 来料检验要求(系列)表(10 张全自定义检验要求表并集:阻垢系列/BK材料系列/除重金属系列/矿化(碱性)系列/抑菌系列/载银系列/炭粉/胶粉/矿化料/原料来料;档案式,物料类别=页签,每表 20 个扩展位 备用1..备用200;面板 QC_INSP_REQ_SERIES)
 table:qc_jjf   # 紧急放行申请单头表——面板 QC_JJF
 table:qc_jjf_detail   # 紧急放行申请单行表——面板 QC_JJF 明细
+table:qc_asm_insp_head   # 组装成品检验单头表(报工审核自动生成;9.29 批次④——面板 QC_ASM_INSP)
+table:qc_asm_insp_detail   # 组装成品检验单行表(合格/不合格各一行;合格转库存/不合格待处理)
+table:qc_cut_insp_head   # 切炭检验单头表(报工审核自动生成——面板 QC_CUT_INSP)
+table:qc_cut_insp_detail   # 切炭检验单行表(通用模板:检验项目/标准/实测/判定)
 table:qc_lyb   # 来料异常分析报告头表——面板 QC_LYB;供应商/物料批次/不良率
 table:qc_lyb_detail   # 来料异常分析报告行表——面板 QC_LYB 明细
+table:qc_mold_insp_head   # 成型检验单头表(报工审核自动生成——面板 QC_MOLD_INSP)
+table:qc_mold_insp_detail   # 成型检验单行表(通用模板:检验项目/标准/实测/判定)
 table:qc_return   # 暂收退料单头表——面板 QC_RETURN;退货类型/仓库/供应商代码
 table:qc_return_detail   # 暂收退料单行表——面板 QC_RETURN 明细
 table:qc_scp   # 试产材料使用申请单头表——面板 QC_SCP
@@ -136,6 +142,8 @@ table:rd_alkaline_detail   # 碱性测试行表
 table:rd_alkaline_head   # 碱性测试头表
 table:rd_antibact_detail   # 抑菌测试行表
 table:rd_antibact_head   # 抑菌测试头表
+table:rd_asm_bom_detail   # 组装BOM表行表(面板 RD_ASM_BOM;2026-09-11 并入组装工艺清单第2页签、菜单下线;当前空表)
+table:rd_asm_bom_head   # 组装BOM表头表(面板 RD_ASM_BOM;后端文书归档集合与 DevTaskService 仍引用,历史 rd_dev_task 行留审计;当前空表)
 table:rd_approval   # 立项申请表(文件类,管理员保存即归档)
 table:rd_approval_detail   # 立项申请表占位行表(恒空,doc模式要求)
 table:rd_asm_proc_detail   # 组装工艺清单行表
@@ -159,6 +167,8 @@ table:rd_mineral_detail   # 矿化测试行表
 table:rd_mineral_head   # 矿化测试头表
 table:rd_mold_proc_detail   # 成型工艺清单行表
 table:rd_mold_proc_head   # 成型工艺清单头表
+table:rd_mold_formula_detail   # 成型配方行表(面板 RD_MOLD_FORMULA;2026-09-11 并入成型工艺清单第2页签、菜单下线;当前空表)
+table:rd_mold_formula_head   # 成型配方头表(面板 RD_MOLD_FORMULA;后端文书归档集合与 DevTaskService 仍引用,历史 rd_dev_task 行留审计;当前空表)
 table:rd_plan   # 项目实施计划(10阶段×五字段:计划内容/计划开始/计划完成/实际完成/责任人,项目定级必填下拉)
 table:rd_plan_detail   # 项目实施计划占位行表(恒空,doc模式要求)
 table:rd_prod_doclist_detail   # 产品文件列表明细表(占位,doc 模式要求):产品×4文件状态矩阵不落库,由 DevTaskService.board() 现算;是否受控/受控日期为派生值(4 份文件全归档 ⇒ 是)
@@ -191,6 +201,9 @@ table:wh_record   # 无黑处理登记头表(加湿前后重量/无黑时间)
 table:wh_record_detail   # 无黑处理登记占位行表(恒空,doc模式要求)
 table:wo_order   # 生产工单(五工序计划预填,产品批号取号)
 table:wo_progress   # 工单工序进度(报工审核按工序累计完成数量)
+table:wo_transfer_log   # 工单调拨轨迹(9.29 批次②:从/到 生产线·车间 + 数量 + 原因 + 撤销标记)
+table:wo_split_log   # 切单操作日志(9.29 批次①:谁/何时/从哪单切出多少/生成哪张子单/是否撤回)
+table:wo_process_line   # 工序—产线预排台账(2026-10-07:一行=一工单行×一工序;计划生产线=排产时人工按工艺路线逐道选定,实际生产线=报工完工转序时落实;撤销排产按行作废)
 
 # ---- 经典 HSDZ 遗留但仍在用(15 张;改动前须评估面板影响,新功能禁止再用) ----
 table:dm_ck   # 仓库代码
@@ -214,6 +227,10 @@ table:yj_schema_log   # 数据库结构脚本执行日志(script_name+content_ha
 table:erp_imp_row   # ERP导入行明细(逐行导入结果)
 table:dm_key   # 各种软件接口Key值表
 
-# 合计 207 张在册 + 3 张例外保留 = 210 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
+# 合计 205 张在册 + 3 张例外保留 = 208 张(与数据库表清单 §0.1 同源;新表必须登记,否则视为脏数据);
+# 2026-10-09 合并 origin/main:远端新增 13 表全部登记(qc_{mold,cut,asm}_insp_head/_detail、wo_transfer_log、
+#   wo_split_log、wo_process_line、rd_asm_bom_head/_detail、rd_mold_formula_head/_detail);
+#   本地下架 17 表同步撤销登记(请购单/其他出入库/委外 10 张 + 品质管理无用 5 面板 7 张)。
+# 2026-10-07 补登:rd_asm_bom_head/_detail、rd_mold_formula_head/_detail(2026-09-11 菜单并入后审计漏网);
 # 已清理 244 张(RENAME_*/_bak_*/tmp_*/t1/t2 + pr_* 已下架面板表 + 无引用遗留表),清单见
 # tools/migrate-drop-unused-tables.sql 与 tools/archive/_table-audit/drop-tables.txt。

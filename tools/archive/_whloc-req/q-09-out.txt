@@ -1,0 +1,20 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & $java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlserver://loc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-09-sweep.sql ==
+  | yj_archive_change_log | doc_no | 9 | 
+  | yj_field | label | 3 | 
+  | yj_panel | panel_name | 1 | 
+  | yj_translation | ref_key | 36 | 
+  | yj_usage_log | doc_no | 9 | 
+  | yj_usage_log | panel_name | 9 | 
+  | yj_panel | WHLOC | 库位 | 
+  | yj_field | WH/库位 | 库位 | 
+  | yj_field | WHLOC/库位编码 | 库位编码 | 
+  | yj_field | WHLOC/库位地址 | 库位地址 | 
+[OK] q-09-sweep.sql (3 batches)

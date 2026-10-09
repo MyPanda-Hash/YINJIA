@@ -1,0 +1,43 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:7 字符: 1
++ & $java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlserver://loc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== migrate-whloc-zone-logic-20261008.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  | bs_wh.厂区 列(应 40) | 40 | 
+  | bs_wh_loc.厂区 已移除(应 NULL) | null | 
+  | WHLOC 仍登记厂区字段(应 0) | 0 | 
+  | bs_wh_loc.大区 列(应 60) | 60 | 
+  | 四个仓就位(应 4) | 4 | 
+  | 成品仓分类兜底(应 3) | 3 | 
+  | CK-A2 已停用(应 1) | 1 | 
+  | 遗留 CK-A2 仓位(应 0) | 0 | 
+  | 有效仓位总数(应 679) | 679 | 
+  | A仓 大区=原料区(应 156) | 156 | 
+  | A仓 大区=辅料及配件区(应 103) | 103 | 
+  | B仓 已去分区(应 180) | 180 | 
+  | C仓 已去分区(应 72) | 72 | 
+  | D仓 大区=成品仓区(应 168) | 168 | 
+  | 仓位地址仍为空(应 0) | 0 | 
+  | WHLOC 字段数(应 12) | 12 | 
+  |   大区 译名(应 9) | 9 | 
+  | WH 面板 厂区 字段(应 1) | 1 | 
+  | 区间层级.仓库 与 bs_wh 名称不一致(应 0) | 0 | 
+  | 新厂区 | D仓 | 成品仓区 | (—) | 168 | 
+  | 老厂区 | A仓 | 辅料及配件区 | 标签区 | 30 | 
+  | 老厂区 | A仓 | 辅料及配件区 | 端盖区 | 25 | 
+  | 老厂区 | A仓 | 辅料及配件区 | 网套区 | 12 | 
+  | 老厂区 | A仓 | 辅料及配件区 | 无纺布区 | 12 | 
+  | 老厂区 | A仓 | 辅料及配件区 | 纸箱区 | 24 | 
+  | 老厂区 | A仓 | 原料区 | 货架区 | 108 | 
+  | 老厂区 | A仓 | 原料区 | 胶粉区 | 12 | 
+  | 老厂区 | A仓 | 原料区 | 炭粉区 | 36 | 
+  | 老厂区 | B仓 | (不分区) | (—) | 180 | 
+  | 老厂区 | C仓 | (不分区) | (—) | 72 | 
+[OK] migrate-whloc-zone-logic-20261008.sql (13 batches)

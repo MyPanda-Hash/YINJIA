@@ -1,0 +1,3963 @@
+==FIELD_EXTRA==
+panel_code|col_name|place
+----------|--------|-----
+CKDA|bz|query,detail
+CKDA|dm|query,detail
+CKDA|mc|query,detail
+DISPATCH_DETAIL|asp_cancel|detail
+DISPATCH_DETAIL|部门|detail
+DISPATCH_DETAIL|产品名称|detail
+DISPATCH_DETAIL|单据编号|detail
+DISPATCH_DETAIL|单据日期|detail
+DISPATCH_DETAIL|单据状态|detail
+DISPATCH_DETAIL|生产车间|detail
+DISPATCH_DETAIL|委外供应商|detail
+DISPATCH_STATS|asp_cancel|detail
+DISPATCH_STATS|单据日期|detail
+DISPATCH_STATS|工序名称|detail
+FINISH_IN_DETAIL|asp_cancel|detail
+FINISH_IN_DETAIL|asp_time1|detail
+FINISH_IN_DETAIL|asp_time2|detail
+FINISH_IN_DETAIL|asp_user1|detail
+FINISH_IN_DETAIL|asp_user2|detail
+FINISH_IN_DETAIL|仓库|detail
+FINISH_IN_DETAIL|产品名称|detail
+FINISH_IN_DETAIL|存货图片|detail
+FINISH_IN_DETAIL|单据编号|detail
+FINISH_IN_DETAIL|单据日期|detail
+FINISH_IN_DETAIL|单据状态|detail
+FINISH_IN_DETAIL|加工单号|detail
+FINISH_IN_DETAIL|匹配来源单号|detail
+FINISH_IN_DETAIL|凭证字号|detail
+FINISH_IN_DETAIL|审核时间|detail
+FINISH_IN_DETAIL|审批人|detail
+FINISH_IN_DETAIL|审批时间|detail
+FINISH_IN_DETAIL|生产车间|detail
+FINISH_IN_DETAIL|图号|detail
+FINISH_IN_DETAIL|现存量|detail
+FINISH_IN_DETAIL|现存量说明|detail
+FINISH_IN_DETAIL|项目|detail
+FINISH_IN_DETAIL|销售订单号|detail
+FINISH_IN_DETAIL|业务类型|detail
+FINISH_IN_DETAIL|智能选单|detail
+FINISH_IN_STATS|asp_cancel|detail
+FINISH_IN_STATS|产品名称|detail
+FINISH_IN_STATS|单据日期|detail
+FINISH_IN_STATS|单据数|detail
+FINISH_IN_STATS|实收数量|detail
+MANU_ORDER|领料单号|header
+MANU_ORDER|批号|detail
+MANU_ORDER_DETAIL|asp_cancel|detail
+MANU_ORDER_DETAIL|asp_time1|detail
+MANU_ORDER_DETAIL|asp_time2|detail
+MANU_ORDER_DETAIL|asp_user1|detail
+MANU_ORDER_DETAIL|asp_user2|detail
+MANU_ORDER_DETAIL|备注|detail
+MANU_ORDER_DETAIL|测试程序|detail
+MANU_ORDER_DETAIL|产品编码|detail
+MANU_ORDER_DETAIL|产品名称|detail
+MANU_ORDER_DETAIL|存货图片|detail
+MANU_ORDER_DETAIL|单据日期|detail
+MANU_ORDER_DETAIL|单重|detail
+MANU_ORDER_DETAIL|负责人|detail
+MANU_ORDER_DETAIL|规格型号|detail
+MANU_ORDER_DETAIL|合同号|detail
+MANU_ORDER_DETAIL|机构|detail
+MANU_ORDER_DETAIL|开工日期|detail
+MANU_ORDER_DETAIL|可用量|detail
+MANU_ORDER_DETAIL|客户|detail
+MANU_ORDER_DETAIL|客户编码|detail
+MANU_ORDER_DETAIL|累计汇报套数(工序单位)|detail
+MANU_ORDER_DETAIL|批号|detail
+MANU_ORDER_DETAIL|齐套数量(主)|detail
+MANU_ORDER_DETAIL|生产单位|detail
+MANU_ORDER_DETAIL|是否手工修改单据编码|detail
+MANU_ORDER_DETAIL|数量|detail
+MANU_ORDER_DETAIL|图号|detail
+MANU_ORDER_DETAIL|完工日期|detail
+MANU_ORDER_DETAIL|现存量|detail
+MANU_ORDER_DETAIL|销售订单号|detail
+MANU_ORDER_DETAIL|型号|detail
+MANU_ORDER_DETAIL|需求令号|detail
+MANU_ORDER_DETAIL|预开工日|detail
+MANU_ORDER_DETAIL|预完工日|detail
+MANU_ORDER_DETAIL|重量|detail
+MANU_ORDER_DETAIL|总重|detail
+MANU_ORDER_STATS|asp_cancel|detail
+MANU_ORDER_STATS|单据数|detail
+MANU_ORDER_STATS|齐套数量|detail
+MANU_ORDER_STATS|数量|detail
+MATERIAL_OUT_DETAIL|asp_cancel|detail
+MATERIAL_OUT_DETAIL|asp_time1|detail
+MATERIAL_OUT_DETAIL|asp_time2|detail
+MATERIAL_OUT_DETAIL|asp_user1|detail
+MATERIAL_OUT_DETAIL|asp_user2|detail
+MATERIAL_OUT_DETAIL|备注|detail
+MATERIAL_OUT_DETAIL|仓库|detail
+MATERIAL_OUT_DETAIL|单据编号|detail
+MATERIAL_OUT_DETAIL|单据日期|detail
+MATERIAL_OUT_DETAIL|单据状态|detail
+MATERIAL_OUT_DETAIL|规格型号|detail
+MATERIAL_OUT_DETAIL|加工单号|detail
+MATERIAL_OUT_DETAIL|来源单号|detail
+MATERIAL_OUT_DETAIL|来源单据|detail
+MATERIAL_OUT_DETAIL|明细备注|detail
+MATERIAL_OUT_DETAIL|匹配来源单号|detail
+MATERIAL_OUT_DETAIL|审核时间|detail
+MATERIAL_OUT_DETAIL|审批人|detail
+MATERIAL_OUT_DETAIL|审批时间|detail
+MATERIAL_OUT_DETAIL|生产车间|detail
+MATERIAL_OUT_DETAIL|手工确定成本|detail
+MATERIAL_OUT_DETAIL|现存量|detail
+MATERIAL_OUT_DETAIL|现存量说明|detail
+MATERIAL_OUT_DETAIL|项目|detail
+MATERIAL_OUT_DETAIL|销售订单号|detail
+MATERIAL_OUT_DETAIL|业务类型|detail
+MATERIAL_OUT_STATS|asp_cancel|detail
+MATERIAL_OUT_STATS|单据日期|detail
+MATERIAL_OUT_STATS|单据数|detail
+MATERIAL_OUT_STATS|规格型号|detail
+MATERIAL_OUT_STATS|计量单位|detail
+MATERIAL_OUT_STATS|数量|detail
+OTHER_IN_DETAIL|asp_cancel|detail
+OTHER_IN_DETAIL|asp_time1|detail
+OTHER_IN_DETAIL|asp_time2|detail
+OTHER_IN_DETAIL|asp_user1|detail
+OTHER_IN_DETAIL|asp_user2|detail
+OTHER_IN_DETAIL|仓库|detail
+OTHER_IN_DETAIL|存货名称|detail
+OTHER_IN_DETAIL|单据编号|detail
+OTHER_IN_DETAIL|单据日期|detail
+OTHER_IN_DETAIL|单据状态|detail
+OTHER_IN_DETAIL|来料客户|detail
+OTHER_IN_DETAIL|匹配来源单号|detail
+OTHER_IN_DETAIL|审核时间|detail
+OTHER_IN_DETAIL|审批人|detail
+OTHER_IN_DETAIL|审批时间|detail
+OTHER_IN_DETAIL|往来单位|detail
+OTHER_IN_DETAIL|现存量|detail
+OTHER_IN_DETAIL|现存量说明|detail
+OTHER_IN_DETAIL|项目|detail
+OTHER_IN_DETAIL|业务类型|detail
+OTHER_IN_DETAIL|智能选单|detail
+OTHER_IN_STATS|asp_cancel|detail
+OTHER_IN_STATS|存货名称|detail
+OTHER_IN_STATS|单据日期|detail
+OTHER_IN_STATS|单据数|detail
+OTHER_IN_STATS|计量单位|detail
+OTHER_IN_STATS|数量|detail
+OTHER_OUT_DETAIL|asp_cancel|detail
+OTHER_OUT_DETAIL|asp_time1|detail
+OTHER_OUT_DETAIL|asp_time2|detail
+OTHER_OUT_DETAIL|asp_user1|detail
+OTHER_OUT_DETAIL|asp_user2|detail
+OTHER_OUT_DETAIL|line_no|detail
+OTHER_OUT_DETAIL|存货名称|detail
+OTHER_OUT_DETAIL|单据编号|detail
+OTHER_OUT_DETAIL|单据日期|detail
+OTHER_OUT_DETAIL|单据状态|detail
+OTHER_OUT_DETAIL|来料客户|detail
+OTHER_OUT_DETAIL|来源单号|detail
+OTHER_OUT_DETAIL|来源单据|detail
+OTHER_OUT_DETAIL|凭证字号|detail
+OTHER_OUT_DETAIL|审核时间|detail
+OTHER_OUT_DETAIL|审批人|detail
+OTHER_OUT_DETAIL|审批时间|detail
+OTHER_OUT_DETAIL|数据来源|detail
+OTHER_OUT_DETAIL|外部单据号|detail
+OTHER_OUT_DETAIL|往来单位|detail
+OTHER_OUT_DETAIL|现存量|detail
+OTHER_OUT_DETAIL|项目|detail
+OTHER_OUT_DETAIL|项目合同号|detail
+OTHER_OUT_DETAIL|销售订单号|detail
+OTHER_OUT_DETAIL|行备注|detail
+OTHER_OUT_DETAIL|业务类型|detail
+OTHER_OUT_DETAIL|自动生入库单|detail
+OTHER_OUT_STATS|asp_cancel|detail
+OTHER_OUT_STATS|存货名称|detail
+OTHER_OUT_STATS|单据日期|detail
+OTHER_OUT_STATS|单据数|detail
+OTHER_OUT_STATS|计量单位|detail
+OTHER_OUT_STATS|数量|detail
+OUTSOURCE_IN_DETAIL|asp_cancel|detail
+OUTSOURCE_IN_DETAIL|asp_time1|detail
+OUTSOURCE_IN_DETAIL|asp_time2|detail
+OUTSOURCE_IN_DETAIL|asp_user1|detail
+OUTSOURCE_IN_DETAIL|asp_user2|detail
+OUTSOURCE_IN_DETAIL|备注|detail
+OUTSOURCE_IN_DETAIL|仓库|detail
+OUTSOURCE_IN_DETAIL|产品名称|detail
+OUTSOURCE_IN_DETAIL|单据编号|detail
+OUTSOURCE_IN_DETAIL|单据日期|detail
+OUTSOURCE_IN_DETAIL|单据状态|detail
+OUTSOURCE_IN_DETAIL|审核人|detail
+OUTSOURCE_IN_DETAIL|审核时间|detail
+OUTSOURCE_IN_DETAIL|审批人|detail
+OUTSOURCE_IN_DETAIL|审批时间|detail
+OUTSOURCE_IN_DETAIL|委外供应商|detail
+OUTSOURCE_IN_STATS|asp_cancel|detail
+OUTSOURCE_IN_STATS|产品名称|detail
+OUTSOURCE_IN_STATS|单据日期|detail
+OUTSOURCE_IN_STATS|委外供应商|detail
+OUTSOURCE_ISSUE_DETAIL|asp_cancel|detail
+OUTSOURCE_ISSUE_DETAIL|asp_time1|detail
+OUTSOURCE_ISSUE_DETAIL|asp_time2|detail
+OUTSOURCE_ISSUE_DETAIL|asp_user1|detail
+OUTSOURCE_ISSUE_DETAIL|asp_user2|detail
+OUTSOURCE_ISSUE_DETAIL|备注|detail
+OUTSOURCE_ISSUE_DETAIL|部门|detail
+OUTSOURCE_ISSUE_DETAIL|材料名称|detail
+OUTSOURCE_ISSUE_DETAIL|仓库|detail
+OUTSOURCE_ISSUE_DETAIL|单据编号|detail
+OUTSOURCE_ISSUE_DETAIL|单据日期|detail
+OUTSOURCE_ISSUE_DETAIL|单据状态|detail
+OUTSOURCE_ISSUE_DETAIL|审核人|detail
+OUTSOURCE_ISSUE_DETAIL|审核时间|detail
+OUTSOURCE_ISSUE_DETAIL|审批人|detail
+OUTSOURCE_ISSUE_DETAIL|审批时间|detail
+OUTSOURCE_ISSUE_DETAIL|委外供应商|detail
+OUTSOURCE_ISSUE_STATS|asp_cancel|detail
+OUTSOURCE_ISSUE_STATS|材料名称|detail
+OUTSOURCE_ISSUE_STATS|单据日期|detail
+OUTSOURCE_ISSUE_STATS|委外供应商|detail
+PARTNER|性质|query,detail
+PU_ORDER|备注|detail
+PURCHASE_IN|备注|detail
+PURCHASE_IN_DETAIL|asp_cancel|detail
+PURCHASE_IN_DETAIL|asp_time1|detail
+PURCHASE_IN_DETAIL|asp_time2|detail
+PURCHASE_IN_DETAIL|asp_user1|detail
+PURCHASE_IN_DETAIL|asp_user2|detail
+PURCHASE_IN_DETAIL|币种|detail
+PURCHASE_IN_DETAIL|采购订单号|detail
+PURCHASE_IN_DETAIL|采购类型|detail
+PURCHASE_IN_DETAIL|仓库|detail
+PURCHASE_IN_DETAIL|产成品图片|detail
+PURCHASE_IN_DETAIL|存货名称|detail
+PURCHASE_IN_DETAIL|存货图片|detail
+PURCHASE_IN_DETAIL|单据编号|detail
+PURCHASE_IN_DETAIL|单据日期|detail
+PURCHASE_IN_DETAIL|单据状态|detail
+PURCHASE_IN_DETAIL|供应商|detail
+PURCHASE_IN_DETAIL|供应商简称|detail
+PURCHASE_IN_DETAIL|含税单价|detail
+PURCHASE_IN_DETAIL|含税单价2|detail
+PURCHASE_IN_DETAIL|含税金额|detail
+PURCHASE_IN_DETAIL|合同号|detail
+PURCHASE_IN_DETAIL|合同号最新|detail
+PURCHASE_IN_DETAIL|换算率|detail
+PURCHASE_IN_DETAIL|汇率|detail
+PURCHASE_IN_DETAIL|计量单位组合|detail
+PURCHASE_IN_DETAIL|来源单号|detail
+PURCHASE_IN_DETAIL|来源单据|detail
+PURCHASE_IN_DETAIL|匹配来源单号|detail
+PURCHASE_IN_DETAIL|审核时间|detail
+PURCHASE_IN_DETAIL|审批人|detail
+PURCHASE_IN_DETAIL|审批时间|detail
+PURCHASE_IN_DETAIL|税率%|detail
+PURCHASE_IN_DETAIL|外部单据号|detail
+PURCHASE_IN_DETAIL|现存量|detail
+PURCHASE_IN_DETAIL|现存量说明|detail
+PURCHASE_IN_DETAIL|项目|detail
+PURCHASE_IN_DETAIL|销售订单号|detail
+PURCHASE_IN_DETAIL|验货人|detail
+PURCHASE_IN_DETAIL|业务类型|detail
+PURCHASE_IN_DETAIL|资金批次|detail
+PURCHASE_IN_STATS|asp_cancel|detail
+PURCHASE_IN_STATS|存货名称|detail
+PURCHASE_IN_STATS|单据日期|detail
+PURCHASE_IN_STATS|单据数|detail
+PURCHASE_IN_STATS|计量单位|detail
+PURCHASE_IN_STATS|实收数量|detail
+QC_RECV|仓库|detail
+QC_RECV|含税单价|detail
+QC_RECV|含税金额|detail
+QC_RECV|计量单位2|detail
+QC_RECV|批次键|header
+QC_RECV|数量2|detail
+QC_RECV|税率%|detail
+QC_RECV|现存量|detail
+QC_RECV|预计到货日期|detail
+QC_RECV|折扣%|detail
+SALE_OUT_DETAIL|asp_cancel|detail
+SALE_OUT_DETAIL|asp_time1|detail
+SALE_OUT_DETAIL|asp_time2|detail
+SALE_OUT_DETAIL|asp_user1|detail
+SALE_OUT_DETAIL|asp_user2|detail
+SALE_OUT_DETAIL|备注|detail
+SALE_OUT_DETAIL|仓库|detail
+SALE_OUT_DETAIL|存货名称|detail
+SALE_OUT_DETAIL|单据编号|detail
+SALE_OUT_DETAIL|单据日期|detail
+SALE_OUT_DETAIL|单据状态|detail
+SALE_OUT_DETAIL|发货单号|detail
+SALE_OUT_DETAIL|发货人|detail
+SALE_OUT_DETAIL|发货日期|detail
+SALE_OUT_DETAIL|含税售价|detail
+SALE_OUT_DETAIL|含税销售金额|detail
+SALE_OUT_DETAIL|结算客户|detail
+SALE_OUT_DETAIL|客户|detail
+SALE_OUT_DETAIL|客户简称|detail
+SALE_OUT_DETAIL|来源单号|detail
+SALE_OUT_DETAIL|来源单据|detail
+SALE_OUT_DETAIL|门店|detail
+SALE_OUT_DETAIL|匹配来源单号|detail
+SALE_OUT_DETAIL|审核时间|detail
+SALE_OUT_DETAIL|审批人|detail
+SALE_OUT_DETAIL|审批时间|detail
+SALE_OUT_DETAIL|收货仓库|detail
+SALE_OUT_DETAIL|售价|detail
+SALE_OUT_DETAIL|税额|detail
+SALE_OUT_DETAIL|税率%|detail
+SALE_OUT_DETAIL|送货地址|detail
+SALE_OUT_DETAIL|退货原因|detail
+SALE_OUT_DETAIL|外部单据号|detail
+SALE_OUT_DETAIL|现存量|detail
+SALE_OUT_DETAIL|现存量说明|detail
+SALE_OUT_DETAIL|项目|detail
+SALE_OUT_DETAIL|销售金额|detail
+SALE_OUT_DETAIL|需求令号|detail
+SALE_OUT_DETAIL|验货人|detail
+SALE_OUT_DETAIL|验货日期|detail
+SALE_OUT_DETAIL|业务类型|detail
+SALE_OUT_DETAIL|折扣金额|detail
+SALE_OUT_DETAIL|智能选单|detail
+SALE_OUT_STATS|asp_cancel|detail
+SALE_OUT_STATS|存货名称|detail
+SALE_OUT_STATS|单据日期|detail
+SALE_OUT_STATS|单据数|detail
+SALE_OUT_STATS|计量单位|detail
+SALE_OUT_STATS|数量|detail
+SALES_ORDER_DETAIL|asp_cancel|detail
+SALES_ORDER_DETAIL|asp_time1|detail
+SALES_ORDER_DETAIL|asp_user1|detail
+SALES_ORDER_DETAIL|line_no|detail
+SALES_ORDER_DETAIL|备注|detail
+SALES_ORDER_DETAIL|部门负责人|detail
+SALES_ORDER_DETAIL|存货名称|detail
+SALES_ORDER_DETAIL|单据编号|detail
+SALES_ORDER_DETAIL|单据日期|detail
+SALES_ORDER_DETAIL|单据状态|detail
+SALES_ORDER_DETAIL|客户|detail
+SALES_ORDER_DETAIL|联系人|detail
+SALES_ORDER_DETAIL|品牌|detail
+SALES_ORDER_DETAIL|审核时间|detail
+SALES_ORDER_DETAIL|审批人|detail
+SALES_ORDER_DETAIL|审批时间|detail
+SALES_ORDER_DETAIL|销售单位|detail
+SALES_ORDER_DETAIL|业务员|detail
+SALES_ORDER_STATS|asp_cancel|detail
+SALES_ORDER_STATS|存货名称|detail
+SALES_ORDER_STATS|单据日期|detail
+SALES_ORDER_STATS|订单数|detail
+SALES_ORDER_STATS|数量|detail
+SALES_ORDER_STATS|销售单位|detail
+SO_ORDER|备注|header
+==ROLE_MISSING==
+role_code|role_name|is_admin
+---------|---------|--------
+AUTO_ROLE_DBG2|DBG2|N
+AUTO_ROLE_mtv0tplg6526|自动化角色_AUTO_ROLE_mtv0tplg6526|N
+AUTO_ROLE_mtv0uh5p3ce0|自动化角色_AUTO_ROLE_mtv0uh5p3ce0|N
+==ROLEPANEL_MISSING==
+role_code|panel_code|perms|can_approve
+---------|----------|-----|-----------
+AUTO_ROLE_DBG2|FINISH_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|FINISH_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_DBG2|FINISH_IN_STATS|view,query,export,print|N
+AUTO_ROLE_DBG2|LOT_TRACE|view,query,export,print|N
+AUTO_ROLE_DBG2|MATERIAL_OUT|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|MATERIAL_OUT_DETAIL|view,query,export,print|N
+AUTO_ROLE_DBG2|MATERIAL_OUT_STATS|view,query,export,print|N
+AUTO_ROLE_DBG2|OTHER_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|OTHER_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_DBG2|OTHER_IN_STATS|view,query,export,print|N
+AUTO_ROLE_DBG2|OTHER_OUT|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|OTHER_OUT_DETAIL|view,query,export,print|N
+AUTO_ROLE_DBG2|OTHER_OUT_STATS|view,query,export,print|N
+AUTO_ROLE_DBG2|OUTSOURCE_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|OUTSOURCE_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_DBG2|OUTSOURCE_IN_STATS|view,query,export,print|N
+AUTO_ROLE_DBG2|OUTSOURCE_ISSUE|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|OUTSOURCE_ISSUE_DETAIL|view,query,export,print|N
+AUTO_ROLE_DBG2|OUTSOURCE_ISSUE_STATS|view,query,export,print|N
+AUTO_ROLE_DBG2|PU_ORDER|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|PU_REQ|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|PURCHASE_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|PURCHASE_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_DBG2|PURCHASE_IN_STATS|view,query,export,print|N
+AUTO_ROLE_DBG2|QC_ASM_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_BHC|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_BHG|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_BHZ|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_CATALOG|view,query,export,print|N
+AUTO_ROLE_DBG2|QC_CUT_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_DISPOSAL|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_INSP_REC|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_INSP_REQ|view,query|N
+AUTO_ROLE_DBG2|QC_INSP_REQ_SERIES|view,query|N
+AUTO_ROLE_DBG2|QC_JJF|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_LYB|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_MOLD_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_OP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_RECORD|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_RECV|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_RETURN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_SCP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_SCY|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|QC_TC_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|RD_PROD_DOCLIST|view,query,export,print|N
+AUTO_ROLE_DBG2|RD_SHARE_FILE|view,query|N
+AUTO_ROLE_DBG2|ROD_RETURN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|SALE_OUT|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_DBG2|SALE_OUT_DETAIL|view,query,export,print|N
+AUTO_ROLE_DBG2|SALE_OUT_STATS|view,query,export,print|N
+AUTO_ROLE_DBG2|SALES_ORDER_DETAIL|view,query,export,print|N
+AUTO_ROLE_DBG2|SALES_ORDER_STATS|view,query,export,print|N
+AUTO_ROLE_DBG2|SO_ORDER|[view, query, add, edit]|N
+AUTO_ROLE_DBG2|STOCK_BALANCE|view,query,export,print|N
+AUTO_ROLE_DBG2|STOCK_LEDGER|view,query,export,print|N
+AUTO_ROLE_DBG2|STOCK_SUMMARY|view,query,export,print|N
+AUTO_ROLE_DBG2|WHLOC|view,query|N
+AUTO_ROLE_mtv0tplg6526|FINISH_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|FINISH_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|FINISH_IN_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|LOT_TRACE|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|MATERIAL_OUT|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|MATERIAL_OUT_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|MATERIAL_OUT_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|OTHER_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|OTHER_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|OTHER_IN_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|OTHER_OUT|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|OTHER_OUT_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|OTHER_OUT_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|OUTSOURCE_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|OUTSOURCE_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|OUTSOURCE_IN_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|OUTSOURCE_ISSUE|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|OUTSOURCE_ISSUE_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|OUTSOURCE_ISSUE_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|PU_ORDER|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|PU_REQ|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|PURCHASE_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|PURCHASE_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|PURCHASE_IN_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|QC_ASM_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_BHC|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_BHG|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_BHZ|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_CATALOG|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|QC_CUT_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_DISPOSAL|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_INSP_REC|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_INSP_REQ|view,query|N
+AUTO_ROLE_mtv0tplg6526|QC_INSP_REQ_SERIES|view,query|N
+AUTO_ROLE_mtv0tplg6526|QC_JJF|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_LYB|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_MOLD_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_OP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_RECORD|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_RECV|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_RETURN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_SCP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_SCY|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|QC_TC_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|RD_PROD_DOCLIST|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|RD_SHARE_FILE|view,query|N
+AUTO_ROLE_mtv0tplg6526|ROD_RETURN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|SALE_OUT|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0tplg6526|SALE_OUT_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|SALE_OUT_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|SALES_ORDER_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|SALES_ORDER_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|SO_ORDER|[view, query, add, edit]|N
+AUTO_ROLE_mtv0tplg6526|STOCK_BALANCE|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|STOCK_LEDGER|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|STOCK_SUMMARY|view,query,export,print|N
+AUTO_ROLE_mtv0tplg6526|WHLOC|view,query|N
+AUTO_ROLE_mtv0uh5p3ce0|FINISH_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|FINISH_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|FINISH_IN_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|LOT_TRACE|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|MATERIAL_OUT|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|MATERIAL_OUT_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|MATERIAL_OUT_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|OTHER_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|OTHER_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|OTHER_IN_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|OTHER_OUT|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|OTHER_OUT_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|OTHER_OUT_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|OUTSOURCE_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|OUTSOURCE_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|OUTSOURCE_IN_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|OUTSOURCE_ISSUE|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|OUTSOURCE_ISSUE_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|OUTSOURCE_ISSUE_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|PU_ORDER|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|PU_REQ|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|PURCHASE_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|PURCHASE_IN_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|PURCHASE_IN_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_ASM_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_BHC|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_BHG|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_BHZ|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_CATALOG|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_CUT_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_DISPOSAL|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_INSP_REC|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_INSP_REQ|view,query|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_INSP_REQ_SERIES|view,query|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_JJF|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_LYB|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_MOLD_INSP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_OP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_RECORD|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_RECV|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_RETURN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_SCP|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_SCY|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|QC_TC_IN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|RD_PROD_DOCLIST|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|RD_SHARE_FILE|view,query|N
+AUTO_ROLE_mtv0uh5p3ce0|ROD_RETURN|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|SALE_OUT|view,query,add,modify,modlog,del,export|N
+AUTO_ROLE_mtv0uh5p3ce0|SALE_OUT_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|SALE_OUT_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|SALES_ORDER_DETAIL|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|SALES_ORDER_STATS|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|SO_ORDER|[view, query, add, edit]|N
+AUTO_ROLE_mtv0uh5p3ce0|STOCK_BALANCE|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|STOCK_LEDGER|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|STOCK_SUMMARY|view,query,export,print|N
+AUTO_ROLE_mtv0uh5p3ce0|WHLOC|view,query|N
+rd_file_owner|DISPATCH|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+rd_file_owner|LINE_LOAD|view,query,add,modify,export|N
+rd_file_owner|MANU_ORDER|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+rd_file_owner|MANU_ORDER_DETAIL|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+rd_file_owner|MANU_ORDER_STATS|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+rd_file_owner|OUTSOURCE_ORDER|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+rd_file_owner|PROD_ABN|view,query,add,modify,export|N
+rd_file_owner|PROD_LINE|view,query,add,modify,export|N
+rd_file_owner|ROUTE|view,query,audit,price,review,adjust,print,export,delete,edit,add|Y
+rd_review|DISPATCH|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+rd_review|LINE_LOAD|view,query,add,modify,export|N
+rd_review|MANU_ORDER|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+rd_review|MANU_ORDER_DETAIL|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+rd_review|MANU_ORDER_STATS|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+rd_review|OUTSOURCE_ORDER|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+rd_review|PROD_ABN|view,query,add,modify,export|N
+rd_review|PROD_LINE|view,query,add,modify,export|N
+rd_review|ROUTE|view,query,audit,price,review,adjust,print,export,delete,edit,add|Y
+user|DISPATCH|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+user|LINE_LOAD|view,query,add,modify,export|N
+user|MANU_ORDER|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+user|MANU_ORDER_DETAIL|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+user|MANU_ORDER_STATS|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+user|OUTSOURCE_ORDER|view,query,add,edit,delete,export,print,audit,price,review,adjust|Y
+user|PROD_ABN|view,query,add,modify,export|N
+user|PROD_LINE|view,query,add,modify,export|N
+user|ROUTE|view,query,audit,price,review,adjust,print,export,delete,edit,add|Y
+==TRANS_MISSING==
+scope|ref_key|locale|text|source
+-----|-------|------|----|------
+field|0.5-1μm颗粒物去除率-2min（%）|en|0.5-1μm颗粒物去除率-2min（%）|manual
+field|4%次氯酸钠|en|4%次氯酸钠|manual
+field|attachments|en|Attachments|manual
+field|auditor_id|en|Auditor Id|manual
+field|auditor_id|ja|監査者ID|manual
+field|auditor_number|en|Auditor Number|manual
+field|bill_sp_id|en|Bill Sp Id|manual
+field|bill_stock_id|en|Bill Stock Id|manual
+field|bill_type_id|ja|伝票タイプID|manual
+field|creator_id|en|Creator Id|manual
+field|creator_id|ja|作成者ID|manual
+field|creator_number|en|Creator Number|manual
+field|cur_settle_amount_for|en|Cur Settle Amount For|manual
+field|customer_id|en|Customer Id|manual
+field|delivery_type_number|en|Delivery Type Number|manual
+field|dept_id|en|Dept Id|manual
+field|dept_id|ja|部門ID|manual
+field|dispatcher_city_id|en|Dispatcher City Id|manual
+field|dispatcher_country_id|en|Dispatcher Country Id|manual
+field|dispatcher_district_id|en|Dispatcher District Id|manual
+field|dispatcher_province_id|en|Dispatcher Province Id|manual
+field|edit_pay_account_number|en|Edit Pay Account Number|manual
+field|edit_pay_type_number|en|Edit Pay Type Number|manual
+field|emp_id|ja|従業員ID|manual
+field|f_logistics_id|en|F Logistics Id|manual
+field|group_id|en|Group Id|manual
+field|is_show_aux_barcode|en|Is Show Aux Barcode|manual
+field|ivc_status |en|Ivc Status |manual
+field|kf_period|en|Kf Period|manual
+field|modifier_id|en|Modifier Id|manual
+field|modifier_id|ja|更新者ID|manual
+field|modifier_number|en|Modifier Number|manual
+field|parent_name|en|Parent Name|manual
+field|PH\n8.5±0.25|en|PH\n8.5±0.25|manual
+field|PH提升值|en|PH提升值|manual
+field|pick_use_id|ja|出庫用途ID|manual
+field|QQ|en|Contact Qq|manual
+field|RO出水|en|RO出水|manual
+field|RO水PH|en|RO水PH|manual
+field|RO水TDS|en|RO水TDS|manual
+field|setting_term_id|en|Setting Term Id|manual
+field|supplier_id|en|Supplier Id|manual
+field|TDS（mg/L）200-500mg/L|en|TDS（mg/L）200-500mg/L|manual
+field|total_unsettle_amount_for|en|Total Unsettle Amount For|manual
+field|版本|de|Version|manual
+field|版本|es|Versión|manual
+field|版本|fr|Version|manual
+field|版本|ja|版数|manual
+field|版本|ko|버전|manual
+field|版本|ru|Версия|manual
+field|版本|th|เวอร์ชัน|manual
+field|版本|vi|Phiên bản|manual
+field|版本|zh-TW|版本|manual
+field|半成品处理方式|en|Semi-finished Disposition|manual
+field|半成品数量|en|Semi-finished Qty|manual
+field|包装方式|en|包装方式|manual
+field|保险金额|en|Total Ins Amount|manual
+field|保质期单位|en|Shelf-life Unit|manual
+field|保质期单位类型|en|Kf Type|manual
+field|保质期类型，1|en|Kf Type|manual
+field|保质期天数|en|Kf Period|manual
+field|报表辅助单位|en|Aux Unit Id|manual
+field|报废|en|Scrap|manual
+field|报告编号|en|报告编号|manual
+field|报价|de|Angebot|manual
+field|报价|es|Cotización|manual
+field|报价|fr|Devis|manual
+field|报价|ja|オファー|manual
+field|报价|ko|견적|manual
+field|报价|ru|Цитата|manual
+field|报价|th|ใบเสนอราคา|manual
+field|报价|vi|Báo giá|manual
+field|杯数(接水量100ml)|en|杯数(接水量100ml)|manual
+field|本次定金|en|Total Deposit|manual
+field|本次核销金额|en|Cur Settle Amount|manual
+field|本次结算金额|en|Cur Settle Amount|manual
+field|本次实验目的|en|本次实验目的|manual
+field|本次试验目的|en|本次试验目的|manual
+field|币别名称|en|Currency Name|manual
+field|币种|de|Währung|manual
+field|币种|es|Moneda|manual
+field|币种|fr|Monnaie|manual
+field|币种|ja|通貨|manual
+field|币种|ko|통화|manual
+field|币种|ru|Валюта|manual
+field|币种|th|สกุลเงิน|manual
+field|币种|vi|Đơn vị tiền tệ|manual
+field|币种id|en|Currency Id|manual
+field|编号|de|Nr.|manual
+field|编号|es|N.º|manual
+field|编号|fr|N°|manual
+field|编号|ja|番号|manual
+field|编号|ko|번호|manual
+field|编号|ru|№|manual
+field|编号|th|เลขที่|manual
+field|编号|vi|Số|manual
+field|编号|zh-TW|編號|manual
+field|编号：|de|Nr.: |manual
+field|编号：|en|No.: |manual
+field|编号：|es|N.º: |manual
+field|编号：|fr|N° : |manual
+field|编号：|ja|番号：|manual
+field|编号：|ko|번호: |manual
+field|编号：|ru|№: |manual
+field|编号：|th|เลขที่: |manual
+field|编号：|vi|Số: |manual
+field|编号：|zh-TW|編號：|manual
+field|编辑人|de|Bearbeiter|manual
+field|编辑人|en|Editor|manual
+field|编辑人|es|Editor|manual
+field|编辑人|fr|Éditeur|manual
+field|编辑人|ja|編集者|manual
+field|编辑人|ko|편집자|manual
+field|编辑人|ru|Редактор|manual
+field|编辑人|th|ผู้แก้ไข|manual
+field|编辑人|vi|Người chỉnh sửa|manual
+field|编辑人|zh-TW|編輯人|manual
+field|编写人|de|Ersteller|manual
+field|编写人|es|Redactor|manual
+field|编写人|fr|Rédacteur|manual
+field|编写人|ja|作成者|manual
+field|编写人|ko|작성자|manual
+field|编写人|ru|Составитель|manual
+field|编写人|th|ผู้จัดทำ|manual
+field|编写人|vi|Người soạn thảo|manual
+field|编写人|zh-TW|編寫人|manual
+field|编制日期|en|编制日期|manual
+field|变更后内容|en|Content After Change|manual
+field|变更后内容|ja|変更後内容|manual
+field|变更来源单号|en|Source Change No.|manual
+field|变更来源单号|ja|変更元伝票番号|manual
+field|变更来源单号|ko|변경 출처 번호|manual
+field|变更来源单号|zh-TW|變更來源單號|manual
+field|变更事由|en|Change Reason|manual
+field|变更事由|ja|変更理由|manual
+field|变更文件|en|Documents to Change|manual
+field|变更文件|ja|変更対象文書|manual
+field|变体|de|Variante|manual
+field|变体|en|Variant|manual
+field|变体|es|Variante|manual
+field|变体|fr|Variante|manual
+field|变体|ja|バリアント|manual
+field|变体|ko|변형|manual
+field|变体|ru|Вариант|manual
+field|变体|th|รูปแบบ|manual
+field|变体|vi|Biến thể|manual
+field|变体|zh-TW|變體|manual
+field|表单管理人|de|Formularverwalter|manual
+field|表单管理人|es|Administrador del formulario|manual
+field|表单管理人|fr|Gestionnaire de formulaire|manual
+field|表单管理人|ja|様式管理者|manual
+field|表单管理人|ko|양식 관리자|manual
+field|表单管理人|ru|Администратор формы|manual
+field|表单管理人|th|ผู้ดูแลแบบฟอร์ม|manual
+field|表单管理人|vi|Người quản lý biểu mẫu|manual
+field|表单管理人|zh-TW|表單管理人|manual
+field|不合格品比例|en|Rejected Ratio|manual
+field|不合格品数量|en|Rejected Qty|manual
+field|不合格应对措施|de|Maßnahmen bei Nichtkonformität|manual
+field|不合格应对措施|es|Medidas ante no conformidad|manual
+field|不合格应对措施|fr|Mesures en cas de non-conformité|manual
+field|不合格应对措施|ja|不適合時の対応措置|manual
+field|不合格应对措施|ko|부적합 대응 조치|manual
+field|不合格应对措施|ru|Меры при несоответствии|manual
+field|不合格应对措施|th|มาตรการรับมือสิ่งที่ไม่เป็นไปตามข้อกำหนด|manual
+field|不合格应对措施|vi|Biện pháp xử lý không phù hợp|manual
+field|不合格应对措施|zh-TW|不合格應對措施|manual
+field|不可溶性铅|en|不可溶性铅|manual
+field|不良率|en|Defect Rate|manual
+field|不良说明|en|Defect Description|manual
+field|部门_dept_name|en|Dept Name|manual
+field|部门-id|en|Sale Dept Id|manual
+field|部门负责人|de|Abteilungsleiter|manual
+field|部门负责人|en|Dept. Manager|manual
+field|部门负责人|es|Responsable de departamento|manual
+field|部门负责人|fr|Responsable du département|manual
+field|部门负责人|ja|部門責任者|manual
+field|部门负责人|ko|부서 담당자|manual
+field|部门负责人|ru|Руководитель отдела|manual
+field|部门负责人|th|หัวหน้าแผนก|manual
+field|部门负责人|vi|Trưởng phòng|manual
+field|部门全称|en|Full Dept. Name|manual
+field|材料|de|Material|manual
+field|材料|en|Material|manual
+field|材料|es|Material|manual
+field|材料|fr|Matériau|manual
+field|材料|ja|材料|manual
+field|材料|ko|자재|manual
+field|材料|ru|Материал|manual
+field|材料|th|วัสดุ|manual
+field|材料|vi|Vật liệu|manual
+field|材料编码|de|Kodierung von Materialien|manual
+field|材料编码|es|Codificación de materiales|manual
+field|材料编码|fr|Code de matériau|manual
+field|材料编码|ko|소재 코드|manual
+field|材料编码|ru|Кодирование материала|manual
+field|材料编码|th|รหัสวัสดุ|manual
+field|材料编码|vi|Mã vật liệu|manual
+field|材料费用|en|Material Cost|manual
+field|材料规格|de|Materialspezifikation|manual
+field|材料规格|en|Material spec|manual
+field|材料规格|es|Especificación material|manual
+field|材料规格|fr|Spécification matériau|manual
+field|材料规格|ja|材料仕様|manual
+field|材料规格|ko|자재 규격|manual
+field|材料规格|ru|Спецификация материала|manual
+field|材料规格|th|สเปกวัสดุ|manual
+field|材料规格|vi|Quy cách vật liệu|manual
+field|材料来源描述|en|Material Source Description|manual
+field|材料名称|de|Name des Materials|manual
+field|材料名称|es|Nombre del material|manual
+field|材料名称|fr|Nom du matériau|manual
+field|材料名称|ko|재료 이름|manual
+field|材料名称|ru|Название материала|manual
+field|材料名称|th|ชื่อวัสดุ|manual
+field|材料名称|vi|Tên vật liệu|manual
+field|采购单位|de|Einkaufs einheit|manual
+field|采购单位|es|Unidad de compras|manual
+field|采购单位|fr|Unité d'achat|manual
+field|采购单位|ja|調達機関|manual
+field|采购单位|ko|조달 기관|manual
+field|采购单位|ru|Закупочная единица|manual
+field|采购单位|th|หน่วยจัดซื้อ|manual
+field|采购单位|vi|Đơn vị mua sắm|manual
+field|采购订单号|de|Bestellnummer kaufen|manual
+field|采购订单号|es|Número de pedido de compra|manual
+field|采购订单号|fr|Numéro de commande d'achat|manual
+field|采购订单号|ja|調達注文番号|manual
+field|采购订单号|ko|구매 주문 번호|manual
+field|采购订单号|ru|Номер заказа на закупку|manual
+field|采购订单号|th|เลขที่ใบสั่งซื้อ|manual
+field|采购订单号|vi|Số đơn mua hàng|manual
+field|采购费用|en|Cost Fee|manual
+field|采购费用分录|en|Cost Fee Entity|manual
+field|采购费用明细|en|Cost Fee Entity|manual
+field|采购类型|de|Art der Beschaffung|manual
+field|采购类型|es|Tipo de compra|manual
+field|采购类型|fr|Type d'achat|manual
+field|采购类型|ja|調達タイプ|manual
+field|采购类型|ko|조달 유형|manual
+field|采购类型|ru|Виды закупок|manual
+field|采购类型|th|ประเภทการจัดซื้อ|manual
+field|采购类型|vi|Loại hình mua sắm|manual
+field|采购员部门|en|Purchaser Dept.|manual
+field|仓库分类|en|Warehouse Group|manual
+field|仓库分类编码|en|Warehouse Group Code|manual
+field|仓库管理员id|en|Storekeeper Id|manual
+field|仓库管理员编码|en|Keeper Code|manual
+field|仓库名称_sp_name|en|Sp Name|manual
+field|仓位|en|Bill Sp Name|manual
+field|测试（检测）背景/目的|en|测试（检测）背景/目的|manual
+field|测试（检测）标准|en|测试（检测）标准|manual
+field|测试（检测）方法|en|测试（检测）方法|manual
+field|测试（检测）目标|en|测试（检测）目标|manual
+field|测试背景/目的|en|测试背景/目的|manual
+field|测试编号|en|测试编号|manual
+field|测试标准|en|测试标准|manual
+field|测试产品打样要求|en|测试产品打样要求|manual
+field|测试程序|de|Test verfahren|manual
+field|测试程序|es|Procedimiento de prueba|manual
+field|测试程序|fr|Procédure de test|manual
+field|测试程序|ja|テストプログラム|manual
+field|测试程序|ko|테스트 프로그램|manual
+field|测试程序|ru|Процедура тестирования|manual
+field|测试程序|th|โปรแกรมทดสอบ|manual
+field|测试程序|vi|Chương trình kiểm tra|manual
+field|测试方法|en|Test Method|manual
+field|测试方式|en|测试方式|manual
+field|测试负责人|en|测试负责人|manual
+field|测试工位|en|测试工位|manual
+field|测试计划|en|测试计划|manual
+field|测试结果|en|Test Result|manual
+field|测试结论|en|测试结论|manual
+field|测试流速（L/min）|en|测试流速（L/min）|manual
+field|测试目标|en|测试目标|manual
+field|测试目的/背景|en|测试目的/背景|manual
+field|测试内容|en|测试内容|manual
+field|测试情况|de|Teststatus|manual
+field|测试情况|en|Test Status|manual
+field|测试情况|es|Estado de pruebas|manual
+field|测试情况|fr|État des tests|manual
+field|测试情况|ja|テスト状況|manual
+field|测试情况|ko|테스트 현황|manual
+field|测试情况|ru|Состояние испытаний|manual
+field|测试情况|th|สถานะการทดสอบ|manual
+field|测试情况|vi|Tình trạng thử nghiệm|manual
+field|测试情况|zh-TW|測試情況|manual
+field|测试日期|en|Test Date|manual
+field|测试时间|en|测试时间|manual
+field|测试水温（℃）|en|测试水温（℃）|manual
+field|测试条件|en|测试条件|manual
+field|测试项目|en|Test Item|manual
+field|测试要求|en|测试要求|manual
+field|测试仪器|en|测试仪器|manual
+field|测试用仪器/检出限|en|测试用仪器/检出限|manual
+field|测试员|en|测试员|manual
+field|测试主题|en|测试主题|manual
+field|测试装置|en|测试装置|manual
+field|测试装置/设备|en|测试装置/设备|manual
+field|测试装置及编号|en|测试装置及编号|manual
+field|测试装置及编号1|en|测试装置及编号1|manual
+field|测试装置及编号2|en|测试装置及编号2|manual
+field|测试装置及编号3|en|测试装置及编号3|manual
+field|测试装置及编号4|en|测试装置及编号4|manual
+field|测试装置及编号5|en|测试装置及编号5|manual
+field|测试装置及编号6|en|测试装置及编号6|manual
+field|测试装置及工位|en|测试装置及工位|manual
+field|测完后样品样品处理|en|测完后样品样品处理|manual
+field|产成品图片|de|Bild des fertigen Produkts|manual
+field|产成品图片|es|Imagen del producto terminado|manual
+field|产成品图片|fr|Images des produits finis|manual
+field|产成品图片|ja|製品画像|manual
+field|产成品图片|ko|완제품 이미지|manual
+field|产成品图片|ru|Изображение готовой продукции|manual
+field|产成品图片|th|ภาพผลิตภัณฑ์สำเร็จรูป|manual
+field|产成品图片|vi|Hình ảnh thành phẩm|manual
+field|产品/物料编码|en|Product/Material Code|manual
+field|产品/物料名称|en|Product/Material Name|manual
+field|产品/物料批次|en|Product/Material Batch|manual
+field|产品编号|de|Produktnummer|manual
+field|产品编号|es|N.º de producto|manual
+field|产品编号|fr|N° de produit|manual
+field|产品编号|ko|제품 번호|manual
+field|产品编号|ru|Номер изделия|manual
+field|产品编号|th|หมายเลขผลิตภัณฑ์|manual
+field|产品编号|vi|Mã sản phẩm|manual
+field|产品编号|zh-TW|產品編號|manual
+field|产品编码|de|Produktcode|manual
+field|产品编码|es|Código del producto|manual
+field|产品编码|fr|Code produit|manual
+field|产品编码|ja|製品コード|manual
+field|产品编码|ko|제품 코드|manual
+field|产品编码|ru|Код продукта|manual
+field|产品编码|th|รหัสสินค้า|manual
+field|产品编码|vi|Mã sản phẩm|manual
+field|产品变更申请单|en|Product Change Request|manual
+field|产品变更申请单|ja|製品変更申請書|manual
+field|产品变更申请单|zh-TW|產品變更申請單|manual
+field|产品分类|en|产品分类|manual
+field|产品负责人|de|Produktverantwortlicher|manual
+field|产品负责人|en|Product Owner|manual
+field|产品负责人|es|Responsable del producto|manual
+field|产品负责人|fr|Responsable produit|manual
+field|产品负责人|ja|製品責任者|manual
+field|产品负责人|ko|제품 책임자|manual
+field|产品负责人|ru|Ответственный за изделие|manual
+field|产品负责人|th|ผู้รับผิดชอบผลิตภัณฑ์|manual
+field|产品负责人|vi|Người phụ trách sản phẩm|manual
+field|产品负责人|zh-TW|產品負責人|manual
+field|产品功能类别|de|Produktfunktionskategorie|manual
+field|产品功能类别|en|Product Function Category|manual
+field|产品功能类别|es|Categoría funcional del producto|manual
+field|产品功能类别|fr|Catégorie fonctionnelle|manual
+field|产品功能类别|ja|製品機能分類|manual
+field|产品功能类别|ko|제품 기능 분류|manual
+field|产品功能类别|ru|Функциональная категория|manual
+field|产品功能类别|th|หมวดหมู่ฟังก์ชันผลิตภัณฑ์|manual
+field|产品功能类别|vi|Loại chức năng sản phẩm|manual
+field|产品功能类别|zh-TW|產品功能類別|manual
+field|产品管控等级|de|Produktkontrollstufe|manual
+field|产品管控等级|en|Product Control Grade|manual
+field|产品管控等级|es|Grado de control del producto|manual
+field|产品管控等级|fr|Niveau de contrôle produit|manual
+field|产品管控等级|ja|製品管理等級|manual
+field|产品管控等级|ko|제품 관리 등급|manual
+field|产品管控等级|ru|Уровень контроля изделия|manual
+field|产品管控等级|th|ระดับควบคุมผลิตภัณฑ์|manual
+field|产品管控等级|vi|Cấp quản lý sản phẩm|manual
+field|产品管控等级|zh-TW|產品管控等級|manual
+field|产品规格|en|产品规格|manual
+field|产品开发部工艺意见|en|Product Dev. Process Opinion|manual
+field|产品开发部性能意见|en|Product Dev. Performance Opinion|manual
+field|产品开发部意见|en|Product Development Opinion|manual
+field|产品类别|de|Produktkategorie|manual
+field|产品类别|en|Category|manual
+field|产品类别|es|Categoría de producto|manual
+field|产品类别|fr|Catégorie de produit|manual
+field|产品类别|ja|製品カテゴリ|manual
+field|产品类别|ko|제품 카테고리|manual
+field|产品类别|ru|Категория продукции|manual
+field|产品类别|th|ประเภทสินค้า|manual
+field|产品类别|vi|Danh mục sản phẩm|manual
+field|产品类别|zh-TW|產品類別|manual
+field|产品类型|en|产品类型|manual
+field|产品名/规格|en|产品名/规格|manual
+field|产品名称|de|Produktname|manual
+field|产品名称|es|Nombre del producto|manual
+field|产品名称|fr|Nom du produit|manual
+field|产品名称|ja|製品名|manual
+field|产品名称|ko|제품 이름|manual
+field|产品名称|ru|Название продукта|manual
+field|产品名称|th|ชื่อผลิตภัณฑ์|manual
+field|产品名称|vi|Tên sản phẩm|manual
+field|产品形态|en|产品形态|manual
+field|产品整体尺寸|de|Gesamtmaße des Produkts|manual
+field|产品整体尺寸|en|产品整体尺寸|manual
+field|产品整体尺寸|es|Dimensiones generales del producto|manual
+field|产品整体尺寸|fr|Dimensions globales du produit|manual
+field|产品整体尺寸|ja|製品全体寸法|manual
+field|产品整体尺寸|ko|제품 전체 치수|manual
+field|产品整体尺寸|ru|Габаритные размеры изделия|manual
+field|产品整体尺寸|th|ขนาดโดยรวมของผลิตภัณฑ์|manual
+field|产品整体尺寸|vi|Kích thước tổng thể sản phẩm|manual
+field|产品整体尺寸|zh-TW|產品整體尺寸|manual
+field|产品种类|en|产品种类|manual
+field|产品主要性能|de|Hauptleistung|manual
+field|产品主要性能|en|产品主要性能|manual
+field|产品主要性能|es|Rendimiento principal|manual
+field|产品主要性能|fr|Performance principale|manual
+field|产品主要性能|ja|主な性能|manual
+field|产品主要性能|ko|주요 성능|manual
+field|产品主要性能|ru|Основные характеристики|manual
+field|产品主要性能|th|สมรรถนะหลัก|manual
+field|产品主要性能|vi|Hiệu suất chính|manual
+field|产品主要性能|zh-TW|產品主要性能|manual
+field|长编码|en|Long Code|manual
+field|长度(mm)|de|Länge (mm)|manual
+field|长度(mm)|en|Length (mm)|manual
+field|长度(mm)|es|Longitud (mm)|manual
+field|长度(mm)|fr|Longueur (mm)|manual
+field|长度(mm)|ja|長さ(mm)|manual
+field|长度(mm)|ko|길이(mm)|manual
+field|长度(mm)|ru|Длина (мм)|manual
+field|长度(mm)|th|ความยาว (มม.)|manual
+field|长度(mm)|vi|Chiều dài (mm)|manual
+field|长度(mm)|zh-TW|長度(mm)|manual
+field|长度范围|en|Length Range|manual
+field|长度要求|en|长度要求|manual
+field|车间|en|Workshop|manual
+field|成本价|de|Einstandspreis|manual
+field|成本价|es|Precio de costo|manual
+field|成本价|fr|Prix de revient|manual
+field|成本价|ja|原価|manual
+field|成本价|ko|원가|manual
+field|成本价|ru|Себестоимость|manual
+field|成本价|th|ราคาต้นทุน|manual
+field|成本价|vi|Giá thành|manual
+field|成本价(辅单位)|de|Einstandspreis (Hilfseinheit)|manual
+field|成本价(辅单位)|en|Unit cost (aux)|manual
+field|成本价(辅单位)|es|Coste unitario (auxiliar)|manual
+field|成本价(辅单位)|fr|Coût unitaire (auxiliaire)|manual
+field|成本价(辅单位)|ja|単位原価(補助単位)|manual
+field|成本价(辅单位)|ko|단위원가(보조단위)|manual
+field|成本价(辅单位)|ru|Себестоимость (всп.)|manual
+field|成本价(辅单位)|th|ต้นทุนต่อหน่วย(หน่วยรอง)|manual
+field|成本价(辅单位)|vi|Giá vốn (phụ)|manual
+field|成本价(主单位)|de|Einstandspreis (Haupteinheit)|manual
+field|成本价(主单位)|en|Unit cost (main)|manual
+field|成本价(主单位)|es|Coste unitario (principal)|manual
+field|成本价(主单位)|fr|Coût unitaire (principal)|manual
+field|成本价(主单位)|ja|単位原価(主単位)|manual
+field|成本价(主单位)|ko|단위원가(주단위)|manual
+field|成本价(主单位)|ru|Себестоимость (осн.)|manual
+field|成本价(主单位)|th|ต้นทุนต่อหน่วย(หน่วยหลัก)|manual
+field|成本价(主单位)|vi|Giá vốn (chính)|manual
+field|成本金额|de|Kostenbetrag|manual
+field|成本金额|en|Cost amount|manual
+field|成本金额|es|Importe de coste|manual
+field|成本金额|fr|Montant du coût|manual
+field|成本金额|ja|原価金額|manual
+field|成本金额|ko|원가 금액|manual
+field|成本金额|ru|Сумма затрат|manual
+field|成本金额|th|จำนวนเงินต้นทุน|manual
+field|成本金额|vi|Tổng giá vốn|manual
+field|成本视图|en|Cost View|manual
+field|成品|de|Fertigprodukt|manual
+field|成品|en|Finished Product|manual
+field|成品|es|Producto terminado|manual
+field|成品|fr|Produit fini|manual
+field|成品|ja|完成品|manual
+field|成品|ko|완제품|manual
+field|成品|ru|Готовая продукция|manual
+field|成品|th|ผลิตภัณฑ์สำเร็จรูป|manual
+field|成品|vi|Thành phẩm|manual
+field|成品|zh-TW|成品|manual
+field|成品处理方式|en|Finished Goods Disposition|manual
+field|成品数量|en|Finished Goods Qty|manual
+field|成品重量|en|成品重量|manual
+field|成型|en|Molding|manual
+field|城市编码|en|City Code|manual
+field|尺寸|en|尺寸|manual
+field|冲水方式|en|冲水方式|manual
+field|冲水时间|en|冲水时间|manual
+field|出货检验报告|de|Versandprüfbericht|manual
+field|出货检验报告|en|Shipping Inspection Report|manual
+field|出货检验报告|es|Informe de inspección de envío|manual
+field|出货检验报告|fr|Rapport d'inspection avant expédition|manual
+field|出货检验报告|ja|出荷検査報告書|manual
+field|出货检验报告|ko|출하 검사 보고서|manual
+field|出货检验报告|ru|Отчёт о приёмочном контроле|manual
+field|出货检验报告|th|รายงานการตรวจสอบการจัดส่ง|manual
+field|出货检验报告|vi|Báo cáo kiểm tra xuất hàng|manual
+field|出货检验报告|zh-TW|出貨檢驗報告|manual
+field|出货检验项目控制计划|de|Kontrollplan für Versandprüfpositionen|manual
+field|出货检验项目控制计划|en|Shipment Inspection Item Control Plan|manual
+field|出货检验项目控制计划|es|Plan de control de ítems de inspección de envío|manual
+field|出货检验项目控制计划|fr|Plan de contrôle des éléments d'inspection à l'expédition|manual
+field|出货检验项目控制计划|ja|出荷検査項目管理計画|manual
+field|出货检验项目控制计划|ko|출하 검사 항목 관리 계획|manual
+field|出货检验项目控制计划|ru|План контроля пунктов отгрузочной инспекции|manual
+field|出货检验项目控制计划|th|แผนควบคุมรายการตรวจสอบการจัดส่ง|manual
+field|出货检验项目控制计划|vi|Kế hoạch kiểm soát hạng mục kiểm tra xuất hàng|manual
+field|出货检验项目控制计划|zh-TW|出貨檢驗項目控制計畫|manual
+field|出库调整|de|Warenausgangsanpassung|manual
+field|出库调整|en|Issue adjustment|manual
+field|出库调整|es|Ajuste de salida|manual
+field|出库调整|fr|Ajustement de sortie|manual
+field|出库调整|ja|出庫調整|manual
+field|出库调整|ko|출고 조정|manual
+field|出库调整|ru|Корректировка отпуска|manual
+field|出库调整|th|ปรับปรุงการออก|manual
+field|出库调整|vi|Điều chỉnh xuất|manual
+field|出库类别|de|Ausgehende Kategorie|manual
+field|出库类别|es|Categoría de salida|manual
+field|出库类别|fr|Catégorie de la bibliothèque|manual
+field|出库类别|ko|아웃바운드 카테고리|manual
+field|出库类别|ru|Исходящая категория|manual
+field|出库类别|th|ประเภทขาออก|manual
+field|出库类别|vi|Danh mục thư viện|manual
+field|出入库状态|en|Io Status|manual
+field|出水含量（ug/L）样品1|en|出水含量（ug/L）样品1|manual
+field|出水含量（ug/L）样品2|en|出水含量（ug/L）样品2|manual
+field|出水含量（ug/L）样品3|en|出水含量（ug/L）样品3|manual
+field|出水含量（ug/L）样品4|en|出水含量（ug/L）样品4|manual
+field|出水含量（ug/L）样品5|en|出水含量（ug/L）样品5|manual
+field|出水含量（ug/L）样品6|en|出水含量（ug/L）样品6|manual
+field|出水硬度（0.8mm-8g(1.1:1)）|en|出水硬度（0.8mm-8g(1.1:1)）|manual
+field|出水硬度（0.8mm-8g(1:2)）|en|出水硬度（0.8mm-8g(1:2)）|manual
+field|出水硬度（1.2mm-12g(1.1:1)）|en|出水硬度（1.2mm-12g(1.1:1)）|manual
+field|除余氯|de|Chlorentfernung|manual
+field|除余氯|en|Chlorine Removal|manual
+field|除余氯|es|Eliminación de cloro|manual
+field|除余氯|fr|Élimination du chlore|manual
+field|除余氯|ja|残留塩素除去|manual
+field|除余氯|ko|잔류염소 제거|manual
+field|除余氯|ru|Удаление хлора|manual
+field|除余氯|th|กำจัดคลอรีน|manual
+field|除余氯|vi|Loại bỏ clo|manual
+field|除余氯|zh-TW|除餘氯|manual
+field|创建人名称|en|Creator Name|manual
+field|创建时间|de|Erstellt am|manual
+field|创建时间|es|Fecha de creación|manual
+field|创建时间|fr|Créé le|manual
+field|创建时间|ko|생성 시간|manual
+field|创建时间|ru|Время создания|manual
+field|创建时间|th|เวลาสร้าง|manual
+field|创建时间|vi|Thời gian tạo|manual
+field|纯水（tds）|en|纯水（tds）|manual
+field|纯水流速(mL/min)|en|纯水流速(mL/min)|manual
+field|存储环境|en|存储环境|manual
+field|存货名称.品牌|de|Artikelname.Marke|manual
+field|存货名称.品牌|en|Item name.brand|manual
+field|存货名称.品牌|es|Nombre artículo.marca|manual
+field|存货名称.品牌|fr|Nom article.marque|manual
+field|存货名称.品牌|ja|品名.ブランド|manual
+field|存货名称.品牌|ko|품명.브랜드|manual
+field|存货名称.品牌|ru|Наименование.Бренд|manual
+field|存货名称.品牌|th|ชื่อสินค้า.ยี่ห้อ|manual
+field|存货名称.品牌|vi|Tên hàng.thương hiệu|manual
+field|存货图片|de|Bilder auf Lager|manual
+field|存货图片|es|Imagen de inventario|manual
+field|存货图片|fr|Images d'inventaire|manual
+field|存货图片|ja|在庫画像|manual
+field|存货图片|ko|재고 이미지|manual
+field|存货图片|ru|Фотографии инвентаря|manual
+field|存货图片|th|รูปภาพสินค้าคงคลัง|manual
+field|存货图片|vi|Hình ảnh hàng tồn kho|manual
+field|单价(辅单位)|de|Einzelpreis (Hilfseinheit)|manual
+field|单价(辅单位)|en|Unit price (aux)|manual
+field|单价(辅单位)|es|Precio unitario (auxiliar)|manual
+field|单价(辅单位)|fr|Prix unitaire (auxiliaire)|manual
+field|单价(辅单位)|ja|単価(補助単位)|manual
+field|单价(辅单位)|ko|단가(보조단위)|manual
+field|单价(辅单位)|ru|Цена (всп.)|manual
+field|单价(辅单位)|th|ราคาต่อหน่วย(หน่วยรอง)|manual
+field|单价(辅单位)|vi|Đơn giá (phụ)|manual
+field|单价(主单位)|de|Einzelpreis (Haupteinheit)|manual
+field|单价(主单位)|en|Unit price (main)|manual
+field|单价(主单位)|es|Precio unitario (principal)|manual
+field|单价(主单位)|fr|Prix unitaire (principal)|manual
+field|单价(主单位)|ja|単価(主単位)|manual
+field|单价(主单位)|ko|단가(주단위)|manual
+field|单价(主单位)|ru|Цена (осн.)|manual
+field|单价(主单位)|th|ราคาต่อหน่วย(หน่วยหลัก)|manual
+field|单价(主单位)|vi|Đơn giá (chính)|manual
+field|单价2|de|Stückpreis 2|manual
+field|单价2|es|Precio unitario 2|manual
+field|单价2|fr|Prix unitaire 2|manual
+field|单价2|ja|単価2|manual
+field|单价2|ko|단가 2|manual
+field|单价2|ru|Цена за единицу 2|manual
+field|单价2|th|ราคาต่อหน่วย2|manual
+field|单价2|vi|Đơn giá 2|manual
+field|单据编号|de|Dokumentennummer|manual
+field|单据编号|es|Número de documento|manual
+field|单据编号|fr|Numéro de document|manual
+field|单据编号|ko|문서 번호|manual
+field|单据编号|ru|Номер документа|manual
+field|单据编号|th|หมายเลขเอกสาร|manual
+field|单据编号|vi|Số chứng từ|manual
+field|单据关闭状态|en|Bill Close State|manual
+field|单据日期|de|Datum der Dokumente|manual
+field|单据日期|es|Fecha del documento|manual
+field|单据日期|fr|Date du document|manual
+field|单据日期|ko|문서 날짜|manual
+field|单据日期|ru|Дата документа|manual
+field|单据日期|th|วันที่เอกสาร|manual
+field|单据日期|vi|Ngày chứng từ|manual
+field|单据日期（周）|de|Belegdatum (Woche)|manual
+field|单据日期（周）|en|Doc date (week)|manual
+field|单据日期（周）|es|Fecha documento (semana)|manual
+field|单据日期（周）|fr|Date document (semaine)|manual
+field|单据日期（周）|ja|伝票日付（週）|manual
+field|单据日期（周）|ko|전표 일자(주)|manual
+field|单据日期（周）|ru|Дата документа (неделя)|manual
+field|单据日期（周）|th|วันที่เอกสาร(สัปดาห์)|manual
+field|单据日期（周）|vi|Ngày chứng từ (tuần)|manual
+field|单据数|de|Beleganzahl|manual
+field|单据数|en|Doc count|manual
+field|单据数|es|N.º documentos|manual
+field|单据数|fr|Nb documents|manual
+field|单据数|ja|伝票数|manual
+field|单据数|ko|전표 수|manual
+field|单据数|ru|Кол-во документов|manual
+field|单据数|th|จำนวนเอกสาร|manual
+field|单据数|vi|Số chứng từ|manual
+field|单据整单折前价税合计|en|Bill Dis Before Amount|manual
+field|单据整单折前价税合计_bill_dis_before_amount|en|Bill Dis Before Amount|manual
+field|单据状态|de|Belegstatus|manual
+field|单据状态|en|Doc status|manual
+field|单据状态|es|Estado documento|manual
+field|单据状态|fr|Statut document|manual
+field|单据状态|ja|伝票ステータス|manual
+field|单据状态|ko|전표 상태|manual
+field|单据状态|ru|Статус документа|manual
+field|单据状态|th|สถานะเอกสาร|manual
+field|单据状态|vi|Trạng thái chứng từ|manual
+field|单据状态_bill_status|en|Bill Status|manual
+field|单据状态_bill_status|ja|伝票ステータス(ERP)|manual
+field|单位成本视图|en|Unit Cost View|manual
+field|单支物料含量|en|单支物料含量|manual
+field|单重|de|Einfachheit|manual
+field|单重|es|Peso único|manual
+field|单重|fr|Poids unique|manual
+field|单重|ja|単重|manual
+field|单重|ko|단일 무게|manual
+field|单重|ru|Одинарный|manual
+field|单重|th|ความเป็นเอก|manual
+field|单重|vi|Đơn trọng|manual
+field|倒冲仓库id|en|Backflushed Stock Id|manual
+field|倒冲仓库编码|en|Backflush Warehouse Code|manual
+field|倒冲仓库名称|en|Backflush Warehouse|manual
+field|倒冲仓位id|en|Backflushed Space Id|manual
+field|倒冲仓位编码|en|Backflushed Space Number|manual
+field|倒冲仓位名称|en|Backflush Bin|manual
+field|到货地址|de|Ankunfts adresse|manual
+field|到货地址|es|Dirección de llegada|manual
+field|到货地址|fr|Adresse d'arrivée|manual
+field|到货地址|ja|着荷先住所|manual
+field|到货地址|ko|배송 주소|manual
+field|到货地址|ru|Адрес прибытия|manual
+field|到货地址|th|ที่อยู่ที่มาถึง|manual
+field|到货地址|vi|Địa chỉ đến|manual
+field|到期日|en|Due Date|manual
+field|抵扣余额|en|Deduction Balance|manual
+field|跌落高度cm|en|跌落高度cm|manual
+field|跌落强度|en|跌落强度|manual
+field|跌落要求|en|跌落要求|manual
+field|订金金额|de|Anzahlung betrag|manual
+field|订金金额|en|Deposit amount|manual
+field|订金金额|es|Cantidad de depósito|manual
+field|订金金额|fr|Montant du dépôt|manual
+field|订金金额|ja|予約金額|manual
+field|订金金额|ko|예금 금액|manual
+field|订金金额|ru|Сумма депозита|manual
+field|订金金额|th|จำนวนเงินฝาก|manual
+field|订金金额|vi|Số tiền đặt cọc|manual
+field|多单位|en|Multi-UOM List|manual
+field|二水氯化钙|en|二水氯化钙|manual
+field|发货单号|de|Rechnungs nummer|manual
+field|发货单号|es|Número de factura|manual
+field|发货单号|fr|Numéro du bon de livraison|manual
+field|发货单号|ja|発送伝票番号|manual
+field|发货单号|ko|배송 주문 번호|manual
+field|发货单号|ru|Номер отгрузки|manual
+field|发货单号|th|หมายเลขใบจัดส่งสินค้า|manual
+field|发货单号|vi|Mã số vận đơn|manual
+field|发货地址|en|Recevice Delivery|manual
+field|发货电话|en|Dispatcher Phone|manual
+field|发货方式|en|Recevice Delivery|manual
+field|发货国家id|en|Dispatcher Country Id|manual
+field|发货国家编码|en|Dispatcher Country Number|manual
+field|发货国家名称|en|Dispatcher Country Name|manual
+field|发货联系电话|en|Dispatcher Phone|manual
+field|发货区县id|en|Dispatcher District Id|manual
+field|发货区县编码|en|Dispatcher District Number|manual
+field|发货区县名称|en|Dispatcher District Name|manual
+field|发货人|de|Absender|manual
+field|发货人|es|Remitente|manual
+field|发货人|fr|Expéditeur|manual
+field|发货人|ja|発送人|manual
+field|发货人|ko|화주|manual
+field|发货人|ru|Отправитель|manual
+field|发货人|th|ผู้จัดส่ง|manual
+field|发货人|vi|Người gửi hàng|manual
+field|发货人_dispatcher_linkman|en|Dispatcher Linkman|manual
+field|发货日期|de|Versanddatum|manual
+field|发货日期|es|Fecha de envío|manual
+field|发货日期|fr|Date d’expédition|manual
+field|发货日期|ja|発送日|manual
+field|发货日期|ko|배송일|manual
+field|发货日期|ru|Дата отгрузки|manual
+field|发货日期|th|วันที่จัดส่ง|manual
+field|发货日期|vi|Ngày giao hàng|manual
+field|发货省份id|en|Dispatcher Province Id|manual
+field|发货省份编码|en|Dispatcher Province Number|manual
+field|发货省份名称|en|Dispatcher Province Name|manual
+field|发货市区id|en|Dispatcher City Id|manual
+field|发货市区编码|en|Dispatcher City Number|manual
+field|发货市区名称|en|Dispatcher City Name|manual
+field|发货详细地址|en|Dispatcher Address|manual
+field|发货状态|de|Liefer status|manual
+field|发货状态|en|Shipping status|manual
+field|发货状态|es|Estado de envío|manual
+field|发货状态|fr|État d'expédition|manual
+field|发货状态|ja|発送ステータス|manual
+field|发货状态|ko|배송 상태|manual
+field|发货状态|ru|Состояние отгрузки|manual
+field|发货状态|th|สถานะการจัดส่ง|manual
+field|发货状态|vi|Tình trạng giao hàng|manual
+field|发料单数|de|Materialausgaben|manual
+field|发料单数|en|Issue count|manual
+field|发料单数|es|N.º emisiones|manual
+field|发料单数|fr|Nb sorties matière|manual
+field|发料单数|ja|発料伝票数|manual
+field|发料单数|ko|지급 전표 수|manual
+field|发料单数|ru|Кол-во выдач|manual
+field|发料单数|th|จำนวนใบเบิก|manual
+field|发料单数|vi|Số phiếu cấp liệu|manual
+field|发票类型|en|Invoice Type|manual
+field|发票类型：1：普票，2:专票|en|Ivc Type|manual
+field|发送状态|en|Send Status|manual
+field|返工达到规定要求|en|Rework to Specification|manual
+field|废水流速(L/min)|en|废水流速(L/min)|manual
+field|费用|en|Fee|manual
+field|费用调整|de|Kosten anpassung|manual
+field|费用调整|es|Ajuste de costos|manual
+field|费用调整|fr|Ajustement des coûts|manual
+field|费用调整|ja|費用調整|manual
+field|费用调整|ko|수수료 조정|manual
+field|费用调整|ru|Корректировка расходов|manual
+field|费用调整|th|การปรับค่าใช้จ่าย|manual
+field|费用调整|vi|Điều chỉnh phí|manual
+field|费用分摊信息|en|Subsist Info|manual
+field|费用金额|de|Höhe der Kosten|manual
+field|费用金额|es|Cantidad de gastos|manual
+field|费用金额|fr|Montant des frais|manual
+field|费用金额|ja|費用金額|manual
+field|费用金额|ko|수수료 금액|manual
+field|费用金额|ru|Сумма расходов|manual
+field|费用金额|th|จำนวนค่าใช้จ่าย|manual
+field|费用金额|vi|Số tiền chi phí|manual
+field|费用信息单据体|en|Cost Fee Entity|manual
+field|分类id|en|Group Id|manual
+field|分类编码|en|Contact Group Number|manual
+field|分录核销状态，未收款|en|Entry Settle Status|manual
+field|分录结算状态|en|Entry Settle Status|manual
+field|分录序号|en|Seq|manual
+field|分录状态|en|Entry Status|manual
+field|分摊差额|en|Divide Diff Amount|manual
+field|辅单位|de|Hilfseinheit|manual
+field|辅助单位|en|Aux. UOM|manual
+field|辅助单位1,启动多单位，才需要传递|en|Fix Unit Id1|manual
+field|辅助单位2|en|Fix Unit Id2|manual
+field|辅助单位3|en|Fix Unit Id3|manual
+field|辅助单位数量|en|Aux Qty|manual
+field|辅助换算率|en|Aux Coefficient|manual
+field|辅助属性|en|Aux Entity|manual
+field|辅助属性4id|en|Aux Id4|manual
+field|辅助属性4编码|en|Aux Number4|manual
+field|辅助属性4名称|en|Aux Name4|manual
+field|辅助属性5id|en|Aux Id5|manual
+field|辅助属性5编码|en|Aux Number5|manual
+field|辅助属性5名称|en|Aux Name5|manual
+field|付款方式|de|Zahlungsart|manual
+field|付款方式|en|Payment Method|manual
+field|付款方式|es|Método de pago|manual
+field|付款方式|fr|Mode de paiement|manual
+field|付款方式|ja|支払い方法|manual
+field|付款方式|ko|결제 방법|manual
+field|付款方式|ru|Способ оплаты|manual
+field|付款方式|th|วิธีการชำระเงิน|manual
+field|付款方式|vi|Phương thức thanh toán|manual
+field|付款方式id|en|Edit Pay Type Id|manual
+field|付款信息单据体|en|Payment Entry|manual
+field|付款信息分录|en|Payment Entry|manual
+field|付款账户|en|Edit Pay Account Name|manual
+field|付款账户id|en|Edit Pay Account Id|manual
+field|附件地址|en|Attachments Url|manual
+field|附件个数|en|Attachments|manual
+field|复合半成品|de|Verbund-Halbfertig|manual
+field|复合半成品|en|Composite Semi-finished|manual
+field|复合半成品|es|Semielaborado compuesto|manual
+field|复合半成品|fr|Semi-fini composite|manual
+field|复合半成品|ja|複合半製品|manual
+field|复合半成品|ko|복합 반제품|manual
+field|复合半成品|ru|Композитный полуфабрикат|manual
+field|复合半成品|th|กึ่งสำเร็จรูปคอมโพสิต|manual
+field|复合半成品|vi|Bán thành phẩm tổng hợp|manual
+field|复合半成品|zh-TW|複合半成品|manual
+field|改善对策|en|Corrective Action|manual
+field|改善效果验证|en|Improvement Effect Verification|manual
+field|改善追踪结果|en|Improvement Tracking Result|manual
+field|钙|en|钙|manual
+field|缸内自来水VOC浓度|en|缸内自来水VOC浓度|manual
+field|高|en|Height|manual
+field|工序管控要求|en|工序管控要求|manual
+field|工序数|de|Anzahl Schritte|manual
+field|工序数|en|Step Count|manual
+field|工序数|es|N.º de pasos|manual
+field|工序数|fr|Nombre d'étapes|manual
+field|工序数|ja|工程数|manual
+field|工序数|ko|공정 수|manual
+field|工序数|ru|Кол-во операций|manual
+field|工序数|th|จำนวนขั้นตอน|manual
+field|工序数|vi|Số công đoạn|manual
+field|工序数|zh-TW|工序數|manual
+field|工艺形态|de|Prozessform|manual
+field|工艺形态|en|Process Form|manual
+field|工艺形态|es|Forma de proceso|manual
+field|工艺形态|fr|Forme de process|manual
+field|工艺形态|ja|工程形態|manual
+field|工艺形态|ko|공정 형태|manual
+field|工艺形态|ru|Форма процесса|manual
+field|工艺形态|th|รูปแบบกระบวนการ|manual
+field|工艺形态|vi|Dạng quy trình|manual
+field|工艺形态|zh-TW|製程形態|manual
+field|供应商|de|Lieferant|manual
+field|供应商|es|Proveedor|manual
+field|供应商|fr|Fournisseur|manual
+field|供应商|ja|サプライヤー|manual
+field|供应商|ko|공급업체|manual
+field|供应商|ru|Поставщик|manual
+field|供应商|th|ผู้จัดจำหน่าย|manual
+field|供应商|vi|Nhà cung cấp|manual
+field|供应商id|en|Supplier Id|manual
+field|供应商编码|de|Lieferantencode|manual
+field|供应商编码|es|Código de proveedor|manual
+field|供应商编码|fr|Code fournisseur|manual
+field|供应商编码|ja|供給業者コード|manual
+field|供应商编码|ko|공급자 코드|manual
+field|供应商编码|ru|Код поставщика|manual
+field|供应商编码|th|ผู้ผลิตรหัส|manual
+field|供应商编码|vi|Mã nhà cung cấp|manual
+field|供应商发货地址国家id|en|Contact Country Id|manual
+field|供应商发货地址国家编码|en|Contact Country Number|manual
+field|供应商发货地址国家名称|en|Contact Country Name|manual
+field|供应商发货地址区县id|en|Contact District Id|manual
+field|供应商发货地址区县编码|en|Contact District Number|manual
+field|供应商发货地址区县名称|en|Contact District Name|manual
+field|供应商发货地址省份id|en|Contact Province Id|manual
+field|供应商发货地址省份编码|en|Contact Province Number|manual
+field|供应商发货地址省份名称|en|Contact Province Name|manual
+field|供应商发货地址市区id|en|Contact City Id|manual
+field|供应商发货地址市区编码|en|Contact City Number|manual
+field|供应商发货地址市区名称|en|Contact City Name|manual
+field|供应商分类编码|en|Supplier Group Code|manual
+field|供应商简称|de|Lieferanten abkürzung|manual
+field|供应商简称|es|Abreviatura del proveedor|manual
+field|供应商简称|fr|Abréviation du fournisseur|manual
+field|供应商简称|ja|供給業者略称|manual
+field|供应商简称|ko|공급 업체 약어|manual
+field|供应商简称|ru|Аббревиатура поставщика|manual
+field|供应商简称|th|ชื่อย่อของผู้จัดจำหน่าย|manual
+field|供应商简称|vi|Tên viết tắt của nhà cung cấp|manual
+field|供应商联系人地址|en|Supplier Contact Address|manual
+field|供应商联系人手机|en|Supplier Contact Mobile|manual
+field|供应商联系人邮箱|en|Supplier Contact Email|manual
+field|供应商联系人座机|en|Supplier Contact Phone|manual
+field|供应商商品编码|en|Supp Material Number|manual
+field|供应商商品名称|en|Supp Material Name|manual
+field|供应商原因|en|Supplier Cause|manual
+field|汞标准溶液 \n1000mg/L|en|汞标准溶液 \n1000mg/L|manual
+field|关闭状态|en|Bill Close State|manual
+field|关键控制清单|de|Kritische Kontrollliste|manual
+field|关键控制清单|en|Critical Control Checklist|manual
+field|关键控制清单|es|Lista de control crítico|manual
+field|关键控制清单|fr|Liste de contrôle critique|manual
+field|关键控制清单|ja|重要管理項目チェックリスト|manual
+field|关键控制清单|ko|중요 관리 항목 체크리스트|manual
+field|关键控制清单|ru|Перечень критического контроля|manual
+field|关键控制清单|th|รายการควบคุมที่สำคัญ|manual
+field|关键控制清单|vi|Danh mục kiểm soát trọng yếu|manual
+field|关键控制清单|zh-TW|關鍵控制清單|manual
+field|关键控制清单标准库|de|Schlüsselkontrolllisten-Bibliothek|manual
+field|关键控制清单标准库|en|Key Control Checklist Library|manual
+field|关键控制清单标准库|es|Biblioteca de lista de control clave|manual
+field|关键控制清单标准库|fr|Bibliothèque de liste de contrôle clé|manual
+field|关键控制清单标准库|ja|重要管理項目リスト標準ライブラリ|manual
+field|关键控制清单标准库|ko|핵심 관리 항목 표준 라이브러리|manual
+field|关键控制清单标准库|ru|Библиотека ключевого контрольного перечня|manual
+field|关键控制清单标准库|th|ไลบรารีรายการควบคุมหลัก|manual
+field|关键控制清单标准库|vi|Thư viện danh mục kiểm soát chính|manual
+field|关键控制清单标准库|zh-TW|關鍵控制清單標準庫|manual
+field|管控要求|en|管控要求|manual
+field|灌料|en|灌料|manual
+field|灌料要求|en|Filling Requirements|manual
+field|规格|en|规格|manual
+field|规格书种类|en|规格书种类|manual
+field|国家|en|Country|manual
+field|国家-id|en|Country Id|manual
+field|国家编码|en|Country Code|manual
+field|国家-编码|en|Contact Contact Country Number|manual
+field|国家-名称|en|Contact Contact Country Name|manual
+field|含税单价|de|Einheitspreis inklusive Steuern|manual
+field|含税单价|es|Precio unitario con impuestos incluidos|manual
+field|含税单价|fr|Prix unitaire TTC|manual
+field|含税单价|ja|税込単価|manual
+field|含税单价|ko|세금 포함 단가|manual
+field|含税单价|ru|Цена за единицу с налогом|manual
+field|含税单价|th|ราคาต่อหน่วยรวมภาษี|manual
+field|含税单价|vi|Đơn giá đã bao gồm thuế|manual
+field|含税单价2|de|Steuerlicher Stückpreis 2|manual
+field|含税单价2|es|Precio unitario 2 con impuestos incluidos|manual
+field|含税单价2|fr|Prix unitaire TTC 2|manual
+field|含税单价2|ja|税込単価2|manual
+field|含税单价2|ko|세금을 포함한 단가: 2|manual
+field|含税单价2|ru|Цена за единицу, включая налог 2|manual
+field|含税单价2|th|ราคาต่อหน่วยรวมภาษี2|manual
+field|含税单价2|vi|Đơn giá đã bao gồm thuế 2|manual
+field|含税金额|de|Beträge inklusive Steuern|manual
+field|含税金额|es|Importe de impuestos incluidos|manual
+field|含税金额|fr|Montant des taxes incluses|manual
+field|含税金额|ja|税込み金額|manual
+field|含税金额|ko|세금 포함 금액|manual
+field|含税金额|ru|Сумма, включая налог|manual
+field|含税金额|th|จำนวนรวมภาษี|manual
+field|含税金额|vi|Số tiền đã bao gồm thuế|manual
+field|含税售价|de|Preis inklusive Steuern|manual
+field|含税售价|es|Precio de venta con impuestos incluidos|manual
+field|含税售价|fr|Prix Taxes inclus|manual
+field|含税售价|ja|税込み価格|manual
+field|含税售价|ko|세금 포함 가격|manual
+field|含税售价|ru|Цена, включая налог|manual
+field|含税售价|th|ราคารวมภาษี|manual
+field|含税售价|vi|Giá đã bao gồm thuế|manual
+field|含税销售金额|de|Umsatz betrag inklusive Steuern|manual
+field|含税销售金额|es|Importe de ventas con impuestos incluidos|manual
+field|含税销售金额|fr|Montant des ventes, taxes comprises|manual
+field|含税销售金额|ja|税込販売金額|manual
+field|含税销售金额|ko|세금을 포함한 판매 금액|manual
+field|含税销售金额|ru|Сумма продажи, включая налог|manual
+field|含税销售金额|th|ยอดขายรวมภาษี|manual
+field|含税销售金额|vi|Số tiền bán hàng đã bao gồm thuế|manual
+field|含税折扣额|en|Dis Tax Amount|manual
+field|含税总金额|de|Gesamtbetrag einschl ießlich Steuern|manual
+field|含税总金额|es|Importe total de impuestos incluidos|manual
+field|含税总金额|fr|Montant total des taxes incluses|manual
+field|含税总金额|ja|税込み総額|manual
+field|含税总金额|ko|세금 포함 총 금액|manual
+field|含税总金额|ru|Общая сумма, включая налог|manual
+field|含税总金额|th|รวมภาษี|manual
+field|含税总金额|vi|Tổng số tiền bao gồm thuế|manual
+field|合理损耗数量|de|Normalverlust|manual
+field|合理损耗数量|en|Reasonable loss qty|manual
+field|合理损耗数量|es|Merma razonable|manual
+field|合理损耗数量|fr|Perte raisonnable|manual
+field|合理损耗数量|ja|合理損耗数量|manual
+field|合理损耗数量|ko|정상 손모 수량|manual
+field|合理损耗数量|ru|Норма потерь|manual
+field|合理损耗数量|th|ปริมาณสูญเสียตามปกติ|manual
+field|合理损耗数量|vi|Hao hụt hợp lý|manual
+field|合理损耗数量(主单位)|de|Normalverlust (Haupteinheit)|manual
+field|合理损耗数量(主单位)|en|Reasonable loss qty (main)|manual
+field|合理损耗数量(主单位)|es|Merma razonable (principal)|manual
+field|合理损耗数量(主单位)|fr|Perte raisonnable (principale)|manual
+field|合理损耗数量(主单位)|ja|合理損耗数量(主単位)|manual
+field|合理损耗数量(主单位)|ko|정상 손모 수량(주단위)|manual
+field|合理损耗数量(主单位)|ru|Норма потерь (осн.)|manual
+field|合理损耗数量(主单位)|th|ปริมาณสูญเสียตามปกติ(หน่วยหลัก)|manual
+field|合理损耗数量(主单位)|vi|Hao hụt hợp lý (chính)|manual
+field|合同号|de|Vertragsnummer|manual
+field|合同号|es|Número de contrato|manual
+field|合同号|fr|Numéro de contrat|manual
+field|合同号|ja|契約番号|manual
+field|合同号|ko|계약 번호|manual
+field|合同号|ru|Номер контракта|manual
+field|合同号|th|หมายเลขสัญญา|manual
+field|合同号|vi|Số hợp đồng|manual
+field|合同号最新|de|Die neueste Vertrags nummer|manual
+field|合同号最新|es|Número de contrato más reciente|manual
+field|合同号最新|fr|Numéro de contrat le plus récent|manual
+field|合同号最新|ja|契約番号最新|manual
+field|合同号最新|ko|최신 계약 번호|manual
+field|合同号最新|ru|Номер контракта обновленный|manual
+field|合同号最新|th|หมายเลขสัญญาล่าสุด|manual
+field|合同号最新|vi|Số hợp đồng mới nhất|manual
+field|后压（kpa)|en|后压（kpa)|manual
+field|换算单位1|en|Conversion Unit Id1|manual
+field|换算单位2|en|Conversion Unit Id2|manual
+field|换算单位3|en|Conversion Unit Id3|manual
+field|换算公式|en|Conversion Rate|manual
+field|换算率_conversion_rate|en|Conversion Rate|manual
+field|换算率1|en|Coefficient1|manual
+field|换算率2|en|Coefficient2|manual
+field|换算率3|en|Coefficient3|manual
+field|汇率|de|Wechselkurse|manual
+field|汇率|es|Tipo de cambio|manual
+field|汇率|fr|Taux de change|manual
+field|汇率|ja|為替レート|manual
+field|汇率|ko|환율|manual
+field|汇率|ru|Обменный курс|manual
+field|汇率|th|อัตราแลกเปลี่ยน|manual
+field|汇率|vi|Tỷ giá hối đoái|manual
+field|会签人|en|Countersigners|manual
+field|会签人|ja|会簽者|manual
+field|活性氧化铝（cfu/ml）|en|活性氧化铝（cfu/ml）|manual
+field|机构|de|Institutionen|manual
+field|机构|es|Institución|manual
+field|机构|fr|Institution|manual
+field|机构|ja|機関|manual
+field|机构|ko|기관|manual
+field|机构|ru|Орган|manual
+field|机构|th|สถาบัน|manual
+field|机构|vi|Cơ quan|manual
+field|机器包布|de|Maschinenumwicklung|manual
+field|机器包布|en|Machine Wrapping|manual
+field|机器包布|es|Envoltura a máquina|manual
+field|机器包布|fr|Enrobage machine|manual
+field|机器包布|ja|機械巻布|manual
+field|机器包布|ko|기계 포장|manual
+field|机器包布|ru|Машинная обмотка|manual
+field|机器包布|th|พันผ้าด้วยเครื่อง|manual
+field|机器包布|vi|Bọc máy|manual
+field|机器包布|zh-TW|機器包布|manual
+field|机型及应用位置|en|机型及应用位置|manual
+field|基本库存数量|en|Inv Base Qty|manual
+field|级次|en|Level|manual
+field|即时库存|en|On-hand Stock|manual
+field|计划数量|de|Anzahl der Pläne|manual
+field|计划数量|es|Cantidad de planes|manual
+field|计划数量|fr|Nombre de plans|manual
+field|计划数量|ja|計画数量|manual
+field|计划数量|ko|계획된 수량|manual
+field|计划数量|ru|Количество планов|manual
+field|计划数量|th|จำนวนแผน|manual
+field|计划数量|vi|Số lượng kế hoạch|manual
+field|计量单位(辅单位)|de|ME (Hilfseinheit)|manual
+field|计量单位(辅单位)|en|UOM (aux)|manual
+field|计量单位(辅单位)|es|UM (aux)|manual
+field|计量单位(辅单位)|fr|UU (aux)|manual
+field|计量单位(辅单位)|ja|計量単位(補助)|manual
+field|计量单位(辅单位)|ko|계량단위(보조)|manual
+field|计量单位(辅单位)|ru|Ед. изм. (всп.)|manual
+field|计量单位(辅单位)|th|หน่วยวัด(หน่วยรอง)|manual
+field|计量单位(辅单位)|vi|ĐVT (phụ)|manual
+field|计量单位2|de|Maßeinheit 2|manual
+field|计量单位2|es|Unidad de medida 2|manual
+field|计量单位2|fr|Unité de mesure 2|manual
+field|计量单位2|ja|計量単位2|manual
+field|计量单位2|ko|측정 단위 2|manual
+field|计量单位2|ru|Единицы измерения 2|manual
+field|计量单位2|th|หน่วยวัด2|manual
+field|计量单位2|vi|Đơn vị đo lường 2|manual
+field|计量单位组合|de|Kombination von Maßeinheiten|manual
+field|计量单位组合|es|Combinación de unidades de medida|manual
+field|计量单位组合|fr|Combinaison d'unités de mesure|manual
+field|计量单位组合|ja|計量単位の組み合わせ|manual
+field|计量单位组合|ko|측정 단위의 조합|manual
+field|计量单位组合|ru|Комбинация единиц измерения|manual
+field|计量单位组合|th|การรวมกันของหน่วยวัด|manual
+field|计量单位组合|vi|Tổ hợp đơn vị đo lường|manual
+field|技术目标达成|de|Technisches Ziel erreicht|manual
+field|技术目标达成|en|Technical Goal Achieved|manual
+field|技术目标达成|es|Objetivo técnico alcanzado|manual
+field|技术目标达成|fr|Objectif technique atteint|manual
+field|技术目标达成|ja|技術目標達成|manual
+field|技术目标达成|ko|기술 목표 달성|manual
+field|技术目标达成|ru|Техническая цель достигнута|manual
+field|技术目标达成|th|บรรลุเป้าหมายทางเทคนิค|manual
+field|技术目标达成|vi|Đạt mục tiêu kỹ thuật|manual
+field|技术目标达成|zh-TW|技術目標達成|manual
+field|加标方式|en|加标方式|manual
+field|加标水配置|en|加标水配置|manual
+field|加标水烧开后硬度H1|en|加标水烧开后硬度H1|manual
+field|加标水硬度H0|en|加标水硬度H0|manual
+field|加工单号|de|Verarbeitung bestellnummer|manual
+field|加工单号|es|Número de orden de procesamiento|manual
+field|加工单号|fr|Numéro de traitement|manual
+field|加工单号|ko|작업 명령 번호|manual
+field|加工单号|ru|Номер обработки|manual
+field|加工单号|th|หมายเลขคำสั่งซื้อ|manual
+field|加工单号|vi|Số đơn chế biến|manual
+field|加工单数|de|Fertigungsaufträge|manual
+field|加工单数|en|Work order count|manual
+field|加工单数|es|N.º órdenes|manual
+field|加工单数|fr|Nb ordres|manual
+field|加工单数|ja|加工伝票数|manual
+field|加工单数|ko|가공 전표 수|manual
+field|加工单数|ru|Кол-во заказов|manual
+field|加工单数|th|จำนวนใบสั่งผลิต|manual
+field|加工单数|vi|Số lệnh gia công|manual
+field|加工类型|de|Art der Verarbeitung|manual
+field|加工类型|es|Tipo de procesamiento|manual
+field|加工类型|fr|Type de traitement|manual
+field|加工类型|ja|加工タイプ|manual
+field|加工类型|ko|처리 유형|manual
+field|加工类型|ru|Тип обработки|manual
+field|加工类型|th|ประเภทการประมวลผล|manual
+field|加工类型|vi|Loại hình gia công|manual
+field|钾|en|钾|manual
+field|价格单位|en|Price UOM|manual
+field|价格等级-id|en|C Level Id|manual
+field|价格等级编码|en|Price Level Code|manual
+field|价税合计本位币|en|All Amount For|manual
+field|检测人|en|Tester|manual
+field|检测仪器|en|检测仪器|manual
+field|检查频率|de|Prüfhäufigkeit|manual
+field|检查频率|en|Check Frequency|manual
+field|检查频率|es|Frecuencia de comprobación|manual
+field|检查频率|fr|Fréquence de vérification|manual
+field|检查频率|ja|検査頻度|manual
+field|检查频率|ko|검사 빈도|manual
+field|检查频率|ru|Частота проверки|manual
+field|检查频率|th|ความถี่ในการตรวจสอบ|manual
+field|检查频率|vi|Tần suất kiểm tra|manual
+field|检查频率|zh-TW|檢查頻率|manual
+field|检出限（PH）|en|检出限（PH）|manual
+field|检出限（TDS）|en|检出限（TDS）|manual
+field|检出限（重金属）|en|检出限（重金属）|manual
+field|检出限（浊度）|en|检出限（浊度）|manual
+field|检验|en|检验|manual
+field|检验工站|en|Inspection Station|manual
+field|检验类别|en|检验类别|manual
+field|检验项目|zh-TW|檢驗項目|manual
+field|检验要求|de|Prüfanforderung|manual
+field|检验要求|es|Requisito de inspección|manual
+field|检验要求|fr|Exigence d'inspection|manual
+field|检验要求|ja|検査要件|manual
+field|检验要求|ko|검사 요구사항|manual
+field|检验要求|ru|Требование контроля|manual
+field|检验要求|th|ข้อกำหนดการตรวจสอบ|manual
+field|检验要求|vi|Yêu cầu kiểm tra|manual
+field|检验要求|zh-TW|檢驗要求|manual
+field|建议供应商|de|Anbieter beraten|manual
+field|建议供应商|es|Recomendar proveedores|manual
+field|建议供应商|fr|Recommander les fournisseurs|manual
+field|建议供应商|ja|仕入先を提案する|manual
+field|建议供应商|ko|공급 업체 권장 사항|manual
+field|建议供应商|ru|Рекомендуемые поставщики|manual
+field|建议供应商|th|ซัพพลายเออร์ที่แนะนำ|manual
+field|建议供应商|vi|Đề xuất nhà cung cấp|manual
+field|建议供应商编码|de|Empfohlene Lieferanten codierung|manual
+field|建议供应商编码|es|Se recomienda la codificación del proveedor|manual
+field|建议供应商编码|fr|Recommande le codage des fournisseurs|manual
+field|建议供应商编码|ja|推奨仕入先コード|manual
+field|建议供应商编码|ko|권장 공급 업체 코드|manual
+field|建议供应商编码|ru|Рекомендуемые коды поставщиков|manual
+field|建议供应商编码|th|แนะนำการเข้ารหัสซัพพลายเออร์|manual
+field|建议供应商编码|vi|Đề xuất mã hóa nhà cung cấp|manual
+field|建议供应商简称|de|Empfohlene Lieferanten abkürzung|manual
+field|建议供应商简称|es|Recomienda abreviatura de proveedor|manual
+field|建议供应商简称|fr|Abréviation du fournisseur recommandée|manual
+field|建议供应商简称|ja|推奨仕入先略称|manual
+field|建议供应商简称|ko|추천 공급 업체 약어|manual
+field|建议供应商简称|ru|Наименование рекомендуемого поставщика|manual
+field|建议供应商简称|th|ตัวย่อซัพพลายเออร์ที่แนะนำ|manual
+field|建议供应商简称|vi|Đề xuất nhà cung cấp viết tắt|manual
+field|交货方式|en|Delivery Type|manual
+field|交货方式id|en|Delivery Type Id|manual
+field|交货方式id,6-物流发货，8-车辆配送，9-客户自提|en|Delivery Type Id|manual
+field|交货方式编码|en|Delivery Type Number|manual
+field|交易类型|en|Trans Type|manual
+field|阶段1|en|阶段1|manual
+field|阶段1_计划开始|en|阶段1_计划开始|manual
+field|阶段1_计划内容|en|阶段1_计划内容|manual
+field|阶段1_计划完成|en|阶段1_计划完成|manual
+field|阶段1_实际完成|en|阶段1_实际完成|manual
+field|阶段1_责任人|en|阶段1_责任人|manual
+field|阶段10|en|阶段10|manual
+field|阶段10_计划开始|en|阶段10_计划开始|manual
+field|阶段10_计划内容|en|阶段10_计划内容|manual
+field|阶段10_计划完成|en|阶段10_计划完成|manual
+field|阶段10_实际完成|en|阶段10_实际完成|manual
+field|阶段10_责任人|en|阶段10_责任人|manual
+field|阶段2|en|阶段2|manual
+field|阶段2_计划开始|en|阶段2_计划开始|manual
+field|阶段2_计划内容|en|阶段2_计划内容|manual
+field|阶段2_计划完成|en|阶段2_计划完成|manual
+field|阶段2_实际完成|en|阶段2_实际完成|manual
+field|阶段2_责任人|en|阶段2_责任人|manual
+field|阶段3|en|阶段3|manual
+field|阶段3_计划开始|en|阶段3_计划开始|manual
+field|阶段3_计划内容|en|阶段3_计划内容|manual
+field|阶段3_计划完成|en|阶段3_计划完成|manual
+field|阶段3_实际完成|en|阶段3_实际完成|manual
+field|阶段3_责任人|en|阶段3_责任人|manual
+field|阶段4|en|阶段4|manual
+field|阶段4_计划开始|en|阶段4_计划开始|manual
+field|阶段4_计划内容|en|阶段4_计划内容|manual
+field|阶段4_计划完成|en|阶段4_计划完成|manual
+field|阶段4_实际完成|en|阶段4_实际完成|manual
+field|阶段4_责任人|en|阶段4_责任人|manual
+field|阶段5|en|阶段5|manual
+field|阶段5_计划开始|en|阶段5_计划开始|manual
+field|阶段5_计划内容|en|阶段5_计划内容|manual
+field|阶段5_计划完成|en|阶段5_计划完成|manual
+field|阶段5_实际完成|en|阶段5_实际完成|manual
+field|阶段5_责任人|en|阶段5_责任人|manual
+field|阶段6|en|阶段6|manual
+field|阶段6_计划开始|en|阶段6_计划开始|manual
+field|阶段6_计划内容|en|阶段6_计划内容|manual
+field|阶段6_计划完成|en|阶段6_计划完成|manual
+field|阶段6_实际完成|en|阶段6_实际完成|manual
+field|阶段6_责任人|en|阶段6_责任人|manual
+field|阶段7|en|阶段7|manual
+field|阶段7_计划开始|en|阶段7_计划开始|manual
+field|阶段7_计划内容|en|阶段7_计划内容|manual
+field|阶段7_计划完成|en|阶段7_计划完成|manual
+field|阶段7_实际完成|en|阶段7_实际完成|manual
+field|阶段7_责任人|en|阶段7_责任人|manual
+field|阶段8|en|阶段8|manual
+field|阶段8_计划开始|en|阶段8_计划开始|manual
+field|阶段8_计划内容|en|阶段8_计划内容|manual
+field|阶段8_计划完成|en|阶段8_计划完成|manual
+field|阶段8_实际完成|en|阶段8_实际完成|manual
+field|阶段8_责任人|en|阶段8_责任人|manual
+field|阶段9|en|阶段9|manual
+field|阶段9_计划开始|en|阶段9_计划开始|manual
+field|阶段9_计划内容|en|阶段9_计划内容|manual
+field|阶段9_计划完成|en|阶段9_计划完成|manual
+field|阶段9_实际完成|en|阶段9_实际完成|manual
+field|阶段9_责任人|en|阶段9_责任人|manual
+field|结案|en|Closed|manual
+field|结算客户id|en|Settle Customer Id|manual
+field|结算客户编码|en|Settle Customer Code|manual
+field|结算类型id|en|Settle Type Id|manual
+field|结算期限|de|Zahlungsziel|manual
+field|结算期限|en|Settlement Term|manual
+field|结算期限|es|Plazo de liquidación|manual
+field|结算期限|fr|Délai de règlement|manual
+field|结算期限|ja|支払条件|manual
+field|结算期限|ko|결제 조건|manual
+field|结算期限|ru|Условия расчета|manual
+field|结算期限|th|ระยะเวลาชำระ|manual
+field|结算期限|vi|Kỳ hạn thanh toán|manual
+field|结算期限id|en|Setting Term Id|manual
+field|结算期限编码|en|Settlement Term Code|manual
+field|结算日期|en|Due Date|manual
+field|结算账户id|en|Settle Bank Id|manual
+field|结算状态|en|Settle Status|manual
+field|紧急程度|en|Urgency|manual
+field|紧急放行原因|en|Emergency Release Reason|manual
+field|进项税率|en|Input Tax Rate|manual
+field|浸泡30min|en|浸泡30min|manual
+field|浸泡30min煮沸晾凉|en|浸泡30min煮沸晾凉|manual
+field|浸泡水配置|en|浸泡水配置|manual
+field|浸泡液用量（1）ml|en|浸泡液用量（1）ml|manual
+field|浸泡液用量（2）ml|en|浸泡液用量（2）ml|manual
+field|浸泡液用量（3）ml|en|浸泡液用量（3）ml|manual
+field|经手人|de|Behandler|manual
+field|经手人|es|Hombre de la mano|manual
+field|经手人|fr|Homme de main|manual
+field|经手人|ja|取扱人|manual
+field|经手人|ko|담당자|manual
+field|经手人|ru|Человек|manual
+field|经手人|th|คนจัดการ|manual
+field|经手人|vi|Người thụ lý|manual
+field|经手人编码|de|Sachbearbeitercode|manual
+field|经手人编码|es|Código responsable|manual
+field|经手人编码|fr|Code responsable|manual
+field|经手人编码|ko|담당자 코드|manual
+field|经手人编码|ru|Код ответственного|manual
+field|经手人编码|th|รหัสผู้รับผิดชอบ|manual
+field|经手人编码|vi|Mã người xử lý|manual
+field|精度处理|en|Precision Handling|manual
+field|净重|en|Net Weight|manual
+field|开发复杂度|de|Entwicklungskomplexität|manual
+field|开发复杂度|en|Development Complexity|manual
+field|开发复杂度|es|Complejidad de desarrollo|manual
+field|开发复杂度|fr|Complexité de développement|manual
+field|开发复杂度|ja|開発複雑度|manual
+field|开发复杂度|ko|개발 복잡도|manual
+field|开发复杂度|ru|Сложность разработки|manual
+field|开发复杂度|th|ความซับซ้อนในการพัฒนา|manual
+field|开发复杂度|vi|Độ phức tạp phát triển|manual
+field|开发复杂度|zh-TW|開發複雜度|manual
+field|开发周期要求|en|开发周期要求|manual
+field|开工日期|de|Datum des Baus|manual
+field|开工日期|es|Fecha de inicio|manual
+field|开工日期|fr|Date de début|manual
+field|开工日期|ja|着工日|manual
+field|开工日期|ko|건설 시작 날짜|manual
+field|开工日期|ru|Дата начала|manual
+field|开工日期|th|วันที่เริ่มต้น|manual
+field|开工日期|vi|Ngày bắt đầu|manual
+field|开户地址|en|Bank Address|manual
+field|开户行|en|Bank|manual
+field|开票名称|en|Invoice Name|manual
+field|开票状态|en|Ivc Status|manual
+field|抗压强度|en|抗压强度|manual
+field|可溶性铅|en|可溶性铅|manual
+field|可用库存|en|Available Stock|manual
+field|可用量|de|Ersetzbare Dosierung|manual
+field|可用量|es|Dosificación disponible|manual
+field|可用量|fr|Dosage disponible|manual
+field|可用量|ja|使用可能量|manual
+field|可用量|ko|사용 가능한 수량|manual
+field|可用量|ru|Дозировка|manual
+field|可用量|th|ปริมาณที่ใช้ได้|manual
+field|可用量|vi|Lượng có thể sử dụng|manual
+field|客户|de|Kunde|manual
+field|客户|es|Cliente|manual
+field|客户|fr|Client|manual
+field|客户|ja|顧客|manual
+field|客户|ko|고객|manual
+field|客户|ru|Клиент|manual
+field|客户|th|ลูกค้า|manual
+field|客户|vi|Khách hàng|manual
+field|客户id|en|Customer Id|manual
+field|客户编码|de|Kundennummer|manual
+field|客户编码|es|Código del cliente|manual
+field|客户编码|fr|Code client|manual
+field|客户编码|ja|顧客コード|manual
+field|客户编码|ko|고객 코드|manual
+field|客户编码|ru|Код клиента|manual
+field|客户编码|th|รหัสลูกค้า|manual
+field|客户编码|vi|Mã khách hàng|manual
+field|客户承担费用单据体|en|Cus Bear Fee Entry|manual
+field|客户承担费用分录|en|Cus Bear Fee Entry|manual
+field|客户单号|en|Cus Bill No|manual
+field|客户订单号|en|Cus Bill No|manual
+field|客户分类编码|en|Customer Group Code|manual
+field|客户国家id|en|Contact Country Id|manual
+field|客户国家编码|en|Contact Country Number|manual
+field|客户国家名称|en|Contact Country Name|manual
+field|客户简称|de|Kunden abkürzung|manual
+field|客户简称|es|Abreviatura del cliente|manual
+field|客户简称|fr|Abréviation du client|manual
+field|客户简称|ja|顧客略称|manual
+field|客户简称|ko|고객 약어|manual
+field|客户简称|ru|Аббревиатура клиента|manual
+field|客户简称|th|คำย่อของลูกค้า|manual
+field|客户简称|vi|Tên viết tắt của khách hàng|manual
+field|客户联系电话|en|Contact Phone|manual
+field|客户料号|de|Kunden-Teilenr.|manual
+field|客户料号|es|N.º de cliente|manual
+field|客户料号|fr|Réf. client|manual
+field|客户料号|ja|顧客品番|manual
+field|客户料号|ko|고객 품번|manual
+field|客户料号|ru|Артикул клиента|manual
+field|客户料号|th|รหัสลูกค้า|manual
+field|客户料号|vi|Mã khách hàng|manual
+field|客户料号|zh-TW|客戶料號|manual
+field|客户名|en|客户名|manual
+field|客户名称|zh-TW|客戶名稱|manual
+field|客户区县id|en|Contact District Id|manual
+field|客户区县编码|en|Contact District Number|manual
+field|客户区县名称|en|Contact District Name|manual
+field|客户省份id|en|Contact Province Id|manual
+field|客户省份编码|en|Contact Province Number|manual
+field|客户省份名称|en|Contact Province Name|manual
+field|客户市区id|en|Contact City Id|manual
+field|客户市区编码|en|Contact City Number|manual
+field|客户市区名称|en|Contact City Name|manual
+field|客户图纸或规格书|en|客户图纸或规格书|manual
+field|客户项目代号|de|Kundenprojektcode|manual
+field|客户项目代号|en|Customer Project Code|manual
+field|客户项目代号|es|Código de proyecto del cliente|manual
+field|客户项目代号|fr|Code projet client|manual
+field|客户项目代号|ja|顧客プロジェクトコード|manual
+field|客户项目代号|ko|고객 프로젝트 코드|manual
+field|客户项目代号|ru|Код проекта клиента|manual
+field|客户项目代号|th|รหัสโครงการลูกค้า|manual
+field|客户项目代号|vi|Mã dự án khách hàng|manual
+field|客户项目代号|zh-TW|客戶專案代號|manual
+field|客户项目名称|de|Kundenprojektname|manual
+field|客户项目名称|en|Customer Project Name|manual
+field|客户项目名称|es|Nombre del proyecto del cliente|manual
+field|客户项目名称|fr|Nom du projet client|manual
+field|客户项目名称|ja|顧客プロジェクト名|manual
+field|客户项目名称|ko|고객 프로젝트명|manual
+field|客户项目名称|ru|Название проекта клиента|manual
+field|客户项目名称|th|ชื่อโครงการของลูกค้า|manual
+field|客户项目名称|vi|Tên dự án khách hàng|manual
+field|客户项目名称|zh-TW|客戶專案名稱|manual
+field|库存单位|en|Store Unit Id|manual
+field|库存管理方式|en|Inventory Mode|manual
+field|来料客户|de|Eingangskunde|manual
+field|来料客户|es|Cliente de entrada|manual
+field|来料客户|fr|Client d'entrée|manual
+field|来料客户|ja|着荷客先|manual
+field|来料客户|ko|입고 거래처|manual
+field|来料客户|ru|Клиент-поставщик|manual
+field|来料客户|th|ลูกค้าที่ส่งเข้า|manual
+field|来料客户|vi|Khách hàng gửi đến|manual
+field|来源单据|de|Quellen belege|manual
+field|来源单据|es|Documentos de origen|manual
+field|来源单据|fr|Sources des documents|manual
+field|来源单据|ko|소스 문서|manual
+field|来源单据|ru|Исходный документ|manual
+field|来源单据|th|เอกสารแหล่งที่มา|manual
+field|来源单据|vi|Chứng từ nguồn|manual
+field|类别|de|Kategorie|manual
+field|类别|es|Categoría|manual
+field|类别|fr|Catégorie|manual
+field|类别|ja|区分|manual
+field|类别|ko|구분|manual
+field|类别|ru|Категория|manual
+field|类别|th|ประเภท|manual
+field|类别|vi|Loại|manual
+field|类别-id|en|Group Id|manual
+field|累计调拨入库量|de|Kum. Umbuchungseingang|manual
+field|累计调拨入库量|en|Cum. transfer-in qty|manual
+field|累计调拨入库量|es|Traslado acumulado|manual
+field|累计调拨入库量|fr|Transfert cumulé|manual
+field|累计调拨入库量|ja|累計振替入庫量|manual
+field|累计调拨入库量|ko|누적 이동 입고량|manual
+field|累计调拨入库量|ru|Накопленный трансферт|manual
+field|累计调拨入库量|th|ปริมาณโอนเข้าสะสม|manual
+field|累计调拨入库量|vi|Lũy kế chuyển nhập|manual
+field|累计调拨入库量(主单位)|de|Kum. Umbuchungseingang (Haupteinheit)|manual
+field|累计调拨入库量(主单位)|en|Cum. transfer-in qty (main)|manual
+field|累计调拨入库量(主单位)|es|Traslado acumulado (principal)|manual
+field|累计调拨入库量(主单位)|fr|Transfert cumulé (principal)|manual
+field|累计调拨入库量(主单位)|ja|累計振替入庫量(主単位)|manual
+field|累计调拨入库量(主单位)|ko|누적 이동 입고량(주단위)|manual
+field|累计调拨入库量(主单位)|ru|Накопленный трансфер (осн.)|manual
+field|累计调拨入库量(主单位)|th|ปริมาณโอนเข้าสะสม(หน่วยหลัก)|manual
+field|累计调拨入库量(主单位)|vi|Lũy kế chuyển nhập (chính)|manual
+field|累计汇报数量|de|Kumulative Anzahl der Melde|manual
+field|累计汇报数量|es|Número acumulado de informes|manual
+field|累计汇报数量|fr|Nombre cumulé de rapports|manual
+field|累计汇报数量|ja|累計報告数量|manual
+field|累计汇报数量|ko|누적 보고 수량|manual
+field|累计汇报数量|ru|Совокупная отчетность|manual
+field|累计汇报数量|th|จำนวนรายงานสะสม|manual
+field|累计汇报数量|vi|Số lượng báo cáo tích lũy|manual
+field|累计汇报套数(工序单位)|de|Kumulative Berichts sätze (Prozess einheiten)|manual
+field|累计汇报套数(工序单位)|es|Número acumulado de conjuntos de informes (unidad de proceso)|manual
+field|累计汇报套数(工序单位)|fr|Nombre cumulé d'ensembles de rapports (unités de processus)|manual
+field|累计汇报套数(工序单位)|ja|累積報告セット数 (工程単位)|manual
+field|累计汇报套数(工序单位)|ko|누적보고 된 단위 (프로세스 단계당)|manual
+field|累计汇报套数(工序单位)|ru|Совокупное количество единиц отчетности (единица обработки)|manual
+field|累计汇报套数(工序单位)|th|จำนวนชุดรายงานสะสม (หน่วยกระบวนการ)|manual
+field|累计汇报套数(工序单位)|vi|Số lượng bộ báo cáo tích lũy (đơn vị quy trình)|manual
+field|累计进水（L）|en|累计进水（L）|manual
+field|累计流量（L）|en|累计流量（L）|manual
+field|累计流量L|en|累计流量L|manual
+field|累计预付|en|Total Pre Settle Amount|manual
+field|累计预付本位币|en|Total Pre Settle Amount For|manual
+field|累计预收|en|Total Pre Settle Amount|manual
+field|累计预收状态|en|Total Pre Settle Status|manual
+field|冷却|en|冷却|manual
+field|冷却参数设置|en|冷却参数设置|manual
+field|离职日期|en|Leave Date|manual
+field|里程完成|en|里程完成|manual
+field|理论水分|en|理论水分|manual
+field|立项背景|en|立项背景|manual
+field|立项日期|de|Startdatum|manual
+field|立项日期|en|Initiation Date|manual
+field|立项日期|es|Fecha de inicio|manual
+field|立项日期|fr|Date de lancement|manual
+field|立项日期|ja|立上げ日|manual
+field|立项日期|ko|착수일|manual
+field|立项日期|ru|Дата открытия|manual
+field|立项日期|th|วันที่เริ่มโครงการ|manual
+field|立项日期|vi|Ngày khởi tạo|manual
+field|立项日期|zh-TW|立項日期|manual
+field|联系地址|en|Contact Address|manual
+field|联系人|en|Contact|manual
+field|联系人QQ|en|Contact QQ|manual
+field|联系人创建时间|en|Contact Create Time Contact|manual
+field|联系人地址|en|Contact Address|manual
+field|联系人电话|en|Contact Phone|manual
+field|联系人国家id|en|Contact Country Id|manual
+field|联系人国家-id|en|Contact Contact Country Id|manual
+field|联系人国家编码|en|Contact Country Number|manual
+field|联系人国家名称|en|Contact Country Name|manual
+field|联系人区-id|en|Contact Contact District Id|manual
+field|联系人区县id|en|Contact District Id|manual
+field|联系人区县编码|en|Contact District Number|manual
+field|联系人区县名称|en|Contact District Name|manual
+field|联系人生日|en|Contact Birthday|manual
+field|联系人省-id|en|Contact Contact Province Id|manual
+field|联系人省份id|en|Contact Province Id|manual
+field|联系人省份编码|en|Contact Province Number|manual
+field|联系人省份名称|en|Contact Province Name|manual
+field|联系人市-id|en|Contact Contact City Id|manual
+field|联系人市区id|en|Contact City Id|manual
+field|联系人市区编码|en|Contact City Number|manual
+field|联系人市区名称|en|Contact City Name|manual
+field|联系人手机|en|Contact Mobile|manual
+field|联系人微信|en|Contact WeChat|manual
+field|联系人性别|en|Contact Gender|manual
+field|联系人序号|en|Contact Seq|manual
+field|联系人邮箱|en|Contact Email|manual
+field|联系人座机|en|Contact Phone|manual
+field|联系信息|en|Contact Info|manual
+field|联系信息-联系方式|en|Contact Phone|manual
+field|领用人|de|Person|manual
+field|领用人|es|Aescogador|manual
+field|领用人|fr|Utiliseur|manual
+field|领用人|ko|항목의 사용자|manual
+field|领用人|ru|Получи|manual
+field|领用人|th|ผู้รับมอบ|manual
+field|领用人|vi|Người nhận dụng cụ|manual
+field|领用人编码|de|Entnehmercode|manual
+field|领用人编码|en|Picker code|manual
+field|领用人编码|es|Código receptor|manual
+field|领用人编码|fr|Code préleveur|manual
+field|领用人编码|ja|受領者コード|manual
+field|领用人编码|ko|수령인 코드|manual
+field|领用人编码|ru|Код получателя|manual
+field|领用人编码|th|รหัสผู้รับ|manual
+field|领用人编码|vi|Mã người lĩnh|manual
+field|流速（L/min)样品1|en|流速（L/min)样品1|manual
+field|流速（L/min)样品2|en|流速（L/min)样品2|manual
+field|流速（L/min)样品3|en|流速（L/min)样品3|manual
+field|流速（L/min)样品4|en|流速（L/min)样品4|manual
+field|流速（L/min)样品5|en|流速（L/min)样品5|manual
+field|流速（L/min)样品6|en|流速（L/min)样品6|manual
+field|硫酸镁|en|硫酸镁|manual
+field|滤芯/炭棒规格或结构|en|滤芯/炭棒规格或结构|manual
+field|滤芯出水PH|en|滤芯出水PH|manual
+field|滤芯出水TDS|en|滤芯出水TDS|manual
+field|氯化钠（g）|en|氯化钠（g）|manual
+field|裸棒|de|Nacktstab|manual
+field|裸棒|en|Bare Rod|manual
+field|裸棒|es|Varilla desnuda|manual
+field|裸棒|fr|Bâton nu|manual
+field|裸棒|ja|裸棒|manual
+field|裸棒|ko|생탄소봉|manual
+field|裸棒|ru|Голый стержень|manual
+field|裸棒|th|แท่งเปล่า|manual
+field|裸棒|vi|Thanh trần|manual
+field|裸棒|zh-TW|裸棒|manual
+field|毛重|en|Gross Weight|manual
+field|镁|en|镁|manual
+field|门店|de|Laden|manual
+field|门店|es|Tienda|manual
+field|门店|fr|Magasins|manual
+field|门店|ja|店舗|manual
+field|门店|ko|상점|manual
+field|门店|ru|Магазин|manual
+field|门店|th|ร้านค้า|manual
+field|门店|vi|Cửa hàng|manual
+field|密度|en|密度|manual
+field|密度管控|en|密度管控|manual
+field|密级|de|Vertraulichkeitsstufe|manual
+field|密级|en|密级|manual
+field|密级|es|Nivel de confidencialidad|manual
+field|密级|fr|Niveau de confidentialité|manual
+field|密级|ja|機密区分|manual
+field|密级|ko|기밀 등급|manual
+field|密级|ru|Уровень конфиденциальности|manual
+field|密级|th|ระดับความลับ|manual
+field|密级|vi|Cấp độ bảo mật|manual
+field|密级|zh-TW|密級|manual
+field|明细.生产车间|de|Position.Fertigungsbereich|manual
+field|明细.生产车间|en|Workshop (line)|manual
+field|明细.生产车间|es|Línea. Taller|manual
+field|明细.生产车间|fr|Ligne. Atelier|manual
+field|明细.生产车间|ja|明細.生産車間|manual
+field|明细.生产车间|ko|명세.생산작업장|manual
+field|明细.生产车间|ru|Строка. Цех|manual
+field|明细.生产车间|th|รายการ.แผนกผลิต|manual
+field|明细.生产车间|vi|Dòng. Xưởng sản xuất|manual
+field|明细备注|de|Details|manual
+field|明细备注|es|Observaciones detalladas|manual
+field|明细备注|fr|Remarques détaillées|manual
+field|明细备注|ko|세부 비고|manual
+field|明细备注|ru|Сметные примечания|manual
+field|明细备注|th|หมายเหตุรายละเอียด|manual
+field|明细备注|vi|Ghi chú chi tiết|manual
+field|模具尺寸|en|Mold Size|manual
+field|膜前压（MPa）|en|膜前压（MPa）|manual
+field|默认仓库|en|Default Warehouse|manual
+field|默认仓库_stock_id|en|Stock Id|manual
+field|默认仓库编码|en|Default Warehouse Code|manual
+field|默认仓位|en|Space Id|manual
+field|默认供应商|en|Vender Id|manual
+field|默认生产车间id|en|Product Department Id|manual
+field|默认生产车间编码|en|Default Workshop Code|manual
+field|内部原因|en|Internal Cause|manual
+field|内径(mm)|de|Innendurchmesser (mm)|manual
+field|内径(mm)|en|Inner dia. (mm)|manual
+field|内径(mm)|es|Diám. interior (mm)|manual
+field|内径(mm)|fr|Diam. intérieur (mm)|manual
+field|内径(mm)|ja|内径(mm)|manual
+field|内径(mm)|ko|내경(mm)|manual
+field|内径(mm)|ru|Внутр. диаметр (мм)|manual
+field|内径(mm)|th|เส้นผ่านศูนย์กลางใน (มม.)|manual
+field|内径(mm)|vi|Đường kính trong (mm)|manual
+field|内径(mm)|zh-TW|內徑(mm)|manual
+field|内容|de|Inhalt|manual
+field|内容|en|内容|manual
+field|内容|es|Contenido|manual
+field|内容|fr|Contenu|manual
+field|内容|ja|内容|manual
+field|内容|ko|내용|manual
+field|内容|ru|Содержание|manual
+field|内容|th|เนื้อหา|manual
+field|内容|vi|Nội dung|manual
+field|内容|zh-TW|內容|manual
+field|钠|en|钠|manual
+field|派工单数|de|Dispositionen|manual
+field|派工单数|en|Dispatch count|manual
+field|派工单数|es|N.º asignaciones|manual
+field|派工单数|fr|Nb affectations|manual
+field|派工单数|ja|派工伝票数|manual
+field|派工单数|ko|작업지시 수|manual
+field|派工单数|ru|Кол-во нарядов|manual
+field|派工单数|th|จำนวนใบสั่งงาน|manual
+field|派工单数|vi|Số phiếu điều phối|manual
+field|派工加工状态|de|Verarbeitung status|manual
+field|派工加工状态|es|Estado de procesamiento de despacho|manual
+field|派工加工状态|fr|État de traitement des travailleurs|manual
+field|派工加工状态|ja|派遣加工ステータス|manual
+field|派工加工状态|ko|작업 순서 처리 상태|manual
+field|派工加工状态|ru|Статус обработки отправки|manual
+field|派工加工状态|th|จัดส่งสถานะการประมวลผล|manual
+field|派工加工状态|vi|Tình trạng xử lý công việc|manual
+field|派工数量|de|Anzahl der versandten Mitarbeiter|manual
+field|派工数量|es|Número de trabajadores enviados|manual
+field|派工数量|fr|Nombre de travailleurs envoyés|manual
+field|派工数量|ja|派遣数量|manual
+field|派工数量|ko|파견량|manual
+field|派工数量|ru|Количество отправленных работников|manual
+field|派工数量|th|จำนวนการจัดส่ง|manual
+field|派工数量|vi|Số lượng phân công công việc|manual
+field|配方|en|配方|manual
+field|配方/工艺|en|配方/工艺|manual
+field|配水量\n（L）|en|配水量\n（L）|manual
+field|配送价|en|Distribution Price|manual
+field|配送路线分录|en|Vrp Entity|manual
+field|配置用水|en|配置用水|manual
+field|批发价|en|Wholesale Price|manual
+field|批准/日期|de|Genehmigt / Datum|manual
+field|批准/日期|es|Aprobado / Fecha|manual
+field|批准/日期|fr|Approuvé / Date|manual
+field|批准/日期|ja|承認/日付|manual
+field|批准/日期|ko|승인/일자|manual
+field|批准/日期|ru|Утвердил / Дата|manual
+field|批准/日期|th|อนุมัติ / วันที่|manual
+field|批准/日期|vi|Phê duyệt / Ngày|manual
+field|批准/日期|zh-TW|批准/日期|manual
+field|批准日期|en|批准日期|manual
+field|匹配来源单号|de|Abgleichen Sie die Quellen nummer|manual
+field|匹配来源单号|es|Coincidir con el número de orden de origen|manual
+field|匹配来源单号|fr|Correspondance avec le numéro de source|manual
+field|匹配来源单号|ko|소스 주문 번호 일치|manual
+field|匹配来源单号|ru|Соответствие номера источника|manual
+field|匹配来源单号|th|จับคู่หมายเลขแหล่งที่มา|manual
+field|匹配来源单号|vi|Số nguồn phù hợp|manual
+field|品牌id|en|Brand Id|manual
+field|品牌编码|en|Brand Code|manual
+field|品牌型号（PH）|en|品牌型号（PH）|manual
+field|品牌型号（TDS）|en|品牌型号（TDS）|manual
+field|品牌型号（重金属）|en|品牌型号（重金属）|manual
+field|品牌型号（浊度）|en|品牌型号（浊度）|manual
+field|品质部意见|en|QC Opinion|manual
+field|凭证字号|de|Gutschein größe|manual
+field|凭证字号|es|Número de cupón|manual
+field|凭证字号|fr|Numéro de police du bon|manual
+field|凭证字号|ja|証憑サイズ|manual
+field|凭证字号|ko|바우처 번호|manual
+field|凭证字号|ru|Номер ваучера|manual
+field|凭证字号|th|ขนาดตัวอักษรบัตรกำนัล|manual
+field|凭证字号|vi|Số hiệu chứng từ|manual
+field|期望完成日期|en|Expected Date|manual
+field|齐套数量(主)|de|Anzahl der Sätze (Haupt)|manual
+field|齐套数量(主)|es|Cantidad de conjunto (principal)|manual
+field|齐套数量(主)|fr|Quantité d'ensembles (principal)|manual
+field|齐套数量(主)|ja|セット数 (メイン)|manual
+field|齐套数量(主)|ko|완전한 세트 수량 (메인)|manual
+field|齐套数量(主)|ru|Количество наборов (основной)|manual
+field|齐套数量(主)|th|จำนวนทั้งหมด (หลัก)|manual
+field|齐套数量(主)|vi|Số lượng bộ (chính)|manual
+field|其他费用|en|Other Cost|manual
+field|其它要求|en|其它要求|manual
+field|启用仓位管理|en|Bin Management|manual
+field|起止时间|en|起止时间|manual
+field|前压（kpa)|en|前压（kpa)|manual
+field|轻微|en|Minor|manual
+field|请购人|de|Bitte Käufer|manual
+field|请购人|es|Comprador|manual
+field|请购人|fr|Demi-achat|manual
+field|请购人|ja|購入者にお願いします|manual
+field|请购人|ko|요청자|manual
+field|请购人|ru|Закупка|manual
+field|请购人|th|ผู้ขอซื้อ|manual
+field|请购人|vi|Người đề nghị mua|manual
+field|区|en|District|manual
+field|区-id|en|District Id|manual
+field|区-编码|en|Contact Contact District Number|manual
+field|区-名称|en|Contact Contact District Name|manual
+field|区县编码|en|District Code|manual
+field|去除率%样品1|en|去除率%样品1|manual
+field|去除率%样品2|en|去除率%样品2|manual
+field|去除率%样品3|en|去除率%样品3|manual
+field|去除率%样品4|en|去除率%样品4|manual
+field|去除率%样品5|en|去除率%样品5|manual
+field|去除率%样品6|en|去除率%样品6|manual
+field|去除率（%）|en|去除率（%）|manual
+field|全检挑选|en|Full Inspection and Sorting|manual
+field|让步使用|en|Concession Use|manual
+field|热压|en|热压|manual
+field|热压要求|en|热压要求|manual
+field|人工费|en|Labor Cost|manual
+field|入库单数|de|Wareneingänge|manual
+field|入库单数|en|Receipt count|manual
+field|入库单数|es|N.º entradas|manual
+field|入库单数|fr|Nb entrées|manual
+field|入库单数|ja|入庫伝票数|manual
+field|入库单数|ko|입고 전표 수|manual
+field|入库单数|ru|Кол-во поступлений|manual
+field|入库单数|th|จำนวนใบรับเข้า|manual
+field|入库单数|vi|Số phiếu nhập|manual
+field|入库调整|de|Wareneingangsanpassung|manual
+field|入库调整|en|Receipt adjustment|manual
+field|入库调整|es|Ajuste de entrada|manual
+field|入库调整|fr|Ajustement d'entrée|manual
+field|入库调整|ja|入庫調整|manual
+field|入库调整|ko|입고 조정|manual
+field|入库调整|ru|Корректировка поступления|manual
+field|入库调整|th|ปรับปรุงการรับเข้า|manual
+field|入库调整|vi|Điều chỉnh nhập|manual
+field|入库类别|de|Lager kategorie|manual
+field|入库类别|es|Categoría de almacenamiento|manual
+field|入库类别|fr|Catégorie d'entreposage|manual
+field|入库类别|ja|入庫カテゴリ|manual
+field|入库类别|ko|인바운드 카테고리|manual
+field|入库类别|ru|Категории хранения|manual
+field|入库类别|th|ประเภทการจัดเก็บ|manual
+field|入库类别|vi|Danh mục lưu trữ|manual
+field|入库状态Z部分入库，C全部入库，A未入库|en|Io Status|manual
+field|若规格书有变动提示管控文件需更新|de|Bei Änderungen der Spezifikation ist das gelenkte Dokument zu aktualisieren|manual
+field|若规格书有变动提示管控文件需更新|en|If the specification changes, note that the controlled document must be updated|manual
+field|若规格书有变动提示管控文件需更新|es|Si la especificación cambia, tenga en cuenta que el documento controlado debe actualizarse|manual
+field|若规格书有变动提示管控文件需更新|fr|En cas de modification de la fiche technique, le document contrôlé doit être mis à jour|manual
+field|若规格书有变动提示管控文件需更新|ja|仕様書に変更がある場合は、管理文書の更新が必要である旨をご留意ください|manual
+field|若规格书有变动提示管控文件需更新|ko|사양서가 변경되면 관리 문서를 갱신해야 함을 알려 주십시오|manual
+field|若规格书有变动提示管控文件需更新|ru|При изменении спецификации необходимо обновить контролируемый документ|manual
+field|若规格书有变动提示管控文件需更新|th|หากข้อกำหนดมีการเปลี่ยนแปลง โปรดอัปเดตเอกสารควบคุม|manual
+field|若规格书有变动提示管控文件需更新|vi|Nếu bản đặc tính có thay đổi, xin lưu ý cập nhật tài liệu được kiểm soát|manual
+field|若规格书有变动提示管控文件需更新|zh-TW|若規格書有變動提示管控文件需更新|manual
+field|三氯甲烷储备液\n（1000mg/L）|en|三氯甲烷储备液\n（1000mg/L）|manual
+field|筛选合格品留用|en|Screen and Keep Qualified|manual
+field|商品标签|en|Item Labels|manual
+field|商品分录|en|Material Entity|manual
+field|商品计量单位id|en|Base Unit Id|manual
+field|商品类别编码|en|Parent Number|manual
+field|商品是否开启保质期|en|Material Is Kf Period|manual
+field|商品是否开启批次|en|Material Is Batch|manual
+field|商品是否启用辅助属性|en|Material Is Asst Attr|manual
+field|商品数量|en|Material Qty|manual
+field|商品条码|en|Barcode Entity|manual
+field|商品图片|en|Images|manual
+field|商品助记码|en|Material Help Code|manual
+field|商品组合|en|Material Group|manual
+field|上次欠款|en|Last Debt|manual
+field|上级id|en|Parent Id|manual
+field|上级编码|en|Parent Code|manual
+field|烧结|en|烧结|manual
+field|烧结炉参数|en|烧结炉参数|manual
+field|烧结时间调速器参数|en|烧结时间调速器参数|manual
+field|设备|ru|Оборудование|manual
+field|设备状态\n（检查管路、阀门、启动是否正常）|en|设备状态\n（检查管路、阀门、启动是否正常）|manual
+field|设计添加量|en|设计添加量|manual
+field|申请部门|en|Requesting Dept.|manual
+field|申请部门|ja|申請部門|manual
+field|申请单类型|en|申请单类型|manual
+field|申请放行数量|en|Release Qty Applied|manual
+field|申请立项人|en|申请立项人|manual
+field|申请立项日期|en|申请立项日期|manual
+field|申请人|en|Applicant|manual
+field|身份证号|de|Ausweisnr.|manual
+field|身份证号|es|N.º de identidad|manual
+field|身份证号|fr|N° d'identité|manual
+field|身份证号|ja|身分証番号|manual
+field|身份证号|ko|신분증 번호|manual
+field|身份证号|ru|№ удостоверения|manual
+field|身份证号|th|เลขบัตรประชาชน|manual
+field|身份证号|vi|Số CMND|manual
+field|审核/日期|de|Geprüft / Datum|manual
+field|审核/日期|es|Revisado / Fecha|manual
+field|审核/日期|fr|Vérifié / Date|manual
+field|审核/日期|ja|審査/日付|manual
+field|审核/日期|ko|검토/일자|manual
+field|审核/日期|ru|Проверил / Дата|manual
+field|审核/日期|th|ตรวจสอบ / วันที่|manual
+field|审核/日期|vi|Kiểm tra / Ngày|manual
+field|审核/日期|zh-TW|審核/日期|manual
+field|审核人|de|Genehmigt von|manual
+field|审核人|es|Aprobado por|manual
+field|审核人|fr|Approuvé par|manual
+field|审核人|ja|承認者|manual
+field|审核人|ko|승인자|manual
+field|审核人|ru|Утвердил|manual
+field|审核人|th|ผู้อนุมัติ|manual
+field|审核人|vi|Người duyệt|manual
+field|审核人（二级审核）|de|Prüfer (Stufe 2)|manual
+field|审核人（二级审核）|en|Reviewer (L2)|manual
+field|审核人（二级审核）|es|Revisor (nivel 2)|manual
+field|审核人（二级审核）|fr|Approbateur (N2)|manual
+field|审核人（二级审核）|ja|承認者(二次審査)|manual
+field|审核人（二级审核）|ko|승인자(2차)|manual
+field|审核人（二级审核）|ru|Утверждающий (2 ур.)|manual
+field|审核人（二级审核）|th|ผู้อนุมัติ (ระดับ 2)|manual
+field|审核人（二级审核）|vi|Người duyệt (cấp 2)|manual
+field|审核人（二级审核）|zh-TW|審核人（二級審核）|manual
+field|审核人（二级审批人）|de|Prüfer (Freigabe 2)|manual
+field|审核人（二级审批人）|en|Reviewer (L2 approval)|manual
+field|审核人（二级审批人）|es|Revisor (aprob. nivel 2)|manual
+field|审核人（二级审批人）|fr|Approbateur (N2)|manual
+field|审核人（二级审批人）|ja|承認者(二次承認)|manual
+field|审核人（二级审批人）|ko|승인자(2차 승인)|manual
+field|审核人（二级审批人）|ru|Утверждающий (2 ур.)|manual
+field|审核人（二级审批人）|th|ผู้อนุมัติ (ระดับ 2)|manual
+field|审核人（二级审批人）|vi|Người duyệt (cấp 2)|manual
+field|审核人（二级审批人）|zh-TW|審核人（二級審批人）|manual
+field|审核人（一级审核）|de|Prüfer (Stufe 1)|manual
+field|审核人（一级审核）|en|Reviewer (L1)|manual
+field|审核人（一级审核）|es|Revisor (nivel 1)|manual
+field|审核人（一级审核）|fr|Approbateur (N1)|manual
+field|审核人（一级审核）|ja|承認者(一次審査)|manual
+field|审核人（一级审核）|ko|승인자(1차)|manual
+field|审核人（一级审核）|ru|Утверждающий (1 ур.)|manual
+field|审核人（一级审核）|th|ผู้อนุมัติ (ระดับ 1)|manual
+field|审核人（一级审核）|vi|Người duyệt (cấp 1)|manual
+field|审核人（一级审核）|zh-TW|審核人（一級審核）|manual
+field|审核人（一级审批人）|de|Prüfer (Freigabe 1)|manual
+field|审核人（一级审批人）|en|Reviewer (L1 approval)|manual
+field|审核人（一级审批人）|es|Revisor (aprob. nivel 1)|manual
+field|审核人（一级审批人）|fr|Approbateur (N1)|manual
+field|审核人（一级审批人）|ja|承認者(一次承認)|manual
+field|审核人（一级审批人）|ko|승인자(1차 승인)|manual
+field|审核人（一级审批人）|ru|Утверждающий (1 ур.)|manual
+field|审核人（一级审批人）|th|ผู้อนุมัติ (ระดับ 1)|manual
+field|审核人（一级审批人）|vi|Người duyệt (cấp 1)|manual
+field|审核人（一级审批人）|zh-TW|審核人（一級審批人）|manual
+field|审核人_auditor_name|en|Auditor Name|manual
+field|审核人_auditor_name|ja|監査者名|manual
+field|审核日期|en|审核日期|manual
+field|审核时间|de|Genehmigt am|manual
+field|审核时间|en|Approved at|manual
+field|审核时间|es|Fecha de aprobación|manual
+field|审核时间|fr|Date d'approbation|manual
+field|审核时间|ja|承認時間|manual
+field|审核时间|ko|승인 시간|manual
+field|审核时间|ru|Время утверждения|manual
+field|审核时间|th|เวลาอนุมัติ|manual
+field|审核时间|vi|Thời gian duyệt|manual
+field|审核时间_audit_time|en|Audit Time|manual
+field|审核时间_audit_time|ja|監査日時|manual
+field|生产车间编码|de|Fertigungsbereichscode|manual
+field|生产车间编码|en|Workshop code|manual
+field|生产车间编码|es|Código taller|manual
+field|生产车间编码|fr|Code atelier|manual
+field|生产车间编码|ja|生産車間コード|manual
+field|生产车间编码|ko|생산작업장 코드|manual
+field|生产车间编码|ru|Код цеха|manual
+field|生产车间编码|th|รหัสแผนกผลิต|manual
+field|生产车间编码|vi|Mã xưởng|manual
+field|生产单位|de|Produktions einheit|manual
+field|生产单位|es|Unidad de producción|manual
+field|生产单位|fr|Unité de production|manual
+field|生产单位|ja|生産単位|manual
+field|生产单位|ko|생산 단위|manual
+field|生产单位|ru|Единица производства|manual
+field|生产单位|th|หน่วยงานผลิต|manual
+field|生产单位|vi|Đơn vị sản xuất|manual
+field|生产进度%|de|Produktionsfortschritt %|manual
+field|生产进度%|en|Progress %|manual
+field|生产进度%|es|Progreso %|manual
+field|生产进度%|fr|Progression %|manual
+field|生产进度%|ja|生産進捗%|manual
+field|生产进度%|ko|생산 진도 %|manual
+field|生产进度%|ru|Прогресс %|manual
+field|生产进度%|th|ความคืบหน้าการผลิต %|manual
+field|生产进度%|vi|Tiến độ sản xuất %|manual
+field|生产量|en|Production Qty|manual
+field|生产批次|en|生产批次|manual
+field|生产许可证号|en|Pro License|manual
+field|生日|en|Birthday|manual
+field|省|en|Province|manual
+field|省-id|en|Province Id|manual
+field|省-编码|en|Contact Contact Province Number|manual
+field|省份编码|en|Province Code|manual
+field|省-名称|en|Contact Contact Province Name|manual
+field|实际不含税金额|en|Act Non Tax Amount|manual
+field|实际出入库状态|en|Real Io Status|manual
+field|实际含税单价|en|Act Tax Price|manual
+field|实际添加比例|en|实际添加比例|manual
+field|实施进度|en|实施进度|manual
+field|实收数量|de|Die tatsächlich gesammelte Menge|manual
+field|实收数量|es|Cantidad recibida efectiva|manual
+field|实收数量|fr|Quantité réelle reçue|manual
+field|实收数量|ja|実収数量|manual
+field|实收数量|ko|실제 수령 수량|manual
+field|实收数量|ru|Количество полученных|manual
+field|实收数量|th|จำนวนเงินที่ได้รับจริง|manual
+field|实收数量|vi|Số lượng thực nhận|manual
+field|实收数量(辅单位)|de|Erhaltene Menge (Hilfseinheit)|manual
+field|实收数量(辅单位)|en|Received qty (aux)|manual
+field|实收数量(辅单位)|es|Cant. recibida (auxiliar)|manual
+field|实收数量(辅单位)|fr|Qté reçue (auxiliaire)|manual
+field|实收数量(辅单位)|ja|実受数量(補助単位)|manual
+field|实收数量(辅单位)|ko|실수량(보조단위)|manual
+field|实收数量(辅单位)|ru|Принято (всп.)|manual
+field|实收数量(辅单位)|th|ปริมาณรับจริง(หน่วยรอง)|manual
+field|实收数量(辅单位)|vi|SL nhận thực (phụ)|manual
+field|实收数量(主单位)|de|Erhaltene Menge (Haupteinheit)|manual
+field|实收数量(主单位)|en|Received qty (main)|manual
+field|实收数量(主单位)|es|Cant. recibida (principal)|manual
+field|实收数量(主单位)|fr|Qté reçue (principale)|manual
+field|实收数量(主单位)|ja|実受数量(主単位)|manual
+field|实收数量(主单位)|ko|실수량(주단위)|manual
+field|实收数量(主单位)|ru|Принято (осн.)|manual
+field|实收数量(主单位)|th|ปริมาณรับจริง(หน่วยหลัก)|manual
+field|实收数量(主单位)|vi|SL nhận thực (chính)|manual
+field|实收数量2|de|Ertrags menge 2|manual
+field|实收数量2|es|Cantidad real 2|manual
+field|实收数量2|fr|Quantité réelle 2|manual
+field|实收数量2|ja|実受領数量2|manual
+field|实收数量2|ko|실제 수량: 2|manual
+field|实收数量2|ru|Оплата 2|manual
+field|实收数量2|th|จำนวนที่ได้รับจริง2|manual
+field|实收数量2|vi|Số lượng thực tế 2|manual
+field|实验结论|en|实验结论|manual
+field|使用范围|de|Verwendungsbereich|manual
+field|使用范围|es|Ámbito de uso|manual
+field|使用范围|fr|Domaine d'utilisation|manual
+field|使用范围|ja|使用範囲|manual
+field|使用范围|ko|사용 범위|manual
+field|使用范围|ru|Область применения|manual
+field|使用范围|th|ขอบเขตการใช้งาน|manual
+field|使用范围|vi|Phạm vi sử dụng|manual
+field|使用范围|zh-TW|使用範圍|manual
+field|使用工位|en|使用工位|manual
+field|使用人|en|User|manual
+field|使用日期|en|Usage Date|manual
+field|市|en|City|manual
+field|市-id|en|City Id|manual
+field|市-编码|en|Contact Contact City Number|manual
+field|市-名称|en|Contact Contact City Name|manual
+field|试验用水|en|试验用水|manual
+field|是否带票|de|Ob Sie ein Ticket mitbringen|manual
+field|是否带票|es|Ya sea con boleto|manual
+field|是否带票|fr|Apportez ou non un billet|manual
+field|是否带票|ja|チケットをお持ちですか|manual
+field|是否带票|ko|티켓과 함께 제공됩니까?|manual
+field|是否带票|ru|Есть ли билет|manual
+field|是否带票|th|มีตั๋วหรือไม่|manual
+field|是否带票|vi|Có mang theo vé không|manual
+field|是否倒冲领料|en|Backflush Issue|manual
+field|是否多单位|en|Multi-UOM|manual
+field|是否可采购|en|Purchasable|manual
+field|是否可销售|en|Sellable|manual
+field|是否内校\n√/-|en|是否内校\n√/-|manual
+field|是否启用保质期|en|Shelf-life Enabled|manual
+field|是否启用辅助属性|en|Aux. Attributes|manual
+field|是否市场转化|de|Marktumsetzung|manual
+field|是否市场转化|en|Market Conversion|manual
+field|是否市场转化|es|Conversión a mercado|manual
+field|是否市场转化|fr|Conversion en marché|manual
+field|是否市场转化|ja|市場転換|manual
+field|是否市场转化|ko|시장 전환|manual
+field|是否市场转化|ru|Вывод на рынок|manual
+field|是否市场转化|th|การเปลี่ยนเป็นตลาด|manual
+field|是否市场转化|vi|Chuyển đổi thị trường|manual
+field|是否市场转化|zh-TW|是否市場轉化|manual
+field|是否手工修改单据编码|de|Ob der Dokumenten code manuell geändert werden soll|manual
+field|是否手工修改单据编码|es|Ya sea para modificar manualmente el código del documento|manual
+field|是否手工修改单据编码|fr|Modifier manuellement le codage des documents|manual
+field|是否手工修改单据编码|ja|伝票コードを手動で修正しますか|manual
+field|是否手工修改单据编码|ko|문서 코드가 수동으로 수정 되었습니까?|manual
+field|是否手工修改单据编码|ru|Измените ли код документа вручную|manual
+field|是否手工修改单据编码|th|ไม่ว่าจะแก้ไขรหัสเอกสารด้วยตนเอง|manual
+field|是否手工修改单据编码|vi|Có sửa đổi mã hóa đơn theo cách thủ công không|manual
+field|是否首要联系人|en|Contact Is Default Linkman|manual
+field|是否受控|de|Gelenkt|manual
+field|是否受控|es|Controlado|manual
+field|是否受控|fr|Sous contrôle|manual
+field|是否受控|ja|管理対象|manual
+field|是否受控|ko|관리 대상|manual
+field|是否受控|ru|Управляемый|manual
+field|是否受控|th|ถูกควบคุม|manual
+field|是否受控|vi|Được kiểm soát|manual
+field|是否受控|zh-TW|是否受控|manual
+field|是否为子件|en|Can Be Component|manual
+field|是否为组件|en|Can Be Assembly|manual
+field|是否叶子节点|en|Leaf Node|manual
+field|是否赠品|en|Is Free|manual
+field|是否自制|en|Self-made|manual
+field|适用范围|en|适用范围|manual
+field|收货仓库|de|Empfangs lager|manual
+field|收货仓库|es|Almacén de recepción|manual
+field|收货仓库|fr|Entrepôt de réception|manual
+field|收货仓库|ja|受け取り倉庫|manual
+field|收货仓库|ko|창고 수령|manual
+field|收货仓库|ru|Склад доставки|manual
+field|收货仓库|th|คลังรับสินค้า|manual
+field|收货仓库|vi|Kho nhận hàng|manual
+field|收货地址|en|Receiving Address|manual
+field|收货地址国家id|en|Dispatcher Country Id|manual
+field|收货地址国家编码|en|Dispatcher Country Number|manual
+field|收货地址国家名称|en|Dispatcher Country Name|manual
+field|收货地址联系电话|en|Dispatcher Phone|manual
+field|收货地址-区ID|en|Dispatcher District Id|manual
+field|收货地址区编码|en|Dispatcher City Number|manual
+field|收货地址区县编码|en|Dispatcher District Number|manual
+field|收货地址区县名称|en|Dispatcher District Name|manual
+field|收货地址人|en|Dispatcher Linkman|manual
+field|收货地址-省ID|en|Dispatcher Province Id|manual
+field|收货地址省份编码|en|Dispatcher Province Number|manual
+field|收货地址省份名称|en|Dispatcher Province Name|manual
+field|收货地址-市ID|en|Dispatcher City Id|manual
+field|收货地址市区名称|en|Dispatcher City Name|manual
+field|收货地址-详细地址|en|Dispatcher Address|manual
+field|收货人|de|Empfänger|manual
+field|收货人|es|Destinatario|manual
+field|收货人|fr|Destinataire|manual
+field|收货人|ja|荷受人|manual
+field|收货人|ko|수취인|manual
+field|收货人|ru|Получатель|manual
+field|收货人|th|ผู้รับสินค้า|manual
+field|收货人|vi|Người nhận hàng|manual
+field|收票手机号|en|Invoice Mobile|manual
+field|收票邮箱|en|Invoice Email|manual
+field|手工确定成本|de|Kosten manuell ermitteln|manual
+field|手工确定成本|es|Determinar el costo a mano|manual
+field|手工确定成本|fr|Détermination manuelle des coûts|manual
+field|手工确定成本|ko|수동 비용 결정|manual
+field|手工确定成本|ru|Определение затрат вручную|manual
+field|手工确定成本|th|การกำหนดต้นทุนด้วยตนเอง|manual
+field|手工确定成本|vi|Xác định chi phí bằng tay|manual
+field|首要联系人|en|Primary Contact|manual
+field|受控日期|de|Lenkungsdatum|manual
+field|受控日期|es|Fecha de control|manual
+field|受控日期|fr|Date de contrôle|manual
+field|受控日期|ja|管理日|manual
+field|受控日期|ko|관리 일자|manual
+field|受控日期|ru|Дата контроля|manual
+field|受控日期|th|วันที่ควบคุม|manual
+field|受控日期|vi|Ngày kiểm soát|manual
+field|受控日期|zh-TW|受控日期|manual
+field|售价|de|Verkaufspreis|manual
+field|售价|es|Precio de venta|manual
+field|售价|fr|Prix de vente|manual
+field|售价|ja|販売価格|manual
+field|售价|ko|판매가격|manual
+field|售价|ru|Цена продажи|manual
+field|售价|th|ราคา|manual
+field|售价|vi|Giá bán|manual
+field|数据结论|en|数据结论|manual
+field|数据来源|de|Datenquellen|manual
+field|数据来源|es|Fuentes de datos|manual
+field|数据来源|fr|Source des données|manual
+field|数据来源|ja|データの出典|manual
+field|数据来源|ko|데이터 소스|manual
+field|数据来源|ru|Источник данных|manual
+field|数据来源|th|แหล่งที่มาของข้อมูล|manual
+field|数据来源|vi|Nguồn dữ liệu|manual
+field|数量(辅单位)|de|Menge (Hilfseinheit)|manual
+field|数量(辅单位)|en|Qty (aux)|manual
+field|数量(辅单位)|es|Cantidad (auxiliar)|manual
+field|数量(辅单位)|fr|Qté (auxiliaire)|manual
+field|数量(辅单位)|ja|数量(補助単位)|manual
+field|数量(辅单位)|ko|수량(보조단위)|manual
+field|数量(辅单位)|ru|Кол-во (всп.)|manual
+field|数量(辅单位)|th|ปริมาณ(หน่วยรอง)|manual
+field|数量(辅单位)|vi|SL (phụ)|manual
+field|数量(主单位)|de|Menge (Haupteinheit)|manual
+field|数量(主单位)|en|Qty (main)|manual
+field|数量(主单位)|es|Cantidad (principal)|manual
+field|数量(主单位)|fr|Qté (principale)|manual
+field|数量(主单位)|ja|数量(主単位)|manual
+field|数量(主单位)|ko|수량(주단위)|manual
+field|数量(主单位)|ru|Кол-во (осн.)|manual
+field|数量(主单位)|th|ปริมาณ(หน่วยหลัก)|manual
+field|数量(主单位)|vi|SL (chính)|manual
+field|数量2|de|Anzahl 2|manual
+field|数量2|es|Cantidad 2|manual
+field|数量2|fr|Quantité 2|manual
+field|数量2|ja|数量2|manual
+field|数量2|ko|수량 2|manual
+field|数量2|ru|Количество 2|manual
+field|数量2|th|จำนวน2|manual
+field|数量2|vi|Số lượng 2|manual
+field|衰减率|en|衰减率|manual
+field|谁来检验|en|谁来检验|manual
+field|谁来批准|en|谁来批准|manual
+field|水分含量|en|Moisture|manual
+field|水温|en|水温|manual
+field|水温（℃）|en|Temp(℃)|manual
+field|水温（℃）\n20±2.5℃|en|水温（℃）\n20±2.5℃|manual
+field|税额|de|Steuerbetrag|manual
+field|税额|es|Importe del impuesto|manual
+field|税额|fr|Montant de l’impôt|manual
+field|税额|ja|税額|manual
+field|税额|ko|세액|manual
+field|税额|ru|Сумма налога|manual
+field|税额|th|จำนวนภาษี|manual
+field|税额|vi|Số thuế|manual
+field|税额_tax_amount|en|Tax Amount|manual
+field|税号|en|Tax No.|manual
+field|税率|en|Contact Rate|manual
+field|税率%|de|Steuersatz %|manual
+field|税率%|es|Tasa de impuestos %|manual
+field|税率%|fr|Taux d'imposition %|manual
+field|税率%|ja|税率 %|manual
+field|税率%|ko|세율 %|manual
+field|税率%|ru|Налоговая ставка %|manual
+field|税率%|th|อัตราภาษี%|manual
+field|税率%|vi|Thuế suất%|manual
+field|税收分类编码|en|Fetch Category Id|manual
+field|说明|en|说明|manual
+field|送货地址|de|Liefer adresse|manual
+field|送货地址|es|Dirección de entrega|manual
+field|送货地址|fr|Adresse de livraison|manual
+field|送货地址|ja|配送先住所|manual
+field|送货地址|ko|배송 주소|manual
+field|送货地址|ru|Адрес доставки|manual
+field|送货地址|th|ที่อยู่จัดส่ง|manual
+field|送货地址|vi|Địa chỉ giao hàng|manual
+field|炭棒编号|en|Rod No.|manual
+field|炭棒长度|de|Stablänge|manual
+field|炭棒长度|en|Rod Length|manual
+field|炭棒长度|es|Longitud de varilla|manual
+field|炭棒长度|fr|Longueur du bâton|manual
+field|炭棒长度|ja|炭棒長さ|manual
+field|炭棒长度|ko|탄소봉 길이|manual
+field|炭棒长度|ru|Длина стержня|manual
+field|炭棒长度|th|ความยาวแท่ง|manual
+field|炭棒长度|vi|Chiều dài thanh|manual
+field|炭棒长度|zh-TW|炭棒長度|manual
+field|炭棒尺寸|en|炭棒尺寸|manual
+field|炭棒尺寸（1）|en|炭棒尺寸（1）|manual
+field|炭棒尺寸（2）|en|炭棒尺寸（2）|manual
+field|炭棒尺寸（3）|en|炭棒尺寸（3）|manual
+field|炭棒处理要求|de|Anforderungen an die Stabbehandlung|manual
+field|炭棒处理要求|en|Rod Treatment Requirements|manual
+field|炭棒处理要求|es|Requisitos de tratamiento de varilla|manual
+field|炭棒处理要求|fr|Exigences de traitement du bâton|manual
+field|炭棒处理要求|ja|炭棒の処理要件|manual
+field|炭棒处理要求|ko|탄소봉 처리 요구사항|manual
+field|炭棒处理要求|ru|Требования к обработке стержня|manual
+field|炭棒处理要求|th|ข้อกำหนดการจัดการแท่ง|manual
+field|炭棒处理要求|vi|Yêu cầu xử lý thanh|manual
+field|炭棒处理要求|zh-TW|炭棒處理要求|manual
+field|炭棒规格|en|炭棒规格|manual
+field|炭棒规格1|en|炭棒规格1|manual
+field|炭棒规格2|en|炭棒规格2|manual
+field|炭棒规格3|en|炭棒规格3|manual
+field|炭棒内径|de|Stab-Innendurchmesser|manual
+field|炭棒内径|en|Rod Inner Dia.|manual
+field|炭棒内径|es|Diám. interior de varilla|manual
+field|炭棒内径|fr|Diam. int. du bâton|manual
+field|炭棒内径|ja|炭棒内径|manual
+field|炭棒内径|ko|탄소봉 내경|manual
+field|炭棒内径|ru|Внутр. диам. стержня|manual
+field|炭棒内径|th|เส้นผ่าศูนย์กลางในแท่ง|manual
+field|炭棒内径|vi|ĐK trong thanh|manual
+field|炭棒内径|zh-TW|炭棒內徑|manual
+field|炭棒内径mm|en|Rod ID (mm)|manual
+field|炭棒内径公差|en|Rod ID Tol.|manual
+field|炭棒内径公差mm|en|Rod ID Tol. (mm)|manual
+field|炭棒内孔要求|de|Innenbohrungsanforderung|manual
+field|炭棒内孔要求|en|Rod Bore Requirement|manual
+field|炭棒内孔要求|es|Requisito de diámetro interior|manual
+field|炭棒内孔要求|fr|Exigence d'alésage|manual
+field|炭棒内孔要求|ja|炭棒内孔径要件|manual
+field|炭棒内孔要求|ko|탄소봉 내경 요구|manual
+field|炭棒内孔要求|ru|Требование к внутреннему отверстию|manual
+field|炭棒内孔要求|th|ข้อกำหนดรูในแท่งคาร์บอน|manual
+field|炭棒内孔要求|vi|Yêu cầu lỗ trong thanh|manual
+field|炭棒内孔要求|zh-TW|炭棒內孔要求|manual
+field|炭棒外径|de|Stab-Außendurchmesser|manual
+field|炭棒外径|en|Rod Outer Dia.|manual
+field|炭棒外径|es|Diám. exterior de varilla|manual
+field|炭棒外径|fr|Diam. ext. du bâton|manual
+field|炭棒外径|ja|炭棒外径|manual
+field|炭棒外径|ko|탄소봉 외경|manual
+field|炭棒外径|ru|Наруж. диам. стержня|manual
+field|炭棒外径|th|เส้นผ่าศูนย์กลางนอกแท่ง|manual
+field|炭棒外径|vi|ĐK ngoài thanh|manual
+field|炭棒外径|zh-TW|炭棒外徑|manual
+field|炭棒外径mm|en|Rod OD (mm)|manual
+field|炭棒外径公差|en|Rod OD Tol.|manual
+field|炭棒外径公差mm|en|Rod OD Tol. (mm)|manual
+field|碳酸氢钠|en|碳酸氢钠|manual
+field|套装信息对象|en|Bom Entity|manual
+field|特采理由|en|Special Procurement Reason|manual
+field|特殊配方1|en|特殊配方1|manual
+field|特殊配方2|en|特殊配方2|manual
+field|特殊配方3|en|特殊配方3|manual
+field|特殊性能描述|en|特殊性能描述|manual
+field|体积|en|Volume|manual
+field|填写部门|en|Filling Department|manual
+field|填写人|en|Filled By|manual
+field|挑选使用|en|Use After Sorting|manual
+field|图号|de|Abbildungsnummer|manual
+field|图号|es|Número de figura|manual
+field|图号|fr|Numéro de plan|manual
+field|图号|ja|図番|manual
+field|图号|ko|드로잉 번호|manual
+field|图号|ru|Номер чертежа|manual
+field|图号|th|หมายเลขภาพ|manual
+field|图号|vi|Số hiệu bản vẽ|manual
+field|图片url|en|Picture|manual
+field|图片链接|en|Image URL|manual
+field|退货基本数量|en|Return Qty|manual
+field|退货数量|en|Return Qty Unit|manual
+field|退货原因|de|Grund für die Rückgabe|manual
+field|退货原因|es|Motivo de la devolución|manual
+field|退货原因|fr|Raison du retour|manual
+field|退货原因|ja|返品の理由|manual
+field|退货原因|ko|반품 사유|manual
+field|退货原因|ru|Причина возврата|manual
+field|退货原因|th|เหตุผลในการคืนสินค้า|manual
+field|退货原因|vi|Lý do trả lại|manual
+field|脱模|en|脱模|manual
+field|脱盐率|en|脱盐率|manual
+field|外部单据号|de|Externe Dokumenten nummer|manual
+field|外部单据号|es|Número de documento externo|manual
+field|外部单据号|fr|Numéro de document externe|manual
+field|外部单据号|ja|外部伝票番号|manual
+field|外部单据号|ko|외부 문서 번호|manual
+field|外部单据号|ru|Номер внешнего документа|manual
+field|外部单据号|th|หมายเลขเอกสารภายนอก|manual
+field|外部单据号|vi|Số tài liệu bên ngoài|manual
+field|外部来料|en|External Incoming Material|manual
+field|外部商品编码|en|Outside Material Number|manual
+field|外部商品单位|en|Outside Material Unit|manual
+field|外观要求|en|外观要求|manual
+field|外径(mm)|de|Außendurchmesser (mm)|manual
+field|外径(mm)|en|Outer dia. (mm)|manual
+field|外径(mm)|es|Diám. exterior (mm)|manual
+field|外径(mm)|fr|Diam. extérieur (mm)|manual
+field|外径(mm)|ja|外径(mm)|manual
+field|外径(mm)|ko|외경(mm)|manual
+field|外径(mm)|ru|Наруж. диаметр (мм)|manual
+field|外径(mm)|th|เส้นผ่านศูนย์กลางนอก (มม.)|manual
+field|外径(mm)|vi|Đường kính ngoài (mm)|manual
+field|外径(mm)|zh-TW|外徑(mm)|manual
+field|完工日期|de|Fertigstellung datum|manual
+field|完工日期|es|Fecha de finalización|manual
+field|完工日期|fr|Date d'achèvement|manual
+field|完工日期|ja|完了日|manual
+field|完工日期|ko|완료일|manual
+field|完工日期|ru|Дата завершения|manual
+field|完工日期|th|วันที่เสร็จสิ้น|manual
+field|完工日期|vi|Ngày hoàn thành|manual
+field|完工数量|de|Fertigmenge|manual
+field|完工数量|en|Completed qty|manual
+field|完工数量|es|Cantidad completada|manual
+field|完工数量|fr|Qté terminée|manual
+field|完工数量|ja|完了数量|manual
+field|完工数量|ko|완료 수량|manual
+field|完工数量|ru|Кол-во завершено|manual
+field|完工数量|th|ปริมาณที่เสร็จ|manual
+field|完工数量|vi|SL hoàn thành|manual
+field|微信|en|WeChat|manual
+field|委外单价|de|Ausgelagerten Stückpreis|manual
+field|委外单价|es|Precio unitario de subcontratación|manual
+field|委外单价|fr|Prix unitaire sous-commandé|manual
+field|委外单价|ja|外注単価|manual
+field|委外单价|ko|아웃소싱 단가|manual
+field|委外单价|ru|Цена за единицу|manual
+field|委外单价|th|ราคาต่อหน่วยเอาท์ซอร์ส|manual
+field|委外单价|vi|Đơn giá thuê ngoài|manual
+field|委外加工单号|de|Outsourcing-Bestellnummer|manual
+field|委外加工单号|es|Número de orden de procesamiento de subcontratación|manual
+field|委外加工单号|fr|Numéro de traitement externe|manual
+field|委外加工单号|ja|外注加工票番号|manual
+field|委外加工单号|ko|아웃소싱 처리 주문 번호|manual
+field|委外加工单号|ru|Номер заказа на обработку|manual
+field|委外加工单号|th|หมายเลขคำสั่งซื้อเอาท์ซอร์ส|manual
+field|委外加工单号|vi|Số đơn hàng gia công thuê ngoài|manual
+field|卫生要求|en|卫生要求|manual
+field|未核销金额|en|Total Un Settle Amount|manual
+field|未结算金额|en|Total Unsettle Amount|manual
+field|未开票金额|en|Entry Un Ivc Amount|manual
+field|未开票数量|en|Entry Un Ivc Qty|manual
+field|未批准原因|en|未批准原因|manual
+field|未执行金额|en|Un Io Amount|manual
+field|未转换原因|de|Grund der Nichtumsetzung|manual
+field|未转换原因|en|Reason for No Conversion|manual
+field|未转换原因|es|Motivo de no conversión|manual
+field|未转换原因|fr|Motif de non-conversion|manual
+field|未转换原因|ja|未転換理由|manual
+field|未转换原因|ko|미전환 사유|manual
+field|未转换原因|ru|Причина невывода на рынок|manual
+field|未转换原因|th|เหตุผลที่ไม่เปลี่ยน|manual
+field|未转换原因|vi|Lý do không chuyển đổi|manual
+field|未转换原因|zh-TW|未轉換原因|manual
+field|文档编号|en|Document No.|manual
+field|文件|en|文件|manual
+field|文件管理人|en|文件管理人|manual
+field|文件使用范围|en|文件使用范围|manual
+field|问题来源|en|Problem Source|manual
+field|问题描述|en|Problem Description|manual
+field|物料类型|en|Material Type|manual
+field|物料描述|en|Material Description|manual
+field|物料名称|zh-TW|物料名稱|manual
+field|物流公司id|en|F Logistics Id|manual
+field|物流信息分录|en|Express Entity|manual
+field|下单数量|en|下单数量|manual
+field|现存量|de|Aktueller Bestand|manual
+field|现存量|es|Existencial|manual
+field|现存量|fr|Stock actuel|manual
+field|现存量|ko|현재 재고|manual
+field|现存量|ru|Текущий запас|manual
+field|现存量|th|สต็อก|manual
+field|现存量|vi|Lượng tồn hiện tại|manual
+field|现存量说明|de|Beschreibung der aktuellen Bestände|manual
+field|现存量说明|es|Descripción de stock actual|manual
+field|现存量说明|fr|Description du stock actuel|manual
+field|现存量说明|ko|현재 재고 설명|manual
+field|现存量说明|ru|Описание текущего запаса|manual
+field|现存量说明|th|คำอธิบายหุ้นปัจจุบัน|manual
+field|现存量说明|vi|Mô tả cổ phiếu hiện tại|manual
+field|相关变更|en|Related Changes|manual
+field|相关变更|ja|関連変更|manual
+field|项目(一/二级)|en|项目(一/二级)|manual
+field|项目.合同号|de|Projekt. Vertrags nummer|manual
+field|项目.合同号|en|Projects. Contract Number|manual
+field|项目.合同号|es|Proyecto. Número de contrato|manual
+field|项目.合同号|fr|Projet. Numéro de contrat|manual
+field|项目.合同号|ja|プロジェクト. 契約番号|manual
+field|项目.合同号|ko|프로젝트. 계약 번호|manual
+field|项目.合同号|ru|Проект. Номер контракта|manual
+field|项目.合同号|th|โครงการ.เลขที่สัญญา|manual
+field|项目.合同号|vi|Dự án. Số hợp đồng|manual
+field|项目编号|de|Projekt-Nr.|manual
+field|项目编号|en|Project No.|manual
+field|项目编号|es|N.º de proyecto|manual
+field|项目编号|fr|N° de projet|manual
+field|项目编号|ja|プロジェクト番号|manual
+field|项目编号|ko|프로젝트 번호|manual
+field|项目编号|ru|Номер проекта|manual
+field|项目编号|th|หมายเลขโครงการ|manual
+field|项目编号|vi|Số dự án|manual
+field|项目编号|zh-TW|專案編號|manual
+field|项目层级|en|项目层级|manual
+field|项目等级|de|Projektstufe|manual
+field|项目等级|en|Project Level|manual
+field|项目等级|es|Nivel de proyecto|manual
+field|项目等级|fr|Niveau de projet|manual
+field|项目等级|ja|プロジェクト等級|manual
+field|项目等级|ko|프로젝트 등급|manual
+field|项目等级|ru|Уровень проекта|manual
+field|项目等级|th|ระดับโครงการ|manual
+field|项目等级|vi|Cấp dự án|manual
+field|项目等级|zh-TW|專案等級|manual
+field|项目定及变更|de|Projektstufe und Änderungen|manual
+field|项目定及变更|en|Project Grade & Changes|manual
+field|项目定及变更|es|Grado y cambios del proyecto|manual
+field|项目定及变更|fr|Niveau et modifications du projet|manual
+field|项目定及变更|ja|プロジェクト等級・変更|manual
+field|项目定及变更|ko|프로젝트 등급·변경|manual
+field|项目定及变更|ru|Категория и изменения проекта|manual
+field|项目定及变更|th|ระดับและการเปลี่ยนแปลงโครงการ|manual
+field|项目定及变更|vi|Cấp dự án và thay đổi|manual
+field|项目定及变更|zh-TW|專案定及變更|manual
+field|项目定级|de|Projektstufe|manual
+field|项目定级|en|项目定级|manual
+field|项目定级|es|Grado del proyecto|manual
+field|项目定级|fr|Niveau de projet|manual
+field|项目定级|ja|プロジェクト等級|manual
+field|项目定级|ko|프로젝트 등급|manual
+field|项目定级|ru|Категория проекта|manual
+field|项目定级|th|ระดับโครงการ|manual
+field|项目定级|vi|Cấp dự án|manual
+field|项目定级|zh-TW|專案定級|manual
+field|项目发起人|de|Projektinitiator|manual
+field|项目发起人|en|Project Initiator|manual
+field|项目发起人|es|Promotor del proyecto|manual
+field|项目发起人|fr|Initiateur du projet|manual
+field|项目发起人|ja|プロジェクト発起人|manual
+field|项目发起人|ko|프로젝트 발의자|manual
+field|项目发起人|ru|Инициатор проекта|manual
+field|项目发起人|th|ผู้ริเริ่มโครงการ|manual
+field|项目发起人|vi|Người khởi tạo dự án|manual
+field|项目发起人|zh-TW|專案發起人|manual
+field|项目负责|en|项目负责|manual
+field|项目负责人|de|Projektverantwortlicher|manual
+field|项目负责人|en|Project Owner|manual
+field|项目负责人|es|Responsable del proyecto|manual
+field|项目负责人|fr|Responsable du projet|manual
+field|项目负责人|ja|プロジェクト責任者|manual
+field|项目负责人|ko|프로젝트 책임자|manual
+field|项目负责人|ru|Ответственный за проект|manual
+field|项目负责人|th|ผู้รับผิดชอบโครงการ|manual
+field|项目负责人|vi|Người phụ trách dự án|manual
+field|项目负责人|zh-TW|專案負責人|manual
+field|项目级|en|项目级|manual
+field|项目开发目标|en|项目开发目标|manual
+field|项目名称/内容|en|项目名称/内容|manual
+field|项目输出|en|项目输出|manual
+field|销售部意见|en|Sales Opinion|manual
+field|销售单位|de|Vertriebseinheit|manual
+field|销售单位|es|UM venta|manual
+field|销售单位|fr|UV|manual
+field|销售单位|ja|販売単位|manual
+field|销售单位|ko|판매 단위|manual
+field|销售单位|ru|Ед. продаж|manual
+field|销售单位|th|หน่วยขาย|manual
+field|销售单位|vi|Đơn vị bán|manual
+field|销售订单号|de|Verkaufs bestellnummer|manual
+field|销售订单号|es|Número de pedido de venta|manual
+field|销售订单号|fr|Numéro de commande de vente|manual
+field|销售订单号|ko|판매 주문 번호|manual
+field|销售订单号|ru|Номер заказа на продажу|manual
+field|销售订单号|th|หมายเลขใบสั่งขาย|manual
+field|销售订单号|vi|Số đơn hàng bán hàng|manual
+field|销售费用|en|Cost Fee|manual
+field|销售费用分摊|en|Fee|manual
+field|销售金额|de|Verkaufs betrag|manual
+field|销售金额|es|Cantidad de ventas|manual
+field|销售金额|fr|Montant des ventes|manual
+field|销售金额|ja|売上高|manual
+field|销售金额|ko|판매량|manual
+field|销售金额|ru|Сумма продаж|manual
+field|销售金额|th|ยอดขาย|manual
+field|销售金额|vi|Số tiền bán hàng|manual
+field|销项税率|en|Output Tax Rate|manual
+field|效果跟踪|en|Effect Follow-up|manual
+field|信用额度|en|Credit Limit|manual
+field|行关闭状态|en|Close State|manual
+field|行入库状态|en|Entry Realio Status|manual
+field|行未执行数量|en|Un Out Qty|manual
+field|行已执行数量|en|Out Qty|manual
+field|行执行未出库数量|en|Real Un Out Qty|manual
+field|行执行已出库数量|en|Real Out Qty|manual
+field|行执行状态|en|Entry Ios Tatus|manual
+field|行中止|de|Linien abbruch|manual
+field|行中止|es|Suspensión de línea|manual
+field|行中止|fr|Ligne suspendue|manual
+field|行中止|ja|行の中止|manual
+field|行中止|ko|실행 중단|manual
+field|行中止|ru|Приостановка строки|manual
+field|行中止|th|หยุดบรรทัด|manual
+field|行中止|vi|Dòng bị đình chỉ|manual
+field|型号|de|Modellnummer|manual
+field|型号|es|Modelo|manual
+field|型号|fr|Modèle|manual
+field|型号|ja|型番|manual
+field|型号|ko|모델|manual
+field|型号|ru|Модель|manual
+field|型号|th|รุ่น|manual
+field|型号|vi|Mẫu mã|manual
+field|性别|en|Gender|manual
+field|性别1-男2-女|en|Contact Gender|manual
+field|性能验证|en|Performance Verification|manual
+field|修订记录|de|Änderungshistorie|manual
+field|修订记录|es|Registro de revisiones|manual
+field|修订记录|fr|Historique des révisions|manual
+field|修订记录|ja|改訂履歴|manual
+field|修订记录|ko|개정 이력|manual
+field|修订记录|ru|История изменений|manual
+field|修订记录|th|ประวัติการแก้ไข|manual
+field|修订记录|vi|Lịch sử sửa đổi|manual
+field|修订记录|zh-TW|修訂記錄|manual
+field|修改人名称|en|Modifier Name|manual
+field|需会签|en|Countersign Required|manual
+field|需会签|ja|会簽が必要|manual
+field|需求2（30*10*113）增加/改变值|en|需求2（30*10*113）增加/改变值|manual
+field|需求2（35*13*107）增加/改变值|en|需求2（35*13*107）增加/改变值|manual
+field|需求4（40.5*10*114）增加/改变值|en|需求4（40.5*10*114）增加/改变值|manual
+field|需求令号|de|Nachfrage auftrag|manual
+field|需求令号|es|Número de orden de demanda|manual
+field|需求令号|fr|Numéro de commande de la demande|manual
+field|需求令号|ja|需要命令番号|manual
+field|需求令号|ko|수요 주문 번호|manual
+field|需求令号|ru|Номер заказа спроса|manual
+field|需求令号|th|คำสั่งความต้องการ|manual
+field|需求令号|vi|Yêu cầu số thứ tự|manual
+field|需求日期|de|Datum der Nachfrage|manual
+field|需求日期|es|Fecha de la demanda|manual
+field|需求日期|fr|Date de la demande|manual
+field|需求日期|ja|要請日|manual
+field|需求日期|ko|수요일|manual
+field|需求日期|ru|Дата спроса|manual
+field|需求日期|th|วันที่กำหนดความต้องการ|manual
+field|需求日期|vi|Ngày yêu cầu|manual
+field|序 号|de|Nr.|manual
+field|序 号|en|No.|manual
+field|序 号|es|N.º|manual
+field|序 号|fr|N°|manual
+field|序 号|ja|番号|manual
+field|序 号|ko|번호|manual
+field|序 号|ru|№|manual
+field|序 号|th|ลำดับ|manual
+field|序 号|vi|STT|manual
+field|序 号|zh-TW|序 號|manual
+field|序号|en|序号|manual
+field|序列号格式|en|Sn List|manual
+field|压差（kpa)|en|压差（kpa)|manual
+field|压降|en|压降|manual
+field|压降测试管路|en|压降测试管路|manual
+field|压降测试流速|en|压降测试流速|manual
+field|压降是否测试|en|Pressure Drop Tested|manual
+field|压力（PSI)样品1|en|压力（PSI)样品1|manual
+field|压力（PSI)样品2|en|压力（PSI)样品2|manual
+field|压力（PSI)样品3|en|压力（PSI)样品3|manual
+field|压力（PSI)样品4|en|压力（PSI)样品4|manual
+field|压力（PSI)样品5|en|压力（PSI)样品5|manual
+field|压力（PSI)样品6|en|压力（PSI)样品6|manual
+field|压头下降速度|en|压头下降速度|manual
+field|严重|en|Critical|manual
+field|严重不合格|en|Major Nonconformance|manual
+field|严重程度|en|Severity|manual
+field|研发部意见|en|R&D Dept Opinion|manual
+field|研发意见|en|R&D Opinion|manual
+field|盐酸或氢氧化钠|en|盐酸或氢氧化钠|manual
+field|验货人|de|Warenprüfer|manual
+field|验货人|es|Inspector de mercancías|manual
+field|验货人|fr|Inspecteur de marchandises|manual
+field|验货人|ja|検品人|manual
+field|验货人|ko|검사관|manual
+field|验货人|ru|Контролёр качества|manual
+field|验货人|th|ผู้ตรวจสอบ|manual
+field|验货人|vi|Người kiểm tra|manual
+field|验货日期|de|Datum der Inspektion|manual
+field|验货日期|es|Fecha de inspección|manual
+field|验货日期|fr|Date d'inspection|manual
+field|验货日期|ja|検品日|manual
+field|验货日期|ko|검사 날짜|manual
+field|验货日期|ru|Дата проверки|manual
+field|验货日期|th|วันที่ตรวจสอบ|manual
+field|验货日期|vi|Ngày kiểm tra|manual
+field|验证数据|en|Verification Data|manual
+field|验证数据|ja|検証データ|manual
+field|样品|en|样品|manual
+field|样品编号|de|Muster-Nr.|manual
+field|样品编号|en|Sample No.|manual
+field|样品编号|es|N.º de muestra|manual
+field|样品编号|fr|N° d'échantillon|manual
+field|样品编号|ja|サンプル番号|manual
+field|样品编号|ko|샘플 번호|manual
+field|样品编号|ru|Номер образца|manual
+field|样品编号|th|หมายเลขตัวอย่าง|manual
+field|样品编号|vi|Số mẫu|manual
+field|样品编号|zh-TW|樣品編號|manual
+field|样品配方|en|样品配方|manual
+field|样品数|en|样品数|manual
+field|样品数量|en|Sample Qty|manual
+field|样品信息|en|样品信息|manual
+field|样品信息1|en|样品信息1|manual
+field|样品信息2|en|样品信息2|manual
+field|样品信息3|en|样品信息3|manual
+field|样品信息4|en|样品信息4|manual
+field|样品信息5|en|样品信息5|manual
+field|样品信息6|en|样品信息6|manual
+field|要求|en|要求|manual
+field|业务类型|de|Art des Geschäfts|manual
+field|业务类型|es|Tipo de negocio|manual
+field|业务类型|fr|Type d'entreprise|manual
+field|业务类型|ko|사업 유형|manual
+field|业务类型|ru|Тип бизнеса|manual
+field|业务类型|th|ประเภทธุรกิจ|manual
+field|业务类型|vi|Loại hình kinh doanh|manual
+field|业务模式0:普通销售，1:直运销售|en|Biz Mode|manual
+field|业务员id|en|Emp Id|manual
+field|业务员-id|en|Saler Id|manual
+field|一般|en|Major|manual
+field|一般不合格|en|Minor Nonconformance|manual
+field|仪器名称（PH）|en|仪器名称（PH）|manual
+field|仪器名称（TDS）|en|仪器名称（TDS）|manual
+field|仪器名称（重金属）|en|仪器名称（重金属）|manual
+field|仪器名称（浊度）|en|仪器名称（浊度）|manual
+field|仪器名称/型号|en|仪器名称/型号|manual
+field|仪器状态\n√/×|en|仪器状态\n√/×|manual
+field|已开票金额|en|Entry Ivc Amount|manual
+field|已开票数量|en|Entry Ivc Qty|manual
+field|已派工数量|de|Anzahl der zugesandt|manual
+field|已派工数量|es|Número de trabajadores enviados|manual
+field|已派工数量|fr|Nombre de travailleurs affectés|manual
+field|已派工数量|ja|派遣された数量|manual
+field|已派工数量|ko|파견 된 작업 명령 수|manual
+field|已派工数量|ru|Количество отправленных работников|manual
+field|已派工数量|th|จำนวนคนงานที่ได้รับมอบหมาย|manual
+field|已派工数量|vi|Số lượng công nhân được điều động|manual
+field|已执行基本单位数量|en|Out Base Qty|manual
+field|已执行金额|en|Io Amount|manual
+field|异常产品规格|en|Abnormal Product Spec|manual
+field|异常等级|en|Abnormality Level|manual
+field|异常时间|en|Abnormality Time|manual
+field|应发数量|de|Sollmenge|manual
+field|应发数量|en|Due qty|manual
+field|应发数量|es|Cantidad debida|manual
+field|应发数量|fr|Qté due|manual
+field|应发数量|ja|応出庫数量|manual
+field|应发数量|ko|지급 예정 수량|manual
+field|应发数量|ru|Подлежит отпуску|manual
+field|应发数量|th|ปริมาณที่ต้องจ่าย|manual
+field|应发数量|vi|SL phải xuất|manual
+field|应发数量2|de|Sollmenge 2|manual
+field|应发数量2|en|Due qty 2|manual
+field|应发数量2|es|Cantidad debida 2|manual
+field|应发数量2|fr|Qté due 2|manual
+field|应发数量2|ja|応出庫数量2|manual
+field|应发数量2|ko|지급 예정 수량2|manual
+field|应发数量2|ru|Подлежит отпуску 2|manual
+field|应发数量2|th|ปริมาณที่ต้องจ่าย2|manual
+field|应发数量2|vi|SL phải xuất 2|manual
+field|应付金额本位币|en|All Amount For|manual
+field|应收金额|en|Total Amount|manual
+field|应收款余额|en|All Debt|manual
+field|应用场景|de|Anwendungsszenario|manual
+field|应用场景|en|Application Scenario|manual
+field|应用场景|es|Escenario de aplicación|manual
+field|应用场景|fr|Scénario d'application|manual
+field|应用场景|ja|適用シーン|manual
+field|应用场景|ko|적용 시나리오|manual
+field|应用场景|ru|Сценарий применения|manual
+field|应用场景|th|สถานการณ์การใช้งาน|manual
+field|应用场景|vi|Kịch bản ứng dụng|manual
+field|应用场景|zh-TW|應用場景|manual
+field|用量|en|用量|manual
+field|用途|en|用途|manual
+field|优惠分摊金额|en|Divide Diff Amount|manual
+field|有效日期|en|Valid Date|manual
+field|预付金额|en|Total Pre Amount|manual
+field|预计到货日期|de|Voraussicht licher Ankunfts termin|manual
+field|预计到货日期|es|Fecha estimada de llegada|manual
+field|预计到货日期|fr|Date d'arrivée prévue|manual
+field|预计到货日期|ja|着荷予定日|manual
+field|预计到货日期|ko|도착 예상 날짜|manual
+field|预计到货日期|ru|Предполагаемая дата прибытия|manual
+field|预计到货日期|th|วันที่คาดว่าจะมาถึง|manual
+field|预计到货日期|vi|Ngày dự kiến hàng về|manual
+field|预计交货日期|de|Liefertermin|manual
+field|预计交货日期|es|Entrega prevista|manual
+field|预计交货日期|fr|Livraison prévue|manual
+field|预计交货日期|ja|納期|manual
+field|预计交货日期|ko|납기일|manual
+field|预计交货日期|ru|Ожид. поставка|manual
+field|预计交货日期|th|วันกำหนดส่ง|manual
+field|预计交货日期|vi|Ngày giao dự kiến|manual
+field|预计完成日期|de|Voraussichtliches Enddatum|manual
+field|预计完成日期|en|预计完成日期|manual
+field|预计完成日期|es|Fecha prevista de finalización|manual
+field|预计完成日期|fr|Date d'achèvement prévue|manual
+field|预计完成日期|ja|完了予定日|manual
+field|预计完成日期|ko|완료 예정일|manual
+field|预计完成日期|ru|Планируемая дата завершения|manual
+field|预计完成日期|th|วันที่คาดว่าจะเสร็จ|manual
+field|预计完成日期|vi|Ngày hoàn thành dự kiến|manual
+field|预计完成日期|zh-TW|預計完成日期|manual
+field|预警库存|en|Alarm Stock|manual
+field|预警天数|en|Alarm Days|manual
+field|预开工日|de|Tag vor dem Bau|manual
+field|预开工日|es|Día previo a la construcción|manual
+field|预开工日|fr|Jour de pré-démarrage|manual
+field|预开工日|ja|着工予定日|manual
+field|预开工日|ko|사전 건설 시작 날짜|manual
+field|预开工日|ru|Предстартовые дни|manual
+field|预开工日|th|วันเริ่มต้น|manual
+field|预开工日|vi|Ngày trước khi bắt đầu|manual
+field|预收款金额|en|Subsist Info|manual
+field|预完工日|de|Tag vor der Fertigstellung|manual
+field|预完工日|es|Día previo a la finalización|manual
+field|预完工日|fr|Jour de pré-achèvement|manual
+field|预完工日|ja|完成予定日|manual
+field|预完工日|ko|예상 완료 날짜|manual
+field|预完工日|ru|Дни предварительной доработки|manual
+field|预完工日|th|วันที่เสร็จสิ้น|manual
+field|预完工日|vi|Ngày hoàn thành trước|manual
+field|原料处理方式|en|Raw Material Disposition|manual
+field|原料数量|en|Raw Material Qty|manual
+field|原水（tds）|en|原水（tds）|manual
+field|原水PH|en|原水PH|manual
+field|原水RO纯水|en|原水RO纯水|manual
+field|原水TDS|en|原水TDS|manual
+field|原水超纯水|en|原水超纯水|manual
+field|原水纯水|en|原水纯水|manual
+field|原水含量（ug/L）5号缸|en|原水含量（ug/L）5号缸|manual
+field|原水自来水|en|原水自来水|manual
+field|原液浓度（cfu/ml）|en|原液浓度（cfu/ml）|manual
+field|源单id|en|Src Order Id|manual
+field|源单id_src_bill_no|en|Src Bill No|manual
+field|源单id_src_inter_id|en|Src Inter Id|manual
+field|运输要求|en|运输要求|manual
+field|责任部门|en|Responsible Department|manual
+field|增值税税率|en|VAT Rate (%)|manual
+field|折后单价|en|Dis Price|manual
+field|折扣|de|Rabatt|manual
+field|折扣|es|Descuento|manual
+field|折扣|fr|Réduction|manual
+field|折扣|ja|割引|manual
+field|折扣|ko|할인|manual
+field|折扣|ru|Скидка|manual
+field|折扣|th|ส่วนลด|manual
+field|折扣|vi|Giảm giá|manual
+field|折扣单价|en|Dis Price|manual
+field|折扣额|en|Discount|manual
+field|折扣金额|de|Rabattbetrag|manual
+field|折扣金额|es|Monto del descuento|manual
+field|折扣金额|fr|Montant de la remise|manual
+field|折扣金额|ja|割引額|manual
+field|折扣金额|ko|할인 금액|manual
+field|折扣金额|ru|Сумма скидки|manual
+field|折扣金额|th|จำนวนส่วนลด|manual
+field|折扣金额|vi|Số tiền chiết khấu|manual
+field|折扣金额_dis_amount|en|Dis Amount|manual
+field|折扣率|en|Bill Dis Rate|manual
+field|折扣率%|en|Dis Rate|manual
+field|折扣税额|en|Dis Tax Amount|manual
+field|折前价税合计|en|Bill Dis Before Amount|manual
+field|折前金额|en|Pre Dis Amount|manual
+field|折算率|en|Dis Rate|manual
+field|整单折扣额|en|Bill Dis Amount|manual
+field|整单折扣分配额|en|Bill Dis Distribution|manual
+field|整单折扣分摊|en|Bill Dis Distribution|manual
+field|整单折扣率%|en|Bill Dis Rate|manual
+field|整批退货|en|Full Batch Return|manual
+field|整体规格（长度）|en|整体规格（长度）|manual
+field|整体规格（外径）|en|整体规格（外径）|manual
+field|整体规格参数|de|Gesamtspezifikation|manual
+field|整体规格参数|en|整体规格参数|manual
+field|整体规格参数|es|Especificaciones generales|manual
+field|整体规格参数|fr|Spécifications globales|manual
+field|整体规格参数|ja|全体仕様|manual
+field|整体规格参数|ko|전체 사양|manual
+field|整体规格参数|ru|Общие параметры|manual
+field|整体规格参数|th|ข้อมูลจำเพาะรวม|manual
+field|整体规格参数|vi|Thông số tổng thể|manual
+field|整体规格参数|zh-TW|整體規格參數|manual
+field|正常使用|en|Normal Use|manual
+field|职务|de|Position|manual
+field|职务|en|Position|manual
+field|职务|es|Cargo|manual
+field|职务|fr|Fonction|manual
+field|职务|ja|役職|manual
+field|职务|ko|직책|manual
+field|职务|ru|Должность|manual
+field|职务|th|ตำแหน่ง|manual
+field|职务|vi|Chức vụ|manual
+field|指标|en|指标|manual
+field|制程|en|In-Process|manual
+field|制单人|de|Erstellt von|manual
+field|制单人|en|Prepared by|manual
+field|制单人|es|Elaborado por|manual
+field|制单人|fr|Établi par|manual
+field|制单人|ja|作成者|manual
+field|制单人|ko|작성자|manual
+field|制单人|ru|Составил|manual
+field|制单人|th|ผู้จัดทำ|manual
+field|制单人|vi|Người lập|manual
+field|制订/日期|de|Erstellt / Datum|manual
+field|制订/日期|es|Elaborado / Fecha|manual
+field|制订/日期|fr|Établi / Date|manual
+field|制订/日期|ja|作成/日付|manual
+field|制订/日期|ko|작성/일자|manual
+field|制订/日期|ru|Составил / Дата|manual
+field|制订/日期|th|จัดทำ / วันที่|manual
+field|制订/日期|vi|Lập / Ngày|manual
+field|制订/日期|zh-TW|制訂/日期|manual
+field|制订日期|en|制订日期|manual
+field|智能选单|de|Intelligentes Menü|manual
+field|智能选单|es|Mendos inteligentes|manual
+field|智能选单|fr|Sélection intelligente|manual
+field|智能选单|ja|スマートメニュー|manual
+field|智能选单|ko|스마트 메뉴|manual
+field|智能选单|ru|Интеллектуальное меню|manual
+field|智能选单|th|เมนูสมาร์ท|manual
+field|智能选单|vi|Menu thông minh|manual
+field|中间值g|en|中间值g|manual
+field|中间值mm|en|中间值mm|manual
+field|中心杆尺寸|en|Center Rod Size|manual
+field|重金属|de|Schwermetalle|manual
+field|重金属|en|Heavy Metals|manual
+field|重金属|es|Metales pesados|manual
+field|重金属|fr|Métaux lourds|manual
+field|重金属|ja|重金属|manual
+field|重金属|ko|중금속|manual
+field|重金属|ru|Тяжёлые металлы|manual
+field|重金属|th|โลหะหนัก|manual
+field|重金属|vi|Kim loại nặng|manual
+field|重金属|zh-TW|重金屬|manual
+field|重量|de|Gewicht|manual
+field|重量|es|Peso|manual
+field|重量|fr|Poids|manual
+field|重量|ja|重量|manual
+field|重量|ko|무게|manual
+field|重量|ru|Вес|manual
+field|重量|th|น้ำหนัก|manual
+field|重量|vi|Trọng lượng|manual
+field|重量单位|en|Weight Unit Id|manual
+field|重量要求|en|重量要求|manual
+field|重要程度|de|Wichtigkeit|manual
+field|重要程度|en|Importance|manual
+field|重要程度|es|Importancia|manual
+field|重要程度|fr|Importance|manual
+field|重要程度|ja|重要度|manual
+field|重要程度|ko|중요도|manual
+field|重要程度|ru|Важность|manual
+field|重要程度|th|ความสำคัญ|manual
+field|重要程度|vi|Mức độ quan trọng|manual
+field|重要程度|zh-TW|重要程度|manual
+field|主要性能描述|de|Beschreibung der Hauptleistung|manual
+field|主要性能描述|en|Main Performance Description|manual
+field|主要性能描述|es|Descripción del rendimiento principal|manual
+field|主要性能描述|fr|Description des performances principales|manual
+field|主要性能描述|ja|主要性能記述|manual
+field|主要性能描述|ko|주요 성능 설명|manual
+field|主要性能描述|ru|Описание основных характеристик|manual
+field|主要性能描述|th|คำอธิบายสมรรถนะหลัก|manual
+field|主要性能描述|vi|Mô tả hiệu suất chính|manual
+field|主要性能描述|zh-TW|主要性能描述|manual
+field|助记码|en|Mnemonic Code|manual
+field|状态|en|Status|manual
+field|浊度值（NTU）\n＜1NTU|en|浊度值（NTU）\n＜1NTU|manual
+field|资金批次|de|Finanzierung stapel|manual
+field|资金批次|es|Lote de fondos|manual
+field|资金批次|fr|Lot de financement|manual
+field|资金批次|ja|資金ロット|manual
+field|资金批次|ko|자금 배치|manual
+field|资金批次|ru|Партия средств|manual
+field|资金批次|th|ชุดเงิน|manual
+field|资金批次|vi|Quỹ lô|manual
+field|子项目|de|Teilprojekt|manual
+field|子项目|en|Sub-project|manual
+field|子项目|es|Subproyecto|manual
+field|子项目|fr|Sous-projet|manual
+field|子项目|ja|サブプロジェクト|manual
+field|子项目|ko|하위 프로젝트|manual
+field|子项目|ru|Подпроект|manual
+field|子项目|th|โครงการย่อย|manual
+field|子项目|vi|Tiểu dự án|manual
+field|子项目|zh-TW|子專案|manual
+field|子项目/尺寸|de|Teilprojekt/Abmessungen|manual
+field|子项目/尺寸|en|子项目/尺寸|manual
+field|子项目/尺寸|es|Subproyecto/Medidas|manual
+field|子项目/尺寸|fr|Sous-projet/Dimensions|manual
+field|子项目/尺寸|ja|サブプロジェクト/寸法|manual
+field|子项目/尺寸|ko|하위 프로젝트/치수|manual
+field|子项目/尺寸|ru|Подпроект/Размеры|manual
+field|子项目/尺寸|th|โครงการย่อย/ขนาด|manual
+field|子项目/尺寸|vi|Tiểu dự án/Kích thước|manual
+field|子项目/尺寸|zh-TW|子專案/尺寸|manual
+field|自动抵扣预收款|en|Auto Offset Advance|manual
+field|自动生入库单|de|Automatische Lager liste|manual
+field|自动生入库单|es|Lista de almacenamiento de nacimiento automático|manual
+field|自动生入库单|fr|Codes de trésorerie de naissance automatique|manual
+field|自动生入库单|ja|自動的に入庫票を生成する|manual
+field|自动生入库单|ko|인바운드 배달 노트의 자동 생성|manual
+field|自动生入库单|ru|Автоматическая складская накладная|manual
+field|自动生入库单|th|รายการคลังสินค้าอัตโนมัติ|manual
+field|自动生入库单|vi|Phiếu nhập kho tự động|manual
+field|自来水加氯浓度|en|自来水加氯浓度|manual
+field|自制物料|en|Self-made Material|manual
+field|总成本|de|Gesamtkosten|manual
+field|总成本|en|Total cost|manual
+field|总成本|es|Coste total|manual
+field|总成本|fr|Coût total|manual
+field|总成本|ja|総原価|manual
+field|总成本|ko|총원가|manual
+field|总成本|ru|Полная себестоимость|manual
+field|总成本|th|ต้นทุนรวม|manual
+field|总成本|vi|Tổng giá thành|manual
+field|总金额|de|Gesamtbetrag|manual
+field|总金额|es|Importe total|manual
+field|总金额|fr|Montant total|manual
+field|总金额|ja|総額|manual
+field|总金额|ko|총액|manual
+field|总金额|ru|Общая сумма|manual
+field|总金额|th|ยอดรวม|manual
+field|总金额|vi|Tổng số tiền|manual
+field|总重|de|Gesamtgewicht|manual
+field|总重|es|Peso total|manual
+field|总重|fr|Le poids total|manual
+field|总重|ja|総重量|manual
+field|总重|ko|총 중량|manual
+field|总重|ru|Общий вес|manual
+field|总重|th|น้ำหนักรวม|manual
+field|总重|vi|Tổng trọng lượng|manual
+field|阻垢率（0.8mm-8g(1.1:1)）|en|阻垢率（0.8mm-8g(1.1:1)）|manual
+field|阻垢率（0.8mm-8g(1:2)）|en|阻垢率（0.8mm-8g(1:2)）|manual
+field|阻垢率（1.2mm-12g(1.1:1)）|en|阻垢率（1.2mm-12g(1.1:1)）|manual
+field|组装|en|Assembly|manual
+field|组装方式|en|组装方式|manual
+field|最低库存|en|Min. Stock|manual
+field|最低销售价|en|Min. Sales Price|manual
+field|最高采购价|en|Max. Purchase Price|manual
+field|最高库存|en|Max. Stock|manual
+field|最近采购价|en|Last Purchase Price|manual
+field|最近采购入库成本|en|Last Purchase Receipt Cost|manual
+field|最近成交供应商|en|Last Supplier|manual
+field|最近含税采购价|en|Last Purchase Price (Tax incl.)|manual
+field|最近含税销售价|en|Last Sales Price (Tax incl.)|manual
+field|最近销售价|en|Last Sales Price|manual
+field|最小包装量|en|Min. Package Qty|manual
+field|最终处理结果|en|Final Disposition|manual
+panel|班组|de|Team|manual
+panel|班组|es|Equipo|manual
+panel|班组|fr|Équipe|manual
+panel|班组|ja|班組|manual
+panel|班组|ko|반|manual
+panel|班组|ru|Бригада|manual
+panel|班组|th|ทีมงาน|manual
+panel|班组|vi|Tổ|manual
+panel|不合格报告(制程)|en|Nonconformance Report (Process)|manual
+panel|不合格品处理单(制程)|en|Nonconforming Product Disposition (Process)|manual
+panel|不合格品处理单(自制物料)|en|Nonconforming Product Disposition (Self-made Material)|manual
+panel|不合格原因|de|Ausschussgrund|manual
+panel|不合格原因|es|Motivo de rechazo|manual
+panel|不合格原因|fr|Motif de rejet|manual
+panel|不合格原因|ja|不合格理由|manual
+panel|不合格原因|ko|불합격 사유|manual
+panel|不合格原因|ru|Причина брака|manual
+panel|不合格原因|th|เหตุผลที่ไม่ผ่าน|manual
+panel|不合格原因|vi|Lý do không đạt|manual
+panel|部门|de|Abteilung|manual
+panel|部门|es|Departamento|manual
+panel|部门|fr|Département|manual
+panel|部门|ja|部門|manual
+panel|部门|ko|부서|manual
+panel|部门|ru|Отдел|manual
+panel|部门|th|แผนก|manual
+panel|部门|vi|Phòng ban|manual
+panel|材料出库单|de|Material ausgang|manual
+panel|材料出库单|es|Lista de salida de material|manual
+panel|材料出库单|fr|Don de stockage des matériaux|manual
+panel|材料出库单|ja|材料出庫票|manual
+panel|材料出库单|ko|재료 문제 슬립|manual
+panel|材料出库单|ru|Материал исходящий лист|manual
+panel|材料出库单|th|รายการวัสดุขาออก|manual
+panel|材料出库单|vi|Phiếu xuất kho vật liệu|manual
+panel|材料出库单明细表|de|Material ausgang Liste|manual
+panel|材料出库单明细表|es|Lista de materiales de salida|manual
+panel|材料出库单明细表|fr|Liste détaillée des documents de sortie|manual
+panel|材料出库单明细表|ja|材料出庫票明細表|manual
+panel|材料出库单明细表|ko|재료 문제 슬립 세부 정보 시트|manual
+panel|材料出库单明细表|ru|Список исходящих материалов|manual
+panel|材料出库单明细表|th|รายการวัสดุขาออก|manual
+panel|材料出库单明细表|vi|Danh sách tài liệu xuất kho|manual
+panel|材料出库单统计表|de|Statistische Tabelle der Material ausgang liste|manual
+panel|材料出库单统计表|es|Tabla de estadísticas de pedidos de salida de materiales|manual
+panel|材料出库单统计表|fr|Tableau statistique des listes de stockage des matériaux|manual
+panel|材料出库单统计表|ja|材料出庫票統計表|manual
+panel|材料出库单统计表|ko|재료 문제 양식 통계 테이블|manual
+panel|材料出库单统计表|ru|Таблица статистики исходящих материалов|manual
+panel|材料出库单统计表|th|ตารางสถิติการจัดส่งวัสดุ|manual
+panel|材料出库单统计表|vi|Bảng thống kê đơn hàng xuất kho vật liệu|manual
+panel|采购订单|de|Bestellbestätigung|manual
+panel|采购订单|es|Orden de compra|manual
+panel|采购订单|fr|Bon de commande|manual
+panel|采购订单|ja|購入注文|manual
+panel|采购订单|ko|구매 주문서|manual
+panel|采购订单|ru|Закупочный заказ|manual
+panel|采购订单|th|คำสั่งซื้อ|manual
+panel|采购订单|vi|Đơn đặt hàng|manual
+panel|采购入库单|de|Einkaufseingangsbeleg|manual
+panel|采购入库单|es|Albarán de entrada de compras|manual
+panel|采购入库单|fr|Bon d’entrée en stock d’achat|manual
+panel|采购入库单|ja|仕入れ入庫票|manual
+panel|采购入库单|ko|구매 수취 주문|manual
+panel|采购入库单|ru|Накладная на приёмку товара на склад|manual
+panel|采购入库单|th|ใบนำเข้าสินค้า|manual
+panel|采购入库单|vi|Phiếu nhập kho mua hàng|manual
+panel|采购入库单明细表|de|Liste der Einkaufs belege|manual
+panel|采购入库单明细表|es|Lista de recibos de compra|manual
+panel|采购入库单明细表|fr|Liste détaillée des commandes d'achat|manual
+panel|采购入库单明细表|ja|調達入庫票明細表|manual
+panel|采购入库单明细表|ko|구매 수신 주문 세부 정보 시트|manual
+panel|采购入库单明细表|ru|Подробные данные о закупках|manual
+panel|采购入库单明细表|th|กำหนดการสั่งซื้อ|manual
+panel|采购入库单明细表|vi|Bảng kê đơn mua hàng|manual
+panel|采购入库单统计表|de|Statistische Tabelle der Einkaufs beleg liste|manual
+panel|采购入库单统计表|es|Estadísticas de recibos de compra|manual
+panel|采购入库单统计表|fr|Tableau statistique des bons de passation des marchés|manual
+panel|采购入库单统计表|ja|調達入庫票統計表|manual
+panel|采购入库单统计表|ko|조달 수신 보고서 통계 표|manual
+panel|采购入库单统计表|ru|Статистические данные о складах закупок|manual
+panel|采购入库单统计表|th|ตารางสถิติการซื้อ|manual
+panel|采购入库单统计表|vi|Bảng thống kê đơn hàng mua hàng|manual
+panel|仓库|de|Lager|manual
+panel|仓库|es|Almacén|manual
+panel|仓库|fr|Entrepôt|manual
+panel|仓库|ja|倉庫|manual
+panel|仓库|ko|창고|manual
+panel|仓库|ru|Склад|manual
+panel|仓库|th|คลังสินค้า|manual
+panel|仓库|vi|Kho|manual
+panel|产成品入库单|de|Lager beleg für Fertig produkte|manual
+panel|产成品入库单|es|Lista de almacenamiento de productos terminados|manual
+panel|产成品入库单|fr|Codes d'entrée des produits finis|manual
+panel|产成品入库单|ja|完成品入庫票|manual
+panel|产成品入库单|ko|완제품 영수증 양식|manual
+panel|产成品入库单|ru|Складская накладная готовой продукции|manual
+panel|产成品入库单|th|รายการจัดเก็บผลิตภัณฑ์สำเร็จรูป|manual
+panel|产成品入库单|vi|Phiếu nhập kho thành phẩm|manual
+panel|产成品入库单明细表|de|Liste der Lager belege für Fertig produkte|manual
+panel|产成品入库单明细表|es|Lista de almacenamiento de productos terminados|manual
+panel|产成品入库单明细表|fr|Liste détaillée des commandes d'entrée des produits finis|manual
+panel|产成品入库单明细表|ja|完成品入庫票明細表|manual
+panel|产成品入库单明细表|ko|완제품 영수증 세부 목록|manual
+panel|产成品入库单明细表|ru|Подробная таблица хранения готовой продукции|manual
+panel|产成品入库单明细表|th|รายการขาเข้าของผลิตภัณฑ์สำเร็จรูป|manual
+panel|产成品入库单明细表|vi|Danh sách thành phẩm|manual
+panel|产成品入库单统计表|de|Statistische Tabelle der Lager liste für Fertig produkte|manual
+panel|产成品入库单统计表|es|Estadísticas de la lista de almacenamiento de productos terminados|manual
+panel|产成品入库单统计表|fr|Tableau statistique des stocks de produits finis|manual
+panel|产成品入库单统计表|ja|完成品入庫票統計表|manual
+panel|产成品入库单统计表|ko|완제품 영수증 통계 표|manual
+panel|产成品入库单统计表|ru|Статистика складских ведомостей готовой продукции|manual
+panel|产成品入库单统计表|th|ตารางสถิติการจัดเก็บสินค้าสำเร็จรูป|manual
+panel|产成品入库单统计表|vi|Bảng thống kê thành phẩm nhập kho|manual
+panel|产品文件列表|de|Produktdokumentliste|manual
+panel|产品文件列表|en|Product Document List|manual
+panel|产品文件列表|es|Lista de documentos de producto|manual
+panel|产品文件列表|fr|Liste des documents produit|manual
+panel|产品文件列表|ja|製品文書一覧|manual
+panel|产品文件列表|ko|제품 문서 목록|manual
+panel|产品文件列表|ru|Список документов изделия|manual
+panel|产品文件列表|th|รายการเอกสารผลิตภัณฑ์|manual
+panel|产品文件列表|vi|Danh sách tài liệu sản phẩm|manual
+panel|产品文件列表|zh-TW|產品文件列表|manual
+panel|产品信息表|en|Product Information|manual
+panel|成型工艺清单|en|Molding Process List|manual
+panel|成型配方|en|Molding Formula|manual
+panel|出货检验计划表|en|Outgoing Inspection Plan|manual
+panel|存货|de|Artikel|manual
+panel|存货|en|Inventory|manual
+panel|存货|es|Artículo|manual
+panel|存货|fr|Article|manual
+panel|存货|ja|存貨|manual
+panel|存货|ko|재고|manual
+panel|存货|ru|Номенклатура|manual
+panel|存货|th|สินค้า|manual
+panel|存货|vi|Hàng tồn|manual
+panel|存货价格本|de|Artikelpreisliste|manual
+panel|存货价格本|es|Lista de precios|manual
+panel|存货价格本|fr|Tarif article|manual
+panel|存货价格本|ja|存貨価格台帳|manual
+panel|存货价格本|ko|재고 가격대장|manual
+panel|存货价格本|ru|Прайс-лист|manual
+panel|存货价格本|th|ทะเบียนราคาสินค้า|manual
+panel|存货价格本|vi|Bảng giá tồn kho|manual
+panel|地区|de|Region|manual
+panel|地区|es|Región|manual
+panel|地区|fr|Région|manual
+panel|地区|ja|地域|manual
+panel|地区|ko|지역|manual
+panel|地区|ru|Регион|manual
+panel|地区|th|ภูมิภาค|manual
+panel|地区|vi|Khu vực|manual
+panel|工序|de|Arbeitsgang|manual
+panel|工序|es|Operación|manual
+panel|工序|fr|Opération|manual
+panel|工序|ja|工程|manual
+panel|工序|ko|공정|manual
+panel|工序|ru|Операция|manual
+panel|工序|th|ขั้นตอน|manual
+panel|工序|vi|Công đoạn|manual
+panel|工序派工单|de|Prozess versand|manual
+panel|工序派工单|es|Orden de despacho de proceso|manual
+panel|工序派工单|fr|Feuille de répartition du processus|manual
+panel|工序派工单|ja|工程派遣オーダー|manual
+panel|工序派工单|ko|프로세스 디스패치 주문|manual
+panel|工序派工单|ru|Оформление процесса|manual
+panel|工序派工单|th|กระบวนการจัดส่งใบสั่งงาน|manual
+panel|工序派工单|vi|Đơn điều phối quy trình|manual
+panel|工序派工单明细表|de|Arbeitsgang-Dispositionsdaten|manual
+panel|工序派工单明细表|en|Process Dispatch Details|manual
+panel|工序派工单明细表|es|Detalle asignaciones de proceso|manual
+panel|工序派工单明细表|fr|Détail affectations de process|manual
+panel|工序派工单明细表|ja|工程派工明細|manual
+panel|工序派工单明细表|ko|공정 작업지시 명세|manual
+panel|工序派工单明细表|ru|Детали нарядов по операциям|manual
+panel|工序派工单明细表|th|รายละเอียดจัดสรรงาน|manual
+panel|工序派工单明细表|vi|Chi tiết điều phối công đoạn|manual
+panel|工序派工单统计表|de|Arbeitsgang-Dispositionsstatistik|manual
+panel|工序派工单统计表|en|Process Dispatch Statistics|manual
+panel|工序派工单统计表|es|Estadística asignaciones de proceso|manual
+panel|工序派工单统计表|fr|Statistiques affectations de process|manual
+panel|工序派工单统计表|ja|工程派工統計表|manual
+panel|工序派工单统计表|ko|공정 작업지시 통계표|manual
+panel|工序派工单统计表|ru|Статистика нарядов по операциям|manual
+panel|工序派工单统计表|th|สถิติจัดสรรงาน|manual
+panel|工序派工单统计表|vi|Thống kê điều phối công đoạn|manual
+panel|工艺路线|de|Arbeitsplan|manual
+panel|工艺路线|es|Ruta de proceso|manual
+panel|工艺路线|fr|Gamme|manual
+panel|工艺路线|ja|工程経路|manual
+panel|工艺路线|ko|공정 라우팅|manual
+panel|工艺路线|ru|Маршрут|manual
+panel|工艺路线|th|เส้นทางกระบวนการ|manual
+panel|工艺路线|vi|Quy trình công nghệ|manual
+panel|工作中心|de|Arbeitsplatz|manual
+panel|工作中心|es|Centro de trabajo|manual
+panel|工作中心|fr|Centre de travail|manual
+panel|工作中心|ja|作業センター|manual
+panel|工作中心|ko|작업장|manual
+panel|工作中心|ru|Рабочий центр|manual
+panel|工作中心|th|ศูนย์งาน|manual
+panel|工作中心|vi|Tâm việc|manual
+panel|功能性滤效|en|Filtration Efficiency|manual
+panel|共享文件库|de|Freigegebene Dateien|manual
+panel|共享文件库|en|Shared Files|manual
+panel|共享文件库|es|Archivos compartidos|manual
+panel|共享文件库|fr|Fichiers partagés|manual
+panel|共享文件库|ja|共有ファイル|manual
+panel|共享文件库|ko|공유 파일|manual
+panel|共享文件库|ru|Общие файлы|manual
+panel|共享文件库|th|ไฟล์แชร์|manual
+panel|共享文件库|vi|Tệp chia sẻ|manual
+panel|规格书|en|Specification|manual
+panel|计量单位|de|Mengeneinheit|manual
+panel|计量单位|es|Unidad de medida|manual
+panel|计量单位|fr|Unité de mesure|manual
+panel|计量单位|ja|計量単位|manual
+panel|计量单位|ko|계량단위|manual
+panel|计量单位|ru|Ед. изм.|manual
+panel|计量单位|th|หน่วยวัด|manual
+panel|计量单位|vi|Đơn vị tính|manual
+panel|加标水配置记录表|en|Spike Water Preparation|manual
+panel|检验方案|de|Prüfplan|manual
+panel|检验方案|es|Plan de inspección|manual
+panel|检验方案|fr|Plan de contrôle|manual
+panel|检验方案|ja|検査方案|manual
+panel|检验方案|ko|검사 방안|manual
+panel|检验方案|ru|План контроля|manual
+panel|检验方案|th|แผนตรวจสอบ|manual
+panel|检验方案|vi|Phương án kiểm tra|manual
+panel|检验项目|de|Prüfmerkmal|manual
+panel|检验项目|es|Elemento de inspección|manual
+panel|检验项目|fr|Point de contrôle|manual
+panel|检验项目|ja|検査項目|manual
+panel|检验项目|ko|검사 항목|manual
+panel|检验项目|ru|Параметр контроля|manual
+panel|检验项目|th|รายการตรวจสอบ|manual
+panel|检验项目|vi|Hạng mục kiểm tra|manual
+panel|紧急放行申请单|en|Emergency Release Application|manual
+panel|来料异常分析报告|en|Incoming Material Abnormality Analysis Report|manual
+panel|立项申请|en|立项申请|manual
+panel|内部委托测试申请单|en|内部委托测试申请单|manual
+panel|其他出库单|de|Andere ausgehende Bestellungen|manual
+panel|其他出库单|es|Otros pedidos de salida|manual
+panel|其他出库单|fr|Autres bons de sortie|manual
+panel|其他出库单|ja|その他の出庫票|manual
+panel|其他出库单|ko|기타 배달 노트|manual
+panel|其他出库单|ru|Другие накладные|manual
+panel|其他出库单|th|ใบส่งของอื่นๆ|manual
+panel|其他出库单|vi|Phiếu xuất kho khác|manual
+panel|其他出库单明细表|de|Zeitplan für andere ausgehende Bestellungen|manual
+panel|其他出库单明细表|es|Otras listas de salida|manual
+panel|其他出库单明细表|fr|Liste détaillée des autres formulaires de sortie|manual
+panel|其他出库单明细表|ja|その他出庫票明細表|manual
+panel|其他出库单明细表|ko|기타 아웃 바운드 주문 세부 사항 목록|manual
+panel|其他出库单明细表|ru|Другие списки исходящих заказов|manual
+panel|其他出库单明细表|th|รายการขาออกอื่นๆ|manual
+panel|其他出库单明细表|vi|Danh sách các đơn đặt hàng khác|manual
+panel|其他出库单统计表|de|Sonstige statistische Tabelle der Auslass liste|manual
+panel|其他出库单统计表|es|Tabla de estadísticas de otras hojas de salida|manual
+panel|其他出库单统计表|fr|Tableau statistique des autres listes de stockage|manual
+panel|其他出库单统计表|ja|その他出庫票統計表|manual
+panel|其他出库单统计表|ko|기타 아웃 바운드 주문 요약 테이블|manual
+panel|其他出库单统计表|ru|Другие статистические таблицы|manual
+panel|其他出库单统计表|th|ตารางสถิติคำสั่งซื้อขาออกอื่นๆ|manual
+panel|其他出库单统计表|vi|Bảng thống kê đơn hàng xuất kho khác|manual
+panel|其他入库单|de|Sonstige Lager aufträge|manual
+panel|其他入库单|es|Otros recibos|manual
+panel|其他入库单|fr|Autres ordres de stockage|manual
+panel|其他入库单|ja|その他入庫票|manual
+panel|其他入库单|ko|기타 인바운드 배송 노트|manual
+panel|其他入库单|ru|Другие складские накладные|manual
+panel|其他入库单|th|ใบนำเข้าสินค้าอื่นๆ|manual
+panel|其他入库单|vi|Phiếu nhập kho khác|manual
+panel|其他入库单明细表|de|Zeitplan für andere Lager belege|manual
+panel|其他入库单明细表|es|Otras listas de almacenamiento|manual
+panel|其他入库单明细表|fr|Liste détaillée des autres formulaires d'entrée|manual
+panel|其他入库单明细表|ja|その他入庫票明細表|manual
+panel|其他入库单明细表|ko|기타 재고 있음 주문 세부 사항 목록|manual
+panel|其他入库单明细表|ru|Другие списки хранения|manual
+panel|其他入库单明细表|th|รายการขาเข้าอื่นๆ|manual
+panel|其他入库单明细表|vi|Danh sách các đơn đặt hàng khác|manual
+panel|其他入库单统计表|de|Andere Lagers tatistiken|manual
+panel|其他入库单统计表|es|Otras estadísticas de recibos|manual
+panel|其他入库单统计表|fr|Tableau statistique des autres listes d'inventaire|manual
+panel|其他入库单统计表|ja|その他入庫票統計表|manual
+panel|其他入库单统计表|ko|기타 재고 있음 주문 요약 테이블|manual
+panel|其他入库单统计表|ru|Другие статистические таблицы|manual
+panel|其他入库单统计表|th|ตารางสถิติคลังอื่นๆ|manual
+panel|其他入库单统计表|vi|Bảng thống kê đơn hàng nhập kho khác|manual
+panel|请购单|de|Bitte kaufen|manual
+panel|请购单|es|Solicitud de compra|manual
+panel|请购单|fr|Demande d'achat|manual
+panel|请购单|ja|購入依頼票|manual
+panel|请购单|ko|구매 신청서|manual
+panel|请购单|ru|Закупки|manual
+panel|请购单|th|ใบคำขอซื้อ|manual
+panel|请购单|vi|Đơn đề nghị mua hàng|manual
+panel|设备|de|Anlage|manual
+panel|设备|es|Equipo|manual
+panel|设备|fr|Équipement|manual
+panel|设备|ja|設備|manual
+panel|设备|ko|설비|manual
+panel|设备|ru|Оборудование|manual
+panel|设备|th|อุปกรณ์|manual
+panel|设备|vi|Thiết bị|manual
+panel|设备使用登记表|en|Equipment Usage Log|manual
+panel|生产工单|de|Produktions verarbeitung auftrag|manual
+panel|生产工单|es|Hoja de procesamiento de producción|manual
+panel|生产工单|fr|Production et traitement des commandes|manual
+panel|生产工单|ja|生産加工票|manual
+panel|生产工单|ko|생산 가공 주문|manual
+panel|生产工单|ru|Производство и обработка заказа|manual
+panel|生产工单|th|รายการการผลิตและการประมวลผล|manual
+panel|生产工单|vi|Đơn hàng gia công sản xuất|manual
+panel|生产工单明细表|de|Liste der Produktions-und Verarbeitung aufträge|manual
+panel|生产工单明细表|es|Lista de procesamiento de producción|manual
+panel|生产工单明细表|fr|Tableau détaillé des commandes de production et de traitement|manual
+panel|生产工单明细表|ja|生産加工票明細表|manual
+panel|生产工单明细表|ko|생산 처리 주문 세부 사항 시트|manual
+panel|生产工单明细表|ru|Список деталей производства и обработки|manual
+panel|生产工单明细表|th|ตารางการผลิตและการประมวลผล|manual
+panel|生产工单明细表|vi|Danh sách sản xuất và gia công|manual
+panel|生产工单统计表|de|Statistische Tabelle der Produktions verarbeitung|manual
+panel|生产工单统计表|es|Tabla de estadísticas de pedidos de producción y procesamiento|manual
+panel|生产工单统计表|fr|Tableau statistique de la production et du traitement|manual
+panel|生产工单统计表|ja|生産加工票統計表|manual
+panel|生产工单统计表|ko|생산 및 가공 주문 통계 테이블|manual
+panel|生产工单统计表|ru|Таблица статистики производства и обработки|manual
+panel|生产工单统计表|th|ตารางสถิติการผลิตและการประมวลผล|manual
+panel|生产工单统计表|vi|Bảng thống kê đơn sản xuất và chế biến|manual
+panel|生产异常分析报告|en|Production Abnormality Analysis Report|manual
+panel|试产材料使用申请单|en|Trial Material Usage Application|manual
+panel|送料暂收单|de|Vorübergehende Materialeingang|manual
+panel|送料暂收单|es|Recepción temporal de material|manual
+panel|送料暂收单|fr|Réception temporaire de matière|manual
+panel|送料暂收单|ja|材料仮受伝票|manual
+panel|送料暂收单|ko|자재 임시수령서|manual
+panel|送料暂收单|ru|Временное получение материала|manual
+panel|送料暂收单|th|ใบรับวัสดุชั่วคราว|manual
+panel|送料暂收单|vi|Phiếu tạm nhận vật tư|manual
+panel|特采申请单|en|Special Procurement Application|manual
+panel|往来单位|de|Geschäftspartner|manual
+panel|往来单位|es|Socio comercial|manual
+panel|往来单位|fr|Partenaire|manual
+panel|往来单位|ja|取引先|manual
+panel|往来单位|ko|거래처|manual
+panel|往来单位|ru|Контрагент|manual
+panel|往来单位|th|คู่ค้า|manual
+panel|往来单位|vi|Đối tác|manual
+panel|委外发料单|de|Outsourcing-Bestellung|manual
+panel|委外发料单|es|Formulario de subcontratación|manual
+panel|委外发料单|fr|Externez la facture|manual
+panel|委外发料单|ja|外注送り状|manual
+panel|委外发料单|ko|아웃소싱 소재 이슈 양식|manual
+panel|委外发料单|ru|Накладные|manual
+panel|委外发料单|th|รายการเอาท์ซอร์ส|manual
+panel|委外发料单|vi|Đơn hàng thuê ngoài|manual
+panel|委外发料单明细表|de|Fremdvergabe-Ausgabedetails|manual
+panel|委外发料单明细表|es|Detalle emisiones subcontratación|manual
+panel|委外发料单明细表|fr|Détail sorties sous-traitance|manual
+panel|委外发料单明细表|ja|委託払出明細|manual
+panel|委外发料单明细表|ko|외주 지급 명세|manual
+panel|委外发料单明细表|ru|Детали выдачи давальцу|manual
+panel|委外发料单明细表|th|รายละเอียดเบิกจ่ายงานผู้รับจ้าง|manual
+panel|委外发料单明细表|vi|Chi tiết cấp liệu gia công|manual
+panel|委外发料单统计表|de|Fremdvergabe-Ausgabestatistik|manual
+panel|委外发料单统计表|es|Estadística emisiones subcontratación|manual
+panel|委外发料单统计表|fr|Statistiques sorties sous-traitance|manual
+panel|委外发料单统计表|ja|委託払出統計表|manual
+panel|委外发料单统计表|ko|외주 지급 통계표|manual
+panel|委外发料单统计表|ru|Статистика выдач давальцу|manual
+panel|委外发料单统计表|th|สถิติเบิกจ่ายงานผู้รับจ้าง|manual
+panel|委外发料单统计表|vi|Thống kê cấp liệu gia công|manual
+panel|委外加工单|de|Outsourcing-Verarbeitung auftrag|manual
+panel|委外加工单|es|Hoja de procesamiento de subcontratación|manual
+panel|委外加工单|fr|Processing de l'ordre|manual
+panel|委外加工单|ja|外注加工票|manual
+panel|委外加工单|ko|아웃소싱 처리 주문|manual
+panel|委外加工单|ru|Внешняя обработка заказа|manual
+panel|委外加工单|th|ใบสั่งเอาท์ซอร์ส|manual
+panel|委外加工单|vi|Đơn hàng gia công|manual
+panel|委外入库单|de|Outsourcing-Lager auftrag|manual
+panel|委外入库单|es|Lista de entrada de subcontratación|manual
+panel|委外入库单|fr|Codes d'entrée externés|manual
+panel|委外入库单|ja|外注入庫票|manual
+panel|委外入库单|ko|아웃소싱 상품 영수증 주문|manual
+panel|委外入库单|ru|Внешнеказначейские накладные|manual
+panel|委外入库单|th|ใบสั่งเอาท์ซอร์ส|manual
+panel|委外入库单|vi|Phiếu nhập kho ủy thác|manual
+panel|委外入库单明细表|de|Fremdvergabe-Eingangsdetails|manual
+panel|委外入库单明细表|es|Detalle entradas subcontratación|manual
+panel|委外入库单明细表|fr|Détail entrées sous-traitance|manual
+panel|委外入库单明细表|ja|委託入庫明細|manual
+panel|委外入库单明细表|ko|외주 입고 명세|manual
+panel|委外入库单明细表|ru|Детали поступлений давальца|manual
+panel|委外入库单明细表|th|รายละเอียดรับเข้างานผู้รับจ้าง|manual
+panel|委外入库单明细表|vi|Chi tiết nhập gia công|manual
+panel|委外入库单统计表|de|Fremdvergabe-Eingangsstatistik|manual
+panel|委外入库单统计表|es|Estadística entradas subcontratación|manual
+panel|委外入库单统计表|fr|Statistiques entrées sous-traitance|manual
+panel|委外入库单统计表|ja|委託入庫統計表|manual
+panel|委外入库单统计表|ko|외주 입고 통계표|manual
+panel|委外入库单统计表|ru|Статистика поступлений давальца|manual
+panel|委外入库单统计表|th|สถิติรับเข้างานผู้รับจ้าง|manual
+panel|委外入库单统计表|vi|Thống kê nhập gia công|manual
+panel|项目|de|Projekt|manual
+panel|项目|es|Proyecto|manual
+panel|项目|fr|Projet|manual
+panel|项目|ja|プロジェクト|manual
+panel|项目|ko|프로젝트|manual
+panel|项目|ru|Проект|manual
+panel|项目|th|โครงการ|manual
+panel|项目|vi|Dự án|manual
+panel|项目进度查询|en|项目进度查询|manual
+panel|项目实施计划|en|项目实施计划|manual
+panel|销售出库单|de|Verkaufsausgangslieferschein|manual
+panel|销售出库单|es|Documento de salida de venta|manual
+panel|销售出库单|fr|Bon de sortie des ventes|manual
+panel|销售出库单|ja|販売出庫票|manual
+panel|销售出库单|ko|판매 인도증|manual
+panel|销售出库单|ru|Товарная накладная на отгрузку|manual
+panel|销售出库单|th|ใบส่งของออกจำหน่าย|manual
+panel|销售出库单|vi|Phiếu xuất kho bán hàng|manual
+panel|销售出库单明细表|de|Verkaufs liste|manual
+panel|销售出库单明细表|es|Lista de ventas|manual
+panel|销售出库单明细表|fr|Liste détaillée des factures de vente|manual
+panel|销售出库单明细表|ja|販売出庫明細表|manual
+panel|销售出库单明细表|ko|판매 아웃 바운드 주문 세부 정보 목록|manual
+panel|销售出库单明细表|ru|Подробная таблица исходящих заказов на продажу|manual
+panel|销售出库单明细表|th|รายการขายและขาออก|manual
+panel|销售出库单明细表|vi|Danh sách các đơn đặt hàng bán hàng|manual
+panel|销售出库单统计表|de|Statistik der Verkaufs-und Verkaufs liste|manual
+panel|销售出库单统计表|es|Tabla de estadísticas de pedidos de salida de ventas|manual
+panel|销售出库单统计表|fr|Tableau statistique des listes de vente|manual
+panel|销售出库单统计表|ja|販売出庫票統計表|manual
+panel|销售出库单统计表|ko|판매 아웃 바운드 주문 통계 테이블|manual
+panel|销售出库单统计表|ru|Таблица статистики продаж|manual
+panel|销售出库单统计表|th|ตารางสถิติใบสั่งขายและขาออก|manual
+panel|销售出库单统计表|vi|Bảng thống kê đơn hàng xuất kho bán hàng|manual
+panel|销售订单|de|Kundenauftrag|manual
+panel|销售订单|es|Pedido de venta|manual
+panel|销售订单|fr|Commande de vente|manual
+panel|销售订单|ja|受注伝票|manual
+panel|销售订单|ko|수주 오더|manual
+panel|销售订单|ru|Заказ клиента|manual
+panel|销售订单|th|ใบสั่งขาย|manual
+panel|销售订单|vi|Đơn hàng bán|manual
+panel|销售订单明细表|de|Kundenauftragspositionen|manual
+panel|销售订单明细表|es|Detalle pedidos de venta|manual
+panel|销售订单明细表|fr|Détail commandes de vente|manual
+panel|销售订单明细表|ja|受注伝票明細|manual
+panel|销售订单明细表|ko|수주 오더 명세|manual
+panel|销售订单明细表|ru|Детали заказов клиентов|manual
+panel|销售订单明细表|th|รายละเอียดใบสั่งขาย|manual
+panel|销售订单明细表|vi|Chi tiết đơn hàng bán|manual
+panel|销售订单统计表|de|Kundenauftragsstatistik|manual
+panel|销售订单统计表|es|Estadística pedidos de venta|manual
+panel|销售订单统计表|fr|Statistiques commandes de vente|manual
+panel|销售订单统计表|ja|受注統計表|manual
+panel|销售订单统计表|ko|수주 통계표|manual
+panel|销售订单统计表|ru|Статистика заказов|manual
+panel|销售订单统计表|th|สถิติใบสั่งขาย|manual
+panel|销售订单统计表|vi|Thống kê đơn hàng bán|manual
+panel|压降、精度|en|压降、精度|manual
+panel|样品编号表|de|Muster-Nummernregister|manual
+panel|样品编号表|en|Sample Number Registry|manual
+panel|样品编号表|es|Registro de números de muestra|manual
+panel|样品编号表|fr|Registre des numéros d'échantillon|manual
+panel|样品编号表|ja|サンプル番号表|manual
+panel|样品编号表|ko|샘플 번호표|manual
+panel|样品编号表|ru|Реестр номеров образцов|manual
+panel|样品编号表|th|ทะเบียนหมายเลขตัวอย่าง|manual
+panel|样品编号表|vi|Sổ đăng ký số mẫu|manual
+panel|样品编号表|zh-TW|樣品編號表|manual
+panel|业务员档案|de|Vertriebsmitarbeiter|manual
+panel|业务员档案|es|Maestro de vendedores|manual
+panel|业务员档案|fr|Commerciaux|manual
+panel|业务员档案|ja|担当者マスター|manual
+panel|业务员档案|ko|담당자 마스터|manual
+panel|业务员档案|ru|Реестр менеджеров|manual
+panel|业务员档案|th|ทะเบียนพนักงานขาย|manual
+panel|业务员档案|vi|Hồ sơ nhân viên kinh doanh|manual
+panel|仪器使用记录表|en|Instrument Usage Log|manual
+panel|员工|de|Mitarbeiter|manual
+panel|员工|en|Employee|manual
+panel|员工|es|Empleado|manual
+panel|员工|fr|Employé|manual
+panel|员工|ja|従業員|manual
+panel|员工|ko|직원|manual
+panel|员工|ru|Сотрудник|manual
+panel|员工|th|พนักงาน|manual
+panel|员工|vi|Nhân viên|manual
+panel|组装BOM表|en|Assembly BOM|manual
+panel|组装工艺清单|en|Assembly Process List|manual

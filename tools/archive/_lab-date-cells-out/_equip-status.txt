@@ -1,0 +1,14 @@
+hop0: cells=0 设备名称=""
+hop1: cells=7 设备名称=""
+hop2: cells=7 设备名称=""
+hop3: cells=7 设备名称=""
+hop4: cells=7 设备名称=""
+hop5: cells=7 设备名称=""
+before: ["2026-09-04","除铅","NSF53","3#","","冯敏",""]
+input: typed
+after-type: ["2026-09-04","除铅","NSF53","3#","管路渗漏（探针写入）","冯敏",""]
+hook: hooked
+save: clicked cls=as-side-btn
+toast: []
+reqs: ["POST /api/px/callButton -> 200 {\"code\":200,\"message\":\"success\",\"data\":{\"单据状态\":\"已归档\",\"编号\":\"EU2609040001\"}}","GET /api/report/templates?panelCode=RD_EQUIP_USE -> 200 {\"code\":200,\"message\":\"success\",\"data\":[]}","POST /api/px/queryFormDataList -> 200 {\"code\":200,\"message\":\"success\",\"data\":{\"totalSize\":3,\"list\":[{\"单据编号\":\"EU2609040003\",\"单据日期\":\"2026-09-04\",\"编号\":\"EU2609040003\",\"单据状态\":\"草稿\",\"saved\":null,\"detail\":{\"items\":[]}},{\"单据编号\":\"EU2609040002\",\"单据日期\":\"2026-09-04\",\"编号\":\"EU2609040002\",\"单据状态\":\"草稿\",\"saved\":null,\"detail\":{\"items\":[{\"id\":2}]}},{\"设备名称\":\"加标测试系统3#\",\"单据编号\":\"EU2609040001\",\"单据日期\":\"2026-09-04\",\"编号\":\"EU2609040001\",\"单据状态\":\"已归档\",\"saved\":\"Y\",\"d"]
+after-save: ["2026-09-04","除铅","NSF53","3#","管路渗漏（探针写入）","冯敏","/"]

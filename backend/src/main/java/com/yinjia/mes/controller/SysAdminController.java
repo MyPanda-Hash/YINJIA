@@ -157,6 +157,7 @@ public class SysAdminController {
         return ApiResult.ok(jdbc.queryForList(
                 "SELECT u.id, u.username AS userName, u.real_name AS realName, u.dept_id AS deptId,"
                         + " u.role_id AS roleId, u.enabled, d.dept_name AS deptName, r.role_name AS roleName,"
+                        + " ISNULL(u.生产车间, N'') AS workshop,"
                         + " CASE WHEN u.is_admin='Y' THEN 1 ELSE 0 END AS isAdmin"
                         + " FROM yj_user u LEFT JOIN yj_dept d ON d.id = u.dept_id"
                         + " LEFT JOIN yj_role r ON r.id = u.role_id ORDER BY u.id"));
@@ -172,6 +173,10 @@ public class SysAdminController {
         Integer deptId = (Integer) body.get("deptId");
         Integer roleId = (Integer) body.get("roleId");
         String enabled = "0".equals(String.valueOf(body.getOrDefault("enabled", 1))) ? "0" : "1";
+        // 生产车间(9.29 批次③「排产界面按车间过滤」):账号车间 → 排产界面只出本车间产线;
+        // 空 = 不受限(管理员/计划组照旧看全部)。取值域 = bs_prod_line.生产车间,不做外键(车间是文本派生值)。
+        String workshop = body.get("workshop") == null ? null : String.valueOf(body.get("workshop")).trim();
+        if (workshop != null && workshop.isBlank()) workshop = null;
         // 权限随角色:仅当所选角色本身就是管理员角色时 is_admin=Y。
         // ⚠ 旧写法把初值写成 "Y"、只在 roleId 非空时才可能改成 "N" —— 于是
         // 「不选角色新建的账号」直接成为系统管理员(2026-09-22 探针实测:id=61/62 两个无角色账号 is_admin=Y)。
@@ -184,20 +189,20 @@ public class SysAdminController {
         Object id = body.get("id");
         if (id != null && !String.valueOf(id).isBlank()) {
             if (!password.isBlank()) {
-                jdbc.update("UPDATE yj_user SET real_name=?, dept_id=?, role_id=?, enabled=?, is_admin=?, password_hash=? WHERE id=?",
-                        realName, deptId, roleId, enabled, isAdmin, encoder.encode(password), Integer.parseInt(String.valueOf(id)));
+                jdbc.update("UPDATE yj_user SET real_name=?, dept_id=?, role_id=?, enabled=?, is_admin=?, 生产车间=?, password_hash=? WHERE id=?",
+                        realName, deptId, roleId, enabled, isAdmin, workshop, encoder.encode(password), Integer.parseInt(String.valueOf(id)));
             } else {
-                jdbc.update("UPDATE yj_user SET real_name=?, dept_id=?, role_id=?, enabled=?, is_admin=? WHERE id=?",
-                        realName, deptId, roleId, enabled, isAdmin, Integer.parseInt(String.valueOf(id)));
+                jdbc.update("UPDATE yj_user SET real_name=?, dept_id=?, role_id=?, enabled=?, is_admin=?, 生产车间=? WHERE id=?",
+                        realName, deptId, roleId, enabled, isAdmin, workshop, Integer.parseInt(String.valueOf(id)));
             }
         } else {
             if (password.isBlank()) throw new IllegalArgumentException("新建用户必须设置密码");
             Integer dup = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM yj_user WHERE username = ?", Integer.class, userName);
             if (dup != null && dup > 0) throw new IllegalStateException("账号已存在：" + userName);
-            jdbc.update("INSERT INTO yj_user (username, password_hash, real_name, is_admin, dept_id, role_id, enabled)"
-                            + " VALUES (?,?,?,?,?,?,?)",
-                    userName, encoder.encode(password), realName, isAdmin, deptId, roleId, enabled);
+            jdbc.update("INSERT INTO yj_user (username, password_hash, real_name, is_admin, dept_id, role_id, enabled, 生产车间)"
+                            + " VALUES (?,?,?,?,?,?,?,?)",
+                    userName, encoder.encode(password), realName, isAdmin, deptId, roleId, enabled, workshop);
         }
         return ApiResult.ok(null);
     }

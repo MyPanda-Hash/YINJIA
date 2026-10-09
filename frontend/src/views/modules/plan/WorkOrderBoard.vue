@@ -18,24 +18,29 @@
     <div class="wb-body">
       <!-- 左:各线 未交量(=基础资料生产线档案,含停用) -->
       <div class="wb-left">
-        <div class="wb-left-head">{{ tt('生产线') }}</div>
-        <div v-for="l in lineSummary" :key="l.生产线" class="wb-line"
-             :class="{ active: sel.line === l.生产线, off: l.停用 }" @click="select(l)">
-          <div class="wb-line-name">
-            {{ l.生产线 }}
-            <span v-if="l.停用" class="wb-tag off-line">{{ tt('停用') }}</span>
+        <div class="wb-left-head">{{ tt('工序/工艺') }} / {{ tt('生产线') }}</div>
+        <!-- 按工序/工艺分组(2026-10-05,依《新系统产线命名.xlsx》):分发维度=生产线,功能分组=成型/切炭/组装 -->
+        <template v-for="g in lineGroups" :key="g.车间">
+          <div class="wb-shop-group">{{ tt(g.车间) }}<span class="wb-shop-cnt">{{ g.lines.length }}</span></div>
+          <div v-for="l in g.lines" :key="l.生产线" class="wb-line"
+               :class="{ active: sel.line === l.生产线, off: l.停用 }" @click="select(l)">
+            <div class="wb-line-name">
+              {{ l.生产线 }}
+              <span v-if="l.停用" class="wb-tag off-line">{{ tt('停用') }}</span>
+            </div>
+            <div class="wb-line-row">
+              <span class="wb-qty">{{ num(l.未交量) }}</span>
+            </div>
           </div>
-          <div class="wb-line-sub">{{ l.生产车间 }}</div>
-          <div class="wb-line-row">
-            <span class="wb-qty">{{ num(l.未交量) }}</span>
-          </div>
-        </div>
+        </template>
       </div>
 
       <!-- 右:选中线正在运行的工单明细 -->
       <div class="wb-main">
         <div class="wb-ctx">
-          <span class="wb-ctx-label">{{ tt('生产线') }}：<b>{{ sel.line || tt('（点击左侧选择）') }}</b></span>
+          <span class="wb-ctx-label">{{ tt('生产线') }}：<b>{{ sel.line || tt('（点击左侧选择）') }}</b>
+            <span v-if="shop" class="wb-shop">{{ tt('当前车间') }}：{{ shop }}</span>
+          </span>
           <span class="wb-ctx-stats">
             {{ tt('排产数量') }} {{ num(selQty) }}　|　{{ tt('未完工量') }} {{ num(selOutstanding) }}
           </span>
@@ -65,7 +70,10 @@
                 </template>
               </el-dropdown>
               <el-button size="small" type="warning" plain :disabled="!checkedSched.length" @click="openReassign">
-                {{ tt('批量调线') }}（{{ checkedSched.length }}）
+                {{ tt('调拨') }}（{{ checkedSched.length }}）
+              </el-button>
+              <el-button size="small" plain :disabled="!checkedSched.length" @click="doTransferRevoke">
+                {{ tt('撤回调拨') }}
               </el-button>
               <!-- 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04):它按 默认BOM×排产数量 生成领料单草稿,
                    数据源 bs_bom 与后端 /px/scheduleBoard/toPicking 端点同期删除 ⇒ 按钮一并撤掉 -->
@@ -91,10 +99,19 @@
             <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
             <el-table-column :label="tt('需求数量')" prop="需求数量" width="90" align="right" />
             <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
-            <el-table-column :label="tt('已报工')" prop="已报工" width="85" align="right" />
+            <!-- 工序口径:当前工序 = 该行**现在该做的工序**(预排台账位置;在切炭线就显示切炭),
+                 旁边给「上道工序 + 上道完工量」= 来料量(上一道已审报工量) -->
+            <el-table-column :label="tt('当前工序')" prop="当前工序" width="95" sortable>
+              <template #default="{ row }">{{ row.当前工序 ? tt(row.当前工序) : '-' }}</template>
+            </el-table-column>
+            <el-table-column :label="tt('当前工序计划量')" prop="当前工序计划量" width="120" align="right" />
+            <el-table-column :label="tt('当前工序完工量')" prop="当前工序完工量" width="120" align="right" />
+            <el-table-column :label="tt('上道工序')" prop="上道工序" width="95">
+              <template #default="{ row }">{{ row.上道工序 ? tt(row.上道工序) : '-' }}</template>
+            </el-table-column>
+            <el-table-column :label="tt('上道完工量')" prop="上道完工量" width="110" align="right" />
+            <!-- 成品口径:未交量 = 排产数量 − 入库数量(此前误减工序口径报工量 ⇒ 换算率 >1 时出负数) -->
             <el-table-column :label="tt('未交量')" prop="未交量" width="85" align="right" />
-            <el-table-column :label="tt('每箱数量')" prop="每箱数量" width="85" align="right" />
-            <el-table-column :label="tt('箱数')" prop="箱数" width="75" align="right" />
             <el-table-column :label="tt('余量')" prop="余量" width="80" align="right" />
             <el-table-column :label="tt('操作员')" prop="操作员" width="80" />
             <el-table-column :label="tt('备注')" prop="备注" min-width="100" show-overflow-tooltip />
@@ -116,99 +133,31 @@
       </div>
     </div>
 
-    <!-- 批量调线弹窗(目标=启用线;停用线由后端守卫拒绝) -->
-    <el-dialog v-model="raVisible" :title="tt('批量调线')" width="360px" append-to-body>
-      <div class="wb-p">{{ tt('目标生产线') }}
-        <el-select v-model="raLine" filterable style="width: 200px">
-          <el-option v-for="x in raLines" :key="x" :label="x" :value="x" />
+    <!-- 调拨弹窗(9.29 批次②):车间 → 产线 两级目标;写 wo_transfer_log 轨迹,可撤回(调回原线、轨迹留痕) -->
+    <el-dialog v-model="raVisible" :title="tt('工单调拨')" width="430px" append-to-body>
+      <div class="wb-p">{{ tt('目标车间') }}
+        <el-select v-model="raShop" filterable clearable style="width: 210px" @change="raLine = ''">
+          <el-option v-for="x in shops" :key="x.车间" :label="x.车间 + '（' + x.产线数 + '）'" :value="x.车间" />
         </el-select>
       </div>
+      <div class="wb-p">{{ tt('目标生产线') }}
+        <el-select v-model="raLine" filterable style="width: 210px">
+          <el-option v-for="x in raLines" :key="x.生产线"
+                     :label="x.生产线 + (x.生产车间 ? '·' + x.生产车间 : '')" :value="x.生产线" />
+        </el-select>
+      </div>
+      <div class="wb-p">{{ tt('调拨原因') }}
+        <el-input v-model="raReason" size="small" style="width: 210px" :placeholder="tt('选填')" />
+      </div>
+      <div class="wb-p wb-dim">{{ tt('调拨写入轨迹(工单追溯可见);「撤回调拨」可把产线调回原线') }}</div>
       <template #footer>
         <el-button @click="raVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="doReassign">{{ tt('确认调线') }}</el-button>
+        <el-button type="primary" @click="doTransfer">{{ tt('确认调拨') }}</el-button>
       </template>
     </el-dialog>
 
-    <!-- 追溯弹窗(参考旧系统 品质追溯):头+时间线+排产/完工/入库/领料;质检段待品质面板接入后补 -->
-    <el-dialog v-model="traceVisible" :title="tt('工单追溯')" width="92%" top="4vh" append-to-body>
-      <template v-if="trace">
-        <div class="wb-trace-head">
-          <span class="wb-trace-no">{{ trace['头']?.['加工单号'] }}</span>
-          <span class="wb-tag" :class="trace['头']?.['单据状态'] === '已审核' ? 'open' : 'closed'">{{ trace['头']?.['单据状态'] }}</span>
-          <span v-if="trace['头']?.['结案'] === 'Y'" class="wb-tag off-line">{{ tt('已结案') }}</span>
-        </div>
-        <div class="wb-trace-desc">
-          <span>{{ tt('产品') }}: {{ trace['头']?.['产品编码'] }} {{ trace['头']?.['产品名称'] }}</span>
-          <span>{{ tt('规格型号') }}: {{ trace['头']?.['规格型号'] || '-' }}</span>
-          <span>{{ tt('客户') }}: {{ trace['头']?.['客户'] || '-' }}</span>
-          <span>{{ tt('客户订单号') }}: {{ trace['头']?.['客户订单号'] || '-' }}</span>
-          <span>{{ tt('批号') }}: {{ trace['头']?.['批号'] || '-' }}</span>
-          <span>{{ tt('生产线') }}: {{ trace['头']?.['生产线'] || tt('未排产') }}</span>
-          <span>{{ tt('排产数量') }}: {{ num(trace['头']?.['排产数量']) }}</span>
-          <span>{{ tt('入库数量') }}: {{ num(trace['头']?.['入库数量']) }}</span>
-          <span>{{ tt('余量') }}: {{ num(trace['头']?.['余量']) }}</span>
-        </div>
-
-        <div class="wb-trace-block">
-          <div class="wb-block-title">{{ tt('流转时间线') }}</div>
-          <el-table :data="trace['时间线']" size="small" border max-height="180">
-            <el-table-column :label="tt('步骤')" prop="步骤" width="140" />
-            <el-table-column :label="tt('操作人')" prop="操作人" width="140" />
-            <el-table-column :label="tt('时间')" prop="时间" min-width="160" />
-          </el-table>
-        </div>
-
-        <div class="wb-trace-block">
-          <div class="wb-block-title">{{ tt('排产数据') }}</div>
-          <el-table :data="trace['排产数据']" size="small" border max-height="180">
-            <el-table-column :label="tt('生产线')" prop="生产线" width="110" />
-            <el-table-column :label="tt('排产数量')" prop="排产数量" width="90" align="right" />
-            <el-table-column :label="tt('需求数量')" prop="需求数量" width="90" align="right" />
-            <el-table-column :label="tt('入库数量')" prop="入库数量" width="90" align="right" />
-            <el-table-column :label="tt('余量')" prop="余量" width="80" align="right" />
-            <el-table-column :label="tt('每箱数量')" prop="每箱数量" width="85" align="right" />
-            <el-table-column :label="tt('箱数')" prop="箱数" width="75" align="right" />
-            <el-table-column :label="tt('开产量')" prop="开产量" width="85" align="right" />
-            <el-table-column :label="tt('计划开工日')" prop="计划开工日" width="100" />
-            <el-table-column :label="tt('工序交期')" prop="工序交期" width="100" />
-            <el-table-column :label="tt('生产状态')" prop="生产状态" width="90" />
-          </el-table>
-        </div>
-
-        <div class="wb-trace-block">
-          <div class="wb-block-title">{{ tt('完工数据') }}</div>
-          <el-table :data="trace['完工数据']" size="small" border max-height="160" :empty-text="tt('暂无报工')">
-            <el-table-column :label="tt('工序')" prop="工序" min-width="120" />
-            <el-table-column :label="tt('计划数量')" prop="计划数量" width="100" align="right" />
-            <el-table-column :label="tt('完成数量')" prop="完成数量" width="100" align="right" />
-            <el-table-column :label="tt('报工人')" prop="报工人" width="120" />
-            <el-table-column :label="tt('报工时间')" prop="报工时间" width="150" />
-          </el-table>
-          <div class="wb-trace-sub">{{ tt('入库单据') }}（{{ (trace['入库单据'] || []).length }}）</div>
-          <el-table :data="trace['入库单据']" size="small" border max-height="140" :empty-text="tt('暂无入库')">
-            <el-table-column :label="tt('入库单号')" prop="单据编号" width="170" />
-            <el-table-column :label="tt('单据日期')" prop="单据日期" width="100" />
-            <el-table-column :label="tt('入库类别')" prop="入库类别" width="110" />
-            <el-table-column :label="tt('经手人')" prop="经手人" width="110" />
-            <el-table-column :label="tt('备注')" prop="备注" min-width="120" />
-          </el-table>
-        </div>
-
-        <div class="wb-trace-block">
-          <div class="wb-block-title">{{ tt('领料数据') }}</div>
-          <el-table :data="trace['领料数据']" size="small" border max-height="180" :empty-text="tt('暂无领料')">
-            <el-table-column :label="tt('领料单号')" prop="领料单号" width="170" />
-            <el-table-column :label="tt('领料日期')" prop="领料日期" width="100" />
-            <el-table-column :label="tt('材料编码')" prop="材料编码" width="120" show-overflow-tooltip />
-            <el-table-column :label="tt('材料名称')" prop="材料名称" min-width="140" show-overflow-tooltip />
-            <el-table-column :label="tt('规格型号')" prop="规格型号" width="110" show-overflow-tooltip />
-            <el-table-column :label="tt('单位')" prop="单位" width="55" />
-            <el-table-column :label="tt('数量')" prop="数量" width="90" align="right" />
-            <el-table-column :label="tt('批号')" prop="批号" width="110" />
-          </el-table>
-        </div>
-      </template>
-    </el-dialog>
+    <!-- 工单详情·追溯:共用组件 WorkOrderTraceDialog(2026-10-05;生产工单页也原地挂同一个) -->
+    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" />
   </div>
 </template>
 
@@ -219,6 +168,7 @@ import request from '@core/request'
 import { callButton } from '@/business/engine'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
+import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import { useUserStore } from '@/stores/user'
 
 const day = ref(new Date().toISOString().slice(0, 10))
@@ -231,14 +181,42 @@ const s = ref({})
 
 const raVisible = ref(false)
 const raLine = ref('')
-// 调线目标=启用线(停用线不可再排/调入)
-const raLines = computed(() => lineSummary.value.filter((l) => !l.停用).map((l) => l.生产线))
+const raShop = ref('')
+const raReason = ref('')
+const shops = ref([])
+// 调拨目标=启用线(停用线不可再排/调入);选了车间则只看该车间的线(车间是产线的属性)
+const raLines = computed(() => lineSummary.value
+  .filter((l) => !l.停用 && (!raShop.value || l.生产车间 === raShop.value))
+  .map((l) => ({ 生产线: l.生产线, 生产车间: l.生产车间 })))
+
+/** 车间下拉(启用产线的车间去重 + 该车间产线数) */
+async function loadShops() {
+  try {
+    const res = await request.post('/px/scheduleBoard/workshops', {})
+    shops.value = res.data || []
+  } catch { /* 不阻断 */ }
+}
 
 function num(v) { const n = Number(v || 0); return n ? n.toFixed(2).replace(/\.?0+$/, '') : '0' }
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
 const selQty = computed(() => schedRows.value.reduce((a, r) => a + Number(r.排产数量 || 0), 0))
-// 未完工量=Σ未交量(排产−max(入库,已报工),报工扣减口径);旧数据无未交量字段时回退余量
+/** 左侧按工序/工艺两级分组(2026-10-05):第1级=成型/切炭/组装,第2级=产线分组(成型下 烧结/X烧结) */
+const lineGroups = computed(() => {
+  const m = new Map()
+  for (const l of lineSummary.value) {
+    const k = l.产线分组 ? `${l.生产车间}·${l.产线分组}` : (l.生产车间 || '未归类')
+    if (!m.has(k)) m.set(k, [])
+    m.get(k).push(l)
+  }
+  return [...m.entries()].map(([车间, lines]) => ({ 车间, lines }))
+})
+// 当前账号的车间(9.29 批次③):由 linesSummary 的产线车间反推(账号车间 = 其可见线的车间;不受限账号为多值 → 不显示)
+const shop = computed(() => {
+  const set = [...new Set(lineSummary.value.map((l) => l.生产车间).filter(Boolean))]
+  return set.length === 1 ? set[0] : ''
+})
+// 未完工量=Σ未交量(**成品口径**:排产−入库,2026-10-07 起);旧数据无未交量字段时回退余量
 const selOutstanding = computed(() => schedRows.value.reduce((a, r) => a + (r.未交量 !== undefined ? Number(r.未交量 || 0) : Number(r.余量 || 0)), 0))
 
 function select(l) {
@@ -276,6 +254,9 @@ function loadAll() { loadSummary(); loadScheduled(); loadStats() }
 function openReassign() {
   if (!checkedSched.value.length) return
   raLine.value = sel.line
+  raShop.value = lineSummary.value.find((l) => l.生产线 === sel.line)?.生产车间 || ''
+  raReason.value = ''
+  loadShops()
   raVisible.value = true
 }
 
@@ -301,18 +282,16 @@ async function unclose() {
   loadSummary()
 }
 
-// ── 追溯:单张工单的流转到哪一步(头+时间线+排产/完工/入库/领料;质检段待品质面板接入后补) ──
+// ── 追溯(= 工单详情,2026-10-05):**弹窗抽成共用组件 WorkOrderTraceDialog**(生产工单页也原地挂同一个,
+//    用户口径「在生产工单也可以这样查看,不是跳转到工单排产」)。本页只负责:置单号 + 打开。
 const traceVisible = ref(false)
-const trace = ref(null)
+const traceNo = ref('')
 
-async function openTrace(noParam) {
-  let no = typeof noParam === 'string' ? noParam : checkedSched.value[0]?.加工单号
+function openTrace(noParam) {
+  const no = typeof noParam === 'string' ? noParam : (noParam?.['工单号'] || checkedSched.value[0]?.加工单号)
   if (!no) return
-  try {
-    const res = await request.post('/px/scheduleBoard/trace', { 工单号: no })
-    trace.value = res.data || {}
-    traceVisible.value = true
-  } catch (e) { err(e, '查询失败') }
+  traceNo.value = no
+  traceVisible.value = true
 }
 
 // ── 打印工单(两模板可选,2026-09-27):成型/组装生产任务单 = 行表直打;打印留痕 printStamp ──
@@ -343,26 +322,53 @@ async function printTask(mode) {
   loadScheduled()
 }
 
-async function doReassign() {
+/** 调拨(9.29 批次②):勾选已排工单 → 目标产线(可按车间收敛)+ 原因 → 写 `wo_transfer_log` 轨迹 */
+async function doTransfer() {
   if (!raLine.value) { ElMessage.warning(tt('请选择目标生产线')); return }
+  const rows = checkedSched.value.map((r) => ({ 工单号: r.加工单号, 工单行号: r.工单行号, 批次号: r.批次号 }))
   try {
-    const res = await request.post('/px/scheduleBoard/reassign', {
-      rows: checkedSched.value.map((r) => ({ 加工单号: r.加工单号 })),
-      目标生产线: raLine.value,
+    await ElMessageBox.confirm(`${tt('确认调拨')} ${rows.length} ${tt('张工单')} → ${raLine.value}？`, tt('工单调拨'),
+      { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
+  } catch { return }
+  try {
+    const res = await request.post('/px/scheduleBoard/transfer', {
+      rows, 目标生产线: raLine.value, 目标车间: raShop.value || undefined, 原因: raReason.value || undefined,
     })
     const d = res.data || {}
     const failed = d['失败行'] || []
-    ElMessage.success(`${tt('已调线')} ${d['调线张数']} ${tt('张')} → ${d['目标']}` + (failed.length ? `（${tt('跳过')} ${failed.length}）` : ''))
+    ElMessage.success(`${tt('已调拨')} ${d['调拨张数']} ${tt('张')} → ${d['目标']}`
+      + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''))
     raVisible.value = false
     loadScheduled()
     loadSummary()
-  } catch (e) { err(e, '调线失败') }
+  } catch (e) { err(e, '调拨失败') }
+}
+
+/** 撤回调拨:按工单最后一条生效轨迹把产线调回原线(轨迹标撤销,留痕不删) */
+async function doTransferRevoke() {
+  const rows = checkedSched.value.map((r) => ({ 工单号: r.加工单号, 工单行号: r.工单行号, 批次号: r.批次号 }))
+  if (!rows.length) return
+  try {
+    await ElMessageBox.confirm(`${tt('撤回调拨')} ${rows.length} ${tt('张工单')}？(${tt('调回原产线,轨迹留痕')})`,
+      tt('撤回调拨'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
+  } catch { return }
+  try {
+    const res = await request.post('/px/scheduleBoard/transferRevoke', { rows })
+    const d = res.data || {}
+    const failed = d['失败行'] || []
+    ElMessage.success(`${tt('已撤回')} ${d['撤回张数']} ${tt('张')}`
+      + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''))
+    loadScheduled()
+    loadSummary()
+  } catch (e) { err(e, '撤回调拨失败') }
 }
 
 // ── 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04) ──
 //    原实现:勾选已排工单 → 按默认 BOM×排产数量 生成材料出库单草稿(后端 /px/scheduleBoard/toPicking
 //    + ScheduleBoardService.toPicking + BOM 表 bs_bom,均已同期删除)。领料单改为在「材料出库单」面板手工
 //    新增/选单;若日后要恢复自动带料,需先有新的用料来源(如金蝶 BOM 接口)。
+//    **2026-10-07 补**:生产工单列表页新增「转领料单」(WorkOrderList.vue + /px/workOrderList/toPicking,
+//    由原「打印领料单」改来)——只转单头(加工单号=工单号)、明细仍由仓库在材料出库单里补,故本页不重复造入口。
 
 onMounted(() => {
   loadAll()
@@ -397,6 +403,9 @@ onMounted(() => {
 .wb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
 .wb-ctx { display: flex; align-items: center; gap: 14px; padding: 8px 10px; background: #eef6ff; border: 1px solid #b3d4f5; border-radius: 4px; flex-wrap: wrap; }
 .wb-ctx-label { font-size: 13px; color: #606266; }
+.wb-shop-group { padding: 6px 10px 2px; font-size: 12px; font-weight: 600; color: #116a5b; background: #f5f7fa; display: flex; justify-content: space-between; }
+.wb-shop-cnt { color: #909399; font-weight: 400; }
+.wb-shop { margin-left: 12px; font-size: 12px; color: #e6a23c; font-weight: 600; }
 .wb-ctx-stats { margin-left: auto; font-size: 12px; color: #1e6fb8; font-weight: 600; }
 .wb-block { background: #fff; border: 1px solid #e4e7ed; border-radius: 4px; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .wb-head { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid #e4e7ed; flex-wrap: wrap; }

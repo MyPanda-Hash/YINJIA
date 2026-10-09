@@ -1,0 +1,134 @@
+{
+  "site": "http://127.0.0.1:8090",
+  "instr": {
+    "panel": "RD_INSTR_USE",
+    "cells": [
+      "date:2026-09-04",
+      "range:09:00~10:00",
+      "input:",
+      "input:",
+      "input:碱性寿命测试",
+      "input:PH测定",
+      "input:5",
+      "input:冯敏",
+      "input:"
+    ],
+    "dates": [
+      "date:2026-09-04"
+    ],
+    "ranges": [
+      "range:09:00~10:00"
+    ]
+  },
+  "equip": {
+    "panel": "RD_EQUIP_USE",
+    "cells": [
+      "date:2026-09-27",
+      "input:111",
+      "input:",
+      "input:",
+      "input:",
+      "input:444",
+      "input:"
+    ],
+    "dates": [
+      "date:2026-09-27"
+    ],
+    "ranges": []
+  },
+  "scale": {
+    "panel": "RD_SCALE",
+    "cells": [
+      "input:阻垢炭棒阻垢率测试",
+      "input:",
+      "input:",
+      "input:黄利红",
+      "input:PD-H-H2026031201",
+      "input:秀丽",
+      "input:34*12*178",
+      "input:1#HPφ0.8mm-8g(1:2)",
+      "input:2#HPφ0.8mm-8g(1.1:1)",
+      "input:3#HPφ1.2mm-12g(1.1:1)",
+      "date:2026-03-23",
+      "input:30",
+      "input:24.1",
+      "input:266.24",
+      "input:216.19",
+      "input:264.24",
+      "input:264.24",
+      "input:265.24",
+      "input:96",
+      "input:96",
+      "input:98",
+      "date:2026-03-26",
+      "input:2000",
+      "input:24.6",
+      "input:268.24",
+      "input:215.19",
+      "input:264.24",
+      "input:263.24",
+      "input:266.24",
+      "input:92.4",
+      "input:90.6",
+      "input:96.2",
+      "date:2026-03-28",
+      "input:4000",
+      "input:24.5",
+      "input:264.24",
+      "input:210.19",
+      "input:258.23",
+      "input:256.23",
+      "input:260.23",
+      "input:88.9",
+      "input:85.2",
+      "input:92.6",
+      "input:34*12*178",
+      "input:1#HPφ0.8mm-8g(1:2)",
+      "input:2#HPφ0.8mm-8g(1.1:1)",
+      "input:3#HPφ1.2mm-12g(1.1:1)"
+    ],
+    "dates": [
+      "date:2026-03-23",
+      "date:2026-03-26",
+      "date:2026-03-28"
+    ],
+    "ranges": []
+  },
+  "checks": [
+    {
+      "name": "RD_INSTR_USE 渲染出「日期」控件",
+      "ok": true,
+      "detail": "date=1"
+    },
+    {
+      "name": "RD_INSTR_USE 渲染出「时间区间」控件",
+      "ok": true,
+      "detail": "range=1"
+    },
+    {
+      "name": "日期值形如 yyyy-MM-dd(本地墙钟下发+归一)",
+      "ok": true,
+      "detail": "date:2026-09-04"
+    },
+    {
+      "name": "时间区间值形如 HH:mm~HH:mm",
+      "ok": true,
+      "detail": "range:09:00~10:00"
+    },
+    {
+      "name": "RD_EQUIP_USE 有日期控件",
+      "ok": true,
+      "detail": "date=1"
+    },
+    {
+      "name": "RD_SCALE 有日期控件",
+      "ok": true,
+      "detail": "date=3"
+    },
+    {
+      "name": "三个面板都没有「文本」形态的日期格残留(使用日期/测试日期)",
+      "ok": true,
+      "detail": "[]"
+    }
+  ]
+}

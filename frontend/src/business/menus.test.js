@@ -83,3 +83,49 @@ test('研发管理 23 个面板一个不少(24 - 下架 样品编号表)', () =>
   assert.equal(codes.length, 23)
   assert.equal(new Set(codes).size, 23)
 })
+
+/**
+ * 2026-10-14 用户口径:「生产制造的侧边栏和其他模块不一样,要求使用相同的实现方式」
+ *   + 「明细表和统计表不做大类区分,跟其他模块方式一样」。
+ * 病根 = 生产制造下多包了一层空壳二级目录「生产管理」,且「明细表」「统计表」自成了两个二级大类:
+ *   · 侧栏点开「生产制造」只列出一项「生产管理」,而 智能供应链/品质管理/基础档案 都列业务域;
+ *   · LeftNav 为此写了 `m.code === 'mfg'` 特判去"穿"这层,别的模块走通用分支 —— 两套实现;
+ *   · 别的模块里明细/统计表都挂在所属业务对象下(智能供应链·销售管理:销售订单 → 明细表 → 统计表)。
+ * 终态 = 二级只剩 6 个业务域,4 张明细/统计面板按业务对象并入 生产计划 / 经典单据。
+ */
+test('生产制造二级目录 = 6 个业务域(拍平「生产管理」空壳层 + 取消「明细表/统计表」大类)', () => {
+  const mfg = menuTree.find((n) => n.code === 'mfg')
+  assert.deepEqual((mfg.children || []).map((c) => c.code),
+    ['plan', 'exec', 'records', 'device', 'sample', 'legacy'])
+  assert.deepEqual((mfg.children || []).map((c) => c.title),
+    ['生产计划', '生产执行', '生产记录', '设备维护', '样品管理', '经典单据'])
+  // 空壳层 / 类型大类都不得回来
+  assert.ok(!(mfg.children || []).some((c) => c.code === 'prod'), '不应再有 prod 空壳层')
+  assert.ok(!(mfg.children || []).some((c) => c.title === '生产管理'), '不应再有「生产管理」空壳层')
+  assert.ok(!(mfg.children || []).some((c) => c.title === '明细表' || c.title === '统计表'),
+    '明细表/统计表不应再是二级大类')
+})
+
+test('生产制造的明细/统计表挂在所属业务对象下(与销售管理同款)', () => {
+  const mfg = menuTree.find((n) => n.code === 'mfg')
+  const group = (code) => (mfg.children || []).find((c) => c.code === code)
+  // 域内顺序 = 单据 → 明细表 → 统计表(照抄 智能供应链·销售管理)
+  assert.deepEqual((group('plan').children || []).map((c) => c.panelCode).filter(Boolean),
+    ['LINE_LOAD', 'MANU_ORDER_DETAIL', 'MANU_ORDER_STATS'])
+  assert.deepEqual((group('legacy').children || []).map((c) => c.panelCode),
+    ['DISPATCH', 'OUTSOURCE_ORDER', 'DISPATCH_DETAIL', 'DISPATCH_STATS'])
+  // 四张面板各出现一次:防并域时重复挂载或漏挂
+  const all = JSON.stringify(mfg)
+  for (const p of ['MANU_ORDER_DETAIL', 'MANU_ORDER_STATS', 'DISPATCH_DETAIL', 'DISPATCH_STATS']) {
+    assert.equal(all.split(`"${p}"`).length - 1, 1, `${p} 应在生产制造菜单里恰好出现一次`)
+  }
+})
+
+test('导航层级同构:一级模块的二级目录一律是"带面板的分组",不出现裸叶子/空壳层', () => {
+  for (const g of menuTree) {
+    if (!g.children || !g.children.length) continue // 我的桌面/财务管理/设备管理 等暂无二级
+    for (const c of g.children) {
+      assert.ok(Array.isArray(c.children) && c.children.length > 0, `${g.title} > ${c.title} 应是"带面板的分组"`)
+    }
+  }
+})

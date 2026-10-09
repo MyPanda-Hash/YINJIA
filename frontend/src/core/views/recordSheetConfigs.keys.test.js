@@ -36,17 +36,14 @@ const NON_FIELD_KEYS = new Set([
 /**
  * ⚠ 已知的**既有**缺陷白名单(本次任务范围外的面板,登记在案待单独修)
  *
- * 症状:以下三列的配置 key 写的是 **col_name**,而该字段的 label 含「\n+括注」,
- * 两者不同 ⇒ 该列 **取不到值(显示空白)且保存时被 labelsToCols 丢掉**。
+ * 症状:配置 key 写的是 **col_name**,而该字段的 label 含「\n+括注」,两者不同
+ * ⇒ 该列 **取不到值(显示空白)且保存时被 labelsToCols 丢掉**。
  * 修法:把配置 key 改成对应 label(或把 label 收敛为纯名称 + 用 alias 放长说明)。
- * 归属:RD_EQUIP_USE / RD_INSTR_USE 两张实验室登记表,2026-09-18 发现,与本次
- *       研发管理设计对齐无关,故**不在本任务内修**,以免夹带无关改动。
+ *
+ * 2026-10-07:原登记的三列已修(用户实测「填了异常情况,保存后变成 "/"」——
+ * 就是 RD_EQUIP_USE.设备状态 这一格丢了值),白名单清空,**从此由本测试硬守**。
  */
-const KNOWN_PREEXISTING = new Set([
-  'RD_EQUIP_USE|设备状态',
-  'RD_INSTR_USE|仪器状态',
-  'RD_INSTR_USE|是否内校',
-])
+const KNOWN_PREEXISTING = new Set([])
 
 /** 面板当前 label 集合 / col_name→label 映射 */
 function fxOf(panel) {
@@ -501,4 +498,42 @@ test('出货检验计划表:一张表 7 列的三处同宽 + 自动填充规格�
   for (const m of afs.detail) {
     assert.ok(dtKeys.has(m.to), `明细落点 '${m.to}' 不在表体列里(填了也看不见)`)
   }
+})
+
+/**
+ * 核心断言 ③:变体列集(`variants[变体].cols`)的 key 也必须是该面板当前的 label。
+ *
+ * 【为什么必须补这条 —— 2026-10-08 用户报「加标水配置记录表填了数据之后数据丢失」】
+ *   这已经是**第四个盲区**了:dataTables(①)/ cover(②)/ 报告头(②·补)都有断言,
+ *   而**变体列集一个都没守**。加标水配置记录表(RD_SPIKE_WATER)正是靠 `variants` 按
+ *   「测试项目」切三种列集(除铅/除汞/除VOC),它的列**不在 dataTables 里**
+ *   (`dataTables: [{}]` 是空的)⇒ 17 个 key 与活库 label 分叉了也没人拦。
+ *
+ *   漂移长什么样(实测):
+ *     配置 `key: '配水量'`   ← 设计稿上的短名
+ *     活库 `label: '配水量\n（L）'`(那个 `\n` 是**字面两字符**,不是换行)
+ *   ⇒ 渲染 `row['配水量']` 恒为 undefined(格子空白),保存时 labelsToCols 按 label 反查
+ *     找不到 `配水量` 这个键 ⇒ **静默丢值**:用户填完保存、再打开就没了。
+ *
+ *   修法与 ①/②/②·补 完全一致:key 写 yj_field.label(字面 `\n` 在源码里写成 `\\n`),
+ *   显示文案仍用 `label:` 那一栏(写 `\n` 真换行,与控制换行一致)。
+ *   同批修过的先例:RD_EQUIP_USE.设备状态 / 仪器状态 / 是否内校(2026-10-07)。
+ */
+test('variants[变体].cols 的 key 必须是该面板当前的 label', () => {
+  const problems = []
+  for (const [panel, cfg] of Object.entries(recordSheetConfigs)) {
+    const fx = FIXTURE[panel]
+    if (!fx || !cfg.variants) continue
+    for (const [vname, v] of Object.entries(cfg.variants)) {
+      for (const c of v.cols || []) {
+        const key = c.key
+        if (!key || NON_FIELD_KEYS.has(key) || fx.labels.includes(key)) continue
+        if (KNOWN_PREEXISTING.has(`${panel}|${key}`)) continue
+        problems.push(fx.cols[key]
+          ? `${panel} · 变体「${vname}」· key='${key}' 是 col_name,但该字段 label 已改为 '${fx.cols[key]}' ⇒ key 应写后者`
+          : `${panel} · 变体「${vname}」· key='${key}' 既不是 label 也不是 col_name`)
+      }
+    }
+  }
+  assert.deepEqual(problems, [], `变体列集的数据键与 yj_field.label 不一致(该列取值空白且保存丢值):\n  ${problems.join('\n  ')}`)
 })

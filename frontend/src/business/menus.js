@@ -196,91 +196,92 @@ export const menuTree = [
     code: 'mfg',
     title: '生产制造',
     icon: 'Odometer',
+    // 2026-10-14 两次归一(用户口径「和其他模块的侧边栏不一样,要求相同实现方式」+「明细表和统计表不做大类区分」):
+    // ① 原先这里多包了一层空壳二级目录「生产管理」(它自己不含面板,真正的业务域在它下面),
+    //    后果:侧栏点开「生产制造」只列出一个二级项「生产管理」,而 智能供应链/品质管理/基础档案
+    //    都是一级 → 业务域(二级) → 分类·面板(三级);前端 LeftNav 还为此写了 `m.code === 'mfg'` 特判去"穿"这层。
+    // ② 原「明细表」「统计表」是并列的两个二级大类,同样与别的模块不同 —— 别的模块里明细/统计表都挂在
+    //    所属业务对象下(如 智能供应链·销售管理:销售订单 → 销售订单明细表 → 销售订单统计表)。
+    // 现终态:二级只剩 6 个业务域(生产计划/生产执行/生产记录/设备维护/样品管理/经典单据),
+    // 4 张明细/统计面板按业务对象并入 生产计划 / 经典单据;LeftNav 的 mfg 特判已删除,全部模块走同一条通用分支。
     children: [
       {
-        code: 'prod',
-        title: '生产管理',
-        icon: 'Cpu',
-        children: [
-          {
-            // 生产计划(流程图·生管泳道):销售订单→工单→排产→齐套
-            code: 'plan', title: '生产计划', children: [
-              // 订单结转·发单工作台(方案 V1.0):待结转行(剩余=需求−已排产−已采购)→转工单/转采购单;
-              // 防重复=行级占用链,转满自动消失;不改销售订单状态。置首位:发单是排产的上一步。
-              { code: 'orderConvert', title: '订单结转', path: '/prod/plan/orderConvert', icon: 'Switch' },
-              // 生产工单(2026-09-24 用户拍板改名:原「生产加工单」MANU_ORDER,面板名/菜单位移自此;
-              // 流程位置=订单结转之后、排产之前:生单→编制审核→排产工作台排线)。
-              // 原生产记录组的「生产加工单」菜单同步下线,单一入口。
-              // 列表样式=工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式:修改/结案/打印工单/打印工单_多个/打印领料单/批量调线+产线筛选+追溯);单据维护从行点修改进表单
-              { code: 'manufactureOrder', title: '生产工单', path: '/prod/plan/workOrderList', icon: 'Document' },
-              // 快速排产(原「排产工作台」,2026-09-26 用户拍板改名):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
-              // 排产单一入口(工单「排产」按钮已下线,表单产线/开工·完工日只读)
-              { code: 'scheduleBoard', title: '快速排产', path: '/prod/plan/scheduleBoard', icon: 'AlarmClock' },
-              // 2026-09-22 单轨改造(参考库式,用户拍板):生产工单/排单计划菜单下线——
-              // 工单=生产加工单(MANU_ORDER),看板职责由「生产排产 MANU_SCHEDULE」承接(含五工序完成/未完成数量);
-              // 面板与权限行保留可回滚(同 组装BOM表 并页签先例)。恢复:取消下两行注释即可。
-              // { code: 'woOrder', title: '生产工单', path: '/panelx/list/WO_ORDER', icon: 'Tickets', panelCode: 'WO_ORDER', operationName: '新增流程' },
-              // { code: 'woSchedule', title: '排单计划', path: '/panelx/list/WO_SCHEDULE', panelCode: 'WO_SCHEDULE', icon: 'DataLine' },
-              // 2026-09-23 纠偏(用户拍板):「生产排产」平铺看板改为「工单排产」产线骨架视图(参考旧系统工单排产页,
-              // 按产线查看正在运行的工单任务);MANU_SCHEDULE 面板/权限行保留可回滚(同 WO_ORDER 先例)。
-              // { code: 'manuSchedule', title: '生产排产', path: '/panelx/list/MANU_SCHEDULE', panelCode: 'MANU_SCHEDULE', icon: 'Histogram' },
-              { code: 'workOrderBoard', title: '工单排产', path: '/prod/plan/workOrderBoard', icon: 'Histogram' },
-              // 生产线档案在 基础资料→生产(PROD_LINE,2026-09-23 归位);此处负荷看板按 生产线档案日产能 判超载
-              { code: 'lineLoad', title: '产线排产负荷', path: '/panelx/list/LINE_LOAD', panelCode: 'LINE_LOAD', icon: 'DataLine' },
-              // 2026-10-14 工单齐套表 WO_KIT 菜单下线:唯一数据源 v_wo_kit(基于自建物料的齐套视图)已随
-              // MES 自建「物料清单(BOM)」功能整体删除(表 bs_bom / 视图 v_wo_kit / 面板 BOM、WO_KIT 同批下架)。
-            ],
-          },
-          {
-            // 生产执行(五道工序:领料/报工)
-            code: 'exec', title: '生产执行', children: [
-              { code: 'woReport', title: '工序报工单', path: '/panelx/list/WO_REPORT', icon: 'Promotion', panelCode: 'WO_REPORT', operationName: '新增流程' },
-              { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
-              // 生产异常闭环(生产部纪要 三:异常提出→分析→处理→结案;挂工单号/批次号按批追溯)
-              { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'WarningFilled' },
-            ],
-          },
-          {
-            // 生产记录(29份真实单据·家族面板)
-            code: 'records', title: '生产记录', icon: 'Notebook', children: [
-              { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
-              { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
-              { code: 'mixRecord', title: '物料混合记录', path: '/panelx/list/MIX_RECORD', panelCode: 'MIX_RECORD', operationName: '新增流程' },
-              { code: 'granRecord', title: '造粒记录', path: '/panelx/list/GRAN_RECORD', panelCode: 'GRAN_RECORD', operationName: '新增流程' },
-              { code: 'whRecord', title: '无黑处理登记', path: '/panelx/list/WH_RECORD', panelCode: 'WH_RECORD', operationName: '新增流程' },
-              { code: 'packConfirm', title: '封箱确认', path: '/panelx/list/PACK_CONFIRM', panelCode: 'PACK_CONFIRM', operationName: '新增流程' },
-            ],
-          },
-          {
-            code: 'device', title: '设备维护', children: [
-              { code: 'equipCheck', title: '设备点检记录', path: '/panelx/list/EQUIP_CHECK', panelCode: 'EQUIP_CHECK', operationName: '新增流程' },
-              { code: 'maintPlan', title: '保养计划', path: '/panelx/list/MAINT_PLAN', panelCode: 'MAINT_PLAN', operationName: '新增流程' },
-            ],
-          },
-          {
-            code: 'sample', title: '样品管理', children: [
-              { code: 'sampleReq', title: '样品申请单', path: '/panelx/list/SAMPLE_REQ', panelCode: 'SAMPLE_REQ', operationName: '新增流程' },
-            ],
-          },
-          {
-            code: 'legacy', title: '经典单据', children: [
-              // 生产工单已归位「生产计划」组(2026-09-24),此处不再重复入口
-              { code: 'dispatch', title: '工序派工单', path: '/panelx/list/DISPATCH', icon: 'AlarmClock', panelCode: 'DISPATCH', operationName: '新增流程' },
-              { code: 'outsourceOrder', title: '委外加工单', path: '/panelx/list/OUTSOURCE_ORDER', icon: 'Tickets', panelCode: 'OUTSOURCE_ORDER', operationName: '新增流程' },
-            ],
-          },
-          {
-            code: 'detail', title: '明细表', children: [
-              { code: 'manuDetail', title: '生产工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
-              { code: 'dispatchDetail', title: '工序派工单明细表', path: '/panelx/list/DISPATCH_DETAIL', panelCode: 'DISPATCH_DETAIL', icon: 'List' },
-            ],
-          },
-          {
-            code: 'stats', title: '统计表', children: [
-              { code: 'manuStats', title: '生产工单统计表', path: '/panelx/list/MANU_ORDER_STATS', panelCode: 'MANU_ORDER_STATS', icon: 'Histogram' },
-              { code: 'dispatchStats', title: '工序派工单统计表', path: '/panelx/list/DISPATCH_STATS', panelCode: 'DISPATCH_STATS', icon: 'Histogram' },
-            ],
-          },
+        // 生产计划(流程图·生管泳道):销售订单→工单→排产→齐套
+        code: 'plan', title: '生产计划', children: [
+          // 订单结转·发单工作台(方案 V1.0):待结转行(剩余=需求−已排产−已采购)→转工单/转采购单;
+          // 防重复=行级占用链,转满自动消失;不改销售订单状态。置首位:发单是排产的上一步。
+          { code: 'orderConvert', title: '订单结转', path: '/prod/plan/orderConvert', icon: 'Switch' },
+          // 生产工单(2026-09-24 用户拍板改名:原「生产加工单」MANU_ORDER,面板名/菜单位移自此;
+          // 流程位置=订单结转之后、排产之前:生单→编制审核→排产工作台排线)。
+          // 原生产记录组的「生产加工单」菜单同步下线,单一入口。
+          // 列表样式=工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式:修改/结案/打印工单/打印工单_多个/打印领料单/批量调线+产线筛选+追溯);单据维护从行点修改进表单
+          { code: 'manufactureOrder', title: '生产工单', path: '/prod/plan/workOrderList', icon: 'Document' },
+          // 快速排产(原「排产工作台」,2026-09-26 用户拍板改名):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
+          // 排产单一入口(工单「排产」按钮已下线,表单产线/开工·完工日只读)
+          { code: 'scheduleBoard', title: '快速排产', path: '/prod/plan/scheduleBoard', icon: 'AlarmClock' },
+          // 2026-09-22 单轨改造(参考库式,用户拍板):生产工单/排单计划菜单下线——
+          // 工单=生产加工单(MANU_ORDER),看板职责由「生产排产 MANU_SCHEDULE」承接(含五工序完成/未完成数量);
+          // 面板与权限行保留可回滚(同 组装BOM表 并页签先例)。恢复:取消下两行注释即可。
+          // { code: 'woOrder', title: '生产工单', path: '/panelx/list/WO_ORDER', icon: 'Tickets', panelCode: 'WO_ORDER', operationName: '新增流程' },
+          // { code: 'woSchedule', title: '排单计划', path: '/panelx/list/WO_SCHEDULE', panelCode: 'WO_SCHEDULE', icon: 'DataLine' },
+          // 2026-09-23 纠偏(用户拍板):「生产排产」平铺看板改为「工单排产」产线骨架视图(参考旧系统工单排产页,
+          // 按产线查看正在运行的工单任务);MANU_SCHEDULE 面板/权限行保留可回滚(同 WO_ORDER 先例)。
+          // { code: 'manuSchedule', title: '生产排产', path: '/panelx/list/MANU_SCHEDULE', panelCode: 'MANU_SCHEDULE', icon: 'Histogram' },
+          { code: 'workOrderBoard', title: '工单排产', path: '/prod/plan/workOrderBoard', icon: 'Histogram' },
+          // 工序任务(路线驱动,A 项 2026-10-05)菜单已按用户口径**撤下**(「把工序任务删除掉算了」,
+          // 2026-10-05):工单详情只看"走到哪一步"(按报工统计),不再维护工序任务队列。
+          // 页面组件/后端接口/表结构按可撤回要求保留但不再挂菜单;要恢复只需把下面一行注释去掉。
+          // { code: 'processQueue', title: '工序任务', path: '/prod/plan/processQueue', icon: 'Sort' },
+          // 生产线档案在 基础资料→生产(PROD_LINE,2026-09-23 归位);此处负荷看板按 生产线档案日产能 判超载
+          { code: 'lineLoad', title: '产线排产负荷', path: '/panelx/list/LINE_LOAD', panelCode: 'LINE_LOAD', icon: 'DataLine' },
+          // 2026-10-14 工单齐套表 WO_KIT 菜单下线:唯一数据源 v_wo_kit(基于自建物料的齐套视图)已随
+          // MES 自建「物料清单(BOM)」功能整体删除(表 bs_bom / 视图 v_wo_kit / 面板 BOM、WO_KIT 同批下架)。
+          // 2026-10-14 用户口径「明细表和统计表不做大类区分,跟其他模块方式一样」:生产工单的两张明细/统计表
+          // 归到本业务域(不再单列「明细表」「统计表」二级大类),与 智能供应链·销售管理「销售订单 →
+          // 销售订单明细表 → 销售订单统计表」的域内摆法一致。
+          { code: 'manuDetail', title: '生产工单明细表', path: '/panelx/list/MANU_ORDER_DETAIL', panelCode: 'MANU_ORDER_DETAIL', icon: 'List' },
+          { code: 'manuStats', title: '生产工单统计表', path: '/panelx/list/MANU_ORDER_STATS', panelCode: 'MANU_ORDER_STATS', icon: 'Histogram' },
+        ],
+      },
+      {
+        // 生产执行(五道工序:领料/报工)
+        code: 'exec', title: '生产执行', children: [
+          { code: 'woReport', title: '工序报工单', path: '/panelx/list/WO_REPORT', icon: 'Promotion', panelCode: 'WO_REPORT', operationName: '新增流程' },
+          { code: 'woReportList', title: '报工记录', path: '/panelx/list/WO_REPORT_LIST', panelCode: 'WO_REPORT_LIST', icon: 'List' },
+          // 生产异常闭环(生产部纪要 三:异常提出→分析→处理→结案;挂工单号/批次号按批追溯)
+          { code: 'prodAbn', title: '生产异常处理单', path: '/panelx/list/PROD_ABN', panelCode: 'PROD_ABN', icon: 'WarningFilled' },
+        ],
+      },
+      {
+        // 生产记录(29份真实单据·家族面板)
+        code: 'records', title: '生产记录', icon: 'Notebook', children: [
+          { code: 'dayReport', title: '生产日报表', path: '/panelx/list/DAY_REPORT', panelCode: 'DAY_REPORT', operationName: '新增流程' },
+          { code: 'feedConfirm', title: '投料确认单', path: '/panelx/list/FEED_CONFIRM', panelCode: 'FEED_CONFIRM', operationName: '新增流程' },
+          { code: 'mixRecord', title: '物料混合记录', path: '/panelx/list/MIX_RECORD', panelCode: 'MIX_RECORD', operationName: '新增流程' },
+          { code: 'granRecord', title: '造粒记录', path: '/panelx/list/GRAN_RECORD', panelCode: 'GRAN_RECORD', operationName: '新增流程' },
+          { code: 'whRecord', title: '无黑处理登记', path: '/panelx/list/WH_RECORD', panelCode: 'WH_RECORD', operationName: '新增流程' },
+          { code: 'packConfirm', title: '封箱确认', path: '/panelx/list/PACK_CONFIRM', panelCode: 'PACK_CONFIRM', operationName: '新增流程' },
+        ],
+      },
+      {
+        code: 'device', title: '设备维护', children: [
+          { code: 'equipCheck', title: '设备点检记录', path: '/panelx/list/EQUIP_CHECK', panelCode: 'EQUIP_CHECK', operationName: '新增流程' },
+          { code: 'maintPlan', title: '保养计划', path: '/panelx/list/MAINT_PLAN', panelCode: 'MAINT_PLAN', operationName: '新增流程' },
+        ],
+      },
+      {
+        code: 'sample', title: '样品管理', children: [
+          { code: 'sampleReq', title: '样品申请单', path: '/panelx/list/SAMPLE_REQ', panelCode: 'SAMPLE_REQ', operationName: '新增流程' },
+        ],
+      },
+      {
+        code: 'legacy', title: '经典单据', children: [
+          // 生产工单已归位「生产计划」组(2026-09-24),此处不再重复入口
+          { code: 'dispatch', title: '工序派工单', path: '/panelx/list/DISPATCH', icon: 'AlarmClock', panelCode: 'DISPATCH', operationName: '新增流程' },
+          { code: 'outsourceOrder', title: '委外加工单', path: '/panelx/list/OUTSOURCE_ORDER', icon: 'Tickets', panelCode: 'OUTSOURCE_ORDER', operationName: '新增流程' },
+          // 2026-10-14 同上:派工单的明细/统计表并回本域,取消二级「明细表/统计表」大类
+          { code: 'dispatchDetail', title: '工序派工单明细表', path: '/panelx/list/DISPATCH_DETAIL', panelCode: 'DISPATCH_DETAIL', icon: 'List' },
+          { code: 'dispatchStats', title: '工序派工单统计表', path: '/panelx/list/DISPATCH_STATS', panelCode: 'DISPATCH_STATS', icon: 'Histogram' },
         ],
       },
     ],
@@ -312,8 +313,19 @@ export const menuTree = [
           { code: 'qcInspReqSeries', title: '来料检验要求(系列)', path: '/panelx/list/QC_INSP_REQ_SERIES', icon: 'Grid', panelCode: 'QC_INSP_REQ_SERIES' },
         ],
       },
-      // 2026-10-09 下架:「制程品质」整组(工序质检单 QC_OP / 检验记录单 QC_RECORD)、
-      // 「不良处理」整组(不良品处理单 QC_DISPOSAL / 炭棒不良退货登记 ROD_RETURN)、
+      {
+        // 制程品质(流程图·品质泳道:工序质检数据)
+        // 2026-10-09 下架:「工序质检单 QC_OP / 检验记录单 QC_RECORD」已随那批无用面板整体删除
+        // (tools/migrate-drop-qc-unused-panels-20261009.sql),不是摘菜单,放开注释也恢复不了;
+        // 本组现役只剩下面三张工序检验单(远端 9.29 批次④新增,与本地下架不冲突)。
+        code: 'process', title: '制程品质', children: [
+          // 三类工序检验单(9.29 批次④,2026-10-05):报工审核自动出单;成型/切炭先按通用模板,组装成品含合格转库存/不合格待处理
+          { code: 'qcMoldInsp', title: '成型检验单', path: '/panelx/list/QC_MOLD_INSP', icon: 'Checked', panelCode: 'QC_MOLD_INSP', operationName: '新增流程' },
+          { code: 'qcCutInsp', title: '切炭检验单', path: '/panelx/list/QC_CUT_INSP', icon: 'Checked', panelCode: 'QC_CUT_INSP', operationName: '新增流程' },
+          { code: 'qcAsmInsp', title: '组装成品检验单', path: '/panelx/list/QC_ASM_INSP', icon: 'Finished', panelCode: 'QC_ASM_INSP', operationName: '新增流程' },
+        ],
+      },
+      // 2026-10-09 下架:「不良处理」整组(不良品处理单 QC_DISPOSAL / 炭棒不良退货登记 ROD_RETURN)、
       // 「品质追溯」组(批号追溯 LOT_TRACE)—— 用户口径「都是没有用到的吧」,
       // 实测:yj_usage_log 操作留痕 0、7 张业务表 0 行、单据状态 0 行 ⇒ 建好之后一张单都没录过。
       // 面板/字段/授权/视图 v_lot_trace/7 张物理表 已整体删除
@@ -363,8 +375,9 @@ export const menuTree = [
           { code: 'zdgl', title: '数据字典', path: '/panelx/list/ZDGL', icon: 'Collection', panelCode: 'ZDGL', operationName: '新增流程' },
           { code: 'erpImpLog', title: 'ERP导入日志', path: '/panelx/list/ERPLG', icon: 'Download', panelCode: 'ERPLG' },
           { code: 'warehouse', title: '仓库', path: '/panelx/list/WH', icon: 'House', panelCode: 'WH', operationName: '新增流程' },
-          // 库位(2026-09-28):仓库下货位档案,一仓多库位、一库位一仓;支持与商品同款「二维码标签」勾选即打
-          { code: 'whloc', title: '库位', path: '/panelx/list/WHLOC', icon: 'LocationInformation', panelCode: 'WHLOC', operationName: '新增流程' },
+          // 仓位(2026-09-28 建为「库位」,2026-10-08 正名「仓位」对齐金蝶):仓库下货位档案,一仓多仓位、一仓位一仓;
+          // 支持与商品同款「二维码标签」勾选即打
+          { code: 'whloc', title: '仓位', path: '/panelx/list/WHLOC', icon: 'LocationInformation', panelCode: 'WHLOC', operationName: '新增流程' },
           { code: 'khda', title: '客户', path: '/panelx/list/KHDA', icon: 'User', panelCode: 'KHDA', operationName: '新增流程' },
           { code: 'gfda', title: '供应商', path: '/panelx/list/GFDA', icon: 'OfficeBuilding', panelCode: 'GFDA', operationName: '新增流程' },
           // 客户/供应商分类不占导航:从 客户/供应商 面板工具栏「分类管理」进入(金蝶同款交互)

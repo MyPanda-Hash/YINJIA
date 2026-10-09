@@ -1,0 +1,35 @@
+﻿
+########## WH · 仓库 ##########
+panelButtons   : 新增流程 / 删除 / 刷新 / 保存 / 放弃
+buttonGroups   :
+   [新增] 新增
+   [修改] 修改
+   [保存] 保存 , 保存新增 , 保存为草稿
+   [删除] 删除 , 删除单据
+   [查找] 查找 , 刷新
+   [打印] 打印 , 预览
+   [更多] 复制 , 表格调整 , 字段管理 , 导出 , 退出
+topBarBtn      : 新增流程 / 删除 / 刷新
+rowOperationBar: 
+form bottomBar : 保存 / 删除 / 放弃
+qrLabel        : (无) | key= - | scope= -
+panelState     : {"dataType":"STRING","defaultOptions":["启用","已作废"],"dataName":"状态"}
+查询字段       : 仓库编码 / 仓库名称 / 厂区 / 停用 / 仓库分类 / 仓库分类编码 / 仓库管理员编码
+
+########## WHLOC · 仓位 ##########
+panelButtons   : 新增流程 / 删除 / 刷新 / 保存 / 放弃
+buttonGroups   :
+   [新增] 新增
+   [修改] 修改
+   [保存] 保存 , 保存新增 , 保存为草稿
+   [删除] 删除 , 删除单据
+   [查找] 查找 , 刷新
+   [打印] 打印 , 预览
+   [二维码标签] 二维码标签
+   [更多] 复制 , 表格调整 , 字段管理 , 导出 , 退出
+topBarBtn      : 新增流程 / 删除 / 刷新
+rowOperationBar: 
+form bottomBar : 保存 / 删除 / 放弃
+qrLabel        : whloc | key= 仓位编码 | scope= 仓库
+panelState     : {"dataType":"STRING","defaultOptions":["启用","已作废"],"dataName":"状态"}
+查询字段       : 仓库 / 仓位编码 / 大区 / 存储分区 / 区码 / 仓位地址 / 停用
