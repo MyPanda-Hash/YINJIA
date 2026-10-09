@@ -2709,3 +2709,17 @@ migrate-clean-orphan-panel-rows-20261009.sql
 #        INV.默认仓位 取消隐藏并改参照 / 译名(含修两处既有劣译 Bill Sp Name、Sp Number)。
 #   ⚠ 采购入库单是四单基线之一 ⇒ 落地后必须重跑 _gen-fourdoc-restore.mjs 与 _gen-doc-fields-md.mjs。
 migrate-bin-on-purchase-in-20261009.sql
+
+# ── 2026-10-09 检验数据记录(QC_INSP_REC)物料名称/物料编码关联「商品」,选一次两个一并填入 ──
+#   用户口径:「检验数据记录的物料名称和物料编码要关联商品,并且要两个一并填入。」
+#   现状:两列都是手填文本框(header 30/40、query 10/20),与同族的 来料检验单 QC_INSP /
+#        送料暂收单 QC_RECV / 暂收退回单 QC_RETURN / 采购订单 PU_ORDER 写法不一致
+#        (那四张:物料编码=参照 INV/存货编码 display 存货名称、物料名称=参照 INV/存货名称)。
+#   做法(纯元数据,零 DDL/零新表/零接口/零前端硬编码):四行 data_type 文本→参照,
+#        ref_panel=INV,物料编码 ref_field=存货编码、物料名称 ref_field=存货名称。
+#   「一并填入」复用既有带回机制(PanelConfigService.buildRefMap 的同义词表已有
+#        存货编码→物料编码、存货名称→物料名称)⇒ 两列互为回带目标,选任一个商品另一个同时填上。
+#   前端配套(同提交):QcInspRecSheet.vue 抬头两格加商品参照控件(点击弹 RefPickDialog + 按 refMap 带回)。
+#   ⚠ 不是四单基线之一(QC_INSP_REC 不在 fourdoc-baseline.tsv),四单基线无需重跑。
+#   幂等(UPDATE 窄条件 + 末尾三自检:两列四行=参照/INV、物理列仍在、越界参照计数);两账套均执行。
+migrate-qc-insp-rec-material-ref-20261009.sql
