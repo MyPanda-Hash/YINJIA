@@ -80,13 +80,30 @@ QC_TC_IN  TCI-2026-10-0057 ─100─▶ PURCHASE_IN PI-2026-10-0086   (特采全
 
 ## 五、发现(本轮新查出,尚未修复)
 
-1. **特采链末跳 `form_flow_link.batch_no` 留空 → 按批次号反查链路会漏这一跳**(轻微,数据完整性)
-   - 证据:`_v-link-gap.sql` 输出 —— 同一批次键下 6 行链路全中;按 `batch_no` 反查命中 211 行,**其中特采入库跳 0 行**。
+> ⚠ **先分清楚两样东西,别混**:①**单据上的批次号** —— 2026-10-04 口径是在「采购订单→送料暂收单」**生单那一刻**由
+> `BatchService` 取号定稿(`yj_doc_batch` 台账行 `source=PU_ORDER / target=QC_RECV`,备注「分批送料 · 生单取号」),
+> 之后**逐站继承**;实测送料暂收单 / 来料检验单 / 暂收退回单 / 特采单 / 采购入库单五张单的批次号**全部为 `20261009`,一件没丢**。
+> ②**链路台账 `form_flow_link` 的冗余列 `batch_no`** —— 只是给「按批次号直接反查链路」用的旁路列。
+> 下面这条发现**只关于 ②**,与单据批次号是否生成、是否正确无关。
+
+1. **特采链末跳 `form_flow_link.batch_no` 未写(同排 `batch_id` 有值)→ 按批次号反查链路会漏这一跳**(轻微,数据完整性)
+   - 证据(`_v-batchno-scope.sql` / `.out`):同一批次键下,`linkTargets` 口径(`batch_id`)6 行全中、含特采入库跳 1 行;
+     `linksOfBatch` 口径(`batch_no`)命中 211 行、**其中特采入库跳 0 行**。
+     该末跳行:`QC_TC_IN TCI-2026-10-0057 → PURCHASE_IN PI-2026-10-0086`,台账 `batch_no=(NULL)`、`batch_id=357`;
+     而 **PI-2026-10-0086 单据本体的批次号 = `20261009`**(与全链一致)。
+   - 用户面实测(`_v-batch-reverse.cjs` 打真实接口):
+     `GET /api/px/batchFlow/batch?batchNo=20261009` 返回 197 条 links,
+     `QC_RETURN → QC_TC_IN`(TCI-2026-10-0057)在、`QC_TC_IN → PURCHASE_IN`(PI-2026-10-0086)**不在**。
    - 根因:`ButtonService.tcInApprovedGenerate` 写 `form_flow_link` 时**只给了 `batch_id`、没给 `batch_no`**
-     (`INSERT ... source_quantity, linked_quantity, batch_id, link_status ...`),而其余各跳都写了 `batch_no`。
+     (`INSERT ... source_quantity, linked_quantity, batch_id, link_status ...`);其余各跳(`inspAutoPurchaseIn` /
+     `inspAutoReturn` / `returnAutoSpecialAccept` / `PushGenerateHandler.generateBatch`)都写了 `batch_no`。
+     该处 `ih.get("批次号")` **就在作用域里**(同一方法下面还用它写了入库行与入库单头的批次号),属漏列而非无值可写。
    - 旁证:`PushGenerateHandler` 特意补过一句 `UPDATE form_flow_link SET batch_no=? WHERE batch_id=? AND ISNULL(batch_no,N'')=N''`,
      注释写明「batch_no 一直留空会让『按批次反查链路』少一条线索」—— 但那条兜底只跑推式生单路径,特采单这条路不经过它。
-   - 影响面:`BatchService.docsOfBatch`(`WHERE batch_no=?`)按批次号反查会漏掉特采入库单;按 `batch_id` 广搜不受影响。
+   - **影响面(别夸大)**:单据与库存全对,链路身份(批次键 `batch_id`)全对,**去向解析 `resolveEndTarget` 走 `batch_id` 广搜、不受影响**;
+     受影响的只有 `BatchService.linksOfBatch`(`WHERE batch_no=?`,接口 `/api/px/batchFlow/batch` 的 `links`)——
+     按批次号反查时会少一行「特采单→采购入库单」。
+   - 修法(一行):该 INSERT 补 `batch_no` 列并传 `ih.get("批次号")`;或复用 `PushGenerateHandler` 那句按 `batch_id` 的兜底回填。
 
 2. **特采单「总数量兜底」分支新单不可达**(非缺陷,仅口径澄清)
    - `returnAutoSpecialAccept` 在退料行「送检数量」为空时按「退货数量」兜底;但检验单保存有数量守恒守卫
@@ -114,6 +131,8 @@ QC_TC_IN  TCI-2026-10-0057 ─100─▶ PURCHASE_IN PI-2026-10-0086   (特采全
 | `_v-gen-chain-sql.cjs` → `_v-chain.sql` | 由结果生成验库 SQL(链台账/数量守恒/批次号/单据状态) |
 | `_v-chain.out` / `_v-stock.out` | 对应的验库原始输出 |
 | `_v-stock.sql` | 库存总账与流水核对 |
-| `_v-link-gap.sql` | 「按批次号反查漏末跳」取证 |
+| `_v-link-gap.sql` | 「按批次号反查漏末跳」取证(简版) |
+| `_v-batchno-scope.sql` / `.out` | 同一发现的**scope 取证**:生单取号台账 → 五单批次号逐站继承 → 只差台账冗余列 → 两种口径对比 |
+| `_v-batch-reverse.cjs` | 打真实接口 `/api/px/batchFlow/batch` 复现「按批次号反查漏末跳」 |
 | `_q-schema-probe.sql` / `_q-e2e-inputs.sql` / `_q-uom.sql` / `_q-wh.sql` / `_q-cols.sql` | 前置侦查(列/面板/必填/单位/仓库口径) |
 | `_e2e-probe-chain.cjs` / `_e2e-probe-tc.cjs` / `_e2e-probe-desc.cjs` / `_e2e-probe-9-4.cjs` | 侦查脚本(确定标签与返回结构、定位 P9.4 失败原因) |
