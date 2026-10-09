@@ -2631,3 +2631,32 @@ migrate-whloc-newplant-drop-20261008.sql
 #   前端配套:新组件 ZonePickDialog.vue + PanelxList 单元格分支 + 10 个语言包 15 条新词条。
 #   幂等;两账套均执行。
 migrate-whloc-zonepick-20261008.sql
+
+# migrate-whloc-fix-dup-zone-field-20261008.sql(2026-10-08):修复 WHLOC 出现**重复的「存储分区」列**
+#   用户报障(2026-10-08):仓位明细里「存储分区」列**出现两次**。
+#   根因(实锤,yj_schema_log 时间线):migrate-whloc-area-a-raw §3 用 `IF NOT EXISTS (... col_name=N'库区')`
+#     守卫注册「库区」字段,而链上后续的 migrate-whloc-clean-coord §2 把该列**改名成「存储分区」**⇒
+#     area-a-raw 一旦重跑,守卫再也找不到「库区」⇒ **又插一行「库区」**,紧接着 clean-coord 又把它改名
+#     ⇒ 同面板两行 (col_name='存储分区', label='存储分区') ⇒ 网格渲染出**两列同名**。
+#     正式库:zonepick 15:23:48 → area-a-raw 16:04:52 → clean-coord 16:04:52.66 ⇒ 多一行 id=16157(文本,seq 34);
+#     测试库:该对脚本重跑了两次 ⇒ 多两行(7408/7410)。这正是「历史脚本重跑撞 schema 演进」。
+#   本脚本:① 删除 WHLOC 内同 (col_name,label) 的重复登记行(保留 MIN(id));
+#     ② 规范化幸存的 大区/存储分区(类型=分区选择、seq 34/36、位置/宽度/可见性),
+#        **补上 zonepick 那次因命中重复行而漏改的 data_type**(幸存行原本仍是「文本」);
+#     ③ 自检重复组数=0、类型非分区选择=0、元数据漂移=0。
+#   ⚠ 同批修复**根因**:migrate-whloc-area-a-raw 的守卫改为跨改名(库区 IN(库区,存储分区))+
+#     跨删列(厂区 加 COL_LENGTH 前置),否则下次重跑还会再造重复。规范同步见 数据库规范.md §4.2。
+#   幂等;两账套均执行。
+migrate-whloc-fix-dup-zone-field-20261008.sql
+
+# migrate-whloc-drop-stale-cols-20261008.sql(2026-10-08):清理同一事故留下的**废弃列/漂移字段/孤儿译名**
+#   现象:bs_wh_loc 多出两个 100% 空列(厂区/库区),列数 38→40;且 yj_field 多一行挂在仓位表上的「厂区」
+#     ⇒ 体检 05 项「元数据漂移」FAIL。
+#   来由:migrate-whloc-area-a-raw §2 的 `IF COL_LENGTH('厂区') IS NULL ALTER TABLE ADD` 在重跑时把
+#     zone-logic 刻意删掉的列**"自愈"补了回来**,§3 的字段守卫随之放行;库区 同理(它已被改名成 存储分区)。
+#   步骤顺序是关键:**先 DROP 列、再删漂移行**(漂移判据是"列不存在",列还在就判不出来)。
+#   ⚠ 整段必须用**动态 SQL**:T-SQL 对「存在的表+不存在的列」是编译期绑定,写在未执行的 IF 分支里
+#     也会报 Invalid column name(实测踩到,初版 §1.2 就因此整脚本 FAIL)。
+#   DROP 前做空列校验,非空则拒绝并告警,绝不静默丢数据。幂等(已清则全 0 行);两账套均执行;
+#   实测:列数回 38、WHLOC 字段 12、漂移 0、679 仓位与 259 个分区值未动。
+migrate-whloc-drop-stale-cols-20261008.sql
