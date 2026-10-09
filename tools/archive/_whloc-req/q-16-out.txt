@@ -1,0 +1,48 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:17 字符: 1
++ & $java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlserver://loc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-16-log.sql ==
+  | migrate-whloc-rename-bin-20261008.sql | 2026-10-08 06:38:45 | 
+  | migrate-fourdoc-baseline-restore-20261008.sql | 2026-10-08 02:59:58 | 
+  | migrate-fourdoc-missing-cols-20261008.sql | 2026-10-08 02:59:47 | 
+  | migrate-fourdoc-bloodline-cols-20261008.sql | 2026-10-08 02:41:42 | 
+  | migrate-lab-sheets-date-fields-2026-10-07.sql | 2026-10-07 13:12:15 | 
+  | migrate-server-converge-20261007.sql | 2026-10-07 08:52:43 | 
+  | migrate-server-comment-parity3-20261007.sql | 2026-10-07 08:52:42 | 
+  | migrate-wo-process-line-qty-recalc.sql | 2026-10-07 08:52:28 | 
+  | migrate-line-load-on-plang.sql | 2026-10-07 08:52:28 | 
+  | migrate-route-header-only-place.sql | 2026-10-07 08:52:28 | 
+  | migrate-route-header-place.sql | 2026-10-07 08:52:28 | 
+  | migrate-wo-process-line.sql | 2026-10-07 08:52:28 | 
+  | migrate-plang-void-legacy-dirty.sql | 2026-10-07 00:04:58 | 
+  | migrate-wo-transfer-log-process.sql | 2026-10-06 23:45:59 | 
+  | migrate-wo-transfer-log-process-rollback.sql | 2026-10-06 23:30:12 | 
+  | migrate-wo-progress-fields.sql | 2026-10-06 15:59:07 | 
+  | migrate-wo-process-line-drop.sql | 2026-10-06 15:13:00 | 
+  | migrate-route-required-original.sql | 2026-10-06 12:10:01 | 
+  | migrate-route-name-not-required.sql | 2026-10-06 12:03:41 | 
+  | migrate-route-header-hide-in-detail.sql | 2026-10-06 11:57:48 | 
+  | migrate-route-header-detail-place.sql | 2026-10-06 11:54:03 | 
+  | migrate-route-restore-required.sql | 2026-10-06 11:39:02 | 
+  | migrate-route-relax-required.sql | 2026-10-06 11:35:38 | 
+  | migrate-unit-chain.sql | 2026-10-06 09:55:27 | 
+  | migrate-plang-split-demand-fix.sql | 2026-10-06 09:26:04 | 
+  | migrate-whloc-rename-bin-20261008.sql | 2026-10-08 06:38:45 | 
+  | migrate-material-out-label-cleanup.sql | 2026-10-05 08:07:43 | 
+  | migrate-whloc-whcode.sql | 2026-09-29 10:28:34 | 
+  | migrate-whloc.sql | 2026-09-28 11:56:54 | 
+  | migrate-db-norm-cleanup.sql | 2026-09-28 05:21:07 | 
+  | migrate-wh-location.sql | 2026-09-27 23:05:42 | 
+  | migrate-so-line-whname.sql | 2026-09-27 09:26:15 | 
+  | migrate-wh-field-rename.sql | 2026-09-24 08:36:50 | 
+  | migrate-pin-wh-unify.sql | 2026-09-24 08:36:49 | 
+  | migrate-purchase-in-wh-ref.sql | 2026-09-17 03:28:15 | 
+  | cleanup-base-panels.sql | 2026-09-15 14:54:53 | 
+  | _cleanup_common_fields_20260914.sql | 2026-09-14 03:57:29 | 
+  | migrate-aux-line-wh.sql | 2026-09-14 03:48:40 | 
+[OK] q-16-log.sql (3 batches)

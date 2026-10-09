@@ -132,7 +132,8 @@ const modules = [
       { code: 'TRANSFER', label: '调拨单' }, { code: 'MATERIAL_REQ', label: '领料申请单' },
       { code: 'MATERIAL_OUT', label: '材料出库单' }, { code: 'FINISH_IN', label: '产成品入库单' },
       { code: 'SO_ORDER', label: '销售订单' }, { code: 'PU_REQ_ANALYSIS', label: '采购需求分析' },
-      { code: 'PU_REQ', label: '请购单' }, { code: 'PU_ORDER', label: '采购订单' },
+      // 2026-10-08 下架:请购单(PU_REQ)—— 全站已无该面板,流程图不再列
+      { code: 'PU_ORDER', label: '采购订单' },
     ],
     archives: [
       { code: 'INV', label: '商品' }, { code: 'UOM', label: '计量单位' }, { code: 'DEPT', label: '部门' },
@@ -153,25 +154,23 @@ const modules = [
     nodes: [
       { code: 'SO_ORDER', label: '销售订单' },
       { code: 'OUTSOURCE_ORDER', label: '委外加工单' },
-      { code: 'OUTSOURCE_ISSUE', label: '委外发料单' },
-      { code: 'OUTSOURCE_IN', label: '委外入库单' },
+      // 2026-10-08 下架:委外发料单(OUTSOURCE_ISSUE)/委外入库单(OUTSOURCE_IN)—— 面板+表+视图整体删除
       { code: 'OUTSOURCE_FEE', label: '委外加工费用单' },
     ],
     edges: [
       { from: 'SO_ORDER', to: 'OUTSOURCE_ORDER' },
-      { from: 'OUTSOURCE_ORDER', to: 'OUTSOURCE_ISSUE' },
-      { from: 'OUTSOURCE_ORDER', to: 'OUTSOURCE_IN' },
       { from: 'OUTSOURCE_ORDER', to: 'OUTSOURCE_FEE' },
     ],
     pos: {
       SO_ORDER: [320, 60],
       OUTSOURCE_ORDER: [320, 230],
-      OUTSOURCE_ISSUE: [20, 400], OUTSOURCE_IN: [320, 400], OUTSOURCE_FEE: [620, 400],
+      OUTSOURCE_FEE: [620, 400],
     },
     docs: [
-      { code: 'OUTSOURCE_ORDER', label: '委外加工单' }, { code: 'OUTSOURCE_ISSUE', label: '委外发料单' },
-      { code: 'OUTSOURCE_IN', label: '委外入库单' }, { code: 'OUTSOURCE_FEE', label: '委外加工费用单' },
-      { code: 'SO_ORDER', label: '销售订单' }, { code: 'PU_REQ', label: '请购单' }, { code: 'PU_ORDER', label: '采购订单' },
+      { code: 'OUTSOURCE_ORDER', label: '委外加工单' },
+      { code: 'OUTSOURCE_FEE', label: '委外加工费用单' },
+      // 2026-10-08 下架:委外发料单/委外入库单/请购单
+      { code: 'SO_ORDER', label: '销售订单' }, { code: 'PU_ORDER', label: '采购订单' },
     ],
     archives: [
       { code: 'INV', label: '商品' }, { code: 'UOM', label: '计量单位' }, { code: 'PARTNER', label: '往来单位' },
@@ -230,7 +229,7 @@ const modules = [
     code: 'purchase', name: '采购管理', icon: 'ShoppingCart', color: '#3aa76d',
     nodes: [
       { code: 'PU_REQ_ANALYSIS', label: '采购需求分析' },
-      { code: 'PU_REQ', label: '请购单' },
+      // 2026-10-08 下架:请购单(PU_REQ)—— 需求分析现在直接接到采购订单
       { code: 'PU_ORDER', label: '采购订单' },
       { code: 'PURCHASE_IN', label: '采购入库单' },
       { code: 'PU_IN', label: '进货单' },
@@ -239,8 +238,7 @@ const modules = [
       { code: 'PU_COST_ALLOC', label: '采购费用分摊单' },
     ],
     edges: [
-      { from: 'PU_REQ_ANALYSIS', to: 'PU_REQ' },
-      { from: 'PU_REQ', to: 'PU_ORDER' },
+      { from: 'PU_REQ_ANALYSIS', to: 'PU_ORDER' },
       { from: 'PU_ORDER', to: 'PURCHASE_IN' },
       { from: 'PU_ORDER', to: 'PU_IN' },
       { from: 'PU_IN', to: 'PU_INVOICE' },
@@ -249,12 +247,12 @@ const modules = [
       { from: 'PU_INVOICE', to: 'PU_COST_ALLOC' },
     ],
     pos: {
-      PU_REQ_ANALYSIS: [440, 20], PU_REQ: [440, 190], PU_ORDER: [440, 360],
+      PU_REQ_ANALYSIS: [440, 20], PU_ORDER: [440, 360],
       PURCHASE_IN: [120, 360], PU_IN: [760, 360],
       PU_INVOICE: [440, 530], PU_COST_ALLOC: [440, 700], EXPENSE: [760, 700],
     },
     docs: [
-      { code: 'PU_REQ_ANALYSIS', label: '采购需求分析' }, { code: 'PU_REQ', label: '请购单' },
+      { code: 'PU_REQ_ANALYSIS', label: '采购需求分析' },
       { code: 'PU_ORDER', label: '采购订单' },
       { code: 'PU_IN', label: '进货单' }, { code: 'PURCHASE_IN', label: '采购入库单' },
       { code: 'PU_INVOICE', label: '采购发票' }, { code: 'EXPENSE', label: '费用单' },
@@ -278,8 +276,9 @@ const modules = [
     ],
     pos: { SO_ORDER: [20, 170], PICK_ORDER: [320, 170], SALE_OUT: [620, 170] },
     docs: [
-      { code: 'PICK_ORDER', label: '配货单' }, { code: 'OTHER_OUT', label: '其他出库单' },
-      { code: 'OTHER_IN', label: '其他入库单' }, { code: 'SO_ORDER', label: '销售订单' },
+      { code: 'PICK_ORDER', label: '配货单' },
+      // 2026-10-08 下架:其他出库单(OTHER_OUT)/其他入库单(OTHER_IN)
+      { code: 'SO_ORDER', label: '销售订单' },
       { code: 'SALE_OUT', label: '销售出库单' }, { code: 'SALE_INV', label: '销货单' },
     ],
     archives: [{ code: 'INV', label: '商品' }, { code: 'WH', label: '仓库' }],
@@ -293,21 +292,20 @@ const modules = [
     nodes: [
       { code: 'PURCHASE_IN', label: '采购入库单' },
       { code: 'FINISH_IN', label: '产成品入库单' },
-      { code: 'OTHER_IN', label: '其他入库单' },
+      // 2026-10-08 下架:其他入库单(OTHER_IN)/其他出库单(OTHER_OUT)
       { code: 'SALE_OUT', label: '销售出库单' },
       { code: 'MATERIAL_OUT', label: '材料出库单' },
-      { code: 'OTHER_OUT', label: '其他出库单' },
     ],
     edges: [],
     pos: {
-      PURCHASE_IN: [40, 60], FINISH_IN: [40, 240], OTHER_IN: [40, 420],
-      SALE_OUT: [640, 60], MATERIAL_OUT: [640, 240], OTHER_OUT: [640, 420],
+      PURCHASE_IN: [40, 60], FINISH_IN: [40, 240],
+      SALE_OUT: [640, 60], MATERIAL_OUT: [640, 240],
     },
     docs: [
       { code: 'PURCHASE_IN', label: '采购入库单' }, { code: 'FINISH_IN', label: '产成品入库单' },
-      { code: 'OUTSOURCE_IN', label: '委外入库单' }, { code: 'OTHER_IN', label: '其他入库单' },
+      // 2026-10-08 下架:委外入库单/其他入库单/其他出库单
       { code: 'SALE_OUT', label: '销售出库单' }, { code: 'MATERIAL_OUT', label: '材料出库单' },
-      { code: 'OTHER_OUT', label: '其他出库单' }, { code: 'PU_COST_ALLOC', label: '采购费用分摊单' },
+      { code: 'PU_COST_ALLOC', label: '采购费用分摊单' },
       { code: 'MATERIAL_REQ', label: '领料申请单' }, { code: 'TRANSFER', label: '调拨单' },
     ],
     archives: [{ code: 'INV', label: '商品' }, { code: 'WH', label: '仓库' }, { code: 'REGION', label: '地区' }],

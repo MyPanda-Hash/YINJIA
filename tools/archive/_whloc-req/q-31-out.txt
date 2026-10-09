@@ -1,0 +1,59 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:25 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-31-bsdict.sql ==
+  | id | int | 2 | 0 | null | 
+  | 字典类别 | nvarchar | 50 | 0 | 字典类别 | 
+  | 代码 | nvarchar | 50 | 0 | 代码 | 
+  | 名称 | nvarchar | 200 | 0 | 名称 | 
+  | 备注 | nvarchar | 500 | 1 | 备注 | 
+  | 状态 | nvarchar | 10 | 0 | 状态 | 
+  | asp_user1 | nvarchar | 50 | 1 | 创建人 | 
+  | asp_time1 | datetime2 | 4 | 1 | 创建时间 | 
+  | asp_cancel | char | 0 | 1 | 删除标记 | 
+  | 排序 | int | 2 | 1 | 排序 | 
+  | 停用 | bit | 0 | 1 | 停用 | 
+  | asp_user2 | nvarchar | 50 | 1 | 最后修改人 | 
+  | asp_time2 | datetime2 | 4 | 1 | 最后修改时间 | 
+  | 备用1 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用2 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用3 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用4 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用5 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用6 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用7 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用8 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用9 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用10 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用11 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用12 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用13 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用14 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用15 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用16 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用17 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用18 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用19 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 备用20 | nvarchar | 500 | 1 | 预留扩展字段(未绑定) | 
+  | 204 | EQUIP_STATUS | EQUIP_STATUS01 | 在用 | null | 启用 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 205 | EQUIP_STATUS | EQUIP_STATUS02 | 维修中 | null | 启用 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 206 | EQUIP_STATUS | EQUIP_STATUS03 | 停用 | null | 启用 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 207 | EQUIP_STATUS | EQUIP_STATUS04 | 报废 | null | 启用 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | EQUIP | 设备状态 | SELECT 名称 FROM bs_dict WHERE 字典类别='EQUIP_STATUS' AND ISNULL(停用,0)=0 ORDER BY 代码 | 
+  | OP | 工序类型 | SELECT 名称 FROM bs_dict WHERE 字典类别='OP_TYPE' AND ISNULL(停用,0)=0 ORDER BY 代码 | 
+  | REJECT | 原因分类 | SELECT 名称 FROM bs_dict WHERE 字典类别='REJECT_CLASS' AND ISNULL(停用,0)=0 ORDER BY 代码 | 
+  | FIN_ACC | 余额方向 | SELECT 名称 FROM bs_dict WHERE 字典类别='BAL_DIR' AND ISNULL(停用,0)=0 ORDER BY 代码 | 
+  | OP_TIME | 生产线 | SELECT 名称 FROM bs_dict WHERE 字典类别=N'SCX' AND ISNULL(停用,0)=0 ORDER BY 排序, 代码 | 
+  | ZDGL | 数据字典 | 基础档案 | archive | bs_dict | id | dm | 25 | 
+  | 字典类别 | 字典类别 | query,detail | 1 | 1 | 0 | 1 | 
+  | 代码 | 代码 | query,detail | 2 | 1 | 0 | 1 | 
+  | 名称 | 名称 | query,detail | 3 | 1 | 0 | 1 | 
+  | 备注 | 备注 | query,detail | 4 | 1 | 0 | 1 | 
+  | 排序 | 排序 | query,detail | 5 | 1 | 0 | 1 | 
+  | 停用 | 停用 | query,detail | 6 | 1 | 0 | 1 | 
+[OK] q-31-bsdict.sql (6 batches)

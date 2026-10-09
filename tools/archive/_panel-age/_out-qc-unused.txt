@@ -1,0 +1,29 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-qc-unused.sql ==
+  (0 rows)
+  | LOT_TRACE | 批号追溯 | flat |  | v_lot_trace | 17 | 4 | 0 | 
+  | QC_DISPOSAL | 不良品处理单 | doc |  | qc_disposal | 15 | 4 | 0 | 
+  | QC_OP | 工序质检单 | doc | qc_op | qc_op_detail | 15 | 4 | 0 | 
+  | QC_RECORD | 检验记录单 | doc | qc_record | qc_record_detail | 19 | 4 | 0 | 
+  | ROD_RETURN | 炭棒不良退货登记 | doc | rod_return | rod_return_detail | 11 | 4 | 0 | 
+  (0 rows)
+  | qc_disposal | 0 | 
+  | qc_op | 0 | 
+  | qc_op_detail | 0 | 
+  | qc_record | 0 | 
+  | qc_record_detail | 0 | 
+  | rod_return | 0 | 
+  | rod_return_detail | 0 | 
+  | v_lot_trace | 222 | 
+  | yj_usage_log 总行数 | 3437 | 
+  | 其中这 5 张面板 | 0 | 
+  | v_lot_trace 可见行(未作废) | 222 | 
+  | 1 | PC0000 | YJ-SX-035 | 端盖 | 采购入库 | CGRK-20260915-03214 | 2026-09-15 | 1222.0000 | 华北工控仓 | 已审核 | 蒋小刚 | 惠州市双喜科技有限公司 | null | 
+  | 2 | PC0000 | YJ-SX-035 | 端盖 | 采购入库 | CGRK-20260915-03214 | 2026-09-15 | 578.0000 | 华北工控仓 | 已审核 | 蒋小刚 | 惠州市双喜科技有限公司 | null | 
+  | 3 | PC0000 | YJ-SX-002-2 | 端盖 | 采购入库 | CGRK-20260915-03213 | 2026-09-15 | 2000.0000 | 恒亿仓 | 已审核 | 蒋小刚 | 惠州市双喜科技有限公司 | null | 
+  | 4 | TL00031 | CL002 | 6061铝锭 | 采购入库 | TCGRK-0003 | 2026-07-25 | 256.0000 | 辅料仓 | 已审核 | 测试导入 | TBRW | null | 
+  | 5 | TL00032 | C-95-14 | 006项目/功能炭棒滤芯 | 采购入库 | TCGRK-0003 | 2026-07-25 | 451.0000 | 辅料仓 | 已审核 | 测试导入 | TBRW | null | 
+  | 6 | TL00040 | CL002 | 6061铝锭 | 采购入库 | TCGRK-0004 | 2026-07-28 | 954.0000 | 成品仓 | 已审核 | 测试导入 | YJ | null | 
+  | 7 | TL00041 | CP005 | 轴套 C | 采购入库 | TCGRK-0004 | 2026-07-28 | 167.0000 | 成品仓 | 已审核 | 测试导入 | YJ | null | 
+  | 8 | TL00042 | CL001 | 45#圆钢 | 采购入库 | TCGRK-0004 | 2026-07-28 | 650.0000 | 成品仓 | 已审核 | 测试导入 | YJ | null | 
+[OK] _q-qc-unused.sql (8 batches)

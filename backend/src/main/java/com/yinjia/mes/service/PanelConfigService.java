@@ -104,8 +104,9 @@ public class PanelConfigService {
         // INV(2026-09-24 改版,用户拍板):80×80 旧版式(物料编码/名称/规格+QR=存货编码)改为
         // 75×100 七字段版式(订单编号/供应商名称/物料编码/物料规格/数量/批次/生产日期,后四类手填),
         // 二维码=公司代码@物料编码[@批号];printProductCards 本地生成,原 /report/qr-label 暂留可回滚。
-        // WHLOC 库位(2026-09-28):与商品同款勾选即打形态,卡面=库位字段(仓库/库位地址/库位编码,不含商品字段),
-        // 二维码=仓库@库位地址@库位编码(printLocationCards);行键=仓库+库位编码 复合(同码多仓不串选)。
+        // WHLOC 仓位(2026-09-28;2026-10-08 库位→仓位术语统一):与商品同款勾选即打形态,
+        // 卡面=仓位字段(仓库/仓位地址/仓位编码,不含商品字段),
+        // 二维码=仓库编码@仓位地址@仓位编码(printLocationCards);行键=仓库+仓位编码 复合(同码多仓不串选)。
         boolean qrLabel = "INV".equals(def.code()) || "WHLOC".equals(def.code());
         if (qrLabel) buttonGroups.add(group("二维码标签", List.of("二维码标签")));
         // 导入仅限单据面板(档案面板不提供导入)
@@ -193,11 +194,13 @@ public class PanelConfigService {
         }
         if (qrLabel) {
             // 前端二维码标签勾选列的行键(编码列)
-            metadata.put("qrLabelKey", "INV".equals(def.code()) ? "存货编码" : "库位编码");
+            // 2026-10-08:WHLOC 的编码列随库位→仓位术语统一改名(库位编码→仓位编码),此处数据键同步;
+            //   面板码 WHLOC 不变(菜单/权限/URL 都按 panel_code 走),故判断条件无需改。
+            metadata.put("qrLabelKey", "INV".equals(def.code()) ? "存货编码" : "仓位编码");
             if ("WHLOC".equals(def.code())) {
-                // 库位标签勾选行键=仓库+库位编码 复合(库位编码按仓内唯一,同码多仓不串选)
+                // 仓位标签勾选行键=仓库+仓位编码 复合(仓位编码按仓内唯一,同码多仓不串选)
                 metadata.put("qrLabelScopeKey", "仓库");
-                // 前端分发:whloc → printLocationCards(库位标识卡,二维码=仓库@库位地址@库位编码)
+                // 前端分发:whloc → printLocationCards(仓位标识卡,二维码=仓库编码@仓位地址@仓位编码)
                 metadata.put("qrLabelKind", "whloc");
             }
         }
@@ -663,9 +666,12 @@ public class PanelConfigService {
      *  创建时间→创建时间 / 修改时间→修改时间 / 创建人→创建人 / 修改人→修改人 ——
      *  原因是 UOM 面板(计量单位档案)也有这几个同名字段,而同名带回是无条件的;
      *  照此带过去,选个单位就把**单位档案的**创建/修改留痕写进了单据行。
-     *  这些列一律按本单真实值落库,故纳入带回排除(与 selfIdentityLabels 同一处置)。 */
+     *  这些列一律按本单真实值落库,故纳入带回排除(与 selfIdentityLabels 同一处置)。
+     *  2026-10-09 加「仓位」:采购入库明细的仓位是**本行该仓的具体库位**(由生单预设或人工选),
+     *  而仓库档案(WH)/仓位档案(WHLOC)上也有同名字段(WH.仓位 是遗留空列)—— 同名带回会让
+     *  「选一次仓库」把刚预设/已选的仓位冲成仓档里的空值。仓位不是来源档案的属性,一律不带回。 */
     private static final java.util.Set<String> REF_CARRY_EXCLUDE = java.util.Set.of(
-            "创建时间", "修改时间", "创建人", "修改人", "创建人编码", "修改人编码", "创建人id", "修改人id");
+            "创建时间", "修改时间", "创建人", "修改人", "创建人编码", "修改人编码", "创建人id", "修改人id", "仓位");
 
     /** 参照带回类型闸门:「是否」型不参与带回(任一侧是即禁止)。
      *  同名≠同义——如 往来单位.结算客户(是否,0/1标志) 与 销售订单.结算客户(客户名下拉) 同名异义,
@@ -712,7 +718,7 @@ public class PanelConfigService {
             Map.entry("项目责任人", List.of("负责人"))
     )));
 
-    /** 委外三单共用按钮组骨架(选单来源各自不同,见下方三常量)。 */
+    /** 委外单据按钮组骨架(2026-10-08 起只剩 委外加工单 OUTSOURCE_ORDER 用它:委外入库单/委外发料单已下架)。 */
     private static final List<String[]> OUTSOURCE_BASE = List.of(
             new String[]{"新增", "新增"},
             new String[]{"保存", "保存", "保存新增", "保存为草稿"},
@@ -740,15 +746,9 @@ public class PanelConfigService {
         return g;
     }
 
-    /** 委外三单:新增|选单|保存|删除|审核|生单(灰)|打印|更多 */
-    private static List<String[]> outsourceGroups(String... selectActions) {
-        List<String[]> out = new ArrayList<>(OUTSOURCE_BASE);
-        out.add(1, buttonGroup("选单", selectActions));
-        return withGenerate(out, "生单");
-    }
-
-    private static final List<String[]> OUTSOURCE_GROUPS_IN = outsourceGroups("选单", "选委外加工单");
-    private static final List<String[]> OUTSOURCE_GROUPS_ISSUE = outsourceGroups("选单", "选委外加工单");
+    // 2026-10-08:outsourceGroups(...) 与 OUTSOURCE_GROUPS_IN / OUTSOURCE_GROUPS_ISSUE 两个常量
+    // 随「委外入库单 / 委外发料单」下架一并移除(它们的唯一用处就是这两张面板)。
+    /** 委外加工单:新增|选单|保存|删除|审核|生单(灰)|打印|更多。 */
     private static final List<String[]> OUTSOURCE_GROUPS_ORDER = withGenerate(
             new ArrayList<>(List.of(new String[]{"新增", "新增"},
                     new String[]{"选单", "选单", "选销售订单"},
@@ -757,7 +757,9 @@ public class PanelConfigService {
                     new String[]{"审核", "审核", "弃审", "审批情况", "提交审批", "审批通过", "审批驳回"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "导出", "表格调整", "退出"})),
-            "生成委外发料单");
+            // 原为「生成委外发料单」——委外发料单下架后无目标面板,改回通用「生单」灰占位
+            // (无 PUSH_TARGETS 登记即前端置灰不可点,不指向已删面板)
+            "生单");
 
     /**
      * 单据面板工具栏按钮组(PANDA 复刻 + 固定位于约定,2026-09-01 用户约定):
@@ -784,23 +786,11 @@ public class PanelConfigService {
                     new String[]{"生单", "生成生产工单", "生成销售出库单"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "整单中止", "表格调整", "导入", "刷新"})),
-            // 请购单:选单灰;生单=采购订单(已实现)
-            java.util.Map.entry("PU_REQ", List.of(
-                    new String[]{"新增", "新增"},
-                    new String[]{"选单", "选单"},
-                    new String[]{"修改", "修改"},
-                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
-                    new String[]{"删除", "删除", "删除单据"},
-                    new String[]{"审核", "审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
-                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生成采购订单"},
-                    new String[]{"打印", "打印", "预览", "导出"},
-                    new String[]{"导入", "导入"},
-                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"})),
-            // 采购订单:选单=请购单;生单=送料暂收单(唯一出口,2026-09-22 起不再免检直达采购入库单)
+            // 请购单(PU_REQ)已下架(2026-10-08 用户口径:请购单不需要;面板/表/菜单/生单映射一并删,
+            // 见 tools/migrate-drop-extra-docs-pu-req-20261008.sql)——此处不再登记按钮组。
+            // 采购订单:选单组已随请购单下架移除(原「选请购单」);生单=送料暂收单(唯一出口)
             java.util.Map.entry("PU_ORDER", List.of(
                     new String[]{"新增", "新增"},
-                    new String[]{"选单", "选请购单"},
                     new String[]{"修改", "修改"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
@@ -922,20 +912,9 @@ public class PanelConfigService {
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 其他入库单:选单灰;生单灰(PANDA 无生单组)
-            java.util.Map.entry("OTHER_IN", List.of(
-                    new String[]{"新增", "新增"},
-                    new String[]{"选单", "选单"},
-                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
-                    new String[]{"删除", "删除", "删除单据"},
-                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
-                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生单"},
-                    new String[]{"打印", "打印", "预览", "导出"},
-                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
-                    new String[]{"修改", "修改"},
-                    new String[]{"查找", "查找", "刷新"},
-                    new String[]{"导入", "导入"})),
+            // 其他入库单(OTHER_IN)已下架(2026-10-08 用户口径:这类出入库单不需要)——不再登记按钮组;
+            // 同批下架的还有 OTHER_OUT / OUTSOURCE_IN / OUTSOURCE_ISSUE 与其明细表/统计表面板,
+            // 连同它们的记账分支(StockFlowService/StockLedgerService)一并移除。
             // 销售出库单:选单=销售订单;生单灰(PANDA:生成销货单,销货单未迁移)
             java.util.Map.entry("SALE_OUT", List.of(
                     new String[]{"新增", "新增"},
@@ -967,23 +946,9 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 其他出库单:选单灰;生单灰(PANDA 无生单组)
-            java.util.Map.entry("OTHER_OUT", List.of(
-                    new String[]{"新增", "新增"},
-                    new String[]{"选单", "选单"},
-                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
-                    new String[]{"删除", "删除", "删除单据"},
-                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
-                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
-                    new String[]{"生单", "生单"},
-                    new String[]{"打印", "打印", "预览", "导出"},
-                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
-                    new String[]{"修改", "修改"},
-                    new String[]{"查找", "查找", "刷新"},
-                    new String[]{"导入", "导入"})),
-            // 委外三单:新增|选单|保存|删除|审核|生单(灰/委外加工单为 PANDA 首个生单动作)|打印|更多
-            java.util.Map.entry("OUTSOURCE_IN", OUTSOURCE_GROUPS_IN),
-            java.util.Map.entry("OUTSOURCE_ISSUE", OUTSOURCE_GROUPS_ISSUE),
+            // 其他出库单(OTHER_OUT)已下架(2026-10-08)——不再登记按钮组(同 OTHER_IN)。
+            // 委外三单:OUTSOURCE_IN / OUTSOURCE_ISSUE 于 2026-10-08 下架(面板+表+视图+菜单),
+            // 只留 委外加工单 OUTSOURCE_ORDER(其「生成委外发料单」动作随之改为通用「生单」占位)。
             java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER),
             // 生产工单:选单=销售订单;生单=产成品入库单(已实现)
             java.util.Map.entry("MANU_ORDER", List.of(
@@ -1018,7 +983,7 @@ public class PanelConfigService {
      * 通用推式生单处理器不认领它(一个动作只能有一个处理器)。
      */
     private static final Map<String, String> PUSH_TARGETS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(java.util.Map.ofEntries(
-            java.util.Map.entry("PU_REQ|生成采购订单", "PU_ORDER"),
+            // 「PU_REQ|生成采购订单」已随请购单下架移除(2026-10-08):请购单不需要,采购订单不再有该上游
             java.util.Map.entry("PU_ORDER|生成送料暂收单", "QC_RECV"),
             java.util.Map.entry("SO_ORDER|生成生产工单", "MANU_ORDER"),
             java.util.Map.entry("SO_ORDER|生成销售出库单", "SALE_OUT"),
@@ -1061,11 +1026,10 @@ public class PanelConfigService {
             java.util.Map.entry("FINISH_IN", "MANU_ORDER"),          // 生产工单 → 产成品入库单
             java.util.Map.entry("DISPATCH", "MANU_ORDER"),           // 生产工单 → 工序派工单
             java.util.Map.entry("OUTSOURCE_ORDER", "SO_ORDER"),      // 销售订单 → 委外加工单
-            java.util.Map.entry("OUTSOURCE_ISSUE", "OUTSOURCE_ORDER"), // 委外加工单 → 委外发料单
-            java.util.Map.entry("OUTSOURCE_IN", "OUTSOURCE_ORDER"),  // 委外加工单 → 委外入库单
+            // OUTSOURCE_ISSUE / OUTSOURCE_IN 两条「委外加工单 → 委外发料单/入库单」已随两张面板下架移除(2026-10-08)
             java.util.Map.entry("SALE_OUT", "SO_ORDER"),             // 销售订单 → 销售出库单
             java.util.Map.entry("MANU_ORDER", "SO_ORDER"),           // 销售订单 → 生产工单(销售-生产链)
-            java.util.Map.entry("PU_ORDER", "PU_REQ"),               // 请购单 → 采购订单
+            // 「PU_ORDER ← PU_REQ」已随请购单下架移除(2026-10-08):采购订单现无上游可选单
             java.util.Map.entry("QC_RECV", "PU_ORDER"),              // 采购订单 → 送料暂收单(库存核算,2026-09-15;编码 9-20 由 SL_RECV 改)
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
@@ -1108,7 +1072,8 @@ public class PanelConfigService {
             {"数量", "实收数量"},
             {"预计交货日期", "预完工日"},
             {"计量单位", "销售单位"}, {"计量单位", "单位"},
-            // 两条链路补齐(采购链 PU_ORDER 物料口径 ↔ PU_REQ/PURCHASE_IN 存货口径;销售链单位换名)
+            // 两条链路补齐(采购链 PU_ORDER 物料口径 ↔ PURCHASE_IN 存货口径;销售链单位换名;
+            // 原 PU_REQ 一侧的口径随请购单下架于 2026-10-08 移除)
             {"物料编码", "存货编码"}, {"物料名称", "存货名称"},
             {"存货编码", "物料编码"}, {"存货名称", "物料名称"},
             {"规格型号", "型号"},
@@ -1140,7 +1105,8 @@ public class PanelConfigService {
     /** 头字段同义词(按链路 source|target 键控;同名映射之外的补充)。 */
     private static final Map<String, String[][]> FLOW_HEAD_SYNONYMS = java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(Map.of(
             // 2026-09-24 用户拍板:供应链域以远端实现为准 —— 此处撤回本地新增的
-            // "PU_REQ|PU_ORDER"({建议供应商→供应商})携带映射,回到远端口径。
+            // "PU_REQ|PU_ORDER"({建议供应商→供应商})携带映射,回到远端口径
+            // (该链路本身也已随 2026-10-08 请购单下架整体消失)。
             // 送料暂收单 → 采购入库单(2026-09-22 新增;原 PU_ORDER|PURCHASE_IN 免检直达已取消,
             // 那条只需 单据编号→采购订单号,本跳的采购订单号随链从采购订单带下来了、同名直通无需登记)。
             // 供应商代码→供应商编码:暂收单头叫「供应商代码」,入库头叫「供应商编码」——异名不带则入库单

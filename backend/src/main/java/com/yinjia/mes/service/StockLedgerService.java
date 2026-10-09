@@ -28,11 +28,15 @@ public class StockLedgerService {
         this.stockFlow = stockFlow;
     }
 
-    /** 是否参与记账的面板。 */
+    /**
+     * 是否参与记账的面板。
+     *
+     * <p>2026-10-08:OTHER_IN / OUTSOURCE_IN / OTHER_OUT / OUTSOURCE_ISSUE 四张面板整体下架
+     * (tools/migrate-drop-extra-docs-pu-req-20261008.sql),记账集合收敛为下面四张。
+     */
     public static boolean postsStock(String panelCode) {
         return switch (panelCode) {
-            case "PURCHASE_IN", "FINISH_IN", "OTHER_IN", "OUTSOURCE_IN",
-                 "MATERIAL_OUT", "SALE_OUT", "OTHER_OUT", "OUTSOURCE_ISSUE" -> true;
+            case "PURCHASE_IN", "FINISH_IN", "MATERIAL_OUT", "SALE_OUT" -> true;
             default -> false;
         };
     }
@@ -51,8 +55,8 @@ public class StockLedgerService {
 
     private void apply(String panelCode, String no, String user, boolean forward) {
         boolean inbound = switch (panelCode) {
-            case "PURCHASE_IN", "FINISH_IN", "OTHER_IN", "OUTSOURCE_IN" -> true;
-            default -> false; // MATERIAL_OUT, SALE_OUT, OTHER_OUT, OUTSOURCE_ISSUE
+            case "PURCHASE_IN", "FINISH_IN" -> true;
+            default -> false; // MATERIAL_OUT, SALE_OUT(2026-10-08 起出库只剩这两张)
         };
         List<Map<String, Object>> rows = loadRows(panelCode, no);
         // 弃审时无明细行或仓库缺失 → 跳过台账冲回(不阻断弃审;正常审核过的必有行和仓库)
@@ -168,7 +172,8 @@ public class StockLedgerService {
      *   · 采购入库:含税金额 = bl_purchase_in.含税金额;
      *              税额 = 含税金额 − ISNULL(金额, 单价×实收数量) —— **反推**(该表没有 税额 列);
      *   · 销售出库:含税金额 = bl_sale_out.含税销售金额(列名不同);税额 = bl_sale_out.税额;
-     *   · 其余 6 段(那 6 张行表本身没有这两列)与期初:不取键 ⇒ 流水落 NULL(与旧视图同口径,不臆造)。
+     *   · 其余两段(材料出库/产成品入库的行表本身没有这两列)与期初:不取键 ⇒ 流水落 NULL(与旧视图同口径,不臆造)。
+     *   · 2026-10-08:其他入库/其他出库/委外入库/委外发料四段随面板下架整体移除(原来共 8 段,现 4 段)。
      */
     private List<Map<String, Object>> loadRows(String panelCode, String no) {
         // 仓库取值口径(2026-09-23):采购入库/销售出库的**明细仓库**由「参照选仓库」写入
@@ -176,8 +181,8 @@ public class StockLedgerService {
         // 故这两张单的查询把三列一起取出,由 resolveWh 做「编码优先、名称兜底」解析;
         // 其余行表没有这两列(已核实),保持原样。
         // 往来单位/经手人(2026-09-30):**照抄 v_stock_movement 的口径** —— 只有 1 采购入库(供应商)、
-        // 5 销售出库(客户)两段有往来单位;3 其他入库、6 材料出库两段连经手人都是 NULL
-        // (前者 bd_other_in 无 经手人 列、其 往来单位 列视图也没取;后者只有 领用人,语义不同)。
+        // 5 销售出库(客户)两段有往来单位;材料出库段只有 领用人(语义不同,不取)。
+        // 2026-10-08:调用方 postsStock 已把面板收敛为这四张,default 只是防御(返回空表,由 apply 抛「无明细行」)。
         return switch (panelCode) {
             case "PURCHASE_IN" -> jdbc.queryForList(
                     // 批号口径(2026-09-22):**批次号优先、(供应商)批号兜底** —— 采购链按「只用批次号」
@@ -207,21 +212,7 @@ public class StockLedgerService {
                             + " N'产成品入库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_finish_in l LEFT JOIN bd_finish_in h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-            case "OTHER_IN" -> jdbc.queryForList(
-                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, l.[单价] AS price,"
-                            + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
-                            + " ISNULL(l.[金额], l.[单价] * l.[数量]) AS 金额,"
-                            + " N'其他入库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], NULL AS [经手人]"
-                            + " FROM bl_other_in l LEFT JOIN bd_other_in h ON h.[单据编号] = l.[单据编号]"
-                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-            case "OUTSOURCE_IN" -> jdbc.queryForList(
-                    // 行仓库优先,缺失时回退头仓库
-                    "SELECT l.[产品编码] AS code, l.[仓库] AS [行仓库], ISNULL(l.[仓库], h.[仓库]) AS [头仓库], l.[批号] AS lot, l.[实收数量] AS qty, l.[单价] AS price,"
-                            + " l.id AS rid, l.[产品名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
-                            + " ISNULL(l.[金额], l.[单价] * l.[实收数量]) AS 金额,"
-                            + " N'委外入库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], h.[经手人] AS [经手人]"
-                            + " FROM bl_outsource_in l LEFT JOIN bd_outsource_in h ON h.[单据编号] = l.[单据编号]"
-                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+            // 2026-10-08:原 OTHER_IN / OUTSOURCE_IN 两个入库段随面板下架整体移除
             case "SALE_OUT" -> jdbc.queryForList(
                     // 2026-09-30:**列名不许回退** —— 销售出库明细的仓库名称列早在 41a683aa
                     // (2026-09-23「仓库字段正名」)就已改名 仓库,采购分支当时同步改了、销售分支漏改,
@@ -239,28 +230,16 @@ public class StockLedgerService {
                             + " N'销售出库单' AS [单据类型], h.[单据日期] AS [单据日期], h.[客户] AS [往来单位], h.[经手人] AS [经手人]"
                             + " FROM bl_sale_out l LEFT JOIN bd_sale_out h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-            case "OTHER_OUT" -> jdbc.queryForList(
-                    // 头表无仓库列,仓库取行表;2026-09-30 起挂头表只为取 单据日期/经手人(流水表要用)
-                    "SELECT l.[存货编码] AS code, l.[仓库] AS [行仓库], l.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
-                            + " l.id AS rid, l.[存货名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
-                            + " ISNULL(l.[金额], l.[单价] * l.[数量]) AS 金额,"
-                            + " N'其他出库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], h.[经手人] AS [经手人]"
-                            + " FROM bl_other_out l LEFT JOIN bd_other_out h ON h.[单据编号] = l.[单据编号]"
-                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-            case "OUTSOURCE_ISSUE" -> jdbc.queryForList(
-                    "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
-                            + " l.id AS rid, l.[材料名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
-                            + " ISNULL(l.[金额], l.[单价] * l.[数量]) AS 金额,"
-                            + " N'委外发料单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], h.[经手人] AS [经手人]"
-                            + " FROM bl_outsource_issue l LEFT JOIN bd_outsource_issue h ON h.[单据编号] = l.[单据编号]"
-                            + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
-            default -> jdbc.queryForList( // MATERIAL_OUT
+            // 2026-10-08:原 OTHER_OUT / OUTSOURCE_ISSUE 两个出库段随面板下架整体移除
+            case "MATERIAL_OUT" -> jdbc.queryForList(
                     "SELECT l.[材料编码] AS code, l.[仓库] AS [行仓库], h.[仓库] AS [头仓库], l.[批号] AS lot, l.[数量] AS qty, NULL AS price,"
                             + " l.id AS rid, l.[材料名称] AS name, l.[规格型号] AS spec, l.[计量单位] AS uom,"
                             + " ISNULL(l.[金额], l.[单价] * l.[数量]) AS 金额,"
                             + " N'材料出库单' AS [单据类型], h.[单据日期] AS [单据日期], NULL AS [往来单位], NULL AS [经手人]"
                             + " FROM bl_material_out l LEFT JOIN bd_material_out h ON h.[单据编号] = l.[单据编号]"
                             + " WHERE l.[单据编号] = ? AND ISNULL(l.asp_cancel, 'N') <> 'Y'", no);
+            // 防御:postsStock 之外的面板不记账,给了也不该走到这里(真走到 → apply 会抛「无明细行」)
+            default -> List.of();
         };
     }
 

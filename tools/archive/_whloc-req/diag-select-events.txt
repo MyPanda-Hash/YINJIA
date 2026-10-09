@@ -1,0 +1,7 @@
+﻿[列] 仓位编码=3 存储分区=5
+[挂监听] activated
+[监听已挂] listeners attached on INPUT.el-select__input
+[输入] typed; active=true
+[点别处前] {"事件":["input | value=\"ZZ诊断区\" | related=null"],"输入框值":"ZZ诊断区","单元格文本":"ZZ诊断区"}
+[模拟点别的行:先 blur 再点] done
+[点后] {"事件":["input | value=\"ZZ诊断区\" | related=null"],"单元格文本":""}

@@ -726,8 +726,8 @@ export default {
     '打印材料码': 'Print Material QR Labels',
     '打印订单无金额': 'Print PO (No Amounts)',
     '请先勾选要导出的商品': 'Select the items to export first',
-    // 库位档案·二维码标签(2026-09-28):同款 75×100mm 标识卡,卡面=仓库/库位地址/库位编码
-    '请先勾选要打印的库位': 'Select the storage locations to print first',
+    // 仓位档案·二维码标签(2026-09-28):同款 75×100mm 标识卡,卡面=仓库/仓位地址/仓位编码
+    '请先勾选要打印的仓位': 'Select the storage locations to print first',
     '已选 {n} 个商品，导出二维码标签 PDF？': 'Export QR code label PDF for {n} selected item(s)?',
     '正在生成标签…': 'Generating labels...',
     '已导出 {n} 张二维码标签': 'Exported {n} QR code label(s)',
@@ -1540,7 +1540,7 @@ export default {
     '出库日期': 'Issue Date',
     '客户代码': 'Customer Code',
     '仓库': 'Warehouse',
-    '库位': 'Storage Location',
+    '仓位': 'Storage Location',
     '领料性质': 'Issue Nature',
     '来源单号': 'Source Order No.',
     '仓库代码': 'Warehouse Code',
@@ -2949,8 +2949,9 @@ export default {
     '所属页签': 'Table (Tab)',
     '该列只出现在这张表里;检验数据记录带入时也按这张表的列走':
       'This column appears only in this table; the inspection data record loads it as part of this table',
-    '给某张表增删自定义列(动态字段/备用列池,仅管理员;弹窗里选所属页签)':
-      'Add or retire custom columns for a table (dynamic fields / spare pool, admins only; pick the table in the dialog)',
+    /* 入口权限改为「本面板·自定义字段」授权(2026-10-09 用户口径),文案不再写「仅管理员」 */
+    '给某张表增删自定义列(动态字段/备用列池;需本面板「自定义字段」权限;弹窗里选所属页签)':
+      'Add or retire custom columns for a table (dynamic fields / spare pool; requires this panel\'s "Custom Fields" permission; pick the table in the dialog)',
     '请选择所属页签(自定义列住哪张表)': 'Please pick the table this custom column belongs to',
     '所属页签不存在:': 'Unknown table: ',
     '该页签已有同名字段:': 'This table already has a column with that name: ',
@@ -2981,6 +2982,15 @@ export default {
 
     // 字段管理(动态字段/备用列池,2026-09-28;规格 docs/design/动态字段扩展-备用列池-V1.0.md)
     '字段管理': 'Field Manager',
+    /* 组织架构「角色与面板权限」矩阵的列头(2026-10-09 补):此前这几条只有中文,
+       切 en 后矩阵表头是"可见/审核反审核/价格金额…",与其余已译列头混排很扎眼。
+       一并补齐(矩阵新增的「自定义字段」列见上方 §自定义字段)。 */
+    '可见': 'Visible',
+    '导出EXCEL': 'Export Excel',
+    '审核反审核': 'Audit / Un-audit',
+    '价格金额': 'Prices & Amounts',
+    '复核反复核': 'Review / Un-review',
+    '调价': 'Price Adjust',
     '动态字段': 'Dynamic fields',
     '表头池': 'Header pool',
     '明细池': 'Detail pool',
@@ -3104,6 +3114,23 @@ export default {
     '当前工序完工量': "Current operation's completed qty",
     '上道工序': 'Previous operation',
     '上道完工量': "Previous operation's completed qty",
+  
+    '仓位分区': 'Location Zones',
+    '分区跟随仓位存在：候选自动来自仓位的实际数据，不需要单独登记；仓位没了，分区就没了。': 'Zones exist only through locations: the list is derived from actual location data, with no separate registration. No locations, no zone.',
+    '填一个新名字即可新增分区（保存后进入候选）': 'Type a new name to add a zone (it joins the list after saving)',
+    '填入本格': 'Fill this cell',
+    '清空本格': 'Clear this cell',
+    '点击选择分区': 'Click to choose a zone',
+    '仓位数': 'Locations',
+    '(不分区)': '(no area)',
+    '(不细分)': '(no sub-zone)',
+    '无法删除': 'Cannot delete',
+    '个仓位仍在使用该分区，无法删除。分区跟随仓位存在：请先把这些仓位改到别的分区或删除它们；当最后一个仓位离开后，本分区会自动从候选里消失。': 'locations still use this zone, so it cannot be deleted. Zones exist only through locations: move those locations to another zone (or delete them) first; once the last one leaves, this zone disappears from the list automatically.',
+    '该分区已没有仓位，它已经随仓位一起从候选里消失了。': 'This zone has no locations left — it has already disappeared from the list along with them.',
+    '分区已消失': 'Zone no longer exists',
+    '大区': 'Area',
+    '存储分区': 'Sub-zone',
+  
   },
 
 }

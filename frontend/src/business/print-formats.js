@@ -4,7 +4,8 @@
  *   ① 银嘉采购订单(用户截图,PU_ORDER 打印):头部信息+物料行表+总计+注意事项+供/需方签章框;
  *   ② 退货单(用户截图,QC_RETURN 暂收退料单 打印):公司抬头+供应商/退货日期+行表+说明+签章行;
  *   ③ 二维码标签(2026-09-24,INV 勾选即打):75×100mm 七字段标签;
- *     ③b 库位标识卡(2026-09-28,WHLOC 勾选即打):同款 75×100mm,卡面=仓库/库位地址/库位编码,二维码=仓库@库位地址@库位编码;
+ *     ③b 仓位标识卡(2026-09-28 建为「库位标识卡」,2026-10-08 正名):同款 75×100mm,
+ *        卡面=仓库/仓位地址/仓位编码,二维码=仓库编码@仓位地址@仓位编码;
  *   ④ 生产任务单(打印工单,2026-09-24):横向 A4 一表多行+行尾二维码=公司代码@工单号@1000+行号(2026-10-09 规则改版,woQrText)。
  * 打印通道:新窗口 HTML + window.print()(同 QrLabelDialog,绕开 jsPDF §5.5 坑);
  * 版面文字(公司抬头/注意事项/需方联系/生产任务单表头)为固定版式常量,改文案只动本文件。
@@ -364,20 +365,21 @@ export async function printProductCards(rows) {
 }
 
 /**
- * 库位标识卡(WHLOC 库位档案「二维码标签」勾选即打,2026-09-28)——与商品标识卡同款 75×100mm 版式,
- * 卡面只放库位字段(仓库/库位地址/库位编码),不含商品标识卡的 订单编号/供应商/数量/批次/生产日期 等字段
- * (用户口径:库位卡只服务定位)。二维码=仓库编码@库位地址@库位编码(固定三段,空段保留占位;
+ * 仓位标识卡(WHLOC 仓位档案「二维码标签」勾选即打,2026-09-28;2026-10-08 库位→仓位术语统一)
+ * ——与商品标识卡同款 75×100mm 版式,
+ * 卡面只放仓位字段(仓库/仓位地址/仓位编码),不含商品标识卡的 订单编号/供应商/数量/批次/生产日期 等字段
+ * (用户口径:仓位卡只服务定位)。二维码=仓库编码@仓位地址@仓位编码(固定三段,空段保留占位;
  * 2026-09-28 同日改版:首段 仓库→仓库编码,扫码按编码定位仓库,仓库编码选仓库时参照带回自动填)。
  * 卡面 CSS 与 printProductCards 同构:标签恒不折行(.lb),值区过长自动转行,二维码右下角 20×20mm。
- * @param rows [{仓库, 仓库编码, 库位地址, 库位编码}](库位编码=行身份,缺码行跳过)
+ * @param rows [{仓库, 仓库编码, 仓位地址, 仓位编码}](仓位编码=行身份,缺码行跳过)
  */
-/** 库位标识卡二维码内容:仓库编码@库位地址@库位编码(三段固定顺序,空段保留占位) */
+/** 仓位标识卡二维码内容:仓库编码@仓位地址@仓位编码(三段固定顺序,空段保留占位) */
 export function locationCardQrText(loc) {
-  return [loc?.['仓库编码'], loc?.['库位地址'], loc?.['库位编码']].map((s) => String(s ?? '').trim()).join('@')
+  return [loc?.['仓库编码'], loc?.['仓位地址'], loc?.['仓位编码']].map((s) => String(s ?? '').trim()).join('@')
 }
 
 export async function printLocationCards(rows) {
-  const cards = (Array.isArray(rows) ? rows : []).filter((r) => r && r['库位编码'])
+  const cards = (Array.isArray(rows) ? rows : []).filter((r) => r && r['仓位编码'])
   if (!cards.length) return false
   const pageCss = '@page{size:75mm 100mm;margin:0}'
   const cardCss = '.card{width:75mm;height:100mm;box-sizing:border-box;border:0.35mm solid #000;'
@@ -397,15 +399,15 @@ export async function printLocationCards(rows) {
       const lib = qrLib()
       if (!lib) throw new Error('qrcode lib unavailable')
       qr = await lib.toDataURL(qrText, { margin: 1, errorCorrectionLevel: 'M' })
-    } catch (e) { console.warn('[print-formats] 库位二维码生成失败:', e?.message || e) }
+    } catch (e) { console.warn('[print-formats] 仓位二维码生成失败:', e?.message || e) }
     const f = (label, value) => `<div class="f"><span class="lb">${label}：</span><span class="v">${esc(value || '')}</span></div>`
     trs.push('<div class="card">'
-      + f('仓　　库', c['仓库']) + f('库位地址', c['库位地址']) + f('库位编码', c['库位编码'])
+      + f('仓　　库', c['仓库']) + f('仓位地址', c['仓位地址']) + f('仓位编码', c['仓位编码'])
       + `<div class="qr">${qr ? `<img src="${qr}"/>` : ''}</div>`
       + '</div>')
   }
   const body = '<style>' + pageCss + cardCss + '</style>' + trs.join('')
-  if (!openPrintWindow('库位标识卡', body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
+  if (!openPrintWindow('仓位标识卡', body)) { alert('浏览器拦截了打印窗口,请允许弹出窗口'); return false }
   return true
 }
 

@@ -188,10 +188,29 @@ export async function refColumns(field) {
   return [...new Set([r.refField, r.displayField].filter(Boolean))]
 }
 
+/** 参照过滤值里的 `$字段` 占位 → 取**本行**该字段的值(用于「仓位随仓库收窄」这类级联)。
+ *  例:yj_field.ref_filter = `仓库=$仓库` ⇒ 本行的「仓库」值即候选集的仓库条件。
+ *  未给行上下文、或该字段为空 ⇒ 返回 null,调用方据此判「无候选」(先选上级字段)。 */
+function resolveFilterValue(expected, row) {
+  if (typeof expected === 'string' && expected.startsWith('$')) {
+    const key = expected.slice(1)
+    const v = row?.[key]
+    return v === undefined || v === null || String(v).trim() === '' ? null : String(v)
+  }
+  return expected
+}
+
 // 拉取引用面板数据（SQL 后端）
-export async function queryRefRows(field, { keyword = '', pageSize = 200 } = {}) {
+export async function queryRefRows(field, { keyword = '', pageSize = 200, row = null } = {}) {
   const r = normRef(field)
-  const filter = r.filter || {}
+  // 级联过滤(2026-10-09):filter 值支持 `$字段` 占位,按本行取值;
+  //   解析不出值(没选上级字段/没传本行)⇒ 直接无候选,避免把全库仓位倒给用户选。
+  const filter = {}
+  for (const [k, v] of Object.entries(r.filter || {})) {
+    const rv = resolveFilterValue(v, row)
+    if (rv === null) return []
+    filter[k] = rv
+  }
   const hasAlternativeFilter = Object.values(filter).some(Array.isArray)
   let refConfig = null
   try {

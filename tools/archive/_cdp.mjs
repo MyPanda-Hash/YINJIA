@@ -19,7 +19,7 @@ import net from 'node:net';
 import crypto from 'node:crypto';
 
 /** 最小 WebSocket 客户端:握手 + 掩码帧 + 分片重组(ping→pong),只实现 CDP 需要的部分 */
-function rawConnect(url) {
+function rawConnect(url, onEvent) {
   const u = new URL(url);
   const key = crypto.randomBytes(16).toString('base64');
   const sock = net.connect(Number(u.port), u.hostname);
@@ -32,7 +32,8 @@ function rawConnect(url) {
   const onMessage = (text) => {
     let m;
     try { m = JSON.parse(text); } catch { return; }
-    if (m.id && waiters.has(m.id)) { waiters.get(m.id)(m); waiters.delete(m.id); }
+    if (m.id && waiters.has(m.id)) { waiters.get(m.id)(m); waiters.delete(m.id); return; }
+    if (m.method && onEvent) { try { onEvent(m); } catch { /* 事件回调不干扰主流程 */ } }   // 事件(如 Page.javascriptDialogOpening)
   };
   sock.on('data', (d) => {
     buf = Buffer.concat([buf, d]);
@@ -102,14 +103,15 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * 连上 Edge 调试端口并挂到一个页面目标(浏览器级端点 + flatten 会话)。
  * @param {number} port       --remote-debugging-port
  * @param {string} [targetId] 指定页面目标(/json/new 返回的 id);省略则取第一个 page 目标
+ * @param {(msg:any)=>void} [onEvent] 可选:CDP 事件回调(如 Page.javascriptDialogOpening)
  */
-export async function attachCdp(port, targetId) {
+export async function attachCdp(port, targetId, onEvent) {
   let ver = null;
   for (let i = 0; i < 30 && !ver; i++) {
     try { const r = await fetch(`http://127.0.0.1:${port}/json/version`); if (r.ok) ver = await r.json(); } catch { await sleep(500); }
   }
   if (!ver) throw new Error('CDP 浏览器端点未就绪(端口 ' + port + ')');
-  const ws = rawConnect(ver.webSocketDebuggerUrl);
+  const ws = rawConnect(ver.webSocketDebuggerUrl, onEvent);
   if (!await ws.ready) throw new Error('CDP WebSocket 握手失败');
   let tid = targetId;
   if (!tid) {

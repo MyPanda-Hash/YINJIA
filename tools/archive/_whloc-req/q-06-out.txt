@@ -1,0 +1,111 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & $java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlserver://loc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-06-scale.sql ==
+  | bd_purchase_in | 119 | 仓位id | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bd_purchase_in | 120 | 仓位 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bd_purchase_in | 121 | 仓位编码 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_material_out | 58 | 仓库启用仓位管理 | nvarchar | 1000 | 材料出库单↔金蝶生产领料单(inv_pick)接口键 stock_is_allow_freight | 
+  | bl_material_out | 59 | 仓位id | nvarchar | 1000 | 材料出库单↔金蝶生产领料单(inv_pick)接口键 sp_id | 
+  | bl_material_out | 60 | 仓位名称 | nvarchar | 1000 | 材料出库单↔金蝶生产领料单(inv_pick)接口键 sp_name | 
+  | bl_material_out | 61 | 仓位编码 | nvarchar | 1000 | 材料出库单↔金蝶生产领料单(inv_pick)接口键 sp_number | 
+  | bl_pu_order | 36 | 仓库启用仓位管理 | nvarchar | 1000 | 仓库启用仓位管理 | 
+  | bl_pu_order | 37 | 仓位id | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_pu_order | 38 | 仓位名称 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_pu_order | 39 | 仓位编码 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_purchase_in | 43 | 仓库启用仓位管理 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_purchase_in | 44 | 仓位id | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_purchase_in | 46 | 仓位编码 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_purchase_in | 126 | 仓位名称 | nvarchar | 400 | 仓位名称:采购入库单明细的仓位(面板 PURCHASE_IN 明细隐藏列,随 ERP 血统保留) | 
+  | bl_sale_out | 39 | 仓库启用仓位管理 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_sale_out | 40 | 仓位id | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_sale_out | 42 | 仓位编码 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_so_order | 34 | 仓库启用仓位管理 | nvarchar | 1000 | 仓库启用仓位管理 | 
+  | bl_so_order | 35 | 仓位id | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_so_order | 36 | 仓位名称 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bl_so_order | 37 | 仓位编码 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bs_inv | 65 | 倒冲仓位名称 | nvarchar | 400 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bs_inv | 113 | 默认仓位 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bs_inv | 122 | 倒冲仓位id | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bs_inv | 123 | 倒冲仓位编码 | nvarchar | 1000 | 历史遗留英文列:无面板字段引用、本表该列全空(2026-09-28 体检)——见《数据库规范》阶段 3 清理候选 | 
+  | bs_wh | 28 | 启用仓位管理 | bit | 1 | 启用仓位管理 | 
+  | bs_wh | 32 | 库位 | nvarchar | 400 | 库位(仓库内货位编号,手工录入文本;2026-09-28 仓库档案新增) | 
+  | bs_wh_loc | 3 | 库位编码 | nvarchar | 200 |  | 
+  | bs_wh_loc | 4 | 库位地址 | nvarchar | 400 |  | 
+  | bl_material_out | 4 | 0 | 
+  | bl_pu_order | 4 | 0 | 
+  | bl_purchase_in | 4 | 0 | 
+  | bl_so_order | 4 | 0 | 
+  | bs_inv | 4 | 0 | 
+  | bd_purchase_in | 3 | 3 | 
+  | bl_sale_out | 3 | 0 | 
+  | bs_wh | 2 | 0 | 
+  | bs_wh_loc | 2 | 0 | 
+  | INV | 商品 | archive | bs_inv | null | 
+  | MATERIAL_OUT | 材料出库单 | doc | bl_material_out | bd_material_out | 
+  | PU_ORDER | 采购订单 | doc | bl_pu_order | bd_pu_order | 
+  | PURCHASE_IN | 采购入库单 | doc | bl_purchase_in | bd_purchase_in | 
+  | SALE_OUT | 销售出库单 | doc | bl_sale_out | bd_sale_out | 
+  | SO_ORDER | 销售订单 | doc | bl_so_order | bd_so_order | 
+  | WH | 仓库 | archive | bs_wh | null | 
+  | WHLOC | 库位 | archive | bs_wh_loc | null | 
+  | 28 | 23 | 23 | 28 | 
+  | bd_purchase_in | 单据头 | 3 | 3 | 
+  | bl_material_out | 单据行 | 4 | 4 | 
+  | bl_pu_order | 单据行 | 4 | 4 | 
+  | bl_purchase_in | 单据行 | 4 | 4 | 
+  | bl_sale_out | 单据行 | 3 | 3 | 
+  | bl_so_order | 单据行 | 4 | 4 | 
+  | bd_purchase_in | 19 | 
+  | bl_purchase_in | 56 | 
+  | bl_sale_out | 126 | 
+  | bl_material_out | 2 | 
+  | bl_pu_order | 133 | 
+  | bl_so_order | 123 | 
+  | bs_inv | 338 | 
+  | bs_wh | 11 | 
+  | bs_wh_loc | 5 | 
+  | 1 | id | bigint | 8 | 
+  | 2 | 仓库 | nvarchar | 400 | 
+  | 3 | 库位编码 | nvarchar | 200 | 
+  | 4 | 库位地址 | nvarchar | 400 | 
+  | 5 | 停用 | bit | 1 | 
+  | 6 | 备注 | nvarchar | 1000 | 
+  | 7 | asp_user1 | nvarchar | 100 | 
+  | 8 | asp_time1 | datetime2 | 8 | 
+  | 9 | asp_user2 | nvarchar | 100 | 
+  | 10 | asp_time2 | datetime2 | 8 | 
+  | 11 | asp_cancel | nvarchar | 2 | 
+  | 12 | 备用1 | nvarchar | 1000 | 
+  | 13 | 备用2 | nvarchar | 1000 | 
+  | 14 | 备用3 | nvarchar | 1000 | 
+  | 15 | 备用4 | nvarchar | 1000 | 
+  | 16 | 备用5 | nvarchar | 1000 | 
+  | 17 | 备用6 | nvarchar | 1000 | 
+  | 18 | 备用7 | nvarchar | 1000 | 
+  | 19 | 备用8 | nvarchar | 1000 | 
+  | 20 | 备用9 | nvarchar | 1000 | 
+  | 21 | 备用10 | nvarchar | 1000 | 
+  | 22 | 备用11 | nvarchar | 1000 | 
+  | 23 | 备用12 | nvarchar | 1000 | 
+  | 24 | 备用13 | nvarchar | 1000 | 
+  | 25 | 备用14 | nvarchar | 1000 | 
+  | 26 | 备用15 | nvarchar | 1000 | 
+  | 27 | 备用16 | nvarchar | 1000 | 
+  | 28 | 备用17 | nvarchar | 1000 | 
+  | 29 | 备用18 | nvarchar | 1000 | 
+  | 30 | 备用19 | nvarchar | 1000 | 
+  | 31 | 备用20 | nvarchar | 1000 | 
+  | 32 | 仓库编码 | nvarchar | 200 | 
+  | DEPT | 上级部门 | 上级部门 | 参照 | detail | 50 | 140 | 1 | 0 | 0 | 1 | DEPT | 部门编码 | 部门名称 | (无) | 
+  | DEPT | 级次 | 级次 | 文本 | detail | 900 | 130 | 1 | 0 | 0 | 1 | null | null | null | (无) | 
+  | DEPT | 长编码 | 长编码 | 文本 | query,detail | 900 | 130 | 1 | 0 | 0 | 1 | null | null | null | (无) | 
+  | DEPT | 部门全称 | 部门全称 | 文本 | detail | 900 | 130 | 1 | 0 | 0 | 1 | null | null | null | (无) | 
+  | DEPT | 上级编码 | 上级编码 | 文本 | query,detail | 900 | 130 | 1 | 0 | 0 | 1 | null | null | null | (无) | 
+  | DEPT | 是否叶子节点 | 是否叶子节点 | 是否 | detail | 900 | 130 | 1 | 0 | 0 | 1 | null | null | null | (无) | 
+[OK] q-06-scale.sql (9 batches)

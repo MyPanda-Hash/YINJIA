@@ -2480,31 +2480,246 @@ migrate-lab-sheets-date-fields-2026-10-07.sql
 #   业务数据(yj_doc_status/yj_user/yj_doc_batch 等)不碰。证据 tools/archive/_srv-bak-compare-20261007/。幂等;两账套均执行。
 migrate-server-converge-20261007.sql
 
-# ── migrate-rd-approval-liaison-owner.sql(2026-10-08):立项申请加「对接人」「项目责任人」两个流程字段 ──
-#   用户口径(m01625 原话):「销售端提出需求 —— 申请前需刘博或冯工同意(这个的意思就是填写立项申请)」
-#   「冯总审核及定级 ← 红字批注(这个就是对立项申请进行审批与定级)」「定级完之后就要分发对接人,
-#   这个对接人可以自己选择是哪一个账号,分发之后对应对接人账号可以进行签核然后分发下去,就是确认责任人,
-#   也可以选择账号,确认责任人之后就可以在项目实施计划里面进行对应单据的填写,填写完通过审批之后
-#   归档进入项目进度查询追踪项目进度」。
-#   目标流程:1 销售填 RD_APPROVAL → 2 冯总审批+定级(同一步两动作) → 3 **分发对接人**(选账号)
-#   → 4 对接人**签核 + 确认责任人**(选账号) → 5 责任人在 RD_PLAN 填单(负责人由「项目责任人」参照带入)
-#   → 6 RD_PLAN 审批归档 → RD_PROGRESS 追踪。
-#   本脚本做第 3、4 步的字段落点:
-#     ① rd_approval.备用1 → 标签「对接人」、备用2 → 标签「项目责任人」(走**备用列池**,零 DDL,依
-#        docs/design/动态字段扩展-备用列池-V1.0.md);place=header seq 210/215、editable=0、**hidden=1**
-#        (程序读写,不进通用表头网格也不进纸面 —— RD_APPROVAL 纸面由 docSheetConfigs.js 的 rows 驱动)。
-#     ② 两列的 MS_Description 中文注明(原为「备用列池成员」)。
-#     ③ 译名 2 字段 × 10 语言 = 20 条(scope='field')。
-#     ④ 研发审核角色 rd_review(role_id=4,唯一成员 cp 陈秀丽)的 RD_APPROVAL can_approve → 'Y'
-#        —— 此前研发链 RD_APPROVAL 三角色(2/4/5)全为 'N' ⇒ 全库只有 admin 能审批/定级。
-#   存量占用核查(实测 HSDZ_MES):rd_approval 46 列、备用1/备用2 全 nvarchar(1000) NULL、现有 2 行
-#     两列非空均为 0;yj_field 里该面板 备用1/备用2 未被任何字段引用;「对接人」「项目责任人」全库 0 命中
-#     (⚠「责任人」已被 QC_BHC/QC_BHZ/QC_JJF/QC_SCP/RD_SPEC_DOC/RD_MOLD_PROC/RD_ASM_PROC/RD_ASM_BOM 占用,
-#      故字段名必须带「项目」前缀)。
-#   取值口径:两字段均存 **username 账号**(用户原话「可以自己选择是哪一个账号」),非姓名;与
-#     rd_dev_task.file_owner 同族(实测 glm53/cp)。
-#   配套代码(同提交):ButtonService.dispatchLiaison / confirmProjectOwner / approveApproval 内
-#     「审批通过即定级」/ unaudit 清空两字段 / save 剥离两只读字段;
-#     PanelConfigService.REF_SYNONYMS 加「项目责任人 → 负责人」(RD_PLAN.负责人 是 editable=0,只能走同义词路径)。
-#   自检:字段 2/2、物理列 2/2、译名 20/20、rd_review 审批权 ≥1。幂等可重跑,两个账套均执行。
-migrate-rd-approval-liaison-owner.sql
+# migrate-fourdoc-bloodline-cols-20261008.sql(2026-10-08):补回基线档登记、本机表已无的 5 个物理列
+#   背景:文档 §3.3/§3.4 登记了 QC_RETURN 头「退货原因/经手人」、QC_RETURN 明细「单位」、
+#   PURCHASE_IN 明细「仓位名称/换算率2」,而本机两账套同名物理列已不存在(查证:yj_schema_log 无任何
+#   删除/改名迁移命中;测试账套与正式库结构完全一致 ⇒ 属越链操作/结构导入丢失,非迁移链演进)。
+#   本脚本按文档把 5 列补回(纯 NULL 空列 + 列级 MS_Description 中文注明),明细「单位」按同表「计量单位」补空回填;
+#   随后由 migrate-fourdoc-baseline-restore-20261008.sql 把对应 5 行字段登记一并回正(基线随之 329 行)。
+#   ⚠「QC_RETURN 明细 退货数量」列名仍绑 `数量`(存量数据在 数量,15/15 非空),标签(数据键)不变 —— 见文档 §5.4/§8.4。
+#   幂等(COL_LENGTH 守卫);两账套均执行;必须排在回正脚本之前。
+migrate-fourdoc-bloodline-cols-20261008.sql
+
+# migrate-fourdoc-missing-cols-20261008.sql(2026-10-08):按文档补齐四单仍缺的 4 个物理列
+#   依据 = docs/development/采购链四单字段与显示字段.md(唯一基线),逐列对账后仍缺:
+#     ① qc_return_detail.退货数量 —— 本机该列叫「数量」(15/15 行有数据)⇒ sp_rename 改名(数据不动);
+#        顺带修掉静默 bug:后端 BatchService.returnedByOrderLine 写死 d.退货数量 + catch(ignore),
+#        导致「退货回冲」一直失效(PushGenerateHandler×2 / PuLabelService×2 / VoucherFlowService)。
+#     ② qc_return_detail.批号 ③ bd_purchase_in.审核时间2 ④ bd_purchase_in.审核人2 —— 补空列(未登记,界面不显示)。
+#   幂等(sp_rename 双向守卫 + COL_LENGTH);两账套均执行;必须排在回正脚本之前。
+#   ⚠ 遗留:migrate-qc-tc-via-return.sql:144 硬写 d.[数量],该文件字节不变即不会重跑;将来要改它须先改成血统二择一。
+migrate-fourdoc-missing-cols-20261008.sql
+
+# migrate-fourdoc-baseline-restore-20261008.sql(2026-10-08):采购链四单 yj_field 回正到 2026-10-03 基线
+#   背景:10-05 07:42 起本地库迁移链整链重放(79 条,首条 migrate-sl-supplier-ref.sql),四单 yj_field 行
+#   被整批换成另一代登记 —— 参照源越界回落(§5.3 同款)、QC_RECV 明细少 10 行(数量2/计量单位2/税率%/
+#   含税单价/含税金额/折扣%/预计到货日期/现存量/仓库/批次键)、表头「单据日期」被改名「日期」、业务员
+#   由参照掉回文本、QC_INSP 明细「单位」整行消失、hidden 位被翻开(明细可见列 QC_RECV 22→37 /
+#   QC_INSP 14→30 / QC_RETURN 12→33)。
+#   按 docs/development/采购链四单字段与显示字段.md §8 复跑取证:§四 12/12 ✅,§五 参照抽查 4/6(两项 FAIL)。
+#   本脚本把四单 yj_field 逐字段回正到基线 dump(tools/archive/_dump-out/fields-HSDZ_MES.md @ 10-03,329 行)。
+#   幂等:差异行数=0 的面板跳过;有差异则整面板重建(单事务 + 重建后复核,非 0 回滚 RAISERROR)。两账套均执行。
+#   ⚠ 顺序(2026-10-08 打包前修正):本脚本必须在上面两条补列脚本**之后** —— 它按基线 dump 重建
+#     yj_field,会为基线档登记但物理列尚不存在的字段插行;先补列再回正才不会留下「字段指向不存在的列」的中间态。
+migrate-fourdoc-baseline-restore-20261008.sql
+
+# ── 2026-10-08 测试库字段对齐正式库(以《采购链四单字段与显示字段.md》为基线) ──
+#   取证:DbSchemaDiff → DIFF-22(bs_line_capacity 缺备用1-20、bl_sale_out.仓库 宽度、缺视图 v_manu_schedule、
+#         yj_field 多 10 行);_YjFieldAlign(ALL) → DIFF-244(多 10 / 改 234,四单 seq 顺序为主 + 27 行 hidden/visible)。
+#   做法:补齐列/视图 + 删测试库多出的 yj_field 行 + 按正式库取值 UPDATE;全部带守卫,正式库上为 no-op。
+migrate-align-ledger-fields-20261008.sql
+#   第二轮(同上对齐,补「同字段多行」盲区漏掉的 4 处:两处 seq、一处 hidden/visible、一处重复行;见脚本头)
+migrate-align-ledger-fields2-20261008.sql
+
+
+# —— 2026-10-08 仓库档案对齐金蝶真实账套:只保留金蝶有的仓库 ——
+#   用户口径:「现在只保留金蝶有的仓库」。取证 tools/archive/_kingdee-stores.out.txt:金蝶真实账套
+#   (clientId=359797 + outerInstanceId=580147507460444160)/jdy/v2/bd/store 共 6 个仓(YJ-08 车间仓/
+#   CP-02 成品B仓/CK00003 成品不良品区/YCL-01 恒亿仓/CK00006 华北工控仓/CK00005 原料不良品仓,全启用);
+#   本库 bs_wh 11 行里另有 5 行本地自建(asp_user1='migration'、无 外部数据ID ⇒ 金蝶账套不存在):
+#   CK01 原料仓/CK02 辅料仓/CK03 成品仓/CK04 半成品仓/CK05 不良品仓。
+#   做法:软删这 5 行(asp_cancel='Y' + 停用=1 + 状态='停用';WHERE 带 外部数据ID IS NULL 窄条件,
+#   金蝶同步行与日后金蝶新增仓不受影响),带行数守卫 + 两条自检(启用中非金蝶来源=0、金蝶 6 仓缺失=0)。
+#   引用这些仓的存量演示单据(TCGRK-*/TXSCK-*/TEST-* 等)与库存/流水本次不动(用户口径:只改仓档);
+#   CK00001 正品仓与「转ERP 无仓默认推 CK00001」同样本次不动。
+#   幂等重跑影响 0 行;两账套均已执行并复核(启用中恰 6 行、全为金蝶来源)。
+migrate-wh-kingdee-only-20261008.sql
+
+# migrate-whloc-rename-bin-20261008.sql(2026-10-08):库位 → 仓位 术语统一(对齐金蝶仓位三件套 sp_id/sp_name/sp_number)
+#   动机:库位档案 2026-09-28 落地用了「库位」,而全系统(金蝶接口血统)一直是「仓位」
+#     (bd_purchase_in.仓位/仓位编码、bl_*.仓位id/仓位名称/仓位编码、bs_inv.默认仓位、bs_wh.启用仓位管理);
+#     一个概念两套词导致参照挂不上、字段对不齐。本脚本把「库位」统一改成「仓位」。
+#   范围(2026-10-08 全量取证 tools/archive/_whloc-req/q-07/q-08/q-09):
+#     物理列 3(sp_rename:bs_wh_loc.库位编码→仓位编码 / 库位地址→仓位地址 / bs_wh.库位→仓位)
+#     + yj_panel 1(WHLOC.panel_name) + yj_field 3(col_name 与 label) + yj_translation 36 行 + MS_Description 3 处。
+#     视图/存储过程 0;db/HSDZ_MES.sql 与 tools/deploy-all.sql 0(旧快照不含此对象)。面板码 WHLOC/表名 bs_wh_loc/菜单 code 不变。
+#   ⚠ 两个硬约束:① yj_translation 唯一键 uq_translation(scope,ref_key,locale),且 field/仓位编码(en=Sp Number,ja=ロケーションコード)
+#     与 field/仓位(en=Bill Sp Name)已存在 ⇒ 冲突感知(先删目标已存在的旧行,保留既有仓位译名),不能无脑 UPDATE ref_key;
+#     ② yj_field.col_name 即物理列名(QueryService.selectCols 拼 t.[col_name] AS [label],前端数据键取 label)⇒ 改 col_name 必须同步 sp_rename。
+#   刻意不改:yj_archive_change_log.doc_no(9) 与 yj_usage_log.doc_no/panel_name(9+9) 是历史事实快照,改了即篡改审计;
+#     20 处既有「仓位*」字段(用户口径:已经为仓位的不需要修改)。
+#   幂等(COL_LENGTH 双向守卫 + 旧名存在条件);两账套均执行;必须排在 migrate-whloc-whcode.sql 之后。
+#   配套代码(同批):PanelConfigService qrLabelKey 库位编码→仓位编码;前端 menus.js/print-formats.js/PanelxList.vue/print-formats.test.js + 10 个语言包。
+migrate-whloc-rename-bin-20261008.sql
+
+# migrate-whloc-area-a-raw-20261008.sql(2026-10-08):原材料区(A仓) 仓位落地 + 仓位档案层次列
+#   需求(用户 2026-10-08):「根据图中数据(仓库库位信息表 Sheet2)为当前仓库增加仓位,仓位先增加原材料区(A仓)」。
+#   口径已确认:① bs_wh 是用户有意清理过的(现存 6 行,均为 jdy-sync 来源),按新仓库来,不恢复被删的 CK01~CK05;
+#     ② 原材料区(A仓) 新建仓库档案「原材料区A仓」(编码 CK-A);③ 货架区 AH 原文截断(AH5-1/2/3-1...),层数按 3 层。
+#   内容:bs_wh 插入 CK-A + bs_wh_loc 加 5 个层次列(厂区/库区/排号/位号/层号,含列级中文注明)
+#     + yj_field 注册这 5 列(seq 32~39,插在 仓位编码(30) 与 仓位地址(40) 之间)+ 45 条九语言译名
+#     + 幂等生成 156 个仓位:炭粉区 36(A1-09-1…A1-20-3)+ 胶粉区 12(A1-21-1…A1-24-3)+ 货架区 108(AH5-1-1…AH16-3-3)。
+#   编码严格照《仓库总体规划》原文,不另发明;原文两处笔误按正字收录:`41-20-1/2/3`⇒A1-20-*、`4H16-1/2/3-1...`⇒AH16-*。
+#   ⚠ 遗留待办(不阻塞):货架区层数 3 是按用户口径假定,原文未写全;原材料区尚有「辅料及配件区(A仓)」6 个区
+#     (纸箱/端盖/PP棉/无纺布/网套/标签,含 AH1~AH4、AH17/AH18 截断)未做;新厂区 D仓 整车未做。
+#   幂等(仓库按编码判存在 / 加列按 COL_LENGTH / 字段按 col_name / 译名按(scope,ref_key,locale) / 仓位按编码 NOT EXISTS);
+#   两账套均执行。测试账套预存 2 行空编码垃圾行(快照遗留),故其「仓位编码重复组」基线为 1(正式 0),非本脚本引入。
+migrate-whloc-area-a-raw-20261008.sql
+
+# migrate-whloc-clean-coord-20261008.sql(2026-10-08):仓位档案「坐标列 vs 用途分区」解耦 + 清理试录垃圾行
+#   背景(体检 tools/archive/_whloc-req/q-19/q-20):上一版把**两个维度压进一列** —— 物理区码(A1/A2/AH/B1..C2)
+#     与 用途分区(炭粉区/胶粉区/货架区)共用「库区」;且货架区 108 行的「排号」塞的是 `AH5`(区码+排号连写),
+#     炭粉/胶粉 48 行是纯数字 —— 同列两种含义。实证:`A1` 一个区码同时承载 炭粉区(排09~20)与胶粉区(排21~24),
+#     说明"用途"是按(区码,排号区间)切的标签,不是物理层级。
+#   内容:① bs_wh_loc 加 `区码`(含注明);② `库区`→`存储分区`(sp_rename + yj_field col_name/label + yj_translation ref_key,冲突感知);
+#     ③ 从 `仓位编码` 原文**重算** 区码/排号/位号/层号;④ 软删试录垃圾行(asp_cancel='Y',可回滚);
+#     ⑤ yj_field 注册 `区码`(seq 33)+ 9 条译名。
+#   拆分规则(按首段"前导字母数"判族,两族**都是 3 个连字符段**):
+#     区域族(前导字母 1 个,A1/A2/B*/C*):`<区码>-<排>-<位>`,无层 —— A1-09-1 ⇒ A1/09/1/空
+#     货架族(前导字母 ≥2 个,AH):`<区码><排>-<位>-<层>` —— AH5-1-1 ⇒ AH/5/1/1
+#   ⚠ 初版误用"段数"判族(`A1-09-1` 与 `AH5-1-1` 都是 3 段),把 AH10-1-1 解成 区码=AH10/排=1/层=空;本版已修正。
+#   ⚠ 模型口径:`仓位编码` = 文档原文、**唯一真源**,因文档语法不统一**不要求能由坐标列反推**;坐标列供筛选聚合。
+#   幂等(加列 COL_LENGTH / 改名双向守卫 / 重算确定性 / 软删幂等);两账套均执行。
+migrate-whloc-clean-coord-20261008.sql
+
+# migrate-whloc-rest-20261008.sql(2026-10-08):剩余仓位一次性带入(523 个)—— 老厂区成品B/C仓 + 辅料及配件区(A仓) + 新厂区成品D仓
+#   需求(用户 2026-10-08):「行就这样先吧,然后把剩下的也一块带入看看」。
+#   内容(全部由 tools/archive/_whloc-req/gen-rest.py 从 xlsx 原文生成,非读截图):
+#     成品B仓 B1~B4 180 → 挂**现有** CP-02(仓库名已对上);成品C仓 C1/C2 72 → 新建 CK-C;
+#     辅料及配件区(A仓) 103 → 新建 CK-A2(纸箱24/端盖25/PP棉0原文空白/无纺布12/网套12/标签30);
+#     新厂区成品D仓 D1~D11 168 → 新建 CK-D。合计 523,连前批共 679 个仓位。
+#   口径:`B-1-18-1/2/3` 笔误按 B1-18-* 收录(B1 实为 57,非 54);AH 截断项层数取用户口径 3 层;
+#     D4~D7 与 D9~D11 依原文「库位排列一样」按 D2/D3、D8 模板**推出**(原文未逐行列,若实际不同需删重生成);
+#     仓位地址统一 `存储分区+区码-排号+排+位号+位[+层号+层]`(本脚本把前批 156 行一并刷成同一口径)。
+#   ⚠ 本批未做(编码规则未定):新厂区 原材料区(炭1区1-36…/胶粉1区1-36…)与 辅料及配件区(1-7/1-14/1-12/1-24/1-12 及 H1-*…H11-*)
+#     —— 纯顺序号或两段式,无「区码-排-位」语法,不能按本例推导,需业务给规则。
+#   幂等(仓库按编码 / 仓位按编码 NOT EXISTS / 地址为确定性赋值);两账套均执行。
+migrate-whloc-rest-20261008.sql
+
+# migrate-whloc-zone-logic-20261008.sql(2026-10-08):仓库/仓位字段逻辑按「厂区 > 仓(A/B/C/D) > 大区 > 分区」重构
+#   用户口径:① 「厂区>仓,仓分 ABCD 四个;老厂区三个仓,A仓 分两个大区 原料区/辅料及配件区;
+#     B仓/C仓 各一个成品仓不再分区;D仓 就是整个新厂区,底下分区 成品仓区/原料区/辅料及配料区」;
+#     ② 澄清「**厂区应该在仓库表而不是仓位表**」(D仓 与新厂区并列,厂区由 仓库 关联取得)。
+#   改动:bs_wh 加 `厂区` + 四个仓归位正名(A仓/B仓/C仓/D仓);bs_wh_loc 加 `大区` 并**移除 `厂区`**(yj_field 行+物理列);
+#     CK-A2(辅料及配件区A仓) 103 个仓位并入 CK-A 后该仓库停用;B/C仓 清空 大区与存储分区(不再分区);
+#     D仓成品 大区=成品仓区;仓位表冗余的 仓库(名称快照) 随改名同步;仓位地址按新层次(含大区)重算;
+#     yj_field WHLOC 加 大区/删 厂区/按层次重排序号,WH 加 厂区;补 大区 九语言译名。
+#   ⚠ 连带:ButtonService:2333/2596 用 `仓库名称 LIKE '%成品%' OR 仓库分类 LIKE '%成品%'` 兜底选默认成品仓
+#     ⇒ 给 B/C/D 同时写 仓库分类='成品' 保住兜底。CP-02 是金蝶同步来源,本仓库代码内无 bs_wh 同步,
+#     不会被自动覆盖;若仓外工具按编码回写名称可能还原(改回 B仓 即可)。
+#     存量流水存的是编码(inh/outh/kucun 用 CP-02),按名称反查只影响「改名前录入、改名后才审核」的单据。
+#   ⚠ 迁移链:本脚本 DROP `bs_wh_loc.厂区`,而前序 migrate-whloc-area-a-raw / migrate-whloc-rest 的
+#     INSERT 列清单仍带 `厂区` —— 两者哈希未变不会重跑;全新库按链顺序走结果一致。要改那两个脚本须先摘掉 `厂区`。
+#   幂等(加列 COL_LENGTH / DROP 判存在 / UPDATE 确定性 / 字段按 col_name / 译名按唯一键);两账套均执行。
+migrate-whloc-zone-logic-20261008.sql
+
+# migrate-whloc-newplant-20261008.sql(2026-10-08):新厂区 D仓 的 原料区 / 辅料及配件区 仓位补齐(622 个)
+#   需求(用户 2026-10-08):「D仓的原料区和辅料配料区怎么没有填入仓位内。编码规则和前面的一样,增加进去吧」。
+#   数据源 = Sheet2 行30-48 逐格 dump(含合并区,tools/archive/_whloc-req/dump-newplant.txt),
+#     行由 tools/archive/_whloc-req/gen-newplant.py 生成(不读截图)。
+#     大区 原材料区(G31:I31)→ 列G 炭粉区/列H 炭粉区/列I 胶粉区;大区 辅料及配件区(J31:O31)→ 纸箱区/端盖区/PP棉区/折叠棉/网套&布区/货架区。
+#   编码规则(与老厂区同源,照原文展开):只有序号区间的分区 ⇒ 区码=分区(或原文子区名)、**排号=NULL**、位号=序号(2位补零),
+#     编码=<区码>-<位号>;货架区原文自带 H<排>-<位> ⇒ 区码=H 排号=1~11 位号=1~4。
+#   ⚠ 三处判断点(原文语义不足,按最忠于原文方式处理,与实际不符须改生成器重跑):
+#     ① 列G 表头「炭粉区」但内容 '1-36辅料'/'1-36'/'1-36'/'成品区'(合并),与右侧列H(也叫炭粉区)重复
+#        ⇒ 三个 '1-36' 各作一组,区码 炭粉区1/2/3(=108);'成品区' 判为非仓位跳过。
+#     ② 纸箱区(列J) 四格 1-7/1-14/1-14/1-7 ⇒ 取并集 1~14(=14)。
+#     ③ 端盖区(列K) 两格均 1-12 ⇒ 取并集 1~12(=12)。
+#   ⚠ 本批 排号 为空,而 T-SQL 的 `+` 遇 NULL 会把整段算成 NULL ⇒ 脚本内按 **NULL 安全公式**重算全表仓位地址;
+#     migrate-whloc-zone-logic-20261008.sql 的原公式已同步改为 CASE 判断(该脚本字节已变,DbSync 会重跑一次,幂等)。
+#   结果:总数 679→**1301**;D仓 = 成品仓区168 + 原料区504(炭粉324/胶粉180) + 辅料及配件区118(纸箱14/端盖12/PP棉12/折叠棉24/网套&布12/货架44)。
+#   幂等(按 仓位编码 NOT EXISTS;地址为确定性赋值);两账套均执行。
+migrate-whloc-newplant-20261008.sql
+
+# migrate-whloc-newplant-drop-20261008.sql(2026-10-08):**撤销** migrate-whloc-newplant 那批(622 个仓位)
+#   用户口径:「不对删除上面一条的,然后这是编码规则 对于仓位的编码规则 B1-01-1/2 = B仓1区-01排-1#位/2#位」
+#   ⇒ 仓位编码统一为「<区>-<排>-<位>」三段式;上一批给 新厂区原料区/辅料及配件区 用的是
+#     「<区码>-<序号>」两段式(纸箱区-14 / 炭1区-36),规则不对,整批删除,待按三段式重做。
+#   删除范围(精确,D仓 成品 168 个不动):仓库编码=CK-D 且 asp_user1='migration' 且 仓位编码 NOT LIKE 'D[0-9]%-%'。
+#   结果:1301 → 679(D仓 只剩成品仓区 168)。幂等(重复跑删 0 行);两账套均执行。
+migrate-whloc-newplant-drop-20261008.sql
+
+# migrate-whloc-zonepick-20261008.sql(2026-10-08):仓位「大区 / 存储分区」→ 新类型「分区选择」(候选=本表实际数据)
+#   用户定稿口径:「如果存在这个分区是因为我有这个仓位数据,但是我没有这个仓位是不是就没有这个分区了,
+#     增加提示即可,让当前的这个分区的仓位存在时就无法删除这个分区,当这个分区的仓位删除完后就会提示
+#     当前的分区也一起没了。」⇒ **分区是仓位数据的派生,不落任何存储**。
+#   本脚本只做一件事:yj_field 的 WHLOC.大区 / WHLOC.存储分区 两行 data_type 文本→**分区选择**(元数据驱动开关,
+#     前端见该类型就把单元格从"行内文本框"换成"点击开「仓位分区」弹窗";不在前端硬编码面板名/列名)。
+#   ⚠ 零新表、零新面板、零 DDL、零后端接口;bs_wh_loc / bs_wh 的列与数据一个字节不动;不碰金蝶「仓位*」。
+#   ⚠ 后端对未知 data_type 安全:isNumericType/下拉框/标准库/是否 等判定全按具体取值比较,`分区选择` 自然落空
+#     (不参与数值合计、不下发 options、不参与「是否」带回闸门),PanelConfigService 只原样透传给前端。
+#   候选实测(两账套一致):(不分区,不细分) 252 / 成品仓区 168 / 辅料及配件区 标签区30·端盖区25·纸箱区24·
+#     网套区12·无纺布区12 / 原料区 货架区108·炭粉区36·胶粉区12 —— 共 10 组,即弹窗将要展示的内容。
+#   前端配套:新组件 ZonePickDialog.vue + PanelxList 单元格分支 + 10 个语言包 15 条新词条。
+#   幂等;两账套均执行。
+migrate-whloc-zonepick-20261008.sql
+# —— 2026-10-08 下架「请购单 + 其他入库/其他出库/委外入库/委外发料」13 个面板(用户口径:这些单据不需要) ——
+#   保留:采购入库单 PURCHASE_IN / 销售出库单 SALE_OUT / 材料出库单 MATERIAL_OUT / 产成品入库单 FINISH_IN
+#   (后者是「工单完工入库」的唯一载体 —— 报工自动生单 + plang/scjl 回写 + 排产看板入库区都挂它,用户明确保留)。
+#   删:yj_panel 13 行 + yj_field 258 行 + yj_role_panel 52 行 + 译名(面板名 117 行 + 22 个孤儿字段标签)
+#      + 视图 8 个(v_other_*_detail/stats、v_outsource_*_detail/stats)+ 物理表 10 张(bd_/bl_ 各 5 对);
+#   依据:这 5 类单据全部 0 张、库存流水 inh/outh 无其一;DB 侧无视图/存储过程/外键引用;13 面板「9 月后零更新」
+#      (详见 docs/development/面板老化盘点-品质管理与智能供应链.md);脚本头逐个列明删了什么。
+#   安全:脚本自带「10 张待删表必须全空」闸(非空即 RAISERROR 中止)+ 越界自检(保留面板/库存三表仍在);
+#      回退抓手 tools/archive/_panel-age/_backup-20261008/。
+migrate-drop-extra-docs-pu-req-20261008.sql
+
+# —— 2026-10-09 修 3 个「flat 报表视图缺 id/asp_cancel」导致面板打开即 500 ——
+#   命中面板:FINISH_IN_DETAIL(产成品入库单明细表)/ FINISH_IN_STATS(统计表)/ MANU_ORDER_STATS(生产工单统计表);
+#   现象:`SELECT COUNT(*) FROM v_finish_in_detail t WHERE ISNULL(t.asp_cancel,'N')<>'Y'` → 列名 'asp_cancel' 无效。
+#   根因:实库这三张视图是初版导入时期的旧定义,缺 flat 报表标配的 id(pk_col)与 asp_cancel(软删过滤);
+#      正确版本仍存于 tools/archive/_table-audit/viewdefs.tsv(2026-09-29 表定册时导出),
+#      DbNormAudit 也早已记着这条存量 FAIL(_normaudit-HSDZ_MES.out / _dbnorm-prod.out.txt)。
+#   做法:按 viewdefs.tsv 正确定义 CREATE OR ALTER 重建,列名与 yj_field 逐列对齐(23/12/9 列),
+#      所需表列已逐列核对存在;v_manu_order_stats 顺带把 5 个恒 NULL 列恢复为真实聚合。
+#   幂等:CREATE OR ALTER VIEW;两账套均已执行,复核「仍缺 id/asp_cancel 的 flat 面板视图 = 0」。
+migrate-fix-report-views-id-aspcancel-20261009.sql
+
+# —— 2026-10-09 下架品质管理「制程品质 / 不良处理 / 品质追溯」5 张从未使用的面板 ——
+#   用户口径:「品质管理下的制程品质、不良处理与品质追溯都是没有用到的吧」→ 确认后连批号追溯一起删。
+#   删:QC_OP 工序质检单 / QC_RECORD 检验记录单 / QC_DISPOSAL 不良品处理单 / ROD_RETURN 炭棒不良退货登记
+#      / LOT_TRACE 批号追溯 —— yj_panel 5 + yj_field 77 + yj_role_panel 20 + 视图 v_lot_trace + 物理表 7 张
+#      (qc_op/qc_op_detail/qc_record/qc_record_detail/qc_disposal/rod_return/rod_return_detail,全部 0 行);
+#      这 5 张面板名本来无译名(0 行),字段标签侧无孤儿标签。
+#   依据:yj_usage_log(3437 行、按面板记动作)里这 5 张**操作留痕 = 0**,7 张表 0 行、单据状态 0 行⇒建好即没用过;
+#      无外键/无 ref_panel 引用/无生单链路/无附件审批列设置(全 0);唯一引用被删表的是 v_lot_trace 自己(同批删)。
+#   配套代码:删 QcDisposalService(111 行)+ ButtonService 两处钩子 + menus.js 5 个入口。
+#   回退抓手 tools/archive/_panel-age/_backup-20261009-qc/;⚠ 批号追溯的「工序质检/不良处置」两段随之消失。
+migrate-drop-qc-unused-panels-20261009.sql
+
+# ── 2026-10-09 清理「面板已不存在」的孤儿元数据(字段登记 + 角色授权)──
+#   2026-10-09 拉取云端仓库后跑 DbNormAudit 发现:两批下架脚本都删过 yj_field / yj_role_panel,
+#   但实测仍有残留(两账套一致,面板码 10 个:OTHER_IN_DETAIL / OTHER_IN_STATS / OTHER_OUT /
+#   OTHER_OUT_DETAIL / OTHER_OUT_STATS / OUTSOURCE_IN_DETAIL / OUTSOURCE_IN_STATS /
+#   OUTSOURCE_ISSUE_DETAIL / OUTSOURCE_ISSUE_STATS / LOT_TRACE)—— 81 行字段 + 30 行授权;
+#   这些面板的 yj_panel 行、物理表、视图早已删除 ⇒ 无人会读的孤儿,并让体检 05 从 0 涨到 81(FAIL)。
+#   ⚠ 残留成因未完全定位(下架脚本自检当时报 0;残留行 id 落在旧区间 11845~12032,呈「备份回灌」形态);
+#   本脚本兜底:只删 panel_code 不在 yj_panel 的行,带守卫(防呆 + 四单 329 行越界自检 + 末尾孤儿=0);
+#   不碰 yj_translation(同标签多为多面板共享,按标签删会误伤)。
+migrate-clean-orphan-panel-rows-20261009.sql
+
+# ── 2026-10-09 采购入库明细启用「仓位」+ 仓位默认标记 + 商品档案默认仓位可见 ──
+#   用户口径:① 采购入库明细要有「仓位」且与「仓库」联动(选仓后候选只出该仓);
+#            ② 预设仓位 = 物料默认 ⇢ 仓库默认兜底;③ 启用仓位管理**逐仓开启**,开了才必填。
+#   现状:bl_purchase_in 仓位类物理列早就有,但 yj_field 那几行 hidden=1(界面看不到、274 行数据全空);
+#        bs_inv.默认仓位 列已登记但 hidden=1(填不了);bs_wh_loc 无「默认」标记列;
+#        bs_wh.启用仓位管理 10 个仓全「否」(界面可见可勾,元数据不用改)。
+#   内容:bs_wh_loc 加 是否默认 / WHLOC 登记该字段 / PURCHASE_IN 明细「仓位名称」就地改造成
+#        「仓位」参照(ref_panel=WHLOC、ref_filter=`仓库=$仓库`、seq 195 紧跟仓库、可见)/
+#        INV.默认仓位 取消隐藏并改参照 / 译名(含修两处既有劣译 Bill Sp Name、Sp Number)。
+#   ⚠ 采购入库单是四单基线之一 ⇒ 落地后必须重跑 _gen-fourdoc-restore.mjs 与 _gen-doc-fields-md.mjs。
+migrate-bin-on-purchase-in-20261009.sql
+
+# ── 2026-10-09 检验数据记录(QC_INSP_REC)物料名称/物料编码关联「商品」,选一次两个一并填入 ──
+#   用户口径:「检验数据记录的物料名称和物料编码要关联商品,并且要两个一并填入。」
+#   现状:两列都是手填文本框(header 30/40、query 10/20),与同族的 来料检验单 QC_INSP /
+#        送料暂收单 QC_RECV / 暂收退回单 QC_RETURN / 采购订单 PU_ORDER 写法不一致
+#        (那四张:物料编码=参照 INV/存货编码 display 存货名称、物料名称=参照 INV/存货名称)。
+#   做法(纯元数据,零 DDL/零新表/零接口/零前端硬编码):四行 data_type 文本→参照,
+#        ref_panel=INV,物料编码 ref_field=存货编码、物料名称 ref_field=存货名称。
+#   「一并填入」复用既有带回机制(PanelConfigService.buildRefMap 的同义词表已有
+#        存货编码→物料编码、存货名称→物料名称)⇒ 两列互为回带目标,选任一个商品另一个同时填上。
+#   前端配套(同提交):QcInspRecSheet.vue 抬头两格加商品参照控件(点击弹 RefPickDialog + 按 refMap 带回)。
+#   ⚠ 不是四单基线之一(QC_INSP_REC 不在 fourdoc-baseline.tsv),四单基线无需重跑。
+#   幂等(UPDATE 窄条件 + 末尾三自检:两列四行=参照/INV、物理列仍在、越界参照计数);两账套均执行。
+migrate-qc-insp-rec-material-ref-20261009.sql

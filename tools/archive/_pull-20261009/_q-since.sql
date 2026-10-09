@@ -1,0 +1,1 @@
+﻿SET NOCOUNT ON; SELECT script_name, applied_at FROM yj_schema_log WHERE applied_at >= CONVERT(datetime,'2026-10-08 16:50:00',120) AND applied_at < CONVERT(datetime,'2026-10-09 10:00:00',120) ORDER BY applied_at;

@@ -1,0 +1,10 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-ref-check2.sql ==
+  | ATTACH | 0 | 
+  | APPROVAL | 0 | 
+  | REPORT_COL_SETTINGS | 0 | 
+  | MODIFY_LOG | 0 | 
+  | ARCHIVE_LOG | 0 | 
+  | PLAN_TERM | 0 | 
+  | EXT_BIND | 0 | 
+[OK] _q-ref-check2.sql (8 batches)

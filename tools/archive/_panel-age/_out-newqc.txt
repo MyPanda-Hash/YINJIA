@@ -1,0 +1,10 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-newqc.sql ==
+  | QC_ASM_INSP | 组装成品检验单 | 生产制造 | doc | 
+  | QC_CUT_INSP | 切炭检验单 | 生产制造 | doc | 
+  | QC_ITEM | 检验项目 | 基础设置 | archive | 
+  | QC_MOLD_INSP | 成型检验单 | 生产制造 | doc | 
+  | QC_PLAN | 检验方案 | 基础设置 | archive | 
+  | QC_RECV | 送料暂收单 | 库存核算 | doc | 
+  | QC_RETURN | 暂收退回单 | 库存核算 | doc | 
+[OK] _q-newqc.sql (1 batches)

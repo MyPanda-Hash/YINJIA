@@ -127,9 +127,9 @@ public class SysAdminController {
 
     // ============ 角色面板授权 ============
 
-    // ============ 角色面板操作权限(11 项) ============
+    // ============ 角色面板操作权限(12 项) ============
 
-    /** 全部操作权限定义(顺序=前端列顺序)——通用面板 11 项 */
+    /** 全部操作权限定义(顺序=前端列顺序)——通用面板 12 项 */
     public static final String[][] PERMISSION_ACTIONS = {
             {"view",    "可见"},
             {"query",   "查询"},
@@ -142,10 +142,15 @@ public class SysAdminController {
             {"price",   "价格金额"},
             {"review",  "复核反复核"},
             {"adjust",  "调价"},
+            // 自定义字段(动态字段/备用列池)配置权(2026-10-09 用户口径):
+            // 原先该动作只有超级管理员能做(is_admin 硬判),现在与其余操作同格 ——
+            // 在「角色与面板权限」里给哪个面板勾上,该角色就能配那个面板的自定义字段。
+            // 服务端同源闸门 = PanelPermissionService.requireFieldConfig(field 词)。
+            {"field",   "自定义字段"},
     };
 
     /** 文件类面板(研发管理·文书式)专属动作集:按真实操作行为设计(新增保存即归档/查询单据/
-     *  申请修改闭环/修改记录/删除申请管理员审批/导出打印/审批族),非通用 11 项 */
+     *  申请修改闭环/修改记录/删除申请管理员审批/导出打印/审批族/自定义字段),非通用 12 项 */
     public static final String[][] FILE_PANEL_ACTIONS = {
             {"view",    "可见"},
             {"query",   "查询单据"},
@@ -155,6 +160,7 @@ public class SysAdminController {
             {"del",     "删除申请"},
             {"export",  "导出打印"},
             {"audit",   "审批"},
+            {"field",   "自定义字段"},
     };
 
     @GetMapping("/role/{id}/panels")

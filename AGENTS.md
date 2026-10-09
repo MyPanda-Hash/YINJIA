@@ -71,7 +71,8 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
      (按 `migrate-golive-cleanup.sql` 模式,待产出),保证全量推上去的是干净账;
    - 备份必须在部署当时新打(`BACKUP DATABASE ... WITH FORMAT, INIT`),
      禁止拿 `deploy/` 里的历史 .bak 直接用;
-   - `tools/db-migrations.txt` 与 `deploy/push-migrations.bat` 清单仍需同步更新,
+   - `tools/db-migrations.txt` 清单仍需同步更新(**清单唯一权威**;旧文档里提过的
+     `deploy/push-migrations.bat` 已在 b9eca8e 的 deploy 重构中删除,勿再引用),
      供测试库(HSDZ_MES_TEST)与增量场景使用。
 
 ## 🔴 采购链四单字段与显示字段基线(2026-10-03 起生效,不可豁免)
@@ -80,11 +81,18 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
 **送料暂收单 `QC_RECV`(来料暂收单)/ 来料检验单 `QC_INSP` / 暂收退回单 `QC_RETURN` /
 采购入库单 `PURCHASE_IN`** 的「字段名 · 显示名 · 顺序 · 参照源 · 可见性」。
 
-1. **拉取云端仓库更新后必看这一份**:每次 `tools/pull-sync.bat`(git pull + DbSync)或服务器
-   部署落地后,按该文档 **§8** 重跑三条取证命令并 `git diff` 本文档 ——
+1. **拉取云端仓库更新后必看这一份**:先跑一条命令的回归闸
+   `cd tools && java -cp lib\mssql-jdbc.jar verify\FourDocAudit.java HSDZ_MES`(测试账套传 `HSDZ_MES_TEST`)——
+   它逐面板比对现役 `yj_field` 与基线快照 `tools/fourdoc-baseline.tsv`,全 0 才 `[PASS]`;
+   `[FAIL]` 或 `DbSync` 重放过历史脚本后,再按该文档 **§8** 重跑取证并 `git diff` 本文档 ——
    **无 diff** = 四单字段与顺序未变,可放心;**有 diff** = 逐条确认是有意改动还是回归,
    有意则连同迁移脚本提交,意外则回退更新并排查。
+   ⚠ 2026-10-05 就是"整链重放 79 条历史脚本"把四单盖回上一代登记(参照源越界、QC_RECV 少 10 行、
+   隐藏列全被翻开),当时 §四 仍 12/12 ✅ —— **只有基线比对/文档 diff 抓得住**;回正脚本
+   `tools/migrate-fourdoc-baseline-restore-20261008.sql`(配套 `migrate-fourdoc-bloodline-cols-20261008.sql`
+   补回被链外操作弄丢的物理列),事故经过见两个脚本头部注释。
 2. **改动这四单任何字段的任务,先读该文档,改完必须回写**(重跑生成脚本,不得手改文档),
+   同批重跑 `node tools/archive/_gen-fourdoc-restore.mjs` 刷新 ①回正脚本 ②`tools/fourdoc-baseline.tsv`,
    并单独一个 commit;`§四 顺序核验汇总` 必须 12/12 全 ✅。
 3. 顺序口径(别凭印象推):
    - **表单页表头** = `place` 含 `header`,**或恰为 `query`** 的全部字段,按 `seq` 升序
@@ -115,7 +123,10 @@ INSERT INTO yj_locale VALUES ('ar', N'阿拉伯语', N'العربية', 1, 100);
    (`.env`、AK/密码——提交前 `git grep` 扫一次);③ 涉代码改动先 `npm run build` / `mvn package` 通过;
    ④ 涉数据库改动确认幂等脚本已执行验证。
 4. **本地工作区干净才能换任务**:一个任务 commit 后才开始下一个;推不推送不限,本地 commit 即达标。
-5. 规范变更本身也按此提交(如本文件更新 = 一个 docs commit)。
+5. **推送前先对齐远端**:`git fetch` 看是否落后;落后先 `git merge origin/main`(有冲突按任务处理
+   并单独提交),再 `git push`。**禁止 `--force` / `--force-with-lease` 覆盖远端**(2026-09-16
+   曾被强推替换过一批提交);推送后按四单规则跑一次回归闸。
+6. 规范变更本身也按此提交(如本文件更新 = 一个 docs commit)。
 
 ## 🔴 验证与收尾:开发机服务(2026-09-22 起生效)
 

@@ -49,7 +49,8 @@ public class OrderConvertService {
      * 列表查询 pending() 与汇总聚合 pendingAgg() **共用同一段 FROM…WHERE**:
      * 「剩余>0」「下单日期范围」「关键字」三类条件都挂在它后面,两处口径不会走偏
      * (代码规范 D:反复制粘贴;此前 stats() 直接复用 pending("") 把整表拉进内存再数数)。
-     * 行级占用链仍是两处 OUTER APPLY(m=加工单/工单通道,p=采购申请通道)。 */
+     * 行级占用链只剩一处 OUTER APPLY(m=加工单/工单通道)——
+     * 原 p=采购申请(PU_REQ)通道已随请购单下架整体移除(2026-10-08,见下)。 */
     private static final String PENDING_FROM =
             " FROM bd_so_order o"
                     + " JOIN bl_so_order l ON l.[单据编号] = o.[单据编号] AND ISNULL(l.asp_cancel,'N') <> 'Y'"
@@ -71,11 +72,12 @@ public class OrderConvertService {
                     + " OUTER APPLY (SELECT SUM(ISNULL(linked_quantity,0)) AS linked FROM form_flow_link f"
                     + "   WHERE f.source_panel_code='SO_ORDER' AND f.source_line_key = o.[单据编号]+N'#'+CAST(l.[id] AS nvarchar(20))"
                     + "     AND f.target_panel_code IN ('MANU_ORDER','PLANG') AND f.link_status='ACTIVE') m"
-                    + " OUTER APPLY (SELECT SUM(ISNULL(linked_quantity,0)) AS linked FROM form_flow_link f"
-                    + "   WHERE f.source_panel_code='SO_ORDER' AND f.source_line_key = o.[单据编号]+N'#'+CAST(l.[id] AS nvarchar(20))"
-                    + "     AND f.target_panel_code='PU_REQ' AND f.link_status='ACTIVE') p"
+                    // 2026-10-08:原「SO_ORDER → PU_REQ(请购单)」占用通道随请购单下架整体移除 ——
+                    // 结转只剩转工单一条出口(转采购走采购订单/金蝶,不在此处占用)。
+                    // 2026-10-09 合并修正:该次下架只删了 OUTER APPLY,漏删 SELECT 里的 p.linked
+                    // ⇒ 订单结转页 500(无法绑定 p.linked);此处连带把残留引用一并清掉。
                     + " WHERE ISNULL(o.asp_cancel,'N') <> 'Y'"
-                    + "   AND ISNULL(l.[数量],0) - ISNULL(m.linked,0) - ISNULL(p.linked,0) > 0.0001";
+                    + "   AND ISNULL(l.[数量],0) - ISNULL(m.linked,0) > 0.0001";
 
     /** 下单日期范围(前两参=起,后两参=止;空串=不限)。止日取 `< 次日`,含当日整天时间戳。 */
     private static final String PENDING_DATE_RANGE =
@@ -112,8 +114,8 @@ public class OrderConvertService {
                         + " ISNULL(l.[客户订单号], N'') AS 客户订单号, ISNULL(l.[批次号], N'') AS 批号,"
                         + " ISNULL(备注_管控.重点管控, N'否') AS 重点管控,"
                         + " ISNULL(l.[数量], 0) AS 需求数量,"
-                        + " ISNULL(m.linked, 0) AS 已排产数量, ISNULL(p.linked, 0) AS 已采购数量,"
-                        + " ISNULL(l.[数量], 0) - ISNULL(m.linked, 0) - ISNULL(p.linked, 0) AS 剩余数量,"
+                        + " ISNULL(m.linked, 0) AS 已排产数量,"
+                        + " ISNULL(l.[数量], 0) - ISNULL(m.linked, 0) AS 剩余数量,"
                         // 工单关联工艺路线(2026-10-05,用户口径「在订单结转处选择工序路线」):
                         // 预填 = 产品档案绑定(bs_inv.工艺路线) → 未绑定默认 GY-CB-STD;前端可逐行改,转单时原样带入工单
                         + " ISNULL(rv.[工艺路线], N'') AS 工艺路线"
@@ -169,7 +171,8 @@ public class OrderConvertService {
         Map<String, Object> today = jdbc.queryForMap(
                 "SELECT COUNT(DISTINCT source_line_key) AS cnt, COUNT(DISTINCT ISNULL(inventory_code,N'')) AS styles,"
                         + " SUM(ISNULL(linked_quantity,0)) AS qty FROM form_flow_link"
-                        + " WHERE source_panel_code='SO_ORDER' AND target_panel_code IN ('MANU_ORDER','PU_REQ','PLANG')"
+                        // 2026-10-08:原含 'PU_REQ' 的计入口径随请购单下架收敛为 工单/排产 两目标
+                        + " WHERE source_panel_code='SO_ORDER' AND target_panel_code IN ('MANU_ORDER','PLANG')"
                         + "   AND link_status='ACTIVE' AND CONVERT(varchar(10), create_time, 120) = CONVERT(varchar(10), GETDATE(), 120)");
         Map<String, Object> done = new LinkedHashMap<>();
         done.put("总订单笔数", num(today.get("cnt")));

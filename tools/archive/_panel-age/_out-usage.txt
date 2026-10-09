@@ -1,0 +1,29 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-usage.sql ==
+  (0 rows)
+  | FINISH_IN_DETAIL |  | null | v_finish_in_detail | 1 | 4 | 0 | null | 23 | 
+  | FINISH_IN_STATS |  | null | v_finish_in_stats | 1 | 4 | 0 | null | 12 | 
+  | LOT_TRACE |  | null | v_lot_trace | 222 | 4 | 0 | null | 17 | 
+  | MATERIAL_OUT_DETAIL |  | null | v_material_out_detail | 8 | 4 | 0 | null | 29 | 
+  | MATERIAL_OUT_STATS |  | null | v_material_out_stats | 2 | 4 | 0 | null | 14 | 
+  | OTHER_IN_DETAIL |  | null | v_other_in_detail | 0 | 4 | 0 | null | 23 | 
+  | OTHER_IN_STATS |  | null | v_other_in_stats | 0 | 4 | 0 | null | 12 | 
+  | OTHER_OUT_DETAIL |  | null | v_other_out_detail | 0 | 4 | 0 | null | 27 | 
+  | OTHER_OUT_STATS |  | null | v_other_out_stats | 0 | 4 | 0 | null | 14 | 
+  | OUTSOURCE_IN_DETAIL |  | null | v_outsource_in_detail | 0 | 4 | 0 | null | 18 | 
+  | OUTSOURCE_IN_STATS |  | null | v_outsource_in_stats | 0 | 4 | 0 | null | 10 | 
+  | OUTSOURCE_ISSUE_DETAIL |  | null | v_outsource_issue_detail | 0 | 4 | 0 | null | 19 | 
+  | OUTSOURCE_ISSUE_STATS |  | null | v_outsource_issue_stats | 0 | 4 | 0 | null | 10 | 
+  | PURCHASE_IN_DETAIL |  | null | v_purchase_in_detail | 279 | 4 | 0 | null | 30 | 
+  | PURCHASE_IN_STATS |  | null | v_purchase_in_stats | 91 | 4 | 0 | null | 17 | 
+  | QC_DISPOSAL |  | null | qc_disposal | 0 | 4 | 0 | null | 15 | 
+  | QC_OP | qc_op | 0 | qc_op_detail | 0 | 4 | 0 | null | 15 | 
+  | QC_RECORD | qc_record | 0 | qc_record_detail | 0 | 4 | 0 | null | 19 | 
+  | ROD_RETURN | rod_return | 0 | rod_return_detail | 0 | 4 | 0 | null | 11 | 
+  | SALE_OUT_DETAIL |  | null | v_sale_out_detail | 123 | 4 | 0 | null | 29 | 
+  | SALE_OUT_STATS |  | null | v_sale_out_stats | 107 | 4 | 0 | null | 12 | 
+  | SALES_ORDER_DETAIL |  | null | v_sales_order_detail | 133 | 4 | 0 | null | 24 | 
+  | SALES_ORDER_STATS |  | null | v_sales_order_stats | 124 | 4 | 0 | null | 15 | 
+  | STOCK_BALANCE |  | null | v_stock_balance | 93 | 4 | 0 | null | 9 | 
+  | STOCK_SUMMARY |  | null | v_stock_summary | 147 | 4 | 0 | null | 19 | 
+[OK] _q-usage.sql (2 batches)

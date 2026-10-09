@@ -1,0 +1,7 @@
+[connected] Microsoft SQL Server @ HSDZ_MES as yinjia
+== migrate-drop-qc-unused-panels-20261009.sql ==
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  (0 rows)
+  [OK] 14 batches

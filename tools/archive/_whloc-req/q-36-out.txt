@@ -1,0 +1,22 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:16 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-36-saved.sql ==
+  | CP-02 | B4-24-2 | (空) | ZZ临时测试区 | migration | 2026-10-08 17:07:17.4410670 | 
+  | (空) | (空) | 251 | 
+  | (空) | ZZ临时测试区 | 1 | 
+  | 成品仓区 | (空) | 168 | 
+  | 辅料及配件区 | 标签区 | 30 | 
+  | 辅料及配件区 | 端盖区 | 25 | 
+  | 辅料及配件区 | 网套区 | 12 | 
+  | 辅料及配件区 | 无纺布区 | 12 | 
+  | 辅料及配件区 | 纸箱区 | 24 | 
+  | 原料区 | 货架区 | 108 | 
+  | 原料区 | 胶粉区 | 12 | 
+  | 原料区 | 炭粉区 | 36 | 
+[OK] q-36-saved.sql (3 batches)

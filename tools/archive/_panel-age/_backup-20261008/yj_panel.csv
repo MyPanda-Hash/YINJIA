@@ -1,0 +1,14 @@
+﻿panel_code,panel_name,category,mode,line_table,head_table,group_col,pk_col,code_col,prefix,date_col,page_size,detail_key,module_group,config,config_at,panel_name_en
+OTHER_IN,其他入库单,库存核算,doc,bl_other_in,bd_other_in,单据编号,id,单据编号,OI,单据日期,50,items,库存核算,,,Other inbound delivery notes
+OTHER_IN_DETAIL,其他入库单明细表,报表,flat,v_other_in_detail,,,id,,,,50,items,库存核算,,,Miscellaneous receipt Doc Details
+OTHER_IN_STATS,其他入库单统计表,报表,flat,v_other_in_stats,,,id,,,,50,items,库存核算,,,Other In-Stock Order Summary Tables
+OTHER_OUT,其他出库单,库存核算,doc,bl_other_out,bd_other_out,单据编号,id,单据编号,OO,单据日期,50,items,库存核算,,,Other delivery notes
+OTHER_OUT_DETAIL,其他出库单明细表,报表,flat,v_other_out_detail,,,id,,,,50,items,库存核算,,,Other issue Doc Details
+OTHER_OUT_STATS,其他出库单统计表,报表,flat,v_other_out_stats,,,id,,,,50,items,库存核算,,,Other Outbound Order Summary Table
+OUTSOURCE_IN,委外入库单,委外加工,doc,bl_outsource_in,bd_outsource_in,单据编号,id,单据编号,WI,单据日期,50,items,委外加工,,,subcontracting receipt document
+OUTSOURCE_IN_DETAIL,委外入库单明细表,报表,flat,v_outsource_in_detail,,,id,,,,50,items,智能供应链,,,Outsourcing Receipt Details
+OUTSOURCE_IN_STATS,委外入库单统计表,报表,flat,v_outsource_in_stats,,,id,,,,50,items,智能供应链,,,Outsourcing Receipt Statistics
+OUTSOURCE_ISSUE,委外发料单,委外加工,doc,bl_outsource_issue,bd_outsource_issue,单据编号,id,单据编号,WS,单据日期,50,items,委外加工,,,Outsourced Material issuing Doc
+OUTSOURCE_ISSUE_DETAIL,委外发料单明细表,报表,flat,v_outsource_issue_detail,,,id,,,,50,items,智能供应链,,,Outsourcing Issue Details
+OUTSOURCE_ISSUE_STATS,委外发料单统计表,报表,flat,v_outsource_issue_stats,,,id,,,,50,items,智能供应链,,,Outsourcing Issue Statistics
+PU_REQ,请购单,采购管理,doc,bl_pu_req,bd_pu_req,单据编号,id,单据编号,PR,单据日期,50,items,采购管理,,,Purchase Requisition

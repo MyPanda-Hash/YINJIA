@@ -1,0 +1,29 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:12 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-22-loccols.sql ==
+  | 1 | id | bigint | 8 | 
+  | 2 | 仓库 | nvarchar | 400 | 
+  | 3 | 仓位编码 | nvarchar | 200 | 
+  | 4 | 仓位地址 | nvarchar | 400 | 
+  | 5 | 停用 | bit | 1 | 
+  | 6 | 备注 | nvarchar | 1000 | 
+  | 7 | asp_user1 | nvarchar | 100 | 
+  | 8 | asp_time1 | datetime2 | 8 | 
+  | 9 | asp_user2 | nvarchar | 100 | 
+  | 10 | asp_time2 | datetime2 | 8 | 
+  | 11 | asp_cancel | nvarchar | 2 | 
+  | 32 | 仓库编码 | nvarchar | 200 | 
+  | 34 | 存储分区 | nvarchar | 60 | 
+  | 35 | 排号 | nvarchar | 20 | 
+  | 36 | 位号 | nvarchar | 20 | 
+  | 37 | 层号 | nvarchar | 20 | 
+  | 38 | 区码 | nvarchar | 40 | 
+  | 39 | 大区 | nvarchar | 60 | 
+  | 备用列数 | 20 | 
+[OK] q-22-loccols.sql (2 batches)

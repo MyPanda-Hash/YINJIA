@@ -1,0 +1,68 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-19-mess.sql ==
+  | CK00005 | 原料不良品仓 | null | null | null | null | s | d | admin | 
+  | CK00006 | 华北工控仓 | null | null | null | null | e |  | admin | 
+  | CK-A | 原材料区A仓 | 货架区 | AH10 | 1 | 1 | AH10-1-1 | 货架区AH10排1位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH10 | 1 | 2 | AH10-1-2 | 货架区AH10排1位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH10 | 1 | 3 | AH10-1-3 | 货架区AH10排1位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH10 | 2 | 1 | AH10-2-1 | 货架区AH10排2位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH10 | 2 | 2 | AH10-2-2 | 货架区AH10排2位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH10 | 2 | 3 | AH10-2-3 | 货架区AH10排2位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH10 | 3 | 1 | AH10-3-1 | 货架区AH10排3位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH10 | 3 | 2 | AH10-3-2 | 货架区AH10排3位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH10 | 3 | 3 | AH10-3-3 | 货架区AH10排3位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH11 | 1 | 1 | AH11-1-1 | 货架区AH11排1位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH11 | 1 | 2 | AH11-1-2 | 货架区AH11排1位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH11 | 1 | 3 | AH11-1-3 | 货架区AH11排1位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH11 | 2 | 1 | AH11-2-1 | 货架区AH11排2位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH11 | 2 | 2 | AH11-2-2 | 货架区AH11排2位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH11 | 2 | 3 | AH11-2-3 | 货架区AH11排2位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH11 | 3 | 1 | AH11-3-1 | 货架区AH11排3位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH11 | 3 | 2 | AH11-3-2 | 货架区AH11排3位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH11 | 3 | 3 | AH11-3-3 | 货架区AH11排3位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH12 | 1 | 1 | AH12-1-1 | 货架区AH12排1位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH12 | 1 | 2 | AH12-1-2 | 货架区AH12排1位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH12 | 1 | 3 | AH12-1-3 | 货架区AH12排1位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH12 | 2 | 1 | AH12-2-1 | 货架区AH12排2位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH12 | 2 | 2 | AH12-2-2 | 货架区AH12排2位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH12 | 2 | 3 | AH12-2-3 | 货架区AH12排2位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH12 | 3 | 1 | AH12-3-1 | 货架区AH12排3位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH12 | 3 | 2 | AH12-3-2 | 货架区AH12排3位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH12 | 3 | 3 | AH12-3-3 | 货架区AH12排3位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH13 | 1 | 1 | AH13-1-1 | 货架区AH13排1位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH13 | 1 | 2 | AH13-1-2 | 货架区AH13排1位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH13 | 1 | 3 | AH13-1-3 | 货架区AH13排1位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH13 | 2 | 1 | AH13-2-1 | 货架区AH13排2位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH13 | 2 | 2 | AH13-2-2 | 货架区AH13排2位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH13 | 2 | 3 | AH13-2-3 | 货架区AH13排2位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH13 | 3 | 1 | AH13-3-1 | 货架区AH13排3位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH13 | 3 | 2 | AH13-3-2 | 货架区AH13排3位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH13 | 3 | 3 | AH13-3-3 | 货架区AH13排3位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH14 | 1 | 1 | AH14-1-1 | 货架区AH14排1位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH14 | 1 | 2 | AH14-1-2 | 货架区AH14排1位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH14 | 1 | 3 | AH14-1-3 | 货架区AH14排1位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH14 | 2 | 1 | AH14-2-1 | 货架区AH14排2位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH14 | 2 | 2 | AH14-2-2 | 货架区AH14排2位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH14 | 2 | 3 | AH14-2-3 | 货架区AH14排2位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH14 | 3 | 1 | AH14-3-1 | 货架区AH14排3位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH14 | 3 | 2 | AH14-3-2 | 货架区AH14排3位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH14 | 3 | 3 | AH14-3-3 | 货架区AH14排3位3层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH15 | 1 | 1 | AH15-1-1 | 货架区AH15排1位1层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH15 | 1 | 2 | AH15-1-2 | 货架区AH15排1位2层 | migration | 
+  | CK-A | 原材料区A仓 | 货架区 | AH15 | 1 | 3 | AH15-1-3 | 货架区AH15排1位3层 | migration | 
+  | 4 | 恒亿仓 | YCL-01 | da5x |  | null | null | null | null | admin | 2026-09-28 16:56:21 | 
+  | 5 | 恒亿仓 | YCL-01 | d2 |  | null | null | null | null | admin | 2026-09-28 16:56:21 | 
+  | 6 | 原料不良品仓 | CK00005 | s | d | null | null | null | null | admin | 2026-09-28 17:36:45 | 
+  | 7 | 华北工控仓 | CK00006 | e |  | null | null | null | null | admin | 2026-09-28 17:40:49 | 
+  | 8 | 车间仓 | YJ-08 | d |  | null | null | null | null | admin | 2026-09-28 17:40:49 | 
+  | 货架区 | 108 | AH10 | AH9 | 108 | 108 | 
+  | 胶粉区 | 12 | 21 | 24 | 0 | 0 | 
+  | 炭粉区 | 36 | 09 | 20 | 0 | 0 | 
+[SQL FAIL] Invalid column name '����'.

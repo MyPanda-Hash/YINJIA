@@ -1,0 +1,21 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== migrate-whloc-area-a-raw-20261008.sql ==
+  | 仓库 CK-A(应 1) | 1 | 
+  | 层次列 5 列(应 5) | 5 | 
+  | 层次列注明(应 5) | 5 | 
+  | WHLOC 字段数(应 11) | 11 | 
+  | 层次列译名(应 45) | 45 | 
+  | CK-A 仓位数(应 156) | 156 | 
+  |   炭粉区(应 36) | 36 | 
+  |   胶粉区(应 12) | 12 | 
+  |   货架区(应 108) | 108 | 
+  | 仓位编码重复组(应 0) | 0 | 
+  | 总行数(5 旧 + 156 新 = 161) | 161 | 
+[OK] migrate-whloc-area-a-raw-20261008.sql (9 batches)

@@ -1,0 +1,21 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-qc-menu-usage.sql ==
+  | QC_INSP | 来料检验单 | doc | 402 | 154 | 
+  | QC_INSP_REC | 检验数据记录 | doc | 106 | 46 | 
+  | QC_TC_IN | 特采单 | doc | 75 | 25 | 
+  | QC_CATALOG | 检验目录 | doc | 39 | 1 | 
+  | QC_INSP_REQ | 来料检验要求 | archive | 34 | 0 | 
+  | QC_BHC | 不合格品处理单(制程) | doc | 14 | 14 | 
+  | LOT_TRACE | 批号追溯 | flat | 0 | 0 | 
+  | QC_BHG | 不合格报告(制程) | doc | 0 | 0 | 
+  | QC_BHZ | 不合格品处理单(自制物料) | doc | 0 | 0 | 
+  | QC_DISPOSAL | 不良品处理单 | doc | 0 | 0 | 
+  | QC_INSP_REQ_SERIES | 来料检验要求(系列) | archive | 0 | 0 | 
+  | QC_JJF | 紧急放行申请单 | doc | 0 | 0 | 
+  | QC_LYB | 来料异常分析报告 | doc | 0 | 0 | 
+  | QC_OP | 工序质检单 | doc | 0 | 0 | 
+  | QC_RECORD | 检验记录单 | doc | 0 | 0 | 
+  | QC_SCP | 试产材料使用申请单 | doc | 0 | 0 | 
+  | QC_SCY | 生产异常分析报告 | doc | 0 | 0 | 
+  | ROD_RETURN | 炭棒不良退货登记 | doc | 0 | 0 | 
+[OK] _q-qc-menu-usage.sql (1 batches)

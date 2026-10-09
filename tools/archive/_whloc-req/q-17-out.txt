@@ -1,0 +1,41 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:29 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-17-ddl.sql ==
+  | id | int | 4 | 0 | 1 |  | 
+  | 仓库编码 | nvarchar | 400 | 0 | 0 |  | 
+  | 仓库名称 | nvarchar | 400 | 0 | 0 |  | 
+  | 仓库地址 | nvarchar | 400 | 1 | 0 |  | 
+  | 负责人 | nvarchar | 400 | 1 | 0 |  | 
+  | 停用 | bit | 1 | 1 | 0 |  | 
+  | 允许零库存出库 | bit | 1 | 1 | 0 |  | 
+  | 备注 | nvarchar | 1000 | 1 | 0 |  | 
+  | 状态 | nvarchar | 20 | 0 | 0 | (N'启用') | 
+  | asp_user1 | nvarchar | 100 | 1 | 0 |  | 
+  | asp_time1 | datetime2 | 8 | 1 | 0 |  | 
+  | asp_cancel | char | 1 | 1 | 0 | ('N') | 
+  | 仓库类型 | nvarchar | 100 | 1 | 0 |  | 
+  | CK00003 | 成品不良品区 | 启用 | (null) | 0 | jdy-sync | 
+  | CK00005 | 原料不良品仓 | 启用 | (null) | 0 | jdy-sync | 
+  | CK00006 | 华北工控仓 | 启用 | (null) | 0 | jdy-sync | 
+  | CP-02 | 成品B仓 | 启用 | (null) | 1 | jdy-sync | 
+  | YCL-01 | 恒亿仓 | 启用 | (null) | 0 | jdy-sync | 
+  | YJ-08 | 车间仓 | 启用 | (null) | 0 | jdy-sync | 
+  | id | bigint | 8 | 
+  | 仓库 | nvarchar | 400 | 
+  | 仓位编码 | nvarchar | 200 | 
+  | 仓位地址 | nvarchar | 400 | 
+  | 停用 | bit | 1 | 
+  | 备注 | nvarchar | 1000 | 
+  | asp_user1 | nvarchar | 100 | 
+  | asp_time1 | datetime2 | 8 | 
+  | asp_user2 | nvarchar | 100 | 
+  | asp_time2 | datetime2 | 8 | 
+  | asp_cancel | nvarchar | 2 | 
+  | 仓库编码 | nvarchar | 200 | 
+[OK] q-17-ddl.sql (5 batches)

@@ -1,0 +1,45 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & $java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlserver://loc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-08-conflict.sql ==
+  | field | 仓位 | en | Bill Sp Name | manual | 
+  | field | 仓位id | en | Sp Id | manual | 
+  | field | 仓位id | ja | ロケーションID | manual | 
+  | field | 仓位编码 | en | Sp Number | manual | 
+  | field | 仓位编码 | ja | ロケーションコード | manual | 
+  | field | 仓位名称 | en | Sp Name | manual | 
+  | field | 仓位名称 | ja | ロケーション名 | manual | 
+  | PK__yj_trans__3213E83F61E13BE4 | 1 | 1 | id | 
+  | uq_translation | 1 | 0 | scope,ref_key,locale | 
+  | 16041 | PURCHASE_IN | 仓位 | 仓位 | header | 670 | 1 | 0 | 
+  | 14413 | MATERIAL_OUT | 仓位编码 | 仓位编码 | detail | 983 | 1 | 0 | 
+  | 8376 | PU_ORDER | 仓位编码 | 仓位编码 | detail | 960 | 1 | 0 | 
+  | 16043 | PURCHASE_IN | 仓位编码 | 仓位编码 | header | 680 | 1 | 0 | 
+  | 8730 | SALE_OUT | 仓位编码 | 仓位编码 | detail | 970 | 1 | 0 | 
+  | 8289 | SO_ORDER | 仓位编码 | 仓位编码 | detail | 310 | 1 | 0 | 
+  | 14412 | MATERIAL_OUT | 仓位名称 | 仓位名称 | detail | 982 | 1 | 0 | 
+  | 8375 | PU_ORDER | 仓位名称 | 仓位名称 | detail | 960 | 1 | 0 | 
+  | 15964 | PURCHASE_IN | 仓位名称 | 仓位名称 | detail | 280 | 1 | 0 | 
+  | 8288 | SO_ORDER | 仓位名称 | 仓位名称 | detail | 300 | 1 | 0 | 
+  | bd_purchase_in | 仓位 | 
+  | bd_purchase_in | 仓位编码 | 
+  | bl_material_out | 仓位编码 | 
+  | bl_pu_order | 仓位编码 | 
+  | bl_purchase_in | 仓位编码 | 
+  | bl_sale_out | 仓位编码 | 
+  | bl_so_order | 仓位编码 | 
+  | pk_bs_wh_loc | CLUSTERED | 1 | id | 
+  | DF__bs_wh__状态__134BE328 | bs_wh | 状态 | 
+  | DF__bs_wh__asp_cance__14400761 | bs_wh | asp_cancel | 
+  | DF__bs_wh_loc__asp_c__7FD9E758 | bs_wh_loc | asp_cancel | 
+  | 4 | 恒亿仓 | YCL-01 | da5x |  | 0 | 
+  | 5 | 恒亿仓 | YCL-01 | d2 |  | 0 | 
+  | 6 | 原料不良品仓 | CK00005 | s | d | 0 | 
+  | 7 | 华北工控仓 | CK00006 | e |  | 0 | 
+  | 8 | 车间仓 | YJ-08 | d |  | 0 | 
+[OK] q-08-conflict.sql (9 batches)

@@ -1,0 +1,22 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-drop-audit2.sql ==
+  (0 rows)
+  (0 rows)
+  | yj_field | panel_code | 319 | 
+  | yj_role_panel | panel_code | 64 | 
+  | yj_panel | panel_code | 16 | 
+  | yj_doc_status | panel_code | 1 | 
+  | bd_finish_in | IX_bd_finish_in_单据编号 | NONCLUSTERED | 
+  | bd_other_in | IX_bd_other_in_单据编号 | NONCLUSTERED | 
+  | bd_other_out | IX_bd_other_out_单据编号 | NONCLUSTERED | 
+  | bd_outsource_in | IX_bd_outsource_in_单据编号 | NONCLUSTERED | 
+  | bd_outsource_issue | IX_bd_outsource_issue_单据编号 | NONCLUSTERED | 
+  | bl_finish_in | IX_bl_finish_in_单据编号 | NONCLUSTERED | 
+  | bl_other_in | IX_bl_other_in_单据编号 | NONCLUSTERED | 
+  | bl_other_out | IX_bl_other_out_单据编号 | NONCLUSTERED | 
+  | bl_outsource_in | IX_bl_outsource_in_单据编号 | NONCLUSTERED | 
+  | bl_outsource_issue | IX_bl_outsource_issue_单据编号 | NONCLUSTERED | 
+  | inh | 采购入库单 | 121 | 
+  | inh | 期初结存 | 1 | 
+  | outh | 销售出库单 | 123 | 
+[OK] _q-drop-audit2.sql (6 batches)

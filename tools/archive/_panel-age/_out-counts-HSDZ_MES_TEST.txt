@@ -1,0 +1,4 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-counts.sql ==
+  | HSDZ_MES_TEST | 199 | 21 | 123 | 
+[OK] _q-counts.sql (1 batches)

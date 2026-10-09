@@ -1,0 +1,25 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-finin-usage.sql ==
+  | plang 总行 | 0 | 
+  | plang.rk_sl>0(已完工入库) | 0 | 
+  | plang.rk_no 非空 | 0 | 
+  | plang.ll_no2 非空(领料回填) | 0 | 
+  | plang.cp_date2 非空(完工日) | 0 | 
+  | scjl 总行 | 0 | 
+  | scjl.post_no 非空(完工单号回填) | 0 | 
+  | bd_material_out 单数 | 2 | 
+  | bd_material_out 挂工单数 | 0 | 
+  | bd_finish_in 单数 | 1 | 
+  | bd_finish_in 已审核数(状态表 shr 非空) | 0 | 
+  | 1 | 2026-09-24 | FI-2026-09-0001 | null | null | null | MO-2026-09-0002 | null | null | null | K-20260909-02 | null | null | null | 草稿 | null | null | null | null | admin | 2026-09-24 10:02:23.1862976 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | 1 | FI-2026-09-0001 | A+级烧结炭棒/滤芯 | null | null | 45*25*178 | null | 支 | 10800.0000 | 9.0000 | 1200.0000 | 0.0000 | null | null | null | admin | 2026-09-24 10:02:23.1902871 | N | null | null | S022-2 | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+  | MANU_ORDER | 生产工单 | bd_manu_order | bl_manu_order | 
+  | MANU_ORDER_DETAIL | 生产工单明细表 |  | v_manu_order_detail | 
+  | MANU_ORDER_STATS | 生产工单统计表 |  | v_manu_order_stats | 
+  | MANU_SCHEDULE | 生产排产 |  | v_manu_schedule | 
+  | WO_ORDER | 生产工单(旧版) | wo_order | wo_progress | 
+  | WO_PROGRESS | 工单工序进度 |  | wo_progress | 
+  | WO_REPORT | 工序报工单 |  | scjl | 
+  | WO_REPORT_LIST | 报工记录 |  | scjl | 
+  | WO_SCHEDULE | 排单计划 |  | v_wo_schedule | 
+[OK] _q-finin-usage.sql (7 batches)

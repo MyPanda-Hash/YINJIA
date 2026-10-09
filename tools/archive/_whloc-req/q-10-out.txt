@@ -1,0 +1,31 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & $java -cp "lib\mssql-jdbc.jar" SqlRunner.java "jdbc:sqlserver://loc ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-10-after.sql ==
+  | bs_wh | 仓位 | 仓位(仓库内货位编号,手工录入文本;2026-09-28 仓库档案新增,2026-10-08 由「库位」正名为「仓位」对齐金蝶) | 
+  | bs_wh_loc | (表) | 仓位档案(仓库内货位主数据:仓库/仓库编码/仓位编码/仓位地址;一仓多仓位、一仓位一仓;仓库列存仓库名称参照 bs_wh;仓位二维码标签内容=仓库编码@仓位地址@仓位编码。2026-10-08 由「库位档案」正名为「仓位档案」对齐金蝶 sp_number/sp_name) | 
+  | bs_wh_loc | 仓位编码 | 仓位编码(仓位的业务标识;对齐金蝶 sp_number;二维码第三段;原「库位编码」2026-10-08 正名) | 
+  | bs_wh_loc | 仓位地址 | 仓位地址(货位在库内的位置描述;二维码第二段;原「库位地址」2026-10-08 正名) | 
+  | 仓位编码 | nvarchar | 200 | 100 | 
+  | 仓位地址 | nvarchar | 400 | 200 | 
+  | 仓库编码 | nvarchar | 200 | 100 | 
+  | 仓位 | nvarchar | 400 | 200 | 
+  | WHLOC | 仓位 | archive | bs_wh_loc | 
+  | 13306 | 仓库 | 仓库 | 参照 | WH | query,detail | 10 | 0 | 1 | 
+  | 13311 | 仓库编码 | 仓库编码 | 文本 | null | detail | 15 | 0 | 1 | 
+  | 13307 | 仓位编码 | 仓位编码 | 文本 | null | query,detail | 20 | 0 | 1 | 
+  | 13308 | 仓位地址 | 仓位地址 | 文本 | null | query,detail | 30 | 0 | 1 | 
+  | 13309 | 停用 | 停用 | 是否 | null | query,detail | 40 | 0 | 1 | 
+  | 13310 | 备注 | 备注 | 文本 | null | detail | 50 | 0 | 1 | 
+  | WH | 仓位 | 仓位 | 
+  | WH | 启用仓位管理 | 启用仓位管理 | 
+  | field | 仓位 | 9 | Bill Sp Name | 
+  | field | 仓位编码 | 9 | Code d'emplacement | 
+  | field | 仓位地址 | 9 | Adresse d'emplacement | 
+  | panel | 仓位 | 9 | Emplacement de stockage | 
+[OK] q-10-after.sql (5 batches)

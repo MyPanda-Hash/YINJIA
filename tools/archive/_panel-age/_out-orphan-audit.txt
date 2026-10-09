@@ -1,0 +1,10 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-orphan-audit.sql ==
+  | ① yj_field 孤儿(字段登记指向不存在的面板) | 0 | 
+  | ② yj_role_panel 孤儿(授权指向不存在的面板) | 0 | 
+  | ③ yj_doc_status 孤儿(单据状态指向不存在的面板) | 0 | 
+  | ④ yj_translation 孤儿(panel 名:已无任何面板/字段用) | 168 | 
+  | ⑤ yj_translation 孤儿(field 标签:已无任何字段行用) | 903 | 
+  | ⑥ 面板总数(合并后) | 125 | 
+  | ⑦ 字段总数(合并后) | 3843 | 
+[SQL FAIL] ���ܶ԰����ۺϻ��Ӳ�ѯ�ı���ʽִ�оۺϺ�����

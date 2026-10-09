@@ -1,0 +1,31 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-13-check.sql ==
+  | 106 | CK00003 | 成品不良品区 | N | 0 | 
+  | 109 | CK00005 | 原料不良品仓 | N | 0 | 
+  | 108 | CK00006 | 华北工控仓 | N | 0 | 
+  | 105 | CP-02 | 成品B仓 | N | 0 | 
+  | 107 | YCL-01 | 恒亿仓 | N | 0 | 
+  | 104 | YJ-08 | 车间仓 | N | 0 | 
+  | locale | varchar | 
+  | name_zh | nvarchar | 
+  | name_native | nvarchar | 
+  | enabled | bit | 
+  | sort | int | 
+  | de | 德语 | Deutsch | 1 | 60 | 
+  | en | 英语 | English | 1 | 10 | 
+  | es | 西班牙语 | Español | 1 | 40 | 
+  | fr | 法语 | Français | 1 | 50 | 
+  | ja | 日语 | 日本語 | 1 | 20 | 
+  | ko | 韩语 | 한국어 | 1 | 30 | 
+  | ru | 俄语 | Русский | 1 | 70 | 
+  | th | 泰语 | ไทย | 1 | 90 | 
+  | vi | 越南语 | Tiếng Việt | 1 | 80 | 
+  | zh-TW | 繁体中文 | 繁體中文 | 0 | 95 | 
+[SQL FAIL] Invalid column name 'asp_user2'.

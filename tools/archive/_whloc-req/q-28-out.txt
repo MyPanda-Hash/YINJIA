@@ -1,0 +1,100 @@
+﻿java.exe : Picked up JAVA_TOOL_OPTIONS: -Dstdout.encoding=UTF-8 -Dfile.encoding=UTF-8
+所在位置 行:3 字符: 1
++ & "C:\Users\vigna\.jdks\ms-25.0.4\bin\java.exe" -cp "lib\mssql-jdbc.j ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Picked up JAVA_....encoding=UTF-8:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[connected] Microsoft SQL Server 15.00.4480 as yinjia
+== q-28-zone-grain.sql ==
+  | A仓 | 辅料及配件区 | 标签区 | AH | 30 | 17 | 18 | 2 | 5 | 3 | 
+  | A仓 | 辅料及配件区 | 端盖区 | A2 | 25 | 2 | 6 | 5 | 5 | 0 | 
+  | A仓 | 辅料及配件区 | 网套区 | AH | 12 | 1 | 4 | 4 | 1 | 3 | 
+  | A仓 | 辅料及配件区 | 无纺布区 | AH | 12 | 1 | 4 | 4 | 1 | 3 | 
+  | A仓 | 辅料及配件区 | 纸箱区 | A1 | 24 | 1 | 8 | 8 | 3 | 0 | 
+  | A仓 | 原料区 | 货架区 | AH | 108 | 10 | 9 | 12 | 3 | 3 | 
+  | A仓 | 原料区 | 胶粉区 | A1 | 12 | 21 | 24 | 4 | 3 | 0 | 
+  | A仓 | 原料区 | 炭粉区 | A1 | 36 | 09 | 20 | 12 | 3 | 0 | 
+  | B仓 | (不分区) | (无) | B1 | 57 | 01 | 24 | 24 | 3 | 0 | 
+  | B仓 | (不分区) | (无) | B2 | 32 | 01 | 16 | 16 | 2 | 0 | 
+  | B仓 | (不分区) | (无) | B3 | 47 | 01 | 21 | 21 | 3 | 0 | 
+  | B仓 | (不分区) | (无) | B4 | 44 | 01 | 24 | 24 | 2 | 0 | 
+  | C仓 | (不分区) | (无) | C1 | 24 | 01 | 12 | 12 | 2 | 0 | 
+  | C仓 | (不分区) | (无) | C2 | 48 | 01 | 16 | 16 | 3 | 0 | 
+  | D仓 | 成品仓区 | (无) | D1 | 32 | 01 | 16 | 16 | 2 | 0 | 
+  | D仓 | 成品仓区 | (无) | D10 | 16 | 01 | 08 | 8 | 2 | 0 | 
+  | D仓 | 成品仓区 | (无) | D11 | 16 | 01 | 08 | 8 | 2 | 0 | 
+  | D仓 | 成品仓区 | (无) | D2 | 12 | 01 | 06 | 6 | 2 | 0 | 
+  | D仓 | 成品仓区 | (无) | D3 | 12 | 01 | 06 | 6 | 2 | 0 | 
+  | D仓 | 成品仓区 | (无) | D4 | 12 | 01 | 06 | 6 | 2 | 0 | 
+  | D仓 | 成品仓区 | (无) | D5 | 12 | 01 | 06 | 6 | 2 | 0 | 
+  | D仓 | 成品仓区 | (无) | D6 | 12 | 01 | 06 | 6 | 2 | 0 | 
+  | D仓 | 成品仓区 | (无) | D7 | 12 | 01 | 06 | 6 | 2 | 0 | 
+  | D仓 | 成品仓区 | (无) | D8 | 16 | 01 | 08 | 8 | 2 | 0 | 
+  | D仓 | 成品仓区 | (无) | D9 | 16 | 01 | 08 | 8 | 2 | 0 | 
+  | 8 | 25 | 679 | 
+  | A1 | 3 | 炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+炭粉区+胶粉区+胶粉区+胶粉区+胶粉区+胶粉区+胶粉区+胶粉区+胶粉区+胶粉区+胶粉区+胶粉区+胶粉区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区+纸箱区 | 
+  | AH | 4 | 网套区+网套区+网套区+网套区+网套区+网套区+网套区+网套区+网套区+网套区+网套区+网套区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+货架区+无纺布区+无纺布区+无纺布区+无纺布区+无纺布区+无纺布区+无纺布区+无纺布区+无纺布区+无纺布区+无纺布区+无纺布区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区+标签区 | 
+  | 仓库分类 |  |  | 
+  | 仓库分类编码 |  |  | 
+  | 分类id |  |  | 
+  | 410 | 42 | 
+  | A供 | 2 | 
+  | BAL_DIR | 2 | 
+  | BB | 4 | 
+  | BFYY | 2 | 
+  | CPH | 6 | 
+  | CPZT | 3 | 
+  | DCLYY | 4 | 
+  | DEPT_TYPE | 4 | 
+  | bs_material_group | id | int | 
+  | bs_material_group | 编码 | nvarchar | 
+  | bs_material_group | 名称 | nvarchar | 
+  | bs_material_group | 级次 | nvarchar | 
+  | bs_material_group | 是否叶子节点 | bit | 
+  | bs_material_group | 上级编码 | nvarchar | 
+  | bs_material_group | 停用 | bit | 
+  | bs_material_group | 状态 | nvarchar | 
+  | bs_material_group | 外部数据ID | nvarchar | 
+  | bs_material_group | 外部单据号 | nvarchar | 
+  | bs_material_group | 外部指纹 | nvarchar | 
+  | bs_material_group | asp_user1 | nvarchar | 
+  | bs_material_group | asp_time1 | datetime2 | 
+  | bs_material_group | asp_user2 | nvarchar | 
+  | bs_material_group | asp_time2 | datetime2 | 
+  | bs_material_group | asp_cancel | char | 
+  | bs_material_group | 创建时间 | datetime2 | 
+  | bs_material_group | 修改时间 | datetime2 | 
+  | bs_material_group | 备注 | nvarchar | 
+  | bs_material_group | 创建人 | nvarchar | 
+  | bs_material_group | 修改人 | nvarchar | 
+  | bs_material_group | 备用1 | nvarchar | 
+  | bs_material_group | 备用2 | nvarchar | 
+  | bs_material_group | 备用3 | nvarchar | 
+  | bs_material_group | 备用4 | nvarchar | 
+  | bs_material_group | 备用5 | nvarchar | 
+  | bs_material_group | 备用6 | nvarchar | 
+  | bs_material_group | 备用7 | nvarchar | 
+  | bs_material_group | 备用8 | nvarchar | 
+  | bs_material_group | 备用9 | nvarchar | 
+  | bs_material_group | 备用10 | nvarchar | 
+  | bs_material_group | 备用11 | nvarchar | 
+  | bs_material_group | 备用12 | nvarchar | 
+  | bs_material_group | 备用13 | nvarchar | 
+  | bs_material_group | 备用14 | nvarchar | 
+  | bs_material_group | 备用15 | nvarchar | 
+  | bs_material_group | 备用16 | nvarchar | 
+  | bs_material_group | 备用17 | nvarchar | 
+  | bs_material_group | 备用18 | nvarchar | 
+  | bs_material_group | 备用19 | nvarchar | 
+  | bs_material_group | 备用20 | nvarchar | 
+  | bs_region | id | int | 
+  | bs_region | 地区编码 | nvarchar | 
+  | bs_region | 地区名称 | nvarchar | 
+  | bs_region | 备注 | nvarchar | 
+  | bs_region | 状态 | nvarchar | 
+  | bs_region | asp_user1 | nvarchar | 
+  | bs_region | asp_time1 | datetime2 | 
+  | bs_region | asp_user2 | nvarchar | 
+  | bs_region | asp_time2 | datetime2 | 
+[OK] q-28-zone-grain.sql (9 batches)

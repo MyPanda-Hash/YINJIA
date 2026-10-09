@@ -1,5 +1,7 @@
 <script setup>
-// 字段管理(动态字段/备用列池):仅管理员;列表/表单/查询/导出由元数据引擎自动获得新字段。
+// 字段管理(动态字段/备用列池):入口由调用方按该面板「自定义字段」权限显隐(2026-10-09 起
+// 不再是「仅管理员」:组织架构 →「角色与面板权限」勾了该面板「自定义字段」的角色即可配置);
+// 列表/表单/查询/导出由元数据引擎自动获得新字段。
 // 规格见 docs/design/动态字段扩展-备用列池-V1.0.md §10;入口由 PanelxList「更多 ▼」注入。
 import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

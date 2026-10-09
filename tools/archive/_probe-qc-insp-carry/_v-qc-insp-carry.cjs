@@ -8,6 +8,10 @@
      ④ 只补缺失项:已填的检测结果不被覆盖;缺的按来料检验要求顺序补进来
      ⑤ 幂等:再点「带入检验要求」一行都不加
      ⑥ 要求表里没有的物料 → 提示无法带入,表体不动
+    ⚠ 2026-10-09 调整(用户口径「物料名称和物料编码要关联商品,并且要两个一并填入」):
+      物料编码/物料名称 从手输框改成**商品参照格** ⇒ 原先「setV 输码」的三步(③⑥⑦)改为
+      「clickRef 点格子 → 弹窗按编码查到商品 → 勾选确定」,并顺带核对**两个字段一并填入**。
+      第⑥步的「无要求物料」因此换成真实存在但要求表里没有的商品(bs_inv 3-01-16-0012)。
    用法:node tools/archive/_probe-qc-insp-carry/_v-qc-insp-carry.cjs [前端地址]
         前端地址默认 http://localhost:5173(vite 热更);传 http://127.0.0.1:8090 即测**打包版**
         (jar 内 BOOT-INF/classes/static —— 用户实际在看的那个实例,改前端后必测它一遍)
@@ -20,13 +24,16 @@ const BASE = 'http://127.0.0.1:8090/api'
 /** 被测前端:默认 vite 热更(5173);传 http://127.0.0.1:8090 即测**打包版**(jar 内 static,用户实际在看的那个) */
 const APP = (process.argv.find((a) => a.startsWith('http')) || 'http://localhost:5173').replace(/\/$/, '')
 const CODE = 'YJ-YCYX-006'
+const MAT_NAME = '折叠棉'            // 商品档案(bs_inv)里 YJ-YCYX-006 的存货名称 —— 选商品时应一并填入
 const EXPECT = [
   ['折叠棉', '47*34*154-1'],
   ['炭棒', '34*12*154'],
   ['折数', '75±5'],
   ['折高', '6--7'],
 ]
-const NO_REQ_CODE = 'YJ-XX-NOPE-999'
+// 2026-10-09 起物料编码只能**从商品档案里选**,乱码再也输不进去 ⇒ 用真实存在但**要求表里没有**的商品:
+// bs_inv 有 3-01-16-0012(SP-FX2-X60-RO),qc_insp_req 里没有该物料编号(实测)。
+const NO_REQ_CODE = '3-01-16-0012'
 const MARK = '实测:外观无脏污'      // 已填检测结果的哨兵值(验证不被覆盖)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 let fails = 0
@@ -50,13 +57,59 @@ const HELPERS = `
       const th = [...document.querySelectorAll('.qc-rec-sheet .qr-head-table th')].find(t => t.innerText.trim() === label)
       return th ? th.nextElementSibling?.querySelector('input') : null
     },
-    /** 抬头格取值:输入框里的值,或**只读文本**(文件编码/检验依据/物料批次 这类回填字段纸面不给输入框) */
+    /** ⚠ 2026-10-09 起 物料名称/物料编码 是**商品参照格**(不再有 input)⇒ 它们只能走 clickRef + 弹窗选择,
+     *  headInput 现在只对**仍是文本框**的抬头字段(备注等)有用;取物料两列请用 headVal/isRefCell。 */
+    /** 抬头格取值:商品参照格(.qr-ref-text)/输入框 / **只读文本**(文件编码/检验依据/物料批次 这类回填字段)。
+     *  2026-10-09 起 物料名称/物料编码 是**商品参照格**(没有 input)⇒ 必须优先取 .qr-ref-text */
     headVal(label) {
       const th = [...document.querySelectorAll('.qc-rec-sheet .qr-head-table th')].find(t => t.innerText.trim() === label)
       const td = th?.nextElementSibling
       if (!td) return ''
+      const rt = td.querySelector('.qr-ref-text')
+      if (rt) { const s = rt.innerText.trim(); return (s === '点击选择' || s === 'Click to pick') ? '' : s }
       const inp = td.querySelector('input')
       return inp ? inp.value : td.innerText.trim()
+    },
+    /** 抬头格是不是商品参照格(物料两列 = 参照 商品档案,不能再手输) */
+    isRefCell(label) {
+      const th = [...document.querySelectorAll('.qc-rec-sheet .qr-head-table th')].find(t => t.innerText.trim() === label)
+      return !!(th?.nextElementSibling?.querySelector('.qr-ref-ctl'))
+    },
+    clickRef(label) {
+      const th = [...document.querySelectorAll('.qc-rec-sheet .qr-head-table th')].find(t => t.innerText.trim() === label)
+      const c = th?.nextElementSibling?.querySelector('.qr-ref-ctl')
+      c?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      return !!c
+    },
+    /** 商品参照弹窗(RefPickDialog 根 .rpd 所在的那个 el-dialog) */
+    dlg() { return [...document.querySelectorAll('.el-dialog')].find(d => d.querySelector('.rpd')) || null },
+    dlgTitle() { const d = window.__yj.dlg(); return d ? (d.querySelector('.el-dialog__header')?.innerText || '').trim() : '' },
+    dlgTotal() {
+      const d = window.__yj.dlg(); if (!d) return -1
+      const m = (d.querySelector('.rpd-tip')?.innerText || '').match(/共\\s*(\\d+)\\s*条/)
+      return m ? Number(m[1]) : -1
+    },
+    dlgRows() { const d = window.__yj.dlg(); return d ? d.querySelectorAll('.el-table__body-wrapper tbody tr').length : 0 },
+    setKeyword(v) { const d = window.__yj.dlg(); return window.__yj.setV(d?.querySelector('.rpd-toolbar input'), v) },
+    clickQuery() {
+      const d = window.__yj.dlg()
+      const b = [...(d?.querySelectorAll('.rpd-toolbar .el-button') || [])].find(x => x.innerText.includes('查询'))
+      b?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      return !!b
+    },
+    pickFirst() {
+      const d = window.__yj.dlg()
+      const tr = d?.querySelector('.el-table__body-wrapper tbody tr')
+      const cb = tr?.querySelector('.el-checkbox')
+      cb?.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      return { clicked: !!cb, row: tr ? tr.innerText.replace(/\\s+/g, ' ').trim() : '' }
+    },
+    confirm() {
+      const d = window.__yj.dlg()
+      const b = d?.querySelector('.el-dialog__footer .el-button--primary')
+      if (!b || b.disabled) return false
+      b.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      return true
     },
     /** 检验项取值:el-select 里**第一个** .el-select__selected-item 是 filterable 的输入外壳(innerText 恒空),
      *  选中值在下一個 .el-select__placeholder 里 —— 踩过,别再用 .el-select__selected-item.innerText */
@@ -118,6 +171,21 @@ async function main() {
     }
     await send('Page.enable'); await send('Runtime.enable')
 
+    /** 商品参照弹窗里按编码选一条并确定(2026-10-09 物料两列改成参照后新增的取数路径) */
+    async function pickMaterial(code) {
+      const opened = await waitForY(`window.__yj.dlg() ? 'DLG' : ''`, 15000)
+      if (!opened) return { ok: false, why: '参照弹窗没开' }
+      await evalY(`window.__yj.setKeyword(${JSON.stringify(code)})`)
+      await evalY(`window.__yj.clickQuery()`)
+      const listed = await waitForY(`(() => { const n = window.__yj.dlgTotal(); return (n > 0 && window.__yj.dlgRows() > 0) ? n : 0 })()`, 20000)
+      if (!listed) return { ok: false, why: '按编码查不到商品' }
+      const picked = await evalY(`JSON.stringify(window.__yj.pickFirst())`)
+      await sleep(400)
+      const confirmed = await waitForY(`window.__yj.confirm() ? 'OK' : ''`, 8000)
+      await sleep(800)
+      return { ok: !!confirmed, row: JSON.parse(picked || '{}').row }
+    }
+
     await navigate(`${APP}/#/login`)
     await evaluate(`localStorage.setItem('mes_token', ${JSON.stringify(token)}); localStorage.setItem('mes_user', ${JSON.stringify(JSON.stringify(login.data.user))}); 'ok'`)
 
@@ -165,24 +233,26 @@ async function main() {
     ok('② 空报告态已稳定(1.5s 后仍为空)', (await evalY(isFresh)) === 'FRESH')
     ok('② 分区条上有「带入检验要求」按钮', await evalY(`!!document.querySelector('.qr-carry-btn')`))
 
-    // ── ③ 填物料编码 → 自动带入 ──
-    // 写值带自愈重试:新增草稿替换窗口内写进去的值会被重渲染冲掉(实测踩过)
+    // ── ③ 选好物料编码(商品参照)→ 自动带入 ──
+    // 2026-10-09 起 物料编码/物料名称 是**商品参照格**(用户口径「关联商品、两个一并填入」),
+    // 不能再手输 ⇒ 本步改成「点格子弹商品参照 → 按编码查到 → 勾选确定」,其余口径不变。
+    ok('③ 物料编码格已是商品参照格(不再是手输框)', await evalY(`window.__yj.isRefCell('物料编码')`))
     let autoHit = null
     for (let i = 0; i < 6 && !autoHit; i++) {
-      await evalY(`(() => {
-        const el = window.__yj.headInput('物料编码')
-        if (!el) return 'NO-INPUT'
-        window.__yj.clearMsgs()
-        return window.__yj.setV(el, ${JSON.stringify(CODE)})
-      })()`)
+      await evalY(`window.__yj.clearMsgs()`)
+      await evalY(`window.__yj.clickRef('物料编码')`)
+      const picked = await pickMaterial(CODE)
+      if (!picked.ok) { console.log(`   [重试 ${i + 1}/6] 商品参照未选中:${picked.why || ''}`); await sleep(1200); continue }
       autoHit = await waitForY(`(() => {
         const r = window.__yj.rows()
-        return (r.length === ${EXPECT.length} && window.__yj.headInput('物料编码')?.value === ${JSON.stringify(CODE)}) ? JSON.stringify(r) : ''
-      })()`, 6000)
-      if (!autoHit) { await sleep(1200); await evalY(`window.__yj.clearMsgs()`); console.log(`   [重试 ${i + 1}/6] 物料编码未生效或未带入`) }
+        return (r.length === ${EXPECT.length} && window.__yj.headVal('物料编码') === ${JSON.stringify(CODE)}) ? JSON.stringify(r) : ''
+      })()`, 8000)
+      if (!autoHit) { await sleep(1200); console.log(`   [重试 ${i + 1}/6] 物料编码未生效或未带入`) }
     }
     const autoRows = JSON.parse(autoHit || (await evalY(`JSON.stringify(window.__yj.rows())`)) || '[]')
-    ok(`③ 填好物料编码自动带入 ${EXPECT.length} 项(物料 ${CODE})`, !!autoHit, JSON.stringify(autoRows.map((r) => [r.item, r.std])))
+    ok(`③ 选好商品后自动带入 ${EXPECT.length} 项(物料 ${CODE})`, !!autoHit, JSON.stringify(autoRows.map((r) => [r.item, r.std])))
+    ok('③ 选商品同时把「物料名称」一并填入商品档案的存货名称',
+      (await evalY(`window.__yj.headVal('物料名称')`)) === MAT_NAME, String(await evalY(`window.__yj.headVal('物料名称')`)))
     ok('③ 检验项=来料检验要求表头列名、检测标准=该列数据(顺序=Excel 原列序)',
       JSON.stringify(autoRows.map((r) => [r.item, r.std])) === JSON.stringify(EXPECT),
       JSON.stringify(autoRows.map((r) => [r.item, r.std])))
@@ -222,7 +292,10 @@ async function main() {
     ok('⑤ 提示「检验项已与来料检验要求一致，无需带入」', /无需带入/.test(String(msgs2)), String(msgs2))
 
     // ── ⑥ 要求表里没有的物料 ──
-    await evalY(`(() => { window.__yj.clearMsgs(); return window.__yj.setV(window.__yj.headInput('物料编码'), ${JSON.stringify(NO_REQ_CODE)}) })()`)
+    await evalY(`window.__yj.clearMsgs()`)
+    await evalY(`window.__yj.clickRef('物料编码')`)
+    const noReq = await pickMaterial(NO_REQ_CODE)
+    ok(`⑥ 换成「要求表里没有」的真实商品 ${NO_REQ_CODE}`, noReq.ok, String(noReq.row))
     await sleep(1600)
     const after6a = await evalY(`window.__yj.rows().length`)
     ok('⑥ 换成无要求物料:表体不被自动清空/重建(仍有 4 行)', after6a === EXPECT.length, String(after6a))
@@ -234,7 +307,9 @@ async function main() {
     ok('⑥ 表体仍 4 行没变', after6b === EXPECT.length, String(after6b))
 
     // ── ⑦ 「⧉ 检验要求」弹窗按物料编码找得到对应的行 ──
-    await evalY(`(() => { window.__yj.setV(window.__yj.headInput('物料编码'), ${JSON.stringify(CODE)}); return 1 })()`)
+    await evalY(`window.__yj.clickRef('物料编码')`)
+    const back = await pickMaterial(CODE)
+    ok(`⑦ 换回有要求的商品 ${CODE}`, back.ok, String(back.row))
     await sleep(1200)
     await evalY(`(() => { const s = document.querySelector('.qr-lib-btn:not(.qr-carry-btn)'); s?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return !!s })()`)
     const dlg = await waitForY(`(() => {
