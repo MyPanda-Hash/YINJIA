@@ -14,11 +14,12 @@
       {{ tt('这里维护的是检验标准本身（项目/接受标准/检验方法/取样要求/处置方式），不会改动任何已录入的检验单。') }}
     </div>
 
-    <!-- ═══ 检验方案 ═══ -->
+    <!-- ═══ ① 检验方案(主表) ═══ -->
     <div class="qcplan-sec">
       <div class="qcplan-bar">
+        <span class="qcplan-no">1</span>
         <b>{{ tt('检验方案') }}</b>
-        <span class="qcplan-sub">{{ tt('一个产品/一类物料一套方案') }}</span>
+        <span class="qcplan-sub">{{ tt('一个产品/一类物料一套方案；点一行选中，下方就是它下面的检验项目') }}</span>
         <span class="qcplan-gap" />
         <el-checkbox v-model="showDisabled" size="small" @change="loadPlans">{{ tt('显示停用') }}</el-checkbox>
         <el-button size="small" type="primary" @click="openPlanForm(null)">{{ tt('新增方案') }}</el-button>
@@ -43,11 +44,23 @@
       </el-table>
     </div>
 
-    <!-- ═══ 该方案下的检验项目 ═══ -->
-    <div class="qcplan-sec">
+    <!-- 主从关系的"桥":当前选中的方案,一眼看清下方表格属于谁 -->
+    <div class="qcplan-bridge" :class="{ empty: !curPlan }">
+      <span class="qcplan-arrow">▼</span>
+      <template v-if="curPlan">
+        <span class="qcplan-cur">{{ tt('当前方案') }}：<b>{{ curPlan['方案编码'] }}</b> {{ curPlan['方案名称'] }}</span>
+        <span class="qcplan-pill">{{ curPlan['项目数'] ?? items.length }} {{ tt('个检验项目') }}</span>
+        <span v-if="curPlan['适用存货']" class="qcplan-pill">{{ tt('适用存货') }} {{ curPlan['适用存货'] }}</span>
+      </template>
+      <span v-else class="qcplan-none">{{ tt('请先在上方点选一个检验方案，下方才会显示它的检验项目') }}</span>
+    </div>
+
+    <!-- ═══ ② 该方案下的检验项目(从表) ═══ -->
+    <div class="qcplan-sec" :class="{ 'is-dim': !curPlan }">
       <div class="qcplan-bar">
+        <span class="qcplan-no">2</span>
         <b>{{ tt('检验项目') }}</b>
-        <span class="qcplan-sub">{{ curPlan ? tt('所属方案') + '：' + curPlan['方案名称'] : tt('请先在上方选择一个检验方案') }}</span>
+        <span class="qcplan-sub">{{ curPlan ? tt('属于方案') + ' ' + curPlan['方案编码'] : tt('（先选方案）') }}</span>
         <span class="qcplan-gap" />
         <el-button size="small" type="primary" :disabled="!curPlan" @click="openItemForm(null)">{{ tt('新增项目') }}</el-button>
         <el-button size="small" :disabled="!curItem" @click="openItemForm(curItem)">{{ tt('编辑') }}</el-button>
@@ -56,7 +69,8 @@
         </el-button>
       </div>
       <el-table :data="items" size="small" border height="240" highlight-current-row row-key="id"
-                :empty-text="tt('该方案下还没有检验项目')" @current-change="(r) => (curItem = r)">
+                :empty-text="curPlan ? tt('该方案下还没有检验项目，点右上角「新增项目」') : tt('请先在上方选择一个检验方案')"
+                @current-change="(r) => (curItem = r)">
         <el-table-column :label="tt('序号')" prop="序号" width="60" />
         <el-table-column :label="tt('项目编码')" prop="项目编码" width="130" show-overflow-tooltip />
         <el-table-column :label="tt('项目名称')" prop="项目名称" width="150" show-overflow-tooltip />
@@ -315,6 +329,18 @@ async function toggleItem() {
 <style scoped>
 .qcplan-tip { font-size: 12px; color: #909399; background: #f4f4f5; border-radius: 4px; padding: 6px 10px; margin-bottom: 10px; }
 .qcplan-sec { margin-bottom: 14px; }
+/* 主从层级(2026-10-09 用户口径「上方为检验方案的表,下方为检验项目的表」):
+   两块长得一样就看不出从属关系 ⇒ 用序号徽章 + 桥接条 + 未选方案时把从表压暗来表明层级。 */
+.qcplan-sec.is-dim { opacity: .55; }
+.qcplan-no { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px;
+  border-radius: 50%; background: #1e6fb8; color: #fff; font-size: 12px; font-weight: 700; }
+.qcplan-bridge { display: flex; align-items: center; gap: 10px; margin: -6px 0 12px 8px; padding: 6px 12px;
+  background: #eef6ff; border-left: 3px solid #1e6fb8; border-radius: 3px; font-size: 12px; color: #1e6fb8; }
+.qcplan-bridge.empty { background: #fdf6ec; border-left-color: #e6a23c; color: #b88230; }
+.qcplan-arrow { font-size: 10px; }
+.qcplan-cur b { font-weight: 700; }
+.qcplan-pill { background: #fff; border: 1px solid #b9d8f5; border-radius: 10px; padding: 1px 8px; color: #1e6fb8; }
+.qcplan-bridge.empty .qcplan-none { font-weight: 600; }
 .qcplan-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
 .qcplan-bar b { font-size: 13px; color: #303133; }
 .qcplan-sub { font-size: 12px; color: #909399; }
