@@ -471,6 +471,12 @@ public class ButtonService {
                 // 保存即归档 = 自审自批,显式留痕(2026-09-12:归档路径审核人不再空白,审批历史可查)
                 recordApproval(def.code(), no, "SUBMIT", "PENDING", "");
                 recordApproval(def.code(), no, "APPROVE", "APPROVED", "保存即归档（管理员保存）");
+                // 申请立项人 = 把这张单推进流程的人(2026-10-09 用户口径)。管理员这条是自审自批,
+                // 既不走 doSubmitApproval、也不走下面的普通用户分支 ⇒ 三处各要落一次,否则这一格恒为空。
+                if ("RD_APPROVAL".equals(def.code())) {
+                    jdbc.update("UPDATE rd_approval SET 申请立项人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                            realNameOf(user), no);
+                }
                 // 保存即归档也要同步进度查询(用户报的"保存归档后没导进来"就是漏了这条路径)
                 if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
             } else {
@@ -482,6 +488,11 @@ public class ButtonService {
                                 + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), GETDATE());",
                         def.code(), no, user, user);
                 recordApproval(def.code(), no, "SUBMIT", "PENDING", "");
+                // 同上:普通用户「保存」= 送审,这才是正常流程走的那条路
+                if ("RD_APPROVAL".equals(def.code())) {
+                    jdbc.update("UPDATE rd_approval SET 申请立项人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                            realNameOf(user), no);
+                }
             }
         }
         // 文件类面板保存:实时刷新未收尾修改记录的 diff(修改中/弃审后再编辑,修改记录随时可见已改内容)
@@ -1410,10 +1421,14 @@ public class ButtonService {
                 + " effective = CASE WHEN ? = 1 THEN NULL ELSE effective END, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?",
                 CHANGE_PANEL.equals(def.code()) ? 1 : 0, def.code(), no);
-        // 立项申请弃审回草稿(2026-10-08 流程图:反审核后重新走流程):对接人/项目责任人随审核结果一起作废,
-        // 否则回草稿的单还挂着上一轮的人,重新定级后直接确认责任人 = 跳过分发对接人这一步。
+        // 立项申请弃审回草稿(2026-10-08 流程图:反审核后重新走流程):对接人/项目责任人/项目等级
+        // 随审核结果一起作废,否则回草稿的单还挂着上一轮的人和级。
+        // ⚠ 2026-10-09 补「项目等级」:定级已改成"确定后不能改"(见 applyGrade),不清级的话
+        //   弃审重审后**永远定不了级** —— applyGrade 直接拒、审批通过带等级也被拒 ⇒ 单子卡在审批中。
+        //   (子 agent 跑矩阵时实测到这个死锁,根因就是这里少清一列。)
         if ("RD_APPROVAL".equals(def.code())) {
-            jdbc.update("UPDATE rd_approval SET 备用1 = NULL, 备用2 = NULL WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+            jdbc.update("UPDATE rd_approval SET 备用1 = NULL, 备用2 = NULL, 项目等级 = NULL"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
         }
         // 质量单据:弃审回草稿,纸面「审核/批准」两格随审批作废清空 + 两级节点标记复位
         // (编制格保留 —— 谁编的单没变;重新提交时会按新的提交人刷新)
@@ -1503,6 +1518,14 @@ public class ButtonService {
                         + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), 'N', 1, GETDATE());",
                 def.code(), no, operator, operator);
         recordApproval(def.code(), no, "SUBMIT", "PENDING", opinion);
+        // 申请立项人 = 提交审批的人(2026-10-09 用户口径:「申请立项人是一开始提交审批的人」)。
+        // 与「保存=送审」两条路同口径(本文件 :468-500 那两处);前端新增单据时按登录用户预填的姓名
+        // 只是草稿期的显示兜底,提交这一刻以操作人为准。下游按这一格认人:项目实施计划的一级审批门禁
+        // 就是 ISNULL(rd_approval.[申请立项人]) 比对人。
+        if ("RD_APPROVAL".equals(def.code())) {
+            jdbc.update("UPDATE rd_approval SET 申请立项人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    realNameOf(operator), no);
+        }
         // 质量单据:纸面「编制」格 = **提交审批的人**(2026-10-04 用户口径)。
         // 落点在提交这一刻而非保存 —— 编制格各表绑的列不同(编制人/填写人/责任人/检测人,见 QC_DOC_PREPARER);
         // 谁提交谁就是编制人;驳回后换人重提也随之更新。
@@ -1637,6 +1660,11 @@ public class ButtonService {
         if (DOC_ARCHIVE_PANELS.contains(def.code())) {
             finalizeOpenModify(def, no, operator);
             markArchived(def.code(), no, operator);
+            // 2026-10-09 用户报障「项目实施计划审批归档后没自动进项目进度查询」:
+            //   同步此前只挂在 audit()(管理员直审)与管理员「保存即归档」两处,而**正常流程 =
+            //   普通用户保存 → 送审 → 管理员「审批通过」→ 归档**走的正是本方法 ⇒ 从来没同步过,
+            //   只能靠侧栏「同步进度」手工补。口径与另两处一致(RD_PLAN 归档即同步,幂等可重跑)。
+            if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
             return result(no, "已归档");
         }
         return result(no, "已审核");
@@ -1692,6 +1720,11 @@ public class ButtonService {
         if (DOC_ARCHIVE_PANELS.contains(def.code())) {
             finalizeOpenModify(def, no, operator);
             markArchived(def.code(), no, operator);
+            // 2026-10-09 用户报障「项目实施计划审批归档后没自动进项目进度查询」:
+            //   同步此前只挂在 audit()(管理员直审)与管理员「保存即归档」两处,而**正常流程 =
+            //   普通用户保存 → 送审 → 管理员「审批通过」→ 归档**走的正是本方法 ⇒ 从来没同步过,
+            //   只能靠侧栏「同步进度」手工补。口径与另两处一致(RD_PLAN 归档即同步,幂等可重跑)。
+            if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
             return result(no, "已归档");
         }
         return result(no, "已审核");
@@ -3613,6 +3646,15 @@ public class ButtonService {
             sel.append(",[阶段").append(i).append("_实际完成]");
             sel.append(",[阶段").append(i).append("_计划完成]");
         }
+        // 2026-10-09 新增:同批把**立项申请**的字段一起取回(关联键 = 文档编号)——
+        //   用户口径:项目定级取立项申请的等级;项目发起人取申请立项人;立项日期取立项申请的归档日期。
+        sel.append(", (SELECT TOP 1 a.[项目等级] FROM rd_approval a WHERE a.[文档编号] = p.[文档编号]"
+                + " AND ISNULL(a.asp_cancel,'N') <> 'Y') AS appr_level");
+        sel.append(", (SELECT TOP 1 a.[申请立项人] FROM rd_approval a WHERE a.[文档编号] = p.[文档编号]"
+                + " AND ISNULL(a.asp_cancel,'N') <> 'Y') AS appr_initiator");
+        sel.append(", (SELECT TOP 1 CONVERT(nvarchar(19), s2.archived_at, 120) FROM rd_approval a"
+                + " JOIN yj_doc_status s2 ON s2.panel_code = 'RD_APPROVAL' AND s2.doc_no = a.[单据编号]"
+                + " WHERE a.[文档编号] = p.[文档编号] AND ISNULL(a.asp_cancel,'N') <> 'Y') AS appr_archived_at");
         sel.append(" FROM rd_plan p WHERE p.[单据编号] = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'");
         sel.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_PLAN'"
                 + " AND s.doc_no = p.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')");
@@ -3624,10 +3666,14 @@ public class ButtonService {
 
         int totalStages = 0, doneStages = 0, lastDoneStage = 0;
         String latestDone = null, lastPlanDue = null;
+        // 2026-10-09:10 个阶段的计划内容**拼接成一段**写进进度表的「内容」列(用户口径)
+        StringBuilder contentBuf = new StringBuilder();
         for (int i = 1; i <= 10; i++) {
             String content = str(plan.get("阶段" + i + "_计划内容"));
             if (content == null) continue;                 // 空阶段框不计入
             totalStages++;
+            if (contentBuf.length() > 0) contentBuf.append("；");
+            contentBuf.append("阶段").append(i).append("：").append(content);
             String planDue = str(plan.get("阶段" + i + "_计划完成"));
             if (planDue != null) lastPlanDue = planDue;    // 阶段号递增:最后取到的即最晚计划完成
             String done = str(plan.get("阶段" + i + "_实际完成"));
@@ -3654,9 +3700,15 @@ public class ButtonService {
         String progressNo = str(targets.get(0).get("单据编号"));
 
         String planDocNo = str(plan.get("文档编号"));            // ← 项目编号(每张计划不同)
-        String level = str(plan.get("项目定级"));
+        // 2026-10-09 用户口径:项目定级取**立项申请的等级**(定级在立项上做、且定了不能改);
+        //   立项里取不到才退回实施计划自己的参照带入值。
+        String level = str(plan.get("appr_level"));
+        if (level == null || level.isBlank()) level = str(plan.get("项目定级"));
         String owner = str(plan.get("负责人"));
         String due = latestDone != null ? latestDone : lastPlanDue;
+        String initiator = str(plan.get("appr_initiator"));       // → 进度表「项目发起人」
+        String startDate = str(plan.get("appr_archived_at"));     // → 进度表「立项日期」= 立项申请的归档日期
+        String contentText = contentBuf.length() == 0 ? null : contentBuf.toString();  // → 进度表「内容」
         String spec = specFromApproval(planDocNo);               // ← 子项目/尺寸
         if (spec == null) spec = planDocNo != null ? planDocNo : projectName;
         final String projNo = planDocNo != null ? planDocNo : "";
@@ -3674,19 +3726,23 @@ public class ButtonService {
         //     现改为只写旧列,那批无人读的新列由 migrate-rd-progress-drop-orphan-cols.sql 删除。
         int n = jdbc.update("UPDATE rd_progress_detail SET [项目层级] = COALESCE(?, [项目层级]),"
                         + " [子项目/尺寸] = ?, [项目负责] = COALESCE(?, [项目负责]),"
-                        + " [里程完成] = COALESCE(?, [里程完成]), [状态] = ?"
+                        + " [里程完成] = COALESCE(?, [里程完成]), [状态] = ?,"
+                        + " [内容] = COALESCE(?, [内容]), [项目级] = COALESCE(?, [项目级]),"
+                        + " [实施进度] = COALESCE(?, [实施进度])"
                         + " WHERE [单据编号] = ? AND [项目名称] = ? AND ISNULL([说明], N'') = ?"
                         + " AND ISNULL(asp_cancel,'N') <> 'Y'",
-                level, spec, owner, due, status, progressNo, projectName, projNo);
+                level, spec, owner, due, status, contentText, initiator, startDate,
+                progressNo, projectName, projNo);
         if (n > 0) {
             org.slf4j.LoggerFactory.getLogger(ButtonService.class)
                     .info("[RD_PLAN→RD_PROGRESS] 更新 {} 行, 项目={}, 子项目={}, 状态={}", n, projectName, spec, status);
             return RES_UPDATED;
         }
         jdbc.update("INSERT INTO rd_progress_detail ([单据编号], [项目名称], [项目层级], [子项目/尺寸], [说明], [项目编号],"
-                        + " [项目负责], [里程完成], [状态], asp_user1, asp_time1)"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())",
-                progressNo, projectName, level, spec, projNo, projNo, owner, due, status, currentUserName());
+                        + " [项目负责], [里程完成], [状态], [内容], [项目级], [实施进度], asp_user1, asp_time1)"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())",
+                progressNo, projectName, level, spec, projNo, projNo, owner, due, status,
+                contentText, initiator, startDate, currentUserName());
         org.slf4j.LoggerFactory.getLogger(ButtonService.class)
                 .info("[RD_PLAN→RD_PROGRESS] 新增 1 行, 进度单={}, 项目={}, 子项目={}, 状态={}", progressNo, projectName, spec, status);
         return RES_INSERTED;
@@ -3912,14 +3968,38 @@ public class ButtonService {
         String status = String.valueOf(docStatusOf(def.code(), no).get("status"));
         if (!"已审核".equals(status) && !"已归档".equals(status))
             throw new IllegalStateException("仅已审核或已归档的立项申请可项目定级(当前:" + status + ")");
+        // 2026-10-09 用户口径:「项目定级只能由一开始的审批人来确定,确定之后不能变」——
+        // 定级权从"有 RD_APPROVAL 审批权"收窄到**本单审批人本人**(严格口径,不给管理员兜底)。
+        String approver = rdApproverOf(no);
+        if (approver.isEmpty())
+            throw new IllegalStateException("本单没有「审批通过」留痕,无法定级");
+        if (!approver.equals(currentUserName()))
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "项目定级只能由本单审批人确认(本单审批人:" + realNameOf(approver) + "（" + approver + "）)");
         String level = pickOf(formData, "项目等级");
         applyGrade(def.code(), no, level, currentUserName());
         return result(no, status.isEmpty() ? "已审核" : status);
     }
 
     /**
+     * 本单「审批通过」的操作人(最近一条 APPROVE/APPROVED 留痕)。
+     * 立项流程里这就是「一开始的审批人」:「审批通过即定级」那条路的 operator 天然等于他,两道门禁同源。
+     * 取"最近一条"而不是"最早一条",是为了弃审重走流程后由**本轮**审批人定级,否则第二个审批人永远定不了级。
+     */
+    private String rdApproverOf(String no) {
+        List<String> os = jdbc.queryForList(
+                "SELECT TOP 1 operator FROM yj_form_approval"
+                        + " WHERE panel_code = 'RD_APPROVAL' AND form_no = ? AND action = 'APPROVE' AND result = 'APPROVED'"
+                        + " ORDER BY id DESC",
+                String.class, no);
+        return os.isEmpty() || os.get(0) == null ? "" : os.get(0).trim();
+    }
+
+    /**
      * 定级落库(「项目定级」按钮与「审批通过即定级」共用,2026-10-08 起两条路同源)。
      * 写 `rd_approval.项目等级` + asp_user2/asp_time2,并按新旧等级留一条 GRADE 审批留痕(不覆盖历史)。
+     * 2026-10-09:「确定之后不能变」—— 已定级直接拒,**两条路都拦**。要改级只能先弃审
+     *   (unaudit 会把项目等级一并清空),重新审批后再定。
      */
     private void applyGrade(String panelCode, String no, String level, String operator) {
         if (!PROJECT_LEVELS.contains(level))
@@ -3928,11 +4008,12 @@ public class ButtonService {
         List<String> cur = jdbc.queryForList(
                 "SELECT TOP 1 项目等级 FROM rd_approval WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, no);
         if (!cur.isEmpty() && cur.get(0) != null) old = cur.get(0).trim();
+        if (!old.isEmpty())
+            throw new IllegalStateException("项目等级已确定为「" + old + "」,不能更改;要改请先弃审回草稿重新走流程");
         int n = jdbc.update("UPDATE rd_approval SET 项目等级 = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
                 + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", level, operator, no);
         if (n == 0) throw new IllegalStateException("立项申请不存在或已作废:" + no);
-        String opinion = old.isEmpty() ? "项目定级：" + level : "项目定级：" + old + " → " + level;
-        recordApproval(panelCode, no, "GRADE", "GRADED", opinion);
+        recordApproval(panelCode, no, "GRADE", "GRADED", "项目定级：" + level);
     }
 
     /** 项目等级取值(与下游 RD_PLAN.项目定级 / RD_PROGRESS.项目定级 同字典;2026-09-21 四级统一) */
@@ -3979,6 +4060,11 @@ public class ButtonService {
         // 「定级完之后就要分发对接人」:没定级就没有下游项目属性,先定级(顺序即流程图顺序)
         String level = blankSafe(approvalHeadOf(no).get("项目等级"));
         if (level.isEmpty()) throw new IllegalStateException("请先完成项目定级,再分发对接人");
+        // 2026-10-09 用户口径:「对接人不能更改」—— 只能分发一次,已分发的直接拒(要换人只能弃审回草稿)。
+        String existingLiaison = blankSafe(approvalHeadOf(no).get("备用1"));
+        if (!existingLiaison.isEmpty())
+            throw new IllegalStateException("对接人已分发给 " + realNameOf(existingLiaison) + "（" + existingLiaison
+                    + "）,不能更改;要换人请先弃审回草稿重新走流程");
         String liaison = pickOf(formData, "对接人");
         if (liaison.isEmpty()) throw new IllegalStateException("请选择对接人账号");
         if (!isEnabledUser(liaison)) throw new IllegalStateException("对接人账号不存在或已停用：" + liaison);
@@ -4015,6 +4101,11 @@ public class ButtonService {
         if (liaison.isEmpty()) throw new IllegalStateException("请先分发对接人,再由对接人确认项目责任人");
         if (!(user.equals(liaison) && isEnabledUser(liaison)) && !isAdminUser(user))
             throw new org.springframework.security.access.AccessDeniedException("仅本单对接人或管理员可确认项目责任人");
+        // 2026-10-09 用户口径:「责任人能随意更改」—— 只能确认一次,已确认的直接拒。
+        String existingOwner = blankSafe(approvalHeadOf(no).get("备用2"));
+        if (!existingOwner.isEmpty())
+            throw new IllegalStateException("项目责任人已确认为 " + realNameOf(existingOwner) + "（" + existingOwner
+                    + "）,不能更改;要换人请先弃审回草稿重新走流程");
         String owner = pickOf(formData, "项目责任人");
         if (owner.isEmpty()) throw new IllegalStateException("请选择项目责任人账号");
         if (!isEnabledUser(owner)) throw new IllegalStateException("项目责任人账号不存在或已停用：" + owner);
@@ -4066,8 +4157,10 @@ public class ButtonService {
             out.put("liaisonName", liaison.isEmpty() ? "" : realNameOf(liaison));
             out.put("owner", owner);
             out.put("ownerName", owner.isEmpty() ? "" : realNameOf(owner));
-            out.put("canDispatchLiaison", settled && !level.isEmpty() && canApprove(user, "RD_APPROVAL"));
-            out.put("canConfirmOwner", settled && !liaison.isEmpty()
+            // 2026-10-09:三条门禁与上面的服务端判定**逐条同源**(界面让点/后端拒绝的错配必须为零)
+            out.put("canGradeProject", settled && level.isEmpty() && rdApproverOf(no).equals(user));
+            out.put("canDispatchLiaison", settled && !level.isEmpty() && liaison.isEmpty() && canApprove(user, "RD_APPROVAL"));
+            out.put("canConfirmOwner", settled && !liaison.isEmpty() && owner.isEmpty()
                     && ((user.equals(liaison) && isEnabledUser(liaison)) || isAdminUser(user)));
         } catch (Exception e) {
             log.warn("[立项流程] 状态查询失败 docNo={}: {}", docNo, e.getMessage());
