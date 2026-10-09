@@ -1,0 +1,3 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-flat-views.sql ==
+[OK] _q-flat-views.sql (1 batches)

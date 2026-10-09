@@ -1,0 +1,4 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-viewcols.sql ==
+  | 缺失列数(期望 0) | 0 | 
+[OK] _q-viewcols.sql (1 batches)

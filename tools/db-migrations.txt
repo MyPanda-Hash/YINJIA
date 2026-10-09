@@ -2288,3 +2288,14 @@ migrate-wh-kingdee-only-20261008.sql
 #   安全:脚本自带「10 张待删表必须全空」闸(非空即 RAISERROR 中止)+ 越界自检(保留面板/库存三表仍在);
 #      回退抓手 tools/archive/_panel-age/_backup-20261008/。
 migrate-drop-extra-docs-pu-req-20261008.sql
+
+# —— 2026-10-09 修 3 个「flat 报表视图缺 id/asp_cancel」导致面板打开即 500 ——
+#   命中面板:FINISH_IN_DETAIL(产成品入库单明细表)/ FINISH_IN_STATS(统计表)/ MANU_ORDER_STATS(生产工单统计表);
+#   现象:`SELECT COUNT(*) FROM v_finish_in_detail t WHERE ISNULL(t.asp_cancel,'N')<>'Y'` → 列名 'asp_cancel' 无效。
+#   根因:实库这三张视图是初版导入时期的旧定义,缺 flat 报表标配的 id(pk_col)与 asp_cancel(软删过滤);
+#      正确版本仍存于 tools/archive/_table-audit/viewdefs.tsv(2026-09-29 表定册时导出),
+#      DbNormAudit 也早已记着这条存量 FAIL(_normaudit-HSDZ_MES.out / _dbnorm-prod.out.txt)。
+#   做法:按 viewdefs.tsv 正确定义 CREATE OR ALTER 重建,列名与 yj_field 逐列对齐(23/12/9 列),
+#      所需表列已逐列核对存在;v_manu_order_stats 顺带把 5 个恒 NULL 列恢复为真实聚合。
+#   幂等:CREATE OR ALTER VIEW;两账套均已执行,复核「仍缺 id/asp_cancel 的 flat 面板视图 = 0」。
+migrate-fix-report-views-id-aspcancel-20261009.sql
