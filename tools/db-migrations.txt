@@ -2697,3 +2697,15 @@ migrate-drop-qc-unused-panels-20261009.sql
 #   本脚本兜底:只删 panel_code 不在 yj_panel 的行,带守卫(防呆 + 四单 329 行越界自检 + 末尾孤儿=0);
 #   不碰 yj_translation(同标签多为多面板共享,按标签删会误伤)。
 migrate-clean-orphan-panel-rows-20261009.sql
+
+# ── 2026-10-09 采购入库明细启用「仓位」+ 仓位默认标记 + 商品档案默认仓位可见 ──
+#   用户口径:① 采购入库明细要有「仓位」且与「仓库」联动(选仓后候选只出该仓);
+#            ② 预设仓位 = 物料默认 ⇢ 仓库默认兜底;③ 启用仓位管理**逐仓开启**,开了才必填。
+#   现状:bl_purchase_in 仓位类物理列早就有,但 yj_field 那几行 hidden=1(界面看不到、274 行数据全空);
+#        bs_inv.默认仓位 列已登记但 hidden=1(填不了);bs_wh_loc 无「默认」标记列;
+#        bs_wh.启用仓位管理 10 个仓全「否」(界面可见可勾,元数据不用改)。
+#   内容:bs_wh_loc 加 是否默认 / WHLOC 登记该字段 / PURCHASE_IN 明细「仓位名称」就地改造成
+#        「仓位」参照(ref_panel=WHLOC、ref_filter=`仓库=$仓库`、seq 195 紧跟仓库、可见)/
+#        INV.默认仓位 取消隐藏并改参照 / 译名(含修两处既有劣译 Bill Sp Name、Sp Number)。
+#   ⚠ 采购入库单是四单基线之一 ⇒ 落地后必须重跑 _gen-fourdoc-restore.mjs 与 _gen-doc-fields-md.mjs。
+migrate-bin-on-purchase-in-20261009.sql
