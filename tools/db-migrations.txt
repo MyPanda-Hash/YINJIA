@@ -2686,3 +2686,14 @@ migrate-fix-report-views-id-aspcancel-20261009.sql
 #   配套代码:删 QcDisposalService(111 行)+ ButtonService 两处钩子 + menus.js 5 个入口。
 #   回退抓手 tools/archive/_panel-age/_backup-20261009-qc/;⚠ 批号追溯的「工序质检/不良处置」两段随之消失。
 migrate-drop-qc-unused-panels-20261009.sql
+
+# ── 2026-10-09 清理「面板已不存在」的孤儿元数据(字段登记 + 角色授权)──
+#   2026-10-09 拉取云端仓库后跑 DbNormAudit 发现:两批下架脚本都删过 yj_field / yj_role_panel,
+#   但实测仍有残留(两账套一致,面板码 10 个:OTHER_IN_DETAIL / OTHER_IN_STATS / OTHER_OUT /
+#   OTHER_OUT_DETAIL / OTHER_OUT_STATS / OUTSOURCE_IN_DETAIL / OUTSOURCE_IN_STATS /
+#   OUTSOURCE_ISSUE_DETAIL / OUTSOURCE_ISSUE_STATS / LOT_TRACE)—— 81 行字段 + 30 行授权;
+#   这些面板的 yj_panel 行、物理表、视图早已删除 ⇒ 无人会读的孤儿,并让体检 05 从 0 涨到 81(FAIL)。
+#   ⚠ 残留成因未完全定位(下架脚本自检当时报 0;残留行 id 落在旧区间 11845~12032,呈「备份回灌」形态);
+#   本脚本兜底:只删 panel_code 不在 yj_panel 的行,带守卫(防呆 + 四单 329 行越界自检 + 末尾孤儿=0);
+#   不碰 yj_translation(同标签多为多面板共享,按标签删会误伤)。
+migrate-clean-orphan-panel-rows-20261009.sql
