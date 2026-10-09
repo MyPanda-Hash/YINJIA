@@ -2687,3 +2687,14 @@ migrate-whloc-drop-stale-cols-20261008.sql
 #   注:CAS-18=存货「Y料」(类别 功能料-颗粒);维护入口三张单都挂,组装成品单是主入口。
 #   幂等(COL_LENGTH 守卫 + 按 方案编码/项目编码 判重);两账套均执行。
 migrate-qc-item-plan.sql
+
+# migrate-drop-qc-insp-spec.sql(2026-10-09):**清理**「检验规范」三页纸张式面板(QC_INSP_SPEC)
+#   起因:用户口径「不行当前实现不正确,去除当前实现」—— 只撤这一轮(三页检验规范 + 「选检验项目」
+#     从规范取数),保留「逐工单追溯质检段」与「检验项目/检验方案维护弹窗」。
+#   做法:代码侧 git reset 回 aec5306c(migrate-qc-insp-spec.sql 已从本清单移除、前端面板配置/菜单
+#     一并回退);库侧由本脚本清对象 —— yj_field → yj_role_panel → yj_panel → 面板级译名 → 两张表。
+#   ⚠ 字段级译名按 ref_key 一刀切会误伤其它面板(文件编号/备注/审核人等是跨面板共享的),
+#     故只删「本面板引入且现在已无任何 yj_field 在用」的词条。
+#   ⚠ 数据守卫:qc_insp_spec_head 若有播种之外的单据(用户自建)则**拒绝删除并列出**,绝不静默丢数据。
+#   幂等(已清则各段 0 行);两账套均执行。
+migrate-drop-qc-insp-spec.sql
