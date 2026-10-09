@@ -435,6 +435,21 @@ public class PanelConfigService {
                 g.put("actions", merged);
             }
         }
+        // 检验项目/检验方案维护(2026-10-09 用户口径):三类工序检验单就地维护检验标准(受控文件的
+        // 项目/标准/方法/取样/处置),入口只下发到 QC_MOLD_INSP / QC_CUT_INSP / QC_ASM_INSP 三张单,
+        // 紧跟「字段管理」之后;真正的写操作由 QcInspPlanController 以 QC_ASM_INSP 可见性把守。
+        if (WO_INSP_PANELS.contains(def.code())) {
+            for (Map<String, Object> g : buttonGroups) {
+                @SuppressWarnings("unchecked")
+                List<String> gActions = (List<String>) g.get("actions");
+                int anchor = gActions.indexOf("字段管理");
+                if (anchor >= 0 && !gActions.contains("检验项目维护")) {
+                    List<String> merged = new ArrayList<>(gActions);
+                    merged.add(anchor + 1, "检验项目维护");
+                    g.put("actions", merged);
+                }
+            }
+        }
         metadata.put("buttonGroups", buttonGroups);
         if (!disabledActions.isEmpty()) metadata.put("disabledActions", disabledActions);
         // 生单动作 → 目标面板(前端据此判断该动作是否走"分批送料对话框":目标面板配了批次号即分批)
@@ -1607,6 +1622,14 @@ public class PanelConfigService {
     private static final java.util.Set<String> TABBED_PANELS = java.util.Set.of("QC_INSP_REQ", "QC_INSP_REQ_SERIES");
     /** 来料检验要求面板码:其列名 = 检验项(动态字段绑定需同批登记进 qc.insp_item,见 addExtField) */
     private static final String QC_INSP_REQ_PANEL = "QC_INSP_REQ";
+
+    /**
+     * 三类工序检验单(成型 CX / 切炭 QT / 组装成品 ZJ)—— 工具栏注入「检验项目维护」入口的面板集。
+     * 2026-10-09 用户口径:「给出一个按钮,让他可以在组装成品检验处对这个检验项目和检验方案进行维护」;
+     * 三张单同构、共用同一套检验标准库(bs_qc_plan + bs_qc_item),故三处都注入(组装单是主入口)。
+     */
+    private static final java.util.Set<String> WO_INSP_PANELS =
+            java.util.Set.of("QC_MOLD_INSP", "QC_CUT_INSP", "QC_ASM_INSP");
     /** 检验项标准库编码(检验数据记录 QC_INSP_REC 的「检验项」字段 dict_sql 就是它) */
     private static final String QC_INSP_ITEM_LIB = "qc.insp_item";
 

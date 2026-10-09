@@ -1605,6 +1605,9 @@
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <!-- 字段管理(动态字段/备用列池;仅 admin):绑定/停用自定义字段 -->
     <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
+    <!-- 检验项目/检验方案维护(2026-10-09):三类工序检验单(成型/切炭/组装成品)工具栏入口;
+         维护的是**标准本身**(bs_qc_plan + bs_qc_item),不往检验单写数据 -->
+    <QcInspPlanDialog v-model="qcInspPlanVisible" />
     <!-- 仓位分区弹窗(2026-10-08):候选来自本面板已加载的仓位行,不落存储 ⇒ 分区随仓位存在;
          选中时「大区 + 存储分区」**一起回填**(用户口径:它们是一个组合) -->
     <ZonePickDialog v-model="zonePickVisible" :rows="zonePickRows" :area-key="ZONE_PAIR.area" :zone-key="ZONE_PAIR.zone" @pick="onZonePick" />
@@ -1738,6 +1741,7 @@ import { printPuOrder, printQcReturn, printProductCards, printLocationCards, pri
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
+import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
 import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
@@ -1960,6 +1964,8 @@ function applyAdvFilters(rows) {
 const colPrefVisible = ref(false)
 // 字段管理(动态字段/备用列池):仅 admin 入口可见,服务端 requireAdmin 把守写操作
 const fieldMgrVisible = ref(false)
+// 检验项目/检验方案维护(2026-10-09):三类工序检验单工具栏「更多」组入口(服务端把守 QC_ASM_INSP 可见性)
+const qcInspPlanVisible = ref(false)
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
 
@@ -6443,6 +6449,12 @@ async function onButton(action) {
   }
   if (action === '字段管理') {
     fieldMgrVisible.value = true
+    return
+  }
+  if (action === '检验项目维护') {
+    // 检验项目/检验方案维护(2026-10-09 用户口径):三类工序检验单(成型/切炭/组装成品)就地维护
+    // 受控文件里的检验项目/标准/方法/取样/处置 —— 只维护标准本身,不往检验单写数据。
+    qcInspPlanVisible.value = true
     return
   }
   if (action === '分类管理') {

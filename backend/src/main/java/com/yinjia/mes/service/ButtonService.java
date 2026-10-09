@@ -2420,28 +2420,14 @@ public class ButtonService {
             head.put("检验员", user);
 
             List<Map<String, Object>> items = new ArrayList<>();
-            // 检验项目行(2026-10-09,依据受控文件如《YJ-Q-125 Y料原料及成品检验规范》):
-            // 按**工单产品**匹配检验方案(bs_qc_plan)→ 带出该方案下的检验项目(bs_qc_item)为明细行
-            // (表区=检验项目:项目/标准/方法由档案带入,实测数值/判定留空给品质填)。
-            // 匹配不到 ⇒ items 为空,走下面的通用模板 —— 存量单与未建档产品零影响。
-            Map<String, Object> plan = matchInspPlan(str(r.get("产品编码")), str(r.get("产品名称")));
-            if (plan != null) {
-                head.put("检验方案", plan.get("方案名称"));
-                if (str(plan.get("文件编码")) != null) head.put("文件编码", plan.get("文件编码"));
-                if (str(plan.get("执行标准")) != null) head.put("执行标准", plan.get("执行标准"));
-                for (Map<String, Object> it : planItems(String.valueOf(plan.get("方案编码")))) {
-                    items.add(inspItemLine(it));
-                }
-            }
             if ("QC_ASM_INSP".equals(target)) {
                 // 组装成品:合格/不合格各一行(会议「录入合格/不合格数量(各一行)」);数量留空由品质填,
                 // 处理方式预置默认(合格→入库、不合格→待处理),人可改。
-                // ⚠ 这两行是**数量判定行**,asmInspToStock 的库存分流只认它们(表区=数量判定);
-                //   上面的检验项目行数量为空 ⇒ 分流侧 `q <= 0 ⇒ continue` 天然跳过,逻辑一行不改。
+                // 这两行是**数量判定行**(表区=数量判定),asmInspToStock 的库存分流只认它们。
                 items.add(inspLine("成品检验", "合格", "入库"));
                 items.add(inspLine("成品检验", "不合格", "待处理"));
-            } else if (items.isEmpty()) {
-                // 成型/切炭:无检验方案时给通用模板一行(项目/标准/实测/判定 由品质填)
+            } else {
+                // 成型/切炭:通用模板一行(检验项目/标准/实测/判定 由品质填;格式到位后替换模板)
                 items.add(inspLine("外观", null, null));
             }
             head.put("detail", Map.of("items", items));
@@ -2463,52 +2449,6 @@ public class ButtonService {
         if (judge != null) m.put("判定", judge);
         if (disposition != null) m.put("处理方式", disposition);
         return m;
-    }
-
-    /**
-     * 检验单**检验项目**行(表区=检验项目):项目/标准要求/检验方法 由检验项目档案(bs_qc_item)带入,
-     * 实测数值/判定留空由品质填。数量为空 ⇒ 不参与 asmInspToStock 的合格/不合格数量分流。
-     */
-    private Map<String, Object> inspItemLine(Map<String, Object> it) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("表区", "检验项目");
-        m.put("检验项目", it.get("项目名称"));
-        if (str(it.get("检验标准")) != null) m.put("标准要求", it.get("检验标准"));
-        if (str(it.get("检验方法")) != null) m.put("检验方法", it.get("检验方法"));
-        return m;
-    }
-
-    /**
-     * 按工单产品匹配检验方案(bs_qc_plan) —— 2026-10-09 起三类工序检验单共用。
-     * 匹配键(按优先级):适用存货 = 产品编码 ⟺ 产品名称 ⟺ 存货档案该编码的存货名称。
-     * <p>⚠ 刻意**不做**「适用存货类别」匹配:一个类别(如 功能料-颗粒 实测 27 个商品)共用一份方案
-     * 会把某个产品的受控标准(如 YJ-Q-125 只针对 CAS-18)套到全类别上;要按类别铺开须业务先确认口径。
-     * @return 命中的方案行(方案编码/方案名称/文件编码/执行标准/取样规则/检验方式);无则 null
-     */
-    private Map<String, Object> matchInspPlan(String code, String name) {
-        if (code == null && name == null) return null;
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT TOP 1 方案编码, 方案名称, ISNULL(文件编码,N'') AS 文件编码,"
-                        + " ISNULL(执行标准,N'') AS 执行标准, ISNULL(取样规则,N'') AS 取样规则,"
-                        + " ISNULL(检验方式,N'') AS 检验方式 FROM dbo.bs_qc_plan p"
-                        + " WHERE ISNULL(p.停用,0)=0 AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                        + "   AND ISNULL(p.适用存货,N'')<>N''"
-                        + "   AND (p.适用存货 = ? OR p.适用存货 = ? OR p.适用存货 ="
-                        + "        ISNULL((SELECT TOP 1 存货名称 FROM dbo.bs_inv"
-                        + "                 WHERE 存货编码=? AND ISNULL(asp_cancel,'N')<>'Y'),N''))"
-                        + " ORDER BY p.id",
-                code == null ? "" : code, name == null ? "" : name, code == null ? "" : code);
-        return rows.isEmpty() ? null : rows.get(0);
-    }
-
-    /** 检验方案下的检验项目(bs_qc_item;停用/作废排除,按 序号→id 排序) */
-    private List<Map<String, Object>> planItems(String planCode) {
-        if (planCode == null || planCode.isBlank()) return List.of();
-        return jdbc.queryForList(
-                "SELECT 项目名称, ISNULL(检验标准,N'') AS 检验标准, ISNULL(检验方法,N'') AS 检验方法"
-                        + " FROM dbo.bs_qc_item"
-                        + " WHERE 方案编码=? AND ISNULL(停用,0)=0 AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + " ORDER BY ISNULL(序号,9999), id", planCode.trim());
     }
 
     /**
