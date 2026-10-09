@@ -2381,7 +2381,14 @@ public class ButtonService {
 
     /** 检验单面板 → 头表名(作废/幂等查重用;取值全是本类常量,无拼接注入面) */
     private static final java.util.Map<String, String> WO_INSP_HEAD = java.util.Map.of(
-            "QC_MOLD_INSP", "qc_mold_insp_head", "QC_CUT_INSP", "qc_cut_insp_head", "QC_ASM_INSP", "qc_asm_insp_head");
+            "QC_MOLD_INSP", "qc_mold_insp_head", "QC_CUT_INSP", "qc_cut_insp_head", "QC_ASM_INSP", "qc_asm_insp_head",
+            // 成品检验规范(2026-10-09):与三张检验单共用同一套「报工弃审 → 作废草稿 + 释放占用链」;
+            // 放进本表即可被 woInspUnauditCascade 的 tbl 解析命中(明细表名由 _head→_detail 推导)。
+            "QC_FIN_SPEC", "qc_fin_spec_head");
+
+    /** 成品检验规范面板/表(2026-10-09 用户任务:8 份受控文件归纳的统一文档格式,组装报工审核时一并生成) */
+    private static final String FIN_SPEC_PANEL = "QC_FIN_SPEC";
+    private static final String FIN_SPEC_HEAD = "qc_fin_spec_head";
 
     /**
      * 报工单审核 → 按工序自动生成检验单草稿(成型/切炭/组装),并写 WO_REPORT→检验单 的占用链。
@@ -2438,7 +2445,49 @@ public class ButtonService {
                             + " target_panel_code, target_form_no, link_status, create_by, create_time)"
                             + " VALUES ('WO_REPORT', ?, ?, ?, ?, 'ACTIVE', ?, GETDATE())",
                     repNo, repNo + "#" + r.get("id"), target, no, user);
+            // 成品检验规范(2026-10-09 用户口径「让当前的生产工单完成后能自动生成这个」):
+            // **组装**报工审核时顺带生成一张空格式规范草稿(表头带工单/产品/批次,正文与检验项目留空),
+            // 与三张检验单各自独立、互不覆盖;弃审随占用链一起作废。
+            if ("QC_ASM_INSP".equals(target)) finSpecGenerate(r, repNo, user);
         }
+    }
+
+    /**
+     * 组装报工审核 → 生成「成品检验规范」**空格式**草稿(用户:「文件中的数据不重要,主要是格式实现」)。
+     * <p>只带表头(工单号/报工单号/产品编码/产品名称/规格型号/批次号 + 文件名称/版本版次/管控状态/发行日期)
+     * 与 1 行修订履历(版本 A0 / 首次发行);正文五段、检验项目、处理方式**全部留空**由品质填写。
+     * <p>幂等:同一报工单已有存活规范则跳过(弃审作废后可再次生成);
+     * 占用链 WO_REPORT → QC_FIN_SPEC 与检验单同一套,故报工弃审能把它一起作废。
+     */
+    private void finSpecGenerate(Map<String, Object> r, String repNo, String user) {
+        Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM " + FIN_SPEC_HEAD
+                + " WHERE 报工单号=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, repNo);
+        if (dup != null && dup > 0) return;                                    // 幂等
+        String today = LocalDate.now().toString();
+        Map<String, Object> head = new LinkedHashMap<>();
+        head.put("单据日期", today);
+        head.put("文件名称", "成品检验规范");
+        head.put("版本版次", "A0");
+        head.put("管控状态", "受控");
+        head.put("发行日期", today);
+        head.put("工单号", r.get("工单号"));
+        head.put("报工单号", repNo);
+        head.put("产品编码", r.get("产品编码"));
+        head.put("产品名称", r.get("产品名称"));
+        if (!String.valueOf(r.get("规格型号")).isBlank()) head.put("规格型号", r.get("规格型号"));
+        if (!String.valueOf(r.get("批次号")).isBlank()) head.put("批次号", r.get("批次号"));
+        Map<String, Object> rev = new LinkedHashMap<>();
+        rev.put("表区", "修订履历");
+        rev.put("版本", "A0");
+        rev.put("修订理由与内容简述", "首次发行");
+        rev.put("修订日期", today);
+        head.put("detail", Map.of("items", List.of(rev)));
+        Map<String, Object> saved = save(registry.panel(FIN_SPEC_PANEL), head, false);
+        String no = String.valueOf(saved.get("编号"));
+        jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
+                        + " target_panel_code, target_form_no, link_status, create_by, create_time)"
+                        + " VALUES ('WO_REPORT', ?, ?, ?, ?, 'ACTIVE', ?, GETDATE())",
+                repNo, repNo + "#" + r.get("id"), FIN_SPEC_PANEL, no, user);
     }
 
     /** 检验单**数量判定**行(表区=数量判定;只放非空键,避免把 null 写进明细) */
@@ -2460,7 +2509,7 @@ public class ButtonService {
         List<Map<String, Object>> links = jdbc.queryForList(
                 "SELECT target_panel_code, target_form_no FROM form_flow_link"
                         + " WHERE source_panel_code='WO_REPORT' AND source_form_no=?"
-                        + "   AND target_panel_code IN ('QC_MOLD_INSP','QC_CUT_INSP','QC_ASM_INSP')"
+                        + "   AND target_panel_code IN ('QC_MOLD_INSP','QC_CUT_INSP','QC_ASM_INSP','QC_FIN_SPEC')"
                         + "   AND link_status='ACTIVE'", repNo);
         for (Map<String, Object> l : links) {
             String p = String.valueOf(l.get("target_panel_code"));

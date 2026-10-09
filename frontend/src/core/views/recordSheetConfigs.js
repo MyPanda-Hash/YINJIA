@@ -1652,4 +1652,125 @@ export const recordSheetConfigs = {
       ]},
     ],
   },
+
+  /**
+   * 成品检验规范(QC_FIN_SPEC,2026-10-09)—— 8 份受控文件归纳成的**一个统一文档格式**:
+   *   YJ-Q-60 SMS / YJ-Q-62 载银抑菌料 A2 / 含锌粉 / YJ-Q-94 碱3料 / YJ-Q-89 碱4料 /
+   *   YJ-Q-130 钾长石 A0 / YJ-Q-129 方解石 A1 / YJ-Q-125 Y料 A0
+   * 骨架逐份一致(证据 tools/archive/_qcspec/_structure.txt):修订履历 → 签字栏 → 正文五段 →
+   *   检验项目(按「检验对象」分节) → 检验结果处理方式。
+   * 四页(数据由后端 migrate-qc-fin-spec.sql 落库,行表用 表区 分块 + 检验对象 区分子节):
+   *   页1 文件修订履历(showHead:false,纸面自成一张表头) / 页2 正文+签署 /
+   *   页3 检验项目(每行带「检验对象」=子节名) / 页4 检验结果处理方式。
+   * ⚠ 只新增,不动组装成品检验单与其它三张检验单。
+   */
+  QC_FIN_SPEC: {
+    headMode: 'report',
+    staticTitle: '成品检验规范',
+    grid: [130, 390, 130, 390],
+    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    info: [
+      { label: '文件编号', key: '文件编号', type: 'text' },
+      { label: '发行日期', key: '发行日期', type: 'text' },
+      { label: '版本版次', key: '版本版次', type: 'text' },
+      { label: '管控状态', key: '管控状态', type: 'text' },
+    ],
+    pages: [
+      { title: '文件修订履历', headMode: 'report', showHead: false, grid: [130, 390, 130, 390] },
+      { title: '正文', headMode: 'report', showHead: true, staticTitle: '成品检验规范' },
+      { title: '检验项目', headMode: 'report', showHead: true, staticTitle: '成品检验规范' },
+      { title: '处理方式', headMode: 'report', showHead: true, staticTitle: '成品检验规范' },
+    ],
+    sections: [
+      // 页2:关联工单信息 + 正文 1~5(可填文本) + 签字栏
+      { page: 1, bar: '关联信息', rows: [
+        { grid: [
+          { label: '工单号' }, { key: '工单号' },
+          { label: '批次号' }, { key: '批次号' },
+        ]},
+        { grid: [
+          { label: '产品编码' }, { key: '产品编码' },
+          { label: '产品名称' }, { key: '产品名称' },
+        ]},
+      ]},
+      { page: 1, bar: '正文', rows: [
+        { pairs: [{ label: '1 目的', key: '目的' }] },
+        { pairs: [{ label: '2 范围', key: '范围' }] },
+        { pairs: [{ label: '3 职责和权限', key: '职责和权限' }] },
+        { pairs: [{ label: '4 取样要求', key: '取样要求' }] },
+        { pairs: [{ label: '5 工作程序', key: '工作程序' }] },
+      ]},
+      // ⚠ 本页 grid 是 4 列 ⇒ 签字栏拆两行,别写成 6 格(会把「核准」挤出纸面)
+      { page: 1, bar: '签署', rows: [
+        { grid: [
+          { label: '制定' }, { key: '制定' },
+          { label: '审核' }, { key: '审核' },
+        ]},
+        { grid: [
+          { label: '核准' }, { key: '核准' },
+        ]},
+      ]},
+      // 页3/页4:同样的关联信息抬头(纸面每页都要能独立看懂)
+      { page: 2, bar: '关联信息', rows: [
+        { grid: [
+          { label: '工单号' }, { key: '工单号' },
+          { label: '产品名称' }, { key: '产品名称' },
+        ]},
+      ]},
+      { page: 3, bar: '关联信息', rows: [
+        { grid: [
+          { label: '工单号' }, { key: '工单号' },
+          { label: '产品名称' }, { key: '产品名称' },
+        ]},
+      ]},
+    ],
+    dataTables: [
+      // 页1 文件修订履历(照文档表头:版本 | 修订理由与内容简述 | 修订日期 | 拟定)
+      {
+        page: 0,
+        pageTitle: '文件修订履历',
+        filterKey: '表区', filterVal: '修订履历',
+        noVariant: true,
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true, w: 60 },
+          { key: '行号', label: '序号', w: 70, align: 'center' },
+          { key: '版本', label: '版本', w: 120, align: 'center' },
+          { key: '修订理由与内容简述', label: '修订理由与内容简述', w: 460, area: true },
+          { key: '修订日期', label: '修订日期', w: 160, align: 'center' },
+          { key: '拟定', label: '拟定', w: 170 },
+        ],
+      },
+      // 页3 检验项目:「检验对象」= 子节名(原料(x)/成品(x)…),同一对象的行构成一节
+      {
+        page: 2,
+        bar: '6 检验项目（按检验对象分节）',
+        filterKey: '表区', filterVal: '检验项目',
+        noVariant: true,
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true, w: 60 },
+          { key: '行号', label: '序号', w: 60, align: 'center' },
+          { key: '检验对象', label: '检验对象', w: 170 },
+          { key: '检验项目', label: '检验项目', w: 140 },
+          { key: '称料', label: '称料', w: 90, align: 'center' },
+          { key: '接受标准', label: '接受标准', w: 250, area: true },
+          { key: '检验方法', label: '检验方法', w: 330, area: true },
+        ],
+      },
+      // 页4 检验结果处理方式(与检验项目子节一一对应)
+      {
+        page: 3,
+        bar: '7 检验结果处理方式',
+        filterKey: '表区', filterVal: '处理方式',
+        noVariant: true,
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true, w: 60 },
+          { key: '行号', label: '序号', w: 70, align: 'center' },
+          { key: '检验对象', label: '检验对象', w: 240 },
+          { key: '合格处置', label: '合格处置', w: 260 },
+          { key: '不合格处置', label: '不合格处置', w: 260 },
+          { key: '备注', label: '备注', w: 150 },
+        ],
+      },
+    ],
+  },
 }

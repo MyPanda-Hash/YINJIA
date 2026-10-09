@@ -347,6 +347,9 @@ export const menuTree = [
         // 按用户口径删的就是这一个。注意:面板与业务表 qc_tc 已整体删除(tools/migrate-qc-tc-drop.sql),
         // 不是仅摘菜单,放开注释也恢复不了;特采单入口在 品质管理 > 来料品质 > 特采单。
         code: 'qcDoc', title: '质量单据', icon: 'DocumentChecked', children: [
+          // 成品检验规范(2026-10-09 用户任务):8 份受控文件(YJ-Q-60/62/89/94/125/129/130/含锌粉)归纳成的
+          // **统一文档格式**页面;报工审核(组装)时自动生成一张空格式草稿。⚠ 与组装成品检验单各自独立,互不影响。
+          { code: 'qcFinSpec', title: '成品检验规范', path: '/panelx/list/QC_FIN_SPEC', icon: 'Notebook', panelCode: 'QC_FIN_SPEC', operationName: '新增流程' },
           { code: 'qcNcrp', title: '不合格报告(制程)', path: '/panelx/list/QC_BHG', icon: 'CircleClose', panelCode: 'QC_BHG', operationName: '新增流程' },
           { code: 'qcNcdp', title: '不合格品处理单(制程)', path: '/panelx/list/QC_BHC', icon: 'Box', panelCode: 'QC_BHC', operationName: '新增流程' },
           { code: 'qcNcdz', title: '不合格品处理单(自制物料)', path: '/panelx/list/QC_BHZ', icon: 'Files', panelCode: 'QC_BHZ', operationName: '新增流程' },
