@@ -2723,3 +2723,15 @@ migrate-qc-fin-spec.sql
 #   修法:只把 asp_user1='migration' 的播种行改名为 CPJY-DEMO-0001(移出正式号池),真实单据不碰;
 #     此后自动编号从 0002 继续。幂等(已改名 0 行);两账套均执行。
 migrate-qc-fin-spec-seed-rename.sql
+
+# migrate-material-out-wo-line-field.sql(2026-10-09):转领料单粒度修正(用户报障)——材料出库单表头
+#   「工单行号」字段注册 + en 译名。用户口径:生产工单的唯一性 = **工单号 + 工单行号**,两者合起来才唯一;
+#   原先「转领料单」按**工单号**去重合并 ⇒ 同单多行只能转出一张(第二行起被守卫挡住)。
+#   配套代码(同提交):WorkOrderPickingService 改为按工单行转单(每行一张草稿,单头写
+#   加工单号 + 工单行号 = plang.pl_xc,占用链按 source_line_key=工单号#行id、存量守卫按 (加工单号,工单行号));
+#   ManuWritebackService.refreshPickList 改为按行回填 plang.ll_no2(无行号老单按工单级兜底)。
+#   ⚠ 物理列 bd_material_out.工单行号 早已存在(parity2,2026-09-28),但从未在 yj_field 注册 ⇒
+#     后端写进 formData 的值会被 labelsToCols **静默丢弃**(同 MANU_ORDER.单据日期 旧坑);
+#     故本脚本只补元数据(防御性补列 + 字段 header/seq22/整数/只读 + field 译名 en),不改表结构。
+#   幂等;两账套均执行。
+migrate-material-out-wo-line-field.sql

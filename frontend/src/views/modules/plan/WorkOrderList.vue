@@ -320,26 +320,30 @@ async function doPrintTask(mode) {
 
 /**
  * 转领料单(2026-10-07 用户拍板:原「打印领料单」改为转单,打印入口不再保留)。
- * 勾选工单 → 按**工单号去重**逐张生成「材料出库单(领料单)」草稿:单据头挂 加工单号=工单号
- * (审核出库后后端 ManuWritebackService 自动回写工单「领料单号」,本页该列随之点亮)。
+ * 勾选工单行 → 逐行生成「材料出库单(领料单)」草稿:单据头挂 加工单号=工单号 + **工单行号**
+ * (审核出库后后端 ManuWritebackService 按行回写工单「领料单号」,本页该列随之逐行点亮)。
+ * ⚠ **唯一键 = 工单号 + 工单行号**(2026-10-09 用户报障修正):同一张工单的不同行**各转各的** ——
+ *   原先按工单号去重合并,同单第二行起转不出来(被"该工单已有未审核领料单"守卫挡住)。
  * ⚠ **明细留空**:MES 自建 BOM 已下架(2026-10-04),配方/工艺清单表全空、遗留 mate 是光缆旧数据,
  *   系统内没有可自动展开的材料来源 ⇒ 材料行由仓库在材料出库单面板按实发补填。
- * 后端守卫:未排产(排产数量 0)/已结案 不给转;已有未审核领料单或占用链未释放时拒绝(见 WorkOrderPickingService)。
+ * 后端守卫:未排产(排产数量 0)/已结案 不给转;该行已有未审核领料单或占用链未释放时拒绝
+ *   (见 WorkOrderPickingService,守卫均按行判)。
  */
 async function toPicking() {
   // 只认**当前列表里还在的**勾选行(表格开了 reserve-selection,已消失的行会留在 checked 里,同切单口径)
   const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
   if (!alive.length) { ElMessage.warning(tt('请先勾选一张工单')); return }
-  const nos = [...new Set(alive.map((r) => r.工单号))]
+  // 计数按**工单行**去重(唯一键 = 工单号 + 工单行号;同一行勾两次只转一张)
+  const keys = [...new Set(alive.map((r) => `${r.工单号}#${r.行id}`))]
   try {
     await ElMessageBox.confirm(
-      `${tt('确认为选中的')} ${nos.length} ${tt('张工单转领料')}?`,
+      `${tt('确认为选中的')} ${keys.length} ${tt('个工单行转领料单')}?`,
       tt('转领料单'),
       { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
   } catch { return }
   try {
     const res = await request.post('/px/workOrderList/toPicking', {
-      rows: alive.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号, 批次号: r.批次号 })),
+      rows: alive.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 行id: r.行id, 工单行号: r.工单行号, 批次号: r.批次号 })),
     })
     const d = res.data || {}
     const list = d['单号清单'] || []

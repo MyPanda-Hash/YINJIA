@@ -3104,6 +3104,8 @@ export default {
     '转领料单': 'To Pick List',
     '确认为选中的': 'Create pick lists for the selected',
     '张工单转领料': 'work order(s)?',
+    // 2026-10-09 粒度修正:唯一键 = 工单号 + 工单行号(同一张工单的不同行各转各的)
+    '个工单行转领料单': 'work order line(s)?',
     '已生成领料单': 'Pick lists created',
     '材料明细请在材料出库单里补填,审核后自动回写工单领料单号': 'Add the material lines in the material issue slip; the picking no. is written back to the WO after audit',
     '未转成功': 'Not converted',

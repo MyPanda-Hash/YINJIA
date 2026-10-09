@@ -4,6 +4,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -19,6 +20,7 @@ import java.util.Map;
  * 审核与弃审同一重算 → 对称幂等。工单=plang(可能多批次行):入库数量按 **FIFO 分配到各批次行**
  * (订单行号→批次,先补前批至排产量,余量进后批),行级 rk_sl/余量(=排产−入库)同步重算;
  * 入库单号/完工日期(cp_date2 首次入库当日,不因冲回清空)写全部行;
+ * **领料单号按工单行回写**(2026-10-09:领料单头带 工单行号 ⇒ 只写该行;无行号老单按工单级兜底写全部行);
  * scjl.post_no 回填该工单未回写的报工行。
  * 锚点:bd_finish_in/bd_material_out.加工单号(选单/切炭双出口均写入)。
  */
@@ -91,14 +93,41 @@ public class ManuWritebackService {
                 noList.isEmpty() ? null : nos.get(0), contract);
     }
 
-    /** 生产领料回填:领料单号=最近已审核 MATERIAL_OUT 单号(最多 3 张)写 plang 全部行 */
+    /**
+     * 生产领料回填(**按工单行**,2026-10-09 随「转领料单」粒度修正):
+     * 领料单头带 工单行号(= plang.pl_xc)⇒ 该行的领料单号只写**该行**的 ll_no2(工单列表逐行点亮);
+     * 工单行号 空/0 的老单(手工建的 / 粒度修正前生成的)按**工单级**兜底写该单全部行 —— 旧行为不变。
+     * 重算式:某行没有任何已审核领料单 → 清空(弃审对称回收);每行各取最近 3 张。
+     */
     private void refreshPickList(String contract, String user) {
-        List<Map<String, Object>> docs = auditedDocs("MATERIAL_OUT", "bd_material_out", contract);
-        List<String> nos = new ArrayList<>();
-        for (Map<String, Object> d : docs) nos.add(String.valueOf(d.get("no")));
-        String noList = String.join(",", nos);
-        jdbc.update("UPDATE dbo.plang SET ll_no2 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE pl_no = ?",
-                noList.isEmpty() ? null : noList, user, contract);
+        List<Map<String, Object>> docs = jdbc.queryForList(
+                "SELECT TOP 50 h.[单据编号] AS no, ISNULL(h.[工单行号], 0) AS xc FROM bd_material_out h"
+                        + " JOIN yj_doc_status s ON s.panel_code = 'MATERIAL_OUT' AND s.doc_no = h.[单据编号]"
+                        + " WHERE h.[加工单号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'"
+                        + " AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N') <> 'Y'"
+                        + " ORDER BY h.[单据编号] DESC", contract);
+        Map<Integer, List<String>> byXc = new LinkedHashMap<>();   // 工单行号 -> 该行最近 3 张单号
+        List<String> general = new ArrayList<>();                  // 工单级(无行号)老单
+        for (Map<String, Object> d : docs) {
+            String no = String.valueOf(d.get("no"));
+            int xc = (int) numOr(d.get("xc"));
+            if (xc == 0) {
+                if (general.size() < 3) general.add(no);
+                continue;
+            }
+            List<String> l = byXc.computeIfAbsent(xc, k -> new ArrayList<>());
+            if (l.size() < 3) l.add(no);
+        }
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT id, ISNULL(pl_xc, 0) AS xc FROM dbo.plang WHERE pl_no = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                contract);
+        for (Map<String, Object> row : rows) {
+            List<String> nos = byXc.get((int) numOr(row.get("xc")));
+            if (nos == null || nos.isEmpty()) nos = general;   // 该行没有专属领料单 ⇒ 工单级老单兜底
+            String noList = String.join(",", nos);
+            jdbc.update("UPDATE dbo.plang SET ll_no2 = ?, asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
+                    noList.isEmpty() ? null : noList, user, row.get("id"));
+        }
     }
 
     /** 该工单名下已审核(yj_doc_status.shr 非空)且未作废/软删的单据,按单号倒序取前 3 */
