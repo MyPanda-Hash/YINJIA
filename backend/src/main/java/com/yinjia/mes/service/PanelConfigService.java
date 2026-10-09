@@ -704,7 +704,12 @@ public class PanelConfigService {
             // 计量单位档案(UOM)整串带回:计量单位编码 → 单据的 单位编码/基本单位编码(同上)。
             // 计量单位列改「参照 UOM」后(见 tools/migrate-material-out-ref-links.sql),选单位即带出编码,
             // 与金蝶单位档案对齐(推送按名称换 unit_id,编码列备查)。
-            Map.entry("计量单位编码", List.of("单位编码", "基本单位编码"))
+            Map.entry("计量单位编码", List.of("单位编码", "基本单位编码")),
+            // 立项申请 项目责任人(对接人签核确认的那位,2026-10-08 研发流程图④) → 项目实施计划的 负责人。
+            // 同名字段那条路走不通:RD_PLAN.负责人 是 editable=0(UI 级只读、由登录用户锁定),
+            // 同名映射循环会跳过它;同义词循环不做 editable 检查 ⇒ 只有这条能把它带过去。
+            // (带入后前端 docDefaults 不再锁死负责人,见 core/panel/docDefaults.js)
+            Map.entry("项目责任人", List.of("负责人"))
     )));
 
     /** 委外三单共用按钮组骨架(选单来源各自不同,见下方三常量)。 */

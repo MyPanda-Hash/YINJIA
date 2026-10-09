@@ -362,6 +362,22 @@ export async function rdDevFileEdit(panelCode, docNo) {
   return unwrap(await request.get('/px/rdDev/fileEdit', { params: { panelCode, docNo } }))
 }
 
+// ==================== 立项申请:分发对接人 / 确认责任人(2026-10-08 研发流程图③④) ====================
+
+/**
+ * 立项申请流程状态(侧栏两按钮的唯一真源):
+ * { status, level, liaison, liaisonName, owner, ownerName, canDispatchLiaison, canConfirmOwner }
+ * ⚠ 走 /rdFlow/* 而不是 /rdDev/* —— 后者要 RD_PROD_INFO 的查看权,立项线的销售/对接人会被 403 挡掉。
+ */
+export async function rdFlowState(docNo) {
+  return unwrap(await request.get('/px/rdFlow/state', { params: { docNo } }))
+}
+
+/** 启用账号清单(立项侧选人下拉):[{username, realName}] */
+export async function rdFlowUsers() {
+  return unwrap(await request.get('/px/rdFlow/users'))
+}
+
 /**
  * 按库存状况表口径回填明细现存量：有仓库取仓库库存，无仓库取全部仓库合计。
  * 选择存货后即时调用，避免引用存货档案中的静态值。

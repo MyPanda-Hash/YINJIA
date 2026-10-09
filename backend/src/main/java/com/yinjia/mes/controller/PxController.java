@@ -162,6 +162,27 @@ public class PxController {
     }
 
     /**
+     * 立项申请:流程状态(2026-10-08 研发流程图③④)——前端侧栏「分发对接人 / 确认责任人」两按钮
+     * 的显隐与置灰**唯一真源**(口径在 ButtonService.rdApprovalFlowState,与按钮的服务端门禁逐条对齐)。
+     */
+    @GetMapping("/rdFlow/state")
+    public ApiResult<Map<String, Object>> rdFlowState(@RequestParam String docNo) {
+        perm.requirePanelView("RD_APPROVAL");
+        return ApiResult.ok(buttons.rdApprovalFlowState(docNo));
+    }
+
+    /**
+     * 立项申请:启用账号清单(分发对接人 / 确认责任人两个弹窗的选人下拉)。
+     * ⚠ **不复用 `/rdDev/users`** —— 那个端点挂 `requirePanelView("RD_PROD_INFO")`,
+     *   立项线的销售/对接人没有产品信息表的查看权,会被 403 挡掉(与 DevTaskService 注释同款理由)。
+     */
+    @GetMapping("/rdFlow/users")
+    public ApiResult<List<Map<String, Object>>> rdFlowUsers() {
+        perm.requirePanelView("RD_APPROVAL");
+        return ApiResult.ok(devTaskService.enabledUsers());
+    }
+
+    /**
      * 四个受控文件「我能不能编这张单」(2026-09-21):前端据此把非责任人的纸张置灰 + 提示责任人是谁。
      * 口径与保存门禁**同一真源**(ButtonService.devFileEditState → devFileEditVerdict),
      * 免得再出现"界面让改、保存被拒"。

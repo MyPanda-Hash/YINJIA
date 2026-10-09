@@ -2479,3 +2479,32 @@ migrate-lab-sheets-date-fields-2026-10-07.sql
 #   + yj_role 缺4 + yj_role_panel 缺202 + yj_translation 缺3396。本脚本全部守卫式补齐/删除。
 #   业务数据(yj_doc_status/yj_user/yj_doc_batch 等)不碰。证据 tools/archive/_srv-bak-compare-20261007/。幂等;两账套均执行。
 migrate-server-converge-20261007.sql
+
+# ── migrate-rd-approval-liaison-owner.sql(2026-10-08):立项申请加「对接人」「项目责任人」两个流程字段 ──
+#   用户口径(m01625 原话):「销售端提出需求 —— 申请前需刘博或冯工同意(这个的意思就是填写立项申请)」
+#   「冯总审核及定级 ← 红字批注(这个就是对立项申请进行审批与定级)」「定级完之后就要分发对接人,
+#   这个对接人可以自己选择是哪一个账号,分发之后对应对接人账号可以进行签核然后分发下去,就是确认责任人,
+#   也可以选择账号,确认责任人之后就可以在项目实施计划里面进行对应单据的填写,填写完通过审批之后
+#   归档进入项目进度查询追踪项目进度」。
+#   目标流程:1 销售填 RD_APPROVAL → 2 冯总审批+定级(同一步两动作) → 3 **分发对接人**(选账号)
+#   → 4 对接人**签核 + 确认责任人**(选账号) → 5 责任人在 RD_PLAN 填单(负责人由「项目责任人」参照带入)
+#   → 6 RD_PLAN 审批归档 → RD_PROGRESS 追踪。
+#   本脚本做第 3、4 步的字段落点:
+#     ① rd_approval.备用1 → 标签「对接人」、备用2 → 标签「项目责任人」(走**备用列池**,零 DDL,依
+#        docs/design/动态字段扩展-备用列池-V1.0.md);place=header seq 210/215、editable=0、**hidden=1**
+#        (程序读写,不进通用表头网格也不进纸面 —— RD_APPROVAL 纸面由 docSheetConfigs.js 的 rows 驱动)。
+#     ② 两列的 MS_Description 中文注明(原为「备用列池成员」)。
+#     ③ 译名 2 字段 × 10 语言 = 20 条(scope='field')。
+#     ④ 研发审核角色 rd_review(role_id=4,唯一成员 cp 陈秀丽)的 RD_APPROVAL can_approve → 'Y'
+#        —— 此前研发链 RD_APPROVAL 三角色(2/4/5)全为 'N' ⇒ 全库只有 admin 能审批/定级。
+#   存量占用核查(实测 HSDZ_MES):rd_approval 46 列、备用1/备用2 全 nvarchar(1000) NULL、现有 2 行
+#     两列非空均为 0;yj_field 里该面板 备用1/备用2 未被任何字段引用;「对接人」「项目责任人」全库 0 命中
+#     (⚠「责任人」已被 QC_BHC/QC_BHZ/QC_JJF/QC_SCP/RD_SPEC_DOC/RD_MOLD_PROC/RD_ASM_PROC/RD_ASM_BOM 占用,
+#      故字段名必须带「项目」前缀)。
+#   取值口径:两字段均存 **username 账号**(用户原话「可以自己选择是哪一个账号」),非姓名;与
+#     rd_dev_task.file_owner 同族(实测 glm53/cp)。
+#   配套代码(同提交):ButtonService.dispatchLiaison / confirmProjectOwner / approveApproval 内
+#     「审批通过即定级」/ unaudit 清空两字段 / save 剥离两只读字段;
+#     PanelConfigService.REF_SYNONYMS 加「项目责任人 → 负责人」(RD_PLAN.负责人 是 editable=0,只能走同义词路径)。
+#   自检:字段 2/2、物理列 2/2、译名 20/20、rd_review 审批权 ≥1。幂等可重跑,两个账套均执行。
+migrate-rd-approval-liaison-owner.sql
