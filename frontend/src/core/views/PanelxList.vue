@@ -125,10 +125,14 @@
     <!-- 文书式面板:完整纸张居中 + 功能按钮右侧竖排(不按表头/表中/表尾三段式) -->
     <template v-else-if="isApprovalDoc">
       <div class="approval-layout">
+        <!-- 项目进度查询(RD_PROGRESS)= 汇总查看面板:数据由「项目实施计划归档 / 立项申请」自动导入,
+             人工不再往里写 ⇒ **单元格恒只读**(:editable 硬编码 false,2026-10-09 用户口径「去掉自己写入功能」)。
+             单据生命周期按钮(保存/审批)不受影响:draftEditable 未动,「⟳ 同步阶段进度」重跑自动导入后仍可保存入库。
+             要恢复正常编辑:把下面 :editable 改回 draftEditable 即可(组件里 editable 分支保留未删)。 -->
         <ProgressControlSheet
           v-if="panelCode === 'RD_PROGRESS'"
           ref="approvalSheetRef"
-          :head="cur" :fields="headerFields" :editable="draftEditable"
+          :head="cur" :fields="headerFields" :editable="false"
           @dirty="markInlineDirty"
           @open-sheets="openDataSheets"
         />
@@ -182,11 +186,13 @@
             <span class="as-side-toggle">{{ sideCollapsed ? '◀' : '▶' }}</span>
           </div>
           <template v-if="!sideCollapsed">
-            <div class="as-side-status-row">
+            <!-- 单据状态胶囊 + 单据切换分页器(2026-10-09 用户口径「把进度查询表侧边栏上边的单据切换去掉」):
+                 单单据面板(RD_PROGRESS)全库只有一张单,切换无意义 ⇒ 这两块整块不渲染。 -->
+            <div v-if="!singleDocMode" class="as-side-status-row">
               <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']" :title="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
               <span v-else class="doc-status none">—</span>
             </div>
-            <div class="as-side-pager">
+            <div v-if="!singleDocMode" class="as-side-pager">
               <span class="page-btn" :title="tt('最前一张')" @click="pageFirst">◁</span>
               <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
               <span class="page-no">{{ pageText(curNo, total, '') }}</span>
@@ -379,12 +385,9 @@
                 </div>
               </div>
               <div class="as-side-btn" v-if="isModLogPanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
-              <div class="as-side-section">{{ tt('文档输出') }}</div>
-              <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
-              <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
-              <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
-                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
-              <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
+              <!-- 文档输出分节标题与它的两个按钮已下移到本侧栏末尾(2026-10-09 归位):
+                   它原先夹在「项目定级/分发…」与工具栏动作组**之前**,把新增/保存/审批这些
+                   动作按钮全归到了「文档输出」标题下面 ⇒ 用户报的"按钮分类混乱"。 -->
               <!-- 项目定级(2026-09-21):立项申请审核通过后,由审核人给项目定级;已定级显示当前等级,可再改 -->
               <div
                 class="as-side-btn"
@@ -451,6 +454,29 @@
                   @click="onSideAction(a)"
                 >{{ tt(a) }}</div>
               </template>
+              <!-- ── 文档输出(2026-10-09 归位) ──
+                   只有真正"出文档"的两个按钮留在这里;其余(项目定级 / 分发对接人 / 确认责任人 /
+                   分发责任人 / 规格书分发 / 以及上面的工具栏动作组 新增·选单·保存·删除·审批·生单·刷新·更多)
+                   一律归「单据操作」。此前本标题夹在它们**之前**,把它们全归到了「文档输出」下面。 -->
+              <div class="as-side-section">{{ tt('文档输出') }}</div>
+              <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
+              <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
+              <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
+                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
+              <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
+              <!-- 导出 / 扫描填单(2026-10-09 用户口径「导出和扫描填单放到下边」):
+                   原混在「单据操作」的工具栏动作组里(见 APPROVAL_SIDE_EXCLUDE 已把它们排除),
+                   现显式放在侧栏末尾的「文档输出」下,与 打印/导出报表 同组。 -->
+              <div
+                class="as-side-btn"
+                :class="{ disabled: isDisabled('导出') }"
+                @click="onSideAction('导出')"
+              >{{ tt('导出') }}</div>
+              <div
+                class="as-side-btn"
+                :class="{ disabled: isDisabled('扫描填单') }"
+                @click="onSideAction('扫描填单')"
+              >{{ tt('扫描填单') }}</div>
             </div>
           </template>
         </div>
@@ -2516,7 +2542,7 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
 // 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
-const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '表头调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出'] // 刷新/退出在文书侧栏体验差(刷新整页重载/退出关闭页签),2026-09-14 移除
+const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '表头调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出', '导出', '扫描填单'] // 刷新/退出在文书侧栏体验差(刷新整页重载/退出关闭页签),2026-09-14 移除；导出/扫描填单 2026-10-09 按用户口径移到侧栏末尾「文档输出」下(见模板里那两个显式按钮)
 // 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
 const openDelMenu = ref(false)
 
