@@ -744,18 +744,20 @@ public class PxController {
         return ApiResult.ok(configService.extFieldOverview(panel));
     }
 
-    /** 绑定新字段到空闲备用列(仅管理员;守卫 G1-G4) */
+    /** 绑定新字段到空闲备用列(守卫 G1-G4;权限 = 该面板「自定义字段」,管理员恒过) */
     @PostMapping("/extField/add")
     public ApiResult<Map<String, Object>> extFieldAdd(@RequestBody Map<String, Object> body) {
-        perm.requireAdmin();
+        // 2026-10-09:原先 requireAdmin(只有超管能配自定义字段)→ 改为按面板授权,
+        // 口径见 PanelPermissionService.requireFieldConfig(组织架构 →「角色与面板权限」勾「自定义字段」)
+        perm.requireFieldConfig(String.valueOf(body.getOrDefault("panel", "")));
         return ApiResult.ok(configService.addExtField(body));
     }
 
-    /** 退绑(数据保留,永不 DROP;仅管理员;守卫 G6) */
+    /** 退绑(数据保留,永不 DROP;守卫 G6;权限同绑定 = 该面板「自定义字段」) */
     @PostMapping("/extField/retire")
     public ApiResult<Void> extFieldRetire(@RequestBody Map<String, Object> body) {
-        perm.requireAdmin();
         String panel = String.valueOf(body.getOrDefault("panel", ""));
+        perm.requireFieldConfig(panel);
         int fieldId;
         try {
             fieldId = Integer.parseInt(String.valueOf(body.getOrDefault("fieldId", "0")));

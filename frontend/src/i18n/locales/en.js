@@ -2949,8 +2949,9 @@ export default {
     '所属页签': 'Table (Tab)',
     '该列只出现在这张表里;检验数据记录带入时也按这张表的列走':
       'This column appears only in this table; the inspection data record loads it as part of this table',
-    '给某张表增删自定义列(动态字段/备用列池,仅管理员;弹窗里选所属页签)':
-      'Add or retire custom columns for a table (dynamic fields / spare pool, admins only; pick the table in the dialog)',
+    /* 入口权限改为「本面板·自定义字段」授权(2026-10-09 用户口径),文案不再写「仅管理员」 */
+    '给某张表增删自定义列(动态字段/备用列池;需本面板「自定义字段」权限;弹窗里选所属页签)':
+      'Add or retire custom columns for a table (dynamic fields / spare pool; requires this panel\'s "Custom Fields" permission; pick the table in the dialog)',
     '请选择所属页签(自定义列住哪张表)': 'Please pick the table this custom column belongs to',
     '所属页签不存在:': 'Unknown table: ',
     '该页签已有同名字段:': 'This table already has a column with that name: ',
@@ -2981,6 +2982,15 @@ export default {
 
     // 字段管理(动态字段/备用列池,2026-09-28;规格 docs/design/动态字段扩展-备用列池-V1.0.md)
     '字段管理': 'Field Manager',
+    /* 组织架构「角色与面板权限」矩阵的列头(2026-10-09 补):此前这几条只有中文,
+       切 en 后矩阵表头是"可见/审核反审核/价格金额…",与其余已译列头混排很扎眼。
+       一并补齐(矩阵新增的「自定义字段」列见上方 §自定义字段)。 */
+    '可见': 'Visible',
+    '导出EXCEL': 'Export Excel',
+    '审核反审核': 'Audit / Un-audit',
+    '价格金额': 'Prices & Amounts',
+    '复核反复核': 'Review / Un-review',
+    '调价': 'Price Adjust',
     '动态字段': 'Dynamic fields',
     '表头池': 'Header pool',
     '明细池': 'Detail pool',

@@ -1603,7 +1603,7 @@
       </template>
     </el-dialog>
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
-    <!-- 字段管理(动态字段/备用列池;仅 admin):绑定/停用自定义字段 -->
+    <!-- 字段管理(动态字段/备用列池):绑定/停用自定义字段(入口按「自定义字段」权限显隐) -->
     <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
     <!-- 仓位分区弹窗(2026-10-08):候选来自本面板已加载的仓位行,不落存储 ⇒ 分区随仓位存在;
          选中时「大区 + 存储分区」**一起回填**(用户口径:它们是一个组合) -->
@@ -1745,6 +1745,7 @@ import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
 // 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
 import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
+import { canConfigFields } from '@core/auth/panelAccess'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import BatchSendDialog from './BatchSendDialog.vue'
@@ -1958,7 +1959,8 @@ function applyAdvFilters(rows) {
 
 // ---- 表格列自定义(排序/栏名/显隐) ----
 const colPrefVisible = ref(false)
-// 字段管理(动态字段/备用列池):仅 admin 入口可见,服务端 requireAdmin 把守写操作
+// 字段管理(动态字段/备用列池):入口按该面板「自定义字段」权限显隐,
+// 服务端 requireFieldConfig(该面板 field 词)把守写操作
 const fieldMgrVisible = ref(false)
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
@@ -5821,8 +5823,11 @@ async function loadCrg() {
     cfg?.metadata?.buttonGroups,
     cfg?.metadata,
   ))
-  // 字段管理(动态字段):非 admin 隐藏入口(服务端 requireAdmin 是真闸门;flat 面板后端不注入)
-  if (!user.isAdmin) {
+  // 字段管理(动态字段):没有该面板「自定义字段」权限的角色隐藏入口。
+  // 2026-10-09 用户口径:不再是「仅管理员」——权限来自组织架构 →「角色与面板权限」勾的
+  // 「自定义字段」列(管理员恒可);服务端真闸门 = PanelPermissionService.requireFieldConfig。
+  // (flat 面板后端不注入该入口)
+  if (!canConfigFields(user, panelCode.value)) {
     groups.value = groups.value.map((g) => ({ ...g, actions: (g.actions || []).filter((a) => a !== '字段管理') }))
   }
   return cfg
