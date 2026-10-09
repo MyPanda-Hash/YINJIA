@@ -1,0 +1,10 @@
+﻿登录: factory=YJ isAdmin=true
+  ✅ QC_MOLD_INSP getPanelConfig code=200 表头=21 明细=8
+  ✅ QC_CUT_INSP getPanelConfig code=200 表头=21 明细=8
+  ✅ QC_ASM_INSP getPanelConfig code=200 表头=21 明细=8
+  ✅ 订单结转 pending code=200 行数=?
+  ✅ QC_RECV 列表 code=200 条数=5
+  ✅ QC_INSP 列表 code=200 条数=5
+  ✅ QC_RETURN 列表 code=200 条数=3
+  ✅ PURCHASE_IN 列表 code=200 条数=5
+  ✅ QC_TC_IN 列表 code=200 条数=5

@@ -85,22 +85,62 @@ HSDZ_MES_TEST  执行 52 / 跳过 383 / 失败 0   → 复跑 执行 0 / 跳过 
 呈「备份 restore 走 IDENTITY_INSERT 回灌」的形态;已排除尾空格/定长列截断(面板码 `varchar(40)`、`LEN = 字节数`,无空格)。
 兜底脚本 `tools/migrate-clean-orphan-panel-rows-20261009.sql` 已入链并两账套执行。
 
-## 五、未做项 / 需要你拍板的事
+## 五、上线到 8090(2026-10-09 12:39~12:45 已做)
 
-1. **8090 仍跑着合并前的构建**(`java -jar target\yinjia-mes-backend-0.1.0.jar`,jar 时间 2026-10-09 09:30:41,
-   进程起于 09:30:50)。因此:
-   - 本次合并带进来的前端/后端改动**在 8090 上看不到**(要看就 5173 起 vite,或重新打包);
-   - **订单结转页在 8090 上仍是 500**(`p.linked` 绑定失败)—— 修复只在源码里,重启前不生效。
-   要生效需:停 8090 → `mvn -DskipTests package`(或 `build-appjar.ps1`) → 起服务。
-   **本次按「拉取云端仓库 + DbSync」的既定流程收尾,没有停/重启你的服务**;要不要现在重打包装上,等你一句话。
-2. **`yj_panel` 的面板名/英译名存在本地↔远端历史差异**(QC_RETURN 本地 `暂收退回单`/en NULL,远端 `暂收退料单`/en 有值;
+**起因**:用户报「品质管理新加的 3 个检验单没拉下来」。查证结果是**库与源码都在,只有运行的 8090 是旧构建**:
+
+- 库(两账套):`QC_MOLD_INSP` / `QC_CUT_INSP` / `QC_ASM_INSP` 三面板在册,6 张表 27/15 列且带 `MS_Description`,
+  各 27 字段、面板名 en 译名齐、各 7 行角色授权,`migrate-qc-process-insp.sql` 已执行;
+- `frontend/src/business/menus.js` 321-326 行:三张挂在 **品质管理 › 制程品质**;
+- 8090 供的却是 `assets/index-Cvouvv6U.js`(合并前那份),里面三个面板码**一个都没有**。
+
+**处置**(按 AGENTS「让 8090 用上新前端」那条流程,顺带把后端也换上):
+
+| 步 | 动作 | 结果 |
+|---|---|---|
+| 1 | `tools/scripts/start-prod.ps1 -Stop` | 停掉旧实例 |
+| 2 | 清 `backend\target\classes` 后 `mvn -DskipTests package` | **90.4MB fat jar、128 条 `BOOT-INF/lib`**,static 只剩新入口 `index-CT8aBh-0.js` |
+| 3 | `tools/scripts/start-prod.ps1` | 起服务(它自己先跑一遍 DbSync:执行 0 / 失败 0) |
+| 4 | `_v-served-menus.mjs` + `_v-post-deploy-smoke.mjs` | 见下 |
+
+复核结论(证据:`_v-served-menus.out` / `_v-post-deploy-smoke.out`):
+
+- 服务下发的入口 chunk = `assets/index-CT8aBh-0.js`,其中**有** `制程品质` 组与 `成型检验单/切炭检验单/组装成品检验单`
+  (菜单 code `qcMoldInsp/qcCutInsp/qcAsmInsp`、面板码 `QC_MOLD_INSP/QC_CUT_INSP/QC_ASM_INSP`),
+  且**没有**已下架的 `QC_OP`/`LOT_TRACE`/`QC_DISPOSAL`;
+- 三张面板 `getPanelConfig` 均 200(表头 21 字段 / 明细 8 字段);
+- **`/px/orderConvert/pending` 由 500 转 200** —— 合并时修掉的 `p.linked` 绑定错误已在线上生效;
+- 采购链四单 + 特采单列表接口全 200。
+
+> 前端是打包进 jar 的 `BOOT-INF/classes/static`,**改源码不重打包 8090 不生效**;浏览器需刷新一次(强刷更稳)。
+
+### ⚠ 打包时踩到的坑(务必记)
+
+第一次 `mvn -DskipTests package` **失败在 `spring-boot:repackage`**:
+`Unable to rename '...yinjia-mes-backend-0.1.0.jar' to '....jar.original'` —— 有 java 进程正占着那个 jar,
+于是磁盘上留下**未 repackage 的瘦 jar**(816 条目、**0 条 `BOOT-INF/lib`**,只有 classes + static,25.4MB)。
+这正是 `build-appjar.ps1` 头注警告过的形态:**进程还活着时看着正常,一旦重启就再也起不来**。
+
+两个额外教训:
+
+1. **必须先停服务再打包**,且停完要确认真的没有 java 进程(`start-prod.ps1 -Stop` 按命令行认实例,已实测有效)。
+2. **`mvn package` 不 `clean` 会让 `target/classes/static` 累积旧产物** —— 那次瘦 jar 里**新旧两个入口 chunk 并存**
+   (`index-CT8aBh-0.js` 与 `index-Cvouvv6U.js`)。要干净:先删 `backend\target\classes`(别用 `mvn clean`,
+   那会把 `target\app.jar` 一起删掉),再 package;完了用 JDK 的 `bin\jar.exe` 数 `BOOT-INF/lib` 条目数验收
+   (注意 **`jar` 不在本机 PATH 上**,直接敲 `jar` 会 CommandNotFound,会让「是不是瘦 jar」的判断落空)。
+
+## 六、其它遗留 / 需要你拍板的事
+
+1. **`yj_panel` 的面板名/英译名存在本地↔远端历史差异**(QC_RETURN 本地 `暂收退回单`/en NULL,远端 `暂收退料单`/en 有值;
    QC_INSP 的 en 本地为 NULL)。这不是本次漂移 —— 远端 `migrate-fourdoc-baseline-restore-20261008.sql:20` 明写
    「不动 yj_panel(面板名『暂收退料单』与 en 名属 yj_panel 历史差异,不是本次漂移)」。所以:
    - 重新生成的《采购链四单字段与显示字段.md》里 QC_RETURN 的标题取自**运行时 dump**(远端那份)= `暂收退料单`,
      而库里 `yj_panel.panel_name` = `暂收退回单` —— 两者不一致是**既有差异**,字段与顺序不受影响(四单闸 12/12 ✅)。
    - 要不要把两边对齐(改 yj_panel 或改文档口径),属独立任务。
-3. **`_dump-out/fields-HSDZ_MES.md` 被重新导出**(§8 第①步):diff 里除了面板名/en 差异,主要是**行 id 变了**
+2. **`_dump-out/fields-HSDZ_MES.md` 被重新导出**(§8 第①步):diff 里除了面板名/en 差异,主要是**行 id 变了**
    (四单基线回正脚本重建过 yj_field 行,新 id 在 12375+)。这是 §8 流程的正常产物。
+3. 体检余下的 FAIL 03/04/07/09 与 WARN 08 全是**存量债**(两账套一致),见第四节。
+4. 本地领先远端 16 个提交,**未推送**(规范:推不推送不限)。
 
 ## 六、目录内文件
 
