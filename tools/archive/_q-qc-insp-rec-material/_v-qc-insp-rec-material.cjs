@@ -73,6 +73,12 @@ const HELPERS = `
       return !!c
     },
     hasReqLink() { return !!(window.__yj.cell('物料编码')?.querySelector('.qr-lib-btn')) },
+    /** 抬头里的商品参照格(与语言无关:en 下标签是 Material Name/Material Code,按标签找会落空)。
+     *  文档序 = 物料名称(第1行第1格) → 物料编码(第2行第1格)。 */
+    refCtl() { return [...document.querySelectorAll('.qc-rec-sheet .qr-head-table .qr-ref-ctl')] },
+    refCount() { return window.__yj.refCtl().length },
+    refTexts() { return window.__yj.refCtl().map(c => (c.querySelector('.qr-ref-text')?.innerText || '').trim()) },
+    refTitles() { return window.__yj.refCtl().map(c => c.getAttribute('title') || '') },
     /** 参照弹窗(RefPickDialog 根节点 .rpd 所在的那个 el-dialog) */
     dlg() {
       return [...document.querySelectorAll('.el-dialog')].find(d => d.querySelector('.rpd')) || null
@@ -151,8 +157,9 @@ async function main() {
     await navigate(`${APP}/#/login`)
     await evaluate(`localStorage.setItem('mes_token', ${JSON.stringify(token)}); localStorage.setItem('mes_user', ${JSON.stringify(JSON.stringify(login.data.user))}); localStorage.setItem('mes_locale','zh-CN'); 'ok'`)
 
-    /** 打开面板并新增一张空报告(draftEditable=true) */
+    /** 打开面板并新增一张空报告(draftEditable=true);新增按钮在 en 下是 New */
     async function newDraft() {
+      const NEW_LABELS = ['新增', 'New']
       let ready = null
       for (let attempt = 1; attempt <= 5 && !ready; attempt++) {
         await navigate('about:blank')
@@ -162,16 +169,20 @@ async function main() {
         ready = await raw(`(() => {
           const sheet = document.querySelector('.qc-rec-sheet')
           const side = [...document.querySelectorAll('.approval-side .as-side-btn')].map(e => e.innerText.replace(/\\s/g, ''))
-          return (sheet && side.includes('新增')) ? 'READY' : ''
+          return (sheet && side.some(t => ${JSON.stringify(NEW_LABELS)}.includes(t))) ? 'READY' : ''
         })()`)
         if (!ready) await sleep(2000)
       }
       if (ready !== 'READY') return ''
-      await evaluate(`(() => { const b = [...document.querySelectorAll('.approval-side .as-side-btn')].find(e => e.innerText.replace(/\\s/g,'') === '新增'); b?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return !!b })()`)
+      await evaluate(`(() => {
+        const b = [...document.querySelectorAll('.approval-side .as-side-btn')].find(e => ${JSON.stringify(NEW_LABELS)}.includes(e.innerText.replace(/\\s/g,'')))
+        b?.dispatchEvent(new MouseEvent('click', { bubbles: true })); return !!b
+      })()`)
       const fresh = `(() => {
         const sheet = document.querySelector('.qc-rec-sheet')
         if (!sheet) return ''
-        return (window.__yj.val('文件编码') === 'YJ-QR-96' && window.__yj.rows() === 0) ? 'FRESH' : ''
+        // 空报告判定与语言无关:纸面在 + 表体 0 行 + 两个商品参照格都在(参照格只在**可编辑的草稿**上渲染)
+        return (window.__yj.rows() === 0 && window.__yj.refCount() === 2) ? 'FRESH' : ''
       })()`
       const got = await waitForY(fresh, 25000)
       await sleep(1800)   // 新增后还会再取一次数(草稿对象被替换),等它稳下来
@@ -182,7 +193,9 @@ async function main() {
     async function pickProduct(code) {
       const opened = await waitForY(`window.__yj.dlg() ? 'DLG' : ''`, 15000)
       if (!opened) return { ok: false, why: '弹窗没开' }
-      const title = await evalY(`window.__yj.dlgTitle()`)
+      // 标题是异步拼的(engine.refPanelName 要拉引用面板配置):等它从「参照选择」变成「<面板名> · 参照选择」
+      const title = await waitForY(`(() => { const t = window.__yj.dlgTitle(); return (t && t.indexOf('参照选择') > 0) ? t : '' })()`, 10000)
+        || await evalY(`window.__yj.dlgTitle()`)
       await evalY(`window.__yj.setKeyword(${JSON.stringify(code)})`)
       await evalY(`window.__yj.clickQuery()`)
       const listed = await waitForY(`(() => { const n = window.__yj.dlgTotal(); return (n > 0 && window.__yj.dlgRows() > 0) ? n : 0 })()`, 20000)
@@ -231,15 +244,25 @@ async function main() {
     ok(`⑥ 换成 ${P2.name} 后 物料名称 一起改(不会只换一半)`, n2 === P2.name, n2)
 
     // ── ⑧ 多语言:切 en 后空格的占位/提示是英文 ──
+    //    ⚠ 按标签找不到格(en 下抬头标签是 Material Name/Material Code)⇒ 走与语言无关的 refTexts/refTitles
     await evaluate(`localStorage.setItem('mes_locale','en'); 'ok'`)
     const en = await newDraft()
     if (en === 'FRESH') {
-      const ph = await evalY(`window.__yj.cell('物料名称').innerText.trim()`)
-      const ti = await evalY(`window.__yj.refTitle('物料名称')`)
-      ok('⑧ en:空商品格占位显示英文 Click to pick', ph === 'Click to pick', String(ph))
-      ok('⑧ en:悬停提示为英文 Click to pick', ti === 'Click to pick', String(ti))
+      const ph = (await evalY(`JSON.stringify(window.__yj.refTexts())`)) || '[]'
+      const ti = (await evalY(`JSON.stringify(window.__yj.refTitles())`)) || '[]'
+      const texts = JSON.parse(ph), titles = JSON.parse(ti)
+      ok('⑧ en:两格商品参照都渲染出来(值序 = 物料名称/物料编码)', texts.length === 2, ph)
+      ok('⑧ en:空商品格占位显示英文 Click to pick', texts[0] === 'Click to pick', String(texts[0]))
+      ok('⑧ en:悬停提示为英文 Click to pick', titles[0] === 'Click to pick', String(titles[0]))
+      ok('⑧ en:占位不是中文(多语言规范判定)', !/点击选择/.test(texts.join('') + titles.join('')), ph + ti)
     } else {
-      ok('⑧ en:面板就绪(用于多语言取证)', false, en)
+      const diag = await evaluate(`JSON.stringify({
+        locale: localStorage.getItem('mes_locale'),
+        sheet: !!document.querySelector('.qc-rec-sheet'),
+        side: [...document.querySelectorAll('.approval-side .as-side-btn')].map(e => e.innerText.replace(/\\s/g,'')),
+        url: location.hash,
+      })`)
+      ok('⑧ en:面板就绪(用于多语言取证)', false, `${en} / ${diag}`)
     }
     await evaluate(`localStorage.setItem('mes_locale','zh-CN'); 'ok'`)
   } finally {
