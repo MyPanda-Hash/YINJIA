@@ -55,6 +55,15 @@ try {
   await sleep(600)
   const menuHas = await ev(`[...document.querySelectorAll('.tb-menu .ctx-item')].map(x=>(x.textContent||'').trim()).join('|')`)
   ok('「更多」下拉里出现「检验项目维护」', /检验项目维护/.test(String(menuHas)), String(menuHas).slice(0, 200))
+  // 入口取证:点开之前先拍一张「更多」下拉里菜单项的样子
+  {
+    const shot0 = await send('Page.captureScreenshot', { format: 'png' })
+    if (shot0?.result?.data) {
+      const out0 = path.join(HERE, '_shot-qc-insp-plan-entry.png')
+      fs.writeFileSync(out0, Buffer.from(shot0.result.data, 'base64'))
+      console.log('    [截图] ' + out0)
+    }
+  }
   const clicked = await ev(`(()=>{const it=[...document.querySelectorAll('.tb-menu .ctx-item')].filter(x=>x.getBoundingClientRect().height>0).find(x=>/检验项目维护/.test(x.textContent||''));if(!it)return 'NO_ITEM';it.click();return 'CLICKED'})()`)
   ok('点开「检验项目维护」', clicked === 'CLICKED', clicked)
 
