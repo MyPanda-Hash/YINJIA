@@ -461,11 +461,14 @@ public class DbNormAudit {
         //   migrate-wo-process-line-drop.sql(2026-10-06):用户当时口径「不应该预排产」⇒ DROP wo_process_line;
         //   但 2026-10-07 又以「人工逐道选线」口径**恢复**了该表(migrate-wo-process-line.sql 头部写明
         //   「该脚本不在迁移链里,手动执行」)。若登记,DbSync 会立刻把线上正在用的表删掉 ⇒ 只能链外。
+        //   migrate-field-multiline-text-rollback-20261015.sql(2026-10-15):「多行文本」字段类型的**回滚**,
+        //   把三面板 21 行的 data_type 从 多行文本 改回 文本。若登记,DbSync 会在链尾自动把功能关掉。
         Set<String> allowOffChain = Set.of("check-migrations.sql", "deploy-all.sql", "dump-schema-log.sql",
                 "dump-server-views.sql", "fix-db-logins.sql", "migrate-golive-cleanup.sql", "migrate-rd-cleanup.sql",
                 "migrate-table-comments.sql", "migrate-testdata-cleanup.sql", "restore-from-backup.sql",
                 "restore-local-bak.sql", "seed-demo-prodfile.sql",
-                "migrate-wo-process-line-drop.sql");
+                "migrate-wo-process-line-drop.sql",
+                "migrate-field-multiline-text-rollback-20261015.sql");
         List<String> bad = new ArrayList<>();
         for (String f : onDisk) {
             if (listed.contains(f) || allowOffChain.contains(f) || f.startsWith("_")) continue;
