@@ -12,10 +12,11 @@ import java.util.Map;
 /**
  * 生产工单「转领料单」(2026-10-07 建;2026-10-09 **粒度修正:按工单行**)。
  *
- * <p><b>唯一键 = 工单号 + 工单行号</b>(与排产/转序/报工/切单同一口径;物理落点是 {@code plang.id})。
- * 修正前按**工单号**去重并把该单所有行并成一张,后果是「同一张工单的第二行再也转不出领料单」
- * (用户报障:相同工单号只能生成一次)—— 现在**每一行各转各的**:
- * 勾选 N 行 → N 张草稿(同一行被勾两次仍只转一张)。
+ * <p><b>标识 = 工单号 + 工单行号</b>(用户口径 2026-10-15:「就是当前的**工单号加工单行号**作为标识,
+ * **每个独立进行**」+「工单号+工单行号 就为当前的**一个新的单**的模式」)——
+ * **一个标识 ⇒ 一张新领料单**。同一标识勾几次都只转一张;不同标识各转各的、互不影响。
+ * 物理落点是 {@code plang.pl_xc};plang 里可能有多个物理行共用同一标识(同订单行分批转单),
+ * 按用户口径它们是**同一个标识**,取代表行出单头,全部批次写进备注。
  *
  * <p>系统里的领料单就是材料出库单({@code bd_material_out} 头 + {@code bl_material_out} 行,
  * 对口金蝶「生产领料单」{@code /jdy/v2/scm/inv_pick});单据头挂
@@ -62,25 +63,38 @@ public class WorkOrderPickingService {
         this.voucherFlow = voucherFlow;
     }
 
-    /** 工单行:唯一键 = 工单号 + 工单行号,物理落点 = plang.id(切单/多批次下同一单号多行) */
-    private record Line(long id, String no, int xc, String batch, String dm, String scx, double plSl) {
+    /**
+     * 工单行标识 = **工单号 + 工单行号**(用户口径 2026-10-15:「就是当前的工单号加工单行号就为当前的
+     * 一个新的单的模式」)—— 一个标识 ⇒ 一张新领料单。
+     *
+     * <p>{@code id} 只是该标识下挑出的**代表物理行**(plang.id,用于取物料/产线/排产数量做单头);
+     * {@code batches} 是该标识下**全部批次**(同订单行分批转单会有多行共用同一标识)——
+     * 写进备注,避免"只体现一个批次"把其它批次的信息丢掉。
+     */
+    private record Line(long id, String no, int xc, String batch, String batches, String dm, String scx, double plSl) {
+        /** 占用链/去重用的**行标识**(工单号#行号,不是 plang.id) */
+        String key() {
+            return no + "#" + xc;
+        }
+
         String label() {
-            return batch == null || batch.isBlank() ? no + "#" + xc : no + "#" + xc + "/" + batch;
+            return key() + (batches == null || batches.isBlank() ? "" : "/" + batches);
         }
     }
 
     /**
-     * 批量转领料单:**入参 = 列表勾选行,按「工单号 + 工单行号」逐行转**。
+     * 批量转领料单:**入参 = 列表勾选行,按「工单号 + 工单行号」逐个转**。
      *
      * <p>用户口径(2026-10-15):「就是当前的**工单号加工单行号**作为标识,**每个独立进行**」
-     * —— 去重键 = (工单号, 工单行号),**不是** plang.id。同一标识勾几次都只转一张
-     * (plang 里可能有多个物理行共用同一 (工单号,行号),按用户口径它们是**同一个标识**)。
+     * + 「工单号+工单行号 就为当前的**一个新的单**的模式」——
+     * 去重键 = (工单号, 工单行号),**不是** plang.id。同一标识勾几次都只转一张
+     * (plang 里可能有多个物理行共用同一 (工单号,行号),按用户口径它们是**同一个标识** ⇒ 同一张单)。
      *
      * @return {转领料单张数, 单号清单:["工单号#行号→领料单号"], 失败行, gotoPanel}
      */
     public Map<String, Object> toPicking(List<Map<String, Object>> rows, String user) {
         if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要转领料单的工单");
-        // 去重键 = 工单号 + 工单行号(用户口径:这就是行标识)
+        // 去重键 = 工单号 + 工单行号(用户口径:这就是行标识 ⇒ 一张新单)
         LinkedHashMap<String, Line> lines = new LinkedHashMap<>();
         List<String> failed = new ArrayList<>();
         for (Map<String, Object> r : rows) {
@@ -88,7 +102,7 @@ public class WorkOrderPickingService {
             if (no == null) { failed.add("勾选行缺少工单号"); continue; }
             try {
                 Line ln = resolveLine(no, r);
-                lines.putIfAbsent(ln.no() + "#" + ln.xc(), ln);
+                lines.putIfAbsent(ln.key(), ln);
             } catch (RuntimeException e) {
                 failed.add(no + "#" + str(r.get("工单行号")) + ":" + msgOf(e));
             }
@@ -112,10 +126,11 @@ public class WorkOrderPickingService {
     }
 
     /**
-     * 勾选行 → 工单行。**行标识 = 工单号 + 工单行号**(用户口径),故按它定位。
+     * 勾选行 → 工单行标识。**行标识 = 工单号 + 工单行号**(用户口径),故按它定位。
      *
      * <p>plang 里同一 (工单号,行号) 可能有多个物理行(同订单行分批转单,批次号不同)——
-     * 按用户口径它们是**同一个标识**,取其中**排产数量>0 且未结案**的一行作为代表(优先行id 命中者),
+     * 按用户口径它们是**同一个标识 ⇒ 同一张新单**,故取其中一行作为**代表行**取单头数据
+     * (优先勾选行本身 → 已排产 → 未结案 → id 小),并把该标识下的**全部批次**收进 batches 供备注体现,
      * 不做"命中多行就拒绝"的处理(那正是把同一标识当成多个的旧思路)。
      */
     private Line resolveLine(String no, Map<String, Object> r) {
@@ -138,14 +153,20 @@ public class WorkOrderPickingService {
         String ja = str(h.get("ja"));
         if ("T".equals(ja) || "Y".equals(ja)) throw new IllegalStateException("已结案,不能转领料单");
         if (num(h.get("pl_sl")) <= 0) throw new IllegalStateException("排产数量为 0(未排产),不能转领料单");
+        // 该标识下全部批次(去重、保序):同标识多物理行时写进备注,避免只体现一个批次
+        List<String> bs = new ArrayList<>();
+        for (Map<String, Object> x : hit) {
+            String b = str(x.get("batch"));
+            if (b != null && !bs.contains(b)) bs.add(b);
+        }
         return new Line(((Number) h.get("id")).longValue(), String.valueOf(h.get("pl_no")),
                 intOf(h.get("xc")) == null ? 0 : intOf(h.get("xc")),
-                str(h.get("batch")), str(h.get("dm")), str(h.get("scx")), num(h.get("pl_sl")));
+                str(h.get("batch")), String.join("/", bs), str(h.get("dm")), str(h.get("scx")), num(h.get("pl_sl")));
     }
 
-    /** 单个**工单行**转领料单(守卫 → 组装单头 → 落占用链;返回新领料单号) */
+    /** 单个**工单行标识**(工单号+工单行号)转领料单(守卫 → 组装单头 → 落占用链;返回新领料单号) */
     private String pickOne(Line ln, String user) {
-        // 1) 防重复①:本按钮生成过且**草稿还在** —— 占用链按行判(source_line_key = 工单号#行id)。
+        // 1) 防重复①:本标识生成过且**草稿还在** —— 占用链按**行标识**判(source_line_key = 工单号#行号)。
         //    🔴 2026-10-15 修(用户报障「转领料单还是不能根据工单号+工单行号进行」):原判据只看
         //      link_status='ACTIVE',**不看目标单的存活状态** —— 于是 2026-10-09 粒度修正**之前**生成的
         //      整单级领料单(给该工单**每一行**都落了一条链)在**审核之后链仍是 ACTIVE**
@@ -156,6 +177,9 @@ public class WorkOrderPickingService {
         //        行1~行7 一律 409「该工单行已生成领料单 CL-2026-10-0004」。
         //    本类口径本来就写明「**已审核的不拦**(分批领料是真实场景)」—— 故此处只拦**活草稿**:
         //      目标单未审核、未作废、未软删。判据与下面 guard② 完全一致(两处守卫同口径)。
+        //    ⚠ 源行键用 ln.key()(= 工单号#行号):与去重键同口径,一个标识一条链。
+        //      2026-10-09~10-15 之间写下的旧链用的是 plang.id(工单号#行id),不再命中 ——
+        //      但这不影响正确性:下面 guard② 按 (加工单号,工单行号) 兜底,老链的活草稿照样拦得住。
         List<String> linked = jdbc.queryForList(
                 "SELECT l.target_form_no FROM form_flow_link l"
                         + " WHERE l.source_panel_code = ? AND l.source_line_key = ?"
@@ -169,7 +193,7 @@ public class WorkOrderPickingService {
                         // 目标单未作废
                         + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status c WHERE c.panel_code = ?"
                         + "        AND c.doc_no = l.target_form_no AND ISNULL(c.canceled,'N') = 'Y')",
-                String.class, SOURCE_PANEL, ln.no() + "#" + ln.id(), TARGET_PANEL, TARGET_PANEL, TARGET_PANEL);
+                String.class, SOURCE_PANEL, ln.key(), TARGET_PANEL, TARGET_PANEL, TARGET_PANEL);
         if (!linked.isEmpty()) {
             throw new IllegalStateException("该工单行已有未审核领料单草稿 " + linked.get(0) + ",请先审核或删除后再转");
         }
@@ -212,9 +236,9 @@ public class WorkOrderPickingService {
         String workshop = workshopOf(ln.scx());
         if (workshop != null) head.put("生产车间", workshop);
         head.put("领用人", realName(user));
-        //    同单号多行共用同一行号时(分批转单)**备注带批次号**,否则两张单在界面上分不出是哪一批。
+        //    备注带**全部批次**(同标识多物理行时),否则只体现一个批次,界面上分不清。
         head.put("备注", "生产工单转领料单(工单行 " + ln.xc()
-                + (ln.batch() == null ? "" : ",批次 " + ln.batch())
+                + (ln.batches() == null || ln.batches().isBlank() ? "" : ",批次 " + ln.batches())
                 + ",排产 " + round4(ln.plSl()) + ");材料明细由仓库补填");
 
         // 4) 建草稿:明细留空 —— ButtonService.save 的"空白草稿"分支只写单头(号池取号 CL-…/草稿态)
@@ -223,9 +247,9 @@ public class WorkOrderPickingService {
         Map<String, Object> saved = buttonService.save(registry.panel(TARGET_PANEL), formData, false);
         String newNo = String.valueOf(saved.get("编号"));
 
-        // 5) 占用链:**只落这一行**(源行键 = 工单号#行id,与选单同一 lineKey 约定);目标暂无行 ⇒ targetLineKey=null。
+        // 5) 占用链:**一个行标识一条链**(源行键 = 工单号#行号,与去重键同口径);目标暂无行 ⇒ targetLineKey=null。
         //    下游草稿删除/作废时 ButtonService 会把 link 置 RELEASED,本按钮随之重新可点(零回滚代码)。
-        voucherFlow.linkLine(SOURCE_PANEL, ln.no(), ln.no() + "#" + ln.id(), ln.dm(), ln.plSl(),
+        voucherFlow.linkLine(SOURCE_PANEL, ln.no(), ln.key(), ln.dm(), ln.plSl(),
                 TARGET_PANEL, newNo, null, null);
         return newNo;
     }

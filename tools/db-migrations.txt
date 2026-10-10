@@ -2758,3 +2758,13 @@ migrate-finish-in-wo-line-20261015.sql
 #   ⚠ scjl 是冻结登记遗留表,此处按用户明确口径扩展,与加「批次号/报工单号/直销数量」同一先例。
 #   幂等(COL_LENGTH 守卫 + 字段 IF NOT EXISTS + ep.class=1);两账套均执行。
 migrate-scjl-wo-line-20261015.sql
+
+# migrate-material-out-wo-line-query-col-20261015.sql(2026-10-15):材料出库单(领料单)**列表**补「工单行号」列
+#   —— 纯元数据、零改表:把 MATERIAL_OUT 的「工单行号」place 由 `header` 改为 `query,header`。
+#   背景(用户口径「工单号+工单行号 就为当前的一个新的单的模式」):转领料单已按该口径出单
+#   (一个标识 ⇒ 一张新单,单头也写了工单行号),但该字段只在**表单页**显示 ⇒ 同一工单多行转出的
+#   多张领料单在**列表**上长得一样,用户仍分不出哪张是哪一行。改 place 后列表可直接按行号分辨。
+#   ⚠ 只改 place,不动 col_name/label/seq/editable —— 数据键与写入路径完全不变;
+#     守卫同时检查物理列仍在(COL_LENGTH 非空)才改,符合规范 §4.2「守卫要跨过后续改名/删列」。
+#   幂等;两账套均执行。
+migrate-material-out-wo-line-query-col-20261015.sql

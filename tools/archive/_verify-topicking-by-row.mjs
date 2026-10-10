@@ -45,7 +45,7 @@ const rows = (list.data || []).filter((r) => String(r['工单号']) === WO)
 console.log(`\n    ${WO} 列表命中 ${rows.length} 行 = ` + JSON.stringify(rows.map((r) => ({ 行id: r['行id'], 行号: r['工单行号'], 批次: r['批次号'] }))))
 ok('① 列表返回多行且每行有独立 行id', rows.length > 1 && rows.every((r) => r['行id'] != null), `n=${rows.length}`)
 ok(`① 行数 = ${EXPECT_ROWS}(fixture 已知)`, rows.length === EXPECT_ROWS, `n=${rows.length}`)
-ok('① 存在两行共用同一 工单行号(证明"工单号+行号"不足以区分,只有 行id 能)',
+ok('① fixture 含"多物理行共用同一工单行号"(用于验"同标识只出一张单")',
   new Set(rows.map((r) => r['工单行号'])).size < rows.length,
   JSON.stringify(rows.map((r) => ({ 行id: r['行id'], 行号: r['工单行号'], 批次: r['批次号'] }))))
 
