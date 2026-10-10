@@ -46,6 +46,7 @@ public class WoReportService {
      */
     public void stampRowNo(String panelCode, String no) {
         if (!posts(panelCode) || no == null || no.isBlank()) return;
+        // ① 已有 gd_id(=plang_pc.id)→ 经 plang_pc.plang_id 反查该行的 pl_xc
         jdbc.update(
                 "UPDATE s SET s.[工单行号] = x.pl_xc FROM dbo.scjl s"
                         + " CROSS APPLY (SELECT TOP 1 p.pl_xc FROM dbo.plang_pc pc"
@@ -53,15 +54,18 @@ public class WoReportService {
                         + "   WHERE pc.id = s.gd_id) x"
                         + " WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
                         + "   AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) > 0", no);
+        // ② 没有 gd_id(草稿期常态)→ 按(工单号 + 批次号)找该行,**恰命中 1 行**才写;0 行/多行留空。
+        //    ⚠ 必须用 CTE + HAVING COUNT(*)=1 的形态:T-SQL 的 `UPDATE … FROM … GROUP BY` 是**语法错**
+        //      (实测 "Incorrect syntax near the keyword 'GROUP'"),与迁移脚本 migrate-scjl-wo-line-20261015.sql 同款。
         jdbc.update(
-                "UPDATE s SET s.[工单行号] = x.pl_xc FROM dbo.scjl s"
-                        + " CROSS APPLY (SELECT TOP 2 p.pl_xc FROM dbo.plang p"
-                        + "   WHERE p.pl_no = s.gldh AND ISNULL(p.[批次号],N'') = ISNULL(s.[批次号],N'')"
-                        + "     AND ISNULL(s.[批次号],N'') <> N'' AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                        + "   ORDER BY p.id) x"
-                        + " WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
-                        + "   AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) = 0"
-                        + " GROUP BY s.id, s.[工单行号], x.pl_xc HAVING COUNT(*) = 1", no);
+                "WITH cand AS ("
+                        + "  SELECT s.id AS sid, MIN(p.pl_xc) AS xc FROM dbo.scjl s"
+                        + "  JOIN dbo.plang p ON p.pl_no = s.gldh AND ISNULL(p.[批次号],N'') = ISNULL(s.[批次号],N'')"
+                        + "       AND ISNULL(p.asp_cancel,'N') <> 'Y'"
+                        + "  WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                        + "    AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') <> N''"
+                        + "  GROUP BY s.id HAVING COUNT(*) = 1)"
+                        + " UPDATE s SET s.[工单行号] = c.xc FROM dbo.scjl s JOIN cand c ON c.sid = s.id", no);
     }
 
     /** 审核 → 本单 scjl 行 wgzt='Y'+wgsj,补 jc_no 与排产镜像。 */
