@@ -20,9 +20,8 @@
       <div v-if="app.mobileNav" class="nav-mask" @click="app.toggleMobileNav()"></div>
     </transition>
 
-    <!-- T+ 浮层：右侧帮助面板 / 初始化向导 -->
+    <!-- T+ 浮层：右侧帮助面板 -->
     <HelpPanel />
-    <InitWizard />
   </div>
 </template>
 
@@ -33,7 +32,6 @@ import TopBar from './TopBar.vue'
 import LeftNav from './LeftNav.vue'
 import TabsBar from './TabsBar.vue'
 import HelpPanel from './HelpPanel.vue'
-import InitWizard from './InitWizard.vue'
 import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
@@ -52,8 +50,6 @@ onMounted(() => {
   // Login data is cached for fast startup; refresh it so server-side corrections
   // and permission changes replace stale localStorage values on the next load.
   Promise.allSettled([user.fetchUserInfo(), user.fetchFactories()])
-  // T+ 行业化配置向导：首次登录自动弹出
-  if (!app.initDone) app.openInitWizard()
 })
 
 watch(

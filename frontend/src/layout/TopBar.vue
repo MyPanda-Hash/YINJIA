@@ -143,7 +143,6 @@
           <el-dropdown-menu>
             <el-dropdown-item command="docs">{{ tt('帮助文档') }}</el-dropdown-item>
             <el-dropdown-item command="ai">{{ tt('AI 智能帮助') }}</el-dropdown-item>
-            <el-dropdown-item command="guide">{{ tt('显示新手引导') }}</el-dropdown-item>
             <el-dropdown-item command="about" divided>{{ tt('关于') }}</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -164,7 +163,6 @@
             <el-dropdown-item command="ui"><el-icon><Setting /></el-icon>{{ tt('界面设置') }}</el-dropdown-item>
             <el-dropdown-item command="dark"><el-icon><Brush /></el-icon>{{ app.dark ? tt('切换亮色') : tt('换肤（暗色）') }}</el-dropdown-item>
             <el-dropdown-item command="desk"><el-icon><Monitor /></el-icon>{{ tt('工作台设置') }}</el-dropdown-item>
-            <el-dropdown-item command="init"><el-icon><MagicStick /></el-icon>{{ tt('初始化向导') }}</el-dropdown-item>
             <el-dropdown-item command="logout" divided><el-icon><SwitchButton /></el-icon>{{ tt('退出') }}</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -343,7 +341,6 @@ async function refreshFactories() {
 function onHelpCommand(cmd) {
   if (cmd === 'docs') app.openHelp('help')
   else if (cmd === 'ai') app.openHelp('knowledge')
-  else if (cmd === 'guide') app.openInitWizard()
   else if (cmd === 'about') aboutVisible.value = true
 }
 
@@ -363,7 +360,6 @@ function onUserCommand(cmd) {
   else if (cmd === 'ui') uiSettingVisible.value = true
   else if (cmd === 'dark') app.toggleDark()
   else if (cmd === 'desk') deskSettingVisible.value = true
-  else if (cmd === 'init') app.openInitWizard()
   else if (cmd === 'logout') {
     user.logout()
     router.replace('/login')

@@ -54,9 +54,6 @@ export const useAppStore = defineStore('app', {
     // 右侧帮助面板
     helpVisible: false,
     helpTab: 'dynamic',
-    // MES 初始化向导（首次登录自动弹出，之后可从用户下拉再次打开）
-    initWizardVisible: false,
-    initDone: localStorage.getItem('mes_init_done') === '1',
   }),
   actions: {
     toggleCollapse() {
@@ -93,20 +90,6 @@ export const useAppStore = defineStore('app', {
     },
     closeHelp() {
       this.helpVisible = false
-    },
-    openInitWizard() {
-      this.initWizardVisible = true
-    },
-    closeInitWizard(skip) {
-      this.initWizardVisible = false
-      if (skip) {
-        this.initDone = true
-        localStorage.setItem('mes_init_done', '1')
-      }
-    },
-    finishInitWizard() {
-      this.initDone = true
-      localStorage.setItem('mes_init_done', '1')
     },
     saveDeskSettings(patch) {
       this.deskSettings = { ...this.deskSettings, ...patch }

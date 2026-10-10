@@ -130,15 +130,9 @@ const shortcuts = [
   { title: '新建加工单', icon: 'DocumentAdd', path: '/panelx/form/MANU_ORDER?new=1', tabPath: '/panelx/form/MANU_ORDER', tabTitle: '新增加工单' },
   { title: '打开加工单列表', icon: 'List', path: '/panelx/list/MANU_ORDER', tabPath: '/panelx/list/MANU_ORDER', tabTitle: '生产工单' },
   { title: '我的桌面', icon: 'HomeFilled', path: '/dashboard', tabPath: '/dashboard', tabTitle: '我的桌面' },
-  { title: '初始化向导', icon: 'MagicStick', action: 'init' },
 ]
 
 function doShortcut(s) {
-  if (s.action === 'init') {
-    app.closeHelp()
-    app.openInitWizard()
-    return
-  }
   tabs.open({ title: s.tabTitle, path: s.tabPath })
   router.push(s.path)
   app.closeHelp()
