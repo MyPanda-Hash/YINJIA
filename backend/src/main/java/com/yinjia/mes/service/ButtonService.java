@@ -1283,39 +1283,9 @@ public class ButtonService {
         // 库存成本重算(移动加权):本单已进入 v_stock_movement(仅已审核单据进视图),成本物化表随之作废。
         // 全量重算而非按分区:单据可能改动了仓库/存货编码,旧分区行不会被范围 DELETE 清掉。
         recalcInvCostIfStockDoc(def.code());
-        // 工序报工记账(生产过程层):报工单审核 → wo_progress.完成数量 累计
-        woReport.post(def.code(), no, currentUserName());
-        // 工序任务回写(A 项,2026-10-05):报工审核 → 该工单该工序任务的完成量累计 + 状态推进
-        processTask.onReport(def.code(), no, currentUserName());
-        // 转序派线(2026-10-07 预排全程线):报工**审核**后,若前道已完工 → 自动把工单切到下一道工序的**预排线**
-        // (计划线 = 排产时人工逐道选定,台账 wo_process_line;留痕 wo_transfer_log 原因「转序自动派线」)。
-        // 只对报工单生效;失败不阻断审核(回执在排产页/追溯里可见)。
-        if ("WO_REPORT".equals(def.code())) {
-            // ⚠ 转序按**工单号 + 工单行号**定位(2026-10-07 用户口径:只切被报工那一行的线;
-            //   no 是报工单号,不能当工单号用;一个报工单可能涉及多行 ⇒ 逐行处理)
-            for (Map<String, Object> rr : woReport.reportRows(def.code(), no)) {
-                String wo = rr.get("工单号") == null ? "" : String.valueOf(rr.get("工单号")).trim();
-                Object rid = rr.get("工单行id");
-                if (wo.isEmpty() || rid == null) continue;
-                try {
-                    processTask.applyNextProcess(wo, ((Number) rid).longValue(), currentUserName());
-                } catch (Exception e) {
-                    log.warn("转序派线失败(不阻断报工审核): 工单={} 行={} 报工单={} {}", wo, rid, no, e.getMessage());
-                }
-            }
-        }
-        // 三类工序检验单(9.29 批次④,2026-10-05):成型/切炭/组装 报工审核 → 各自动生成一张检验单草稿
-        // (三张独立不合并;幂等=同一报工单同一工序只出一张;后续品质填写判定/数量)
-        woInspGenerate(def.code(), no, currentUserName());
-        // 组装成品检验单审核 → 合格数转产成品入库单草稿、不合格数转不良品处理单草稿(待处理)
-        asmInspToStock(def.code(), no, currentUserName());
-        // 切炭双出口(已确认):报工审核后,直销数量自动生成成品入库单并审核入账(成品仓)
-        dualOutFinishIn(def.code(), no, currentUserName());
-        // 生产工单执行回填(参考库 plang_pc:完工入库回写 rk_sl/rk_no、领料回写 ll_no2):
-        // 重算式(以该工单名下已审核入库/领料单为真源),审核/弃审对称;切炭自动入库经上方同路径已覆盖
-        manuWriteback.post(def.code(), no, currentUserName());
-        // 不良品处理记账(品质层):处理单审核 → 原仓扣减+目标仓(隔离/不良品)移仓或报废
-        qcDisposal.post(def.code(), no, currentUserName());
+        // 生产报工审核后副作用(报工记账/工序任务/转序派线/检验单/入库回填/结案重算/不良品记账)
+        // —— 与「审批通过」共用同一方法,避免再次出现"只在审核路径生效"的漏挂(见 runWoAuditHooks 注释)
+        runWoAuditHooks(def, no, currentUserName());
         // 来料检验单审核 → 自动生单(2026-09-16 双出口口径):合格数量>0 的行生成采购入库单草稿,
         // 不良数量>0 的行生成暂收退回单草稿(此前暂收退回单为手工按钮,现改为审核自动创建)
         inspAutoPurchaseIn(def.code(), no, currentUserName());
@@ -1420,7 +1390,75 @@ public class ButtonService {
         // 生产工单执行回填(对称重算):必须在上方 yj_doc_status 置 shr=NULL **之后**执行——
         // 重算以"已审核集合"为真源,挂钩早于状态清除会把弃审单仍按已审核计入,回填回旧值(2026-09-22 实测踩坑)
         manuWriteback.unpost(def.code(), no, currentUserName());
+        // 组装成品检验**弃审** → 重算结案:检验不再是"已审核通过" ⇒ 该工单行应退回未结案
+        //   (必须在 shr 清掉之后,口径同上方的 manuWriteback 注释)
+        syncCloseAfterAsmInsp(def.code(), no, currentUserName());
         return result(no, "草稿");
+    }
+
+    /**
+     * 生产报工「审核后副作用」—— **审核与「审批通过」两条路共用**(2026-10-15 用户报障:
+     * 「当前生产报工内点击审批不会自动填入相应的数据」「自动填入只在审核按钮实现,点击审批按钮不会实现」)。
+     *
+     * <p>根因:这段钩子原来**只挂在 {@code audit()}** 里;走「提交审批 → 审批通过」的报工单
+     * 因此不写 {@code wgzt/wgsj}(用户看不到"相应的数据")、不解析工单行号、不生成工序检验单、
+     * 不转序派线、不回填入库/领料/结案 —— 审批完了单子还是空的。
+     *
+     * <p>⚠ 同类问题 2026-09-16 在**来料检验单**上已经发生过一次(inspAutoPurchaseIn/inspAutoReturn
+     * 只挂审核路径);说明"钩子散落在 audit 里、审批路径靠人工补记"这个结构必然反复漏。
+     * 故这里把生产报工这一族的钩子抽成**一处**,两个入口共用。
+     * 每一步内部都自筛面板(非本面板直接 return),所以对任意面板调用都无副作用。
+     */
+    private void runWoAuditHooks(PanelRegistry.PanelDef def, String no, String user) {
+        // 报工记账(生产过程层):写 wgzt='Y'/wgsj、补工单行号、镜像排产到 scjl
+        woReport.post(def.code(), no, user);
+        // 工序任务回写(A 项):该工单该工序任务的完成量累计 + 状态推进 + 工单完工状态重算
+        processTask.onReport(def.code(), no, user);
+        // 转序派线(预排全程线):前道已完工 → 把工单切到下一道工序的预排线
+        if ("WO_REPORT".equals(def.code())) {
+            for (Map<String, Object> rr : woReport.reportRows(def.code(), no)) {
+                String wo = rr.get("工单号") == null ? "" : String.valueOf(rr.get("工单号")).trim();
+                Object rid = rr.get("工单行id");
+                if (wo.isEmpty() || rid == null) continue;
+                try {
+                    processTask.applyNextProcess(wo, ((Number) rid).longValue(), user);
+                } catch (Exception e) {
+                    log.warn("转序派线失败(不阻断报工审核): 工单={} 行={} 报工单={} {}", wo, rid, no, e.getMessage());
+                }
+            }
+        }
+        // 三类工序检验单:成型/切炭/组装 报工审核 → 各自动生成一张检验单草稿
+        woInspGenerate(def.code(), no, user);
+        // 组装成品检验单 → 合格数转产成品入库单草稿、不合格数转不良品处理单草稿
+        asmInspToStock(def.code(), no, user);
+        // 切炭双出口:直销数量自动生成成品入库单并审核入账(成品仓)
+        dualOutFinishIn(def.code(), no, user);
+        // 生产工单执行回填(入库回写 rk_sl/rk_no、领料回写 ll_no2)
+        manuWriteback.post(def.code(), no, user);
+        // 组装成品检验审核 → 重算结案(组装成品检验已审核 + 入库≥排产)
+        syncCloseAfterAsmInsp(def.code(), no, user);
+        // 不良品处理记账(品质层)
+        qcDisposal.post(def.code(), no, user);
+    }
+
+    /**
+     * 组装成品检验单 审核/弃审 → 重算其所属**工单**各行的结案状态。
+     *
+     * <p>用户口径(2026-10-15):「当最后**组装成品检验完成入库后**才显示结案」——
+     * 所以组装成品检验的审核状态是结案的**前置条件之一**,它一变就要重算。
+     * 非 QC_ASM_INSP 面板直接返回(无副作用);失败不阻断主流程(结案只是派生状态)。
+     */
+    private void syncCloseAfterAsmInsp(String panelCode, String inspNo, String user) {
+        if (!"QC_ASM_INSP".equals(panelCode)) return;
+        try {
+            for (String wo : jdbc.queryForList(
+                    "SELECT DISTINCT ISNULL(工单号,N'') FROM dbo.qc_asm_insp_head WHERE 单据编号=?",
+                    String.class, inspNo)) {
+                if (wo != null && !wo.isBlank()) processTask.syncCloseStateByOrder(wo, user);
+            }
+        } catch (Exception e) {
+            log.warn("[结案重算] 组装成品检验 {} 触发失败(不阻断): {}", inspNo, e.getMessage());
+        }
     }
 
     // ---- 中止(对齐 PANDA/T+ 整单中止、生产工单中止执行):仅已审核可中止,恢复保留原审核留痕 ----
@@ -1593,6 +1631,11 @@ public class ButtonService {
                     Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion, "effect", madeF), operator));
             return result(no, "已生效");
         }
+        // 🔴 2026-10-15 用户报障:「当前生产报工内点击审批不会自动填入相应的数据;自动填入只在审核按钮实现,
+        //   点击审批按钮不会实现」—— 生产报工的审核后副作用(写 wgzt/wgsj、解析工单行号、生成工序检验单、
+        //   转序派线、入库/领料回填、结案重算)此前**只挂在 audit()** 里,审批通过这条路整段缺失。
+        //   现与审核共用同一方法(各钩子内部自筛面板,对非报工面板无副作用)。
+        runWoAuditHooks(def, no, operator);
         // 来料检验单审批通过(与「审核」同效为已审核) → 同样触发自动生单(2026-09-16 修复:
         // 此前钩子只挂在审核路径,走 提交审批→审批通过 的检验单不生成采购入库单/暂收退回单,
         // 用户只好点手工生单按钮,而手工路径实收数量映射错误且退回单被死过滤器挡住)
@@ -1642,6 +1685,8 @@ public class ButtonService {
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND approve_node = 2", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion, 2);
+        // 2026-10-15:二级(最终)审批通过同样要跑生产报工的审核后副作用 —— 见 approveApproval 的同款注释
+        runWoAuditHooks(def, no, operator);
         inspAutoPurchaseIn(def.code(), no, operator);
         inspAutoReturn(def.code(), no, operator);
         if (ADMIN_L2_PANELS.contains(def.code())) {

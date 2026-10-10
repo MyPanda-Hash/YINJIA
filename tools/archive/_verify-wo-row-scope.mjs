@@ -187,8 +187,15 @@ console.log('\n── 步0 工序报工单:工单行号落库 + 列表可见 ─
       mine.length > 0 && mine.every((x) => Number(x['工单行号']) === 7),
       JSON.stringify(mine.map((x) => x['工单行号'])))
     const anchored = rows.filter((x) => x['工单行号'] != null)
-    ok('步0 有行号的报工行占多数(存量已回填能唯一确定的)',
-      anchored.length >= rows.length - 1, `带行号 ${anchored.length} / 共 ${rows.length}`)
+    // 精确口径(2026-10-15 改):原来写"带行号的占多数(允许 1 条缺失)",但**不可确定的**老留痕本就该留空
+    //   —— 实测残留 3 条:BG-2026-10-0007(有工单号但**没有批次号**,同工单多行无法唯一定位)、
+    //      BG-2026-10-0010/0011(连工单号都没有的空白占位草稿)⇒ 都属"取不到行、按口径不猜"。
+    //   真正该守的不变量:**凡能唯一确定的(有工单号 + 有批次号)都必须已回填出行号**。
+    const determinable = rows.filter((x) => String(x['工单号'] || '').trim() !== '' && String(x['批次号'] || '').trim() !== '')
+    const undet = determinable.filter((x) => x['工单行号'] == null)
+    ok('步0 能唯一确定的报工行(有工单号+批次号)都已回填行号',
+      undet.length === 0,
+      `不可确定 ${undet.length} 条 / 可确定 ${determinable.length} 条;带行号 ${anchored.length} / 共 ${rows.length}`)
   }
 }
 

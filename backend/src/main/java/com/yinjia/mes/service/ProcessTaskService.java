@@ -910,12 +910,10 @@ public class ProcessTaskService {
         }
     }
 
-    /** 单行状态重算(工序进度/完工状态/结案):路线取**本行**的,报工量取**本行**的 */
+    /** 单行状态重算(工序进度/完工状态):路线取**本行**的,报工量取**本行**的。结案另见 syncCloseState */
     private void syncOneRowState(long id, Map<String, Object> t, String no, String user) {
         double plan = num(t.get("pl_sl"));
         double inQty = num(t.get("rk_sl"));
-        String prev = String.valueOf(t.get("原完工状态"));
-        String jaPrev = String.valueOf(t.get("原结案"));
         String batch = String.valueOf(t.get("批次号"));
         // 本行路线(空则退回标准五步)
         List<String> ops = new ArrayList<>();
@@ -949,13 +947,74 @@ public class ProcessTaskService {
         // 生产完工判定(用户口径):**全部生产工序报工达标**  或  **入库数量达标**
         boolean prodDone = plan > 0 && (allDone || inQty >= plan - 0.0001);
         String state = prodDone ? "生产完工" : (started ? "在制" : "未开工");
-        // **自动结案**:转入生产完工 → ja='Y';从生产完工退回(弃审) → 自动反结案(仅当仍处于结案态)
-        String ja = prodDone ? "Y"
-                : ("生产完工".equals(prev) && "Y".equals(jaPrev) ? "N" : jaPrev);
+        // 🔴 2026-10-15 用户口径(报障):「全部报工完成后**不应**变为已结案,员工看到的应是**完工**;
+        //   只有**最后组装成品检验完成入库后**才显示结案」。
+        //   原实现把"报工达标"直接等同于"结案":`ja = prodDone ? "Y" : (从生产完工退回 ? "N" : 保持)` ——
+        //   于是报工一做完,工单立刻 ja='Y',生产工单列表第一分支(入库≥排产)又把它显示成「已结案」,
+        //   跟"完工"挤在一起分不开,而且成品检验还没做就已经结案了。
+        //   现:**报工只负责"完工状态"**,结案改由 {@link #syncCloseState} 按
+        //   「组装成品检验单已审核通过 且 入库≥排产」单独判定(在入库/检验的审核与弃审时重算)。
+        //   ⇒ 这里**不再动 ja**(保持原值,人工结案/取消结案仍由生产工单页负责)。
         jdbc.update("UPDATE dbo.plang SET 当前工序=?, 当前工序完工量=?, 完工状态=?,"
                         + " 完工时间 = CASE WHEN ? = N'生产完工' THEN ISNULL(完工时间, GETDATE()) ELSE NULL END,"
-                        + " ja = ?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
-                cur, round(curQty), state, state, ja, user, id);
+                        + " asp_user2=?, asp_time2=GETDATE() WHERE id=?",
+                cur, round(curQty), state, state, user, id);
+    }
+
+    /**
+     * 结案重算(**按工单行**:工单号 + 工单行号) —— 用户口径 2026-10-15:
+     * 「当最后**组装成品检验完成入库后**才显示结案」。
+     *
+     * <p>判据(两个都满足才 ja='Y',任一不满足回 'N'):
+     * <ol><li>该行的**组装成品检验单已审核通过**(qc_asm_insp_head 存活 + yj_doc_status.shr 非空且未作废/中止);
+     *     行级取 工单行号=本行,老检验单没有行号列时退回该行产生的报工单号;</li>
+     * <li>**入库数量达标**:rk_sl ≥ pl_sl(排产数量,>0)。</li></ol>
+     *
+     * <p>⚠ 只在**入库单 / 组装成品检验单**的审核与弃审时调用(见 ManuWritebackService / ButtonService),
+     * 不做全库批量重算 —— 这样存量里人工结案的单不会因为本次改动被莫名打开,行为只在该两事件上改变。
+     *
+     * @return 该行重算后的 ja 值
+     */
+    @Transactional
+    public String syncCloseState(long rowId, String user) {
+        List<Map<String, Object>> rs = jdbc.queryForList(
+                "SELECT id, pl_no, ISNULL(pl_xc,0) AS xc, ISNULL(pl_sl,0) AS pl_sl, ISNULL(rk_sl,0) AS rk_sl,"
+                        + " ISNULL([批次号],N'') AS 批次号 FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'",
+                rowId);
+        if (rs.isEmpty()) return null;
+        Map<String, Object> r = rs.get(0);
+        String no = String.valueOf(r.get("pl_no"));
+        int xc = ((Number) r.get("xc")).intValue();
+        double plan = num(r.get("pl_sl"));
+        double inQty = num(r.get("rk_sl"));
+        String batch = String.valueOf(r.get("批次号"));
+        boolean inOk = plan > 0 && inQty >= plan - 0.0001;
+        // 组装成品检验:存活 + 已审核(shr 非空)+ 未作废/中止
+        Integer asm = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo.qc_asm_insp_head h"
+                        + " JOIN dbo.yj_doc_status s ON s.panel_code='QC_ASM_INSP' AND s.doc_no=h.[单据编号]"
+                        + " WHERE h.[工单号]=? AND ISNULL(h.asp_cancel,'N')<>'Y'"
+                        + "   AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N')<>'Y' AND ISNULL(s.stopped,'N')<>'Y'"
+                        // 行级:检验单带本行行号;2026-10-15 前的老单无行号,退回按本行批次
+                        + "   AND (ISNULL(h.[工单行号],0) = ? OR (ISNULL(h.[工单行号],0) = 0 AND ISNULL(h.[批次号],N'') = ?))",
+                Integer.class, no, xc, batch);
+        boolean asmOk = asm != null && asm > 0;
+        String ja = (asmOk && inOk) ? "Y" : "N";
+        jdbc.update("UPDATE dbo.plang SET ja=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?", ja, user, rowId);
+        return ja;
+    }
+
+    /**
+     * 结案重算(整单入口:该工单**每一个未作废行**各算各的)。供只拿到工单号的调用方使用。
+     */
+    @Transactional
+    public void syncCloseStateByOrder(String plNo, String user) {
+        if (!notBlank(plNo)) return;
+        for (Long id : jdbc.queryForList(
+                "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY pl_xc, id",
+                Long.class, plNo.trim())) {
+            syncCloseState(id, user);
+        }
     }
 
     /**

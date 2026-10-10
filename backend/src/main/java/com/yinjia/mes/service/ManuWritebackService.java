@@ -32,9 +32,13 @@ import java.util.Map;
 public class ManuWritebackService {
 
     private final JdbcTemplate jdbc;
+    /** 结案重算(2026-10-15):入库数量变化后按「组装成品检验已审核 + 入库≥排产」重算 plang.ja。
+     *  依赖方向 ManuWritebackService → ProcessTaskService → ScheduleBoardService,无环。 */
+    private final ProcessTaskService processTask;
 
-    public ManuWritebackService(JdbcTemplate jdbc) {
+    public ManuWritebackService(JdbcTemplate jdbc, ProcessTaskService processTask) {
         this.jdbc = jdbc;
+        this.processTask = processTask;
     }
 
     /** 审核 hook:入库/领料单审核后重算对应工单回填列 */
@@ -114,6 +118,8 @@ public class ManuWritebackService {
                             + " cp_date2 = COALESCE(cp_date2, CASE WHEN ? > 0 THEN CAST(GETDATE() AS date) END),"
                             + " asp_user2 = ?, asp_time2 = GETDATE() WHERE id = ?",
                     rk, noList.isEmpty() ? null : noList, rk, user, row.get("id"));
+            // 入库量变了 ⇒ 重算该行结案(用户口径 2026-10-15:入库 + 组装成品检验均达成才结案)
+            processTask.syncCloseState(((Number) row.get("id")).longValue(), user);
         }
         // scjl.post_no 重算式回写(参考库完工即入库口径;对称:弃审入库单后随之清空,与 rk_no 同算)
         jdbc.update("UPDATE dbo.scjl SET post_no = ? WHERE gldh = ? AND ISNULL(asp_cancel,'N') <> 'Y'",

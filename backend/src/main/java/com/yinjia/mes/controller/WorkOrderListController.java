@@ -108,6 +108,9 @@ public class WorkOrderListController {
                         // 血缘(会议口径第二版):根工单号(多级按根聚合)+ 是否切单(一眼区分原单/子单)
                         + " ISNULL(p.[根工单号], N'') AS 根工单号, ISNULL(p.[是否切单], N'N') AS 是否切单,"
                         + " CASE WHEN p.ja IN (N'T', N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
+                        // 完工状态(2026-10-15):生产状态的「完工」用它判,不再只看入库 ——
+                        //   全部报工达标即 完工状态='生产完工' ⇒ 员工看到「完工」;结案另看 ja(需组装成品检验+入库)
+                        + " ISNULL(p.[完工状态], N'') AS 完工状态,"
                         + " p.dm AS 物料编码, ISNULL(p.mc, N'') AS 产品名称, ISNULL(p.gg, N'') AS 规格型号,"
                         + " ISNULL(p.jldw, N'') AS 生产单位,"
                         + " ISNULL(p.pl_sl, 0) AS 排产数量, ISNULL(p.xq_sl, 0) AS 需求数量, ISNULL(p.rk_sl, 0) AS 入库数量,"
@@ -163,15 +166,25 @@ public class WorkOrderListController {
                         + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序) cop"
                         + w + " ORDER BY p.pl_date DESC, p.pl_no, p.pl_xc",
                 args.toArray());
-        // 生产状态(与 v_manu_schedule 同口径:完工=入库≥排产;在产=有入库;其余未完工;未排产行=未排产)
+        // 生产状态(2026-10-15 用户口径拆分「完工」与「结案」):
+        //   · 已结案 = **plang.ja**(唯一结案标志;由「组装成品检验已审核 + 入库≥排产」重算,或手工结案);
+        //   · 完工  = 完工状态 IN (生产完工, 已完工) —— 全部报工达标即成立,**不需要**(也不该等)入库/检验;
+        //   · 在产  = 有入库但未达标;未完工 = 无入库;未排产 = 无产线。
+        //   ⚠ 原口径「完工 = 入库≥排产」把"生产做完了"(完工)和"货入完库了"混在一个词里,
+        //     用户报障「全部报工完成后不会变为完工,会变为已结案」即由此而来。
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             Map<String, Object> m = new LinkedHashMap<>(r);
             double sched = ((Number) r.getOrDefault("排产数量", 0)).doubleValue();
             double in = ((Number) r.getOrDefault("入库数量", 0)).doubleValue();
             String line = String.valueOf(r.getOrDefault("生产线", ""));
+            boolean closed = "Y".equals(String.valueOf(r.getOrDefault("结案", "N")));
+            String doneState = String.valueOf(r.getOrDefault("完工状态", ""));
+            boolean prodDone = "生产完工".equals(doneState) || "已完工".equals(doneState);
             m.put("生产状态", line.isBlank() ? "未排产"
-                    : sched > 0 && in >= sched ? "完工" : (in > 0 ? "在产" : "未完工"));
+                    : closed ? "已结案"
+                    : (prodDone || (sched > 0 && in >= sched)) ? "完工"
+                    : (in > 0 ? "在产" : "未完工"));
             out.add(m);
         }
         return ApiResult.ok(out);
