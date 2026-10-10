@@ -1,5 +1,5 @@
 <template>
-  <div class="sbars">
+  <div class="sbars" :class="{ 'sbars-scroll': scroll }" :style="scrollStyle" :tabindex="scroll ? 0 : undefined">
     <template v-if="data.length">
       <div v-for="(d, i) in data" :key="i" class="bar-row" :class="{ top: i === 0 && sorted }" :title="`${d.name}：${fmt(d.value)}${d.meta ? '（' + d.meta + '）' : ''}`">
         <span class="bar-label" :title="d.name">{{ d.name }}</span>
@@ -31,7 +31,16 @@ const props = defineProps({
   showPct: { type: Boolean, default: false },
   /** 数据已按降序传入(仅影响首行强调样式) */
   sorted: { type: Boolean, default: true },
+  /**
+   * 行数多时改为滚动查看(2026-10-10 现存量 TOP 需求)。
+   * 默认关 —— 本组件被桌面 10+ 处复用,只有条目会超出一屏的卡片才开。
+   */
+  scroll: { type: Boolean, default: false },
+  /** 滚动区最大高度;留空取默认 260px */
+  maxHeight: { type: String, default: '' },
 })
+
+const scrollStyle = computed(() => (props.scroll ? { maxHeight: props.maxHeight || '260px' } : null))
 
 const max = computed(() => {
   const m = Math.max(...props.data.map((d) => d.value || 0), 1)
@@ -59,6 +68,33 @@ function fmt(v) {
   flex-direction: column;
   gap: 10px;
   padding: 4px 2px;
+}
+/* 条目超出可视高度时滚动查看:不改全局 .sbars,只由 scroll prop 挂上 */
+.sbars-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 6px;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--t-border, rgba(0, 0, 0, 0.18)) transparent;
+}
+.sbars-scroll:focus-visible {
+  outline: 2px solid var(--el-color-primary, #116a5b);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.sbars-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.sbars-scroll::-webkit-scrollbar-thumb {
+  background: var(--t-border, rgba(0, 0, 0, 0.18));
+  border-radius: 3px;
+}
+.sbars-scroll::-webkit-scrollbar-thumb:hover {
+  background: var(--t-text-3, rgba(0, 0, 0, 0.32));
+}
+.sbars-scroll::-webkit-scrollbar-track {
+  background: transparent;
 }
 .bar-row {
   display: flex;

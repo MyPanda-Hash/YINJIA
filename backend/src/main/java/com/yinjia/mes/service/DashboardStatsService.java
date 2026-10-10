@@ -17,8 +17,8 @@ import java.util.Map;
  * 分层口径(2026-09-28,SQL 全部收敛在 service —— 代码规范 A2,不再往 ShellController 堆 SQL):
  *  - 生产 = 参考库 plang(工单行):完工=rk_no 已填 / 在产=其余;车间=scx;趋势=pl_date(新增)/cp_date(完工);
  *    工序完成率 = scjl 报工(gxdm 工序 × wgzt 完工)——未报工工序不出条,空数据=空态。
- *  - 库存 = inh/outh 两物理表(入库/出库):单数=DISTINCT 单号,行数=明细行;现存量 TOP = kucun.yl 按物料;
- *    物料名取 mate(取不到回退物料编码)。
+ *  - 库存 = inh/outh 两物理表(入库/出库):单数=DISTINCT 单号,行数=明细行;
+ *    现存量 TOP = v_stock_balance(库存状况表)按 存货编码+存货 跨仓库 SUM,全量下发由前端滚动展示;
  *  - 销售 = bd_so_order(头)/bl_so_order(行):状态取头表「单据状态」列(展示口径);金额=行 SUM(金额);
  *    TOP 产品 = 行 GROUP BY 存货名称。
  *  - 质量 = qc_insp_detail(明细):合格=SUM(合格数量),不合格=SUM(不良数量);趋势=按日期 送检/合格双线。
@@ -316,7 +316,9 @@ public class DashboardStatsService {
             // v_stock_balance 是实时聚合视图(v_stock_movement + inv_cost_ledger),含 存货编码/存货,
             // 故按 存货编码+存货 分组(跨仓库合计,同一物料多仓拆行需 SUM),
             // 名称作标签、编码作 meta 进 title 提示;其 asp_cancel 恒为 'N',过滤无意义故不写。
-            stock.put("topItems", nameValue("SELECT TOP 8 b.存货 AS k, SUM(b.现存量) AS v, b.存货编码 AS m"
+            // 2026-10-10:不设 TOP —— 卡片改滚动查看(SBars 的 scroll prop),截断会让"看不全"。
+            // v_stock_balance 为聚合视图,行数=物料数(演示库 31),全量下发无压力。
+            stock.put("topItems", nameValue("SELECT b.存货 AS k, SUM(b.现存量) AS v, b.存货编码 AS m"
                     + " FROM v_stock_balance b GROUP BY b.存货编码, b.存货 ORDER BY SUM(b.现存量) DESC"));
         } catch (Exception e) {
             stock.put("panels", List.of());

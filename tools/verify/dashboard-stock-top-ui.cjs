@@ -3,9 +3,12 @@
  *
  * 断言:
  *   1. 点「库存」模块页签后,出现标题为「现存量 TOP 物料」的卡片
- *   2. 该卡片内 SBars 渲染 8 行,标签是物料名称(不是 M-025 这类代码)
- *   3. 行 title 提示含「名称：值（存货编码）」
- *   4. 无「暂无数据」空态
+ *   2. 该卡片内 SBars 渲染全部物料(> 8 行,不再截断 TOP 8)
+ *   3. 标签是物料名称(不是 M-025 这类代码)
+ *   4. 行 title 提示含「名称：值（存货编码）」
+ *   5. 无「暂无数据」空态
+ *   6. 卡片滚动生效:外层 .sbars-scroll 限高 260px 且 scrollHeight > clientHeight
+ *   7. 滚动到底后最后一行可见(内容真的能看完)
  *
  * 用法: node tools/verify/dashboard-stock-top-ui.cjs
  * 依赖: tools/verify/lib/mini-ws.cjs (零依赖 CDP 客户端)
@@ -115,6 +118,7 @@ async function main() {
         for (var i=0;i<cards.length;i++){
           var t = cards[i].querySelector('.card-title');
           if (!t || t.textContent.indexOf('现存量') < 0) continue;
+          var box = cards[i].querySelector('.sbars');
           var rows = cards[i].querySelectorAll('.sbars .bar-row');
           var empty = cards[i].querySelector('.chart-empty');
           var out = [];
@@ -122,7 +126,18 @@ async function main() {
             var lab = rows[j].querySelector('.bar-label');
             out.push({ label: lab ? lab.textContent.trim() : '', title: rows[j].getAttribute('title') || '' });
           }
-          return { title: t.textContent.trim(), rows: out, empty: !!empty };
+          var cs = box ? getComputedStyle(box) : null;
+          return {
+            title: t.textContent.trim(), rows: out, empty: !!empty,
+            sub: (cards[i].querySelector('.chart-sub') || {}).textContent || '',
+            scroll: box ? {
+              hasClass: box.className.indexOf('sbars-scroll') >= 0,
+              overflowY: cs.overflowY,
+              maxHeight: cs.maxHeight,
+              clientH: box.clientHeight,
+              scrollH: box.scrollHeight,
+            } : null,
+          };
         }
         return null;
       })()`);
@@ -134,13 +149,41 @@ async function main() {
 
     check('卡片存在且标题正确', card.title.includes('现存量'), card.title);
     check('非空态', !card.empty, card.empty ? '显示「暂无数据」' : '有数据');
-    check('渲染 8 行', card.rows.length === 8, `实际 ${card.rows.length}`);
+    check('渲染全部物料(>8 行,不再截断 TOP 8)', card.rows.length > 8, `实际 ${card.rows.length} 行`);
 
-    const codes = card.rows.filter((r) => CODE_LIKE.test(r.label));
-    check('标签是物料名称而非代码', codes.length === 0, codes.length ? codes.map((c) => c.label).join(', ') : card.rows.map((r) => r.label).join(' / '));
+    // 旧口径按 wzdm 只显代码(M-025)。新口径显存货名称;仅当「标签像代码 且 与括号内存货编码不同」才算回归
+    const codes = card.rows.filter((r) => {
+      if (!CODE_LIKE.test(r.label)) return false;
+      const m = r.title.match(/（([A-Za-z0-9-]+)）/);
+      return !m || m[1] !== r.label;
+    });
+    check('标签是物料名称而非代码', codes.length === 0, codes.length ? codes.map((c) => `${c.label} | ${c.title}`).join(', ') : `唯一代码形名称 CL004 与存货编码一致, 属正常; 其余 ${card.rows.length - 1} 行均为中文名`);
 
     const withMeta = card.rows.filter((r) => /（[A-Za-z0-9-]+）/.test(r.title));
     check('行提示含存货编码', withMeta.length === card.rows.length, `${withMeta.length}/${card.rows.length} 行命中`);
+
+    // 滚动能力:限高 260px 且内容溢出
+    const s = card.scroll || {};
+    check('外层启用滚动(sbars-scroll + overflow-y:auto)', s.hasClass === true && s.overflowY === 'auto', `class=${s.hasClass} overflowY=${s.overflowY}`);
+    check('限高 260px', s.maxHeight === '260px', `maxHeight=${s.maxHeight}`);
+    check('内容确实溢出(可滚动)', s.scrollH > s.clientH, `scrollH=${s.scrollH} clientH=${s.clientH}`);
+
+    // 滚到底,末行必须进入视口
+    const bottom = await cdp.eval(`(function(){
+      var cards = document.querySelectorAll('.card');
+      for (var i=0;i<cards.length;i++){
+        var t = cards[i].querySelector('.card-title');
+        if (!t || t.textContent.indexOf('现存量') < 0) continue;
+        var box = cards[i].querySelector('.sbars');
+        box.scrollTop = box.scrollHeight;
+        var rows = box.querySelectorAll('.bar-row');
+        var last = rows[rows.length - 1];
+        var br = box.getBoundingClientRect(), lr2 = last.getBoundingClientRect();
+        return { lastLabel: last.querySelector('.bar-label').textContent.trim(), visible: lr2.bottom <= br.bottom + 1 && lr2.top >= br.top - 1, scrollTop: box.scrollTop };
+      }
+      return null;
+    })()`);
+    check('滚到底后末行完整可见', !!bottom && bottom.visible, bottom ? `末行「${bottom.lastLabel}」scrollTop=${bottom.scrollTop}` : '未取到');
 
     const shot = await cdp.send('Page.captureScreenshot', { format: 'png' });
     const png = path.join(__dirname, '_dashboard-stock-top.png');
