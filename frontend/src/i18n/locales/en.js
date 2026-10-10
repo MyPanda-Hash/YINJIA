@@ -755,6 +755,9 @@ export default {
     '空=全排': 'blank = all',
     '关键字': 'Keyword',
     '订单号 / 加工单号 / 产品 / 品名': 'Order / MO no. / item / name',
+    // 快速排产关键字新增「工单号#行号」精确到行的写法(2026-10-15 用户报障:按工单号筛会带出该单所有行)
+    '订单号 / 加工单号 / 产品 / 品名;只要某一行可写 工单号#行号':
+      'Order / MO no. / item / name; type MO no.#line to narrow to a single line',
     '批量排入勾选': 'Assign Selected',
     '待排产': 'Pending',
     '笔': 'rows',

@@ -15,7 +15,7 @@
         </el-select>
       </el-form-item>
       <el-form-item :label="tt('关键字')">
-        <el-input v-model="keyword" :placeholder="tt('订单号 / 加工单号 / 产品 / 品名')" clearable style="width: 250px" @keyup.enter="loadAll" />
+        <el-input v-model="keyword" :placeholder="tt('订单号 / 加工单号 / 产品 / 品名;只要某一行可写 工单号#行号')" clearable style="width: 250px" @keyup.enter="loadAll" />
       </el-form-item>
       <el-button type="primary" @click="loadAll">{{ tt('查询') }}</el-button>
       <el-button :loading="loading" @click="loadAll">{{ tt('刷新') }}</el-button>
@@ -108,9 +108,12 @@ import request from '@core/request'
 import { tt } from '@/i18n'
 import ProcessRoutePlanDialog from './ProcessRoutePlanDialog.vue'
 
-/** 内嵌/筛选(2026-10-05 用户口径):生产工单页把"快速排产页面本身"弹出来,并只筛当前工单 */
+/** 内嵌/筛选(2026-10-05 用户口径):生产工单页把"快速排产页面本身"弹出来,并只筛当前工单;
+ *  2026-10-15 补「工单行号」—— 用户口径「工单号+工单行号确定当前唯一工单」:
+ *  从生产工单页**勾某一行**点「排产」时,弹窗必须只出**那一行**,不能再把同工单所有行都列出来。 */
 const props = defineProps({
   '工单号': { type: String, default: '' },
+  '工单行号': { type: [Number, String], default: null },
   embedded: { type: Boolean, default: false },
 })
 
@@ -210,8 +213,14 @@ async function unassign() {
 function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
 onMounted(() => {
-  // 内嵌模式(2026-10-05 用户口径):生产工单页弹出"快速排产页面本身",用**工单号**预置单框搜索 ⇒ 只显示当前工单
-  if (props['工单号']) keyword.value = props['工单号']
+  // 内嵌模式(2026-10-05 用户口径):生产工单页弹出"快速排产页面本身",预置单框搜索 ⇒ 只显示当前工单。
+  // 2026-10-15:带了**工单行号**时预置成「工单号#行号」标识形式 ⇒ **只显示这一行**
+  //   (用户报障「勾选单一工单号+行号的一条单据,同样会显示全部相同工单号的行」;
+  //    后端 pending/today 已支持该形式,见 ScheduleBoardService.parseWoLineKey)。
+  if (props['工单号']) {
+    const xc = props['工单行号']
+    keyword.value = (xc === null || xc === undefined || xc === '') ? props['工单号'] : `${props['工单号']}#${xc}`
+  }
   loadAll()
 })
 </script>

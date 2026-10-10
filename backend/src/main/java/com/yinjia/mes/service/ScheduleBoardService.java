@@ -75,6 +75,10 @@ public class ScheduleBoardService {
         String kw = keyword == null ? "" : keyword.trim();
         String like = "%" + kw + "%";
         String cu = customer == null ? "" : customer.trim();
+        // 「工单号#行号」标识形式(用户口径 2026-10-15):命中时**只出这一行**,不再把同工单所有行都捞出来
+        String[] key = parseWoLineKey(kw);
+        String noLike = key == null ? like : "%" + key[0] + "%";
+        Integer xcEq = key == null ? null : Integer.valueOf(key[1]);
         return jdbc.queryForList(
                 "SELECT p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 工单行号, ISNULL(p.[批次号],N'') AS 批次号,"
                         + " CONVERT(varchar(10), p.pl_date, 120) AS 单据日期,"
@@ -93,12 +97,37 @@ public class ScheduleBoardService {
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
                         + " WHERE ISNULL(p.asp_cancel,'N') <> 'Y' AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
                         + "   AND ISNULL(p.scx, N'') = N''"
-                        + "   AND (? = '' OR p.pl_no LIKE ? OR p.od_no LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR p.khdm LIKE ? OR ISNULL(dk.mc,'') LIKE ?)"
+                        // 关键字:单号用 noLike(标识形式时已剥掉 #行号 部分);批次号也参与(它基本等同于一行的身份)
+                        + "   AND (? = '' OR p.pl_no LIKE ? OR p.od_no LIKE ? OR p.dm LIKE ? OR p.mc LIKE ? OR p.khdm LIKE ?"
+                        + "        OR ISNULL(dk.mc,'') LIKE ? OR ISNULL(p.[批次号],N'') LIKE ?)"
+                        // 「工单号#行号」:把结果钉到这一行(与去重键/占用链同一种写法)
+                        + "   AND (? IS NULL OR ISNULL(p.pl_xc,0) = ?)"
                         + "   AND (? = '' OR ISNULL(dk.mc, p.khdm) = ?)"
                         // 2026-10-11 用户拍板:待排产按转单时间倒序——新结转的工单置顶(asp_time1=转单留痕,
                         // 与生产工单列表"转单时间"同源;NULL 旧数据沉底,次级 pl_date DESC 对齐工单列表口径)
                         + " ORDER BY p.asp_time1 DESC, p.pl_date DESC, p.pl_no, p.pl_xc",
-                kw, like, like, like, like, like, like, cu, cu);
+                kw, noLike, like, like, like, like, like, like, xcEq, xcEq, cu, cu);
+    }
+
+    /**
+     * 解析关键字里的「**工单号#行号**」标识形式(用户口径 2026-10-15:「工单号+工单行号确定当前唯一工单」)。
+     *
+     * <p>支持 {@code MO-2026-10-0004#2}、全角 {@code ＃}、以及 {@code #} 两侧有空格;
+     * 行号部分必须是纯数字,否则视为普通关键字(返回 null)⇒ 调用方走原来的模糊匹配。
+     * 这是排产页「只查这一行」的入口 —— 原来只能按工单号模糊查,一个单号必然带出该单**所有行**。
+     *
+     * @return {@code [工单号, 行号]};不是标识形式时 null
+     */
+    private static String[] parseWoLineKey(String kw) {
+        if (kw == null || kw.isBlank()) return null;
+        int i = kw.indexOf('#');
+        if (i < 0) i = kw.indexOf('＃');
+        if (i <= 0 || i == kw.length() - 1) return null;
+        String no = kw.substring(0, i).trim();
+        String xc = kw.substring(i + 1).trim();
+        if (no.isEmpty() || xc.isEmpty()) return null;
+        try { Integer.parseInt(xc); } catch (NumberFormatException e) { return null; }
+        return new String[]{no, xc};
     }
 
     /**
@@ -365,6 +394,10 @@ public class ScheduleBoardService {
         String ws = (workshop == null || workshop.isBlank()) ? "" : workshop.trim();
         String kw = keyword == null ? "" : keyword.trim();
         String like = "%" + kw + "%";
+        // 「工单号#行号」标识形式:命中时只出这一行(与待排产同口径,用户口径 2026-10-15)
+        String[] key = parseWoLineKey(kw);
+        String noLike = key == null ? like : "%" + key[0] + "%";
+        Integer xcEq = key == null ? null : Integer.valueOf(key[1]);
         boolean all = "all".equalsIgnoreCase(mode);
         return jdbc.queryForList(
                 "SELECT ISNULL(p.scx,N'') AS 生产线, p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 工单行号,"
@@ -388,11 +421,13 @@ public class ScheduleBoardService {
                         + " WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'') <> N''"
                         + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
                         + (all ? "" : " AND CONVERT(varchar(10), p.asp_time2, 120) = CONVERT(varchar(10), GETDATE(), 120)")
-                        + "   AND (? = '' OR p.pl_no LIKE ? OR p.scx LIKE ? OR p.dm LIKE ?)"
+                        + "   AND (? = '' OR p.pl_no LIKE ? OR p.scx LIKE ? OR p.dm LIKE ? OR p.mc LIKE ?"
+                        + "        OR ISNULL(p.[批次号],N'') LIKE ?)"
+                        + "   AND (? IS NULL OR ISNULL(p.pl_xc,0) = ?)"
                         + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = p.scx"
                         + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))"
                         + " ORDER BY p.scx, p.pl_no, p.pl_xc, p.[批次号]",
-                kw, like, like, like, ws, ws);
+                kw, noLike, like, like, like, like, xcEq, xcEq, ws, ws);
     }
 
     /**

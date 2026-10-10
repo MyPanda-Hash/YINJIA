@@ -116,11 +116,11 @@
       </el-table-column>
     </el-table>
 
-    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**,用工单号筛选 ⇒ 只显示当前工单 -->
+    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**,按「工单号+工单行号」筛选 ⇒ 只显示当前这一行 -->
     <el-dialog v-model="schedVisible" :title="tt('工单排产（快速排产）')" width="94%" top="4vh" append-to-body destroy-on-close
                @closed="load">
       <div style="height: 76vh; overflow: hidden">
-        <ScheduleBoard :工单号="schedNo" embedded />
+        <ScheduleBoard :工单号="schedNo" :工单行号="schedXc" embedded />
       </div>
     </el-dialog>
 
@@ -198,14 +198,19 @@ const traceVisible = ref(false)
 const traceNo = ref('')
 /** 追溯的工单行id(plang.id):行级口径必需(2026-10-15) */
 const traceRowId = ref(null)
-/** 工单排产弹窗(2026-10-05 用户口径):只带当前这一张工单的快速排产 */
+/** 工单排产弹窗(2026-10-05 用户口径):只带**当前这一行**的快速排产 */
 const schedVisible = ref(false)
 const schedNo = ref('')
+/** 弹窗要预筛的工单行号(2026-10-15):带它 ⇒ 快速排产只出这一行,而不是同工单所有行 */
+const schedXc = ref(null)
 function openSchedule() {
   const r = (checked.value.length === 1 ? checked.value[0] : currentRow.value) || checked.value[0]
   if (!r) { ElMessage.warning(tt('请先勾选一张工单')); return }
   if (r['生产线']) { ElMessage.warning(`${tt('该工单已排产')}(${r['生产线']})，${tt('不能重复排入;换线请先撤销排产')}`); return }
   schedNo.value = r['工单号']
+  // 行级(用户口径「工单号+工单行号确定当前唯一工单」):把行号一并带给弹窗内的快速排产,
+  //   否则弹窗只按工单号筛 ⇒ 同工单其它行也一起列出来(用户报障场景)
+  schedXc.value = r['工单行号'] ?? null
   schedVisible.value = true
 }
 
