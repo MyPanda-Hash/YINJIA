@@ -135,9 +135,22 @@ public class WoReportService {
         //   ① 报工的工序必须在 plang.工艺路线 的工序明细内;
         //   ② 不得跳序:路线中排在该工序之前的工序若尚无**已审核**报工 → 拦截(提示先报前道)。
         // 工单未关联路线时不校验(兼容历史单);校验在**写入之前**,失败不落任何数据。
-        List<String> rtRows = jdbc.queryForList(
-                "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + " AND ISNULL([工艺路线],N'')<>N''", String.class, wo);
+        // 🔴 2026-10-15 修(用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、流程追溯都这样实现」):
+        //   原按 `pl_no` 取**整单首条非空路线** —— 而**同一工单号的不同行可以有不同路线**
+        //   (实测 GD-2026-10-0002:行2/3/4 = GY-2026-10-0003,行1/5/6/7/8 = GY-CB-STD)
+        //   ⇒ 给行2 报工时拿的是行1 的路线,工序校验/不跳序判断全落在**别的行**的工序集上
+        //   (正确工序被拒 / 错误工序被放行)。现改为取**本行**(工单行id → 批次兜底)的路线。
+        Long repRowId = resolveRowIdForReport(wo, rptBatch);
+        List<String> rtRows = repRowId != null
+                ? jdbc.queryForList("SELECT ISNULL([工艺路线],N'') FROM dbo.plang WHERE id=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL([工艺路线],N'')<>N''", String.class, repRowId)
+                : List.of();
+        if (rtRows.isEmpty()) {
+            // 行定位不到(历史单/没带批次):退回整单口径,与旧行为一致
+            rtRows = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + " AND ISNULL([工艺路线],N'')<>N''", String.class, wo);
+        }
         String route = rtRows.isEmpty() ? "" : rtRows.get(0);
         if (!route.isBlank()) {
             List<String> ops = jdbc.queryForList(
@@ -149,12 +162,23 @@ public class WoReportService {
                         + String.join("→", ops) + "),不能报工");
             }
             for (int i = 0; i < idx; i++) {
-                // 不跳序:按**本次报工的行/批次**判(2026-10-07 行级口径);报工单没批次号时退回工单级
-                Integer done = jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM dbo.scjl WHERE gldh=? AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                                + " AND ISNULL(wgzt,'N')='Y'"
-                                + " AND (? = N'' OR ISNULL([批次号],N'') = ?)",
-                        Integer.class, wo, ops.get(i), rptBatch, rptBatch);
+                // 不跳序:按**本次报工的行**判(2026-10-15:工单号+工单行号才是唯一工单 ⇒ 前道是否已报
+                //   要看**本行**;原来只按批次号比,同批次多行时会看到别的行的报工)
+                Integer done;
+                if (repRowId != null) {
+                    done = jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM dbo.scjl s WHERE s.gldh=? AND s.gxdm=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                                    + " AND ISNULL(s.wgzt,'N')='Y'"
+                                    + " AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = ?)"
+                                    + "      OR (ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') = ?))",
+                            Integer.class, wo, ops.get(i), repRowId, rptBatch);
+                } else {
+                    // 行定位不到(历史单/没带批次):退回工单级,与旧行为一致
+                    done = jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM dbo.scjl WHERE gldh=? AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                                    + " AND ISNULL(wgzt,'N')='Y'",
+                            Integer.class, wo, ops.get(i));
+                }
                 if (done == null || done == 0) {
                     throw new IllegalStateException("前道工序「" + ops.get(i) + "」尚未报工,不能跳到「" + op
                             + "」(工单路线:" + String.join("→", ops) + ")");
@@ -252,6 +276,32 @@ public class WoReportService {
                 t.get("od_no"), t.get("od_xc"), t.get("zl"), t.get("llxz"), t.get("djlx"), t.get("pc_batch"),
                 t.get("pl_xc"),
                 jcNo, user, user, rowId);
+    }
+
+    /**
+     * 报工单 → **工单行**(plang.id):行级口径的唯一身份(用户口径 2026-10-15
+     * 「工单号+工单行号确定当前唯一工单」)。
+     *
+     * <p>解析顺序(取不到返回 null,调用方退回整单口径 = 旧行为):
+     * ① 本单已锚定的 {@code scjl.gd_id}(= plang_pc.id)→ {@code plang_pc.plang_id = plang.id};
+     * ② 本单带了批次号 → 按(工单号 + 批次号)找该行(**恰命中 1 行**才认,多行不猜);
+     * ③ 都不行 → null。
+     */
+    private Long resolveRowIdForReport(String wo, String rptBatch) {
+        if (wo == null || wo.isBlank()) return null;
+        List<Long> anchored = jdbc.queryForList(
+                "SELECT TOP 1 pc.plang_id FROM dbo.scjl s JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
+                        + " JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.gd_id,0) > 0"
+                        + " ORDER BY s.id DESC", Long.class, wo);
+        if (!anchored.isEmpty() && anchored.get(0) != null) return anchored.get(0);
+        if (rptBatch != null && !rptBatch.isBlank()) {
+            List<Long> byBatch = jdbc.queryForList(
+                    "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL([批次号],N'')=?"
+                            + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", Long.class, wo, rptBatch);
+            if (byBatch.size() == 1) return byBatch.get(0);
+        }
+        return null;
     }
 
     private static double num(Object o) {

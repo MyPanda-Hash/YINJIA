@@ -475,13 +475,15 @@ public class ScheduleBoardService {
         else if ("全部".equals(scope)) complete = "";
         else complete = " AND st.[生产状态] <> N'完工' AND st.[生产状态] <> N'已结案'";
         // ── 「当前工序」/「上道工序」表达式(2026-10-07 用户口径)──────────────────────────
-        //   当前工序 = 预排台账里最后一道「已落实」(转到切炭线后就显示切炭);缺台账回落报工派生值 wpp.当前工序
-        //   ⚠ 原来直接用 wpp(最后一道**有报工**的工序)⇒ 到了切炭线还显示成型的量(用户报障)
+        //   当前工序 = 预排台账里最后一道「已落实」(转到切炭线后就显示切炭);缺台账回落**本行** p.当前工序
+        // 🔴 2026-10-15 修(用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、流程追溯都这样实现」):
+        //   回落值原取 wpp.当前工序 —— 视图 v_wo_process_progress 是**按单号聚合**的整单派生值
+        //   ⇒ 同工单所有行显示同一个工序(与行级口径冲突)。现回落 p.[当前工序](本行状态列)。
         //   ⚠ 不跨 CROSS APPLY 引用别名(T-SQL 实测「Invalid column name」)⇒ 拼成局部变量复用
         final String curOp = "ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
                 + " WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                 + "   AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                + " ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(wpp.当前工序,N''))";
+                + " ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序],N''))";
         final String prevOp = "(SELECT TOP 1 r4.工序名称 FROM dbo.bs_route r4"
                 + " WHERE r4.工艺路线编码 = ISNULL(p.[工艺路线],N'') AND ISNULL(r4.asp_cancel,'N')<>'Y'"
                 + "   AND ISNULL(r4.加工顺序,999) < ISNULL(NULLIF((SELECT TOP 1 w4.工序序 FROM dbo.wo_process_line w4"
@@ -561,7 +563,9 @@ public class ScheduleBoardService {
                         + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
                         + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
-                        + " LEFT JOIN dbo.v_wo_process_progress wpp ON wpp.单号 = p.pl_no"                        + " CROSS APPLY (SELECT CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0)"
+                        // ⚠ 2026-10-15 移除 `LEFT JOIN v_wo_process_progress wpp`(整单聚合视图,与行级口径冲突;
+                        //   其唯一用处 wpp.当前工序 已改为回落本行 p.[当前工序],见上方 curOp)
+                        + " CROSS APPLY (SELECT CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0)"
                         + "   THEN N'完工' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS [生产状态]) st"
                         + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'') = ?"
                         + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = pc.scx"

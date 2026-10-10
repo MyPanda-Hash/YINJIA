@@ -116,12 +116,16 @@ public class WorkOrderListController {
                         // 「这单走到哪道工序」由报工派生(视图 v_wo_process_progress) —— 现场问的
                         // 「这是组装单还是成型单」= 当前工序指针,前端直接显示
                         // 「当前工序」= 该工单行**现在该做的工序**(2026-10-07 用户口径修正):
-                        //   预排台账里最后一道「已落实」优先(在切炭线就该显示切炭),台账缺失时回落报工派生值。
-                        //   ⚠ 原来直接用报工派生值 ⇒ 到了切炭线还显示成型(用户截图为证)。
+                        //   预排台账里最后一道「已落实」优先(在切炭线就该显示切炭),台账缺失时回落**本行**状态。
+                        // 🔴 2026-10-15 修(用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、
+                        //   流程追溯都这样实现,都需要这两个进行确定」):回落值原取视图 prg.当前工序 ——
+                        //   那是**按单号聚合**的整单派生值 ⇒ 同工单所有行显示同一个工序(实测行2 路线是
+                        //   GY-2026-10-0003 首道应为混料,却因视图显示成整单的成型)。
+                        //   现改为回落 **p.当前工序**(本行自己的状态列,由 ProcessTaskService 按行维护)。
                         + " ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
                         + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                         + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(prg.当前工序, N'')) AS 当前工序,"
+                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序,"
                         // 当前工序完工量 = **该工单行**该道的已审报工量(2026-10-07:视图按单号聚合=整单口径,
                         //   与单行计划量配对会出现作用域错配「整单 56000 / 单行 75」⇒ 按行锚定)
                         + " ISNULL((SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s"
@@ -147,13 +151,16 @@ public class WorkOrderListController {
                         + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
                         + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
-                        // 当前工序/工序进度(视图:按报工派生;见 tools/migrate-wo-process-progress-view.sql)
-                        + " LEFT JOIN dbo.v_wo_process_progress prg ON prg.单号 = p.pl_no"
-                        // 当前工序 = 预排台账最后一道「已落实」(该行现在该做的工序),缺台账回落报工派生值
+                        // ⚠ 2026-10-15 移除 `LEFT JOIN v_wo_process_progress prg ON prg.单号 = p.pl_no`:
+                        //   该视图是**按单号聚合**的整单派生值(当前工序/进度/完工合计),与「工单号+工单行号
+                        //   才是唯一工单」的口径冲突;且它是**一对多**风险源(视图按单号一行,join 尚安全,
+                        //   但语义已是整单)。本查询已全部改用行级来源:当前工序取台账→本行 p.[当前工序]、
+                        //   当前工序完工量按 p.id 锚定、当前工序计划量按本行路线换算 ⇒ 不再需要该视图。
+                        // 当前工序 = 预排台账最后一道「已落实」(该行现在该做的工序),缺台账回落**本行** p.当前工序
                         + " CROSS APPLY (SELECT ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
                         + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                         + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(prg.当前工序, N'')) AS 当前工序) cop"
+                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序) cop"
                         + w + " ORDER BY p.pl_date DESC, p.pl_no, p.pl_xc",
                 args.toArray());
         // 生产状态(与 v_manu_schedule 同口径:完工=入库≥排产;在产=有入库;其余未完工;未排产行=未排产)
