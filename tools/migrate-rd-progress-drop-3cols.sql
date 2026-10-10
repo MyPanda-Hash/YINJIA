@@ -28,7 +28,9 @@ UPDATE yj_field SET hidden = 1
    AND label IN (N'技术目标达成', N'是否市场转化', N'未转换原因')
    AND ISNULL(hidden, 0) <> 1;
 SET @n = @@ROWCOUNT;
-RAISERROR(N'OK 置 hidden=1 影响 %d 行(0 = 本来就已经撤下)', 16, 1, @n);
+-- ⚠ 2026-10-15 修:成功/进度类自检原用 severity 16 ⇒ JDBC 抛 SQLException,DbSync 把本该成功的
+--   迁移判为 FAIL 且不写 yj_schema_log(卡住队列、每次重跑)。信息级改用 severity 10,失败仍 16。
+RAISERROR(N'OK 置 hidden=1 影响 %d 行(0 = 本来就已经撤下)', 10, 1, @n) WITH NOWAIT;
 GO
 
 -- ② 自检:这三列必须全部 hidden=1,且物理列仍在(没被误删)
@@ -40,7 +42,7 @@ DECLARE @t int = (SELECT COUNT(*) FROM yj_field
                    WHERE panel_code = N'RD_PROGRESS'
                      AND label IN (N'技术目标达成', N'是否市场转化', N'未转换原因'));
 IF @h = 3 AND @t = 3
-  RAISERROR(N'SELFCHECK OK 三列全部 hidden=1(3/3),yj_field 行保留', 16, 1);
+  RAISERROR(N'SELFCHECK OK 三列全部 hidden=1(3/3),yj_field 行保留', 10, 1) WITH NOWAIT;
 ELSE
   RAISERROR(N'SELFCHECK FAIL hidden=%d/3 命中=%d/3', 16, 1, @h, @t);
 GO

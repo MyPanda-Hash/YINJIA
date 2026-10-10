@@ -32,8 +32,13 @@ DECLARE @cfg nvarchar(400);
 SELECT TOP 1 @cfg = CONVERT(nvarchar(400), config) FROM yj_panel WHERE panel_code = N'RD_PROGRESS';
 IF @cfg IS NULL
   RAISERROR(N'SELFCHECK FAIL: RD_PROGRESS 不存在或 config 为 NULL', 16, 1);
+-- ⚠ 2026-10-15 修:成功分支原用 RAISERROR(...,16,1) ⇒ JDBC st.execute() 直接抛 SQLException,
+--   DbSync 把这条**本该成功的迁移**判为 FAIL 且**不写 yj_schema_log** ⇒ 下次重跑、且队列被卡住
+--   (实测:脚本三批全生效、config={"singleDoc":true},日志里却 0 行记录)。
+--   成功自检改用 **severity 10**(信息级,以 SQLWarning 返回;DbSync 白名单已含 0/5701 等,
+--   10 走 [print] 分支打印而不中断)。失败分支仍保留 16 —— 失败就该真失败。
 ELSE IF REPLACE(REPLACE(REPLACE(@cfg, N' ', N''), CHAR(10), N''), CHAR(13), N'') LIKE N'%"singleDoc":true%'
-  RAISERROR(N'SELFCHECK OK  RD_PROGRESS config = %s', 16, 1, @cfg);
+  RAISERROR(N'SELFCHECK OK  RD_PROGRESS config = %s', 10, 1, @cfg) WITH NOWAIT;
 ELSE
   RAISERROR(N'SELFCHECK FAIL  config 仍不含 singleDoc:true = %s', 16, 1, @cfg);
 GO

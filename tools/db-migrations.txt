@@ -2723,3 +2723,58 @@ migrate-bin-on-purchase-in-20261009.sql
 #   ⚠ 不是四单基线之一(QC_INSP_REC 不在 fourdoc-baseline.tsv),四单基线无需重跑。
 #   幂等(UPDATE 窄条件 + 末尾三自检:两列四行=参照/INV、物理列仍在、越界参照计数);两账套均执行。
 migrate-qc-insp-rec-material-ref-20261009.sql
+
+# ════════════════════════════════════════════════════════════════════════════
+# ── 2026-10-15 补登记:远端 2026-10-09 合并带进来的 5 条迁移此前**漏登记清单** ──
+#   背景:origin/main 的 c735f4ed(合并 69 提交)把脚本文件带进仓库,却**没往本清单登记**
+#         ⇒ DbSync 按清单跑,这 5 条永远不会被应用(本地实测:RD_APPROVAL 的 对接人/项目责任人
+#         字段 0 命中、RD_PROGRESS 仍是 43 字段多列形态)。脚本自述均为「幂等;两个账套都要执行」。
+#   顺序:grant → revoke 必须按此序(revoke 是 2026-10-09 终稿,口径为「cp 不该能点审批通过」,
+#         它把 grant 写的 can_approve 与源列 perms 一起归零 ⇒ 倒序会让 grant 复活那次授权)。
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── 立项申请(RD_APPROVAL)加「对接人」「项目责任人」两个流程字段 + 研发审核角色开审批权 ──
+#   用 RD_APPROVAL 的 备用1/备用2 物理列承载(全库 0 命中,标签不撞);含 yj_translation 译名。
+#   ⚠ 其第 ④ 步给 rd_review 开的 can_approve 已被下一条 revoke 收回 —— 保留在本清单是为
+#     让链路完整可重放(revoke 幂等且必在其后)。
+migrate-rd-approval-liaison-owner.sql
+
+# ── 项目进度查询(RD_PROGRESS)登记为「单单据面板」(yj_panel.config 补 "singleDoc": true) ──
+#   配套 57166963「改成汇总查看面板(纸面 11 列 + 单元格恒只读 + 侧栏分类归位)」。
+migrate-rd-progress-singledoc.sql
+
+# ── 项目进度查询从面板上撤下 3 列(技术目标达成 / 是否市场转化 / 未转化原因) ──
+#   与 singledoc 同属「11 列纸面」收口,须在其后执行。
+migrate-rd-progress-drop-3cols.sql
+
+# ── 收回 rd_review 角色对 RD_APPROVAL 的审批权(2026-10-09 用户口径:cp 不该能点「审批通过」)──
+#   ⚠ 本脚本修的是 liaison-owner 第 ④ 步的缺陷:它只写派生列 can_approve、没写源列 perms
+#     ⇒ 权限矩阵界面(读 perms)显示无审批权,运行时(读 can_approve)却放行。
+#   ⚠ 决策一天内翻了两次:用户先说"cp 不该能点审批通过"(即本条),**随即改为"还是选 a"= 保留审批权**
+#     ⇒ 下一条 grant 才是**终稿**,本条的净效果被它覆盖。
+#   链序必须 revoke → grant;倒序会让 revoke 成为最终态,把用户的最终选择抹掉。
+migrate-revoke-rd-review-approve.sql
+
+# ── 【终稿】rd_review 对 RD_APPROVAL **保留**审批权,并把源列 perms 补上 audit(界面与运行时归一)──
+#   用户最终口径「还是选 a」;后果(已确认):cp 继续能「审批通过/项目定级/分发对接人」。
+#   必须在 revoke 之后执行 —— 它把 revoke 归零的两列一起置回 Y,是整条链的净效果。
+migrate-grant-rd-review-approve.sql
+
+# ── 采购入库明细「仓位」+ 库位默认标记 + 商品档案默认库位可见(2026-10-09,bin-on-purchase-in)──
+#   记录在案但**未随本次补登记执行**:该条属四单基线链路,落地后须重跑
+#   _gen-fourdoc-restore.mjs 与 _gen-doc-fields-md.mjs(脚本头注明示)。
+#   本次任务只补「漏登记导致永远不跑」的脚本,四单基线相关迁移另案处理,避免夹带。
+#   ℹ 该脚本虽未登记,却已于 2026-10-09 14:17 由他人在本机正式库执行过(见 yj_schema_log),
+#     这也是四单基线闸当前 FAIL 的来源(见下方备注)。
+# migrate-bin-on-purchase-in-20261009.sql
+
+# ── 备注:四单基线回归闸当前 FAIL 182 处 —— 属**既有问题,非本次改动引入** ──
+#   证据:① 本批补登记只执行 RD_PROGRESS / yj_role_panel 相关脚本,与 QC_INSP/PURCHASE_IN 无关;
+#         ② tools/fourdoc-baseline.tsv 自 2026-10-08 起未被任何提交改动。
+#   偏离项全部落在这两条既有改动上(bin-on-purchase-in-20261009.sql,2026-10-09 14:17 执行):
+#     · PURCHASE_IN 明细「仓位名称」(文本/hidden)就地改造成「仓位」参照,seq 195;
+#       仓位编码 被移到 seq 680 ⇒ 闸报「多出 仓位编码@680 / 缺失 @195」。
+#     · QC_INSP 批次号 seq 60→150、部门 明细 seq 230→90。
+#   处置(按《采购链四单字段与显示字段》§8):须重跑
+#     node tools/archive/_gen-fourdoc-restore.mjs 刷新 ①回正脚本 ②fourdoc-baseline.tsv,
+#   并在确认这些偏离是「有意改动」后连同迁移脚本单独提交 —— 属另一任务,本次不夹带。
