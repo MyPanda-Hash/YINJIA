@@ -2452,6 +2452,7 @@ public class ButtonService {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT id, ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL(sl,0) AS 报工数量,"
                         + " ISNULL(scx,N'') AS 生产线, ISNULL([批次号],N'') AS 批次号, ISNULL(wzdm,N'') AS 产品编码,"
+                        + " ISNULL(gd_id,0) AS gd_id, [工单行号] AS own_xc,"
                         + " ISNULL(mc,N'') AS 产品名称, ISNULL(gg,N'') AS 规格型号 FROM dbo.scjl"
                         + " WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", repNo);
         for (Map<String, Object> r : rows) {
@@ -2467,6 +2468,17 @@ public class ButtonService {
             Map<String, Object> head = new LinkedHashMap<>();
             head.put("单据日期", LocalDate.now().toString());
             head.put("工单号", r.get("工单号"));
+            // 工单行号(2026-10-15 用户口径「工单号+工单行号确定当前唯一工单」):
+            //   检验单也要带行键,否则同工单多行的检验单在列表/追溯上分不出是哪一行。
+            //   取 scjl.[工单行号];老报工没这个值时用 resolveWoRow(经 gd_id → plang_pc.plang_id,
+            //   再退 (工单号+批次号))反查该行;仍取不到就不写(不猜行)。
+            Integer ownXc = r.get("own_xc") == null ? null : ((Number) r.get("own_xc")).intValue();
+            if (ownXc == null || ownXc == 0) {
+                Map<String, Object> prow = resolveWoRow(String.valueOf(r.get("工单号")),
+                        (long) numOr(r.get("gd_id")), r.get("批次号") == null ? null : String.valueOf(r.get("批次号")));
+                if (prow != null && prow.get("pl_xc") != null) ownXc = ((Number) prow.get("pl_xc")).intValue();
+            }
+            if (ownXc != null && ownXc != 0) head.put("工单行号", ownXc);
             head.put("报工单号", repNo);
             head.put("工序", op);
             if (!String.valueOf(r.get("批次号")).isBlank()) head.put("批次号", r.get("批次号"));

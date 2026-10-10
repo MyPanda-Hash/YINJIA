@@ -2783,3 +2783,17 @@ migrate-material-out-wo-line-query-col-20261015.sql
 #   从生产完工退回且原已结案→N)。⚠ 只重算这四列派生缓存,不碰单据/报工/库存数据。
 #   自检:不应再有"无报工却在制"的行。幂等(重跑结果一致);两账套均执行。
 migrate-plang-row-state-backfill-20261015.sql
+
+# migrate-wo-insp-wo-line-20261015.sql(2026-10-15):三张工序检验单(成型/切炭/组装)表头补「工单行号」
+#   + 字段注册 + 译名 + 存量回填。用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、
+#   流程追溯都这样实现,都需要这两个进行确定」—— 检验单是工序链一环(报工审核自动生单),
+#   原来单头只有 工单号+报工单号+批次号:工单号只能定位整单,报工单号虽能经 scjl.gd_id 间接反查行,
+#   但检验单自身/列表/追溯拿不到行键 ⇒ 同工单多行的检验单在界面上长得一样。
+#   内容:① qc_mold_insp_head/qc_cut_insp_head/qc_asm_insp_head 各补 int 列 [工单行号]+中文注明;
+#         ② yj_field 注册三面板「工单行号」(place='query,header' 列表+表单可见,seq 35 紧随 工单号 30、
+#            在 报工单号 40 之前;只读,值由系统按 scjl.[工单行号] 写入);
+#         ③ yj_translation en 译名(field/工单行号 = WO Line,全局共享词条);
+#         ④ 存量回填:按 报工单号 → scjl.[工单行号],仅**能唯一确定**的(恰一个行号)才回填,否则留 NULL。
+#   配套代码:ButtonService.woInspGenerate 写入「工单行号」(取 scjl.[工单行号],缺失时经 resolveWoRow 反查)。
+#   ⚠ 这三张表不在采购链四单基线(FourDocAudit)范围内。幂等;两账套均执行。
+migrate-wo-insp-wo-line-20261015.sql

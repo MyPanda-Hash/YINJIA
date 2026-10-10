@@ -15,7 +15,8 @@
  */
 const args = process.argv.slice(2)
 const BASE = (args.find((a) => a.startsWith('http')) || 'http://127.0.0.1:8090').replace(/\/$/, '')
-const CLEAN = args.includes('--clean')
+// 默认**自清理**(保持探针可反复重跑);传 --no-clean 可保留产物人工查看
+const CLEAN = !args.includes('--no-clean')
 // 测试库 fixture 选择(2026-10-15 实测):
 //   MO-2026-09-0006 有 4 行 pl_xc 全 =1,但存在一张**真实的未审核整单级草稿** LL2609280001
 //     (工单行号=0,4 行明细)—— 按本类口径「工单级单据视为占整单」,**拦它是正确行为**,
