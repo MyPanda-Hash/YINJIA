@@ -3400,6 +3400,17 @@ const DOC_RAIL_PANELS = {
     // 已转=转ERP成功才有(ERP单号成功回填/弃审清空;是否已转ERP 未入 yj_field 不随行下发,作首选信号)
     derive: (row) => (String(row?.['是否已转ERP'] ?? '') === '是' || String(row?.['ERP单号'] ?? '').trim() !== '' ? '已转' : '未转'),
   }],
+  // 三张出库单(2026-10-15 用户口径:「为成品出库、销售出库与材料出库,都配置与销售订单一样的订单选择列」)
+  // 左栏结构与销售订单**完全一致**(单号 | 日期 | 中间1列 | 审核状态,同一套 docRailCfg 组装),
+  // 只把中间列按各自单据语义填「这张单归属于谁/走哪条线」——这三个面板都没有「客户」字段
+  // (实测 yj_field:仅 SALE_OUT 有 客户),故硬填「客户」只会得到一列全空(列名对齐而数据对不齐),
+  // 改按**实测有值率**挑列(HSDZ_MES 计数:nz/total —— 空列等于没配):
+  //   SALE_OUT     → 客户      :销售出库对象,与销售订单同义(54/54 有值)
+  //   MATERIAL_OUT → 生产车间  :材料出库归属车间,参照 DEPT(2/2 有值;其 加工单号 0/2 恒空)
+  //   FINISH_IN    → 加工单号  :产成品入库的来源工单(1/1 有值;其 生产车间/业务类型/仓库 均 0/1 恒空)
+  SALE_OUT: ['客户'],
+  MATERIAL_OUT: ['生产车间'],
+  FINISH_IN: ['加工单号'],
 }
 const docRailCfg = computed(() => {
   const middles = DOC_RAIL_PANELS[panelCode.value]
