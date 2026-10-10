@@ -503,6 +503,17 @@ export default {
     '加载检验方案失败': 'Failed to load inspection plans',
     '加载检验项目失败': 'Failed to load inspection items',
     '选中工单中没有已结案的': 'No closed work orders among the selected',
+    // ---- 工单追溯:行级口径(2026-10-15)----
+    '追溯口径': 'Trace Scope',
+    '整单': 'Whole Order',
+    '按工单行': 'By Work Order Line',
+    // 本文件历史遗留缺词(2026-10-15 补齐,使 WorkOrderTraceDialog 词条 0 缺失)
+    '工单详情 · 追溯': 'Work Order Detail · Trace',
+    '绿=已完工': 'Green = Completed',
+    '蓝=进行中': 'Blue = In Progress',
+    '灰=未开始': 'Grey = Not Started',
+    '该工单还没有工序进度': 'This work order has no process progress yet',
+    '血缘': 'Lineage',
     // ---- 检验方案/检验项目维护:主从层级(2026-10-09)----
     '一个产品/一类物料一套方案；点一行选中，下方就是它下面的检验项目': 'One plan per product / material category; click a row to select it and the items below belong to that plan',
     // ---- 检验项目/检验方案 单一入口·两用弹窗(2026-10-09 合并口径)----

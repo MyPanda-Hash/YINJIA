@@ -12,7 +12,13 @@
         <span class="wb-trace-no">{{ trace['头']?.['加工单号'] || code }}</span>
         <span class="wb-tag" :class="trace['头']?.['单据状态'] === '已审核' ? 'open' : 'closed'">{{ trace['头']?.['单据状态'] }}</span>
         <span v-if="trace['头']?.['结案'] === 'Y'" class="wb-tag off-line">{{ tt('已结案') }}</span>
+        <!-- 行级口径(2026-10-15 用户报障「同工单号不同行号显示了之前的数据」):把"看的是哪一行/哪一批"
+             摆在最显眼处;未传行 id 时口径=整单,提示用户点行上的追溯。 -->
+        <span v-if="trace['头']?.['工单行号']" class="wb-tag wb-tag-line">{{ tt('工单行号') }} {{ trace['头']?.['工单行号'] }}</span>
+        <span v-if="trace['头']?.['批次号']" class="wb-tag wb-tag-line">{{ tt('批次号') }} {{ trace['头']?.['批次号'] }}</span>
+        <span class="wb-trace-scope">{{ tt('追溯口径') }}：{{ tt(trace['头']?.['追溯口径'] || '整单') }}</span>
       </div>
+      <div v-if="trace['口径说明']" class="wb-trace-scope-line">{{ trace['口径说明'] }}</div>
       <div class="wb-trace-desc">
         <span>{{ tt('产品') }}: {{ trace['头']?.['产品编码'] }} {{ trace['头']?.['产品名称'] }}</span>
         <span>{{ tt('规格型号') }}: {{ trace['头']?.['规格型号'] || '-' }}</span>
@@ -188,6 +194,9 @@ import { tt } from '@/i18n'
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   code: { type: String, default: '' },
+  /** 工单行id(plang.id)—— 追溯**必须**带它:同工单号可有多行/多批次,只按单号取会把别的行的数据带进来
+   *  (2026-10-15 用户报障)。不传=整单口径(后端会在「头.追溯口径」里标注)。 */
+  行id: { type: [Number, String], default: null },
 })
 const emit = defineEmits(['update:modelValue'])
 const trace = ref(null)
@@ -202,19 +211,24 @@ async function load() {
   trace.value = null
   prog.value = null
   try {
+    const rowId = props.行id === '' || props.行id === null || props.行id === undefined ? undefined : props.行id
     const [t, p] = await Promise.all([
-      request.post('/px/scheduleBoard/trace', { 工单号: no }),
+      request.post('/px/scheduleBoard/trace', { 工单号: no, 工单行id: rowId }),
       request.post('/px/processTask/detail', { 工单号: no }).catch(() => ({ data: null })),
     ])
     trace.value = t.data || {}
     prog.value = p?.data || null
   } catch { trace.value = {} }
 }
-watch(() => [props.modelValue, props.code], ([v]) => { if (v) load() })
+watch(() => [props.modelValue, props.code, props.行id], ([v]) => { if (v) load() })
 </script>
 
 <style scoped>
 .wb-trace-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+/* 行级口径标识(2026-10-15):行号/批次胶囊 + 右侧口径 + 下方一段口径说明 */
+.wb-tag-line { background: #eef6ff; color: #1e6fb8; border: 1px solid #b9d8f5; border-radius: 10px; padding: 1px 8px; font-size: 12px; }
+.wb-trace-scope { font-size: 12px; color: #606266; margin-left: auto; }
+.wb-trace-scope-line { font-size: 12px; color: #909399; background: #f4f4f5; border-radius: 4px; padding: 5px 10px; margin-bottom: 8px; }
 .wb-trace-no { font-size: 16px; font-weight: 700; color: #1e6fb8; }
 .wb-trace-desc { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12px; color: #606266; background: #fdf6ec; border: 1px solid #f5dab1; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; }
 .wb-trace-block { margin-bottom: 12px; }

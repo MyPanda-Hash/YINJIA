@@ -157,7 +157,7 @@
     </el-dialog>
 
     <!-- 工单详情·追溯:共用组件 WorkOrderTraceDialog(2026-10-05;生产工单页也原地挂同一个) -->
-    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" />
+    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
   </div>
 </template>
 
@@ -286,11 +286,15 @@ async function unclose() {
 //    用户口径「在生产工单也可以这样查看,不是跳转到工单排产」)。本页只负责:置单号 + 打开。
 const traceVisible = ref(false)
 const traceNo = ref('')
+/** 追溯的工单行id(plang.id):同工单号可有多行/多批次,不带它会把别的行数据混进来(2026-10-15) */
+const traceRowId = ref(null)
 
 function openTrace(noParam) {
+  const obj = typeof noParam === 'string' ? null : noParam
   const no = typeof noParam === 'string' ? noParam : (noParam?.['工单号'] || checkedSched.value[0]?.加工单号)
   if (!no) return
   traceNo.value = no
+  traceRowId.value = obj?.['行id'] ?? checkedSched.value[0]?.['行id'] ?? null
   traceVisible.value = true
 }
 

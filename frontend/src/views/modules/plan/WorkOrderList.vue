@@ -125,7 +125,7 @@
     </el-dialog>
 
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
-    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" />
+    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
 
     <!-- 切单弹窗:可切上限 = 排产数量 − max(已入库, 各工序已完工报工最大值);子单取新工单号 -->
     <el-dialog v-model="splitVisible" :title="tt('切单')" width="440px" append-to-body>
@@ -196,6 +196,8 @@ const splitInherit = ref(true)
 /** 工单详情·追溯(2026-10-05):与工单排产同一组件,本页原地打开 */
 const traceVisible = ref(false)
 const traceNo = ref('')
+/** 追溯的工单行id(plang.id):行级口径必需(2026-10-15) */
+const traceRowId = ref(null)
 /** 工单排产弹窗(2026-10-05 用户口径):只带当前这一张工单的快速排产 */
 const schedVisible = ref(false)
 const schedNo = ref('')
@@ -434,9 +436,13 @@ async function onUnsplit() {
 
 function openTrace(row) {
   // 工单详情·追溯(2026-10-05):与工单排产**同一个弹窗组件**,本页原地打开(用户口径「不是跳转到工单排产」)。
-  const no = row?.['工单号'] || currentRow.value?.工单号 || checked.value[0]?.工单号
+  // 行级口径(2026-10-15):必须把**工单行id**一起传下去 —— 同工单号可有多行/多批次,
+  //   只传单号会把别的行的报工/检验数据一起带出来(用户报障)。
+  const src = row || currentRow.value || checked.value[0]
+  const no = src?.['工单号']
   if (!no) return
   traceNo.value = no
+  traceRowId.value = src?.['行id'] ?? null
   traceVisible.value = true
 }
 
