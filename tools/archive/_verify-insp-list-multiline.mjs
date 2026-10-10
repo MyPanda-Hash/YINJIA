@@ -157,6 +157,16 @@ try {
     ok('确实落在**列表页**(#/panelx/list/...)而非表单页', String(routed).includes('/panelx/list/'), String(routed))
 
     const long = '表面无缩孔、无飞边、无缺料,尺寸复测全部落在图纸公差带内,抽检 30 模次结论合格,允许转序;备注:本批为试模尾批,需在下一批加严抽检。'
+    // 2026-10-15 用户口径:「去除合格数量只保留不合格数量即可」⇒ 明细列不该再有「合格数量」
+    const cols = await ev(`(() => {
+      const clean = (s) => (s||'').replace(/[\\n\\r\\t]/g,'').replace(/[\\u21c5\\u25b2\\u25bc]/g,'').trim()
+      const wrap = [...document.querySelectorAll('.detail')].find(d => d.querySelector('.el-table__body-wrapper tbody tr'))
+      return wrap ? [...wrap.querySelectorAll('.el-table__header-wrapper thead th')].map(th => clean(th.innerText).split(' ')[0]) : []
+    })()`)
+    console.log(`    明细列 = ${JSON.stringify(cols)}`)
+    ok('明细里已没有「合格数量」列(字段登记行已注销)', !cols.includes('合格数量'), JSON.stringify(cols))
+    ok('明细里仍有「不合格数量」列(唯一录入列)', cols.includes('不合格数量'), JSON.stringify(cols))
+
     const ml = await probeCell('处理方式', long)
     console.log(`    [长文本列 处理方式] ${JSON.stringify(ml)}`)
     ok('长文本列点开后是 <textarea>', ml?.tag === 'TEXTAREA', JSON.stringify(ml))

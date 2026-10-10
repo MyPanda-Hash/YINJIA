@@ -33,14 +33,16 @@ const alreadyAudited = String(mine[0]['单据状态'] || '') === '已审核'
 const head = { ...mine[0] }
 delete head['detail']
 
-// 读它的明细,把「合格」行数量填成本行排产数量
+// 读它的明细,填「不合格数量」
+// ⚠ 2026-10-15 第三次修订口径(用户:「去除合格数量只保留不合格数量即可,最终的合格数量就是
+//   [报工数量]减去[不合格数量]」):明细**只填 不合格数量**,合格数量由后端算 = 表头报工数量 − Σ不合格。
+//   所以本探针不再写 合格数量(该字段登记行已注销,写了也落不进去)。
 const before = await show('审核前')
 const plan = Number(before['排产数量'] || 0)
-const det = (await api('/px/queryFormDataList', { panelCode: 'QC_ASM_INSP_DETAIL', pageNo: 1, pageSize: 50, docNo: no }).catch(() => ({}))).data || {}
-void det
-// 用面板保存接口按单据编号回写(2026-10-15 新口径:明细**不再预铺**,直接填明细列的 合格数量/不合格数量)
+const reportQty = Number(mine[0]['报工数量'] || 0)   // 表头报工数量 = 合格数量的被减数
+const NG = 0                                          // 本路径要结案(入库≥排产)⇒ 不合格取 0 ⇒ 合格 = 报工数量
 const items = [
-  { 单据编号: no, 行号: 1, 检验项目: '成品检验', 合格数量: plan, 不合格数量: 0 },
+  { 单据编号: no, 行号: 1, 检验项目: '成品检验', 不合格数量: NG },
 ]
 const sv = alreadyAudited ? { code: 200, message: 'skip(已审核)' }
   : await api('/px/callButton', { panelCode: 'QC_ASM_INSP', buttonName: '保存', buttonParam: {}, formData: { ...head, 单据编号: no, detail: { items } } })
@@ -50,7 +52,8 @@ const au = alreadyAudited ? { code: 200, message: 'skip(已审核)' }
 console.log(`    审核检验单 = ${JSON.stringify(au).slice(0, 200)}`)
 ok('② 组装成品检验单已审核(本轮审核 或 上一轮遗留)',
   alreadyAudited || au.code === 200, alreadyAudited ? '已审核(幂等跳过)' : JSON.stringify(au).slice(0, 160))
-await show('检验审核后')
+const afterInsp = await show('检验审核后')
+void afterInsp
 
 // 审核自动生成的产成品入库单
 const fin = (await api('/px/queryFormDataList', { panelCode: 'FINISH_IN', pageNo: 1, pageSize: 200 })).data || {}
@@ -69,6 +72,12 @@ if (fMine.length) {
   console.log(`    审核入库单 ${fno} = ${JSON.stringify(fa).slice(0, 200)}`)
   ok('④ 入库单已审核(本轮审核 或 上一轮遗留)', fAlready || fa.code === 200, JSON.stringify(fa).slice(0, 160))
   const after = await show('入库审核后')
+  // 🔴 2026-10-15 第三次修订口径的验收点:合格数量 = 表头报工数量 − Σ明细不合格数量。
+  //   ⚠ 只能在**入库单审核后**看工单的 入库数量 —— 检验审核只落一张入库单**草稿**,
+  //     草稿不计入库(第一版断言写在检验审核后,恒 0,误判成失败)。
+  ok('②b 入库数 = 报工数量 − 不合格数量(派生:明细只填不合格)',
+    Math.abs(Number(after['入库数量'] || 0) - Math.max(0, reportQty - NG)) < 0.001,
+    `报工数量=${reportQty} − 不合格=${NG} = ${Math.max(0, reportQty - NG)},实际入库=${after['入库数量']}`)
   ok('⑤ 入库≥排产 ⇒ 结案=Y(组装成品检验已审核 + 入库达标)', String(after['结案']) === 'Y', `结案=${after['结案']}`)
   ok('⑤ 生产状态 = 已结案', String(after['生产状态']) === '已结案', String(after['生产状态']))
 }

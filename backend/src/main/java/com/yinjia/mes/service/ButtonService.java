@@ -2633,9 +2633,10 @@ public class ButtonService {
 
     /**
      * 组装成品检验单审核 → 数量分流(会议「合格数转库存、不合格数留系统待处理」):
-     * <ul><li>合格行(判定=合格 或 处理方式=入库)数量 &gt; 0 → 生成**产成品入库单草稿**(FINISH_IN,
+     * <ul><li><b>合格数 = 表头报工数量 − Σ明细不合格数量</b>(2026-10-15 用户口径:明细只填「不合格数量」,
+     *   合格数量是派生值)数量 &gt; 0 → 生成**产成品入库单草稿**(FINISH_IN,
      *   与切炭直销同一落点,留草稿由仓库审核,不自动记账);</li>
-     * <li>不合格行数量 &gt; 0 → 生成**不良品处理单草稿**(QC_DISPOSAL,处置方式=隔离,待品质/仓库处置)。</li></ul>
+     * <li>不合格数量 &gt; 0 → 生成**不良品处理单草稿**(QC_DISPOSAL,处置方式=隔离,待品质/仓库处置)。</li></ul>
      * 幂等:按 form_flow_link(源=检验单号) 判重,下游作废释放后可重新生成。
      */
     private void asmInspToStock(String panelCode, String inspNo, String user) {
@@ -2647,21 +2648,22 @@ public class ButtonService {
         List<Map<String, Object>> heads = jdbc.queryForList(
                 "SELECT ISNULL(工单号,N'') AS 工单号, ISNULL(批次号,N'') AS 批次号, ISNULL(产品编码,N'') AS 产品编码,"
                         + " ISNULL(产品名称,N'') AS 产品名称, ISNULL(规格型号,N'') AS 规格型号,"
-                        + " ISNULL(生产线,N'') AS 生产线, ISNULL(报工单号,N'') AS 报工单号 FROM qc_asm_insp_head"
+                        + " ISNULL(生产线,N'') AS 生产线, ISNULL(报工单号,N'') AS 报工单号,"
+                        + " ISNULL(报工数量,0) AS 报工数量 FROM qc_asm_insp_head"
                         + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", inspNo);
         if (heads.isEmpty()) throw new IllegalStateException("组装成品检验单不存在:" + inspNo);
         Map<String, Object> h = heads.get(0);
         List<Map<String, Object>> lines = jdbc.queryForList(
-                "SELECT ISNULL(合格数量,0) AS 合格数量, ISNULL(不合格数量,0) AS 不合格数量"
+                "SELECT ISNULL(不合格数量,0) AS 不合格数量"
                         + " FROM qc_asm_insp_detail WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", inspNo);
-        // 🔴 2026-10-15 改口径(用户口径:明细行不预填,汇总按明细列填的数量走):
-        //   原来读「判定 + 数量」(靠预铺的 合格/不合格 两行),现在直接**对明细列的 合格数量/不合格数量 求和**
-        //   —— 品质在明细里想填几行就填几行(按检验项目),汇总天然是各行的合计。
-        double pass = 0, ng = 0;
-        for (Map<String, Object> r : lines) {
-            pass += numOr(r.get("合格数量"));
-            ng += numOr(r.get("不合格数量"));
-        }
+        // 🔴 2026-10-15 用户口径(第三次修订):「去除合格数量只保留不合格数量即可,最终的合格数量就是
+        //   [报工数量]减去[不合格数量]」。
+        //   ⇒ 明细只填「不合格数量」;合格数量 = **表头报工数量 − Σ明细不合格数量**(负值兜 0),
+        //     不再读明细的「合格数量」列(该字段登记行已由
+        //     tools/migrate-insp-pass-qty-derived-20261015.sql 注销,物理列留作历史)。
+        double ng = 0;
+        for (Map<String, Object> r : lines) ng += numOr(r.get("不合格数量"));
+        double pass = Math.max(0, numOr(h.get("报工数量")) - ng);
         if (pass <= 0 && ng <= 0) return;                          // 品质没填数量:单据走过而已,不产生下游
         // 工单侧数据(单位/单价/批号;保留 dualOutFinishIn 的 inline 取仓口径,后续可抽公共方法)
         String wo = String.valueOf(h.get("工单号"));

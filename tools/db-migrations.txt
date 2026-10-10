@@ -2860,3 +2860,15 @@ migrate-insp-detail-quantity-20261015.sql
 #            由字段类型而非面板名单决定是否多行。
 #   自检:21 个长文本列全部就位,且 表区/行号/数量 未被误改。幂等;两账套均执行。
 migrate-field-multiline-text-20261015.sql
+
+# migrate-insp-pass-qty-derived-20261015.sql(2026-10-15):三张工序检验单「合格数量」改派生值
+#   用户口径:①「当前去除合格数量只保留不合格数量即可」;
+#            ②「最终的合格数量就是[报工数量]减去[不合格数量]」;
+#            ③「数据要可返回追溯页面」。
+#   处置:注销三面板明细的 合格数量 字段登记行(界面不再录入;**不删物理列**,留历史值);
+#        合格数量改为读取时算 = 表头报工数量 − Σ明细不合格数量,两个消费点同步:
+#        追溯「质检数据」段(ScheduleBoardService)、组装成品检验单审核分流(ButtonService.asmInspToStock)。
+#   ⚠ 只限这三张工序检验单:来料检验单 QC_INSP 的「合格数量」是采购链数量守恒与入库依据,
+#     同名不同义,脚本末尾有守卫断言(误删即 RAISERROR)。
+#   回滚:重跑 migrate-insp-detail-quantity-20261015.sql 补回字段行。幂等;两账套均执行。
+migrate-insp-pass-qty-derived-20261015.sql

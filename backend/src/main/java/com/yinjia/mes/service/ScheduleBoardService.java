@@ -924,7 +924,13 @@ public class ScheduleBoardService {
                             + "      WHEN s.shr IS NOT NULL THEN N'已审核' ELSE N'草稿' END AS 单据状态,"
                             + " ISNULL(h.总结论,N'') AS 总结论,"
                             + " ISNULL(h.报工数量,0) AS 送检数量, ISNULL(h.检验数量,0) AS 检验数量,"
-                            + " ISNULL(d.合格数量,0) AS 合格数量, ISNULL(d.不合格数量,0) AS 不合格数量,"
+                            // 🔴 2026-10-15 用户口径:「去除合格数量只保留不合格数量」「最终的合格数量就是
+                            //   [报工数量]减去[不合格数量]」「数据要可返回追溯页面」。
+                            //   ⇒ 合格数量不再是明细里填的列,而是**读取时算**:表头报工数量 − Σ明细不合格数量。
+                            //   负值兜 0(不合格填超报工数量时不该在追溯页显示负数)。
+                            + " CASE WHEN ISNULL(h.报工数量,0) - ISNULL(d.不合格数量,0) < 0 THEN 0"
+                            + "      ELSE ISNULL(h.报工数量,0) - ISNULL(d.不合格数量,0) END AS 合格数量,"
+                            + " ISNULL(d.不合格数量,0) AS 不合格数量,"
                             + " ISNULL(h.检验员,N'') AS 检验员, ISNULL(h.批次号,N'') AS 批次号,"
                             + " ISNULL(h.报工单号,N'') AS 报工单号, ISNULL(h.处理方式,N'') AS 处理方式,"
                             + " ISNULL((SELECT TOP 1 l.target_form_no FROM dbo.form_flow_link l"
@@ -937,8 +943,8 @@ public class ScheduleBoardService {
                             //   原来按明细的「判定=合格/不合格」再取「数量」求和 —— 依赖生单时**预铺**的
                             //   合格/不合格两行;现在生单不再预填明细,改为一律 **对明细列 合格数量/不合格数量 求和**。
                             //   品质在明细里按检验项目填几行都行,汇总天然是各行合计。
-                            + "      SUM(ISNULL(合格数量,0)) AS 合格数量,"
                             + "      SUM(ISNULL(不合格数量,0)) AS 不合格数量"
+                            // ↑ 只汇总「不合格数量」:合格数量改为 表头报工数量 − 本值(2026-10-15 用户口径,详见外层 CASE)
                             + "    FROM dbo." + tbl.replace("_head", "_detail")
                             + "   WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY 单据编号) d"
                             + "   ON d.单据编号 = h.单据编号"
