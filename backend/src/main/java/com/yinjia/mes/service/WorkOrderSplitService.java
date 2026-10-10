@@ -64,9 +64,13 @@ public class WorkOrderSplitService {
         out.put("排产数量", round(num(p.get("pl_sl"))));
         out.put("需求数量", round(num(p.get("xq_sl"))));
         out.put("入库数量", round(num(p.get("rk_sl"))));
-        out.put("已完工报工", round(maxCompleted(String.valueOf(p.get("pl_no")))));
+        // 🔴 2026-10-15 修(用户口径「工单号+工单行号确定当前唯一工单」):原按 pl_no 整单汇总报工,
+        //   会把同工单**别的行**的报工算进本行的可切上限 ⇒ 本行明明没生产却切不出来(上限被压成 0),
+        //   或反过来算错。现按**本行**(工单号+工单行号)统计。
+        out.put("已完工报工", round(maxCompletedOfRow(((Number) p.get("id")).longValue(),
+                String.valueOf(p.get("pl_no")), str(p.get("批次号")))));
         out.put("已切出数量", round(sumChildren(((Number) p.get("id")).longValue())));
-        out.put("可切上限", round(cutLimit(p)));
+        out.put("可切上限", round(cutLimit(p, str(p.get("批次号")))));
         // 血缘与家族(会议口径:多级切分一律按根单聚合 —— 计划员看整体进度用)
         String root = familyRoot(p);
         out.put("是否切单", "Y".equals(String.valueOf(p.get("是否切单"))) ? "Y" : "N");
@@ -92,15 +96,18 @@ public class WorkOrderSplitService {
 
         double qty = num(req.get("切出数量"));
         if (qty <= 0.0001) throw new IllegalStateException("切出数量必须大于 0");
-        double limit = cutLimit(p);
+        // 可切上限按**本行**(工单号+工单行号)算 —— 别把同工单其它行的报工算进来(2026-10-15)
+        String parentBatch = str(p.get("批次号"));
+        double limit = cutLimit(p, parentBatch);
+        double rowDone = maxCompletedOfRow(parentId, parentNo, parentBatch);
         if (limit <= 0.0001)
-            throw new IllegalStateException("工单 " + parentNo + " 没有可切出的数量(排产 " + round(num(p.get("pl_sl")))
-                    + " − 已入库 " + round(num(p.get("rk_sl"))) + " / 已完工报工 "
-                    + round(maxCompleted(parentNo)) + ")");
+            throw new IllegalStateException("工单行 " + parentNo + "#" + parentXc + " 没有可切出的数量(排产 "
+                    + round(num(p.get("pl_sl"))) + " − 已入库 " + round(num(p.get("rk_sl")))
+                    + " / 本行已完工报工 " + round(rowDone) + ")");
         if (qty > limit + 0.0001)
             throw new IllegalStateException("切出数量 " + round(qty) + " 超过可切上限 " + round(limit)
                     + "(排产 " + round(num(p.get("pl_sl"))) + " − 已入库 " + round(num(p.get("rk_sl")))
-                    + " / 已完工报工 " + round(maxCompleted(parentNo)) + ")");
+                    + " / 本行已完工报工 " + round(rowDone) + ")");
         qty = round(qty);
 
         // 继承排产:勾选则子单直接落在父单同一条产线/班组/交期(会议「复制原单产品、工艺、交期」)
@@ -202,23 +209,34 @@ public class WorkOrderSplitService {
             throw new IllegalStateException("子工单 " + childNo + " 已结案,不能撤回;请先取消结案");
 
         // 下游守卫:报工 / 入库 / 领料 / 再切分(任一存在即拒绝,并给出挡路单据号)
+        // 🔴 2026-10-15:全部改按**本行**(工单号+工单行号)判 —— 子单号虽唯一,但同一子单号也可能多行;
+        //   原来按 pl_no 整单判,同单其它行的报工/入库会把本行的撤回挡死(用户口径:两行互不关联)。
+        String childBatch = str(c.get("批次号"));
         List<Map<String, Object>> reports = jdbc.queryForList(
-                "SELECT TOP 3 [报工单号] FROM dbo.scjl WHERE gldh=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", childNo);
+                "SELECT TOP 3 s.[报工单号] FROM dbo.scjl s WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                        + " AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = ?)"
+                        + "      OR (ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') = ?))"
+                        + " ORDER BY s.id", childNo, childId, childBatch == null ? "" : childBatch);
         if (!reports.isEmpty())
-            throw new IllegalStateException("子工单 " + childNo + " 已有报工("
+            throw new IllegalStateException("子工单行 " + childNo + "#" + c.get("pl_xc") + " 已有报工("
                     + reports.stream().map(r -> String.valueOf(r.get("报工单号"))).reduce((a, b) -> a + "、" + b).orElse("")
                     + "),不能撤回;请先弃审/删除该报工单");
+        // 入库/领料:按 (加工单号 + 工单行号) 判(单据头已带工单行号;老单行号空视为占整单)
+        Integer childXc = c.get("pl_xc") == null ? null : ((Number) c.get("pl_xc")).intValue();
         List<String> fins = jdbc.queryForList(
-                "SELECT TOP 3 [单据编号] FROM dbo.bd_finish_in WHERE [加工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'", String.class, childNo);
+                "SELECT TOP 3 [单据编号] FROM dbo.bd_finish_in WHERE [加工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " AND (ISNULL([工单行号],0) = 0 OR [工单行号] = ?)",
+                String.class, childNo, childXc);
         if (!fins.isEmpty() || num(c.get("rk_sl")) > 0.0001)
-            throw new IllegalStateException("子工单 " + childNo + " 已有完工入库"
+            throw new IllegalStateException("子工单行 " + childNo + "#" + childXc + " 已有完工入库"
                     + (fins.isEmpty() ? "" : "(" + String.join("、", fins) + ")") + ",不能撤回;请先作废该入库单");
         List<String> picks = jdbc.queryForList(
                 "SELECT TOP 3 h.[单据编号] FROM dbo.bl_material_out m JOIN dbo.bd_material_out h ON h.[单据编号]=m.[单据编号]"
-                        + " WHERE m.[加工单号]=? AND ISNULL(m.asp_cancel,'N')<>'Y' AND ISNULL(h.asp_cancel,'N')<>'Y'",
-                String.class, childNo);
+                        + " WHERE m.[加工单号]=? AND ISNULL(m.asp_cancel,'N')<>'Y' AND ISNULL(h.asp_cancel,'N')<>'Y'"
+                        + " AND (ISNULL(h.[工单行号],0) = 0 OR h.[工单行号] = ?)",
+                String.class, childNo, childXc);
         if (!picks.isEmpty())
-            throw new IllegalStateException("子工单 " + childNo + " 已发生领料(" + String.join("、", picks)
+            throw new IllegalStateException("子工单行 " + childNo + "#" + childXc + " 已发生领料(" + String.join("、", picks)
                     + "),不能撤回;请先作废该领料单");
         Integer grand = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM dbo.plang WHERE [源工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, childNo);
@@ -314,31 +332,59 @@ public class WorkOrderSplitService {
         try {
             if (rid != null && !String.valueOf(rid).isBlank() && !"null".equals(String.valueOf(rid)))
                 return jdbc.queryForMap(
-                        "SELECT id, pl_no, pl_xc, ISNULL(pl_sl,0) AS pl_sl, ISNULL(xq_sl,0) AS xq_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja,"
+                        "SELECT id, pl_no, pl_xc, ISNULL([批次号],N'') AS 批次号, ISNULL(pl_sl,0) AS pl_sl,"
+                                + " ISNULL(xq_sl,0) AS xq_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja,"
                                 + " [源工单号], [源工单行id], [拆分序号] FROM dbo.plang"
                                 + " WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'",
                         Long.parseLong(String.valueOf(rid).trim()));
             String no = str(req.get("工单号"));
             if (no == null) throw new IllegalArgumentException("撤回切单缺少 工单号/行id");
+            // ⚠ 按 (工单号 + 工单行号) 定位(用户口径:这两个才是唯一工单);没给行号才退回首行
+            Object xc = req.get("工单行号");
             Map<String, Object> row = jdbc.queryForMap(
-                    "SELECT TOP 1 id, pl_no, pl_xc, ISNULL(pl_sl,0) AS pl_sl, ISNULL(xq_sl,0) AS xq_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja,"
+                    "SELECT TOP 1 id, pl_no, pl_xc, ISNULL([批次号],N'') AS 批次号, ISNULL(pl_sl,0) AS pl_sl,"
+                            + " ISNULL(xq_sl,0) AS xq_sl, ISNULL(rk_sl,0) AS rk_sl, ISNULL(ja,'N') AS ja,"
                             + " [源工单号], [源工单行id], [拆分序号] FROM dbo.plang"
-                            + " WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id",
-                    no);
+                            + " WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + "   AND (? IS NULL OR pl_xc=?) ORDER BY id",
+                    no, xcOf(xc), xcOf(xc));
             return row;
         } catch (org.springframework.dao.EmptyResultDataAccessException e) {
             throw new IllegalStateException("工单不存在或已作废");
         }
     }
 
-    /** 可切上限 = 排产数量 − max(已入库, 各工序已完工报工量最大值)。 */
-    private double cutLimit(Map<String, Object> p) {
+    /**
+     * 可切上限 = 排产数量 − max(已入库, **本行**各工序已完工报工量最大值)。
+     * 🔴 2026-10-15:报工量改为**按行**统计(原来按 pl_no 整单汇总,会把别的行的报工算进来)。
+     */
+    private double cutLimit(Map<String, Object> p, String batch) {
         double plSl = num(p.get("pl_sl"));
-        double bound = Math.max(num(p.get("rk_sl")), maxCompleted(String.valueOf(p.get("pl_no"))));
+        double bound = Math.max(num(p.get("rk_sl")),
+                maxCompletedOfRow(((Number) p.get("id")).longValue(), String.valueOf(p.get("pl_no")), batch));
         return round(plSl - bound);
     }
 
-    /** 该工单各工序已完工报工量的最大值(报工封顶按「工序 × 工单」比对,故取最大工序量当约束)。 */
+    /**
+     * 该**工单行**各工序已完工报工量的最大值(报工封顶按「工序 × 工单行」比对,故取最大工序量当约束)。
+     * 行级键 = scjl.gd_id → plang_pc.plang_id = 本行;老数据 gd_id 为空时按(工单号 + 本行批次号)兜底。
+     */
+    private double maxCompletedOfRow(long rowId, String plNo, String batch) {
+        Double v = jdbc.queryForObject(
+                "SELECT ISNULL(MAX(s),0) FROM ("
+                        + "  SELECT SUM(ISNULL(sl,0)) AS s FROM dbo.scjl s"
+                        + "   WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "     AND EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = ?)"
+                        + "   GROUP BY s.gxdm"
+                        + "  UNION ALL"
+                        + "  SELECT SUM(ISNULL(sl,0)) AS s FROM dbo.scjl s"
+                        + "   WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "     AND ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') = ?"
+                        + "   GROUP BY s.gxdm) t", Double.class, plNo, rowId, plNo, batch == null ? "" : batch);
+        return v == null ? 0 : v;
+    }
+
+    /** 该工单各工序已完工报工量的最大值(整单口径;保留给家族汇总等整单场景) */
     private double maxCompleted(String plNo) {
         Double v = jdbc.queryForObject(
                 "SELECT ISNULL(MAX(s),0) FROM (SELECT SUM(ISNULL(sl,0)) AS s FROM dbo.scjl"
