@@ -25,6 +25,13 @@ DECLARE @fBefore int = (SELECT COUNT(*) FROM dbo.yj_field f
                          WHERE NOT EXISTS (SELECT 1 FROM dbo.yj_panel p WHERE p.panel_code = f.panel_code));
 DECLARE @rBefore int = (SELECT COUNT(*) FROM dbo.yj_role_panel r
                          WHERE NOT EXISTS (SELECT 1 FROM dbo.yj_panel p WHERE p.panel_code = r.panel_code));
+-- ⚠ 2026-10-10 修(服务器部署实测本脚本被判失败):原第 ④ 项自检**硬编码「四单字段行数应 329」**,
+--   而四单基线在 2026-10-09 因「采购入库明细启用仓位」刷新过一次 ⇒ 总数不再恒为 329,
+--   在基线已演进的环境(服务器)该断言必然误报,RAISERROR 把整条迁移判成失败。
+--   改为**前后对比**:只要四单行数在清理前后不变,就证明在册面板的字段行没被误伤 ——
+--   这才是本检查真正要守的不变量,且对今后任何一次基线刷新免疫。
+DECLARE @fourBefore int = (SELECT COUNT(*) FROM dbo.yj_field
+                            WHERE panel_code IN (N'QC_RECV', N'QC_INSP', N'QC_RETURN', N'PURCHASE_IN'));
 PRINT N'[' + DB_NAME() + N'] 清理前 yj_field 孤儿 = ' + CAST(@fBefore AS nvarchar(10));
 PRINT N'[' + DB_NAME() + N'] 清理前 yj_role_panel 孤儿 = ' + CAST(@rBefore AS nvarchar(10));
 
@@ -53,10 +60,11 @@ PRINT N'[' + DB_NAME() + N'] 自检 yj_role_panel 孤儿(应为 0): ' + CAST(@rA
 IF @fAfter <> 0 RAISERROR(N'yj_field 仍有孤儿行', 16, 1);
 IF @rAfter <> 0 RAISERROR(N'yj_role_panel 仍有孤儿行', 16, 1);
 
--- ④ 越界自检:在册面板的字段行不得被误伤(抽四单点数,应与四单基线一致)
+-- ④ 越界自检:在册面板的字段行不得被误伤(抽四单点数,与**清理前**对比;不写死绝对值,见文件头注释)
 DECLARE @four int = (SELECT COUNT(*) FROM dbo.yj_field
                       WHERE panel_code IN (N'QC_RECV', N'QC_INSP', N'QC_RETURN', N'PURCHASE_IN'));
-PRINT N'[' + DB_NAME() + N'] 越界自检 四单字段行数(应 329): ' + CAST(@four AS nvarchar(10));
-IF @four <> 329 RAISERROR(N'四单字段行数被误伤(应 329)', 16, 1);
+PRINT N'[' + DB_NAME() + N'] 越界自检 四单字段行数(清理前 ' + CAST(@fourBefore AS nvarchar(10))
+      + N' → 清理后 ' + CAST(@four AS nvarchar(10)) + N';两者必须相等): ';
+IF @four <> @fourBefore RAISERROR(N'四单字段行数被误伤(清理前后应相等)', 16, 1);
 
 PRINT N'✅ 面板孤儿元数据清理完成(字段 + 角色授权;面板码与物理表/视图早已删除)';

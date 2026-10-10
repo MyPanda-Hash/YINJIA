@@ -1,4 +1,25 @@
 -- migrate-align-ledger-fields-20261008.sql
+-- ⚠ 2026-10-10 修(服务器部署实测「四单偏离基线」):本脚本原含 **234 条针对四单的 yj_field 覆写**
+--   (207 条纯 seq + 27 条 seq/hidden/visible),内嵌的是 **2026-10-08 当时正式库的取值**;而四单基线在
+--   2026-10-09 因「采购入库明细启用仓位」**刷新过一次**(冻结副本 + 回正脚本 + fourdoc-baseline.tsv 同批更新)。
+--   本脚本排在回正脚本之后执行,于是每次运行都把四单元数据**改回 10-08 老口径** ⇒ 四单回归闸
+--   FourDocAudit 报「名次不符 182 处 / 内容变 4 处」(纯顺序与可见性,数据无损);脚本自称
+--   「在正式库上执行等于 no-op」并不成立 —— 那些 UPDATE 没有取值守卫,是无条件覆写。
+--   处置:**整段移除四单的元数据覆写** —— 四单字段/显示名/顺序/可见性一律以基线为准(唯一权威 =
+--   docs/development/采购链四单字段与显示字段.md 与其快照 fourdoc-baseline.tsv,由回正脚本负责写入),
+--   本脚本不再插手。两账套早已对齐(除本次引入的偏离外),故这部分职责已完结;
+--   本脚本余下职责不变:列宽对齐(bs_line_capacity 备用1-20 / bl_sale_out.仓库)、
+--   视图 v_manu_schedule 缺则建(EXEC 动态建,不引用库名)、清掉测试库多出的 10 行 yj_field。
+
+-- ⚠ 2026-10-10 修(服务器部署实测「四单偏离基线 182 处」):本脚本内嵌的是 **2026-10-08 当时正式库(four doc)的 seq 取值**,
+--   而四单基线在 2026-10-09 因「采购入库明细启用仓位」**刷新过一次**(冻结副本 + 回正脚本 + fourdoc-baseline.tsv 同批更新)。
+--   本脚本在链尾执行,于是每次运行都把四单顺序**改回 10-08 老口径**,压过回正脚本写下的基线顺序 ⇒
+--   四单回归闸 FourDocAudit 报「名次不符」182 处(纯顺序,内容未变);且脚本自称「正式库上等于 no-op」并不成立 ——
+--   原语句形如 UPDATE yj_field SET seq=数值, **没有取值守卫**,是无条件覆写。
+--   处置:**摘掉四单的 seq 覆写**(纯 seq 的 207 条整条删除;其余 27 条只去掉 seq 部分,保留可见性对齐),
+--   顺序一律以基线(fourdoc-baseline.tsv / 采购链四单字段与显示字段.md)为准 —— 见 AGENTS.md「采购链四单字段与显示字段基线」。
+--   本脚本余下职责(列宽、视图缺则建、多出的 10 行清理)不变;两账套已同步验证四单闸 [PASS]。
+
 -- 目的:把测试库(HSDZ_MES_TEST)的**字段元数据与结构**对齐正式库(HSDZ_MES)。依据:
 --   docs/development/采购链四单字段与显示字段.md(四单字段与显示字段唯一基线)
 --
@@ -159,238 +180,4 @@ DELETE FROM yj_field WHERE panel_code=N'QC_INSP_REQ_SERIES' AND col_name=N'备�
 DELETE FROM yj_field WHERE panel_code=N'QC_INSP_REQ_SERIES' AND col_name=N'备用6';
 DELETE FROM yj_field WHERE panel_code=N'QC_INSP_REQ_SERIES' AND col_name=N'备用7';
 DELETE FROM yj_field WHERE panel_code=N'QC_INSP_REQ_SERIES' AND col_name=N'备用8';
-UPDATE yj_field SET seq=300 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'ERP单号';
-UPDATE yj_field SET seq=230 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'交货方式';
-UPDATE yj_field SET seq=240 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'交货方式编码';
-UPDATE yj_field SET seq=670 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'仓位';
-UPDATE yj_field SET seq=270 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'仓位id';
-UPDATE yj_field SET seq=280 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'仓位名称';
-UPDATE yj_field SET seq=680 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'仓位编码';
-UPDATE yj_field SET seq=190 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'仓库';
-UPDATE yj_field SET seq=250 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'仓库id';
-UPDATE yj_field SET seq=840 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'仓库名称_sp_name';
-UPDATE yj_field SET seq=260 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'仓库启用仓位管理';
-UPDATE yj_field SET seq=660 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'仓库编码';
-UPDATE yj_field SET seq=820 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'付款方式编码';
-UPDATE yj_field SET seq=500 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'付款账户';
-UPDATE yj_field SET seq=840 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'付款账户编码';
-UPDATE yj_field SET seq=790 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'价税合计本位币';
-UPDATE yj_field SET seq=60 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'供应商';
-UPDATE yj_field SET seq=50 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'供应商编码';
-UPDATE yj_field SET seq=510 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'保险金额';
-UPDATE yj_field SET seq=280 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'修改人';
-UPDATE yj_field SET seq=750 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'修改人编码';
-UPDATE yj_field SET seq=260 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'修改时间';
-UPDATE yj_field SET seq=30 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'入库类别';
-UPDATE yj_field SET seq=270 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'创建人';
-UPDATE yj_field SET seq=730 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'创建人编码';
-UPDATE yj_field SET seq=180 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'创建时间';
-UPDATE yj_field SET seq=520 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'到期日';
-UPDATE yj_field SET seq=70 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'匹配来源单号';
-UPDATE yj_field SET seq=80 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'单价';
-UPDATE yj_field SET seq=770 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'单位成本视图';
-UPDATE yj_field SET seq=200 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'单据关闭状态';
-UPDATE yj_field SET seq=700 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'单据状态_bill_status';
-UPDATE yj_field SET seq=550 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货人';
-UPDATE yj_field SET seq=640 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货区县名称';
-UPDATE yj_field SET seq=650 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货区县编码';
-UPDATE yj_field SET seq=580 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货国家名称';
-UPDATE yj_field SET seq=590 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货国家编码';
-UPDATE yj_field SET seq=570 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货地址';
-UPDATE yj_field SET seq=620 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货市区名称';
-UPDATE yj_field SET seq=630 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货市区编码';
-UPDATE yj_field SET seq=560 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货电话';
-UPDATE yj_field SET seq=600 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货省份名称';
-UPDATE yj_field SET seq=610 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'发货省份编码';
-UPDATE yj_field SET seq=110 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'含税单价';
-UPDATE yj_field SET seq=120 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'含税金额';
-UPDATE yj_field SET seq=180 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'商品id';
-UPDATE yj_field SET seq=230 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'商品是否保质期';
-UPDATE yj_field SET seq=200 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'商品是否多单位';
-UPDATE yj_field SET seq=210 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'商品是否序列号';
-UPDATE yj_field SET seq=240 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'商品是否批次';
-UPDATE yj_field SET seq=220 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'商品是否辅助属性';
-UPDATE yj_field SET hidden=1, visible=0 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'基本单位名称';
-UPDATE yj_field SET seq=870 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'备注';
-UPDATE yj_field SET seq=10 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'存货编码';
-UPDATE yj_field SET seq=40 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'实收数量';
-UPDATE yj_field SET seq=60 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'实收数量2';
-UPDATE yj_field SET seq=760 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'审核人_auditor_name';
-UPDATE yj_field SET seq=780 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'审核人编码';
-UPDATE yj_field SET seq=710 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'审核时间_audit_time';
-UPDATE yj_field SET seq=360 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'客户';
-UPDATE yj_field SET seq=370 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'客户编码';
-UPDATE yj_field SET seq=760 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'成本视图';
-UPDATE yj_field SET seq=130, hidden=1, visible=0 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'批号';
-UPDATE yj_field SET seq=690 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'批次键';
-UPDATE yj_field SET seq=750 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'折扣率%';
-UPDATE yj_field SET seq=850 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'换算率_conversion_rate';
-UPDATE yj_field SET seq=330, hidden=1, visible=0 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'是否已转ERP';
-UPDATE yj_field SET seq=140, hidden=0, visible=1 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'是否来料检验';
-UPDATE yj_field SET seq=800 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'是否赠品';
-UPDATE yj_field SET seq=800 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'未结算金额本位币';
-UPDATE yj_field SET seq=860 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'本次结算金额本位币';
-UPDATE yj_field SET seq=190 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'来源单号';
-UPDATE yj_field SET seq=170 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'来源单据';
-UPDATE yj_field SET seq=40 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'汇率';
-UPDATE yj_field SET seq=290 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'源单行号';
-UPDATE yj_field SET seq=150 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'特采';
-UPDATE yj_field SET seq=170 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'现存量';
-UPDATE yj_field SET seq=830 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'生产日期';
-UPDATE yj_field SET seq=100 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'税率%';
-UPDATE yj_field SET seq=80 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'经手人';
-UPDATE yj_field SET seq=220 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'经手人编码';
-UPDATE yj_field SET seq=540 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'结算期限';
-UPDATE yj_field SET seq=530 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'结算期限编码';
-UPDATE yj_field SET seq=250 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'结算状态';
-UPDATE yj_field SET seq=450 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'联系人区县名称';
-UPDATE yj_field SET seq=460 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'联系人区县编码';
-UPDATE yj_field SET seq=390 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'联系人国家名称';
-UPDATE yj_field SET seq=400 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'联系人国家编码';
-UPDATE yj_field SET seq=430 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'联系人市区名称';
-UPDATE yj_field SET seq=440 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'联系人市区编码';
-UPDATE yj_field SET seq=380 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'联系人电话';
-UPDATE yj_field SET seq=410 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'联系人省份名称';
-UPDATE yj_field SET seq=420 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'联系人省份编码';
-UPDATE yj_field SET seq=470 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'联系地址';
-UPDATE yj_field SET seq=160 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'行号';
-UPDATE yj_field SET seq=30 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'规格型号';
-UPDATE yj_field SET seq=50 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'计量单位';
-UPDATE yj_field SET seq=70 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'计量单位2';
-UPDATE yj_field SET seq=310 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'转ERP操作人';
-UPDATE yj_field SET seq=320 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'转ERP时间';
-UPDATE yj_field SET seq=300 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'辅助属性id';
-UPDATE yj_field SET seq=780 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'退货数量';
-UPDATE yj_field SET seq=810 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'送检数量';
-UPDATE yj_field SET seq=340 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'部门';
-UPDATE yj_field SET seq=820 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'部门名称';
-UPDATE yj_field SET seq=350 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'部门编码';
-UPDATE yj_field SET seq=160, hidden=0, visible=1 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'采购订单号';
-UPDATE yj_field SET seq=90 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'金额';
-UPDATE yj_field SET seq=210 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'销售订单号';
-UPDATE yj_field SET seq=90 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'附件1';
-UPDATE yj_field SET seq=100 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'附件2';
-UPDATE yj_field SET seq=110 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'附件3';
-UPDATE yj_field SET seq=120 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'附件4';
-UPDATE yj_field SET seq=130 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'附件5';
-UPDATE yj_field SET seq=140 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'附件6';
-UPDATE yj_field SET seq=490 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'预付金额';
-UPDATE yj_field SET seq=150 WHERE panel_code=N'PURCHASE_IN' AND col_name=N'验货人';
-UPDATE yj_field SET seq=100 WHERE panel_code=N'QC_INSP' AND col_name=N'不合格数量';
-UPDATE yj_field SET seq=270, hidden=1, visible=0 WHERE panel_code=N'QC_INSP' AND col_name=N'仓库代码';
-UPDATE yj_field SET seq=70 WHERE panel_code=N'QC_INSP' AND col_name=N'供应商';
-UPDATE yj_field SET seq=80 WHERE panel_code=N'QC_INSP' AND col_name=N'供应商代码';
-UPDATE yj_field SET seq=60 WHERE panel_code=N'QC_INSP' AND col_name=N'单价';
-UPDATE yj_field SET seq=50, hidden=1, visible=0 WHERE panel_code=N'QC_INSP' AND col_name=N'单位';
-UPDATE yj_field SET seq=240, hidden=1, visible=0 WHERE panel_code=N'QC_INSP' AND col_name=N'单据状态';
-UPDATE yj_field SET seq=90 WHERE panel_code=N'QC_INSP' AND col_name=N'合格数量';
-UPDATE yj_field SET seq=240, hidden=1, visible=0 WHERE panel_code=N'QC_INSP' AND col_name=N'备注';
-UPDATE yj_field SET seq=260 WHERE panel_code=N'QC_INSP' AND col_name=N'审核人';
-UPDATE yj_field SET seq=270 WHERE panel_code=N'QC_INSP' AND col_name=N'审核时间';
-UPDATE yj_field SET seq=170 WHERE panel_code=N'QC_INSP' AND col_name=N'总结论';
-UPDATE yj_field SET seq=150 WHERE panel_code=N'QC_INSP' AND col_name=N'执行标准';
-UPDATE yj_field SET seq=150 WHERE panel_code=N'QC_INSP' AND col_name=N'批次号';
-UPDATE yj_field SET seq=280 WHERE panel_code=N'QC_INSP' AND col_name=N'批次键';
-UPDATE yj_field SET seq=110 WHERE panel_code=N'QC_INSP' AND col_name=N'报废数量';
-UPDATE yj_field SET seq=120 WHERE panel_code=N'QC_INSP' AND col_name=N'损耗';
-UPDATE yj_field SET seq=130 WHERE panel_code=N'QC_INSP' AND col_name=N'损耗率';
-UPDATE yj_field SET seq=210 WHERE panel_code=N'QC_INSP' AND col_name=N'日期';
-UPDATE yj_field SET seq=40 WHERE panel_code=N'QC_INSP' AND col_name=N'暂收单号';
-UPDATE yj_field SET seq=110 WHERE panel_code=N'QC_INSP' AND col_name=N'检验员';
-UPDATE yj_field SET seq=140 WHERE panel_code=N'QC_INSP' AND col_name=N'检验方案';
-UPDATE yj_field SET seq=120 WHERE panel_code=N'QC_INSP' AND col_name=N'检验日期';
-UPDATE yj_field SET seq=160 WHERE panel_code=N'QC_INSP' AND col_name=N'检验类型';
-UPDATE yj_field SET seq=130 WHERE panel_code=N'QC_INSP' AND col_name=N'检验编号';
-UPDATE yj_field SET seq=20 WHERE panel_code=N'QC_INSP' AND col_name=N'物料名称';
-UPDATE yj_field SET seq=190 WHERE panel_code=N'QC_INSP' AND col_name=N'物料描述';
-UPDATE yj_field SET seq=10 WHERE panel_code=N'QC_INSP' AND col_name=N'物料编码';
-UPDATE yj_field SET seq=140 WHERE panel_code=N'QC_INSP' AND col_name=N'生产日期';
-UPDATE yj_field SET seq=200 WHERE panel_code=N'QC_INSP' AND col_name=N'箱数';
-UPDATE yj_field SET seq=220 WHERE panel_code=N'QC_INSP' AND col_name=N'结案';
-UPDATE yj_field SET seq=30 WHERE panel_code=N'QC_INSP' AND col_name=N'规格型号';
-UPDATE yj_field SET seq=70 WHERE panel_code=N'QC_INSP' AND col_name=N'计量单位';
-UPDATE yj_field SET seq=90 WHERE panel_code=N'QC_INSP' AND col_name=N'部门';
-UPDATE yj_field SET hidden=1, visible=0 WHERE panel_code=N'QC_INSP' AND col_name=N'部门名称';
-UPDATE yj_field SET seq=100 WHERE panel_code=N'QC_INSP' AND col_name=N'部门编码';
-UPDATE yj_field SET seq=50 WHERE panel_code=N'QC_INSP' AND col_name=N'采购订单号';
-UPDATE yj_field SET seq=40 WHERE panel_code=N'QC_INSP' AND col_name=N'采购订单行号';
-UPDATE yj_field SET seq=180 WHERE panel_code=N'QC_INSP' AND col_name=N'附件1';
-UPDATE yj_field SET seq=190 WHERE panel_code=N'QC_INSP' AND col_name=N'附件2';
-UPDATE yj_field SET seq=200 WHERE panel_code=N'QC_INSP' AND col_name=N'附件3';
-UPDATE yj_field SET seq=210 WHERE panel_code=N'QC_INSP' AND col_name=N'附件4';
-UPDATE yj_field SET seq=220 WHERE panel_code=N'QC_INSP' AND col_name=N'附件5';
-UPDATE yj_field SET seq=230 WHERE panel_code=N'QC_INSP' AND col_name=N'附件6';
-UPDATE yj_field SET seq=370, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'仓库';
-UPDATE yj_field SET seq=210, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'供应商';
-UPDATE yj_field SET seq=230, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'入库单号';
-UPDATE yj_field SET seq=220, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'入库数量';
-UPDATE yj_field SET seq=440 WHERE panel_code=N'QC_RECV' AND col_name=N'制单号';
-UPDATE yj_field SET seq=410 WHERE panel_code=N'QC_RECV' AND col_name=N'剩余数量';
-UPDATE yj_field SET seq=90 WHERE panel_code=N'QC_RECV' AND col_name=N'单价';
-UPDATE yj_field SET seq=10 WHERE panel_code=N'QC_RECV' AND col_name=N'单据编号';
-UPDATE yj_field SET seq=400 WHERE panel_code=N'QC_RECV' AND col_name=N'发货数量';
-UPDATE yj_field SET seq=170 WHERE panel_code=N'QC_RECV' AND col_name=N'含税单价';
-UPDATE yj_field SET seq=190 WHERE panel_code=N'QC_RECV' AND col_name=N'含税金额';
-UPDATE yj_field SET seq=450 WHERE panel_code=N'QC_RECV' AND col_name=N'品质复核人';
-UPDATE yj_field SET seq=460 WHERE panel_code=N'QC_RECV' AND col_name=N'品质复核时间';
-UPDATE yj_field SET seq=350 WHERE panel_code=N'QC_RECV' AND col_name=N'备注';
-UPDATE yj_field SET seq=220 WHERE panel_code=N'QC_RECV' AND col_name=N'审核人';
-UPDATE yj_field SET seq=230 WHERE panel_code=N'QC_RECV' AND col_name=N'审核时间';
-UPDATE yj_field SET seq=80, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'总金额';
-UPDATE yj_field SET seq=70 WHERE panel_code=N'QC_RECV' AND col_name=N'批次号';
-UPDATE yj_field SET seq=240 WHERE panel_code=N'QC_RECV' AND col_name=N'批次键';
-UPDATE yj_field SET seq=200, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'折扣';
-UPDATE yj_field SET seq=330 WHERE panel_code=N'QC_RECV' AND col_name=N'折扣%';
-UPDATE yj_field SET seq=380 WHERE panel_code=N'QC_RECV' AND col_name=N'折扣金额';
-UPDATE yj_field SET seq=430 WHERE panel_code=N'QC_RECV' AND col_name=N'报废数量';
-UPDATE yj_field SET seq=100 WHERE panel_code=N'QC_RECV' AND col_name=N'数量';
-UPDATE yj_field SET seq=120 WHERE panel_code=N'QC_RECV' AND col_name=N'数量2';
-UPDATE yj_field SET seq=150 WHERE panel_code=N'QC_RECV' AND col_name=N'日期';
-UPDATE yj_field SET seq=390 WHERE panel_code=N'QC_RECV' AND col_name=N'条码';
-UPDATE yj_field SET seq=90 WHERE panel_code=N'QC_RECV' AND col_name=N'来料性质';
-UPDATE yj_field SET seq=50 WHERE panel_code=N'QC_RECV' AND col_name=N'物料名称';
-UPDATE yj_field SET seq=80 WHERE panel_code=N'QC_RECV' AND col_name=N'物料描述';
-UPDATE yj_field SET seq=20 WHERE panel_code=N'QC_RECV' AND col_name=N'物料编码';
-UPDATE yj_field SET seq=360, hidden=1 WHERE panel_code=N'QC_RECV' AND col_name=N'现存量';
-UPDATE yj_field SET seq=260, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'税别代码';
-UPDATE yj_field SET seq=270, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'税别说明';
-UPDATE yj_field SET seq=160 WHERE panel_code=N'QC_RECV' AND col_name=N'税率%';
-UPDATE yj_field SET seq=70, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'税额';
-UPDATE yj_field SET seq=300, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'箱数';
-UPDATE yj_field SET seq=250, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'结案';
-UPDATE yj_field SET seq=60 WHERE panel_code=N'QC_RECV' AND col_name=N'规格型号';
-UPDATE yj_field SET seq=110 WHERE panel_code=N'QC_RECV' AND col_name=N'计量单位';
-UPDATE yj_field SET seq=130 WHERE panel_code=N'QC_RECV' AND col_name=N'计量单位2';
-UPDATE yj_field SET seq=290, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'订单号';
-UPDATE yj_field SET seq=420 WHERE panel_code=N'QC_RECV' AND col_name=N'退料数量';
-UPDATE yj_field SET seq=310, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'部门';
-UPDATE yj_field SET seq=320, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'部门名称';
-UPDATE yj_field SET seq=30 WHERE panel_code=N'QC_RECV' AND col_name=N'采购单号';
-UPDATE yj_field SET seq=210 WHERE panel_code=N'QC_RECV' AND col_name=N'采购订单号';
-UPDATE yj_field SET seq=40 WHERE panel_code=N'QC_RECV' AND col_name=N'采购订单行号';
-UPDATE yj_field SET seq=60, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'金额';
-UPDATE yj_field SET seq=150 WHERE panel_code=N'QC_RECV' AND col_name=N'附件1';
-UPDATE yj_field SET seq=160 WHERE panel_code=N'QC_RECV' AND col_name=N'附件2';
-UPDATE yj_field SET seq=170 WHERE panel_code=N'QC_RECV' AND col_name=N'附件3';
-UPDATE yj_field SET seq=180 WHERE panel_code=N'QC_RECV' AND col_name=N'附件4';
-UPDATE yj_field SET seq=190 WHERE panel_code=N'QC_RECV' AND col_name=N'附件5';
-UPDATE yj_field SET seq=200 WHERE panel_code=N'QC_RECV' AND col_name=N'附件6';
-UPDATE yj_field SET seq=340 WHERE panel_code=N'QC_RECV' AND col_name=N'预计到货日期';
-UPDATE yj_field SET seq=240, hidden=1, visible=0 WHERE panel_code=N'QC_RECV' AND col_name=N'领料单号';
-UPDATE yj_field SET seq=80 WHERE panel_code=N'QC_RETURN' AND col_name=N'仓库';
-UPDATE yj_field SET seq=60 WHERE panel_code=N'QC_RETURN' AND col_name=N'供应商';
-UPDATE yj_field SET seq=110 WHERE panel_code=N'QC_RETURN' AND col_name=N'单据状态';
-UPDATE yj_field SET seq=140 WHERE panel_code=N'QC_RETURN' AND col_name=N'备注';
-UPDATE yj_field SET seq=120 WHERE panel_code=N'QC_RETURN' AND col_name=N'审核人';
-UPDATE yj_field SET seq=130 WHERE panel_code=N'QC_RETURN' AND col_name=N'审核时间';
-UPDATE yj_field SET seq=100 WHERE panel_code=N'QC_RETURN' AND col_name=N'经手人';
-UPDATE yj_field SET seq=90 WHERE panel_code=N'QC_RETURN' AND col_name=N'退货原因';
-UPDATE yj_field SET seq=70 WHERE panel_code=N'QC_RETURN' AND col_name=N'退货类型';
-UPDATE yj_field SET seq=40 WHERE panel_code=N'QC_RETURN' AND col_name=N'采购订单号';
-UPDATE yj_field SET seq=150 WHERE panel_code=N'QC_RETURN' AND col_name=N'附件1';
-UPDATE yj_field SET seq=160 WHERE panel_code=N'QC_RETURN' AND col_name=N'附件2';
-UPDATE yj_field SET seq=170 WHERE panel_code=N'QC_RETURN' AND col_name=N'附件3';
-UPDATE yj_field SET seq=180 WHERE panel_code=N'QC_RETURN' AND col_name=N'附件4';
-UPDATE yj_field SET seq=190 WHERE panel_code=N'QC_RETURN' AND col_name=N'附件5';
-UPDATE yj_field SET seq=200 WHERE panel_code=N'QC_RETURN' AND col_name=N'附件6';
 GO
