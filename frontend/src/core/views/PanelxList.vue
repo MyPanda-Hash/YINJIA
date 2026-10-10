@@ -863,7 +863,7 @@
               :width="archColW(b, c)"
               :min-width="archColW(b, c) ? undefined : c.width"
               :align="c.align"
-              :show-overflow-tooltip="!detailEditable(b)"
+              :show-overflow-tooltip="!detailEditable(b) && !isMultilineField(c.field)"
             >
             <template #header>
               <div class="col-hdr" :class="{ filtering: hasColFilter(c.prop) }" @click.stop="toggleColFilter(c.prop)">
@@ -978,9 +978,16 @@
                     @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
                   />
                 </template>
-                <span v-else class="cell-lazy" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <!-- 未激活时的纯文本呈现:「多行文本」列**不截断**,整段文字换行显示、行高跟着变高
+                     (用户口径 2026-10-15:「当前需要点击后才能显示多行,不点击就不能」) -->
+                <span
+                  v-else
+                  class="cell-lazy"
+                  :class="{ 'cell-multiline': isMultilineField(c.field) }"
+                  @click="activateCell(row, b, c.prop)"
+                >{{ formatFieldValue(c.field, row[c.prop]) }}</span>
               </template>
-              <span v-else>{{ tt(row[c.prop] ?? '') }}</span>
+              <span v-else :class="{ 'cell-multiline': isMultilineField(c.field) }">{{ tt(row[c.prop] ?? '') }}</span>
             </template>
           </el-table-column>
           </template>
@@ -8325,6 +8332,28 @@ onUnmounted(() => {
 .detail :deep(.el-table td .cell-lazy:hover) {
   background: #f2f6ff;
   box-shadow: inset 0 0 0 1px #c7d8f5;
+}
+/* 「多行文本」字段:未激活时的纯文本也**整段换行显示**,不再截成一行加省略号
+   (用户口径 2026-10-15:「当前需要点击后才能显示多行,不点击就不能」)。
+   行高随内容增长 ⇒ 该行变高,整段文字都看得见。
+   ⚠ 必须同时清掉 nowrap/ellipsis,只改 white-space 不够(el-table 的 .cell 也带截断)。 */
+.detail :deep(.el-table td .cell-lazy.cell-multiline) {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.detail :deep(.el-table td .cell.cell-multiline) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-overflow: clip;
+}
+.detail :deep(.el-table td:has(.cell-multiline)) .cell {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 /* 分区选择格(2026-10-08):点击开弹窗而非行内输入 —— 用 pointer + 虚线下划线把"可点选"显出来,
    与参照列(readonly input + 点击选择)的观感区分开 */

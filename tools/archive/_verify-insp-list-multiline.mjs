@@ -168,8 +168,41 @@ try {
     ok('无横向溢出', (ml?.grown?.scrollW || 0) <= (ml?.grown?.clientW || 0) + 2,
       `scrollW=${ml?.grown?.scrollW} clientW=${ml?.grown?.clientW}`)
 
-    // 实拍:列表页里「处理方式」格撑着 6 行长文的样子(给用户看的证据)
-    //  ⚠ 必须在**切到别的格之前**拍:活动格一换,这一格就退回 `.cell-lazy` 纯文本(带省略号)。
+    // ── 不点开也要多行(用户口径 2026-10-15:「当前需要点击后才能显示多行,不点击就不能」)──
+    //  做法:把活动格切到「备注」⇒「处理方式」退回 `.cell-lazy` 纯文本呈现,
+    //  此时它应当**整段换行、行高变高**,而不是截成一行加省略号。
+    const lazy = await (async () => {
+      await probeCell('备注') // 切走活动格(不给长文,只借它把焦点挪开)
+      return ev(`(() => {
+        const clean = (s) => (s||'').replace(/[\\n\\r\\t]/g,'').replace(/[\\u21c5\\u25b2\\u25bc]/g,'').trim()
+        const wrap = [...document.querySelectorAll('.detail')].find(d => d.querySelector('.el-table__body-wrapper tbody tr'))
+        const tbl = wrap.querySelector('.el-table')
+        const ths = [...tbl.querySelectorAll('.el-table__header-wrapper thead th')]
+        const heads = ths.map(th => clean(th.innerText).split(' ')[0])
+        const idx = heads.indexOf('处理方式')
+        const td = tbl.querySelector('.el-table__body-wrapper tbody tr').querySelectorAll('td')[idx]
+        const el = td.querySelector('.cell-multiline') || td.querySelector('.cell-lazy') || td.querySelector('.cell')
+        if (!el) return { err: 'no-el', html: (td.innerHTML||'').slice(0,120) }
+        const cs = getComputedStyle(el)
+        return {
+          cls: el.className, whiteSpace: cs.whiteSpace,
+          h: el.offsetHeight, lineH: parseFloat(cs.lineHeight) || 0,
+          clientW: el.clientWidth, scrollW: el.scrollWidth,
+          textLen: (el.innerText||'').length,
+        }
+      })()`)
+    })()
+    console.log(`    [不点开时的纯文本呈现] ${JSON.stringify(lazy)}`)
+    ok('未激活的格子带 cell-multiline(按字段类型)', /cell-multiline/.test(String(lazy?.cls || '')), JSON.stringify(lazy))
+    ok('未激活时也换行显示(white-space = pre-wrap)', lazy?.whiteSpace === 'pre-wrap', `whiteSpace=${lazy?.whiteSpace}`)
+    ok('整段文字都在(没被截成一行)', (lazy?.textLen || 0) === long.length, `textLen=${lazy?.textLen}/${long.length}`)
+    ok('行高随内容变高(≥3 行)', (lazy?.h || 0) >= (lazy?.lineH || 18) * 3 - 2,
+      `h=${lazy?.h}px / lineH=${lazy?.lineH}px`)
+    ok('未被截断(无横向溢出)', (lazy?.scrollW || 0) <= (lazy?.clientW || 0) + 2,
+      `scrollW=${lazy?.scrollW} clientW=${lazy?.clientW}`)
+
+    // 实拍:列表页里**不点开**也能看到整段文字换行的样子(给用户看的证据)
+    //  ⚠ 必须在切回活动格之前拍。
     if (sc.capture) {
       const s = await send('Page.captureScreenshot', { format: 'png' })
       if (s?.result?.data) {
