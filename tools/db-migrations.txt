@@ -3053,3 +3053,13 @@ migrate-sale-out-order-line-i18n-20261015.sql
 #     bl_sale_out.源单编号/源单行号(见 KingdeePushService 的销售支)。
 #   幂等(UPDATE 窄条件 + 自检含物理列仍在);两账套均执行。
 migrate-sale-out-order-cols2-20261015.sql
+# ── 2026-10-10 登记补漏:4 张库存报表(flat)面板的 module_group 乱码修复 ──
+#   背景:STOCK_BALANCE/LEDGER/STATUS/SUMMARY 的 module_group 曾被非 UTF-8 通道写成 4 个半角问号
+#     (raw 0x3F003F003F003F00),后果是权限矩阵里冒出名为 "????" 的分组、这 4 张面板也落不进
+#     「智能供应链」(ReportService.NAV_GROUP 里「库存核算」→ 智能供应链)。
+#   本脚本把乱码写回合法值「库存核算」;守卫是 module_group LIKE '%?%' —— 只碰乱码行,
+#   已是合法值的环境(如开发机现为 系统管理/仓库管理)自动空转,故可安全进链、幂等;双账套均已执行。
+#   ⚠ 同批两个一次性清理脚本(cleanup-kucun-resync-marker / cleanup-probe-residue-roles)
+#     有意**不进链**(前者清写入者标记、后者按硬编码 id 删探针残留角色,登记会让 DbSync 在
+#     所有环境自动执行),已登记进 tools/verify/DbNormAudit.java 检查 12 的 allowOffChain 白名单。
+fix-stock-report-module-group.sql

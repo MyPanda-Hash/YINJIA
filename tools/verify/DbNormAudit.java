@@ -463,12 +463,20 @@ public class DbNormAudit {
         //   「该脚本不在迁移链里,手动执行」)。若登记,DbSync 会立刻把线上正在用的表删掉 ⇒ 只能链外。
         //   migrate-field-multiline-text-rollback-20261015.sql(2026-10-15):「多行文本」字段类型的**回滚**,
         //   把三面板 21 行的 data_type 从 多行文本 改回 文本。若登记,DbSync 会在链尾自动把功能关掉。
+        //   ⚠ 第三类:**一次性清理 / 探针残留处理**(2026-10-10 补登,随打包前核查):
+        //   cleanup-kucun-resync-marker.sql:清 kucun 表的迁移写入者标记(asp_user2='kucun-resync'),
+        //     属一次性数据保洁、不是结构/元数据演进;登记后每套环境都多跑一次无意义的 UPDATE。
+        //   cleanup-probe-residue-roles.sql:按**硬编码 id(3/6/7/8)** 删视觉探针留下的垃圾角色 ——
+        //     非本机环境(服务器)的 yj_role 同 id 可能就是**真实角色**,登记 = 让 DbSync 在所有环境盲删。
+        //     只能链外手工执行(脚本内自带「有用户挂载则整批回滚」安全闸)。
         Set<String> allowOffChain = Set.of("check-migrations.sql", "deploy-all.sql", "dump-schema-log.sql",
                 "dump-server-views.sql", "fix-db-logins.sql", "migrate-golive-cleanup.sql", "migrate-rd-cleanup.sql",
                 "migrate-table-comments.sql", "migrate-testdata-cleanup.sql", "restore-from-backup.sql",
                 "restore-local-bak.sql", "seed-demo-prodfile.sql",
                 "migrate-wo-process-line-drop.sql",
-                "migrate-field-multiline-text-rollback-20261015.sql");
+                "migrate-field-multiline-text-rollback-20261015.sql",
+                "cleanup-kucun-resync-marker.sql",
+                "cleanup-probe-residue-roles.sql");
         List<String> bad = new ArrayList<>();
         for (String f : onDisk) {
             if (listed.contains(f) || allowOffChain.contains(f) || f.startsWith("_")) continue;
