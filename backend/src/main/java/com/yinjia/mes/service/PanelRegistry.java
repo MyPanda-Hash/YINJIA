@@ -57,9 +57,9 @@ public class PanelRegistry {
         public String tabKey() {
             return detailKey == null || detailKey.isBlank() ? "items" : detailKey;
         }
-        /** 模块分组(对齐 HSDZ permission.GROP;缺省 系统管理) */
+        /** 模块分组(对齐 HSDZ permission.GROP;缺省 其他) */
         public String moduleName() {
-            return moduleGroup == null || moduleGroup.isBlank() ? "系统管理" : moduleGroup;
+            return moduleGroup == null || moduleGroup.isBlank() ? "其他" : moduleGroup;
         }
         public List<FieldDef> fieldsAt(String place) {
             return fields.stream().filter(f -> f.inPlace(place)).toList();

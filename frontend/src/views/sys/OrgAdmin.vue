@@ -125,7 +125,7 @@
                   </thead>
                   <tbody>
                     <tr v-for="r in g.panels" :key="r.panelCode">
-                      <td class="pt-panel">{{ tt(r.panelName) }}</td>
+                      <td class="pt-panel" :title="tt(r.panelName)">{{ tt(r.panelName) }}</td>
                       <td v-for="act in actsOf(g)" :key="act[0]" class="pt-act pt-sweep"
                           @mousedown.prevent="rowHasAct(r, act[0]) && canAct(r, act[0]) && startSweep(r, act[0])"
                           @mouseenter="rowHasAct(r, act[0]) && sweepOver(r, act[0])">
@@ -265,7 +265,9 @@ const permActions = ref([])  // [['view','可见'],['query','查询'],...]
 
 function applyPanelModules(modules, actions) {
   panelModules.value = (modules || []).filter((m) => (m.panels || []).length)
-  openGroups.value = panelModules.value.map((m) => m.code)
+  // 2026-10-10:分组默认折叠(原先全量展开,124 个面板一次铺开导致盲选/卡顿);
+  // 分组名由后端按导航一级模块归并返回(ReportService.navGroup)
+  openGroups.value = []
   permActions.value = actions || []
 }
 
@@ -1106,7 +1108,8 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
 }
-/* 操作权限矩阵表(11 项)—— wrap 是唯一滚动容器:thead sticky 在此生效 */
+/* 操作权限矩阵表 —— wrap 是唯一滚动容器:thead sticky 在此生效。
+   2026-10-10:改为 fixed 布局后总宽由列宽决定，窄屏超出即在此横向滚动(首列钉左)。 */
 .perm-table-wrap { overflow: auto; max-height: 50vh; }
 .perm-table thead th {
   position: sticky;
@@ -1129,7 +1132,9 @@ onBeforeUnmount(() => {
 .perm-table tbody tr:hover td.pt-panel { background: #eaf2fb; }
 .perm-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate; /* 钉左首列+钉顶表头共存时，collapse 会让 sticky 边框丢失 */
+  border-spacing: 0;
+  table-layout: fixed; /* 2026-10-10:面板列曾被 12 个 min-width:40px 操作列挤成竖排 */
   font-size: 12px;
 }
 .perm-table th {
@@ -1138,6 +1143,24 @@ onBeforeUnmount(() => {
   text-align: center;
   white-space: nowrap;
 }
+/* 面板列定宽:table-layout:fixed 下首列必须有宽度，否则退回等分被压成竖排。
+   窄屏下收窄，给操作列让位。 */
+.perm-table th.pt-panel,
+.perm-table td.pt-panel {
+  width: 168px;
+  min-width: 168px;
+  max-width: 168px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 1440px) {
+  .perm-table th.pt-panel,
+  .perm-table td.pt-panel { width: 132px; min-width: 132px; max-width: 132px; }
+}
+/* 面板名过长时截断，完整名走 title 提示（见模板 :title） */
+.perm-table td.pt-panel { color: #303133; }
 .perm-table thead th {
   background: #f5f7fa;
   font-weight: 600;
@@ -1153,6 +1176,10 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 .perm-table .pt-act { min-width: 40px; text-align: center; }
+/* 2026-10-10:列头最长为「审核反审核」「复核反审核」「自定义字段」(5 字)。
+   fixed 布局下不给列宽会让操作列平分剩余空间、长表头换行挤高行高。 */
+.perm-table th.pt-act,
+.perm-table td.pt-act { width: 74px; min-width: 74px; }
 .perm-table .pt-na { color: #d1d5db; }
 /* 原生大号勾选框(18px)+滑动扫选:整格命中,按下即切换,拖动批量套用 */
 .perm-table .pt-cb {
@@ -1171,6 +1198,8 @@ onBeforeUnmount(() => {
   background: #fafbfc;
   font-weight: 600;
 }
+.perm-table th.pt-all,
+.perm-table td.pt-all { width: 48px; min-width: 48px; }
 .pt-head-caret:hover { color: #409eff; background: rgba(64, 158, 255, 0.12); }
 .pt-head-caret.is-all { color: #409eff; }
 .pt-head-caret.is-part { color: #e6a23c; }

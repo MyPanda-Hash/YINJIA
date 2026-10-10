@@ -3,6 +3,7 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PanelRegistry;
+import com.yinjia.mes.service.ReportService;
 import com.yinjia.mes.service.SysAdminService;
 import com.yinjia.mes.service.UsageLogService;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -140,7 +141,7 @@ public class SysAdminController {
             {"print",   "打印预览"},
             {"audit",   "审核反审核"},
             {"price",   "价格金额"},
-            {"review",  "复核反复核"},
+            {"review",  "复核反审核"},
             {"adjust",  "调价"},
             // 自定义字段(动态字段/备用列池)配置权(2026-10-09 用户口径):
             // 原先该动作只有超级管理员能做(is_admin 硬判),现在与其余操作同格 ——
@@ -166,27 +167,40 @@ public class SysAdminController {
     @GetMapping("/role/{id}/panels")
     public ApiResult<Map<String, Object>> rolePanels(@PathVariable int id) {
         // 面板按真实模块分组返回(对齐 HSDZ permission.GROP,数据源 yj_panel.module_group)
+        // 分组名经 ReportService.navGroup 归并到导航一级模块(历史碎组:基础资料/采购管理/订单管理/生产管理/委外加工/库存核算 → 对应导航模块),
+        // 未归并的原值原样保留;库中 module_group 原列不动,读权限放行口径不受影响。
         Map<String, List<Map<String, Object>>> byModule = new LinkedHashMap<>();
         // 通用虚拟面板:我的桌面权限化(勾可见才在导航显示;admin 恒可见)
         Map<String, Object> dash = new LinkedHashMap<>();
         dash.put("panelCode", "DASHBOARD");
         dash.put("panelName", "我的桌面");
-        dash.put("module", "通用");
+        dash.put("module", "我的桌面");
         dash.put("hasApproval", false);
         dash.put("actions", new String[][]{{"view", "可见"}});
-        byModule.computeIfAbsent("通用", k -> new ArrayList<>()).add(dash);
+        byModule.computeIfAbsent("我的桌面", k -> new ArrayList<>()).add(dash);
         for (PanelRegistry.PanelDef def : registry.all()) {
             Map<String, Object> p = new LinkedHashMap<>();
+            String group = ReportService.navGroup(def.moduleName());
             p.put("panelCode", def.code());
             p.put("panelName", def.name());
-            p.put("module", def.moduleName());
+            p.put("module", group);
             p.put("hasApproval", def.isDoc());
             // 面板级动作集:文件类面板按真实操作行为下发专属 8 项,其余保持通用 11 项
             p.put("actions", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code())
                     ? FILE_PANEL_ACTIONS : PERMISSION_ACTIONS);
-            byModule.computeIfAbsent(def.moduleName(), k -> new ArrayList<>()).add(p);
+            byModule.computeIfAbsent(group, k -> new ArrayList<>()).add(p);
         }
         List<Map<String, Object>> modules = new ArrayList<>();
+        // 按导航一级模块顺序输出(未登记模块按发现顺序排在末尾),前端即按此顺序渲染分组
+        for (String nav : ReportService.NAV_GROUP_ORDER) {
+            List<Map<String, Object>> panels = byModule.remove(nav);
+            if (panels == null) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("code", nav);
+            m.put("name", nav);
+            m.put("panels", panels);
+            modules.add(m);
+        }
         for (Map.Entry<String, List<Map<String, Object>>> e : byModule.entrySet()) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("code", e.getKey());

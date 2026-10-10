@@ -61,6 +61,32 @@ public class ReportService {
     private static final String RD_PREFIX = "RD_";
 
     /**
+     * 模块分组归并(2026-10-10):yj_panel.module_group 的历史碎值(基础资料/采购管理/生产管理/
+     * 订单管理/委外加工/库存核算…)**同时**保留在原列用于读权限放行(PanelPermissionService.readablePanels
+     * 按同模块放行),但对外展示(权限矩阵分组、报表口径)统一归并到**导航一级模块名**。
+     * 只做单向投影:不改库、不改原列语义,故读放行与报表排除口径均不受影响。
+     */
+    private static final Map<String, String> NAV_GROUP = Map.ofEntries(
+            Map.entry("智能供应链", "智能供应链"),
+            Map.entry("库存核算", "智能供应链"),
+            Map.entry("库存报表", "智能供应链"),
+            Map.entry("采购管理", "智能供应链"),
+            Map.entry("订单管理", "智能供应链"),
+            Map.entry("销售管理", "智能供应链"),
+            Map.entry("生产制造", "生产制造"),
+            Map.entry("生产管理", "生产制造"),
+            Map.entry("委外加工", "生产制造"),
+            Map.entry("品质管理", "品质管理"),
+            Map.entry("研发管理", "研发管理"),
+            Map.entry("基础档案", "基础档案"),
+            Map.entry("基础资料", "基础档案"),
+            Map.entry("基础数据", "基础档案"),
+            Map.entry("物料及价格", "基础档案"),
+            Map.entry("设备管理", "设备管理"),
+            Map.entry("财务管理", "财务管理"),
+            Map.entry("我的桌面", "我的桌面"),
+            Map.entry("其他", "其他"));
+    /**
      * 物料二维码标签(存货档案勾选即打,2026-09-16):80×80mm 一码一页,二维码内容=存货编码。
      * 不走 /export 的单据链路(无 docNo/头参数),由 qrLabelPdf 直查 bs_inv 明细喂模板。
      */
@@ -175,8 +201,25 @@ public class ReportService {
      * 两口径取或:任一命中即排除 —— 新增面板只填了其中一个字段时也不会漏。
      */
     private static boolean isRdManagement(PanelRegistry.PanelDef def) {
-        return RD_MODULE.equals(def.moduleName()) || def.code().startsWith(RD_PREFIX);
+        return RD_MODULE.equals(ReportService.navGroup(def.moduleName())) || def.code().startsWith(RD_PREFIX);
     }
+
+    /** 模块分组归并到导航一级模块名;未登记的值原样返回(保证不会凭空吞掉面板)。 */
+    public static String navGroup(String moduleGroup) {
+        if (moduleGroup == null) return "其他";
+        String g = moduleGroup.trim();
+        if (g.isEmpty()) return "其他";
+        // 乱码兜底(2026-10-10):历史上经非 UTF-8 通道写入,module_group 被写成一串半角问号
+        // (实测 STOCK_BALANCE/STOCK_LEDGER/STOCK_STATUS/STOCK_SUMMARY 四行的值即 "????",
+        //  原始字节 3F003F003F003F00)。这类值不是合法模块名,归到「其他」而不是自成一组,
+        // 避免权限矩阵里冒出一个叫 "????" 的组。库侧已同批修正,此处是二次防线。
+        if (g.chars().allMatch(c -> c == '?' || c == '\uFFFD')) return "其他";
+        return NAV_GROUP.getOrDefault(g, g);
+    }
+
+    /** 导航一级模块展示顺序(权限矩阵按此排序,未登记模块排在末尾)。 */
+    public static final List<String> NAV_GROUP_ORDER = List.of(
+            "我的桌面", "研发管理", "智能供应链", "生产制造", "品质管理", "财务管理", "设备管理", "基础档案", "其他");
 
     /** 通用模板条目(面板名做报表名,文件名也更可读) */
     private ReportTemplate genericTemplate(String panelCode) {
