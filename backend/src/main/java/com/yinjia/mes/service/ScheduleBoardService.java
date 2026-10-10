@@ -71,6 +71,18 @@ public class ScheduleBoardService {
      * 这是 2026-10-05 与用户确认的口径(另一条路线「按产品默认生产车间过滤」需先补 338 个商品的主数据)。
      */
     public List<Map<String, Object>> pending(String keyword, String customer, String workshop) {
+        return pending(keyword, customer, workshop, null);
+    }
+
+    /**
+     * 待排产池。
+     *
+     * @param rowIds **限定行id**(plang.id):非空时**只出这些物理行** —— 生产工单页勾 N 行点「排产」
+     *               弹内嵌快速排产时用。⚠ 这里必须用 行id 而不是「工单号#行号」:生产工单页可以勾
+     *               **任意多行**(可能跨工单),而关键字那种"工单号#行号"只能表达**一个**标识
+     *               (2026-10-15 踩到:只传一行 ⇒ 勾 2 行弹窗里只剩 1 行,用户报障)。
+     */
+    public List<Map<String, Object>> pending(String keyword, String customer, String workshop, List<Long> rowIds) {
         if (workshop != null && !workshop.isBlank()) return List.of();
         String kw = keyword == null ? "" : keyword.trim();
         String like = "%" + kw + "%";
@@ -79,6 +91,18 @@ public class ScheduleBoardService {
         String[] key = parseWoLineKey(kw);
         String noLike = key == null ? like : "%" + key[0] + "%";
         Integer xcEq = key == null ? null : Integer.valueOf(key[1]);
+        // 限定行id:动态拼 IN(数量可控 —— 来自界面勾选,不会很长)
+        boolean limit = rowIds != null && !rowIds.isEmpty();
+        StringBuilder in = new StringBuilder();
+        List<Object> args = new ArrayList<>();
+        if (limit) {
+            for (int i = 0; i < rowIds.size(); i++) in.append(i == 0 ? "?" : ",?");
+        }
+        args.add(kw); args.add(noLike);
+        args.add(like); args.add(like); args.add(like); args.add(like); args.add(like); args.add(like);
+        args.add(xcEq); args.add(xcEq);
+        args.add(cu); args.add(cu);
+        if (limit) args.addAll(rowIds);
         return jdbc.queryForList(
                 "SELECT p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 工单行号, ISNULL(p.[批次号],N'') AS 批次号,"
                         + " CONVERT(varchar(10), p.pl_date, 120) AS 单据日期,"
@@ -103,10 +127,12 @@ public class ScheduleBoardService {
                         // 「工单号#行号」:把结果钉到这一行(与去重键/占用链同一种写法)
                         + "   AND (? IS NULL OR ISNULL(p.pl_xc,0) = ?)"
                         + "   AND (? = '' OR ISNULL(dk.mc, p.khdm) = ?)"
+                        // 限定行id(勾选进来的那些行)
+                        + (limit ? "   AND p.id IN (" + in + ")" : "")
                         // 2026-10-11 用户拍板:待排产按转单时间倒序——新结转的工单置顶(asp_time1=转单留痕,
                         // 与生产工单列表"转单时间"同源;NULL 旧数据沉底,次级 pl_date DESC 对齐工单列表口径)
                         + " ORDER BY p.asp_time1 DESC, p.pl_date DESC, p.pl_no, p.pl_xc",
-                kw, noLike, like, like, like, like, like, like, xcEq, xcEq, cu, cu);
+                args.toArray());
     }
 
     /**

@@ -62,5 +62,32 @@ ok(`④ 已排产 "工单号#行号" 只出第 ${XC} 行`,
   tAll.length === 1 && Number(tAll[0]['工单行号']) === XC, JSON.stringify(xcs(tAll)))
 ok('④ 普通关键字仍出多行(对照,不回归)', tBroad.length >= 1, JSON.stringify(xcs(tBroad)))
 
+// ── ⑤ 限定行id(勾选多行进来的场景)—— 勾几行就只出几行 ──
+console.log(`\n── ⑤ 限定行id(生产工单页勾 N 行 → 弹内嵌快速排产) ──`)
+// 取该工单**未排产**的行(在待排产池里的)
+const poolAll = (await api('/px/scheduleBoard/pending', { keyword: WO })).data || []
+const two = poolAll.slice(0, 2)
+console.log(`    取池里前 2 行 = ${JSON.stringify(two.map((r) => ({ 行id: r['行id'], 行号: r['工单行号'] })))}`)
+ok('⑤ fixture 池里至少 2 行可勾', two.length === 2, `n=${poolAll.length}`)
+if (two.length === 2) {
+  const ids = two.map((r) => r['行id'])
+  const lim = (await api('/px/scheduleBoard/pending', { keyword: '', 限定行id: ids })).data || []
+  console.log(`    限定行id=${JSON.stringify(ids)} → ${lim.length} 行,行id=${JSON.stringify(lim.map((r) => r['行id']))}`)
+  ok('⑤ 勾 2 行 → 池里恰出这 2 行(不是 1 行、也不是整单)',
+    lim.length === 2 && ids.every((i) => lim.some((r) => Number(r['行id']) === Number(i))),
+    `实际 ${lim.length} 行`)
+  // 跨工单也支持:再混一个别的工单的行
+  const other = (await api('/px/scheduleBoard/pending', { keyword: 'MO-2026-10-0004' })).data || []
+  if (other.length) {
+    const ids3 = [...ids, other[0]['行id']]
+    const lim3 = (await api('/px/scheduleBoard/pending', { keyword: '', 限定行id: ids3 })).data || []
+    console.log(`    限定行id=3 个(含别的工单 ${other[0]['加工单号']}#${other[0]['工单行号']}) → ${lim3.length} 行`)
+    ok('⑤ 限定行id 支持跨工单(勾 3 行出 3 行)', lim3.length === 3, `实际 ${lim3.length}`)
+  }
+  // 与关键字叠加:限定行id 优先/取交集,不应把整单放出来
+  const both = (await api('/px/scheduleBoard/pending', { keyword: WO, 限定行id: ids })).data || []
+  ok('⑤ 关键字+限定行id 叠加取交集(仍只 2 行)', both.length === 2, `实际 ${both.length}`)
+}
+
 console.log(`\n[结果] pass=${pass} fail=${fail}`)
 process.exit(fail === 0 ? 0 : 1)

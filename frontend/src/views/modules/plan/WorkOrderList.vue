@@ -26,8 +26,8 @@
       <!-- 切单(9.29 生产管理批次①,2026-10-05):勾选一张在产工单 → 输入切出数量 → 子工单(新工单号);
            撤回切单 = 子单无报工/入库/领料时可还原父单数量(WorkOrderSplitService.split/unsplit) -->
       <el-button size="small" type="warning" plain @click="openSplit" :disabled="!checked.length && !currentRow">{{ tt('切单') }}</el-button>
-      <!-- 工单排产弹窗(2026-10-05 用户口径):只带当前这一张工单的快速排产 -->
-      <el-button size="small" type="success" plain :disabled="(!checked.length && !currentRow) || Number((checked[0] || currentRow || {})['生产线'] ? 1 : 0) === 1" @click="openSchedule">{{ tt('排产') }}</el-button>
+      <!-- 工单排产弹窗(2026-10-05 用户口径):带**勾选的那些行**的快速排产(多选=多行,可跨工单) -->
+      <el-button size="small" type="success" plain :disabled="schedDisabled" @click="openSchedule">{{ tt('排产') }}</el-button>
       <el-button size="small" plain @click="onUnsplit" :disabled="!checked.length && !currentRow">{{ tt('撤回切单') }}</el-button>
       <el-dropdown split-button size="small" type="primary" @click="doPrintTask('成型生产任务单')" @command="doPrintTask"
                    :disabled="!checked.length && !currentRow">
@@ -116,11 +116,11 @@
       </el-table-column>
     </el-table>
 
-    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**,按「工单号+工单行号」筛选 ⇒ 只显示当前这一行 -->
+    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**,按勾选的「工单号+工单行号」筛选 ⇒ 只显示勾选的那些行 -->
     <el-dialog v-model="schedVisible" :title="tt('工单排产（快速排产）')" width="94%" top="4vh" append-to-body destroy-on-close
                @closed="load">
       <div style="height: 76vh; overflow: hidden">
-        <ScheduleBoard :工单号="schedNo" :工单行号="schedXc" embedded />
+        <ScheduleBoard :工单号="schedNo" :工单行号="schedXc" :限定行id="schedRowIds" embedded />
       </div>
     </el-dialog>
 
@@ -198,19 +198,41 @@ const traceVisible = ref(false)
 const traceNo = ref('')
 /** 追溯的工单行id(plang.id):行级口径必需(2026-10-15) */
 const traceRowId = ref(null)
-/** 工单排产弹窗(2026-10-05 用户口径):只带**当前这一行**的快速排产 */
+/** 排产按钮可用性(2026-10-15 多选修正):没勾也没当前行 → 禁用;勾选/当前行里**任一已排产** → 禁用
+ *  (原来是只看 checked[0] —— 勾 2 行时若第一行已排产就误禁用,或第一行未排产就误放行)。 */
+const schedDisabled = computed(() => {
+  const picked = (checked.value && checked.value.length) ? checked.value
+    : (currentRow.value ? [currentRow.value] : [])
+  if (!picked.length) return true
+  return picked.some((r) => !!r['生产线'])
+})
+
+/** 工单排产弹窗(2026-10-05 用户口径):只带**勾选的那些行**的快速排产 */
 const schedVisible = ref(false)
 const schedNo = ref('')
-/** 弹窗要预筛的工单行号(2026-10-15):带它 ⇒ 快速排产只出这一行,而不是同工单所有行 */
+/** 弹窗要预筛的工单行号(2026-10-15):单行时带它 ⇒ 快速排产只出这一行 */
 const schedXc = ref(null)
+/** 弹窗要限定的行id 列表(2026-10-15):**多选**时带它 —— 勾几行就只出几行(可跨工单) */
+const schedRowIds = ref(null)
 function openSchedule() {
-  const r = (checked.value.length === 1 ? checked.value[0] : currentRow.value) || checked.value[0]
-  if (!r) { ElMessage.warning(tt('请先勾选一张工单')); return }
-  if (r['生产线']) { ElMessage.warning(`${tt('该工单已排产')}(${r['生产线']})，${tt('不能重复排入;换线请先撤销排产')}`); return }
-  schedNo.value = r['工单号']
-  // 行级(用户口径「工单号+工单行号确定当前唯一工单」):把行号一并带给弹窗内的快速排产,
-  //   否则弹窗只按工单号筛 ⇒ 同工单其它行也一起列出来(用户报障场景)
-  schedXc.value = r['工单行号'] ?? null
+  // ⚠ 勾选优先(2026-10-15 修):原来 `checked.length === 1 ? checked[0] : currentRow` —— 勾 2 行时会
+  //   掉进 currentRow 分支,弹窗只带**一行**进去,用户报障「勾选两个,进入排产的只有一个单据」。
+  //   现:勾了几行就带几行(checked 非空即用它),没勾才用当前行。
+  const picked = (checked.value && checked.value.length) ? checked.value.slice()
+    : (currentRow.value ? [currentRow.value] : [])
+  if (!picked.length) { ElMessage.warning(tt('请先勾选一张工单')); return }
+  const scheduled = picked.filter((r) => r['生产线'])
+  if (scheduled.length) {
+    ElMessage.warning(`${tt('该工单已排产')}(${scheduled.map((r) => `${r['工单号']}#${r['工单行号']}`).join('、')})，${tt('不能重复排入;换线请先撤销排产')}`)
+    return
+  }
+  const nos = [...new Set(picked.map((r) => r['工单号']))]
+  schedNo.value = nos.length === 1 ? nos[0] : ''
+  schedXc.value = picked.length === 1 ? (picked[0]['工单行号'] ?? null) : null
+  // 行级(用户口径「工单号+工单行号确定当前唯一工单」):把勾选的**全部行id**一并带给弹窗内的快速排产,
+  //   否则弹窗只按工单号筛 ⇒ 同工单其它行也一起列出来(用户报障场景)。
+  //   多行必须走 行id 列表(可跨工单、任意多行),"工单号#行号"关键字只能表达一个行。
+  schedRowIds.value = picked.length > 1 ? picked.map((r) => r['行id']).filter((x) => x != null) : null
   schedVisible.value = true
 }
 

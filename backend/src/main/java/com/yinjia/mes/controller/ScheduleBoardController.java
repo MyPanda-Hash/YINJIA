@@ -36,12 +36,15 @@ public class ScheduleBoardController {
         this.processTask = processTask;
     }
 
-    /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据) */
+    /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据)
+     *  2026-10-15:支持 `限定行id` —— 生产工单页勾 N 行进来时,池只显示**这 N 行**
+     *  (行id = plang.id,物理行;按「工单号+工单行号」表达不了"任意多行"的组合)。 */
     @PostMapping("/pending")
     public ApiResult<List<Map<String, Object>>> pending(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");
         return ApiResult.ok(service.pending(str(body == null ? null : body.get("keyword")),
-                str(body == null ? null : body.get("客户")), workshop()));
+                str(body == null ? null : body.get("客户")), workshop(),
+                idList(body == null ? null : body.get("限定行id"))));
     }
 
     /** 统计:待排产/今日排产/总未完成 + 产线下拉(带当日负荷/日产能) + 班组下拉;按登录账号车间收敛 */
@@ -205,5 +208,23 @@ public class ScheduleBoardController {
 
     private static String str(Object o) {
         return o == null ? null : String.valueOf(o);
+    }
+
+    /**
+     * 请求体里的 id 数组 → List&lt;Long&gt;(容错:Number / 数字串 / 空值都收)。
+     * 用于「限定行id」这类**任意多行**的精确圈定(2026-10-15)。
+     */
+    @SuppressWarnings("unchecked")
+    private static List<Long> idList(Object o) {
+        List<Long> out = new java.util.ArrayList<>();
+        if (!(o instanceof List<?> l)) return out;
+        for (Object x : (List<Object>) l) {
+            if (x == null) continue;
+            if (x instanceof Number n) { out.add(n.longValue()); continue; }
+            String s = String.valueOf(x).trim();
+            if (s.isEmpty() || "null".equals(s)) continue;
+            try { out.add(Long.valueOf(s)); } catch (NumberFormatException ignore) { /* 跳过非数字 */ }
+        }
+        return out;
     }
 }

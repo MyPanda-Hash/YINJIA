@@ -19,6 +19,9 @@ import path from 'node:path'
 import WebSocket from '../../tools/node_modules/ws/index.js'
 
 const BASE = (process.argv[2] || 'http://127.0.0.1:8090').replace(/\/$/, '')
+// 勾选行数:1 = 单行(关键字=工单号#行号);2 = 多行(限定行id 列表)。
+// 2026-10-15 用户报障「当前我勾选两个,进入排产的只有一个单据」⇒ 默认验 2 行。
+const PICK_N = Number((process.argv.find((a) => a.startsWith('--rows=')) || '--rows=2').split('=')[1]) || 2
 const PORT = 9357
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
 const WO = 'MO-2026-10-0004'
@@ -74,23 +77,25 @@ try {
   await evaluate(`(() => { const b=[...document.querySelectorAll('button')].find(x=>(x.innerText||'').trim()==='查找'); if(b){b.click();return 'ok'} return 'no-btn' })()`)
   await sleep(4000)
 
-  // 勾 行号=PICK_XC 的那一行(工单行号列)
+  // 勾该工单的前 PICK_N 行
   const picked = await evaluate(`(() => {
     const clean = (s)=>(s||'').replace(/[\\n\\r\\t]/g,'').replace(/[⇅▲▼]/g,'').trim()
     const heads=[...document.querySelectorAll('.el-table__header th')].map(th=>clean(th.innerText))
     const iXc=heads.indexOf('工单行号'), iNo=heads.indexOf('工单号')
     const trs=[...document.querySelectorAll('.el-table__body tr')]
     let hit=0
+    const got=[]
     for (const tr of trs) {
+      if (hit >= ${PICK_N}) break
       const t=[...tr.querySelectorAll('td')].map(td=>clean(td.innerText))
-      if (t[iNo]===${JSON.stringify(WO)} && String(t[iXc])===${JSON.stringify(String(PICK_XC))}) {
-        const cb=tr.querySelector('td .el-checkbox'); if(cb){cb.click();hit++}
+      if (t[iNo]===${JSON.stringify(WO)}) {
+        const cb=tr.querySelector('td .el-checkbox'); if(cb){cb.click();hit++;got.push(String(t[iXc]))}
       }
     }
-    return { iNo, iXc, hit, rows: trs.length }
+    return { iNo, iXc, hit, rows: trs.length, got }
   })()`)
-  console.log(`    表格列定位 工单号@${picked?.iNo} 工单行号@${picked?.iXc};总行数=${picked?.rows};勾中=${picked?.hit}`)
-  ok(`① 勾中工单行号=${PICK_XC} 的那一行`, picked?.hit === 1, JSON.stringify(picked))
+  console.log(`    表格列定位 工单号@${picked?.iNo} 工单行号@${picked?.iXc};总行数=${picked?.rows};勾中=${picked?.hit} 行号=${JSON.stringify(picked?.got)}`)
+  ok(`① 勾中 ${PICK_N} 行`, picked?.hit === PICK_N, JSON.stringify(picked))
   await sleep(900)
   await shoot('_shot-sched-dialog-before.png')
 
@@ -125,11 +130,27 @@ try {
   })()`)
   console.log(`    弹窗内关键字 = "${inner?.keyword}"`)
   console.log(`    弹窗内待排产表 首表 ${inner?.rows?.length} 行 = ${JSON.stringify(inner?.rows)}`)
-  ok(`③ 关键字被预置成「工单号#行号」= ${WO}#${PICK_XC}`,
-    String(inner?.keyword) === `${WO}#${PICK_XC}`, String(inner?.keyword))
-  ok(`④ 待排产只剩 1 行,且行号 = ${PICK_XC}`,
-    (inner?.rows?.length === 1) && String(inner?.rows?.[0]?.['行']) === String(PICK_XC),
-    JSON.stringify(inner?.rows))
+  if (PICK_N === 1) {
+    // 单行:关键字走「工单号#行号」标识形式,池里只剩这一行
+    //   ⚠ 期望值用**实际勾中的行号**(页面第一行可能是 3 而不是 2),别写死
+    const wantXc = String(picked?.got?.[0])
+    ok(`③ 关键字被预置成「工单号#行号」= ${WO}#${wantXc}`,
+      String(inner?.keyword) === `${WO}#${wantXc}`, String(inner?.keyword))
+    ok(`④ 待排产只剩 1 行,且行号 = ${wantXc}`,
+      (inner?.rows?.length === 1) && String(inner?.rows?.[0]?.['行']) === wantXc,
+      JSON.stringify(inner?.rows))
+  } else {
+    // 多行:走「限定行id」列表(勾几行出几行) —— 2026-10-15 用户报障「勾选两个,进入排产的只有一个单据」
+    ok(`③ 多选时不预置关键字(用限定行id 精确圈定,避免关键字把别的行也带进来)`,
+      String(inner?.keyword || '') === '', String(inner?.keyword))
+    ok(`④ 待排产恰出勾选的 ${PICK_N} 行(不是 1 行)`,
+      inner?.rows?.length === PICK_N,
+      `实际 ${inner?.rows?.length} 行 = ${JSON.stringify(inner?.rows)}`)
+    const want = (picked?.got || []).slice().sort()
+    const got = (inner?.rows || []).map((r) => String(r['行'])).sort()
+    ok(`④ 出的正是勾选的那几行(行号集合一致)`, JSON.stringify(want) === JSON.stringify(got),
+      `勾=${JSON.stringify(want)} 出=${JSON.stringify(got)}`)
+  }
 
   console.log(`\n[结果] pass=${pass} fail=${fail}`)
   ws.close()
