@@ -123,10 +123,21 @@ GO
 --   实际完成数量(已入库回填)/工序交期/交期紧迫度/**7天·15天·大于15天已排产分桶**/产能(工作中心.产量每小时)
 IF OBJECT_ID('v_manu_schedule','V') IS NOT NULL DROP VIEW v_manu_schedule;
 GO
+-- ⚠ 2026-10-15 修(既有缺陷,非本批改动引入):原写法取 h.[生产车间],但 **bd_manu_order 没有这一列**
+--   (实测 COL_LENGTH('bd_manu_order','生产车间') IS NULL,只有「生产线」;MANU_ORDER 面板的 yj_field
+--    里也从没有过「生产车间」字段,L186 那次 INSERT 从未生效)。
+--   ⇒ 本视图历史上**从未建成**(OBJECT_ID('v_manu_schedule','V') 至今为 NULL),
+--     脚本每次跑到这批就在这里断,`MANU_SCHEDULE` 面板那 80 个字段是断点**之前**留下的。
+--   为什么现在才暴露:该脚本早于 2026-09-24 执行过并被 yj_schema_log 记录,
+--     而 DbSync 按**内容哈希**判重跑 —— 2026-10-10 远端只改了文件头**注释**,哈希一变即重跑,
+--     潜伏的列名错误因此爆出来(并卡住其后所有脚本)。
+--   修法(用户 2026-10-15 拍板):两处 h.[生产车间] 一律改用**同语义的就近真实列 h.[生产线]**
+--     (排产看板的「车间」口径即生产线;下方 JOIN dbo.bs_wc 也照样按名称/编码匹配工作中心)。
+--     不改表结构、不加列 —— 避免为一条历史脚本动生产表。
 CREATE VIEW v_manu_schedule AS
 SELECT l.id AS id, h.[合同号] AS 加工单号, h.[单据日期] AS 单据日期, h.[销售订单号] AS 销售订单号,
        h.[客户] AS 客户, ISNULL(pt.[客户价格等级], N'') AS 客户等级,
-       h.[生产线] AS 生产线, h.[生产车间] AS 生产车间,
+       h.[生产线] AS 生产线, h.[生产线] AS 生产车间,
        ISNULL(wc.[产量/小时], 0) AS [产能/小时],
        l.[产品编码] AS 产品编码, l.[产品名称] AS 产品名称,
        ISNULL(NULLIF(l.[规格型号], N''), iv.[规格型号]) AS 规格型号, l.[生产单位] AS 生产单位,
@@ -169,7 +180,7 @@ JOIN dbo.bl_manu_order l ON l.[合同号] = h.[合同号] AND ISNULL(l.asp_cance
 LEFT JOIN dbo.yj_doc_status st ON st.panel_code = 'MANU_ORDER' AND st.doc_no = h.[合同号]
 LEFT JOIN dbo.bs_partner pt ON pt.[往来单位编码] = h.[客户编码] OR (ISNULL(h.[客户编码],N'') = N'' AND pt.[往来单位名称] = h.[客户])
 LEFT JOIN dbo.bs_inv iv ON iv.[存货编码] = l.[产品编码]
-LEFT JOIN dbo.bs_wc wc ON wc.[工作中心名称] = h.[生产车间] OR wc.[工作中心编码] = h.[生产车间]
+LEFT JOIN dbo.bs_wc wc ON wc.[工作中心名称] = h.[生产线] OR wc.[工作中心编码] = h.[生产线]
 LEFT JOIN dbo.bl_so_order so ON so.[单据编号] = h.[销售订单号] AND so.[存货编码] = l.[产品编码]
 WHERE ISNULL(h.asp_cancel,'N') <> 'Y';
 GO

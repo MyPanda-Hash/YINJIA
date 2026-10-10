@@ -2812,3 +2812,32 @@ migrate-sale-out-order-line-i18n-20261015.sql
 #     bl_sale_out.源单编号/源单行号(见 KingdeePushService 的销售支)。
 #   幂等(UPDATE 窄条件 + 自检含物理列仍在);两账套均执行。
 migrate-sale-out-order-cols2-20261015.sql
+
+# ════════════════════════════════════════════════════════════════════════════
+# ── 2026-10-15 补登记:远端 2026-10-10 那批带进来的 3 条清理/修正脚本此前**漏登记** ──
+#   同上一次(见本文件 2760 行附近的同类备注)是同一个坑:远端把脚本提交进仓库,
+#   却没往本清单登记 ⇒ DbSync 按清单跑,**这些脚本永远不会被应用**。
+#   本地实测确认未生效:kucun 仍有 262 行 asp_user2='kucun-resync' 标记、
+#   仍有 1 张库存报表 module_group 为空/乱码。
+#   (第 4 个 migrate-manu-order-schedule.sql 早已登记且已于 2026-09-24 执行,不重复登记。)
+#   三条均为**幂等 + 自带前后核对 + 事务**;本批按「清理类」排在一起,顺序无相互依赖。
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── 清理 kucun 表的迁移写入者标记 asp_user2='kucun-resync'(2026-10-10)──
+#   kucun 是活结存缓存表(StockLedgerService 读写 + InvCostService 启动对账),
+#   该标记只是 2026-10-08 全量回填的写入者痕迹,非业务数据;脚本只清标记、不动结存数量金额。
+cleanup-kucun-resync-marker.sql
+
+# ── 清理探针残留角色(自动化测试垃圾角色)(2026-10-10)──
+#   4 个角色(id=3/6/7/8)由 tools/verify/*.cjs 探针「保存面板权限」时经
+#   SysAdminService.saveRolePanels「先删后插」遗留;yj_user 挂载数 = 0 ⇒ 删除安全。
+#   ⚠ 脚本自带安全闸:若真有用户挂在这些角色上会 RAISERROR 中止,不静默删。
+#   回滚备份在 tools/verify/_probe-roles-backup.tsv(文件末尾附回滚 SQL)。
+cleanup-probe-residue-roles.sql
+
+# ── 修正 4 张库存报表(flat)面板的 module_group(2026-10-10)──
+#   STOCK_BALANCE/LEDGER/STATUS/SUMMARY 的 module_group 是 4 个半角问号 "????"
+#   (早期经非 UTF-8 通道写入的乱码残留),导致权限矩阵冒出名为 "????" 的分组、
+#   这 4 张表也永远落不进「智能供应链」。写回合法值「库存核算」由 ReportService 归并。
+#   方向保守:改前后都不是面板既有 module_group ⇒ 权限放行集合只可能变大不会变小。
+fix-stock-report-module-group.sql
