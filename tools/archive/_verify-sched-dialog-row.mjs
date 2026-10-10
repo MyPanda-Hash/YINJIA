@@ -106,7 +106,13 @@ try {
     if (b.disabled) return 'disabled'
     b.click(); return 'ok'
   })()`)
-  await sleep(5000)
+  // ⚠ 提示条(ElMessage)3 秒自动消失,必须在点完**马上**读 —— 不能等 5 秒后再读(实测读到空串)
+  await sleep(600)
+  const tipEarly = await evaluate(`(() => {
+    const m=[...document.querySelectorAll('.el-message')].map(x=>(x.innerText||'').trim())
+    return m.join(' | ')
+  })()`)
+  await sleep(4400)
   console.log(`    点「排产」= ${clicked}`)
   ok('② 「排产」按钮可点(该行未排产)', clicked === 'ok', String(clicked))
   await shoot('_shot-sched-dialog-open.png')
@@ -140,16 +146,11 @@ try {
       (inner?.rows?.length === 1) && String(inner?.rows?.[0]?.['行']) === wantXc,
       JSON.stringify(inner?.rows))
   } else {
-    // 多行:走「限定行id」列表(勾几行出几行) —— 2026-10-15 用户报障「勾选两个,进入排产的只有一个单据」
-    ok(`③ 多选时不预置关键字(用限定行id 精确圈定,避免关键字把别的行也带进来)`,
-      String(inner?.keyword || '') === '', String(inner?.keyword))
-    ok(`④ 待排产恰出勾选的 ${PICK_N} 行(不是 1 行)`,
-      inner?.rows?.length === PICK_N,
-      `实际 ${inner?.rows?.length} 行 = ${JSON.stringify(inner?.rows)}`)
-    const want = (picked?.got || []).slice().sort()
-    const got = (inner?.rows || []).map((r) => String(r['行'])).sort()
-    ok(`④ 出的正是勾选的那几行(行号集合一致)`, JSON.stringify(want) === JSON.stringify(got),
-      `勾=${JSON.stringify(want)} 出=${JSON.stringify(got)}`)
+    // 多行:**按用户口径应被拦下**(排产一次只勾一行)—— 弹窗不该开,更不该出 N 行
+    ok(`③ 勾 ${PICK_N} 行时**弹窗不开**(排产一次只勾一行)`, inner?.found !== true,
+      `弹窗内关键字="${inner?.keyword}" 行数=${inner?.rows?.length}`)
+    console.log(`    页面提示 = "${tipEarly}"`)
+    ok('③ 给出明确提示(请只勾选一张工单)', String(tipEarly).includes('只勾选一张'), String(tipEarly))
   }
 
   console.log(`\n[结果] pass=${pass} fail=${fail}`)

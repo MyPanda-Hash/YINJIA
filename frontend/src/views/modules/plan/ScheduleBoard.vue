@@ -109,22 +109,14 @@ import { tt } from '@/i18n'
 import ProcessRoutePlanDialog from './ProcessRoutePlanDialog.vue'
 
 /** 内嵌/筛选(2026-10-05 用户口径):生产工单页把"快速排产页面本身"弹出来,并只筛当前工单;
- *  2026-10-15 补「工单行号」/「限定行id」—— 用户口径「工单号+工单行号确定当前唯一工单」:
- *  从生产工单页**勾某一行**点「排产」时,弹窗必须只出**那一行**,不能再把同工单所有行都列出来;
- *  勾**多行**时则出这多行(跨工单也行)⇒ 用 限定行id 列表表达,比"工单号#行号"关键字更通用。 */
+ *  2026-10-15 补「工单行号」—— 用户口径「工单号+工单行号确定当前唯一工单」:
+ *  从生产工单页点「排产」时,弹窗必须只出**那一行**,不能把同工单所有行都列出来。
+ *  ⚠ 生产工单页的「排产」**一次只允许勾一行**(勾多行会先提示),所以这里只需单行入参;
+ *    曾经加过的「限定行id 列表」(为支持多选)已按用户口径回退。 */
 const props = defineProps({
   '工单号': { type: String, default: '' },
   '工单行号': { type: [Number, String], default: null },
-  /** 限定行id 列表(plang.id):非空时待排产池只出这些行(生产工单页勾选进来的那些) */
-  '限定行id': { type: Array, default: null },
   embedded: { type: Boolean, default: false },
-})
-
-/** 限定行id(去重 + 只留数字) */
-const limitedIds = computed(() => {
-  const a = props['限定行id']
-  if (!Array.isArray(a) || !a.length) return null
-  return [...new Set(a.map((x) => Number(x)).filter((n) => Number.isFinite(n) && n > 0))]
 })
 
 const keyword = ref('')
@@ -152,12 +144,7 @@ function urgent(v) {
 async function loadPool() {
   loading.value = true
   try {
-    // 限定行id(2026-10-15):生产工单页勾 N 行点「排产」时,池里**只出这 N 行**。
-    //   必须用 行id 列表而不是「工单号#行号」关键字 —— 勾选可以跨工单、任意多行,
-    //   而关键字那种标识形式只能表达**一个**行(上一版只传一行 ⇒ 勾 2 行只剩 1 行,用户报障)。
-    const body = { keyword: keyword.value, 客户: customer.value }
-    if (limitedIds.value?.length) body['限定行id'] = limitedIds.value
-    const res = await request.post('/px/scheduleBoard/pending', body)
+    const res = await request.post('/px/scheduleBoard/pending', { keyword: keyword.value, 客户: customer.value })
     pool.value = (res.data || []).map((r) => ({
       ...r,
       rowKey: `${r.加工单号}#${r['行id']}`,
@@ -229,13 +216,10 @@ function err(e, f) { ElMessage.error(e?.response?.data?.message || tt(f)) }
 
 onMounted(() => {
   // 内嵌模式(2026-10-05 用户口径):生产工单页弹出"快速排产页面本身",预置单框搜索 ⇒ 只显示当前工单。
-  // 2026-10-15:带了 **限定行id** 时以它为准(勾几行出几行,可跨工单);
-  //   只带了 工单行号 时预置「工单号#行号」标识形式 ⇒ 只出这一行
+  // 2026-10-15:带了**工单行号**时预置成「工单号#行号」标识形式 ⇒ **只显示这一行**
   //   (用户报障「勾选单一工单号+行号的一条单据,同样会显示全部相同工单号的行」;
-  //    后端 pending 已支持这两种收敛,见 ScheduleBoardService.parseWoLineKey / 限定行id)。
-  if (limitedIds.value?.length) {
-    keyword.value = ''                      // 勾选限定优先,不再用工单号模糊筛(否则会互相干扰)
-  } else if (props['工单号']) {
+  //    后端 pending 支持该形式,见 ScheduleBoardService.parseWoLineKey)。
+  if (props['工单号']) {
     const xc = props['工单行号']
     keyword.value = (xc === null || xc === undefined || xc === '') ? props['工单号'] : `${props['工单号']}#${xc}`
   }
