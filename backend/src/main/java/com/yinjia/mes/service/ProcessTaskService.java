@@ -996,7 +996,11 @@ public class ProcessTaskService {
                         + " WHERE h.[工单号]=? AND ISNULL(h.asp_cancel,'N')<>'Y'"
                         + "   AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N')<>'Y' AND ISNULL(s.stopped,'N')<>'Y'"
                         // 行级:检验单带本行行号;2026-10-15 前的老单无行号,退回按本行批次
-                        + "   AND (ISNULL(h.[工单行号],0) = ? OR (ISNULL(h.[工单行号],0) = 0 AND ISNULL(h.[批次号],N'') = ?))",
+                        // ⚠ 批次兜底**必须要求批次非空** —— 否则两边批次都是空串时 `'' = ''` 恒真,
+                        //   会误命中任意一张"无行号且无批次"的旧检验单 ⇒ 把没检验的工单错误结案(2026-10-15 自查发现)
+                        + "   AND (ISNULL(h.[工单行号],0) = ?"
+                        + "        OR (ISNULL(h.[工单行号],0) = 0 AND ISNULL(h.[批次号],N'') <> N''"
+                        + "            AND ISNULL(h.[批次号],N'') = ?))",
                 Integer.class, no, xc, batch);
         boolean asmOk = asm != null && asm > 0;
         String ja = (asmOk && inOk) ? "Y" : "N";
