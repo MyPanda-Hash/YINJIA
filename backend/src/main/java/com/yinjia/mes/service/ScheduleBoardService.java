@@ -828,18 +828,25 @@ public class ScheduleBoardService {
         //  · 合格/不合格数量按明细「判定」汇总(组装固定合格/不合格两行;成型/切炭现为通用模板,通常皆为 0);
         //  · 下游单号 = 该检验单审核后自动生成的下游(产成品入库单 FINISH_IN / 不良品处理单 QC_DISPOSAL)。
         List<Map<String, Object>> qc = new ArrayList<>();
-        // 行级收敛(2026-10-15 用户口径「按工单号+工单行号」):检验单头上**只有「报工单号」**能反推到行
-        // (头表没有工单行号列)⇒ 按"本行产生的报工单号集合"(rowReps,已按 gd_id/批次收敛)过滤。
-        // 本行还没报工 ⇒ rowReps 空 ⇒ 不出任何检验单 —— 这是**正确**结果:这行还没有产出。
+        // 行级收敛(2026-10-15 用户口径「按工单号+工单行号」):
+        //   ① **首选本行的 工单行号** —— 三张检验单头已补该列(migrate-wo-insp-wo-line-20261015.sql,
+        //      报工审核自动生单时按 scjl.[工单行号] 写入)⇒ 直接按行号收敛,不依赖报工单号;
+        //   ② 2026-10-15 之前的老检验单**没有行号** ⇒ 退回「本行产生的报工单号集合」(rowReps,
+        //      已按 gd_id/批次收敛)过滤。
+        //   本行还没报工且老单也没有 ⇒ 不出任何检验单 —— 这是**正确**结果:这行还没有产出。
         String qcRowCond = "";
         List<Object> qcRowArgs = new ArrayList<>();
         if (byRow) {
+            Integer curXc = curRow.get("工单行号") == null ? null : ((Number) curRow.get("工单行号")).intValue();
             if (rowReps.isEmpty()) {
-                qcRowCond = " AND 1=0";
+                // 没有本行报工单 ⇒ 只能靠行号(老单无行号,故一并排除)
+                qcRowCond = curXc == null ? " AND 1=0" : " AND h.[工单行号] = ?";
+                if (curXc != null) qcRowArgs.add(curXc);
             } else {
                 StringBuilder ph = new StringBuilder();
                 for (int i = 0; i < rowReps.size(); i++) ph.append(i == 0 ? "?" : ",?");
-                qcRowCond = " AND h.报工单号 IN (" + ph + ")";
+                qcRowCond = " AND (h.[工单行号] = ? OR (ISNULL(h.[工单行号],0) = 0 AND h.报工单号 IN (" + ph + ")))";
+                qcRowArgs.add(curXc == null ? -1 : curXc);
                 qcRowArgs.addAll(rowReps);
             }
         }
@@ -1011,7 +1018,8 @@ public class ScheduleBoardService {
                 ? "按工单行(行号 " + head.get("工单行号") + " / 批次 " + rowBatch + "):"
                         + "报工段、检验段、工序进度、入库段、调拨轨迹、父子/家族血缘已收敛到本行"
                         + "(报工按 scjl.gd_id → 本行排产行,历史空 gd_id 用本行批次兜底;"
-                        + "检验单头没有工单行号列,按本行产生的报工单号收敛;"
+                        + "检验单按 工单行号=本行行号 收敛(2026-10-15 起检验单头已带该列;"
+                        + "更早的老单无行号,退回按本行产生的报工单号收敛);"
                         + "入库单按 工单行号=本行行号 收敛,2026-10-15 前的老单无行号则按本行批次兜底、两者都空标「历史未标注」)。"
                         + "**领料数据仍是整单口径**:bl_material_out 的 加工单号 实测为空、批号是 ERP 批号口径"
                         + "(≠生产批次号)、源单行号空 ⇒ 无行键、无可靠映射,无法按行收敛。"

@@ -2384,7 +2384,8 @@ public class ButtonService {
 
     /**
      * 报工单号 → 该单锚定的**排产行id**(scjl.gd_id = plang_pc.id);取不到返回 0(不猜)。
-     * 检验单头没有工单行号列,入库单要按行写行键时只能经「报工单号」反推(2026-10-15)。
+     * 入库单要按行写行键时,经「报工单号」反推比经检验单头更直接(检验单头自带工单行号列后
+     * 也可以走它,但报工单号是这条链上的原始锚,2026-10-15)。
      */
     private long gdIdOfReport(String reportNo) {
         if (reportNo == null || reportNo.isBlank()) return 0;
