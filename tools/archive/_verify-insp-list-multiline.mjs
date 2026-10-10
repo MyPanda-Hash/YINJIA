@@ -33,8 +33,8 @@ const ok = (n, c, x = '') => { c ? (pass++, console.log('  ok - ' + n)) : (fail+
 
 /** [{账套, 面板, 单号, 说明}] —— YJ=正式账套;YJ_TEST=测试账套(用户截图所在账套) */
 const SCENARIOS = [
-  { factory: 'YJ', panel: 'QC_MOLD_INSP', docNo: 'CX-2026-10-0022', label: '成型检验单' },
-  { factory: 'YJ_TEST', panel: 'QC_MOLD_INSP', docNo: 'CX-2026-10-0015', label: '成型检验单(测试账套,用户截图那张)' },
+  { factory: 'YJ', panel: 'QC_MOLD_INSP', docNo: 'CX-2026-10-0022', label: '成型检验单', capture: true },
+  { factory: 'YJ_TEST', panel: 'QC_MOLD_INSP', docNo: 'CX-2026-10-0015', label: '成型检验单(测试账套,用户截图那张)', capture: true },
 ]
 const NEGATIVE = { factory: 'YJ', panel: 'QC_INSP', docNo: 'IJ-2026-09-0016', label: '来料检验单' }
 
@@ -167,6 +167,17 @@ try {
       `h0=${ml?.h0}px → h1=${ml?.grown?.h1}px(行高 ${ml?.grown?.lineH}px)`)
     ok('无横向溢出', (ml?.grown?.scrollW || 0) <= (ml?.grown?.clientW || 0) + 2,
       `scrollW=${ml?.grown?.scrollW} clientW=${ml?.grown?.clientW}`)
+
+    // 实拍:列表页里「处理方式」格撑着 6 行长文的样子(给用户看的证据)
+    //  ⚠ 必须在**切到别的格之前**拍:活动格一换,这一格就退回 `.cell-lazy` 纯文本(带省略号)。
+    if (sc.capture) {
+      const s = await send('Page.captureScreenshot', { format: 'png' })
+      if (s?.result?.data) {
+        const p = path.join(HERE, `_shot-insp-list-multiline-${sc.factory}.png`)
+        fs.writeFileSync(p, Buffer.from(s.result.data, 'base64'))
+        console.log(`    [截图] ${p}`)
+      }
+    }
 
     // 短列(数量)必须还是单行 —— 别把整格都换掉
     const num = await probeCell('数量')
