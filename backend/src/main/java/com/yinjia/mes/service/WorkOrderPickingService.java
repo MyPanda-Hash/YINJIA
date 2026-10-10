@@ -144,29 +144,44 @@ public class WorkOrderPickingService {
 
     /** 单个**工单行**转领料单(守卫 → 组装单头 → 落占用链;返回新领料单号) */
     private String pickOne(Line ln, String user) {
-        // 1) 防重复①:本按钮生成过且草稿还在 —— 占用链**按行**判(source_line_key = 工单号#行id)
+        // 1) 防重复①:本按钮生成过且**草稿还在** —— 占用链按行判(source_line_key = 工单号#行id)。
+        //    🔴 2026-10-15 修(用户报障「转领料单还是不能根据工单号+工单行号进行」):原判据只看
+        //      link_status='ACTIVE',**不看目标单的存活状态** —— 于是 2026-10-09 粒度修正**之前**生成的
+        //      整单级领料单(给该工单**每一行**都落了一条链)在**审核之后链仍是 ACTIVE**
+        //      (form_flow_link 只在下游删除/作废时才置 RELEASED,审核不置)
+        //      ⇒ 只要该工单历史上转过一次且审核了,之后**每一行**都被永久挡住,
+        //        提示还写着"请先删除该草稿后再转"—— 而那单早已审核,根本删不掉(死锁)。
+        //      实测 GD-2026-10-0002:CL-2026-10-0004(整单级/已审核)的 7 条链全 ACTIVE,
+        //        行1~行7 一律 409「该工单行已生成领料单 CL-2026-10-0004」。
+        //    本类口径本来就写明「**已审核的不拦**(分批领料是真实场景)」—— 故此处只拦**活草稿**:
+        //      目标单未审核、未作废、未软删。判据与下面 guard② 完全一致(两处守卫同口径)。
         List<String> linked = jdbc.queryForList(
-                "SELECT target_form_no FROM form_flow_link WHERE source_panel_code = ? AND source_line_key = ?"
-                        + " AND target_panel_code = ? AND link_status = 'ACTIVE'",
-                String.class, SOURCE_PANEL, ln.no() + "#" + ln.id(), TARGET_PANEL);
+                "SELECT l.target_form_no FROM form_flow_link l"
+                        + " WHERE l.source_panel_code = ? AND l.source_line_key = ?"
+                        + "   AND l.target_panel_code = ? AND l.link_status = 'ACTIVE'"
+                        // 目标单存在且未软删
+                        + "   AND EXISTS (SELECT 1 FROM bd_material_out h WHERE h.[单据编号] = l.target_form_no"
+                        + "        AND ISNULL(h.asp_cancel,'N') <> 'Y')"
+                        // 目标单未审核(= 活草稿)
+                        + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ?"
+                        + "        AND s.doc_no = l.target_form_no AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N') <> 'Y')"
+                        // 目标单未作废
+                        + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status c WHERE c.panel_code = ?"
+                        + "        AND c.doc_no = l.target_form_no AND ISNULL(c.canceled,'N') = 'Y')",
+                String.class, SOURCE_PANEL, ln.no() + "#" + ln.id(), TARGET_PANEL, TARGET_PANEL, TARGET_PANEL);
         if (!linked.isEmpty()) {
-            throw new IllegalStateException("该工单行已生成领料单 " + linked.get(0) + ",请先删除该草稿后再转");
+            throw new IllegalStateException("该工单行已有未审核领料单草稿 " + linked.get(0) + ",请先审核或删除后再转");
         }
-        // 2) 防重复②:存量未审核领料单兜底(含手工建的)—— 按 (加工单号 + 工单行号) 判;
-        //    工单行号 空/0 = 工单级单据(没有行信息),保守地视为占整单,所有行都不放行。
-        //    ⚠ **行号不唯一时不比行号**:plang 里同一工单号可以有**多行共用同一个 pl_xc**(同订单行分批转单,
-        //      批次号不同 —— 实测 MO-2026-09-0006 有 4 行都是 pl_xc=1),那种行的真实身份只有 plang.id,
-        //      按行号去比会把同单其它批次行连坐挡住 ⇒ 此时只认"工单级"单据 + 上面的按行占用链。
-        Integer sameXc = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM dbo.plang WHERE pl_no = ? AND ISNULL(pl_xc,0) = ?"
-                        + " AND ISNULL(asp_cancel,'N') <> 'Y'", Integer.class, ln.no(), ln.xc());
-        boolean xcUnique = sameXc == null || sameXc <= 1;
+        // 2) 防重复②:存量未审核领料单兜底(含手工建的)—— **按 工单号 + 工单行号** 判。
+        //    用户口径(2026-10-15):「工单号 + 工单行号 作为标识,每个独立进行」——
+        //    故行号就是行身份,不比 plang.id;同一行号下若有多个 plang 物理行,按用户口径它们是**同一行**。
+        //    工单行号 空/0 = 工单级单据(没有行信息),视为占整单,所有行都不放行。
         // ⚠ 参数按分支**逐个列出**(与类内既有 queryForList(sql, String.class, ?…) 同形):
         //   把 Object[] 直接喂给可变参数位会被重载解析挑成 queryForList(String, Object…)
         //   ⇒ 编译期报「List<Map> 不能转 List<String>」(2026-10-09 实测踩到)。
         String pendSql = "SELECT TOP 1 h.[单据编号] FROM bd_material_out h"
                 + " WHERE h.[加工单号] = ? AND ISNULL(h.asp_cancel,'N') <> 'Y'"
-                + "   AND (ISNULL(h.[工单行号], 0) = 0" + (xcUnique ? " OR h.[工单行号] = ?" : "") + ")"
+                + "   AND (ISNULL(h.[工单行号], 0) = 0 OR h.[工单行号] = ?)"
                 // ⚠ 已作废的草稿**不算存量**:删除即作废(yj_doc_status.canceled='Y'),
                 //   少了这一条,「删掉草稿再重转」会被自己刚删的单挡住(2026-10-07 界面探针实测踩到)。
                 + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status c WHERE c.panel_code = ?"
@@ -175,9 +190,7 @@ public class WorkOrderPickingService {
                 + "   AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = ?"
                 + "     AND s.doc_no = h.[单据编号] AND s.shr IS NOT NULL AND ISNULL(s.canceled,'N') <> 'Y')"
                 + " ORDER BY h.[单据编号] DESC";
-        List<String> pending = xcUnique
-                ? jdbc.queryForList(pendSql, String.class, ln.no(), ln.xc(), TARGET_PANEL, TARGET_PANEL)
-                : jdbc.queryForList(pendSql, String.class, ln.no(), TARGET_PANEL, TARGET_PANEL);
+        List<String> pending = jdbc.queryForList(pendSql, String.class, ln.no(), ln.xc(), TARGET_PANEL, TARGET_PANEL);
         if (!pending.isEmpty()) {
             throw new IllegalStateException("该工单行已有未审核领料单 " + pending.get(0) + ",请先审核或删除后再转");
         }
@@ -191,6 +204,7 @@ public class WorkOrderPickingService {
         head.put("业务类型", "材料出库");
         head.put("出库类别", "直接领料");
         head.put("加工单号", ln.no());
+        // 行标识 = 工单号 + **工单行号**(用户口径 2026-10-15:「工单号加工单行号作为标识,每个独立进行」)
         head.put("工单行号", ln.xc());
         head.put("来源单据", "生产工单");
         head.put("来源单号", ln.no());
