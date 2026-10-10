@@ -2848,3 +2848,15 @@ migrate-finish-in-notnull-align-20261015.sql
 #        asmInspToStock 与追溯质检段汇总改为 SUM(合格数量)/SUM(不合格数量)。
 #   自检:三表两列 + 三面板两字段 + 两译名齐备。幂等;两账套均执行。
 migrate-insp-detail-quantity-20261015.sql
+# migrate-field-multiline-text-20261015.sql(2026-10-15):新增「多行文本」字段类型
+#   用户口径:①「还需要实现让当前明细行文字过长时可以多行显示」;
+#            ② 撤回上一版(面板白名单硬编码)后「重新创建出多行文本形式」,
+#               并选定走**元数据驱动**、且**只改长文本列**。
+#   处置:三张工序检验单(QC_MOLD_INSP/QC_CUT_INSP/QC_ASM_INSP)明细的
+#        处理方式/备注/检验项目/标准要求/实测数值/检验方法/判定 共 21 行
+#        yj_field.data_type 改为 N'多行文本';表区/行号/数量 保持单行
+#        —— 上一版把它们也变成多行框,正是被撤回的原因。
+#   配套代码:PanelxForm.vue 增加 isMultiline() 渲染分支(表单头 + 明细通用),
+#            由字段类型而非面板名单决定是否多行。
+#   自检:21 个长文本列全部就位,且 表区/行号/数量 未被误改。幂等;两账套均执行。
+migrate-field-multiline-text-20261015.sql
