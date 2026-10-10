@@ -110,6 +110,17 @@
                 <span class="g-count">{{ g.panels.length }} {{ tt('个面板') }}</span>
                 <span class="g-granted">{{ grantedOf(g) }} / {{ grantableOf(g) }}</span>
                 <span class="g-actions" @click.stop>
+                  <!-- 2026-10-10：组内筛选。展开模块后组内最多 28 个面板，逐个滚动查找费力；
+                       输入即过滤本组行，不改变权限数据，只改可见行。 -->
+                  <el-input
+                    v-model="groupFilter[g.code]"
+                    size="small"
+                    clearable
+                    :placeholder="tt('筛选面板')"
+                    class="g-filter"
+                    @click.stop
+                    @keydown.stop
+                  />
                   <el-button link size="small" type="primary" @click="setGroupPerms(g, 'all')">{{ tt('全选') }}</el-button>
                   <el-button link size="small" @click="setGroupPerms(g, 'none')">{{ tt('清空') }}</el-button>
                 </span>
@@ -124,7 +135,7 @@
                     </tr>
                   </thead>
                   <tbody>
-                    <tr v-for="r in g.panels" :key="r.panelCode">
+                    <tr v-for="r in visiblePanels(g)" :key="r.panelCode">
                       <td class="pt-panel" :title="tt(r.panelName)">{{ tt(r.panelName) }}</td>
                       <td v-for="act in actsOf(g)" :key="act[0]" class="pt-act pt-sweep"
                           @mousedown.prevent="rowHasAct(r, act[0]) && canAct(r, act[0]) && startSweep(r, act[0])"
@@ -144,6 +155,9 @@
                           @update:model-value="toggleAllPerms(r, $event)"
                         />
                       </td>
+                    </tr>
+                    <tr v-if="!visiblePanels(g).length">
+                      <td class="pt-empty" :colspan="actsOf(g).length + 2">{{ tt('无匹配面板') }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -262,13 +276,28 @@ const user = useUserStore()
 const panelModules = ref([])
 const openGroups = ref([])
 const permActions = ref([])  // [['view','可见'],['query','查询'],...]
+// 组内筛选关键字:模块 code -> 关键字(2026-10-10)
+const groupFilter = ref({})
 
 function applyPanelModules(modules, actions) {
   panelModules.value = (modules || []).filter((m) => (m.panels || []).length)
   // 2026-10-10:分组默认折叠(原先全量展开,124 个面板一次铺开导致盲选/卡顿);
   // 分组名由后端按导航一级模块归并返回(ReportService.navGroup)
   openGroups.value = []
+  groupFilter.value = {}
   permActions.value = actions || []
+}
+
+// 组内可见行:按关键字过滤(面板名 / 面板编码,忽略大小写)。
+// 只影响渲染的行,不触碰 permsSet——被筛掉的行权限原样保留,保存时仍按全部行提交。
+// 传空关键字即全量(默认),故未输入时与改前行为完全一致。
+function visiblePanels(g) {
+  const kw = (groupFilter.value[g.code] || '').trim().toLowerCase()
+  if (!kw) return g.panels
+  return g.panels.filter((r) =>
+    String(r.panelName || '').toLowerCase().includes(kw) ||
+    String(r.panelCode || '').toLowerCase().includes(kw)
+  )
 }
 
 // 按模块分组渲染（行对象与 panelRows 同引用，勾选联动保存）
@@ -1033,9 +1062,33 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
 }
-.org-col.dept { flex: 1; }
-.org-col.users { flex: 1.4; }
-.org-col.roles { flex: 1.6; }
+/* 2026-10-10:三栏比例 1/1.4/1.6 下 roles 栏最多约 475px,而权限矩阵 14 列固定宽
+   1068px(面板 132 + 12 操作×74 + 全选 48)。三栏并列在几何上容不下该表。
+   故选中角色后切为专注视图:左两栏(部门/用户)并排收在上方,权限矩阵独占整行。 */
+.org-col.dept { flex: 1; min-width: 0; }
+.org-col.users { flex: 1.4; min-width: 0; }
+.org-col.roles { flex: 1.6; min-width: 0; }
+
+/* 配置态:矩阵独占整行(左两栏限高,矩阵占满剩余高度) */
+.org-wrap:has(.perm-box) {
+  flex-wrap: wrap;
+  align-content: flex-start;
+}
+.org-wrap:has(.perm-box) .org-col.dept,
+.org-wrap:has(.perm-box) .org-col.users {
+  flex: 0 0 auto;
+  height: 200px;
+}
+.org-wrap:has(.perm-box) .org-col.dept { width: calc(38% - 6px); }
+.org-wrap:has(.perm-box) .org-col.users { width: calc(62% - 6px); }
+.org-wrap:has(.perm-box) .org-col.roles {
+  flex: 1 0 100%;
+  width: 100%;
+  height: auto;
+  min-height: 320px;
+}
+/* 配置态:角色列表压缩为单行表(选角色的入口),把高度让给下方权限矩阵 */
+.org-wrap:has(.perm-box) .org-col.roles :deep(.el-table) { max-height: 220px; }
 .col-head {
   display: flex;
   justify-content: space-between;
@@ -1073,7 +1126,10 @@ onBeforeUnmount(() => {
   border-radius: 6px;
 }
 .perm-collapse :deep(.el-collapse-item__header) {
+  /* EP 默认 height/min-height 均为 48px;只覆盖 height 会被 min-height:48px 顶回 48px,
+     组头插入筛选框后仍占 48px 高。两者必须同时压到 34px。 */
   height: 34px;
+  min-height: 34px;
   line-height: 34px;
   padding: 0 10px;
   font-size: 13px;
@@ -1111,6 +1167,8 @@ onBeforeUnmount(() => {
 /* 操作权限矩阵表 —— wrap 是唯一滚动容器:thead sticky 在此生效。
    2026-10-10:改为 fixed 布局后总宽由列宽决定，窄屏超出即在此横向滚动(首列钉左)。 */
 .perm-table-wrap { overflow: auto; max-height: 50vh; }
+/* 配置态:矩阵独占整行,wrap 撑高到 72vh(50vh 在专注视图下过矮,组内只能看两三行) */
+.org-wrap:has(.perm-box) .perm-table-wrap { max-height: 72vh; }
 .perm-table thead th {
   position: sticky;
   top: 0;
@@ -1132,6 +1190,7 @@ onBeforeUnmount(() => {
 .perm-table tbody tr:hover td.pt-panel { background: #eaf2fb; }
 .perm-table {
   width: 100%;
+  min-width: 1068px; /* 面板 132 + 12 操作×74 + 全选 48;不足由此 wrap 横滚,列不被压切 */
   border-collapse: separate; /* 钉左首列+钉顶表头共存时，collapse 会让 sticky 边框丢失 */
   border-spacing: 0;
   table-layout: fixed; /* 2026-10-10:面板列曾被 12 个 min-width:40px 操作列挤成竖排 */
@@ -1181,6 +1240,20 @@ onBeforeUnmount(() => {
 .perm-table th.pt-act,
 .perm-table td.pt-act { width: 74px; min-width: 74px; }
 .perm-table .pt-na { color: #d1d5db; }
+/* 2026-10-10:组内筛选。输入框随组头吸顶(组头 z-index 5),关键字只过滤本组行。
+   紧凑尺寸:组头恒高 34px,输入框不得超过该高度撑破吸顶行。 */
+.g-filter { width: 132px; margin-right: 8px; }
+/* 组头固定 34px。EP 输入框默认 32px 高,会把组头撑到 48px ⇒ 强制压到 24px。
+   必须同时压 wrapper(行高来源)与 inner,只压 inner 仍被 wrapper 顶开。 */
+.g-filter :deep(.el-input__wrapper) {
+  padding: 0 8px;
+  height: 24px;
+  min-height: 24px;
+  line-height: 24px;
+}
+.g-filter :deep(.el-input__inner) { height: 24px; line-height: 24px; font-size: 12px; }
+/* 筛到 0 行时的占位行:不撑出空表格边框 */
+.perm-table td.pt-empty { text-align: center; color: #909399; font-size: 12px; padding: 14px 0; }
 /* 原生大号勾选框(18px)+滑动扫选:整格命中,按下即切换,拖动批量套用 */
 .perm-table .pt-cb {
   width: 18px;
