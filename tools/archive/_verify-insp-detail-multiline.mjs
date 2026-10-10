@@ -191,12 +191,14 @@ try {
     ta.dispatchEvent(new Event('input', { bubbles: true }))
     await new Promise((r) => setTimeout(r, 800))
     const after = tbl.querySelector('.multi-text textarea')
+    const cs = getComputedStyle(after)
     return {
       tag: after.tagName, cls: after.closest('.multi-text') ? 'multi-text' : '(无)',
       disabled, h0, h1: after.offsetHeight,
       clientW: after.clientWidth, scrollW: after.scrollWidth,
-      lineH: parseFloat(getComputedStyle(after).lineHeight) || 0,
-      wrapCss: getComputedStyle(after).whiteSpace,
+      lineH: parseFloat(cs.lineHeight) || 0,
+      wrapCss: cs.whiteSpace,
+      shadow: cs.boxShadow, bg: cs.backgroundColor,
       textLen: long.length, valueLen: (after.value || '').length,
     }
   })()`)
@@ -210,6 +212,10 @@ try {
     ok('高度由单行增长为多行(autosize 生效)', wrap.h1 > wrap.h0 + 8, `h0=${wrap.h0}px → h1=${wrap.h1}px(行高 ${wrap.lineH}px)`)
     ok('渲染行数 ≥ 3 行(文字确实折行)', wrap.h1 >= wrap.lineH * 3 - 2, `h1=${wrap.h1}px / lineH=${wrap.lineH}px`)
     ok('无横向溢出(单行 input 会横向滚动)', wrap.scrollW <= wrap.clientW + 2, `scrollW=${wrap.scrollW} clientW=${wrap.clientW}`)
+    // ⚠ 2026-10-15 用户反馈「我没看到修改」的根因就在这条:多行框必须**看得出是个输入框**
+    //   (默认边框/底色),不能是"没有框的纯文字格" —— 同排的单行框都有框,一眼对比就露馅。
+    ok('看得出是输入框(保留默认边框/底色,不是无框纯文字)', String(wrap.shadow) !== 'none' && !!wrap.shadow,
+      `boxShadow=${wrap.shadow} bg=${wrap.bg}`)
   }
   {
     const s = await send('Page.captureScreenshot', { format: 'png' })

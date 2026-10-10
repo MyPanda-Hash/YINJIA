@@ -1454,21 +1454,18 @@ watch(() => [panelCode.value, code.value], () => {
 </script>
 
 <style scoped>
-/* 「多行文本」字段类型的观感:与单行输入框保持一致(同高同边),
-   只是内容超长时会自动撑高折行。`class` 落在 el-input 的外层 div 上,
-   真正的 <textarea> 在里面,所以要 :deep 下去改。 */
+/* 「多行文本」字段类型的观感:**保持单行输入框的原样**(默认边框/底色/聚焦高亮一律不动),
+   只把高度、行高、内边距调成和能力一致,内容超长时自动撑高折行。
+   ⚠ 不要写 `border:0 / background:transparent / box-shadow:none` —— 2026-10-15 实测踩到:
+     那样这几列会变成"没有框的纯文字格",跟同排的单行框(表区/行号/数量)一眼看出不一样,
+     用户直接反馈「我没看到修改」。`class` 落在 el-input 的外层 div 上,
+     真正的 <textarea> 在里面,所以要 :deep 下去改。 */
 .multi-text :deep(.el-textarea__inner) {
   min-height: 32px !important;
   padding: 5px 11px;
   line-height: 22px;
-  box-shadow: none;
-  border: 0;
-  background: transparent;
   resize: none;
   font-family: inherit;
-}
-.multi-text :deep(.el-textarea__inner:focus) {
-  box-shadow: none;
 }
 /* 已完成(金蝶自动关单):靛蓝,与「已审核」的品牌绿明确区分 ——
    覆盖 el-tag 的三个 CSS 变量(元素级变量优先级高于 .el-tag--xxx 的单类规则) */
