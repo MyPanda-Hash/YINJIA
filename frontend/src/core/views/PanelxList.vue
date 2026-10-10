@@ -958,6 +958,18 @@
                     @update:model-value="(v) => onInlineBoolInput(activeTab(b).key, row, c.field, v)"
                   />
                   <el-input
+                    v-else-if="isMultilineField(c.field)"
+                    :model-value="activeCellEcho"
+                    v-cell-focus
+                    type="textarea"
+                    :autosize="{ minRows: 1, maxRows: 6 }"
+                    resize="none"
+                    class="multi-text"
+                    :disabled="c.field.computed"
+                    @update:model-value="(v) => onActiveCellEchoInput(row, c.prop, v)"
+                    @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+                  />
+                  <el-input
                     v-else
                     :model-value="activeCellEcho"
                     v-cell-focus
@@ -4945,6 +4957,16 @@ function isBooleanField(field) {
   return ['是否', 'Boolean', 'BOOL'].includes(fieldType(field))
 }
 
+/**
+ * 「多行文本」字段类型(yj_field.data_type = 多行文本):激活后的编辑器用可自撑高的多行框,
+ * 文字过长时折行显示。**由元数据驱动**(认字段类型,不认面板/字段名单);
+ * 与表单页 PanelxForm.vue 的 isMultiline 同口径 —— 两个组件各有一套控件分支,必须同时支持,
+ * 否则用户从菜单进的列表页(默认入口)看不到效果(2026-10-15 实测踩到)。
+ */
+function isMultilineField(field) {
+  return fieldType(field) === '多行文本'
+}
+
 /** 生产线档案「停用」列按钮化:仅 PROD_LINE 面板的 停用 列走行内切换按钮(2026-09-24 随生产域下拉) */
 function isLineToggleCol(prop) {
   return panelCode.value === 'PROD_LINE' && prop === '停用'
@@ -7194,6 +7216,19 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 「多行文本」字段类型的激活编辑器:保持单行输入框的原样观感(默认边框/底色/聚焦高亮不动),
+   只把高度/行高/内边距调成和能力一致,内容超长时自动撑高折行。
+   ⚠ 别写 border:0 / background:transparent / box-shadow:none —— 会变成"没有框的纯文字格",
+     用户直接反馈「我没看到修改」(2026-10-15 表单页踩过同一个坑)。
+   `class` 落在 el-input 的外层 div 上,真正的 <textarea> 在里面,故要 :deep 下去改。 */
+.multi-text :deep(.el-textarea__inner) {
+  min-height: 32px !important;
+  padding: 5px 11px;
+  line-height: 22px;
+  resize: none;
+  font-family: inherit;
+}
+
 .panelx-list {
   font-size: 13px;
   color: #333;
