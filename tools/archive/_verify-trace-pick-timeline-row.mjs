@@ -113,5 +113,27 @@ const anyUndo = [...tlByRow.values()].some((tl) =>
 ok('② 存量回填生效:原先隐形的「撤销排产」留痕现已按行出现(不再被丢弃)', anyUndo,
   JSON.stringify(undoPerRow))
 
+// ── ③ 排产数据按行:每行只出自己的排产行 ──
+console.log('\n── ③ 排产数据按工单行号 ──')
+const schedByRow = new Map()
+for (const r of rows) {
+  const t = await traceOf(r)
+  const sc = t['排产数据'] || []
+  schedByRow.set(Number(r['工单行号']), sc)
+  console.log(`    行${r['工单行号']}: ${sc.length} 条,行号列=${JSON.stringify([...new Set(sc.map((x) => x['工单行号']))])}`)
+}
+const t0b = await traceOf(rows[0])
+ok('③ 排产数据段口径 = 按工单行', t0b['分段口径']?.['排产数据'] === '按工单行',
+  String(t0b['分段口径']?.['排产数据']))
+const badSched = [...schedByRow.entries()].flatMap(([xc, sc]) =>
+  sc.filter((x) => x['工单行号'] != null && Number(x['工单行号']) !== Number(xc)).map((x) => `${xc}->${x['工单行号']}`))
+ok('③ 每行的排产数据只含本行的排产(不出现别的行)', badSched.length === 0, JSON.stringify(badSched))
+// 关键回归:修前每行都返回"该工单全部排产行",各行的集合完全相同;修后应各不相同/更小
+const schedSizes = [...schedByRow.values()].map((v) => v.length)
+const totalRows = rows.length
+ok('③ 各行的排产条数 ≤ 1 或至少小于整单行数(证明不再是"每行都返回整单全部排产")',
+  schedSizes.every((n) => n <= 1) || schedSizes.some((n) => n < totalRows),
+  `各行条数=${JSON.stringify(schedSizes)} 整单行数=${totalRows}`)
+
 console.log(`\n[结果] pass=${pass} fail=${fail}`)
 process.exit(fail === 0 ? 0 : 1)

@@ -782,9 +782,14 @@ public class ScheduleBoardService {
                     timeline.add(m);
                 }, tlArgs.toArray());
 
-        // 排产数据:plang_pc 各排产行(未排产为空)
+        // 排产数据:plang_pc 排产行(未排产为空)。
+        // 🔴 2026-10-15 按行(用户口径「当前排产数据也不是实现根据工单号+工单行号实现」):
+        //   原 `WHERE pc.pl_no=?` 会把该工单**所有行**的排产都列出来 —— 而行3 的追溯里出现行1/行2 的排产,
+        //   恰恰就是用户最初报障的"显示之前同工单号的数据"。段口径标签当时已写「按工单行(本行)」,
+        //   但数据是整单的 ⇒ **标签在说谎**。现按 plang_id(= 本行的排产行归属)收敛,标签与数据一致。
+        //   (JOIN 已含 pc.plang_id = p.id,故此处按 pc.plang_id = 本行 id 精确取。)
         List<Map<String, Object>> sched = jdbc.queryForList(
-                "SELECT pc.scx AS 生产线, ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
+                "SELECT p.pl_xc AS 工单行号, pc.scx AS 生产线, ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
                         + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc)) AND l.link_status = 'ACTIVE'), 0) AS 余量,"
                         + " CONVERT(varchar(10), pc.st_date, 120) AS 计划开工日,"
                         + " CONVERT(varchar(10), pc.cp_date, 120) AS 工序交期,"
@@ -795,7 +800,10 @@ public class ScheduleBoardService {
                         + " FROM dbo.plang_pc pc"
                         + " JOIN dbo.plang p ON p.comm = pc.comm AND p.pl_no = pc.pl_no AND p.pl_xc = pc.pl_xc"
                         + "   AND pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
-                        + " WHERE pc.pl_no=? AND ISNULL(pc.asp_cancel,'N')<>'Y' ORDER BY pc.pl_xc, pc.[批次号]", doc);
+                        + " WHERE pc.pl_no=? AND ISNULL(pc.asp_cancel,'N')<>'Y'"
+                        + (byRow ? "   AND pc.plang_id = ?" : "")
+                        + " ORDER BY pc.pl_xc, pc.[批次号]",
+                byRow ? new Object[]{doc, curRow.get("行id")} : new Object[]{doc});
 
         // 完工数据:报工记录(scjl,参考库口径;按 工序 汇总:完成数量=Σsl,计划数量=排产冗余)
         // 2026-10-15:按行追溯时只统计**本行**的报工(gd_id=本行排产行id;历史空 gd_id 用本行批次兜底)。
@@ -1078,7 +1086,9 @@ public class ScheduleBoardService {
                         + "**流转时间线**已按行(yj_usage_log 2026-10-15 起带「工单行号」列):"
                         + "只出本行留痕 + 工单级留痕(结案等整单动作、以及 2026-10-15 前没有行键的老留痕),"
                         + "每条标了「范围」可辨。"
-                        + "排产数据=该工单全部排产行(便于对照整单)。"
+                        + "**排产数据**也按行(2026-10-15:原来按 pc.pl_no 取该工单**全部**排产行,"
+                        + "行3 的追溯里会出现行1/行2 的排产 —— 段口径标签写「按工单行(本行)」而数据是整单的,标签在说谎;"
+                        + "现按 pc.plang_id=本行收敛,标签与数据一致)。"
                 : "整单口径(未指定工单行):各段按工单号汇总。");
         // 每段口径(前端按段显示「按工单行」/「整单」小胶囊,2026-10-15 步2)
         Map<String, Object> segScope = new LinkedHashMap<>();
@@ -1086,7 +1096,7 @@ public class ScheduleBoardService {
         segScope.put("工序进度", rowScope);
         segScope.put("流转时间线", rowScope);
         segScope.put("调拨轨迹", rowScope);
-        segScope.put("排产数据", byRow ? "按工单行(本行)" : "整单");
+        segScope.put("排产数据", rowScope);
         segScope.put("完工数据", rowScope);
         segScope.put("入库单据", rowScope);
         segScope.put("质检数据", rowScope);
