@@ -413,9 +413,14 @@ public class ProcessTaskService {
             cnt.put(op, (int) num(r.get("报工单数")));
         }
         List<Map<String, Object>> steps = new ArrayList<>();
-        // 步骤口径(2026-10-05 第二版,用户口径「根据换算率换算即可;不做成品收口」):
-        //   · 按该工单**工艺路线**逐道算**工序计划量**:首道 = 工单量 × 首道换算率;其后 = 上一道量 × 本道换算率;
-        //     换算率留空 / =1 = **沿用**(不乘) —— 只在真的发生倍数变化的工序填率(如 碳棒 1 切 3 → 填 3);
+        // 步骤口径(**2026-10-15 改为「各工序独立」,与快速排产 routeSteps / 报工封顶同口径**):
+        //   · 工序计划量(**该道**) = 本行排产数量 × **该工序自己的换算率**;
+        //   · ❌ **不逐道累乘** —— 旧实现是 `cumPlan = cumPlan × rate`(2026-10-05 第二版),
+        //     后果实测:G Y-CB-STD(成型换算率 7、切炭/组装 1)+ 行3 排产 1200
+        //     ⇒ 成型/切炭/组装 三道全显示 8400,而切炭/组装其实各只需 1200(用户报障「这里的数量也对不上」);
+        //     快速排产弹窗里同一行显示的是 8400/1200/1200 ⇒ **同一条路线两个页面数不一样**。
+        //     用户口径 2026-10-07「各个工序的换算率分开算」已在 routeSteps 落地并注明不累乘,本条补齐。
+        //   · 换算率留空 / =1 = 沿用(不乘) —— 只在真的发生倍数变化的工序填率;
         //   · 未绑路线 / 路线无明细 → 回退标准五步(全部率=1);
         //   · **不做成品收口**:成品量 = 路线**最后一道**的实际完工量(报工多生产就是多,允许超产);
         //   · 状态四态:已完工(=) / 超产(>) / 进行中(0<完工<计划) / 未开始(0)。
@@ -439,26 +444,27 @@ public class ProcessTaskService {
             String op = String.valueOf(l.get("工序名称")).trim();
             if (qty.getOrDefault(op, 0d) > 0) cur = op;
         }
-        double cumPlan = num(headObject(heads).get("计划数量"));
+        // 本行排产数量 = 各工序计划量的**共同基数**(不再累乘)
+        double basePlan = num(headObject(heads).get("计划数量"));
         int doneSteps = 0;
         double overQty = 0;
         for (int i = 0; i < lines.size(); i++) {
             String op = String.valueOf(lines.get(i).get("工序名称")).trim();
             double rate = num(lines.get(i).get("换算率"));
             if (rate <= 0) rate = 1;
-            cumPlan = round(cumPlan * rate);          // 填了才乘;留空/1 = 沿用
+            double stepPlan = round(basePlan * rate);   // 该道自己的计划量(独立折算,不累乘)
             double q = qty.getOrDefault(op, 0d);
-            String st = (cumPlan > 0 && q > cumPlan) ? "超产"
-                    : (cumPlan > 0 && q >= cumPlan) ? "已完工"
+            String st = (stepPlan > 0 && q > stepPlan) ? "超产"
+                    : (stepPlan > 0 && q >= stepPlan) ? "已完工"
                     : (q > 0 ? "进行中" : "未开始");
             if ("已完工".equals(st) || "超产".equals(st)) doneSteps++;
-            if (q > cumPlan) overQty = round(overQty + (q - cumPlan));
+            if (q > stepPlan) overQty = round(overQty + (q - stepPlan));
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("序", i + 1);
             s.put("工序", op);
             s.put("换算率", round(rate));
             s.put("完工量", round(q));
-            s.put("计划量", cumPlan);                  // 该道**换算后**的工序计划量
+            s.put("计划量", stepPlan);                 // 该道**自己**的工序计划量(基数 = 本行排产数量)
             s.put("报工单数", cnt.getOrDefault(op, 0));
             s.put("当前", op.equals(cur));
             s.put("状态", st);
@@ -498,9 +504,13 @@ public class ProcessTaskService {
     private static final String[] PROCESS_ORDER = {"混料", "成型", "切炭", "组装", "装箱"};
 
     /**
-     * 某道工序的**换算后计划量**(报工封顶用,与工单详情的工序步骤同一口径 —— 一处实现,避免两套):
-     *   首道 = Σ排产 × 首道换算率;其后 = 上一道量 × 本道换算率;换算率留空/=1 = 沿用。
-     * 未绑路线 / 路线无明细 → 返回 Σ排产(等价于全部率=1)。
+     * 某道工序的**换算后计划量**(报工封顶用) —— 口径与工单详情的工序步骤、快速排产 routeSteps 一致:
+     *   **该道自己的计划量 = 基数 × 该道换算率**,❌ 不逐道累乘(见 detail() 里的口径说明)。
+     * 未绑路线 / 路线无明细 → 返回基数(等价于全部率=1)。
+     *
+     * <p>⚠ 本方法只有 {@code plNo}(没有行键)⇒ 基数是 **Σ整单排产**,属**老数据兜底**:
+     * 正常路径已按「工单号+工单行号」取该行排产 × 该行路线换算率(见 WoReportService.complete 的 rowPl/rowRate)。
+     * 2026-10-15:顺带把这里的**逐道累乘**改成独立折算 —— 否则同一行不同页面/不同入口报出来的封顶值不一样。
      */
     public double processPlanQty(String plNo, String op) {
         if (!notBlank(plNo) || !notBlank(op)) return 0;
@@ -517,12 +527,11 @@ public class ProcessTaskService {
                 "SELECT 工序名称, ISNULL(换算率,1) AS 换算率 FROM dbo.bs_route WHERE 工艺路线编码=?"
                         + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(工序名称,N'')<>N'' ORDER BY ISNULL(加工顺序,999)", r);
         if (lines.isEmpty()) return base;
-        double cum = base;
         for (Map<String, Object> l : lines) {
+            if (!op.trim().equals(String.valueOf(l.get("工序名称")).trim())) continue;
             double rate = num(l.get("换算率"));
             if (rate <= 0) rate = 1;
-            cum = round(cum * rate);
-            if (op.trim().equals(String.valueOf(l.get("工序名称")).trim())) return cum;
+            return round(base * rate);   // 该道**独立**折算(不累乘)
         }
         return base;
     }
