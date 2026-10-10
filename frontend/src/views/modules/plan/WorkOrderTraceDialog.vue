@@ -35,6 +35,12 @@
       <div v-if="prog" class="wb-trace-block">
         <div class="wb-block-title">
           {{ tt('工序进度') }}
+          <!-- 口径标识(2026-10-10):这一段的计划/产出到底是"本行"还是"整单",必须一眼看清,
+               否则会重演"行6 的界面显示出 行7 的 56000"那种误读 -->
+          <span v-if="prog['追溯口径']" class="wb-tag-line" style="margin-left: 6px">{{ tt(prog['追溯口径']) }}</span>
+          <span v-if="prog['追溯口径'] === '按工单行'" class="wb-tag-line" style="margin-left: 4px">
+            {{ tt('工单行号') }} {{ prog['工单行号'] ?? '-' }} ｜ {{ tt('批次号') }} {{ prog['批次号'] || '-' }}
+          </span>
           <span class="wb-trace-sub" style="display: inline; margin-left: 8px">
             {{ tt('工艺路线') }}: {{ prog['表头']?.['工艺路线'] || '-' }}
             ｜ {{ tt('计划数量') }}: {{ num(prog['计划合计']) }}
@@ -214,7 +220,9 @@ async function load() {
     const rowId = props.行id === '' || props.行id === null || props.行id === undefined ? undefined : props.行id
     const [t, p] = await Promise.all([
       request.post('/px/scheduleBoard/trace', { 工单号: no, 工单行id: rowId }),
-      request.post('/px/processTask/detail', { 工单号: no }).catch(() => ({ data: null })),
+      // ⚠ 工序进度也必须带行 id(2026-10-10 用户实测:不带行 id 时表头计划=Σ全工单(16945)、
+      //   报工量取全工单(把行7 的 56000 算到行6 头上);后端 detail(工单号, 行id) 按行收敛。
+      request.post('/px/processTask/detail', { 工单号: no, 工单行id: rowId }).catch(() => ({ data: null })),
     ])
     trace.value = t.data || {}
     prog.value = p?.data || null

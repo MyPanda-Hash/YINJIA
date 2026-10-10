@@ -341,10 +341,36 @@ public class ProcessTaskService {
      *   · 产出 = 最后一道有完工量的工序的完工量;进度 = 产出 / 计划数量。
      * 只读,不改任何数据。
      */
-    public Map<String, Object> detail(String plNo) {
+    public Map<String, Object> detail(String plNo) { return detail(plNo, null); }
+
+    /**
+     * 工单详情 —— **行级口径**(2026-10-10 用户口径:「同工单号的不同行除同源销售订单外无任何关联,
+     * 追溯的每一段都必须按 (工单号, 工单行号) 唯一确定」)：
+     * <p>传 rowId(=plang.id) 时,表头计划数量/批次号/报工量/工序步骤计划量 **全部换成该行**：
+     * 计划数量 = 该行 pl_sl(**不再 Σ 全工单** —— 此前 GD-2026-10-0002 把 8 行加起来 16945);
+     * 报工完成量锚 `scjl.gd_id → plang_pc.plang_id = 该行 id`(老数据无 gd_id 时按该行批次号兜底,
+     * 与 {@link #reportedQty} 同一口径);逐道计划量 = 该行计划 × 该道换算率(与整单口径同一套换算,不另立)。
+     * <p>不传 rowId = 整单聚合(**旧行为**,兼容工序任务页/生产排产等既有调用方)。
+     */
+    public Map<String, Object> detail(String plNo, Long rowId) {
         if (!notBlank(plNo)) throw new IllegalArgumentException("请提供工单号");
         String no = plNo.trim();
-        List<Map<String, Object>> heads = jdbc.queryForList(
+        List<Map<String, Object>> heads;
+        if (rowId != null) {
+            heads = jdbc.queryForList(
+                    "SELECT TOP 1 p.pl_no AS 工单号, ISNULL(p.dm,N'') AS 产品编码, ISNULL(p.mc,N'') AS 产品名称,"
+                            + " ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.khdm,N'') AS 客户,"
+                            + " ISNULL(p.pl_sl,0) AS 计划数量,"
+                            + " CONVERT(varchar(10), p.cp_date, 120) AS 交期,"
+                            + " 1 AS 工单行数, 0 AS 异常计划量,"
+                            + " ISNULL(p.[批次号],N'') AS 批次号, p.pl_xc AS 工单行号,"
+                            + " ISNULL(p.[工艺路线],N'') AS 工艺路线, ISNULL(p.[完工状态],N'') AS 完工状态,"
+                            + " ISNULL(p.[当前工序],N'') AS 表头当前工序, ISNULL(p.scx,N'') AS 排产产线"
+                            + " FROM dbo.plang p WHERE p.id=? AND p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y'", rowId, no);
+            if (heads.isEmpty())
+                throw new IllegalArgumentException("工单行不存在或已作废(工单号=" + no + ", 行id=" + rowId + ")");
+        } else {
+            heads = jdbc.queryForList(
                 "SELECT TOP 1 p.pl_no AS 工单号, ISNULL(p.dm,N'') AS 产品编码, ISNULL(p.mc,N'') AS 产品名称,"
                         + " ISNULL(p.gg,N'') AS 规格型号, ISNULL(p.khdm,N'') AS 客户,"
                         + " (SELECT ISNULL(SUM(g.pl_sl),0) FROM dbo.plang g WHERE g.pl_no=p.pl_no AND ISNULL(g.asp_cancel,'N')<>'Y') AS 计划数量,"
@@ -355,11 +381,25 @@ public class ProcessTaskService {
                         + " ISNULL(p.[工艺路线],N'') AS 工艺路线, ISNULL(p.[完工状态],N'') AS 完工状态, ISNULL(p.[当前工序],N'') AS 表头当前工序,"
                         + " ISNULL(p.scx,N'') AS 排产产线"
                         + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id", no);
-        // 报工口径:每道工序的完工量(只算已审核报工)
-        List<Map<String, Object>> reps = jdbc.queryForList(
-                "SELECT ISNULL(gxdm,N'') AS 工序, SUM(ISNULL(sl,0)) AS 完工量, COUNT(*) AS 报工单数"
-                        + " FROM dbo.scjl WHERE gldh=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'"
-                        + " GROUP BY gxdm", no);
+        }
+        // 报工口径:每道工序的完工量(只算已审核报工)。
+        // ⚠ 行级(2026-10-10):传 rowId 时锚 scjl.gd_id → plang_pc.plang_id = 该行(老数据无 gd_id 时按该行批次兜底),
+        //   否则会把同工单其它行的报工算进来(实测:行6 的界面显示出行7 的 56000)。
+        List<Map<String, Object>> reps;
+        if (rowId != null) {
+            reps = jdbc.queryForList(
+                    "SELECT ISNULL(s.gxdm,N'') AS 工序, SUM(ISNULL(s.sl,0)) AS 完工量, COUNT(*) AS 报工单数"
+                            + " FROM dbo.scjl s LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
+                            + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                            + "   AND (pc.plang_id=? OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'')="
+                            + "        ISNULL((SELECT TOP 1 ISNULL(p.[批次号],N'') FROM dbo.plang p WHERE p.id=?), N'')))"
+                            + " GROUP BY s.gxdm", no, rowId, rowId);
+        } else {
+            reps = jdbc.queryForList(
+                    "SELECT ISNULL(gxdm,N'') AS 工序, SUM(ISNULL(sl,0)) AS 完工量, COUNT(*) AS 报工单数"
+                            + " FROM dbo.scjl WHERE gldh=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'"
+                            + " GROUP BY gxdm", no);
+        }
         Map<String, Double> qty = new LinkedHashMap<>();
         Map<String, Integer> cnt = new LinkedHashMap<>();
         for (Map<String, Object> r : reps) {
@@ -440,6 +480,13 @@ public class ProcessTaskService {
         out.put("计划合计", round(planQty));
         out.put("产出", round(outQty));
         out.put("未完成合计", round(Math.max(planQty - outQty, 0)));
+        // 行级标识(2026-10-10):让界面能明说"看的是哪一行/是不是整单口径",不再让人误读
+        out.put("追溯口径", rowId != null ? "按工单行" : "整单");
+        if (rowId != null) {
+            out.put("工单行号", head.get("工单行号"));
+            out.put("批次号", head.get("批次号"));
+            out.put("工单行id", rowId);
+        }
         return out;
     }
 
