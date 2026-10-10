@@ -1,0 +1,6 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-coverage.sql ==
+  | CGD | 采购单 | 订单管理 | 单据 | doc | 
+  | KHDD | 客户订单 | 订单管理 | 单据 | doc | 
+  | OUTSOURCE_ORDER | 委外加工单 | 委外加工 | 委外加工 | doc | 
+[OK] _q-coverage.sql (2 batches)

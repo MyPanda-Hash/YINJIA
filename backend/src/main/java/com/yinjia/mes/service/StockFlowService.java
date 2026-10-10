@@ -36,24 +36,26 @@ public class StockFlowService {
         this.jdbc = jdbc;
     }
 
-    /** 入库面板(src 1..4,与 v_stock_movement 的段号同口径)。 */
+    /**
+     * 入库面板(src 1..4,与 v_stock_movement 的段号同口径)。
+     *
+     * <p>2026-10-08:OTHER_IN(3)/OUTSOURCE_IN(4) 及其他出入库单据面板整体下架
+     * (tools/migrate-drop-extra-docs-pu-req-20261008.sql)—— 段号 3/4 与 7/8 自此无面板使用;
+     * 段号本身是流水表的既有口径(v_stock_movement 按 src 分段),不回收,以免历史流水无法解读。
+     */
     private static int inSrc(String panelCode) {
         return switch (panelCode) {
             case "PURCHASE_IN" -> 1;
             case "FINISH_IN" -> 2;
-            case "OTHER_IN" -> 3;
-            case "OUTSOURCE_IN" -> 4;
             default -> -1;
         };
     }
 
-    /** 出库面板(src 5..8)。 */
+    /** 出库面板(src 5..8;7=其他出库、8=委外发料已随面板下架,见 inSrc 注释)。 */
     private static int outSrc(String panelCode) {
         return switch (panelCode) {
             case "SALE_OUT" -> 5;
             case "MATERIAL_OUT" -> 6;
-            case "OTHER_OUT" -> 7;
-            case "OUTSOURCE_ISSUE" -> 8;
             default -> -1;
         };
     }

@@ -1,10 +1,12 @@
 <script setup>
-// 字段管理(动态字段/备用列池):仅管理员;列表/表单/查询/导出由元数据引擎自动获得新字段。
+// 字段管理(动态字段/备用列池):入口由调用方按该面板「自定义字段」权限显隐(2026-10-09 起
+// 不再是「仅管理员」:组织架构 →「角色与面板权限」勾了该面板「自定义字段」的角色即可配置);
+// 列表/表单/查询/导出由元数据引擎自动获得新字段。
 // 规格见 docs/design/动态字段扩展-备用列池-V1.0.md §10;入口由 PanelxList「更多 ▼」注入。
 import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
-import { extFieldOverview, extFieldAdd, extFieldRetire } from '@/business/engine'
+import { usePanelRuntime } from '@core/panel-runtime'
 
 // 2026-09-28 修「点关闭无反应」:本组件此前声明 visible prop + emit('update:visible'),
 // 而父组件(PanelxList)用 v-model(即 modelValue / update:modelValue)⇒ 页脚「关闭」按钮
@@ -21,6 +23,10 @@ const props = defineProps({
   parentOptionsOf: { type: Function, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'done'])
+const engine = usePanelRuntime()
+const extFieldOverview = (panelCode) => engine.extFieldOverview(panelCode)
+const extFieldAdd = (payload) => engine.extFieldAdd(payload)
+const extFieldRetire = (payload) => engine.extFieldRetire(payload)
 const loading = ref(false)
 const saving = ref(false)
 const data = ref({ capacity: 20, fields: [], linePool: [] })

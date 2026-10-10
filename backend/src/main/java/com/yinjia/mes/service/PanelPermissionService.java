@@ -42,7 +42,8 @@ public class PanelPermissionService {
     /** 权限词 → 配置界面标签(错误提示用) */
     private static final Map<String, String> PERM_LABEL = Map.of(
             "view", "可见", "query", "查询单据", "add", "新增保存", "modify", "申请修改",
-            "modlog", "修改记录", "del", "删除申请", "export", "导出打印", "audit", "审批");
+            "modlog", "修改记录", "del", "删除申请", "export", "导出打印", "audit", "审批",
+            "field", "自定义字段");
 
     static {
         Map<String, String[]> m = new HashMap<>();
@@ -257,5 +258,23 @@ public class PanelPermissionService {
     public void requireAnyPerm(String panelCode, String actionLabel, String... words) {
         if (!hasAnyPerm(panelCode, words))
             throw new org.springframework.security.access.AccessDeniedException("仅该面板「" + actionLabel + "」权限的指定人员可操作");
+    }
+
+    /** 「自定义字段」权限词(与 SysAdminController.PERMISSION_ACTIONS 的 field 同源) */
+    public static final String PERM_FIELD = "field";
+
+    /**
+     * 自定义字段(动态字段/备用列池)配置权校验 —— 2026-10-09 用户口径:
+     * 「自定义字段需要在组织权限里面能够配置;现在的来料检验要求的自定义字段只要超级管理员能够配置。」
+     *
+     * 原先 /px/extField/add|retire 是 requireAdmin 硬闸门;现改为**按面板授权**:
+     * 组织架构 →「角色与面板权限」里给该面板勾上「自定义字段」的角色即可配置该面板的自定义字段
+     * (管理员恒过)。配置本身仍是元数据写入(不改物理列),但会改变全公司看到的面板结构,
+     * 故必须逐面板授予、且与按钮权限同一张矩阵(yj_role_panel.perms 的 field 词)。
+     */
+    public void requireFieldConfig(String panelCode) {
+        if (panelCode == null || panelCode.isBlank())
+            throw new org.springframework.security.access.AccessDeniedException("面板编码不能为空");
+        requireAnyPerm(panelCode, "自定义字段", PERM_FIELD);
     }
 }

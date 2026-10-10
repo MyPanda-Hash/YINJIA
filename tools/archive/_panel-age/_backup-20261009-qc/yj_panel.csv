@@ -1,0 +1,6 @@
+﻿panel_code,panel_name,category,mode,line_table,head_table,group_col,pk_col,code_col,prefix,date_col,page_size,detail_key,module_group,config,config_at,panel_name_en
+LOT_TRACE,批号追溯,报表,flat,v_lot_trace,,,id,,,,50,items,生产制造,,,
+QC_DISPOSAL,不良品处理单,生产管理,doc,qc_disposal,,单据编号,id,单据编号,BL,单据日期,20,items,生产制造,,,
+QC_OP,工序质检单,生产管理,doc,qc_op_detail,qc_op,单据编号,id,单据编号,GJ,单据日期,20,items,生产制造,,,
+QC_RECORD,检验记录单,生产管理,doc,qc_record_detail,qc_record,单据编号,id,单据编号,JY,单据日期,20,items,生产制造,,,
+ROD_RETURN,炭棒不良退货登记,生产管理,doc,rod_return_detail,rod_return,单据编号,id,单据编号,TL,单据日期,20,items,生产制造,,,

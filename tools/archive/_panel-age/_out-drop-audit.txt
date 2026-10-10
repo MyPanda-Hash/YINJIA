@@ -1,0 +1,62 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-drop-audit.sql ==
+  (0 rows)
+  | FINISH_IN | 产成品入库单 | 库存核算 | doc | bd_finish_in | bl_finish_in | 26 | 4 | 1 | 
+  | FINISH_IN_DETAIL | 产成品入库单明细表 | 报表 | flat |  | v_finish_in_detail | 23 | 4 | 0 | 
+  | FINISH_IN_STATS | 产成品入库单统计表 | 报表 | flat |  | v_finish_in_stats | 12 | 4 | 0 | 
+  | OTHER_IN | 其他入库单 | 库存核算 | doc | bd_other_in | bl_other_in | 22 | 4 | 0 | 
+  | OTHER_IN_DETAIL | 其他入库单明细表 | 报表 | flat |  | v_other_in_detail | 23 | 4 | 0 | 
+  | OTHER_IN_STATS | 其他入库单统计表 | 报表 | flat |  | v_other_in_stats | 12 | 4 | 0 | 
+  | OTHER_OUT | 其他出库单 | 库存核算 | doc | bd_other_out | bl_other_out | 27 | 4 | 0 | 
+  | OTHER_OUT_DETAIL | 其他出库单明细表 | 报表 | flat |  | v_other_out_detail | 27 | 4 | 0 | 
+  | OTHER_OUT_STATS | 其他出库单统计表 | 报表 | flat |  | v_other_out_stats | 14 | 4 | 0 | 
+  | OUTSOURCE_IN | 委外入库单 | 委外加工 | doc | bd_outsource_in | bl_outsource_in | 20 | 4 | 0 | 
+  | OUTSOURCE_IN_DETAIL | 委外入库单明细表 | 报表 | flat |  | v_outsource_in_detail | 18 | 4 | 0 | 
+  | OUTSOURCE_IN_STATS | 委外入库单统计表 | 报表 | flat |  | v_outsource_in_stats | 10 | 4 | 0 | 
+  | OUTSOURCE_ISSUE | 委外发料单 | 委外加工 | doc | bd_outsource_issue | bl_outsource_issue | 20 | 4 | 0 | 
+  | OUTSOURCE_ISSUE_DETAIL | 委外发料单明细表 | 报表 | flat |  | v_outsource_issue_detail | 19 | 4 | 0 | 
+  | OUTSOURCE_ISSUE_STATS | 委外发料单统计表 | 报表 | flat |  | v_outsource_issue_stats | 10 | 4 | 0 | 
+  | PU_REQ | 请购单 | 采购管理 | doc | bd_pu_req | bl_pu_req | 36 | 4 | 0 | 
+  (0 rows)
+  | bd_finish_in | USER_TABLE | 1 | 
+  | bd_other_in | USER_TABLE | 0 | 
+  | bd_other_out | USER_TABLE | 0 | 
+  | bd_outsource_in | USER_TABLE | 0 | 
+  | bd_outsource_issue | USER_TABLE | 0 | 
+  | bd_pu_req | USER_TABLE | 0 | 
+  | bl_finish_in | USER_TABLE | 1 | 
+  | bl_other_in | USER_TABLE | 0 | 
+  | bl_other_out | USER_TABLE | 0 | 
+  | bl_outsource_in | USER_TABLE | 0 | 
+  | bl_outsource_issue | USER_TABLE | 0 | 
+  | bl_pu_req | USER_TABLE | 0 | 
+  | v_finish_in_detail | VIEW | 1 | 
+  | v_finish_in_stats | VIEW | 1 | 
+  | v_other_in_detail | VIEW | 0 | 
+  | v_other_in_stats | VIEW | 0 | 
+  | v_other_out_detail | VIEW | 0 | 
+  | v_other_out_stats | VIEW | 0 | 
+  | v_outsource_in_detail | VIEW | 0 | 
+  | v_outsource_in_stats | VIEW | 0 | 
+  | v_outsource_issue_detail | VIEW | 0 | 
+  | v_outsource_issue_stats | VIEW | 0 | 
+  | v_pu_req_detail | (不存在) | null | 
+  | FINISH_IN | 产成品入库单 | 9 | 0 | 
+  | FINISH_IN_DETAIL | 产成品入库单明细表 | 9 | 0 | 
+  | FINISH_IN_STATS | 产成品入库单统计表 | 9 | 0 | 
+  | OTHER_IN | 其他入库单 | 9 | 0 | 
+  | OTHER_IN_DETAIL | 其他入库单明细表 | 9 | 0 | 
+  | OTHER_IN_STATS | 其他入库单统计表 | 9 | 0 | 
+  | OTHER_OUT | 其他出库单 | 9 | 0 | 
+  | OTHER_OUT_DETAIL | 其他出库单明细表 | 9 | 0 | 
+  | OTHER_OUT_STATS | 其他出库单统计表 | 9 | 0 | 
+  | OUTSOURCE_IN | 委外入库单 | 9 | 0 | 
+  | OUTSOURCE_IN_DETAIL | 委外入库单明细表 | 9 | 0 | 
+  | OUTSOURCE_IN_STATS | 委外入库单统计表 | 9 | 0 | 
+  | OUTSOURCE_ISSUE | 委外发料单 | 9 | 0 | 
+  | OUTSOURCE_ISSUE_DETAIL | 委外发料单明细表 | 9 | 0 | 
+  | OUTSOURCE_ISSUE_STATS | 委外发料单统计表 | 9 | 0 | 
+  | PU_REQ | 请购单 | 9 | 0 | 
+  | MANU_ORDER | FINISH_IN | ACTIVE | 1 | 
+  | 1 | 2026-09-24 | FI-2026-09-0001 | null | null | null | MO-2026-09-0002 | null | null | null | K-20260909-02 | null | null | null | 草稿 | null | null | null | null | admin | 2026-09-24 10:02:23.1862976 | null | null | N | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | null | 
+[OK] _q-drop-audit.sql (7 batches)

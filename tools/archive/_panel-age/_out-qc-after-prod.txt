@@ -1,0 +1,22 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-qc-drop-audit.sql ==
+  (0 rows)
+  (0 rows)
+  | qc_disposal | (不存在) | null | 
+  | qc_op | (不存在) | null | 
+  | qc_op_detail | (不存在) | null | 
+  | qc_record | (不存在) | null | 
+  | qc_record_detail | (不存在) | null | 
+  | rod_return | (不存在) | null | 
+  | rod_return_detail | (不存在) | null | 
+  | v_lot_trace | (不存在) | null | 
+  | 字段参照(ref_panel) | 0 | 
+  | 生单链路 form_flow_link | 0 | 
+  | 附件 yj_attachment | 0 | 
+  | 审批 yj_form_approval | 0 | 
+  | 列设置 report_column_settings | 0 | 
+  | 批号表 yj_doc_batch | 0 | 
+  | 修改日志 yj_doc_modify_log | 0 | 
+  | 归档日志 yj_archive_change_log | 0 | 
+  | 使用日志 yj_usage_log(按面板名) | 0 | 
+[OK] _q-qc-drop-audit.sql (8 batches)

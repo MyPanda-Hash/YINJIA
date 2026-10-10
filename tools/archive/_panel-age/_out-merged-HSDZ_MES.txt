@@ -1,0 +1,23 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-verify-drop.sql ==
+  | HSDZ_MES | 0 | 0 | 0 | 0 | 0 | 
+  | HSDZ_MES | 125 | 3843 | 6 | 3 | 0 | 0 | 0 | 
+  | HSDZ_MES | 译名残留(面板名) | 104 | 
+  | HSDZ_MES | 仍被引用的孤儿标签(期望 0) | 132 | 
+  | HSDZ_MES | PU_ORDER | 采购订单 | 采购管理 | 
+  | HSDZ_MES | FINISH_IN | 产成品入库单 | 库存核算 | 
+  | HSDZ_MES | FINISH_IN_DETAIL | 产成品入库单明细表 | 库存核算 | 
+  | HSDZ_MES | FINISH_IN_STATS | 产成品入库单统计表 | 库存核算 | 
+  | HSDZ_MES | MATERIAL_OUT | 材料出库单 | 库存核算 | 
+  | HSDZ_MES | MATERIAL_OUT_DETAIL | 材料出库单明细表 | 库存核算 | 
+  | HSDZ_MES | MATERIAL_OUT_STATS | 材料出库单统计表 | 库存核算 | 
+  | HSDZ_MES | PURCHASE_IN | 采购入库单 | 库存核算 | 
+  | HSDZ_MES | PURCHASE_IN_DETAIL | 采购入库单明细表 | 库存核算 | 
+  | HSDZ_MES | PURCHASE_IN_STATS | 采购入库单统计表 | 库存核算 | 
+  | HSDZ_MES | QC_RECV | 送料暂收单 | 库存核算 | 
+  | HSDZ_MES | QC_RETURN | 暂收退回单 | 库存核算 | 
+  | HSDZ_MES | SALE_OUT | 销售出库单 | 库存核算 | 
+  | HSDZ_MES | SALE_OUT_DETAIL | 销售出库单明细表 | 库存核算 | 
+  | HSDZ_MES | SALE_OUT_STATS | 销售出库单统计表 | 库存核算 | 
+  | HSDZ_MES | OUTSOURCE_ORDER | 委外加工单 | 委外加工 | 
+[OK] _q-verify-drop.sql (5 batches)

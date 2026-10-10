@@ -335,7 +335,7 @@
         </template>
       </el-dialog>
     </div>
-    <RefPickDialog v-model="refVisible" :field="refPick?.field" :mode="refPick?.mode" @confirm="onRefConfirm" />
+    <RefPickDialog v-model="refVisible" :field="refPick?.field" :row="refPick?.row" :mode="refPick?.mode" @confirm="onRefConfirm" />
 
     <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
     <el-dialog v-model="dictPickVisible" :title="tt('选择') + '：' + (dictPickField ? tt(dictPickField.name) : '')" width="440px" append-to-body :close-on-click-modal="false">
@@ -380,13 +380,10 @@ const props = defineProps({
   embedded: { type: Boolean, default: false },
 })
 const emit = defineEmits(['saved'])
-import { useTabsStore } from '@/stores/tabs'
-import { useUserStore } from '@/stores/user'
-import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Back, Plus, Delete, ArrowDown, Search } from '@element-plus/icons-vue'
-import { usePanelRuntime } from '@core/panel-runtime'
+import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import { applyCalcRules } from '@core/panel/calcRules'
@@ -404,9 +401,7 @@ const { SHORTCUTS } = engine
 
 const route = useRoute()
 const router = useRouter()
-const tabsStore = useTabsStore()
-const user = useUserStore()
-const localeStore = useLocaleStore()
+const { user, tabs: tabsStore, locale: localeStore } = useAppContext()
 
 // 语言热切换:轻量重拉字段标签与按钮组(仅换显示定义),
 // 表单输入值/明细数据/页签状态全部保留(meta.code 键不随语言变化)。

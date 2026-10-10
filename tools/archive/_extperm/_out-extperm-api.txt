@@ -1,0 +1,20 @@
+== 目标 http://127.0.0.1:8090/api(账套 YJ_TEST)==
+  ✔ 管理员登录成功 — 系统管理员
+  ✔ 管理员 fieldPanels = ['*'] — ["*"]
+  ✔ 建探针角色 — "success"
+  ✔ 建探针账号 — "success"
+  ✔ 权限矩阵动作集含 field — view,query,add,edit,delete,export,print,audit,price,review,adjust,field
+  ✔ QC_INSP_REQ 一行含 field 且标签为「自定义字段」 — view,query,add,edit,delete,export,print,audit,price,review,adjust,field
+  ✔ 文书类面板 RD_PROD_INFO 也含 field
+  ✔ 探针账号登录成功(可见但无 field)
+  ✔ 未授权时 fieldPanels 不含 QC_INSP_REQ — []
+  ✔ 未授权 POST /px/extField/add 被 403 拦下 — code=403 仅该面板「自定义字段」权限的指定人员可操作
+  ✔ 403 文案点明「自定义字段」权限 — 仅该面板「自定义字段」权限的指定人员可操作
+  ✔ 未授权 POST /px/extField/retire 被 403 拦下 — code=403 仅该面板「自定义字段」权限的指定人员可操作
+  ✔ 授权后 fieldPanels 含 QC_INSP_REQ — ["QC_INSP_REQ"]
+  ✔ 授权后穿过权限闸门(403 → 400 参数校验) — code=400 请选择所属页签(自定义列住哪张表)
+  ✔ 授权后退绑接口同口径放行(落到「字段不存在」) — code=400 字段不存在:id=99999999
+  ✔ 逐面板生效:未授权的 PURCHASE_IN 仍 403 — code=403 仅该面板「自定义字段」权限的指定人员可操作
+  ✔ 探针账号/角色已清理
+
+=== 结果: PASS 17 / FAIL 0 ===

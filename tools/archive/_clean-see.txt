@@ -1,0 +1,5 @@
+﻿[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _probe-rd-flow-ui-cleanup.sql ==
+  | ������:rd_approval ��� | 0 | 
+  | ������:yj_doc_status | 0 | 
+[OK] _probe-rd-flow-ui-cleanup.sql (1 batches)

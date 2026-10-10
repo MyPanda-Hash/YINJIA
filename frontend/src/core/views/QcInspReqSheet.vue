@@ -28,12 +28,14 @@
     <div v-if="showToolbar" class="qc-bar qc-bar2">
       <span class="qc-bar-btn" :title="tt('按字段+内容多条件查找(可跨页签,点结果跳到该行)')" @click="toggleFuzzy">🔍 {{ tt('模糊搜索') }}</span>
       <span class="qc-bar-btn" :title="tt('查看本表的修改记录(每次保存留痕,近 3 次)')" @click="openModifyLog">🕘 {{ tt('修改记录') }}</span>
-      <!-- 自定义字段(仅管理员):每张表各有各的自定义列(动态字段/备用列池),
-           在弹窗里选「所属页签」;加完该表立刻多一列,检验报告里带入的检验项也跟着多一项 -->
+      <!-- 自定义字段:每张表各有各的自定义列(动态字段/备用列池),
+           在弹窗里选「所属页签」;加完该表立刻多一列,检验报告里带入的检验项也跟着多一项。
+           入口权限(2026-10-09 用户口径):不再是「仅管理员」——组织架构 →「角色与面板权限」
+           给本面板勾上「自定义字段」的角色即可配置(管理员恒可),后端 requireFieldConfig 同口径。 -->
       <span
-        v-if="showToolbar && user.isAdmin"
+        v-if="showToolbar && canConfigExt"
         class="qc-bar-btn"
-        :title="tt('给某张表增删自定义列(动态字段/备用列池,仅管理员;弹窗里选所属页签)')"
+        :title="tt('给某张表增删自定义列(动态字段/备用列池;需本面板「自定义字段」权限;弹窗里选所属页签)')"
         @click="extMgrVisible = true"
       >⚙ {{ tt('自定义字段') }}</span>
     </div>
@@ -154,7 +156,7 @@
       </div>
     </div>
 
-    <!-- 自定义字段(仅管理员):**每张表各有各的自定义列** —— 在弹窗里选「所属页签」,
+    <!-- 自定义字段:**每张表各有各的自定义列** —— 在弹窗里选「所属页签」,
          加完只有那张表多一列,检验报告带入时也按那张表的列走;
          可再指定「父字段」并到某个分组标题下(父只做表头分组、没有数据格,带入只带子字段) -->
     <FieldManagerDialog
@@ -211,11 +213,12 @@
 import { computed, nextTick, ref, toRaw, watch } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { callButton, errMsg } from '@/business/engine'
-import { useUserStore } from '@/stores/user'
+import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
+import { errMsg } from '@core/panel-engine'
 import { detailRowsOf, ensureDetailRows } from '@core/panel/detailRows'
 import { fetchExtOverview, invalidateExtFields } from '@core/qc/qcInspReqApi'
 import { DEFAULT_EXT_COL_W, colsOfTab, parentOptionsOfTab } from '@core/qc/qcInspReqCols'
+import { canConfigFields } from '@core/auth/panelAccess'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import { tabsOfPanel } from './qcInspReqConfig'
 
@@ -233,7 +236,13 @@ const props = defineProps({
   tabKeys: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['dirty', 'save', 'refresh', 'refresh-config'])
-const user = useUserStore()
+const engine = usePanelRuntime()
+const { user } = useAppContext()
+
+/** 「自定义字段」入口可见性(2026-10-09 用户口径:不再只给超级管理员)——
+ *  管理员 ∪ 角色在本面板被授予「自定义字段」权限(组织架构 →「角色与面板权限」)。
+ *  真闸门在服务端(PanelPermissionService.requireFieldConfig),这里只管入口显隐。 */
+const canConfigExt = computed(() => canConfigFields(user, props.panelCode))
 
 /* ── 每张表各自的自定义列(动态字段/备用列池,「自定义字段」里维护) ──
  * 2026-10-04 用户口径:「自定义字段单独针对每个表」——
@@ -495,7 +504,7 @@ async function openModifyLog() {
   modLogVisible.value = true
   modLogLoading.value = true
   try {
-    const res = await callButton({ panelCode: props.panelCode, buttonName: '修改记录', formData: { 编号: no }, buttonParam: {} })
+    const res = await engine.callButton({ panelCode: props.panelCode, buttonName: '修改记录', formData: { 编号: no }, buttonParam: {} })
     modLogNo.value = res?.编号 || no
     modLogRecords.value = (res?.records || []).map((r) => ({
       ...r,

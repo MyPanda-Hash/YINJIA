@@ -1,0 +1,15 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-label-owners.sql ==
+  | LABEL_OWNERS | 建议供应商 | PU_REQ | 建议供应商 | 
+  | LABEL_OWNERS | 请购人 | PU_REQ | 请购人 | 
+  | LABEL_OWNERS | 是否带票 | PU_REQ | 是否带票 | 
+  | LABEL_OWNERS | 收货人 | PU_REQ | 收货人 | 
+  | LABEL_OWNERS | 外部单据号 | OTHER_OUT | 外部单据号 | 
+  | LABEL_OWNERS | 外部单据号 | PU_REQ | 外部单据号 | 
+  | LABEL_OWNERS | 委外加工单号 | OUTSOURCE_IN | 委外加工单号 | 
+  | LABEL_OWNERS | 委外加工单号 | OUTSOURCE_IN_DETAIL | 委外加工单号 | 
+  | LABEL_OWNERS | 委外加工单号 | OUTSOURCE_ISSUE | 委外加工单号 | 
+  | LABEL_OWNERS | 委外加工单号 | OUTSOURCE_ISSUE_DETAIL | 委外加工单号 | 
+  | LABEL_OWNERS | 需求日期 | PU_REQ | 需求日期 | 
+  | LABEL_OWNERS | 自动生入库单 | OTHER_OUT | 自动生入库单 | 
+[OK] _q-label-owners.sql (2 batches)

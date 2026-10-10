@@ -129,22 +129,34 @@ JOIN dbo.qc_insp_detail src
 WHERE d.[送检数量] IS NULL AND src.[送检数量] IS NOT NULL;
 PRINT N'[qc-tc-via-return] ⑤-1 链路溯源回填 送检数量: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行';
 GO
--- ⑤-2 兜底:链路缺失的老单,按「头 检验单号 + 物料编码 + 不良数量 = 本行数量」找检验行,
+-- ⑤-2 兜底:链路缺失的老单,按「头 检验单号 + 物料编码 + 不良数量 = 本行退货数量」找检验行,
 --      **且必须唯一命中**才回填 —— 一张检验单可以有同一物料的多行(送检量各不相同),多命中时
---      取最大/最小都是编数据,宁可留空(留空由前端/生单侧按 数量 兜底,不阻断业务)。
---      ⚠ 2026-10-05 修正:原稿写 d.[退货数量],那是另一台机器上的旧列名;现行链建的
---      qc_return_detail 退料数量列叫 [数量](本机实测无 退货数量 列)——按现用列名修正。
-UPDATE d SET d.[送检数量] = x.qty
-FROM dbo.qc_return_detail d
-JOIN dbo.qc_return h ON h.单据编号 = d.单据编号
-CROSS APPLY (SELECT MIN(i.[送检数量]) AS qty
-               FROM dbo.qc_insp_detail i
-              WHERE i.单据编号 = h.检验单号 AND ISNULL(i.asp_cancel, 'N') <> 'Y'
-                AND i.物料编码 = d.物料编码
-                AND ABS(ISNULL(i.[不良数量], 0) - ISNULL(d.[数量], 0)) < 0.0001
-             HAVING COUNT(*) = 1) x
-WHERE d.[送检数量] IS NULL AND x.qty IS NOT NULL;
-PRINT N'[qc-tc-via-return] ⑤-2 检验单号+物料编码+不良数量 唯一命中兜底回填: ' + CAST(@@ROWCOUNT AS nvarchar(10)) + N' 行';
+--      取最大/最小都是编数据,宁可留空(留空由前端/生单侧按 退货数量 兜底,不阻断业务)。
+--      ⚠ 列名**血统二择一**(2026-10-09 修):退料数量列在两种血统下叫法不同 ——
+--        现行四单基线链 = `退货数量`(由 migrate-fourdoc-missing-cols-20261008.sql 的 sp_rename 改来,
+--        依据是《采购链四单字段与显示字段.md》);2026-10-05 那台机器上叫 `数量`。
+--        本脚本字节一变 DbSync 就会重跑,写死任何一侧都会在另一侧炸:2026-10-09 合并后被重跑实测
+--        报「列名 '数量' 无效」把整条迁移链卡在中途(两账套现用列均为 退货数量)。
+--        故按 COL_LENGTH 取现存的那一列(动态 SQL:列名不能参数化,只能拼)。
+DECLARE @qtyCol sysname =
+    CASE WHEN COL_LENGTH('dbo.qc_return_detail', N'退货数量') IS NOT NULL THEN N'退货数量'
+         WHEN COL_LENGTH('dbo.qc_return_detail', N'数量')    IS NOT NULL THEN N'数量'
+    END;
+IF @qtyCol IS NULL RAISERROR(N'qc_return_detail 既无 退货数量 也无 数量 列,无法回填送检数量', 16, 1);
+DECLARE @n5b int, @sql5b nvarchar(max) =
+      N'UPDATE d SET d.[送检数量] = x.qty'
+    + N' FROM dbo.qc_return_detail d'
+    + N' JOIN dbo.qc_return h ON h.单据编号 = d.单据编号'
+    + N' CROSS APPLY (SELECT MIN(i.[送检数量]) AS qty'
+    + N'                FROM dbo.qc_insp_detail i'
+    + N'               WHERE i.单据编号 = h.检验单号 AND ISNULL(i.asp_cancel, N''N'') <> N''Y'''
+    + N'                 AND i.物料编码 = d.物料编码'
+    + N'                 AND ABS(ISNULL(i.[不良数量], 0) - ISNULL(d.[' + @qtyCol + N'], 0)) < 0.0001'
+    + N'              HAVING COUNT(*) = 1) x'
+    + N' WHERE d.[送检数量] IS NULL AND x.qty IS NOT NULL;'
+    + N' SET @n = @@ROWCOUNT;';
+EXEC sp_executesql @sql5b, N'@n int OUTPUT', @n = @n5b OUTPUT;
+PRINT N'[qc-tc-via-return] ⑤-2 检验单号+物料编码+不良数量 唯一命中兜底回填: ' + CAST(ISNULL(@n5b, 0) AS nvarchar(10)) + N' 行';
 GO
 
 /* ---------- ⑥ 自检 ---------- */

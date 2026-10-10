@@ -1,0 +1,13 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-manustats.sql ==
+  | CREATE   VIEW v_manu_order_stats AS SELECT l.[产品编码], MAX(l.[产品名称]) AS [产品名称], MAX(l.[规格型号]) AS [规格型号], MAX(l.[生产单位]) AS [生产单位], NULL AS [加工单数], NULL AS [计划数量], NULL AS [累计汇报数量], NULL AS [完工数量], NULL AS [生产进度%] FROM bd_manu_order h LEFT JOIN bl_manu_order l ON h.[合同号] = l.[合同号] GROUP BY l.[产品编码]; | 
+  | 产品编码 | 产品编码 | 
+  | 产品名称 | 产品名称 | 
+  | 规格型号 | 规格型号 | 
+  | 生产单位 | 生产单位 | 
+  | 加工单数 | 加工单数 | 
+  | 计划数量 | 计划数量 | 
+  | 累计汇报数量 | 累计汇报数量 | 
+  | 完工数量 | 完工数量 | 
+  | 生产进度% | 生产进度% | 
+[OK] _q-manustats.sql (2 batches)

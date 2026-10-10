@@ -23,7 +23,7 @@ import {
 const DESIGN_LABELS = [
   '项目定级', '项目名称', '子项目/尺寸', '项目编号', '内容',
   '项目发起人', '项目负责人', '立项日期', '预计完成日期', '状态',
-  '测试情况', '技术目标达成', '是否市场转化', '未转换原因',
+  '测试情况',
 ]
 
 /** 不上控制列表、但保留在明细元数据里的列(不参与纸面,数据不删) */
@@ -45,9 +45,9 @@ test('每个可落库列的 key 必须是 RD_PROGRESS 明细字段的 label(后�
 })
 
 test('列数固定为 14(用户 2026-09-22 口径),显示名与设计逐字一致且顺序相同', () => {
-  assert.equal(PROGRESS_COLUMNS.length, 14)
+  assert.equal(PROGRESS_COLUMNS.length, 11)   // 2026-10-09 撤下 3 列(原 14)
   assert.deepEqual(PROGRESS_COLUMNS.map((c) => c.label), DESIGN_LABELS)
-  assert.equal(new Set(PROGRESS_COLUMNS.map((c) => c.label)).size, 14)
+  assert.equal(new Set(PROGRESS_COLUMNS.map((c) => c.label)).size, 11)
   // 那 4 列必须彻底不在控制列表里(否则又会多出列)
   const onSheet = PROGRESS_COLUMNS.map((c) => c.label)
   for (const off of OFF_SHEET_LABELS) {
@@ -140,9 +140,10 @@ test('dataKeyOf:每列都返回真实落库键(=字段 label,后端按它收发)
   assert.equal(dataKeyOf('项目定级'), '项目定级')     // 物理列是「项目层级」,但载荷键必须用 label
   assert.equal(dataKeyOf('项目负责人'), '项目负责')
   assert.equal(dataKeyOf('预计完成日期'), '里程完成')
-  assert.equal(dataKeyOf('技术目标达成'), '技术目标达成')   // 本轮起真落库
-  assert.equal(dataKeyOf('是否市场转化'), '是否市场转化')
-  assert.equal(dataKeyOf('未转换原因'), '未转换原因')
+  // 2026-10-09:这三列已从控制列表撤下 ⇒ 不再有列定义;物理列与历史数据仍保留在 RD_PROGRESS_DETAIL_COLUMNS
+  assert.equal(dataKeyOf('技术目标达成'), null)
+  assert.equal(dataKeyOf('是否市场转化'), null)
+  assert.equal(dataKeyOf('未转换原因'), null)
   assert.equal(dataKeyOf('不存在的列'), null)
 })
 
@@ -173,6 +174,32 @@ test('组件源码里不得出现裸的显示名方括号取值(必须经 K 映�
 })
 
 /** 正则转义(中文标签里含 / 等字符) */
+/**
+ * 源码级回归:控制列表的**纸面表头**必须与 PROGRESS_COLUMNS 逐列一致。
+ *
+ * 2026-10-09 踩过:三列从 PROGRESS_COLUMNS 删了、单测也改了,却忘了
+ * ProgressControlSheet.vue 的表头/单元格是**手写的** —— 列定义 11 列、纸面仍 14 列;
+ * 而且被删列的单元格 `row[K['技术目标达成']]` 里 K[...] 已随 PROGRESS_COLUMNS 变成 undefined,
+ * 读写都落到 `row[undefined]` 上,静默不落库。这条断言把"改一处忘了另一处"钉死:
+ * 表头逐列比对 + 空态 colspan 跟列数对齐。
+ */
+test('纸面表头与 PROGRESS_COLUMNS 逐列一致,空态 colspan 跟列数对齐', () => {
+  const src = readFileSync(new URL('../views/ProgressControlSheet.vue', import.meta.url), 'utf8')
+  const thead = src.match(/<thead>([\s\S]*?)<\/thead>/)
+  assert.ok(thead, '在 ProgressControlSheet.vue 里找不到 <thead> —— 组件结构变了,请同步更新本断言')
+  const headLabels = [...thead[1].matchAll(/<th[^>]*>\s*\{\{\s*tt\('([^']+)'\)\s*\}\}\s*<\/th>/g)].map((m) => m[1])
+  assert.deepEqual(
+    headLabels,
+    PROGRESS_COLUMNS.map((c) => c.label),
+    '纸面表头与 PROGRESS_COLUMNS 不一致(改一侧必须同步改另一侧)',
+  )
+  // 空态那一行:`<td :colspan="editable ? N+1 : N"`(N = 业务列数;+1 = editable 时的操作列)
+  const col = src.match(/<td\s+:colspan="editable \? (\d+) : (\d+)"/)
+  assert.ok(col, '找不到空态 colspan 表达式')
+  assert.equal(Number(col[1]), PROGRESS_COLUMNS.length + 1, 'editable 态 colspan 应为 业务列数+1')
+  assert.equal(Number(col[2]), PROGRESS_COLUMNS.length, '只读态 colspan 应等于业务列数')
+})
+
 function escapeRe(s) {
   return s.replace(/[.*+?^$${}()|[\]\\]/g, '\\$&')
 }

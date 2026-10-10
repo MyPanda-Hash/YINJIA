@@ -1,0 +1,32 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-deps.sql ==
+  | qc_disposal | (无人引用) | 
+  | qc_op | (无人引用) | 
+  | qc_op_detail | (无人引用) | 
+  | qc_record | (无人引用) | 
+  | qc_record_detail | (无人引用) | 
+  | rod_return | (无人引用) | 
+  | rod_return_detail | (无人引用) | 
+  | v_finish_in_detail | (无人引用) | 
+  | v_finish_in_stats | (无人引用) | 
+  | v_lot_trace | (无人引用) | 
+  | v_material_out_detail | (无人引用) | 
+  | v_material_out_stats | (无人引用) | 
+  | v_other_in_detail | (无人引用) | 
+  | v_other_in_stats | (无人引用) | 
+  | v_other_out_detail | (无人引用) | 
+  | v_other_out_stats | (无人引用) | 
+  | v_outsource_in_detail | (无人引用) | 
+  | v_outsource_in_stats | (无人引用) | 
+  | v_outsource_issue_detail | (无人引用) | 
+  | v_outsource_issue_stats | (无人引用) | 
+  | v_purchase_in_detail | (无人引用) | 
+  | v_purchase_in_stats | (无人引用) | 
+  | v_sale_out_detail | (无人引用) | 
+  | v_sale_out_stats | (无人引用) | 
+  | v_sales_order_detail | (无人引用) | 
+  | v_sales_order_stats | (无人引用) | 
+  | v_stock_balance | (无人引用) | 
+  | v_stock_summary | (无人引用) | 
+  (0 rows)
+[OK] _q-deps.sql (3 batches)

@@ -158,6 +158,10 @@ const MSG_TPL = {
   APPROVAL_L2_PENDING: { title: '待超级管理员批准', body: '「{panelName} {docNo}」已由 {actor} 一级审核通过，等待您批准。意见：{opinion}' },
   APPROVAL_L2_DONE: { title: '单据已批准', body: '您一级审核通过的「{panelName} {docNo}」已由 {actor} 批准通过。' },
   APPROVAL_L2_REJECTED: { title: '二级审批被驳回', body: '您一级审核通过的「{panelName} {docNo}」被 {actor} 驳回，已退回草稿。意见：{opinion}' },
+  // 研发立项流程(2026-10-08,流程图③④):定级 → 分发对接人 → 对接人签核并确认责任人。
+  // 收件人:③ 被选中的对接人本人;④ 被确认的项目责任人本人。
+  LIAISON_ASSIGNED: { title: '您被指定为项目对接人', body: '「{panelName} {docNo}」（{level}）已由 {actor} 指定您为对接人，请签核并确认项目责任人。' },
+  OWNER_CONFIRMED: { title: '您被确认为项目责任人', body: '「{panelName} {docNo}」已由 {actor} 确认您为项目责任人，请在「项目实施计划」中新建对应单据。' },
 }
 
 function fillTpl(text, params) {

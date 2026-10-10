@@ -1,0 +1,17 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-both.sql ==
+  | HSDZ_MES | 141 | 3970 | 
+  | HSDZ_MES | OTHER_IN | 
+  | HSDZ_MES | OTHER_IN_DETAIL | 
+  | HSDZ_MES | OTHER_IN_STATS | 
+  | HSDZ_MES | OTHER_OUT | 
+  | HSDZ_MES | OTHER_OUT_DETAIL | 
+  | HSDZ_MES | OTHER_OUT_STATS | 
+  | HSDZ_MES | OUTSOURCE_IN | 
+  | HSDZ_MES | OUTSOURCE_IN_DETAIL | 
+  | HSDZ_MES | OUTSOURCE_IN_STATS | 
+  | HSDZ_MES | OUTSOURCE_ISSUE | 
+  | HSDZ_MES | OUTSOURCE_ISSUE_DETAIL | 
+  | HSDZ_MES | OUTSOURCE_ISSUE_STATS | 
+  | HSDZ_MES | PU_REQ | 
+[OK] _q-both.sql (2 batches)

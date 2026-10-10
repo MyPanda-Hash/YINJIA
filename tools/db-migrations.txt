@@ -2513,6 +2513,28 @@ migrate-fourdoc-missing-cols-20261008.sql
 #     yj_field,会为基线档登记但物理列尚不存在的字段插行;先补列再回正才不会留下「字段指向不存在的列」的中间态。
 migrate-fourdoc-baseline-restore-20261008.sql
 
+# ── 2026-10-08 测试库字段对齐正式库(以《采购链四单字段与显示字段.md》为基线) ──
+#   取证:DbSchemaDiff → DIFF-22(bs_line_capacity 缺备用1-20、bl_sale_out.仓库 宽度、缺视图 v_manu_schedule、
+#         yj_field 多 10 行);_YjFieldAlign(ALL) → DIFF-244(多 10 / 改 234,四单 seq 顺序为主 + 27 行 hidden/visible)。
+#   做法:补齐列/视图 + 删测试库多出的 yj_field 行 + 按正式库取值 UPDATE;全部带守卫,正式库上为 no-op。
+migrate-align-ledger-fields-20261008.sql
+#   第二轮(同上对齐,补「同字段多行」盲区漏掉的 4 处:两处 seq、一处 hidden/visible、一处重复行;见脚本头)
+migrate-align-ledger-fields2-20261008.sql
+
+
+# —— 2026-10-08 仓库档案对齐金蝶真实账套:只保留金蝶有的仓库 ——
+#   用户口径:「现在只保留金蝶有的仓库」。取证 tools/archive/_kingdee-stores.out.txt:金蝶真实账套
+#   (clientId=359797 + outerInstanceId=580147507460444160)/jdy/v2/bd/store 共 6 个仓(YJ-08 车间仓/
+#   CP-02 成品B仓/CK00003 成品不良品区/YCL-01 恒亿仓/CK00006 华北工控仓/CK00005 原料不良品仓,全启用);
+#   本库 bs_wh 11 行里另有 5 行本地自建(asp_user1='migration'、无 外部数据ID ⇒ 金蝶账套不存在):
+#   CK01 原料仓/CK02 辅料仓/CK03 成品仓/CK04 半成品仓/CK05 不良品仓。
+#   做法:软删这 5 行(asp_cancel='Y' + 停用=1 + 状态='停用';WHERE 带 外部数据ID IS NULL 窄条件,
+#   金蝶同步行与日后金蝶新增仓不受影响),带行数守卫 + 两条自检(启用中非金蝶来源=0、金蝶 6 仓缺失=0)。
+#   引用这些仓的存量演示单据(TCGRK-*/TXSCK-*/TEST-* 等)与库存/流水本次不动(用户口径:只改仓档);
+#   CK00001 正品仓与「转ERP 无仓默认推 CK00001」同样本次不动。
+#   幂等重跑影响 0 行;两账套均已执行并复核(启用中恰 6 行、全为金蝶来源)。
+migrate-wh-kingdee-only-20261008.sql
+
 # migrate-whloc-rename-bin-20261008.sql(2026-10-08):库位 → 仓位 术语统一(对齐金蝶仓位三件套 sp_id/sp_name/sp_number)
 #   动机:库位档案 2026-09-28 落地用了「库位」,而全系统(金蝶接口血统)一直是「仓位」
 #     (bd_purchase_in.仓位/仓位编码、bl_*.仓位id/仓位名称/仓位编码、bs_inv.默认仓位、bs_wh.启用仓位管理);
@@ -2872,3 +2894,162 @@ migrate-field-multiline-text-20261015.sql
 #     同名不同义,脚本末尾有守卫断言(误删即 RAISERROR)。
 #   回滚:重跑 migrate-insp-detail-quantity-20261015.sql 补回字段行。幂等;两账套均执行。
 migrate-insp-pass-qty-derived-20261015.sql
+# —— 2026-10-08 下架「请购单 + 其他入库/其他出库/委外入库/委外发料」13 个面板(用户口径:这些单据不需要) ——
+#   保留:采购入库单 PURCHASE_IN / 销售出库单 SALE_OUT / 材料出库单 MATERIAL_OUT / 产成品入库单 FINISH_IN
+#   (后者是「工单完工入库」的唯一载体 —— 报工自动生单 + plang/scjl 回写 + 排产看板入库区都挂它,用户明确保留)。
+#   删:yj_panel 13 行 + yj_field 258 行 + yj_role_panel 52 行 + 译名(面板名 117 行 + 22 个孤儿字段标签)
+#      + 视图 8 个(v_other_*_detail/stats、v_outsource_*_detail/stats)+ 物理表 10 张(bd_/bl_ 各 5 对);
+#   依据:这 5 类单据全部 0 张、库存流水 inh/outh 无其一;DB 侧无视图/存储过程/外键引用;13 面板「9 月后零更新」
+#      (详见 docs/development/面板老化盘点-品质管理与智能供应链.md);脚本头逐个列明删了什么。
+#   安全:脚本自带「10 张待删表必须全空」闸(非空即 RAISERROR 中止)+ 越界自检(保留面板/库存三表仍在);
+#      回退抓手 tools/archive/_panel-age/_backup-20261008/。
+migrate-drop-extra-docs-pu-req-20261008.sql
+
+# —— 2026-10-09 修 3 个「flat 报表视图缺 id/asp_cancel」导致面板打开即 500 ——
+#   命中面板:FINISH_IN_DETAIL(产成品入库单明细表)/ FINISH_IN_STATS(统计表)/ MANU_ORDER_STATS(生产工单统计表);
+#   现象:`SELECT COUNT(*) FROM v_finish_in_detail t WHERE ISNULL(t.asp_cancel,'N')<>'Y'` → 列名 'asp_cancel' 无效。
+#   根因:实库这三张视图是初版导入时期的旧定义,缺 flat 报表标配的 id(pk_col)与 asp_cancel(软删过滤);
+#      正确版本仍存于 tools/archive/_table-audit/viewdefs.tsv(2026-09-29 表定册时导出),
+#      DbNormAudit 也早已记着这条存量 FAIL(_normaudit-HSDZ_MES.out / _dbnorm-prod.out.txt)。
+#   做法:按 viewdefs.tsv 正确定义 CREATE OR ALTER 重建,列名与 yj_field 逐列对齐(23/12/9 列),
+#      所需表列已逐列核对存在;v_manu_order_stats 顺带把 5 个恒 NULL 列恢复为真实聚合。
+#   幂等:CREATE OR ALTER VIEW;两账套均已执行,复核「仍缺 id/asp_cancel 的 flat 面板视图 = 0」。
+migrate-fix-report-views-id-aspcancel-20261009.sql
+
+# —— 2026-10-09 下架品质管理「制程品质 / 不良处理 / 品质追溯」5 张从未使用的面板 ——
+#   用户口径:「品质管理下的制程品质、不良处理与品质追溯都是没有用到的吧」→ 确认后连批号追溯一起删。
+#   删:QC_OP 工序质检单 / QC_RECORD 检验记录单 / QC_DISPOSAL 不良品处理单 / ROD_RETURN 炭棒不良退货登记
+#      / LOT_TRACE 批号追溯 —— yj_panel 5 + yj_field 77 + yj_role_panel 20 + 视图 v_lot_trace + 物理表 7 张
+#      (qc_op/qc_op_detail/qc_record/qc_record_detail/qc_disposal/rod_return/rod_return_detail,全部 0 行);
+#      这 5 张面板名本来无译名(0 行),字段标签侧无孤儿标签。
+#   依据:yj_usage_log(3437 行、按面板记动作)里这 5 张**操作留痕 = 0**,7 张表 0 行、单据状态 0 行⇒建好即没用过;
+#      无外键/无 ref_panel 引用/无生单链路/无附件审批列设置(全 0);唯一引用被删表的是 v_lot_trace 自己(同批删)。
+#   配套代码:删 QcDisposalService(111 行)+ ButtonService 两处钩子 + menus.js 5 个入口。
+#   回退抓手 tools/archive/_panel-age/_backup-20261009-qc/;⚠ 批号追溯的「工序质检/不良处置」两段随之消失。
+migrate-drop-qc-unused-panels-20261009.sql
+
+# ── 2026-10-09 清理「面板已不存在」的孤儿元数据(字段登记 + 角色授权)──
+#   2026-10-09 拉取云端仓库后跑 DbNormAudit 发现:两批下架脚本都删过 yj_field / yj_role_panel,
+#   但实测仍有残留(两账套一致,面板码 10 个:OTHER_IN_DETAIL / OTHER_IN_STATS / OTHER_OUT /
+#   OTHER_OUT_DETAIL / OTHER_OUT_STATS / OUTSOURCE_IN_DETAIL / OUTSOURCE_IN_STATS /
+#   OUTSOURCE_ISSUE_DETAIL / OUTSOURCE_ISSUE_STATS / LOT_TRACE)—— 81 行字段 + 30 行授权;
+#   这些面板的 yj_panel 行、物理表、视图早已删除 ⇒ 无人会读的孤儿,并让体检 05 从 0 涨到 81(FAIL)。
+#   ⚠ 残留成因未完全定位(下架脚本自检当时报 0;残留行 id 落在旧区间 11845~12032,呈「备份回灌」形态);
+#   本脚本兜底:只删 panel_code 不在 yj_panel 的行,带守卫(防呆 + 四单 329 行越界自检 + 末尾孤儿=0);
+#   不碰 yj_translation(同标签多为多面板共享,按标签删会误伤)。
+migrate-clean-orphan-panel-rows-20261009.sql
+
+# ── 2026-10-09 采购入库明细启用「仓位」+ 仓位默认标记 + 商品档案默认仓位可见 ──
+#   用户口径:① 采购入库明细要有「仓位」且与「仓库」联动(选仓后候选只出该仓);
+#            ② 预设仓位 = 物料默认 ⇢ 仓库默认兜底;③ 启用仓位管理**逐仓开启**,开了才必填。
+#   现状:bl_purchase_in 仓位类物理列早就有,但 yj_field 那几行 hidden=1(界面看不到、274 行数据全空);
+#        bs_inv.默认仓位 列已登记但 hidden=1(填不了);bs_wh_loc 无「默认」标记列;
+#        bs_wh.启用仓位管理 10 个仓全「否」(界面可见可勾,元数据不用改)。
+#   内容:bs_wh_loc 加 是否默认 / WHLOC 登记该字段 / PURCHASE_IN 明细「仓位名称」就地改造成
+#        「仓位」参照(ref_panel=WHLOC、ref_filter=`仓库=$仓库`、seq 195 紧跟仓库、可见)/
+#        INV.默认仓位 取消隐藏并改参照 / 译名(含修两处既有劣译 Bill Sp Name、Sp Number)。
+#   ⚠ 采购入库单是四单基线之一 ⇒ 落地后必须重跑 _gen-fourdoc-restore.mjs 与 _gen-doc-fields-md.mjs。
+migrate-bin-on-purchase-in-20261009.sql
+
+# ── 2026-10-09 检验数据记录(QC_INSP_REC)物料名称/物料编码关联「商品」,选一次两个一并填入 ──
+#   用户口径:「检验数据记录的物料名称和物料编码要关联商品,并且要两个一并填入。」
+#   现状:两列都是手填文本框(header 30/40、query 10/20),与同族的 来料检验单 QC_INSP /
+#        送料暂收单 QC_RECV / 暂收退回单 QC_RETURN / 采购订单 PU_ORDER 写法不一致
+#        (那四张:物料编码=参照 INV/存货编码 display 存货名称、物料名称=参照 INV/存货名称)。
+#   做法(纯元数据,零 DDL/零新表/零接口/零前端硬编码):四行 data_type 文本→参照,
+#        ref_panel=INV,物料编码 ref_field=存货编码、物料名称 ref_field=存货名称。
+#   「一并填入」复用既有带回机制(PanelConfigService.buildRefMap 的同义词表已有
+#        存货编码→物料编码、存货名称→物料名称)⇒ 两列互为回带目标,选任一个商品另一个同时填上。
+#   前端配套(同提交):QcInspRecSheet.vue 抬头两格加商品参照控件(点击弹 RefPickDialog + 按 refMap 带回)。
+#   ⚠ 不是四单基线之一(QC_INSP_REC 不在 fourdoc-baseline.tsv),四单基线无需重跑。
+#   幂等(UPDATE 窄条件 + 末尾三自检:两列四行=参照/INV、物理列仍在、越界参照计数);两账套均执行。
+migrate-qc-insp-rec-material-ref-20261009.sql
+
+# ════════════════════════════════════════════════════════════════════════════
+# ── 2026-10-15 补登记:远端 2026-10-09 合并带进来的 5 条迁移此前**漏登记清单** ──
+#   背景:origin/main 的 c735f4ed(合并 69 提交)把脚本文件带进仓库,却**没往本清单登记**
+#         ⇒ DbSync 按清单跑,这 5 条永远不会被应用(本地实测:RD_APPROVAL 的 对接人/项目责任人
+#         字段 0 命中、RD_PROGRESS 仍是 43 字段多列形态)。脚本自述均为「幂等;两个账套都要执行」。
+#   顺序:grant → revoke 必须按此序(revoke 是 2026-10-09 终稿,口径为「cp 不该能点审批通过」,
+#         它把 grant 写的 can_approve 与源列 perms 一起归零 ⇒ 倒序会让 grant 复活那次授权)。
+# ════════════════════════════════════════════════════════════════════════════
+
+# ── 立项申请(RD_APPROVAL)加「对接人」「项目责任人」两个流程字段 + 研发审核角色开审批权 ──
+#   用 RD_APPROVAL 的 备用1/备用2 物理列承载(全库 0 命中,标签不撞);含 yj_translation 译名。
+#   ⚠ 其第 ④ 步给 rd_review 开的 can_approve 已被下一条 revoke 收回 —— 保留在本清单是为
+#     让链路完整可重放(revoke 幂等且必在其后)。
+migrate-rd-approval-liaison-owner.sql
+
+# ── 项目进度查询(RD_PROGRESS)登记为「单单据面板」(yj_panel.config 补 "singleDoc": true) ──
+#   配套 57166963「改成汇总查看面板(纸面 11 列 + 单元格恒只读 + 侧栏分类归位)」。
+migrate-rd-progress-singledoc.sql
+
+# ── 项目进度查询从面板上撤下 3 列(技术目标达成 / 是否市场转化 / 未转化原因) ──
+#   与 singledoc 同属「11 列纸面」收口,须在其后执行。
+migrate-rd-progress-drop-3cols.sql
+
+# ── 收回 rd_review 角色对 RD_APPROVAL 的审批权(2026-10-09 用户口径:cp 不该能点「审批通过」)──
+#   ⚠ 本脚本修的是 liaison-owner 第 ④ 步的缺陷:它只写派生列 can_approve、没写源列 perms
+#     ⇒ 权限矩阵界面(读 perms)显示无审批权,运行时(读 can_approve)却放行。
+#   ⚠ 决策一天内翻了两次:用户先说"cp 不该能点审批通过"(即本条),**随即改为"还是选 a"= 保留审批权**
+#     ⇒ 下一条 grant 才是**终稿**,本条的净效果被它覆盖。
+#   链序必须 revoke → grant;倒序会让 revoke 成为最终态,把用户的最终选择抹掉。
+migrate-revoke-rd-review-approve.sql
+
+# ── 【终稿】rd_review 对 RD_APPROVAL **保留**审批权,并把源列 perms 补上 audit(界面与运行时归一)──
+#   用户最终口径「还是选 a」;后果(已确认):cp 继续能「审批通过/项目定级/分发对接人」。
+#   必须在 revoke 之后执行 —— 它把 revoke 归零的两列一起置回 Y,是整条链的净效果。
+migrate-grant-rd-review-approve.sql
+
+# ── 采购入库明细「仓位」+ 库位默认标记 + 商品档案默认库位可见(2026-10-09,bin-on-purchase-in)──
+#   记录在案但**未随本次补登记执行**:该条属四单基线链路,落地后须重跑
+#   _gen-fourdoc-restore.mjs 与 _gen-doc-fields-md.mjs(脚本头注明示)。
+#   本次任务只补「漏登记导致永远不跑」的脚本,四单基线相关迁移另案处理,避免夹带。
+#   ℹ 该脚本虽未登记,却已于 2026-10-09 14:17 由他人在本机正式库执行过(见 yj_schema_log),
+#     这也是四单基线闸当前 FAIL 的来源(见下方备注)。
+# migrate-bin-on-purchase-in-20261009.sql
+
+# ── 备注:四单基线回归闸当前 FAIL 182 处 —— 属**既有问题,非本次改动引入** ──
+#   证据:① 本批补登记只执行 RD_PROGRESS / yj_role_panel 相关脚本,与 QC_INSP/PURCHASE_IN 无关;
+#         ② tools/fourdoc-baseline.tsv 自 2026-10-08 起未被任何提交改动。
+#   偏离项全部落在这两条既有改动上(bin-on-purchase-in-20261009.sql,2026-10-09 14:17 执行):
+#     · PURCHASE_IN 明细「仓位名称」(文本/hidden)就地改造成「仓位」参照,seq 195;
+#       仓位编码 被移到 seq 680 ⇒ 闸报「多出 仓位编码@680 / 缺失 @195」。
+#     · QC_INSP 批次号 seq 60→150、部门 明细 seq 230→90。
+#   处置(按《采购链四单字段与显示字段》§8):须重跑
+#     node tools/archive/_gen-fourdoc-restore.mjs 刷新 ①回正脚本 ②fourdoc-baseline.tsv,
+#   并在确认这些偏离是「有意改动」后连同迁移脚本单独提交 —— 属另一任务,本次不夹带。
+
+# ── 2026-10-15 销售出库单带出「销售订单号 / 销售订单行号」──
+#   用户口径:「销售出库单是从销售订单生单或者选单过来的,要带有销售订单号和销售订单行号。」
+#   根因(实测 HSDZ_MES):**物理列早就有,是元数据没登记/被隐藏**,不是数据链没带 ——
+#     · bd_sale_out.销售订单号 存在,yj_field 里**完全没登记** ⇒ 界面永不显示(来源单号/来源单据/匹配来源单号同);
+#     · bl_sale_out.源单编号/源单行号 已登记但 hidden=1/visible=0 ⇒ 看不到。
+#   数据现状:表头 4 列 0/54 全空;明细源单编号 11/123、源单行号 15/123 有值,但那批带 XQ-/ZL- 前缀的
+#     是历史导入(SO_ORDER 单号形如 ZXL-20260916-01);form_flow_link 里 SO_ORDER→SALE_OUT 链路数 = 0
+#     ⇒ 该链路尚未真正跑过。**历史单不回填**(用户口径:只做新单)。
+#   对齐基线 = 采购链(已跑通的同款需求):PURCHASE_IN.header.采购订单号 可见;
+#     PURCHASE_IN.detail.源单行号 **label=采购订单行号** 可见 ⇒ 销售侧同构。
+#   ⚠ 明细两列**不新插行**(源单编号/源单行号已存在),只改 label/hidden/visible/seq ——
+#     插新行会造出「同一物理列两条登记」,体检项 07 会报错。
+#   ⚠ seq 取 55/56 而非采购链的 290:SALE_OUT 明细 290/300 已被隐藏列占用,照抄会撞位。
+#   配套代码(同提交):PanelConfigService 的 SO_ORDER|SALE_OUT 头/行同义词
+#     (单据编号→销售订单号、行号→销售订单行号);无后者则生单后两列为空。
+#   幂等(INSERT NOT EXISTS + UPDATE 窄条件 + 末尾自检含物理列仍在);两账套均执行。
+migrate-sale-out-order-cols-20261015.sql
+
+# ── 2026-10-15 「销售订单行号」补齐 9 语言译名 ──
+#   上一条只补了 en(满足 AGENTS.md 下限),本条补齐与「销售订单号」同批语言集
+#   (de/en/es/fr/ja/ko/ru/th/vi),两标签的多语言覆盖对齐。
+#   幂等(逐行 NOT EXISTS + 自检 ≥9);两账套均执行。
+migrate-sale-out-order-line-i18n-20261015.sql
+
+# ── 2026-10-15 销售出库单二轮收口:撤下明细「源单编号」列 ──
+#   用户口径:「把明细中的源订单编号改成销售订单号或者删除。」取**删除**:
+#     · 明细「源单编号」与表头「销售订单号」是同一信息的两处显示;
+#     · 行级对应关系已由「销售订单行号」表达,来源单号在明细里冗余;
+#     · 与采购链一致(PURCHASE_IN.detail.源单编号 一直是 hidden=1,订单号只在表头显示)。
+#   ⚠ 只撤可见性,**不删 yj_field 行、不动物理列** —— 转ERP 挂金蝶源单仍要读
+#     bl_sale_out.源单编号/源单行号(见 KingdeePushService 的销售支)。
+#   幂等(UPDATE 窄条件 + 自检含物理列仍在);两账套均执行。
+migrate-sale-out-order-cols2-20261015.sql

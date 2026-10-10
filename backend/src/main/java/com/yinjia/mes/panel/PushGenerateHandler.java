@@ -234,6 +234,15 @@ public class PushGenerateHandler implements PanelActionHandler {
         if (!"PURCHASE_IN".equals(targetPanel) || row == null) return;
         row.put("是否来料检验", "QC_INSP".equals(sourcePanel) ? "是" : "否");
         row.put("特采", "否");
+        // 仓位预设(2026-10-09):免检直达(暂收→入库)、选单、分批这条路径同样要预设仓位,
+        // 口径与 ButtonService.inspAutoPurchaseIn(检验审核→入库)完全一致 —— 共用 presetBinFor 一份实现:
+        //   物料默认(bs_inv.默认仓位) ⇢ 该仓默认(bs_wh_loc.是否默认),且仅当该仓启用仓位管理=1。
+        // 仓库取本行已映射的值;取不到时回落来源行的「仓库」(detailMap 未登记该列时的兜底)。
+        Object wh = row.get("仓库") != null ? row.get("仓库") : (srcItem == null ? null : srcItem.get("仓库"));
+        String bin = buttonService.presetBinFor(
+                srcItem == null || srcItem.get("物料编码") == null ? null : String.valueOf(srcItem.get("物料编码")),
+                wh == null ? null : String.valueOf(wh));
+        if (bin != null) row.put("仓位", bin);
     }
 
     private double numOf(Object v) {

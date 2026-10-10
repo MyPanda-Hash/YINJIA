@@ -10,7 +10,6 @@ import com.yinjia.mes.service.PanelRegistry;
 import com.yinjia.mes.service.ReportColumnSettingsService;
 import com.yinjia.mes.service.UsageLogService;
 import com.yinjia.mes.service.VoucherFlowService;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
 import java.util.LinkedHashMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,7 +35,6 @@ public class PxController {
     private final VoucherFlowService voucherFlowService;
     private final PanelRegistry registry;
     private final UsageLogService usageLog;
-    private final JdbcTemplate jdbc;
     private final DevTaskService devTaskService;
     private final ButtonService buttons;
     private final PanelPermissionService perm;
@@ -49,7 +47,7 @@ public class PxController {
     public PxController(PanelRuntimeService service, PanelConfigService configService,
                         ReportColumnSettingsService reportColumnSettingsService,
                         VoucherFlowService voucherFlowService,
-                        PanelRegistry registry, UsageLogService usageLog, JdbcTemplate jdbc,
+                        PanelRegistry registry, UsageLogService usageLog,
                         DevTaskService devTaskService, ButtonService buttons,
                         PanelPermissionService perm,
                         com.yinjia.mes.panel.PushGenerateHandler pushGenerateHandler,
@@ -61,7 +59,6 @@ public class PxController {
         this.voucherFlowService = voucherFlowService;
         this.registry = registry;
         this.usageLog = usageLog;
-        this.jdbc = jdbc;
         this.devTaskService = devTaskService;
         this.buttons = buttons;
         this.perm = perm;
@@ -165,6 +162,27 @@ public class PxController {
     }
 
     /**
+     * 立项申请:流程状态(2026-10-08 研发流程图③④)——前端侧栏「分发对接人 / 确认责任人」两按钮
+     * 的显隐与置灰**唯一真源**(口径在 ButtonService.rdApprovalFlowState,与按钮的服务端门禁逐条对齐)。
+     */
+    @GetMapping("/rdFlow/state")
+    public ApiResult<Map<String, Object>> rdFlowState(@RequestParam String docNo) {
+        perm.requirePanelView("RD_APPROVAL");
+        return ApiResult.ok(buttons.rdApprovalFlowState(docNo));
+    }
+
+    /**
+     * 立项申请:启用账号清单(分发对接人 / 确认责任人两个弹窗的选人下拉)。
+     * ⚠ **不复用 `/rdDev/users`** —— 那个端点挂 `requirePanelView("RD_PROD_INFO")`,
+     *   立项线的销售/对接人没有产品信息表的查看权,会被 403 挡掉(与 DevTaskService 注释同款理由)。
+     */
+    @GetMapping("/rdFlow/users")
+    public ApiResult<List<Map<String, Object>>> rdFlowUsers() {
+        perm.requirePanelView("RD_APPROVAL");
+        return ApiResult.ok(devTaskService.enabledUsers());
+    }
+
+    /**
      * 四个受控文件「我能不能编这张单」(2026-09-21):前端据此把非责任人的纸张置灰 + 提示责任人是谁。
      * 口径与保存门禁**同一真源**(ButtonService.devFileEditState → devFileEditVerdict),
      * 免得再出现"界面让改、保存被拒"。
@@ -175,11 +193,9 @@ public class PxController {
         return ApiResult.ok(buttons.devFileEditState(panelCode, docNo));
     }
 
-    /** 单据编号 → 产品编号(产品信息表侧边栏用;查不到返回空串) */    private String productCodeOf(String docNo) {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT TOP 1 产品编号 FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
-        if (rows.isEmpty() || rows.get(0).get("产品编号") == null) return "";
-        return String.valueOf(rows.get(0).get("产品编号")).trim();
+    /** 单据编号 → 产品编号(产品信息表侧边栏用;查不到返回空串) —— 数据在 DevTaskService */
+    private String productCodeOf(String docNo) {
+        return devTaskService.productCodeOfDocNo(docNo);
     }
 
     /** 产品开发:已下发产品的开发矩阵 */
@@ -211,42 +227,8 @@ public class PxController {
 
         List<Map<String, Object>> rows = devTaskService.board();
 
-        // 各面板"已受控单据的产品键 → 受控日期"。产品键字段各面板不同(规格书是「产品编号」,其余同名),
-        // 用 DevTaskService.productKeyOf(panel) 取。
-        // ⚠ 2026-09-30 改口径:原先这里取的是 MAX(yj_doc_status.archived_at) —— 那是"归档时点",
-        //   而需求(《产品开发系统需求汇总》5.1)要的是**审批后自动受控**,且用户口径「受控按文件」:
-        //   现在直接读该文件头表备用列池里的 受控标记(备用1=是否受控 / 备用2=受控日期,
-        //   由 ButtonService.markArchived → markFileControlled 写入)。
-        //   历史单(本功能上线前归档的)没有这两个值 ⇒ 回退到 archived_at,不让老单显示成"未受控"。
-        Map<String, Map<String, String>> controlledAt = new LinkedHashMap<>();  // 面板 → (产品键 → 受控日期)
-        for (String panel : DevTaskService.devPanelCodes()) {
-            Map<String, String> m = new LinkedHashMap<>();
-            try {
-                String table = registry.panel(panel).headTable();
-                String keyCol = DevTaskService.productKeyOf(panel);
-                String docCol = pickGroupCol(panel);
-                jdbc.query("SELECT t.[" + keyCol + "] AS k,"
-                                + " MAX(CASE WHEN ISNULL(t.[备用1], N'') = N'是' THEN ISNULL(t.[备用2], '') ELSE '' END) AS ctl,"
-                                + " MAX(s.archived_at) AS at "
-                                + "FROM " + table + " t "
-                                + "LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = t.[" + docCol + "] "
-                                + "WHERE ISNULL(t.asp_cancel,'N') <> 'Y' "
-                                + "GROUP BY t.[" + keyCol + "]",
-                        rs -> {
-                            String k = rs.getString("k");
-                            if (k != null && !k.isBlank()) {
-                                String ctl = rs.getString("ctl");
-                                Object at = rs.getObject("at");
-                                // 受控标记优先;没有(历史单)才回退归档时点
-                                m.put(k, ctl != null && !ctl.isBlank() ? ctl : (at == null ? "" : String.valueOf(at)));
-                            }
-                        }, panel);
-            } catch (Exception e) {
-                // 某面板表/列缺失时降级:该面板不参与受控推导,矩阵主体仍可用
-                log.warn("[RD_PROD_DOCLIST] 受控推导跳过 panel={}: {}", panel, e.getMessage());
-            }
-            controlledAt.put(panel, m);
-        }
+        // 线上的受控推导(含 2026-09-30 口径与缺失降级)已随 SQL 一起下沉到 DevTaskService.controlledAt()
+        Map<String, Map<String, String>> controlledAt = devTaskService.controlledAt();
 
         for (Map<String, Object> row : rows) {
             String productCode = String.valueOf(row.get("产品编号"));
@@ -270,12 +252,6 @@ public class PxController {
         out.put("columns", columns);
         out.put("rows", rows);
         return ApiResult.ok(out);
-    }
-
-    /** 该面板的单据号列(状态表 doc_no 的对应列):优先 group_col,缺省「单据编号」 */
-    private String pickGroupCol(String panelCode) {
-        String g = registry.panel(panelCode).groupCol();
-        return g == null || g.isBlank() ? "单据编号" : g;
     }
 
     /** 产品开发:参照标注(某面板下,这批产品是 未开发 / 已开发) */
@@ -322,115 +298,13 @@ public class PxController {
      * 两条都按 id 倒序取最新。同一产品可能分发了多张规格书(不同规格书种类),
      * 故用 matched 回报命中数,前端提示「按哪一张填的」,不让用户猜。
      *
-     * <p>明细只取 [表区]='检验要求' 的行 —— 与 ButtonService.specTestRowsSnapshot 同款口径,
-     * 那是规格书「检验项目及检验标准」页的行;其余表区(修订记录/物料清单…)不参与出货检验。
+     * 取数整体在 DevTaskService.specByProduct(code)(含 ProductCode→单号解析与审批门禁),
+     * 这里只保留端点契约:校验 RD_INSP_PLAN 查看权 + 原样返回。
      */
     @GetMapping("/specByProduct")
     public ApiResult<Map<String, Object>> specByProduct(@RequestParam String code) {
         perm.requirePanelView("RD_INSP_PLAN");
-        String productCode = code == null ? "" : code.trim();
-
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("found", false);
-        out.put("matched", 0);
-        out.put("单据编号", "");
-        out.put("产品编号", "");
-        out.put("客户项目名称", "");
-        out.put("产品类别", "");
-        out.put("整体规格参数", "");
-        out.put("items", List.of());
-        if (productCode.isEmpty()) return ApiResult.ok(out);
-
-        List<String> nos = specDocNosOfProduct(productCode);
-        out.put("matched", nos.size());
-        if (nos.isEmpty()) return ApiResult.ok(out);
-
-        // 门禁(2026-09-21 用户口径):出货检验计划表按规格书自动带入检验方法,必须规格书**填写并提交审批完**
-        // 才行 —— 未定稿的检验方法填进出货检验计划,等于把没批准的检验口径发到产线。
-        // 门禁落在服务端(客户端绕不过);挑不到就把"是哪一张、什么状态"带回去,界面据此把原因说清楚。
-        String no = "";
-        String blockedNo = "";
-        String blockedStatus = "";
-        for (String cand : nos) {
-            String st = specStatusOf(cand);
-            if (specUsable(st)) { no = cand; break; }
-            if (blockedNo.isEmpty()) { blockedNo = cand; blockedStatus = st; }
-        }
-        if (no.isEmpty()) {
-            out.put("reason", "not_approved");
-            out.put("规格书编号", blockedNo);
-            out.put("规格书状态", blockedStatus);
-            return ApiResult.ok(out);
-        }
-        out.put("状态", specStatusOf(no));
-        List<Map<String, Object>> heads = jdbc.queryForList(
-                "SELECT 单据编号, ISNULL(产品编号, N'') AS 产品编号, ISNULL(客户项目名称, N'') AS 客户项目名称,"
-                        + " ISNULL(产品类别, N'') AS 产品类别, ISNULL(整体规格参数, N'') AS 整体规格参数"
-                        + " FROM rd_spec_doc_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
-        if (heads.isEmpty()) return ApiResult.ok(out);
-
-        Map<String, Object> h = heads.get(0);
-        out.put("found", true);
-        for (String k : List.of("单据编号", "产品编号", "客户项目名称", "产品类别", "整体规格参数")) {
-            Object v = h.get(k);
-            out.put(k, v == null ? "" : String.valueOf(v));
-        }
-        out.put("items", jdbc.queryForList(
-                "SELECT ISNULL(序号, N'') AS 序号, ISNULL(检验项目, N'') AS 检验项目,"
-                        + " ISNULL(检验要求, N'') AS 检验要求, ISNULL(检验方法, N'') AS 检验方法,"
-                        + " ISNULL(检验依据, N'') AS 检验依据"
-                        + " FROM rd_spec_doc_detail WHERE 单据编号 = ? AND 表区 = N'检验要求' ORDER BY id", no));
-        return ApiResult.ok(out);
-    }
-
-    /** 规格书可用状态:填写并提交审批完(审批通过 ⇒ 已归档/已审核)。草稿/审批中/修改中/已作废一律不可用 */
-    private static boolean specUsable(String status) {
-        return "已审核".equals(status) || "已归档".equals(status);
-    }
-
-    /**
-     * 规格书单据状态 —— 口径与 DevTaskService 的分发弹窗(CASE 派生)一致:
-     * 已作废 &gt; 已中止 &gt; 删除申请中 &gt; 修改申请中 &gt; 审批中 &gt; 修改中 &gt; 已归档 &gt; 已审核 &gt; 草稿。
-     * 读不到(表缺失/无状态行)一律按不可用返回"草稿" —— 宁可不带入,也不能拿没审批的口径去填出货检验计划。
-     */
-    private String specStatusOf(String no) {
-        try {
-            List<Map<String, Object>> rows = jdbc.queryForList(
-                    "SELECT CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废' WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
-                            + " WHEN ISNULL(s.deleting,'N')='Y' THEN N'删除申请中' WHEN ISNULL(s.modify_state,N'')='R' THEN N'修改申请中'"
-                            + " WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' WHEN ISNULL(s.modify_state,N'')='Y' THEN N'修改中'"
-                            + " WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档'"
-                            + " WHEN ISNULL(s.shr,N'') <> N'' THEN N'已审核' ELSE N'草稿' END AS status"
-                            + " FROM rd_spec_doc_head h LEFT JOIN yj_doc_status s"
-                            + " ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = h.单据编号"
-                            + " WHERE h.单据编号 = ?", no);
-            if (rows.isEmpty() || rows.get(0).get("status") == null) return "草稿";
-            return String.valueOf(rows.get(0).get("status"));
-        } catch (Exception e) {
-            return "草稿";
-        }
-    }
-
-    /** 产品编号 → 该产品已分发的规格书单号(最新在前,去重);rd_spec_assign 优先,退回 head.产品编号 盖章 */
-    private List<String> specDocNosOfProduct(String productCode) {
-        List<String> nos = new java.util.ArrayList<>();
-        String[] sqls = {
-                "SELECT 单据编号 FROM rd_spec_assign WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
-                "SELECT 单据编号 FROM rd_spec_doc_head WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
-        };
-        for (String sql : sqls) {
-            try {
-                for (Map<String, Object> r : jdbc.queryForList(sql, productCode)) {
-                    Object v = r.get("单据编号");
-                    String s = v == null ? "" : String.valueOf(v);
-                    if (!s.isBlank() && !nos.contains(s)) nos.add(s);
-                }
-            } catch (Exception e) {
-                // 表缺失时降级:另一条路径仍可用(与 prodDocList 的受控推导同款处理)
-                log.warn("[specByProduct] 规格书单解析跳过 product={}: {}", productCode, e.getMessage());
-            }
-        }
-        return nos;
+        return ApiResult.ok(devTaskService.specByProduct(code));
     }
 
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。
@@ -672,9 +546,7 @@ public class PxController {
             String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
                     : SecurityContextHolder.getContext().getAuthentication().getName();
             if (username == null) return;
-            List<Map<String, Object>> u = jdbc.queryForList(
-                    "SELECT real_name FROM yj_user WHERE username = ?", username);
-            String realName = u.isEmpty() ? username : String.valueOf(u.get(0).get("real_name"));
+            String realName = usageLog.realNameOf(username, username);
             String panelName = panelCode;
             try {
                 PanelRegistry.PanelDef def = registry.panel(panelCode);
@@ -744,18 +616,20 @@ public class PxController {
         return ApiResult.ok(configService.extFieldOverview(panel));
     }
 
-    /** 绑定新字段到空闲备用列(仅管理员;守卫 G1-G4) */
+    /** 绑定新字段到空闲备用列(守卫 G1-G4;权限 = 该面板「自定义字段」,管理员恒过) */
     @PostMapping("/extField/add")
     public ApiResult<Map<String, Object>> extFieldAdd(@RequestBody Map<String, Object> body) {
-        perm.requireAdmin();
+        // 2026-10-09:原先 requireAdmin(只有超管能配自定义字段)→ 改为按面板授权,
+        // 口径见 PanelPermissionService.requireFieldConfig(组织架构 →「角色与面板权限」勾「自定义字段」)
+        perm.requireFieldConfig(String.valueOf(body.getOrDefault("panel", "")));
         return ApiResult.ok(configService.addExtField(body));
     }
 
-    /** 退绑(数据保留,永不 DROP;仅管理员;守卫 G6) */
+    /** 退绑(数据保留,永不 DROP;守卫 G6;权限同绑定 = 该面板「自定义字段」) */
     @PostMapping("/extField/retire")
     public ApiResult<Void> extFieldRetire(@RequestBody Map<String, Object> body) {
-        perm.requireAdmin();
         String panel = String.valueOf(body.getOrDefault("panel", ""));
+        perm.requireFieldConfig(panel);
         int fieldId;
         try {
             fieldId = Integer.parseInt(String.valueOf(body.getOrDefault("fieldId", "0")));

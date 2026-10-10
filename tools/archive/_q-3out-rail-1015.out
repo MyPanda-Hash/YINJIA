@@ -1,0 +1,48 @@
+panel|col|total|nz
+FINISH_IN|加工单号|1|1
+FINISH_IN|生产车间|1|0
+FINISH_IN|业务类型|1|0
+MATERIAL_OUT|生产车间|2|2
+MATERIAL_OUT|加工单号|2|0
+SALE_OUT|客户|54|54
+SO_ORDER(基线)|客户|63|58
+panel_code|col_name|label|data_type|ref_panel|ref_field
+FINISH_IN|生产车间|生产车间|下拉框|null|null
+FINISH_IN|加工单号|加工单号|文本|null|null
+MATERIAL_OUT|加工单号|加工单号|文本|null|null
+MATERIAL_OUT|生产车间|生产车间|参照|DEPT|部门名称
+SALE_OUT|客户|客户|参照|KHDA|mc
+SALE_OUT|客户编码|客户编码|参照|KHDA|dm
+SALE_OUT|客户简称|客户简称|文本|null|null
+SALE_OUT|结算客户|结算客户|参照|KHDA|dm
+SALE_OUT|客户承担费用分录|客户承担费用分录|文本|null|null
+SALE_OUT|客户id|客户id|文本|null|null
+SALE_OUT|客户单号|客户单号|文本|null|null
+ref_key|locale|text|source
+加工单号|de|Verarbeitung bestellnummer|manual
+加工单号|en|Work order no.|manual
+加工单号|es|Número de orden de procesamiento|manual
+加工单号|fr|Numéro de traitement|manual
+加工单号|ja|加工票番号|manual
+加工单号|ko|작업 명령 번호|manual
+加工单号|ru|Номер обработки|manual
+加工单号|th|หมายเลขคำสั่งซื้อ|manual
+加工单号|vi|Số đơn chế biến|manual
+客户|de|Kunde|manual
+客户|en|Customer|manual
+客户|es|Cliente|manual
+客户|fr|Client|manual
+客户|ja|顧客|manual
+客户|ko|고객|manual
+客户|ru|Клиент|manual
+客户|th|ลูกค้า|manual
+客户|vi|Khách hàng|manual
+生产车间|de|Produktions werkstatt|manual
+生产车间|en|Workshop|manual
+生产车间|es|Taller de producción|manual
+生产车间|fr|Atelier de production|manual
+生产车间|ja|生産工場|manual
+生产车间|ko|생산 작업장|manual
+生产车间|ru|Производственный цех|manual
+生产车间|th|ห้องผลิต|manual
+生产车间|vi|Xưởng sản xuất|manual

@@ -15,7 +15,40 @@ const REQUIRED_METHODS = [
   'fillCurrentStock',
   'roundDecimal',
   'errMsg',
+  'extFieldOverview',
+  'extFieldAdd',
+  'extFieldRetire',
+  'printPuOrder',
+  'printPuOrderNoAmount',
+  'printQcReturn',
+  'printProductCards',
+  'printLocationCards',
+  'printProductionTask',
+  'woQrText',
 ]
+
+/**
+ * shell-level dependencies (accounts/tabs/locale), injected separately from panelRuntime:
+ * panelRuntime is meant to stay a **data adapter**; pinia stores are application shell state,
+ * and merging them in would force every adapter (including tests) to install UI state for no reason.
+ */
+let appContext = null
+
+/** Register the shell context; core views read it through useAppContext(). */
+export function installAppContext(context) {
+  if (!context || typeof context !== 'object') {
+    throw new TypeError('App context must be an object')
+  }
+  appContext = Object.freeze({ ...context })
+  return appContext
+}
+
+export function useAppContext() {
+  if (!appContext) {
+    throw new Error('App context has not been installed')
+  }
+  return appContext
+}
 
 let activeRuntime = null
 

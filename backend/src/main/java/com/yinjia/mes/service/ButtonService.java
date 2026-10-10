@@ -51,7 +51,6 @@ public class ButtonService {
     private final WoReportService woReport;
     /** 工序任务(路线驱动,A 项):报工审核/弃审回写任务完成量与状态 */
     private final ProcessTaskService processTask;
-    private final QcDisposalService qcDisposal;
     private final KingdeePushService kingdeePush;
     private final BatchService batchService;
     private final InvCostService invCost;
@@ -66,7 +65,7 @@ public class ButtonService {
                          FormNoService formNoService, JdbcTemplate jdbc,
                          DevTaskService devTaskService, MessageService messageService,
                          LotSeqService lotSeqService, StockLedgerService stockLedger,
-                         WoReportService woReport, QcDisposalService qcDisposal,
+                         WoReportService woReport,
                          KingdeePushService kingdeePush, BatchService batchService,
                          InvCostService invCost, QcCatalogService qcCatalog,
                          ManuWritebackService manuWriteback, CalcRuleService calcRuleService,
@@ -80,7 +79,6 @@ public class ButtonService {
         this.lotSeqService = lotSeqService;
         this.stockLedger = stockLedger;
         this.woReport = woReport;
-        this.qcDisposal = qcDisposal;
         this.kingdeePush = kingdeePush;
         this.batchService = batchService;
         this.invCost = invCost;
@@ -135,6 +133,10 @@ public class ButtonService {
             // 立项申请:审核通过(已审核/已归档)后由审核人给项目定级(2026-09-21 用户口径)——
             // 等级是后续立项(实施计划)与进度流程的属性,按参照自动带给下游 项目定级
             case "项目定级" -> gradeProject(def, formData);
+            // 立项申请:定级后由审核人指定「对接人」(选一个账号,2026-10-08 研发流程图③);
+            // 对接人签核时确认「项目责任人」(再选一个账号,流程图④)——责任人按参照带给实施计划
+            case "分发对接人" -> dispatchLiaison(def, formData);
+            case "确认责任人" -> confirmProjectOwner(def, formData);
             // 产品信息表:归档后由二级审核人把四个下游文件的**责任人**分发下去(2026-09-20;
             // 原名「产品开发」= 只写任务行不带分工,保留兼容)
             case "产品开发", "分发责任人" -> dispatchDev(def, formData);
@@ -253,6 +255,13 @@ public class ButtonService {
         body.remove("更新时间");
         body.remove("审核人");
         body.remove("审核时间");
+        // 立项申请(2026-10-08 研发流程图③④):「对接人/项目责任人」是流程动作写下的只读格
+        // (字段在 yj_field 已 editable=0,这里再剥一次 —— 前端题面能改的键,服务端一律不收),
+        // 否则绕过按钮直接保存就能"自封责任人"。
+        if ("RD_APPROVAL".equals(def.code())) {
+            body.remove("对接人");
+            body.remove("项目责任人");
+        }
         // 质量单据(2026-10-04,特采单 + 质量单据一族):纸面「编制/审核/批准」三格由审批流自动落值
         // (提交审批写编制、一级通过写审核、超级管理员批准写批准),保存不接收前端改值 ——
         // 否则"手改编制人"就能绕过"编制=提交人"的口径。字段在 yj_field 里已 editable=0(前端只读)。
@@ -460,6 +469,12 @@ public class ButtonService {
                 // 保存即归档 = 自审自批,显式留痕(2026-09-12:归档路径审核人不再空白,审批历史可查)
                 recordApproval(def.code(), no, "SUBMIT", "PENDING", "");
                 recordApproval(def.code(), no, "APPROVE", "APPROVED", "保存即归档（管理员保存）");
+                // 申请立项人 = 把这张单推进流程的人(2026-10-09 用户口径)。管理员这条是自审自批,
+                // 既不走 doSubmitApproval、也不走下面的普通用户分支 ⇒ 三处各要落一次,否则这一格恒为空。
+                if ("RD_APPROVAL".equals(def.code())) {
+                    jdbc.update("UPDATE rd_approval SET 申请立项人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                            realNameOf(user), no);
+                }
                 // 保存即归档也要同步进度查询(用户报的"保存归档后没导进来"就是漏了这条路径)
                 if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
             } else {
@@ -471,6 +486,11 @@ public class ButtonService {
                                 + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), GETDATE());",
                         def.code(), no, user, user);
                 recordApproval(def.code(), no, "SUBMIT", "PENDING", "");
+                // 同上:普通用户「保存」= 送审,这才是正常流程走的那条路
+                if ("RD_APPROVAL".equals(def.code())) {
+                    jdbc.update("UPDATE rd_approval SET 申请立项人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                            realNameOf(user), no);
+                }
             }
         }
         // 文件类面板保存:实时刷新未收尾修改记录的 diff(修改中/弃审后再编辑,修改记录随时可见已改内容)
@@ -586,6 +606,93 @@ public class ButtonService {
                 if (v != null && !String.valueOf(v).isBlank()) continue;
                 throw new IllegalArgumentException("明细第 " + (i + 1) + " 行" + f.displayName() + "不能为空");
             }
+        }
+        ensureBinRequiredFilled(def, items);
+    }
+
+    /**
+     * 仓位「逐仓必填」(2026-10-09 用户口径「启用仓位管理逐仓开启,开了才必填」)。
+     *
+     * <p>为什么不做成 yj_field.required=1:它是**条件性**必填 —— 依赖本行「仓库」在
+     * {@code bs_wh.启用仓位管理} 上是否勾了。`required` 是全局静态位,表达不了"这个仓要、那个仓不要"。
+     *
+     * <p>口径与 {@link #ensureDetailRequiredFilled} 逐条对齐:只对**登记了明细「仓位」字段**的面板生效;
+     * 只校验**载荷里明确带了该键**的行(键缺失=局部提交,不误报);取不到仓库/仓库档案查不到 ⇒ 按"不要求",
+     * 宁可少拦也不误报(用户还能在仓档上把开关关掉)。
+     */
+    private void ensureBinRequiredFilled(PanelRegistry.PanelDef def, List<Map<String, Object>> items) {
+        PanelRegistry.FieldDef bin = def.fieldsAt("detail").stream()
+                .filter(f -> "仓位".equals(f.label())).findFirst().orElse(null);
+        if (bin == null) return;                       // 该面板明细没有仓位字段:整段跳过
+        for (int i = 0; i < items.size(); i++) {
+            Map<String, Object> row = items.get(i);
+            if (row == null || !row.containsKey(bin.label())) continue;
+            Object v = row.get(bin.label());
+            if (v != null && !String.valueOf(v).isBlank()) continue;
+            if (!warehouseNeedsBin(str(row.get("仓库")))) continue;
+            throw new IllegalArgumentException("明细第 " + (i + 1) + " 行" + bin.displayName() + "不能为空(该仓库已启用仓位管理)");
+        }
+    }
+
+    /** 该仓库是否启用了仓位管理(bs_wh.启用仓位管理;按 名称/编码 两路匹配)。
+     *  查不到仓库、取不到值、异常 ⇒ 一律按「不要求」返回 false(不因脏数据把保存堵死)。 */
+    private boolean warehouseNeedsBin(String wh) {
+        if (wh == null || wh.isBlank()) return false;
+        try {
+            Boolean need = jdbc.queryForObject(
+                    "SELECT TOP 1 CONVERT(bit, ISNULL([启用仓位管理], 0)) FROM bs_wh"
+                            + " WHERE (RTRIM([仓库名称]) = RTRIM(?) OR RTRIM([仓库编码]) = RTRIM(?))"
+                            + "   AND ISNULL(asp_cancel, 'N') <> 'Y'",
+                    Boolean.class, wh.trim(), wh.trim());
+            return Boolean.TRUE.equals(need);
+        } catch (Exception e) {
+            log.debug("仓位必填判定回退(视为不要求) wh={} : {}", wh, e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * 生单预设仓位(2026-10-09 用户口径「物料默认 ⇢ 仓位默认兜底」)。
+     *
+     * <p>取值顺序:
+     * <ol>
+     *   <li>商品基本档案 {@code bs_inv.默认仓位}(按 存货编码;两侧 TRIM,防档案尾空格)—— 物料级,最精确;</li>
+     *   <li>该仓在仓位档案 {@code bs_wh_loc} 里勾了「是否默认」的仓位(同仓多个时取仓位编码最小者)—— 仓库级兜底。</li>
+     * </ol>
+     *
+     * <p><b>只在该仓启用了仓位管理时预设</b>({@code bs_wh.启用仓位管理=1}):没开仓位管理的仓
+     * 本来就不管仓位,凭空塞一个位只会让仓库核单时要删它。取不到返回 null —— 调用方**不写该键**,
+     * 界面留空由人工选(配合必填校验:开了仓位管理的仓,人工必须补上)。
+     *
+     * <p>public 供 {@code PushGenerateHandler.applySourceFlags} 复用 —— 免检直达/选单/分批那条生单
+     * 路径不经过本类(inspAutoPurchaseIn),但预设口径必须是同一份实现(代码规范 D:反复制粘贴)。
+     */
+    public String presetBinFor(String invCode, String whName) {
+        String wh = whName == null ? "" : whName.trim();
+        if (wh.isEmpty() || !warehouseNeedsBin(wh)) return null;
+        String code = invCode == null ? "" : invCode.trim();
+        if (!code.isEmpty()) {
+            try {
+                List<String> own = jdbc.queryForList(
+                        "SELECT TOP 1 RTRIM([默认仓位]) FROM bs_inv"
+                                + " WHERE RTRIM([存货编码]) = ? AND ISNULL([默认仓位], N'') <> N''"
+                                + "   AND ISNULL(asp_cancel, 'N') <> 'Y'", String.class, code);
+                if (!own.isEmpty() && own.get(0) != null && !own.get(0).isBlank()) return own.get(0).trim();
+            } catch (Exception e) {
+                log.debug("物料默认仓位取数失败,回退仓库默认 inv={} : {}", code, e.getMessage());
+            }
+        }
+        try {
+            // 仓位档案的「仓库」存的是仓库名称快照(随仓改名同步);编码列另一路兜底
+            List<String> whDef = jdbc.queryForList(
+                    "SELECT TOP 1 RTRIM(l.[仓位编码]) FROM bs_wh_loc l"
+                            + " WHERE (RTRIM(l.[仓库]) = ? OR RTRIM(l.[仓库编码]) = ?)"
+                            + "   AND ISNULL(l.[是否默认], 0) = 1 AND ISNULL(l.[停用], 0) = 0"
+                            + "   AND ISNULL(l.asp_cancel, 'N') <> 'Y' ORDER BY l.[仓位编码]", String.class, wh, wh);
+            return whDef.isEmpty() || whDef.get(0) == null || whDef.get(0).isBlank() ? null : whDef.get(0).trim();
+        } catch (Exception e) {
+            log.debug("仓库默认仓位取数失败 wh={} : {}", wh, e.getMessage());
+            return null;
         }
     }
 
@@ -1345,8 +1452,7 @@ public class ButtonService {
         woInspUnauditCascade(def.code(), no, currentUserName());
         // 切炭双出口冲回:弃审报工 → 自动生成红字(负数量)成品入库单冲回台账
         dualOutRedReverse(def.code(), no, currentUserName());
-        // 不良品处理冲回(品质层):移仓/报废对称冲回,目标仓被消耗则拒绝
-        qcDisposal.unpost(def.code(), no, currentUserName());
+        // 不良品处理冲回钩子同样随 QC_DISPOSAL 下架移除(见审核侧注释,2026-10-09)
         // 来料检验单弃审联动:自动生成的采购入库单为草稿则作废+释放占用+清入库单号回填;
         // 已审核(可能已记台账)则拒绝,提示先弃审入库单——防止"检验弃审了、库存已入账"的错位
         inspUnauditCascade(def.code(), no, currentUserName());
@@ -1372,6 +1478,15 @@ public class ButtonService {
                 + " effective = CASE WHEN ? = 1 THEN NULL ELSE effective END, update_at = GETDATE()"
                 + " WHERE panel_code = ? AND doc_no = ?",
                 CHANGE_PANEL.equals(def.code()) ? 1 : 0, def.code(), no);
+        // 立项申请弃审回草稿(2026-10-08 流程图:反审核后重新走流程):对接人/项目责任人/项目等级
+        // 随审核结果一起作废,否则回草稿的单还挂着上一轮的人和级。
+        // ⚠ 2026-10-09 补「项目等级」:定级已改成"确定后不能改"(见 applyGrade),不清级的话
+        //   弃审重审后**永远定不了级** —— applyGrade 直接拒、审批通过带等级也被拒 ⇒ 单子卡在审批中。
+        //   (子 agent 跑矩阵时实测到这个死锁,根因就是这里少清一列。)
+        if ("RD_APPROVAL".equals(def.code())) {
+            jdbc.update("UPDATE rd_approval SET 备用1 = NULL, 备用2 = NULL, 项目等级 = NULL"
+                    + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        }
         // 质量单据:弃审回草稿,纸面「审核/批准」两格随审批作废清空 + 两级节点标记复位
         // (编制格保留 —— 谁编的单没变;重新提交时会按新的提交人刷新)
         if (ADMIN_L2_PANELS.contains(def.code())) {
@@ -1437,8 +1552,10 @@ public class ButtonService {
         manuWriteback.post(def.code(), no, user);
         // 组装成品检验审核 → 重算结案(组装成品检验已审核 + 入库≥排产)
         syncCloseAfterAsmInsp(def.code(), no, user);
-        // 不良品处理记账(品质层)
-        qcDisposal.post(def.code(), no, user);
+        // 不良品处理记账钩子已随「不良品处理单 QC_DISPOSAL」下架移除(2026-10-09,origin/main):
+        //   该面板 0 单据、0 操作留痕,用户确认不要,对应的 QcDisposalService 整文件已删除。
+        // ⚠ 本方法 runWoAuditHooks 是**本分支新抽**的公共方法,远端删钩子时看不到它 ⇒
+        //   合并后必须在这里手工去掉 qcDisposal 调用,否则引用已删除的类、编译不过。
     }
 
     /**
@@ -1528,6 +1645,14 @@ public class ButtonService {
                         + "VALUES (s.panel_code, s.doc_no, 'Y', ?, GETDATE(), 'N', 1, GETDATE());",
                 def.code(), no, operator, operator);
         recordApproval(def.code(), no, "SUBMIT", "PENDING", opinion);
+        // 申请立项人 = 提交审批的人(2026-10-09 用户口径:「申请立项人是一开始提交审批的人」)。
+        // 与「保存=送审」两条路同口径(本文件 :468-500 那两处);前端新增单据时按登录用户预填的姓名
+        // 只是草稿期的显示兜底,提交这一刻以操作人为准。下游按这一格认人:项目实施计划的一级审批门禁
+        // 就是 ISNULL(rd_approval.[申请立项人]) 比对人。
+        if ("RD_APPROVAL".equals(def.code())) {
+            jdbc.update("UPDATE rd_approval SET 申请立项人 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'",
+                    realNameOf(operator), no);
+        }
         // 质量单据:纸面「编制」格 = **提交审批的人**(2026-10-04 用户口径)。
         // 落点在提交这一刻而非保存 —— 编制格各表绑的列不同(编制人/填写人/责任人/检测人,见 QC_DOC_PREPARER);
         // 谁提交谁就是编制人;驳回后换人重提也随之更新。
@@ -1619,6 +1744,13 @@ public class ButtonService {
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y'", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion);
+        // 立项申请:审批与定级是**同一步骤的两个动作**(2026-10-08 用户口径②「冯总审核及定级」)——
+        // 审批弹窗里一并选项目等级,通过即定级,省掉"审完再点一次项目定级"。载荷没带等级时跳过
+        // (兼容旧前端/老单:仍可事后用侧栏「项目定级」按钮补定级)。
+        if ("RD_APPROVAL".equals(def.code())) {
+            String level = pickOf(formData, "项目等级");
+            if (!level.isEmpty()) applyGrade(def.code(), no, level, operator);
+        }
         // 产品变更申请单:审批通过即**生效**(2026-09-21 用户口径第⑤条)——状态转「已生效」,
         // 并按勾选的受控文件建下一版草稿(带来源单号)+ 通知各文件责任人重走受控审核
         if (CHANGE_PANEL.equals(def.code())) {
@@ -1660,6 +1792,11 @@ public class ButtonService {
         if (DOC_ARCHIVE_PANELS.contains(def.code())) {
             finalizeOpenModify(def, no, operator);
             markArchived(def.code(), no, operator);
+            // 2026-10-09 用户报障「项目实施计划审批归档后没自动进项目进度查询」:
+            //   同步此前只挂在 audit()(管理员直审)与管理员「保存即归档」两处,而**正常流程 =
+            //   普通用户保存 → 送审 → 管理员「审批通过」→ 归档**走的正是本方法 ⇒ 从来没同步过,
+            //   只能靠侧栏「同步进度」手工补。口径与另两处一致(RD_PLAN 归档即同步,幂等可重跑)。
+            if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
             return result(no, "已归档");
         }
         return result(no, "已审核");
@@ -1717,6 +1854,11 @@ public class ButtonService {
         if (DOC_ARCHIVE_PANELS.contains(def.code())) {
             finalizeOpenModify(def, no, operator);
             markArchived(def.code(), no, operator);
+            // 2026-10-09 用户报障「项目实施计划审批归档后没自动进项目进度查询」:
+            //   同步此前只挂在 audit()(管理员直审)与管理员「保存即归档」两处,而**正常流程 =
+            //   普通用户保存 → 送审 → 管理员「审批通过」→ 归档**走的正是本方法 ⇒ 从来没同步过,
+            //   只能靠侧栏「同步进度」手工补。口径与另两处一致(RD_PLAN 归档即同步,幂等可重跑)。
+            if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
             return result(no, "已归档");
         }
         return result(no, "已审核");
@@ -2837,6 +2979,9 @@ public class ButtonService {
             // 单据选仓库字段已全局统一叫「仓库」(migrate-wh-field-rename),参照/必填/推送兜底同列
             Object wh = r.get("仓库代码");
             if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
+            // 仓位预设(2026-10-09 用户口径「物料默认 ⇢ 仓位默认兜底」):该仓启用仓位管理才预设
+            Object binA = presetBinFor(str(r.get("物料编码")), str(wh));
+            if (binA != null) line.put("仓位", binA);
             items.add(line);
         }
         Map<String, Object> head = new LinkedHashMap<>();
@@ -3285,6 +3430,9 @@ public class ButtonService {
         // 行仓库(2026-09-23 正名):同 inspAutoPurchaseIn —— 落「仓库」(字段已全局正名)
         Object wh = r.get("仓库代码");
         if (wh != null && !String.valueOf(wh).isBlank()) line.put("仓库", wh);
+        // 仓位预设(2026-10-09):同 inspAutoPurchaseIn —— 物料默认 ⇢ 该仓默认,该仓启用仓位管理才预设
+        Object binT = presetBinFor(str(r.get("物料编码")), str(wh));
+        if (binT != null) line.put("仓位", binT);
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", LocalDate.now().toString());
         head.put("供应商", ih.get("供应商"));
@@ -3759,6 +3907,15 @@ public class ButtonService {
             sel.append(",[阶段").append(i).append("_实际完成]");
             sel.append(",[阶段").append(i).append("_计划完成]");
         }
+        // 2026-10-09 新增:同批把**立项申请**的字段一起取回(关联键 = 文档编号)——
+        //   用户口径:项目定级取立项申请的等级;项目发起人取申请立项人;立项日期取立项申请的归档日期。
+        sel.append(", (SELECT TOP 1 a.[项目等级] FROM rd_approval a WHERE a.[文档编号] = p.[文档编号]"
+                + " AND ISNULL(a.asp_cancel,'N') <> 'Y') AS appr_level");
+        sel.append(", (SELECT TOP 1 a.[申请立项人] FROM rd_approval a WHERE a.[文档编号] = p.[文档编号]"
+                + " AND ISNULL(a.asp_cancel,'N') <> 'Y') AS appr_initiator");
+        sel.append(", (SELECT TOP 1 CONVERT(nvarchar(19), s2.archived_at, 120) FROM rd_approval a"
+                + " JOIN yj_doc_status s2 ON s2.panel_code = 'RD_APPROVAL' AND s2.doc_no = a.[单据编号]"
+                + " WHERE a.[文档编号] = p.[文档编号] AND ISNULL(a.asp_cancel,'N') <> 'Y') AS appr_archived_at");
         sel.append(" FROM rd_plan p WHERE p.[单据编号] = ? AND ISNULL(p.asp_cancel,'N') <> 'Y'");
         sel.append(" AND NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code = 'RD_PLAN'"
                 + " AND s.doc_no = p.[单据编号] AND ISNULL(s.canceled,'N') = 'Y')");
@@ -3770,10 +3927,14 @@ public class ButtonService {
 
         int totalStages = 0, doneStages = 0, lastDoneStage = 0;
         String latestDone = null, lastPlanDue = null;
+        // 2026-10-09:10 个阶段的计划内容**拼接成一段**写进进度表的「内容」列(用户口径)
+        StringBuilder contentBuf = new StringBuilder();
         for (int i = 1; i <= 10; i++) {
             String content = str(plan.get("阶段" + i + "_计划内容"));
             if (content == null) continue;                 // 空阶段框不计入
             totalStages++;
+            if (contentBuf.length() > 0) contentBuf.append("；");
+            contentBuf.append("阶段").append(i).append("：").append(content);
             String planDue = str(plan.get("阶段" + i + "_计划完成"));
             if (planDue != null) lastPlanDue = planDue;    // 阶段号递增:最后取到的即最晚计划完成
             String done = str(plan.get("阶段" + i + "_实际完成"));
@@ -3800,9 +3961,15 @@ public class ButtonService {
         String progressNo = str(targets.get(0).get("单据编号"));
 
         String planDocNo = str(plan.get("文档编号"));            // ← 项目编号(每张计划不同)
-        String level = str(plan.get("项目定级"));
+        // 2026-10-09 用户口径:项目定级取**立项申请的等级**(定级在立项上做、且定了不能改);
+        //   立项里取不到才退回实施计划自己的参照带入值。
+        String level = str(plan.get("appr_level"));
+        if (level == null || level.isBlank()) level = str(plan.get("项目定级"));
         String owner = str(plan.get("负责人"));
         String due = latestDone != null ? latestDone : lastPlanDue;
+        String initiator = str(plan.get("appr_initiator"));       // → 进度表「项目发起人」
+        String startDate = str(plan.get("appr_archived_at"));     // → 进度表「立项日期」= 立项申请的归档日期
+        String contentText = contentBuf.length() == 0 ? null : contentBuf.toString();  // → 进度表「内容」
         String spec = specFromApproval(planDocNo);               // ← 子项目/尺寸
         if (spec == null) spec = planDocNo != null ? planDocNo : projectName;
         final String projNo = planDocNo != null ? planDocNo : "";
@@ -3820,19 +3987,23 @@ public class ButtonService {
         //     现改为只写旧列,那批无人读的新列由 migrate-rd-progress-drop-orphan-cols.sql 删除。
         int n = jdbc.update("UPDATE rd_progress_detail SET [项目层级] = COALESCE(?, [项目层级]),"
                         + " [子项目/尺寸] = ?, [项目负责] = COALESCE(?, [项目负责]),"
-                        + " [里程完成] = COALESCE(?, [里程完成]), [状态] = ?"
+                        + " [里程完成] = COALESCE(?, [里程完成]), [状态] = ?,"
+                        + " [内容] = COALESCE(?, [内容]), [项目级] = COALESCE(?, [项目级]),"
+                        + " [实施进度] = COALESCE(?, [实施进度])"
                         + " WHERE [单据编号] = ? AND [项目名称] = ? AND ISNULL([说明], N'') = ?"
                         + " AND ISNULL(asp_cancel,'N') <> 'Y'",
-                level, spec, owner, due, status, progressNo, projectName, projNo);
+                level, spec, owner, due, status, contentText, initiator, startDate,
+                progressNo, projectName, projNo);
         if (n > 0) {
             org.slf4j.LoggerFactory.getLogger(ButtonService.class)
                     .info("[RD_PLAN→RD_PROGRESS] 更新 {} 行, 项目={}, 子项目={}, 状态={}", n, projectName, spec, status);
             return RES_UPDATED;
         }
         jdbc.update("INSERT INTO rd_progress_detail ([单据编号], [项目名称], [项目层级], [子项目/尺寸], [说明], [项目编号],"
-                        + " [项目负责], [里程完成], [状态], asp_user1, asp_time1)"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())",
-                progressNo, projectName, level, spec, projNo, projNo, owner, due, status, currentUserName());
+                        + " [项目负责], [里程完成], [状态], [内容], [项目级], [实施进度], asp_user1, asp_time1)"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE())",
+                progressNo, projectName, level, spec, projNo, projNo, owner, due, status,
+                contentText, initiator, startDate, currentUserName());
         org.slf4j.LoggerFactory.getLogger(ButtonService.class)
                 .info("[RD_PLAN→RD_PROGRESS] 新增 1 行, 进度单={}, 项目={}, 子项目={}, 状态={}", progressNo, projectName, spec, status);
         return RES_INSERTED;
@@ -4058,24 +4229,205 @@ public class ButtonService {
         String status = String.valueOf(docStatusOf(def.code(), no).get("status"));
         if (!"已审核".equals(status) && !"已归档".equals(status))
             throw new IllegalStateException("仅已审核或已归档的立项申请可项目定级(当前:" + status + ")");
+        // 2026-10-09 用户口径:「项目定级只能由一开始的审批人来确定,确定之后不能变」——
+        // 定级权从"有 RD_APPROVAL 审批权"收窄到**本单审批人本人**(严格口径,不给管理员兜底)。
+        String approver = rdApproverOf(no);
+        if (approver.isEmpty())
+            throw new IllegalStateException("本单没有「审批通过」留痕,无法定级");
+        if (!approver.equals(currentUserName()))
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "项目定级只能由本单审批人确认(本单审批人:" + realNameOf(approver) + "（" + approver + "）)");
         String level = pickOf(formData, "项目等级");
+        applyGrade(def.code(), no, level, currentUserName());
+        return result(no, status.isEmpty() ? "已审核" : status);
+    }
+
+    /**
+     * 本单「审批通过」的操作人(最近一条 APPROVE/APPROVED 留痕)。
+     * 立项流程里这就是「一开始的审批人」:「审批通过即定级」那条路的 operator 天然等于他,两道门禁同源。
+     * 取"最近一条"而不是"最早一条",是为了弃审重走流程后由**本轮**审批人定级,否则第二个审批人永远定不了级。
+     */
+    private String rdApproverOf(String no) {
+        List<String> os = jdbc.queryForList(
+                "SELECT TOP 1 operator FROM yj_form_approval"
+                        + " WHERE panel_code = 'RD_APPROVAL' AND form_no = ? AND action = 'APPROVE' AND result = 'APPROVED'"
+                        + " ORDER BY id DESC",
+                String.class, no);
+        return os.isEmpty() || os.get(0) == null ? "" : os.get(0).trim();
+    }
+
+    /**
+     * 定级落库(「项目定级」按钮与「审批通过即定级」共用,2026-10-08 起两条路同源)。
+     * 写 `rd_approval.项目等级` + asp_user2/asp_time2,并按新旧等级留一条 GRADE 审批留痕(不覆盖历史)。
+     * 2026-10-09:「确定之后不能变」—— 已定级直接拒,**两条路都拦**。要改级只能先弃审
+     *   (unaudit 会把项目等级一并清空),重新审批后再定。
+     */
+    private void applyGrade(String panelCode, String no, String level, String operator) {
         if (!PROJECT_LEVELS.contains(level))
             throw new IllegalStateException("项目等级取值不合法(应为 一级/二级/三级/四级):" + level);
         String old = "";
         List<String> cur = jdbc.queryForList(
                 "SELECT TOP 1 项目等级 FROM rd_approval WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", String.class, no);
         if (!cur.isEmpty() && cur.get(0) != null) old = cur.get(0).trim();
+        if (!old.isEmpty())
+            throw new IllegalStateException("项目等级已确定为「" + old + "」,不能更改;要改请先弃审回草稿重新走流程");
         int n = jdbc.update("UPDATE rd_approval SET 项目等级 = ?, asp_user2 = ?, asp_time2 = SYSDATETIME()"
-                + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", level, currentUserName(), no);
+                + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", level, operator, no);
         if (n == 0) throw new IllegalStateException("立项申请不存在或已作废:" + no);
-        String opinion = old.isEmpty() ? "项目定级：" + level : "项目定级：" + old + " → " + level;
-        recordApproval(def.code(), no, "GRADE", "GRADED", opinion);
-        return result(no, status.isEmpty() ? "已审核" : status);
+        recordApproval(panelCode, no, "GRADE", "GRADED", "项目定级：" + level);
     }
 
     /** 项目等级取值(与下游 RD_PLAN.项目定级 / RD_PROGRESS.项目定级 同字典;2026-09-21 四级统一) */
     private static final java.util.Set<String> PROJECT_LEVELS =
             java.util.Set.of("一级", "二级", "三级", "四级");
+
+    // ══════════ 立项申请:分发对接人 → 确认项目责任人(2026-10-08 研发流程图③④)══════════
+    // 用户口径(m01625 逐句):
+    //   ①「销售端提出需求 —— 申请前需刘博或冯工同意」= 填立项申请(RD_APPROVAL,既有);
+    //   ②「冯总审核及定级」= 对这张立项申请审批 + 定级(approveApproval 里就地定级,同一步骤两个动作);
+    //   ③「定级完之后就要分发对接人,这个对接人可以自己选择是哪一个账号」= dispatchLiaison(下面);
+    //   ④「分发之后对应对接人账号可以进行签核然后分发下去,就是确认责任人,也可以选择账号」= confirmProjectOwner;
+    //   ⑤「确认责任人之后就可以在项目实施计划里面进行对应单据的填写」= RD_PLAN.负责人 按参照带入
+    //      (PanelConfigService.REF_SYNONYMS:项目责任人 → 负责人);
+    //   ⑥「填写完通过审批之后归档进入项目进度查询追踪项目进度」= 既有链路(审批归档 + syncAllPlansToProgress)。
+    //
+    // 落点 = rd_approval 的**备用列池**(备用1=对接人 / 备用2=项目责任人;label 登记见
+    //   tools/migrate-rd-approval-liaison-owner.sql),两格都存**账号**(与 rd_dev_task.file_owner 同口径;
+    //   rd_prod_info_head.责任人 存姓名是反例),前端显示拼「姓名（账号）」。
+    // 字段 editable=0 + save() 对这两个键显式剥离 ⇒ 只能由这两个按钮写,前端直改无效(防自封责任人)。
+
+    /** 立项申请头一行(项目等级 + 两个流程账号;流程门禁与出参共用) */
+    private Map<String, Object> approvalHeadOf(String no) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT TOP 1 项目等级, 备用1, 备用2 FROM rd_approval WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        return rows.isEmpty() ? Map.of() : rows.get(0);
+    }
+
+    /**
+     * 分发对接人(2026-10-08 流程图③):定级完成后,由该面板**审批人**(∪ 管理员)从账号里指定一个对接人。
+     * 载荷「对接人」= 账号(必须存在且启用);写 rd_approval.备用1 + 一条 LIAISON 留痕;
+     * 被指定的对接人收 LIAISON_ASSIGNED 消息(操作人本人除外)。
+     * 幂等:可随时改对接人(改一次留一条痕)。
+     */
+    private Map<String, Object> dispatchLiaison(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_APPROVAL".equals(def.code())) throw new IllegalStateException("仅立项申请表可分发对接人");
+        requireApprover(def.code());
+        String user = currentUserName();
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String status = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if (!"已审核".equals(status) && !"已归档".equals(status))
+            throw new IllegalStateException("仅已审核或已归档的立项申请可分发对接人(当前:" + status + ")");
+        // 「定级完之后就要分发对接人」:没定级就没有下游项目属性,先定级(顺序即流程图顺序)
+        String level = blankSafe(approvalHeadOf(no).get("项目等级"));
+        if (level.isEmpty()) throw new IllegalStateException("请先完成项目定级,再分发对接人");
+        // 2026-10-09 用户口径:「对接人不能更改」—— 只能分发一次,已分发的直接拒(要换人只能弃审回草稿)。
+        String existingLiaison = blankSafe(approvalHeadOf(no).get("备用1"));
+        if (!existingLiaison.isEmpty())
+            throw new IllegalStateException("对接人已分发给 " + realNameOf(existingLiaison) + "（" + existingLiaison
+                    + "）,不能更改;要换人请先弃审回草稿重新走流程");
+        String liaison = pickOf(formData, "对接人");
+        if (liaison.isEmpty()) throw new IllegalStateException("请选择对接人账号");
+        if (!isEnabledUser(liaison)) throw new IllegalStateException("对接人账号不存在或已停用：" + liaison);
+        int n = jdbc.update("UPDATE rd_approval SET 备用1 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", liaison, no);
+        if (n == 0) throw new IllegalStateException("立项申请不存在或已作废:" + no);
+        String name = realNameOf(liaison);
+        recordApproval(def.code(), no, "LIAISON", "DISPATCHED", "分发对接人：" + name + "（" + liaison + "）");
+        if (!liaison.equals(user)) {
+            notify(() -> messageService.send(List.of(liaison), MessageService.LIAISON_ASSIGNED, "RD_APPROVAL", no,
+                    Map.of("level", level, "actor", user), user));
+        }
+        Map<String, Object> r = result(no, status);
+        r.put("对接人", liaison);
+        r.put("对接人姓名", name);
+        return r;
+    }
+
+    /**
+     * 确认项目责任人(2026-10-08 流程图④):**本单对接人**签核,并从账号里指定项目责任人。
+     * 载荷「项目责任人」= 账号;写 rd_approval.备用2 + 一条 OWNER 留痕;责任人收 OWNER_CONFIRMED 消息。
+     * 门禁:必须先有对接人(备用1);执行人 = 对接人本人(账号仍启用时)∪ 管理员 ——
+     *   对接人离职/停用后单子不能卡死,与「分发责任人」同款管理员兜底。
+     * 下游:实施计划按「文档编号」参照立项申请时,项目责任人 → 负责人 由 REF_SYNONYMS 自动带回。
+     */
+    private Map<String, Object> confirmProjectOwner(PanelRegistry.PanelDef def, Map<String, Object> formData) {
+        if (!"RD_APPROVAL".equals(def.code())) throw new IllegalStateException("仅立项申请表可确认责任人");
+        String user = currentUserName();
+        String no = requireNo(formData);
+        ensureDocExists(def, no);
+        String status = String.valueOf(docStatusOf(def.code(), no).get("status"));
+        if (!"已审核".equals(status) && !"已归档".equals(status))
+            throw new IllegalStateException("仅已审核或已归档的立项申请可确认责任人(当前:" + status + ")");
+        String liaison = blankSafe(approvalHeadOf(no).get("备用1"));
+        if (liaison.isEmpty()) throw new IllegalStateException("请先分发对接人,再由对接人确认项目责任人");
+        if (!(user.equals(liaison) && isEnabledUser(liaison)) && !isAdminUser(user))
+            throw new org.springframework.security.access.AccessDeniedException("仅本单对接人或管理员可确认项目责任人");
+        // 2026-10-09 用户口径:「责任人能随意更改」—— 只能确认一次,已确认的直接拒。
+        String existingOwner = blankSafe(approvalHeadOf(no).get("备用2"));
+        if (!existingOwner.isEmpty())
+            throw new IllegalStateException("项目责任人已确认为 " + realNameOf(existingOwner) + "（" + existingOwner
+                    + "）,不能更改;要换人请先弃审回草稿重新走流程");
+        String owner = pickOf(formData, "项目责任人");
+        if (owner.isEmpty()) throw new IllegalStateException("请选择项目责任人账号");
+        if (!isEnabledUser(owner)) throw new IllegalStateException("项目责任人账号不存在或已停用：" + owner);
+        int n = jdbc.update("UPDATE rd_approval SET 备用2 = ? WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", owner, no);
+        if (n == 0) throw new IllegalStateException("立项申请不存在或已作废:" + no);
+        String name = realNameOf(owner);
+        recordApproval(def.code(), no, "OWNER", "CONFIRMED", "确认项目责任人：" + name + "（" + owner + "）");
+        if (!owner.equals(user)) {
+            notify(() -> messageService.send(List.of(owner), MessageService.OWNER_CONFIRMED, "RD_APPROVAL", no,
+                    Map.of("actor", user, "liaison", liaison), user));
+        }
+        Map<String, Object> r = result(no, status);
+        r.put("项目责任人", owner);
+        r.put("项目责任人姓名", name);
+        return r;
+    }
+
+    /**
+     * 立项申请侧边栏流程状态(2026-10-08 研发流程图③④;前端两个按钮的显隐/置灰 + 弹窗回显**唯一真源**)。
+     *
+     * 返回:{ status, level, liaison, liaisonName, owner, ownerName, canDispatchLiaison, canConfirmOwner }。
+     * 口径与两个按钮的服务端门禁逐条对齐(免得再出现"界面让点、点了被拒"):
+     *   · canDispatchLiaison = 已审核/已归档 ∧ 已定级 ∧ 当前用户有审批权;
+     *   · canConfirmOwner    = 已审核/已归档 ∧ 已有对接人 ∧ (对接人本人且账号启用 ∨ 管理员)。
+     */
+    public Map<String, Object> rdApprovalFlowState(String docNo) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>();
+        out.put("status", "");
+        out.put("level", "");
+        out.put("liaison", "");
+        out.put("liaisonName", "");
+        out.put("owner", "");
+        out.put("ownerName", "");
+        out.put("canDispatchLiaison", false);
+        out.put("canConfirmOwner", false);
+        try {
+            String no = blankSafe(docNo);
+            if (no.isEmpty()) return out;
+            String user = currentUserName();
+            String status = String.valueOf(docStatusOf("RD_APPROVAL", no).get("status"));
+            Map<String, Object> head = approvalHeadOf(no);
+            String level = blankSafe(head.get("项目等级"));
+            String liaison = blankSafe(head.get("备用1"));
+            String owner = blankSafe(head.get("备用2"));
+            boolean settled = "已审核".equals(status) || "已归档".equals(status);
+            out.put("status", status);
+            out.put("level", level);
+            out.put("liaison", liaison);
+            out.put("liaisonName", liaison.isEmpty() ? "" : realNameOf(liaison));
+            out.put("owner", owner);
+            out.put("ownerName", owner.isEmpty() ? "" : realNameOf(owner));
+            // 2026-10-09:三条门禁与上面的服务端判定**逐条同源**(界面让点/后端拒绝的错配必须为零)
+            out.put("canGradeProject", settled && level.isEmpty() && rdApproverOf(no).equals(user));
+            out.put("canDispatchLiaison", settled && !level.isEmpty() && liaison.isEmpty() && canApprove(user, "RD_APPROVAL"));
+            out.put("canConfirmOwner", settled && !liaison.isEmpty() && owner.isEmpty()
+                    && ((user.equals(liaison) && isEnabledUser(liaison)) || isAdminUser(user)));
+        } catch (Exception e) {
+            log.warn("[立项流程] 状态查询失败 docNo={}: {}", docNo, e.getMessage());
+        }
+        return out;
+    }
 
     // ══════════ 产品变更申请单(RD_CHANGE):部门评审行 + 按部门按格编辑门禁 ══════════
     // 用户口径(2026-09-21 第③条):各部门按各自账号分工填本部门栏目,每人只能改自己填写的内容,

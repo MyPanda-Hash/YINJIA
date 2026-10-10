@@ -1,0 +1,75 @@
+=== 数据库规范体检 @ HSDZ_MES ===
+(豁免登记:table 46, panel 2, col 69, dupkey 97, count 3, skiplabel 27)
+
+[PASS] 01 表命名合规(白名单外)
+[FAIL] 02 表级中文注明(白名单外) —— 5 处
+        yj_attachment
+        yj_form_approval
+        yj_message
+        yj_plan_term
+        yj_std_lib
+[FAIL] 03 拼音/英文列名的列注明(共 3 列;存量收敛) —— 实际 3,超过存量基线 0(棘轮:只许降不许升)
+        bl_pu_order.kf_period
+        bs_inv.parent_name
+        bs_inv.is_show_aux_barcode
+[FAIL] 04 业务表主键与审计四件套 —— 38 处
+        bd_account
+        bd_dispatch
+        bd_expense_type
+        bd_finish_in
+        bd_manu_order
+        bd_material_out
+        bd_outsource_order
+        bd_pu_order
+        bd_purchase_in
+        bd_sale_out
+        bd_so_order
+        bd_tax_type
+        …(还有 26 项)
+[FAIL] 05 元数据漂移(字段不在其所在对象里) —— 1 处
+        SL_RECV.计量单位(detail → )
+[PASS] 06 面板指向不存在的表/视图
+[FAIL] 07 完全重复的字段登记行 —— 6 处
+        PURCHASE_IN.创建人编码 (header,seq 730)
+        PURCHASE_IN.付款方式编码 (header,seq 820)
+        PURCHASE_IN.付款账户编码 (header,seq 840)
+        PURCHASE_IN.审核人编码 (header,seq 780)
+        PURCHASE_IN.未结算金额本位币 (header,seq 800)
+        PURCHASE_IN.修改人编码 (header,seq 750)
+[WARN] 08 同一列多标签(数据键不唯一;已登记 88 组) —— 13 处
+        MANU_ORDER_DETAIL.产品名称
+        PU_ORDER.备注
+        SO_ORDER.备注
+        WO_SCHEDULE.产品编码
+        WO_SCHEDULE.产品名称
+        WO_SCHEDULE.工单号
+        WO_SCHEDULE.工单状态
+        WO_SCHEDULE.交期
+        WO_SCHEDULE.交期紧迫度
+        WO_SCHEDULE.客户
+        WO_SCHEDULE.生产车间
+        WO_SCHEDULE.未完成数量
+        …(还有 1 项)
+[FAIL] 09 缺 en 译名(面板 19 / 字段标签 198) —— 实际 217,超过存量基线 0(棘轮:只许降不许升)
+        面板缺: 19 个;字段标签缺: 198 个
+        Z-G-C批次
+        Z-HP-C批次
+        安装车间
+        保养内容
+        保养情况
+        保养人
+        保养责任人
+        保养周期
+        保养周期(天)
+        报工人
+        报工数量
+        币别符号
+        …(还有 186 项)
+        补齐:tools/scripts/trigger-mt.ps1;免译标签登记见 §5
+[PASS] 10 备份/临时表(应清零)
+[PASS] 11 ≥10 万行且无非聚集索引的表(现存 0 张大表)
+[PASS] 12 迁移链清单 ↔ 文件一致(清单 387 / 文件 400)
+[PASS] 13 面板引用对象缺 pk_col / asp_cancel(打开即 500)
+
+=== 汇总: FAIL 6 / WARN 1 ===
+RESULT: FAIL-6

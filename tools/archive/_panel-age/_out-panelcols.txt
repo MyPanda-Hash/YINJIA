@@ -1,0 +1,23 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-panelcols.sql ==
+  | form_flow_link | source_panel_code | 
+  | form_flow_link | target_panel_code | 
+  | report_column_settings | panel_code | 
+  | yj_archive_change_log | panel_code | 
+  | yj_attachment | panel_code | 
+  | yj_doc_batch | source_panel_code | 
+  | yj_doc_batch | target_panel_code | 
+  | yj_doc_modify_log | panel_code | 
+  | yj_doc_status | panel_code | 
+  | yj_ext_bind_log | panel_code | 
+  | yj_field | panel_code | 
+  | yj_field | ref_panel | 
+  | yj_form_approval | panel_code | 
+  | yj_panel | panel_code | 
+  | yj_panel | panel_name | 
+  | yj_panel | panel_name_en | 
+  | yj_plan_term | panel_code | 
+  | yj_report_template | panel_code | 
+  | yj_role_panel | panel_code | 
+  | yj_usage_log | panel_name | 
+[OK] _q-panelcols.sql (2 batches)

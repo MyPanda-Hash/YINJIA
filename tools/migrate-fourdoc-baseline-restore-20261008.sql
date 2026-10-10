@@ -1,7 +1,10 @@
-/* migrate-fourdoc-baseline-restore-20261008.sql — 采购链四单 yj_field 回正到 2026-10-03 基线
+/* migrate-fourdoc-baseline-restore-20261008.sql — 采购链四单 yj_field 回正到**冻结基线 dump**
  *
  * 【为什么有这条】
- *   docs/development/采购链四单字段与显示字段.md 是四单字段/显示名/顺序的唯一基线(2026-10-03 冻结)。
+ *   docs/development/采购链四单字段与显示字段.md 是四单字段/显示名/顺序的唯一基线。
+ *   ⚠ 基线的**真源是下面第【本脚本做什么】节里那份冻结 dump 的 sha256**,不是某个写死的日期 ——
+ *     2026-10-03 首次冻结(事故复盘用),2026-10-09 因「采购入库明细启用仓位」刷新过一次
+ *     (冻结副本 tools/archive/_dump-out/_head-fields-HSDZ_MES.md ← 当时的现库 dump)。
  *   2026-10-05 07:42 起本地库发生**迁移链整链重放**(79 条脚本因字节变更被 DbSync 判为"未执行"而重跑,
  *   首条即 migrate-sl-supplier-ref.sql),四单的 yj_field 行被整批换成另一代登记:
  *     · 参照源回落:非供应商字段又挂 ref_panel='GFDA'(§5.3 同款越界形态,QC_INSP.部门 = 1 行越界);
@@ -14,7 +17,7 @@
  *
  * 【本脚本做什么】
  *   把四单(QC_RECV/QC_INSP/QC_RETURN/PURCHASE_IN)的 yj_field 行**逐字段回正**到基线 dump:
- *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 3b6e0fe7e40c(sha256 7bc9419c93484f8f…)
+ *     tools/archive/_dump-out/fields-HSDZ_MES.md @ git 35a6bfa373f7(sha256 64f5d36ee202b1c8…)
  *   回正行数:QC_RECV=70 · QC_INSP=54 · QC_RETURN=34 · PURCHASE_IN=171(共 329 行)。
  *   插入顺序 = 基线 (seq, id) 名次 ⇒ seq 并列组的先后与基线逐行一致(§1.2 并列按 id 升序)。
  *   不动物理表、不动 yj_translation、不动 yj_panel(面板名「暂收退料单」与 en 名属 yj_panel 历史差异,不是本次漂移)。
@@ -262,24 +265,24 @@ INSERT INTO #base (ord,panel_code,col_name,label,data_type,dict_sql,ref_panel,re
   (36,N'PURCHASE_IN',N'商品id',N'商品id',N'文本',NULL,NULL,NULL,NULL,N'detail',180,120,1,0,1,NULL,0,NULL,NULL,NULL),
   (37,N'PURCHASE_IN',N'来源单号',N'来源单号',N'文本',NULL,NULL,NULL,NULL,N'query,header',190,120,1,0,1,NULL,0,N'Source no.',NULL,NULL),
   (38,N'PURCHASE_IN',N'仓库',N'仓库',N'参照',NULL,N'WH',N'仓库名称',N'仓库名称',N'detail',190,140,1,1,0,NULL,1,NULL,NULL,NULL),
-  (39,N'PURCHASE_IN',N'单据关闭状态',N'单据关闭状态',N'文本',NULL,NULL,NULL,NULL,N'header',200,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (40,N'PURCHASE_IN',N'商品是否多单位',N'商品是否多单位',N'文本',NULL,NULL,NULL,NULL,N'detail',200,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (41,N'PURCHASE_IN',N'商品是否序列号',N'商品是否序列号',N'文本',NULL,NULL,NULL,NULL,N'detail',210,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (42,N'PURCHASE_IN',N'销售订单号',N'销售订单号',N'文本',NULL,NULL,NULL,NULL,N'query,header',210,130,1,0,1,NULL,0,N'Sales order no.',NULL,NULL),
-  (43,N'PURCHASE_IN',N'经手人编码',N'经手人编码',N'文本',NULL,NULL,NULL,NULL,N'header',220,130,1,0,1,NULL,0,N'Handler code',NULL,NULL),
-  (44,N'PURCHASE_IN',N'商品是否辅助属性',N'商品是否辅助属性',N'文本',NULL,NULL,NULL,NULL,N'detail',220,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (45,N'PURCHASE_IN',N'交货方式',N'交货方式',N'文本',NULL,NULL,NULL,NULL,N'header',230,130,1,0,0,NULL,1,NULL,NULL,NULL),
-  (46,N'PURCHASE_IN',N'商品是否保质期',N'商品是否保质期',N'文本',NULL,NULL,NULL,NULL,N'detail',230,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (47,N'PURCHASE_IN',N'交货方式编码',N'交货方式编码',N'文本',NULL,NULL,NULL,NULL,N'header',240,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (48,N'PURCHASE_IN',N'商品是否批次',N'商品是否批次',N'文本',NULL,NULL,NULL,NULL,N'detail',240,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (49,N'PURCHASE_IN',N'结算状态',N'结算状态',N'文本',NULL,NULL,NULL,NULL,N'header',250,130,1,0,0,NULL,1,NULL,NULL,NULL),
-  (50,N'PURCHASE_IN',N'仓库id',N'仓库id',N'文本',NULL,NULL,NULL,NULL,N'detail',250,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (51,N'PURCHASE_IN',N'修改时间',N'修改时间',N'日期',NULL,NULL,NULL,NULL,N'header',260,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (52,N'PURCHASE_IN',N'仓库启用仓位管理',N'仓库启用仓位管理',N'文本',NULL,NULL,NULL,NULL,N'detail',260,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (53,N'PURCHASE_IN',N'创建人',N'创建人',N'文本',NULL,NULL,NULL,NULL,N'header',270,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (54,N'PURCHASE_IN',N'仓位id',N'仓位id',N'文本',NULL,NULL,NULL,NULL,N'detail',270,120,1,0,1,NULL,0,NULL,NULL,NULL),
-  (55,N'PURCHASE_IN',N'修改人',N'修改人',N'文本',NULL,NULL,NULL,NULL,N'header',280,130,1,0,1,NULL,0,NULL,NULL,NULL),
-  (56,N'PURCHASE_IN',N'仓位名称',N'仓位名称',N'文本',NULL,NULL,NULL,NULL,N'detail',280,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (39,N'PURCHASE_IN',N'仓位编码',N'仓位',N'参照',NULL,N'WHLOC',N'仓位编码',N'仓位编码',N'detail',195,120,1,0,0,NULL,1,N'Bin',NULL,N'仓库=$仓库'),
+  (40,N'PURCHASE_IN',N'单据关闭状态',N'单据关闭状态',N'文本',NULL,NULL,NULL,NULL,N'header',200,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (41,N'PURCHASE_IN',N'商品是否多单位',N'商品是否多单位',N'文本',NULL,NULL,NULL,NULL,N'detail',200,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (42,N'PURCHASE_IN',N'商品是否序列号',N'商品是否序列号',N'文本',NULL,NULL,NULL,NULL,N'detail',210,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (43,N'PURCHASE_IN',N'销售订单号',N'销售订单号',N'文本',NULL,NULL,NULL,NULL,N'query,header',210,130,1,0,1,NULL,0,N'Sales order no.',NULL,NULL),
+  (44,N'PURCHASE_IN',N'经手人编码',N'经手人编码',N'文本',NULL,NULL,NULL,NULL,N'header',220,130,1,0,1,NULL,0,N'Handler code',NULL,NULL),
+  (45,N'PURCHASE_IN',N'商品是否辅助属性',N'商品是否辅助属性',N'文本',NULL,NULL,NULL,NULL,N'detail',220,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (46,N'PURCHASE_IN',N'交货方式',N'交货方式',N'文本',NULL,NULL,NULL,NULL,N'header',230,130,1,0,0,NULL,1,NULL,NULL,NULL),
+  (47,N'PURCHASE_IN',N'商品是否保质期',N'商品是否保质期',N'文本',NULL,NULL,NULL,NULL,N'detail',230,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (48,N'PURCHASE_IN',N'交货方式编码',N'交货方式编码',N'文本',NULL,NULL,NULL,NULL,N'header',240,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (49,N'PURCHASE_IN',N'商品是否批次',N'商品是否批次',N'文本',NULL,NULL,NULL,NULL,N'detail',240,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (50,N'PURCHASE_IN',N'结算状态',N'结算状态',N'文本',NULL,NULL,NULL,NULL,N'header',250,130,1,0,0,NULL,1,NULL,NULL,NULL),
+  (51,N'PURCHASE_IN',N'仓库id',N'仓库id',N'文本',NULL,NULL,NULL,NULL,N'detail',250,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (52,N'PURCHASE_IN',N'修改时间',N'修改时间',N'日期',NULL,NULL,NULL,NULL,N'header',260,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (53,N'PURCHASE_IN',N'仓库启用仓位管理',N'仓库启用仓位管理',N'文本',NULL,NULL,NULL,NULL,N'detail',260,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (54,N'PURCHASE_IN',N'创建人',N'创建人',N'文本',NULL,NULL,NULL,NULL,N'header',270,130,1,0,1,NULL,0,NULL,NULL,NULL),
+  (55,N'PURCHASE_IN',N'仓位id',N'仓位id',N'文本',NULL,NULL,NULL,NULL,N'detail',270,120,1,0,1,NULL,0,NULL,NULL,NULL),
+  (56,N'PURCHASE_IN',N'修改人',N'修改人',N'文本',NULL,NULL,NULL,NULL,N'header',280,130,1,0,1,NULL,0,NULL,NULL,NULL),
   (57,N'PURCHASE_IN',N'源单行号',N'采购订单行号',N'文本',NULL,NULL,NULL,NULL,N'detail',290,110,1,0,0,NULL,1,NULL,NULL,NULL),
   (58,N'PURCHASE_IN',N'批次号',N'批次号',N'文本',NULL,NULL,NULL,NULL,N'query,header',290,160,0,0,0,NULL,1,NULL,NULL,NULL),
   (59,N'PURCHASE_IN',N'辅助属性id',N'辅助属性id',N'文本',NULL,NULL,NULL,NULL,N'detail',300,120,1,0,1,NULL,0,NULL,NULL,NULL),

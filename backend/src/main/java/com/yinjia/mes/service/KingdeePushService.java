@@ -296,6 +296,35 @@ public class KingdeePushService {
             }
         }
         boolean linkSrc = isPur && poRefs != null;
+
+        // ── 销售出库单挂来源销售订单(2026-10-15 用户口径:
+        //   「转erp时要把这个销售订单号与销售订单行号转成源订单号和源订单行号(在金蝶上)」)──
+        // 与采购侧同构,只是把 采购订单 → 销售订单:
+        //   头:bd_sale_out.销售订单号  → 金蝶 sal_out_bound 行级 src_bill_no
+        //   行:bl_sale_out.源单行号(面板标签「销售订单行号」) → src_seq
+        // 口径完全沿用采购链(那边的血泪教训同样适用,不可简化):
+        //   · 必须齐发 src_bill_type_id/number/name —— 只发 src_bill_no 时**金蝶静默忽略引用**
+        //     (落库后 src_bill_no 为空),带上 type_id 后金蝶才真的校验来源单;
+        //   · 因此**解析到订单才推整组**;解析不到就不推,按无来源单的普通出库单推送 + 返回消息提示,
+        //     避免"账套里没有该订单 → 转ERP 直接失败";
+        //   · src_seq 必须在订单确有该分录时才推,否则金蝶按"源单分录不存在"整单被拒(用分录映射当白名单)。
+        String soNo = str(head.get("销售订单号"));
+        String soLinkWarning = "";
+        SoRefs soRefs = null;
+        if (!isPur && !isOrder && !isMatOut) {   // 仅销售出库单走此支
+            if (soNo.isEmpty()) {
+                log.warn("销售出库单[{}]头上无销售订单号:本次转ERP 不带金蝶源单关联(src_bill_no/src_seq),"
+                        + "金蝶侧显示为无来源单的普通销售出库单", docNo);
+            } else {
+                soRefs = resolveSoRefs(soNo);
+                if (soRefs == null) {
+                    soLinkWarning = "；注意:金蝶账套内未找到销售订单[" + soNo + "],本次未挂来源单(请核对账套/订单号,"
+                            + "或先在金蝶补建该订单后重审再转)";
+                    log.warn("销售出库单[{}] 未挂来源单:金蝶账套内无销售订单[{}]", docNo, soNo);
+                }
+            }
+        }
+        boolean linkSaleSrc = soRefs != null;
         // 采购订单直推的字段口径:订单行叫 物料编码/数量/单价/单位;入库行叫 存货编码/实收数量/单价/计量单位;
         // 材料出库行叫 材料编码/数量/单价/计量单位(料件口径,与采购入库的"存货"族不同名)
         String matKey = isOrder ? "物料编码" : isMatOut ? "材料编码" : "存货编码";
@@ -411,6 +440,30 @@ public class KingdeePushService {
                     }
                 }
             }
+
+            // 销售出库单挂来源**销售订单**(2026-10-15 用户口径):与上面采购支同构。
+            // 行级 src_bill_no 写销售订单号(同单全部行带同一订单号)、src_seq 写该行对应的销售订单行号
+            // (bl_sale_out.源单行号,面板标签「销售订单行号」,自销售订单生单/选单时带入)。
+            if (linkSaleSrc) {
+                e.put("src_bill_no", soNo);
+                e.put("src_bill_type_id", SO_BILL_TYPE);
+                e.put("src_bill_type_number", SO_BILL_TYPE);
+                e.put("src_bill_type_name", SO_BILL_TYPE_NAME);
+                e.put("src_inter_id", soRefs.billId());
+                Integer srcSeq = intOf(lineColumn(line, "源单行号", "销售订单行号"));
+                if (srcSeq == null) {
+                    log.warn("销售出库单[{}]第{}行无销售订单行号:该行不带 src_seq(金蝶侧按订单号挂单,不定位到具体行)", docNo, rowNo);
+                } else {
+                    String entryId = soRefs.entryIdBySeq().get(srcSeq);
+                    if (entryId == null) {
+                        log.warn("销售出库单[{}]第{}行 销售订单行号[{}] 在销售订单[{}]分录中不存在:该行不带 src_seq/src_entry_id",
+                                docNo, rowNo, srcSeq, soNo);
+                    } else {
+                        e.put("src_seq", srcSeq);
+                        e.put("src_entry_id", entryId);
+                    }
+                }
+            }
         }
 
         // ⑤ 推送(纯 Java HTTP)
@@ -441,7 +494,7 @@ public class KingdeePushService {
         out.put("ERP单号", erpBillNo);
         out.put("转ERP操作人", operator);
         out.put("转ERP时间", now);
-        out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）" + linkWarning);
+        out.put("message", "已成功转入金蝶ERP，ERP单号: " + erpBillNo + "（请在金蝶界面审核）" + linkWarning + soLinkWarning);
         return out;
     }
 
@@ -503,8 +556,81 @@ public class KingdeePushService {
         }
     }
 
-    /** 金蝶 GET(签名 + app-token,与计量单位拉取同款);返回 data 节点,errcode!=0 抛业务异常 */
-    private JsonNode kingdeeGet(String path, Map<String, String> params) throws Exception {
+    // ══════════ 销售订单来源引用(2026-10-15) ══════════
+
+    /**
+     * 金蝶**销售订单**的接口路径与类型常量。
+     *
+     * <p>⚠ <b>待沙箱实测</b>:采购侧那组是真实账套实测过的
+     * ({@code /jdy/v2/scm/pur_order} + {@code pur_bill_order});销售侧这一组是**按金蝶星辰
+     * SCM 接口命名规律类推**的 —— 仓库内没有销售订单 API 的留档
+     * (deploy/doc-endpoints.json 只有 sal_out_bound/sal_in_bound/sal_quota 三条,
+     * 本地 SO_ORDER-*.jsonl 是 MES 侧镜像、不是金蝶 API schema)。
+     *
+     * <p>因此本实现的**安全边界**是:解析不到订单就**不推源单组**,只按普通出库单推送并提示
+     * (与采购链同一口径)。也就是说,即使下面路径/常量写错,最坏结果只是"没挂上来源单" ——
+     * <b>不会把整单推错、也不会因它而转ERP 失败</b>。首次对沙箱实测后,把实测值回填到这两个常量即可。
+     */
+    private static final String SO_LIST_PATH = "/jdy/v2/scm/sal_order";
+    private static final String SO_DETAIL_PATH = "/jdy/v2/scm/sal_order_detail";
+    /** 金蝶销售订单的单据类型常量(采购侧对应 pur_bill_order) */
+    private static final String SO_BILL_TYPE = "sal_bill_order";
+    private static final String SO_BILL_TYPE_NAME = "销售订单";
+
+    /** 销售订单金蝶内部引用(src_inter_id=单据id;src_entry_id=按分录 seq 查分录id) */
+    private record SoRefs(String billId, Map<Integer, String> entryIdBySeq) {}
+
+    /** 销售订单引用缓存(单号→引用;转ERP 为低频操作,进程内缓存即可;失败不缓存以便重试) */
+    private final Map<String, SoRefs> soRefsCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * 按销售订单号向金蝶解析 订单单据id + 各分录id(推送 src_inter_id/src_entry_id 用)。
+     * 结构完全对齐 {@link #resolvePoRefs(String)}:列表接口按 bill_no 精确过滤拿单据 id,
+     * 详情接口 material_entity[].{seq,id} 给出 分录序号→分录id。
+     * 解析不到(订单不在该账套/接口路径不符/网络异常)一律返回 null —— 调用方据此**整组不推**,
+     * 只按普通出库单转,并提示用户(绝不因此阻断转ERP)。
+     */
+    private SoRefs resolveSoRefs(String soNo) {
+        if (soNo == null || soNo.isBlank()) return null;
+        SoRefs cached = soRefsCache.get(soNo);
+        if (cached != null) return cached;
+        try {
+            Map<String, String> lp = new TreeMap<>();
+            lp.put("page", "1"); lp.put("page_size", "10"); lp.put("bill_no", soNo);
+            JsonNode rows = kingdeeGet(SO_LIST_PATH, lp).path("rows");
+            String billId = "";
+            if (rows.isArray()) {
+                for (JsonNode r : rows) {
+                    if (soNo.equals(r.path("bill_no").asText(""))) { billId = r.path("id").asText(""); break; }
+                }
+            }
+            if (billId.isEmpty()) {
+                log.warn("金蝶账套内未找到销售订单[{}]:本次转ERP 不挂来源单(请核对账套/订单号)", soNo);
+                return null;
+            }
+            Map<String, String> dp = new TreeMap<>();
+            dp.put("id", billId);
+            JsonNode entries = kingdeeGet(SO_DETAIL_PATH, dp).path("material_entity");
+            Map<Integer, String> bySeq = new HashMap<>();
+            if (entries.isArray()) {
+                for (JsonNode e : entries) {
+                    int seq = e.path("seq").asInt(-1);
+                    String eid = e.path("id").asText("");
+                    if (seq > 0 && !eid.isEmpty()) bySeq.put(seq, eid);
+                }
+            }
+            SoRefs out = new SoRefs(billId, bySeq);
+            soRefsCache.put(soNo, out);
+            log.info("金蝶销售订单[{}] 源单引用已解析:单据id={} 分录 {} 条", soNo, billId, bySeq.size());
+            return out;
+        } catch (Exception e) {
+            log.warn("解析金蝶销售订单[{}]内部id 失败({}):本次转ERP 不挂来源单,其余字段照推",
+                    soNo, e.getMessage());
+            return null;
+        }
+    }
+
+    /** 金蝶 GET(签名 + app-token,与计量单位拉取同款);返回 data 节点,errcode!=0 抛业务异常 */    private JsonNode kingdeeGet(String path, Map<String, String> params) throws Exception {
         ensureCreds();
         String[] tn = timestampNonce();
         String url = API_BASE + path + "?" + qs(params, false);
