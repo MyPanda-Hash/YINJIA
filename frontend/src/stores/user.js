@@ -16,6 +16,8 @@ export const useUserStore = defineStore('user', {
       isAdmin: !!ui?.isAdmin,
       visiblePanels: Array.isArray(ui?.visiblePanels) ? ui.visiblePanels : [],
       approvePanels: Array.isArray(ui?.approvePanels) ? ui.approvePanels : [],
+      // 可配置「自定义字段」的面板(2026-10-09):管理员=['*'],其余=角色在该面板被勾了「自定义字段」
+      fieldPanels: Array.isArray(ui?.fieldPanels) ? ui.fieldPanels : [],
     }
   },
   getters: {
@@ -56,6 +58,7 @@ export const useUserStore = defineStore('user', {
       this.isAdmin = !!u?.isAdmin
       this.visiblePanels = Array.isArray(u?.visiblePanels) ? u.visiblePanels : []
       this.approvePanels = Array.isArray(u?.approvePanels) ? u.approvePanels : []
+      this.fieldPanels = Array.isArray(u?.fieldPanels) ? u.fieldPanels : []
     },
     // 刷新权限（角色/面板配置变更后调用）
     async fetchPerms() {
@@ -66,8 +69,9 @@ export const useUserStore = defineStore('user', {
       this.isAdmin = !!p.isAdmin
       this.visiblePanels = Array.isArray(p.visiblePanels) ? p.visiblePanels : []
       this.approvePanels = Array.isArray(p.approvePanels) ? p.approvePanels : []
+      this.fieldPanels = Array.isArray(p.fieldPanels) ? p.fieldPanels : []
       if (this.userInfo) {
-        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels }
+        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels }
         localStorage.setItem('mes_user', JSON.stringify(this.userInfo))
       }
     },
@@ -117,6 +121,7 @@ export const useUserStore = defineStore('user', {
       this.isAdmin = false
       this.visiblePanels = []
       this.approvePanels = []
+      this.fieldPanels = []
       localStorage.removeItem('mes_token')
       localStorage.removeItem('mes_user')
     },

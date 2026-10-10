@@ -1,0 +1,55 @@
+﻿
+=== 研发立项流程:审批并定级 → 分发对接人 → 确认责任人(账套 YJ_TEST)===
+  ok   登录成功(admin / glm53 / liulei / cp,账套均为 YJ_TEST)
+
+▶ ⑩ 新字段登记为隐藏只读(不进表单/网格,只能由按钮写)
+  ok   对接人 = hidden + readonly
+  ok   项目责任人 = hidden + readonly
+
+▶ ① 普通用户建单并按「保存」提交 → 管理员「审批通过」带 项目等级(审批与定级同一步)
+     保存后:单号=LXA-2026-10-0004 code=200 success 状态=审批中
+  ok   普通用户「保存」即送审(状态 = 审批中,待管理员审批)
+  ok   未定级/未归档时分发被拒:仅已审核或已归档的立项申请可分发对接人(当前:审批中)
+     审批通过:code=200 success {"单据状态":"已归档","编号":"LXA-2026-10-0004"}
+  ok   rd_approval.项目等级 = 二级(与审批同一步落库)
+  ok   单据状态 = 已归档
+  ok   留痕含 GRADE:项目定级：二级
+
+▶ ② /px/rdFlow/state 判定
+     {"status":"已归档","level":"二级","liaison":"","liaisonName":"","owner":"","ownerName":"","canDispatchLiaison":true,"canConfirmOwner":false}
+  ok   管理员可分发对接人(canDispatchLiaison=true)
+  ok   未分发对接人前 canConfirmOwner=false
+  ok   glm53 无审批权 ⇒ canDispatchLiaison=false
+
+▶ ④ 无审批权账号分发对接人被拒
+  ok   被拒:当前用户无审批权限
+
+▶ ⑧ 联系人账号不存在/停用被拒
+  ok   被拒:对接人账号不存在或已停用：no_such_account
+     code=200 success {"单据状态":"已归档","对接人姓名":"彭于晏","对接人":"glm53","编号":"LXA-2026-10-0004"}
+  ok   glm53 收到 1 条 LIAISON_ASSIGNED 消息
+
+▶ ⑥ 非本单对接人(liulei)确认责任人被拒
+  ok   被拒:仅本单对接人或管理员可确认项目责任人
+
+▶ ⑦ 对接人(glm53)确认责任人 = cp
+  ok   对接人 canConfirmOwner=true
+     code=200 success {"单据状态":"已归档","项目责任人姓名":"陈秀丽","项目责任人":"cp","编号":"LXA-2026-10-0004"}
+  ok   cp 收到 1 条 OWNER_CONFIRMED 消息
+  ok   状态端点回读:对接人=glm53 责任人=cp(陈秀丽)
+
+▶ ⑫ 表单直接塞 对接人/项目责任人 ⇒ 服务端不收
+  ok   两格未被表单改写(save 里已 remove)
+
+▶ ⑨ 下游:RD_PLAN 的「文档编号」refMap 含 项目责任人 → 负责人
+     文档编号.refMap = [{"to":"文件管理人","from":"文件管理人"},{"to":"密级","from":"密级"},{"to":"文件使用范围","from":"文件使用范围"},{"to":"项目定级","from":"项目等级"},{"to":"负责人","from":"项目责任人"}]
+  ok   映射在:项目责任人 → 负责人(选中本单即带入计划负责人)
+  ok   RD_PLAN.负责人 仍是只读格(只能靠参照带入,符合设计)
+
+▶ ⑪ 反审核把 对接人/项目责任人 一起清空
+     弃审:code=200 success
+  ok   两格已清空(回草稿后必须重新分发对接人)
+
+  --   清理 SQL:C:\INCER\YINJIA-MES\tools\archive\_probe-rd-liaison-owner-cleanup.sql(单号 LXA-2026-10-0004 / 文档编号 PROBE-LIAISON-463538)
+
+ALL PASSED

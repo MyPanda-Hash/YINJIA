@@ -1,0 +1,12 @@
+[db] HSDZ_MES  [out] D:\YINJIA-main\tools\archive\_panel-age\_backup-20261008
+  yj_panel -> yj_panel.csv (13 行)
+  yj_field -> yj_field.csv (258 行)
+  yj_role_panel -> yj_role_panel.csv (52 行)
+  yj_translation -> yj_translation-panel.csv (117 行)
+  restore-metadata.sql: yj_panel 13 行
+  restore-metadata.sql: yj_field 258 行
+  restore-metadata.sql: yj_role_panel 52 行
+  restore-metadata.sql -> restore-metadata.sql
+  views.sql -> views.sql
+  tables-ddl.sql -> tables-ddl.sql
+[done]

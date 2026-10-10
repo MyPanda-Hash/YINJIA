@@ -1,0 +1,17 @@
+﻿入口 chunk: assets/index-CT8aBh-0.js  (182 KB)
+  ✅ 有  QC_MOLD_INSP
+  ✅ 有  QC_CUT_INSP
+  ✅ 有  QC_ASM_INSP
+  ✅ 有  成型检验单
+  ✅ 有  切炭检验单
+  ✅ 有  组装成品检验单
+  ✅ 有  制程品质
+  ✅ 有  qcMoldInsp
+  ✅ 有  qcCutInsp
+  ✅ 有  qcAsmInsp
+  ❌ 无  QC_DISPOSAL
+  ❌ 无  LOT_TRACE
+  ❌ 无  QC_OP
+
+--- qcMoldInsp 上下文 ---
+",title:"来料检验要求",path:"/panelx/list/QC_INSP_REQ",icon:"Grid",panelCode:"QC_INSP_REQ"},{code:"qcInspReqSeries",title:"来料检验要求(系列)",path:"/panelx/list/QC_INSP_REQ_SERIES",icon:"Grid",panelCode:"QC_INSP_REQ_SERIES"}]},{code:"process",title:"制程品质",children:[{code:"qcMoldInsp",title:"成型检验单",path:"/panelx/list/QC_MOLD_INSP",icon:"Checked",panelCode:"QC_MOLD_INSP",operationName:"新增流程"},{code:"qcCutInsp",title:"切炭检验单",path:"/panelx/list/QC_CUT_INSP",icon:"Checked",panelCode:"QC_CUT_INSP",operationName:"新增流程"},{code:"qcAsmInsp",title:"组装成品检验单",path:"/panelx/list/QC_ASM_INSP",icon:"Finished",panelCode:"Q

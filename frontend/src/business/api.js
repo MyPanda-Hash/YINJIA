@@ -11,6 +11,13 @@ export async function apiGetPerms() {
   return res?.data ?? res
 }
 
+/** 自助改密(2026-10-15):原密码由服务端 encoder.matches 校验,不再前端硬编码。 */
+export async function apiChangePassword(payload) {
+  const res = await request.post('/auth/changePassword', payload)
+  if (res?.code && res.code !== 200) throw new Error(res.message || '修改密码失败')
+  return res?.data ?? res
+}
+
 export async function apiGetUserInfo() {
   const res = await request.get('/auth/userinfo')
   return res?.data ?? res

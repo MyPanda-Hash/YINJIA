@@ -1,0 +1,6 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-flat-views.sql ==
+  | FINISH_IN_DETAIL | 产成品入库单明细表 | v_finish_in_detail | 缺id 缺asp_cancel | 
+  | FINISH_IN_STATS | 产成品入库单统计表 | v_finish_in_stats | 缺id 缺asp_cancel | 
+  | MANU_ORDER_STATS | 生产工单统计表 | v_manu_order_stats | 缺id 缺asp_cancel | 
+[OK] _q-flat-views.sql (1 batches)

@@ -147,9 +147,10 @@ import { computed, nextTick, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { usePanelRuntime } from '@core/panel-runtime'
-import { printProductCards } from '@/business/print-formats'
 
 const engine = usePanelRuntime()
+/** 纸质单据打印(与其让本组件直接依赖 atom print-formats,不如统一<｜hy_place▁holder▁no▁813｜>面板 runtime 下发) */
+const printProductCards = (rows) => engine.printProductCards(rows)
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },

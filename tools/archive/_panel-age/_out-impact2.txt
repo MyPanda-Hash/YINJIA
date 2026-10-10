@@ -1,0 +1,64 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-impact2.sql ==
+  (0 rows)
+  | bd_other_in | (none) | 
+  | bd_other_out | (none) | 
+  | bd_outsource_in | (none) | 
+  | bd_outsource_issue | (none) | 
+  | bd_pu_req | (none) | 
+  | bl_other_in | (none) | 
+  | bl_other_out | (none) | 
+  | bl_outsource_in | (none) | 
+  | bl_outsource_issue | (none) | 
+  | bl_pu_req | (none) | 
+  | v_other_in_detail | (none) | 
+  | v_other_in_stats | (none) | 
+  | v_other_out_detail | (none) | 
+  | v_other_out_stats | (none) | 
+  | v_outsource_in_detail | (none) | 
+  | v_outsource_in_stats | (none) | 
+  | v_outsource_issue_detail | (none) | 
+  | v_outsource_issue_stats | (none) | 
+  | v_stock_balance | (none) | 
+  | v_stock_ledger | (none) | 
+  | v_stock_movement | (none) | 
+  | v_stock_summary | (none) | 
+  | id | 
+  | source_panel_code | 
+  | source_form_no | 
+  | source_detail_key | 
+  | source_line_key | 
+  | target_panel_code | 
+  | target_form_no | 
+  | target_detail_key | 
+  | target_line_key | 
+  | inventory_code | 
+  | source_quantity | 
+  | linked_quantity | 
+  | link_status | 
+  | create_by | 
+  | create_time | 
+  | release_time | 
+  | batch_no | 
+  | batch_id | 
+  | 备用1 | 
+  | 备用2 | 
+  | 备用3 | 
+  | 备用4 | 
+  | 备用5 | 
+  | 备用6 | 
+  | 备用7 | 
+  | 备用8 | 
+  | 备用9 | 
+  | 备用10 | 
+  | 备用11 | 
+  | 备用12 | 
+  | 备用13 | 
+  | 备用14 | 
+  | 备用15 | 
+  | 备用16 | 
+  | 备用17 | 
+  | 备用18 | 
+  | 备用19 | 
+  | 备用20 | 
+[OK] _q-impact2.sql (3 batches)

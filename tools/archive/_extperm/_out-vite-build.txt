@@ -1,0 +1,129 @@
+
+> yinjia-mes-frontend@0.1.0 build
+> vite build
+
+vite v6.4.3 building for production...
+transforming...
+node_modules/@vueuse/core/dist/index.js (3362:0): A comment
+
+"/* #__PURE__ */"
+
+in "node_modules/@vueuse/core/dist/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+node_modules/@vueuse/core/dist/index.js (5780:22): A comment
+
+"/* #__PURE__ */"
+
+in "node_modules/@vueuse/core/dist/index.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 2300 modules transformed.
+rendering chunks...
+[plugin vite:reporter] 
+(!) D:/YINJIA-main/frontend/src/business/api.js is dynamically imported by D:/YINJIA-main/frontend/src/stores/user.js, D:/YINJIA-main/frontend/src/stores/user.js but also statically imported by D:/YINJIA-main/frontend/src/layout/NoticeCenter.vue, D:/YINJIA-main/frontend/src/layout/TabsBar.vue, D:/YINJIA-main/frontend/src/layout/TopBar.vue, D:/YINJIA-main/frontend/src/stores/user.js, dynamic import will not move module into another chunk.
+
+[plugin vite:reporter] 
+(!) D:/YINJIA-main/frontend/src/stores/user.js is dynamically imported by D:/YINJIA-main/frontend/src/core/request.js but also statically imported by D:/YINJIA-main/frontend/src/core/views/NewVoucherDialog.vue, D:/YINJIA-main/frontend/src/core/views/PanelxForm.vue, D:/YINJIA-main/frontend/src/core/views/PanelxList.vue, D:/YINJIA-main/frontend/src/core/views/ProdDocListSheet.vue, D:/YINJIA-main/frontend/src/core/views/QcInspReqSheet.vue, D:/YINJIA-main/frontend/src/layout/DeskSettingsDialog.vue, D:/YINJIA-main/frontend/src/layout/FactorySwitchDialog.vue, D:/YINJIA-main/frontend/src/layout/InitWizard.vue, D:/YINJIA-main/frontend/src/layout/LeftNav.vue, D:/YINJIA-main/frontend/src/layout/NoticeCenter.vue, D:/YINJIA-main/frontend/src/layout/PortalLayout.vue, D:/YINJIA-main/frontend/src/layout/TopBar.vue, D:/YINJIA-main/frontend/src/router/index.js, D:/YINJIA-main/frontend/src/views/dashboard/index.vue, D:/YINJIA-main/frontend/src/views/login/index.vue, D:/YINJIA-main/frontend/src/views/modules/plan/WorkOrderBoard.vue, D:/YINJIA-main/frontend/src/views/modules/plan/WorkOrderList.vue, D:/YINJIA-main/frontend/src/views/sys/OrgAdmin.vue, dynamic import will not move module into another chunk.
+
+computing gzip size...
+dist/index.html                                      1.47 kB │ gzip:   0.95 kB
+dist/assets/login-manufacturing-eYI5rolY.webp      113.70 kB
+dist/assets/UsageLog-De28kLy2.css                    0.47 kB │ gzip:   0.24 kB
+dist/assets/ModuleView-CHwVXfI2.css                  0.63 kB │ gzip:   0.30 kB
+dist/assets/ManufactureBoard-kUh8tqEi.css            0.75 kB │ gzip:   0.35 kB
+dist/assets/el-card-BAyktVMS.css                     0.92 kB │ gzip:   0.32 kB
+dist/assets/SolutionCenter-C8YSTtff.css              1.07 kB │ gzip:   0.38 kB
+dist/assets/OrderConvert-iLRfuKJL.css                1.15 kB │ gzip:   0.48 kB
+dist/assets/el-empty-S7fQQ3B8.css                    1.16 kB │ gzip:   0.46 kB
+dist/assets/ReworkDesk-C2HUYkTF.css                  1.23 kB │ gzip:   0.52 kB
+dist/assets/el-popover-CIWuyyfx.css                  1.40 kB │ gzip:   0.44 kB
+dist/assets/MobileWarehouse-DA2fvRhj.css             1.51 kB │ gzip:   0.53 kB
+dist/assets/ScheduleBoard-tCHfXe1-.css               1.52 kB │ gzip:   0.51 kB
+dist/assets/404-BWALRO-W.css                         1.55 kB │ gzip:   0.42 kB
+dist/assets/SerialNumber-CjfvC1rW.css                1.66 kB │ gzip:   0.55 kB
+dist/assets/el-collapse-item-BvmEG8Qn.css            2.09 kB │ gzip:   0.58 kB
+dist/assets/ShareFileCenter-DJsBuUA-.css             2.34 kB │ gzip:   0.70 kB
+dist/assets/StdLibManager-BOzie-FT.css               2.50 kB │ gzip:   0.79 kB
+dist/assets/el-radio-button-98CJgL9d.css             3.26 kB │ gzip:   0.80 kB
+dist/assets/WorkOrderList-VBhtjd11.css               3.46 kB │ gzip:   0.87 kB
+dist/assets/el-alert-B6UgayC7.css                    3.47 kB │ gzip:   0.74 kB
+dist/assets/WorkOrderBoard-eKkCKd07.css              3.47 kB │ gzip:   0.89 kB
+dist/assets/el-switch-DpR9-s4E.css                   3.91 kB │ gzip:   0.95 kB
+dist/assets/el-radio--Lrp4je_.css                    4.34 kB │ gzip:   0.94 kB
+dist/assets/el-input-number-DExoAqKP.css             4.35 kB │ gzip:   0.90 kB
+dist/assets/OrgAdmin-P_mR9J8y.css                    4.99 kB │ gzip:   1.38 kB
+dist/assets/WorkOrderTraceDialog-faXOx4ZB.css        5.32 kB │ gzip:   1.34 kB
+dist/assets/el-form-item-D_relxjU.css                5.69 kB │ gzip:   0.98 kB
+dist/assets/el-tag-1VV9QMa7.css                      6.02 kB │ gzip:   0.95 kB
+dist/assets/el-tree-select-BlVFFK_D.css              6.55 kB │ gzip:   1.45 kB
+dist/assets/el-pagination-CDeFZDGO.css               7.03 kB │ gzip:   1.19 kB
+dist/assets/index-DnlbRrGI.css                       7.98 kB │ gzip:   1.98 kB
+dist/assets/PanelxForm-DM5C3v0C.css                  8.94 kB │ gzip:   1.99 kB
+dist/assets/BusinessOverview-IC0Dh_lp.css            9.28 kB │ gzip:   2.14 kB
+dist/assets/el-select-D5zQ8kOe.css                   9.82 kB │ gzip:   1.94 kB
+dist/assets/el-dropdown-item-BeIfAqTO.css           10.10 kB │ gzip:   1.40 kB
+dist/assets/el-popper-DNltde0j.css                  10.32 kB │ gzip:   1.91 kB
+dist/assets/ScanFillDialog-D_Z5CJkC.css             11.23 kB │ gzip:   2.47 kB
+dist/assets/el-table-column-Dp73S2HR.css            19.54 kB │ gzip:   2.91 kB
+dist/assets/el-date-picker-BsrAVvYx.css             28.88 kB │ gzip:   4.20 kB
+dist/assets/el-col-BWEC13sA.css                     36.49 kB │ gzip:   3.51 kB
+dist/assets/RecordSheetPanels-vnI96Uyo.css          36.71 kB │ gzip:   6.89 kB
+dist/assets/index-CddwIsmd.css                      38.21 kB │ gzip:   7.19 kB
+dist/assets/PortalLayout-Czrjqo-c.css               39.26 kB │ gzip:   6.92 kB
+dist/assets/index-MBKkMBiO.css                      63.84 kB │ gzip:   9.97 kB
+dist/assets/PanelxList-90-umZXx.css                118.34 kB │ gzip:  19.21 kB
+dist/assets/el-dropdown-menu-l0sNRNKZ.js             0.00 kB │ gzip:   0.02 kB
+dist/assets/el-tooltip-l0sNRNKZ.js                   0.00 kB │ gzip:   0.02 kB
+dist/assets/_plugin-vue_export-helper-DlAUqK2U.js    0.09 kB │ gzip:   0.10 kB
+dist/assets/404-CSNz2__b.js                          0.64 kB │ gzip:   0.49 kB
+dist/assets/sumTotals-Cp3tglrz.js                    0.72 kB │ gzip:   0.40 kB
+dist/assets/tabs-DSsXSaQP.js                         1.05 kB │ gzip:   0.52 kB
+dist/assets/SerialNumber-DGi1_bXJ.js                 2.05 kB │ gzip:   1.06 kB
+dist/assets/MobileWarehouse-BwPES4Rq.js              2.58 kB │ gzip:   1.28 kB
+dist/assets/ManufactureBoard-DAm9GnCD.js             2.92 kB │ gzip:   1.37 kB
+dist/assets/app-B_rdxSoB.js                          3.09 kB │ gzip:   1.26 kB
+dist/assets/ModuleView-HZxVMzpq.js                   3.10 kB │ gzip:   1.89 kB
+dist/assets/ReworkDesk-BXBvAv8r.js                   3.30 kB │ gzip:   1.54 kB
+dist/assets/SolutionCenter-CaaYkH-y.js               3.66 kB │ gzip:   1.82 kB
+dist/assets/UsageLog-CdHh1nVy.js                     5.29 kB │ gzip:   2.18 kB
+dist/assets/index-8OHT2iij.js                        6.29 kB │ gzip:   2.69 kB
+dist/assets/WorkOrderTraceDialog-B341Q0ex.js        10.46 kB │ gzip:   2.98 kB
+dist/assets/OrderConvert-DVLrC4Y1.js                13.04 kB │ gzip:   4.78 kB
+dist/assets/StdLibManager-CEmMHMqZ.js               14.66 kB │ gzip:   5.92 kB
+dist/assets/WorkOrderBoard-DmQCJWAr.js              15.20 kB │ gzip:   4.95 kB
+dist/assets/ScheduleBoard-BM8EwvrQ.js               16.07 kB │ gzip:   5.57 kB
+dist/assets/ShareFileCenter-BaGAEF87.js             17.41 kB │ gzip:   5.90 kB
+dist/assets/WorkOrderList-bPK0alcf.js               19.12 kB │ gzip:   6.17 kB
+dist/assets/OrgAdmin-r8g5iZQO.js                    23.58 kB │ gzip:   7.04 kB
+dist/assets/index-BGbQGMFM.js                       27.29 kB │ gzip:  10.50 kB
+dist/assets/purify.es-DedTAGkB.js                   29.05 kB │ gzip:  11.18 kB
+dist/assets/ScanFillDialog-CKjqSe7v.js              35.82 kB │ gzip:  12.20 kB
+dist/assets/PanelxForm-Dz0KqOct.js                  38.84 kB │ gzip:  12.92 kB
+dist/assets/index-BoVjyNBy.js                       42.19 kB │ gzip:  14.26 kB
+dist/assets/print-formats-cDhBiB-s.js               43.68 kB │ gzip:  15.51 kB
+dist/assets/PortalLayout-CF670FRp.js                55.91 kB │ gzip:  18.86 kB
+dist/assets/zh-TW-B_GW5HdM.js                      103.64 kB │ gzip:  36.75 kB
+dist/assets/ko-CUvEDO6M.js                         107.77 kB │ gzip:  39.76 kB
+dist/assets/ja-DLD7uf9F.js                         110.91 kB │ gzip:  38.76 kB
+dist/assets/de-XTbzjOUT.js                         112.42 kB │ gzip:  42.59 kB
+dist/assets/es-yd014Gfv.js                         114.01 kB │ gzip:  40.63 kB
+dist/assets/vue-vendor-DjmkY1sX.js                 114.23 kB │ gzip:  44.54 kB
+dist/assets/fr-ZbJKnEzI.js                         116.02 kB │ gzip:  41.70 kB
+dist/assets/vi-CZ4h5CRF.js                         121.60 kB │ gzip:  39.88 kB
+dist/assets/en-Dcs8MVdn.js                         141.69 kB │ gzip:  54.61 kB
+dist/assets/ru-wHyXx_lo.js                         157.48 kB │ gzip:  45.68 kB
+dist/assets/index.es-fUmnCa_r.js                   159.86 kB │ gzip:  53.61 kB
+dist/assets/element-icons-B9nAuNKn.js              170.97 kB │ gzip:  44.24 kB
+dist/assets/docx-preview-AlLTmon6.js               174.76 kB │ gzip:  51.58 kB
+dist/assets/BusinessOverview-DWg51ln6.js           176.30 kB │ gzip:  56.12 kB
+dist/assets/th-BmloDuIE.js                         184.46 kB │ gzip:  43.56 kB
+dist/assets/index-CfmQ93Xh.js                      194.49 kB │ gzip:  63.58 kB
+dist/assets/RecordSheetPanels-Dqb2g5uT.js          199.30 kB │ gzip:  49.77 kB
+dist/assets/html2canvas.esm-QH1iLAAe.js            202.38 kB │ gzip:  48.04 kB
+dist/assets/jspdf.es.min-Bd2apUuV.js               390.89 kB │ gzip: 128.89 kB
+dist/assets/PanelxList-mg0n-cXK.js                 418.85 kB │ gzip: 118.15 kB
+dist/assets/xlsx-CkFp8p6R.js                       429.53 kB │ gzip: 143.08 kB
+dist/assets/element-plus-DWtrvQvD.js               905.51 kB │ gzip: 293.42 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 27.10s

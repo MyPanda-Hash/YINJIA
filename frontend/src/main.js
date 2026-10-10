@@ -14,9 +14,11 @@ import App from './App.vue'
 import router from './router'
 import './styles/index.css'
 import * as sqlPanelRuntime from './business/engine'
-import { installPanelRuntime } from './core/panel-runtime'
+import { installAppContext, installPanelRuntime } from './core/panel-runtime'
 import { i18n, registerDictFetcher, ensureLocalePack } from './i18n'
 import { useLocaleStore } from './stores/locale'
+import { useTabsStore } from './stores/tabs'
+import { useUserStore } from './stores/user'
 
 const app = createApp(App)
 
@@ -30,6 +32,10 @@ app.use(createPinia())
 app.use(router)
 app.use(i18n)
 app.use(ElLoading)
+
+// core 视图不认 pinia(分层约束:core 只依赖注入进来的东西),所以把应用外壳状态
+// (账号/页签/语言)显式注入;必须在 createPinia() 之后,store 实例才可用。
+installAppContext({ user: useUserStore(), tabs: useTabsStore(), locale: useLocaleStore() })
 
 // 应用启动时把检测到的 locale 应用到 i18n 与 <html lang>;
 // 拉取动态语言列表(yj_locale 注册表);外语缺失词典(翻译表/机翻)后台补齐

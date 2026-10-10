@@ -1,0 +1,42 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-finin-fields.sql ==
+  | FINISH_IN_DETAIL 字段 | 单据日期 | 单据日期 | query,detail | 
+  | FINISH_IN_DETAIL 字段 | 创建时间 | 创建时间 | detail | 
+  | FINISH_IN_DETAIL 字段 | 单据编号 | 单据编号 | query,detail | 
+  | FINISH_IN_DETAIL 字段 | 业务类型 | 业务类型 | query,detail | 
+  | FINISH_IN_DETAIL 字段 | 仓库编码 | 仓库编码 | detail | 
+  | FINISH_IN_DETAIL 字段 | 仓库 | 仓库 | query,detail | 
+  | FINISH_IN_DETAIL 字段 | 入库类别 | 入库类别 | detail | 
+  | FINISH_IN_DETAIL 字段 | 生产车间编码 | 生产车间编码 | detail | 
+  | FINISH_IN_DETAIL 字段 | 生产车间 | 生产车间 | query,detail | 
+  | FINISH_IN_DETAIL 字段 | 经手人编码 | 经手人编码 | detail | 
+  | FINISH_IN_DETAIL 字段 | 经手人 | 经手人 | detail | 
+  | FINISH_IN_DETAIL 字段 | 备注 | 备注 | detail | 
+  | FINISH_IN_DETAIL 字段 | 制单人 | 制单人 | detail | 
+  | FINISH_IN_DETAIL 字段 | 审核人 | 审核人 | detail | 
+  | FINISH_IN_DETAIL 字段 | 存货编码 | 存货编码 | detail | 
+  | FINISH_IN_DETAIL 字段 | 存货 | 存货 | query,detail | 
+  | FINISH_IN_DETAIL 字段 | 规格型号 | 规格型号 | detail | 
+  | FINISH_IN_DETAIL 字段 | 计量单位 | 计量单位 | detail | 
+  | FINISH_IN_DETAIL 字段 | 实收数量 | 实收数量 | detail | 
+  | FINISH_IN_DETAIL 字段 | 单价 | 单价 | detail | 
+  | FINISH_IN_DETAIL 字段 | 金额 | 金额 | detail | 
+  | FINISH_IN_DETAIL 字段 | 计量单位2 | 计量单位2 | detail | 
+  | FINISH_IN_DETAIL 字段 | 实收数量2 | 实收数量2 | detail | 
+  | FINISH_IN_STATS 字段 | 单据日期 | 单据日期 | query,detail | 
+  | FINISH_IN_STATS 字段 | 项目 | 项目 | detail | 
+  | FINISH_IN_STATS 字段 | 存货编码 | 存货编码 | detail | 
+  | FINISH_IN_STATS 字段 | 存货 | 存货 | query,detail | 
+  | FINISH_IN_STATS 字段 | 规格型号 | 规格型号 | detail | 
+  | FINISH_IN_STATS 字段 | 计量单位 | 计量单位 | detail | 
+  | FINISH_IN_STATS 字段 | 辅单位 | 辅单位 | detail | 
+  | FINISH_IN_STATS 字段 | 实收数量(主单位) | 实收数量(主单位) | detail | 
+  | FINISH_IN_STATS 字段 | 单价 | 单价 | detail | 
+  | FINISH_IN_STATS 字段 | 金额 | 金额 | detail | 
+  | FINISH_IN_STATS 字段 | 实收数量(辅单位) | 实收数量(辅单位) | detail | 
+  | FINISH_IN_STATS 字段 | 单价(辅单位) | 单价(辅单位) | detail | 
+  | CREATE   VIEW v_material_out_detail AS
+SELECT ROW_NUMBER() OVER(ORDER BY h.id DESC, l.id) AS id, h.asp_cancel, h.[单据日期], h.asp_time1 AS [创建时间], h.[单据编号], h.[业务类型], NULL AS [仓库编码] /* 无数据源,布局列 */, h.[仓库], h.[出库类别], NULL AS [生产车间编码] /* 无数据源,布局列 */, h.[生产车间], NULL AS [领用人编码] /* 无数据源,布局列 */, h.[领用人], h.asp_user1 AS [制单人], s.shr AS [审核人], NULL AS [材料编码] /* 无数据源,布局列 */, l.[材料名称], l.[规格型号] AS [材料规格], NULL AS [明细.生产车间] /* 无数据源,布局列 */, NULL AS [工作中心] /* 无数据源,布局列 */, NULL AS [班组] /* 无数据源,布局列 */, NULL AS [工人] /* 无数据源,布局列 */, NULL AS [设备] /* 无数据源,布局列 */, l.[计量单位], l.[数量], l.[单价], l.[金额], NULL AS [计量单位2] /* 无数据源,布局列 */, NULL AS [数量2] /* 无数据源,布局列 */, NULL AS [出库调整] /* 无数据源,布局列 */
+FROM bd_material_out h LEFT JOIN bl_material_out l ON h.[单据编号]=l.[单据编号]
+LEFT JOIN yj_doc_status s ON s.panel_code='MATERIAL_OUT' AND s.doc_no=h.[单据编号] | 
+[OK] _q-finin-fields.sql (3 batches)

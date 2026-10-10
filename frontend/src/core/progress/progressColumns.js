@@ -116,9 +116,9 @@ export const PROGRESS_COLUMNS = Object.freeze([
   { label: '预计完成日期', key: '里程完成',     width: 11, alias: ['预计完成日期'] },
   { label: '状态',         key: '状态',         width: 18, readonly: true },
   { label: '测试情况',     key: '测试员',       width: 20, alias: ['测试情况'] },
-  { label: '技术目标达成', key: '技术目标达成', width: 10 },
-  { label: '是否市场转化', key: '是否市场转化', width: 10 },
-  { label: '未转换原因',   key: '未转换原因',   width: 14 },
+  // 2026-10-09 用户口径:撤下「技术目标达成 / 是否市场转化 / 未转换原因」三列(控制列表 14 → 11)。
+  // 元数据侧同步置 hidden=1(见 tools/migrate-rd-progress-drop-3cols.sql);
+  // 物理列与历史数据**保留** —— RD_PROGRESS_DETAIL_COLUMNS 里仍有这三项(项目铁律:col_name 永不改)。
 ])
 
 /** 按显示名取列定义 */

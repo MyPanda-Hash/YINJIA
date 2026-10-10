@@ -37,19 +37,19 @@ const router = useRouter()
 const tabs = useTabsStore()
 
 const flow = [
-  { name: '入库', desc: '采购入库 / 生产入库（产成品入库）/ 其他入库，扫码或录入数量' },
+  // 2026-10-08:其他入库/其他出库单据已下架,文案同步(移动端只剩采购入库/产成品入库/销售出库/材料出库)
+  { name: '入库', desc: '采购入库 / 生产入库（产成品入库），扫码或录入数量' },
   { name: '上下架', desc: '货位调整、货位管理，移动货物到指定货位' },
-  { name: '出库', desc: '销售出库 / 材料出库 / 其他出库，扫描或选择货物出库' },
+  { name: '出库', desc: '销售出库 / 材料出库，扫描或选择货物出库' },
   { name: '货位调整', desc: '库存盘点（账面/实盘/盈亏）、货位调整、库存查询' },
 ]
 
 const docs = [
   { code: 'PURCHASE_IN', label: '采购入库单' },
   { code: 'FINISH_IN', label: '产成品入库单' },
-  { code: 'OTHER_IN', label: '其他入库单' },
+  // 2026-10-08 下架:其他入库单 OTHER_IN / 其他出库单 OTHER_OUT(面板+表+视图整体删除)
   { code: 'SALE_OUT', label: '销售出库单' },
   { code: 'MATERIAL_OUT', label: '材料出库单' },
-  { code: 'OTHER_OUT', label: '其他出库单' },
   { code: 'TRANSFER', label: '调拨单' },
   { code: 'STOCK_CHECK', label: '库存盘点单' },
   { code: 'LOCATION_ADJUST', label: '货位调整单' },

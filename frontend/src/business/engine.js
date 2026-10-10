@@ -12,6 +12,15 @@ export { unwrap, unwrapStrict, errMsg }
  */
 export { roundDecimal } from '@core/panel/calcRules'
 
+/**
+ * 纸质单据/标签打印(固定版式)——面板 runtime 契约的一站式再导出。
+ * core 视图不再直接 import `@/business/print-formats`,统一经 usePanelRuntime() 取。
+ */
+export {
+  printPuOrder, printPuOrderNoAmount, printQcReturn,
+  printProductCards, printLocationCards, printProductionTask, woQrText,
+} from './print-formats'
+
 // 数据访问固定为 SQL 后端：/api/px/* -> Spring Boot -> SQL Server HSDZ_MES（YINJIA-MES）。
 
 const APPROVAL_WORKFLOW_ACTIONS = ['提交审批', '审批通过', '审批驳回', '审批情况', '弃审']
@@ -179,10 +188,29 @@ export async function refColumns(field) {
   return [...new Set([r.refField, r.displayField].filter(Boolean))]
 }
 
+/** 参照过滤值里的 `$字段` 占位 → 取**本行**该字段的值(用于「仓位随仓库收窄」这类级联)。
+ *  例:yj_field.ref_filter = `仓库=$仓库` ⇒ 本行的「仓库」值即候选集的仓库条件。
+ *  未给行上下文、或该字段为空 ⇒ 返回 null,调用方据此判「无候选」(先选上级字段)。 */
+function resolveFilterValue(expected, row) {
+  if (typeof expected === 'string' && expected.startsWith('$')) {
+    const key = expected.slice(1)
+    const v = row?.[key]
+    return v === undefined || v === null || String(v).trim() === '' ? null : String(v)
+  }
+  return expected
+}
+
 // 拉取引用面板数据（SQL 后端）
-export async function queryRefRows(field, { keyword = '', pageSize = 200 } = {}) {
+export async function queryRefRows(field, { keyword = '', pageSize = 200, row = null } = {}) {
   const r = normRef(field)
-  const filter = r.filter || {}
+  // 级联过滤(2026-10-09):filter 值支持 `$字段` 占位,按本行取值;
+  //   解析不出值(没选上级字段/没传本行)⇒ 直接无候选,避免把全库仓位倒给用户选。
+  const filter = {}
+  for (const [k, v] of Object.entries(r.filter || {})) {
+    const rv = resolveFilterValue(v, row)
+    if (rv === null) return []
+    filter[k] = rv
+  }
   const hasAlternativeFilter = Object.values(filter).some(Array.isArray)
   let refConfig = null
   try {
@@ -351,6 +379,22 @@ export async function specAssignDoc(no) {
 /** 四个受控文件:我能不能编这张单 { applicable, canEdit, reason, productCode, owner, ownerName }(2026-09-21) */
 export async function rdDevFileEdit(panelCode, docNo) {
   return unwrap(await request.get('/px/rdDev/fileEdit', { params: { panelCode, docNo } }))
+}
+
+// ==================== 立项申请:分发对接人 / 确认责任人(2026-10-08 研发流程图③④) ====================
+
+/**
+ * 立项申请流程状态(侧栏两按钮的唯一真源):
+ * { status, level, liaison, liaisonName, owner, ownerName, canDispatchLiaison, canConfirmOwner }
+ * ⚠ 走 /rdFlow/* 而不是 /rdDev/* —— 后者要 RD_PROD_INFO 的查看权,立项线的销售/对接人会被 403 挡掉。
+ */
+export async function rdFlowState(docNo) {
+  return unwrap(await request.get('/px/rdFlow/state', { params: { docNo } }))
+}
+
+/** 启用账号清单(立项侧选人下拉):[{username, realName}] */
+export async function rdFlowUsers() {
+  return unwrap(await request.get('/px/rdFlow/users'))
 }
 
 /**

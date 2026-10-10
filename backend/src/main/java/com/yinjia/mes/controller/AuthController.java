@@ -81,6 +81,10 @@ public class AuthController {
             user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
             // 审批权限面板:管理员=全部;普通用户=角色勾了审批(yj_role_panel.can_approve)的面板
             user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
+            // 自定义字段配置权限面板(2026-10-09):管理员=全部;普通用户=角色勾了「自定义字段」的面板。
+            // 前端据此决定「字段管理 / 自定义字段」入口显不显示;真闸门在服务端
+            // PanelPermissionService.requireFieldConfig(同词 = field)。
+            user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
             Map<String, Object> out = new HashMap<>();
             out.put("token", jwtUtil.generate(username, factory));
             out.put("user", user);
@@ -98,12 +102,46 @@ public class AuthController {
         out.put("isAdmin", user.get("isAdmin"));
         out.put("visiblePanels", user.get("visiblePanels"));
         out.put("approvePanels", user.get("approvePanels"));
+        out.put("fieldPanels", user.get("fieldPanels"));
         return ApiResult.ok(out);
     }
 
     @GetMapping("/userinfo")
     public ApiResult<Map<String, Object>> userinfo() {
         return ApiResult.ok(currentUser());
+    }
+
+    /**
+     * 用户自助改密(2026-10-15 补)。此前前端 `TopBar.changePwd` 是纯前端假实现:
+     * 硬编码 `old !== '123456'` 校验、提示"演示环境不落库",库里一个字节都不动 ——
+     * 且除管理员在组织管理里改他人密码外,普通用户**根本没有轮换自己口令的出口**。
+     *
+     * 账套:本方法走认证请求(JwtAuthFilter 已按令牌声明 DataSourceRouter.use),故无需自己 use/clear。
+     */
+    @PostMapping("/changePassword")
+    public ApiResult<Void> changePassword(@RequestBody Map<String, String> body) {
+        String oldPassword = body.getOrDefault("old", "");
+        String newPassword = body.getOrDefault("next", "");
+        if (oldPassword.isBlank() || newPassword.isBlank()) {
+            throw new IllegalArgumentException("原密码和新密码不能为空");
+        }
+        if (newPassword.length() < 6) {
+            throw new IllegalArgumentException("新密码至少 6 位");
+        }
+        if (newPassword.equals(oldPassword)) {
+            throw new IllegalArgumentException("新密码不能与原密码相同");
+        }
+        String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
+                : SecurityContextHolder.getContext().getAuthentication().getName();
+        if (username == null) throw new IllegalStateException("未登录");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT password_hash FROM yj_user WHERE username = ?", username);
+        if (rows.isEmpty()) throw new IllegalStateException("用户不存在");
+        if (!encoder.matches(oldPassword, String.valueOf(rows.get(0).get("password_hash")))) {
+            throw new IllegalStateException("原密码不正确");
+        }
+        jdbc.update("UPDATE yj_user SET password_hash = ? WHERE username = ?", encoder.encode(newPassword), username);
+        return ApiResult.ok(null);
     }
 
     private Map<String, Object> currentUser() {
@@ -126,6 +164,7 @@ public class AuthController {
         user.put("factory", DataSourceRouter.current());
         user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
         user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
+        user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
         return user;
     }
 
@@ -146,6 +185,29 @@ public class AuthController {
         return jdbc.query(
                 "SELECT panel_code FROM yj_role_panel WHERE role_id = ? AND can_approve = 'Y'",
                 (rs, i) -> rs.getString(1), roleId);
+    }
+
+    /**
+     * 持有指定权限词的面板码(2026-10-09):取该角色 yj_role_panel.perms 的 csv 逐行**按词**判定
+     * —— 不用 `perms LIKE '%field%'`,免得日后出现同前缀的词(如 fieldx)被误命中。
+     * 管理员返回 `*`(= 全部,前端 canConfigFields 认这个通配)。
+     */
+    private List<String> panelsWithPerm(boolean admin, Object roleId, String word) {
+        if (admin) return List.of("*");
+        if (roleId == null) return List.of();
+        return jdbc.query(
+                "SELECT panel_code, perms FROM yj_role_panel WHERE role_id = ?",
+                (rs, i) -> hasPermWord(rs.getString(2), word) ? rs.getString(1) : null, roleId)
+                .stream().filter(java.util.Objects::nonNull).toList();
+    }
+
+    /** csv 权限词表是否含某词(trim + 逐词精确匹配;null/空表 = 不含) */
+    private static boolean hasPermWord(String perms, String word) {
+        if (perms == null || perms.isBlank()) return false;
+        for (String p : perms.split(",")) {
+            if (word.equals(p.trim())) return true;
+        }
+        return false;
     }
 
     /**

@@ -1,0 +1,25 @@
+﻿QC_OP	f9e0dc29|2026-09-10|feat: 销售出库三键记账+工序质检单(品质层#10:GJ前缀doc面板工单参照/检验项行)E2E均通过(T382出库10结余46)	frontend/src/business/menus.js
+QC_RECORD	7c52c53a|2026-09-10|db: 登记生产11面板新增脚本(表结构+面板注册+字段与译名)到迁移清单	tools/migrate-prod-forms.sql
+QC_DISPOSAL	b9795c62|2026-09-10|feat: 产成品入库三键记账+不良品处理单(品质层#11:转隔离仓/不良品仓kucun移仓,报废扣减,弃审对称冲回)E2E双通(CK04入20移5,WH-GL隔离仓5)	backend/src/main/java/com/yinjia/mes/service/QcDisposalService.java
+ROD_RETURN	7c52c53a|2026-09-10|db: 登记生产11面板新增脚本(表结构+面板注册+字段与译名)到迁移清单	tools/migrate-prod-forms.sql
+LOT_TRACE	072baf2d|2026-09-10|feat: 批号追溯视图(品质层#11收官:v_lot_trace八事件UNION时间线,暂收/检验/入库/领料/工序质检/处置/成品/销售出库,INIT-T382与测试批号全链验证)	frontend/src/business/menus.js
+SALES_ORDER_DETAIL	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/views/scm/BusinessOverview.vue
+SALES_ORDER_STATS	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/views/scm/BusinessOverview.vue
+PURCHASE_IN_DETAIL	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+FINISH_IN_DETAIL	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+OTHER_IN_DETAIL	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+OUTSOURCE_IN_DETAIL	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+SALE_OUT_DETAIL	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+MATERIAL_OUT_DETAIL	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+OTHER_OUT_DETAIL	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+OUTSOURCE_ISSUE_DETAIL	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+PURCHASE_IN_STATS	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+FINISH_IN_STATS	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+OTHER_IN_STATS	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+OUTSOURCE_IN_STATS	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+SALE_OUT_STATS	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+MATERIAL_OUT_STATS	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+OTHER_OUT_STATS	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+OUTSOURCE_ISSUE_STATS	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/business/menus.js
+STOCK_BALANCE	fadbe55e|2026-09-16|feat: 库存状况表(STOCK_BALANCE)参照 PANDA 实时聚合实现——视图 v_stock_balance 聚合 8 类出入库行(采购入库/产成品入库/其他入库/委外入库/销售出库/材料出库/其他出库/委外发料)按仓库+存货计算现存量/结存单价/结存金额;列名兼容(产成品表用产品编码、材料出库用材料编码);平表面板+9字段(仓库/存货带参照)+10语言译名;菜单在库存统计组末尾;API 查询验证 5 行数据返回	frontend/src/business/menus.js
+STOCK_SUMMARY	801abcce|2026-08-31|feat: YINJIA-MES v0.8 — full system with i18n, OCR, panel engine, base settings, inventory docs	frontend/src/views/scm/BusinessOverview.vue

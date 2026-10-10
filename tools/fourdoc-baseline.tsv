@@ -195,24 +195,24 @@ ord	panel_code	col_name	label	place	seq	data_type	width	flags	alias	ref_panel	re
 36	PURCHASE_IN	商品id	商品id	detail	180	文本	120	E-H-								
 37	PURCHASE_IN	来源单号	来源单号	query,header	190	文本	120	E-H-							Source no.	
 38	PURCHASE_IN	仓库	仓库	detail	190	参照	140	ER-V		WH	仓库名称	仓库名称				
-39	PURCHASE_IN	单据关闭状态	单据关闭状态	header	200	文本	130	E-H-								
-40	PURCHASE_IN	商品是否多单位	商品是否多单位	detail	200	文本	120	E-H-								
-41	PURCHASE_IN	商品是否序列号	商品是否序列号	detail	210	文本	120	E-H-								
-42	PURCHASE_IN	销售订单号	销售订单号	query,header	210	文本	130	E-H-							Sales order no.	
-43	PURCHASE_IN	经手人编码	经手人编码	header	220	文本	130	E-H-							Handler code	
-44	PURCHASE_IN	商品是否辅助属性	商品是否辅助属性	detail	220	文本	120	E-H-								
-45	PURCHASE_IN	交货方式	交货方式	header	230	文本	130	E--V								
-46	PURCHASE_IN	商品是否保质期	商品是否保质期	detail	230	文本	120	E-H-								
-47	PURCHASE_IN	交货方式编码	交货方式编码	header	240	文本	130	E-H-								
-48	PURCHASE_IN	商品是否批次	商品是否批次	detail	240	文本	120	E-H-								
-49	PURCHASE_IN	结算状态	结算状态	header	250	文本	130	E--V								
-50	PURCHASE_IN	仓库id	仓库id	detail	250	文本	120	E-H-								
-51	PURCHASE_IN	修改时间	修改时间	header	260	日期	130	E-H-								
-52	PURCHASE_IN	仓库启用仓位管理	仓库启用仓位管理	detail	260	文本	120	E-H-								
-53	PURCHASE_IN	创建人	创建人	header	270	文本	130	E-H-								
-54	PURCHASE_IN	仓位id	仓位id	detail	270	文本	120	E-H-								
-55	PURCHASE_IN	修改人	修改人	header	280	文本	130	E-H-								
-56	PURCHASE_IN	仓位名称	仓位名称	detail	280	文本	120	E-H-								
+39	PURCHASE_IN	仓位编码	仓位	detail	195	参照	120	E--V		WHLOC	仓位编码	仓位编码	仓库=$仓库		Bin	
+40	PURCHASE_IN	单据关闭状态	单据关闭状态	header	200	文本	130	E-H-								
+41	PURCHASE_IN	商品是否多单位	商品是否多单位	detail	200	文本	120	E-H-								
+42	PURCHASE_IN	商品是否序列号	商品是否序列号	detail	210	文本	120	E-H-								
+43	PURCHASE_IN	销售订单号	销售订单号	query,header	210	文本	130	E-H-							Sales order no.	
+44	PURCHASE_IN	经手人编码	经手人编码	header	220	文本	130	E-H-							Handler code	
+45	PURCHASE_IN	商品是否辅助属性	商品是否辅助属性	detail	220	文本	120	E-H-								
+46	PURCHASE_IN	交货方式	交货方式	header	230	文本	130	E--V								
+47	PURCHASE_IN	商品是否保质期	商品是否保质期	detail	230	文本	120	E-H-								
+48	PURCHASE_IN	交货方式编码	交货方式编码	header	240	文本	130	E-H-								
+49	PURCHASE_IN	商品是否批次	商品是否批次	detail	240	文本	120	E-H-								
+50	PURCHASE_IN	结算状态	结算状态	header	250	文本	130	E--V								
+51	PURCHASE_IN	仓库id	仓库id	detail	250	文本	120	E-H-								
+52	PURCHASE_IN	修改时间	修改时间	header	260	日期	130	E-H-								
+53	PURCHASE_IN	仓库启用仓位管理	仓库启用仓位管理	detail	260	文本	120	E-H-								
+54	PURCHASE_IN	创建人	创建人	header	270	文本	130	E-H-								
+55	PURCHASE_IN	仓位id	仓位id	detail	270	文本	120	E-H-								
+56	PURCHASE_IN	修改人	修改人	header	280	文本	130	E-H-								
 57	PURCHASE_IN	源单行号	采购订单行号	detail	290	文本	110	E--V								
 58	PURCHASE_IN	批次号	批次号	query,header	290	文本	160	---V								
 59	PURCHASE_IN	辅助属性id	辅助属性id	detail	300	文本	120	E-H-								

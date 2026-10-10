@@ -108,7 +108,7 @@ import { tt } from '@/i18n'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import request from '@/core/request'
-import { useUserStore } from '@/stores/user'
+import { useAppContext } from '@/core/panel-runtime'
 import { canViewPanel } from '@/core/auth/panelAccess'
 import { PROD_DOC_FIELD_OPTIONS, filterProdDocRows } from '@/core/prod/prodDocSearch'
 
@@ -122,7 +122,7 @@ const props = defineProps({
 const emit = defineEmits(['rows', 'clear-filter'])
 
 const router = useRouter()
-const user = useUserStore()
+const { user } = useAppContext()
 
 const columns = ref([])
 const rows = ref([])

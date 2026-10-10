@@ -249,6 +249,16 @@
                     :disabled="!editable || dr.computed"
                     style="width: 100%"
                   />
+                  <!-- 明细里的「多行文本」字段,同上(元数据驱动,非面板硬编码) -->
+                  <el-input
+                    v-else-if="isMultiline(dr)"
+                    v-model="row[dr.dataName]"
+                    type="textarea"
+                    :autosize="{ minRows: 1, maxRows: 6 }"
+                    resize="none"
+                    :disabled="!editable || dr.computed"
+                    class="multi-text"
+                  />
                   <el-input v-else v-model="row[dr.dataName]" :disabled="!editable || dr.computed" />
                 </template>
               </el-table-column>
@@ -325,7 +335,7 @@
         </template>
       </el-dialog>
     </div>
-    <RefPickDialog v-model="refVisible" :field="refPick?.field" :mode="refPick?.mode" @confirm="onRefConfirm" />
+    <RefPickDialog v-model="refVisible" :field="refPick?.field" :row="refPick?.row" :mode="refPick?.mode" @confirm="onRefConfirm" />
 
     <!-- 下拉框字段弹窗模式(>20 条):字典项搜索选择 -->
     <el-dialog v-model="dictPickVisible" :title="tt('选择') + '：' + (dictPickField ? tt(dictPickField.name) : '')" width="440px" append-to-body :close-on-click-modal="false">
@@ -370,13 +380,10 @@ const props = defineProps({
   embedded: { type: Boolean, default: false },
 })
 const emit = defineEmits(['saved'])
-import { useTabsStore } from '@/stores/tabs'
-import { useUserStore } from '@/stores/user'
-import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Back, Plus, Delete, ArrowDown, Search } from '@element-plus/icons-vue'
-import { usePanelRuntime } from '@core/panel-runtime'
+import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import { applyCalcRules } from '@core/panel/calcRules'
@@ -394,9 +401,7 @@ const { SHORTCUTS } = engine
 
 const route = useRoute()
 const router = useRouter()
-const tabsStore = useTabsStore()
-const user = useUserStore()
-const localeStore = useLocaleStore()
+const { user, tabs: tabsStore, locale: localeStore } = useAppContext()
 
 // 语言热切换:轻量重拉字段标签与按钮组(仅换显示定义),
 // 表单输入值/明细数据/页签状态全部保留(meta.code 键不随语言变化)。
@@ -794,6 +799,17 @@ function isBool(r) {
 function isSelect(r) {
   return r.dataType === '下拉框' || r.dataType === '参照'
 }
+/** 「多行文本」字段类型:明细网格里渲染成可自撑高的多行框(见 §5 字段与参照) */
+function isMultiline(r) {
+  return String(r?.dataType || '') === '多行文本'
+}
+/**
+ * ⚠ 「多行文本」**只在明细网格生效**,表头位保持单行。
+ *   原因:`place='header,detail'` 的字段(三张检验单的 处理方式/备注 就是)是**一行 yj_field
+ *   同时供表头与明细**,若表头也渲染多行框,一屏 4 列的表头网格会被一个 6 行高的框撑开、
+ *   下面整排字段(执行标准/单据状态/审核人…)被推下去留一大块空白(2026-10-15 实测截图)。
+ *   用户口径本来也只说「明细行文字过长时多行显示」⇒ 范围收在明细,表头不动。
+ */
 
 // ---------- 参照字段弹窗选择（开发约束十一-1：能对应基础档案的字段弹窗拉取勾选导入） ----------
 const refVisible = ref(false)
@@ -1433,6 +1449,19 @@ watch(() => [panelCode.value, code.value], () => {
 </script>
 
 <style scoped>
+/* 「多行文本」字段类型的观感:**保持单行输入框的原样**(默认边框/底色/聚焦高亮一律不动),
+   只把高度、行高、内边距调成和能力一致,内容超长时自动撑高折行。
+   ⚠ 不要写 `border:0 / background:transparent / box-shadow:none` —— 2026-10-15 实测踩到:
+     那样这几列会变成"没有框的纯文字格",跟同排的单行框(表区/行号/数量)一眼看出不一样,
+     用户直接反馈「我没看到修改」。`class` 落在 el-input 的外层 div 上,
+     真正的 <textarea> 在里面,所以要 :deep 下去改。 */
+.multi-text :deep(.el-textarea__inner) {
+  min-height: 32px !important;
+  padding: 5px 11px;
+  line-height: 22px;
+  resize: none;
+  font-family: inherit;
+}
 /* 已完成(金蝶自动关单):靛蓝,与「已审核」的品牌绿明确区分 ——
    覆盖 el-tag 的三个 CSS 变量(元素级变量优先级高于 .el-tag--xxx 的单类规则) */
 .st-done {

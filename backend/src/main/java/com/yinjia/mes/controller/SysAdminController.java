@@ -3,11 +3,9 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.ButtonService;
 import com.yinjia.mes.service.PanelRegistry;
+import com.yinjia.mes.service.ReportService;
+import com.yinjia.mes.service.SysAdminService;
 import com.yinjia.mes.service.UsageLogService;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -28,14 +26,12 @@ import java.util.Map;
 @RequestMapping("/api/sys")
 public class SysAdminController {
 
-    private final JdbcTemplate jdbc;
-    private final PasswordEncoder encoder;
+    private final SysAdminService sysAdmin;
     private final PanelRegistry registry;
     private final UsageLogService usageLog;
 
-    public SysAdminController(JdbcTemplate jdbc, PasswordEncoder encoder, PanelRegistry registry, UsageLogService usageLog) {
-        this.jdbc = jdbc;
-        this.encoder = encoder;
+    public SysAdminController(SysAdminService sysAdmin, PanelRegistry registry, UsageLogService usageLog) {
+        this.sysAdmin = sysAdmin;
         this.registry = registry;
         this.usageLog = usageLog;
     }
@@ -51,7 +47,7 @@ public class SysAdminController {
                                                    @RequestParam(required = false) String end,
                                                    @RequestParam(defaultValue = "1") int page,
                                                    @RequestParam(defaultValue = "20") int size) {
-        requireAdmin();
+        sysAdmin.requireAdmin();
         return ApiResult.ok(usageLog.query(userName, panelName, actionName, start, end, page, size));
     }
 
@@ -62,91 +58,26 @@ public class SysAdminController {
                                                           @RequestParam(required = false) String actionName,
                                                           @RequestParam(required = false) String start,
                                                           @RequestParam(required = false) String end) {
-        requireAdmin();
+        sysAdmin.requireAdmin();
         return ApiResult.ok(usageLog.queryGrouped(userName, panelName, actionName, start, end));
-    }
-
-    /** 当前登录账号名(未登录抛 403,不触发前端登出)。 */
-    private String currentUsername() {
-        String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
-                : SecurityContextHolder.getContext().getAuthentication().getName();
-        if (username == null) throw new AccessDeniedException("未登录");
-        return username;
-    }
-
-    private void requireAdmin() {
-        requireAdmin("查看使用记录");
-    }
-
-    /**
-     * 组织架构维护与使用记录查看一律限系统管理员,否则 403。
-     * ⚠ 走 AccessDeniedException → GlobalExceptionHandler 归一成 **HTTP 200 + body code 403**,
-     * 这是刻意的:前端 request.js 把 HTTP 401/403 当作认证失效并强制登出,
-     * 若这里返回真 403,非管理员点一下组织架构就会被踢出登录。
-     *
-     * 读接口(部门树/用户清单/角色清单/角色面板)不设此校验:
-     * PanelxList 的「规格书分发责任人」选人依赖 GET /sys/user/list,非管理员也要用。
-     */
-    private void requireAdmin(String action) {
-        String username = currentUsername();
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT is_admin FROM yj_user WHERE username = ?", username);
-        boolean admin = !rows.isEmpty() && "Y".equals(rows.get(0).get("is_admin"));
-        if (!admin) throw new AccessDeniedException("仅管理员可" + action);
     }
 
     // ============ 部门 ============
 
     @GetMapping("/dept/tree")
-    @SuppressWarnings("unchecked")
     public ApiResult<List<Map<String, Object>>> deptTree() {
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT id, parent_id, dept_name, sort FROM yj_dept ORDER BY sort, id");
-        Map<Object, Map<String, Object>> nodes = new LinkedHashMap<>();
-        for (Map<String, Object> r : rows) {
-            Map<String, Object> node = new LinkedHashMap<>();
-            node.put("id", r.get("id"));
-            node.put("parentId", r.get("parent_id"));
-            node.put("deptName", r.get("dept_name"));
-            node.put("children", new ArrayList<Map<String, Object>>());
-            nodes.put(r.get("id"), node);
-        }
-        List<Map<String, Object>> roots = new ArrayList<>();
-        for (Map<String, Object> node : nodes.values()) {
-            Object pid = node.get("parentId");
-            Map<String, Object> parent = nodes.get(pid);
-            if (parent == null) roots.add(node);
-            else ((List<Map<String, Object>>) parent.get("children")).add(node);
-        }
-        return ApiResult.ok(roots);
+        return ApiResult.ok(sysAdmin.deptTree());
     }
 
     @PostMapping("/dept/save")
     public ApiResult<Void> deptSave(@RequestBody Map<String, Object> body) {
-        requireAdmin("维护部门");
-        String name = String.valueOf(body.getOrDefault("deptName", "")).trim();
-        if (name.isBlank()) throw new IllegalArgumentException("请输入部门名称");
-        int parentId = parseInt(body.get("parentId"), 0);
-        Object id = body.get("id");
-        if (id != null && !String.valueOf(id).isBlank()) {
-            jdbc.update("UPDATE yj_dept SET parent_id = ?, dept_name = ? WHERE id = ?",
-                    parentId, name, Integer.parseInt(String.valueOf(id)));
-        } else {
-            jdbc.update("INSERT INTO yj_dept (parent_id, dept_name, sort) VALUES (?,?,99)", parentId, name);
-        }
+        sysAdmin.deptSave(body);
         return ApiResult.ok(null);
     }
 
     @DeleteMapping("/dept/{id}")
     public ApiResult<Void> deptDelete(@PathVariable int id) {
-        requireAdmin("维护部门");
-        Integer children = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM yj_dept WHERE parent_id = ?", Integer.class, id);
-        if (children != null && children > 0) throw new IllegalStateException("存在下级部门，不能删除");
-        Integer users = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM yj_user WHERE dept_id = ?", Integer.class, id);
-        if (users != null && users > 0) throw new IllegalStateException("部门下存在用户，不能删除");
-        jdbc.update("DELETE FROM yj_dept WHERE id = ?", id);
+        sysAdmin.deptDelete(id);
         return ApiResult.ok(null);
     }
 
@@ -154,154 +85,52 @@ public class SysAdminController {
 
     @GetMapping("/user/list")
     public ApiResult<List<Map<String, Object>>> userList() {
-        return ApiResult.ok(jdbc.queryForList(
-                "SELECT u.id, u.username AS userName, u.real_name AS realName, u.dept_id AS deptId,"
-                        + " u.role_id AS roleId, u.enabled, d.dept_name AS deptName, r.role_name AS roleName,"
-                        + " ISNULL(u.生产车间, N'') AS workshop,"
-                        + " CASE WHEN u.is_admin='Y' THEN 1 ELSE 0 END AS isAdmin"
-                        + " FROM yj_user u LEFT JOIN yj_dept d ON d.id = u.dept_id"
-                        + " LEFT JOIN yj_role r ON r.id = u.role_id ORDER BY u.id"));
+        return ApiResult.ok(sysAdmin.userList());
     }
 
     @PostMapping("/user/save")
     public ApiResult<Void> userSave(@RequestBody Map<String, Object> body) {
-        requireAdmin("维护用户");
-        String userName = String.valueOf(body.getOrDefault("userName", "")).trim();
-        if (userName.isBlank()) throw new IllegalArgumentException("请输入账号");
-        String realName = String.valueOf(body.getOrDefault("realName", "")).trim();
-        String password = body.get("password") == null ? "" : String.valueOf(body.get("password"));
-        Integer deptId = (Integer) body.get("deptId");
-        Integer roleId = (Integer) body.get("roleId");
-        String enabled = "0".equals(String.valueOf(body.getOrDefault("enabled", 1))) ? "0" : "1";
-        // 生产车间(9.29 批次③「排产界面按车间过滤」):账号车间 → 排产界面只出本车间产线;
-        // 空 = 不受限(管理员/计划组照旧看全部)。取值域 = bs_prod_line.生产车间,不做外键(车间是文本派生值)。
-        String workshop = body.get("workshop") == null ? null : String.valueOf(body.get("workshop")).trim();
-        if (workshop != null && workshop.isBlank()) workshop = null;
-        // 权限随角色:仅当所选角色本身就是管理员角色时 is_admin=Y。
-        // ⚠ 旧写法把初值写成 "Y"、只在 roleId 非空时才可能改成 "N" —— 于是
-        // 「不选角色新建的账号」直接成为系统管理员(2026-09-22 探针实测:id=61/62 两个无角色账号 is_admin=Y)。
-        String isAdmin = "N";
-        if (roleId != null) {
-            List<String> r = jdbc.query(
-                    "SELECT is_admin FROM yj_role WHERE id = ?", (rs, i) -> rs.getString(1), roleId);
-            isAdmin = (!r.isEmpty() && "Y".equals(r.get(0))) ? "Y" : "N";
-        }
-        Object id = body.get("id");
-        if (id != null && !String.valueOf(id).isBlank()) {
-            if (!password.isBlank()) {
-                jdbc.update("UPDATE yj_user SET real_name=?, dept_id=?, role_id=?, enabled=?, is_admin=?, 生产车间=?, password_hash=? WHERE id=?",
-                        realName, deptId, roleId, enabled, isAdmin, workshop, encoder.encode(password), Integer.parseInt(String.valueOf(id)));
-            } else {
-                jdbc.update("UPDATE yj_user SET real_name=?, dept_id=?, role_id=?, enabled=?, is_admin=?, 生产车间=? WHERE id=?",
-                        realName, deptId, roleId, enabled, isAdmin, workshop, Integer.parseInt(String.valueOf(id)));
-            }
-        } else {
-            if (password.isBlank()) throw new IllegalArgumentException("新建用户必须设置密码");
-            Integer dup = jdbc.queryForObject(
-                    "SELECT COUNT(*) FROM yj_user WHERE username = ?", Integer.class, userName);
-            if (dup != null && dup > 0) throw new IllegalStateException("账号已存在：" + userName);
-            jdbc.update("INSERT INTO yj_user (username, password_hash, real_name, is_admin, dept_id, role_id, enabled, 生产车间)"
-                            + " VALUES (?,?,?,?,?,?,?,?)",
-                    userName, encoder.encode(password), realName, isAdmin, deptId, roleId, enabled, workshop);
-        }
+        sysAdmin.userSave(body);
         return ApiResult.ok(null);
     }
 
     /** 批量分配角色:给一组用户统一换角色;权限随角色,is_admin 同步角色口径,管理员账号自动跳过 */
     @PostMapping("/user/batch-role")
     public ApiResult<Void> userBatchRole(@RequestBody Map<String, Object> body) {
-        requireAdmin("维护用户");
-        Object idsObj = body.get("userIds");
-        Object roleObj = body.get("roleId");
-        if (!(idsObj instanceof List<?> ids) || ids.isEmpty()) throw new IllegalArgumentException("请选择用户");
-        Integer roleId = roleObj == null || String.valueOf(roleObj).isBlank()
-                ? null : Integer.valueOf(String.valueOf(roleObj));
-        String isAdmin = "N";
-        if (roleId != null) {
-            List<String> r = jdbc.query("SELECT is_admin FROM yj_role WHERE id = ?", (rs, i) -> rs.getString(1), roleId);
-            if (r.isEmpty()) throw new IllegalArgumentException("角色不存在");
-            isAdmin = "Y".equals(r.get(0)) ? "Y" : "N";
-        }
-        int n = 0;
-        for (Object idObj : ids) {
-            int userId = Integer.parseInt(String.valueOf(idObj));
-            List<Map<String, Object>> rows = jdbc.queryForList("SELECT is_admin FROM yj_user WHERE id = ?", userId);
-            if (rows.isEmpty() || "Y".equals(String.valueOf(rows.get(0).get("is_admin")))) continue;
-            jdbc.update("UPDATE yj_user SET role_id = ?, is_admin = ? WHERE id = ?", roleId, isAdmin, userId);
-            n++;
-        }
-        if (n == 0) throw new IllegalStateException("没有可分配的用户（管理员账号不参与批量分配）");
+        sysAdmin.userBatchRole(body);
         return ApiResult.ok(null);
     }
 
-    /**
-     * 删除账号(物理删除 yj_user 行,仅管理员)。
-     *
-     * 守卫(顺序有意:先判"删自己"再判"管理员",否则管理员删自己会拿到管理员那条文案):
-     *   ① 账号不存在 → 报「账号不存在」(前端列表可能已过期)
-     *   ② 删当前登录账号 → 拒绝(防自锁:删掉自己就再也进不来组织架构了)
-     *   ③ 管理员账号(is_admin='Y')→ 拒绝(防把最后一个管理员删掉后无人能管组织架构)
-     *
-     * 为何物理删除是安全的:业务留痕存的是**账号/姓名文本**,不是外键 ——
-     *   asp_user1/asp_user2(制单/审核账号)、yj_doc_status.shr、yj_usage_log.username、
-     *   yj_form_approval.actor 等全部按 username 存字符串;全库也没有任何外键指向 yj_user。
-     *   所以删掉账号行不会破坏历史单据,留下的仍是当时那个人名(审计要求:留痕不随账号消失而抹除)。
-     */
+    /** 删除账号(物理删除 yj_user 行,仅管理员);守卫顺序见 {@link SysAdminService#userDelete} */
     @DeleteMapping("/user/{id}")
     public ApiResult<Void> userDelete(@PathVariable int id) {
-        requireAdmin("维护用户");
-        List<Map<String, Object>> rows = jdbc.queryForList(
-                "SELECT username, is_admin FROM yj_user WHERE id = ?", id);
-        if (rows.isEmpty()) throw new IllegalStateException("账号不存在");
-        String target = String.valueOf(rows.get(0).get("username"));
-        if (target.equalsIgnoreCase(currentUsername())) {
-            throw new IllegalStateException("不能删除当前登录的账号");
-        }
-        if ("Y".equals(String.valueOf(rows.get(0).get("is_admin")))) {
-            throw new IllegalStateException("管理员账号不能删除：" + target);
-        }
-        jdbc.update("DELETE FROM yj_user WHERE id = ?", id);
+        sysAdmin.userDelete(id);
         return ApiResult.ok(null);
     }
 
     // ============ 角色 ============
     @GetMapping("/role/list")
     public ApiResult<List<Map<String, Object>>> roleList() {
-        return ApiResult.ok(jdbc.queryForList(
-                "SELECT id, role_code AS roleCode, role_name AS roleName, remark,"
-                        + " CASE WHEN is_admin='Y' THEN 1 ELSE 0 END AS isAdmin FROM yj_role ORDER BY id"));
+        return ApiResult.ok(sysAdmin.roleList());
     }
 
     @PostMapping("/role/save")
     public ApiResult<Void> roleSave(@RequestBody Map<String, Object> body) {
-        requireAdmin("维护角色");
-        String code = String.valueOf(body.getOrDefault("roleCode", "")).trim();
-        String name = String.valueOf(body.getOrDefault("roleName", "")).trim();
-        if (code.isBlank() || name.isBlank()) throw new IllegalArgumentException("请填写角色编码与名称");
-        Integer dup = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM yj_role WHERE role_code = ?", Integer.class, code);
-        if (dup != null && dup > 0) throw new IllegalStateException("角色编码已存在：" + code);
-        jdbc.update("INSERT INTO yj_role (role_code, role_name, remark, is_admin) VALUES (?,?,?,'N')",
-                code, name, String.valueOf(body.getOrDefault("remark", "")));
+        sysAdmin.roleSave(body);
         return ApiResult.ok(null);
     }
 
     @DeleteMapping("/role/{id}")
     public ApiResult<Void> roleDelete(@PathVariable int id) {
-        requireAdmin("维护角色");
-        Integer users = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM yj_user WHERE role_id = ?", Integer.class, id);
-        if (users != null && users > 0) throw new IllegalStateException("角色下存在用户，先调整用户角色");
-        jdbc.update("DELETE FROM yj_role_panel WHERE role_id = ?", id);
-        jdbc.update("DELETE FROM yj_role WHERE id = ?", id);
+        sysAdmin.roleDelete(id);
         return ApiResult.ok(null);
     }
 
     // ============ 角色面板授权 ============
 
-    // ============ 角色面板操作权限(11 项) ============
+    // ============ 角色面板操作权限(12 项) ============
 
-    /** 全部操作权限定义(顺序=前端列顺序)——通用面板 11 项 */
+    /** 全部操作权限定义(顺序=前端列顺序)——通用面板 12 项 */
     public static final String[][] PERMISSION_ACTIONS = {
             {"view",    "可见"},
             {"query",   "查询"},
@@ -312,12 +141,17 @@ public class SysAdminController {
             {"print",   "打印预览"},
             {"audit",   "审核反审核"},
             {"price",   "价格金额"},
-            {"review",  "复核反复核"},
+            {"review",  "复核反审核"},
             {"adjust",  "调价"},
+            // 自定义字段(动态字段/备用列池)配置权(2026-10-09 用户口径):
+            // 原先该动作只有超级管理员能做(is_admin 硬判),现在与其余操作同格 ——
+            // 在「角色与面板权限」里给哪个面板勾上,该角色就能配那个面板的自定义字段。
+            // 服务端同源闸门 = PanelPermissionService.requireFieldConfig(field 词)。
+            {"field",   "自定义字段"},
     };
 
     /** 文件类面板(研发管理·文书式)专属动作集:按真实操作行为设计(新增保存即归档/查询单据/
-     *  申请修改闭环/修改记录/删除申请管理员审批/导出打印/审批族),非通用 11 项 */
+     *  申请修改闭环/修改记录/删除申请管理员审批/导出打印/审批族/自定义字段),非通用 12 项 */
     public static final String[][] FILE_PANEL_ACTIONS = {
             {"view",    "可见"},
             {"query",   "查询单据"},
@@ -327,32 +161,46 @@ public class SysAdminController {
             {"del",     "删除申请"},
             {"export",  "导出打印"},
             {"audit",   "审批"},
+            {"field",   "自定义字段"},
     };
 
     @GetMapping("/role/{id}/panels")
     public ApiResult<Map<String, Object>> rolePanels(@PathVariable int id) {
         // 面板按真实模块分组返回(对齐 HSDZ permission.GROP,数据源 yj_panel.module_group)
+        // 分组名经 ReportService.navGroup 归并到导航一级模块(历史碎组:基础资料/采购管理/订单管理/生产管理/委外加工/库存核算 → 对应导航模块),
+        // 未归并的原值原样保留;库中 module_group 原列不动,读权限放行口径不受影响。
         Map<String, List<Map<String, Object>>> byModule = new LinkedHashMap<>();
         // 通用虚拟面板:我的桌面权限化(勾可见才在导航显示;admin 恒可见)
         Map<String, Object> dash = new LinkedHashMap<>();
         dash.put("panelCode", "DASHBOARD");
         dash.put("panelName", "我的桌面");
-        dash.put("module", "通用");
+        dash.put("module", "我的桌面");
         dash.put("hasApproval", false);
         dash.put("actions", new String[][]{{"view", "可见"}});
-        byModule.computeIfAbsent("通用", k -> new ArrayList<>()).add(dash);
+        byModule.computeIfAbsent("我的桌面", k -> new ArrayList<>()).add(dash);
         for (PanelRegistry.PanelDef def : registry.all()) {
             Map<String, Object> p = new LinkedHashMap<>();
+            String group = ReportService.navGroup(def.moduleName());
             p.put("panelCode", def.code());
             p.put("panelName", def.name());
-            p.put("module", def.moduleName());
+            p.put("module", group);
             p.put("hasApproval", def.isDoc());
             // 面板级动作集:文件类面板按真实操作行为下发专属 8 项,其余保持通用 11 项
             p.put("actions", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code())
                     ? FILE_PANEL_ACTIONS : PERMISSION_ACTIONS);
-            byModule.computeIfAbsent(def.moduleName(), k -> new ArrayList<>()).add(p);
+            byModule.computeIfAbsent(group, k -> new ArrayList<>()).add(p);
         }
         List<Map<String, Object>> modules = new ArrayList<>();
+        // 按导航一级模块顺序输出(未登记模块按发现顺序排在末尾),前端即按此顺序渲染分组
+        for (String nav : ReportService.NAV_GROUP_ORDER) {
+            List<Map<String, Object>> panels = byModule.remove(nav);
+            if (panels == null) continue;
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("code", nav);
+            m.put("name", nav);
+            m.put("panels", panels);
+            modules.add(m);
+        }
         for (Map.Entry<String, List<Map<String, Object>>> e : byModule.entrySet()) {
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("code", e.getKey());
@@ -360,12 +208,10 @@ public class SysAdminController {
             m.put("panels", e.getValue());
             modules.add(m);
         }
-        List<Map<String, Object>> granted = jdbc.queryForList(
-                "SELECT panel_code AS panelCode, perms FROM yj_role_panel WHERE role_id = ?", id);
         Map<String, Object> out = new HashMap<>();
         out.put("modules", modules);
         out.put("allPanels", modules.stream().flatMap(m -> ((List<Map<String, Object>>) m.get("panels")).stream()).toList());
-        out.put("granted", granted);
+        out.put("granted", sysAdmin.grantedPanels(id));
         out.put("actions", PERMISSION_ACTIONS);
         return ApiResult.ok(out);
     }
@@ -373,25 +219,8 @@ public class SysAdminController {
     @PostMapping("/role/{id}/panels")
     @SuppressWarnings("unchecked")
     public ApiResult<Void> rolePanelsSave(@PathVariable int id, @RequestBody Map<String, Object> body) {
-        requireAdmin("维护角色权限");
         List<Map<String, Object>> panels = (List<Map<String, Object>>) body.getOrDefault("panels", List.of());
-        jdbc.update("DELETE FROM yj_role_panel WHERE role_id = ?", id);
-        for (Map<String, Object> p : panels) {
-            String panelCode = String.valueOf(p.getOrDefault("panelCode", ""));
-            if (panelCode.isBlank()) continue;
-            String perms = String.valueOf(p.getOrDefault("perms", ""));
-            jdbc.update("INSERT INTO yj_role_panel (role_id, panel_code, perms, can_approve) VALUES (?,?,?,?)",
-                    id, panelCode, perms, perms.contains("audit") ? "Y" : "N");
-        }
+        sysAdmin.saveRolePanels(id, panels);
         return ApiResult.ok(null);
-    }
-
-    private int parseInt(Object v, int def) {
-        if (v == null || String.valueOf(v).isBlank()) return def;
-        try {
-            return Integer.parseInt(String.valueOf(v));
-        } catch (NumberFormatException e) {
-            return def;
-        }
     }
 }

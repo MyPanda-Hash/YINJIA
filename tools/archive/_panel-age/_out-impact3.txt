@@ -1,0 +1,23 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-impact3.sql ==
+  | VIEW | v_other_in_detail | 
+  | VIEW | v_other_in_stats | 
+  | VIEW | v_other_out_detail | 
+  | VIEW | v_other_out_stats | 
+  | VIEW | v_outsource_in_detail | 
+  | VIEW | v_outsource_in_stats | 
+  | VIEW | v_outsource_issue_detail | 
+  | VIEW | v_outsource_issue_stats | 
+  | MANU_ORDER | FINISH_IN | 1 | 
+  | PU_ORDER | PURCHASE_IN | 5 | 
+  | PU_ORDER | QC_RECV | 14 | 
+  | QC_INSP | PURCHASE_IN | 119 | 
+  | QC_INSP | QC_RETURN | 26 | 
+  | QC_INSP | QC_TC_IN | 10 | 
+  | QC_RECV | PURCHASE_IN | 3 | 
+  | QC_RECV | QC_INSP | 3 | 
+  | QC_TC_IN | PURCHASE_IN | 12 | 
+  | OUT:销售出库单 | 123 | 
+  | 采购入库单 | 121 | 
+  | 期初结存 | 1 | 
+[OK] _q-impact3.sql (3 batches)

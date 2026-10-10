@@ -1,0 +1,13 @@
+[set] qc 面板 5 / 表 7 / 视图 1
+[db] HSDZ_MES  [out] D:\YINJIA-main\tools\archive\_panel-age\_backup-20261009-qc
+  yj_panel -> yj_panel.csv (5 行)
+  yj_field -> yj_field.csv (77 行)
+  yj_role_panel -> yj_role_panel.csv (20 行)
+  yj_translation -> yj_translation-panel.csv (0 行)
+  restore-metadata.sql: yj_panel 5 行
+  restore-metadata.sql: yj_field 77 行
+  restore-metadata.sql: yj_role_panel 20 行
+  restore-metadata.sql -> restore-metadata.sql
+  views.sql -> views.sql
+  tables-ddl.sql -> tables-ddl.sql
+[done]

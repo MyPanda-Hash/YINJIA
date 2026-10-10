@@ -24,11 +24,25 @@
         <tr v-for="(pair, ri) in QC_INSP_REC_HEAD_ROWS" :key="'h' + ri">
           <template v-for="cell in pair" :key="cell.key">
             <th class="qr-label">{{ tt(cell.label) }}</th>
-            <!-- 物料编码的值格:编码(可填输入框)右侧跟「检验要求」查看链接 —— 2026-09-23
+            <!-- 物料编码的值格:编码 右侧跟「检验要求」查看链接 —— 2026-09-23
                  用户口径「把检验要求的链接放在右边物料编码后面」;纸面打印不出现(no-print) -->
             <td class="qr-value" :class="{ 'qr-value-code': cell.key === '物料编码' }">
+              <!-- 商品参照(2026-10-09 用户口径:「物料名称和物料编码要关联商品,并且要两个一并填入」):
+                   两列都是参照 商品档案(INV)的字段 ⇒ 点格子弹参照,选一条商品后
+                   主字段写 refField,再按 refMap 整串带回 —— 存货编码↔物料名称 的同义映射
+                   让**两个字段一次填齐**(映射由后端 buildRefMap 现算,前端不硬编码列名)。
+                   与 DataRecordSheet/RecordSheetPanels 的参照单元格同款:拟态输入框,点击即选。 -->
+              <div
+                v-if="editable && !cell.locked && isRefKey(cell.key)"
+                class="qr-ref-ctl"
+                :title="tt('点击选择')"
+                @click="openRefPick(cell.key)"
+              >
+                <span class="qr-ref-text" :class="{ 'is-empty': !head[cell.key] }">{{ head[cell.key] || tt('点击选择') }}</span>
+                <el-icon class="qr-ref-ico no-print"><Search /></el-icon>
+              </div>
               <el-date-picker
-                v-if="isDateField(cell.key) && editable && !cell.locked"
+                v-else-if="isDateField(cell.key) && editable && !cell.locked"
                 v-model="head[cell.key]"
                 type="date"
                 value-format="YYYY-MM-DD"
@@ -210,6 +224,9 @@
 
     <!-- 来料检验要求·按本单物料编码查看(只读;内容取自品质管理 > 来料检验要求) -->
     <QcInspReqViewDialog v-model="reqViewVisible" :material-code="materialCode" />
+
+    <!-- 商品参照(物料名称 / 物料编码 → 商品档案 INV):勾一条商品确定后,两个字段一并填入 -->
+    <RefPickDialog v-model="refPickVisible" :field="refPickField" mode="header" @confirm="onRefConfirm" />
   </div>
 </template>
 
@@ -217,10 +234,13 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
 import { tt } from '@/i18n'
-import { errMsg } from '@/business/engine'
+import { errMsg } from '@core/panel-engine'
 import StdLibManager from './StdLibManager.vue'
 import QcInspReqViewDialog from './QcInspReqViewDialog.vue'
+import RefPickDialog from './RefPickDialog.vue'
+import { applyRefCarry, refConfigOf } from '@core/ref/refCarry'
 import { fetchReqRows, fetchExtOverview, QC_INSP_REQ_PANEL, QC_INSP_REQ_SERIES_PANEL } from '@core/qc/qcInspReqApi'
 import { carryPlan } from '@core/qc/qcInspReqCarry'
 import { qcInspReqTabs, tabsOfPanel } from './qcInspReqConfig'
@@ -266,6 +286,39 @@ const judgeOptions = computed(() => optionsOf(K.JUDGE))
 
 function isDateField(key) {
   return String(fieldMap.value.get(key)?.dataType || '') === '日期'
+}
+
+/* ── 商品参照(物料名称 / 物料编码 → 商品档案 INV,2026-10-09 用户口径)──
+   用户口径:「检验数据记录的物料名称和物料编码要关联商品,并且要两个一并填入。」
+   两列在 yj_field 里是**参照 INV** 的字段(物料编码→存货编码 / 物料名称→存货名称),
+   配置里带 refPanel/refField/displayField 与 refMap(与 DataRecordSheet 的「文档编号」同形态),
+   这里只按配置开弹窗、写主字段、按 refMap 整串带回 —— 不在前端硬编码面板名/列名。
+   带回后两列**同时有值**:两列互为对方的 refMap 目标(见后端 PanelConfigService.buildRefMap
+   的同义词表 存货编码→物料编码、存货名称→物料名称),一侧写值即把另一侧填上。 */
+function isRefKey(key) {
+  if (!key) return false
+  const f = fieldMap.value.get(key)
+  return !!(f && f.refPanel)
+}
+const refPickVisible = ref(false)
+const refPickKey = ref('')
+const refPickField = computed(() => fieldMap.value.get(refPickKey.value) || null)
+function openRefPick(key) {
+  if (!props.editable || !isRefKey(key)) return
+  refPickKey.value = key
+  refPickVisible.value = true
+}
+/** 参照确认:主字段写 refField 的原始值(物料编码存编码 / 物料名称存名称),
+ *  再按 refMap 把选中商品的其他映射字段整串带回(其中就包含**配对的那一列**)。 */
+function onRefConfirm(rows) {
+  const f = refPickField.value
+  const src = rows?.[0]
+  if (!f || !src) return
+  const key = refPickKey.value
+  props.head[key] = src[f.refField || f.dataName] ?? ''
+  applyRefCarry(props.head, src, refConfigOf(f), key)
+  refPickVisible.value = false
+  emit('dirty')
 }
 
 /**
@@ -536,6 +589,35 @@ watch(
   width: 100%;
   word-break: break-all;
 }
+/* 商品参照单元格(物料名称/物料编码):拟态输入框 —— 点整格即弹参照,未填时给占位提示。
+   与 DataRecordSheet/RecordSheetPanels 的参照格同观感(纸面上仍是"一格值",不带边框)。 */
+.qr-ref-ctl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-height: 20px;
+  cursor: pointer;
+}
+.qr-ref-ctl:hover .qr-ref-text {
+  color: #1677ff;
+}
+.qr-ref-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 未选商品时的占位文案(弱化,与真实值的墨色区分开) */
+.qr-ref-text.is-empty {
+  color: #a8abb2;
+}
+.qr-ref-ico {
+  flex: none;
+  color: #1677ff;
+  font-size: 13px;
+}
 .qr-sign {
   font-weight: 600;
   color: #1f5fa8;
@@ -612,6 +694,12 @@ watch(
   gap: 2px;
 }
 .qr-value-code .qr-cell-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+/* 物料编码格改成商品参照后,值区是 .qr-ref-ctl:与「检验要求」链接同排,值区自适应、链接不缩 */
+.qr-value-code .qr-ref-ctl {
   flex: 1;
   width: auto;
   min-width: 0;
@@ -714,7 +802,8 @@ watch(
     padding: 1px 3px !important;
   }
   body.approval-printing .qr-addbar,
-  body.approval-printing .qr-lib-btn {
+  body.approval-printing .qr-lib-btn,
+  body.approval-printing .qr-ref-ico {
     display: none !important;
   }
   @page {

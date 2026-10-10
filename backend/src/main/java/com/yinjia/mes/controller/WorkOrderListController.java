@@ -108,6 +108,9 @@ public class WorkOrderListController {
                         // 血缘(会议口径第二版):根工单号(多级按根聚合)+ 是否切单(一眼区分原单/子单)
                         + " ISNULL(p.[根工单号], N'') AS 根工单号, ISNULL(p.[是否切单], N'N') AS 是否切单,"
                         + " CASE WHEN p.ja IN (N'T', N'Y') THEN N'Y' ELSE N'N' END AS 结案,"
+                        // 完工状态(2026-10-15):生产状态的「完工」用它判,不再只看入库 ——
+                        //   全部报工达标即 完工状态='生产完工' ⇒ 员工看到「完工」;结案另看 ja(需组装成品检验+入库)
+                        + " ISNULL(p.[完工状态], N'') AS 完工状态,"
                         + " p.dm AS 物料编码, ISNULL(p.mc, N'') AS 产品名称, ISNULL(p.gg, N'') AS 规格型号,"
                         + " ISNULL(p.jldw, N'') AS 生产单位,"
                         + " ISNULL(p.pl_sl, 0) AS 排产数量, ISNULL(p.xq_sl, 0) AS 需求数量, ISNULL(p.rk_sl, 0) AS 入库数量,"
@@ -116,12 +119,16 @@ public class WorkOrderListController {
                         // 「这单走到哪道工序」由报工派生(视图 v_wo_process_progress) —— 现场问的
                         // 「这是组装单还是成型单」= 当前工序指针,前端直接显示
                         // 「当前工序」= 该工单行**现在该做的工序**(2026-10-07 用户口径修正):
-                        //   预排台账里最后一道「已落实」优先(在切炭线就该显示切炭),台账缺失时回落报工派生值。
-                        //   ⚠ 原来直接用报工派生值 ⇒ 到了切炭线还显示成型(用户截图为证)。
+                        //   预排台账里最后一道「已落实」优先(在切炭线就该显示切炭),台账缺失时回落**本行**状态。
+                        // 🔴 2026-10-15 修(用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、
+                        //   流程追溯都这样实现,都需要这两个进行确定」):回落值原取视图 prg.当前工序 ——
+                        //   那是**按单号聚合**的整单派生值 ⇒ 同工单所有行显示同一个工序(实测行2 路线是
+                        //   GY-2026-10-0003 首道应为混料,却因视图显示成整单的成型)。
+                        //   现改为回落 **p.当前工序**(本行自己的状态列,由 ProcessTaskService 按行维护)。
                         + " ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
                         + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                         + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(prg.当前工序, N'')) AS 当前工序,"
+                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序,"
                         // 当前工序完工量 = **该工单行**该道的已审报工量(2026-10-07:视图按单号聚合=整单口径,
                         //   与单行计划量配对会出现作用域错配「整单 56000 / 单行 75」⇒ 按行锚定)
                         + " ISNULL((SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s"
@@ -147,24 +154,37 @@ public class WorkOrderListController {
                         + " LEFT JOIN dbo.dm_kh dk ON dk.dm = p.khdm"
                         + " LEFT JOIN (SELECT iv.存货编码, MAX(CASE WHEN iv.商品标签 LIKE N'%重点%' THEN N'是' ELSE N'否' END) AS 重点管控"
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
-                        // 当前工序/工序进度(视图:按报工派生;见 tools/migrate-wo-process-progress-view.sql)
-                        + " LEFT JOIN dbo.v_wo_process_progress prg ON prg.单号 = p.pl_no"
-                        // 当前工序 = 预排台账最后一道「已落实」(该行现在该做的工序),缺台账回落报工派生值
+                        // ⚠ 2026-10-15 移除 `LEFT JOIN v_wo_process_progress prg ON prg.单号 = p.pl_no`:
+                        //   该视图是**按单号聚合**的整单派生值(当前工序/进度/完工合计),与「工单号+工单行号
+                        //   才是唯一工单」的口径冲突;且它是**一对多**风险源(视图按单号一行,join 尚安全,
+                        //   但语义已是整单)。本查询已全部改用行级来源:当前工序取台账→本行 p.[当前工序]、
+                        //   当前工序完工量按 p.id 锚定、当前工序计划量按本行路线换算 ⇒ 不再需要该视图。
+                        // 当前工序 = 预排台账最后一道「已落实」(该行现在该做的工序),缺台账回落**本行** p.当前工序
                         + " CROSS APPLY (SELECT ISNULL(NULLIF((SELECT TOP 1 w.工序 FROM dbo.wo_process_line w"
                         + "   WHERE w.工单号 = p.pl_no AND ISNULL(w.asp_cancel,'N')<>'Y'"
                         + "     AND (w.工单行id = p.id OR w.工单行id IS NULL) AND ISNULL(w.状态,N'')=N'已落实'"
-                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(prg.当前工序, N'')) AS 当前工序) cop"
+                        + "   ORDER BY ISNULL(w.工序序,999) DESC, w.id DESC), N''), ISNULL(p.[当前工序], N'')) AS 当前工序) cop"
                         + w + " ORDER BY p.pl_date DESC, p.pl_no, p.pl_xc",
                 args.toArray());
-        // 生产状态(与 v_manu_schedule 同口径:完工=入库≥排产;在产=有入库;其余未完工;未排产行=未排产)
+        // 生产状态(2026-10-15 用户口径拆分「完工」与「结案」):
+        //   · 已结案 = **plang.ja**(唯一结案标志;由「组装成品检验已审核 + 入库≥排产」重算,或手工结案);
+        //   · 完工  = 完工状态 IN (生产完工, 已完工) —— 全部报工达标即成立,**不需要**(也不该等)入库/检验;
+        //   · 在产  = 有入库但未达标;未完工 = 无入库;未排产 = 无产线。
+        //   ⚠ 原口径「完工 = 入库≥排产」把"生产做完了"(完工)和"货入完库了"混在一个词里,
+        //     用户报障「全部报工完成后不会变为完工,会变为已结案」即由此而来。
         List<Map<String, Object>> out = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             Map<String, Object> m = new LinkedHashMap<>(r);
             double sched = ((Number) r.getOrDefault("排产数量", 0)).doubleValue();
             double in = ((Number) r.getOrDefault("入库数量", 0)).doubleValue();
             String line = String.valueOf(r.getOrDefault("生产线", ""));
+            boolean closed = "Y".equals(String.valueOf(r.getOrDefault("结案", "N")));
+            String doneState = String.valueOf(r.getOrDefault("完工状态", ""));
+            boolean prodDone = "生产完工".equals(doneState) || "已完工".equals(doneState);
             m.put("生产状态", line.isBlank() ? "未排产"
-                    : sched > 0 && in >= sched ? "完工" : (in > 0 ? "在产" : "未完工"));
+                    : closed ? "已结案"
+                    : (prodDone || (sched > 0 && in >= sched)) ? "完工"
+                    : (in > 0 ? "在产" : "未完工"));
             out.add(m);
         }
         return ApiResult.ok(out);
@@ -232,7 +252,7 @@ public class WorkOrderListController {
                                 + " AND ISNULL(asp_cancel,'N')<>'Y'",
                         close ? "Y" : "N", k.comm(), k.no(), k.xc(), k.batch(), k.batch());
                 if (n == 0) throw new IllegalStateException("plang 中未找到");
-                logUsage(user, close ? "结案" : "取消结案", k.no());
+                logUsage(user, close ? "结案" : "取消结案", k.no(), k.xc());
                 done.add(k.label());
             } catch (IllegalStateException e) {
                 failed.add(k.no() + ":" + e.getMessage());
@@ -297,13 +317,17 @@ public class WorkOrderListController {
     /**
      * 按钮留痕(yj_usage_log)。real_name 非空:从 yj_user 取,查不到回落登录名;
      * 留痕失败不阻断业务(口径同 ScheduleBoardService,但显式补齐 real_name 根因)。
+     *
+     * <p>2026-10-15:补 [工单行号] —— 用户口径「流转时间线…要根据工单行号完成」。
+     * 行键落专列,**不再**往 doc_no 里拼(拼了会让 `doc_no=@工单号` 的查询匹配不上、留痕静默丢失)。
      */
-    private void logUsage(String user, String action, String docNo) {
+    private void logUsage(String user, String action, String docNo, Integer xc) {
         try {
-            jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no, created_at)"
+            jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no,"
+                            + " [工单行号], created_at)"
                             + " VALUES (?, ISNULL((SELECT real_name FROM yj_user WHERE username = ?), ?),"
-                            + " N'工单', N'生产工单', ?, ?, GETDATE())",
-                    user, user, user, action, docNo);
+                            + " N'工单', N'生产工单', ?, ?, ?, GETDATE())",
+                    user, user, user, action, docNo, xc);
         } catch (Exception ignore) { /* 留痕不阻断业务 */ }
     }
 

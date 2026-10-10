@@ -26,8 +26,8 @@
       <!-- 切单(9.29 生产管理批次①,2026-10-05):勾选一张在产工单 → 输入切出数量 → 子工单(新工单号);
            撤回切单 = 子单无报工/入库/领料时可还原父单数量(WorkOrderSplitService.split/unsplit) -->
       <el-button size="small" type="warning" plain @click="openSplit" :disabled="!checked.length && !currentRow">{{ tt('切单') }}</el-button>
-      <!-- 工单排产弹窗(2026-10-05 用户口径):只带当前这一张工单的快速排产 -->
-      <el-button size="small" type="success" plain :disabled="(!checked.length && !currentRow) || Number((checked[0] || currentRow || {})['生产线'] ? 1 : 0) === 1" @click="openSchedule">{{ tt('排产') }}</el-button>
+      <!-- 工单排产弹窗(2026-10-05 用户口径):**一次只排一行**(勾多行会提示"请只勾选一张工单",与切单同范式) -->
+      <el-button size="small" type="success" plain :disabled="!checked.length && !currentRow" @click="openSchedule">{{ tt('排产') }}</el-button>
       <el-button size="small" plain @click="onUnsplit" :disabled="!checked.length && !currentRow">{{ tt('撤回切单') }}</el-button>
       <el-dropdown split-button size="small" type="primary" @click="doPrintTask('成型生产任务单')" @command="doPrintTask"
                    :disabled="!checked.length && !currentRow">
@@ -116,16 +116,16 @@
       </el-table-column>
     </el-table>
 
-    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**,用工单号筛选 ⇒ 只显示当前工单 -->
+    <!-- 工单排产弹窗(2026-10-05 用户口径):**内嵌快速排产页面本身**,按「工单号+工单行号」筛选 ⇒ 只显示这一行 -->
     <el-dialog v-model="schedVisible" :title="tt('工单排产（快速排产）')" width="94%" top="4vh" append-to-body destroy-on-close
                @closed="load">
       <div style="height: 76vh; overflow: hidden">
-        <ScheduleBoard :工单号="schedNo" embedded />
+        <ScheduleBoard :工单号="schedNo" :工单行号="schedXc" embedded />
       </div>
     </el-dialog>
 
     <!-- 工单详情·追溯(与工单排产同一组件,原地打开;2026-10-05) -->
-    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" />
+    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
 
     <!-- 切单弹窗:可切上限 = 排产数量 − max(已入库, 各工序已完工报工最大值);子单取新工单号 -->
     <el-dialog v-model="splitVisible" :title="tt('切单')" width="440px" append-to-body>
@@ -196,14 +196,46 @@ const splitInherit = ref(true)
 /** 工单详情·追溯(2026-10-05):与工单排产同一组件,本页原地打开 */
 const traceVisible = ref(false)
 const traceNo = ref('')
-/** 工单排产弹窗(2026-10-05 用户口径):只带当前这一张工单的快速排产 */
+/** 追溯的工单行id(plang.id):行级口径必需(2026-10-15) */
+const traceRowId = ref(null)
+/** 工单排产弹窗(2026-10-05 用户口径):只带**这一行**的快速排产 */
 const schedVisible = ref(false)
 const schedNo = ref('')
+/** 弹窗要预筛的工单行号(2026-10-15):带上它 ⇒ 快速排产只出这一行,而不是同工单所有行 */
+const schedXc = ref(null)
+/**
+ * 工单排产弹窗(2026-10-05 用户口径):只带**这一行**的快速排产。
+ *
+ * <p>2026-10-15 用户拍板:**排产一次只能勾一行** —— 勾多行时不动手,直接提示"请只勾选一张工单"
+ * (与「切单」的 splitTarget 同一范式)。理由:排产要逐道工序选线,一次只能针对一行做决策;
+ * 批量排产应当去「快速排产」页自己勾(那里有多选批量排入)。
+ * ⚠ 上一版曾试图支持"勾 N 行弹窗出 N 行"(加过 `限定行id` 列表通道),按用户口径**已回退**。
+ */
+function scheduleTarget() {
+  // 只认**当前列表里还在的**勾选行(表格开了 reserve-selection,已消失的行会留在 checked 里,同切单口径)
+  const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
+  const cur = currentRow.value && rows.value.some((r) => String(r.行id) === String(currentRow.value.行id)) ? currentRow.value : null
+  const list = alive.length ? alive : (cur ? [cur] : [])
+  if (list.length !== 1) {
+    ElMessage.warning(list.length === 0 ? tt('请先勾选一张工单')
+      : `${tt('请只勾选一张工单')}（${tt('当前已勾选')} ${list.length} ${tt('张')}）`)
+    return null
+  }
+  const r = list[0]
+  if (r['生产线']) {
+    ElMessage.warning(`${tt('该工单已排产')}(${r['生产线']})，${tt('不能重复排入;换线请先撤销排产')}`)
+    return null
+  }
+  return r
+}
+
 function openSchedule() {
-  const r = (checked.value.length === 1 ? checked.value[0] : currentRow.value) || checked.value[0]
-  if (!r) { ElMessage.warning(tt('请先勾选一张工单')); return }
-  if (r['生产线']) { ElMessage.warning(`${tt('该工单已排产')}(${r['生产线']})，${tt('不能重复排入;换线请先撤销排产')}`); return }
+  const r = scheduleTarget()
+  if (!r) return
   schedNo.value = r['工单号']
+  // 行级(用户口径「工单号+工单行号确定当前唯一工单」):把行号一并带给弹窗内的快速排产,
+  //   否则弹窗只按工单号筛 ⇒ 同工单其它行也一起列出来(用户报障场景)
+  schedXc.value = r['工单行号'] ?? null
   schedVisible.value = true
 }
 
@@ -280,17 +312,23 @@ async function doPrintTask(mode) {
   try {
     // 成型任务单的数量 = **按工艺路线换算后的成型工序量**(2026-10-05 用户口径:
     // 「成型打印的任务单就是需要根据换算进行的…不需要显示换算率,显示换算后的数量即可」)。
-    // 换算因子 = 该工单成型工序的计划量 ÷ 工单计划合计(即累计换算率),再按**行**的排产数量摊算;
+    // 换算因子 = 该**工单行**成型工序的计划量 ÷ **该行**计划合计(即累计换算率),再按该行的排产数量摊算;
     // 取不到(未绑路线/无换算)时退回排产数量,不影响既有打印。
+    // ⚠ 2026-10-15 改**按行**(用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、
+    //   流程追溯都这样实现,都需要这两个进行确定」):原来只传 工单号 ⇒ 后端返回**整单**计划合计,
+    //   而同一工单**不同行的工艺路线/排产数量可以不同**(实测 GD-2026-10-0002:行2/3/4 与行1/5/6/7/8
+    //   路线不同)⇒ 整单因子套到每一行,打印出的成型数量是错的。现逐行取该行自己的合计与成型量,
+    //   因子按 `工单号#行id` 存。
+    const fkey = (r) => `${r.工单号}#${r.行id}`
     const factor = {}
     if (mode === '成型生产任务单') {
-      await Promise.all([...new Set(src.map((r) => r.工单号))].map(async (no) => {
+      await Promise.all(src.map(async (r) => {
         try {
-          const d = (await request.post('/px/processTask/detail', { 工单号: no })).data || {}
+          const d = (await request.post('/px/processTask/detail', { 工单号: r.工单号, 工单行id: r.行id })).data || {}
           const total = Number(d['计划合计'] || 0)
           const st = (d['工序步骤'] || []).find((x) => x['工序'] === '成型')
           const q = Number(st?.['计划量'] || 0)
-          if (total > 0 && q > 0) factor[no] = q / total
+          if (total > 0 && q > 0) factor[fkey(r)] = q / total
         } catch { /* 取不到就退回排产数量 */ }
       }))
     }
@@ -302,8 +340,8 @@ async function doPrintTask(mode) {
       商品名称: r.产品名称 || '',
       规格型号: r.规格型号 || '',
       订单数量: r.需求数量,
-      // 成型任务单:换算后的数量(出货口 = 该行排产数量 × 累计换算率,如 3 倍 → 80 变 240)
-      成型折算后数量: factor[r.工单号] ? Math.round(Number(r.排产数量 || 0) * factor[r.工单号] * 10000) / 10000 : r.排产数量,
+      // 成型任务单:换算后的数量(出货口 = **该行**排产数量 × 该行累计换算率,如 3 倍 → 80 变 240)
+      成型折算后数量: factor[fkey(r)] ? Math.round(Number(r.排产数量 || 0) * factor[fkey(r)] * 10000) / 10000 : r.排产数量,
       计划完工日期: r.计划完工日期 || '',
       批号: r.批号 || '', 物料编码: r.物料编码 || '',
       排产数量: r.排产数量, 生产线: r.生产线 || lineFilter.value || '',
@@ -320,26 +358,32 @@ async function doPrintTask(mode) {
 
 /**
  * 转领料单(2026-10-07 用户拍板:原「打印领料单」改为转单,打印入口不再保留)。
- * 勾选工单 → 按**工单号去重**逐张生成「材料出库单(领料单)」草稿:单据头挂 加工单号=工单号
- * (审核出库后后端 ManuWritebackService 自动回写工单「领料单号」,本页该列随之点亮)。
+ * 勾选工单行 → 逐个生成「材料出库单(领料单)」草稿:单据头挂 加工单号=工单号 + **工单行号**
+ * (审核出库后后端 ManuWritebackService 按行回写工单「领料单号」,本页该列随之逐行点亮)。
+ * ⚠ **标识 = 工单号 + 工单行号**(用户口径 2026-10-15:「就是当前的工单号加工单行号作为标识,
+ *   每个独立进行」+「工单号+工单行号 就为当前的**一个新的单**的模式」):
+ *   **一个标识 ⇒ 一张新领料单**;plang 里同一标识可能有多个物理行(同订单行分批转单,批次号不同),
+ *   按用户口径它们是同一个标识 ⇒ 只转一张(故计数/去重都用 (工单号,工单行号),**不是** 行id)。
  * ⚠ **明细留空**:MES 自建 BOM 已下架(2026-10-04),配方/工艺清单表全空、遗留 mate 是光缆旧数据,
  *   系统内没有可自动展开的材料来源 ⇒ 材料行由仓库在材料出库单面板按实发补填。
- * 后端守卫:未排产(排产数量 0)/已结案 不给转;已有未审核领料单或占用链未释放时拒绝(见 WorkOrderPickingService)。
+ * 后端守卫:未排产(排产数量 0)/已结案 不给转;该标识已有未审核领料单时拒绝
+ *   (见 WorkOrderPickingService,守卫按 (加工单号,工单行号) 判)。
  */
 async function toPicking() {
   // 只认**当前列表里还在的**勾选行(表格开了 reserve-selection,已消失的行会留在 checked 里,同切单口径)
   const alive = (checked.value || []).filter((x) => rows.value.some((r) => String(r.行id) === String(x.行id)))
   if (!alive.length) { ElMessage.warning(tt('请先勾选一张工单')); return }
-  const nos = [...new Set(alive.map((r) => r.工单号))]
+  // 计数按**标识**去重(标识 = 工单号 + 工单行号;同标识的多物理行只算一个、只转一张)
+  const keys = [...new Set(alive.map((r) => `${r.工单号}#${r.工单行号}`))]
   try {
     await ElMessageBox.confirm(
-      `${tt('确认为选中的')} ${nos.length} ${tt('张工单转领料')}?`,
+      `${tt('确认为选中的')} ${keys.length} ${tt('个工单行转领料单')}?`,
       tt('转领料单'),
       { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
   } catch { return }
   try {
     const res = await request.post('/px/workOrderList/toPicking', {
-      rows: alive.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 工单行号: r.工单行号, 批次号: r.批次号 })),
+      rows: alive.map((r) => ({ 公司代码: r.公司代码, 工单号: r.工单号, 行id: r.行id, 工单行号: r.工单行号, 批次号: r.批次号 })),
     })
     const d = res.data || {}
     const list = d['单号清单'] || []
@@ -421,7 +465,8 @@ async function onUnsplit() {
       tt('撤回切单'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
   } catch { return }
   try {
-    const res = await request.post('/px/workOrderList/unsplit', { 行id: r.行id, 工单号: r.工单号 })
+    // 两把键都带上(标识 = 工单号 + 工单行号):后端优先 行id,缺了按 (工单号+行号) 反查
+    const res = await request.post('/px/workOrderList/unsplit', { 行id: r.行id, 工单号: r.工单号, 工单行号: r.工单行号 })
     const d = res.data || {}
     ElMessage.success(`${tt('已撤回')} ${d['子工单号']}，${tt('父工单')} ${d['父工单号']} ${tt('还原')} ${num(d['还原数量'])}`)
     load()
@@ -430,9 +475,13 @@ async function onUnsplit() {
 
 function openTrace(row) {
   // 工单详情·追溯(2026-10-05):与工单排产**同一个弹窗组件**,本页原地打开(用户口径「不是跳转到工单排产」)。
-  const no = row?.['工单号'] || currentRow.value?.工单号 || checked.value[0]?.工单号
+  // 行级口径(2026-10-15):必须把**工单行id**一起传下去 —— 同工单号可有多行/多批次,
+  //   只传单号会把别的行的报工/检验数据一起带出来(用户报障)。
+  const src = row || currentRow.value || checked.value[0]
+  const no = src?.['工单号']
   if (!no) return
   traceNo.value = no
+  traceRowId.value = src?.['行id'] ?? null
   traceVisible.value = true
 }
 

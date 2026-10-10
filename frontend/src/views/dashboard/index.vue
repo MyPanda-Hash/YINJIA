@@ -336,8 +336,10 @@
           <div class="chart-box"><SLine :data="stock.trend7" :legend-a="tt('入库')" :legend-b="tt('出库')" /></div>
         </div>
         <div class="card col-6">
-          <div class="card-title">{{ tt('现存量 TOP 物料') }}</div>
-          <div class="chart-box"><SBars :data="stock.topItems" :colors="['#537786', '#116a5b', '#3b8978', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" /></div>
+          <div class="card-title">{{ tt('现存量 TOP 物料') }}<span class="chart-sub">{{ stock.topItems.length }} {{ tt('项可滚动查看') }}</span></div>
+          <div class="chart-box chart-box-scroll">
+            <SBars :data="stock.topItems" scroll :colors="['#537786', '#116a5b', '#3b8978', '#d79a2b', '#8a9a92', '#9c7650', '#708575', '#b94d3f']" />
+          </div>
         </div>
       </div>
     </template>
@@ -1856,6 +1858,12 @@ function go(path, title) {
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+/* 滚动型图表卡(2026-10-10 现存量 TOP):顶对齐且不强制 220px 高,
+   否则 justify-content:center 会把滚动内容居中、首尾各留一段空白 */
+.chart-box-scroll {
+  justify-content: flex-start;
+  min-height: 0;
 }
 /* 图表标题右侧的口径小注(2026-09-28 桌面深度开发) */
 .chart-sub {

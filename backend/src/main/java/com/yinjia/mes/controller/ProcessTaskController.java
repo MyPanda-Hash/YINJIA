@@ -110,11 +110,21 @@ public class ProcessTaskController {
         return ApiResult.ok(service.board());
     }
 
-    /** 工单详情:表头 + 工序时间轴(这单处在哪个阶段)+ 汇总 —— 点工单号即看 */
+    /**
+     * 工单详情:表头 + 工序时间轴(这单处在哪个阶段)+ 汇总 —— 点工单号即看。
+     * <p>2026-10-10 行级口径:body 带「工单行id」(plang.id)时按该行取数(计划=该行 pl_sl、报工锚该行),
+     * 不带 = 整单聚合(旧行为);响应里回「追溯口径」供界面标注。
+     */
     @PostMapping("/detail")
     public ApiResult<Map<String, Object>> detail(@RequestBody Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");
-        return ApiResult.ok(service.detail(str(body.get("工单号"))));
+        Object rid = body.get("工单行id");
+        Long rowId = null;
+        if (rid instanceof Number n) rowId = n.longValue();
+        else if (rid != null && !String.valueOf(rid).isBlank()) {
+            try { rowId = Long.valueOf(String.valueOf(rid).trim()); } catch (NumberFormatException ignore) { /* 非法值按整单 */ }
+        }
+        return ApiResult.ok(service.detail(str(body.get("工单号")), rowId));
     }
 
     /** **撤回派工**:任务退回待加工、清空生产线(可批量) */

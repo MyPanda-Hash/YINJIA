@@ -73,6 +73,10 @@ public class MessageService {
     public static final String APPROVAL_L2_REJECTED = "APPROVAL_L2_REJECTED";
     /** 消息码:产品开发已分发责任人 → 四个下游文件的责任人(2026-09-20 分发责任人) */
     public static final String TASK_ASSIGNED = "TASK_ASSIGNED";
+    /** 消息码:立项申请定级后已分发对接人 → 被选中的对接人(2026-10-08 研发流程图③) */
+    public static final String LIAISON_ASSIGNED = "LIAISON_ASSIGNED";
+    /** 消息码:对接人签核并确认项目责任人 → 被确认的项目责任人(2026-10-08 研发流程图④) */
+    public static final String OWNER_CONFIRMED = "OWNER_CONFIRMED";
     /** 消息码:产品变更申请单提交会签 → 各会签人(2026-09-21 变更线上流程④) */
     public static final String SIGNOFF_REQUESTED = "SIGNOFF_REQUESTED";
     /** 消息码:会签全部通过、已自动转审批 → 发起人 */

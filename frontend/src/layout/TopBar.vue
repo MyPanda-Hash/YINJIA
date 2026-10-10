@@ -3,7 +3,7 @@
     <!-- ===== 左：汉堡（移动端）+ Logo + 分隔线 + 账套（工厂）切换 ===== -->
     <div class="t-left">
       <el-icon class="hamburger" @click="app.toggleMobileNav()"><Menu /></el-icon>
-      <div class="logo">轻<span>MES</span></div>
+      <div class="logo">银嘉<span>数字化平台</span></div>
       <div class="t-split"></div>
       <el-dropdown @command="onPickFactory">
         <span
@@ -45,7 +45,10 @@
     <!-- ===== 右：语言切换 / 搜索 / 更新公告 / 移动端 / 通知角标 / 全屏 / 帮助 / 用户 ===== -->
     <div class="t-right">
       <!-- 语言切换(多国语言 P1):下拉选择,Alt+L 快捷循环,即时热切换 -->
-      <el-dropdown @command="(l) => localeStore.set(l)" popper-class="locale-glass-popper">
+      <el-dropdown
+        @command="(l) => localeStore.set(l)"
+        popper-class="locale-glass-popper locale-select-popper"
+      >
         <span
           class="factory locale-switch"
           :aria-label="tt('切换语言')"
@@ -143,7 +146,6 @@
           <el-dropdown-menu>
             <el-dropdown-item command="docs">{{ tt('帮助文档') }}</el-dropdown-item>
             <el-dropdown-item command="ai">{{ tt('AI 智能帮助') }}</el-dropdown-item>
-            <el-dropdown-item command="guide">{{ tt('显示新手引导') }}</el-dropdown-item>
             <el-dropdown-item command="about" divided>{{ tt('关于') }}</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -164,7 +166,6 @@
             <el-dropdown-item command="ui"><el-icon><Setting /></el-icon>{{ tt('界面设置') }}</el-dropdown-item>
             <el-dropdown-item command="dark"><el-icon><Brush /></el-icon>{{ app.dark ? tt('切换亮色') : tt('换肤（暗色）') }}</el-dropdown-item>
             <el-dropdown-item command="desk"><el-icon><Monitor /></el-icon>{{ tt('工作台设置') }}</el-dropdown-item>
-            <el-dropdown-item command="init"><el-icon><MagicStick /></el-icon>{{ tt('初始化向导') }}</el-dropdown-item>
             <el-dropdown-item command="logout" divided><el-icon><SwitchButton /></el-icon>{{ tt('退出') }}</el-dropdown-item>
           </el-dropdown-menu>
         </template>
@@ -209,7 +210,7 @@
       </el-form>
       <template #footer>
         <el-button @click="pwdVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="changePwd">{{ tt('确定') }}</el-button>
+        <el-button type="primary" :loading="pwdLoading" @click="changePwd">{{ tt('确定') }}</el-button>
       </template>
     </el-dialog>
 
@@ -237,7 +238,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
 import { flatMenus, menuTree as rawMenuTree, filterMenuTree } from '@/business/menus'
-import { apiGetNotices } from '@/business/api'
+import { apiGetNotices, apiChangePassword } from '@/business/api'
 import { ElMessage } from 'element-plus'
 import NoticeCenter from './NoticeCenter.vue'
 import UiSettingsDialog from './UiSettingsDialog.vue'
@@ -343,7 +344,6 @@ async function refreshFactories() {
 function onHelpCommand(cmd) {
   if (cmd === 'docs') app.openHelp('help')
   else if (cmd === 'ai') app.openHelp('knowledge')
-  else if (cmd === 'guide') app.openInitWizard()
   else if (cmd === 'about') aboutVisible.value = true
 }
 
@@ -363,22 +363,35 @@ function onUserCommand(cmd) {
   else if (cmd === 'ui') uiSettingVisible.value = true
   else if (cmd === 'dark') app.toggleDark()
   else if (cmd === 'desk') deskSettingVisible.value = true
-  else if (cmd === 'init') app.openInitWizard()
   else if (cmd === 'logout') {
     user.logout()
     router.replace('/login')
   }
 }
 
-function changePwd() {
+const pwdLoading = ref(false)
+
+async function changePwd() {
   const f = pwdForm.value
   if (!f.old || !f.next || !f.confirm) return ElMessage.warning('请填写完整')
-  if (f.old !== '123456') return ElMessage.error('原密码不正确（演示账号原密码 123456）')
   if (f.next.length < 6) return ElMessage.warning('新密码至少 6 位')
   if (f.next !== f.confirm) return ElMessage.warning('两次输入的新密码不一致')
-  pwdVisible.value = false
-  pwdForm.value = { old: '', next: '', confirm: '' }
-  ElMessage.success('密码修改成功（演示环境不落库）')
+  pwdLoading.value = true
+  try {
+    await apiChangePassword({ old: f.old, next: f.next })
+    pwdVisible.value = false
+    pwdForm.value = { old: '', next: '', confirm: '' }
+    // 改密即作废当前会话:令牌里没有密码版本号,旧 token 不会因改密失效,
+    // 不重登就等于「改了密码但旧凭证继续可用」。清会话 → 跳登录页,让用户用新口令进来。
+    ElMessage.success('密码修改成功，请用新密码重新登录')
+    user.logout()
+    router.replace('/login')
+  } catch (e) {
+    // 服务端原密码校验失败(原实现是前端硬编码 old !== '123456',任何账号输 123456 都能过)
+    ElMessage.error(e?.message || '修改密码失败')
+  } finally {
+    pwdLoading.value = false
+  }
 }
 </script>
 
@@ -402,11 +415,12 @@ function changePwd() {
   flex-shrink: 0;
 }
 .logo {
-  font-size: 19px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--t-primary);
   letter-spacing: 0;
   cursor: default;
+  white-space: nowrap;
 }
 .logo span {
   font-weight: 400;
@@ -450,6 +464,15 @@ function changePwd() {
 .locale-option.locale-active {
   color: var(--el-color-primary);
   font-weight: 600;
+}
+/* 当前语言项同样要压过 EP 的 --el-color-primary,并提亮以适配深底 */
+.locale-glass-popper .locale-option.locale-active,
+.locale-glass-popper .el-dropdown-menu__item .locale-option.locale-active {
+  color: #7fd8c3;
+  font-weight: 600;
+}
+html:not(.dark) .locale-glass-popper .locale-option.locale-active {
+  color: #116a5b;
 }
 .locale-check {
   font-size: 13px;
@@ -891,16 +914,36 @@ function changePwd() {
 }
 </style>
 
-<!-- 全局(popper teleport 到 body,scoped 无法命中):语言下拉毛玻璃弹层 -->
+<!-- 全局(popper teleport 到 body,scoped 无法命中):语言下拉毛玻璃弹层
+     颜色一律走 --locale-popper-* 变量,亮/暗两套取值见结尾 html.dark 块。
+     禁止在此硬编码颜色:亮色下会与周围白色 UI 冲突,暗色下会漏掉 is-light 覆盖。 -->
 <style lang="css">
+:root,
+html.dark {
+  --locale-popper-bg: #fff;
+  --locale-popper-bd: rgba(0, 0, 0, 0.08);
+  --locale-popper-shadow: 0 12px 32px rgba(15, 23, 20, 0.12);
+  --locale-popper-fg: var(--el-text-color-primary);
+  --locale-popper-fg-hover: var(--el-text-color-primary);
+  --locale-popper-hover-bg: rgba(15, 23, 20, 0.06);
+}
+html.dark {
+  --locale-popper-bg: rgba(21, 36, 31, 0.92);
+  --locale-popper-bd: rgba(255, 255, 255, 0.14);
+  --locale-popper-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  --locale-popper-fg: rgba(255, 255, 255, 0.88);
+  --locale-popper-fg-hover: #fff;
+  --locale-popper-hover-bg: rgba(255, 255, 255, 0.14);
+}
+/* 双类选择器压过 EP 的 is-light/is-dark 弹层底色(此前白底根因) */
 .locale-glass-popper.el-dropdown__popper,
 .locale-select-popper.el-select__popper {
-  background: rgba(21, 36, 31, 0.78);
+  background: var(--locale-popper-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--locale-popper-bd);
   border-radius: 14px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  box-shadow: var(--locale-popper-shadow);
   padding: 6px;
 }
 .locale-glass-popper .el-dropdown-menu {
@@ -909,26 +952,34 @@ function changePwd() {
 }
 .locale-glass-popper .el-dropdown-menu__item,
 .locale-select-popper .el-select-dropdown__item {
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--locale-popper-fg);
   border-radius: 9px;
   padding: 7px 12px;
   line-height: 20px;
+}
+/* 内层 .locale-option 才是真正显示文字的节点,必须同色(此前浅色字根因) */
+.locale-glass-popper .locale-option,
+.locale-select-popper .locale-option {
+  color: inherit;
 }
 .locale-glass-popper .el-dropdown-menu__item:not(.is-disabled):hover,
 .locale-glass-popper .el-dropdown-menu__item:not(.is-disabled):focus,
 .locale-select-popper .el-select-dropdown__item.hover,
 .locale-select-popper .el-select-dropdown__item:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: var(--locale-popper-hover-bg);
+  color: var(--locale-popper-fg-hover);
 }
 .locale-select-popper .el-select-dropdown__item.is-selected {
   color: #7fd8c3;
   font-weight: 600;
 }
+html.dark .locale-select-popper .el-select-dropdown__item.is-selected {
+  color: #7fd8c3;
+}
 .locale-glass-popper .el-popper__arrow::before,
 .login-locale .el-select__popper .el-popper__arrow::before {
-  background: rgba(21, 36, 31, 0.9);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: var(--locale-popper-bg);
+  border-color: var(--locale-popper-bd);
 }
 .locale-glass-popper .el-dropdown-menu__item:not(:last-child) {
   margin-bottom: 2px;

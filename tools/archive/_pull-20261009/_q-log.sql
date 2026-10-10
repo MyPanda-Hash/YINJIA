@@ -1,0 +1,1 @@
+﻿SET NOCOUNT ON; SELECT script_name, applied_at FROM yj_schema_log WHERE script_name IN (N'migrate-server-converge-20261007.sql', N'migrate-drop-extra-docs-pu-req-20261008.sql', N'migrate-drop-qc-unused-panels-20261009.sql', N'migrate-fourdoc-baseline-restore-20261008.sql') ORDER BY applied_at;

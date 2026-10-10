@@ -1,0 +1,26 @@
+  ✔ 探针账号(未授权 field)fieldPanels 为空 — []
+  ✔ A 选中角色后权限矩阵渲染 — 角色行「普通用户 user - 删除」→ 列 188 个
+  ✔ A 组织架构·权限矩阵出现「自定义字段」列 — 面板 | 可见 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询单据 | 新增保存 | 申请修改 | 修改记录 | 删除申请 | 导出打印 | 审批 | 自定义字段 | 修改 | 删除 | 打印预览 | 价格金额 | 复核反复核 | 调价 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选 | 面板 | 可见 | 查询 | 新增 | 修改 | 删除 | 导出EXCEL | 打印预览 | 审核反审核 | 价格金额 | 复核反复核 | 调价 | 自定义字段 | 全选
+  ✔ A 权限矩阵含角色面板权限区(已载入) — 「普通用户」面板操作权限 （勾选对应操作权限;可见=能看到面板,其余为操作级别） 复制自 选择角色 复制权限
+  · 截图: 1-orgadmin-perm-matrix.png
+  ✔ B 未授权:商品档案「更多 ▼」无「字段管理」 — 表格调整 | 导出 | 退出
+  ✔ B 未授权:「更多 ▼」仍在(菜单本身没坏) — 表格调整 | 导出 | 退出
+  · 截图: 2-unauthorized-no-fieldmgr.png
+  ✔ B 未授权:来料检验要求无「⚙ 自定义字段」 — ↻ 刷新 | 保存 | 🔍 模糊搜索 | 🕘 修改记录
+  · 截图: 3-unauthorized-qcinspreq.png
+  ✔ C 授权后 fieldPanels = 两个面板 — ["QC_INSP_REQ","INV"]
+  ✔ C 授权后:商品档案「更多 ▼」出现「字段管理」 — 表格调整 | 字段管理 | 导出 | 退出
+  · 截图: 4-authorized-fieldmgr-menu.png
+  ✔ C 授权后:来料检验要求出现「⚙ 自定义字段」 — ↻ 刷新 | 保存 | 🔍 模糊搜索 | 🕘 修改记录 | ⚙ 自定义字段
+  · 截图: 5-authorized-qcinspreq.png
+  ✔ C 点得开「字段管理」弹窗 — 字段管理
+  ✔ C 弹窗载入该面板扩展池账目(可选页面)
+  · 截图: 6-fieldmgr-dialog.png
+  ✔ D 切 en:权限矩阵出现 Custom Fields 列 — 角色行「普通用户 user - Delete」· 列 188 个 · Panel | Visible | Select all | Query | New | Edit | Delete | Export Excel | Print preview | Audit / Un-audit | Prices & Amounts | Review / Un-review | Price Adjust
+  · 截图: 7-en-orgadmin-perm-matrix.png
+  ✔ D 切 en:来料检验要求入口显示 Custom Fields — ↻ Refresh | Save | 🔍 Fuzzy search | 🕘 Modification Log | ⚙ Custom Fields
+  · 截图: 8-en-qcinspreq-customfields.png
+  ✔ D 切 en:「更多 ▼」里的入口显示 Field Manager — Adjust Columns | Field Manager | Export | Sign out
+  ✔ 探针账号/角色已清理
+
+=== 界面取证结果: PASS 16 / FAIL 0(截图在 D:\YINJIA-main\tools\archive\_extperm\_shots)===

@@ -104,13 +104,10 @@ public class QuickScheduleService {
                         + " WHERE source_panel_code='SO_ORDER' AND source_line_key=?"
                         + " AND target_panel_code IN ('MANU_ORDER','PLANG') AND link_status='ACTIVE'",
                 Double.class, sourceNo + "#" + lineId);
-        Double pu = jdbc.queryForObject(
-                "SELECT ISNULL(SUM(ISNULL(linked_quantity,0)),0) FROM form_flow_link"
-                        + " WHERE source_panel_code='SO_ORDER' AND source_line_key=?"
-                        + " AND target_panel_code='PU_REQ' AND link_status='ACTIVE'",
-                Double.class, sourceNo + "#" + lineId);
+        // 2026-10-08:原「SO_ORDER → PU_REQ(请购单)」也占剩余量的口径随请购单下架移除 ——
+        // 订单行的剩余可转量现在只看 工单/排产(MANU_ORDER/PLANG)的占用
         double demand = Num.of(line.get("数量"));
-        double residual = demand - (manu == null ? 0 : manu) - (pu == null ? 0 : pu);
+        double residual = demand - (manu == null ? 0 : manu);
         if (residual <= 0.0001) {
             throw new IllegalStateException("该订单行已全部转出(剩余可转数量 0)");
         }

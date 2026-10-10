@@ -1,0 +1,45 @@
+[connected] Microsoft SQL Server 15.00.2000 as yinjia
+== _q-meta.sql ==
+  | T | yj_doc_status | 
+  | T | yj_role_panel | 
+  | T | yj_schema_log | 
+  | COLS | yj_doc_status | id | 
+  | COLS | yj_doc_status | panel_code | 
+  | COLS | yj_doc_status | doc_no | 
+  | COLS | yj_doc_status | shr | 
+  | COLS | yj_doc_status | shsj | 
+  | COLS | yj_doc_status | canceled | 
+  | COLS | yj_doc_status | cancel_by | 
+  | COLS | yj_doc_status | cancel_at | 
+  | COLS | yj_doc_status | pending | 
+  | COLS | yj_doc_status | pending_by | 
+  | COLS | yj_doc_status | pending_at | 
+  | COLS | yj_doc_status | update_at | 
+  | COLS | yj_doc_status | archived | 
+  | COLS | yj_doc_status | deleting | 
+  | COLS | yj_doc_status | delete_req_by | 
+  | COLS | yj_doc_status | delete_req_at | 
+  | COLS | yj_doc_status | stopped | 
+  | COLS | yj_doc_status | stop_by | 
+  | COLS | yj_doc_status | stop_at | 
+  | COLS | yj_doc_status | saved | 
+  | COLS | yj_doc_status | modify_state | 
+  | COLS | yj_doc_status | modify_req_by | 
+  | COLS | yj_doc_status | modify_req_at | 
+  | COLS | yj_doc_status | modify_appr_by | 
+  | COLS | yj_doc_status | modify_appr_at | 
+  | COLS | yj_doc_status | archived_at | 
+  | COLS | yj_doc_status | erp_close_state | 
+  | COLS | yj_doc_status | approve_node | 
+  | COLS | yj_doc_status | l2_approver | 
+  | COLS | yj_doc_status | effective | 
+  | COLS | yj_doc_status | modify_reason | 
+  | COLS | yj_role_panel | id | 
+  | COLS | yj_role_panel | role_id | 
+  | COLS | yj_role_panel | panel_code | 
+  | COLS | yj_role_panel | can_approve | 
+  | COLS | yj_role_panel | perms | 
+  | COLS | yj_schema_log | script_name | 
+  | COLS | yj_schema_log | content_hash | 
+  | COLS | yj_schema_log | applied_at | 
+[OK] _q-meta.sql (2 batches)
