@@ -381,7 +381,11 @@ async function changePwd() {
     await apiChangePassword({ old: f.old, next: f.next })
     pwdVisible.value = false
     pwdForm.value = { old: '', next: '', confirm: '' }
-    ElMessage.success('密码修改成功')
+    // 改密即作废当前会话:令牌里没有密码版本号,旧 token 不会因改密失效,
+    // 不重登就等于「改了密码但旧凭证继续可用」。清会话 → 跳登录页,让用户用新口令进来。
+    ElMessage.success('密码修改成功，请用新密码重新登录')
+    user.logout()
+    router.replace('/login')
   } catch (e) {
     // 服务端原密码校验失败(原实现是前端硬编码 old !== '123456',任何账号输 123456 都能过)
     ElMessage.error(e?.message || '修改密码失败')
