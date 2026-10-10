@@ -2774,11 +2774,12 @@ public class ButtonService {
     }
 
     /**
-     * 组装成品检验单审核 → 数量分流(会议「合格数转库存、不合格数留系统待处理」):
+     * 组装成品检验单审核 → 数量分流:
      * <ul><li><b>合格数 = 表头报工数量 − Σ明细不合格数量</b>(2026-10-15 用户口径:明细只填「不合格数量」,
      *   合格数量是派生值)数量 &gt; 0 → 生成**产成品入库单草稿**(FINISH_IN,
      *   与切炭直销同一落点,留草稿由仓库审核,不自动记账);</li>
-     * <li>不合格数量 &gt; 0 → 生成**不良品处理单草稿**(QC_DISPOSAL,处置方式=隔离,待品质/仓库处置)。</li></ul>
+     * <li>不合格数量 &gt; 0 → **不再派生下游单**(2026-10-09 上游已下架「不良品处理单 QC_DISPOSAL」;
+     *   原分支遗漏未删,会让「填了不合格 ⇒ 审核 400 整单回滚」,2026-10-15 合并时收掉,见方法内注释)。</li></ul>
      * 幂等:按 form_flow_link(源=检验单号) 判重,下游作废释放后可重新生成。
      */
     private void asmInspToStock(String panelCode, String inspNo, String user) {
@@ -2866,27 +2867,14 @@ public class ButtonService {
             jdbc.update("UPDATE qc_asm_insp_head SET 处理方式=?, asp_user2=?, asp_time2=GETDATE()"
                     + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", "合格转库存(" + fiNo + ")", user, inspNo);
         }
-        if (ng > 0) {
-            Map<String, Object> head = new LinkedHashMap<>();
-            head.put("单据日期", LocalDate.now().toString());
-            head.put("来源单号", inspNo);
-            head.put("物料编码", h.get("产品编码"));
-            head.put("物料名称", h.get("产品名称"));
-            if (lot != null && !lot.isBlank()) head.put("批号", lot);
-            head.put("数量", ng);
-            head.put("原仓库", wh);
-            head.put("处置方式", "隔离");                       // 留系统待处理:先进隔离仓,由品质/仓库处置
-            head.put("处置原因", "组装成品检验不合格(检验单 " + inspNo + ")");
-            head.put("经手人", user);
-            Map<String, Object> saved = save(registry.panel("QC_DISPOSAL"), head, false);
-            String blNo = String.valueOf(saved.get("编号"));
-            jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
-                            + " target_panel_code, target_form_no, link_status, create_by, create_time)"
-                            + " VALUES ('QC_ASM_INSP', ?, '', 'QC_DISPOSAL', ?, 'ACTIVE', ?, GETDATE())",
-                    inspNo, blNo, user);
-            jdbc.update("UPDATE qc_asm_insp_head SET 处理方式=?, asp_user2=?, asp_time2=GETDATE()"
-                    + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", "不合格待处理(" + blNo + ")", user, inspNo);
-        }
+        // 🔴 2026-10-15 合并 origin/main 时收掉的尾巴:**不合格侧不再建下游单**。
+        //   上游 2026-10-09 已下架「不良品处理单 QC_DISPOSAL」(面板 0 单据、0 操作留痕,用户确认不要),
+        //   连带删了 QcDisposalService、删了 yj_panel 行与 qc_disposal 表,但**漏删了这里的分支**:
+        //   一旦 不合格数量 > 0,审核走到 save(registry.panel("QC_DISPOSAL")) 就抛
+        //   「面板不存在:QC_DISPOSAL」⇒ 整单 400 回滚(实测:不合格=3 时审核必失败、入库单也不生成)。
+        //   这与本分支「合格数量 = 报工数量 − 不合格数量」的口径直接冲突(填了不合格就审不过),
+        //   故按上游的下架口径把该分支整段移除:不合格数量仍记在检验单明细上、追溯页「不合格数量合计」
+        //   照常汇总,只是不再自动派生一张不良品处理单。
     }
 
     /** 产线 → 所属车间(bs_prod_line.生产车间;线不存在返回 null) */

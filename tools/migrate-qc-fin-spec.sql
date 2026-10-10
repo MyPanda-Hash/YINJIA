@@ -215,6 +215,20 @@ GO
 
 /* ═══════════════════ C. 播种 1 张示例(只做格式;数据取自 YJ-Q-125 的形状) ═══════════════════ */
 DECLARE @doc nvarchar(50) = N'CPJY-2026-10-0001';
+-- 🔴 2026-10-15(合并 origin/main 时实测发现)自愈补丁:
+--   下面整段播种原先只由 `IF NOT EXISTS(单头)` 守卫 ⇒ **单头在、明细缺**时永远不会补种,
+--   而文件末尾自检要求「修订履历 ≥1 / 检验项目 ≥3 / 处理方式 ≥2」⇒ 自检**永久失败**、
+--   DbSync 每次都报「自检失败」并中止后续脚本(实测两账套都卡在这里)。
+--   成因:脚本第一次只跑到一半(或单头被别处写入)留下"有头无行"的半成品,而守卫看不到。
+--   处置:先自愈 —— 单头在但明细不齐,就把这张示例单整体删掉,让下方整段重播;
+--         示例单是脚本自己播的样板单,删除重播不丢业务数据。
+IF EXISTS (SELECT 1 FROM qc_fin_spec_head WHERE 单据编号 = @doc)
+   AND (SELECT COUNT(*) FROM qc_fin_spec_detail WHERE 单据编号 = @doc AND 表区 = N'修订履历') < 1
+BEGIN
+  DELETE FROM qc_fin_spec_detail WHERE 单据编号 = @doc;
+  DELETE FROM qc_fin_spec_head   WHERE 单据编号 = @doc;
+  PRINT N'  ~ 示例单 ' + @doc + N' 有头无行 ⇒ 已清,准备重播';
+END
 IF NOT EXISTS (SELECT 1 FROM qc_fin_spec_head WHERE 单据编号 = @doc)
 BEGIN
   INSERT INTO qc_fin_spec_head (单据编号, 单据日期, 文件编号, 文件名称, 版本版次, 管控状态, 发行日期,
