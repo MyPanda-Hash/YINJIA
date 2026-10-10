@@ -507,6 +507,17 @@ export default {
     '追溯口径': 'Trace Scope',
     '整单': 'Whole Order',
     '按工单行': 'By Work Order Line',
+    // ---- 工单追溯:分段口径胶囊 + 入库段按行(2026-10-15 步2/步5)----
+    '收敛口径': 'Converged By',
+    '根工单号': 'Root WO No.',
+    '张数': 'Count',
+    '计划数量合计': 'Total Planned Qty',
+    '入库数量合计': 'Total Received Qty',
+    '是否切单': 'Split?',
+    '家族(按根行聚合)': 'Family (aggregated by root line)',
+    '按钮留痕只记工单号(yj_usage_log.doc_no),没有工单行维度 ⇒ 天生是工单级口径': 'Action logs record only the work order number (yj_usage_log.doc_no) with no line dimension, so this section is inherently order-level',
+    '只显示本行的调拨;2026-10-15 之前的老记录没有工单行键,只在「整单」口径里出现(不回填、不猜)': 'Only transfers of this line are shown; records older than 2026-10-15 carry no line key and appear only in the Whole Order scope (never backfilled or guessed)',
+    '材料出库单没有生产行键:加工单号为空、批号是 ERP 批号口径(≠生产批次号)、源单行号空 ⇒ 无法按行收敛,如实按整单显示': 'Material issue notes carry no production line key: 加工单号 is empty, the lot number follows the ERP convention (≠ production batch), and the source line no. is empty — so this section stays order-level, reported as-is',
     // 本文件历史遗留缺词(2026-10-15 补齐,使 WorkOrderTraceDialog 词条 0 缺失)
     '工单详情 · 追溯': 'Work Order Detail · Trace',
     '绿=已完工': 'Green = Completed',
