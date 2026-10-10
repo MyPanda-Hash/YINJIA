@@ -249,19 +249,6 @@
                     :disabled="!editable || dr.computed"
                     style="width: 100%"
                   />
-                  <!-- 工序检验单三面板的明细文本列 → 可自动撑高的多行输入(用户口径 2026-10-15:
-                       「让当前明细行文字过长时可以多行显示」)。普通 el-input 是单行控件,
-                       长文字只能在框内横向滚动;换成 textarea + autosize 后行高随内容增长,
-                       溢出时也不会被切掉。范围**只限这三个面板**(其余面板观感不变)。 -->
-                  <el-input
-                    v-else-if="multilineDetail(dr)"
-                    v-model="row[dr.dataName]"
-                    type="textarea"
-                    :autosize="{ minRows: 1, maxRows: 6 }"
-                    :disabled="!editable || dr.computed"
-                    resize="none"
-                    class="detail-multiline"
-                  />
                   <el-input v-else v-model="row[dr.dataName]" :disabled="!editable || dr.computed" />
                 </template>
               </el-table-column>
@@ -428,19 +415,6 @@ watch(() => localeStore.locale, async () => {
 })
 
 const panelCode = computed(() => props.panelCodeProp || route.params.panelCode)
-
-/**
- * 明细文本列改多行显示的**面板白名单**(用户口径 2026-10-15:「让当前明细行文字过长时可以多行显示」)。
- * 只放工序检验单三张 —— 它们是"按检验项目写字"的表,备注/检验项目/标准要求 常超出单行宽度;
- * 其余面板保持单行输入,避免全局把行高撑开、一屏可见行数变少。
- */
-const MULTILINE_DETAIL_PANELS = ['QC_MOLD_INSP', 'QC_CUT_INSP', 'QC_ASM_INSP']
-/** 明细里"自由文本"之外的控件类型:这些各有多行以外的表达方式,不套 textarea */
-const DETAIL_NON_TEXT_TYPES = ['参照', '下拉框', '标准库', '是否', '图片', '小数', '整数', '日期']
-/** 该明细字段是否应渲染成多行文本框(面板在白名单内 且 是自由文本) */
-const multilineDetail = (dr) =>
-  MULTILINE_DETAIL_PANELS.includes(String(panelCode.value || ''))
-  && !DETAIL_NON_TEXT_TYPES.includes(String(dr?.dataType || ''))
 const operationName = computed(() => route.query.operationName || '新增流程')
 const code = computed(() => props.codeProp || route.query.code)
 const isEdit = computed(() => !!code.value)
@@ -1459,21 +1433,6 @@ watch(() => [panelCode.value, code.value], () => {
 </script>
 
 <style scoped>
-/* 工序检验单三面板:明细文本列用 textarea 多行显示(2026-10-15)
-   —— 去掉拖拽手柄与固定高度,让单元格随内容长高;行高与单行输入框对齐,避免空行看着偏高。 */
-.detail-multiline :deep(.el-textarea__inner) {
-  min-height: 32px !important;
-  padding: 5px 11px;
-  line-height: 22px;
-  box-shadow: none;
-  border: 0;
-  background: transparent;
-  resize: none;
-  font-family: inherit;
-}
-.detail-multiline :deep(.el-textarea__inner:focus) {
-  box-shadow: 0 0 0 1px var(--t-primary, #0d5bd3) inset;
-}
 /* 已完成(金蝶自动关单):靛蓝,与「已审核」的品牌绿明确区分 ——
    覆盖 el-tag 的三个 CSS 变量(元素级变量优先级高于 .el-tag--xxx 的单类规则) */
 .st-done {
