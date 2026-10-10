@@ -34,6 +34,26 @@ public class UsageLogService {
         insert("action", userName, realName, panelName, actionName, docNo, ip);
     }
 
+    /**
+     * 账号 → 姓名(取不到、空值、或查询失败时返回 fallback)。
+     *
+     * <p>收敛点:原先 PxController / ButtonService / DevTaskService 各自写一份
+     * `SELECT real_name FROM yj_user WHERE username = ?`,是同一句 SQL 的三处拷贝;
+     * 埋点侧统一走这里,免得再有人为了一行查询往 Controller 里注入 JdbcTemplate。
+     */
+    public String realNameOf(String userName, String fallback) {
+        try {
+            if (userName == null || userName.isBlank()) return fallback;
+            List<String> rows = jdbc.queryForList(
+                    "SELECT real_name FROM yj_user WHERE username = ?", String.class, userName);
+            if (rows.isEmpty() || rows.get(0) == null) return fallback;
+            String name = String.valueOf(rows.get(0));
+            return name.isBlank() ? fallback : name;
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
     private void insert(String eventType, String userName, String realName, String panelName,
                         String actionName, String docNo, String ip) {
         try {

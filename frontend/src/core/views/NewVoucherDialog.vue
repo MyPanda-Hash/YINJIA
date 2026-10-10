@@ -116,15 +116,14 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus, Delete, Search } from '@element-plus/icons-vue'
-import { usePanelRuntime } from '@core/panel-runtime'
+import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import RefPickDialog from './RefPickDialog.vue'
 import { tt } from '@/i18n'
-import { useUserStore } from '@/stores/user'
 import { applyDocDefaults } from '@core/panel/docDefaults'
 import { applyCalcRules } from '@core/panel/calcRules'
 
 const engine = usePanelRuntime()
-const user = useUserStore()
+const { user } = useAppContext()
 
 const props = defineProps({
   visible: { type: Boolean, default: false },

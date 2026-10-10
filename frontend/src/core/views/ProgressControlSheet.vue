@@ -88,9 +88,10 @@
             <th class="c-mile">{{ tt('预计完成日期') }}</th>
             <th class="c-status">{{ tt('状态') }}</th>
             <th class="c-tester">{{ tt('测试情况') }}</th>
-            <th class="c-approve">{{ tt('技术目标达成') }}</th>
-            <th class="c-inspect">{{ tt('是否市场转化') }}</th>
-            <th class="c-reason">{{ tt('未转换原因') }}</th>
+            <!-- 2026-10-09 用户口径:撤下「技术目标达成 / 是否市场转化 / 未转换原因」三列(纸面 14 → 11)。
+                 唯一真源 = progressColumns.js 的 PROGRESS_COLUMNS(同批已删);
+                 元数据置 hidden=1(tools/migrate-rd-progress-drop-3cols.sql);
+                 物理列与历史数据保留(项目铁律:col_name 永不改,见 RD_PROGRESS_DETAIL_COLUMNS)。 -->
             <th v-if="editable" class="c-op"></th>
           </tr>
         </thead>
@@ -170,33 +171,29 @@
               <el-input v-if="editable" v-model="row[K['测试情况']]" type="textarea" :autosize="{ minRows: 1, maxRows: 6 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
               <span v-else class="ps-cell-text">{{ row[K['测试情况']] || '' }}</span>
             </td>
-            <td class="c-approve">
-              <el-input v-if="editable" v-model="row[K['技术目标达成']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row[K['技术目标达成']] || '' }}</span>
-            </td>
-            <td class="c-inspect">
-              <el-input v-if="editable" v-model="row[K['是否市场转化']]" size="small" class="ps-cell-input" maxlength="50" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row[K['是否市场转化']] || '' }}</span>
-            </td>
-            <td class="c-reason">
-              <el-input v-if="editable" v-model="row[K['未转换原因']]" type="textarea" :autosize="{ minRows: 1, maxRows: 5 }" size="small" class="ps-cell-input" @input="emit('dirty')" />
-              <span v-else class="ps-cell-text">{{ row[K['未转换原因']] || '' }}</span>
-            </td>
+            <!-- 技术目标达成 / 是否市场转化 / 未转换原因:2026-10-09 随纸面列一并撤下(见表头注释)。
+                 物理列与历史数据保留在 rd_progress_detail,只是不再出现在控制列表。 -->
             <td v-if="editable" class="c-op">
               <span class="ps-addrow" :title="tt('在该项目后新增子项目')" @click="insertAfter(i)">＋</span>
               <span class="ps-del" :title="tt('删除该子项目')" @click="removeItem(i)">×</span>
             </td>
           </tr>
           <tr v-if="!items.length">
-            <td :colspan="editable ? 15 : 14" class="ps-empty">{{ tt('暂无子项目，点击下方按钮新增') }}</td>
+            <!-- 空态文案改用已有的「暂无数据」(10 个语言包均有译名);原「点击下方按钮新增」在撤掉
+                 写入口后已不成立,换成新句子则要同步补 10 个语言包,收益不抵成本。 -->
+            <td :colspan="editable ? 12 : 11" class="ps-empty">{{ tt('暂无数据') }}</td>
           </tr>
         </tbody>
       </table>
-      <div v-if="editable" class="ps-addbar">
-        <div class="ps-add" @click="openAddProject">＋ {{ tt('新增项目') }}</div>
+      <!-- ⚠ 这里**不能**再挂 v-if="editable":调用点已把 editable 硬编码为 false(单元格恒只读),
+           若跟着 editable 一起消失,「⟳ 同步阶段进度」就没了 —— 而它是"重跑自动导入",不是手填。 -->
+      <div class="ps-addbar">
+        <!-- 2026-10-09 用户口径「去掉底部的自己写入功能」:
+             项目进度查询是**汇总查看面板** —— 数据由「项目实施计划归档 + 立项申请」自动导入,人工不再往里写。
+             故撤掉「＋ 新增项目」与「⬆ 导入Excel」两个写入口(连同导入说明文案);
+             「⟳ 同步阶段进度」保留 —— 它是重跑自动导入,不是手填。
+             单元格级的彻底只读由 editable 判据负责(后续改动)。 -->
         <div class="ps-add" @click="syncStageProgress">⟳ {{ tt('同步阶段进度') }}</div>
-        <div class="ps-add" @click="pickImportFile">⬆ {{ tt('导入Excel') }}</div>
-        <span class="ps-addbar-tip">{{ tt('导入Excel列与面板一致（项目定级/项目名称/子项目尺寸/项目编号/内容/项目发起人/项目负责人/立项日期/预计完成日期/状态/测试情况/技术目标达成/是否市场转化/未转换原因），导入后自动追加子项目行，请保存入库。') }}</span>
         <input ref="fileRef" type="file" accept=".xlsx,.xls" style="display: none" @change="importExcelFile" />
       </div>
     </div>

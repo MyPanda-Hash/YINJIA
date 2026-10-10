@@ -12,6 +12,15 @@ export { unwrap, unwrapStrict, errMsg }
  */
 export { roundDecimal } from '@core/panel/calcRules'
 
+/**
+ * 纸质单据/标签打印(固定版式)——面板 runtime 契约的一站式再导出。
+ * core 视图不再直接 import `@/business/print-formats`,统一经 usePanelRuntime() 取。
+ */
+export {
+  printPuOrder, printPuOrderNoAmount, printQcReturn,
+  printProductCards, printLocationCards, printProductionTask, woQrText,
+} from './print-formats'
+
 // 数据访问固定为 SQL 后端：/api/px/* -> Spring Boot -> SQL Server HSDZ_MES（YINJIA-MES）。
 
 const APPROVAL_WORKFLOW_ACTIONS = ['提交审批', '审批通过', '审批驳回', '审批情况', '弃审']
@@ -370,6 +379,22 @@ export async function specAssignDoc(no) {
 /** 四个受控文件:我能不能编这张单 { applicable, canEdit, reason, productCode, owner, ownerName }(2026-09-21) */
 export async function rdDevFileEdit(panelCode, docNo) {
   return unwrap(await request.get('/px/rdDev/fileEdit', { params: { panelCode, docNo } }))
+}
+
+// ==================== 立项申请:分发对接人 / 确认责任人(2026-10-08 研发流程图③④) ====================
+
+/**
+ * 立项申请流程状态(侧栏两按钮的唯一真源):
+ * { status, level, liaison, liaisonName, owner, ownerName, canDispatchLiaison, canConfirmOwner }
+ * ⚠ 走 /rdFlow/* 而不是 /rdDev/* —— 后者要 RD_PROD_INFO 的查看权,立项线的销售/对接人会被 403 挡掉。
+ */
+export async function rdFlowState(docNo) {
+  return unwrap(await request.get('/px/rdFlow/state', { params: { docNo } }))
+}
+
+/** 启用账号清单(立项侧选人下拉):[{username, realName}] */
+export async function rdFlowUsers() {
+  return unwrap(await request.get('/px/rdFlow/users'))
 }
 
 /**

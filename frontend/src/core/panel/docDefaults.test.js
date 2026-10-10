@@ -14,14 +14,20 @@ import {
  *    要求 draftEditable 的 watch 上,等于永不执行。
  *  · 新增真正经过的界面是 NewVoucherDialog,默认值必须在那里、保存之前带出。
  *  · RD_PLAN **没有**「申请立项人」字段,它的人是「负责人」。
+ *
+ * ⚠ 2026-10-08 变更(研发流程图③④,m01625 用户口径):
+ *   RD_PLAN「负责人」**不再锁定当前登录人**。定级后先在立项申请表上「分发对接人」,
+ *   对接人签核并「确认责任人」,该责任人经 REF_SYNONYMS(项目责任人 → 负责人)在
+ *   选「文档编号」参照时带入 RD_PLAN.负责人(该字段 yj_field.editable=0,不带入就永远空)。
+ *   所以「新增实施计划 ⇒ 负责人=当前用户」是**错误行为**,本文件改成反向断言守着。
  */
 
 const USER = { realName: '彭于晏', userName: 'glm53' }
 const T = '2026-09-11'
 
-test('锁定字段:立项申请=申请立项人,实施计划=负责人,其它面板没有', () => {
+test('锁定字段:立项申请=申请立项人;实施计划不再锁定(负责人来自「项目责任人」带入)', () => {
   assert.equal(lockedPersonLabel('RD_APPROVAL'), '申请立项人')
-  assert.equal(lockedPersonLabel('RD_PLAN'), '负责人')
+  assert.equal(lockedPersonLabel('RD_PLAN'), null)
   assert.equal(lockedPersonLabel('RD_PROGRESS'), null)
   assert.equal(lockedPersonLabel('RD_FILTER_EFF'), null)
 })
@@ -32,10 +38,11 @@ test('新增立项申请:申请立项人=当前用户姓名', () => {
   assert.equal(form['申请立项人'], '彭于晏')
 })
 
-test('新增实施计划:负责人=当前用户姓名', () => {
+test('新增实施计划:负责人**不**填当前用户(2026-10-08 起由「项目责任人」参照带入)', () => {
   const form = {}
   applyDocDefaults('RD_PLAN', form, USER, { isNew: true, today: T })
-  assert.equal(form['负责人'], '彭于晏')
+  // 反例守卫:若哪天有人把 RD_PLAN:'负责人' 加回 LOCKED_PERSON,这条会红。
+  assert.equal('负责人' in form, false)
 })
 
 test('实施计划不该凭空多出「申请立项人」键(该面板没有这个字段,多余键会在保存时静默丢弃)', () => {

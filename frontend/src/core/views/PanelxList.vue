@@ -125,10 +125,14 @@
     <!-- 文书式面板:完整纸张居中 + 功能按钮右侧竖排(不按表头/表中/表尾三段式) -->
     <template v-else-if="isApprovalDoc">
       <div class="approval-layout">
+        <!-- 项目进度查询(RD_PROGRESS)= 汇总查看面板:数据由「项目实施计划归档 / 立项申请」自动导入,
+             人工不再往里写 ⇒ **单元格恒只读**(:editable 硬编码 false,2026-10-09 用户口径「去掉自己写入功能」)。
+             单据生命周期按钮(保存/审批)不受影响:draftEditable 未动,「⟳ 同步阶段进度」重跑自动导入后仍可保存入库。
+             要恢复正常编辑:把下面 :editable 改回 draftEditable 即可(组件里 editable 分支保留未删)。 -->
         <ProgressControlSheet
           v-if="panelCode === 'RD_PROGRESS'"
           ref="approvalSheetRef"
-          :head="cur" :fields="headerFields" :editable="draftEditable"
+          :head="cur" :fields="headerFields" :editable="false"
           @dirty="markInlineDirty"
           @open-sheets="openDataSheets"
         />
@@ -182,11 +186,13 @@
             <span class="as-side-toggle">{{ sideCollapsed ? '◀' : '▶' }}</span>
           </div>
           <template v-if="!sideCollapsed">
-            <div class="as-side-status-row">
+            <!-- 单据状态胶囊 + 单据切换分页器(2026-10-09 用户口径「把进度查询表侧边栏上边的单据切换去掉」):
+                 单单据面板(RD_PROGRESS)全库只有一张单,切换无意义 ⇒ 这两块整块不渲染。 -->
+            <div v-if="!singleDocMode" class="as-side-status-row">
               <span v-if="cur['单据状态']" class="doc-status" :class="cur['单据状态']" :title="cur['单据状态']">{{ tt(cur['单据状态']) }}</span>
               <span v-else class="doc-status none">—</span>
             </div>
-            <div class="as-side-pager">
+            <div v-if="!singleDocMode" class="as-side-pager">
               <span class="page-btn" :title="tt('最前一张')" @click="pageFirst">◁</span>
               <span class="page-btn" :title="tt('上一张')" @click="page(-1)">◀</span>
               <span class="page-no">{{ pageText(curNo, total, '') }}</span>
@@ -379,12 +385,9 @@
                 </div>
               </div>
               <div class="as-side-btn" v-if="isModLogPanel" @click="openModifyLog">{{ tt('修改记录') }}</div>
-              <div class="as-side-section">{{ tt('文档输出') }}</div>
-              <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
-              <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
-              <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
-                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
-              <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
+              <!-- 文档输出分节标题与它的两个按钮已下移到本侧栏末尾(2026-10-09 归位):
+                   它原先夹在「项目定级/分发…」与工具栏动作组**之前**,把新增/保存/审批这些
+                   动作按钮全归到了「文档输出」标题下面 ⇒ 用户报的"按钮分类混乱"。 -->
               <!-- 项目定级(2026-09-21):立项申请审核通过后,由审核人给项目定级;已定级显示当前等级,可再改 -->
               <div
                 class="as-side-btn"
@@ -394,6 +397,29 @@
                   : (['已审核', '已归档'].includes(curDocStatus) ? tt('仅审批人（或管理员）可项目定级') : tt('仅已审核或已归档的立项申请可项目定级'))"
                 @click="openGrade"
               >{{ tt('项目定级') }}{{ cur && cur['项目等级'] ? '·' + cur['项目等级'] : '' }}</div>
+              <!-- 分发对接人 / 确认责任人(2026-10-08 研发流程图③④):
+                   定级完成后,由审批人**从账号列表选一个账号**作为本项目的「对接人」;
+                   对接人登录后签核,再**从账号列表选人**确认「项目责任人」。
+                   ⚠ 显隐与置灰的判据全部来自后端 rdApprovalFlowState(与按钮的服务端门禁逐条同源),
+                     前端只做展示 —— 免得界面能点、后端拒绝这类"点了才知道"的错配。 -->
+              <div
+                class="as-side-btn"
+                v-if="panelCode === 'RD_APPROVAL'"
+                :class="{ disabled: !rdFlow.canDispatchLiaison }"
+                :title="rdFlow.canDispatchLiaison ? tt('把该立项申请分发给一个对接人账号（由对接人签核并确认项目责任人）')
+                  : (!isRdSettled ? tt('仅已审核或已归档的立项申请可分发给对接人')
+                    : (!rdFlow.level ? tt('请先完成项目定级，再分发对接人') : tt('仅审批人（或管理员）可分发给对接人')))"
+                @click="openLiaison"
+              >{{ tt('分发对接人') }}{{ rdFlow.liaisonName ? '·' + rdFlow.liaisonName : '' }}</div>
+              <div
+                class="as-side-btn"
+                v-if="panelCode === 'RD_APPROVAL'"
+                :class="{ disabled: !rdFlow.canConfirmOwner }"
+                :title="rdFlow.canConfirmOwner ? tt('对接人签核：确认本项目的项目责任人（项目负责人）')
+                  : (!isRdSettled ? tt('仅已审核或已归档的立项申请可确认责任人')
+                    : (!rdFlow.liaison ? tt('请先分发对接人，再由对接人确认项目责任人') : tt('仅本单对接人或管理员可确认项目责任人')))"
+                @click="openOwner"
+              >{{ tt('确认责任人') }}{{ rdFlow.ownerName ? '·' + rdFlow.ownerName : '' }}</div>
               <!-- 分发责任人(2026-09-20;原名「产品开发下发」):仅产品信息表;
                    已归档 **且 二级审核人 ∪ 管理员** 才可点;已分发后按钮变「改责任人」(分发后随时可改) -->
               <div
@@ -428,6 +454,29 @@
                   @click="onSideAction(a)"
                 >{{ tt(a) }}</div>
               </template>
+              <!-- ── 文档输出(2026-10-09 归位) ──
+                   只有真正"出文档"的两个按钮留在这里;其余(项目定级 / 分发对接人 / 确认责任人 /
+                   分发责任人 / 规格书分发 / 以及上面的工具栏动作组 新增·选单·保存·删除·审批·生单·刷新·更多)
+                   一律归「单据操作」。此前本标题夹在它们**之前**,把它们全归到了「文档输出」下面。 -->
+              <div class="as-side-section">{{ tt('文档输出') }}</div>
+              <!-- 打印:独立按钮(与导出分离;导出走格式选择 PDF/Excel) -->
+              <div v-if="isApprovalDoc" class="as-side-btn" @click="printApprovalSheet">{{ tt('打印') }}</div>
+              <!-- 对外正式报表:后端 JasperReports 模板(IT 维护版式:公司抬头+页眉页脚+页码)。
+                   该面板在 reports/report-templates.properties 里登记了模板才出现 —— 没有模板时前端完全无感 -->
+              <div v-if="reportTemplates.length || user.isAdmin" class="as-side-btn" @click="reportVisible = true">{{ tt('导出报表') }}</div>
+              <!-- 导出 / 扫描填单(2026-10-09 用户口径「导出和扫描填单放到下边」):
+                   原混在「单据操作」的工具栏动作组里(见 APPROVAL_SIDE_EXCLUDE 已把它们排除),
+                   现显式放在侧栏末尾的「文档输出」下,与 打印/导出报表 同组。 -->
+              <div
+                class="as-side-btn"
+                :class="{ disabled: isDisabled('导出') }"
+                @click="onSideAction('导出')"
+              >{{ tt('导出') }}</div>
+              <div
+                class="as-side-btn"
+                :class="{ disabled: isDisabled('扫描填单') }"
+                @click="onSideAction('扫描填单')"
+              >{{ tt('扫描填单') }}</div>
             </div>
           </template>
         </div>
@@ -1512,6 +1561,66 @@
       </template>
     </el-dialog>
 
+    <!-- 分发对接人弹窗(2026-10-08 研发流程图③):定级后由审批人选一个对接人账号。
+         对接人收到站内消息,登录后在该单上签核并确认项目责任人(下一步)。 -->
+    <el-dialog v-model="liaisonVisible" :title="tt('分发对接人')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('把该立项申请交给一个对接人账号：他负责签核，并从账号列表里确认本项目的责任人。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('对接人') }}</span>
+          <el-select v-model="liaisonUser" style="flex:1" filterable clearable :placeholder="tt('请选择对接人账号')">
+            <el-option v-for="u in rdFlowUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+          </el-select>
+        </div>
+        <div class="mod-log-meta">{{ tt('项目等级') }}：{{ rdFlow.level || tt('（未定级）') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="liaisonVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="liaisonBusy" @click="confirmLiaison">{{ tt('分发') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 确认责任人弹窗(2026-10-08 研发流程图④):对接人签核 + 选定项目责任人。
+         被选中的责任人姓名会随「文档编号」参照带到项目实施计划的「负责人」格。 -->
+    <el-dialog v-model="ownerVisible" :title="tt('确认责任人')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('对接人签核：确认本项目的责任人；确认后由他到「项目实施计划」填写对应单据。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('项目责任人') }}</span>
+          <el-select v-model="ownerUser" style="flex:1" filterable clearable :placeholder="tt('请选择项目责任人账号')">
+            <el-option v-for="u in rdFlowUsers" :key="u.username" :label="`${u.realName}（${u.username}）`" :value="u.username" />
+          </el-select>
+        </div>
+        <div class="mod-log-meta">{{ tt('对接人') }}：{{ rdFlow.liaisonName || rdFlow.liaison || tt('（未分发）') }}</div>
+      </div>
+      <template #footer>
+        <el-button @click="ownerVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="ownerBusy" @click="confirmOwner">{{ tt('签核并确认') }}</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 立项申请「审批通过 + 定级」弹窗(2026-10-08 研发流程图②):用户口径「冯总审核及定级」= 一次动作两件事。
+         仅立项申请表出现;其余面板的「审批通过」仍是原来的意见确认框。 -->
+    <el-dialog v-model="apvVisible" :title="tt('审批通过并定级')" width="460px" append-to-body>
+      <div class="dq-form">
+        <div class="mod-log-meta" style="margin-bottom:8px">{{ tt('审核通过与项目定级是同一步骤：定级后即可分发对接人。等级会随「文档编号」参照带到下游。') }}</div>
+        <div class="dq-row" style="align-items:center">
+          <span class="dq-label">{{ tt('项目等级') }}</span>
+          <el-radio-group v-model="apvLevel">
+            <el-radio-button v-for="lv in gradeOptions" :key="lv" :value="lv">{{ tt(lv) }}</el-radio-button>
+          </el-radio-group>
+        </div>
+        <div class="dq-row" style="align-items:flex-start">
+          <span class="dq-label">{{ tt('审批意见') }}</span>
+          <el-input v-model="apvOpinion" type="textarea" :rows="3" :placeholder="tt('审批意见（选填）')" />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="apvVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="apvBusy" @click="confirmRdApprove">{{ tt('确认审批通过') }}</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 查询单据弹窗(文件面板):编号模糊(单据编号/文档编号) + 首次归档时间区间 -->
     <el-dialog v-model="docQueryVisible" :title="tt(isProdDocMatrix ? '查询产品' : '查询单据')" width="480px" append-to-body>
       <div class="dq-form">
@@ -1724,17 +1833,14 @@ import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, 
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search } from '@element-plus/icons-vue'
-import { useTabsStore } from '@/stores/tabs'
-import { useUserStore } from '@/stores/user'
-import { useLocaleStore } from '@/stores/locale'
 import { tt } from '@/i18n'
-import { usePanelRuntime } from '@core/panel-runtime'
+import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
 import { ensureScanFillAction } from '@core/button-groups'
 import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
-import { printPuOrder, printQcReturn, printProductCards, printLocationCards, printProductionTask, printPuOrderNoAmount, woQrText } from '@/business/print-formats'
+
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
@@ -1770,11 +1876,15 @@ import DetailMaintainDialog from './DetailMaintainDialog.vue'
 import ScanFillDialog from './ScanFillDialog.vue'
 
 const engine = usePanelRuntime()
+const { user, tabs, locale: localeStore } = useAppContext()
 const route = useRoute()
 const router = useRouter()
-const tabs = useTabsStore()
-const user = useUserStore()
-const localeStore = useLocaleStore()
+
+// ── 纸质单据/标签打印:统一由面板 runtime 下发,本组件不直接依赖 business/print-formats ──
+const {
+  printPuOrder, printQcReturn, printProductCards, printLocationCards,
+  printProductionTask, printPuOrderNoAmount, woQrText,
+} = engine
 
 // 语言热切换:仅重拉面板配置(字段标签/面板名/列别名随 Accept-Language 更新),
 // 不重拉数据——分页、滚动、弹窗、筛选、展开状态全部保留。
@@ -2443,7 +2553,7 @@ const toolbarGroups = computed(() => (groups.value || []).map((group) => {
   return { ...group, name, actions }
 }).filter((group) => actsOf(group).length))
 // 文书式面板右侧栏:过滤无意义动作(选单/生单/复制/表格调整 对无明细文书无作用;审批流程本面板不启用)
-const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '表头调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出'] // 刷新/退出在文书侧栏体验差(刷新整页重载/退出关闭页签),2026-09-14 移除
+const APPROVAL_SIDE_EXCLUDE = ['选单', '生单', '复制', '表格调整', '表头调整', '审核', '提交审批', '审批通过', '审批驳回', '审批情况', '弃审', '刷新', '退出', '导出', '扫描填单'] // 刷新/退出在文书侧栏体验差(刷新整页重载/退出关闭页签),2026-09-14 移除；导出/扫描填单 2026-10-09 按用户口径移到侧栏末尾「文档输出」下(见模板里那两个显式按钮)
 // 删除组单独渲染(带下拉:删除=整单删除;管理员含 删除审批通过/驳回)
 const openDelMenu = ref(false)
 
@@ -3317,7 +3427,7 @@ const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, 
 
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
-watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate() }, { immediate: true })
+watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState() }, { immediate: true })
 
 /* 批次号「材料码锁定」(2026-10-04 用户口径:凡**有关打印明细生成的单据**都不可以修改批次号)。
    判定在服务端:该单的来源链里有没有**隔离行键**(`{订单号}#{行id}@{打印行id}`)的 ACTIVE link ——
@@ -4354,6 +4464,43 @@ async function confirmL2Pick() {
   }
 }
 
+// ---------- 立项申请:审批通过即定级(2026-10-08 研发流程图②) ----------
+// 用户口径(m01625 逐句):②「冯总审核及定级 ← 红字批注(这个就是对立项申请进行审批与定级)」
+// ⇒ 「审核」与「定级」是**同一步骤的两个动作**,不是先审完再去侧栏点「项目定级」。
+// 后端 approveApproval 的 RD_APPROVAL 分支会读 formData['项目等级'] 顺带落级(applyGrade);
+// 载荷不带等级则跳过 —— 兼容老单:仍可用侧栏「项目定级」补定/改定。
+const apvVisible = ref(false)
+const apvBusy = ref(false)
+const apvLevel = ref('')
+const apvOpinion = ref('')
+const apvDocNo = ref('')
+async function openRdApprove(no) {
+  apvDocNo.value = no
+  // 已定过级的单据默认选中当前等级(改级场景);新单默认空,必须选(与用户口径「审批与定级同一步」一致)
+  apvLevel.value = String(current.value?.['项目等级'] || '')
+  apvOpinion.value = ''
+  apvVisible.value = true
+}
+async function confirmRdApprove() {
+  if (!apvLevel.value) return ElMessage.warning(tt('请选择项目等级'))
+  if (apvBusy.value) return
+  apvBusy.value = true
+  try {
+    await engine.callButton({
+      panelCode: RD_FLOW_PANEL, buttonName: '审批通过',
+      formData: { 编号: apvDocNo.value, 项目等级: apvLevel.value, ...(apvOpinion.value ? { 审批意见: apvOpinion.value } : {}) },
+      buttonParam: {},
+    })
+    ElMessage.success(tt('审批通过并定级：') + apvLevel.value)
+    apvVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '审批失败')
+  } finally {
+    apvBusy.value = false
+  }
+}
+
 function filterGroups(raw) {
   const canApprove = user.isAdmin || user.approvePanels.includes(panelCode.value)
   return (raw || [])
@@ -4405,6 +4552,119 @@ async function confirmGrade() {
     ElMessage.error(engine.errMsg(e) || tt('项目定级失败'))
   } finally {
     gradeBusy.value = false
+  }
+}
+
+// ---------- 分发对接人 / 确认责任人(2026-10-08 研发流程图③④) ----------
+// 用户口径(逐句):
+//   ③「定级完之后就要分发对接人,这个对接人可以自己选择是哪一个账号」;
+//   ④「分发之后对应对接人账号可以进行签核然后分发下去,就是确认责任人,也可以选择账号,
+//      确认责任人之后就可以在项目实施计划里面进行对应单据的填写」。
+// ⇒ 两步都挂在**立项申请 RD_APPROVAL** 上,由定级完成触发,都不是新建面板。
+// ⚠ 两字段存**账号**(username)而非姓名(与 rd_dev_task.file_owner 同款口径);显示时拼「姓名（账号）」。
+// ⚠ 判据(能不能点)全部来自后端 rdApprovalFlowState —— 前端不自己重算,免得与门禁漂移。
+const RD_FLOW_PANEL = 'RD_APPROVAL'
+const rdFlow = reactive({
+  status: '', level: '', liaison: '', liaisonName: '', owner: '', ownerName: '',
+  canDispatchLiaison: false, canConfirmOwner: false,
+})
+/** 状态已定形(已审核/已归档)才谈得上分发与确认;仅用于按钮提示文案的分支 */
+const isRdSettled = computed(() => ['已审核', '已归档'].includes(rdFlow.status))
+const rdFlowUsers = ref([])
+const liaisonVisible = ref(false)
+const liaisonBusy = ref(false)
+const liaisonUser = ref('')
+const ownerVisible = ref(false)
+const ownerBusy = ref(false)
+const ownerUser = ref('')
+
+function clearRdFlow() {
+  Object.assign(rdFlow, {
+    status: '', level: '', liaison: '', liaisonName: '', owner: '', ownerName: '',
+    canDispatchLiaison: false, canConfirmOwner: false,
+  })
+}
+
+/** 拉立项流程状态(面板/当前单据变化时刷新;非立项面板直接清零,一个请求都不发) */
+async function loadRdFlowState() {
+  if (panelCode.value !== RD_FLOW_PANEL) return clearRdFlow()
+  const no = cur.value?.['单据编号'] || ''
+  if (!no) return clearRdFlow()
+  try {
+    const r = await engine.rdFlowState(no)
+    Object.assign(rdFlow, {
+      status: r?.status || '', level: r?.level || '',
+      liaison: r?.liaison || '', liaisonName: r?.liaisonName || '',
+      owner: r?.owner || '', ownerName: r?.ownerName || '',
+      canDispatchLiaison: !!r?.canDispatchLiaison, canConfirmOwner: !!r?.canConfirmOwner,
+    })
+  } catch (e) {
+    // 端点不可用(旧后端)或网络失败 ⇒ 全部置灰,不阻断打开单据(保存/审批仍走各自门禁)
+    clearRdFlow()
+  }
+}
+
+/** 懒加载启用账号清单(两个弹窗共用;接口挂 RD_APPROVAL 查看权,与 /rdDev/users 的 RD_PROD_INFO 权分开) */
+async function ensureRdFlowUsers() {
+  if (rdFlowUsers.value.length) return true
+  try {
+    rdFlowUsers.value = (await engine.rdFlowUsers()) || []
+    return true
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || '读取账号列表失败')
+    return false
+  }
+}
+
+async function openLiaison() {
+  if (!rdFlow.canDispatchLiaison) return
+  if (!(await ensureRdFlowUsers())) return
+  liaisonUser.value = rdFlow.liaison || ''
+  liaisonVisible.value = true
+}
+async function confirmLiaison() {
+  if (!liaisonUser.value) return ElMessage.warning(tt('请选择对接人账号'))
+  if (liaisonBusy.value) return
+  liaisonBusy.value = true
+  try {
+    const no = cur.value?.['编号'] || cur.value?.['单据编号'] || ''
+    await engine.callButton({
+      panelCode: RD_FLOW_PANEL, buttonName: '分发对接人',
+      formData: { 编号: no, 对接人: liaisonUser.value }, buttonParam: {},
+    })
+    ElMessage.success(tt('已分发对接人'))
+    liaisonVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('分发对接人失败'))
+  } finally {
+    liaisonBusy.value = false
+  }
+}
+
+async function openOwner() {
+  if (!rdFlow.canConfirmOwner) return
+  if (!(await ensureRdFlowUsers())) return
+  ownerUser.value = rdFlow.owner || ''
+  ownerVisible.value = true
+}
+async function confirmOwner() {
+  if (!ownerUser.value) return ElMessage.warning(tt('请选择项目责任人账号'))
+  if (ownerBusy.value) return
+  ownerBusy.value = true
+  try {
+    const no = cur.value?.['编号'] || cur.value?.['单据编号'] || ''
+    await engine.callButton({
+      panelCode: RD_FLOW_PANEL, buttonName: '确认责任人',
+      formData: { 编号: no, 项目责任人: ownerUser.value }, buttonParam: {},
+    })
+    ElMessage.success(tt('已确认项目责任人'))
+    ownerVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('确认项目责任人失败'))
+  } finally {
+    ownerBusy.value = false
   }
 }
 
@@ -6642,6 +6902,15 @@ async function onButton(action) {
           if (!saved) return
         }
         return openL2Pick(current.value['编号'] || current.value['单据编号'] || '')
+      }
+      // 立项申请表(2026-10-08 流程图②):审批通过与项目定级是同一步骤的两个动作 ⇒ 走「审批通过 + 定级」弹窗。
+      // 其余面板保持原样(意见确认框)。
+      if (action === '审批通过' && panelCode.value === 'RD_APPROVAL') {
+        if (draftEditable.value) {
+          const saved = await saveInlineDraft('保存', { silent: true })
+          if (!saved) return
+        }
+        return openRdApprove(current.value['编号'] || current.value['单据编号'] || '')
       }
       const no = current.value['编号'] || current.value['单据编号'] || ''
       try {

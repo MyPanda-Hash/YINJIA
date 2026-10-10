@@ -28,6 +28,15 @@ GO
 -- ═══ 一、物理结构对齐 ═══
 
 -- 1.1 产线产能表补 备用1-20(动态字段备用列池;正式库已有,测试库缺)
+-- ⚠ 2026-10-09 修正:原写法只判「列是否存在」,而**表不存在时 `COL_LENGTH` 返回 NULL**,
+--   `NULL IS NULL` 为真 ⇒ 会去 ALTER 一张不存在的表,报「找不到对象 dbo.bs_line_capacity」
+--   并让整条迁移链中止(DbSync「失败 1」,后续脚本全不执行)。
+--   本机两个账套都没有这张表,且它既不在 tools/db-inuse-tables.txt、也不在《数据库表清单》里,
+--   后端代码零引用 ⇒ 先判表在不在:表不在就跳过(「对齐」本就无从对齐一张没有的表)。
+IF OBJECT_ID(N'dbo.bs_line_capacity') IS NULL
+  PRINT N'[skip] dbo.bs_line_capacity 不存在(未在册),跳过 备用1-20 补列';
+ELSE
+BEGIN
 IF COL_LENGTH('dbo.bs_line_capacity', N'备用1') IS NULL ALTER TABLE dbo.bs_line_capacity ADD [备用1] nvarchar(500) NULL;
 IF COL_LENGTH('dbo.bs_line_capacity', N'备用2') IS NULL ALTER TABLE dbo.bs_line_capacity ADD [备用2] nvarchar(500) NULL;
 IF COL_LENGTH('dbo.bs_line_capacity', N'备用3') IS NULL ALTER TABLE dbo.bs_line_capacity ADD [备用3] nvarchar(500) NULL;
@@ -48,6 +57,7 @@ IF COL_LENGTH('dbo.bs_line_capacity', N'备用17') IS NULL ALTER TABLE dbo.bs_li
 IF COL_LENGTH('dbo.bs_line_capacity', N'备用18') IS NULL ALTER TABLE dbo.bs_line_capacity ADD [备用18] nvarchar(500) NULL;
 IF COL_LENGTH('dbo.bs_line_capacity', N'备用19') IS NULL ALTER TABLE dbo.bs_line_capacity ADD [备用19] nvarchar(500) NULL;
 IF COL_LENGTH('dbo.bs_line_capacity', N'备用20') IS NULL ALTER TABLE dbo.bs_line_capacity ADD [备用20] nvarchar(500) NULL;
+END
 GO
 
 -- 1.2 销售出库单.仓库 宽度对齐(nvarchar(500) → nvarchar(1000),与正式库一致)

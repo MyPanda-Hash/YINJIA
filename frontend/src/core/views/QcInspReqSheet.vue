@@ -213,8 +213,8 @@
 import { computed, nextTick, ref, toRaw, watch } from 'vue'
 import { tt } from '@/i18n'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { callButton, errMsg } from '@/business/engine'
-import { useUserStore } from '@/stores/user'
+import { useAppContext, usePanelRuntime } from '@core/panel-runtime'
+import { errMsg } from '@core/panel-engine'
 import { detailRowsOf, ensureDetailRows } from '@core/panel/detailRows'
 import { fetchExtOverview, invalidateExtFields } from '@core/qc/qcInspReqApi'
 import { DEFAULT_EXT_COL_W, colsOfTab, parentOptionsOfTab } from '@core/qc/qcInspReqCols'
@@ -236,7 +236,8 @@ const props = defineProps({
   tabKeys: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['dirty', 'save', 'refresh', 'refresh-config'])
-const user = useUserStore()
+const engine = usePanelRuntime()
+const { user } = useAppContext()
 
 /** 「自定义字段」入口可见性(2026-10-09 用户口径:不再只给超级管理员)——
  *  管理员 ∪ 角色在本面板被授予「自定义字段」权限(组织架构 →「角色与面板权限」)。
@@ -503,7 +504,7 @@ async function openModifyLog() {
   modLogVisible.value = true
   modLogLoading.value = true
   try {
-    const res = await callButton({ panelCode: props.panelCode, buttonName: '修改记录', formData: { 编号: no }, buttonParam: {} })
+    const res = await engine.callButton({ panelCode: props.panelCode, buttonName: '修改记录', formData: { 编号: no }, buttonParam: {} })
     modLogNo.value = res?.编号 || no
     modLogRecords.value = (res?.records || []).map((r) => ({
       ...r,

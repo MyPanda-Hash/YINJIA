@@ -62,9 +62,13 @@ public class DevTaskService {
     public static final String STATUS_DISPATCHED = "已下发";
 
     private final JdbcTemplate jdbc;
+    private final PanelRegistry registry;
 
-    public DevTaskService(JdbcTemplate jdbc) {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(DevTaskService.class);
+
+    public DevTaskService(JdbcTemplate jdbc, PanelRegistry registry) {
         this.jdbc = jdbc;
+        this.registry = registry;
     }
 
     public static Set<String> devPanelCodes() {
@@ -477,5 +481,193 @@ public class DevTaskService {
             }
         }
         return out;
+    }
+
+    // ==================== 以下为 PxController 下沉的数据访问(2026-10-09 分层收敛) ====================
+    // 原实现散在 PxController 里直写 jdbc;这些查询都是 rd_* 推导的一部分(与 board/statusOf 同域),
+    // 归属本服务后 Controller 只剩「收参 → 校验 → 组装响应」。SQL 与异常降级口径逐字照搬,行为不变。
+
+    /** 单据编号 → 产品编号(产品信息表侧边栏用;查不到返回空串) */
+    public String productCodeOfDocNo(String docNo) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT TOP 1 产品编号 FROM rd_prod_info_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
+        if (rows.isEmpty() || rows.get(0).get("产品编号") == null) return "";
+        return String.valueOf(rows.get(0).get("产品编号")).trim();
+    }
+
+    /**
+     * 产品文件列表(RD_PROD_DOCLIST)受控列推导:各面板「产品键 → 受控日期」。
+     *
+     * <p>⚠ 2026-09-30 改口径:原先取 MAX(yj_doc_status.archived_at) —— 那是"归档时点",
+     * 而需求(《产品开发系统需求汇总》5.1)要的是**审批后自动受控**,且用户口径「受控按文件」:
+     * 现在直接读该文件头表备用列池里的受控标记(备用1=是否受控 / 备用2=受控日期,
+     * 由 ButtonService.markArchived → markFileControlled 写入)。
+     * 历史单(本功能上线前归档的)没有这两个值 ⇒ 回退到 archived_at,不让老单显示成"未受控"。
+     *
+     * <p>某面板表/列缺失时降级:该面板不参与受控推导(空表),矩阵主体仍可用。
+     */
+    public Map<String, Map<String, String>> controlledAt() {
+        Map<String, Map<String, String>> controlledAt = new LinkedHashMap<>();  // 面板 → (产品键 → 受控日期)
+        for (String panel : DEV_PANELS.keySet()) {
+            Map<String, String> m = new LinkedHashMap<>();
+            try {
+                String table = registry.panel(panel).headTable();
+                String keyCol = PRODUCT_KEY.get(panel);
+                String docCol = pickGroupCol(panel);
+                jdbc.query("SELECT t.[" + keyCol + "] AS k,"
+                                + " MAX(CASE WHEN ISNULL(t.[备用1], N'') = N'是' THEN ISNULL(t.[备用2], '') ELSE '' END) AS ctl,"
+                                + " MAX(s.archived_at) AS at "
+                                + "FROM " + table + " t "
+                                + "LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = t.[" + docCol + "] "
+                                + "WHERE ISNULL(t.asp_cancel,'N') <> 'Y' "
+                                + "GROUP BY t.[" + keyCol + "]",
+                        rs -> {
+                            String k = rs.getString("k");
+                            if (k != null && !k.isBlank()) {
+                                String ctl = rs.getString("ctl");
+                                Object at = rs.getObject("at");
+                                // 受控标记优先;没有(历史单)才回退归档时点
+                                m.put(k, ctl != null && !ctl.isBlank() ? ctl : (at == null ? "" : String.valueOf(at)));
+                            }
+                        }, panel);
+            } catch (Exception e) {
+                // 某面板表/列缺失时降级:该面板不参与受控推导,矩阵主体仍可用
+                log.warn("[RD_PROD_DOCLIST] 受控推导跳过 panel={}: {}", panel, e.getMessage());
+            }
+            controlledAt.put(panel, m);
+        }
+        return controlledAt;
+    }
+
+    /** 该面板的单据号列(状态表 doc_no 的对应列):优先 group_col,缺省「单据编号」 */
+    private String pickGroupCol(String panelCode) {
+        String g = registry.panel(panelCode).groupCol();
+        return g == null || g.isBlank() ? "单据编号" : g;
+    }
+
+    /**
+     * 「自动填充规格书」数据源:按产品编号取对应规格书的表头 + 检验要求明细行。
+     *
+     * <p>【为什么要专门开一个端点】规格书的产品键在通用查询链路里**看不见**——
+     * QueryService.loadDocs 对每个 doc 面板都会执行 doc.put("编号", 单据编号)。该字段原先就叫
+     * 「编号」,于是真值被覆盖成单据号(2026-09-30 用户报障「封面右上角显示的不是产品编号」);
+     * 现在字段已改名「产品编号」(migrate-rd-specdoc-prodno-2026-09-30.sql),与单据标识键分家,
+     * 但通用链路是**按面板动态出列**的、且列里没有「产品编号」的兜底,故这里仍直接读 head 表。
+     *
+     * <p>【产品编号 → 规格书单 的解析顺序】
+     * <ol>
+     *   <li>rd_spec_assign(产品编号=?)—— 分发写下的正式映射,带 责任人/负责人,是权威源;</li>
+     *   <li>rd_spec_doc_head.产品编号 = ? —— 分发时盖在产品键列上的章(ButtonService 分发路径写)。</li>
+     * </ol>
+     * 两条都按 id 倒序取最新。同一产品可能分发了多张规格书(不同规格书种类),
+     * 故用 matched 回报命中数,前端提示「按哪一张填的」,不让用户猜。
+     *
+     * <p>明细只取 [表区]='检验要求' 的行 —— 与 ButtonService.specTestRowsSnapshot 同款口径,
+     * 那是规格书「检验项目及检验标准」页的行;其余表区(修订记录/物料清单…)不参与出货检验。
+     */
+    public Map<String, Object> specByProduct(String productCode) {
+        String code = productCode == null ? "" : productCode.trim();
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("found", false);
+        out.put("matched", 0);
+        out.put("单据编号", "");
+        out.put("产品编号", "");
+        out.put("客户项目名称", "");
+        out.put("产品类别", "");
+        out.put("整体规格参数", "");
+        out.put("items", List.of());
+        if (code.isEmpty()) return out;
+
+        List<String> nos = specDocNosOfProduct(code);
+        out.put("matched", nos.size());
+        if (nos.isEmpty()) return out;
+
+        // 门禁(2026-09-21 用户口径):出货检验计划表按规格书自动带入检验方法,必须规格书**填写并提交审批完**
+        // 才行 —— 未定稿的检验方法填进出货检验计划,等于把没批准的检验口径发到产线。
+        // 门禁落在服务端(客户端绕不过);挑不到就把"是哪一张、什么状态"带回去,界面据此把原因说清楚。
+        String no = "";
+        String blockedNo = "";
+        String blockedStatus = "";
+        for (String cand : nos) {
+            String st = specStatusOf(cand);
+            if (specUsable(st)) { no = cand; break; }
+            if (blockedNo.isEmpty()) { blockedNo = cand; blockedStatus = st; }
+        }
+        if (no.isEmpty()) {
+            out.put("reason", "not_approved");
+            out.put("规格书编号", blockedNo);
+            out.put("规格书状态", blockedStatus);
+            return out;
+        }
+        out.put("状态", specStatusOf(no));
+        List<Map<String, Object>> heads = jdbc.queryForList(
+                "SELECT 单据编号, ISNULL(产品编号, N'') AS 产品编号, ISNULL(客户项目名称, N'') AS 客户项目名称,"
+                        + " ISNULL(产品类别, N'') AS 产品类别, ISNULL(整体规格参数, N'') AS 整体规格参数"
+                        + " FROM rd_spec_doc_head WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", no);
+        if (heads.isEmpty()) return out;
+
+        Map<String, Object> h = heads.get(0);
+        out.put("found", true);
+        for (String k : List.of("单据编号", "产品编号", "客户项目名称", "产品类别", "整体规格参数")) {
+            Object v = h.get(k);
+            out.put(k, v == null ? "" : String.valueOf(v));
+        }
+        out.put("items", jdbc.queryForList(
+                "SELECT ISNULL(序号, N'') AS 序号, ISNULL(检验项目, N'') AS 检验项目,"
+                        + " ISNULL(检验要求, N'') AS 检验要求, ISNULL(检验方法, N'') AS 检验方法,"
+                        + " ISNULL(检验依据, N'') AS 检验依据"
+                        + " FROM rd_spec_doc_detail WHERE 单据编号 = ? AND 表区 = N'检验要求' ORDER BY id", no));
+        return out;
+    }
+
+    /** 规格书可用状态:填写并提交审批完(审批通过 ⇒ 已归档/已审核)。草稿/审批中/修改中/已作废一律不可用 */
+    private static boolean specUsable(String status) {
+        return "已审核".equals(status) || "已归档".equals(status);
+    }
+
+    /**
+     * 规格书单据状态 —— 口径与 {@link #statusAndDocNo} 的分发弹窗(CASE 派生)一致:
+     * 已作废 &gt; 已中止 &gt; 删除申请中 &gt; 修改申请中 &gt; 审批中 &gt; 修改中 &gt; 已归档 &gt; 已审核 &gt; 草稿。
+     * 读不到(表缺失/无状态行)一律按不可用返回"草稿" —— 宁可不带入,也不能拿没审批的口径去填出货检验计划。
+     */
+    private String specStatusOf(String no) {
+        try {
+            List<Map<String, Object>> rows = jdbc.queryForList(
+                    "SELECT CASE WHEN ISNULL(s.canceled,'N')='Y' THEN N'已作废' WHEN ISNULL(s.stopped,'N')='Y' THEN N'已中止'"
+                            + " WHEN ISNULL(s.deleting,'N')='Y' THEN N'删除申请中' WHEN ISNULL(s.modify_state,N'')='R' THEN N'修改申请中'"
+                            + " WHEN ISNULL(s.pending,'N')='Y' THEN N'审批中' WHEN ISNULL(s.modify_state,N'')='Y' THEN N'修改中'"
+                            + " WHEN ISNULL(s.archived,'N')='Y' THEN N'已归档'"
+                            + " WHEN ISNULL(s.shr,N'') <> N'' THEN N'已审核' ELSE N'草稿' END AS status"
+                            + " FROM rd_spec_doc_head h LEFT JOIN yj_doc_status s"
+                            + " ON s.panel_code = 'RD_SPEC_DOC' AND s.doc_no = h.单据编号"
+                            + " WHERE h.单据编号 = ?", no);
+            if (rows.isEmpty() || rows.get(0).get("status") == null) return "草稿";
+            return String.valueOf(rows.get(0).get("status"));
+        } catch (Exception e) {
+            return "草稿";
+        }
+    }
+
+    /** 产品编号 → 该产品已分发的规格书单号(最新在前,去重);rd_spec_assign 优先,退回 head.产品编号 盖章 */
+    private List<String> specDocNosOfProduct(String productCode) {
+        List<String> nos = new ArrayList<>();
+        String[] sqls = {
+                "SELECT 单据编号 FROM rd_spec_assign WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
+                "SELECT 单据编号 FROM rd_spec_doc_head WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC",
+        };
+        for (String sql : sqls) {
+            try {
+                for (Map<String, Object> r : jdbc.queryForList(sql, productCode)) {
+                    Object v = r.get("单据编号");
+                    String s = v == null ? "" : String.valueOf(v);
+                    if (!s.isBlank() && !nos.contains(s)) nos.add(s);
+                }
+            } catch (Exception e) {
+                // 表缺失时降级:另一条路径仍可用(与 prodDocList 的受控推导同款处理)
+                log.warn("[specByProduct] 规格书单解析跳过 product={}: {}", productCode, e.getMessage());
+            }
+        }
+        return nos;
     }
 }

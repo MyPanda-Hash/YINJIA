@@ -1,0 +1,16 @@
+﻿
+=== 立项申请「分发对接人 / 确认责任人」界面验收(账套 YJ_TEST)===
+  ok   登录成功(admin / glm53,账套均为 YJ_TEST)
+
+▶ ① 造一张已定级的立项单(界面要有可点态才验证得了)
+     单号=LXA-2026-10-0005 审批通过 code=200 success
+     {"status":"已归档","level":"三级","liaison":"","liaisonName":"","owner":"","ownerName":"","canDispatchLiaison":true,"canConfirmOwner":false}
+  ok   单据已定形:已归档(等级 三级)
+  ok   后端判定可分发(canDispatchLiaison=true)——界面按钮应为可点
+node : 探针异常: fetch failed
+所在位置 行:1 字符: 129
++ ... ]::new($false); node tools\archive\_probe-rd-flow-ui.cjs 2>&1 | Out-F ...
++                     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (探针异常: fetch failed:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 

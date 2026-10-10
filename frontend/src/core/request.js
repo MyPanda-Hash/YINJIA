@@ -25,8 +25,10 @@ request.interceptors.response.use(
     // 401/403 都视为认证失效（后端无 token/伪造/过期返回 403）→ 同步 user store 登出并跳登录
     if (status === 401 || status === 403) {
       try {
-        const { useUserStore } = await import('@/stores/user')
-        useUserStore().logout()
+        // 经注入的应用外壳取账号 store(分层约束:core 不许 import stores);
+        // 未安装(单测等无外壳场景)时退化成清 token,与历史行为一致。
+        const { useAppContext } = await import('@core/panel-runtime')
+        useAppContext().user.logout()
       } catch (e) {
         localStorage.removeItem('mes_token')
       }
