@@ -26,11 +26,11 @@ const EDGE = 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe'
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const CASES = [
-  { code: 'FINISH_IN', name: '产成品入库单', middle: '加工单号' },
-  { code: 'SALE_OUT', name: '销售出库单', middle: '客户' },
-  { code: 'MATERIAL_OUT', name: '材料出库单', middle: '生产车间' },
+  { code: 'FINISH_IN', name: '产成品入库单', middle: '加工单号', expect: ['加工单号'] },
+  { code: 'SALE_OUT', name: '销售出库单', middle: '客户', expect: ['销售订单号', '客户', 'ERP单'] },
+  { code: 'MATERIAL_OUT', name: '材料出库单', middle: '生产车间', expect: ['生产车间', 'ERP单'] },
 ]
-const REF = { code: 'SO_ORDER', name: '销售订单(基线对照)', middle: '客户' }
+const REF = { code: 'SO_ORDER', name: '销售订单(基线对照)', middle: '客户', expect: ['客户'] }
 
 const results = []
 let pass = 0, total = 0
@@ -119,14 +119,22 @@ for (const c of [...CASES, REF]) {
   if (!rail.ok) { check(`${c.code} 左栏存在`, false, rail.reason + ' | hash=' + hash); continue }
   check(`${c.code} 左栏存在且未折叠`, !rail.collapsed, `列头 ${JSON.stringify(rail.heads)}`)
 
-  const expectHeads = ['单号', '日期', c.middle, '审核状态']
+  // 列头 = 单号 | 日期 | <中间列们> | 审核状态(2026-10-15 起中间列可为多列)
+  const expectHeads = ['单号', '日期', ...c.expect, '审核状态']
   check(`${c.code} 列头 = ${expectHeads.join(' | ')}`,
-    rail.heads.length === 4 && expectHeads.every((h, i) => rail.heads[i] === h),
+    rail.heads.length === expectHeads.length && expectHeads.every((h, i) => rail.heads[i] === h),
     `实际 ${JSON.stringify(rail.heads)}`)
 
+  // 首行有值判定:单号/日期/审核状态三格**必须**有值;中间列允许空
+  //   (历史单本来就没有销售订单号,要求"必须有值"会把正常数据判成失败)。
+  //   ERP单 是派生列,恒为 已转/未转,必有值。
   const first = rail.rows[0] || []
-  check(`${c.code} 首行四格均有值`,
-    first.length === 4 && first.every((v) => String(v).trim() !== ''),
+  const mustIdx = [0, 1, expectHeads.length - 1]
+  const erpIdx = expectHeads.indexOf('ERP单')
+  if (erpIdx >= 0) mustIdx.push(erpIdx)
+  const empties = mustIdx.filter((i) => !String(first[i] ?? '').trim())
+  check(`${c.code} 首行必有值格均非空(单号/日期/审核状态${erpIdx >= 0 ? '/ERP单' : ''})`,
+    first.length === expectHeads.length && empties.length === 0,
     `首行 ${JSON.stringify(first)}`)
 
   if (rail.rows.length >= 2 && rail.activeIdx !== 1) {

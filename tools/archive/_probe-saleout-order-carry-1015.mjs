@@ -54,10 +54,22 @@ const allLabels = new Set([...headLabels, ...dataFields])
 check('表头可查询/可见列含「销售订单号」', allLabels.has('销售订单号'),
   allLabels.has('销售订单号') ? '' : '实际:' + [...allLabels].slice(0, 12).join(','))
 
-const detailLabels = (cfg?.detail?.tabs || []).flatMap((t) => (t.fields || []).map((f) => f.label || f.dataName))
-check('明细可见列含「销售订单行号」', detailLabels.includes('销售订单行号'),
-  detailLabels.includes('销售订单行号') ? '' : '实际:' + detailLabels.join(','))
-check('明细可见列含「源单编号」', detailLabels.includes('源单编号'), '')
+// ⚠ 关键口径:getPanelConfig 会把**全部**字段都下发(实测 SALE_OUT.items 109 个字段里 96 个
+//   hidden=true)—— 判"可见"必须看 hidden/visible 标志,**不能只看字段在不在返回里**。
+//   (第一版就是这么误判的:DB 已是 hidden=1,探针却因为字段仍在数组里而判"仍可见"。)
+const detailFields = (cfg?.detail?.tabs || []).flatMap((t) => t.fields || [])
+const visibleDetailLabels = detailFields
+  .filter((f) => f.hidden !== true && f.visible !== false)
+  .map((f) => f.label || f.dataName)
+
+check('明细可见列含「销售订单行号」', visibleDetailLabels.includes('销售订单行号'),
+  visibleDetailLabels.includes('销售订单行号') ? '' : '实际可见:' + visibleDetailLabels.join(','))
+// 2026-10-15 二轮用户口径:「把明细中的源订单编号改成销售订单号或者删除」→ 取**删除**
+// (与表头 销售订单号 重复;行级对应关系已由 销售订单行号 表达)。
+// ⚠ 只撤**可见性**,物理列与 yj_field 行都保留 —— 转ERP 挂金蝶源单仍要读 bl_sale_out.源单编号。
+const srcNoVisible = detailFields.some((f) => f.dataName === '源单编号' && f.hidden !== true && f.visible !== false)
+check('明细已不再显示「源单编号」(二轮口径:删除)', !srcNoVisible,
+  srcNoVisible ? '仍可见,与口径不符' : '字段仍在(转ERP 需读),但已不显示 —— 符合')
 
 // 选单配置:来源 + 头/行映射
 const sc = cfg?.selectConfig || {}

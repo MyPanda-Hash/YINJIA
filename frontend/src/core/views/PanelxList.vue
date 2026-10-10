@@ -3518,8 +3518,27 @@ const DOC_RAIL_PANELS = {
   //   SALE_OUT     → 客户      :销售出库对象,与销售订单同义(54/54 有值)
   //   MATERIAL_OUT → 生产车间  :材料出库归属车间,参照 DEPT(2/2 有值;其 加工单号 0/2 恒空)
   //   FINISH_IN    → 加工单号  :产成品入库的来源工单(1/1 有值;其 生产车间/业务类型/仓库 均 0/1 恒空)
-  SALE_OUT: ['客户'],
-  MATERIAL_OUT: ['生产车间'],
+  // 🔴 2026-10-15 第二轮(用户口径):销售出库单还要显示「销售订单号」+「ERP单」——
+  //   它是从销售订单生单/选单过来的,左栏要能一眼看到来源订单;材料出库单同样要 ERP单。
+  //   列序 = 单号 | 日期 | 销售订单号 | 客户 | ERP单 | 审核状态(销售出库);
+  //   ERP单 复用采购入库同款**派生列**(已转/未转 彩色标签),不是新字段 ——
+  //   两张单的 ERP单号/是否已转ERP 实测都已在 yj_field 且可见,故直接可派生。
+  SALE_OUT: [
+    '销售订单号',
+    '客户',
+    {
+      label: 'ERP单', align: 'center', tag: true,
+      // 已转 = 转ERP成功才有(ERP单号成功回填/弃审清空;是否已转ERP 作首选信号)——与采购入库同判据
+      derive: (row) => (String(row?.['是否已转ERP'] ?? '') === '是' || String(row?.['ERP单号'] ?? '').trim() !== '' ? '已转' : '未转'),
+    },
+  ],
+  MATERIAL_OUT: [
+    '生产车间',
+    {
+      label: 'ERP单', align: 'center', tag: true,
+      derive: (row) => (String(row?.['是否已转ERP'] ?? '') === '是' || String(row?.['ERP单号'] ?? '').trim() !== '' ? '已转' : '未转'),
+    },
+  ],
   FINISH_IN: ['加工单号'],
 }
 const docRailCfg = computed(() => {

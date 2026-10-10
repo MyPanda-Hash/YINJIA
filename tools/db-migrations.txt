@@ -2802,3 +2802,13 @@ migrate-sale-out-order-cols-20261015.sql
 #   (de/en/es/fr/ja/ko/ru/th/vi),两标签的多语言覆盖对齐。
 #   幂等(逐行 NOT EXISTS + 自检 ≥9);两账套均执行。
 migrate-sale-out-order-line-i18n-20261015.sql
+
+# ── 2026-10-15 销售出库单二轮收口:撤下明细「源单编号」列 ──
+#   用户口径:「把明细中的源订单编号改成销售订单号或者删除。」取**删除**:
+#     · 明细「源单编号」与表头「销售订单号」是同一信息的两处显示;
+#     · 行级对应关系已由「销售订单行号」表达,来源单号在明细里冗余;
+#     · 与采购链一致(PURCHASE_IN.detail.源单编号 一直是 hidden=1,订单号只在表头显示)。
+#   ⚠ 只撤可见性,**不删 yj_field 行、不动物理列** —— 转ERP 挂金蝶源单仍要读
+#     bl_sale_out.源单编号/源单行号(见 KingdeePushService 的销售支)。
+#   幂等(UPDATE 窄条件 + 自检含物理列仍在);两账套均执行。
+migrate-sale-out-order-cols2-20261015.sql
