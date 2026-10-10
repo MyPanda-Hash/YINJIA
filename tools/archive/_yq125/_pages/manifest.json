@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "backend": "native",
+  "rasterEngine": "libreoffice",
+  "source": "saved",
+  "inputPath": "D:\\workspace\\yinjia\\tools\\archive\\_yq125\\YJ-Q-125.doc",
+  "sourceSha256": "589931af548b1c71aebda5bfbc49de2cb8836b4b91cbcdf0caa9e4bc5af3c6f7",
+  "dpi": 130,
+  "pageCount": 4,
+  "images": [
+    {
+      "index": 1,
+      "page": 1,
+      "path": "D:\\workspace\\yinjia\\tools\\archive\\_yq125\\_pages\\page-0001.png",
+      "width": 1075,
+      "height": 1521,
+      "rectangle": {
+        "x": 0,
+        "y": 0,
+        "width": 793.7333333333333,
+        "height": 1122.5333333333333
+      },
+      "byteLength": 92460
+    },
+    {
+      "index": 2,
+      "page": 2,
+      "path": "D:\\workspace\\yinjia\\tools\\archive\\_yq125\\_pages\\page-0002.png",
+      "width": 1075,
+      "height": 1521,
+      "rectangle": {
+        "x": 0,
+        "y": 0,
+        "width": 793.7333333333333,
+        "height": 1122.5333333333333
+      },
+      "byteLength": 220115
+    },
+    {
+      "index": 3,
+      "page": 3,
+      "path": "D:\\workspace\\yinjia\\tools\\archive\\_yq125\\_pages\\page-0003.png",
+      "width": 1075,
+      "height": 1521,
+      "rectangle": {
+        "x": 0,
+        "y": 0,
+        "width": 793.7333333333333,
+        "height": 1122.5333333333333
+      },
+      "byteLength": 179249
+    },
+    {
+      "index": 4,
+      "page": 4,
+      "path": "D:\\workspace\\yinjia\\tools\\archive\\_yq125\\_pages\\page-0004.png",
+      "width": 1075,
+      "height": 1521,
+      "rectangle": {
+        "x": 0,
+        "y": 0,
+        "width": 793.7333333333333,
+        "height": 1122.5333333333333
+      },
+      "byteLength": 147185
+    }
+  ],
+  "missingFonts": []
+}
