@@ -70,21 +70,25 @@ public class WorkOrderPickingService {
     }
 
     /**
-     * 批量转领料单:**入参 = 列表勾选行,按「工单号 + 工单行号」逐行转**(同一行勾两次只转一张)。
+     * 批量转领料单:**入参 = 列表勾选行,按「工单号 + 工单行号」逐行转**。
+     *
+     * <p>用户口径(2026-10-15):「就是当前的**工单号加工单行号**作为标识,**每个独立进行**」
+     * —— 去重键 = (工单号, 工单行号),**不是** plang.id。同一标识勾几次都只转一张
+     * (plang 里可能有多个物理行共用同一 (工单号,行号),按用户口径它们是**同一个标识**)。
      *
      * @return {转领料单张数, 单号清单:["工单号#行号→领料单号"], 失败行, gotoPanel}
      */
     public Map<String, Object> toPicking(List<Map<String, Object>> rows, String user) {
         if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要转领料单的工单");
-        // 勾选行 → 具体工单行(按 plang.id 去重):同单不同行各转一张,同一行只转一张
-        LinkedHashMap<Long, Line> lines = new LinkedHashMap<>();
+        // 去重键 = 工单号 + 工单行号(用户口径:这就是行标识)
+        LinkedHashMap<String, Line> lines = new LinkedHashMap<>();
         List<String> failed = new ArrayList<>();
         for (Map<String, Object> r : rows) {
             String no = orderNoOf(r);
             if (no == null) { failed.add("勾选行缺少工单号"); continue; }
             try {
                 Line ln = resolveLine(no, r);
-                lines.putIfAbsent(ln.id(), ln);
+                lines.putIfAbsent(ln.no() + "#" + ln.xc(), ln);
             } catch (RuntimeException e) {
                 failed.add(no + "#" + str(r.get("工单行号")) + ":" + msgOf(e));
             }
@@ -108,37 +112,34 @@ public class WorkOrderPickingService {
     }
 
     /**
-     * 勾选行 → 工单行。优先用列表回传的**行id**(唯一键的物理落点,最准);
-     * 缺行id 时按 工单号+工单行号(+批次号)反查 —— 反查命中多行(同单号同行号的不同批次)时拒绝,
-     * 让调用方回列表重新勾选,不猜。
+     * 勾选行 → 工单行。**行标识 = 工单号 + 工单行号**(用户口径),故按它定位。
+     *
+     * <p>plang 里同一 (工单号,行号) 可能有多个物理行(同订单行分批转单,批次号不同)——
+     * 按用户口径它们是**同一个标识**,取其中**排产数量>0 且未结案**的一行作为代表(优先行id 命中者),
+     * 不做"命中多行就拒绝"的处理(那正是把同一标识当成多个的旧思路)。
      */
     private Line resolveLine(String no, Map<String, Object> r) {
-        Long id = longOf(r.get("行id"));
-        if (id == null) {
-            Integer xc = intOf(r.get("工单行号"));
-            if (xc == null) throw new IllegalStateException("勾选行缺少工单行号");
-            String batch = str(r.get("批次号"));
-            String sql = "SELECT id FROM dbo.plang WHERE pl_no = ? AND pl_xc = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
-                    + (batch == null ? "" : " AND ISNULL([批次号], N'') = ?")
-                    + " ORDER BY id";
-            List<Long> ids = batch == null
-                    ? jdbc.queryForList(sql, Long.class, no, xc)
-                    : jdbc.queryForList(sql, Long.class, no, xc, batch);
-            if (ids.isEmpty()) throw new IllegalStateException("工单行不存在或已作废");
-            if (ids.size() > 1) throw new IllegalStateException("该工单号+行号对应多行(批次不同),请回列表勾选(带行id)");
-            id = ids.get(0);
-        }
+        Integer xc = intOf(r.get("工单行号"));
+        if (xc == null) throw new IllegalStateException("勾选行缺少工单行号");
+        Long id = longOf(r.get("行id"));   // 列表勾选时带的物理行(仅用于优先挑代表行)
         List<Map<String, Object>> hit = jdbc.queryForList(
                 "SELECT id, pl_no, ISNULL(pl_xc, 0) AS xc, ISNULL([批次号], N'') AS batch,"
                         + " ISNULL(dm, N'') AS dm, ISNULL(scx, N'') AS scx, ISNULL(pl_sl, 0) AS pl_sl,"
                         + " ISNULL(ja, N'N') AS ja"
-                        + " FROM dbo.plang WHERE id = ? AND ISNULL(asp_cancel,'N') <> 'Y'", id);
-        if (hit.isEmpty()) throw new IllegalStateException("工单行不存在或已作废");
+                        + " FROM dbo.plang WHERE pl_no = ? AND ISNULL(pl_xc,0) = ?"
+                        + " AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        // 代表行优先:① 勾选行本身 ② 已排产(pl_sl>0) ③ 未结案 ④ id 小
+                        + " ORDER BY CASE WHEN id = ? THEN 0 ELSE 1 END,"
+                        + "          CASE WHEN ISNULL(pl_sl,0) > 0 THEN 0 ELSE 1 END,"
+                        + "          CASE WHEN ISNULL(ja,'N') IN (N'T',N'Y') THEN 1 ELSE 0 END, id",
+                no, xc, id == null ? -1L : id);
+        if (hit.isEmpty()) throw new IllegalStateException("工单行不存在或已作废(工单号 " + no + " 行号 " + xc + ")");
         Map<String, Object> h = hit.get(0);
         String ja = str(h.get("ja"));
         if ("T".equals(ja) || "Y".equals(ja)) throw new IllegalStateException("已结案,不能转领料单");
         if (num(h.get("pl_sl")) <= 0) throw new IllegalStateException("排产数量为 0(未排产),不能转领料单");
-        return new Line(id, String.valueOf(h.get("pl_no")), intOf(h.get("xc")) == null ? 0 : intOf(h.get("xc")),
+        return new Line(((Number) h.get("id")).longValue(), String.valueOf(h.get("pl_no")),
+                intOf(h.get("xc")) == null ? 0 : intOf(h.get("xc")),
                 str(h.get("batch")), str(h.get("dm")), str(h.get("scx")), num(h.get("pl_sl")));
     }
 

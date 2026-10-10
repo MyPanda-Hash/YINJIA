@@ -50,12 +50,18 @@ ok('① 存在两行共用同一 工单行号(证明"工单号+行号"不足以�
   JSON.stringify(rows.map((r) => ({ 行id: r['行id'], 行号: r['工单行号'], 批次: r['批次号'] }))))
 
 // ── 勾选全部行转领料单 ──
+// 用户口径(2026-10-15):「工单号加工单行号作为标识,每个独立进行」⇒ 去重键 = (工单号, 工单行号)。
+// 本 fixture 的 3 行里,行id=32 与 36 **共用同一 (工单号,行号)=(MO-2026-09-0007, 2)** ——
+// 按用户口径它们是**同一个标识** ⇒ 只应转出 1 张;加上行号1 那张,合计 **2 张**(不是 3 张)。
+const uniqKeys = [...new Set(rows.map((r) => `${r['工单号']}#${r['工单行号']}`))]
+console.log(`    去重后标识 = ${JSON.stringify(uniqKeys)} (物理行 ${rows.length} 个)`)
 const payload = rows.map((r) => ({ 公司代码: r['公司代码'], 工单号: r['工单号'], 行id: r['行id'], 工单行号: r['工单行号'], 批次号: r['批次号'] }))
 const res = await api('/px/workOrderList/toPicking', { rows: payload })
 const d = res.data || {}
 console.log(`    回执 = ${JSON.stringify(d).slice(0, 400)}`)
-ok('② 勾 N 行 → 转出 N 张(每行各转各的)', Number(d['转领料单张数'] || 0) === rows.length,
-  `张数=${d['转领料单张数']} 勾选=${rows.length} 失败=${JSON.stringify(d['失败行'] || [])}`)
+ok('② 张数 = 不同(工单号,工单行号)标识数(同标识的多物理行只转一张)',
+  Number(d['转领料单张数'] || 0) === uniqKeys.length,
+  `张数=${d['转领料单张数']} 标识数=${uniqKeys.length} 失败=${JSON.stringify(d['失败行'] || [])}`)
 const created = (d['单号清单'] || []).map((s) => String(s).split('→').pop())
 console.log(`    生成单号 = ${JSON.stringify(created)}`)
 
