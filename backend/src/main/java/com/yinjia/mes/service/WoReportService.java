@@ -34,6 +34,36 @@ public class WoReportService {
         return "WO_REPORT".equals(panelCode);
     }
 
+    /**
+     * 报工单**保存后**补「工单行号」(2026-10-15 用户口径:报工单必带工单行号 —— 落库 + 界面显示)。
+     *
+     * <p>为什么在保存时补而不只在审核时:权威行键 {@code gd_id} 只在**审核**时由 {@link #complete} 写入
+     * ⇒ 草稿期的报工单不携带任何行信息,列表上看不出"这张单是哪一行的",同工单号多行时无法分辨。
+     * 本方法在草稿阶段就把行号解析出来落库(冗余展示列),审核时再由 complete() 按行锚定 gd_id。
+     *
+     * <p>解析口径(与 {@link #reportRows} 同源,取不到**不猜**):① 已有 gd_id → 经 plang_pc 反查 pl_xc;
+     * ② 否则按(工单号 + 批次号)找该行,**恰命中 1 行**才写;0 行/多行留空(等审核时按行锚定)。
+     */
+    public void stampRowNo(String panelCode, String no) {
+        if (!posts(panelCode) || no == null || no.isBlank()) return;
+        jdbc.update(
+                "UPDATE s SET s.[工单行号] = x.pl_xc FROM dbo.scjl s"
+                        + " CROSS APPLY (SELECT TOP 1 p.pl_xc FROM dbo.plang_pc pc"
+                        + "   JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + "   WHERE pc.id = s.gd_id) x"
+                        + " WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                        + "   AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) > 0", no);
+        jdbc.update(
+                "UPDATE s SET s.[工单行号] = x.pl_xc FROM dbo.scjl s"
+                        + " CROSS APPLY (SELECT TOP 2 p.pl_xc FROM dbo.plang p"
+                        + "   WHERE p.pl_no = s.gldh AND ISNULL(p.[批次号],N'') = ISNULL(s.[批次号],N'')"
+                        + "     AND ISNULL(s.[批次号],N'') <> N'' AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + "   ORDER BY p.id) x"
+                        + " WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                        + "   AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) = 0"
+                        + " GROUP BY s.id, s.[工单行号], x.pl_xc HAVING COUNT(*) = 1", no);
+    }
+
     /** 审核 → 本单 scjl 行 wgzt='Y'+wgsj,补 jc_no 与排产镜像。 */
     public void post(String panelCode, String no, String user) {
         if (!posts(panelCode)) return;
@@ -203,10 +233,12 @@ public class WoReportService {
                 scx, scx + "--" + day + "-%");
         String jcNo = scx + "--" + day + "-" + String.format("%08d", (seq == null ? 0 : seq) + 1);
         // 就地完成化:补镜像 + 锚定 + 完工状态(草稿行本来就在 scjl,不另插行)
+        // 「工单行号」(2026-10-15):权威行键 gd_id 在此写定,行号随之落库 —— 界面直接显示"哪一行",
+        //   同工单号多行/多批次时一眼可辨(此前只有批次号,同天多笔转单批次号相同则分不出)。
         jdbc.update("UPDATE dbo.scjl SET"
                         + " comm=?, gd_id=?, tm=?, scx=?, scxmc=?, jbbh=?,"
                         + " wzdm=?, mc=?, gg=?, jldw=?, khdm=?, lot_no=?, pl_sl=?,"
-                        + " od_no=?, od_xc=?, zl=?, llxz=?, djlx=?, [批次号]=?,"
+                        + " od_no=?, od_xc=?, zl=?, llxz=?, djlx=?, [批次号]=?, [工单行号]=?,"
                         + " wgzt=N'Y', wgsj=GETDATE(), jc_no=?, ywman=COALESCE(NULLIF(ywman,''),?),"
                         + " asp_user2=?, asp_time2=GETDATE()"
                         + " WHERE id=?",
@@ -214,6 +246,7 @@ public class WoReportService {
                 t.get("pc_lb"),
                 t.get("dm"), t.get("mc"), t.get("gg"), t.get("jldw"), t.get("khdm"), t.get("lot_no"), t.get("pl_sl"),
                 t.get("od_no"), t.get("od_xc"), t.get("zl"), t.get("llxz"), t.get("djlx"), t.get("pc_batch"),
+                t.get("pl_xc"),
                 jcNo, user, user, rowId);
     }
 

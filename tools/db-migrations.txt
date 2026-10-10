@@ -2735,3 +2735,26 @@ migrate-qc-fin-spec-seed-rename.sql
 #     故本脚本只补元数据(防御性补列 + 字段 header/seq22/整数/只读 + field 译名 en),不改表结构。
 #   幂等;两账套均执行。
 migrate-material-out-wo-line-field.sql
+
+# migrate-finish-in-wo-line-20261015.sql(2026-10-15):工单追溯「入库段」按行收敛的**唯一结构变更** ——
+#   产成品入库单 bd_finish_in 补 [批次号] nvarchar(12) + [工单行号] int(与 plang.[批次号]/plang.pl_xc 同型同义)。
+#   背景(用户口径「能按行的都按行;同工单号的不同行除同源销售订单外无任何关联」):入库段此前只按
+#   [加工单号]=整单取数,同工单多行/多批次的入库单全混在一起;根因是该表无任何生产行键(2026-10-15 实测列清单为证)。
+#   处置:①加两列 + MS_Description 中文注明;②yj_field 注册 FINISH_IN 表头两字段(query,header/seq 62·64/只读);
+#   ③field 译名 en(批次号/工单行号 全局共享,已有则不重复插);④**存量不回填** —— 实测仅 1 行
+#   (FI-2026-09-0009 / MO-2026-09-0062 / 匹配来源单号为空),无法回溯属哪一批哪一行 ⇒ 标「历史未标注」,绝不猜。
+#   配套代码:ButtonService 两处生成钩子(切炭直销 dualOutFinishIn / 组装成品检验 asmInspToStock)写新列;
+#   ScheduleBoardService.trace 入库段按行收敛 + 口径说明同步改写。该表被 45 个文件按列名读 ⇒ 加列安全(NULL 不影响聚合)。
+#   幂等(COL_LENGTH 守卫 + 字段 IF NOT EXISTS + ep.class=1);两账套均执行。
+migrate-finish-in-wo-line-20261015.sql
+
+# migrate-scjl-wo-line-20261015.sql(2026-10-15):工序报工单**必带工单行号**(落库 + 界面显示)——
+#   scjl 补 [工单行号] int NULL(与 plang.pl_xc 同型同义;冗余展示列,权威行键仍是 gd_id=plang_pc.id)。
+#   背景(用户口径「生产工单/快速排产/工序报工单/追溯 都实现 工单号+工单行号」):行级键 gd_id 只在**审核**时
+#   由 WoReportService.complete() 补写 ⇒ 草稿期为空、单据不携带行键、列表上看不出是哪一行;同天多笔转单批次号相同更分不出。
+#   处置:①加列 + MS_Description;②yj_field 注册 WO_REPORT + WO_REPORT_LIST(query,detail/seq 36/只读);
+#   ③field 译名 en;④存量只回填**能唯一确定**的(gd_id 锚定 / 工单号+批次号恰命中 1 行),0 行或多行一律留 NULL(不猜)。
+#   配套代码:WoReportService.stampRowNo(保存后解析落库)+ complete() 审核时按行写定;ButtonService.saveDoc 调钩子。
+#   ⚠ scjl 是冻结登记遗留表,此处按用户明确口径扩展,与加「批次号/报工单号/直销数量」同一先例。
+#   幂等(COL_LENGTH 守卫 + 字段 IF NOT EXISTS + ep.class=1);两账套均执行。
+migrate-scjl-wo-line-20261015.sql

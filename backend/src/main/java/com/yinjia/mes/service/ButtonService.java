@@ -480,6 +480,9 @@ public class ButtonService {
         // 送料暂收单(面板编码 QC_RECV,2026-09-20 由 SL_RECV 改):保存(含修改)后同步修改
         // 由它生成的来料检验单(共享字段镜像,见 syncInspFromSlRecv)
         if ("QC_RECV".equals(def.code())) syncInspFromSlRecv(no, user);
+        // 工序报工单:保存后即补「工单行号」(2026-10-15 用户口径「报工单必带工单行号」)——
+        //   权威行键 gd_id 只在审核时写,草稿期列表上看不出是哪一行;此处按 gd_id/批次号解析后落库。
+        woReport.stampRowNo(def.code(), no);
 
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复。
@@ -2291,9 +2294,11 @@ public class ButtonService {
     private void dualOutFinishIn(String panelCode, String no, String user) {
         if (!"WO_REPORT".equals(panelCode)) return;
         // 2026-09-27 单表化:报工数据直读 scjl(按 报工单号)
+        // 2026-10-15 行级:带上 gd_id(=plang_pc.id → 工单行),入库单要按行写「批次号 + 工单行号」
         List<Map<String, Object>> reps = jdbc.queryForList(
                 "SELECT ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL(sl,0) AS 报工数量,"
-                        + " ISNULL([直销数量],0) AS 直销数量 FROM dbo.scjl"
+                        + " ISNULL([直销数量],0) AS 直销数量, ISNULL([批次号],N'') AS 报工批次,"
+                        + " ISNULL(gd_id,0) AS gd_id FROM dbo.scjl"
                         + " WHERE [报工单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(wgzt,'N')='Y'", no);
         if (reps.isEmpty()) return;
         Map<String, Object> rep = reps.get(0);
@@ -2307,6 +2312,9 @@ public class ButtonService {
                         + " AND target_panel_code = 'FINISH_IN' AND link_status = 'ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已生成过直销入库(重审幂等)
         String wo = String.valueOf(rep.get("工单号"));
+        // 本单锚定的**工单行**(scjl.gd_id = plang_pc.id → plang_pc.plang_id = plang.id);
+        //   老数据没有 gd_id 时按(工单号+批次号)找该行 —— 与 WoReportService.reportRows 同一口径
+        Map<String, Object> woRow = resolveWoRow(wo, (long) numOr(rep.get("gd_id")), String.valueOf(rep.get("报工批次")));
         // 工单数据源(2026-09-27 切 plang 单轨):工单号=plang.pl_no,产品/单位/批号取 plang 行;
         // 批号 lot_no 空时现场取号并回写 plang 全部行
         List<Map<String, Object>> ws = jdbc.queryForList(
@@ -2350,6 +2358,14 @@ public class ButtonService {
         head.put("仓库", finishWh);
         head.put("生产车间", "切炭车间");
         head.put("加工单号", wo);
+        // 行级键(2026-10-15):工单行号 + 批次号写进入库单头 ⇒ 工单追溯「入库段」能按行收敛
+        //   (列随 migrate-finish-in-wo-line-20261015.sql 新增;yj_field 已注册 header,否则被 labelsToCols 静默丢弃)
+        if (woRow != null) {
+            head.put("工单行号", woRow.get("pl_xc"));
+            if (woRow.get("批次号") != null && !String.valueOf(woRow.get("批次号")).isBlank()) {
+                head.put("批次号", woRow.get("批次号"));
+            }
+        }
         head.put("经手人", user);
         head.put("detail", Map.of("items", List.of(line)));
         Map<String, Object> saved = save(registry.panel("FINISH_IN"), head, false);
@@ -2364,6 +2380,43 @@ public class ButtonService {
     private static double numOr(Object o) {
         if (o == null || String.valueOf(o).isBlank()) return 0;
         try { return Double.parseDouble(String.valueOf(o)); } catch (NumberFormatException e) { return 0; }
+    }
+
+    /**
+     * 报工单号 → 该单锚定的**排产行id**(scjl.gd_id = plang_pc.id);取不到返回 0(不猜)。
+     * 检验单头没有工单行号列,入库单要按行写行键时只能经「报工单号」反推(2026-10-15)。
+     */
+    private long gdIdOfReport(String reportNo) {
+        if (reportNo == null || reportNo.isBlank()) return 0;
+        List<Long> r = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL(gd_id,0) FROM dbo.scjl WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " AND ISNULL(gd_id,0) > 0 ORDER BY id", Long.class, reportNo);
+        return r.isEmpty() || r.get(0) == null ? 0 : r.get(0);
+    }
+
+    /**
+     * 报工行 → **工单行**(plang 行):入库单要按「工单号 + 工单行号」写行键(2026-10-15)。
+     * <p>行级键口径(与 {@code WoReportService.reportRows} / {@code ScheduleBoardService.trace} 同源):
+     * {@code scjl.gd_id = plang_pc.id} → {@code plang_pc.plang_id = plang.id}(**不是** gd_id 直接当 plang.id);
+     * 老数据没有 gd_id 时退回按(工单号 + 批次号)找该行。取不到返回 null(不猜行)。
+     */
+    private Map<String, Object> resolveWoRow(String wo, long gdId, String batch) {
+        if (wo == null || wo.isBlank()) return null;
+        if (gdId > 0) {
+            List<Map<String, Object>> r = jdbc.queryForList(
+                    "SELECT TOP 1 p.id, p.pl_xc, ISNULL(p.[批次号],N'') AS 批次号 FROM dbo.plang_pc pc"
+                            + " JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                            + " WHERE pc.id=?", gdId);
+            if (!r.isEmpty()) return r.get(0);
+        }
+        if (batch != null && !batch.isBlank()) {
+            List<Map<String, Object>> r = jdbc.queryForList(
+                    "SELECT TOP 1 p.id, p.pl_xc, ISNULL(p.[批次号],N'') AS 批次号 FROM dbo.plang p"
+                            + " WHERE p.pl_no=? AND ISNULL(p.[批次号],N'')=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                            + " ORDER BY p.id", wo, batch);
+            if (!r.isEmpty()) return r.get(0);
+        }
+        return null;
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════
@@ -2546,7 +2599,7 @@ public class ButtonService {
         List<Map<String, Object>> heads = jdbc.queryForList(
                 "SELECT ISNULL(工单号,N'') AS 工单号, ISNULL(批次号,N'') AS 批次号, ISNULL(产品编码,N'') AS 产品编码,"
                         + " ISNULL(产品名称,N'') AS 产品名称, ISNULL(规格型号,N'') AS 规格型号,"
-                        + " ISNULL(生产线,N'') AS 生产线 FROM qc_asm_insp_head"
+                        + " ISNULL(生产线,N'') AS 生产线, ISNULL(报工单号,N'') AS 报工单号 FROM qc_asm_insp_head"
                         + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", inspNo);
         if (heads.isEmpty()) throw new IllegalStateException("组装成品检验单不存在:" + inspNo);
         Map<String, Object> h = heads.get(0);
@@ -2593,6 +2646,17 @@ public class ButtonService {
             head.put("单据日期", LocalDate.now().toString());
             head.put("仓库", wh);
             head.put("加工单号", wo);
+            // 行级键(2026-10-15):工单行号 + 批次号写进入库单头 ⇒ 工单追溯「入库段」按行收敛。
+            //   检验单头只有「报工单号」能反推到行(头表没有工单行号列),故经报工单号 → scjl.gd_id → plang 行。
+            Map<String, Object> woRow = resolveWoRow(wo, gdIdOfReport(String.valueOf(h.get("报工单号"))), batch);
+            if (woRow != null) {
+                head.put("工单行号", woRow.get("pl_xc"));
+                if (woRow.get("批次号") != null && !String.valueOf(woRow.get("批次号")).isBlank()) {
+                    head.put("批次号", woRow.get("批次号"));
+                }
+            } else if (!batch.isBlank()) {
+                head.put("批次号", batch);       // 行号取不到时至少留批次(追溯按批次兜底)
+            }
             head.put("经手人", user);
             head.put("备注", "组装成品检验单 " + inspNo + " 合格数转库存");
             head.put("detail", Map.of("items", List.of(line)));
