@@ -1652,4 +1652,66 @@ export const recordSheetConfigs = {
       ]},
     ],
   },
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // 归档式(archive)面板 —— 与上面 17 张「纸面记录表」是**两套渲染路径**
+  //
+  // 上面 17 张:`yj_panel.mode='doc'`,走本文件 + RecordSheetPanels.vue 的纸面复刻。
+  // 下面 2 张:`yj_panel.mode='archive'`,按设计走 PanelxList.vue 的**整表档案**路径
+  //   (一行一记录、saveArchive 整表 upsert、修改闭环 rearchive 审批)。
+  //
+  // ⚠ 那为什么还登记在这里?——**因为数据键契约必须有人守**。
+  //   无论走哪条渲染路径,前端行模型都是 `{ [label]: value }`,配置/映射里的键
+  //   一旦与活库 `yj_field.label` 分叉,就是**静默丢值**(见本文件头 :13-15 与
+  //   recordSheetConfigs.keys.test.js :503-520 的四次事故)。
+  //   本目录的 recordSheetConfigs.livedb.test.js 直接查活库守这两个面板的键,
+  //   而它是**按 ARCHIVE_PANELS 名单**遍历的,所以面板必须登记进本对象。
+  //
+  // ⚠ 实测范围:RD_ 命名空间下 mode='archive' **只有这 2 张**。
+  //   全库 archive 共 36 张(清单见 docs/development 系统通用设计-重提炼.md 证据),
+  //   其余 34 张(INV/EMP/WH/… )不在 RD 命名空间、也不走本文件,别把名单扩错。
+  //
+  // ⚠ 下面每个 `key` 都必须等于活库该字段的**当前 label**;label 与 col_name 实测相同,
+  //   所以这里看不出分叉,但**改活库 label 就是改数据键**,改完必须回来改这里,
+  //   否则 recordSheetConfigs.livedb.test.js 会红(这是设计意图,不是误报)。
+  // ───────────────────────────────────────────────────────────────────────────
+
+  // 共享文件库 —— 单文件附件表。yj_panel: head_table=yj_share_file, detail_key=items, page_size=20
+  // 字段只有 1 个(place='header', data_type='附件'),没有明细列 ⇒ 不是纸面复刻,是"每个记录挂一个文件"。
+  RD_SHARE_FILE: {
+    titlePlaceholder: '共享文件库',
+    head: { docnoPrefix: false },
+    sections: [
+      { bar: '文件', rows: [
+        // 附件单元格:与 RD_SPEC_DOC 的「客户图纸或规格书」同一控件(type:'file')
+        { pairs: [
+          { label: '文件', key: '文件', type: 'file', vspan: 3 },
+        ]},
+      ]},
+    ],
+    dataTables: [],
+  },
+
+  // 烧结尺寸表 —— 无头表(整表即行表)。yj_panel: head_table=NULL, line_table=rd_sinter_tolerance,
+  //                                          detail_key=items, page_size=25
+  // 10 个字段全部 place 含 'detail';车间/型号另含 'query'(进查询区)且 required=1。
+  RD_SINTER_TOL: {
+    titlePlaceholder: '烧结尺寸表',
+    head: { docnoPrefix: false },
+    sections: [],
+    dataTables: [
+      { bar: '烧结尺寸', cols: [
+        { key: '车间', label: '车间' },
+        { key: '型号', label: '型号' },
+        { key: '模具尺寸', label: '模具尺寸' },
+        { key: '中心杆尺寸', label: '中心杆尺寸' },
+        { key: '炭棒外径', label: '炭棒外径' },
+        { key: '炭棒外径公差', label: '炭棒外径公差' },
+        { key: '炭棒内径', label: '炭棒内径' },
+        { key: '炭棒内径公差', label: '炭棒内径公差' },
+        { key: '长度范围', label: '长度范围' },
+        { key: '停用', label: '停用', type: 'bool' },
+      ]},
+    ],
+  },
 }
