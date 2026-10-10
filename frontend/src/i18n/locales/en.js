@@ -376,6 +376,16 @@ export default {
     'BOM明细': 'BOM Detail',
     '打印工单_多个': 'Print WOs (Multi)',
     '工单行号': 'WO Line',
+    // 追溯「流转时间线」「领料数据」按工单行号收敛(2026-10-15)
+    '范围': 'Scope',
+    '按钮留痕 2026-10-15 起带「工单行号」(yj_usage_log.工单行号)⇒ 按行看时只出本行的操作;':
+      'Button logs carry a WO line no. since 2026-10-15 (yj_usage_log.工单行号), so a line view shows only that line\u2019s actions;',
+    '结案等工单级动作、以及 2026-10-15 前没有行键的老留痕,按「整单」显示(每条都标了范围,不会混着看不出)':
+      'order-level actions (close, etc.) and pre-2026-10-15 logs without a line key are shown as "Whole WO" (each row is labelled, so they are not silently mixed in)',
+    '按材料出库单**单头**的 工单行号 收敛(2026-10-15 改;原来错查明细行的加工单号 —— 该列全空,这一段一直是空的)。':
+      'Scoped by the picking order HEAD\u2019s WO line no. (changed 2026-10-15; it used to filter on the detail row\u2019s MO no., which is always blank \u2014 so this block was always empty).',
+    '单头 工单行号 空/0 的老单属整单,每行都显示;领料单已开但材料还没补填时,该单也会出现(材料列空)。':
+      'Legacy orders with a blank/0 line no. belong to the whole WO and show for every line; an order whose materials are not filled in yet still shows (material columns blank).',
     '公司代码': 'Company Code',
     '产线代号': 'Line Code',
     '层级': 'Level',

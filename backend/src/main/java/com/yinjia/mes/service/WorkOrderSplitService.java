@@ -174,10 +174,11 @@ public class WorkOrderSplitService {
         boolean linkAdjusted = splitLink(parentNo, parentXc, batch, childNo, childId, qty);
 
         // ⑤ 留痕(两侧各一条,工单追溯时间线直接可见)+ 切单操作日志(谁/何时/从哪单切出多少/生成哪张子单)
-        logUsage(user, "切单", childNo);
-        logUsage(user, "切出子工单", parentNo);
+        // 2026-10-15 带工单行号:子单是新建行(pl_xc=1),父单留痕带**被切的那一行**的行号
+        logUsage(user, "切单", childNo, 1);
+        logUsage(user, "切出子工单", parentNo, parentXc);
         logSplit("切单", parentNo, parentId, childNo, root, seq, qty, newParentSl, dueDate, remark, user);
-        logUsage(user, "打印子工单", childNo);   // 会议口径:切完即打子工单码(扫码领料/报工绑到子单)
+        logUsage(user, "打印子工单", childNo, 1);   // 会议口径:切完即打子工单码(扫码领料/报工绑到子单)
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("父工单号", parentNo);
@@ -267,8 +268,9 @@ public class WorkOrderSplitService {
                 newParentSl, childXq, childXq, newParentSl, user, parentId);
         boolean linkRestored = mergeLink(parentNo, parentXc, str(parent.get("批次号")), childNo, childSl);
 
-        logUsage(user, "撤回切单", childNo);
-        logUsage(user, "撤回子工单", parentNo);
+        // 2026-10-15 带工单行号:子单是它自己的行(pl_xc=1),父单留痕带**被撤回的那一行**的行号
+        logUsage(user, "撤回切单", childNo, c.get("pl_xc") == null ? 1 : ((Number) c.get("pl_xc")).intValue());
+        logUsage(user, "撤回子工单", parentNo, parentXc);
         // 日志:对应「切单」行标已撤回(留痕不删) + 记一行撤回操作
         try {
             jdbc.update("UPDATE dbo.wo_split_log SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE()"
@@ -501,13 +503,16 @@ public class WorkOrderSplitService {
     /**
      * 按钮留痕(yj_usage_log;列固定为 user_name/real_name/event_type/panel_name/action_name/doc_no/created_at
      * —— 无备注列,故方向与数量由「两侧各一条 + 追溯里的父子工单块」表达)。失败不阻断业务。
+     *
+     * <p>2026-10-15:补 [工单行号] —— 用户口径「流转时间线…要根据工单行号完成」;行键落专列不拼进 doc_no。
      */
-    private void logUsage(String user, String action, String docNo) {
+    private void logUsage(String user, String action, String docNo, Integer xc) {
         try {
-            jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no, created_at)"
+            jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no,"
+                            + " [工单行号], created_at)"
                             + " VALUES (?, ISNULL((SELECT real_name FROM yj_user WHERE username = ?), ?),"
-                            + " N'生产', ?, ?, ?, GETDATE())",
-                    user, user, user, LOG_PANEL, action, docNo);
+                            + " N'生产', ?, ?, ?, ?, GETDATE())",
+                    user, user, user, LOG_PANEL, action, docNo, xc);
         } catch (Exception ignore) { /* 留痕失败不阻断业务 */ }
     }
 

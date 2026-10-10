@@ -96,7 +96,9 @@ public class WorkOrderTransferService {
                             from, fromShop, line, shop, str(reason), user);
                     moved.add(from + "→" + line);
                 }
-                logUsage(user, "调拨", no);
+                // 留痕带工单行号(2026-10-15 用户口径「流转时间线…要根据工单行号完成」):
+                //   单行调拨写该行行号(h.pl_xc);整单调拨(rows 未给行id、targetRows 返多行)时 null = 工单级
+                logUsage(user, "调拨", no, heads.size() == 1 ? intOf(heads.get(0).get("pl_xc")) : null);
                 done.add(no + "(" + String.join("、", moved) + ")");
             } catch (IllegalStateException e) {
                 failed.add(no + ":" + e.getMessage());
@@ -141,11 +143,11 @@ public class WorkOrderTransferService {
                 Long plangId = longOf(lg.get("plang_id"));
                 List<Map<String, Object>> heads;
                 if (plangId != null) {
-                    heads = jdbc.queryForList("SELECT id, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", plangId);
+                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", plangId);
                 } else if (xc != null) {
-                    heads = jdbc.queryForList("SELECT id, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=? AND ISNULL(asp_cancel,'N')<>'Y'", no, xc);
+                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=? AND ISNULL(asp_cancel,'N')<>'Y'", no, xc);
                 } else {
-                    heads = jdbc.queryForList("SELECT id, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
+                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
                 }
                 if (heads.isEmpty()) throw new IllegalStateException("工单行已不存在或已作废");
                 for (Map<String, Object> h : heads) {
@@ -163,7 +165,7 @@ public class WorkOrderTransferService {
                     jdbc.update("UPDATE dbo.plang_pc SET scx=?, asp_user2=?, asp_time2=GETDATE() WHERE plang_id=?", back, user, id);
                 }
                 jdbc.update("UPDATE dbo.wo_transfer_log SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE() WHERE id=?", user, logId);
-                logUsage(user, "撤回调拨", no);
+                logUsage(user, "撤回调拨", no, heads.size() == 1 ? intOf(heads.get(0).get("pl_xc")) : null);
                 done.add(no + ":" + lg.get("到生产线") + "→" + lg.get("从生产线"));
             } catch (IllegalStateException e) {
                 failed.add(no + ":" + e.getMessage());
@@ -227,13 +229,17 @@ public class WorkOrderTransferService {
         return s.isEmpty() || s.get(0).isBlank() ? null : s.get(0);
     }
 
-    /** 按钮留痕(yj_usage_log;失败不阻断业务) */
-    private void logUsage(String user, String action, String docNo) {
+    /**
+     * 按钮留痕(yj_usage_log;失败不阻断业务)。
+     * 2026-10-15:补 [工单行号] —— 用户口径「流转时间线…要根据工单行号完成」;行键落专列不拼进 doc_no。
+     */
+    private void logUsage(String user, String action, String docNo, Integer xc) {
         try {
-            jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no, created_at)"
+            jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no,"
+                            + " [工单行号], created_at)"
                             + " VALUES (?, ISNULL((SELECT real_name FROM yj_user WHERE username = ?), ?),"
-                            + " N'生产', ?, ?, ?, GETDATE())",
-                    user, user, user, LOG_PANEL, action, docNo);
+                            + " N'生产', ?, ?, ?, ?, GETDATE())",
+                    user, user, user, LOG_PANEL, action, docNo, xc);
         } catch (Exception ignore) { /* 留痕失败不阻断 */ }
     }
 

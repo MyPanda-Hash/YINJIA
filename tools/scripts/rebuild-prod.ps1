@@ -22,12 +22,24 @@ function Get-MesProcs {
         Where-Object { $_.CommandLine -match 'yinjia-mes' }
 }
 
-Write-Host '[1/4] 停正式实例 ...'
+# 🔴 关键:`backend\start-backend.bat` 里是个**重启循环**
+#   (:loop → java -jar … → "Restarting in 5 seconds" → goto loop)
+#   所以**只杀 java 进程没用** —— 5 秒后监督它的 cmd.exe 会把 java 再拉起来、重新占住 jar,
+#   maven repackage 的改名随即失败(2026-10-15 实测:先报"jar 可独占打开",几秒后打包又挂)。
+#   必须先杀监督进程(cmd.exe 跑 start-backend.bat),再杀 java。
+function Get-MesSupervisors {
+    Get-CimInstance Win32_Process -Filter "Name='cmd.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -match 'start-backend\.bat' }
+}
+
+Write-Host '[1/4] 停正式实例 + 停掉它的重启监督进程 ...'
 & (Join-Path $PSScriptRoot 'start-prod.ps1') -Stop | Out-Null
 
 Write-Host '[2/4] 等进程退出 + jar 句柄释放 ...'
 $ok = $false
 for ($i = 0; $i -lt 60; $i++) {
+    $sup = Get-MesSupervisors
+    if ($sup) { $sup | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }
     $procs = Get-MesProcs
     if ($procs) { $procs | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue } }
     $free = $true
@@ -37,7 +49,7 @@ for ($i = 0; $i -lt 60; $i++) {
             $fs.Close(); $fs.Dispose()
         } catch { $free = $false }
     }
-    if (-not $procs -and $free) { $ok = $true; break }
+    if (-not $procs -and -not $sup -and $free) { $ok = $true; break }
     Start-Sleep -Seconds 1
 }
 if (-not $ok) { throw "等待 jar 句柄释放超时(60s):$jar 仍被占用" }

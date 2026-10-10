@@ -239,7 +239,7 @@ public class WorkOrderListController {
                                 + " AND ISNULL(asp_cancel,'N')<>'Y'",
                         close ? "Y" : "N", k.comm(), k.no(), k.xc(), k.batch(), k.batch());
                 if (n == 0) throw new IllegalStateException("plang 中未找到");
-                logUsage(user, close ? "结案" : "取消结案", k.no());
+                logUsage(user, close ? "结案" : "取消结案", k.no(), k.xc());
                 done.add(k.label());
             } catch (IllegalStateException e) {
                 failed.add(k.no() + ":" + e.getMessage());
@@ -304,13 +304,17 @@ public class WorkOrderListController {
     /**
      * 按钮留痕(yj_usage_log)。real_name 非空:从 yj_user 取,查不到回落登录名;
      * 留痕失败不阻断业务(口径同 ScheduleBoardService,但显式补齐 real_name 根因)。
+     *
+     * <p>2026-10-15:补 [工单行号] —— 用户口径「流转时间线…要根据工单行号完成」。
+     * 行键落专列,**不再**往 doc_no 里拼(拼了会让 `doc_no=@工单号` 的查询匹配不上、留痕静默丢失)。
      */
-    private void logUsage(String user, String action, String docNo) {
+    private void logUsage(String user, String action, String docNo, Integer xc) {
         try {
-            jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no, created_at)"
+            jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no,"
+                            + " [工单行号], created_at)"
                             + " VALUES (?, ISNULL((SELECT real_name FROM yj_user WHERE username = ?), ?),"
-                            + " N'工单', N'生产工单', ?, ?, GETDATE())",
-                    user, user, user, action, docNo);
+                            + " N'工单', N'生产工单', ?, ?, ?, GETDATE())",
+                    user, user, user, action, docNo, xc);
         } catch (Exception ignore) { /* 留痕不阻断业务 */ }
     }
 

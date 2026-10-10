@@ -63,12 +63,17 @@
       </div>
 
       <div class="wb-trace-block">
-        <div class="wb-block-title">{{ tt('流转时间线') }}<span class="wb-scope-cap whole">{{ tt('整单') }}</span></div>
-        <div class="wb-trace-sub">{{ tt('按钮留痕只记工单号(yj_usage_log.doc_no),没有工单行维度 ⇒ 天生是工单级口径') }}</div>
+        <div class="wb-block-title">{{ tt('流转时间线') }}<span class="wb-scope-cap" :class="capsule('流转时间线')">{{ tt(scopeOf('流转时间线')) }}</span></div>
+        <div class="wb-trace-sub">
+          {{ tt('按钮留痕 2026-10-15 起带「工单行号」(yj_usage_log.工单行号)⇒ 按行看时只出本行的操作;') }}
+          {{ tt('结案等工单级动作、以及 2026-10-15 前没有行键的老留痕,按「整单」显示(每条都标了范围,不会混着看不出)') }}
+        </div>
         <el-table :data="trace['时间线']" size="small" border max-height="180">
           <el-table-column :label="tt('步骤')" prop="步骤" width="140" />
           <el-table-column :label="tt('操作人')" prop="操作人" width="140" />
           <el-table-column :label="tt('时间')" prop="时间" min-width="160" />
+          <el-table-column :label="tt('范围')" prop="范围" width="130" />
+          <el-table-column :label="tt('工单行号')" prop="工单行号" width="90" />
         </el-table>
       </div>
 
@@ -172,13 +177,16 @@
       </div>
 
       <div class="wb-trace-block">
-        <div class="wb-block-title">{{ tt('领料数据') }}<span class="wb-scope-cap whole">{{ tt('整单') }}</span></div>
+        <div class="wb-block-title">{{ tt('领料数据') }}<span class="wb-scope-cap" :class="capsule('领料数据')">{{ tt(scopeOf('领料数据')) }}</span></div>
         <div class="wb-trace-sub">
-          {{ tt('材料出库单没有生产行键:加工单号为空、批号是 ERP 批号口径(≠生产批次号)、源单行号空 ⇒ 无法按行收敛,如实按整单显示') }}
+          {{ tt('按材料出库单**单头**的 工单行号 收敛(2026-10-15 改;原来错查明细行的加工单号 —— 该列全空,这一段一直是空的)。') }}
+          {{ tt('单头 工单行号 空/0 的老单属整单,每行都显示;领料单已开但材料还没补填时,该单也会出现(材料列空)。') }}
         </div>
         <el-table :data="trace['领料数据']" size="small" border max-height="180" :empty-text="tt('暂无领料')">
           <el-table-column :label="tt('领料单号')" prop="领料单号" width="170" />
           <el-table-column :label="tt('领料日期')" prop="领料日期" width="100" />
+          <el-table-column :label="tt('范围')" prop="范围" width="130" />
+          <el-table-column :label="tt('单据状态')" prop="单据状态" width="90" />
           <el-table-column :label="tt('材料编码')" prop="材料编码" width="120" show-overflow-tooltip />
           <el-table-column :label="tt('材料名称')" prop="材料名称" min-width="140" show-overflow-tooltip />
           <el-table-column :label="tt('规格型号')" prop="规格型号" width="110" show-overflow-tooltip />

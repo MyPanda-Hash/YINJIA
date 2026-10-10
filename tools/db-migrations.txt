@@ -2797,3 +2797,19 @@ migrate-plang-row-state-backfill-20261015.sql
 #   配套代码:ButtonService.woInspGenerate 写入「工单行号」(取 scjl.[工单行号],缺失时经 resolveWoRow 反查)。
 #   ⚠ 这三张表不在采购链四单基线(FourDocAudit)范围内。幂等;两账套均执行。
 migrate-wo-insp-wo-line-20261015.sql
+
+# migrate-usage-log-wo-line-20261015.sql(2026-10-15):yj_usage_log(按钮留痕)补「工单行号」+ 存量从 doc_no 拆解回填
+#   用户口径「当前修改流转时间线和领料数据同样要根据工单行号完成」。工单追溯的「流转时间线」段
+#   数据源就是 yj_usage_log,而它只记 doc_no(工单号):
+#     · 同工单多行的留痕全混在一起(行3 的时间线里出现行1/行2 的排产);
+#     · 更糟:有些写入方把行键拼进 doc_no(如 GD-2026-10-0002#111),而查询用 `doc_no = @工单号`
+#       ⇒ 这些留痕**根本匹配不上、被静默丢弃**(实测撤销排产 7 条全隐形)。
+#   处置:① 补 int 列 [工单行号](= plang.pl_xc)+ 中文注明;
+#         ② 存量:凡 doc_no 带 # 的拆出「单号 + 行id」→ doc_no 还原纯单号、[工单行号] 由
+#            行id → plang.pl_xc 解析(plang 行已软删也照样解析,留痕是历史事实);解析不到的只还原
+#            doc_no、行号留 NULL(按"工单级老留痕"显示,**不再隐形**);自检 doc_no 不应再有 #;
+#         ③ 代码侧写入点在有行上下文时写 [工单行号],不再往 doc_no 拼 #行id
+#            (ScheduleBoardService / WorkOrderListController / WorkOrderTransferService /
+#             WorkOrderSplitService;UsageLogService 与 QuickScheduleService 无行上下文 ⇒ 保持 NULL=工单级)。
+#   ⚠ 只加列 + 拆后缀,不动任何 action/panel 语义。幂等;两账套均执行。
+migrate-usage-log-wo-line-20261015.sql
