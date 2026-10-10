@@ -2400,6 +2400,10 @@ public class ButtonService {
         line.put("仓库", finishWh);
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", LocalDate.now().toString());
+        // 🔴 2026-10-15 修:必须写「业务类型」—— 正式库 bd_finish_in.[业务类型] 是 **NOT NULL**,
+        //   而测试库该列**允许 NULL**(两账套结构不一致)⇒ 自动生单在测试账套跑得通、到正式库报
+        //   「Cannot insert the value NULL into column '业务类型'」。值取该字段字典里的「产成品入库」。
+        head.put("业务类型", "产成品入库");
         head.put("仓库", finishWh);
         head.put("生产车间", "切炭车间");
         head.put("加工单号", wo);
@@ -2702,6 +2706,10 @@ public class ButtonService {
             line.put("仓库", wh);
             Map<String, Object> head = new LinkedHashMap<>();
             head.put("单据日期", LocalDate.now().toString());
+            // 🔴 2026-10-15 修(用户报障「组装成品检验单审批通过/审核后报 业务类型 不能为 NULL」):
+            //   正式库 bd_finish_in.[业务类型] 是 **NOT NULL**,本方法原来没写它 ⇒ 生成产成品入库单时
+            //   `Cannot insert the value NULL into column '业务类型'`。测试库该列允许 NULL,故探针没抓到。
+            head.put("业务类型", "产成品入库");
             head.put("仓库", wh);
             head.put("加工单号", wo);
             // 行级键(2026-10-15):工单行号 + 批次号写进入库单头 ⇒ 工单追溯「入库段」按行收敛。

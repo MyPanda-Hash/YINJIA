@@ -2827,3 +2827,12 @@ migrate-usage-log-wo-line-20261015.sql
 #      而错误结案(同款守卫已加到 ProcessTaskService.syncCloseState)。
 #   自检:不应再有「完工状态=生产完工 且 ja=Y 但入库<排产」的行。幂等;两账套均执行。
 migrate-plang-ja-stale-autoclose-20261015.sql
+# migrate-finish-in-notnull-align-20261015.sql(2026-10-15):把 bd_finish_in 的 NOT NULL 口径在两账套对齐
+#   用户报障:组装成品检验单 审批通过/审核 → 自动生产成品入库单时报
+#   Cannot insert the value NULL into column '业务类型', table 'HSDZ_MES.dbo.bd_finish_in'。
+#   实测两账套结构不一致:正式库 [业务类型]/[单据日期] 均 NOT NULL,测试库两列都允许 NULL
+#   ⇒ 自动生单漏写必填列时**测试账套跑得通、只有正式库报错**,探针永远抓不到(测试库快照漂移的典型)。
+#   处置:回填测试库存量 NULL(业务类型→'产成品入库'、单据日期→当天)后把两列 ALTER 成 NOT NULL;
+#   正式库本来就已是 ⇒ 幂等跳过。作用是让测试账套能复现正式库约束,回归探针真的能拦住"漏写必填列"。
+#   自检:两列都必须 NOT NULL。幂等;两账套均执行。
+migrate-finish-in-notnull-align-20261015.sql
