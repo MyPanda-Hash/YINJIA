@@ -45,7 +45,10 @@
     <!-- ===== 右：语言切换 / 搜索 / 更新公告 / 移动端 / 通知角标 / 全屏 / 帮助 / 用户 ===== -->
     <div class="t-right">
       <!-- 语言切换(多国语言 P1):下拉选择,Alt+L 快捷循环,即时热切换 -->
-      <el-dropdown @command="(l) => localeStore.set(l)" popper-class="locale-glass-popper">
+      <el-dropdown
+        @command="(l) => localeStore.set(l)"
+        popper-class="locale-glass-popper locale-select-popper"
+      >
         <span
           class="factory locale-switch"
           :aria-label="tt('切换语言')"
@@ -446,6 +449,15 @@ function changePwd() {
 .locale-option.locale-active {
   color: var(--el-color-primary);
   font-weight: 600;
+}
+/* 当前语言项同样要压过 EP 的 --el-color-primary,并提亮以适配深底 */
+.locale-glass-popper .locale-option.locale-active,
+.locale-glass-popper .el-dropdown-menu__item .locale-option.locale-active {
+  color: #7fd8c3;
+  font-weight: 600;
+}
+html:not(.dark) .locale-glass-popper .locale-option.locale-active {
+  color: #116a5b;
 }
 .locale-check {
   font-size: 13px;
@@ -887,16 +899,36 @@ function changePwd() {
 }
 </style>
 
-<!-- 全局(popper teleport 到 body,scoped 无法命中):语言下拉毛玻璃弹层 -->
+<!-- 全局(popper teleport 到 body,scoped 无法命中):语言下拉毛玻璃弹层
+     颜色一律走 --locale-popper-* 变量,亮/暗两套取值见结尾 html.dark 块。
+     禁止在此硬编码颜色:亮色下会与周围白色 UI 冲突,暗色下会漏掉 is-light 覆盖。 -->
 <style lang="css">
+:root,
+html.dark {
+  --locale-popper-bg: #fff;
+  --locale-popper-bd: rgba(0, 0, 0, 0.08);
+  --locale-popper-shadow: 0 12px 32px rgba(15, 23, 20, 0.12);
+  --locale-popper-fg: var(--el-text-color-primary);
+  --locale-popper-fg-hover: var(--el-text-color-primary);
+  --locale-popper-hover-bg: rgba(15, 23, 20, 0.06);
+}
+html.dark {
+  --locale-popper-bg: rgba(21, 36, 31, 0.92);
+  --locale-popper-bd: rgba(255, 255, 255, 0.14);
+  --locale-popper-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  --locale-popper-fg: rgba(255, 255, 255, 0.88);
+  --locale-popper-fg-hover: #fff;
+  --locale-popper-hover-bg: rgba(255, 255, 255, 0.14);
+}
+/* 双类选择器压过 EP 的 is-light/is-dark 弹层底色(此前白底根因) */
 .locale-glass-popper.el-dropdown__popper,
 .locale-select-popper.el-select__popper {
-  background: rgba(21, 36, 31, 0.78);
+  background: var(--locale-popper-bg);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--locale-popper-bd);
   border-radius: 14px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.32);
+  box-shadow: var(--locale-popper-shadow);
   padding: 6px;
 }
 .locale-glass-popper .el-dropdown-menu {
@@ -905,26 +937,34 @@ function changePwd() {
 }
 .locale-glass-popper .el-dropdown-menu__item,
 .locale-select-popper .el-select-dropdown__item {
-  color: rgba(255, 255, 255, 0.88);
+  color: var(--locale-popper-fg);
   border-radius: 9px;
   padding: 7px 12px;
   line-height: 20px;
+}
+/* 内层 .locale-option 才是真正显示文字的节点,必须同色(此前浅色字根因) */
+.locale-glass-popper .locale-option,
+.locale-select-popper .locale-option {
+  color: inherit;
 }
 .locale-glass-popper .el-dropdown-menu__item:not(.is-disabled):hover,
 .locale-glass-popper .el-dropdown-menu__item:not(.is-disabled):focus,
 .locale-select-popper .el-select-dropdown__item.hover,
 .locale-select-popper .el-select-dropdown__item:hover {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
+  background: var(--locale-popper-hover-bg);
+  color: var(--locale-popper-fg-hover);
 }
 .locale-select-popper .el-select-dropdown__item.is-selected {
   color: #7fd8c3;
   font-weight: 600;
 }
+html.dark .locale-select-popper .el-select-dropdown__item.is-selected {
+  color: #7fd8c3;
+}
 .locale-glass-popper .el-popper__arrow::before,
 .login-locale .el-select__popper .el-popper__arrow::before {
-  background: rgba(21, 36, 31, 0.9);
-  border-color: rgba(255, 255, 255, 0.14);
+  background: var(--locale-popper-bg);
+  border-color: var(--locale-popper-bd);
 }
 .locale-glass-popper .el-dropdown-menu__item:not(:last-child) {
   margin-bottom: 2px;

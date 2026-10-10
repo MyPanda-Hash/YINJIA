@@ -8,7 +8,7 @@
         filterable
         :placeholder="tt('切换语言')"
         class="locale-select"
-        popper-class="locale-select-popper"
+        popper-class="locale-select-popper locale-glass-popper"
         @change="(l) => localeStore.set(l)"
       >
         <el-option
