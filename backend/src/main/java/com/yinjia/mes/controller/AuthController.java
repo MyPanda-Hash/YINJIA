@@ -111,6 +111,39 @@ public class AuthController {
         return ApiResult.ok(currentUser());
     }
 
+    /**
+     * 用户自助改密(2026-10-15 补)。此前前端 `TopBar.changePwd` 是纯前端假实现:
+     * 硬编码 `old !== '123456'` 校验、提示"演示环境不落库",库里一个字节都不动 ——
+     * 且除管理员在组织管理里改他人密码外,普通用户**根本没有轮换自己口令的出口**。
+     *
+     * 账套:本方法走认证请求(JwtAuthFilter 已按令牌声明 DataSourceRouter.use),故无需自己 use/clear。
+     */
+    @PostMapping("/changePassword")
+    public ApiResult<Void> changePassword(@RequestBody Map<String, String> body) {
+        String oldPassword = body.getOrDefault("old", "");
+        String newPassword = body.getOrDefault("next", "");
+        if (oldPassword.isBlank() || newPassword.isBlank()) {
+            throw new IllegalArgumentException("原密码和新密码不能为空");
+        }
+        if (newPassword.length() < 6) {
+            throw new IllegalArgumentException("新密码至少 6 位");
+        }
+        if (newPassword.equals(oldPassword)) {
+            throw new IllegalArgumentException("新密码不能与原密码相同");
+        }
+        String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
+                : SecurityContextHolder.getContext().getAuthentication().getName();
+        if (username == null) throw new IllegalStateException("未登录");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT password_hash FROM yj_user WHERE username = ?", username);
+        if (rows.isEmpty()) throw new IllegalStateException("用户不存在");
+        if (!encoder.matches(oldPassword, String.valueOf(rows.get(0).get("password_hash")))) {
+            throw new IllegalStateException("原密码不正确");
+        }
+        jdbc.update("UPDATE yj_user SET password_hash = ? WHERE username = ?", encoder.encode(newPassword), username);
+        return ApiResult.ok(null);
+    }
+
     private Map<String, Object> currentUser() {
         String username = SecurityContextHolder.getContext().getAuthentication() == null ? null
                 : SecurityContextHolder.getContext().getAuthentication().getName();

@@ -210,7 +210,7 @@
       </el-form>
       <template #footer>
         <el-button @click="pwdVisible = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" @click="changePwd">{{ tt('确定') }}</el-button>
+        <el-button type="primary" :loading="pwdLoading" @click="changePwd">{{ tt('确定') }}</el-button>
       </template>
     </el-dialog>
 
@@ -238,7 +238,7 @@ import { useAppStore } from '@/stores/app'
 import { useUserStore } from '@/stores/user'
 import { useTabsStore } from '@/stores/tabs'
 import { flatMenus, menuTree as rawMenuTree, filterMenuTree } from '@/business/menus'
-import { apiGetNotices } from '@/business/api'
+import { apiGetNotices, apiChangePassword } from '@/business/api'
 import { ElMessage } from 'element-plus'
 import NoticeCenter from './NoticeCenter.vue'
 import UiSettingsDialog from './UiSettingsDialog.vue'
@@ -369,15 +369,25 @@ function onUserCommand(cmd) {
   }
 }
 
-function changePwd() {
+const pwdLoading = ref(false)
+
+async function changePwd() {
   const f = pwdForm.value
   if (!f.old || !f.next || !f.confirm) return ElMessage.warning('请填写完整')
-  if (f.old !== '123456') return ElMessage.error('原密码不正确（演示账号原密码 123456）')
   if (f.next.length < 6) return ElMessage.warning('新密码至少 6 位')
   if (f.next !== f.confirm) return ElMessage.warning('两次输入的新密码不一致')
-  pwdVisible.value = false
-  pwdForm.value = { old: '', next: '', confirm: '' }
-  ElMessage.success('密码修改成功（演示环境不落库）')
+  pwdLoading.value = true
+  try {
+    await apiChangePassword({ old: f.old, next: f.next })
+    pwdVisible.value = false
+    pwdForm.value = { old: '', next: '', confirm: '' }
+    ElMessage.success('密码修改成功')
+  } catch (e) {
+    // 服务端原密码校验失败(原实现是前端硬编码 old !== '123456',任何账号输 123456 都能过)
+    ElMessage.error(e?.message || '修改密码失败')
+  } finally {
+    pwdLoading.value = false
+  }
 }
 </script>
 
