@@ -50,6 +50,22 @@ ok('① fixture 含"多物理行共用同一工单行号"(用于验"同标识只
   new Set(rows.map((r) => r['工单行号'])).size < rows.length,
   JSON.stringify(rows.map((r) => ({ 行id: r['行id'], 行号: r['工单行号'], 批次: r['批次号'] }))))
 
+// ── 前置:清掉该 fixture 上的**整单级老单**(工单行号 = 0/NULL) ──
+// 口径(WorkOrderPickingService 守卫②):「工单行号 空/0 = 工单级单据,视为占整单,所有行都不放行」。
+// 测试账套的 MO-2026-09-0007 上有一张 2026-10-07 的整单级草稿 CL-2026-10-0001 ⇒ 会把本 fixture
+// **整单**挡住(这是**正确**的既有守卫行为,不是 bug)。本探针为验证行级出单,先把这类挡路的
+// 整单级草稿按界面「删除」作废(仅 yj_doc_status.canceled,业务表数据不动),跑完打印复位 SQL。
+const list0 = await api('/px/queryFormDataList', { panelCode: 'MATERIAL_OUT', pageNo: 1, pageSize: 200 })
+const allMo = (list0.data && (list0.data.rows || list0.data.list || list0.data.items)) || []
+const blockers = allMo.filter((x) => String(x['加工单号']) === WO
+  && (x['工单行号'] == null || Number(x['工单行号']) === 0)
+  && String(x['单据状态'] || '') !== '已作废')
+for (const b of blockers) {
+  const dn = b['单据编号']
+  await api('/px/callButton', { panelCode: 'MATERIAL_OUT', buttonName: '删除', formData: { 编号: dn }, buttonParam: {} })
+  console.log(`    [前置] 已按界面「删除」作废整单级挡路草稿 ${dn}(复位:UPDATE dbo.yj_doc_status SET canceled='N' WHERE panel_code='MATERIAL_OUT' AND doc_no=N'${dn}')`)
+}
+
 // ── 勾选全部行转领料单 ──
 // 用户口径(2026-10-15):「工单号加工单行号作为标识,每个独立进行」⇒ 去重键 = (工单号, 工单行号)。
 // 本 fixture 的 3 行里,行id=32 与 36 **共用同一 (工单号,行号)=(MO-2026-09-0007, 2)** ——

@@ -217,12 +217,8 @@ public class ScheduleBoardService {
             }
             Double qtyOverride = num(r.get("排产数量"));
             String team = str(r.get("排产班组"));
-            Integer rowId = null;
-            Object rid = r.get("行id");
-            if (rid instanceof Number nn) rowId = nn.intValue();
-            else if (rid != null && !String.valueOf(rid).isBlank()) {
-                try { rowId = Integer.valueOf(String.valueOf(rid).trim()); } catch (NumberFormatException ignore) { }
-            }
+            Long rowIdL = resolvePickRowId(no, r);
+            Integer rowId = rowIdL == null ? null : rowIdL.intValue();
             try {
                 Map<String, Object> head;
                 try {
@@ -295,15 +291,9 @@ public class ScheduleBoardService {
         for (Map<String, Object> r : rows) {
             String no = str(r.get("加工单号"));
             if (no == null) throw new IllegalArgumentException("撤销行缺少 加工单号");
-            // 唯一键 = **工单号 + 工单行号**(2026-10-07 用户口径):带 行id 时只撤销那一行;
-            //   不带(旧调用)时退回整单撤销
-            Object ridObj = r.get("行id");
-            Long rowId = null;
-            if (ridObj instanceof Number nn) rowId = nn.longValue();
-            else if (ridObj != null && !String.valueOf(ridObj).isBlank()) {
-                try { rowId = Long.valueOf(String.valueOf(ridObj).trim()); } catch (NumberFormatException ignore) { }
-            }
-            final Long row = rowId;
+            // 唯一键 = **工单号 + 工单行号**(用户口径 2026-10-15「这两个确定当前唯一工单」):
+            //   带 行id 或 工单行号 时只撤销那一行;都没有(旧调用)才退回整单撤销
+            final Long row = resolvePickRowId(no, r);
             try {
                 // 已报工量(判"能不能撤销"):带 行id 时只算**该行**的报工(锚 scjl.gd_id → plang_pc.plang_id,
                 //   老数据没有 gd_id 时按(工单号+批次号)兜底);不带行id(旧调用)时算整单。
@@ -1149,6 +1139,32 @@ public class ScheduleBoardService {
 
     private static String str(Object o) {
         return o == null || String.valueOf(o).isBlank() ? null : String.valueOf(o).trim();
+    }
+
+    /**
+     * 勾选行 → **工单行id**:优先取 行id;没有时按 **(加工单号 + 工单行号)** 反查
+     * (用户口径 2026-10-15「工单号+工单行号确定当前唯一工单,各个工单的进程、流程追溯
+     * 都这样实现,都需要这两个进行确定」)。
+     *
+     * <p>⚠ 按行号反查**恰命中 1 行才认**(plang 里同一 (工单号,行号) 可能有多个物理行);
+     * 命中多行返回 null ⇒ 调用方退回旧口径(整单/首行),不猜行。
+     *
+     * @return 工单行id;两把键都没有(或行号不唯一/查不到)时 null
+     */
+    private Long resolvePickRowId(String no, Map<String, Object> r) {
+        Object rid = r.get("行id");
+        if (rid instanceof Number nn) return nn.longValue();
+        if (rid != null && !String.valueOf(rid).isBlank() && !"null".equals(String.valueOf(rid))) {
+            try { return Long.valueOf(String.valueOf(rid).trim()); } catch (NumberFormatException ignore) { /* 落下面按行号 */ }
+        }
+        Object xcObj = r.get("工单行号");
+        if (xcObj == null || String.valueOf(xcObj).isBlank() || "null".equals(String.valueOf(xcObj))) return null;
+        int xc;
+        try { xc = (int) Double.parseDouble(String.valueOf(xcObj).trim()); } catch (NumberFormatException e) { return null; }
+        List<Long> ids = jdbc.queryForList(
+                "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " ORDER BY id", Long.class, no, xc);
+        return ids.size() == 1 ? ids.get(0) : null;
     }
 
     private static Double num(Object o) {
