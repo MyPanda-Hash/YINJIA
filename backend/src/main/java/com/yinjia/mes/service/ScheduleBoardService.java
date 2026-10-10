@@ -933,8 +933,12 @@ public class ScheduleBoardService {
                             + " FROM dbo." + tbl + " h"
                             + " LEFT JOIN dbo.yj_doc_status s ON s.panel_code=? AND s.doc_no=h.单据编号"
                             + " LEFT JOIN (SELECT 单据编号,"
-                            + "      SUM(CASE WHEN 判定=N'合格' THEN ISNULL(数量,0) ELSE 0 END) AS 合格数量,"
-                            + "      SUM(CASE WHEN 判定=N'不合格' THEN ISNULL(数量,0) ELSE 0 END) AS 不合格数量"
+                            // 🔴 2026-10-15 改口径(用户:「汇总保持当前表格列的填入合格数量的多少」):
+                            //   原来按明细的「判定=合格/不合格」再取「数量」求和 —— 依赖生单时**预铺**的
+                            //   合格/不合格两行;现在生单不再预填明细,改为一律 **对明细列 合格数量/不合格数量 求和**。
+                            //   品质在明细里按检验项目填几行都行,汇总天然是各行合计。
+                            + "      SUM(ISNULL(合格数量,0)) AS 合格数量,"
+                            + "      SUM(ISNULL(不合格数量,0)) AS 不合格数量"
                             + "    FROM dbo." + tbl.replace("_head", "_detail")
                             + "   WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY 单据编号) d"
                             + "   ON d.单据编号 = h.单据编号"

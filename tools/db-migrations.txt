@@ -2836,3 +2836,15 @@ migrate-plang-ja-stale-autoclose-20261015.sql
 #   正式库本来就已是 ⇒ 幂等跳过。作用是让测试账套能复现正式库约束,回归探针真的能拦住"漏写必填列"。
 #   自检:两列都必须 NOT NULL。幂等;两账套均执行。
 migrate-finish-in-notnull-align-20261015.sql
+
+# migrate-insp-detail-quantity-20261015.sql(2026-10-15):三张工序检验单**明细**补「合格数量」「不合格数量」
+#   用户口径:① 「检验单自动生成不需要实现明细行的自动填入」「表头带入,明细行不填入」;
+#            ② 「为当前明细列增加合格数量/不合格数量」;
+#            ③ 「汇总保持当前表格列的填入合格数量的多少」⇒ 汇总一律按明细列求和。
+#   处置:qc_mold_insp_detail / qc_cut_insp_detail / qc_asm_insp_detail 各补 decimal(18,4) 两列 + 中文注明;
+#        yj_field 为 QC_MOLD_INSP/QC_CUT_INSP/QC_ASM_INSP 注册 detail 字段(seq 300/310,可编辑);
+#        yj_translation en 译名(Pass Qty / Fail Qty);存量把旧写法「判定=合格/不合格 + 数量」搬进新列。
+#   配套代码:ButtonService.woInspGenerate 改为只建空明细单头(删除预铺行与 inspLine 死代码);
+#        asmInspToStock 与追溯质检段汇总改为 SUM(合格数量)/SUM(不合格数量)。
+#   自检:三表两列 + 三面板两字段 + 两译名齐备。幂等;两账套均执行。
+migrate-insp-detail-quantity-20261015.sql

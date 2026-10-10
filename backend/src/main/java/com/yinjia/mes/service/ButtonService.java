@@ -2541,18 +2541,11 @@ public class ButtonService {
             head.put("检验日期", LocalDate.now().toString());
             head.put("检验员", user);
 
-            List<Map<String, Object>> items = new ArrayList<>();
-            if ("QC_ASM_INSP".equals(target)) {
-                // 组装成品:合格/不合格各一行(会议「录入合格/不合格数量(各一行)」);数量留空由品质填,
-                // 处理方式预置默认(合格→入库、不合格→待处理),人可改。
-                // 这两行是**数量判定行**(表区=数量判定),asmInspToStock 的库存分流只认它们。
-                items.add(inspLine("成品检验", "合格", "入库"));
-                items.add(inspLine("成品检验", "不合格", "待处理"));
-            } else {
-                // 成型/切炭:通用模板一行(检验项目/标准/实测/判定 由品质填;格式到位后替换模板)
-                items.add(inspLine("外观", null, null));
-            }
-            head.put("detail", Map.of("items", items));
+            // 🔴 2026-10-15 用户口径:「检验单自动生成**不需要**实现明细行的自动填入」+「明细行不填入」
+            //   ⇒ 只建**空明细**的单头,检验项目/合格数量/不合格数量都由品质在明细里自己填。
+            //   原来预铺的行(组装=合格/不合格两行 表区=数量判定;成型/切炭=外观一行)已取消;
+            //   库存分流随之改为按明细列的 合格数量/不合格数量 汇总(见 asmInspToStock)。
+            head.put("detail", Map.of("items", List.of()));
             Map<String, Object> saved = save(registry.panel(target), head, false);
             String no = String.valueOf(saved.get("编号"));
             // 占用链:报工单 → 检验单(源行键=报工单号#scjl.id;弃审时据此作废+释放)
@@ -2605,15 +2598,8 @@ public class ButtonService {
                 repNo, repNo + "#" + r.get("id"), FIN_SPEC_PANEL, no, user);
     }
 
-    /** 检验单**数量判定**行(表区=数量判定;只放非空键,避免把 null 写进明细) */
-    private Map<String, Object> inspLine(String item, String judge, String disposition) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("表区", "数量判定");
-        if (item != null) m.put("检验项目", item);
-        if (judge != null) m.put("判定", judge);
-        if (disposition != null) m.put("处理方式", disposition);
-        return m;
-    }
+    // 【已删除】inspLine(检验单「数量判定」预铺行)—— 2026-10-15 用户口径「明细行不填入」后不再预铺明细,
+    //   该辅助方法成了死代码(代码规范 D/E:不留无用方法)。合格/不合格改由明细列 合格数量/不合格数量 表达。
 
     /**
      * 报工单弃审联动:把该报工生成的检验单**草稿**作废(软删)+ 释放占用链;
@@ -2666,15 +2652,15 @@ public class ButtonService {
         if (heads.isEmpty()) throw new IllegalStateException("组装成品检验单不存在:" + inspNo);
         Map<String, Object> h = heads.get(0);
         List<Map<String, Object>> lines = jdbc.queryForList(
-                "SELECT ISNULL(判定,N'') AS 判定, ISNULL(数量,0) AS 数量, ISNULL(处理方式,N'') AS 处理方式"
+                "SELECT ISNULL(合格数量,0) AS 合格数量, ISNULL(不合格数量,0) AS 不合格数量"
                         + " FROM qc_asm_insp_detail WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", inspNo);
+        // 🔴 2026-10-15 改口径(用户口径:明细行不预填,汇总按明细列填的数量走):
+        //   原来读「判定 + 数量」(靠预铺的 合格/不合格 两行),现在直接**对明细列的 合格数量/不合格数量 求和**
+        //   —— 品质在明细里想填几行就填几行(按检验项目),汇总天然是各行的合计。
         double pass = 0, ng = 0;
         for (Map<String, Object> r : lines) {
-            double q = numOr(r.get("数量"));
-            if (q <= 0) continue;                                  // 数量空=品质还没填,不生成下游
-            boolean okLine = "合格".equals(String.valueOf(r.get("判定")).trim())
-                    || "入库".equals(String.valueOf(r.get("处理方式")).trim());
-            if (okLine) pass += q; else ng += q;
+            pass += numOr(r.get("合格数量"));
+            ng += numOr(r.get("不合格数量"));
         }
         if (pass <= 0 && ng <= 0) return;                          // 品质没填数量:单据走过而已,不产生下游
         // 工单侧数据(单位/单价/批号;保留 dualOutFinishIn 的 inline 取仓口径,后续可抽公共方法)

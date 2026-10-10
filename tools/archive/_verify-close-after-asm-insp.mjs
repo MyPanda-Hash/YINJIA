@@ -38,10 +38,9 @@ const before = await show('审核前')
 const plan = Number(before['排产数量'] || 0)
 const det = (await api('/px/queryFormDataList', { panelCode: 'QC_ASM_INSP_DETAIL', pageNo: 1, pageSize: 50, docNo: no }).catch(() => ({}))).data || {}
 void det
-// 用面板保存接口按单据编号回写:数量判定两行(合格=plan, 不合格=0)
+// 用面板保存接口按单据编号回写(2026-10-15 新口径:明细**不再预铺**,直接填明细列的 合格数量/不合格数量)
 const items = [
-  { 单据编号: no, 行号: 1, 表区: '数量判定', 检验项目: '成品检验', 判定: '合格', 数量: plan },
-  { 单据编号: no, 行号: 2, 表区: '数量判定', 检验项目: '成品检验', 判定: '不合格', 数量: 0 },
+  { 单据编号: no, 行号: 1, 检验项目: '成品检验', 合格数量: plan, 不合格数量: 0 },
 ]
 const sv = alreadyAudited ? { code: 200, message: 'skip(已审核)' }
   : await api('/px/callButton', { panelCode: 'QC_ASM_INSP', buttonName: '保存', buttonParam: {}, formData: { ...head, 单据编号: no, detail: { items } } })
