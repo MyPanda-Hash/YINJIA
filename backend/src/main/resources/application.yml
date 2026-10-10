@@ -10,6 +10,20 @@ server:
 spring:
   application:
     name: yinjia-mes-backend
+  web:
+    resources:
+      # 前端静态资源缓存策略(2026-10-15 用户报「前端还是没有更新」的根治):
+      #   现象:后端确实换了新前端(实测磁盘真源/服务端返回/全新无痕 profile 三方一致,
+      #     PanelxList chunk MD5 相同、三面板左栏配置俱在),但用户在**日常浏览器**里仍是旧界面。
+      #     根因=浏览器缓存:index.html 被连旧哈希 chunk 一起缓存住,页面根本不去请求新 chunk,
+      #     于是"重建 jar / 重启服务"怎么做都没用(请求压根没发出去)。
+      #   口径:全局给带哈希的产物长期缓存;入口文档不许缓存(见 WebCacheConfig 的按路径覆盖)。
+      #   ⚠ immutable 省略:部分代理/杀软对 immutable 处理不一致,且本项目前端体积大、
+      #     真正受益的是 chunk 的长 max-age,immutable 只是省一次条件请求,收益小风险不必要。
+      cache:
+        cachecontrol:
+          max-age: 365d
+          cache-public: true
   servlet:
     multipart:
       # 20MB:附件上传上限(产品信息表·客户图纸或规格书等附件字段);OCR 图片另有 10MB 服务端校验

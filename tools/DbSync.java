@@ -29,8 +29,17 @@ import java.util.regex.Pattern;
  */
 public class DbSync {
     /** SQL Server 提示类消息码(0=PRINT,5701=库上下文,5703/5704=语言,15477=sp_rename 注意事项,
-     *  8153=聚合/SET 操作忽略 NULL 的信息性警告——SQL Server 自己都只发警告不中断,脚本自检把关结果),不算错误 */
-    static final java.util.Set<Integer> INFO_CODES = java.util.Set.of(0, 5701, 5703, 5704, 15477, 8153);
+     *  8153=聚合/SET 操作忽略 NULL 的信息性警告——SQL Server 自己都只发警告不中断,脚本自检把关结果),不算错误。
+     *
+     *  <p>50000 = {@code RAISERROR(..., severity &lt;= 10)} 的消息号。2026-10-15 补:
+     *  若干迁移用「RAISERROR + severity 10」打印自检结果(因为 DbSync 不显示 PRINT —— 见
+     *  migrate-rd-progress-singledoc.sql 头注),而 severity 10 的信息级消息经 JDBC 回报时
+     *  错误码恒为 50000。不列入白名单则**本该成功的迁移会被判 FAIL 且不写 yj_schema_log**,
+     *  表现为"每次同步都在同一条上失败、队列卡死"(实测 migrate-rd-progress-singledoc.sql:
+     *  3 批全生效、config={"singleDoc":true},却零记录)。
+     *  ⚠ 只有 severity ≤10 才映射到 50000;RAISERROR(...,16,..) 仍走 SQLException 真失败路径,
+     *  失败自检不受本白名单影响。 */
+    static final java.util.Set<Integer> INFO_CODES = java.util.Set.of(0, 5701, 5703, 5704, 15477, 8153, 50000);
 
     /**
      * 目标库可用环境变量 YINJIA_SQL_DB 覆盖(默认 HSDZ_MES)。
