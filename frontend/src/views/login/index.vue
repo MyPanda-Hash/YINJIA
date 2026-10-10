@@ -29,7 +29,7 @@
           <span></span>
           MANUFACTURING OPERATIONS
         </p>
-        <h1><strong>{{ tt('轻 MES') }}</strong> {{ tt('让生产现场') }}<br />{{ tt('有序运转') }}</h1>
+        <h1><strong>{{ tt('银嘉数字化平台') }}</strong> {{ tt('让生产现场') }}<br />{{ tt('有序运转') }}</h1>
         <p class="scene-subtitle">{{ tt('生产制造执行系统') }}</p>
       </div>
 
@@ -47,7 +47,7 @@
             <el-icon><DataLine /></el-icon>
           </div>
           <div>
-            <div class="brand-name">{{ tt('轻 MES') }}</div>
+            <div class="brand-name">{{ tt('银嘉数字化平台') }}</div>
             <div class="brand-subtitle">{{ tt('制造协同工作台') }}</div>
           </div>
         </header>

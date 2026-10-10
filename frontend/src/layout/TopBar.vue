@@ -3,7 +3,7 @@
     <!-- ===== 左：汉堡（移动端）+ Logo + 分隔线 + 账套（工厂）切换 ===== -->
     <div class="t-left">
       <el-icon class="hamburger" @click="app.toggleMobileNav()"><Menu /></el-icon>
-      <div class="logo">轻<span>MES</span></div>
+      <div class="logo">银嘉<span>数字化平台</span></div>
       <div class="t-split"></div>
       <el-dropdown @command="onPickFactory">
         <span
@@ -415,11 +415,12 @@ async function changePwd() {
   flex-shrink: 0;
 }
 .logo {
-  font-size: 19px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--t-primary);
   letter-spacing: 0;
   cursor: default;
+  white-space: nowrap;
 }
 .logo span {
   font-weight: 400;
