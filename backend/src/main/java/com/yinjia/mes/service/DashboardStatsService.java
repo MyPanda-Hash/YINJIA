@@ -310,8 +310,14 @@ public class DashboardStatsService {
                 if (slot != null) slot[1] = toInt(r.get("v"));
             }
             stock.put("trend7", toTrend(days, byDay));
-            stock.put("topItems", nameValue("SELECT TOP 8 k.wzdm AS k, SUM(ISNULL(k.yl,0)) AS v FROM kucun k"
-                    + " WHERE ISNULL(k.asp_cancel,'N')<>'Y' GROUP BY k.wzdm ORDER BY SUM(ISNULL(k.yl,0)) DESC"));
+            // 2026-10-10:「现存量 TOP 物料」改绑库存状况表(STOCK_BALANCE / v_stock_balance)。
+            // 旧口径读遗留快照表 kucun(kucun-resync 过程写入,asp_time2 停在 2026-10-08),
+            // 且按 wzdm 物料代码分组 —— 卡片显示的是代码、且数据不随出入库实时变。
+            // v_stock_balance 是实时聚合视图(v_stock_movement + inv_cost_ledger),含 存货编码/存货,
+            // 故按 存货编码+存货 分组(跨仓库合计,同一物料多仓拆行需 SUM),
+            // 名称作标签、编码作 meta 进 title 提示;其 asp_cancel 恒为 'N',过滤无意义故不写。
+            stock.put("topItems", nameValue("SELECT TOP 8 b.存货 AS k, SUM(b.现存量) AS v, b.存货编码 AS m"
+                    + " FROM v_stock_balance b GROUP BY b.存货编码, b.存货 ORDER BY SUM(b.现存量) DESC"));
         } catch (Exception e) {
             stock.put("panels", List.of());
             stock.put("trend7", List.of());
@@ -469,13 +475,20 @@ public class DashboardStatsService {
         }
     }
 
-    /** 通用 [{name,value}] 聚合(k 列为名,v 列为值,已按调用方排序) */
+    /**
+     * 通用 [{name,value}] 聚合(k 列为名,v 列为值,已按调用方排序)。
+     * 可选 m 列作为 meta(SBars 行 title 提示用,如物料编码);缺列不影响其它调用方。
+     */
     private List<Map<String, Object>> nameValue(String sql) {
         try {
             List<Map<String, Object>> rows = jdbc.queryForList(sql);
             List<Map<String, Object>> out = new ArrayList<>();
             for (Map<String, Object> r : rows) {
-                out.add(Map.of("name", String.valueOf(r.get("k")), "value", toInt(r.get("v"))));
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("name", String.valueOf(r.get("k")));
+                item.put("value", toNum(r.get("v")));
+                if (r.containsKey("m") && r.get("m") != null) item.put("meta", String.valueOf(r.get("m")).trim());
+                out.add(item);
             }
             return out;
         } catch (Exception e) {
@@ -556,6 +569,25 @@ public class DashboardStatsService {
         } catch (Exception e) {
             return 0;
         }
+    }
+
+    /**
+     * 数值取整:整数值原样返回 int(保持既有调用方 JSON 不变),
+     * 小数保留 2 位(现存量/数量类字段是 decimal,用 toInt 会截断)。
+     */
+    private static Object toNum(Object v) {
+        double d;
+        if (v instanceof Number n) d = n.doubleValue();
+        else {
+            try {
+                d = Double.parseDouble(String.valueOf(v).trim());
+            } catch (Exception e) {
+                return 0;
+            }
+        }
+        if (Double.isNaN(d) || Double.isInfinite(d)) return 0;
+        if (d == Math.rint(d) && d >= Integer.MIN_VALUE && d <= Integer.MAX_VALUE) return (int) d;
+        return Math.round(d * 100) / 100.0;
     }
 
     private static Map<String, Object> row(Object... kv) {
