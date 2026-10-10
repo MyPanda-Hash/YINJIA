@@ -2778,3 +2778,27 @@ migrate-grant-rd-review-approve.sql
 #   处置(按《采购链四单字段与显示字段》§8):须重跑
 #     node tools/archive/_gen-fourdoc-restore.mjs 刷新 ①回正脚本 ②fourdoc-baseline.tsv,
 #   并在确认这些偏离是「有意改动」后连同迁移脚本单独提交 —— 属另一任务,本次不夹带。
+
+# ── 2026-10-15 销售出库单带出「销售订单号 / 销售订单行号」──
+#   用户口径:「销售出库单是从销售订单生单或者选单过来的,要带有销售订单号和销售订单行号。」
+#   根因(实测 HSDZ_MES):**物理列早就有,是元数据没登记/被隐藏**,不是数据链没带 ——
+#     · bd_sale_out.销售订单号 存在,yj_field 里**完全没登记** ⇒ 界面永不显示(来源单号/来源单据/匹配来源单号同);
+#     · bl_sale_out.源单编号/源单行号 已登记但 hidden=1/visible=0 ⇒ 看不到。
+#   数据现状:表头 4 列 0/54 全空;明细源单编号 11/123、源单行号 15/123 有值,但那批带 XQ-/ZL- 前缀的
+#     是历史导入(SO_ORDER 单号形如 ZXL-20260916-01);form_flow_link 里 SO_ORDER→SALE_OUT 链路数 = 0
+#     ⇒ 该链路尚未真正跑过。**历史单不回填**(用户口径:只做新单)。
+#   对齐基线 = 采购链(已跑通的同款需求):PURCHASE_IN.header.采购订单号 可见;
+#     PURCHASE_IN.detail.源单行号 **label=采购订单行号** 可见 ⇒ 销售侧同构。
+#   ⚠ 明细两列**不新插行**(源单编号/源单行号已存在),只改 label/hidden/visible/seq ——
+#     插新行会造出「同一物理列两条登记」,体检项 07 会报错。
+#   ⚠ seq 取 55/56 而非采购链的 290:SALE_OUT 明细 290/300 已被隐藏列占用,照抄会撞位。
+#   配套代码(同提交):PanelConfigService 的 SO_ORDER|SALE_OUT 头/行同义词
+#     (单据编号→销售订单号、行号→销售订单行号);无后者则生单后两列为空。
+#   幂等(INSERT NOT EXISTS + UPDATE 窄条件 + 末尾自检含物理列仍在);两账套均执行。
+migrate-sale-out-order-cols-20261015.sql
+
+# ── 2026-10-15 「销售订单行号」补齐 9 语言译名 ──
+#   上一条只补了 en(满足 AGENTS.md 下限),本条补齐与「销售订单号」同批语言集
+#   (de/en/es/fr/ja/ko/ru/th/vi),两标签的多语言覆盖对齐。
+#   幂等(逐行 NOT EXISTS + 自检 ≥9);两账套均执行。
+migrate-sale-out-order-line-i18n-20261015.sql
