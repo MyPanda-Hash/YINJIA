@@ -1,13 +1,15 @@
 /**
  * 验证:「我的桌面 → 库存 → 现存量 TOP 物料」卡片已改绑库存状况表。
  *
- * 背景:旧口径读遗留快照表 kucun(过程 kucun-resync 写入,快照时间停在 2026-10-08),
- * 且按 wzdm 物料代码分组 —— 卡片显示的是代码,数据也不随出入库实时变。
+ * 背景:旧口径按 wzdm 物料代码分组读 kucun(结存缓存表,写入者标记 kucun-resync),
+ * 卡片显示的是代码,数据也不随出入库实时变。
  * 新口径读实时聚合视图 v_stock_balance(库存状况表 STOCK_BALANCE 的底表)。
+ * 2026-10-10:卡片改为滚动全量展示,后端取消 TOP 8 截断,故断言由「长度 = 8」改为「未截断」。
  *
  * 断言:
- *   1. /api/dashboard/stats 返回 stock.topItems,长度 = 8
+ *   1. /api/dashboard/stats 返回 stock.topItems,非空且未按 TOP 8 截断
  *   2. 每项 name 是物料名称(不是形如 M-025 的物料代码),meta 是该物料的存货编码
+ *      —— 物料名本身即代码时(如 CL004,name === meta)不算违规,属数据真实值
  *   3. name 与 meta 一一对应,无重复
  *   4. value 降序
  *   5. value 为数值(非字符串),且全为正(现存量 0/负的行不应进 TOP)
@@ -44,13 +46,14 @@ async function main() {
   items.forEach((it) => console.log(`  ${it.name}  ${it.value}  [${it.meta ?? '-'}]`))
   console.log('')
 
-  check('topItems 长度 = 8', items.length === 8, `实际 ${items.length}`)
+  check('topItems 未按 TOP 8 截断', items.length > 8, `实际 ${items.length} 项`)
 
-  const codeNames = items.filter((it) => CODE_LIKE.test(String(it.name)))
+  // 物料名与编码同名时(如 CL004)不判违规:那是数据真实值,不是口径回退成代码
+  const codeNames = items.filter((it) => String(it.name) !== String(it.meta) && CODE_LIKE.test(String(it.name)))
   check(
     'name 是物料名称而非物料代码',
     codeNames.length === 0,
-    codeNames.length ? `仍是代码: ${codeNames.map((c) => c.name).join(', ')}` : '全部为名称'
+    codeNames.length ? `仍是代码: ${codeNames.map((c) => c.name).join(', ')}` : '全部为名称(同名物料已豁免)'
   )
 
   const noMeta = items.filter((it) => !it.meta)
