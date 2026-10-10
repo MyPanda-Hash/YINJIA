@@ -189,9 +189,10 @@ function planOne(row) { openPlan(row, false) }
 async function unassign() {
   const list = checkedToday.value
   if (!list.length) return
-  // 撤销**按工单行**(唯一键 = 工单号 + 工单行号,2026-10-07 用户口径):勾哪一行撤销哪一行,
-  //   同工单其它行不动;该行预排线同时作废
-  const targets = list.map((r) => ({ 加工单号: r['加工单号'], 行id: r['行id'] })).filter((x) => x['加工单号'])
+  // 撤销**按工单行**(标识 = 工单号 + 工单行号,用户口径 2026-10-15「这两个确定当前唯一工单」):
+  //   勾哪一行撤销哪一行,同工单其它行不动;该行预排线同时作废。
+  //   两把键都带上:后端优先 行id,缺了还能按 (加工单号 + 工单行号) 反查(不会误退成整单撤销)
+  const targets = list.map((r) => ({ 加工单号: r['加工单号'], 行id: r['行id'], 工单行号: r['工单行号'] })).filter((x) => x['加工单号'])
   const labels = list.map((r) => `${r['加工单号']}${r['工单行号'] != null ? ' 行' + r['工单行号'] : ''}`)
   try {
     await ElMessageBox.confirm(`${tt('确认撤销选中的')} ${targets.length} ${tt('行排产')}(${tt('撤销后回到待排产池;换线=撤销+重排;该行预排线同时作废')})？\n${labels.join('、')}`,

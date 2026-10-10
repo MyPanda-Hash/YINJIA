@@ -429,7 +429,8 @@ async function onUnsplit() {
       tt('撤回切单'), { confirmButtonText: tt('确认'), cancelButtonText: tt('取消'), type: 'warning' })
   } catch { return }
   try {
-    const res = await request.post('/px/workOrderList/unsplit', { 行id: r.行id, 工单号: r.工单号 })
+    // 两把键都带上(标识 = 工单号 + 工单行号):后端优先 行id,缺了按 (工单号+行号) 反查
+    const res = await request.post('/px/workOrderList/unsplit', { 行id: r.行id, 工单号: r.工单号, 工单行号: r.工单行号 })
     const d = res.data || {}
     ElMessage.success(`${tt('已撤回')} ${d['子工单号']}，${tt('父工单')} ${d['父工单号']} ${tt('还原')} ${num(d['还原数量'])}`)
     load()

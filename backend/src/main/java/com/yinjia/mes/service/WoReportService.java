@@ -94,11 +94,19 @@ public class WoReportService {
      */
     public List<Map<String, Object>> reportRows(String panelCode, String no) {
         if (!posts(panelCode)) return java.util.List.of();
+        // 行定位优先级(用户口径 2026-10-15「工单号+工单行号确定当前唯一工单」):
+        //   ① gd_id(= plang_pc.id)→ plang_pc.plang_id  —— 排产行级精确锚(最准)
+        //   ② (工单号 + scjl.[工单行号])               —— 行标识本身(报工保存时 stampRowNo 落库)
+        //   ③ (工单号 + 批次号)                        —— 老数据兜底
+        //   三级都取不到 ⇒ NULL(不猜行)
         return jdbc.queryForList(
                 "SELECT DISTINCT ISNULL(s.gldh,N'') AS 工单号, ISNULL(pc.plang_id,"
-                        + "   (SELECT TOP 1 p.id FROM dbo.plang p WHERE p.pl_no = s.gldh"
-                        + "      AND ISNULL(p.[批次号],N'') = ISNULL(s.[批次号],N'')"
-                        + "      AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id)) AS 工单行id"
+                        + "   ISNULL((SELECT TOP 1 p.id FROM dbo.plang p WHERE p.pl_no = s.gldh"
+                        + "      AND ISNULL(p.pl_xc,0) = ISNULL(s.[工单行号],0) AND ISNULL(s.[工单行号],0) > 0"
+                        + "      AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id),"
+                        + "     (SELECT TOP 1 p.id FROM dbo.plang p WHERE p.pl_no = s.gldh"
+                        + "        AND ISNULL(p.[批次号],N'') = ISNULL(s.[批次号],N'')"
+                        + "        AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id))) AS 工单行id"
                         + " FROM dbo.scjl s LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
                         + " WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'", no);
     }
