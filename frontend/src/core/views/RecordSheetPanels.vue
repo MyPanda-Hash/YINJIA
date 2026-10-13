@@ -481,6 +481,14 @@
                   <span>{{ tt(dt.bar) }}</span>
                   <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
                   <span v-if="dt.recipeCalc && editable" class="rs-lib-btn" style="color:#409eff;border-color:#a0cfff" @click.stop="openRecipeCalc(dt)">🧮 {{ tt('配方计算') }}</span>
+                  <!-- 手动导入规格书数据(组装BOM表 ← 规格书「1.关键物料列表」):
+                       自动带入之外留的手动入口 —— 未提交审批之前可以反复尝试、规格书后补通过后重试。
+                       按钮文案来自配置(autoFillSpec.manual),只有配了它的表才出现。 -->
+                  <span
+                    v-if="editable && cfg.autoFillSpec?.manual && autoFillTargetDt(cfg.autoFillSpec) === dt"
+                    class="rs-lib-btn"
+                    @click.stop="onSpecImportClick"
+                  >⤓ {{ tt(cfg.autoFillSpec.manual) }}</span>
                   <!-- 规格书变动:单子填完之后规格书又变了 ⇒ 就地表态并可一键按规格书更新 -->
                   <span
                     v-if="specDriftState && editable && cfg.autoFillSpec && autoFillTargetDt(cfg.autoFillSpec) === dt"
@@ -1225,7 +1233,7 @@ import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
-import { specCarryFailure, specDrift } from '@/core/insp/specCarry'
+import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -2391,26 +2399,33 @@ function autoFillTargetDt(afs) {
 
 /**
  * 自动填充规格书 —— 「自动填充规格书」就是这条路径:
- *   选定产品编号 → 取该产品对应**规格书**(RD_SPEC_DOC)的表头 + 「检验要求」表区明细 → 回填。
+ *   选定产品编号 → 取该产品对应**规格书**(RD_SPEC_DOC)的某个表区明细 → 回填。
+ *   两条链共用本函数(差异全部在配置里,见 core/insp/specCarry.js 头注):
+ *     · 出货检验计划表 ← 规格书「检验项目及检验标准」(表区 '检验要求',端点 /px/specByProduct);
+ *     · 组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」(表区 '物料清单',端点 /px/specByProductForAsm)。
  *
- * 【为什么走后端 /px/specByProduct 而不是通用查询】规格书的 编号(=产品键)在通用链路里被
+ * 【为什么走后端端点而不是通用查询】规格书的 编号(=产品键)在通用链路里被
  *   QueryService.loadDocs 用单据编号覆盖掉了(详见该处注释),getFormDescriptor /
  *   queryFormDataList 都取不到真值。该端点另开一条直读 head/detail 的路。
  *
  * 【填充口径】
  *   表头:按 head[] 逐格写(客户项目名称/产品功能类别/产品整体尺寸 ← 规格书等价列);
- *   明细:整表替换 —— 本表的检验项就是规格书的检验项,逐条追加会越填越长;
+ *   明细:整表替换 —— 本表的检验项/BOM 行就是规格书的那些行,逐条追加会越填越长;
  *   兜底:defaults 里的固定值(如不合格应对措施三段式)**只填空格**,不覆盖已录内容。
  *   命中多张规格书时(matched>1)只取最新一张,末尾提示按哪一张填的,不让用户猜。
+ *
+ * 【审批门禁】规格书没填写提交审批完(草稿/审批中/…)时后端一个格都不带回,这里只把
+ *   payload.reason 翻成人话:not_approved ⇒ 按该链自己的措辞提示(afs.notApprovedTip)。
  */
 async function autoFillFromSpec(code, afs) {
   const key = afs?.fromKey
   const val = String(code ?? '').trim()
   if (!key || !val || !props.editable) return
   const dt = autoFillTargetDt(afs)
+  const req = specCarryRequest(val, afs)
   let payload = null
   try {
-    const res = await request.get('/px/specByProduct', { params: { code: val } })
+    const res = await request.get(req.url, { params: req.params })
     // request.js 的响应拦截器已 (res) => res.data ⇒ 这里拿到的是 ApiResult {code,message,data}
     payload = res?.data ?? res ?? null
   } catch (e) {
@@ -2421,7 +2436,7 @@ async function autoFillFromSpec(code, afs) {
     // 门禁口径见 core/insp/specCarry.js:规格书必须填写并提交审批完,否则一个格都不带入
     const fail = specCarryFailure(payload)
     if (fail && fail.kind === 'not_approved') {
-      ElMessage.warning(tt('该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批')
+      ElMessage.warning(tt(specNotApprovedTip(afs))
         .replace('{no}', fail.specNo || '')
         .replace('{st}', fail.status || tt('未知')))
       return
@@ -2479,6 +2494,24 @@ async function autoFillFromSpec(code, afs) {
   specDriftState.value = null
 }
 
+/**
+ * 手动导入规格书数据(组装BOM表)。
+ * 用户口径(2026-10-13):「在还没有提交审批之前都是可以尝试导入规格书数据的」——
+ * 所以除了「选完产品编号自动带入」,这张表还留一个可以反复点的手动入口:
+ * 规格书后补审批通过之后、或第一次没填产品编号时,重试不用重开单据。
+ * 入口只在配了 autoFillSpec.manual(按钮文案)的表上渲染,与自动路径走同一个 autoFillFromSpec。
+ */
+function onSpecImportClick() {
+  const afs = cfg.value?.autoFillSpec
+  if (!afs || !props.editable) return
+  const code = String(props.head?.[afs.fromKey] ?? '').trim()
+  if (!code) {
+    ElMessage.warning(tt('请先选择产品编号，再导入规格书数据'))
+    return
+  }
+  autoFillFromSpec(code, afs)
+}
+
 /* ── 规格书变动提示(2026-09-21 用户口径:「规格书变动就提示当前出货检验」)──────────────
    单子填完之后规格书又变了(同张改了内容 / 出了新版本),打开这张出货检验计划表时要看得见
    "与规格书不一致",并能一键按规格书更新。判据 = core/insp/specCarry.specDrift(只比内容不比单号)。 */
@@ -2489,12 +2522,14 @@ let specDriftCheckedHead = null    // 记表头对象:对象换了=重新载入�
 /** 按当前明细 + 规格书算差异(取规格书走与自动填充同一个受门禁保护的口径) */
 async function checkSpecDrift() {
   const afs = cfg.value?.autoFillSpec
-  if (!afs || !props.editable) return
+  // 该链不参与变动比对时直接跳过:组装BOM表的明细是物料行,比的是检验项目的 要求/方法 —— 比了只会误报
+  if (!afs || !props.editable || !specDriftEnabled(afs)) return
   const dt = autoFillTargetDt(afs)
   const code = String(props.head?.[afs.fromKey] ?? '').trim()
   if (!dt || !code) { specDriftState.value = null; return }
   try {
-    const res = await request.get('/px/specByProduct', { params: { code } })
+    const req = specCarryRequest(code, afs)
+    const res = await request.get(req.url, { params: req.params })
     const payload = res?.data ?? res ?? null
     if (!payload || !payload.found) { specDriftState.value = null; return }
     const specRows = (Array.isArray(payload.items) ? payload.items : []).map((r) => ({

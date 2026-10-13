@@ -323,11 +323,36 @@ public class PxController {
      *
      * 取数整体在 DevTaskService.specByProduct(code)(含 ProductCode→单号解析与审批门禁),
      * 这里只保留端点契约:校验 RD_INSP_PLAN 查看权 + 原样返回。
+     *
+     * <p>{@code sheetArea} 是**可选**的新参数(2026-10-13):不传 = 出货检验计划表原口径
+     * (规格书「检验要求」表区),传了才换表区。本端点的权限、返回结构、缺省取数均不变。
      */
     @GetMapping("/specByProduct")
-    public ApiResult<Map<String, Object>> specByProduct(@RequestParam String code) {
+    public ApiResult<Map<String, Object>> specByProduct(@RequestParam String code,
+                                                       @RequestParam(required = false) String sheetArea) {
         perm.requirePanelView("RD_INSP_PLAN");
-        return ApiResult.ok(devTaskService.specByProduct(code));
+        return ApiResult.ok(devTaskService.specByProduct(code, sheetArea));
+    }
+
+    /**
+     * 「自动填充规格书」数据源 · 组装工艺清单版:按产品编号取规格书「1.关键物料列表」的物料行。
+     *
+     * <p>【为什么另开一个端点而不是复用上面那个】取数逻辑**完全共用**(同一个
+     * DevTaskService.specByProduct(code, sheetArea)),差别只在**权限**:这张表长在组装工艺清单
+     * (RD_ASM_PROC)的「组装BOM表」页上,能看这张表的人未必有出货检验计划表(RD_INSP_PLAN)的查看权;
+     * 复用就得以别人的面板权限放行,反之也会把 RD_ASM_PROC 的查看者挡在门外。
+     * 审批门禁在服务层(未审批 ⇒ reason=not_approved,一个格都不带回)。
+     *
+     * <p>{@code sheetArea} 缺省 = '物料清单'(本端点的语义就是取关键物料列表);
+     * 显式传别的表区也允许,便于以后再加别的落点。
+     */
+    @GetMapping("/specByProductForAsm")
+    public ApiResult<Map<String, Object>> specByProductForAsm(@RequestParam String code,
+                                                             @RequestParam(required = false) String sheetArea) {
+        perm.requirePanelView("RD_ASM_PROC");
+        String area = sheetArea == null || sheetArea.isBlank()
+                ? DevTaskService.SPEC_SHEET_AREA_MATERIAL : sheetArea;
+        return ApiResult.ok(devTaskService.specByProduct(code, area));
     }
 
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。

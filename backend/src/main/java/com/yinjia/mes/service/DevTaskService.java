@@ -645,9 +645,33 @@ public class DevTaskService {
      *
      * <p>明细只取 [表区]='检验要求' 的行 —— 与 ButtonService.specTestRowsSnapshot 同款口径,
      * 那是规格书「检验项目及检验标准」页的行;其余表区(修订记录/物料清单…)不参与出货检验。
+     *
+     * <p>【表区参数(2026-10-13)】组装工艺清单(RD_ASM_PROC)的「组装BOM表」要从同一张规格书取
+     * 「1.关键物料列表」的行 —— 那条链与此处**共用**产品编号解析与审批门禁,只差表区。
+     * 故表区改成 {@link #specByProduct(String, String)} 的参数,本单参重载 = 传 null =
+     * 出厂口径 '检验要求' ⇒ 出货检验计划表那条链的取数与返回结构一字不变。
      */
     public Map<String, Object> specByProduct(String productCode) {
+        return specByProduct(productCode, null);
+    }
+
+    /** 规格书「检验项目及检验标准」页的表区值(出货检验计划表 ← 它的检验项目) */
+    public static final String SPEC_SHEET_AREA_INSPECT = "检验要求";
+
+    /** 规格书「1.关键物料列表」的表区值(组装工艺清单「组装BOM表」← 它的物料行) */
+    public static final String SPEC_SHEET_AREA_MATERIAL = "物料清单";
+
+    /**
+     * {@link #specByProduct(String)} 的表区参数化版本。
+     *
+     * @param sheetArea 规格书明细的 [表区];为空 ⇒ {@link #SPEC_SHEET_AREA_INSPECT}(原口径)。
+     *                  目前两种落点:检验要求(序号/检验项目/检验要求/检验方法/检验依据)、
+     *                  物料清单(序号/物料编码/物料名称/规格参数/数量/备注)。
+     *                  两处都用**参数化** [表区] = ?,不拼串。
+     */
+    public Map<String, Object> specByProduct(String productCode, String sheetArea) {
         String code = productCode == null ? "" : productCode.trim();
+        String area = sheetArea == null || sheetArea.isBlank() ? SPEC_SHEET_AREA_INSPECT : sheetArea.trim();
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("found", false);
@@ -694,12 +718,27 @@ public class DevTaskService {
             Object v = h.get(k);
             out.put(k, v == null ? "" : String.valueOf(v));
         }
-        out.put("items", jdbc.queryForList(
+        out.put("items", specDetailRows(no, area));
+        return out;
+    }
+
+    /**
+     * 规格书明细行(按表区出列):检验要求页 ← 检验项目五列;物料清单页 ← 物料六列。
+     * 其余表区按检验要求的列形返回(空集)—— 不猜、不硬编第三套列。
+     */
+    private List<Map<String, Object>> specDetailRows(String no, String area) {
+        if (SPEC_SHEET_AREA_MATERIAL.equals(area)) {
+            return jdbc.queryForList(
+                    "SELECT ISNULL(序号, N'') AS 序号, ISNULL(物料编码, N'') AS 物料编码,"
+                            + " ISNULL(物料名称, N'') AS 物料名称, ISNULL(规格参数, N'') AS 规格参数,"
+                            + " ISNULL(数量, N'') AS 数量, ISNULL(备注, N'') AS 备注"
+                            + " FROM rd_spec_doc_detail WHERE 单据编号 = ? AND 表区 = ? ORDER BY id", no, area);
+        }
+        return jdbc.queryForList(
                 "SELECT ISNULL(序号, N'') AS 序号, ISNULL(检验项目, N'') AS 检验项目,"
                         + " ISNULL(检验要求, N'') AS 检验要求, ISNULL(检验方法, N'') AS 检验方法,"
                         + " ISNULL(检验依据, N'') AS 检验依据"
-                        + " FROM rd_spec_doc_detail WHERE 单据编号 = ? AND 表区 = N'检验要求' ORDER BY id", no));
-        return out;
+                        + " FROM rd_spec_doc_detail WHERE 单据编号 = ? AND 表区 = ? ORDER BY id", no, area);
     }
 
     /** 规格书可用状态:填写并提交审批完(审批通过 ⇒ 已归档/已审核)。草稿/审批中/修改中/已作废一律不可用 */

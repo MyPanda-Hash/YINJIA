@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { specCarryFailure, specDrift } from './specCarry.js'
+import {
+  specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled,
+  DEFAULT_NOT_APPROVED_TIP,
+} from './specCarry.js'
 
 /**
  * 「自动填充规格书」的失败口径(2026-09-21 用户口径):
@@ -92,4 +95,45 @@ test('规格书一行都没有(或本单空)⇒ 不报变动(交给"没有可带
   assert.equal(specDrift([], plan(SPEC)).drifted, false)
   assert.equal(specDrift(SPEC, []).drifted, false)
   assert.equal(specDrift(null, null).drifted, false)
+})
+
+/* ── 跨面板复用(2026-10-13):组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」──────
+   用户口径:「组装工艺清单的 BOM 表也是可以导入对应规格书的 1.关键物料列表,这个是需要规格书
+   已经填写完并且通过审批才会导入对应的规格书的数据,否则就只是导入那些平常的数据,如果规格书
+   没有通过审批归档导致数据不能导入时,可以弹窗提示…在还没有提交审批之前都是可以尝试导入。」
+   ⇒ 两条链共用同一套取数 + 审批门禁,只差三处:
+     ① 取规格书哪个**表区**(出货检验='检验要求' / 组装BOM='物料清单');
+     ② 打哪个**端点**(权限按承载面板校验:RD_INSP_PLAN / RD_ASM_PROC);
+     ③ 未审批时的**提示文案**(出货检验那条已验收通过,措辞不许改)。
+   本组断言钉住:不配这三项的旧链**一个字节都不变**。 */
+const INSP_AFS = { fromKey: '产品编号' }
+const ASM_AFS = {
+  fromKey: '产品编号',
+  endpoint: '/px/specByProductForAsm',
+  specSheetArea: '物料清单',
+  notApprovedTip: '规格书未进行填写，请规格书通过审批之后再试，或者自行填写',
+  specDrift: false,
+}
+
+test('表区/端点:没配置就沿用出货检验计划表那条链(端点不变、不带 sheetArea)', () => {
+  assert.deepEqual(specCarryRequest('P-1', INSP_AFS), { url: '/px/specByProduct', params: { code: 'P-1' } })
+  assert.deepEqual(specCarryRequest(' P-1 ', undefined), { url: '/px/specByProduct', params: { code: 'P-1' } })
+})
+
+test('组装BOM表:走 ASM 端点(权限按 RD_ASM_PROC)并显式带上表区', () => {
+  assert.deepEqual(
+    specCarryRequest('P-1', ASM_AFS),
+    { url: '/px/specByProductForAsm', params: { code: 'P-1', sheetArea: '物料清单' } },
+  )
+})
+
+test('未审批提示:出货检验计划表沿用已验收文案,组装BOM表用用户原话', () => {
+  assert.equal(specNotApprovedTip(INSP_AFS), DEFAULT_NOT_APPROVED_TIP)
+  assert.equal(specNotApprovedTip(ASM_AFS), '规格书未进行填写，请规格书通过审批之后再试，或者自行填写')
+})
+
+test('规格书变动提示:出货检验计划表照旧,组装BOM表不参与(比的是检验项目,那边比了只会误报)', () => {
+  assert.equal(specDriftEnabled(INSP_AFS), true)
+  assert.equal(specDriftEnabled(undefined), true)
+  assert.equal(specDriftEnabled(ASM_AFS), false)
 })

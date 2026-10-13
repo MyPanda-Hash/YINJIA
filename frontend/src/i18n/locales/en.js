@@ -2784,6 +2784,10 @@ export default {
     '自动填充规格书': 'Auto-fill from Specification',
     '该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批': 'Specification {no} of this product has not been filled in and submitted for approval yet (current: {st}), so nothing can be carried over — complete it and finish the approval first',
     '该产品编号还没有对应的规格书，请先分发规格书后再来引用': 'No specification is linked to this product code yet — assign (distribute) the specification first',
+    // 组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」(用户原话,2026-10-13;出货检验那条文案不动)
+    '规格书未进行填写，请规格书通过审批之后再试，或者自行填写': 'The specification has not been filled in — please wait until it passes approval and try again, or fill in the data manually',
+    '从规格书导入': 'Import from Specification',
+    '请先选择产品编号，再导入规格书数据': 'Select the product code first, then import the specification data',
     '已按规格书 {no} 自动填充': 'Auto-filled from specification {no}',
     '规格书已变动': 'The specification has changed',
     '规格书新增': 'added:',

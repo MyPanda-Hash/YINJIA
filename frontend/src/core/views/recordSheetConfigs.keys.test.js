@@ -537,3 +537,37 @@ test('variants[变体].cols 的 key 必须是该面板当前的 label', () => {
   }
   assert.deepEqual(problems, [], `变体列集的数据键与 yj_field.label 不一致(该列取值空白且保存丢值):\n  ${problems.join('\n  ')}`)
 })
+
+/**
+ * 组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」(2026-10-13 用户口径)。
+ *
+ * 【为什么断言要写在这里】这条链是**跨面板**取值:落点写错(写成 RD_SPEC_DOC 的列名或写错
+ *   label)不会报错,只会静默填空白 —— 与 RD_INSP_PLAN 那条链同一个坑(见上面 ⑥/⑦)。
+ *   另钉两条会静默跑偏的配置事实:
+ *     · specSheetArea 决定取规格书哪个表区,写错就取回检验项目行(整张 BOM 表被灌成检验项);
+ *     · endpoint 必须走 ASM 专端点(RD_ASM_PROC 查看权),否则用出货检验计划的端点会被 403。
+ */
+test('组装工艺清单:组装BOM表的规格书导入映射到 BOM 表真实列', () => {
+  const cfg = recordSheetConfigs.RD_ASM_PROC
+  assert.ok(cfg, 'RD_ASM_PROC 配置缺失')
+  const afs = cfg.autoFillSpec
+  assert.ok(afs, '组装BOM表需要 autoFillSpec(导入规格书 1.关键物料列表)')
+  assert.equal(afs.fromKey, '产品编号', '触发键 = 组装工艺清单的 产品编号(参照字段)')
+  assert.equal(afs.specSheetArea, '物料清单', '规格书「1.关键物料列表」的表区值就是 物料清单')
+  assert.ok(afs.endpoint && afs.endpoint !== '/px/specByProduct',
+    '权限按 RD_ASM_PROC 校验 ⇒ 必须走 ASM 专端点(用出货检验计划表的端点会被 403)')
+
+  const bom = (cfg.dataTables || []).find((dt) => dt.filterVal === '物料清单')
+  assert.ok(bom, '找不到组装BOM表(dataTables 里 filterVal=物料清单 那一张)')
+  assert.ok(afs.detail?.length, 'autoFillSpec.detail 为空 ⇒ 明细不会回填')
+  const fx = FIXTURE.RD_ASM_PROC
+  const specFx = FIXTURE.RD_SPEC_DOC
+  const bomKeys = new Set((bom.cols || []).map((c) => c.key))
+  for (const m of afs.detail) {
+    assert.ok(bomKeys.has(m.to), `明细落点 '${m.to}' 不在组装BOM表的列里(填了也看不见)`)
+    assert.ok(fx.labels.includes(m.to), `明细落点 '${m.to}' 不是本面板字段`)
+    assert.ok(specFx.labels.includes(m.from), `取数源 '${m.from}' 不是规格书字段(那边改 label 这里就填空白)`)
+  }
+  assert.deepEqual(afs.detail.map((m) => m.to).sort(), ['物料名', '物料规格', '物料编号', '用量'].sort(),
+    '四条映射:物料编号←物料编码 / 物料名←物料名称 / 物料规格←规格参数 / 用量←数量')
+})
