@@ -1868,6 +1868,7 @@ import ProdDocListSheet from './ProdDocListSheet.vue'
 import DataRecordSheet from './DataRecordSheet.vue'
 import RecordSheetPanels from './RecordSheetPanels.vue'
 import { recordSheetConfigs } from './recordSheetConfigs'
+import { missingKeyFromMessage } from './recordSheetFocus'
 import QcInspReqSheet from './QcInspReqSheet.vue'
 import { isQcInspReqPanel } from './qcInspReqConfig'
 import { approvalSheetCfg, planSheetCfg, qcSheetCfgs } from './docSheetConfigs'
@@ -5587,6 +5588,20 @@ function emptyFieldValue(value) {
   return value === undefined || value === null || String(value).trim() === ''
 }
 
+/**
+ * 校验失败时「跳到缺失字段所在页签 + 高亮该格」(用户报障 2026-10-13:规格书在第 4 页点保存、
+ * 提示「名称不能为空」,而字段在第 1 页,用户不知道该回哪一页填)。
+ *
+ * 只有文书面板(RecordSheetPanels)暴露了 focusField;基础资料/普通表格面板没有,
+ * 故**全部可选链 + try**:拿不到就静默跳过 —— 定位纯属锦上添花,绝不能改变校验结果、
+ * 提示文案或保存流程。
+ * @param {string} key 字段数据键(中文 dataName = 模板里 head[key] 的那个 key)
+ */
+function focusMissingField(key) {
+  if (!key) return
+  try { approvalSheetRef.value?.focusField?.(key) } catch { /* 定位失败不影响校验 */ }
+}
+
 function validateInlineDraft() {
   for (const field of headerFields.value) {
     const key = headerFieldKey(field)
@@ -5597,12 +5612,18 @@ function validateInlineDraft() {
         continue
       }
       if (key === '单据编号' || key === '规格书种类') continue
+      // 先跳到该字段所在页签并高亮,再返回提示(用户才看得到要填哪里)
+      focusMissingField(key)
       return `${headerFieldLabel(field)}不能为空`
     }
   }
   for (const tab of cfgCache.value?.detail?.tabs || []) {
     const rows = cur.value.detail?.[tab.key] || []
-    if (tab.isRequired && !rows.length) return `请至少添加一行${tab.label || '明细'}`
+    if (tab.isRequired && !rows.length) {
+      // 整张明细页签为空:按**页签键**跳(配置里查得到就翻过去,查不到静默跳过,不硬编页码)
+      focusMissingField(tab.key)
+      return `请至少添加一行${tab.label || '明细'}`
+    }
     // 2026-10-05 修复(用户报障「明细第 2 行工序控制不能为空」,而第 2 行根本没录入数据):
     //   编辑器会给明细**预置空白行**,原实现逐行逐格校必填 ⇒ 空白行被判缺必填、拦在保存上。
     //   口径:**空行视为"未录入"**,不参与必填校验;若整张明细全是空行,按"请至少添加一行"处理。
@@ -5624,11 +5645,15 @@ function validateInlineDraft() {
       nonEmpty++
       for (const field of tab.fields || []) {
         if (field.isRequired && emptyFieldValue(row[field.dataName])) {
+          focusMissingField(field.dataName)
           return `${tab.label || '明细'}第 ${index + 1} 行${field.dataName}不能为空`
         }
       }
     }
-    if (tab.isRequired && nonEmpty === 0) return `请至少添加一行${tab.label || '明细'}`
+    if (tab.isRequired && nonEmpty === 0) {
+      focusMissingField(tab.key)
+      return `请至少添加一行${tab.label || '明细'}`
+    }
   }
   return ''
 }
@@ -5642,11 +5667,9 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
   const validation = skipValidation ? '' : validateInlineDraft()
   if (validation) {
     ElMessage.warning(validation)
-    // 文书面板(RecordSheetPanels/DocSheet/DataRecordSheet):自动定位缺失字段(翻页/滚动/闪烁);仅必填触发
-    if (approvalSheetRef.value?.focusField) {
-      const label = validation.replace(/第\s*\d+\s*行/g, '').match(/^(.+?)不能为空/)?.[1] || ''
-      approvalSheetRef.value.focusField(String(label).trim())
-    }
+    // 定位(翻页/滚动/高亮)已改为在 validateInlineDraft 的**每个失败点**就地调用
+    // focusMissingField(精确的数据键,含明细行字段)。此处不再从提示文案反推字段名:
+    // 反推出来的常是「明细工序控制」这类不存在的键,还会把已生效的高亮覆盖掉。
     return false
   }
   for (const tab of cfgCache.value?.detail?.tabs || []) {
@@ -5691,7 +5714,11 @@ async function saveInlineDraft(buttonName = '保存', { silent = false, skipVali
     clearFreshDraft(documentNo)
     return true
   } catch (error) {
-    ElMessage.error(engine.errMsg(error) || '保存失败')
+    const msg = engine.errMsg(error) || '保存失败'
+    // 后端拒绝也要跳(ButtonService「X不能为空」/「X、Y不能为空」/「明细第 N 行X不能为空」):
+    // 用户可能根本没走到前端校验(页面刚载入就点保存、或字段由服务端二次判定)
+    focusMissingField(missingKeyFromMessage(msg))
+    ElMessage.error(msg)
     return false
   } finally {
     inlineSaving.value = false
@@ -7067,6 +7094,8 @@ async function onButton(action) {
     if (actionIndex >= 0) curIdx.value = actionIndex
   } catch (e) {
     const msg = engine.errMsg(e) || '按钮执行失败'
+    // 按钮(保存/提交)被服务端必填拦下时,同样翻到缺失字段所在页并高亮
+    focusMissingField(missingKeyFromMessage(msg))
     if (msg.includes('演示环境暂未实现')) ElMessage.info(msg)
     else ElMessage.error(msg)
   }

@@ -6,7 +6,7 @@
        报告头/条件区/数据表竖线全页对齐;数据键=字段 label(中文)
        特例块:碱性原水水质条 / 浸泡安全(浸泡液用量+仪器检出限) / 矿化(4 指标块+散点图)
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="record-sheet rsp-sheet">
+  <div ref="rootEl" class="record-sheet rsp-sheet">
     <!-- ═══ 页签(规格书多页结构:封面/修订与范围/检验要求/关键物料/包装运输) ═══ -->
     <div v-if="pageList.length" class="rsp-pages">
       <div
@@ -47,7 +47,7 @@
                    :style="{ top: (COVER_COMPANY_TOP * coverVy) + 'px', height: (COVER_COMPANY_H * coverVy) + 'px' }">
                 <span class="rsp-cover-docno-lb">{{ tt('编号：') }}</span>
                 <el-input v-if="editable" v-model="head[coverDocNoKey]" size="small" class="rsp-cover-docno-in"
-                          :maxlength="60" @input="emit('dirty')" />
+                          :class="{ 'rs-focus': isFocus(coverDocNoKey) }" :maxlength="60" @input="emit('dirty')" />
                 <span v-else class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '' }}</span>
               </div>
               <div class="rsp-cover-title"
@@ -64,9 +64,9 @@
                   <table class="rsp-cover-fields">
                     <tbody>
                       <tr v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi">
-                        <td class="rsp-cover-lb">{{ tt(fd.label) }}</td>
+                        <td class="rsp-cover-lb" :class="{ 'rs-focus': isFocus(fd.key) }">{{ tt(fd.label) }}</td>
                         <td class="rsp-cover-vl">
-                          <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :maxlength="fd.max || 200" @input="emit('dirty')" />
+                          <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :class="{ 'rs-focus': isFocus(fd.key) }" :maxlength="fd.max || 200" @input="emit('dirty')" />
                           <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
                         </td>
                       </tr>
@@ -190,6 +190,12 @@
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
           <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
             <span>{{ tt(sec.bar) }}</span>
+            <!-- 从物料清单引用:本节后面紧跟的表要它时挂在本节标题行上(2026-09-20;
+                 2026-10-13 恢复,数据源由已下架的 BOM 面板改为 WLBOM 物料清单)
+                 —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
+                    按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
+            <span v-if="materialPickAt(sec) && editable" class="rs-lib-btn"
+                  style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(materialPickAt(sec))">📦 {{ tt('从物料清单引用') }}</span>
             <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
@@ -199,7 +205,7 @@
         <template v-if="sec.doc">
           <tr v-for="(row, ri) in sec.rows" :key="'dl' + ri">
             <td :colspan="secCols(sec).length" class="rsp-doccell">
-              <div class="rsp-docrow">
+              <div class="rsp-docrow" :class="{ 'rs-focus': isFocus(row.key) }">
                 <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
                 <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
                 <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
@@ -213,14 +219,14 @@
         <template v-for="(row, ri) in sec.rows" v-if="!sec.doc" :key="'pr' + ri">
           <tr v-if="row.pairs">
             <template v-for="(pair, pi) in row.pairs" :key="'p' + pi">
-              <td class="rs-td rs-label" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
+              <td class="rs-td rs-label" :class="{ 'rs-focus': isPairFocus(pair) }" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
               <template v-if="pair.cells">
-                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
+                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
                   <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
                 </td>
               </template>
-              <td v-else class="rs-td" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
+              <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
                 <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(pair.key)">
                   <span class="rs-ref-text">{{ head[pair.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
@@ -263,7 +269,7 @@
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(effColLabel(c.label, c.label)) }}</td>
-              <td v-else class="rs-td" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
+              <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
                   <span class="rs-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === c.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
@@ -661,6 +667,12 @@
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
           <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
             <span>{{ tt(sec.bar) }}</span>
+            <!-- 从物料清单引用:本节后面紧跟的表要它时挂在本节标题行上(2026-09-20;
+                 2026-10-13 恢复,数据源由已下架的 BOM 面板改为 WLBOM 物料清单)
+                 —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
+                    按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
+            <span v-if="materialPickAt(sec) && editable" class="rs-lib-btn"
+                  style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(materialPickAt(sec))">📦 {{ tt('从物料清单引用') }}</span>
             <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
@@ -670,7 +682,7 @@
         <template v-if="sec.doc">
           <tr v-for="(row, ri) in sec.rows" :key="'dl' + ri">
             <td :colspan="secCols(sec).length" class="rsp-doccell">
-              <div class="rsp-docrow">
+              <div class="rsp-docrow" :class="{ 'rs-focus': isFocus(row.key) }">
                 <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
                 <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
                 <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
@@ -684,14 +696,14 @@
         <template v-for="(row, ri) in sec.rows" v-if="!sec.doc" :key="'pr' + ri">
           <tr v-if="row.pairs">
             <template v-for="(pair, pi) in row.pairs" :key="'p' + pi">
-              <td class="rs-td rs-label" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
+              <td class="rs-td rs-label" :class="{ 'rs-focus': isPairFocus(pair) }" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
               <template v-if="pair.cells">
-                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
+                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
                   <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
                 </td>
               </template>
-              <td v-else class="rs-td" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
+              <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
                 <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(pair.key)">
                   <span class="rs-ref-text">{{ head[pair.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
@@ -734,7 +746,7 @@
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(effColLabel(c.label, c.label)) }}</td>
-              <td v-else class="rs-td" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
+              <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
                   <span class="rs-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === c.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
@@ -888,7 +900,7 @@
       <tbody>
         <tr v-for="(row, ri) in sec.rows" :key="'tdr' + ri">
           <td :colspan="secCols(sec).length" class="rsp-doccell">
-            <div class="rsp-docrow">
+            <div class="rsp-docrow" :class="{ 'rs-focus': isFocus(row.key) }">
               <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
               <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
               <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
@@ -905,8 +917,8 @@
       <tbody>
         <tr><td :colspan="nCols" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
         <tr v-for="(row, ri) in sec.rows" :key="'tr' + ri">
-          <td class="rs-td rs-label">{{ tt(row.label) }}</td>
-          <td class="rs-td" :colspan="nCols - 1">
+          <td class="rs-td rs-label" :class="{ 'rs-focus': isFocus(row.key) }">{{ tt(row.label) }}</td>
+          <td class="rs-td" :class="{ 'rs-focus': isFocus(row.key) }" :colspan="nCols - 1">
             <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
             <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head[row.key] || '' }}</span>
@@ -1126,6 +1138,30 @@
       </template>
     </el-dialog>
 
+    <!-- ═══ 从物料清单引用:列出物料清单(WLBOM)的子件行,勾选后批量带进本表明细 ═══
+         2026-10-13 恢复(原实现 2026-09-20 随 MES 自建 BOM 面板族整体下架而删);
+         新版**不再分导入范围**,直接列子件行让人勾,简单为主。行数据取 detail.items。 -->
+    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用')" width="820px" append-to-body>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
+        <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索子件代码/名称')" clearable style="width:260px" @input="filterMatPick" />
+        <span style="color:#909399;font-size:12px">{{ tt('数据源：物料清单') }}</span>
+      </div>
+      <el-table :data="matPickFiltered" size="small" border max-height="420" row-key="__k"
+                @selection-change="(sel) => (matPickChecked = sel)">
+        <el-table-column type="selection" width="42" />
+        <el-table-column prop="子件代码" :label="tt('子件代码')" width="120" />
+        <el-table-column prop="子件名称" :label="tt('子件名称')" min-width="170" show-overflow-tooltip />
+        <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="子件单位" :label="tt('子件单位')" width="90" align="center" />
+        <el-table-column prop="标准用量" :label="tt('标准用量')" width="90" align="right" />
+      </el-table>
+      <div style="color:#909399;font-size:12px;margin-top:6px">{{ matPickHint }}</div>
+      <template #footer>
+        <el-button @click="matPickVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="confirmMaterialPick">{{ tt('导入') }}({{ matPickChecked.length }})</el-button>
+      </template>
+    </el-dialog>
+
     <!-- ═══ 章节标准库(yj_std_lib,lib=spec.section) ═══ -->
     <el-dialog v-model="secLibVisible" :title="tt('章节标准库') + ' · ' + tt(secLibLabel)" width="760px" append-to-body>
       <StdLibManager ref="secLibRef" :lib="secLibLib" :item="secLibItem" :add-item="secLibItem" pickable :show-add="false" @pick="applySectionLib" />
@@ -1185,6 +1221,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
+import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
@@ -1532,6 +1569,20 @@ function isAtOrBeforeTableAnchor(sec) {
   return samePage.indexOf(sec) <= lastAnchor
 }
 
+/**
+ * 本节标题行要挂「从物料清单引用」按钮吗(2026-09-20;2026-10-13 随 WLBOM 数据源恢复)。
+ * 判据:本节的 bar 是某张 dataTable 的 tablesAfterBar 锚点,且那张表声明了 materialPick
+ * 且**它自己没有 bar 行** —— 有 bar 的按钮已经渲染在表格的 bar 行上,别挂两处。
+ * 为什么需要:规格书第 4 页「1.关键物料列表」的表故意没有 bar(标题由本节出,加了会重复标题),
+ * 原先按钮只认 dt.bar ⇒ 那张表上配了 materialPick 也永远渲染不出来(用户报「加上这个功能」即此)。
+ */
+function materialPickAt(sec) {
+  const c = cfg.value || {}
+  if (!sec || !sec.bar) return null
+  return (c.dataTables || []).find((d) =>
+    d.materialPick && !d.bar && d.tablesAfterBar === sec.bar && pageOf(d) === pageOf(sec)) || null
+}
+
 watch(() => props.panelCode, () => { activePage.value = 0 })
 
 // ── 表尾静态表(cfg.tailTables)与只读台账页(pages[i].ledger) ──
@@ -1633,51 +1684,84 @@ function isLockedCell(dt, row, c) {
   return props.editable && rowLocked(dt, row) && !(dt.lockCols && !dt.lockCols.includes(c.key))
 }
 
-// ── 校验定位(供 PanelxList 保存校验调用):翻到字段所在页 + 滚动 + 闪烁 ──
-/** 找到 label 所在页签(封面字段=0;sections/tailSections 按 page 归属;找不到返回 null) */
-function pageOfLabel(label) {
-  const c = cfg.value || {}
-  if ((c.cover?.fields || []).some((f) => f.label === label)) return 0
-  for (const sec of [...(c.sections || []), ...(c.tailSections || [])]) {
-    const hit = (sec.rows || []).some((row) =>
-      (row.pairs || []).some((p) => p.label === label)
-      || row.label === label
-      || (row.grid || []).some((g) => g.label === label))
-    if (hit) return pageOf(sec)
-  }
-  // 数据表列头/格式区条(多页签面板的页 2 表格列,如成型配方「实际添加比例」)
-  for (const dt of c.dataTables || []) {
-    const hit = (dt.cols || []).some((col) => col.label === label)
-      || (dt.subHeads || []).some((sh) => sh.label === label)
-      || dt.bar === label
-    if (hit) return pageOf(dt)
-  }
-  return null
+// ── 校验定位(供 PanelxList 保存校验调用):翻到字段所在页 + 滚动 + 高亮 ──
+/**
+ * 校验失败时被点名的**字段数据键**(= yj_field.label,中文);模板据此给该格打 rs-focus。
+ * 空串 = 无高亮。注意是**键**不是纸面文案:同名字段两者可能不同(版  本 / 物料名),
+ * 用文案去比模板里的 key 会全落空 —— 这正是 2026-10-13 这次改造的核心。
+ */
+const focusKey = ref('')
+/** 定位查询只在本组件内做(document 里可能同时存在别的文书面板实例,查全局会闪错格子) */
+const rootEl = ref(null)
+/**
+ * 高亮自动熄灭的定时器(模块级:重复调用先 clear,避免多次校验叠出一堆定时器)。
+ * clearFocusOf 记住"上一次那处高亮属于哪个实例"—— 同一页面可能同时挂着两个文书面板
+ * (PanelxList 的主表单 + 单据选择栏),被新一次定位抢占时要把上一处的高亮清掉,
+ * 否则上个实例的 focusKey 会永久留着(它的定时器已被 clear)。
+ */
+let focusTimer = null
+let clearFocusOf = null
+/** 该数据键此刻是否是高亮目标(模板绑定用) */
+function isFocus(key) { return !!key && focusKey.value === String(key) }
+/** 键值对行的标签格:整对里任意一格(key 或 cells 的某一格)命中即高亮标签 */
+function isPairFocus(pair) {
+  if (!pair) return false
+  return isFocus(pair.key) || (pair.cells || []).some((c) => isFocus(c.key))
 }
-/** 翻页 + 定位闪烁该字段(琥珀高亮约 3 秒);返回是否定位成功 */
-function focusField(label) {
-  if (!label) return false
-  const target = pageOfLabel(label)
-  if (target === null) return false
+
+/** 数据键 → 所在页签页码(找不到 -1);判据见 recordSheetFocus.js(单向真源,带单测) */
+function pageOfKey(key) { return pageOfKeyIn(cfg.value, key) }
+/** 纸面文案 → 所在页签页码(找不到 null);仅供只拿得到 message 文案的旧路径兼容 */
+function pageOfLabel(label) { return pageOfLabelIn(cfg.value, label) }
+
+/**
+ * 滚动到高亮格;配置里没有可高亮的格子时,回退按纸面文案找标签格闪一下(旧行为,别丢)。
+ * v-show 隐藏的其它页签也在 DOM 里,故只在**可见**元素里找。
+ */
+function scrollToFocus() {
+  const root = rootEl.value
+  if (!root) return
+  const visible = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length)
+  const hit = [...root.querySelectorAll('.rs-focus')].filter(visible)[0]
+  if (hit) {
+    hit.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    return
+  }
+  const label = focusKey.value
+  const all = [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb, td.rs-td, th')].filter(visible)
+  const el = all.find((e) => (e.textContent || '').trim() === label)
+    || [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb')].filter(visible)
+      .find((e) => (e.textContent || '').includes(label))
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('field-blink')
+    setTimeout(() => el.classList.remove('field-blink'), 3200)
+  }
+}
+
+/**
+ * 翻页 + 定位高亮该字段(约 3 秒后自动熄灭);返回是否定位成功。
+ * 入参优先按**数据键**解析(与模板绑定同一判据),键找不到页时回退按纸面文案找页。
+ * 定位失败(该字段在纸面配置里根本没渲染)返回 false —— 调用方不得据此改变校验/保存行为。
+ */
+async function focusField(key) {
+  const name = String(key ?? '').trim()
+  if (!name) return false
+  let target = pageOfKey(name)
+  if (target < 0) target = pageOfLabel(name)
+  if (target === null || target < 0) return false
+  // 抢占上一次定位:清掉它的定时器与高亮(可能是另一个组件实例的高亮)
+  if (focusTimer) { clearTimeout(focusTimer); focusTimer = null }
+  clearFocusOf?.()
   if (pageList.value.length) activePage.value = target
-  nextTick(() => {
-    const root = document.querySelector('.record-sheet')
-    if (!root) return
-    // v-show 隐藏的其它页签也会命中查询,故只在**可见**元素里找(否则会闪到看不见的格子上)
-    const visible = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length)
-    const els = [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb, td.rs-td, th')].filter(visible)
-    const el = els.find((e) => (e.textContent || '').trim() === label)
-      || [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb')].filter(visible)
-        .find((e) => (e.textContent || '').includes(label))
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.classList.add('field-blink')
-      setTimeout(() => el.classList.remove('field-blink'), 3200)
-    }
-  })
+  focusKey.value = name
+  clearFocusOf = () => { focusKey.value = '' }
+  await nextTick()
+  scrollToFocus()
+  focusTimer = setTimeout(() => { focusKey.value = ''; focusTimer = null; clearFocusOf = null }, 3000)
   return true
 }
-defineExpose({ focusField })
+defineExpose({ focusField, pageOfKey })
 
 /** plain 版式表格列宽与总宽(无全页网格,列宽取 col.w) */
 function plainCols(dt) {
@@ -2643,6 +2727,98 @@ watch(
   { immediate: true },
 )
 
+// ── 从物料清单引用(数据源 = WLBOM「物料清单」面板,mode=doc ⇒ 单单据)──
+// 2026-10-13 恢复:原实现(2026-09-20)读的是已下架的 BOM 面板主从结构(list[].detail.children),
+//   现改读 WLBOM:res.data.list 长度 1,行在 **list[0].detail.items**(不再是 children)。
+// 行键是**中文字段 label**(本单铁律:后端按 label 收发):物料代码/物料名称(父件)、
+//   子件代码/子件名称/规格型号/子件单位/标准用量/损耗量。新版直接列子件行让人勾,不分导入范围。
+const matPickVisible = ref(false)
+const matPickRows = ref([])
+const matPickFiltered = ref([])
+const matPickChecked = ref([])
+const matPickKeyword = ref('')
+const matPickTargetDt = ref(null)
+const matPickHint = computed(() => (matPickRows.value.length
+  ? tt('共 {n} 个子件，勾选后点「导入」追加到本表明细').replace('{n}', matPickRows.value.length)
+  : tt('物料清单里还没有子件')))
+async function openMaterialPick(dt) {
+  matPickTargetDt.value = dt
+  matPickKeyword.value = ''
+  matPickChecked.value = []
+  matPickRows.value = []
+  matPickFiltered.value = []
+  matPickVisible.value = true
+  try {
+    const res = await request.post('/px/queryFormDataList', { panelCode: 'WLBOM', condition: {}, pageNo: 1, pageSize: 500 })
+    const masters = res?.data?.list || res?.data?.rows || res?.data || []
+    const all = []
+    if (Array.isArray(masters)) {
+      for (const m of masters) {
+        // WLBOM 是单单据面板 ⇒ 行在 detail.items;children 是旧 BOM 主从面板的形状,留着兜底
+        const kids = m?.detail?.items || m?.detail?.children || []
+        if (Array.isArray(kids)) all.push(...kids)
+      }
+    }
+    // __k 只给 el-table 当 row-key(过滤后仍保持勾选),不是单据字段 ⇒ 落库前不进行模型
+    matPickRows.value = all.map((r, i) => ({ ...r, __k: `${r['子件代码'] || ''}#${i}` }))
+    matPickFiltered.value = matPickRows.value
+  } catch (e) {
+    matPickRows.value = []
+    matPickFiltered.value = []
+    ElMessage.error(tt('取物料清单失败'))
+  }
+}
+function filterMatPick() {
+  const kw = (matPickKeyword.value || '').trim().toLowerCase()
+  if (!kw) { matPickFiltered.value = matPickRows.value; return }
+  matPickFiltered.value = matPickRows.value.filter((r) =>
+    String(r['子件代码'] || '').toLowerCase().includes(kw) ||
+    String(r['子件名称'] || '').toLowerCase().includes(kw)
+  )
+}
+/**
+ * 确认导入:把勾中的子件行**追加**到目标表的明细数组。
+ * 映射按**目标表的列定义**(dt.cols 的 key = 该面板 label)逐列判断,与文件里其它导入同款写法:
+ *   表区 ← filterVal('物料清单' —— 规格书全部明细共用一张 rd_spec_doc_detail,
+ *          不写这个分区值这些行会掉进"没有表认领"的桶,界面上永不显示);
+ *   物料编码 ← 子件代码 / 物料名称 ← 子件名称 / 规格参数 ← 规格型号 / 数量 ← 标准用量。
+ * 序号从本表区已有行数续编;同表区已有同一物料编码的跳过(重复点导入不会灌重复行)。
+ */
+function confirmMaterialPick() {
+  const dt = matPickTargetDt.value
+  if (!dt) return
+  const colKeys = new Set((dt.cols || []).map((c) => c.key))
+  const existCodes = new Set(rowsOf(dt).map((r) => String(r['物料编码'] || '').trim()).filter(Boolean))
+  let added = 0
+  let skipped = 0
+  for (const r of matPickChecked.value) {
+    const code = String(r['子件代码'] || '').trim()
+    if (!code) continue
+    if (existCodes.has(code)) { skipped++; continue }
+    // ⚠ 落行**直接复用表格自带的 addRow**(而不是自己 touch().push):
+    //   addRow 是界面上「＋」走的同一条路,经活体验证确实能出行(2026-10-13 对照实验:
+    //   点 ＋ 13 行 → 14 行);而本函数先前自己 push 时,提示「已导入 1 行」却不出行 ——
+    //   同样操作、同样 touch(),唯一区别只在"谁调用的",故改为共用同一条已验证的落行路径,
+    //   避免两条路径再次漂移(这处已经因此踩过一次)。
+    addRow(dt)
+    const rows = rowsOf(dt)
+    const row = rows[rows.length - 1]
+    if (!row) continue
+    if (colKeys.has('物料编码')) row['物料编码'] = code
+    if (colKeys.has('物料名称')) row['物料名称'] = r['子件名称'] || ''
+    if (colKeys.has('规格参数')) row['规格参数'] = r['规格型号'] || ''
+    if (colKeys.has('数量')) row['数量'] = r['标准用量'] ?? ''
+    if (colKeys.has('备注')) row['备注'] = ''
+    existCodes.add(code)
+    added++
+  }
+  matPickChecked.value = []
+  matPickVisible.value = false
+  emit('dirty')
+  ElMessage.success(tt('已导入 {n} 行').replace('{n}', added)
+    + (skipped ? tt('(跳过重复 {n} 行)').replace('{n}', skipped) : ''))
+}
+
 // ---------- 配方计算(成型工艺清单:读页 2 配方表 → 算 → 回填页 1 与配方表) ----------
 // 口径见 CONTEXT.md「配方计算器」与 docs/adr/0004:公式固定(与设计器 exe 逐位一致)、
 // 弹窗输入不落库不打印,只有回填进单据字段的值随单据保存。逻辑全在 core/mold/,这里只负责把行喂给它。
@@ -2791,6 +2967,30 @@ function chartOf(dt) {
   animation: rsFieldBlink 0.65s ease-in-out 5;
   outline: 2px solid #faad14;
   outline-offset: -2px;
+}
+/**
+ * 校验定位高亮(2026-10-13):保存被必填拦下时,自动翻到缺失字段所在页并把该格标红约 3 秒。
+ * 为什么不用 field-blink:那个是**命令式**加的类(按纸面文案找 DOM),纸面文案与数据键不同就找不到;
+ * 这个是**数据驱动**的(模板按 focusKey === 数据键 绑定),与翻页判据同一真源。
+ * 尺寸零影响:只用 outline/box-shadow/background-color —— 不用 border(会撑开盒子、
+ * 把纸面网格与列宽顶歪,规格书是 1:1 复刻版式)。
+ * transition 只列具体属性(项目红线:禁 transition: all)。
+ */
+@keyframes rsFocusPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 108, 108, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(245, 108, 108, 0.35); }
+}
+.rs-focus {
+  outline: 2px solid #f56c6c;
+  outline-offset: -2px;
+  background-color: #fef0f0;
+  transition: background-color 0.2s ease, outline-color 0.2s ease;
+  animation: rsFocusPulse 1s ease-in-out 3;
+}
+.rs-focus :deep(.el-input__wrapper),
+.rs-focus :deep(.el-textarea__inner),
+.rs-focus :deep(.el-select__wrapper) {
+  box-shadow: 0 0 0 1px #f56c6c inset;
 }
 .rs-txt {
   white-space: pre-wrap;
