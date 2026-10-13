@@ -856,7 +856,79 @@
             @current-change="(p) => (archPage = p)"
           />
         </div>
+        <!-- ══════════ 分区渲染(2026-10-12):明细带「表区」列时按类别纵向分区 ══════════
+             用户口径:「不同检验项目类别就能自动分格开来实现」+「字母自动编 / 每区只显示本区内容」。
+             每区 = 区标题(A.外观…) + 该区**自己的列头** + 该区的行 ⇒ 不同区列集可不同。 -->
+        <template v-if="isSectioned(b)">
+          <div v-for="sec in archSections(b)" :key="'sec-' + b.id + '-' + sec.sector" class="arch-section">
+            <div class="arch-section-title">{{ sec.title }}</div>
+            <el-table
+              :data="sec.rows"
+              border
+              size="small"
+              :show-summary="false"
+              :row-class-name="(o) => rowCls(o, b)"
+              @selection-change="(r) => (delSel = r)"
+              @row-contextmenu="(row, col, ev) => onCtx(ev, row, b)"
+              @cell-dblclick="(row, col, cell, ev) => onDetailCellDblclick(row, col, ev, b)"
+              @row-click="(row) => onRowClick(row, b)"
+              @click.capture="(e) => onTableClick(b, e)"
+            >
+              <el-table-column v-if="delMode && b.isMain" type="selection" width="45" fixed="left" />
+              <!-- 区内序号(1、2、3…) -->
+              <el-table-column width="50" align="center" :label="tt('序号')">
+                <template #default="{ row }">{{ sectionRowNo(sec.rows, row) }}</template>
+              </el-table-column>
+              <el-table-column
+                v-for="c in sec.cols"
+                :key="c.prop"
+                :prop="c.prop"
+                :label="c.label"
+                :width="c.width"
+                :min-width="c.width ? undefined : 120"
+              >
+                <template #default="{ row }">
+                  <template v-if="archEditable(b) && !row._placeholder">
+                    <span v-if="c.field && c.field.computed" class="inline-computed-value">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                    <span v-else-if="isSelectField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                    <span v-else-if="isReferenceField(c.field)" class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                    <template v-else-if="isActiveCell(row, b, c.prop)">
+                      <el-select
+                        v-if="isSelectField(c.field)"
+                        v-model="row[c.prop]"
+                        size="small"
+                        v-cell-focus
+                        clearable
+                        @change="markInlineDirty()"
+                      >
+                        <el-option v-for="o in fieldOptions(c.field)" :key="o" :label="o" :value="o" />
+                      </el-select>
+                      <el-input
+                        v-else
+                        v-model="row[c.prop]"
+                        size="small"
+                        v-cell-focus
+                        @input="markInlineDirty()"
+                      />
+                    </template>
+                    <span v-else class="cell-lazy" :title="tt('点击编辑')" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                  </template>
+                  <span v-else>{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                </template>
+              </el-table-column>
+              <el-table-column v-if="archEditable(b)" :label="tt('操作')" width="90" align="center" fixed="right">
+                <template #default="{ row }">
+                  <el-button link type="danger" size="small" @click="removeSectionRow(b, row)">{{ tt('删除') }}</el-button>
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+          <div v-if="archEditable(b)" class="arch-section-add">
+            <el-button size="small" type="primary" :icon="Plus" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
+          </div>
+        </template>
         <el-table
+          v-else
           :data="pagedBlockRows(b)"
           :height="tableH(b)"
           border
@@ -4275,6 +4347,113 @@ function pagedBlockRows(b) {
   if (real.length <= archPageSize.value) return rows
   const start = (archCurPage(b) - 1) * archPageSize.value
   return real.slice(start, start + archPageSize.value)
+}
+
+/* ══════════════ 按「表区」纵向分区渲染(2026-10-12) ══════════════
+ * 用户口径:「不同检验项目类别就能自动分格开来实现」+「1 自动编,2 显示的列为相同分区的内容」:
+ *   · 明细带「表区」列(目前只有制程检验单)时,废弃「一张平表」,改为**按表区纵向分区**:
+ *     每个区 = 区标题(字母自动编 A/B/C/D/E + 区名) + 该区**自己的列头** + 该区的行;
+ *   · 「表区」列本身不再作为一列显示(它已经变成区标题);
+ *   · 不同区列集可不同(如 外观 无测量值列、尺寸 有 测量值1..5),取决于该区实际填了哪些列。
+ */
+/** 类别 → 字母(A、B、C…):按该面板内类别首次出现顺序自动编 */
+function sectorLetter(b, sector) {
+  const order = sectorOrder(b)
+  const i = order.indexOf(sector)
+  if (i < 0) return ''
+  // 0→A, 25→Z, 26→AA(超出 26 个类别的兜底)
+  let n = i
+  let s = ''
+  do { s = String.fromCharCode(65 + (n % 26)) + s; n = Math.floor(n / 26) - 1 } while (n >= 0)
+  return s
+}
+/** 该面板明细里「表区」的出现顺序(去重,跳过空值) */
+function sectorOrder(b) {
+  const out = []
+  for (const r of archRows(b)) {
+    if (r._placeholder) continue
+    const v = String(r['表区'] ?? '').trim()
+    if (v && !out.includes(v)) out.push(v)
+  }
+  return out
+}
+/** 本面板是否走分区渲染:明细列里有「表区」 */
+function isSectioned(b) {
+  return (activeTab(b).cols || []).includes('表区')
+}
+/** 分区后的渲染单元:[{sector, letter, title, cols, rows}] */
+function archSections(b) {
+  if (!isSectioned(b)) return []
+  const all = pagedBlockRows(b)
+  const order = sectorOrder(b)
+  const byCat = new Map()
+  const noCat = []
+  for (const r of all) {
+    if (r._placeholder) continue
+    const v = String(r['表区'] ?? '').trim()
+    if (!v) { noCat.push(r); continue }
+    if (!byCat.has(v)) byCat.set(v, [])
+    byCat.get(v).push(r)
+  }
+  // 封面用 sectorOrder 的顺序(先出现先排),未在 order 里的(分页外)按 Map 顺序补
+  const seq = [...order, ...[...byCat.keys()].filter((k) => !order.includes(k))]
+  const out = []
+  for (const s of seq) {
+    const rows = byCat.get(s)
+    if (!rows || !rows.length) continue
+    const cols = sectionCols(b, rows)
+    if (!cols.length) continue
+    out.push({
+      sector: s,
+      letter: sectorLetter(b, s),
+      title: `${sectorLetter(b, s)}.${tt(s)}`,
+      cols,
+      rows,
+    })
+  }
+  // 未填类别的行归到末尾一个「未分类」区(不丢数据)
+  if (noCat.length) {
+    const cols = sectionCols(b, noCat)
+    if (cols.length) out.push({ sector: '', letter: '', title: tt('未分类'), cols, rows: noCat })
+  }
+  return out
+}
+/**
+ * 某区的列 = 面板明细列 ∩ 该区行里「有值」的列。
+ * 「表区」列排除(已变成区标题);「行号」排除(区内自带序号)。
+ * 用户口径「显示的列为相同分区的内容」⇒ 每区列集可不同:外观没有测量值列就不显示。
+ */
+function sectionCols(b, rows) {
+  // ⚠ 用 archCols(全量列)而不是 archGridCols —— 后者做列级虚拟化(只返回视口内列 + 插占位列),
+  //   分区视图列少(每区几列),不需要虚拟化;用它会漏列并把 spacer 当成列。
+  const all = archCols(b) || []
+  const out = []
+  for (const c of all) {
+    const prop = c.prop
+    if (!prop || prop === '表区' || prop === '行号') continue
+    // 该列在本区任一行有值 ⇒ 显示(空串/null/undefined 都算无值;0 算有值)
+    const hasVal = rows.some((r) => {
+      const v = r[prop]
+      return v !== undefined && v !== null && String(v).trim() !== ''
+    })
+    if (hasVal) out.push(c)
+  }
+  return out
+}
+/** 区标题下该区行内的序号(1、2、3…),用于「1.外径」这种显示 */
+function sectionRowNo(rows, row) {
+  return rows.indexOf(row) + 1
+}
+/** 分区视图里删除某行(与表格「删除」同语义:从当前单据明细移除并置脏) */
+function removeSectionRow(b, row) {
+  if (!detailEditable(b)) return
+  const tabKey = activeTab(b).key
+  const rows = cur.value.detail?.[tabKey]
+  if (!Array.isArray(rows)) return
+  const i = rows.indexOf(row)
+  if (i < 0) return
+  rows.splice(i, 1)
+  markInlineDirty()
 }
 /** 档案分页时合计行仍按全量行计算,不随当前页截断;
  *  合计值走 archSums 缓存(全量行×数值列只算一遍)——此前每次翻页 el-table 重算合计,
@@ -8532,6 +8711,29 @@ onUnmounted(() => {
   margin-bottom: 8px;
   background: #fff;
   position: relative;
+}
+/* ══ 分区渲染(2026-10-12):按「表区」纵向分区,每区自带列头 ══
+   用户口径「不同检验项目类别就能自动分格开来实现」;样式对齐截图的 A/B/C/D/E 分段。 */
+.arch-section {
+  margin: 6px 8px 10px;
+}
+/* 区标题:A.外观 —— 浅色条 + 左侧描边,与截图分区标题一致 */
+.arch-section-title {
+  padding: 4px 8px;
+  font-weight: 600;
+  font-size: 13px;
+  color: #1f4e79;
+  background: #eef3f9;
+  border-left: 3px solid #5b9bd5;
+  border-bottom: 1px solid #d7e2ee;
+}
+/* 区内的表:贴紧标题,去掉 el-table 自带的上外边距 */
+.arch-section .el-table {
+  margin-top: 0;
+}
+/* 分区视图底部的「新增数据」 */
+.arch-section-add {
+  margin: 4px 8px 8px;
 }
 /* 档案大表分页器:右对齐贴在明细表头上沿 */
 .arch-pager {
