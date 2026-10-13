@@ -3068,3 +3068,4 @@ fix-qc-proc-insp-i18n.sql
 fix-qc-proc-insp-report-i18n.sql
 migrate-qc-proc-insp-measure-cols.sql
 migrate-qc-item-category-dict.sql
+fix-qc-item-category-free.sql
