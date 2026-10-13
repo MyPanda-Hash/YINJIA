@@ -155,7 +155,20 @@
           <el-input v-model="itemForm.项目名称" style="width: 320px" :placeholder="tt('如 目数(+20目)')" />
         </el-form-item>
         <el-form-item :label="tt('检验内容')">
-          <el-input v-model="itemForm.检验内容" style="width: 320px" :placeholder="tt('如 目数')" />
+          <!-- 项目类别(2026-10-12 用户口径):「在项目维护处增加一个项目类别来实现各个分类」——
+               类别由维护时**自由录入**(如 外观/重要尺寸/性能/材质/包装),同一类别的项目自动归为一组;
+               不是预设死的几个值。allow-create + filterable:既能选已有类别,也能直接打新类别。 -->
+          <el-select
+            v-model="itemForm.检验内容"
+            style="width: 320px"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            :placeholder="tt('如 外观 / 重要尺寸 / 性能 / 材质 / 包装(可直接输入新类别)')"
+          >
+            <el-option v-for="c in categoryOptions" :key="c" :label="c" :value="c" />
+          </el-select>
         </el-form-item>
         <el-form-item :label="tt('检验标准')" required>
           <el-input v-model="itemForm.检验标准" :placeholder="tt('如 +20目占比≤15%')" />
@@ -208,7 +221,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
@@ -236,6 +249,23 @@ const planFormVisible = ref(false)
 const planForm = ref({})
 const itemFormVisible = ref(false)
 const itemForm = ref({})
+
+/**
+ * 项目类别候选(2026-10-12):类别由维护时自由录入,不是预设死的值。
+ * 候选 = 当前项目列表里已用过的类别去重 —— 便于同一类别复用(如把多个项目都归到「外观」);
+ * 想开新类别直接在下拉里打字(allow-create),无需改代码/字典。
+ */
+const categoryOptions = computed(() => {
+  const set = new Set()
+  for (const it of items.value || []) {
+    const c = String(it['检验内容'] ?? '').trim()
+    if (c) set.add(c)
+  }
+  // 当前正在编辑的值也纳入(编辑已有项目时能选中自身)
+  const cur = String(itemForm.value?.['检验内容'] ?? '').trim()
+  if (cur) set.add(cur)
+  return [...set]
+})
 
 const err = (e, dft) => ElMessage.error(e?.response?.data?.message || e?.message || tt(dft))
 
