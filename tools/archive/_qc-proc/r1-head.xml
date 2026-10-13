@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  制程检验记录表报表模板(QC_PROC_INSP / qc_proc_insp_head + qc_proc_insp_detail,2026-10-12)
+  ============================================================================
+  版式来源:用户截图「制程检验」页签(《生产相关品质检验.xlsx》第 2 个页签)。
+  结构与截图一致,分上下两块:
+    ① 制程检验组:表头 7 列(检验时间|客户名称|产品编码|型号(mm)|批号|抽检总量|结果判断)
+       表体 3 组 —— 外观(端盖两头|管身两侧|按项目填充) / 尺寸(5 格) / 出货重量(5 格)
+    ② 出货检验功能性测试组:客户名称|产品编码|型号(mm)|批号|检验人员|产线常规功能性结果|结果判断
+       表体 —— 检验要求 | 检验方法(截图注明「自动填充出货检验计划表」)
+
+  ⚠ 数据契约(ReportService):
+    · $P{...} = 头字段标量 headParams 按 yj_field.label 下发 + 单据编号/打印时间后端补;
+    · $F{...} = 明细行(detailRows),字段名 = yj_field.label。
+  ⚠ JR 6.x XSD 排版坑(与 so_order/sl_recv 同套):
+    · 样式集中声明;<box><pen/></box> 写法;band 必须包在分节元素里;
+    · textAlignment/verticalAlignment 只作 textElement 属性;isStretchWithOverflow 已废弃,用 textAdjust。
+  ⚠ band 顺序(严格):title → pageHeader → columnHeader → detail → columnFooter → pageFooter → lastPageFooter → summary → noData
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="qc_proc_insp" language="java" columnCount="1"
+              pageWidth="842" pageHeight="595" orientation="Landscape"
+              columnWidth="758" leftMargin="42" rightMargin="42" topMargin="30" bottomMargin="30"
+              whenNoDataType="AllSectionsNoDetail"
+              uuid="a7f3c1d8-52e9-4b06-9c14-8d2f6a0b7e31">
+
+  <property name="net.sf.jasperreports.awt.ignore.missing.font" value="false"/>
+  <property name="net.sf.jasperreports.default.font.name" value="NotoSansSC"/>
+  <property name="net.sf.jasperreports.export.xlsx.detect.cell.type" value="true"/>
+
+  <!-- ======================= 样式(与 so_order / sl_recv 同套) ======================= -->
+  <style name="base" isDefault="true" fontName="NotoSansSC" fontSize="9"/>
+  <style name="cell" style="base" hAlign="Left" vAlign="Middle">
+    <box padding="2">
+      <pen lineWidth="0.5" lineColor="#8A8A8A"/>
+    </box>
+  </style>
+  <style name="cellC" style="cell" hAlign="Center"/>
+  <style name="th" style="cell" isBold="true" hAlign="Center" mode="Opaque" backcolor="#EFEFEF"/>
+  <style name="bandTitle" style="base" fontSize="11" isBold="true" hAlign="Center" vAlign="Middle"
+         mode="Opaque" backcolor="#DCE6F1">
+    <box padding="2">
+      <pen lineWidth="0.5" lineColor="#8A8A8A"/>
+    </box>
+  </style>
+  <style name="notice" style="base" fontSize="10" isBold="true" hAlign="Center" vAlign="Middle"
+         mode="Opaque" backcolor="#FFFF00">
+    <box padding="2">
+      <pen lineWidth="0.5" lineColor="#8A8A8A"/>
+    </box>
+  </style>
+  <style name="company" style="base" fontSize="16" isBold="true" hAlign="Center" vAlign="Bottom"/>
+  <style name="docTitle" style="base" fontSize="15" isBold="true" hAlign="Center" vAlign="Middle"/>
+  <style name="meta" style="base" fontSize="9" vAlign="Middle"/>
+  <style name="metaR" style="meta" hAlign="Right"/>
+  <style name="gridLabel" style="base" isBold="true" vAlign="Middle"/>
+  <style name="gridValue" style="base" vAlign="Middle"/>
+  <style name="pager" style="base" vAlign="Middle"/>
+  <style name="pagerR" style="pager" hAlign="Right"/>
+  <style name="sign" style="base" fontSize="9" vAlign="Middle"/>
+  <style name="small" style="cell" fontSize="8"/>
+
+  <!-- 小字号单元格(表头/数据行用;字体大小必须在 style 里,不能写在 reportElement 上) -->
+  <style name="th6" style="th" fontSize="6"/>
+  <style name="th7" style="th" fontSize="7"/>
+  <style name="th8" style="th" fontSize="8"/>
+  <style name="c6" style="cellC" fontSize="6"/>
+  <style name="c7" style="cellC" fontSize="7"/>
+  <style name="c8" style="cellC" fontSize="8"/>
+  <style name="l7" style="cell" fontSize="7"/>
+  <style name="l8" style="cell" fontSize="8"/>
+
+  <!-- ======================= 参数(头字段) ======================= -->
+  <parameter name="单据编号" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="单据日期" class="java.util.Date" isForPrompting="false"/>
+  <parameter name="检验时间" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="检验类别" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="工单号" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="报工单号" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="工序" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="批次号" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="客户名称" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="产品编码" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="产品名称" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="规格型号" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="生产线" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="生产车间" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="报工数量" class="java.math.BigDecimal" isForPrompting="false"/>
+  <parameter name="抽检总量" class="java.math.BigDecimal" isForPrompting="false"/>
+  <parameter name="检验数量" class="java.math.BigDecimal" isForPrompting="false"/>
+  <parameter name="检验员" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="检验日期" class="java.util.Date" isForPrompting="false"/>
+  <parameter name="总结论" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="检验方案" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="文件编码" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="执行标准" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="处理方式" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="单据状态" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="审核人" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="审核时间" class="java.util.Date" isForPrompting="false"/>
+  <parameter name="打印时间" class="java.lang.String" isForPrompting="false"/>
+  <!-- 三个表区的汇总结果:报表填充前由 ReportService 按 表区 归并明细后下发 -->
+  <parameter name="外观结果" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="尺寸结果" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="重量结果" class="java.lang.String" isForPrompting="false"/>
+  <!-- 尺寸/重量各 5 格:填充前把「多值字符串」按 "/" 拆成 5 个值(见 ReportService.splitParts) -->
+  <parameter name="尺寸_1" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="尺寸_2" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="尺寸_3" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="尺寸_4" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="尺寸_5" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="重量_1" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="重量_2" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="重量_3" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="重量_4" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="重量_5" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="公司名称" class="java.lang.String" isForPrompting="false">
+    <defaultValueExpression><![CDATA["惠州市银嘉环保科技有限公司"]]></defaultValueExpression>
+  </parameter>
+
+  <!-- ======================= 字段(明细行) ======================= -->
+  <field name="表区" class="java.lang.String"/>
+  <field name="行号" class="java.lang.Integer"/>
+  <field name="检验项目" class="java.lang.String"/>
+  <field name="检验要求" class="java.lang.String"/>
+  <field name="检验方法" class="java.lang.String"/>
+  <field name="抽检量" class="java.math.BigDecimal"/>
+  <field name="实测数值" class="java.lang.String"/>
+  <field name="单项判定" class="java.lang.String"/>
+  <field name="不合格应对措施" class="java.lang.String"/>
+  <field name="结果判断" class="java.lang.String"/>

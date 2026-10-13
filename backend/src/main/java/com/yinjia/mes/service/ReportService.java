@@ -317,9 +317,17 @@ public class ReportService {
 
         JasperPrint print;
         try {
-            print = GENERIC_CODE.equals(tpl.code())
-                    ? fillGeneric(def, doc, docNo, rows)
-                    : JasperFillManager.fillReport(compile(tpl), headParams(doc, docNo), new JRMapCollectionDataSource(rows));
+            if (GENERIC_CODE.equals(tpl.code())) {
+                print = fillGeneric(def, doc, docNo, rows);
+            } else {
+                // 「制程检验记录表」这类**矩阵版式**模板:上半部(外观/尺寸/重量)由参数承载、
+                // 下半部(detail)只渲染功能性测试行 ⇒ 主数据源要换成过滤后的子集,
+                // 否则 detail 会把外观/尺寸/重量的明细也逐行渲染一遍。
+                // 判据:明细里出现过「表区」列(其他面板没有这一列,不受影响)。
+                List<Map<String, ?>> feed = hasSectorColumn(rows) ? funcRows(rows) : rows;
+                print = JasperFillManager.fillReport(compile(tpl), headParams(doc, docNo, rows),
+                        new JRMapCollectionDataSource(feed));
+            }
         } catch (JRException e) {
             throw new IllegalArgumentException("报表填充失败：" + rootMessage(e));
         }
@@ -472,6 +480,20 @@ public class ReportService {
 
     /** 头字段(标量)+ 单据编号/打印时间:精细模板与通用模板共用 */
     private static Map<String, Object> headParams(Map<String, Object> doc, String docNo) {
+        return headParams(doc, docNo, List.of());
+    }
+
+    /**
+     * 头参数 + 按「表区」归并的汇总结果(制程检验记录表用)。
+     *
+     * <p>背景:制程检验单(qc_proc_insp_detail)的明细按「表区」分成 外观/尺寸/重量/功能性测试 四组,
+     * 报表上半部是三组各占一格的**矩阵版式**(照用户截图),不是一个检验项一行 ——
+     * 因此需要把同表区的明细归并成一个字符串下发成参数。
+     *
+     * <p>归并口径:同表区多行时,取「检验项目:实测数值(判定)」逐行拼接,用 " · " 分隔;
+     * 无值则留空(模板 isBlankWhenNull)。模板缺失这些参数时不受影响(只是多几个键)。
+     */
+    private static Map<String, Object> headParams(Map<String, Object> doc, String docNo, List<Map<String, ?>> rows) {
         Map<String, Object> params = new LinkedHashMap<>();
         for (Map.Entry<String, Object> e : doc.entrySet()) {
             // 头字段(标量)一律下发为报表参数:模板要用哪个用哪个,加字段不必改 Java
@@ -481,7 +503,90 @@ public class ReportService {
         }
         params.put("单据编号", docNo);
         params.put("打印时间", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")));
+        // 制程检验记录表:按表区归并(其他面板的明细没有「表区」列,归并结果为空,不影响既有模板)
+        for (Map.Entry<String, String> e : SECTOR_PARAMS.entrySet()) {
+            params.put(e.getValue(), joinSector(rows, e.getKey()));
+        }
+        // 尺寸/重量各 5 格:把该表区的多值串按 "/" 拆成 5 个参数(照截图 5 格=5 个抽样值)
+        for (Map.Entry<String, String> e : SPLIT_PARAMS.entrySet()) {
+            List<String> parts = splitParts(rows, e.getKey());
+            for (int i = 0; i < 5; i++) {
+                params.put(e.getValue() + "_" + (i + 1), i < parts.size() ? parts.get(i) : "");
+            }
+        }
+        // 说明:制程检验记录表的 detail band 只渲染「功能性测试」行 —— 由 export() 把
+        // 主数据源换成 funcRows(rows) 实现(不在这里塞额外数据源参数)。
         return params;
+    }
+
+    /** 需拆成 5 格的表区 → 参数名前缀 */
+    private static final Map<String, String> SPLIT_PARAMS = Map.of(
+            "尺寸", "尺寸",
+            "重量", "重量");
+
+    /** 明细是否带「表区」列(制程检验单专有;其他面板没有 ⇒ 矩阵版式逻辑不外溢) */
+    private static boolean hasSectorColumn(List<Map<String, ?>> rows) {
+        return rows != null && !rows.isEmpty() && rows.get(0).containsKey("表区");
+    }
+
+    /** 只保留「表区=功能性测试」的行(制程检验记录表下半部的 detail 数据源) */
+    private static List<Map<String, ?>> funcRows(List<Map<String, ?>> rows) {
+        List<Map<String, ?>> out = new ArrayList<>();
+        for (Map<String, ?> r : rows) {
+            if ("功能性测试".equals(str(r.get("表区")))) out.add(r);
+        }
+        return out;
+    }
+
+    /**
+     * 取某表区的「实测数值」,把所有值摊平成一个列表(最多取 5 个,对应截图的 5 格)。
+     * 值形如 {@code 44.5/44.6/44.5/44.7/44.6} —— 按 "/" 拆;
+     * 同表区多行(如 尺寸 有 外径/内径/长度 三行)时按行顺序依次摊平,取前 5 个。
+     */
+    private static List<String> splitParts(List<Map<String, ?>> rows, String sector) {
+        List<String> out = new ArrayList<>();
+        if (rows == null) return out;
+        for (Map<String, ?> r : rows) {
+            if (!sector.equals(str(r.get("表区")))) continue;
+            String v = str(r.get("实测数值"));
+            if (v.isEmpty()) continue;
+            for (String p : v.split("[/、,，\\s]+")) {
+                String t = p.trim();
+                if (!t.isEmpty()) out.add(t);
+                if (out.size() >= 5) return out;
+            }
+        }
+        return out;
+    }
+
+    /** 明细「表区」→ 报表参数名(制程检验记录表的三个矩阵格) */
+    private static final Map<String, String> SECTOR_PARAMS = Map.of(
+            "外观", "外观结果",
+            "尺寸", "尺寸结果",
+            "重量", "重量结果");
+
+    /** 取同表区明细,按「检验项目:实测数值(判定)」拼接;无该表区则返回空串 */
+    private static String joinSector(List<Map<String, ?>> rows, String sector) {
+        if (rows == null || rows.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (Map<String, ?> r : rows) {
+            Object sec = r.get("表区");
+            if (sec == null || !sector.equals(String.valueOf(sec).trim())) continue;
+            String item = str(r.get("检验项目"));
+            String val = str(r.get("实测数值"));
+            String judge = str(r.get("单项判定"));
+            String one = item;
+            if (!val.isEmpty()) one = one.isEmpty() ? val : one + ":" + val;
+            if (!judge.isEmpty()) one = one.isEmpty() ? judge : one + "(" + judge + ")";
+            if (one.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(one);
+        }
+        return sb.toString();
+    }
+
+    private static String str(Object o) {
+        return o == null ? "" : String.valueOf(o).trim();
     }
 
     /** 报表文件名(浏览器另存用):面板名-单据号.pdf;登记过精细模板的用模板名(销售订单-xxx.pdf) */
