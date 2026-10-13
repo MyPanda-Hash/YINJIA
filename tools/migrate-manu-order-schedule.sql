@@ -121,15 +121,24 @@ GO
 -- 排产口径:对齐 V1.2 §8.1「排单计划表格真实字段」+ 参考库 plang_pc 排产口径:
 --   客户等级(往来单位.客户价格等级)/型号(商品.规格型号)/工序车间/销售订单数量(客户订单行)/生产计划数量(排产数量)/
 --   实际完成数量(已入库回填)/工序交期/交期紧迫度/**7天·15天·大于15天已排产分桶**/产能(工作中心.产量每小时)
-IF OBJECT_ID('v_manu_schedule','V') IS NOT NULL DROP VIEW v_manu_schedule;
+-- ⚠ 2026-10-10 修(服务器部署实测「重跑必炸」):本块原先是**无条件** DROP + CREATE VIEW,而视图定义里引用了
+--   bd_manu_order.生产车间 —— 该列已由链条后段的 migrate-manu-prune-legacy.sql(清单第 293 条)下线。
+--   后果(本脚本排在第 280 条、早于那次下线):**首次应用/全新库按链顺序跑是自洽的**,但在演进后的 schema 上
+--   重跑时,先 DROP 成功提交、再 CREATE 报 Invalid column name —— 视图当场丢掉、脚本判失败。
+--   改法:血统二择一 —— 列在才 DROP/重建(首次应用行为逐字不变);列已下线则整块跳过,
+--   视图交付给 migrate-align-ledger-fields-20261008.sql(清单第 422 条,IF OBJECT_ID IS NULL 缺则建)。
+IF COL_LENGTH('dbo.bd_manu_order', N'生产车间') IS NOT NULL AND OBJECT_ID('v_manu_schedule','V') IS NOT NULL DROP VIEW v_manu_schedule;
 GO
-CREATE VIEW v_manu_schedule AS
+IF COL_LENGTH('dbo.bd_manu_order', N'生产车间') IS NULL
+  PRINT N'  · v_manu_schedule 重建已跳过(生产车间 列已下线;视图由 migrate-align-ledger-fields-20261008.sql 缺则建)';
+ELSE
+  EXEC(N'CREATE VIEW v_manu_schedule AS
 SELECT l.id AS id, h.[合同号] AS 加工单号, h.[单据日期] AS 单据日期, h.[销售订单号] AS 销售订单号,
-       h.[客户] AS 客户, ISNULL(pt.[客户价格等级], N'') AS 客户等级,
+       h.[客户] AS 客户, ISNULL(pt.[客户价格等级], N'''') AS 客户等级,
        h.[生产线] AS 生产线, h.[生产车间] AS 生产车间,
        ISNULL(wc.[产量/小时], 0) AS [产能/小时],
        l.[产品编码] AS 产品编码, l.[产品名称] AS 产品名称,
-       ISNULL(NULLIF(l.[规格型号], N''), iv.[规格型号]) AS 规格型号, l.[生产单位] AS 生产单位,
+       ISNULL(NULLIF(l.[规格型号], N''''), iv.[规格型号]) AS 规格型号, l.[生产单位] AS 生产单位,
        l.[批号] AS 批号,
        ISNULL(so.[数量], 0) AS 销售订单数量,
        ISNULL(l.[需求数量], ISNULL(l.[数量], 0)) AS 需求数量,
@@ -153,25 +162,25 @@ SELECT l.id AS id, h.[合同号] AS 加工单号, h.[单据日期] AS 单据日�
        h.[结案] AS 结案,
        -- 五工序完成(单轨:wo_progress 按 加工单号+工序 求和,V1.2 §8.1「完成数=工单报工数求和」)
        -- 与 未完成数量(=排产数量−装箱完成)——吸收原「排单计划 WO_SCHEDULE」看板职责(2026-09-22 单轨改造)
-       ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N'混料' AND ISNULL(p.asp_cancel,'N') <> 'Y'), 0) AS 混料完成,
-       ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N'成型' AND ISNULL(p.asp_cancel,'N') <> 'Y'), 0) AS 成型完成,
-       ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N'切炭' AND ISNULL(p.asp_cancel,'N') <> 'Y'), 0) AS 切炭完成,
-       ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N'组装' AND ISNULL(p.asp_cancel,'N') <> 'Y'), 0) AS 组装完成,
-       ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N'装箱' AND ISNULL(p.asp_cancel,'N') <> 'Y'), 0) AS 装箱完成,
-       ISNULL(l.[排产数量], 0) - ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N'装箱' AND ISNULL(p.asp_cancel,'N') <> 'Y'), 0) AS 未完成数量,
-       CASE WHEN ISNULL(st.canceled,'Y') = 'Y' THEN N'已作废'
-            WHEN ISNULL(st.stopped,'N') = 'Y' THEN N'已中止'
-            WHEN st.shr IS NOT NULL THEN N'已审核' ELSE N'草稿' END AS 单据状态,
-       ISNULL(h.[源工单号], N'') AS 源工单号,
+       ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N''混料'' AND ISNULL(p.asp_cancel,''N'') <> ''Y''), 0) AS 混料完成,
+       ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N''成型'' AND ISNULL(p.asp_cancel,''N'') <> ''Y''), 0) AS 成型完成,
+       ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N''切炭'' AND ISNULL(p.asp_cancel,''N'') <> ''Y''), 0) AS 切炭完成,
+       ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N''组装'' AND ISNULL(p.asp_cancel,''N'') <> ''Y''), 0) AS 组装完成,
+       ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N''装箱'' AND ISNULL(p.asp_cancel,''N'') <> ''Y''), 0) AS 装箱完成,
+       ISNULL(l.[排产数量], 0) - ISNULL((SELECT SUM(p.[完成数量]) FROM dbo.wo_progress p WHERE p.[单据编号] = h.[合同号] AND p.[工序] = N''装箱'' AND ISNULL(p.asp_cancel,''N'') <> ''Y''), 0) AS 未完成数量,
+       CASE WHEN ISNULL(st.canceled,''Y'') = ''Y'' THEN N''已作废''
+            WHEN ISNULL(st.stopped,''N'') = ''Y'' THEN N''已中止''
+            WHEN st.shr IS NOT NULL THEN N''已审核'' ELSE N''草稿'' END AS 单据状态,
+       ISNULL(h.[源工单号], N'''') AS 源工单号,
        CAST(NULL AS char(1)) AS asp_cancel
 FROM dbo.bd_manu_order h
-JOIN dbo.bl_manu_order l ON l.[合同号] = h.[合同号] AND ISNULL(l.asp_cancel,'N') <> 'Y'
-LEFT JOIN dbo.yj_doc_status st ON st.panel_code = 'MANU_ORDER' AND st.doc_no = h.[合同号]
-LEFT JOIN dbo.bs_partner pt ON pt.[往来单位编码] = h.[客户编码] OR (ISNULL(h.[客户编码],N'') = N'' AND pt.[往来单位名称] = h.[客户])
+JOIN dbo.bl_manu_order l ON l.[合同号] = h.[合同号] AND ISNULL(l.asp_cancel,''N'') <> ''Y''
+LEFT JOIN dbo.yj_doc_status st ON st.panel_code = ''MANU_ORDER'' AND st.doc_no = h.[合同号]
+LEFT JOIN dbo.bs_partner pt ON pt.[往来单位编码] = h.[客户编码] OR (ISNULL(h.[客户编码],N'''') = N'''' AND pt.[往来单位名称] = h.[客户])
 LEFT JOIN dbo.bs_inv iv ON iv.[存货编码] = l.[产品编码]
 LEFT JOIN dbo.bs_wc wc ON wc.[工作中心名称] = h.[生产车间] OR wc.[工作中心编码] = h.[生产车间]
 LEFT JOIN dbo.bl_so_order so ON so.[单据编号] = h.[销售订单号] AND so.[存货编码] = l.[产品编码]
-WHERE ISNULL(h.asp_cancel,'N') <> 'Y';
+WHERE ISNULL(h.asp_cancel,''N'') <> ''Y'';');
 GO
 
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='MANU_SCHEDULE')
@@ -183,7 +192,7 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MANU_SCHEDULE' AND col_n
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MANU_SCHEDULE' AND col_name=N'销售订单号') INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_SCHEDULE',N'销售订单号',N'销售订单号',N'文本',N'query,detail',30,150,0,0,0,1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MANU_SCHEDULE' AND col_name=N'客户') INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_SCHEDULE',N'客户',N'客户',N'文本',N'query,detail',40,180,0,0,0,1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MANU_SCHEDULE' AND col_name=N'生产线') INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_SCHEDULE',N'生产线',N'生产线',N'文本',N'query,detail',50,120,0,0,0,1);
-IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MANU_SCHEDULE' AND col_name=N'生产车间') INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_SCHEDULE',N'生产车间',N'生产车间',N'文本',N'query,detail',60,120,0,0,0,1);
+IF COL_LENGTH('dbo.bd_manu_order', N'生产车间') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MANU_SCHEDULE' AND col_name=N'生产车间') INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_SCHEDULE',N'生产车间',N'生产车间',N'文本',N'query,detail',60,120,0,0,0,1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MANU_SCHEDULE' AND col_name=N'产品编码') INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_SCHEDULE',N'产品编码',N'产品编码',N'文本',N'query,detail',70,120,0,0,0,1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MANU_SCHEDULE' AND col_name=N'产品名称') INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_SCHEDULE',N'产品名称',N'产品名称',N'文本',N'query,detail',80,170,0,0,0,1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='MANU_SCHEDULE' AND col_name=N'规格型号') INSERT INTO yj_field (panel_code,col_name,label,data_type,place,seq,width,editable,required,hidden,visible) VALUES ('MANU_SCHEDULE',N'规格型号',N'规格型号',N'文本',N'detail',90,140,0,0,0,1);

@@ -921,7 +921,7 @@
               :width="archColW(b, c)"
               :min-width="archColW(b, c) ? undefined : c.width"
               :align="c.align"
-              :show-overflow-tooltip="!detailEditable(b)"
+              :show-overflow-tooltip="!detailEditable(b) && !isMultilineField(c.field)"
             >
             <template #header>
               <div class="col-hdr" :class="{ filtering: hasColFilter(c.prop) }" @click.stop="toggleColFilter(c.prop)">
@@ -1016,6 +1016,18 @@
                     @update:model-value="(v) => onInlineBoolInput(activeTab(b).key, row, c.field, v)"
                   />
                   <el-input
+                    v-else-if="isMultilineField(c.field)"
+                    :model-value="activeCellEcho"
+                    v-cell-focus
+                    type="textarea"
+                    :autosize="{ minRows: 1, maxRows: 6 }"
+                    resize="none"
+                    class="multi-text"
+                    :disabled="c.field.computed"
+                    @update:model-value="(v) => onActiveCellEchoInput(row, c.prop, v)"
+                    @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
+                  />
+                  <el-input
                     v-else
                     :model-value="activeCellEcho"
                     v-cell-focus
@@ -1024,9 +1036,16 @@
                     @change="onInlineDetailChange(activeTab(b).key, row, c.field)"
                   />
                 </template>
-                <span v-else class="cell-lazy" @click="activateCell(row, b, c.prop)">{{ formatFieldValue(c.field, row[c.prop]) }}</span>
+                <!-- 未激活时的纯文本呈现:「多行文本」列**不截断**,整段文字换行显示、行高跟着变高
+                     (用户口径 2026-10-15:「当前需要点击后才能显示多行,不点击就不能」) -->
+                <span
+                  v-else
+                  class="cell-lazy"
+                  :class="{ 'cell-multiline': isMultilineField(c.field) }"
+                  @click="activateCell(row, b, c.prop)"
+                >{{ formatFieldValue(c.field, row[c.prop]) }}</span>
               </template>
-              <span v-else>{{ tt(row[c.prop] ?? '') }}</span>
+              <span v-else :class="{ 'cell-multiline': isMultilineField(c.field) }">{{ tt(row[c.prop] ?? '') }}</span>
             </template>
           </el-table-column>
           </template>
@@ -1753,6 +1772,11 @@
     <DetailMaintainDialog v-model="maintainVisible" :panel-code="panelCode" :row="maintainRow" @saved="onMaintainSaved" />
     <!-- 字段管理(动态字段/备用列池):绑定/停用自定义字段(入口按「自定义字段」权限显隐) -->
     <FieldManagerDialog v-model="fieldMgrVisible" :panel-code="panelCode" @done="cfgCache = null; load()" />
+    <!-- 检验项目/检验方案(2026-10-09 **合并口径**):三类工序检验单(成型/切炭/组装成品)工具栏**唯一**入口 ——
+         同一个弹窗两用:上=方案表、下=该方案的项目表(可勾选);①勾选后「带入明细」把项目写进当前单据
+         (表区=检验项目,再按现有模板填实测/判定);②表头的新增/编辑/停用就地维护标准本身
+         (bs_qc_plan + bs_qc_item),维护动作不往检验单写数据。 -->
+    <QcInspPlanDialog v-model="qcInspPlanVisible" @pick="applyInspItems" />
     <!-- 仓位分区弹窗(2026-10-08):候选来自本面板已加载的仓位行,不落存储 ⇒ 分区随仓位存在;
          选中时「大区 + 存储分区」**一起回填**(用户口径:它们是一个组合) -->
     <ZonePickDialog v-model="zonePickVisible" :rows="zonePickRows" :area-key="ZONE_PAIR.area" :zone-key="ZONE_PAIR.zone" @pick="onZonePick" />
@@ -1883,6 +1907,7 @@ import { sumKeepScale } from '@core/panel/sumTotals'
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
+import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
 import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
@@ -2112,6 +2137,9 @@ const colPrefVisible = ref(false)
 // 字段管理(动态字段/备用列池):入口按该面板「自定义字段」权限显隐,
 // 服务端 requireFieldConfig(该面板 field 词)把守写操作
 const fieldMgrVisible = ref(false)
+// 检验项目/检验方案(2026-10-09 合并口径):三类工序检验单工具栏「更多」组的**唯一**入口
+// (服务端把守 QC_ASM_INSP 可见性);弹窗两用:勾选「带入明细」+ 就地维护标准本身。
+const qcInspPlanVisible = ref(false)
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
 
@@ -5314,6 +5342,16 @@ function isBooleanField(field) {
   return ['是否', 'Boolean', 'BOOL'].includes(fieldType(field))
 }
 
+/**
+ * 「多行文本」字段类型(yj_field.data_type = 多行文本):激活后的编辑器用可自撑高的多行框,
+ * 文字过长时折行显示。**由元数据驱动**(认字段类型,不认面板/字段名单);
+ * 与表单页 PanelxForm.vue 的 isMultiline 同口径 —— 两个组件各有一套控件分支,必须同时支持,
+ * 否则用户从菜单进的列表页(默认入口)看不到效果(2026-10-15 实测踩到)。
+ */
+function isMultilineField(field) {
+  return fieldType(field) === '多行文本'
+}
+
 /** 生产线档案「停用」列按钮化:仅 PROD_LINE 面板的 停用 列走行内切换按钮(2026-09-24 随生产域下拉) */
 function isLineToggleCol(prop) {
   return panelCode.value === 'PROD_LINE' && prop === '停用'
@@ -5537,6 +5575,38 @@ function addInlineDetailRow(b) {
     syncActiveCellEcho(row, firstEditable.dataName)
   }
   markInlineDirty() // 新增明细行 = 未保存修改
+}
+
+/**
+ * 选检验项目 → 带入当前单据明细(2026-10-09 用户口径:「在组装成品检验处看到对应的检验项目,
+ * 选择填写检验单的数据」)。
+ *
+ * 行为:把勾选的检验项目**追加**到当前明细页签行尾,每行只填 表区=检验项目 + 项目/标准要求/检验方法,
+ * 实测数值与判定留空,由品质按**现有模板**逐格填;不自动保存(保存仍由用户点「保存」)。
+ * 行由 newDetailRow(tabKey) 构造(带齐该页签各字段默认值),与「新增数据」完全同构
+ * ⇒ 保存链路(labelsToCols/行表 upsert)一行都不用改。
+ */
+function applyInspItems(items) {
+  const b = blocks.value[0]
+  const tabKey = b ? activeTab(b).key : 'items'
+  if (!cur.value.detail) cur.value.detail = {}
+  const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
+  let n = 0
+  for (const it of items || []) {
+    const row = newDetailRow(tabKey)
+    row['表区'] = '检验项目'
+    row['检验项目'] = it['项目名称'] || ''
+    row['标准要求'] = it['检验标准'] || ''
+    if (it['检验方法']) row['检验方法'] = it['检验方法']
+    rows.push(row)
+    n++
+  }
+  if (n) {
+    archPage.value = Math.ceil(rows.length / archPageSize.value)
+    markInlineDirty()
+    ElMessage.success(`${tt('已带入')} ${n} ${tt('行检验项目，请填写实测数值与判定')}`)
+  }
+  return n
 }
 
 function primaryDetailRefField(b) {
@@ -6796,6 +6866,18 @@ async function onButton(action) {
     impVisible.value = true
     return
   }
+  // 检验项目/检验方案(2026-10-09 **合并口径**):选项目带入 + 就地维护合并成同一个弹窗。
+  // ⚠ 「选检验项目」这个旧动作名以「选」开头,必须排在下面「选X」通用分支(catch-all)之前 ——
+  //   它取 `action.startsWith('选')`,会把本动作截走并提示「演示环境暂未实现选单」(2026-10-09 实测踩到)。
+  //   三个名字都收(旧按钮名保留兼容:已配可见性的库/缓存里可能还留着)。
+  if (['检验项目/检验方案', '检验项目维护', '选检验项目'].includes(action)) {
+    const needDoc = action === '选检验项目'
+    if (needDoc && (!cur.value || !(cur.value['单据编号'] || cur.value['编号'] || cur.value['合同号']))) {
+      return ElMessage.warning(tt('请先打开一张检验单，再选检验项目'))
+    }
+    qcInspPlanVisible.value = true
+    return
+  }
   // 选单通用化：任意 选X 动作且配置有 selectConfig 即走选单（对齐 PanelxForm 的通用分支）
   if (action === '选单' || action.startsWith('选')) {
     const sc = selectConfigFor(action)
@@ -6852,6 +6934,7 @@ async function onButton(action) {
     fieldMgrVisible.value = true
     return
   }
+  // 「检验项目维护」分支已并入上面的合并分支(2026-10-09):三个动作名走同一个弹窗,此处不再重复处理。
   if (action === '分类管理') {
     // 客户/供应商档案 → 对应分类面板(金蝶同款:分类不占导航,从档案工具栏进)
     const target = cfgCache.value?.metadata?.classifyPanel
@@ -7558,6 +7641,19 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* 「多行文本」字段类型的激活编辑器:保持单行输入框的原样观感(默认边框/底色/聚焦高亮不动),
+   只把高度/行高/内边距调成和能力一致,内容超长时自动撑高折行。
+   ⚠ 别写 border:0 / background:transparent / box-shadow:none —— 会变成"没有框的纯文字格",
+     用户直接反馈「我没看到修改」(2026-10-15 表单页踩过同一个坑)。
+   `class` 落在 el-input 的外层 div 上,真正的 <textarea> 在里面,故要 :deep 下去改。 */
+.multi-text :deep(.el-textarea__inner) {
+  min-height: 32px !important;
+  padding: 5px 11px;
+  line-height: 22px;
+  resize: none;
+  font-family: inherit;
+}
+
 .panelx-list {
   font-size: 13px;
   color: #333;
@@ -8682,6 +8778,28 @@ onUnmounted(() => {
 .detail :deep(.el-table td .cell-lazy:hover) {
   background: #f2f6ff;
   box-shadow: inset 0 0 0 1px #c7d8f5;
+}
+/* 「多行文本」字段:未激活时的纯文本也**整段换行显示**,不再截成一行加省略号
+   (用户口径 2026-10-15:「当前需要点击后才能显示多行,不点击就不能」)。
+   行高随内容增长 ⇒ 该行变高,整段文字都看得见。
+   ⚠ 必须同时清掉 nowrap/ellipsis,只改 white-space 不够(el-table 的 .cell 也带截断)。 */
+.detail :deep(.el-table td .cell-lazy.cell-multiline) {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.detail :deep(.el-table td .cell.cell-multiline) {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-overflow: clip;
+}
+.detail :deep(.el-table td:has(.cell-multiline)) .cell {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 /* 分区选择格(2026-10-08):点击开弹窗而非行内输入 —— 用 pointer + 虚线下划线把"可点选"显出来,
    与参照列(readonly input + 点击选择)的观感区分开 */

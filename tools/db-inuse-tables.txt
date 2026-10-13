@@ -38,7 +38,7 @@ table:yj_translation   # 多语言翻译表(scope=panel|field,ref_key=中文键,
 table:yj_usage_log   # 使用日志(登录与面板操作留痕,使用权限查看页面数据源)
 table:yj_user   # 用户表(登录名/口令哈希/姓名/部门dept_id/角色role_id/管理员标志is_admin)
 
-# ---- MES 自有业务表(165 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
+# ---- MES 自有业务表(167 张;bs_/bd_/bl_/rd_/qc_/wo_ + day_report 等本系统自建表) ----
 table:bd_account   # 会计科目档案
 table:bd_dispatch   # 工序派工单头表(经典遗留面板)
 table:bd_expense_type   # 费用类别档案
@@ -129,6 +129,8 @@ table:qc_lyb   # 来料异常分析报告头表——面板 QC_LYB;供应商/物
 table:qc_lyb_detail   # 来料异常分析报告行表——面板 QC_LYB 明细
 table:qc_mold_insp_head   # 成型检验单头表(报工审核自动生成——面板 QC_MOLD_INSP)
 table:qc_mold_insp_detail   # 成型检验单行表(通用模板:检验项目/标准/实测/判定)
+table:qc_fin_spec_detail   # 成品检验规范行表——面板 QC_FIN_SPEC 明细(按 表区 分三块:修订履历/检验项目/处理方式;「检验对象」列区分子节;migrate-qc-fin-spec.sql 新建)
+table:qc_fin_spec_head   # 成品检验规范头表——面板 QC_FIN_SPEC(8 份受控文件归纳的统一格式:修订履历+正文五段+检验项目分节+处理方式;报工审核自动生成草稿;migrate-qc-fin-spec.sql 新建)
 table:qc_return   # 暂收退料单头表——面板 QC_RETURN;退货类型/仓库/供应商代码
 table:qc_return_detail   # 暂收退料单行表——面板 QC_RETURN 明细
 table:qc_scp   # 试产材料使用申请单头表——面板 QC_SCP

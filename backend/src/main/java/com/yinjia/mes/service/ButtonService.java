@@ -503,6 +503,9 @@ public class ButtonService {
         // 送料暂收单(面板编码 QC_RECV,2026-09-20 由 SL_RECV 改):保存(含修改)后同步修改
         // 由它生成的来料检验单(共享字段镜像,见 syncInspFromSlRecv)
         if ("QC_RECV".equals(def.code())) syncInspFromSlRecv(no, user);
+        // 工序报工单:保存后即补「工单行号」(2026-10-15 用户口径「报工单必带工单行号」)——
+        //   权威行键 gd_id 只在审核时写,草稿期列表上看不出是哪一行;此处按 gd_id/批次号解析后落库。
+        woReport.stampRowNo(def.code(), no);
 
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复
         // 文档编号唯一性(实施计划单号等):不允许与其他单据重复。
@@ -1390,39 +1393,9 @@ public class ButtonService {
         // 库存成本重算(移动加权):本单已进入 v_stock_movement(仅已审核单据进视图),成本物化表随之作废。
         // 全量重算而非按分区:单据可能改动了仓库/存货编码,旧分区行不会被范围 DELETE 清掉。
         recalcInvCostIfStockDoc(def.code());
-        // 工序报工记账(生产过程层):报工单审核 → wo_progress.完成数量 累计
-        woReport.post(def.code(), no, currentUserName());
-        // 工序任务回写(A 项,2026-10-05):报工审核 → 该工单该工序任务的完成量累计 + 状态推进
-        processTask.onReport(def.code(), no, currentUserName());
-        // 转序派线(2026-10-07 预排全程线):报工**审核**后,若前道已完工 → 自动把工单切到下一道工序的**预排线**
-        // (计划线 = 排产时人工逐道选定,台账 wo_process_line;留痕 wo_transfer_log 原因「转序自动派线」)。
-        // 只对报工单生效;失败不阻断审核(回执在排产页/追溯里可见)。
-        if ("WO_REPORT".equals(def.code())) {
-            // ⚠ 转序按**工单号 + 工单行号**定位(2026-10-07 用户口径:只切被报工那一行的线;
-            //   no 是报工单号,不能当工单号用;一个报工单可能涉及多行 ⇒ 逐行处理)
-            for (Map<String, Object> rr : woReport.reportRows(def.code(), no)) {
-                String wo = rr.get("工单号") == null ? "" : String.valueOf(rr.get("工单号")).trim();
-                Object rid = rr.get("工单行id");
-                if (wo.isEmpty() || rid == null) continue;
-                try {
-                    processTask.applyNextProcess(wo, ((Number) rid).longValue(), currentUserName());
-                } catch (Exception e) {
-                    log.warn("转序派线失败(不阻断报工审核): 工单={} 行={} 报工单={} {}", wo, rid, no, e.getMessage());
-                }
-            }
-        }
-        // 三类工序检验单(9.29 批次④,2026-10-05):成型/切炭/组装 报工审核 → 各自动生成一张检验单草稿
-        // (三张独立不合并;幂等=同一报工单同一工序只出一张;后续品质填写判定/数量)
-        woInspGenerate(def.code(), no, currentUserName());
-        // 组装成品检验单审核 → 合格数转产成品入库单草稿、不合格数转不良品处理单草稿(待处理)
-        asmInspToStock(def.code(), no, currentUserName());
-        // 切炭双出口(已确认):报工审核后,直销数量自动生成成品入库单并审核入账(成品仓)
-        dualOutFinishIn(def.code(), no, currentUserName());
-        // 生产工单执行回填(参考库 plang_pc:完工入库回写 rk_sl/rk_no、领料回写 ll_no2):
-        // 重算式(以该工单名下已审核入库/领料单为真源),审核/弃审对称;切炭自动入库经上方同路径已覆盖
-        manuWriteback.post(def.code(), no, currentUserName());
-        // 不良品处理记账钩子已随「不良品处理单 QC_DISPOSAL」下架移除(2026-10-09):该面板 0 单据、0 操作留痕,
-        // 用户确认不要;对应的 QcDisposalService(原仓扣减 + 隔离/不良品仓移仓 / 报废只扣不入)整文件删除。
+        // 生产报工审核后副作用(报工记账/工序任务/转序派线/检验单/入库回填/结案重算/不良品记账)
+        // —— 与「审批通过」共用同一方法,避免再次出现"只在审核路径生效"的漏挂(见 runWoAuditHooks 注释)
+        runWoAuditHooks(def, no, currentUserName());
         // 来料检验单审核 → 自动生单(2026-09-16 双出口口径):合格数量>0 的行生成采购入库单草稿,
         // 不良数量>0 的行生成暂收退回单草稿(此前暂收退回单为手工按钮,现改为审核自动创建)
         inspAutoPurchaseIn(def.code(), no, currentUserName());
@@ -1535,7 +1508,77 @@ public class ButtonService {
         // 生产工单执行回填(对称重算):必须在上方 yj_doc_status 置 shr=NULL **之后**执行——
         // 重算以"已审核集合"为真源,挂钩早于状态清除会把弃审单仍按已审核计入,回填回旧值(2026-09-22 实测踩坑)
         manuWriteback.unpost(def.code(), no, currentUserName());
+        // 组装成品检验**弃审** → 重算结案:检验不再是"已审核通过" ⇒ 该工单行应退回未结案
+        //   (必须在 shr 清掉之后,口径同上方的 manuWriteback 注释)
+        syncCloseAfterAsmInsp(def.code(), no, currentUserName());
         return result(no, "草稿");
+    }
+
+    /**
+     * 生产报工「审核后副作用」—— **审核与「审批通过」两条路共用**(2026-10-15 用户报障:
+     * 「当前生产报工内点击审批不会自动填入相应的数据」「自动填入只在审核按钮实现,点击审批按钮不会实现」)。
+     *
+     * <p>根因:这段钩子原来**只挂在 {@code audit()}** 里;走「提交审批 → 审批通过」的报工单
+     * 因此不写 {@code wgzt/wgsj}(用户看不到"相应的数据")、不解析工单行号、不生成工序检验单、
+     * 不转序派线、不回填入库/领料/结案 —— 审批完了单子还是空的。
+     *
+     * <p>⚠ 同类问题 2026-09-16 在**来料检验单**上已经发生过一次(inspAutoPurchaseIn/inspAutoReturn
+     * 只挂审核路径);说明"钩子散落在 audit 里、审批路径靠人工补记"这个结构必然反复漏。
+     * 故这里把生产报工这一族的钩子抽成**一处**,两个入口共用。
+     * 每一步内部都自筛面板(非本面板直接 return),所以对任意面板调用都无副作用。
+     */
+    private void runWoAuditHooks(PanelRegistry.PanelDef def, String no, String user) {
+        // 报工记账(生产过程层):写 wgzt='Y'/wgsj、补工单行号、镜像排产到 scjl
+        woReport.post(def.code(), no, user);
+        // 工序任务回写(A 项):该工单该工序任务的完成量累计 + 状态推进 + 工单完工状态重算
+        processTask.onReport(def.code(), no, user);
+        // 转序派线(预排全程线):前道已完工 → 把工单切到下一道工序的预排线
+        if ("WO_REPORT".equals(def.code())) {
+            for (Map<String, Object> rr : woReport.reportRows(def.code(), no)) {
+                String wo = rr.get("工单号") == null ? "" : String.valueOf(rr.get("工单号")).trim();
+                Object rid = rr.get("工单行id");
+                if (wo.isEmpty() || rid == null) continue;
+                try {
+                    processTask.applyNextProcess(wo, ((Number) rid).longValue(), user);
+                } catch (Exception e) {
+                    log.warn("转序派线失败(不阻断报工审核): 工单={} 行={} 报工单={} {}", wo, rid, no, e.getMessage());
+                }
+            }
+        }
+        // 三类工序检验单:成型/切炭/组装 报工审核 → 各自动生成一张检验单草稿
+        woInspGenerate(def.code(), no, user);
+        // 组装成品检验单 → 合格数转产成品入库单草稿、不合格数转不良品处理单草稿
+        asmInspToStock(def.code(), no, user);
+        // 切炭双出口:直销数量自动生成成品入库单并审核入账(成品仓)
+        dualOutFinishIn(def.code(), no, user);
+        // 生产工单执行回填(入库回写 rk_sl/rk_no、领料回写 ll_no2)
+        manuWriteback.post(def.code(), no, user);
+        // 组装成品检验审核 → 重算结案(组装成品检验已审核 + 入库≥排产)
+        syncCloseAfterAsmInsp(def.code(), no, user);
+        // 不良品处理记账钩子已随「不良品处理单 QC_DISPOSAL」下架移除(2026-10-09,origin/main):
+        //   该面板 0 单据、0 操作留痕,用户确认不要,对应的 QcDisposalService 整文件已删除。
+        // ⚠ 本方法 runWoAuditHooks 是**本分支新抽**的公共方法,远端删钩子时看不到它 ⇒
+        //   合并后必须在这里手工去掉 qcDisposal 调用,否则引用已删除的类、编译不过。
+    }
+
+    /**
+     * 组装成品检验单 审核/弃审 → 重算其所属**工单**各行的结案状态。
+     *
+     * <p>用户口径(2026-10-15):「当最后**组装成品检验完成入库后**才显示结案」——
+     * 所以组装成品检验的审核状态是结案的**前置条件之一**,它一变就要重算。
+     * 非 QC_ASM_INSP 面板直接返回(无副作用);失败不阻断主流程(结案只是派生状态)。
+     */
+    private void syncCloseAfterAsmInsp(String panelCode, String inspNo, String user) {
+        if (!"QC_ASM_INSP".equals(panelCode)) return;
+        try {
+            for (String wo : jdbc.queryForList(
+                    "SELECT DISTINCT ISNULL(工单号,N'') FROM dbo.qc_asm_insp_head WHERE 单据编号=?",
+                    String.class, inspNo)) {
+                if (wo != null && !wo.isBlank()) processTask.syncCloseStateByOrder(wo, user);
+            }
+        } catch (Exception e) {
+            log.warn("[结案重算] 组装成品检验 {} 触发失败(不阻断): {}", inspNo, e.getMessage());
+        }
     }
 
     // ---- 中止(对齐 PANDA/T+ 整单中止、生产工单中止执行):仅已审核可中止,恢复保留原审核留痕 ----
@@ -1723,6 +1766,11 @@ public class ButtonService {
                     Map.of("docNo", no, "actor", operator, "opinion", opinion == null ? "" : opinion, "effect", madeF), operator));
             return result(no, "已生效");
         }
+        // 🔴 2026-10-15 用户报障:「当前生产报工内点击审批不会自动填入相应的数据;自动填入只在审核按钮实现,
+        //   点击审批按钮不会实现」—— 生产报工的审核后副作用(写 wgzt/wgsj、解析工单行号、生成工序检验单、
+        //   转序派线、入库/领料回填、结案重算)此前**只挂在 audit()** 里,审批通过这条路整段缺失。
+        //   现与审核共用同一方法(各钩子内部自筛面板,对非报工面板无副作用)。
+        runWoAuditHooks(def, no, operator);
         // 来料检验单审批通过(与「审核」同效为已审核) → 同样触发自动生单(2026-09-16 修复:
         // 此前钩子只挂在审核路径,走 提交审批→审批通过 的检验单不生成采购入库单/暂收退回单,
         // 用户只好点手工生单按钮,而手工路径实收数量映射错误且退回单被死过滤器挡住)
@@ -1777,6 +1825,8 @@ public class ButtonService {
                         + " WHERE panel_code = ? AND doc_no = ? AND pending = 'Y' AND approve_node = 2", operator, def.code(), no);
         if (n == 0) throw new IllegalStateException("单据已被审批或驳回，请刷新后查看");
         recordApproval(def.code(), no, "APPROVE", "APPROVED", opinion, 2);
+        // 2026-10-15:二级(最终)审批通过同样要跑生产报工的审核后副作用 —— 见 approveApproval 的同款注释
+        runWoAuditHooks(def, no, operator);
         inspAutoPurchaseIn(def.code(), no, operator);
         inspAutoReturn(def.code(), no, operator);
         if (ADMIN_L2_PANELS.contains(def.code())) {
@@ -2450,9 +2500,11 @@ public class ButtonService {
     private void dualOutFinishIn(String panelCode, String no, String user) {
         if (!"WO_REPORT".equals(panelCode)) return;
         // 2026-09-27 单表化:报工数据直读 scjl(按 报工单号)
+        // 2026-10-15 行级:带上 gd_id(=plang_pc.id → 工单行),入库单要按行写「批次号 + 工单行号」
         List<Map<String, Object>> reps = jdbc.queryForList(
                 "SELECT ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL(sl,0) AS 报工数量,"
-                        + " ISNULL([直销数量],0) AS 直销数量 FROM dbo.scjl"
+                        + " ISNULL([直销数量],0) AS 直销数量, ISNULL([批次号],N'') AS 报工批次,"
+                        + " ISNULL(gd_id,0) AS gd_id FROM dbo.scjl"
                         + " WHERE [报工单号] = ? AND ISNULL(asp_cancel,'N') <> 'Y' AND ISNULL(wgzt,'N')='Y'", no);
         if (reps.isEmpty()) return;
         Map<String, Object> rep = reps.get(0);
@@ -2466,6 +2518,9 @@ public class ButtonService {
                         + " AND target_panel_code = 'FINISH_IN' AND link_status = 'ACTIVE'", Integer.class, no);
         if (linked != null && linked > 0) return; // 已生成过直销入库(重审幂等)
         String wo = String.valueOf(rep.get("工单号"));
+        // 本单锚定的**工单行**(scjl.gd_id = plang_pc.id → plang_pc.plang_id = plang.id);
+        //   老数据没有 gd_id 时按(工单号+批次号)找该行 —— 与 WoReportService.reportRows 同一口径
+        Map<String, Object> woRow = resolveWoRow(wo, (long) numOr(rep.get("gd_id")), String.valueOf(rep.get("报工批次")));
         // 工单数据源(2026-09-27 切 plang 单轨):工单号=plang.pl_no,产品/单位/批号取 plang 行;
         // 批号 lot_no 空时现场取号并回写 plang 全部行
         List<Map<String, Object>> ws = jdbc.queryForList(
@@ -2506,9 +2561,21 @@ public class ButtonService {
         line.put("仓库", finishWh);
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", LocalDate.now().toString());
+        // 🔴 2026-10-15 修:必须写「业务类型」—— 正式库 bd_finish_in.[业务类型] 是 **NOT NULL**,
+        //   而测试库该列**允许 NULL**(两账套结构不一致)⇒ 自动生单在测试账套跑得通、到正式库报
+        //   「Cannot insert the value NULL into column '业务类型'」。值取该字段字典里的「产成品入库」。
+        head.put("业务类型", "产成品入库");
         head.put("仓库", finishWh);
         head.put("生产车间", "切炭车间");
         head.put("加工单号", wo);
+        // 行级键(2026-10-15):工单行号 + 批次号写进入库单头 ⇒ 工单追溯「入库段」能按行收敛
+        //   (列随 migrate-finish-in-wo-line-20261015.sql 新增;yj_field 已注册 header,否则被 labelsToCols 静默丢弃)
+        if (woRow != null) {
+            head.put("工单行号", woRow.get("pl_xc"));
+            if (woRow.get("批次号") != null && !String.valueOf(woRow.get("批次号")).isBlank()) {
+                head.put("批次号", woRow.get("批次号"));
+            }
+        }
         head.put("经手人", user);
         head.put("detail", Map.of("items", List.of(line)));
         Map<String, Object> saved = save(registry.panel("FINISH_IN"), head, false);
@@ -2523,6 +2590,44 @@ public class ButtonService {
     private static double numOr(Object o) {
         if (o == null || String.valueOf(o).isBlank()) return 0;
         try { return Double.parseDouble(String.valueOf(o)); } catch (NumberFormatException e) { return 0; }
+    }
+
+    /**
+     * 报工单号 → 该单锚定的**排产行id**(scjl.gd_id = plang_pc.id);取不到返回 0(不猜)。
+     * 入库单要按行写行键时,经「报工单号」反推比经检验单头更直接(检验单头自带工单行号列后
+     * 也可以走它,但报工单号是这条链上的原始锚,2026-10-15)。
+     */
+    private long gdIdOfReport(String reportNo) {
+        if (reportNo == null || reportNo.isBlank()) return 0;
+        List<Long> r = jdbc.queryForList(
+                "SELECT TOP 1 ISNULL(gd_id,0) FROM dbo.scjl WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                        + " AND ISNULL(gd_id,0) > 0 ORDER BY id", Long.class, reportNo);
+        return r.isEmpty() || r.get(0) == null ? 0 : r.get(0);
+    }
+
+    /**
+     * 报工行 → **工单行**(plang 行):入库单要按「工单号 + 工单行号」写行键(2026-10-15)。
+     * <p>行级键口径(与 {@code WoReportService.reportRows} / {@code ScheduleBoardService.trace} 同源):
+     * {@code scjl.gd_id = plang_pc.id} → {@code plang_pc.plang_id = plang.id}(**不是** gd_id 直接当 plang.id);
+     * 老数据没有 gd_id 时退回按(工单号 + 批次号)找该行。取不到返回 null(不猜行)。
+     */
+    private Map<String, Object> resolveWoRow(String wo, long gdId, String batch) {
+        if (wo == null || wo.isBlank()) return null;
+        if (gdId > 0) {
+            List<Map<String, Object>> r = jdbc.queryForList(
+                    "SELECT TOP 1 p.id, p.pl_xc, ISNULL(p.[批次号],N'') AS 批次号 FROM dbo.plang_pc pc"
+                            + " JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                            + " WHERE pc.id=?", gdId);
+            if (!r.isEmpty()) return r.get(0);
+        }
+        if (batch != null && !batch.isBlank()) {
+            List<Map<String, Object>> r = jdbc.queryForList(
+                    "SELECT TOP 1 p.id, p.pl_xc, ISNULL(p.[批次号],N'') AS 批次号 FROM dbo.plang p"
+                            + " WHERE p.pl_no=? AND ISNULL(p.[批次号],N'')=? AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                            + " ORDER BY p.id", wo, batch);
+            if (!r.isEmpty()) return r.get(0);
+        }
+        return null;
     }
 
     // ══════════════════════════════════════════════════════════════════════════════════
@@ -2540,7 +2645,14 @@ public class ButtonService {
 
     /** 检验单面板 → 头表名(作废/幂等查重用;取值全是本类常量,无拼接注入面) */
     private static final java.util.Map<String, String> WO_INSP_HEAD = java.util.Map.of(
-            "QC_MOLD_INSP", "qc_mold_insp_head", "QC_CUT_INSP", "qc_cut_insp_head", "QC_ASM_INSP", "qc_asm_insp_head");
+            "QC_MOLD_INSP", "qc_mold_insp_head", "QC_CUT_INSP", "qc_cut_insp_head", "QC_ASM_INSP", "qc_asm_insp_head",
+            // 成品检验规范(2026-10-09):与三张检验单共用同一套「报工弃审 → 作废草稿 + 释放占用链」;
+            // 放进本表即可被 woInspUnauditCascade 的 tbl 解析命中(明细表名由 _head→_detail 推导)。
+            "QC_FIN_SPEC", "qc_fin_spec_head");
+
+    /** 成品检验规范面板/表(2026-10-09 用户任务:8 份受控文件归纳的统一文档格式,组装报工审核时一并生成) */
+    private static final String FIN_SPEC_PANEL = "QC_FIN_SPEC";
+    private static final String FIN_SPEC_HEAD = "qc_fin_spec_head";
 
     /**
      * 报工单审核 → 按工序自动生成检验单草稿(成型/切炭/组装),并写 WO_REPORT→检验单 的占用链。
@@ -2551,6 +2663,7 @@ public class ButtonService {
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT id, ISNULL(gldh,N'') AS 工单号, ISNULL(gxdm,N'') AS 工序, ISNULL(sl,0) AS 报工数量,"
                         + " ISNULL(scx,N'') AS 生产线, ISNULL([批次号],N'') AS 批次号, ISNULL(wzdm,N'') AS 产品编码,"
+                        + " ISNULL(gd_id,0) AS gd_id, [工单行号] AS own_xc,"
                         + " ISNULL(mc,N'') AS 产品名称, ISNULL(gg,N'') AS 规格型号 FROM dbo.scjl"
                         + " WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", repNo);
         for (Map<String, Object> r : rows) {
@@ -2566,6 +2679,17 @@ public class ButtonService {
             Map<String, Object> head = new LinkedHashMap<>();
             head.put("单据日期", LocalDate.now().toString());
             head.put("工单号", r.get("工单号"));
+            // 工单行号(2026-10-15 用户口径「工单号+工单行号确定当前唯一工单」):
+            //   检验单也要带行键,否则同工单多行的检验单在列表/追溯上分不出是哪一行。
+            //   取 scjl.[工单行号];老报工没这个值时用 resolveWoRow(经 gd_id → plang_pc.plang_id,
+            //   再退 (工单号+批次号))反查该行;仍取不到就不写(不猜行)。
+            Integer ownXc = r.get("own_xc") == null ? null : ((Number) r.get("own_xc")).intValue();
+            if (ownXc == null || ownXc == 0) {
+                Map<String, Object> prow = resolveWoRow(String.valueOf(r.get("工单号")),
+                        (long) numOr(r.get("gd_id")), r.get("批次号") == null ? null : String.valueOf(r.get("批次号")));
+                if (prow != null && prow.get("pl_xc") != null) ownXc = ((Number) prow.get("pl_xc")).intValue();
+            }
+            if (ownXc != null && ownXc != 0) head.put("工单行号", ownXc);
             head.put("报工单号", repNo);
             head.put("工序", op);
             if (!String.valueOf(r.get("批次号")).isBlank()) head.put("批次号", r.get("批次号"));
@@ -2578,17 +2702,11 @@ public class ButtonService {
             head.put("检验日期", LocalDate.now().toString());
             head.put("检验员", user);
 
-            List<Map<String, Object>> items = new ArrayList<>();
-            if ("QC_ASM_INSP".equals(target)) {
-                // 组装成品:合格/不合格各一行(会议「录入合格/不合格数量(各一行)」);数量留空由品质填,
-                // 处理方式预置默认(合格→入库、不合格→待处理),人可改
-                items.add(inspLine("成品检验", "合格", "入库"));
-                items.add(inspLine("成品检验", "不合格", "待处理"));
-            } else {
-                // 成型/切炭:通用模板一行(检验项目/标准/实测/判定 由品质填;格式到位后替换模板)
-                items.add(inspLine("外观", null, null));
-            }
-            head.put("detail", Map.of("items", items));
+            // 🔴 2026-10-15 用户口径:「检验单自动生成**不需要**实现明细行的自动填入」+「明细行不填入」
+            //   ⇒ 只建**空明细**的单头,检验项目/合格数量/不合格数量都由品质在明细里自己填。
+            //   原来预铺的行(组装=合格/不合格两行 表区=数量判定;成型/切炭=外观一行)已取消;
+            //   库存分流随之改为按明细列的 合格数量/不合格数量 汇总(见 asmInspToStock)。
+            head.put("detail", Map.of("items", List.of()));
             Map<String, Object> saved = save(registry.panel(target), head, false);
             String no = String.valueOf(saved.get("编号"));
             // 占用链:报工单 → 检验单(源行键=报工单号#scjl.id;弃审时据此作废+释放)
@@ -2596,17 +2714,53 @@ public class ButtonService {
                             + " target_panel_code, target_form_no, link_status, create_by, create_time)"
                             + " VALUES ('WO_REPORT', ?, ?, ?, ?, 'ACTIVE', ?, GETDATE())",
                     repNo, repNo + "#" + r.get("id"), target, no, user);
+            // 成品检验规范(2026-10-09 用户口径「让当前的生产工单完成后能自动生成这个」):
+            // **组装**报工审核时顺带生成一张空格式规范草稿(表头带工单/产品/批次,正文与检验项目留空),
+            // 与三张检验单各自独立、互不覆盖;弃审随占用链一起作废。
+            if ("QC_ASM_INSP".equals(target)) finSpecGenerate(r, repNo, user);
         }
     }
 
-    /** 检验单明细行(只放非空键,避免把 null 写进明细) */
-    private Map<String, Object> inspLine(String item, String judge, String disposition) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        if (item != null) m.put("检验项目", item);
-        if (judge != null) m.put("判定", judge);
-        if (disposition != null) m.put("处理方式", disposition);
-        return m;
+    /**
+     * 组装报工审核 → 生成「成品检验规范」**空格式**草稿(用户:「文件中的数据不重要,主要是格式实现」)。
+     * <p>只带表头(工单号/报工单号/产品编码/产品名称/规格型号/批次号 + 文件名称/版本版次/管控状态/发行日期)
+     * 与 1 行修订履历(版本 A0 / 首次发行);正文五段、检验项目、处理方式**全部留空**由品质填写。
+     * <p>幂等:同一报工单已有存活规范则跳过(弃审作废后可再次生成);
+     * 占用链 WO_REPORT → QC_FIN_SPEC 与检验单同一套,故报工弃审能把它一起作废。
+     */
+    private void finSpecGenerate(Map<String, Object> r, String repNo, String user) {
+        Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM " + FIN_SPEC_HEAD
+                + " WHERE 报工单号=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, repNo);
+        if (dup != null && dup > 0) return;                                    // 幂等
+        String today = LocalDate.now().toString();
+        Map<String, Object> head = new LinkedHashMap<>();
+        head.put("单据日期", today);
+        head.put("文件名称", "成品检验规范");
+        head.put("版本版次", "A0");
+        head.put("管控状态", "受控");
+        head.put("发行日期", today);
+        head.put("工单号", r.get("工单号"));
+        head.put("报工单号", repNo);
+        head.put("产品编码", r.get("产品编码"));
+        head.put("产品名称", r.get("产品名称"));
+        if (!String.valueOf(r.get("规格型号")).isBlank()) head.put("规格型号", r.get("规格型号"));
+        if (!String.valueOf(r.get("批次号")).isBlank()) head.put("批次号", r.get("批次号"));
+        Map<String, Object> rev = new LinkedHashMap<>();
+        rev.put("表区", "修订履历");
+        rev.put("版本", "A0");
+        rev.put("修订理由与内容简述", "首次发行");
+        rev.put("修订日期", today);
+        head.put("detail", Map.of("items", List.of(rev)));
+        Map<String, Object> saved = save(registry.panel(FIN_SPEC_PANEL), head, false);
+        String no = String.valueOf(saved.get("编号"));
+        jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
+                        + " target_panel_code, target_form_no, link_status, create_by, create_time)"
+                        + " VALUES ('WO_REPORT', ?, ?, ?, ?, 'ACTIVE', ?, GETDATE())",
+                repNo, repNo + "#" + r.get("id"), FIN_SPEC_PANEL, no, user);
     }
+
+    // 【已删除】inspLine(检验单「数量判定」预铺行)—— 2026-10-15 用户口径「明细行不填入」后不再预铺明细,
+    //   该辅助方法成了死代码(代码规范 D/E:不留无用方法)。合格/不合格改由明细列 合格数量/不合格数量 表达。
 
     /**
      * 报工单弃审联动:把该报工生成的检验单**草稿**作废(软删)+ 释放占用链;
@@ -2617,7 +2771,7 @@ public class ButtonService {
         List<Map<String, Object>> links = jdbc.queryForList(
                 "SELECT target_panel_code, target_form_no FROM form_flow_link"
                         + " WHERE source_panel_code='WO_REPORT' AND source_form_no=?"
-                        + "   AND target_panel_code IN ('QC_MOLD_INSP','QC_CUT_INSP','QC_ASM_INSP')"
+                        + "   AND target_panel_code IN ('QC_MOLD_INSP','QC_CUT_INSP','QC_ASM_INSP','QC_FIN_SPEC')"
                         + "   AND link_status='ACTIVE'", repNo);
         for (Map<String, Object> l : links) {
             String p = String.valueOf(l.get("target_panel_code"));
@@ -2639,10 +2793,12 @@ public class ButtonService {
     }
 
     /**
-     * 组装成品检验单审核 → 数量分流(会议「合格数转库存、不合格数留系统待处理」):
-     * <ul><li>合格行(判定=合格 或 处理方式=入库)数量 &gt; 0 → 生成**产成品入库单草稿**(FINISH_IN,
+     * 组装成品检验单审核 → 数量分流:
+     * <ul><li><b>合格数 = 表头报工数量 − Σ明细不合格数量</b>(2026-10-15 用户口径:明细只填「不合格数量」,
+     *   合格数量是派生值)数量 &gt; 0 → 生成**产成品入库单草稿**(FINISH_IN,
      *   与切炭直销同一落点,留草稿由仓库审核,不自动记账);</li>
-     * <li>不合格行数量 &gt; 0 → 生成**不良品处理单草稿**(QC_DISPOSAL,处置方式=隔离,待品质/仓库处置)。</li></ul>
+     * <li>不合格数量 &gt; 0 → **不再派生下游单**(2026-10-09 上游已下架「不良品处理单 QC_DISPOSAL」;
+     *   原分支遗漏未删,会让「填了不合格 ⇒ 审核 400 整单回滚」,2026-10-15 合并时收掉,见方法内注释)。</li></ul>
      * 幂等:按 form_flow_link(源=检验单号) 判重,下游作废释放后可重新生成。
      */
     private void asmInspToStock(String panelCode, String inspNo, String user) {
@@ -2654,21 +2810,22 @@ public class ButtonService {
         List<Map<String, Object>> heads = jdbc.queryForList(
                 "SELECT ISNULL(工单号,N'') AS 工单号, ISNULL(批次号,N'') AS 批次号, ISNULL(产品编码,N'') AS 产品编码,"
                         + " ISNULL(产品名称,N'') AS 产品名称, ISNULL(规格型号,N'') AS 规格型号,"
-                        + " ISNULL(生产线,N'') AS 生产线 FROM qc_asm_insp_head"
+                        + " ISNULL(生产线,N'') AS 生产线, ISNULL(报工单号,N'') AS 报工单号,"
+                        + " ISNULL(报工数量,0) AS 报工数量 FROM qc_asm_insp_head"
                         + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", inspNo);
         if (heads.isEmpty()) throw new IllegalStateException("组装成品检验单不存在:" + inspNo);
         Map<String, Object> h = heads.get(0);
         List<Map<String, Object>> lines = jdbc.queryForList(
-                "SELECT ISNULL(判定,N'') AS 判定, ISNULL(数量,0) AS 数量, ISNULL(处理方式,N'') AS 处理方式"
+                "SELECT ISNULL(不合格数量,0) AS 不合格数量"
                         + " FROM qc_asm_insp_detail WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", inspNo);
-        double pass = 0, ng = 0;
-        for (Map<String, Object> r : lines) {
-            double q = numOr(r.get("数量"));
-            if (q <= 0) continue;                                  // 数量空=品质还没填,不生成下游
-            boolean okLine = "合格".equals(String.valueOf(r.get("判定")).trim())
-                    || "入库".equals(String.valueOf(r.get("处理方式")).trim());
-            if (okLine) pass += q; else ng += q;
-        }
+        // 🔴 2026-10-15 用户口径(第三次修订):「去除合格数量只保留不合格数量即可,最终的合格数量就是
+        //   [报工数量]减去[不合格数量]」。
+        //   ⇒ 明细只填「不合格数量」;合格数量 = **表头报工数量 − Σ明细不合格数量**(负值兜 0),
+        //     不再读明细的「合格数量」列(该字段登记行已由
+        //     tools/migrate-insp-pass-qty-derived-20261015.sql 注销,物理列留作历史)。
+        double ng = 0;
+        for (Map<String, Object> r : lines) ng += numOr(r.get("不合格数量"));
+        double pass = Math.max(0, numOr(h.get("报工数量")) - ng);
         if (pass <= 0 && ng <= 0) return;                          // 品质没填数量:单据走过而已,不产生下游
         // 工单侧数据(单位/单价/批号;保留 dualOutFinishIn 的 inline 取仓口径,后续可抽公共方法)
         String wo = String.valueOf(h.get("工单号"));
@@ -2699,8 +2856,23 @@ public class ButtonService {
             line.put("仓库", wh);
             Map<String, Object> head = new LinkedHashMap<>();
             head.put("单据日期", LocalDate.now().toString());
+            // 🔴 2026-10-15 修(用户报障「组装成品检验单审批通过/审核后报 业务类型 不能为 NULL」):
+            //   正式库 bd_finish_in.[业务类型] 是 **NOT NULL**,本方法原来没写它 ⇒ 生成产成品入库单时
+            //   `Cannot insert the value NULL into column '业务类型'`。测试库该列允许 NULL,故探针没抓到。
+            head.put("业务类型", "产成品入库");
             head.put("仓库", wh);
             head.put("加工单号", wo);
+            // 行级键(2026-10-15):工单行号 + 批次号写进入库单头 ⇒ 工单追溯「入库段」按行收敛。
+            //   检验单头只有「报工单号」能反推到行(头表没有工单行号列),故经报工单号 → scjl.gd_id → plang 行。
+            Map<String, Object> woRow = resolveWoRow(wo, gdIdOfReport(String.valueOf(h.get("报工单号"))), batch);
+            if (woRow != null) {
+                head.put("工单行号", woRow.get("pl_xc"));
+                if (woRow.get("批次号") != null && !String.valueOf(woRow.get("批次号")).isBlank()) {
+                    head.put("批次号", woRow.get("批次号"));
+                }
+            } else if (!batch.isBlank()) {
+                head.put("批次号", batch);       // 行号取不到时至少留批次(追溯按批次兜底)
+            }
             head.put("经手人", user);
             head.put("备注", "组装成品检验单 " + inspNo + " 合格数转库存");
             head.put("detail", Map.of("items", List.of(line)));
@@ -2714,27 +2886,14 @@ public class ButtonService {
             jdbc.update("UPDATE qc_asm_insp_head SET 处理方式=?, asp_user2=?, asp_time2=GETDATE()"
                     + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", "合格转库存(" + fiNo + ")", user, inspNo);
         }
-        if (ng > 0) {
-            Map<String, Object> head = new LinkedHashMap<>();
-            head.put("单据日期", LocalDate.now().toString());
-            head.put("来源单号", inspNo);
-            head.put("物料编码", h.get("产品编码"));
-            head.put("物料名称", h.get("产品名称"));
-            if (lot != null && !lot.isBlank()) head.put("批号", lot);
-            head.put("数量", ng);
-            head.put("原仓库", wh);
-            head.put("处置方式", "隔离");                       // 留系统待处理:先进隔离仓,由品质/仓库处置
-            head.put("处置原因", "组装成品检验不合格(检验单 " + inspNo + ")");
-            head.put("经手人", user);
-            Map<String, Object> saved = save(registry.panel("QC_DISPOSAL"), head, false);
-            String blNo = String.valueOf(saved.get("编号"));
-            jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
-                            + " target_panel_code, target_form_no, link_status, create_by, create_time)"
-                            + " VALUES ('QC_ASM_INSP', ?, '', 'QC_DISPOSAL', ?, 'ACTIVE', ?, GETDATE())",
-                    inspNo, blNo, user);
-            jdbc.update("UPDATE qc_asm_insp_head SET 处理方式=?, asp_user2=?, asp_time2=GETDATE()"
-                    + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", "不合格待处理(" + blNo + ")", user, inspNo);
-        }
+        // 🔴 2026-10-15 合并 origin/main 时收掉的尾巴:**不合格侧不再建下游单**。
+        //   上游 2026-10-09 已下架「不良品处理单 QC_DISPOSAL」(面板 0 单据、0 操作留痕,用户确认不要),
+        //   连带删了 QcDisposalService、删了 yj_panel 行与 qc_disposal 表,但**漏删了这里的分支**:
+        //   一旦 不合格数量 > 0,审核走到 save(registry.panel("QC_DISPOSAL")) 就抛
+        //   「面板不存在:QC_DISPOSAL」⇒ 整单 400 回滚(实测:不合格=3 时审核必失败、入库单也不生成)。
+        //   这与本分支「合格数量 = 报工数量 − 不合格数量」的口径直接冲突(填了不合格就审不过),
+        //   故按上游的下架口径把该分支整段移除:不合格数量仍记在检验单明细上、追溯页「不合格数量合计」
+        //   照常汇总,只是不再自动派生一张不良品处理单。
     }
 
     /** 产线 → 所属车间(bs_prod_line.生产车间;线不存在返回 null) */
