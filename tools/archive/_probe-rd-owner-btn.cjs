@@ -82,6 +82,36 @@ async function main() {
       return 'none' })()`)
 
     await send('Page.enable'); await send('Runtime.enable')
+    // 装请求钩子:抓页面自己发出的 rdFlow 请求与响应体 —— 按钮置灰等于 !rdFlow.canConfirmOwner,
+    // 而那个值只在「调用成功」时才被赋值(失败走 clearRdFlow 静默全灰,PanelxList.vue:4620-4623)。
+    // 必须在本页任何脚本执行前注入,故放在导航之前。
+    await send('Page.addScriptToEvaluateOnNewDocument', { source: `
+      window.__reqLog = [];
+      (function(){
+        var of = window.fetch;
+        window.fetch = function(){
+          var u = (arguments[0] && arguments[0].url) || String(arguments[0]);
+          var p = of.apply(this, arguments);
+          if (String(u).indexOf('rdFlow') >= 0) {
+            p.then(function(r){ r.clone().text().then(function(t){
+              window.__reqLog.push({ via:'fetch', url:String(u), status:r.status, body:String(t).slice(0,300) }) })
+            }).catch(function(e){ window.__reqLog.push({ via:'fetch', url:String(u), err:String(e) }) });
+          }
+          return p;
+        };
+        var oo = XMLHttpRequest.prototype.open, os = XMLHttpRequest.prototype.send;
+        XMLHttpRequest.prototype.open = function(m,u){ this.__u = u; return oo.apply(this, arguments); };
+        XMLHttpRequest.prototype.send = function(){
+          var x = this;
+          if (String(x.__u).indexOf('rdFlow') >= 0) {
+            x.addEventListener('loadend', function(){
+              window.__reqLog.push({ via:'xhr', url:String(x.__u), status:x.status, body:String(x.responseText||'').slice(0,300) });
+            });
+          }
+          return os.apply(this, arguments);
+        };
+      })();
+    ` })
     await send('Emulation.setDeviceMetricsOverride', { width: 1760, height: 1400, deviceScaleFactor: 1, mobile: false })
     await nav(`${BASE}/#/login`)
     await ev(`localStorage.setItem('mes_init_done','1'); localStorage.setItem('mes_token', ${JSON.stringify(me.token)}); localStorage.setItem('mes_user', ${JSON.stringify(JSON.stringify(me.user))}); 'ok'`)
@@ -108,6 +138,8 @@ async function main() {
       }
       const chip = await ev(`(function(){ var e=document.querySelector('.doc-chip, .side-doc-no, .as-side-docno'); return e?(e.textContent||'').trim():'' })()`)
       console.log(`  当前打开的单据条 = ${JSON.stringify(chip)}`)
+      const reqLog = await ev(`JSON.stringify(window.__reqLog || [])`)
+      console.log(`  页面自己发出的 rdFlow 请求 = ${reqLog}`)
       const f = await shot(no)
       console.log(`  截图:${f}`)
     }
