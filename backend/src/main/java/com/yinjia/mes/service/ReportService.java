@@ -539,13 +539,31 @@ public class ReportService {
     }
 
     /**
-     * 取某表区的「实测数值」,把所有值摊平成一个列表(最多取 5 个,对应截图的 5 格)。
-     * 值形如 {@code 44.5/44.6/44.5/44.7/44.6} —— 按 "/" 拆;
-     * 同表区多行(如 尺寸 有 外径/内径/长度 三行)时按行顺序依次摊平,取前 5 个。
+     * 取某表区的「实测值」,摊平成一个列表(最多 5 个,对应截图的 5 格)。
+     *
+     * <p>取值优先级(2026-10-12 加「测量值1..5」列后):
+     * <ol>
+     *   <li>优先读结构化列 {@code 测量值1..5}(面板上就是 5 个录入格),
+     *       同一行有多个值时全部摊平(如尺寸行 外径 填了 5 个格 ⇒ 5 个值);</li>
+     *   <li>取不到再回退到旧文本列 {@code 实测数值},按 "/" 拆(兼容历史数据)。</li>
+     * </ol>
      */
     private static List<String> splitParts(List<Map<String, ?>> rows, String sector) {
         List<String> out = new ArrayList<>();
         if (rows == null) return out;
+        // ① 结构化列优先:同表区每行的 测量值1..5 依次摊平
+        for (Map<String, ?> r : rows) {
+            if (!sector.equals(str(r.get("表区")))) continue;
+            for (int i = 1; i <= 5; i++) {
+                Object v = r.get("测量值" + i);
+                if (v == null) continue;
+                String t = num(v);
+                if (!t.isEmpty()) out.add(t);
+                if (out.size() >= 5) return out;
+            }
+        }
+        if (!out.isEmpty()) return out;
+        // ② 回退:旧文本列按 / 拆
         for (Map<String, ?> r : rows) {
             if (!sector.equals(str(r.get("表区")))) continue;
             String v = str(r.get("实测数值"));
@@ -559,13 +577,29 @@ public class ReportService {
         return out;
     }
 
+    /** 数值转显示串:去尾零(44.5000 → 44.5),null/0 视为未填 */
+    private static String num(Object o) {
+        if (o == null) return "";
+        if (o instanceof java.math.BigDecimal bd) {
+            if (bd.signum() == 0) return "";                       // 0 = 未填
+            return bd.stripTrailingZeros().toPlainString();
+        }
+        if (o instanceof Number n) {
+            double d = n.doubleValue();
+            if (d == 0d) return "";
+            return d == Math.rint(d) ? String.valueOf((long) d) : String.valueOf(d);
+        }
+        String t = String.valueOf(o).trim();
+        return "0".equals(t) ? "" : t;
+    }
+
     /** 明细「表区」→ 报表参数名(制程检验记录表的三个矩阵格) */
     private static final Map<String, String> SECTOR_PARAMS = Map.of(
             "外观", "外观结果",
             "尺寸", "尺寸结果",
             "重量", "重量结果");
 
-    /** 取同表区明细,按「检验项目:实测数值(判定)」拼接;无该表区则返回空串 */
+    /** 取同表区明细,按「检验项目:实测值(判定)」拼接;无该表区则返回空串 */
     private static String joinSector(List<Map<String, ?>> rows, String sector) {
         if (rows == null || rows.isEmpty()) return "";
         StringBuilder sb = new StringBuilder();
@@ -573,7 +607,7 @@ public class ReportService {
             Object sec = r.get("表区");
             if (sec == null || !sector.equals(String.valueOf(sec).trim())) continue;
             String item = str(r.get("检验项目"));
-            String val = str(r.get("实测数值"));
+            String val = firstMeasure(r);           // 优先结构化测量值,回退旧文本列
             String judge = str(r.get("单项判定"));
             String one = item;
             if (!val.isEmpty()) one = one.isEmpty() ? val : one + ":" + val;
@@ -583,6 +617,17 @@ public class ReportService {
             sb.append(one);
         }
         return sb.toString();
+    }
+
+    /** 单个明细行的实测值:优先 测量值1..5(取首个非空非零),回退 实测数值 文本 */
+    private static String firstMeasure(Map<String, ?> r) {
+        for (int i = 1; i <= 5; i++) {
+            Object v = r.get("测量值" + i);
+            if (v == null) continue;
+            String t = num(v);
+            if (!t.isEmpty()) return t;
+        }
+        return str(r.get("实测数值"));
     }
 
     private static String str(Object o) {

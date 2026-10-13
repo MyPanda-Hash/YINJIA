@@ -1,5 +1,6 @@
 SET NOCOUNT ON;
-MERGE yj_report_template AS t USING (VALUES (N'qc_proc_insp', N'QC_PROC_INSP', N'制程检验记录表', N'<?xml version="1.0" encoding="UTF-8"?>
+MERGE yj_report_template AS t USING (VALUES (N'qc_proc_insp', N'QC_PROC_INSP', N'制程检验记录表',
+  N'<?xml version="1.0" encoding="UTF-8"?>
 <!--
   制程检验记录表报表模板(QC_PROC_INSP / qc_proc_insp_head + qc_proc_insp_detail,2026-10-12)
   ============================================================================
@@ -350,8 +351,9 @@ MERGE yj_report_template AS t USING (VALUES (N'qc_proc_insp', N'QC_PROC_INSP', N
 </jasperReport>
 ', N'按《生产相关品质检验.xlsx》制程检验页签版式(2026-10-12)', N'admin'))
   AS s(template_code, panel_code, name, jrxml_text, remark, update_by)
-ON t.template_code=s.template_code
+ON t.template_code = s.template_code
 WHEN MATCHED THEN UPDATE SET panel_code=s.panel_code, name=s.name, jrxml_text=s.jrxml_text,
   enabled='Y', remark=s.remark, update_by=s.update_by, update_at=SYSDATETIME()
 WHEN NOT MATCHED THEN INSERT (template_code, panel_code, name, jrxml_text, enabled, remark, create_by, update_by)
   VALUES (s.template_code, s.panel_code, s.name, s.jrxml_text, 'Y', s.remark, s.update_by, s.update_by);
+SELECT template_code, panel_code, name, LEN(jrxml_text) AS jrxml长度, enabled FROM yj_report_template WHERE template_code='qc_proc_insp';
