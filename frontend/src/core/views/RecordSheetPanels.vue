@@ -2839,6 +2839,8 @@ function confirmMaterialPick() {
     const rows = rowsOf(dt)
     const row = rows[rows.length - 1]
     if (!row) continue
+    // 序号:按**本表区**已有行数续编(addRow 只在 dt.autoSeqBar / cfg.autoSeq 时才设,这张表没配)
+    if (colKeys.has('序号')) row['序号'] = String(rows.length)
     if (colKeys.has('物料编码')) row['物料编码'] = code
     if (colKeys.has('物料名称')) row['物料名称'] = r['子件名称'] || ''
     if (colKeys.has('规格参数')) row['规格参数'] = r['规格型号'] || ''

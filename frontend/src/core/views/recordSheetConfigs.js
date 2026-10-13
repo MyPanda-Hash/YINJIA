@@ -1363,13 +1363,11 @@ export const recordSheetConfigs = {
       //    两者都有 = 同一标题渲染两遍(用户报「空余行重复了」)。
       // ⚠ filterKey/filterVal 保留:规格书全部明细共用一张 rd_spec_doc_detail,靠 [表区]='物料清单'
       //    把物料行与修订记录/检验项目行分开;删掉会把整张明细当物料显示(踩过)。
-      // ⚠ 2026-10-13:「从物料清单引用」(materialPick) 的**能力代码**已在 RecordSheetPanels.vue 里
-      //    恢复(按钮模板/弹窗/取数 WLBOM/字段映射),但**本行开关保持关闭** ——
-      //    实测导入后行不落进这张表(弹「已导入 1 行」而表格仍只有表头 + 空操作行),
-      //    根因未定位(已排除:弹窗没开、勾选丢失、filterKey 硬编码、未复用 addRow,
-      //    且先前那版"点表格自带 ＋ 能出行"的对照实验因选择器不精确而作废)。
-      //    功能完成前不开这个开关,免得用户点到一个不工作的按钮;修好后在本行加回 materialPick: true。
-      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', cols: [
+      // ⚠ 2026-10-13:「从物料清单引用」(materialPick) 能力代码已在 RecordSheetPanels.vue 里恢复
+      //    (按钮模板/弹窗/取数 WLBOM/字段映射),数据源是 WLBOM「物料清单」
+      //    (line_table=mate,单单据面板,子件行在 detail.items),不再读已删掉的 BOM 面板。
+      //    [表区]='物料清单' 是分区值,不动。开关由 materialPick: true 控制(见下行)。
+      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },
           { key: '物料编码', label: '物料编码' },
