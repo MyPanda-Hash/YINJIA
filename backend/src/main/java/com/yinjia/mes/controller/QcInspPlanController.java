@@ -37,7 +37,31 @@ import java.util.Map;
 @RequestMapping("/api/qc/inspPlan")
 public class QcInspPlanController {
 
-    /** 权限锚点:维护入口挂在组装成品检验单上,故以它的可见性为准 */
+    /**
+     * 权限锚点:维护入口挂在各张工序检验单上,故「任一检验单可见」即可。
+     *
+     * <p>2026-10-12:原为单一 {@code QC_ASM_INSP}。制程检验单 QC_PROC_INSP 也要用同一个
+     * 「检验项目设定」弹窗(用户口径:不同检验项目类别自动分格带出明细),故改为集合 ——
+     * 只要用户能看见其中任意一张检验单,就有权读写这套检验标准库。
+     */
+    private static final java.util.List<String> PANELS =
+            java.util.List.of("QC_ASM_INSP", "QC_MOLD_INSP", "QC_CUT_INSP", "QC_PROC_INSP");
+
+    /** 任一检验单可见即放行 */
+    private void requireAnyPanelView() {
+        RuntimeException last = null;
+        for (String p : PANELS) {
+            try {
+                perm.requirePanelView(p);
+                return;
+            } catch (RuntimeException e) {
+                last = e;
+            }
+        }
+        throw last != null ? last : new IllegalStateException("无权访问检验标准库");
+    }
+
+    /** 权限锚点(兼容旧调用点):保留原常量名,指向主入口 */
     private static final String PANEL = "QC_ASM_INSP";
 
     private final JdbcTemplate jdbc;
@@ -57,7 +81,7 @@ public class QcInspPlanController {
     @GetMapping("/plans")
     public ApiResult<List<Map<String, Object>>> plans(@RequestParam(required = false) String keyword,
                                                       @RequestParam(required = false) String all) {
-        perm.requirePanelView(PANEL);
+        requireAnyPanelView();
         boolean withDisabled = truthy(all);
         StringBuilder sql = new StringBuilder(
                 "SELECT id, 方案编码, 方案名称, ISNULL(适用存货,N'') AS 适用存货,"
@@ -83,7 +107,7 @@ public class QcInspPlanController {
     /** 新增/修改方案:POST {id?, 方案编码, 方案名称, 适用存货, 适用存货类别, 检验方式, 抽检比例, 取样规则, 文件编码, 执行标准, 备注} */
     @PostMapping("/planSave")
     public ApiResult<Map<String, Object>> planSave(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView(PANEL);
+        requireAnyPanelView();
         String user = currentUser();
         String code = str(body.get("方案编码"));
         String name = str(body.get("方案名称"));
@@ -131,7 +155,7 @@ public class QcInspPlanController {
     }
 
     private ApiResult<Map<String, Object>> planSetEnabled(Map<String, Object> body, int disabled) {
-        perm.requirePanelView(PANEL);
+        requireAnyPanelView();
         Long id = lng(body.get("id"));
         if (id == null) return ApiResult.error(400, "id 无效");
         int n = jdbc.update("UPDATE dbo.bs_qc_plan SET 停用=?, asp_user2=?, asp_time2=SYSDATETIME()"
@@ -146,7 +170,7 @@ public class QcInspPlanController {
     @GetMapping("/items")
     public ApiResult<List<Map<String, Object>>> items(@RequestParam(required = false) String planCode,
                                                       @RequestParam(required = false) String all) {
-        perm.requirePanelView(PANEL);
+        requireAnyPanelView();
         boolean withDisabled = truthy(all);
         StringBuilder sql = new StringBuilder(
                 "SELECT id, ISNULL(方案编码,N'') AS 方案编码, ISNULL(序号,0) AS 序号,"
@@ -169,7 +193,7 @@ public class QcInspPlanController {
     /** 新增/修改检验项目:POST {id?, 方案编码, 序号, 项目编码, 项目名称, 检验内容, 检验标准, 数据类型, 计量单位, 判定规则, 标准下限, 标准上限, 取样要求, 检验方法, 合格处置, 不合格处置, 备注} */
     @PostMapping("/itemSave")
     public ApiResult<Map<String, Object>> itemSave(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView(PANEL);
+        requireAnyPanelView();
         String user = currentUser();
         String code = str(body.get("项目编码"));
         String name = str(body.get("项目名称"));
@@ -223,7 +247,7 @@ public class QcInspPlanController {
     }
 
     private ApiResult<Map<String, Object>> itemSetEnabled(Map<String, Object> body, int disabled) {
-        perm.requirePanelView(PANEL);
+        requireAnyPanelView();
         Long id = lng(body.get("id"));
         if (id == null) return ApiResult.error(400, "id 无效");
         int n = jdbc.update("UPDATE dbo.bs_qc_item SET 停用=?, asp_user2=?, asp_time2=SYSDATETIME()"

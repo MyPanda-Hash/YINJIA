@@ -1613,7 +1613,7 @@ public class PanelConfigService {
      * 三张单同构、共用同一套检验标准库(bs_qc_plan + bs_qc_item),故三处都注入(组装单是主入口)。
      */
     private static final java.util.Set<String> WO_INSP_PANELS =
-            java.util.Set.of("QC_MOLD_INSP", "QC_CUT_INSP", "QC_ASM_INSP");
+            java.util.Set.of("QC_MOLD_INSP", "QC_CUT_INSP", "QC_ASM_INSP", "QC_PROC_INSP");
     /** 检验项标准库编码(检验数据记录 QC_INSP_REC 的「检验项」字段 dict_sql 就是它) */
     private static final String QC_INSP_ITEM_LIB = "qc.insp_item";
 

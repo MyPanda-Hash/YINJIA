@@ -5510,20 +5510,35 @@ function applyInspItems(items) {
   const tabKey = b ? activeTab(b).key : 'items'
   if (!cur.value.detail) cur.value.detail = {}
   const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
+  // 明细列名(用于判断本面板是否支持「表区」/「检验要求」这类别名字段 —— 制程检验单用别名)
+  const cols = new Set(b ? (activeTab(b).cols || []) : [])
+  const has = (k) => cols.size === 0 || cols.has(k)
+  // 2026-10-12 用户口径:「不同检验项目类别就能自动分格开来实现」
+  //   项目的「检验内容」= 类别(A/B/C/D/E 那种);带入明细时把类别写进「表区」,
+  //   报表/明细即可按类别分格显示。没有类别时回退旧口径 '检验项目'。
   let n = 0
   for (const it of items || []) {
     const row = newDetailRow(tabKey)
-    row['表区'] = '检验项目'
-    row['检验项目'] = it['项目名称'] || ''
-    row['标准要求'] = it['检验标准'] || ''
-    if (it['检验方法']) row['检验方法'] = it['检验方法']
+    const category = String(it['检验内容'] || '').trim()
+    if (has('表区')) row['表区'] = category || '检验项目'
+    if (has('检验项目')) row['检验项目'] = it['项目名称'] || ''
+    // 制程检验单的列名是「检验要求」,三类工序检验单是「标准要求」—— 两个都填,各自生效
+    if (has('标准要求')) row['标准要求'] = it['检验标准'] || ''
+    if (has('检验要求')) row['检验要求'] = it['检验标准'] || ''
+    if (it['检验方法'] && has('检验方法')) row['检验方法'] = it['检验方法']
+    if (it['取样要求'] && has('抽检量')) row['抽检量'] = it['取样要求']
+    if (it['计量单位'] && has('单位')) row['单位'] = it['计量单位']
+    // 顺序:按类别分组后同类相邻(便于人工核对),类别内保持接口返回的 序号 次序
     rows.push(row)
     n++
   }
   if (n) {
     archPage.value = Math.ceil(rows.length / archPageSize.value)
     markInlineDirty()
-    ElMessage.success(`${tt('已带入')} ${n} ${tt('行检验项目，请填写实测数值与判定')}`)
+    const cats = [...new Set(rows.map((r) => r['表区']).filter(Boolean))]
+    ElMessage.success(cats.length > 1
+      ? `${tt('已带入')} ${n} ${tt('行检验项目，按')} ${cats.length} ${tt('个类别分格，请填写实测数值与判定')}`
+      : `${tt('已带入')} ${n} ${tt('行检验项目，请填写实测数值与判定')}`)
   }
   return n
 }
