@@ -3063,3 +3063,6 @@ migrate-sale-out-order-cols2-20261015.sql
 #     有意**不进链**(前者清写入者标记、后者按硬编码 id 删探针残留角色,登记会让 DbSync 在
 #     所有环境自动执行),已登记进 tools/verify/DbNormAudit.java 检查 12 的 allowOffChain 白名单。
 fix-stock-report-module-group.sql
+migrate-qc-proc-insp.sql
+fix-qc-proc-insp-i18n.sql
+fix-qc-proc-insp-report-i18n.sql

@@ -129,6 +129,8 @@ table:qc_lyb   # 来料异常分析报告头表——面板 QC_LYB;供应商/物
 table:qc_lyb_detail   # 来料异常分析报告行表——面板 QC_LYB 明细
 table:qc_mold_insp_head   # 成型检验单头表(报工审核自动生成——面板 QC_MOLD_INSP)
 table:qc_mold_insp_detail   # 成型检验单行表(通用模板:检验项目/标准/实测/判定)
+table:qc_proc_insp_detail   # 制程检验单行表——面板 QC_PROC_INSP 明细(表区=外观/尺寸/重量/功能性测试;尺寸与重量实测可含多个抽样值;migrate-qc-proc-insp.sql 新建)
+table:qc_proc_insp_head   # 制程检验单头表——面板 QC_PROC_INSP(2026-10-12 按《生产相关品质检验.xlsx》第3步建;检验类别区分 首件检验/制程检验;报工审核可自动生成)
 table:qc_fin_spec_detail   # 成品检验规范行表——面板 QC_FIN_SPEC 明细(按 表区 分三块:修订履历/检验项目/处理方式;「检验对象」列区分子节;migrate-qc-fin-spec.sql 新建)
 table:qc_fin_spec_head   # 成品检验规范头表——面板 QC_FIN_SPEC(8 份受控文件归纳的统一格式:修订履历+正文五段+检验项目分节+处理方式;报工审核自动生成草稿;migrate-qc-fin-spec.sql 新建)
 table:qc_return   # 暂收退料单头表——面板 QC_RETURN;退货类型/仓库/供应商代码
