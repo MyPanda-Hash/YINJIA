@@ -440,6 +440,15 @@
                   : (devDispatch.supervisorResolved ? tt('仅总负责人或管理员可分发规格书') : tt('产品信息表「责任人」未匹配到启用账号，任务挂起'))"
                 @click="openSpecAssign"
               >{{ tt('规格书分发') }}</div>
+              <!-- 待开发单据(2026-10-10):四个下游面板(规格书/成型工艺清单/组装工艺清单/出货检验计划表)
+                   各自一个按钮,**只有被分发到该面板的人**才看得到 —— 显隐判据是 pendingDocs.rows.length>0,
+                   它由后端 /px/rdDev/pendingDocs 按 rd_dev_task 的负责人过滤后下发,前端不自己算权限。
+                   红点数字 = pendingCount(rows 里「未开发」的条数),为 0 时整个红点不渲染。 -->
+              <div
+                v-if="isDevFilePanel && pendingDocs.rows.length"
+                class="as-side-btn has-badge"
+                @click="openPendingDocs"
+              >{{ tt('待开发单据') }}<span v-if="pendingDocs.pendingCount > 0" class="pending-docs-badge">{{ pendingDocs.pendingCount }}</span></div>
               <template v-for="(g, gi) in approvalSideGroups" :key="'sg' + gi">
                 <div
                   class="as-side-btn"
@@ -1498,6 +1507,36 @@
       <template #footer>
         <el-button @click="specAssignVisible = false">{{ tt('取消') }}</el-button>
         <el-button type="primary" :loading="specAssignBusy" @click="submitSpecAssign">{{ tt('分发') }}</el-button>
+      </template>
+    </el-dialog>
+    <!-- 待开发单据弹窗(2026-10-10):列出**分发给我的**产品信息表单据(可能多张)。
+         单据编号=产品信息表那张单的编号;状态只有「未开发」(产品信息表还没提交审批)/
+         「已开发」(审批通过,本面板下游单已建,下游单号见「下游单据编号」)。 -->
+    <el-dialog v-model="pendingDocsVisible" :title="tt('待开发单据')" width="720px" append-to-body>
+      <table v-if="pendingDocs.rows.length" class="mod-log-table">
+        <thead>
+          <tr>
+            <th>{{ tt('单据编号') }}</th>
+            <th style="width:110px">{{ tt('产品编号') }}</th>
+            <th>{{ tt('产品名称') }}</th>
+            <th style="width:90px">{{ tt('状态') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="r in pendingDocs.rows" :key="r['单据编号']">
+            <td>
+              <span class="pending-docs-link" @click="openPendingDoc(r)">{{ r['单据编号'] }}</span>
+            </td>
+            <td>{{ r['产品编号'] }}</td>
+            <td>{{ r['产品名称'] }}</td>
+            <td>
+              <el-tag :type="r['状态'] === '未开发' ? 'warning' : 'success'" size="small">{{ tt(String(r['状态'] || '')) }}</el-tag>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <template #footer>
+        <el-button @click="pendingDocsVisible = false">{{ tt('关闭') }}</el-button>
       </template>
     </el-dialog>
     <!-- 分发责任人弹窗(2026-09-20):四个下游文件各选一个责任人(默认为产品负责人,可逐个改)。
@@ -2995,6 +3034,47 @@ const modifyLogVisible = ref(false)
 const modifyLogRecords = ref([])
 const modifyLogNo = ref('')
 
+// ── 待开发单据(2026-10-10):四个下游面板侧的「我被分发了多少张产品信息表待开发」──
+// 真源 = 后端 /px/rdDev/pendingDocs(已按 rd_dev_task 的负责人过滤)⇒ 前端不自己判权限:
+//   · 按钮显隐 判据 = rows.length > 0(我被分发到了这个面板)
+//   · 红点数字 判据 = pendingCount(rows 里「未开发」的条数),为 0 时红点整块不渲染
+// 请求失败静默降级(清空即可,不弹错误 —— 这个入口是辅助性的,不能打扰用户/影响页面其它功能)。
+const isDevFilePanel = computed(() => DEV_FILE_PANELS.includes(String(panelCode.value)))
+const pendingDocsVisible = ref(false)
+const pendingDocs = reactive({ panelCode: '', pendingCount: 0, rows: [] })
+function clearPendingDocs() {
+  pendingDocs.panelCode = ''
+  pendingDocs.pendingCount = 0
+  pendingDocs.rows = []
+}
+async function loadPendingDocs() {
+  const pc = String(panelCode.value || '')
+  if (!DEV_FILE_PANELS.includes(pc)) { clearPendingDocs(); pendingDocsVisible.value = false; return }
+  try {
+    const r = await engine.rdPendingDocs(pc)
+    // 竞态守卫:期间切了面板就丢弃这次结果(与 loadDevDispatchState 同款写法)
+    if (String(panelCode.value || '') !== pc) return
+    pendingDocs.panelCode = pc
+    pendingDocs.pendingCount = Number(r?.pendingCount) || 0
+    pendingDocs.rows = Array.isArray(r?.rows) ? r.rows : []
+  } catch {
+    clearPendingDocs()
+  }
+}
+function openPendingDocs() {
+  if (!pendingDocs.rows.length) return
+  pendingDocsVisible.value = true
+}
+/** 点编号 = 跳到那张**产品信息表**单据(与批次浮层跳转同款:开页签 + 带 docNo) */
+function openPendingDoc(row) {
+  const no = row?.['单据编号']
+  if (!no) return
+  const base = '/panelx/list/RD_PROD_INFO'
+  pendingDocsVisible.value = false
+  tabs.open({ path: base, title: 'RD_PROD_INFO' })
+  router.push({ path: base, query: { docNo: no } })
+}
+
 // ── 分发责任人(2026-09-20;原名「产品开发下发」2026-09-09)──
 // 口径:已归档 + (二级审核人 ∪ 管理员)可分发;四个下游文件**各自**一个责任人,分发后随时可改。
 const devDispatch = reactive({ productCode: '', dispatched: false, busy: false, supervisor: '', supervisorName: '', supervisorResolved: false, canAssign: false, l2Approver: '', isL2: false, assigns: {} })
@@ -3428,7 +3508,7 @@ const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, 
 
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
-watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState() }, { immediate: true })
+watch(() => [panelCode.value, cur.value?.['单据编号']], () => { loadDevDispatchState(); loadSpecDocAssign(); loadDevFileGate(); loadRdFlowState(); loadPendingDocs() }, { immediate: true })
 
 /* 批次号「材料码锁定」(2026-10-04 用户口径:凡**有关打印明细生成的单据**都不可以修改批次号)。
    判定在服务端:该单的来源链里有没有**隔离行键**(`{订单号}#{行id}@{打印行id}`)的 ACTIVE link ——
@@ -8053,6 +8133,34 @@ onUnmounted(() => {
   color: #b9c2ce;
   border-color: #e4ebf3;
   background: #f4f6f9;
+}
+/* 待开发单据:按钮右上角红色数字(未开发张数;为 0 时整个 span 不渲染)。
+   ⚠ 只做自身定位与描边,不引入全属性过渡(项目红线)。 */
+.as-side-btn.has-badge {
+  position: relative;
+}
+.pending-docs-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  box-sizing: border-box;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: #f56c6c;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+.pending-docs-link {
+  color: #2f6fd0;
+  cursor: pointer;
+}
+.pending-docs-link:hover {
+  text-decoration: underline;
 }
 /* 删除组 + 下拉 */
 .as-side-del {

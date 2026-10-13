@@ -2525,6 +2525,7 @@ export default {
     '开发审核中': 'Under Review',
     '开发完毕': 'Completed',
     '已开发': 'Developed',
+    '待开发单据': 'Pending Documents',
     '开发状态': 'Dev Status',
     '产品开发业务流': 'Product Development Flow',
     '选择业务流': 'Business flow',
