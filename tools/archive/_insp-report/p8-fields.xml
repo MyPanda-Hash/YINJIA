@@ -1,0 +1,6 @@
+  <field name="存货编码" class="java.lang.String"/>
+  <field name="存货名称" class="java.lang.String"/>
+  <field name="规格型号" class="java.lang.String"/>
+  <field name="计量单位" class="java.lang.String"/>
+  <field name="数量" class="java.math.BigDecimal"/>
+  <field name="批号" class="java.lang.String"/>

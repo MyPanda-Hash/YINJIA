@@ -1,0 +1,31 @@
+﻿### bs_qc_item 列 ###
+id | 项目编码 | 项目名称 | 检验内容 | 检验标准 | 数据类型 | 计量单位 | 判定规则 | 标准下限 | 标准上限 | 停用 | 备注 | 状态 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 备用1 | 备用2 | 备用3 | 备用4 | 备用5 | 备用6 | 备用7 | 备用8 | 备用9 | 备用10 | 备用11 | 备用12 | 备用13 | 备用14 | 备用15 | 备用16 | 备用17 | 备用18 | 备用19 | 备用20 | 方案编码 | 序号 | 取样要求 | 检验方法 | 合格处置 | 不合格处置 | 
+
+### bs_qc_plan 列 ###
+id | 方案编码 | 方案名称 | 适用存货 | 适用存货类别 | 检验方式 | 抽检比例% | 停用 | 备注 | 状态 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 备用1 | 备用2 | 备用3 | 备用4 | 备用5 | 备用6 | 备用7 | 备用8 | 备用9 | 备用10 | 备用11 | 备用12 | 备用13 | 备用14 | 备用15 | 备用16 | 备用17 | 备用18 | 备用19 | 备用20 | 取样规则 | 文件编码 | 执行标准 | 
+
+### qc_asm_insp_detail 列 ###
+id | 单据编号 | 行号 | 检验项目 | 标准要求 | 实测数值 | 判定 | 数量 | 处理方式 | 备注 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 表区 | 检验方法 | 合格数量 | 不合格数量 | 
+
+### qc_insp_rec_detail 列 ###
+id | 单据编号 | 检验项 | 检测标准 | 检测结果 | 单项判定 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 备用1 | 备用2 | 备用3 | 备用4 | 备用5 | 备用6 | 备用7 | 备用8 | 备用9 | 备用10 | 备用11 | 备用12 | 备用13 | 备用14 | 备用15 | 备用16 | 备用17 | 备用18 | 备用19 | 备用20 | 
+
+### bs_qc_plan 数据(方案) ###
+java.exe : Exception in thread "main" com.microsoft.sqlserver.jdbc.SQLServerException: Invalid column name '������'.
+所在位置 行:7 字符: 1
++ & "$jdk\bin\java.exe" "-Dfile.encoding=UTF-8" -cp "$out;$cp2" Q2 2>&1 ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Exception in th... name '������'.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+	at com.microsoft.sqlserver.jdbc.SQLServerException.makeFromDatabaseError(SQLServerException.java:270)
+	at com.microsoft.sqlserver.jdbc.SQLServerStatement.getNextResult(SQLServerStatement.java:1735)
+	at com.microsoft.sqlserver.jdbc.SQLServerStatement.doExecuteStatement(SQLServerStatement.java:929)
+	at com.microsoft.sqlserver.jdbc.SQLServerStatement$StmtExecCmd.doExecute(SQLServerStatement.java:823)
+	at com.microsoft.sqlserver.jdbc.TDSCommand.execute(IOBuffer.java:7745)
+	at com.microsoft.sqlserver.jdbc.SQLServerConnection.executeCommand(SQLServerConnection.java:4391)
+	at com.microsoft.sqlserver.jdbc.SQLServerStatement.executeCommand(SQLServerStatement.java:276)
+	at com.microsoft.sqlserver.jdbc.SQLServerStatement.executeStatement(SQLServerStatement.java:246)
+	at com.microsoft.sqlserver.jdbc.SQLServerStatement.executeQuery(SQLServerStatement.java:745)
+	at Q2.dump(Q2.java:42)
+	at Q2.main(Q2.java:20)

@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- prod_insp.jrxml 出厂检验报告(2026-10-12;表单编号 YJ-QR-05/A1)
+     取数:ReportService.headParams(头字段→参数) + detailRows(明细行→字段),字段名=yj_field.label。
+     排版规约同 so_order.jrxml:样式集中 / 属性归属 / box 写法 / 分节包 band / fontName=NotoSansSC -->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="prod_insp" language="java" columnCount="1"
+              pageWidth="595" pageHeight="842" orientation="Portrait"
+              columnWidth="539" leftMargin="28" rightMargin="28" topMargin="28" bottomMargin="28"
+              whenNoDataType="AllSectionsNoDetail"
+              uuid="1a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d">
+
+  <property name="net.sf.jasperreports.awt.ignore.missing-font" value="false"/>
+  <property name="net.sf.jasperreports.default.font.name" value="NotoSansSC"/>
+  <property name="net.sf.jasperreports.export.xlsx.detect.cell.type" value="true"/>
+
+  <style name="base" isDefault="true" fontName="NotoSansSC" fontSize="9"/>
+  <style name="cell" style="base" hAlign="Left" vAlign="Middle">
+    <box padding="2"><pen lineWidth="0.5" lineColor="#8A8A8A"/></box>
+  </style>
+  <style name="cellC" style="cell" hAlign="Center"/>
+  <style name="cellR" style="cell" hAlign="Right"/>
+  <style name="th" style="cell" isBold="true" hAlign="Center" mode="Opaque" backcolor="#EFEFEF"/>
+  <style name="itemC" style="cellC" isBold="true"/>
+  <style name="cellS" style="base" fontSize="8" hAlign="Left" vAlign="Middle">
+    <box padding="2"><pen lineWidth="0.5" lineColor="#8A8A8A"/></box>
+  </style>
+  <style name="cellSC" style="cellS" hAlign="Center"/>
+  <style name="cellXS" style="base" fontSize="7" hAlign="Left" vAlign="Top">
+    <box padding="1"><pen lineWidth="0.5" lineColor="#8A8A8A"/></box>
+  </style>
+  <style name="company" style="base" fontSize="13" isBold="true" hAlign="Center" vAlign="Bottom"/>
+  <style name="docTitle" style="base" fontSize="20" isBold="true" hAlign="Center" vAlign="Middle"/>
+  <style name="meta" style="base" fontSize="9" vAlign="Middle"/>
+  <style name="metaR" style="meta" hAlign="Right"/>
+  <style name="gridLabel" style="base" isBold="true" vAlign="Middle"/>
+  <style name="gridValue" style="base" vAlign="Middle"/>
+  <style name="conclusion" style="base" fontSize="11" isBold="true" hAlign="Left" vAlign="Middle"/>
+  <style name="note" style="base" fontSize="8" vAlign="Top"/>
+  <style name="sign" style="base" fontSize="9" vAlign="Middle"/>
+  <style name="footerNote" style="base" fontSize="7" forecolor="#666666" vAlign="Middle"/>
+  <style name="pager" style="base" fontSize="8" vAlign="Middle"/>
+  <style name="pagerR" style="pager" hAlign="Right"/>
+
+  <parameter name="单据编号" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="单据日期" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="客户" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="打印时间" class="java.lang.String" isForPrompting="false"/>
+  <parameter name="公司" class="java.lang.String" isForPrompting="false">
+    <defaultValueExpression><![CDATA["惠州市银嘉环保科技有限公司"]]></defaultValueExpression>
+  
+  </parameter>
+  <field name="存货编码" class="java.lang.String"/>
+  <field name="存货名称" class="java.lang.String"/>
+  <field name="规格型号" class="java.lang.String"/>
+  <field name="计量单位" class="java.lang.String"/>
+  <field name="数量" class="java.math.BigDecimal"/>
+  <field name="批号" class="java.lang.String"/>
+  <pageHeader>
+    <band height="118">
+      <textField>
+        <reportElement style="company" x="0" y="0" width="539" height="20"/>
+        <textFieldExpression><![CDATA[$P{公司}]]></textFieldExpression>
+      </textField>
+
+      <textField>
+        <reportElement style="docTitle" x="0" y="20" width="539" height="34"/>
+        <textFieldExpression><![CDATA["出厂检验报告"]]></textFieldExpression>
+      </textField>
+
+      <textField isBlankWhenNull="true">
+        <reportElement style="meta" x="0" y="56" width="200" height="16"/>
+        <textFieldExpression><![CDATA["报告编号：" + ($P{单据编号} == null ? "" : $P{单据编号})]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true">
+        <reportElement style="meta" x="200" y="56" width="190" height="16"/>
+        <textFieldExpression><![CDATA["编制日期：" + ($P{单据日期} == null ? "" : String.valueOf($P{单据日期}).substring(0, Math.min(10, String.valueOf($P{单据日期}).length())))]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true">
+        <reportElement style="metaR" x="390" y="56" width="149" height="16"/>
+        <textFieldExpression><![CDATA["客户：" + ($P{客户} == null ? "" : $P{客户})]]></textFieldExpression>
+      </textField>
+
+      <frame>
+        <reportElement x="0" y="76" width="539" height="38"/>
+        <box><pen lineWidth="0.5" lineColor="#8A8A8A"/></box>
+
+        <staticText><reportElement style="gridLabel" x="4" y="0" width="62" height="19"/><text><![CDATA[产品名称：]]></text></staticText>
+        <textField isBlankWhenNull="true"><reportElement style="gridValue" x="66" y="0" width="112" height="19"/><textFieldExpression><![CDATA[$F{存货名称}]]></textFieldExpression></textField>
+        <staticText><reportElement style="gridLabel" x="182" y="0" width="62" height="19"/><text><![CDATA[产品规格：]]></text></staticText>
+        <textField isBlankWhenNull="true"><reportElement style="gridValue" x="244" y="0" width="112" height="19"/><textFieldExpression><![CDATA[$F{规格型号}]]></textFieldExpression></textField>
+        <staticText><reportElement style="gridLabel" x="360" y="0" width="62" height="19"/><text><![CDATA[产品编码：]]></text></staticText>
+        <textField isBlankWhenNull="true"><reportElement style="gridValue" x="422" y="0" width="113" height="19"/><textFieldExpression><![CDATA[$F{存货编码}]]></textFieldExpression></textField>
+
+        <staticText><reportElement style="gridLabel" x="4" y="19" width="62" height="19"/><text><![CDATA[生产日期：]]></text></staticText>
+        <textField isBlankWhenNull="true"><reportElement style="gridValue" x="66" y="19" width="112" height="19"/><textFieldExpression><![CDATA[$P{单据日期} == null ? "" : String.valueOf($P{单据日期}).substring(0, Math.min(10, String.valueOf($P{单据日期}).length()))]]></textFieldExpression></textField>
+        <staticText><reportElement style="gridLabel" x="182" y="19" width="62" height="19"/><text><![CDATA[生产数量：]]></text></staticText>
+        <textField isBlankWhenNull="true" pattern="#,##0.###"><reportElement style="gridValue" x="244" y="19" width="112" height="19"/><textFieldExpression><![CDATA[$F{数量}]]></textFieldExpression></textField>
+        <staticText><reportElement style="gridLabel" x="360" y="19" width="62" height="19"/><text><![CDATA[检测日期：]]></text></staticText>
+        <textField isBlankWhenNull="true"><reportElement style="gridValue" x="422" y="19" width="113" height="19"/><textFieldExpression><![CDATA[$P{打印时间}]]></textFieldExpression></textField>
+      </frame>
+    </band>
+  </pageHeader>
+  <columnHeader>
+    <band height="326">
+<staticText><reportElement style="th" x="0" y="0" width="26" height="20"/><text><![CDATA[序号]]></text></staticText>
+      <staticText><reportElement style="th" x="26" y="0" width="76" height="20"/><text><![CDATA[检验项目]]></text></staticText>
+      <staticText><reportElement style="th" x="102" y="0" width="190" height="20"/><text><![CDATA[检验要求]]></text></staticText>
+      <staticText><reportElement style="th" x="292" y="0" width="66" height="20"/><text><![CDATA[抽样标准]]></text></staticText>
+      <staticText><reportElement style="th" x="358" y="0" width="40" height="20"/><text><![CDATA[抽检量]]></text></staticText>
+      <staticText><reportElement style="th" x="398" y="0" width="110" height="20"/><text><![CDATA[结果]]></text></staticText>
+      <staticText><reportElement style="th" x="508" y="0" width="31" height="20"/><text><![CDATA[判定]]></text></staticText>
+
+      <textField><reportElement style="cellSC" x="0" y="24" width="26" height="22"/><textFieldExpression><![CDATA["1"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="24" width="76" height="22"/><textFieldExpression><![CDATA["外观检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="24" width="190" height="22"/><textFieldExpression><![CDATA["外观均匀完好，无弯曲变形、无明显划痕裂纹、无油污"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="24" width="66" height="22"/><textFieldExpression><![CDATA["GBT2828II级"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="24" width="40" height="22"/><textFieldExpression><![CDATA["50"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="24" width="110" height="22"/><textFieldExpression><![CDATA[""]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="24" width="31" height="22"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="48" width="26" height="52"/><textFieldExpression><![CDATA["2"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="48" width="76" height="52"/><textFieldExpression><![CDATA["尺寸规格检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="48" width="190" height="52"/><textFieldExpression><![CDATA["外径：44.5±0.5mm  内径：20.8±0.5mm  长度：256.5±0.5mm"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="48" width="66" height="52"/><textFieldExpression><![CDATA["GBT2828S-2"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="48" width="40" height="52"/><textFieldExpression><![CDATA["5"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="48" width="110" height="52"/><textFieldExpression><![CDATA["外径 44.5/44.6/44.5/44.7/44.6" + "\n" + "内径 20.9/20.8/21.0/20.7/20.8" + "\n" + "长度 256.2/256.2/256.9/256.4/256.6"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="48" width="31" height="52"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="102" width="26" height="22"/><textFieldExpression><![CDATA["3"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="102" width="76" height="22"/><textFieldExpression><![CDATA["重量检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="102" width="190" height="22"/><textFieldExpression><![CDATA["＞200克"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="102" width="66" height="22"/><textFieldExpression><![CDATA["GBT2828S-2"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="102" width="40" height="22"/><textFieldExpression><![CDATA["5"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="102" width="110" height="22"/><textFieldExpression><![CDATA["234.5/230.8/234.1/225.1/226.1"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="102" width="31" height="22"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="126" width="26" height="22"/><textFieldExpression><![CDATA["4"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="126" width="76" height="22"/><textFieldExpression><![CDATA["挤压强度检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="126" width="190" height="22"/><textFieldExpression><![CDATA["参考伊可普测试方法，挤压强度≥30kgf"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="126" width="66" height="22"/><textFieldExpression><![CDATA["GBT2828S-1"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="126" width="40" height="22"/><textFieldExpression><![CDATA["3"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="126" width="110" height="22"/><textFieldExpression><![CDATA["无破损"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="126" width="31" height="22"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="150" width="26" height="40"/><textFieldExpression><![CDATA["5"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="150" width="76" height="40"/><textFieldExpression><![CDATA["黑水检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="150" width="190" height="40"/><textFieldExpression><![CDATA["进水压力0.4±0.02Mpa，流速1.4L/min，接水测试黑水量；同一根炭梭冲洗五分钟后静置浸泡四小时再次通水，接水200ml，检查是否有黑水、黑渣"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="150" width="66" height="40"/><textFieldExpression><![CDATA["GBT2828S-1"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="150" width="40" height="40"/><textFieldExpression><![CDATA["3"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="150" width="110" height="40"/><textFieldExpression><![CDATA["无黑水，无可见颗粒物"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="150" width="31" height="40"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="192" width="26" height="48"/><textFieldExpression><![CDATA["6"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="192" width="76" height="48"/><textFieldExpression><![CDATA["余氯测试"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="192" width="190" height="48"/><textFieldExpression><![CDATA["采用次氯酸钠原液，余氯浓度控制在2.0(±0.2)mg/L，pH7.5±0.5;进水压力60psi，流速1.4L/min,温度20±3℃;在初始、1/4寿命、1/2寿命、3/4寿命、寿命终点测试，寿命≥4000L（去除率：初始98%,终点50%）"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="192" width="66" height="48"/><textFieldExpression><![CDATA["GBT2828S-1"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="192" width="40" height="48"/><textFieldExpression><![CDATA["1"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="192" width="110" height="48"/><textFieldExpression><![CDATA["0L：99.1%  4000L：77.5%"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="192" width="31" height="48"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="242" width="26" height="56"/><textFieldExpression><![CDATA["7"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="242" width="76" height="56"/><textFieldExpression><![CDATA["碱性寿命测试"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="242" width="190" height="56"/><textFieldExpression><![CDATA["纯水测试（银嘉纯水）测试25±3℃、流速1.4L/min，在初始、1/4寿命、1/2寿命、3/4寿命、寿命终点测试，测试纯水及炭梭出水PH值，4000L寿命末端pH提升值≥0.5，炭梭在过流和浸泡条件下的滤后水口感无明显异常"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="242" width="66" height="56"/><textFieldExpression><![CDATA["GBT2828S-1"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="242" width="40" height="56"/><textFieldExpression><![CDATA["1"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="242" width="110" height="56"/><textFieldExpression><![CDATA["4000L:0.65"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="242" width="31" height="56"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="300" width="26" height="22"/><textFieldExpression><![CDATA["8"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="300" width="76" height="22"/><textFieldExpression><![CDATA["包装检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="300" width="190" height="22"/><textFieldExpression><![CDATA["纸箱无破损，胶带封箱完好，出货标示完整清晰"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="300" width="66" height="22"/><textFieldExpression><![CDATA["GBT2828II级"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="300" width="40" height="22"/><textFieldExpression><![CDATA["50"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="300" width="110" height="22"/><textFieldExpression><![CDATA["无破损"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="300" width="31" height="22"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+    </band>
+
+  </columnHeader>
+  <detail>
+    <band height="1">
+      <staticText><reportElement x="0" y="0" width="1" height="1" forecolor="#FFFFFF"/><text><![CDATA[ ]]></text></staticText>
+    </band>
+  </detail>
+
+<pageFooter>
+    <band height="52">
+      <line>
+        <reportElement x="0" y="0" width="539" height="1"/>
+        <graphicElement><pen lineWidth="0.5" lineColor="#8A8A8A"/></graphicElement>
+      </line>
+
+      <textField evaluationTime="Now">
+        <reportElement style="pager" x="0" y="6" width="120" height="12"/>
+        <textFieldExpression><![CDATA["第 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
+      </textField>
+      <textField evaluationTime="Report">
+        <reportElement style="pager" x="120" y="6" width="120" height="12"/>
+        <textFieldExpression><![CDATA[" / 共 " + $V{PAGE_NUMBER} + " 页"]]></textFieldExpression>
+      </textField>
+      <textField isBlankWhenNull="true">
+        <reportElement style="pagerR" x="299" y="6" width="240" height="12"/>
+        <textFieldExpression><![CDATA["打印时间：" + ($P{打印时间} == null ? "" : $P{打印时间})]]></textFieldExpression>
+      </textField>
+
+      <textField>
+        <reportElement style="sign" x="0" y="24" width="180" height="16"/>
+        <textFieldExpression><![CDATA["检验员：________________"]]></textFieldExpression>
+      </textField>
+      <textField>
+        <reportElement style="sign" x="180" y="24" width="180" height="16"/>
+        <textFieldExpression><![CDATA["审核：________________"]]></textFieldExpression>
+      </textField>
+      <textField>
+        <reportElement style="sign" x="360" y="24" width="179" height="16"/>
+        <textFieldExpression><![CDATA["批准：________________"]]></textFieldExpression>
+      </textField>
+
+      <textField>
+        <reportElement style="footerNote" x="0" y="42" width="539" height="10"/>
+        <textFieldExpression><![CDATA["表单编号：YJ-QR-05/A1"]]></textFieldExpression>
+      </textField>
+    </band>
+  </pageFooter>
+
+  <summary>
+    <band height="327">
+      <staticText><reportElement style="gridLabel" x="0" y="0" width="76" height="20"/><text><![CDATA[检验结论：]]></text></staticText>
+      <staticText><reportElement style="conclusion" x="76" y="0" width="60" height="20"/><text><![CDATA[合格]]></text></staticText>
+      <staticText><reportElement style="note" x="140" y="0" width="399" height="20"/><text><![CDATA[备注：测试环境：温度24℃  湿度：48 %；测试样本超过5个时，填写5个数据，记录数据时选择偏高离标准最远的数据进行记录]]></text></staticText>
+
+      <staticText><reportElement style="gridLabel" x="0" y="30" width="539" height="14"/><text><![CDATA[按《生活饮用水输配水设备及防护材料卫生安全评价规范》项目]]></text></staticText>
+      <staticText><reportElement style="th" x="0" y="46" width="359" height="16"/><text><![CDATA[卫生要求]]></text></staticText>
+      <staticText><reportElement style="th" x="359" y="46" width="180" height="16"/><text><![CDATA[结果]]></text></staticText>
+
+      <staticText><reportElement style="cellS" x="0" y="64" width="359" height="17"/><text><![CDATA[涌法度增加量（0.2NTU）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="64" width="180" height="17"/><text><![CDATA[0.12]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="81" width="359" height="17"/><text><![CDATA[膤和味：浸泡后水无异膠、异味]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="81" width="180" height="17"/><text><![CDATA[无]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="98" width="359" height="17"/><text><![CDATA[眨眼可见物：浸泡后水不产生任何眨眼可见的碎片杂物等]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="98" width="180" height="17"/><text><![CDATA[无]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="115" width="359" height="17"/><text><![CDATA[改变度（0.5）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="115" width="180" height="17"/><text><![CDATA[1.79]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="132" width="359" height="17"/><text><![CDATA[融解性总固体（20 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="132" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="149" width="359" height="17"/><text><![CDATA[耗氧量（以O2计）增加量（1 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="149" width="180" height="17"/><text><![CDATA[0.46]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="166" width="359" height="17"/><text><![CDATA[硇增加量（0.001 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="166" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="183" width="359" height="17"/><text><![CDATA[锌增加量（0.005 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="183" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="200" width="359" height="17"/><text><![CDATA[铝增加量（0.02 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="200" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="217" width="359" height="17"/><text><![CDATA[铀增加量（0.001 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="217" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="234" width="359" height="17"/><text><![CDATA[汞增加量（0.0001 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="234" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="251" width="359" height="17"/><text><![CDATA[铁增加量（0.06 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="251" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="268" width="359" height="17"/><text><![CDATA[锰增加量（0.02 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="268" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="285" width="359" height="17"/><text><![CDATA[铜增加量（0.2 mg/L）   /   锌增加量（0.2 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="285" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+      <staticText><reportElement style="cellS" x="0" y="302" width="359" height="17"/><text><![CDATA[总硬度增加量（按碳酸钙计 100 mg/L）]]></text></staticText>
+      <staticText><reportElement style="cellSC" x="359" y="302" width="180" height="17"/><text><![CDATA[—]]></text></staticText>
+    </band>
+  </summary>
+</jasperReport>

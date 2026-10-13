@@ -1,0 +1,60 @@
+  <detail>
+    <band height="302">
+      <textField><reportElement style="cellSC" x="0" y="0" width="26" height="22"/><textFieldExpression><![CDATA["1"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="0" width="76" height="22"/><textFieldExpression><![CDATA["外观检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="0" width="190" height="22"/><textFieldExpression><![CDATA["外观均匀完好，无弯曲变形、无明显划痕裂纹、无油污"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="0" width="66" height="22"/><textFieldExpression><![CDATA["GBT2828II级"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="0" width="40" height="22"/><textFieldExpression><![CDATA["50"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="0" width="110" height="22"/><textFieldExpression><![CDATA[""]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="0" width="31" height="22"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="24" width="26" height="52"/><textFieldExpression><![CDATA["2"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="24" width="76" height="52"/><textFieldExpression><![CDATA["尺寸规格检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="24" width="190" height="52"/><textFieldExpression><![CDATA["外径：44.5±0.5mm  内径：20.8±0.5mm  长度：256.5±0.5mm"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="24" width="66" height="52"/><textFieldExpression><![CDATA["GBT2828S-2"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="24" width="40" height="52"/><textFieldExpression><![CDATA["5"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="24" width="110" height="52"/><textFieldExpression><![CDATA["外径 44.5/44.6/44.5/44.7/44.6" + "\n" + "内径 20.9/20.8/21.0/20.7/20.8" + "\n" + "长度 256.2/256.2/256.9/256.4/256.6"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="24" width="31" height="52"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="78" width="26" height="22"/><textFieldExpression><![CDATA["3"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="78" width="76" height="22"/><textFieldExpression><![CDATA["重量检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="78" width="190" height="22"/><textFieldExpression><![CDATA["＞200克"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="78" width="66" height="22"/><textFieldExpression><![CDATA["GBT2828S-2"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="78" width="40" height="22"/><textFieldExpression><![CDATA["5"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="78" width="110" height="22"/><textFieldExpression><![CDATA["234.5/230.8/234.1/225.1/226.1"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="78" width="31" height="22"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="102" width="26" height="22"/><textFieldExpression><![CDATA["4"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="102" width="76" height="22"/><textFieldExpression><![CDATA["挤压强度检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="102" width="190" height="22"/><textFieldExpression><![CDATA["参考伊可普测试方法，挤压强度≥30kgf"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="102" width="66" height="22"/><textFieldExpression><![CDATA["GBT2828S-1"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="102" width="40" height="22"/><textFieldExpression><![CDATA["3"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="102" width="110" height="22"/><textFieldExpression><![CDATA["无破损"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="102" width="31" height="22"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="126" width="26" height="40"/><textFieldExpression><![CDATA["5"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="126" width="76" height="40"/><textFieldExpression><![CDATA["黑水检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="126" width="190" height="40"/><textFieldExpression><![CDATA["进水压力0.4±0.02Mpa，流速1.4L/min，接水测试黑水量；同一根炭梭冲洗五分钟后静置浸泡四小时再次通水，接水200ml，检查是否有黑水、黑渣"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="126" width="66" height="40"/><textFieldExpression><![CDATA["GBT2828S-1"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="126" width="40" height="40"/><textFieldExpression><![CDATA["3"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="126" width="110" height="40"/><textFieldExpression><![CDATA["无黑水，无可见颗粒物"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="126" width="31" height="40"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="168" width="26" height="48"/><textFieldExpression><![CDATA["6"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="168" width="76" height="48"/><textFieldExpression><![CDATA["余氯测试"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="168" width="190" height="48"/><textFieldExpression><![CDATA["采用次氯酸钠原液，余氯浓度控制在2.0(±0.2)mg/L，pH7.5±0.5;进水压力60psi，流速1.4L/min,温度20±3℃;在初始、1/4寿命、1/2寿命、3/4寿命、寿命终点测试，寿命≥4000L（去除率：初始98%,终点50%）"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="168" width="66" height="48"/><textFieldExpression><![CDATA["GBT2828S-1"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="168" width="40" height="48"/><textFieldExpression><![CDATA["1"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="168" width="110" height="48"/><textFieldExpression><![CDATA["0L：99.1%  4000L：77.5%"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="168" width="31" height="48"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="218" width="26" height="56"/><textFieldExpression><![CDATA["7"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="218" width="76" height="56"/><textFieldExpression><![CDATA["碱性寿命测试"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="218" width="190" height="56"/><textFieldExpression><![CDATA["纯水测试（银嘉纯水）测试25±3℃、流速1.4L/min，在初始、1/4寿命、1/2寿命、3/4寿命、寿命终点测试，测试纯水及炭梭出水PH值，4000L寿命末端pH提升值≥0.5，炭梭在过流和浸泡条件下的滤后水口感无明显异常"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="218" width="66" height="56"/><textFieldExpression><![CDATA["GBT2828S-1"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="218" width="40" height="56"/><textFieldExpression><![CDATA["1"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="218" width="110" height="56"/><textFieldExpression><![CDATA["4000L:0.65"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="218" width="31" height="56"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="0" y="276" width="26" height="22"/><textFieldExpression><![CDATA["8"]]></textFieldExpression></textField>
+      <textField><reportElement style="itemC" x="26" y="276" width="76" height="22"/><textFieldExpression><![CDATA["包装检查"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellS" x="102" y="276" width="190" height="22"/><textFieldExpression><![CDATA["纸箱无破损，胶带封箱完好，出货标示完整清晰"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="292" y="276" width="66" height="22"/><textFieldExpression><![CDATA["GBT2828II级"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="358" y="276" width="40" height="22"/><textFieldExpression><![CDATA["50"]]></textFieldExpression></textField>
+      <textField textAdjust="StretchHeight"><reportElement style="cellXS" x="398" y="276" width="110" height="22"/><textFieldExpression><![CDATA["无破损"]]></textFieldExpression></textField>
+      <textField><reportElement style="cellSC" x="508" y="276" width="31" height="22"/><textFieldExpression><![CDATA["符合"]]></textFieldExpression></textField>
+    </band>
+  </detail>
