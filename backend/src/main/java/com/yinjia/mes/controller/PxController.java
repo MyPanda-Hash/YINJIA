@@ -206,6 +206,29 @@ public class PxController {
     }
 
     /**
+     * 某人在某文件面板下的「待开发单据」清单(2026-10-13 用户需求)。
+     *
+     * <p>用户要的交互:4 类下游面板(规格书 / 成型工艺清单 / 组装工艺清单 / 出货检验计划表)
+     * 的侧边有一个「待开发单据」入口 —— **只有被分发给该文件的人**看得到;点开弹出对应的
+     * 产品信息表编号,逐条标 未开发 / 已开发;按钮右上角红点数字 = 未开发张数(0 则不显示)。
+     *
+     * <p>判定口径由用户拍板:**审批通过(已审核/已归档)才算「已开发」**。
+     * 取数与判定全在 {@link com.yinjia.mes.service.DevTaskService#pendingDocsFor};本端点只
+     * 收参 → 校验面板可见 → 组响应(分层规矩:Controller 不直写 jdbc)。
+     */
+    @GetMapping("/rdDev/pendingDocs")
+    public ApiResult<Map<String, Object>> rdDevPendingDocs(@RequestParam String panelCode) {
+        perm.requirePanelView(panelCode);
+        List<Map<String, Object>> rows = devTaskService.pendingDocsFor(panelCode, currentUser());
+        long pending = rows.stream().filter((r) -> "未开发".equals(String.valueOf(r.get("状态")))).count();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("panelCode", panelCode);
+        out.put("pendingCount", pending);
+        out.put("rows", rows);
+        return ApiResult.ok(out);
+    }
+
+    /**
      * 产品文件列表(RD_PROD_DOCLIST)—— 设计《产品开发系统需求汇总》sheet「文件汇总表」那张表。
      *
      * 【不新建业务逻辑】列头与状态推导**直接复用** DevTaskService:

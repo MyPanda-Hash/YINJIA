@@ -483,8 +483,89 @@ public class DevTaskService {
         return out;
     }
 
-    // ==================== 以下为 PxController 下沉的数据访问(2026-10-09 分层收敛) ====================
-    // 原实现散在 PxController 里直写 jdbc;这些查询都是 rd_* 推导的一部分(与 board/statusOf 同域),
+    /**
+     * 某人在某文件面板下「待开发」的产品清单(2026-10-13 用户口径)。
+     *
+     * <p>口径(用户拍板):该产品在这个面板下**已有单据且审批通过(已审核/已归档)才算「已开发」**,
+     * 其余(无单 / 草稿 / 审批中 / 待二级审批 / 被驳回)一律算「未开发」。
+     * 与 {@link #statusOf} 的 4 档(未开发/开发中/开发审核中/开发完毕)不同 —— 那是产品文件列表
+     * 矩阵用的;这里回答的是"这件事我还要不要去做",故合并成 2 档。取数与 statusOf 同源
+     * (同一张头表 + yj_doc_status、同一"归档优先"排序),免得两处口径分叉出现
+     * "矩阵说开发完毕、待开发清单里又冒出来"。
+     *
+     * <p>只看**当前登录人被分发**的产品(rd_dev_task.负责人 = user)—— 这同时也是入口按钮
+     * 显隐与红点数字的依据。
+     *
+     * @return 每项含 单据编号(产品信息表那张单,弹窗按用户要求显示它)/ 产品编号 / 产品名称 /
+     *         状态(已开发|未开发) / 下游单据编号;未开发的排在前面
+     */
+    public List<Map<String, Object>> pendingDocsFor(String panelCode, String user) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        String[] meta = DEV_PANELS.get(panelCode);
+        if (meta == null || user == null || user.isBlank()) return out;
+        String table = meta[0];
+        String key = meta[1];
+        List<Map<String, Object>> tasks = jdbc.queryForList(
+                "SELECT DISTINCT 产品编号 FROM rd_dev_task "
+                        + "WHERE 目标面板 = ? AND 负责人 = ? AND ISNULL(asp_cancel,'N') <> 'Y' "
+                        + "ORDER BY 产品编号", panelCode, user);
+        for (Map<String, Object> t : tasks) {
+            String code = t.get("产品编号") == null ? "" : String.valueOf(t.get("产品编号")).trim();
+            if (code.isEmpty()) continue;
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("产品编号", code);
+            item.put("panelCode", panelCode);
+            item.put("panelName", meta[2]);
+            // 产品信息表侧:取**单据编号**(弹窗展示用)+ 产品名称
+            try {
+                List<Map<String, Object>> pi = jdbc.queryForList(
+                        "SELECT TOP 1 单据编号, ISNULL(产品名称, N'') AS pname FROM rd_prod_info_head "
+                                + "WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC", code);
+                item.put("单据编号", pi.isEmpty() || pi.get(0).get("单据编号") == null
+                        ? "" : String.valueOf(pi.get(0).get("单据编号")));
+                item.put("产品名称", pi.isEmpty() ? "" : String.valueOf(pi.get(0).get("pname")));
+            } catch (Exception e) {
+                item.put("单据编号", "");
+                item.put("产品名称", "");
+                log.debug("待开发:取产品信息表失败 code={} : {}", code, e.getMessage());
+            }
+            // 本面板侧:有没有单、审批到哪一步(已归档 或 已写审核人 ⇒ 已开发)
+            String docNo = "";
+            String status = STATUS_NONE;
+            try {
+                List<Map<String, Object>> rows = jdbc.queryForList(
+                        "SELECT TOP 1 h.[单据编号] AS no, ISNULL(s.archived,'N') AS arc, ISNULL(s.shr, N'') AS shr "
+                                + "FROM " + table + " h "
+                                + "LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = h.[单据编号] "
+                                + "WHERE h." + key + " = ? AND ISNULL(h.asp_cancel,'N') <> 'Y' "
+                                + "AND ISNULL(s.canceled,'N') <> 'Y' "
+                                + "ORDER BY CASE WHEN ISNULL(s.archived,'N')='Y' THEN 3 "
+                                + "WHEN LEN(ISNULL(s.shr, N'')) > 0 THEN 2 ELSE 1 END DESC, h.id DESC",
+                        panelCode, code);
+                if (!rows.isEmpty()) {
+                    Map<String, Object> r = rows.get(0);
+                    docNo = r.get("no") == null ? "" : String.valueOf(r.get("no"));
+                    boolean done = "Y".equals(String.valueOf(r.get("arc")))
+                            || !String.valueOf(r.get("shr")).isBlank();
+                    status = done ? "已开发" : STATUS_NONE;
+                }
+            } catch (Exception e) {
+                log.debug("待开发判定回退(按未开发算) panel={} code={} : {}", panelCode, code, e.getMessage());
+            }
+            item.put("状态", status);
+            item.put("下游单据编号", docNo);
+            out.add(item);
+        }
+        out.sort((a, b) -> {
+            boolean an = STATUS_NONE.equals(a.get("状态"));
+            boolean bn = STATUS_NONE.equals(b.get("状态"));
+            if (an != bn) return an ? -1 : 1;
+            return String.valueOf(a.get("单据编号")).compareTo(String.valueOf(b.get("单据编号")));
+        });
+        return out;
+    }
+
+    // ==================== 以下为 PxController 下沉的数据访问(2026-10-09 分层收敛) ====================    // 原实现散在 PxController 里直写 jdbc;这些查询都是 rd_* 推导的一部分(与 board/statusOf 同域),
     // 归属本服务后 Controller 只剩「收参 → 校验 → 组装响应」。SQL 与异常降级口径逐字照搬,行为不变。
 
     /** 单据编号 → 产品编号(产品信息表侧边栏用;查不到返回空串) */
