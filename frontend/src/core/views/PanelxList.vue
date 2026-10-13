@@ -923,9 +923,6 @@
               </el-table-column>
             </el-table>
           </div>
-          <div v-if="archEditable(b)" class="arch-section-add">
-            <el-button size="small" type="primary" :icon="Plus" @click="addInlineDetailRow(b)">{{ tt('新增数据') }}</el-button>
-          </div>
         </template>
         <el-table
           v-else
@@ -8730,10 +8727,6 @@ onUnmounted(() => {
 /* 区内的表:贴紧标题,去掉 el-table 自带的上外边距 */
 .arch-section .el-table {
   margin-top: 0;
-}
-/* 分区视图底部的「新增数据」 */
-.arch-section-add {
-  margin: 4px 8px 8px;
 }
 /* 档案大表分页器:右对齐贴在明细表头上沿 */
 .arch-pager {
