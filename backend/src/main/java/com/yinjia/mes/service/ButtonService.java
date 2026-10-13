@@ -463,7 +463,9 @@ public class ButtonService {
         // 「保存为草稿/新增」不触发(markSaved=false,2026-09-12 修复:此前草稿路径同样被自动归档/送审,
         // 文书面板实际没有"存一半不送审"的能力);修改态保存不归档走再审批
         if (markSaved && DOC_ARCHIVE_PANELS.contains(def.code()) && !"Y".equals(modifyStateOf(def.code(), no))) {
-            if (isAdminUser(user)) {
+            // ⚠ 两级审批面板(RD_PROD_INFO)不让管理员走"保存即归档"这条自审自批捷径 ——
+            //   否则整条两级审批被跳过(见 ADMIN_SAVE_DEFERS_TO_FLOW 的注释)。
+            if (isAdminUser(user) && !ADMIN_SAVE_DEFERS_TO_FLOW.contains(def.code())) {
                 finalizeOpenModify(def, no, user); // 有未收尾修改留痕(修改闭环/弃审后再编辑)先收尾再归档
                 markArchived(def.code(), no, user);
                 // 保存即归档 = 自审自批,显式留痕(2026-09-12:归档路径审核人不再空白,审批历史可查)
@@ -478,7 +480,8 @@ public class ButtonService {
                 // 保存即归档也要同步进度查询(用户报的"保存归档后没导进来"就是漏了这条路径)
                 if ("RD_PLAN".equals(def.code())) syncAllPlansToProgress();
             } else {
-                // 普通用户:保存→自动提交审批(pending='Y'),管理员审批通过后再归档
+                // 普通用户,以及「管理员保存不直接归档」的两级面板(RD_PROD_INFO):
+                // 保存 → 自动提交审批(pending='Y'),走完整审批流(两级面板还须先选二级审核人)
                 jdbc.update("MERGE yj_doc_status AS t USING (VALUES (?, ?)) AS s(panel_code, doc_no) "
                                 + "ON t.panel_code = s.panel_code AND t.doc_no = s.doc_no "
                                 + "WHEN MATCHED THEN UPDATE SET pending = 'Y', pending_by = ?, pending_at = GETDATE(), update_at = GETDATE() "
@@ -1991,6 +1994,22 @@ public class ButtonService {
         s.add("RD_PROD_INFO");
         return java.util.Set.copyOf(s);
     }
+
+    /**
+     * 「管理员保存 = 保存即归档」这条自审自批捷径**不适用的面板**(2026-10-13 用户口径)。
+     *
+     * 为什么要单独列:RD_PROD_INFO 是两级审批面板(一级通过 → 「待二级审批」→ 二级签核 → 归档),
+     * 而管理员「保存」走的是 save() 里的自审自批捷径 ⇒ **整条两级审批被跳过**:
+     * 纸面「审核人（一级审批人）/（二级审批人）」恒空、approve_node 不置位、
+     * 「分发责任人」凭管理员兜底提前放行。
+     * 实测(测试账套 PI-2026-10-0013):留痕 APPROVE/APPROVED 意见 =「保存即归档（管理员保存）」,
+     * 而该单按设计应当停在「待二级审批」。
+     *
+     * ⚠ 只收 RD_PROD_INFO —— **用户 2026-10-13 明确选定「只改产品信息表」**。
+     *   同为两级面板的 8 张质量单据(ADMIN_L2_PANELS:QC_TC_IN/QC_LYB/QC_SCY/QC_BHG/QC_BHC/
+     *   QC_BHZ/QC_JJF/QC_SCP)保持"管理员保存即归档"的现状,未经用户确认不要顺手扩大。
+     */
+    private static final java.util.Set<String> ADMIN_SAVE_DEFERS_TO_FLOW = java.util.Set.of("RD_PROD_INFO");
 
     /** 当前待审批节点:1=待一级(缺省)/2=待二级;不在审批中返回 1 */
     private int pendingNodeOf(String panelCode, String no) {
