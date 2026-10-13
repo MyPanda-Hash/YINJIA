@@ -256,6 +256,80 @@ public class QcInspPlanController {
         return ApiResult.ok(Map.of("id", id, "停用", disabled));
     }
 
+    // ══════════════════ 出货检验计划(RD_INSP_PLAN)→ 制程检验单 ══════════════════
+
+    /**
+     * 按**产品编码**取出货检验计划的检验项目,供制程检验单带入明细。
+     *
+     * <p>用户 2026-10-13 口径:「当前出货检验计划的内容能被当前制程检验单取到 —— 实现对应的
+     * 产品编码就能获取到对应的检验内容进行填入」。
+     * 该计划单(RD_INSP_PLAN,文档编号 YJ-RD001)四个红框里:</p>
+     * <ul>
+     *   <li>产品编号 = 关联键(制程检验单已有「产品编码」,不新增表头字段);</li>
+     *   <li>检验要求 / 检验方法 = 制程检验单已有字段,直接映射;</li>
+     *   <li>检查频率 = 本批迁移补的字段(映射 {@code 检测频率})。</li>
+     * </ul>
+     *
+     * <p>字段映射:{@code 控制项目→检验项目 · 控制标准及要求→检验要求 · 控制方法→检验方法 ·
+     * 检测频率→检查频率 · 检测仪器→检验仪器 · 不合格应对措施→同名 · 检验内容→表区}。</p>
+     *
+     * <p>同产品多张计划取**最新一张**(id 倒序),与系统既有「按产品找最新单据」口径一致。
+     * 查不到不算错:返回 200 + 空 rows,由前端提示「该产品没有出货检验计划」。</p>
+     */
+    @GetMapping("/fromShipPlan")
+    public ApiResult<Map<String, Object>> fromShipPlan(@RequestParam String productCode) {
+        requireAnyPanelView();
+        String code = str(productCode);
+        if (code.isEmpty()) return ApiResult.error(400, "请先填写产品编码");
+
+        List<Map<String, Object>> plans = jdbc.queryForList(
+                "SELECT TOP 1 [单据编号] AS planNo, ISNULL([标题],N'') AS title,"
+                        + " ISNULL([版本号],N'') AS version, ISNULL([客户项目名称],N'') AS customerProject,"
+                        + " ISNULL([产品整体尺寸],N'') AS productSize"
+                        + " FROM dbo.rd_insp_plan_head"
+                        + " WHERE [产品编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY id DESC", code);
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("productCode", code);
+        if (plans.isEmpty()) {
+            out.put("planNo", null);
+            out.put("rows", List.of());
+            return ApiResult.ok(out);
+        }
+        Map<String, Object> plan = plans.get(0);
+        String planNo = str(plan.get("planNo"));
+        out.put("planNo", planNo);
+        out.put("title", plan.get("title"));
+        out.put("version", plan.get("version"));
+        out.put("customerProject", plan.get("customerProject"));
+        out.put("productSize", plan.get("productSize"));
+
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT ISNULL([控制项目],N'') AS item, ISNULL([控制标准及要求],N'') AS req,"
+                        + " ISNULL([控制方法],N'') AS method, ISNULL([检测频率],N'') AS freq,"
+                        + " ISNULL([检测仪器],N'') AS instrument, ISNULL([不合格应对措施],N'') AS action,"
+                        + " ISNULL([检验内容],N'') AS category"
+                        + " FROM dbo.rd_insp_plan_detail"
+                        + " WHERE [单据编号] = ? AND ISNULL(asp_cancel,'N') <> 'Y'"
+                        + " ORDER BY ISNULL(TRY_CAST([序号] AS int), 999999), id", planNo);
+
+        List<Map<String, Object>> mapped = new ArrayList<>();
+        for (Map<String, Object> r : rows) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("表区", str(r.get("category")));            // RD_INSP_PLAN.检验内容 = 类别(决定分区)
+            m.put("检验项目", str(r.get("item")));
+            m.put("检验要求", str(r.get("req")));
+            m.put("检验方法", str(r.get("method")));
+            m.put("检查频率", str(r.get("freq")));
+            m.put("检验仪器", str(r.get("instrument")));
+            m.put("不合格应对措施", str(r.get("action")));
+            mapped.add(m);
+        }
+        out.put("rows", mapped);
+        return ApiResult.ok(out);
+    }
+
     // ══════════════════════════ 小工具 ══════════════════════════
 
     private static boolean truthy(String s) {

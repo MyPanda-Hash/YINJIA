@@ -451,6 +451,13 @@ public class PanelConfigService {
                     // 入口 —— 弹窗两用:上=方案表、下=该项目表(可勾选),勾选后「带入明细」写入本单;
                     // 表头的新增/编辑/停用就地维护标准本身。基础档案里的 QC_ITEM/QC_PLAN 菜单已摘,维护只此一处。
                     if (!merged.contains("检验项目/检验方案")) merged.add(anchor + 1, "检验项目/检验方案");
+                    // 2026-10-13:制程检验单再加一个「取出货检验计划」入口(RD_INSP_PLAN)——
+                    // 用户口径「实现对应的产品编码就能获取到对应的检验内容进行填入」。只给这一张单:
+                    // 出货检验计划只服务制程工序,其余三张单仍走既有「检验项目/检验方案」标准库。
+                    if ("QC_PROC_INSP".equals(def.code()) && !merged.contains("取出货检验计划")) {
+                        int at = merged.indexOf("检验项目/检验方案");   // 排在它之前(按产品取现成计划更常用)
+                        merged.add(at < 0 ? anchor + 1 : at, "取出货检验计划");
+                    }
                     g.put("actions", merged);
                 }
             }

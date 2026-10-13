@@ -5673,6 +5673,42 @@ function addInlineDetailRow(b) {
 }
 
 /**
+ * 取出货检验计划 → 带入当前单据明细(2026-10-13 用户口径:「当前出货检验计划的内容能被当前
+ * 制程检验单取到 —— 实现对应的产品编码就能获取到对应的检验内容进行填入」)。
+ *
+ * 与 applyInspItems 的差别:来源是**研发受控计划单 RD_INSP_PLAN**(不是 QC_ITEM 标准库),
+ * 由后端 /qc/inspPlan/fromShipPlan 按产品编码取回、并已映射成制程检验单的字段名,
+ * 比标准库多带一个「检查频率」。同样**追加**到明细行尾、不自动保存;
+ * 只对有值的键赋值(空值不写,避免把空串覆盖上去)。
+ */
+function applyShipPlanItems(items) {
+  const b = blocks.value[0]
+  const tabKey = b ? activeTab(b).key : 'items'
+  if (!cur.value.detail) cur.value.detail = {}
+  const rows = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
+  const cols = new Set(b ? (activeTab(b).cols || []) : [])
+  const has = (k) => cols.size === 0 || cols.has(k)
+  // 后端已用这些键名下发(与 yj_field.label 对齐);本面板没有的列自动跳过
+  const KEYS = ['表区', '检验项目', '检验要求', '检验方法', '检查频率', '检验仪器', '不合格应对措施', '备注']
+  let n = 0
+  for (const it of items || []) {
+    const row = newDetailRow(tabKey)
+    for (const k of KEYS) {
+      if (!has(k)) continue
+      const v = String(it[k] ?? '').trim()
+      if (v) row[k] = v
+    }
+    rows.push(row)
+    n++
+  }
+  if (n) {
+    archPage.value = Math.ceil(rows.length / archPageSize.value) // 新行在末尾,跳末页立即可见
+    markInlineDirty()
+  }
+  return n
+}
+
+/**
  * 选检验项目 → 带入当前单据明细(2026-10-09 用户口径:「在组装成品检验处看到对应的检验项目,
  * 选择填写检验单的数据」)。
  *
@@ -6960,6 +6996,29 @@ async function onButton(action) {
       return ElMessage.warning(tt('请先打开一张检验单，再选检验项目'))
     }
     qcInspPlanVisible.value = true
+    return
+  }
+  // 取出货检验计划(2026-10-13):**制程检验单专用** —— 按本单的「产品编码」从出货检验计划表
+  // (RD_INSP_PLAN,文档编号 YJ-RD001)取回该产品的检验项目,追加到明细。
+  // 用户口径:「实现对应的产品编码就能获取到对应的检验内容进行填入」。
+  // 追加不覆盖(可重复点、可手工删多余行);查不到计划不算错,由这里给业务话术。
+  if (action === '取出货检验计划') {
+    const code = String(cur.value?.['产品编码'] || '').trim()
+    if (!code) return ElMessage.warning(tt('请先填写产品编码'))
+    try {
+      const res = await request.get('/qc/inspPlan/fromShipPlan', { params: { productCode: code } })
+      const data = res.data || {}
+      const planRows = data.rows || []
+      if (!planRows.length) {
+        return ElMessage.warning(data.planNo
+          ? tt('该出货检验计划没有明细')
+          : `${tt('该产品没有出货检验计划')}：${code}`)
+      }
+      const n = applyShipPlanItems(planRows)
+      ElMessage.success(`${tt('已按出货检验计划')} ${data.planNo} ${tt('带入')} ${n} ${tt('行，请填写实测数值与判定')}`)
+    } catch (error) {
+      ElMessage.error(engine.errMsg(error) || tt('取出货检验计划失败'))
+    }
     return
   }
   // 选单通用化：任意 选X 动作且配置有 selectConfig 即走选单（对齐 PanelxForm 的通用分支）

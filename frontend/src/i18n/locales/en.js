@@ -539,6 +539,15 @@ export default {
     '一个产品/一类物料一套方案；点一行选中，下方就是它下面的检验项目': 'One plan per product / material category; click a row to select it and the items below belong to that plan',
     // ---- 检验项目/检验方案 单一入口·两用弹窗(2026-10-09 合并口径)----
     '检验项目/检验方案': 'Inspection Items / Plans',
+    // ---- 取出货检验计划(制程检验单专用,2026-10-13)----
+    '取出货检验计划': 'Fetch from Shipment Inspection Plan',
+    '请先填写产品编码': 'Please fill in the product code first',
+    '该产品没有出货检验计划': 'No shipment inspection plan for this product',
+    '该出货检验计划没有明细': 'This shipment inspection plan has no detail lines',
+    '已按出货检验计划': 'Fetched from shipment inspection plan',
+    '带入': 'added',
+    '行，请填写实测数值与判定': 'line(s); please fill in measured values and judgement',
+    '取出货检验计划失败': 'Failed to fetch the shipment inspection plan',
     '上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用标准本身。维护动作不会改动任何已录入的检验单。': 'Top = inspection plans, bottom = the items of the selected plan. Tick items and click "Add to Details" to write them into this sheet (then fill in measured values and judgement as usual); you may also add / edit / disable the standards themselves right in the two tables. Maintenance never touches sheets already entered.',
     '当前方案': 'Current plan',
     '个检验项目': 'inspection item(s)',
