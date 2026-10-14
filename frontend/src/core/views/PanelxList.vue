@@ -151,6 +151,16 @@
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
+        <!-- 制程检验单(QC_PROC_INSP,2026-10-12 用户口径「参考检验数据记录的做法」):
+             纸张式可填写报表 —— 表区横向分组(外观|尺寸|出货重量 并排,组名横跨本组列)。
+             写法与 QcInspRecSheet 同款:props=head/fields/editable,行取 head.detail,
+             单元格 v-model 直绑 + @input=emit('dirty') 走引擎脏标记(markRaw 行不可直写)。 -->
+        <QcProcInspSheet
+          v-else-if="panelCode === 'QC_PROC_INSP'"
+          ref="approvalSheetRef"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
+          @dirty="markInlineDirty"
+        />
         <!-- 产品文件列表:4 文件×状态矩阵(设计《文件汇总表》)。只读视图 ——
              数据源与产品信息表侧栏「产品开发」按钮同一份(DevTaskService),不另存状态 -->
         <ProdDocListSheet
@@ -581,7 +591,7 @@
     <!-- !isApprovalDoc:文书式面板(RD 全系)只走上方纸张分支,单据卡片(含表头字段条)整体不渲染——
          9357460 拆分报表链时此排除丢失,曾致 RD 每个面板纸张下方多出一条全空表头。
          来料检验要求同样走专属分支,单据卡片不渲染 -->
-    <template v-else-if="!isApprovalDoc && !isQcInspReq && !isQcProcInsp">
+    <template v-else-if="!isApprovalDoc && !isQcInspReq">
       <!-- 单据卡片:左「单据选择」栏(送料暂收单等启用,对齐 PANDA 左停靠选择列表) + 右侧表头/明细 -->
       <div class="doc-rail-layout" :class="{ 'rail-on': !!docRailCfg && !railCollapsed }">
         <DocSelectRail
@@ -802,7 +812,7 @@
       </table>
     </div>
 
-    <div v-if="!isApprovalDoc && !isQcInspReq && !isQcProcInsp" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading">
+    <div v-if="!isApprovalDoc && !isQcInspReq" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading">
       <!-- ══════════ ③b 主表预览表格（配置 mainTable 时显示：主表字段列，点行切换当前单据，明细联动） -->
       <div v-if="mainGrid" class="main-grid">
         <div class="dt-head">
@@ -1088,19 +1098,6 @@
       </div>
     </template>
 
-    <!-- 制程检验单(QC_PROC_INSP,报表式特例,2026-10-12 用户口径「照截图 / 修改当前页面」):
-         整页一张交叉表 —— 表头字段(产品编码/型号/批号/抽检总量)在左、表区(外观|尺寸|出货重量…)横向并排、
-         结果判断在右。单据卡片与明细表整体不渲染,由 QcProcInspSheet 接管;工具栏与表尾保留(保存/审核要用)。 -->
-    <template v-else-if="isQcProcInsp">
-      <div class="qc-proc-wrap" v-loading="loading">
-        <QcProcInspSheet
-          :head="cur"
-          :fields="headerFields"
-          :editable="draftEditable"
-          @dirty="markInlineDirty"
-        />
-      </div>
-    </template>
 
 
     <!-- ══════════ 表格右键菜单（对齐真实 T+ 明细右键）══════════ -->
@@ -1951,7 +1948,10 @@ const invalidPanel = computed(() => !panelCode.value || panelCode.value === 'und
 
 // 立项申请表/项目实施计划/项目进度查询/数据记录表(功能性滤效+其余7张)+实验室使用记录表4张:文件类文书式特例面板
 const RECORD_SHEET_PANELS = Object.keys(recordSheetConfigs)
-const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
+const isApprovalDoc = computed(() => ['RD_APPROVAL', 'RD_PLAN', 'RD_PROGRESS', 'RD_PROD_DOCLIST', 'RD_FILTER_EFF', 'QC_CATALOG', 'QC_INSP_REC',
+  // 制程检验单(2026-10-12):用户口径「参考检验数据记录的做法」—— 作为文书式面板,
+  // 整页纸张居中 + 功能按钮右侧竖排,由 QcProcInspSheet 以报表形态接管
+  'QC_PROC_INSP', ...RECORD_SHEET_PANELS, ...Object.keys(qcSheetCfgs)].includes(String(panelCode.value)))
 const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(panelCode.value)))
 /**
  * 产品文件列表(RD_PROD_DOCLIST)= **单单据 + 矩阵**面板:库里只有 1 张单据(PDL-0001),
@@ -1963,8 +1963,6 @@ const isProdDocMatrix = computed(() => String(panelCode.value) === 'RD_PROD_DOCL
 // 来料检验要求(品质资料 7 表):档案式特例面板——工具栏/单据卡片/明细表格/页脚全隐,QcInspReqSheet 整体接管
 const isQcInspReq = computed(() => isQcInspReqPanel(panelCode.value))
 
-/** 制程检验单:整页报表式(交叉表)分支的开关 */
-const isQcProcInsp = computed(() => panelCode.value === 'QC_PROC_INSP')
 /** 产品变更申请单:当前账号可填的纸面部门行(后端按 yj_user.dept_id → yj_change_dept 算,metadata 下发)。
  *  仅 RD_CHANGE 有该键;其它面板拿到空数组也无害(没有 lockKey 的表根本不看它)。 */
 const changeDeptRows = computed(() => cfgCache.value?.metadata?.changeDepts || [])
