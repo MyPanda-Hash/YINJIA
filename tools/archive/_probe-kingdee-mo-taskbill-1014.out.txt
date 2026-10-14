@@ -1,0 +1,23 @@
+=== 金蝶真实账套探针(生产工单/生产任务单)===
+账套: clientId=359797 outerInstanceId=580147507460444160 domain=https://tf.jdy.com
+时间: 2026-10-14T09:25:44.316Z
+✅ app-token 已获取(长度 403)
+
+=== ① 候选路径探测(page=1,page_size=2)===
+✅ /jdy/v2/pm/mo_taskbill → count=0
+❌ /jdy/v2/pm/mo_taskbill_detail → HTTP 400 Bad Request
+❌ /jdy/v2/pm/mo_bill → HTTP 519 status code 519
+❌ /jdy/v2/pm/mo_bill_detail → HTTP 519 status code 519
+✅ /jdy/v2/pm/subm_workorder → count=0
+✅ /jdy/v2/scm/inv_pick → count=4981
+✅ /jdy/v2/scm/inv_product → count=2880
+
+=== ② 生产任务单 /jdy/v2/pm/mo_taskbill ===
+总数 count = 0
+本页行数 = 0
+(账套内该列表为空 —— 无生产任务单数据)
+
+=== ③ 生产链其它单据数量(旁证)===
+  /jdy/v2/pm/subm_workorder → count=0
+  /jdy/v2/scm/inv_pick → count=4981
+  /jdy/v2/scm/inv_product → count=2880
