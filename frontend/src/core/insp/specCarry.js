@@ -124,17 +124,18 @@ export function headFromSpecDetail(afs, items) {
 }
 
 /**
- * 明细落点取哪一段行:配了 detailSource 就取 payload[detailSource](成型工艺清单的配方表 ← 规格书
- * 「物料清单」表区,与表头格用的「检验要求」不是同一段),没配就还是 payload.items(旧链一个字节不变)。
+ * 明细落点取哪一段行:规格书**本表区**的行(后端把该表区的行放在 payload.items)。
  *
- * @param {{items?: Array, [k: string]: any}|null} payload 后端 /px/specByProduct* 的返回
- * @param {{detailSource?: string}|null} afs
- * @returns {Array<Record<string, any>>} 取不到一律空数组(不猜、不退回 items —— 退回去会把检验项目行
- *   灌进配方表)
+ * ⚠ 2026-10-15:原有一个 `detailSource` 分支(成型工艺清单的配方表 ← payload['物料清单'] 表区),
+ *   随用户口径变更撤掉 —— 「配方表的数据是在配方计算器里面填写数据然后填入单据的,
+ *   而不是带入的规格书的」(配方行改在配方计算弹窗里录,见 core/mold/recipeRows.js)。
+ *   剩下的三链表(出货检验计划表/组装BOM表/成型工艺清单的检验要求)取的都是 payload.items,
+ *   故这里只剩来回结构 + 非数组兜底;**不再有第二个取数源**。
+ *
+ * @param {{items?: Array}|null} payload 后端 /px/specByProduct* 的返回
+ * @returns {Array<Record<string, any>>} items 不是数组一律空数组(不猜)
  */
-export function specCarryRows(payload, afs) {
-  const src = String(afs?.detailSource ?? '').trim()
-  if (src) return Array.isArray(payload?.[src]) ? payload[src] : []
+export function specCarryRows(payload) {
   return Array.isArray(payload?.items) ? payload.items : []
 }
 

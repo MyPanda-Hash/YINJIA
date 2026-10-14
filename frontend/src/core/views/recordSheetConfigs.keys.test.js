@@ -581,8 +581,10 @@ test('组装工艺清单:组装BOM表的规格书导入映射到 BOM 表真实�
  *       上一版把值只读挂在 4 个**块名标签格**下方(valueKey + .rs-subval),用户 8090 实测否决:
  *       「规格书的检验要求数据应该是填在成型工艺清单的表格内的要求/强度要求/压降标准里面的」;
  *     · `尺寸` 那一项要**整句解析成四格**(外径mm/外径公差/内径mm/内径公差,见 core/insp/dimensionSpec.js);
- *     · 配方表两列(物料编号/物料种类)从规格书「物料清单」表区带出 ⇒ 本链**要配 detail**,
- *       取数源由 detailSource 指向payload['物料清单'](不是表头那格用的 items)。
+ *     · ⚠ 2026-10-15 口径变更:原先把配方表三列(物料编号/物料名称/物料种类)也挂在本链上
+ *       (靠 detailSource 取 payload['物料清单'])—— 用户改口「配方表的数据是在配方计算器里面填写
+ *       数据然后填入单据的,而不是带入的规格书的」,那段配置连同本文件的守卫测试一并撤掉;
+ *       本链现在**只带表头检验要求那几格**(detail 为空 ⇒ 不会去动任何明细表)。
  */
 test('成型工艺清单:检验要求落在真实数据格上(不再是块名下方的只读值)', () => {
   const cfg = recordSheetConfigs.RD_MOLD_PROC
@@ -594,7 +596,10 @@ test('成型工艺清单:检验要求落在真实数据格上(不再是块名下
 
   // 权限按承载面板校验(与 /px/specByProductForAsm 同款):本面板 403 不了别人的端点
   assert.equal(afs.endpoint, '/px/specByProductForMold',
-    '本面板要一次取「检验要求」+「物料清单」两个表区 ⇒ 走 RD_MOLD_PROC 权限的专端点')
+    '本面板要按 RD_MOLD_PROC 的权限取规格书 ⇒ 走本面板的端点(借别人的端点会被 403)')
+  // 配方表的物料行改在配方计算弹窗里录 ⇒ 本链不许再配明细落点(配了就会去动配方表)
+  assert.equal(afs.detail, undefined, '本链只带表头检验要求:明细落点已随 2026-10-15 口径变更撤掉')
+  assert.equal(afs.detailSource, undefined, 'detailSource(配方表 ← 规格书物料清单)已撤')
 
   const fx = FIXTURE.RD_MOLD_PROC
   assert.ok(fx?.labels?.length, 'fixture 缺 RD_MOLD_PROC')
@@ -643,37 +648,8 @@ test('成型工艺清单:检验要求落在真实数据格上(不再是块名下
     }
   }
   assert.deepEqual(valueKeys, [], 'valueKey/.rs-subval 那套只读带出已撤(值直接写真实数据格)')
-})
 
-test('成型工艺清单:配方表 物料编号/物料名称/物料种类 ← 规格书「物料清单」表区', () => {
-  const cfg = recordSheetConfigs.RD_MOLD_PROC
-  const afs = cfg.autoFillSpec
-  const recipe = (cfg.dataTables || []).find((dt) => dt.filterVal === '配方表')
-  assert.ok(recipe, '找不到配方表(dataTables 里 filterVal=配方表 那一张)')
-  assert.equal(afs.detailSource, '物料清单',
-    '配方表的取数源 = payload[物料清单](与表头那格用的 payload.items 不是同一段)')
-  assert.ok(afs.detail?.length, 'autoFillSpec.detail 为空 ⇒ 配方表两列不会回填')
-
-  const recipeKeys = new Set((recipe.cols || []).map((c) => c.key))
-  for (const m of afs.detail) {
-    assert.ok(recipeKeys.has(m.to), `明细落点 '${m.to}' 不在配方表列里(填了也看不见)`)
-  }
-  // ⚠ 2026-10-14 补「物料名称」:原先漏了这一列,而配方表的行是**程序写入**的、不经过失焦,
-  //   所以 A5 那条「失焦按编码/名称互相带出」永远不会触发 ⇒ 该列恒空(用户实测报障)。
-  assert.deepEqual(afs.detail.map((m) => m.to).sort(), ['序号', '物料名称', '物料种类', '物料编号'].sort(),
-    '四列:物料编号←规格书物料编码 / 物料名称←规格书物料名称 / 物料种类←bs_inv 所属类别 / 序号←规格书序号')
-  assert.equal(afs.detail.find((m) => m.to === '物料编号').from, '物料编码')
-  assert.equal(afs.detail.find((m) => m.to === '物料名称').from, '物料名称',
-    '物料名称与物料编码同取规格书「物料清单」那一行(同源最准)')
-  // 所属类别 不是规格书字段,是**后端按 存货编码 查商品档案(bs_inv)** 补上的派生列(见 DevTaskService.specDetailRows)
-  assert.equal(afs.detail.find((m) => m.to === '物料种类').from, '所属类别')
-  const specFx = FIXTURE.RD_SPEC_DOC
-  assert.ok(specFx.labels.includes('物料编码'), '取数源 物料编码 必须是规格书字段(那边改 label 这里就填空白)')
-  assert.ok(specFx.labels.includes('物料名称'), '取数源 物料名称 同样取自规格书「物料清单」那一行')
-  // ⚠ 2026-10-14 纠正:原断言是**反向**的(「物料名称 由 A5 的双向带出负责,本链不许顺手覆盖它」),
-  //   前提错了 —— A5 的 invCarry 是 **@change(失焦)** 触发,而配方表的行是**程序写入**的、
-  //   全程不失焦 ⇒ 那条链在这里永远不会跑,物料名称列恒空(用户实测报障「物料名称没带过来」)。
-  //   故改为正向:本链**必须**带物料名称,且取自规格书同一行(与物料编码同源)。
-  assert.ok(afs.detail.some((m) => m.to === '物料名称'),
-    '配方表「物料名称」必须由本链带出(程序写入的行不过失焦,A5 的失焦链在这里不会触发)')
+  // ⚠ 2026-10-15:原先这里还有一条「配方表 物料编号/物料名称/物料种类 ← 规格书「物料清单」表区」
+  //   的守卫测试 —— 随该功能一起撤掉(用户改口:配方表的行在**配方计算弹窗**里录,
+  //   见 core/mold/recipeRows.js 与 RecipeCalcDialog 的物料行区)。留着就是断言一个不存在的配置。
 })

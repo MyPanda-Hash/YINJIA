@@ -11,7 +11,7 @@
   >
     <div class="rcd">
       <div class="rcd-note">
-        {{ tt('计算口径与《炭棒工艺配方设计器》逐位一致；本弹窗的输入不保存、不打印，只有点「填入单据」写进单据的值才随单据保存。') }}
+        {{ tt('计算口径与《炭棒工艺配方设计器》逐位一致；本弹窗的输入不保存、不打印，只有点「填入单据」写进单据的值（含上面这份物料行）才随单据保存。') }}
       </div>
 
       <!-- ① 工艺参数:公式固定,只有这几个系数可调;按产品编号持久化 -->
@@ -55,10 +55,50 @@
         </div>
       </div>
 
-      <!-- ② 料位(读单据页 2 配方表)+ 含水率 -->
+      <!-- ② 物料行 = 配方表的真源(2026-10-15 用户口径:配方表在弹窗里录,不由规格书带入) -->
       <div class="rcd-sec-h">
-        <span class="rcd-sec-t">② {{ tt('料位与含水率') }}</span>
-        <span class="rcd-muted">{{ tt('料位按配方表的物料种类分组(粉料 1~5 / 胶粉 6~7 / 折算料 8~10);料位 1 是补差位。含水率默认从物料档案(商品·水分含量)按物料编号带出,档案没有的请手填 —— 只有粉料位的含水率参与计算。') }}</span>
+        <span class="rcd-sec-t">② {{ tt('物料行') }}</span>
+        <span class="rcd-muted">{{ tt('配方表的物料行在这里录。刚打开时带进来的是页 2 配方表已有的行(页 2 空就从零加);算完点「填入单据」会连这些行一起写回页 2 配方表。') }}</span>
+        <span class="rcd-act" @click="addMaterialRow">{{ tt('加一行') }}</span>
+        <span v-if="invTip" class="rcd-muted">{{ invTip }}</span>
+      </div>
+      <table class="rcd-tb">
+        <thead>
+          <tr>
+            <th style="width:44px">No.</th>
+            <th style="width:132px">{{ tt('物料种类') }}</th>
+            <th style="width:150px">{{ tt('物料编号') }}</th>
+            <th>{{ tt('物料名称') }}</th>
+            <th style="width:110px">{{ tt('设计添加量') }}</th>
+            <th style="width:104px">{{ tt('实际添加比例') }}</th>
+            <th style="width:96px">{{ tt('单支物料含量') }}</th>
+            <th style="width:44px"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(r, i) in editRows" :key="i">
+            <td class="rcd-c">{{ i + 1 }}</td>
+            <td>
+              <el-select v-model="r['物料种类']" size="small" clearable>
+                <el-option v-for="k in MATERIAL_KINDS" :key="k" :label="tt(k)" :value="k" />
+              </el-select>
+            </td>
+            <td><el-input v-model="r['物料编号']" size="small" @change="onMaterialCodeChange(i)" /></td>
+            <td><el-input v-model="r['物料名称']" size="small" /></td>
+            <td><el-input v-model="r['设计添加量']" size="small" class="rcd-mini" /></td>
+            <!-- 两列是算出来的(引擎输出),这里只读展示输入旁边 —— 回填预览那张表还要拿它跟旧值比 -->
+            <td class="rcd-c">{{ rowCalc(i, '实际添加比例') }}</td>
+            <td class="rcd-c">{{ rowCalc(i, '单支物料含量') }}</td>
+            <td class="rcd-c"><span class="rcd-del" :title="tt('删除这一行')" @click="removeMaterialRow(i)">✕</span></td>
+          </tr>
+          <tr v-if="!editRows.length"><td colspan="8" class="rcd-muted">{{ tt('还没有物料行 —— 点上面「加一行」开始录') }}</td></tr>
+        </tbody>
+      </table>
+
+      <!-- ③ 料位(按上面这份物料行分组)+ 含水率 -->
+      <div class="rcd-sec-h">
+        <span class="rcd-sec-t">③ {{ tt('料位与含水率') }}</span>
+        <span class="rcd-muted">{{ tt('料位按上面物料行的物料种类分组(粉料 1~5 / 胶粉 6~7 / 折算料 8~10);料位 1 是补差位。含水率默认从物料档案(商品·水分含量)按物料编号带出,档案没有的请手填 —— 只有粉料位的含水率参与计算。') }}</span>
         <span v-if="archiveTip" class="rcd-muted">{{ archiveTip }}</span>
       </div>
       <table class="rcd-tb">
@@ -68,7 +108,7 @@
             <th style="width:74px">{{ tt('分组') }}</th>
             <th style="width:130px">{{ tt('物料编号') }}</th>
             <th>{{ tt('物料名称') }}</th>
-            <th style="width:150px">{{ tt('设计值(来自配方表)') }}</th>
+            <th style="width:150px">{{ tt('设计值(来自物料行)') }}</th>
             <th style="width:110px">{{ tt('含水率%') }}</th>
             <th style="width:110px">{{ tt('最终比例') }}</th>
             <th style="width:110px">{{ tt('单支克重g') }}</th>
@@ -92,9 +132,9 @@
         </tbody>
       </table>
 
-      <!-- ③ 结果 -->
+      <!-- ④ 结果 -->
       <div class="rcd-sec-h">
-        <span class="rcd-sec-t">③ {{ tt('计算结果') }}</span>
+        <span class="rcd-sec-t">④ {{ tt('计算结果') }}</span>
         <!-- 算不出来时最需要它:规格/型号/密度一键从产品信息与历史单带出(只填空格,不覆盖已填值) -->
         <span class="rcd-act" :class="{ 'rcd-act-off': carrying }" @click="carrySpec">{{ tt('按产品规格带出') }}</span>
         <span v-if="blockReason" class="rcd-warn">{{ blockReason }}</span>
@@ -109,10 +149,10 @@
         <div v-for="(w, i) in visibleWarnings" :key="i" class="rcd-warn">⚠ {{ w }}</div>
       </div>
 
-      <!-- ④ 回填预览 -->
+      <!-- ⑤ 回填预览 -->
       <div class="rcd-sec-h">
-        <span class="rcd-sec-t">④ {{ tt('回填预览') }}</span>
-        <span class="rcd-muted">{{ tt('点「填入单据」后按下面这张表覆盖对应格;未变化的格不列出。') }}</span>
+        <span class="rcd-sec-t">⑤ {{ tt('回填预览') }}</span>
+        <span class="rcd-muted">{{ tt('点「填入单据」后按下面这张表覆盖对应格(明细整表替换为上面那份物料行);未变化的格不列出。') }}</span>
       </div>
       <div v-if="patch" class="rcd-two">
         <table class="rcd-tb">
@@ -131,7 +171,7 @@
               <td class="rcd-c"><span class="rcd-old">{{ d.oldRatio || '—' }}</span> → {{ d.实际添加比例 }}</td>
               <td class="rcd-c"><span class="rcd-old">{{ d.oldAmount || '—' }}</span> → {{ d.单支物料含量 }}</td>
             </tr>
-            <tr v-if="!rowDiff.length"><td colspan="4" class="rcd-muted">{{ tt('配方表没有可回填的行') }}</td></tr>
+            <tr v-if="!rowDiff.length"><td colspan="4" class="rcd-muted">{{ tt('没有可回填的物料行') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -166,6 +206,9 @@ import { compute } from '@/core/mold/recipeEngine.js'
 import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisturePercent, NO_RECIPE_ROWS, paramsFromHead,
   slotsFromRows, specCarryFrom, sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery,
   unfilledDesignRows } from '@/core/mold/recipeSheet.js'
+import { blankRecipeRow, buildRecipeRows, editRowsFrom, invFillFor } from '@/core/mold/recipeRows.js'
+import { MATERIAL_KINDS } from '@/core/mold/materialKinds.js'
+import { invRowsOf } from '@/core/panel/invCarry.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
 
 /**
@@ -174,13 +217,16 @@ import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
  * 口径见 CONTEXT.md「配方计算器(Recipe Calculator)」与 docs/adr/0004:
  *   - 公式 = 与《炭棒工艺配方设计器》exe 逐位一致(core/mold/recipeEngine.js),本弹窗不做任何计算;
  *   - 输入(工艺参数/含水率)**不落库、不打印**;只有回填进单据字段的值随单据保存;
- *   - 配方真源 = 当前单据页 2 配方表(本弹窗读它、写回同一行);
+ *   - **配方表的物料行在本弹窗里录**(2026-10-15 用户口径变更:原来是"页 2 手填 + 规格书带出",
+ *     现改为"配方计算器里填写数据然后填入单据");所以两道输入闸的判据是本弹窗这份行
+ *     (core/mold/recipeRows.js),不再是页 2 有没有行;
  *   - 可调参数(一切几/折算比/公差/漂移)= 系统默认 + 按产品编号覆盖,落标准库 yj_std_lib
  *     (lib=mold.calcparam,条目名=产品编号,条目名"默认"为系统默认),维护界面用现成的 StdLibManager。
  */
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   head: { type: Object, required: true },
+  /** 页 2 配方表**已有的行**:弹窗打开时带进来接着编(页面为空就传 [],从零加)。只读来源。 */
   rows: { type: Array, default: () => [] },
 })
 const emit = defineEmits(['update:modelValue', 'applied'])
@@ -202,6 +248,13 @@ const moisture = ref(Array(10).fill(''))
 const moistureTouched = ref([])          // 用户手改过的料位下标(档案不许覆盖)
 const archiveFilled = ref([])            // 本次由档案带出的料位号(界面上标「档案」)
 const archiveTip = ref('')
+const invTip = ref('')                   // 物料行里「按编号查商品档案」的结果提示
+/**
+ * 配方表的物料行 —— **本弹窗是配方表的真源**(2026-10-15 用户口径变更)。
+ * 打开时从页 2 已有的行拷贝进来接着编(props.rows 是只读来源),页 2 空则从零加;
+ * 引擎/告警/回填全部吃这份行,点「填入单据」时整表写回页 2。纯函数在 core/mold/recipeRows.js。
+ */
+const editRows = ref([])
 const paramEntryId = ref(null)
 const paramScopeTip = ref('')
 const paramLibVisible = ref(false)
@@ -283,13 +336,14 @@ const overrides = computed(() => {
   return base
 })
 
-const slots = computed(() => slotsFromRows(props.rows).slots
+const slots = computed(() => slotsFromRows(editRows.value).slots
   // 弹窗输入是百分数(exe 前端同款),引擎吃小数 —— 换算在 recipeSheet.moisturePercent 里,有单测
   .map((s, i) => ({ ...s, moisture: moisturePercent(moisture.value[i]) })))
 
 const parsed = computed(() => {
-  // 第三参 rows:配方表一行物料都没有时 paramsFromHead 会给出阻断项(见 NO_RECIPE_ROWS)
-  const { params, missing } = paramsFromHead(props.head, overrides.value, props.rows)
+  // 第三参 = **弹窗里这份物料行**:一行物料都没有时 paramsFromHead 给出阻断项(见 NO_RECIPE_ROWS)。
+  // ⚠ 口径变更(2026-10-15):判据不再是页 2 有没有行 —— 行就是在弹窗里录的。
+  const { params, missing } = paramsFromHead(props.head, overrides.value, editRows.value)
   if (missing.length) return { missing }
   try {
     return { params, result: compute(params, slots.value.map((s) => ({ design_ratio: s.designRatio, amount_g: s.amountG, moisture: s.moisture }))) }
@@ -299,9 +353,9 @@ const parsed = computed(() => {
 })
 const result = computed(() => parsed.value.result || null)
 const blockReason = computed(() => {
-  // 配方表 0 行:文案得对症(「请先在页 1 填好…」对页 2 的配方表说不通)
+  // 弹窗里一行物料都没有(文案得对症:「请先在页 1 填好…」对物料行说不通)
   if (parsed.value.missing?.includes(NO_RECIPE_ROWS)) {
-    return tt('配方表还没有物料行 —— 请先在页 2「配方表」填上至少 1 行物料，再点「配方计算」')
+    return tt('还没有物料行 —— 请在下面「② 物料行」里加上至少 1 行（填物料种类 + 物料编号），再回来算')
   }
   if (parsed.value.missing?.length) return `${tt('单据上还缺')}：${parsed.value.missing.join('、')}${tt('（请先在页 1 填好，或补齐密度管控范围）')}`
   if (parsed.value.error) return parsed.value.error
@@ -312,11 +366,11 @@ const patch = computed(() => (result.value
   : null))
 /** 配方表自己的问题:分组/容量告警 + 「设计添加量」没填(会被静默按 0 算,最需要点名的一条) */
 const rowWarnings = computed(() => {
-  const list = [...slotsFromRows(props.rows).warnings]
-  const unfilled = unfilledDesignRows(props.rows, slots.value)
+  const list = [...slotsFromRows(editRows.value).warnings]
+  const unfilled = unfilledDesignRows(editRows.value, slots.value)
   if (unfilled.length) {
     // 空着 = 引擎按 0 算;料位 1 是补差位会把差额吃下来 ⇒ 两行全空也照样"出结果",这条告警就是拦这个。
-    list.push(tt('配方表有 {n} 行的「设计添加量」为空或不是数字（第 {rows} 行），这些行会被按 0 参与计算；不用的料请填 0，不要留空')
+    list.push(tt('有 {n} 行的「设计添加量」为空或不是数字（第 {rows} 行），这些行会被按 0 参与计算；不用的料请填 0，不要留空')
       .replace('{n}', unfilled.length).replace('{rows}', unfilled.join('、')))
   }
   return list
@@ -363,26 +417,86 @@ const headDiff = computed(() => (patch.value ? Object.entries(patch.value.head)
   .filter((d) => d.old !== d.val) : []))
 const rowDiff = computed(() => (patch.value ? patch.value.rows.map((r) => ({
   ...r,
-  oldRatio: String(props.rows?.[r.rowIndex]?.['实际添加比例'] ?? ''),
-  oldAmount: String(props.rows?.[r.rowIndex]?.['单支物料含量'] ?? ''),
+  oldRatio: String(editRows.value?.[r.rowIndex]?.['实际添加比例'] ?? ''),
+  oldAmount: String(editRows.value?.[r.rowIndex]?.['单支物料含量'] ?? ''),
 })) : []))
+/** 物料行上那两列算出来的值(按行号对齐 patch.value.rows,与「回填预览」同一份数据源) */
+const calcByRow = computed(() => {
+  const map = new Map()
+  for (const r of (patch.value?.rows || [])) map.set(r.rowIndex, r)
+  return map
+})
+const rowCalc = (i, key) => String(calcByRow.value.get(i)?.[key] ?? '—')
+
+/* ── 物料行的增/删/按编号查档案(2026-10-15)────────────────────────────────────
+   加行/删行都是**改弹窗里这份草稿**,不动物单据;写回只发生在点「填入单据」时。
+   物料编号改完(current-change,即失焦/回车)按商品档案带出物料名称与物料种类 ——
+   走既有档案查询(INV→bs_inv),不新开后端接口。 */
+function addMaterialRow() {
+  editRows.value = [...editRows.value, blankRecipeRow()]
+}
+function removeMaterialRow(i) {
+  const next = editRows.value.slice()
+  next.splice(i, 1)
+  editRows.value = next
+}
+/**
+ * 商品档案行:商品档案面板(INV → bs_inv)按存货编码取一行。
+ * ⚠ 后端 condition 对普通文本走 `LIKE %值%`(见 core/panel/invCarry.js 头注),`M-001` 会命中 `XM-001`,
+ *   所以**本地按 trim 后全等收紧**,且只认唯一命中 —— 多条/没有都返回 null(宁可不带,不带错)。
+ */
+async function fetchInvRowOf(code) {
+  try {
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: 'INV', condition: { 存货编码: code }, pageNo: 1, pageSize: 5,
+    })
+    const hits = invRowsOf(res?.data).filter((r) => String(r?.['存货编码'] ?? '').trim() === code)
+    return hits.length === 1 ? hits[0] : null
+  } catch {
+    return null   // 无权限/查不到都按"档案没有"处理,转手填
+  }
+}
+async function onMaterialCodeChange(i) {
+  const code = String(editRows.value[i]?.['物料编号'] ?? '').trim()
+  invTip.value = ''
+  if (!code) return
+  const inv = await fetchInvRowOf(code)
+  if (!inv) {
+    invTip.value = `· ${tt('这些物料编号在商品档案里查不到，物料名称/物料种类请手填')}`
+    return
+  }
+  const fill = invFillFor(editRows.value[i], inv)
+  if (Object.keys(fill).length) {
+    Object.assign(editRows.value[i], fill)
+    invTip.value = `· ${tt('已按商品档案带出')}：${Object.keys(fill).join('、')}`
+  }
+  // 含水率:同一份档案行顺带更新(只粉料位参与计算;用户手改过的格不覆盖 —— 复用已测的 applyArchiveMoisture)
+  const pct = Number(inv['水分含量'])
+  if (!Number.isFinite(pct) || pct <= 0) return
+  const merged = applyArchiveMoisture(slots.value, moisture.value, moistureTouched.value, { [code]: pct })
+  moisture.value = merged.values
+  archiveFilled.value = merged.filledSlots
+}
 const footTip = computed(() => {
   if (blockReason.value) return blockReason.value
   const n = headDiff.value.length + rowDiff.value.length
   return n ? `${tt('将写入')} ${n} ${tt('处')}` : tt('没有需要写入的变化')
 })
 
-/** 打开时:载入该产品的参数(没有就用系统默认条目,再没有就用内置默认) */
+/** 打开时:台账/参数载入 + **把页 2 配方表已有的物料行带进来接着编** */
 async function onOpen() {
   moisture.value = Array(10).fill('')
   moistureTouched.value = []
   archiveFilled.value = []
   archiveTip.value = ''
+  invTip.value = ''
   paramEntryId.value = null
   Object.assign(form, builtinDefaults())
   paramScopeTip.value = scopeTip()
   sinterModel.value = ''
   sinterWorkshop.value = String(props.head?.['生产车间'] ?? '').trim()
+  // 物料行:页 2 已有的行拷贝进弹窗(用户在页 2 填过的接着编);页 2 为空就是空的,由「加一行」从零加
+  editRows.value = editRowsFrom(props.rows)
   const key = productCode.value || DEFAULT_ITEM
   try {
     const hit = await fetchParam(key)
@@ -408,20 +522,9 @@ async function loadArchiveMoisture() {
   if (!codes.length) return
   const archive = {}
   await Promise.all(codes.map(async (code) => {
-    try {
-      const res = await request.post('/px/queryFormDataList', {
-        panelCode: 'INV', condition: { 存货编码: code }, pageNo: 1, pageSize: 1,
-      })
-      const d = res?.data
-      const list = Array.isArray(d) ? d : (d?.list || d?.rows || [])
-      // ⚠ 档案面板返回的是**主从结构**:list[0].detail.items[0] 才是行数据(实测),
-      //   直接把 list[0] 当行会拿到 {编号,状态,单据状态,detail} 四个键、含水量永远取不到。
-      const row = list.length ? (list[0]?.detail?.items?.[0] || list[0]) : null
-      const v = row ? Number(row['水分含量']) : NaN
-      archive[code] = Number.isFinite(v) && v > 0 ? v : null
-    } catch {
-      archive[code] = null   // 无权限/查不到都按"档案没有"处理,转手填
-    }
+    const row = await fetchInvRowOf(code)
+    const v = row ? Number(row['水分含量']) : NaN
+    archive[code] = Number.isFinite(v) && v > 0 ? v : null
   }))
   const merged = applyArchiveMoisture(slots.value, moisture.value, moistureTouched.value, archive)
   moisture.value = merged.values
@@ -547,17 +650,18 @@ async function carrySpec() {
   }
 }
 
-/** 回填:页 1 十一个格 + 配方表对应行的两列(设计文档口径:比例 2 位小数带 %、含量 2 位小数) */
+/**
+ * 回填:页 1 十一个格(patch.head)+ **页 2 配方表整表替换为弹窗里这份物料行**
+ * (设计文档口径:比例 2 位小数带 %、含量 2 位小数)。
+ *
+ * ⚠ 明细不再逐行改原行(那要求行必须先在页 2 存在),而是把整份新行交给面板
+ * (emit applied 的 payload.rows),由面板按本表区(表区='配方表')换掉旧行 ——
+ * 页 2 原来是空的也能一次写进去。行内两列由 buildRecipeRows 并好(纯函数+单测)。
+ */
 function apply() {
   if (!patch.value) return
   Object.entries(patch.value.head).forEach(([key, val]) => { props.head[key] = val })
-  patch.value.rows.forEach((r) => {
-    const row = props.rows[r.rowIndex]
-    if (!row) return
-    row['实际添加比例'] = r.实际添加比例
-    row['单支物料含量'] = r.单支物料含量
-  })
-  emit('applied')
+  emit('applied', { rows: buildRecipeRows(editRows.value, patch.value.rows) })
   ElMessage.success(`${tt('已填入单据')}（${headDiff.value.length + rowDiff.value.length} ${tt('处')}）`)
   emit('update:modelValue', false)
 }
@@ -583,6 +687,8 @@ function apply() {
 .rcd-empty { background: #fbfbfb; color: #c0c4cc; }
 .rcd-mini { width: 78px; }
 .rcd-mini :deep(.el-input__inner) { text-align: center; }
+.rcd-del { color: #f56c6c; cursor: pointer; padding: 0 6px; font-size: 12px; }
+.rcd-del:hover { color: #c45656; }
 .rcd-src { margin-left: 3px; font-size: 10px; color: #67c23a; border: 1px solid #b3e19d; border-radius: 2px; padding: 0 2px; vertical-align: middle; }
 .rcd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 14px; }
 .rcd-r { display: flex; justify-content: space-between; border-bottom: 1px dashed #ebeef5; padding: 2px 0; }

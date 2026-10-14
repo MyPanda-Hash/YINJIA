@@ -238,25 +238,18 @@ test('认不出来的 parse 名字 ⇒ 跳过该项(不静默把整句塞进某�
   assert.deepEqual(out, {})
 })
 
-/* ── 明细落点取哪一段行(2026-10-15:配方表 ← 规格书「物料清单」表区)─────────────────
-   成型工艺清单一条链上要取规格书的**两个表区**:表头那几格取「检验要求」(payload.items),
-   配方表那几行取「物料清单」(payload['物料清单'],由 /px/specByProductForMold 一并带回)。
-   取数源写错不会报错,只会把检验项目行灌进配方表 —— 故这里钉死。 */
+/* ── 明细落点取哪一段行(2026-10-15:配方表那条 detailSource 分支已随口径变更撤掉)──────────
+   三条链(出货检验计划表 / 组装BOM表 / 成型工艺清单的检验要求)取的都是 payload.items
+   —— 规格书本表区的行,由后端按各自端点选表区。 */
 const MOLD_PAYLOAD = {
   found: true,
   items: [{ 检验项目: '压降', 检验要求: '≤5 kPa' }],
-  物料清单: [{ 序号: '1', 物料编码: 'M-001', 所属类别: '折算物料' }],
 }
 
-test('没配 detailSource ⇒ 仍旧取 payload.items(出货检验/组装BOM 两条旧链一个字节不变)', () => {
-  assert.deepEqual(specCarryRows(MOLD_PAYLOAD, INSP_AFS), MOLD_PAYLOAD.items)
-  assert.deepEqual(specCarryRows(MOLD_PAYLOAD, { detailSource: '' }), MOLD_PAYLOAD.items)
-  assert.deepEqual(specCarryRows(null, undefined), [])
-  assert.deepEqual(specCarryRows({ items: 'nope' }, undefined), [])
+test('明细取 payload.items;不是数组一律空数组(不猜)', () => {
+  assert.deepEqual(specCarryRows(MOLD_PAYLOAD), MOLD_PAYLOAD.items)
+  assert.deepEqual(specCarryRows(null), [])
+  assert.deepEqual(specCarryRows(undefined), [])
+  assert.deepEqual(specCarryRows({ items: 'nope' }), [])
 })
 
-test('配了 detailSource ⇒ 取那一段;取不到就是空数组(**不退回 items**,否则检验项目行会灌进配方表)', () => {
-  assert.deepEqual(specCarryRows(MOLD_PAYLOAD, { detailSource: '物料清单' }), MOLD_PAYLOAD.物料清单)
-  assert.deepEqual(specCarryRows(MOLD_PAYLOAD, { detailSource: '没有这段' }), [])
-  assert.deepEqual(specCarryRows({ found: true, items: MOLD_PAYLOAD.items }, { detailSource: '物料清单' }), [])
-})

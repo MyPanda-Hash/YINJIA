@@ -428,7 +428,9 @@ const RD_MOLD_FORMULA = {
       ]},
     ],
     dataTables: [
-      // recipeCalc:表头上出「配方计算」按钮(读本表行 → 算 → 回填页 1 与本表两列);
+      // recipeCalc:表头上出「配方计算」按钮 —— 配方表的物料行**在弹窗里录**(2026-10-15 用户口径:
+      // 「配方表的数据是在配方计算器里面填写数据然后填入单据的,而不是带入的规格书的」),
+      // 算完点「填入单据」写回页 1 十一格 + 本表区**整表替换**为弹窗那份行;
       // 口径见 CONTEXT.md「配方计算器」/ docs/adr/0004 —— 弹窗输入不落库,只有回填值随单据保存
       { page: 2, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
@@ -1054,14 +1056,12 @@ export const recordSheetConfigs = {
     dataTables: [RD_MOLD_PROC_DT_REVISION, ...RD_MOLD_FORMULA.dataTables],
     tailSections: [...RD_MOLD_FORMULA.tailSections],
     /**
-     * 「自动填充规格书」—— 成型工艺清单:检验要求落**真实数据格** + 配方表两列 ← 规格书物料清单。
+     * 「自动填充规格书」—— 成型工艺清单:检验要求落**真实数据格**。
      *
      * 用户口径(2026-10-15 实测反馈,推翻上一版"块名下方只读显示"):
      *   ① 「规格书的检验要求数据应该是填在成型工艺清单的表格内的**要求、强度要求、压降标准**里面的」;
      *   ② 「如果是尺寸,应该是把对应检测的**内径或者外径的公差**等数据填写进成型工艺清单的对应
      *      检测要求里面的数据表格里面」。
-     *   ③ 「配方表的物料种类和物料编号…应该是对应规格书里面的**物料编码**,种类是基础档案**物料清单**
-     *      里面对应物料编码的数据」。
      *
      * 映射(键一律用中文 label):
      *   规格书 · 检验要求表区           成型工艺清单 · 检验要求区(真实数据格)
@@ -1070,43 +1070,33 @@ export const recordSheetConfigs = {
      *     压降                    →      压降标准kpa
      *     尺寸                    →      外径mm / 外径公差 / 内径mm / 内径公差(**整句解析**,
      *                                    纯函数 + 单测在 core/insp/dimensionSpec.js;长度项不落格)
-     *   规格书 · 物料清单表区           成型工艺清单 · 页 2 配方表
-     *     序号                    →      序号
-     *     物料编码                →      物料编号
-     *     (bs_inv.所属类别 派生)   →      物料种类   ← 后端按 存货编码 查商品档案补进 payload
+     *
+     * ⚠ **2026-10-15 口径变更(用户原话)**:「这个需要改一下成型工艺清单的配方表的数据是在配方计算器
+     *   里面填写数据然后填入单据的,**而不是带入的规格书的**」⇒ 原先这段里的
+     *   `detailSource:'物料清单'` + `detail:[序号/物料编号/物料名称/物料种类 ← 规格书物料清单]`
+     *   **整段撤掉**:页 2 配方表的物料行改在配方计算弹窗里录(见 RecipeCalcDialog.vue、
+     *   RecordSheetPanels.onRecipeApplied 与 core/mold/recipeRows.js),本链只管检验要求那几格 ——
+     *   明细落点为空 ⇒ autoFillFromSpec 不会去动任何明细表(它按 detail 空就不认明细表)。
      *
      * 链路与出货检验计划表**同源**(core/insp/specCarry.js 头注):选完「产品编号」→
      *   onProdRefConfirm() → autoFillFromSpec() → 后端 GET /px/specByProductForMold?code=
      *   —— 审批门禁在服务端(只挑已审核/已归档的规格书),前端不另开端点、不绕门禁;
      *   规格书未审批 ⇒ 后端一个格都不带回,前端只弹提示。
      * 三处配置差异:
-     *   · endpoint    本面板要一次取「检验要求」+「物料清单」两个表区,权限按 RD_MOLD_PROC 校验
-     *                 (与 /px/specByProductForAsm 同款理由:借别人的端点会被 403);
-     *   · detailSource 明细(配方表)取 payload['物料清单'] 那一段,与表头那格用的 payload.items 分开;
+     *   · endpoint    本面板要按 RD_MOLD_PROC 的权限取规格书(与 /px/specByProductForAsm 同款理由:
+     *                 借别人的端点会被 403),端点在服务端只回「检验要求」表区;
      *   · specDrift:false 本表明细是修订记录/配方表,不是检验项目,比「规格书变动」只会误报。
      * 表头「客户项目名称」等格由产品信息表带出,不由规格书。
      */
     autoFillSpec: {
       fromKey: '产品编号',
       endpoint: '/px/specByProductForMold',
-      detailSource: '物料清单',
       specDrift: false,
       headFromDetail: [
         { to: '跌落要求', matchProject: '跌落强度' },
         { to: '强度要求kgf', matchProject: '抗压强度' },
         { to: '压降标准kpa', matchProject: '压降' },
         { parse: 'dimension', matchProject: '尺寸' },
-      ],
-      detail: [
-        { to: '序号', from: '序号' },
-        { to: '物料编号', from: '物料编码' },
-        // ⚠ 2026-10-14 补:原先漏了「物料名称」这一条 —— 配方表的行是**程序写入**的,
-        //   不经过用户失焦,所以 A5 那条「失焦按编码/名称互相带出」的链在这里永远不会触发,
-        //   结果物料名称列恒空(用户实测报障「物料名称没带过来」)。
-        //   这里直接用规格书「物料清单」行自己的 `物料名称`(与 `物料编码` 同一行,同源最准);
-        //   若那一格在规格书里没填,则本格仍为空(不回退商品档案 —— 需要的话再加派生列)。
-        { to: '物料名称', from: '物料名称' },
-        { to: '物料种类', from: '所属类别' },
       ],
     },
   },
