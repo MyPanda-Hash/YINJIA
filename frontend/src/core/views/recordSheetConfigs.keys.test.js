@@ -645,7 +645,7 @@ test('成型工艺清单:检验要求落在真实数据格上(不再是块名下
   assert.deepEqual(valueKeys, [], 'valueKey/.rs-subval 那套只读带出已撤(值直接写真实数据格)')
 })
 
-test('成型工艺清单:配方表 物料编号/物料种类 ← 规格书「物料清单」表区', () => {
+test('成型工艺清单:配方表 物料编号/物料名称/物料种类 ← 规格书「物料清单」表区', () => {
   const cfg = recordSheetConfigs.RD_MOLD_PROC
   const afs = cfg.autoFillSpec
   const recipe = (cfg.dataTables || []).find((dt) => dt.filterVal === '配方表')
@@ -658,9 +658,13 @@ test('成型工艺清单:配方表 物料编号/物料种类 ← 规格书「物
   for (const m of afs.detail) {
     assert.ok(recipeKeys.has(m.to), `明细落点 '${m.to}' 不在配方表列里(填了也看不见)`)
   }
-  assert.deepEqual(afs.detail.map((m) => m.to).sort(), ['序号', '物料种类', '物料编号'].sort(),
-    '三列:物料编号←规格书物料编码 / 物料种类←bs_inv 所属类别(后端按 存货编码 查) / 序号←规格书序号')
+  // ⚠ 2026-10-14 补「物料名称」:原先漏了这一列,而配方表的行是**程序写入**的、不经过失焦,
+  //   所以 A5 那条「失焦按编码/名称互相带出」永远不会触发 ⇒ 该列恒空(用户实测报障)。
+  assert.deepEqual(afs.detail.map((m) => m.to).sort(), ['序号', '物料名称', '物料种类', '物料编号'].sort(),
+    '四列:物料编号←规格书物料编码 / 物料名称←规格书物料名称 / 物料种类←bs_inv 所属类别 / 序号←规格书序号')
   assert.equal(afs.detail.find((m) => m.to === '物料编号').from, '物料编码')
+  assert.equal(afs.detail.find((m) => m.to === '物料名称').from, '物料名称',
+    '物料名称与物料编码同取规格书「物料清单」那一行(同源最准)')
   // 所属类别 不是规格书字段,是**后端按 存货编码 查商品档案(bs_inv)** 补上的派生列(见 DevTaskService.specDetailRows)
   assert.equal(afs.detail.find((m) => m.to === '物料种类').from, '所属类别')
   const specFx = FIXTURE.RD_SPEC_DOC
