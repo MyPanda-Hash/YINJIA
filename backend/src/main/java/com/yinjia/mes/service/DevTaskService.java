@@ -723,27 +723,22 @@ public class DevTaskService {
     }
 
     /**
-     * 规格书明细行(按表区出列):检验要求页 ← 检验项目五列;物料清单页 ← 物料六列 + 物料类别。
+     * 规格书明细行(按表区出列):检验要求页 ← 检验项目五列;物料清单页 ← 物料六列。
      * 其余表区按检验要求的列形返回(空集)—— 不猜、不硬编第三套列。
      *
-     * <p>【物料清单页多带一列 所属类别(2026-10-15)】成型工艺清单的配方表要按规格书物料行填
-     * 「物料种类」,取值口径 = **商品基本档案 {@code bs_inv.所属类别}**(按 {@code 存货编码},
-     * 与 QcCatalogService.categoryOf 同一口径)。放在这一层做,是因为前端只认中文键、没有查档案的能力:
-     * 多带一个派生键,组装BOM那条链按显式 from 映射取数,多了这一列它一个字节都不受影响。
-     * 两侧都 RTRIM(bs_inv 有尾空格的历史数据,见 ButtonService 的 RTRIM 口径);
-     * 同一编码多行取 id 最小那行(bs_inv 无唯一约束,与 ReportService 的重复编码守卫同一现状)。
+     * <p>【2026-10-15 撤掉物料清单页的派生列 所属类别】原为成型工艺清单「配方表 ← 规格书物料清单」
+     * 那条链按 bs_inv 补 物料种类;用户改口「配方表的数据是在配方计算器里面填写数据然后填入单据的,
+     * 而不是带入的规格书的」⇒ 该链连同 {@code specByProductForMold} 一并撤掉,这一列再没人取
+     * (组装BOM表按显式 from 映射只取 物料编码/物料名称/规格参数/数量,不取它)。
+     * 留着就是没人用的机制,故删除 —— 以后要再补,按当时的取数口径重新加。
      */
     private List<Map<String, Object>> specDetailRows(String no, String area) {
         if (SPEC_SHEET_AREA_MATERIAL.equals(area)) {
             return jdbc.queryForList(
                     "SELECT ISNULL(d.序号, N'') AS 序号, ISNULL(d.物料编码, N'') AS 物料编码,"
                             + " ISNULL(d.物料名称, N'') AS 物料名称, ISNULL(d.规格参数, N'') AS 规格参数,"
-                            + " ISNULL(d.数量, N'') AS 数量, ISNULL(d.备注, N'') AS 备注,"
-                            + " ISNULL(inv.所属类别, N'') AS 所属类别"
+                            + " ISNULL(d.数量, N'') AS 数量, ISNULL(d.备注, N'') AS 备注"
                             + " FROM rd_spec_doc_detail d"
-                            + " OUTER APPLY (SELECT TOP 1 i.所属类别 FROM bs_inv i"
-                            + "    WHERE RTRIM(i.存货编码) = RTRIM(d.物料编码) AND ISNULL(i.asp_cancel,'N') <> 'Y'"
-                            + "    ORDER BY i.id) inv"
                             + " WHERE d.单据编号 = ? AND d.表区 = ? ORDER BY d.id", no, area);
         }
         return jdbc.queryForList(
@@ -751,26 +746,6 @@ public class DevTaskService {
                         + " ISNULL(检验要求, N'') AS 检验要求, ISNULL(检验方法, N'') AS 检验方法,"
                         + " ISNULL(检验依据, N'') AS 检验依据"
                         + " FROM rd_spec_doc_detail WHERE 单据编号 = ? AND 表区 = ? ORDER BY id", no, area);
-    }
-
-    /**
-     * 成型工艺清单(RD_MOLD_PROC)版:一次带回规格书的**两个表区** ——
-     * 「检验要求」(items,表头那几格:跌落要求/强度要求kgf/压降标准kpa/尺寸四格)+
-     * 「物料清单」(键名即表区名,页 2 配方表:物料编号 ← 物料编码、物料种类 ← bs_inv.所属类别)。
-     *
-     * <p>【为什么合一个方法而不是让前端打两次】前端一条 autoFillSpec 只打一个端点、只弹一次
-     * 「本表已有 N 行,替换?」,两次往返会出现"表头已改、明细被取消"的半截状态;而且两个表区
-     * 必须来自**同一张规格书**(分两次取,规格书在两请求之间改版就会串号)。
-     * 取数与门禁完全复用 {@link #specByProduct(String, String)} —— 本方法只多带一段明细。
-     */
-    public Map<String, Object> specByProductForMold(String productCode) {
-        Map<String, Object> out = specByProduct(productCode, SPEC_SHEET_AREA_INSPECT);
-        List<Map<String, Object>> mats = List.of();
-        if (Boolean.TRUE.equals(out.get("found"))) {
-            mats = specDetailRows(String.valueOf(out.get("单据编号")), SPEC_SHEET_AREA_MATERIAL);
-        }
-        out.put(SPEC_SHEET_AREA_MATERIAL, mats);
-        return out;
     }
 
     /** 规格书可用状态:填写并提交审批完(审批通过 ⇒ 已归档/已审核)。草稿/审批中/修改中/已作废一律不可用 */

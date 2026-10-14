@@ -356,21 +356,24 @@ public class PxController {
     }
 
     /**
-     * 「自动填充规格书」数据源 · 成型工艺清单版:一次带回规格书的「检验要求」明细(items)
-     * 与「物料清单」明细(键名 = 表区名『物料清单』)。
+     * 「自动填充规格书」数据源 · 成型工艺清单版:按产品编号取规格书「检验要求」明细行
+     * (表头那几格:跌落要求/强度要求kgf/压降标准kpa + 尺寸四格)。
      *
-     * <p>【为什么又开一个端点】与上面那个同款理由:权限按**承载面板**校验 —— 这张表长在成型工艺
-     * 清单(RD_MOLD_PROC)的「检验要求」区与页 2 配方表上,复用 RD_INSP_PLAN / RD_ASM_PROC 的端点
-     * 会以别人的面板权限放行,反之也会把本面板的查看者挡在 403 外。
+     * <p>【为什么要这个端点】与上面那个同款理由:权限按**承载面板**校验 —— 这张表长在成型工艺
+     * 清单(RD_MOLD_PROC)的「检验要求」区上,复用 RD_INSP_PLAN / RD_ASM_PROC 的端点会以别人的
+     * 面板权限放行,反之也会把本面板的查看者挡在 403 外。
      *
-     * <p>【为什么合一个端点】本面板一条链要取**两个表区**(表头格 ← 检验要求,配方表 ← 物料清单),
-     * 而两者必须来自同一张规格书、且只让用户确认一次整表替换(见 DevTaskService.specByProductForMold)。
-     * 审批门禁与取数完全复用同一套服务方法(未审批 ⇒ reason=not_approved,一个格都不带回)。
+     * <p>【2026-10-15 口径变更,端点瘦身】原服务方法 {@code DevTaskService.specByProductForMold}
+     * 是"一个端点回两个表区":检验要求 + 物料清单(页 2 配方表 ← 规格书物料行,后端按 bs_inv
+     * 补派生列 所属类别)。用户改口:「这个需要改一下成型工艺清单的配方表的数据是在配方计算器里面
+     * 填写数据然后填入单据的,**而不是带入的规格书的**」⇒ 配方表那条链连同该服务方法与派生列一并
+     * **撤掉**,本端点只按本面板权限取「检验要求」表区(取数与门禁仍走同一套
+     * {@link DevTaskService#specByProduct(String, String)},未审批 ⇒ reason=not_approved)。
      */
     @GetMapping("/specByProductForMold")
     public ApiResult<Map<String, Object>> specByProductForMold(@RequestParam String code) {
         perm.requirePanelView("RD_MOLD_PROC");
-        return ApiResult.ok(devTaskService.specByProductForMold(code));
+        return ApiResult.ok(devTaskService.specByProduct(code, DevTaskService.SPEC_SHEET_AREA_INSPECT));
     }
 
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。
