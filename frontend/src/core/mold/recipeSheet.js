@@ -29,8 +29,10 @@ import { SLOT_COUNT, POWDER_SLOTS, GLUE_SLOTS, CONVERTED_SLOTS, DEFAULT_LENGTH_T
 export const SLOT_GROUPS = { POWDER: '粉料', GLUE: '胶粉', CONVERTED: '折算料' }
 
 /**
- * `paramsFromHead(...).missing` 里的阻断项名:配方表一行物料都没有。
- * 弹窗据此换一句对症的文案(「请先在页 1 填好…」那套对页 2 的配方表说不通)。
+ * `paramsFromHead(...).missing` 里的阻断项名:配方行一行物料都没有。
+ * 判据就是**调用方传进来的那份行**:2026-10-15 起配方表的行在配方计算弹窗里录
+ * (不再从规格书带入、也不要求页 2 先填),故弹窗传的是它自己那份行 —— 页 2 空不空与本次计算无关。
+ * 弹窗据此换一句对症的文案(「请先在页 1 填好…」那套对配方行说不通)。
  */
 export const NO_RECIPE_ROWS = '配方表物料行'
 
@@ -389,9 +391,10 @@ export function paramsFromHead(head, overrides = {}, rows) {
   }
 
   const missing = []
-  // 配方表一行物料都没有 ⇒ 引擎拿到的全是空料位,算出来的比例/克重毫无意义
+  // 配方行一行物料都没有 ⇒ 引擎拿到的全是空料位,算出来的比例/克重毫无意义
   // (实测:照算照回填,页 1 十一格全来自"料位 1 补差=100%",看着像算成功了)。
-  // 与"缺外径/内径/长度/密度"同级阻断 —— 这是唯一没有歧义的拦法(调用方必须显式传 rows 才做这项校验)。
+  // 与"缺外径/内径/长度/密度"同级阻断 —— 这是唯一没有歧义的拦法(调用方必须显式传 rows 才做这项校验;
+  // 2026-10-15 起配方计算弹窗传的是**弹窗里那份物料行**,与页 2 有没有行无关)。
   if (Array.isArray(rows) && materialRowCount(rows) === 0) missing.push(NO_RECIPE_ROWS)
   if (od === null) missing.push('外径')
   if (id === null) missing.push('内径')

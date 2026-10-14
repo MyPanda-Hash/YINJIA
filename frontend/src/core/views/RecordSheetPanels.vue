@@ -1218,8 +1218,8 @@
     </el-dialog>
 
 
-    <!-- ═══ 配方计算(成型工艺清单:读页 2 配方表 → 算 → 回填页 1 与配方表;输入不落库) ═══ -->
-    <RecipeCalcDialog v-model="recipeCalcVisible" :head="head" :rows="recipeCalcRows" @applied="emit('dirty')" />
+    <!-- ═══ 配方计算(成型工艺清单:弹窗里录配方表物料行 → 算 → 写回页 1 与页 2 配方表;输入不落库) ═══ -->
+    <RecipeCalcDialog v-model="recipeCalcVisible" :head="head" :rows="recipeCalcRows" @applied="onRecipeApplied" />
 
     <!-- ═══ 参照选择(产品编号 -> 产品信息表):确认后按 refMap 带回 产品名称 等 ═══ -->
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" :owner-panel="panelCode" @confirm="onProdRefConfirm" />
@@ -2472,9 +2472,11 @@ function autoFillTargetDt(afs) {
  *   三条链共用本函数(差异全部在配置里,见 core/insp/specCarry.js 头注):
  *     · 出货检验计划表 ← 规格书「检验项目及检验标准」(表区 '检验要求',端点 /px/specByProduct);
  *     · 组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」(表区 '物料清单',端点 /px/specByProductForAsm);
- *     · 成型工艺清单 ← 规格书**两个表区**:检验要求(写进 跌落要求/强度要求kgf/压降标准kpa 与尺寸四格)
- *       + 物料清单(页 2 配方表的 物料编号/物料种类),端点 /px/specByProductForMold
- *       —— 明细取哪一段由 autoFillSpec.detailSource 指定(specCarryRows),表头格仍取 payload.items。
+ *     · 成型工艺清单 ← 规格书「检验要求」(写进 跌落要求/强度要求kgf/压降标准kpa 与尺寸四格),
+ *       端点 /px/specByProductForMold
+ *       —— ⚠ 2026-10-15 口径变更:原先它还带页 2 配方表的物料行(靠 detailSource 取
+ *       payload['物料清单']),用户改口「配方表的数据是在配方计算器里面填写数据然后填入单据的」
+ *       ⇒ 那段撤掉;配方表的行改在**配方计算弹窗**里录(见本文件 onRecipeApplied)。
  *
  * 【为什么走后端端点而不是通用查询】规格书的 编号(=产品键)在通用链路里被
  *   QueryService.loadDocs 用单据编号覆盖掉了(详见该处注释),getFormDescriptor /
@@ -2520,9 +2522,9 @@ async function autoFillFromSpec(code, afs) {
     return
   }
   const rows = Array.isArray(payload.items) ? payload.items : []
-  // 明细落点的取数源:配了 detailSource 就取那一段(成型工艺清单页 2 配方表 ← 规格书「物料清单」),
-  // 否则还是 payload.items(出货检验计划表/组装BOM表两条旧链一个字节不变)。纯函数+单测在 core/insp/specCarry.js。
-  const srcRows = detailMap.length ? specCarryRows(payload, afs) : []
+  // 明细落点的行 = 规格书本表区的行(payload.items)。原按 detailSource 取第二段的写法已随
+  // 2026-10-15 口径变更撤掉(配方行改在配方计算弹窗里录);纯函数+单测在 core/insp/specCarry.js。
+  const srcRows = detailMap.length ? specCarryRows(payload) : []
   const filled = detailMap.length ? srcRows.map((r) => {
     const row = {}
     for (const m of detailMap) row[m.to] = r[m.from] === undefined || r[m.from] === null ? '' : String(r[m.from])
@@ -2938,14 +2940,32 @@ function confirmMaterialPick() {
     + (skipped ? tt('(跳过重复 {n} 行)').replace('{n}', skipped) : ''))
 }
 
-// ---------- 配方计算(成型工艺清单:读页 2 配方表 → 算 → 回填页 1 与配方表) ----------
+// ---------- 配方计算(成型工艺清单:弹窗里录配方表物料行 → 算 → 写回页 1 与页 2 配方表) ----------
 // 口径见 CONTEXT.md「配方计算器」与 docs/adr/0004:公式固定(与设计器 exe 逐位一致)、
 // 弹窗输入不落库不打印,只有回填进单据字段的值随单据保存。逻辑全在 core/mold/,这里只负责把行喂给它。
+// ⚠ 2026-10-15 用户口径变更:配方表的物料行**在弹窗里录**(原来从规格书带入 / 页 2 手填),
+//   故弹窗回填时明细是**整表替换本表区**,由 onRecipeApplied 完成(与「按规格书自动填充」同一套替换口径)。
 const recipeCalcVisible = ref(false)
 const recipeCalcRows = ref([])
+const recipeCalcDt = ref(null)
 function openRecipeCalc(dt) {
+  recipeCalcDt.value = dt
   recipeCalcRows.value = rowsOf(dt)
   recipeCalcVisible.value = true
+}
+/** 弹窗算完:把弹窗里那份物料行整表换掉本表区的旧行(页 2 原来是空的也能一次写入) */
+function onRecipeApplied(payload) {
+  const dt = recipeCalcDt.value
+  const rows = Array.isArray(payload?.rows) ? payload.rows : []
+  if (dt) {
+    const arr = touch()
+    if (dt.filterKey) for (const r of rows) r[dt.filterKey] = dt.filterVal
+    const kept = dt.filterKey
+      ? arr.filter((r) => String(r[dt.filterKey] || '') !== String(dt.filterVal || ''))
+      : []
+    arr.splice(0, arr.length, ...kept, ...rows)
+  }
+  emit('dirty')
 }
 
 // ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──
