@@ -355,6 +355,24 @@ public class PxController {
         return ApiResult.ok(devTaskService.specByProduct(code, area));
     }
 
+    /**
+     * 「自动填充规格书」数据源 · 成型工艺清单版:一次带回规格书的「检验要求」明细(items)
+     * 与「物料清单」明细(键名 = 表区名『物料清单』)。
+     *
+     * <p>【为什么又开一个端点】与上面那个同款理由:权限按**承载面板**校验 —— 这张表长在成型工艺
+     * 清单(RD_MOLD_PROC)的「检验要求」区与页 2 配方表上,复用 RD_INSP_PLAN / RD_ASM_PROC 的端点
+     * 会以别人的面板权限放行,反之也会把本面板的查看者挡在 403 外。
+     *
+     * <p>【为什么合一个端点】本面板一条链要取**两个表区**(表头格 ← 检验要求,配方表 ← 物料清单),
+     * 而两者必须来自同一张规格书、且只让用户确认一次整表替换(见 DevTaskService.specByProductForMold)。
+     * 审批门禁与取数完全复用同一套服务方法(未审批 ⇒ reason=not_approved,一个格都不带回)。
+     */
+    @GetMapping("/specByProductForMold")
+    public ApiResult<Map<String, Object>> specByProductForMold(@RequestParam String code) {
+        perm.requirePanelView("RD_MOLD_PROC");
+        return ApiResult.ok(devTaskService.specByProductForMold(code));
+    }
+
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。
      *  权限按目标面板校验(选单是为了在目标面板生单,来源数据是选单必需的参照)。 */
     @PostMapping("/voucherFlow/sources")
