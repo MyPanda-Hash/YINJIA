@@ -1903,6 +1903,7 @@ import { PROGRESS_COLUMNS } from '@core/progress/progressColumns'
 import { applyDocDefaults, todayStr, docNoFromDate } from '@core/panel/docDefaults'
 import { applyCalcRules } from '@core/panel/calcRules'
 import { sumKeepScale } from '@core/panel/sumTotals'
+import { docKeyOf, findStashedRow, stashKeysToDrop } from '@core/panel/tabDraft'
 
 import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
@@ -3524,6 +3525,58 @@ const cur = computed(() => {
   if (!l.length) return {}
   return l[Math.min(curIdx.value, l.length - 1)]
 })
+
+// ---------- 页签级「未保存填写」暂存(2026-10-15 用户报障:切页签时未保存的数据被自动清理)----------
+// 未保存的填写不另存一份,它就长在列表行对象上:`:head="cur"`、cur = list[curIdx],子组件
+// 按引用直接改这一行。而切面板时下面那个 panelCode watcher 会 `list.value = []` 再重载 ⇒
+// 行对象连同填写内容一起被丢掉,回来时是服务端的新行,看起来就是"自动清理"(活体实测:
+// 顶部页签互切数据丢失且**不弹**未保存提示;同一面板内部页签互切则原样保留)。
+// 于是:离开前把那张单(**含未保存填写**)按面板号暂存,回来时按单号找回同一行放回;
+// **页签被 × 掉才丢**(用户口径:没×掉就应该保留)。纯逻辑见 @core/panel/tabDraft。
+const tabDraftStash = new Map() // panelCode → { pageNo, row }
+
+/** 深拷贝一行(含 detail.items):暂存后不能再被列表重载牵连 */
+function cloneRow(row) {
+  try { return structuredClone(row) } catch { /* 含函数等不可结构化值时退回 JSON 口径 */ }
+  try { return JSON.parse(JSON.stringify(row)) } catch { return null }
+}
+
+/** 离开当前面板前:有未保存填写就把当前这张单暂存下来(干净单据不留副本) */
+function stashCurrentPanelDraft(code) {
+  const c = String(code || '')
+  if (!c || !cur.value || !hasUnsavedChanges()) return
+  if (!docKeyOf(cur.value)) return // 没有单号的占位行:暂存了也找不回来
+  const row = cloneRow(cur.value)
+  if (row) tabDraftStash.set(c, { pageNo: query.pageNo, row })
+}
+
+/** 页签被 × 掉的暂存就地清掉(要进入的那个面板除外:此刻它的页签可能还没建上) */
+function dropClosedTabDrafts(enteringCode) {
+  const entering = String(enteringCode || '')
+  const keys = [...tabDraftStash.keys()].filter((k) => k !== entering)
+  for (const k of stashKeysToDrop(keys, (tabs.tabs || []).map((t) => t.path))) tabDraftStash.delete(k)
+}
+
+// 页签被 × 掉**即时**清掉那份暂存(用户口径的另一半:只有 × 掉才该丢)。
+// 不等下一次切面板才清 —— 否则"关掉页签 → 再从菜单打开"会把旧填写复活。
+watch(
+  () => (tabs.tabs || []).map((t) => t.path).join('\n'),
+  () => dropClosedTabDrafts(''),
+)
+
+/** 回到有暂存的面板:新载入的列表里按单号找回那一行,把未保存填写放回,光标停在那张单 */
+function restorePanelDraft(code) {
+  const c = String(code || '')
+  const draft = tabDraftStash.get(c)
+  if (!draft) return
+  tabDraftStash.delete(c) // 只放回一次;找不回(单号不在本页)也如实丢弃,不留陈旧副本
+  const hit = findStashedRow(list.value, draft.row)
+  if (!hit) return
+  Object.assign(hit.row, draft.row)
+  curIdx.value = hit.index
+  inlineDirtyFlag.value = true // 放回来的就是未保存的修改(否则基线快照会把它当成"已保存")
+}
+
 // 当前单据在全量中的序号(不是页内序号!)——页脚「第 X/N 张」必须用全局序号,
 // 否则数据量超过一页后永远显示 1..pageSize(2026-09-20 修:分页显示与实际不符)
 const curNo = computed(() => {
@@ -7493,10 +7546,16 @@ function selectProduct(code) {
 let switchFrameToken = 0
 watch(
   () => [panelCode.value, operationName.value],
-  async () => {
+  async (now, prev) => {
     scanVisible.value = false
+    const code = String(now?.[0] ?? '')
+    const prevCode = String(prev?.[0] ?? '')
+    // 切面板页签:①把**正要离开**那个面板的未保存填写暂存起来;②清掉已被 × 掉的页签的暂存。
+    // 都在清空之前做(此刻 cur/query 还是上一个面板的状态)。顺序不可颠倒。
+    if (prevCode && prevCode !== 'undefined') stashCurrentPanelDraft(prevCode)
+    dropClosedTabDrafts(code)
     // 2026-08-20：关闭页签/切走时 panelCode 变 undefined——不触发加载（避免「面板编号无效」误报）
-    if (!panelCode.value || panelCode.value === 'undefined') return
+    if (!code || code === 'undefined') return
     // 拆除顺序(2026-09-28):先清行、再清配置 —— 若在仍挂着旧行数据时清 gridTabs,
     // el-table 每删一列都会对全部行重渲染一次(O(列×行),宽表拆除的主长帧来源之一)。
     list.value = []
@@ -7532,8 +7591,15 @@ watch(
     // 嵌套一层才真正等到"旧 DOM 已提交绘制"之后的下一帧(实测单层时 INV→SO_ORDER 仍有 200ms 同帧)。
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))
     if (tok !== switchFrameToken || !panelCode.value || panelCode.value === 'undefined') return
-    if (applyDocNoQuery()) load()
+    // 回到「离开时暂存过的」面板:按暂存里的页码取数(否则会退回第 1 页,"那一张单"根本不在这页,
+    // 找不回就等于还是丢了),取完再把未保存的填写放回那一行。
+    const draft = tabDraftStash.get(String(panelCode.value))
+    if (draft && draft.pageNo) query.pageNo = draft.pageNo
+    if (applyDocNoQuery()) await load()
+    else if (draft) { curIdx.value = 0; await load() }
     else search()
+    // 期间又切了面板就别放回了(否则会把上一个面板的行按到当前面板的列表上)
+    if (tok === switchFrameToken && String(panelCode.value) === code) restorePanelDraft(code)
   }
 )
 
