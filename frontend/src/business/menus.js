@@ -402,6 +402,11 @@ export const menuTree = [
           { code: 'inventory', title: '商品', path: '/panelx/list/INV', icon: 'Grid', panelCode: 'INV', operationName: '新增流程' },
           // 2026-10-14 物料清单(BOM)菜单下线:MES 自建 BOM 功能整体删除
           // (表 bs_bom / 面板 BOM 及其正反向查询 BOM_FWD、BOM_REV 同批下架)。
+          // ⚠ 2026-10-15 补回「物料清单」入口 —— 但**指向 WLBOM(mate 表),不是当年下架的 BOM(bs_bom)**:
+          //   规格书「1.关键物料列表」引用的那份物料数据就是 WLBOM(面板与表都还在,yj_panel 里仍有登记),
+          //   当年下线的只是另一套自建 BOM;用户报障「物料清单面板入口没有在基础档案里面」即指此。
+          //   位置按 README §基础档案 的登记顺序:计量单位 / 商品 / 物料清单 / 存货价格本。
+          { code: 'wlbom', title: '物料清单', path: '/panelx/list/WLBOM', icon: 'Files', panelCode: 'WLBOM', operationName: '新增流程' },
           { code: 'invPrice', title: '存货价格本', path: '/panelx/list/INV_PRICE', icon: 'PriceTag', panelCode: 'INV_PRICE', operationName: '新增流程' },
         ],
       },
