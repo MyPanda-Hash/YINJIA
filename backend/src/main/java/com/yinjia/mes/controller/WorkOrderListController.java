@@ -146,7 +146,7 @@ public class WorkOrderListController {
                         + "   WHERE s.gldh = p.pl_no AND s.gxdm = cop.当前工序"
                         + "     AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
                         + "     AND (EXISTS (SELECT 1 FROM dbo.plang_pc pcx WHERE pcx.id = s.gd_id AND pcx.plang_id = p.id)"
-                        + "          OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'') = ISNULL(p.[批次号],N'')))), 0) AS 当前工序完工量,"
+                        + "          OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'') = ISNULL(p.[批次号],N'')))), 0) AS 当前工序完工量,"
                         // 当前工序**计划量**(2026-10-07):= 本行排产数量 × 该工序自己的换算率(工序口径)。
                         //   前端原来显示「当前工序完工量 / 排产数量」是跨口径(成型 56000 / 成品 8000)⇒ 改与它配对
                         + " ISNULL((SELECT TOP 1 ISNULL(p.pl_sl,0) * ISNULL(r.换算率,1) FROM dbo.bs_route r"

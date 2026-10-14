@@ -341,7 +341,7 @@ public class ScheduleBoardService {
                           + "   JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
                           + "   WHERE s.gldh=p.pl_no AND pc.plang_id=? AND ISNULL(s.asp_cancel,'N')<>'Y'),0)"
                           + " + ISNULL((SELECT SUM(ISNULL(s.sl,0)) FROM dbo.scjl s"
-                          + "   WHERE s.gldh=p.pl_no AND s.gd_id IS NULL AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                          + "   WHERE s.gldh=p.pl_no AND ISNULL(s.gd_id,0)=0 AND ISNULL(s.asp_cancel,'N')<>'Y'"
                           + "     AND ISNULL(s.[批次号],N'')=ISNULL(p.[批次号],N'')),0)";
                 String headSql = "SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(rk_sl,0) AS rk_sl,"
                         + " (" + reportedExpr + ") AS 已报工"
@@ -530,7 +530,7 @@ public class ScheduleBoardService {
                 + " WHERE s.gldh = p.pl_no AND s.gxdm = %s"
                 + "   AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
                 + "   AND (EXISTS (SELECT 1 FROM dbo.plang_pc pcx WHERE pcx.id = s.gd_id AND pcx.plang_id = p.id)"
-                + "        OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'') = ISNULL(p.[批次号],N''))))";
+                + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'') = ISNULL(p.[批次号],N''))))";
         return jdbc.queryForList(
                 // 行id = **工单行身份**(plang.id),行级键的第一段(2026-10-15「能按行的都按行」):
                 //   下游(打印留痕/取消结案/调拨/追溯)一律拿它定位,不再只靠(工单号+批次号)反查 ——
@@ -731,19 +731,23 @@ public class ScheduleBoardService {
             head.put("追溯口径", "整单");
         }
         // 本行的报工单号集合(检验段按它收敛;该行还没报工 ⇒ 空集 ⇒ 检验段正确返回"无产出")
+        // 行定位三级(2026-10-16,与 WoReportService.reportRows 同口径):①gd_id ②scjl.[工单行号] ③批次号。
+        //   ② 这一级是给**草稿报工**用的:权威行键 gd_id 只在审核时写,草稿期靠保存时落库的 [工单行号] 归属。
         List<String> rowReps = List.of();
         if (byRow) {
             rowReps = jdbc.queryForList(
                     "SELECT [报工单号] FROM dbo.scjl WHERE gldh=? AND ISNULL(asp_cancel,'N')<>'Y'"
                             + " AND [报工单号] IS NOT NULL"
                             + " AND (gd_id IN (SELECT id FROM dbo.plang_pc WHERE plang_id=? AND ISNULL(asp_cancel,'N')<>'Y')"
-                            + "      OR (ISNULL(gd_id,0)=0 AND ISNULL([批次号],N'')=?))",
-                    String.class, doc, rowId, rowBatch);
+                            + "      OR (ISNULL(gd_id,0)=0 AND ISNULL([工单行号],0)>0 AND ISNULL([工单行号],0)=?)"
+                            + "      OR (ISNULL(gd_id,0)=0 AND ISNULL([工单行号],0)=0 AND ISNULL([批次号],N'')=?))",
+                    String.class, doc, rowId, curRow.get("工单行号"), rowBatch);
         }
-        // 报工段的行级谓词(gd_id 优先,历史空 gd_id 用批次兜底);不传行id 时为空串=整单口径
+        // 报工段的行级谓词(三级锚定,同上);不传行id 时为空串=整单口径
         String repRowCond = byRow
                 ? " AND (s.gd_id IN (SELECT id FROM dbo.plang_pc WHERE plang_id=? AND ISNULL(asp_cancel,'N')<>'Y')"
-                        + " OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')=?))"
+                        + " OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[工单行号],0)>0 AND ISNULL(s.[工单行号],0)=?)"
+                        + " OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[工单行号],0)=0 AND ISNULL(s.[批次号],N'')=?))"
                 : "";
 
         // 流转时间线:创建(plang 系统戳) + 按钮留痕(排产/撤销/调线/结案…;面板名含 快速排产/生产工单 两代)
@@ -807,17 +811,23 @@ public class ScheduleBoardService {
 
         // 完工数据:报工记录(scjl,参考库口径;按 工序 汇总:完成数量=Σsl,计划数量=排产冗余)
         // 2026-10-15:按行追溯时只统计**本行**的报工(gd_id=本行排产行id;历史空 gd_id 用本行批次兜底)。
+        // 2026-10-16:锚定补第②级 scjl.[工单行号](草稿报工尚未写 gd_id,靠保存时落库的行号归属),
+        //   并**一并返回审核状态** —— 与「工序进度」段同源,避免两段一个说"有报工"、一个说"0/未开始"。
         List<Map<String, Object>> done = byRow
                 ? jdbc.queryForList(
                         "SELECT ISNULL(s.gxdm, N'') AS 工序, MAX(ISNULL(s.pl_sl,0)) AS 计划数量,"
                                 + " SUM(ISNULL(s.sl,0)) AS 完成数量, MAX(s.asp_user1) AS 报工人,"
-                                + " CONVERT(varchar(16), MAX(s.asp_time1), 120) AS 报工时间"
+                                + " CONVERT(varchar(16), MAX(s.asp_time1), 120) AS 报工时间,"
+                                + " CASE WHEN SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) > 0"
+                                + "      THEN N'已审核' ELSE N'草稿' END AS 单据状态"
                                 + " FROM dbo.scjl s WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'" + repRowCond
-                                + " GROUP BY s.gxdm ORDER BY s.gxdm", doc, rowId, rowBatch)
+                                + " GROUP BY s.gxdm ORDER BY s.gxdm", doc, rowId, curRow.get("工单行号"), rowBatch)
                 : jdbc.queryForList(
                         "SELECT ISNULL(s.gxdm, N'') AS 工序, MAX(ISNULL(s.pl_sl,0)) AS 计划数量,"
                                 + " SUM(ISNULL(s.sl,0)) AS 完成数量, MAX(s.asp_user1) AS 报工人,"
-                                + " CONVERT(varchar(16), MAX(s.asp_time1), 120) AS 报工时间"
+                                + " CONVERT(varchar(16), MAX(s.asp_time1), 120) AS 报工时间,"
+                                + " CASE WHEN SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) > 0"
+                                + "      THEN N'已审核' ELSE N'草稿' END AS 单据状态"
                                 + " FROM dbo.scjl s WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
                                 + " GROUP BY s.gxdm ORDER BY s.gxdm", doc);
         // 入库单据(产成品入库单挂 加工单号)

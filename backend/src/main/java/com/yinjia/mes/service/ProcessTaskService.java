@@ -386,30 +386,53 @@ public class ProcessTaskService {
                         + " ISNULL(p.scx,N'') AS 排产产线"
                         + " FROM dbo.plang p WHERE p.pl_no=? AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id", no);
         }
-        // 报工口径:每道工序的完工量(只算已审核报工)。
+        // 报工口径:每道工序的**完工量(只算已审核)**+ **待审量(草稿/未审核)**。
         // ⚠ 行级(2026-10-10):传 rowId 时锚 scjl.gd_id → plang_pc.plang_id = 该行(老数据无 gd_id 时按该行批次兜底),
         //   否则会把同工单其它行的报工算进来(实测:行6 的界面显示出行7 的 56000)。
+        // 🔴 2026-10-16(用户报障「存在生产报工但工序进度不变蓝」):**待审量必须一起取出来**。
+        //   此前本查询直接 `AND wgzt='Y'` 把草稿报工整个滤掉 ⇒ 同一弹窗里「完工数据」段(不过滤 wgzt)
+        //   明明列出了这道工序的报工数量,工序步骤却按 0 着色 = 灰(未开始),两段自相矛盾。
+        //   现:完工量仍只算已审(**完工/转序/结案口径不变,绝不让草稿冒充产量**),
+        //   待审量单独出一列,只用来把该步判成「进行中」(蓝)并在描述里标注「待审」。
+        //   `gd_id IS NULL` 一并改为 `ISNULL(gd_id,0)=0`:scjl.gd_id 默认约束是 ((0)) 且可空
+        //   ⇒ 「未锚定」有 NULL 和 0 两种写法,只判 NULL 会漏(与 ScheduleBoardService 完工段/转序判据不一致)。
+        //   行定位补**第③级 scjl.[工单行号]**:草稿报工还没审核 ⇒ gd_id 仍是 0(权威行键只在审核时写),
+        //   但保存时 stampRowNo 已把 [工单行号] 落库 ⇒ 不加这一级,草稿就归属不到行、步骤条看不到它。
+        //   三级优先级与 {@link WoReportService#reportRows} 一致:①gd_id ②[工单行号] ③批次号。
         List<Map<String, Object>> reps;
         if (rowId != null) {
             reps = jdbc.queryForList(
-                    "SELECT ISNULL(s.gxdm,N'') AS 工序, SUM(ISNULL(s.sl,0)) AS 完工量, COUNT(*) AS 报工单数"
+                    "SELECT ISNULL(s.gxdm,N'') AS 工序,"
+                            + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN ISNULL(s.sl,0) ELSE 0 END) AS 完工量,"
+                            + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN 0 ELSE ISNULL(s.sl,0) END) AS 待审量,"
+                            + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN 1 ELSE 0 END) AS 报工单数,"
+                            + " SUM(CASE WHEN ISNULL(s.wgzt,'N')='Y' THEN 0 ELSE 1 END) AS 待审单数"
                             + " FROM dbo.scjl s LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
-                            + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
-                            + "   AND (pc.plang_id=? OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'')="
-                            + "        ISNULL((SELECT TOP 1 ISNULL(p.[批次号],N'') FROM dbo.plang p WHERE p.id=?), N'')))"
-                            + " GROUP BY s.gxdm", no, rowId, rowId);
+                            + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                            + "   AND (pc.plang_id=?"
+                            + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[工单行号],0)>0"
+                            + "            AND ISNULL(s.[工单行号],0) = ISNULL((SELECT TOP 1 ISNULL(p.pl_xc,0) FROM dbo.plang p WHERE p.id=?),0))"
+                            + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[工单行号],0)=0 AND ISNULL(s.[批次号],N'')="
+                            + "            ISNULL((SELECT TOP 1 ISNULL(p.[批次号],N'') FROM dbo.plang p WHERE p.id=?), N'')))"
+                            + " GROUP BY s.gxdm", no, rowId, rowId, rowId);
         } else {
             reps = jdbc.queryForList(
-                    "SELECT ISNULL(gxdm,N'') AS 工序, SUM(ISNULL(sl,0)) AS 完工量, COUNT(*) AS 报工单数"
-                            + " FROM dbo.scjl WHERE gldh=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(wgzt,'N')='Y'"
+                    "SELECT ISNULL(gxdm,N'') AS 工序,"
+                            + " SUM(CASE WHEN ISNULL(wgzt,'N')='Y' THEN ISNULL(sl,0) ELSE 0 END) AS 完工量,"
+                            + " SUM(CASE WHEN ISNULL(wgzt,'N')='Y' THEN 0 ELSE ISNULL(sl,0) END) AS 待审量,"
+                            + " SUM(CASE WHEN ISNULL(wgzt,'N')='Y' THEN 1 ELSE 0 END) AS 报工单数,"
+                            + " SUM(CASE WHEN ISNULL(wgzt,'N')='Y' THEN 0 ELSE 1 END) AS 待审单数"
+                            + " FROM dbo.scjl WHERE gldh=? AND ISNULL(asp_cancel,'N')<>'Y'"
                             + " GROUP BY gxdm", no);
         }
         Map<String, Double> qty = new LinkedHashMap<>();
+        Map<String, Double> pendQty = new LinkedHashMap<>();
         Map<String, Integer> cnt = new LinkedHashMap<>();
         for (Map<String, Object> r : reps) {
             String op = String.valueOf(r.get("工序")).trim();
             if (op.isEmpty()) continue;
             qty.put(op, num(r.get("完工量")));
+            pendQty.put(op, num(r.get("待审量")));
             cnt.put(op, (int) num(r.get("报工单数")));
         }
         List<Map<String, Object>> steps = new ArrayList<>();
@@ -442,6 +465,10 @@ public class ProcessTaskService {
         String cur = "";
         for (Map<String, Object> l : lines) {
             String op = String.valueOf(l.get("工序名称")).trim();
+            // 当前工序 = 最后一道**有已审产出**的工序。
+            //   ⚠ 只认已审量:plang.[当前工序](由 syncOneRowState 维护)同样只按已审报工推进
+            //   ⇒ 这里若把草稿报工也算进去,弹窗的「当前工序」会与生产工单列表/工单状态打架。
+            //   (草稿报工只影响步骤**着色**,见下方 pendQty。)
             if (qty.getOrDefault(op, 0d) > 0) cur = op;
         }
         // 本行排产数量 = 各工序计划量的**共同基数**(不再累乘)
@@ -454,20 +481,31 @@ public class ProcessTaskService {
             if (rate <= 0) rate = 1;
             double stepPlan = round(basePlan * rate);   // 该道自己的计划量(独立折算,不累乘)
             double q = qty.getOrDefault(op, 0d);
+            double pend = pendQty.getOrDefault(op, 0d);
+            // 状态四态(2026-10-16 加「待审」):
+            //   · 超产/已完工 = **已审**量达标 ⇒ 绿(完成);超产是"已完成且超了",不能算未完成;
+            //   · 进行中 = 已审量 0<q<计划,或**只有待审报工** ⇒ 蓝;
+            //   · 未开始 = 已审、待审都为 0 ⇒ 灰。
+            //   ⚠ 待审**不参与**达标判定(计划量封顶/转序/结案仍只看已审),只影响"是否已开始"的着色。
             String st = (stepPlan > 0 && q > stepPlan) ? "超产"
                     : (stepPlan > 0 && q >= stepPlan) ? "已完工"
-                    : (q > 0 ? "进行中" : "未开始");
-            if ("已完工".equals(st) || "超产".equals(st)) doneSteps++;
+                    : (q > 0 || pend > 0) ? "进行中" : "未开始";
+            boolean finished = "已完工".equals(st) || "超产".equals(st);
+            if (finished) doneSteps++;
             if (q > stepPlan) overQty = round(overQty + (q - stepPlan));
             Map<String, Object> s = new LinkedHashMap<>();
             s.put("序", i + 1);
             s.put("工序", op);
             s.put("换算率", round(rate));
             s.put("完工量", round(q));
+            s.put("待审量", round(pend));               // 草稿/未审报工量(只作着色与提示,不计入产出/进度)
             s.put("计划量", stepPlan);                 // 该道**自己**的工序计划量(基数 = 本行排产数量)
             s.put("报工单数", cnt.getOrDefault(op, 0));
             s.put("当前", op.equals(cur));
             s.put("状态", st);
+            // 完成标记(2026-10-16):前端**不要**再自己按状态字面量猜颜色 —— 超产=完成这件事
+            //   只在后端一处判定,避免"报工 161/160 却不显绿"再次出现。
+            s.put("已完成", finished);
             steps.add(s);
         }
         double outQty = 0;
@@ -791,13 +829,16 @@ public class ProcessTaskService {
     /**
      * 该**工单行**该道工序的已审核报工量(转序判据):
      *   优先按 scjl.gd_id → plang_pc.plang_id 锚到行;老数据没有 gd_id 时退回按(工单号+批次号)匹配该行。
+     * <p>⚠ 2026-10-16:「未锚定」判据统一为 {@code ISNULL(gd_id,0)=0} —— {@code scjl.gd_id} 的默认约束是
+     * {@code ((0))} 且可空 ⇒ 未锚定有 NULL / 0 两种写法,只判 NULL 会漏掉 0 的那批,
+     * 于是同一条报工在「完工数据」段算得到、在「工序进度/转序」算不到(两段数量对不上)。
      */
     private double reportedQty(String plNo, Long rowId, String op) {
         Double d = jdbc.queryForObject(
                 "SELECT ISNULL(SUM(ISNULL(s.sl,0)),0) FROM dbo.scjl s"
                         + " LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
                         + " WHERE s.gldh=? AND s.gxdm=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
-                        + "   AND (pc.plang_id=? OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'')="
+                        + "   AND (pc.plang_id=? OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'')="
                         + "        ISNULL((SELECT TOP 1 ISNULL(p.[批次号],N'') FROM dbo.plang p WHERE p.id=?), N'')))",
                 Double.class, plNo, op, rowId, rowId);
         return d == null ? 0 : d;

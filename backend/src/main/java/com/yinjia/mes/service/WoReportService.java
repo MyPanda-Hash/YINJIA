@@ -285,7 +285,7 @@ public class WoReportService {
                         + " WHERE s.gldh=? AND s.gxdm=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
                         + "   AND (? IS NULL"
                         + "        OR EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = ?)"
-                        + "        OR (s.gd_id IS NULL AND ISNULL(s.[批次号],N'') = ?))",
+                        + "        OR (ISNULL(s.gd_id,0)=0 AND ISNULL(s.[批次号],N'') = ?))",
                 Double.class, wo, op, plangRowId, plangRowId, t.get("pc_batch"));
         if (qty > cap * 10 + 0.0001) {
             throw new IllegalStateException("报工数量 " + qty + " 明显异常(本行" + (rptBatch.isBlank() ? "" : "批次" + rptBatch + " ")
