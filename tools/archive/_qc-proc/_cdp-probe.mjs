@@ -109,6 +109,10 @@ const PROBE = `(async()=>{
     btn.click();
     await new Promise(r=>setTimeout(r,800));
     out.rowsAfter=rowN(); out.cellsAfter=cellN(); out.inputsAfter=inpN(); out.emptyAfter=emptyN();
+    out.bandSub=!!document.querySelector('.qr-band-sub');
+    out.ungroupTable=!!document.querySelector('table.qr-ungroup');
+    out.ungroupBordered=(()=>{const t=document.querySelector('table.qr-ungroup');if(!t)return null;const th=t.querySelector('th');if(!th)return null;return getComputedStyle(th).borderTopWidth;})();
+    out.strayOp=[...document.querySelectorAll('.qr-grid thead th.c-op')].length;
   }
   return out;
 })()`

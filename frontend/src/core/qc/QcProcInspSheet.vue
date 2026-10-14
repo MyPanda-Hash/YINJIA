@@ -71,7 +71,7 @@
             <span v-if="editable" class="qr-grp-add no-print" :title="tt('在本表区新增一项（定性组=加一列，定量组=加一行）')" @click.stop="addInGroup(g)">＋</span>
           </th>
           <th rowspan="2" class="c-fixed">{{ tt('结果判断') }}</th>
-          <th v-if="editable" rowspan="2" class="c-op"></th>
+          <th v-if="editable && groups.length" rowspan="2" class="c-op"></th>
         </tr>
         <tr>
           <template v-for="g in groups" :key="'sc' + g.sector">
@@ -117,9 +117,7 @@
             />
             <span v-else class="qr-cell-text">{{ head['总结论'] || '' }}</span>
           </td>
-          <td v-if="editable && ri === 1" class="c-op" :rowspan="rowCount">
-            <span class="qr-del no-print" :title="tt('删除本表区')" @click="removeGroup(groups[0])">×</span>
-          </td>
+          <td v-if="editable && ri === 1 && groups.length" class="c-op" :rowspan="rowCount"></td>
         </tr>
         <tr v-if="!groups.length">
           <td :colspan="fixedCols.length + 2 + (editable ? 1 : 0)" class="c-empty">
@@ -131,7 +129,11 @@
 
     <!-- ④b 待归类检验项目:纵向(一行一项)—— 新增的行表区为空,先落在这里,
          填上表区即自动并入上方横表对应分组(避免塞进窄组列里没法填) -->
-    <table v-if="ungroupedRows.length" class="qr-table qr-ungroup">
+    <div v-if="ungroupedRows.length" class="qr-band qr-band-sub">
+      <span class="qr-band-title">{{ tt('待归类检验项目') }}</span>
+      <span class="qr-band-hint">{{ tt('填上「表区」后自动并入上方对应分组') }}</span>
+    </div>
+    <table v-if="ungroupedRows.length" class="qr-ungroup">
       <thead>
         <tr>
           <th class="c-sector">{{ tt('表区') }}</th>
@@ -458,6 +460,15 @@ function removeGroup(g) {
   font-weight: 700;
   color: #1f4e79;
 }
+.qr-band-sub {
+  margin-top: 10px;
+}
+.qr-band-hint {
+  margin-left: 10px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #5b7fa6;
+}
 .qr-band-act {
   position: absolute;
   right: 8px;
@@ -508,8 +519,27 @@ function removeGroup(g) {
   width: 34px;
 }
 /* 待归类纵向表:与横表同观感,但列宽按自身需要 */
+/* 待归类纵向表:补齐边框(此前 .qr-table 样式随横表改名 .qr-grid 一并丢失,导致无框) */
 .qr-ungroup {
   margin-top: 6px;
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 12px;
+}
+.qr-ungroup th,
+.qr-ungroup td {
+  border: 1px solid #b8cfe6;
+  padding: 2px 4px;
+  min-height: 26px;
+  text-align: center;
+  vertical-align: middle;
+  word-break: break-all;
+}
+.qr-ungroup thead th {
+  background: #dce9f5;
+  color: #1f4e79;
+  font-weight: 600;
 }
 .c-empty {
   color: #8a94a0;
