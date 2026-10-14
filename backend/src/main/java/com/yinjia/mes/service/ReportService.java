@@ -505,20 +505,47 @@ public class ReportService {
         for (Map.Entry<String, String> e : SECTOR_PARAMS.entrySet()) {
             params.put(e.getValue(), joinSector(rows, e.getKey()));
         }
-        // 尺寸/重量各 5 格:把该表区的多值串按 "/" 拆成 5 个参数(照截图 5 格=5 个抽样值)
-        for (Map.Entry<String, String> e : SPLIT_PARAMS.entrySet()) {
-            List<String> parts = splitParts(rows, e.getKey());
-            for (int i = 0; i < 5; i++) {
-                params.put(e.getValue() + "_" + (i + 1), i < parts.size() ? parts.get(i) : "");
+        // 尺寸/重量各 5 格、外观 3 格:把该表区的值摊平成**定格数**的参数(照截图逐格)
+        for (Map.Entry<String, String[]> e : SPLIT_PARAMS.entrySet()) {
+            int slots = Integer.parseInt(e.getValue()[1]);
+            List<String> parts = "外观".equals(e.getKey())
+                    ? sectorRowValues(rows, e.getKey(), slots)   // 外观一格 = 一行(端盖/管身/其余)
+                    : splitParts(rows, e.getKey());              // 尺寸/重量:一行的 测量值1..5 摊平
+            for (int i = 0; i < slots; i++) {
+                params.put(e.getValue()[0] + "_" + (i + 1), i < parts.size() ? parts.get(i) : "");
             }
         }
         return params;
     }
 
-    /** 需拆成 5 格的表区 → 参数名前缀 */
-    private static final Map<String, String> SPLIT_PARAMS = Map.of(
-            "尺寸", "尺寸",
-            "重量", "重量");
+    /** 需拆成定格的表区 → {参数名前缀, 格数}(2026-10-15:外观 3 格;尺寸/重量 5 格) */
+    private static final Map<String, String[]> SPLIT_PARAMS = Map.of(
+            "尺寸", new String[]{"尺寸", "5"},
+            "重量", new String[]{"重量", "5"},
+            "外观", new String[]{"外观", "3"});
+
+    /**
+     * 取某表区**每行一个**值(外观三格用):端盖两头 / 管身两侧 / 其余外观项 各占一格。
+     *
+     * <p>与 {@link #splitParts} 的差别:后者会把同一行里的多个值也摊平(尺寸/重量正需要那样),
+     * 而外观的**一格语义上就是一个检验项** —— 一行再按空格拆会串位
+     * (例:「无明显划痕 无裂纹」会占掉两格,把后面的项挤出去)。
+     * 空值也占位(保持与检验项一一对应,不左移)。
+     */
+    private static List<String> sectorRowValues(List<Map<String, ?>> rows, String sector, int max) {
+        List<String> out = new ArrayList<>();
+        if (rows == null) return out;
+        for (Map<String, ?> r : rows) {
+            if (!sector.equals(str(r.get("表区")))) continue;
+            String v = str(r.get("实测数值"));
+            if (v.isEmpty()) {
+                for (int i = 1; i <= 5 && v.isEmpty(); i++) v = num(r.get("测量值" + i));
+            }
+            out.add(v);
+            if (out.size() >= max) break;
+        }
+        return out;
+    }
 
     /**
      * 取某表区的「实测值」,摊平成一个列表(最多 5 个,对应截图的 5 格)。
