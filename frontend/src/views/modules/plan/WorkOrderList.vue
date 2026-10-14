@@ -154,7 +154,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
@@ -509,6 +509,21 @@ onMounted(() => {
     dateTo.value = dayStr(0)
   }
   load(); loadLines()
+})
+
+/**
+ * 切回本页签时**重新取数**(2026-10-14,与「快速排产」页同一口径 —— 两处必须一致)。
+ *
+ * 根因:`PortalLayout` 的 `<router-view>` 外有 `<keep-alive>`,本页被缓存 ⇒ 在「快速排产」排产/撤销后
+ * 切回本页,列表仍显示上一次的产线/生产状态(本页的「排产」是弹窗内嵌快速排产,关弹窗会 load,
+ * 但**别人改的**排产状态不会自动反映)。现每次切回都重拉列表。
+ *
+ * ⚠ 只认**切回**(首次 activate 跳过):首次挂载已由 onMounted 取数。
+ */
+let firstActivate = true
+onActivated(() => {
+  if (firstActivate) { firstActivate = false; return }
+  load()
 })
 </script>
 
