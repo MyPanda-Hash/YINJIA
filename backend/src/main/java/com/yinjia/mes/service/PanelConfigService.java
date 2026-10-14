@@ -312,7 +312,15 @@ public class PanelConfigService {
             // 位置:第一个动作 = 侧边栏主按钮,其余进 ▼ 下拉 ⇒ 主按钮仍是「保存」(即提交),
             //   草稿落在下拉,不改变既有主路径的点击习惯(与 PANDA_BUTTONS 各单据的写法一致)。
             buttonGroups.add(group("保存", List.of("保存", "保存为草稿")));
-            buttonGroups.add(group("删除", List.of("删除")));
+            // 删除组:四张工序检验单(成型/切炭/组装/制程)额外给「删除单据」——
+            // 用户 2026-10-14 口径「为当前的四张检验单增加删除中的删除单据的按钮」。
+            // 语义区别:「删除」= 进入明细行勾选删除模式(删行);「删除单据」= 删整张单据
+            // (前端 engine.deleteForms → ButtonService.delete:doc 面板草稿直接作废,
+            //  已审核抛「仅草稿状态可删除(已审核请先弃审)」,不会误删已审核单)。
+            // 只放开这四张单,其余无 PANDA 基准的面板维持原样(不扩大改动面)。
+            buttonGroups.add(group("删除", WO_INSP_PANELS.contains(def.code())
+                    ? List.of("删除", "删除单据")
+                    : List.of("删除")));
             buttonGroups.add(group("审批", List.of("审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审")));
             buttonGroups.add(group("生单", List.of("生单")));
             disabledActions.add("生单");
