@@ -3083,6 +3083,7 @@ export default {
     '载银系列': 'Silver-Loaded Series',
     '炭粉': 'Carbon Powder',
     '胶粉': 'Binder Powder',
+    '折算物料': 'Converted Material',
     '矿化料': 'Mineralizing Material',
     '原料来料': 'Raw Material Incoming',
 

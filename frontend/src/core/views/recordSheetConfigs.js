@@ -57,8 +57,9 @@
 // ⚠ 必须带 .js 扩展名:Node 的 ESM 解析不做扩展名补全(node --test 直接跑源码时
 //   无扩展名会 ERR_MODULE_NOT_FOUND);Vite 两种写法都接受,故带扩展名对两端都安全。
 import { SPEC_TEST_LIB } from './specTestLib.js'
-// 配方表「物料种类」的词表:引擎只认物料档案口径的四个类别,集中放在 core/mold/materialKinds.js,
-// 并由 materialKinds.test.js 钉住"下拉里每个词都必须被引擎认出来"(填错会静默算错,见该文件注释)
+// 配方表「物料种类」的词表:集中放在 core/mold/materialKinds.js(引擎认得的那几个档案类别,
+// 2026-10-15 补「折算物料」共五个),并由 materialKinds.test.js 钉住
+// "下拉里每个词都必须被引擎认出来"(填错会静默算错,见该文件注释)
 // ⚠ 必须相对路径:本文件被 node --test 直接 import(keys.test.js),`@/` 别名只有 Vite 认
 import { MATERIAL_KINDS } from '../mold/materialKinds.js'
 

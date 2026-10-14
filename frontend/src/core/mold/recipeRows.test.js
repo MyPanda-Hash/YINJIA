@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { NO_RECIPE_ROWS, paramsFromHead, slotsFromRows, unfilledDesignRows } from './recipeSheet.js'
-import { blankRecipeRow, buildRecipeRows, editRowsFrom, invFillFor } from './recipeRows.js'
+import { NO_RECIPE_ROWS, groupOfMaterialType, paramsFromHead, slotsFromRows, unfilledDesignRows } from './recipeSheet.js'
+import { blankRecipeRow, buildRecipeRows, editRowsFrom, invFillFor, invOptionsOf, uniqueInvRowOf } from './recipeRows.js'
 
 /**
  * 配方计算弹窗「物料行」编辑(2026-10-15 用户口径变更)。
@@ -101,5 +101,71 @@ test('按编号带出 · 商品档案只补空格(已有值不动),所属类别�
     '人已经填了的格不许被档案覆盖')
   assert.deepEqual(invFillFor({ 物料编号: 'M-001', 物料种类: '炭粉' }, inv), { 物料名称: '炭纤维' })
   assert.deepEqual(invFillFor({ 物料编号: 'M-001' }, { 存货编码: 'M-001', 存货名称: '', 所属类别: '其它类别' }), {},
-    '档案里没有名称 / 类别不是引擎认的那四个词 ⇒ 什么都不补(不猜)')
+    '档案里没有名称 / 类别不是引擎认的词 ⇒ 什么都不补(不猜)')
+})
+
+test('按编号带出 · 档案里的「折算物料」(M-001 炭棒 / M-003 炭纤维 的实际类别)必须带得出来', () => {
+  // 2026-10-15:bs_inv.所属类别 实测值域 8 类,工艺员要录的 M-001/M-003 都是「折算物料」;
+  // 引擎 groupOfMaterialType 显式认它(归折算料位 8~10),以前因为词表只有四个词而带不出来。
+  const inv = { 存货编码: 'M-001', 存货名称: '炭棒', 所属类别: '折算物料' }
+  assert.deepEqual(invFillFor({ 物料编号: 'M-001' }, inv), { 物料名称: '炭棒', 物料种类: '折算物料' })
+  assert.deepEqual(invFillFor({ 物料编号: 'M-003', 物料种类: '炭粉' }, { 存货编码: 'M-003', 存货名称: '炭纤维', 所属类别: '折算物料' }),
+    { 物料名称: '炭纤维' }, '手填过的种类仍然不许被覆盖')
+  assert.equal(groupOfMaterialType('折算物料'), '折算料', '前提:引擎确实认这个词(不认就不该带出)')
+})
+
+/* ── 「物料编号」下拉的选项与唯一命中判据(2026-10-15 用户口径:手打太慢,改成从商品档案里挑) ── */
+
+test('编号下拉选项 · 由商品档案行生成:值=存货编码,显示「编码 — 名称」,保序', () => {
+  const rows = [{ 存货编码: 'M-001', 存货名称: '炭棒' }, { 存货编码: 'M-003', 存货名称: '炭纤维' }]
+  assert.deepEqual(invOptionsOf(rows), [
+    { value: 'M-001', label: 'M-001 — 炭棒' },
+    { value: 'M-003', label: 'M-003 — 炭纤维' },
+  ], '保档案返回的原序,不另排序(排序是显示偏好,不该由这个纯函数偷偷定)')
+})
+
+test('编号下拉选项 · 空编码不出现、空名称只显示编码、同码去重、非数组给空', () => {
+  const rows = [
+    { 存货编码: '  M-001  ', 存货名称: '  炭棒  ' },
+    { 存货编码: '', 存货名称: '没编码的不算物料' },
+    { 存货编码: null, 存货名称: '同上' },
+    { 存货编码: 'M-001', 存货名称: '重码的第二条' },
+    { 存货编码: 'PS-3', 存货名称: '' },
+  ]
+  assert.deepEqual(invOptionsOf(rows), [
+    { value: 'M-001', label: 'M-001 — 炭棒' },
+    { value: 'PS-3', label: 'PS-3' },
+  ], '空编码的档案行不是可选的物料;重码只留第一条(下拉里同值两项会让人以为选错了)')
+  assert.deepEqual(invOptionsOf(null), [])
+  assert.deepEqual(invOptionsOf(undefined), [])
+  assert.deepEqual(invOptionsOf('不是数组'), [])
+})
+
+test('唯一命中判据 · trim 后全等才算命中,查不到/多条都给 null(宁可不带,不带错)', () => {
+  const rows = [{ 存货编码: 'M-001', 存货名称: '炭棒' }, { 存货编码: 'XM-001', 存货名称: '别的料' }]
+  assert.equal(uniqueInvRowOf(rows, 'M-001')?.['存货名称'], '炭棒')
+  assert.equal(uniqueInvRowOf(rows, '  M-001  ')?.['存货名称'], '炭棒', '前后空格要能容忍')
+  assert.equal(uniqueInvRowOf(rows, 'M-002'), null, '档案里没有 ⇒ null(调用方据此保留手输值)')
+  assert.equal(uniqueInvRowOf(rows, '001'), null,
+    '不许按子串命中:后端 condition 对普通文本走 LIKE,`M-001` 会带回 `XM-001` —— 判等在本地收紧')
+  assert.equal(uniqueInvRowOf([...rows, { 存货编码: 'M-001', 存货名称: '重码' }], 'M-001'), null,
+    '同一编码两条 ⇒ 不猜哪条对,谁也不带')
+  assert.equal(uniqueInvRowOf(rows, ''), null)
+  assert.equal(uniqueInvRowOf(rows, null), null)
+  assert.equal(uniqueInvRowOf(null, 'M-001'), null)
+})
+
+test('下拉选中 → 带出:选项由档案生成、按选中编码取唯一命中、折算物料也照样带出来', () => {
+  // 这条把"选项怎么来"和"选中后带出什么"串起来(弹窗里 onMaterialCodeChange 的判据链):
+  const archive = [
+    { 存货编码: 'M-001', 存货名称: '炭棒', 所属类别: '折算物料' },
+    { 存货编码: 'YJ-XH-001', 存货名称: '专用炭X5', 所属类别: '炭粉' },
+  ]
+  const options = invOptionsOf(archive)
+  const picked = options.find((o) => o.label.includes('炭棒'))   // 用户在下拉里挑中的那项
+  assert.equal(picked.value, 'M-001', '下拉的值就是可写进单据的 物料编号')
+  const inv = uniqueInvRowOf(archive, picked.value)
+  assert.deepEqual(invFillFor({ 物料编号: picked.value }, inv), { 物料名称: '炭棒', 物料种类: '折算物料' },
+    '选中一条 ⇒ 名称与种类都带出来(折算物料不再因为词表缺词而丢掉)')
+  assert.equal(uniqueInvRowOf(archive, 'M-999'), null, 'allow-create 手打的新编码 ⇒ 档案查不到,什么都不动')
 })

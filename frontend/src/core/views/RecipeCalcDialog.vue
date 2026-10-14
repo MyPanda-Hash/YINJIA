@@ -80,11 +80,20 @@
           <tr v-for="(r, i) in editRows" :key="i">
             <td class="rcd-c">{{ i + 1 }}</td>
             <td>
-              <el-select v-model="r['物料种类']" size="small" clearable>
+              <!-- 物料种类:词表是**候选**不是白名单 —— 开 allow-create,档案里将来冒出的新类别
+                   (以及 bs_inv 里的「折算物料」)直接敲得进来。引擎认不认由 ③ 区的告警兜 -->
+              <el-select v-model="r['物料种类']" size="small" class="rcd-sel" clearable filterable allow-create default-first-option>
                 <el-option v-for="k in MATERIAL_KINDS" :key="k" :label="tt(k)" :value="k" />
               </el-select>
             </td>
-            <td><el-input v-model="r['物料编号']" size="small" @change="onMaterialCodeChange(i)" /></td>
+            <td>
+              <!-- 物料编号:下拉挑商品档案(2026-10-15 用户口径「手打太慢」),选项一次性载入
+                   (114 行,见 ensureInvRows);allow-create 保留 ⇒ 档案里没有的编码照样能手打 -->
+              <el-select v-model="r['物料编号']" size="small" class="rcd-sel" clearable filterable allow-create default-first-option
+                         @change="onMaterialCodeChange(i)">
+                <el-option v-for="o in invOptions" :key="o.value" :label="o.label" :value="o.value" />
+              </el-select>
+            </td>
             <td><el-input v-model="r['物料名称']" size="small" /></td>
             <td><el-input v-model="r['设计添加量']" size="small" class="rcd-mini" /></td>
             <!-- 两列是算出来的(引擎输出),这里只读展示输入旁边 —— 回填预览那张表还要拿它跟旧值比 -->
@@ -207,7 +216,7 @@ import { compute } from '@/core/mold/recipeEngine.js'
 import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisturePercent, NO_RECIPE_ROWS, paramsFromHead,
   slotsFromRows, specCarryFrom, sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery,
   unfilledDesignRows } from '@/core/mold/recipeSheet.js'
-import { blankRecipeRow, buildRecipeRows, editRowsFrom, invFillFor } from '@/core/mold/recipeRows.js'
+import { blankRecipeRow, buildRecipeRows, editRowsFrom, invFillFor, invOptionsOf, uniqueInvRowOf } from '@/core/mold/recipeRows.js'
 import { MATERIAL_KINDS } from '@/core/mold/materialKinds.js'
 import { invRowsOf } from '@/core/panel/invCarry.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
@@ -441,18 +450,45 @@ function removeMaterialRow(i) {
   next.splice(i, 1)
   editRows.value = next
 }
-/**
- * 商品档案行:商品档案面板(INV → bs_inv)按存货编码取一行。
- * ⚠ 后端 condition 对普通文本走 `LIKE %值%`(见 core/panel/invCarry.js 头注),`M-001` 会命中 `XM-001`,
- *   所以**本地按 trim 后全等收紧**,且只认唯一命中 —— 多条/没有都返回 null(宁可不带,不带错)。
- */
-async function fetchInvRowOf(code) {
+/* ── 商品档案(INV → bs_inv)全量缓存 + 「物料编号」下拉的选项(2026-10-15)────────────
+   用户口径:「手打太慢了,应该是可以下拉选择商品里面的数据」。
+   实测(2026-10-15 直接打 8090 的 /px/queryFormDataList 取数):bs_inv 一共 **114 行**,
+   且档案分支 QueryService.queryArchive **忽略 pageSize**(pageSize 传 5 / 50 / 200 / 1000 都回同样 114 行,
+   全量返回上限 ARCH_LOAD_CAP=50000)⇒ 一次性载入最省事,不必做 remote 搜索
+   (remote 会变成"每敲一次打一次请求",114 行的量级完全不值得)。
+   缓存**不随弹窗开关重置**(组件存活期内只拉一次):同一会话反复开弹窗不再重复请求;
+   拉不到就下次打开重试,并退回"按编号逐条查"的老路(见 fetchInvRowOf)。
+   代价:会话中新加的商品档案行要刷新页面才进下拉 —— 114 行的档案变动频率下可以接受。 */
+const INV_PAGE_SIZE = 1000       // pageSize 实测被档案分支忽略;写大一点表明要全量,别退回 50 那种截断口径
+const invRows = ref([])          // 商品档案行(invRowsOf 的产物,只读缓存)
+const invLoaded = ref(false)     // 全量是否已成功拿到 —— 拿到了才敢说"档案里查不到"
+const invOptions = computed(() => invOptionsOf(invRows.value))
+async function ensureInvRows() {
+  if (invLoaded.value) return invRows.value
   try {
     const res = await request.post('/px/queryFormDataList', {
-      panelCode: 'INV', condition: { 存货编码: code }, pageNo: 1, pageSize: 5,
+      panelCode: 'INV', condition: {}, pageNo: 1, pageSize: INV_PAGE_SIZE,
     })
-    const hits = invRowsOf(res?.data).filter((r) => String(r?.['存货编码'] ?? '').trim() === code)
-    return hits.length === 1 ? hits[0] : null
+    const rows = invRowsOf(res?.data)
+    if (rows.length) { invRows.value = rows; invLoaded.value = true }
+    return rows
+  } catch {
+    return []   // 无权限/接口异常 ⇒ 下拉只剩手打,不阻断计算(与带出失败同一口径)
+  }
+}
+/**
+ * 商品档案行:按存货编码取**唯一**命中那一行(带出名称/种类/含水率的唯一数据入口)。
+ * ⚠ 后端 condition 对普通文本走 `LIKE %值%`(见 core/panel/invCarry.js 头注),`M-001` 会命中 `XM-001`,
+ *   所以**本地按 trim 后全等收紧**(uniqueInvRowOf),且只认唯一命中 —— 多条/没有都返回 null(宁可不带,不带错)。
+ * 全量在手时就地判,不再打请求;只有全量没拉到才退回逐条查的老口径(行为与从前逐字一致)。
+ */
+async function fetchInvRowOf(code) {
+  if (invLoaded.value) return uniqueInvRowOf(invRows.value, code)
+  try {
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: 'INV', condition: { 存货编码: code }, pageNo: 1, pageSize: 50,
+    })
+    return uniqueInvRowOf(invRowsOf(res?.data), code)
   } catch {
     return null   // 无权限/查不到都按"档案没有"处理,转手填
   }
@@ -498,6 +534,9 @@ async function onOpen() {
   sinterWorkshop.value = String(props.head?.['生产车间'] ?? '').trim()
   // 物料行:页 2 已有的行拷贝进弹窗(用户在页 2 填过的接着编);页 2 为空就是空的,由「加一行」从零加
   editRows.value = editRowsFrom(props.rows)
+  // 商品档案(「物料编号」下拉的选项):与参数读取并行拉,拉完再走下面的含水率带出 ——
+  // 全量在手,含水率那 N 个粉料位就不用逐条打请求了(同一份缓存)。缓存跨多次打开复用,不重置。
+  const invPromise = ensureInvRows()
   const key = productCode.value || DEFAULT_ITEM
   try {
     const hit = await fetchParam(key)
@@ -509,6 +548,7 @@ async function onOpen() {
   } catch {
     paramScopeTip.value = `${scopeTip()}；${tt('参数库读取失败，已退回内置默认值')}`
   }
+  await invPromise
   await loadArchiveMoisture()
   await loadSinterRows()
 }
@@ -688,6 +728,8 @@ function apply() {
 .rcd-empty { background: #fbfbfb; color: #c0c4cc; }
 .rcd-mini { width: 78px; }
 .rcd-mini :deep(.el-input__inner) { text-align: center; }
+/* 表格单元格里的下拉:撑满格子(默认宽度不定),与同格的输入框口径一致 */
+.rcd-sel { width: 100%; }
 .rcd-del { color: #f56c6c; cursor: pointer; padding: 0 6px; font-size: 12px; }
 .rcd-del:hover { color: #c45656; }
 .rcd-src { margin-left: 3px; font-size: 10px; color: #67c23a; border: 1px solid #b3e19d; border-radius: 2px; padding: 0 2px; vertical-align: middle; }

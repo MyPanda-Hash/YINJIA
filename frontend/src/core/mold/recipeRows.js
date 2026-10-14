@@ -81,13 +81,56 @@ export function buildRecipeRows(editRows, patchRows) {
 }
 
 /**
+ * 商品档案行 → 「物料编号」下拉的选项(2026-10-15 用户口径:「手打太慢了,应该是可以下拉选择商品里面的数据」)。
+ *
+ * 显示 `存货编码 — 名称`,值取 `存货编码`(写进单据的就是这个编码);保档案返回的原序(不在这里偷偷排序)。
+ * 去重与丢弃都只按"这条档案行能不能选"来判:`存货编码` 空的行不是可选物料(下拉里会出现一个点不出值的空项);
+ * 同编码多行只留第一条(下拉里两个同值项会让人以为选错了)。
+ * ⚠ 这只是**候选**:控件同时开 allow-create,档案里没有的编码照样能手打 —— 下拉不许堵死例外情况。
+ *
+ * @param {Array<Record<string, any>>|null} rows 商品档案行(invCarry.invRowsOf 的产物)
+ * @returns {Array<{value: string, label: string}>} el-select 的选项
+ */
+export function invOptionsOf(rows) {
+  const out = []
+  const seen = new Set()
+  for (const r of (Array.isArray(rows) ? rows : [])) {
+    const code = String(r?.['存货编码'] ?? '').trim()
+    if (!code || seen.has(code)) continue
+    seen.add(code)
+    const name = String(r?.['存货名称'] ?? '').trim()
+    out.push({ value: code, label: name ? `${code} — ${name}` : code })
+  }
+  return out
+}
+
+/**
+ * 按编码在商品档案行里找**唯一**命中那一行(选中/手填一个编号后带出名称/种类/含水率的判据)。
+ *
+ * 为什么必须"唯一命中才认":后端 `condition` 对普通文本走 `LIKE %值%`(见 core/panel/invCarry.js 头注),
+ * `M-001` 会把 `XM-001` 一起带回来,所以**判等在本地按 trim 后全等收紧**;查到多条(重码)同样谁也不认
+ * —— 宁可不带,不带错(调用方据此保持用户输入不动、不清空、不弹错)。
+ *
+ * @param {Array<Record<string, any>>|null} rows 商品档案行(已 flatten 的,如 invRowsOf 的产物)
+ * @param {*} code 用户选中/手填的 物料编号
+ * @returns {Record<string, any>|null} 唯一命中 ⇒ 该档案行;否则 null
+ */
+export function uniqueInvRowOf(rows, code) {
+  const want = String(code ?? '').trim()
+  if (!want || !Array.isArray(rows)) return null
+  const hits = rows.filter((r) => String(r?.['存货编码'] ?? '').trim() === want)
+  return hits.length === 1 ? hits[0] : null
+}
+
+/**
  * 商品档案行 → 这行**还能补上**的格(填「物料编号」带出名称/种类;只补空格)。
  *
  * 数据源 = 既有档案查询(商品档案 INV,列 `存货编码`/`存货名称`/`所属类别`),
  * 不新开后端接口。两条硬规矩:
  *   · 已有值的格一律不动(人手填的优先);
- *   · `所属类别` 必须正好是引擎认的那四个词(MATERIAL_KINDS)才补 —— 档案里别的词
- *     填进「物料种类」会让 groupOfMaterialType 认不出来(静默按粉料算),不如不补。
+ *   · `所属类别` 必须是**引擎认得的词**(MATERIAL_KINDS 口径;materialKinds.test.js 钉着
+ *     "词表里每个词都被 groupOfMaterialType 认出来")才补 —— 档案里的 包装材料/辅助材料/成品
+ *     这类配不上料位的词填进「物料种类」只会让引擎认不出来(暂按粉料算 + 弹窗告警),不如不补。
  *
  * @param {Record<string, any>|null} row 弹窗里的编辑行
  * @param {Record<string, any>|null} inv 商品档案行(取不到传 null)

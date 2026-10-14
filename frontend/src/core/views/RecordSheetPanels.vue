@@ -554,7 +554,8 @@
                 <el-input v-if="cellEditable(dt, row, c) && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
                 <!-- 下拉列(配置 c.type='select'):配方表「物料种类」用它 —— 自由文本会让引擎
                      静默认不出、把折算料当比例算(见 core/mold/materialKinds.js 注释)。
-                     filterable+allow-create:预设四个档案类别,新增类别也能直接敲(口径由工艺科定) -->
+                     filterable+allow-create:预设档案类别(2026-10-15 起五个,含「折算物料」),
+                     新增类别也能直接敲(口径由工艺科定) -->
                 <el-select
                   v-else-if="cellEditable(dt, row, c) && c.type === 'select'"
                   v-model="row[c.key]"
