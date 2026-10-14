@@ -69,6 +69,44 @@ export function specDriftEnabled(afs) {
   return afs?.specDrift !== false
 }
 
+/* ── 表头格 ← 规格书明细,按「检验项目」名匹配(2026-10-15,成型工艺清单 A4)──────────────
+   用户口径:「成型工艺清单从规格书带出 4 项检验要求 —— 全从规格书取,按『检验项目』名匹配」:
+     成型工艺清单 · 检验要求区   规格书明细 · 检验项目
+       炭棒尺寸      ←            尺寸
+       跌落强度      ←            跌落强度
+       抗压强度      ←            抗压强度
+       压降          ←            压降
+   取值 = 规格书明细里 表区='检验要求' 且 检验项目 等于右列的那一行的 **检验要求**。
+
+   ⚠ 与出货检验计划表那条链的差别:那边是「整表替换明细」,这里只写**表头格**、
+     且**按名逐个匹配**。映射写在 autoFillSpec.headFromDetail(可配置),本函数只认配置不认面板。 */
+
+/**
+ * 规格书明细行 → 表头格的值。
+ *
+ * @param {{headFromDetail?: Array<{to: string, matchProject: string}>}|null} afs 「自动填充规格书」配置
+ * @param {Array<Record<string, any>>|null} items 规格书明细行(键 = RD_SPEC_DOC 的字段 label)
+ * @returns {Record<string, string>} **只含真取到的格**的 { 本面板字段label: 规格书检验要求 };
+ *   某个 检验项目 在规格书里没有对应行(或那行 检验要求 为空)= **该键不出现** ——
+ *   调用方按条目写 head 即可,没取到的那一格保持不动(不清空、也不写空串)。
+ */
+export function headFromSpecDetail(afs, items) {
+  const out = {}
+  const maps = afs?.headFromDetail
+  if (!Array.isArray(maps) || !maps.length) return out
+  const rows = Array.isArray(items) ? items : []
+  for (const m of maps) {
+    const to = String(m?.to ?? '').trim()
+    const want = norm(m?.matchProject)
+    if (!to || !want) continue
+    // 匹配用 specDrift 同一条归一(去掉全部空白):「跌落 强度」这类排版差不算另一个检验项目
+    const hit = rows.find((r) => norm(r?.['检验项目']) === want)
+    const val = hit ? String(hit['检验要求'] ?? '').trim() : ''
+    if (val) out[to] = val
+  }
+  return out
+}
+
 /**
  * 归一:去掉**所有**空白(含换行)。
  * 口径理由:检验要求/检验方法里的换行与空格是排版差异(「目视检查」写成「目视 检查」、

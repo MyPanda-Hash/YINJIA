@@ -268,7 +268,14 @@
           <tr v-else-if="row.grid">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
-                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(effColLabel(c.label, c.label)) }}</td>
+                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
+                <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+                <!-- 只读带出值(成型工艺清单 检验要求区那四格 ← 规格书,见 autoFillSpec.headFromDetail):
+                     格子本身是**显示标签**(yj_field editable=0/hidden=1),带出来的检验要求只显示、不可编辑;
+                     没带出(或本来就没这个键)时不占位、不影响版式。 -->
+                <span v-if="c.valueKey && head[c.valueKey]" class="rs-subval"
+                      :title="tt('规格书检验要求（自动带入，只读）')">{{ head[c.valueKey] }}</span>
+              </td>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
                   <span class="rs-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
@@ -753,7 +760,14 @@
           <tr v-else-if="row.grid">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
-                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(effColLabel(c.label, c.label)) }}</td>
+                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
+                <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+                <!-- 只读带出值(成型工艺清单 检验要求区那四格 ← 规格书,见 autoFillSpec.headFromDetail):
+                     格子本身是**显示标签**(yj_field editable=0/hidden=1),带出来的检验要求只显示、不可编辑;
+                     没带出(或本来就没这个键)时不占位、不影响版式。 -->
+                <span v-if="c.valueKey && head[c.valueKey]" class="rs-subval"
+                      :title="tt('规格书检验要求（自动带入，只读）')">{{ head[c.valueKey] }}</span>
+              </td>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
                   <span class="rs-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
@@ -1233,7 +1247,7 @@ import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
-import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled } from '@/core/insp/specCarry'
+import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -2458,7 +2472,10 @@ async function autoFillFromSpec(code, afs) {
   const key = afs?.fromKey
   const val = String(code ?? '').trim()
   if (!key || !val || !props.editable) return
-  const dt = autoFillTargetDt(afs)
+  // 明细落点:没配 detail 的链(成型工艺清单——只做表头格带入,见 autoFillSpec.headFromDetail)
+  // **不认**明细表 —— 否则 autoFillTargetDt 会退回到第一张表,把它整表替换成按空映射生成的空行。
+  const detailMap = afs.detail || []
+  const dt = detailMap.length ? autoFillTargetDt(afs) : null
   const req = specCarryRequest(val, afs)
   let payload = null
   try {
@@ -2482,12 +2499,12 @@ async function autoFillFromSpec(code, afs) {
     return
   }
   const rows = Array.isArray(payload.items) ? payload.items : []
-  const filled = rows.map((r) => {
+  const filled = detailMap.length ? rows.map((r) => {
     const row = {}
-    for (const m of afs.detail || []) row[m.to] = r[m.from] === undefined || r[m.from] === null ? '' : String(r[m.from])
+    for (const m of detailMap) row[m.to] = r[m.from] === undefined || r[m.from] === null ? '' : String(r[m.from])
     if (dt?.filterKey) row[dt.filterKey] = dt.filterVal
     return row
-  })
+  }) : []
 
   const cur = dt ? rowsOf(dt) : []
   if (cur.length) {
@@ -2507,6 +2524,10 @@ async function autoFillFromSpec(code, afs) {
     const v = payload[m.from]
     if (v !== undefined && v !== null && String(v).trim() !== '') props.head[m.to] = String(v)
   }
+  // 表头格 ← 规格书**明细**按「检验项目」名匹配(成型工艺清单 检验要求区那四格,见
+  // autoFillSpec.headFromDetail)。headFromSpecDetail 只吐出**真取到值**的键 ⇒
+  // 规格书里没有该检验项目的那一格**保持不动**(不清空、不写空串)。纯函数+单测在 core/insp/specCarry.js。
+  for (const [k, v] of Object.entries(headFromSpecDetail(afs, rows))) props.head[k] = v
   if (dt && filled.length) {
     // 兜底固定值(设计 F9 模板行的三段应对措施)逐行填空格 —— 是**明细**字段,不动表头
     for (const row of filled) {
@@ -3037,6 +3058,20 @@ function chartOf(dt) {
   color: #333;
   text-align: center;
   font-weight: 500;
+}
+/* 标签格里的**只读带出值**(cell.valueKey):成型工艺清单 检验要求区四格 ← 规格书。
+   与标题同格上下排;不给过渡动画(只澄清状态的变化才配动效,这里没有状态变化)。 */
+.rs-subval {
+  display: block;
+  margin-top: 2px;
+  padding: 1px 2px;
+  font-weight: 400;
+  font-size: 11.5px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #1f2d3d;
+  background: #f2f6ff;
 }
 /* 校验定位闪烁:琥珀高亮约3秒(保存必填缺失时跳转提示) */
 @keyframes rsFieldBlink {

@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled,
-  DEFAULT_NOT_APPROVED_TIP,
+  headFromSpecDetail, DEFAULT_NOT_APPROVED_TIP,
 } from './specCarry.js'
 
 /**
@@ -136,4 +136,65 @@ test('规格书变动提示:出货检验计划表照旧,组装BOM表不参与(�
   assert.equal(specDriftEnabled(INSP_AFS), true)
   assert.equal(specDriftEnabled(undefined), true)
   assert.equal(specDriftEnabled(ASM_AFS), false)
+})
+
+/* ── 表头格 ← 规格书明细,按「检验项目」名匹配(2026-10-15,成型工艺清单 A4)────────────
+   用户口径:成型工艺清单「检验要求」区的四个块名格由规格书带出 —— 在规格书明细里找
+   检验项目 等于指定名的行,把该行的 **检验要求** 写进对应的格。
+   关键口径:**只在真取到值时写** —— 某个检验项目规格书里没有 ⇒ 那一格不出现 = 保持不动。 */
+const MOLD_AFS = {
+  fromKey: '产品编号',
+  specDrift: false,
+  headFromDetail: [
+    { to: '炭棒尺寸', matchProject: '尺寸' },
+    { to: '跌落强度', matchProject: '跌落强度' },
+    { to: '抗压强度', matchProject: '抗压强度' },
+    { to: '压降', matchProject: '压降' },
+  ],
+}
+const SPEC_ROWS = [
+  { 检验项目: '尺寸', 检验要求: '外径 20±0.5mm、长度 250±2mm', 检验方法: '游标卡尺' },
+  { 检验项目: '压降', 检验要求: '≤25kPa', 检验方法: '数显压力表' },
+]
+
+test('按检验项目名匹配,把该行的 检验要求 写进对应的格', () => {
+  assert.deepEqual(headFromSpecDetail(MOLD_AFS, SPEC_ROWS), {
+    炭棒尺寸: '外径 20±0.5mm、长度 250±2mm',
+    压降: '≤25kPa',
+  })
+})
+
+test('规格书里没有该检验项目 ⇒ 该键不出现(那一格保持不动,不清空、不写空串)', () => {
+  const out = headFromSpecDetail(MOLD_AFS, SPEC_ROWS)
+  assert.equal('跌落强度' in out, false)
+  assert.equal('抗压强度' in out, false)
+  assert.deepEqual(Object.keys(out).sort(), ['压降', '炭棒尺寸'].sort())
+})
+
+test('检验要求 为空白 ⇒ 同样不写那一格(不能拿空串覆盖纸上已有的值)', () => {
+  const out = headFromSpecDetail(MOLD_AFS, [
+    { 检验项目: '尺寸', 检验要求: '   ' },
+    { 检验项目: '压降', 检验要求: null },
+  ])
+  assert.deepEqual(out, {})
+})
+
+test('检验项目名匹配忽略空白(「跌落 强度」这类排版差不算另一个项目)', () => {
+  const out = headFromSpecDetail(MOLD_AFS, [{ 检验项目: ' 跌落 强度 ', 检验要求: '高度50cm,跌3次无断裂' }])
+  assert.deepEqual(out, { 跌落强度: '高度50cm,跌3次无断裂' })
+})
+
+test('没配 headFromDetail / items 不是数组 ⇒ 一格都不写(旧链一个字节不变)', () => {
+  assert.deepEqual(headFromSpecDetail(INSP_AFS, SPEC_ROWS), {})
+  assert.deepEqual(headFromSpecDetail(undefined, SPEC_ROWS), {})
+  assert.deepEqual(headFromSpecDetail(MOLD_AFS, null), {})
+  assert.deepEqual(headFromSpecDetail({ headFromDetail: [] }, SPEC_ROWS), {})
+})
+
+test('映射项缺 to / matchProject ⇒ 跳过该项,不影响其它项', () => {
+  const out = headFromSpecDetail(
+    { headFromDetail: [{ to: '', matchProject: '尺寸' }, { to: '压降' }, ...MOLD_AFS.headFromDetail] },
+    SPEC_ROWS,
+  )
+  assert.deepEqual(out, { 炭棒尺寸: '外径 20±0.5mm、长度 250±2mm', 压降: '≤25kPa' })
 })

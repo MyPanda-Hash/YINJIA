@@ -571,3 +571,50 @@ test('组装工艺清单:组装BOM表的规格书导入映射到 BOM 表真实�
   assert.deepEqual(afs.detail.map((m) => m.to).sort(), ['物料名', '物料规格', '物料编号', '用量'].sort(),
     '四条映射:物料编号←物料编码 / 物料名←物料名称 / 物料规格←规格参数 / 用量←数量')
 })
+
+/**
+ * 成型工艺清单「检验要求」区四格 ← 规格书明细(2026-10-15 用户口径)。
+ *
+ * 【为什么断言要写在这里】与 RD_INSP_PLAN / RD_ASM_PROC 两条链同一个坑:跨面板取值,
+ *   落点写错(labelsToCols 反查不到)只会**静默丢值**,不报错 —— 而路线要点是:
+ *     · to 必须是本面板真实存在的 label;
+ *     · 那四格在配置里是**显示标签格**(yj_field editable=0/hidden=1,见
+ *       tools/migrate-mold-proc-labels.sql),所以必须挂 valueKey 才看得见带出的值
+ *       —— 只写 head 不挂 valueKey = 填进 rd_mold_proc_head 但纸面永远空白;
+ *     · 这条链**不许**配 detail:配了 autoFillTargetDt 会退回第一张表,把修订记录整表替换掉。
+ */
+test('成型工艺清单:检验要求四格 ← 规格书明细,落点是本面板真实字段且挂得上纸面', () => {
+  const cfg = recordSheetConfigs.RD_MOLD_PROC
+  assert.ok(cfg, 'RD_MOLD_PROC 配置缺失')
+  const afs = cfg.autoFillSpec
+  assert.ok(afs, '成型工艺清单需要 autoFillSpec(从规格书带出检验要求四格)')
+  assert.equal(afs.fromKey, '产品编号', '触发键 = 产品编号(选完它才动手)')
+  assert.equal(afs.specDrift, false, '本表明细是修订记录/配方表,不是检验项目,比「规格书变动」只会误报')
+  assert.ok(!afs.detail, '本链只写表头格;配了 detail 会把修订记录整表替换掉')
+  assert.ok(!afs.endpoint && !afs.specSheetArea, '走默认端点/默认表区(检验要求)——不另开端点、不绕审批门禁')
+
+  const fx = FIXTURE.RD_MOLD_PROC
+  assert.ok(fx?.labels?.length, 'fixture 缺 RD_MOLD_PROC')
+  const maps = afs.headFromDetail
+  assert.ok(Array.isArray(maps) && maps.length, 'autoFillSpec.headFromDetail 为空 ⇒ 四格不会回填')
+  assert.deepEqual(
+    maps.map((m) => [m.to, m.matchProject]),
+    [['炭棒尺寸', '尺寸'], ['跌落强度', '跌落强度'], ['抗压强度', '抗压强度'], ['压降', '压降']],
+    '映射口径(用户给定):炭棒尺寸←尺寸 / 跌落强度←跌落强度 / 抗压强度←抗压强度 / 压降←压降',
+  )
+  for (const m of maps) {
+    assert.ok(fx.labels.includes(m.to), `落点 '${m.to}' 不是本面板字段(label 写错会被 labelsToCols 静默丢弃)`)
+  }
+
+  // 四格必须挂 valueKey(它们是 editable=0/hidden=1 的**显示标签**格,只写 head 纸面看不见)
+  const valueKeys = new Set()
+  for (const sec of cfg.sections || []) {
+    for (const row of sec.rows || []) {
+      for (const c of row.grid || []) if (c.valueKey) valueKeys.add(c.valueKey)
+    }
+  }
+  for (const m of maps) {
+    assert.ok(valueKeys.has(m.to), `'${m.to}' 没挂 valueKey ⇒ 带出的值只进库、不上纸面`)
+  }
+  assert.deepEqual([...valueKeys].sort(), maps.map((m) => m.to).sort(), 'valueKey 只该挂在这四格上')
+})

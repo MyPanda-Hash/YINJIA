@@ -2931,6 +2931,8 @@ export default {
     '本表已有 {n} 行，改用规格书 {no} 的 {m} 行内容替换？': 'This table already has {n} row(s). Replace them with the {m} row(s) from specification {no}?',
     '替换': 'Replace',
     '取规格书失败，请手工填写': 'Failed to read the specification — please fill in manually',
+    // 成型工艺清单(页 1)检验要求区的四格 ← 规格书明细,按「检验项目」名匹配(2026-10-15)
+    '规格书检验要求（自动带入，只读）': 'Specification inspection requirement (carried over, read-only)',
     '未知': 'unknown',
     '回填预览': 'Write-back Preview',
     '页 1 字段': 'Page 1 Field',
