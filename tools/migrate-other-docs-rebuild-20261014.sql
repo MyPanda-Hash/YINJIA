@@ -437,7 +437,7 @@ FROM bd_other_in h LEFT JOIN bl_other_in l ON h.[单据编号]=l.[单据编号]
 LEFT JOIN yj_doc_status s ON s.panel_code='OTHER_IN' AND s.doc_no=h.[单据编号];
 GO
 CREATE OR ALTER VIEW v_other_in_stats AS
-SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id,
+SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.asp_cancel,
   NULL AS [仓库编码], l.[仓库], h.[供应商编码], h.[供应商], l.[存货编码], l.[存货名称] AS [存货], l.[规格型号], l.[计量单位] AS [主单位], l.[辅助单位名称] AS [辅单位], SUM(COALESCE(l.[数量],0)) AS [数量(主单位)], SUM(COALESCE(l.[金额],0))/NULLIF(SUM(COALESCE(l.[数量],0)),0) AS [单价(主单位)], SUM(COALESCE(l.[金额],0)) AS [金额], SUM(COALESCE(l.[辅助数量],0)) AS [数量(辅单位)], NULL AS [单价(辅单位)]
 FROM bd_other_in h LEFT JOIN bl_other_in l ON h.[单据编号]=l.[单据编号]
 WHERE NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code='OTHER_IN' AND s.doc_no=h.[单据编号] AND s.canceled='Y')
@@ -453,7 +453,7 @@ FROM bd_other_out h LEFT JOIN bl_other_out l ON h.[单据编号]=l.[单据编号
 LEFT JOIN yj_doc_status s ON s.panel_code='OTHER_OUT' AND s.doc_no=h.[单据编号];
 GO
 CREATE OR ALTER VIEW v_other_out_stats AS
-SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id,
+SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.asp_cancel,
   NULL AS [仓库编码], l.[仓库], h.[部门编码], h.[部门], l.[存货编码], l.[存货名称] AS [存货], l.[规格型号], l.[计量单位] AS [主单位], l.[辅助单位名称] AS [辅单位], SUM(COALESCE(l.[数量],0)) AS [数量(主单位)], SUM(COALESCE(l.[金额],0))/NULLIF(SUM(COALESCE(l.[数量],0)),0) AS [单价(主单位)], SUM(COALESCE(l.[金额],0)) AS [金额], SUM(COALESCE(l.[辅助数量],0)) AS [数量(辅单位)], NULL AS [单价(辅单位)]
 FROM bd_other_out h LEFT JOIN bl_other_out l ON h.[单据编号]=l.[单据编号]
 WHERE NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code='OTHER_OUT' AND s.doc_no=h.[单据编号] AND s.canceled='Y')

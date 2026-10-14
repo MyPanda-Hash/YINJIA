@@ -262,7 +262,9 @@ function build() {
     P(`LEFT JOIN yj_doc_status s ON s.panel_code='${s.panel}' AND s.doc_no=h.[单据编号];`)
     P('GO')
     P(`CREATE OR ALTER VIEW v_${s.head.replace('bd_', '')}_stats AS`)
-    P(`SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id,`)
+    // ⚠ 必须带 asp_cancel:DbNormAudit 第 13 项「面板引用对象缺 pk_col / asp_cancel(打开即 500)」会 FAIL
+    //   (参照 v_purchase_in_stats / v_material_out_stats 都是 id + asp_cancel 打头)
+    P(`SELECT ROW_NUMBER() OVER(ORDER BY (SELECT NULL)) AS id, h.asp_cancel,`)
     P('  ' + s.statsView.join(', '))
     P(`FROM ${s.head} h LEFT JOIN ${s.line} l ON h.[单据编号]=l.[单据编号]`)
     P(`WHERE NOT EXISTS (SELECT 1 FROM yj_doc_status s WHERE s.panel_code='${s.panel}' AND s.doc_no=h.[单据编号] AND s.canceled='Y')`)
