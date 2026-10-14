@@ -1,0 +1,85 @@
+=== 银嘉真实账套:其他入库单 + 同类出入库单据全景(只读)===
+账套: 惠州市银嘉环保科技有限公司 outerInstanceId=580147507460444160
+时间: 2026-10-14T09:47:00.432Z
+
+=== ① 逐单据计数(已审核 C 口径)+ 最近 3 张 ===
+
+--- 其他入库单  /jdy/v2/scm/inv_other_in
+    count = 81
+    列表行字段(18): create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, trans_type_id, trans_type_name, trans_type_number, customer_id, customer_name, customer_number, supplier_id, supplier_name, supplier_number, modify_time
+    · bill_no=QTRK-20261014-00092  bill_date=2026-10-14  bill_status=C  trans_type_name=其他入库  supplier_name=KG
+    · bill_no=QTRK-20261012-00091  bill_date=2026-10-12  bill_status=C  trans_type_name=其他入库  supplier_name=KG
+    · bill_no=QTRK-20261013-00090  bill_date=2026-10-13  bill_status=C  trans_type_name=其他入库  supplier_name=KG
+
+--- 其他出库单  /jdy/v2/scm/inv_other_out
+    count = 1149
+    列表行字段(29): create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, trans_type_id, trans_type_name, trans_type_number, customer_id, customer_name, customer_number, contact_phone, contact_country_id, contact_country_name, contact_country_number, contact_province_id, contact_province_name, contact_province_number, contact_city_id, contact_city_name, contact_city_number, contact_district_id, contact_district_name, contact_district_number, contact_linkman, contact_address
+    · bill_no=QTCK-20261014-01172  bill_date=2026-10-14  bill_status=C  trans_type_name=其他出库  dept_name=品质部
+    · bill_no=QTCK-20261014-01171  bill_date=2026-10-14  bill_status=C  trans_type_name=其他出库  dept_name=工程技术中心
+    · bill_no=QTCK-20261014-01170  bill_date=2026-10-14  bill_status=C  trans_type_name=其他出库  dept_name=组装车间
+
+--- 调拨出库单  /jdy/v2/scm/inv_tfout
+    count = 0
+    (0 行)
+
+--- 组装单  /jdy/v2/scm/inv_assemble
+    count = 0
+    (0 行)
+
+--- 采购入库单  /jdy/v2/scm/pur_inbound
+    count = 3382
+    列表行字段(18): create_time, bill_date, id, bill_no, bill_status, bill_close_state, supplier_id, supplier_name, supplier_number, emp_id, emp_name, emp_number, remark, total_amount, delivery_type_id, delivery_type_name, delivery_type_number, settle_status
+    · bill_no=CGRK-20261013-03415  bill_date=2026-10-13  bill_status=C  supplier_name=惠州市双喜科技有限公司  emp_name=王光珍
+    · bill_no=CGRK-20261014-03414  bill_date=2026-10-14  bill_status=C  supplier_name=深圳市陶氏水处理设备技术开发有限公司  emp_name=王光珍
+    · bill_no=CGRK-20261014-03413  bill_date=2026-10-14  bill_status=C  supplier_name=深圳兴文睿环保科技有限公司  emp_name=王光珍
+
+--- 采购退货单  /jdy/v2/scm/pur_ret
+    count = 99
+    列表行字段(12): create_time, bill_date, id, bill_no, bill_status, supplier_id, supplier_name, supplier_number, emp_id, emp_name, emp_number, remark
+    · bill_no=CGTH-20260922-00107  bill_date=2026-09-22  bill_status=C  supplier_name=惠州市双喜科技有限公司  emp_name=王光珍
+    · bill_no=CGTH-20260910-00106  bill_date=2026-09-10  bill_status=C  supplier_name=宁波杜康陶瓷有限公司  emp_name=王光珍
+    · bill_no=CGTH-20260921-00105  bill_date=2026-09-21  bill_status=C  supplier_name=深圳市泰兴盛科技有限公司  emp_name=王光珍
+
+--- 销售出库单  /jdy/v2/scm/sal_out_bound
+    count = 5209
+    列表行字段(22): create_time, bill_date, id, bill_no, bill_status, settle_status, delivery_status, customer_id, customer_name, customer_number, emp_id, emp_name, emp_number, total_amount, material_group, material_qty, bill_dis_before_amount, bill_dis_amount, material_entity, express_entity, ivc_status , custom_field
+    · bill_no=XSCK-20261014-00008  bill_date=2026-10-14  bill_status=C  customer_name=张莉  emp_name=张莉
+    · bill_no=XSCK-20261014-00007  bill_date=2026-10-14  bill_status=C  customer_name=绍兴摩纳净水科技有限公司  emp_name=练玉珍
+    · bill_no=XSCK-20261014-00006  bill_date=2026-10-14  bill_status=C  customer_name=广东梵浦洛环保科技有限公司  emp_name=张莉
+
+--- 销售退货单  /jdy/v2/scm/sal_in_bound
+    count = 95
+    列表行字段(16): bill_dis_amount, create_time, bill_date, id, bill_no, bill_status, settle_status, customer_id, customer_name, customer_number, emp_id, emp_name, emp_number, dept_id, dept_name, dept_number
+    · bill_no=XSTH-20260926-00100  bill_date=2026-09-26  bill_status=C  customer_name=东莞市科菱沃特智能科技有限公司  dept_name=销售部  emp_name=李梓维
+    · bill_no=XSTH-20260919-00099  bill_date=2026-09-19  bill_status=C  customer_name=无锡品之恒商贸有限公司  dept_name=销售部  emp_name=李梓维
+    · bill_no=XSTH-20260831-00098  bill_date=2026-08-31  bill_status=C  customer_name=澳兰斯健康产业有限公司  dept_name=销售部  emp_name=李梓维
+
+--- 生产领料单(材料出库)  /jdy/v2/scm/inv_pick
+    count = 4978
+    列表行字段(10): create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, remark, pick_type
+    · bill_no=SCLL-20261014-00007  bill_date=2026-10-14  bill_status=C  dept_name=X烧结车间
+    · bill_no=SCLL-20261014-00006  bill_date=2026-10-14  bill_status=C  dept_name=烧结车间
+    · bill_no=SCLL-20261014-00005  bill_date=2026-10-14  bill_status=C  dept_name=烧结车间
+
+--- 产品入库单(成品入库)  /jdy/v2/scm/inv_product
+    count = 2879
+    列表行字段(12): create_time, bill_date, id, bill_no, bill_status, dept_id, dept_name, dept_number, remark, emp_id, emp_name, emp_number
+    · bill_no=CPRK-20261014-00002  bill_date=2026-10-14  bill_status=C  dept_name=组装车间  emp_name=周荣香
+    · bill_no=CPRK-20261014-00001  bill_date=2026-10-14  bill_status=C  dept_name=组装车间  emp_name=余均亚
+    · bill_no=CPRK-20261013-00007  bill_date=2026-10-13  bill_status=C  dept_name=组装车间  emp_name=王万华
+
+--- 盘点单  /jdy/v2/scm/inv_check_bill
+    count = 36
+    列表行字段(14): create_time, bill_date, id, bill_no, bill_status, check_status, remark, stock_id, stock_name, stock_number, check_date, check_model, check_scope, material_source
+    · bill_no=PDD-20260106-00008  bill_date=2026-01-06  bill_status=C  remark=由盘点单“PDD-20260106-00007”重新盘点生成
+    · bill_no=PDD-20260106-00007  bill_date=2026-01-06  bill_status=C  remark=该单据是按总量盘点存在盈亏，已转为另外一张按批次保质期盘点的单据。
+    · bill_no=PDD-20260106-00001  bill_date=2026-01-06  bill_status=C
+
+=== ② 其他入库单:详情 + 业务类型分布 ===
+  本页 81 张(共 81),业务类型分布: 其他入库:81
+
+  样例单据 QTRK-20261014-00092 (2026-10-14) 表头键(49): id, bill_no, bill_date, bill_status, create_time, modify_time, audit_time, creator_id, creator_name, creator_number, modifier_id, modifier_name, modifier_number, auditor_id, auditor_name, auditor_number, trans_type_id, trans_type_name, trans_type_number, customer_id, customer_name, customer_number, supplier_id, supplier_name, supplier_number, remark, dept_id, dept_name, dept_number, emp_id, emp_name, emp_number, contact_phone, contact_city, contact_country_id, contact_country_name, contact_country_number, contact_province_id, contact_province_name, contact_province_number, contact_city_id, contact_city_name, contact_city_number, contact_district_id, contact_district_name, contact_district_number, contact_address, material_entity, custom_field
+  表头 JSON: {"id":"2590130656491170816","bill_no":"QTRK-20261014-00092","bill_date":"2026-10-14","bill_status":"C","create_time":"2026-10-14 16:46:53","modify_time":"2026-10-14 16:47:16","audit_time":"2026-10-14 16:47:15","creator_id":"425692977","creator_name":"蒋小刚","creator_number":"multicorp_6171610_-952599178","modifier_id":"425692977","modifier_name":"蒋小刚","modifier_number":"multicorp_6171610_-952599178","auditor_id":"425692977","auditor_name":"蒋小刚","auditor_number":"multicorp_6171610_-952599178","trans_type_id":"12","trans_type_name":"其他入库","trans_type_number":"QTRKLX01","customer_id":"","customer_name":"","customer_number":"","supplier_id":"2241285519952694272","supplier_name":"KG","supplier_number":"GYS00014","remark":"","dept_id":"","dept_name":"","dept_number":"","emp_id":"","emp_name":"","emp_number":"","contact_phone":"","contact_city":"","contact_country_id":"","contact_country_name":"","contact_country_number":"","contact_province_id":"","contact_province_name":"","contact_province_number":"","contact_city_id":"","contact_city_name":"","contact_city_number":"","contact_district_id":"","contact_district_name":"","contact_district_number":"","contact_address":"","material_entity":[{"picture":"","seq":1,"id":"2590130656491169792","material_id":"2305923234782023680","material_name":"客供标签","material_number":"YJ-KG-B12","material_is_multi_unit":false,"material_is_serial":false,"material_is_asst_attr":false,"material_is_kf_period":false,"material_is_batch":false,"material_model":"
+
+  分录 1 行,分录键(73): picture, seq, id, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux_id1, aux_name1, aux_number1, aux_id2, aux_name2, aux_number2, aux_id3, aux_name3, aux_number3, barcode, batch_no, pro_place, pro_reg_no, pro_license, kf_date, valid_date, kf_type, kf_period, sn_list, sn_list_id, base_unit_id, base_unit_name, base_unit_number, unit_id, unit_name, unit_number, aux_unit_id, aux_unit_name, aux_unit_number, conversion_rate, qty, inv_qty, base_qty, inv_base_qty, aux_qty, def_float_qty, aux_coefficient, coefficient, price, cost, unit_cost, comment, src_bill_no, src_bill_type_id, src_bill_type_name, src_bill_type_number, src_inter_id, src_bill_date, src_seq, src_entry_id, custom_entity_field
+  首条分录: {"picture":"","seq":1,"id":"2590130656491169792","material_id":"2305923234782023680","material_name":"客供标签","material_number":"YJ-KG-B12","material_is_multi_unit":false,"material_is_serial":false,"material_is_asst_attr":false,"material_is_kf_period":false,"material_is_batch":false,"material_model":"乐天鹅标B-46-14","stock_id":"2436465656128978944","stock_name":"华北工控仓","stock_number":"CK00006","stock_is_allow_freight":false,"sp_id":"","sp_name":"","sp_number":"","aux_prop_id":"","aux_prop_name":"","aux_prop_number":"","aux_id1":"","aux_name1":"","aux_number1":"","aux_id2":"","aux_name2":"","aux_number2":"","aux_id3":"","aux_name3":"","aux_number3":"","barcode":"","batch_no":"","pro_place":"","pro_reg_no":"","pro_license":"","kf_date":"","valid_date":"","kf_type":"","kf_period":0,"sn_list":"","sn_list_id":"0","base_unit_id":"2167741887128111104","base_unit_name":"张","base_unit_number":"张","unit_id":"2167741887128111104","unit_name":"张","unit_number":"张","aux_unit_id":"","aux_unit_name":"","aux_unit_number":"","conversion_rate":"","qty":1050,"inv_qty":0,"base_qty":1050,"inv_base_qty":0,"aux_qty":0,"def_float_qty":0,"aux_coefficient":0,"coefficient":1,"price":0,"cost":0,"unit_cost":0,"comment":"","src_bill_no":"","src_bill_type_id":"","src_bill_type_name":"","src_bill_type_number":"","src_inter_id":"0","src_bill_date":"","src_seq":"0","src_entry_id":"0","custom_entity_field":{}}
