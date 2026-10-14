@@ -22,6 +22,6 @@ INSERT INTO bl_other_out ([单据编号], [序号], [存货编码], [存货名�
 INSERT INTO bl_other_out ([单据编号], [序号], [存货编码], [存货名称], [规格型号], [仓库], [仓库编码], [计量单位], [基本单位名称], [基本单位编码], [基本单位id], [辅助单位名称], [辅助单位编码], [辅助单位id], [换算率], [换算系数], [辅助换算系数], [数量], [辅助数量], [库存数量], [批号], [明细备注], [asp_user1], [asp_time1], [asp_cancel]) VALUES (N'QTCK-20261014-01173', N'2', N'S032', N'S阻垢炭棒/滤芯', N'28*12*178', N'成品B仓', N'CP-02', N'支', N'支', N'支', N'3', NULL, NULL, NULL, NULL, N'1', N'0', 60, 0, N'393', N'PC0000', NULL, N'样例取样', GETDATE(), N'N');
 INSERT INTO bl_other_out ([单据编号], [序号], [存货编码], [存货名称], [规格型号], [仓库], [仓库编码], [计量单位], [基本单位名称], [基本单位编码], [基本单位id], [辅助单位名称], [辅助单位编码], [辅助单位id], [换算率], [换算系数], [辅助换算系数], [数量], [辅助数量], [库存数量], [批号], [明细备注], [asp_user1], [asp_time1], [asp_cancel]) VALUES (N'QTCK-20261014-01173', N'3', N'S022-0', N'A+级烧结炭棒/滤芯', N'41*22*178', N'成品B仓', N'CP-02', N'支', N'支', N'支', N'3', NULL, NULL, NULL, NULL, N'1', N'0', 180, 0, N'2639', N'PC0000', NULL, N'样例取样', GETDATE(), N'N');
 
-SELECT '样例单据已写入' AS 结果, (SELECT COUNT(*) FROM bd_finish_in WHERE asp_user1=N'样例取样') AS 产品入库,
-  (SELECT COUNT(*) FROM bd_other_in WHERE asp_user1=N'样例取样') AS 其他入库,
-  (SELECT COUNT(*) FROM bd_other_out WHERE asp_user1=N'样例取样') AS 其他出库;
+SELECT N'单据已写入(HSDZ_MES_TEST)' AS 结果, (SELECT COUNT(*) FROM bd_finish_in WHERE asp_user1 = N'样例取样') AS 产品入库,
+  (SELECT COUNT(*) FROM bd_other_in WHERE asp_user1 = N'样例取样') AS 其他入库,
+  (SELECT COUNT(*) FROM bd_other_out WHERE asp_user1 = N'样例取样') AS 其他出库;

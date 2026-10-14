@@ -7,9 +7,13 @@
  *
  * 🔴 只读金蝶(真实账套 deploy/config.json,全部 GET,绝不 POST)。
  * 用法: node tools/archive/_pull-kingdee-samples-1014.mjs
- * 产物: tools/archive/_dump-out/kingdee-samples-1014.json  (金蝶原始返回)
- *        tools/archive/_dump-out/kingdee-samples-1014.md    (逐字段对照表)
- *        tools/archive/_dump-out/kingdee-samples-1014.sql   (写入测试账套的 INSERT;由 SqlRunner 执行)
+ * 产物: tools/archive/_dump-out/kingdee-samples[-prod]-1014.json  (金蝶原始返回)
+ *        tools/archive/_dump-out/kingdee-samples[-prod]-1014.md    (逐字段对照表)
+ *        tools/archive/_dump-out/kingdee-samples[-prod]-1014.sql   (写入目标账套的 INSERT;由 SqlRunner 执行)
+ *
+ * 目标账套:默认 **HSDZ_MES_TEST**(样例数据);`YINJIA_SAMPLE_TAG=prod` 时写 **HSDZ_MES**
+ *   —— 用户 2026-10-14 口径「还有要下来一条出入库的数据下来让验证」:8090 跑的是正式库,
+ *   只有落到正式库才看得见;正式库写的是**金蝶真实单据**(非造数),落库人记「金蝶同步」。
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
 import { fetchAppToken, kingdeeTryGet } from '../../deploy/kingdee-client.mjs'
@@ -17,6 +21,15 @@ import { fetchAppToken, kingdeeTryGet } from '../../deploy/kingdee-client.mjs'
 const cfg = JSON.parse(readFileSync(new URL('../../deploy/config.json', import.meta.url), 'utf8')).kingdee
 const { token } = await fetchAppToken(cfg)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+// 目标账套(2026-10-14):默认写**测试账套**;`YINJIA_SAMPLE_TAG=prod` 时写**正式账套**
+//   —— 用户口径「还有要下来一条出入库的数据下来让验证」,正式库跑的是 8090,只有落到正式库才看得到。
+//   正式库写的是**金蝶真实单据**(非造数),落库人记为「金蝶同步」;测试库仍记「样例取样」以便区分。
+const TAG = process.env.YINJIA_SAMPLE_TAG || 'test'
+const IS_PROD = TAG === 'prod'
+const SYNC_USER = IS_PROD ? '金蝶同步' : '样例取样'
+const SUF = IS_PROD ? '-prod' : ''
+const TARGET_DB = process.env.YINJIA_SAMPLE_DB || (IS_PROD ? 'HSDZ_MES' : 'HSDZ_MES_TEST')
 
 const s = (v) => (v === undefined || v === null ? '' : String(v))
 const q = (v) => (v === '' || v === undefined || v === null ? 'NULL' : `N'${String(v).replace(/'/g, "''")}'`)
@@ -74,7 +87,7 @@ const md = ['# 金蝶 → MES 取样对照(每类 1 条真实单据)', '',
   `- 金蝶账套:惠州市银嘉环保(outerInstanceId ${cfg.outerInstanceId},**只读**)`,
   `- 落库目标:**测试账套 HSDZ_MES_TEST**(正式库只录真实业务)`,
   `- 抓取时间:${out.at}`, '']
-const sql = [`-- kingdee-samples-1014.sql — 由 tools/archive/_pull-kingdee-samples-1014.mjs 生成`,
+const sql = [`-- kingdee-samples${SUF}-1014.sql — 由 tools/archive/_pull-kingdee-samples-1014.mjs 生成`,
   `-- 用途:Phase 3 取样核对 —— 每类单据写入 1 张金蝶真实单据作为样例(仅测试账套 HSDZ_MES_TEST)`,
   'SET NOCOUNT ON;']
 let insertSeq = 0
@@ -106,7 +119,7 @@ for (const t of TYPES) {
   hCols.push('[是否已转ERP]'); hVals.push(q('是')); hMap.push(['(派生)', '是否已转ERP', '是(单据来自金蝶)'])
   hCols.push('[ERP单号]'); hVals.push(q(s(d.bill_no))); hMap.push(['bill_no', 'ERP单号', s(d.bill_no)])
   hCols.push('[外部指纹]'); hVals.push(q(`SAMPLE|${s(d.bill_no)}|${s(d.modify_time)}`))
-  hCols.push('[asp_user1]'); hVals.push(q('样例取样')); hMap.push(['(系统)', 'asp_user1', '样例取样'])
+  hCols.push('[asp_user1]'); hVals.push(q(SYNC_USER)); hMap.push(['(系统)', 'asp_user1', SYNC_USER])
   hCols.push('[asp_time1]'); hVals.push('GETDATE()')
   hCols.push('[asp_cancel]'); hVals.push(q('N'))
 
@@ -121,7 +134,7 @@ for (const t of TYPES) {
   for (const [kd, col, only] of LINE_MAP) {
     if (applies(only, t.api) && !lCols.includes(`[${col}]`)) { lCols.push(`[${col}]`); lVals.push('@x') }
   }
-  lCols.push('[asp_user1]'); lVals.push(q('样例取样'))
+  lCols.push('[asp_user1]'); lVals.push(q(SYNC_USER))
   lCols.push('[asp_time1]'); lVals.push('GETDATE()')
   lCols.push('[asp_cancel]'); lVals.push(q('N'))
 
@@ -152,17 +165,18 @@ for (const t of TYPES) {
   await sleep(300)
 }
 
-sql.push('', `SELECT '样例单据已写入' AS 结果, (SELECT COUNT(*) FROM bd_finish_in WHERE asp_user1=N'样例取样') AS 产品入库,`,
-  `  (SELECT COUNT(*) FROM bd_other_in WHERE asp_user1=N'样例取样') AS 其他入库,`,
-  `  (SELECT COUNT(*) FROM bd_other_out WHERE asp_user1=N'样例取样') AS 其他出库;`)
+sql.push('', `SELECT N'单据已写入(${TARGET_DB})' AS 结果, (SELECT COUNT(*) FROM bd_finish_in WHERE asp_user1 = ${q(SYNC_USER)}) AS 产品入库,`,
+  `  (SELECT COUNT(*) FROM bd_other_in WHERE asp_user1 = ${q(SYNC_USER)}) AS 其他入库,`,
+  `  (SELECT COUNT(*) FROM bd_other_out WHERE asp_user1 = ${q(SYNC_USER)}) AS 其他出库;`)
 
 mkdirSync(new URL('./_dump-out/', import.meta.url), { recursive: true })
-writeFileSync(new URL('./_dump-out/kingdee-samples-1014.json', import.meta.url), JSON.stringify(out, null, 1), 'utf8')
-writeFileSync(new URL('./_dump-out/kingdee-samples-1014.md', import.meta.url), md.join('\n'), 'utf8')
-writeFileSync(new URL('./_dump-out/kingdee-samples-1014.sql', import.meta.url), sql.join('\n'), 'utf8')
-console.log('取样完成:')
+writeFileSync(new URL(`./_dump-out/kingdee-samples${SUF}-1014.json`, import.meta.url), JSON.stringify(out, null, 1), 'utf8')
+writeFileSync(new URL(`./_dump-out/kingdee-samples${SUF}-1014.md`, import.meta.url), md.join('\n'), 'utf8')
+writeFileSync(new URL(`./_dump-out/kingdee-samples${SUF}-1014.sql`, import.meta.url), sql.join('\n'), 'utf8')
+console.log(`取样完成(目标账套 ${TARGET_DB};落库人 ${SYNC_USER}):`)
 for (const t of TYPES) {
   const sm = out.samples[t.api]
   console.log(`  ${t.label.padEnd(6)} ${t.api.padEnd(14)} 取样=${sm.bill_no}  分录=${sm.entries.length} 行`)
 }
-console.log('\n[产物] tools/archive/_dump-out/kingdee-samples-1014.{json,md,sql}')
+console.log(`\n[产物] tools/archive/_dump-out/kingdee-samples${SUF}-1014.{json,md,sql}`)
+

@@ -943,6 +943,9 @@ public class PanelConfigService {
             //   而金蝶无业务类型档案接口 ⇒ 值落在 MES 的「业务类型id」字段上(空则用账套默认)。
             java.util.Map.entry("OTHER_IN", List.of(
                     new String[]{"新增", "新增"},
+                    // 选单(2026-10-14 补,与产成品入库单同形):来源 = SELECT_FLOWS 的 PU_ORDER;
+                    // ⚠ actions[0] 必须是字面量「选单」,写成「选采购订单」会让工具栏主按钮回落成未实现
+                    new String[]{"选单", "选单", "选采购订单"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
@@ -988,6 +991,8 @@ public class PanelConfigService {
             // (业务类型 trans_type_id 真实账套=13)。委外三单(OUTSOURCE_*)仍保持 2026-10-08 下架状态。
             java.util.Map.entry("OTHER_OUT", List.of(
                     new String[]{"新增", "新增"},
+                    // 选单(2026-10-14 补,与材料出库单同形):来源 = SELECT_FLOWS 的 MANU_ORDER
+                    new String[]{"选单", "选单", "选生产工单"},
                     new String[]{"保存", "保存", "保存新增", "保存为草稿"},
                     new String[]{"删除", "删除", "删除单据"},
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
@@ -1085,6 +1090,11 @@ public class PanelConfigService {
             java.util.Map.entry("QC_INSP", "QC_RECV"),               // 送料暂收单 → 来料检验单(暂收入库单已下线,来源指向送料暂收单 QC_RECV)
             java.util.Map.entry("QC_RETURN", "QC_INSP"),             // 来料检验单 → 暂收退回单
             java.util.Map.entry("WO_ORDER", "SO_ORDER")              // 销售订单 → 生产工单(计划层:选单生单)
+   // 2026-10-14 其他入库/其他出库重建后补选单(用户口径「没有将面板的全部实现与产成品入库单对齐,如左侧的订单选择栏目」):
+   //   其他入库 ← 采购订单(与采购入库单同源:客供/采购到货类入库);其他出库 ← 生产工单(与材料出库单同源:生产领用类出库)。
+   //   ⚠ 这两条是**按同族面板的最近邻**取的默认口径,若业务上另有来源,改 SELECT_FLOWS 这一行即可(选单按钮由它派生)。
+   , java.util.Map.entry("OTHER_IN", "PU_ORDER")
+   , java.util.Map.entry("OTHER_OUT", "MANU_ORDER")
             // 2026-09-30:原最后两条 RKD/CKD(采购单(旧)→入库单(旧) / 客户订单(旧)→出库单(旧))
             // 随 RKD/CKD 面板元数据一并删除 —— 这两个纺织遗留面板的 yj_field 按旧列名登记,
             // inh/outh 重建后已永久失效(菜单侧也从未挂载),保留映射只会让「选单」指向不存在的面板。

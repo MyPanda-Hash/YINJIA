@@ -37,6 +37,10 @@ CREATE TABLE dbo.bd_other_in (
     [业务类型id] nvarchar(20) NULL,
     [供应商编码] nvarchar(50) NULL,
     [供应商] nvarchar(100) NULL,
+    [部门] nvarchar(50) NULL,
+    [部门编码] nvarchar(50) NULL,
+    [经手人] nvarchar(50) NULL,
+    [经手人编码] nvarchar(50) NULL,
     [备注] nvarchar(500) NULL,
     [创建人] nvarchar(50) NULL,
     [创建时间] nvarchar(30) NULL,
@@ -106,6 +110,10 @@ IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型编码') IS NULL ALTER TABLE dbo
 IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型id') IS NULL ALTER TABLE dbo.bd_other_in ADD [业务类型id] nvarchar(20) NULL;
 IF COL_LENGTH(N'dbo.bd_other_in', N'供应商编码') IS NULL ALTER TABLE dbo.bd_other_in ADD [供应商编码] nvarchar(50) NULL;
 IF COL_LENGTH(N'dbo.bd_other_in', N'供应商') IS NULL ALTER TABLE dbo.bd_other_in ADD [供应商] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'部门') IS NULL ALTER TABLE dbo.bd_other_in ADD [部门] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'部门编码') IS NULL ALTER TABLE dbo.bd_other_in ADD [部门编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'经手人') IS NULL ALTER TABLE dbo.bd_other_in ADD [经手人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'经手人编码') IS NULL ALTER TABLE dbo.bd_other_in ADD [经手人编码] nvarchar(50) NULL;
 IF COL_LENGTH(N'dbo.bd_other_in', N'备注') IS NULL ALTER TABLE dbo.bd_other_in ADD [备注] nvarchar(500) NULL;
 IF COL_LENGTH(N'dbo.bd_other_in', N'创建人') IS NULL ALTER TABLE dbo.bd_other_in ADD [创建人] nvarchar(50) NULL;
 IF COL_LENGTH(N'dbo.bd_other_in', N'创建时间') IS NULL ALTER TABLE dbo.bd_other_in ADD [创建时间] nvarchar(30) NULL;
@@ -388,7 +396,7 @@ IF COL_LENGTH(N'dbo.bd_other_in', N'单据编号') IS NOT NULL AND NOT EXISTS (S
 IF COL_LENGTH(N'dbo.bd_other_in', N'单据状态') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'单据状态', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'单据状态(MES 单据状态快照;面板不登记该字段,界面状态由 yj_doc_status 派生 —— 与采购入库单/产成品入库单/材料出库单同款)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'单据状态';
 IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'业务类型', 'ColumnId') AND ep.name=N'MS_Description')
-    EXEC sp_addextendedproperty N'MS_Description', N'业务类型(金蝶 trans_type_name;其他入库=其他入库 / 其他出库=其他出库)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'业务类型';
+    EXEC sp_addextendedproperty N'MS_Description', N'业务类型(金蝶 trans_type_name;候选 = 其他入库)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'业务类型';
 IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'业务类型编码', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'业务类型编码(金蝶 trans_type_number,如 QTRKLX01/QTCKLX01)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'业务类型编码';
 IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'业务类型id', 'ColumnId') AND ep.name=N'MS_Description')
@@ -397,6 +405,14 @@ IF COL_LENGTH(N'dbo.bd_other_in', N'供应商编码') IS NOT NULL AND NOT EXISTS
     EXEC sp_addextendedproperty N'MS_Description', N'供应商编码(金蝶 supplier_number;其他入库实测 100% 有值)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'供应商编码';
 IF COL_LENGTH(N'dbo.bd_other_in', N'供应商') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'供应商', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'供应商(金蝶 supplier_name)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'供应商';
+IF COL_LENGTH(N'dbo.bd_other_in', N'部门') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'部门', 'ColumnId') AND ep.name=N'MS_Description')
+    EXEC sp_addextendedproperty N'MS_Description', N'部门(金蝶 dept_name;参照部门档案)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'部门';
+IF COL_LENGTH(N'dbo.bd_other_in', N'部门编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'部门编码', 'ColumnId') AND ep.name=N'MS_Description')
+    EXEC sp_addextendedproperty N'MS_Description', N'部门编码(金蝶 dept_number;转ERP 推 dept_number)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'部门编码';
+IF COL_LENGTH(N'dbo.bd_other_in', N'经手人') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'经手人', 'ColumnId') AND ep.name=N'MS_Description')
+    EXEC sp_addextendedproperty N'MS_Description', N'经手人(金蝶 emp_name)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'经手人';
+IF COL_LENGTH(N'dbo.bd_other_in', N'经手人编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'经手人编码', 'ColumnId') AND ep.name=N'MS_Description')
+    EXEC sp_addextendedproperty N'MS_Description', N'经手人编码(金蝶 emp_number;转ERP 推 emp_number)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'经手人编码';
 IF COL_LENGTH(N'dbo.bd_other_in', N'备注') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'备注', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'备注(金蝶 remark)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'备注';
 IF COL_LENGTH(N'dbo.bd_other_in', N'创建人') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'创建人', 'ColumnId') AND ep.name=N'MS_Description')
@@ -434,13 +450,13 @@ IF COL_LENGTH(N'dbo.bd_other_in', N'金蝶审核时间') IS NOT NULL AND NOT EXI
 IF COL_LENGTH(N'dbo.bl_other_in', N'序号') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'序号', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'序号(金蝶分录 seq)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'序号';
 IF COL_LENGTH(N'dbo.bl_other_in', N'存货编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'存货编码', 'ColumnId') AND ep.name=N'MS_Description')
-    EXEC sp_addextendedproperty N'MS_Description', N'存货编码(金蝶 material_number)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'存货编码';
+    EXEC sp_addextendedproperty N'MS_Description', N'存货编码(金蝶 material_number;参照商品档案)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'存货编码';
 IF COL_LENGTH(N'dbo.bl_other_in', N'存货名称') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'存货名称', 'ColumnId') AND ep.name=N'MS_Description')
-    EXEC sp_addextendedproperty N'MS_Description', N'存货名称(金蝶 material_name)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'存货名称';
+    EXEC sp_addextendedproperty N'MS_Description', N'存货名称(金蝶 material_name;参照商品档案)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'存货名称';
 IF COL_LENGTH(N'dbo.bl_other_in', N'规格型号') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'规格型号', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'规格型号(金蝶 material_model)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'规格型号';
 IF COL_LENGTH(N'dbo.bl_other_in', N'仓库') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'仓库', 'ColumnId') AND ep.name=N'MS_Description')
-    EXEC sp_addextendedproperty N'MS_Description', N'仓库(名称,金蝶 stock_name)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'仓库';
+    EXEC sp_addextendedproperty N'MS_Description', N'仓库(金蝶 stock_name;参照仓库档案)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'仓库';
 IF COL_LENGTH(N'dbo.bl_other_in', N'仓库编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'仓库编码', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'仓库编码(金蝶 stock_number;转ERP 按它解析 stock_id)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'仓库编码';
 IF COL_LENGTH(N'dbo.bl_other_in', N'计量单位') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'计量单位', 'ColumnId') AND ep.name=N'MS_Description')
@@ -524,13 +540,13 @@ IF COL_LENGTH(N'dbo.bd_other_out', N'单据编号') IS NOT NULL AND NOT EXISTS (
 IF COL_LENGTH(N'dbo.bd_other_out', N'单据状态') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'单据状态', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'单据状态(MES 单据状态快照;面板不登记该字段,界面状态由 yj_doc_status 派生 —— 与采购入库单/产成品入库单/材料出库单同款)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'单据状态';
 IF COL_LENGTH(N'dbo.bd_other_out', N'业务类型') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'业务类型', 'ColumnId') AND ep.name=N'MS_Description')
-    EXEC sp_addextendedproperty N'MS_Description', N'业务类型(金蝶 trans_type_name;其他入库=其他入库 / 其他出库=其他出库)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'业务类型';
+    EXEC sp_addextendedproperty N'MS_Description', N'业务类型(金蝶 trans_type_name;候选 = 其他出库)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'业务类型';
 IF COL_LENGTH(N'dbo.bd_other_out', N'业务类型编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'业务类型编码', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'业务类型编码(金蝶 trans_type_number,如 QTRKLX01/QTCKLX01)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'业务类型编码';
 IF COL_LENGTH(N'dbo.bd_other_out', N'业务类型id') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'业务类型id', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'业务类型id(金蝶 trans_type_id,保存接口**必需**;无档案接口故按账套配置:真实账套 其他入库=12 / 其他出库=13)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'业务类型id';
 IF COL_LENGTH(N'dbo.bd_other_out', N'部门') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'部门', 'ColumnId') AND ep.name=N'MS_Description')
-    EXEC sp_addextendedproperty N'MS_Description', N'部门(金蝶 dept_name;其他出库实测 97% 有值)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'部门';
+    EXEC sp_addextendedproperty N'MS_Description', N'部门(金蝶 dept_name;其他出库实测 97% 有值;参照部门档案)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'部门';
 IF COL_LENGTH(N'dbo.bd_other_out', N'部门编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'部门编码', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'部门编码(金蝶 dept_number;转ERP 推 dept_number)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'部门编码';
 IF COL_LENGTH(N'dbo.bd_other_out', N'经手人') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'经手人', 'ColumnId') AND ep.name=N'MS_Description')
@@ -574,13 +590,13 @@ IF COL_LENGTH(N'dbo.bd_other_out', N'金蝶审核时间') IS NOT NULL AND NOT EX
 IF COL_LENGTH(N'dbo.bl_other_out', N'序号') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_out'), N'序号', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'序号(金蝶分录 seq)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_out', N'COLUMN', N'序号';
 IF COL_LENGTH(N'dbo.bl_other_out', N'存货编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_out'), N'存货编码', 'ColumnId') AND ep.name=N'MS_Description')
-    EXEC sp_addextendedproperty N'MS_Description', N'存货编码(金蝶 material_number)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_out', N'COLUMN', N'存货编码';
+    EXEC sp_addextendedproperty N'MS_Description', N'存货编码(金蝶 material_number;参照商品档案)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_out', N'COLUMN', N'存货编码';
 IF COL_LENGTH(N'dbo.bl_other_out', N'存货名称') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_out'), N'存货名称', 'ColumnId') AND ep.name=N'MS_Description')
-    EXEC sp_addextendedproperty N'MS_Description', N'存货名称(金蝶 material_name)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_out', N'COLUMN', N'存货名称';
+    EXEC sp_addextendedproperty N'MS_Description', N'存货名称(金蝶 material_name;参照商品档案)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_out', N'COLUMN', N'存货名称';
 IF COL_LENGTH(N'dbo.bl_other_out', N'规格型号') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_out'), N'规格型号', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'规格型号(金蝶 material_model)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_out', N'COLUMN', N'规格型号';
 IF COL_LENGTH(N'dbo.bl_other_out', N'仓库') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_out'), N'仓库', 'ColumnId') AND ep.name=N'MS_Description')
-    EXEC sp_addextendedproperty N'MS_Description', N'仓库(名称,金蝶 stock_name)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_out', N'COLUMN', N'仓库';
+    EXEC sp_addextendedproperty N'MS_Description', N'仓库(金蝶 stock_name;参照仓库档案)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_out', N'COLUMN', N'仓库';
 IF COL_LENGTH(N'dbo.bl_other_out', N'仓库编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_out'), N'仓库编码', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'仓库编码(金蝶 stock_number;转ERP 按它解析 stock_id)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_out', N'COLUMN', N'仓库编码';
 IF COL_LENGTH(N'dbo.bl_other_out', N'计量单位') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_out'), N'计量单位', 'ColumnId') AND ep.name=N'MS_Description')
@@ -711,7 +727,7 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'�
     VALUES ('OTHER_IN', N'单据编号', N'单据编号', N'文本', NULL, NULL, NULL, NULL, N'query,header', 20, 140, 0, 1, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'业务类型')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_IN', N'业务类型', N'业务类型', N'文本', NULL, NULL, NULL, NULL, N'query,header', 30, 120, 0, 1, 0, NULL, 1);
+    VALUES ('OTHER_IN', N'业务类型', N'业务类型', N'下拉框', N'SELECT v FROM (VALUES (N''其他入库'')) AS t(v)', NULL, NULL, NULL, N'query,header', 30, 120, 0, 1, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'业务类型编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_IN', N'业务类型编码', N'业务类型编码', N'文本', NULL, NULL, NULL, NULL, N'header', 32, 120, 0, 0, 0, NULL, 1);
@@ -720,10 +736,22 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'�
     VALUES ('OTHER_IN', N'业务类型id', N'业务类型id', N'文本', NULL, NULL, NULL, NULL, N'header', 34, 90, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'供应商编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_IN', N'供应商编码', N'供应商编码', N'文本', NULL, NULL, NULL, NULL, N'query,header', 50, 140, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_IN', N'供应商编码', N'供应商编码', N'参照', NULL, N'GFDA', N'dm', N'mc', N'query,header', 50, 140, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'供应商')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_IN', N'供应商', N'供应商', N'文本', NULL, NULL, NULL, NULL, N'query,header', 52, 160, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_IN', N'供应商', N'供应商', N'参照', NULL, N'GFDA', N'mc', N'mc', N'query,header', 52, 160, 1, 0, 0, NULL, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'部门')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
+    VALUES ('OTHER_IN', N'部门', N'部门', N'参照', NULL, N'DEPT', N'部门名称', N'部门名称', N'header', 54, 130, 1, 0, 0, NULL, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'部门编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
+    VALUES ('OTHER_IN', N'部门编码', N'部门编码', N'参照', NULL, N'DEPT', N'部门编码', N'部门名称', N'header', 56, 110, 1, 0, 0, NULL, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'经手人')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
+    VALUES ('OTHER_IN', N'经手人', N'经手人', N'参照', NULL, N'EMP', N'员工名称', N'员工名称', N'header', 58, 130, 1, 0, 0, NULL, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'经手人编码')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
+    VALUES ('OTHER_IN', N'经手人编码', N'经手人编码', N'文本', NULL, NULL, NULL, NULL, N'header', 59, 110, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'备注')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_IN', N'备注', N'备注', N'文本', NULL, NULL, NULL, NULL, N'header', 900, 200, 1, 0, 0, NULL, 1);
@@ -781,22 +809,22 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'�
     VALUES ('OTHER_IN', N'序号', N'序号', N'整数', NULL, NULL, NULL, NULL, N'detail', 5, 60, 0, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'存货编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_IN', N'存货编码', N'存货编码', N'文本', NULL, NULL, NULL, NULL, N'query,detail', 10, 120, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_IN', N'存货编码', N'存货编码', N'参照', NULL, N'INV', N'存货编码', N'存货名称', N'query,detail', 10, 120, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'存货名称')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_IN', N'存货名称', N'存货名称', N'文本', NULL, NULL, NULL, NULL, N'detail', 20, 160, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_IN', N'存货名称', N'存货名称', N'参照', NULL, N'INV', N'存货名称', N'存货名称', N'detail', 20, 160, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'规格型号')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_IN', N'规格型号', N'规格型号', N'文本', NULL, NULL, NULL, NULL, N'detail', 30, 140, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'仓库')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_IN', N'仓库', N'仓库', N'文本', NULL, NULL, NULL, NULL, N'query,detail', 40, 110, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_IN', N'仓库', N'仓库', N'参照', NULL, N'WH', N'仓库名称', N'仓库名称', N'query,detail', 40, 110, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'仓库编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_IN', N'仓库编码', N'仓库编码', N'文本', NULL, NULL, NULL, NULL, N'query,detail', 42, 100, 1, 0, 1, NULL, 0);
+    VALUES ('OTHER_IN', N'仓库编码', N'仓库编码', N'参照', NULL, N'WH', N'仓库编码', N'仓库名称', N'query,detail', 42, 100, 1, 0, 1, NULL, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'计量单位')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_IN', N'计量单位', N'计量单位', N'文本', NULL, NULL, NULL, NULL, N'detail', 60, 100, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_IN', N'计量单位', N'计量单位', N'下拉框', N'SELECT v FROM (VALUES (N''件''),(N''kg''),(N''套''),(N''升'')) AS t(v)', NULL, NULL, NULL, N'detail', 60, 100, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'基本单位名称')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_IN', N'基本单位名称', N'基本单位名称', N'文本', NULL, NULL, NULL, NULL, N'detail', 62, 100, 0, 0, 0, NULL, 1);
@@ -854,6 +882,19 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'�
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'存货图片')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_IN', N'存货图片', N'存货图片', N'文本', NULL, NULL, NULL, NULL, N'detail', 104, 200, 0, 0, 0, NULL, 1);
+GO
+-- ⑤b 既有字段口径对齐(OTHER_IN:文本 → 参照/下拉,口径照抄采购入库单/销售出库单)
+UPDATE yj_field SET data_type = N'下拉框', dict_sql = N'SELECT v FROM (VALUES (N''其他入库'')) AS t(v)', ref_panel = NULL, ref_field = NULL, display_field = NULL, place = N'query,header', seq = 30, width = 120, editable = 0, required = 1, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_IN' AND label = N'业务类型' AND (data_type <> N'下拉框' OR ISNULL(ref_panel,'') <> '' OR ISNULL(dict_sql,'') <> N'SELECT v FROM (VALUES (N''其他入库'')) AS t(v)');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'GFDA', ref_field = N'dm', display_field = N'mc', place = N'query,header', seq = 50, width = 140, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_IN' AND label = N'供应商编码' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'GFDA' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'GFDA', ref_field = N'mc', display_field = N'mc', place = N'query,header', seq = 52, width = 160, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_IN' AND label = N'供应商' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'GFDA' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'DEPT', ref_field = N'部门名称', display_field = N'部门名称', place = N'header', seq = 54, width = 130, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_IN' AND label = N'部门' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'DEPT' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'DEPT', ref_field = N'部门编码', display_field = N'部门名称', place = N'header', seq = 56, width = 110, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_IN' AND label = N'部门编码' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'DEPT' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'EMP', ref_field = N'员工名称', display_field = N'员工名称', place = N'header', seq = 58, width = 130, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_IN' AND label = N'经手人' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'EMP' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'INV', ref_field = N'存货编码', display_field = N'存货名称', place = N'query,detail', seq = 10, width = 120, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_IN' AND label = N'存货编码' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'INV' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'INV', ref_field = N'存货名称', display_field = N'存货名称', place = N'detail', seq = 20, width = 160, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_IN' AND label = N'存货名称' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'INV' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'WH', ref_field = N'仓库名称', display_field = N'仓库名称', place = N'query,detail', seq = 40, width = 110, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_IN' AND label = N'仓库' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'WH' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'WH', ref_field = N'仓库编码', display_field = N'仓库名称', place = N'query,detail', seq = 42, width = 100, editable = 1, required = 0, hidden = 1, visible = 0 WHERE panel_code = 'OTHER_IN' AND label = N'仓库编码' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'WH' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'下拉框', dict_sql = N'SELECT v FROM (VALUES (N''件''),(N''kg''),(N''套''),(N''升'')) AS t(v)', ref_panel = NULL, ref_field = NULL, display_field = NULL, place = N'detail', seq = 60, width = 100, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_IN' AND label = N'计量单位' AND (data_type <> N'下拉框' OR ISNULL(ref_panel,'') <> '' OR ISNULL(dict_sql,'') <> N'SELECT v FROM (VALUES (N''件''),(N''kg''),(N''套''),(N''升'')) AS t(v)');
 GO
 -- ⑤ 字段登记(OTHER_IN_DETAIL 21 列)
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN_DETAIL' AND label=N'单据日期')
@@ -973,7 +1014,7 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'�
     VALUES ('OTHER_OUT', N'单据编号', N'单据编号', N'文本', NULL, NULL, NULL, NULL, N'query,header', 20, 140, 0, 1, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'业务类型')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_OUT', N'业务类型', N'业务类型', N'文本', NULL, NULL, NULL, NULL, N'query,header', 30, 120, 0, 1, 0, NULL, 1);
+    VALUES ('OTHER_OUT', N'业务类型', N'业务类型', N'下拉框', N'SELECT v FROM (VALUES (N''其他出库'')) AS t(v)', NULL, NULL, NULL, N'query,header', 30, 120, 0, 1, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'业务类型编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_OUT', N'业务类型编码', N'业务类型编码', N'文本', NULL, NULL, NULL, NULL, N'header', 32, 120, 0, 0, 0, NULL, 1);
@@ -982,13 +1023,13 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'�
     VALUES ('OTHER_OUT', N'业务类型id', N'业务类型id', N'文本', NULL, NULL, NULL, NULL, N'header', 34, 90, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'部门')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_OUT', N'部门', N'部门', N'文本', NULL, NULL, NULL, NULL, N'query,header', 50, 130, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_OUT', N'部门', N'部门', N'参照', NULL, N'DEPT', N'部门名称', N'部门名称', N'query,header', 50, 130, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'部门编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_OUT', N'部门编码', N'部门编码', N'文本', NULL, NULL, NULL, NULL, N'header', 52, 110, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_OUT', N'部门编码', N'部门编码', N'参照', NULL, N'DEPT', N'部门编码', N'部门名称', N'header', 52, 110, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'经手人')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_OUT', N'经手人', N'经手人', N'文本', NULL, NULL, NULL, NULL, N'query,header', 54, 130, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_OUT', N'经手人', N'经手人', N'参照', NULL, N'EMP', N'员工名称', N'员工名称', N'query,header', 54, 130, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'经手人编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_OUT', N'经手人编码', N'经手人编码', N'文本', NULL, NULL, NULL, NULL, N'header', 56, 110, 1, 0, 0, NULL, 1);
@@ -1049,22 +1090,22 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'�
     VALUES ('OTHER_OUT', N'序号', N'序号', N'整数', NULL, NULL, NULL, NULL, N'detail', 5, 60, 0, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'存货编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_OUT', N'存货编码', N'存货编码', N'文本', NULL, NULL, NULL, NULL, N'query,detail', 10, 120, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_OUT', N'存货编码', N'存货编码', N'参照', NULL, N'INV', N'存货编码', N'存货名称', N'query,detail', 10, 120, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'存货名称')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_OUT', N'存货名称', N'存货名称', N'文本', NULL, NULL, NULL, NULL, N'detail', 20, 160, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_OUT', N'存货名称', N'存货名称', N'参照', NULL, N'INV', N'存货名称', N'存货名称', N'detail', 20, 160, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'规格型号')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_OUT', N'规格型号', N'规格型号', N'文本', NULL, NULL, NULL, NULL, N'detail', 30, 140, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'仓库')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_OUT', N'仓库', N'仓库', N'文本', NULL, NULL, NULL, NULL, N'query,detail', 40, 110, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_OUT', N'仓库', N'仓库', N'参照', NULL, N'WH', N'仓库名称', N'仓库名称', N'query,detail', 40, 110, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'仓库编码')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_OUT', N'仓库编码', N'仓库编码', N'文本', NULL, NULL, NULL, NULL, N'query,detail', 42, 100, 1, 0, 1, NULL, 0);
+    VALUES ('OTHER_OUT', N'仓库编码', N'仓库编码', N'参照', NULL, N'WH', N'仓库编码', N'仓库名称', N'query,detail', 42, 100, 1, 0, 1, NULL, 0);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'计量单位')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
-    VALUES ('OTHER_OUT', N'计量单位', N'计量单位', N'文本', NULL, NULL, NULL, NULL, N'detail', 60, 100, 1, 0, 0, NULL, 1);
+    VALUES ('OTHER_OUT', N'计量单位', N'计量单位', N'下拉框', N'SELECT v FROM (VALUES (N''件''),(N''kg''),(N''套''),(N''升'')) AS t(v)', NULL, NULL, NULL, N'detail', 60, 100, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'基本单位名称')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_OUT', N'基本单位名称', N'基本单位名称', N'文本', NULL, NULL, NULL, NULL, N'detail', 62, 100, 0, 0, 0, NULL, 1);
@@ -1113,6 +1154,17 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'�
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT' AND label=N'批号')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_OUT', N'批号', N'批号', N'文本', NULL, NULL, NULL, NULL, N'query,detail', 100, 120, 1, 0, 0, NULL, 1);
+GO
+-- ⑤b 既有字段口径对齐(OTHER_OUT:文本 → 参照/下拉,口径照抄采购入库单/销售出库单)
+UPDATE yj_field SET data_type = N'下拉框', dict_sql = N'SELECT v FROM (VALUES (N''其他出库'')) AS t(v)', ref_panel = NULL, ref_field = NULL, display_field = NULL, place = N'query,header', seq = 30, width = 120, editable = 0, required = 1, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_OUT' AND label = N'业务类型' AND (data_type <> N'下拉框' OR ISNULL(ref_panel,'') <> '' OR ISNULL(dict_sql,'') <> N'SELECT v FROM (VALUES (N''其他出库'')) AS t(v)');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'DEPT', ref_field = N'部门名称', display_field = N'部门名称', place = N'query,header', seq = 50, width = 130, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_OUT' AND label = N'部门' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'DEPT' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'DEPT', ref_field = N'部门编码', display_field = N'部门名称', place = N'header', seq = 52, width = 110, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_OUT' AND label = N'部门编码' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'DEPT' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'EMP', ref_field = N'员工名称', display_field = N'员工名称', place = N'query,header', seq = 54, width = 130, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_OUT' AND label = N'经手人' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'EMP' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'INV', ref_field = N'存货编码', display_field = N'存货名称', place = N'query,detail', seq = 10, width = 120, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_OUT' AND label = N'存货编码' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'INV' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'INV', ref_field = N'存货名称', display_field = N'存货名称', place = N'detail', seq = 20, width = 160, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_OUT' AND label = N'存货名称' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'INV' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'WH', ref_field = N'仓库名称', display_field = N'仓库名称', place = N'query,detail', seq = 40, width = 110, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_OUT' AND label = N'仓库' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'WH' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'参照', dict_sql = NULL, ref_panel = N'WH', ref_field = N'仓库编码', display_field = N'仓库名称', place = N'query,detail', seq = 42, width = 100, editable = 1, required = 0, hidden = 1, visible = 0 WHERE panel_code = 'OTHER_OUT' AND label = N'仓库编码' AND (data_type <> N'参照' OR ISNULL(ref_panel,'') <> N'WH' OR ISNULL(dict_sql,'') <> '');
+UPDATE yj_field SET data_type = N'下拉框', dict_sql = N'SELECT v FROM (VALUES (N''件''),(N''kg''),(N''套''),(N''升'')) AS t(v)', ref_panel = NULL, ref_field = NULL, display_field = NULL, place = N'detail', seq = 60, width = 100, editable = 1, required = 0, hidden = 0, visible = 1 WHERE panel_code = 'OTHER_OUT' AND label = N'计量单位' AND (data_type <> N'下拉框' OR ISNULL(ref_panel,'') <> '' OR ISNULL(dict_sql,'') <> N'SELECT v FROM (VALUES (N''件''),(N''kg''),(N''套''),(N''升'')) AS t(v)');
 GO
 -- ⑤ 字段登记(OTHER_OUT_DETAIL 22 列)
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_OUT_DETAIL' AND label=N'单据日期')
@@ -1405,7 +1457,7 @@ IF OBJECT_ID(N'dbo.v_other_in_stats', N'V') IS NULL SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='OTHER_IN') SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='OTHER_IN_DETAIL') SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='OTHER_IN_STATS') SET @bad = @bad + 1;
-IF (SELECT COUNT(*) FROM yj_field WHERE panel_code='OTHER_IN') < 50 SET @bad = @bad + 1;
+IF (SELECT COUNT(*) FROM yj_field WHERE panel_code='OTHER_IN') < 54 SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='panel' AND ref_key=N'其他入库单' AND locale='en') SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_role_panel WHERE panel_code='OTHER_IN' AND role_id=1) SET @bad = @bad + 1;
 IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型id') IS NULL SET @bad = @bad + 1;

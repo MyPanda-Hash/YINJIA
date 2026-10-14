@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 生成器(2026-10-14)Phase 2:重建「其他入库单 / 其他出库单」三件套(单据 + 明细表 + 统计表)。
  *
  * 背景:MES 的 OTHER_IN / OTHER_OUT(含 _DETAIL / _STATS 共 6 个面板)与 10 张物理表、
@@ -26,14 +26,17 @@
  */
 import { writeFileSync } from 'node:fs'
 
-const HEAD_SIDE = (role) => [
-  // [列名, 类型, 中文注明, 字段类型, place, seq, width, editable, required, hidden, visible]
+const HEAD_SIDE = (bizName) => [
+  // [列名, 类型, 中文注明, 字段类型, place, seq, width, editable, required, hidden, visible, 取数口径?]
+  // 取数口径(第 12 项)= { dict } 下拉候选 / { ref, refField, disp } 参照源 —— 口径照抄参照面板
+  //   (采购入库单/销售出库单/产成品入库单):用户 2026-10-14 反馈「其他出库和入库没有下拉数据下来」。
   ['单据日期', 'date', '单据日期(金蝶 bill_date)', '日期', 'query,header', 10, 140, 0, 1, 0, 1],
   ['单据编号', 'nvarchar(50)', '单据编号(MES 单号;金蝶侧单号存 外部单据号)', '文本', 'query,header', 20, 140, 0, 1, 0, 1],
   // 单据状态:物理列有(与 bd_purchase_in/bd_finish_in/bd_material_out 同款),但**不登记为面板字段**
   // —— 参照面板都不登记它,界面状态由 yj_doc_status 派生(见 NO_FIELD)
   ['单据状态', 'nvarchar(20)', '单据状态(MES 单据状态快照;面板不登记该字段,界面状态由 yj_doc_status 派生 —— 与采购入库单/产成品入库单/材料出库单同款)', '文本', 'header', 22, 100, 0, 0, 1, 0],
-  ['业务类型', 'nvarchar(50)', '业务类型(金蝶 trans_type_name;其他入库=其他入库 / 其他出库=其他出库)', '文本', 'query,header', 30, 120, 0, 1, 0, 1],
+  // 业务类型:下拉框(候选 = 金蝶业务类型名;口径同产成品入库单的「业务类型」下拉)
+  ['业务类型', 'nvarchar(50)', `业务类型(金蝶 trans_type_name;候选 = ${bizName})`, '下拉框', 'query,header', 30, 120, 0, 1, 0, 1, { dict: `SELECT v FROM (VALUES (N'${bizName}')) AS t(v)` }],
   ['业务类型编码', 'nvarchar(50)', '业务类型编码(金蝶 trans_type_number,如 QTRKLX01/QTCKLX01)', '文本', 'header', 32, 120, 0, 0, 0, 1],
   ['业务类型id', 'nvarchar(20)', '业务类型id(金蝶 trans_type_id,保存接口**必需**;无档案接口故按账套配置:真实账套 其他入库=12 / 其他出库=13)', '文本', 'header', 34, 90, 1, 0, 0, 1],
 ]
@@ -60,12 +63,15 @@ const COMMON_HEAD_TAIL = [
 
 const LINE_COLS = [
   ['序号', 'int', '序号(金蝶分录 seq)', '整数', 'detail', 5, 60, 0, 0, 0, 1],
-  ['存货编码', 'nvarchar(50)', '存货编码(金蝶 material_number)', '文本', 'query,detail', 10, 120, 1, 0, 0, 1],
-  ['存货名称', 'nvarchar(100)', '存货名称(金蝶 material_name)', '文本', 'detail', 20, 160, 1, 0, 0, 1],
+  // 存货:参照 商品档案 INV(口径照抄采购入库单:编码 ref=存货编码/disp=存货名称,名称 ref=存货名称)
+  ['存货编码', 'nvarchar(50)', '存货编码(金蝶 material_number;参照商品档案)', '参照', 'query,detail', 10, 120, 1, 0, 0, 1, { ref: 'INV', refField: '存货编码', disp: '存货名称' }],
+  ['存货名称', 'nvarchar(100)', '存货名称(金蝶 material_name;参照商品档案)', '参照', 'detail', 20, 160, 1, 0, 0, 1, { ref: 'INV', refField: '存货名称', disp: '存货名称' }],
   ['规格型号', 'nvarchar(100)', '规格型号(金蝶 material_model)', '文本', 'detail', 30, 140, 1, 0, 0, 1],
-  ['仓库', 'nvarchar(50)', '仓库(名称,金蝶 stock_name)', '文本', 'query,detail', 40, 110, 1, 0, 0, 1],
-  ['仓库编码', 'nvarchar(50)', '仓库编码(金蝶 stock_number;转ERP 按它解析 stock_id)', '文本', 'query,detail', 42, 100, 1, 0, 1, 0],
-  ['计量单位', 'nvarchar(20)', '计量单位(金蝶 unit_name)', '文本', 'detail', 60, 100, 1, 0, 0, 1],
+  // 仓库:参照 仓库档案 WH(口径照抄采购入库单:名称 ref=仓库名称,编码 ref=仓库编码/disp=仓库名称)
+  ['仓库', 'nvarchar(50)', '仓库(金蝶 stock_name;参照仓库档案)', '参照', 'query,detail', 40, 110, 1, 0, 0, 1, { ref: 'WH', refField: '仓库名称', disp: '仓库名称' }],
+  ['仓库编码', 'nvarchar(50)', '仓库编码(金蝶 stock_number;转ERP 按它解析 stock_id)', '参照', 'query,detail', 42, 100, 1, 0, 1, 0, { ref: 'WH', refField: '仓库编码', disp: '仓库名称' }],
+  // 计量单位:下拉框(候选口径与采购入库单/产成品入库单一致)
+  ['计量单位', 'nvarchar(20)', '计量单位(金蝶 unit_name)', '下拉框', 'detail', 60, 100, 1, 0, 0, 1, { dict: "SELECT v FROM (VALUES (N'件'),(N'kg'),(N'套'),(N'升')) AS t(v)" }],
   ['基本单位名称', 'nvarchar(50)', '基本单位名称(金蝶 base_unit_name)', '文本', 'detail', 62, 100, 0, 0, 0, 1],
   ['基本单位编码', 'nvarchar(50)', '基本单位编码(金蝶 base_unit_number)', '文本', 'detail', 63, 100, 0, 0, 1, 0],
   ['基本单位id', 'nvarchar(50)', '基本单位id(金蝶 base_unit_id)', '文本', 'detail', 64, 100, 0, 0, 1, 0],
@@ -96,13 +102,20 @@ const OUT_ONLY_LINE = [
   ['批号', 'nvarchar(50)', '批号(金蝶 batch_no;其他出库实测 93% 行有值)', '文本', 'query,detail', 100, 120, 1, 0, 0, 1],
 ]
 const IN_ONLY_HEAD = [
-  ['供应商编码', 'nvarchar(50)', '供应商编码(金蝶 supplier_number;其他入库实测 100% 有值)', '文本', 'query,header', 50, 140, 1, 0, 0, 1],
-  ['供应商', 'nvarchar(100)', '供应商(金蝶 supplier_name)', '文本', 'query,header', 52, 160, 1, 0, 0, 1],
+  // 供应商:参照 供应商档案 GFDA(口径照抄采购入库单:编码 ref=dm/disp=mc,名称 ref=mc/disp=mc)
+  ['供应商编码', 'nvarchar(50)', '供应商编码(金蝶 supplier_number;其他入库实测 100% 有值)', '参照', 'query,header', 50, 140, 1, 0, 0, 1, { ref: 'GFDA', refField: 'dm', disp: 'mc' }],
+  ['供应商', 'nvarchar(100)', '供应商(金蝶 supplier_name)', '参照', 'query,header', 52, 160, 1, 0, 0, 1, { ref: 'GFDA', refField: 'mc', disp: 'mc' }],
+  // 部门/经手人:金蝶 inv_other_in 有这两个键族(实测非空率 0%),但**面板口径与产成品入库单对齐**要有
+  // (用户 2026-10-14:「没有将面板的全部实现与产成品入库对齐」)⇒ 建列并登记为参照;拉取有值即落。
+  ['部门', 'nvarchar(50)', '部门(金蝶 dept_name;参照部门档案)', '参照', 'header', 54, 130, 1, 0, 0, 1, { ref: 'DEPT', refField: '部门名称', disp: '部门名称' }],
+  ['部门编码', 'nvarchar(50)', '部门编码(金蝶 dept_number;转ERP 推 dept_number)', '参照', 'header', 56, 110, 1, 0, 0, 1, { ref: 'DEPT', refField: '部门编码', disp: '部门名称' }],
+  ['经手人', 'nvarchar(50)', '经手人(金蝶 emp_name)', '参照', 'header', 58, 130, 1, 0, 0, 1, { ref: 'EMP', refField: '员工名称', disp: '员工名称' }],
+  ['经手人编码', 'nvarchar(50)', '经手人编码(金蝶 emp_number;转ERP 推 emp_number)', '文本', 'header', 59, 110, 1, 0, 0, 1],
 ]
 const OUT_ONLY_HEAD = [
-  ['部门', 'nvarchar(50)', '部门(金蝶 dept_name;其他出库实测 97% 有值)', '文本', 'query,header', 50, 130, 1, 0, 0, 1],
-  ['部门编码', 'nvarchar(50)', '部门编码(金蝶 dept_number;转ERP 推 dept_number)', '文本', 'header', 52, 110, 1, 0, 0, 1],
-  ['经手人', 'nvarchar(50)', '经手人(金蝶 emp_name;其他出库实测 97% 有值)', '文本', 'query,header', 54, 130, 1, 0, 0, 1],
+  ['部门', 'nvarchar(50)', '部门(金蝶 dept_name;其他出库实测 97% 有值;参照部门档案)', '参照', 'query,header', 50, 130, 1, 0, 0, 1, { ref: 'DEPT', refField: '部门名称', disp: '部门名称' }],
+  ['部门编码', 'nvarchar(50)', '部门编码(金蝶 dept_number;转ERP 推 dept_number)', '参照', 'header', 52, 110, 1, 0, 0, 1, { ref: 'DEPT', refField: '部门编码', disp: '部门名称' }],
+  ['经手人', 'nvarchar(50)', '经手人(金蝶 emp_name;其他出库实测 97% 有值)', '参照', 'query,header', 54, 130, 1, 0, 0, 1, { ref: 'EMP', refField: '员工名称', disp: '员工名称' }],
   ['经手人编码', 'nvarchar(50)', '经手人编码(金蝶 emp_number;转ERP 推 emp_number)', '文本', 'header', 56, 110, 1, 0, 0, 1],
 ]
 
@@ -112,7 +125,7 @@ const SPEC = {
     panel: 'OTHER_IN', panelName: '其他入库单', panelNameEn: 'Other inbound delivery notes',
     head: 'bd_other_in', line: 'bl_other_in', prefix: 'OI', kdApi: 'inv_other_in',
     kdLabel: '其他入库单', transTypeId: '12', transTypeNumber: 'QTRKLX01', transTypeName: '其他入库',
-    headCols: [...HEAD_SIDE(), ...IN_ONLY_HEAD, ...COMMON_HEAD_TAIL],
+    headCols: [...HEAD_SIDE('其他入库'), ...IN_ONLY_HEAD, ...COMMON_HEAD_TAIL],
     lineCols: [...LINE_COLS, ...IN_ONLY_LINE],
     // 明细/统计视图(列名对照 v_purchase_in_detail / v_purchase_in_stats)
     detailView: [
@@ -140,7 +153,7 @@ SPEC.OTHER_OUT = {
   panel: 'OTHER_OUT', panelName: '其他出库单', panelNameEn: 'Other delivery notes',
   head: 'bd_other_out', line: 'bl_other_out', prefix: 'OO', kdApi: 'inv_other_out',
   kdLabel: '其他出库单', transTypeId: '13', transTypeNumber: 'QTCKLX01', transTypeName: '其他出库',
-  headCols: [...HEAD_SIDE(), ...OUT_ONLY_HEAD, ...COMMON_HEAD_TAIL],
+  headCols: [...HEAD_SIDE('其他出库'), ...OUT_ONLY_HEAD, ...COMMON_HEAD_TAIL],
   lineCols: [...LINE_COLS, ...OUT_ONLY_LINE],
   detailView: SPEC.OTHER_IN.detailView.map((x) => x.replace('h.[供应商编码]', 'h.[部门编码]').replace('h.[供应商]', 'h.[部门]')).slice(0, 9)
     .concat(['h.[经手人]'])
@@ -310,19 +323,47 @@ function build() {
   }
 
   // ⑤ 字段登记
+  /** 取数口径(第 12 项):{dict} 下拉候选 / {ref,refField,disp} 参照源 —— 直接落进 yj_field 的四列 */
+  const wiring = (t) => {
+    const w = t[11] || {}
+    return {
+      dict: w.dict ? q(w.dict) : 'NULL',
+      ref: w.ref ? q(w.ref) : 'NULL',
+      refField: w.refField ? q(w.refField) : 'NULL',
+      disp: w.disp ? q(w.disp) : 'NULL',
+    }
+  }
   for (const s of Object.values(SPEC)) {
     P(`-- ⑤ 字段登记(${s.panel} 表头 + 明细)`)
-    for (const [name, , , dt, place, seq, width, editable, required, hidden, visible] of s.headCols) {
+    for (const t of s.headCols) {
+      const [name, , , dt, place, seq, width, editable, required, hidden, visible] = t
       if (NO_FIELD.has(name)) continue
+      const w = wiring(t)
       P(`IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='${s.panel}' AND label=${q(name)})`)
       P(`    INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)`)
-      P(`    VALUES ('${s.panel}', ${q(name)}, ${q(name)}, ${q(dt)}, NULL, NULL, NULL, NULL, ${q(place)}, ${seq}, ${width}, ${editable}, ${required}, ${hidden}, NULL, ${visible});`)
+      P(`    VALUES ('${s.panel}', ${q(name)}, ${q(name)}, ${q(dt)}, ${w.dict}, ${w.ref}, ${w.refField}, ${w.disp}, ${q(place)}, ${seq}, ${width}, ${editable}, ${required}, ${hidden}, NULL, ${visible});`)
     }
     P('GO')
-    for (const [name, , , dt, place, seq, width, editable, required, hidden, visible] of s.lineCols) {
+    for (const t of s.lineCols) {
+      const [name, , , dt, place, seq, width, editable, required, hidden, visible] = t
+      const w = wiring(t)
       P(`IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='${s.panel}' AND label=${q(name)})`)
       P(`    INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)`)
-      P(`    VALUES ('${s.panel}', ${q(name)}, ${q(name)}, ${q(dt)}, NULL, NULL, NULL, NULL, ${q(place)}, ${seq}, ${width}, ${editable}, ${required}, ${hidden}, NULL, ${visible});`)
+      P(`    VALUES ('${s.panel}', ${q(name)}, ${q(name)}, ${q(dt)}, ${w.dict}, ${w.ref}, ${w.refField}, ${w.disp}, ${q(place)}, ${seq}, ${width}, ${editable}, ${required}, ${hidden}, NULL, ${visible});`)
+    }
+    P('GO')
+    // ⑤b 对齐既有登记(2026-10-14 用户反馈「没有下拉数据下来」):早先这批字段是按**纯文本**登记的,
+    //   生成器的 INSERT 有 NOT EXISTS 守卫 ⇒ 不会再改既有行。故这里逐字段 UPDATE 成参照/下拉口径
+    //   (窄条件:同面板 + 同标签 + 当前类型不符才改),并同步 place/seq/宽/可编辑 —— 与参照面板一致。
+    P(`-- ⑤b 既有字段口径对齐(${s.panel}:文本 → 参照/下拉,口径照抄采购入库单/销售出库单)`)
+    for (const t of [...s.headCols, ...s.lineCols]) {
+      const [name, , , dt, place, seq, width, editable, required, hidden, visible] = t
+      if (NO_FIELD.has(name)) continue
+      const w = wiring(t)
+      if (w.dict === 'NULL' && w.ref === 'NULL') continue
+      P(`UPDATE yj_field SET data_type = ${q(dt)}, dict_sql = ${w.dict}, ref_panel = ${w.ref}, ref_field = ${w.refField}, display_field = ${w.disp},`
+        + ` place = ${q(place)}, seq = ${seq}, width = ${width}, editable = ${editable}, required = ${required}, hidden = ${hidden}, visible = ${visible}`
+        + ` WHERE panel_code = '${s.panel}' AND label = ${q(name)} AND (data_type <> ${q(dt)} OR ISNULL(ref_panel,'') <> ${w.ref === 'NULL' ? "''" : w.ref} OR ISNULL(dict_sql,'') <> ${w.dict === 'NULL' ? "''" : w.dict});`)
     }
     P('GO')
     // 明细/统计面板字段(视图列)
@@ -403,3 +444,4 @@ const sql = build()
 writeFileSync(new URL('../migrate-other-docs-rebuild-20261014.sql', import.meta.url), sql, 'utf8')
 console.log(`生成 tools/migrate-other-docs-rebuild-20261014.sql (${sql.split('\n').length} 行)`)
 for (const s of Object.values(SPEC)) console.log(`  ${s.panel}: 表头 ${s.headCols.length} 列 / 明细 ${s.lineCols.length} 列 / 明细视图 ${s.detailView.length} 列 / 统计视图 ${s.statsView.length} 列`)
+
