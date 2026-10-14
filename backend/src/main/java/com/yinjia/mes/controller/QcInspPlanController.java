@@ -4,6 +4,7 @@ import com.yinjia.mes.dto.ApiResult;
 import com.yinjia.mes.service.PanelPermissionService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -142,6 +143,39 @@ public class QcInspPlanController {
         return ApiResult.ok(out);
     }
 
+    /**
+     * **彻底删除方案**(物理删,连同其下检验项目):POST {id}。
+     *
+     * <p>2026-10-15 用户口径:「检验项目需要能实现删除,不能只可增加不可删除」——
+     * 维护弹窗此前只有「停用」(软删,列表里仍留灰行),想清掉建错的方案/项目没有出口。
+     * 本接口与 {@code StdLibController#destroy} 的 🗑「彻底删除」同口径:**物理删,不可恢复**。
+     *
+     * <p>连带删掉该方案下的全部检验项目(方案 1..N 项目,方案编码是唯一的归属键)——
+     * 前端确认框会把「将一并删除 N 个检验项目」说清楚再执行。
+     *
+     * <p>⚠ 不影响已录入单据:检验单的检验项目是**文本快照**(带入明细时只写文本,不存条目 id),
+     * 全库无任何表按 id 引用这两张库表(2026-10-15 全仓核对)。
+     */
+    @PostMapping("/planDestroy")
+    @Transactional
+    public ApiResult<Map<String, Object>> planDestroy(@RequestBody Map<String, Object> body) {
+        requireAnyPanelView();
+        Long id = lng(body.get("id"));
+        if (id == null) return ApiResult.error(400, "id 无效");
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT 方案编码 FROM dbo.bs_qc_plan WHERE id=?", id);
+        if (rows.isEmpty()) return ApiResult.error(404, "检验方案不存在或已删除");
+        String code = str(rows.get(0).get("方案编码"));
+        int items = code.isEmpty() ? 0
+                : jdbc.update("DELETE FROM dbo.bs_qc_item WHERE 方案编码=?", code);
+        int plans = jdbc.update("DELETE FROM dbo.bs_qc_plan WHERE id=?", id);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("deleted", plans);
+        out.put("items", items);
+        out.put("方案编码", code);
+        return ApiResult.ok(out);
+    }
+
     /** 停用方案(软删;可恢复):POST {id} */
     @PostMapping("/planRemove")
     public ApiResult<Map<String, Object>> planRemove(@RequestBody Map<String, Object> body) {
@@ -231,6 +265,30 @@ public class QcInspPlanController {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("id", id);
         out.put("项目编码", code);
+        return ApiResult.ok(out);
+    }
+
+    /**
+     * **彻底删除检验项目**(物理删,不可恢复):POST {id} 或 {ids:[...]}(多选一次删)。
+     *
+     * <p>与「停用」的分工(2026-10-15 用户口径「不能只可增加不可删除」):
+     * <ul>
+     *   <li>停用 = 以后不再使用,但列表里留灰行、可恢复 —— 保留历史/暂缓用;</li>
+     *   <li>删除 = 这条标准**建错了、不要了**,从库里彻底拿掉。</li>
+     * </ul>
+     * 两者都**不动已录入的检验单**(检验单存的是文本快照,不按 id 回查本表)。
+     */
+    @PostMapping("/itemDestroy")
+    public ApiResult<Map<String, Object>> itemDestroy(@RequestBody Map<String, Object> body) {
+        requireAnyPanelView();
+        List<Long> ids = idList(body);
+        if (ids.isEmpty()) return ApiResult.error(400, "请先选中或勾选要删除的检验项目");
+        StringBuilder in = new StringBuilder();
+        for (int i = 0; i < ids.size(); i++) in.append(i == 0 ? "?" : ",?");
+        int n = jdbc.update("DELETE FROM dbo.bs_qc_item WHERE id IN (" + in + ")", ids.toArray());
+        if (n == 0) return ApiResult.error(404, "检验项目不存在或已删除");
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("deleted", n);
         return ApiResult.ok(out);
     }
 
@@ -363,6 +421,24 @@ public class QcInspPlanController {
         String s = String.valueOf(o).trim();
         if (s.isEmpty()) return null;
         try { return Long.valueOf(s); } catch (NumberFormatException e) { return null; }
+    }
+
+    /**
+     * 取 id 集合:{ids:[1,2]} 或 {id:1}(单条)两种都收 ——
+     * 弹窗「删除」既可删当前行(单条),也可删勾选的多行,后端一个入口收口。
+     */
+    private static List<Long> idList(Map<String, Object> body) {
+        List<Long> out = new ArrayList<>();
+        Object ids = body.get("ids");
+        if (ids instanceof List<?> list) {
+            for (Object o : list) {
+                Long v = lng(o);
+                if (v != null && !out.contains(v)) out.add(v);
+            }
+        }
+        Long one = lng(body.get("id"));
+        if (one != null && !out.contains(one)) out.add(one);
+        return out;
     }
 
     private static java.math.BigDecimal dec(Object o) {

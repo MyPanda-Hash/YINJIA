@@ -572,7 +572,11 @@ export default {
     '生成制程检验单失败': 'Failed to create the in-process inspection sheet',
     '工单号 / 产品编码 / 产品名称': 'Work order no. / product code / product name',
     '选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。': 'Pick one production work order line (uniquely identified by work order no. + line no.) to create an in-process inspection sheet draft. Lines that already have a sheet are marked, and picking them again will not create a duplicate.',
-    '上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用标准本身。维护动作不会改动任何已录入的检验单。': 'Top = inspection plans, bottom = the items of the selected plan. Tick items and click "Add to Details" to write them into this sheet (then fill in measured values and judgement as usual); you may also add / edit / disable the standards themselves right in the two tables. Maintenance never touches sheets already entered.',
+'上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用/删除标准本身（停用可恢复，删除不可恢复）。维护动作不会改动任何已录入的检验单。': 'Top = inspection plans, bottom = the items of the selected plan. Tick items and click "Add to Details" to write them into this sheet (then fill in measured values and judgement as usual); you may also add / edit / disable / delete the standards themselves right in the two tables (disable is reversible, delete is not). Maintenance never touches sheets already entered.',
+    // ---- 检验项目/方案「彻底删除」(2026-10-15 用户口径「不能只可增加不可删除」)----
+    '彻底删除该检验项目？不可恢复，已录入的检验单不受影响。': 'Delete this inspection item permanently? This cannot be undone. Saved inspection sheets are unaffected.',
+    '彻底删除该检验方案？其下的检验项目会一并删除，不可恢复；已录入的检验单不受影响。': 'Delete this inspection plan permanently? Its inspection items will be deleted as well. This cannot be undone; saved inspection sheets are unaffected.',
+    '删除失败': 'Delete failed',
     '当前方案': 'Current plan',
     '个检验项目': 'inspection item(s)',
     '请先在上方点选一个检验方案，下方才会显示它的检验项目': 'Select an inspection plan above to list its inspection items below',

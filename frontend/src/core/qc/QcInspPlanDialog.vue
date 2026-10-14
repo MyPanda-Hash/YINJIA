@@ -11,7 +11,7 @@
   <el-dialog :model-value="modelValue" :title="tt('检验项目/检验方案')" width="1200px" top="4vh" append-to-body
              destroy-on-close @update:model-value="(v) => emit('update:modelValue', v)" @open="load">
     <div class="qcplan-tip">
-      {{ tt('上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用标准本身。维护动作不会改动任何已录入的检验单。') }}
+      {{ tt('上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用/删除标准本身（停用可恢复，删除不可恢复）。维护动作不会改动任何已录入的检验单。') }}
     </div>
 
     <!-- ═══ ① 检验方案(主表) ═══ -->
@@ -26,6 +26,11 @@
         <el-button size="small" :disabled="!curPlan" @click="openPlanForm(curPlan)">{{ tt('编辑') }}</el-button>
         <el-button size="small" :disabled="!curPlan" @click="togglePlan">
           {{ curPlan?.['停用'] ? tt('恢复启用') : tt('停用') }}
+        </el-button>
+        <!-- 彻底删除(2026-10-15 用户口径「不能只可增加不可删除」):停用只影响以后的使用、
+             列表里留灰行;建错的方案要能真拿掉 —— 连同其下检验项目一并删(确认框里报清条数)。 -->
+        <el-button size="small" type="danger" plain :disabled="!curPlan" :title="tt('彻底删除')" @click="destroyPlan">
+          {{ tt('删除') }}
         </el-button>
       </div>
       <el-table :data="plans" size="small" border height="190" highlight-current-row
@@ -66,6 +71,11 @@
         <el-button size="small" :disabled="!curItem" @click="openItemForm(curItem)">{{ tt('编辑') }}</el-button>
         <el-button size="small" :disabled="!curItem" @click="toggleItem">
           {{ curItem?.['停用'] ? tt('恢复启用') : tt('停用') }}
+        </el-button>
+        <!-- 彻底删除:勾了行就删勾选的那些,没勾就删当前行(点行高亮)——
+             勾选框在 Element 里不改「当前行」,只认高亮会让用户觉得点了没反应。 -->
+        <el-button size="small" type="danger" plain :disabled="!canDestroyItems" :title="tt('彻底删除')" @click="destroyItems">
+          {{ tt('删除') }}
         </el-button>
       </div>
       <el-table ref="itemTable" :data="items" size="small" border height="240" highlight-current-row row-key="id"
@@ -289,7 +299,11 @@ async function loadItems() {
   } catch (e) { err(e, '加载检验项目失败') }
 }
 
-function load() { loadPlans() }
+function load() {
+  // 每次打开先清空勾选:上一次「带入明细」留下的勾选若留着,「删除」会误伤那些行
+  picked.value = []
+  loadPlans()
+}
 
 /** 方案行选中 → 加载它的项目 */
 async function onPlanRow(row) {
@@ -335,6 +349,35 @@ async function togglePlan() {
   } catch (e) { if (e !== 'cancel') err(e, '操作失败') }
 }
 
+/**
+ * 彻底删除方案(2026-10-15 用户口径「检验项目需要能实现删除,不能只可增加不可删除」)。
+ * 与「停用」的分工:停用=以后不用了,列表留灰行可恢复;删除=建错了、不要了,从库里拿掉。
+ * 连同其下检验项目一并删(方案编码是唯一归属键),确认框里先把条数说清楚。
+ * 不影响已录入单据:检验单存的是文本快照,不按 id 回查这两张库表。
+ */
+async function destroyPlan() {
+  const p = curPlan.value
+  if (!p) return
+  const n = Number(p['项目数'] ?? items.value.length ?? 0) || 0
+  const detail = `${p['方案编码'] || ''}${p['方案名称'] ? ' ' + p['方案名称'] : ''}${n ? ` · ${n}${tt('项')}` : ''}`
+  try {
+    await ElMessageBox.confirm(
+      `${tt('彻底删除该检验方案？其下的检验项目会一并删除，不可恢复；已录入的检验单不受影响。')}（${detail}）`,
+      tt('删除确认'), { type: 'warning' })
+  } catch { return }
+  saving.value = true
+  try {
+    await request.post(`${API}/planDestroy`, { id: p.id })
+    ElMessage.success(tt('已彻底删除'))
+    picked.value = []
+    itemTable.value?.clearSelection()
+    curPlan.value = null
+    curItem.value = null
+    await loadPlans()
+    emit('changed')
+  } catch (e) { err(e, '删除失败') } finally { saving.value = false }
+}
+
 function openItemForm(row) {
   itemForm.value = row
     ? { ...row, 标准下限: row['标准下限'] ?? '', 标准上限: row['标准上限'] ?? '', 序号: row['序号'] ?? '' }
@@ -370,6 +413,40 @@ async function toggleItem() {
     await loadPlans()
     emit('changed')
   } catch (e) { if (e !== 'cancel') err(e, '操作失败') }
+}
+
+/**
+ * 「删除」按钮的可用条件:勾了行,或点了行高亮。
+ * ⚠ Element 的勾选框**不改当前行**(selection-change 与 current-change 是两回事):
+ * 只认高亮会让「勾了行再点删除」看着像点了没反应 —— 故两者都收。
+ */
+const canDestroyItems = computed(() => picked.value.length > 0 || !!curItem.value)
+
+/** 待删项目:勾选优先(多选一次删),否则当前高亮行 */
+function destroyTargets() {
+  return picked.value.length ? picked.value.slice() : (curItem.value ? [curItem.value] : [])
+}
+
+/** 彻底删除检验项目(物理删,与 StdLibManager 的 🗑 同口径);不影响已录入单据 */
+async function destroyItems() {
+  const rows = destroyTargets()
+  if (!rows.length) return
+  const names = rows.map((r) => r['项目名称'] || r['项目编码']).filter(Boolean).join('、')
+  try {
+    await ElMessageBox.confirm(
+      `${tt('彻底删除该检验项目？不可恢复，已录入的检验单不受影响。')}（${names}）`,
+      tt('删除确认'), { type: 'warning' })
+  } catch { return }
+  saving.value = true
+  try {
+    const r = await request.post(`${API}/itemDestroy`, { ids: rows.map((x) => x.id) })
+    ElMessage.success(`${tt('已彻底删除')} ${r?.data?.deleted ?? rows.length} ${tt('项')}`)
+    picked.value = []
+    itemTable.value?.clearSelection()
+    await loadItems()
+    await loadPlans()
+    emit('changed')
+  } catch (e) { err(e, '删除失败') } finally { saving.value = false }
 }
 </script>
 
