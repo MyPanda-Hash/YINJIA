@@ -3105,3 +3105,8 @@ migrate-finish-in-dept-ref-20261014.sql
 #   只有 nvarchar(200)(sys.columns.max_length 返回字节数,400 字节 = 200 字符)。统一加宽到 500 字符。
 #   幂等(仅当宽度 < 500 字符才 ALTER;nvarchar 加宽是元数据变更);两账套均执行。
 migrate-doc-image-col-width-20261014.sql
+# ── 2026-10-14 仓库名称与金蝶对齐(CP-02:B仓 → 成品B仓) ──
+#   拉取单据做「审核+记账」排练时,产品入库单 183 张卡在「仓库档案不存在:[成品B仓]」——
+#   金蝶该仓叫「成品B仓」而 MES 档案同编码 CP-02 叫「B仓」;产成品入库行表只有仓库名称列,
+#   台账按名称解析 ⇒ 名称必须对齐。拉取单据里出现的 4 个仓库名中唯一不一致的一个。
+migrate-wh-name-align-kingdee-20261014.sql
