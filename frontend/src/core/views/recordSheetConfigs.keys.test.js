@@ -653,3 +653,39 @@ test('成型工艺清单:检验要求落在真实数据格上(不再是块名下
   //   的守卫测试 —— 随该功能一起撤掉(用户改口:配方表的行在**配方计算弹窗**里录,
   //   见 core/mold/recipeRows.js 与 RecipeCalcDialog 的物料行区)。留着就是断言一个不存在的配置。
 })
+
+/**
+ * 断言 ⑧(2026-10-15 用户报障「配方计算 → 点『维护尺寸表』打开的视图有问题」):
+ * 烧结尺寸表 RD_SINTER_TOL 是**无头表的档案**(yj_panel.head_table=NULL),不是纸面文书,
+ * 它的版式有两条硬约束,缺一条页面上就"静默塌掉"(都不是报错,是难看/看不懂):
+ *
+ *   ① `headMode` 必须是 'plain'。留空(默认 report 版式)时,`effInfo` 在 `cfg.info === undefined`
+ *      会回落 DEFAULT_INFO ⇒ 纸上凭空印出「YJ-PD-01 密级 适用范围 测试负责人 报告编号 审核人」
+ *      一整块**数据记录表**抬头(活体实测 8090:reportHeadPresent=true/headText 就是那串)。
+ *   ② 每一列必须有 `w`。本面板没有(也不该有)全页 grid,plain 版式的表宽只能取
+ *      `plainW = Σcols[].w`;列宽缺省 100 虽能兜底,但真正的塌陷源是**没有 grid 的 report 版式**
+ *      ⇒ `gridW = 0`,而 `.rs-t` 是 `table-layout:fixed` ⇒ 整张纸塌成一条竖线。
+ *      活体实测:修前数据表宽 **1px**(10 个列名与 60 行全挤在一列),修后 **1101px**。
+ *      列宽取该字段的 yj_field.width(车间 90 / 型号 130 / … / 停用 80),与面板元数据同源。
+ *
+ * 为什么这条要自动化守:两种坏法都**不抛错、不进控制台**,只有肉眼看页面才发现;
+ * 而 keys.test 的断言⑥ 已经在别的面板上记过同一个"缺 grid ⇒ 塌成竖线"的坑。
+ */
+test('烧结尺寸表(无头档案表):走 plain 版式且逐列给宽,否则整表塌成 1px 竖线并印出报告头', () => {
+  const cfg = recordSheetConfigs.RD_SINTER_TOL
+  assert.ok(cfg, 'RD_SINTER_TOL 配置缺失(它被 recordSheetConfigs.livedb.test.js 纳入范围)')
+  assert.equal(cfg.headMode, 'plain', "report 版式会给这张无头档案表印上数据记录表抬头(密级/报告编号…)")
+  assert.equal(cfg.plainTitle, '烧结尺寸表', 'plain 版式的标题条文字 = 面板名')
+  assert.deepEqual(cfg.sections, [], '无头表没有表头区')
+  assert.equal((cfg.dataTables || []).length, 1, '整表即一张数据表')
+
+  const cols = cfg.dataTables[0].cols || []
+  assert.deepEqual(
+    cols.map((c) => c.key),
+    ['车间', '型号', '模具尺寸', '中心杆尺寸', '炭棒外径', '炭棒外径公差', '炭棒内径', '炭棒内径公差', '长度范围', '停用'],
+    '数据键必须逐字等于活库 yj_field.label(顺序同 seq)',
+  )
+  for (const c of cols) {
+    assert.ok(Number.isFinite(c.w) && c.w > 0, `列「${c.label}」缺 w(plain 表宽 = Σw,缺了会退回兜底值并与 dtOwnsWidth 判据打架)`)
+  }
+})

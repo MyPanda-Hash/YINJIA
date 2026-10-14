@@ -3004,6 +3004,8 @@ export default {
     '内径': 'ID',
     '带出尺寸': 'Carried Sizes',
     '维护尺寸表': 'Maintain Size Table',
+    /* 该面板纸面版式的标题条(recordSheetConfigs.RD_SINTER_TOL.plainTitle) */
+    '烧结尺寸表': 'Sintering Size Table',
     '未选型号 —— 尺寸按单据上的炭棒规格': 'No model selected — sizes come from the document spec',
     '正在读取烧结尺寸表…': 'Loading sintering size table…',
     '来自烧结尺寸表': 'from the sintering size table:',
