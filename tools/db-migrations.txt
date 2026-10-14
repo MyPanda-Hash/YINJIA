@@ -3098,3 +3098,10 @@ migrate-other-docs-rebuild-20261014.sql
 #   Phase 1 新建这两列时按文本登记,而采购入库单/销售出库单的同名字段是参照 DEPT。纯元数据 UPDATE,零 DDL。
 #   幂等(窄条件 + 自检);两账套均执行。
 migrate-finish-in-dept-ref-20261014.sql
+
+# ── 2026-10-14 「存货图片」列加宽到 nvarchar(500)(拉取截断根因) ──
+#   拉取 9/1 至今单据时产品入库单 2 张整单失败:String or binary data would be truncated。
+#   根因:金蝶分录 picture 是 OSS 长 URL(实测 297/303 字符),而 bl_finish_in/bl_purchase_in 的 [存货图片]
+#   只有 nvarchar(200)(sys.columns.max_length 返回字节数,400 字节 = 200 字符)。统一加宽到 500 字符。
+#   幂等(仅当宽度 < 500 字符才 ALTER;nvarchar 加宽是元数据变更);两账套均执行。
+migrate-doc-image-col-width-20261014.sql
