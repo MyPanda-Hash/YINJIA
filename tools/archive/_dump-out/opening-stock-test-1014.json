@@ -1,16 +1,16 @@
 {
- "at": "2026-10-14T12:47:47.421Z",
+ "at": "2026-10-14T12:49:13.013Z",
  "from": "2026-09-01",
  "kdKeys": 1367,
  "netKeys": 824,
- "openingKeys": 1367,
+ "openingKeys": 2004,
  "rows": [
   {
    "wzdm": "3-01-16-0012",
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 53,
+   "qty": 80,
    "cost": null
   },
   {
@@ -154,7 +154,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 3837,
+   "qty": 11572,
    "cost": null
   },
   {
@@ -178,7 +178,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 1674,
+   "qty": 170,
    "cost": null
   },
   {
@@ -242,7 +242,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 295,
+   "qty": 21295,
    "cost": null
   },
   {
@@ -258,7 +258,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 76,
+   "qty": 1276,
    "cost": null
   },
   {
@@ -266,7 +266,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 41,
+   "qty": 2403,
    "cost": null
   },
   {
@@ -274,7 +274,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 9,
+   "qty": 998,
    "cost": null
   },
   {
@@ -282,7 +282,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 46,
+   "qty": 646,
    "cost": null
   },
   {
@@ -418,7 +418,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 261,
+   "qty": 658,
    "cost": null
   },
   {
@@ -426,7 +426,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 1041,
+   "qty": 1062,
    "cost": null
   },
   {
@@ -442,7 +442,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 2721,
+   "qty": 2435,
    "cost": null
   },
   {
@@ -450,7 +450,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 92,
+   "qty": 1619,
    "cost": null
   },
   {
@@ -458,7 +458,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 1224,
+   "qty": 550,
    "cost": null
   },
   {
@@ -466,7 +466,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 16921,
+   "qty": 12050,
    "cost": null
   },
   {
@@ -474,7 +474,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 13698,
+   "qty": 11180,
    "cost": null
   },
   {
@@ -482,7 +482,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 803,
+   "qty": 4507,
    "cost": null
   },
   {
@@ -490,7 +490,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 1966,
+   "qty": 7893,
    "cost": null
   },
   {
@@ -498,7 +498,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 104,
+   "qty": 125,
    "cost": null
   },
   {
@@ -506,7 +506,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 110,
+   "qty": 131,
    "cost": null
   },
   {
@@ -514,7 +514,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 1774,
+   "qty": 1417,
    "cost": null
   },
   {
@@ -522,7 +522,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 59,
+   "qty": 40,
    "cost": null
   },
   {
@@ -530,7 +530,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 108,
+   "qty": 610,
    "cost": null
   },
   {
@@ -538,7 +538,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 363,
+   "qty": 1,
    "cost": null
   },
   {
@@ -546,7 +546,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 25,
+   "qty": 0,
    "cost": null
   },
   {
@@ -554,7 +554,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 203,
+   "qty": 811,
    "cost": null
   },
   {
@@ -562,7 +562,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 552,
+   "qty": 555,
    "cost": null
   },
   {
@@ -578,7 +578,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": -225,
+   "qty": 0,
    "cost": null
   },
   {
@@ -586,7 +586,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 70,
+   "qty": 0,
    "cost": null
   },
   {
@@ -682,7 +682,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 15,
+   "qty": 0,
    "cost": null
   },
   {
@@ -698,7 +698,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 1019,
+   "qty": 237,
    "cost": null
   },
   {
@@ -706,7 +706,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 4331,
+   "qty": 94,
    "cost": null
   },
   {
@@ -714,7 +714,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 230,
+   "qty": 674,
    "cost": null
   },
   {
@@ -730,7 +730,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 4.9,
+   "qty": 5.9,
    "cost": null
   },
   {
@@ -738,7 +738,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 385,
+   "qty": 1379,
    "cost": null
   },
   {
@@ -1610,7 +1610,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 323,
+   "qty": 2121,
    "cost": null
   },
   {
@@ -1618,7 +1618,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 116,
+   "qty": 411,
    "cost": null
   },
   {
@@ -1802,7 +1802,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 31,
+   "qty": 0,
    "cost": null
   },
   {
@@ -1810,7 +1810,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 31,
+   "qty": 0,
    "cost": null
   },
   {
@@ -2026,7 +2026,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 35,
+   "qty": 2285,
    "cost": null
   },
   {
@@ -2082,7 +2082,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 252,
+   "qty": 352,
    "cost": null
   },
   {
@@ -2114,7 +2114,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 335,
+   "qty": 380,
    "cost": null
   },
   {
@@ -2138,7 +2138,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 548,
+   "qty": 0,
    "cost": null
   },
   {
@@ -2146,7 +2146,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 580,
+   "qty": 700,
    "cost": null
   },
   {
@@ -2154,7 +2154,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 82,
+   "qty": 277,
    "cost": null
   },
   {
@@ -2226,7 +2226,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 768.4,
+   "qty": 843.4,
    "cost": null
   },
   {
@@ -2250,7 +2250,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 805,
+   "qty": 0,
    "cost": null
   },
   {
@@ -2298,7 +2298,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 5175,
+   "qty": 0,
    "cost": null
   },
   {
@@ -2306,7 +2306,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 4050,
+   "qty": 0,
    "cost": null
   },
   {
@@ -2738,7 +2738,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 616,
+   "qty": 1528,
    "cost": null
   },
   {
@@ -2754,7 +2754,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 10,
+   "qty": 0,
    "cost": null
   },
   {
@@ -2834,7 +2834,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 2346,
+   "qty": 0,
    "cost": null
   },
   {
@@ -2866,7 +2866,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 212,
+   "qty": 14,
    "cost": null
   },
   {
@@ -2874,7 +2874,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 198,
+   "qty": 24,
    "cost": null
   },
   {
@@ -2882,7 +2882,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 78,
+   "qty": 28,
    "cost": null
   },
   {
@@ -2890,7 +2890,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 1575,
+   "qty": 2642,
    "cost": null
   },
   {
@@ -2906,7 +2906,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 2978,
+   "qty": 2722,
    "cost": null
   },
   {
@@ -2914,7 +2914,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 334,
+   "qty": 153,
    "cost": null
   },
   {
@@ -2930,7 +2930,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 165,
+   "qty": 100,
    "cost": null
   },
   {
@@ -2938,7 +2938,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 94,
+   "qty": 27,
    "cost": null
   },
   {
@@ -2946,7 +2946,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 173,
+   "qty": 154,
    "cost": null
   },
   {
@@ -2954,7 +2954,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 23,
+   "qty": 70,
    "cost": null
   },
   {
@@ -2962,7 +2962,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 35,
+   "qty": 189,
    "cost": null
   },
   {
@@ -2970,7 +2970,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 54,
+   "qty": 56,
    "cost": null
   },
   {
@@ -2978,7 +2978,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 486,
+   "qty": 326,
    "cost": null
   },
   {
@@ -3066,7 +3066,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 8970,
+   "qty": 22408,
    "cost": null
   },
   {
@@ -3082,7 +3082,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 4153,
+   "qty": 787,
    "cost": null
   },
   {
@@ -3114,7 +3114,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 6089,
+   "qty": 8195,
    "cost": null
   },
   {
@@ -3122,7 +3122,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 2535,
+   "qty": 5462,
    "cost": null
   },
   {
@@ -3138,7 +3138,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 132,
+   "qty": 5,
    "cost": null
   },
   {
@@ -3146,7 +3146,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 48,
+   "qty": 1,
    "cost": null
   },
   {
@@ -3154,7 +3154,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 130,
+   "qty": 17,
    "cost": null
   },
   {
@@ -3418,7 +3418,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 2050,
+   "qty": 60,
    "cost": null
   },
   {
@@ -3450,7 +3450,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 633,
+   "qty": 0,
    "cost": null
   },
   {
@@ -3546,7 +3546,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 28,
+   "qty": 0,
    "cost": null
   },
   {
@@ -3602,7 +3602,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 205,
+   "qty": 0,
    "cost": null
   },
   {
@@ -3626,7 +3626,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 1203,
+   "qty": 66,
    "cost": null
   },
   {
@@ -3698,7 +3698,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 39,
+   "qty": 57.5,
    "cost": null
   },
   {
@@ -3730,7 +3730,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 90,
+   "qty": 30,
    "cost": null
   },
   {
@@ -3738,7 +3738,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 139.7,
+   "qty": 240.7,
    "cost": null
   },
   {
@@ -3778,7 +3778,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 33000,
+   "qty": 33038.5,
    "cost": null
   },
   {
@@ -3786,7 +3786,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 320000,
+   "qty": 319912.9,
    "cost": null
   },
   {
@@ -4178,7 +4178,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 20000,
+   "qty": 20030.3,
    "cost": null
   },
   {
@@ -4186,7 +4186,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 17.5,
+   "qty": 15,
    "cost": null
   },
   {
@@ -4194,7 +4194,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 183800,
+   "qty": 183841,
    "cost": null
   },
   {
@@ -4218,7 +4218,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 166500,
+   "qty": 166503,
    "cost": null
   },
   {
@@ -4266,7 +4266,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 102,
+   "qty": 103,
    "cost": null
   },
   {
@@ -4330,7 +4330,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 49,
+   "qty": 500,
    "cost": null
   },
   {
@@ -4730,7 +4730,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 5208,
+   "qty": 8285,
    "cost": null
   },
   {
@@ -4738,7 +4738,7 @@
    "ckdm": "CP-02",
    "ckName": "成品B仓",
    "lot": null,
-   "qty": 68,
+   "qty": 4,
    "cost": null
   },
   {
@@ -5058,7 +5058,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 137,
+   "qty": 0,
    "cost": null
   },
   {
@@ -5066,7 +5066,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 238000,
+   "qty": 238071,
    "cost": null
   },
   {
@@ -5074,7 +5074,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 136000,
+   "qty": 136077,
    "cost": null
   },
   {
@@ -5090,7 +5090,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 114000,
+   "qty": 114925,
    "cost": null
   },
   {
@@ -5098,7 +5098,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 300,
+   "qty": 0,
    "cost": null
   },
   {
@@ -5106,7 +5106,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 200,
+   "qty": 400,
    "cost": null
   },
   {
@@ -5114,7 +5114,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 100,
+   "qty": 60,
    "cost": null
   },
   {
@@ -5130,7 +5130,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 100,
+   "qty": 0,
    "cost": null
   },
   {
@@ -5154,7 +5154,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 4787.5,
+   "qty": 5467.5,
    "cost": null
   },
   {
@@ -6042,7 +6042,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 1716,
+   "qty": 6026,
    "cost": null
   },
   {
@@ -6322,7 +6322,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 86,
+   "qty": 6,
    "cost": null
   },
   {
@@ -6338,7 +6338,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 180,
+   "qty": 570,
    "cost": null
   },
   {
@@ -6354,7 +6354,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 3250,
+   "qty": 4150,
    "cost": null
   },
   {
@@ -6362,7 +6362,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 1600,
+   "qty": 5100,
    "cost": null
   },
   {
@@ -6378,7 +6378,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 76,
+   "qty": 110,
    "cost": null
   },
   {
@@ -6386,7 +6386,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 10,
+   "qty": 0,
    "cost": null
   },
   {
@@ -6394,7 +6394,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 1800,
+   "qty": 2200,
    "cost": null
   },
   {
@@ -6402,7 +6402,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 184,
+   "qty": 304,
    "cost": null
   },
   {
@@ -6410,7 +6410,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 2828,
+   "qty": 3728,
    "cost": null
   },
   {
@@ -6418,7 +6418,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 2500,
+   "qty": 3300,
    "cost": null
   },
   {
@@ -6458,7 +6458,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 50,
+   "qty": 6,
    "cost": null
   },
   {
@@ -6586,7 +6586,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 525,
+   "qty": 300,
    "cost": null
   },
   {
@@ -6594,7 +6594,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 225,
+   "qty": 50,
    "cost": null
   },
   {
@@ -6642,7 +6642,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 1890,
+   "qty": 1915,
    "cost": null
   },
   {
@@ -6650,7 +6650,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 2286,
+   "qty": 2336,
    "cost": null
   },
   {
@@ -6682,7 +6682,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 1950,
+   "qty": -1000,
    "cost": null
   },
   {
@@ -6706,7 +6706,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 3150,
+   "qty": 6425,
    "cost": null
   },
   {
@@ -6730,7 +6730,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 3563,
+   "qty": 3703,
    "cost": null
   },
   {
@@ -6738,7 +6738,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 1545.9,
+   "qty": 1565.9,
    "cost": null
   },
   {
@@ -6746,7 +6746,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 20895,
+   "qty": 29980,
    "cost": null
   },
   {
@@ -6754,7 +6754,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 2900,
+   "qty": 0,
    "cost": null
   },
   {
@@ -6762,7 +6762,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 260,
+   "qty": 480,
    "cost": null
   },
   {
@@ -7282,7 +7282,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 1800,
+   "qty": 4400,
    "cost": null
   },
   {
@@ -7370,7 +7370,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 25500,
+   "qty": 9300,
    "cost": null
   },
   {
@@ -7378,7 +7378,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 23200,
+   "qty": 11700,
    "cost": null
   },
   {
@@ -7690,7 +7690,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 2,
+   "qty": 3,
    "cost": null
   },
   {
@@ -7698,7 +7698,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 2,
+   "qty": 3,
    "cost": null
   },
   {
@@ -8162,7 +8162,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 3800,
+   "qty": 1800,
    "cost": null
   },
   {
@@ -8194,7 +8194,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 20000,
+   "qty": 0,
    "cost": null
   },
   {
@@ -8202,7 +8202,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 200,
+   "qty": 700,
    "cost": null
   },
   {
@@ -8258,7 +8258,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 6000,
+   "qty": 17300,
    "cost": null
   },
   {
@@ -8282,7 +8282,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 2458,
+   "qty": 11758,
    "cost": null
   },
   {
@@ -8418,7 +8418,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 545,
+   "qty": 45,
    "cost": null
   },
   {
@@ -8458,7 +8458,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 10130,
+   "qty": 17714,
    "cost": null
   },
   {
@@ -8466,7 +8466,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 10177,
+   "qty": 17761,
    "cost": null
   },
   {
@@ -8474,7 +8474,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 5248,
+   "qty": 12832,
    "cost": null
   },
   {
@@ -8490,7 +8490,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 15652,
+   "qty": 18764,
    "cost": null
   },
   {
@@ -8498,7 +8498,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 12054,
+   "qty": 12304,
    "cost": null
   },
   {
@@ -8522,7 +8522,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 33660,
+   "qty": 34660,
    "cost": null
   },
   {
@@ -8586,7 +8586,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 14150,
+   "qty": 14400,
    "cost": null
   },
   {
@@ -8618,7 +8618,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 236.5,
+   "qty": 392.5,
    "cost": null
   },
   {
@@ -8626,7 +8626,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 2600,
+   "qty": 0,
    "cost": null
   },
   {
@@ -8666,7 +8666,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 225,
+   "qty": 800,
    "cost": null
   },
   {
@@ -8922,7 +8922,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 2400,
+   "qty": 6600,
    "cost": null
   },
   {
@@ -8930,7 +8930,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 12000,
+   "qty": 14085,
    "cost": null
   },
   {
@@ -9258,7 +9258,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 198,
+   "qty": 200,
    "cost": null
   },
   {
@@ -9282,7 +9282,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 2400,
+   "qty": 4430,
    "cost": null
   },
   {
@@ -9362,7 +9362,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 50,
+   "qty": 530,
    "cost": null
   },
   {
@@ -9498,7 +9498,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 15100,
+   "qty": 4200,
    "cost": null
   },
   {
@@ -9506,7 +9506,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 4100,
+   "qty": 0,
    "cost": null
   },
   {
@@ -9538,7 +9538,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 525,
+   "qty": 650,
    "cost": null
   },
   {
@@ -9858,7 +9858,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 3000,
+   "qty": 28000,
    "cost": null
   },
   {
@@ -10138,7 +10138,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 1000,
+   "qty": 6000,
    "cost": null
   },
   {
@@ -10226,7 +10226,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 4000,
+   "qty": 6800,
    "cost": null
   },
   {
@@ -10258,7 +10258,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 1000,
+   "qty": 2000,
    "cost": null
   },
   {
@@ -10266,7 +10266,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 6700,
+   "qty": 5500,
    "cost": null
   },
   {
@@ -10274,7 +10274,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 800,
+   "qty": 300,
    "cost": null
   },
   {
@@ -10282,7 +10282,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 600,
+   "qty": 2100,
    "cost": null
   },
   {
@@ -10450,7 +10450,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 385,
+   "qty": 2128,
    "cost": null
   },
   {
@@ -10466,7 +10466,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 500,
+   "qty": 2709,
    "cost": null
   },
   {
@@ -10474,7 +10474,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 464,
+   "qty": 0,
    "cost": null
   },
   {
@@ -10482,7 +10482,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 350,
+   "qty": 950,
    "cost": null
   },
   {
@@ -10498,7 +10498,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 843,
+   "qty": 649,
    "cost": null
   },
   {
@@ -10506,7 +10506,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 508,
+   "qty": 537,
    "cost": null
   },
   {
@@ -10514,7 +10514,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 189,
+   "qty": 692,
    "cost": null
   },
   {
@@ -10530,7 +10530,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 420,
+   "qty": 60,
    "cost": null
   },
   {
@@ -10538,7 +10538,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 1378,
+   "qty": 1838,
    "cost": null
   },
   {
@@ -10546,7 +10546,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 240,
+   "qty": 175,
    "cost": null
   },
   {
@@ -10554,7 +10554,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 836,
+   "qty": 560,
    "cost": null
   },
   {
@@ -10578,7 +10578,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 121,
+   "qty": 153,
    "cost": null
   },
   {
@@ -10594,7 +10594,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 805,
+   "qty": 705,
    "cost": null
   },
   {
@@ -10610,7 +10610,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 3725,
+   "qty": 2411,
    "cost": null
   },
   {
@@ -10618,7 +10618,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 70,
+   "qty": 124,
    "cost": null
   },
   {
@@ -10658,7 +10658,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 44,
+   "qty": 582,
    "cost": null
   },
   {
@@ -10706,7 +10706,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 130,
+   "qty": -600,
    "cost": null
   },
   {
@@ -10714,7 +10714,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 906,
+   "qty": 0,
    "cost": null
   },
   {
@@ -10786,7 +10786,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 13000,
+   "qty": 0,
    "cost": null
   },
   {
@@ -10858,7 +10858,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 19975,
+   "qty": 33825,
    "cost": null
   },
   {
@@ -10874,7 +10874,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 3856,
+   "qty": 4486,
    "cost": null
   },
   {
@@ -10890,7 +10890,7 @@
    "ckdm": "CK00006",
    "ckName": "华北工控仓",
    "lot": null,
-   "qty": 2533,
+   "qty": 8,
    "cost": null
   },
   {
@@ -10898,7 +10898,7 @@
    "ckdm": "YCL-01",
    "ckName": "恒亿仓",
    "lot": null,
-   "qty": 660,
+   "qty": 0,
    "cost": null
   },
   {
@@ -10939,6 +10939,5102 @@
    "ckName": "华北工控仓",
    "lot": null,
    "qty": 19.1,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 648,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 415,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-06",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 415,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-09",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -4518,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-11",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 7,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-13",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-14",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1500,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-17",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-19",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-21",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-26",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-27",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1197,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-28",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 1153,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-31",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2594,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-32",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -258,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-33",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 976,
+   "cost": null
+  },
+  {
+   "wzdm": "A-32-34",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -29,
+   "cost": null
+  },
+  {
+   "wzdm": "A-34-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 24,
+   "cost": null
+  },
+  {
+   "wzdm": "A-34-03",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 19200,
+   "cost": null
+  },
+  {
+   "wzdm": "A-34-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1836,
+   "cost": null
+  },
+  {
+   "wzdm": "A-42-03",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -42,
+   "cost": null
+  },
+  {
+   "wzdm": "A-42-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -30,
+   "cost": null
+  },
+  {
+   "wzdm": "A-43-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "A-43-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "A-43-07",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "A-45-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 208,
+   "cost": null
+  },
+  {
+   "wzdm": "A-48-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2982,
+   "cost": null
+  },
+  {
+   "wzdm": "A-48-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3763,
+   "cost": null
+  },
+  {
+   "wzdm": "A-48-07",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2293,
+   "cost": null
+  },
+  {
+   "wzdm": "A-48-09",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 10649,
+   "cost": null
+  },
+  {
+   "wzdm": "A-48-10",
+   "ckdm": "CK00003",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "A-48-10",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 6,
+   "cost": null
+  },
+  {
+   "wzdm": "A-48-11",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -32,
+   "cost": null
+  },
+  {
+   "wzdm": "A-48-15",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 21,
+   "cost": null
+  },
+  {
+   "wzdm": "A-52-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1802,
+   "cost": null
+  },
+  {
+   "wzdm": "A-52-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1802,
+   "cost": null
+  },
+  {
+   "wzdm": "B-05-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2060,
+   "cost": null
+  },
+  {
+   "wzdm": "B-06-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 4,
+   "cost": null
+  },
+  {
+   "wzdm": "B-21-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 452,
+   "cost": null
+  },
+  {
+   "wzdm": "B-34-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -13369,
+   "cost": null
+  },
+  {
+   "wzdm": "B-34-12",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -20,
+   "cost": null
+  },
+  {
+   "wzdm": "B-34-13",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -30,
+   "cost": null
+  },
+  {
+   "wzdm": "B-34-14",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -18,
+   "cost": null
+  },
+  {
+   "wzdm": "B-34-15",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -37,
+   "cost": null
+  },
+  {
+   "wzdm": "B-35-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 199,
+   "cost": null
+  },
+  {
+   "wzdm": "B-35-05-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 98,
+   "cost": null
+  },
+  {
+   "wzdm": "B-35-08",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "B-35-09",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "B-36-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 200,
+   "cost": null
+  },
+  {
+   "wzdm": "B-37-06",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 306,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-03",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2275,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -199,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 300,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-06",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 200,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-07",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -303,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-07-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -57,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-09",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -74,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-09-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -68,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-10",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-13",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -109,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-13-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-16",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 910,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-20",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-22",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1,
+   "cost": null
+  },
+  {
+   "wzdm": "B-46-22-3",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -224,
+   "cost": null
+  },
+  {
+   "wzdm": "B-47-13",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 639,
+   "cost": null
+  },
+  {
+   "wzdm": "B-47-14",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "B-47-20",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "B-47-27",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 310,
+   "cost": null
+  },
+  {
+   "wzdm": "B-47-28",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -223,
+   "cost": null
+  },
+  {
+   "wzdm": "B-47-29",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -142,
+   "cost": null
+  },
+  {
+   "wzdm": "B-49-02-0",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -22,
+   "cost": null
+  },
+  {
+   "wzdm": "B-49-02-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "B-50-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "B-58-07",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -907,
+   "cost": null
+  },
+  {
+   "wzdm": "B-58-08",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -212,
+   "cost": null
+  },
+  {
+   "wzdm": "B-58-10",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 96,
+   "cost": null
+  },
+  {
+   "wzdm": "B-58-12",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1060,
+   "cost": null
+  },
+  {
+   "wzdm": "B-65-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 600,
+   "cost": null
+  },
+  {
+   "wzdm": "B-65-06",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 810,
+   "cost": null
+  },
+  {
+   "wzdm": "B-67-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2,
+   "cost": null
+  },
+  {
+   "wzdm": "B-67-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2,
+   "cost": null
+  },
+  {
+   "wzdm": "B-68-12",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 172,
+   "cost": null
+  },
+  {
+   "wzdm": "B-68-13",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 68,
+   "cost": null
+  },
+  {
+   "wzdm": "B-68-14",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 255,
+   "cost": null
+  },
+  {
+   "wzdm": "B-70-03",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 40,
+   "cost": null
+  },
+  {
+   "wzdm": "B-70-07",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 1950,
+   "cost": null
+  },
+  {
+   "wzdm": "B-72-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -4003,
+   "cost": null
+  },
+  {
+   "wzdm": "B-72-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -4021,
+   "cost": null
+  },
+  {
+   "wzdm": "B-76-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -910,
+   "cost": null
+  },
+  {
+   "wzdm": "B-77-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1800,
+   "cost": null
+  },
+  {
+   "wzdm": "B-80-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 500,
+   "cost": null
+  },
+  {
+   "wzdm": "B-80-08",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "B-81-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -82,
+   "cost": null
+  },
+  {
+   "wzdm": "B-84-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -60,
+   "cost": null
+  },
+  {
+   "wzdm": "B-84-13",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 732,
+   "cost": null
+  },
+  {
+   "wzdm": "B-88-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -5694,
+   "cost": null
+  },
+  {
+   "wzdm": "B-88-07",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1043,
+   "cost": null
+  },
+  {
+   "wzdm": "B-88-11",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -5036,
+   "cost": null
+  },
+  {
+   "wzdm": "B-88-12",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -4619,
+   "cost": null
+  },
+  {
+   "wzdm": "B-88-13",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -61,
+   "cost": null
+  },
+  {
+   "wzdm": "B-88-20",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5034,
+   "cost": null
+  },
+  {
+   "wzdm": "B-92-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -62,
+   "cost": null
+  },
+  {
+   "wzdm": "B-92-03",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -321,
+   "cost": null
+  },
+  {
+   "wzdm": "B-92-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 91,
+   "cost": null
+  },
+  {
+   "wzdm": "B-92-06",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -11,
+   "cost": null
+  },
+  {
+   "wzdm": "B-92-08",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1982,
+   "cost": null
+  },
+  {
+   "wzdm": "B-92-12",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1232,
+   "cost": null
+  },
+  {
+   "wzdm": "B-92-18",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -545,
+   "cost": null
+  },
+  {
+   "wzdm": "B-92-19",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -573,
+   "cost": null
+  },
+  {
+   "wzdm": "BHP-12",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -135,
+   "cost": null
+  },
+  {
+   "wzdm": "BK1-D/10",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 374,
+   "cost": null
+  },
+  {
+   "wzdm": "BK1-DS02/10",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 85,
+   "cost": null
+  },
+  {
+   "wzdm": "BK2-D",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -42,
+   "cost": null
+  },
+  {
+   "wzdm": "C-103-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-105-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-105-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 134,
+   "cost": null
+  },
+  {
+   "wzdm": "C-105-03",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-108-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-109-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1000,
+   "cost": null
+  },
+  {
+   "wzdm": "C-109-06",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -560,
+   "cost": null
+  },
+  {
+   "wzdm": "C-23-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -44,
+   "cost": null
+  },
+  {
+   "wzdm": "C-23-10",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1549,
+   "cost": null
+  },
+  {
+   "wzdm": "C-32-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 135,
+   "cost": null
+  },
+  {
+   "wzdm": "C-40-09",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-40-10",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3761,
+   "cost": null
+  },
+  {
+   "wzdm": "C-40-14",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-54-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-54-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-58-11",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2098,
+   "cost": null
+  },
+  {
+   "wzdm": "C-58-12",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3015,
+   "cost": null
+  },
+  {
+   "wzdm": "C-58-13",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 533,
+   "cost": null
+  },
+  {
+   "wzdm": "C-58-15",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -112,
+   "cost": null
+  },
+  {
+   "wzdm": "C-58-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2717,
+   "cost": null
+  },
+  {
+   "wzdm": "C-58-8",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5015,
+   "cost": null
+  },
+  {
+   "wzdm": "C-68-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 404,
+   "cost": null
+  },
+  {
+   "wzdm": "C-68-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 431,
+   "cost": null
+  },
+  {
+   "wzdm": "C-75-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -112,
+   "cost": null
+  },
+  {
+   "wzdm": "C-75-03",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -54,
+   "cost": null
+  },
+  {
+   "wzdm": "C-75-20",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 161,
+   "cost": null
+  },
+  {
+   "wzdm": "C-75-27",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -505,
+   "cost": null
+  },
+  {
+   "wzdm": "C-75-28",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -5912,
+   "cost": null
+  },
+  {
+   "wzdm": "C-75-32",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -209,
+   "cost": null
+  },
+  {
+   "wzdm": "C-75-33",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3009,
+   "cost": null
+  },
+  {
+   "wzdm": "C-75-34",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 829,
+   "cost": null
+  },
+  {
+   "wzdm": "C-75-35",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -806,
+   "cost": null
+  },
+  {
+   "wzdm": "C-78-09",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 11399,
+   "cost": null
+  },
+  {
+   "wzdm": "C-78-11",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 10457,
+   "cost": null
+  },
+  {
+   "wzdm": "C-78-12",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3,
+   "cost": null
+  },
+  {
+   "wzdm": "C-78-15",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -22,
+   "cost": null
+  },
+  {
+   "wzdm": "C-78-21",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 1026,
+   "cost": null
+  },
+  {
+   "wzdm": "C-78-32",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -163,
+   "cost": null
+  },
+  {
+   "wzdm": "C-83-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2323,
+   "cost": null
+  },
+  {
+   "wzdm": "C-84-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 669,
+   "cost": null
+  },
+  {
+   "wzdm": "C-84-02",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3700,
+   "cost": null
+  },
+  {
+   "wzdm": "C-84-02-0",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-84-03",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -23,
+   "cost": null
+  },
+  {
+   "wzdm": "C-89-03",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 20,
+   "cost": null
+  },
+  {
+   "wzdm": "C-89-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-90-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "C-93-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 62,
+   "cost": null
+  },
+  {
+   "wzdm": "C-95-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2,
+   "cost": null
+  },
+  {
+   "wzdm": "C-95-04",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 422,
+   "cost": null
+  },
+  {
+   "wzdm": "C-95-22",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 136,
+   "cost": null
+  },
+  {
+   "wzdm": "C-95-23",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 60,
+   "cost": null
+  },
+  {
+   "wzdm": "C-95-39",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 14,
+   "cost": null
+  },
+  {
+   "wzdm": "CAS-18",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -325,
+   "cost": null
+  },
+  {
+   "wzdm": "D-01-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -51,
+   "cost": null
+  },
+  {
+   "wzdm": "D-01-08",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -186,
+   "cost": null
+  },
+  {
+   "wzdm": "D-01-13",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 12,
+   "cost": null
+  },
+  {
+   "wzdm": "D-01-14",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1549,
+   "cost": null
+  },
+  {
+   "wzdm": "D-01-18",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 882,
+   "cost": null
+  },
+  {
+   "wzdm": "D-01-21",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 371,
+   "cost": null
+  },
+  {
+   "wzdm": "D-01-25",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 496,
+   "cost": null
+  },
+  {
+   "wzdm": "D-01-49",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2424,
+   "cost": null
+  },
+  {
+   "wzdm": "D-01-50",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "D-03-05",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "D-04-07",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1076,
+   "cost": null
+  },
+  {
+   "wzdm": "D-053",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -303,
+   "cost": null
+  },
+  {
+   "wzdm": "D-18-06",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 4992,
+   "cost": null
+  },
+  {
+   "wzdm": "D-18-07",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -5118,
+   "cost": null
+  },
+  {
+   "wzdm": "D-25-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -326,
+   "cost": null
+  },
+  {
+   "wzdm": "D-45-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "D-54-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 10,
+   "cost": null
+  },
+  {
+   "wzdm": "D-56-01",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "E-024",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 292,
+   "cost": null
+  },
+  {
+   "wzdm": "HD-050",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -60,
+   "cost": null
+  },
+  {
+   "wzdm": "HD-080",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 12,
+   "cost": null
+  },
+  {
+   "wzdm": "HD-100",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 24,
+   "cost": null
+  },
+  {
+   "wzdm": "HKK-CF",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 15,
+   "cost": null
+  },
+  {
+   "wzdm": "HP-08",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 43,
+   "cost": null
+  },
+  {
+   "wzdm": "HP-08",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 161,
+   "cost": null
+  },
+  {
+   "wzdm": "HP-12",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -744,
+   "cost": null
+  },
+  {
+   "wzdm": "HP-12",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 327,
+   "cost": null
+  },
+  {
+   "wzdm": "HP-2040",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2,
+   "cost": null
+  },
+  {
+   "wzdm": "MG-12",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2,
+   "cost": null
+  },
+  {
+   "wzdm": "PMC-80325",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 67,
+   "cost": null
+  },
+  {
+   "wzdm": "S011",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 655,
+   "cost": null
+  },
+  {
+   "wzdm": "S011-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "S011-3",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "S022",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 684,
+   "cost": null
+  },
+  {
+   "wzdm": "S022-0",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2459,
+   "cost": null
+  },
+  {
+   "wzdm": "S022-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 200,
+   "cost": null
+  },
+  {
+   "wzdm": "S022-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -844,
+   "cost": null
+  },
+  {
+   "wzdm": "S022-3",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "S031",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 484,
+   "cost": null
+  },
+  {
+   "wzdm": "S031-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1200,
+   "cost": null
+  },
+  {
+   "wzdm": "S031-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "S031-3",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "S031-4",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -800,
+   "cost": null
+  },
+  {
+   "wzdm": "S032",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 160,
+   "cost": null
+  },
+  {
+   "wzdm": "S032-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -25,
+   "cost": null
+  },
+  {
+   "wzdm": "S041",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 273,
+   "cost": null
+  },
+  {
+   "wzdm": "S041-3",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -98,
+   "cost": null
+  },
+  {
+   "wzdm": "S042",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -250,
+   "cost": null
+  },
+  {
+   "wzdm": "S042-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -475,
+   "cost": null
+  },
+  {
+   "wzdm": "S042-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -525,
+   "cost": null
+  },
+  {
+   "wzdm": "S051",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -988,
+   "cost": null
+  },
+  {
+   "wzdm": "S051-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 300,
+   "cost": null
+  },
+  {
+   "wzdm": "S051-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -841,
+   "cost": null
+  },
+  {
+   "wzdm": "S051-4",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -600,
+   "cost": null
+  },
+  {
+   "wzdm": "S062",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -723,
+   "cost": null
+  },
+  {
+   "wzdm": "S062-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -27,
+   "cost": null
+  },
+  {
+   "wzdm": "S062-11",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "S062-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 208,
+   "cost": null
+  },
+  {
+   "wzdm": "S071-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -639,
+   "cost": null
+  },
+  {
+   "wzdm": "S091",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -11,
+   "cost": null
+  },
+  {
+   "wzdm": "S091-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "S091-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 113,
+   "cost": null
+  },
+  {
+   "wzdm": "S092",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 182,
+   "cost": null
+  },
+  {
+   "wzdm": "S092-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2,
+   "cost": null
+  },
+  {
+   "wzdm": "S092-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 180,
+   "cost": null
+  },
+  {
+   "wzdm": "S101-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -176,
+   "cost": null
+  },
+  {
+   "wzdm": "S102-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -449,
+   "cost": null
+  },
+  {
+   "wzdm": "S111-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 31,
+   "cost": null
+  },
+  {
+   "wzdm": "S112",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 25,
+   "cost": null
+  },
+  {
+   "wzdm": "Sr-1020",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 8.3,
+   "cost": null
+  },
+  {
+   "wzdm": "Sr-2040",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -83.5,
+   "cost": null
+  },
+  {
+   "wzdm": "Sr-40100",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -60,
+   "cost": null
+  },
+  {
+   "wzdm": "SSC-12",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 95,
+   "cost": null
+  },
+  {
+   "wzdm": "SSC-40100",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -5,
+   "cost": null
+  },
+  {
+   "wzdm": "T035",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "T042",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -4866,
+   "cost": null
+  },
+  {
+   "wzdm": "T042-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -93,
+   "cost": null
+  },
+  {
+   "wzdm": "T042-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "T042-4",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -200,
+   "cost": null
+  },
+  {
+   "wzdm": "T042-5",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -100,
+   "cost": null
+  },
+  {
+   "wzdm": "T042-6",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1000,
+   "cost": null
+  },
+  {
+   "wzdm": "T042-7",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "T042-7-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "T042-8",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "T042-8-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "T044-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": null,
+   "qty": 200,
+   "cost": null
+  },
+  {
+   "wzdm": "T061-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 85,
+   "cost": null
+  },
+  {
+   "wzdm": "T062",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -230,
+   "cost": null
+  },
+  {
+   "wzdm": "T062-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -200,
+   "cost": null
+  },
+  {
+   "wzdm": "T062-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -418,
+   "cost": null
+  },
+  {
+   "wzdm": "T063",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 300,
+   "cost": null
+  },
+  {
+   "wzdm": "T073",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -753,
+   "cost": null
+  },
+  {
+   "wzdm": "T073-1",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -25,
+   "cost": null
+  },
+  {
+   "wzdm": "T111",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 200,
+   "cost": null
+  },
+  {
+   "wzdm": "T201",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1923,
+   "cost": null
+  },
+  {
+   "wzdm": "T203",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 4845,
+   "cost": null
+  },
+  {
+   "wzdm": "T205",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2596,
+   "cost": null
+  },
+  {
+   "wzdm": "T206",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -307,
+   "cost": null
+  },
+  {
+   "wzdm": "T208",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -85,
+   "cost": null
+  },
+  {
+   "wzdm": "T210",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 88,
+   "cost": null
+  },
+  {
+   "wzdm": "T211-2",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -790,
+   "cost": null
+  },
+  {
+   "wzdm": "T211-6",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "T223",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -373,
+   "cost": null
+  },
+  {
+   "wzdm": "T224",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 500,
+   "cost": null
+  },
+  {
+   "wzdm": "T227",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 400,
+   "cost": null
+  },
+  {
+   "wzdm": "T233",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -300,
+   "cost": null
+  },
+  {
+   "wzdm": "T233-0",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -68,
+   "cost": null
+  },
+  {
+   "wzdm": "T236",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -10,
+   "cost": null
+  },
+  {
+   "wzdm": "T244",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1478,
+   "cost": null
+  },
+  {
+   "wzdm": "T261",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1030,
+   "cost": null
+  },
+  {
+   "wzdm": "T268",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2166,
+   "cost": null
+  },
+  {
+   "wzdm": "T269",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -48,
+   "cost": null
+  },
+  {
+   "wzdm": "T270",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -4351,
+   "cost": null
+  },
+  {
+   "wzdm": "T302",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1321,
+   "cost": null
+  },
+  {
+   "wzdm": "T305",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -118,
+   "cost": null
+  },
+  {
+   "wzdm": "T307",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -282,
+   "cost": null
+  },
+  {
+   "wzdm": "T309",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 978,
+   "cost": null
+  },
+  {
+   "wzdm": "T311",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 7059,
+   "cost": null
+  },
+  {
+   "wzdm": "T312",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 4939,
+   "cost": null
+  },
+  {
+   "wzdm": "T314",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1000,
+   "cost": null
+  },
+  {
+   "wzdm": "T322",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 39,
+   "cost": null
+  },
+  {
+   "wzdm": "T329",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -137,
+   "cost": null
+  },
+  {
+   "wzdm": "T330",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -88,
+   "cost": null
+  },
+  {
+   "wzdm": "T338",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 911,
+   "cost": null
+  },
+  {
+   "wzdm": "T342",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1,
+   "cost": null
+  },
+  {
+   "wzdm": "T343",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -9,
+   "cost": null
+  },
+  {
+   "wzdm": "T358",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 600,
+   "cost": null
+  },
+  {
+   "wzdm": "T376",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 18,
+   "cost": null
+  },
+  {
+   "wzdm": "T377",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 91,
+   "cost": null
+  },
+  {
+   "wzdm": "T382",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3361,
+   "cost": null
+  },
+  {
+   "wzdm": "T384",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 400,
+   "cost": null
+  },
+  {
+   "wzdm": "T387",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 685,
+   "cost": null
+  },
+  {
+   "wzdm": "T400",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2,
+   "cost": null
+  },
+  {
+   "wzdm": "T410",
+   "ckdm": "CP-02",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 977,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-B-E",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 80,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-CSA-23",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3.9,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-G-150FS",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 380,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-G-325",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 600,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-G-80",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 600,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-G-A",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 300,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-G-D",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 1160,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-GL-300400",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-GL-500800",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 400,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-H-A",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 6500,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-H-E",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 400,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-H-F",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2460,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-HP-B",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 8925,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-044",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -154.5,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-005",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1680,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-009",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1830,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-010",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 4070,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-011",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1650,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-013",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 165,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-016-1",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5280,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-016-1",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 13863,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-016-2",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5280,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-016-2",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 13863,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-017",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -140,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-018",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -712,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-022",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3113,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-026",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2087,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-030",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -10212,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-030",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 7492,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-032",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 6,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-033",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-034",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-035",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-036",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-037",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AJ-039",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-AK-003",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 328,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-006",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-009",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-010",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-011",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 6000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-017",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 300,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-018",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-019",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-022",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -17500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-023",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -27500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-027",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-028",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2200,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-032",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2223,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-033",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -5000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-037",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2200,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-039",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1800,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-044",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-046",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-050",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-051",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-072",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 200,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CH-073",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CQF-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CQF-003",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 27,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-CQF-005",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 10000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-DGM-003",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-DGM-003",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-DH-018",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GF-001-1",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 2.7,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-001",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 150,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -330,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-002",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 40,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -160,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-003",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 300,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-003",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 110,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-004",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -300,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-004",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -110,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-005",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -110,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-006",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2300,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-006",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-007",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-007",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-008",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-009",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1100,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-009",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1200,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-010",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -100,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-011",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 150,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-011",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -110,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-012",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 410,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-012",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 180,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-013",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-016",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 217,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-016",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -172,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-017",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 20,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-018",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 110,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-019",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 680,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-020",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 680,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-021",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 40,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-021",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -5,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-022",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 300,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-022",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2100,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-026",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-035",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-035",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -900,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-043",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-044",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -100,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-045",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-046",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-047",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-048",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-GL-049",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-HG-009-1",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": null,
+   "qty": 250,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-HJ-001",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 25,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-HJ-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 125,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-HJ-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 64,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-HKB-003",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 1900,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JB-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 8500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JDS-005",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2505,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-001",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3600,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3595,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-002",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 4000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 7600,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-004",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 9000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-005",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3600,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-023",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-026",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-033",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -811.474,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-034",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2300,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-04",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2250,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-048",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -4600,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-061",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 1800,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-066",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-19",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-20",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-21",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-25",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1250,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-28",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-30",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-33",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-39",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-39",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-48",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -7,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-49",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-50",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-51",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-52",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-53",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-54",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-55",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-56",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -26,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-58",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-59",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-61",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-61",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-68",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-70",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-JPL-72",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-003",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-005",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-005",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-007",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -300,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-007",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-009",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3800,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-010",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-011",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -25,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-012",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1200,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-012",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -900,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-014",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-016",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-016",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -14,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-021",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-022",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-025",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -5500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-026",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 10190,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KBL-027",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-B12",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": null,
+   "qty": 1050,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-B14",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-DBH-C01",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": null,
+   "qty": 10000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-DGBZ-C01",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 80,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-DGBZ-C03",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-DGBZ-C04",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-FPL-C01",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-JC-B02",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-WD-D01",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 525,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-WD-D02",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-WQD-C02",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 320,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-YBS-C01",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 1449,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-YM-B12",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 1200,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KG-YM-B14",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-KR-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -15000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-MF-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 8000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-MF-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 11000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-RSD-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SL-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 273,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SL-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 273,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SL-003",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SL-004",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SL-010",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SLD-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SLD-005",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 25,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SLD-007",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -825,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SLD-009",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-001-2",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 16875,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-002-2",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 14740,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-003-1",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 6030,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-003-1",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 22400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-003-2",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 6030,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-003-2",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 22400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-005-1",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -6400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-005-2",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 4500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-008",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 385,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-009",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-011-1",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-011-10",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-011-2",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-011-3",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-011-4",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-011-5",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-011-6",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-011-7",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-011-9",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-014",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1300,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-016-1",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -544,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-016-2",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -166,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-016-3",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -600,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-021-1",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-021-2",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2320,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-025",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-026",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-028",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-028",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5510,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-029",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-029",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 6900,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-031",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -15215,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-034",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 900,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-035",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 900,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-035",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-037",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 558,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-038",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3600,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-038",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2790,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-039",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-040",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3644,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-041",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1600,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-042",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3540,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-043",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-043",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-053",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1222,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-056",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -410,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-061-1",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-061-2",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-061-3",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 4600,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-062",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1350,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-062",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3750,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-063",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 12015,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-064",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 9990,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-066",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1880,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-067",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-068",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 50,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-069",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 750,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-070",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2850,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-SX-071",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TB-006",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TBRW-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 7200,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TJHZ-001",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TJHZ-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 800,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TS-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TS-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -990,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TS-004",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -4362,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TS-005",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 4632,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TS-006",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 300,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TS-006",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -596,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TS-024",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -358,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TS-032",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TS-033",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -6561,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TS-033",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2399,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TXS-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -438,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-TXS-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2696,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-WJGM-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 13490,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-WX-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 100,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XH-001",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XH-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3155,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XH-002",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XH-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -975,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XT-001",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 8000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XT-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 520,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -5000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-003",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -12500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-003",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -2500,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-005",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 200,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-014",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-021",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 8800,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-028",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1800,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-031",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-032",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3350,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XWR-061",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 6000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XYH-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1170,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XYH-002",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XYH-004",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -6000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XYH-005",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-XYH-006",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 2235,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YCYX-008",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -3125,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YCYX-009",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 214,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YCYX-016",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1166,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YCYX-027",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YCYX-048",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 870,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YKB-001",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 412,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YKB-002",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 25,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YKF-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YKRS-007",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1000,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YKRS-007",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": -1275,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YKRS-008",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 6012,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YKRS-009",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 400,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YPS-002",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 5025,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YPS-004",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 902,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YPS-004",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 300,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YPS-007",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": null,
+   "qty": 2306,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-YPS-007",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 650,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-ZX-003",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 850,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-ZX-004",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 675,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-ZX-005",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 375,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-ZX-007",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-ZZ-001",
+   "ckdm": "CK00006",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 72.9,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-ZZ-001",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 25.8,
+   "cost": null
+  },
+  {
+   "wzdm": "YJ-ZZ-006",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 0,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-M-B",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 500,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-M-C",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 900,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-M-D",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 600,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-M-E",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 120,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-P-A",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 3250,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-P-D",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 120,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-P-E",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 202,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-S-590",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 120,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-S-N",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 1685,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-S-T",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 620,
+   "cost": null
+  },
+  {
+   "wzdm": "Y-S-Z",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": "PC0000",
+   "qty": 7750,
+   "cost": null
+  },
+  {
+   "wzdm": "ZNP-80250",
+   "ckdm": "YCL-01",
+   "ckName": null,
+   "lot": null,
+   "qty": 22,
    "cost": null
   }
  ]
