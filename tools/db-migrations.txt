@@ -3063,3 +3063,17 @@ migrate-sale-out-order-cols2-20261015.sql
 #     有意**不进链**(前者清写入者标记、后者按硬编码 id 删探针残留角色,登记会让 DbSync 在
 #     所有环境自动执行),已登记进 tools/verify/DbNormAudit.java 检查 12 的 allowOffChain 白名单。
 fix-stock-report-module-group.sql
+
+# ════════════════════════════════════════════════════════════════════════════
+# ── 2026-10-14 产品入库单(产成品入库单 FINISH_IN)转ERP 补齐 ──
+#   用户口径(2026-10-14):① 产品入库单要能转ERP(推金蝶「产品入库单」/jdy/v2/scm/inv_product;
+#     此前转ERP 通道只有 采购入库/销售出库/材料出库);② 字段完全对照金蝶接口来写;
+#     ③ 补一个检验字段 —— 用户指定放**明细行**(每行一个「检验方式」= 全检/抽检)。
+#   金蝶侧真源:字段清单 tools/archive/_dump-out/kingdee-3docs-fields-1014.md(逐键+样例值);
+#     非空率统计 tools/archive/_dump-out/kingdee-3docs-fieldfill-1014.md(30 张真实单据逐键)。
+#     本脚本按用户口径「有数据的字段要保留、不要无用数据」只登记非空率>0 的键 + 链路必需族。
+#   沙箱实测(2026-10-14)两条硬约束:保存接口 protobuf 校验要求**数值/布尔一律传字符串**;
+#     检验类键(check_type / inspect_way / qc_type)**静默忽略且不报错**
+#     ⇒ 「检验方式」只存 MES 本地、不推送金蝶(证据 tools/archive/_dump-out/kingdee-save-inv-product-1014.md)。
+#   幂等(COL_LENGTH + 注明双向 + yj_field/译名 NOT EXISTS + 末尾自检);两账套均执行。
+migrate-finish-in-erp-cols-20261014.sql

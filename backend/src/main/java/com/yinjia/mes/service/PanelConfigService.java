@@ -929,6 +929,11 @@ public class PanelConfigService {
                     new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
                     new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
                     new String[]{"生单", "生成产成品入库单（自制退库）"},
+                    // 转ERP(2026-10-14 用户口径「先把产品入库的转erp补齐」):产品入库单 → 金蝶「产品入库单」
+                    // /jdy/v2/scm/inv_product。字段完全对照金蝶接口(沙箱实测见
+                    // tools/archive/_dump-out/kingdee-save-inv-product-1014.md);
+                    // 明细行的「检验方式」(全检/抽检)是 MES 本地字段 —— 金蝶保存接口对检验类键静默忽略,不推送。
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"导入", "导入"})),
