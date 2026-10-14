@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 /**
- * 把制程检验记录表模板写入 yj_report_template(DB 存储 = 上传即生效,免重启)。
+ * ⛔ 2026-10-14 起**不再使用**(保留作历史记录 / 应急):
+ *   当时是为了在「8090 不能重启」的前提下让模板立即生效才写 DB。
+ *   现在既定口径已回到 **classpath 注册表**(report-templates.properties + reports/*.jrxml),
+ *   两账套的 yj_report_template 里 qc_proc_insp 行**已删除**。
+ *   ⚠ 再跑本脚本会写回一条 DB 行,而 **DB 优先于注册表** ⇒ 会用这份快照**遮蔽**注册表里
+ *     更新过的模板(jrxml 改了却看不到效果,正是最难查的那类问题)。改用 `mvn package` + 重启。
+ *   ⚠ 另有坑:本脚本一次性 fs.writeFileSync 写大段含中文的 SQL,在受限沙箱下会被截断成
+ *      0 字节(实测 2026-10-14);若确需再造 SQL,请分块 append 写入并校验文件长度。
+ *
+ * 原用途:把制程检验记录表模板写入 yj_report_template(DB 存储 = 上传即生效,免重启)。
  * 见 ADR-0002:模板可放 classpath 注册表,也可放 DB;DB 优先、按 update_at 失效重编。
- * 写入后 8090 上的旧实例即可导出(模板文本走 DB,不受 jar 影响)。
- * ⚠ 但 ReportService 的「表区归并 + 5 格拆分」是 Java 代码,旧实例没有 ——
- *   旧实例导出时这三个参数会是 null,模板里 isBlankWhenNull 会显示空白。
- *   完整效果需重启 8090 加载新代码(见汇报说明)。
  * 运行: node tools/archive/_qc-proc/seed-db-template.mjs
  */
 import fs from "node:fs";
