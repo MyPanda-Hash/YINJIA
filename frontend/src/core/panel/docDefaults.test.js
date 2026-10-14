@@ -126,17 +126,27 @@ test('未知面板:不做任何写入', () => {
  * 2026-09-18 第二轮:产品信息表两级审批人固定填写 冯总 / 秀丽。
  * 口径:走"默认值"(仅空时填、可人工改),不是"锁定只读" —— 与 文件管理人=陈秀丽 同款。
  * 若将来要收紧成不可改,改 yj_field.editable=0 即可(那时这条测试要改成断言 lockedPersonLabel)。
+ *
+ * ⚠ 2026-10-13 修正:断言值从物理列名 '审核人一级'/'审核人二级' 改为**字段标签**
+ *   「审核人（一级审批人）」/「审核人（二级审批人）」。
+ *   原断言跟着错误的生产代码一起写错了 —— 两边都用列名,测试全绿而功能全坏:
+ *   纸面格子按 label 取值 ⇒ 显示为空;保存时后端 labelsToCols 按 label 取 ⇒ 静默丢弃、落库恒 NULL
+ *   (实测 测试账套 PI-2026-10-0013 两列皆 NULL)。
+ *   **这条测试此前测的是错的行为,不是漏测 —— 断言照抄了生产代码的键名。**
  */
-test('产品信息表:两级审批人默认带出 冯总 / 秀丽', () => {
+test('产品信息表:两级审批人默认带出 冯总 / 秀丽(键=字段标签,不是物理列名)', () => {
   const form = {}
   applyDocDefaults('RD_PROD_INFO', form, USER, { isNew: true, today: T })
-  assert.equal(form['审核人一级'], '冯总')
-  assert.equal(form['审核人二级'], '秀丽')
+  assert.equal(form['审核人（一级审批人）'], '冯总')
+  assert.equal(form['审核人（二级审批人）'], '秀丽')
+  // 防回归:绝不能再退回物理列名做键(那两个名字在 yj_field.label 里不存在 ⇒ 两头都丢)
+  assert.equal(form['审核人一级'], undefined, '键不能是物理列名「审核人一级」')
+  assert.equal(form['审核人二级'], undefined, '键不能是物理列名「审核人二级」')
   // 不是锁定字段(不在 LOCKED_PERSON 里):用户可改 ⇒ 已填值时不再覆盖
-  const filled = { 审核人一级: '张三' }
+  const filled = { '审核人（一级审批人）': '张三' }
   applyDocDefaults('RD_PROD_INFO', filled, USER, { isNew: true, today: T })
-  assert.equal(filled['审核人一级'], '张三', '已有值不应被默认值覆盖')
-  assert.equal(filled['审核人二级'], '秀丽', '空值仍应带出默认')
+  assert.equal(filled['审核人（一级审批人）'], '张三', '已有值不应被默认值覆盖')
+  assert.equal(filled['审核人（二级审批人）'], '秀丽', '空值仍应带出默认')
 })
 
 test('todayStr:按本地时区给 YYYY-MM-DD(不能因 UTC 偏移差一天)', () => {
@@ -208,4 +218,37 @@ test('项目进度查询:密级默认「绝密」+ 适用范围默认「工程�
   applyDocDefaults('RD_PROGRESS', form, USER, { isNew: true, today: T })
   assert.equal(form['密级'], '绝密', '设计 P2/Q2 印的是绝密')
   assert.equal(form['文件使用范围'], '工程技术中心', '设计 P3/Q3 印的是工程技术中心')
+})
+
+/**
+ * 2026-10-15:成型工艺清单 / 成型配方 / 组装工艺清单补「表单管理人 + 版本号」默认值。
+ *
+ * 用户报障原文:「审批通过后无法做到自动录入管理人及文件版本号,需要提前手动输入」。
+ * 同族面板(RD_INSP_PLAN)早有这两项,这三张漏了 ⇒ 新建单据时两格都是空的。
+ * 口径与 RD_INSP_PLAN 逐字一致:表单管理人=冯敏、版本号 = 'V' + 当天(设计原文「V + 按照日期来」),
+ * 走"默认值"(仅空时填、可人工改),**不是**锁定只读。
+ *
+ * ⚠ 键必须是**字段 label**:两张账套 yj_field 实测这三张表的 label 都是「表单管理人」/「版本号」;
+ *   同族的规格书那条 label 是**「版本」** —— 写成「版本号」会被 labelsToCols 静默丢弃。
+ */
+test('成型工艺清单/成型配方/组装工艺清单:表单管理人=冯敏、版本号=V+当天', () => {
+  for (const code of ['RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_PROC']) {
+    const form = {}
+    applyDocDefaults(code, form, USER, { isNew: true, today: T })
+    assert.equal(form['表单管理人'], '冯敏', `${code} 的表单管理人应默认冯敏`)
+    assert.equal(form['版本号'], 'V2026-09-11', `${code} 的版本号应展开成 V+当天(@today 占位)`)
+  }
+})
+
+test('三张表的默认值不得覆盖用户已填内容(仅空时填)', () => {
+  const form = { 表单管理人: '刘磊', 版本号: 'V9.9' }
+  applyDocDefaults('RD_MOLD_PROC', form, USER, { isNew: true, today: T })
+  assert.equal(form['表单管理人'], '刘磊', '已有值不应被默认值覆盖')
+  assert.equal(form['版本号'], 'V9.9', '已有值不应被默认值覆盖')
+})
+
+test('版本号占位符只认「版本号」这个 label —— 规格书那条叫「版本」,不该被本批默认值碰到', () => {
+  const spec = {}
+  applyDocDefaults('RD_SPEC_DOC', spec, USER, { isNew: true, today: T })
+  assert.deepEqual(spec, {}, '本批默认值不得落到规格书(那边 label 是「版本」不是「版本号」)')
 })

@@ -337,6 +337,9 @@ export const menuTree = [
         // 按用户口径删的就是这一个。注意:面板与业务表 qc_tc 已整体删除(tools/migrate-qc-tc-drop.sql),
         // 不是仅摘菜单,放开注释也恢复不了;特采单入口在 品质管理 > 来料品质 > 特采单。
         code: 'qcDoc', title: '质量单据', icon: 'DocumentChecked', children: [
+          // 成品检验规范(2026-10-09 用户任务):8 份受控文件(YJ-Q-60/62/89/94/125/129/130/含锌粉)归纳成的
+          // **统一文档格式**页面;报工审核(组装)时自动生成一张空格式草稿。⚠ 与组装成品检验单各自独立,互不影响。
+          { code: 'qcFinSpec', title: '成品检验规范', path: '/panelx/list/QC_FIN_SPEC', icon: 'Notebook', panelCode: 'QC_FIN_SPEC', operationName: '新增流程' },
           { code: 'qcNcrp', title: '不合格报告(制程)', path: '/panelx/list/QC_BHG', icon: 'CircleClose', panelCode: 'QC_BHG', operationName: '新增流程' },
           { code: 'qcNcdp', title: '不合格品处理单(制程)', path: '/panelx/list/QC_BHC', icon: 'Box', panelCode: 'QC_BHC', operationName: '新增流程' },
           { code: 'qcNcdz', title: '不合格品处理单(自制物料)', path: '/panelx/list/QC_BHZ', icon: 'Files', panelCode: 'QC_BHZ', operationName: '新增流程' },
@@ -348,18 +351,10 @@ export const menuTree = [
       },
     ],
   },
-  {
-    code: 'fin',
-    title: '财务管理',
-    icon: 'Money',
-    children: [],
-  },
-  {
-    code: 'equip',
-    title: '设备管理',
-    icon: 'Cpu',
-    children: [],
-  },
+  // 2026-10-15 用户要求「把侧边栏的财务管理与设备管理删掉」——
+  //   这两栏从建起来就是**空的占位分组**(children: []),里面没有任何菜单项,
+  //   侧边栏却会渲染出两个点不开的空分类,徒增噪音。删除不影响任何面板入口
+  //   (财务类面板本就走「基础档案 → 财务」栏,设备类走「生产」栏的 设备/设备维护)。
   {
     code: 'base',
     title: '基础档案',
@@ -399,6 +394,11 @@ export const menuTree = [
           { code: 'inventory', title: '商品', path: '/panelx/list/INV', icon: 'Grid', panelCode: 'INV', operationName: '新增流程' },
           // 2026-10-14 物料清单(BOM)菜单下线:MES 自建 BOM 功能整体删除
           // (表 bs_bom / 面板 BOM 及其正反向查询 BOM_FWD、BOM_REV 同批下架)。
+          // ⚠ 2026-10-15 补回「物料清单」入口 —— 但**指向 WLBOM(mate 表),不是当年下架的 BOM(bs_bom)**:
+          //   规格书「1.关键物料列表」引用的那份物料数据就是 WLBOM(面板与表都还在,yj_panel 里仍有登记),
+          //   当年下线的只是另一套自建 BOM;用户报障「物料清单面板入口没有在基础档案里面」即指此。
+          //   位置按 README §基础档案 的登记顺序:计量单位 / 商品 / 物料清单 / 存货价格本。
+          { code: 'wlbom', title: '物料清单', path: '/panelx/list/WLBOM', icon: 'Files', panelCode: 'WLBOM', operationName: '新增流程' },
           { code: 'invPrice', title: '存货价格本', path: '/panelx/list/INV_PRICE', icon: 'PriceTag', panelCode: 'INV_PRICE', operationName: '新增流程' },
         ],
       },
@@ -417,8 +417,9 @@ export const menuTree = [
           // 工序工时:参考库 gxgs——按 客户×物料×工序 维护 换线/标准·最快·最慢·平均时间与加工单价(排产产能/计件依据)
           { code: 'opTime', title: '工序工时', path: '/panelx/list/OP_TIME', icon: 'Timer', panelCode: 'OP_TIME', operationName: '新增流程' },
           { code: 'reject', title: '不合格原因', path: '/panelx/list/REJECT', icon: 'CircleClose', panelCode: 'REJECT', operationName: '新增流程' },
-          { code: 'qcItem', title: '检验项目', path: '/panelx/list/QC_ITEM', icon: 'List', panelCode: 'QC_ITEM', operationName: '新增流程' },
-          { code: 'qcPlan', title: '检验方案', path: '/panelx/list/QC_PLAN', icon: 'DocumentChecked', panelCode: 'QC_PLAN', operationName: '新增流程' },
+          // 2026-10-09 摘除「检验项目 QC_ITEM」「检验方案 QC_PLAN」两个菜单入口(用户口径:维护入口收敛到
+          // 检验单工具栏那一个按钮,弹窗两用=勾选带入 + 就地维护)。⚠ 只摘菜单:**面板与数据表保留不动**
+          // (bs_qc_plan/bs_qc_item 仍被维护弹窗读写,面板元数据留作历史/备份),放开注释即可恢复入口。
         ],
       },
       {

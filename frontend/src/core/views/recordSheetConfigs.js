@@ -57,8 +57,9 @@
 // ⚠ 必须带 .js 扩展名:Node 的 ESM 解析不做扩展名补全(node --test 直接跑源码时
 //   无扩展名会 ERR_MODULE_NOT_FOUND);Vite 两种写法都接受,故带扩展名对两端都安全。
 import { SPEC_TEST_LIB } from './specTestLib.js'
-// 配方表「物料种类」的词表:引擎只认物料档案口径的四个类别,集中放在 core/mold/materialKinds.js,
-// 并由 materialKinds.test.js 钉住"下拉里每个词都必须被引擎认出来"(填错会静默算错,见该文件注释)
+// 配方表「物料种类」的词表:集中放在 core/mold/materialKinds.js(引擎认得的那几个档案类别,
+// 2026-10-15 补「折算物料」共五个),并由 materialKinds.test.js 钉住
+// "下拉里每个词都必须被引擎认出来"(填错会静默算错,见该文件注释)
 // ⚠ 必须相对路径:本文件被 node --test 直接 import(keys.test.js),`@/` 别名只有 Vite 认
 import { MATERIAL_KINDS } from '../mold/materialKinds.js'
 
@@ -324,6 +325,10 @@ const RD_MOLD_PROC_SEC0 = [
       ]},
       { page: 1, bar: '检验要求', rows: [
         // 炭棒尺寸:标签行 4 格 + 值行 4 格,标签与值同列对齐(新版面无「内孔要求」)
+        // ⚠ 四个块名格(炭棒尺寸/跌落强度/抗压强度/压降)在 yj_field 里是**显示标签**
+        //   (editable=0 / hidden=1,见 tools/migrate-mold-proc-labels.sql 头注「只做显示(不存数据)」)。
+        //   规格书带出的检验要求写在**右边那几格真实数据格**上(跌落要求 / 强度要求kgf / 压降标准kpa、
+        //   以及尺寸那四格),不写块名格 —— 用户 2026-10-15 实测口径,见本块末尾 autoFillSpec。
         { grid: [
           { label: '炭棒尺寸', rowspan: 2 },
           { label: '炭棒外径mm', span: 2 },
@@ -424,7 +429,9 @@ const RD_MOLD_FORMULA = {
       ]},
     ],
     dataTables: [
-      // recipeCalc:表头上出「配方计算」按钮(读本表行 → 算 → 回填页 1 与本表两列);
+      // recipeCalc:表头上出「配方计算」按钮 —— 配方表的物料行**在弹窗里录**(2026-10-15 用户口径:
+      // 「配方表的数据是在配方计算器里面填写数据然后填入单据的,而不是带入的规格书的」),
+      // 算完点「填入单据」写回页 1 十一格 + 本表区**整表替换**为弹窗那份行;
       // 口径见 CONTEXT.md「配方计算器」/ docs/adr/0004 —— 弹窗输入不落库,只有回填值随单据保存
       { page: 2, bar: '配方表', autoSeqBar: true, totalCols: true, recipeCalc: true, filterKey: '表区', filterVal: '配方表', cols: [
           { key: '序号', label: 'No.' },
@@ -1049,6 +1056,50 @@ export const recordSheetConfigs = {
     //(修订记录 / 配方表),少一条 rowsOf() 就会把整份明细当本表显示。
     dataTables: [RD_MOLD_PROC_DT_REVISION, ...RD_MOLD_FORMULA.dataTables],
     tailSections: [...RD_MOLD_FORMULA.tailSections],
+    /**
+     * 「自动填充规格书」—— 成型工艺清单:检验要求落**真实数据格**。
+     *
+     * 用户口径(2026-10-15 实测反馈,推翻上一版"块名下方只读显示"):
+     *   ① 「规格书的检验要求数据应该是填在成型工艺清单的表格内的**要求、强度要求、压降标准**里面的」;
+     *   ② 「如果是尺寸,应该是把对应检测的**内径或者外径的公差**等数据填写进成型工艺清单的对应
+     *      检测要求里面的数据表格里面」。
+     *
+     * 映射(键一律用中文 label):
+     *   规格书 · 检验要求表区           成型工艺清单 · 检验要求区(真实数据格)
+     *     跌落强度                →      跌落要求
+     *     抗压强度                →      强度要求kgf
+     *     压降                    →      压降标准kpa
+     *     尺寸                    →      外径mm / 外径公差 / 内径mm / 内径公差(**整句解析**,
+     *                                    纯函数 + 单测在 core/insp/dimensionSpec.js;长度项不落格)
+     *
+     * ⚠ **2026-10-15 口径变更(用户原话)**:「这个需要改一下成型工艺清单的配方表的数据是在配方计算器
+     *   里面填写数据然后填入单据的,**而不是带入的规格书的**」⇒ 原先这段里的
+     *   `detailSource:'物料清单'` + `detail:[序号/物料编号/物料名称/物料种类 ← 规格书物料清单]`
+     *   **整段撤掉**:页 2 配方表的物料行改在配方计算弹窗里录(见 RecipeCalcDialog.vue、
+     *   RecordSheetPanels.onRecipeApplied 与 core/mold/recipeRows.js),本链只管检验要求那几格 ——
+     *   明细落点为空 ⇒ autoFillFromSpec 不会去动任何明细表(它按 detail 空就不认明细表)。
+     *
+     * 链路与出货检验计划表**同源**(core/insp/specCarry.js 头注):选完「产品编号」→
+     *   onProdRefConfirm() → autoFillFromSpec() → 后端 GET /px/specByProductForMold?code=
+     *   —— 审批门禁在服务端(只挑已审核/已归档的规格书),前端不另开端点、不绕门禁;
+     *   规格书未审批 ⇒ 后端一个格都不带回,前端只弹提示。
+     * 三处配置差异:
+     *   · endpoint    本面板要按 RD_MOLD_PROC 的权限取规格书(与 /px/specByProductForAsm 同款理由:
+     *                 借别人的端点会被 403),端点在服务端只回「检验要求」表区;
+     *   · specDrift:false 本表明细是修订记录/配方表,不是检验项目,比「规格书变动」只会误报。
+     * 表头「客户项目名称」等格由产品信息表带出,不由规格书。
+     */
+    autoFillSpec: {
+      fromKey: '产品编号',
+      endpoint: '/px/specByProductForMold',
+      specDrift: false,
+      headFromDetail: [
+        { to: '跌落要求', matchProject: '跌落强度' },
+        { to: '强度要求kgf', matchProject: '抗压强度' },
+        { to: '压降标准kpa', matchProject: '压降' },
+        { parse: 'dimension', matchProject: '尺寸' },
+      ],
+    },
   },
 // 产品信息表:14 字段纯表单升级为文书面板(纸张式,与产品文件家族同视觉语言);
   // 网格 4 列(标签130/值260×2),报告头带单据日期信息块;下拉走 yj_field 字典,长文本不写 type 即多行域
@@ -1187,6 +1238,40 @@ export const recordSheetConfigs = {
      *  ⚠ 4 个 sheet 是**四个独立变体**,没有"默认那个"之说 ⇒ 新单 工艺形态 为空时
      *    不假装是某一个变体:内容由用户从标准库勾选某个变体带入(勾选时一并写回 工艺形态)。 */
     variantKey: '工艺形态',
+    /**
+     * 「导入规格书 1.关键物料列表」—— 组装BOM表 ← 规格书(RD_SPEC_DOC)的物料清单表区。
+     *
+     * 用户口径(2026-10-13):「组装工艺清单的 BOM 表也是可以导入对应规格书的 1.关键物料列表,
+     * 这个是需要规格书已经填写完并且通过审批才会导入对应的规格书的数据,否则就只是导入那些平常
+     * 的数据,如果规格书没有通过审批归档导致数据不能导入时,可以弹窗提示『规格书未进行填写,
+     * 请规格书通过审批之后再试,或者自行填写』,在还没有提交审批之前都是可以尝试导入规格书数据的。」
+     *
+     * 与出货检验计划表那条链(RD_INSP_PLAN.autoFillSpec)**共用**同一套取数与审批门禁
+     * (见 core/insp/specCarry.js 头注),差异只有下面四处:
+     *   · endpoint      ASM 专端点 —— 权限按本面板(RD_ASM_PROC)校验;借用出货检验计划的端点会 403;
+     *   · specSheetArea 取规格书哪个表区:『物料清单』= 规格书「1.关键物料列表」那一页
+     *                   (规格书全部明细共用 rd_spec_doc_detail,靠 [表区] 分列,见该面板配置);
+     *   · notApprovedTip 未审批时的提示用用户原话(出货检验那条已验收通过,措辞不许改);
+     *   · specDrift:false 本表不比「规格书变动」—— specDrift 比的是检验项目/要求/方法,物料行比了只会误报。
+     * 手动入口:表头条上的 ⤓ 按钮(manual = 按钮文案),未提交审批前可反复重试。
+     * ⚠ 「外观要求」没有对应源(规格书关键物料列表是 序号|物料编码|物料名称|规格参数|数量|备注),
+     *   故意不映射 —— 宁缺毋滥,不把 备注 硬塞进 外观要求。
+     */
+    autoFillSpec: {
+      fromKey: '产品编号',
+      endpoint: '/px/specByProductForAsm',
+      specSheetArea: '物料清单',
+      notApprovedTip: '规格书未进行填写，请规格书通过审批之后再试，或者自行填写',
+      manual: '从规格书导入',
+      specDrift: false,
+      // 表头不动:本表只导入 BOM 行(产品基本信息区那几格与规格书表头不一一对应,不顺手覆盖)
+      detail: [
+        { to: '物料编号', from: '物料编码' },
+        { to: '物料名', from: '物料名称' },
+        { to: '物料规格', from: '规格参数' },
+        { to: '用量', from: '数量' },
+      ],
+    },
     // 列序/表区值见各常量;三页的列宽都配平到 1040(与 grid 总宽一致,打印左右缘对齐)。
     dataTables: [
       RD_ASM_PROC_DT_REVISION,
@@ -1329,9 +1414,11 @@ export const recordSheetConfigs = {
       //    两者都有 = 同一标题渲染两遍(用户报「空余行重复了」)。
       // ⚠ filterKey/filterVal 保留:规格书全部明细共用一张 rd_spec_doc_detail,靠 [表区]='物料清单'
       //    把物料行与修订记录/检验项目行分开;删掉会把整张明细当物料显示(踩过)。
-      // ⚠ 2026-10-14:MES 自建「物料清单(BOM)」功能整体删除(表 bs_bom / 面板 BOM 下架),
-      //    原先挂在表上的 materialPick「从物料清单引用」按钮随之去掉;[表区]='物料清单' 只是分区值,保留。
-      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', cols: [
+      // ⚠ 2026-10-13:「从物料清单引用」(materialPick) 能力代码已在 RecordSheetPanels.vue 里恢复
+      //    (按钮模板/弹窗/取数 WLBOM/字段映射),数据源是 WLBOM「物料清单」
+      //    (line_table=mate,单单据面板,子件行在 detail.items),不再读已删掉的 BOM 面板。
+      //    [表区]='物料清单' 是分区值,不动。开关由 materialPick: true 控制(见下行)。
+      { page: 3, tablesAfterBar: '1.关键物料列表', filterKey: '表区', filterVal: '物料清单', materialPick: true, cols: [
           { key: '表区', label: '表区', hiddenCol: true },
           { key: '序号', label: '序号' },
           { key: '物料编码', label: '物料编码' },
@@ -1653,6 +1740,129 @@ export const recordSheetConfigs = {
     ],
   },
 
+  /**
+   * 成品检验规范(QC_FIN_SPEC,2026-10-09)—— 8 份受控文件归纳成的**一个统一文档格式**:
+   *   YJ-Q-60 SMS / YJ-Q-62 载银抑菌料 A2 / 含锌粉 / YJ-Q-94 碱3料 / YJ-Q-89 碱4料 /
+   *   YJ-Q-130 钾长石 A0 / YJ-Q-129 方解石 A1 / YJ-Q-125 Y料 A0
+   * 骨架逐份一致(证据 tools/archive/_qcspec/_structure.txt):修订履历 → 签字栏 → 正文五段 →
+   *   检验项目(按「检验对象」分节) → 检验结果处理方式。
+   * 四页(数据由后端 migrate-qc-fin-spec.sql 落库,行表用 表区 分块 + 检验对象 区分子节):
+   *   页1 文件修订履历(showHead:false,纸面自成一张表头) / 页2 正文+签署 /
+   *   页3 检验项目(每行带「检验对象」=子节名) / 页4 检验结果处理方式。
+   * ⚠ 只新增,不动组装成品检验单与其它三张检验单。
+   */
+  QC_FIN_SPEC: {
+    headMode: 'report',
+    staticTitle: '成品检验规范',
+    grid: [130, 390, 130, 390],
+    head: { title: 2, infoLabel: 1, infoValue: 1 },
+    info: [
+      { label: '文件编号', key: '文件编号', type: 'text' },
+      { label: '发行日期', key: '发行日期', type: 'text' },
+      { label: '版本版次', key: '版本版次', type: 'text' },
+      { label: '管控状态', key: '管控状态', type: 'text' },
+    ],
+    pages: [
+      { title: '文件修订履历', headMode: 'report', showHead: false, grid: [130, 390, 130, 390] },
+      { title: '正文', headMode: 'report', showHead: true, staticTitle: '成品检验规范' },
+      { title: '检验项目', headMode: 'report', showHead: true, staticTitle: '成品检验规范' },
+      { title: '处理方式', headMode: 'report', showHead: true, staticTitle: '成品检验规范' },
+    ],
+    sections: [
+      // 页2:关联工单信息 + 正文 1~5(可填文本) + 签字栏
+      { page: 1, bar: '关联信息', rows: [
+        { grid: [
+          { label: '工单号' }, { key: '工单号' },
+          { label: '批次号' }, { key: '批次号' },
+        ]},
+        { grid: [
+          { label: '产品编码' }, { key: '产品编码' },
+          { label: '产品名称' }, { key: '产品名称' },
+        ]},
+      ]},
+      { page: 1, bar: '正文', rows: [
+        // ⚠ vspan=3:键值对行的值格默认只占 **1 列**,4 列版式下右边会空一半(2026-10-09 用户实测报
+        //   「表格为什么不填满右边」)⇒ 值格跨满 label 之外的 3 列。
+        { pairs: [{ label: '1 目的', key: '目的', vspan: 3 }] },
+        { pairs: [{ label: '2 范围', key: '范围', vspan: 3 }] },
+        { pairs: [{ label: '3 职责和权限', key: '职责和权限', vspan: 3 }] },
+        { pairs: [{ label: '4 取样要求', key: '取样要求', vspan: 3 }] },
+        { pairs: [{ label: '5 工作程序', key: '工作程序', vspan: 3 }] },
+      ]},
+      // ⚠ 本页 grid 是 4 列 ⇒ 签字栏拆两行,别写成 6 格(会把「核准」挤出纸面)
+      { page: 1, bar: '签署', rows: [
+        { grid: [
+          { label: '制定' }, { key: '制定' },
+          { label: '审核' }, { key: '审核' },
+        ]},
+        { grid: [
+          { label: '核准' }, { key: '核准' },
+        ]},
+      ]},
+      // 页3/页4:同样的关联信息抬头(纸面每页都要能独立看懂)
+      { page: 2, bar: '关联信息', rows: [
+        { grid: [
+          { label: '工单号' }, { key: '工单号' },
+          { label: '产品名称' }, { key: '产品名称' },
+        ]},
+      ]},
+      { page: 3, bar: '关联信息', rows: [
+        { grid: [
+          { label: '工单号' }, { key: '工单号' },
+          { label: '产品名称' }, { key: '产品名称' },
+        ]},
+      ]},
+    ],
+    dataTables: [
+      // 页1 文件修订履历(照文档表头:版本 | 修订理由与内容简述 | 修订日期 | 拟定)
+      {
+        page: 0,
+        pageTitle: '文件修订履历',
+        filterKey: '表区', filterVal: '修订履历',
+        noVariant: true,
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true, w: 60 },
+          { key: '行号', label: '序号', w: 70, align: 'center' },
+          { key: '版本', label: '版本', w: 120, align: 'center' },
+          { key: '修订理由与内容简述', label: '修订理由与内容简述', w: 460, area: true },
+          { key: '修订日期', label: '修订日期', w: 160, align: 'center' },
+          { key: '拟定', label: '拟定', w: 170 },
+        ],
+      },
+      // 页3 检验项目:「检验对象」= 子节名(原料(x)/成品(x)…),同一对象的行构成一节
+      {
+        page: 2,
+        bar: '6 检验项目（按检验对象分节）',
+        filterKey: '表区', filterVal: '检验项目',
+        noVariant: true,
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true, w: 60 },
+          { key: '行号', label: '序号', w: 60, align: 'center' },
+          { key: '检验对象', label: '检验对象', w: 170 },
+          { key: '检验项目', label: '检验项目', w: 140 },
+          { key: '称料', label: '称料', w: 90, align: 'center' },
+          { key: '接受标准', label: '接受标准', w: 250, area: true },
+          { key: '检验方法', label: '检验方法', w: 330, area: true },
+        ],
+      },
+      // 页4 检验结果处理方式(与检验项目子节一一对应)
+      {
+        page: 3,
+        bar: '7 检验结果处理方式',
+        filterKey: '表区', filterVal: '处理方式',
+        noVariant: true,
+        cols: [
+          { key: '表区', label: '表区', hiddenCol: true, w: 60 },
+          { key: '行号', label: '序号', w: 70, align: 'center' },
+          { key: '检验对象', label: '检验对象', w: 240 },
+          { key: '合格处置', label: '合格处置', w: 260 },
+          { key: '不合格处置', label: '不合格处置', w: 260 },
+          { key: '备注', label: '备注', w: 150 },
+        ],
+      },
+    ],
+  },
+
   // ───────────────────────────────────────────────────────────────────────────
   // 归档式(archive)面板 —— 与上面 17 张「纸面记录表」是**两套渲染路径**
   //
@@ -1695,22 +1905,30 @@ export const recordSheetConfigs = {
   // 烧结尺寸表 —— 无头表(整表即行表)。yj_panel: head_table=NULL, line_table=rd_sinter_tolerance,
   //                                          detail_key=items, page_size=25
   // 10 个字段全部 place 含 'detail';车间/型号另含 'query'(进查询区)且 required=1。
+  //
+  // ⚠ 版式必须是 **plain**(2026-10-15 用户报障「配方计算里点『维护尺寸表』打开的视图有问题」):
+  //   这张表不是纸面文书(没有报告头,也没有 密级/报告编号 那套「数据记录表」抬头),走 report 版式会同时踩两个坑:
+  //     ① `effInfo` 在 `cfg.info === undefined` 时回落 DEFAULT_INFO ⇒ 纸上凭空多出
+  //        「YJ-PD-01 密级 适用范围 测试负责人 报告编号 审核人」这一整块属于数据记录表的抬头(实测);
+  //     ② 本面板未声明 `grid` ⇒ `gridW = 0`,而 `.rs-t` 是 `table-layout:fixed` ⇒ **整张纸塌成一条竖线**
+  //        (实测 1600×1000 截图:10 个列名与 62 行全挤在一列里,与 keys.test.js 断言⑥ 记的坑同源)。
+  //   plain 版式不渲报告头,表宽直接取 `plainW = Σcols[].w`,故这里**逐列给宽**(取该字段 yj_field.width)。
   RD_SINTER_TOL: {
-    titlePlaceholder: '烧结尺寸表',
-    head: { docnoPrefix: false },
+    headMode: 'plain',
+    plainTitle: '烧结尺寸表',
     sections: [],
     dataTables: [
       { bar: '烧结尺寸', cols: [
-        { key: '车间', label: '车间' },
-        { key: '型号', label: '型号' },
-        { key: '模具尺寸', label: '模具尺寸' },
-        { key: '中心杆尺寸', label: '中心杆尺寸' },
-        { key: '炭棒外径', label: '炭棒外径' },
-        { key: '炭棒外径公差', label: '炭棒外径公差' },
-        { key: '炭棒内径', label: '炭棒内径' },
-        { key: '炭棒内径公差', label: '炭棒内径公差' },
-        { key: '长度范围', label: '长度范围' },
-        { key: '停用', label: '停用', type: 'bool' },
+        { key: '车间', label: '车间', w: 90 },
+        { key: '型号', label: '型号', w: 130 },
+        { key: '模具尺寸', label: '模具尺寸', w: 100 },
+        { key: '中心杆尺寸', label: '中心杆尺寸', w: 110 },
+        { key: '炭棒外径', label: '炭棒外径', w: 100 },
+        { key: '炭棒外径公差', label: '炭棒外径公差', w: 110 },
+        { key: '炭棒内径', label: '炭棒内径', w: 100 },
+        { key: '炭棒内径公差', label: '炭棒内径公差', w: 110 },
+        { key: '长度范围', label: '长度范围', w: 170 },
+        { key: '停用', label: '停用', type: 'bool', w: 80 },
       ]},
     ],
   },

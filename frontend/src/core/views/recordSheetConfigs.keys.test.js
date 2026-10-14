@@ -537,3 +537,155 @@ test('variants[变体].cols 的 key 必须是该面板当前的 label', () => {
   }
   assert.deepEqual(problems, [], `变体列集的数据键与 yj_field.label 不一致(该列取值空白且保存丢值):\n  ${problems.join('\n  ')}`)
 })
+
+/**
+ * 组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」(2026-10-13 用户口径)。
+ *
+ * 【为什么断言要写在这里】这条链是**跨面板**取值:落点写错(写成 RD_SPEC_DOC 的列名或写错
+ *   label)不会报错,只会静默填空白 —— 与 RD_INSP_PLAN 那条链同一个坑(见上面 ⑥/⑦)。
+ *   另钉两条会静默跑偏的配置事实:
+ *     · specSheetArea 决定取规格书哪个表区,写错就取回检验项目行(整张 BOM 表被灌成检验项);
+ *     · endpoint 必须走 ASM 专端点(RD_ASM_PROC 查看权),否则用出货检验计划的端点会被 403。
+ */
+test('组装工艺清单:组装BOM表的规格书导入映射到 BOM 表真实列', () => {
+  const cfg = recordSheetConfigs.RD_ASM_PROC
+  assert.ok(cfg, 'RD_ASM_PROC 配置缺失')
+  const afs = cfg.autoFillSpec
+  assert.ok(afs, '组装BOM表需要 autoFillSpec(导入规格书 1.关键物料列表)')
+  assert.equal(afs.fromKey, '产品编号', '触发键 = 组装工艺清单的 产品编号(参照字段)')
+  assert.equal(afs.specSheetArea, '物料清单', '规格书「1.关键物料列表」的表区值就是 物料清单')
+  assert.ok(afs.endpoint && afs.endpoint !== '/px/specByProduct',
+    '权限按 RD_ASM_PROC 校验 ⇒ 必须走 ASM 专端点(用出货检验计划表的端点会被 403)')
+
+  const bom = (cfg.dataTables || []).find((dt) => dt.filterVal === '物料清单')
+  assert.ok(bom, '找不到组装BOM表(dataTables 里 filterVal=物料清单 那一张)')
+  assert.ok(afs.detail?.length, 'autoFillSpec.detail 为空 ⇒ 明细不会回填')
+  const fx = FIXTURE.RD_ASM_PROC
+  const specFx = FIXTURE.RD_SPEC_DOC
+  const bomKeys = new Set((bom.cols || []).map((c) => c.key))
+  for (const m of afs.detail) {
+    assert.ok(bomKeys.has(m.to), `明细落点 '${m.to}' 不在组装BOM表的列里(填了也看不见)`)
+    assert.ok(fx.labels.includes(m.to), `明细落点 '${m.to}' 不是本面板字段`)
+    assert.ok(specFx.labels.includes(m.from), `取数源 '${m.from}' 不是规格书字段(那边改 label 这里就填空白)`)
+  }
+  assert.deepEqual(afs.detail.map((m) => m.to).sort(), ['物料名', '物料规格', '物料编号', '用量'].sort(),
+    '四条映射:物料编号←物料编码 / 物料名←物料名称 / 物料规格←规格参数 / 用量←数量')
+})
+
+/**
+ * 成型工艺清单「检验要求」区 ← 规格书明细(2026-10-15 用户实测反馈后的口径)。
+ *
+ * 【为什么断言要写在这里】与 RD_INSP_PLAN / RD_ASM_PROC 两条链同一个坑:跨面板取值,
+ *   落点写错(labelsToCols 反查不到)只会**静默丢值**,不报错 —— 而路线要点是:
+ *     · 落点必须是本面板真实存在的 label,**且是真实数据格**;
+ *       上一版把值只读挂在 4 个**块名标签格**下方(valueKey + .rs-subval),用户 8090 实测否决:
+ *       「规格书的检验要求数据应该是填在成型工艺清单的表格内的要求/强度要求/压降标准里面的」;
+ *     · `尺寸` 那一项要**整句解析成四格**(外径mm/外径公差/内径mm/内径公差,见 core/insp/dimensionSpec.js);
+ *     · ⚠ 2026-10-15 口径变更:原先把配方表三列(物料编号/物料名称/物料种类)也挂在本链上
+ *       (靠 detailSource 取 payload['物料清单'])—— 用户改口「配方表的数据是在配方计算器里面填写
+ *       数据然后填入单据的,而不是带入的规格书的」,那段配置连同本文件的守卫测试一并撤掉;
+ *       本链现在**只带表头检验要求那几格**(detail 为空 ⇒ 不会去动任何明细表)。
+ */
+test('成型工艺清单:检验要求落在真实数据格上(不再是块名下方的只读值)', () => {
+  const cfg = recordSheetConfigs.RD_MOLD_PROC
+  assert.ok(cfg, 'RD_MOLD_PROC 配置缺失')
+  const afs = cfg.autoFillSpec
+  assert.ok(afs, '成型工艺清单需要 autoFillSpec(从规格书带出检验要求)')
+  assert.equal(afs.fromKey, '产品编号', '触发键 = 产品编号(选完它才动手)')
+  assert.equal(afs.specDrift, false, '本表明细是修订记录/配方表,不是检验项目,比「规格书变动」只会误报')
+
+  // 权限按承载面板校验(与 /px/specByProductForAsm 同款):本面板 403 不了别人的端点
+  assert.equal(afs.endpoint, '/px/specByProductForMold',
+    '本面板要按 RD_MOLD_PROC 的权限取规格书 ⇒ 走本面板的端点(借别人的端点会被 403)')
+  // 配方表的物料行改在配方计算弹窗里录 ⇒ 本链不许再配明细落点(配了就会去动配方表)
+  assert.equal(afs.detail, undefined, '本链只带表头检验要求:明细落点已随 2026-10-15 口径变更撤掉')
+  assert.equal(afs.detailSource, undefined, 'detailSource(配方表 ← 规格书物料清单)已撤')
+
+  const fx = FIXTURE.RD_MOLD_PROC
+  assert.ok(fx?.labels?.length, 'fixture 缺 RD_MOLD_PROC')
+  const maps = afs.headFromDetail
+  assert.ok(Array.isArray(maps) && maps.length, 'autoFillSpec.headFromDetail 为空 ⇒ 检验要求不会回填')
+  assert.deepEqual(
+    maps.map((m) => [m.to ?? `parse:${m.parse}`, m.matchProject]),
+    [['跌落要求', '跌落强度'], ['强度要求kgf', '抗压强度'], ['压降标准kpa', '压降'], ['parse:dimension', '尺寸']],
+    '落点口径(用户给定):跌落强度→跌落要求 / 抗压强度→强度要求kgf / 压降→压降标准kpa / 尺寸→四格解析',
+  )
+
+  // 收集纸面上的格:标签格(label 且无 key)与数据格(key)
+  const labelCells = new Set()
+  const dataCells = new Set()
+  for (const sec of cfg.sections || []) {
+    for (const row of sec.rows || []) {
+      for (const c of row.grid || []) {
+        if (c.key) dataCells.add(c.key)
+        else if (c.label) labelCells.add(c.label)
+      }
+    }
+  }
+  for (const m of maps) {
+    if (!m.to) continue
+    assert.ok(fx.labels.includes(m.to), `落点 '${m.to}' 不是本面板字段(label 写错会被 labelsToCols 静默丢弃)`)
+    assert.ok(dataCells.has(m.to), `落点 '${m.to}' 在本面板纸面上不是数据格(挂不到格上)`)
+  }
+  // 上一版就是把这 4 个**块名**当落点(值只读显示在块名下方)—— 用户否决,钉住别再挂回去。
+  // 机制上的强守卫是上面那句 dataCells.has(to):块名格是 rowspan 的显示标签格,**没有对应的 key**
+  // (纸面上每个值行还有一个同名 label 格,那是"行标签",与块名是两回事)。
+  const BLOCK_LABELS = ['炭棒尺寸', '跌落强度', '抗压强度', '压降']
+  for (const m of maps) {
+    if (!m.to) continue
+    assert.ok(!BLOCK_LABELS.includes(m.to),
+      `落点 '${m.to}' 是块名标签格(只做显示,纸面上没有数据格)`)
+  }
+
+  // 块名标签格本身仍在纸面上(它们只是标题,不再挂 valueKey)
+  for (const lb of ['炭棒尺寸', '跌落强度', '抗压强度', '压降']) {
+    assert.ok(labelCells.has(lb), `块名标签格 '${lb}' 不该被删掉`)
+  }
+  const valueKeys = []
+  for (const sec of cfg.sections || []) {
+    for (const row of sec.rows || []) {
+      for (const c of row.grid || []) if (c.valueKey) valueKeys.push(c.valueKey)
+    }
+  }
+  assert.deepEqual(valueKeys, [], 'valueKey/.rs-subval 那套只读带出已撤(值直接写真实数据格)')
+
+  // ⚠ 2026-10-15:原先这里还有一条「配方表 物料编号/物料名称/物料种类 ← 规格书「物料清单」表区」
+  //   的守卫测试 —— 随该功能一起撤掉(用户改口:配方表的行在**配方计算弹窗**里录,
+  //   见 core/mold/recipeRows.js 与 RecipeCalcDialog 的物料行区)。留着就是断言一个不存在的配置。
+})
+
+/**
+ * 断言 ⑧(2026-10-15 用户报障「配方计算 → 点『维护尺寸表』打开的视图有问题」):
+ * 烧结尺寸表 RD_SINTER_TOL 是**无头表的档案**(yj_panel.head_table=NULL),不是纸面文书,
+ * 它的版式有两条硬约束,缺一条页面上就"静默塌掉"(都不是报错,是难看/看不懂):
+ *
+ *   ① `headMode` 必须是 'plain'。留空(默认 report 版式)时,`effInfo` 在 `cfg.info === undefined`
+ *      会回落 DEFAULT_INFO ⇒ 纸上凭空印出「YJ-PD-01 密级 适用范围 测试负责人 报告编号 审核人」
+ *      一整块**数据记录表**抬头(活体实测 8090:reportHeadPresent=true/headText 就是那串)。
+ *   ② 每一列必须有 `w`。本面板没有(也不该有)全页 grid,plain 版式的表宽只能取
+ *      `plainW = Σcols[].w`;列宽缺省 100 虽能兜底,但真正的塌陷源是**没有 grid 的 report 版式**
+ *      ⇒ `gridW = 0`,而 `.rs-t` 是 `table-layout:fixed` ⇒ 整张纸塌成一条竖线。
+ *      活体实测:修前数据表宽 **1px**(10 个列名与 60 行全挤在一列),修后 **1101px**。
+ *      列宽取该字段的 yj_field.width(车间 90 / 型号 130 / … / 停用 80),与面板元数据同源。
+ *
+ * 为什么这条要自动化守:两种坏法都**不抛错、不进控制台**,只有肉眼看页面才发现;
+ * 而 keys.test 的断言⑥ 已经在别的面板上记过同一个"缺 grid ⇒ 塌成竖线"的坑。
+ */
+test('烧结尺寸表(无头档案表):走 plain 版式且逐列给宽,否则整表塌成 1px 竖线并印出报告头', () => {
+  const cfg = recordSheetConfigs.RD_SINTER_TOL
+  assert.ok(cfg, 'RD_SINTER_TOL 配置缺失(它被 recordSheetConfigs.livedb.test.js 纳入范围)')
+  assert.equal(cfg.headMode, 'plain', "report 版式会给这张无头档案表印上数据记录表抬头(密级/报告编号…)")
+  assert.equal(cfg.plainTitle, '烧结尺寸表', 'plain 版式的标题条文字 = 面板名')
+  assert.deepEqual(cfg.sections, [], '无头表没有表头区')
+  assert.equal((cfg.dataTables || []).length, 1, '整表即一张数据表')
+
+  const cols = cfg.dataTables[0].cols || []
+  assert.deepEqual(
+    cols.map((c) => c.key),
+    ['车间', '型号', '模具尺寸', '中心杆尺寸', '炭棒外径', '炭棒外径公差', '炭棒内径', '炭棒内径公差', '长度范围', '停用'],
+    '数据键必须逐字等于活库 yj_field.label(顺序同 seq)',
+  )
+  for (const c of cols) {
+    assert.ok(Number.isFinite(c.w) && c.w > 0, `列「${c.label}」缺 w(plain 表宽 = Σw,缺了会退回兜底值并与 dtOwnsWidth 判据打架)`)
+  }
+})

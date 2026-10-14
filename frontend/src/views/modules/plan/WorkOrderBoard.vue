@@ -157,7 +157,7 @@
     </el-dialog>
 
     <!-- 工单详情·追溯:共用组件 WorkOrderTraceDialog(2026-10-05;生产工单页也原地挂同一个) -->
-    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" />
+    <WorkOrderTraceDialog v-model="traceVisible" :code="traceNo" :行id="traceRowId" />
   </div>
 </template>
 
@@ -165,7 +165,6 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
-import { callButton } from '@/business/engine'
 import { printWorkTaskSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
@@ -272,9 +271,16 @@ async function unclose() {
   let done = 0
   for (const r of rows) {
     try {
-      await callButton({ panelCode: 'MANU_ORDER', buttonName: '取消结案', formData: { 编号: r.加工单号 }, buttonParam: {} })
+      // ⚠ 行级(2026-10-15):本页的行来自 plang(参考库),取消结案必须落 plang 的**那一行** ——
+      //   原来走 MANU_ORDER 按钮 → ManuCloseHandler → bd_manu_order,而 plang 单轨后该表已无本单
+      //   (实测只剩 13 行历史 MO 单)⇒ 点了没反应/改错表。改调 /px/workOrderList/close(与生产工单
+      //   列表页同一落点同一行键:公司代码+工单号+工单行号+批次号)。
+      await request.post('/px/workOrderList/close', {
+        结案: false,
+        rows: [{ 公司代码: r.公司代码, 工单号: r.加工单号, 工单行号: r.工单行号, 批次号: r.批次号 }],
+      })
       done++
-    } catch (e) { failed.push(`${r.加工单号}:${e?.response?.data?.message || e?.message || tt('操作失败')}`) }
+    } catch (e) { failed.push(`${r.加工单号}${r.工单行号 != null ? ' 行' + r.工单行号 : ''}:${e?.response?.data?.message || e?.message || tt('操作失败')}`) }
   }
   if (done) ElMessage.success(`${tt('已取消结案')} ${done} ${tt('张')}` + (failed.length ? `（${tt('跳过')} ${failed.length}：${failed[0]}）` : ''))
   if (failed.length && !done) ElMessage.error(failed[0])
@@ -286,11 +292,15 @@ async function unclose() {
 //    用户口径「在生产工单也可以这样查看,不是跳转到工单排产」)。本页只负责:置单号 + 打开。
 const traceVisible = ref(false)
 const traceNo = ref('')
+/** 追溯的工单行id(plang.id):同工单号可有多行/多批次,不带它会把别的行数据混进来(2026-10-15) */
+const traceRowId = ref(null)
 
 function openTrace(noParam) {
+  const obj = typeof noParam === 'string' ? null : noParam
   const no = typeof noParam === 'string' ? noParam : (noParam?.['工单号'] || checkedSched.value[0]?.加工单号)
   if (!no) return
   traceNo.value = no
+  traceRowId.value = obj?.['行id'] ?? checkedSched.value[0]?.['行id'] ?? null
   traceVisible.value = true
 }
 
@@ -316,7 +326,11 @@ async function printTask(mode) {
   const okPrint = await printWorkTaskSheet(mode, rowsToPrint, { line: sel.line || '', preparedBy: useUserStore().realName })
   if (!okPrint) return
   try {
-    await request.post('/px/scheduleBoard/printStamp', { rows: rows.map((r) => ({ 加工单号: r.加工单号 })) })
+    // 行级留痕(2026-10-15):带 行id + 公司代码 + 批次号,后端按 plang.id 精确定位(原只传加工单号,
+    //   而后端打的是 bd_manu_order ⇒ plang 单轨后留痕落空)
+    await request.post('/px/scheduleBoard/printStamp', {
+      rows: rows.map((r) => ({ 加工单号: r.加工单号, 行id: r.行id, 公司代码: r.公司代码, 工单行号: r.工单行号, 批次号: r.批次号 })),
+    })
   } catch (e) { /* 留痕失败不阻断打印 */ }
   ElMessage.success(tt('已发送打印') + ' ' + rows.length + ' ' + tt('张'))
   loadScheduled()
@@ -325,7 +339,9 @@ async function printTask(mode) {
 /** 调拨(9.29 批次②):勾选已排工单 → 目标产线(可按车间收敛)+ 原因 → 写 `wo_transfer_log` 轨迹 */
 async function doTransfer() {
   if (!raLine.value) { ElMessage.warning(tt('请选择目标生产线')); return }
-  const rows = checkedSched.value.map((r) => ({ 工单号: r.加工单号, 工单行号: r.工单行号, 批次号: r.批次号 }))
+  // 行级(2026-10-15):必须带 行id —— 同工单多行同批次号时,(工单号+批次号) 无法唯一定位;
+  //   后端 WorkOrderTransferService 优先按 行id 精确到行(缺 行id 才退回整单/批次)
+  const rows = checkedSched.value.map((r) => ({ 工单号: r.加工单号, 行id: r.行id, 工单行号: r.工单行号, 批次号: r.批次号 }))
   try {
     await ElMessageBox.confirm(`${tt('确认调拨')} ${rows.length} ${tt('张工单')} → ${raLine.value}？`, tt('工单调拨'),
       { confirmButtonText: tt('确认'), cancelButtonText: tt('取消') })
@@ -346,7 +362,8 @@ async function doTransfer() {
 
 /** 撤回调拨:按工单最后一条生效轨迹把产线调回原线(轨迹标撤销,留痕不删) */
 async function doTransferRevoke() {
-  const rows = checkedSched.value.map((r) => ({ 工单号: r.加工单号, 工单行号: r.工单行号, 批次号: r.批次号 }))
+  // 行级(2026-10-15):带 行id —— 撤回只撤**该行**的最后一条轨迹(不带则撤整单最后一条,可能撤错行)
+  const rows = checkedSched.value.map((r) => ({ 工单号: r.加工单号, 行id: r.行id, 工单行号: r.工单行号, 批次号: r.批次号 }))
   if (!rows.length) return
   try {
     await ElMessageBox.confirm(`${tt('撤回调拨')} ${rows.length} ${tt('张工单')}？(${tt('调回原产线,轨迹留痕')})`,

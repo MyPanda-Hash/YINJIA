@@ -1,0 +1,12 @@
+=== HSDZ_MES ===
+rd_spec_doc_detail 行数 = 0
+--- 表区 分布 ---
+--- 检验要求区 检验项目 全部取值 ---
+--- 检验要求区 最近 3 单 样例行 ---
+--- RD_MOLD_PROC 表头物理表 列(含 炭棒尺寸/跌落强度/抗压强度/压降/表单管理人/版本号) ---
+  rd_mold_proc_head . 表单管理人
+  rd_mold_proc_head . 版本号
+  rd_mold_proc_head . 炭棒尺寸
+  rd_mold_proc_head . 跌落强度
+  rd_mold_proc_head . 抗压强度
+  rd_mold_proc_head . 压降

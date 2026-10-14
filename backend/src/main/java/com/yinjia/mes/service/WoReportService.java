@@ -34,9 +34,46 @@ public class WoReportService {
         return "WO_REPORT".equals(panelCode);
     }
 
+    /**
+     * 报工单**保存后**补「工单行号」(2026-10-15 用户口径:报工单必带工单行号 —— 落库 + 界面显示)。
+     *
+     * <p>为什么在保存时补而不只在审核时:权威行键 {@code gd_id} 只在**审核**时由 {@link #complete} 写入
+     * ⇒ 草稿期的报工单不携带任何行信息,列表上看不出"这张单是哪一行的",同工单号多行时无法分辨。
+     * 本方法在草稿阶段就把行号解析出来落库(冗余展示列),审核时再由 complete() 按行锚定 gd_id。
+     *
+     * <p>解析口径(与 {@link #reportRows} 同源,取不到**不猜**):① 已有 gd_id → 经 plang_pc 反查 pl_xc;
+     * ② 否则按(工单号 + 批次号)找该行,**恰命中 1 行**才写;0 行/多行留空(等审核时按行锚定)。
+     */
+    public void stampRowNo(String panelCode, String no) {
+        if (!posts(panelCode) || no == null || no.isBlank()) return;
+        // ① 已有 gd_id(=plang_pc.id)→ 经 plang_pc.plang_id 反查该行的 pl_xc
+        jdbc.update(
+                "UPDATE s SET s.[工单行号] = x.pl_xc FROM dbo.scjl s"
+                        + " CROSS APPLY (SELECT TOP 1 p.pl_xc FROM dbo.plang_pc pc"
+                        + "   JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + "   WHERE pc.id = s.gd_id) x"
+                        + " WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                        + "   AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) > 0", no);
+        // ② 没有 gd_id(草稿期常态)→ 按(工单号 + 批次号)找该行,**恰命中 1 行**才写;0 行/多行留空。
+        //    ⚠ 必须用 CTE + HAVING COUNT(*)=1 的形态:T-SQL 的 `UPDATE … FROM … GROUP BY` 是**语法错**
+        //      (实测 "Incorrect syntax near the keyword 'GROUP'"),与迁移脚本 migrate-scjl-wo-line-20261015.sql 同款。
+        jdbc.update(
+                "WITH cand AS ("
+                        + "  SELECT s.id AS sid, MIN(p.pl_xc) AS xc FROM dbo.scjl s"
+                        + "  JOIN dbo.plang p ON p.pl_no = s.gldh AND ISNULL(p.[批次号],N'') = ISNULL(s.[批次号],N'')"
+                        + "       AND ISNULL(p.asp_cancel,'N') <> 'Y'"
+                        + "  WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                        + "    AND s.[工单行号] IS NULL AND ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') <> N''"
+                        + "  GROUP BY s.id HAVING COUNT(*) = 1)"
+                        + " UPDATE s SET s.[工单行号] = c.xc FROM dbo.scjl s JOIN cand c ON c.sid = s.id", no);
+    }
+
     /** 审核 → 本单 scjl 行 wgzt='Y'+wgsj,补 jc_no 与排产镜像。 */
     public void post(String panelCode, String no, String user) {
         if (!posts(panelCode)) return;
+        // 审核前先补行号(2026-10-15):complete() 的锚定与工序校验都读 scjl.[工单行号];
+        //   若本单是"直接审核"(没走过保存)或行号尚未解析,这里补一次,保证按「工单号+工单行号」落点。
+        stampRowNo(panelCode, no);
         for (Map<String, Object> r : rows(no)) {
             complete(r, user);
         }
@@ -57,11 +94,19 @@ public class WoReportService {
      */
     public List<Map<String, Object>> reportRows(String panelCode, String no) {
         if (!posts(panelCode)) return java.util.List.of();
+        // 行定位优先级(用户口径 2026-10-15「工单号+工单行号确定当前唯一工单」):
+        //   ① gd_id(= plang_pc.id)→ plang_pc.plang_id  —— 排产行级精确锚(最准)
+        //   ② (工单号 + scjl.[工单行号])               —— 行标识本身(报工保存时 stampRowNo 落库)
+        //   ③ (工单号 + 批次号)                        —— 老数据兜底
+        //   三级都取不到 ⇒ NULL(不猜行)
         return jdbc.queryForList(
                 "SELECT DISTINCT ISNULL(s.gldh,N'') AS 工单号, ISNULL(pc.plang_id,"
-                        + "   (SELECT TOP 1 p.id FROM dbo.plang p WHERE p.pl_no = s.gldh"
-                        + "      AND ISNULL(p.[批次号],N'') = ISNULL(s.[批次号],N'')"
-                        + "      AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id)) AS 工单行id"
+                        + "   ISNULL((SELECT TOP 1 p.id FROM dbo.plang p WHERE p.pl_no = s.gldh"
+                        + "      AND ISNULL(p.pl_xc,0) = ISNULL(s.[工单行号],0) AND ISNULL(s.[工单行号],0) > 0"
+                        + "      AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id),"
+                        + "     (SELECT TOP 1 p.id FROM dbo.plang p WHERE p.pl_no = s.gldh"
+                        + "        AND ISNULL(p.[批次号],N'') = ISNULL(s.[批次号],N'')"
+                        + "        AND ISNULL(p.asp_cancel,'N')<>'Y' ORDER BY p.id))) AS 工单行id"
                         + " FROM dbo.scjl s LEFT JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
                         + " WHERE s.[报工单号]=? AND ISNULL(s.asp_cancel,'N')<>'Y'", no);
     }
@@ -84,6 +129,8 @@ public class WoReportService {
         return jdbc.queryForList(
                 "SELECT id, ISNULL(gldh,N'') AS gldh, ISNULL(gxdm,N'') AS gxdm, ISNULL(sl,0) AS sl,"
                         + " ISNULL([批次号],N'') AS rpt_batch, ISNULL(gd_id,0) AS gd_id,"
+                        // 「工单行号」= 保存时由 stampRowNo 落库的行标识(2026-10-15 行级锚点)
+                        + " [工单行号] AS own_xc,"
                         + " ISNULL([直销数量],0) AS dual_qty FROM dbo.scjl"
                         + " WHERE [报工单号]=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
     }
@@ -97,13 +144,48 @@ public class WoReportService {
         if (wo.isEmpty() || op.isEmpty()) throw new IllegalStateException("报工单缺少工单号或工序,不能过账");
         // 本次报工归属的**批次**(2026-10-07 行级口径:唯一键 = 工单号 + 工单行号;批次号用于锚定到行)
         String rptBatch = r.get("rpt_batch") == null ? "" : String.valueOf(r.get("rpt_batch")).trim();
+        // 本行锚点(2026-10-15「工单号+工单行号确定当前唯一工单」):
+        //   ① 本单已带 gd_id(=plang_pc.id,重审/再报时)→ plang_pc.plang_id
+        //   ② 本单带 工单行号(scjl.工单行号,界面可见)→ (工单号 + 行号) 定位该行
+        //   ⚠ 优先取 ①:gd_id 是排产行级别的精确锚,行号可能对应多个物理行。
+        Long wantRowId = null;
+        double ownGd = num(r.get("gd_id"));
+        if (ownGd > 0) {
+            List<Long> rr = jdbc.queryForList(
+                    "SELECT TOP 1 pc.plang_id FROM dbo.plang_pc pc"
+                            + " JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                            + " WHERE pc.id=?", Long.class, (long) ownGd);
+            if (!rr.isEmpty()) wantRowId = rr.get(0);
+        }
+        if (wantRowId == null && r.get("own_xc") != null) {
+            List<Long> rr = jdbc.queryForList(
+                    "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=?"
+                            + " AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + " AND (? = N'' OR ISNULL([批次号],N'') = ?)"
+                            + " ORDER BY id", Long.class, wo, ((Number) r.get("own_xc")).intValue(),
+                    rptBatch, rptBatch);
+            if (rr.size() == 1) wantRowId = rr.get(0);   // 恰命中 1 行才认,多行不猜(退回批次/FIFO)
+        }
         // ── 工序报工必须跟随工单的**工艺路线**(2026-10-05 用户口径:报工按当前工单路线执行,选错工序会报错)──
         //   ① 报工的工序必须在 plang.工艺路线 的工序明细内;
         //   ② 不得跳序:路线中排在该工序之前的工序若尚无**已审核**报工 → 拦截(提示先报前道)。
         // 工单未关联路线时不校验(兼容历史单);校验在**写入之前**,失败不落任何数据。
-        List<String> rtRows = jdbc.queryForList(
-                "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                        + " AND ISNULL([工艺路线],N'')<>N''", String.class, wo);
+        // 🔴 2026-10-15 修(用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、流程追溯都这样实现」):
+        //   原按 `pl_no` 取**整单首条非空路线** —— 而**同一工单号的不同行可以有不同路线**
+        //   (实测 GD-2026-10-0002:行2/3/4 = GY-2026-10-0003,行1/5/6/7/8 = GY-CB-STD)
+        //   ⇒ 给行2 报工时拿的是行1 的路线,工序校验/不跳序判断全落在**别的行**的工序集上
+        //   (正确工序被拒 / 错误工序被放行)。现改为取**本行**(工单行id → 批次兜底)的路线。
+        Long repRowId = resolveRowIdForReport(wo, rptBatch);
+        List<String> rtRows = repRowId != null
+                ? jdbc.queryForList("SELECT ISNULL([工艺路线],N'') FROM dbo.plang WHERE id=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL([工艺路线],N'')<>N''", String.class, repRowId)
+                : List.of();
+        if (rtRows.isEmpty()) {
+            // 行定位不到(历史单/没带批次):退回整单口径,与旧行为一致
+            rtRows = jdbc.queryForList(
+                    "SELECT TOP 1 ISNULL([工艺路线],N'') FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                            + " AND ISNULL([工艺路线],N'')<>N''", String.class, wo);
+        }
         String route = rtRows.isEmpty() ? "" : rtRows.get(0);
         if (!route.isBlank()) {
             List<String> ops = jdbc.queryForList(
@@ -115,12 +197,23 @@ public class WoReportService {
                         + String.join("→", ops) + "),不能报工");
             }
             for (int i = 0; i < idx; i++) {
-                // 不跳序:按**本次报工的行/批次**判(2026-10-07 行级口径);报工单没批次号时退回工单级
-                Integer done = jdbc.queryForObject(
-                        "SELECT COUNT(*) FROM dbo.scjl WHERE gldh=? AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y'"
-                                + " AND ISNULL(wgzt,'N')='Y'"
-                                + " AND (? = N'' OR ISNULL([批次号],N'') = ?)",
-                        Integer.class, wo, ops.get(i), rptBatch, rptBatch);
+                // 不跳序:按**本次报工的行**判(2026-10-15:工单号+工单行号才是唯一工单 ⇒ 前道是否已报
+                //   要看**本行**;原来只按批次号比,同批次多行时会看到别的行的报工)
+                Integer done;
+                if (repRowId != null) {
+                    done = jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM dbo.scjl s WHERE s.gldh=? AND s.gxdm=? AND ISNULL(s.asp_cancel,'N')<>'Y'"
+                                    + " AND ISNULL(s.wgzt,'N')='Y'"
+                                    + " AND (EXISTS (SELECT 1 FROM dbo.plang_pc pc WHERE pc.id = s.gd_id AND pc.plang_id = ?)"
+                                    + "      OR (ISNULL(s.gd_id,0) = 0 AND ISNULL(s.[批次号],N'') = ?))",
+                            Integer.class, wo, ops.get(i), repRowId, rptBatch);
+                } else {
+                    // 行定位不到(历史单/没带批次):退回工单级,与旧行为一致
+                    done = jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM dbo.scjl WHERE gldh=? AND gxdm=? AND ISNULL(asp_cancel,'N')<>'Y'"
+                                    + " AND ISNULL(wgzt,'N')='Y'",
+                            Integer.class, wo, ops.get(i));
+                }
                 if (done == null || done == 0) {
                     throw new IllegalStateException("前道工序「" + ops.get(i) + "」尚未报工,不能跳到「" + op
                             + "」(工单路线:" + String.join("→", ops) + ")");
@@ -131,9 +224,11 @@ public class WoReportService {
         double dual = num(r.get("dual_qty"));
         if (dual > qty + 0.0001) throw new IllegalStateException("直销数量(" + dual + ")不能大于报工数量(" + qty + ")");
         // 守卫+落点:plang 未结案行 × plang_pc 排产行
-        //   2026-10-07 用户口径:执行单位 = **工单号 + 工单行号** ⇒ 报工单带了**批次号**时,
-        //   优先锚定到该批次的排产行(plang_pc),而不是 FIFO 取第一行(两行都排产时会认错行);
-        //   报工单没带批次号的老口径才退回 FIFO(订单行号→批次)。
+        //   用户口径(2026-10-15)「工单号+工单行号确定当前唯一工单」:报工单**必须**锚到本行。
+        //   锚定优先级:① 本单已有 gd_id(重审/再报)② 本单带的**工单行号**(界面已显示该列)
+        //   ③ 批次号 ④ 才退回 FIFO(订单行号→批次;历史单兼容)。
+        //   ⚠ 原实现只认批次号、否则 FIFO 取第一行 —— 同工单多行同批次时会**认错行**
+        //     (把行6 的报工记到行1 头上),这正是用户报障的"同工单号不同行混在一起"。
         Map<String, Object> t;
         try {
             t = jdbc.queryForMap(
@@ -147,8 +242,10 @@ public class WoReportService {
                             + " JOIN dbo.plang p ON pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
                             + " WHERE pc.pl_no = ? AND ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'')<>N''"
                             + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
-                            + "   AND (? = N'' OR ISNULL(pc.[批次号],N'') = ?)"
-                            + " ORDER BY p.pl_xc, pc.[批次号], p.id", wo, rptBatch, rptBatch);
+                            + "   AND (? IS NULL OR p.id = ?)"                       // ① 本单锚定的行(已有 gd_id / 带行号)
+                            + "   AND (? = N'' OR ISNULL(pc.[批次号],N'') = ?)"      // ② 批次
+                            + " ORDER BY p.pl_xc, pc.[批次号], p.id",
+                    wo, wantRowId, wantRowId, rptBatch, rptBatch);
         } catch (org.springframework.dao.EmptyResultDataAccessException e) {
             Integer exists = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, wo);
@@ -203,10 +300,12 @@ public class WoReportService {
                 scx, scx + "--" + day + "-%");
         String jcNo = scx + "--" + day + "-" + String.format("%08d", (seq == null ? 0 : seq) + 1);
         // 就地完成化:补镜像 + 锚定 + 完工状态(草稿行本来就在 scjl,不另插行)
+        // 「工单行号」(2026-10-15):权威行键 gd_id 在此写定,行号随之落库 —— 界面直接显示"哪一行",
+        //   同工单号多行/多批次时一眼可辨(此前只有批次号,同天多笔转单批次号相同则分不出)。
         jdbc.update("UPDATE dbo.scjl SET"
                         + " comm=?, gd_id=?, tm=?, scx=?, scxmc=?, jbbh=?,"
                         + " wzdm=?, mc=?, gg=?, jldw=?, khdm=?, lot_no=?, pl_sl=?,"
-                        + " od_no=?, od_xc=?, zl=?, llxz=?, djlx=?, [批次号]=?,"
+                        + " od_no=?, od_xc=?, zl=?, llxz=?, djlx=?, [批次号]=?, [工单行号]=?,"
                         + " wgzt=N'Y', wgsj=GETDATE(), jc_no=?, ywman=COALESCE(NULLIF(ywman,''),?),"
                         + " asp_user2=?, asp_time2=GETDATE()"
                         + " WHERE id=?",
@@ -214,7 +313,34 @@ public class WoReportService {
                 t.get("pc_lb"),
                 t.get("dm"), t.get("mc"), t.get("gg"), t.get("jldw"), t.get("khdm"), t.get("lot_no"), t.get("pl_sl"),
                 t.get("od_no"), t.get("od_xc"), t.get("zl"), t.get("llxz"), t.get("djlx"), t.get("pc_batch"),
+                t.get("pl_xc"),
                 jcNo, user, user, rowId);
+    }
+
+    /**
+     * 报工单 → **工单行**(plang.id):行级口径的唯一身份(用户口径 2026-10-15
+     * 「工单号+工单行号确定当前唯一工单」)。
+     *
+     * <p>解析顺序(取不到返回 null,调用方退回整单口径 = 旧行为):
+     * ① 本单已锚定的 {@code scjl.gd_id}(= plang_pc.id)→ {@code plang_pc.plang_id = plang.id};
+     * ② 本单带了批次号 → 按(工单号 + 批次号)找该行(**恰命中 1 行**才认,多行不猜);
+     * ③ 都不行 → null。
+     */
+    private Long resolveRowIdForReport(String wo, String rptBatch) {
+        if (wo == null || wo.isBlank()) return null;
+        List<Long> anchored = jdbc.queryForList(
+                "SELECT TOP 1 pc.plang_id FROM dbo.scjl s JOIN dbo.plang_pc pc ON pc.id = s.gd_id"
+                        + " JOIN dbo.plang p ON p.id = pc.plang_id AND ISNULL(p.asp_cancel,'N')<>'Y'"
+                        + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.gd_id,0) > 0"
+                        + " ORDER BY s.id DESC", Long.class, wo);
+        if (!anchored.isEmpty() && anchored.get(0) != null) return anchored.get(0);
+        if (rptBatch != null && !rptBatch.isBlank()) {
+            List<Long> byBatch = jdbc.queryForList(
+                    "SELECT id FROM dbo.plang WHERE pl_no=? AND ISNULL([批次号],N'')=?"
+                            + " AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id", Long.class, wo, rptBatch);
+            if (byBatch.size() == 1) return byBatch.get(0);
+        }
+        return null;
     }
 
     private static double num(Object o) {

@@ -96,7 +96,9 @@ public class WorkOrderTransferService {
                             from, fromShop, line, shop, str(reason), user);
                     moved.add(from + "→" + line);
                 }
-                logUsage(user, "调拨", no);
+                // 留痕带工单行号(2026-10-15 用户口径「流转时间线…要根据工单行号完成」):
+                //   单行调拨写该行行号(h.pl_xc);整单调拨(rows 未给行id、targetRows 返多行)时 null = 工单级
+                logUsage(user, "调拨", no, heads.size() == 1 ? intOf(heads.get(0).get("pl_xc")) : null);
                 done.add(no + "(" + String.join("、", moved) + ")");
             } catch (IllegalStateException e) {
                 failed.add(no + ":" + e.getMessage());
@@ -125,16 +127,28 @@ public class WorkOrderTransferService {
             if (no == null) { failed.add("(缺工单号)"); continue; }
             try {
                 Long rowId = longOf(r.get("行id"));
-                List<Map<String, Object>> logs = rowId != null
-                        ? jdbc.queryForList("SELECT TOP 1 * FROM dbo.wo_transfer_log WHERE plang_id=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id DESC", rowId)
-                        : jdbc.queryForList("SELECT TOP 1 * FROM dbo.wo_transfer_log WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id DESC", no);
+                Integer xc = intOf(r.get("工单行号"));
+                // 定位优先:行id → (工单号+工单行号) → 整单最近一条
+                List<Map<String, Object>> logs;
+                if (rowId != null) {
+                    logs = jdbc.queryForList("SELECT TOP 1 * FROM dbo.wo_transfer_log WHERE plang_id=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id DESC", rowId);
+                } else if (xc != null) {
+                    logs = jdbc.queryForList("SELECT TOP 1 * FROM dbo.wo_transfer_log WHERE pl_no=? AND pl_xc=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id DESC", no, xc);
+                } else {
+                    logs = jdbc.queryForList("SELECT TOP 1 * FROM dbo.wo_transfer_log WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' ORDER BY id DESC", no);
+                }
                 if (logs.isEmpty()) throw new IllegalStateException("没有可撤销的调拨记录");
                 Map<String, Object> lg = logs.get(0);
                 long logId = ((Number) lg.get("id")).longValue();
                 Long plangId = longOf(lg.get("plang_id"));
-                List<Map<String, Object>> heads = plangId != null
-                        ? jdbc.queryForList("SELECT id, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", plangId)
-                        : jdbc.queryForList("SELECT id, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
+                List<Map<String, Object>> heads;
+                if (plangId != null) {
+                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", plangId);
+                } else if (xc != null) {
+                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(pl_xc,0)=? AND ISNULL(asp_cancel,'N')<>'Y'", no, xc);
+                } else {
+                    heads = jdbc.queryForList("SELECT id, ISNULL(pl_xc,0) AS pl_xc, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'", no);
+                }
                 if (heads.isEmpty()) throw new IllegalStateException("工单行已不存在或已作废");
                 for (Map<String, Object> h : heads) {
                     if ("T".equals(String.valueOf(h.get("ja"))) || "Y".equals(String.valueOf(h.get("ja"))))
@@ -151,7 +165,7 @@ public class WorkOrderTransferService {
                     jdbc.update("UPDATE dbo.plang_pc SET scx=?, asp_user2=?, asp_time2=GETDATE() WHERE plang_id=?", back, user, id);
                 }
                 jdbc.update("UPDATE dbo.wo_transfer_log SET asp_cancel='Y', asp_user2=?, asp_time2=GETDATE() WHERE id=?", user, logId);
-                logUsage(user, "撤回调拨", no);
+                logUsage(user, "撤回调拨", no, heads.size() == 1 ? intOf(heads.get(0).get("pl_xc")) : null);
                 done.add(no + ":" + lg.get("到生产线") + "→" + lg.get("从生产线"));
             } catch (IllegalStateException e) {
                 failed.add(no + ":" + e.getMessage());
@@ -167,7 +181,10 @@ public class WorkOrderTransferService {
 
     // ────────────────────────── 内部 ──────────────────────────
 
-    /** 待调拨的 plang 行:给行id 就精确到行,否则该工单全部未作废行(与工单排产页勾选口径一致) */
+    /**
+     * 待调拨的 plang 行:定位优先级 = **行id** → **工单号 + 工单行号**(用户口径 2026-10-15
+     * 「工单号+工单行号确定当前唯一工单」)→ 批次号 → 该工单全部未作废行(老口径兜底)。
+     */
     private List<Map<String, Object>> targetRows(String no, Map<String, Object> r) {
         Long rowId = longOf(r.get("行id"));
         if (rowId != null) {
@@ -176,12 +193,26 @@ public class WorkOrderTransferService {
                             + " ISNULL(pl_sl,0) AS pl_sl, ISNULL(ja,'N') AS ja FROM dbo.plang"
                             + " WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'", rowId);
         }
+        // 没给行id:按 (工单号 + 工单行号) 精确到行(行号也没给才退整单/批次)
+        Integer xc = intOf(r.get("工单行号"));
+        if (xc != null) {
+            return jdbc.queryForList(
+                    "SELECT id, pl_no, pl_xc, ISNULL([批次号],N'') AS 批次号, ISNULL(scx,N'') AS scx,"
+                            + " ISNULL(pl_sl,0) AS pl_sl, ISNULL(ja,'N') AS ja FROM dbo.plang"
+                            + " WHERE pl_no=? AND ISNULL(pl_xc,0)=? AND ISNULL(asp_cancel,'N')<>'Y'", no, xc);
+        }
         String batch = str(r.get("批次号"));
         String sql = "SELECT id, pl_no, pl_xc, ISNULL([批次号],N'') AS 批次号, ISNULL(scx,N'') AS scx,"
                 + " ISNULL(pl_sl,0) AS pl_sl, ISNULL(ja,'N') AS ja FROM dbo.plang"
                 + " WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y'";
         return batch == null ? jdbc.queryForList(sql, no)
                 : jdbc.queryForList(sql + " AND ISNULL([批次号],N'')=?", no, batch);
+    }
+
+    private static Integer intOf(Object o) {
+        if (o == null || String.valueOf(o).isBlank() || "null".equals(String.valueOf(o))) return null;
+        if (o instanceof Number n) return n.intValue();
+        try { return (int) Double.parseDouble(String.valueOf(o).trim()); } catch (NumberFormatException e) { return null; }
     }
 
     private Map<String, Object> lineInfo(String line) {
@@ -198,13 +229,17 @@ public class WorkOrderTransferService {
         return s.isEmpty() || s.get(0).isBlank() ? null : s.get(0);
     }
 
-    /** 按钮留痕(yj_usage_log;失败不阻断业务) */
-    private void logUsage(String user, String action, String docNo) {
+    /**
+     * 按钮留痕(yj_usage_log;失败不阻断业务)。
+     * 2026-10-15:补 [工单行号] —— 用户口径「流转时间线…要根据工单行号完成」;行键落专列不拼进 doc_no。
+     */
+    private void logUsage(String user, String action, String docNo, Integer xc) {
         try {
-            jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no, created_at)"
+            jdbc.update("INSERT INTO yj_usage_log (user_name, real_name, event_type, panel_name, action_name, doc_no,"
+                            + " [工单行号], created_at)"
                             + " VALUES (?, ISNULL((SELECT real_name FROM yj_user WHERE username = ?), ?),"
-                            + " N'生产', ?, ?, ?, GETDATE())",
-                    user, user, user, LOG_PANEL, action, docNo);
+                            + " N'生产', ?, ?, ?, ?, GETDATE())",
+                    user, user, user, LOG_PANEL, action, docNo, xc);
         } catch (Exception ignore) { /* 留痕失败不阻断 */ }
     }
 

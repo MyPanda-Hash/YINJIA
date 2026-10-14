@@ -381,6 +381,16 @@ export async function rdDevFileEdit(panelCode, docNo) {
   return unwrap(await request.get('/px/rdDev/fileEdit', { params: { panelCode, docNo } }))
 }
 
+/**
+ * 四个下游面板的「待开发单据」(侧栏按钮 + 红点数字的唯一真源):
+ * { panelCode, pendingCount, rows:[{ 单据编号, 产品编号, 产品名称, 状态, 下游单据编号 }] }
+ * ⚠ rows 已由后端按「当前登录人是该面板负责人」过滤 ⇒ rows.length>0 就等于"我被分发到了这个面板",
+ *   按钮显隐直接用它,前端不再自己判权限;pendingCount = rows 里「未开发」的条数(红点数字)。
+ */
+export async function rdPendingDocs(panelCode) {
+  return unwrap(await request.get('/px/rdDev/pendingDocs', { params: { panelCode } }))
+}
+
 // ==================== 立项申请:分发对接人 / 确认责任人(2026-10-08 研发流程图③④) ====================
 
 /**

@@ -2653,6 +2653,247 @@ migrate-whloc-newplant-drop-20261008.sql
 #   前端配套:新组件 ZonePickDialog.vue + PanelxList 单元格分支 + 10 个语言包 15 条新词条。
 #   幂等;两账套均执行。
 migrate-whloc-zonepick-20261008.sql
+
+# migrate-whloc-fix-dup-zone-field-20261008.sql(2026-10-08):修复 WHLOC 出现**重复的「存储分区」列**
+#   用户报障(2026-10-08):仓位明细里「存储分区」列**出现两次**。
+#   根因(实锤,yj_schema_log 时间线):migrate-whloc-area-a-raw §3 用 `IF NOT EXISTS (... col_name=N'库区')`
+#     守卫注册「库区」字段,而链上后续的 migrate-whloc-clean-coord §2 把该列**改名成「存储分区」**⇒
+#     area-a-raw 一旦重跑,守卫再也找不到「库区」⇒ **又插一行「库区」**,紧接着 clean-coord 又把它改名
+#     ⇒ 同面板两行 (col_name='存储分区', label='存储分区') ⇒ 网格渲染出**两列同名**。
+#     正式库:zonepick 15:23:48 → area-a-raw 16:04:52 → clean-coord 16:04:52.66 ⇒ 多一行 id=16157(文本,seq 34);
+#     测试库:该对脚本重跑了两次 ⇒ 多两行(7408/7410)。这正是「历史脚本重跑撞 schema 演进」。
+#   本脚本:① 删除 WHLOC 内同 (col_name,label) 的重复登记行(保留 MIN(id));
+#     ② 规范化幸存的 大区/存储分区(类型=分区选择、seq 34/36、位置/宽度/可见性),
+#        **补上 zonepick 那次因命中重复行而漏改的 data_type**(幸存行原本仍是「文本」);
+#     ③ 自检重复组数=0、类型非分区选择=0、元数据漂移=0。
+#   ⚠ 同批修复**根因**:migrate-whloc-area-a-raw 的守卫改为跨改名(库区 IN(库区,存储分区))+
+#     跨删列(厂区 加 COL_LENGTH 前置),否则下次重跑还会再造重复。规范同步见 数据库规范.md §4.2。
+#   幂等;两账套均执行。
+migrate-whloc-fix-dup-zone-field-20261008.sql
+
+# migrate-whloc-drop-stale-cols-20261008.sql(2026-10-08):清理同一事故留下的**废弃列/漂移字段/孤儿译名**
+#   现象:bs_wh_loc 多出两个 100% 空列(厂区/库区),列数 38→40;且 yj_field 多一行挂在仓位表上的「厂区」
+#     ⇒ 体检 05 项「元数据漂移」FAIL。
+#   来由:migrate-whloc-area-a-raw §2 的 `IF COL_LENGTH('厂区') IS NULL ALTER TABLE ADD` 在重跑时把
+#     zone-logic 刻意删掉的列**"自愈"补了回来**,§3 的字段守卫随之放行;库区 同理(它已被改名成 存储分区)。
+#   步骤顺序是关键:**先 DROP 列、再删漂移行**(漂移判据是"列不存在",列还在就判不出来)。
+#   ⚠ 整段必须用**动态 SQL**:T-SQL 对「存在的表+不存在的列」是编译期绑定,写在未执行的 IF 分支里
+#     也会报 Invalid column name(实测踩到,初版 §1.2 就因此整脚本 FAIL)。
+#   DROP 前做空列校验,非空则拒绝并告警,绝不静默丢数据。幂等(已清则全 0 行);两账套均执行;
+#   实测:列数回 38、WHLOC 字段 12、漂移 0、679 仓位与 259 个分区值未动。
+migrate-whloc-drop-stale-cols-20261008.sql
+
+# migrate-qc-item-plan.sql(2026-10-09):检验项目/检验方案落地 + 三类工序检验单按产品带出检验项
+#   依据:受控文件《YJ-Q-125 Y料原料及成品检验规范 A0》(用户提供 .doc,原件与结构 dump 存
+#     tools/archive/_yq125/):§4 取样(每50kg取1个/每样200g)、§6.1 原料 Y-CAS-23(性能 余氯去除率≥80%
+#     + 卫生安全 11 项重金属限值)、§6.2 成品 CAS-18(目数:+20目≤15%、-325目≤10%,20/325目筛分 5min)、
+#     §7 处置(原料不合格=退货;成品合格=入库、不合格=重新筛分)。
+#   用户口径:「参考 YJ-Q-125,把这种检验项目放入到当前组装成品检验里面」。
+#   模型(不新造表,复用两处既有资产):
+#     ① 主数据 = 已存在但一直**空表**的 bs_qc_plan(检验方案头:适用存货/类别 + 检验方式/抽检比例
+#        + 本次加 取样规则/文件编码/执行标准)与 bs_qc_item(检验项目行:项目编码/名称/检验内容/标准/
+#        判定规则/上下限 + 本次加 方案编码/序号/取样要求/检验方法/合格处置/不合格处置)
+#        —— 给行加「方案编码+序号」即「方案 1..N 项目」,省掉一张关联表(免在册登记/注明/清单维护);
+#     ② 单据明细分**表区**:'检验项目'(项目/标准要求/检验方法/实测数值/判定)与
+#        '数量判定'(判定/数量/处理方式)—— 后者=组装成品现状那两行**原样保留**,
+#        ButtonService.asmInspToStock 的「合格数转库存/不合格数待处理」分流一行不改;
+#        三张工序检验单 头加 检验方案/文件编码/执行标准,行加 表区/检验方法(三组同构,一起加);
+#        存量明细分派回填:组装→'数量判定'、成型/切炭→'检验项目'(判空,不覆盖);
+#     ③ 建单侧**不做自动带出**(2026-10-09 用户口径「不要使用这种方式实现」):建单仍只出数量判定行;
+#        检验项目的维护入口改为**面板按钮** —— 三类工序检验单工具栏「更多 → 检验项目维护」
+#        (前端 QcInspPlanDialog.vue + 后端 QcInspPlanController,CRUD 的就是本迁移落下的两张表);
+#        「表区」列保留(两类行共存的分块键,数量判定行已回填)。
+#   配套:yj_field 登记(QC_ITEM +6 / QC_PLAN +3 / 三类检验单 各 头+3 行+2)+ en 译名 11 条 +
+#     新列 MS_Description + 播种 YJ-Q-125 真数据(2 方案 / 14 项目:成品 CAS-18 目数 2 + 原料 Y-CAS-23
+#     性能 1 + 卫生安全 11);面板按钮注入见 PanelConfigService.WO_INSP_PANELS。
+#   注:CAS-18=存货「Y料」(类别 功能料-颗粒);维护入口三张单都挂,组装成品单是主入口。
+#   幂等(COL_LENGTH 守卫 + 按 方案编码/项目编码 判重);两账套均执行。
+migrate-qc-item-plan.sql
+
+# migrate-drop-qc-insp-spec.sql(2026-10-09):**清理**「检验规范」三页纸张式面板(QC_INSP_SPEC)
+#   起因:用户口径「不行当前实现不正确,去除当前实现」—— 只撤这一轮(三页检验规范 + 「选检验项目」
+#     从规范取数),保留「逐工单追溯质检段」与「检验项目/检验方案维护弹窗」。
+#   做法:代码侧 git reset 回 aec5306c(migrate-qc-insp-spec.sql 已从本清单移除、前端面板配置/菜单
+#     一并回退);库侧由本脚本清对象 —— yj_field → yj_role_panel → yj_panel → 面板级译名 → 两张表。
+#   ⚠ 字段级译名按 ref_key 一刀切会误伤其它面板(文件编号/备注/审核人等是跨面板共享的),
+#     故只删「本面板引入且现在已无任何 yj_field 在用」的词条。
+#   ⚠ 数据守卫:qc_insp_spec_head 若有播种之外的单据(用户自建)则**拒绝删除并列出**,绝不静默丢数据。
+#   幂等(已清则各段 0 行);两账套均执行。
+migrate-drop-qc-insp-spec.sql
+
+# migrate-qc-fin-spec.sql(2026-10-09):「成品检验规范」统一文档面板(QC_FIN_SPEC)
+#   用户任务:「这些是所有和成品检验相关的文件,能否将这些整理为一个文档格式作为成品检验文档的页面
+#     实现?先放在菜单拿出来,不要覆盖原有的组装成品检验单先。同时让当前的生产工单完成后能自动生成这个,
+#     文件中的数据不重要,主要是格式实现。」(8 份:YJ-Q-60/62/89/94/125/129/130/含锌粉)
+#   口径(用户未选,按推荐执行):①报工单审核时(现 woInspGenerate 钩子)自动生成 ②纸张式多页、照文档骨架
+#     ③只要空格式(表头带 工单号/产品/批次,正文与检验项目空着)。
+#   依据:8 份原件转 docx 后逐份抽取骨架(tools/archive/_qcspec/_structure.txt),共同骨架一致 ——
+#     文件修订履历 → 制定/审核/核准 → 正文(1目的/2范围/3职责和权限/4取样要求/5工作程序) →
+#     检验项目(按「检验对象」分节:原料(x)/成品(x)…,列=检验项目/称料/接受标准/检验方法) →
+#     检验结果处理方式(合格/不合格处置)。
+#   模型:头表 qc_fin_spec_head(抬头 + 工单联动字段 + 正文五段 + 签字栏);
+#     行表 qc_fin_spec_detail 用 **表区** 分三块(修订履历/检验项目/处理方式)+「检验对象」列区分子节。
+#   面板:QC_FIN_SPEC / 成品检验规范 / doc / 前缀 CPJY / 模块 品质管理;纸张四页版式在前端
+#     recordSheetConfigs.QC_FIN_SPEC。⚠ 本脚本**只新增**:组装成品检验单与其它三张检验单零改动。
+#   播种:CPJY-2026-10-0001 格式示例(修订 1 行 / 检验项目 3 行 2 对象 / 处理方式 2 行)。
+#   幂等(OBJECT_ID 守卫 + 按单据编号判重);两账套均执行。
+migrate-qc-fin-spec.sql
+
+# migrate-qc-fin-spec-seed-rename.sql(2026-10-09):修播种示例与自动生成单的**编号冲突**
+#   实测:示例占用了正式号池 CPJY-2026-10-0001,自动编号不知道示例的存在 ⇒ 组装报工审核生成的
+#     第一张规范**也取到同号**,而明细按 单据编号 关联,导致生成单显示示例的检验项目/处理方式行。
+#   修法:只把 asp_user1='migration' 的播种行改名为 CPJY-DEMO-0001(移出正式号池),真实单据不碰;
+#     此后自动编号从 0002 继续。幂等(已改名 0 行);两账套均执行。
+migrate-qc-fin-spec-seed-rename.sql
+
+# migrate-material-out-wo-line-field.sql(2026-10-09):转领料单粒度修正(用户报障)——材料出库单表头
+#   「工单行号」字段注册 + en 译名。用户口径:生产工单的唯一性 = **工单号 + 工单行号**,两者合起来才唯一;
+#   原先「转领料单」按**工单号**去重合并 ⇒ 同单多行只能转出一张(第二行起被守卫挡住)。
+#   配套代码(同提交):WorkOrderPickingService 改为按工单行转单(每行一张草稿,单头写
+#   加工单号 + 工单行号 = plang.pl_xc,占用链按 source_line_key=工单号#行id、存量守卫按 (加工单号,工单行号));
+#   ManuWritebackService.refreshPickList 改为按行回填 plang.ll_no2(无行号老单按工单级兜底)。
+#   ⚠ 物理列 bd_material_out.工单行号 早已存在(parity2,2026-09-28),但从未在 yj_field 注册 ⇒
+#     后端写进 formData 的值会被 labelsToCols **静默丢弃**(同 MANU_ORDER.单据日期 旧坑);
+#     故本脚本只补元数据(防御性补列 + 字段 header/seq22/整数/只读 + field 译名 en),不改表结构。
+#   幂等;两账套均执行。
+migrate-material-out-wo-line-field.sql
+
+# migrate-finish-in-wo-line-20261015.sql(2026-10-15):工单追溯「入库段」按行收敛的**唯一结构变更** ——
+#   产成品入库单 bd_finish_in 补 [批次号] nvarchar(12) + [工单行号] int(与 plang.[批次号]/plang.pl_xc 同型同义)。
+#   背景(用户口径「能按行的都按行;同工单号的不同行除同源销售订单外无任何关联」):入库段此前只按
+#   [加工单号]=整单取数,同工单多行/多批次的入库单全混在一起;根因是该表无任何生产行键(2026-10-15 实测列清单为证)。
+#   处置:①加两列 + MS_Description 中文注明;②yj_field 注册 FINISH_IN 表头两字段(query,header/seq 62·64/只读);
+#   ③field 译名 en(批次号/工单行号 全局共享,已有则不重复插);④**存量不回填** —— 实测仅 1 行
+#   (FI-2026-09-0009 / MO-2026-09-0062 / 匹配来源单号为空),无法回溯属哪一批哪一行 ⇒ 标「历史未标注」,绝不猜。
+#   配套代码:ButtonService 两处生成钩子(切炭直销 dualOutFinishIn / 组装成品检验 asmInspToStock)写新列;
+#   ScheduleBoardService.trace 入库段按行收敛 + 口径说明同步改写。该表被 45 个文件按列名读 ⇒ 加列安全(NULL 不影响聚合)。
+#   幂等(COL_LENGTH 守卫 + 字段 IF NOT EXISTS + ep.class=1);两账套均执行。
+migrate-finish-in-wo-line-20261015.sql
+
+# migrate-scjl-wo-line-20261015.sql(2026-10-15):工序报工单**必带工单行号**(落库 + 界面显示)——
+#   scjl 补 [工单行号] int NULL(与 plang.pl_xc 同型同义;冗余展示列,权威行键仍是 gd_id=plang_pc.id)。
+#   背景(用户口径「生产工单/快速排产/工序报工单/追溯 都实现 工单号+工单行号」):行级键 gd_id 只在**审核**时
+#   由 WoReportService.complete() 补写 ⇒ 草稿期为空、单据不携带行键、列表上看不出是哪一行;同天多笔转单批次号相同更分不出。
+#   处置:①加列 + MS_Description;②yj_field 注册 WO_REPORT + WO_REPORT_LIST(query,detail/seq 36/只读);
+#   ③field 译名 en;④存量只回填**能唯一确定**的(gd_id 锚定 / 工单号+批次号恰命中 1 行),0 行或多行一律留 NULL(不猜)。
+#   配套代码:WoReportService.stampRowNo(保存后解析落库)+ complete() 审核时按行写定;ButtonService.saveDoc 调钩子。
+#   ⚠ scjl 是冻结登记遗留表,此处按用户明确口径扩展,与加「批次号/报工单号/直销数量」同一先例。
+#   幂等(COL_LENGTH 守卫 + 字段 IF NOT EXISTS + ep.class=1);两账套均执行。
+migrate-scjl-wo-line-20261015.sql
+
+# migrate-material-out-wo-line-query-col-20261015.sql(2026-10-15):材料出库单(领料单)**列表**补「工单行号」列
+#   —— 纯元数据、零改表:把 MATERIAL_OUT 的「工单行号」place 由 `header` 改为 `query,header`。
+#   背景(用户口径「工单号+工单行号 就为当前的一个新的单的模式」):转领料单已按该口径出单
+#   (一个标识 ⇒ 一张新单,单头也写了工单行号),但该字段只在**表单页**显示 ⇒ 同一工单多行转出的
+#   多张领料单在**列表**上长得一样,用户仍分不出哪张是哪一行。改 place 后列表可直接按行号分辨。
+#   ⚠ 只改 place,不动 col_name/label/seq/editable —— 数据键与写入路径完全不变;
+#     守卫同时检查物理列仍在(COL_LENGTH 非空)才改,符合规范 §4.2「守卫要跨过后续改名/删列」。
+#   幂等;两账套均执行。
+migrate-material-out-wo-line-query-col-20261015.sql
+
+# migrate-plang-row-state-backfill-20261015.sql(2026-10-15):按「工单号+工单行号」**逐行重算** plang 工序状态
+#   (修正历史整单口径写下的脏缓存)。用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、
+#   流程追溯都这样实现,都需要这两个进行确定」。
+#   plang 的 当前工序/当前工序完工量/完工状态/完工时间 是**报工审核时写的缓存**;2026-10-15 之前
+#   ProcessTaskService.syncWorkOrderState 整段按 pl_no 聚合(计划量 Σ整单、路线取整单首条、报工按 gldh 汇总,
+#   UPDATE ... WHERE pl_no=?)⇒ **该工单每一行都被刷成同一个值**。实测 GD-2026-10-0002:只有行7 有报工
+#   (成型 56000),8 行却全是「在制/切炭」;行2/3/4 路线是 GY-2026-10-0003 却按行1 的 GY-CB-STD 算 ⇒
+#   界面「当前工序/工序进度/生产状态」在同工单不同行之间全是串的。
+#   代码已修(syncWorkOrderState 改为逐行各算各的,新增 rowId 重载);本脚本把存量脏缓存按同一口径重算:
+#   路线=本行、报工量=本行(锚 gd_id → plang_pc.plang_id,老数据按批次兜底)、当前工序=本行首道未达标、
+#   完工状态=全道达标或本行入库达标→生产完工 / 有报工→在制 / 否则未开工;ja 随之(生产完工→Y,
+#   从生产完工退回且原已结案→N)。⚠ 只重算这四列派生缓存,不碰单据/报工/库存数据。
+#   自检:不应再有"无报工却在制"的行。幂等(重跑结果一致);两账套均执行。
+migrate-plang-row-state-backfill-20261015.sql
+
+# migrate-wo-insp-wo-line-20261015.sql(2026-10-15):三张工序检验单(成型/切炭/组装)表头补「工单行号」
+#   + 字段注册 + 译名 + 存量回填。用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、
+#   流程追溯都这样实现,都需要这两个进行确定」—— 检验单是工序链一环(报工审核自动生单),
+#   原来单头只有 工单号+报工单号+批次号:工单号只能定位整单,报工单号虽能经 scjl.gd_id 间接反查行,
+#   但检验单自身/列表/追溯拿不到行键 ⇒ 同工单多行的检验单在界面上长得一样。
+#   内容:① qc_mold_insp_head/qc_cut_insp_head/qc_asm_insp_head 各补 int 列 [工单行号]+中文注明;
+#         ② yj_field 注册三面板「工单行号」(place='query,header' 列表+表单可见,seq 35 紧随 工单号 30、
+#            在 报工单号 40 之前;只读,值由系统按 scjl.[工单行号] 写入);
+#         ③ yj_translation en 译名(field/工单行号 = WO Line,全局共享词条);
+#         ④ 存量回填:按 报工单号 → scjl.[工单行号],仅**能唯一确定**的(恰一个行号)才回填,否则留 NULL。
+#   配套代码:ButtonService.woInspGenerate 写入「工单行号」(取 scjl.[工单行号],缺失时经 resolveWoRow 反查)。
+#   ⚠ 这三张表不在采购链四单基线(FourDocAudit)范围内。幂等;两账套均执行。
+migrate-wo-insp-wo-line-20261015.sql
+
+# migrate-usage-log-wo-line-20261015.sql(2026-10-15):yj_usage_log(按钮留痕)补「工单行号」+ 存量从 doc_no 拆解回填
+#   用户口径「当前修改流转时间线和领料数据同样要根据工单行号完成」。工单追溯的「流转时间线」段
+#   数据源就是 yj_usage_log,而它只记 doc_no(工单号):
+#     · 同工单多行的留痕全混在一起(行3 的时间线里出现行1/行2 的排产);
+#     · 更糟:有些写入方把行键拼进 doc_no(如 GD-2026-10-0002#111),而查询用 `doc_no = @工单号`
+#       ⇒ 这些留痕**根本匹配不上、被静默丢弃**(实测撤销排产 7 条全隐形)。
+#   处置:① 补 int 列 [工单行号](= plang.pl_xc)+ 中文注明;
+#         ② 存量:凡 doc_no 带 # 的拆出「单号 + 行id」→ doc_no 还原纯单号、[工单行号] 由
+#            行id → plang.pl_xc 解析(plang 行已软删也照样解析,留痕是历史事实);解析不到的只还原
+#            doc_no、行号留 NULL(按"工单级老留痕"显示,**不再隐形**);自检 doc_no 不应再有 #;
+#         ③ 代码侧写入点在有行上下文时写 [工单行号],不再往 doc_no 拼 #行id
+#            (ScheduleBoardService / WorkOrderListController / WorkOrderTransferService /
+#             WorkOrderSplitService;UsageLogService 与 QuickScheduleService 无行上下文 ⇒ 保持 NULL=工单级)。
+#   ⚠ 只加列 + 拆后缀,不动任何 action/panel 语义。幂等;两账套均执行。
+migrate-usage-log-wo-line-20261015.sql
+
+# migrate-plang-ja-stale-autoclose-20261015.sql(2026-10-15):清掉「旧口径:报工达标即自动结案」留下的脏 ja
+#   用户报障「当前修改错误,把完工状态改成结案了」。根因:旧口径把"报工达标"直接等同于结案
+#   (`ja = prodDone ? "Y" : …`)⇒ 一批行在**只做完报工、货未入库、成品检验未做**时就被写了 ja='Y';
+#   而「生产状态」的「已结案」自 2026-10-15 起改由 plang.ja 驱动(此前按 入库≥排产 判),
+#   这些行于是从「完工」变成显示「已结案」。实测正式库命中 1 行:GD-2026-10-0003 行1
+#   (产线 装箱2(新厂),排产 421,入库 0,完工状态=生产完工,ja=Y)。
+#   处置(范围收到最小):把**满足新完工条件但不满足新结案条件**的行 ja 置 'N'
+#   —— 完工条件 = 完工状态 ∈ (生产完工,已完工);结案条件 = 组装成品检验已审核通过 且 入库≥排产。
+#   ⚠ 不动参考库时代真实结过的历史单(GD2608xxxxx:完工状态=未开工、无产线、ja='T';界面显示「未排产」)。
+#   ⚠ 组装检验的批次兜底**要求批次非空** —— 否则两边空串 `'' = ''` 恒真,会误命中无行号无批次的旧检验单
+#      而错误结案(同款守卫已加到 ProcessTaskService.syncCloseState)。
+#   自检:不应再有「完工状态=生产完工 且 ja=Y 但入库<排产」的行。幂等;两账套均执行。
+migrate-plang-ja-stale-autoclose-20261015.sql
+# migrate-finish-in-notnull-align-20261015.sql(2026-10-15):把 bd_finish_in 的 NOT NULL 口径在两账套对齐
+#   用户报障:组装成品检验单 审批通过/审核 → 自动生产成品入库单时报
+#   Cannot insert the value NULL into column '业务类型', table 'HSDZ_MES.dbo.bd_finish_in'。
+#   实测两账套结构不一致:正式库 [业务类型]/[单据日期] 均 NOT NULL,测试库两列都允许 NULL
+#   ⇒ 自动生单漏写必填列时**测试账套跑得通、只有正式库报错**,探针永远抓不到(测试库快照漂移的典型)。
+#   处置:回填测试库存量 NULL(业务类型→'产成品入库'、单据日期→当天)后把两列 ALTER 成 NOT NULL;
+#   正式库本来就已是 ⇒ 幂等跳过。作用是让测试账套能复现正式库约束,回归探针真的能拦住"漏写必填列"。
+#   自检:两列都必须 NOT NULL。幂等;两账套均执行。
+migrate-finish-in-notnull-align-20261015.sql
+
+# migrate-insp-detail-quantity-20261015.sql(2026-10-15):三张工序检验单**明细**补「合格数量」「不合格数量」
+#   用户口径:① 「检验单自动生成不需要实现明细行的自动填入」「表头带入,明细行不填入」;
+#            ② 「为当前明细列增加合格数量/不合格数量」;
+#            ③ 「汇总保持当前表格列的填入合格数量的多少」⇒ 汇总一律按明细列求和。
+#   处置:qc_mold_insp_detail / qc_cut_insp_detail / qc_asm_insp_detail 各补 decimal(18,4) 两列 + 中文注明;
+#        yj_field 为 QC_MOLD_INSP/QC_CUT_INSP/QC_ASM_INSP 注册 detail 字段(seq 300/310,可编辑);
+#        yj_translation en 译名(Pass Qty / Fail Qty);存量把旧写法「判定=合格/不合格 + 数量」搬进新列。
+#   配套代码:ButtonService.woInspGenerate 改为只建空明细单头(删除预铺行与 inspLine 死代码);
+#        asmInspToStock 与追溯质检段汇总改为 SUM(合格数量)/SUM(不合格数量)。
+#   自检:三表两列 + 三面板两字段 + 两译名齐备。幂等;两账套均执行。
+migrate-insp-detail-quantity-20261015.sql
+# migrate-field-multiline-text-20261015.sql(2026-10-15):新增「多行文本」字段类型
+#   用户口径:①「还需要实现让当前明细行文字过长时可以多行显示」;
+#            ② 撤回上一版(面板白名单硬编码)后「重新创建出多行文本形式」,
+#               并选定走**元数据驱动**、且**只改长文本列**。
+#   处置:三张工序检验单(QC_MOLD_INSP/QC_CUT_INSP/QC_ASM_INSP)明细的
+#        处理方式/备注/检验项目/标准要求/实测数值/检验方法/判定 共 21 行
+#        yj_field.data_type 改为 N'多行文本';表区/行号/数量 保持单行
+#        —— 上一版把它们也变成多行框,正是被撤回的原因。
+#   配套代码:PanelxForm.vue 增加 isMultiline() 渲染分支(表单头 + 明细通用),
+#            由字段类型而非面板名单决定是否多行。
+#   自检:21 个长文本列全部就位,且 表区/行号/数量 未被误改。幂等;两账套均执行。
+migrate-field-multiline-text-20261015.sql
+
+# migrate-insp-pass-qty-derived-20261015.sql(2026-10-15):三张工序检验单「合格数量」改派生值
+#   用户口径:①「当前去除合格数量只保留不合格数量即可」;
+#            ②「最终的合格数量就是[报工数量]减去[不合格数量]」;
+#            ③「数据要可返回追溯页面」。
+#   处置:注销三面板明细的 合格数量 字段登记行(界面不再录入;**不删物理列**,留历史值);
+#        合格数量改为读取时算 = 表头报工数量 − Σ明细不合格数量,两个消费点同步:
+#        追溯「质检数据」段(ScheduleBoardService)、组装成品检验单审核分流(ButtonService.asmInspToStock)。
+#   ⚠ 只限这三张工序检验单:来料检验单 QC_INSP 的「合格数量」是采购链数量守恒与入库依据,
+#     同名不同义,脚本末尾有守卫断言(误删即 RAISERROR)。
+#   回滚:重跑 migrate-insp-detail-quantity-20261015.sql 补回字段行。幂等;两账套均执行。
+migrate-insp-pass-qty-derived-20261015.sql
 # —— 2026-10-08 下架「请购单 + 其他入库/其他出库/委外入库/委外发料」13 个面板(用户口径:这些单据不需要) ——
 #   保留:采购入库单 PURCHASE_IN / 销售出库单 SALE_OUT / 材料出库单 MATERIAL_OUT / 产成品入库单 FINISH_IN
 #   (后者是「工单完工入库」的唯一载体 —— 报工自动生单 + plang/scjl 回写 + 排产看板入库区都挂它,用户明确保留)。
@@ -2812,32 +3053,13 @@ migrate-sale-out-order-line-i18n-20261015.sql
 #     bl_sale_out.源单编号/源单行号(见 KingdeePushService 的销售支)。
 #   幂等(UPDATE 窄条件 + 自检含物理列仍在);两账套均执行。
 migrate-sale-out-order-cols2-20261015.sql
-
-# ════════════════════════════════════════════════════════════════════════════
-# ── 2026-10-15 补登记:远端 2026-10-10 那批带进来的 3 条清理/修正脚本此前**漏登记** ──
-#   同上一次(见本文件 2760 行附近的同类备注)是同一个坑:远端把脚本提交进仓库,
-#   却没往本清单登记 ⇒ DbSync 按清单跑,**这些脚本永远不会被应用**。
-#   本地实测确认未生效:kucun 仍有 262 行 asp_user2='kucun-resync' 标记、
-#   仍有 1 张库存报表 module_group 为空/乱码。
-#   (第 4 个 migrate-manu-order-schedule.sql 早已登记且已于 2026-09-24 执行,不重复登记。)
-#   三条均为**幂等 + 自带前后核对 + 事务**;本批按「清理类」排在一起,顺序无相互依赖。
-# ════════════════════════════════════════════════════════════════════════════
-
-# ── 清理 kucun 表的迁移写入者标记 asp_user2='kucun-resync'(2026-10-10)──
-#   kucun 是活结存缓存表(StockLedgerService 读写 + InvCostService 启动对账),
-#   该标记只是 2026-10-08 全量回填的写入者痕迹,非业务数据;脚本只清标记、不动结存数量金额。
-cleanup-kucun-resync-marker.sql
-
-# ── 清理探针残留角色(自动化测试垃圾角色)(2026-10-10)──
-#   4 个角色(id=3/6/7/8)由 tools/verify/*.cjs 探针「保存面板权限」时经
-#   SysAdminService.saveRolePanels「先删后插」遗留;yj_user 挂载数 = 0 ⇒ 删除安全。
-#   ⚠ 脚本自带安全闸:若真有用户挂在这些角色上会 RAISERROR 中止,不静默删。
-#   回滚备份在 tools/verify/_probe-roles-backup.tsv(文件末尾附回滚 SQL)。
-cleanup-probe-residue-roles.sql
-
-# ── 修正 4 张库存报表(flat)面板的 module_group(2026-10-10)──
-#   STOCK_BALANCE/LEDGER/STATUS/SUMMARY 的 module_group 是 4 个半角问号 "????"
-#   (早期经非 UTF-8 通道写入的乱码残留),导致权限矩阵冒出名为 "????" 的分组、
-#   这 4 张表也永远落不进「智能供应链」。写回合法值「库存核算」由 ReportService 归并。
-#   方向保守:改前后都不是面板既有 module_group ⇒ 权限放行集合只可能变大不会变小。
+# ── 2026-10-10 登记补漏:4 张库存报表(flat)面板的 module_group 乱码修复 ──
+#   背景:STOCK_BALANCE/LEDGER/STATUS/SUMMARY 的 module_group 曾被非 UTF-8 通道写成 4 个半角问号
+#     (raw 0x3F003F003F003F00),后果是权限矩阵里冒出名为 "????" 的分组、这 4 张面板也落不进
+#     「智能供应链」(ReportService.NAV_GROUP 里「库存核算」→ 智能供应链)。
+#   本脚本把乱码写回合法值「库存核算」;守卫是 module_group LIKE '%?%' —— 只碰乱码行,
+#   已是合法值的环境(如开发机现为 系统管理/仓库管理)自动空转,故可安全进链、幂等;双账套均已执行。
+#   ⚠ 同批两个一次性清理脚本(cleanup-kucun-resync-marker / cleanup-probe-residue-roles)
+#     有意**不进链**(前者清写入者标记、后者按硬编码 id 删探针残留角色,登记会让 DbSync 在
+#     所有环境自动执行),已登记进 tools/verify/DbNormAudit.java 检查 12 的 allowOffChain 白名单。
 fix-stock-report-module-group.sql

@@ -1,3 +1,5 @@
+import { parseDimensionRequirement } from './dimensionSpec.js'
+
 /**
  * 「自动填充规格书」的失败口径(出货检验计划表 RD_INSP_PLAN ← 规格书 RD_SPEC_DOC)。
  *
@@ -26,6 +28,117 @@ export function specCarryFailure(payload) {
   }
   return { kind: 'no_spec', specNo: '', status: '' }
 }
+
+/* ── 跨面板复用(2026-10-13):组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」──────
+   用户口径:「组装工艺清单的 BOM 表也是可以导入对应规格书的 1.关键物料列表,这个是需要规格书
+   已经填写完并且通过审批才会导入对应的规格书的数据…如果规格书没有通过审批归档导致数据不能
+   导入时,可以弹窗提示『规格书未进行填写,请规格书通过审批之后再试,或者自行填写』,
+   在还没有提交审批之前都是可以尝试导入规格书数据的。」
+
+   于是同一套「按产品编号取规格书 + 审批门禁 + 整表替换」被两条链共用,差异全部落在
+   autoFillSpec 配置上(不配 = 出厂口径 = 出货检验计划表那条**已验收通过**的链,一个字节都不变):
+     · endpoint      —— 打哪个端点(权限按承载面板校验:RD_INSP_PLAN / RD_ASM_PROC);
+     · specSheetArea —— 取规格书哪个表区('检验要求' / '物料清单');
+     · notApprovedTip—— 未审批时的提示文案;
+     · specDrift     —— 是否参与「规格书变动」比对(false = 该链的明细不是检验项目,比了只会误报)。
+   下面三个纯函数就是这三处差异的唯一出口,组件不再自己拼 URL/文案(可单测)。 */
+
+/** 出货检验计划表那条**已验收通过**的未审批提示(2026-09-21 用户口径)—— 缺省文案,不许改字 */
+export const DEFAULT_NOT_APPROVED_TIP = '该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批'
+
+/** 未审批提示的模板:面板配了 notApprovedTip 就用自己的措辞,否则用例(出货检验计划表) */
+export function specNotApprovedTip(afs) {
+  const t = String(afs?.notApprovedTip ?? '').trim()
+  return t || DEFAULT_NOT_APPROVED_TIP
+}
+
+/**
+ * 取规格书的请求(端点 + 查询参数)。
+ * ⚠ 没配 specSheetArea 时**不带** sheetArea 参数 —— 出货检验计划表那条链的请求与改造前逐字相同
+ *   (后端缺省取 '检验要求' 表区)。
+ * @returns {{url: string, params: {code: string, sheetArea?: string}}}
+ */
+export function specCarryRequest(code, afs) {
+  const url = String(afs?.endpoint ?? '').trim() || '/px/specByProduct'
+  const params = { code: String(code ?? '').trim() }
+  const area = String(afs?.specSheetArea ?? '').trim()
+  if (area) params.sheetArea = area
+  return { url, params }
+}
+
+/** 该链是否参与「规格书变动」比对(只有检验项目那类明细可比;显式 false 才关) */
+export function specDriftEnabled(afs) {
+  return afs?.specDrift !== false
+}
+
+/* ── 表头格 ← 规格书明细,按「检验项目」名匹配(成型工艺清单 A4)──────────────────────
+   用户口径(2026-10-15 实测反馈,推翻上一版的"块名下方只读显示"):
+     「规格书的检验要求数据应该是填在成型工艺清单的**表格内的要求、强度要求、压降标准**里面的」
+     「如果是尺寸,应该是把对应检测的内径或者外径的公差等数据填写进成型工艺清单的对应检测要求
+       里面的数据表格里面」
+   即落点是**真实数据格**,映射写在 autoFillSpec.headFromDetail:
+     规格书 · 检验项目      成型工艺清单 · 检验要求区
+       跌落强度      →       跌落要求
+       抗压强度      →       强度要求kgf
+       压降          →       压降标准kpa
+       尺寸          →       外径mm / 外径公差 / 内径mm / 内径公差(**整句解析**,见 dimensionSpec.js)
+
+   ⚠ 与出货检验计划表那条链的差别:那边是「整表替换明细」,这里只写**表头格**。 */
+
+/** headFromDetail 里认的**解析器**名(落点不是一个格,而是把整句解析成多个格);新增解析器在此登记 */
+const DETAIL_PARSERS = { dimension: parseDimensionRequirement }
+
+/**
+ * 规格书明细行 → 表头格的值。
+ *
+ * @param {{headFromDetail?: Array<{to?: string, parse?: string, matchProject: string}>}|null} afs 「自动填充规格书」配置
+ * @param {Array<Record<string, any>>|null} items 规格书明细行(键 = RD_SPEC_DOC 的字段 label)
+ * @returns {Record<string, string>} **只含真取到的格**的 { 本面板字段label: 值 };
+ *   某个 检验项目 在规格书里没有对应行(或那行 检验要求 为空、解析不出) = **该键不出现** ——
+ *   调用方按条目写 head 即可,没取到的那一格保持不动(不清空、也不写空串)。
+ */
+export function headFromSpecDetail(afs, items) {
+  const out = {}
+  const maps = afs?.headFromDetail
+  if (!Array.isArray(maps) || !maps.length) return out
+  const rows = Array.isArray(items) ? items : []
+  for (const m of maps) {
+    const want = norm(m?.matchProject)
+    if (!want) continue
+    // 匹配用 specDrift 同一条归一(去掉全部空白):「跌落 强度」这类排版差不算另一个检验项目
+    const hit = rows.find((r) => norm(r?.['检验项目']) === want)
+    if (!hit) continue
+    const val = String(hit['检验要求'] ?? '').trim()
+    if (!val) continue
+    // 整句解析型落点(尺寸):解析器自己保证"只吐真解析出来的格" —— 解析不出就是不写
+    const parse = String(m?.parse ?? '').trim()
+    if (parse) {
+      const fn = DETAIL_PARSERS[parse]
+      if (fn) Object.assign(out, fn(val))
+      continue
+    }
+    const to = String(m?.to ?? '').trim()
+    if (to) out[to] = val
+  }
+  return out
+}
+
+/**
+ * 明细落点取哪一段行:规格书**本表区**的行(后端把该表区的行放在 payload.items)。
+ *
+ * ⚠ 2026-10-15:原有一个 `detailSource` 分支(成型工艺清单的配方表 ← payload['物料清单'] 表区),
+ *   随用户口径变更撤掉 —— 「配方表的数据是在配方计算器里面填写数据然后填入单据的,
+ *   而不是带入的规格书的」(配方行改在配方计算弹窗里录,见 core/mold/recipeRows.js)。
+ *   剩下的三链表(出货检验计划表/组装BOM表/成型工艺清单的检验要求)取的都是 payload.items,
+ *   故这里只剩来回结构 + 非数组兜底;**不再有第二个取数源**。
+ *
+ * @param {{items?: Array}|null} payload 后端 /px/specByProduct* 的返回
+ * @returns {Array<Record<string, any>>} items 不是数组一律空数组(不猜)
+ */
+export function specCarryRows(payload) {
+  return Array.isArray(payload?.items) ? payload.items : []
+}
+
 
 /**
  * 归一:去掉**所有**空白(含换行)。

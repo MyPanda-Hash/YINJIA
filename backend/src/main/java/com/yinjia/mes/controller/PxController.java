@@ -206,6 +206,29 @@ public class PxController {
     }
 
     /**
+     * 某人在某文件面板下的「待开发单据」清单(2026-10-13 用户需求)。
+     *
+     * <p>用户要的交互:4 类下游面板(规格书 / 成型工艺清单 / 组装工艺清单 / 出货检验计划表)
+     * 的侧边有一个「待开发单据」入口 —— **只有被分发给该文件的人**看得到;点开弹出对应的
+     * 产品信息表编号,逐条标 未开发 / 已开发;按钮右上角红点数字 = 未开发张数(0 则不显示)。
+     *
+     * <p>判定口径由用户拍板:**审批通过(已审核/已归档)才算「已开发」**。
+     * 取数与判定全在 {@link com.yinjia.mes.service.DevTaskService#pendingDocsFor};本端点只
+     * 收参 → 校验面板可见 → 组响应(分层规矩:Controller 不直写 jdbc)。
+     */
+    @GetMapping("/rdDev/pendingDocs")
+    public ApiResult<Map<String, Object>> rdDevPendingDocs(@RequestParam String panelCode) {
+        perm.requirePanelView(panelCode);
+        List<Map<String, Object>> rows = devTaskService.pendingDocsFor(panelCode, currentUser());
+        long pending = rows.stream().filter((r) -> "未开发".equals(String.valueOf(r.get("状态")))).count();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("panelCode", panelCode);
+        out.put("pendingCount", pending);
+        out.put("rows", rows);
+        return ApiResult.ok(out);
+    }
+
+    /**
      * 产品文件列表(RD_PROD_DOCLIST)—— 设计《产品开发系统需求汇总》sheet「文件汇总表」那张表。
      *
      * 【不新建业务逻辑】列头与状态推导**直接复用** DevTaskService:
@@ -300,11 +323,57 @@ public class PxController {
      *
      * 取数整体在 DevTaskService.specByProduct(code)(含 ProductCode→单号解析与审批门禁),
      * 这里只保留端点契约:校验 RD_INSP_PLAN 查看权 + 原样返回。
+     *
+     * <p>{@code sheetArea} 是**可选**的新参数(2026-10-13):不传 = 出货检验计划表原口径
+     * (规格书「检验要求」表区),传了才换表区。本端点的权限、返回结构、缺省取数均不变。
      */
     @GetMapping("/specByProduct")
-    public ApiResult<Map<String, Object>> specByProduct(@RequestParam String code) {
+    public ApiResult<Map<String, Object>> specByProduct(@RequestParam String code,
+                                                       @RequestParam(required = false) String sheetArea) {
         perm.requirePanelView("RD_INSP_PLAN");
-        return ApiResult.ok(devTaskService.specByProduct(code));
+        return ApiResult.ok(devTaskService.specByProduct(code, sheetArea));
+    }
+
+    /**
+     * 「自动填充规格书」数据源 · 组装工艺清单版:按产品编号取规格书「1.关键物料列表」的物料行。
+     *
+     * <p>【为什么另开一个端点而不是复用上面那个】取数逻辑**完全共用**(同一个
+     * DevTaskService.specByProduct(code, sheetArea)),差别只在**权限**:这张表长在组装工艺清单
+     * (RD_ASM_PROC)的「组装BOM表」页上,能看这张表的人未必有出货检验计划表(RD_INSP_PLAN)的查看权;
+     * 复用就得以别人的面板权限放行,反之也会把 RD_ASM_PROC 的查看者挡在门外。
+     * 审批门禁在服务层(未审批 ⇒ reason=not_approved,一个格都不带回)。
+     *
+     * <p>{@code sheetArea} 缺省 = '物料清单'(本端点的语义就是取关键物料列表);
+     * 显式传别的表区也允许,便于以后再加别的落点。
+     */
+    @GetMapping("/specByProductForAsm")
+    public ApiResult<Map<String, Object>> specByProductForAsm(@RequestParam String code,
+                                                             @RequestParam(required = false) String sheetArea) {
+        perm.requirePanelView("RD_ASM_PROC");
+        String area = sheetArea == null || sheetArea.isBlank()
+                ? DevTaskService.SPEC_SHEET_AREA_MATERIAL : sheetArea;
+        return ApiResult.ok(devTaskService.specByProduct(code, area));
+    }
+
+    /**
+     * 「自动填充规格书」数据源 · 成型工艺清单版:按产品编号取规格书「检验要求」明细行
+     * (表头那几格:跌落要求/强度要求kgf/压降标准kpa + 尺寸四格)。
+     *
+     * <p>【为什么要这个端点】与上面那个同款理由:权限按**承载面板**校验 —— 这张表长在成型工艺
+     * 清单(RD_MOLD_PROC)的「检验要求」区上,复用 RD_INSP_PLAN / RD_ASM_PROC 的端点会以别人的
+     * 面板权限放行,反之也会把本面板的查看者挡在 403 外。
+     *
+     * <p>【2026-10-15 口径变更,端点瘦身】原服务方法 {@code DevTaskService.specByProductForMold}
+     * 是"一个端点回两个表区":检验要求 + 物料清单(页 2 配方表 ← 规格书物料行,后端按 bs_inv
+     * 补派生列 所属类别)。用户改口:「这个需要改一下成型工艺清单的配方表的数据是在配方计算器里面
+     * 填写数据然后填入单据的,**而不是带入的规格书的**」⇒ 配方表那条链连同该服务方法与派生列一并
+     * **撤掉**,本端点只按本面板权限取「检验要求」表区(取数与门禁仍走同一套
+     * {@link DevTaskService#specByProduct(String, String)},未审批 ⇒ reason=not_approved)。
+     */
+    @GetMapping("/specByProductForMold")
+    public ApiResult<Map<String, Object>> specByProductForMold(@RequestParam String code) {
+        perm.requirePanelView("RD_MOLD_PROC");
+        return ApiResult.ok(devTaskService.specByProduct(code, DevTaskService.SPEC_SHEET_AREA_INSPECT));
     }
 
     /** 选单来源查询(已审核 + 占用过滤,对齐 T+ SelectVoucher)。

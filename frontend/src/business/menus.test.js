@@ -67,8 +67,25 @@ test('自建 BOM 下线:菜单树里不得再有 物料清单(BOM)/工单齐套�
   const all = JSON.stringify(menuTree)
   assert.ok(!all.includes('/panelx/list/BOM'), '菜单树里不应再有 物料清单 入口(或 BOM_FWD/BOM_REV 变体)')
   assert.ok(!all.includes('WO_KIT'), '菜单树里不应再有 工单齐套表 入口(v_wo_kit 已删)')
-  assert.ok(!all.includes('物料清单'), '菜单树里不应再有「物料清单」标题')
   assert.ok(!all.includes('工单齐套表'), '菜单树里不应再有「工单齐套表」标题')
+  // ⚠ 2026-10-15 修正判据:原来这里断言"菜单树里不得出现「物料清单」标题" —— **判宽了**。
+  //   当天下架的是**自建 BOM 那套**(表 bs_bom / 面板 BOM、BOM_FWD、BOM_REV),它们绝不能回来;
+  //   而 **WLBOM(物料清单,表 mate)是另一个面板** —— 它一直都在库里(yj_panel 仍登记、mode=doc、
+  //   line_table=mate、mate 表有数据),规格书「1.关键物料清单」引用的就是它,只是当天连菜单一起下线了。
+  //   用户报障「物料清单面板入口没有在基础档案里面」⇒ 已按 README 的栏目顺序(计量单位/商品/物料清单/
+  //   存货价格本)把 **WLBOM** 入口补回「物料及价格」栏。故本测试改为**按 panelCode 精确禁止**,
+  //   仍能钉住"自建 BOM 不得溜回导航",同时不再误伤那个仍然在用的 WLBOM。
+  const collectCodes = (node) => {
+    if (Array.isArray(node)) return node.flatMap(collectCodes)
+    if (!node || typeof node !== 'object') return []
+    const self = node.panelCode ? [node.panelCode] : []
+    return self.concat(collectCodes(node.children))
+  }
+  const codes = collectCodes(menuTree)
+  for (const dead of ['BOM', 'BOM_FWD', 'BOM_REV', 'WO_KIT']) {
+    assert.ok(!codes.includes(dead), `菜单树里不应再有已下架面板 ${dead} 的入口`)
+  }
+  assert.ok(codes.includes('WLBOM'), 'WLBOM(物料清单,表 mate)仍在用 —— 入口应在「物料及价格」栏里')
 })
 
 /**

@@ -1,0 +1,1 @@
+﻿SET NOCOUNT ON; SELECT panel_code, panel_name, line_table FROM yj_panel WHERE panel_code LIKE 'MANU%' OR panel_code LIKE 'PROC%' OR panel_code LIKE '%DETAIL%' OR panel_code LIKE '%STATS%' ORDER BY panel_code;

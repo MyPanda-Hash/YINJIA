@@ -6,7 +6,7 @@
        报告头/条件区/数据表竖线全页对齐;数据键=字段 label(中文)
        特例块:碱性原水水质条 / 浸泡安全(浸泡液用量+仪器检出限) / 矿化(4 指标块+散点图)
        ═══════════════════════════════════════════════════════════════════ -->
-  <div class="record-sheet rsp-sheet">
+  <div ref="rootEl" class="record-sheet rsp-sheet">
     <!-- ═══ 页签(规格书多页结构:封面/修订与范围/检验要求/关键物料/包装运输) ═══ -->
     <div v-if="pageList.length" class="rsp-pages">
       <div
@@ -47,7 +47,7 @@
                    :style="{ top: (COVER_COMPANY_TOP * coverVy) + 'px', height: (COVER_COMPANY_H * coverVy) + 'px' }">
                 <span class="rsp-cover-docno-lb">{{ tt('编号：') }}</span>
                 <el-input v-if="editable" v-model="head[coverDocNoKey]" size="small" class="rsp-cover-docno-in"
-                          :maxlength="60" @input="emit('dirty')" />
+                          :class="{ 'rs-focus': isFocus(coverDocNoKey) }" :maxlength="60" @input="emit('dirty')" />
                 <span v-else class="rsp-cover-docno-val">{{ head[coverDocNoKey] || '' }}</span>
               </div>
               <div class="rsp-cover-title"
@@ -64,10 +64,10 @@
                   <table class="rsp-cover-fields">
                     <tbody>
                       <tr v-for="(fd, fi) in cfg.cover.fields" :key="'cf' + fi">
-                        <td class="rsp-cover-lb">{{ tt(fd.label) }}</td>
+                        <td class="rsp-cover-lb" :class="{ 'rs-focus': isFocus(fd.key) }">{{ tt(fd.label) }}</td>
                         <td class="rsp-cover-vl">
-                          <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :maxlength="fd.max || 200" @input="emit('dirty')" />
-                          <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
+                          <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :class="{ 'rs-focus': isFocus(fd.key) }" :maxlength="fd.max || 200" @input="emit('dirty')" />
+                          <span v-else class="rsp-cover-val" :class="coverValClass(head[fd.key])">{{ head[fd.key] || '' }}</span>
                         </td>
                       </tr>
                     </tbody>
@@ -190,6 +190,12 @@
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
           <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
             <span>{{ tt(sec.bar) }}</span>
+            <!-- 从物料清单引用:本节后面紧跟的表要它时挂在本节标题行上(2026-09-20;
+                 2026-10-13 恢复,数据源由已下架的 BOM 面板改为 WLBOM 物料清单)
+                 —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
+                    按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
+            <span v-if="materialPickAt(sec) && editable" class="rs-lib-btn"
+                  style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(materialPickAt(sec))">📦 {{ tt('从物料清单引用') }}</span>
             <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
@@ -199,7 +205,7 @@
         <template v-if="sec.doc">
           <tr v-for="(row, ri) in sec.rows" :key="'dl' + ri">
             <td :colspan="secCols(sec).length" class="rsp-doccell">
-              <div class="rsp-docrow">
+              <div class="rsp-docrow" :class="{ 'rs-focus': isFocus(row.key) }">
                 <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
                 <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
                 <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
@@ -213,14 +219,14 @@
         <template v-for="(row, ri) in sec.rows" v-if="!sec.doc" :key="'pr' + ri">
           <tr v-if="row.pairs">
             <template v-for="(pair, pi) in row.pairs" :key="'p' + pi">
-              <td class="rs-td rs-label" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
+              <td class="rs-td rs-label" :class="{ 'rs-focus': isPairFocus(pair) }" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
               <template v-if="pair.cells">
-                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
+                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
                   <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
                 </td>
               </template>
-              <td v-else class="rs-td" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
+              <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
                 <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(pair.key)">
                   <span class="rs-ref-text">{{ head[pair.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
@@ -262,8 +268,10 @@
           <tr v-else-if="row.grid">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
-                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(effColLabel(c.label, c.label)) }}</td>
-              <td v-else class="rs-td" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
+                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
+                <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+              </td>
+              <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
                   <span class="rs-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === c.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
@@ -475,6 +483,14 @@
                   <span>{{ tt(dt.bar) }}</span>
                   <span v-if="dt.lib && editable" class="rs-lib-btn" @click.stop="openLib(dt)">⧉ {{ tt('从标准库勾选') }}</span>
                   <span v-if="dt.recipeCalc && editable" class="rs-lib-btn" style="color:#409eff;border-color:#a0cfff" @click.stop="openRecipeCalc(dt)">🧮 {{ tt('配方计算') }}</span>
+                  <!-- 手动导入规格书数据(组装BOM表 ← 规格书「1.关键物料列表」):
+                       自动带入之外留的手动入口 —— 未提交审批之前可以反复尝试、规格书后补通过后重试。
+                       按钮文案来自配置(autoFillSpec.manual),只有配了它的表才出现。 -->
+                  <span
+                    v-if="editable && cfg.autoFillSpec?.manual && autoFillTargetDt(cfg.autoFillSpec) === dt"
+                    class="rs-lib-btn"
+                    @click.stop="onSpecImportClick"
+                  >⤓ {{ tt(cfg.autoFillSpec.manual) }}</span>
                   <!-- 规格书变动:单子填完之后规格书又变了 ⇒ 就地表态并可一键按规格书更新 -->
                   <span
                     v-if="specDriftState && editable && cfg.autoFillSpec && autoFillTargetDt(cfg.autoFillSpec) === dt"
@@ -538,7 +554,8 @@
                 <el-input v-if="cellEditable(dt, row, c) && c.area" v-model="row[c.key]" type="textarea" :autosize="{ minRows: 2, maxRows: 10 }" size="small" class="rs-t-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
                 <!-- 下拉列(配置 c.type='select'):配方表「物料种类」用它 —— 自由文本会让引擎
                      静默认不出、把折算料当比例算(见 core/mold/materialKinds.js 注释)。
-                     filterable+allow-create:预设四个档案类别,新增类别也能直接敲(口径由工艺科定) -->
+                     filterable+allow-create:预设档案类别(2026-10-15 起五个,含「折算物料」),
+                     新增类别也能直接敲(口径由工艺科定) -->
                 <el-select
                   v-else-if="cellEditable(dt, row, c) && c.type === 'select'"
                   v-model="row[c.key]"
@@ -602,7 +619,7 @@
                   :style="designInputStyle(dt)"
                   @update:model-value="(v) => setCellValue(row, c, v)"
                 />
-                <el-input v-else-if="cellEditable(dt, row, c)" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
+                <el-input v-else-if="cellEditable(dt, row, c)" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" @change="onDetailTextCommit(row, c.key)" />
                 <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ cellText(cellKind(c), row[c.key]) || ' / ' }}</span>
               </td>
               <td v-if="editable && !dt.fixedRows" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
@@ -661,6 +678,12 @@
         <tr v-if="sec.bar"><td :colspan="secCols(sec).length" class="rs-sectionbar">
           <span style="display:inline-flex;align-items:center;gap:12px;justify-content:center;width:100%">
             <span>{{ tt(sec.bar) }}</span>
+            <!-- 从物料清单引用:本节后面紧跟的表要它时挂在本节标题行上(2026-09-20;
+                 2026-10-13 恢复,数据源由已下架的 BOM 面板改为 WLBOM 物料清单)
+                 —— 规格书第 4 页「1.关键物料列表」那张表**故意没有 bar 行**(标题由本节出),
+                    按钮挂在表上永远渲染不出来;挂到标题行才出现在用户眼前。 -->
+            <span v-if="materialPickAt(sec) && editable" class="rs-lib-btn"
+                  style="color:#67c23a;border-color:#b3e19d" @click.stop="openMaterialPick(materialPickAt(sec))">📦 {{ tt('从物料清单引用') }}</span>
             <span v-if="si === (cfg.sections || []).length - 1 && !(cfg.dataTables || []).length" class="rs-field-edit-btn" @click.stop="openFieldEdit">✎ {{ tt('字段编辑') }}</span>
           </span>
         </td></tr>
@@ -670,7 +693,7 @@
         <template v-if="sec.doc">
           <tr v-for="(row, ri) in sec.rows" :key="'dl' + ri">
             <td :colspan="secCols(sec).length" class="rsp-doccell">
-              <div class="rsp-docrow">
+              <div class="rsp-docrow" :class="{ 'rs-focus': isFocus(row.key) }">
                 <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
                 <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
                 <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
@@ -684,14 +707,14 @@
         <template v-for="(row, ri) in sec.rows" v-if="!sec.doc" :key="'pr' + ri">
           <tr v-if="row.pairs">
             <template v-for="(pair, pi) in row.pairs" :key="'p' + pi">
-              <td class="rs-td rs-label" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
+              <td class="rs-td rs-label" :class="{ 'rs-focus': isPairFocus(pair) }" :colspan="pair.lspan || 1" :rowspan="pair.rowspan || 1">{{ tt(pair.label) }}</td>
               <template v-if="pair.cells">
-                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
+                <td v-for="(c, ci) in pair.cells" :key="'pc' + ci" class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="ci === pair.cells.length - 1 ? (pair.vspan || 1) : 1" :rowspan="pair.rowspan || 1">
                   <el-input v-if="editable" v-model="head[c.key]" size="small" maxlength="120" class="rs-t-in" :placeholder="c.ph ? tt(c.ph) : ''" @input="emit('dirty')" />
                   <span v-else class="rs-txt">{{ head[c.key] || '' }}</span>
                 </td>
               </template>
-              <td v-else class="rs-td" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
+              <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(pair.key) }" :colspan="pair.vspan || 1" :rowspan="pair.rowspan || 1">
                 <div v-if="editable && isRefKey(pair.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(pair.key)">
                   <span class="rs-ref-text">{{ head[pair.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === pair.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
@@ -733,8 +756,10 @@
           <tr v-else-if="row.grid">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
-                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">{{ tt(effColLabel(c.label, c.label)) }}</td>
-              <td v-else class="rs-td" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
+                  :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
+                <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
+              </td>
+              <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
                   <span class="rs-ref-text">{{ head[c.key] || tt('点击选择') }}</span>
                   <span v-if="devStatus && devKey === c.key" class="rs-dev-badge" :class="devStatus === '已开发' ? 'done' : 'none'">{{ tt(devStatus) }}</span>
@@ -888,7 +913,7 @@
       <tbody>
         <tr v-for="(row, ri) in sec.rows" :key="'tdr' + ri">
           <td :colspan="secCols(sec).length" class="rsp-doccell">
-            <div class="rsp-docrow">
+            <div class="rsp-docrow" :class="{ 'rs-focus': isFocus(row.key) }">
               <span class="rsp-doclabel">{{ tt(row.label) }}：</span>
               <el-input v-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: row.area ? 2 : 1, maxRows: 8 }" size="small" class="rsp-docinput" :maxlength="row.max || 2000" @input="emit('dirty')" />
               <span v-else class="rsp-docval rsp-pre">{{ head[row.key] || '' }}</span>
@@ -905,8 +930,8 @@
       <tbody>
         <tr><td :colspan="nCols" class="rs-sectionbar">{{ tt(sec.bar) }}</td></tr>
         <tr v-for="(row, ri) in sec.rows" :key="'tr' + ri">
-          <td class="rs-td rs-label">{{ tt(row.label) }}</td>
-          <td class="rs-td" :colspan="nCols - 1">
+          <td class="rs-td rs-label" :class="{ 'rs-focus': isFocus(row.key) }">{{ tt(row.label) }}</td>
+          <td class="rs-td" :class="{ 'rs-focus': isFocus(row.key) }" :colspan="nCols - 1">
             <el-input v-if="editable && row.type === 'text'" v-model="head[row.key]" size="small" :maxlength="row.max || 300" class="rs-t-in" @input="emit('dirty')" />
             <el-input v-else-if="editable" v-model="head[row.key]" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" size="small" :maxlength="row.max || 2000" class="rs-t-in" @input="emit('dirty')" />
             <span v-else class="rs-txt">{{ head[row.key] || '' }}</span>
@@ -1126,6 +1151,30 @@
       </template>
     </el-dialog>
 
+    <!-- ═══ 从物料清单引用:列出物料清单(WLBOM)的子件行,勾选后批量带进本表明细 ═══
+         2026-10-13 恢复(原实现 2026-09-20 随 MES 自建 BOM 面板族整体下架而删);
+         新版**不再分导入范围**,直接列子件行让人勾,简单为主。行数据取 detail.items。 -->
+    <el-dialog v-model="matPickVisible" :title="tt('从物料清单引用')" width="820px" append-to-body>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap">
+        <el-input v-model="matPickKeyword" size="small" :placeholder="tt('搜索子件代码/名称')" clearable style="width:260px" @input="filterMatPick" />
+        <span style="color:#909399;font-size:12px">{{ tt('数据源：物料清单') }}</span>
+      </div>
+      <el-table :data="matPickFiltered" size="small" border max-height="420" row-key="__k"
+                @selection-change="(sel) => (matPickChecked = sel)">
+        <el-table-column type="selection" width="42" />
+        <el-table-column prop="子件代码" :label="tt('子件代码')" width="120" />
+        <el-table-column prop="子件名称" :label="tt('子件名称')" min-width="170" show-overflow-tooltip />
+        <el-table-column prop="规格型号" :label="tt('规格型号')" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="子件单位" :label="tt('子件单位')" width="90" align="center" />
+        <el-table-column prop="标准用量" :label="tt('标准用量')" width="90" align="right" />
+      </el-table>
+      <div style="color:#909399;font-size:12px;margin-top:6px">{{ matPickHint }}</div>
+      <template #footer>
+        <el-button @click="matPickVisible = false">{{ tt('取消') }}</el-button>
+        <el-button type="primary" @click="confirmMaterialPick">{{ tt('导入') }}({{ matPickChecked.length }})</el-button>
+      </template>
+    </el-dialog>
+
     <!-- ═══ 章节标准库(yj_std_lib,lib=spec.section) ═══ -->
     <el-dialog v-model="secLibVisible" :title="tt('章节标准库') + ' · ' + tt(secLibLabel)" width="760px" append-to-body>
       <StdLibManager ref="secLibRef" :lib="secLibLib" :item="secLibItem" :add-item="secLibItem" pickable :show-add="false" @pick="applySectionLib" />
@@ -1170,8 +1219,8 @@
     </el-dialog>
 
 
-    <!-- ═══ 配方计算(成型工艺清单:读页 2 配方表 → 算 → 回填页 1 与配方表;输入不落库) ═══ -->
-    <RecipeCalcDialog v-model="recipeCalcVisible" :head="head" :rows="recipeCalcRows" @applied="emit('dirty')" />
+    <!-- ═══ 配方计算(成型工艺清单:弹窗里录配方表物料行 → 算 → 写回页 1 与页 2 配方表;输入不落库) ═══ -->
+    <RecipeCalcDialog v-model="recipeCalcVisible" :head="head" :rows="recipeCalcRows" @applied="onRecipeApplied" />
 
     <!-- ═══ 参照选择(产品编号 -> 产品信息表):确认后按 refMap 带回 产品名称 等 ═══ -->
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" :owner-panel="panelCode" @confirm="onProdRefConfirm" />
@@ -1185,10 +1234,11 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import request from '@/core/request'
 import { recordSheetConfigs } from './recordSheetConfigs'
+import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
-import { specCarryFailure, specDrift } from '@/core/insp/specCarry'
+import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -1197,6 +1247,10 @@ import RecipeCalcDialog from './RecipeCalcDialog.vue'
 import { ledgerCell as ledgerCellOf } from '@/core/panel/ledgerCols'
 // 日期/时间格:控件种类按 yj_field.data_type 决定,取值归一同上(纯函数 + 单测)
 import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/panel/sheetDateCells'
+// 选「产品编号」→ 炭棒规格三窄格的回填口径(三个独立字段优先,整串回退;纯函数 + 单测)
+import { carbonSpecFrom } from '@/core/panel/carbonSpec'
+// 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
+import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, pickInvCarry } from '@/core/panel/invCarry'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -1252,6 +1306,44 @@ function cellKind(c) {
 function setCellValue(row, c, picked) {
   row[c.key] = controlToStored(cellKind(c), picked)
   emit('dirty')
+}
+
+// ---------- 明细「物料编号 ↔ 物料名称」按商品档案带出(2026-10-14) ----------
+// 用户报障「输入物料编号无法自动录入对应物料名称、输入物料名称无法自动录入对应物料编号」。
+// 这两列在 yj_field 里是**普通文本、没有参照**(ref_panel 为空),所以照参照那条路走不通,
+// 这里在**失焦/回车**(@change,不是 @input —— 否则每敲一个字发一次请求)按值查商品档案 INV。
+// 口径全在 core/panel/invCarry.js:唯一命中才带出,查不到/多条 ⇒ 静默不动(用户手输的编码可能还没建档)。
+// 生效范围由该明细表是否**同时**有这两列决定(库里只有成型工艺清单「配方表」两列齐全)。
+const invCarryKeys = computed(() => {
+  for (const dt of cfg.value?.dataTables || []) {
+    const pair = invCarryPair(dt.cols)
+    if (pair) return pair
+  }
+  return null
+})
+
+async function onDetailTextCommit(row, key) {
+  if (!invCarryKeys.value?.includes(key)) return
+  const typed = String(row[key] ?? '').trim()
+  if (!typed) return
+  const other = key === '物料编号' ? '物料名称' : '物料编号'
+  try {
+    // condition 用「档案列 label」(存货编码/存货名称);后端对普通文本字段走 LIKE,
+    // 只是把结果收窄,精确与否由 pickInvCarry 在本地全等判定(见该文件头注②)。
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: INV_PANEL,
+      condition: { [INV_CARRY[key].match]: typed },
+      pageNo: 1,
+      pageSize: 50,
+    })
+    const d = res?.data
+    const value = pickInvCarry(invRowsOf(d), key, typed)
+    if (!value) return // 查不到 / 多条命中 / 对侧为空 ⇒ 一个格都不动,也不提示
+    row[other] = value
+    emit('dirty')
+  } catch (e) {
+    /* 无权限/网络异常都按「档案里没有」处理:保持用户输入,不弹错(与参照链路同款兜底) */
+  }
 }
 
 /** 副标题下拉的选项:优先取字段元数据的 options(标准库字段即标准库条目),退回变体选项 */
@@ -1445,6 +1537,28 @@ const coverDocNoKey = computed(() => String(cfg.value?.coverDocNoKey || ''))
 function coverLineTop(i) {
   return ((COVER_GRID_TOP + i * COVER_ROW_H) * coverVy.value).toFixed(1) + 'px'
 }
+/**
+ * 封面只读值**过长 ⇒ 降字号**的档位(2026-10-15 用户口径:「如果过长应该是适当缩小字体」)。
+ *
+ * 为什么必须降:值列是 `white-space:nowrap` + `table-layout:auto`,列宽由内容撑开 ⇒
+ * 一行长文本(实测 `除余氯效率 ≥95%，压降 ≤5kPa@30L/min，抗压 ≥300N`)会把整张字段表顶宽出画布,
+ * 画布 `.rsp-cover-page` 是 `overflow:hidden`,超出部分**直接被切**。
+ *
+ * 档位按**显示宽度当量**算(中文/全角 1、半角 0.5 —— 与浏览器排版一致,避免"字不多但全是字母"误判),
+ * 阈值按"一行放得下"折算:画布 767 设计px − 标签列(最长标签「客户项目名称」≈183)− 内边距/边框
+ * ≈ 565 ⇒ 每档字数上限 = 565 / 字号。全部档位只改 font-size(与 white-space),
+ * **不碰行高与列宽**,画布版式(8 行等高的网格、四段首尾相接)逐像素不变 ⇒ 回退只需删类名绑定。
+ * 最后一档(>48 当量)才允许换行:此时表宽已收到值列的 min-width,行高最多长到 4 行 ——
+ * 字段表底(设计 y474)到签字栏(设计 y605)之间还有 131 设计px 余量,压不到签字栏、撑不破格线。
+ */
+function coverValClass(v) {
+  const w = [...String(v ?? '')].reduce((n, ch) => n + (ch.codePointAt(0) > 0xff ? 1 : 0.5), 0)
+  if (w > 48) return 'rsp-cv-4'
+  if (w > 36) return 'rsp-cv-3'
+  if (w > 26) return 'rsp-cv-2'
+  if (w > 18) return 'rsp-cv-1'
+  return ''
+}
 /** 签字栏三栏:与字段表**同宽同居中**(两表共用 CSS 的居中规则 + var(--coverw) 宽度),
  *  故左/右边界天然对齐。三栏之间按设计 B17..D17 的比例 92.7:97.3:97.3 分配(百分比)。 */
 const COVER_SIGN_COLS = [92.7, 97.3, 97.3]
@@ -1530,6 +1644,20 @@ function isAtOrBeforeTableAnchor(sec) {
   })
   if (lastAnchor < 0) return true
   return samePage.indexOf(sec) <= lastAnchor
+}
+
+/**
+ * 本节标题行要挂「从物料清单引用」按钮吗(2026-09-20;2026-10-13 随 WLBOM 数据源恢复)。
+ * 判据:本节的 bar 是某张 dataTable 的 tablesAfterBar 锚点,且那张表声明了 materialPick
+ * 且**它自己没有 bar 行** —— 有 bar 的按钮已经渲染在表格的 bar 行上,别挂两处。
+ * 为什么需要:规格书第 4 页「1.关键物料列表」的表故意没有 bar(标题由本节出,加了会重复标题),
+ * 原先按钮只认 dt.bar ⇒ 那张表上配了 materialPick 也永远渲染不出来(用户报「加上这个功能」即此)。
+ */
+function materialPickAt(sec) {
+  const c = cfg.value || {}
+  if (!sec || !sec.bar) return null
+  return (c.dataTables || []).find((d) =>
+    d.materialPick && !d.bar && d.tablesAfterBar === sec.bar && pageOf(d) === pageOf(sec)) || null
 }
 
 watch(() => props.panelCode, () => { activePage.value = 0 })
@@ -1633,51 +1761,84 @@ function isLockedCell(dt, row, c) {
   return props.editable && rowLocked(dt, row) && !(dt.lockCols && !dt.lockCols.includes(c.key))
 }
 
-// ── 校验定位(供 PanelxList 保存校验调用):翻到字段所在页 + 滚动 + 闪烁 ──
-/** 找到 label 所在页签(封面字段=0;sections/tailSections 按 page 归属;找不到返回 null) */
-function pageOfLabel(label) {
-  const c = cfg.value || {}
-  if ((c.cover?.fields || []).some((f) => f.label === label)) return 0
-  for (const sec of [...(c.sections || []), ...(c.tailSections || [])]) {
-    const hit = (sec.rows || []).some((row) =>
-      (row.pairs || []).some((p) => p.label === label)
-      || row.label === label
-      || (row.grid || []).some((g) => g.label === label))
-    if (hit) return pageOf(sec)
-  }
-  // 数据表列头/格式区条(多页签面板的页 2 表格列,如成型配方「实际添加比例」)
-  for (const dt of c.dataTables || []) {
-    const hit = (dt.cols || []).some((col) => col.label === label)
-      || (dt.subHeads || []).some((sh) => sh.label === label)
-      || dt.bar === label
-    if (hit) return pageOf(dt)
-  }
-  return null
+// ── 校验定位(供 PanelxList 保存校验调用):翻到字段所在页 + 滚动 + 高亮 ──
+/**
+ * 校验失败时被点名的**字段数据键**(= yj_field.label,中文);模板据此给该格打 rs-focus。
+ * 空串 = 无高亮。注意是**键**不是纸面文案:同名字段两者可能不同(版  本 / 物料名),
+ * 用文案去比模板里的 key 会全落空 —— 这正是 2026-10-13 这次改造的核心。
+ */
+const focusKey = ref('')
+/** 定位查询只在本组件内做(document 里可能同时存在别的文书面板实例,查全局会闪错格子) */
+const rootEl = ref(null)
+/**
+ * 高亮自动熄灭的定时器(模块级:重复调用先 clear,避免多次校验叠出一堆定时器)。
+ * clearFocusOf 记住"上一次那处高亮属于哪个实例"—— 同一页面可能同时挂着两个文书面板
+ * (PanelxList 的主表单 + 单据选择栏),被新一次定位抢占时要把上一处的高亮清掉,
+ * 否则上个实例的 focusKey 会永久留着(它的定时器已被 clear)。
+ */
+let focusTimer = null
+let clearFocusOf = null
+/** 该数据键此刻是否是高亮目标(模板绑定用) */
+function isFocus(key) { return !!key && focusKey.value === String(key) }
+/** 键值对行的标签格:整对里任意一格(key 或 cells 的某一格)命中即高亮标签 */
+function isPairFocus(pair) {
+  if (!pair) return false
+  return isFocus(pair.key) || (pair.cells || []).some((c) => isFocus(c.key))
 }
-/** 翻页 + 定位闪烁该字段(琥珀高亮约 3 秒);返回是否定位成功 */
-function focusField(label) {
-  if (!label) return false
-  const target = pageOfLabel(label)
-  if (target === null) return false
+
+/** 数据键 → 所在页签页码(找不到 -1);判据见 recordSheetFocus.js(单向真源,带单测) */
+function pageOfKey(key) { return pageOfKeyIn(cfg.value, key) }
+/** 纸面文案 → 所在页签页码(找不到 null);仅供只拿得到 message 文案的旧路径兼容 */
+function pageOfLabel(label) { return pageOfLabelIn(cfg.value, label) }
+
+/**
+ * 滚动到高亮格;配置里没有可高亮的格子时,回退按纸面文案找标签格闪一下(旧行为,别丢)。
+ * v-show 隐藏的其它页签也在 DOM 里,故只在**可见**元素里找。
+ */
+function scrollToFocus() {
+  const root = rootEl.value
+  if (!root) return
+  const visible = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length)
+  const hit = [...root.querySelectorAll('.rs-focus')].filter(visible)[0]
+  if (hit) {
+    hit.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    return
+  }
+  const label = focusKey.value
+  const all = [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb, td.rs-td, th')].filter(visible)
+  const el = all.find((e) => (e.textContent || '').trim() === label)
+    || [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb')].filter(visible)
+      .find((e) => (e.textContent || '').includes(label))
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.add('field-blink')
+    setTimeout(() => el.classList.remove('field-blink'), 3200)
+  }
+}
+
+/**
+ * 翻页 + 定位高亮该字段(约 3 秒后自动熄灭);返回是否定位成功。
+ * 入参优先按**数据键**解析(与模板绑定同一判据),键找不到页时回退按纸面文案找页。
+ * 定位失败(该字段在纸面配置里根本没渲染)返回 false —— 调用方不得据此改变校验/保存行为。
+ */
+async function focusField(key) {
+  const name = String(key ?? '').trim()
+  if (!name) return false
+  let target = pageOfKey(name)
+  if (target < 0) target = pageOfLabel(name)
+  if (target === null || target < 0) return false
+  // 抢占上一次定位:清掉它的定时器与高亮(可能是另一个组件实例的高亮)
+  if (focusTimer) { clearTimeout(focusTimer); focusTimer = null }
+  clearFocusOf?.()
   if (pageList.value.length) activePage.value = target
-  nextTick(() => {
-    const root = document.querySelector('.record-sheet')
-    if (!root) return
-    // v-show 隐藏的其它页签也会命中查询,故只在**可见**元素里找(否则会闪到看不见的格子上)
-    const visible = (e) => !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length)
-    const els = [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb, td.rs-td, th')].filter(visible)
-    const el = els.find((e) => (e.textContent || '').trim() === label)
-      || [...root.querySelectorAll('td.rs-label, td.rsp-cover-lb, .rsp-cover-lb')].filter(visible)
-        .find((e) => (e.textContent || '').includes(label))
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.classList.add('field-blink')
-      setTimeout(() => el.classList.remove('field-blink'), 3200)
-    }
-  })
+  focusKey.value = name
+  clearFocusOf = () => { focusKey.value = '' }
+  await nextTick()
+  scrollToFocus()
+  focusTimer = setTimeout(() => { focusKey.value = ''; focusTimer = null; clearFocusOf = null }, 3000)
   return true
 }
-defineExpose({ focusField })
+defineExpose({ focusField, pageOfKey })
 
 /** plain 版式表格列宽与总宽(无全页网格,列宽取 col.w) */
 function plainCols(dt) {
@@ -2279,16 +2440,11 @@ function onProdRefConfirm(rows) {
   for (const m of f.refMap || []) {
     if (m && source[m.from] !== undefined) props.head[m.to || m.from] = source[m.from]
   }
-  // 炭棒尺寸整串 → 成型面板 炭棒规格1/2/3 三窄格拆分回填(外：/内：/长： 前缀区分数值;源 Excel 即外径/内径/长度三个窄数字格)
-  const sizeStr = String(source['炭棒尺寸'] ?? '')
-  if (sizeStr && fieldMap.value.has('炭棒规格1')) {
-    const dim = (kw, prefix) => {
-      const v = (sizeStr.match(new RegExp(kw + '\\s*([0-9.]+)\\s*mm')) || [])[1]
-      return v ? `${prefix}${v}` : ''
-    }
-    props.head['炭棒规格1'] = dim('外径', '外：')
-    props.head['炭棒规格2'] = dim('内径', '内：')
-    props.head['炭棒规格3'] = dim('长度', '长：')
+  // 炭棒规格回填:成型面板 炭棒规格1/2/3 三窄格(外：/内：/长： 前缀区分数值)。
+  // 取值口径见 core/panel/carbonSpec.js(三个独立字段优先,「炭棒尺寸」整串逐格回退;
+  // 空的不写 —— 半截的 `外：` 不许落格)。只在有这三个格的成型工艺面板上动手。
+  for (const [k, v] of Object.entries(carbonSpecFrom(source, fieldMap.value.has('炭棒规格1')))) {
+    props.head[k] = v
   }
   prodRefVisible.value = false
   emit('dirty')
@@ -2298,35 +2454,56 @@ function onProdRefConfirm(rows) {
   if (afs && prodRefKey.value === afs.fromKey) autoFillFromSpec(props.head[afs.fromKey], afs)
 }
 
-/** 该面板承载 autoFillSpec.detail 落点的明细表:按第一个 to 键在哪张表的列里找,找不到用第一张 */
+/** 该面板承载 autoFillSpec.detail 落点的明细表。
+ *  两段式:先找**同时含全部落点键**的表,再退回「含第一个 to 键的表」,最后才是第一张表。
+ *  ⚠ 为什么要有第一段:成型工艺清单(RD_MOLD_PROC)的修订记录表与配方表**共用一张行表**,
+ *    修订记录表里也有『序号』—— 只按"含任意一个落点键"找,配方表那三列会被写进修订记录区。
+ *    单表区面板(出货检验计划表/组装BOM表)两段结果相同,行为一字不变。 */
 function autoFillTargetDt(afs) {
   const want = (afs.detail || []).map((m) => m.to)
   const tables = cfg.value?.dataTables || []
-  return tables.find((dt) => (dt.cols || []).some((c) => want.includes(c.key))) || tables[0] || null
+  return tables.find((dt) => want.length && want.every((k) => (dt.cols || []).some((c) => c.key === k)))
+    || tables.find((dt) => (dt.cols || []).some((c) => want.includes(c.key)))
+    || tables[0] || null
 }
 
 /**
  * 自动填充规格书 —— 「自动填充规格书」就是这条路径:
- *   选定产品编号 → 取该产品对应**规格书**(RD_SPEC_DOC)的表头 + 「检验要求」表区明细 → 回填。
+ *   选定产品编号 → 取该产品对应**规格书**(RD_SPEC_DOC)的某个表区明细 → 回填。
+ *   三条链共用本函数(差异全部在配置里,见 core/insp/specCarry.js 头注):
+ *     · 出货检验计划表 ← 规格书「检验项目及检验标准」(表区 '检验要求',端点 /px/specByProduct);
+ *     · 组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」(表区 '物料清单',端点 /px/specByProductForAsm);
+ *     · 成型工艺清单 ← 规格书「检验要求」(写进 跌落要求/强度要求kgf/压降标准kpa 与尺寸四格),
+ *       端点 /px/specByProductForMold
+ *       —— ⚠ 2026-10-15 口径变更:原先它还带页 2 配方表的物料行(靠 detailSource 取
+ *       payload['物料清单']),用户改口「配方表的数据是在配方计算器里面填写数据然后填入单据的」
+ *       ⇒ 那段撤掉;配方表的行改在**配方计算弹窗**里录(见本文件 onRecipeApplied)。
  *
- * 【为什么走后端 /px/specByProduct 而不是通用查询】规格书的 编号(=产品键)在通用链路里被
+ * 【为什么走后端端点而不是通用查询】规格书的 编号(=产品键)在通用链路里被
  *   QueryService.loadDocs 用单据编号覆盖掉了(详见该处注释),getFormDescriptor /
  *   queryFormDataList 都取不到真值。该端点另开一条直读 head/detail 的路。
  *
  * 【填充口径】
  *   表头:按 head[] 逐格写(客户项目名称/产品功能类别/产品整体尺寸 ← 规格书等价列);
- *   明细:整表替换 —— 本表的检验项就是规格书的检验项,逐条追加会越填越长;
+ *   明细:整表替换 —— 本表的检验项/BOM 行就是规格书的那些行,逐条追加会越填越长;
  *   兜底:defaults 里的固定值(如不合格应对措施三段式)**只填空格**,不覆盖已录内容。
  *   命中多张规格书时(matched>1)只取最新一张,末尾提示按哪一张填的,不让用户猜。
+ *
+ * 【审批门禁】规格书没填写提交审批完(草稿/审批中/…)时后端一个格都不带回,这里只把
+ *   payload.reason 翻成人话:not_approved ⇒ 按该链自己的措辞提示(afs.notApprovedTip)。
  */
 async function autoFillFromSpec(code, afs) {
   const key = afs?.fromKey
   const val = String(code ?? '').trim()
   if (!key || !val || !props.editable) return
-  const dt = autoFillTargetDt(afs)
+  // 明细落点:没配 detail 的链(部分面板只做表头格带入,见 autoFillSpec.headFromDetail)
+  // **不认**明细表 —— 否则 autoFillTargetDt 会退回到第一张表,把它整表替换成按空映射生成的空行。
+  const detailMap = afs.detail || []
+  const dt = detailMap.length ? autoFillTargetDt(afs) : null
+  const req = specCarryRequest(val, afs)
   let payload = null
   try {
-    const res = await request.get('/px/specByProduct', { params: { code: val } })
+    const res = await request.get(req.url, { params: req.params })
     // request.js 的响应拦截器已 (res) => res.data ⇒ 这里拿到的是 ApiResult {code,message,data}
     payload = res?.data ?? res ?? null
   } catch (e) {
@@ -2337,7 +2514,7 @@ async function autoFillFromSpec(code, afs) {
     // 门禁口径见 core/insp/specCarry.js:规格书必须填写并提交审批完,否则一个格都不带入
     const fail = specCarryFailure(payload)
     if (fail && fail.kind === 'not_approved') {
-      ElMessage.warning(tt('该产品的规格书 {no} 还没填写提交审批完（当前：{st}），暂不能自动带入 —— 请先在规格书里填好并走完提交审批')
+      ElMessage.warning(tt(specNotApprovedTip(afs))
         .replace('{no}', fail.specNo || '')
         .replace('{st}', fail.status || tt('未知')))
       return
@@ -2346,12 +2523,15 @@ async function autoFillFromSpec(code, afs) {
     return
   }
   const rows = Array.isArray(payload.items) ? payload.items : []
-  const filled = rows.map((r) => {
+  // 明细落点的行 = 规格书本表区的行(payload.items)。原按 detailSource 取第二段的写法已随
+  // 2026-10-15 口径变更撤掉(配方行改在配方计算弹窗里录);纯函数+单测在 core/insp/specCarry.js。
+  const srcRows = detailMap.length ? specCarryRows(payload) : []
+  const filled = detailMap.length ? srcRows.map((r) => {
     const row = {}
-    for (const m of afs.detail || []) row[m.to] = r[m.from] === undefined || r[m.from] === null ? '' : String(r[m.from])
+    for (const m of detailMap) row[m.to] = r[m.from] === undefined || r[m.from] === null ? '' : String(r[m.from])
     if (dt?.filterKey) row[dt.filterKey] = dt.filterVal
     return row
-  })
+  }) : []
 
   const cur = dt ? rowsOf(dt) : []
   if (cur.length) {
@@ -2371,6 +2551,10 @@ async function autoFillFromSpec(code, afs) {
     const v = payload[m.from]
     if (v !== undefined && v !== null && String(v).trim() !== '') props.head[m.to] = String(v)
   }
+  // 表头格 ← 规格书**明细**按「检验项目」名匹配(成型工艺清单 检验要求区那四格,见
+  // autoFillSpec.headFromDetail)。headFromSpecDetail 只吐出**真取到值**的键 ⇒
+  // 规格书里没有该检验项目的那一格**保持不动**(不清空、不写空串)。纯函数+单测在 core/insp/specCarry.js。
+  for (const [k, v] of Object.entries(headFromSpecDetail(afs, rows))) props.head[k] = v
   if (dt && filled.length) {
     // 兜底固定值(设计 F9 模板行的三段应对措施)逐行填空格 —— 是**明细**字段,不动表头
     for (const row of filled) {
@@ -2395,6 +2579,24 @@ async function autoFillFromSpec(code, afs) {
   specDriftState.value = null
 }
 
+/**
+ * 手动导入规格书数据(组装BOM表)。
+ * 用户口径(2026-10-13):「在还没有提交审批之前都是可以尝试导入规格书数据的」——
+ * 所以除了「选完产品编号自动带入」,这张表还留一个可以反复点的手动入口:
+ * 规格书后补审批通过之后、或第一次没填产品编号时,重试不用重开单据。
+ * 入口只在配了 autoFillSpec.manual(按钮文案)的表上渲染,与自动路径走同一个 autoFillFromSpec。
+ */
+function onSpecImportClick() {
+  const afs = cfg.value?.autoFillSpec
+  if (!afs || !props.editable) return
+  const code = String(props.head?.[afs.fromKey] ?? '').trim()
+  if (!code) {
+    ElMessage.warning(tt('请先选择产品编号，再导入规格书数据'))
+    return
+  }
+  autoFillFromSpec(code, afs)
+}
+
 /* ── 规格书变动提示(2026-09-21 用户口径:「规格书变动就提示当前出货检验」)──────────────
    单子填完之后规格书又变了(同张改了内容 / 出了新版本),打开这张出货检验计划表时要看得见
    "与规格书不一致",并能一键按规格书更新。判据 = core/insp/specCarry.specDrift(只比内容不比单号)。 */
@@ -2405,12 +2607,14 @@ let specDriftCheckedHead = null    // 记表头对象:对象换了=重新载入�
 /** 按当前明细 + 规格书算差异(取规格书走与自动填充同一个受门禁保护的口径) */
 async function checkSpecDrift() {
   const afs = cfg.value?.autoFillSpec
-  if (!afs || !props.editable) return
+  // 该链不参与变动比对时直接跳过:组装BOM表的明细是物料行,比的是检验项目的 要求/方法 —— 比了只会误报
+  if (!afs || !props.editable || !specDriftEnabled(afs)) return
   const dt = autoFillTargetDt(afs)
   const code = String(props.head?.[afs.fromKey] ?? '').trim()
   if (!dt || !code) { specDriftState.value = null; return }
   try {
-    const res = await request.get('/px/specByProduct', { params: { code } })
+    const req = specCarryRequest(code, afs)
+    const res = await request.get(req.url, { params: req.params })
     const payload = res?.data ?? res ?? null
     if (!payload || !payload.found) { specDriftState.value = null; return }
     const specRows = (Array.isArray(payload.items) ? payload.items : []).map((r) => ({
@@ -2643,14 +2847,126 @@ watch(
   { immediate: true },
 )
 
-// ---------- 配方计算(成型工艺清单:读页 2 配方表 → 算 → 回填页 1 与配方表) ----------
+// ── 从物料清单引用(数据源 = WLBOM「物料清单」面板,mode=doc ⇒ 单单据)──
+// 2026-10-13 恢复:原实现(2026-09-20)读的是已下架的 BOM 面板主从结构(list[].detail.children),
+//   现改读 WLBOM:res.data.list 长度 1,行在 **list[0].detail.items**(不再是 children)。
+// 行键是**中文字段 label**(本单铁律:后端按 label 收发):物料代码/物料名称(父件)、
+//   子件代码/子件名称/规格型号/子件单位/标准用量/损耗量。新版直接列子件行让人勾,不分导入范围。
+const matPickVisible = ref(false)
+const matPickRows = ref([])
+const matPickFiltered = ref([])
+const matPickChecked = ref([])
+const matPickKeyword = ref('')
+const matPickTargetDt = ref(null)
+const matPickHint = computed(() => (matPickRows.value.length
+  ? tt('共 {n} 个子件，勾选后点「导入」追加到本表明细').replace('{n}', matPickRows.value.length)
+  : tt('物料清单里还没有子件')))
+async function openMaterialPick(dt) {
+  matPickTargetDt.value = dt
+  matPickKeyword.value = ''
+  matPickChecked.value = []
+  matPickRows.value = []
+  matPickFiltered.value = []
+  matPickVisible.value = true
+  try {
+    const res = await request.post('/px/queryFormDataList', { panelCode: 'WLBOM', condition: {}, pageNo: 1, pageSize: 500 })
+    const masters = res?.data?.list || res?.data?.rows || res?.data || []
+    const all = []
+    if (Array.isArray(masters)) {
+      for (const m of masters) {
+        // WLBOM 是单单据面板 ⇒ 行在 detail.items;children 是旧 BOM 主从面板的形状,留着兜底
+        const kids = m?.detail?.items || m?.detail?.children || []
+        if (Array.isArray(kids)) all.push(...kids)
+      }
+    }
+    // __k 只给 el-table 当 row-key(过滤后仍保持勾选),不是单据字段 ⇒ 落库前不进行模型
+    matPickRows.value = all.map((r, i) => ({ ...r, __k: `${r['子件代码'] || ''}#${i}` }))
+    matPickFiltered.value = matPickRows.value
+  } catch (e) {
+    matPickRows.value = []
+    matPickFiltered.value = []
+    ElMessage.error(tt('取物料清单失败'))
+  }
+}
+function filterMatPick() {
+  const kw = (matPickKeyword.value || '').trim().toLowerCase()
+  if (!kw) { matPickFiltered.value = matPickRows.value; return }
+  matPickFiltered.value = matPickRows.value.filter((r) =>
+    String(r['子件代码'] || '').toLowerCase().includes(kw) ||
+    String(r['子件名称'] || '').toLowerCase().includes(kw)
+  )
+}
+/**
+ * 确认导入:把勾中的子件行**追加**到目标表的明细数组。
+ * 映射按**目标表的列定义**(dt.cols 的 key = 该面板 label)逐列判断,与文件里其它导入同款写法:
+ *   表区 ← filterVal('物料清单' —— 规格书全部明细共用一张 rd_spec_doc_detail,
+ *          不写这个分区值这些行会掉进"没有表认领"的桶,界面上永不显示);
+ *   物料编码 ← 子件代码 / 物料名称 ← 子件名称 / 规格参数 ← 规格型号 / 数量 ← 标准用量。
+ * 序号从本表区已有行数续编;同表区已有同一物料编码的跳过(重复点导入不会灌重复行)。
+ */
+function confirmMaterialPick() {
+  const dt = matPickTargetDt.value
+  if (!dt) return
+  const colKeys = new Set((dt.cols || []).map((c) => c.key))
+  const existCodes = new Set(rowsOf(dt).map((r) => String(r['物料编码'] || '').trim()).filter(Boolean))
+  let added = 0
+  let skipped = 0
+  for (const r of matPickChecked.value) {
+    const code = String(r['子件代码'] || '').trim()
+    if (!code) continue
+    if (existCodes.has(code)) { skipped++; continue }
+    // ⚠ 落行**直接复用表格自带的 addRow**(而不是自己 touch().push):
+    //   addRow 是界面上「＋」走的同一条路,经活体验证确实能出行(2026-10-13 对照实验:
+    //   点 ＋ 13 行 → 14 行);而本函数先前自己 push 时,提示「已导入 1 行」却不出行 ——
+    //   同样操作、同样 touch(),唯一区别只在"谁调用的",故改为共用同一条已验证的落行路径,
+    //   避免两条路径再次漂移(这处已经因此踩过一次)。
+    addRow(dt)
+    const rows = rowsOf(dt)
+    const row = rows[rows.length - 1]
+    if (!row) continue
+    // 序号:按**本表区**已有行数续编(addRow 只在 dt.autoSeqBar / cfg.autoSeq 时才设,这张表没配)
+    if (colKeys.has('序号')) row['序号'] = String(rows.length)
+    if (colKeys.has('物料编码')) row['物料编码'] = code
+    if (colKeys.has('物料名称')) row['物料名称'] = r['子件名称'] || ''
+    if (colKeys.has('规格参数')) row['规格参数'] = r['规格型号'] || ''
+    if (colKeys.has('数量')) row['数量'] = r['标准用量'] ?? ''
+    if (colKeys.has('备注')) row['备注'] = ''
+    existCodes.add(code)
+    added++
+  }
+  matPickChecked.value = []
+  matPickVisible.value = false
+  emit('dirty')
+  ElMessage.success(tt('已导入 {n} 行').replace('{n}', added)
+    + (skipped ? tt('(跳过重复 {n} 行)').replace('{n}', skipped) : ''))
+}
+
+// ---------- 配方计算(成型工艺清单:弹窗里录配方表物料行 → 算 → 写回页 1 与页 2 配方表) ----------
 // 口径见 CONTEXT.md「配方计算器」与 docs/adr/0004:公式固定(与设计器 exe 逐位一致)、
 // 弹窗输入不落库不打印,只有回填进单据字段的值随单据保存。逻辑全在 core/mold/,这里只负责把行喂给它。
+// ⚠ 2026-10-15 用户口径变更:配方表的物料行**在弹窗里录**(原来从规格书带入 / 页 2 手填),
+//   故弹窗回填时明细是**整表替换本表区**,由 onRecipeApplied 完成(与「按规格书自动填充」同一套替换口径)。
 const recipeCalcVisible = ref(false)
 const recipeCalcRows = ref([])
+const recipeCalcDt = ref(null)
 function openRecipeCalc(dt) {
+  recipeCalcDt.value = dt
   recipeCalcRows.value = rowsOf(dt)
   recipeCalcVisible.value = true
+}
+/** 弹窗算完:把弹窗里那份物料行整表换掉本表区的旧行(页 2 原来是空的也能一次写入) */
+function onRecipeApplied(payload) {
+  const dt = recipeCalcDt.value
+  const rows = Array.isArray(payload?.rows) ? payload.rows : []
+  if (dt) {
+    const arr = touch()
+    if (dt.filterKey) for (const r of rows) r[dt.filterKey] = dt.filterVal
+    const kept = dt.filterKey
+      ? arr.filter((r) => String(r[dt.filterKey] || '') !== String(dt.filterVal || ''))
+      : []
+    arr.splice(0, arr.length, ...kept, ...rows)
+  }
+  emit('dirty')
 }
 
 // ── 章节标准库(yj_std_lib,lib=spec.section):1-3/6-8 章节内容可勾选示例、可自行补充 ──
@@ -2684,8 +3000,14 @@ function applySectionLib(content) {
 async function addSectionLib() {
   const text = (secLibDraft.value || '').trim()
   if (!text) return
+  // ⚠ 库与条目名必须取自本弹窗当前字段声明的标准库(openSectionLib 决定),**不能写死 spec.section**:
+  //   成型工艺的 配料要求(mold.batching)/热压要求(mold.hotpress) 等字段用的是各自的库,
+  //   写死会把条目塞进 spec.section ⇒ 弹窗(绑 secLibLib)与预设列表里**一条也看不到** = 「新增无效」。
+  //   规格书章节字段没有自己的库,secLibLib/secLibItem 退化为 spec.section + 章节名,与改前逐字等价。
+  const lib = secLibLib.value || 'spec.section'
+  const item = secLibItem.value || secLibLabel.value
   try {
-    await request.post('/stdlib/add', { lib: 'spec.section', item: secLibLabel.value, content: text })
+    await request.post('/stdlib/add', { lib, item, content: text })
     ElMessage.success(tt('已存入标准库'))
     secLibDraft.value = ''
     await secLibRef.value?.load()
@@ -2791,6 +3113,30 @@ function chartOf(dt) {
   animation: rsFieldBlink 0.65s ease-in-out 5;
   outline: 2px solid #faad14;
   outline-offset: -2px;
+}
+/**
+ * 校验定位高亮(2026-10-13):保存被必填拦下时,自动翻到缺失字段所在页并把该格标红约 3 秒。
+ * 为什么不用 field-blink:那个是**命令式**加的类(按纸面文案找 DOM),纸面文案与数据键不同就找不到;
+ * 这个是**数据驱动**的(模板按 focusKey === 数据键 绑定),与翻页判据同一真源。
+ * 尺寸零影响:只用 outline/box-shadow/background-color —— 不用 border(会撑开盒子、
+ * 把纸面网格与列宽顶歪,规格书是 1:1 复刻版式)。
+ * transition 只列具体属性(项目红线:禁 transition: all)。
+ */
+@keyframes rsFocusPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 108, 108, 0); }
+  50% { box-shadow: 0 0 0 4px rgba(245, 108, 108, 0.35); }
+}
+.rs-focus {
+  outline: 2px solid #f56c6c;
+  outline-offset: -2px;
+  background-color: #fef0f0;
+  transition: background-color 0.2s ease, outline-color 0.2s ease;
+  animation: rsFocusPulse 1s ease-in-out 3;
+}
+.rs-focus :deep(.el-input__wrapper),
+.rs-focus :deep(.el-textarea__inner),
+.rs-focus :deep(.el-select__wrapper) {
+  box-shadow: 0 0 0 1px #f56c6c inset;
 }
 .rs-txt {
   white-space: pre-wrap;
@@ -3610,6 +3956,23 @@ function chartOf(dt) {
   line-height: 1.15;
   font-family: 'SimSun', 'Songti SC', serif;
   color: #1a1a1a;
+}
+/**
+ * 只读值**过长 ⇒ 逐档降字号**(用户 2026-10-15 口径:「如果过长应该是适当缩小字体」)。
+ * 档位由模板按显示宽度当量给出(coverValClass),每档字号都保证**一行放得下** ——
+ * 值列 nowrap + table-layout:auto,不降字号就会把整张字段表顶宽出画布而被 overflow:hidden 切掉。
+ * 只覆盖 font-size(/white-space),不动行高、列宽与边框 ⇒ 版式不变、回退 = 删这几个类。
+ * 不用 transition(项目红线:禁 transition: all;这里也没有状态要澄清)。
+ */
+.rsp-cover-val.rsp-cv-1 { font-size: calc(20px * var(--cok)); }
+.rsp-cover-val.rsp-cv-2 { font-size: calc(15px * var(--cok)); }
+.rsp-cover-val.rsp-cv-3 { font-size: calc(11px * var(--cok)); }
+.rsp-cover-val.rsp-cv-4 {
+  font-size: calc(9.5px * var(--cok));
+  /* 超长才允许折行:表宽此时已收到值列 min-width,行高最多 4 行(设计 46px 网格内) */
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.12;
 }
 /* 签名表:width:100% 跟随 .rsp-cover-blockin ⇒ 与字段表同宽、左右边界对齐;
    与字段表之间的垂直间隔 = margin-top,由模板按 COVER_SIGN_TOP/ROW_H 算出(设计 y520→y605 = 85px),

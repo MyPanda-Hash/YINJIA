@@ -36,7 +36,9 @@ public class ScheduleBoardController {
         this.processTask = processTask;
     }
 
-    /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据) */
+    /** 待排产池(已审核·未指派产线);9.29 批次③:车间账号看不到池(池内行无产线 ⇒ 无车间判据)
+     *  2026-10-15:生产工单页的「排产」一次只排一行,靠 `keyword = 工单号#行号` 收敛到该行
+     *  (曾为多选加过的 `限定行id` 列表通道已按用户口径回退)。 */
     @PostMapping("/pending")
     public ApiResult<List<Map<String, Object>>> pending(@RequestBody(required = false) Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");
@@ -167,7 +169,7 @@ public class ScheduleBoardController {
                 str(body == null ? null : body.get("keyword")), workshop()));
     }
 
-    /** 工单追溯:头+时间线+排产/完工/入库/领料+父子/调拨/家族(质检段见三类工序检验单) */
+    /** 工单追溯:头+时间线+排产/完工/入库+**质检段(三类工序检验单 + 应检/已检/缺检/结论汇总)**+领料+父子/调拨/家族 */
     @PostMapping("/trace")
     public ApiResult<Map<String, Object>> trace(@RequestBody Map<String, Object> body) {
         perm.requirePanelView("MANU_ORDER");

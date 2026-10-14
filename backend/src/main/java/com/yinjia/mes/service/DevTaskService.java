@@ -483,8 +483,89 @@ public class DevTaskService {
         return out;
     }
 
-    // ==================== 以下为 PxController 下沉的数据访问(2026-10-09 分层收敛) ====================
-    // 原实现散在 PxController 里直写 jdbc;这些查询都是 rd_* 推导的一部分(与 board/statusOf 同域),
+    /**
+     * 某人在某文件面板下「待开发」的产品清单(2026-10-13 用户口径)。
+     *
+     * <p>口径(用户拍板):该产品在这个面板下**已有单据且审批通过(已审核/已归档)才算「已开发」**,
+     * 其余(无单 / 草稿 / 审批中 / 待二级审批 / 被驳回)一律算「未开发」。
+     * 与 {@link #statusOf} 的 4 档(未开发/开发中/开发审核中/开发完毕)不同 —— 那是产品文件列表
+     * 矩阵用的;这里回答的是"这件事我还要不要去做",故合并成 2 档。取数与 statusOf 同源
+     * (同一张头表 + yj_doc_status、同一"归档优先"排序),免得两处口径分叉出现
+     * "矩阵说开发完毕、待开发清单里又冒出来"。
+     *
+     * <p>只看**当前登录人被分发**的产品(rd_dev_task.负责人 = user)—— 这同时也是入口按钮
+     * 显隐与红点数字的依据。
+     *
+     * @return 每项含 单据编号(产品信息表那张单,弹窗按用户要求显示它)/ 产品编号 / 产品名称 /
+     *         状态(已开发|未开发) / 下游单据编号;未开发的排在前面
+     */
+    public List<Map<String, Object>> pendingDocsFor(String panelCode, String user) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        String[] meta = DEV_PANELS.get(panelCode);
+        if (meta == null || user == null || user.isBlank()) return out;
+        String table = meta[0];
+        String key = meta[1];
+        List<Map<String, Object>> tasks = jdbc.queryForList(
+                "SELECT DISTINCT 产品编号 FROM rd_dev_task "
+                        + "WHERE 目标面板 = ? AND 负责人 = ? AND ISNULL(asp_cancel,'N') <> 'Y' "
+                        + "ORDER BY 产品编号", panelCode, user);
+        for (Map<String, Object> t : tasks) {
+            String code = t.get("产品编号") == null ? "" : String.valueOf(t.get("产品编号")).trim();
+            if (code.isEmpty()) continue;
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("产品编号", code);
+            item.put("panelCode", panelCode);
+            item.put("panelName", meta[2]);
+            // 产品信息表侧:取**单据编号**(弹窗展示用)+ 产品名称
+            try {
+                List<Map<String, Object>> pi = jdbc.queryForList(
+                        "SELECT TOP 1 单据编号, ISNULL(产品名称, N'') AS pname FROM rd_prod_info_head "
+                                + "WHERE 产品编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y' ORDER BY id DESC", code);
+                item.put("单据编号", pi.isEmpty() || pi.get(0).get("单据编号") == null
+                        ? "" : String.valueOf(pi.get(0).get("单据编号")));
+                item.put("产品名称", pi.isEmpty() ? "" : String.valueOf(pi.get(0).get("pname")));
+            } catch (Exception e) {
+                item.put("单据编号", "");
+                item.put("产品名称", "");
+                log.debug("待开发:取产品信息表失败 code={} : {}", code, e.getMessage());
+            }
+            // 本面板侧:有没有单、审批到哪一步(已归档 或 已写审核人 ⇒ 已开发)
+            String docNo = "";
+            String status = STATUS_NONE;
+            try {
+                List<Map<String, Object>> rows = jdbc.queryForList(
+                        "SELECT TOP 1 h.[单据编号] AS no, ISNULL(s.archived,'N') AS arc, ISNULL(s.shr, N'') AS shr "
+                                + "FROM " + table + " h "
+                                + "LEFT JOIN yj_doc_status s ON s.panel_code = ? AND s.doc_no = h.[单据编号] "
+                                + "WHERE h." + key + " = ? AND ISNULL(h.asp_cancel,'N') <> 'Y' "
+                                + "AND ISNULL(s.canceled,'N') <> 'Y' "
+                                + "ORDER BY CASE WHEN ISNULL(s.archived,'N')='Y' THEN 3 "
+                                + "WHEN LEN(ISNULL(s.shr, N'')) > 0 THEN 2 ELSE 1 END DESC, h.id DESC",
+                        panelCode, code);
+                if (!rows.isEmpty()) {
+                    Map<String, Object> r = rows.get(0);
+                    docNo = r.get("no") == null ? "" : String.valueOf(r.get("no"));
+                    boolean done = "Y".equals(String.valueOf(r.get("arc")))
+                            || !String.valueOf(r.get("shr")).isBlank();
+                    status = done ? "已开发" : STATUS_NONE;
+                }
+            } catch (Exception e) {
+                log.debug("待开发判定回退(按未开发算) panel={} code={} : {}", panelCode, code, e.getMessage());
+            }
+            item.put("状态", status);
+            item.put("下游单据编号", docNo);
+            out.add(item);
+        }
+        out.sort((a, b) -> {
+            boolean an = STATUS_NONE.equals(a.get("状态"));
+            boolean bn = STATUS_NONE.equals(b.get("状态"));
+            if (an != bn) return an ? -1 : 1;
+            return String.valueOf(a.get("单据编号")).compareTo(String.valueOf(b.get("单据编号")));
+        });
+        return out;
+    }
+
+    // ==================== 以下为 PxController 下沉的数据访问(2026-10-09 分层收敛) ====================    // 原实现散在 PxController 里直写 jdbc;这些查询都是 rd_* 推导的一部分(与 board/statusOf 同域),
     // 归属本服务后 Controller 只剩「收参 → 校验 → 组装响应」。SQL 与异常降级口径逐字照搬,行为不变。
 
     /** 单据编号 → 产品编号(产品信息表侧边栏用;查不到返回空串) */
@@ -564,9 +645,33 @@ public class DevTaskService {
      *
      * <p>明细只取 [表区]='检验要求' 的行 —— 与 ButtonService.specTestRowsSnapshot 同款口径,
      * 那是规格书「检验项目及检验标准」页的行;其余表区(修订记录/物料清单…)不参与出货检验。
+     *
+     * <p>【表区参数(2026-10-13)】组装工艺清单(RD_ASM_PROC)的「组装BOM表」要从同一张规格书取
+     * 「1.关键物料列表」的行 —— 那条链与此处**共用**产品编号解析与审批门禁,只差表区。
+     * 故表区改成 {@link #specByProduct(String, String)} 的参数,本单参重载 = 传 null =
+     * 出厂口径 '检验要求' ⇒ 出货检验计划表那条链的取数与返回结构一字不变。
      */
     public Map<String, Object> specByProduct(String productCode) {
+        return specByProduct(productCode, null);
+    }
+
+    /** 规格书「检验项目及检验标准」页的表区值(出货检验计划表 ← 它的检验项目) */
+    public static final String SPEC_SHEET_AREA_INSPECT = "检验要求";
+
+    /** 规格书「1.关键物料列表」的表区值(组装工艺清单「组装BOM表」← 它的物料行) */
+    public static final String SPEC_SHEET_AREA_MATERIAL = "物料清单";
+
+    /**
+     * {@link #specByProduct(String)} 的表区参数化版本。
+     *
+     * @param sheetArea 规格书明细的 [表区];为空 ⇒ {@link #SPEC_SHEET_AREA_INSPECT}(原口径)。
+     *                  目前两种落点:检验要求(序号/检验项目/检验要求/检验方法/检验依据)、
+     *                  物料清单(序号/物料编码/物料名称/规格参数/数量/备注)。
+     *                  两处都用**参数化** [表区] = ?,不拼串。
+     */
+    public Map<String, Object> specByProduct(String productCode, String sheetArea) {
         String code = productCode == null ? "" : productCode.trim();
+        String area = sheetArea == null || sheetArea.isBlank() ? SPEC_SHEET_AREA_INSPECT : sheetArea.trim();
 
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("found", false);
@@ -613,12 +718,34 @@ public class DevTaskService {
             Object v = h.get(k);
             out.put(k, v == null ? "" : String.valueOf(v));
         }
-        out.put("items", jdbc.queryForList(
+        out.put("items", specDetailRows(no, area));
+        return out;
+    }
+
+    /**
+     * 规格书明细行(按表区出列):检验要求页 ← 检验项目五列;物料清单页 ← 物料六列。
+     * 其余表区按检验要求的列形返回(空集)—— 不猜、不硬编第三套列。
+     *
+     * <p>【2026-10-15 撤掉物料清单页的派生列 所属类别】原为成型工艺清单「配方表 ← 规格书物料清单」
+     * 那条链按 bs_inv 补 物料种类;用户改口「配方表的数据是在配方计算器里面填写数据然后填入单据的,
+     * 而不是带入的规格书的」⇒ 该链连同 {@code specByProductForMold} 一并撤掉,这一列再没人取
+     * (组装BOM表按显式 from 映射只取 物料编码/物料名称/规格参数/数量,不取它)。
+     * 留着就是没人用的机制,故删除 —— 以后要再补,按当时的取数口径重新加。
+     */
+    private List<Map<String, Object>> specDetailRows(String no, String area) {
+        if (SPEC_SHEET_AREA_MATERIAL.equals(area)) {
+            return jdbc.queryForList(
+                    "SELECT ISNULL(d.序号, N'') AS 序号, ISNULL(d.物料编码, N'') AS 物料编码,"
+                            + " ISNULL(d.物料名称, N'') AS 物料名称, ISNULL(d.规格参数, N'') AS 规格参数,"
+                            + " ISNULL(d.数量, N'') AS 数量, ISNULL(d.备注, N'') AS 备注"
+                            + " FROM rd_spec_doc_detail d"
+                            + " WHERE d.单据编号 = ? AND d.表区 = ? ORDER BY d.id", no, area);
+        }
+        return jdbc.queryForList(
                 "SELECT ISNULL(序号, N'') AS 序号, ISNULL(检验项目, N'') AS 检验项目,"
                         + " ISNULL(检验要求, N'') AS 检验要求, ISNULL(检验方法, N'') AS 检验方法,"
                         + " ISNULL(检验依据, N'') AS 检验依据"
-                        + " FROM rd_spec_doc_detail WHERE 单据编号 = ? AND 表区 = N'检验要求' ORDER BY id", no));
-        return out;
+                        + " FROM rd_spec_doc_detail WHERE 单据编号 = ? AND 表区 = ? ORDER BY id", no, area);
     }
 
     /** 规格书可用状态:填写并提交审批完(审批通过 ⇒ 已归档/已审核)。草稿/审批中/修改中/已作废一律不可用 */
