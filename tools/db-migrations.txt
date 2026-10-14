@@ -3071,3 +3071,20 @@ migrate-qc-item-category-dict.sql
 fix-qc-item-category-free.sql
 migrate-qc-proc-insp-freq-col.sql
 migrate-qc-proc-insp-wo-line-field.sql
+
+# ── 2026-10-16 四个看板页面的**页面级面板权限**(订单结转/快速排产/工单排产/生产工单) ──
+#   用户口径:「查看当前组织架构中是否存在当前的订单结转,快速排产,工单排产,生产订单的界面的权限控制,
+#     不存在的话进行创建和增加,针对当前页面的特性进行编写实现。」
+#   排查(实库实测):ORDER_CONVERT / SCHEDULE_BOARD / WORK_ORDER_BOARD 三个码 **yj_panel 里不存在**
+#     ⇒ 权限矩阵(只列 registry.all())里无从勾选;四条菜单项无 panelCode,而 filterMenuTree 对
+#     「无 panelCode 的叶子」一律放行 ⇒ 任何登录账号都能看到并进入;生产工单列表
+#     /px/workOrderList 更是**零校验**(登录即可读全部工单/客户/数量)。
+#   处置:沿用「虚拟面板 DASHBOARD」先例 —— **不建表、不插 yj_panel 行**(空面板会污染报表/选单等
+#     registry.all() 下游),矩阵条目由 SysAdminController 注入(定义/动作集见 PagePanelRegistry);
+#   本脚本只做**等价补授**:按旧闸门(SO_ORDER view / MANU_ORDER view)把现有角色的授权平移到新页面码,
+#     保证老账号不掉权限。动作集按页面特性裁剪(非通用 12 项):
+#       ORDER_CONVERT=view,query,date,convert;SCHEDULE_BOARD=view,query,assign,unassign;
+#       WORK_ORDER_BOARD=view,query,transfer,revoke,unclose,print;
+#       WORK_ORDER_LIST=view,query,print,close,split,picking,export,assign。
+#   同批另附四个面板名的 en 译名(yj_translation scope='panel')。幂等(逐条 NOT EXISTS);两账套均执行。
+migrate-page-panel-perms-20261016.sql
