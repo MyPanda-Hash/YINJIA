@@ -437,16 +437,18 @@ public class KingdeePushService {
                 e.put("price", plainDecimal(num(line, priceKey)));
                 double cessO = num(line, "税率%"); if (cessO != 0) e.put("cess", plainDecimal(cessO));
             } else if (isFinIn) {
-                // 产品入库单(inv_product)实测落库字段:只收 qty(数量族由金蝶按系数自算),且**无税金族**
-                // (与生产领料单同)。价格族在真实账套恒空(30 张样本 price/cost/unit_cost 全 0%),故不推。
-                e.put("qty", num(line, qtyKey));
-                e.put("seq", rowNo);
+                // 产品入库单(inv_product)实测口径:数量族**必须传字符串**(沙箱实测 proto 校验:
+                //   数字型 qty 报「invalid value for string type: 123.0」,见
+                //   tools/archive/_dump-out/kingdee-save-inv-product-1014.md)⇒ 用 plainDecimal 转字符串;
+                // 金蝶按系数自算数量族,故只传 qty;该单据**无税金族**,价格族在真实账套恒空(30 张样本 0%)。
+                e.put("qty", plainDecimal(num(line, qtyKey)));
+                e.put("seq", String.valueOf(rowNo));
                 String comment = str(line.get("备注")); if (!comment.isEmpty()) e.put("comment", comment);
             } else if (isOtherIn || isOtherOut) {
-                // 其他入库/出库:与产品入库单同族(只收 qty、无税金族);其他入库行另有 成本/单位成本 两键
-                // (真实账套实测 19% 行有值),按实测口径「有值才推」。
-                e.put("qty", num(line, qtyKey));
-                e.put("seq", rowNo);
+                // 其他入库/出库:与产品入库单同口径 —— 数量族传**字符串**;
+                // 其他入库行另有 成本/单位成本 两键(真实账套实测 19% 行有值),按「有值才推」。
+                e.put("qty", plainDecimal(num(line, qtyKey)));
+                e.put("seq", String.valueOf(rowNo));
                 if (isOtherIn) {
                     String cost = str(line.get("成本")); if (!cost.isEmpty()) e.put("cost", cost);
                     String unitCost = str(line.get("单位成本")); if (!unitCost.isEmpty()) e.put("unit_cost", unitCost);
