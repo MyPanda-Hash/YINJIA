@@ -219,3 +219,36 @@ test('项目进度查询:密级默认「绝密」+ 适用范围默认「工程�
   assert.equal(form['密级'], '绝密', '设计 P2/Q2 印的是绝密')
   assert.equal(form['文件使用范围'], '工程技术中心', '设计 P3/Q3 印的是工程技术中心')
 })
+
+/**
+ * 2026-10-15:成型工艺清单 / 成型配方 / 组装工艺清单补「表单管理人 + 版本号」默认值。
+ *
+ * 用户报障原文:「审批通过后无法做到自动录入管理人及文件版本号,需要提前手动输入」。
+ * 同族面板(RD_INSP_PLAN)早有这两项,这三张漏了 ⇒ 新建单据时两格都是空的。
+ * 口径与 RD_INSP_PLAN 逐字一致:表单管理人=冯敏、版本号 = 'V' + 当天(设计原文「V + 按照日期来」),
+ * 走"默认值"(仅空时填、可人工改),**不是**锁定只读。
+ *
+ * ⚠ 键必须是**字段 label**:两张账套 yj_field 实测这三张表的 label 都是「表单管理人」/「版本号」;
+ *   同族的规格书那条 label 是**「版本」** —— 写成「版本号」会被 labelsToCols 静默丢弃。
+ */
+test('成型工艺清单/成型配方/组装工艺清单:表单管理人=冯敏、版本号=V+当天', () => {
+  for (const code of ['RD_MOLD_PROC', 'RD_MOLD_FORMULA', 'RD_ASM_PROC']) {
+    const form = {}
+    applyDocDefaults(code, form, USER, { isNew: true, today: T })
+    assert.equal(form['表单管理人'], '冯敏', `${code} 的表单管理人应默认冯敏`)
+    assert.equal(form['版本号'], 'V2026-09-11', `${code} 的版本号应展开成 V+当天(@today 占位)`)
+  }
+})
+
+test('三张表的默认值不得覆盖用户已填内容(仅空时填)', () => {
+  const form = { 表单管理人: '刘磊', 版本号: 'V9.9' }
+  applyDocDefaults('RD_MOLD_PROC', form, USER, { isNew: true, today: T })
+  assert.equal(form['表单管理人'], '刘磊', '已有值不应被默认值覆盖')
+  assert.equal(form['版本号'], 'V9.9', '已有值不应被默认值覆盖')
+})
+
+test('版本号占位符只认「版本号」这个 label —— 规格书那条叫「版本」,不该被本批默认值碰到', () => {
+  const spec = {}
+  applyDocDefaults('RD_SPEC_DOC', spec, USER, { isNew: true, today: T })
+  assert.deepEqual(spec, {}, '本批默认值不得落到规格书(那边 label 是「版本」不是「版本号」)')
+})
