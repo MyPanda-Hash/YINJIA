@@ -2,7 +2,8 @@
   <el-dialog
     :model-value="modelValue"
     :title="tt('配方计算')"
-    width="1120px"
+    width="min(1560px, 94vw)"
+    top="3vh"
     append-to-body
     destroy-on-close
     class="rcd-dlg"
