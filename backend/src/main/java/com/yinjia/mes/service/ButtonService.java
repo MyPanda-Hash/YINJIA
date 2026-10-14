@@ -407,6 +407,13 @@ public class ButtonService {
         if ("修改申请中".equals(stStatus)) throw new IllegalStateException("修改申请审批期间不可保存，请等待审批完成或撤回申请");
         // 来料检验单数量守恒:每行 合格数量+不良数量 ≤ 数量(送检数量),超限拒绝保存
         if ("QC_INSP".equals(def.code())) validateInspQty(items);
+        // 三张工序检验单(成型/切炭/组装成品)数量守恒:Σ明细(合格数量+不合格数量) ≤ 表头**检验数量**。
+        // 2026-10-15 用户报障「工序报工完成就默认变成合格数量」的落点之一 —— 合格数量是
+        // **派生值**(检验数量−Σ不合格),前端不录该列,故这里管两道:
+        //   ① 明细里出现「合格数量」直填(物理列还在、接口可绕)不准超过检验数量;
+        //   ② 明细 Σ不合格数量 超过表头检验数量 ⇒ 派生合格数会是负数,与追溯页/入库分流口径冲突,拒绝。
+        // 这样保存下来的单,合格+不合格 恒 = 检验数量(或 ≤),数据一致性闭环。
+        if (WO_INSP_PANEL.containsValue(def.code())) validateProcInspQty(def, head, items);
         // ⚠ 原「样品编号表(RD_SAMPLE_NO)的样品编号唯一性校验」2026-09-30 随面板下架移除
         //   (用户口径「样品编号表删掉」,见 tools/migrate-drop-sample-no-panel-2026-09-30.sql);
         //   连带删掉私有方法 ensureSampleNoUnique —— 面板没了,该分支永不进入。
@@ -839,6 +846,49 @@ public class ButtonService {
                 throw new IllegalStateException("第" + (i + 1) + "行 合格数量(" + trimZero(ok) + ")+不合格数量("
                         + trimZero(bad) + ") 超过送检数量(" + trimZero(qty) + ")，请核对");
             }
+        }
+    }
+
+    /**
+     * 三张工序检验单(成型/切炭/组装成品)明细数量守恒(2026-10-15 用户口径「数据一致性」)。
+     *
+     * <p>背景:合格数量自 2026-10-15 起是**派生值**(表头检验数量 − Σ明细不合格数量),
+     * 界面不再录这一列。但只要物理列与接口还在,就有两条出路必须守住:</p>
+     * <ol>
+     *   <li>明细直填「合格数量」(老单/接口)→ 加总后不得超过表头检验数量;</li>
+     *   <li>明细 Σ不合格数量 超过表头检验数量 → 派生合格数为负,追溯页与入库分流
+     *       (asmInspToStock)的口径都会打架,直接拒绝保存。</li>
+     * </ol>
+     * <p>表头检验数量为空(还没检验)时:明细若已填了数量属超前录入,一并拦下,
+     * 提示先填表头「检验数量」—— 这正是用户报障「报工完成就默认合格」的根因。
+     * 明细全空(草稿态)放行。</p>
+     */
+    private void validateProcInspQty(PanelRegistry.PanelDef def, Map<String, Object> head,
+                                     List<Map<String, Object>> items) {
+        if (items.isEmpty()) return;
+        double inspQty = 0;
+        for (Object v : new Object[]{
+                head == null ? null : head.get("检验数量"),
+                head == null ? null : head.get("抽检总量"),
+                head == null ? null : head.get("抽检量")}) {
+            if (v != null && !String.valueOf(v).isBlank()) { inspQty = numOf(v); break; }
+        }
+        double sumOk = 0, sumNg = 0;
+        for (Map<String, Object> it : items) {
+            sumOk += firstNum(it, "合格数量");
+            sumNg += firstNum(it, "不合格数量", "不良数量");
+        }
+        double eps = 1e-9;
+        if (inspQty <= eps && (sumOk > eps || sumNg > eps)) {
+            throw new IllegalStateException("表头「检验数量」还没填(未检验)，明细已填了合格/不合格数量，请核对");
+        }
+        if (sumOk > inspQty + eps) {
+            throw new IllegalStateException("明细合格数量合计(" + trimZero(sumOk) + ") 超过表头检验数量("
+                    + trimZero(inspQty) + ")，请核对");
+        }
+        if (sumNg > inspQty + eps) {
+            throw new IllegalStateException("明细不合格数量合计(" + trimZero(sumNg) + ") 超过表头检验数量("
+                    + trimZero(inspQty) + ")，合格数量会算成负数，请核对");
         }
     }
 
@@ -2775,8 +2825,10 @@ public class ButtonService {
 
     /**
      * 组装成品检验单审核 → 数量分流:
-     * <ul><li><b>合格数 = 表头报工数量 − Σ明细不合格数量</b>(2026-10-15 用户口径:明细只填「不合格数量」,
-     *   合格数量是派生值)数量 &gt; 0 → 生成**产成品入库单草稿**(FINISH_IN,
+     * <ul><li><b>合格数 = 表头检验数量 − Σ明细不合格数量</b>(2026-10-15 用户口径:明细只填「不合格数量」,
+     *   合格数量是派生值;2026-10-15 数据一致性修订:基数取**检验数量**而非报工数量 ——
+     *   报工审核自动生成的空草稿检验数量=0,旧口径会把报工总量全额写进入库单=没检就入库)
+     *   数量 &gt; 0 → 生成**产成品入库单草稿**(FINISH_IN,
      *   与切炭直销同一落点,留草稿由仓库审核,不自动记账);</li>
      * <li>不合格数量 &gt; 0 → **不再派生下游单**(2026-10-09 上游已下架「不良品处理单 QC_DISPOSAL」;
      *   原分支遗漏未删,会让「填了不合格 ⇒ 审核 400 整单回滚」,2026-10-15 合并时收掉,见方法内注释)。</li></ul>
@@ -2792,7 +2844,8 @@ public class ButtonService {
                 "SELECT ISNULL(工单号,N'') AS 工单号, ISNULL(批次号,N'') AS 批次号, ISNULL(产品编码,N'') AS 产品编码,"
                         + " ISNULL(产品名称,N'') AS 产品名称, ISNULL(规格型号,N'') AS 规格型号,"
                         + " ISNULL(生产线,N'') AS 生产线, ISNULL(报工单号,N'') AS 报工单号,"
-                        + " ISNULL(报工数量,0) AS 报工数量 FROM qc_asm_insp_head"
+                        + " ISNULL(报工数量,0) AS 报工数量, ISNULL(检验数量,0) AS 检验数量"
+                        + " FROM qc_asm_insp_head"
                         + " WHERE 单据编号=? AND ISNULL(asp_cancel,'N')<>'Y'", inspNo);
         if (heads.isEmpty()) throw new IllegalStateException("组装成品检验单不存在:" + inspNo);
         Map<String, Object> h = heads.get(0);
@@ -2804,9 +2857,17 @@ public class ButtonService {
         //   ⇒ 明细只填「不合格数量」;合格数量 = **表头报工数量 − Σ明细不合格数量**(负值兜 0),
         //     不再读明细的「合格数量」列(该字段登记行已由
         //     tools/migrate-insp-pass-qty-derived-20261015.sql 注销,物理列留作历史)。
+        // 🔴🔴 2026-10-15 数据一致性再修订(用户报障「工序报工完成就默认变成合格数量」):
+        //   基数从「报工数量」改成「检验数量」—— 检验单是报工审核自动生成的**空草稿**
+        //   (明细全空、检验数量=0),照旧口径会把**报工总量**全额当合格数写进入库单,
+        //   等于"没检验就入库"。
+        //   新口径:检验数量为空/0 ⇒ pass=0 ⇒ 不生成任何下游单(等于没检过就不动库存),
+        //   与工单追溯「质检数据」段的 合格数量=检验数量−Σ不合格 完全一致。
+        //   老单(2026-10-15 前、明细有预铺的「判定+数量」两行)取数仍成立:
+        //   那种单的检验数量通常等于报工数量,数值不回归。
         double ng = 0;
         for (Map<String, Object> r : lines) ng += numOr(r.get("不合格数量"));
-        double pass = Math.max(0, numOr(h.get("报工数量")) - ng);
+        double pass = Math.max(0, numOr(h.get("检验数量")) - ng);
         if (pass <= 0 && ng <= 0) return;                          // 品质没填数量:单据走过而已,不产生下游
         // 工单侧数据(单位/单价/批号;保留 dualOutFinishIn 的 inline 取仓口径,后续可抽公共方法)
         String wo = String.valueOf(h.get("工单号"));

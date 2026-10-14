@@ -894,8 +894,9 @@ public class ScheduleBoardService {
         //  · 工单号是检验单头上唯一的工单维度键(头表暂无「工单行号」,分批报工会出多张,靠批次号/报工单号区分);
         //  · **单据状态必须走 yj_doc_status 推导**:这三张表的物理「单据状态」列实测全为 NULL(引擎不写),
         //    口径与面板列表 QueryService.docStatus 一致(canceled→stopped→pending→shr→草稿);
-        //  · 合格/不合格数量按明细「判定」汇总(组装固定合格/不合格两行;成型/切炭现为通用模板,通常皆为 0);
-        //  · 下游单号 = 该检验单审核后自动生成的下游(产成品入库单 FINISH_IN / 不良品处理单 QC_DISPOSAL)。
+        //  · 合格/不合格数量按明细「不合格数量」列汇总;**合格数量是派生值 = 表头检验数量 − Σ不合格**
+        //    (2026-10-15 数据一致性修订:只有检过才有合格数,见下方 SELECT 内注释);
+        //  · 下游单号 = 该检验单审核后自动生成的下游(产成品入库单 FINISH_IN)。
         List<Map<String, Object>> qc = new ArrayList<>();
         // 行级收敛(2026-10-15 用户口径「按工单号+工单行号」):
         //   ① **首选本行的 工单行号** —— 三张检验单头已补该列(migrate-wo-insp-wo-line-20261015.sql,
@@ -934,12 +935,18 @@ public class ScheduleBoardService {
                             + "      WHEN s.shr IS NOT NULL THEN N'已审核' ELSE N'草稿' END AS 单据状态,"
                             + " ISNULL(h.总结论,N'') AS 总结论,"
                             + " ISNULL(h.报工数量,0) AS 送检数量, ISNULL(h.检验数量,0) AS 检验数量,"
-                            // 🔴 2026-10-15 用户口径:「去除合格数量只保留不合格数量」「最终的合格数量就是
-                            //   [报工数量]减去[不合格数量]」「数据要可返回追溯页面」。
-                            //   ⇒ 合格数量不再是明细里填的列,而是**读取时算**:表头报工数量 − Σ明细不合格数量。
-                            //   负值兜 0(不合格填超报工数量时不该在追溯页显示负数)。
-                            + " CASE WHEN ISNULL(h.报工数量,0) - ISNULL(d.不合格数量,0) < 0 THEN 0"
-                            + "      ELSE ISNULL(h.报工数量,0) - ISNULL(d.不合格数量,0) END AS 合格数量,"
+                            // 🔴 2026-10-15 用户口径(数据一致性修订):
+                            //   「需要完成当前的检验单才会显示对应的合格数量，否则不会显示才是正确的」。
+                            //   ⇒ 合格数量 = **检验数量** − Σ明细不合格数量，而不是原来的「报工数量 − 不合格」。
+                            //   为什么改：检验单是报工审核自动生成的**空草稿**(明细全空、检验数量=0)，
+                            //   旧口径会凭「报工数量」凭空算出 161/161/160 的合格数，并把汇总结论写成
+                            //   「全部合格」—— 可什么都没检。
+                            //   ⇒ 未检验(检验数量为空或 ≤0)时返回 **NULL**（界面该列留空，即"不显示"），
+                            //     这比给 0 更贴用户口径；检验过的单才有数值。负值兜 0
+                            //     (不合格填超检验数量时不在追溯页显示负数)。
+                            + " CASE WHEN ISNULL(h.检验数量,0) <= 0 THEN NULL"
+                            + "      WHEN ISNULL(h.检验数量,0) - ISNULL(d.不合格数量,0) < 0 THEN 0"
+                            + "      ELSE ISNULL(h.检验数量,0) - ISNULL(d.不合格数量,0) END AS 合格数量,"
                             + " ISNULL(d.不合格数量,0) AS 不合格数量,"
                             + " ISNULL(h.检验员,N'') AS 检验员, ISNULL(h.批次号,N'') AS 批次号,"
                             + " ISNULL(h.报工单号,N'') AS 报工单号, ISNULL(h.处理方式,N'') AS 处理方式,"
@@ -954,7 +961,8 @@ public class ScheduleBoardService {
                             //   合格/不合格两行;现在生单不再预填明细,改为一律 **对明细列 合格数量/不合格数量 求和**。
                             //   品质在明细里按检验项目填几行都行,汇总天然是各行合计。
                             + "      SUM(ISNULL(不合格数量,0)) AS 不合格数量"
-                            // ↑ 只汇总「不合格数量」:合格数量改为 表头报工数量 − 本值(2026-10-15 用户口径,详见外层 CASE)
+                            // ↑ 只汇总「不合格数量」:合格数量改为 表头**检验数量** − 本值
+                            //   (2026-10-15 数据一致性修订,详见外层 CASE:未检验不得显示合格数)
                             + "    FROM dbo." + tbl.replace("_head", "_detail")
                             + "   WHERE ISNULL(asp_cancel,'N')<>'Y' GROUP BY 单据编号) d"
                             + "   ON d.单据编号 = h.单据编号"
@@ -963,7 +971,7 @@ public class ScheduleBoardService {
         }
         qc.sort((a, b) -> String.valueOf(a.get("检验单号")).compareTo(String.valueOf(b.get("检验单号"))));
         // 汇总(「对上」用):应检 = 成型/切炭/组装(与出单口径同源);已检 = 存活检验单上出现的工序;
-        // 缺检 = 应检 − 已检;结论按"有不合格 > 缺检 > 全合格 > 未判定"优先级给一句话。
+        // 缺检 = 应检 − 已检。合格/不合格取各单派生值求和(未检验的合格数为 NULL，Num.of 按 0 计)。
         LinkedHashSet<String> doneOps = new LinkedHashSet<>();
         double passQty = 0, ngQty = 0, inspQty = 0;
         int auditedCnt = 0;
@@ -986,8 +994,13 @@ public class ScheduleBoardService {
         qcSum.put("检验数量合计", Math.round(inspQty * 10000d) / 10000d);
         qcSum.put("合格数量合计", Math.round(passQty * 10000d) / 10000d);
         qcSum.put("不合格数量合计", Math.round(ngQty * 10000d) / 10000d);
+        // 结论(2026-10-15 数据一致性修订):「全部合格」的判据从 passQty>0 改为 **检验过**
+        // (inspQty>0)。旧口径下"报工审核自动生成的空检验单"也能凑出 passQty>0 ⇒ 一条没检
+        // 就报「全部合格」。现在:有不合格 → 存在不合格;没检过(inspQty=0) → 未检验;
+        // 否则三道都出单且检过 → 全部合格;还有工序没出单 → 缺检。
         qcSum.put("结论", ngQty > 0 ? "存在不合格"
-                : (!missOps.isEmpty() ? "缺检" : (passQty > 0 ? "全部合格" : "未判定")));
+                : (inspQty <= 0 ? "未检验"
+                : (!missOps.isEmpty() ? "缺检" : "全部合格")));
 
         // 父子工单(切单,9.29 批次① 2026-10-05):本单切出的子单 + 本单的来源父单 —— 追溯「同一产品」
         // 行级收敛(2026-10-15 步3):**本行**切出的子单(plang.源工单行id = 本行 id),不是整单切出的全部;

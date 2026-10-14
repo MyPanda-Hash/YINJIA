@@ -455,6 +455,9 @@ export default {
     '缺检': 'Inspection missing',
     '全部合格': 'All passed',
     '未判定': 'Not judged',
+    // 2026-10-15 数据一致性修订:质检汇总结论新增「未检验」(合格数量 = 检验数量 − Σ不合格,
+    // 还没检验就不显示合格数、不再误报「全部合格」)
+    '未检验': 'Not inspected yet',
     '三类工序检验单由报工审核自动生成；混料/装箱不出检验单': 'The three process inspection sheets are auto-created on work-report approval; mixing and packing produce none',
     // ---- 检验项目/检验方案维护弹窗(QcInspPlanDialog,2026-10-09)----
     '检验项目维护': 'Inspection Items',
