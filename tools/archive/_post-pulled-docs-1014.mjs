@@ -49,8 +49,8 @@ jobs.sort((a, b) => (a.date === b.date ? (a.kind === b.kind ? a.no.localeCompare
 const todo = LIMIT ? jobs.slice(0, LIMIT) : jobs
 console.log(`待审核单据 ${todo.length} 张(入账顺序:日期升序,同日入库先于出库)`)
 
-// ② 登录(账套由 factory 决定)
-const BASE = 'http://127.0.0.1:8090'
+// ② 登录(账套由 factory 决定);--base 默认 8090,历史回填时指向带 -Dmes.hist.backfill=true 的实例(如 8091)
+const BASE = arg('base', 'http://127.0.0.1:8090')
 const login = await (await fetch(`${BASE}/api/auth/login`, {
   method: 'POST', headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ userName: 'admin', password: '123456', ...(FACTORY ? { factory: FACTORY } : {}) }),
