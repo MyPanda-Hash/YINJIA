@@ -1,0 +1,1859 @@
+{
+ "at": "2026-10-14T10:42:58.634Z",
+ "account": "580147507460444160",
+ "sampleSize": 30,
+ "docs": {
+  "inv_product": {
+   "header": {
+    "id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2590188220981525504\""
+    },
+    "bill_no": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"CPRK-20261014-00004\""
+    },
+    "bill_date": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14\""
+    },
+    "bill_status": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"C\""
+    },
+    "create_time": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14 18:40:46\""
+    },
+    "modify_time": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14 18:41:38\""
+    },
+    "audit_time": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14 18:41:38\""
+    },
+    "creator_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"425692977\""
+    },
+    "creator_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"蒋小刚\""
+    },
+    "creator_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"multicorp_6171610_-952599178\""
+    },
+    "modifier_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"425692977\""
+    },
+    "modifier_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"蒋小刚\""
+    },
+    "modifier_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"multicorp_6171610_-952599178\""
+    },
+    "bill_type_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"产品入库单\""
+    },
+    "bill_type_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"inv_product_bill\""
+    },
+    "bill_type_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"inv_product_bill\""
+    },
+    "auditor_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"425692977\""
+    },
+    "auditor_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"蒋小刚\""
+    },
+    "auditor_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"multicorp_6171610_-952599178\""
+    },
+    "remark": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "dept_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2170469887338617856\""
+    },
+    "dept_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"组装车间\""
+    },
+    "dept_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"BM00005\""
+    },
+    "emp_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2203244138931956736\""
+    },
+    "emp_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"王万华\""
+    },
+    "emp_number": {
+     "present": 30,
+     "nonEmpty": 26,
+     "sample": "\"ZY00038\""
+    },
+    "custom_field": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "acceptor_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "acceptor_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "acceptor_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    }
+   },
+   "entry": {
+    "picture": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "seq": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "1"
+    },
+    "id": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"2590188220981629952\""
+    },
+    "material_id": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"2182903273994943488\""
+    },
+    "material_name": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"A+级烧结炭棒/滤芯\""
+    },
+    "material_number": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"D-18-07\""
+    },
+    "material_is_multi_unit": {
+     "present": 117,
+     "nonEmpty": 3,
+     "sample": "true"
+    },
+    "material_is_serial": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_is_asst_attr": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_is_kf_period": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_is_batch": {
+     "present": 117,
+     "nonEmpty": 78,
+     "sample": "true"
+    },
+    "material_model": {
+     "present": 117,
+     "nonEmpty": 111,
+     "sample": "\"30*12*200\""
+    },
+    "stock_id": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"2220441270411712512\""
+    },
+    "stock_name": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"成品B仓\""
+    },
+    "stock_number": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"CP-02\""
+    },
+    "stock_is_allow_freight": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sp_id": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sp_name": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sp_number": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_prop_id": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_prop_name": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_prop_number": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux1_id": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux1_name": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux1_number": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux2_id": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux2_name": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux2_number": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux3_id": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux3_name": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux3_number": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "barcode": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "batch_no": {
+     "present": 117,
+     "nonEmpty": 78,
+     "sample": "\"PC0000\""
+    },
+    "pro_place": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "pro_reg_no": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "pro_license": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "kf_date": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "valid_date": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "kf_type": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "kf_period": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sn_list": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sn_list_id": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "base_unit_id": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"3\""
+    },
+    "base_unit_name": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"支\""
+    },
+    "base_unit_number": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"支\""
+    },
+    "unit_id": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"3\""
+    },
+    "unit_name": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"支\""
+    },
+    "unit_number": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "\"支\""
+    },
+    "aux_unit_id": {
+     "present": 117,
+     "nonEmpty": 3,
+     "sample": "\"7\""
+    },
+    "aux_unit_name": {
+     "present": 117,
+     "nonEmpty": 3,
+     "sample": "\"kg\""
+    },
+    "aux_unit_number": {
+     "present": 117,
+     "nonEmpty": 3,
+     "sample": "\"kg\""
+    },
+    "conversion_rate": {
+     "present": 117,
+     "nonEmpty": 3,
+     "sample": "\"1 kg = 1000 g\\n\""
+    },
+    "qty": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "3470"
+    },
+    "inv_qty": {
+     "present": 117,
+     "nonEmpty": 105,
+     "sample": "6828"
+    },
+    "base_qty": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "3470"
+    },
+    "inv_base_qty": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_qty": {
+     "present": 117,
+     "nonEmpty": 3,
+     "sample": "184"
+    },
+    "def_float_qty": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_coefficient": {
+     "present": 117,
+     "nonEmpty": 3,
+     "sample": "1000"
+    },
+    "coefficient": {
+     "present": 117,
+     "nonEmpty": 117,
+     "sample": "1"
+    },
+    "price": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "cost": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "unit_cost": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "comment": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_no": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_type_id": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_type_name": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_type_number": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_inter_id": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_date": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_seq": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_entry_id": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "custom_entity_field": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "recv_qty": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "recv_base_qty": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "customer_id": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "customer_number": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "customer_name": {
+     "present": 117,
+     "nonEmpty": 0,
+     "sample": ""
+    }
+   },
+   "total": 30,
+   "bills": [
+    "CPRK-20261014-00004",
+    "CPRK-20261014-00003",
+    "CPRK-20261014-00002",
+    "CPRK-20261014-00001",
+    "CPRK-20261013-00007",
+    "CPRK-20261013-00006",
+    "CPRK-20261013-00005",
+    "CPRK-20261013-00004",
+    "CPRK-20261013-00003",
+    "CPRK-20261013-00002",
+    "CPRK-20261012-00006",
+    "CPRK-20261013-00001",
+    "CPRK-20261012-00005",
+    "CPRK-20261012-00004",
+    "CPRK-20261012-00003",
+    "CPRK-20261012-00002",
+    "CPRK-20261012-00001",
+    "CPRK-20261011-00005",
+    "CPRK-20261011-00004",
+    "CPRK-20261011-00003",
+    "CPRK-20261011-00002",
+    "CPRK-20261011-00001",
+    "CPRK-20261010-00007",
+    "CPRK-20261010-00006",
+    "CPRK-20261010-00005",
+    "CPRK-20261010-00004",
+    "CPRK-20261010-00003",
+    "CPRK-20261009-00008",
+    "CPRK-20261009-00007",
+    "CPRK-20261009-00006"
+   ]
+  },
+  "inv_other_in": {
+   "header": {
+    "id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2590130656491170816\""
+    },
+    "bill_no": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"QTRK-20261014-00092\""
+    },
+    "bill_date": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14\""
+    },
+    "bill_status": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"C\""
+    },
+    "create_time": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14 16:46:53\""
+    },
+    "modify_time": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14 16:47:16\""
+    },
+    "audit_time": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14 16:47:15\""
+    },
+    "creator_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"425692977\""
+    },
+    "creator_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"蒋小刚\""
+    },
+    "creator_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"multicorp_6171610_-952599178\""
+    },
+    "modifier_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"425692977\""
+    },
+    "modifier_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"蒋小刚\""
+    },
+    "modifier_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"multicorp_6171610_-952599178\""
+    },
+    "auditor_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"425692977\""
+    },
+    "auditor_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"蒋小刚\""
+    },
+    "auditor_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"multicorp_6171610_-952599178\""
+    },
+    "trans_type_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"12\""
+    },
+    "trans_type_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"其他入库\""
+    },
+    "trans_type_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"QTRKLX01\""
+    },
+    "customer_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "customer_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "customer_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "supplier_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2241285519952694272\""
+    },
+    "supplier_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"KG\""
+    },
+    "supplier_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"GYS00014\""
+    },
+    "remark": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "dept_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "dept_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "dept_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "emp_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "emp_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "emp_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_phone": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_city": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_country_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_country_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_country_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_province_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_province_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_province_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_city_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_city_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_city_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_district_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_district_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_district_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_address": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "custom_field": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    }
+   },
+   "entry": {
+    "picture": {
+     "present": 37,
+     "nonEmpty": 5,
+     "sample": "\"https://v7-oss.oss-cn-hangzhou.aliyuncs.com/jdyattachmentimage/1735565918201383"
+    },
+    "seq": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "1"
+    },
+    "id": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"2590130656491169792\""
+    },
+    "material_id": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"2305923234782023680\""
+    },
+    "material_name": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"客供标签\""
+    },
+    "material_number": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"YJ-KG-B12\""
+    },
+    "material_is_multi_unit": {
+     "present": 37,
+     "nonEmpty": 1,
+     "sample": "true"
+    },
+    "material_is_serial": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_is_asst_attr": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_is_kf_period": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_is_batch": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_model": {
+     "present": 37,
+     "nonEmpty": 31,
+     "sample": "\"乐天鹅标B-46-14\""
+    },
+    "stock_id": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"2436465656128978944\""
+    },
+    "stock_name": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"华北工控仓\""
+    },
+    "stock_number": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"CK00006\""
+    },
+    "stock_is_allow_freight": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sp_id": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sp_name": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sp_number": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_prop_id": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_prop_name": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_prop_number": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_id1": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_name1": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_number1": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_id2": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_name2": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_number2": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_id3": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_name3": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_number3": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "barcode": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "batch_no": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "pro_place": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "pro_reg_no": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "pro_license": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "kf_date": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "valid_date": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "kf_type": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "kf_period": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sn_list": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sn_list_id": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "base_unit_id": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"2167741887128111104\""
+    },
+    "base_unit_name": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"张\""
+    },
+    "base_unit_number": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"张\""
+    },
+    "unit_id": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"2167741887128111104\""
+    },
+    "unit_name": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"张\""
+    },
+    "unit_number": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "\"张\""
+    },
+    "aux_unit_id": {
+     "present": 37,
+     "nonEmpty": 1,
+     "sample": "\"7\""
+    },
+    "aux_unit_name": {
+     "present": 37,
+     "nonEmpty": 1,
+     "sample": "\"kg\""
+    },
+    "aux_unit_number": {
+     "present": 37,
+     "nonEmpty": 1,
+     "sample": "\"kg\""
+    },
+    "conversion_rate": {
+     "present": 37,
+     "nonEmpty": 1,
+     "sample": "\"1 kg = 1000 g\\n\""
+    },
+    "qty": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "1050"
+    },
+    "inv_qty": {
+     "present": 37,
+     "nonEmpty": 8,
+     "sample": "45"
+    },
+    "base_qty": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "1050"
+    },
+    "inv_base_qty": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_qty": {
+     "present": 37,
+     "nonEmpty": 1,
+     "sample": "80"
+    },
+    "def_float_qty": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_coefficient": {
+     "present": 37,
+     "nonEmpty": 1,
+     "sample": "1000"
+    },
+    "coefficient": {
+     "present": 37,
+     "nonEmpty": 37,
+     "sample": "1"
+    },
+    "price": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "cost": {
+     "present": 37,
+     "nonEmpty": 7,
+     "sample": "135.19"
+    },
+    "unit_cost": {
+     "present": 37,
+     "nonEmpty": 7,
+     "sample": "0.055"
+    },
+    "comment": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_no": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_type_id": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_type_name": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_type_number": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_inter_id": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_date": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_seq": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_entry_id": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "custom_entity_field": {
+     "present": 37,
+     "nonEmpty": 0,
+     "sample": ""
+    }
+   },
+   "total": 30,
+   "bills": [
+    "QTRK-20261014-00092",
+    "QTRK-20261012-00091",
+    "QTRK-20261013-00090",
+    "QTRK-20261009-00089",
+    "QTRK-20261005-00088",
+    "QTRK-20260930-00087",
+    "QTRK-20260922-00086",
+    "QTRK-20260916-00085",
+    "QTRK-20260916-00084",
+    "QTRK-20260914-00083",
+    "QTRK-20260914-00082",
+    "QTRK-20260912-00081",
+    "QTRK-20260911-00080",
+    "QTRK-20260911-00079",
+    "QTRK-20260829-00078",
+    "QTRK-20260826-00077",
+    "QTRK-20260825-00076",
+    "QTRK-20260822-00075",
+    "QTRK-20260821-00074",
+    "QTRK-20260815-00073",
+    "QTRK-20260814-00072",
+    "QTRK-20260808-00071",
+    "QTRK-20260804-00070",
+    "QTRK-20260803-00069",
+    "QTRK-20260801-00068",
+    "QTRK-20260729-00067",
+    "QTRK-20260728-00066",
+    "QTRK-20260721-00065",
+    "QTRK-20260720-00064",
+    "QTRK-20260720-00063"
+   ]
+  },
+  "inv_other_out": {
+   "header": {
+    "id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2590052297648318464\""
+    },
+    "bill_no": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"QTCK-20261014-01172\""
+    },
+    "bill_date": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14\""
+    },
+    "bill_status": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"C\""
+    },
+    "create_time": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14 14:10:53\""
+    },
+    "modify_time": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14 14:11:34\""
+    },
+    "audit_time": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"2026-10-14 14:11:34\""
+    },
+    "creator_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"425692977\""
+    },
+    "creator_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"蒋小刚\""
+    },
+    "creator_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"multicorp_6171610_-952599178\""
+    },
+    "modifier_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"425692977\""
+    },
+    "modifier_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"蒋小刚\""
+    },
+    "modifier_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"multicorp_6171610_-952599178\""
+    },
+    "auditor_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"425692977\""
+    },
+    "auditor_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"蒋小刚\""
+    },
+    "auditor_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"multicorp_6171610_-952599178\""
+    },
+    "trans_type_id": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"13\""
+    },
+    "trans_type_name": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"其他出库\""
+    },
+    "trans_type_number": {
+     "present": 30,
+     "nonEmpty": 30,
+     "sample": "\"QTCKLX01\""
+    },
+    "customer_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "customer_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "customer_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "remark": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "dept_id": {
+     "present": 30,
+     "nonEmpty": 29,
+     "sample": "\"2259481876848820224\""
+    },
+    "dept_name": {
+     "present": 30,
+     "nonEmpty": 29,
+     "sample": "\"品质部\""
+    },
+    "dept_number": {
+     "present": 30,
+     "nonEmpty": 29,
+     "sample": "\"BM00022\""
+    },
+    "emp_id": {
+     "present": 30,
+     "nonEmpty": 29,
+     "sample": "\"2210981295260037120\""
+    },
+    "emp_name": {
+     "present": 30,
+     "nonEmpty": 29,
+     "sample": "\"冯敏\""
+    },
+    "emp_number": {
+     "present": 30,
+     "nonEmpty": 29,
+     "sample": "\"ZY00053\""
+    },
+    "contact_phone": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_country_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_country_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_country_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_province_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_province_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_province_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_city_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_city_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_city_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_district_id": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_district_name": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_linkman": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_district_number": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "contact_address": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "custom_field": {
+     "present": 30,
+     "nonEmpty": 0,
+     "sample": ""
+    }
+   },
+   "entry": {
+    "picture": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "seq": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "1"
+    },
+    "id": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"2590052297648319488\""
+    },
+    "material_id": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"2182903275429394432\""
+    },
+    "material_name": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"A+级烧结炭棒/滤芯\""
+    },
+    "material_number": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"S062\""
+    },
+    "material_is_multi_unit": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_is_serial": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_is_asst_attr": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_is_kf_period": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "material_is_batch": {
+     "present": 41,
+     "nonEmpty": 38,
+     "sample": "true"
+    },
+    "material_model": {
+     "present": 41,
+     "nonEmpty": 37,
+     "sample": "\"63*40*242.5\""
+    },
+    "stock_id": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"2220441270411712512\""
+    },
+    "stock_name": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"成品B仓\""
+    },
+    "stock_number": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"CP-02\""
+    },
+    "stock_is_allow_freight": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sp_id": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sp_name": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sp_number": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_prop_id": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_prop_name": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_prop_number": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_id1": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_name1": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_number1": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_id2": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_name2": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_number2": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_id3": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_name3": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_number3": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "barcode": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "batch_no": {
+     "present": 41,
+     "nonEmpty": 38,
+     "sample": "\"PC0000\""
+    },
+    "pro_place": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "pro_reg_no": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "pro_license": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "kf_date": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "valid_date": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "kf_type": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "kf_period": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sn_list": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "sn_list_id": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "base_unit_id": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"3\""
+    },
+    "base_unit_name": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"支\""
+    },
+    "base_unit_number": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"支\""
+    },
+    "unit_id": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"3\""
+    },
+    "unit_name": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"支\""
+    },
+    "unit_number": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "\"支\""
+    },
+    "aux_unit_id": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_unit_name": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_unit_number": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "conversion_rate": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "qty": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "2"
+    },
+    "inv_qty": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "1549"
+    },
+    "base_qty": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "2"
+    },
+    "inv_base_qty": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_qty": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "def_float_qty": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "aux_coefficient": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "coefficient": {
+     "present": 41,
+     "nonEmpty": 41,
+     "sample": "1"
+    },
+    "price": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "cost": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "unit_cost": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "comment": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_no": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_type_id": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_type_name": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_type_number": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_inter_id": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_bill_date": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_seq": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "src_entry_id": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    },
+    "custom_entity_field": {
+     "present": 41,
+     "nonEmpty": 0,
+     "sample": ""
+    }
+   },
+   "total": 30,
+   "bills": [
+    "QTCK-20261014-01172",
+    "QTCK-20261014-01171",
+    "QTCK-20261014-01170",
+    "QTCK-20261013-01168",
+    "QTCK-20261012-01167",
+    "QTCK-20261012-01166",
+    "QTCK-20261012-01165",
+    "QTCK-20261010-01164",
+    "QTCK-20261010-01163",
+    "QTCK-20261007-01162",
+    "QTCK-20261007-01161",
+    "QTCK-20261007-01160",
+    "QTCK-20261005-01159",
+    "QTCK-20261004-01158",
+    "QTCK-20260930-01157",
+    "QTCK-20260930-01156",
+    "QTCK-20260930-01155",
+    "QTCK-20260929-01154",
+    "QTCK-20260928-01153",
+    "QTCK-20260927-01152",
+    "QTCK-20260927-01151",
+    "QTCK-20260926-01150",
+    "QTCK-20260926-01149",
+    "QTCK-20260924-01148",
+    "QTCK-20260924-01147",
+    "QTCK-20260924-01146",
+    "QTCK-20260924-01145",
+    "QTCK-20260924-01144",
+    "QTCK-20260924-01143",
+    "QTCK-20260923-01142"
+   ]
+  }
+ }
+}
