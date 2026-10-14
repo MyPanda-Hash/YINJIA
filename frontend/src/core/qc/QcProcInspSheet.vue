@@ -1,16 +1,15 @@
 <template>
   <!-- ═══════════════════════════════════════════════════════════════════
-       制程检验单(QC_PROC_INSP)—— 纸张式可填写报表(2026-10-12)
-       实现模式完全照 **检验记录报告**(QcInspRecSheet / QC_INSP_REC):
-         标题 → 抬头 标签|值 → 分区表体(一行一个检验项目) → 删除/新增行
+       制程检验单(QC_PROC_INSP)—— 纸张式可填写报表
+       版式照 **检验报告**(QcInspRecSheet / QC_INSP_REC):
+         标题 → 抬头(一行 2 组,标签蓝底) → 分区带(居中蓝底 + 右侧带入) →
+         表体(表头蓝底) → ＋新增检验项(表下虚线框) →
+         检验结论 / 处理意见(多行) → 检验人 | 审核人
        契约同款:props = head(含 detail) / fields / editable;emit = dirty;
-       行取 head.detail 下明细数组;单元格 v-model 直绑 + @input=emit('dirty')
-       (明细行是 markRaw 的,必须走 dirty 链路,不能直写后期望响应)。
+       行取 head.detail 下明细数组;单元格 v-model 直绑 + @input=emit('dirty')。
 
-       ⚠ 上一版的错误(已废弃):按「该组行里有没有测量值」推断定性/定量 ——
-         新建/带入的行测量值本就是空的 ⇒ 恒判为定性,永远渲染不出测量值输入框,
-         纸张上无法建立定量数据(即用户说的"无法创建到这个页面/填不了")。
-         现改为**固定列**:测量值1..5 恒为可填列,不依赖数据推断。
+       ⚠ 测量值1..5 为**固定列**(不按数据推断) —— 新建行也能直接填:
+         此前按「该组行里有没有测量值」推断定性/定量,新建行恒为空 ⇒ 永远填不了。
        ═══════════════════════════════════════════════════════════════════ -->
   <div class="qr-sheet">
     <!-- ① 标题 -->
@@ -18,7 +17,7 @@
       <div class="qr-title">{{ tt('制程检验记录表') }}</div>
     </div>
 
-    <!-- ② 抬头:面板表头字段,每行 4 组 标签|值(按字段可编辑性与类型渲染) -->
+    <!-- ② 抬头:一行 2 组「标签|值」(照检验报告的四行结构) -->
     <table class="qr-head-table">
       <tbody>
         <tr v-for="(row, ri) in headRows" :key="'h' + ri">
@@ -43,7 +42,7 @@
                 maxlength="200"
                 @input="emit('dirty')"
               />
-              <!-- 单据编号=引擎生成,lok 字段只读展示(照 QcInspRecSheet 的 locked 处理) -->
+              <!-- 引擎生成/只读字段:纯文本展示(照检验报告的 locked 处理) -->
               <span v-else class="qr-cell-text">{{ head[k] || '' }}</span>
             </td>
           </template>
@@ -51,18 +50,15 @@
       </tbody>
     </table>
 
-    <!-- ③ 分区标题 + 新增行 -->
-    <div class="qr-section">
-      {{ tt('检验结果') }}
-      <span
-        v-if="editable"
-        class="qr-lib-btn no-print"
-        :title="tt('在末尾追加一行检验项目')"
-        @click="addRow()"
-      >＋ {{ tt('新增检验项目') }}</span>
+    <!-- ③ 分区带:居中标题 + 右侧带入入口(照检验报告「检验结果 ⧉带入检验要求」) -->
+    <div class="qr-band">
+      <span class="qr-band-title">{{ tt('检验结果') }}</span>
+      <span v-if="editable" class="qr-band-act no-print" @click="emit('open-items')">
+        ⧉ {{ tt('带入检验项目') }}
+      </span>
     </div>
 
-    <!-- ④ 表体:一行一个检验项目(平铺,不做定性/定量推断) -->
+    <!-- ④ 表体:一行一个检验项目 -->
     <table class="qr-table">
       <thead>
         <tr>
@@ -106,25 +102,57 @@
           </td>
         </tr>
         <tr v-if="!items.length">
-          <td :colspan="editable ? 11 : 10" class="c-empty">{{ tt('暂无检验项目，点上方「新增检验项目」或工具栏「检验项目/检验方案」带入') }}</td>
+          <td :colspan="editable ? 11 : 10" class="c-empty">
+            {{ editable ? tt('暂无检验项，点击下方按钮新增') : tt('暂无检验项') }}
+          </td>
         </tr>
       </tbody>
     </table>
 
-    <!-- ⑤ 结论:总结论 + 备注(照检验记录报告的结论/意见区) -->
+    <!-- ⑤ ＋新增检验项:表格下方的虚线框按钮(照检验报告) -->
+    <div v-if="editable" class="qr-add-row no-print">
+      <span class="qr-add-btn" @click="addRow()">＋ {{ tt('新增检验项') }}</span>
+    </div>
+
+    <!-- ⑥ 结论区:检验结论 / 处理意见(多行) + 检验人 | 审核人 -->
     <table class="qr-foot-table">
       <tbody>
         <tr>
-          <th class="qr-label">{{ tt('结果判断') }}</th>
-          <td class="qr-value">
-            <el-input v-if="editable" v-model="head['总结论']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+          <th class="qr-label">{{ tt('检验结论') }}</th>
+          <td class="qr-value" colspan="3">
+            <el-input
+              v-if="editable"
+              v-model="head['总结论']"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              class="qr-cell-input"
+              @input="emit('dirty')"
+            />
             <span v-else class="qr-cell-text">{{ head['总结论'] || '' }}</span>
           </td>
-          <th class="qr-label">{{ tt('备注') }}</th>
-          <td class="qr-value">
-            <el-input v-if="editable" v-model="head['备注']" size="small" class="qr-cell-input" @input="emit('dirty')" />
-            <span v-else class="qr-cell-text">{{ head['备注'] || '' }}</span>
+        </tr>
+        <tr>
+          <th class="qr-label">{{ tt('处理意见') }}</th>
+          <td class="qr-value" colspan="3">
+            <el-input
+              v-if="editable"
+              v-model="head['处理方式']"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 4 }"
+              class="qr-cell-input"
+              @input="emit('dirty')"
+            />
+            <span v-else class="qr-cell-text">{{ head['处理方式'] || '' }}</span>
           </td>
+        </tr>
+        <tr>
+          <th class="qr-label">{{ tt('检验人') }}</th>
+          <td class="qr-value">
+            <el-input v-if="editable" v-model="head['检验员']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <span v-else class="qr-cell-text">{{ head['检验员'] || '' }}</span>
+          </td>
+          <th class="qr-label">{{ tt('审核人') }}</th>
+          <td class="qr-value"><span class="qr-cell-text">{{ head['审核人'] || '' }}</span></td>
         </tr>
       </tbody>
     </table>
@@ -141,12 +169,12 @@ const props = defineProps({
   fields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
 })
-const emit = defineEmits(['dirty'])
+const emit = defineEmits(['dirty', 'open-items'])
 
-/** 测量值列(固定,不按数据推断 —— 否则新建行永远填不了这几个格) */
+/** 测量值列(固定,不按数据推断) */
 const MEASURE = ['测量值1', '测量值2', '测量值3', '测量值4', '测量值5']
 
-/** 明细行:取 head.detail 下第一个数组(通常 items) */
+/** 明细行:取 head.detail 下第一个数组 */
 const items = computed(() => {
   const d = props.head?.detail
   if (!d) return []
@@ -154,31 +182,30 @@ const items = computed(() => {
   return []
 })
 
-/** 字段元数据索引(判可编辑性/类型,照 QcInspRecSheet 的 fieldMap) */
+/** 字段元数据索引 */
 const fieldMap = computed(() => new Map((props.fields || []).map((f) => [f.dataName, f])))
 
-/** 抬头字段行(每行 4 组):只取表头字段里 visible 的,跳过系统/审计与明细类 */
+/** 抬头排除项:系统/审计类 + 已在表体或结论区出现的字段 */
 const HEAD_SKIP = new Set([
-  '单据状态', '审核人', '审核时间', '处理方式', '表区', '行号', '检验项目', '检验要求',
+  '单据状态', '处理方式', '表区', '行号', '检验项目', '检验要求',
   '检验方法', '检查频率', '检验仪器', '抽检量', '实测数值', '测量值1', '测量值2',
   '测量值3', '测量值4', '测量值5', '单项判定', '不合格应对措施', '不良数量',
-  '结果判断', '备注2', '备注',
+  '结果判断', '备注2', '备注', '总结论', '检验员', '审核人', '审核时间',
 ])
+/** 抬头字段行:一行 2 组(照检验报告) */
 const headRows = computed(() => {
   const names = (props.fields || [])
     .filter((f) => f && !f.hidden && f.dataName && !HEAD_SKIP.has(f.dataName))
     .map((f) => f.dataName)
   const rows = []
-  for (let i = 0; i < names.length; i += 4) rows.push(names.slice(i, i + 4))
+  for (let i = 0; i < names.length; i += 2) rows.push(names.slice(i, i + 2))
   return rows
 })
 
-/** 日期类字段(用日期选择器,照 QcInspRecSheet 的 isDateField) */
 function isDateKey(k) {
   const t = fieldMap.value.get(k)?.dataType
   return t === '日期' || t === '日期时间'
 }
-/** 只读字段:引擎生成的单据编号不可手改 */
 function isLockedKey(k) {
   const f = fieldMap.value.get(k)
   return !f || f.editable === false || f.editable === 0
@@ -190,29 +217,33 @@ function num(v) {
   return /^-?\d+(\.\d+)?$/.test(s) ? String(Number(s)) : s
 }
 
-/** 追加一行检验项目(照 QcInspRecSheet 的新增:只塞进 items,保存时由引擎落库) */
-function addRow() {
+/** 明细数组键 */
+function rowsKey() {
   const d = props.head?.detail
-  if (!d) return
-  const k = Object.keys(d).find((x) => Array.isArray(d[x]))
+  if (!d) return null
+  return Object.keys(d).find((x) => Array.isArray(d[x])) || null
+}
+
+/** 追加一行检验项目 */
+function addRow() {
+  const k = rowsKey()
   if (!k) return
-  d[k].push({ 表区: '', 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
+  props.head.detail[k].push({ 表区: '', 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
   emit('dirty')
 }
 
 /** 删除一行 */
 function removeRow(row) {
-  const d = props.head?.detail
-  if (!d) return
-  const k = Object.keys(d).find((x) => Array.isArray(d[x]))
+  const k = rowsKey()
   if (!k) return
-  const i = d[k].indexOf(row)
-  if (i >= 0) { d[k].splice(i, 1); emit('dirty') }
+  const arr = props.head.detail[k]
+  const i = arr.indexOf(row)
+  if (i >= 0) { arr.splice(i, 1); emit('dirty') }
 }
 </script>
 
 <style scoped>
-/* 纸张容器:与 QcInspRecSheet 同族观感 */
+/* 纸张容器 */
 .qr-sheet {
   background: #fff;
   border: 1px solid #d7dce5;
@@ -221,66 +252,76 @@ function removeRow(row) {
 }
 .qr-titlerow {
   text-align: center;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 .qr-title {
-  font-size: 17px;
+  font-size: 20px;
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
+  color: #1f4e79;
 }
-/* 抬头表 */
+/* ── 抬头:一行 2 组,标签蓝底(照检验报告) ── */
 .qr-head-table,
 .qr-foot-table {
   border-collapse: collapse;
   width: 100%;
-  margin-bottom: 8px;
   font-size: 12px;
   table-layout: fixed;
 }
+.qr-head-table {
+  margin-bottom: 0;
+}
 .qr-label {
-  border: 1px solid #c9d4e0;
-  background: #f7fafd;
-  font-weight: 500;
-  text-align: right;
-  padding: 2px 6px;
-  width: 84px;
+  border: 1px solid #b8cfe6;
+  background: #dce9f5;
+  font-weight: 600;
+  color: #1f4e79;
+  text-align: center;
+  padding: 3px 6px;
+  width: 96px;
   white-space: nowrap;
 }
 .qr-value {
-  border: 1px solid #c9d4e0;
+  border: 1px solid #b8cfe6;
   padding: 1px 4px;
   text-align: left;
+  background: #fff;
 }
-/* 分区标题 */
-.qr-section {
-  font-weight: 600;
-  color: #1f4e79;
-  background: #eef3f9;
-  border-left: 3px solid #5b9bd5;
-  padding: 4px 8px;
-  margin: 6px 0;
+/* ── 分区带:居中标题 + 右侧动作 ── */
+.qr-band {
+  position: relative;
+  margin-top: -1px;
+  border: 1px solid #b8cfe6;
+  background: #cfe0f2;
+  text-align: center;
+  padding: 3px 6px;
   font-size: 13px;
+  font-weight: 700;
+  color: #1f4e79;
 }
-.qr-lib-btn {
-  margin-left: 10px;
-  font-weight: 400;
+.qr-band-act {
+  position: absolute;
+  right: 8px;
+  top: 3px;
   font-size: 12px;
+  font-weight: 400;
   color: #2b6cb0;
   cursor: pointer;
 }
-.qr-lib-btn:hover {
+.qr-band-act:hover {
   text-decoration: underline;
 }
-/* 表体:一行一个检验项目 */
+/* ── 表体:表头蓝底 ── */
 .qr-table {
   border-collapse: collapse;
   width: 100%;
   table-layout: fixed;
   font-size: 12px;
+  margin-top: -1px;
 }
 .qr-table th,
 .qr-table td {
-  border: 1px solid #c9d4e0;
+  border: 1px solid #b8cfe6;
   padding: 2px 4px;
   min-height: 26px;
   text-align: center;
@@ -288,38 +329,63 @@ function removeRow(row) {
   word-break: break-all;
 }
 .qr-table thead th {
-  background: #eef3f9;
+  background: #dce9f5;
   color: #1f4e79;
   font-weight: 600;
 }
-.c-sector { width: 90px; }
-.c-item { width: 150px; }
-.c-req { width: 200px; }
-.c-method { width: 200px; }
-.c-mv { width: 72px; }
-.c-judge { width: 80px; }
-.c-op { width: 40px; }
+.c-sector { width: 80px; }
+.c-item { width: 140px; }
+.c-req { width: 190px; }
+.c-method { width: 190px; }
+.c-mv { width: 70px; }
+.c-judge { width: 76px; }
+.c-op { width: 36px; }
 .c-empty {
   color: #8a94a0;
-  padding: 10px 0;
+  padding: 12px 0;
 }
 .qr-del {
   color: #f56c6c;
   cursor: pointer;
   font-weight: 700;
 }
-/* 可填写:输入框看得见(此前做透明过,看着像死文本) */
+/* ── ＋新增检验项:表下虚线框(照检验报告) ── */
+.qr-add-row {
+  padding: 8px 0 10px;
+}
+.qr-add-btn {
+  display: inline-block;
+  border: 1px dashed #9db8d2;
+  border-radius: 3px;
+  padding: 4px 14px;
+  color: #2b6cb0;
+  cursor: pointer;
+  font-size: 12px;
+  background: #fbfdff;
+}
+.qr-add-btn:hover {
+  border-color: #5b9bd5;
+  background: #f2f8ff;
+}
+/* ── 结论区 ── */
+.qr-foot-table {
+  margin-top: 2px;
+}
+.qr-foot-table .qr-label {
+  width: 96px;
+}
+/* 输入控件:看得见(此前做透明过,看着像死文本) */
 .qr-cell-input :deep(.el-input__wrapper),
-.qr-cell-input :deep(.el-input__inner) {
-  box-shadow: none;
+.qr-cell-input :deep(.el-textarea__inner) {
   background: #fff;
+  box-shadow: 0 0 0 1px #b8c8da inset;
 }
 .qr-cell-input :deep(.el-input__wrapper) {
-  box-shadow: 0 0 0 1px #b8c8da inset;
   padding: 0 4px;
 }
 .qr-cell-input :deep(.el-input__wrapper:hover),
-.qr-cell-input :deep(.el-input__wrapper.is-focus) {
+.qr-cell-input :deep(.el-input__wrapper.is-focus),
+.qr-cell-input :deep(.el-textarea__inner:focus) {
   box-shadow: 0 0 0 1px #5b9bd5 inset;
 }
 .qr-cell-input :deep(.el-input__inner) {

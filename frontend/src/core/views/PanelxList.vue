@@ -160,6 +160,7 @@
           ref="approvalSheetRef"
           :head="cur" :fields="headerFields" :editable="draftEditable"
           @dirty="markInlineDirty"
+          @open-items="qcInspPlanVisible = true"
         />
         <!-- 产品文件列表:4 文件×状态矩阵(设计《文件汇总表》)。只读视图 ——
              数据源与产品信息表侧栏「产品开发」按钮同一份(DevTaskService),不另存状态 -->
