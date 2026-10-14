@@ -63,6 +63,10 @@
         <span class="rcd-act" @click="addMaterialRow">{{ tt('加一行') }}</span>
         <span v-if="invTip" class="rcd-muted">{{ invTip }}</span>
       </div>
+      <div class="rcd-note rcd-note-tip">
+        {{ tt('先选「物料种类」可按类别缩小候选；不选就直接按关键字联网查（输入后稍候）——商品档案生产上有几千行，下拉一次最多显示前 50 条，继续输入可缩小范围。') }}
+        <span v-if="invKindTip" class="rcd-muted">{{ invKindTip }}</span>
+      </div>
       <table class="rcd-tb">
         <thead>
           <tr>
@@ -80,21 +84,42 @@
           <tr v-for="(r, i) in editRows" :key="i">
             <td class="rcd-c">{{ i + 1 }}</td>
             <td>
-              <!-- 物料种类:词表是**候选**不是白名单 —— 开 allow-create,档案里将来冒出的新类别
-                   (以及 bs_inv 里的「折算物料」)直接敲得进来。引擎认不认由 ③ 区的告警兜 -->
-              <el-select v-model="r['物料种类']" size="small" class="rcd-sel" clearable filterable allow-create default-first-option>
+              <!-- 物料种类:**前置筛选**(2026-10-15 用户口径「先通过前面的物料种类先进行一个筛选,
+                   方便后面的物料编码、物料名称的查找」)—— 选定后它把同行的编号/名称候选收窄到该类商品。
+                   词表是**候选**不是白名单:开 allow-create,档案里将来冒出的新类别(以及「折算物料」)照样敲得进来 -->
+              <el-select v-model="r['物料种类']" size="small" class="rcd-sel" clearable filterable allow-create default-first-option
+                         @change="onKindChange(i)">
                 <el-option v-for="k in MATERIAL_KINDS" :key="k" :label="tt(k)" :value="k" />
               </el-select>
             </td>
             <td>
-              <!-- 物料编号:下拉挑商品档案(2026-10-15 用户口径「手打太慢」),选项一次性载入
-                   (114 行,见 ensureInvRows);allow-create 保留 ⇒ 档案里没有的编码照样能手打 -->
+              <!-- 物料编号 / 物料名称:**远程搜索的下拉**(两格共用一套取数,只是取值列不同)。
+                   选了种类 ⇒ 候选只在该类里(本地过滤,零请求);没选种类 ⇒ 打字才联网查(keyword);
+                   两边的候选**封顶 50 项** ⇒ 几千行档案也不会一次性渲成几千个 el-option。
+                   allow-create 保留:档案里没有的编号/名称照样能手打输入。 -->
               <el-select v-model="r['物料编号']" size="small" class="rcd-sel" clearable filterable allow-create default-first-option
-                         @change="onMaterialCodeChange(i)">
-                <el-option v-for="o in invOptions" :key="o.value" :label="o.label" :value="o.value" />
+                         remote :debounce="300" :remote-method="(q) => searchInv(i, '物料编号', q)"
+                         :loading="!!invOptLoading[optKey(i, '物料编号')]" :title="optHint(i, '物料编号')"
+                         @change="onMaterialPick(i, '物料编号')">
+                <el-option v-for="o in optList(i, '物料编号')" :key="o.value" :label="o.label" :value="o.value" />
+                <!-- remote 下拉必须给 empty 槽:否则"没候选"时下拉整个不弹(点了没反应),
+                     用户根本看不到"先选种类"这句提示(Element Plus 的 dropdownMenuVisible 依赖它有槽) -->
+                <template #empty>
+                  <div class="rcd-sel-empty">{{ tt('没有候选 —— 先在上面选「物料种类」收窄范围，或换个关键字') }}</div>
+                </template>
               </el-select>
             </td>
-            <td><el-input v-model="r['物料名称']" size="small" /></td>
+            <td>
+              <el-select v-model="r['物料名称']" size="small" class="rcd-sel" clearable filterable allow-create default-first-option
+                         remote :debounce="300" :remote-method="(q) => searchInv(i, '物料名称', q)"
+                         :loading="!!invOptLoading[optKey(i, '物料名称')]" :title="optHint(i, '物料名称')"
+                         @change="onMaterialPick(i, '物料名称')">
+                <el-option v-for="o in optList(i, '物料名称')" :key="o.value" :label="o.label" :value="o.value" />
+                <template #empty>
+                  <div class="rcd-sel-empty">{{ tt('没有候选 —— 先在上面选「物料种类」收窄范围，或换个关键字') }}</div>
+                </template>
+              </el-select>
+            </td>
             <td><el-input v-model="r['设计添加量']" size="small" class="rcd-mini" /></td>
             <!-- 两列是算出来的(引擎输出),这里只读展示输入旁边 —— 回填预览那张表还要拿它跟旧值比 -->
             <td class="rcd-c">{{ rowCalc(i, '实际添加比例') }}</td>
@@ -216,7 +241,8 @@ import { compute } from '@/core/mold/recipeEngine.js'
 import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisturePercent, NO_RECIPE_ROWS, paramsFromHead,
   slotsFromRows, specCarryFrom, sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery,
   unfilledDesignRows } from '@/core/mold/recipeSheet.js'
-import { blankRecipeRow, buildRecipeRows, editRowsFrom, invFillFor, invOptionsOf, uniqueInvRowOf } from '@/core/mold/recipeRows.js'
+import { blankRecipeRow, buildRecipeRows, editRowsFrom, invRowsOfKind, invSearchOptions, materialFillFor,
+  uniqueInvRowBy } from '@/core/mold/recipeRows.js'
 import { MATERIAL_KINDS } from '@/core/mold/materialKinds.js'
 import { invRowsOf } from '@/core/panel/invCarry.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
@@ -438,78 +464,209 @@ const calcByRow = computed(() => {
 })
 const rowCalc = (i, key) => String(calcByRow.value.get(i)?.[key] ?? '—')
 
-/* ── 物料行的增/删/按编号查档案(2026-10-15)────────────────────────────────────
+/* ── 物料行的增/删/按档案查一格(2026-10-15)──────────────────────────────────────
    加行/删行都是**改弹窗里这份草稿**,不动物单据;写回只发生在点「填入单据」时。
-   物料编号改完(current-change,即失焦/回车)按商品档案带出物料名称与物料种类 ——
-   走既有档案查询(INV→bs_inv),不新开后端接口。 */
+   两格(物料编号 / 物料名称)互为反向带出,**走同一套取数与防打架闸门**(见下)——
+   取数仍走既有档案查询(INV→bs_inv),不新开后端接口。 */
 function addMaterialRow() {
   editRows.value = [...editRows.value, blankRecipeRow()]
+  resetRowOptions()
 }
 function removeMaterialRow(i) {
   const next = editRows.value.slice()
   next.splice(i, 1)
   editRows.value = next
+  resetRowOptions()   // 行号是候选表的键,删行会让后面的行号整体前移 ⇒ 旧候选必须作废
 }
-/* ── 商品档案(INV → bs_inv)全量缓存 + 「物料编号」下拉的选项(2026-10-15)────────────
-   用户口径:「手打太慢了,应该是可以下拉选择商品里面的数据」。
-   实测(2026-10-15 直接打 8090 的 /px/queryFormDataList 取数):bs_inv 一共 **114 行**,
-   且档案分支 QueryService.queryArchive **忽略 pageSize**(pageSize 传 5 / 50 / 200 / 1000 都回同样 114 行,
-   全量返回上限 ARCH_LOAD_CAP=50000)⇒ 一次性载入最省事,不必做 remote 搜索
-   (remote 会变成"每敲一次打一次请求",114 行的量级完全不值得)。
-   缓存**不随弹窗开关重置**(组件存活期内只拉一次):同一会话反复开弹窗不再重复请求;
-   拉不到就下次打开重试,并退回"按编号逐条查"的老路(见 fetchInvRowOf)。
-   代价:会话中新加的商品档案行要刷新页面才进下拉 —— 114 行的档案变动频率下可以接受。 */
-const INV_PAGE_SIZE = 1000       // pageSize 实测被档案分支忽略;写大一点表明要全量,别退回 50 那种截断口径
-const invRows = ref([])          // 商品档案行(invRowsOf 的产物,只读缓存)
-const invLoaded = ref(false)     // 全量是否已成功拿到 —— 拿到了才敢说"档案里查不到"
-const invOptions = computed(() => invOptionsOf(invRows.value))
-async function ensureInvRows() {
-  if (invLoaded.value) return invRows.value
-  try {
-    const res = await request.post('/px/queryFormDataList', {
-      panelCode: 'INV', condition: {}, pageNo: 1, pageSize: INV_PAGE_SIZE,
-    })
-    const rows = invRowsOf(res?.data)
-    if (rows.length) { invRows.value = rows; invLoaded.value = true }
-    return rows
-  } catch {
-    return []   // 无权限/接口异常 ⇒ 下拉只剩手打,不阻断计算(与带出失败同一口径)
+/* ── 商品档案(INV → bs_inv):按「物料种类」按需取数 + 两格远程搜索(2026-10-15 性能优化)──────
+   用户口径:「现在的数据是 100 多条在商品里面,**实际上的服务器上的数据是几千条**,
+   现在加上一个优化的点,**可以先通过前面的物料种类先进行一个筛选,方便后面的物料编码、物料名称的查找**」。
+
+   规模事实(2026-10-15 实测):本机两个账套 bs_inv 都是 **114 行**,生产几千行
+   (`QueryService` 里 ARCH_LOAD_CAP 的注释记着 2026-09-16 已 3850 行)。
+   旧实现是"弹窗打开就全量拉 + 全量渲 option"——114 行看不出问题,生产上就是几千个 el-option。改成:
+
+   · **选了物料种类** ⇒ 按种类拉一次(`condition:{所属类别:种类}`),拉回来的**再按 trim 全等筛一遍**
+     (后端 `appendDirectFilters` 对普通文本字段走 `LIKE %值%`,服务端返回多少行不构成判据 —— 见
+     core/mold/recipeRows.js 头注),结果**按种类缓存**,同一种类只拉一次、切回来不再请求;
+     候选在本地过滤(不打请求),但**最多渲 OPTION_CAP=50 项**。
+   · **没选种类** ⇒ 打字才远程查(服务端 `keyword`,空关键字**一个请求都不发** ——
+     实测空 keyword 等于不过滤,会把整个档案拉回来);候选同样封顶 50 项。
+
+   两格共用同一套取数与候选生成(物料编号取 `存货编码`、物料名称取 `存货名称`,互为反向带出):
+   候选生成/去重/封顶 = recipeRows.invSearchOptions,防打架 = recipeRows.materialFillFor。
+   缓存(种类池 + 见过的档案行)与旧实现一样**不随弹窗开关重置**:同一会话反复开弹窗不再重复请求。 */
+const INV_PAGE_SIZE = 1000             // pageSize 被档案分支忽略(见旧实现注释);写大一点表明要全量
+const invKindRows = ref({})            // { 种类: 档案行[] } 按种类缓存 —— 同一种类只拉一次
+const invKindTip = ref('')             // 该种类缓存的状态提示(条数/读不到)
+const invSeen = ref([])                // 见过的档案行(种类池/远程搜索/逐码补查的并集);查过的不再打请求
+const kindPending = new Map()          // 正在拉的种类(多行同类/连点只打一枪)
+const invOpts = ref({})                // { '行号|格': {options, matched} } 两格各自的候选
+const invOptLoading = ref({})          // { '行号|格': true }  远程搜索中(下拉显 loading)
+const invSearchSeq = new Map()         // 同一格的搜索序号 —— 慢的那次回来不许盖掉新的
+const fillingAt = ref(null)            // 正在被"对侧带出"写入的行号(防 A→B→A 的同步回环)
+
+const invCodeOf = (r) => String(r?.['存货编码'] ?? '').trim()
+const optKey = (i, field) => `${i}|${field}`
+const optList = (i, field) => invOpts.value[optKey(i, field)]?.options || []
+/** 候选被 cap 截断时的提示(挂在控件 title 上:继续输入就能缩小) */
+const optHint = (i, field) => {
+  const r = invOpts.value[optKey(i, field)]
+  return r && r.matched > r.options.length
+    ? tt('共 {n} 条命中，继续输入可缩小范围').replace('{n}', String(r.matched))
+    : ''
+}
+function setOpts(key, val) { invOpts.value = { ...invOpts.value, [key]: val } }
+/** 行结构变了(加行/删行)⇒ 行号做键的候选表整体作废 */
+function resetRowOptions() { invOpts.value = {}; invOptLoading.value = {} }
+
+/** 把取回来的档案行并进"见过"的缓存(按 编码+名称 去重:同码不同名是真重码,必须保留两条给唯一命中判据用) */
+function rememberRows(rows) {
+  const have = new Set(invSeen.value.map((r) => `${invCodeOf(r)}\u0000${String(r?.['存货名称'] ?? '').trim()}`))
+  const add = []
+  for (const r of (Array.isArray(rows) ? rows : [])) {
+    const key = `${invCodeOf(r)}\u0000${String(r?.['存货名称'] ?? '').trim()}`
+    if (!invCodeOf(r) || have.has(key)) continue
+    have.add(key)
+    add.push(r)
   }
+  if (add.length) invSeen.value = [...invSeen.value, ...add]
 }
 /**
- * 商品档案行:按存货编码取**唯一**命中那一行(带出名称/种类/含水率的唯一数据入口)。
- * ⚠ 后端 condition 对普通文本走 `LIKE %值%`(见 core/panel/invCarry.js 头注),`M-001` 会命中 `XM-001`,
- *   所以**本地按 trim 后全等收紧**(uniqueInvRowOf),且只认唯一命中 —— 多条/没有都返回 null(宁可不带,不带错)。
- * 全量在手时就地判,不再打请求;只有全量没拉到才退回逐条查的老口径(行为与从前逐字一致)。
+ * 按种类取档案行(**按种类缓存**,同一种类只拉一次;失败不缓存 ⇒ 下次会重试,与旧实现同口径)。
+ * ⚠ 服务端 LIKE %值% 只当收窄,判据是本地 trim 全等(invRowsOfKind)——
+ * 实测 `condition {存货编码:'M-001'}` 会带回 `YJ-HSM-001`,类别同理。
  */
-async function fetchInvRowOf(code) {
-  if (invLoaded.value) return uniqueInvRowOf(invRows.value, code)
+async function ensureKindRows(kind) {
+  const k = String(kind ?? '').trim()
+  if (!k) return []
+  if (invKindRows.value[k]) return invKindRows.value[k]
+  if (kindPending.has(k)) return kindPending.get(k)
+  const p = (async () => {
+    try {
+      const res = await request.post('/px/queryFormDataList', {
+        panelCode: 'INV', condition: { 所属类别: k }, pageNo: 1, pageSize: INV_PAGE_SIZE,
+      })
+      const raw = invRowsOf(res?.data)
+      rememberRows(raw)
+      const rows = invRowsOfKind(raw, k)
+      invKindRows.value = { ...invKindRows.value, [k]: rows }
+      invKindTip.value = rows.length
+        ? `· ${tt('该类别商品')} ${rows.length} ${tt('条，候选只在这一类里找')}`
+        : `· ${tt('商品档案里没有这一类的物料，可手打编号')}`
+      return rows
+    } catch {
+      // 无权限/接口异常 ⇒ 下拉只剩手打,不阻断计算(与带出失败同一口径);不缓存,下次重试
+      invKindTip.value = `· ${tt('读不到商品档案（可能没有该面板权限），请手打编号')}`
+      return []
+    } finally { kindPending.delete(k) }
+  })()
+  kindPending.set(k, p)
+  return p
+}
+/** 没选种类时的远程搜索:服务端 keyword(编码/名称一起模糊)。空关键字不发请求 */
+async function remoteInvSearch(kw) {
+  const res = await request.post('/px/queryFormDataList', {
+    panelCode: 'INV', keyword: kw, condition: {}, pageNo: 1, pageSize: 50,
+  })
+  const rows = invRowsOf(res?.data)
+  rememberRows(rows)
+  return rows
+}
+/**
+ * 两格共用的 remote-method(el-select 自带 300ms debounce)。
+ * 选了种类 ⇒ 用该类缓存本地过滤;没选种类 ⇒ 打字才联网。两条路都封顶 OPTION_CAP 项。
+ */
+async function searchInv(i, field, kw) {
+  const key = optKey(i, field)
+  const kind = String(editRows.value[i]?.['物料种类'] ?? '').trim()
+  const q = String(kw ?? '').trim()
+  if (!kind && !q) { setOpts(key, { options: [], matched: 0 }); return }   // 没选种类又没打字 ⇒ 一个请求都不发
+  const seq = (invSearchSeq.get(key) || 0) + 1
+  invSearchSeq.set(key, seq)
+  invOptLoading.value = { ...invOptLoading.value, [key]: true }
   try {
-    const res = await request.post('/px/queryFormDataList', {
-      panelCode: 'INV', condition: { 存货编码: code }, pageNo: 1, pageSize: 50,
-    })
-    return uniqueInvRowOf(invRowsOf(res?.data), code)
+    const rows = kind ? await ensureKindRows(kind) : await remoteInvSearch(q)
+    if (invSearchSeq.get(key) !== seq) return       // 这一格已经发起了更新的一次搜索 ⇒ 本次结果作废
+    setOpts(key, invSearchOptions(rows, field, q))
   } catch {
-    return null   // 无权限/查不到都按"档案没有"处理,转手填
+    if (invSearchSeq.get(key) === seq) setOpts(key, { options: [], matched: 0 })   // 读不到就只剩手打
+  } finally {
+    if (invSearchSeq.get(key) === seq) {
+      const next = { ...invOptLoading.value }
+      delete next[key]
+      invOptLoading.value = next
+    }
   }
 }
-async function onMaterialCodeChange(i) {
-  const code = String(editRows.value[i]?.['物料编号'] ?? '').trim()
+/** 种类选定 ⇒ 预取该类档案(缓存 + 并进"见过"池),并把这一行两格的旧候选作废(下次输入重新取) */
+function onKindChange(i) {
   invTip.value = ''
-  if (!code) return
-  const inv = await fetchInvRowOf(code)
+  const kind = String(editRows.value[i]?.['物料种类'] ?? '').trim()
+  const next = { ...invOpts.value }
+  delete next[optKey(i, '物料编号')]
+  delete next[optKey(i, '物料名称')]
+  invOpts.value = next
+  // 预取只是热身:两格的候选由下拉**打开/输入**时经 remote-method 填(那时种类池已在缓存里,零请求)
+  if (kind) ensureKindRows(kind).catch(() => {})
+  else invKindTip.value = ''
+}
+/**
+ * 挑中/手填一格后,拿**唯一命中**的档案行。
+ * 顺序:见过的缓存(本地,零请求)→ 服务端按这一格等值查(再按 trim 全等收紧)。
+ * 为什么要服务端兜底:① 没选种类时本地没有池;② 手打的编号可能不属于所选种类 —— 档案的真值优先于筛选。
+ * "本地已有同值多行"直接判重码返回 null(口径与 uniqueInvRowBy 一致:宁可不带,不带错)。
+ */
+async function lookupInvRow(field, value) {
+  const col = field === '物料编号' ? '存货编码' : '存货名称'
+  const want = String(value ?? '').trim()
+  if (!want) return null
+  const local = uniqueInvRowBy(invSeen.value, col, want)
+  if (local) return local
+  if (invSeen.value.filter((r) => String(r?.[col] ?? '').trim() === want).length > 1) return null
+  try {
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: 'INV', condition: { [col]: want }, pageNo: 1, pageSize: 50,
+    })
+    const rows = invRowsOf(res?.data)
+    rememberRows(rows)
+    return uniqueInvRowBy(rows, col, want)
+  } catch {
+    return null   // 无权限/查不到都按"档案没有"处理,不阻断、不清空用户输入
+  }
+}
+/** 按物料编号取唯一命中那一行(含水率带出/逐条补查用) */
+const invRowOfCode = (code) => lookupInvRow('物料编号', code)
+
+/**
+ * 挑中一格后的带出(两格共用入口;防打架三条:被操作的那格永不回写 + 值真的不同才写 +
+ * 写入期间的行标记 fillingAt)。fill 的算法在 recipeRows.materialFillFor(有单测)。
+ */
+async function onMaterialPick(i, field) {
+  if (fillingAt.value === i) return                 // 正在被对侧带出写 ⇒ 不接手(防 A→B→A)
+  const row = editRows.value[i]
+  const typed = String(row?.[field] ?? '').trim()
+  invTip.value = ''
+  if (!typed) return
+  const inv = await lookupInvRow(field, typed)
+  // 等请求期间用户又改了这一格 ⇒ 这次带出作废(异步竞态不许把旧结果写回去)
+  if (String(editRows.value[i]?.[field] ?? '').trim() !== typed) return
   if (!inv) {
-    invTip.value = `· ${tt('这些物料编号在商品档案里查不到，物料名称/物料种类请手填')}`
+    invTip.value = field === '物料编号'
+      ? `· ${tt('这些物料编号在商品档案里查不到，物料名称/物料种类请手填')}`
+      : `· ${tt('这个物料名称在商品档案里查不到或重名，物料编号请手填')}`
     return
   }
-  const fill = invFillFor(editRows.value[i], inv)
+  const fill = materialFillFor(row, inv, field)
   if (Object.keys(fill).length) {
-    Object.assign(editRows.value[i], fill)
+    fillingAt.value = i
+    try { Object.assign(editRows.value[i], fill) } finally { fillingAt.value = null }
     invTip.value = `· ${tt('已按商品档案带出')}：${Object.keys(fill).join('、')}`
   }
   // 含水率:同一份档案行顺带更新(只粉料位参与计算;用户手改过的格不覆盖 —— 复用已测的 applyArchiveMoisture)
+  const code = String(fill['物料编号'] ?? row['物料编号'] ?? '').trim()
   const pct = Number(inv['水分含量'])
-  if (!Number.isFinite(pct) || pct <= 0) return
+  if (!code || !Number.isFinite(pct) || pct <= 0) return
   const merged = applyArchiveMoisture(slots.value, moisture.value, moistureTouched.value, { [code]: pct })
   moisture.value = merged.values
   archiveFilled.value = merged.filledSlots
@@ -534,9 +691,10 @@ async function onOpen() {
   sinterWorkshop.value = String(props.head?.['生产车间'] ?? '').trim()
   // 物料行:页 2 已有的行拷贝进弹窗(用户在页 2 填过的接着编);页 2 为空就是空的,由「加一行」从零加
   editRows.value = editRowsFrom(props.rows)
-  // 商品档案(「物料编号」下拉的选项):与参数读取并行拉,拉完再走下面的含水率带出 ——
-  // 全量在手,含水率那 N 个粉料位就不用逐条打请求了(同一份缓存)。缓存跨多次打开复用,不重置。
-  const invPromise = ensureInvRows()
+  resetRowOptions()
+  invKindTip.value = ''
+  // ⚠ 2026-10-15 优化:不再"打开就全量拉商品档案"(生产几千行)。档案改成**选了种类才按类拉**、
+  // 没选种类则**打字才远程查**;只有含水率带出要用档案行,见 loadArchiveMoisture(先按这份行的种类预取)。
   const key = productCode.value || DEFAULT_ITEM
   try {
     const hit = await fetchParam(key)
@@ -548,7 +706,6 @@ async function onOpen() {
   } catch {
     paramScopeTip.value = `${scopeTip()}；${tt('参数库读取失败，已退回内置默认值')}`
   }
-  await invPromise
   await loadArchiveMoisture()
   await loadSinterRows()
 }
@@ -557,13 +714,19 @@ async function onOpen() {
  * 含水率从物料档案带出(商品面板 INV 的「水分含量」,见 tools/migrate-recipe-materials.sql)。
  * 口径:只查粉料位的物料(只有它们参与湿重换算);按物料编号逐个查(等值条件),
  * 结果用 applyArchiveMoisture 合并 —— 用户手改过的格不覆盖。档案读不到就退回手填,不阻断计算。
+ *
+ * 2026-10-15 优化:不再是"打开就全量拉档案再就地查",而是**先按这份物料行里出现过的种类各拉一次**
+ * (1~3 个种类;这份候选本来就要给用户挑编号/名称用,不白拉),再逐码在本地的"见过"缓存里查;
+ * 只有本地没有的码才真的按码打请求(粉料位至多 10 个)。全量那条路在生产几千行时是最贵的一步。
  */
 async function loadArchiveMoisture() {
   const codes = [...new Set(slots.value.filter((s) => isPowder(s) && s.code).map((s) => s.code))]
   if (!codes.length) return
+  const kinds = [...new Set(editRows.value.map((r) => String(r?.['物料种类'] ?? '').trim()).filter(Boolean))]
+  await Promise.all(kinds.map((k) => ensureKindRows(k)))
   const archive = {}
   await Promise.all(codes.map(async (code) => {
-    const row = await fetchInvRowOf(code)
+    const row = await invRowOfCode(code)
     const v = row ? Number(row['水分含量']) : NaN
     archive[code] = Number.isFinite(v) && v > 0 ? v : null
   }))
@@ -711,6 +874,8 @@ function apply() {
 <style scoped>
 .rcd { font-size: 12px; }
 .rcd-note { padding: 6px 10px; margin-bottom: 10px; background: #f4f8ff; border: 1px solid #d6e4ff; border-radius: 4px; color: #4a5568; line-height: 1.6; }
+/* ② 区的取数口径说明:比顶部那条 note 轻一档,不抢物料行的注意力 */
+.rcd-note-tip { padding: 4px 10px; margin-bottom: 6px; background: #fafcff; border-color: #e4eeff; }
 .rcd-sec-h { display: flex; align-items: center; gap: 10px; margin: 12px 0 6px; flex-wrap: wrap; }
 .rcd-sec-t { font-weight: 600; color: #303133; }
 .rcd-muted { color: #909399; font-size: 11px; line-height: 1.5; }
@@ -730,6 +895,8 @@ function apply() {
 .rcd-mini :deep(.el-input__inner) { text-align: center; }
 /* 表格单元格里的下拉:撑满格子(默认宽度不定),与同格的输入框口径一致 */
 .rcd-sel { width: 100%; }
+/* remote 下拉的"没有候选"提示(下拉面板里的空槽):小字、不抢眼、可换行 */
+.rcd-sel-empty { padding: 6px 10px; color: #909399; font-size: 11px; line-height: 1.5; white-space: normal; }
 .rcd-del { color: #f56c6c; cursor: pointer; padding: 0 6px; font-size: 12px; }
 .rcd-del:hover { color: #c45656; }
 .rcd-src { margin-left: 3px; font-size: 10px; color: #67c23a; border: 1px solid #b3e19d; border-radius: 2px; padding: 0 2px; vertical-align: middle; }

@@ -104,22 +104,145 @@ export function invOptionsOf(rows) {
   return out
 }
 
+const norm = (v) => (v === null || v === undefined ? '' : String(v).trim())
+
 /**
- * 按编码在商品档案行里找**唯一**命中那一行(选中/手填一个编号后带出名称/种类/含水率的判据)。
+ * 按某个档案列在商品档案行里找**唯一**命中那一行(选中/手填一格后带出对侧值与种类的判据)。
  *
  * 为什么必须"唯一命中才认":后端 `condition` 对普通文本走 `LIKE %值%`(见 core/panel/invCarry.js 头注),
- * `M-001` 会把 `XM-001` 一起带回来,所以**判等在本地按 trim 后全等收紧**;查到多条(重码)同样谁也不认
+ * `M-001` 会把 `XM-001` 一起带回来(2026-10-15 实测:condition {存货编码:'M-001'} 回 2 行
+ * —— YJ-HSM-001 与 M-001),所以**判等在本地按 trim 后全等收紧**;查到多条(重码/重名)同样谁也不认
  * —— 宁可不带,不带错(调用方据此保持用户输入不动、不清空、不弹错)。
  *
  * @param {Array<Record<string, any>>|null} rows 商品档案行(已 flatten 的,如 invRowsOf 的产物)
+ * @param {string} key 比对的列(`存货编码` 或 `存货名称`)
+ * @param {*} value 用户选中/手填的值
+ * @returns {Record<string, any>|null} 唯一命中 ⇒ 该档案行;否则 null
+ */
+export function uniqueInvRowBy(rows, key, value) {
+  const want = norm(value)
+  if (!want || !Array.isArray(rows)) return null
+  const hits = rows.filter((r) => norm(r?.[key]) === want)
+  return hits.length === 1 ? hits[0] : null
+}
+
+/**
+ * 按编码取唯一命中的档案行(等价 `uniqueInvRowBy(rows, '存货编码', code)`,保留原调用点与口径)。
+ * @param {Array<Record<string, any>>|null} rows 商品档案行
  * @param {*} code 用户选中/手填的 物料编号
  * @returns {Record<string, any>|null} 唯一命中 ⇒ 该档案行;否则 null
  */
 export function uniqueInvRowOf(rows, code) {
-  const want = String(code ?? '').trim()
-  if (!want || !Array.isArray(rows)) return null
-  const hits = rows.filter((r) => String(r?.['存货编码'] ?? '').trim() === want)
-  return hits.length === 1 ? hits[0] : null
+  return uniqueInvRowBy(rows, '存货编码', code)
+}
+
+/* ── 物料种类 = 前置筛选(2026-10-15 用户口径:「先通过前面的物料种类先进行一个筛选,
+      方便后面的物料编码、物料名称的查找」)────────────────────────────────────────
+   规模事实:本机两个账套 bs_inv 都是 **114 行**(实测),生产服务器**几千行**
+   (`QueryService` 里 ARCH_LOAD_CAP 的注释记着 2026-09-16 已 3850 行)。
+   所以候选**永远不一次性全拉全渲**:选了种类 ⇒ 只拉那一类;没选种类 ⇒ 打字才远程查。 */
+
+/** 下拉一次最多渲染多少项 —— 与档案行数无关的硬上限(几千行不许一次性渲成 el-option) */
+export const OPTION_CAP = 50
+
+/**
+ * 按「物料种类」把档案行收窄到**真的属于这一类**的行。
+ *
+ * ⚠ 服务端那层只当**收窄**:`QueryService.appendDirectFilters` 对普通文本字段走 `LIKE %值%`
+ * (只有 dataType=参照 才等值),所以 `所属类别 = 功能料-粉末` 在服务端会把
+ * 「功能料-粉末新」这类**含子串**的类别一起带回来(实测口径同 `condition {存货编码:'M-001'}` → 2 行)。
+ * 因此这里必须再按 trim 后**全等**筛一遍 —— 服务端返回多少行,不构成判据。
+ *
+ * 未选种类(kind 空)**故意返回空数组**:未选种类时前端走的是 remote 搜索那条路,
+ * 若这里退化成"返回全量",几千行就会顺着这个口子渲进下拉 —— 宁可空,不许全量。
+ *
+ * @param {Array<Record<string, any>>|null} rows 档案行(invRowsOf 的产物)
+ * @param {string} kind 物料种类(引擎认的五个词之一,或用户手打的词)
+ * @returns {Array<Record<string, any>>} 该种类的档案行(保原序)
+ */
+export function invRowsOfKind(rows, kind) {
+  const want = norm(kind)
+  if (!want || !Array.isArray(rows)) return []
+  return rows.filter((r) => norm(r?.['所属类别']) === want)
+}
+
+/** 两格的取值列:物料编号格取 `存货编码`,物料名称格取 `存货名称`(互为反向) */
+export const INV_SEARCH_FIELDS = {
+  物料编号: { value: '存货编码', label: '存货编码' },
+  物料名称: { value: '存货名称', label: '存货名称' },
+}
+
+/**
+ * 「物料编号」/「物料名称」下拉的候选(纯函数;两格共用,只是取值列不同)。
+ *
+ * 口径:
+ *   · 值 = 该格的列(编号格给 `存货编码`,名称格给 `存货名称`);
+ *     编号格的显示是 `编码 — 名称`(与既有 invOptionsOf 一致),名称格显示名称本身;
+ *   · 关键字**同时**匹配编码与名称、**大小写无关** —— 用户记不住编码只记得名字是常态,
+ *     下拉里本来就显示着名称;后端 LIKE 实测同样大小写不敏感(`m-00` 与 `M-00` 都回 11 行),前端同口径;
+ *   · 同一格取值相同的只留第一条(下拉里两个同值项会让人以为选错了);
+ *   · **封顶 cap 项**,同时报 `matched` 总数 —— 界面据此提示"还有 N 条,继续输入缩小范围"。
+ *     这是"几千行不许一次性渲染"的可测落点:渲染量只由 cap 决定,与档案行数无关。
+ *
+ * @param {Array<Record<string, any>>|null} rows 候选来源(某种类的缓存 或 远程搜索回来的那一小把)
+ * @param {'物料编号'|'物料名称'} field 用户在搜哪一格
+ * @param {string} keyword 用户敲进去的关键字(空 = 不过滤,给前 cap 项)
+ * @param {number} [cap=OPTION_CAP] 最多返回几项
+ * @returns {{options: Array<{value: string, label: string}>, matched: number}}
+ */
+export function invSearchOptions(rows, field, keyword, cap = OPTION_CAP) {
+  const spec = INV_SEARCH_FIELDS[field]
+  if (!spec || !Array.isArray(rows)) return { options: [], matched: 0 }
+  const kw = norm(keyword).toLowerCase()
+  const seen = new Set()
+  const hits = []
+  for (const r of rows) {
+    const value = norm(r?.[spec.value])
+    // 没有编码的档案行不是可录进单据的物料(编码才是身份):名称格也不放它进来 ——
+    // 选中它连编号都回填不了,只会得到一行"有名字没编号"的配方行。
+    if (!norm(r?.['存货编码']) || !value || seen.has(value)) continue
+    if (kw) {
+      const hay = `${norm(r?.['存货编码'])} ${norm(r?.['存货名称'])}`.toLowerCase()
+      if (!hay.includes(kw)) continue
+    }
+    seen.add(value)
+    const name = norm(r?.['存货名称'])
+    hits.push({
+      value,
+      label: field === '物料名称' ? value : (name ? `${value} — ${name}` : value),
+    })
+  }
+  const limit = Number.isInteger(cap) && cap > 0 ? cap : OPTION_CAP
+  return { options: hits.slice(0, limit), matched: hits.length }
+}
+
+/**
+ * 在下拉里挑中一格后,这一行**真正要改**的格(两格互为反向带出的**防打架**闸门)。
+ *
+ * 三条规矩(缺一条就会两格互触发):
+ *   ① **被操作的那一格永不回写** —— 回写它就是"名称 change → 写名称 → 又触发 change"的起点;
+ *   ② **值真的不同才写**(trim 后比)—— 同值再写一遍只会白触发一轮,定长列的尾空格还会来回写;
+ *   ③ 档案取不到 / 类别不是引擎认的词 ⇒ 该格**不带**(与既有口径一致,不清空、不报错、不猜)。
+ *
+ * 两侧的"对侧格"语义**故意不对称**,理由写在各分支里:
+ *   · 选**编号**:沿用 2026-10-15 既有口径(只补空格,人手填的名称不被档案覆盖)—— 有单测钉着;
+ *   · 选**名称**:用户是按**名字**挑的物料 ⇒ 编号**必须**跟着走(留着旧编号 = 新名的料配旧编号,
+ *     是静默错数),所以这一侧是"不同就覆盖"。
+ *
+ * @param {Record<string, any>|null} row 弹窗里的编辑行
+ * @param {Record<string, any>|null} inv 唯一命中的档案行(取不到传 null)
+ * @param {'物料编号'|'物料名称'} side 用户刚操作的那一格
+ * @returns {Record<string, string>} 要写进该行的格(一个都不改给 {})
+ */
+export function materialFillFor(row, inv, side) {
+  if (side === '物料编号') return invFillFor(row, inv)
+  if (side !== '物料名称') return {}
+  const out = {}
+  const code = norm(inv?.['存货编码'])
+  if (code && norm(row?.['物料编号']) !== code) out['物料编号'] = code
+  const kind = norm(inv?.['所属类别'])
+  if (kind && MATERIAL_KINDS.includes(kind) && !norm(row?.['物料种类'])) out['物料种类'] = kind
+  return out
 }
 
 /**
