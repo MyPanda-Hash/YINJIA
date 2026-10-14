@@ -1,0 +1,18 @@
+=== WO_REPORT 面板元数据 ===
+mode=doc head=null line=scjl group=报工单号 pk=id code=报工单号 date=单据日期 detailKey=items
+
+=== WO_REPORT 字段(place|seq|label) ===
+query,detail | 30 | 工单号
+query,detail | 35 | 批次号
+query,detail | 36 | 工单行号
+query,detail | 40 | 工序
+query,detail | 50 | 报工数量
+query,detail | 55 | 直销数量
+query,detail | 56 | 批号
+query,detail | 57 | 生产线
+query,detail | 58 | 入库单号
+query,detail | 59 | 产成品流水号
+query,detail | 60 | 报工人
+query,detail | 70 | 备注
+query,header | 10 | 单据编号
+query,header | 20 | 单据日期

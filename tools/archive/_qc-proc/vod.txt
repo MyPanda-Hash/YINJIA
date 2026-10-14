@@ -1,0 +1,73 @@
+=== v_manu_order_detail 列 ===
+单据编号 | id | 合同号 | 批号 | 预开工日 | 预完工日 | 销售订单号 | 客户编码 | 客户 | 测试程序 | 机构 | 重量 | 开工日期 | 完工日期 | 是否手工修改单据编码 | 负责人 | 备注 | asp_user1 | asp_time1 | asp_user2 | asp_time2 | asp_cancel | 单据日期 | 生产线 | 操作员 | 需求数量 | 排产数量 | 入库数量 | 余量 | 入库单号 | 领料单号 | 外包单号 | 结案 | 单据类型 | 来料性质 | 来料单号 | 采购入库单号 | 单价 | 金额 | 源工单号 | 拆分序号 | 重点管控 | 混料批次号 | 首件完成 | 首件完成时间 | 首件通知人 | 附件1 | 附件2 | 附件3 | 附件4 | 附件5 | 附件6 | 模具类型 | 打印次数 | 排产班组 | 结案人 | 结案时间 | 打印人 | 打印时间 | 产品编码 | 存货图片 | 产品名称 | 规格型号 | 型号 | 生产单位 | 数量 | 齐套数量(主) | 累计汇报套数(工序单位) | 可用量 | 现存量 | 图号 | 单重 | 总重 | 需求令号 | 
+
+=== MANU_ORDER_DETAIL 的 yj_field(place|seq|label) ===
+query,detail | 1 | 单据编号
+query,detail | 2 | 客户编码
+query,detail | 3 | 客户
+query,detail | 4 | 产品编码
+query,detail | 5 | 产品名称
+query,detail | 6 | 规格型号
+query,detail | 7 | 型号
+query,detail | 8 | 生产单位
+query,detail | 9 | 数量
+query,detail | 10 | 齐套数量(主)
+query,detail | 11 | 累计汇报套数(工序单位)
+query,detail | 12 | 可用量
+query,detail | 13 | 现存量
+query,detail | 14 | 图号
+query,detail | 15 | 单重
+query,detail | 16 | 总重
+query,detail | 17 | 需求令号
+query,detail | 18 | 批号
+query,detail | 19 | 预开工日
+query,detail | 20 | 预完工日
+query,detail | 21 | 生产线
+query,detail | 22 | 排产数量
+query,detail | 23 | 入库数量
+query,detail | 24 | 余量
+query,detail | 25 | 需求数量
+
+=== v_manu_schedule 列(排产视图) ===
+id | 加工单号 | 单据日期 | 销售订单号 | 客户 | 客户等级 | 生产线 | 重点管控 | 产能/小时 | 产品编码 | 产品名称 | 规格型号 | 生产单位 | 批号 | 销售订单数量 | 需求数量 | 生产订单数量 | 排产数量 | 生产计划数量 | 每箱数量 | 箱数 | 入库数量 | 实际完成数量 | 余量 | 计划开工日 | 交期 | 工序交期 | 交期紧迫度(天) | 7天已排产 | 15天已排产 | 大于15天 | 结案 | 混料计划 | 混料完成 | 混料未完成 | 成型计划 | 成型完成 | 成型未完成 | 切炭计划 | 切炭完成 | 切炭未完成 | 组装计划 | 组装完成 | 组装未完成 | 装箱计划 | 装箱完成 | 装箱未完成 | 未完成数量 | 单据状态 | 源工单号 | asp_cancel | 开产量 | 已报工 | 生产状态 | 
+
+=== plang 视图是否存在 ===
+DF__plang__CompFlag__37BCB71A (DEFAULT_CONSTRAINT)
+DF__plang__ypl_sl__1A17459A (DEFAULT_CONSTRAINT)
+DF__plang_cop__BomId__4FE94666 (DEFAULT_CONSTRAINT)
+DF__plang_cop__od_xc__4EF5222D (DEFAULT_CONSTRAINT)
+DF__plang_cop__pl_sl__493C48D7 (DEFAULT_CONSTRAINT)
+DF__plang_cop__pl_xc__4848249E (DEFAULT_CONSTRAINT)
+DF__plang_cop__rk_sl__4B249149 (DEFAULT_CONSTRAINT)
+DF__plang_cop__xq_sl__4A306D10 (DEFAULT_CONSTRAINT)
+DF__plang_copy__jine__4E00FDF4 (DEFAULT_CONSTRAINT)
+DF__plang_copy1__dj__4D0CD9BB (DEFAULT_CONSTRAINT)
+DF__plang_copy1__yl__4C18B582 (DEFAULT_CONSTRAINT)
+DF_plang_asp_print_2 (DEFAULT_CONSTRAINT)
+DF_plang_asp_time1_2 (DEFAULT_CONSTRAINT)
+DF_plang_asp_user1_1 (DEFAULT_CONSTRAINT)
+DF_plang_asp_user2_1 (DEFAULT_CONSTRAINT)
+DF_plang_asp_user3_1 (DEFAULT_CONSTRAINT)
+DF_plang_asp_user4_1 (DEFAULT_CONSTRAINT)
+DF_plang_dj_1 (DEFAULT_CONSTRAINT)
+DF_plang_jine_1 (DEFAULT_CONSTRAINT)
+DF_plang_od_xc_1 (DEFAULT_CONSTRAINT)
+DF_plang_pc_asp_print (DEFAULT_CONSTRAINT)
+DF_plang_pc_asp_time1 (DEFAULT_CONSTRAINT)
+DF_plang_pc_asp_user1 (DEFAULT_CONSTRAINT)
+DF_plang_pc_asp_user2 (DEFAULT_CONSTRAINT)
+DF_plang_pc_asp_user3 (DEFAULT_CONSTRAINT)
+DF_plang_pc_asp_user4 (DEFAULT_CONSTRAINT)
+DF_plang_pc_od_xc1 (DEFAULT_CONSTRAINT)
+DF_plang_pc_pl_sl1 (DEFAULT_CONSTRAINT)
+DF_plang_pl_sl_1 (DEFAULT_CONSTRAINT)
+DF_plang_pl_sl1 (DEFAULT_CONSTRAINT)
+DF_plang_pl_sl2 (DEFAULT_CONSTRAINT)
+DF_plang_pl_xc (DEFAULT_CONSTRAINT)
+DF_plang_rk_sl (DEFAULT_CONSTRAINT)
+DF_plang_yl (DEFAULT_CONSTRAINT)
+DF_plang_zl (DEFAULT_CONSTRAINT)
+PK_plang_1 (PRIMARY_KEY_CONSTRAINT)
+PK_plang_1_copy2 (PRIMARY_KEY_CONSTRAINT)
+plang (USER_TABLE)
+plang_pc (USER_TABLE)
