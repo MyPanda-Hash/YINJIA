@@ -3,15 +3,15 @@
   制程检验记录表报表模板(QC_PROC_INSP / qc_proc_insp_head + qc_proc_insp_detail,2026-10-12)
   ============================================================================
   版式来源:用户截图「制程检验」页签(《生产相关品质检验.xlsx》第 2 个页签)。
-  结构与截图一致,分上下两块:
-    ① 制程检验组:表头 7 列(检验时间|客户名称|产品编码|型号(mm)|批号|抽检总量|结果判断)
-       表体 3 组 —— 外观(端盖两头|管身两侧|按项目填充) / 尺寸(5 格) / 出货重量(5 格)
-    ② 出货检验功能性测试组:客户名称|产品编码|型号(mm)|批号|检验人员|产线常规功能性结果|结果判断
-       表体 —— 检验要求 | 检验方法(截图注明「自动填充出货检验计划表」)
+  ⚠ 2026-10-14 用户口径:「当前制程表只需要这种形式实现即可。下面的表是组装成品的」
+    ⇒ 本报表**只含制程检验组**(原 ② 出货检验功能性测试组已移除,它属组装成品检验单 QC_ASM_INSP)。
+  结构:
+    制程检验组:表头 7 列(检验时间|客户名称|产品编码|型号(mm)|批号|抽检总量|结果判断)
+      表体 3 组 —— 外观(端盖两头|管身两侧|按项目填充) / 尺寸(5 格) / 出货重量(5 格)
 
   ⚠ 数据契约(ReportService):
     · $P{...} = 头字段标量 headParams 按 yj_field.label 下发 + 单据编号/打印时间后端补;
-    · $F{...} = 明细行(detailRows),字段名 = yj_field.label。
+    · 三个矩阵格(外观结果/尺寸_1..5/重量_1..5)由 headParams 按明细「表区」归并后下发。
   ⚠ JR 6.x XSD 排版坑(与 so_order/sl_recv 同套):
     · 样式集中声明;<box><pen/></box> 写法;band 必须包在分节元素里;
     · textAlignment/verticalAlignment 只作 textElement 属性;isStretchWithOverflow 已废弃,用 textAdjust。
@@ -242,74 +242,6 @@
   <pageHeader>
     <band height="1"/>
   </pageHeader>
-  <!-- ======================= ② 出货检验功能性测试组(band: columnHeader / detail) =======================
-       截图:表头 客户名称|产品编码|型号(mm)|批号|检验人员|产线常规功能性结果|结果判断
-             表体 检验要求 | 检验方法(注明「自动填充出货检验计划表」) -->
-  <columnHeader>
-    <band height="54">
-      <staticText>
-        <reportElement style="bandTitle" x="0" y="0" width="758" height="16"/>
-        <text><![CDATA[出货检验功能性测试]]></text>
-      </staticText>
-
-      <staticText><reportElement style="th7" x="0" y="18" width="60" height="36" /><text><![CDATA[客户名称]]></text></staticText>
-      <staticText><reportElement style="th7" x="60" y="18" width="56" height="36" /><text><![CDATA[产品编码]]></text></staticText>
-      <staticText><reportElement style="th7" x="116" y="18" width="56" height="36" /><text><![CDATA[型号（mm)]]></text></staticText>
-      <staticText><reportElement style="th7" x="172" y="18" width="62" height="36" /><text><![CDATA[批号]]></text></staticText>
-      <staticText><reportElement style="th7" x="234" y="18" width="86" height="18"/><text><![CDATA[检验人员：]]></text></staticText>
-      <staticText><reportElement style="th6" x="234" y="36" width="86" height="18"/><text><![CDATA[]]></text></staticText>
-      <staticText><reportElement style="th6" x="320" y="18" width="150" height="36"/><text><![CDATA[以下检验要求自动填充出货检验计划表]]></text></staticText>
-      <staticText><reportElement style="th6" x="470" y="18" width="150" height="36"/><text><![CDATA[以下检验方法自动填充出货检验计划表]]></text></staticText>
-      <staticText><reportElement style="th7" x="620" y="18" width="76" height="36"/><text><![CDATA[产线常规功能性结果]]></text></staticText>
-      <staticText><reportElement style="th7" x="696" y="18" width="62" height="36"/><text><![CDATA[结果判断]]></text></staticText>
-    </band>
-  </columnHeader>
-
-  <!-- 功能性测试行:每行 = 一条检验要求 + 检验方法。
-       ⚠ 数据源必须用 $P{主数据源}(后端已过滤成「表区=功能性测试」的行),
-         否则 detail 会把外观/尺寸/重量的明细也逐行渲染一遍(11 行而不是 4 行)。 -->
-  <detail>
-    <band height="20">
-      <textField isBlankWhenNull="true">
-        <reportElement style="l7" x="0" y="0" width="60" height="20"/>
-        <textFieldExpression><![CDATA[$P{客户名称}]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true">
-        <reportElement style="c7" x="60" y="0" width="56" height="20"/>
-        <textFieldExpression><![CDATA[$P{产品编码}]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true">
-        <reportElement style="c7" x="116" y="0" width="56" height="20"/>
-        <textFieldExpression><![CDATA[$P{规格型号}]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true">
-        <reportElement style="c7" x="172" y="0" width="62" height="20"/>
-        <textFieldExpression><![CDATA[$P{批次号}]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true">
-        <reportElement style="c7" x="234" y="0" width="86" height="20"/>
-        <textFieldExpression><![CDATA[$P{检验员}]]></textFieldExpression>
-      </textField>
-
-      <!-- 检验要求(F)| 检验方法(G)= 截图两列 -->
-      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
-        <reportElement style="l7" x="320" y="0" width="150" height="20"/>
-        <textFieldExpression><![CDATA[$F{检验要求}]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true" textAdjust="StretchHeight">
-        <reportElement style="l7" x="470" y="0" width="150" height="20"/>
-        <textFieldExpression><![CDATA[$F{检验方法}]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true">
-        <reportElement style="c7" x="620" y="0" width="76" height="20"/>
-        <textFieldExpression><![CDATA[$F{实测数值}]]></textFieldExpression>
-      </textField>
-      <textField isBlankWhenNull="true">
-        <reportElement style="c7" x="696" y="0" width="62" height="20"/>
-        <textFieldExpression><![CDATA[$F{单项判定}]]></textFieldExpression>
-      </textField>
-    </band>
-  </detail>
   <pageFooter>
     <band height="30">
       <textField>

@@ -320,13 +320,11 @@ public class ReportService {
             if (GENERIC_CODE.equals(tpl.code())) {
                 print = fillGeneric(def, doc, docNo, rows);
             } else {
-                // 「制程检验记录表」这类**矩阵版式**模板:上半部(外观/尺寸/重量)由参数承载、
-                // 下半部(detail)只渲染功能性测试行 ⇒ 主数据源要换成过滤后的子集,
-                // 否则 detail 会把外观/尺寸/重量的明细也逐行渲染一遍。
-                // 判据:明细里出现过「表区」列(其他面板没有这一列,不受影响)。
-                List<Map<String, ?>> feed = hasSectorColumn(rows) ? funcRows(rows) : rows;
+                // 主数据源=明细全量。制程检验记录表是**矩阵版式**(外观/尺寸/重量三格由
+                // headParams 按「表区」归并后下发成参数),模板里没有 detail band ⇒ 数据源不参与渲染;
+                // 其余精细模板(so_order/sl_recv/出厂检验报告)照旧用明细行逐行渲染。
                 print = JasperFillManager.fillReport(compile(tpl), headParams(doc, docNo, rows),
-                        new JRMapCollectionDataSource(feed));
+                        new JRMapCollectionDataSource(rows));
             }
         } catch (JRException e) {
             throw new IllegalArgumentException("报表填充失败：" + rootMessage(e));
@@ -514,8 +512,6 @@ public class ReportService {
                 params.put(e.getValue() + "_" + (i + 1), i < parts.size() ? parts.get(i) : "");
             }
         }
-        // 说明:制程检验记录表的 detail band 只渲染「功能性测试」行 —— 由 export() 把
-        // 主数据源换成 funcRows(rows) 实现(不在这里塞额外数据源参数)。
         return params;
     }
 
@@ -523,20 +519,6 @@ public class ReportService {
     private static final Map<String, String> SPLIT_PARAMS = Map.of(
             "尺寸", "尺寸",
             "重量", "重量");
-
-    /** 明细是否带「表区」列(制程检验单专有;其他面板没有 ⇒ 矩阵版式逻辑不外溢) */
-    private static boolean hasSectorColumn(List<Map<String, ?>> rows) {
-        return rows != null && !rows.isEmpty() && rows.get(0).containsKey("表区");
-    }
-
-    /** 只保留「表区=功能性测试」的行(制程检验记录表下半部的 detail 数据源) */
-    private static List<Map<String, ?>> funcRows(List<Map<String, ?>> rows) {
-        List<Map<String, ?>> out = new ArrayList<>();
-        for (Map<String, ?> r : rows) {
-            if ("功能性测试".equals(str(r.get("表区")))) out.add(r);
-        }
-        return out;
-    }
 
     /**
      * 取某表区的「实测值」,摊平成一个列表(最多 5 个,对应截图的 5 格)。
