@@ -59,16 +59,16 @@
           </template>
           <template v-for="g in groups" :key="'g' + g.sector + ri">
             <td v-for="c in g.cols" :key="'g' + g.sector + ri + c.k" class="c-val">
-              <template v-if="cellRow(g, c, ri)">
-                <el-input
-                  v-if="editable"
-                  v-model="cellRow(g, c, ri)[g.measure ? c.prop : '实测数值']"
-                  size="small"
-                  class="qr-cell-input"
-                  @input="emit('dirty')"
-                />
-                <span v-else class="qr-cell-text">{{ cellText(g, c, ri) }}</span>
-              </template>
+              <!-- 有行则绑该行;无行(本组行数少于最大行数)则占位虚线框,提示可补行 -->
+              <el-input
+                v-if="editable && cellRow(g, c, ri)"
+                v-model="cellRow(g, c, ri)[g.measure ? c.prop : '实测数值']"
+                size="small"
+                class="qr-cell-input"
+                @input="emit('dirty')"
+              />
+              <span v-else-if="editable" class="qr-cell-empty">—</span>
+              <span v-else class="qr-cell-text">{{ cellText(g, c, ri) }}</span>
             </td>
           </template>
           <td v-if="ri === 1" class="c-fixed" :rowspan="rowCount">
@@ -247,15 +247,23 @@ function cellText(g, c, ri) {
   font-weight: 500;
 }
 /* 单元格内输入:铺满格子(与 QcInspRecSheet 的 qr-cell-input 同款) */
+/* 可填写:输入框必须看得见(此前做成透明无边框,看着像死文本) */
 .qr-cell-input :deep(.el-input__wrapper) {
-  box-shadow: none;
-  background: transparent;
-  padding: 0 2px;
+  background: #fff;
+  box-shadow: 0 0 0 1px #b8c8da inset;
+  padding: 0 4px;
+}
+.qr-cell-input :deep(.el-input__wrapper:hover),
+.qr-cell-input :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1px #5b9bd5 inset;
 }
 .qr-cell-input :deep(.el-input__inner) {
   height: 20px;
   line-height: 20px;
   text-align: center;
+}
+.qr-cell-empty {
+  color: #c2ccd4;
 }
 .qr-cell-text {
   display: inline-block;
