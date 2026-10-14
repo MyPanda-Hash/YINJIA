@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 /**
  * CDP 真实点击探针(2026-10-15)
- * 目的:制程检验单「＋新增检验项」点了没反应 —— 不再靠猜,用无头 Edge 真点一次,
- *       采:点击前的行数 / 点击后的行数 / 控制台报错 / 组件内部 detail.items 长度。
+ * 用途:制程检验单「＋新增检验项」点了没反应 —— 用无头 Edge 真点一次并取证:
+ *       点击前后行数/单元格数、控制台报错与异常、页面路由与登录态。
  *
  * 用法: node tools/archive/_qc-proc/_cdp-probe.mjs
  * 前提:8090 在跑;本机有 Edge。
+ * 要点:应用是 **hash 路由**(整页深链会被服务端 403),故先 / 打开 → 驱动登录表单
+ *       → 再用 location.hash 进面板(不整页重载,保住登录态)。
  */
 import { spawn } from 'node:child_process'
 import { mkdtempSync } from 'node:fs'
@@ -13,25 +15,24 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe'
-const PORT = 9222
-const BASE = 'http://127.0.0.1:8090'
+const PORT = 9223
+const BASE = process.env.PROBE_BASE || 'http://127.0.0.1:8090'
 const PANEL = 'QC_PROC_INSP'
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
 const profile = mkdtempSync(join(tmpdir(), 'cdp-'))
 const edge = spawn(EDGE, [
   '--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`,
-  '--no-first-run', '--no-default-browser-check', '--disable-gpu', 'about:blank',
+  '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--window-size=1600,900',
+  'about:blank',
 ], { stdio: 'ignore' })
 
-async function targets() {
-  for (let i = 0; i < 40; i++) {
+async function firstPage() {
+  for (let i = 0; i < 60; i++) {
     try {
-      const r = await fetch(`http://127.0.0.1:${PORT}/json/list`)
-      const list = await r.json()
-      const page = list.find((t) => t.type === 'page')
-      if (page?.webSocketDebuggerUrl) return page
+      const list = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json()
+      const p = list.find((t) => t.type === 'page' && t.webSocketDebuggerUrl)
+      if (p) return p
     } catch {}
     await sleep(250)
   }
@@ -39,18 +40,20 @@ async function targets() {
 }
 
 class CDP {
-  constructor(ws) { this.ws = ws; this.id = 0; this.waiting = new Map(); this.logs = [] }
+  constructor(ws) { this.ws = ws; this.id = 0; this.pending = new Map(); this.logs = [] }
   static async open(url) {
     const ws = new WebSocket(url)
-    await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej })
+    await new Promise((res, rej) => { ws.onopen = res; ws.onerror = () => rej(new Error('ws error')) })
     const c = new CDP(ws)
     ws.onmessage = (ev) => {
       const m = JSON.parse(ev.data)
-      if (m.id && c.waiting.has(m.id)) {
-        const { res, rej } = c.waiting.get(m.id); c.waiting.delete(m.id)
+      if (m.id && c.pending.has(m.id)) {
+        const { res, rej } = c.pending.get(m.id); c.pending.delete(m.id)
         m.error ? rej(new Error(JSON.stringify(m.error))) : res(m.result)
-      } else if (m.method === 'Runtime.consoleAPICalled') {
-        c.logs.push('[console.' + m.params.type + '] ' + m.params.args.map((a) => a.value ?? a.description ?? a.type).join(' '))
+        return
+      }
+      if (m.method === 'Runtime.consoleAPICalled') {
+        c.logs.push(`[console.${m.params.type}] ` + m.params.args.map((a) => a.value ?? a.description ?? a.type).join(' '))
       } else if (m.method === 'Runtime.exceptionThrown') {
         const d = m.params.exceptionDetails
         c.logs.push('[EXCEPTION] ' + (d.exception?.description || d.text))
@@ -64,88 +67,89 @@ class CDP {
   send(method, params = {}) {
     const id = ++this.id
     this.ws.send(JSON.stringify({ id, method, params }))
-    return new Promise((res, rej) => this.waiting.set(id, { res, rej }))
+    return new Promise((res, rej) => this.pending.set(id, { res, rej }))
   }
-  async eval(expr, awaitPromise = true) {
-    const r = await this.send('Runtime.evaluate', {
-      expression: expr, awaitPromise, returnByValue: true, userGesture: true,
-    })
+  async eval(expression, awaitPromise = true) {
+    const r = await this.send('Runtime.evaluate', { expression, awaitPromise, returnByValue: true, userGesture: true })
     if (r.exceptionDetails) throw new Error(r.exceptionDetails.exception?.description || r.exceptionDetails.text)
     return r.result?.value
   }
 }
 
-try {
-  const page = await targets()
-  const c = await CDP.open(page.webSocketDebuggerUrl)
-  await c.send('Runtime.enable')
-  await c.send('Log.enable')
-  await c.send('Page.enable')
+const LOGIN_FORM = `(async()=>{
+  const setV=(el,v)=>{
+    const d=Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,'value').set;
+    d.call(el,v); el.dispatchEvent(new Event('input',{bubbles:true})); el.dispatchEvent(new Event('change',{bubbles:true}));
+  };
+  const ins=[...document.querySelectorAll('input')];
+  const acc=ins.find(i=>i.type==='text'||i.type==='');
+  const pwd=ins.find(i=>i.type==='password');
+  if(acc) setV(acc,'admin');
+  if(pwd) setV(pwd,'123456');
+  await new Promise(r=>setTimeout(r,500));
+  const btn=[...document.querySelectorAll('button')].find(b=>/进入系统|登\\s*录/.test(b.textContent||''));
+  if(btn) btn.click();
+  return {inputs:ins.length, acc:!!acc, pwd:!!pwd, btn:!!btn, hash:location.hash};
+})()`
 
-  // ① 打开应用并注入登录态(用真实登录接口,不在脚本里存密码)
-  await c.send('Page.navigate', { url: BASE + '/' })
-  await sleep(2500)
-  const token = await c.eval(`(async()=>{
-    const r = await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({userName:'admin',password:'123456'})});
-    const j = await r.json();
-    const d = j.data || j;
-    localStorage.setItem('mes_token', d.token);
-    if (d.user) localStorage.setItem('mes_user', JSON.stringify(d.user));
-    localStorage.setItem('mes_login_date', new Date().toISOString().slice(0,10));
-    if (d.factory) localStorage.setItem('mes_factory', JSON.stringify(d.factory));
-    return d.token ? 'TOKEN_OK' : 'TOKEN_FAIL:'+JSON.stringify(j).slice(0,120);
-  })()`)
-  console.log('① 注入登录态 =', token)
-
-  // ② 进面板
-  await c.eval(`location.href = ${JSON.stringify('#/panelx/list/' + 'QC_PROC_INSP')}`).catch(()=>{})
-  await c.send('Page.navigate', { url: `${BASE}/#/panelx/list/${PANEL}` })
-  await sleep(6000)
-
-  // ③ 定位「新增检验项」按钮并点击,前后各采一次行数
-  const state = await c.eval(`({url:location.href, title:document.title, body:(document.body.innerText||'').slice(0,300)})`)
-  console.log('①b 页面状态 =', JSON.stringify(state))
-  const probe = await c.eval(`(async()=>{
-    const out = {};
-    const btn = [...document.querySelectorAll('.qr-add-btn')][0];
-    out.btnFound = !!btn;
-    out.btnText = btn ? btn.textContent.trim() : null;
-    const grid = document.querySelector('.qr-grid');
-    out.gridFound = !!grid;
-    const rows = () => document.querySelectorAll('.qr-grid tbody tr').length;
-    const vals = () => [...document.querySelectorAll('.qr-grid tbody td .qr-cell-text')].length;
-    out.rowsBefore = rows();
-    out.cellsBefore = vals();
-    out.emptyText = (document.querySelector('.qr-grid .c-empty')||{}).textContent || null;
-    if (btn) {
-      btn.click();
-      await new Promise(r=>setTimeout(r,600));
-      out.clicked = true;
-      out.rowsAfter = rows();
-      out.cellsAfter = vals();
-      out.emptyTextAfter = (document.querySelector('.qr-grid .c-empty')||{}).textContent || null;
-    }
-    // 页面里能否读到 Vue 实例上的 detail.items
-    try {
-      const app = document.querySelector('#app')?.__vue_app__;
-      out.hasApp = !!app;
-    } catch(e) { out.appErr = String(e); }
-    return out;
-  })()`)
-
-  console.log('② 探针结果:')
-  for (const [k, v] of Object.entries(probe)) console.log(`   ${k} = ${JSON.stringify(v)}`)
-
-  await sleep(500)
-  if (c.logs.length) {
-    console.log('③ 控制台输出:')
-    for (const l of c.logs.slice(0, 25)) console.log('   ' + l)
-  } else {
-    console.log('③ 控制台:无输出')
+const PROBE = `(async()=>{
+  const out={};
+  out.hash=location.hash;
+  out.btnFound=!!document.querySelector('.qr-add-btn');
+  out.gridFound=!!document.querySelector('.qr-grid');
+  const rowN=()=>document.querySelectorAll('.qr-grid tbody tr').length;
+  const cellN=()=>document.querySelectorAll('.qr-grid tbody .qr-cell-text').length;
+  const inpN=()=>document.querySelectorAll('.qr-grid tbody input').length;
+  const emptyN=()=>document.querySelectorAll('.qr-grid .c-empty').length;
+  out.rowsBefore=rowN(); out.cellsBefore=cellN(); out.inputsBefore=inpN(); out.emptyBefore=emptyN();
+  const btn=document.querySelector('.qr-add-btn');
+  if(btn){
+    btn.click();
+    await new Promise(r=>setTimeout(r,800));
+    out.rowsAfter=rowN(); out.cellsAfter=cellN(); out.inputsAfter=inpN(); out.emptyAfter=emptyN();
   }
-  console.log('\n结论: rowsBefore ->', probe.rowsBefore, ' rowsAfter ->', probe.rowsAfter,
-    probe.rowsAfter > probe.rowsBefore ? '  ✅ 点得动' : '  ❌ 点击未产生新行')
+  return out;
+})()`
+
+try {
+  const page = await firstPage()
+  const c = await CDP.open(page.webSocketDebuggerUrl)
+  await c.send('Runtime.enable'); await c.send('Log.enable'); await c.send('Page.enable')
+
+  console.log('① 打开应用')
+  await c.send('Page.navigate', { url: BASE + '/' })
+  await sleep(4500)
+
+  console.log('② 接口登录 + 写 localStorage')
+  const tok = await c.eval(`(async()=>{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({userName:'admin',password:'123456'})});
+    const j=await r.json(); const d=j.data||j;
+    localStorage.setItem('mes_token', d.token);
+    localStorage.setItem('mes_user', JSON.stringify(d.user||{}));
+    localStorage.setItem('mes_login_date', new Date().toISOString().slice(0,10));
+    localStorage.setItem('mes_factory', JSON.stringify(d.factory||{code:'HSDZ_MES',name:'YINJIA-MES'}));
+    return {token:!!d.token, keys:Object.keys(localStorage).join(',')};
+  })()`)
+  console.log('   ', JSON.stringify(tok))
+  await c.send('Page.navigate', { url: BASE + '/' })
+  await sleep(7000)
+  console.log('   重载后 hash =', await c.eval('location.hash'))
+
+  console.log('③ hash 进面板 ' + PANEL)
+  await c.eval(`location.hash = '#/panelx/list/${PANEL}'`)
+  await sleep(9000)
+  const st = await c.eval(`({hash:location.hash, rows:document.querySelectorAll('.qr-grid tbody tr').length, btn:!!document.querySelector('.qr-add-btn'), body:(document.body.innerText||'').slice(0,200)})`)
+  console.log('   页面 =', JSON.stringify(st))
+
+  console.log('④ 真点「＋新增检验项」')
+  const r = await c.eval(PROBE)
+  for (const [k, v] of Object.entries(r)) console.log(`   ${k} = ${JSON.stringify(v)}`)
+
+  console.log('⑤ 控制台')
+  if (c.logs.length) for (const l of c.logs.slice(-25)) console.log('   ' + l)
+  else console.log('   (无输出)')
+
+  console.log('\n结论:', (r.inputsAfter > r.inputsBefore || r.emptyAfter < r.emptyBefore) ? '✅ 点得动(新增行已渲染)' : '❌ 点击未产生新行')
 } finally {
   try { edge.kill() } catch {}
 }

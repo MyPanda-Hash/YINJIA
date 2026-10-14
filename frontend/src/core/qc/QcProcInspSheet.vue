@@ -191,6 +191,8 @@ const MEASURE = ['测量值1', '测量值2', '测量值3', '测量值4', '测量
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 /** 表区名含这些词 => 定量组(项目 + 测量值1..5);否则定性组(按项目名分列) */
 const QUANT_KEYS = ['尺寸', '重量', '厚度', '直径', '长度', '宽度', '高度']
+/** 表区为空时的暂存组名:保证新增行可见、可填表区 */
+const UNGROUPED = '未分类'
 
 /** 左侧固定列(照用户图:检验时间 | 客户名称 | 产品编码 | 型号(mm) | 批号 | 抽检总量) */
 const fixedCols = [
@@ -245,8 +247,9 @@ const groups = computed(() => {
   const order = []
   const map = new Map()
   for (const r of items.value) {
-    const s = String(r['表区'] ?? '').trim()
-    if (!s) continue
+    // ⚠ 表区为空的行**必须也渲染**:新增出来的行表区就是空的,
+    //   此前 continue 跳过 => 行虽然 push 进去了却永远看不见、也就永远填不了表区(死循环)。
+    const s = String(r['表区'] ?? '').trim() || UNGROUPED
     if (!map.has(s)) { map.set(s, []); order.push(s) }
     map.get(s).push(r)
   }
@@ -257,7 +260,7 @@ const groups = computed(() => {
       ? [{ k: '项目', label: '项目' }].concat(
           MEASURE.map((m) => ({ k: m, label: m, prop: m })))
       : rs.map((r, j) => ({ k: 'i' + j, label: String(r['检验项目'] || ''), itemIdx: j }))
-    return { sector: s, title: (LETTERS[i] || '') + '.' + tt(s), cols, rows: rs, quant }
+    return { sector: s, title: s === UNGROUPED ? tt(s) : (LETTERS[i] || '') + '.' + tt(s), cols, rows: rs, quant }
   })
 })
 
