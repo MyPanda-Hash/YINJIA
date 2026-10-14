@@ -116,8 +116,11 @@ const fixedCols = [
 ]
 
 /** 抬头字段行(每行 4 组):由 fields 驱动,已在固定列的不重复 */
+/** 抬头不显示的字段:系统/审计类 —— 业务报表只需单据要素,不要填单状态/审核痕迹那些 */
+const HEAD_SKIP = new Set(['单据状态', '审核人', '审核时间', '处理方式'])
+
 const headRows = computed(() => {
-  const skip = new Set(fixedCols.map((c) => c.key))
+  const skip = new Set([...fixedCols.map((c) => c.key), ...HEAD_SKIP])
   const names = (props.fields || [])
     .filter((f) => f && !f.hidden && f.dataName)
     .map((f) => f.dataName)

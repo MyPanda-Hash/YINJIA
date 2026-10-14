@@ -158,7 +158,7 @@
         <QcProcInspSheet
           v-else-if="panelCode === 'QC_PROC_INSP'"
           ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
+          :head="cur" :fields="headerFields" :editable="draftEditable"
           @dirty="markInlineDirty"
         />
         <!-- 产品文件列表:4 文件×状态矩阵(设计《文件汇总表》)。只读视图 ——
