@@ -29,6 +29,21 @@ public class StockLedgerService {
     }
 
     /**
+     * 历史回填模式(2026-10-14):拉取的金蝶历史单据入库时,用 JVM 参数 {@code -Dmes.hist.backfill=true} 打开。
+     *
+     * <p>用户口径(2026-10-14):「无批号就先按无批号算,允许期初为负」。回填期间放开三处库存控制:
+     * <ul>
+     *   <li>出库行无批号 ⇒ 不再要求补批号,按无批号扣减(金蝶侧这批出库行本就没有批号);</li>
+     *   <li>台账无该库存行 ⇒ 补一行 0 结存后继续(扣成负数由下一条容忍);</li>
+     *   <li>出库后 / 冲回后余额为负 ⇒ 不再拒绝。</li>
+     * </ul>
+     * 为什么必须放开:回填的验收标准是「期初 + 记账 = 金蝶现存量」,而区间内存在非本仓拉取的
+     * 库存移动(盘点/委外/调拨等),期间必然出现负结存 —— 终点对得上即可。
+     * ⚠ 该开关**默认关闭**:日常录单/审核的库存控制一个字都没变。
+     */
+    private static final boolean HIST_BACKFILL = "true".equalsIgnoreCase(System.getProperty("mes.hist.backfill"));
+
+    /**
      * 是否参与记账的面板。
      *
      * <p>2026-10-08:OTHER_IN / OUTSOURCE_IN / OTHER_OUT / OUTSOURCE_ISSUE 四张面板整体下架
@@ -133,24 +148,31 @@ public class StockLedgerService {
         }
         if (!forward || qty < 0) {
             Double yl = bal(code, ckdm, lot);
-            if (yl != null && yl < -0.0001) throw new IllegalStateException("冲回将使现存量为负(物料 " + code + " 批 " + lot + " 余额 " + yl + "),库存已被消耗,不可冲回");
+            if (!HIST_BACKFILL && yl != null && yl < -0.0001) throw new IllegalStateException("冲回将使现存量为负(物料 " + code + " 批 " + lot + " 余额 " + yl + "),库存已被消耗,不可冲回");
         }
         return n;
     }
 
     private void applyOut(String code, String ckdm, String lot, double qty, String user, boolean forward) {
-        if (lot == null && forward) throw new IllegalStateException("出库行缺少[批号]——请扫材料二维码补批号后再审核(物料 " + code + ")");
+        if (lot == null && forward && !HIST_BACKFILL) throw new IllegalStateException("出库行缺少[批号]——请扫材料二维码补批号后再审核(物料 " + code + ")");
         double sign = forward ? 1 : -1;
         int n = jdbc.update("UPDATE kucun SET ckl = ckl + ?, yl = yl - ?, update_date = GETDATE(),"
                         + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ?"
                         + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)",
                 sign * qty, sign * qty, user, code, ckdm, lot, lot);
         if (n == 0) {
-            if (forward) throw new IllegalStateException("台账无该批库存(物料 " + code + " 批 " + lot + " 仓 " + ckdm + "),不能出库");
-            throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + ")");
+            if (!forward) throw new IllegalStateException("冲回失败:台账无该行(物料 " + code + " 批 " + lot + ")");
+            if (!HIST_BACKFILL) throw new IllegalStateException("台账无该批库存(物料 " + code + " 批 " + lot + " 仓 " + ckdm + "),不能出库");
+            // 历史回填:补一行 0 结存再扣(金蝶该键在 MES 台账尚无行,属区间外/其它类型移动造成的缺口)
+            jdbc.update("INSERT INTO kucun (wzdm, ckdm, lot_no, in_date, rkl, yl, asp_user1, asp_time1, asp_cancel)"
+                            + " VALUES (?, ?, ?, GETDATE(), 0, 0, ?, GETDATE(), 'N')", code, ckdm, lot, "stock:" + user);
+            n = jdbc.update("UPDATE kucun SET ckl = ckl + ?, yl = yl - ?, update_date = GETDATE(),"
+                            + " asp_user2 = ?, asp_time2 = GETDATE() WHERE wzdm = ? AND ckdm = ?"
+                            + " AND ((? IS NULL AND lot_no IS NULL) OR lot_no = ?)",
+                    sign * qty, sign * qty, user, code, ckdm, lot, lot);
         }
         Double yl = bal(code, ckdm, lot);
-        if (yl != null && yl < -0.0001) {
+        if (!HIST_BACKFILL && yl != null && yl < -0.0001) {
             throw new IllegalStateException(forward
                     ? "现存量不足(物料 " + code + " 批 " + lot + " 出库后余额将变 " + yl + "),不能出库"
                     : "冲回将使现存量异常(物料 " + code + " 批 " + lot + " 余额 " + yl + "),不可弃审");
