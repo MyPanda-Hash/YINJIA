@@ -616,7 +616,7 @@
                   :style="designInputStyle(dt)"
                   @update:model-value="(v) => setCellValue(row, c, v)"
                 />
-                <el-input v-else-if="cellEditable(dt, row, c)" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" />
+                <el-input v-else-if="cellEditable(dt, row, c)" v-model="row[c.key]" size="small" class="rs-c-in" :style="designInputStyle(dt)" @input="emit('dirty')" @change="onDetailTextCommit(row, c.key)" />
                 <span v-else class="rs-txt rsp-cell" :title="isLockedCell(dt, row, c) ? tt('非本部门栏目（只读）') : ''">{{ cellText(cellKind(c), row[c.key]) || ' / ' }}</span>
               </td>
               <td v-if="editable && !dt.fixedRows" class="rs-td-op"><span class="rs-op-add" @click="addRow(dt)">＋</span><span class="rs-op-del" @click="removeRow(row)">×</span></td>
@@ -1242,6 +1242,10 @@ import RecipeCalcDialog from './RecipeCalcDialog.vue'
 import { ledgerCell as ledgerCellOf } from '@/core/panel/ledgerCols'
 // 日期/时间格:控件种类按 yj_field.data_type 决定,取值归一同上(纯函数 + 单测)
 import { cellKindOf, cellText, controlValue, controlToStored } from '@/core/panel/sheetDateCells'
+// 选「产品编号」→ 炭棒规格三窄格的回填口径(三个独立字段优先,整串回退;纯函数 + 单测)
+import { carbonSpecFrom } from '@/core/panel/carbonSpec'
+// 明细「物料编号 ↔ 物料名称」按商品档案 INV 双向带出(唯一命中才带出;纯函数 + 单测)
+import { INV_CARRY, INV_PANEL, invCarryPair, invRowsOf, pickInvCarry } from '@/core/panel/invCarry'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -1297,6 +1301,44 @@ function cellKind(c) {
 function setCellValue(row, c, picked) {
   row[c.key] = controlToStored(cellKind(c), picked)
   emit('dirty')
+}
+
+// ---------- 明细「物料编号 ↔ 物料名称」按商品档案带出(2026-10-14) ----------
+// 用户报障「输入物料编号无法自动录入对应物料名称、输入物料名称无法自动录入对应物料编号」。
+// 这两列在 yj_field 里是**普通文本、没有参照**(ref_panel 为空),所以照参照那条路走不通,
+// 这里在**失焦/回车**(@change,不是 @input —— 否则每敲一个字发一次请求)按值查商品档案 INV。
+// 口径全在 core/panel/invCarry.js:唯一命中才带出,查不到/多条 ⇒ 静默不动(用户手输的编码可能还没建档)。
+// 生效范围由该明细表是否**同时**有这两列决定(库里只有成型工艺清单「配方表」两列齐全)。
+const invCarryKeys = computed(() => {
+  for (const dt of cfg.value?.dataTables || []) {
+    const pair = invCarryPair(dt.cols)
+    if (pair) return pair
+  }
+  return null
+})
+
+async function onDetailTextCommit(row, key) {
+  if (!invCarryKeys.value?.includes(key)) return
+  const typed = String(row[key] ?? '').trim()
+  if (!typed) return
+  const other = key === '物料编号' ? '物料名称' : '物料编号'
+  try {
+    // condition 用「档案列 label」(存货编码/存货名称);后端对普通文本字段走 LIKE,
+    // 只是把结果收窄,精确与否由 pickInvCarry 在本地全等判定(见该文件头注②)。
+    const res = await request.post('/px/queryFormDataList', {
+      panelCode: INV_PANEL,
+      condition: { [INV_CARRY[key].match]: typed },
+      pageNo: 1,
+      pageSize: 50,
+    })
+    const d = res?.data
+    const value = pickInvCarry(invRowsOf(d), key, typed)
+    if (!value) return // 查不到 / 多条命中 / 对侧为空 ⇒ 一个格都不动,也不提示
+    row[other] = value
+    emit('dirty')
+  } catch (e) {
+    /* 无权限/网络异常都按「档案里没有」处理:保持用户输入,不弹错(与参照链路同款兜底) */
+  }
 }
 
 /** 副标题下拉的选项:优先取字段元数据的 options(标准库字段即标准库条目),退回变体选项 */
@@ -2371,16 +2413,11 @@ function onProdRefConfirm(rows) {
   for (const m of f.refMap || []) {
     if (m && source[m.from] !== undefined) props.head[m.to || m.from] = source[m.from]
   }
-  // 炭棒尺寸整串 → 成型面板 炭棒规格1/2/3 三窄格拆分回填(外：/内：/长： 前缀区分数值;源 Excel 即外径/内径/长度三个窄数字格)
-  const sizeStr = String(source['炭棒尺寸'] ?? '')
-  if (sizeStr && fieldMap.value.has('炭棒规格1')) {
-    const dim = (kw, prefix) => {
-      const v = (sizeStr.match(new RegExp(kw + '\\s*([0-9.]+)\\s*mm')) || [])[1]
-      return v ? `${prefix}${v}` : ''
-    }
-    props.head['炭棒规格1'] = dim('外径', '外：')
-    props.head['炭棒规格2'] = dim('内径', '内：')
-    props.head['炭棒规格3'] = dim('长度', '长：')
+  // 炭棒规格回填:成型面板 炭棒规格1/2/3 三窄格(外：/内：/长： 前缀区分数值)。
+  // 取值口径见 core/panel/carbonSpec.js(三个独立字段优先,「炭棒尺寸」整串逐格回退;
+  // 空的不写 —— 半截的 `外：` 不许落格)。只在有这三个格的成型工艺面板上动手。
+  for (const [k, v] of Object.entries(carbonSpecFrom(source, fieldMap.value.has('炭棒规格1')))) {
+    props.head[k] = v
   }
   prodRefVisible.value = false
   emit('dirty')
