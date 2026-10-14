@@ -74,19 +74,47 @@
       <tbody>
         <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
           <td class="c-sector">
-            <el-input v-if="editable" v-model="row['表区']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <el-input
+              v-if="editable"
+              v-model="row['表区']"
+              type="textarea"
+              :autosize="{ minRows: 1 }"
+              class="qr-cell-input qr-cell-wrap"
+              @input="emit('dirty')"
+            />
             <span v-else class="qr-cell-text">{{ row['表区'] || '' }}</span>
           </td>
           <td class="c-item">
-            <el-input v-if="editable" v-model="row['检验项目']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <el-input
+              v-if="editable"
+              v-model="row['检验项目']"
+              type="textarea"
+              :autosize="{ minRows: 1 }"
+              class="qr-cell-input qr-cell-wrap"
+              @input="emit('dirty')"
+            />
             <span v-else class="qr-cell-text">{{ row['检验项目'] || '' }}</span>
           </td>
           <td class="c-req">
-            <el-input v-if="editable" v-model="row['检验要求']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <el-input
+              v-if="editable"
+              v-model="row['检验要求']"
+              type="textarea"
+              :autosize="{ minRows: 1 }"
+              class="qr-cell-input qr-cell-wrap"
+              @input="emit('dirty')"
+            />
             <span v-else class="qr-cell-text">{{ row['检验要求'] || '' }}</span>
           </td>
           <td class="c-method">
-            <el-input v-if="editable" v-model="row['检验方法']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <el-input
+              v-if="editable"
+              v-model="row['检验方法']"
+              type="textarea"
+              :autosize="{ minRows: 1 }"
+              class="qr-cell-input qr-cell-wrap"
+              @input="emit('dirty')"
+            />
             <span v-else class="qr-cell-text">{{ row['检验方法'] || '' }}</span>
           </td>
           <td v-for="m in MEASURE" :key="m" class="c-mv">
@@ -374,24 +402,42 @@ function removeRow(row) {
 .qr-foot-table .qr-label {
   width: 96px;
 }
-/* 输入控件:看得见(此前做透明过,看着像死文本) */
+/* 输入控件:方角、贴合单元格 —— 去掉 el-input 自带的圆角框,
+   让**单元格自身的边框**成为唯一的框(照检验报告的平铺观感)。
+   悬停/聚焦只做淡蓝底提示,不再画第二个框。 */
 .qr-cell-input :deep(.el-input__wrapper),
 .qr-cell-input :deep(.el-textarea__inner) {
-  background: #fff;
-  box-shadow: 0 0 0 1px #b8c8da inset;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
 }
 .qr-cell-input :deep(.el-input__wrapper) {
-  padding: 0 4px;
+  padding: 0 2px;
 }
 .qr-cell-input :deep(.el-input__wrapper:hover),
 .qr-cell-input :deep(.el-input__wrapper.is-focus),
+.qr-cell-input :deep(.el-textarea__inner:hover),
 .qr-cell-input :deep(.el-textarea__inner:focus) {
-  box-shadow: 0 0 0 1px #5b9bd5 inset;
+  box-shadow: none;
+  background: #f2f8ff;
 }
 .qr-cell-input :deep(.el-input__inner) {
   height: 20px;
   line-height: 20px;
   text-align: center;
+}
+/* 多行列:左对齐、铺满格子(随内容增高) */
+.qr-cell-wrap :deep(.el-textarea__inner) {
+  text-align: left;
+  padding: 2px 2px;
+  line-height: 18px;
+  resize: none;
+  font-family: inherit;
+}
+/* 单元格:给内容撑高留出空间 */
+.qr-table td {
+  vertical-align: top;
+  padding: 1px 2px;
 }
 .qr-cell-text {
   display: inline-block;
