@@ -9,7 +9,17 @@
         <tr v-for="(row, i) in metaRows" :key="'m' + i">
           <template v-for="k in row" :key="k">
             <th class="ml">{{ tt(k) }}</th>
-            <td class="mv">{{ fmt(doc[k]) }}</td>
+            <td class="mv" :class="{ ed: editable }" @click="onMetaClick(k)">
+              <input
+                v-if="editing && editing.key === 'meta|' + k"
+                ref="inp"
+                class="cell-inp"
+                :value="fmt(doc[k])"
+                @blur="commitMeta($event, k)"
+                @keyup.enter="commitMeta($event, k)"
+              />
+              <template v-else>{{ fmt(doc[k]) }}</template>
+            </td>
           </template>
         </tr>
       </tbody>
@@ -67,17 +77,23 @@ import { tt } from '@/i18n'
 const props = defineProps({
   doc: { type: Object, default: () => ({}) },
   rows: { type: Array, default: () => [] },
+  /** 面板表头字段(yj_field 的 label/dataName);整页报表把它们排成 标签|值 */
+  fields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
 })
 const emit = defineEmits(['dirty'])
 
-/** 表头字段(报表式:每行 4 组 标签|值;不含已在左侧固定列的 产品编码/型号/批号/抽检总量) */
-const META = [
-  ['单据编号', '单据日期', '检验类别', '工序'],
-  ['客户名称', '产品名称', '工单号', '报工单号'],
-  ['检验员', '检验日期', '检验方案', '备注'],
-]
-const metaRows = computed(() => META.map((r) => r.slice()))
+/** 表头字段行(每行 4 组 标签|值):由面板表头字段驱动,已在左侧固定列的 产品编码/型号/批号/抽检总量 不重复 */
+const metaRows = computed(() => {
+  const skip = new Set(headCols.map((h) => h.key))
+  const names = (props.fields || [])
+    .filter((f) => f && !f.hidden && f.dataName)
+    .map((f) => f.dataName)
+    .filter((k) => !skip.has(k))
+  const rows = []
+  for (let i = 0; i < names.length; i += 4) rows.push(names.slice(i, i + 4))
+  return rows
+})
 
 /** 左侧固定列(照截图:产品编码 | 型号(mm) | 批号 | 抽检总量) */
 const headCols = [
@@ -147,6 +163,22 @@ function cellText(g, c, ri) {
   return fmt(r['实测数值']) || fmt(r['单项判定'])
 }
 
+/* ── 表头字段编辑(与明细格同一套:点击即编辑,回车/失焦提交) ── */
+function onMetaClick(k) {
+  if (!props.editable) return
+  editing.value = { key: 'meta|' + k, row: props.doc, prop: k }
+  nextTick(() => {
+    const el = Array.isArray(inp.value) ? inp.value[0] : inp.value
+    if (el && el.focus) el.focus()
+  })
+}
+
+function commitMeta(ev, k) {
+  props.doc[k] = ev.target.value
+  editing.value = null
+  emit('dirty')
+}
+
 /* ── 单元格编辑(点击即编辑,回车/失焦提交) ── */
 const editing = ref(null)
 const inp = ref(null)
@@ -198,6 +230,12 @@ function commit(ev) {
   text-align: left;
   padding: 2px 6px;
   color: #1f2d3d;
+}
+.qsheet-meta td.mv.ed {
+  cursor: pointer;
+}
+.qsheet-meta td.mv.ed:hover {
+  background: #f0f7ff;
 }
 .qsheet-tb {
   border-collapse: collapse;

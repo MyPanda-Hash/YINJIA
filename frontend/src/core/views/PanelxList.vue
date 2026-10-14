@@ -581,7 +581,7 @@
     <!-- !isApprovalDoc:文书式面板(RD 全系)只走上方纸张分支,单据卡片(含表头字段条)整体不渲染——
          9357460 拆分报表链时此排除丢失,曾致 RD 每个面板纸张下方多出一条全空表头。
          来料检验要求同样走专属分支,单据卡片不渲染 -->
-    <template v-else-if="!isApprovalDoc && !isQcInspReq">
+    <template v-else-if="!isApprovalDoc && !isQcInspReq && !isQcProcInsp">
       <!-- 单据卡片:左「单据选择」栏(送料暂收单等启用,对齐 PANDA 左停靠选择列表) + 右侧表头/明细 -->
       <div class="doc-rail-layout" :class="{ 'rail-on': !!docRailCfg && !railCollapsed }">
         <DocSelectRail
@@ -1096,6 +1096,7 @@
         <QcProcInspSheet
           :doc="cur"
           :rows="procRows"
+          :fields="headerFields"
           :editable="draftEditable"
           @dirty="markInlineDirty"
         />
