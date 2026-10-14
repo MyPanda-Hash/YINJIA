@@ -937,9 +937,22 @@ public class PanelConfigService {
                     new String[]{"打印", "打印", "预览", "导出"},
                     new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 其他入库单(OTHER_IN)已下架(2026-10-08 用户口径:这类出入库单不需要)——不再登记按钮组;
-            // 同批下架的还有 OTHER_OUT / OUTSOURCE_IN / OUTSOURCE_ISSUE 与其明细表/统计表面板,
-            // 连同它们的记账分支(StockFlowService/StockLedgerService)一并移除。
+            // 其他入库单(2026-10-14 重建):面板/表/视图按金蝶字段重建(migrate-other-docs-rebuild-20261014.sql),
+            // 并接入转ERP(推金蝶「其他入库单」/jdy/v2/scm/inv_other_in)。
+            // ⚠ 金蝶该单据**必须传 trans_type_id**(业务类型;真实账套 其他入库=12),
+            //   而金蝶无业务类型档案接口 ⇒ 值落在 MES 的「业务类型id」字段上(空则用账套默认)。
+            java.util.Map.entry("OTHER_IN", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"导入", "导入"})),
             // 销售出库单:选单=销售订单;生单灰(PANDA:生成销货单,销货单未迁移)
             java.util.Map.entry("SALE_OUT", List.of(
                     new String[]{"新增", "新增"},
@@ -971,7 +984,20 @@ public class PanelConfigService {
                     new String[]{"修改", "修改"},
                     new String[]{"查找", "查找", "刷新"},
                     new String[]{"导入", "导入"})),
-            // 其他出库单(OTHER_OUT)已下架(2026-10-08)——不再登记按钮组(同 OTHER_IN)。
+            // 其他出库单(2026-10-14 重建):同其他入库单,转ERP 推金蝶「其他出库单」/jdy/v2/scm/inv_other_out
+            // (业务类型 trans_type_id 真实账套=13)。委外三单(OUTSOURCE_*)仍保持 2026-10-08 下架状态。
+            java.util.Map.entry("OTHER_OUT", List.of(
+                    new String[]{"新增", "新增"},
+                    new String[]{"保存", "保存", "保存新增", "保存为草稿"},
+                    new String[]{"删除", "删除", "删除单据"},
+                    new String[]{"审核", "提交审批", "审批通过", "审批驳回", "审批情况", "弃审"},
+                    new String[]{"审批", "提交审批", "审批通过", "驳回审批"},
+                    new String[]{"转ERP", "转ERP", "批量转ERP"},
+                    new String[]{"打印", "打印", "预览", "导出"},
+                    new String[]{"更多", "复制", "放弃", "草稿", "表格调整", "刷新"},
+                    new String[]{"修改", "修改"},
+                    new String[]{"查找", "查找", "刷新"},
+                    new String[]{"导入", "导入"})),
             // 委外三单:OUTSOURCE_IN / OUTSOURCE_ISSUE 于 2026-10-08 下架(面板+表+视图+菜单),
             // 只留 委外加工单 OUTSOURCE_ORDER(其「生成委外发料单」动作随之改为通用「生单」占位)。
             java.util.Map.entry("OUTSOURCE_ORDER", OUTSOURCE_GROUPS_ORDER),

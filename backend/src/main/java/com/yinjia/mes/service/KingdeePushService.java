@@ -186,10 +186,22 @@ public class KingdeePushService {
         //   · 检验类键(check_type / inspect_way / qc_type)**静默忽略且不报错** ⇒ 明细行的
         //     「检验方式」(全检/抽检,用户指定放明细行)只存 MES 本地,本方法**不推送**。
         boolean isFinIn = "FINISH_IN".equals(panelCode);
-        String headTable = isOrder ? "bd_pu_order" : isPur ? "bd_purchase_in" : isMatOut ? "bd_material_out" : isFinIn ? "bd_finish_in" : "bd_sale_out";
-        String lineTable = isOrder ? "bl_pu_order" : isPur ? "bl_purchase_in" : isMatOut ? "bl_material_out" : isFinIn ? "bl_finish_in" : "bl_sale_out";
+        // 其他入库单 / 其他出库单 直推(2026-10-14):作为金蝶「其他入库单/其他出库单」
+        // (inv_other_in / inv_other_out)落到目标账套。沙箱实测(证据
+        // tools/archive/_dump-out/kingdee-save-inv-other-1014.md · kingdee-transtype-1014.md):
+        //   · ⚠ 这两个单据**必须传 trans_type_id**(业务类型):只发 trans_type/number/name 都会报
+        //     「请填写"业务类型"」;而金蝶**没有业务类型档案接口**(9 条候选路径全 519)
+        //     ⇒ 只能按账套配置 id(真实账套实测:其他入库=12 / 其他出库=13),MES 侧落在「业务类型id」字段上。
+        //   · 其余字段落库口径与产品入库单同族(数值/布尔一律传字符串)。
+        boolean isOtherIn = "OTHER_IN".equals(panelCode);
+        boolean isOtherOut = "OTHER_OUT".equals(panelCode);
+        String headTable = isOrder ? "bd_pu_order" : isPur ? "bd_purchase_in" : isMatOut ? "bd_material_out"
+                : isFinIn ? "bd_finish_in" : isOtherIn ? "bd_other_in" : isOtherOut ? "bd_other_out" : "bd_sale_out";
+        String lineTable = isOrder ? "bl_pu_order" : isPur ? "bl_purchase_in" : isMatOut ? "bl_material_out"
+                : isFinIn ? "bl_finish_in" : isOtherIn ? "bl_other_in" : isOtherOut ? "bl_other_out" : "bl_sale_out";
         // 日志文案用的单据名(此前硬编码"采购入库单",材料出库单接进来后会把日志写错单)
-        String docLabel = isOrder ? "采购订单" : isPur ? "采购入库单" : isMatOut ? "材料出库单" : isFinIn ? "产品入库单" : "销售出库单";
+        String docLabel = isOrder ? "采购订单" : isPur ? "采购入库单" : isMatOut ? "材料出库单"
+                : isFinIn ? "产品入库单" : isOtherIn ? "其他入库单" : isOtherOut ? "其他出库单" : "销售出库单";
 
         Map<String, Object> head = jdbc.queryForMap(
                 "SELECT * FROM " + headTable + " WHERE 单据编号 = ? AND ISNULL(asp_cancel,'N') <> 'Y'", docNo);
@@ -251,7 +263,40 @@ public class KingdeePushService {
         String remark = str(head.get("备注"));
         body.put("remark", (remark.isEmpty() ? "" : remark) + " [MES:" + docNo + "]");
         if (isPur || isOrder) body.put("supplier_number", str(head.get("供应商编码")));
-        else if (!isMatOut && !isFinIn) body.put("customer_number", str(head.get("客户编码")));
+        else if (!isMatOut && !isFinIn && !isOtherOut) body.put("customer_number", str(head.get("客户编码")));
+
+        // 其他入库单 / 其他出库单 头(2026-10-14):**业务类型(trans_type_id)是必填** ——
+        // 沙箱实测:只发 trans_type / trans_type_number / trans_type_name 都会报「请填写"业务类型"」,
+        // 只有 trans_type_id 是保存接口认的键;而金蝶没有业务类型档案接口(9 条候选路径全 519),
+        // 故只能按账套配置:MES 字段「业务类型id」优先,空则回落本账套常见默认(其他入库 12 / 其他出库 13,
+        // 真实账套实测值)。对方单位:其他入库=供应商(实测 100% 有值),其他出库=部门+经手人(实测 97%)。
+        if (isOtherIn || isOtherOut) {
+            String transTypeId = str(head.get("业务类型id"));
+            if (transTypeId.isEmpty()) transTypeId = isOtherIn ? "12" : "13";
+            body.put("trans_type_id", transTypeId);
+            log.info("{}[{}]推送业务类型 trans_type_id={}(来自{}字段)", docLabel, docNo, transTypeId,
+                    str(head.get("业务类型id")).isEmpty() ? "账套默认" : "单据");
+            if (isOtherIn) {
+                String supNo = str(head.get("供应商编码"));
+                if (supNo.isEmpty()) supNo = archiveCode("bs_supplier", "供应商名称", "供应商编码", str(head.get("供应商")));
+                if (!supNo.isEmpty()) body.put("supplier_number", supNo);
+            } else {
+                String deptNo = str(head.get("部门编码"));
+                if (deptNo.isEmpty()) deptNo = archiveCode("bs_dept", "部门名称", "部门编码", str(head.get("部门")));
+                if (!deptNo.isEmpty()) {
+                    body.put("dept_number", deptNo);
+                    String deptId = str(safeIdMap(DEPT_LIST_PATH, "部门").get(deptNo));
+                    if (!deptId.isEmpty()) body.put("dept_id", deptId);
+                }
+                String empNo = str(head.get("经手人编码"));
+                if (empNo.isEmpty()) empNo = archiveCode("bs_emp", "员工名称", "员工编码", str(head.get("经手人")));
+                if (!empNo.isEmpty()) {
+                    body.put("emp_number", empNo);
+                    String empId = str(safeIdMap(EMP_LIST_PATH, "职员").get(empNo));
+                    if (!empId.isEmpty()) body.put("emp_id", empId);
+                }
+            }
+        }
 
         // 产品入库单(inv_product)头:部门 + 经手人(2026-10-14 沙箱实测:dept_number/dept_id/
         // emp_number/emp_id 四键均**确实落库**)。MES 侧存的是名称(生产车间/经手人),按档案解析成编码;
@@ -397,6 +442,15 @@ public class KingdeePushService {
                 e.put("qty", num(line, qtyKey));
                 e.put("seq", rowNo);
                 String comment = str(line.get("备注")); if (!comment.isEmpty()) e.put("comment", comment);
+            } else if (isOtherIn || isOtherOut) {
+                // 其他入库/出库:与产品入库单同族(只收 qty、无税金族);其他入库行另有 成本/单位成本 两键
+                // (真实账套实测 19% 行有值),按实测口径「有值才推」。
+                e.put("qty", num(line, qtyKey));
+                e.put("seq", rowNo);
+                if (isOtherIn) {
+                    String cost = str(line.get("成本")); if (!cost.isEmpty()) e.put("cost", cost);
+                    String unitCost = str(line.get("单位成本")); if (!unitCost.isEmpty()) e.put("unit_cost", unitCost);
+                }
             } else {
                 e.put("qty", num(line, qtyKey));
                 e.put("price", num(line, priceKey));
@@ -518,6 +572,8 @@ public class KingdeePushService {
                 : isPur ? "/jdy/v2/scm/pur_inbound"
                 : isMatOut ? "/jdy/v2/scm/inv_pick"   // 材料出库单 → 金蝶「生产领料单」
                 : isFinIn ? "/jdy/v2/scm/inv_product" // 产品入库单 → 金蝶「产品入库单」
+                : isOtherIn ? "/jdy/v2/scm/inv_other_in"   // 其他入库单 → 金蝶「其他入库单」
+                : isOtherOut ? "/jdy/v2/scm/inv_other_out" // 其他出库单 → 金蝶「其他出库单」
                 : "/jdy/v2/scm/sal_out_bound";
         JsonNode res = postJson(apiPath, body);
         if (res.path("errcode").asInt(-1) != 0) {

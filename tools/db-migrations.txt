@@ -3077,3 +3077,18 @@ fix-stock-report-module-group.sql
 #     ⇒ 「检验方式」只存 MES 本地、不推送金蝶(证据 tools/archive/_dump-out/kingdee-save-inv-product-1014.md)。
 #   幂等(COL_LENGTH + 注明双向 + yj_field/译名 NOT EXISTS + 末尾自检);两账套均执行。
 migrate-finish-in-erp-cols-20261014.sql
+
+# ════════════════════════════════════════════════════════════════════════════
+# ── 2026-10-14 其他入库单 / 其他出库单:重建三件套 + 字段对照金蝶 + 转ERP 支撑列 ──
+#   用户口径:「其他出库/入库也是一样(同产品入库),详细和统计也要做」。
+#   这 6 个面板(OTHER_IN/_DETAIL/_STATS × 2)+ 10 张表 + 8 视图曾于 2026-10-08 整体下架
+#   (migrate-drop-extra-docs-pu-req-20261008.sql);本次按**金蝶接口字段**重建,
+#   面板编码 / 单号前缀(OI/OO)/ 模块归属(库存核算)沿用下架前登记。
+#   由 tools/archive/_gen-other-docs-migration.mjs 生成(改规格后重跑生成器,勿手改)。
+#   字段取舍依据(实测):_dump-out/kingdee-3docs-fields-1014.md(逐键+样例)、
+#     _dump-out/kingdee-3docs-fieldfill-1014.md(30 张真实单据非空率)、
+#     _dump-out/kingdee-save-inv-other-1014.md 与 kingdee-transtype-1014.md(保存接口实测)。
+#   ⚠ 其他入库/出库保存**必须传 trans_type_id**(单发 number/name/trans_type 均报「请填写"业务类型"」),
+#     且金蝶**无业务类型档案接口**(9 条候选全 519)⇒ 按账套在 MES 侧配置(真实账套实测 12/13)。
+#   幂等(OBJECT_ID / NOT EXISTS 守卫 + 末尾自检);两账套均执行。
+migrate-other-docs-rebuild-20261014.sql
