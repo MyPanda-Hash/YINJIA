@@ -3661,17 +3661,21 @@ async function guardPageAction(run) {
 /** 左栏「单据选择」每页条数(整页翻的步长;2026-09-20 按用户口径统一 50 条,
  *  原 QC_RECV/QC_INSP/QC_RETURN 面板配置是 20 条 → 带左栏的面板一律按此值分页) */
 const RAIL_PAGE_SIZE = 50
+/** 左栏「ERP单」派生列(采购入库/销售出库/材料出库/其他出库/其他入库 共用**同一判据**):
+ *  行上没有现成字段,由 ERP单号/是否已转ERP 推出 —— 已转 = 转ERP成功才有
+ *  (ERP单号成功回填、弃审清空;「是否已转ERP」是首选信号)。
+ *  五个面板同款,故只此一处定义 —— 新增带左栏的转ERP单据直接引用,别再复制粘贴。 */
+const ERP_TAG_COL = {
+  label: 'ERP单', align: 'center', tag: true,
+  derive: (row) => (String(row?.['是否已转ERP'] ?? '') === '是' || String(row?.['ERP单号'] ?? '').trim() !== '' ? '已转' : '未转'),
+}
 const DOC_RAIL_PANELS = {
   QC_RECV: ['供应商', '采购订单号', '批次号'],   // 送料暂收单(2026-09-20 面板编码由 SL_RECV 改;原「部门」列实测 12 单仅 1 单有值,按链路可见性换成采购订单号,再加批次号)
   QC_INSP: ['供应商', '采购订单号', '批次号'],   // 来料检验单(「部门」11 单全空,换采购订单号;批次号随链带入)
   QC_RETURN: ['供应商', '检验单号', '批次号'],   // 暂收退料单(qc_return 无「部门」列,恒空;检验单号可直接追到检验单)
   PU_ORDER: ['供应商'],          // 采购订单(币种列 2026-09-16 按用户口径删)
   SO_ORDER: ['客户'],            // 销售订单(对齐采购订单:中间列只留往来单位,采购=供应商/销售=客户)
-  PURCHASE_IN: ['供应商', '批次号', {   // 采购入库单(入库类别列 2026-09-16 按用户口径换成 ERP 转入状态;2026-09-20 加批次号)
-    label: 'ERP单', align: 'center', tag: true,
-    // 已转=转ERP成功才有(ERP单号成功回填/弃审清空;是否已转ERP 未入 yj_field 不随行下发,作首选信号)
-    derive: (row) => (String(row?.['是否已转ERP'] ?? '') === '是' || String(row?.['ERP单号'] ?? '').trim() !== '' ? '已转' : '未转'),
-  }],
+  PURCHASE_IN: ['供应商', '批次号', ERP_TAG_COL], // 采购入库单(入库类别列 2026-09-16 按用户口径换成 ERP 转入状态;2026-09-20 加批次号)
   // 三张出库单(2026-10-15 用户口径:「为成品出库、销售出库与材料出库,都配置与销售订单一样的订单选择列」)
   // 左栏结构与销售订单**完全一致**(单号 | 日期 | 中间1列 | 审核状态,同一套 docRailCfg 组装),
   // 只把中间列按各自单据语义填「这张单归属于谁/走哪条线」——这三个面板都没有「客户」字段
@@ -3688,20 +3692,28 @@ const DOC_RAIL_PANELS = {
   SALE_OUT: [
     '销售订单号',
     '客户',
-    {
-      label: 'ERP单', align: 'center', tag: true,
-      // 已转 = 转ERP成功才有(ERP单号成功回填/弃审清空;是否已转ERP 作首选信号)——与采购入库同判据
-      derive: (row) => (String(row?.['是否已转ERP'] ?? '') === '是' || String(row?.['ERP单号'] ?? '').trim() !== '' ? '已转' : '未转'),
-    },
+    ERP_TAG_COL,
   ],
-  MATERIAL_OUT: [
-    '生产车间',
-    {
-      label: 'ERP单', align: 'center', tag: true,
-      derive: (row) => (String(row?.['是否已转ERP'] ?? '') === '是' || String(row?.['ERP单号'] ?? '').trim() !== '' ? '已转' : '未转'),
-    },
-  ],
+  MATERIAL_OUT: ['生产车间', ERP_TAG_COL],
   FINISH_IN: ['加工单号'],
+  // 其他入库单/其他出库单(2026-10-16 用户口径:同采购入库单配「XX单选择」左栏)——两张单都没有「客户」,
+  // 中间列按**实测有值率**挑(HSDZ_MES 计数,空列等于没配;「业务类型」实测 14/14 与 78/79 恒为
+  // 「其他入库 / 其他出库」,是常量列=不承载信息,故不入列):
+  //   OTHER_IN  → 供应商 :14/14 有值(金蝶 supplier_number=GYS00014 / supplier_name=KG,是金蝶档案真名,
+  //                        非映射错位),与采购入库单的中间列同义;部门/经手人实测 0/14 恒空。
+  //   OTHER_OUT → 部门 | 经手人 :78/79 · 78/79 有值(其余候选:供应商该单无此字段)。
+  // ERP单 复用上面 ERP_TAG_COL(两单的 ERP单号/是否已转ERP 均在 yj_field 且随行下发,实测均已转)。
+  OTHER_IN: ['供应商', ERP_TAG_COL],
+  OTHER_OUT: ['部门', '经手人', ERP_TAG_COL],
+}
+/** 左栏标题 =「面板名 + 选择」。分词语言(英/德/俄/越…)两词相接必须留空格,否则英文下显示成
+ *  "Other inbound delivery notesSelect";中/日/韩/泰文直接相接才对。故按「两侧是否都是表音文字
+ *  字母」判,不硬编码语言清单 —— 中文面板名照旧零间距。 */
+function railTitle(name) {
+  const base = String(name || '')
+  const suffix = tt('选择')
+  const wordish = (ch) => /[A-Za-z\u00C0-\u024F\u0370-\u03FF\u0400-\u04FF]/.test(ch || '')
+  return wordish(base.slice(-1)) && wordish(suffix[0]) ? base + ' ' + suffix : base + suffix
 }
 const docRailCfg = computed(() => {
   const middles = DOC_RAIL_PANELS[panelCode.value]
@@ -3712,7 +3724,7 @@ const docRailCfg = computed(() => {
     ...middles.map((m) => (typeof m === 'string' ? { label: m, keys: [m], align: 'left' } : m)),
     { label: '审核状态', keys: ['单据状态'], align: 'center', tag: true },
   ]
-  return { title: (panelName.value || '') + tt('选择'), columns }
+  return { title: railTitle(panelName.value), columns }
 })
 const railCollapsed = ref(false)
 const railCurNo = computed(() => {
