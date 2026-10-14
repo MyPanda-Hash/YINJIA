@@ -4866,8 +4866,9 @@ function toggleGroup(gi) {
 }
 function onGroupAction(a) {
   openGroup.value = -1
-  // 2026-08-25：灰按钮（如草稿态「生成XX」）点击不执行、不弹提示
-  if (isDisabled(a)) return
+  // 2026-08-25：灰按钮（如草稿态「生成XX」）点击不执行；
+  // 2026-10-13：改为「不执行 + 说清为什么点不动」（原来静默 return，用户以为按钮坏了）
+  if (isDisabled(a)) { warnDisabled(a); return }
   onButton(a)
 }
 
@@ -4887,7 +4888,7 @@ function onSideAction(a) {
     return
   }
   // 删除确认与整单语义统一在 onButton(isApprovalDoc 分支)处理
-  if (isDisabled(a)) return
+  if (isDisabled(a)) { warnDisabled(a); return }
   onButton(a)
 }
 
@@ -6397,6 +6398,60 @@ function isDisabled(action) {
   return map[action] === true
 }
 
+/** 保存类动作:禁用原因由 draftEditable(见 :3363)逐档解释 */
+const EDIT_ACTIONS = ['保存', '保存为草稿', '保存新增']
+
+/**
+ * 灰按钮「为什么不能点」的唯一文案来源(2026-10-13 用户报障「点的是『保存为草稿』,
+ * 但也不能编辑」——原来 isDisabled 命中就静默 return,界面上毫无反馈,用户只能理解成
+ * "保存了草稿也不给编辑")。
+ *
+ * ⚠ 纯解释:判据全部读既有 computed / 当前单据状态,**既不新增也不放松任何门禁**——
+ *   能不能编辑仍由 draftEditable 置灰、由服务端兜底,这里只把既有判定翻译成人话。
+ *   文案口径与侧栏 :310-320 完全一致(受控文件/规格书分发两句直接复用),不另起一套说法。
+ */
+function disabledReason(action) {
+  const st = current.value?.['单据状态']
+  const stText = st ? tt(String(st)) : tt('未知')
+  if (inlineSaving.value) return tt('正在保存，请稍候')
+  if (action === '扫描填单' && reportMode.value) return tt('报表为只读，不可编辑')
+  if (!current.value) return tt('请先选择一张单据')
+  // 保存类:draftEditable 为假的四种成因,按优先级逐档说清
+  if (EDIT_ACTIONS.includes(action)) {
+    if (reportMode.value) return tt('报表为只读，不可编辑')
+    if (specAssignBlocked.value) {
+      const owner = specDocAssign.value?.ownerName || specDocAssign.value?.owner || ''
+      return tt('该规格书已分发：仅责任人、总负责人或管理员可保存/申请修改/删除')
+        + (owner ? '（' + tt('责任人') + '：' + owner + '）' : '')
+    }
+    if (devFileBlocked.value) {
+      const owner = devFileGate.value?.ownerName
+      return owner
+        ? tt('本文件责任人') + '：' + owner + '（' + tt('只读') + '）'
+        : tt('尚未分发责任人') + '：' + tt('请先在产品信息表点「分发责任人」')
+    }
+    return tt('单据状态') + '：' + stText + '，' + tt('仅草稿可编辑')
+  }
+  // 灰色占位动作(后端 metadata.disabledActions:选单无流转来源/生单无实现链路),与状态无关
+  if ((cfgCache.value?.metadata?.disabledActions || []).includes(action)) return tt('该动作当前没有可用的来源单据')
+  // 生单按钮统一仅已审核可用(与上面「生成XX」同一句口径)
+  if (action.startsWith('生成')) return tt('单据状态') + '：' + stText + '，' + tt('仅已审核可生单')
+  return tt('单据状态') + '：' + stText + '，' + '「' + tt(action) + '」' + tt('不可用')
+}
+
+/** 防刷屏:同一句话 2s 内只弹一次(连点/手抖),ElMessage 再按内容合并成一条带计数 */
+let lastDisabledTip = ''
+let lastDisabledTipAt = 0
+function warnDisabled(action) {
+  const text = disabledReason(action)
+  if (!text) return
+  const now = Date.now()
+  if (text === lastDisabledTip && now - lastDisabledTipAt < 2000) return
+  lastDisabledTip = text
+  lastDisabledTipAt = now
+  ElMessage.warning({ message: text, grouping: true })
+}
+
 // 2026-10-15 用户口径:列表页**不再有**任何打开「整单卡片」的入口 ——
 //   双击明细行(见 onDetailCellDblclick)与工具栏「修改」都曾走这里的 openForm() 弹 VoucherFormDialog,
 //   两者连同 VoucherFormDialog 组件一并删除;单据数据一律在列表页原地内联编辑(草稿态)。
@@ -6680,8 +6735,9 @@ if (typeof window !== 'undefined') {
 }
 
 async function onButton(action) {
-  // 2026-08-25：灰按钮（disabled）点击直接忽略，不执行、不弹提示（如草稿态「生成XX」生单按钮）
-  if (isDisabled(action)) return
+  // 2026-08-25：灰按钮（disabled）点击不执行；
+  // 2026-10-13 用户报障「点了『保存为草稿』没反应，以为保存了草稿也不给编辑」⇒ 补一次原因提示
+  if (isDisabled(action)) { warnDisabled(action); return }
   if (APPROVE_ACTIONS.includes(action) && !user.isAdmin && !user.approvePanels.includes(panelCode.value)) {
     return ElMessage.warning('当前角色无审批权限')
   }

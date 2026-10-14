@@ -781,6 +781,36 @@ function isDisabled(action) {
   return map[action] === true
 }
 
+/**
+ * 灰按钮「为什么不能点」(2026-10-13,与列表页 PanelxList.warnDisabled 同口径):
+ * 原来 isDisabled 命中就静默 return,用户点了没反应只当按钮坏了。
+ * ⚠ 纯解释:只读既有 editable/status,**不新增也不放松门禁**。
+ */
+function disabledReason(action) {
+  const s = status.value
+  if (saving.value) return tt('正在保存，请稍候')
+  // 新增态还没建单:审核/弃审/删除/修改都点不动,原因不是状态而是「这张单还不存在」
+  if (!isEdit.value) return tt('该单据尚未保存') + '，' + '「' + tt(action) + '」' + tt('不可用')
+  const stText = s ? tt(String(s)) : tt('未知')
+  // 保存类:editable 为假 = 已建单且状态不是 草稿/启用/停用(与 editable 同一判据)
+  if (['保存', '保存为草稿', '保存新增'].includes(action)) return tt('单据状态') + '：' + stText + '，' + tt('仅草稿可编辑')
+  if (action.startsWith('生成')) return tt('单据状态') + '：' + stText + '，' + tt('仅已审核可生单')
+  return tt('单据状态') + '：' + stText + '，' + '「' + tt(action) + '」' + tt('不可用')
+}
+
+/** 防刷屏:同一句话 2s 内只弹一次,ElMessage 再按内容合并成一条带计数 */
+let lastDisabledTip = ''
+let lastDisabledTipAt = 0
+function warnDisabled(action) {
+  const text = disabledReason(action)
+  if (!text) return
+  const now = Date.now()
+  if (text === lastDisabledTip && now - lastDisabledTipAt < 2000) return
+  lastDisabledTip = text
+  lastDisabledTipAt = now
+  ElMessage.warning({ message: text, grouping: true })
+}
+
 function isText(r) {
   return !r.dataType || r.dataType === '文本' || r.dataType === 'STRING'
 }
@@ -1123,8 +1153,9 @@ async function load() {
 }
 
 async function onButton(action) {
-  // 2026-08-25：灰按钮（disabled）点击直接忽略，不执行、不弹提示（如草稿态「生成XX」生单按钮）
-  if (isDisabled(action)) return
+  // 2026-08-25：灰按钮（disabled）点击不执行；
+  // 2026-10-13：改为「不执行 + 说清为什么点不动」(与列表页同口径)
+  if (isDisabled(action)) { warnDisabled(action); return }
   if (APPROVE_ACTIONS.includes(action) && !user.isAdmin && !user.approvePanels.includes(panelCode.value)) {
     return ElMessage.warning('当前角色无审批权限')
   }
