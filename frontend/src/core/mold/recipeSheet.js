@@ -6,6 +6,12 @@
  *   ② `paramsFromHead` 单据头字段 + 参数集 → 引擎入参
  *   ③ `buildPatch`     引擎结果 → 回填补丁(页 1 十一个格 + 配方表两列)
  *
+ * 另有两条**输入闸**(2026-10-15,治"输入不全却静默出结果"):
+ *   · `paramsFromHead(head, overrides, rows)` 第三参给出配方表行时,`materialRowCount(rows) === 0`
+ *     ⇒ `missing` 里多一条 `NO_RECIPE_ROWS`,弹窗据此阻断(0 行是唯一没有歧义的"根本算不了");
+ *   · `unfilledDesignRows(rows, slots)` 点名"有物料但没填设计添加量"的行 → 弹窗出告警(只告警不阻断)。
+ * 两条都只做**判定**,不碰 `recipeEngine.compute` 的公式(ADR-0004)。
+ *
  * 单位与口径(与 recipeEngine 的头注一致,这里再钉一次):
  *   - 粉料/胶粉行的「设计添加量」= **比例**。单据上人可能填小数(0.62)也可能填百分数(62),
  *     故 `parseRatio` 做容错解释并对"按百分数解释"标记出来,弹窗会把它显示给用户看;
@@ -21,6 +27,12 @@
 import { SLOT_COUNT, POWDER_SLOTS, GLUE_SLOTS, CONVERTED_SLOTS, DEFAULT_LENGTH_TOL } from './recipeConstants.js'
 
 export const SLOT_GROUPS = { POWDER: '粉料', GLUE: '胶粉', CONVERTED: '折算料' }
+
+/**
+ * `paramsFromHead(...).missing` 里的阻断项名:配方表一行物料都没有。
+ * 弹窗据此换一句对症的文案(「请先在页 1 填好…」那套对页 2 的配方表说不通)。
+ */
+export const NO_RECIPE_ROWS = '配方表物料行'
 
 /** 物料种类 → 料位分组(与演示程序 料位↔可选物料 的对应关系一致) */
 export function groupOfMaterialType(type) {
@@ -50,6 +62,26 @@ function parseNumber(text) {
   if (!raw) return null
   const num = Number(raw.replace('%', '').trim())
   return Number.isFinite(num) ? num : null
+}
+
+/**
+ * 炭棒规格格文本 → 数字。
+ *
+ * ⚠ 为什么不能直接用 parseNumber:「选产品编号」带出的落格文本**带标签前缀**
+ * (`外：56.5` / `内：29.5` / `长：250`,见 core/panel/carbonSpec.js 的 SPEC_SLOTS),
+ * 直接 Number() 得到 NaN。外径/内径另有「外径mm/内径mm」兜底,长度没有兜底 ——
+ * 于是"单据上明明有长度"却永远报「缺长度」,或者被当成缺失拦下来。
+ *
+ * 口径:先剥掉**冒号前缀**(冒号前没有数字才算前缀,免得把 `12:30` 这类值当标签),
+ * 再要求剩下的部分是一个纯数字(允许尾随 `mm`);解析不出给 null —— 不猜。
+ */
+export function parseSpecNumber(text) {
+  const raw = String(text ?? '').trim()
+  if (!raw) return null
+  const m = raw.match(/^[^0-9]*[：:]\s*(.+)$/)
+  const body = (m ? m[1] : raw).trim()
+  const num = /^([+-]?\d+(?:\.\d+)?)\s*(?:mm)?$/i.exec(body)
+  return num ? Number(num[1]) : null
 }
 
 /**
@@ -137,6 +169,38 @@ export function slotsFromRows(rows) {
     warnings.push(`料位 1 的补差比例算出来是负的（${(slots[0].designRatio * 100).toFixed(2)}%），说明料位 2~7 的比例合计已超过 100%，请核对设计添加量`)
   }
   return { slots, warnings }
+}
+
+/**
+ * 「参与计算的行没填设计添加量」的行号清单(1 起,升序)—— 弹窗据此出告警。
+ *
+ * 为什么必须有这条:空着的「设计添加量」在引擎里等同于 0(粉料/胶粉位 = 比例 0,折算料位 = 0 克/支),
+ * 而料位 1 是补差位(1 − Σ料位2~7)会把差额全吃下来 ⇒ **两行折算料全空也照样出结果、零告警**,
+ * 页 1 十一格全来自"料位 1 = 100%",看着像算成功了,其实毫无意义。
+ *
+ * 哪些行**该填**(按引擎真实料位语义,不是"凡有行就报"):
+ *   · 料位 1(第 1 个粉料行)是补差位 —— 它的值由引擎反推,行上填什么本来就不参与 ⇒ 不点名;
+ *   · 料位 2~7(粉料/胶粉)吃 `design_ratio`、料位 8~10(折算料)吃 `amount_g` ⇒ 空/非数字即按 0 算,点名;
+ *   · 没有物料(编号与名称皆空)的空行不点名 —— 明细表天生会留空行;
+ *   · 显式填 `0` 不点名 —— 那是"这个料不用"的有意输入(与"忘了填"要区分开)。
+ * ⚠ 刻意**只告警不阻断**:料位分组按「物料种类」判定,第 1 行/空行/不参与位的存在使"该填哪些行"
+ *   无法做到零误判(硬要求:宁可提示,不可误伤合法场景)。唯一无歧义的"0 行"由 NO_RECIPE_ROWS 阻断。
+ *
+ * @param {Array} rows 配方表行
+ * @param {Array} slots slotsFromRows(...).slots
+ * @returns {number[]} 行号(配方表第几行),无问题给 []
+ */
+export function unfilledDesignRows(rows, slots) {
+  const out = []
+  const list = Array.isArray(slots) ? slots : []
+  list.forEach((s) => {
+    if (!s || s.rowIndex < 0 || s.slot === 1) return                       // 空料位 / 补差位
+    if (!String(s.code ?? '').trim() && !String(s.name ?? '').trim()) return  // 连物料都没有的空行
+    const text = rows?.[s.rowIndex]?.['设计添加量']
+    const usable = s.group === SLOT_GROUPS.CONVERTED ? parseNumber(text) !== null : parseRatio(text) !== null
+    if (!usable) out.push(s.rowIndex + 1)
+  })
+  return out.sort((a, b) => a - b)
 }
 
 /* ── 烧结尺寸表(60 行模具↔炭棒内外径公差对照,表 rd_sinter_tolerance)──────────────── */
@@ -288,24 +352,34 @@ export function sinterLengthWarning(row, length) {
   return null
 }
 
+/**
+ * 配方表里"有物料的行"数:物料编号/物料名称/物料种类任一非空才算数。
+ * 整行空白的行不算(明细表格天生会留空行),否则"0 行"这道闸永远拦不住。
+ */
+export function materialRowCount(rows) {
+  const keys = ['物料编号', '物料名称', '物料种类']
+  return (Array.isArray(rows) ? rows : []).filter((r) => keys.some((k) => String(r?.[k] ?? '').trim())).length
+}
+
 /** 引擎入参:尺寸/密度读单据,工艺参数来自参数集(弹窗传入) */
-export function paramsFromHead(head, overrides = {}) {
+export function paramsFromHead(head, overrides = {}, rows) {
   const h = head || {}
-  const pick = (...keys) => {
+  const pick = (parse, ...keys) => {
     for (const k of keys) {
-      const v = parseNumber(h[k])
+      const v = parse(h[k])
       if (v !== null) return v
     }
     return null
   }
-  // 尺寸优先取弹窗里选中的烧结尺寸行(表 rd_sinter_tolerance),没选才回退单据上的炭棒规格/外径内径
+  // 尺寸优先取弹窗里选中的烧结尺寸行(表 rd_sinter_tolerance),没选才回退单据上的炭棒规格/外径内径。
+  // 炭棒规格格是「选产品编号」带出的**带前缀**文本(`外：56.5`),故走 parseSpecNumber 而不是 parseNumber。
   const overOd = parseNumber(overrides.od)
   const overId = parseNumber(overrides.id)
-  const od = overOd !== null ? overOd : pick('炭棒规格1', '外径mm')
-  const id = overId !== null ? overId : pick('炭棒规格2', '内径mm')
-  const length = pick('炭棒规格3')
-  let densityLow = pick('实际密度管控下限')
-  let densityHigh = pick('实际密度管控上限')
+  const od = overOd !== null ? overOd : pick(parseSpecNumber, '炭棒规格1', '外径mm')
+  const id = overId !== null ? overId : pick(parseSpecNumber, '炭棒规格2', '内径mm')
+  const length = pick(parseSpecNumber, '炭棒规格3')
+  let densityLow = pick(parseNumber, '实际密度管控下限')
+  let densityHigh = pick(parseNumber, '实际密度管控上限')
   if (densityLow === null || densityHigh === null) {
     const range = parseDensityRange(h['密度管控要求'])
     if (range) {
@@ -315,6 +389,10 @@ export function paramsFromHead(head, overrides = {}) {
   }
 
   const missing = []
+  // 配方表一行物料都没有 ⇒ 引擎拿到的全是空料位,算出来的比例/克重毫无意义
+  // (实测:照算照回填,页 1 十一格全来自"料位 1 补差=100%",看着像算成功了)。
+  // 与"缺外径/内径/长度/密度"同级阻断 —— 这是唯一没有歧义的拦法(调用方必须显式传 rows 才做这项校验)。
+  if (Array.isArray(rows) && materialRowCount(rows) === 0) missing.push(NO_RECIPE_ROWS)
   if (od === null) missing.push('外径')
   if (id === null) missing.push('内径')
   if (length === null) missing.push('长度')

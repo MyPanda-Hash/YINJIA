@@ -163,8 +163,9 @@ import request from '@/core/request'
 import { tt } from '@/i18n'
 import StdLibManager from './StdLibManager.vue'
 import { compute } from '@/core/mold/recipeEngine.js'
-import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisturePercent, paramsFromHead, slotsFromRows,
-  specCarryFrom, sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery } from '@/core/mold/recipeSheet.js'
+import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisturePercent, NO_RECIPE_ROWS, paramsFromHead,
+  slotsFromRows, specCarryFrom, sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery,
+  unfilledDesignRows } from '@/core/mold/recipeSheet.js'
 import { DEFAULT_LENGTH_TOL } from '@/core/mold/recipeConstants.js'
 
 /**
@@ -287,7 +288,8 @@ const slots = computed(() => slotsFromRows(props.rows).slots
   .map((s, i) => ({ ...s, moisture: moisturePercent(moisture.value[i]) })))
 
 const parsed = computed(() => {
-  const { params, missing } = paramsFromHead(props.head, overrides.value)
+  // 第三参 rows:配方表一行物料都没有时 paramsFromHead 会给出阻断项(见 NO_RECIPE_ROWS)
+  const { params, missing } = paramsFromHead(props.head, overrides.value, props.rows)
   if (missing.length) return { missing }
   try {
     return { params, result: compute(params, slots.value.map((s) => ({ design_ratio: s.designRatio, amount_g: s.amountG, moisture: s.moisture }))) }
@@ -297,6 +299,10 @@ const parsed = computed(() => {
 })
 const result = computed(() => parsed.value.result || null)
 const blockReason = computed(() => {
+  // 配方表 0 行:文案得对症(「请先在页 1 填好…」对页 2 的配方表说不通)
+  if (parsed.value.missing?.includes(NO_RECIPE_ROWS)) {
+    return tt('配方表还没有物料行 —— 请先在页 2「配方表」填上至少 1 行物料，再点「配方计算」')
+  }
   if (parsed.value.missing?.length) return `${tt('单据上还缺')}：${parsed.value.missing.join('、')}${tt('（请先在页 1 填好，或补齐密度管控范围）')}`
   if (parsed.value.error) return parsed.value.error
   return ''
@@ -304,7 +310,17 @@ const blockReason = computed(() => {
 const patch = computed(() => (result.value
   ? buildPatch(result.value, slots.value, sinterRow.value ? sinterPatch(sinterRow.value) : null)
   : null))
-const rowWarnings = computed(() => slotsFromRows(props.rows).warnings)
+/** 配方表自己的问题:分组/容量告警 + 「设计添加量」没填(会被静默按 0 算,最需要点名的一条) */
+const rowWarnings = computed(() => {
+  const list = [...slotsFromRows(props.rows).warnings]
+  const unfilled = unfilledDesignRows(props.rows, slots.value)
+  if (unfilled.length) {
+    // 空着 = 引擎按 0 算;料位 1 是补差位会把差额吃下来 ⇒ 两行全空也照样"出结果",这条告警就是拦这个。
+    list.push(tt('配方表有 {n} 行的「设计添加量」为空或不是数字（第 {rows} 行），这些行会被按 0 参与计算；不用的料请填 0，不要留空')
+      .replace('{n}', unfilled.length).replace('{rows}', unfilled.join('、')))
+  }
+  return list
+})
 /** 空料位不必报"水分未采集"(那不是问题,是没这个料位) */
 const visibleWarnings = computed(() => {
   const emptySlots = slots.value.filter((s) => s.rowIndex < 0).map((s) => s.slot)

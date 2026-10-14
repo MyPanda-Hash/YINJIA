@@ -2938,6 +2938,8 @@ export default {
     '新值': 'New',
     '页 1 无可回填的格子': 'Nothing to write back on page 1',
     '配方表没有可回填的行': 'No recipe rows to write back',
+    '配方表还没有物料行 —— 请先在页 2「配方表」填上至少 1 行物料，再点「配方计算」': 'The recipe table has no material rows — add at least one row on page 2 “Recipe” before running the calculation',
+    '配方表有 {n} 行的「设计添加量」为空或不是数字（第 {rows} 行），这些行会被按 0 参与计算；不用的料请填 0，不要留空': '{n} row(s) in the recipe table have an empty or non-numeric “Design Addition” (row {rows}); those rows are counted as 0 — enter 0 for materials you do not use instead of leaving them blank',
     '填入单据': 'Write to Document',
     '将写入': 'Will write',
     '处': 'entries',
