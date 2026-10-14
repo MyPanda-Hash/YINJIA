@@ -23,6 +23,10 @@ const arg = (n, d) => { const i = argv.indexOf('--' + n); return i >= 0 ? argv[i
 const DB = arg('db', 'HSDZ_MES_TEST')
 const FROM = arg('from', '2026-09-01')
 const WRITE = argv.includes('--write')
+/** 写入模式(用户 2026-10-14:「将金蝶的库存导入进来是不是更好」):
+ *  · `--mode stock`(推荐):**直接写金蝶现存量** —— 结存与金蝶完全相同,一步到位,不需要逐张记账推导;
+ *  · `--mode opening`(默认):写推导期初 = 现存量 − 区间净额,用于「期初 + 逐张记账」路线。 */
+const MODE = arg('mode', 'opening')
 const TAG = DB === 'HSDZ_MES' ? 'prod' : 'test'
 
 const cfg = JSON.parse(readFileSync(new URL('../../deploy/config.json', import.meta.url), 'utf8')).kingdee
@@ -84,11 +88,16 @@ console.log(`区间内单据净额:${netRows.length} 个库存键`)
 
 // ③ 期初 = 现存量 − 净额(键的并集:只出现在单据里、现存量已为 0 的也要建行,否则记账会「无库存可扣」)
 const opening = new Map()
-for (const [k, v] of kdStock) opening.set(k, { ...v, qty: v.qty - (netMap.get(k) || 0) })
-for (const [k, net] of netMap) {
-  if (opening.has(k)) continue
-  const [w, c, l] = k.split('|')
-  opening.set(k, { wzdm: w, ckdm: c, ckName: null, lot: l || null, qty: -net, cost: null })
+if (MODE === 'stock') {
+  // 直接导现存量:结存 = 金蝶现存量(与金蝶逐键相同,无推导误差)
+  for (const [k, v] of kdStock) opening.set(k, { ...v })
+} else {
+  for (const [k, v] of kdStock) opening.set(k, { ...v, qty: v.qty - (netMap.get(k) || 0) })
+  for (const [k, net] of netMap) {
+    if (opening.has(k)) continue
+    const [w, c, l] = k.split('|')
+    opening.set(k, { wzdm: w, ckdm: c, ckName: null, lot: l || null, qty: -net, cost: null })
+  }
 }
 
 // ④ 现状对照(MES kucun)
