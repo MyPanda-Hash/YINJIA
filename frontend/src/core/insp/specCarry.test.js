@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled,
-  headFromSpecDetail, DEFAULT_NOT_APPROVED_TIP,
+  headFromSpecDetail, specCarryRows, DEFAULT_NOT_APPROVED_TIP,
 } from './specCarry.js'
 
 /**
@@ -138,50 +138,76 @@ test('规格书变动提示:出货检验计划表照旧,组装BOM表不参与(�
   assert.equal(specDriftEnabled(ASM_AFS), false)
 })
 
-/* ── 表头格 ← 规格书明细,按「检验项目」名匹配(2026-10-15,成型工艺清单 A4)────────────
-   用户口径:成型工艺清单「检验要求」区的四个块名格由规格书带出 —— 在规格书明细里找
-   检验项目 等于指定名的行,把该行的 **检验要求** 写进对应的格。
-   关键口径:**只在真取到值时写** —— 某个检验项目规格书里没有 ⇒ 那一格不出现 = 保持不动。 */
+/* ── 表头格 ← 规格书明细,按「检验项目」名匹配(成型工艺清单 A4)──────────────────────
+   用户口径(2026-10-15 实测反馈,推翻上一版):
+     「规格书的检验要求数据应该是填在成型工艺清单的**表格内的要求、强度要求、压降标准**里面的」
+     「如果是尺寸,应该是把对应检测的内径或者外径的公差等数据填写进成型工艺清单的对应检测要求
+       里面的数据表格里面」
+   即:① 落点必须是**真实数据格**(跌落要求 / 强度要求kgf / 压降标准kpa),不是块名标签格;
+      ② `检验项目=尺寸` 要**解析成四格**(外径mm / 外径公差 / 内径mm / 内径公差)。
+
+   关键口径:**只在真取到值时写** —— 某个检验项目规格书里没有(或解析不出)⇒ 那一格不出现 = 保持不动。 */
 const MOLD_AFS = {
   fromKey: '产品编号',
   specDrift: false,
   headFromDetail: [
-    { to: '炭棒尺寸', matchProject: '尺寸' },
-    { to: '跌落强度', matchProject: '跌落强度' },
-    { to: '抗压强度', matchProject: '抗压强度' },
-    { to: '压降', matchProject: '压降' },
+    { to: '跌落要求', matchProject: '跌落强度' },
+    { to: '强度要求kgf', matchProject: '抗压强度' },
+    { to: '压降标准kpa', matchProject: '压降' },
+    { parse: 'dimension', matchProject: '尺寸' },
   ],
 }
 const SPEC_ROWS = [
-  { 检验项目: '尺寸', 检验要求: '外径 20±0.5mm、长度 250±2mm', 检验方法: '游标卡尺' },
+  { 检验项目: '尺寸', 检验要求: '外径 20±0.5mm、内径 5±0.3mm、长度 250±2mm', 检验方法: '游标卡尺' },
+  { 检验项目: '跌落强度', 检验要求: '1.2m 高度自由跌落无破损', 检验方法: '跌落试验' },
+  { 检验项目: '抗压强度', 检验要求: '≥ 300N 不破裂', 检验方法: '压力试验机' },
   { 检验项目: '压降', 检验要求: '≤25kPa', 检验方法: '数显压力表' },
 ]
 
-test('按检验项目名匹配,把该行的 检验要求 写进对应的格', () => {
+test('按检验项目名匹配,把 检验要求 写进**真实数据格**(不是块名标签格)', () => {
   assert.deepEqual(headFromSpecDetail(MOLD_AFS, SPEC_ROWS), {
-    炭棒尺寸: '外径 20±0.5mm、长度 250±2mm',
-    压降: '≤25kPa',
+    跌落要求: '1.2m 高度自由跌落无破损',
+    强度要求kgf: '≥ 300N 不破裂',
+    压降标准kpa: '≤25kPa',
+    外径mm: '20',
+    外径公差: '±0.5',
+    内径mm: '5',
+    内径公差: '±0.3',
   })
 })
 
+test('尺寸那一项解析成四格,且**长度不落格**(本面板没有长度数据格)', () => {
+  const out = headFromSpecDetail(MOLD_AFS, [SPEC_ROWS[0]])
+  assert.deepEqual(out, { 外径mm: '20', 外径公差: '±0.5', 内径mm: '5', 内径公差: '±0.3' })
+  assert.equal('长度' in out, false)
+})
+
+test('尺寸句缺项 ⇒ 只写解析得出的格,不写半截值', () => {
+  assert.deepEqual(headFromSpecDetail(MOLD_AFS, [{ 检验项目: '尺寸', 检验要求: '外径 20±0.5mm' }]),
+    { 外径mm: '20', 外径公差: '±0.5' })
+  assert.deepEqual(headFromSpecDetail(MOLD_AFS, [{ 检验项目: '尺寸', 检验要求: '符合图纸要求' }]), {},
+    '尺寸句解析不出来 ⇒ 四格一个都不写')
+})
+
 test('规格书里没有该检验项目 ⇒ 该键不出现(那一格保持不动,不清空、不写空串)', () => {
-  const out = headFromSpecDetail(MOLD_AFS, SPEC_ROWS)
-  assert.equal('跌落强度' in out, false)
-  assert.equal('抗压强度' in out, false)
-  assert.deepEqual(Object.keys(out).sort(), ['压降', '炭棒尺寸'].sort())
+  const out = headFromSpecDetail(MOLD_AFS, [SPEC_ROWS[0], SPEC_ROWS[3]])
+  assert.equal('跌落要求' in out, false)
+  assert.equal('强度要求kgf' in out, false)
+  assert.deepEqual(Object.keys(out).sort(), ['外径公差', '外径mm', '内径公差', '内径mm', '压降标准kpa'].sort())
 })
 
 test('检验要求 为空白 ⇒ 同样不写那一格(不能拿空串覆盖纸上已有的值)', () => {
   const out = headFromSpecDetail(MOLD_AFS, [
     { 检验项目: '尺寸', 检验要求: '   ' },
     { 检验项目: '压降', 检验要求: null },
+    { 检验项目: '跌落强度', 检验要求: '' },
   ])
   assert.deepEqual(out, {})
 })
 
 test('检验项目名匹配忽略空白(「跌落 强度」这类排版差不算另一个项目)', () => {
   const out = headFromSpecDetail(MOLD_AFS, [{ 检验项目: ' 跌落 强度 ', 检验要求: '高度50cm,跌3次无断裂' }])
-  assert.deepEqual(out, { 跌落强度: '高度50cm,跌3次无断裂' })
+  assert.deepEqual(out, { 跌落要求: '高度50cm,跌3次无断裂' })
 })
 
 test('没配 headFromDetail / items 不是数组 ⇒ 一格都不写(旧链一个字节不变)', () => {
@@ -193,8 +219,44 @@ test('没配 headFromDetail / items 不是数组 ⇒ 一格都不写(旧链一�
 
 test('映射项缺 to / matchProject ⇒ 跳过该项,不影响其它项', () => {
   const out = headFromSpecDetail(
-    { headFromDetail: [{ to: '', matchProject: '尺寸' }, { to: '压降' }, ...MOLD_AFS.headFromDetail] },
+    { headFromDetail: [{ to: '', matchProject: '尺寸' }, { to: '压降标准kpa' }, ...MOLD_AFS.headFromDetail] },
     SPEC_ROWS,
   )
-  assert.deepEqual(out, { 炭棒尺寸: '外径 20±0.5mm、长度 250±2mm', 压降: '≤25kPa' })
+  assert.deepEqual(out, {
+    跌落要求: '1.2m 高度自由跌落无破损',
+    强度要求kgf: '≥ 300N 不破裂',
+    压降标准kpa: '≤25kPa',
+    外径mm: '20',
+    外径公差: '±0.5',
+    内径mm: '5',
+    内径公差: '±0.3',
+  })
+})
+
+test('认不出来的 parse 名字 ⇒ 跳过该项(不静默把整句塞进某个格)', () => {
+  const out = headFromSpecDetail({ headFromDetail: [{ parse: 'nope', matchProject: '尺寸' }] }, SPEC_ROWS)
+  assert.deepEqual(out, {})
+})
+
+/* ── 明细落点取哪一段行(2026-10-15:配方表 ← 规格书「物料清单」表区)─────────────────
+   成型工艺清单一条链上要取规格书的**两个表区**:表头那几格取「检验要求」(payload.items),
+   配方表那几行取「物料清单」(payload['物料清单'],由 /px/specByProductForMold 一并带回)。
+   取数源写错不会报错,只会把检验项目行灌进配方表 —— 故这里钉死。 */
+const MOLD_PAYLOAD = {
+  found: true,
+  items: [{ 检验项目: '压降', 检验要求: '≤5 kPa' }],
+  物料清单: [{ 序号: '1', 物料编码: 'M-001', 所属类别: '折算物料' }],
+}
+
+test('没配 detailSource ⇒ 仍旧取 payload.items(出货检验/组装BOM 两条旧链一个字节不变)', () => {
+  assert.deepEqual(specCarryRows(MOLD_PAYLOAD, INSP_AFS), MOLD_PAYLOAD.items)
+  assert.deepEqual(specCarryRows(MOLD_PAYLOAD, { detailSource: '' }), MOLD_PAYLOAD.items)
+  assert.deepEqual(specCarryRows(null, undefined), [])
+  assert.deepEqual(specCarryRows({ items: 'nope' }, undefined), [])
+})
+
+test('配了 detailSource ⇒ 取那一段;取不到就是空数组(**不退回 items**,否则检验项目行会灌进配方表)', () => {
+  assert.deepEqual(specCarryRows(MOLD_PAYLOAD, { detailSource: '物料清单' }), MOLD_PAYLOAD.物料清单)
+  assert.deepEqual(specCarryRows(MOLD_PAYLOAD, { detailSource: '没有这段' }), [])
+  assert.deepEqual(specCarryRows({ found: true, items: MOLD_PAYLOAD.items }, { detailSource: '物料清单' }), [])
 })

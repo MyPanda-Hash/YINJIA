@@ -326,10 +326,10 @@ const RD_MOLD_PROC_SEC0 = [
         // 炭棒尺寸:标签行 4 格 + 值行 4 格,标签与值同列对齐(新版面无「内孔要求」)
         // ⚠ 四个块名格(炭棒尺寸/跌落强度/抗压强度/压降)在 yj_field 里是**显示标签**
         //   (editable=0 / hidden=1,见 tools/migrate-mold-proc-labels.sql 头注「只做显示(不存数据)」)。
-        //   valueKey = 它们同时也是规格书带入的落点(见本块末尾 autoFillSpec.headFromDetail):
-        //   标题照旧,带出来的「检验要求」只读显示在标题下方(不改可编辑、不占新格)。
+        //   规格书带出的检验要求写在**右边那几格真实数据格**上(跌落要求 / 强度要求kgf / 压降标准kpa、
+        //   以及尺寸那四格),不写块名格 —— 用户 2026-10-15 实测口径,见本块末尾 autoFillSpec。
         { grid: [
-          { label: '炭棒尺寸', rowspan: 2, valueKey: '炭棒尺寸' },
+          { label: '炭棒尺寸', rowspan: 2 },
           { label: '炭棒外径mm', span: 2 },
           { label: '炭棒外径公差mm', span: 3 },
           { label: '炭棒内径mm', span: 2 },
@@ -353,7 +353,7 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '实际密度管控上限', span: 4 },
         ]},
         { grid: [
-          { label: '跌落强度', rowspan: 2, valueKey: '跌落强度' },
+          { label: '跌落强度', rowspan: 2 },
           { label: '高度cm', span: 2 },
           { label: '跌落次数', span: 4 },
           { label: '要求', span: 4 },
@@ -364,7 +364,7 @@ const RD_MOLD_PROC_SEC0 = [
           { key: '跌落要求', span: 4 },
         ]},
         { grid: [
-          { label: '抗压强度', rowspan: 2, valueKey: '抗压强度' },
+          { label: '抗压强度', rowspan: 2 },
           { label: '测试间距mm', span: 2 },
           { label: '压头下降速度mm/min', span: 4 },
           { label: '强度要求kgf', span: 4 },
@@ -376,7 +376,7 @@ const RD_MOLD_PROC_SEC0 = [
         ]},
         // 压降:块名跨 3 行 —— 第三行是设计图上的「是否测试丨 √ × 丨」(口径:压降是否抽检)
         { grid: [
-          { label: '压降', rowspan: 3, valueKey: '压降' },
+          { label: '压降', rowspan: 3 },
           { label: '测试管路', span: 2 },
           { label: '测试流速L/min', span: 4 },
           { label: '压降标准kpa', span: 4 },
@@ -1054,33 +1054,53 @@ export const recordSheetConfigs = {
     dataTables: [RD_MOLD_PROC_DT_REVISION, ...RD_MOLD_FORMULA.dataTables],
     tailSections: [...RD_MOLD_FORMULA.tailSections],
     /**
-     * 「自动填充规格书」—— 成型工艺清单只做**表头格**带入(2026-10-15 用户口径):
-     *   「检验要求区的四个格从规格书带出,全从规格书取、按『检验项目』名匹配」——
-     *     检验要求区        规格书明细 · 检验项目
-     *       炭棒尺寸   ←      尺寸
-     *       跌落强度   ←      跌落强度
-     *       抗压强度   ←      抗压强度
-     *       压降       ←      压降
-     *   取值 = 规格书明细里该 检验项目 那一行的 **检验要求**。
+     * 「自动填充规格书」—— 成型工艺清单:检验要求落**真实数据格** + 配方表两列 ← 规格书物料清单。
      *
-     * 链路与出货检验计划表**完全同源**(core/insp/specCarry.js 头注):选完「产品编号」→
-     *   onProdRefConfirm() → autoFillFromSpec() → 后端 GET /px/specByProduct?code=
+     * 用户口径(2026-10-15 实测反馈,推翻上一版"块名下方只读显示"):
+     *   ① 「规格书的检验要求数据应该是填在成型工艺清单的表格内的**要求、强度要求、压降标准**里面的」;
+     *   ② 「如果是尺寸,应该是把对应检测的**内径或者外径的公差**等数据填写进成型工艺清单的对应
+     *      检测要求里面的数据表格里面」。
+     *   ③ 「配方表的物料种类和物料编号…应该是对应规格书里面的**物料编码**,种类是基础档案**物料清单**
+     *      里面对应物料编码的数据」。
+     *
+     * 映射(键一律用中文 label):
+     *   规格书 · 检验要求表区           成型工艺清单 · 检验要求区(真实数据格)
+     *     跌落强度                →      跌落要求
+     *     抗压强度                →      强度要求kgf
+     *     压降                    →      压降标准kpa
+     *     尺寸                    →      外径mm / 外径公差 / 内径mm / 内径公差(**整句解析**,
+     *                                    纯函数 + 单测在 core/insp/dimensionSpec.js;长度项不落格)
+     *   规格书 · 物料清单表区           成型工艺清单 · 页 2 配方表
+     *     序号                    →      序号
+     *     物料编码                →      物料编号
+     *     (bs_inv.所属类别 派生)   →      物料种类   ← 后端按 存货编码 查商品档案补进 payload
+     *
+     * 链路与出货检验计划表**同源**(core/insp/specCarry.js 头注):选完「产品编号」→
+     *   onProdRefConfirm() → autoFillFromSpec() → 后端 GET /px/specByProductForMold?code=
      *   —— 审批门禁在服务端(只挑已审核/已归档的规格书),前端不另开端点、不绕门禁;
-     *   规格书未审批 ⇒ 后端一个格都不带回,前端只弹「请先把规格书走完审批」的提示。
-     * 差异只有两处,都落在配置上:
-     *   · headFromDetail —— 本面板**只写表头格**、且按名逐个匹配(出货检验那条是整表替换明细);
-     *   · specDrift:false —— 本表明细是修订记录/配方表,不是检验项目,比「规格书变动」只会误报。
-     * 无 head / detail:表头「客户项目名称」等格由产品信息表带出,不由规格书;明细一行都不碰
-     *   (autoFillFromSpec 见 autoFillSpec.detail 为空就跳过明细替换,不会误清表)。
+     *   规格书未审批 ⇒ 后端一个格都不带回,前端只弹提示。
+     * 三处配置差异:
+     *   · endpoint    本面板要一次取「检验要求」+「物料清单」两个表区,权限按 RD_MOLD_PROC 校验
+     *                 (与 /px/specByProductForAsm 同款理由:借别人的端点会被 403);
+     *   · detailSource 明细(配方表)取 payload['物料清单'] 那一段,与表头那格用的 payload.items 分开;
+     *   · specDrift:false 本表明细是修订记录/配方表,不是检验项目,比「规格书变动」只会误报。
+     * 表头「客户项目名称」等格由产品信息表带出,不由规格书。
      */
     autoFillSpec: {
       fromKey: '产品编号',
+      endpoint: '/px/specByProductForMold',
+      detailSource: '物料清单',
       specDrift: false,
       headFromDetail: [
-        { to: '炭棒尺寸', matchProject: '尺寸' },
-        { to: '跌落强度', matchProject: '跌落强度' },
-        { to: '抗压强度', matchProject: '抗压强度' },
-        { to: '压降', matchProject: '压降' },
+        { to: '跌落要求', matchProject: '跌落强度' },
+        { to: '强度要求kgf', matchProject: '抗压强度' },
+        { to: '压降标准kpa', matchProject: '压降' },
+        { parse: 'dimension', matchProject: '尺寸' },
+      ],
+      detail: [
+        { to: '序号', from: '序号' },
+        { to: '物料编号', from: '物料编码' },
+        { to: '物料种类', from: '所属类别' },
       ],
     },
   },

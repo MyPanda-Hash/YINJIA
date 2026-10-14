@@ -67,7 +67,7 @@
                         <td class="rsp-cover-lb" :class="{ 'rs-focus': isFocus(fd.key) }">{{ tt(fd.label) }}</td>
                         <td class="rsp-cover-vl">
                           <el-input v-if="editable" v-model="head[fd.key]" size="small" class="rsp-cover-input" :class="{ 'rs-focus': isFocus(fd.key) }" :maxlength="fd.max || 200" @input="emit('dirty')" />
-                          <span v-else class="rsp-cover-val">{{ head[fd.key] || '' }}</span>
+                          <span v-else class="rsp-cover-val" :class="coverValClass(head[fd.key])">{{ head[fd.key] || '' }}</span>
                         </td>
                       </tr>
                     </tbody>
@@ -270,11 +270,6 @@
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
-                <!-- 只读带出值(成型工艺清单 检验要求区那四格 ← 规格书,见 autoFillSpec.headFromDetail):
-                     格子本身是**显示标签**(yj_field editable=0/hidden=1),带出来的检验要求只显示、不可编辑;
-                     没带出(或本来就没这个键)时不占位、不影响版式。 -->
-                <span v-if="c.valueKey && head[c.valueKey]" class="rs-subval"
-                      :title="tt('规格书检验要求（自动带入，只读）')">{{ head[c.valueKey] }}</span>
               </td>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
@@ -762,11 +757,6 @@
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
                   :style="c.cap ? 'background:#9c9c9c;color:#fff;font-weight:600;font-size:12.5px' : ''">
                 <span>{{ tt(effColLabel(c.label, c.label)) }}</span>
-                <!-- 只读带出值(成型工艺清单 检验要求区那四格 ← 规格书,见 autoFillSpec.headFromDetail):
-                     格子本身是**显示标签**(yj_field editable=0/hidden=1),带出来的检验要求只显示、不可编辑;
-                     没带出(或本来就没这个键)时不占位、不影响版式。 -->
-                <span v-if="c.valueKey && head[c.valueKey]" class="rs-subval"
-                      :title="tt('规格书检验要求（自动带入，只读）')">{{ head[c.valueKey] }}</span>
               </td>
               <td v-else class="rs-td" :class="{ 'rs-focus': isFocus(c.key) }" :colspan="c.span || 1" :rowspan="c.rowspan || 1">
                 <div v-if="editable && isRefKey(c.key)" class="rs-ref-ctl" :title="tt('点击选择')" @click="openProdRef(c.key)">
@@ -1247,7 +1237,7 @@ import { pageOfKeyIn, pageOfLabelIn } from './recordSheetFocus'
 import { toCanonical, toSpecSub, toInspRow, toContentJson, emptyEntry } from '@/core/panel/testItemLib'
 import { docNoKeyOf } from '@/core/panel/sheetDocNo'
 import { sumKeepScale } from '@/core/panel/sumTotals'
-import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail } from '@/core/insp/specCarry'
+import { specCarryFailure, specDrift, specCarryRequest, specNotApprovedTip, specDriftEnabled, headFromSpecDetail, specCarryRows } from '@/core/insp/specCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import FileAttachCell from './FileAttachCell.vue'
 import StdLibManager from './StdLibManager.vue'
@@ -1545,6 +1535,28 @@ const coverDocNoKey = computed(() => String(cfg.value?.coverDocNoKey || ''))
 /** 字段行顶部(设计 px):等宽等高,由行号推出(不再手写坐标表 —— 加行不用改这里) */
 function coverLineTop(i) {
   return ((COVER_GRID_TOP + i * COVER_ROW_H) * coverVy.value).toFixed(1) + 'px'
+}
+/**
+ * 封面只读值**过长 ⇒ 降字号**的档位(2026-10-15 用户口径:「如果过长应该是适当缩小字体」)。
+ *
+ * 为什么必须降:值列是 `white-space:nowrap` + `table-layout:auto`,列宽由内容撑开 ⇒
+ * 一行长文本(实测 `除余氯效率 ≥95%，压降 ≤5kPa@30L/min，抗压 ≥300N`)会把整张字段表顶宽出画布,
+ * 画布 `.rsp-cover-page` 是 `overflow:hidden`,超出部分**直接被切**。
+ *
+ * 档位按**显示宽度当量**算(中文/全角 1、半角 0.5 —— 与浏览器排版一致,避免"字不多但全是字母"误判),
+ * 阈值按"一行放得下"折算:画布 767 设计px − 标签列(最长标签「客户项目名称」≈183)− 内边距/边框
+ * ≈ 565 ⇒ 每档字数上限 = 565 / 字号。全部档位只改 font-size(与 white-space),
+ * **不碰行高与列宽**,画布版式(8 行等高的网格、四段首尾相接)逐像素不变 ⇒ 回退只需删类名绑定。
+ * 最后一档(>48 当量)才允许换行:此时表宽已收到值列的 min-width,行高最多长到 4 行 ——
+ * 字段表底(设计 y474)到签字栏(设计 y605)之间还有 131 设计px 余量,压不到签字栏、撑不破格线。
+ */
+function coverValClass(v) {
+  const w = [...String(v ?? '')].reduce((n, ch) => n + (ch.codePointAt(0) > 0xff ? 1 : 0.5), 0)
+  if (w > 48) return 'rsp-cv-4'
+  if (w > 36) return 'rsp-cv-3'
+  if (w > 26) return 'rsp-cv-2'
+  if (w > 18) return 'rsp-cv-1'
+  return ''
 }
 /** 签字栏三栏:与字段表**同宽同居中**(两表共用 CSS 的居中规则 + var(--coverw) 宽度),
  *  故左/右边界天然对齐。三栏之间按设计 B17..D17 的比例 92.7:97.3:97.3 分配(百分比)。 */
@@ -2441,19 +2453,28 @@ function onProdRefConfirm(rows) {
   if (afs && prodRefKey.value === afs.fromKey) autoFillFromSpec(props.head[afs.fromKey], afs)
 }
 
-/** 该面板承载 autoFillSpec.detail 落点的明细表:按第一个 to 键在哪张表的列里找,找不到用第一张 */
+/** 该面板承载 autoFillSpec.detail 落点的明细表。
+ *  两段式:先找**同时含全部落点键**的表,再退回「含第一个 to 键的表」,最后才是第一张表。
+ *  ⚠ 为什么要有第一段:成型工艺清单(RD_MOLD_PROC)的修订记录表与配方表**共用一张行表**,
+ *    修订记录表里也有『序号』—— 只按"含任意一个落点键"找,配方表那三列会被写进修订记录区。
+ *    单表区面板(出货检验计划表/组装BOM表)两段结果相同,行为一字不变。 */
 function autoFillTargetDt(afs) {
   const want = (afs.detail || []).map((m) => m.to)
   const tables = cfg.value?.dataTables || []
-  return tables.find((dt) => (dt.cols || []).some((c) => want.includes(c.key))) || tables[0] || null
+  return tables.find((dt) => want.length && want.every((k) => (dt.cols || []).some((c) => c.key === k)))
+    || tables.find((dt) => (dt.cols || []).some((c) => want.includes(c.key)))
+    || tables[0] || null
 }
 
 /**
  * 自动填充规格书 —— 「自动填充规格书」就是这条路径:
  *   选定产品编号 → 取该产品对应**规格书**(RD_SPEC_DOC)的某个表区明细 → 回填。
- *   两条链共用本函数(差异全部在配置里,见 core/insp/specCarry.js 头注):
+ *   三条链共用本函数(差异全部在配置里,见 core/insp/specCarry.js 头注):
  *     · 出货检验计划表 ← 规格书「检验项目及检验标准」(表区 '检验要求',端点 /px/specByProduct);
- *     · 组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」(表区 '物料清单',端点 /px/specByProductForAsm)。
+ *     · 组装工艺清单「组装BOM表」← 规格书「1.关键物料列表」(表区 '物料清单',端点 /px/specByProductForAsm);
+ *     · 成型工艺清单 ← 规格书**两个表区**:检验要求(写进 跌落要求/强度要求kgf/压降标准kpa 与尺寸四格)
+ *       + 物料清单(页 2 配方表的 物料编号/物料种类),端点 /px/specByProductForMold
+ *       —— 明细取哪一段由 autoFillSpec.detailSource 指定(specCarryRows),表头格仍取 payload.items。
  *
  * 【为什么走后端端点而不是通用查询】规格书的 编号(=产品键)在通用链路里被
  *   QueryService.loadDocs 用单据编号覆盖掉了(详见该处注释),getFormDescriptor /
@@ -2472,7 +2493,7 @@ async function autoFillFromSpec(code, afs) {
   const key = afs?.fromKey
   const val = String(code ?? '').trim()
   if (!key || !val || !props.editable) return
-  // 明细落点:没配 detail 的链(成型工艺清单——只做表头格带入,见 autoFillSpec.headFromDetail)
+  // 明细落点:没配 detail 的链(部分面板只做表头格带入,见 autoFillSpec.headFromDetail)
   // **不认**明细表 —— 否则 autoFillTargetDt 会退回到第一张表,把它整表替换成按空映射生成的空行。
   const detailMap = afs.detail || []
   const dt = detailMap.length ? autoFillTargetDt(afs) : null
@@ -2499,7 +2520,10 @@ async function autoFillFromSpec(code, afs) {
     return
   }
   const rows = Array.isArray(payload.items) ? payload.items : []
-  const filled = detailMap.length ? rows.map((r) => {
+  // 明细落点的取数源:配了 detailSource 就取那一段(成型工艺清单页 2 配方表 ← 规格书「物料清单」),
+  // 否则还是 payload.items(出货检验计划表/组装BOM表两条旧链一个字节不变)。纯函数+单测在 core/insp/specCarry.js。
+  const srcRows = detailMap.length ? specCarryRows(payload, afs) : []
+  const filled = detailMap.length ? srcRows.map((r) => {
     const row = {}
     for (const m of detailMap) row[m.to] = r[m.from] === undefined || r[m.from] === null ? '' : String(r[m.from])
     if (dt?.filterKey) row[dt.filterKey] = dt.filterVal
@@ -3058,20 +3082,6 @@ function chartOf(dt) {
   color: #333;
   text-align: center;
   font-weight: 500;
-}
-/* 标签格里的**只读带出值**(cell.valueKey):成型工艺清单 检验要求区四格 ← 规格书。
-   与标题同格上下排;不给过渡动画(只澄清状态的变化才配动效,这里没有状态变化)。 */
-.rs-subval {
-  display: block;
-  margin-top: 2px;
-  padding: 1px 2px;
-  font-weight: 400;
-  font-size: 11.5px;
-  line-height: 1.35;
-  white-space: pre-wrap;
-  word-break: break-all;
-  color: #1f2d3d;
-  background: #f2f6ff;
 }
 /* 校验定位闪烁:琥珀高亮约3秒(保存必填缺失时跳转提示) */
 @keyframes rsFieldBlink {
@@ -3925,6 +3935,23 @@ function chartOf(dt) {
   line-height: 1.15;
   font-family: 'SimSun', 'Songti SC', serif;
   color: #1a1a1a;
+}
+/**
+ * 只读值**过长 ⇒ 逐档降字号**(用户 2026-10-15 口径:「如果过长应该是适当缩小字体」)。
+ * 档位由模板按显示宽度当量给出(coverValClass),每档字号都保证**一行放得下** ——
+ * 值列 nowrap + table-layout:auto,不降字号就会把整张字段表顶宽出画布而被 overflow:hidden 切掉。
+ * 只覆盖 font-size(/white-space),不动行高、列宽与边框 ⇒ 版式不变、回退 = 删这几个类。
+ * 不用 transition(项目红线:禁 transition: all;这里也没有状态要澄清)。
+ */
+.rsp-cover-val.rsp-cv-1 { font-size: calc(20px * var(--cok)); }
+.rsp-cover-val.rsp-cv-2 { font-size: calc(15px * var(--cok)); }
+.rsp-cover-val.rsp-cv-3 { font-size: calc(11px * var(--cok)); }
+.rsp-cover-val.rsp-cv-4 {
+  font-size: calc(9.5px * var(--cok));
+  /* 超长才允许折行:表宽此时已收到值列 min-width,行高最多 4 行(设计 46px 网格内) */
+  white-space: normal;
+  word-break: break-all;
+  line-height: 1.12;
 }
 /* 签名表:width:100% 跟随 .rsp-cover-blockin ⇒ 与字段表同宽、左右边界对齐;
    与字段表之间的垂直间隔 = margin-top,由模板按 COVER_SIGN_TOP/ROW_H 算出(设计 y520→y605 = 85px),

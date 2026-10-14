@@ -573,48 +573,98 @@ test('组装工艺清单:组装BOM表的规格书导入映射到 BOM 表真实�
 })
 
 /**
- * 成型工艺清单「检验要求」区四格 ← 规格书明细(2026-10-15 用户口径)。
+ * 成型工艺清单「检验要求」区 ← 规格书明细(2026-10-15 用户实测反馈后的口径)。
  *
  * 【为什么断言要写在这里】与 RD_INSP_PLAN / RD_ASM_PROC 两条链同一个坑:跨面板取值,
  *   落点写错(labelsToCols 反查不到)只会**静默丢值**,不报错 —— 而路线要点是:
- *     · to 必须是本面板真实存在的 label;
- *     · 那四格在配置里是**显示标签格**(yj_field editable=0/hidden=1,见
- *       tools/migrate-mold-proc-labels.sql),所以必须挂 valueKey 才看得见带出的值
- *       —— 只写 head 不挂 valueKey = 填进 rd_mold_proc_head 但纸面永远空白;
- *     · 这条链**不许**配 detail:配了 autoFillTargetDt 会退回第一张表,把修订记录整表替换掉。
+ *     · 落点必须是本面板真实存在的 label,**且是真实数据格**;
+ *       上一版把值只读挂在 4 个**块名标签格**下方(valueKey + .rs-subval),用户 8090 实测否决:
+ *       「规格书的检验要求数据应该是填在成型工艺清单的表格内的要求/强度要求/压降标准里面的」;
+ *     · `尺寸` 那一项要**整句解析成四格**(外径mm/外径公差/内径mm/内径公差,见 core/insp/dimensionSpec.js);
+ *     · 配方表两列(物料编号/物料种类)从规格书「物料清单」表区带出 ⇒ 本链**要配 detail**,
+ *       取数源由 detailSource 指向payload['物料清单'](不是表头那格用的 items)。
  */
-test('成型工艺清单:检验要求四格 ← 规格书明细,落点是本面板真实字段且挂得上纸面', () => {
+test('成型工艺清单:检验要求落在真实数据格上(不再是块名下方的只读值)', () => {
   const cfg = recordSheetConfigs.RD_MOLD_PROC
   assert.ok(cfg, 'RD_MOLD_PROC 配置缺失')
   const afs = cfg.autoFillSpec
-  assert.ok(afs, '成型工艺清单需要 autoFillSpec(从规格书带出检验要求四格)')
+  assert.ok(afs, '成型工艺清单需要 autoFillSpec(从规格书带出检验要求)')
   assert.equal(afs.fromKey, '产品编号', '触发键 = 产品编号(选完它才动手)')
   assert.equal(afs.specDrift, false, '本表明细是修订记录/配方表,不是检验项目,比「规格书变动」只会误报')
-  assert.ok(!afs.detail, '本链只写表头格;配了 detail 会把修订记录整表替换掉')
-  assert.ok(!afs.endpoint && !afs.specSheetArea, '走默认端点/默认表区(检验要求)——不另开端点、不绕审批门禁')
+
+  // 权限按承载面板校验(与 /px/specByProductForAsm 同款):本面板 403 不了别人的端点
+  assert.equal(afs.endpoint, '/px/specByProductForMold',
+    '本面板要一次取「检验要求」+「物料清单」两个表区 ⇒ 走 RD_MOLD_PROC 权限的专端点')
 
   const fx = FIXTURE.RD_MOLD_PROC
   assert.ok(fx?.labels?.length, 'fixture 缺 RD_MOLD_PROC')
   const maps = afs.headFromDetail
-  assert.ok(Array.isArray(maps) && maps.length, 'autoFillSpec.headFromDetail 为空 ⇒ 四格不会回填')
+  assert.ok(Array.isArray(maps) && maps.length, 'autoFillSpec.headFromDetail 为空 ⇒ 检验要求不会回填')
   assert.deepEqual(
-    maps.map((m) => [m.to, m.matchProject]),
-    [['炭棒尺寸', '尺寸'], ['跌落强度', '跌落强度'], ['抗压强度', '抗压强度'], ['压降', '压降']],
-    '映射口径(用户给定):炭棒尺寸←尺寸 / 跌落强度←跌落强度 / 抗压强度←抗压强度 / 压降←压降',
+    maps.map((m) => [m.to ?? `parse:${m.parse}`, m.matchProject]),
+    [['跌落要求', '跌落强度'], ['强度要求kgf', '抗压强度'], ['压降标准kpa', '压降'], ['parse:dimension', '尺寸']],
+    '落点口径(用户给定):跌落强度→跌落要求 / 抗压强度→强度要求kgf / 压降→压降标准kpa / 尺寸→四格解析',
   )
-  for (const m of maps) {
-    assert.ok(fx.labels.includes(m.to), `落点 '${m.to}' 不是本面板字段(label 写错会被 labelsToCols 静默丢弃)`)
-  }
 
-  // 四格必须挂 valueKey(它们是 editable=0/hidden=1 的**显示标签**格,只写 head 纸面看不见)
-  const valueKeys = new Set()
+  // 收集纸面上的格:标签格(label 且无 key)与数据格(key)
+  const labelCells = new Set()
+  const dataCells = new Set()
   for (const sec of cfg.sections || []) {
     for (const row of sec.rows || []) {
-      for (const c of row.grid || []) if (c.valueKey) valueKeys.add(c.valueKey)
+      for (const c of row.grid || []) {
+        if (c.key) dataCells.add(c.key)
+        else if (c.label) labelCells.add(c.label)
+      }
     }
   }
   for (const m of maps) {
-    assert.ok(valueKeys.has(m.to), `'${m.to}' 没挂 valueKey ⇒ 带出的值只进库、不上纸面`)
+    if (!m.to) continue
+    assert.ok(fx.labels.includes(m.to), `落点 '${m.to}' 不是本面板字段(label 写错会被 labelsToCols 静默丢弃)`)
+    assert.ok(dataCells.has(m.to), `落点 '${m.to}' 在本面板纸面上不是数据格(挂不到格上)`)
   }
-  assert.deepEqual([...valueKeys].sort(), maps.map((m) => m.to).sort(), 'valueKey 只该挂在这四格上')
+  // 上一版就是把这 4 个**块名**当落点(值只读显示在块名下方)—— 用户否决,钉住别再挂回去。
+  // 机制上的强守卫是上面那句 dataCells.has(to):块名格是 rowspan 的显示标签格,**没有对应的 key**
+  // (纸面上每个值行还有一个同名 label 格,那是"行标签",与块名是两回事)。
+  const BLOCK_LABELS = ['炭棒尺寸', '跌落强度', '抗压强度', '压降']
+  for (const m of maps) {
+    if (!m.to) continue
+    assert.ok(!BLOCK_LABELS.includes(m.to),
+      `落点 '${m.to}' 是块名标签格(只做显示,纸面上没有数据格)`)
+  }
+
+  // 块名标签格本身仍在纸面上(它们只是标题,不再挂 valueKey)
+  for (const lb of ['炭棒尺寸', '跌落强度', '抗压强度', '压降']) {
+    assert.ok(labelCells.has(lb), `块名标签格 '${lb}' 不该被删掉`)
+  }
+  const valueKeys = []
+  for (const sec of cfg.sections || []) {
+    for (const row of sec.rows || []) {
+      for (const c of row.grid || []) if (c.valueKey) valueKeys.push(c.valueKey)
+    }
+  }
+  assert.deepEqual(valueKeys, [], 'valueKey/.rs-subval 那套只读带出已撤(值直接写真实数据格)')
+})
+
+test('成型工艺清单:配方表 物料编号/物料种类 ← 规格书「物料清单」表区', () => {
+  const cfg = recordSheetConfigs.RD_MOLD_PROC
+  const afs = cfg.autoFillSpec
+  const recipe = (cfg.dataTables || []).find((dt) => dt.filterVal === '配方表')
+  assert.ok(recipe, '找不到配方表(dataTables 里 filterVal=配方表 那一张)')
+  assert.equal(afs.detailSource, '物料清单',
+    '配方表的取数源 = payload[物料清单](与表头那格用的 payload.items 不是同一段)')
+  assert.ok(afs.detail?.length, 'autoFillSpec.detail 为空 ⇒ 配方表两列不会回填')
+
+  const recipeKeys = new Set((recipe.cols || []).map((c) => c.key))
+  for (const m of afs.detail) {
+    assert.ok(recipeKeys.has(m.to), `明细落点 '${m.to}' 不在配方表列里(填了也看不见)`)
+  }
+  assert.deepEqual(afs.detail.map((m) => m.to).sort(), ['序号', '物料种类', '物料编号'].sort(),
+    '三列:物料编号←规格书物料编码 / 物料种类←bs_inv 所属类别(后端按 存货编码 查) / 序号←规格书序号')
+  assert.equal(afs.detail.find((m) => m.to === '物料编号').from, '物料编码')
+  // 所属类别 不是规格书字段,是**后端按 存货编码 查商品档案(bs_inv)** 补上的派生列(见 DevTaskService.specDetailRows)
+  assert.equal(afs.detail.find((m) => m.to === '物料种类').from, '所属类别')
+  const specFx = FIXTURE.RD_SPEC_DOC
+  assert.ok(specFx.labels.includes('物料编码'), '取数源 物料编码 必须是规格书字段(那边改 label 这里就填空白)')
+  assert.ok(!afs.detail.some((m) => m.to === '物料名称'),
+    '物料名称 由 A5 的双向带出负责,本链不许顺手覆盖它')
 })
