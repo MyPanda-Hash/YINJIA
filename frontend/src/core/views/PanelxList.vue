@@ -5690,8 +5690,18 @@ function applyShipPlanItems(items) {
   const has = (k) => cols.size === 0 || cols.has(k)
   // 后端已用这些键名下发(与 yj_field.label 对齐);本面板没有的列自动跳过
   const KEYS = ['表区', '检验项目', '检验要求', '检验方法', '检查频率', '检验仪器', '不合格应对措施', '备注']
-  let n = 0
+  const norm = (v) => String(v ?? '').trim().replace(/\s+/g, '')
+  // 明细里已经有的检验项目(判重复用):同名项目可能分属不同「表区」,故键 = 表区 + 检验项目
+  const seen = new Set(rows.map((r) => norm(r['表区']) + '|' + norm(r['检验项目'])).filter((k) => k !== '|'))
+  const dupes = []
+  const fresh = []
   for (const it of items || []) {
+    const k = norm(it['表区']) + '|' + norm(it['检验项目'])
+    if (seen.has(k)) dupes.push(it['检验项目'] || '')   // 已带入过 ⇒ 不再重复加
+    else { seen.add(k); fresh.push(it) }
+  }
+  let n = 0
+  for (const it of fresh) {
     const row = newDetailRow(tabKey)
     for (const k of KEYS) {
       if (!has(k)) continue
@@ -5705,7 +5715,7 @@ function applyShipPlanItems(items) {
     archPage.value = Math.ceil(rows.length / archPageSize.value) // 新行在末尾,跳末页立即可见
     markInlineDirty()
   }
-  return n
+  return { added: n, total: (items || []).length, dupes }
 }
 
 /**
@@ -5729,9 +5739,17 @@ function applyInspItems(items) {
   //   项目的「检验内容」= 类别(A/B/C/D/E 那种);带入明细时把类别写进「表区」,
   //   报表/明细即可按类别分格显示。没有类别时回退旧口径 '检验项目'。
   let n = 0
-  for (const it of items || []) {
-    const row = newDetailRow(tabKey)
+  const norm = (v) => String(v ?? '').trim().replace(/\s+/g, '')
+  // 明细已有项目(判重复用):键 = 表区 + 检验项目。同名的两个项目分属不同类别时互不干扰
+  const seen = new Set(rows.map((r) => norm(r['表区']) + '|' + norm(r['检验项目'])).filter((k) => k !== '|'))
+  const dupes = []
+  const fresh = items || []
+  for (const it of fresh) {
     const category = String(it['检验内容'] || '').trim()
+    const k = norm(category || '检验项目') + '|' + norm(it['项目名称'])
+    if (seen.has(k)) { dupes.push(it['项目名称'] || ''); continue }   // 已带入过 ⇒ 跳过不重复加
+    seen.add(k)
+    const row = newDetailRow(tabKey)
     if (has('表区')) row['表区'] = category || '检验项目'
     if (has('检验项目')) row['检验项目'] = it['项目名称'] || ''
     // 制程检验单的列名是「检验要求」,三类工序检验单是「标准要求」—— 两个都填,各自生效
@@ -5748,9 +5766,13 @@ function applyInspItems(items) {
     archPage.value = Math.ceil(rows.length / archPageSize.value)
     markInlineDirty()
     const cats = [...new Set(rows.map((r) => r['表区']).filter(Boolean))]
+    const dupTip = dupes.length ? `，${tt('跳过已带入')}${dupes.length}${tt('项(带入结果)')}` : ''
     ElMessage.success(cats.length > 1
-      ? `${tt('已带入')} ${n} ${tt('行检验项目，按')} ${cats.length} ${tt('个类别分格，请填写实测数值与判定')}`
-      : `${tt('已带入')} ${n} ${tt('行检验项目，请填写实测数值与判定')}`)
+      ? `${tt('已带入')} ${n} ${tt('行检验项目，按')} ${cats.length} ${tt('个类别分格')}${dupTip}`
+      : `${tt('已带入')} ${n} ${tt('行检验项目')}${dupTip}`)
+  } else if (dupes.length) {
+    // 勾的都已在明细里 ⇒ 一条不加,明确告知
+    ElMessage.warning(`${tt('勾选的检验项目已全部带入')}(${dupes.length})${tt('，不重复添加')}`)
   }
   return n
 }
@@ -7002,6 +7024,8 @@ async function onButton(action) {
   // (RD_INSP_PLAN,文档编号 YJ-RD001)取回该产品的检验项目,追加到明细。
   // 用户口径:「实现对应的产品编码就能获取到对应的检验内容进行填入」。
   // 追加不覆盖(可重复点、可手工删多余行);查不到计划不算错,由这里给业务话术。
+  // 2026-10-14 口径:「获得项目后应存校验、查看是否已获取,不能无限添加」——
+  //   ⇒ 带入前先与明细已有项目对账:已带的跳过不重复加,重复项在结果里报出来。
   if (action === '取出货检验计划') {
     const code = String(cur.value?.['产品编码'] || '').trim()
     if (!code) return ElMessage.warning(tt('请先填写产品编码'))
@@ -7014,8 +7038,17 @@ async function onButton(action) {
           ? tt('该出货检验计划没有明细')
           : `${tt('该产品没有出货检验计划')}：${code}`)
       }
-      const n = applyShipPlanItems(planRows)
-      ElMessage.success(`${tt('已按出货检验计划')} ${data.planNo} ${tt('带入')} ${n} ${tt('行，请填写实测数值与判定')}`)
+      const r = applyShipPlanItems(planRows)
+      if (!r.added) {
+        // 一条都没加进来 ⇒ 计划里的项目都在明细里了,明确告知不重复添加
+        return ElMessage.warning(
+          `${tt('该产品')}${code}${tt('的检验项目已全部带入')}(${r.dupes.length})${tt('，不重复添加')}`)
+      }
+      // 有新增也有重复:说明新增几条、跳过几条,避免用户以为整张计划都进来了
+      const dupTip = r.dupes.length
+        ? `，${tt('跳过已带入')}${r.dupes.length}${tt('项(带入结果)')}`
+        : ''
+      ElMessage.success(`${tt('已按出货检验计划')} ${data.planNo} ${tt('带入')} ${r.added}/${r.total} ${tt('行(带入结果)')}${dupTip}${tt('，请填写实测数值与判定')}`)
     } catch (error) {
       ElMessage.error(engine.errMsg(error) || tt('取出货检验计划失败'))
     }
