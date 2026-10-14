@@ -18,6 +18,9 @@ export const useUserStore = defineStore('user', {
       approvePanels: Array.isArray(ui?.approvePanels) ? ui.approvePanels : [],
       // 可配置「自定义字段」的面板(2026-10-09):管理员=['*'],其余=角色在该面板被勾了「自定义字段」
       fieldPanels: Array.isArray(ui?.fieldPanels) ? ui.fieldPanels : [],
+      // 页面级虚拟面板的动作词(2026-10-16):订单结转/快速排产/工单排产/生产工单,code → perms csv。
+      // 管理员=每码 '*'。判定走 core/auth/panelAccess.canDo(与后端 requireButton 同源)。
+      pagePerms: ui?.pagePerms && typeof ui.pagePerms === 'object' ? ui.pagePerms : {},
     }
   },
   getters: {
@@ -59,6 +62,7 @@ export const useUserStore = defineStore('user', {
       this.visiblePanels = Array.isArray(u?.visiblePanels) ? u.visiblePanels : []
       this.approvePanels = Array.isArray(u?.approvePanels) ? u.approvePanels : []
       this.fieldPanels = Array.isArray(u?.fieldPanels) ? u.fieldPanels : []
+      this.pagePerms = u?.pagePerms && typeof u.pagePerms === 'object' ? u.pagePerms : {}
     },
     // 刷新权限（角色/面板配置变更后调用）
     async fetchPerms() {
@@ -70,8 +74,9 @@ export const useUserStore = defineStore('user', {
       this.visiblePanels = Array.isArray(p.visiblePanels) ? p.visiblePanels : []
       this.approvePanels = Array.isArray(p.approvePanels) ? p.approvePanels : []
       this.fieldPanels = Array.isArray(p.fieldPanels) ? p.fieldPanels : []
+      this.pagePerms = p.pagePerms && typeof p.pagePerms === 'object' ? p.pagePerms : {}
       if (this.userInfo) {
-        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels }
+        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, pagePerms: this.pagePerms }
         localStorage.setItem('mes_user', JSON.stringify(this.userInfo))
       }
     },
@@ -122,6 +127,7 @@ export const useUserStore = defineStore('user', {
       this.visiblePanels = []
       this.approvePanels = []
       this.fieldPanels = []
+      this.pagePerms = {}
       localStorage.removeItem('mes_token')
       localStorage.removeItem('mes_user')
     },

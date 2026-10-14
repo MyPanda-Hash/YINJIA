@@ -19,8 +19,10 @@
       </el-form-item>
       <el-button type="primary" @click="loadAll">{{ tt('查询') }}</el-button>
       <el-button :loading="loading" @click="loadAll">{{ tt('刷新') }}</el-button>
-      <!-- 2026-10-07 用户口径:排产时**一次把整条工艺路线的线选好**(弹窗逐道选线,人工选) -->
-      <el-button type="success" :disabled="checked.length !== 1" @click="openPlan(checked[0])">
+      <!-- 2026-10-07 用户口径:排产时**一次把整条工艺路线的线选好**(弹窗逐道选线,人工选)。
+           2026-10-16 权限:排产=页面面板「排产」动作词(assign);快速排产页与生产工单页两个入口
+           任一授予即可(与后端 requireButtonAny 同口径)。 -->
+      <el-button v-if="canAssign" type="success" :disabled="checked.length !== 1" @click="openPlan(checked[0])">
         {{ tt('排产') }}
       </el-button>
       <span class="sb-stats">
@@ -66,10 +68,10 @@
         <el-switch v-model="allMode" :active-text="tt('全部')" @change="loadToday" />
         <div class="sb-actions">
           <!-- 改线(2026-10-07):已排产工单重开排线弹窗改后续各道的预排线(首道线锁定) -->
-          <el-button size="small" type="primary" plain :disabled="checkedToday.length !== 1" @click="openPlan(checkedToday[0], true)">
+          <el-button v-if="canAssign" size="small" type="primary" plain :disabled="checkedToday.length !== 1" @click="openPlan(checkedToday[0], true)">
             {{ tt('预排线') }}
           </el-button>
-          <el-button size="small" type="danger" plain :disabled="!checkedToday.length" @click="unassign">
+          <el-button v-if="canUnassign" size="small" type="danger" plain :disabled="!checkedToday.length" @click="unassign">
             {{ tt('撤销排产') }}（{{ checkedToday.length }}）
           </el-button>
         </div>
@@ -106,7 +108,19 @@ import { ref, computed, onMounted, onActivated } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
+import { useUserStore } from '@/stores/user'
+import { canDo, canDoAny } from '@core/auth/panelAccess'
 import ProcessRoutePlanDialog from './ProcessRoutePlanDialog.vue'
+
+/**
+ * 页面级权限(2026-10-16):本组件**两处挂载** —— 快速排产页(/prod/plan/scheduleBoard)与其
+ * 在生产工单页里弹出的内嵌版;两处的动作词口径与后端 requireButtonAny 一致:
+ *   · 排产/预排线 = 快速排产「排产」∪ 生产工单「排产」(assign);
+ *   · 撤销排产   = 只认快速排产「撤销排产」(unassign,后端同口径)。
+ */
+const user = useUserStore()
+const canAssign = computed(() => canDoAny(user, ['SCHEDULE_BOARD', 'WORK_ORDER_LIST'], 'assign'))
+const canUnassign = computed(() => canDo(user, 'SCHEDULE_BOARD', 'unassign'))
 
 /** 内嵌/筛选(2026-10-05 用户口径):生产工单页把"快速排产页面本身"弹出来,并只筛当前工单;
  *  2026-10-15 补「工单行号」—— 用户口径「工单号+工单行号确定当前唯一工单」:

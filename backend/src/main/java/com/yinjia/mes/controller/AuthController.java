@@ -3,6 +3,7 @@ package com.yinjia.mes.controller;
 import com.yinjia.mes.config.DataSourceRouter;
 import com.yinjia.mes.config.JwtUtil;
 import com.yinjia.mes.dto.ApiResult;
+import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.UsageLogService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -85,6 +87,10 @@ public class AuthController {
             // 前端据此决定「字段管理 / 自定义字段」入口显不显示;真闸门在服务端
             // PanelPermissionService.requireFieldConfig(同词 = field)。
             user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
+            // 页面级面板权限词(2026-10-16):订单结转/快速排产/工单排产/生产工单四个**看板页面**不是
+            // 单据面板,按钮不能走面板元数据(yj_button)—— 由本表下发 code → perms csv,前端 canDo 判显隐;
+            // 真闸门在服务端 PanelPermissionService.requirePanelView/requireButton(同一份 yj_role_panel.perms)。
+            user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
             Map<String, Object> out = new HashMap<>();
             out.put("token", jwtUtil.generate(username, factory));
             out.put("user", user);
@@ -103,6 +109,7 @@ public class AuthController {
         out.put("visiblePanels", user.get("visiblePanels"));
         out.put("approvePanels", user.get("approvePanels"));
         out.put("fieldPanels", user.get("fieldPanels"));
+        out.put("pagePerms", user.get("pagePerms"));
         return ApiResult.ok(out);
     }
 
@@ -165,6 +172,7 @@ public class AuthController {
         user.put("visiblePanels", visiblePanelsOf(admin, u.get("role_id")));
         user.put("approvePanels", approvePanelsOf(admin, u.get("role_id")));
         user.put("fieldPanels", panelsWithPerm(admin, u.get("role_id"), "field"));
+        user.put("pagePerms", pagePermsOf(admin, u.get("role_id")));
         return user;
     }
 
@@ -199,6 +207,28 @@ public class AuthController {
                 "SELECT panel_code, perms FROM yj_role_panel WHERE role_id = ?",
                 (rs, i) -> hasPermWord(rs.getString(2), word) ? rs.getString(1) : null, roleId)
                 .stream().filter(java.util.Objects::nonNull).toList();
+    }
+
+    /**
+     * 页面级虚拟面板的权限词表(2026-10-16):code → perms csv,只含
+     * {@link PagePanelRegistry} 登记的四个看板页面(不把整张权限矩阵发给前端)。
+     * 管理员 = 每个页面面板都给 `*`(通配"全部动作",与 fieldPanels 的 admin 口径一致)。
+     * 未授权的页面给空串(前端按"拿不到权限 = 不放行"处理,宁可看不到按钮也别点出 403)。
+     */
+    private Map<String, Object> pagePermsOf(boolean admin, Object roleId) {
+        Map<String, String> granted = new HashMap<>();
+        if (!admin && roleId != null) {
+            for (Map<String, Object> r : jdbc.queryForList(
+                    "SELECT panel_code, perms FROM yj_role_panel WHERE role_id = ?", roleId)) {
+                Object perms = r.get("perms");
+                granted.put(String.valueOf(r.get("panel_code")), perms == null ? "" : String.valueOf(perms));
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        for (String code : PagePanelRegistry.codes()) {
+            out.put(code, admin ? "*" : granted.getOrDefault(code, ""));
+        }
+        return out;
     }
 
     /** csv 权限词表是否含某词(trim + 逐词精确匹配;null/空表 = 不含) */

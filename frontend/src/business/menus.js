@@ -210,15 +210,18 @@ export const menuTree = [
         code: 'plan', title: '生产计划', children: [
           // 订单结转·发单工作台(方案 V1.0):待结转行(剩余=需求−已排产−已采购)→转工单/转采购单;
           // 防重复=行级占用链,转满自动消失;不改销售订单状态。置首位:发单是排产的上一步。
-          { code: 'orderConvert', title: '订单结转', path: '/prod/plan/orderConvert', icon: 'Switch' },
+          // 2026-10-16 权限化:这四个看板页面此前**没有 panelCode** —— 而 filterMenuTree 对
+          // 「无 panelCode 的叶子」一律放行 ⇒ 任何登录账号都能看到并进入。现挂页面级虚拟面板码
+          // (定义见后端 PagePanelRegistry;组织架构「角色与面板权限」里按页特性勾动作)。
+          { code: 'orderConvert', title: '订单结转', path: '/prod/plan/orderConvert', panelCode: 'ORDER_CONVERT', icon: 'Switch' },
           // 生产工单(2026-09-24 用户拍板改名:原「生产加工单」MANU_ORDER,面板名/菜单位移自此;
           // 流程位置=订单结转之后、排产之前:生单→编制审核→排产工作台排线)。
           // 原生产记录组的「生产加工单」菜单同步下线,单一入口。
           // 列表样式=工单排产·列表(2026-09-24,参考旧系统 ProSchedulingController 报表式:修改/结案/打印工单/打印工单_多个/打印领料单/批量调线+产线筛选+追溯);单据维护从行点修改进表单
-          { code: 'manufactureOrder', title: '生产工单', path: '/prod/plan/workOrderList', icon: 'Document' },
+          { code: 'manufactureOrder', title: '生产工单', path: '/prod/plan/workOrderList', panelCode: 'WORK_ORDER_LIST', icon: 'Document' },
           // 快速排产(原「排产工作台」,2026-09-26 用户拍板改名):待排产池(已审核·未指派产线)→选产线(带负荷)→单笔/批量排入→撤销回池;
           // 排产单一入口(工单「排产」按钮已下线,表单产线/开工·完工日只读)
-          { code: 'scheduleBoard', title: '快速排产', path: '/prod/plan/scheduleBoard', icon: 'AlarmClock' },
+          { code: 'scheduleBoard', title: '快速排产', path: '/prod/plan/scheduleBoard', panelCode: 'SCHEDULE_BOARD', icon: 'AlarmClock' },
           // 2026-09-22 单轨改造(参考库式,用户拍板):生产工单/排单计划菜单下线——
           // 工单=生产加工单(MANU_ORDER),看板职责由「生产排产 MANU_SCHEDULE」承接(含五工序完成/未完成数量);
           // 面板与权限行保留可回滚(同 组装BOM表 并页签先例)。恢复:取消下两行注释即可。
@@ -227,7 +230,7 @@ export const menuTree = [
           // 2026-09-23 纠偏(用户拍板):「生产排产」平铺看板改为「工单排产」产线骨架视图(参考旧系统工单排产页,
           // 按产线查看正在运行的工单任务);MANU_SCHEDULE 面板/权限行保留可回滚(同 WO_ORDER 先例)。
           // { code: 'manuSchedule', title: '生产排产', path: '/panelx/list/MANU_SCHEDULE', panelCode: 'MANU_SCHEDULE', icon: 'Histogram' },
-          { code: 'workOrderBoard', title: '工单排产', path: '/prod/plan/workOrderBoard', icon: 'Histogram' },
+          { code: 'workOrderBoard', title: '工单排产', path: '/prod/plan/workOrderBoard', panelCode: 'WORK_ORDER_BOARD', icon: 'Histogram' },
           // 工序任务(路线驱动,A 项 2026-10-05)菜单已按用户口径**撤下**(「把工序任务删除掉算了」,
           // 2026-10-05):工单详情只看"走到哪一步"(按报工统计),不再维护工序任务队列。
           // 页面组件/后端接口/表结构按可撤回要求保留但不再挂菜单;要恢复只需把下面一行注释去掉。

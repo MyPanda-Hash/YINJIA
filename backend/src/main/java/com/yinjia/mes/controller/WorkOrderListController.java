@@ -1,6 +1,7 @@
 package com.yinjia.mes.controller;
 
 import com.yinjia.mes.dto.ApiResult;
+import com.yinjia.mes.service.PagePanelRegistry;
 import com.yinjia.mes.service.PanelPermissionService;
 import com.yinjia.mes.service.WorkOrderPickingService;
 import com.yinjia.mes.service.WorkOrderSplitService;
@@ -27,11 +28,20 @@ import java.util.Map;
  * ④/toPicking 转领料单(2026-10-07:原「打印领料单」改为转单)——按工单号生成「材料出库单(领料单)」
  *   草稿,业务规则见 {@link WorkOrderPickingService}。
  * 定位(2026-09-26 用户拍板):生产工单=**纯查询+打印**,不作为快速排产任务——/reassign 批量调线已移除。
- * 权限:查看=登录即可(列表只读);写操作挂 MANU_ORDER(打印=打印按钮,结案/转领料单=保存词表)。
+ *
+ * <p>权限(2026-10-16 补):本页此前是四页里**唯一连读都没拦**的 —— 菜单无 panelCode(任何登录账号可见)、
+ * 列表接口零校验(登录即可读全部工单/客户/数量)。现挂**页面面板**
+ * {@link PagePanelRegistry#WORK_ORDER_LIST}(可见/查询/打印/结案/切单/转领料单/导出/排产),
+ * 写操作按各自动作词判定;与工单排产看板共用的端点(close/printStamp)按「任一命中」放行。
  */
 @RestController
 @RequestMapping("/api/px")
 public class WorkOrderListController {
+
+    /** 结案族与打印的两个入口:生产工单列表 + 工单排产看板(看板只有「取消结案」⇒ unclose 词) */
+    private static final String[] CLOSE_ENTRIES = {
+            PagePanelRegistry.WORK_ORDER_LIST, PagePanelRegistry.WORK_ORDER_BOARD};
+    private static final String[] PRINT_ENTRIES = CLOSE_ENTRIES;
 
     private final JdbcTemplate jdbc;
     private final PanelPermissionService perm;
@@ -69,6 +79,7 @@ public class WorkOrderListController {
 
     @PostMapping("/workOrderList")
     public ApiResult<List<Map<String, Object>>> list(@RequestBody(required = false) Map<String, Object> body) {
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
         Map<String, Object> b = body == null ? Map.of() : body;
         List<Object> args = new ArrayList<>();
         StringBuilder w = new StringBuilder(" WHERE ISNULL(p.asp_cancel,'N') <> 'Y'");
@@ -193,8 +204,8 @@ public class WorkOrderListController {
     /** 打印生产任务单留痕:plang.asp_print+1、打印人/打印时间(权限=MANU_ORDER 打印) */
     @PostMapping("/workOrderList/printStamp")
     public ApiResult<Map<String, Object>> printStamp(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "打印");
+        perm.requirePanelViewAny(PRINT_ENTRIES);
+        perm.requireButtonAny(PRINT_ENTRIES, "打印");
         List<Map<String, Object>> rows = castRows(body.get("rows"));
         if (rows.isEmpty()) throw new IllegalArgumentException("请先勾选要打印的工单");
         String user = currentUser();
@@ -220,9 +231,10 @@ public class WorkOrderListController {
     /** 结案/取消结案:plang.ja=Y/N(参考库 T/Y 归一);留痕 yj_usage_log */
     @PostMapping("/workOrderList/close")
     public ApiResult<Map<String, Object>> close(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelViewAny(CLOSE_ENTRIES);
         boolean close = !"false".equals(String.valueOf(body.get("结案")));
+        // 列表按「结案/取消结案」两词同挂 close;看板上的「取消结案」挂 unclose ⇒ 逐面板找词、任一命中
+        perm.requireButtonAny(CLOSE_ENTRIES, close ? "结案" : "取消结案");
         List<Map<String, Object>> rows = castRows(body.get("rows"));
         if (rows.isEmpty()) throw new IllegalArgumentException(close ? "请先勾选要结案的工单" : "请先勾选要取消结案的工单");
         String user = currentUser();
@@ -275,23 +287,23 @@ public class WorkOrderListController {
     /** 切单预览:返回 可切上限 / 已入库 / 已完工报工 / 已切出,供弹窗限制输入范围 */
     @PostMapping("/workOrderList/splitPreview")
     public ApiResult<Map<String, Object>> splitPreview(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
         return ApiResult.ok(splitService.preview(body == null ? Map.of() : body));
     }
 
     /** 切单:父单核减 + 子单新建(+ 继承排产)+ 占用链拆账 + 双向留痕 */
     @PostMapping("/workOrderList/split")
     public ApiResult<Map<String, Object>> split(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButton(PagePanelRegistry.WORK_ORDER_LIST, "切单");
         return ApiResult.ok(splitService.split(body == null ? Map.of() : body, currentUser()));
     }
 
     /** 撤回切单:子单无下游(无报工/无入库/无领料/未结案/未再切分)才可撤回 */
     @PostMapping("/workOrderList/unsplit")
     public ApiResult<Map<String, Object>> unsplit(@RequestBody Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButton(PagePanelRegistry.WORK_ORDER_LIST, "撤回切单");
         return ApiResult.ok(splitService.unsplit(body == null ? Map.of() : body, currentUser()));
     }
 
@@ -302,8 +314,8 @@ public class WorkOrderListController {
     /** 转领料单:按工单号去重逐张生成草稿;回执含 单号清单/失败行,前端据此提示并可跳材料出库单 */
     @PostMapping("/workOrderList/toPicking")
     public ApiResult<Map<String, Object>> toPicking(@RequestBody(required = false) Map<String, Object> body) {
-        perm.requirePanelView("MANU_ORDER");
-        perm.requireButton("MANU_ORDER", "保存");
+        perm.requirePanelView(PagePanelRegistry.WORK_ORDER_LIST);
+        perm.requireButton(PagePanelRegistry.WORK_ORDER_LIST, "转领料单");
         Map<String, Object> b = body == null ? Map.of() : body;
         return ApiResult.ok(pickingService.toPicking(castRows(b.get("rows")), currentUser()));
     }

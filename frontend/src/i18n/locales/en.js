@@ -777,6 +777,9 @@ export default {
     '完工数据': 'Completion',
     '（快速排产已不可选）': ' (removed from quick scheduling)',
     '保存交期': 'Save Due Dates',
+    // 页面面板动作名(2026-10-16):组织架构 →「角色与面板权限」里 订单结转 的动作列头
+    // (动作集定义见后端 PagePanelRegistry;其余动作名沿用本文件既有译名)
+    '修改交期': 'Edit Due Dates',
     '交期已保存': 'Due dates saved',
     '同步交期常与创建日期雷同，可在此修正；保存交期或转单时回写订单行': 'Synced due dates often equal the created date; correct here - saved on Save or on convert',
 

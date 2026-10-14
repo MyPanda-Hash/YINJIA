@@ -110,8 +110,12 @@ test('生产制造的明细/统计表挂在所属业务对象下(与销售管理
   const mfg = menuTree.find((n) => n.code === 'mfg')
   const group = (code) => (mfg.children || []).find((c) => c.code === code)
   // 域内顺序 = 单据 → 明细表 → 统计表(照抄 智能供应链·销售管理)
+  // 2026-10-16:生产计划域的四个看板页面(订单结转/生产工单/快速排产/工单排产)新增了
+  // **页面级虚拟面板码**(权限化,定义见后端 PagePanelRegistry),故也进入本断言 ——
+  // 顺序即 menus.js 里的菜单顺序,改菜单必须同步这里。
   assert.deepEqual((group('plan').children || []).map((c) => c.panelCode).filter(Boolean),
-    ['LINE_LOAD', 'MANU_ORDER_DETAIL', 'MANU_ORDER_STATS'])
+    ['ORDER_CONVERT', 'WORK_ORDER_LIST', 'SCHEDULE_BOARD', 'WORK_ORDER_BOARD',
+      'LINE_LOAD', 'MANU_ORDER_DETAIL', 'MANU_ORDER_STATS'])
   assert.deepEqual((group('legacy').children || []).map((c) => c.panelCode),
     ['DISPATCH', 'OUTSOURCE_ORDER', 'DISPATCH_DETAIL', 'DISPATCH_STATS'])
   // 四张面板各出现一次:防并域时重复挂载或漏挂

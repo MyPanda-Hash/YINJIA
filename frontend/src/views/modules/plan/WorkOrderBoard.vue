@@ -55,13 +55,17 @@
               <el-radio-button value="全部">{{ tt('全部') }}</el-radio-button>
             </el-radio-group>
             <div class="wb-actions">
-              <el-button size="small" type="danger" plain :disabled="!checkedSched.length" @click="unclose">
+              <!-- 页面级权限(2026-10-16):本页挂页面面板 WORK_ORDER_BOARD
+                   (可见/查询/调拨/撤回调拨/取消结案/打印,词表见后端 PagePanelRegistry)。
+                   无该动作词的角色不显示按钮;后端按同一份 perms 复核(取消结案与打印
+                   与生产工单列表共用端点,故那边授予的同名词亦可放行 —— 见 requireButtonAny)。 -->
+              <el-button v-if="canDo('unclose')" size="small" type="danger" plain :disabled="!checkedSched.length" @click="unclose">
                 {{ tt('取消结案') }}（{{ checkedSched.length }}）
               </el-button>
               <el-button size="small" type="primary" plain :disabled="checkedSched.length !== 1" @click="openTrace">
                 {{ tt('追溯') }}
               </el-button>
-              <el-dropdown split-button size="small" type="success" plain :disabled="!checkedSched.length"
+              <el-dropdown v-if="canDo('print')" split-button size="small" type="success" plain :disabled="!checkedSched.length"
                            @click="printTask('成型生产任务单')" @command="printTask">
                 {{ tt('打印工单') }}（{{ checkedSched.length }}）
                 <template #dropdown>
@@ -69,10 +73,10 @@
                   <el-dropdown-item command="组装生产任务单">{{ tt('组装生产任务单') }}</el-dropdown-item>
                 </template>
               </el-dropdown>
-              <el-button size="small" type="warning" plain :disabled="!checkedSched.length" @click="openReassign">
+              <el-button v-if="canDo('transfer')" size="small" type="warning" plain :disabled="!checkedSched.length" @click="openReassign">
                 {{ tt('调拨') }}（{{ checkedSched.length }}）
               </el-button>
-              <el-button size="small" plain :disabled="!checkedSched.length" @click="doTransferRevoke">
+              <el-button v-if="canDo('revoke')" size="small" plain :disabled="!checkedSched.length" @click="doTransferRevoke">
                 {{ tt('撤回调拨') }}
               </el-button>
               <!-- 「转领料」已随 MES 自建 BOM 下架移除(2026-10-04):它按 默认BOM×排产数量 生成领料单草稿,
@@ -169,6 +173,15 @@ import { printWorkTaskSheet } from '@/business/print-formats'
 import { tt } from '@/i18n'
 import WorkOrderTraceDialog from './WorkOrderTraceDialog.vue'
 import { useUserStore } from '@/stores/user'
+import { canDo as canDoPerm } from '@core/auth/panelAccess'
+
+/**
+ * 页面级动作权限(2026-10-16):页面面板 WORK_ORDER_BOARD
+ * (可见/查询/调拨/撤回调拨/取消结案/打印;词表见后端 PagePanelRegistry)。
+ * 未授权的按钮不渲染;「追溯」是只读查看,归「可见」不另设动作。
+ */
+const permUser = useUserStore()
+const canDo = (word) => canDoPerm(permUser, 'WORK_ORDER_BOARD', word)
 
 const day = ref(new Date().toISOString().slice(0, 10))
 const lineSummary = ref([])

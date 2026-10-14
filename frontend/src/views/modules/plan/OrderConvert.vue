@@ -36,11 +36,13 @@
       </el-form-item>
       <el-button type="primary" @click="onQuery">{{ tt('查询') }}</el-button>
       <el-button :loading="loading" @click="onQuery">{{ tt('刷新') }}</el-button>
-      <el-button type="danger" plain :disabled="!dateChanged.length" @click="saveDates">
+      <!-- 页面级权限(2026-10-16):保存交期=页面面板「修改交期」动作词(date),
+           选路线/转工单=「转工单」(convert);无该词的角色不显示按钮,后端同口径 403。 -->
+      <el-button v-if="canDates" type="danger" plain :disabled="!dateChanged.length" @click="saveDates">
         {{ tt('保存交期') }}（{{ dateChanged.length }}）
       </el-button>
-      <el-button :disabled="!checked.length" @click="openRouteDialog">{{ tt('选择工艺路线') }}（{{ checked.length }}）</el-button>
-      <el-button type="success" :disabled="!checked.length" @click="toManu">{{ tt('转工单') }}（{{ checked.length }}）</el-button>
+      <el-button v-if="canConvert" :disabled="!checked.length" @click="openRouteDialog">{{ tt('选择工艺路线') }}（{{ checked.length }}）</el-button>
+      <el-button v-if="canConvert" type="success" :disabled="!checked.length" @click="toManu">{{ tt('转工单') }}（{{ checked.length }}）</el-button>
       <span class="oc-count">{{ tt('共有数据') }}: <b>{{ rows.length }}</b> {{ tt('条') }}</span>
     </el-form>
 
@@ -62,6 +64,7 @@
           <template #default="{ row }">
             <el-date-picker v-model="row.交货日期" type="date" value-format="YYYY-MM-DD" size="small"
                             style="width: 130px" :class="{ 'oc-date-dirty': row.交货日期 !== row.交货日期原始 }"
+                            :disabled="!canDates"
                             :title="tt('同步交期常与创建日期雷同，可在此修正；保存交期或转单时回写订单行')" />
           </template>
         </el-table-column>
@@ -137,6 +140,17 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '@core/request'
 import { tt } from '@/i18n'
+import { useUserStore } from '@/stores/user'
+import { canDo } from '@core/auth/panelAccess'
+
+/**
+ * 页面级权限(2026-10-16):本页挂页面面板 ORDER_CONVERT
+ * (可见/查询/修改交期/转工单,词表见后端 PagePanelRegistry)。
+ * 无权限的按钮直接不显示;后端 /px/orderConvert/* 按同一份 perms 复核。
+ */
+const user = useUserStore()
+const canDates = computed(() => canDo(user, 'ORDER_CONVERT', 'date'))
+const canConvert = computed(() => canDo(user, 'ORDER_CONVERT', 'convert'))
 
 /** 近N天档位(用户口径:默认单日,可切近几日) */
 const NEAR_DAYS = [3, 7, 14, 30]
