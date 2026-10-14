@@ -1,69 +1,86 @@
 <template>
-  <!-- 制程检验单 · 整页报表式交叉表(2026-10-12)
-       用户口径:「照截图:横向组头」+「不是修改明细表而是修改当前页面」——
-       本组件接管整页:上方=表头字段(报表式 标签|值),下方=交叉表(表区横向并排,组名横跨本组列)。 -->
-  <div class="qsheet">
-    <!-- ① 表头字段(报表式两列一组:标签 + 值) -->
-    <table class="qsheet-meta">
+  <!-- ═══════════════════════════════════════════════════════════════════
+       制程检验单(QC_PROC_INSP)—— 纸张式可填写报表(2026-10-12)
+       写法仿 QcInspRecSheet(检验数据记录):标题 → 抬头 标签|值 → 分区表体 → 结论,
+       单元格 editable 守卫 + v-model 直绑 + @input=emit('dirty');
+       行数据取 head.detail 下的明细数组(与 QcInspRecSheet 同款契约,不另设 rows prop)。
+
+       与 QcInspRecSheet 的差异(按用户截图):**表体按「表区」横向分组** ——
+       外观 | 尺寸 | 出货重量 … 并排,组名横跨本组各列(两层表头)。
+         · 定性组(外观/材质/包装…):列 = 该组各检验项目,单元格 = 实测数值
+         · 定量组(尺寸/重量/性能…):列 = 项目 + 测量值1..5,行 = 该组各检验项目
+       ═══════════════════════════════════════════════════════════════════ -->
+  <div class="qr-sheet">
+    <!-- ① 标题 -->
+    <div class="qr-titlerow">
+      <div class="qr-title">{{ tt('制程检验记录表') }}</div>
+    </div>
+
+    <!-- ② 抬头:面板表头字段,每行 4 组 标签|值(值可填) -->
+    <table class="qr-head-table">
       <tbody>
-        <tr v-for="(row, i) in metaRows" :key="'m' + i">
+        <tr v-for="(row, ri) in headRows" :key="'h' + ri">
           <template v-for="k in row" :key="k">
-            <th class="ml">{{ tt(k) }}</th>
-            <td class="mv" :class="{ ed: editable }" @click="onMetaClick(k)">
-              <input
-                v-if="editing && editing.key === 'meta|' + k"
-                ref="inp"
-                class="cell-inp"
-                :value="fmt(doc[k])"
-                @blur="commitMeta($event, k)"
-                @keyup.enter="commitMeta($event, k)"
+            <th class="qr-label">{{ tt(k) }}</th>
+            <td class="qr-value">
+              <el-input
+                v-if="editable"
+                v-model="head[k]"
+                size="small"
+                class="qr-cell-input"
+                maxlength="200"
+                @input="emit('dirty')"
               />
-              <template v-else>{{ fmt(doc[k]) }}</template>
+              <span v-else class="qr-cell-text">{{ head[k] || '' }}</span>
             </td>
           </template>
         </tr>
       </tbody>
     </table>
 
-    <!-- ② 交叉表:表区横向并排 -->
-    <table class="qsheet-tb">
+    <!-- ③ 表体:表区横向分组 -->
+    <table class="qr-table">
       <thead>
         <tr>
-          <th v-for="h in headCols" :key="h.k" rowspan="2" class="fc">{{ tt(h.label) }}</th>
-          <th v-for="g in groups" :key="g.sector" :colspan="g.cols.length" class="gh">{{ g.title }}</th>
-          <th rowspan="2" class="fc">{{ tt('结果判断') }}</th>
+          <th v-for="h in fixedCols" :key="h.k" rowspan="2" class="c-fixed">{{ tt(h.label) }}</th>
+          <th v-for="g in groups" :key="g.sector" :colspan="g.cols.length" class="c-group">{{ g.title }}</th>
+          <th rowspan="2" class="c-fixed">{{ tt('结果判断') }}</th>
         </tr>
         <tr>
           <template v-for="g in groups" :key="'c' + g.sector">
-            <th v-for="c in g.cols" :key="'c' + g.sector + c.k" class="sh">{{ c.label }}</th>
+            <th v-for="c in g.cols" :key="'c' + g.sector + c.k" class="c-sub">{{ c.label }}</th>
           </template>
         </tr>
       </thead>
       <tbody>
         <tr v-for="ri in rowCount" :key="'r' + ri">
           <template v-if="ri === 1">
-            <td v-for="h in headCols" :key="'h' + h.k" class="fc" :rowspan="rowCount">{{ fmt(doc[h.key]) }}</td>
+            <td v-for="h in fixedCols" :key="'f' + h.k" class="c-fixed" :rowspan="rowCount">{{ head[h.key] || '' }}</td>
           </template>
           <template v-for="g in groups" :key="'g' + g.sector + ri">
-            <td
-              v-for="c in g.cols"
-              :key="'g' + g.sector + ri + c.k"
-              class="vc"
-              :class="{ ed: editable && cellRow(g, c, ri) }"
-              @click="onCellClick(g, c, ri)"
-            >
-              <input
-                v-if="editing && editing.key === g.sector + '|' + ri + '|' + c.k"
-                ref="inp"
-                class="cell-inp"
-                :value="cellText(g, c, ri)"
-                @blur="commit($event)"
-                @keyup.enter="commit($event)"
-              />
-              <template v-else>{{ cellText(g, c, ri) }}</template>
+            <td v-for="c in g.cols" :key="'g' + g.sector + ri + c.k" class="c-val">
+              <template v-if="cellRow(g, c, ri)">
+                <el-input
+                  v-if="editable"
+                  v-model="cellRow(g, c, ri)[g.measure ? c.prop : '实测数值']"
+                  size="small"
+                  class="qr-cell-input"
+                  @input="emit('dirty')"
+                />
+                <span v-else class="qr-cell-text">{{ cellText(g, c, ri) }}</span>
+              </template>
             </td>
           </template>
-          <td v-if="ri === 1" class="fc" :rowspan="rowCount">{{ fmt(doc['总结论']) }}</td>
+          <td v-if="ri === 1" class="c-fixed" :rowspan="rowCount">
+            <el-input
+              v-if="editable"
+              v-model="head['总结论']"
+              size="small"
+              class="qr-cell-input"
+              @input="emit('dirty')"
+            />
+            <span v-else class="qr-cell-text">{{ head['总结论'] || '' }}</span>
+          </td>
         </tr>
       </tbody>
     </table>
@@ -71,21 +88,36 @@
 </template>
 
 <script setup>
-import { computed, nextTick, ref } from 'vue'
+import { computed } from 'vue'
 import { tt } from '@/i18n'
 
 const props = defineProps({
-  doc: { type: Object, default: () => ({}) },
-  rows: { type: Array, default: () => [] },
-  /** 面板表头字段(yj_field 的 label/dataName);整页报表把它们排成 标签|值 */
+  /** 当前单据(含 detail):与 QcInspRecSheet 同款契约 */
+  head: { type: Object, required: true },
   fields: { type: Array, default: () => [] },
   editable: { type: Boolean, default: false },
 })
 const emit = defineEmits(['dirty'])
 
-/** 表头字段行(每行 4 组 标签|值):由面板表头字段驱动,已在左侧固定列的 产品编码/型号/批号/抽检总量 不重复 */
-const metaRows = computed(() => {
-  const skip = new Set(headCols.map((h) => h.key))
+/** 明细行:取 head.detail 下第一个数组(通常 items) */
+const items = computed(() => {
+  const d = props.head?.detail
+  if (!d) return []
+  for (const k of Object.keys(d)) if (Array.isArray(d[k])) return d[k]
+  return []
+})
+
+/** 左侧固定列(照截图:产品编码 | 型号(mm) | 批号 | 抽检总量) */
+const fixedCols = [
+  { k: '产品编码', label: '产品编码', key: '产品编码' },
+  { k: '型号', label: '型号（mm)', key: '规格型号' },
+  { k: '批号', label: '批号', key: '批次号' },
+  { k: '抽检总量', label: '抽检总量', key: '抽检总量' },
+]
+
+/** 抬头字段行(每行 4 组):由 fields 驱动,已在固定列的不重复 */
+const headRows = computed(() => {
+  const skip = new Set(fixedCols.map((c) => c.key))
   const names = (props.fields || [])
     .filter((f) => f && !f.hidden && f.dataName)
     .map((f) => f.dataName)
@@ -95,29 +127,19 @@ const metaRows = computed(() => {
   return rows
 })
 
-/** 左侧固定列(照截图:产品编码 | 型号(mm) | 批号 | 抽检总量) */
-const headCols = [
-  { k: '产品编码', label: '产品编码', key: '产品编码' },
-  { k: '型号', label: '型号（mm)', key: '规格型号' },
-  { k: '批号', label: '批号', key: '批次号' },
-  { k: '抽检总量', label: '抽检总量', key: '抽检总量' },
-]
 const MEASURE = ['测量值1', '测量值2', '测量值3', '测量值4', '测量值5']
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-function isMeasure(rows) {
-  return rows.some((r) => MEASURE.some((m) => {
-    const v = String(r[m] ?? '').trim()
-    return v !== '' && v !== '0'
-  }))
-}
+const isMeasure = (rows) => rows.some((r) => MEASURE.some((m) => {
+  const v = String(r[m] ?? '').trim()
+  return v !== '' && v !== '0'
+}))
 
-/** 按「表区」横向分组:每组自带列定义 */
+/** 按「表区」横向分组 */
 const groups = computed(() => {
   const order = []
   const map = new Map()
-  for (const r of props.rows || []) {
-    if (r._placeholder) continue
+  for (const r of items.value) {
     const s = String(r['表区'] ?? '').trim()
     if (!s) continue
     if (!map.has(s)) { map.set(s, []); order.push(s) }
@@ -145,106 +167,64 @@ function cellRow(g, c, ri) {
   return c.itemIdx != null ? (g.rows[c.itemIdx] || null) : null
 }
 
-function fmt(v) {
-  if (v === undefined || v === null) return ''
-  const s = String(v).trim()
-  if (s === '') return ''
-  if (/^-?\d+(\.\d+)?$/.test(s)) {
-    const n = Number(s)
-    return Number.isFinite(n) ? String(n) : s
-  }
-  return s
-}
-
 function cellText(g, c, ri) {
   const r = cellRow(g, c, ri)
   if (!r) return ''
-  if (g.measure) return fmt(r[c.prop])
-  return fmt(r['实测数值']) || fmt(r['单项判定'])
-}
-
-/* ── 表头字段编辑(与明细格同一套:点击即编辑,回车/失焦提交) ── */
-function onMetaClick(k) {
-  if (!props.editable) return
-  editing.value = { key: 'meta|' + k, row: props.doc, prop: k }
-  nextTick(() => {
-    const el = Array.isArray(inp.value) ? inp.value[0] : inp.value
-    if (el && el.focus) el.focus()
-  })
-}
-
-function commitMeta(ev, k) {
-  props.doc[k] = ev.target.value
-  editing.value = null
-  emit('dirty')
-}
-
-/* ── 单元格编辑(点击即编辑,回车/失焦提交) ── */
-const editing = ref(null)
-const inp = ref(null)
-
-function onCellClick(g, c, ri) {
-  if (!props.editable) return
-  const r = cellRow(g, c, ri)
-  if (!r) return
-  const prop = g.measure ? c.prop : '实测数值'
-  if (!prop) return
-  editing.value = { key: g.sector + '|' + ri + '|' + c.k, row: r, prop }
-  nextTick(() => {
-    const el = Array.isArray(inp.value) ? inp.value[0] : inp.value
-    if (el && el.focus) el.focus()
-  })
-}
-
-function commit(ev) {
-  if (!editing.value) return
-  const { row, prop } = editing.value
-  row[prop] = ev.target.value
-  editing.value = null
-  emit('dirty')
+  const v = g.measure ? r[c.prop] : (r['实测数值'] || r['单项判定'])
+  if (v === undefined || v === null || String(v).trim() === '') return ''
+  const s = String(v).trim()
+  return /^-?\d+(\.\d+)?$/.test(s) ? String(Number(s)) : s
 }
 </script>
 
 <style scoped>
-.qsheet {
-  margin: 4px 8px 10px;
-  overflow-x: auto;
+/* 纸张容器:与 QcInspRecSheet 同族观感 */
+.qr-sheet {
+  background: #fff;
+  border: 1px solid #d7dce5;
+  padding: 10px 12px 14px;
+  margin: 0 6px 8px;
 }
-.qsheet-meta {
+.qr-titlerow {
+  text-align: center;
+  margin-bottom: 8px;
+}
+.qr-title {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+/* 抬头表:标签右对齐 + 值左对齐,贴报表观感 */
+.qr-head-table {
   border-collapse: collapse;
   width: 100%;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   font-size: 12px;
+  table-layout: fixed;
 }
-.qsheet-meta th.ml {
+.qr-label {
   border: 1px solid #c9d4e0;
   background: #f7fafd;
   font-weight: 500;
   text-align: right;
   padding: 2px 6px;
-  width: 90px;
+  width: 84px;
   white-space: nowrap;
 }
-.qsheet-meta td.mv {
+.qr-value {
   border: 1px solid #c9d4e0;
+  padding: 1px 4px;
   text-align: left;
-  padding: 2px 6px;
-  color: #1f2d3d;
 }
-.qsheet-meta td.mv.ed {
-  cursor: pointer;
-}
-.qsheet-meta td.mv.ed:hover {
-  background: #f0f7ff;
-}
-.qsheet-tb {
+/* 表体:组名跨列的两层表头 */
+.qr-table {
   border-collapse: collapse;
   width: 100%;
   table-layout: fixed;
   font-size: 12px;
 }
-.qsheet-tb th,
-.qsheet-tb td {
+.qr-table th,
+.qr-table td {
   border: 1px solid #c9d4e0;
   padding: 2px 4px;
   height: 26px;
@@ -252,33 +232,33 @@ function commit(ev) {
   vertical-align: middle;
   word-break: break-all;
 }
-/* 组名行:浅蓝底,横跨本组各列 */
-.qsheet-tb th.gh {
+.qr-table th.c-group {
   background: #eef3f9;
   color: #1f4e79;
   font-weight: 600;
 }
-.qsheet-tb th.sh {
+.qr-table th.c-sub {
   background: #f7fafd;
   font-weight: 500;
 }
-.qsheet-tb th.fc,
-.qsheet-tb td.fc {
+.qr-table th.c-fixed,
+.qr-table td.c-fixed {
   background: #fafbfc;
   font-weight: 500;
 }
-.qsheet-tb td.vc.ed {
-  cursor: pointer;
+/* 单元格内输入:铺满格子(与 QcInspRecSheet 的 qr-cell-input 同款) */
+.qr-cell-input :deep(.el-input__wrapper) {
+  box-shadow: none;
+  background: transparent;
+  padding: 0 2px;
 }
-.qsheet-tb td.vc.ed:hover {
-  background: #f0f7ff;
-}
-.qsheet-tb .cell-inp {
-  width: 100%;
-  height: 22px;
-  border: 1px solid #5b9bd5;
-  outline: none;
+.qr-cell-input :deep(.el-input__inner) {
+  height: 20px;
+  line-height: 20px;
   text-align: center;
-  font-size: 12px;
+}
+.qr-cell-text {
+  display: inline-block;
+  min-height: 18px;
 }
 </style>

@@ -1094,8 +1094,7 @@
     <template v-else-if="isQcProcInsp">
       <div class="qc-proc-wrap" v-loading="loading">
         <QcProcInspSheet
-          :doc="cur"
-          :rows="procRows"
+          :head="cur"
           :fields="headerFields"
           :editable="draftEditable"
           @dirty="markInlineDirty"
@@ -1966,11 +1965,6 @@ const isQcInspReq = computed(() => isQcInspReqPanel(panelCode.value))
 
 /** 制程检验单:整页报表式(交叉表)分支的开关 */
 const isQcProcInsp = computed(() => panelCode.value === 'QC_PROC_INSP')
-/** 制程检验单的明细行(供交叉表渲染) */
-const procRows = computed(() => {
-  const b = blocks.value[0]
-  return b ? archRows(b) : []
-})
 /** 产品变更申请单:当前账号可填的纸面部门行(后端按 yj_user.dept_id → yj_change_dept 算,metadata 下发)。
  *  仅 RD_CHANGE 有该键;其它面板拿到空数组也无害(没有 lockKey 的表根本不看它)。 */
 const changeDeptRows = computed(() => cfgCache.value?.metadata?.changeDepts || [])
