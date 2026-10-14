@@ -2897,8 +2897,14 @@ function applySectionLib(content) {
 async function addSectionLib() {
   const text = (secLibDraft.value || '').trim()
   if (!text) return
+  // ⚠ 库与条目名必须取自本弹窗当前字段声明的标准库(openSectionLib 决定),**不能写死 spec.section**:
+  //   成型工艺的 配料要求(mold.batching)/热压要求(mold.hotpress) 等字段用的是各自的库,
+  //   写死会把条目塞进 spec.section ⇒ 弹窗(绑 secLibLib)与预设列表里**一条也看不到** = 「新增无效」。
+  //   规格书章节字段没有自己的库,secLibLib/secLibItem 退化为 spec.section + 章节名,与改前逐字等价。
+  const lib = secLibLib.value || 'spec.section'
+  const item = secLibItem.value || secLibLabel.value
   try {
-    await request.post('/stdlib/add', { lib: 'spec.section', item: secLibLabel.value, content: text })
+    await request.post('/stdlib/add', { lib, item, content: text })
     ElMessage.success(tt('已存入标准库'))
     secLibDraft.value = ''
     await secLibRef.value?.load()
