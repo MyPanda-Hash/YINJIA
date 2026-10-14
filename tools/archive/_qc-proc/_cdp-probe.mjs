@@ -97,6 +97,8 @@ const PROBE = `(async()=>{
   out.hash=location.hash;
   out.btnFound=!!document.querySelector('.qr-add-btn');
   out.gridFound=!!document.querySelector('.qr-grid');
+  out.addRowBtn=[...document.querySelectorAll('.qr-add-btn')].map(b=>b.textContent.trim()).join(' | ');
+  out.grpAddButtons=document.querySelectorAll('.qr-grp-add').length;
   const rowN=()=>document.querySelectorAll('.qr-grid tbody tr').length;
   const cellN=()=>document.querySelectorAll('.qr-grid tbody .qr-cell-text').length;
   const inpN=()=>document.querySelectorAll('.qr-sheet input, .qr-sheet textarea').length;

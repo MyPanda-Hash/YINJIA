@@ -66,7 +66,10 @@
       <thead>
         <tr>
           <th v-for="c in fixedCols" :key="c.k" rowspan="2" class="c-fixed">{{ tt(c.label) }}</th>
-          <th v-for="g in groups" :key="g.sector" :colspan="g.cols.length" class="c-group">{{ g.title }}</th>
+          <th v-for="g in groups" :key="g.sector" :colspan="g.cols.length" class="c-group">
+            {{ g.title }}
+            <span v-if="editable" class="qr-grp-add no-print" :title="tt('在本表区新增一项（定性组=加一列，定量组=加一行）')" @click.stop="addInGroup(g)">＋</span>
+          </th>
           <th rowspan="2" class="c-fixed">{{ tt('结果判断') }}</th>
           <th v-if="editable" rowspan="2" class="c-op"></th>
         </tr>
@@ -176,6 +179,7 @@
     <!-- ⑤ ＋新增检验项 -->
     <div v-if="editable" class="qr-add-row no-print">
       <span class="qr-add-btn" @click="addRow()">＋ {{ tt('新增检验项') }}</span>
+      <span class="qr-add-btn" style="margin-left:8px" @click="addGroup()">＋ {{ tt('新增表区') }}</span>
     </div>
 
     <!-- ⑥ 结论区 -->
@@ -226,6 +230,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { tt } from '@/i18n'
+import { ElMessageBox } from 'element-plus'
 
 const props = defineProps({
   head: { type: Object, required: true },
@@ -352,6 +357,31 @@ function isLockedKey(k) {
 function addRow() {
   ensureItems().push({ 表区: '', 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
   bump.value++      // 明细非响应式:手动强制刷新
+  emit('dirty')
+}
+
+/** 组内新增一项:定性组表现为**加一列**,定量组表现为**加一行** */
+function addInGroup(g) {
+  if (!g) return
+  ensureItems().push({ 表区: g.sector, 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
+  bump.value++
+  emit('dirty')
+}
+
+/** 新增表区(加一整组列):让用户输入表区名,再建一行挂到该表区 */
+async function addGroup() {
+  let name = ''
+  try {
+    const r = await ElMessageBox.prompt(
+      tt('请输入表区名称（如：外观 / 尺寸 / 出货重量）'),
+      tt('新增表区'),
+      { confirmButtonText: tt('确定'), cancelButtonText: tt('取消'), inputPattern: /\S/, inputErrorMessage: tt('表区名称不能为空') },
+    )
+    name = String(r.value || '').trim()
+  } catch { return }
+  if (!name) return
+  ensureItems().push({ 表区: name, 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
+  bump.value++
   emit('dirty')
 }
 
@@ -484,6 +514,15 @@ function removeGroup(g) {
 .c-empty {
   color: #8a94a0;
   padding: 12px 0;
+}
+.qr-grp-add {
+  margin-left: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #2b6cb0;
+}
+.qr-grp-add:hover {
+  color: #1f4e79;
 }
 .qr-del {
   color: #f56c6c;
