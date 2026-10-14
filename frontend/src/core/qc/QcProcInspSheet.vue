@@ -177,7 +177,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { tt } from '@/i18n'
 
 const props = defineProps({
@@ -202,8 +202,13 @@ const fixedCols = [
   { k: '抽检总量', label: '抽检总量', key: '抽检总量' },
 ]
 
+/** 本地版本号:明细数组/行可能被面板做了 raw 处理(非响应式),
+ *  push/splice 后不会触发重渲染 —— 用它在组件内**强制刷新**(不依赖面板内部机制)。 */
+const bump = ref(0)
+
 /** 检验项明细行:照 QcInspRecSheet 硬编码 head.detail.items */
 const items = computed(() => {
+  bump.value // ← 建立依赖:变更后强制重算并触发重渲染
   const d = props.head?.detail
   return d && Array.isArray(d.items) ? d.items : []
 })
@@ -289,6 +294,7 @@ function isLockedKey(k) {
 /** 追加一行检验项目(表区留空,由用户填;填了表区即自动成组) */
 function addRow() {
   ensureItems().push({ 表区: '', 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
+  bump.value++      // 明细非响应式:手动强制刷新
   emit('dirty')
 }
 
@@ -300,6 +306,7 @@ function removeGroup(g) {
     const i = arr.indexOf(r)
     if (i >= 0) arr.splice(i, 1)
   }
+  bump.value++      // 同上:手动强制刷新
   emit('dirty')
 }
 </script>
