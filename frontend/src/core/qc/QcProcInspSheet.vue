@@ -202,12 +202,20 @@ const fixedCols = [
   { k: '抽检总量', label: '抽检总量', key: '抽检总量' },
 ]
 
+/** 检验项明细行:照 QcInspRecSheet 硬编码 head.detail.items */
 const items = computed(() => {
   const d = props.head?.detail
-  if (!d) return []
-  for (const k of Object.keys(d)) if (Array.isArray(d[k])) return d[k]
-  return []
+  return d && Array.isArray(d.items) ? d.items : []
 })
+
+/** 取(必要时创建)明细数组 —— 照 QcInspRecSheet addItem:
+    新建单据 head.detail 可能是 {} 或 {tabs:[…]} 而**没有 items**,
+    此前用「找 detail 下第一个数组」会拿到 null 直接 return ⇒ 点新增无反应。 */
+function ensureItems() {
+  const d = props.head.detail || (props.head.detail = {})
+  if (!Array.isArray(d.items)) d.items = []
+  return d.items
+}
 
 const fieldMap = computed(() => new Map((props.fields || []).map((f) => [f.dataName, f])))
 /** 抬头排除:固定列已显示 + 系统/审计 + 已在表体/结论区出现 */
@@ -278,26 +286,16 @@ function isLockedKey(k) {
   return !f || f.editable === false || f.editable === 0
 }
 
-function rowsKey() {
-  const d = props.head?.detail
-  if (!d) return null
-  return Object.keys(d).find((x) => Array.isArray(d[x])) || null
-}
-
 /** 追加一行检验项目(表区留空,由用户填;填了表区即自动成组) */
 function addRow() {
-  const k = rowsKey()
-  if (!k) return
-  props.head.detail[k].push({ 表区: '', 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
+  ensureItems().push({ 表区: '', 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
   emit('dirty')
 }
 
 /** 删除一个表区的全部行 */
 function removeGroup(g) {
   if (!g) return
-  const k = rowsKey()
-  if (!k) return
-  const arr = props.head.detail[k]
+  const arr = ensureItems()
   for (const r of [...g.rows]) {
     const i = arr.indexOf(r)
     if (i >= 0) arr.splice(i, 1)
