@@ -3088,3 +3088,4 @@ migrate-qc-proc-insp-wo-line-field.sql
 #       WORK_ORDER_LIST=view,query,print,close,split,picking,export,assign。
 #   同批另附四个面板名的 en 译名(yj_translation scope='panel')。幂等(逐条 NOT EXISTS);两账套均执行。
 migrate-page-panel-perms-20261016.sql
+hide-qc-proc-insp-spare-head-fields.sql
