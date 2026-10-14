@@ -1,11 +1,21 @@
 <template>
-  <!-- 制程检验单 · 交叉表版式(2026-10-12)
-       用户口径:「照截图:横向组头」—— 外观 | 尺寸 | 出货重量 等**表区并排**,
-       组名横跨在本组各列之上(两层表头);固定头列在左、结果判断在右。
-       数据来源仍是明细行(每行=一个检验项目),按「表区」横向分组渲染:
-         · 定性组(外观/材质/包装…):列 = 该组各检验项目名,单元格 = 实测值/判定
-         · 定量组(尺寸/重量/性能…):列 = 项目 + 测量值1..5,行 = 该组各检验项目 -->
+  <!-- 制程检验单 · 整页报表式交叉表(2026-10-12)
+       用户口径:「照截图:横向组头」+「不是修改明细表而是修改当前页面」——
+       本组件接管整页:上方=表头字段(报表式 标签|值),下方=交叉表(表区横向并排,组名横跨本组列)。 -->
   <div class="qsheet">
+    <!-- ① 表头字段(报表式两列一组:标签 + 值) -->
+    <table class="qsheet-meta">
+      <tbody>
+        <tr v-for="(row, i) in metaRows" :key="'m' + i">
+          <template v-for="k in row" :key="k">
+            <th class="ml">{{ tt(k) }}</th>
+            <td class="mv">{{ fmt(doc[k]) }}</td>
+          </template>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- ② 交叉表:表区横向并排 -->
     <table class="qsheet-tb">
       <thead>
         <tr>
@@ -21,7 +31,6 @@
       </thead>
       <tbody>
         <tr v-for="ri in rowCount" :key="'r' + ri">
-          <!-- 固定头列只在首行渲染并纵向合并(照截图:左侧一列跨整块) -->
           <template v-if="ri === 1">
             <td v-for="h in headCols" :key="'h' + h.k" class="fc" :rowspan="rowCount">{{ fmt(doc[h.key]) }}</td>
           </template>
@@ -31,7 +40,7 @@
               :key="'g' + g.sector + ri + c.k"
               class="vc"
               :class="{ ed: editable && cellRow(g, c, ri) }"
-              @click="onCellClick(g, c, ri, $event)"
+              @click="onCellClick(g, c, ri)"
             >
               <input
                 v-if="editing && editing.key === g.sector + '|' + ri + '|' + c.k"
@@ -62,7 +71,15 @@ const props = defineProps({
 })
 const emit = defineEmits(['dirty'])
 
-/** 左侧固定列(来自单据头;照截图:产品编码 | 型号(mm) | 批号 | 抽检总量) */
+/** 表头字段(报表式:每行 4 组 标签|值;不含已在左侧固定列的 产品编码/型号/批号/抽检总量) */
+const META = [
+  ['单据编号', '单据日期', '检验类别', '工序'],
+  ['客户名称', '产品名称', '工单号', '报工单号'],
+  ['检验员', '检验日期', '检验方案', '备注'],
+]
+const metaRows = computed(() => META.map((r) => r.slice()))
+
+/** 左侧固定列(照截图:产品编码 | 型号(mm) | 批号 | 抽检总量) */
 const headCols = [
   { k: '产品编码', label: '产品编码', key: '产品编码' },
   { k: '型号', label: '型号（mm)', key: '规格型号' },
@@ -72,7 +89,6 @@ const headCols = [
 const MEASURE = ['测量值1', '测量值2', '测量值3', '测量值4', '测量值5']
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
 
-/** 该组是否定量(有任意测量值) */
 function isMeasure(rows) {
   return rows.some((r) => MEASURE.some((m) => {
     const v = String(r[m] ?? '').trim()
@@ -95,21 +111,18 @@ const groups = computed(() => {
     const rs = map.get(s)
     const meas = isMeasure(rs)
     const cols = meas
-      ? [{ k: '项目', label: '项目' }].concat(
-          MEASURE.map((m) => ({ k: m, label: m, prop: m })))
+      ? [{ k: '项目', label: '项目' }].concat(MEASURE.map((m) => ({ k: m, label: m, prop: m })))
       : rs.map((r, j) => ({ k: 'i' + j, label: String(r['检验项目'] || ''), itemIdx: j }))
     return { sector: s, title: (LETTERS[i] || '') + '.' + tt(s), cols, rows: rs, measure: meas }
   })
 })
 
-/** 行数 = 各定量组的项目数取最大(定性组占第 1 行) */
 const rowCount = computed(() => {
   let n = 1
   for (const g of groups.value) n = Math.max(n, g.measure ? g.rows.length : 1)
   return n
 })
 
-/** 某单元格对应的明细行 */
 function cellRow(g, c, ri) {
   const i = ri - 1
   if (g.measure) return g.rows[i] || null
@@ -120,7 +133,6 @@ function fmt(v) {
   if (v === undefined || v === null) return ''
   const s = String(v).trim()
   if (s === '') return ''
-  // 纯数值去尾零(44.5000 → 44.5)
   if (/^-?\d+(\.\d+)?$/.test(s)) {
     const n = Number(s)
     return Number.isFinite(n) ? String(n) : s
@@ -160,3 +172,75 @@ function commit(ev) {
   emit('dirty')
 }
 </script>
+
+<style scoped>
+.qsheet {
+  margin: 4px 8px 10px;
+  overflow-x: auto;
+}
+.qsheet-meta {
+  border-collapse: collapse;
+  width: 100%;
+  margin-bottom: 6px;
+  font-size: 12px;
+}
+.qsheet-meta th.ml {
+  border: 1px solid #c9d4e0;
+  background: #f7fafd;
+  font-weight: 500;
+  text-align: right;
+  padding: 2px 6px;
+  width: 90px;
+  white-space: nowrap;
+}
+.qsheet-meta td.mv {
+  border: 1px solid #c9d4e0;
+  text-align: left;
+  padding: 2px 6px;
+  color: #1f2d3d;
+}
+.qsheet-tb {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: fixed;
+  font-size: 12px;
+}
+.qsheet-tb th,
+.qsheet-tb td {
+  border: 1px solid #c9d4e0;
+  padding: 2px 4px;
+  height: 26px;
+  text-align: center;
+  vertical-align: middle;
+  word-break: break-all;
+}
+/* 组名行:浅蓝底,横跨本组各列 */
+.qsheet-tb th.gh {
+  background: #eef3f9;
+  color: #1f4e79;
+  font-weight: 600;
+}
+.qsheet-tb th.sh {
+  background: #f7fafd;
+  font-weight: 500;
+}
+.qsheet-tb th.fc,
+.qsheet-tb td.fc {
+  background: #fafbfc;
+  font-weight: 500;
+}
+.qsheet-tb td.vc.ed {
+  cursor: pointer;
+}
+.qsheet-tb td.vc.ed:hover {
+  background: #f0f7ff;
+}
+.qsheet-tb .cell-inp {
+  width: 100%;
+  height: 22px;
+  border: 1px solid #5b9bd5;
+  outline: none;
+  text-align: center;
+  font-size: 12px;
+}
+</style>

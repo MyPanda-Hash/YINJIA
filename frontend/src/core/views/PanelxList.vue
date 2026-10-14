@@ -802,7 +802,7 @@
       </table>
     </div>
 
-    <div v-if="!isApprovalDoc && !isQcInspReq" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading">
+    <div v-if="!isApprovalDoc && !isQcInspReq && !isQcProcInsp" class="body" :class="{ 'draft-body': draftEditable }" v-loading="loading">
       <!-- ══════════ ③b 主表预览表格（配置 mainTable 时显示：主表字段列，点行切换当前单据，明细联动） -->
       <div v-if="mainGrid" class="main-grid">
         <div class="dt-head">
@@ -861,15 +861,7 @@
              每区 = 区标题(A.外观…) + 该区**自己的列头** + 该区的行 ⇒ 不同区列集可不同。 -->
         <!-- 制程检验单 · 交叉表版式(2026-10-12 用户口径「照截图:横向组头」):
              外观 | 尺寸 | 出货重量 等表区并排,组名横跨在本组列之上;固定头列在左、结果判断在右。 -->
-        <QcProcInspSheet
-          v-if="isSectioned(b)"
-          :doc="cur"
-          :rows="archRows(b)"
-          :editable="archEditable(b)"
-          @dirty="markInlineDirty()"
-        />
         <el-table
-          v-else
           :data="pagedBlockRows(b)"
           :height="tableH(b)"
           border
@@ -1092,6 +1084,20 @@
           @save="saveInlineDraft('保存')"
           @refresh="load()"
           @refresh-config="onFieldEditRefresh"
+        />
+      </div>
+    </template>
+
+    <!-- 制程检验单(QC_PROC_INSP,报表式特例,2026-10-12 用户口径「照截图 / 修改当前页面」):
+         整页一张交叉表 —— 表头字段(产品编码/型号/批号/抽检总量)在左、表区(外观|尺寸|出货重量…)横向并排、
+         结果判断在右。单据卡片与明细表整体不渲染,由 QcProcInspSheet 接管;工具栏与表尾保留(保存/审核要用)。 -->
+    <template v-else-if="isQcProcInsp">
+      <div class="qc-proc-wrap" v-loading="loading">
+        <QcProcInspSheet
+          :doc="cur"
+          :rows="procRows"
+          :editable="draftEditable"
+          @dirty="markInlineDirty"
         />
       </div>
     </template>
@@ -1956,6 +1962,14 @@ const isRecordSheetPanel = computed(() => RECORD_SHEET_PANELS.includes(String(pa
 const isProdDocMatrix = computed(() => String(panelCode.value) === 'RD_PROD_DOCLIST')
 // 来料检验要求(品质资料 7 表):档案式特例面板——工具栏/单据卡片/明细表格/页脚全隐,QcInspReqSheet 整体接管
 const isQcInspReq = computed(() => isQcInspReqPanel(panelCode.value))
+
+/** 制程检验单:整页报表式(交叉表)分支的开关 */
+const isQcProcInsp = computed(() => panelCode.value === 'QC_PROC_INSP')
+/** 制程检验单的明细行(供交叉表渲染) */
+const procRows = computed(() => {
+  const b = blocks.value[0]
+  return b ? archRows(b) : []
+})
 /** 产品变更申请单:当前账号可填的纸面部门行(后端按 yj_user.dept_id → yj_change_dept 算,metadata 下发)。
  *  仅 RD_CHANGE 有该键;其它面板拿到空数组也无害(没有 lockKey 的表根本不看它)。 */
 const changeDeptRows = computed(() => cfgCache.value?.metadata?.changeDepts || [])
@@ -4296,12 +4310,6 @@ function pagedBlockRows(b) {
   if (real.length <= archPageSize.value) return rows
   const start = (archCurPage(b) - 1) * archPageSize.value
   return real.slice(start, start + archPageSize.value)
-}
-
-/* 制程检验单(2026-10-12):明细含「表区」列 ⇒ 走交叉表版式(见 @core/qc/QcProcInspSheet.vue)。
-   横向组头:外观 | 尺寸 | 出货重量 等表区并排,组名横跨本组各列。 */
-function isSectioned(b) {
-  return (activeTab(b).cols || []).includes('表区')
 }
 /** 档案分页时合计行仍按全量行计算,不随当前页截断;
  *  合计值走 archSums 缓存(全量行×数值列只算一遍)——此前每次翻页 el-table 重算合计,
@@ -8685,58 +8693,6 @@ onUnmounted(() => {
   margin-bottom: 8px;
   background: #fff;
   position: relative;
-}
-/* ══ 制程检验单 · 交叉表(2026-10-12 用户口径「照截图:横向组头」)══
-   外观 | 尺寸 | 出货重量 等表区并排,组名横跨在本组列之上;固定头列在左、结果判断在右。 */
-.qsheet {
-  margin: 6px 8px 10px;
-  overflow-x: auto;
-}
-.qsheet-tb {
-  border-collapse: collapse;
-  width: 100%;
-  table-layout: fixed;
-  font-size: 12px;
-}
-.qsheet-tb th,
-.qsheet-tb td {
-  border: 1px solid #c9d4e0;
-  padding: 2px 4px;
-  height: 26px;
-  text-align: center;
-  vertical-align: middle;
-  word-break: break-all;
-}
-/* 组名行:浅蓝底,横跨本组各列 */
-.qsheet-tb th.gh {
-  background: #eef3f9;
-  color: #1f4e79;
-  font-weight: 600;
-}
-/* 子列头 */
-.qsheet-tb th.sh {
-  background: #f7fafd;
-  font-weight: 500;
-}
-/* 固定头列 / 结果判断列:浅灰底 */
-.qsheet-tb th.fc,
-.qsheet-tb td.fc {
-  background: #fafbfc;
-  font-weight: 500;
-}
-.qsheet-tb td.vc.ed {
-  cursor: pointer;
-}
-.qsheet-tb td.vc.ed:hover {
-  background: #f0f7ff;
-}
-.qsheet-tb .cell-inp {
-  width: 100%;
-  height: 22px;
-  border: 1px solid #5b9bd5;
-  outline: none;
-  text-align: center;
-  font-size: 12px;
 }
 /* 档案大表分页器:右对齐贴在明细表头上沿 */
 .arch-pager {
