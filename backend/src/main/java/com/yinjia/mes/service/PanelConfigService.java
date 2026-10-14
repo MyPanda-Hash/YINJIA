@@ -466,6 +466,14 @@ public class PanelConfigService {
                         int at = merged.indexOf("检验项目/检验方案");   // 排在它之前(按产品取现成计划更常用)
                         merged.add(at < 0 ? anchor + 1 : at, "取出货检验计划");
                     }
+                    // 2026-10-15:制程检验单再加「选生产工单」(用户口径「选择生产工单加工单行号唯一确定
+                    // 当前的生产工单」)—— 排在「取出货检验计划」之前:先按工单行建单,再带检验项目。
+                    // 通用「选单」不可用(见 QcProcInspController 类注释:来源须已审核 + 须带量明细行 +
+                    // 头行映射只认来源表头),故走专用入口。
+                    if ("QC_PROC_INSP".equals(def.code()) && !merged.contains("选生产工单")) {
+                        int at = merged.indexOf("取出货检验计划");
+                        merged.add(at < 0 ? anchor + 1 : at, "选生产工单");
+                    }
                     g.put("actions", merged);
                 }
             }

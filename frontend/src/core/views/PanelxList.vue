@@ -1807,6 +1807,9 @@
          (表区=检验项目,再按现有模板填实测/判定);②表头的新增/编辑/停用就地维护标准本身
          (bs_qc_plan + bs_qc_item),维护动作不往检验单写数据。 -->
     <QcInspPlanDialog v-model="qcInspPlanVisible" @pick="applyInspItems" />
+    <!-- 选生产工单(2026-10-15):制程检验单专用 —— 列生产工单行(工单号+工单行号唯一确定),
+         选中即生成一张草稿并跳过去(表头带产品/批次/产线,明细留空)。 -->
+    <QcProcInspWoPicker v-model="woPickerVisible" @picked="openPickedProcInsp" />
     <!-- 仓位分区弹窗(2026-10-08):候选来自本面板已加载的仓位行,不落存储 ⇒ 分区随仓位存在;
          选中时「大区 + 存储分区」**一起回填**(用户口径:它们是一个组合) -->
     <ZonePickDialog v-model="zonePickVisible" :rows="zonePickRows" :area-key="ZONE_PAIR.area" :zone-key="ZONE_PAIR.zone" @pick="onZonePick" />
@@ -1938,6 +1941,7 @@ import QrLabelDialog from './QrLabelDialog.vue'
 import MaterialLabelDialog from './MaterialLabelDialog.vue'
 import FieldManagerDialog from './FieldManagerDialog.vue'
 import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
+import QcProcInspWoPicker from '@core/qc/QcProcInspWoPicker.vue'
 import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
 import { useReportColumns } from '@core/report/useReportColumns'
@@ -2169,6 +2173,9 @@ const fieldMgrVisible = ref(false)
 // 检验项目/检验方案(2026-10-09 合并口径):三类工序检验单工具栏「更多」组的**唯一**入口
 // (服务端把守 QC_ASM_INSP 可见性);弹窗两用:勾选「带入明细」+ 就地维护标准本身。
 const qcInspPlanVisible = ref(false)
+// 选生产工单(2026-10-15):制程检验单专用 —— 列生产工单行(plang:工单号+工单行号唯一确定),
+// 选中即生成一张制程检验单草稿(服务端 QcProcInspController 幂等 + 把守 QC_PROC_INSP 可见性)。
+const woPickerVisible = ref(false)
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
 
@@ -5673,6 +5680,32 @@ function addInlineDetailRow(b) {
 }
 
 /**
+ * 「选生产工单」弹窗的回执 → 提示并跳到新单(2026-10-15)。
+ *
+ * 草稿已由服务端建好(表头带 工单号/工单行号/产品/批次/产线,明细留空),这里只做两件事:
+ * 说清结果 + 让用户看到那张单。幂等命中时服务端回 `已存在=true` 并给**原来那张**单号,
+ * 故提示用「已有」而不是「已生成」,避免用户以为又建了一张。
+ * 目标面板与本面板相同时(本入口就是同面板自建)不关页签,直接刷新列表即可,免得关了又开。
+ */
+function openPickedProcInsp(res) {
+  const no = String(res?.['编号'] || '')
+  if (!no) return ElMessage.warning(tt('未生成制程检验单'))
+  const existed = res?.['已存在'] === true
+  ElMessage.success(existed
+    ? `${tt('该工单行已有制程检验单')}：${no}`
+    : `${tt('已生成制程检验单')}：${no}`)
+  const target = String(res?.['gotoPanel'] || 'QC_PROC_INSP')
+  if (target === panelCode.value) {
+    load()                       // 同面板:新草稿按创建时间倒序排在第一张
+    return
+  }
+  const targetPath = `/panelx/list/${target}`
+  tabs.close(route.path)
+  router.push(targetPath)
+  tabs.open({ path: targetPath, title: target })
+}
+
+/**
  * 取出货检验计划 → 带入当前单据明细(2026-10-13 用户口径:「当前出货检验计划的内容能被当前
  * 制程检验单取到 —— 实现对应的产品编码就能获取到对应的检验内容进行填入」)。
  *
@@ -7018,6 +7051,14 @@ async function onButton(action) {
       return ElMessage.warning(tt('请先打开一张检验单，再选检验项目'))
     }
     qcInspPlanVisible.value = true
+    return
+  }
+  // 选生产工单(2026-10-15):**制程检验单专用** —— 用户口径「选择生产工单加工单行号唯一确定
+  // 当前的生产工单」。弹窗列生产工单行(plang),选中一行 → 服务端生成草稿(curInspController
+  // 幂等:同一工单行已有存活单则返回那张)→ 这里按既有 gotoPanel 惯例跳过去。
+  // 生成是**新建一张单**,故与当前单据无关,不需要先打开单据。
+  if (action === '选生产工单') {
+    woPickerVisible.value = true
     return
   }
   // 取出货检验计划(2026-10-13):**制程检验单专用** —— 按本单的「产品编码」从出货检验计划表
