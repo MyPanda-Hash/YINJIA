@@ -96,6 +96,7 @@ for (const t of TYPES) {
   const hMap = []
   for (const [kd, col, only] of HEAD_MAP) {
     if (!applies(only, t.api)) continue
+    if (col === '单据状态') continue // 本脚本自己写(把金蝶 C → 「已审核」,与 sync-core 同步口径一致)
     if (d[kd] === undefined) continue
     hCols.push(`[${col}]`); hVals.push(q(s(d[kd])))
     hMap.push([kd, col, s(d[kd])])
