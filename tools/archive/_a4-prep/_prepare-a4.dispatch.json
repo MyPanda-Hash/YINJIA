@@ -1,0 +1,22 @@
+{
+ "productCode": "A4TEST01",
+ "dispatched": true,
+ "assigns": {
+  "RD_SPEC_DOC": "cp",
+  "RD_MOLD_PROC": "cp",
+  "RD_ASM_PROC": "cp",
+  "RD_INSP_PLAN": "cp"
+ },
+ "assignNames": {
+  "RD_SPEC_DOC": "陈秀丽",
+  "RD_MOLD_PROC": "陈秀丽",
+  "RD_ASM_PROC": "陈秀丽",
+  "RD_INSP_PLAN": "陈秀丽"
+ },
+ "supervisor": "cp",
+ "supervisorName": "陈秀丽",
+ "supervisorResolved": true,
+ "docNo": "PI-2026-10-0019",
+ "canAssign": true,
+ "l2Approver": "陈秀丽"
+}

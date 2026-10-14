@@ -1,0 +1,48 @@
+=== A4 测试数据准备 · http://127.0.0.1:8090 · factory=YJ_TEST (HSDZ_MES_TEST) · 操作人=admin ===
+目标产品编号 = A4TEST01  分发责任人 = cp
+前置守卫:产品编号 A4TEST01 无占用 ✅
+
+【1】产品信息表新建草稿 → PI-2026-10-0019 (状态 草稿)
+    保存 → {"单据状态":"审批中","编号":"PI-2026-10-0019"}
+    读回: 单据编号=undefined 产品编号=undefined 单据状态=undefined
+
+── 1a 产品信息表 保存后读回 ──
+{"detail":{"tabs":[{"key":"items","label":"明细","fields":[],"isRequired":false}]}}
+
+【1b】一级审批通过 → {"单据状态":"待二级审批","编号":"PI-2026-10-0019"}
+     读回: 单据状态=undefined
+
+── 1b 一级审批通过后读回 ──
+{"detail":{"tabs":[{"key":"items","label":"明细","fields":[],"isRequired":false}]}}
+
+【1c】二级审批通过 → {"单据状态":"已归档","编号":"PI-2026-10-0019"}
+     读回: 单据状态=undefined
+
+── 1c 二级审批通过后读回 ──
+{"detail":{"tabs":[{"key":"items","label":"明细","fields":[],"isRequired":false}]}}
+
+【2】分发责任人 {"RD_SPEC_DOC":"cp","RD_MOLD_PROC":"cp","RD_ASM_PROC":"cp","RD_INSP_PLAN":"cp"} → {"already":false,"productCode":"A4TEST01","assigns":{"RD_SPEC_DOC":"cp","RD_MOLD_PROC":"cp","RD_ASM_PROC":"cp","RD_INSP_PLAN":"cp"},"supervisor":"cp"}
+    读回 /px/rdDev/assignState: {"productCode":"A4TEST01","dispatched":true,"assigns":{"RD_SPEC_DOC":"cp","RD_MOLD_PROC":"cp","RD_ASM_PROC":"cp","RD_INSP_PLAN":"cp"},"assignNames":{"RD_SPEC_DOC":"陈秀丽","RD_MOLD_PROC":"陈秀丽","RD_ASM_PROC":"陈秀丽","RD_INSP_PLAN":"陈秀丽"},"supervisor":"cp","supervisorName":"陈秀丽","supervisorResolved":true,"docNo":"PI-2026-10-0019","canAssign":true,"l2Approver":"陈秀丽"}
+
+── 2 分发责任人读回(接口) ──
+{"productCode":"A4TEST01","dispatched":true,"assigns":{"RD_SPEC_DOC":"cp","RD_MOLD_PROC":"cp","RD_ASM_PROC":"cp","RD_INSP_PLAN":"cp"},"assignNames":{"RD_SPEC_DOC":"陈秀丽","RD_MOLD_PROC":"陈秀丽","RD_ASM_PROC":"陈秀丽","RD_INSP_PLAN":"陈秀丽"},"supervisor":"cp","supervisorName":"陈秀丽","supervisorResolved":true,"docNo":"PI-2026-10-0019","canAssign":true,"l2Approver":"陈秀丽"}
+
+【3】规格书新建草稿 → SD-2026-10-0004 (状态 草稿)
+    保存 → {"单据状态":"已归档","编号":"SD-2026-10-0004"}
+    读回: 单据编号=undefined 产品编号=undefined 单据状态=undefined
+    读回明细: undefined
+
+── 3 规格书保存后读回(含明细) ──
+{"detail":{"tabs":[{"key":"items","label":"明细","fields":[{"dataName":"表区","dataType":"下拉框","width":90,"options":["修订记录","检验要求","物料清单"],"isRequired":false},{"dataName":"序号","dataType":"文本","width":60,"isRequired":false},{"dataName":"更改内容","dataType":"文本","width":220,"isRequired":false},{"dataName":"更改原因","dataType":"文本","width":160,"isRequired":false},{"dataName":"更改时间","dataType":"文本","width":100,"isRequired":false},{"dataName":"责任人","dataType":"文本","width":90,"isRequired":false},{"dataName":"备注","dataType":"文本","width":120,"isRequired":false},{"dataName":"检验项目","dataType":"文本","width":110,"isRequired":false},{"dataName":"检验要求","dataType":"文本","width":260,"isRequired":false},{"dataName":"检验方法","dataType":"文本","width":110,"isRequired":false},{"dataName":"检验依据","dataType":"文本","width":120,"isRequired":false},{"dataName":"物料编码","dataType":"文本","width":110,"isRequired":false},{"dataName":"物料名称","dataType":"文本","width":130,"isRequired":false},{"dataName":"规格参数","dataType":"文本","width":240,"isRequired":false},{"dataName":"数量","dataType":"文本","width":70,"isRequired":false}],"isRequired":true}]}}
+
+【4】GET /api/px/specByProduct?code=A4TEST01
+    → {"found":true,"matched":1,"单据编号":"SD-2026-10-0004","产品编号":"A4TEST01","客户项目名称":"A4-测试项目","产品类别":"普通炭棒","整体规格参数":"外径 20±0.5mm、内径 5±0.3mm、长度 250±2mm","items":[{"序号":"1","检验项目":"跌落强度","检验要求":"1.2m 高度自由跌落无破损","检验方法":"1.2m 跌落试验","检验依据":"YJ-Q-31"},{"序号":"2","检验项目":"抗压强度","检验要求":"≥ 300N 不破裂","检验方法":"压力试验机","检验依据":"YJ-Q-31"},{"序号":"3","检验项目":"压降","检验要求":"≤ 5 kPa @ 30L/min","检验方法":"压降测试台","检验依据":"YJ-Q-31"}],"状态":"已归档"}
+
+── 4 specByProduct 实测 ──
+{"found":true,"matched":1,"单据编号":"SD-2026-10-0004","产品编号":"A4TEST01","客户项目名称":"A4-测试项目","产品类别":"普通炭棒","整体规格参数":"外径 20±0.5mm、内径 5±0.3mm、长度 250±2mm","items":[{"序号":"1","检验项目":"跌落强度","检验要求":"1.2m 高度自由跌落无破损","检验方法":"1.2m 跌落试验","检验依据":"YJ-Q-31"},{"序号":"2","检验项目":"抗压强度","检验要求":"≥ 300N 不破裂","检验方法":"压力试验机","检验依据":"YJ-Q-31"},{"序号":"3","检验项目":"压降","检验要求":"≤ 5 kPa @ 30L/min","检验方法":"压降测试台","检验依据":"YJ-Q-31"}],"状态":"已归档"}
+
+=== 结果摘要 ===
+产品信息表: PI-2026-10-0019 | 产品编号 A4TEST01 | 状态 undefined
+分发: {"RD_SPEC_DOC":"cp","RD_MOLD_PROC":"cp","RD_ASM_PROC":"cp","RD_INSP_PLAN":"cp"}
+规格书: SD-2026-10-0004 | 产品编号 undefined | 状态 undefined
+specByProduct: found=true matched=1 单据编号=SD-2026-10-0004
