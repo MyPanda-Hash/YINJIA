@@ -3070,3 +3070,4 @@ migrate-qc-proc-insp-measure-cols.sql
 migrate-qc-item-category-dict.sql
 fix-qc-item-category-free.sql
 migrate-qc-proc-insp-freq-col.sql
+migrate-qc-proc-insp-wo-line-field.sql
