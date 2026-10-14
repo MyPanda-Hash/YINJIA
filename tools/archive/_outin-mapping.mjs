@@ -50,7 +50,7 @@ export const LINE_MAP = [
   ['qty', '实收数量', ['inv_product']], ['qty', '数量', ['inv_other_in', 'inv_other_out']],
   ['aux_qty', '辅助数量', ['inv_other_in', 'inv_other_out']],
   ['inv_qty', '库存数量'],
-  ['batch_no', '批号', ['inv_product', 'inv_other_out']],
+  ['batch_no', '批号', ['inv_product', 'inv_other_in', 'inv_other_out']],
   ['picture', '存货图片', ['inv_product', 'inv_other_in']],
   ['cost', '成本', ['inv_other_in']], ['unit_cost', '单位成本', ['inv_other_in']],
   ['comment', '备注', ['inv_product']], ['comment', '明细备注', ['inv_other_in', 'inv_other_out']],

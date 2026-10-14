@@ -31,6 +31,7 @@ CREATE TABLE dbo.bd_other_in (
     [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,
     [单据日期] date NULL,
     [单据编号] nvarchar(50) NULL,
+    [单据状态] nvarchar(20) NULL,
     [业务类型] nvarchar(50) NULL,
     [业务类型编码] nvarchar(50) NULL,
     [业务类型id] nvarchar(20) NULL,
@@ -84,6 +85,7 @@ CREATE TABLE dbo.bl_other_in (
     [单价] decimal(18,4) NULL,
     [金额] decimal(18,4) NULL,
     [明细备注] nvarchar(200) NULL,
+    [批号] nvarchar(50) NULL,
     [成本] nvarchar(50) NULL,
     [单位成本] nvarchar(50) NULL,
     [存货图片] nvarchar(300) NULL,
@@ -94,12 +96,118 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'ix_bl_other_in_docno' AND object_id = OBJECT_ID(N'dbo.bl_other_in'))
     CREATE INDEX ix_bl_other_in_docno ON dbo.bl_other_in([单据编号]);
 GO
+-- ①b 防御性补列(bd_other_in / bl_other_in:列缺失即补,幂等)
+IF COL_LENGTH(N'dbo.bd_other_in', N'单据日期') IS NULL ALTER TABLE dbo.bd_other_in ADD [单据日期] date NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'单据日期') IS NULL ALTER TABLE dbo.bd_other_in ADD [单据日期] date NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'单据编号') IS NULL ALTER TABLE dbo.bd_other_in ADD [单据编号] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'单据状态') IS NULL ALTER TABLE dbo.bd_other_in ADD [单据状态] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型') IS NULL ALTER TABLE dbo.bd_other_in ADD [业务类型] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型编码') IS NULL ALTER TABLE dbo.bd_other_in ADD [业务类型编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型id') IS NULL ALTER TABLE dbo.bd_other_in ADD [业务类型id] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'供应商编码') IS NULL ALTER TABLE dbo.bd_other_in ADD [供应商编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'供应商') IS NULL ALTER TABLE dbo.bd_other_in ADD [供应商] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备注') IS NULL ALTER TABLE dbo.bd_other_in ADD [备注] nvarchar(500) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'创建人') IS NULL ALTER TABLE dbo.bd_other_in ADD [创建人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'创建时间') IS NULL ALTER TABLE dbo.bd_other_in ADD [创建时间] nvarchar(30) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'修改人') IS NULL ALTER TABLE dbo.bd_other_in ADD [修改人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'修改时间') IS NULL ALTER TABLE dbo.bd_other_in ADD [修改时间] nvarchar(30) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'审核人') IS NULL ALTER TABLE dbo.bd_other_in ADD [审核人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'审核时间') IS NULL ALTER TABLE dbo.bd_other_in ADD [审核时间] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'外部数据ID') IS NULL ALTER TABLE dbo.bd_other_in ADD [外部数据ID] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'外部单据号') IS NULL ALTER TABLE dbo.bd_other_in ADD [外部单据号] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'外部指纹') IS NULL ALTER TABLE dbo.bd_other_in ADD [外部指纹] nvarchar(200) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'是否已转ERP') IS NULL ALTER TABLE dbo.bd_other_in ADD [是否已转ERP] nvarchar(10) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'ERP单号') IS NULL ALTER TABLE dbo.bd_other_in ADD [ERP单号] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'转ERP操作人') IS NULL ALTER TABLE dbo.bd_other_in ADD [转ERP操作人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'转ERP时间') IS NULL ALTER TABLE dbo.bd_other_in ADD [转ERP时间] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'金蝶单据状态') IS NULL ALTER TABLE dbo.bd_other_in ADD [金蝶单据状态] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'金蝶审核人') IS NULL ALTER TABLE dbo.bd_other_in ADD [金蝶审核人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'金蝶审核时间') IS NULL ALTER TABLE dbo.bd_other_in ADD [金蝶审核时间] nvarchar(30) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'asp_user1') IS NULL ALTER TABLE dbo.bd_other_in ADD [asp_user1] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'asp_time1') IS NULL ALTER TABLE dbo.bd_other_in ADD [asp_time1] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'asp_user2') IS NULL ALTER TABLE dbo.bd_other_in ADD [asp_user2] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'asp_time2') IS NULL ALTER TABLE dbo.bd_other_in ADD [asp_time2] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'asp_cancel') IS NULL ALTER TABLE dbo.bd_other_in ADD [asp_cancel] char(1) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用1') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用1] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用2') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用2] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用3') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用3] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用4') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用4] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用5') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用5] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用6') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用6] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用7') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用7] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用8') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用8] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用9') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用9] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用10') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用10] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用11') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用11] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用12') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用12] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用13') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用13] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用14') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用14] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用15') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用15] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用16') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用16] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用17') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用17] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用18') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用18] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用19') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用19] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_in', N'备用20') IS NULL ALTER TABLE dbo.bd_other_in ADD [备用20] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'单据编号') IS NULL ALTER TABLE dbo.bl_other_in ADD [单据编号] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'序号') IS NULL ALTER TABLE dbo.bl_other_in ADD [序号] int NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'存货编码') IS NULL ALTER TABLE dbo.bl_other_in ADD [存货编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'存货名称') IS NULL ALTER TABLE dbo.bl_other_in ADD [存货名称] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'规格型号') IS NULL ALTER TABLE dbo.bl_other_in ADD [规格型号] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'仓库') IS NULL ALTER TABLE dbo.bl_other_in ADD [仓库] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'仓库编码') IS NULL ALTER TABLE dbo.bl_other_in ADD [仓库编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'计量单位') IS NULL ALTER TABLE dbo.bl_other_in ADD [计量单位] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'基本单位名称') IS NULL ALTER TABLE dbo.bl_other_in ADD [基本单位名称] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'基本单位编码') IS NULL ALTER TABLE dbo.bl_other_in ADD [基本单位编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'基本单位id') IS NULL ALTER TABLE dbo.bl_other_in ADD [基本单位id] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'辅助单位名称') IS NULL ALTER TABLE dbo.bl_other_in ADD [辅助单位名称] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'辅助单位编码') IS NULL ALTER TABLE dbo.bl_other_in ADD [辅助单位编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'辅助单位id') IS NULL ALTER TABLE dbo.bl_other_in ADD [辅助单位id] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'换算率') IS NULL ALTER TABLE dbo.bl_other_in ADD [换算率] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'换算系数') IS NULL ALTER TABLE dbo.bl_other_in ADD [换算系数] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'辅助换算系数') IS NULL ALTER TABLE dbo.bl_other_in ADD [辅助换算系数] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'数量') IS NULL ALTER TABLE dbo.bl_other_in ADD [数量] decimal(18,4) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'辅助数量') IS NULL ALTER TABLE dbo.bl_other_in ADD [辅助数量] decimal(18,4) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'库存数量') IS NULL ALTER TABLE dbo.bl_other_in ADD [库存数量] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'单价') IS NULL ALTER TABLE dbo.bl_other_in ADD [单价] decimal(18,4) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'金额') IS NULL ALTER TABLE dbo.bl_other_in ADD [金额] decimal(18,4) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'明细备注') IS NULL ALTER TABLE dbo.bl_other_in ADD [明细备注] nvarchar(200) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'批号') IS NULL ALTER TABLE dbo.bl_other_in ADD [批号] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'成本') IS NULL ALTER TABLE dbo.bl_other_in ADD [成本] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'单位成本') IS NULL ALTER TABLE dbo.bl_other_in ADD [单位成本] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'存货图片') IS NULL ALTER TABLE dbo.bl_other_in ADD [存货图片] nvarchar(300) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'asp_user1') IS NULL ALTER TABLE dbo.bl_other_in ADD [asp_user1] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'asp_time1') IS NULL ALTER TABLE dbo.bl_other_in ADD [asp_time1] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'asp_user2') IS NULL ALTER TABLE dbo.bl_other_in ADD [asp_user2] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'asp_time2') IS NULL ALTER TABLE dbo.bl_other_in ADD [asp_time2] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'asp_cancel') IS NULL ALTER TABLE dbo.bl_other_in ADD [asp_cancel] char(1) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用1') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用1] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用2') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用2] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用3') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用3] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用4') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用4] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用5') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用5] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用6') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用6] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用7') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用7] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用8') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用8] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用9') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用9] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用10') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用10] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用11') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用11] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用12') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用12] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用13') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用13] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用14') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用14] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用15') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用15] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用16') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用16] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用17') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用17] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用18') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用18] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用19') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用19] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_in', N'备用20') IS NULL ALTER TABLE dbo.bl_other_in ADD [备用20] nvarchar(100) NULL;
+GO
 -- ① 建表 bd_other_out(其他出库单 表头)
 IF OBJECT_ID(N'dbo.bd_other_out', N'U') IS NULL
 CREATE TABLE dbo.bd_other_out (
     [id] int IDENTITY(1,1) NOT NULL PRIMARY KEY,
     [单据日期] date NULL,
     [单据编号] nvarchar(50) NULL,
+    [单据状态] nvarchar(20) NULL,
     [业务类型] nvarchar(50) NULL,
     [业务类型编码] nvarchar(50) NULL,
     [业务类型id] nvarchar(20) NULL,
@@ -163,6 +271,110 @@ GO
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'ix_bl_other_out_docno' AND object_id = OBJECT_ID(N'dbo.bl_other_out'))
     CREATE INDEX ix_bl_other_out_docno ON dbo.bl_other_out([单据编号]);
 GO
+-- ①b 防御性补列(bd_other_out / bl_other_out:列缺失即补,幂等)
+IF COL_LENGTH(N'dbo.bd_other_out', N'单据日期') IS NULL ALTER TABLE dbo.bd_other_out ADD [单据日期] date NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'单据日期') IS NULL ALTER TABLE dbo.bd_other_out ADD [单据日期] date NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'单据编号') IS NULL ALTER TABLE dbo.bd_other_out ADD [单据编号] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'单据状态') IS NULL ALTER TABLE dbo.bd_other_out ADD [单据状态] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'业务类型') IS NULL ALTER TABLE dbo.bd_other_out ADD [业务类型] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'业务类型编码') IS NULL ALTER TABLE dbo.bd_other_out ADD [业务类型编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'业务类型id') IS NULL ALTER TABLE dbo.bd_other_out ADD [业务类型id] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'部门') IS NULL ALTER TABLE dbo.bd_other_out ADD [部门] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'部门编码') IS NULL ALTER TABLE dbo.bd_other_out ADD [部门编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'经手人') IS NULL ALTER TABLE dbo.bd_other_out ADD [经手人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'经手人编码') IS NULL ALTER TABLE dbo.bd_other_out ADD [经手人编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备注') IS NULL ALTER TABLE dbo.bd_other_out ADD [备注] nvarchar(500) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'创建人') IS NULL ALTER TABLE dbo.bd_other_out ADD [创建人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'创建时间') IS NULL ALTER TABLE dbo.bd_other_out ADD [创建时间] nvarchar(30) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'修改人') IS NULL ALTER TABLE dbo.bd_other_out ADD [修改人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'修改时间') IS NULL ALTER TABLE dbo.bd_other_out ADD [修改时间] nvarchar(30) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'审核人') IS NULL ALTER TABLE dbo.bd_other_out ADD [审核人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'审核时间') IS NULL ALTER TABLE dbo.bd_other_out ADD [审核时间] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'外部数据ID') IS NULL ALTER TABLE dbo.bd_other_out ADD [外部数据ID] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'外部单据号') IS NULL ALTER TABLE dbo.bd_other_out ADD [外部单据号] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'外部指纹') IS NULL ALTER TABLE dbo.bd_other_out ADD [外部指纹] nvarchar(200) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'是否已转ERP') IS NULL ALTER TABLE dbo.bd_other_out ADD [是否已转ERP] nvarchar(10) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'ERP单号') IS NULL ALTER TABLE dbo.bd_other_out ADD [ERP单号] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'转ERP操作人') IS NULL ALTER TABLE dbo.bd_other_out ADD [转ERP操作人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'转ERP时间') IS NULL ALTER TABLE dbo.bd_other_out ADD [转ERP时间] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'金蝶单据状态') IS NULL ALTER TABLE dbo.bd_other_out ADD [金蝶单据状态] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'金蝶审核人') IS NULL ALTER TABLE dbo.bd_other_out ADD [金蝶审核人] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'金蝶审核时间') IS NULL ALTER TABLE dbo.bd_other_out ADD [金蝶审核时间] nvarchar(30) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'asp_user1') IS NULL ALTER TABLE dbo.bd_other_out ADD [asp_user1] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'asp_time1') IS NULL ALTER TABLE dbo.bd_other_out ADD [asp_time1] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'asp_user2') IS NULL ALTER TABLE dbo.bd_other_out ADD [asp_user2] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'asp_time2') IS NULL ALTER TABLE dbo.bd_other_out ADD [asp_time2] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'asp_cancel') IS NULL ALTER TABLE dbo.bd_other_out ADD [asp_cancel] char(1) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用1') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用1] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用2') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用2] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用3') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用3] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用4') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用4] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用5') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用5] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用6') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用6] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用7') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用7] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用8') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用8] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用9') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用9] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用10') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用10] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用11') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用11] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用12') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用12] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用13') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用13] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用14') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用14] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用15') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用15] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用16') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用16] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用17') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用17] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用18') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用18] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用19') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用19] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bd_other_out', N'备用20') IS NULL ALTER TABLE dbo.bd_other_out ADD [备用20] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'单据编号') IS NULL ALTER TABLE dbo.bl_other_out ADD [单据编号] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'序号') IS NULL ALTER TABLE dbo.bl_other_out ADD [序号] int NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'存货编码') IS NULL ALTER TABLE dbo.bl_other_out ADD [存货编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'存货名称') IS NULL ALTER TABLE dbo.bl_other_out ADD [存货名称] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'规格型号') IS NULL ALTER TABLE dbo.bl_other_out ADD [规格型号] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'仓库') IS NULL ALTER TABLE dbo.bl_other_out ADD [仓库] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'仓库编码') IS NULL ALTER TABLE dbo.bl_other_out ADD [仓库编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'计量单位') IS NULL ALTER TABLE dbo.bl_other_out ADD [计量单位] nvarchar(20) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'基本单位名称') IS NULL ALTER TABLE dbo.bl_other_out ADD [基本单位名称] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'基本单位编码') IS NULL ALTER TABLE dbo.bl_other_out ADD [基本单位编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'基本单位id') IS NULL ALTER TABLE dbo.bl_other_out ADD [基本单位id] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'辅助单位名称') IS NULL ALTER TABLE dbo.bl_other_out ADD [辅助单位名称] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'辅助单位编码') IS NULL ALTER TABLE dbo.bl_other_out ADD [辅助单位编码] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'辅助单位id') IS NULL ALTER TABLE dbo.bl_other_out ADD [辅助单位id] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'换算率') IS NULL ALTER TABLE dbo.bl_other_out ADD [换算率] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'换算系数') IS NULL ALTER TABLE dbo.bl_other_out ADD [换算系数] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'辅助换算系数') IS NULL ALTER TABLE dbo.bl_other_out ADD [辅助换算系数] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'数量') IS NULL ALTER TABLE dbo.bl_other_out ADD [数量] decimal(18,4) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'辅助数量') IS NULL ALTER TABLE dbo.bl_other_out ADD [辅助数量] decimal(18,4) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'库存数量') IS NULL ALTER TABLE dbo.bl_other_out ADD [库存数量] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'单价') IS NULL ALTER TABLE dbo.bl_other_out ADD [单价] decimal(18,4) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'金额') IS NULL ALTER TABLE dbo.bl_other_out ADD [金额] decimal(18,4) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'明细备注') IS NULL ALTER TABLE dbo.bl_other_out ADD [明细备注] nvarchar(200) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'批号') IS NULL ALTER TABLE dbo.bl_other_out ADD [批号] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'asp_user1') IS NULL ALTER TABLE dbo.bl_other_out ADD [asp_user1] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'asp_time1') IS NULL ALTER TABLE dbo.bl_other_out ADD [asp_time1] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'asp_user2') IS NULL ALTER TABLE dbo.bl_other_out ADD [asp_user2] nvarchar(50) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'asp_time2') IS NULL ALTER TABLE dbo.bl_other_out ADD [asp_time2] datetime2 NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'asp_cancel') IS NULL ALTER TABLE dbo.bl_other_out ADD [asp_cancel] char(1) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用1') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用1] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用2') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用2] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用3') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用3] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用4') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用4] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用5') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用5] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用6') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用6] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用7') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用7] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用8') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用8] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用9') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用9] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用10') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用10] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用11') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用11] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用12') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用12] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用13') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用13] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用14') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用14] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用15') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用15] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用16') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用16] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用17') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用17] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用18') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用18] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用19') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用19] nvarchar(100) NULL;
+IF COL_LENGTH(N'dbo.bl_other_out', N'备用20') IS NULL ALTER TABLE dbo.bl_other_out ADD [备用20] nvarchar(100) NULL;
+GO
 -- ② 中文注明(bd_other_in / bl_other_in)
 IF NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=0 AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'其他入库单表头(金蝶 inv_other_in 镜像;2026-10-08 下架后于 2026-10-14 按金蝶字段重建)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in';
@@ -173,6 +385,8 @@ IF COL_LENGTH(N'dbo.bd_other_in', N'单据日期') IS NOT NULL AND NOT EXISTS (S
     EXEC sp_addextendedproperty N'MS_Description', N'单据日期(金蝶 bill_date)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'单据日期';
 IF COL_LENGTH(N'dbo.bd_other_in', N'单据编号') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'单据编号', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'单据编号(MES 单号;金蝶侧单号存 外部单据号)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'单据编号';
+IF COL_LENGTH(N'dbo.bd_other_in', N'单据状态') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'单据状态', 'ColumnId') AND ep.name=N'MS_Description')
+    EXEC sp_addextendedproperty N'MS_Description', N'单据状态(MES 单据状态快照;面板不登记该字段,界面状态由 yj_doc_status 派生 —— 与采购入库单/产成品入库单/材料出库单同款)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'单据状态';
 IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'业务类型', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'业务类型(金蝶 trans_type_name;其他入库=其他入库 / 其他出库=其他出库)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_in', N'COLUMN', N'业务类型';
 IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_in'), N'业务类型编码', 'ColumnId') AND ep.name=N'MS_Description')
@@ -261,6 +475,8 @@ IF COL_LENGTH(N'dbo.bl_other_in', N'金额') IS NOT NULL AND NOT EXISTS (SELECT 
     EXEC sp_addextendedproperty N'MS_Description', N'金额', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'金额';
 IF COL_LENGTH(N'dbo.bl_other_in', N'明细备注') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'明细备注', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'明细备注(金蝶 comment;列名 备注,标签 明细备注 —— 与表头「备注」区分)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'明细备注';
+IF COL_LENGTH(N'dbo.bl_other_in', N'批号') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'批号', 'ColumnId') AND ep.name=N'MS_Description')
+    EXEC sp_addextendedproperty N'MS_Description', N'批号(金蝶 batch_no;其他入库实测 0% 有值,但**库存记账要用它做库存键**——与采购入库/产成品入库/其他出库同款,故建列并登记)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'批号';
 IF COL_LENGTH(N'dbo.bl_other_in', N'成本') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'成本', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'成本(金蝶 cost;其他入库实测 19% 行有值)', N'SCHEMA', N'dbo', N'TABLE', N'bl_other_in', N'COLUMN', N'成本';
 IF COL_LENGTH(N'dbo.bl_other_in', N'单位成本') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bl_other_in') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bl_other_in'), N'单位成本', 'ColumnId') AND ep.name=N'MS_Description')
@@ -305,6 +521,8 @@ IF COL_LENGTH(N'dbo.bd_other_out', N'单据日期') IS NOT NULL AND NOT EXISTS (
     EXEC sp_addextendedproperty N'MS_Description', N'单据日期(金蝶 bill_date)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'单据日期';
 IF COL_LENGTH(N'dbo.bd_other_out', N'单据编号') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'单据编号', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'单据编号(MES 单号;金蝶侧单号存 外部单据号)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'单据编号';
+IF COL_LENGTH(N'dbo.bd_other_out', N'单据状态') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'单据状态', 'ColumnId') AND ep.name=N'MS_Description')
+    EXEC sp_addextendedproperty N'MS_Description', N'单据状态(MES 单据状态快照;面板不登记该字段,界面状态由 yj_doc_status 派生 —— 与采购入库单/产成品入库单/材料出库单同款)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'单据状态';
 IF COL_LENGTH(N'dbo.bd_other_out', N'业务类型') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'业务类型', 'ColumnId') AND ep.name=N'MS_Description')
     EXEC sp_addextendedproperty N'MS_Description', N'业务类型(金蝶 trans_type_name;其他入库=其他入库 / 其他出库=其他出库)', N'SCHEMA', N'dbo', N'TABLE', N'bd_other_out', N'COLUMN', N'业务类型';
 IF COL_LENGTH(N'dbo.bd_other_out', N'业务类型编码') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.extended_properties ep WHERE ep.class=1 AND ep.major_id=OBJECT_ID(N'dbo.bd_other_out') AND ep.minor_id=COLUMNPROPERTY(OBJECT_ID(N'dbo.bd_other_out'), N'业务类型编码', 'ColumnId') AND ep.name=N'MS_Description')
@@ -624,6 +842,9 @@ IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'�
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'明细备注')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_IN', N'明细备注', N'明细备注', N'文本', NULL, NULL, NULL, NULL, N'detail', 95, 160, 1, 0, 0, NULL, 1);
+IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'批号')
+    INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
+    VALUES ('OTHER_IN', N'批号', N'批号', N'文本', NULL, NULL, NULL, NULL, N'query,detail', 96, 120, 1, 0, 0, NULL, 1);
 IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='OTHER_IN' AND label=N'成本')
     INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)
     VALUES ('OTHER_IN', N'成本', N'成本', N'文本', NULL, NULL, NULL, NULL, N'detail', 100, 100, 0, 0, 0, NULL, 1);
@@ -1184,7 +1405,7 @@ IF OBJECT_ID(N'dbo.v_other_in_stats', N'V') IS NULL SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='OTHER_IN') SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='OTHER_IN_DETAIL') SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='OTHER_IN_STATS') SET @bad = @bad + 1;
-IF (SELECT COUNT(*) FROM yj_field WHERE panel_code='OTHER_IN') < 49 SET @bad = @bad + 1;
+IF (SELECT COUNT(*) FROM yj_field WHERE panel_code='OTHER_IN') < 50 SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='panel' AND ref_key=N'其他入库单' AND locale='en') SET @bad = @bad + 1;
 IF NOT EXISTS (SELECT 1 FROM yj_role_panel WHERE panel_code='OTHER_IN' AND role_id=1) SET @bad = @bad + 1;
 IF COL_LENGTH(N'dbo.bd_other_in', N'业务类型id') IS NULL SET @bad = @bad + 1;

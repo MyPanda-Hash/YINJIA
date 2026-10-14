@@ -30,6 +30,9 @@ const HEAD_SIDE = (role) => [
   // [列名, 类型, 中文注明, 字段类型, place, seq, width, editable, required, hidden, visible]
   ['单据日期', 'date', '单据日期(金蝶 bill_date)', '日期', 'query,header', 10, 140, 0, 1, 0, 1],
   ['单据编号', 'nvarchar(50)', '单据编号(MES 单号;金蝶侧单号存 外部单据号)', '文本', 'query,header', 20, 140, 0, 1, 0, 1],
+  // 单据状态:物理列有(与 bd_purchase_in/bd_finish_in/bd_material_out 同款),但**不登记为面板字段**
+  // —— 参照面板都不登记它,界面状态由 yj_doc_status 派生(见 NO_FIELD)
+  ['单据状态', 'nvarchar(20)', '单据状态(MES 单据状态快照;面板不登记该字段,界面状态由 yj_doc_status 派生 —— 与采购入库单/产成品入库单/材料出库单同款)', '文本', 'header', 22, 100, 0, 0, 1, 0],
   ['业务类型', 'nvarchar(50)', '业务类型(金蝶 trans_type_name;其他入库=其他入库 / 其他出库=其他出库)', '文本', 'query,header', 30, 120, 0, 1, 0, 1],
   ['业务类型编码', 'nvarchar(50)', '业务类型编码(金蝶 trans_type_number,如 QTRKLX01/QTCKLX01)', '文本', 'header', 32, 120, 0, 0, 0, 1],
   ['业务类型id', 'nvarchar(20)', '业务类型id(金蝶 trans_type_id,保存接口**必需**;无档案接口故按账套配置:真实账套 其他入库=12 / 其他出库=13)', '文本', 'header', 34, 90, 1, 0, 0, 1],
@@ -84,6 +87,7 @@ const LINE_COLS = [
 
 // 类型专属列(按实测:其他入库行有 成本/单位成本/图片 且无批次;其他出库行有批号)
 const IN_ONLY_LINE = [
+  ['批号', 'nvarchar(50)', '批号(金蝶 batch_no;其他入库实测 0% 有值,但**库存记账要用它做库存键**——与采购入库/产成品入库/其他出库同款,故建列并登记)', '文本', 'query,detail', 96, 120, 1, 0, 0, 1],
   ['成本', 'nvarchar(50)', '成本(金蝶 cost;其他入库实测 19% 行有值)', '文本', 'detail', 100, 100, 0, 0, 0, 1],
   ['单位成本', 'nvarchar(50)', '单位成本(金蝶 unit_cost;其他入库实测 19% 行有值)', '文本', 'detail', 102, 100, 0, 0, 0, 1],
   ['存货图片', 'nvarchar(300)', '存货图片(金蝶 picture;其他入库实测 14% 行有值)', '文本', 'detail', 104, 200, 0, 0, 0, 1],
@@ -161,6 +165,8 @@ const EN = {
 }
 
 const q = (s) => (s === null || s === undefined ? 'NULL' : `N'${String(s).replace(/'/g, "''")}'`)
+/** 只建列、不登记为面板字段的列(参照面板同款:单据状态由 yj_doc_status 派生) */
+const NO_FIELD = new Set(['单据状态'])
 const col = ([name, type]) => `[${name}] ${type} NULL`
 const AUDIT = ['asp_user1 nvarchar(50) NULL', 'asp_time1 datetime2 NULL', 'asp_user2 nvarchar(50) NULL', 'asp_time2 datetime2 NULL', 'asp_cancel char(1) NULL']
 const SPARE = Array.from({ length: 20 }, (_, i) => `[备用${i + 1}] nvarchar(100) NULL`)
@@ -219,6 +225,21 @@ function build() {
     P('GO')
     P(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'ix_${s.line}_docno' AND object_id = OBJECT_ID(N'dbo.${s.line}'))`)
     P(`    CREATE INDEX ix_${s.line}_docno ON dbo.${s.line}([单据编号]);`)
+    P('GO')
+    // 防御性补列:表已存在(如上次只跑了部分、或后续在规格里加了新列)时,逐列补齐
+    // —— 仓库惯例见 migrate-finish-in-wo-line-20261015.sql「防御性加列」
+    P(`-- ①b 防御性补列(${s.head} / ${s.line}:列缺失即补,幂等)`)
+    for (const [table, cols, extra] of [[s.head, s.headCols, [['单据日期', 'date']]], [s.line, s.lineCols, [['单据编号', 'nvarchar(50)']]]]) {
+      for (const [name, type] of [...extra, ...cols.map((c) => [c[0], c[1]]), ...AUDIT.map((a) => {
+        const m = a.match(/^(\S+)\s+(.+?)\s+NULL$/)
+        return [m[1], m[2]]
+      }), ...SPARE.map((sp) => {
+        const m = sp.match(/^\[(.+?)\]\s+(.+?)\s+NULL$/)
+        return [m[1], m[2]]
+      })]) {
+        P(`IF COL_LENGTH(N'dbo.${table}', N'${name}') IS NULL ALTER TABLE dbo.${table} ADD [${name}] ${type} NULL;`)
+      }
+    }
     P('GO')
   }
 
@@ -292,6 +313,7 @@ function build() {
   for (const s of Object.values(SPEC)) {
     P(`-- ⑤ 字段登记(${s.panel} 表头 + 明细)`)
     for (const [name, , , dt, place, seq, width, editable, required, hidden, visible] of s.headCols) {
+      if (NO_FIELD.has(name)) continue
       P(`IF NOT EXISTS (SELECT 1 FROM yj_field WHERE panel_code='${s.panel}' AND label=${q(name)})`)
       P(`    INSERT INTO yj_field (panel_code, col_name, label, data_type, dict_sql, ref_panel, ref_field, display_field, place, seq, width, editable, required, hidden, alias, visible)`)
       P(`    VALUES ('${s.panel}', ${q(name)}, ${q(name)}, ${q(dt)}, NULL, NULL, NULL, NULL, ${q(place)}, ${seq}, ${width}, ${editable}, ${required}, ${hidden}, NULL, ${visible});`)
@@ -365,7 +387,8 @@ function build() {
     for (const t of [s.head, s.line]) P(`IF OBJECT_ID(N'dbo.${t}', N'U') IS NULL SET @bad = @bad + 1;`)
     for (const v of [`v_${s.head.replace('bd_', '')}_detail`, `v_${s.head.replace('bd_', '')}_stats`]) P(`IF OBJECT_ID(N'dbo.${v}', N'V') IS NULL SET @bad = @bad + 1;`)
     for (const c of [s.panel, `${s.panel}_DETAIL`, `${s.panel}_STATS`]) P(`IF NOT EXISTS (SELECT 1 FROM yj_panel WHERE panel_code='${c}') SET @bad = @bad + 1;`)
-    P(`IF (SELECT COUNT(*) FROM yj_field WHERE panel_code='${s.panel}') < ${s.headCols.length + s.lineCols.length} SET @bad = @bad + 1;`)
+    const fieldCnt = s.headCols.filter((c) => !NO_FIELD.has(c[0])).length + s.lineCols.length
+    P(`IF (SELECT COUNT(*) FROM yj_field WHERE panel_code='${s.panel}') < ${fieldCnt} SET @bad = @bad + 1;`)
     P(`IF NOT EXISTS (SELECT 1 FROM yj_translation WHERE scope='panel' AND ref_key=${q(s.panelName)} AND locale='en') SET @bad = @bad + 1;`)
     P(`IF NOT EXISTS (SELECT 1 FROM yj_role_panel WHERE panel_code='${s.panel}' AND role_id=1) SET @bad = @bad + 1;`)
     P(`IF COL_LENGTH(N'dbo.${s.head}', N'业务类型id') IS NULL SET @bad = @bad + 1;`)
