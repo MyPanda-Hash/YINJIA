@@ -99,7 +99,7 @@ const PROBE = `(async()=>{
   out.gridFound=!!document.querySelector('.qr-grid');
   const rowN=()=>document.querySelectorAll('.qr-grid tbody tr').length;
   const cellN=()=>document.querySelectorAll('.qr-grid tbody .qr-cell-text').length;
-  const inpN=()=>document.querySelectorAll('.qr-grid tbody input').length;
+  const inpN=()=>document.querySelectorAll('.qr-sheet input, .qr-sheet textarea').length;
   const emptyN=()=>document.querySelectorAll('.qr-grid .c-empty').length;
   out.rowsBefore=rowN(); out.cellsBefore=cellN(); out.inputsBefore=inpN(); out.emptyBefore=emptyN();
   const btn=document.querySelector('.qr-add-btn');

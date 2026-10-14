@@ -126,6 +126,53 @@
       </tbody>
     </table>
 
+    <!-- ④b 待归类检验项目:纵向(一行一项)—— 新增的行表区为空,先落在这里,
+         填上表区即自动并入上方横表对应分组(避免塞进窄组列里没法填) -->
+    <table v-if="ungroupedRows.length" class="qr-table qr-ungroup">
+      <thead>
+        <tr>
+          <th class="c-sector">{{ tt('表区') }}</th>
+          <th class="c-item">{{ tt('检验项目') }}</th>
+          <th class="c-req">{{ tt('检验要求') }}</th>
+          <th class="c-method">{{ tt('检验方法') }}</th>
+          <th v-for="m in MEASURE" :key="'um' + m" class="c-mv">{{ tt(m) }}</th>
+          <th class="c-judge">{{ tt('单项判定') }}</th>
+          <th v-if="editable" class="c-op"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="(row, i) in ungroupedRows" :key="row.id ?? ('u' + i)">
+          <td class="c-sector">
+            <el-input v-if="editable" v-model="row['表区']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <span v-else class="qr-cell-text">{{ row['表区'] || '' }}</span>
+          </td>
+          <td class="c-item">
+            <el-input v-if="editable" v-model="row['检验项目']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <span v-else class="qr-cell-text">{{ row['检验项目'] || '' }}</span>
+          </td>
+          <td class="c-req">
+            <el-input v-if="editable" v-model="row['检验要求']" size="small" class="qr-cell-input qr-cell-wrap" @input="emit('dirty')" />
+            <span v-else class="qr-cell-text">{{ row['检验要求'] || '' }}</span>
+          </td>
+          <td class="c-method">
+            <el-input v-if="editable" v-model="row['检验方法']" size="small" class="qr-cell-input qr-cell-wrap" @input="emit('dirty')" />
+            <span v-else class="qr-cell-text">{{ row['检验方法'] || '' }}</span>
+          </td>
+          <td v-for="m in MEASURE" :key="'uv' + m" class="c-mv">
+            <el-input v-if="editable" v-model="row[m]" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <span v-else class="qr-cell-text">{{ num(row[m]) }}</span>
+          </td>
+          <td class="c-judge">
+            <el-input v-if="editable" v-model="row['单项判定']" size="small" class="qr-cell-input" @input="emit('dirty')" />
+            <span v-else class="qr-cell-text">{{ row['单项判定'] || '' }}</span>
+          </td>
+          <td v-if="editable" class="c-op">
+            <span class="qr-del no-print" :title="tt('删除本行')" @click="removeRow(row)">×</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
     <!-- ⑤ ＋新增检验项 -->
     <div v-if="editable" class="qr-add-row no-print">
       <span class="qr-add-btn" @click="addRow()">＋ {{ tt('新增检验项') }}</span>
@@ -249,7 +296,8 @@ const groups = computed(() => {
   for (const r of items.value) {
     // ⚠ 表区为空的行**必须也渲染**:新增出来的行表区就是空的,
     //   此前 continue 跳过 => 行虽然 push 进去了却永远看不见、也就永远填不了表区(死循环)。
-    const s = String(r['表区'] ?? '').trim() || UNGROUPED
+    const s = String(r['表区'] ?? '').trim()
+    if (!s) continue // 空表区 = 待归类,走下方纵向表(横表只放已成组的)
     if (!map.has(s)) { map.set(s, []); order.push(s) }
     map.get(s).push(r)
   }
@@ -262,6 +310,12 @@ const groups = computed(() => {
       : rs.map((r, j) => ({ k: 'i' + j, label: String(r['检验项目'] || ''), itemIdx: j }))
     return { sector: s, title: s === UNGROUPED ? tt(s) : (LETTERS[i] || '') + '.' + tt(s), cols, rows: rs, quant }
   })
+})
+
+/** 待归类行(表区为空):纵向表格显示,填上表区后自动并入上方横表对应组 */
+const ungroupedRows = computed(() => {
+  bump.value
+  return items.value.filter((r) => !String(r['表区'] ?? '').trim())
 })
 
 const rowCount = computed(() => {
@@ -299,6 +353,13 @@ function addRow() {
   ensureItems().push({ 表区: '', 检验项目: '', 检验要求: '', 检验方法: '', 单项判定: '' })
   bump.value++      // 明细非响应式:手动强制刷新
   emit('dirty')
+}
+
+/** 删除单行(待归类纵向表用) */
+function removeRow(row) {
+  const arr = ensureItems()
+  const i = arr.indexOf(row)
+  if (i >= 0) { arr.splice(i, 1); bump.value++; emit('dirty') }
 }
 
 /** 删除一个表区的全部行 */
@@ -415,6 +476,10 @@ function removeGroup(g) {
 }
 .c-op {
   width: 34px;
+}
+/* 待归类纵向表:与横表同观感,但列宽按自身需要 */
+.qr-ungroup {
+  margin-top: 6px;
 }
 .c-empty {
   color: #8a94a0;
