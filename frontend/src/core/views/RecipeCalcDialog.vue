@@ -120,7 +120,16 @@
                 </template>
               </el-select>
             </td>
-            <td><el-input v-model="r['设计添加量']" size="small" class="rcd-mini" /></td>
+            <td class="rcd-c">
+              <!-- 料位 1(= 按物料种类分组后的第 1 个粉料行,由 slot1RowIndex 点名)是**补差位**:
+                   引擎只拷料位 2~7,这一格填什么都被丢掉(2026-10-15 静默失效)⇒ 禁用 + 灰底 + 值就地显示 -->
+              <template v-if="i === autoDesignRow">
+                <el-input size="small" class="rcd-mini rcd-auto" disabled
+                          :placeholder="tt('自动补差')" :title="autoDesignTip" />
+                <div class="rcd-auto-v" :title="autoDesignTip">{{ autoDesignText }}</div>
+              </template>
+              <el-input v-else v-model="r['设计添加量']" size="small" class="rcd-mini" />
+            </td>
             <!-- 两列是算出来的(引擎输出),这里只读展示输入旁边 —— 回填预览那张表还要拿它跟旧值比 -->
             <td class="rcd-c">{{ rowCalc(i, '实际添加比例') }}</td>
             <td class="rcd-c">{{ rowCalc(i, '单支物料含量') }}</td>
@@ -239,8 +248,8 @@ import { tt } from '@/i18n'
 import StdLibManager from './StdLibManager.vue'
 import { compute } from '@/core/mold/recipeEngine.js'
 import { applyArchiveMoisture, buildPatch, densityOf, matchSinterModel, moisturePercent, NO_RECIPE_ROWS, paramsFromHead,
-  slotsFromRows, specCarryFrom, sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop, sinterRowsFromQuery,
-  unfilledDesignRows } from '@/core/mold/recipeSheet.js'
+  slot1RowIndex, slotsFromRows, specCarryFrom, sinterLengthWarning, sinterParams, sinterPatch, sinterRowsForWorkshop,
+  sinterRowsFromQuery, unfilledDesignRows } from '@/core/mold/recipeSheet.js'
 import { blankRecipeRow, buildRecipeRows, editRowsFrom, invRowsOfKind, invSearchOptions, materialFillFor,
   uniqueInvRowBy } from '@/core/mold/recipeRows.js'
 import { MATERIAL_KINDS } from '@/core/mold/materialKinds.js'
@@ -375,6 +384,16 @@ const overrides = computed(() => {
 const slots = computed(() => slotsFromRows(editRows.value).slots
   // 弹窗输入是百分数(exe 前端同款),引擎吃小数 —— 换算在 recipeSheet.moisturePercent 里,有单测
   .map((s, i) => ({ ...s, moisture: moisturePercent(moisture.value[i]) })))
+
+/**
+ * 料位 1(补差位)那一行在物料行里的下标;-1 = 没有粉料行(全折算料/全胶粉/空表)⇒ **一格都不禁用**。
+ * 判定全在 recipeSheet.slot1RowIndex 里(复用 slotsFromRows + groupOfMaterialType,有单测),
+ * 组件只按它决定哪一格的「设计添加量」改成"由系统反推"。
+ */
+const autoDesignRow = computed(() => slot1RowIndex(editRows.value))
+/** 反推出来的补差值(1 − 料位2~7),与 ③ 表「设计值(来自物料行)」同一句口径:「补差 38.00%」 */
+const autoDesignText = computed(() => (autoDesignRow.value < 0 ? '' : designText(slots.value[0])))
+const autoDesignTip = computed(() => tt('料位 1（按物料种类分组后的第 1 个粉料行）是补差位，它的值由系统反推 = 1 - 料位 2~7 之和；这一格填什么都不会参与计算'))
 
 const parsed = computed(() => {
   // 第三参 = **弹窗里这份物料行**:一行物料都没有时 paramsFromHead 给出阻断项(见 NO_RECIPE_ROWS)。
@@ -893,6 +912,9 @@ function apply() {
 .rcd-empty { background: #fbfbfb; color: #c0c4cc; }
 .rcd-mini { width: 78px; }
 .rcd-mini :deep(.el-input__inner) { text-align: center; }
+/* 料位 1(补差位)那一格:不参与计算 ⇒ 灰底只读 + 下面挂着反推出来的值(与 ③ 表的「补差 xx%」同口径) */
+.rcd-auto :deep(.el-input__wrapper) { background: #f2f3f5; }
+.rcd-auto-v { font-size: 10px; color: #909399; line-height: 1.4; white-space: nowrap; }
 /* 表格单元格里的下拉:撑满格子(默认宽度不定),与同格的输入框口径一致 */
 .rcd-sel { width: 100%; }
 /* remote 下拉的"没有候选"提示(下拉面板里的空槽):小字、不抢眼、可换行 */

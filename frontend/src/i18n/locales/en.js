@@ -2925,6 +2925,9 @@ export default {
     '最终比例': 'Final Ratio',
     '单支克重g': 'Weight per Rod (g)',
     '补差': 'Balancing',
+    /* 料位 1(补差位)那一格的「设计添加量」不参与计算 ⇒ 禁用 + 标"由系统反推"(2026-10-15) */
+    '自动补差': 'Auto balancing',
+    '料位 1（按物料种类分组后的第 1 个粉料行）是补差位，它的值由系统反推 = 1 - 料位 2~7 之和；这一格填什么都不会参与计算': 'Slot 1 (the first powder row after grouping by material type) is the balancing slot: its value is derived by the system = 1 - the sum of slots 2-7. Whatever is typed in this cell does not take part in the calculation.',
     '计算结果': 'Result',
     // 按产品规格一键带出(2026-09-21):规格/烧结型号/密度范围从产品信息与历史单带出
     '按产品规格带出': 'Carry from Product Spec',

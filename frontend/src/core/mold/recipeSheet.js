@@ -174,6 +174,32 @@ export function slotsFromRows(rows) {
 }
 
 /**
+ * 「料位 1(补差位)那一行」在配方表里的行下标;**没有这样的行给 -1**。弹窗据此把那一行的
+ * 「设计添加量」格禁用并标成"由系统反推"—— 2026-10-15 用户报障:那一格看着能编辑,填什么却被
+ * 引擎丢掉(recipeEngine 只拷料位 2~7,料位 1 由 1 − Σ料位2~7 反推),**零告警**,是静默失效。
+ *
+ * 归属判定**只走既有纯函数**,不另立一套分组:
+ *   · `slotsFromRows` 给出引擎口径的料位 1 是哪个 rowIndex(哪个行占料位 1 由它说了算);
+ *   · `groupOfMaterialType` 再确认那一行**认得出是粉料**。
+ *
+ * 为什么还要第二道确认(为什么不是"引擎说谁是料位 1 就点谁"):物料种类为空(「加一行」造的空白行)
+ * 或认不出的词,`slotsFromRows` 会**容错地暂按粉料**放进料位 1 —— 那时用户根本还没选物料,
+ * 把这一格灰掉只会让人莫名其妙,而硬要求是"一个粉料行都没有就一格都不许禁用"。两个方向的代价不对称:
+ * 少禁用一格 = 维持现状(认不出的种类本来就有告警);错禁用一格 = 把**真被引擎使用**的值锁死/显示错,
+ * 比原来的静默更糟。故这里取"认得出是粉料才点"。
+ *
+ * @param {Array} rows 配方表的物料行
+ * @returns {number} 行下标(0 起);没有粉料行 / 空表 / 非数组给 -1
+ */
+export function slot1RowIndex(rows) {
+  const first = slotsFromRows(rows).slots[0]
+  const i = first && first.rowIndex >= 0 ? first.rowIndex : -1
+  if (i < 0) return -1
+  const list = Array.isArray(rows) ? rows : []
+  return groupOfMaterialType(list[i]?.['物料种类']) === SLOT_GROUPS.POWDER ? i : -1
+}
+
+/**
  * 「参与计算的行没填设计添加量」的行号清单(1 起,升序)—— 弹窗据此出告警。
  *
  * 为什么必须有这条:空着的「设计添加量」在引擎里等同于 0(粉料/胶粉位 = 比例 0,折算料位 = 0 克/支),
