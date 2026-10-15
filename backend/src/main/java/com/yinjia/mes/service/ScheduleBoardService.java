@@ -31,6 +31,30 @@ public class ScheduleBoardService {
     private final JdbcTemplate jdbc;
 
     /**
+     * 「该工单行**已完成生产**」的判据(plang.完工状态,由 ProcessTaskService 在**全部报工达标**时置位):
+     * 生产完工 / 已完工。**与入库无关** —— 入库是仓库的事,不改变"这条线已经没活了"。
+     *
+     * <p>2026-10-16 用户口径「当前生产工单完工后…需要实现当前完工后组装内没有当前生产工单」:
+     * 末道(组装)完工后**没有下一道可转序**,`scx` 会一直停在组装线 ⇒ 旧口径下这条工单永远算在
+     * 组装线的未交量/负荷里、且一直挂在「未完工」页签。凡"这条线还有多少活"的口径一律剔除本态。
+     */
+    private static final String DONE_ROW = "ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工')";
+
+    /**
+     * **生产状态唯一定义**(2026-10-16 收口):显示列与「未完工 / 已完工」页签筛选**必须同源**。
+     * <ol>
+     *   <li>ja ∈ (T,Y) ⇒ 已结案;</li>
+     *   <li>{@link #DONE_ROW} ⇒ 完工(全部报工达标即完工,**不等入库**);</li>
+     *   <li>有入库 ⇒ 在产;否则 未完工。</li>
+     * </ol>
+     * ⚠ 原 `st` 子查询用的是「入库 ≥ 排产」口径 ⇒ 报工全完但还没入库的行**列里显示「完工」、
+     * 却被筛进「未完工」页签**(「已完工」页签恒 0 行)——就是用户报障的那个现象。
+     */
+    private static final String ST_EXPR = "CASE WHEN ISNULL(p.ja,'N') IN (N'T',N'Y') THEN N'已结案'"
+            + " WHEN " + DONE_ROW + " THEN N'完工'"
+            + " WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END";
+
+    /**
      * 工序检验单:面板 → 头表(工单追溯「质检段」用)。
      * 表**同构**(头/行结构一致,建表见 {@code tools/migrate-qc-process-insp.sql}),
      * 故同一段 SQL 换表名即可全查;出单口径见 {@code ButtonService.WO_INSP_PANEL}
@@ -165,6 +189,8 @@ public class ScheduleBoardService {
                 "SELECT ISNULL(SUM(ISNULL(p.pl_sl,0) - ISNULL(p.rk_sl,0)),0)"
                         + " FROM dbo.plang p WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''"
                         + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        // 已完工的行不算"未完成量"(2026-10-16 同上:完工即这条线没活;按行判)
+                        + "   AND NOT (" + DONE_ROW + ")"
                         + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = p.scx"
                         + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))",
                 Double.class, ws, ws);
@@ -221,7 +247,10 @@ public class ScheduleBoardService {
                         + "             WHEN CAST(p.cp_date AS date) > DATEADD(day,13,CAST(GETDATE() AS date)) THEN DATEADD(day,13,CAST(GETDATE() AS date))"
                         + "             ELSE CAST(p.cp_date AS date) END) + 1) END) AS 今日负荷"
                         + "   FROM dbo.plang p WHERE ISNULL(p.asp_cancel,'N')<>'Y' AND ISNULL(p.scx,N'')<>N''"
-                        + "     AND ISNULL(p.ja,'N') NOT IN ('T','Y') AND ISNULL(p.pl_sl,0) > 0 GROUP BY p.scx) ld"
+                        + "     AND ISNULL(p.ja,'N') NOT IN ('T','Y') AND ISNULL(p.pl_sl,0) > 0"
+                        // 已完工的行不占产线负荷(2026-10-16:完工=这条线没活了;按工单行判)
+                        + "     AND NOT (" + DONE_ROW + ")"
+                        + " GROUP BY p.scx) ld"
                         + " ON ld.生产线 = pl.生产线" + f + " ORDER BY pl.生产线",
                 args.toArray());
     }
@@ -406,8 +435,8 @@ public class ScheduleBoardService {
         return jdbc.queryForList(
                 "SELECT ISNULL(p.scx,N'') AS 生产线, p.pl_no AS 加工单号, p.id AS 行id, p.pl_xc AS 工单行号,"
                         + " ISNULL(p.[批次号],N'') AS 批次号, ISNULL(p.lb,N'') AS 排产班组,"
-                        + " CASE WHEN ISNULL(p.ja,'N') IN (N'T',N'Y') THEN N'已结案'"
-                        + "      WHEN ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工') THEN N'完工' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
+                        // 生产状态 = {@link #ST_EXPR}(唯一定义,与工单排产看板/生产工单列表同源)
+                        + " " + ST_EXPR + " AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量,"
                         + " ISNULL(p.xq_sl,0) AS 需求数量, ISNULL(p.rk_sl,0) AS 入库数量,"
                         // 余量(2026-09-28 定稿)=订单结转剩余数量(需求−已转出占用,与订单结转页同源)
@@ -438,6 +467,11 @@ public class ScheduleBoardService {
      * 左侧骨架(2026-09-27 切 plang_pc×plang):生产线档案**全部线**(含停用)的 未交量汇总。
      * 未交量 = 该线已排工单的 Σ(排产−max(入库,已报工))(未结案未作废)——排产行=plang_pc(薄记录),
      * 数量/状态=plang 活数据;已报工=wo_progress 按工单号完成数最大值。
+     *
+     * <p><b>2026-10-16(用户口径「完工后组装内没有当前生产工单」)</b>:已完工({@link #DONE_ROW})的行
+     * **不再计入任何线的未交量** —— 末道(组装)完工后无处转序,scx 会一直停在组装线,旧口径把这条已做完的
+     * 工单永久算成组装线的欠量(实测 GD-2026-10-0007#1:完工、入库 0 ⇒ 组装线还挂着 160)。
+     * 按**工单号+工单行号**逐行判(同单其它未完工行照常计入)。
      */
     public List<Map<String, Object>> linesSummary(String date) {
         return linesSummary(date, null);
@@ -460,6 +494,8 @@ public class ScheduleBoardService {
                         + "   AND pc.plang_id = p.id AND ISNULL(p.asp_cancel,'N')<>'Y'"
                         + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'')<>N''"
                         + "   AND ISNULL(p.ja,'N') NOT IN ('T','Y')"
+                        // 已完工 ⇒ 这条线没活了(末道组装完工后无处转序,否则永久挂账)
+                        + "   AND NOT (" + DONE_ROW + ")"
                         + " GROUP BY pc.scx");
         Map<String, Double> bk = new LinkedHashMap<>();
         for (Map<String, Object> b : backlog) {
@@ -499,10 +535,12 @@ public class ScheduleBoardService {
     /** 选中线 的排产明细(按车间收敛版:workshop 非空时只认本车间的产线,跨车间查询返回空) */
     public List<Map<String, Object>> scheduled(String line, String scope, String workshop) {
         String ws = (workshop == null || workshop.isBlank()) ? "" : workshop.trim();
+        // 页签筛选 = {@link #ST_EXPR}(与「生产状态」列**同源**,2026-10-16 收口):
+        //   完工的行从「未完工」里去掉、并真正出现在「已完工」里(此前两边用的是两套口径)。
         String complete;
         if ("已完工".equals(scope)) complete = " AND st.[生产状态] IN (N'完工', N'已结案')";
         else if ("全部".equals(scope)) complete = "";
-        else complete = " AND st.[生产状态] <> N'完工' AND st.[生产状态] <> N'已结案'";
+        else complete = " AND st.[生产状态] NOT IN (N'完工', N'已结案')";
         // ── 「当前工序」/「上道工序」表达式(2026-10-07 用户口径)──────────────────────────
         //   当前工序 = 预排台账里最后一道「已落实」(转到切炭线后就显示切炭);缺台账回落**本行** p.当前工序
         // 🔴 2026-10-15 修(用户口径「工单号+工单行号确定当前唯一工单,各个工单的进程、流程追溯都这样实现」):
@@ -541,8 +579,8 @@ public class ScheduleBoardService {
                         + " CONVERT(varchar(10), p.cp_date2, 120) AS 实际完工日期,"
                         + " ISNULL(p.mc,N'') AS 产品名称, ISNULL(p.gg,N'') AS 规格型号,"
                         + " ISNULL(p.jldw,N'') AS 单位,"
-                        + " CASE WHEN ISNULL(p.ja,'N') IN (N'T',N'Y') THEN N'已结案'"
-                        + "      WHEN ISNULL(p.[完工状态],N'') IN (N'生产完工', N'已完工') THEN N'完工' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS 生产状态,"
+                        // 生产状态 = {@link #ST_EXPR}(唯一定义;页签筛选用同一个表达式,见上面 complete)
+                        + " " + ST_EXPR + " AS 生产状态,"
                         + " ISNULL(p.pl_sl,0) AS 排产数量, ISNULL(p.xq_sl,0) AS 需求数量,"
                         + " ISNULL(p.rk_sl,0) AS 入库数量, ISNULL(p.xq_sl,0) - ISNULL((SELECT SUM(l.linked_quantity) FROM form_flow_link l WHERE l.source_panel_code = 'SO_ORDER' AND l.source_form_no = p.od_no AND l.source_line_key = p.od_no + N'#' + CONVERT(nvarchar(20), CONVERT(int, p.od_xc)) AND l.link_status = 'ACTIVE'), 0) AS 余量,"
                         // 批号=转单批次号(与生产工单页「批次号」对应;legacy 旧行无批次号回退产品批号 lot_no)
@@ -594,8 +632,7 @@ public class ScheduleBoardService {
                         + "            FROM bs_inv iv GROUP BY iv.存货编码) 管控 ON 管控.存货编码 = p.dm"
                         // ⚠ 2026-10-15 移除 `LEFT JOIN v_wo_process_progress wpp`(整单聚合视图,与行级口径冲突;
                         //   其唯一用处 wpp.当前工序 已改为回落本行 p.[当前工序],见上方 curOp)
-                        + " CROSS APPLY (SELECT CASE WHEN ISNULL(p.pl_sl,0) > 0 AND ISNULL(p.rk_sl,0) >= ISNULL(p.pl_sl,0)"
-                        + "   THEN N'完工' WHEN ISNULL(p.rk_sl,0) > 0 THEN N'在产' ELSE N'未完工' END AS [生产状态]) st"
+                        + " CROSS APPLY (SELECT " + ST_EXPR + " AS [生产状态]) st"
                         + " WHERE ISNULL(pc.asp_cancel,'N')<>'Y' AND ISNULL(pc.scx,N'') = ?"
                         + "   AND (? = N'' OR EXISTS (SELECT 1 FROM bs_prod_line pl WHERE pl.生产线 = pc.scx"
                         + "        AND ISNULL(pl.asp_cancel,'N')<>'Y' AND ISNULL(pl.生产车间,N'') = ?))" + complete
