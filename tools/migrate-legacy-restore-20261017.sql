@@ -19,6 +19,8 @@
  *      ⚠ s_commdata 主键在快照上是系统自动名 `PK__s_commda__3214EC27C3DB5918`,
  *        本脚本改用规范名 `PK_s_commdata`(键列/聚集/唯一性完全一致,仅名字不同)。
  *   ③ 列级中文注明:v1 只加了表级 —— 现在把快照上的列注明逐条搬过来(NOT EXISTS 守卫)。
+ *      ⚠ 自检对注明数用 `>=`(不是 `==`):后续迁移(如 migrate-legacy-comments-fill-20261017.sql)
+ *        会给快照没有注明的列补上说明,条数只多不少 —— 用等号会在下次重跑时误判 FAIL。
  *
  * 【数据怎么办 —— 本脚本**不灌数据**,这是有意的】
  *   快照里这 6 张表共 7,936 行,其中 s_commdata.JSZ 是**真实手机号**、gscs 是公司电话,
@@ -782,37 +784,37 @@ IF OBJECT_ID(N'dbo.dm_langue', N'U') IS NULL BEGIN SET @bad = @bad + 1; SET @msg
 ELSE BEGIN
   IF (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.dm_langue')) <> 22 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'dm_langue 列数 '; END
   IF (SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.dm_langue') AND type > 0) <> 1 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'dm_langue 索引 '; END
-  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.dm_langue') AND name = N'MS_Description') <> 13 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'dm_langue 注明 '; END
+  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.dm_langue') AND name = N'MS_Description') < 13 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'dm_langue 注明不足 '; END
 END
 IF OBJECT_ID(N'dbo.gscs', N'U') IS NULL BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'gscs 缺表 '; END
 ELSE BEGIN
   IF (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.gscs')) <> 55 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'gscs 列数 '; END
   IF (SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.gscs') AND type > 0) <> 1 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'gscs 索引 '; END
-  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.gscs') AND name = N'MS_Description') <> 37 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'gscs 注明 '; END
+  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.gscs') AND name = N'MS_Description') < 37 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'gscs 注明不足 '; END
 END
 IF OBJECT_ID(N'dbo.permission', N'U') IS NULL BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'permission 缺表 '; END
 ELSE BEGIN
   IF (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.permission')) <> 18 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'permission 列数 '; END
   IF (SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.permission') AND type > 0) <> 1 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'permission 索引 '; END
-  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.permission') AND name = N'MS_Description') <> 14 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'permission 注明 '; END
+  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.permission') AND name = N'MS_Description') < 14 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'permission 注明不足 '; END
 END
 IF OBJECT_ID(N'dbo.s_commdata', N'U') IS NULL BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_commdata 缺表 '; END
 ELSE BEGIN
   IF (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.s_commdata')) <> 28 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_commdata 列数 '; END
   IF (SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.s_commdata') AND type > 0) <> 4 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_commdata 索引 '; END
-  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.s_commdata') AND name = N'MS_Description') <> 28 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_commdata 注明 '; END
+  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.s_commdata') AND name = N'MS_Description') < 28 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_commdata 注明不足 '; END
 END
 IF OBJECT_ID(N'dbo.s_sys', N'U') IS NULL BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_sys 缺表 '; END
 ELSE BEGIN
   IF (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.s_sys')) <> 46 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_sys 列数 '; END
   IF (SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.s_sys') AND type > 0) <> 1 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_sys 索引 '; END
-  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.s_sys') AND name = N'MS_Description') <> 47 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_sys 注明 '; END
+  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.s_sys') AND name = N'MS_Description') < 47 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_sys 注明不足 '; END
 END
 IF OBJECT_ID(N'dbo.s_xtcs', N'U') IS NULL BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_xtcs 缺表 '; END
 ELSE BEGIN
   IF (SELECT COUNT(*) FROM sys.columns WHERE object_id = OBJECT_ID(N'dbo.s_xtcs')) <> 17 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_xtcs 列数 '; END
   IF (SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.s_xtcs') AND type > 0) <> 1 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_xtcs 索引 '; END
-  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.s_xtcs') AND name = N'MS_Description') <> 17 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_xtcs 注明 '; END
+  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.s_xtcs') AND name = N'MS_Description') < 17 BEGIN SET @bad = @bad + 1; SET @msg = @msg + N's_xtcs 注明不足 '; END
 END
 DECLARE @dbn sysname = DB_NAME();
 RAISERROR(N'[自检] %s:6 张遗留表(表/列数/索引/注明),不符项 %d %s', 10, 1, @dbn, @bad, @msg);

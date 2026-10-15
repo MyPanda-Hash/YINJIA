@@ -3670,6 +3670,20 @@ migrate-srv-config-sync-20261017.sql
 #   登记:tools/db-inuse-tables.txt(快照回补节) + tools/db-legacy-whitelist.txt(冻结表 6 条)。
 migrate-legacy-restore-20261017.sql
 
+# —— 2026-10-17 9 张遗留表的列中文说明补齐(57 列)——
+#   用户口径:「把这些描述按照原来的描述补齐这 9 张表」。
+#   实况:dm_langue / gscs / permission / s_commdata / s_sys / s_xtcs / inh / outh / scjl
+#   的列注明覆盖数与服务器快照**逐表相等**,但两边都还有 57 列**完全没有注明** ⇒ 这才是要补的:
+#     dm_langue 10 / gscs 19 / permission 5 / s_commdata 1 / s_xtcs 1 / inh 8 / outh 12 / scjl 1。
+#   取值口径(严格按优先级,不臆造):① 全库同名列已有原文 → 照抄;② 拼音可确解 → 给中文义
+#   (gscs 的 gsmc/gsdh/tpwz/xpsm1/xpsm2 有该表唯一一行的**取值佐证**;tm_* 一组按
+#   条码长度/高度/左右间距/上下间距/上边距/左边距 释义);③ 取值为空且无确解的 6 列
+#   (gsgs/gszg/xpzs/msbdh/sczg/rem)如实标注「语义待业务确认」,不编造。
+#   全部 NOT EXISTS 守卫(已有注明一个字不动);自检断言 9 张表无注明列数 = 0。两账套均执行。
+#   ⚠ 本脚本要求排在上面 migrate-legacy-restore 之后;后者的自检已放宽为「注明数不足才 FAIL」
+#     (原为等号,补完会误判),见 _GenLegacyDdl.java 的说明。
+migrate-legacy-comments-fill-20261017.sql
+
 # —— 2026-10-17 scjl.jbbh 类型对齐服务器快照:text → nvarchar(250) ——
 #   与快照库 HSDZ_MES_SRV1015 逐列比对,scjl 的 100 列里**只有 jbbh 有类型差异**
 #   (本地 text / 服务器 nvarchar(250));根因是本地这张表 2026-10-03 由

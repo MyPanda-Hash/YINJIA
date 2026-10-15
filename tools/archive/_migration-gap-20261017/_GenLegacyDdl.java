@@ -61,6 +61,8 @@ public class _GenLegacyDdl {
                  *      ⚠ s_commdata 主键在快照上是系统自动名 `PK__s_commda__3214EC27C3DB5918`,
                  *        本脚本改用规范名 `PK_s_commdata`(键列/聚集/唯一性完全一致,仅名字不同)。
                  *   ③ 列级中文注明:v1 只加了表级 —— 现在把快照上的列注明逐条搬过来(NOT EXISTS 守卫)。
+                 *      ⚠ 自检对注明数用 `>=`(不是 `==`):后续迁移(如 migrate-legacy-comments-fill-20261017.sql)
+                 *        会给快照没有注明的列补上说明,条数只多不少 —— 用等号会在下次重跑时误判 FAIL。
                  *
                  * 【数据怎么办 —— 本脚本**不灌数据**,这是有意的】
                  *   快照里这 6 张表共 7,936 行,其中 s_commdata.JSZ 是**真实手机号**、gscs 是公司电话,
@@ -114,8 +116,8 @@ public class _GenLegacyDdl {
                   .append(" BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'").append(t.name()).append(" 列数 '; END\n")
                   .append("  IF (SELECT COUNT(*) FROM sys.indexes WHERE object_id = OBJECT_ID(N'dbo.").append(t.name()).append("') AND type > 0) <> ").append(idx)
                   .append(" BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'").append(t.name()).append(" 索引 '; END\n")
-                  .append("  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.").append(t.name()).append("') AND name = N'MS_Description') <> ").append(cmt + 1)
-                  .append(" BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'").append(t.name()).append(" 注明 '; END\n")
+                  .append("  IF (SELECT COUNT(*) FROM sys.extended_properties WHERE major_id = OBJECT_ID(N'dbo.").append(t.name()).append("') AND name = N'MS_Description') < ").append(cmt + 1)
+                  .append(" BEGIN SET @bad = @bad + 1; SET @msg = @msg + N'").append(t.name()).append(" 注明不足 '; END\n")
                   .append("END\n");
             }
             sb.append("DECLARE @dbn sysname = DB_NAME();\n");
