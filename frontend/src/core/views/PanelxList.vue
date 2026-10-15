@@ -140,14 +140,14 @@
         <QcCatalogSheet
           v-else-if="panelCode === 'QC_CATALOG'"
           ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
         />
         <!-- 来料品质·检验数据记录(QC_INSP_REC):纸张式检验报告,与原表「检验数据记录模版」一比一 -->
         <QcInspRecSheet
           v-else-if="panelCode === 'QC_INSP_REC'"
           ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -164,7 +164,7 @@
         <DataRecordSheet
           v-else-if="panelCode === 'RD_FILTER_EFF'"
           ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
@@ -172,12 +172,12 @@
         <RecordSheetPanels
           v-else-if="isRecordSheetPanel"
           ref="approvalSheetRef"
-          :head="cur" :fields="sheetAllFields" :editable="draftEditable" :panel-code="panelCode"
+          :head="cur" :fields="sheetAllFields" :editable="draftEditable && !annOn" :panel-code="panelCode"
           :my-dept-rows="changeDeptRows" :dept-lock-all="user.isAdmin === true"
           @dirty="markInlineDirty"
           @refresh-config="onFieldEditRefresh"
         />
-        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
+        <DocSheet v-else ref="approvalSheetRef" :head="cur" :fields="headerFields" :editable="draftEditable && !annOn" :attach-can-edit="attachEditable" :config="docSheetConfig" :panel-code="panelCode" :audited="curDocStatus === '已审核' || curDocStatus === '已归档'" :user="{ realName: user.realName, isAdmin: user.isAdmin, userName: user.userName }" @dirty="markInlineDirty" @term-changed="onTermChanged" />
         <!-- 项目实施计划:阶段进度面板(与文书面板并列,结构化10阶段+完成按钮) -->
 
         <div class="approval-side" :class="{ collapsed: sideCollapsed }">
@@ -486,8 +486,50 @@
                 :class="{ disabled: isDisabled('扫描填单') }"
                 @click="onSideAction('扫描填单')"
               >{{ tt('扫描填单') }}</div>
+
+              <!-- 标注笔 / 橡皮擦(2026-10-16 用户口径):仅**研发管理面板**(RD_*)且已载单据时出现。
+                   标注只落在**只读纸面与打印**上 —— 可编辑态的值在 <input> 里,HTML 无法只给其中几个字上色。 -->
+              <template v-if="annActive">
+                <div
+                  class="as-side-btn"
+                  :style="annMode === 'pen' ? 'background:#116a5b;color:#fff' : ''"
+                  @click="toggleAnnMode('pen')"
+                >{{ tt('标注笔') }}</div>
+                <div
+                  class="as-side-btn"
+                  :style="annMode === 'eraser' ? 'background:#b94d3f;color:#fff' : ''"
+                  @click="toggleAnnMode('eraser')"
+                >{{ tt('橡皮擦') }}</div>
+                <!-- 模式提示(开着才显示):第一次用最常见的卡点就是"点了标注笔以后呢?" -->
+                <div v-if="annMode" class="as-side-hint">
+                  {{ tt(annMode === 'pen' ? '在纸面上划选要标注的文字，再选颜色' : '点击已标注的文字即可擦除') }}
+                </div>
+              </template>
             </div>
           </template>
+        </div>
+      </div>
+
+      <!-- 标注色盘(选中文字后浮出;position:fixed 用视口坐标,内联样式免动本文件巨大的样式段)。
+           点色即落库并关闭;「加粗」是叠加开关,勾上再点色 = 该段着色且加粗。 -->
+      <div
+        v-if="annPending"
+        :style="`position:fixed;left:${annPending.x + 8}px;top:${annPending.y + 8}px;z-index:3000;background:#fff;border:1px solid #d8d8d8;border-radius:6px;box-shadow:0 6px 20px rgba(0,0,0,.16);padding:8px 10px;width:172px`"
+      >
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+          <i
+            v-for="cc in ANNOTATION_COLORS"
+            :key="cc"
+            :title="cc"
+            :style="`display:block;width:22px;height:22px;border-radius:4px;cursor:pointer;border:1px solid rgba(0,0,0,.12);background:${cc}`"
+            @click="pickAnnColor(cc)"
+          ></i>
+        </div>
+        <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:#333;margin-bottom:8px">
+          <input v-model="annBold" type="checkbox" /> {{ tt('加粗') }}
+        </label>
+        <div style="display:flex;justify-content:flex-end;gap:8px">
+          <span style="font-size:12px;color:#888;cursor:pointer" @click="annPending = null">{{ tt('取消') }}</span>
         </div>
       </div>
     </template>
@@ -1183,7 +1225,7 @@
     <template v-else-if="isQcInspReq">
       <div class="qc-insp-wrap" v-loading="loading">
         <QcInspReqSheet
-          :head="cur" :editable="draftEditable" :panel-code="panelCode" :fields="sheetAllFields"
+          :head="cur" :editable="draftEditable && !annOn" :panel-code="panelCode" :fields="sheetAllFields"
           @dirty="markInlineDirty"
           @save="saveInlineDraft('保存')"
           @refresh="load()"
@@ -1992,7 +2034,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, nextTick, markRaw, toRaw } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, onDeactivated, watch, nextTick, markRaw, toRaw, provide } from 'vue'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Filter, Plus, Search, WarningFilled } from '@element-plus/icons-vue'
@@ -2026,6 +2068,10 @@ import SelectVoucherDialog from './SelectVoucherDialog.vue'
 import DocSelectRail from './DocSelectRail.vue'
 import DocSheet from './DocSheet.vue'
 import FileAttachCell from './FileAttachCell.vue'
+// 标注笔/橡皮擦:纸面(RecordSheetPanels 里的 AnnotatedText)通过 provide/inject 拿状态,
+// 侧栏按钮与色盘在本组件 ⇒ 不必逐层透传 prop
+import { provideAnnotations, ANN_KEY } from '@core/panel/annotationBus.js'
+import { ANNOTATION_COLORS } from '@core/panel/docAnnotation.js'
 import ProgressControlSheet from './ProgressControlSheet.vue'
 import QcCatalogSheet from './QcCatalogSheet.vue'
 import QcInspRecSheet from './QcInspRecSheet.vue'
@@ -3539,6 +3585,102 @@ const attachValues = computed(() => Object.fromEntries(attachKeys.value.map((k) 
 function applyAttachSlots(map) {
   Object.entries(map || {}).forEach(([k, v]) => { cur.value[k] = v })
 }
+
+// ═══ 标注笔 / 橡皮擦(2026-10-16 用户口径:研发管理面板侧栏「文档输出」下) ═══
+// 交互:点「标注笔」→ 在纸面用鼠标选中要标注的文字 → 弹色盘选色(可叠加粗)→ 落库;
+//       点「橡皮擦」→ 点已标注的字即擦掉那一段。
+// 只在**只读纸面 + 打印**生效:可编辑态的值在 <input> 里,HTML 无法只给其中几个字上色。
+// ⚠ 仅研发管理面板(RD_*)开放;且必须已载单据(标注按 panelCode+docNo 定位)。
+const isRdPanel = computed(() => String(panelCode.value || '').startsWith('RD_'))
+/** 当前单据的标注:{ [fieldKey]: [{start,end,color,bold}] } */
+const annMap = ref({})
+/** 当前模式:null=关 / 'pen'=标注笔 / 'eraser'=橡皮擦 */
+const annMode = ref(null)
+/** 待选色的标注(色盘锚点);null=没在选色 */
+const annPending = ref(null)
+const annBold = ref(false)
+const annBusy = ref(false)
+const annActive = computed(() => !!isRdPanel.value && !!curDocNo.value)
+/**
+ * 标注模式开着吗(标注笔或橡皮擦)。
+ * 它同时是**纸面开关**:标注模式下把交给表组件的 `:editable` 关掉,整张纸切成只读 ——
+ * 否则草稿单的值都在 <input>/<textarea> 里,HTML 无法只给其中几个字上色,
+ * 划选也没有 AnnotatedText 去换算下标 ⇒ 用户点标注笔"没有反应"(2026-10-16 报障的真因)。
+ * 退出模式即恢复可编辑;未保存的值在 cur 里,不因切渲染而丢。
+ */
+const annOn = computed(() => !!isRdPanel.value && annMode.value !== null)
+function setAnnList(list) {
+  const m = {}
+  for (const a of list || []) {
+    const k = String(a.fieldKey || '')
+    if (!k) continue
+    ;(m[k] = m[k] || []).push(a)
+  }
+  annMap.value = m
+}
+async function loadAnns() {
+  if (!annActive.value) { annMap.value = {}; annPending.value = null; return }
+  try {
+    const res = await request.get('/annotation/list', { params: { panelCode: panelCode.value, docNo: curDocNo.value } })
+    setAnnList(res?.data)
+  } catch { annMap.value = {} }   // 读取失败不阻塞纸面
+}
+/** 标注笔:纸面选好范围 → 弹色盘(真正落库在 pickAnnColor) */
+function askAnn(fieldKey, start, end, at) {
+  annPending.value = { fieldKey, start, end, x: at?.x ?? 420, y: at?.y ?? 260, bold: annBold.value }
+}
+/** 色盘选色 → 落库(后端会把相交的旧段软删 ⇒ 再标即覆盖) */
+async function pickAnnColor(color) {
+  const p = annPending.value
+  if (!p || annBusy.value) return
+  annBusy.value = true
+  try {
+    const res = await request.post('/annotation/save', {
+      panelCode: panelCode.value, docNo: curDocNo.value,
+      fieldKey: p.fieldKey, start: p.start, end: p.end, color, bold: p.bold,
+    })
+    setAnnList(res?.data)
+    annPending.value = null
+  } catch (e) {
+    ElMessage.error(engine.errMsg?.(e) || tt('操作失败'))
+  } finally { annBusy.value = false }
+}
+/** 橡皮擦:擦掉与 [start,end) 相交的标注段 */
+async function eraseAnn(fieldKey, start, end) {
+  if (annBusy.value) return
+  annBusy.value = true
+  try {
+    const res = await request.post('/annotation/erase', {
+      panelCode: panelCode.value, docNo: curDocNo.value, fieldKey, start, end,
+    })
+    setAnnList(res?.data)
+  } catch (e) {
+    ElMessage.error(engine.errMsg?.(e) || tt('操作失败'))
+  } finally { annBusy.value = false }
+}
+function toggleAnnMode(m) {
+  annPending.value = null
+  annMode.value = annMode.value === m ? null : m
+}
+provideAnnotations({
+  anns: annMap,
+  mode: annMode,
+  active: annActive,
+  ask: askAnn,
+  erase: eraseAnn,
+})
+// 换单据/换面板即重载;退出研发面板自动关掉模式(免得状态串到别的面板)。
+// ⚠ 必须放进 onMounted:watch(source, cb) **注册时就立即求值 source**,而 source 读的是
+//   curDocNo → cur,而 cur 声明在本块**之后**(L3779 附近) ⇒ 直接写 watch(...) 会命中
+//   `Cannot access 'cur' before initialization` 的 TDZ(2026-10-16 实测,page 整页白)。
+//   放到 onMounted 里:此时 setup 已执行完,所有 const 都已初始化。
+onMounted(() => {
+  loadAnns()
+  watch([() => curDocNo.value, () => panelCode.value], () => {
+    loadAnns()
+    if (!isRdPanel.value) annMode.value = null
+  })
+})
 /** RecordSheetPanels 专用:表头字段 + 明细字段(数据表列的 alias 从明细字段元数据取) */
 const sheetAllFields = computed(() => {
   const header = headerFields.value || []
@@ -3569,11 +3711,13 @@ const draftEditable = computed(() => {
 /** 附件上传闸门(2026-09-20):草稿/修改中照旧可传;**凡配了附件列位的单据,已审核/已完成也允许补附件**
  *  (合同/送货单/检验报告等佐证材料,只写附件列与 yj_attachment,不动业务字段;金蝶同步进来的订单
  *  本来就是已审核,沿用"审核即锁定"这些单永远传不了附件)。仅「已作废」单据禁止。
- *  名单 = 已配 6 列位的单据:SALE/采购订单、生产工单、委外加工单、生产工单、客户订单
- *  + 采购链的送料暂收/来料检验/暂收退回/采购入库(见 migrate-order-attach / migrate-attach-restore)。 */
+ *  名单 = 已配附件列位的单据:SALE/采购订单、生产工单、委外加工单、生产工单、客户订单
+ *  + 采购链的送料暂收/来料检验/暂收退回/采购入库(见 migrate-order-attach / migrate-attach-restore)
+ *  + 立项申请表 RD_APPROVAL(2026-10-16 用户口径「给立项申请表的备注栏加一个可以上传附件的功能」:
+ *    该表只有一个附件列位 rd_approval.[附件1],纸面是文书式,佐证材料同属"审核后仍要补"的一类)。 */
 const ATTACH_EDIT_PANELS = new Set([
   'PU_ORDER', 'SO_ORDER', 'MANU_ORDER', 'OUTSOURCE_ORDER', 'WO_ORDER', 'KHDD',
-  'QC_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT',
+  'QC_RECV', 'QC_INSP', 'QC_RETURN', 'PURCHASE_IN', 'SALE_OUT', 'RD_APPROVAL',
 ])
 const attachEditable = computed(() => {
   if (draftEditable.value) return true
@@ -3777,6 +3921,22 @@ const curNo = computed(() => {
 })
 /** 总页数(单据面板分页用;与后端 OFFSET/FETCH 口径一致) */
 const lastPage = computed(() => Math.max(1, Math.ceil(total.value / Math.max(1, query.pageSize))))
+
+// 立项申请流程状态(rdFlow)—————————— 必须声明在下面那个 immediate watch 之前 ——————————
+// ⚠ 2026-10-15 TDZ 修复:该 watch 带 immediate,setup 期间就会调 loadRdFlowState() → clearRdFlow() → 读 rdFlow。
+//   而 rdFlow 原先声明在 4906 行(远在这个 watch 之后) ⇒ 每次进**任何**面板页都抛
+//   `ReferenceError: Cannot access 'rdFlow' before initialization`(Vue 捕获后仍渲染,
+//   所以面板看着正常,但立项流程状态永远加载不到、控制台每次报错)。
+//   声明本身是纯字面量初始化,不含依赖,前移安全。
+// 判据(能不能点)全部来自后端 rdApprovalFlowState —— 前端不自己重算,免得与门禁漂移。
+const RD_FLOW_PANEL = 'RD_APPROVAL'
+const rdFlow = reactive({
+  status: '', level: '', liaison: '', liaisonName: '', owner: '', ownerName: '',
+  canDispatchLiaison: false, canConfirmOwner: false,
+})
+/** 状态已定形(已审核/已归档)才谈得上分发与确认;仅用于按钮提示文案的分支 */
+const isRdSettled = computed(() => ['已审核', '已归档'].includes(rdFlow.status))
+const rdFlowUsers = ref([])
 
 // 产品开发下发按钮状态:随面板/当前单据变化刷新(必须在 cur 定义之后,immediate 会在 setup 时立即求值)
 // 规格书分配状态(编辑闸门)同批加载:RD_SPEC_DOC 单据打开即取分配,决定只读与否
@@ -4949,15 +5109,8 @@ async function confirmGrade() {
 //      确认责任人之后就可以在项目实施计划里面进行对应单据的填写」。
 // ⇒ 两步都挂在**立项申请 RD_APPROVAL** 上,由定级完成触发,都不是新建面板。
 // ⚠ 两字段存**账号**(username)而非姓名(与 rd_dev_task.file_owner 同款口径);显示时拼「姓名（账号）」。
-// ⚠ 判据(能不能点)全部来自后端 rdApprovalFlowState —— 前端不自己重算,免得与门禁漂移。
-const RD_FLOW_PANEL = 'RD_APPROVAL'
-const rdFlow = reactive({
-  status: '', level: '', liaison: '', liaisonName: '', owner: '', ownerName: '',
-  canDispatchLiaison: false, canConfirmOwner: false,
-})
-/** 状态已定形(已审核/已归档)才谈得上分发与确认;仅用于按钮提示文案的分支 */
-const isRdSettled = computed(() => ['已审核', '已归档'].includes(rdFlow.status))
-const rdFlowUsers = ref([])
+// ⚠ RD_FLOW_PANEL / rdFlow / isRdSettled / rdFlowUsers 已**前移到 3733 行附近**的 immediate watch 之前
+//   (2026-10-15 TDZ 修复,原因见那处的注释)。
 const liaisonVisible = ref(false)
 const liaisonBusy = ref(false)
 const liaisonUser = ref('')
@@ -8579,6 +8732,17 @@ onUnmounted(() => {
   background: #f2f6fa;
   border-color: #b9c9dc;
   color: #2f4d75;
+}
+/* 标注模式的操作提示(开着才显示):「点了标注笔之后要干什么」是第一次用最容易卡住的地方 */
+.as-side-hint {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-left: 3px solid #116a5b;
+  background: #f3f8f6;
+  color: #46605a;
+  font-size: 11.5px;
+  line-height: 1.6;
+  border-radius: 0 3px 3px 0;
 }
 .as-side-btn.sub {
   background: transparent;

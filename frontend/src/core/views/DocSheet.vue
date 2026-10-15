@@ -89,7 +89,7 @@
               class="as-cell-input"
               @input="emit('dirty')"
             />
-            <template v-else>{{ head[info.key] || '' }}</template>
+            <AnnotatedText v-else :text="head[info.key] || ''" :field-key="String(info.key || '')" />
           </span>
         </div>
       </div>
@@ -125,7 +125,7 @@
                       :rows="c.rows || 3" :maxlength="c.max || 2000"
                       class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
                     />
-                    <div v-else class="as-ro-text">{{ head[c.key] || '' }}</div>
+                    <AnnotatedText v-else class="as-ro-text" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
                     <div v-if="c.sign" class="q-signline end">
                       <span class="q-sign-label">{{ tt(c.sign) }}：</span>
                       <span class="q-sign-val">
@@ -169,7 +169,7 @@
                     v-model="head[c.key]" size="small" :maxlength="c.max || 200"
                     class="as-cell-input" @input="emit('dirty')"
                   />
-                  <div v-else class="q-ro">{{ head[c.key] || '' }}</div>
+                  <AnnotatedText v-else class="q-ro" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
                 </div>
               </div>
             </div>
@@ -196,7 +196,7 @@
                   :rows="c.rows || 3" :maxlength="c.max || 2000"
                   class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
                 />
-                <div v-else class="as-ro-text">{{ head[c.key] || '' }}</div>
+                <AnnotatedText v-else class="as-ro-text" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
                 <div v-if="c.sign" class="q-signline end">
                   <span class="q-sign-label">{{ tt(c.sign) }}：</span>
                   <span class="q-sign-val">
@@ -240,7 +240,7 @@
                 v-model="head[c.key]" size="small" :maxlength="c.max || 200"
                 class="as-cell-input" @input="emit('dirty')"
               />
-              <div v-else class="q-ro">{{ head[c.key] || '' }}</div>
+              <AnnotatedText v-else class="q-ro" :text="head[c.key] || ''" :field-key="String(c.key || '')" />
             </div>
           </div>
         </div>
@@ -257,7 +257,7 @@
                   :rows="sub.rows || 2" :maxlength="sub.max || 1000"
                   class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
                 />
-                <div v-else class="as-ro-text">{{ head[sub.key] || '' }}</div>
+                <AnnotatedText v-else class="as-ro-text" :text="head[sub.key] || ''" :field-key="String(sub.key || '')" />
               </div>
             </template>
             <el-input
@@ -265,7 +265,7 @@
               :rows="row.rows || 3" :maxlength="row.max || 2000"
               class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
             />
-            <div v-else-if="row.key && !row.checks" class="as-ro-text">{{ head[row.key] || '' }}</div>
+            <AnnotatedText v-else-if="row.key && !row.checks" class="as-ro-text" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
             <div v-if="row.checks" class="q-checks" :class="{ spread: row.spread }">
               <span
                 v-for="o in row.checks" :key="o" class="q-check" :class="{ on: head[row.key] === o }"
@@ -308,7 +308,7 @@
                 :rows="sub.rows || 2" :maxlength="sub.max || 500"
                 class="as-fill-input as-fill-area" resize="none" @input="emit('dirty')"
               />
-              <div v-else class="as-ro-text">{{ head[sub.key] || '' }}</div>
+              <AnnotatedText v-else class="as-ro-text" :text="head[sub.key] || ''" :field-key="String(sub.key || '')" />
               <!-- 签名行落子区最下一行(原图);signKey/dateKey=签名与年月日可填写(编辑态输入、只读回显),
                    不给则维持纯印刷文本(其它面板现状) -->
               <div v-if="config.deptSignBottom" class="q-dept-signline">
@@ -377,7 +377,7 @@
                 resize="none"
                 @input="emit('dirty')"
               />
-              <div v-else class="as-ro-text">{{ head[row.key] || '' }}</div>
+              <AnnotatedText v-else class="as-ro-text" :text="head[row.key] || ''" :field-key="String(row.key || '')" />
             </div>
             <!-- 同一行右侧的第二字段:实施计划第 8 行 = 负责人 + 编制日期
                  设计(B15..G15)是三格并排:负责人值区(D:E) | 「编制日期：」标签格(F) | 日期值区(G),
@@ -403,7 +403,7 @@
                   class="as-cell-input as-second-input"
                   @input="emit('dirty')"
                 />
-                <span v-else class="as-ro-text">{{ head[row.second.key] || '' }}</span>
+                <AnnotatedText v-else class="as-ro-text" :text="head[row.second.key] || ''" :field-key="String(row.second.key || '')" />
               </span>
             </div>
           </div>
@@ -426,7 +426,7 @@
                 resize="none"
                 @input="emit('dirty')"
               />
-              <div v-else class="as-ro-text">{{ head[sub.key] || '' }}</div>
+              <AnnotatedText v-else class="as-ro-text" :text="head[sub.key] || ''" :field-key="String(sub.key || '')" />
             </div>
           </div>
         </div>
@@ -574,11 +574,25 @@
       </div>
     </div>
       <!-- 备注列(设计:立项申请表 F5「备注」标签 + F6:G15 合并填写区)
-           2026-09-22 前这里是 deco 装饰虚线(只画不填),而 rd_approval.备注 列一直存在却没登记字段 -->
-      <div v-if="config.remark" class="as-remark">
-        <div class="as-remark-label">{{ tt(config.remark.label) }}</div>
+           2026-09-22 前这里是 deco 装饰虚线(只画不填),而 rd_approval.备注 列一直存在却没登记字段
+           2026-10-16:本列同时承载**附件入口** —— 立项申请等文书式面板的附件字段(yj_field.data_type=附件)
+           是元数据驱动的,但备注不是表头字段格,附件能力原先只接在 RecordSheetPanels,文书式面板整条链没接
+           ⇒ 用户报「备注栏没有附件上传入口」。附件字段名从下发的 fields 里发现(attachFieldOf),不写死。
+           该面板没有备注列但有附件字段时也要显示 ⇒ 条件写成 config.remark || remarkAttach。 -->
+      <div v-if="config.remark || remarkAttach" class="as-remark">
+        <div v-if="config.remark" class="as-remark-label">{{ tt(config.remark.label) }}</div>
+        <FileAttachCell
+          v-if="remarkAttach"
+          class="as-remark-attach"
+          :panel-code="panelCode"
+          :doc-no="head['单据编号'] || ''"
+          :field-key="remarkAttach.key"
+          :model-value="head[remarkAttach.key] || ''"
+          :can-edit="attachCanEdit"
+          @update:model-value="(v) => { head[remarkAttach.key] = v }"
+        />
         <el-input
-          v-if="editable"
+          v-if="config.remark && editable"
           v-model="head[config.remark.key]"
           type="textarea"
           :maxlength="config.remark.max || 2000"
@@ -586,7 +600,10 @@
           resize="none"
           @input="emit('dirty')"
         />
-        <div v-else class="as-ro-text as-remark-ro">{{ head[config.remark.key] || '' }}</div>
+        <AnnotatedText
+          v-else-if="config.remark" class="as-ro-text as-remark-ro"
+          :text="head[config.remark.key] || ''" :field-key="String(config.remark.key || '')"
+        />
       </div>
     </div>
     <RefPickDialog v-model="prodRefVisible" :field="prodRefField" mode="header" @confirm="onProdRefConfirm" />
@@ -599,6 +616,9 @@ import { ElMessage, ElButton, ElMessageBox } from 'element-plus'
 import { tt } from '@/i18n'
 import { Search } from '@element-plus/icons-vue'
 import RefPickDialog from './RefPickDialog.vue'
+import AnnotatedText from './AnnotatedText.vue'
+import FileAttachCell from './FileAttachCell.vue'
+import { attachFieldOf } from '@core/panel/attachField.js'
 import request from '@core/request'
 import { usePanelRuntime } from '@core/panel-runtime'
 import { chainNextStageStart, hasPhaseContent } from '@core/progress/stageProgress'
@@ -614,8 +634,23 @@ const props = defineProps({
   audited: { type: Boolean, default: false },
   /** 当前用户(终止审批按钮显隐:一级=立项人姓名匹配,二级=管理员) */
   user: { type: Object, default: () => ({}) },
+  /**
+   * 附件位是否可上传/删除。**不能直接取 editable** —— 附件闸门另有口径
+   * (PanelxList.attachEditable:草稿可传,已审核的指定面板也允许补佐证材料,仅已作废禁止;
+   *  2026-10-16 用户要立项申请能上传附件,而他那张单是已审核的 ⇒ 只跟 editable 走就会"还是没有入口")。
+   */
+  attachCanEdit: { type: Boolean, default: false },
 })
 const emit = defineEmits(['dirty', 'term-changed'])
+
+/**
+ * 备注栏旁的附件入口(元数据驱动):从下发的 fields 里发现 dataType='附件' 的字段。
+ * 【为什么要在这里接】立项申请(RD_APPROVAL)的「备注」不是表头字段格,而是本组件 config.remark 的
+ * 专用块 ⇒ 2026-10-16 之前附件能力只做在 RecordSheetPanels,文书式面板整条链没接,
+ * 用户在立项申请里"备注栏没有附件上传入口"。附件在库里是 rd_approval.[附件1] + yj_field(dataType=附件),
+ * 所以这里只要把字段发现出来挂 FileAttachCell,不写死键名。
+ */
+const remarkAttach = computed(() => attachFieldOf(props.fields))
 
 const engine = usePanelRuntime()
 const stageLoading = ref(0)
@@ -1138,6 +1173,11 @@ defineExpose({ focusField })
   font-size: 15px;
   color: #333;
   padding: 2px 0 4px;
+}
+/* 附件入口(备注栏下):不占满整列高度,列表按内容撑开,避免把备注文本区顶下去 */
+.as-remark-attach {
+  flex: none;
+  padding: 0 0 6px;
 }
 .as-remark-input {
   flex: 1;

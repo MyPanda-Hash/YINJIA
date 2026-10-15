@@ -3211,3 +3211,39 @@ migrate-stock-report-dup-fields-20261015.sql
 #   改动行打 asp_user2='lotmerge:migration' 便于回退。执行后需两账套各重跑一次月结。
 #   自检:三表空批号 = 0/0/0、流水量不变。幂等(第二次执行 0 行)。
 migrate-lot-normalize-blank-to-pc0000.sql
+# migrate-align-docdate-batch-time-20261016.sql — 批号/批次号日期后缀、转ERP时间/创建时间、
+#   送料暂收单·来料检验单的日期与时间,统一对齐到各自**单据日期**(时间列落在 12:00)。
+#   为什么登记:这批修正在协作机上是拿 node 直连脚本改的(tools/archive/_align-*-1016.mjs、
+#   _fix-time-of-day-1016.mjs),硬编码 database:'HSDZ_MES'、不进迁移链;而部署走「本地库整体
+#   覆盖服务器」⇒ 不登记的话下次部署会把服务器上已对齐的批次号/日期**又带回去**。
+#   规则化要点:批号日期来源优先级 = 源采购订单(sl_recv/sl_recv_detail/qc_insp 三链)→ 本表
+#   单据日期/日期/发生日期 → 头表(bl_X→bd_X、X_detail→X、X_head→X);无来源的表跳过。
+#   自检:仍不一致合计必须为 0,否则 RAISERROR。全 UPDATE 带「现值≠目标值」守卫 ⇒ 幂等;
+#   只改值不增删行,不动物理表结构与 yj_field/yj_translation。两账套均执行。
+migrate-align-docdate-batch-time-20261016.sql
+# migrate-rd-prod-info-od-before-id-20261016.sql — 产品信息表表头「炭棒外径」排到「炭棒内径」之前。
+#   用户口径(2026-10-16):「一般都是外径*内径*长度来表示」。原顺序 内径92 → 外径94(读作内径·外径·长度)
+#   ⇒ 只对调这两行的 seq(92↔94),label/col_name/ref/可见性/译名不动,不碰采购链四单。
+#   全库扫描结论:label/col_name/alias/label_en 含「径」共 18 行 6 个面板,**只此一处违反**;
+#   RD_MOLD_PROC / RD_SINTER_TOL / QC_INSP_REQ 均为外径在前;QC_INSP_REQ 的
+#   「外径1/外径2/外径（+密封圈）」是变体属性,提到内径前会拆散核心「外径→内径」相邻关系,故不动。
+#   幂等:仅当内径仍在外径之前才交换;末尾断言「外径严格先于内径」,否则 RAISERROR。两账套均执行。
+migrate-rd-prod-info-od-before-id-20261016.sql
+# migrate-rd-approval-attach-20261016.sql — 立项申请表(RD_APPROVAL)加附件能力。
+#   用户口径:「给立项申请表的备注栏加一个可以上传附件的功能」。本仓附件是**元数据驱动**:
+#   yj_field.data_type=N'附件' 的字段自动进「附件条」(attachFields=headerFields.filter(dataType==='附件')),
+#   由 FileAttachCell.vue 渲染上传/查看/删除,文件本体存 yj_attachment(不进业务表)⇒ 无需改渲染代码。
+#   本脚本:① 补物理占位列 rd_approval.[附件1] nvarchar(1000) NULL + 中文注明
+#           (selectCols 按 col_name 出列,缺列会报"列名无效",所以占位列必须有)
+#           ② 登记 yj_field(data_type='附件', place='header', seq=167 紧跟备注 165, width=220, visible=1)。
+#   译名 N'附件1' 十语言已存在,无需新增。幂等;两账套均执行。
+migrate-rd-approval-attach-20261016.sql
+# migrate-doc-annotation-20261016.sql — 新建 yj_doc_annotation(单据纸面文字标注:标注笔/橡皮擦)。
+#   用户口径:「研发管理面板侧栏文档输出下加标注笔,选择填写内容标色加粗,颜色用色盘,
+#   标注后的字体打印出对应颜色;标注笔下加橡皮擦,可擦掉标注过的字的标注效果」。
+#   一条标注 = 某字段原文的一段字符区间 [start_pos,end_pos)(0 基,左闭右开) + 颜色 #RRGGBB + bold;
+#   同字段多段共存,写入时先软删相交旧段(后写覆盖先写);field_key 存 yj_field.label。
+#   分表理由:一段标注存不下一个列、且业务表列是金蝶同步/导出的读写面,塞标记会污染口径。
+#   建表 + 13 列 + (panel_code,doc_no) 索引 + 表/列中文注明;已登记 tools/db-inuse-tables.txt(yj_* 25→26)。
+#   幂等(建表/索引/注明各自判空);末尾自检表与关键列齐备否则 RAISERROR。两账套均执行。
+migrate-doc-annotation-20261016.sql
