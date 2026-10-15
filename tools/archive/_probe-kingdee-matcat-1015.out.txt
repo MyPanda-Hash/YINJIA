@@ -1,0 +1,119 @@
+=== 商品列表前 3 行完整 JSON ===
+{"parent_name":"冰箱炭棒","number":"C-95-13","parent_number":"SPFL00013","parent_id":"2236463020798653440","name":"006项目/功能炭棒滤芯","id":"2350998447882071040","is_multi_unit":false,"is_serial":false,"is_asst_attr":false,"is_weight":false,"is_kf_period":false,"is_batch":false,"url":"","model":"57*21*66.5","barcode":"","is_show_aux_barcode":false,"mul_label":[{"id":"2479206810112873472","number":"2479206810112873472","name":"3-01-01-0234"}],"check_type":"1","brand_id":"","brand_name":"","brand_number":"","producing_pace":"","help_code":"3-01-01-0234","base_unit_id":"3","base_unit_number":"支","base_unit_name":"支","remark":"寿命:300 gallons\n流速:0.5 GPM\n过滤精度:0.5-1微米(不能超过1)\n去除物质:余氧、cyst、lead(要求满足NSF 42\\53性能)","units":[],"stock_id":"","stock_name":"","stock_number":"","pro_license":"","purchase_unit_id":"3","is_self_restraint":"false","short_name":""} 
+
+{"parent_name":"冰箱炭棒","number":"C-95-13**TB","parent_number":"SPFL00013","parent_id":"2236463020798653440","name":"006项目/功能炭棒滤芯","id":"2350998674601006080","is_multi_unit":false,"is_serial":false,"is_asst_attr":false,"is_weight":false,"is_kf_period":false,"is_batch":false,"url":"","model":"57*21*66.5","barcode":"","is_show_aux_barcode":false,"mul_label":[],"check_type":"1","brand_id":"","brand_name":"","brand_number":"","producing_pace":"","help_code":"物料编码：3-01-01-0234","base_unit_id":"3","base_unit_number":"支","base_unit_name":"支","remark":"寿命:300 gallons\n流速:0.5 GPM\n过滤精度:0.5-1微米(不能超过1)\n去除物质:余氧、cyst、lead(要求满足NSF 42\\53性能)","units":[],"stock_id":"","stock_name":"","stock_number":"","pro_license":"","purchase_unit_id":"3","is_self_restraint":"false","short_name":""} 
+
+{"parent_name":"冰箱炭棒","number":"C-95-14","parent_number":"SPFL00013","parent_id":"2236463020798653440","name":"006项目/功能炭棒滤芯","id":"2351000013741609984","is_multi_unit":false,"is_serial":false,"is_asst_attr":false,"is_weight":false,"is_kf_period":false,"is_batch":false,"url":"","model":"30*10*182","barcode":"","is_show_aux_barcode":false,"mul_label":[],"check_type":"1","brand_id":"","brand_name":"","brand_number":"","producing_pace":"","help_code":"3-01-01-0228","base_unit_id":"3","base_unit_number":"支","base_unit_name":"支","remark":"实测寿金:300 gallons、流速:0.5 GPM\n过滤精度:0.5-1微米(不能超过1)\n去除物质:余氧、cyst、lead (要求满足NSF 42\\53性能)","units":[],"stock_id":"","stock_name":"","stock_number":"","pro_license":"","purchase_unit_id":"3","is_self_restraint":"false","short_name":""} 
+
+=== parent_name 分布 ===
+  成品 = 999
+  半成品 = 752
+  裸棒 = 442
+  (空) = 264
+  冰箱炭棒 = 258
+  无纺布 = 138
+  客供 = 129
+  注塑件 = 124
+  标签 = 82
+  折叠棉 = 79
+  PP棉 = 76
+  网套 = 74
+  纸箱 = 59
+  炭粉 = 57
+  原材料 = 38
+  原料制备车间 = 36
+  矿化料 = 36
+  包材 = 32
+  胶粉 = 27
+  功能炭棒 = 24
+  滤芯 = 16
+  密封圈 = 12
+  抑菌杀菌炭棒 = 12
+  彩盒 = 10
+  ZL = 9
+  垫片 = 9
+  外加工 = 8
+  碱性炭棒 = 7
+  T筒 = 7
+  卷膜 = 6
+  阻垢料 = 6
+  炭纤维 = 5
+  五金配件 = 5
+  阻垢 = 4
+  热熔胶 = 4
+  公司直管客户 = 3
+  LZW = 3
+  超滤 = 3
+  防尘塞 = 3
+  矿化炭棒 = 2
+  螺丝 = 2
+  普通炭棒 = 2
+  海绵 = 2
+  纤维棉 = 2
+  其他 = 2
+  清洗剂 = 1
+  自制材料 = 1
+  沐浴香薰 = 1
+  树脂 = 1
+  白色无纺布（036专用） = 1
+  衔接件 = 1
+  止回阀 = 1
+
+=== 商品详情键 ===
+id, number, name, enable, base_unit_id, base_unit_name, aux_unit_name, mul_label, barcode, model, brand_id, producing_pace, help_code, is_multi_unit, fix_unit_id1, coefficient1, conversion_unit_id1, fix_unit_id2, coefficient2, conversion_unit_id2, fix_unit_id3, coefficient3, conversion_unit_id3, purchase_unit_id, sale_unit_id, store_unit_id, aux_unit_id, aux_unit_number, is_weight, is_serial, is_batch, is_sale, is_purchase, is_subpart, is_assembly, is_kf_period, kf_period_type, kf_period, alarm_day, is_asst_attr, aux_entity, barcode_entity, price_entity, inv_mgr_type, min_inventory_qty, max_inventory_qty, sec_inventory_qty, cost_method, fetch_category_id, tax_rate, in_tax_rate, stock_id, space_id, vender_id, purchase_id, refistration_number, pro_license, gross_weight, net_weight, weight_unit_id, length, wide, high, volume, images, check_type, remark, custom_field, parent_number, parent_id, bom_entity, valid_qty, qty_inv, attachments_url, product_department_id, product_department_number, min_package_qty, modify_time, is_backflushed, backflushed_stock_id, backflushed_stock_name, backflushed_stock_number, backflushed_space_id, backflushed_space_name, backflushed_space_number, short_name
+
+详情 JSON(截断): {"id":"2350998447882071040","number":"C-95-13","name":"006项目/功能炭棒滤芯","enable":"1","base_unit_id":"3","base_unit_name":"支","aux_unit_name":"支","mul_label":[{"id":"2479206810112873472","number":"2479206810112873472","name":"3-01-01-0234"}],"barcode":"","model":"57*21*66.5","brand_id":"","producing_pace":"","help_code":"3-01-01-0234","is_multi_unit":false,"fix_unit_id1":"","coefficient1":0,"conversion_unit_id1":"","fix_unit_id2":"","coefficient2":0,"conversion_unit_id2":"","fix_unit_id3":"","coefficient3":0,"conversion_unit_id3":"","purchase_unit_id":"3","sale_unit_id":"3","store_unit_id":"3","aux_unit_id":"3","aux_unit_number":"支","is_weight":false,"is_serial":false,"is_batch":false,"is_sale":true,"is_purchase":true,"is_subpart":true,"is_assembly":true,"is_kf_period":false,"kf_period_type":"","kf_period":"0","alarm_day":"0","is_asst_attr":false,"aux_entity":[],"barcode_entity":[],"price_entity":[{"id":"2350998447882071041","price_barcode":"","price_unit_id":"3","price_unit_name":"支","price_unit_number":"支","price_purchase_price":"0","price_max_purchase_price":"0","price_cost_price":"0","price_distribution_price":"0","price_trade_price":"0","price_retail_price":"0","price_min_sales_price":"0","price_near_pur_price":"0","price_near_pur_tax_price":"0","price_near_sal_price":"9.6","price_near_sal_tax_price":"9.6","price_sale_price1":"0","price_sale_price2":"0","price_sale_price3":"0","price_sale_price4":"0","price_sale_price5":"0","price_sale_price6":"0","price_sale_price7":"0","price_sale_price8":"0","price_sale_price9":"0","price_sale_price10":"0","price_aux_id":"","price_aux_id1":"","price_aux_number1":"","price_aux_name1":"","price_aux_id2":"","price_aux_number2":"","price_aux_name2":"","price_aux_id3":"","price_aux_name3":"","price_aux_number3":"","price_aux_id4":"","price_aux_number4":"","price_aux_name4":"","price_aux_id5":"","price_aux_number5":"","price_aux_name5":"","price_min_pur_tax_price":"0","price_near_pur_unit_cost":"0","price_near_supplier":"","price_outsourceprice":"0"}],"inv_mgr_type":"0","min_inventory_qty":"0","max_inventory_qty":"0","sec_inventory_qty":"0","cost_method":"1","fetch_category_id":"","tax_rate":"0","in_tax_rate":"0","stock_id":"","space_id":"","vender_id":"","purchase_id":"","refistration_number":"","pro_license":"","gross_weight":"0","net_weight":"0","weight_unit_id":"","length":"0","wide":"0","high":"0","volume":"0","images":[],"check_type":"1","remark":"寿命:300 gallons\n流速:0.5 GPM\n过滤精度:0.5-1微米(不能超过1)\n去除物质:余氧、cyst、lead(要求满足NSF 42\\53性能)","custom_field":{"custom_field__1__4swgci5cr1vb":"57*21*66.5","custom_field__1__4swgegvojiasxiej":"57*21*66.5","custom_field__1__62tvoyr1j4fa":"","custom_field__1__6jiafyhnnjic0w":"108支/箱"},"parent_number":"SPFL00013","parent_id":"2236463020798653440","bom_entity":[],"valid_qty":"0","qty_inv":"0","attachments_url":[],"product_department_id":"","product_department_number":"","min_package_qty":0,"modify_time":"2026-08-22 16:19:59","is_backflushed":false,"backflushed_stock_id":"","back
+
+=== 库存查询 IMS:material_category_name 分布 ===
+  成品 = 296
+  无纺布 = 136
+  裸棒 = 106
+  冰箱炭棒 = 106
+  (空) = 92
+  注塑件 = 90
+  纸箱 = 66
+  网套 = 59
+  PP棉 = 57
+  标签 = 57
+  折叠棉 = 52
+  客供 = 51
+  炭粉 = 29
+  原材料 = 26
+  包材 = 24
+  矿化料 = 19
+  功能炭棒 = 10
+  T筒 = 10
+  胶粉 = 9
+  彩盒 = 9
+  垫片 = 8
+  热熔胶 = 6
+  密封圈 = 6
+  半成品 = 5
+  抑菌杀菌炭棒 = 5
+  阻垢料 = 4
+  卷膜 = 4
+  滤芯 = 3
+  碱性炭棒 = 3
+  阻垢 = 2
+  超滤 = 2
+  防尘塞 = 2
+  纤维棉 = 2
+  海绵 = 2
+  矿化炭棒 = 1
+  自制材料 = 1
+  衔接件 = 1
+  LZW = 1
+  止回阀 = 1
+  树脂 = 1
+  炭纤维 = 1
+  外加工 = 1
+
+=== 分类=半成品 的库存行 = 5 ===
+  · B-92-09 A+级烧结炭棒/滤芯 | 仓=CP-02/成品B仓 | 批号=- | qty=121 可用=121 成本=null
+  · B-92-13 除三氯甲烷炭棒/滤芯 | 仓=CP-02/成品B仓 | 批号=- | qty=252 可用=252 成本=null
+  · C-95-06 除PFAS炭棒/滤芯 | 仓=CP-02/成品B仓 | 批号=- | qty=78 可用=78 成本=null
+  · C-95-07 碱性烧结炭棒/滤芯 | 仓=CP-02/成品B仓 | 批号=- | qty=1575 可用=1575 成本=null
+  · C-95-12 1018项目/碱性炭棒 | 仓=CP-02/成品B仓 | 批号=- | qty=2978 可用=2978 成本=null
+
+=== scm/inventory 行样例(字段少,看有没有分类)===
+{"material_id":"2182903026698778624","material_name":"S阻垢炭棒/滤芯","material_number":"A-32-01","material_model":"40.5*16*80","stock_id":"2164517032744208384","stock_name":"B仓","stock_number":"YJ-05","stock_id_is_allow_freight":false,"sp_id":"2185005277579956224","sp_name":"发货区","sp_number":"CW00011","aux_prop_id":"0","aux_prop_name":"","aux_prop_number":"","qty":"0","qty_package":"","valid_qty":"0","valid_qty_package":"","kf_date":"","valid_date":"","kf_type":"","kf_period":0,"batch_no":"","aux_qty":0,"valid_aux_qty":"0"}

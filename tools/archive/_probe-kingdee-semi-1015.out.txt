@@ -1,0 +1,175 @@
+=== 金蝶云·星辰 真实账套:有没有「半成品」的出入库数据(只读)===
+账套: 惠州市银嘉环保科技有限公司 clientId=359797 outerInstanceId=580147507460444160
+时间: 2026-10-15T02:46:09.282Z  抽样张数/单据类型: 15
+
+=== ① 商品分类档案 /jdy/v2/bd/material_group ===
+  count = 62;首页 62 行
+   · 001 | 炭粉 | parent=
+   · 002 | 无纺布 | parent=
+   · 003 | 胶粉 | parent=
+   · 004 | 吸附剂 | parent=
+   · 005 | 矿化料 | parent=
+   · 006 | 阻垢料 | parent=
+   · 007 | 树脂 | parent=
+   · 008 | 纸箱 | parent=
+   · 009 | 彩盒 | parent=
+   · 010 | T筒 | parent=
+   · 011 | 防尘塞 | parent=
+   · 012 | 超滤 | parent=
+   · 013 | 网套 | parent=
+   · 014 | 白色无纺布（036专用） | parent=
+   · 015 | PP棉 | parent=
+   · 016 | 滤芯 | parent=
+   · 017 | 折叠棉 | parent=
+   · 018 | 炭纤维 | parent=
+   · 019 | 卷膜 | parent=
+   · 020 | 标签 | parent=
+   · 021 | 包材 | parent=
+   · 022 | 热熔胶 | parent=
+   · 023 | 注塑件 | parent=
+   · 024 | 外加工 | parent=
+   · 025 | 衔接件 | parent=
+   · 026 | 垫片 | parent=
+   · 027 | 止回阀 | parent=
+   · 028 | 纤维棉 | parent=
+   · 029 | 密封圈 | parent=
+   · 030 | 螺丝 | parent=
+   · 031 | 清洗剂 | parent=
+   · 032 | 海绵 | parent=
+   · 13 | 原料制备车间 | parent=
+   · A | 公司直管客户 | parent=
+   · B | LZW | parent=
+   · C | ZL | parent=
+   · D | ZXL | parent=
+   · E | HQS | parent=
+   · SPFL00001 | 原材料 | parent=
+   · SPFL00002 | 成品 | parent=
+   · SPFL00004 | 裸棒 | parent=
+   · SPFL00005 | 其他 | parent=
+   · SPFL00007 | 样品 | parent=
+   · SPFL00008 | 阻垢 | parent=
+   · SPFL00009 | 半成品 | parent=
+   · SPFL00010 | 客供 | parent=
+   · SPFL00011 | X阻垢 | parent=
+   · SPFL00012 | 五金配件 | parent=
+   · SPFL00013 | 冰箱炭棒 | parent=
+   · SPFL00014 | X烧结 | parent=
+   · SPFL00015 | 烧结 | parent=
+   · SPFL00016 | 富锶炭棒 | parent=
+   · SPFL00017 | 新材料 | parent=
+   · SPFL00018 | 除铅/除氟等炭棒 | parent=
+   · SPFL00019 | 抑菌杀菌炭棒 | parent=
+   · SPFL00020 | 碱性炭棒 | parent=
+   · SPFL00021 | 铜锌合金硅酸盐阻垢/盐酸盐等炭棒 | parent=
+   · SPFL00022 | 功能炭棒 | parent=
+   · SPFL00024 | 矿化炭棒 | parent=
+   · SPFL00025 | 沐浴香薰 | parent=
+   · SPFL00026 | 普通炭棒 | parent=
+   · SPFL00027 | 自制材料 | parent=
+  ⇒ 分类名含「半成品/半制品/在制品」的: 半成品
+
+=== ② 商品档案 /jdy/v2/bd/material 全量:按分类分布 + 名称含「半成品」的条目 ===
+  商品总数 = 3877
+  商品行字段(35): parent_name, number, parent_number, parent_id, name, id, is_multi_unit, is_serial, is_asst_attr, is_weight, is_kf_period, is_batch, url, model, barcode, is_show_aux_barcode, mul_label, check_type, brand_id, brand_name, brand_number, producing_pace, help_code, base_unit_id, base_unit_number, base_unit_name, remark, units, stock_id, stock_name, stock_number, pro_license, purchase_unit_id, is_self_restraint, short_name
+  分类分布:
+   · (无分类) = 3877
+
+  ⇒ 半成品候选(判据: 分类名 or 商品名含「半成品/半制品/在制品」)共 0 条
+  判据敏感性:名称含半成品但分类不是半成品的 0 条(已计入候选)
+
+=== ③ 逐类出入库单:总数 + 最近单据明细里的半成品分录 ===
+
+--- 采购入库单  /jdy/v2/scm/pur_inbound
+    已审核单据总数 = 3382;本次抽最近 15 张明细
+    分录容器键 = material_entity;分录字段(83) picture, seq, id, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux_id1, aux_name1, aux_number1, aux_id2, aux_name2, aux_number2, aux_id3, aux_name3
+    抽到明细 15/15 张,分录 30 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 采购退货单  /jdy/v2/scm/pur_ret
+    已审核单据总数 = 99;本次抽最近 15 张明细
+    分录容器键 = material_entity;分录字段(80) picture, seq, id, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux_id1, aux_name1, aux_number1, aux_id2, aux_name2, aux_number2, aux_id3, aux_name3
+    抽到明细 15/15 张,分录 35 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 销售出库单  /jdy/v2/scm/sal_out_bound
+    已审核单据总数 = 5210;本次抽最近 15 张明细
+    分录容器键 = material_entity;分录字段(107) id, picture, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, material_help_code, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux_id1, aux_name1, aux_number1, aux_id2, aux_name2, aux_number2, aux_id3, aux_name3
+    抽到明细 15/15 张,分录 41 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 销售退货单  /jdy/v2/scm/sal_in_bound
+    已审核单据总数 = 95;本次抽最近 15 张明细
+    分录容器键 = material_entity;分录字段(100) id, picture, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, material_help_code, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux_id1, aux_name1, aux_number1, aux_id2, aux_name2, aux_number2, aux_id3, aux_name3
+    抽到明细 15/15 张,分录 21 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 生产领料单(材料出库)  /jdy/v2/scm/inv_pick
+    已审核单据总数 = 4982;本次抽最近 15 张明细
+    分录容器键 = material_entity;分录字段(74) picture, seq, id, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux1_id, aux1_name, aux1_number, aux2_id, aux2_name, aux2_number, aux3_id, aux3_name
+    抽到明细 15/15 张,分录 69 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 产品入库单(成品入库)  /jdy/v2/scm/inv_product
+    已审核单据总数 = 2882;本次抽最近 15 张明细
+    分录容器键 = material_entity;分录字段(78) picture, seq, id, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux1_id, aux1_name, aux1_number, aux2_id, aux2_name, aux2_number, aux3_id, aux3_name
+    抽到明细 15/15 张,分录 53 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 其他入库单  /jdy/v2/scm/inv_other_in
+    已审核单据总数 = 79;本次抽最近 15 张明细
+    分录容器键 = material_entity;分录字段(73) picture, seq, id, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux_id1, aux_name1, aux_number1, aux_id2, aux_name2, aux_number2, aux_id3, aux_name3
+    抽到明细 15/15 张,分录 17 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 其他出库单  /jdy/v2/scm/inv_other_out
+    已审核单据总数 = 1150;本次抽最近 15 张明细
+    分录容器键 = material_entity;分录字段(73) picture, seq, id, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, stock_id, stock_name, stock_number, stock_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux_id1, aux_name1, aux_number1, aux_id2, aux_name2, aux_number2, aux_id3, aux_name3
+    抽到明细 15/15 张,分录 20 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 调拨出库单  /jdy/v2/scm/inv_tfout
+    已审核单据总数 = 0;本次抽最近 0 张明细
+    分录容器键 = (未识别);分录字段(0) 
+    抽到明细 0/0 张,分录 0 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 调拨入库单(候选路径)  /jdy/v2/scm/inv_tfin
+    已审核单据总数 = 0;本次抽最近 0 张明细
+    分录容器键 = (未识别);分录字段(0) 
+    抽到明细 0/0 张,分录 0 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 盘点单  /jdy/v2/scm/inv_check_bill
+    已审核单据总数 = 36;本次抽最近 15 张明细
+    分录容器键 = material_entity;分录字段(64) seq, id, picture, material_id, material_name, material_number, material_is_multi_unit, material_is_serial, material_is_asst_attr, material_is_kf_period, material_is_batch, material_model, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, aux_id1, aux_name1, aux_number1, aux_id2, aux_name2, aux_number2, aux_id3, aux_name3, aux_number3, barcode, batch_no, pro_place
+    抽到明细 15/15 张,分录 2662 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 组装单  /jdy/v2/scm/inv_assemble
+    已审核单据总数 = 0;本次抽最近 0 张明细
+    分录容器键 = (未识别);分录字段(0) 
+    抽到明细 0/0 张,分录 0 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 拆卸单(候选路径)  /jdy/v2/scm/inv_disassemble
+    已审核单据总数 = 0;本次抽最近 0 张明细
+    分录容器键 = (未识别);分录字段(0) 
+    抽到明细 0/0 张,分录 0 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+--- 委外加工单  /jdy/v2/pm/subm_workorder
+    已审核单据总数 = 0;本次抽最近 0 张明细
+    分录容器键 = (未识别);分录字段(0) 
+    抽到明细 0/0 张,分录 0 行;**命中半成品的分录 = 0 行,涉及单据 = 0 张**
+
+=== ④ 现存量/库存查询接口:半成品候选有没有余额 ===
+  ✅ 库存查询(IMS) /jdy/v2/inv/inv_inventory_ims  count=1366  行字段(43): material_picture, material_id, material_number, material_name, material_category_name, barcode, material_model, material_help_code, material_is_asst_attr, material_is_batch, material_is_kf_period, material_brand_name, aux_prop_id, aux_prop_name, batch_no, kf_period, kf_type, valid_date, kf_date, base_unit_id, stock_id, stock_number, stockid_name, stock_is_allow_freight, aux_unit_id, aux_unit_name, cost, unit_cost, retail_price, retail_amount, purchase_price, purchase_amount, trade_price, trade_amount, qty, aux_qty, pkg_qty, valid_qty, valid_aux_qty, pkg_valid_qty, sp_id, sp_number, sp_name
+     首行样例: {"material_picture":"","material_id":"2467487304869110784","material_number":"3-01-16-0012","material_name":"SP-FX2-X60-RO","material_category_name":"客供","barcode":"","material_model":"","material_help_code":"SP-FX2-X60-RO","material_is_asst_attr":false,"material_is_batch":false,"material_is_kf_period":false,"material_brand_name":"","aux_prop_id":"","aux_prop_name":"","batch_no":"","kf_period":"","kf_type":"空值","valid_date":"","kf_date":"","base_unit_id":"7","stock_id":"2243772584451731456","stock_number":"YCL-01","stockid_name":"恒亿仓","stock_is_allow_freight":false,"aux_unit_id":"7","aux_unit_
+  ✅ 商品库存(scm) /jdy/v2/scm/inventory  count=4226  行字段(25): material_id, material_name, material_number, material_model, stock_id, stock_name, stock_number, stock_id_is_allow_freight, sp_id, sp_name, sp_number, aux_prop_id, aux_prop_name, aux_prop_number, qty, qty_package, valid_qty, valid_qty_package, kf_date, valid_date, kf_type, kf_period, batch_no, aux_qty, valid_aux_qty
+     首行样例: {"material_id":"2182903026698778624","material_name":"S阻垢炭棒/滤芯","material_number":"A-32-01","material_model":"40.5*16*80","stock_id":"2164517032744208384","stock_name":"B仓","stock_number":"YJ-05","stock_id_is_allow_freight":false,"sp_id":"2185005277579956224","sp_name":"发货区","sp_number":"CW00011","aux_prop_id":"0","aux_prop_name":"","aux_prop_number":"","qty":"0","qty_package":"","valid_qty":"0","valid_qty_package":"","kf_date":"","valid_date":"","kf_type":"","kf_period":0,"batch_no":"","aux_qty":0,"valid_aux_qty":"0"}
+  ❌ 商品库存(inv) /jdy/v2/inv/inventory → HTTP 519 status code 519
+
+=== ⑤ 小结(证据在上一节逐条)===
+  金蝶商品分类里含「半成品」的分类: SPFL00009 半成品
+  半成品候选商品 0 条
+  · 采购入库单: 总数 3382,抽 15 张/30 行,半成品分录 0 行(0 张)
+  · 采购退货单: 总数 99,抽 15 张/35 行,半成品分录 0 行(0 张)
+  · 销售出库单: 总数 5210,抽 15 张/41 行,半成品分录 0 行(0 张)
+  · 销售退货单: 总数 95,抽 15 张/21 行,半成品分录 0 行(0 张)
+  · 生产领料单(材料出库): 总数 4982,抽 15 张/69 行,半成品分录 0 行(0 张)
+  · 产品入库单(成品入库): 总数 2882,抽 15 张/53 行,半成品分录 0 行(0 张)
+  · 其他入库单: 总数 79,抽 15 张/17 行,半成品分录 0 行(0 张)
+  · 其他出库单: 总数 1150,抽 15 张/20 行,半成品分录 0 行(0 张)
+  · 调拨出库单: 总数 0,抽 0 张/0 行,半成品分录 0 行(0 张)
+  · 调拨入库单(候选路径): 总数 0,抽 0 张/0 行,半成品分录 0 行(0 张)
+  · 盘点单: 总数 36,抽 15 张/2662 行,半成品分录 0 行(0 张)
+  · 组装单: 总数 0,抽 0 张/0 行,半成品分录 0 行(0 张)
+  · 拆卸单(候选路径): 总数 0,抽 0 张/0 行,半成品分录 0 行(0 张)
+  · 委外加工单: 总数 0,抽 0 张/0 行,半成品分录 0 行(0 张)
