@@ -1046,6 +1046,7 @@ public class ProcessTaskService {
         boolean asmOk = asm != null && asm > 0;
         String ja = (asmOk && inOk) ? "Y" : "N";
         jdbc.update("UPDATE dbo.plang SET ja=?, asp_user2=?, asp_time2=GETDATE() WHERE id=?", ja, user, rowId);
+        WorkOrderScheduleRecord.sync(jdbc, rowId, user);
         return ja;
     }
 

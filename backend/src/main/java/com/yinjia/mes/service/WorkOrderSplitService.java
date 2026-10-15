@@ -132,6 +132,7 @@ public class WorkOrderSplitService {
         jdbc.update("UPDATE dbo.plang SET pl_sl=?, xq_sl=ISNULL(xq_sl,0)-?,"
                         + " yl=ISNULL(xq_sl,0)-?-?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                 newParentSl, qty, qty, newParentSl, user, parentId);
+        WorkOrderScheduleRecord.sync(jdbc, parentId, user);
 
         // ② 子单新建:复制产品/规格/单位/价格/交期/批次/来源订单;领料·入库单号不带(那是父单回执)
         int ins = jdbc.update(
@@ -147,8 +148,8 @@ public class WorkOrderSplitService {
                         + "   COALESCE(?, bz), N'N',"                           // 备注可填(急单/分波),默认继承
                         + "   od_no, od_xc, lot_no, color, siz, ?, mjlx, NULL, NULL, ypl_sl, NULL, remark,"
                         + "   llxz, cgrkdh, lldh, djlx, zl, [批次号], ?, ?, ?,"
-                        + "   ?, N'Y',"
-                        + "   N'N', ?, GETDATE(), [工艺路线]"
+                        + "   ?, N'Y', [工艺路线],"
+                        + "   N'N', ?, GETDATE()"
                         + " FROM dbo.plang WHERE id=?",
                 childNo, scx, plMan, qty, qty,
                 dueDate == null ? null : java.time.LocalDate.parse(dueDate), remark,
@@ -161,12 +162,7 @@ public class WorkOrderSplitService {
         // ③ 继承排产:子单同步落 plang_pc(锚=plang_id;排产表按行 id 定位,批次号不唯一)
         boolean scheduled = false;
         if (inherit && scx != null && !scx.isBlank() && childId != null) {
-            jdbc.update("INSERT INTO plang_pc (comm, pl_no, pl_xc, pl_date, scx, pl_man, lb, st_date, cp_date, jh_date,"
-                            + " od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号], plang_id)"
-                            + " SELECT comm, pl_no, pl_xc, pl_date, scx, pl_man, lb, st_date, cp_date, NULL,"
-                            + " od_no, od_xc, ja, N'N', ?, GETDATE(), [批次号], id"
-                            + " FROM dbo.plang WHERE id=?",
-                    user, childId);
+            WorkOrderScheduleRecord.create(jdbc, childId, user);
             scheduled = true;
         }
 
@@ -266,6 +262,7 @@ public class WorkOrderSplitService {
         jdbc.update("UPDATE dbo.plang SET pl_sl=?, xq_sl=ISNULL(xq_sl,0)+?,"
                         + " yl=ISNULL(xq_sl,0)+?-?, asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                 newParentSl, childXq, childXq, newParentSl, user, parentId);
+        WorkOrderScheduleRecord.sync(jdbc, parentId, user);
         boolean linkRestored = mergeLink(parentNo, parentXc, str(parent.get("批次号")), childNo, childSl);
 
         // 2026-10-15 带工单行号:子单是它自己的行(pl_xc=1),父单留痕带**被撤回的那一行**的行号

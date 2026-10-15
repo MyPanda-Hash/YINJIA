@@ -231,8 +231,10 @@ public class ScheduleBoardService {
      * 批量排入(plang 单轨):每行 {加工单号, 行id?(plang.id 精确到批次行), 排产数量?(空=沿用), 生产线?} + 公共参数
      * {生产线, 排产班组(≤4字写 lb), 预开工日→st_date, 预完工日→cp_date}。
      * 守卫:产线必填/停用线拒绝/未排产(scx 空)/未结案;排产数量≤需求数量;完工不早于开工。
-     * 写 plang.scx/pl_man/lb/st_date/cp_date(/pl_sl,yl),留痕 yj_usage_log。行级独立提交(同 toManu 事务口径)。
+     * 写 plang 与原有 plang_pc 的产线/数量/业务镜像,留痕 yj_usage_log。
+     * 批次事务保证主行与排产记录同成同败;业务校验失败行仍返回失败清单。
      */
+    @Transactional
     public Map<String, Object> assign(List<Map<String, Object>> rows, String user) {
         if (rows == null || rows.isEmpty()) throw new IllegalArgumentException("请先勾选要排产的加工单");
         List<String> done = new ArrayList<>();
@@ -259,8 +261,8 @@ public class ScheduleBoardService {
                 Map<String, Object> head;
                 try {
                     head = rowId != null
-                            ? jdbc.queryForMap("SELECT id, pl_xc, ISNULL([批次号],N'') AS pc_batch, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(xq_sl,0) AS xq_sl FROM dbo.plang WHERE id=?", rowId)
-                            : jdbc.queryForMap("SELECT TOP 1 id, pl_xc, ISNULL([批次号],N'') AS pc_batch, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(xq_sl,0) AS xq_sl FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(scx,N'')=N'' ORDER BY id", no);
+                            ? jdbc.queryForMap("SELECT id, pl_xc, ISNULL([批次号],N'') AS pc_batch, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(xq_sl,0) AS xq_sl, ISNULL(pl_sl,0) AS pl_sl FROM dbo.plang WHERE id=?", rowId)
+                            : jdbc.queryForMap("SELECT TOP 1 id, pl_xc, ISNULL([批次号],N'') AS pc_batch, ISNULL(scx,N'') AS scx, ISNULL(ja,'N') AS ja, ISNULL(xq_sl,0) AS xq_sl, ISNULL(pl_sl,0) AS pl_sl FROM dbo.plang WHERE pl_no=? AND ISNULL(asp_cancel,'N')<>'Y' AND ISNULL(scx,N'')=N'' ORDER BY id", no);
                 } catch (org.springframework.dao.EmptyResultDataAccessException e) {
                     throw new IllegalStateException("工单不存在:" + no);
                 }
@@ -269,8 +271,11 @@ public class ScheduleBoardService {
                 if (!"".equals(String.valueOf(head.get("scx"))))
                     throw new IllegalStateException("已排产(产线=" + head.get("scx") + "),不能重复排入;换线请先撤销");
                 double demand = Num.of(head.get("xq_sl"));
-                Double qty = qtyOverride;
-                if (qty != null && qty > 0 && qty > demand + 0.0001)
+                double qty = qtyOverride != null ? qtyOverride
+                        : (Num.of(head.get("pl_sl")) > 0 ? Num.of(head.get("pl_sl")) : demand);
+                if (!Double.isFinite(qty) || qty <= 0)
+                    throw new IllegalStateException("排产数量必须大于 0");
+                if (qty > demand + 0.0001)
                     throw new IllegalStateException("排产数量 " + qty + " 超过需求数量 " + demand);
                 StringBuilder sql = new StringBuilder("UPDATE dbo.plang SET scx=?, pl_man=?,"
                         + " st_date=COALESCE(?, st_date), cp_date=COALESCE(?, cp_date)");
@@ -281,23 +286,16 @@ public class ScheduleBoardService {
                 if (team != null && !team.isBlank() && team.length() <= 10) { sql.append(", lb=?"); args.add(team); }
                 // 余量口径(2026-09-27 用户拍板):余量=需求数量−排产数量(未排产),排产只改 排产数量,
                 // 不再与排产数量相等(旧 yl=qty−rk 在 rk=0 时恒等于排产数量,显示混乱)
-                if (qty != null && qty > 0) { sql.append(", pl_sl=?, yl=ISNULL(xq_sl,0) - ?"); args.add(qty); args.add(qty); }
+                sql.append(", pl_sl=?, yl=ISNULL(xq_sl,0) - ?"); args.add(qty); args.add(qty);
                 sql.append(", asp_user2=?, asp_time2=GETDATE() WHERE id=? AND ISNULL(asp_cancel,'N')<>'Y'");
                 args.add(user); args.add(head.get("id"));
                 jdbc.update(sql.toString(), args.toArray());
-                // 同步落排产表 plang_pc(薄记录)——幂等:先删后插;锚=plang_id(批次号纯日期化后
-                // 同天多行同批次号,(pl_no,pl_xc,批次号) 不再唯一,必须按行 id 定位)
-                jdbc.update("DELETE FROM dbo.plang_pc WHERE plang_id=?",
-                        head.get("id"));
-                jdbc.update("INSERT INTO plang_pc (comm, pl_no, pl_xc, pl_date, scx, pl_man, lb, st_date, cp_date, jh_date,"
-                                + " od_no, od_xc, ja, asp_cancel, asp_user1, asp_time1, [批次号], plang_id)"
-                                + " SELECT p.comm, p.pl_no, p.pl_xc, p.pl_date, ?, ?, ?, ?, ?, NULL,"
-                                + " p.od_no, p.od_xc, p.ja, N'N', ?, GETDATE(), p.[批次号], p.id"
-                                + " FROM dbo.plang p WHERE p.id=?",
-                        line, user, (team != null && !team.isBlank() && team.length() <= 10) ? team : null,
-                        start == null ? null : java.time.LocalDate.parse(start),
-                        end == null ? null : java.time.LocalDate.parse(end),
-                        user, head.get("id"));
+                // 原有排产结构必须携带数量/产品等业务字段,不能只写产线留下默认零数量。
+                // 已有行只更新,保留 scjl.gd_id 引用的排产记录身份。
+                Integer existing = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.plang_pc WHERE plang_id=?"
+                        + " AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, head.get("id"));
+                if (existing != null && existing > 0) WorkOrderScheduleRecord.sync(jdbc, head.get("id"), user);
+                else WorkOrderScheduleRecord.create(jdbc, head.get("id"), user);
                 logUsage(user, "排产", no, xcOf(head));
                 done.add(no);
                 if (!lines.contains(line)) lines.add(line);
