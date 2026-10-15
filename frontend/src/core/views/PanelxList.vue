@@ -624,6 +624,9 @@
                     ? tt('上月月结已取消,以下陈列该月原始单据')
                     : tt('上月未月结,以下陈列该月原始单据') }}
                 </div>
+                <!-- 注:此前的「统一预警」输入框 + 应用按钮已按用户 2026-10-15 当日改口径
+                     (「统一预警是对所有数据的,要放在按钮栏那里,点击给弹窗」)**移到工具条 + 弹窗**,
+                     展开区只保留下面批次表里的**按批次单独设置**(走 /api/stock/warn/set)。 -->
                 <!-- **二次展开**(用户 2026-10-15 第十五轮:「根据统一批次号不同单据做二次展开」):
                      外层 = 批次号一行(汇总:月结数量 / 当月单据数 / 当月合计 / 余额),
                      点该行的 `>` 再展开 ⇒ 该批次的单据明细(**第一条是月结**,后面是当月单据)。 -->
@@ -651,6 +654,20 @@
                   <el-table-column prop="当月单据数" :label="tt('当月单据数')" width="110" align="right" />
                   <el-table-column prop="当月合计" :label="tt('当月合计')" width="110" align="right" />
                   <el-table-column prop="余额" :label="tt('余额')" width="110" align="right" />
+                  <!-- 预警数量:库存明细里直接设置(用户 2026-10-15 第十六轮)。落库到 kucun.[预警数量],
+                       出库审批时按「出库后余额 < 预警数量」拦截(StockWarnService.checkOutbound)。
+                       余额低于预警时数字标红,一眼看出哪批要警戒。
+                       权限(2026-10-15 用户改口径:只有库存明细用 warn 词):没勾「预警配置」的角色
+                       **输入框整体不渲染**(只读文本展示阈值),服务端同词闸门兜底。 -->
+                  <el-table-column :label="tt('预警数量')" width="160">
+                    <template #default="{ row: g }">
+                      <el-input-number v-if="canConfigWarnHere" size="small" :controls="false" :min="0" style="width: 110px"
+                                       :model-value="mcWarn(row.id, g.批次号)"
+                                       @change="(v) => saveMcWarn(row, g.批次号, v)" />
+                      <span v-else>{{ mcWarn(row.id, g.批次号) }}</span>
+                      <span v-if="g.余额 < mcWarn(row.id, g.批次号)" class="mc-warn-hit">{{ tt('低于预警') }}</span>
+                    </template>
+                  </el-table-column>
                   <el-table-column :label="tt('首次月结')" min-width="140">
                     <template #default="{ row: g }">
                       {{ (g.单据.find((x) => String(x['单据类型'] || '').includes('月结')) || {})['单据编号'] || '—' }}
@@ -717,6 +734,8 @@
                   @keyup.esc="warnEdit.id = null"
                   @blur="saveWarnEdit"
                 />
+                <!-- 库存状况(2026-10-15 用户改口径:库存状况不需要 warn 词):编辑入口恢复原样
+                     —— 不做 warn 词判定,服务端按 add/modify 在 /px/callButton 侧校验。 -->
                 <span v-else class="warn-editable" :title="tt('点击修改预警数量，留空使用默认阈值50')" @click="startWarnEdit(row)">{{ row['预警数量'] == null || row['预警数量'] === '' ? '—' : row['预警数量'] }}</span>
               </template>
               <span v-else>{{ row[column.prop] }}</span>
@@ -1897,6 +1916,29 @@
         <el-button type="primary" :loading="stockAdding" @click="submitStockAdd">{{ tt('确定') }}</el-button>
       </template>
     </el-dialog>
+    <!-- **统一预警弹窗**(库存明细,2026-10-15 当日改口径:「统一预警是对所有数据的,要放在按钮栏那里,
+         点击给弹窗」):按钮栏「统一预警」动作打开本弹窗;作用域 = 全部数据(不按物料过滤),
+         左栏勾了仓库就只作用该仓库 ⇒ POST /api/stock/warn/setAllData。
+         权限:无「预警配置」(warn)词的角色在动作分支就被拦下(服务端同词闸门 403 兜底)。 -->
+    <el-dialog v-model="warnAllVisible" :title="tt('统一预警')" width="460px" append-to-body
+               :close-on-click-modal="false" @close="closeWarnAll">
+      <div class="dq-form">
+        <div class="dq-row">
+          <span class="dq-label">{{ tt('预警数量') }}</span>
+          <el-input-number v-model="warnAllQty" :min="0" :precision="0" :controls="false"
+                           style="width: 100%" :placeholder="tt('请填写预警数量')" />
+        </div>
+        <div class="dq-tip">
+          {{ whDockSelected
+            ? tt('将对所选仓库的全部数据设置') + '：' + whDockSelected
+            : tt('将对全部数据设置') }}
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="closeWarnAll">{{ tt('取消') }}</el-button>
+        <el-button type="primary" :loading="warnAllSaving" @click="warnAllSubmit">{{ tt('确定') }}</el-button>
+      </template>
+    </el-dialog>
     <SelectVoucherDialog v-model="selVisible" :panelCode="panelCode" :config="selCfg" @generated="onSelGenerated" />
     <QrLabelDialog v-model="qrVisible" :labels="qrLabels" />
     <!-- 采购订单·打印材料码(2026-10-04):批次号在打印时登记 + 预约该行数量 -->
@@ -2074,7 +2116,7 @@ import { ALL_FIELDS, buildFuzzyQuery } from '@core/search/fuzzyQuery'
 // 产品文件列表的矩阵行筛选(单一口径,与 ProdDocListSheet 共用;纯函数 + 单测)
 import { PROD_DOC_FIELD_OPTIONS, buildProdDocFilter, filterProdDocRows } from '@core/prod/prodDocSearch'
 import { nextSortState, sortRows } from '@core/sort/rowSort'
-import { canConfigFields } from '@core/auth/panelAccess'
+import { canConfigFields, canConfigWarn } from '@core/auth/panelAccess'
 import { applyRefCarry, refConfigOf, refShowsCode } from '@core/ref/refCarry'
 import RefPickDialog from './RefPickDialog.vue'
 import BatchSendDialog from './BatchSendDialog.vue'
@@ -2811,6 +2853,17 @@ const docQueryRange = ref(null)
 const stockWh = ref('')
 const warehouseOptions = ref([])
 const isStockStatus = computed(() => String(panelCode.value) === 'STOCK_STATUS')
+/**
+ * 「本面板能不能配库存预警数量」(2026-10-15 用户改口径:只有**库存明细**用 warn 词)。
+ * 判据 = 组织架构「角色与面板权限」勾的「预警配置」列(后端 AuthController 下发 warnPanels);
+ * 服务端真闸门 = PanelPermissionService.requireWarnConfig(同一 warn 词,StockWarnController
+ * 只在面板 = STOCK_DETAIL 时调用)。
+ * ⚠ 用途**仅限库存明细**(按钮栏「统一预警」弹窗 + 展开区按批次设置);库存状况的行内编辑已恢复
+ *   add/modify 口径,不受本判定约束(见模板里 isStockStatus 分支)。
+ *   工具条那颗「统一预警」按钮本身由服务端配置驱动(有该面板可见权的人都能看到),
+ *   所以判权放在**动作分支里**(见 onButton 的 action === '统一预警')。
+ */
+const canConfigWarnHere = computed(() => canConfigWarn(user, panelCode.value))
 watch(isStockStatus, async (v) => {
   if (!v || warehouseOptions.value.length) return
   try {
@@ -2873,6 +2926,83 @@ const mcDetailLoading = ref({})
  * 所以外层每一行是一条批次号,点开就是「先月结、后当月单据」。
  * 每组给四个汇总数:月结数量 / 当月单据数 / 当月合计 / 余额(= 月结 + 当月,即该批当前余额)。
  */
+/** 该批次已设的预警数量(展开区显示/编辑用) */
+function mcWarn(id, lot) {
+  return Number(mcDetail.value?.[id]?.['预警']?.[lot] ?? 0)
+}
+
+/** 保存预警数量(**单独设置**,库存明细里按批次设;落 kucun.[预警数量],出库审批据此拦截)。
+ *  带 panel = 当前面板码:服务端按该面板的「预警配置」(warn)词校验(管理员恒过),
+ *  见 StockWarnController.set → PanelPermissionService.requireWarnConfig。
+ *  ⚠ 全量口径的「统一预警」已按用户 2026-10-15 当日改口径移到**按钮栏弹窗**
+ *  (走 /api/stock/warn/setAllData,见 warnAllSubmit);本方法只做**按批次覆盖**。 */
+async function saveMcWarn(row, lot, qty) {
+  if (!canConfigWarnHere.value) return   // 无「预警配置」词 ⇒ 不提交(服务端同词闸门兜底)
+  const id = row.id
+  try {
+    await request.post('/stock/warn/set', {
+      wzdm: row['存货编码'] ?? '', ckdm: row['仓库编码'] ?? '', lot: lot || '', qty: Number(qty) || 0,
+      panel: panelCode.value,
+    })
+    if (mcDetail.value[id]) {
+      mcDetail.value[id]['预警'] = { ...(mcDetail.value[id]['预警'] || {}), [lot]: Number(qty) || 0 }
+    }
+    ElMessage.success(tt('预警数量已保存'))
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('保存预警数量失败'))
+  }
+}
+
+// ---------- 按钮栏「统一预警」弹窗(用户 2026-10-15 当日改口径)----------
+// 口径原话:「统一预警是对所有数据的,要放在按钮栏那里,点击给弹窗」。
+// 作用域 = /api/stock/warn/setAllData:**不按物料过滤**;左栏勾了仓库 ⇒ 只刷该仓库,没勾 ⇒ 整张 kucun。
+// 服务端闸门 = requireWarnConfig(warn 词;普通用户 403),本处先判一次只是为了少跑一趟请求。
+const warnAllVisible = ref(false)
+/** 弹窗里的「预警数量」输入值(null = 未填) */
+const warnAllQty = ref(null)
+const warnAllSaving = ref(false)
+
+/** 打开弹窗(工具条动作分支调用):每次打开都清成未填,免得带入上次的值 */
+function openWarnAll() {
+  if (!canConfigWarnHere.value) { ElMessage.warning(tt('无「预警配置」权限')); return }
+  warnAllQty.value = null
+  warnAllVisible.value = true
+}
+
+/** 关闭弹窗(取消/右上角 ×):清输入值 */
+function closeWarnAll() {
+  warnAllVisible.value = false
+  warnAllQty.value = null
+}
+
+/**
+ * 提交全量统一预警 ⇒ POST /api/stock/warn/setAllData。
+ * 左栏勾了仓库就带 ckdm(只作用该仓库),没勾就不带(= 所有数据)。
+ * 成功后:提示带**更新行数** ⇒ 关弹窗 ⇒ load() 刷列表 ⇒ 清 mcDetail
+ * (展开缓存里带着每批次的预警数字,必须重拉,否则展开看到的还是旧值)。
+ */
+async function warnAllSubmit() {
+  if (!canConfigWarnHere.value) { ElMessage.warning(tt('无「预警配置」权限')); return }
+  const v = warnAllQty.value
+  if (v === null || v === undefined || v === '') { ElMessage.warning(tt('请填写预警数量')); return }
+  const ck = String(whDockSelected.value || '')   // 空 = 全部数据
+  warnAllSaving.value = true
+  try {
+    const res = await request.post('/stock/warn/setAllData', {
+      warnQty: Number(v) || 0, ckdm: ck, panel: panelCode.value,
+    })
+    const n = res?.data?.['更新行数'] ?? 0
+    ElMessage.success(`${tt('已统一设置预警数量')}(${tt('更新行数')} ${n})`)
+    closeWarnAll()
+    mcDetail.value = {}   // 展开缓存里的「预警」map 是旧值 ⇒ 丢掉重拉(下次展开即新值)
+    await load()
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('统一设置预警数量失败'))
+  } finally {
+    warnAllSaving.value = false
+  }
+}
+
 function mcBatchGroups(id) {
   const rows = mcDetail.value?.[id]?.['单据明细'] || []
   const map = new Map()
@@ -2893,7 +3023,17 @@ async function onMcExpand(row, expanded) {
   if (!isStockDetail.value || !row) return
   const rows = Array.isArray(expanded) ? expanded : (expanded ? [row] : [])
   if (!rows.some((r) => r && r.id === row.id)) return   // 收起事件不拉数据
-  if (mcDetail.value[row.id]) return                    // 命中缓存
+  await loadMcDetail(row)
+}
+
+/**
+ * 拉/复用「某行 → 该 (物料,仓库) 的月结明细」:命中缓存即返回。
+ * 需要强制刷新时由调用方先清缓存(`delete mcDetail.value[id]` / `mcDetail.value = {}`)——
+ * 例如弹窗里的全量统一预警提交后(展开缓存里带旧预警数字,见 warnAllSubmit)。
+ */
+async function loadMcDetail(row) {
+  if (!isStockDetail.value || !row) return
+  if (mcDetail.value[row.id]) return          // 命中缓存
   mcDetailLoading.value[row.id] = true
   try {
     const res = await request.get('/stock/monthClose/detail', {
@@ -2950,6 +3090,8 @@ async function submitStockAdd() {
 }
 
 // ---------- 预警数量行内编辑(库存状况):点击变输入框,回车/失焦保存,Esc 取消 ----------
+// 权限(2026-10-15 用户改口径):库存状况**不吃 warn 词**,恢复原样 —— 前端不做 warn 判定,
+// 服务端按 add/modify 在 /px/callButton(ButtonService.updateStockWarn)侧校验。
 const warnEdit = reactive({ id: null, value: null })
 const warnEditRef = ref(null)
 watch(() => warnEdit.id, async (v) => {
@@ -7294,6 +7436,13 @@ async function onButton(action) {
     search()
     return
   }
+  // 库存明细「统一预警」按钮(2026-10-15 当日改口径:「统一预警是对所有数据的,要放在按钮栏那里,
+  //   点击给弹窗」):按钮本身由服务端 buttonGroups 下发(单动作组),这里只负责开弹窗。
+  //   权限在**动作分支里**判(无 warn 词 ⇒ 提示并 return;服务端 requireWarnConfig 是权威闸门,会 403)。
+  if (action === '统一预警') {
+    openWarnAll()
+    return
+  }
   // 库存明细「库存月结」两按钮(2026-10-15 用户口径):上月月结 / 取消月结
   //   · 只有这两个(「重新月结」按钮已按要求撤掉;引擎里仍保留 reclose,运维走 /api/stock/monthClose/run);
   //   · 期间:上月月结恒为**上月**(服务端再校验);取消月结不带参数,服务端取「最近一次已月结期间」;
@@ -9257,6 +9406,7 @@ onUnmounted(() => {
 .mc-detail-title { font-size: 13px; font-weight: 600; color: #1f2937; margin-bottom: 6px; }
 .mc-detail-snap { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; font-size: 12px; color: #334155; }
 .mc-detail-snap.mc-dim { color: #94a3b8; }
+.mc-warn-hit { color: #dc2626; font-size: 11px; margin-left: 6px; }
 .mc-snap-note { font-style: normal; color: #94a3b8; font-size: 11px; }
 .mc-snap-item b { color: #64748b; font-weight: 500; margin-right: 4px; }
 .mc-detail-tables { display: flex; flex-wrap: wrap; gap: 12px; }

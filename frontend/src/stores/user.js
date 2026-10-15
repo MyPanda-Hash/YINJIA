@@ -18,6 +18,9 @@ export const useUserStore = defineStore('user', {
       approvePanels: Array.isArray(ui?.approvePanels) ? ui.approvePanels : [],
       // 可配置「自定义字段」的面板(2026-10-09):管理员=['*'],其余=角色在该面板被勾了「自定义字段」
       fieldPanels: Array.isArray(ui?.fieldPanels) ? ui.fieldPanels : [],
+      // 可配置「预警配置」(库存预警数量)的面板(2026-10-15,同 fieldPanels 机制):
+      // 管理员=['*'],其余=角色在该面板被勾了「预警配置」
+      warnPanels: Array.isArray(ui?.warnPanels) ? ui.warnPanels : [],
     }
   },
   getters: {
@@ -59,6 +62,7 @@ export const useUserStore = defineStore('user', {
       this.visiblePanels = Array.isArray(u?.visiblePanels) ? u.visiblePanels : []
       this.approvePanels = Array.isArray(u?.approvePanels) ? u.approvePanels : []
       this.fieldPanels = Array.isArray(u?.fieldPanels) ? u.fieldPanels : []
+      this.warnPanels = Array.isArray(u?.warnPanels) ? u.warnPanels : []
     },
     // 刷新权限（角色/面板配置变更后调用）
     async fetchPerms() {
@@ -70,8 +74,9 @@ export const useUserStore = defineStore('user', {
       this.visiblePanels = Array.isArray(p.visiblePanels) ? p.visiblePanels : []
       this.approvePanels = Array.isArray(p.approvePanels) ? p.approvePanels : []
       this.fieldPanels = Array.isArray(p.fieldPanels) ? p.fieldPanels : []
+      this.warnPanels = Array.isArray(p.warnPanels) ? p.warnPanels : []
       if (this.userInfo) {
-        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels }
+        this.userInfo = { ...this.userInfo, roleCode: this.roleCode, isAdmin: this.isAdmin, visiblePanels: this.visiblePanels, approvePanels: this.approvePanels, fieldPanels: this.fieldPanels, warnPanels: this.warnPanels }
         localStorage.setItem('mes_user', JSON.stringify(this.userInfo))
       }
     },
@@ -122,6 +127,7 @@ export const useUserStore = defineStore('user', {
       this.visiblePanels = []
       this.approvePanels = []
       this.fieldPanels = []
+      this.warnPanels = []
       localStorage.removeItem('mes_token')
       localStorage.removeItem('mes_user')
     },

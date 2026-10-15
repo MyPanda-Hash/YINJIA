@@ -128,9 +128,9 @@ public class SysAdminController {
 
     // ============ 角色面板授权 ============
 
-    // ============ 角色面板操作权限(12 项) ============
+    // ============ 角色面板操作权限(13 项:12 项 + 预警配置) ============
 
-    /** 全部操作权限定义(顺序=前端列顺序)——通用面板 12 项 */
+    /** 全部操作权限定义(顺序=前端列顺序)——通用面板 13 项(field 2026-10-09 / warn 2026-10-15 追加) */
     public static final String[][] PERMISSION_ACTIONS = {
             {"view",    "可见"},
             {"query",   "查询"},
@@ -148,6 +148,11 @@ public class SysAdminController {
             // 在「角色与面板权限」里给哪个面板勾上,该角色就能配那个面板的自定义字段。
             // 服务端同源闸门 = PanelPermissionService.requireFieldConfig(field 词)。
             {"field",   "自定义字段"},
+            // 库存预警数量配置权(2026-10-15 用户口径,机制同 field 词):
+            // 库存状况行内编辑 / 库存明细展开区按批次号设置 kucun.[预警数量] —— 在「角色与面板权限」里
+            // 给哪个面板勾上,该角色就能配那个面板的预警数量(只改出库审批的拦截阈值,不动业务单据)。
+            // 服务端同源闸门 = PanelPermissionService.requireWarnConfig(warn 词)。
+            {"warn",    "预警配置"},
     };
 
     /** 文件类面板(研发管理·文书式)专属动作集:按真实操作行为设计(新增保存即归档/查询单据/
@@ -185,7 +190,8 @@ public class SysAdminController {
             p.put("panelName", def.name());
             p.put("module", group);
             p.put("hasApproval", def.isDoc());
-            // 面板级动作集:文件类面板按真实操作行为下发专属 8 项,其余保持通用 11 项
+            // 面板级动作集:文件类面板按真实操作行为下发专属 8 项,其余保持通用 13 项
+            // (warn「预警配置」只进通用集:它作用于库存 kucun.[预警数量] 阈值,RD_* 文书式面板没有该动作)
             p.put("actions", ButtonService.DOC_ARCHIVE_PANELS.contains(def.code())
                     ? FILE_PANEL_ACTIONS : PERMISSION_ACTIONS);
             byModule.computeIfAbsent(group, k -> new ArrayList<>()).add(p);

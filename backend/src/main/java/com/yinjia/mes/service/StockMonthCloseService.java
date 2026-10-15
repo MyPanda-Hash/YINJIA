@@ -59,9 +59,11 @@ public class StockMonthCloseService {
     private static final DateTimeFormatter PERIOD_FMT = DateTimeFormatter.ofPattern("yyyy-MM");
 
     private final JdbcTemplate jdbc;
+    private final StockWarnService warn;
 
-    public StockMonthCloseService(JdbcTemplate jdbc) {
+    public StockMonthCloseService(JdbcTemplate jdbc, StockWarnService warn) {
         this.jdbc = jdbc;
+        this.warn = warn;   // 展开明细要带每个批次的预警数量(用户第十六轮)
     }
 
     // ==================== 期间工具 ====================
@@ -221,6 +223,18 @@ public class StockMonthCloseService {
             lines.add(ln);
         }
 
+        // ③.5 **并发闸门**(2026-10-15 用户发现「同一批次号出现两次月结」的根因):
+        //   两次月结并发时会**各自通过**「未月结」状态检查,交错执行(后一次的 DELETE 夹在前一次的 INSERT 中间)
+        //   ⇒ 尾巴上那一批结转行会被写两遍(实测 126 组重复,两行同一毫秒、id 相邻)。
+        //   用 SQL Server 应用锁把「同一期间的月结/取消」串行化:拿不到锁直接失败,绝不写出脏数据。
+        //   锁随事务释放(关闭月结是 @Transactional),不需要手工解锁。
+        Integer got = jdbc.queryForObject(
+                "DECLARE @r int; EXEC @r = sp_getapplock @Resource = ?, @LockMode = 'Exclusive',"
+                        + " @LockOwner = 'Transaction', @LockTimeout = 0; SELECT @r",
+                Integer.class, "monthclose:" + p);
+        if (got == null || got < 0) {
+            throw new IllegalStateException("期间 " + p + " 的月结正在执行中(另一个月结/取消还没结束),请稍后再试");
+        }
         // ④ 写结转单(inh):**按 (物料编码, 仓库编码, 批号) 一行、批号照实写**;并且**只保留本月这一套结转**。
         //    用户 2026-10-15 第十三轮口径:
         //      · 「月结也要分不同批次号的月结,而且月结要带有批次号」⇒ 行按批次号拆,批号照实写(无批号的键留空);
@@ -485,10 +499,13 @@ public class StockMonthCloseService {
         //   与上面两条配套:INSERT 只补非零键,所以删除是稳定的(不会下个月结又冒出来)。
         //   ⚠ 代价:该批次的「累计入库量/累计出库量」历史也随之从明细里消失(报表读的就是 kucun);
         //     若 (仓库,存货) 下**所有**批次都为 0,这一行整行消失 —— 这是"库存明细只列有余额的行"的口径。
-        int zeroPurged = jdbc.update(
-                "DELETE k FROM kucun k JOIN (" + agg + ") a"
+        Integer zeroCnt = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM kucun k JOIN (" + agg + ") a"
                         + " ON a.w = k.wzdm AND a.c = ISNULL(RTRIM(k.ckdm), N'') AND a.l = ISNULL(RTRIM(k.lot_no), N'')"
-                        + " WHERE a.yl = 0 AND a.w <> N'' AND a.c <> N''", endEx, endEx);        // 孤儿行清理(2026-10-15 补):**走审核钩子写入的 kucun 行必然有配套流水**
+                        + " WHERE a.yl = 0 AND a.w <> N'' AND a.c <> N''"
+                        // ⚠ 设过预警数量的行**不删**:预警是主数据,不能随批次清零被删(第十六轮)
+                        + "   AND ISNULL(k.预警数量, 0) = 0", Integer.class, endEx, endEx);
+        int zeroPurged = zeroCnt == null ? 0 : zeroCnt;        // 孤儿行清理(2026-10-15 补):**走审核钩子写入的 kucun 行必然有配套流水**
         //   (StockLedgerService.apply 在同一事务里既改 kucun 又写 inh/outh)⇒ 一个 `asp_user1 LIKE 'stock:%'`
         //   的键如果在流水里**一条都没有**,只可能是「流水被改了批号(换键)」留下的残影:
         //   重算只做 upsert、不清旧键 ⇒ 同一批货会在新旧两个键上各算一次(实测正式库 260 行 / +135 万)。
@@ -591,6 +608,7 @@ public class StockMonthCloseService {
                 .thenComparing(r -> String.valueOf(r.get("单据类型")).contains("月结") ? 0 : 1)
                 .thenComparing(r -> String.valueOf(r.get("单据日期")))
                 .thenComparing(r -> String.valueOf(r.get("单据编号"))));
+        out.put("预警", warn.warnMap(w, c));   // {批号 → 预警数量}(展开区按批次号设置/显示用)
         out.put("单据明细", rows);
         return out;
     }

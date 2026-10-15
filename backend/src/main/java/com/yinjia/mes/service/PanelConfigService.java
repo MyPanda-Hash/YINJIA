@@ -282,6 +282,10 @@ public class PanelConfigService {
             if (MONTH_CLOSE_PANELS.contains(def.code())) {
                 buttonGroups.add(group("上月月结", List.of("上月月结")));
                 buttonGroups.add(group("取消月结", List.of("取消月结")));
+                // 「统一预警」(用户 2026-10-15 当日改口径:「统一预警是对所有数据的,要放在按钮栏那里,
+                // 点击给弹窗」):**单动作组**放进按钮栏(不是「更多」下拉),位置 = 取消月结之后、打印之前。
+                // 点击走前端弹窗 ⇒ POST /api/stock/warn/setAllData(不按物料过滤:勾了仓库刷该仓库,否则全量)。
+                buttonGroups.add(group("统一预警", List.of("统一预警")));
             }
             buttonGroups.add(group("打印", List.of("打印", "预览", "导出")));
             // 库存三报表的金额列读 inv_cost_ledger(移动加权成本),口径=物化值,需可手工重算:
