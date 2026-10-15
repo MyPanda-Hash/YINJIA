@@ -221,22 +221,36 @@ public class StockMonthCloseService {
             lines.add(ln);
         }
 
-        // ④ 写结转单(inh):**按 (物料编码, 仓库编码, 批号) 一行、批号照实写** ——
-        //    用户 2026-10-15 第十轮口径:「月结也得按批号来分」。
-        //    与第七轮"不带批号、按物料+仓库汇总"相比:仍是**一个月一套结转行**(单据编号 JZ-YYYYMM 一份、
-        //    一次月结覆盖全部数量),但**行按批号拆** ⇒ 批号级余额各自能被吃(批号级台账才是平的);
-        //    无批号的键批号留空(NULL)。先删同期间旧的结转行,保证重跑/重新月结都只有一份。
-        int deleted = jdbc.update("DELETE FROM inh WHERE 单据类型 = ? AND 单据编号 = ?", CARRY_TYPE, no);
-        int carryRows = 0;
+        // ④ 写结转单(inh):**按 (物料编码, 仓库编码) 汇总、不带批号** ——
+        //    用户 2026-10-15 口径:「月结是没有批号的,而且月结应该是一个月只有一次的所有数量的月结」
+        //    ⇒ 一个月的月结只有一套结转行(单据编号 JZ-YYYYMM 一份),每行是"该仓该物料**全部批号**的期末合计",
+        //      批号留空。先删同期间旧的结转行,保证重跑/重新月结都只有一份。
+        Map<String, Agg> byItem = new LinkedHashMap<>();
+        Map<String, Key> itemKey = new LinkedHashMap<>();
         for (Map.Entry<Key, Agg> e : aggs.entrySet()) {
             Key k = e.getKey();
             Agg a = e.getValue();
+            String gid = k.wz + "\u0001" + k.ck;
+            Agg t = byItem.computeIfAbsent(gid, x -> new Agg());
+            t.opening = t.opening.add(a.opening);
+            t.in = t.in.add(a.in);
+            t.out = t.out.add(a.out);
+            t.end = t.end.add(a.end);
+            if (t.price == null) t.price = a.price;
+            if (t.name == null) { t.name = a.name; t.spec = a.spec; t.uom = a.uom; t.whName = a.whName; }
+            itemKey.putIfAbsent(gid, k);
+        }
+        int deleted = jdbc.update("DELETE FROM inh WHERE 单据类型 = ? AND 单据编号 = ?", CARRY_TYPE, no);
+        int carryRows = 0;
+        for (Map.Entry<String, Agg> e : byItem.entrySet()) {
+            Agg a = e.getValue();
             if (a.end.signum() == 0) continue;
+            Key k = itemKey.get(e.getKey());
             jdbc.update("INSERT INTO inh (src, rid, 单据编号, 单据类型, 单据日期, 物料编码, 物料名称, 规格型号,"
                             + " 计量单位, 仓库编码, 仓库名称, 批号, 数量, 单价, 金额, 经手人, asp_user1, asp_time1, asp_cancel)"
-                            + " VALUES (0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), 'N')",
+                            + " VALUES (0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, GETDATE(), 'N')",
                     no, CARRY_TYPE, java.sql.Date.valueOf(carryDate), k.wz, a.name, a.spec, a.uom, k.ck, a.whName,
-                    k.lot.isEmpty() ? null : k.lot, a.end, a.price,
+                    a.end, a.price,
                     a.price == null ? null : a.price.multiply(a.end), "月结:" + user, "monthclose:" + user);
             carryRows++;
         }
@@ -515,14 +529,12 @@ public class StockMonthCloseService {
     public Map<String, Object> detail(String period, String wzdm, String ckdm, String lot) {
         String cur = normPeriod(period == null || period.isBlank() ? LocalDate.now().format(PERIOD_FMT) : period);
         String prev = YearMonth.parse(cur, PERIOD_FMT).minusMonths(1).format(PERIOD_FMT);
-        String w = nz(wzdm), c = nz(ckdm);
-        // 批号口径(2026-10-15 第十轮,报表已按 (仓库,存货,批号) 分行):
-        //   · **lot == null(前端不传)= 不限批号** —— 给"按物料+仓库"看的口子;
-        //   · lot 传了值(含空串)= **精确匹配该批号**(空串 = 只取无批号的行)。
-        //   前端展开时会带上本行的 批号(可能为空),所以批号级行看到的就是本批号的结转 + 本批号当月单据。
-        String lotArg = lot == null ? null : ("*".equals(lot.trim()) ? null : lot.trim());
+        String w = nz(wzdm), c = nz(ckdm), l = nz(lot);
+        // 第四轮口径:报表一行 = 一个 (仓库编码, 存货编码)(批号已合并) ⇒ 展开时**不再按批号过滤**,
+        // 该物料该仓的**所有批次**单据一起陈列(单据明细里带 `批号` 列,想看哪一批一眼可见)。
+        // 仍然保留按批号查的能力(传了具体批号就按批号过滤),给以后"按批展开"留口子。
+        String lotArg = ("*".equals(l) || l.isEmpty()) ? null : l;
         LocalDate prevStart = periodStart(prev), prevEndEx = periodEndExclusive(prev);
-        LocalDate curStart = periodStart(cur), curEndEx = periodEndExclusive(cur);
         String prevState = periodState(prev);
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -559,10 +571,9 @@ public class StockMonthCloseService {
             // 上月未月结/已取消 ⇒ 陈列上月的原始单据(入库正、出库负)
             rows.addAll(flowRows(prevStart, prevEndEx, w, c, lotArg));
         }
-        // **当月单据照常铺出来**(用户 2026-10-15 第十轮:「月结后,10 月的单据呢」)——
-        //   展开 = 上月的结转行(余额来源)+ 当月的出入库单据(本月动了什么),一张表按日期排;
-        //   第八轮曾只留结转行,现按用户要求把当月单据加回。结转行本身仍不进累计口径(v_stock_movement 已排除)。
-        rows.addAll(flowRows(curStart, curEndEx, w, c, lotArg));
+        // ⚠ **不再铺当月的单据**(用户 2026-10-15 截图口径:「只要上一个月的结转,就是 9 月的」):
+        //   展开 = 这一行的**余额来源** —— 上月已月结就是那张结转单(一行,如 `2026-09月结 / JZ-202609 / 15000`);
+        //   上月没结/被取消才退回陈列上月的原始单据。当月单据属于下一个月结,列在这里只会淹掉那一行。
         rows.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("单据日期")))
                 .thenComparing(r -> String.valueOf(r.get("单据类型"))));
         out.put("单据明细", rows);

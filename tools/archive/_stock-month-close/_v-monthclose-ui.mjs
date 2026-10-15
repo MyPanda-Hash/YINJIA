@@ -95,7 +95,7 @@ await ev(`(() => {
 })()`)
 await sleep(5000)
 const count2 = await ev(`(document.body.innerText.match(/共\\s*([0-9,]+)\\s*条/) || [])[1] || '?'`)
-console.log(`    未勾选=${count0}(应 3145 全部) → 勾恒亿仓=${count1}(应 1480) → 再点取消=${count2}(应回到 3145)`)
+console.log(`    未勾选=${count0}(应 1611 全部) → 勾恒亿仓=${count1}(应 612) → 再点取消=${count2}(应回到 1611)`)
 // 勾「华北工控仓 CK00006」(展开断言的目标行 YJ-SX-043/CK00006 在 CK00006 下,列表按更新时间倒序 ⇒ 在第 1 页)
 await ev(`(() => {
   const item = [...document.querySelectorAll('.wh-dock-item')].find(el => el.innerText.includes('CK00006'));
@@ -123,10 +123,10 @@ const readExpand = async () => {
     return '表=' + tables + (hint ? ' 提示[' + hint + ']' : '') + (rows.length ? '\\n        行: ' + rows.join('  ///  ') : '');
   })()`)
 }
-await dump(`tr => !tr.querySelector('.el-table__expand-icon') ? false : (tr.innerText || '').includes('YJ-SX-043') && (tr.innerText || '').includes('CK00006')`)
-console.log('    YJ-SX-043/CK00006 的第一个批号行(信息性:空=该批上月结存 0): ' + await readExpand())
+await dump(`tr => (tr.innerText || '').includes('YJ-SX-043') && (tr.innerText || '').includes('CK00006')`)
+console.log('    有结转的行(YJ-SX-043/CK00006): ' + await readExpand())
 await ev(`document.querySelectorAll('.mc-detail .el-table__expand-icon').forEach(() => {})`)
-console.log('    说明:上月期末结存为 0 的批号行展开显示提示文字;有余额的批号行 = 本批号结转 + 本批号当月单据')
+console.log('    说明:无结转的行(上月期末结存=0)展开应显示提示文字,不再是空表')
 
 console.log('[8] 工具栏按钮: ' + await ev(`(() => {
   const labels = [...document.querySelectorAll('span.tb-main')].map(x => x.innerText.trim()).filter(Boolean);
