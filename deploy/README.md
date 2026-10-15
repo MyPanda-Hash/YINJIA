@@ -290,7 +290,8 @@ exchange_rate→汇率、明细最早 delivery_date→交货日期、数据来�
 |---|---|
 | 签名不匹配/401 | 确认 clientSecret 为最新(后台可"重新生成");可跑 `node _verify-signature.mjs` 自证算法 |
 | `1030002006 授权密钥校验失败` | 账套重新授权后 appSecret 已变,更新 config.json |
-| token 相关异常 | 删除 state.json 强制重取(缓存约 23h,正常无需干预) |
+| token 相关异常 / **换账套后接口 404** | `state.json` 缓存的是**上一个账套**的 app-token(约 23h)。改了 clientId/outerInstanceId 之后脚本会**直接复用旧 token**,金蝶网关认不出这个租户 ⇒ 表现是 `HTTP 404 Not Found`(**不是** 401/1030002006,极易误判成"接口路径没了/接口下线")。**换账套、换凭证前先删 `state.json`**,再 `node sync.mjs --probe` 复核(2026-10-15 实测:沙箱→真实账套切换时踩到) |
+| 拿一个 32 位十六进制串当 `outerInstanceId` | 按它取授权会回 `1030002003 所指定推送的授权 clientId-xxx-第三方实例id-xxx 不存在`。**轮换出来的新 appSecret 也是十六进制串,别和实例 id 搞混**(实例 id 是 16~20 位纯数字;同款教训见 `材料出库单字段接口核对.md`)。正确取值:开发者后台「授权记录」表格,或本仓库文档里已记录的账套对照(`工艺路线接口核查.md` §四) |
 | `HTTP 429 已被限流` | 超出 500 次/分钟,等下一周期;频繁出现则加大任务间隔 |
 | 计划任务 LastResult=1 且无日志 | 任务动作经 cmd/bat + 路径含括号 → 改用 run-hidden.vbs 方案(本文档第 6 节) |
 | 自写 bat 报"不是内部或外部命令"碎片 | bat 必须 CRLF+ASCII(LF 会被 cmd 错位解析) |
@@ -300,10 +301,14 @@ exchange_rate→汇率、明细最早 delivery_date→交货日期、数据来�
 | 想立即刷新全部 | 跑 `node init-sync.mjs`(全量指纹复核,十几秒);增量手动触发 `Start-ScheduledTask JdySalOrderSync` |
 | 金蝶新加了字段(如商品·来料检验),MES 里是空的 | ① 把键登记进 `sync-core.mjs` 的 `CF_INSPECTION_KEYS`(键=自定义字段容器里的 `custom_field__…`,用 `tools/archive/_probe-material-cf.mjs` 实测取得,接口不给字段名);② 存量行补拉一次:`node sync.mjs --refresh=BD_MATERIAL --yes`(3852 商品约 20-30 分钟)。此后日常由「自定义字段复核」自动跟进(见第 0 节) |
 | 单据异常/漏单怀疑 | 跑 `node init-sync.mjs` 全量复核兜底(时间窗外的变化会被它补齐) |
+| **只想补某类单据 / 某段历史**(如"补上 9 月份的单据") | ① `config.json` 的 `sync.types` 收窄到要跑的类型(如 `["SO_ORDER","PU_ORDER"]`;**空/缺省 = 全量 14 类**)② `sync.windowDays` 调大到覆盖目标区间(窗口口径是「**近 N 天修改/新增**」,补 9 月就设成今天往前 50 天)③ `node sync.mjs --refresh=<CODE,CODE> --yes`(`--refresh` 忽略库内指纹、全量重取详情)。④ **补完把这两项改回**(types 删掉、windowDays 回 31),否则日常同步一直被限制在这一类/这个窗口 |
 
-**更换账套 / 重置已同步数据**:改 `config.json` 的 kingdee 段(新账套的
-clientId/clientSecret/outerInstanceId)→ `node _switch-prod.mjs`(清空旧同步数据+补迁移)
-→ `node init-sync.mjs` 重新初始化。清理 SQL(`外部数据ID IS NOT NULL` 即已同步行):
+**更换账套 / 重置已同步数据**:
+**① 先删 `state.json`**(否则复用旧账套的 app-token,下一步会以 `HTTP 404` 失败——见上表)
+→ ② 改 `config.json` 的 kingdee 段(新账套的 clientId/clientSecret/outerInstanceId)
+→ ③ `node sync.mjs --probe` 复核凭证已切到新账套
+→ ④ `node _switch-prod.mjs`(清空旧同步数据+补迁移)
+→ ⑤ `node init-sync.mjs` 重新初始化。清理 SQL(`外部数据ID IS NOT NULL` 即已同步行):
 
 ```sql
 DELETE FROM bl_so_order WHERE 单据编号 IN (SELECT 单据编号 FROM bd_so_order WHERE 外部数据ID IS NOT NULL);
