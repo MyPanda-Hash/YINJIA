@@ -299,14 +299,28 @@ public class ProcessTaskService {
 
     /**
      * 可选工艺路线列表(**含工序序列**,供弹窗选择;2026-10-05 用户口径:路线多时下拉不现实 → 改弹窗)。
+     *
+     * <p>2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」:每条路线带上
+     * 「审核状态」(已审核/未审核)，弹窗把未审核的置灰并说明原因;
+     * 只读展示，选单的硬拦在后端 {@code QuickScheduleService.requireRouteAudited}。</p>
+     *
+     * <p>口径与 {@code bs_route.审核状态} 字段(触发器派生)一致：shr 非空 且
+     * 未作废/未中止/非删除申请/非修改中 = 已审核；审批中(pending='Y')算未审核。</p>
      */
     public List<Map<String, Object>> routes() {
         return jdbc.queryForList(
                 "SELECT r.工艺路线编码 AS 编码, MAX(ISNULL(r.工艺路线名称, N'')) AS 名称, COUNT(*) AS 工序数,"
+                        // 审核状态:左连 ROUTE 的状态行(无状态行 = 从未走过审核流 = 未审核)
+                        + " CASE WHEN MAX(CASE WHEN s.shr IS NOT NULL AND ISNULL(s.canceled,'N')<>'Y'"
+                        + "           AND ISNULL(s.stopped,'N')<>'Y' AND ISNULL(s.deleting,'N')<>'Y'"
+                        + "           AND ISNULL(s.modify_state,'N')<>'Y' THEN 1 ELSE 0 END) = 1"
+                        + "      THEN N'已审核' ELSE N'未审核' END AS 审核状态,"
                         + " STUFF((SELECT N'→' + x.工序名称 FROM dbo.bs_route x WHERE x.工艺路线编码 = r.工艺路线编码"
                         + "         AND ISNULL(x.asp_cancel,'N')<>'Y' AND ISNULL(x.工序名称,N'')<>N''"
                         + "         ORDER BY ISNULL(x.加工顺序,999) FOR XML PATH('')),1,1,N'') AS 工序序列"
-                        + " FROM dbo.bs_route r WHERE ISNULL(r.asp_cancel,'N')<>'Y' AND ISNULL(r.工序名称,N'')<>N''"
+                        + " FROM dbo.bs_route r"
+                        + " LEFT JOIN dbo.yj_doc_status s ON s.panel_code = 'ROUTE' AND s.doc_no = r.工艺路线编码"
+                        + " WHERE ISNULL(r.asp_cancel,'N')<>'Y' AND ISNULL(r.工序名称,N'')<>N''"
                         + " GROUP BY r.工艺路线编码 ORDER BY r.工艺路线编码");
     }
 

@@ -87,8 +87,11 @@
         <el-table-column :label="tt('工艺路线')" width="180" fixed="right">
           <template #default="{ row }">
             <!-- 用户口径(2026-10-05):**在订单结转处选择工序路线** —— 预填产品绑定(否则默认 GY-CB-STD),可逐行改;
-                 转单时原样带入工单(plang.工艺路线),之后排产/详情一律按这条路线解释"走到哪一步"。 -->
-            <span :class="{ 'oc-blue': !!row.工艺路线 }" :title="row.工艺路线">{{ row.工艺路线 || '-' }}</span>
+                 转单时原样带入工单(plang.工艺路线),之后排产/详情一律按这条路线解释"走到哪一步"。
+                 2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」:未审核的路线标红 + 行内提示，
+                 转工单按钮对含未审核路线的行一并禁用(后端同口径拒绝)。 -->
+            <span :class="row.工艺路线 && row.路线审核状态 === '已审核' ? 'oc-blue' : 'oc-warn'"
+                  :title="routeAuditTip(row)">{{ row.工艺路线 || '-' }}</span>
           </template>
         </el-table-column>
         <el-table-column :label="tt('本次转单数量')" width="125" fixed="right">
@@ -112,17 +115,23 @@
     <!-- 工艺路线选择弹窗(2026-10-05 用户口径:路线多时下拉不现实 ⇒ 弹窗;支持编码/名称过滤,列出工序序列) -->
     <el-dialog v-model="routeDialog" :title="tt('选择工艺路线')" width="660px" append-to-body>
       <el-input v-model="routeKw" :placeholder="tt('编码 / 名称')" clearable style="width: 220px; margin-bottom: 8px" />
+      <div class="oc-route-note">{{ tt('仅「已审核」的工艺路线可用于转工单（未审核的路线置灰，需先在「基础设置→工艺路线」完成审核）') }}</div>
       <el-table :data="routeFiltered" size="small" border height="330" highlight-current-row
-                @current-change="(r) => (routePick = r)" @row-dblclick="applyRoute">
+                @current-change="(r) => (routePick = r)" @row-dblclick="applyRoute" :row-class-name="routeRowCls">
         <el-table-column :label="tt('编码')" prop="编码" width="140" />
         <el-table-column :label="tt('名称')" prop="名称" width="170" show-overflow-tooltip />
         <el-table-column :label="tt('工序序列')" prop="工序序列" min-width="220" show-overflow-tooltip />
         <el-table-column :label="tt('工序数')" prop="工序数" width="80" align="right" />
+        <el-table-column :label="tt('审核状态')" width="100" align="center">
+          <template #default="{ row }">
+            <span :class="row.审核状态 === '已审核' ? 'oc-blue' : 'oc-warn'">{{ tt(row.审核状态 || '未审核') }}</span>
+          </template>
+        </el-table-column>
       </el-table>
       <template #footer>
         <span class="oc-route-tip">{{ tt('将对勾选的') }} {{ checked.length }} {{ tt('行应用该路线(双击行亦可)') }}</span>
         <el-button @click="routeDialog = false">{{ tt('取消') }}</el-button>
-        <el-button type="primary" :disabled="!routePick" @click="applyRoute">{{ tt('确定') }}</el-button>
+        <el-button type="primary" :disabled="!routePick || routePick.审核状态 !== '已审核'" @click="applyRoute">{{ tt('确定') }}</el-button>
       </template>
     </el-dialog>
     </div>
@@ -172,11 +181,18 @@ async function loadRoutes() {
   try { routeOptions.value = (await request.post('/px/processTask/routes', {})).data || [] } catch { routeOptions.value = [] }
 }
 function openRouteDialog() { routePick.value = null; routeKw.value = ''; routeDialog.value = true }
+/** 行样式:未审核的工艺路线整行置灰(2026-10-16) */
+function routeRowCls({ row }) { return row.审核状态 === '已审核' ? '' : 'oc-row-warn' }
 /** 把弹窗里选中的路线应用到**勾选行**(批量;未勾选则不动) */
 function applyRoute() {
   const rt = routePick.value
   if (!rt) return
-  for (const r of checked.value) r.工艺路线 = rt.编码
+  // 未审核的路线不给应用(2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」)
+  if (rt.审核状态 !== '已审核') {
+    ElMessage.warning(tt('该工艺路线尚未审核，不能用于转工单；请先在「基础设置→工艺路线」完成审核') + '：' + rt.编码)
+    return
+  }
+  for (const r of checked.value) { r.工艺路线 = rt.编码; r.路线审核状态 = '已审核' }
   ElMessage.success(`${tt('已为')} ${checked.value.length} ${tt('行设置工艺路线')} ${rt.编码}`)
   routeDialog.value = false
 }
@@ -295,6 +311,14 @@ async function toManu() {
   await convert('toManu', '转工单')
 }
 
+/** 工艺路线列的气泡提示(2026-10-16:未审核 → 说明为什么不能转工单) */
+function routeAuditTip(row) {
+  const st = row.路线审核状态
+  if (st === '已审核') return row.工艺路线
+  if (st === '未选择') return tt('未选择工艺路线，不能转工单')
+  return `${row.工艺路线 || ''}\n${tt('该工艺路线未审核，不能转工单；请先在「基础设置→工艺路线」完成审核')}`
+}
+
 async function convert(api, label) {
   const list = (checked.value || []).filter((r) => Number(r.生单数量) > 0)
   if (!list.length) { ElMessage.warning(tt('请先勾选要结转的订单行')); return }
@@ -302,6 +326,16 @@ async function convert(api, label) {
   const noRoute = list.filter((r) => !r['工艺路线'])
   if (noRoute.length) {
     ElMessage.warning(tt('有') + ' ' + noRoute.length + ' ' + tt('行未选择工艺路线,不能转工单;请先点工具栏「选择工艺路线」指定') + '：' + noRoute.slice(0, 5).map((r) => r['订单号'] + '#' + r['行号']).join('、'))
+    return
+  }
+  // 🔴 工艺路线必须审核完成后才能被使用(2026-10-16 用户口径):
+  //   前端先拦一层(勾了未审核路线的行不给转)，后端 createFromOrderLine.requireRouteAudited 同口径兜底。
+  //   只提示、不自动跳过 —— 用户需要知道是"审核"这件事卡住，而不是数量/日期。
+  const noAudit = list.filter((r) => r['路线审核状态'] !== '已审核')
+  if (noAudit.length) {
+    ElMessage.warning(tt('有') + ' ' + noAudit.length + ' '
+      + tt('行所选工艺路线尚未审核，不能转工单;请先在「基础设置→工艺路线」对该路线提交审批并通过') + '：'
+      + noAudit.slice(0, 5).map((r) => `${r['订单号']}#${r['行号']}(${r['工艺路线']})`).join('、'))
     return
   }
   const qty = list.reduce((a, r) => a + Number(r.生单数量 || 0), 0)
@@ -366,5 +400,11 @@ onMounted(async () => {
 .oc-dim { color: #909399; font-size: 12px; }
 .oc-blue { color: #1e6fb8; font-weight: 600; }
 .oc-orange { color: #e6a23c; font-weight: 600; }
+/* 未审核的工艺路线(2026-10-16 用户口径「审核完成后才能被使用」):红字提示 */
+.oc-warn { color: #f56c6c; font-weight: 600; }
+.oc-route-note { margin-bottom: 6px; font-size: 12px; color: #e6a23c; }
+/* 路线弹窗里未审核的行:整行置灰，且不给选中 */
+:deep(.oc-row-warn) { color: #c0c4cc; background: #fafafa; }
+:deep(.oc-row-warn.el-table__row--current) { background: #fdf6ec; }
 :deep(.oc-date-dirty .el-input__wrapper) { box-shadow: 0 0 0 1px #f56c6c inset; }
 </style>

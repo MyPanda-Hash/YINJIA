@@ -1,0 +1,159 @@
+=== ① yj_doc_status 列 ===
+COLUMN_NAME	DATA_TYPE	
+id	int	
+panel_code	varchar	
+doc_no	nvarchar	
+shr	nvarchar	
+shsj	datetime	
+canceled	char	
+cancel_by	nvarchar	
+cancel_at	datetime	
+pending	char	
+pending_by	nvarchar	
+pending_at	datetime	
+update_at	datetime	
+stopped	char	
+stop_by	nvarchar	
+stop_at	datetime2	
+saved	char	
+archived	char	
+deleting	char	
+delete_req_by	nvarchar	
+delete_req_at	datetime2	
+modify_state	char	
+modify_req_by	nvarchar	
+modify_req_at	datetime2	
+modify_appr_by	nvarchar	
+modify_appr_at	datetime2	
+archived_at	datetime2	
+erp_close_state	nvarchar	
+approve_node	tinyint	
+l2_approver	nvarchar	
+effective	char	
+modify_reason	nvarchar	
+-- 31 row(s)
+
+=== ② bs_route 列 ===
+COLUMN_NAME	DATA_TYPE	
+id	int	
+工艺路线编码	nvarchar	
+工艺路线名称	nvarchar	
+停用	bit	
+加工顺序	int	
+工序编码	nvarchar	
+工序名称	nvarchar	
+加工方式	nvarchar	
+生产车间	nvarchar	
+工资类型	nvarchar	
+计件依据	nvarchar	
+委外供应商	nvarchar	
+按辅单位计价	bit	
+辅单位	nvarchar	
+换算率	decimal	
+默认报工数量	decimal	
+关键工序	bit	
+标准合格率%	decimal	
+备注	nvarchar	
+状态	nvarchar	
+asp_user1	nvarchar	
+asp_time1	datetime2	
+asp_user2	nvarchar	
+asp_time2	datetime2	
+asp_cancel	char	
+备用1	nvarchar	
+备用2	nvarchar	
+备用3	nvarchar	
+备用4	nvarchar	
+备用5	nvarchar	
+备用6	nvarchar	
+备用7	nvarchar	
+备用8	nvarchar	
+备用9	nvarchar	
+备用10	nvarchar	
+备用11	nvarchar	
+备用12	nvarchar	
+备用13	nvarchar	
+备用14	nvarchar	
+备用15	nvarchar	
+备用16	nvarchar	
+备用17	nvarchar	
+备用18	nvarchar	
+备用19	nvarchar	
+备用20	nvarchar	
+工艺路线分组	nvarchar	
+生效日期	date	
+失效日期	date	
+工艺类型	nvarchar	
+备注2	nvarchar	
+备注3	nvarchar	
+生产单据类型	nvarchar	
+是否连续委外	nvarchar	
+工序图片	nvarchar	
+工序说明	nvarchar	
+工序组	nvarchar	
+班组	nvarchar	
+操作工	nvarchar	
+工序单位	nvarchar	
+是否末道工序	nvarchar	
+允许超额	nvarchar	
+是否质检	nvarchar	
+是否首检	nvarchar	
+审核状态	nvarchar	
+-- 64 row(s)
+
+=== ③ plang 工艺路线 列 + 触发器 ===
+COLUMN_NAME	
+工艺路线	
+批次号	
+-- 2 row(s)
+name	type_desc	
+trg_yj_doc_status_route_audit	SQL_TRIGGER	
+-- 1 row(s)
+tbl	name	
+bs_route	DF__bs_route__状态__04099F98	
+bs_route	DF__bs_route__asp_ca__04FDC3D1	
+yj_doc_status	df_yjd_cancel	
+yj_doc_status	df_yjd_pending	
+yj_doc_status	DF_yj_doc_status_saved	
+yj_doc_status	df_yjd_update	
+yj_doc_status	DF__yj_doc_st__archi__4385062F	
+yj_doc_status	DF__yj_doc_st__delet__44792A68	
+-- 8 row(s)
+
+=== ④ 已被工单使用的路线 + 审核状态(基线目标)===
+工艺路线编码	工单行数	shr	已审核	canceled	stopped	pending	
+GY-CB-STD	2	admin	Y	N	N	N	
+-- 1 row(s)
+
+=== ⑤ 未被工单使用的路线(不许被补审)===
+工艺路线编码	工艺路线名称	shr	
+GY-001	铝棒 Φ80 加工路线	null	
+GY-001	铝棒 Φ80 加工路线	null	
+GY-001	铝棒 Φ80 加工路线	null	
+GY-001	铝棒 Φ80 加工路线	null	
+GY-001	铝棒 Φ80 加工路线	null	
+GY-001	铝棒 Φ80 加工路线	null	
+GY-002	减速箱体 A 加工路线	null	
+GY-002	减速箱体 A 加工路线	null	
+GY-002	减速箱体 A 加工路线	null	
+GY-002	减速箱体 A 加工路线	null	
+GY-002	减速箱体 A 加工路线	null	
+GY-002	减速箱体 A 加工路线	null	
+GY-002	减速箱体 A 加工路线	null	
+GY-002	减速箱体 A 加工路线	null	
+GY-003	制门加工路线	null	
+GY-003	制门加工路线	null	
+GY-003	制门加工路线	null	
+GY-003	制门加工路线	null	
+GY-003	制门加工路线	null	
+GY-003	制门加工路线	null	
+GY-2026-10-0001		null	
+GY-2026-10-0002		null	
+GY-2026-10-0003	88881010	admin	
+GY-2026-10-0003	88881010	admin	
+GY-2026-10-0003	88881010	admin	
+GY-2026-10-0003	88881010	admin	
+GY-2026-10-0003	88881010	admin	
+GY-2026-10-0004	123	null	
+GY-2026-10-0004	123	null	
+-- 29 row(s)

@@ -89,6 +89,17 @@ public class QuickScheduleService {
      */
     public String createFromOrderLine(String sourceNo, String lineId, Double qtyOverride, String user, String route) {
         requireAudited(sourceNo);
+        // 🔴 工艺路线必须审核完成后才能被使用(2026-10-16 用户口径「当前能工艺路线需要被
+        //   审核完成后才能被使用」)。拦住的是**生成工单这一步**：订单结转/快速排产选定的路线
+        //   若未审核，直接拒绝 —— 否则未评审的工序/换算率/质检配置会一路带到工单、报工、入库。
+        //   ⚠ 只拦"转工单"，不拦已在产的老工单(它们投产时按当时口径建的，见
+        //     tools/migrate-route-must-audited-20261016.sql 的存量基线补齐)。
+        //   空路线也一并拦(与 OrderConvertService 的前置提示同口径，这里是服务端兜底，
+        //   防直连 /px/callButton 绕过前端校验)。
+        if (route == null || route.isBlank()) {
+            throw new IllegalStateException("未选择工艺路线，不能转工单;请先在订单结转处选择工艺路线");
+        }
+        requireRouteAudited(route.trim());
         // 订单行直查表(不走面板标签映射);来源单头取 客户编码;行号带 id 序兜底(历史行 行号 可能为空)
         Map<String, Object> line = jdbc.queryForMap(
                 "SELECT l.[存货编码], ISNULL(l.[存货名称],N'') AS 存货名称, ISNULL(l.[规格型号],N'') AS 规格型号,"
@@ -287,6 +298,32 @@ public class QuickScheduleService {
         Map<String, Object> st = buttonService.docStatus("SO_ORDER", sourceNo);
         String status = String.valueOf(st.get("status"));
         if (!"已审核".equals(status)) throw new IllegalStateException("仅已审核客户订单可生成生产工单,当前状态:" + status);
+    }
+
+    /**
+     * 工艺路线必须已审核才能使用(2026-10-16 用户口径)。
+     *
+     * <p>口径与 {@code bs_route.审核状态} 字段(触发器 {@code trg_yj_doc_status_route_audit}
+     * 派生)完全一致：**shr 非空 且 未作废/未中止/非删除申请/非修改中** 才算审核完成。
+     * 审批中(pending='Y')不算 —— 那是"还在审",不是"审完"。</p>
+     *
+     * <p>为什么走 yj_doc_status 而不是读 {@code bs_route.审核状态} 列：那一列是**显示投影**，
+     * 依赖触发器是否触发;状态表才是状态机的唯一凭据(与 {@code docStatusOf} 同源)。
+     * 取不到状态行 ⇒ 该路线从未走过审核流 ⇒ 视为未审核。</p>
+     */
+    private void requireRouteAudited(String route) {
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT shr FROM yj_doc_status WHERE panel_code = 'ROUTE' AND doc_no = ?", route);
+        if (rows.isEmpty()) {
+            throw new IllegalStateException("工艺路线「" + route + "」尚未审核，不能转工单;"
+                    + "请先在 基础设置→工艺路线 对该路线执行「提交审批→审批通过」(或管理员审核)");
+        }
+        Map<String, Object> st = buttonService.docStatus("ROUTE", route);
+        String status = String.valueOf(st.get("status"));
+        if (!"已审核".equals(status)) {
+            throw new IllegalStateException("工艺路线「" + route + "」" + status + "，不能转工单;"
+                    + "请先完成该路线的审核(当前状态:" + status + ")");
+        }
     }
 
     private static double qtyOf(Map<String, Object> line) {

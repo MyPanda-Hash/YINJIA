@@ -45,7 +45,6 @@ export default {
     logout: 'Sign out',
   },
   biz: {
-    '待超级管理员批准': 'Awaiting super-admin approval',
     '完工明细': 'Completion Details',
     '按工序汇总': 'Summary by Operation',
     '完工记录': 'Completion Records',
@@ -58,6 +57,7 @@ export default {
     '工单号+工单行号': 'Work Order + Line No.',
     '工单内唯一批次': 'Unique Batch within Work Order',
     '仅显示本工单行已审核的完工记录；各工序数量分别统计，不跨工序累计。': 'Only approved completion records for this work order line are shown. Quantities are summarized separately for each operation, not added across operations.',
+    '待超级管理员批准': 'Awaiting super-admin approval',
     '单据已批准': 'Document approved',
     /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
     '批准通过': 'Approve',
@@ -582,9 +582,31 @@ export default {
     '已生成制程检验单': 'In-process inspection sheet created',
     '生产工单行加载失败': 'Failed to load production work order lines',
     '生成制程检验单失败': 'Failed to create the in-process inspection sheet',
+    // ---- 制程检验单横表「一个检验项目 = 一列,列内格数可加减」(2026-10-16)----
+    '制程检验记录表': 'In-Process Inspection Record',
+    '格数': 'Cells',
+    '加一格': 'Add one cell',
+    '减一格': 'Remove one cell',
+    '删除本项': 'Delete this item',
+    '删除本行': 'Delete this row',
+    '在本表区新增一个检验项目（加一列）': 'Add an inspection item to this section (one more column)',
+    '检验项目明细': 'Inspection Item Details',
+    // ---- 甲-2:每个表区 = 独立区块(2026-10-16)----
+    '按照检验项目填充': 'Fill in per inspection item',
+    '删除本表区': 'Delete this section',
+    '删除本表区（连同其下检验项目）': 'Delete this section (with all its inspection items)',
+    '删除本表区及其下': 'Delete this section and its',
+    '个检验项目？': 'inspection item(s)?',
+    '检验要求 / 检验方法 / 单项判定': 'Requirement / method / per-item judgement',
+    '表区 / 检验要求 / 检验方法 / 单项判定（横表只填实测值）': 'Section / requirement / method / per-item judgement (the grid above only takes measured values)',
+    '组名旁的「＋」= 加一列（新增一个检验项目）；列头「−/＋」调格数': 'The "+" beside a section name adds a column (a new inspection item); the "−/+" in a column header changes its cell count',
+    '暂无检验项，点下方「＋新增表区」开始': 'No inspection items yet — start with "+ New Section" below',
+    '暂无检验项，点右上「＋新增表区」开始': 'No inspection items yet — start with "+ New Section" at the top right',
+    '请输入表区名称（如：外观 / 尺寸 / 出货重量）': 'Enter the section name (e.g. Appearance / Dimensions / Shipping Weight)',
+    '表区名称不能为空': 'Section name is required',
     '工单号 / 产品编码 / 产品名称': 'Work order no. / product code / product name',
     '选择一条生产工单行（工单号 + 工单行号唯一确定）生成制程检验单草稿；已建单的行会标出来，重复选择不会重复建单。': 'Pick one production work order line (uniquely identified by work order no. + line no.) to create an in-process inspection sheet draft. Lines that already have a sheet are marked, and picking them again will not create a duplicate.',
-'上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用/删除标准本身（停用可恢复，删除不可恢复）。维护动作不会改动任何已录入的检验单。': 'Top = inspection plans, bottom = the items of the selected plan. Tick items and click "Add to Details" to write them into this sheet (then fill in measured values and judgement as usual); you may also add / edit / disable / delete the standards themselves right in the two tables (disable is reversible, delete is not). Maintenance never touches sheets already entered.',
+    '上=检验方案、下=该方案下的检验项目。勾选项目后点「带入明细」即写入当前单据（再按单填写实测数值与判定）；也可以直接在两张表上新增/编辑/停用/删除标准本身（停用可恢复，删除不可恢复）。维护动作不会改动任何已录入的检验单。': 'Top = inspection plans, bottom = the items of the selected plan. Tick items and click "Add to Details" to write them into this sheet (then fill in measured values and judgement as usual); you may also add / edit / disable / delete the standards themselves right in the two tables (disable is reversible, delete is not). Maintenance never touches sheets already entered.',
     // ---- 检验项目/方案「彻底删除」(2026-10-15 用户口径「不能只可增加不可删除」)----
     '彻底删除该检验项目？不可恢复，已录入的检验单不受影响。': 'Delete this inspection item permanently? This cannot be undone. Saved inspection sheets are unaffected.',
     '彻底删除该检验方案？其下的检验项目会一并删除，不可恢复；已录入的检验单不受影响。': 'Delete this inspection plan permanently? Its inspection items will be deleted as well. This cannot be undone; saved inspection sheets are unaffected.',
@@ -669,6 +691,19 @@ export default {
     '行应用该路线(双击行亦可)': 'row(s) (double-click a row too)',
     '已为': 'Set routing for',
     '行设置工艺路线': 'row(s):',
+    // ---- 工艺路线审核闸门(2026-10-16 用户口径「工艺路线需要被审核完成后才能被使用」)----
+    '审核状态': 'Audit Status',
+    '已审核': 'Audited',
+    '未审核': 'Not Audited',
+    '该工艺路线尚未审核，不能用于转工单；请先在「基础设置→工艺路线」完成审核':
+      'This routing is not audited yet and cannot be used for work-order conversion; complete its audit in Basic Settings → Routings first',
+    '仅「已审核」的工艺路线可用于转工单（未审核的路线置灰，需先在「基础设置→工艺路线」完成审核）':
+      'Only audited routings can be used for work-order conversion (unaudited ones are greyed out and must be audited first)',
+    '未选择工艺路线，不能转工单': 'No routing selected — cannot convert to work order',
+    '该工艺路线未审核，不能转工单；请先在「基础设置→工艺路线」完成审核':
+      'This routing is not audited — cannot convert to work order; complete its audit in Basic Settings → Routings first',
+    '行所选工艺路线尚未审核，不能转工单;请先在「基础设置→工艺路线」对该路线提交审批并通过':
+      'row(s) use an unaudited routing and cannot be converted; submit and pass its approval in Basic Settings → Routings first',
     '下一道工序': 'Next Process',
     '按勾选工单': 'per selected work order',
     '默认 GY-CB-STD': 'default GY-CB-STD',
