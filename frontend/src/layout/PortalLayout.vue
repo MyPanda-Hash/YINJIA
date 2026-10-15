@@ -7,13 +7,17 @@
         <TabsBar />
         <div class="portal-content">
           <router-view v-slot="{ Component }">
+            <!-- ⚠ `:key="route.path"`(2026-10-16 用户口径「切换 tab 页…填写的表格数据要保留」):
+                 不同面板列表页**(同一个 PanelxList 组件)**原先共用一个 keep-alive 缓存条目 ——
+                 切页签回来时复用同一实例、路由参数一变就重新 load,没保存的填写内容当场没了。
+                 按页签路径给 key ⇒ 每个页签一份实例与状态(未保存内容、当前单据、页签内滚动位置),
+                 页签关掉这个 key 也随之释放。键用 path(不是 fullPath):同一页签内换单据走 ?code=,
+                 仍是同一个页签、同一份实例(单据内切换由面板自己的守卫处理)。
+                 🔴 注释必须留在 <keep-alive> **外面**(2026-10-17 修):dev 编译**保留模板注释**,而
+                 KeepAlive 的单子节点校验数的是 node.children —— 注释也算一个 ⇒
+                 `[plugin:vite:vue] <KeepAlive> expects exactly one child component.`
+                 (生产构建会剥掉注释,所以 `npm run build` 一直不报,只有 vite dev 报)。 -->
             <keep-alive :max="20">
-              <!-- ⚠ `:key="route.path"`(2026-10-16 用户口径「切换 tab 页…填写的表格数据要保留」):
-                   不同面板列表页**(同一个 PanelxList 组件)**原先共用一个 keep-alive 缓存条目 ——
-                   切页签回来时复用同一实例、路由参数一变就重新 load,没保存的填写内容当场没了。
-                   按页签路径给 key ⇒ 每个页签一份实例与状态(未保存内容、当前单据、页签内滚动位置),
-                   页签关掉这个 key 也随之释放。键用 path(不是 fullPath):同一页签内换单据走 ?code=,
-                   仍是同一个页签、同一份实例(单据内切换由面板自己的守卫处理)。 -->
               <component :is="Component" :key="route.path" />
             </keep-alive>
           </router-view>
