@@ -1096,6 +1096,8 @@ export default {
     '已开发': 'Developed',
     '已反审核待重走': 'Unaudited \u2014 needs to be redone',
     '未开始': 'Not started',
+    '产品开发': 'Product development',
+    '点击查看开发流程': 'Click to view the development flow',
     '新增产品': 'New product',
     '打开产品信息表': 'Open product info sheet',
     '打开': 'Open',

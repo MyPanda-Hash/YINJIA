@@ -77,6 +77,10 @@
       <table class="ps-table">
         <thead>
           <tr>
+            <!-- 产品开发列(2026-10-16 用户口径「给项目进度查询加上一个『开发产品』按钮」):
+                 ⚠ 放**第一列** —— 这张表比屏幕宽、要横向滚动,实测放在 状态 之后会被挡在视口外,
+                 用户报「看不到产品开发按钮」(按钮本身是好的)。no-print:打印纸面不出现 UI 按钮列。 -->
+            <th class="c-dev no-print">{{ tt('产品开发') }}</th>
             <th class="c-level">{{ tt('项目定级') }}</th>
             <th class="c-name">{{ tt('项目名称') }}</th>
             <th class="c-sub">{{ tt('子项目/尺寸') }}</th>
@@ -87,6 +91,9 @@
             <th class="c-progress">{{ tt('立项日期') }}</th>
             <th class="c-mile">{{ tt('预计完成日期') }}</th>
             <th class="c-status">{{ tt('状态') }}</th>
+            <!-- 产品开发列(2026-10-16 用户口径「给项目进度查询加上一个『开发产品』按钮」):
+                 单独一列放**真按钮**,不再是状态列里的一个小标签 —— 之前 11px 的标签被当成状态文字,
+                 用户实测报「看不到产品开发按钮」。状态列继续显示开发情况(开发 n/m / 已全部开发完毕)。 -->
             <th class="c-tester">{{ tt('测试情况') }}</th>
             <!-- 2026-10-09 用户口径:撤下「技术目标达成 / 是否市场转化 / 未转换原因」三列(纸面 14 → 11)。
                  唯一真源 = progressColumns.js 的 PROGRESS_COLUMNS(同批已删);
@@ -97,6 +104,23 @@
         </thead>
         <tbody>
           <tr v-for="(row, i) in items" :key="row.id ?? ('new' + i)">
+            <td class="c-dev no-print">
+              <!-- 「开发产品」按钮(用户口径):项目实施计划**已归档**才可点;未归档置灰并说明原因。
+                   点开 = 该项目的产品开发流程弹窗(每个产品四个文件走到哪一步/哪个没开始)。 -->
+              <el-button
+                v-if="!planArchivedOf(row)"
+                size="small"
+                disabled
+                :title="tt('项目实施计划归档后才能开发产品')"
+              >{{ tt('开发产品') }}</el-button>
+              <el-button
+                v-else
+                size="small"
+                :type="devStateOf(row).allDone ? 'success' : 'primary'"
+                @click.stop="openDevDialog(row)"
+              >{{ devStateText(row) }}</el-button>
+              <div v-if="devStateOf(row).count" class="ps-dev-tip">{{ tt('点击查看开发流程') }}</div>
+            </td>
             <td v-if="isLevelHead(i)" class="c-level" :rowspan="levelSpan(i)">
               <!-- 2026-09-22 用户口径:项目等级不再手选 —— 由项目实施计划的「项目定级」自动带入
                    (后端 syncPlanToProgress 写入明细 [项目层级]),这里只读展示 + 按等级合并归类。
@@ -166,22 +190,10 @@
                 @click="openStageDialog(row)"
               >{{ progressText(row) }}</span>
               <span v-else class="ps-cell-text">—</span>
-              <!-- 产品开发(2026-10-16 用户口径):一个立项可以开发好几个产品(产品编号各不相同);
-                   项目实施计划**已归档**才允许开发 ⇒ 未归档时按钮置灰并说明原因;
-                   已开发则直接显示进度(已开发 n/4 / 已全部开发完毕),点开是流程结构弹窗。 -->
-              <div class="ps-dev no-print">
-                <span
-                  v-if="!planArchivedOf(row)"
-                  class="ps-dev-tag ps-dev-off"
-                  :title="tt('项目实施计划归档后才能开发产品')"
-                >{{ tt('开发产品') }}</span>
-                <span
-                  v-else
-                  class="ps-dev-tag"
-                  :class="{ done: devStateOf(row).allDone }"
-                  :title="tt('点击查看该项目的产品开发流程')"
-                  @click.stop="openDevDialog(row)"
-                >{{ devStateText(row) }}</span>
+              <!-- 产品开发情况(用户口径「在状态显示对应的产品信息表的开发情况」):
+                   纯文字状态,不在这里放按钮(按钮在右边的「产品开发」列) -->
+              <div v-if="devStateOf(row).count" class="ps-dev-state" :class="{ done: devStateOf(row).allDone }">
+                {{ devStateText(row) }}
               </div>
             </td>
             <td class="c-tester">
@@ -198,7 +210,7 @@
           <tr v-if="!items.length">
             <!-- 空态文案改用已有的「暂无数据」(10 个语言包均有译名);原「点击下方按钮新增」在撤掉
                  写入口后已不成立,换成新句子则要同步补 10 个语言包,收益不抵成本。 -->
-            <td :colspan="editable ? 12 : 11" class="ps-empty">{{ tt('暂无数据') }}</td>
+            <td :colspan="editable ? 13 : 12" class="ps-empty">{{ tt('暂无数据') }}</td>
           </tr>
         </tbody>
       </table>
@@ -1151,7 +1163,9 @@ defineExpose({ exportProgressExcel })
 .c-owner { min-width: 110px; }
 .c-progress { min-width: 110px; }
 .c-mile { min-width: 120px; }
-.c-status { min-width: 300px; }
+.c-status { min-width: 240px; }
+/* 产品开发列(2026-10-16 新增):放「开发产品」按钮 + 开发进度,按钮不换行 */
+.c-dev { min-width: 140px; text-align: center; white-space: nowrap; }
 .c-tester { min-width: 200px; }
 .c-approve { min-width: 90px; }
 .c-inspect { min-width: 90px; }
@@ -1218,24 +1232,11 @@ defineExpose({ exportProgressExcel })
 .psd-next { color: #1677ff; }
 .psd-table :deep(.el-table__cell) { font-size: 12px; }
 .psd-empty { padding: 18px 4px; color: #909399; font-size: 13px; }
-/* ---- 产品开发(状态列上的小标签 + 弹窗里的产品卡片与流程节点)---- */
+/* ---- 产品开发(「产品开发」列上的按钮 + 状态列里的开发情况文字 + 弹窗里的产品卡片与流程节点)---- */
 .psd-warn { color: #e6a23c; }
-.ps-dev { margin-top: 2px; }
-.ps-dev-tag {
-  display: inline-block;
-  font-size: 11px;
-  line-height: 16px;
-  padding: 0 6px;
-  border-radius: 3px;
-  border: 1px solid #b7c8e0;
-  color: #0d5bd3;
-  background: #f3f7ff;
-  cursor: pointer;
-  user-select: none;
-}
-.ps-dev-tag:hover { border-color: #0d5bd3; }
-.ps-dev-tag.done { border-color: #7cc47c; color: #2e7d32; background: #f2fbf2; }
-.ps-dev-off { border-color: #dcdfe6; color: #a8abb2; background: #f7f8fa; cursor: not-allowed; }
+.ps-dev-state { margin-top: 3px; font-size: 12px; color: #0d5bd3; }
+.ps-dev-state.done { color: #2e7d32; }
+.ps-dev-tip { margin-top: 2px; font-size: 11px; color: #a8abb2; }
 .ps-dev-card { border: 1px solid #e4e7ed; border-radius: 4px; padding: 8px 10px; margin-bottom: 10px; }
 .ps-dev-card-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
 .ps-dev-code { font-weight: 600; color: #0d5bd3; }
