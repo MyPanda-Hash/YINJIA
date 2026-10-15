@@ -4,7 +4,9 @@ import com.yinjia.mes.service.StockMonthCloseService;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -68,5 +70,50 @@ public class StockMonthCloseController {
         out.put("code", 200);
         out.put("data", Map.of("期间", p, "状态", monthClose.periodState(p)));
         return out;
+    }
+
+    /**
+     * 月结直调入口(运维/补做历史月用):{@code POST /api/stock/monthClose/run}
+     * body = {@code {"action":"close|cancel|reclose","period":"2026-09"}}。
+     *
+     * <p>与面板按钮走的是**同一份引擎**,差别只在入口:按钮那条路经 {@code /api/px/callButton}
+     * (含按钮权限与操作留痕);这条路给「面板点不动/要写脚本补月」的场景。
+     *
+     * <p>失败时把**异常类名 + 消息 + 前 8 帧**原样返回 —— 全局异常处理器会把异常归一成
+     * 「400/500 + 消息」,消息为空时(如 NPE)只剩一个 code,排查时看不到线索(2026-10-15 实测踩到)。
+     */
+    @PostMapping("/run")
+    public Map<String, Object> run(@RequestBody Map<String, Object> body) {
+        String action = body == null ? null : String.valueOf(body.getOrDefault("action", "close"));
+        Object rawPeriod = body == null ? null : body.get("period");
+        String period = rawPeriod == null || String.valueOf(rawPeriod).isBlank()
+                ? StockMonthCloseService.prevPeriod(LocalDate.now())
+                : StockMonthCloseService.normPeriod(String.valueOf(rawPeriod));
+        String user = currentUserName();
+        Map<String, Object> out = new LinkedHashMap<>();
+        try {
+            Map<String, Object> res = switch (action) {
+                case "cancel" -> monthClose.cancel(period, user);
+                case "reclose" -> monthClose.reclose(period, user);
+                default -> monthClose.close(period, user);
+            };
+            out.put("code", 200);
+            out.put("message", "success");
+            out.put("data", res);
+        } catch (Throwable e) {
+            out.put("code", 500);
+            out.put("message", e.getClass().getSimpleName() + ": " + e.getMessage()
+                    + (e.getCause() == null ? "" : " ← " + e.getCause().getClass().getSimpleName() + ": " + e.getCause().getMessage()));
+            List<String> trace = new ArrayList<>();
+            StackTraceElement[] st = e.getStackTrace();
+            for (int i = 0; i < Math.min(8, st.length); i++) trace.add(st[i].toString());
+            out.put("stack", trace);
+        }
+        return out;
+    }
+
+    private static String currentUserName() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return auth != null && auth.getName() != null && !auth.getName().isBlank() ? auth.getName() : "system";
     }
 }

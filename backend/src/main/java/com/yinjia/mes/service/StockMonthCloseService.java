@@ -361,12 +361,18 @@ public class StockMonthCloseService {
             }
             if (remain.signum() > 0) overIssued++;
             // 归集:分摊到各批次的量 + (分摊不掉/带批号取不足的)余量留在原键上
+            // ⚠ 出库行的 单据日期 可能是 NULL(实测有这种历史行):String.valueOf(null) 会得到字符串
+            //   "null",再喂给 Date.valueOf 就是 `IllegalArgumentException: null`(消息为空,全局处理器
+            //   只剩一个 code,排查时看不到线索)—— 2026-10-15 直调入口抓到的就是这个,必须判空。
+            Object dv = o.get("d");
+            String d = dv == null ? null : String.valueOf(dv);
             for (Map.Entry<String, BigDecimal> t : takeByLot.entrySet()) {
                 String uid = g + "\u0001" + t.getKey();
                 alloc.merge(uid, t.getValue(), BigDecimal::add);
-                String d = String.valueOf(o.get("d"));
-                String prev = lastOut.get(uid);
-                if (prev == null || d.compareTo(prev) > 0) lastOut.put(uid, d);
+                if (d != null) {
+                    String prev = lastOut.get(uid);
+                    if (prev == null || d.compareTo(prev) > 0) lastOut.put(uid, d);
+                }
             }
             if (remain.signum() > 0) alloc.merge(g + "\u0001" + lot, remain, BigDecimal::add);
         }
@@ -486,8 +492,28 @@ public class StockMonthCloseService {
         m.put("仓库编码", k.ck); m.put("仓库名称", a.whName); m.put("批号", k.lot.isEmpty() ? null : k.lot);
         m.put("期初数量", a.opening); m.put("入库数量", a.in); m.put("出库数量", a.out);
         m.put("结存数量", a.end); m.put("单价", a.price);
-        m.put("最晚出库日期", lastOut == null ? null : java.sql.Date.valueOf(lastOut));
+        m.put("最晚出库日期", toDate(lastOut));
         return m;
+    }
+
+    /**
+     * 文本 → java.sql.Date(只取前 10 位)。
+     *
+     * <p>为什么不能直接 {@code Date.valueOf(s)}:{@code inh/outh.单据日期} 是 **datetime**(不是 date),
+     * JDBC 取回来 {@code String.valueOf} 得到 {@code "2026-09-30 10:20:30.0"} —— 直接喂给
+     * {@code Date.valueOf} 抛 {@code IllegalArgumentException: null}(消息为空,全局异常处理器只剩一个
+     * code,2026-10-15 连踩两次才定位到)。同时防住 NULL 被拼成字面量 {@code "null"}。
+     */
+    private static java.sql.Date toDate(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        if (t.length() < 10 || "null".equalsIgnoreCase(t)) return null;
+        try {
+            return java.sql.Date.valueOf(t.substring(0, 10));
+        } catch (RuntimeException e) {
+            log.warn("[月结] 无法识别的最晚出库日期文本:'{}'(已忽略该值)", s);
+            return null;
+        }
     }
 
     private static BigDecimal dec(Object v) {
