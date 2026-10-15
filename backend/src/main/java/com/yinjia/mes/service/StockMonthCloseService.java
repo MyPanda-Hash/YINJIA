@@ -221,18 +221,36 @@ public class StockMonthCloseService {
             lines.add(ln);
         }
 
-        // ④ 写结转单(inh):一个键一行,数量 = 期末结存(0 不写)。先删同期间旧的结转行 ⇒ 重跑不重复
+        // ④ 写结转单(inh):**按 (物料编码, 仓库编码) 汇总、不带批号** ——
+        //    用户 2026-10-15 口径:「月结是没有批号的,而且月结应该是一个月只有一次的所有数量的月结」
+        //    ⇒ 一个月的月结只有一套结转行(单据编号 JZ-YYYYMM 一份),每行是"该仓该物料**全部批号**的期末合计",
+        //      批号留空。先删同期间旧的结转行,保证重跑/重新月结都只有一份。
+        Map<String, Agg> byItem = new LinkedHashMap<>();
+        Map<String, Key> itemKey = new LinkedHashMap<>();
+        for (Map.Entry<Key, Agg> e : aggs.entrySet()) {
+            Key k = e.getKey();
+            Agg a = e.getValue();
+            String gid = k.wz + "\u0001" + k.ck;
+            Agg t = byItem.computeIfAbsent(gid, x -> new Agg());
+            t.opening = t.opening.add(a.opening);
+            t.in = t.in.add(a.in);
+            t.out = t.out.add(a.out);
+            t.end = t.end.add(a.end);
+            if (t.price == null) t.price = a.price;
+            if (t.name == null) { t.name = a.name; t.spec = a.spec; t.uom = a.uom; t.whName = a.whName; }
+            itemKey.putIfAbsent(gid, k);
+        }
         int deleted = jdbc.update("DELETE FROM inh WHERE 单据类型 = ? AND 单据编号 = ?", CARRY_TYPE, no);
         int carryRows = 0;
-        for (Map.Entry<Key, Agg> e : aggs.entrySet()) {
+        for (Map.Entry<String, Agg> e : byItem.entrySet()) {
             Agg a = e.getValue();
             if (a.end.signum() == 0) continue;
-            Key k = e.getKey();
+            Key k = itemKey.get(e.getKey());
             jdbc.update("INSERT INTO inh (src, rid, 单据编号, 单据类型, 单据日期, 物料编码, 物料名称, 规格型号,"
                             + " 计量单位, 仓库编码, 仓库名称, 批号, 数量, 单价, 金额, 经手人, asp_user1, asp_time1, asp_cancel)"
-                            + " VALUES (0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, GETDATE(), 'N')",
+                            + " VALUES (0, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?, ?, GETDATE(), 'N')",
                     no, CARRY_TYPE, java.sql.Date.valueOf(carryDate), k.wz, a.name, a.spec, a.uom, k.ck, a.whName,
-                    k.lot.isEmpty() ? null : k.lot, a.end, a.price,
+                    a.end, a.price,
                     a.price == null ? null : a.price.multiply(a.end), "月结:" + user, "monthclose:" + user);
             carryRows++;
         }
@@ -266,12 +284,13 @@ public class StockMonthCloseService {
         out.put("结存合计", sumEnd);
         out.put("kucun新增", kc[0]);
         out.put("kucun更新", kc[1]);
+        out.put("kucun清理孤儿行", kc[2]);
         out.put("缺批号出库行", fifo.blankRows);
         out.put("缺批号回写行", fifo.writtenBack);
         out.put("跨批未回写行", fifo.crossLot);
         out.put("超发行数", fifo.overIssued);
-        log.info("[月结] {} 完成:键 {} · 结转行 {} · 入 {} · 出 {} · 结存 {} · kucun 新增{}/更新{}",
-                p, lines.size(), carryRows, sumIn, sumOut, sumEnd, kc[0], kc[1]);
+        log.info("[月结] {} 完成:键 {} · 结转行 {} · 入 {} · 出 {} · 结存 {} · kucun 新增{}/更新{}/孤儿清零{}",
+                p, lines.size(), carryRows, sumIn, sumOut, sumEnd, kc[0], kc[1], kc[2]);
         return out;
     }
 
@@ -433,7 +452,10 @@ public class StockMonthCloseService {
     /**
      * 按流水把 kucun 重算到期末(用户三步里的 ②③):有则 UPDATE、无则 INSERT。
      * rkl/ckl = 截至期末的累计入/出(与审核钩子同口径),yl = 累计入 − 累计出(= 期末结存)。
-     * 只处理流水里出现过的键,不做全表刷。必须在 FIFO 回写之后调用(见类注释的计算顺序)。
+     * 只处理流水里出现过的键(不做全表刷),**外加**一步孤儿行清零(见方法内注释)。
+     * 必须在 FIFO 回写之后调用(见类注释的计算顺序)。
+     *
+     * @return {@code [新增行数, 更新行数, 孤儿清零行数]}
      */
     private int[] reconcileKucun(LocalDate endEx, String user) {
         List<Map<String, Object>> rows = jdbc.queryForList(
@@ -462,7 +484,25 @@ public class StockMonthCloseService {
                 ins++;
             } else upd += n;
         }
-        return new int[]{ins, upd};
+        // 孤儿行清理(2026-10-15 补):**走审核钩子写入的 kucun 行必然有配套流水**
+        //   (StockLedgerService.apply 在同一事务里既改 kucun 又写 inh/outh)⇒ 一个 `asp_user1 LIKE 'stock:%'`
+        //   的键如果在流水里**一条都没有**,只可能是「流水被改了批号(换键)」留下的残影:
+        //   重算只做 upsert、不清旧键 ⇒ 同一批货会在新旧两个键上各算一次(实测正式库 260 行 / +135 万)。
+        //   这里把这类行**清零**(不删除,留痕:asp_user2 记为 who/when 清过),q/c 来源(不良品处理不走流水,
+        //   见坑 4)与期初导入行**不动**。
+        int purged = jdbc.update(
+                "UPDATE kucun SET rkl = 0, ckl = 0, yl = 0, update_date = GETDATE(), asp_user2 = ?, asp_time2 = GETDATE()"
+                        + " WHERE ISNULL(asp_user1, N'') LIKE 'stock:%'"
+                        + "   AND NOT EXISTS (SELECT 1 FROM inh x WHERE ISNULL(RTRIM(x.物料编码),N'') = kucun.wzdm"
+                        + "        AND ISNULL(RTRIM(x.仓库编码),N'') = kucun.ckdm"
+                        + "        AND ISNULL(RTRIM(x.批号),N'') = ISNULL(RTRIM(kucun.lot_no),N'')"
+                        + "        AND ISNULL(x.asp_cancel,'N') <> 'Y' AND ISNULL(x.单据类型,'') <> N'" + CARRY_TYPE + "' AND x.单据日期 < ?)"
+                        + "   AND NOT EXISTS (SELECT 1 FROM outh y WHERE ISNULL(RTRIM(y.物料编码),N'') = kucun.wzdm"
+                        + "        AND ISNULL(RTRIM(y.仓库编码),N'') = kucun.ckdm"
+                        + "        AND ISNULL(RTRIM(y.批号),N'') = ISNULL(RTRIM(kucun.lot_no),N'')"
+                        + "        AND ISNULL(y.asp_cancel,'N') <> 'Y' AND y.单据日期 < ?)",
+                "orphan-purge:" + user, endEx, endEx);
+        return new int[]{ins, upd, purged};
     }
 
     // ==================== 展开明细(报表用) ====================
