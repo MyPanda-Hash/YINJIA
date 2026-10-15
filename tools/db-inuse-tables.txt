@@ -133,6 +133,8 @@ table:qc_proc_insp_detail   # 制程检验单行表——面板 QC_PROC_INSP 明
 table:qc_proc_insp_head   # 制程检验单头表——面板 QC_PROC_INSP(2026-10-12 按《生产相关品质检验.xlsx》第3步建;检验类别区分 首件检验/制程检验;报工审核可自动生成)
 table:qc_fin_spec_detail   # 成品检验规范行表——面板 QC_FIN_SPEC 明细(按 表区 分三块:修订履历/检验项目/处理方式;「检验对象」列区分子节;migrate-qc-fin-spec.sql 新建)
 table:qc_fin_spec_head   # 成品检验规范头表——面板 QC_FIN_SPEC(8 份受控文件归纳的统一格式:修订履历+正文五段+检验项目分节+处理方式;报工审核自动生成草稿;migrate-qc-fin-spec.sql 新建)
+table:qc_first_insp_head   # 首件检验单头表——面板 QC_FIRST_INSP(2026-10-15;实现方式照组装成品检验单;本(工单号,批次号,工单行号)第一张报工审核时自动出草稿;migrate-first-insp.sql 新建)
+table:qc_first_insp_detail   # 首件检验单行表——面板 QC_FIRST_INSP 明细(检验项目/检验要求/检验方法/检查频率/实测数值/测量值1..5/结果判断;生成时按《成型工艺清单》RD_MOLD_PROC 的检验要求预铺 5 项)
 table:qc_return   # 暂收退料单头表——面板 QC_RETURN;退货类型/仓库/供应商代码
 table:qc_return_detail   # 暂收退料单行表——面板 QC_RETURN 明细
 table:qc_scp   # 试产材料使用申请单头表——面板 QC_SCP

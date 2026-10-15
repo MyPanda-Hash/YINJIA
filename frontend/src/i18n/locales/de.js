@@ -1,6 +1,12 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 首件检验单(QC_FIRST_INSP,2026-10-15)----
+    "首件检验单": "Erstmusterprüfblatt",
+    "取成型工艺清单": "Aus Formprozessblatt übernehmen",
+    "该产品没有成型工艺清单": "Für dieses Produkt gibt es kein Formprozessblatt",
+    "取成型工艺清单失败": "Formprozessblatt konnte nicht übernommen werden",
+    "已按成型工艺清单": "Aus dem Formprozessblatt übernommen",
     '待超级管理员批准': 'Wartet auf Genehmigung des Superadministrators',
     '单据已批准': 'Dokument genehmigt',
     /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */

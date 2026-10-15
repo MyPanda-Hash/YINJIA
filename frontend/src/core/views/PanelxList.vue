@@ -7095,6 +7095,39 @@ async function onButton(action) {
     woPickerVisible.value = true
     return
   }
+  // 取成型工艺清单(2026-10-15):**首件检验单专用** —— 按本单「产品编码」从《成型工艺清单》
+  // (RD_MOLD_PROC)取回该产品「检验要求」区块的 5 个检验项目(炭棒尺寸/密度管控/跌落强度/
+  // 抗压强度/压降)带入明细。用户口径:「检验方式参考成型工艺清单内的检验要求进行编写」。
+  // 与「取出货检验计划」共用同一套带入逻辑(applyShipPlanItems):字段名一致(表区/检验项目/
+  // 检验要求),同样**追加不覆盖**、同样先与明细已有项目对账去重。
+  // 报工审核自动出单时后端已按同一来源预铺过一次(ButtonService.firstInspGenerate),
+  // 这个按钮用于工艺清单后补/改版后重新带入。
+  if (action === '取成型工艺清单') {
+    const code = String(cur.value?.['产品编码'] || '').trim()
+    if (!code) return ElMessage.warning(tt('请先填写产品编码'))
+    try {
+      const res = await request.get('/qc/firstInsp/fromMoldProc', { params: { productCode: code } })
+      const data = res.data || {}
+      const rows = data.rows || []
+      if (!data.moldProcNo || !rows.length) {
+        return ElMessage.warning(`${tt('该产品没有成型工艺清单')}：${code}`)
+      }
+      const r = applyShipPlanItems(rows)
+      if (!r.added) {
+        return ElMessage.warning(
+          `${tt('该产品')}${code}${tt('的检验项目已全部带入')}(${r.dupes.length})${tt('，不重复添加')}`)
+      }
+      const dupTip = r.dupes.length
+        ? `，${tt('跳过已带入')}${r.dupes.length}${tt('项(带入结果)')}`
+        : ''
+      ElMessage.success(
+        `${tt('已按成型工艺清单')} ${data.moldProcNo} ${tt('带入')} ${r.added}/${r.total} ${tt('行(带入结果)')}` +
+        `${dupTip}${tt('，请填写实测数值与判定')}`)
+    } catch (error) {
+      ElMessage.error(engine.errMsg(error) || tt('取成型工艺清单失败'))
+    }
+    return
+  }
   // 取出货检验计划(2026-10-13):**制程检验单专用** —— 按本单的「产品编码」从出货检验计划表
   // (RD_INSP_PLAN,文档编号 YJ-RD001)取回该产品的检验项目,追加到明细。
   // 用户口径:「实现对应的产品编码就能获取到对应的检验内容进行填入」。

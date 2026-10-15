@@ -323,6 +323,11 @@ export const menuTree = [
         // (tools/migrate-drop-qc-unused-panels-20261009.sql),不是摘菜单,放开注释也恢复不了;
         // 本组现役只剩下面三张工序检验单(远端 9.29 批次④新增,与本地下架不冲突)。
         code: 'process', title: '制程品质', children: [
+          // 首件检验单(2026-10-15 新增,面板 QC_FIRST_INSP):按《生产相关品质检验.xlsx》Sheet1 第2步
+          // 「车间生产(首批,每天一个生产批次)→ 首件检验」建,实现方式照成品检验单(QC_ASM_INSP)。
+          // 本(工单号,批次号,工单行号)的**第一张报工**审核时自动出一张草稿,检验要求按
+          // 《成型工艺清单》RD_MOLD_PROC 的检验要求区块预铺。置首位 = 流程上最早的一道检验。
+          { code: 'qcFirstInsp', title: '首件检验单', path: '/panelx/list/QC_FIRST_INSP', icon: 'DocumentChecked', panelCode: 'QC_FIRST_INSP', operationName: '新增流程' },
           // 制程检验单(2026-10-12 新增,面板 QC_PROC_INSP):按《生产相关品质检验.xlsx》第3步建。
           // 表样=截图「制程检验」页签:外观/尺寸/出货重量 三组 + 出货检验功能性测试组(用「表区」区分)。
           // 检验类别字段区分「首件检验(第2步)」与「制程检验(第3步)」。

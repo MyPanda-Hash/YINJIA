@@ -2794,7 +2794,9 @@ public class ButtonService {
             "QC_MOLD_INSP", "qc_mold_insp_head", "QC_CUT_INSP", "qc_cut_insp_head", "QC_ASM_INSP", "qc_asm_insp_head",
             // 成品检验规范(2026-10-09):与三张检验单共用同一套「报工弃审 → 作废草稿 + 释放占用链」;
             // 放进本表即可被 woInspUnauditCascade 的 tbl 解析命中(明细表名由 _head→_detail 推导)。
-            "QC_FIN_SPEC", "qc_fin_spec_head");
+            "QC_FIN_SPEC", "qc_fin_spec_head",
+            // 首件检验单(2026-10-15):同一套占用链 —— 报工弃审时随三张工序检验单一起作废。
+            "QC_FIRST_INSP", "qc_first_insp_head");
 
     /** 成品检验规范面板/表(2026-10-09 用户任务:8 份受控文件归纳的统一文档格式,组装报工审核时一并生成) */
     private static final String FIN_SPEC_PANEL = "QC_FIN_SPEC";
@@ -2815,6 +2817,11 @@ public class ButtonService {
         for (Map<String, Object> r : rows) {
             String op = String.valueOf(r.get("工序")).trim();
             String target = WO_INSP_PANEL.get(op);
+            // 首件检验单(2026-10-15 用户口径「数据来源于当前生产工单的单据当前批次第一次报工产生」):
+            //   判据是「本(工单号,批次号,工单行号)还没有更早的已审核报工」,与工序无关 ——
+            //   混料/装箱这些不出工序检验单的报工同样能被算作"本批第一张报工",所以必须放在
+            //   下面那句 `if (target == null) continue;` **之前**。
+            firstInspGenerate(r, repNo, user);
             if (target == null) continue;                                     // 混料/装箱:本批不出检验单
             Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM " + WO_INSP_HEAD.get(target)
                     + " WHERE 报工单号=? AND ISNULL(asp_cancel,'N')<>'Y'", Integer.class, repNo);
@@ -2867,6 +2874,97 @@ public class ButtonService {
         }
     }
 
+    /** 首件检验单面板 / 头表(2026-10-15;生成见 {@link #firstInspGenerate}) */
+    private static final String FIRST_INSP_PANEL = "QC_FIRST_INSP";
+    private static final String FIRST_INSP_HEAD = "qc_first_insp_head";
+
+    /**
+     * 报工审核 → **首件检验单**(用户 2026-10-15 口径:「当前增加首件检验,实现方式参考成品检验单,
+     * 首件检验的数据来源于当前生产工单的单据当前批次第一次报工产生,检验方式参考成型工艺清单内的
+     * 检验要求进行编写」)。
+     *
+     * <p><b>触发判据</b> = 本(工单号, 批次号, 工单行号)还没有**更早的已审核报工** ⇒ 这一张就是
+     * 「当前批次第一次报工」。刻意**不按工序**判:混料/装箱这些不出工序检验单的报工同样算数,
+     * 否则本批真正的第一张报工落在混料上时就永远出不了首件检验单。</p>
+     *
+     * <p><b>数据来源</b>:表头照抄本张报工(工单号 / 工单行号 / 报工单号 / 工序 / 批次号 /
+     * 产品编码 / 产品名称 / 规格型号 / 生产线 / 生产车间 / 报工数量);明细按《成型工艺清单》
+     * RD_MOLD_PROC 的「检验要求」区块预铺 5 个检验项目(炭棒尺寸 / 密度管控 / 跌落强度 /
+     * 抗压强度 / 压降,见 {@link FirstInspItems})—— 这是与三张工序检验单「明细恒空」
+     * (2026-10-15 口径)的**唯一**差别,依据就是上面那句「检验方式参考成型工艺清单内的检验要求」。
+     * 工艺清单尚未维护时,铺出来的是一张只有项目名的清单,品质可在单上点「取成型工艺清单」重新带入。</p>
+     *
+     * <p><b>幂等</b>:同一 (工单号, 批次号, 工单行号) 已有存活首件检验单则跳过;占用链
+     * WO_REPORT → QC_FIRST_INSP 与其它检验单同一套,报工弃审时一起作废、可再次生成。</p>
+     */
+    private void firstInspGenerate(Map<String, Object> r, String repNo, String user) {
+        String wo = str(r.get("工单号"));
+        String batch = str(r.get("批次号"));
+        if (wo.isEmpty() || batch.isEmpty()) return;              // 没有批次就谈不上"本批第一张"
+        long curId = r.get("id") instanceof Number n ? n.longValue() : 0L;
+
+        // 工单行:优先 scjl.[工单行号](2026-10-15 起审核时写定),缺了用 gd_id/批次反查
+        Integer ownXc = r.get("own_xc") == null ? null : ((Number) r.get("own_xc")).intValue();
+        Map<String, Object> prow = resolveWoRow(wo, (long) numOr(r.get("gd_id")), batch);
+        if ((ownXc == null || ownXc == 0) && prow != null && prow.get("pl_xc") != null) {
+            ownXc = ((Number) prow.get("pl_xc")).intValue();
+        }
+        int xc = ownXc == null ? 0 : ownXc;
+        long plangRowId = prow == null || prow.get("id") == null ? 0L : ((Number) prow.get("id")).longValue();
+
+        // 本批是否已有更早的已审核报工(同 WoReportService 的行锚口径:先 gd_id→plang_id,再回退批次)
+        Integer prior = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM dbo.scjl s"
+                        + " WHERE s.gldh=? AND ISNULL(s.asp_cancel,'N')<>'Y' AND ISNULL(s.wgzt,'N')='Y'"
+                        + "   AND s.id<>? AND ISNULL(s.[批次号],N'')=?"
+                        + "   AND (? = 0"
+                        + "        OR ISNULL(s.[工单行号],0) = ?"
+                        + "        OR (? > 0 AND EXISTS (SELECT 1 FROM dbo.plang_pc pc"
+                        + "                              WHERE pc.id = s.gd_id AND pc.plang_id = ?)))",
+                Integer.class, wo, curId, batch, xc, xc, plangRowId, plangRowId);
+        if (prior != null && prior > 0) return;                   // 本批已有更早的已审核报工 ⇒ 首件已过
+
+        Integer dup = jdbc.queryForObject("SELECT COUNT(*) FROM dbo." + FIRST_INSP_HEAD
+                        + " WHERE 工单号=? AND ISNULL(批次号,N'')=? AND ISNULL(工单行号,0)=?"
+                        + "   AND ISNULL(asp_cancel,'N')<>'Y'",
+                Integer.class, wo, batch, xc);
+        if (dup != null && dup > 0) return;                       // 幂等
+
+        String today = LocalDate.now().toString();
+        String productCode = str(r.get("产品编码"));
+        FirstInspItems.Result items = FirstInspItems.load(jdbc, productCode);
+
+        Map<String, Object> head = new LinkedHashMap<>();
+        head.put("单据日期", today);
+        head.put("检验日期", today);
+        head.put("工单号", wo);
+        if (xc != 0) head.put("工单行号", xc);
+        head.put("报工单号", repNo);
+        head.put("工序", r.get("工序"));
+        head.put("批次号", batch);
+        head.put("产品编码", productCode);
+        head.put("产品名称", r.get("产品名称"));
+        if (!str(r.get("规格型号")).isEmpty()) head.put("规格型号", r.get("规格型号"));
+        String line = str(r.get("生产线"));
+        if (!line.isEmpty()) {
+            head.put("生产线", line);
+            String shop = lineShop(line);
+            if (shop != null) head.put("生产车间", shop);
+        }
+        head.put("报工数量", r.get("报工数量"));
+        if (items.docNo() != null) head.put("工艺清单单号", items.docNo());
+        head.put("检验员", user);
+        head.put("detail", Map.of("items", items.rows()));
+        Map<String, Object> saved = save(registry.panel(FIRST_INSP_PANEL), head, false);
+        String no = str(saved.get("编号"));
+        jdbc.update("INSERT INTO form_flow_link (source_panel_code, source_form_no, source_line_key,"
+                        + " target_panel_code, target_form_no, link_status, create_by, create_time)"
+                        + " VALUES ('WO_REPORT', ?, ?, ?, ?, 'ACTIVE', ?, GETDATE())",
+                repNo, repNo + "#" + curId, FIRST_INSP_PANEL, no, user);
+        log.info("[首件检验] 报工 {} 是工单 {} 批次 {} 的第一张报工 ⇒ 生成首件检验单 {}(工艺清单 {})",
+                repNo, wo, batch, no, items.docNo() == null ? "无" : items.docNo());
+    }
+
     /**
      * 组装报工审核 → 生成「成品检验规范」**空格式**草稿(用户:「文件中的数据不重要,主要是格式实现」)。
      * <p>只带表头(工单号/报工单号/产品编码/产品名称/规格型号/批次号 + 文件名称/版本版次/管控状态/发行日期)
@@ -2917,7 +3015,7 @@ public class ButtonService {
         List<Map<String, Object>> links = jdbc.queryForList(
                 "SELECT target_panel_code, target_form_no FROM form_flow_link"
                         + " WHERE source_panel_code='WO_REPORT' AND source_form_no=?"
-                        + "   AND target_panel_code IN ('QC_MOLD_INSP','QC_CUT_INSP','QC_ASM_INSP','QC_FIN_SPEC')"
+                        + "   AND target_panel_code IN ('QC_MOLD_INSP','QC_CUT_INSP','QC_ASM_INSP','QC_FIN_SPEC','QC_FIRST_INSP')"
                         + "   AND link_status='ACTIVE'", repNo);
         for (Map<String, Object> l : links) {
             String p = String.valueOf(l.get("target_panel_code"));

@@ -1,6 +1,12 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 首件检验单(QC_FIRST_INSP,2026-10-15)----
+    "首件检验单": "Fiche de contrôle de la première pièce",
+    "取成型工艺清单": "Reprendre depuis la fiche de process de moulage",
+    "该产品没有成型工艺清单": "Ce produit n'a pas de fiche de process de moulage",
+    "取成型工艺清单失败": "Échec de la reprise depuis la fiche de process de moulage",
+    "已按成型工艺清单": "Repris depuis la fiche de process de moulage",
     '待超级管理员批准': 'En attente d\'approbation du super-administrateur',
     '单据已批准': 'Document approuvé',
     /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */

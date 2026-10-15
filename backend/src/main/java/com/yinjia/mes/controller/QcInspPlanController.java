@@ -49,7 +49,7 @@ public class QcInspPlanController {
      * 只要用户能看见其中任意一张检验单,就有权读写这套检验标准库。
      */
     private static final java.util.List<String> PANELS =
-            java.util.List.of("QC_ASM_INSP", "QC_MOLD_INSP", "QC_CUT_INSP", "QC_PROC_INSP");
+            java.util.List.of("QC_ASM_INSP", "QC_MOLD_INSP", "QC_CUT_INSP", "QC_PROC_INSP", "QC_FIRST_INSP");
 
     /** 任一检验单可见即放行 */
     private void requireAnyPanelView() {

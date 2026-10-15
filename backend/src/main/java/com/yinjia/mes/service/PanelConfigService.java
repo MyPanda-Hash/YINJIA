@@ -471,8 +471,18 @@ public class PanelConfigService {
                     //   —— 四张单的明细列已统一为 检验项目/检验要求/检验方法/检查频率(yj_field 同名),
                     //   与计划表的 控制项目/控制标准及要求/控制方法/检测频率 一一对应,故入口一并下发。
                     if (!merged.contains("取出货检验计划")) {
-                        int at = merged.indexOf("检验项目/检验方案");   // 排在它之前(按产品取现成计划更常用)
-                        merged.add(at < 0 ? anchor + 1 : at, "取出货检验计划");
+                        // 首件检验单不在 SHIP_PLAN_PANELS 内(来源是成型工艺清单,不是出货检验计划)
+                        if (SHIP_PLAN_PANELS.contains(def.code())) {
+                            int at = merged.indexOf("检验项目/检验方案");   // 排在它之前(按产品取现成计划更常用)
+                            merged.add(at < 0 ? anchor + 1 : at, "取出货检验计划");
+                        }
+                    }
+                    // 2026-10-15:首件检验单的检验要求来自《成型工艺清单》RD_MOLD_PROC(用户口径
+                    //   「检验方式参考成型工艺清单内的检验要求进行编写」)—— 与「取出货检验计划」同位,
+                    //   但只下发到这一张单。
+                    if (FIRST_INSP_PANEL.equals(def.code()) && !merged.contains("取成型工艺清单")) {
+                        int at = merged.indexOf("检验项目/检验方案");
+                        merged.add(at < 0 ? anchor + 1 : at, "取成型工艺清单");
                     }
                     // 2026-10-15:制程检验单再加「选生产工单」(用户口径「选择生产工单加工单行号唯一确定
                     // 当前的生产工单」)—— 排在「取出货检验计划」之前:先按工单行建单,再带检验项目。
@@ -1644,7 +1654,18 @@ public class PanelConfigService {
      * 三张单同构、共用同一套检验标准库(bs_qc_plan + bs_qc_item),故三处都注入(组装单是主入口)。
      */
     private static final java.util.Set<String> WO_INSP_PANELS =
+            java.util.Set.of("QC_MOLD_INSP", "QC_CUT_INSP", "QC_ASM_INSP", "QC_PROC_INSP", "QC_FIRST_INSP");
+
+    /**
+     * 「取出货检验计划」(RD_INSP_PLAN)入口下发的面板集 —— **不含首件检验单**:
+     * 首件检验的检验要求来自《成型工艺清单》RD_MOLD_PROC(见 {@link #FIRST_INSP_PANEL}),
+     * 走「取成型工艺清单」另一个入口;把出货检验计划也挂上去只会让品质点错来源。
+     */
+    private static final java.util.Set<String> SHIP_PLAN_PANELS =
             java.util.Set.of("QC_MOLD_INSP", "QC_CUT_INSP", "QC_ASM_INSP", "QC_PROC_INSP");
+
+    /** 首件检验单(2026-10-15):工具栏注入「取成型工艺清单」入口 */
+    private static final String FIRST_INSP_PANEL = "QC_FIRST_INSP";
     /** 检验项标准库编码(检验数据记录 QC_INSP_REC 的「检验项」字段 dict_sql 就是它) */
     private static final String QC_INSP_ITEM_LIB = "qc.insp_item";
 

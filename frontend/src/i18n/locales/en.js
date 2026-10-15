@@ -45,6 +45,12 @@ export default {
     logout: 'Sign out',
   },
   biz: {
+    // ---- 首件检验单(QC_FIRST_INSP,2026-10-15)----
+    "首件检验单": "First Article Inspection Sheet",
+    "取成型工艺清单": "Fetch from Molding Process Sheet",
+    "该产品没有成型工艺清单": "No molding process sheet for this product",
+    "取成型工艺清单失败": "Failed to fetch the molding process sheet",
+    "已按成型工艺清单": "Fetched from molding process sheet",
     '完工明细': 'Completion Details',
     '按工序汇总': 'Summary by Operation',
     '完工记录': 'Completion Records',

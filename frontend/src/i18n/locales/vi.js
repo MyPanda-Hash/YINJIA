@@ -1,6 +1,12 @@
 /** 自动合并(ours+theirs 词条并集) */
 export default {
   biz: {
+    // ---- 首件检验单(QC_FIRST_INSP,2026-10-15)----
+    "首件检验单": "Phiếu kiểm tra chi tiết đầu tiên",
+    "取成型工艺清单": "Lấy từ phiếu công nghệ tạo hình",
+    "该产品没有成型工艺清单": "Sản phẩm này không có phiếu công nghệ tạo hình",
+    "取成型工艺清单失败": "Không lấy được phiếu công nghệ tạo hình",
+    "已按成型工艺清单": "Đã lấy theo phiếu công nghệ tạo hình",
     '待超级管理员批准': 'Chờ quản trị viên cấp cao phê duyệt',
     '单据已批准': 'Chứng từ đã được phê duyệt',
     /* ── 特采单两级审批(2026-10-04):编制=提交审批的人 / 审核=一级审批通过的人 / 批准=超级管理员 ── */
