@@ -1113,6 +1113,7 @@ export default {
     '列': 'cols',
     '库存状况表': 'Stock Balance',
     '库存明细': 'Stock Detail',
+    '月末结转': ' month-end carry-forward',
     '上月无出入库单据': 'No inbound/outbound documents last month',
     '上月期末结存为 0,无结转行': 'Closing balance of last month was 0, so there is no carry-forward row',
     '上月未月结,以下陈列该月原始单据': 'Last month is not closed; the original documents of that month are listed below',

@@ -327,6 +327,7 @@ export default {
     '列': 'col.',
     '库存状况表': 'État du Stock',
     '库存明细': 'Détail du Stock',
+    '月末结转': ' report de fin de mois',
     '上月无出入库单据': 'Aucun document d’entrée/sortie le mois précédent',
     '上月期末结存为 0,无结转行': 'Le solde final du mois précédent était 0 : aucune ligne de report',
     '上月未月结,以下陈列该月原始单据': 'Le mois précédent n’est pas clôturé ; les documents d’origine de ce mois sont listés ci-dessous',

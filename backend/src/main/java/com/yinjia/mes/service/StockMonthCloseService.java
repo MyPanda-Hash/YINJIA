@@ -535,6 +535,7 @@ public class StockMonthCloseService {
         // 仍然保留按批号查的能力(传了具体批号就按批号过滤),给以后"按批展开"留口子。
         String lotArg = ("*".equals(l) || l.isEmpty()) ? null : l;
         LocalDate prevStart = periodStart(prev), prevEndEx = periodEndExclusive(prev);
+        LocalDate curStart = periodStart(cur), curEndEx = periodEndExclusive(cur);
         String prevState = periodState(prev);
 
         Map<String, Object> out = new LinkedHashMap<>();
@@ -552,6 +553,9 @@ public class StockMonthCloseService {
                 lotArg == null ? new Object[]{prev, w, c} : new Object[]{prev, w, c, lotArg});
         // 月结汇总只在**月结生效中**才展示:已取消时该次汇总已被撤销,界面改为陈列该月原始单据
         // (用户 2026-10-15 第三轮口径),不然"已取消"和一组汇总数字并排会让人以为月结还在。
+        // 「期初数量」的口径说明(用户第十二轮点名):它 = **上上个月(如 8 月)的月末结转**,
+// 也就是被结那个月(如 9 月)的期初。前端把它显示在数字后面,免得看的人以为它是本月数。
+        out.put("期初月份", YearMonth.parse(prev, PERIOD_FMT).minusMonths(1).format(PERIOD_FMT));
         out.put("月结快照", "已月结".equals(prevState) && !snap.isEmpty() ? snap.get(0) : null);
 
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -571,9 +575,12 @@ public class StockMonthCloseService {
             // 上月未月结/已取消 ⇒ 陈列上月的原始单据(入库正、出库负)
             rows.addAll(flowRows(prevStart, prevEndEx, w, c, lotArg));
         }
-        // ⚠ **不再铺当月的单据**(用户 2026-10-15 截图口径:「只要上一个月的结转,就是 9 月的」):
-        //   展开 = 这一行的**余额来源** —— 上月已月结就是那张结转单(一行,如 `2026-09月结 / JZ-202609 / 15000`);
-        //   上月没结/被取消才退回陈列上月的原始单据。当月单据属于下一个月结,列在这里只会淹掉那一行。
+        // **当月单据要展开**(用户 2026-10-15 第十二轮:「当月单据要有…10 月的数据要展开」)——
+        //   展开 = 上月的结转行(余额来源;它的"期初数量"= 上上个月如 8 月的月末结转)
+        //        + 当月的出入库单据(本月动了什么),一张表按日期排。
+        //   结转行本身不进累计口径(v_stock_movement 已排除),所以这里只是"看单据",不参与任何合计。
+        //   ⚠ 第八轮曾只留结转行(用户当时截图口径),第十二轮按用户要求把当月单据加回 —— 别再删了。
+        rows.addAll(flowRows(curStart, curEndEx, w, c, lotArg));
         rows.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("单据日期")))
                 .thenComparing(r -> String.valueOf(r.get("单据类型"))));
         out.put("单据明细", rows);

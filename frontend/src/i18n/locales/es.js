@@ -327,6 +327,7 @@ export default {
     '列': 'cols.',
     '库存状况表': 'Estado de Stock',
     '库存明细': 'Detalle de Inventario',
+    '月末结转': ' arrastre de fin de mes',
     '上月无出入库单据': 'No hay documentos de entrada/salida el mes anterior',
     '上月期末结存为 0,无结转行': 'El saldo final del mes anterior fue 0, no hay línea de arrastre',
     '上月未月结,以下陈列该月原始单据': 'El mes anterior no está cerrado; abajo se listan los documentos originales de ese mes',

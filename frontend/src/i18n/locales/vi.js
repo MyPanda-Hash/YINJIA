@@ -317,6 +317,7 @@ export default {
     '列': 'cột',
     '库存状况表': 'Tình trạng kho',
     '库存明细': 'Chi tiết tồn kho',
+    '月末结转': ' kết chuyển cuối tháng',
     '上月无出入库单据': 'Tháng trước không có chứng từ nhập/xuất',
     '上月期末结存为 0,无结转行': 'Tồn cuối kỳ tháng trước bằng 0, không có dòng kết chuyển',
     '上月未月结,以下陈列该月原始单据': 'Tháng trước chưa kết chuyển; dưới đây là chứng từ gốc của tháng đó',

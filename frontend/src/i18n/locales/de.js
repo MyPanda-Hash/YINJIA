@@ -330,6 +330,7 @@ export default {
     '列': 'Spalten',
     '库存状况表': 'Lagerbestand',
     '库存明细': 'Bestandsdetail',
+    '月末结转': ' Monatsendübertrag',
     '上月无出入库单据': 'Im Vormonat keine Zu-/Abgangsbelege',
     '上月期末结存为 0,无结转行': 'Der Endbestand des Vormonats war 0, daher keine Übertragszeile',
     '上月未月结,以下陈列该月原始单据': 'Der Vormonat ist nicht abgeschlossen; unten stehen die Originalbelege jenes Monats',

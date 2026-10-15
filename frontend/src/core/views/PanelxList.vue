@@ -551,7 +551,12 @@
                   {{ tt('月结状态') }}:{{ mcDetail[row.id]['上月状态'] }}
                 </div>
                 <div v-if="mcDetail[row.id]['月结快照']" class="mc-detail-snap">
-                  <span class="mc-snap-item"><b>{{ tt('期初数量') }}</b>{{ mcDetail[row.id]['月结快照']['期初数量'] ?? '—' }}</span>
+                  <!-- 「期初数量」= 上上个月(如 8 月)的月末结转,也就是被结那个月(9 月)的期初 ——
+                       用户第十二轮点名,故把来源月份写在数字后面,免得被当成本月数 -->
+                  <span class="mc-snap-item">
+                    <b>{{ tt('期初数量') }}</b>{{ mcDetail[row.id]['月结快照']['期初数量'] ?? '—' }}
+                    <i class="mc-snap-note">({{ mcDetail[row.id]['期初月份'] }}{{ tt('月末结转') }})</i>
+                  </span>
                   <span class="mc-snap-item"><b>{{ tt('入库数量') }}</b>{{ mcDetail[row.id]['月结快照']['入库数量'] ?? '—' }}</span>
                   <span class="mc-snap-item"><b>{{ tt('出库数量') }}</b>{{ mcDetail[row.id]['月结快照']['出库数量'] ?? '—' }}</span>
                   <span class="mc-snap-item"><b>{{ tt('结存数量') }}</b>{{ mcDetail[row.id]['月结快照']['结存数量'] ?? '—' }}</span>
@@ -8984,6 +8989,7 @@ onUnmounted(() => {
 .mc-detail-title { font-size: 13px; font-weight: 600; color: #1f2937; margin-bottom: 6px; }
 .mc-detail-snap { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; font-size: 12px; color: #334155; }
 .mc-detail-snap.mc-dim { color: #94a3b8; }
+.mc-snap-note { font-style: normal; color: #94a3b8; font-size: 11px; }
 .mc-snap-item b { color: #64748b; font-weight: 500; margin-right: 4px; }
 .mc-detail-tables { display: flex; flex-wrap: wrap; gap: 12px; }
 .mc-detail-block { flex: 1 1 320px; min-width: 300px; }
