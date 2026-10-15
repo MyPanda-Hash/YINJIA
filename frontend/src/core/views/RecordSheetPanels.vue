@@ -270,9 +270,13 @@
           </tr>
 
           <!-- 单元格网格行(成型工艺:产品基本信息两行式/工序阶段块/列标题行)——
-               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化) } 逐格铺 sec.cols
+               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化), ro(只读展示)} 逐格铺 sec.cols
                row.h = 该行**最小行高**(2026-10-16:产品变更申请单表头空白时被压得很扁,
-               用户口径「不要压这么扁,适当拉长看起来协调一点」⇒ 配置可给行高,内容多了仍自由撑开) -->
+               用户口径「不要压这么扁,适当拉长看起来协调一点」⇒ 配置可给行高,内容多了仍自由撑开)
+               cell.ro = 该格只读展示(2026-10-16 用户口径「表头…这个字段怎么能修改了」:
+               系统自己管的字段(单据编号/申请人之类)在纸面上不该给输入框 ——
+               yj_field.editable=0 不敢全库照用(产品信息表的产品编号/名称就靠纸面录入),
+               故由**配置逐格**声明,零波及面) -->
           <tr v-else-if="row.grid" :style="row.h ? { height: row.h + 'px' } : null">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
@@ -311,7 +315,7 @@
                     >{{ tt(o) }}</el-checkbox>
                   </span>
                 </template>
-                <template v-else-if="editable && c.key">
+                <template v-else-if="editable && c.key && !c.ro">
                   <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->
@@ -772,9 +776,13 @@
           </tr>
 
           <!-- 单元格网格行(成型工艺:产品基本信息两行式/工序阶段块/列标题行)——
-               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化) } 逐格铺 sec.cols
+               cell = {label|key/fixed, type, span, rowspan, cap(灰表头样式弱化), ro(只读展示)} 逐格铺 sec.cols
                row.h = 该行**最小行高**(2026-10-16:产品变更申请单表头空白时被压得很扁,
-               用户口径「不要压这么扁,适当拉长看起来协调一点」⇒ 配置可给行高,内容多了仍自由撑开) -->
+               用户口径「不要压这么扁,适当拉长看起来协调一点」⇒ 配置可给行高,内容多了仍自由撑开)
+               cell.ro = 该格只读展示(2026-10-16 用户口径「表头…这个字段怎么能修改了」:
+               系统自己管的字段(单据编号/申请人之类)在纸面上不该给输入框 ——
+               yj_field.editable=0 不敢全库照用(产品信息表的产品编号/名称就靠纸面录入),
+               故由**配置逐格**声明,零波及面) -->
           <tr v-else-if="row.grid" :style="row.h ? { height: row.h + 'px' } : null">
             <template v-for="(c, ci) in row.grid" :key="'g' + ci">
               <td v-if="c.label" class="rs-td rs-label" :colspan="c.span || 1" :rowspan="c.rowspan || 1"
@@ -813,7 +821,7 @@
                     >{{ tt(o) }}</el-checkbox>
                   </span>
                 </template>
-                <template v-else-if="editable && c.key">
+                <template v-else-if="editable && c.key && !c.ro">
                   <el-input v-if="c.area" v-model="head[c.key]" type="textarea" :autosize="{ minRows: c.rows || 1, maxRows: 6 }" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <el-input v-else v-model="head[c.key]" size="small" :maxlength="c.max || 2000" :placeholder="c.ph ? tt(c.ph) : ''" class="rs-t-in" @input="emit('dirty')" />
                   <!-- 标准库型字段但版式要文本框(配料要求/热压要求):文本可自由改 + ⌄标准库 选预设 -->

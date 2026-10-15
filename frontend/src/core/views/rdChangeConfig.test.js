@@ -19,15 +19,15 @@ import { recordSheetConfigs } from './recordSheetConfigs.js'
 const panelx = readFileSync(new URL('./PanelxList.vue', import.meta.url), 'utf8')
 const devTask = readFileSync(new URL('../../../../backend/src/main/java/com/yinjia/mes/service/DevTaskService.java', import.meta.url), 'utf8')
 
-// ── 一、变更申请单:每行都要有明确的最小行高,大填写区至少两行 ──
-test('RD_CHANGE 每个表格行都给最小行高 h(>=36),大填写区 rows>=2', () => {
+// ── 一、变更申请单:每行都要有明确的最小行高,大填写区至少两行;纸要"窄而长" ──
+test('RD_CHANGE 每个表格行都给最小行高 h(>=55),大填写区 rows>=2', () => {
   const cfg = recordSheetConfigs.RD_CHANGE
   assert.ok(cfg, 'RD_CHANGE 配置必须存在')
   const rowsOf = (secs) => (secs || []).flatMap((s) => (s.rows || []).map((r) => ({ bar: s.bar, r })))
   const all = [...rowsOf(cfg.sections), ...rowsOf(cfg.tailSections)]
   assert.ok(all.length >= 12, `行数异常:${all.length}`)
-  const noH = all.filter((x) => !(Number(x.r.h) >= 36)).map((x) => x.bar)
-  assert.deepEqual(noH, [], '这些行没给行高(空白时会被压扁):' + noH.join(' / '))
+  const noH = all.filter((x) => !(Number(x.r.h) >= 55)).map((x) => x.bar)
+  assert.deepEqual(noH, [], '这些行没给足行高(空白时会被压扁):' + noH.join(' / '))
   const areas = all.filter((x) => (x.r.grid || []).some((c) => c.area))
   assert.ok(areas.length > 0, '应当存在大填写区行')
   for (const { bar, r } of areas) {
@@ -35,6 +35,30 @@ test('RD_CHANGE 每个表格行都给最小行高 h(>=36),大填写区 rows>=2',
       assert.ok(Number(c.rows) >= 2, `${bar} 的「${c.key || c.label}」大填写区要至少两行(rows>=2),否则空白时只有一行高`)
     }
   }
+})
+
+test('RD_CHANGE 纸宽:按用户口径收窄(设计 1963 → 1242),表格列宽与之对齐,行高拉长', () => {
+  const cfg = recordSheetConfigs.RD_CHANGE
+  const sum = (a) => a.reduce((x, y) => x + y, 0)
+  const gridW = sum(cfg.grid)
+  // 2026-10-16 用户口径「看起来怎么那么宽整张表,窄一点,最好是宽比长是 1:1.6」
+  assert.ok(gridW <= 1300, `网格总宽应显著小于设计原宽 1963(现 ${gridW})`)
+  const dt = cfg.dataTables[0]
+  const dtW = sum(dt.cols.filter((c) => !c.hiddenCol).map((c) => c.w || 0))
+  assert.equal(dtW, gridW, `部门评审意见表宽(${dtW})必须等于网格宽(${gridW}),否则上下竖线错位`)
+  assert.ok(Number(dt.rowH) >= 55, '数据表行高也要拉长')
+})
+
+test('RD_CHANGE 系统自管字段在纸面上只读展示(2026-10-16「这个字段怎么能修改了」)', () => {
+  const cfg = recordSheetConfigs.RD_CHANGE
+  const cells = [...cfg.sections, ...cfg.tailSections].flatMap((s) => (s.rows || []).flatMap((r) => r.grid || []))
+  for (const key of ['单据编号']) {
+    const c = cells.find((x) => x.key === key)
+    assert.ok(c, `配置里应有 ${key} 格`)
+    assert.equal(c.ro, true, `${key} 是系统自管的(yj_field editable=0),纸面上必须 ro:true 只读展示`)
+  }
+  const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  assert.match(rec, /v-else-if="editable && c\.key && !c\.ro"/, '网格格渲染要认 c.ro(否则配置里写了也不生效)')
 })
 
 test('RD_CHANGE 的数据表行也要有最小行高 rowH(空表时别压扁)', () => {

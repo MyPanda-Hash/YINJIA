@@ -306,10 +306,14 @@
                   </template>
                 </div>
               </div>
-              <!-- 四个受控文件:非该文件责任人只读时,把"责任人是谁"写在侧栏(否则用户只会觉得点不动) -->
+              <!-- 四个受控文件:非该文件责任人只读时,把"责任人是谁"写在侧栏(否则用户只会觉得点不动)。
+                   2026-10-16 用户报障「一填写保存规格书就提示报错」——真正卡点是本单的**产品编号**
+                   在分发记录里查不到(实测多为 产品编号 被手改成别的值,如把封面「编号」填成 111),
+                   而旧提示只说"尚未分发责任人",看不出是"哪张产品"。现在把后端原因(含产品编号)原样显示。 -->
               <div v-if="devFileGate?.applicable && devFileGate.canEdit === false"
                    style="font-size:12px;color:#e6a23c;line-height:1.7;padding:2px 0 6px;border-bottom:1px dashed #dcdfe6;margin-bottom:4px">
                 <div v-if="devFileGate.ownerName">{{ tt('本文件责任人') }}：{{ devFileGate.ownerName }}（{{ tt('只读') }}）</div>
+                <div v-else-if="devFileGate.reason">{{ tt(devFileGate.reason) }}</div>
                 <div v-else>{{ tt('尚未分发责任人') }}：{{ tt('请先在产品信息表点「分发责任人」') }}</div>
               </div>
               <!-- 规格书两级分发:已分配单展示归属;非 责任人∪总负责人∪管理员 只读 -->
