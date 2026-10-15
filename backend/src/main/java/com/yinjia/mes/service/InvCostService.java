@@ -2,6 +2,7 @@ package com.yinjia.mes.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +35,23 @@ import java.util.Map;
  *
  * <p>与 tools/migrate-inv-report-fields.sql 的分工:迁移建视图与物化表(不预填),
  * 本类负责运行期重算;二者口径必须一致,改动请同步该文件头部的注释。
+ *
+ * <p><b>2026-10-15 重算路径重写(两处硬伤,见 tools/archive/_stock-report-timeout/README.md §六):</b>
+ * <ol>
+ *   <li><b>慢</b>:递归段原来是 {@code FROM rec JOIN s} 而 {@code s} 是「现场查视图 + ROW_NUMBER」的 CTE,
+ *       每一轮递归都要重新求值 ⇒ 退化到分钟级。实测 5,207 行流水 / 894 分区:<b>137,320 ms</b>
+ *       (再测 141,449 ms),而本方法注释当时还写着「235 行流水,成本可忽略」。
+ *       改法:{@code SELECT … INTO #s} 落临时表 + {@code UNIQUE CLUSTERED INDEX (仓库键,存货编码,rn)},
+ *       递归段改走 seek ⇒ <b>70~302 ms</b>(约 450 倍)。</li>
+ *   <li><b>根本写不进去</b>:{@code v_stock_movement} 的入库段是裸 {@code CAST(金额 AS decimal(18,4))}
+ *       (出库段写的是 {@code CAST(0 …)}),而 {@code inh.金额} 有 NULL(实测 807 行产成品入库单)
+ *       ⇒ INSERT 撞 {@code inv_cost_ledger.收入金额 NOT NULL} 报「不能将值 NULL 插入列」,
+ *       **每次重算都回滚**,成本物化表长期 0 行、报表金额全部退化成「Σ入库金额」。
+ *       改法:在 #s 里就 {@code ISNULL(收入金额,0)}(与出库段「缺席即 0」的既有口径对齐),
+ *       并把「金额缺失行数」打进 WARN 日志 —— 口径缺口要看得见,不能静默按 0 计价。</li>
+ * </ol>
+ * 顺带把「算」与「写」分开:递归先算进 {@code #rec},再 DELETE + INSERT ⇒ 排它锁只覆盖 INSERT 那一段
+ * (实测 60 ms),报表读(三张报表都 JOIN 本表)不再被分钟级写事务堵住。
  */
 @Service
 public class InvCostService {
@@ -52,17 +70,28 @@ public class InvCostService {
     }
 
     /**
-     * 递归主体:出库按**出库前**的移动加权单价计价(结存金额/结存数量;除零则 0)。
+     * 步①:取数落临时表 #s(带行号);{@code ISNULL(收入金额,0)} 见类头 §2,{@code 缺金额} 供 WARN 统计。
+     * <p>为什么必须落表:原写法把这段当 CTE 直接喂给递归段,每轮递归都重新求值(137 s 的根源)。
+     */
+    private static final String STEP_S_INTO =
+            "SELECT src, rid, 仓库键, 存货编码, 批号, 单据日期,"
+            + " ISNULL(收入数量, 0) AS 收入数量, ISNULL(发出数量, 0) AS 发出数量, ISNULL(收入金额, 0) AS 收入金额,"
+            + " CASE WHEN 收入金额 IS NULL THEN 1 ELSE 0 END AS 缺金额,"
+            + " ROW_NUMBER() OVER (PARTITION BY 仓库键, 存货编码 ORDER BY 单据日期, src, rid) AS rn"
+            + " INTO #s FROM dbo.v_stock_movement%WHERE%";
+
+    /** 步②:聚簇索引 —— 递归段的连接键(src 表是堆表时每轮都是全扫,索引让它变成 seek) */
+    private static final String STEP_S_INDEX =
+            "CREATE UNIQUE CLUSTERED INDEX IX_inv_cost_s ON #s (仓库键, 存货编码, rn)";
+
+    /**
+     * 步③:递归主体 → #rec(只在内存/临时表里算,不碰 inv_cost_ledger,故不持写锁)。
+     * 出库按**出库前**的移动加权单价计价(结存金额/结存数量;除零则 0);
      * 结存金额 = 前期结存金额 + 本行收入金额 − 本行发出成本。
      * 全部金额列显式 CAST 到 decimal(38,10):不加会报「定位点类型和递归部分的类型不匹配」。
      */
-    private static final String RECURSE =
-            "WITH s AS ("
-            + " SELECT src, rid, 仓库键, 存货编码, 批号, 单据日期, 收入数量, 发出数量, 收入金额,"
-            + " ROW_NUMBER() OVER (PARTITION BY 仓库键, 存货编码 ORDER BY 单据日期, src, rid) AS rn"
-            + " FROM dbo.v_stock_movement%WHERE%"
-            + "), rec AS ("
-            // 定位点:分区首行,此前结存为 0 → 出库按 0 计价(只出无进的分区,出库成本即 0)
+    private static final String STEP_REC_TO_TEMP =
+            "WITH rec AS ("
             + " SELECT rn, src, rid, 仓库键, 存货编码, 批号, 单据日期,"
             + " CAST(收入数量 - 发出数量 AS decimal(38,10)) AS 结存数量,"
             + " CAST(收入金额 - 发出数量 * (CASE WHEN 收入数量 <> 0 THEN 收入金额 / 收入数量 ELSE 0 END)"
@@ -72,7 +101,7 @@ public class InvCostService {
             + " CAST(收入数量 AS decimal(38,10)) AS 收入数量,"
             + " CAST(发出数量 AS decimal(38,10)) AS 发出数量,"
             + " CAST(收入金额 AS decimal(38,10)) AS 收入金额"
-            + " FROM s WHERE rn = 1"
+            + " FROM #s WHERE rn = 1"
             + " UNION ALL"
             + " SELECT s.rn, s.src, s.rid, s.仓库键, s.存货编码, s.批号, s.单据日期,"
             + " CAST(rec.结存数量 + s.收入数量 - s.发出数量 AS decimal(38,10)),"
@@ -84,9 +113,15 @@ public class InvCostService {
             + " CAST(s.收入数量 AS decimal(38,10)),"
             + " CAST(s.发出数量 AS decimal(38,10)),"
             + " CAST(s.收入金额 AS decimal(38,10))"
-            + " FROM rec JOIN s ON s.仓库键 = rec.仓库键 AND s.存货编码 = rec.存货编码 AND s.rn = rec.rn + 1"
+            + " FROM rec JOIN #s s ON s.仓库键 = rec.仓库键 AND s.存货编码 = rec.存货编码 AND s.rn = rec.rn + 1"
             + ")"
-            + " INSERT INTO dbo.inv_cost_ledger"
+            + " SELECT * INTO #rec FROM rec OPTION (MAXRECURSION 0)";
+
+    /** 步⑤:写库(DELETE 与 INSERT 同事务,排它锁只在这两条之间持有) */
+    private static final String STEP_DELETE = "DELETE FROM dbo.inv_cost_ledger%WHERE%";
+
+    private static final String STEP_INSERT =
+            "INSERT INTO dbo.inv_cost_ledger"
             + " (src, rid, 仓库键, 存货编码, 批号, 单据日期, 收入数量, 发出数量, 收入金额,"
             + "  结存数量, 移动加权单价, 结存金额, 发出成本金额, 重算时间)"
             + " SELECT src, rid, 仓库键, 存货编码, 批号, 单据日期,"
@@ -94,10 +129,10 @@ public class InvCostService {
             + " CAST(结存数量 AS decimal(18,4)),"
             + " CAST(CASE WHEN 结存数量 <> 0 THEN 结存金额 / 结存数量 ELSE 0 END AS decimal(18,6)),"
             + " CAST(结存金额 AS decimal(18,4)), CAST(发出成本金额 AS decimal(18,4)), SYSDATETIME()"
-            + " FROM rec"
-            + " OPTION (MAXRECURSION 0)";
+            + " FROM #rec";
 
-    /** 全量重算。单据审核/弃审后调它(235 行流水,成本可忽略)。 */
+
+    /** 全量重算。单据审核/弃审后调它(2026-10-15:5,207 行流水实测 0.5~1.5 s,原来是 137 s)。 */
     @Transactional
     public int recalcAll() {
         return recalc(null, null);
@@ -109,6 +144,10 @@ public class InvCostService {
      * 重算结果与全量一致。若某张单据改动了仓库或其存货编码,旧分区行不会被本次 DELETE 覆盖,
      * 需走全量重算(审核钩子即调全量)。
      *
+     * <p>步骤(SQL 常量见类内注释):① 视图取数落 #s → ② 建聚簇索引 → ③ 递归算进 #rec
+     * → ④ DELETE + INSERT 写回。**必须逐条 execute、不能拼成一个多语句批次**:
+     * SQL Server JDBC 驱动对批次里的 `SELECT … INTO` 只跑到那里就断(实测),拼批会静默只执行前半段。
+     *
      * @return 写入行数
      */
     @Transactional
@@ -119,8 +158,47 @@ public class InvCostService {
         if (存货编码 != null) { conds.add("存货编码 = ?"); args.add(存货编码); }
         String where = conds.isEmpty() ? "" : " WHERE " + String.join(" AND ", conds);
 
-        jdbc.update("DELETE FROM dbo.inv_cost_ledger" + where, args.toArray());
-        return jdbc.update(RECURSE.replace("%WHERE%", where), args.toArray());
+        // #s / #rec 是会话级临时表:连接池复用同一连接时可能还留着上一轮的(上一次中途失败),
+        // 故每步前先兜底 DROP,建完也 DROP 收尾。
+        exec("IF OBJECT_ID('tempdb..#s') IS NOT NULL DROP TABLE #s", List.of());
+        exec(STEP_S_INTO.replace("%WHERE%", where), args);
+
+        // 缺金额口径缺口:按 0 计价会让这些入库把加权单价拉低 —— 数量要喊出来,不能静默
+        Integer missing = jdbc.queryForObject("SELECT COUNT(*) FROM #s WHERE 缺金额 = 1", Integer.class);
+        if (missing != null && missing > 0) {
+            log.warn("库存成本重算:流水里有 {} 行的「收入金额」为空(视图入库段裸 CAST,in h.金额 为 NULL),"
+                    + "本次按 0 计入加权成本 —— 这些行的成本口径需要补数据(见 docs/development/库存表清单.md §2)", missing);
+        }
+
+        exec(STEP_S_INDEX, List.of());
+        exec("IF OBJECT_ID('tempdb..#rec') IS NOT NULL DROP TABLE #rec", List.of());
+        exec(STEP_REC_TO_TEMP, List.of());
+        exec(STEP_DELETE.replace("%WHERE%", where), args);
+        exec(STEP_INSERT, List.of());
+        exec("DROP TABLE #rec", List.of());
+        exec("DROP TABLE #s", List.of());
+
+        Integer n = jdbc.queryForObject("SELECT COUNT(*) FROM dbo.inv_cost_ledger" + where, Integer.class, args.toArray());
+        return n == null ? 0 : n;
+    }
+
+    /**
+     * 跑一条重算步骤(无参走 Statement,有参走 PreparedStatement)。
+     * ⚠ 必须用 {@link org.springframework.jdbc.core.ConnectionCallback}:它拿到的是**当前事务绑定的那条连接**,
+     * 临时表才活在同一条会话里(换成新连接,#s 就不存在了)。
+     */
+    private void exec(String sql, List<Object> args) {
+        if (args.isEmpty()) {
+            jdbc.execute(sql);
+            return;
+        }
+        jdbc.execute((ConnectionCallback<Void>) con -> {
+            try (java.sql.PreparedStatement ps = con.prepareStatement(sql)) {
+                for (int i = 0; i < args.size(); i++) ps.setObject(i + 1, args.get(i));
+                ps.execute();
+            }
+            return null;
+        });
     }
 
     /**
@@ -143,7 +221,7 @@ public class InvCostService {
      * 启动自检:物化表与流水不一致则全量重算。
      * 必要性 —— 金蝶同步会把已审核单据直接写进 bl_(行表)与 bd_(头表),这类写入不经过 ButtonService 的
      * 审核动作,钩子不会触发,成本会静默过期。以「行数 + 数量金额合计」双指纹判断,
-     * 只有真的不一致才重算(本机 235 行,毫秒级)。
+     * 只有真的不一致才重算(2026-10-15 实测 5,207 行 ≈ 0.5~1.5 s;改写前同一份数据要 137 s)。
      */
     private void reconcileCostOnStartup() {
         try {
