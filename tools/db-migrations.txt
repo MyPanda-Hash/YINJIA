@@ -3197,3 +3197,11 @@ migrate-stock-detail-group-by-wh-item.sql
 #   自检:仍不一致合计必须为 0,否则 RAISERROR。全 UPDATE 带「现值≠目标值」守卫 ⇒ 幂等;
 #   只改值不增删行,不动物理表结构与 yj_field/yj_translation。两账套均执行。
 migrate-align-docdate-batch-time-20261016.sql
+# migrate-rd-prod-info-od-before-id-20261016.sql — 产品信息表表头「炭棒外径」排到「炭棒内径」之前。
+#   用户口径(2026-10-16):「一般都是外径*内径*长度来表示」。原顺序 内径92 → 外径94(读作内径·外径·长度)
+#   ⇒ 只对调这两行的 seq(92↔94),label/col_name/ref/可见性/译名不动,不碰采购链四单。
+#   全库扫描结论:label/col_name/alias/label_en 含「径」共 18 行 6 个面板,**只此一处违反**;
+#   RD_MOLD_PROC / RD_SINTER_TOL / QC_INSP_REQ 均为外径在前;QC_INSP_REQ 的
+#   「外径1/外径2/外径（+密封圈）」是变体属性,提到内径前会拆散核心「外径→内径」相邻关系,故不动。
+#   幂等:仅当内径仍在外径之前才交换;末尾断言「外径严格先于内径」,否则 RAISERROR。两账套均执行。
+migrate-rd-prod-info-od-before-id-20261016.sql
