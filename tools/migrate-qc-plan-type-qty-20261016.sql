@@ -26,10 +26,17 @@
 
 /* ============ A0. 同批修正:清掉初版留下的 `检验数量` 行表列 ============
  * 本脚本初版把上限列命名为 `检验数量`(与头表业务列同名),正式名定为 `格数上限`;
- * 初版只在本机两账套跑过、该列全为空,故此处仅在「列存在且全空」时清掉(幂等;有值则不动)。 */
+ * 初版只在本机两账套跑过、该列全为空,故此处仅在「列存在且全空」时清掉(幂等;有值则不动)。
+ * ⚠ 2026-10-17 修:整段必须走**动态 SQL**。原来把 `WHERE 检验数量 IS NOT NULL` 直接写在
+ *   `IF COL_LENGTH(...) IS NOT NULL AND NOT EXISTS (SELECT …)` 里 —— T-SQL 是**整批编译**,
+ *   列不存在时该 SELECT 依然编译失败(`Invalid column name '检验数量'`),COL_LENGTH 守卫拦不住;
+ *   而正式库该列早被初版删掉 ⇒ 本脚本内容一变要重跑就必失败 ⇒ 链断(其后迁移不再执行)。 */
 IF COL_LENGTH(N'dbo.qc_proc_insp_detail', N'检验数量') IS NOT NULL
-   AND NOT EXISTS (SELECT 1 FROM dbo.qc_proc_insp_detail WHERE 检验数量 IS NOT NULL)
-  ALTER TABLE dbo.qc_proc_insp_detail DROP COLUMN 检验数量;
+BEGIN
+  DECLARE @sqlA0 nvarchar(max) = N'IF NOT EXISTS (SELECT 1 FROM dbo.qc_proc_insp_detail WHERE 检验数量 IS NOT NULL) '
+                               + N'ALTER TABLE dbo.qc_proc_insp_detail DROP COLUMN 检验数量;';
+  EXEC sp_executesql @sqlA0;
+END
 GO
 
 /* ============ A. 加列 ============ */

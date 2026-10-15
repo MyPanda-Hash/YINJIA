@@ -127,21 +127,24 @@ IF (SELECT COUNT(*) FROM dbo.qc_asm_insp_detail WHERE 结果判断 IS NOT NULL) 
 IF (SELECT COUNT(*) FROM yj_field WHERE panel_code = N'QC_ASM_INSP' AND col_name = N'结果判断'
       AND place = N'detail' AND visible = 1 AND hidden = 0) <> 1 SET @bad = @bad + 1;
 IF EXISTS (SELECT 1 FROM yj_field WHERE panel_code = N'QC_ASM_INSP' AND col_name = N'判定') SET @bad = @bad + 1;
-/* F4. 次序:检验方法 < 实测数值 < 测量值1 < 测量值5 < 检查频率 < 数量 < 处理方式 < 备注 < 产线常规功能性结果 < 结果判断 */
-IF NOT EXISTS (SELECT 1 FROM yj_field a, yj_field b, yj_field c, yj_field d, yj_field e, yj_field f, yj_field g, yj_field h, yj_field i, yj_field j
-                WHERE a.panel_code = N'QC_ASM_INSP' AND a.col_name = N'检验方法'
-                  AND b.panel_code = N'QC_ASM_INSP' AND b.col_name = N'实测数值'
-                  AND c.panel_code = N'QC_ASM_INSP' AND c.col_name = N'测量值1'
-                  AND d.panel_code = N'QC_ASM_INSP' AND d.col_name = N'测量值5'
-                  AND e.panel_code = N'QC_ASM_INSP' AND e.col_name = N'检查频率'
-                  AND f.panel_code = N'QC_ASM_INSP' AND f.col_name = N'数量'
-                  AND g.panel_code = N'QC_ASM_INSP' AND g.col_name = N'处理方式'
-                  AND h.panel_code = N'QC_ASM_INSP' AND h.col_name = N'备注'
-                  AND i.panel_code = N'QC_ASM_INSP' AND i.col_name = N'产线常规功能性结果'
-                  AND j.panel_code = N'QC_ASM_INSP' AND j.col_name = N'结果判断'
-                  AND a.seq < b.seq AND b.seq < c.seq AND c.seq < d.seq AND d.seq < e.seq
-                  AND e.seq < f.seq AND f.seq < g.seq AND g.seq < h.seq AND h.seq < i.seq AND i.seq < j.seq)
-  SET @bad = @bad + 1;
+/* F4. 次序:按规范序列断言相邻两段 seq 递增,**只对当前仍存在的字段**断言
+   ⚠ 2026-10-17 修:原断言写死要求 实测数值/数量 参与,而链上更靠后的
+   migrate-asm-insp-report-fields-20261016.sql(清单 L3514 > 本脚本 L3411)明确
+   `DELETE FROM yj_field WHERE panel_code='QC_ASM_INSP' AND col_name IN (数量, 实测数值)`。
+   本脚本内容一变就会被 DbSync 判「重新执行」,写死 ⇒ 必然 FAIL ⇒ 中止 ⇒ 其后迁移全不执行。 */
+DECLARE @ord TABLE (k int, col sysname);
+INSERT INTO @ord VALUES (1, N'检验项目'), (2, N'检验要求'), (3, N'检验方法'), (4, N'实测数值'),
+                        (5, N'测量值1'), (6, N'测量值5'), (7, N'检查频率'), (8, N'数量'),
+                        (9, N'处理方式'), (10, N'备注'), (11, N'产线常规功能性结果'), (12, N'结果判断');
+DELETE o FROM @ord o
+ WHERE NOT EXISTS (SELECT 1 FROM yj_field f WHERE f.panel_code = N'QC_ASM_INSP' AND f.col_name = o.col);
+IF EXISTS (SELECT 1
+             FROM @ord x
+             JOIN @ord y ON y.k > x.k
+                       AND NOT EXISTS (SELECT 1 FROM @ord m WHERE m.k > x.k AND m.k < y.k)
+             JOIN yj_field fx ON fx.panel_code = N'QC_ASM_INSP' AND fx.col_name = x.col
+             JOIN yj_field fy ON fy.panel_code = N'QC_ASM_INSP' AND fy.col_name = y.col
+            WHERE fx.seq >= fy.seq) SET @bad = @bad + 1;
 /* F5. 明细可见列不撞号 */
 IF EXISTS (SELECT 1 FROM yj_field x JOIN yj_field y
              ON y.panel_code = x.panel_code AND y.seq = x.seq AND y.id <> x.id
