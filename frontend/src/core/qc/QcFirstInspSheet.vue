@@ -321,9 +321,10 @@ function isLocked(key) {
  * 可填态不用它(v-model 直绑真实字段,填什么存什么)。
  */
 function headText(f) {
-  if (f.key === '生产日期') return head['生产日期'] || head['检验日期'] || head['单据日期'] || ''
-  if (f.key === '规格型号') return head['规格型号'] || head['产品名称'] || ''
-  return head[f.key] || ''
+  const data = props.head || {}
+  if (f.key === '生产日期') return data['生产日期'] || data['检验日期'] || data['单据日期'] || ''
+  if (f.key === '规格型号') return data['规格型号'] || data['产品名称'] || ''
+  return data[f.key] || ''
 }
 
 /** 这一列的「定义行」(标准行)与某样品的行 —— 行不存在时按需补出来(老单据/手填列) */
