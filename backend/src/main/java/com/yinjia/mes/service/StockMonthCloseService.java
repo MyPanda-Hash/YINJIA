@@ -509,23 +509,20 @@ public class StockMonthCloseService {
     // ==================== 展开明细(报表用) ====================
 
     /**
-     * 展开一个 (物料,仓库,批号) 的明细(2026-10-15 第二轮 + 第三轮口径)。
+     * 展开一个 (物料,仓库) 的明细 = **这一行余额的来源**(2026-10-15 第二轮~第八轮口径)。
      *
      * <h4>列表构成(一张表,靠「单据类型」区分,数量带方向:入库正 / 出库负)</h4>
-     * <ol>
-     *   <li><b>上月部分</b>:
-     *     <ul>
-     *       <li>上月**已月结** ⇒ 只放那张**月结单据**(显示成 <code>2026-09月结</code>)——即「月结后按汇总展示」;</li>
-     *       <li>上月**未月结 / 已取消** ⇒ 把**该月的原始单据全部陈列出来**
-     *           (用户 2026-10-15 第三轮:「上月月结被取消后要把那个月的单据陈列出来」)。</li>
-     *     </ul>
-     *   </li>
-     *   <li><b>当月部分</b>:当月原始单据照常展示(当月还没月结时就是它的正常单据)。</li>
-     * </ol>
-     * 每行带 `月份`(yyyy-MM)列:跨两个月时一眼能分清。
+     * <ul>
+     *   <li>上月**已月结** ⇒ 只有那张**月结结转单**(显示成 <code>2026-09月结</code>,单据编号 <code>JZ-202609</code>,
+     *       数量 = 该月期末结存 ⇒ 也就是当月的期初)。用户第八轮截图口径:
+     *       「**只要上一个月的结转,就是 9 月的**」—— 当月那一堆原始单据**不再铺出来**(见方法尾注释);</li>
+     *   <li>上月**未月结 / 已取消** ⇒ 把**该月的原始单据**陈列出来
+     *       (第三轮:「上月月结被取消后要把那个月的单据陈列出来」)。</li>
+     * </ul>
+     * 每行带 `月份`(yyyy-MM)列,便于对照结转行落在哪个月。
      *
      * <h4>月结快照</h4>
-     * 取的是**上月**那次月结在 `bl_stock_close` 里的行(期初/入/出/结存/最晚出库日期);
+     * 取的是**上月**那次月结在 `bl_stock_close` 里的行(期初/入/出/结存/最晚出库日期),跨批汇总;
      * 上月未月结则为 null。⚠ 早先版本按「当前月」查快照 —— 月结是结**上月**的,所以永远查不到,
      * 这条是 2026-10-15 第三轮一并修正的。
      */
@@ -537,7 +534,6 @@ public class StockMonthCloseService {
         // 该物料该仓的**所有批次**单据一起陈列(单据明细里带 `批号` 列,想看哪一批一眼可见)。
         // 仍然保留按批号查的能力(传了具体批号就按批号过滤),给以后"按批展开"留口子。
         String lotArg = ("*".equals(l) || l.isEmpty()) ? null : l;
-        LocalDate curStart = periodStart(cur), curEndEx = periodEndExclusive(cur);
         LocalDate prevStart = periodStart(prev), prevEndEx = periodEndExclusive(prev);
         String prevState = periodState(prev);
 
@@ -575,8 +571,9 @@ public class StockMonthCloseService {
             // 上月未月结/已取消 ⇒ 陈列上月的原始单据(入库正、出库负)
             rows.addAll(flowRows(prevStart, prevEndEx, w, c, lotArg));
         }
-        // 当月原始单据(不含月结结转行:那一行属于上月的展示口径)
-        rows.addAll(flowRows(curStart, curEndEx, w, c, lotArg));
+        // ⚠ **不再铺当月的单据**(用户 2026-10-15 截图口径:「只要上一个月的结转,就是 9 月的」):
+        //   展开 = 这一行的**余额来源** —— 上月已月结就是那张结转单(一行,如 `2026-09月结 / JZ-202609 / 15000`);
+        //   上月没结/被取消才退回陈列上月的原始单据。当月单据属于下一个月结,列在这里只会淹掉那一行。
         rows.sort(Comparator.comparing((Map<String, Object> r) -> String.valueOf(r.get("单据日期")))
                 .thenComparing(r -> String.valueOf(r.get("单据类型"))));
         out.put("单据明细", rows);

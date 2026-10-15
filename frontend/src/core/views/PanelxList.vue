@@ -559,10 +559,14 @@
                 </div>
                 <div v-else class="mc-detail-snap mc-dim">
                   {{ mcDetail[row.id]['上月状态'] === '已取消'
-                    ? tt('上月月结已取消,以下陈列该月与当月的原始单据')
-                    : tt('上月未月结,以下陈列该月与当月的原始单据') }}
+                    ? tt('上月月结已取消,以下陈列该月原始单据')
+                    : tt('上月未月结,以下陈列该月原始单据') }}
                 </div>
-                <el-table :data="mcDetail[row.id]['单据明细'] || []" size="small" border max-height="340" show-summary>
+                <!-- 展开 = 这一行余额的来源:上月已月结就只有那张结转单(用户第八轮截图:
+                     「只要上一个月的结转,就是 9 月的」);上月没结/被取消才退回该月原始单据。
+                     上月期末结存 = 0 的键**本来就不写结转行** ⇒ 这里给一句人话,免得空表像坏了。 -->
+                <el-table v-if="(mcDetail[row.id]['单据明细'] || []).length"
+                          :data="mcDetail[row.id]['单据明细']" size="small" border max-height="340" show-summary>
                   <el-table-column prop="月份" :label="tt('月份')" width="82" />
                   <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
                   <el-table-column prop="单据类型" :label="tt('单据类型')" width="150" />
@@ -573,6 +577,11 @@
                   <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="150" />
                   <el-table-column prop="经手人" :label="tt('经手人')" width="100" />
                 </el-table>
+                <div v-else class="mc-detail-snap mc-dim">
+                  {{ mcDetail[row.id]['上月状态'] === '已月结'
+                    ? tt('上月期末结存为 0,无结转行')
+                    : tt('上月无出入库单据') }}
+                </div>
               </template>
             </div>
           </template>
