@@ -693,6 +693,24 @@ public class QueryService {
                 where.append(" AND RTRIM(").append(alias).append(".[").append(l2c.get("仓库编码")).append("]) = ?");
                 args.add(String.valueOf(whCode).trim());
             }
+            // 多仓库过滤(2026-10-15,库存明细左侧「分仓库选择」):`_whCodes` = 逗号分隔的仓库编码列表 ⇒ IN(...)。
+            // 为什么单独一个键:通用条件一次只表达一个值(名称/编码),而左侧列表是多选;沿用 `_` 前缀的
+            // 「控制键」口径(与 _ckdm/_whCode/_itemCode 同族),不污染业务字段名。
+            // 列取 仓库编码 优先、退化到 仓库(库存明细是 flat 直读 kucun,标签就是「仓库」)。
+            String whCol = l2c.getOrDefault("仓库编码", l2c.get("仓库"));
+            Object whCodes = condition.get("_whCodes");
+            if (whCodes != null && !String.valueOf(whCodes).isBlank() && whCol != null) {
+                List<String> codes = new ArrayList<>();
+                for (String s : String.valueOf(whCodes).split(",")) {
+                    String t = s.trim();
+                    if (!t.isEmpty()) codes.add(t);
+                }
+                if (!codes.isEmpty()) {
+                    where.append(" AND RTRIM(").append(alias).append(".[").append(whCol).append("]) IN (")
+                            .append(String.join(",", java.util.Collections.nCopies(codes.size(), "?"))).append(")");
+                    args.addAll(codes);
+                }
+            }
             Object itemCode = condition.get("_itemCode");
             boolean byItemCode = itemCode != null && !String.valueOf(itemCode).isBlank() && l2c.containsKey("存货编码");
             if (byItemCode) {

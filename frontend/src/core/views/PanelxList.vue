@@ -491,11 +491,34 @@
         </div>
       </div>
     </template>
-    <div v-if="reportMode" class="report-body" v-loading="loading">
+    <div v-if="reportMode" class="report-body" :class="{ 'has-dock': isStockDetail }" v-loading="loading">
       <div class="report-heading">
         <strong>{{ panelName }}</strong>
         <span>{{ reportPeriod }}</span>
       </div>
+      <!-- 分仓库选择(2026-10-15,库存明细):与采购入库单「选单」弹窗同款的勾选列表,只是数据源 = 仓库档案,
+           勾选后按编码多选过滤主表(condition._whCodes,后端走 IN)。浮层定位,不改表格结构。 -->
+      <aside v-if="isStockDetail" class="wh-dock">
+        <div class="wh-dock-head">{{ tt('分仓库') }}</div>
+        <el-input v-model="whDockSearch" size="small" clearable :placeholder="tt('查找仓库')" :prefix-icon="Search" />
+        <div class="wh-dock-meta">{{ tt('共有数据') }}:{{ whDockRows.length }} {{ tt('条') }}</div>
+        <div class="wh-dock-list">
+          <el-checkbox
+            v-for="w in whDockRows"
+            :key="w.code"
+            :label="w.code"
+            :model-value="whDockChecked.includes(w.code)"
+            class="wh-dock-item"
+            @change="(v) => toggleWhDock(w.code, v)"
+          >
+            <span class="wh-dock-name">{{ w.name }}</span>
+            <span class="wh-dock-code">{{ w.code }}</span>
+          </el-checkbox>
+        </div>
+        <div class="wh-dock-actions">
+          <el-button size="small" text @click="clearWhDock">{{ tt('全不选') }}</el-button>
+        </div>
+      </aside>
       <el-table
         class="report-table"
         :data="reportList"
@@ -507,8 +530,65 @@
         :summary-method="sumMethod"
         empty-text="暂无符合条件的数据"
         @row-click="(row) => (current = row)"
+        @expand-change="onMcExpand"
       >
         <el-table-column type="index" :label="tt('序号')" width="58" fixed="left" :index="(i) => (query.pageNo - 1) * query.pageSize + i + 1" />
+        <!-- 库存月结明细(2026-10-15):展开该 (物料,仓库,批号) 在「上月」的入库/出库/结转行 + 月结快照 -->
+        <el-table-column v-if="isStockDetail" type="expand" width="46">
+          <template #default="{ row }">
+            <div class="mc-detail">
+              <div v-if="!mcDetail[row.id]" class="mc-detail-loading">{{ tt('展开加载中') }}…</div>
+              <template v-else>
+                <div class="mc-detail-title">
+                  {{ tt('库存月结明细') }} ·
+                  {{ mcDetail[row.id]['期间'] }}
+                  {{ tt('期间状态') }}:{{ mcDetail[row.id]['期间状态'] }}
+                </div>
+                <div v-if="mcDetail[row.id]['月结快照']" class="mc-detail-snap">
+                  <span v-for="(v, k) in mcDetail[row.id]['月结快照']" :key="k" class="mc-snap-item">
+                    <b>{{ tt(String(k)) }}</b>{{ v ?? '—' }}
+                  </span>
+                </div>
+                <div v-else class="mc-detail-snap mc-dim">{{ tt('该期间尚未月结') }}</div>
+                <div class="mc-detail-tables">
+                  <div class="mc-detail-block">
+                    <div class="mc-detail-block-title">{{ tt('本月入库') }}({{ (mcDetail[row.id]['入库明细'] || []).length }})</div>
+                    <el-table :data="mcDetail[row.id]['入库明细'] || []" size="small" border max-height="240">
+                      <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
+                      <el-table-column prop="单据类型" :label="tt('单据类型')" width="120" />
+                      <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="150" />
+                      <el-table-column prop="数量" :label="tt('数量')" width="100" align="right" />
+                      <el-table-column prop="单价" :label="tt('单价')" width="90" align="right" />
+                      <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="140" />
+                    </el-table>
+                  </div>
+                  <div class="mc-detail-block">
+                    <div class="mc-detail-block-title">{{ tt('本月出库') }}({{ (mcDetail[row.id]['出库明细'] || []).length }})</div>
+                    <el-table :data="mcDetail[row.id]['出库明细'] || []" size="small" border max-height="240">
+                      <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
+                      <el-table-column prop="单据类型" :label="tt('单据类型')" width="120" />
+                      <el-table-column prop="单据编号" :label="tt('单据编号')" min-width="150" />
+                      <el-table-column prop="数量" :label="tt('数量')" width="100" align="right" />
+                      <el-table-column prop="成本单价" :label="tt('成本单价')" width="90" align="right" />
+                      <el-table-column prop="往来单位" :label="tt('往来单位')" min-width="140" />
+                    </el-table>
+                  </div>
+                  <div class="mc-detail-block">
+                    <div class="mc-detail-block-title">
+                      {{ tt('结转行') }}({{ (mcDetail[row.id]['结转行'] || []).length }})
+                    </div>
+                    <el-table :data="mcDetail[row.id]['结转行'] || []" size="small" border max-height="240">
+                      <el-table-column prop="单据编号" :label="tt('单据编号')" width="150" />
+                      <el-table-column prop="单据日期" :label="tt('单据日期')" width="110" />
+                      <el-table-column prop="数量" :label="tt('数量')" width="110" align="right" />
+                      <el-table-column prop="单价" :label="tt('单价')" width="90" align="right" />
+                    </el-table>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </el-table-column>
         <template v-for="column in reportColumnTree" :key="column.label">
           <el-table-column v-if="column.children" :label="tt(column.label)" align="center">
             <el-table-column
@@ -2659,6 +2739,66 @@ function onStockWhChange(v) {
   if (v) condition['_ckdm'] = v
   else delete condition['_ckdm']
   search()
+}
+
+// ---------- 库存明细:分仓库选择(与采购入库单「选单」弹窗同款的勾选列表,数据源 = 仓库档案 bs_wh)----------
+// 勾选结果走 condition._whCodes(逗号分隔编码),后端 QueryService 按编码 IN 过滤(不比名称:名称会重名/改名)。
+const isStockDetail = computed(() => String(panelCode.value) === 'STOCK_DETAIL')
+const whDockSearch = ref('')
+const whDockChecked = ref([])
+watch(isStockDetail, async (v) => {
+  if (!v) { whDockChecked.value = []; return }
+  if (warehouseOptions.value.length) return
+  try {
+    const res = await request.get('/base/warehouse/list')
+    warehouseOptions.value = res?.data || []
+  } catch { warehouseOptions.value = [] }
+}, { immediate: true })
+const whDockRows = computed(() => {
+  const kw = String(whDockSearch.value || '').trim().toLowerCase()
+  const all = warehouseOptions.value || []
+  if (!kw) return all
+  return all.filter((w) => String(w.name || '').toLowerCase().includes(kw)
+    || String(w.code || '').toLowerCase().includes(kw))
+})
+function toggleWhDock(code, checked) {
+  const set = new Set(whDockChecked.value.filter(Boolean))
+  if (checked) set.add(code); else set.delete(code)
+  whDockChecked.value = [...set]
+  applyWhDock()
+}
+function clearWhDock() { whDockChecked.value = []; applyWhDock() }
+function applyWhDock() {
+  const codes = whDockChecked.value.filter(Boolean)
+  if (codes.length) condition['_whCodes'] = codes.join(',')
+  else delete condition['_whCodes']
+  search()
+}
+
+// ---------- 库存明细:行展开 → 该 (物料,仓库,批号) 的月结明细(快照 + 本月入库/出库 + 结转行)----------
+const mcDetail = ref({})
+const mcDetailLoading = ref({})
+async function onMcExpand(row, expanded) {
+  if (!isStockDetail.value || !row) return
+  const rows = Array.isArray(expanded) ? expanded : (expanded ? [row] : [])
+  if (!rows.some((r) => r && r.id === row.id)) return   // 收起事件不拉数据
+  if (mcDetail.value[row.id]) return                    // 命中缓存
+  mcDetailLoading.value[row.id] = true
+  try {
+    const res = await request.get('/stock/monthClose/detail', {
+      params: {
+        wzdm: row['存货编码'] ?? '',
+        ckdm: row['仓库'] ?? '',
+        lot: row['批号'] ?? '',
+      },
+    })
+    mcDetail.value[row.id] = res?.data || {}
+  } catch (e) {
+    ElMessage.error(engine.errMsg(e) || tt('加载月结明细失败'))
+    mcDetail.value[row.id] = { 期间: '-', 期间状态: '-', 入库明细: [], 出库明细: [], 结转行: [] }
+  } finally {
+    mcDetailLoading.value[row.id] = false
+  }
 }
 
 // ---------- 新增库存(库存状况):存货/仓库按编码绑定基础档案,期初现存量+预警数量 ----------
@@ -6933,6 +7073,7 @@ async function onButton(action) {
         )
       }
       await load()
+      mcDetail.value = {}   // 月结/取消/重新月结都会改结转行与余量 ⇒ 丢掉展开明细缓存
     } catch (e) {
       loading.close()
       ElMessage.error(engine.errMsg(e) || tt('按钮执行失败'))
@@ -8805,6 +8946,32 @@ onUnmounted(() => {
   color: #64748b;
   font-size: 12px;
 }
+/* ── 库存明细:左侧「分仓库」列表(2026-10-15) ──────────────────────────────
+   形态对齐采购入库单「选单」弹窗的勾选列表(查找框 + 共 N 条 + 勾选行),只是数据源 = 仓库档案。
+   用浮层定位而不是改 report-body 的 flex 方向:标题条要留在最上方,表格仍占满剩余高度。 */
+.report-body.has-dock { position: relative; padding-left: 226px; }
+.wh-dock {
+  position: absolute; left: 6px; top: 50px; bottom: 10px; width: 208px;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 8px; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff;
+}
+.wh-dock-head { font-size: 13px; font-weight: 600; color: #1f2937; }
+.wh-dock-meta { font-size: 12px; color: #64748b; }
+.wh-dock-list { flex: 1; overflow: auto; display: flex; flex-direction: column; }
+.wh-dock-item { height: 26px; margin-right: 0; }
+.wh-dock-name { font-size: 13px; }
+.wh-dock-code { margin-left: 6px; color: #94a3b8; font-size: 11px; }
+.wh-dock-actions { display: flex; justify-content: flex-end; }
+/* ── 月结明细展开区 ── */
+.mc-detail { padding: 6px 10px 10px 46px; background: #fbfcfe; }
+.mc-detail-loading { color: #94a3b8; font-size: 12px; padding: 6px 0; }
+.mc-detail-title { font-size: 13px; font-weight: 600; color: #1f2937; margin-bottom: 6px; }
+.mc-detail-snap { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 8px; font-size: 12px; color: #334155; }
+.mc-detail-snap.mc-dim { color: #94a3b8; }
+.mc-snap-item b { color: #64748b; font-weight: 500; margin-right: 4px; }
+.mc-detail-tables { display: flex; flex-wrap: wrap; gap: 12px; }
+.mc-detail-block { flex: 1 1 320px; min-width: 300px; }
+.mc-detail-block-title { font-size: 12px; color: #475569; margin-bottom: 4px; }
 .report-table {
   flex: 1;
   min-height: 360px;

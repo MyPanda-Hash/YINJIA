@@ -85,15 +85,30 @@ java -cp lib\mssql-jdbc.jar SqlRunner.java "jdbc:sqlserver://127.0.0.1:1433;data
 curl -X POST http://127.0.0.1:8090/api/px/callButton -H "Authorization: Bearer <token>" -H "Content-Type: application/json" -d "{\"panelCode\":\"STOCK_DETAIL\",\"buttonName\":\"上月月结\",\"formData\":{},\"buttonParam\":{}}"
 ```
 
-## 5. 尚未完成(下一轮)
+## 5. 报表侧(2026-10-15 第二轮已完成)
 
-1. **前端三按钮**:`PanelxList.vue` 的工具栏 action 分支(参考 `重算成本` 那段)+ 结果提示
-   (后端已就绪,面板「更多」组已下发三个按钮;点下去现在**没有前端分支**接,所以还没反应);
-2. **行展开显示月结明细**:表格加 `type="expand"`(面板引擎当前**没有**展开行能力,要在 flat 渲染分支里加),
-   展开内容调 `/api/stock/monthClose/detail`;
-3. **左侧「分仓库选择」列表**:做成与采购入库单「选单」弹窗同款(`SelectVoucherDialog.vue`),数据源换成 `bs_wh`,
-   多选后过滤主表;
-4. 10 语言词条(三按钮 + 展开区标题)与 5173/8090 两处走查。
+| 件 | 位置 | 说明 |
+|---|---|---|
+| 三按钮前端分支 | `PanelxList.vue` 工具栏 action 分支 | 上月月结 / 取消上月月结 / 重新月结(取消与重新月结带二次确认);执行中给 loading 提示、结束回显 期间/键数/结转行/结存合计,并清掉展开明细缓存 |
+| 行展开月结明细 | `PanelxList.vue` 报表表加 `type="expand"` | 展开即调 `GET /api/stock/monthClose/detail`(带缓存);渲染「月结快照 + 本月入库 + 本月出库 + 结转行」四块 |
+| 左侧分仓库列表 | `PanelxList.vue` `.wh-dock` + `QueryService._whCodes` | 与采购入库单「选单」弹窗同款勾选列表(查找框 + 共 N 条 + 勾选行),数据源 `bs_wh`;**多选**后按编码 `IN(...)` 过滤主表 |
+| 多语言 | 10 个语言文件(19 条/语言)+ `_add-monthclose-i18n.cjs` | 三按钮、展开区、左栏文案;脚本幂等,已有词条自动跳过 |
+
+### 界面验收(`_v-monthclose-ui.mjs`,5173 源码即时生效)
+
+```
+[3] 左侧分仓库列表:共 9 个:车间仓YJ-08 | 成品B仓CP-02 | 成品不良品区CK00003 | 恒亿仓YCL-01 |
+    华北工控仓CK00006 | 原料不良品仓CK00005 | A仓CK-A | C仓CK-C | D仓CK-D
+[4] 过滤前主表条数:2507
+[5] 勾选「恒亿仓」→ 过滤后 1013(编码精确过滤;接口层双仓 1013+852=1865 亦已核对)
+[6] 展开第一行 → 「库存月结明细 · 2026-09 期间状态:已月结 / 期初 0 · 入库 700 · 出库 700 · 结存 0 ·
+    单价 20 · 最晚出库日期 2026-09-22」+ 本月入库(2) / 本月出库(3) / 结转行(0)
+```
+
+> ⚠ 探针的「更多」下拉项没能取到(页面里有**两个**「更多」:右上角用户菜单 + 面板工具栏;
+> 工具栏那个是 `span.tb-main`,点开后下拉项的 class 未知)。**三按钮确实在面板配置里**
+> (`getPanelConfig` → `更多: 发送邮件, 上月月结, 取消上月月结, 重新月结, 表格调整, 表头调整, 字段管理, 退出`),
+> 前端是照配置逐项渲染的,故按钮存在性以面板配置为凭。
 
 ## 6. 踩坑留档(本任务实测,别重犯)
 
@@ -104,3 +119,5 @@ curl -X POST http://127.0.0.1:8090/api/px/callButton -H "Authorization: Bearer <
 | 3 | 全局异常处理器吞堆栈 | `GlobalExceptionHandler` 把异常归一成 code+message,**不打日志**。为此给月结加了运维直调入口 `POST /api/stock/monthClose/run`(返回异常类名 + 消息 + 前 8 帧),后续排查先打它 |
 | 4 | `rebuild-prod.ps1` 的 fat jar 自检 | 脚本用 `jar tf`,而 `jar` 不在 PATH(`$JAVA_HOME\bin` 没进 PATH)⇒ 打包成功后卡在自检、**没重启服务**。自检要显式用 `"$env:JAVA_HOME\bin\jar.exe"` |
 | 5 | 停服才能 repackage | 后端跑着 `target\*.jar` 时 `mvn package` 报 `Unable to rename ... .jar.original`;必须 `start-prod.ps1 -Stop` 后再打包 |
+| 6 | **改了后端必须重打 jar 才生效** | 8090 跑的是 jar 里的 class:我先改了 `QueryService._whCodes` 却在旧 jar 上验前端 ⇒ 勾选仓库**看着像前端没生效**(条数纹丝不动),其实是后端不认这个条件键。判据:同一个接口用 curl 直接带 `_whCodes` 试一次,能区分「前端没送」还是「后端没认」 |
+| 7 | 改带中文的 `.ps1` 会丢 BOM | 编辑工具写回的是无 BOM UTF-8,PowerShell 5.1 按 GBK 解码 ⇒ 语法报错。改完 `.ps1` 要**补回 BOM**(本仓库既有脚本都是带 BOM 的) |
