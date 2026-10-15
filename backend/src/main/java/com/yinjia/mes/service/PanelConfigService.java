@@ -463,7 +463,12 @@ public class PanelConfigService {
                     // 2026-10-09 **合并口径**(用户拍板):原来两个按钮(选检验项目 / 检验项目维护)收敛成同一个
                     // 入口 —— 弹窗两用:上=方案表、下=该项目表(可勾选),勾选后「带入明细」写入本单;
                     // 表头的新增/编辑/停用就地维护标准本身。基础档案里的 QC_ITEM/QC_PLAN 菜单已摘,维护只此一处。
-                    if (!merged.contains("检验项目/检验方案")) merged.add(anchor + 1, "检验项目/检验方案");
+                    // 2026-10-16 第三轮:**首件检验单不要这个入口**(用户口径「去除当前首件检验单中检验项目/
+                    //   检验方案的按钮」)—— 它的检验要求有专用来源《成型工艺清单》RD_MOLD_PROC(取成型工艺清单),
+                    //   挂上标准库入口只会让品质点错来源。
+                    if (!FIRST_INSP_PANEL.equals(def.code()) && !merged.contains("检验项目/检验方案")) {
+                        merged.add(anchor + 1, "检验项目/检验方案");
+                    }
                     // 2026-10-13:制程检验单再加一个「取出货检验计划」入口(RD_INSP_PLAN)——
                     // 用户口径「实现对应的产品编码就能获取到对应的检验内容进行填入」。
                     // 2026-10-16 扩到**四张检验单**:用户口径「当前成品检验单实现方式需要修改,要能获取到
@@ -490,6 +495,15 @@ public class PanelConfigService {
                     // 头行映射只认来源表头),故走专用入口。
                     if ("QC_PROC_INSP".equals(def.code()) && !merged.contains("选生产工单")) {
                         int at = merged.indexOf("取出货检验计划");
+                        merged.add(at < 0 ? anchor + 1 : at, "选生产工单");
+                    }
+                    // 2026-10-16 第三轮:**首件检验单也要能选生产工单**(用户口径「让当前的首件检验单也可以
+                    //   选择到生产工单。当前制程检验单中存在实现方式,可以参照制程检验单的实现方式进行」)
+                    //   —— 同一个弹窗(按面板分流到 /qc/firstInsp/woLines + fromWoLine),选中一行即按
+                    //   「工单号+工单行号」建一张首件检验单草稿(表头带产品/批次/产线/客户,明细按
+                    //   《成型工艺清单》预铺),排在「取成型工艺清单」之前:先按工单行建单,再带检验项目。
+                    if (FIRST_INSP_PANEL.equals(def.code()) && !merged.contains("选生产工单")) {
+                        int at = merged.indexOf("取成型工艺清单");
                         merged.add(at < 0 ? anchor + 1 : at, "选生产工单");
                     }
                     g.put("actions", merged);

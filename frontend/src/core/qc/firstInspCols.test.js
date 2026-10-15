@@ -13,7 +13,7 @@ import {
   SAMPLE_COUNT, GROUP_ORDER, ROW_STANDARD, ROW_SAMPLE,
   columnsOf, groupsOf, unitOfLabel, nextColumnKey, nextColumnLabel,
   rowsForColumn, addColumn, removeColumn, updateColumn, columnHasContent, ensureItems,
-  seedDefaultColumns, DEFAULT_TEST_ITEMS,
+  seedDefaultColumns, DEFAULT_TEST_ITEMS, mergeFetchedColumns, ensureColumnRows,
 } from './firstInspCols.js'
 
 const headOf = (items = []) => ({ 单据编号: 'SJ-T-1', detail: { items } })
@@ -229,4 +229,75 @@ test('nextColumnKey / nextColumnLabel 只在冲突时让号', () => {
   assert.equal(nextColumnKey(cols, 'X'), 'X-2')
   assert.equal(nextColumnLabel([{ label: '测试项目1' }]), '测试项目2')
   assert.equal(GROUP_ORDER.length, 4)
+})
+
+/* ── 「取成型工艺清单」按列合并(2026-10-16 第三轮用户口径:带入要保留列内已填的数据) ────────── */
+
+/** 造一份后端 FirstInspItems 形状的取回行(2 列 × (1 标准 + 8 样品)) */
+const fetchedOf = (specs) => specs.flatMap((s, i) => [
+  { 表区: '首件检验', 行类型: ROW_STANDARD, 样品序号: '标准', 检验列: s.key, 检验项目: s.label, 项目分组: s.group, 标准: s.standard, 实测数值: '', 结果判断: '', 行号: i * 9 + 1, 备注: '' },
+  ...Array.from({ length: SAMPLE_COUNT }, (_, k) => ({
+    表区: '首件检验', 行类型: ROW_SAMPLE, 样品序号: `${k + 1}#`, 检验列: s.key, 检验项目: s.label,
+    项目分组: s.group, 标准: '', 实测数值: '', 结果判断: '', 行号: i * 9 + k + 2, 备注: '',
+  })),
+])
+
+test('合并带入:已有列只刷新标准,已填的实测数值/结果判断/列名一律保留', () => {
+  const head = headOf()
+  addColumn(head, { label: '炭棒外径', group: '尺寸及重量', standard: '外径:34.0±0.5' })
+  // 品质已经量了两支样品,还改了列名(列名是人家定的,不该被带入冲掉)
+  const items = head.detail.items
+  items.find((r) => r['检验列'] === '炭棒外径' && r['样品序号'] === '1#')['实测数值'] = '34.2'
+  items.find((r) => r['检验列'] === '炭棒外径' && r['样品序号'] === '2#')['实测数值'] = '34.4'
+  items.find((r) => r['检验列'] === '炭棒外径' && r['样品序号'] === '2#')['结果判断'] = '合格'
+  updateColumn(head, '炭棒外径', { label: '外径(品质改过名)' })
+
+  const r = mergeFetchedColumns(head, fetchedOf([
+    { key: '炭棒外径', label: '炭棒外径', group: '尺寸及重量', standard: '外径:34.5±0.1（新）' },
+    { key: '炭棒内径', label: '炭棒内径', group: '尺寸及重量', standard: '内径:12.5±0.5' },
+  ]))
+
+  assert.deepEqual([r.added, r.updated, r.total], [1, 1, 2])
+  assert.equal(items.find((x) => x['行类型'] === ROW_STANDARD && x['检验列'] === '炭棒外径')['标准'],
+    '外径:34.5±0.1（新）', '已有列的标准要被工艺清单刷新')
+  assert.equal(items.find((x) => x['检验列'] === '炭棒外径' && x['样品序号'] === '1#')['实测数值'], '34.2')
+  assert.equal(items.find((x) => x['检验列'] === '炭棒外径' && x['样品序号'] === '2#')['实测数值'], '34.4')
+  assert.equal(items.find((x) => x['检验列'] === '炭棒外径' && x['样品序号'] === '2#')['结果判断'], '合格')
+  assert.equal(items.find((x) => x['检验列'] === '炭棒外径' && x['行类型'] === ROW_STANDARD)['检验项目'],
+    '外径(品质改过名)', '列名是品质定的,带入不覆盖')
+  assert.equal(r.kept, 3, '保留已填格数应如实统计(2 个实测 + 1 个判定)')
+  // 新列整列进来:1 标准 + 8 样品
+  assert.equal(items.filter((x) => x['检验列'] === '炭棒内径').length, SAMPLE_COUNT + 1)
+  assert.equal(items.find((x) => x['检验列'] === '炭棒内径' && x['行类型'] === ROW_STANDARD)['标准'], '内径:12.5±0.5')
+  // 列的先后:已有的在前,新加的接在后面
+  assert.deepEqual(columnsOf(items).map((c) => c.key), ['炭棒外径', '炭棒内径'])
+})
+
+test('合并带入:不删列;已有列缺的样品行补齐', () => {
+  const head = headOf()
+  addColumn(head, { label: '炭棒长度', group: '尺寸及重量', standard: '长度:120' })
+  // 手工删掉 7#/8# 两行(模拟老单/手删)
+  const items = head.detail.items
+  for (let i = items.length - 1; i >= 0; i--) {
+    if (items[i]['检验列'] === '炭棒长度' && ['7#', '8#'].includes(items[i]['样品序号'])) items.splice(i, 1)
+  }
+  assert.equal(items.length, 7)
+
+  const r = mergeFetchedColumns(head, fetchedOf([
+    { key: '炭棒长度', label: '炭棒长度', group: '尺寸及重量', standard: '长度:121' },
+  ]))
+  assert.equal(r.added, 0)
+  assert.equal(r.updated, 1)
+  assert.equal(items.length, 9, '缺的样品行要补齐,已有的不重复')
+  assert.equal(new Set(items.map((x) => Number(x['行号']))).size, items.length, '补行后行号仍唯一')
+})
+
+test('ensureColumnRows 幂等:补齐过的列再补一次不长行', () => {
+  const head = headOf()
+  addColumn(head, { label: 'X' })
+  const items = head.detail.items
+  assert.equal(ensureColumnRows(items, { key: 'X' }), 0)
+  items.splice(items.findIndex((x) => x['样品序号'] === '3#'), 1)
+  assert.equal(ensureColumnRows(items, { key: 'X' }), 1)
+  assert.equal(items.length, 9)
 })

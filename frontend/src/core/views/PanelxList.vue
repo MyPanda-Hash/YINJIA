@@ -1868,9 +1868,9 @@
       :ship-source="SHIP_PLAN_SOURCE_PANELS.includes(panelCode)"
       @pick="applyInspItems"
     />
-    <!-- 选生产工单(2026-10-15):制程检验单专用 —— 列生产工单行(工单号+工单行号唯一确定),
-         选中即生成一张草稿并跳过去(表头带产品/批次/产线,明细留空)。 -->
-    <QcProcInspWoPicker v-model="woPickerVisible" @picked="openPickedProcInsp" />
+    <!-- 选生产工单(2026-10-15 制程检验单 / 2026-10-16 首件检验单):列生产工单行
+         (工单号+工单行号唯一确定),选中即生成一张草稿并跳过去(mode 决定建哪种单、走哪套接口)。 -->
+    <QcProcInspWoPicker v-model="woPickerVisible" :mode="woPickerMode" @picked="openPickedProcInsp" />
     <!-- 仓位分区弹窗(2026-10-08):候选来自本面板已加载的仓位行,不落存储 ⇒ 分区随仓位存在;
          选中时「大区 + 存储分区」**一起回填**(用户口径:它们是一个组合) -->
     <ZonePickDialog v-model="zonePickVisible" :rows="zonePickRows" :area-key="ZONE_PAIR.area" :zone-key="ZONE_PAIR.zone" @pick="onZonePick" />
@@ -2004,6 +2004,8 @@ import FieldManagerDialog from './FieldManagerDialog.vue'
 import QcInspPlanDialog from '@core/qc/QcInspPlanDialog.vue'
 import QcProcInspSheet from '@core/qc/QcProcInspSheet.vue'
 import QcFirstInspSheet from '@core/qc/QcFirstInspSheet.vue'
+// 首件检验单的列模型(「取成型工艺清单」按列合并时用:已有列只刷标准、保留已填数据)
+import { mergeFetchedColumns } from '@core/qc/firstInspCols.js'
 import QcProcInspWoPicker from '@core/qc/QcProcInspWoPicker.vue'
 import ZonePickDialog from './ZonePickDialog.vue'
 import request from '@core/request'
@@ -2246,9 +2248,10 @@ const qcInspPlanVisible = ref(false)
  * 少了这层门禁就会把上一个面板取到的计划行串到别的检验单弹窗里(见 QcInspPlanDialog.shipMode)。
  */
 const SHIP_PLAN_SOURCE_PANELS = ['QC_ASM_INSP', 'QC_PROC_INSP']
-// 选生产工单(2026-10-15):制程检验单专用 —— 列生产工单行(plang:工单号+工单行号唯一确定),
-// 选中即生成一张制程检验单草稿(服务端 QcProcInspController 幂等 + 把守 QC_PROC_INSP 可见性)。
+// 选生产工单(2026-10-15 制程检验单 / 2026-10-16 首件检验单)—— 列生产工单行(plang:工单号+工单行号
+// 唯一确定),选中即生成一张草稿(服务端各自幂等 + 按本面板可见性把守)。mode 决定建哪种单、走哪套接口。
 const woPickerVisible = ref(false)
+const woPickerMode = ref('proc')          // 'proc' = 制程检验单 / 'first' = 首件检验单
 const colPrefSaving = ref(false)
 const colPrefRows = ref([])
 
@@ -6113,21 +6116,22 @@ function addInlineDetailRow(b) {
 }
 
 /**
- * 「选生产工单」弹窗的回执 → 提示并跳到新单(2026-10-15)。
+ * 「选生产工单」弹窗的回执 → 提示并跳到新单(2026-10-15 制程检验单 / 2026-10-16 首件检验单)。
  *
- * 草稿已由服务端建好(表头带 工单号/工单行号/产品/批次/产线,明细留空),这里只做两件事:
- * 说清结果 + 让用户看到那张单。幂等命中时服务端回 `已存在=true` 并给**原来那张**单号,
+ * 草稿已由服务端建好(表头带 工单号/工单行号/产品/批次/产线;制程明细留空、首件按工艺清单预铺),
+ * 这里只做两件事:说清结果 + 让用户看到那张单。幂等命中时服务端回 `已存在=true` 并给**原来那张**单号,
  * 故提示用「已有」而不是「已生成」,避免用户以为又建了一张。
  * 目标面板与本面板相同时(本入口就是同面板自建)不关页签,直接刷新列表即可,免得关了又开。
  */
 function openPickedProcInsp(res) {
   const no = String(res?.['编号'] || '')
-  if (!no) return ElMessage.warning(tt('未生成制程检验单'))
+  const target = String(res?.['gotoPanel'] || 'QC_PROC_INSP')
+  const isFirst = target === 'QC_FIRST_INSP'                 // 首件检验单(同一套回执,话术分面板)
+  if (!no) return ElMessage.warning(isFirst ? tt('未生成首件检验单') : tt('未生成制程检验单'))
   const existed = res?.['已存在'] === true
   ElMessage.success(existed
-    ? `${tt('该工单行已有制程检验单')}：${no}`
-    : `${tt('已生成制程检验单')}：${no}`)
-  const target = String(res?.['gotoPanel'] || 'QC_PROC_INSP')
+    ? `${isFirst ? tt('该工单行已有首件检验单') : tt('该工单行已有制程检验单')}：${no}`
+    : `${isFirst ? tt('已生成首件检验单') : tt('已生成制程检验单')}：${no}`)
   if (target === panelCode.value) {
     load()                       // 同面板:新草稿按创建时间倒序排在第一张
     return
@@ -7614,21 +7618,24 @@ async function onButton(action) {
     qcInspPlanVisible.value = true
     return
   }
-  // 选生产工单(2026-10-15):**制程检验单专用** —— 用户口径「选择生产工单加工单行号唯一确定
-  // 当前的生产工单」。弹窗列生产工单行(plang),选中一行 → 服务端生成草稿(curInspController
-  // 幂等:同一工单行已有存活单则返回那张)→ 这里按既有 gotoPanel 惯例跳过去。
-  // 生成是**新建一张单**,故与当前单据无关,不需要先打开单据。
+  // 选生产工单(2026-10-15 制程检验单 / 2026-10-16 首件检验单):用户口径「选择生产工单加工单行号
+  // 唯一确定当前的生产工单」+「让当前的首件检验单也可以选择到生产工单,参照制程检验单的实现方式」。
+  // 弹窗列生产工单行(plang),选中一行 → 服务端按面板各自生成草稿(幂等:同一工单行已有存活单则
+  // 返回那张)→ 这里按既有 gotoPanel 惯例跳过去。生成是**新建一张单**,故与当前单据无关,不需要先打开单据。
   if (action === '选生产工单') {
+    woPickerMode.value = panelCode.value === 'QC_FIRST_INSP' ? 'first' : 'proc'
     woPickerVisible.value = true
     return
   }
   // 取成型工艺清单(2026-10-15):**首件检验单专用** —— 按本单「产品编码」从《成型工艺清单》
-  // (RD_MOLD_PROC)取回该产品「检验要求」区块的 5 个检验项目(炭棒尺寸/密度管控/跌落强度/
-  // 抗压强度/压降)带入明细。用户口径:「检验方式参考成型工艺清单内的检验要求进行编写」。
-  // 与「取出货检验计划」共用同一套带入逻辑(applyShipPlanItems):字段名一致(表区/检验项目/
-  // 检验要求),同样**追加不覆盖**、同样先与明细已有项目对账去重。
-  // 报工审核自动出单时后端已按同一来源预铺过一次(ButtonService.firstInspGenerate),
-  // 这个按钮用于工艺清单后补/改版后重新带入。
+  // (RD_MOLD_PROC)取回该产品的检验项目(本单:一个检验项目 = 一列)带入明细。
+  // 用户口径:「检验方式参考成型工艺清单内的检验要求进行编写」。
+  // ⚠ 2026-10-16 第三轮(用户口径「让当前取成型工艺清单的按钮实现的时候能够带入当前其对应列内
+  //   填写的数据内容」):带入改成**按列合并**(firstInspCols.mergeFetchedColumns)——
+  //   已有列只刷新「标准」、**保留已填的实测数值/结果判断/备注**,缺的列才整列新增。
+  //   原来的 applyShipPlanItems 是给"一行一个检验项目"的四张工序检验单用的**平表**追加器:
+  //   喂给首件检验单(「样品序号 × 检验列」长表)时行里没有 行类型/样品序号/检验列 ⇒
+  //   纸上会长出一列没有标准行、没有样品格的怪列,已填数据也带不过去。故这里换成列模型自己的实现。
   if (action === '取成型工艺清单') {
     const code = String(cur.value?.['产品编码'] || '').trim()
     if (!code) return ElMessage.warning(tt('请先填写产品编码'))
@@ -7636,20 +7643,17 @@ async function onButton(action) {
       const res = await request.get('/qc/firstInsp/fromMoldProc', { params: { productCode: code } })
       const data = res.data || {}
       const rows = data.rows || []
-      if (!data.moldProcNo || !rows.length) {
+      if (!data.moldProcNo) {
         return ElMessage.warning(`${tt('该产品没有成型工艺清单')}：${code}`)
       }
-      const r = applyShipPlanItems(rows)
-      if (!r.added) {
-        return ElMessage.warning(
-          `${tt('该产品')}${code}${tt('的检验项目已全部带入')}(${r.dupes.length})${tt('，不重复添加')}`)
-      }
-      const dupTip = r.dupes.length
-        ? `，${tt('跳过已带入')}${r.dupes.length}${tt('项(带入结果)')}`
-        : ''
-      ElMessage.success(
-        `${tt('已按成型工艺清单')} ${data.moldProcNo} ${tt('带入')} ${r.added}/${r.total} ${tt('行(带入结果)')}` +
-        `${dupTip}${tt('，请填写实测数值与判定')}`)
+      const b = blocks.value[0]
+      const tabKey = b ? activeTab(b).key : 'items'
+      if (!cur.value.detail) cur.value.detail = {}
+      const detail = cur.value.detail[tabKey] || (cur.value.detail[tabKey] = [])
+      const r = mergeFetchedColumns({ detail: { items: detail } }, rows)
+      markInlineDirty()
+      ElMessage.success(tt('已按成型工艺清单 {a}：新增 {b} 列、刷新标准 {c} 列、保留已填数据 {d} 格')
+        .replace('{a}', data.moldProcNo).replace('{b}', r.added).replace('{c}', r.updated).replace('{d}', r.kept))
     } catch (error) {
       ElMessage.error(engine.errMsg(error) || tt('取成型工艺清单失败'))
     }

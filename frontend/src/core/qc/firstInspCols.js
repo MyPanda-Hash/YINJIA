@@ -240,6 +240,74 @@ export function columnHasContent(items, key) {
     && (String(r['实测数值'] ?? '').trim() || String(r['结果判断'] ?? '').trim()))
 }
 
+/**
+ * 补一列缺的样品行(**已存在的不动**;老单/手工删过行时用)。
+ * @param {Array<object>} items 明细行(就地改)
+ * @param {{key:string,label:string,group:string,standard?:string}} col
+ * @returns {number} 补了几行
+ */
+export function ensureColumnRows(items, col) {
+  const has = new Set((items || [])
+    .filter((r) => String(r?.['检验列'] || r?.['检验项目'] || '') === col.key
+      && String(r?.['行类型']) === ROW_SAMPLE)
+    .map((r) => String(r?.['样品序号'])))
+  let n = 0
+  for (let i = 1; i <= SAMPLE_COUNT; i++) {
+    if (has.has(`${i}#`)) continue
+    const row = rowOf(ROW_SAMPLE, `${i}#`, i, col)
+    row['行号'] = items.reduce((m, r) => Math.max(m, Number(r?.['行号']) || 0), 0) + 1
+    items.push(row)
+    n++
+  }
+  return n
+}
+
+/**
+ * 把「取成型工艺清单」取回的列**合并**进现有明细 —— 用户口径(2026-10-16 第三轮):
+ *   「让当前取成型工艺清单的按钮实现的时候能够带入当前其对应列内填写的数据内容」。
+ *
+ * 规则(以**列**为单位,列身份 = 检验列 key —— 与后端 {@code FirstInspItems} 的 key 同一套):
+ *   · 已有同名列 ⇒ **只刷新标准**(工艺清单改版要能带过来),列名/分组/已录数据(实测数值、结果判断、备注)
+ *     一律**保留** —— 品质已经量过的数不会被带入动作抹掉;
+ *   · 没有的列   ⇒ 整列新增(1 行标准 + 8 行样品);
+ *   · 已有列缺的样品行(手删过/老单)⇒ 补齐,已有的数据行不重复、不覆盖;
+ *   · 一律**不删列**。
+ *
+ * @param {object} head 单据表头(含 detail.items)
+ * @param {Array<object>} fetched 后端取回的**长表行**(行类型/样品序号/检验列/检验项目/项目分组/标准…)
+ * @returns {{added:number, updated:number, kept:number, total:number}} 新增列数 / 刷新列数 / 保留的已填**数据格**数 / 取回列数
+ */
+export function mergeFetchedColumns(head, fetched) {
+  const items = ensureItems(head)
+  const cols = columnsOf(fetched || [])
+  const existing = new Set(columnsOf(items).map((c) => c.key))
+  let added = 0
+  let updated = 0
+  for (const c of cols) {
+    if (existing.has(c.key)) {
+      for (const r of items) {
+        if (String(r?.['检验列'] || r?.['检验项目'] || '') !== c.key) continue
+        if (String(r?.['行类型']) === ROW_STANDARD && String(c.standard || '').trim()) r['标准'] = String(c.standard)
+      }
+      ensureColumnRows(items, c)
+      updated++
+    } else {
+      const maxNo = items.reduce((m, r) => Math.max(m, Number(r?.['行号']) || 0), 0)
+      items.push(...rowsForColumn(c, maxNo))
+      existing.add(c.key)
+      added++
+    }
+  }
+  // 保留下来的**已填数据格**数(实测数值 / 结果判断 各算一格,与提示话术里的「格」对齐)
+  let kept = 0
+  for (const r of items) {
+    if (String(r?.['行类型']) !== ROW_SAMPLE) continue
+    if (String(r?.['实测数值'] ?? '').trim()) kept++
+    if (String(r?.['结果判断'] ?? '').trim()) kept++
+  }
+  return { added, updated, kept, total: cols.length }
+}
+
 /** 取(必要时创建)明细数组 */
 export function ensureItems(head) {
   const d = head.detail || (head.detail = {})
