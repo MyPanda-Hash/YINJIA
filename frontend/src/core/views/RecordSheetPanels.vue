@@ -536,11 +536,17 @@
                 <th v-for="c in groupCols(dt)" :key="'h2' + c.key" class="rs-th" :colspan="(c.span || 1) > 1 ? c.span : undefined">{{ tt(effColLabel(c.key, c.label)) }}</th>
               </tr>
             </template>
-            <!-- 分组式数据行(检验项目及标准:序号/组跨行,子项目列,要求/方法/依据可编辑) -->
+            <!-- 分组式数据行(检验项目及标准:序号/组跨行,子项目列,要求/方法/依据可编辑)
+                 ⚠ 序号/组名两格**只能在组首行渲染**(2026-10-16 用户报障「检验项目下面和检验要求下面有空白格」):
+                 它们带 rowspan 占住整组,后续行若照样输出空 &lt;td&gt;,浏览器会把本行的 子项目/要求/方法/依据
+                 依次**右移两列**——于是子项目列、检验要求列看着空白,而「除余氯寿命」跑到检验方法列、
+                 「寿命920L，全程加标」跑到检验依据列。行首两格必须由 rowspan 覆盖,不能重复输出。 -->
             <template v-if="dt.design?.groupCol">
               <tr v-for="r in designGroupRows(dt)" :key="r.key" class="rsp-design">
-                <td class="rs-td" :style="designTdStyle(dt, 'seq')" :rowspan="r.groupFirst ? r.group.count : undefined">{{ r.groupFirst ? r.seq : '' }}</td>
-                <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.groupFirst ? r.group.count : undefined" :colspan="r.standalone ? 2 : 1">{{ r.groupFirst ? tt(r.group.label) : '' }}</td>
+                <template v-if="r.groupFirst">
+                  <td class="rs-td" :style="designTdStyle(dt, 'seq')" :rowspan="r.group.count">{{ r.seq }}</td>
+                  <td class="rs-td" :style="designTdStyle(dt, 'item')" :rowspan="r.group.count" :colspan="r.standalone ? 2 : 1">{{ tt(r.group.label) }}</td>
+                </template>
                 <td v-if="!r.standalone" class="rs-td" :style="designTdStyle(dt, 'item')">{{ tt(r.sub || '') }}</td>
                 <td class="rs-td" :style="designTdStyle(dt, 'req')">
                   <el-input v-if="editable" v-model="r.row['检验要求']" type="textarea" :autosize="{ minRows: 1, maxRows: 12 }" size="small" class="rs-t-in rsp-area-left" @input="emit('dirty')" />

@@ -62,7 +62,18 @@ test('文书归档面板放出「弃审」入口,置灰口径与后端一致(已
     '弃审置灰口径要覆盖已归档 —— 否则归档单上按钮永远点不动')
 })
 
-// ── 三、规格书分发:rd_spec_doc_head 没有「编号」列(2026-10-16 用户报障 500) ──
+// ── 三、规格书「检验项目及标准」分组表:组首两格不能在后继行重复输出 ──
+test('分组设计表:非组首行不得再输出序号/组名 <td>(否则整行右移两列 → 空白格)', () => {
+  const rec = readFileSync(new URL('./RecordSheetPanels.vue', import.meta.url), 'utf8')
+  // 组首两格必须包在 v-if="r.groupFirst" 里(它们带 rowspan 占住整组)
+  assert.match(rec, /<template v-if="r\.groupFirst">\s*\n\s*<td class="rs-td" :style="designTdStyle\(dt, 'seq'\)" :rowspan="r\.group\.count">/,
+    '序号格必须只在组首行渲染(带 rowspan)')
+  assert.ok(!/:rowspan="r\.groupFirst \? r\.group\.count : undefined"/.test(rec),
+    '旧写法在后继行输出空 <td> —— 浏览器把它们排到子项目/检验要求两列,内容整行右移两列' +
+    '(2026-10-16 用户截图:「检验项目下面和检验要求下面有空白格」)')
+})
+
+// ── 四、规格书分发:rd_spec_doc_head 没有「编号」列(2026-10-16 用户报障 500) ──
 test('DevTaskService 不得再引用 rd_spec_doc_head.编号(该列不存在 ⇒ 分发责任人 500)', () => {
   // ⚠ 匹配要带 SQL 上下文:修复注释里就写着 h.编号 这个反面例子,裸文本匹配会误报
   assert.ok(!/\(h\.编号 IS NULL OR h\.编号 = \?\)/.test(devTask),
