@@ -1,5 +1,7 @@
 package com.yinjia.mes.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +33,8 @@ import java.util.Map;
  */
 @Service
 public class ProcessTaskService {
+
+    private static final Logger log = LoggerFactory.getLogger(ProcessTaskService.class);
 
     /** 默认工艺路线(产品未绑定时兜底) */
     public static final String DEFAULT_ROUTE = "GY-CB-STD";
@@ -1015,11 +1019,11 @@ public class ProcessTaskService {
                         + " 完工时间 = CASE WHEN ? = N'生产完工' THEN ISNULL(完工时间, GETDATE()) ELSE NULL END,"
                         + " asp_user2=?, asp_time2=GETDATE() WHERE id=?",
                 cur, round(curQty), state, state, user, id);
-        if (prodDone) assignProductionBatch(id, no, user);
+        if (prodDone) assignProductionBatch(id, no, user, String.valueOf(t.get("原完工状态")));
     }
 
     /** 首次进入生产完工时生成当天生产批次；工单行 id 是唯一身份，重算/重审复用已有批次。 */
-    private void assignProductionBatch(long rowId, String workOrder, String user) {
+    private void assignProductionBatch(long rowId, String workOrder, String user, String prevState) {
         String today = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
         int changed = jdbc.update("UPDATE dbo.plang SET [批次号]=COALESCE(NULLIF([批次号],N''),?),"
                         + " asp_user2=?, asp_time2=GETDATE() WHERE id=? AND pl_no=?"
@@ -1036,6 +1040,15 @@ public class ProcessTaskService {
                         + " FROM dbo.scjl s JOIN dbo.plang_pc pc ON pc.id=s.gd_id"
                         + " JOIN dbo.plang p ON p.id=pc.plang_id"
                         + " WHERE p.id=? AND ISNULL(s.asp_cancel,'N')<>'Y'", user, rowId);
+        // ★ 本行**第一次**进入生产完工(原状态不是完工)⇒ 回填首件检验单(2026-10-16 第二轮用户口径:
+        //   「让生产日期根据当前的生产工单完成首批次后进行回填…检验单是绑定工单号的…批次号是完工时
+        //     自动生产的」)。回填内容 = 该行完工当日(生产日期)+ 该行批次号,只填检验单上的空格。
+        if ("生产完工".equals(prevState)) return;      // 重算/重审/再次报工:已在完工态,不重复回填
+        int n = FirstInspBackfill.backfillOnFirstBatch(jdbc, rowId, workOrder, user);
+        if (n > 0) {
+            log.info("[首件检验] 工单 {} 行 {} 第一批完工(批号 {}) ⇒ 回填生产日期/批号 {} 张首件检验单",
+                    workOrder, rowId, today, n);
+        }
     }
 
     /**

@@ -2960,14 +2960,23 @@ public class ButtonService {
         Map<String, Object> head = new LinkedHashMap<>();
         head.put("单据日期", today);
         head.put("检验日期", today);
-        // 生产日期(2026-10-16 第 J 段新加的抬头字段):纸张上单独一格,自动出单默认 = 今天,
-        //   品质可在纸面改(图片上这一格本来是手填的;与单据日期/检验日期分开存)。
-        head.put("生产日期", today);
         head.put("工单号", wo);
         if (xc != 0) head.put("工单行号", xc);
         head.put("报工单号", repNo);
         head.put("工序", r.get("工序"));
         head.put("批次号", batch);
+        // 生产日期 + 批号(2026-10-16 第二轮用户口径:「让生产日期在当前根据当前的生产工单完成首批次后
+        //   进行回填…这个工单生产啥样的批号,检验人员是不知道的…批次号是完工时自动生产的」)
+        //   ⇒ 出单时**不再写死今天**:批号是工单这一行**第一批完工**时自动生成的,生产日期同理,
+        //     两者都在完工那一刻由 {@link FirstInspBackfill} 按**工单号(+工单行号)**回填到这张单上。
+        //   出单这一刻本行若已经完工(首张报工正好是末道 / 事后补出单),就当场按完工日与批号填上,
+        //   不必等下一次完工事件;还没完工则留空等回填(只读纸张按 生产日期→检验日期→单据日期 回落显示,
+        //   纸面不会开天窗 —— 见 QcFirstInspSheet.vue 的 headText)。
+        Map<String, String> done = FirstInspBackfill.completedBatch(jdbc, plangRowId);
+        if (done != null) {
+            if (!done.get("批次号").isBlank()) head.put("批次号", done.get("批次号"));
+            head.put("生产日期", done.get("生产日期"));
+        }
         head.put("产品编码", productCode);
         head.put("产品名称", r.get("产品名称"));
         if (!str(r.get("规格型号")).isEmpty()) head.put("规格型号", r.get("规格型号"));
